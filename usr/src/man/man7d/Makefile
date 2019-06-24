@@ -24,7 +24,6 @@ MANSECT=	7d
 
 _MANFILES=	aac.7d		\
 		afe.7d		\
-		amdf17nbdf.7d	\
 		audio.7d	\
 		audio1575.7d	\
 		audioens.7d	\
@@ -39,7 +38,6 @@ _MANFILES=	aac.7d		\
 		bscv.7d		\
 		chxge.7d	\
 		console.7d	\
-		coretemp.7d	\
 		cpuid.7d	\
 		dca.7d		\
 		dcam1394.7d	\
