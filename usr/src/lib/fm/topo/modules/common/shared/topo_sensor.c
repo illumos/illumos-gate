@@ -225,7 +225,8 @@ topo_sensor_create_temp_sensor(topo_mod_t *mod, tnode_t *pnode,
 
 	}
 
-	if (topo_method_register(mod, fnode, topo_sensor_temp_fac_methods) < 0) {
+	if (topo_method_register(mod, fnode, topo_sensor_temp_fac_methods) <
+	    0) {
 		topo_mod_dprintf(mod, "failed to register reading methods on "
 		    "%s", path);
 		ret = -1;

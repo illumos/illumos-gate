@@ -29,7 +29,7 @@ ARCH = i86pc
 CLASS = arch
 SHAREDDIR = ../../common/shared/
 
-MODULESRCS = chip.c chip_label.c chip_subr.c chip_amd.c chip_intel.c\
+MODULESRCS = chip.c chip_label.c chip_subr.c chip_amd.c chip_intel.c \
 chip_serial.c chip_smbios.c chip_temp.o
 MODULESRCS += topo_sensor.c
 

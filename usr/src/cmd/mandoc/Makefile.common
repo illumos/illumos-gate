@@ -17,7 +17,8 @@
 
 PROG=		mandoc
 
-OBJS=		att.o		\
+OBJS=		arch.o		\
+		att.o		\
 		chars.o		\
 		dba.o		\
 		dba_array.o	\
@@ -39,6 +40,7 @@ OBJS=		att.o		\
 		man_validate.o	\
 		mandoc.o	\
 		mandoc_aux.o	\
+		mandoc_msg.o	\
 		mandoc_ohash.o	\
 		mandoc_xr.o	\
 		mandocdb.o	\

@@ -7,7 +7,6 @@
 .SH NAME
 usb_parse_data \- Tokenize and align the bytes of raw variable-format data
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/usb/usba.h>
 
@@ -18,7 +17,6 @@ usb_parse_data \- Tokenize and align the bytes of raw variable-format data
 .fi
 
 .SH INTERFACE LEVEL
-.LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .ne 2
@@ -71,7 +69,6 @@ exceed this value.
 .RE
 
 .SH DESCRIPTION
-.LP
 The \fBusb_parse_data\fR function parses data such as a variable-format class-
 or vendor-specific descriptor. The function also tokenizes and aligns the bytes
 of raw descriptor data into fields of a variable-format descriptor.
@@ -91,13 +88,11 @@ While the USB specification defines bit ordering as little-endian, this routine
 The \fIstructlen\fR parameter defines the size of the destination data buffer.
 Data is truncated to this size if the destination data buffer is too small.
 .SH RETURN VALUES
-.LP
 On success: Returns the size (in bytes) of the parsed data result.
 .sp
 .LP
 On failure: Returns 0. (Same as USB_PARSE_ERROR).
 .SH CONTEXT
-.LP
 May be called from user, kernel or interrupt context.
 .SH EXAMPLES
 .in +2
@@ -130,7 +125,6 @@ May be called from user, kernel or interrupt context.
 .in -2
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -147,6 +141,5 @@ Interface stability	Committed
 .TE
 
 .SH SEE ALSO
-.LP
 \fBattributes\fR(5), \fBusb_get_dev_data\fR(9F),
 \fBusb_get_string_descr\fR(9F), \fBusb_get_cfg\fR(9F)

@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2019, Joyent, Inc.
 .\"
-.Dd April 22, 2019
+.Dd June 03, 2019
 .Dt SCSI_HBA_TGTMAP_CREATE 9F
 .Os
 .Sh NAME
@@ -35,7 +35,7 @@
 .Fa "void *tgtmap_priv"
 .Fa "scsi_tgt_activate_cb_t activate_cb"
 .Fa "scsi_tgt_deactivate_cb_t deactivate_cb"
-.Fa "scsi_hba_tgtmap_t *tgtmapout"
+.Fa "scsi_hba_tgtmap_t **tgtmapout"
 .Fc
 .Ft void
 .Fo scsi_hba_tgtmap_destroy
@@ -121,7 +121,7 @@ added to the system.
 An optional callback that will be called when an existing devices is
 removed from the system.
 .It Fa tgtmapout
-Pointer where the target map is stored.
+Pointer where the target map handle is stored.
 .It Fa tgtmap
 Pointer to an allocated target map.
 .It Fa flags

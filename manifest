@@ -4513,6 +4513,7 @@ f usr/include/sys/sem_impl.h 0644 root bin
 f usr/include/sys/sema_impl.h 0644 root bin
 f usr/include/sys/semaphore.h 0644 root bin
 f usr/include/sys/sendfile.h 0644 root bin
+f usr/include/sys/sensors.h 0644 root bin
 f usr/include/sys/ser_sync.h 0644 root bin
 f usr/include/sys/serializer.h 0644 root bin
 f usr/include/sys/session.h 0644 root bin
