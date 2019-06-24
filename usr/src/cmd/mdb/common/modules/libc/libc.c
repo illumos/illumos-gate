@@ -1169,44 +1169,6 @@ d_tsd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
-static int
-d_errno(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
-{
-	mdb_libc_ulwp_t u;
-	uintptr_t ulwp_addr;
-	int error, errval;
-
-	if (argc != 0 || (flags & DCMD_ADDRSPEC) == 0)
-		return (DCMD_USAGE);
-
-	error = tid2ulwp_impl(addr, &ulwp_addr);
-	if (error != DCMD_OK)
-		return (error);
-
-	/*
-	 * For historical compatibility, thread 1's errno value is stored in
-	 * a libc global variable 'errno', while each additional thread's
-	 * errno value is stored in ulwp_t->ul_errno.  In addition,
-	 * ulwp_t->ul_errnop is set to the address of the thread's errno value,
-	 * (i.e. for tid 1, curthead->ul_errnop = &errno, for tid > 1,
-	 * curthread->ul_errnop = &curthread->ul_errno).
-	 *
-	 * Since errno itself uses *curthread->ul_errnop (see ___errno()) to
-	 * return the thread's current errno value, we do the same.
-	 */
-	if (mdb_ctf_vread(&u, "ulwp_t", "mdb_libc_ulwp_t", ulwp_addr, 0) == -1)
-		return (DCMD_ERR);
-
-	if (mdb_vread(&errval, sizeof (errval), (uintptr_t)u.ul_errnop) == -1) {
-		mdb_warn("cannot read error value at 0x%p", u.ul_errnop);
-		return (DCMD_ERR);
-	}
-
-	mdb_printf("%d\n", errval);
-
-	return (DCMD_OK);
-}
-
 /*
  * Print percent from 16-bit binary fraction [0 .. 1]
  * Round up .01 to .1 to indicate some small percentage (the 0x7000 below).
