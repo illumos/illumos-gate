@@ -169,7 +169,7 @@ add_pool_to_xml(nvlist_t *config, void *data)
 	    (xmlChar *)zjni_pool_state_to_str(state));
 
 	(void) xmlSetProp(pool, (xmlChar *)ATTR_POOL_STATUS, (xmlChar *)
-	    zjni_pool_status_to_str(zpool_import_status(config, &c)));
+	    zjni_pool_status_to_str(zpool_import_status(config, &c, NULL)));
 
 	return (0);
 }

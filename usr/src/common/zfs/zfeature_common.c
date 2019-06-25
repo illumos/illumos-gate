@@ -262,6 +262,18 @@ zpool_feature_init(void)
 	    ZFEATURE_FLAG_PER_DATASET, large_blocks_deps);
 
 	{
+	static const spa_feature_t bookmark_v2_deps[] = {
+		SPA_FEATURE_EXTENSIBLE_DATASET,
+		SPA_FEATURE_BOOKMARKS,
+		SPA_FEATURE_NONE
+	};
+	zfeature_register(SPA_FEATURE_BOOKMARK_V2,
+	    "com.datto:bookmark_v2", "bookmark_v2",
+	    "Support for larger bookmarks",
+	    ZFEATURE_FLAG_PER_DATASET, bookmark_v2_deps);
+	}
+
+	{
 	static const spa_feature_t large_dnode_deps[] = {
 		SPA_FEATURE_EXTENSIBLE_DATASET,
 		SPA_FEATURE_NONE
@@ -324,4 +336,14 @@ zpool_feature_init(void)
 	    "com.datto:resilver_defer", "resilver_defer",
 	    "Support for defering new resilvers when one is already running.",
 	    ZFEATURE_FLAG_READONLY_COMPAT, NULL);
+
+	static const spa_feature_t encryption_deps[] = {
+		SPA_FEATURE_EXTENSIBLE_DATASET,
+		SPA_FEATURE_BOOKMARK_V2,
+		SPA_FEATURE_NONE
+	};
+	zfeature_register(SPA_FEATURE_ENCRYPTION,
+	    "com.datto:encryption", "encryption",
+	    "Support for dataset level encryption",
+	    ZFEATURE_FLAG_PER_DATASET, encryption_deps);
 }

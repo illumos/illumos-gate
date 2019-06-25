@@ -889,7 +889,7 @@ ccm_init_ctx(ccm_ctx_t *ccm_ctx, char *param, int kmflag,
 		rv = CRYPTO_MECHANISM_PARAM_INVALID;
 		goto out;
 	}
-	if (!is_encrypt_init) {
+	if (!is_encrypt_init && ccm_ctx->ccm_data_len != 0) {
 		/* allocate buffer for storing decrypted plaintext */
 #ifdef _KERNEL
 		ccm_ctx->ccm_pt_buf = kmem_alloc(ccm_ctx->ccm_data_len,

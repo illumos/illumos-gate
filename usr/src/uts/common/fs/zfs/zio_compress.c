@@ -144,20 +144,31 @@ zio_decompress_data_buf(enum zio_compress c, void *src, void *dst,
 	return (ci->ci_decompress(src, dst, s_len, d_len, ci->ci_level));
 }
 
+void *zio_decompress_failed_buf;
+
 int
 zio_decompress_data(enum zio_compress c, abd_t *src, void *dst,
     size_t s_len, size_t d_len)
 {
 	void *tmp = abd_borrow_buf_copy(src, s_len);
 	int ret = zio_decompress_data_buf(c, tmp, dst, s_len, d_len);
-	abd_return_buf(src, tmp, s_len);
 
 	/*
-	 * Decompression shouldn't fail, because we've already verifyied
+	 * Decompression shouldn't fail, because we've already verified
 	 * the checksum.  However, for extra protection (e.g. against bitflips
 	 * in non-ECC RAM), we handle this error (and test it).
 	 */
-	ASSERT0(ret);
+	if (ret != 0) {
+		zio_decompress_failed_buf = kmem_alloc(s_len, KM_SLEEP);
+		bcopy(tmp, zio_decompress_failed_buf, s_len);
+		panic("decompression failed "
+		    "err=%u c=%u buf=%p s_len=%u d_len=%u",
+		    ret, (int)c, zio_decompress_failed_buf,
+		    (int)s_len, (int)d_len);
+	}
+
+	abd_return_buf(src, tmp, s_len);
+
 	if (zio_decompress_fail_fraction != 0 &&
 	    spa_get_random(zio_decompress_fail_fraction) == 0)
 		ret = SET_ERROR(EINVAL);

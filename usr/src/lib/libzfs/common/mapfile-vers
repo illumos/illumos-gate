@@ -71,6 +71,11 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_close;
 	zfs_create;
 	zfs_create_ancestors;
+	zfs_crypto_attempt_load_keys;
+	zfs_crypto_get_encryption_root;
+	zfs_crypto_load_key;
+	zfs_crypto_rewrap;
+	zfs_crypto_unload_key;
 	zfs_dataset_exists;
 	zfs_deleg_share_nfs;
 	zfs_destroy;

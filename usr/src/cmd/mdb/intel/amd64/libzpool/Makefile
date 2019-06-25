@@ -42,7 +42,8 @@ GENUNIX_DIR = ../../../common/modules/genunix
 
 CPPFLAGS.first = -I$(SRC)/lib/libfakekernel/common -D_FAKE_KERNEL
 CPPFLAGS += -I../../../../../lib/libzpool/common \
-	-I../../../../../uts/common/fs/zfs
+	-I../../../../../uts/common/fs/zfs \
+	-I../../../../../common/zfs
 
 CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all

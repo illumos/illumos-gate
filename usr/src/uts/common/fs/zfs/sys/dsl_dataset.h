@@ -40,6 +40,7 @@
 #include <sys/dsl_deadlist.h>
 #include <sys/refcount.h>
 #include <sys/rrwlock.h>
+#include <sys/dsl_crypt.h>
 #include <zfeature_common.h>
 
 #ifdef	__cplusplus
@@ -49,6 +50,8 @@ extern "C" {
 struct dsl_dataset;
 struct dsl_dir;
 struct dsl_pool;
+struct dsl_crypto_params;
+struct dsl_key_mapping;
 
 #define	DS_FLAG_INCONSISTENT	(1ULL<<0)
 #define	DS_IS_INCONSISTENT(ds)	\
@@ -106,11 +109,18 @@ struct dsl_pool;
 #define	DS_FIELD_RESUME_LARGEBLOCK "com.delphix:resume_largeblockok"
 #define	DS_FIELD_RESUME_EMBEDOK "com.delphix:resume_embedok"
 #define	DS_FIELD_RESUME_COMPRESSOK "com.delphix:resume_compressok"
+#define	DS_FIELD_RESUME_RAWOK "com.datto:resume_rawok"
 
 /*
  * This field is set to the object number of the remap deadlist if one exists.
  */
 #define	DS_FIELD_REMAP_DEADLIST	"com.delphix:remap_deadlist"
+
+/*
+ * This field is set to the ivset guid for encrypted snapshots. This is used
+ * for validating raw receives.
+ */
+#define	DS_FIELD_IVSET_GUID	"com.datto:ivset_guid"
 
 /*
  * DS_FLAG_CI_DATASET is set if the dataset contains a file system whose
@@ -164,6 +174,7 @@ typedef struct dsl_dataset {
 	uint64_t ds_object;
 	uint64_t ds_fsid_guid;
 	boolean_t ds_is_snapshot;
+	struct dsl_key_mapping *ds_key_mapping;
 
 	/* only used in syncing context, only valid for non-snapshots: */
 	struct dsl_dataset *ds_prev;
@@ -293,26 +304,40 @@ typedef struct dsl_dataset_snapshot_arg {
 #define	DS_UNIQUE_IS_ACCURATE(ds)	\
 	((dsl_dataset_phys(ds)->ds_flags & DS_FLAG_UNIQUE_ACCURATE) != 0)
 
+/* flags for holding the dataset */
+typedef enum ds_hold_flags {
+	DS_HOLD_FLAG_DECRYPT    = 1 << 0 /* needs access to encrypted data */
+} ds_hold_flags_t;
+
 int dsl_dataset_hold(struct dsl_pool *dp, const char *name, void *tag,
     dsl_dataset_t **dsp);
+int dsl_dataset_hold_flags(struct dsl_pool *dp, const char *name,
+    ds_hold_flags_t flags, void *tag, dsl_dataset_t **dsp);
 boolean_t dsl_dataset_try_add_ref(struct dsl_pool *dp, dsl_dataset_t *ds,
     void *tag);
+int dsl_dataset_create_key_mapping(dsl_dataset_t *ds);
 int dsl_dataset_hold_obj(struct dsl_pool *dp, uint64_t dsobj, void *tag,
     dsl_dataset_t **);
+int dsl_dataset_hold_obj_flags(struct dsl_pool *dp, uint64_t dsobj,
+	ds_hold_flags_t flags, void *tag, dsl_dataset_t **);
+void dsl_dataset_remove_key_mapping(dsl_dataset_t *ds);
 void dsl_dataset_rele(dsl_dataset_t *ds, void *tag);
+void dsl_dataset_rele_flags(dsl_dataset_t *ds, ds_hold_flags_t flags,
+    void *tag);
 int dsl_dataset_own(struct dsl_pool *dp, const char *name,
-    void *tag, dsl_dataset_t **dsp);
+    ds_hold_flags_t flags, void *tag, dsl_dataset_t **dsp);
 int dsl_dataset_own_obj(struct dsl_pool *dp, uint64_t dsobj,
-    void *tag, dsl_dataset_t **dsp);
-void dsl_dataset_disown(dsl_dataset_t *ds, void *tag);
+    ds_hold_flags_t flags, void *tag, dsl_dataset_t **dsp);
+void dsl_dataset_disown(dsl_dataset_t *ds, ds_hold_flags_t flags, void *tag);
 void dsl_dataset_name(dsl_dataset_t *ds, char *name);
 boolean_t dsl_dataset_tryown(dsl_dataset_t *ds, void *tag);
 int dsl_dataset_namelen(dsl_dataset_t *ds);
 boolean_t dsl_dataset_has_owner(dsl_dataset_t *ds);
 uint64_t dsl_dataset_create_sync(dsl_dir_t *pds, const char *lastname,
-    dsl_dataset_t *origin, uint64_t flags, cred_t *, dmu_tx_t *);
+    dsl_dataset_t *origin, uint64_t flags, cred_t *,
+    struct dsl_crypto_params *, dmu_tx_t *);
 uint64_t dsl_dataset_create_sync_dd(dsl_dir_t *dd, dsl_dataset_t *origin,
-    uint64_t flags, dmu_tx_t *tx);
+    struct dsl_crypto_params *dcp, uint64_t flags, dmu_tx_t *tx);
 void dsl_dataset_snapshot_sync(void *arg, dmu_tx_t *tx);
 int dsl_dataset_snapshot_check(void *arg, dmu_tx_t *tx);
 int dsl_dataset_snapshot(nvlist_t *snaps, nvlist_t *props, nvlist_t *errors);
@@ -434,6 +459,8 @@ void dsl_dataset_create_remap_deadlist(dsl_dataset_t *ds, dmu_tx_t *tx);
 boolean_t dsl_dataset_remap_deadlist_exists(dsl_dataset_t *ds);
 void dsl_dataset_destroy_remap_deadlist(dsl_dataset_t *ds, dmu_tx_t *tx);
 
+void dsl_dataset_activate_feature(uint64_t dsobj,
+    spa_feature_t f, dmu_tx_t *tx);
 void dsl_dataset_deactivate_feature(uint64_t dsobj,
     spa_feature_t f, dmu_tx_t *tx);
 

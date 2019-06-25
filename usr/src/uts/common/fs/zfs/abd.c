@@ -427,8 +427,9 @@ abd_alloc_for_io(size_t size, boolean_t is_metadata)
  * buffer data with sabd. Use abd_put() to free. sabd must not be freed while
  * any derived ABDs exist.
  */
-abd_t *
-abd_get_offset(abd_t *sabd, size_t off)
+/* ARGSUSED */
+static inline abd_t *
+abd_get_offset_impl(abd_t *sabd, size_t off, size_t size)
 {
 	abd_t *abd;
 
@@ -479,6 +480,25 @@ abd_get_offset(abd_t *sabd, size_t off)
 
 	return (abd);
 }
+
+abd_t *
+abd_get_offset(abd_t *sabd, size_t off)
+{
+	size_t size = sabd->abd_size > off ? sabd->abd_size - off : 0;
+
+	VERIFY3U(size, >, 0);
+
+	return (abd_get_offset_impl(sabd, off, size));
+}
+
+abd_t *
+abd_get_offset_size(abd_t *sabd, size_t off, size_t size)
+{
+	ASSERT3U(off + size, <=, sabd->abd_size);
+
+	return (abd_get_offset_impl(sabd, off, size));
+}
+
 
 /*
  * Allocate a linear ABD structure for buf. You must free this with abd_put()

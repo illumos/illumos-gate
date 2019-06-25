@@ -438,7 +438,8 @@ dsl_pool_destroy_obsolete_bpobj(dsl_pool_t *dp, dmu_tx_t *tx)
 }
 
 dsl_pool_t *
-dsl_pool_create(spa_t *spa, nvlist_t *zplprops, uint64_t txg)
+dsl_pool_create(spa_t *spa, nvlist_t *zplprops, dsl_crypto_params_t *dcp,
+    uint64_t txg)
 {
 	int err;
 	dsl_pool_t *dp = dsl_pool_open_impl(spa, txg);
@@ -451,6 +452,7 @@ dsl_pool_create(spa_t *spa, nvlist_t *zplprops, uint64_t txg)
 	/* create and open the MOS (meta-objset) */
 	dp->dp_meta_objset = dmu_objset_create_impl(spa,
 	    NULL, &dp->dp_meta_rootbp, DMU_OST_META, tx);
+	spa->spa_meta_objset = dp->dp_meta_objset;
 
 	/* create the pool directory */
 	err = zap_create_claim(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
@@ -488,11 +490,23 @@ dsl_pool_create(spa_t *spa, nvlist_t *zplprops, uint64_t txg)
 	if (spa_version(spa) >= SPA_VERSION_DSL_SCRUB)
 		dsl_pool_create_origin(dp, tx);
 
+	/*
+	 * Some features may be needed when creating the root dataset, so we
+	 * create the feature objects here.
+	 */
+	if (spa_version(spa) >= SPA_VERSION_FEATURES)
+		spa_feature_create_zap_objects(spa, tx);
+
+	if (dcp != NULL && dcp->cp_crypt != ZIO_CRYPT_OFF &&
+	    dcp->cp_crypt != ZIO_CRYPT_INHERIT)
+		spa_feature_enable(spa, SPA_FEATURE_ENCRYPTION, tx);
+
 	/* create the root dataset */
-	obj = dsl_dataset_create_sync_dd(dp->dp_root_dir, NULL, 0, tx);
+	obj = dsl_dataset_create_sync_dd(dp->dp_root_dir, NULL, dcp, 0, tx);
 
 	/* create the root objset */
-	VERIFY0(dsl_dataset_hold_obj(dp, obj, FTAG, &ds));
+	VERIFY0(dsl_dataset_hold_obj_flags(dp, obj,
+	    DS_HOLD_FLAG_DECRYPT, FTAG, &ds));
 #ifdef _KERNEL
 	{
 		objset_t *os;
@@ -503,7 +517,7 @@ dsl_pool_create(spa_t *spa, nvlist_t *zplprops, uint64_t txg)
 		zfs_create_fs(os, kcred, zplprops, tx);
 	}
 #endif
-	dsl_dataset_rele(ds, FTAG);
+	dsl_dataset_rele_flags(ds, DS_HOLD_FLAG_DECRYPT, FTAG);
 
 	dmu_tx_commit(tx);
 
@@ -664,9 +678,22 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	 */
 	zio = zio_root(dp->dp_spa, NULL, NULL, ZIO_FLAG_MUSTSUCCEED);
 	while ((ds = txg_list_remove(&dp->dp_dirty_datasets, txg)) != NULL) {
+		objset_t *os = ds->ds_objset;
+
 		ASSERT(list_link_active(&ds->ds_synced_link));
 		dmu_buf_rele(ds->ds_dbuf, ds);
 		dsl_dataset_sync(ds, zio, tx);
+
+		/*
+		 * Release any key mappings created by calls to
+		 * dsl_dataset_dirty() from the userquota accounting
+		 * code paths.
+		 */
+		if (os->os_encrypted && !os->os_raw_receive &&
+		    !os->os_next_write_raw[txg & TXG_MASK]) {
+			ASSERT3P(ds->ds_key_mapping, !=, NULL);
+			key_mapping_rele(dp->dp_spa, ds->ds_key_mapping, ds);
+		}
 	}
 	VERIFY0(zio_wait(zio));
 
@@ -676,8 +703,17 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	 *
 	 *  - move dead blocks from the pending deadlist to the on-disk deadlist
 	 *  - release hold from dsl_dataset_dirty()
+	 *  - release key mapping hold from dsl_dataset_dirty()
 	 */
 	while ((ds = list_remove_head(&synced_datasets)) != NULL) {
+		objset_t *os = ds->ds_objset;
+
+		if (os->os_encrypted && !os->os_raw_receive &&
+		    !os->os_next_write_raw[txg & TXG_MASK]) {
+			ASSERT3P(ds->ds_key_mapping, !=, NULL);
+			key_mapping_rele(dp->dp_spa, ds->ds_key_mapping, ds);
+		}
+
 		dsl_dataset_sync_done(ds, tx);
 	}
 	while ((dd = txg_list_remove(&dp->dp_dirty_dirs, txg)) != NULL) {
@@ -1027,7 +1063,7 @@ dsl_pool_create_origin(dsl_pool_t *dp, dmu_tx_t *tx)
 
 	/* create the origin dir, ds, & snap-ds */
 	dsobj = dsl_dataset_create_sync(dp->dp_root_dir, ORIGIN_DIR_NAME,
-	    NULL, 0, kcred, tx);
+	    NULL, 0, kcred, NULL, tx);
 	VERIFY0(dsl_dataset_hold_obj(dp, dsobj, FTAG, &ds));
 	dsl_dataset_snapshot_sync_impl(ds, ORIGIN_DIR_NAME, tx);
 	VERIFY0(dsl_dataset_hold_obj(dp, dsl_dataset_phys(ds)->ds_prev_snap_obj,

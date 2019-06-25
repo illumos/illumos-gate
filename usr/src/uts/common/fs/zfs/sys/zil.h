@@ -33,6 +33,7 @@
 #include <sys/spa.h>
 #include <sys/zio.h>
 #include <sys/dmu.h>
+#include <sys/zio_crypt.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -407,7 +408,8 @@ typedef int zil_get_data_t(void *arg, lr_write_t *lr, char *dbuf,
     struct lwb *lwb, zio_t *zio);
 
 extern int zil_parse(zilog_t *zilog, zil_parse_blk_func_t *parse_blk_func,
-    zil_parse_lr_func_t *parse_lr_func, void *arg, uint64_t txg);
+    zil_parse_lr_func_t *parse_lr_func, void *arg, uint64_t txg,
+    boolean_t decrypt);
 
 extern void	zil_init(void);
 extern void	zil_fini(void);

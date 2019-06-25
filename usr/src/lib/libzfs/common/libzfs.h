@@ -141,6 +141,7 @@ typedef enum zfs_error {
 	EZFS_INITIALIZING,	/* currently initializing */
 	EZFS_NO_INITIALIZE,	/* no active initialize */
 	EZFS_NO_RESILVER_DEFER,	/* pool doesn't support resilver_defer */
+	EZFS_CRYPTOFAILED,	/* failed to setup encryption */
 	EZFS_UNKNOWN
 } zfs_error_t;
 
@@ -336,6 +337,7 @@ typedef enum {
 	ZPOOL_STATUS_IO_FAILURE_CONTINUE, /* failed I/O, failmode 'continue' */
 	ZPOOL_STATUS_IO_FAILURE_MMP,	/* failed MMP, failmode not 'panic' */
 	ZPOOL_STATUS_BAD_LOG,		/* cannot read log chain(s) */
+	ZPOOL_STATUS_ERRATA,		/* informational errata available */
 
 	/*
 	 * If the pool has unsupported features but can still be opened in
@@ -371,8 +373,10 @@ typedef enum {
 	ZPOOL_STATUS_OK
 } zpool_status_t;
 
-extern zpool_status_t zpool_get_status(zpool_handle_t *, char **);
-extern zpool_status_t zpool_import_status(nvlist_t *, char **);
+extern zpool_status_t zpool_get_status(zpool_handle_t *, char **,
+    zpool_errata_t *);
+extern zpool_status_t zpool_import_status(nvlist_t *, char **,
+    zpool_errata_t *);
 extern void zpool_dump_ddt(const ddt_stat_t *dds, const ddt_histogram_t *ddh);
 
 /*
@@ -474,8 +478,8 @@ extern uint64_t zfs_prop_default_numeric(zfs_prop_t);
 extern const char *zfs_prop_column_name(zfs_prop_t);
 extern boolean_t zfs_prop_align_right(zfs_prop_t);
 
-extern nvlist_t *zfs_valid_proplist(libzfs_handle_t *, zfs_type_t,
-    nvlist_t *, uint64_t, zfs_handle_t *, zpool_handle_t *, const char *);
+extern nvlist_t *zfs_valid_proplist(libzfs_handle_t *, zfs_type_t, nvlist_t *,
+    uint64_t, zfs_handle_t *, zpool_handle_t *, boolean_t, const char *);
 
 extern const char *zfs_prop_to_name(zfs_prop_t);
 extern int zfs_prop_set(zfs_handle_t *, const char *, const char *);
@@ -504,6 +508,19 @@ extern nvlist_t *zfs_get_user_props(zfs_handle_t *);
 extern nvlist_t *zfs_get_recvd_props(zfs_handle_t *);
 extern nvlist_t *zfs_get_clones_nvl(zfs_handle_t *);
 
+
+/*
+ * zfs encryption management
+ */
+extern int zfs_crypto_get_encryption_root(zfs_handle_t *, boolean_t *, char *);
+extern int zfs_crypto_create(libzfs_handle_t *, char *, nvlist_t *, nvlist_t *,
+    uint8_t **, uint_t *);
+extern int zfs_crypto_clone_check(libzfs_handle_t *, zfs_handle_t *, char *,
+    nvlist_t *);
+extern int zfs_crypto_attempt_load_keys(libzfs_handle_t *, char *);
+extern int zfs_crypto_load_key(zfs_handle_t *, boolean_t, char *);
+extern int zfs_crypto_unload_key(zfs_handle_t *);
+extern int zfs_crypto_rewrap(zfs_handle_t *, nvlist_t *, boolean_t);
 
 typedef struct zprop_list {
 	int		pl_prop;
@@ -653,6 +670,9 @@ typedef struct sendflags {
 
 	/* compressed WRITE records are permitted */
 	boolean_t compress;
+
+	/* raw encrypted records are permitted */
+	boolean_t raw;
 } sendflags_t;
 
 typedef boolean_t (snapfilter_cb_t)(zfs_handle_t *, void *);
@@ -737,6 +757,7 @@ extern const char *zfs_type_to_name(zfs_type_t);
 extern void zfs_refresh_properties(zfs_handle_t *);
 extern int zfs_name_valid(const char *, zfs_type_t);
 extern zfs_handle_t *zfs_path_to_zhandle(libzfs_handle_t *, char *, zfs_type_t);
+extern int zfs_parent_name(zfs_handle_t *, char *, size_t);
 extern boolean_t zfs_dataset_exists(libzfs_handle_t *, const char *,
     zfs_type_t);
 extern int zfs_spa_version(zfs_handle_t *, int *);

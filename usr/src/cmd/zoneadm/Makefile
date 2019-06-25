@@ -38,6 +38,8 @@ POFILES= $(OBJS:%.o=%.po)
 
 LDLIBS += -lzonecfg -lsocket -lgen -lpool -lzfs -luuid -lnvpair -lbrand -ldladm -lsecdb
 
+INCS += -I../../common/zfs
+
 CERRWARN += -_gcc=-Wno-uninitialized
 
 .KEEP_STATE:

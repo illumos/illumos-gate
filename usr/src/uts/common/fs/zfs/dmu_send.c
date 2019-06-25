@@ -61,6 +61,8 @@ int zfs_send_corrupt_data = B_FALSE;
 int zfs_send_queue_length = 16 * 1024 * 1024;
 /* Set this tunable to FALSE to disable setting of DRR_FLAG_FREERECORDS */
 int zfs_send_set_freerecords_bit = B_TRUE;
+/* Set this tunable to FALSE is disable sending unmodified spill blocks. */
+int zfs_send_unmodified_spill_blocks = B_TRUE;
 
 /*
  * Use this to override the recordsize calculation for fast zfs send estimates.
@@ -90,6 +92,8 @@ struct send_block_record {
 	bqueue_node_t		ln;
 };
 
+static int do_dump(dmu_sendarg_t *dsa, struct send_block_record *data);
+
 static int
 dump_bytes(dmu_sendarg_t *dsp, void *buf, int len)
 {
@@ -97,18 +101,17 @@ dump_bytes(dmu_sendarg_t *dsp, void *buf, int len)
 	ssize_t resid; /* have to get resid to get detailed errno */
 
 	/*
-	 * The code does not rely on this (len being a multiple of 8).  We keep
+	 * The code does not rely on len being a multiple of 8.  We keep
 	 * this assertion because of the corresponding assertion in
 	 * receive_read().  Keeping this assertion ensures that we do not
 	 * inadvertently break backwards compatibility (causing the assertion
-	 * in receive_read() to trigger on old software).
-	 *
-	 * Removing the assertions could be rolled into a new feature that uses
-	 * data that isn't 8-byte aligned; if the assertions were removed, a
-	 * feature flag would have to be added.
+	 * in receive_read() to trigger on old software). Newer feature flags
+	 * (such as raw send) may break this assertion since they were
+	 * introduced after the requirement was made obsolete.
 	 */
 
-	ASSERT0(len % 8);
+	ASSERT(len % 8 == 0 ||
+	    (dsp->dsa_featureflags & DMU_BACKUP_FEATURE_RAW) != 0);
 
 	dsp->dsa_err = vn_rdwr(UIO_WRITE, dsp->dsa_vp,
 	    (caddr_t)buf, len,
@@ -189,9 +192,6 @@ dump_free(dmu_sendarg_t *dsp, uint64_t object, uint64_t offset,
 	    (object == dsp->dsa_last_data_object &&
 	    offset > dsp->dsa_last_data_offset));
 
-	if (length != -1ULL && offset + length < offset)
-		length = -1ULL;
-
 	/*
 	 * If there is a pending op, but it's not PENDING_FREE, push it out,
 	 * since free block aggregation can only be done for blocks of the
@@ -208,19 +208,22 @@ dump_free(dmu_sendarg_t *dsp, uint64_t object, uint64_t offset,
 
 	if (dsp->dsa_pending_op == PENDING_FREE) {
 		/*
-		 * There should never be a PENDING_FREE if length is -1
-		 * (because dump_dnode is the only place where this
-		 * function is called with a -1, and only after flushing
-		 * any pending record).
+		 * There should never be a PENDING_FREE if length is
+		 * DMU_OBJECT_END (because dump_dnode is the only place where
+		 * this function is called with a DMU_OBJECT_END, and only after
+		 * flushing any pending record).
 		 */
-		ASSERT(length != -1ULL);
+		ASSERT(length != DMU_OBJECT_END);
 		/*
 		 * Check to see whether this free block can be aggregated
 		 * with pending one.
 		 */
 		if (drrf->drr_object == object && drrf->drr_offset +
 		    drrf->drr_length == offset) {
-			drrf->drr_length += length;
+			if (offset + length < offset)
+				drrf->drr_length = DMU_OBJECT_END;
+			else
+				drrf->drr_length += length;
 			return (0);
 		} else {
 			/* not a continuation.  Push out pending record */
@@ -234,9 +237,12 @@ dump_free(dmu_sendarg_t *dsp, uint64_t object, uint64_t offset,
 	dsp->dsa_drr->drr_type = DRR_FREE;
 	drrf->drr_object = object;
 	drrf->drr_offset = offset;
-	drrf->drr_length = length;
+	if (offset + length < offset)
+		drrf->drr_length = DMU_OBJECT_END;
+	else
+		drrf->drr_length = length;
 	drrf->drr_toguid = dsp->dsa_toguid;
-	if (length == -1ULL) {
+	if (length == DMU_OBJECT_END) {
 		if (dump_record(dsp, NULL, 0) != 0)
 			return (SET_ERROR(EINTR));
 	} else {
@@ -247,11 +253,11 @@ dump_free(dmu_sendarg_t *dsp, uint64_t object, uint64_t offset,
 }
 
 static int
-dump_write(dmu_sendarg_t *dsp, dmu_object_type_t type,
-    uint64_t object, uint64_t offset, int lsize, int psize, const blkptr_t *bp,
-    void *data)
+dump_write(dmu_sendarg_t *dsp, dmu_object_type_t type, uint64_t object,
+    uint64_t offset, int lsize, int psize, const blkptr_t *bp, void *data)
 {
 	uint64_t payload_size;
+	boolean_t raw = (dsp->dsa_featureflags & DMU_BACKUP_FEATURE_RAW);
 	struct drr_write *drrw = &(dsp->dsa_drr->drr_u.drr_write);
 
 	/*
@@ -284,16 +290,36 @@ dump_write(dmu_sendarg_t *dsp, dmu_object_type_t type,
 	drrw->drr_toguid = dsp->dsa_toguid;
 	drrw->drr_logical_size = lsize;
 
-	/* only set the compression fields if the buf is compressed */
-	if (lsize != psize) {
-		ASSERT(dsp->dsa_featureflags & DMU_BACKUP_FEATURE_COMPRESSED);
+	/* only set the compression fields if the buf is compressed or raw */
+	if (raw || lsize != psize) {
 		ASSERT(!BP_IS_EMBEDDED(bp));
-		ASSERT(!BP_SHOULD_BYTESWAP(bp));
-		ASSERT(!DMU_OT_IS_METADATA(BP_GET_TYPE(bp)));
-		ASSERT3U(BP_GET_COMPRESS(bp), !=, ZIO_COMPRESS_OFF);
 		ASSERT3S(psize, >, 0);
-		ASSERT3S(lsize, >=, psize);
 
+		if (raw) {
+			ASSERT(BP_IS_PROTECTED(bp));
+
+			/*
+			 * This is a raw protected block so we need to pass
+			 * along everything the receiving side will need to
+			 * interpret this block, including the byteswap, salt,
+			 * IV, and MAC.
+			 */
+			if (BP_SHOULD_BYTESWAP(bp))
+				drrw->drr_flags |= DRR_RAW_BYTESWAP;
+			zio_crypt_decode_params_bp(bp, drrw->drr_salt,
+			    drrw->drr_iv);
+			zio_crypt_decode_mac_bp(bp, drrw->drr_mac);
+		} else {
+			/* this is a compressed block */
+			ASSERT(dsp->dsa_featureflags &
+			    DMU_BACKUP_FEATURE_COMPRESSED);
+			ASSERT(!BP_SHOULD_BYTESWAP(bp));
+			ASSERT(!DMU_OT_IS_METADATA(BP_GET_TYPE(bp)));
+			ASSERT3U(BP_GET_COMPRESS(bp), !=, ZIO_COMPRESS_OFF);
+			ASSERT3S(lsize, >=, psize);
+		}
+
+		/* set fields common to compressed and raw sends */
 		drrw->drr_compressiontype = BP_GET_COMPRESS(bp);
 		drrw->drr_compressed_size = psize;
 		payload_size = drrw->drr_compressed_size;
@@ -301,22 +327,23 @@ dump_write(dmu_sendarg_t *dsp, dmu_object_type_t type,
 		payload_size = drrw->drr_logical_size;
 	}
 
-	if (bp == NULL || BP_IS_EMBEDDED(bp)) {
+	if (bp == NULL || BP_IS_EMBEDDED(bp) || (BP_IS_PROTECTED(bp) && !raw)) {
 		/*
-		 * There's no pre-computed checksum for partial-block
-		 * writes or embedded BP's, so (like
-		 * fletcher4-checkummed blocks) userland will have to
-		 * compute a dedup-capable checksum itself.
+		 * There's no pre-computed checksum for partial-block writes,
+		 * embedded BP's, or encrypted BP's that are being sent as
+		 * plaintext, so (like fletcher4-checkummed blocks) userland
+		 * will have to compute a dedup-capable checksum itself.
 		 */
 		drrw->drr_checksumtype = ZIO_CHECKSUM_OFF;
 	} else {
 		drrw->drr_checksumtype = BP_GET_CHECKSUM(bp);
 		if (zio_checksum_table[drrw->drr_checksumtype].ci_flags &
 		    ZCHECKSUM_FLAG_DEDUP)
-			drrw->drr_checksumflags |= DRR_CHECKSUM_DEDUP;
+			drrw->drr_flags |= DRR_CHECKSUM_DEDUP;
 		DDK_SET_LSIZE(&drrw->drr_key, BP_GET_LSIZE(bp));
 		DDK_SET_PSIZE(&drrw->drr_key, BP_GET_PSIZE(bp));
 		DDK_SET_COMPRESS(&drrw->drr_key, BP_GET_COMPRESS(bp));
+		DDK_SET_CRYPT(&drrw->drr_key, BP_IS_PROTECTED(bp));
 		drrw->drr_key.ddk_cksum = bp->blk_cksum;
 	}
 
@@ -360,9 +387,11 @@ dump_write_embedded(dmu_sendarg_t *dsp, uint64_t object, uint64_t offset,
 }
 
 static int
-dump_spill(dmu_sendarg_t *dsp, uint64_t object, int blksz, void *data)
+dump_spill(dmu_sendarg_t *dsp, const blkptr_t *bp, uint64_t object, void *data)
 {
 	struct drr_spill *drrs = &(dsp->dsa_drr->drr_u.drr_spill);
+	uint64_t blksz = BP_GET_LSIZE(bp);
+	uint64_t payload_size = blksz;
 
 	if (dsp->dsa_pending_op != PENDING_NONE) {
 		if (dump_record(dsp, NULL, 0) != 0)
@@ -377,7 +406,26 @@ dump_spill(dmu_sendarg_t *dsp, uint64_t object, int blksz, void *data)
 	drrs->drr_length = blksz;
 	drrs->drr_toguid = dsp->dsa_toguid;
 
-	if (dump_record(dsp, data, blksz) != 0)
+	/* See comment in dump_dnode() for full details */
+	if (zfs_send_unmodified_spill_blocks &&
+	    (bp->blk_birth <= dsp->dsa_fromtxg)) {
+		drrs->drr_flags |= DRR_SPILL_UNMODIFIED;
+	}
+
+	/* handle raw send fields */
+	if (dsp->dsa_featureflags & DMU_BACKUP_FEATURE_RAW) {
+		ASSERT(BP_IS_PROTECTED(bp));
+
+		if (BP_SHOULD_BYTESWAP(bp))
+			drrs->drr_flags |= DRR_RAW_BYTESWAP;
+		drrs->drr_compressiontype = BP_GET_COMPRESS(bp);
+		drrs->drr_compressed_size = BP_GET_PSIZE(bp);
+		zio_crypt_decode_params_bp(bp, drrs->drr_salt, drrs->drr_iv);
+		zio_crypt_decode_mac_bp(bp, drrs->drr_mac);
+		payload_size = drrs->drr_compressed_size;
+	}
+
+	if (dump_record(dsp, data, payload_size) != 0)
 		return (SET_ERROR(EINTR));
 	return (0);
 }
@@ -429,9 +477,11 @@ dump_freeobjects(dmu_sendarg_t *dsp, uint64_t firstobj, uint64_t numobjs)
 }
 
 static int
-dump_dnode(dmu_sendarg_t *dsp, uint64_t object, dnode_phys_t *dnp)
+dump_dnode(dmu_sendarg_t *dsp, const blkptr_t *bp, uint64_t object,
+    dnode_phys_t *dnp)
 {
 	struct drr_object *drro = &(dsp->dsa_drr->drr_u.drr_object);
+	int bonuslen;
 
 	if (object < dsp->dsa_resume_object) {
 		/*
@@ -472,16 +522,107 @@ dump_dnode(dmu_sendarg_t *dsp, uint64_t object, dnode_phys_t *dnp)
 	    drro->drr_blksz > SPA_OLD_MAXBLOCKSIZE)
 		drro->drr_blksz = SPA_OLD_MAXBLOCKSIZE;
 
-	if (dump_record(dsp, DN_BONUS(dnp),
-	    P2ROUNDUP(dnp->dn_bonuslen, 8)) != 0) {
-		return (SET_ERROR(EINTR));
+	bonuslen = P2ROUNDUP(dnp->dn_bonuslen, 8);
+
+	if ((dsp->dsa_featureflags & DMU_BACKUP_FEATURE_RAW)) {
+		ASSERT(BP_IS_ENCRYPTED(bp));
+
+		if (BP_SHOULD_BYTESWAP(bp))
+			drro->drr_flags |= DRR_RAW_BYTESWAP;
+
+		/* needed for reconstructing dnp on recv side */
+		drro->drr_maxblkid = dnp->dn_maxblkid;
+		drro->drr_indblkshift = dnp->dn_indblkshift;
+		drro->drr_nlevels = dnp->dn_nlevels;
+		drro->drr_nblkptr = dnp->dn_nblkptr;
+
+		/*
+		 * Since we encrypt the entire bonus area, the (raw) part
+		 * beyond the bonuslen is actually nonzero, so we need
+		 * to send it.
+		 */
+		if (bonuslen != 0) {
+			drro->drr_raw_bonuslen = DN_MAX_BONUS_LEN(dnp);
+			bonuslen = drro->drr_raw_bonuslen;
+		}
 	}
+
+	/*
+	 * DRR_OBJECT_SPILL is set for every dnode which references a
+	 * spill block.  This allows the receiving pool to definitively
+	 * determine when a spill block should be kept or freed.
+	 */
+	if (dnp->dn_flags & DNODE_FLAG_SPILL_BLKPTR)
+		drro->drr_flags |= DRR_OBJECT_SPILL;
+
+	if (dump_record(dsp, DN_BONUS(dnp), bonuslen) != 0)
+		return (SET_ERROR(EINTR));
 
 	/* Free anything past the end of the file. */
 	if (dump_free(dsp, object, (dnp->dn_maxblkid + 1) *
-	    (dnp->dn_datablkszsec << SPA_MINBLOCKSHIFT), -1ULL) != 0)
+	    (dnp->dn_datablkszsec << SPA_MINBLOCKSHIFT), DMU_OBJECT_END) != 0)
 		return (SET_ERROR(EINTR));
+
+	/*
+	 * Send DRR_SPILL records for unmodified spill blocks.  This is useful
+	 * because changing certain attributes of the object (e.g. blocksize)
+	 * can cause old versions of ZFS to incorrectly remove a spill block.
+	 * Including these records in the stream forces an up to date version
+	 * to always be written ensuring they're never lost.  Current versions
+	 * of the code which understand the DRR_FLAG_SPILL_BLOCK feature can
+	 * ignore these unmodified spill blocks.
+	 */
+	if (zfs_send_unmodified_spill_blocks &&
+	    (dnp->dn_flags & DNODE_FLAG_SPILL_BLKPTR) &&
+	    (DN_SPILL_BLKPTR(dnp)->blk_birth <= dsp->dsa_fromtxg)) {
+		struct send_block_record record;
+
+		bzero(&record, sizeof (struct send_block_record));
+		record.eos_marker = B_FALSE;
+		record.bp = *DN_SPILL_BLKPTR(dnp);
+		SET_BOOKMARK(&(record.zb), dmu_objset_id(dsp->dsa_os),
+		    object, 0, DMU_SPILL_BLKID);
+
+		if (do_dump(dsp, &record) != 0)
+			return (SET_ERROR(EINTR));
+	}
+
 	if (dsp->dsa_err != 0)
+		return (SET_ERROR(EINTR));
+	return (0);
+}
+
+static int
+dump_object_range(dmu_sendarg_t *dsp, const blkptr_t *bp, uint64_t firstobj,
+    uint64_t numslots)
+{
+	struct drr_object_range *drror =
+	    &(dsp->dsa_drr->drr_u.drr_object_range);
+
+	/* we only use this record type for raw sends */
+	ASSERT(BP_IS_PROTECTED(bp));
+	ASSERT(dsp->dsa_featureflags & DMU_BACKUP_FEATURE_RAW);
+	ASSERT3U(BP_GET_COMPRESS(bp), ==, ZIO_COMPRESS_OFF);
+	ASSERT3U(BP_GET_TYPE(bp), ==, DMU_OT_DNODE);
+	ASSERT0(BP_GET_LEVEL(bp));
+
+	if (dsp->dsa_pending_op != PENDING_NONE) {
+		if (dump_record(dsp, NULL, 0) != 0)
+			return (SET_ERROR(EINTR));
+		dsp->dsa_pending_op = PENDING_NONE;
+	}
+
+	bzero(dsp->dsa_drr, sizeof (dmu_replay_record_t));
+	dsp->dsa_drr->drr_type = DRR_OBJECT_RANGE;
+	drror->drr_firstobj = firstobj;
+	drror->drr_numslots = numslots;
+	drror->drr_toguid = dsp->dsa_toguid;
+	if (BP_SHOULD_BYTESWAP(bp))
+		drror->drr_flags |= DRR_RAW_BYTESWAP;
+	zio_crypt_decode_params_bp(bp, drror->drr_salt, drror->drr_iv);
+	zio_crypt_decode_mac_bp(bp, drror->drr_mac);
+
+	if (dump_record(dsp, NULL, 0) != 0)
 		return (SET_ERROR(EINTR));
 	return (0);
 }
@@ -529,6 +670,7 @@ send_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 
 	ASSERT(zb->zb_object == DMU_META_DNODE_OBJECT ||
 	    zb->zb_object >= sta->resume.zb_object);
+	ASSERT3P(sta->ds, !=, NULL);
 
 	if (sta->cancel)
 		return (SET_ERROR(EINTR));
@@ -601,6 +743,18 @@ do_dump(dmu_sendarg_t *dsa, struct send_block_record *data)
 	ASSERT(zb->zb_object == DMU_META_DNODE_OBJECT ||
 	    zb->zb_object >= dsa->dsa_resume_object);
 
+	/*
+	 * All bps of an encrypted os should have the encryption bit set.
+	 * If this is not true it indicates tampering and we report an error.
+	 */
+	if (dsa->dsa_os->os_encrypted &&
+	    !BP_IS_HOLE(bp) && !BP_USES_CRYPT(bp)) {
+		spa_log_error(spa, zb);
+		zfs_panic_recover("unencrypted block in encrypted "
+		    "object set %llu", ds->ds_object);
+		return (SET_ERROR(EIO));
+	}
+
 	if (zb->zb_object != DMU_META_DNODE_OBJECT &&
 	    DMU_OBJECT_IS_SPECIAL(zb->zb_object)) {
 		return (0);
@@ -612,40 +766,66 @@ do_dump(dmu_sendarg_t *dsa, struct send_block_record *data)
 	} else if (BP_IS_HOLE(bp)) {
 		uint64_t span = BP_SPAN(dblkszsec, indblkshift, zb->zb_level);
 		uint64_t offset = zb->zb_blkid * span;
-		err = dump_free(dsa, zb->zb_object, offset, span);
+		/* Don't dump free records for offsets > DMU_OBJECT_END */
+		if (zb->zb_blkid == 0 || span <= DMU_OBJECT_END / zb->zb_blkid)
+			err = dump_free(dsa, zb->zb_object, offset, span);
 	} else if (zb->zb_level > 0 || type == DMU_OT_OBJSET) {
 		return (0);
 	} else if (type == DMU_OT_DNODE) {
 		int epb = BP_GET_LSIZE(bp) >> DNODE_SHIFT;
 		arc_flags_t aflags = ARC_FLAG_WAIT;
 		arc_buf_t *abuf;
+		enum zio_flag zioflags = ZIO_FLAG_CANFAIL;
+
+		if (dsa->dsa_featureflags & DMU_BACKUP_FEATURE_RAW) {
+			ASSERT(BP_IS_ENCRYPTED(bp));
+			ASSERT3U(BP_GET_COMPRESS(bp), ==, ZIO_COMPRESS_OFF);
+			zioflags |= ZIO_FLAG_RAW;
+		}
 
 		ASSERT0(zb->zb_level);
 
 		if (arc_read(NULL, spa, bp, arc_getbuf_func, &abuf,
-		    ZIO_PRIORITY_ASYNC_READ, ZIO_FLAG_CANFAIL,
-		    &aflags, zb) != 0)
+		    ZIO_PRIORITY_ASYNC_READ, zioflags, &aflags, zb) != 0)
 			return (SET_ERROR(EIO));
 
 		dnode_phys_t *blk = abuf->b_data;
 		uint64_t dnobj = zb->zb_blkid * epb;
-		for (int i = 0; i < epb; i += blk[i].dn_extra_slots + 1) {
-			err = dump_dnode(dsa, dnobj + i, blk + i);
-			if (err != 0)
-				break;
+
+		/*
+		 * Raw sends require sending encryption parameters for the
+		 * block of dnodes. Regular sends do not need to send this
+		 * info.
+		 */
+		if (dsa->dsa_featureflags & DMU_BACKUP_FEATURE_RAW) {
+			ASSERT(arc_is_encrypted(abuf));
+			err = dump_object_range(dsa, bp, dnobj, epb);
+		}
+
+		if (err == 0) {
+			for (int i = 0; i < epb;
+			    i += blk[i].dn_extra_slots + 1) {
+				err = dump_dnode(dsa, bp, dnobj + i, blk + i);
+				if (err != 0)
+					break;
+			}
 		}
 		arc_buf_destroy(abuf, &abuf);
 	} else if (type == DMU_OT_SA) {
 		arc_flags_t aflags = ARC_FLAG_WAIT;
 		arc_buf_t *abuf;
-		int blksz = BP_GET_LSIZE(bp);
+		enum zio_flag zioflags = ZIO_FLAG_CANFAIL;
+
+		if (dsa->dsa_featureflags & DMU_BACKUP_FEATURE_RAW) {
+			ASSERT(BP_IS_PROTECTED(bp));
+			zioflags |= ZIO_FLAG_RAW;
+		}
 
 		if (arc_read(NULL, spa, bp, arc_getbuf_func, &abuf,
-		    ZIO_PRIORITY_ASYNC_READ, ZIO_FLAG_CANFAIL,
-		    &aflags, zb) != 0)
+		    ZIO_PRIORITY_ASYNC_READ, zioflags, &aflags, zb) != 0)
 			return (SET_ERROR(EIO));
 
-		err = dump_spill(dsa, zb->zb_object, blksz, abuf->b_data);
+		err = dump_spill(dsa, bp, zb->zb_object, abuf->b_data);
 		arc_buf_destroy(abuf, &abuf);
 	} else if (backup_do_embed(dsa, bp)) {
 		/* it's an embedded level-0 block of a regular object */
@@ -667,6 +847,14 @@ do_dump(dmu_sendarg_t *dsa, struct send_block_record *data)
 		 */
 		boolean_t split_large_blocks = blksz > SPA_OLD_MAXBLOCKSIZE &&
 		    !(dsa->dsa_featureflags & DMU_BACKUP_FEATURE_LARGE_BLOCKS);
+
+		/*
+		 * Raw sends require that we always get raw data as it exists
+		 * on disk, so we assert that we are not splitting blocks here.
+		 */
+		boolean_t request_raw =
+		    (dsa->dsa_featureflags & DMU_BACKUP_FEATURE_RAW) != 0;
+
 		/*
 		 * We should only request compressed data from the ARC if all
 		 * the following are true:
@@ -682,6 +870,8 @@ do_dump(dmu_sendarg_t *dsa, struct send_block_record *data)
 		    !split_large_blocks && !BP_SHOULD_BYTESWAP(bp) &&
 		    !BP_IS_EMBEDDED(bp) && !DMU_OT_IS_METADATA(BP_GET_TYPE(bp));
 
+		IMPLY(request_raw, !split_large_blocks);
+		IMPLY(request_raw, BP_IS_PROTECTED(bp));
 		ASSERT0(zb->zb_level);
 		ASSERT(zb->zb_object > dsa->dsa_resume_object ||
 		    (zb->zb_object == dsa->dsa_resume_object &&
@@ -695,8 +885,11 @@ do_dump(dmu_sendarg_t *dsa, struct send_block_record *data)
 		ASSERT3U(blksz, ==, BP_GET_LSIZE(bp));
 
 		enum zio_flag zioflags = ZIO_FLAG_CANFAIL;
-		if (request_compressed)
+		if (request_raw)
 			zioflags |= ZIO_FLAG_RAW;
+		else if (request_compressed)
+			zioflags |= ZIO_FLAG_RAW_COMPRESS;
+
 		if (arc_read(NULL, spa, bp, arc_getbuf_func, &abuf,
 		    ZIO_PRIORITY_ASYNC_READ, zioflags, &aflags, zb) != 0) {
 			if (zfs_send_corrupt_data) {
@@ -716,6 +909,7 @@ do_dump(dmu_sendarg_t *dsa, struct send_block_record *data)
 		offset = zb->zb_blkid * blksz;
 
 		if (split_large_blocks) {
+			ASSERT0(arc_is_encrypted(abuf));
 			ASSERT3U(arc_get_compression(abuf), ==,
 			    ZIO_COMPRESS_OFF);
 			char *buf = abuf->b_data;
@@ -758,7 +952,7 @@ static int
 dmu_send_impl(void *tag, dsl_pool_t *dp, dsl_dataset_t *to_ds,
     zfs_bookmark_phys_t *ancestor_zb, boolean_t is_clone,
     boolean_t embedok, boolean_t large_block_ok, boolean_t compressok,
-    int outfd, uint64_t resumeobj, uint64_t resumeoff,
+    boolean_t rawok, int outfd, uint64_t resumeobj, uint64_t resumeoff,
     vnode_t *vp, offset_t *off)
 {
 	objset_t *os;
@@ -773,6 +967,28 @@ dmu_send_impl(void *tag, dsl_pool_t *dp, dsl_dataset_t *to_ds,
 	if (err != 0) {
 		dsl_pool_rele(dp, tag);
 		return (err);
+	}
+
+	/*
+	 * If this is a non-raw send of an encrypted ds, we can ensure that
+	 * the objset_phys_t is authenticated. This is safe because this is
+	 * either a snapshot or we have owned the dataset, ensuring that
+	 * it can't be modified.
+	 */
+	if (!rawok && os->os_encrypted &&
+	    arc_is_unauthenticated(os->os_phys_buf)) {
+		zbookmark_phys_t zb;
+
+		SET_BOOKMARK(&zb, to_ds->ds_object, ZB_ROOT_OBJECT,
+		    ZB_ROOT_LEVEL, ZB_ROOT_BLKID);
+		err = arc_untransform(os->os_phys_buf, os->os_spa,
+		    &zb, B_FALSE);
+		if (err != 0) {
+			dsl_pool_rele(dp, tag);
+			return (err);
+		}
+
+		ASSERT0(arc_is_unauthenticated(os->os_phys_buf));
 	}
 
 	drr = kmem_zalloc(sizeof (dmu_replay_record_t), KM_SLEEP);
@@ -795,22 +1011,29 @@ dmu_send_impl(void *tag, dsl_pool_t *dp, dsl_dataset_t *to_ds,
 	}
 #endif
 
-	if (large_block_ok && to_ds->ds_feature_inuse[SPA_FEATURE_LARGE_BLOCKS])
+	/* raw sends imply large_block_ok */
+	if ((large_block_ok || rawok) &&
+	    to_ds->ds_feature_inuse[SPA_FEATURE_LARGE_BLOCKS])
 		featureflags |= DMU_BACKUP_FEATURE_LARGE_BLOCKS;
 	if (to_ds->ds_feature_inuse[SPA_FEATURE_LARGE_DNODE])
 		featureflags |= DMU_BACKUP_FEATURE_LARGE_DNODE;
-	if (embedok &&
+
+	/* encrypted datasets will not have embedded blocks */
+	if ((embedok || rawok) && !os->os_encrypted &&
 	    spa_feature_is_active(dp->dp_spa, SPA_FEATURE_EMBEDDED_DATA)) {
 		featureflags |= DMU_BACKUP_FEATURE_EMBED_DATA;
-		if (spa_feature_is_active(dp->dp_spa, SPA_FEATURE_LZ4_COMPRESS))
-			featureflags |= DMU_BACKUP_FEATURE_LZ4;
 	}
-	if (compressok) {
+
+	/* raw send implies compressok */
+	if (compressok || rawok)
 		featureflags |= DMU_BACKUP_FEATURE_COMPRESSED;
-	}
+	if (rawok && os->os_encrypted)
+		featureflags |= DMU_BACKUP_FEATURE_RAW;
+
 	if ((featureflags &
-	    (DMU_BACKUP_FEATURE_EMBED_DATA | DMU_BACKUP_FEATURE_COMPRESSED)) !=
-	    0 && spa_feature_is_active(dp->dp_spa, SPA_FEATURE_LZ4_COMPRESS)) {
+	    (DMU_BACKUP_FEATURE_EMBED_DATA | DMU_BACKUP_FEATURE_COMPRESSED |
+	    DMU_BACKUP_FEATURE_RAW)) != 0 &&
+	    spa_feature_is_active(dp->dp_spa, SPA_FEATURE_LZ4_COMPRESS)) {
 		featureflags |= DMU_BACKUP_FEATURE_LZ4;
 	}
 
@@ -832,6 +1055,8 @@ dmu_send_impl(void *tag, dsl_pool_t *dp, dsl_dataset_t *to_ds,
 	if (zfs_send_set_freerecords_bit)
 		drr->drr_u.drr_begin.drr_flags |= DRR_FLAG_FREERECORDS;
 
+	drr->drr_u.drr_begin.drr_flags |= DRR_FLAG_SPILL_BLOCK;
+
 	if (ancestor_zb != NULL) {
 		drr->drr_u.drr_begin.drr_fromguid =
 		    ancestor_zb->zbm_guid;
@@ -852,6 +1077,7 @@ dmu_send_impl(void *tag, dsl_pool_t *dp, dsl_dataset_t *to_ds,
 	dsp->dsa_os = os;
 	dsp->dsa_off = off;
 	dsp->dsa_toguid = dsl_dataset_phys(to_ds)->ds_guid;
+	dsp->dsa_fromtxg = fromtxg;
 	dsp->dsa_pending_op = PENDING_NONE;
 	dsp->dsa_featureflags = featureflags;
 	dsp->dsa_resume_object = resumeobj;
@@ -866,19 +1092,47 @@ dmu_send_impl(void *tag, dsl_pool_t *dp, dsl_dataset_t *to_ds,
 
 	void *payload = NULL;
 	size_t payload_len = 0;
-	if (resumeobj != 0 || resumeoff != 0) {
-		dmu_object_info_t to_doi;
-		err = dmu_object_info(os, resumeobj, &to_doi);
-		if (err != 0)
-			goto out;
-		SET_BOOKMARK(&to_arg.resume, to_ds->ds_object, resumeobj, 0,
-		    resumeoff / to_doi.doi_data_block_size);
-
+	/* handle features that require a DRR_BEGIN payload */
+	if (featureflags &
+	    (DMU_BACKUP_FEATURE_RESUMING | DMU_BACKUP_FEATURE_RAW)) {
+		nvlist_t *keynvl = NULL;
 		nvlist_t *nvl = fnvlist_alloc();
-		fnvlist_add_uint64(nvl, "resume_object", resumeobj);
-		fnvlist_add_uint64(nvl, "resume_offset", resumeoff);
+
+		if (featureflags & DMU_BACKUP_FEATURE_RESUMING) {
+			dmu_object_info_t to_doi;
+			err = dmu_object_info(os, resumeobj, &to_doi);
+			if (err != 0) {
+				fnvlist_free(nvl);
+				goto out;
+			}
+
+			SET_BOOKMARK(&to_arg.resume, to_ds->ds_object,
+			    resumeobj, 0,
+			    resumeoff / to_doi.doi_data_block_size);
+
+			fnvlist_add_uint64(nvl, "resume_object", resumeobj);
+			fnvlist_add_uint64(nvl, "resume_offset", resumeoff);
+		}
+
+		if (featureflags & DMU_BACKUP_FEATURE_RAW) {
+			uint64_t ivset_guid = (ancestor_zb != NULL) ?
+			    ancestor_zb->zbm_ivset_guid : 0;
+
+			ASSERT(os->os_encrypted);
+
+			err = dsl_crypto_populate_key_nvlist(to_ds,
+			    ivset_guid, &keynvl);
+			if (err != 0) {
+				fnvlist_free(nvl);
+				goto out;
+			}
+
+			fnvlist_add_nvlist(nvl, "crypt_keydata", keynvl);
+		}
+
 		payload = fnvlist_pack(nvl, &payload_len);
 		drr->drr_payloadlen = payload_len;
+		fnvlist_free(keynvl);
 		fnvlist_free(nvl);
 	}
 
@@ -896,6 +1150,8 @@ dmu_send_impl(void *tag, dsl_pool_t *dp, dsl_dataset_t *to_ds,
 	to_arg.ds = to_ds;
 	to_arg.fromtxg = fromtxg;
 	to_arg.flags = TRAVERSE_PRE | TRAVERSE_PREFETCH;
+	if (rawok)
+		to_arg.flags |= TRAVERSE_NO_DECRYPT;
 	(void) thread_create(NULL, 0, send_traverse_thread, &to_arg, 0, curproc,
 	    TS_RUN, minclsyspri);
 
@@ -942,7 +1198,6 @@ dmu_send_impl(void *tag, dsl_pool_t *dp, dsl_dataset_t *to_ds,
 
 	if (dump_record(dsp, NULL, 0) != 0)
 		err = dsp->dsa_err;
-
 out:
 	mutex_enter(&to_ds->ds_sendstream_lock);
 	list_remove(&to_ds->ds_sendstreams, dsp);
@@ -961,60 +1216,77 @@ out:
 int
 dmu_send_obj(const char *pool, uint64_t tosnap, uint64_t fromsnap,
     boolean_t embedok, boolean_t large_block_ok, boolean_t compressok,
-    int outfd, vnode_t *vp, offset_t *off)
+    boolean_t rawok, int outfd, vnode_t *vp, offset_t *off)
 {
 	dsl_pool_t *dp;
 	dsl_dataset_t *ds;
 	dsl_dataset_t *fromds = NULL;
+	ds_hold_flags_t dsflags = (rawok) ? 0 : DS_HOLD_FLAG_DECRYPT;
 	int err;
 
 	err = dsl_pool_hold(pool, FTAG, &dp);
 	if (err != 0)
 		return (err);
 
-	err = dsl_dataset_hold_obj(dp, tosnap, FTAG, &ds);
+	err = dsl_dataset_hold_obj_flags(dp, tosnap, dsflags, FTAG, &ds);
 	if (err != 0) {
 		dsl_pool_rele(dp, FTAG);
 		return (err);
 	}
 
 	if (fromsnap != 0) {
-		zfs_bookmark_phys_t zb;
+		zfs_bookmark_phys_t zb = { 0 };
 		boolean_t is_clone;
 
 		err = dsl_dataset_hold_obj(dp, fromsnap, FTAG, &fromds);
 		if (err != 0) {
-			dsl_dataset_rele(ds, FTAG);
+			dsl_dataset_rele_flags(ds, dsflags, FTAG);
 			dsl_pool_rele(dp, FTAG);
 			return (err);
 		}
-		if (!dsl_dataset_is_before(ds, fromds, 0))
+		if (!dsl_dataset_is_before(ds, fromds, 0)) {
 			err = SET_ERROR(EXDEV);
+			dsl_dataset_rele(fromds, FTAG);
+			dsl_dataset_rele_flags(ds, dsflags, FTAG);
+			dsl_pool_rele(dp, FTAG);
+			return (err);
+		}
+
 		zb.zbm_creation_time =
 		    dsl_dataset_phys(fromds)->ds_creation_time;
 		zb.zbm_creation_txg = dsl_dataset_phys(fromds)->ds_creation_txg;
 		zb.zbm_guid = dsl_dataset_phys(fromds)->ds_guid;
+
+		if (dsl_dataset_is_zapified(fromds)) {
+			(void) zap_lookup(dp->dp_meta_objset,
+			    fromds->ds_object, DS_FIELD_IVSET_GUID, 8, 1,
+			    &zb.zbm_ivset_guid);
+		}
+
 		is_clone = (fromds->ds_dir != ds->ds_dir);
 		dsl_dataset_rele(fromds, FTAG);
 		err = dmu_send_impl(FTAG, dp, ds, &zb, is_clone,
-		    embedok, large_block_ok, compressok, outfd, 0, 0, vp, off);
+		    embedok, large_block_ok, compressok, rawok, outfd,
+		    0, 0, vp, off);
 	} else {
 		err = dmu_send_impl(FTAG, dp, ds, NULL, B_FALSE,
-		    embedok, large_block_ok, compressok, outfd, 0, 0, vp, off);
+		    embedok, large_block_ok, compressok, rawok, outfd,
+		    0, 0, vp, off);
 	}
-	dsl_dataset_rele(ds, FTAG);
+	dsl_dataset_rele_flags(ds, dsflags, FTAG);
 	return (err);
 }
 
 int
 dmu_send(const char *tosnap, const char *fromsnap, boolean_t embedok,
-    boolean_t large_block_ok, boolean_t compressok, int outfd,
-    uint64_t resumeobj, uint64_t resumeoff,
-    vnode_t *vp, offset_t *off)
+    boolean_t large_block_ok, boolean_t compressok, boolean_t rawok,
+    int outfd, uint64_t resumeobj, uint64_t resumeoff, vnode_t *vp,
+    offset_t *off)
 {
 	dsl_pool_t *dp;
 	dsl_dataset_t *ds;
 	int err;
+	ds_hold_flags_t dsflags = (rawok) ? 0 : DS_HOLD_FLAG_DECRYPT;
 	boolean_t owned = B_FALSE;
 
 	if (fromsnap != NULL && strpbrk(fromsnap, "@#") == NULL)
@@ -1029,10 +1301,10 @@ dmu_send(const char *tosnap, const char *fromsnap, boolean_t embedok,
 		 * We are sending a filesystem or volume.  Ensure
 		 * that it doesn't change by owning the dataset.
 		 */
-		err = dsl_dataset_own(dp, tosnap, FTAG, &ds);
+		err = dsl_dataset_own(dp, tosnap, dsflags, FTAG, &ds);
 		owned = B_TRUE;
 	} else {
-		err = dsl_dataset_hold(dp, tosnap, FTAG, &ds);
+		err = dsl_dataset_hold_flags(dp, tosnap, dsflags, FTAG, &ds);
 	}
 	if (err != 0) {
 		dsl_pool_rele(dp, FTAG);
@@ -1040,7 +1312,7 @@ dmu_send(const char *tosnap, const char *fromsnap, boolean_t embedok,
 	}
 
 	if (fromsnap != NULL) {
-		zfs_bookmark_phys_t zb;
+		zfs_bookmark_phys_t zb = { 0 };
 		boolean_t is_clone = B_FALSE;
 		int fsnamelen = strchr(tosnap, '@') - tosnap;
 
@@ -1066,28 +1338,40 @@ dmu_send(const char *tosnap, const char *fromsnap, boolean_t embedok,
 				    dsl_dataset_phys(fromds)->ds_creation_txg;
 				zb.zbm_guid = dsl_dataset_phys(fromds)->ds_guid;
 				is_clone = (ds->ds_dir != fromds->ds_dir);
+
+				if (dsl_dataset_is_zapified(fromds)) {
+					(void) zap_lookup(dp->dp_meta_objset,
+					    fromds->ds_object,
+					    DS_FIELD_IVSET_GUID, 8, 1,
+					    &zb.zbm_ivset_guid);
+				}
 				dsl_dataset_rele(fromds, FTAG);
 			}
 		} else {
 			err = dsl_bookmark_lookup(dp, fromsnap, ds, &zb);
 		}
 		if (err != 0) {
-			dsl_dataset_rele(ds, FTAG);
+			if (owned)
+				dsl_dataset_disown(ds, dsflags, FTAG);
+			else
+				dsl_dataset_rele_flags(ds, dsflags, FTAG);
+
 			dsl_pool_rele(dp, FTAG);
 			return (err);
 		}
 		err = dmu_send_impl(FTAG, dp, ds, &zb, is_clone,
-		    embedok, large_block_ok, compressok,
+		    embedok, large_block_ok, compressok, rawok,
 		    outfd, resumeobj, resumeoff, vp, off);
 	} else {
 		err = dmu_send_impl(FTAG, dp, ds, NULL, B_FALSE,
-		    embedok, large_block_ok, compressok,
+		    embedok, large_block_ok, compressok, rawok,
 		    outfd, resumeobj, resumeoff, vp, off);
 	}
 	if (owned)
-		dsl_dataset_disown(ds, FTAG);
+		dsl_dataset_disown(ds, dsflags, FTAG);
 	else
-		dsl_dataset_rele(ds, FTAG);
+		dsl_dataset_rele_flags(ds, dsflags, FTAG);
+
 	return (err);
 }
 
@@ -1242,7 +1526,8 @@ dmu_send_estimate_from_txg(dsl_dataset_t *ds, uint64_t from_txg,
 	 * traverse the blocks of the snapshot with birth times after
 	 * from_txg, summing their uncompressed size
 	 */
-	err = traverse_dataset(ds, from_txg, TRAVERSE_POST,
+	err = traverse_dataset(ds, from_txg,
+	    TRAVERSE_POST | TRAVERSE_NO_DECRYPT,
 	    dmu_calculate_send_traversal, &size);
 	if (err)
 		return (err);

@@ -626,6 +626,27 @@ Booting off of pools using \fBskein\fR is supported.
 .sp
 .ne 2
 .na
+\fB\fBbookmark_v2\fR\fR
+.ad
+.RS 4n
+.TS
+l l .
+GUID	com.datto:bookmark_v2
+READ\-ONLY COMPATIBLE	no
+DEPENDENCIES	extensible_dataset
+.TE
+
+This feature enables the creation and management of larger bookmarks which are
+needed for other features in ZFS.
+
+This feature becomes \fBactive\fR when a v2 bookmark is created and will be
+returned to the \fBenabled\fR state when all v2 bookmarks are destroyed.
+
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBedonr\fR\fR
 .ad
 .RS 4n
@@ -682,6 +703,26 @@ This feature becomes \fBactive\fR when a dedicated allocation class vdev
 (dedup or special) is created with zpool create or zpool add. With device
 removal, it can be returned to the \fBenabled\fR state if all the top-level
 vdevs from an allocation class are removed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBcom.datto:encryption\fR\fR
+.ad
+.RS 4n
+.TS
+l l .
+GUID	com.datto:encryption
+READ\-ONLY COMPATIBLE	no
+DEPENDENCIES	extensible_dataset
+.TE
+
+This feature enables the creation and management of natively encrypted datasets.
+
+This feature becomes \fBactive\fR when an encrypted dataset is created
+and will be returned to the \fBenabled\fR state when all datasets that
+use this feature are destroyed.
 
 .RE
 .sp

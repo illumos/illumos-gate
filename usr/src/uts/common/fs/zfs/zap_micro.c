@@ -670,7 +670,7 @@ mzap_create_impl(objset_t *os, uint64_t obj, int normflags, zap_flags_t flags,
 	dmu_buf_will_dirty(db, tx);
 	mzap_phys_t *zp = db->db_data;
 	zp->mz_block_type = ZBT_MICRO;
-	zp->mz_salt = ((uintptr_t)db ^ (uintptr_t)tx ^ (obj << 1)) | 1ULL;
+	(void) random_get_pseudo_bytes((void *)&zp->mz_salt, sizeof (uint64_t));
 	zp->mz_normflags = normflags;
 
 	if (flags != 0) {

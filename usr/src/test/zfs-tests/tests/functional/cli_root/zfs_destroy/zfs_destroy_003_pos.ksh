@@ -134,8 +134,8 @@ log_note "Verify that 'zfs destroy -r' fails to destroy dataset " \
 for obj in $child_fs $child_fs1 $ctr $ctr1; do
 	log_mustnot zfs destroy -r $obj
 	datasetexists $obj || \
-		log_fail "'zfs destroy -r' fails to keep clone " \
-			"dependant outside the hirearchy."
+		log_fail "'zfs destroy -r' fails to keep dependent " \
+			"clone outside the hierarchy."
 done
 
 

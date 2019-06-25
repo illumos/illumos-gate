@@ -367,8 +367,8 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 
 		abuf = abp[i];
 		size = arc_buf_size(abuf);
-		dmu_assign_arcbuf_dnode(sl->sl_zvol_dn_hdl, toffset, abuf,
-		    tx);
+		(void) dmu_assign_arcbuf_by_dnode(sl->sl_zvol_dn_hdl,
+		    toffset, abuf, tx);
 		toffset += size;
 		resid -= size;
 	}
