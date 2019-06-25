@@ -24,6 +24,7 @@
  * Copyright 2012, Josef 'Jeff' Sipek <jeffpc@31bits.net>. All rights reserved.
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989  AT&T.	*/
@@ -95,14 +96,14 @@ struct suffix {
 /*
  * Flags that control behavior of build_manpath()
  *
- *   BMP_ISPATH 		pathv is a vector constructed from PATH.
- *                		Perform appropriate path translations for
- * 				manpath.
+ *   BMP_ISPATH			pathv is a vector constructed from PATH.
+ *				Perform appropriate path translations for
+ *				manpath.
  *   BMP_APPEND_DEFMANDIR	Add DEFMANDIR to the end if it hasn't
  *				already appeared earlier.
  *   BMP_FALLBACK_DEFMANDIR	Append /usr/share/man only if no other
  *				manpath (including derived from PATH)
- * 				elements are valid.
+ *				elements are valid.
  */
 #define	BMP_ISPATH		1
 #define	BMP_APPEND_DEFMANDIR	2
@@ -199,7 +200,7 @@ static void	usage_catman(void);
 static void	usage_makewhatis(void);
 static void	whatapro(struct man_node *, char *);
 
-static char	language[MAXPATHLEN]; 	/* LC_MESSAGES */
+static char	language[MAXPATHLEN];	/* LC_MESSAGES */
 static char	localedir[MAXPATHLEN];	/* locale specific path component */
 
 static char	*newsection = NULL;
@@ -569,7 +570,7 @@ get_all_sect(struct man_node *manp)
 	char	**dv;
 	char	**p;
 	char	*prev = NULL;
-	char 	*tmp = NULL;
+	char	*tmp = NULL;
 	int	maxentries = MAXTOKENS;
 	int	entries = 0;
 
@@ -1134,7 +1135,7 @@ searchdir(char *path, char *dir, char *name)
 		return (0);
 
 	while ((sd = readdir(sdp))) {
-		char	*pname;
+		char	*pname, *upper = NULL;
 
 		if ((pname = strdup(sd->d_name)) == NULL)
 			err(1, "strdup");
@@ -1144,14 +1145,38 @@ searchdir(char *path, char *dir, char *name)
 		last = strrchr(pname, '.');
 		nlen = last - pname;
 		(void) snprintf(dname, sizeof (dname), "%.*s.", nlen, pname);
+
+		/*
+		 * Check for a case where name has something like foo.3C because
+		 * the user reasonably thought that the section name was
+		 * capitalized in the file. This relies on the fact that all of
+		 * our section names are currently 7-bit ASCII.
+		 */
+		if (last != NULL) {
+			char *c;
+			if ((upper = strdup(pname)) == NULL) {
+				err(1, "strdup");
+			}
+
+			c = strrchr(upper, '.');
+			c++;
+			while (*c != '\0') {
+				*c = toupper(*c);
+				c++;
+			}
+		}
+
 		if (strcmp(dname, file) == 0 ||
-		    strcmp(pname, name) == 0) {
+		    strcmp(pname, name) == 0 ||
+		    (upper != NULL && strcmp(upper, name) == 0)) {
 			(void) format(path, dir, name, sd->d_name);
 			(void) closedir(sdp);
 			free(pname);
+			free(upper);
 			return (1);
 		}
 		free(pname);
+		free(upper);
 	}
 	(void) closedir(sdp);
 
@@ -1346,8 +1371,8 @@ dupcheck(struct man_node *mnp, struct dupnode **dnp)
 {
 	struct dupnode	*curdnp;
 	struct secnode	*cursnp;
-	struct stat 	sb;
-	int 		i;
+	struct stat	sb;
+	int		i;
 	int		rv = 1;
 	int		dupfound;
 
