@@ -120,7 +120,7 @@ typedef enum {
  */
 typedef struct {
 	elfedit_obj_state_t	*obj_state;
-	shdr_opt_t		optmask;   	/* Mask of options used */
+	shdr_opt_t		optmask;	/* Mask of options used */
 	int			argc;		/* # of plain arguments */
 	const char		**argv;		/* Plain arguments */
 } ARGSTATE;
@@ -216,7 +216,7 @@ print_shdr(SHDR_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 	Ehdr			*ehdr = argstate->obj_state->os_ehdr;
 	uchar_t			osabi = ehdr->e_ident[EI_OSABI];
 	Half			mach = ehdr->e_machine;
-	elfedit_section_t 	*ref_sec = &argstate->obj_state->os_secarr[ndx];
+	elfedit_section_t	*ref_sec = &argstate->obj_state->os_secarr[ndx];
 
 
 	if ((autoprint && ((elfedit_flags() & ELFEDIT_F_AUTOPRINT) == 0)) ||
@@ -939,7 +939,7 @@ elfedit_init(elfedit_module_version_t version)
 {
 	/* Multiple commands accept only the standard set of options */
 	static elfedit_cmd_optarg_t opt_std[] = {
-		{ ELFEDIT_STDOA_OPT_O, NULL,
+		{ ELFEDIT_STDOA_OPT_O, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SHNDX),
 		    /* MSG_INTL(MSG_OPTDESC_SHNDX) */
@@ -957,7 +957,7 @@ elfedit_init(elfedit_module_version_t version)
 	 * plus -value_shnam and -value_shtyp.
 	 */
 	static elfedit_cmd_optarg_t opt_infolink[] = {
-		{ ELFEDIT_STDOA_OPT_O, NULL,
+		{ ELFEDIT_STDOA_OPT_O, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SHNDX),
 		    /* MSG_INTL(MSG_OPTDESC_SHNDX) */
@@ -1052,13 +1052,13 @@ elfedit_init(elfedit_module_version_t version)
 	static const char *name_sh_flags[] = {
 	    MSG_ORIG(MSG_CMD_SH_FLAGS), NULL };
 	static elfedit_cmd_optarg_t opt_sh_flags[] = {
-		{ ELFEDIT_STDOA_OPT_AND, NULL,
+		{ ELFEDIT_STDOA_OPT_AND, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, SHDR_OPT_F_AND, SHDR_OPT_F_OR },
-		{ ELFEDIT_STDOA_OPT_CMP, NULL,
+		{ ELFEDIT_STDOA_OPT_CMP, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, SHDR_OPT_F_CMP, 0 },
-		{ ELFEDIT_STDOA_OPT_O, NULL,
+		{ ELFEDIT_STDOA_OPT_O, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
-		{ ELFEDIT_STDOA_OPT_OR, NULL,
+		{ ELFEDIT_STDOA_OPT_OR, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, SHDR_OPT_F_OR, SHDR_OPT_F_AND },
 		{ MSG_ORIG(MSG_STR_MINUS_SHNDX),
 		    /* MSG_INTL(MSG_OPTDESC_SHNDX) */
@@ -1120,7 +1120,7 @@ elfedit_init(elfedit_module_version_t version)
 		    /* MSG_INTL(MSG_OPTDESC_NAME_OFFSET) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_NAME_OFFSET), 0,
 		    SHDR_OPT_F_NAMOFFSET, 0 },
-		{ ELFEDIT_STDOA_OPT_O, NULL,
+		{ ELFEDIT_STDOA_OPT_O, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SHNDX),
 		    /* MSG_INTL(MSG_OPTDESC_SHNDX) */

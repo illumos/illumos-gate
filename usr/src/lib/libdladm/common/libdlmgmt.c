@@ -277,7 +277,7 @@ dladm_walk_datalink_id(int (*fn)(dladm_handle_t, datalink_id_t, void *),
 {
 	dlmgmt_door_getnext_t	getnext;
 	dlmgmt_getnext_retval_t	retval;
-	uint32_t 		dlmgmt_flags;
+	uint32_t		dlmgmt_flags;
 	datalink_id_t		linkid = DATALINK_INVALID_LINKID;
 	dladm_status_t		status = DLADM_STATUS_OK;
 	size_t			sz = sizeof (retval);
@@ -517,7 +517,7 @@ dladm_getnext_conf_linkprop(dladm_handle_t handle, dladm_conf_t conf,
 		return (DLADM_STATUS_NOTFOUND);
 
 	if ((err = nvpair_value_byte_array(nvp, (uchar_t **)&oattrval,
-	    &oattrsz)) != NULL) {
+	    &oattrsz)) != 0) {
 		return (dladm_errno2status(err));
 	}
 

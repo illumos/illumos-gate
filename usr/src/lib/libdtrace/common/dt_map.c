@@ -384,7 +384,7 @@ dt_aggid_add(dtrace_hdl_t *dtp, dtrace_aggid_t id)
 		 * provide the compiler-generated aggregation information.
 		 */
 		if (dtp->dt_options[DTRACEOPT_GRABANON] == DTRACEOPT_UNSET &&
-		    agg->dtagd_rec[0].dtrd_uarg != NULL) {
+		    agg->dtagd_rec[0].dtrd_uarg != 0) {
 			dtrace_stmtdesc_t *sdp;
 			dt_ident_t *aid;
 

@@ -61,7 +61,7 @@ static fpd_setf_t	do_set_priority;
 static fpd_checkf_t	do_check_priority;
 
 static fprop_desc_t	prop_table[] = {
-	{ "maxbw",	{ "", NULL }, NULL, 0, B_FALSE,
+	{ "maxbw",	{ "", 0 }, NULL, 0, B_FALSE,
 	    do_set_maxbw, NULL,
 	    do_get_maxbw, do_check_maxbw},
 	{ "priority",	{ "", MPL_RESET }, NULL, 0, B_FALSE,
@@ -266,7 +266,7 @@ do_get_maxbw(dladm_handle_t handle, const char *flow, char **prop_val,
     uint_t *val_cnt)
 {
 	mac_resource_props_t	*mrp;
-	char 			buf[DLADM_STRSIZE];
+	char			buf[DLADM_STRSIZE];
 	dladm_flow_attr_t	fa;
 	dladm_status_t		status;
 
@@ -360,7 +360,7 @@ do_get_priority(dladm_handle_t handle, const char *flow, char **prop_val,
     uint_t *val_cnt)
 {
 	mac_resource_props_t	*mrp;
-	char 			buf[DLADM_STRSIZE];
+	char			buf[DLADM_STRSIZE];
 	dladm_flow_attr_t	fa;
 	dladm_status_t		status;
 

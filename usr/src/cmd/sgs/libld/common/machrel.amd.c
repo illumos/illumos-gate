@@ -1322,7 +1322,7 @@ ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 	/*
 	 * Perform relocation.
 	 */
-	return (ld_add_actrel(NULL, rsp, ofl));
+	return (ld_add_actrel(0, rsp, ofl));
 }
 
 
@@ -1389,7 +1389,7 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	    GOT_REF_TLSLD, ofl, rsp)) == NULL)) {
 
 		if (ld_assign_got_TLS(local, rsp, ofl, sdp, gnp, GOT_REF_TLSLD,
-		    FLG_REL_MTLS, rtype, R_AMD64_DTPMOD64, NULL) == S_ERROR)
+		    FLG_REL_MTLS, rtype, R_AMD64_DTPMOD64, 0) == S_ERROR)
 			return (S_ERROR);
 
 	} else if (IS_TLS_GD(rtype) &&

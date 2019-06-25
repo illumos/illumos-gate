@@ -136,12 +136,12 @@ static scf_simple_prop_t *
 fill_prop(scf_property_t *prop, const char *pgname, const char *propname,
     scf_handle_t *h)
 {
-	scf_simple_prop_t 		*ret;
-	scf_iter_t 			*iter;
-	scf_value_t 			*val;
-	int 				iterret, i;
-	ssize_t 			valsize, numvals;
-	union scf_simple_prop_val 	*vallist = NULL, *vallist_backup = NULL;
+	scf_simple_prop_t		*ret;
+	scf_iter_t			*iter;
+	scf_value_t			*val;
+	int				iterret, i;
+	ssize_t				valsize, numvals;
+	union scf_simple_prop_val	*vallist = NULL, *vallist_backup = NULL;
 
 	if ((ret = malloc(sizeof (*ret))) == NULL) {
 		(void) scf_set_error(SCF_ERROR_NO_MEMORY);
@@ -478,9 +478,9 @@ transaction_property_set(scf_transaction_t *tx, scf_transaction_entry_t *e,
 static int
 get_inst_enabled(const scf_instance_t *inst, const char *pgname)
 {
-	scf_propertygroup_t 	*gpg = NULL;
-	scf_property_t 		*eprop = NULL;
-	scf_value_t 		*v = NULL;
+	scf_propertygroup_t	*gpg = NULL;
+	scf_property_t		*eprop = NULL;
+	scf_value_t		*v = NULL;
 	scf_handle_t		*h = NULL;
 	uint8_t			enabled;
 	int			ret = -1;
@@ -517,13 +517,13 @@ static int
 set_inst_enabled(const scf_instance_t *inst, uint8_t desired,
     const char *pgname, uint32_t pgflags)
 {
-	scf_transaction_t 	*tx = NULL;
+	scf_transaction_t	*tx = NULL;
 	scf_transaction_entry_t *ent = NULL;
-	scf_propertygroup_t 	*gpg = NULL;
-	scf_property_t 		*eprop = NULL;
-	scf_value_t 		*v = NULL;
+	scf_propertygroup_t	*gpg = NULL;
+	scf_property_t		*eprop = NULL;
+	scf_value_t		*v = NULL;
 	scf_handle_t		*h = NULL;
-	int 			ret = -1;
+	int			ret = -1;
 	int			committed;
 	uint8_t			b;
 
@@ -649,9 +649,9 @@ out:
 static int
 delete_inst_enabled(const scf_instance_t *inst, const char *pgname)
 {
-	scf_transaction_t 	*tx = NULL;
+	scf_transaction_t	*tx = NULL;
 	scf_transaction_entry_t *ent = NULL;
-	scf_propertygroup_t 	*gpg = NULL;
+	scf_propertygroup_t	*gpg = NULL;
 	scf_handle_t		*h = NULL;
 	int			ret = -1;
 	int			committed;
@@ -1343,7 +1343,7 @@ scf_general_pg_setup(const char *fmri, const char *pg_name)
 	}
 
 	if (scf_handle_decode_fmri(ret->h, fmri, NULL, NULL, ret->inst,
-	    NULL, NULL, NULL) == -1) {
+	    NULL, NULL, 0) == -1) {
 		goto out;
 	}
 
@@ -1566,7 +1566,7 @@ int
 scf_simple_walk_instances(uint_t state_flags, void *private,
     int (*inst_callback)(scf_handle_t *, scf_instance_t *, void *))
 {
-	scf_scope_t 		*scope = NULL;
+	scf_scope_t		*scope = NULL;
 	scf_service_t		*svc = NULL;
 	scf_instance_t		*inst = NULL;
 	scf_iter_t		*svc_iter = NULL, *inst_iter = NULL;
@@ -1649,13 +1649,13 @@ out:
 
 scf_simple_prop_t *
 scf_simple_prop_get(scf_handle_t *hin, const char *instance, const char *pgname,
-			const char *propname)
+    const char *propname)
 {
-	char 			*fmri_buf, *svcfmri = NULL;
-	ssize_t 		fmri_sz;
-	scf_property_t 		*prop = NULL;
-	scf_service_t 		*svc = NULL;
-	scf_simple_prop_t 	*ret;
+	char			*fmri_buf, *svcfmri = NULL;
+	ssize_t			fmri_sz;
+	scf_property_t		*prop = NULL;
+	scf_service_t		*svc = NULL;
+	scf_simple_prop_t	*ret;
 	scf_handle_t		*h = NULL;
 	boolean_t		local_h = B_TRUE;
 
@@ -1785,10 +1785,10 @@ scf_simple_prop_free(scf_simple_prop_t *prop)
 scf_simple_app_props_t *
 scf_simple_app_props_get(scf_handle_t *hin, const char *inst_fmri)
 {
-	scf_instance_t 		*inst = NULL;
-	scf_service_t 		*svc = NULL;
-	scf_propertygroup_t 	*pg = NULL;
-	scf_property_t 		*prop = NULL;
+	scf_instance_t		*inst = NULL;
+	scf_service_t		*svc = NULL;
+	scf_propertygroup_t	*pg = NULL;
+	scf_property_t		*prop = NULL;
 	scf_simple_app_props_t	*ret = NULL;
 	scf_iter_t		*pgiter = NULL, *propiter = NULL;
 	struct scf_simple_pg	*thispg = NULL, *nextpg;
@@ -1796,7 +1796,7 @@ scf_simple_app_props_get(scf_handle_t *hin, const char *inst_fmri)
 	scf_handle_t		*h = NULL;
 	int			pgiter_ret, propiter_ret;
 	ssize_t			namelen;
-	char 			*propname = NULL, *pgname = NULL, *sys_fmri;
+	char			*propname = NULL, *pgname = NULL, *sys_fmri;
 	uint8_t			found;
 	boolean_t		local_h = B_TRUE;
 
@@ -2136,8 +2136,8 @@ error2:
 void
 scf_simple_app_props_free(scf_simple_app_props_t *propblock)
 {
-	struct scf_simple_pg 	*pgthis, *pgnext;
-	scf_simple_prop_t 	*propthis, *propnext;
+	struct scf_simple_pg	*pgthis, *pgnext;
+	scf_simple_prop_t	*propthis, *propnext;
 
 	if ((propblock == NULL) || (propblock->ap_pglist == NULL))
 		return;
@@ -2165,7 +2165,7 @@ const scf_simple_prop_t *
 scf_simple_app_props_next(const scf_simple_app_props_t *propblock,
     scf_simple_prop_t *last)
 {
-	struct scf_simple_pg 	*this;
+	struct scf_simple_pg	*this;
 
 	if (propblock == NULL) {
 		(void) scf_set_error(SCF_ERROR_NOT_SET);
@@ -2230,8 +2230,8 @@ const scf_simple_prop_t *
 scf_simple_app_props_search(const scf_simple_app_props_t *propblock,
     const char *pgname, const char *propname)
 {
-	struct scf_simple_pg 	*pg;
-	scf_simple_prop_t 	*prop;
+	struct scf_simple_pg	*pg;
+	scf_simple_prop_t	*prop;
 
 	if ((propblock == NULL) || (propname == NULL)) {
 		(void) scf_set_error(SCF_ERROR_NOT_SET);

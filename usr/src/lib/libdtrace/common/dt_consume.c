@@ -1277,7 +1277,7 @@ dt_print_stack(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 			return (dt_set_errno(dtp, EDT_BADSTACKPC));
 		}
 
-		if (pc == NULL)
+		if (pc == 0)
 			break;
 
 		addr += size;
@@ -1365,7 +1365,7 @@ dt_print_ustack(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 	if (P != NULL)
 		dt_proc_lock(dtp, P); /* lock handle while we perform lookups */
 
-	for (i = 0; i < depth && pc[i] != NULL; i++) {
+	for (i = 0; i < depth && pc[i] != 0; i++) {
 		const prmap_t *map;
 
 		if ((err = dt_printf(dtp, fp, "%*s", indent, "")) < 0)

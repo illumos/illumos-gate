@@ -23,9 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  *	Name:		getpathbylabel.c
  *
@@ -182,7 +179,7 @@ tsol_mkmntlist(void)
 		return (NULL);
 	}
 	resetmnttab(mounted);
-	while (getmntent(mounted, &mnt) == NULL) {
+	while (getmntent(mounted, &mnt) == 0) {
 		mntl = (struct mntlist *)malloc(sizeof (*mntl));
 		if (mntl == NULL) {
 			tsol_mlist_free(mntst);

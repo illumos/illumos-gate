@@ -152,7 +152,7 @@ validate_rdebug32(struct rd_agent *rap)
 
 rd_err_e
 find_dynamic_ent32(struct rd_agent *rap, psaddr_t dynaddr,
-	Xword dyntag, Dyn *dyn)
+    Xword dyntag, Dyn *dyn)
 {
 	struct ps_prochandle	*php = rap->rd_psp;
 	Dyn			d;
@@ -570,7 +570,7 @@ _rd_objpad_enable32(struct rd_agent *rap, size_t padsize)
 
 static rd_err_e
 iter_map(rd_agent_t *rap, unsigned long ident, psaddr_t lmaddr,
-	rl_iter_f *cb, void *client_data, uint_t *abort_iterp)
+    rl_iter_f *cb, void *client_data, uint_t *abort_iterp)
 {
 	while (lmaddr) {
 		Rt_map		rmap;
@@ -724,7 +724,7 @@ _rd_loadobj_iter32_native(rd_agent_t *rap, rl_iter_f *cb, void *client_data,
 		return (RD_DBERR);
 	}
 
-	if (db_priv.rtd_dynlmlst == NULL) {
+	if (db_priv.rtd_dynlmlst == 0) {
 		LOG(ps_plog(MSG_ORIG(MSG_DB_LKMAPNOINIT),
 		    EC_ADDR((uintptr_t)db_priv.rtd_dynlmlst)));
 		return (RD_NOMAPS);
@@ -737,7 +737,7 @@ _rd_loadobj_iter32_native(rd_agent_t *rap, rl_iter_f *cb, void *client_data,
 		return (RD_DBERR);
 	}
 
-	if (addr == NULL) {
+	if (addr == 0) {
 		LOG(ps_plog(MSG_ORIG(MSG_DB_LKMAPNOINIT_1),
 		    EC_ADDR((uintptr_t)db_priv.rtd_dynlmlst)));
 		return (RD_NOMAPS);

@@ -23,8 +23,6 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -236,7 +234,7 @@ sip_get_uri_port(const struct sip_uri *uri, int *error)
 
 	_uri = sip_check_get_param(uri, error);
 	if (_uri == NULL)
-		return (NULL);
+		return (0);
 
 	if ((_uri->sip_uri_errflags & SIP_URIERR_PORT) != 0) {
 		if (error != NULL)

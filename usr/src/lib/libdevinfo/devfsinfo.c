@@ -491,7 +491,7 @@ devfs_bootdev_set_list(const char *dev_name, const uint_t options)
 			i++;
 		}
 		ptr--;
-		*ptr = NULL;
+		*ptr = 0;
 
 		prom_list_free(prom_list);
 	}
@@ -835,7 +835,7 @@ find_x86_boot_device(struct openpromio *opp)
  */
 int
 devfs_bootdev_get_list(const char *default_root,
-	struct boot_dev ***bootdev_list)
+    struct boot_dev ***bootdev_list)
 {
 	Oppbuf  oppbuf;
 	struct openpromio *opp = &(oppbuf.opp);
@@ -877,7 +877,7 @@ devfs_bootdev_get_list(const char *default_root,
  */
 static int
 process_bootdev(const char *bootdevice, const char *default_root,
-	struct boot_dev ***list)
+    struct boot_dev ***list)
 {
 	int i;
 	char *entry, *ptr;
@@ -1202,7 +1202,7 @@ devfs_phys_to_logical(struct boot_dev **bootdev_array, const int array_size,
 /* ARGSUSED */
 static int
 check_logical_dev(const char *node, const struct stat *node_stat, int flags,
-	struct FTW *ftw_info)
+    struct FTW *ftw_info)
 {
 	char link_buf[MAXPATHLEN];
 	int link_buf_len;
@@ -1352,7 +1352,7 @@ devfs_dev_to_prom_names(char *dev_path, char *prom_path, size_t len)
 		i = len - opp->oprom_size;
 		if (i < 0) {
 			bcopy(opp->oprom_array, prom_path, len);
-			prom_path[len - 1] = NULL;
+			prom_path[len - 1] = '\0';
 			return (len);
 		} else {
 			bcopy(opp->oprom_array, prom_path, len);

@@ -88,7 +88,7 @@ ecleanup(void)
 {
 	if (errfile[0]) {
 		(void) unlink(errfile);
-		errfile[0] = NULL;
+		errfile[0] = '\0';
 	}
 }
 
@@ -218,15 +218,15 @@ epopen(char *cmd, char *mode)
 
 	if (strlcpy(errfile, perrfile, sizeof (errfile)) > sizeof (errfile)) {
 		progerr(pkg_gt("file name max length %d; name is too long: %s"),
-						sizeof (errfile), perrfile);
-		return ((FILE *)0);
+		    sizeof (errfile), perrfile);
+		return (NULL);
 	}
 
 	len = strlen(cmd)+6+strlen(errfile);
 	buffer = (char *)calloc(len, sizeof (char));
 	if (buffer == NULL) {
 		progerr(pkg_gt("no memory in epopen(), errno=%d"), errno);
-		return ((FILE *)0);
+		return (NULL);
 	}
 
 	if (strchr(cmd, '|')) {
@@ -237,8 +237,8 @@ epopen(char *cmd, char *mode)
 
 	if (alen > len) {
 		progerr(pkg_gt("command max length %d; cmd is too long: %s"),
-								len, cmd);
-		return ((FILE *)0);
+		    len, cmd);
+		return (NULL);
 	}
 
 	pp = popen(buffer, mode);
@@ -289,7 +289,7 @@ epclose(FILE *pp)
  *				r_status and r_results have no meaning;
  *				r_status will be -1
  *				r_results will be NULL
- * NOTE:    	Any results returned is placed in new storage for the
+ * NOTE:	Any results returned is placed in new storage for the
  *		calling method. The caller must use 'free' to dispose
  *		of the storage once the results are no longer needed.
  * NOTE:	If 0 is returned, 'r_status' must be queried to
@@ -301,7 +301,7 @@ epclose(FILE *pp)
 
 int
 e_ExecCmdArray(int *r_status, char **r_results,
-	char *a_inputFile, char *a_cmd, char **a_args)
+    char *a_inputFile, char *a_cmd, char **a_args)
 {
 	char		*buffer;
 	int		bufferIndex;
@@ -427,7 +427,7 @@ e_ExecCmdArray(int *r_status, char **r_results,
 		/* read as much child data as there is available buffer space */
 
 		bytesRead = read(ipipe[0], buffer + bufferIndex,
-						bufferSize - bufferIndex);
+		    bufferSize - bufferIndex);
 
 		/* break out of read loop if end-of-file encountered */
 
@@ -459,9 +459,9 @@ e_ExecCmdArray(int *r_status, char **r_results,
 		bufferIndex += bytesRead;
 		if (bufferIndex >= bufferSize) {
 			buffer = realloc(buffer,
-					bufferSize += PIPE_BUFFER_INCREMENT);
+			    bufferSize += PIPE_BUFFER_INCREMENT);
 			(void) memset(buffer + bufferIndex, 0,
-				bufferSize - bufferIndex);
+			    bufferSize - bufferIndex);
 		}
 	}
 
@@ -538,7 +538,7 @@ e_ExecCmdArray(int *r_status, char **r_results,
  *				Look at r_status for results of Unix command
  *			!= 0 - problems executing command
  *				r_status and r_results have no meaning
- * NOTE:    	Any results returned is placed in new storage for the
+ * NOTE:	Any results returned is placed in new storage for the
  *		calling method. The caller must use 'free' to dispose
  *		of the storage once the results are no longer needed.
  * NOTE:	If LU_SUCCESS is returned, 'r_status' must be queried to
@@ -547,7 +547,7 @@ e_ExecCmdArray(int *r_status, char **r_results,
 
 int
 e_ExecCmdList(int *r_status, char **r_results,
-	char *a_inputFile, char *a_cmd, ...)
+    char *a_inputFile, char *a_cmd, ...)
 {
 	va_list		ap;		/* references variable argument list */
 	char		*array[MAX_EXEC_CMD_ARGS+1];
@@ -569,6 +569,5 @@ e_ExecCmdList(int *r_status, char **r_results,
 	}
 
 	va_end(ap);
-	return (e_ExecCmdArray(r_status, r_results, a_inputFile,
-								a_cmd, array));
+	return (e_ExecCmdArray(r_status, r_results, a_inputFile, a_cmd, array));
 }

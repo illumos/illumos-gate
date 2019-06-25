@@ -92,8 +92,8 @@ sip_int_to_str(int i)
 static char *
 sip_add_aquot_to_str(char *str, boolean_t *alloc)
 {
-	char 		*new_str;
-	char 		*tmp = str;
+	char		*new_str;
+	char		*tmp = str;
 	int		size;
 
 	while (isspace(*tmp))
@@ -124,8 +124,8 @@ static int
 sip_add_empty_hdr(sip_msg_t sip_msg, char *hdr_name)
 {
 	_sip_header_t	*new_header;
-	int 		header_size;
-	_sip_msg_t 	*_sip_msg;
+	int		header_size;
+	_sip_msg_t	*_sip_msg;
 	int		csize = sizeof (char);
 
 	if (sip_msg == NULL || hdr_name == NULL)
@@ -164,8 +164,8 @@ sip_add_2strs_to_msg(sip_msg_t sip_msg, char *hdr_name, char *str1,
     boolean_t qstr1, char *str2, char *plist, char sep)
 {
 	_sip_header_t	*new_header;
-	int 		header_size;
-	_sip_msg_t 	*_sip_msg;
+	int		header_size;
+	_sip_msg_t	*_sip_msg;
 	int		csize = sizeof (char);
 
 	if (sip_msg == NULL || str1 == NULL || str2 == NULL ||
@@ -237,8 +237,8 @@ sip_add_str_to_msg(sip_msg_t sip_msg, char *hdr_name, char *str, char *plist,
     char param_sep)
 {
 	_sip_header_t	*new_header;
-	int 		header_size;
-	_sip_msg_t 	*_sip_msg;
+	int		header_size;
+	_sip_msg_t	*_sip_msg;
 	int		csize = sizeof (char);
 
 	if (sip_msg == NULL || str == NULL || (str != NULL && str[0] == '\0'))
@@ -287,8 +287,8 @@ static int
 sip_add_int_to_msg(sip_msg_t sip_msg, char *hdr_name, int i, char *plist)
 {
 	_sip_header_t	*new_header;
-	int 		header_size;
-	_sip_msg_t 	*_sip_msg;
+	int		header_size;
+	_sip_msg_t	*_sip_msg;
 	char		*digit_str;
 	int		csize = sizeof (char);
 
@@ -349,8 +349,8 @@ sip_add_intstr_to_msg(sip_msg_t sip_msg, char *hdr_name, int i, char *s,
     char *plist)
 {
 	_sip_header_t	*new_header;
-	int 		header_size;
-	_sip_msg_t 	*_sip_msg;
+	int		header_size;
+	_sip_msg_t	*_sip_msg;
 	char		*digit_str;
 	int		csize = sizeof (char);
 
@@ -580,7 +580,7 @@ sip_add_allow(sip_msg_t sip_msg, sip_method_t method)
 	if (method == 0 || method >= MAX_SIP_METHODS)
 		return (EINVAL);
 	ret = sip_add_str_to_msg(sip_msg, SIP_ALLOW, sip_methods[method].name,
-	    NULL, (char)NULL);
+	    NULL, 0);
 	return (ret);
 }
 
@@ -646,8 +646,7 @@ sip_add_content_enc(sip_msg_t sip_msg, char *code)
 	if (code == NULL)
 		return (EINVAL);
 
-	ret = sip_add_str_to_msg(sip_msg, SIP_CONTENT_ENCODE, code, NULL,
-	    (char)NULL);
+	ret = sip_add_str_to_msg(sip_msg, SIP_CONTENT_ENCODE, code, NULL, 0);
 	return (ret);
 }
 
@@ -665,8 +664,7 @@ sip_add_content_lang(sip_msg_t sip_msg, char *lang)
 
 	if (lang == NULL)
 		return (EINVAL);
-	ret = sip_add_str_to_msg(sip_msg, SIP_CONTENT_LANG, lang, NULL,
-	    (char)NULL);
+	ret = sip_add_str_to_msg(sip_msg, SIP_CONTENT_LANG, lang, NULL, 0);
 	return (ret);
 }
 
@@ -675,7 +673,7 @@ sip_add_content_lang(sip_msg_t sip_msg, char *lang)
  * SIP-date      =  rfc1123-date
  * rfc1123-date  =  wkday "," SP date1 SP time SP "GMT"
  * date1         =  2DIGIT SP month SP 4DIGIT
- * 			; day month year (e.g., 02 Jun 1982)
+ *			; day month year (e.g., 02 Jun 1982)
  * time          =  2DIGIT ":" 2DIGIT ":" 2DIGIT
  *			; 00:00:00 - 23:59:59
  * wkday         =  "Mon" / "Tue" / "Wed"
@@ -691,7 +689,7 @@ sip_add_date(sip_msg_t sip_msg, char *date)
 
 	if (date == NULL)
 		return (EINVAL);
-	ret = sip_add_str_to_msg(sip_msg, SIP_DATE, date, NULL, (char)NULL);
+	ret = sip_add_str_to_msg(sip_msg, SIP_DATE, date, NULL, 0);
 	return (ret);
 }
 
@@ -745,8 +743,7 @@ sip_add_in_reply_to(sip_msg_t sip_msg, char *reply_id)
 
 	if (reply_id == NULL)
 		return (EINVAL);
-	r = sip_add_str_to_msg(sip_msg, SIP_IN_REPLY_TO, reply_id, NULL,
-	    (char)NULL);
+	r = sip_add_str_to_msg(sip_msg, SIP_IN_REPLY_TO, reply_id, NULL, 0);
 	return (r);
 }
 
@@ -788,8 +785,7 @@ sip_add_mime_version(sip_msg_t sip_msg, char *version)
 
 	if (version == NULL)
 		return (EINVAL);
-	ret = sip_add_str_to_msg(sip_msg, SIP_MIME_VERSION, version, NULL,
-	    (char)NULL);
+	ret = sip_add_str_to_msg(sip_msg, SIP_MIME_VERSION, version, NULL, 0);
 	return (ret);
 }
 
@@ -805,7 +801,7 @@ sip_add_org(sip_msg_t sip_msg, char *org)
 		ret = sip_add_empty_hdr(sip_msg, SIP_ORGANIZATION);
 	} else {
 		ret = sip_add_str_to_msg(sip_msg, SIP_ORGANIZATION, org, NULL,
-		    (char)NULL);
+		    0);
 	}
 	return (ret);
 }
@@ -823,7 +819,7 @@ sip_add_priority(sip_msg_t sip_msg, char *prio)
 
 	if (prio == NULL)
 		return (EINVAL);
-	ret = sip_add_str_to_msg(sip_msg, SIP_PRIORITY, prio, NULL, (char)NULL);
+	ret = sip_add_str_to_msg(sip_msg, SIP_PRIORITY, prio, NULL, 0);
 
 	return (ret);
 }
@@ -855,8 +851,7 @@ sip_add_privacy(sip_msg_t sip_msg, char *priv_val)
 
 	if (priv_val == NULL)
 		return (EINVAL);
-	ret = sip_add_str_to_msg(sip_msg, SIP_PRIVACY, priv_val, NULL,
-	    (char)NULL);
+	ret = sip_add_str_to_msg(sip_msg, SIP_PRIVACY, priv_val, NULL, 0);
 	return (ret);
 }
 
@@ -871,7 +866,7 @@ sip_add_require(sip_msg_t sip_msg, char *req)
 
 	if (req == NULL)
 		return (EINVAL);
-	ret = sip_add_str_to_msg(sip_msg, SIP_REQUIRE, req, NULL, (char)NULL);
+	ret = sip_add_str_to_msg(sip_msg, SIP_REQUIRE, req, NULL, 0);
 	return (ret);
 }
 
@@ -911,7 +906,7 @@ sip_add_server(sip_msg_t sip_msg, char *svr)
 
 	if (svr == NULL)
 		return (EINVAL);
-	ret = sip_add_str_to_msg(sip_msg, SIP_SERVER, svr, NULL, (char)NULL);
+	ret = sip_add_str_to_msg(sip_msg, SIP_SERVER, svr, NULL, 0);
 	return (ret);
 }
 
@@ -926,8 +921,8 @@ sip_add_subject(sip_msg_t sip_msg, char *subject)
 	if (subject == NULL) {
 		ret = sip_add_empty_hdr(sip_msg, SIP_SUBJECT);
 	} else {
-		ret = sip_add_str_to_msg(sip_msg, SIP_SUBJECT, subject, NULL,
-		    (char)NULL);
+		ret = sip_add_str_to_msg(sip_msg, SIP_SUBJECT, subject,
+		    NULL, 0);
 	}
 	return (ret);
 }
@@ -945,7 +940,7 @@ sip_add_supported(sip_msg_t sip_msg, char *support)
 		ret = sip_add_empty_hdr(sip_msg, SIP_SUPPORT);
 	} else {
 		ret = sip_add_str_to_msg(sip_msg, SIP_SUPPORT, support, NULL,
-		    (char)NULL);
+		    0);
 	}
 	return (ret);
 }
@@ -961,8 +956,7 @@ sip_add_tstamp(sip_msg_t sip_msg, char *time, char *delay)
 	int	ret;
 
 	if (delay == NULL) {
-		ret = sip_add_str_to_msg(sip_msg, SIP_TIMESTAMP, time, NULL,
-		    (char)NULL);
+		ret = sip_add_str_to_msg(sip_msg, SIP_TIMESTAMP, time, NULL, 0);
 	} else {
 		ret = sip_add_2strs_to_msg(sip_msg, SIP_TIMESTAMP, time,
 		    B_FALSE, delay, NULL, ' ');
@@ -980,8 +974,7 @@ sip_add_unsupported(sip_msg_t sip_msg, char *unsupport)
 
 	if (unsupport == NULL)
 		return (EINVAL);
-	ret = sip_add_str_to_msg(sip_msg, SIP_UNSUPPORT, unsupport, NULL,
-	    (char)NULL);
+	ret = sip_add_str_to_msg(sip_msg, SIP_UNSUPPORT, unsupport, NULL, 0);
 	return (ret);
 }
 
@@ -995,7 +988,7 @@ sip_add_user_agent(sip_msg_t sip_msg, char *usr)
 
 	if (usr == NULL)
 		return (EINVAL);
-	r = sip_add_str_to_msg(sip_msg, SIP_USER_AGENT, usr, NULL, (char)NULL);
+	r = sip_add_str_to_msg(sip_msg, SIP_USER_AGENT, usr, NULL, 0);
 	return (r);
 }
 
@@ -1013,8 +1006,8 @@ int
 sip_add_warning(sip_msg_t sip_msg, int code, char *addr, char *msg)
 {
 	_sip_header_t	*new_header;
-	int 		header_size;
-	_sip_msg_t 	*_sip_msg;
+	int		header_size;
+	_sip_msg_t	*_sip_msg;
 	char		*hdr_name = SIP_WARNING;
 
 	if (sip_msg == NULL || addr == NULL || msg == NULL ||
@@ -1060,8 +1053,8 @@ int
 sip_add_rack(sip_msg_t sip_msg, int resp_num, int cseq, sip_method_t method)
 {
 	_sip_header_t	*new_header;
-	int 		header_size;
-	_sip_msg_t 	*_sip_msg;
+	int		header_size;
+	_sip_msg_t	*_sip_msg;
 	char		*hdr_name = SIP_RACK;
 
 	if (sip_msg == NULL || resp_num <= 0 || cseq < 0 || method <= 0 ||
@@ -1107,8 +1100,8 @@ sip_add_rack(sip_msg_t sip_msg, int resp_num, int cseq, sip_method_t method)
 int
 sip_add_allow_events(sip_msg_t sip_msg, char *t_event)
 {
-	return (sip_add_str_to_msg(sip_msg, SIP_ALLOW_EVENTS, t_event, NULL,
-	    (char)NULL));
+	return (sip_add_str_to_msg(sip_msg, SIP_ALLOW_EVENTS, t_event,
+	    NULL, 0));
 }
 
 /*
@@ -1130,13 +1123,13 @@ sip_add_event(sip_msg_t sip_msg, char *t_event, char *plist)
 
 /*
  * Subscription-State   = "Subscription-State" HCOLON substate-value
- * 			*( SEMI subexp-params )
+ *			*( SEMI subexp-params )
  * substate-value       = "active" / "pending" / "terminated"
  *			/ extension-substate
  * extension-substate   = token
  * subexp-params        =   ("reason" EQUAL event-reason-value)
  *			/ ("expires" EQUAL delta-seconds)*
- * 			/ ("retry-after" EQUAL delta-seconds)
+ *			/ ("retry-after" EQUAL delta-seconds)
  *			/ generic-param
  * event-reason-value   =   "deactivated"
  *				/ "probation"
@@ -1176,7 +1169,7 @@ sip_add_substate(sip_msg_t sip_msg, char *sub, char *plist)
  * dresponse         =  "response" EQUAL request-digest
  * request-digest    =  LDQUOT 32LHEX RDQUOT
  * auth-param        =  auth-param-name EQUAL
- * 			( token / quoted-string )
+ *			( token / quoted-string )
  * auth-param-name   =  token
  * other-response    =  auth-scheme LWS auth-param
  *			*(COMMA auth-param)
@@ -1201,8 +1194,7 @@ sip_add_author(sip_msg_t sip_msg, char *scheme, char *param)
 int
 sip_add_authen_info(sip_msg_t sip_msg, char *ainfo)
 {
-	return (sip_add_str_to_msg(sip_msg, SIP_AUTHEN_INFO, ainfo, NULL,
-	    (char)NULL));
+	return (sip_add_str_to_msg(sip_msg, SIP_AUTHEN_INFO, ainfo, NULL, 0));
 }
 
 /*
@@ -1210,7 +1202,7 @@ sip_add_authen_info(sip_msg_t sip_msg, char *ainfo)
  * challenge           =  ("Digest" LWS digest-cln *(COMMA digest-cln))
  *				/ other-challenge
  * other-challenge     =  auth-scheme LWS auth-param
- * 				*(COMMA auth-param)
+ *				*(COMMA auth-param)
  * digest-cln          =  realm / domain / nonce
  *				/ opaque / stale / algorithm
  *				/ qop-options / auth-param
@@ -1254,8 +1246,7 @@ sip_add_proxy_author(sip_msg_t sip_msg, char *paschem, char *paparam)
 int
 sip_add_proxy_require(sip_msg_t sip_msg, char *opt)
 {
-	return (sip_add_str_to_msg(sip_msg, SIP_PROXY_REQ, opt, NULL,
-	    (char)NULL));
+	return (sip_add_str_to_msg(sip_msg, SIP_PROXY_REQ, opt, NULL, 0));
 }
 
 /*
@@ -1289,8 +1280,7 @@ sip_add_callid(sip_msg_t sip_msg, char *callid)
 			return (ENOMEM);
 		allocd = B_TRUE;
 	}
-	ret = sip_add_str_to_msg(sip_msg, SIP_CALL_ID, callid, NULL,
-	    (char)NULL);
+	ret = sip_add_str_to_msg(sip_msg, SIP_CALL_ID, callid, NULL, 0);
 	if (allocd)
 		free(callid);
 	return (ret);
@@ -1465,7 +1455,7 @@ int
 sip_add_content_length(_sip_msg_t *_sip_msg, int length)
 {
 	_sip_header_t	*new_header;
-	int 		header_size;
+	int		header_size;
 
 	if (_sip_msg == NULL || length < 0)
 		return (EINVAL);

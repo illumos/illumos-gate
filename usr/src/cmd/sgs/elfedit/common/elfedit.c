@@ -268,7 +268,7 @@ elfedit_msg(elfedit_msg_t type, const char *format, ...)
 {
 	typedef enum {			/* What to do after finished */
 		DISP_RET = 0,		/* Return to caller */
-		DISP_JMP = 1, 		/* if (interactive) longjmp else exit */
+		DISP_JMP = 1,		/* if (interactive) longjmp else exit */
 		DISP_EXIT = 2		/* exit under all circumstances */
 	} DISP;
 
@@ -1420,7 +1420,7 @@ path_is_so(const char *path)
 static const char *
 elfedit_basename(const char *path, const char *tail, char *buf, size_t bufsiz)
 {
-	const char 	*s;
+	const char	*s;
 
 	if (tail == NULL)
 		tail = path + strlen(path);
@@ -1676,7 +1676,7 @@ validate_optarg(elfedit_cmd_optarg_t *optarg, int isopt, MODLIST_T *moddef,
 				/* MSG_INTL(MSG_ERR_CMDOA_VALNAM) */
 				FAIL(MSG_ERR_CMDOA_VALNAM);
 			}
-			if ((oa1->oa_help != NULL) || (oa1->oa_flags != 0) ||
+			if ((oa1->oa_help != 0) || (oa1->oa_flags != 0) ||
 			    (oa1->oa_idmask != 0) || (oa1->oa_excmask != 0)) {
 				/* MSG_INTL(MSG_ERR_CMDOA_VALNOT0) */
 				FAIL(MSG_ERR_CMDOA_VALNOT0);
@@ -1977,7 +1977,7 @@ elfedit_load_moddir(const char *dirpath, int must_exist, int abs_path)
 	char		path[PATH_MAX + 1];
 	DIR		*dir;
 	struct dirent	*dp;
-	const char 	*tail;
+	const char	*tail;
 
 	dir = opendir(dirpath);
 	if (dir == NULL) {
@@ -3225,7 +3225,7 @@ cmd_match_fcn(WordCompletion *cpl, void *data, const char *line, int word_end)
 		}
 		skip_one = 0;
 		ostyle_ndx = -1;
-		if ((strcmp(argv[i], MSG_ORIG(MSG_STR_MINUS_MINUS)) == NULL) ||
+		if ((strcmp(argv[i], MSG_ORIG(MSG_STR_MINUS_MINUS)) == 0) ||
 		    (*argv[i] != '-')) {
 			opt_term_seen = 1;
 			continue;

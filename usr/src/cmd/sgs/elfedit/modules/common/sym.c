@@ -116,7 +116,7 @@ typedef enum {
 					/*	 index section */
 	SYM_OPT_F_NAMOFFSET =	2,	/* -name_offset: sym:st_name name arg */
 					/*	is numeric offset */
-					/* 	rather than ASCII string */
+					/*	rather than ASCII string */
 	SYM_OPT_F_SECSHNDX =	4,	/* -secshndx: Section arg is */
 					/*	section index, not name */
 	SYM_OPT_F_SECSHTYP =	8,	/* -secshtyp: Section arg is */
@@ -171,7 +171,7 @@ typedef struct {
 } SYMSTATE;
 typedef struct {
 	elfedit_obj_state_t	*obj_state;
-	sym_opt_t		optmask;   	/* Mask of options used */
+	sym_opt_t		optmask;	/* Mask of options used */
 	int			argc;		/* # of plain arguments */
 	const char		**argv;		/* Plain arguments */
 	int			numsymstate;	/* # of items in symstate[] */
@@ -1471,7 +1471,7 @@ cpl_sh_opt(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
 {
 	enum { NAME, INDEX, TYPE }	op;
 	elfedit_symtab_t		*symtab;
-	Word 	tblndx;
+	Word	tblndx;
 
 	if ((argc != num_opt) || (argc < 2))
 		return;
@@ -1689,21 +1689,21 @@ elfedit_init(elfedit_module_version_t version)
 		    /* MSG_INTL(MSG_OPTDESC_SHNAM) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_SHNAM), ELFEDIT_CMDOA_F_VALUE,
 		    SYM_OPT_F_SHNAME, SYM_OPT_F_SHNDX | SYM_OPT_F_SHTYP },
-		{ MSG_ORIG(MSG_STR_NAME), NULL, 0 },
+		{ MSG_ORIG(MSG_STR_NAME), 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SHNDX),
 		    /* MSG_INTL(MSG_OPTDESC_SHNDX) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_SHNDX), ELFEDIT_CMDOA_F_VALUE,
 		    SYM_OPT_F_SHNDX, SYM_OPT_F_SHNAME | SYM_OPT_F_SHTYP },
-		{ MSG_ORIG(MSG_STR_INDEX), NULL, 0 },
+		{ MSG_ORIG(MSG_STR_INDEX), 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SHTYP),
 		    /* MSG_INTL(MSG_OPTDESC_SHTYP) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_SHTYP), ELFEDIT_CMDOA_F_VALUE,
 		    SYM_OPT_F_SHTYP, SYM_OPT_F_SHNAME | SYM_OPT_F_SHNDX },
-		{ MSG_ORIG(MSG_STR_TYPE), NULL, 0 },
+		{ MSG_ORIG(MSG_STR_TYPE), 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SYMNDX),
 		    /* MSG_INTL(MSG_OPTDESC_SYMNDX) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_SYMNDX), 0, SYM_OPT_F_SYMNDX },
-		{ ELFEDIT_STDOA_OPT_O, NULL,
+		{ ELFEDIT_STDOA_OPT_O, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, 0 },
 		{ NULL }
 	};
@@ -1719,17 +1719,17 @@ elfedit_init(elfedit_module_version_t version)
 		    /* MSG_INTL(MSG_OPTDESC_SHNAM) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_SHNAM), ELFEDIT_CMDOA_F_VALUE,
 		    SYM_OPT_F_SHNAME, SYM_OPT_F_SHNDX | SYM_OPT_F_SHTYP },
-		{ MSG_ORIG(MSG_STR_NAME), NULL, 0 },
+		{ MSG_ORIG(MSG_STR_NAME), 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SHNDX),
 		    /* MSG_INTL(MSG_OPTDESC_SHNDX) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_SHNDX), ELFEDIT_CMDOA_F_VALUE,
 		    SYM_OPT_F_SHNDX, SYM_OPT_F_SHNAME | SYM_OPT_F_SHTYP },
-		{ MSG_ORIG(MSG_STR_INDEX), NULL, 0 },
+		{ MSG_ORIG(MSG_STR_INDEX), 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SHTYP),
 		    /* MSG_INTL(MSG_OPTDESC_SHTYP) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_SHTYP), ELFEDIT_CMDOA_F_VALUE,
 		    SYM_OPT_F_SHTYP, SYM_OPT_F_SHNAME | SYM_OPT_F_SHNDX },
-		{ MSG_ORIG(MSG_STR_TYPE), NULL, 0 },
+		{ MSG_ORIG(MSG_STR_TYPE), 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SYMNDX),
 		    /* MSG_INTL(MSG_OPTDESC_SYMNDX) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_SYMNDX), 0, SYM_OPT_F_SYMNDX },
@@ -1781,17 +1781,17 @@ elfedit_init(elfedit_module_version_t version)
 		    /* MSG_INTL(MSG_OPTDESC_SHNAM) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_SHNAM), ELFEDIT_CMDOA_F_VALUE,
 		    SYM_OPT_F_SHNAME, SYM_OPT_F_SHNDX | SYM_OPT_F_SHTYP },
-		{ MSG_ORIG(MSG_STR_NAME), NULL, 0, 0 },
+		{ MSG_ORIG(MSG_STR_NAME), 0, 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SHNDX),
 		    /* MSG_INTL(MSG_OPTDESC_SHNDX) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_SHNDX), ELFEDIT_CMDOA_F_VALUE,
 		    SYM_OPT_F_SHNDX, SYM_OPT_F_SHNAME | SYM_OPT_F_SHTYP },
-		{ MSG_ORIG(MSG_STR_INDEX), NULL, 0, 0 },
+		{ MSG_ORIG(MSG_STR_INDEX), 0, 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SHTYP),
 		    /* MSG_INTL(MSG_OPTDESC_SHTYP) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_SHTYP), ELFEDIT_CMDOA_F_VALUE,
 		    SYM_OPT_F_SHTYP, SYM_OPT_F_SHNAME | SYM_OPT_F_SHNDX },
-		{ MSG_ORIG(MSG_STR_TYPE), NULL, 0, 0 },
+		{ MSG_ORIG(MSG_STR_TYPE), 0, 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SYMNDX),
 		    /* MSG_INTL(MSG_OPTDESC_SYMNDX) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_SYMNDX), 0,
@@ -1800,7 +1800,7 @@ elfedit_init(elfedit_module_version_t version)
 		    /* MSG_INTL(MSG_OPTDESC_NAME_OFFSET) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_NAME_OFFSET), 0,
 		    SYM_OPT_F_NAMOFFSET, 0 },
-		{ ELFEDIT_STDOA_OPT_O, NULL,
+		{ ELFEDIT_STDOA_OPT_O, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
 		{ NULL }
 	};
@@ -1842,22 +1842,22 @@ elfedit_init(elfedit_module_version_t version)
 		    /* MSG_INTL(MSG_OPTDESC_SHNAM) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_SHNAM), ELFEDIT_CMDOA_F_VALUE,
 		    SYM_OPT_F_SHNAME, SYM_OPT_F_SHNDX | SYM_OPT_F_SHTYP },
-		{ MSG_ORIG(MSG_STR_NAME), NULL, 0, 0 },
+		{ MSG_ORIG(MSG_STR_NAME), 0, 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SHNDX),
 		    /* MSG_INTL(MSG_OPTDESC_SHNDX) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_SHNDX), ELFEDIT_CMDOA_F_VALUE,
 		    SYM_OPT_F_SHNDX, SYM_OPT_F_SHNAME | SYM_OPT_F_SHTYP },
-		{ MSG_ORIG(MSG_STR_INDEX), NULL, 0, 0 },
+		{ MSG_ORIG(MSG_STR_INDEX), 0, 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SHTYP),
 		    /* MSG_INTL(MSG_OPTDESC_SHTYP) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_SHTYP), ELFEDIT_CMDOA_F_VALUE,
 		    SYM_OPT_F_SHTYP, SYM_OPT_F_SHNAME | SYM_OPT_F_SHNDX },
-		{ MSG_ORIG(MSG_STR_TYPE), NULL, 0, 0 },
+		{ MSG_ORIG(MSG_STR_TYPE), 0, 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SYMNDX),
 		    /* MSG_INTL(MSG_OPTDESC_SYMNDX) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_SYMNDX), 0,
 		    SYM_OPT_F_SYMNDX, 0 },
-		{ ELFEDIT_STDOA_OPT_O, NULL,
+		{ ELFEDIT_STDOA_OPT_O, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SECSHNDX),
 		    /* MSG_INTL(MSG_OPTDESC_SECSHNDX) */

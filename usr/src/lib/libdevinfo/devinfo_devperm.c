@@ -676,7 +676,7 @@ getnexttoken(char *next, char **nextp, char **tokenpp, char *tchar)
 			;
 		if (*cp1 == '=' || *cp1 == ':' || *cp1 == '&' || *cp1 == '|' ||
 		    *cp1 == ';' || *cp1 == '\n' || *cp1 == '\0') {
-			*cp = NULL;	/* terminate token */
+			*cp = '\0';	/* terminate token */
 			cp = cp1;
 		}
 	}
@@ -959,7 +959,7 @@ devfs_read_minor_perm(void (*errcb)(minorperm_err_t, int))
 
 static struct mperm *
 i_devfs_read_minor_perm_by_driver(char *drvname,
-	void (*errcb)(minorperm_err_t mp_err, int key))
+    void (*errcb)(minorperm_err_t mp_err, int key))
 {
 	return (i_devfs_read_minor_perm(drvname, errcb));
 }
@@ -1010,7 +1010,7 @@ i_devfs_add_perm_entry(nvlist_t *nvl, struct mperm *mp)
 
 static nvlist_t *
 i_devfs_minor_perm_nvlist(struct mperm *mplist,
-	void (*errcb)(minorperm_err_t, int))
+    void (*errcb)(minorperm_err_t, int))
 {
 	int err;
 	struct mperm *mp;
@@ -1037,8 +1037,7 @@ i_devfs_minor_perm_nvlist(struct mperm *mplist,
  * Done at boot time via devfsadm
  */
 int
-devfs_load_minor_perm(struct mperm *mplist,
-	void (*errcb)(minorperm_err_t, int))
+devfs_load_minor_perm(struct mperm *mplist, void (*errcb)(minorperm_err_t, int))
 {
 	int err;
 	char *buf = NULL;
@@ -1066,7 +1065,7 @@ devfs_load_minor_perm(struct mperm *mplist,
  */
 static int
 i_devfs_update_minor_perm(char *drv, int ctl,
-	void (*errcb)(minorperm_err_t, int))
+    void (*errcb)(minorperm_err_t, int))
 {
 	int err;
 	char *buf;
@@ -1095,15 +1094,13 @@ i_devfs_update_minor_perm(char *drv, int ctl,
 }
 
 int
-devfs_add_minor_perm(char *drv,
-	void (*errcb)(minorperm_err_t, int))
+devfs_add_minor_perm(char *drv, void (*errcb)(minorperm_err_t, int))
 {
 	return (i_devfs_update_minor_perm(drv, MODADDMINORPERM, errcb));
 }
 
 int
-devfs_rm_minor_perm(char *drv,
-	void (*errcb)(minorperm_err_t, int))
+devfs_rm_minor_perm(char *drv, void (*errcb)(minorperm_err_t, int))
 {
 	return (i_devfs_update_minor_perm(drv, MODREMMINORPERM, errcb));
 }

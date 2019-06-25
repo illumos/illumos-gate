@@ -466,7 +466,7 @@ compress(char *str, size_t *size)
 				mcs_exit(FAILURE);
 			}
 		}
-		strings[next_str++] = NULL;
+		strings[next_str++] = '\0';
 		/*
 		 * End get string
 		 */
@@ -528,7 +528,7 @@ dohash(char *str)
 	unsigned shift;
 	int t;
 	sum = 1;
-	for (shift = 0; (t = *str++) != NULL; shift += 7) {
+	for (shift = 0; (t = *str++) != 0; shift += 7) {
 		sum += (long)t << (shift %= HALFLONG);
 	}
 	sum = low(sum) + high(sum);

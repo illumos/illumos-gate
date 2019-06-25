@@ -93,7 +93,7 @@ mappath(int flag, char *path)
 				 * error.
 				 */
 				if ((token = getenv(varname)) != NULL &&
-				    *token != NULL) {
+				    *token != '\0') {
 					/* copy in parameter value */
 					while (*token)
 						*copy++ = *token++;

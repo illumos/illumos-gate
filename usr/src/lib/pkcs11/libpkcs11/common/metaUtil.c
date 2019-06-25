@@ -35,7 +35,7 @@ static boolean_t threshold_chk_enabled = B_FALSE;
 
 CK_RV
 meta_operation_init_defer(CK_FLAGS optype, meta_session_t *session,
-	CK_MECHANISM *pMechanism, meta_object_t *key)
+    CK_MECHANISM *pMechanism, meta_object_t *key)
 {
 
 	if (session->init.pMech == NULL) {
@@ -108,7 +108,7 @@ meta_operation_init_defer(CK_FLAGS optype, meta_session_t *session,
  */
 CK_RV
 meta_operation_init(CK_FLAGS optype, meta_session_t *session,
-	CK_MECHANISM *pMechanism, meta_object_t *key)
+    CK_MECHANISM *pMechanism, meta_object_t *key)
 {
 	CK_RV rv, save_rv;
 	mechinfo_t **supporting_slots;
@@ -325,7 +325,7 @@ finish:
  */
 CK_RV
 meta_operation_init_softtoken(CK_FLAGS optype, meta_session_t *session,
-	CK_MECHANISM *pMechanism, meta_object_t *key)
+    CK_MECHANISM *pMechanism, meta_object_t *key)
 {
 	CK_RV rv = CKR_FUNCTION_FAILED;
 	slot_session_t *init_session = NULL;
@@ -917,8 +917,8 @@ get_slotlist_for_mech(CK_MECHANISM_TYPE mech_type,
  */
 CK_RV
 meta_generate_keys(meta_session_t *session, CK_MECHANISM *pMechanism,
-	CK_ATTRIBUTE *k1Template, CK_ULONG k1AttrCount, meta_object_t *key1,
-	CK_ATTRIBUTE *k2Template, CK_ULONG k2AttrCount, meta_object_t *key2)
+    CK_ATTRIBUTE *k1Template, CK_ULONG k1AttrCount, meta_object_t *key1,
+    CK_ATTRIBUTE *k2Template, CK_ULONG k2AttrCount, meta_object_t *key2)
 {
 	CK_RV rv, save_rv;
 	slot_session_t *gen_session = NULL;
@@ -977,7 +977,7 @@ meta_generate_keys(meta_session_t *session, CK_MECHANISM *pMechanism,
 	}
 
 	if (meta_freeobject_check(session, key1, pMechanism, k1Template,
-	    k1AttrCount, NULL)) {
+	    k1AttrCount, 0)) {
 
 		if ((key1->isPrivate || (doKeyPair && key2->isPrivate)) &&
 		    !metaslot_logged_in())
@@ -1298,10 +1298,10 @@ finish:
  */
 CK_RV
 meta_unwrap_key(meta_session_t *session,
-	CK_MECHANISM *pMechanism, meta_object_t *unwrapping_key,
-	CK_BYTE *wrapped_key, CK_ULONG wrapped_key_len,
-	CK_ATTRIBUTE *template, CK_ULONG template_size,
-	meta_object_t *unwrapped_key)
+    CK_MECHANISM *pMechanism, meta_object_t *unwrapping_key,
+    CK_BYTE *wrapped_key, CK_ULONG wrapped_key_len,
+    CK_ATTRIBUTE *template, CK_ULONG template_size,
+    meta_object_t *unwrapped_key)
 {
 	CK_RV rv, save_rv;
 	CK_OBJECT_HANDLE hUnwrappedKey;
@@ -1452,11 +1452,11 @@ finish:
  */
 CK_RV
 meta_derive_key(meta_session_t *session, CK_MECHANISM *pMechanism,
-	meta_object_t *basekey1, meta_object_t *basekey2,
-	CK_OBJECT_HANDLE *phBaseKey2,
-	CK_ATTRIBUTE *pTemplate, CK_ULONG ulAttributeCount,
-	meta_object_t *newKey1, meta_object_t *newKey2,
-	meta_object_t *newKey3, meta_object_t *newKey4)
+    meta_object_t *basekey1, meta_object_t *basekey2,
+    CK_OBJECT_HANDLE *phBaseKey2,
+    CK_ATTRIBUTE *pTemplate, CK_ULONG ulAttributeCount,
+    meta_object_t *newKey1, meta_object_t *newKey2,
+    meta_object_t *newKey3, meta_object_t *newKey4)
 {
 	CK_RV rv, save_rv;
 	CK_OBJECT_HANDLE hDerivedKey;
@@ -1495,7 +1495,7 @@ meta_derive_key(meta_session_t *session, CK_MECHANISM *pMechanism,
 	}
 
 	if (meta_freeobject_check(session, newKey1, pMechanism, pTemplate,
-	    ulAttributeCount, NULL)) {
+	    ulAttributeCount, 0)) {
 
 		if (newKey1->isPrivate && !metaslot_logged_in())
 			return (CKR_USER_NOT_LOGGED_IN);

@@ -71,7 +71,7 @@
 
 /*
  * The linkprop get() callback.
- * - pd: 	pointer to the prop_desc_t
+ * - pd:	pointer to the prop_desc_t
  * - propstrp:	a property string array to keep the returned property.
  *		Caller allocated.
  * - cntp:	number of returned properties.
@@ -88,7 +88,7 @@ typedef dladm_status_t	pd_getf_t(dladm_handle_t, prop_desc_t *pdp,
  * The linkprop set() callback.
  * - propval:	a val_desc_t array which keeps the property values to be set.
  * - cnt:	number of properties to be set.
- * - flags: 	additional flags passed down the system call.
+ * - flags:	additional flags passed down the system call.
  *
  * pd_set takes val_desc_t given by pd_check(), translates it into
  * a format suitable for kernel consumption. This may require allocation
@@ -416,8 +416,8 @@ static const bridge_public_prop_t bridge_prop[] = {
 };
 
 static  val_desc_t	link_duplex_vals[] = {
-	{ "half", 	LINK_DUPLEX_HALF	},
-	{ "full", 	LINK_DUPLEX_HALF	}
+	{ "half",	LINK_DUPLEX_HALF	},
+	{ "full",	LINK_DUPLEX_HALF	}
 };
 static  val_desc_t	link_status_vals[] = {
 	{ "up",		LINK_STATE_UP		},
@@ -2686,7 +2686,7 @@ check_allowedips(dladm_handle_t handle, prop_desc_t *pdp,
 fail:
 	for (i = 0; i < val_cnt; i++) {
 		free((void *)vdp[i].vd_val);
-		vdp[i].vd_val = NULL;
+		vdp[i].vd_val = 0;
 	}
 	return (status);
 }
@@ -3109,7 +3109,7 @@ check_allowedcids(dladm_handle_t handle, prop_desc_t *pdp,
 fail:
 	for (i = 0; i < val_cnt; i++) {
 		free((void *)vdp[i].vd_val);
-		vdp[i].vd_val = NULL;
+		vdp[i].vd_val = 0;
 	}
 	return (status);
 }
@@ -3177,7 +3177,7 @@ check_secondary_macs(dladm_handle_t handle, prop_desc_t *pdp,
 fail:
 	for (i = 0; i < val_cnt; i++) {
 		free((void *)vdp[i].vd_val);
-		vdp[i].vd_val = NULL;
+		vdp[i].vd_val = 0;
 	}
 	return (status);
 }
@@ -3476,7 +3476,7 @@ check_rate(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 	uint_t		modval_cnt = MAX_SUPPORT_RATES;
 	char		*buf, **modval;
 	dladm_status_t	status;
-	uint_t 		perm_flags;
+	uint_t		perm_flags;
 	uint_t		val_cnt = *val_cntp;
 	val_desc_t	*vdp = *vdpp;
 
@@ -4277,9 +4277,9 @@ i_dladm_set_private_prop(dladm_handle_t handle, datalink_id_t linkid,
     const char *prop_name, char **prop_val, uint_t val_cnt, uint_t flags)
 {
 	int		i, slen;
-	int 		bufsize = 0;
+	int		bufsize = 0;
 	dld_ioc_macprop_t *dip = NULL;
-	uchar_t 	*dp;
+	uchar_t		*dp;
 	link_attr_t *p;
 	dladm_status_t	status = DLADM_STATUS_OK;
 

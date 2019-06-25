@@ -412,7 +412,7 @@ scf_default_secflags(scf_handle_t *hndl, scf_secflags_t *flags)
 				uu_die("Allocation failure\n");
 
 			if (scf_handle_decode_fmri(hndl, pfmri,
-			    NULL, NULL, NULL, NULL, prop, NULL) != 0)
+			    NULL, NULL, NULL, NULL, prop, 0) != 0)
 				goto next;
 
 			if (scf_property_get_value(prop, val) != 0)

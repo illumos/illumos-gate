@@ -1269,7 +1269,7 @@ ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 		Word	ortype = rsp->rel_rtype;
 
 		rsp->rel_rtype = R_386_RELATIVE;
-		if (ld_add_outrel(NULL, rsp, ofl) == S_ERROR)
+		if (ld_add_outrel(0, rsp, ofl) == S_ERROR)
 			return (S_ERROR);
 		rsp->rel_rtype = ortype;
 	}
@@ -1313,7 +1313,7 @@ ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 	/*
 	 * Perform relocation.
 	 */
-	return (ld_add_actrel(NULL, rsp, ofl));
+	return (ld_add_actrel(0, rsp, ofl));
 }
 
 static uintptr_t
@@ -1343,7 +1343,7 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 
 				if (ld_assign_got_TLS(local, rsp, ofl, sdp,
 				    gnp, GOT_REF_TLSIE, FLG_REL_STLS,
-				    rtype, R_386_TLS_TPOFF, NULL) == S_ERROR)
+				    rtype, R_386_TLS_TPOFF, 0) == S_ERROR)
 					return (S_ERROR);
 			}
 
@@ -1362,7 +1362,7 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 				if (((flags & FLG_OF_EXEC) == 0) &&
 				    (rtype == R_386_TLS_IE)) {
 					rsp->rel_rtype = R_386_RELATIVE;
-					return (ld_add_outrel(NULL, rsp, ofl));
+					return (ld_add_outrel(0, rsp, ofl));
 				}
 				return (1);
 			}
@@ -1393,7 +1393,7 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	    GOT_REF_TLSLD, ofl, NULL)) == NULL)) {
 
 		if (ld_assign_got_TLS(local, rsp, ofl, sdp, gnp, GOT_REF_TLSLD,
-		    FLG_REL_MTLS, rtype, R_386_TLS_DTPMOD32, NULL) == S_ERROR)
+		    FLG_REL_MTLS, rtype, R_386_TLS_DTPMOD32, 0) == S_ERROR)
 			return (S_ERROR);
 
 	} else if (IS_TLS_GD(rtype) && ((gnp = ld_find_got_ndx(sdp->sd_GOTndxs,
