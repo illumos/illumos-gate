@@ -63,6 +63,13 @@ static const char *features_for_read[] = {
 	"org.illumos:edonr",
 	"org.zfsonlinux:large_dnode",
 	"com.joyent:multi_vdev_crash_dump",
+	"com.delphix:spacemap_histogram",
+	"com.delphix:zpool_checkpoint",
+	"com.delphix:spacemap_v2",
+	"com.datto:encryption",
+	"com.datto:bookmark_v2",
+	"org.zfsonlinux:allocation_classes",
+	"com.datto:resilver_defer",
 	NULL
 };
 
@@ -1358,7 +1365,7 @@ dnode_read(const spa_t *spa, const dnode_phys_t *dnode, off_t offset, void *buf,
 		/*
 		 * The buffer contains our data block. Copy what we
 		 * need from it and loop.
-		 */ 
+		 */
 		i = bsize - boff;
 		if (i > buflen) i = buflen;
 		memcpy(buf, &dnode_cache_buf[boff], i);
@@ -1414,7 +1421,7 @@ fzap_name_equal(const zap_leaf_t *zl, const zap_leaf_chunk_t *zc, const char *na
 	const char *p;
 
 	namelen = zc->l_entry.le_name_numints;
-			
+
 	nc = &ZAP_LEAF_CHUNK(zl, zc->l_entry.le_name_chunk);
 	p = name;
 	while (namelen > 0) {
