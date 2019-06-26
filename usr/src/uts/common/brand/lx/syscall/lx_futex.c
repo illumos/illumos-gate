@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -72,7 +72,7 @@
  * Fortunately, there is only a single kernel-level interface:
  *
  * long sys_futex(void *futex1, int cmd, int val1,
- * 	struct timespec	*timeout, void *futex2, int val2)
+ *     struct timespec *timeout, void *futex2, int val2)
  *
  * The kernel-level operations that may be performed on a simple futex are:
  *
@@ -314,6 +314,12 @@ typedef struct futex_robust_list32 {
 #define	BELOW_MINPRI	INT_MIN
 
 /*
+ * Arbitrary limit on the number of CAS failures allowed in tight looping
+ * contexts before a back-off retry occurs.
+ */
+#define	CAS_LOOP_LIMIT	100
+
+/*
  * We place the per-chain lock next to the pointer to the chain itself.
  * When compared to an array of orthogonal locks, this reduces false sharing
  * (though adjacent entries can still be falsely shared -- just not as many),
@@ -499,6 +505,7 @@ futex_wake_op_execute(int32_t *addr, int32_t val3)
 	int32_t oparg, oldval, newval;
 	label_t ljb;
 	int rval;
+	uint_t loops = 0;
 
 	if ((uintptr_t)addr >= KERNELBASE)
 		return (-EFAULT);
@@ -509,6 +516,15 @@ futex_wake_op_execute(int32_t *addr, int32_t val3)
 	oparg = FUTEX_OP_OPARG(val3);
 
 	do {
+		/*
+		 * Bail out (for a later retry) if the CAS operation repeatedly
+		 * fails to set the new value.
+		 */
+		if (loops++ > CAS_LOOP_LIMIT) {
+			no_fault();
+			return (-EAGAIN);
+		}
+
 		oldval = *addr;
 		newval = oparg;
 
@@ -595,12 +611,24 @@ futex_wake_op(memid_t *memid, caddr_t addr2, memid_t *memid2,
 		l2 = &futex_hash[index1].fh_lock;
 	}
 
+retry:
 	mutex_enter(l1);
 	if (l2 != NULL)
 		mutex_enter(l2);
 
 	/* LINTED: alignment */
 	if ((wake = futex_wake_op_execute((int32_t *)addr2, val3)) < 0) {
+		/*
+		 * If the futex op fails on a looping CAS attempt, drop the
+		 * involved mutexes to allow others to run, and try again.
+		 */
+		if (wake == -EAGAIN) {
+			if (l2 != NULL)
+				mutex_exit(l2);
+			mutex_exit(l1);
+			goto retry;
+		}
+
 		(void) set_errno(-wake); /* convert back to positive errno */
 		ret = -1;
 		goto out;
@@ -811,6 +839,7 @@ futex_lock_pi(memid_t *memid, uint32_t *addr, timespec_t *timeout,
 	proc_t *fproc = NULL;		/* current futex holder proc */
 	kthread_t *fthrd;		/* current futex holder thread */
 	volatile uint32_t oldval;
+	volatile uint_t loops = 0;
 
 	if ((uintptr_t)addr >= KERNELBASE)
 		return (set_errno(EFAULT));
@@ -826,6 +855,7 @@ futex_lock_pi(memid_t *memid, uint32_t *addr, timespec_t *timeout,
 	 * At this point nothing will ever wake T1.
 	 */
 	index = HASH_FUNC(memid);
+retry:
 	mutex_enter(&futex_hash[index].fh_lock);
 
 	/* It would be very unusual to actually loop here. */
@@ -834,6 +864,15 @@ futex_lock_pi(memid_t *memid, uint32_t *addr, timespec_t *timeout,
 	while (1) {
 		uint32_t curval;
 		label_t ljb;
+
+		/*
+		 * Make a round trip through the lock if too many CAS failures
+		 * occur, indicative of userspace tomfoolery.
+		 */
+		if (loops++ > CAS_LOOP_LIMIT) {
+			mutex_exit(&futex_hash[index].fh_lock);
+			goto retry;
+		}
 
 		if (on_fault(&ljb)) {
 			mutex_exit(&futex_hash[index].fh_lock);
