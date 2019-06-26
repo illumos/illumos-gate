@@ -885,7 +885,7 @@ convertBEInfoToDictionary(be_node_list_t *be, PyObject **listDict)
 		}
 	}
 
-	if (be->be_node_creation != NULL) {
+	if (be->be_node_creation != 0) {
 		if (PyDict_SetItemString(*listDict, BE_ATTR_DATE,
 		    PyLong_FromLong(be->be_node_creation)) != 0) {
 			return (B_FALSE);
@@ -958,7 +958,7 @@ convertDatasetInfoToDictionary(be_dataset_list_t *ds, PyObject **listDict)
 		}
 	}
 
-	if (ds->be_ds_creation != NULL) {
+	if (ds->be_ds_creation != 0) {
 		if (PyDict_SetItemString(*listDict, BE_ATTR_DATE,
 		    PyLong_FromLong(ds->be_ds_creation)) != 0) {
 			return (B_FALSE);
@@ -978,7 +978,7 @@ convertSnapshotInfoToDictionary(be_snapshot_list_t *ss, PyObject **listDict)
 		}
 	}
 
-	if (ss->be_snapshot_creation != NULL) {
+	if (ss->be_snapshot_creation != 0) {
 		if (PyDict_SetItemString(*listDict, BE_ATTR_DATE,
 		    PyLong_FromLong(ss->be_snapshot_creation)) != 0) {
 			return (B_FALSE);

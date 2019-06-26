@@ -2275,7 +2275,7 @@ token_rsa_load_key(
 		hParentKey = hPublicRootKey;
 	}
 
-	*phKey = NULL;
+	*phKey = 0;
 	if (template_attribute_find(key_obj->template, CKA_CLASS,
 	    &attr) == FALSE) {
 		return (CKR_TEMPLATE_INCOMPLETE);
@@ -2306,7 +2306,7 @@ token_rsa_load_key(
 	 */
 	if (class == CKO_PRIVATE_KEY) {
 		/* If we already have a handle, just load it */
-		if (*phKey != NULL) {
+		if (*phKey != 0) {
 			result = Tspi_Key_LoadKey(*phKey, hParentKey);
 			if (result) {
 				stlogit("Tspi_Context_LoadKeyByBlob: "

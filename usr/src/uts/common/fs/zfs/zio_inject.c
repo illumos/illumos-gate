@@ -194,6 +194,37 @@ zio_match_dva(zio_t *zio)
 
 
 /*
+ * Inject a decryption failure. Decryption failures can occur in
+ * both the ARC and the ZIO layers.
+ */
+int
+zio_handle_decrypt_injection(spa_t *spa, const zbookmark_phys_t *zb,
+    uint64_t type, int error)
+{
+	int ret = 0;
+	inject_handler_t *handler;
+
+	rw_enter(&inject_lock, RW_READER);
+
+	for (handler = list_head(&inject_handlers); handler != NULL;
+	    handler = list_next(&inject_handlers, handler)) {
+
+		if (spa != handler->zi_spa ||
+		    handler->zi_record.zi_cmd != ZINJECT_DECRYPT_FAULT)
+			continue;
+
+		if (zio_match_handler((zbookmark_phys_t *)zb, type, ZI_NO_DVA,
+		    &handler->zi_record, error)) {
+			ret = error;
+			break;
+		}
+	}
+
+	rw_exit(&inject_lock);
+	return (ret);
+}
+
+/*
  * Determine if the I/O in question should return failure.  Returns the errno
  * to be returned to the caller.
  */

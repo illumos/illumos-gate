@@ -701,7 +701,7 @@ libvrrpadm:	libdladm libscf
 libvscan:	libscf libsecdb
 libzdoor:	libc libzonecfg libcontract
 libzfs:		libdevid libgen libuutil libadm libavl libefi libidmap \
-		libumem libtsol libzfs_core
+		libumem libtsol libzfs_core libcryptoutil pkcs11 libmd libcmdutils
 libzfs_jni:	libdiskmgt libzfs
 libzonecfg:	libuuid libsysevent libsec libbrand libpool libscf libproc \
 		libuutil libbsm libsecdb

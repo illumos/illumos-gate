@@ -198,7 +198,7 @@ find_vdev_problem(nvlist_t *vdev, int (*func)(uint64_t, uint64_t, uint64_t))
  * only picks the most damaging of all the current errors to report.
  */
 static zpool_status_t
-check_status(nvlist_t *config, boolean_t isimport)
+check_status(nvlist_t *config, boolean_t isimport, zpool_errata_t *erratap)
 {
 	nvlist_t *nvroot;
 	vdev_stat_t *vs;
@@ -209,6 +209,7 @@ check_status(nvlist_t *config, boolean_t isimport)
 	uint64_t stateval;
 	uint64_t suspended;
 	uint64_t hostid = 0;
+	uint64_t errata = 0;
 	unsigned long system_hostid = get_system_hostid();
 
 	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION,
@@ -369,6 +370,15 @@ check_status(nvlist_t *config, boolean_t isimport)
 		return (ZPOOL_STATUS_REMOVED_DEV);
 
 	/*
+	 * Informational errata available.
+	 */
+	(void) nvlist_lookup_uint64(config, ZPOOL_CONFIG_ERRATA, &errata);
+	if (errata) {
+		*erratap = errata;
+		return (ZPOOL_STATUS_ERRATA);
+	}
+
+	/*
 	 * Outdated, but usable, version
 	 */
 	if (SPA_VERSION_IS_SUPPORTED(version) && version != SPA_VERSION)
@@ -403,9 +413,9 @@ check_status(nvlist_t *config, boolean_t isimport)
 }
 
 zpool_status_t
-zpool_get_status(zpool_handle_t *zhp, char **msgid)
+zpool_get_status(zpool_handle_t *zhp, char **msgid, zpool_errata_t *errata)
 {
-	zpool_status_t ret = check_status(zhp->zpool_config, B_FALSE);
+	zpool_status_t ret = check_status(zhp->zpool_config, B_FALSE, errata);
 
 	if (ret >= NMSGID)
 		*msgid = NULL;
@@ -416,9 +426,9 @@ zpool_get_status(zpool_handle_t *zhp, char **msgid)
 }
 
 zpool_status_t
-zpool_import_status(nvlist_t *config, char **msgid)
+zpool_import_status(nvlist_t *config, char **msgid, zpool_errata_t *errata)
 {
-	zpool_status_t ret = check_status(config, B_TRUE);
+	zpool_status_t ret = check_status(config, B_TRUE, errata);
 
 	if (ret >= NMSGID)
 		*msgid = NULL;

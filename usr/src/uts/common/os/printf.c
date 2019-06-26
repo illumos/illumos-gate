@@ -65,7 +65,7 @@
 uint32_t panicbuf_log = PANICBUFSIZE;
 uint32_t panicbuf_index = PANICBUFSIZE;
 
-static int aask, aok;
+int aask, aok;
 static int ce_to_sl[CE_IGNORE] = { SL_NOTE, SL_NOTE, SL_WARN, SL_FATAL };
 static char ce_prefix[CE_IGNORE][10] = { "", "NOTICE: ", "WARNING: ", "" };
 static char ce_suffix[CE_IGNORE][2] = { "", "\n", "\n", "" };

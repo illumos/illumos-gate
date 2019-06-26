@@ -104,8 +104,8 @@
 #ifdef _KERNEL
 static void
 zfs_ereport_start(nvlist_t **ereport_out, nvlist_t **detector_out,
-    const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
-    uint64_t stateoroffset, uint64_t size)
+    const char *subclass, spa_t *spa, vdev_t *vd, const zbookmark_phys_t *zb,
+    zio_t *zio, uint64_t stateoroffset, uint64_t size)
 {
 	nvlist_t *ereport, *detector;
 
@@ -318,24 +318,6 @@ zfs_ereport_start(nvlist_t **ereport_out, nvlist_t **detector_out,
 				    FM_EREPORT_PAYLOAD_ZFS_ZIO_SIZE,
 				    DATA_TYPE_UINT64, zio->io_size, NULL);
 		}
-
-		/*
-		 * Payload for I/Os with corresponding logical information.
-		 */
-		if (zio->io_logical != NULL)
-			fm_payload_set(ereport,
-			    FM_EREPORT_PAYLOAD_ZFS_ZIO_OBJSET,
-			    DATA_TYPE_UINT64,
-			    zio->io_logical->io_bookmark.zb_objset,
-			    FM_EREPORT_PAYLOAD_ZFS_ZIO_OBJECT,
-			    DATA_TYPE_UINT64,
-			    zio->io_logical->io_bookmark.zb_object,
-			    FM_EREPORT_PAYLOAD_ZFS_ZIO_LEVEL,
-			    DATA_TYPE_INT64,
-			    zio->io_logical->io_bookmark.zb_level,
-			    FM_EREPORT_PAYLOAD_ZFS_ZIO_BLKID,
-			    DATA_TYPE_UINT64,
-			    zio->io_logical->io_bookmark.zb_blkid, NULL);
 	} else if (vd != NULL) {
 		/*
 		 * If we have a vdev but no zio, this is a device fault, and the
@@ -346,6 +328,20 @@ zfs_ereport_start(nvlist_t **ereport_out, nvlist_t **detector_out,
 		    FM_EREPORT_PAYLOAD_ZFS_PREV_STATE,
 		    DATA_TYPE_UINT64, stateoroffset, NULL);
 	}
+
+	/*
+	 * Payload for I/Os with corresponding logical information.
+	 */
+	if (zb != NULL && (zio == NULL || zio->io_logical != NULL))
+		fm_payload_set(ereport,
+		    FM_EREPORT_PAYLOAD_ZFS_ZIO_OBJSET,
+		    DATA_TYPE_UINT64, zb->zb_objset,
+		    FM_EREPORT_PAYLOAD_ZFS_ZIO_OBJECT,
+		    DATA_TYPE_UINT64, zb->zb_object,
+		    FM_EREPORT_PAYLOAD_ZFS_ZIO_LEVEL,
+		    DATA_TYPE_INT64, zb->zb_level,
+		    FM_EREPORT_PAYLOAD_ZFS_ZIO_BLKID,
+		    DATA_TYPE_UINT64, zb->zb_blkid, NULL);
 
 	mutex_exit(&spa->spa_errlist_lock);
 
@@ -501,11 +497,11 @@ range_total_size(zfs_ecksum_info_t *eip)
 
 static zfs_ecksum_info_t *
 annotate_ecksum(nvlist_t *ereport, zio_bad_cksum_t *info,
-    const uint8_t *goodbuf, const uint8_t *badbuf, size_t size,
+    const abd_t *goodabd, const abd_t *badabd, size_t size,
     boolean_t drop_if_identical)
 {
-	const uint64_t *good = (const uint64_t *)goodbuf;
-	const uint64_t *bad = (const uint64_t *)badbuf;
+	const uint64_t *good;
+	const uint64_t *bad;
 
 	uint64_t allset = 0;
 	uint64_t allcleared = 0;
@@ -549,13 +545,16 @@ annotate_ecksum(nvlist_t *ereport, zio_bad_cksum_t *info,
 		}
 	}
 
-	if (badbuf == NULL || goodbuf == NULL)
+	if (badabd == NULL || goodabd == NULL)
 		return (eip);
 
 	ASSERT3U(nui64s, <=, UINT32_MAX);
 	ASSERT3U(size, ==, nui64s * sizeof (uint64_t));
 	ASSERT3U(size, <=, SPA_MAXBLOCKSIZE);
 	ASSERT3U(size, <=, UINT32_MAX);
+
+	good = (const uint64_t *) abd_borrow_buf_copy((abd_t *)goodabd, size);
+	bad = (const uint64_t *) abd_borrow_buf_copy((abd_t *)badabd, size);
 
 	/* build up the range list by comparing the two buffers. */
 	for (idx = 0; idx < nui64s; idx++) {
@@ -586,6 +585,8 @@ annotate_ecksum(nvlist_t *ereport, zio_bad_cksum_t *info,
 	 */
 	if (inline_size == 0 && drop_if_identical) {
 		kmem_free(eip, sizeof (*eip));
+		abd_return_buf((abd_t *)goodabd, (void *)good, size);
+		abd_return_buf((abd_t *)badabd, (void *)bad, size);
 		return (NULL);
 	}
 
@@ -626,6 +627,10 @@ annotate_ecksum(nvlist_t *ereport, zio_bad_cksum_t *info,
 		eip->zei_ranges[range].zr_start	*= sizeof (uint64_t);
 		eip->zei_ranges[range].zr_end	*= sizeof (uint64_t);
 	}
+
+	abd_return_buf((abd_t *)goodabd, (void *)good, size);
+	abd_return_buf((abd_t *)badabd, (void *)bad, size);
+
 	eip->zei_allowed_mingap	*= sizeof (uint64_t);
 	inline_size		*= sizeof (uint64_t);
 
@@ -666,15 +671,16 @@ annotate_ecksum(nvlist_t *ereport, zio_bad_cksum_t *info,
 #endif
 
 void
-zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
-    uint64_t stateoroffset, uint64_t size)
+zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd,
+    const struct zbookmark_phys *zb, zio_t *zio, uint64_t stateoroffset,
+    uint64_t size)
 {
 #ifdef _KERNEL
 	nvlist_t *ereport = NULL;
 	nvlist_t *detector = NULL;
 
-	zfs_ereport_start(&ereport, &detector,
-	    subclass, spa, vd, zio, stateoroffset, size);
+	zfs_ereport_start(&ereport, &detector, subclass, spa, vd,
+	    zb, zio, stateoroffset, size);
 
 	if (ereport == NULL)
 		return;
@@ -687,7 +693,7 @@ zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
 }
 
 void
-zfs_ereport_start_checksum(spa_t *spa, vdev_t *vd,
+zfs_ereport_start_checksum(spa_t *spa, vdev_t *vd, const zbookmark_phys_t *zb,
     struct zio *zio, uint64_t offset, uint64_t length, void *arg,
     zio_bad_cksum_t *info)
 {
@@ -709,7 +715,7 @@ zfs_ereport_start_checksum(spa_t *spa, vdev_t *vd,
 
 #ifdef _KERNEL
 	zfs_ereport_start(&report->zcr_ereport, &report->zcr_detector,
-	    FM_EREPORT_ZFS_CHECKSUM, spa, vd, zio, offset, length);
+	    FM_EREPORT_ZFS_CHECKSUM, spa, vd, zb, zio, offset, length);
 
 	if (report->zcr_ereport == NULL) {
 		report->zcr_free(report->zcr_cbdata, report->zcr_cbinfo);
@@ -729,8 +735,8 @@ zfs_ereport_start_checksum(spa_t *spa, vdev_t *vd,
 }
 
 void
-zfs_ereport_finish_checksum(zio_cksum_report_t *report,
-    const void *good_data, const void *bad_data, boolean_t drop_if_identical)
+zfs_ereport_finish_checksum(zio_cksum_report_t *report, const abd_t *good_data,
+    const abd_t *bad_data, boolean_t drop_if_identical)
 {
 #ifdef _KERNEL
 	zfs_ecksum_info_t *info = NULL;
@@ -777,17 +783,17 @@ zfs_ereport_send_interim_checksum(zio_cksum_report_t *report)
 }
 
 void
-zfs_ereport_post_checksum(spa_t *spa, vdev_t *vd,
+zfs_ereport_post_checksum(spa_t *spa, vdev_t *vd, const zbookmark_phys_t *zb,
     struct zio *zio, uint64_t offset, uint64_t length,
-    const void *good_data, const void *bad_data, zio_bad_cksum_t *zbc)
+    const abd_t *good_data, const abd_t *bad_data, zio_bad_cksum_t *zbc)
 {
 #ifdef _KERNEL
 	nvlist_t *ereport = NULL;
 	nvlist_t *detector = NULL;
 	zfs_ecksum_info_t *info;
 
-	zfs_ereport_start(&ereport, &detector,
-	    FM_EREPORT_ZFS_CHECKSUM, spa, vd, zio, offset, length);
+	zfs_ereport_start(&ereport, &detector, FM_EREPORT_ZFS_CHECKSUM,
+	    spa, vd, zb, zio, offset, length);
 
 	if (ereport == NULL)
 		return;

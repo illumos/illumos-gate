@@ -41,6 +41,7 @@ OBJS_SHARED=			\
 OBJS_COMMON=			\
 	libzfs_changelist.o	\
 	libzfs_config.o		\
+	libzfs_crypto.o		\
 	libzfs_dataset.o	\
 	libzfs_diff.o		\
 	libzfs_fru.o		\
@@ -72,7 +73,8 @@ INCS += -I../../libc/inc
 CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
 LDLIBS +=	-lc -lm -ldevid -lgen -lnvpair -luutil -lavl -lefi \
-	-ladm -lidmap -ltsol -lmd -lumem -lzfs_core -lcmdutils
+	-ladm -lidmap -ltsol -lcryptoutil -lpkcs11 -lmd -lumem -lzfs_core \
+	-lcmdutils
 CPPFLAGS +=	$(INCS) -D_LARGEFILE64_SOURCE=1 -D_REENTRANT
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 
@@ -88,6 +90,12 @@ LINTFLAGS64 +=	-erroff=E_STATIC_UNUSED
 SRCS=	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
 	$(OBJS_SHARED:%.o=$(SRC)/common/zfs/%.c)
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
+
+# lint complains about unused inline functions, even though
+# they are "inline", not "static inline", with "extern inline"
+# implementations and usage in libzpool.
+LINTFLAGS += -erroff=E_STATIC_UNUSED
+LINTFLAGS64 += -erroff=E_STATIC_UNUSED
 
 .KEEP_STATE:
 

@@ -369,6 +369,19 @@ feature_enable_sync(spa_t *spa, zfeature_info_t *feature, dmu_tx_t *tx)
 		    spa->spa_feat_enabled_txg_obj, feature->fi_guid,
 		    sizeof (uint64_t), 1, &enabling_txg, tx));
 	}
+
+	/*
+	 * Errata #4 is mostly a problem with encrypted datasets, but it
+	 * is also a problem where the old encryption feature did not
+	 * depend on the bookmark_v2 feature. If the pool does not have
+	 * any encrypted datasets we can resolve this issue simply by
+	 * enabling this dependency.
+	 */
+	if (spa->spa_errata == ZPOOL_ERRATA_ZOL_8308_ENCRYPTION &&
+	    spa_feature_is_enabled(spa, SPA_FEATURE_ENCRYPTION) &&
+	    !spa_feature_is_active(spa, SPA_FEATURE_ENCRYPTION) &&
+	    feature->fi_feature == SPA_FEATURE_BOOKMARK_V2)
+		spa->spa_errata = 0;
 }
 
 static void
@@ -413,8 +426,8 @@ spa_feature_create_zap_objects(spa_t *spa, dmu_tx_t *tx)
 	 * We create feature flags ZAP objects in two instances: during pool
 	 * creation and during pool upgrade.
 	 */
-	ASSERT(dsl_pool_sync_context(spa_get_dsl(spa)) || (!spa->spa_sync_on &&
-	    tx->tx_txg == TXG_INITIAL));
+	ASSERT((!spa->spa_sync_on && tx->tx_txg == TXG_INITIAL) ||
+	    dsl_pool_sync_context(spa_get_dsl(spa)));
 
 	spa->spa_feat_for_read_obj = zap_create_link(spa->spa_meta_objset,
 	    DMU_OTN_ZAP_METADATA, DMU_POOL_DIRECTORY_OBJECT,

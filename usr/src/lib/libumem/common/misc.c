@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
 #include <dlfcn.h>
 #include <signal.h>
@@ -244,7 +242,7 @@ print_sym(void *pointer)
 	int result;
 	Dl_info sym_info;
 
-	uintptr_t end = NULL;
+	uintptr_t end = (uintptr_t)NULL;
 
 	Sym *ext_info = NULL;
 

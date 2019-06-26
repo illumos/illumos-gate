@@ -138,7 +138,7 @@ umem_create_update_thread(void)
 
 	(void) mutex_unlock(&umem_update_lock);
 
-	if (thr_create(NULL, NULL, umem_update_thread, NULL,
+	if (thr_create(NULL, 0, umem_update_thread, NULL,
 	    THR_BOUND | THR_DAEMON | THR_DETACHED | THR_SUSPENDED,
 	    &newthread) == 0) {
 		(void) thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);

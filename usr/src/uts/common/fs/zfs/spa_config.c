@@ -281,7 +281,7 @@ spa_write_cachefile(spa_t *target, boolean_t removing, boolean_t postsysevent)
 		 */
 		if (target->spa_ccw_fail_time == 0) {
 			zfs_ereport_post(FM_EREPORT_ZFS_CONFIG_CACHE_WRITE,
-			    target, NULL, NULL, 0, 0);
+			    target, NULL, NULL, NULL, 0, 0);
 		}
 		target->spa_ccw_fail_time = gethrtime();
 		spa_async_request(target, SPA_ASYNC_CONFIG_UPDATE);
@@ -408,6 +408,7 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 	fnvlist_add_uint64(config, ZPOOL_CONFIG_POOL_STATE, spa_state(spa));
 	fnvlist_add_uint64(config, ZPOOL_CONFIG_POOL_TXG, txg);
 	fnvlist_add_uint64(config, ZPOOL_CONFIG_POOL_GUID, spa_guid(spa));
+	fnvlist_add_uint64(config, ZPOOL_CONFIG_ERRATA, spa->spa_errata);
 	if (spa->spa_comment != NULL) {
 		fnvlist_add_string(config, ZPOOL_CONFIG_COMMENT,
 		    spa->spa_comment);

@@ -264,7 +264,7 @@ crypto_uio_data(crypto_data_t *data, uchar_t *buf, int len, cmd_type_t cmd,
 	    offset -= uiop->uio_iov[vec_idx++].iov_len)
 		;
 
-	if (vec_idx == uiop->uio_iovcnt) {
+	if (vec_idx == uiop->uio_iovcnt && length > 0) {
 		/*
 		 * The caller specified an offset that is larger than
 		 * the total size of the buffers it provided.

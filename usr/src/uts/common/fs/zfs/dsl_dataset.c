@@ -540,6 +540,13 @@ dsl_dataset_hold_obj(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 			ds->ds_reserved = ds->ds_quota = 0;
 		}
 
+		if (err == 0 && ds->ds_dir->dd_crypto_obj != 0 &&
+		    ds->ds_is_snapshot &&
+		    zap_contains(mos, dsobj, DS_FIELD_IVSET_GUID) != 0) {
+			dp->dp_spa->spa_errata =
+			    ZPOOL_ERRATA_ZOL_8308_ENCRYPTION;
+		}
+
 		dsl_deadlist_open(&ds->ds_deadlist,
 		    mos, dsl_dataset_phys(ds)->ds_deadlist_obj);
 		uint64_t remap_deadlist_obj =
@@ -591,17 +598,52 @@ dsl_dataset_hold_obj(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 			}
 		}
 	}
+
 	ASSERT3P(ds->ds_dbuf, ==, dbuf);
 	ASSERT3P(dsl_dataset_phys(ds), ==, dbuf->db_data);
 	ASSERT(dsl_dataset_phys(ds)->ds_prev_snap_obj != 0 ||
 	    spa_version(dp->dp_spa) < SPA_VERSION_ORIGIN ||
 	    dp->dp_origin_snap == NULL || ds == dp->dp_origin_snap);
 	*dsp = ds;
+
 	return (0);
 }
 
 int
-dsl_dataset_hold(dsl_pool_t *dp, const char *name,
+dsl_dataset_create_key_mapping(dsl_dataset_t *ds)
+{
+	dsl_dir_t *dd = ds->ds_dir;
+
+	if (dd->dd_crypto_obj == 0)
+		return (0);
+
+	return (spa_keystore_create_mapping(dd->dd_pool->dp_spa,
+	    ds, ds, &ds->ds_key_mapping));
+}
+
+int
+dsl_dataset_hold_obj_flags(dsl_pool_t *dp, uint64_t dsobj,
+    ds_hold_flags_t flags, void *tag, dsl_dataset_t **dsp)
+{
+	int err;
+
+	err = dsl_dataset_hold_obj(dp, dsobj, tag, dsp);
+	if (err != 0)
+		return (err);
+
+	ASSERT3P(*dsp, !=, NULL);
+
+	if (flags & DS_HOLD_FLAG_DECRYPT) {
+		err = dsl_dataset_create_key_mapping(*dsp);
+		if (err != 0)
+			dsl_dataset_rele(*dsp, tag);
+	}
+
+	return (err);
+}
+
+int
+dsl_dataset_hold_flags(dsl_pool_t *dp, const char *name, ds_hold_flags_t flags,
     void *tag, dsl_dataset_t **dsp)
 {
 	dsl_dir_t *dd;
@@ -617,7 +659,7 @@ dsl_dataset_hold(dsl_pool_t *dp, const char *name,
 	ASSERT(dsl_pool_config_held(dp));
 	obj = dsl_dir_phys(dd)->dd_head_dataset_obj;
 	if (obj != 0)
-		err = dsl_dataset_hold_obj(dp, obj, tag, &ds);
+		err = dsl_dataset_hold_obj_flags(dp, obj, flags, tag, &ds);
 	else
 		err = SET_ERROR(ENOENT);
 
@@ -626,16 +668,18 @@ dsl_dataset_hold(dsl_pool_t *dp, const char *name,
 		dsl_dataset_t *snap_ds;
 
 		if (*snapname++ != '@') {
-			dsl_dataset_rele(ds, tag);
+			dsl_dataset_rele_flags(ds, flags, tag);
 			dsl_dir_rele(dd, FTAG);
 			return (SET_ERROR(ENOENT));
 		}
 
 		dprintf("looking for snapshot '%s'\n", snapname);
 		err = dsl_dataset_snap_lookup(ds, snapname, &obj);
-		if (err == 0)
-			err = dsl_dataset_hold_obj(dp, obj, tag, &snap_ds);
-		dsl_dataset_rele(ds, tag);
+		if (err == 0) {
+			err = dsl_dataset_hold_obj_flags(dp, obj, flags, tag,
+			    &snap_ds);
+		}
+		dsl_dataset_rele_flags(ds, flags, tag);
 
 		if (err == 0) {
 			mutex_enter(&snap_ds->ds_lock);
@@ -653,14 +697,21 @@ dsl_dataset_hold(dsl_pool_t *dp, const char *name,
 }
 
 int
-dsl_dataset_own_obj(dsl_pool_t *dp, uint64_t dsobj,
+dsl_dataset_hold(dsl_pool_t *dp, const char *name, void *tag,
+    dsl_dataset_t **dsp)
+{
+	return (dsl_dataset_hold_flags(dp, name, 0, tag, dsp));
+}
+
+int
+dsl_dataset_own_obj(dsl_pool_t *dp, uint64_t dsobj, ds_hold_flags_t flags,
     void *tag, dsl_dataset_t **dsp)
 {
-	int err = dsl_dataset_hold_obj(dp, dsobj, tag, dsp);
+	int err = dsl_dataset_hold_obj_flags(dp, dsobj, flags, tag, dsp);
 	if (err != 0)
 		return (err);
 	if (!dsl_dataset_tryown(*dsp, tag)) {
-		dsl_dataset_rele(*dsp, tag);
+		dsl_dataset_rele_flags(*dsp, flags, tag);
 		*dsp = NULL;
 		return (SET_ERROR(EBUSY));
 	}
@@ -668,14 +719,14 @@ dsl_dataset_own_obj(dsl_pool_t *dp, uint64_t dsobj,
 }
 
 int
-dsl_dataset_own(dsl_pool_t *dp, const char *name,
+dsl_dataset_own(dsl_pool_t *dp, const char *name, ds_hold_flags_t flags,
     void *tag, dsl_dataset_t **dsp)
 {
-	int err = dsl_dataset_hold(dp, name, tag, dsp);
+	int err = dsl_dataset_hold_flags(dp, name, flags, tag, dsp);
 	if (err != 0)
 		return (err);
 	if (!dsl_dataset_tryown(*dsp, tag)) {
-		dsl_dataset_rele(*dsp, tag);
+		dsl_dataset_rele_flags(*dsp, flags, tag);
 		return (SET_ERROR(EBUSY));
 	}
 	return (0);
@@ -757,7 +808,28 @@ dsl_dataset_rele(dsl_dataset_t *ds, void *tag)
 }
 
 void
-dsl_dataset_disown(dsl_dataset_t *ds, void *tag)
+dsl_dataset_remove_key_mapping(dsl_dataset_t *ds)
+{
+	dsl_dir_t *dd = ds->ds_dir;
+
+	if (dd == NULL || dd->dd_crypto_obj == 0)
+		return;
+
+	(void) spa_keystore_remove_mapping(dd->dd_pool->dp_spa,
+	    ds->ds_object, ds);
+}
+
+void
+dsl_dataset_rele_flags(dsl_dataset_t *ds, ds_hold_flags_t flags, void *tag)
+{
+	if (flags & DS_HOLD_FLAG_DECRYPT)
+		dsl_dataset_remove_key_mapping(ds);
+
+	dsl_dataset_rele(ds, tag);
+}
+
+void
+dsl_dataset_disown(dsl_dataset_t *ds, ds_hold_flags_t flags, void *tag)
 {
 	ASSERT3P(ds->ds_owner, ==, tag);
 	ASSERT(ds->ds_dbuf != NULL);
@@ -766,7 +838,7 @@ dsl_dataset_disown(dsl_dataset_t *ds, void *tag)
 	ds->ds_owner = NULL;
 	mutex_exit(&ds->ds_lock);
 	dsl_dataset_long_rele(ds, tag);
-	dsl_dataset_rele(ds, tag);
+	dsl_dataset_rele_flags(ds, flags, tag);
 }
 
 boolean_t
@@ -795,7 +867,7 @@ dsl_dataset_has_owner(dsl_dataset_t *ds)
 	return (rv);
 }
 
-static void
+void
 dsl_dataset_activate_feature(uint64_t dsobj, spa_feature_t f, dmu_tx_t *tx)
 {
 	spa_t *spa = dmu_tx_pool(tx)->dp_spa;
@@ -825,7 +897,7 @@ dsl_dataset_deactivate_feature(uint64_t dsobj, spa_feature_t f, dmu_tx_t *tx)
 
 uint64_t
 dsl_dataset_create_sync_dd(dsl_dir_t *dd, dsl_dataset_t *origin,
-    uint64_t flags, dmu_tx_t *tx)
+    dsl_crypto_params_t *dcp, uint64_t flags, dmu_tx_t *tx)
 {
 	dsl_pool_t *dp = dd->dd_pool;
 	dmu_buf_t *dbuf;
@@ -924,6 +996,9 @@ dsl_dataset_create_sync_dd(dsl_dir_t *dd, dsl_dataset_t *origin,
 		}
 	}
 
+	/* handle encryption */
+	dsl_dataset_create_crypt_sync(dsobj, dd, origin, dcp, tx);
+
 	if (spa_version(dp->dp_spa) >= SPA_VERSION_UNIQUE_ACCURATE)
 		dsphys->ds_flags |= DS_FLAG_UNIQUE_ACCURATE;
 
@@ -946,6 +1021,8 @@ dsl_dataset_zero_zil(dsl_dataset_t *ds, dmu_tx_t *tx)
 		zio_t *zio;
 
 		bzero(&os->os_zil_header, sizeof (os->os_zil_header));
+		if (os->os_encrypted)
+			os->os_next_write_raw[tx->tx_txg & TXG_MASK] = B_TRUE;
 
 		zio = zio_root(dp->dp_spa, NULL, NULL, ZIO_FLAG_MUSTSUCCEED);
 		dsl_dataset_sync(ds, zio, tx);
@@ -959,7 +1036,8 @@ dsl_dataset_zero_zil(dsl_dataset_t *ds, dmu_tx_t *tx)
 
 uint64_t
 dsl_dataset_create_sync(dsl_dir_t *pdd, const char *lastname,
-    dsl_dataset_t *origin, uint64_t flags, cred_t *cr, dmu_tx_t *tx)
+    dsl_dataset_t *origin, uint64_t flags, cred_t *cr,
+    dsl_crypto_params_t *dcp, dmu_tx_t *tx)
 {
 	dsl_pool_t *dp = pdd->dd_pool;
 	uint64_t dsobj, ddobj;
@@ -971,7 +1049,7 @@ dsl_dataset_create_sync(dsl_dir_t *pdd, const char *lastname,
 	ddobj = dsl_dir_create_sync(dp, pdd, lastname, tx);
 	VERIFY0(dsl_dir_hold_obj(dp, ddobj, lastname, FTAG, &dd));
 
-	dsobj = dsl_dataset_create_sync_dd(dd, origin,
+	dsobj = dsl_dataset_create_sync_dd(dd, origin, dcp,
 	    flags & ~DS_CREATE_FLAG_NODIRTY, tx);
 
 	dsl_deleg_set_create_perms(dd, tx, cr);
@@ -1099,8 +1177,18 @@ dsl_dataset_dirty(dsl_dataset_t *ds, dmu_tx_t *tx)
 
 	dp = ds->ds_dir->dd_pool;
 	if (txg_list_add(&dp->dp_dirty_datasets, ds, tx->tx_txg)) {
+		objset_t *os = ds->ds_objset;
+
 		/* up the hold count until we can be written out */
 		dmu_buf_add_ref(ds->ds_dbuf, ds);
+
+		/* if this dataset is encrypted, grab a reference to the DCK */
+		if (ds->ds_dir->dd_crypto_obj != 0 &&
+		    !os->os_raw_receive &&
+		    !os->os_next_write_raw[tx->tx_txg & TXG_MASK]) {
+			ASSERT3P(ds->ds_key_mapping, !=, NULL);
+			key_mapping_add_ref(ds->ds_key_mapping, ds);
+		}
 	}
 }
 
@@ -1471,6 +1559,30 @@ dsl_dataset_snapshot_sync_impl(dsl_dataset_t *ds, const char *snapname,
 		    sizeof (remap_deadlist_obj), 1, &remap_deadlist_obj, tx));
 	}
 
+	/*
+	 * Create a ivset guid for this snapshot if the dataset is
+	 * encrypted. This may be overridden by a raw receive. A
+	 * previous implementation of this code did not have this
+	 * field as part of the on-disk format for ZFS encryption
+	 * (see errata #4). As part of the remediation for this
+	 * issue, we ask the user to enable the bookmark_v2 feature
+	 * which is now a dependency of the encryption feature. We
+	 * use this as a heuristic to determine when the user has
+	 * elected to correct any datasets created with the old code.
+	 * As a result, we only do this step if the bookmark_v2
+	 * feature is enabled, which limits the number of states a
+	 * given pool / dataset can be in with regards to terms of
+	 * correcting the issue.
+	 */
+	if (ds->ds_dir->dd_crypto_obj != 0 &&
+	    spa_feature_is_enabled(dp->dp_spa, SPA_FEATURE_BOOKMARK_V2)) {
+		uint64_t ivset_guid = unique_create();
+
+		dmu_object_zapify(mos, dsobj, DMU_OT_DSL_DATASET, tx);
+		VERIFY0(zap_add(mos, dsobj, DS_FIELD_IVSET_GUID,
+		    sizeof (ivset_guid), 1, &ivset_guid, tx));
+	}
+
 	ASSERT3U(dsl_dataset_phys(ds)->ds_prev_snap_txg, <, tx->tx_txg);
 	dsl_dataset_phys(ds)->ds_prev_snap_obj = dsobj;
 	dsl_dataset_phys(ds)->ds_prev_snap_txg = crtxg;
@@ -1750,6 +1862,11 @@ dsl_dataset_sync_done(dsl_dataset_t *ds, dmu_tx_t *tx)
 		os->os_synced_dnodes = NULL;
 	}
 
+	if (os->os_encrypted)
+		os->os_next_write_raw[tx->tx_txg & TXG_MASK] = B_FALSE;
+	else
+		ASSERT0(os->os_next_write_raw[tx->tx_txg & TXG_MASK]);
+
 	ASSERT(!dmu_objset_is_dirty(os, dmu_tx_get_txg(tx)));
 
 	dmu_buf_rele(ds->ds_dbuf, ds);
@@ -1873,6 +1990,10 @@ get_receive_resume_stats_impl(dsl_dataset_t *ds)
 		if (zap_contains(dp->dp_meta_objset, ds->ds_object,
 		    DS_FIELD_RESUME_COMPRESSOK) == 0) {
 			fnvlist_add_boolean(token_nv, "compressok");
+		}
+		if (zap_contains(dp->dp_meta_objset, ds->ds_object,
+		    DS_FIELD_RESUME_RAWOK) == 0) {
+			fnvlist_add_boolean(token_nv, "rawok");
 		}
 		packed = fnvlist_pack(token_nv, &packed_size);
 		fnvlist_free(token_nv);
@@ -2196,6 +2317,7 @@ dsl_get_mountpoint(dsl_dataset_t *ds, const char *dsname, char *value,
 void
 dsl_dataset_stats(dsl_dataset_t *ds, nvlist_t *nv)
 {
+	int err;
 	dsl_pool_t *dp = ds->ds_dir->dd_pool;
 
 	ASSERT(dsl_pool_config_held(dp));
@@ -2240,13 +2362,24 @@ dsl_dataset_stats(dsl_dataset_t *ds, nvlist_t *nv)
 	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_USERREFS,
 	    dsl_get_userrefs(ds));
 	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_DEFER_DESTROY,
-	    dsl_get_defer_destroy(ds));
+	    DS_IS_DEFER_DESTROY(ds) ? 1 : 0);
+	dsl_dataset_crypt_stats(ds, nv);
 
 	if (dsl_dataset_phys(ds)->ds_prev_snap_obj != 0) {
-		uint64_t written;
-		if (dsl_get_written(ds, &written) == 0) {
-			dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_WRITTEN,
-			    written);
+		uint64_t written, comp, uncomp;
+		dsl_pool_t *dp = ds->ds_dir->dd_pool;
+		dsl_dataset_t *prev;
+
+		err = dsl_dataset_hold_obj(dp,
+		    dsl_dataset_phys(ds)->ds_prev_snap_obj, FTAG, &prev);
+		if (err == 0) {
+			err = dsl_dataset_space_written(prev, ds, &written,
+			    &comp, &uncomp);
+			dsl_dataset_rele(prev, FTAG);
+			if (err == 0) {
+				dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_WRITTEN,
+				    written);
+			}
 		}
 	}
 
@@ -2685,7 +2818,7 @@ dsl_dataset_rollback_sync(void *arg, dmu_tx_t *tx)
 	fnvlist_add_string(ddra->ddra_result, "target", namebuf);
 
 	cloneobj = dsl_dataset_create_sync(ds->ds_dir, "%rollback",
-	    ds->ds_prev, DS_CREATE_FLAG_NODIRTY, kcred, tx);
+	    ds->ds_prev, DS_CREATE_FLAG_NODIRTY, kcred, NULL, tx);
 
 	VERIFY0(dsl_dataset_hold_obj(dp, cloneobj, FTAG, &clone));
 
@@ -2766,6 +2899,23 @@ dsl_dataset_promote_check(void *arg, dmu_tx_t *tx)
 		promote_rele(ddpa, FTAG);
 		return (SET_ERROR(EXDEV));
 	}
+
+	snap = list_head(&ddpa->shared_snaps);
+	if (snap == NULL) {
+		err = SET_ERROR(ENOENT);
+		goto out;
+	}
+	origin_ds = snap->ds;
+
+	/*
+	 * Encrypted clones share a DSL Crypto Key with their origin's dsl dir.
+	 * When doing a promote we must make sure the encryption root for
+	 * both the target and the target's origin does not change to avoid
+	 * needing to rewrap encryption keys
+	 */
+	err = dsl_dataset_promote_crypt_check(hds->ds_dir, origin_ds->ds_dir);
+	if (err != 0)
+		goto out;
 
 	/*
 	 * Compute and check the amount of space to transfer.  Since this is
@@ -2949,6 +3099,8 @@ dsl_dataset_promote_sync(void *arg, dmu_tx_t *tx)
 	 */
 	VERIFY0(dsl_dir_hold_obj(dp, origin_ds->ds_dir->dd_object,
 	    NULL, FTAG, &odd));
+
+	dsl_dataset_promote_crypt_sync(hds->ds_dir, odd, tx);
 
 	/* change origin's next snap */
 	dmu_buf_will_dirty(origin_ds->ds_dbuf, tx);

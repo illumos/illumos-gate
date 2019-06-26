@@ -382,7 +382,7 @@ populate_PoolBean(JNIEnv *env, zpool_handle_t *zphp, zfs_handle_t *zhp,
 		(*env)->CallVoidMethod(env, object->object,
 		    pool_stats->method_setPoolStatus,
 		    zjni_pool_status_to_obj(env,
-		    zpool_get_status(zphp, &msgid)));
+		    zpool_get_status(zphp, &msgid, NULL)));
 
 		(*env)->CallVoidMethod(env, object->object,
 		    pool_stats->method_setPoolVersion,

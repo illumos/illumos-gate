@@ -248,11 +248,13 @@ get_usage(zpool_help_t idx)
 		return (gettext("\thistory [-il] [<pool>] ...\n"));
 	case HELP_IMPORT:
 		return (gettext("\timport [-d dir] [-D]\n"
+		    "\timport [-d dir | -c cachefile] [-F [-n]] [-l] "
+		    "<pool | id>\n"
 		    "\timport [-o mntopts] [-o property=value] ... \n"
-		    "\t    [-d dir | -c cachefile] [-D] [-f] [-m] [-N] "
+		    "\t    [-d dir | -c cachefile] [-D] [-l] [-f] [-m] [-N] "
 		    "[-R root] [-F [-n]] -a\n"
 		    "\timport [-o mntopts] [-o property=value] ... \n"
-		    "\t    [-d dir | -c cachefile] [-D] [-f] [-m] [-N] "
+		    "\t    [-d dir | -c cachefile] [-D] [-l] [-f] [-m] [-N] "
 		    "[-R root] [-F [-n]] [-t]\n"
 		    "\t    [--rewind-to-checkpoint] <pool | id> [newpool]\n"));
 	case HELP_IOSTAT:
@@ -293,7 +295,7 @@ get_usage(zpool_help_t idx)
 	case HELP_SET:
 		return (gettext("\tset <property=value> <pool> \n"));
 	case HELP_SPLIT:
-		return (gettext("\tsplit [-gLnP] [-R altroot] [-o mntopts]\n"
+		return (gettext("\tsplit [-gLlnP] [-R altroot] [-o mntopts]\n"
 		    "\t    [-o property=value] <pool> <newpool> "
 		    "[<device> ...]\n"));
 	case HELP_REGUID:
@@ -1956,6 +1958,7 @@ show_import(nvlist_t *config)
 	char *hostname = "unknown";
 	nvlist_t *nvroot, *nvinfo;
 	int reason;
+	zpool_errata_t errata;
 	const char *health;
 	uint_t vsc;
 	char *comment;
@@ -1974,7 +1977,7 @@ show_import(nvlist_t *config)
 	    (uint64_t **)&vs, &vsc) == 0);
 	health = zpool_state_to_name(vs->vs_state, vs->vs_aux);
 
-	reason = zpool_import_status(config, &msgid);
+	reason = zpool_import_status(config, &msgid, &errata);
 
 	(void) printf(gettext("   pool: %s\n"), name);
 	(void) printf(gettext("     id: %llu\n"), (u_longlong_t)guid);
@@ -2073,6 +2076,11 @@ show_import(nvlist_t *config)
 		    "resilvered.\n"));
 		break;
 
+	case ZPOOL_STATUS_ERRATA:
+		(void) printf(gettext(" status: Errata #%d detected.\n"),
+		    errata);
+		break;
+
 	default:
 		/*
 		 * No other status can be seen when importing pools.
@@ -2094,6 +2102,55 @@ show_import(nvlist_t *config)
 			(void) printf(gettext(" action: The pool can be "
 			    "imported using its name or numeric "
 			    "identifier and\n\tthe '-f' flag.\n"));
+		} else if (reason == ZPOOL_STATUS_ERRATA) {
+			switch (errata) {
+			case ZPOOL_ERRATA_NONE:
+				break;
+
+			case ZPOOL_ERRATA_ZOL_2094_SCRUB:
+				(void) printf(gettext(" action: The pool can "
+				    "be imported using its name or numeric "
+				    "identifier,\n\thowever there is a compat"
+				    "ibility issue which should be corrected"
+				    "\n\tby running 'zpool scrub'\n"));
+				break;
+
+			case ZPOOL_ERRATA_ZOL_2094_ASYNC_DESTROY:
+				(void) printf(gettext(" action: The pool can"
+				    "not be imported with this version of ZFS "
+				    "due to\n\tan active asynchronous destroy. "
+				    "Revert to an earlier version\n\tand "
+				    "allow the destroy to complete before "
+				    "updating.\n"));
+				break;
+
+			case ZPOOL_ERRATA_ZOL_6845_ENCRYPTION:
+				(void) printf(gettext(" action: Existing "
+				    "encrypted datasets contain an on-disk "
+				    "incompatibility, which\n\tneeds to be "
+				    "corrected. Backup these datasets to new "
+				    "encrypted datasets\n\tand destroy the "
+				    "old ones.\n"));
+				break;
+			case ZPOOL_ERRATA_ZOL_8308_ENCRYPTION:
+				(void) printf(gettext(" action: Any existing "
+				    "encrypted datasets contain an on-disk "
+				    "incompatibility which\n\tmay cause "
+				    "on-disk corruption with 'zfs recv' and "
+				    "which needs to be\n\tcorrected. Enable "
+				    "the bookmark_v2 feature and backup "
+				    "these datasets to new encrypted "
+				    "datasets and\n\tdestroy the old ones. "
+				    "If this pool does not contain any "
+				    "encrypted datasets, simply enable\n\t"
+				    "the bookmark_v2 feature.\n"));
+				break;
+			default:
+				/*
+				 * All errata must contain an action message.
+				 */
+				assert(0);
+			}
 		} else {
 			(void) printf(gettext(" action: The pool can be "
 			    "imported using its name or numeric "
@@ -2236,6 +2293,7 @@ static int
 do_import(nvlist_t *config, const char *newname, const char *mntopts,
     nvlist_t *props, int flags)
 {
+	int ret = 0;
 	zpool_handle_t *zhp;
 	char *name;
 	uint64_t version;
@@ -2316,6 +2374,16 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 	if ((zhp = zpool_open_canfail(g_zfs, name)) == NULL)
 		return (1);
 
+	/*
+	 * Loading keys is best effort. We don't want to return immediately
+	 * if it fails but we do want to give the error to the caller.
+	 */
+	if (flags & ZFS_IMPORT_LOAD_KEYS) {
+		ret = zfs_crypto_attempt_load_keys(g_zfs, name);
+		if (ret != 0)
+			ret = 1;
+	}
+
 	if (zpool_get_state(zhp) != POOL_STATE_UNAVAIL &&
 	    !(flags & ZFS_IMPORT_ONLY) &&
 	    zpool_enable_datasets(zhp, mntopts, 0) != 0) {
@@ -2324,7 +2392,7 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 	}
 
 	zpool_close(zhp);
-	return (0);
+	return (ret);
 }
 
 /*
@@ -2402,9 +2470,9 @@ zpool_do_checkpoint(int argc, char **argv)
 
 /*
  * zpool import [-d dir] [-D]
- *       import [-o mntopts] [-o prop=value] ... [-R root] [-D]
+ *       import [-o mntopts] [-o prop=value] ... [-R root] [-D] [-l]
  *              [-d dir | -c cachefile] [-f] -a
- *       import [-o mntopts] [-o prop=value] ... [-R root] [-D]
+ *       import [-o mntopts] [-o prop=value] ... [-R root] [-D] [-l]
  *              [-d dir | -c cachefile] [-f] [-n] [-F] [-t]
  *              <pool | id> [newpool]
  *
@@ -2446,6 +2514,7 @@ zpool_do_checkpoint(int argc, char **argv)
  *	-a	Import all pools found.
  *
  *	-o	Set property=value and/or temporary mount options (without '=').
+ *  -l	Load encryption keys while importing.
  *
  *	--rewind-to-checkpoint
  *		Import the pool and revert back to the checkpoint.
@@ -2490,7 +2559,7 @@ zpool_do_import(int argc, char **argv)
 	};
 
 	/* check options */
-	while ((c = getopt_long(argc, argv, ":aCc:d:DEfFmnNo:rR:tT:VX",
+	while ((c = getopt_long(argc, argv, ":aCc:d:DEfFlmnNo:rR:tT:VX",
 	    long_options, NULL)) != -1) {
 		switch (c) {
 		case 'a':
@@ -2520,6 +2589,9 @@ zpool_do_import(int argc, char **argv)
 			break;
 		case 'F':
 			do_rewind = B_TRUE;
+			break;
+		case 'l':
+			flags |= ZFS_IMPORT_LOAD_KEYS;
 			break;
 		case 'm':
 			flags |= ZFS_IMPORT_MISSING_LOG;
@@ -2591,6 +2663,17 @@ zpool_do_import(int argc, char **argv)
 
 	if (cachefile && nsearch != 0) {
 		(void) fprintf(stderr, gettext("-c is incompatible with -d\n"));
+		usage(B_FALSE);
+	}
+
+	if ((flags & ZFS_IMPORT_LOAD_KEYS) && (flags & ZFS_IMPORT_ONLY)) {
+		(void) fprintf(stderr, gettext("-l is incompatible with -N\n"));
+		usage(B_FALSE);
+	}
+
+	if ((flags & ZFS_IMPORT_LOAD_KEYS) && !do_all && argc == 0) {
+		(void) fprintf(stderr, gettext("-l is only meaningful during "
+		    "an import\n"));
 		usage(B_FALSE);
 	}
 
@@ -4037,6 +4120,7 @@ zpool_do_detach(int argc, char **argv)
  *	-o	Set property=value, or set mount options.
  *	-P	Display full path for vdev name.
  *	-R	Mount the split-off pool under an alternate root.
+ *	-l	Load encryption keys while importing.
  *
  * Splits the named pool and gives it the new pool name.  Devices to be split
  * off may be listed, provided that no more than one device is specified
@@ -4054,6 +4138,7 @@ zpool_do_split(int argc, char **argv)
 	char *mntopts = NULL;
 	splitflags_t flags;
 	int c, ret = 0;
+	boolean_t loadkeys = B_FALSE;
 	zpool_handle_t *zhp;
 	nvlist_t *config, *props = NULL;
 
@@ -4062,7 +4147,7 @@ zpool_do_split(int argc, char **argv)
 	flags.name_flags = 0;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":gLR:no:P")) != -1) {
+	while ((c = getopt(argc, argv, ":gLR:lno:P")) != -1) {
 		switch (c) {
 		case 'g':
 			flags.name_flags |= VDEV_NAME_GUID;
@@ -4078,6 +4163,9 @@ zpool_do_split(int argc, char **argv)
 				nvlist_free(props);
 				usage(B_FALSE);
 			}
+			break;
+		case 'l':
+			loadkeys = B_TRUE;
 			break;
 		case 'n':
 			flags.dryrun = B_TRUE;
@@ -4113,6 +4201,12 @@ zpool_do_split(int argc, char **argv)
 
 	if (!flags.import && mntopts != NULL) {
 		(void) fprintf(stderr, gettext("setting mntopts is only "
+		    "valid when importing the pool\n"));
+		usage(B_FALSE);
+	}
+
+	if (!flags.import && loadkeys) {
+		(void) fprintf(stderr, gettext("loading keys is only "
 		    "valid when importing the pool\n"));
 		usage(B_FALSE);
 	}
@@ -4162,6 +4256,13 @@ zpool_do_split(int argc, char **argv)
 	 */
 	if ((zhp = zpool_open_canfail(g_zfs, newpool)) == NULL)
 		return (1);
+
+	if (loadkeys) {
+		ret = zfs_crypto_attempt_load_keys(g_zfs, newpool);
+		if (ret != 0)
+			ret = 1;
+	}
+
 	if (zpool_get_state(zhp) != POOL_STATE_UNAVAIL &&
 	    zpool_enable_datasets(zhp, mntopts, 0) != 0) {
 		ret = 1;
@@ -5206,12 +5307,13 @@ status_callback(zpool_handle_t *zhp, void *data)
 	nvlist_t *config, *nvroot;
 	char *msgid;
 	int reason;
+	zpool_errata_t errata;
 	const char *health;
 	uint_t c;
 	vdev_stat_t *vs;
 
 	config = zpool_get_config(zhp, NULL);
-	reason = zpool_get_status(zhp, &msgid);
+	reason = zpool_get_status(zhp, &msgid, &errata);
 
 	cbp->cb_count++;
 
@@ -5435,6 +5537,52 @@ status_callback(zpool_handle_t *zhp, void *data)
 		    "device(s) and run 'zpool online',\n"
 		    "\tor ignore the intent log records by running "
 		    "'zpool clear'.\n"));
+		break;
+
+	case ZPOOL_STATUS_ERRATA:
+		(void) printf(gettext("status: Errata #%d detected.\n"),
+		    errata);
+
+		switch (errata) {
+		case ZPOOL_ERRATA_NONE:
+			break;
+
+		case ZPOOL_ERRATA_ZOL_2094_SCRUB:
+			(void) printf(gettext("action: To correct the issue "
+			    "run 'zpool scrub'.\n"));
+			break;
+
+		case ZPOOL_ERRATA_ZOL_6845_ENCRYPTION:
+			(void) printf(gettext("\tExisting encrypted datasets "
+			    "contain an on-disk incompatibility\n\twhich "
+			    "needs to be corrected.\n"));
+			(void) printf(gettext("action: To correct the issue "
+			    "backup existing encrypted datasets to new\n\t"
+			    "encrypted datasets and destroy the old ones. "
+			    "'zfs mount -o ro' can\n\tbe used to temporarily "
+			    "mount existing encrypted datasets readonly.\n"));
+			break;
+
+		case ZPOOL_ERRATA_ZOL_8308_ENCRYPTION:
+			(void) printf(gettext("\tExisting encrypted datasets "
+			    "contain an on-disk incompatibility\n\twhich "
+			    "needs to be corrected.\n"));
+			(void) printf(gettext("action: To correct the issue "
+			    "enable the bookmark_v2 feature and "
+			    "backup\n\tany existing encrypted datasets to "
+			    "new encrypted datasets and\n\tdestroy the old "
+			    "ones. If this pool does not contain any\n\t"
+			    "encrypted datasets, simply enable the "
+			    "bookmark_v2 feature\n"));
+			break;
+
+		default:
+			/*
+			 * All errata which allow the pool to be imported
+			 * must contain an action message.
+			 */
+			assert(0);
+		}
 		break;
 
 	default:

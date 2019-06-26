@@ -487,6 +487,43 @@ dsl_scan_init(dsl_pool_t *dp, uint64_t txg)
 		err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
 		    DMU_POOL_SCAN, sizeof (uint64_t), SCAN_PHYS_NUMINTS,
 		    &scn->scn_phys);
+
+		/*
+		 * Detect if the pool contains the signature of #2094.  If it
+		 * does properly update the scn->scn_phys structure and notify
+		 * the administrator by setting an errata for the pool.
+		 */
+		if (err == EOVERFLOW) {
+			uint64_t zaptmp[SCAN_PHYS_NUMINTS + 1];
+			VERIFY3S(SCAN_PHYS_NUMINTS, ==, 24);
+			VERIFY3S(offsetof(dsl_scan_phys_t, scn_flags), ==,
+			    (23 * sizeof (uint64_t)));
+
+			err = zap_lookup(dp->dp_meta_objset,
+			    DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_SCAN,
+			    sizeof (uint64_t), SCAN_PHYS_NUMINTS + 1, &zaptmp);
+			if (err == 0) {
+				uint64_t overflow = zaptmp[SCAN_PHYS_NUMINTS];
+
+				if (overflow & ~DSF_VISIT_DS_AGAIN ||
+				    scn->scn_async_destroying) {
+					spa->spa_errata =
+					    ZPOOL_ERRATA_ZOL_2094_ASYNC_DESTROY;
+					return (EOVERFLOW);
+				}
+
+				bcopy(zaptmp, &scn->scn_phys,
+				    SCAN_PHYS_NUMINTS * sizeof (uint64_t));
+				scn->scn_phys.scn_flags = overflow;
+
+				/* Required scrub already in progress. */
+				if (scn->scn_phys.scn_state == DSS_FINISHED ||
+				    scn->scn_phys.scn_state == DSS_CANCELED)
+					spa->spa_errata =
+					    ZPOOL_ERRATA_ZOL_2094_SCRUB;
+			}
+		}
+
 		if (err == ENOENT)
 			return (0);
 		else if (err)
@@ -1379,7 +1416,7 @@ dsl_scan_zil(dsl_pool_t *dp, zil_header_t *zh)
 	zilog = zil_alloc(dp->dp_meta_objset, zh);
 
 	(void) zil_parse(zilog, dsl_scan_zil_block, dsl_scan_zil_record, &zsa,
-	    claim_txg);
+	    claim_txg, B_FALSE);
 
 	zil_free(zilog);
 }
@@ -1637,6 +1674,13 @@ dsl_scan_prefetch_thread(void *arg)
 
 		mutex_exit(&spa->spa_scrub_lock);
 
+		if (BP_IS_PROTECTED(&spic->spic_bp)) {
+			ASSERT(BP_GET_TYPE(&spic->spic_bp) == DMU_OT_DNODE ||
+			    BP_GET_TYPE(&spic->spic_bp) == DMU_OT_OBJSET);
+			ASSERT3U(BP_GET_LEVEL(&spic->spic_bp), ==, 0);
+			zio_flags |= ZIO_FLAG_RAW;
+		}
+
 		/* issue the prefetch asynchronously */
 		(void) arc_read(scn->scn_zio_root, scn->scn_dp->dp_spa,
 		    &spic->spic_bp, dsl_scan_prefetch_cb, spic->spic_spc,
@@ -1743,6 +1787,11 @@ dsl_scan_recurse(dsl_scan_t *scn, dsl_dataset_t *ds, dmu_objset_type_t ostype,
 		int i;
 		int epb = BP_GET_LSIZE(bp) >> DNODE_SHIFT;
 		arc_buf_t *buf;
+
+		if (BP_IS_PROTECTED(bp)) {
+			ASSERT3U(BP_GET_COMPRESS(bp), ==, ZIO_COMPRESS_OFF);
+			zio_flags |= ZIO_FLAG_RAW;
+		}
 
 		err = arc_read(NULL, dp->dp_spa, bp, arc_getbuf_func, &buf,
 		    ZIO_PRIORITY_SCRUB, zio_flags, &flags, zb);

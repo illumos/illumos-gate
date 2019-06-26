@@ -55,6 +55,7 @@
 #include <zlib.h>
 #include <sha2.h>
 #include <sys/zio_checksum.h>
+#include <sys/dsl_crypt.h>
 #include <sys/ddt.h>
 
 /* in libzfs_dataset.c */
@@ -324,11 +325,9 @@ cksummer(void *arg)
 			struct drr_object *drro = &drr->drr_u.drr_object;
 			if (drro->drr_bonuslen > 0) {
 				(void) ssread(buf,
-				    P2ROUNDUP((uint64_t)drro->drr_bonuslen, 8),
-				    ofp);
+				    DRR_OBJECT_PAYLOAD_SIZE(drro), ofp);
 			}
-			if (dump_record(drr, buf,
-			    P2ROUNDUP((uint64_t)drro->drr_bonuslen, 8),
+			if (dump_record(drr, buf, DRR_OBJECT_PAYLOAD_SIZE(drro),
 			    &stream_cksum, outfd) != 0)
 				goto out;
 			break;
@@ -337,8 +336,8 @@ cksummer(void *arg)
 		case DRR_SPILL:
 		{
 			struct drr_spill *drrs = &drr->drr_u.drr_spill;
-			(void) ssread(buf, drrs->drr_length, ofp);
-			if (dump_record(drr, buf, drrs->drr_length,
+			(void) ssread(buf, DRR_SPILL_PAYLOAD_SIZE(drrs), ofp);
+			if (dump_record(drr, buf, DRR_SPILL_PAYLOAD_SIZE(drrs),
 			    &stream_cksum, outfd) != 0)
 				goto out;
 			break;
@@ -368,7 +367,7 @@ cksummer(void *arg)
 
 			if (ZIO_CHECKSUM_EQUAL(drrw->drr_key.ddk_cksum,
 			    zero_cksum) ||
-			    !DRR_IS_DEDUP_CAPABLE(drrw->drr_checksumflags)) {
+			    !DRR_IS_DEDUP_CAPABLE(drrw->drr_flags)) {
 				SHA256_CTX	ctx;
 				zio_cksum_t	tmpsha256;
 
@@ -384,7 +383,7 @@ cksummer(void *arg)
 				drrw->drr_key.ddk_cksum.zc_word[3] =
 				    BE_64(tmpsha256.zc_word[3]);
 				drrw->drr_checksumtype = ZIO_CHECKSUM_SHA256;
-				drrw->drr_checksumflags = DRR_CHECKSUM_DEDUP;
+				drrw->drr_flags |= DRR_CHECKSUM_DEDUP;
 			}
 
 			dataref.ref_guid = drrw->drr_toguid;
@@ -413,8 +412,7 @@ cksummer(void *arg)
 
 				wbr_drrr->drr_checksumtype =
 				    drrw->drr_checksumtype;
-				wbr_drrr->drr_checksumflags =
-				    drrw->drr_checksumtype;
+				wbr_drrr->drr_flags = drrw->drr_flags;
 				wbr_drrr->drr_key.ddk_cksum =
 				    drrw->drr_key.ddk_cksum;
 				wbr_drrr->drr_key.ddk_prop =
@@ -446,6 +444,14 @@ cksummer(void *arg)
 		}
 
 		case DRR_FREE:
+		{
+			if (dump_record(drr, NULL, 0, &stream_cksum,
+			    outfd) != 0)
+				goto out;
+			break;
+		}
+
+		case DRR_OBJECT_RANGE:
 		{
 			if (dump_record(drr, NULL, 0, &stream_cksum,
 			    outfd) != 0)
@@ -601,6 +607,7 @@ typedef struct send_data {
 	const char *fsname;
 	const char *fromsnap;
 	const char *tosnap;
+	boolean_t raw;
 	boolean_t recursive;
 	boolean_t verbose;
 
@@ -620,6 +627,7 @@ typedef struct send_data {
 	 *	 "snapprops" -> { name (lastname) -> { name -> value } }
 	 *
 	 *	 "origin" -> number (guid) (if clone)
+	 *	 "is_encroot" -> boolean
 	 *	 "sent" -> boolean (not on-disk)
 	 *	}
 	 *   }
@@ -778,7 +786,7 @@ static int
 send_iterate_fs(zfs_handle_t *zhp, void *arg)
 {
 	send_data_t *sd = arg;
-	nvlist_t *nvfs, *nv;
+	nvlist_t *nvfs = NULL, *nv = NULL;
 	int rv = 0;
 	uint64_t parent_fromsnap_guid_save = sd->parent_fromsnap_guid;
 	uint64_t fromsnap_txg_save = sd->fromsnap_txg;
@@ -842,8 +850,37 @@ send_iterate_fs(zfs_handle_t *zhp, void *arg)
 	/* iterate over props */
 	VERIFY(0 == nvlist_alloc(&nv, NV_UNIQUE_NAME, 0));
 	send_iterate_prop(zhp, nv);
+
+	if (zfs_prop_get_int(zhp, ZFS_PROP_ENCRYPTION) != ZIO_CRYPT_OFF) {
+		boolean_t encroot;
+
+		/* determine if this dataset is an encryption root */
+		if (zfs_crypto_get_encryption_root(zhp, &encroot, NULL) != 0) {
+			rv = -1;
+			goto out;
+		}
+
+		if (encroot)
+			VERIFY(0 == nvlist_add_boolean(nvfs, "is_encroot"));
+
+		/*
+		 * Encrypted datasets can only be sent with properties if
+		 * the raw flag is specified because the receive side doesn't
+		 * currently have a mechanism for recursively asking the user
+		 * for new encryption parameters.
+		 */
+		if (!sd->raw) {
+			(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+			    "cannot send %s@%s: encrypted dataset %s may not "
+			    "be sent with properties without the raw flag\n"),
+			    sd->fsname, sd->tosnap, zhp->zfs_name);
+			rv = -1;
+			goto out;
+		}
+
+	}
+
 	VERIFY(0 == nvlist_add_nvlist(nvfs, "props", nv));
-	nvlist_free(nv);
 
 	/* iterate over snaps, and set sd->parent_fromsnap_guid */
 	sd->parent_fromsnap_guid = 0;
@@ -859,7 +896,6 @@ send_iterate_fs(zfs_handle_t *zhp, void *arg)
 	(void) snprintf(guidstring, sizeof (guidstring),
 	    "0x%llx", (longlong_t)guid);
 	VERIFY(0 == nvlist_add_nvlist(sd->fss, guidstring, nvfs));
-	nvlist_free(nvfs);
 
 	/* iterate over children */
 	if (sd->recursive)
@@ -869,6 +905,8 @@ out:
 	sd->parent_fromsnap_guid = parent_fromsnap_guid_save;
 	sd->fromsnap_txg = fromsnap_txg_save;
 	sd->tosnap_txg = tosnap_txg_save;
+	nvlist_free(nv);
+	nvlist_free(nvfs);
 
 	zfs_close(zhp);
 	return (rv);
@@ -876,7 +914,7 @@ out:
 
 static int
 gather_nvlist(libzfs_handle_t *hdl, const char *fsname, const char *fromsnap,
-    const char *tosnap, boolean_t recursive, boolean_t verbose,
+    const char *tosnap, boolean_t recursive, boolean_t raw, boolean_t verbose,
     nvlist_t **nvlp, avl_tree_t **avlp)
 {
 	zfs_handle_t *zhp;
@@ -892,6 +930,7 @@ gather_nvlist(libzfs_handle_t *hdl, const char *fsname, const char *fromsnap,
 	sd.fromsnap = fromsnap;
 	sd.tosnap = tosnap;
 	sd.recursive = recursive;
+	sd.raw = raw;
 	sd.verbose = verbose;
 
 	if ((error = send_iterate_fs(zhp, &sd)) != 0) {
@@ -923,7 +962,7 @@ typedef struct send_dump_data {
 	uint64_t prevsnap_obj;
 	boolean_t seenfrom, seento, replicate, doall, fromorigin;
 	boolean_t verbose, dryrun, parsable, progress, embed_data, std_out;
-	boolean_t large_block, compress;
+	boolean_t large_block, compress, raw;
 	int outfd;
 	boolean_t err;
 	nvlist_t *fss;
@@ -964,6 +1003,11 @@ estimate_ioctl(zfs_handle_t *zhp, uint64_t fromsnap_obj,
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "not an earlier snapshot from the same fs"));
 			return (zfs_error(hdl, EZFS_CROSSTARGET, errbuf));
+
+		case EACCES:
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "source key must be loaded"));
+			return (zfs_error(hdl, EZFS_CRYPTOFAILED, errbuf));
 
 		case ENOENT:
 			if (zfs_dataset_exists(hdl, zc.zc_name,
@@ -1044,6 +1088,11 @@ dump_ioctl(zfs_handle_t *zhp, const char *fromsnap, uint64_t fromsnap_obj,
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "not an earlier snapshot from the same fs"));
 			return (zfs_error(hdl, EZFS_CROSSTARGET, errbuf));
+
+		case EACCES:
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "source key must be loaded"));
+			return (zfs_error(hdl, EZFS_CRYPTOFAILED, errbuf));
 
 		case ENOENT:
 			if (zfs_dataset_exists(hdl, zc.zc_name,
@@ -1226,6 +1275,8 @@ dump_snapshot(zfs_handle_t *zhp, void *arg)
 		flags |= LZC_SEND_FLAG_EMBED_DATA;
 	if (sdd->compress)
 		flags |= LZC_SEND_FLAG_COMPRESS;
+	if (sdd->raw)
+		flags |= LZC_SEND_FLAG_RAW;
 
 	if (!sdd->doall && !isfromsnap && !istosnap) {
 		if (sdd->replicate) {
@@ -1610,6 +1661,8 @@ zfs_send_resume(libzfs_handle_t *hdl, sendflags_t *flags, int outfd,
 		lzc_flags |= LZC_SEND_FLAG_EMBED_DATA;
 	if (flags->compress || nvlist_exists(resume_nvl, "compressok"))
 		lzc_flags |= LZC_SEND_FLAG_COMPRESS;
+	if (flags->raw || nvlist_exists(resume_nvl, "rawok"))
+		lzc_flags |= LZC_SEND_FLAG_RAW;
 
 	if (guid_to_name(hdl, toname, toguid, B_FALSE, name) != 0) {
 		if (zfs_dataset_exists(hdl, toname, ZFS_TYPE_DATASET)) {
@@ -1687,6 +1740,11 @@ zfs_send_resume(libzfs_handle_t *hdl, sendflags_t *flags, int outfd,
 		switch (error) {
 		case 0:
 			return (0);
+		case EACCES:
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "source key must be loaded"));
+			return (zfs_error(hdl, EZFS_CRYPTOFAILED, errbuf));
+
 		case EXDEV:
 		case ENOENT:
 		case EDQUOT:
@@ -1765,7 +1823,14 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 		}
 	}
 
-	if (flags->dedup && !flags->dryrun) {
+	/*
+	 * Start the dedup thread if this is a dedup stream. We do not bother
+	 * doing this if this a raw send of an encrypted dataset with dedup off
+	 * because normal encrypted blocks won't dedup.
+	 */
+	if (flags->dedup && !flags->dryrun && !(flags->raw &&
+	    zfs_prop_get_int(zhp, ZFS_PROP_ENCRYPTION) != ZIO_CRYPT_OFF &&
+	    zfs_prop_get_int(zhp, ZFS_PROP_DEDUP) == ZIO_CHECKSUM_OFF)) {
 		featureflags |= (DMU_BACKUP_FEATURE_DEDUP |
 		    DMU_BACKUP_FEATURE_DEDUPPROPS);
 		if ((err = pipe(pipefd)) != 0) {
@@ -1804,10 +1869,13 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 				VERIFY(0 == nvlist_add_boolean(hdrnv,
 				    "not_recursive"));
 			}
+			if (flags->raw) {
+				VERIFY(0 == nvlist_add_boolean(hdrnv, "raw"));
+			}
 
 			err = gather_nvlist(zhp->zfs_hdl, zhp->zfs_name,
-			    fromsnap, tosnap, flags->replicate, flags->verbose,
-			    &fss, &fsavl);
+			    fromsnap, tosnap, flags->replicate, flags->raw,
+			    flags->verbose, &fss, &fsavl);
 			if (err)
 				goto err_out;
 			VERIFY(0 == nvlist_add_nvlist(hdrnv, "fss", fss));
@@ -1872,6 +1940,7 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 	sdd.large_block = flags->largeblock;
 	sdd.embed_data = flags->embed_data;
 	sdd.compress = flags->compress;
+	sdd.raw = flags->raw;
 	sdd.filter_cb = filter_func;
 	sdd.filter_cb_arg = cb_arg;
 	if (debugnvp)
@@ -2033,6 +2102,11 @@ zfs_send_one(zfs_handle_t *zhp, const char *from, int fd,
 			}
 			return (zfs_error(hdl, EZFS_NOENT, errbuf));
 
+		case EACCES:
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "dataset key must be loaded"));
+			return (zfs_error(hdl, EZFS_CRYPTOFAILED, errbuf));
+
 		case EBUSY:
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "target is busy; if a filesystem, "
@@ -2123,26 +2197,86 @@ recv_read_nvlist(libzfs_handle_t *hdl, int fd, int len, nvlist_t **nvp,
 	return (0);
 }
 
+/*
+ * Returns the grand origin (origin of origin of origin...) of a given handle.
+ * If this dataset is not a clone, it simply returns a copy of the original
+ * handle.
+ */
+static zfs_handle_t *
+recv_open_grand_origin(zfs_handle_t *zhp)
+{
+	char origin[ZFS_MAX_DATASET_NAME_LEN];
+	zprop_source_t src;
+	zfs_handle_t *ozhp = zfs_handle_dup(zhp);
+
+	while (ozhp != NULL) {
+		if (zfs_prop_get(ozhp, ZFS_PROP_ORIGIN, origin,
+		    sizeof (origin), &src, NULL, 0, B_FALSE) != 0)
+			break;
+
+		(void) zfs_close(ozhp);
+		ozhp = zfs_open(zhp->zfs_hdl, origin, ZFS_TYPE_FILESYSTEM);
+	}
+
+	return (ozhp);
+}
+
+static int
+recv_rename_impl(zfs_handle_t *zhp, const char *source, const char *target)
+{
+	int err;
+	zfs_handle_t *ozhp = NULL;
+
+	/*
+	 * Attempt to rename the dataset. If it fails with EACCES we have
+	 * attempted to rename the dataset outside of its encryption root.
+	 * Force the dataset to become an encryption root and try again.
+	 */
+	err = lzc_rename(source, target);
+	if (err == EACCES) {
+		ozhp = recv_open_grand_origin(zhp);
+		if (ozhp == NULL) {
+			err = ENOENT;
+			goto out;
+		}
+
+		err = lzc_change_key(ozhp->zfs_name, DCP_CMD_FORCE_NEW_KEY,
+		    NULL, NULL, 0);
+		if (err != 0)
+			goto out;
+
+		err = lzc_rename(source, target);
+	}
+
+out:
+	if (ozhp != NULL)
+		zfs_close(ozhp);
+	return (err);
+}
+
 static int
 recv_rename(libzfs_handle_t *hdl, const char *name, const char *tryname,
     int baselen, char *newname, recvflags_t *flags)
 {
 	static int seq;
 	int err;
-	prop_changelist_t *clp;
-	zfs_handle_t *zhp;
+	prop_changelist_t *clp = NULL;
+	zfs_handle_t *zhp = NULL;
 
 	zhp = zfs_open(hdl, name, ZFS_TYPE_DATASET);
-	if (zhp == NULL)
-		return (-1);
+	if (zhp == NULL) {
+		err = -1;
+		goto out;
+	}
 	clp = changelist_gather(zhp, ZFS_PROP_NAME, 0,
 	    flags->force ? MS_FORCE : 0);
-	zfs_close(zhp);
-	if (clp == NULL)
-		return (-1);
+	if (clp == NULL) {
+		err = -1;
+		goto out;
+	}
 	err = changelist_prefix(clp);
 	if (err)
-		return (err);
+		goto out;
 
 	if (tryname) {
 		(void) strcpy(newname, tryname);
@@ -2150,7 +2284,7 @@ recv_rename(libzfs_handle_t *hdl, const char *name, const char *tryname,
 			(void) printf("attempting rename %s to %s\n",
 			    name, newname);
 		}
-		err = lzc_rename(name, newname);
+		err = recv_rename_impl(zhp, name, newname);
 		if (err == 0)
 			changelist_rename(clp, name, tryname);
 	} else {
@@ -2166,7 +2300,7 @@ recv_rename(libzfs_handle_t *hdl, const char *name, const char *tryname,
 			(void) printf("failed - trying rename %s to %s\n",
 			    name, newname);
 		}
-		err = lzc_rename(name, newname);
+		err = recv_rename_impl(zhp, name, newname);
 		if (err == 0)
 			changelist_rename(clp, name, newname);
 		if (err && flags->verbose) {
@@ -2182,7 +2316,62 @@ recv_rename(libzfs_handle_t *hdl, const char *name, const char *tryname,
 	}
 
 	(void) changelist_postfix(clp);
-	changelist_free(clp);
+
+out:
+	if (clp != NULL)
+		changelist_free(clp);
+	if (zhp != NULL)
+		zfs_close(zhp);
+
+	return (err);
+}
+
+static int
+recv_promote(libzfs_handle_t *hdl, const char *fsname,
+    const char *origin_fsname, recvflags_t *flags)
+{
+	int err;
+	zfs_cmd_t zc = {"\0"};
+	zfs_handle_t *zhp = NULL, *ozhp = NULL;
+
+	if (flags->verbose)
+		(void) printf("promoting %s\n", fsname);
+
+	(void) strlcpy(zc.zc_value, origin_fsname, sizeof (zc.zc_value));
+	(void) strlcpy(zc.zc_name, fsname, sizeof (zc.zc_name));
+
+	/*
+	 * Attempt to promote the dataset. If it fails with EACCES the
+	 * promotion would cause this dataset to leave its encryption root.
+	 * Force the origin to become an encryption root and try again.
+	 */
+	err = zfs_ioctl(hdl, ZFS_IOC_PROMOTE, &zc);
+	if (err == EACCES) {
+		zhp = zfs_open(hdl, fsname, ZFS_TYPE_DATASET);
+		if (zhp == NULL) {
+			err = -1;
+			goto out;
+		}
+
+		ozhp = recv_open_grand_origin(zhp);
+		if (ozhp == NULL) {
+			err = -1;
+			goto out;
+		}
+
+		err = lzc_change_key(ozhp->zfs_name, DCP_CMD_FORCE_NEW_KEY,
+		    NULL, NULL, 0);
+		if (err != 0)
+			goto out;
+
+		err = zfs_ioctl(hdl, ZFS_IOC_PROMOTE, &zc);
+	}
+
+out:
+	if (zhp != NULL)
+		zfs_close(zhp);
+	if (ozhp != NULL)
+		zfs_close(ozhp);
 
 	return (err);
 }
@@ -2386,6 +2575,150 @@ created_before(libzfs_handle_t *hdl, avl_tree_t *avl,
 	return (rv);
 }
 
+/*
+ * This function reestablishes the heirarchy of encryption roots after a
+ * recursive incremental receive has completed. This must be done after the
+ * second call to recv_incremental_replication() has renamed and promoted all
+ * sent datasets to their final locations in the dataset heriarchy.
+ */
+/* ARGSUSED */
+static int
+recv_fix_encryption_hierarchy(libzfs_handle_t *hdl, const char *destname,
+    nvlist_t *stream_nv, avl_tree_t *stream_avl)
+{
+	int err;
+	nvpair_t *fselem = NULL;
+	nvlist_t *stream_fss;
+	char *cp;
+	char top_zfs[ZFS_MAX_DATASET_NAME_LEN];
+
+	(void) strcpy(top_zfs, destname);
+	cp = strrchr(top_zfs, '@');
+	if (cp != NULL)
+		*cp = '\0';
+
+	VERIFY(0 == nvlist_lookup_nvlist(stream_nv, "fss", &stream_fss));
+
+	while ((fselem = nvlist_next_nvpair(stream_fss, fselem)) != NULL) {
+		zfs_handle_t *zhp = NULL;
+		uint64_t crypt;
+		nvlist_t *snaps, *props, *stream_nvfs = NULL;
+		nvpair_t *snapel = NULL;
+		boolean_t is_encroot, is_clone, stream_encroot;
+		char *cp;
+		char *stream_keylocation = NULL;
+		char keylocation[MAXNAMELEN];
+		char fsname[ZFS_MAX_DATASET_NAME_LEN];
+
+		keylocation[0] = '\0';
+		VERIFY(0 == nvpair_value_nvlist(fselem, &stream_nvfs));
+		VERIFY(0 == nvlist_lookup_nvlist(stream_nvfs, "snaps", &snaps));
+		VERIFY(0 == nvlist_lookup_nvlist(stream_nvfs, "props", &props));
+		stream_encroot = nvlist_exists(stream_nvfs, "is_encroot");
+
+		/* find a snapshot from the stream that exists locally */
+		err = ENOENT;
+		while ((snapel = nvlist_next_nvpair(snaps, snapel)) != NULL) {
+			uint64_t guid;
+
+			VERIFY(0 == nvpair_value_uint64(snapel, &guid));
+			err = guid_to_name(hdl, destname, guid, B_FALSE,
+			    fsname);
+			if (err == 0)
+				break;
+		}
+
+		if (err != 0)
+			continue;
+
+		cp = strchr(fsname, '@');
+		if (cp != NULL)
+			*cp = '\0';
+
+		zhp = zfs_open(hdl, fsname, ZFS_TYPE_DATASET);
+		if (zhp == NULL) {
+			err = ENOENT;
+			goto error;
+		}
+
+		crypt = zfs_prop_get_int(zhp, ZFS_PROP_ENCRYPTION);
+		is_clone = zhp->zfs_dmustats.dds_origin[0] != '\0';
+		(void) zfs_crypto_get_encryption_root(zhp, &is_encroot, NULL);
+
+		/* we don't need to do anything for unencrypted filesystems */
+		if (crypt == ZIO_CRYPT_OFF) {
+			zfs_close(zhp);
+			continue;
+		}
+
+		/*
+		 * If the dataset is flagged as an encryption root, was not
+		 * received as a clone and is not currently an encryption root,
+		 * force it to become one. Fixup the keylocation if necessary.
+		 */
+		if (stream_encroot) {
+			if (!is_clone && !is_encroot) {
+				err = lzc_change_key(fsname,
+				    DCP_CMD_FORCE_NEW_KEY, NULL, NULL, 0);
+				if (err != 0) {
+					zfs_close(zhp);
+					goto error;
+				}
+			}
+
+			VERIFY(0 == nvlist_lookup_string(props,
+			    zfs_prop_to_name(ZFS_PROP_KEYLOCATION),
+			    &stream_keylocation));
+
+			/*
+			 * Refresh the properties in case the call to
+			 * lzc_change_key() changed the value.
+			 */
+			zfs_refresh_properties(zhp);
+			err = zfs_prop_get(zhp, ZFS_PROP_KEYLOCATION,
+			    keylocation, sizeof (keylocation), NULL, NULL,
+			    0, B_TRUE);
+			if (err != 0) {
+				zfs_close(zhp);
+				goto error;
+			}
+
+			if (strcmp(keylocation, stream_keylocation) != 0) {
+				err = zfs_prop_set(zhp,
+				    zfs_prop_to_name(ZFS_PROP_KEYLOCATION),
+				    stream_keylocation);
+				if (err != 0) {
+					zfs_close(zhp);
+					goto error;
+				}
+			}
+		}
+
+		/*
+		 * If the dataset is not flagged as an encryption root and is
+		 * currently an encryption root, force it to inherit from its
+		 * parent. The root of a raw send should never be
+		 * force-inherited.
+		 */
+		if (!stream_encroot && is_encroot &&
+		    strcmp(top_zfs, fsname) != 0) {
+			err = lzc_change_key(fsname, DCP_CMD_FORCE_INHERIT,
+			    NULL, NULL, 0);
+			if (err != 0) {
+				zfs_close(zhp);
+				goto error;
+			}
+		}
+
+		zfs_close(zhp);
+	}
+
+	return (0);
+
+error:
+	return (err);
+}
+
 static int
 recv_incremental_replication(libzfs_handle_t *hdl, const char *tofs,
     recvflags_t *flags, nvlist_t *stream_nv, avl_tree_t *stream_avl,
@@ -2412,7 +2745,7 @@ again:
 	needagain = progress = B_FALSE;
 
 	if ((error = gather_nvlist(hdl, tofs, fromsnap, NULL,
-	    recursive, B_FALSE, &local_nv, &local_avl)) != 0)
+	    recursive, B_TRUE, B_FALSE, &local_nv, &local_avl)) != 0)
 		return (error);
 
 	/*
@@ -2461,22 +2794,15 @@ again:
 			    stream_originguid, originguid)) {
 			case 1: {
 				/* promote it! */
-				zfs_cmd_t zc = { 0 };
 				nvlist_t *origin_nvfs;
 				char *origin_fsname;
-
-				if (flags->verbose)
-					(void) printf("promoting %s\n", fsname);
 
 				origin_nvfs = fsavl_find(local_avl, originguid,
 				    NULL);
 				VERIFY(0 == nvlist_lookup_string(origin_nvfs,
 				    "name", &origin_fsname));
-				(void) strlcpy(zc.zc_value, origin_fsname,
-				    sizeof (zc.zc_value));
-				(void) strlcpy(zc.zc_name, fsname,
-				    sizeof (zc.zc_name));
-				error = zfs_ioctl(hdl, ZFS_IOC_PROMOTE, &zc);
+				error = recv_promote(hdl, fsname, origin_fsname,
+				    flags);
 				if (error == 0)
 					progress = B_TRUE;
 				break;
@@ -2665,7 +2991,7 @@ again:
 		goto again;
 	}
 
-	return (needagain);
+	return (needagain || error != 0);
 }
 
 static int
@@ -2685,7 +3011,7 @@ zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
 	int error;
 	boolean_t anyerr = B_FALSE;
 	boolean_t softerr = B_FALSE;
-	boolean_t recursive;
+	boolean_t recursive, raw;
 
 	(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
 	    "cannot receive"));
@@ -2709,6 +3035,7 @@ zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
 
 	recursive = (nvlist_lookup_boolean(stream_nv, "not_recursive") ==
 	    ENOENT);
+	raw = (nvlist_lookup_boolean(stream_nv, "raw") == 0);
 
 	if (recursive && strchr(destname, '@')) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
@@ -2862,6 +3189,11 @@ zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
 		 */
 		softerr = recv_incremental_replication(hdl, tofs, flags,
 		    stream_nv, stream_avl, NULL);
+	}
+
+	if (raw && softerr == 0) {
+		softerr = recv_fix_encryption_hierarchy(hdl, destname,
+		    stream_nv, stream_avl);
 	}
 
 out:
@@ -3030,14 +3362,18 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 	const char *chopprefix;
 	boolean_t newfs = B_FALSE;
 	boolean_t stream_wantsnewfs;
+	boolean_t newprops = B_FALSE;
 	uint64_t parent_snapguid = 0;
 	prop_changelist_t *clp = NULL;
 	nvlist_t *snapprops_nvlist = NULL;
 	zprop_errflags_t prop_errflags;
 	boolean_t recursive;
 	char *snapname = NULL;
+	nvlist_t *props = NULL;
+	char tmp_keylocation[MAXNAMELEN];
 
 	begin_time = time(NULL);
+	bzero(tmp_keylocation, MAXNAMELEN);
 
 	(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
 	    "cannot receive"));
@@ -3046,32 +3382,50 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 	    ENOENT);
 
 	if (stream_avl != NULL) {
+		char *keylocation = NULL;
+		nvlist_t *lookup = NULL;
 		nvlist_t *fs = fsavl_find(stream_avl, drrb->drr_toguid,
 		    &snapname);
-		nvlist_t *props;
 		int ret;
 
 		(void) nvlist_lookup_uint64(fs, "parentfromsnap",
 		    &parent_snapguid);
 		err = nvlist_lookup_nvlist(fs, "props", &props);
-		if (err)
+		if (err) {
 			VERIFY(0 == nvlist_alloc(&props, NV_UNIQUE_NAME, 0));
+			newprops = B_TRUE;
+		}
+		/*
+		 * The keylocation property may only be set on encryption roots,
+		 * but this dataset might not become an encryption root until
+		 * recv_fix_encryption_hierarchy() is called. That function
+		 * will fixup the keylocation anyway, so we temporarily unset
+		 * the keylocation for now to avoid any errors from the receive
+		 * ioctl.
+		 */
+		err = nvlist_lookup_string(props,
+		    zfs_prop_to_name(ZFS_PROP_KEYLOCATION), &keylocation);
+		if (err == 0) {
+			(void) strcpy(tmp_keylocation, keylocation);
+			(void) nvlist_remove_all(props,
+			    zfs_prop_to_name(ZFS_PROP_KEYLOCATION));
+		}
 
 		if (flags->canmountoff) {
 			VERIFY(0 == nvlist_add_uint64(props,
 			    zfs_prop_to_name(ZFS_PROP_CANMOUNT), 0));
 		}
 		ret = zcmd_write_src_nvlist(hdl, &zc, props);
-		if (err)
-			nvlist_free(props);
 
-		if (0 == nvlist_lookup_nvlist(fs, "snapprops", &props)) {
-			VERIFY(0 == nvlist_lookup_nvlist(props,
+		if (0 == nvlist_lookup_nvlist(fs, "snapprops", &lookup)) {
+			VERIFY(0 == nvlist_lookup_nvlist(lookup,
 			    snapname, &snapprops_nvlist));
 		}
 
-		if (ret != 0)
-			return (-1);
+		if (ret != 0) {
+			err = -1;
+			goto out;
+		}
 	}
 
 	cp = NULL;
@@ -3092,7 +3446,8 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		if (strchr(tosnap, '@')) {
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "invalid "
 			    "argument - snapshot not allowed with -e"));
-			return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
+			err = zfs_error(hdl, EZFS_INVALIDNAME, errbuf);
+			goto out;
 		}
 
 		chopprefix = strrchr(sendfs, '/');
@@ -3119,7 +3474,8 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		if (strchr(tosnap, '@')) {
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "invalid "
 			    "argument - snapshot not allowed with -d"));
-			return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
+			err = zfs_error(hdl, EZFS_INVALIDNAME, errbuf);
+			goto out;
 		}
 
 		chopprefix = strchr(drrb->drr_toname, '/');
@@ -3137,7 +3493,8 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "cannot specify snapshot name for multi-snapshot "
 			    "stream"));
-			return (zfs_error(hdl, EZFS_BADSTREAM, errbuf));
+			err = zfs_error(hdl, EZFS_BADSTREAM, errbuf);
+			goto out;
 		}
 		chopprefix = drrb->drr_toname + strlen(drrb->drr_toname);
 	}
@@ -3156,7 +3513,8 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 	free(cp);
 	if (!zfs_name_valid(zc.zc_value, ZFS_TYPE_SNAPSHOT)) {
 		zcmd_free_nvlists(&zc);
-		return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
+		err = zfs_error(hdl, EZFS_INVALIDNAME, errbuf);
+		goto out;
 	}
 
 	/*
@@ -3174,7 +3532,8 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "local origin for clone %s does not exist"),
 			    zc.zc_value);
-			return (zfs_error(hdl, EZFS_NOENT, errbuf));
+			err = zfs_error(hdl, EZFS_NOENT, errbuf);
+			goto out;
 		}
 		if (flags->verbose)
 			(void) printf("found clone origin %s\n", zc.zc_string);
@@ -3182,6 +3541,10 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 
 	boolean_t resuming = DMU_GET_FEATUREFLAGS(drrb->drr_versioninfo) &
 	    DMU_BACKUP_FEATURE_RESUMING;
+	boolean_t raw = DMU_GET_FEATUREFLAGS(drrb->drr_versioninfo) &
+	    DMU_BACKUP_FEATURE_RAW;
+	boolean_t embedded = DMU_GET_FEATUREFLAGS(drrb->drr_versioninfo) &
+	    DMU_BACKUP_FEATURE_EMBED_DATA;
 	stream_wantsnewfs = (drrb->drr_fromguid == NULL ||
 	    (drrb->drr_flags & DRR_FLAG_CLONE) || originsnap) && !resuming;
 
@@ -3241,6 +3604,7 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 
 	if (zfs_dataset_exists(hdl, zc.zc_name, ZFS_TYPE_DATASET)) {
 		zfs_handle_t *zhp;
+		boolean_t encrypted;
 
 		/*
 		 * Destination fs exists.  It must be one of these cases:
@@ -3257,7 +3621,8 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 				    "destination '%s' exists\n"
 				    "must specify -F to overwrite it"),
 				    zc.zc_name);
-				return (zfs_error(hdl, EZFS_EXISTS, errbuf));
+				err = zfs_error(hdl, EZFS_EXISTS, errbuf);
+				goto out;
 			}
 			if (ioctl(hdl->libzfs_fd, ZFS_IOC_SNAPSHOT_LIST_NEXT,
 			    &zc) == 0) {
@@ -3266,14 +3631,16 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 				    "destination has snapshots (eg. %s)\n"
 				    "must destroy them to overwrite it"),
 				    zc.zc_name);
-				return (zfs_error(hdl, EZFS_EXISTS, errbuf));
+				err = zfs_error(hdl, EZFS_EXISTS, errbuf);
+				goto out;
 			}
 		}
 
 		if ((zhp = zfs_open(hdl, zc.zc_name,
 		    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME)) == NULL) {
 			zcmd_free_nvlists(&zc);
-			return (-1);
+			err = -1;
+			goto out;
 		}
 
 		if (stream_wantsnewfs &&
@@ -3284,7 +3651,42 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 			    "destination '%s' is a clone\n"
 			    "must destroy it to overwrite it"),
 			    zc.zc_name);
-			return (zfs_error(hdl, EZFS_EXISTS, errbuf));
+			err = zfs_error(hdl, EZFS_EXISTS, errbuf);
+			goto out;
+		}
+
+		/*
+		 * Raw sends can not be performed as an incremental on top
+		 * of existing unencrypted datasets. zfs recv -F cant be
+		 * used to blow away an existing encrypted filesystem. This
+		 * is because it would require the dsl dir to point to the
+		 * new key (or lack of a key) and the old key at the same
+		 * time. The -F flag may still be used for deleting
+		 * intermediate snapshots that would otherwise prevent the
+		 * receive from working.
+		 */
+		encrypted = zfs_prop_get_int(zhp, ZFS_PROP_ENCRYPTION) !=
+		    ZIO_CRYPT_OFF;
+		if (!stream_wantsnewfs && !encrypted && raw) {
+			zfs_close(zhp);
+			zcmd_free_nvlists(&zc);
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "cannot perform raw receive on top of "
+			    "existing unencrypted dataset"));
+			err = zfs_error(hdl, EZFS_BADRESTORE, errbuf);
+			goto out;
+		}
+
+		if (stream_wantsnewfs && flags->force &&
+		    ((raw && !encrypted) || encrypted)) {
+			zfs_close(zhp);
+			zcmd_free_nvlists(&zc);
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "zfs receive -F cannot be used to destroy an "
+			    "encrypted filesystem or overwrite an "
+			    "unencrypted one with an encrypted one"));
+			err = zfs_error(hdl, EZFS_BADRESTORE, errbuf);
+			goto out;
 		}
 
 		if (!flags->dryrun && zhp->zfs_type == ZFS_TYPE_FILESYSTEM &&
@@ -3294,13 +3696,15 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 			if (clp == NULL) {
 				zfs_close(zhp);
 				zcmd_free_nvlists(&zc);
-				return (-1);
+				err = -1;
+				goto out;
 			}
 			if (changelist_prefix(clp) != 0) {
 				changelist_free(clp);
 				zfs_close(zhp);
 				zcmd_free_nvlists(&zc);
-				return (-1);
+				err = -1;
+				goto out;
 			}
 		}
 
@@ -3317,6 +3721,8 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 
 		zfs_close(zhp);
 	} else {
+		zfs_handle_t *zhp;
+
 		/*
 		 * Destination filesystem does not exist.  Therefore we better
 		 * be creating a new filesystem (either from a full backup, or
@@ -3329,7 +3735,8 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 			zcmd_free_nvlists(&zc);
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "destination '%s' does not exist"), zc.zc_name);
-			return (zfs_error(hdl, EZFS_NOENT, errbuf));
+			err = zfs_error(hdl, EZFS_NOENT, errbuf);
+			goto out;
 		}
 
 		/*
@@ -3341,10 +3748,45 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		if (flags->isprefix && !flags->istail && !flags->dryrun &&
 		    create_parents(hdl, zc.zc_value, strlen(tosnap)) != 0) {
 			zcmd_free_nvlists(&zc);
-			return (zfs_error(hdl, EZFS_BADRESTORE, errbuf));
+			err = zfs_error(hdl, EZFS_BADRESTORE, errbuf);
+			goto out;
+		}
+
+		/*
+		 * It is invalid to receive a properties stream that was
+		 * unencrypted on the send side as a child of an encrypted
+		 * parent. Technically there is nothing preventing this, but
+		 * it would mean that the encryption=off property which is
+		 * locally set on the send side would not be received correctly.
+		 * We can infer encryption=off if the stream is not raw and
+		 * properties were included since the send side will only ever
+		 * send the encryption property in a raw nvlist header.
+		 */
+		if (!raw && props != NULL) {
+			uint64_t crypt;
+
+			zhp = zfs_open(hdl, zc.zc_name, ZFS_TYPE_DATASET);
+			if (zhp == NULL) {
+				err = zfs_error(hdl, EZFS_BADRESTORE,
+				    errbuf);
+				goto out;
+			}
+
+			crypt = zfs_prop_get_int(zhp, ZFS_PROP_ENCRYPTION);
+			zfs_close(zhp);
+
+			if (crypt != ZIO_CRYPT_OFF) {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "parent '%s' must not be encrypted to "
+				    "receive unencrypted property"),
+				    zc.zc_name);
+				err = zfs_error(hdl, EZFS_BADPROP, errbuf);
+				goto out;
+			}
 		}
 
 		newfs = B_TRUE;
+		*cp = '/';
 	}
 
 	zc.zc_begin_record = *drr_noswap;
@@ -3361,7 +3803,8 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 
 	if (flags->dryrun) {
 		zcmd_free_nvlists(&zc);
-		return (recv_skip(hdl, infd, flags->byteswap));
+		err = recv_skip(hdl, infd, flags->byteswap);
+		goto out;
 	}
 
 	zc.zc_nvlist_dst = (uint64_t)(uintptr_t)prop_errbuf;
@@ -3448,7 +3891,7 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		 * get a strange "does not exist" error message.
 		 */
 		*cp = '\0';
-		if (gather_nvlist(hdl, zc.zc_value, NULL, NULL, B_FALSE,
+		if (gather_nvlist(hdl, zc.zc_value, NULL, NULL, B_FALSE, B_TRUE,
 		    B_FALSE, &local_nv, &local_avl) == 0) {
 			*cp = '@';
 			fs = fsavl_find(local_avl, drrb->drr_toguid, NULL);
@@ -3484,6 +3927,20 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 			    "since most recent snapshot"), zc.zc_name);
 			(void) zfs_error(hdl, EZFS_BADRESTORE, errbuf);
 			break;
+		case EACCES:
+			if (raw && stream_wantsnewfs) {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "failed to create encryption key"));
+			} else if (raw && !stream_wantsnewfs) {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "encryption key does not match "
+				    "existing key"));
+			} else {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "inherited key must be loaded"));
+			}
+			(void) zfs_error(hdl, EZFS_CRYPTOFAILED, errbuf);
+			break;
 		case EEXIST:
 			cp = strchr(zc.zc_value, '@');
 			if (newfs) {
@@ -3498,6 +3955,10 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 			*cp = '@';
 			break;
 		case EINVAL:
+			if (embedded && !raw)
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "incompatible embedded data stream "
+				    "feature with encrypted receive."));
 			(void) zfs_error(hdl, EZFS_BADSTREAM, errbuf);
 			break;
 		case ECKSUM:
@@ -3513,6 +3974,20 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "destination %s space quota exceeded"), zc.zc_name);
 			(void) zfs_error(hdl, EZFS_NOSPC, errbuf);
+			break;
+		case ZFS_ERR_FROM_IVSET_GUID_MISSING:
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "IV set guid missing. See errata %u at"
+			    "http://zfsonlinux.org/msg/ZFS-8000-ER"),
+			    ZPOOL_ERRATA_ZOL_8308_ENCRYPTION);
+			(void) zfs_error(hdl, EZFS_BADSTREAM, errbuf);
+			break;
+		case ZFS_ERR_FROM_IVSET_GUID_MISMATCH:
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "IV set guid mismatch. See the 'zfs receive' "
+			    "man page section\n discussing the limitations "
+			    "of raw encrypted send streams."));
+			(void) zfs_error(hdl, EZFS_BADSTREAM, errbuf);
 			break;
 		default:
 			(void) zfs_standard_error(hdl, ioctl_errno, errbuf);
@@ -3566,8 +4041,10 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		(void) fprintf(stderr, "\n");
 	}
 
-	if (err || ioctl_err)
-		return (-1);
+	if (err || ioctl_err) {
+		err = -1;
+		goto out;
+	}
 
 	*action_handlep = zc.zc_action_handle;
 
@@ -3585,7 +4062,18 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		    buf1, delta, buf2);
 	}
 
-	return (0);
+	err = 0;
+out:
+
+	if (tmp_keylocation[0] != '\0') {
+		VERIFY(0 == nvlist_add_string(props,
+		    zfs_prop_to_name(ZFS_PROP_KEYLOCATION), tmp_keylocation));
+	}
+
+	if (newprops)
+		nvlist_free(props);
+
+	return (err);
 }
 
 static int

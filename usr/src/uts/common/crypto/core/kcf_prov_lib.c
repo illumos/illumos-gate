@@ -246,7 +246,7 @@ crypto_update_uio(void *ctx, crypto_data_t *input, crypto_data_t *output,
 	    offset >= uiop->uio_iov[vec_idx].iov_len;
 	    offset -= uiop->uio_iov[vec_idx++].iov_len)
 		;
-	if (vec_idx == uiop->uio_iovcnt) {
+	if (vec_idx == uiop->uio_iovcnt && length > 0) {
 		/*
 		 * The caller specified an offset that is larger than the
 		 * total size of the buffers it provided.

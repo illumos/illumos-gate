@@ -38,8 +38,6 @@
 #include <ns.h>
 #include <list.h>
 
-extern void ns_kvp_destroy(ns_kvp_t *);
-
 /*
  *	Commonly Used routines...
  */

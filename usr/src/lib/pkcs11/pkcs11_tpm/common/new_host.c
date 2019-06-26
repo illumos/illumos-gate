@@ -2317,7 +2317,7 @@ SC_SeedRandom(ST_SESSION_HANDLE  sSession,
 	if (st_Initialized() == FALSE) {
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 	}
-	if (pSeed == NULL || ulSeedLen == NULL)
+	if (pSeed == NULL || ulSeedLen == 0)
 		return (CKR_ARGUMENTS_BAD);
 
 	return (CKR_OK);

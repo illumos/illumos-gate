@@ -611,7 +611,7 @@ C_DigestFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pDigest,
 			(void) pthread_mutex_unlock(&session_p->session_mutex);
 			ses_lock_held = B_FALSE;
 			rv = do_soft_digest(get_spp(&session_p->digest),
-			    NULL, NULL, NULL, pDigest, pulDigestLen, OP_FINAL);
+			    NULL, NULL, 0, pDigest, pulDigestLen, OP_FINAL);
 		} else {
 			/*
 			 * We end up here if an earlier C_DigestFinal() call

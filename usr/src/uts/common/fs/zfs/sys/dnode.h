@@ -74,9 +74,7 @@ extern "C" {
 /*
  * dnode id flags
  *
- * Note: a file will never ever have its
- * ids moved from bonus->spill
- * and only in a crypto environment would it be on spill
+ * Note: a file will never ever have its ids moved from bonus->spill
  */
 #define	DN_ID_CHKED_BONUS	0x1
 #define	DN_ID_CHKED_SPILL	0x2
@@ -201,6 +199,8 @@ enum dnode_dirtycontext {
  * dataset and even within the same dnode block.
  */
 
+#define	DNODE_CRYPT_PORTABLE_FLAGS_MASK		(DNODE_FLAG_SPILL_BLKPTR)
+
 typedef struct dnode_phys {
 	uint8_t dn_type;		/* dmu_object_type_t */
 	uint8_t dn_indblkshift;		/* ln2(indirect block size) */
@@ -219,6 +219,13 @@ typedef struct dnode_phys {
 	uint64_t dn_maxblkid;		/* largest allocated block ID */
 	uint64_t dn_used;		/* bytes (or sectors) of disk space */
 
+	/*
+	 * Both dn_pad2 and dn_pad3 are protected by the block's MAC. This
+	 * allows us to protect any fields that might be added here in the
+	 * future. In either case, developers will want to check
+	 * zio_crypt_init_uios_dnode() to ensure the new field is being
+	 * protected properly.
+	 */
 	uint64_t dn_pad3[4];
 	union {
 		blkptr_t dn_blkptr[1+DN_OLD_MAX_BONUSLEN/sizeof (blkptr_t)];
@@ -235,8 +242,8 @@ typedef struct dnode_phys {
 	};
 } dnode_phys_t;
 
-#define	DN_SPILL_BLKPTR(dnp)	(blkptr_t *)((char *)(dnp) + \
-	(((dnp)->dn_extra_slots + 1) << DNODE_SHIFT) - (1 << SPA_BLKPTRSHIFT))
+#define	DN_SPILL_BLKPTR(dnp)	((blkptr_t *)((char *)(dnp) +		\
+	(((dnp)->dn_extra_slots + 1) << DNODE_SHIFT) - (1 << SPA_BLKPTRSHIFT)))
 
 struct dnode {
 	/*
@@ -282,6 +289,7 @@ struct dnode {
 	uint8_t dn_rm_spillblk[TXG_SIZE];	/* for removing spill blk */
 	uint16_t dn_next_bonuslen[TXG_SIZE];
 	uint32_t dn_next_blksz[TXG_SIZE];	/* next block size in bytes */
+	uint64_t dn_next_maxblkid[TXG_SIZE];	/* next maxblkid in bytes */
 
 	/* protected by dn_dbufs_mtx; declared here to fill 32-bit hole */
 	uint32_t dn_dbufs_count;	/* count of dn_dbufs */
@@ -339,6 +347,12 @@ struct dnode {
 };
 
 /*
+ * We use this (otherwise unused) bit to indicate if the value of
+ * dn_next_maxblkid[txgoff] is valid to use in dnode_sync().
+ */
+#define	DMU_NEXT_MAXBLKID_SET		(1ULL << 63)
+
+/*
  * Adds a level of indirection between the dbuf and the dnode to avoid
  * iterating descendent dbufs in dnode_move(). Handles are not allocated
  * individually, but as an array of child dnodes in dnode_hold_impl().
@@ -381,15 +395,18 @@ void dnode_sync(dnode_t *dn, dmu_tx_t *tx);
 void dnode_allocate(dnode_t *dn, dmu_object_type_t ot, int blocksize, int ibs,
     dmu_object_type_t bonustype, int bonuslen, int dn_slots, dmu_tx_t *tx);
 void dnode_reallocate(dnode_t *dn, dmu_object_type_t ot, int blocksize,
-    dmu_object_type_t bonustype, int bonuslen, int dn_slots, dmu_tx_t *tx);
+    dmu_object_type_t bonustype, int bonuslen, int dn_slots,
+    boolean_t keep_spill, dmu_tx_t *tx);
 void dnode_free(dnode_t *dn, dmu_tx_t *tx);
 void dnode_byteswap(dnode_phys_t *dnp);
 void dnode_buf_byteswap(void *buf, size_t size);
 void dnode_verify(dnode_t *dn);
+int dnode_set_nlevels(dnode_t *dn, int nlevels, dmu_tx_t *tx);
 int dnode_set_blksz(dnode_t *dn, uint64_t size, int ibs, dmu_tx_t *tx);
 void dnode_free_range(dnode_t *dn, uint64_t off, uint64_t len, dmu_tx_t *tx);
 void dnode_diduse_space(dnode_t *dn, int64_t space);
-void dnode_new_blkid(dnode_t *dn, uint64_t blkid, dmu_tx_t *tx, boolean_t);
+void dnode_new_blkid(dnode_t *dn, uint64_t blkid, dmu_tx_t *tx,
+    boolean_t have_read, boolean_t force);
 uint64_t dnode_block_freed(dnode_t *dn, uint64_t blkid);
 void dnode_init(void);
 void dnode_fini(void);

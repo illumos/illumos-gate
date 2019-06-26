@@ -242,9 +242,9 @@ zio_checksum_dedup_select(spa_t *spa, enum zio_checksum child,
  * a tuple which is guaranteed to be unique for the life of the pool.
  */
 static void
-zio_checksum_gang_verifier(zio_cksum_t *zcp, blkptr_t *bp)
+zio_checksum_gang_verifier(zio_cksum_t *zcp, const blkptr_t *bp)
 {
-	dva_t *dva = BP_IDENTITY(bp);
+	const dva_t *dva = BP_IDENTITY(bp);
 	uint64_t txg = BP_PHYSICAL_BIRTH(bp);
 
 	ASSERT(BP_IS_GANG(bp));
@@ -287,6 +287,25 @@ zio_checksum_template_init(enum zio_checksum checksum, spa_t *spa)
 	mutex_exit(&spa->spa_cksum_tmpls_lock);
 }
 
+/* convenience function to update a checksum to accomodate an encryption MAC */
+static void
+zio_checksum_handle_crypt(zio_cksum_t *cksum, zio_cksum_t *saved, boolean_t xor)
+{
+	/*
+	 * Weak checksums do not have their entropy spread evenly
+	 * across the bits of the checksum. Therefore, when truncating
+	 * a weak checksum we XOR the first 2 words with the last 2 so
+	 * that we don't "lose" any entropy unnecessarily.
+	 */
+	if (xor) {
+		cksum->zc_word[0] ^= cksum->zc_word[2];
+		cksum->zc_word[1] ^= cksum->zc_word[3];
+	}
+
+	cksum->zc_word[2] = saved->zc_word[2];
+	cksum->zc_word[3] = saved->zc_word[3];
+}
+
 /*
  * Generate the checksum.
  */
@@ -294,11 +313,13 @@ void
 zio_checksum_compute(zio_t *zio, enum zio_checksum checksum,
     abd_t *abd, uint64_t size)
 {
+	static const uint64_t zec_magic = ZEC_MAGIC;
 	blkptr_t *bp = zio->io_bp;
 	uint64_t offset = zio->io_offset;
 	zio_checksum_info_t *ci = &zio_checksum_table[checksum];
-	zio_cksum_t cksum;
+	zio_cksum_t cksum, saved;
 	spa_t *spa = zio->io_spa;
+	boolean_t insecure = (ci->ci_flags & ZCHECKSUM_FLAG_DEDUP) == 0;
 
 	ASSERT((uint_t)checksum < ZIO_CHECKSUM_FUNCTIONS);
 	ASSERT(ci->ci_func[0] != NULL);
@@ -306,40 +327,68 @@ zio_checksum_compute(zio_t *zio, enum zio_checksum checksum,
 	zio_checksum_template_init(checksum, spa);
 
 	if (ci->ci_flags & ZCHECKSUM_FLAG_EMBEDDED) {
-		zio_eck_t *eck;
-		void *data = abd_to_buf(abd);
+		zio_eck_t eck;
+		size_t eck_offset;
+
+		bzero(&saved, sizeof (zio_cksum_t));
 
 		if (checksum == ZIO_CHECKSUM_ZILOG2) {
-			zil_chain_t *zilc = data;
+			zil_chain_t zilc;
+			abd_copy_to_buf(&zilc, abd, sizeof (zil_chain_t));
 
-			size = P2ROUNDUP_TYPED(zilc->zc_nused, ZIL_MIN_BLKSZ,
+			size = P2ROUNDUP_TYPED(zilc.zc_nused, ZIL_MIN_BLKSZ,
 			    uint64_t);
-			eck = &zilc->zc_eck;
+			eck = zilc.zc_eck;
+			eck_offset = offsetof(zil_chain_t, zc_eck);
 		} else {
-			eck = (zio_eck_t *)((char *)data + size) - 1;
+			eck_offset = size - sizeof (zio_eck_t);
+			abd_copy_to_buf_off(&eck, abd, eck_offset,
+			    sizeof (zio_eck_t));
 		}
-		if (checksum == ZIO_CHECKSUM_GANG_HEADER)
-			zio_checksum_gang_verifier(&eck->zec_cksum, bp);
-		else if (checksum == ZIO_CHECKSUM_LABEL)
-			zio_checksum_label_verifier(&eck->zec_cksum, offset);
-		else
-			bp->blk_cksum = eck->zec_cksum;
-		eck->zec_magic = ZEC_MAGIC;
+
+		if (checksum == ZIO_CHECKSUM_GANG_HEADER) {
+			zio_checksum_gang_verifier(&eck.zec_cksum, bp);
+		} else if (checksum == ZIO_CHECKSUM_LABEL) {
+			zio_checksum_label_verifier(&eck.zec_cksum, offset);
+		} else {
+			saved = eck.zec_cksum;
+			eck.zec_cksum = bp->blk_cksum;
+		}
+
+		abd_copy_from_buf_off(abd, &zec_magic,
+		    eck_offset + offsetof(zio_eck_t, zec_magic),
+		    sizeof (zec_magic));
+		abd_copy_from_buf_off(abd, &eck.zec_cksum,
+		    eck_offset + offsetof(zio_eck_t, zec_cksum),
+		    sizeof (zio_cksum_t));
+
 		ci->ci_func[0](abd, size, spa->spa_cksum_tmpls[checksum],
 		    &cksum);
-		eck->zec_cksum = cksum;
+		if (bp != NULL && BP_USES_CRYPT(bp) &&
+		    BP_GET_TYPE(bp) != DMU_OT_OBJSET)
+			zio_checksum_handle_crypt(&cksum, &saved, insecure);
+
+		abd_copy_from_buf_off(abd, &cksum,
+		    eck_offset + offsetof(zio_eck_t, zec_cksum),
+		    sizeof (zio_cksum_t));
 	} else {
+		saved = bp->blk_cksum;
 		ci->ci_func[0](abd, size, spa->spa_cksum_tmpls[checksum],
-		    &bp->blk_cksum);
+		    &cksum);
+		if (BP_USES_CRYPT(bp) && BP_GET_TYPE(bp) != DMU_OT_OBJSET)
+			zio_checksum_handle_crypt(&cksum, &saved, insecure);
+		bp->blk_cksum = cksum;
 	}
 }
 
 int
-zio_checksum_error_impl(spa_t *spa, blkptr_t *bp, enum zio_checksum checksum,
-    abd_t *abd, uint64_t size, uint64_t offset, zio_bad_cksum_t *info)
+zio_checksum_error_impl(spa_t *spa, const blkptr_t *bp,
+    enum zio_checksum checksum, abd_t *abd, uint64_t size,
+    uint64_t offset, zio_bad_cksum_t *info)
 {
 	zio_checksum_info_t *ci = &zio_checksum_table[checksum];
 	zio_cksum_t actual_cksum, expected_cksum;
+	zio_eck_t eck;
 	int byteswap;
 
 	if (checksum >= ZIO_CHECKSUM_FUNCTIONS || ci->ci_func[0] == NULL)
@@ -348,33 +397,37 @@ zio_checksum_error_impl(spa_t *spa, blkptr_t *bp, enum zio_checksum checksum,
 	zio_checksum_template_init(checksum, spa);
 
 	if (ci->ci_flags & ZCHECKSUM_FLAG_EMBEDDED) {
-		zio_eck_t *eck;
 		zio_cksum_t verifier;
-		uint64_t data_size = size;
-		void *data = abd_borrow_buf_copy(abd, data_size);
+		size_t eck_offset;
 
 		if (checksum == ZIO_CHECKSUM_ZILOG2) {
-			zil_chain_t *zilc = data;
+			zil_chain_t zilc;
 			uint64_t nused;
 
-			eck = &zilc->zc_eck;
-			if (eck->zec_magic == ZEC_MAGIC) {
-				nused = zilc->zc_nused;
-			} else if (eck->zec_magic == BSWAP_64(ZEC_MAGIC)) {
-				nused = BSWAP_64(zilc->zc_nused);
+			abd_copy_to_buf(&zilc, abd, sizeof (zil_chain_t));
+
+			eck = zilc.zc_eck;
+			eck_offset = offsetof(zil_chain_t, zc_eck) +
+			    offsetof(zio_eck_t, zec_cksum);
+
+			if (eck.zec_magic == ZEC_MAGIC) {
+				nused = zilc.zc_nused;
+			} else if (eck.zec_magic == BSWAP_64(ZEC_MAGIC)) {
+				nused = BSWAP_64(zilc.zc_nused);
 			} else {
-				abd_return_buf(abd, data, data_size);
 				return (SET_ERROR(ECKSUM));
 			}
 
-			if (nused > data_size) {
-				abd_return_buf(abd, data, data_size);
+			if (nused > size) {
 				return (SET_ERROR(ECKSUM));
 			}
 
 			size = P2ROUNDUP_TYPED(nused, ZIL_MIN_BLKSZ, uint64_t);
 		} else {
-			eck = (zio_eck_t *)((char *)data + data_size) - 1;
+			eck_offset = size - sizeof (zio_eck_t);
+			abd_copy_to_buf_off(&eck, abd, eck_offset,
+			    sizeof (zio_eck_t));
+			eck_offset += offsetof(zio_eck_t, zec_cksum);
 		}
 
 		if (checksum == ZIO_CHECKSUM_GANG_HEADER)
@@ -384,20 +437,21 @@ zio_checksum_error_impl(spa_t *spa, blkptr_t *bp, enum zio_checksum checksum,
 		else
 			verifier = bp->blk_cksum;
 
-		byteswap = (eck->zec_magic == BSWAP_64(ZEC_MAGIC));
+		byteswap = (eck.zec_magic == BSWAP_64(ZEC_MAGIC));
 
 		if (byteswap)
 			byteswap_uint64_array(&verifier, sizeof (zio_cksum_t));
 
-		size_t eck_offset = (size_t)(&eck->zec_cksum) - (size_t)data;
-		expected_cksum = eck->zec_cksum;
-		eck->zec_cksum = verifier;
-		abd_return_buf_copy(abd, data, data_size);
+		expected_cksum = eck.zec_cksum;
+
+		abd_copy_from_buf_off(abd, &verifier, eck_offset,
+		    sizeof (zio_cksum_t));
 
 		ci->ci_func[byteswap](abd, size,
 		    spa->spa_cksum_tmpls[checksum], &actual_cksum);
-		abd_copy_from_buf_off(abd, &expected_cksum,
-		    eck_offset, sizeof (zio_cksum_t));
+
+		abd_copy_from_buf_off(abd, &expected_cksum, eck_offset,
+		    sizeof (zio_cksum_t));
 
 		if (byteswap) {
 			byteswap_uint64_array(&expected_cksum,
@@ -410,6 +464,26 @@ zio_checksum_error_impl(spa_t *spa, blkptr_t *bp, enum zio_checksum checksum,
 		    spa->spa_cksum_tmpls[checksum], &actual_cksum);
 	}
 
+	/*
+	 * MAC checksums are a special case since half of this checksum will
+	 * actually be the encryption MAC. This will be verified by the
+	 * decryption process, so we just check the truncated checksum now.
+	 * Objset blocks use embedded MACs so we don't truncate the checksum
+	 * for them.
+	 */
+	if (bp != NULL && BP_USES_CRYPT(bp) &&
+	    BP_GET_TYPE(bp) != DMU_OT_OBJSET) {
+		if (!(ci->ci_flags & ZCHECKSUM_FLAG_DEDUP)) {
+			actual_cksum.zc_word[0] ^= actual_cksum.zc_word[2];
+			actual_cksum.zc_word[1] ^= actual_cksum.zc_word[3];
+		}
+
+		actual_cksum.zc_word[2] = 0;
+		actual_cksum.zc_word[3] = 0;
+		expected_cksum.zc_word[2] = 0;
+		expected_cksum.zc_word[3] = 0;
+	}
+
 	if (info != NULL) {
 		info->zbc_expected = expected_cksum;
 		info->zbc_actual = actual_cksum;
@@ -418,7 +492,6 @@ zio_checksum_error_impl(spa_t *spa, blkptr_t *bp, enum zio_checksum checksum,
 		info->zbc_injected = 0;
 		info->zbc_has_cksum = 1;
 	}
-
 	if (!ZIO_CHECKSUM_EQUAL(actual_cksum, expected_cksum))
 		return (SET_ERROR(ECKSUM));
 

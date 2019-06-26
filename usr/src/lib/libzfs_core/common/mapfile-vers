@@ -74,6 +74,9 @@ SYMBOL_VERSION ILLUMOS_0.1 {
 	lzc_channel_program_nosync;
 	lzc_clone;
 	lzc_create;
+	lzc_load_key;
+	lzc_unload_key;
+	lzc_change_key;
 	lzc_destroy_bookmarks;
 	lzc_destroy_snaps;
 	lzc_exists;

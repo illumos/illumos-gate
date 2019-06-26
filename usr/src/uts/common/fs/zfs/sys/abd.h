@@ -73,6 +73,7 @@ abd_t *abd_alloc_for_io(size_t, boolean_t);
 abd_t *abd_alloc_sametype(abd_t *, size_t);
 void abd_free(abd_t *);
 abd_t *abd_get_offset(abd_t *, size_t);
+abd_t *abd_get_offset_size(abd_t *, size_t, size_t);
 abd_t *abd_get_from_buf(void *, size_t);
 void abd_put(abd_t *);
 

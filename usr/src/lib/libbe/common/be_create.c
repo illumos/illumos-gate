@@ -2836,7 +2836,7 @@ be_get_snap(char *origin, char **snap)
 	 */
 	cp = strrchr(origin, '@');
 	if (cp != NULL) {
-		if (cp[1] != NULL && cp[1] != '\0') {
+		if (cp[1] != '\0') {
 			cp[0] = '\0';
 			*snap = cp+1;
 		} else {

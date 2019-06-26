@@ -42,6 +42,11 @@
 #include <sys/utsname.h>
 #include <sys/systeminfo.h>
 #include <libzfs.h>
+#include <sys/crypto/common.h>
+#include <sys/crypto/impl.h>
+#include <sys/crypto/api.h>
+#include <sys/sha2.h>
+#include <crypto/aes/aes_impl.h>
 
 extern void system_taskq_init(void);
 extern void system_taskq_fini(void);
@@ -594,4 +599,88 @@ geterror(struct buf *bp)
 			error = EIO;
 	}
 	return (error);
+}
+
+int
+crypto_create_ctx_template(crypto_mechanism_t *mech,
+    crypto_key_t *key, crypto_ctx_template_t *tmpl, int kmflag)
+{
+	return (0);
+}
+
+crypto_mech_type_t
+crypto_mech2id(crypto_mech_name_t name)
+{
+	return (CRYPTO_MECH_INVALID);
+}
+
+int
+crypto_mac(crypto_mechanism_t *mech, crypto_data_t *data,
+    crypto_key_t *key, crypto_ctx_template_t impl,
+    crypto_data_t *mac, crypto_call_req_t *cr)
+{
+	return (0);
+}
+
+int
+crypto_encrypt(crypto_mechanism_t *mech, crypto_data_t *plaintext,
+    crypto_key_t *key, crypto_ctx_template_t tmpl,
+    crypto_data_t *ciphertext, crypto_call_req_t *cr)
+{
+	return (0);
+}
+
+/* This could probably be a weak reference */
+int
+crypto_decrypt(crypto_mechanism_t *mech, crypto_data_t *plaintext,
+    crypto_key_t *key, crypto_ctx_template_t tmpl,
+    crypto_data_t *ciphertext, crypto_call_req_t *cr)
+{
+	return (0);
+}
+
+
+int
+crypto_digest_final(crypto_context_t context, crypto_data_t *digest,
+    crypto_call_req_t *cr)
+{
+	return (0);
+}
+
+int
+crypto_digest_update(crypto_context_t context, crypto_data_t *data,
+    crypto_call_req_t *cr)
+{
+	return (0);
+}
+
+int
+crypto_digest_init(crypto_mechanism_t *mech, crypto_context_t *ctxp,
+    crypto_call_req_t  *crq)
+{
+	return (0);
+}
+
+void
+crypto_destroy_ctx_template(crypto_ctx_template_t tmpl)
+{
+}
+
+extern int crypto_mac_init(crypto_mechanism_t *mech, crypto_key_t *key,
+	crypto_ctx_template_t tmpl, crypto_context_t *ctxp,
+    crypto_call_req_t *cr)
+{
+	return (0);
+}
+
+extern int crypto_mac_update(crypto_context_t ctx, crypto_data_t *data,
+	crypto_call_req_t *cr)
+{
+	return (0);
+}
+
+extern int crypto_mac_final(crypto_context_t ctx, crypto_data_t *data,
+	crypto_call_req_t *cr)
+{
+	return (0);
 }

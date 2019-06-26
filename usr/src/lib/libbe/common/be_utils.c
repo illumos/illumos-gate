@@ -2318,7 +2318,7 @@ be_update_zone_vfstab(zfs_handle_t *zhp, char *be_name, char *old_rc_loc,
 char *
 be_auto_snap_name(void)
 {
-	time_t		utc_tm = NULL;
+	time_t		utc_tm = 0;
 	struct tm	*gmt_tm = NULL;
 	char		gmt_time_str[64];
 	char		*auto_snap_name = NULL;
@@ -2505,7 +2505,7 @@ be_valid_auto_snap_name(char *name)
 	}
 
 	/* Get the next field, which is the reserved field. */
-	if (c[1] == NULL || c[1] == '\0') {
+	if (c[1] == '\0') {
 		free(policy);
 		return (B_FALSE);
 	}
@@ -2524,7 +2524,7 @@ be_valid_auto_snap_name(char *name)
 	}
 
 	/* The remaining string should be the date field */
-	if (c[1] == NULL || c[1] == '\0') {
+	if (c[1] == '\0') {
 		free(policy);
 		return (B_FALSE);
 	}
