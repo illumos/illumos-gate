@@ -33,11 +33,23 @@ driver name=amdf17nbdf \
     alias=pci1022,1450 \
     alias=pci1022,1460
 driver name=coretemp
+driver name=pchtemp \
+    alias=pci8086,8c24 \
+    alias=pci8086,8ca4 \
+    alias=pci8086,8d24 \
+    alias=pci8086,9d31 \
+    alias=pci8086,a131 \
+    alias=pci8086,a1b1 \
+    alias=pci8086,a231 \
+    alias=pci8086,a2b1 \
+    alias=pci8086,a379
 file path=kernel/drv/$(ARCH64)/amdf17nbdf group=sys
 file path=kernel/drv/$(ARCH64)/coretemp group=sys
+file path=kernel/drv/$(ARCH64)/pchtemp group=sys
 file path=kernel/drv/coretemp.conf group=sys
 file path=usr/include/sys/sensors.h mode=0644
 file path=usr/lib/devfsadm/linkmod/SUNW_sensor_link.so group=sys
 file path=usr/share/man/man7d/amdf17nbdf.7d
 file path=usr/share/man/man7d/coretemp.7d
+file path=usr/share/man/man7d/pchtemp.7d
 license lic_CDDL license=lic_CDDL

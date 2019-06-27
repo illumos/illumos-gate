@@ -221,6 +221,7 @@ i386_MANFILES=	ahci.7d		\
 		ntxn.7d		\
 		nv_sata.7d	\
 		nvme.7d		\
+		pchtemp.7d	\
 		pcn.7d		\
 		qede.7d		\
 		ral.7d		\

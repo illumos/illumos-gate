@@ -806,6 +806,8 @@ $(i386_ONLY)file \
 $(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/maps/psu-hc-topology.xml \
     mode=0444
 $(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/plugins/chip.so mode=0555
+$(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/plugins/chipset.so \
+    mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/plugins/hostbridge.so \
     mode=0555
 $(i386_ONLY)file path=usr/platform/i86pc/lib/fm/topo/plugins/pcibus.so \
