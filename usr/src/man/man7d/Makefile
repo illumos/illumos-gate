@@ -108,7 +108,6 @@ _MANFILES=	aac.7d		\
 		random.7d	\
 		rge.7d		\
 		rtls.7d		\
-		pchtemp.7d	\
 		sad.7d		\
 		sata.7d		\
 		scsa1394.7d	\
