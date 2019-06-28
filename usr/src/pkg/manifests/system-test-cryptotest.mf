@@ -85,6 +85,12 @@ file opt/crypto-tests/tests/aes/pkcs/aes_cbc_32 \
 file opt/crypto-tests/tests/aes/pkcs/aes_cbc_64 \
     path=opt/crypto-tests/tests/aes/pkcs/aes_cbc_64 group=root mode=0555 \
     owner=root
+file opt/crypto-tests/tests/aes/pkcs/aes_cbc_pad_32 \
+    path=opt/crypto-tests/tests/aes/pkcs/aes_cbc_pad_32 group=root mode=0555 \
+    owner=root
+file opt/crypto-tests/tests/aes/pkcs/aes_cbc_pad_64 \
+    path=opt/crypto-tests/tests/aes/pkcs/aes_cbc_pad_64 group=root mode=0555 \
+    owner=root
 file opt/crypto-tests/tests/aes/pkcs/aes_ccm_32 \
     path=opt/crypto-tests/tests/aes/pkcs/aes_ccm_32 group=root mode=0555 \
     owner=root

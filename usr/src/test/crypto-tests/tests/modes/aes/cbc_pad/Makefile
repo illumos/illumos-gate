@@ -15,8 +15,12 @@
 # Copyright 2019 Joyent, Inc.
 #
 
-.PARALLEL: $(SUBDIRS)
+BASEPROG = aes_cbc_pad
 
-SUBDIRS = cbc cbc_pad ccm cmac ctr ecb gcm
+# Currently, the cbc_pad mechanism is only present in PKCS#11 and
+# not KCF, so we do not create _kcf test binaries.
+CRYPTO = pkcs
+CRYPTO_kcf = $(POUND_SIGN)
 
-include $(SRC)/test/Makefile.com
+include $(SRC)/cmd/Makefile.cmd
+include ../Makefile.subdirs
