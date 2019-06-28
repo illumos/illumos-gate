@@ -17,6 +17,7 @@ usr/src/cmd/smbsrv/testoplock/case*.ref
 usr/src/data/hwdata/pci.ids
 usr/src/data/hwdata/usb.ids
 usr/src/data/perfmon/readme.txt
+usr/src/test/util-tests/tests/dis/i386/*.out
 usr/src/tools/smatch/src/*
 usr/src/uts/common/io/cxgbe/*
 usr/src/uts/common/io/qede/*

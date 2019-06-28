@@ -1289,6 +1289,8 @@ file path=opt/util-tests/tests/dis/i386/tst.tsc.out mode=0444
 file path=opt/util-tests/tests/dis/i386/tst.tsc.s mode=0444
 file path=opt/util-tests/tests/dis/i386/tst.vmx.out mode=0444
 file path=opt/util-tests/tests/dis/i386/tst.vmx.s mode=0444
+file path=opt/util-tests/tests/dis/i386/tst.wbnovind.out mode=0444
+file path=opt/util-tests/tests/dis/i386/tst.wbnovind.s mode=0444
 file path=opt/util-tests/tests/dis/risc-v-c/32.ldsr.out mode=0444
 file path=opt/util-tests/tests/dis/risc-v-c/32.ldsr.s mode=0444
 file path=opt/util-tests/tests/dis/risc-v-c/64.int.out mode=0444
