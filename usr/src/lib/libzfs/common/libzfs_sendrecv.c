@@ -63,7 +63,7 @@ extern void zfs_setprop_error(libzfs_handle_t *, zfs_prop_t, int, char *);
 
 static int zfs_receive_impl(libzfs_handle_t *, const char *, const char *,
     recvflags_t *, int, const char *, nvlist_t *, avl_tree_t *, char **, int,
-    uint64_t *, const char *);
+    uint64_t *, const char *, nvlist_t *);
 static int guid_to_name(libzfs_handle_t *, const char *,
     uint64_t, boolean_t, char *);
 
@@ -2645,7 +2645,7 @@ recv_fix_encryption_hierarchy(libzfs_handle_t *hdl, const char *destname,
 		is_clone = zhp->zfs_dmustats.dds_origin[0] != '\0';
 		(void) zfs_crypto_get_encryption_root(zhp, &is_encroot, NULL);
 
-		/* we don't need to do anything for unencrypted filesystems */
+		/* we don't need to do anything for unencrypted datasets */
 		if (crypt == ZIO_CRYPT_OFF) {
 			zfs_close(zhp);
 			continue;
@@ -2997,7 +2997,8 @@ again:
 static int
 zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
     recvflags_t *flags, dmu_replay_record_t *drr, zio_cksum_t *zc,
-    char **top_zfs, int cleanup_fd, uint64_t *action_handlep)
+    char **top_zfs, int cleanup_fd, uint64_t *action_handlep,
+    nvlist_t *cmdprops)
 {
 	nvlist_t *stream_nv = NULL;
 	avl_tree_t *stream_avl = NULL;
@@ -3174,7 +3175,7 @@ zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
 		 */
 		error = zfs_receive_impl(hdl, destname, NULL, flags, fd,
 		    sendfs, stream_nv, stream_avl, top_zfs, cleanup_fd,
-		    action_handlep, sendsnap);
+		    action_handlep, sendsnap, cmdprops);
 		if (error == ENODATA) {
 			error = 0;
 			break;
@@ -3350,7 +3351,7 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
     const char *originsnap, recvflags_t *flags, dmu_replay_record_t *drr,
     dmu_replay_record_t *drr_noswap, const char *sendfs, nvlist_t *stream_nv,
     avl_tree_t *stream_avl, char **top_zfs, int cleanup_fd,
-    uint64_t *action_handlep, const char *finalsnap)
+    uint64_t *action_handlep, const char *finalsnap, nvlist_t *cmdprops)
 {
 	zfs_cmd_t zc = { 0 };
 	time_t begin_time;
@@ -3371,6 +3372,8 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 	char *snapname = NULL;
 	nvlist_t *props = NULL;
 	char tmp_keylocation[MAXNAMELEN];
+	nvlist_t *rcvprops = NULL; /* props received from the send stream */
+	nvlist_t *oxprops = NULL; /* override (-o) and exclude (-x) props */
 
 	begin_time = time(NULL);
 	bzero(tmp_keylocation, MAXNAMELEN);
@@ -3721,8 +3724,6 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 
 		zfs_close(zhp);
 	} else {
-		zfs_handle_t *zhp;
-
 		/*
 		 * Destination filesystem does not exist.  Therefore we better
 		 * be creating a new filesystem (either from a full backup, or
@@ -3752,39 +3753,6 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 			goto out;
 		}
 
-		/*
-		 * It is invalid to receive a properties stream that was
-		 * unencrypted on the send side as a child of an encrypted
-		 * parent. Technically there is nothing preventing this, but
-		 * it would mean that the encryption=off property which is
-		 * locally set on the send side would not be received correctly.
-		 * We can infer encryption=off if the stream is not raw and
-		 * properties were included since the send side will only ever
-		 * send the encryption property in a raw nvlist header.
-		 */
-		if (!raw && props != NULL) {
-			uint64_t crypt;
-
-			zhp = zfs_open(hdl, zc.zc_name, ZFS_TYPE_DATASET);
-			if (zhp == NULL) {
-				err = zfs_error(hdl, EZFS_BADRESTORE,
-				    errbuf);
-				goto out;
-			}
-
-			crypt = zfs_prop_get_int(zhp, ZFS_PROP_ENCRYPTION);
-			zfs_close(zhp);
-
-			if (crypt != ZIO_CRYPT_OFF) {
-				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-				    "parent '%s' must not be encrypted to "
-				    "receive unencrypted property"),
-				    zc.zc_name);
-				err = zfs_error(hdl, EZFS_BADPROP, errbuf);
-				goto out;
-			}
-		}
-
 		newfs = B_TRUE;
 		*cp = '/';
 	}
@@ -3805,6 +3773,24 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		zcmd_free_nvlists(&zc);
 		err = recv_skip(hdl, infd, flags->byteswap);
 		goto out;
+	}
+
+	/*
+	 * When sending with properties (zfs send -p), the encryption property
+	 * is not included because it is a SETONCE property and therefore
+	 * treated as read only. However, we are always able to determine its
+	 * value because raw sends will include it in the DRR_BDEGIN payload
+	 * and non-raw sends with properties are not allowed for encrypted
+	 * datasets. Therefore, if this is a non-raw properties stream, we can
+	 * infer that the value should be ZIO_CRYPT_OFF and manually add that
+	 * to the received properties.
+	 */
+	if (stream_wantsnewfs && !raw && rcvprops != NULL &&
+	    !nvlist_exists(cmdprops, zfs_prop_to_name(ZFS_PROP_ENCRYPTION))) {
+		if (oxprops == NULL)
+			oxprops = fnvlist_alloc();
+		fnvlist_add_uint64(oxprops,
+		    zfs_prop_to_name(ZFS_PROP_ENCRYPTION), ZIO_CRYPT_OFF);
 	}
 
 	zc.zc_nvlist_dst = (uint64_t)(uintptr_t)prop_errbuf;
@@ -4080,7 +4066,7 @@ static int
 zfs_receive_impl(libzfs_handle_t *hdl, const char *tosnap,
     const char *originsnap, recvflags_t *flags, int infd, const char *sendfs,
     nvlist_t *stream_nv, avl_tree_t *stream_avl, char **top_zfs, int cleanup_fd,
-    uint64_t *action_handlep, const char *finalsnap)
+    uint64_t *action_handlep, const char *finalsnap, nvlist_t *cmdprops)
 {
 	int err;
 	dmu_replay_record_t drr, drr_noswap;
@@ -4182,12 +4168,12 @@ zfs_receive_impl(libzfs_handle_t *hdl, const char *tosnap,
 		}
 		return (zfs_receive_one(hdl, infd, tosnap, originsnap, flags,
 		    &drr, &drr_noswap, sendfs, stream_nv, stream_avl, top_zfs,
-		    cleanup_fd, action_handlep, finalsnap));
+		    cleanup_fd, action_handlep, finalsnap, cmdprops));
 	} else {
 		assert(DMU_GET_STREAM_HDRTYPE(drrb->drr_versioninfo) ==
 		    DMU_COMPOUNDSTREAM);
 		return (zfs_receive_package(hdl, infd, tosnap, flags, &drr,
-		    &zcksum, top_zfs, cleanup_fd, action_handlep));
+		    &zcksum, top_zfs, cleanup_fd, action_handlep, cmdprops));
 	}
 }
 
@@ -4217,7 +4203,7 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, nvlist_t *props,
 	VERIFY(cleanup_fd >= 0);
 
 	err = zfs_receive_impl(hdl, tosnap, originsnap, flags, infd, NULL, NULL,
-	    stream_avl, &top_zfs, cleanup_fd, &action_handle, NULL);
+	    stream_avl, &top_zfs, cleanup_fd, &action_handle, NULL, props);
 
 	VERIFY(0 == close(cleanup_fd));
 

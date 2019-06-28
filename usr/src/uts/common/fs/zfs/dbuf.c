@@ -1037,7 +1037,6 @@ dbuf_read_verify_dnode_crypt(dmu_buf_impl_t *db, uint32_t flags)
 	    !DMU_OT_IS_ENCRYPTED(dn->dn_bonustype))))
 		err = 0;
 
-
 	DB_DNODE_EXIT(db);
 
 	return (err);

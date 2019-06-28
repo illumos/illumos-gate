@@ -196,6 +196,7 @@ file path=opt/zfs-tests/bin/rm_lnkcnt_zero_file mode=0555
 file path=opt/zfs-tests/bin/zfstest mode=0555
 file path=opt/zfs-tests/callbacks/zfs_dbgmsg mode=0555
 file path=opt/zfs-tests/callbacks/zfs_mmp mode=0555
+file path=opt/zfs-tests/include/blkdev.shlib mode=0444
 file path=opt/zfs-tests/include/commands.cfg mode=0444
 file path=opt/zfs-tests/include/default.cfg mode=0444
 file path=opt/zfs-tests/include/libtest.shlib mode=0444
@@ -2805,6 +2806,8 @@ file path=opt/zfs-tests/tests/functional/rsend/send-c_verify_ratio mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send-c_volume mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send-c_zstreamdump mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send-cpL_varied_recsize \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send-wDR_encrypted_zvol \
     mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send_encrypted_files mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send_encrypted_hierarchy \
