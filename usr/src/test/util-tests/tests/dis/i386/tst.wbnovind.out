@@ -1,0 +1,3 @@
+    libdis_test:     f3 0f 09           wbnoinvd 
+    libdis_test+0x3: 0f 09              wbinvd 
+    libdis_test+0x5: 0f 08              invd   

@@ -21,7 +21,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -560,6 +560,11 @@ const instable_t dis_opMOVSLD = TNS("movslq",MOVSXZ);
  *	"decode table" for pause and clflush instructions
  */
 const instable_t dis_opPause = TNS("pause", NORM);
+
+/*
+ *	"decode table" for wbnoinvd instruction
+ */
+const instable_t dis_opWbnoinvd = TNS("wbnoinvd", NORM);
 
 /*
  *	Decode table for 0x0F00 opcodes
@@ -2660,7 +2665,7 @@ dtrace_vex_adjust(uint_t vex_byte1, uint_t mode, uint_t *reg, uint_t *r_m)
  */
 /* ARGSUSED */
 static void
-dtrace_evex_mnem_adjust(dis86_t *x, instable_t *dp, uint_t vex_W,
+dtrace_evex_mnem_adjust(dis86_t *x, const instable_t *dp, uint_t vex_W,
     uint_t evex_byte2)
 {
 #ifdef DIS_TEXT
@@ -3215,7 +3220,7 @@ dtrace_get_operand(dis86_t *x, uint_t mode, uint_t r_m, int wbit, int opindex)
 int
 dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 {
-	instable_t *dp;		/* decode table being used */
+	const instable_t *dp;	/* decode table being used */
 #ifdef DIS_TEXT
 	uint_t i;
 #endif
@@ -3712,11 +3717,11 @@ not_avx512:
 					if (opnd_size_prefix == 0) {
 						/* SSSE3 MMX instructions */
 						dp_mmx = *dp;
-						dp = &dp_mmx;
-						dp->it_adrmode = MMOPM_66o;
+						dp_mmx.it_adrmode = MMOPM_66o;
 #ifdef	DIS_MEM
-						dp->it_size = 8;
+						dp_mmx.it_size = 8;
 #endif
+						dp = &dp_mmx;
 					}
 					break;
 				default:
@@ -3797,11 +3802,11 @@ not_avx512:
 					if (opnd_size_prefix == 0) {
 						/* SSSE3 MMX instructions */
 						dp_mmx = *dp;
-						dp = &dp_mmx;
-						dp->it_adrmode = MM;
+						dp_mmx.it_adrmode = MM;
 #ifdef	DIS_MEM
-						dp->it_size = 8;
+						dp_mmx.it_size = 8;
 #endif
+						dp = &dp_mmx;
 					}
 					break;
 				case CRC32:
@@ -3818,6 +3823,9 @@ not_avx512:
 				default:
 					goto error;
 			}
+		} else if (rep_prefix == 0xf3 && opcode4 == 0 && opcode5 == 9) {
+			rep_prefix = 0;
+			dp = (instable_t *)&dis_opWbnoinvd;
 		} else {
 			dp = (instable_t *)&dis_op0F[opcode4][opcode5];
 		}
