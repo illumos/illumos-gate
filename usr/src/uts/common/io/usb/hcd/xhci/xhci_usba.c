@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019 by Western Digital Corporation
  */
 
 /*
@@ -24,7 +25,7 @@
 #include <sys/strsun.h>
 #include <sys/strsubr.h>
 
-static xhci_t *
+xhci_t *
 xhci_hcdi_get_xhcip_from_dev(usba_device_t *ud)
 {
 	dev_info_t *dip = ud->usb_root_hub_dip;
@@ -1435,86 +1436,6 @@ xhci_hcdi_get_max_isoc_pkts(usba_device_t *usba_device,
 {
 	*max_isoc_pkts_per_request = XHCI_ISOC_MAX_TRB;
 	return (USB_SUCCESS);
-}
-
-/*
- * The next series of routines is used for both the OBP console and general USB
- * console polled I/O. In general, we opt not to support any of that at this
- * time in xHCI. As we have the need of that, we can start plumbing that
- * through.
- */
-/* ARGSUSED */
-static int
-xhci_hcdi_console_input_init(usba_pipe_handle_data_t *pipe_handle,
-    uchar_t **obp_buf, usb_console_info_impl_t *console_input_info)
-{
-	return (USB_NOT_SUPPORTED);
-}
-
-/* ARGSUSED */
-static int
-xhci_hcdi_console_input_fini(usb_console_info_impl_t *console_input_info)
-{
-	return (USB_NOT_SUPPORTED);
-}
-
-/* ARGSUSED */
-static int
-xhci_hcdi_console_input_enter(usb_console_info_impl_t *console_input_info)
-{
-	return (USB_NOT_SUPPORTED);
-}
-
-/* ARGSUSED */
-static int
-xhci_hcdi_console_read(usb_console_info_impl_t *console_input_info,
-    uint_t *num_characters)
-{
-	return (USB_NOT_SUPPORTED);
-}
-
-/* ARGSUSED */
-static int
-xhci_hcdi_console_input_exit(usb_console_info_impl_t *console_input_info)
-{
-	return (USB_NOT_SUPPORTED);
-}
-
-/* ARGSUSED */
-static int
-xhci_hcdi_console_output_init(usba_pipe_handle_data_t *pipe_handle,
-    usb_console_info_impl_t *console_output_info)
-{
-	return (USB_NOT_SUPPORTED);
-}
-
-/* ARGSUSED */
-static int
-xhci_hcdi_console_output_fini(usb_console_info_impl_t *console_output_info)
-{
-	return (USB_NOT_SUPPORTED);
-}
-
-/* ARGSUSED */
-static int
-xhci_hcdi_console_output_enter(usb_console_info_impl_t *console_output_info)
-{
-	return (USB_NOT_SUPPORTED);
-}
-
-/* ARGSUSED */
-static int
-xhci_hcdi_console_write(usb_console_info_impl_t	*console_output_info,
-    uchar_t *buf, uint_t num_characters, uint_t *num_characters_written)
-{
-	return (USB_NOT_SUPPORTED);
-}
-
-/* ARGSUSED */
-static int
-xhci_hcdi_console_output_exit(usb_console_info_impl_t *console_output_info)
-{
-	return (USB_NOT_SUPPORTED);
 }
 
 /*
