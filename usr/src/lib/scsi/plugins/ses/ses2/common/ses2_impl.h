@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2019 RackTop Systems
+ */
 
 #ifndef	_PLUGIN_SES_IMPL_H
 #define	_PLUGIN_SES_IMPL_H
@@ -1163,6 +1166,9 @@ typedef struct ses2_aes_page_impl {
 
 /*
  * SES-2 Additional Element Status descriptor (EIP == 1) (Table 26, 6.1.13).
+ * Updated with EIIOE for Table 32 from SES-3, 6.1.13.
+ * Note that we think later revs of SES-3 probably widen the EIIOE to 2 bits,
+ * waiting for final document to be sure.
  */
 typedef struct ses2_aes_descr_eip_impl {
 	DECL_BITFIELD4(
@@ -1171,7 +1177,9 @@ typedef struct ses2_aes_descr_eip_impl {
 	    _reserved1			:2,
 	    sadei_invalid		:1);
 	uint8_t sadei_length;
-	uint8_t _reserved2;
+	DECL_BITFIELD2(
+	    sadei_eiioe			:2,
+	    _reserved2			:6);
 	uint8_t sadei_element_index;
 	uint8_t sadei_protocol_specific[1];
 } ses2_aes_descr_eip_impl_t;

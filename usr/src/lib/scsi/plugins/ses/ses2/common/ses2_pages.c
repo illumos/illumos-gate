@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 RackTop Systems
  */
 
 #include <stddef.h>
@@ -59,14 +60,16 @@ ses2_aes_index(ses_plugin_t *sp, ses_node_t *np, void *data, size_t pagelen,
     size_t *len)
 {
 	ses2_aes_page_impl_t *apip = data;
-	uint64_t index, type;
+	uint64_t index, eindex, oindex, type;
 	nvlist_t *props = ses_node_props(np);
 	ses2_aes_descr_eip_impl_t *dep;
 	size_t desclen;
 	int i, pos;
 
 	VERIFY(nvlist_lookup_uint64(props, SES_PROP_ELEMENT_ONLY_INDEX,
-	    &index) == 0);
+	    &eindex) == 0);
+	VERIFY(nvlist_lookup_uint64(props, SES_PROP_ELEMENT_INDEX,
+	    &oindex) == 0);
 	VERIFY(nvlist_lookup_uint64(props, SES_PROP_ELEMENT_TYPE,
 	    &type) == 0);
 
@@ -86,6 +89,34 @@ ses2_aes_index(ses_plugin_t *sp, ses_node_t *np, void *data, size_t pagelen,
 		if (!SES_WITHIN_PAGE(dep, desclen, data, pagelen))
 			break;
 
+		if (dep->sadei_eip) {
+			/*
+			 * The following switch table deals with the cases
+			 * for the EIIOE (element index includes overall
+			 * elements).  The treatment for this includes handling
+			 * connector and other element indices, but we don't
+			 * actually care about or use them, so for now we
+			 * really only care about the ELEMENT INDEX field.
+			 */
+			switch (dep->sadei_eiioe) {
+			case 1:
+				/*
+				 * Use the overall index.  We expect most
+				 * modern implementations to use this case.
+				 */
+				index = oindex;
+				break;
+			case 0:
+			case 2:
+			case 3:
+				/*
+				 * Use the element only index - excluding
+				 * the overall elements.
+				 */
+				index = eindex;
+				break;
+			}
+		}
 		pos += desclen;
 		if (!dep->sadei_eip &&
 		    type != SES_ET_DEVICE &&
@@ -102,8 +133,11 @@ ses2_aes_index(ses_plugin_t *sp, ses_node_t *np, void *data, size_t pagelen,
 			 * to have otherwise.  See 6.1.13.1.
 			 */
 			continue;
-		} else if (dep->sadei_eip &&
-		    dep->sadei_element_index != index) {
+		} else if (dep->sadei_eip) {
+			if (dep->sadei_element_index == index) {
+				*len = desclen;
+				return (dep);
+			}
 			/*
 			 * The element index field from AES descriptor is
 			 * element only index which doesn't include the OVERALL
@@ -112,7 +146,7 @@ ses2_aes_index(ses_plugin_t *sp, ses_node_t *np, void *data, size_t pagelen,
 			 * SES_PROP_ELEMENT_INDEX.
 			 */
 			continue;
-		} else if (dep->sadei_eip || i == index) {
+		} else if (i == eindex) {
 			*len = desclen;
 			return (dep);
 		}
