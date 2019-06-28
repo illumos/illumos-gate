@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998 Robert Nordier
  * All rights reserved.
  *
@@ -11,8 +11,6 @@
  * implied warranties, including, without limitation, the implied
  * warranties of merchantability and fitness for a particular
  * purpose.
- *
- * $FreeBSD$
  */
 
 #ifndef _RBX_H_
@@ -37,7 +35,7 @@
 #define RBX_MUTE	0x10	/* -m */
 /* 0x11 is reserved for log2(RB_SELFTEST). */
 /* 0x12 is reserved for boot programs. */
-/* 0x13 is reserved for boot programs. */
+#define	RBX_TEXT_MODE	0x13	/* -t */
 #define RBX_PAUSE	0x14	/* -p */
 #define RBX_QUIET	0x15	/* -q */
 #define RBX_NOINTR	0x1c	/* -n */
@@ -45,13 +43,14 @@
 #define RBX_DUAL	0x1d	/* -D */
 /* 0x1f is reserved for log2(RB_BOOTINFO). */
 
-/* pass: -a, -s, -r, -d, -c, -v, -h, -C, -g, -m, -p, -D */
+/* pass: -a, -s, -r, -d, -c, -v, -h, -C, -g, -m, -p, -D, -t */
 #define RBX_MASK	(OPT_SET(RBX_ASKNAME) | OPT_SET(RBX_SINGLE) | \
 			OPT_SET(RBX_DFLTROOT) | OPT_SET(RBX_KDB ) | \
 			OPT_SET(RBX_CONFIG) | OPT_SET(RBX_VERBOSE) | \
 			OPT_SET(RBX_SERIAL) | OPT_SET(RBX_CDROM) | \
 			OPT_SET(RBX_GDB ) | OPT_SET(RBX_MUTE) | \
-			OPT_SET(RBX_PAUSE) | OPT_SET(RBX_DUAL))
+			OPT_SET(RBX_PAUSE) | OPT_SET(RBX_DUAL) | \
+			OPT_SET(RBX_TEXT_MODE))
 
 #define OPT_SET(opt)	(1 << (opt))
 #define OPT_CHECK(opt)	((opts) & OPT_SET(opt))

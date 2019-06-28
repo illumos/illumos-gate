@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 #include <stdio.h>
@@ -58,8 +56,8 @@ list_append(void **list, void *item)
 
 	if (list == NULL) {
 		list = (void **)calloc(_list_increment, sizeof (void *));
-		(void) memset(list, NULL, (_list_increment * sizeof (void *)));
-		list[0] = item;
+		if (list != NULL)
+			list[0] = item;
 	} else {
 		int	count;
 
@@ -70,10 +68,9 @@ list_append(void **list, void *item)
 			int new_size = (((count + 1) / _list_increment) + 1) *
 				_list_increment;
 
-			new_list = (void **)calloc(new_size,
-						sizeof (void *));
-			(void) memset(new_list, NULL,
-			    (new_size * sizeof (void *)));
+			new_list = (void **)calloc(new_size, sizeof (void *));
+			if (new_list == NULL)
+				return (NULL);
 			for (count = 0; list[count] != NULL; count++)
 				new_list[count] = list[count];
 			free(list);
