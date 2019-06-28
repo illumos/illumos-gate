@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_COMMON_CRYPTO_MODES_H
@@ -50,6 +50,9 @@ extern "C" {
 #define	GCM_MODE			0x00000020
 #define	GMAC_MODE			0x00000040
 #define	CMAC_MODE			0x00000080
+
+/* Private flag for pkcs11_softtoken */
+#define	P11_DECRYPTED			0x80000000
 
 /*
  * cc_keysched:		Pointer to key schedule.

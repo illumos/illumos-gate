@@ -12,47 +12,43 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 include $(SRC)/cmd/Makefile.ctf
 
-CRYPTO = pkcs kcf
 PROGS_32 = $(CRYPTO:%=$(BASEPROG)_32_%)
 PROGS_64 = $(CRYPTO:%=$(BASEPROG)_64_%)
 PROGS = $(PROGS_32) $(PROGS_64)
-PROGS_pkcs = $(BASEPROG:%=%_32_pkcs) $(BASEPROG:%=%_64_pkcs)
-PROGS_kcf = $(BASEPROG:%=%_32_kcf) $(BASEPROG:%=%_64_kcf)
+$(CRYPTO_pkcs)PROGS_pkcs = $(BASEPROG:%=%_32_pkcs) $(BASEPROG:%=%_64_pkcs)
+$(CRYPTO_kcf)PROGS_kcf = $(BASEPROG:%=%_32_kcf) $(BASEPROG:%=%_64_kcf)
 
 ROOTOPTPKG = $(ROOT)/opt/crypto-tests
 TESTROOT = $(ROOTOPTPKG)/tests/aes
-TESTDIR_pkcs = $(TESTROOT)/pkcs
-TESTDIR_kcf = $(TESTROOT)/kcf
+$(CRYPTO_pkcs)TESTDIR_pkcs = $(TESTROOT)/pkcs
+$(CRYPTO_kcf)TESTDIR_kcf = $(TESTROOT)/kcf
 
 COMMONDIR = ../../../common
 $(PROGS_32)	:= OBJS += $(COMMONDIR)/testfuncs.32.o
 $(PROGS_64)	:= OBJS += $(COMMONDIR)/testfuncs.64.o
 $(PROGS_32)	:= OBJS += $(BASEPROG:%=%.32.o)
 $(PROGS_64)	:= OBJS += $(BASEPROG:%=%.64.o)
-$(BASEPROG)_32_pkcs	:= OBJS += $(COMMONDIR)/cryptotest_pkcs.32.o
-$(BASEPROG)_64_pkcs	:= OBJS += $(COMMONDIR)/cryptotest_pkcs.64.o
-$(BASEPROG)_32_kcf	:= OBJS += $(COMMONDIR)/cryptotest_kcf.32.o
-$(BASEPROG)_64_kcf	:= OBJS += $(COMMONDIR)/cryptotest_kcf.64.o
+$(CRYPTO_pkcs)$(BASEPROG)_32_pkcs	:= OBJS += $(COMMONDIR)/cryptotest_pkcs.32.o
+$(CRYPTO_pkcs)$(BASEPROG)_64_pkcs	:= OBJS += $(COMMONDIR)/cryptotest_pkcs.64.o
+$(CRYPTO_kcf)$(BASEPROG)_32_kcf	:= OBJS += $(COMMONDIR)/cryptotest_kcf.32.o
+$(CRYPTO_kcf)$(BASEPROG)_64_kcf	:= OBJS += $(COMMONDIR)/cryptotest_kcf.64.o
 
-$(PROGS_pkcs)	:= LDLIBS += -lpkcs11 -lcryptoutil
+$(CRYPTO_pkcs)$(PROGS_pkcs)	:= LDLIBS += -lpkcs11 -lcryptoutil
 
 CSTD = $(CSTD_GNU99)
 
-CMDS_pkcs = $(PROGS_pkcs:%_pkcs=$(TESTDIR_pkcs)/%)
-CMDS_kcf = $(PROGS_kcf:%_kcf=$(TESTDIR_kcf)/%)
+$(CRYPTO_pkcs)CMDS_pkcs = $(PROGS_pkcs:%_pkcs=$(TESTDIR_pkcs)/%)
+$(CRYPTO_kcf)CMDS_kcf = $(PROGS_kcf:%_kcf=$(TESTDIR_kcf)/%)
 CMDS = $(CMDS_pkcs) $(CMDS_kcf)
 
 $(CMDS) := FILEMODE = 0555
-
-LINTFLAGS += -xerroff=E_NAME_USED_NOT_DEF2
-LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
 
 CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 CPPFLAGS += -I$(COMMONDIR) -I$(SRC)/common/crypto/
@@ -83,17 +79,8 @@ all: $(PROGS)
 	$(COMPILE64.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-	echo $(CMDS_kcf)
-
 install: all $(CMDS)
 
-lint: $(CRYPTO:%=lint_%)
-
-lint_pkcs:
-	$(LINT.c) $(OBJS_PKCS_23:%.o=%.c) $(LDLIBS) $(PKCSLIBS)
-
-lint_kcf:
-	$(LINT.c) $(OBJS_KCF_32:%.o=%.c) $(LDLIBS)
 clobber: clean
 	-$(RM) $(PROGS)
 

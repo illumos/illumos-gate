@@ -15,8 +15,12 @@
 # Copyright 2019 Joyent, Inc.
 #
 
-BASEPROG = aes_ccm
-CRYPTO = pkcs kcf
+BASEPROG = aes_cbc_pad
+
+# Currently, the cbc_pad mechanism is only present in PKCS#11 and
+# not KCF, so we do not create _kcf test binaries.
+CRYPTO = pkcs
+CRYPTO_kcf = $(POUND_SIGN)
 
 include $(SRC)/cmd/Makefile.cmd
 include ../Makefile.subdirs
