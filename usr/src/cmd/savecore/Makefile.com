@@ -21,7 +21,7 @@
 #
 # Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 
 PROG= savecore
 SRCS= ../savecore.c ../../../uts/common/os/compress.c
@@ -54,12 +54,14 @@ BZIP2OBJS =	bz2blocksort.o	\
 		bz2crctable.o	\
 		bz2huffman.o
 
+CHACHAOBJ =	chacha.o
+
 .KEEP_STATE:
 
 all: $(PROG)
 
-$(PROG): $(OBJS) $(BZIP2OBJS)
-	$(LINK.c) -o $(PROG) $(OBJS) $(BZIP2OBJS) $(LDLIBS)
+$(PROG): $(OBJS) $(BZIP2OBJS) $(CHACHAOBJ)
+	$(LINK.c) -o $(PROG) $(OBJS) $(BZIP2OBJS) $(CHACHAOBJ) $(LDLIBS)
 	$(POST_PROCESS)
 
 clean:
@@ -95,3 +97,8 @@ include ../../Makefile.targ
 bz2%.o: ../../../common/bzip2/%.c
 	$(COMPILE.c) -o $@ -I$(SRC)/common -I$(SRC)/common/bzip2 $<
 	$(POST_PROCESS_O)
+
+%.o: ../../../common/crypto/chacha/%.c
+	$(COMPILE.c) -o $@ -I$(SRC)/common -I$(SRC)/common/crypto/chacha $<
+	$(POST_PROCESS_O)
+

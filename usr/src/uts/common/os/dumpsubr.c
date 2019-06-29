@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2018 Nexenta Systems, Inc. All rights reserved.
  */
 
@@ -75,6 +75,7 @@
 #include <sys/cpu.h>
 
 #include <bzip2/bzlib.h>
+#include <crypto/chacha/chacha.h>
 
 #define	ONE_GIG	(1024 * 1024 * 1024UL)
 
@@ -112,6 +113,8 @@ int		dump_timeout = 120;	/* timeout for dumping pages */
 int		dump_timeleft;		/* portion of dump_timeout remaining */
 int		dump_ioerr;		/* dump i/o error */
 int		dump_check_used;	/* enable check for used pages */
+uint8_t		dump_crypt_key[DUMP_CRYPT_KEYLEN]; /* dump encryption key */
+uint8_t		dump_crypt_nonce[DUMP_CRYPT_NONCELEN]; /* dump nonce */
 char	    *dump_stack_scratch; /* scratch area for saving stack summary */
 
 /*
@@ -357,6 +360,7 @@ typedef struct dumpsync {
 	hrtime_t iotime;		/* time spent writing nwrite bytes */
 	hrtime_t iowait;		/* time spent waiting for output */
 	hrtime_t iowaitts;		/* iowait timestamp */
+	hrtime_t crypt;			/* time spent encrypting */
 	perpage_t perpage;		/* metrics */
 	perpage_t perpagets;
 	int dumpcpu;			/* master cpu */
@@ -435,6 +439,7 @@ typedef struct dumpbuf {
 	char	*cur;		/* dump write pointer */
 	char	*start;		/* dump buffer address */
 	char	*end;		/* dump buffer end */
+	char	*scratch;	/* scratch buffer */
 	size_t	size;		/* size of dumpbuf in bytes */
 	size_t	iosize;		/* best transfer size for device */
 } dumpbuf_t;
@@ -493,11 +498,16 @@ dumpbuf_resize(void)
 	if (new_size <= old_size)
 		return; /* no need to reallocate buffer */
 
-	new_buf = kmem_alloc(new_size, KM_SLEEP);
+	/*
+	 * Allocate thrice the size of buffer to allow for space for the stream
+	 * and its ciphertext should encryption be enabled (or become so).
+	 */
+	new_buf = kmem_alloc(new_size * 3, KM_SLEEP);
 	dumpbuf.size = new_size;
 	dumpbuf.start = new_buf;
 	dumpbuf.end = new_buf + new_size;
-	kmem_free(old_buf, old_size);
+	dumpbuf.scratch = dumpbuf.end + new_size;
+	kmem_free(old_buf, old_size * 3);
 }
 
 /*
@@ -1125,9 +1135,16 @@ dumphdr_init(void)
 		dumphdr->dump_pagesize = PAGESIZE;
 		dumphdr->dump_utsname = utsname;
 		(void) strcpy(dumphdr->dump_platform, platform);
+
+		/*
+		 * Allocate our buffer, assuring enough room for encryption
+		 * should it become configured.
+		 */
 		dumpbuf.size = dumpbuf_iosize(maxphys);
-		dumpbuf.start = kmem_alloc(dumpbuf.size, KM_SLEEP);
+		dumpbuf.start = kmem_alloc(dumpbuf.size * 3, KM_SLEEP);
 		dumpbuf.end = dumpbuf.start + dumpbuf.size;
+		dumpbuf.scratch = dumpbuf.end + dumpbuf.size;
+
 		dumpcfg.pids = kmem_alloc(v.v_proc * sizeof (pid_t), KM_SLEEP);
 		dumpcfg.helpermap = kmem_zalloc(BT_SIZEOFMAP(NCPU), KM_SLEEP);
 		LOCK_INIT_HELD(&dumpcfg.helper_lock);
@@ -1317,6 +1334,41 @@ dumpfini(void)
 	dumppath = NULL;
 }
 
+static void
+dumpvp_encrypt(size_t size)
+{
+	size_t nelems = size / sizeof (uint64_t), i;
+	uint64_t *start = (uint64_t *)dumpbuf.start;
+	uint64_t *stream = (uint64_t *)dumpbuf.end;
+	uint64_t *crypt = (uint64_t *)dumpbuf.scratch;
+	uint64_t ctr = dumpbuf.vp_off >> DUMP_CRYPT_BLOCKSHIFT;
+	hrtime_t ts = gethrtime();
+	offset_t dumpoff = dumpbuf.vp_off;
+	chacha_ctx_t ctx;
+
+	/*
+	 * Our size should be 64-bit aligned and our offset must be aligned
+	 * to our crypto blocksize.
+	 */
+	ASSERT(!(size & (sizeof (uint64_t) - 1)));
+	ASSERT(!(dumpbuf.vp_off & ((1 << DUMP_CRYPT_BLOCKSHIFT) - 1)));
+
+	chacha_keysetup(&ctx, dump_crypt_key, DUMP_CRYPT_KEYLEN * 8, 0);
+	chacha_ivsetup(&ctx, dump_crypt_nonce, (uint8_t *)&ctr);
+
+	for (i = 0; i < nelems; i++) {
+		stream[i] = dumpoff;
+		dumpoff += sizeof (uint64_t);
+	}
+
+	chacha_encrypt_bytes(&ctx, (uint8_t *)stream, (uint8_t *)crypt, size);
+
+	for (i = 0; i < nelems; i++)
+		start[i] ^= crypt[i];
+
+	dumpsync.crypt += gethrtime() - ts;
+}
+
 static offset_t
 dumpvp_flush(void)
 {
@@ -1328,6 +1380,17 @@ dumpvp_flush(void)
 		dump_ioerr = ENOSPC;
 		dumpbuf.vp_off = dumpbuf.vp_limit;
 	} else if (size != 0) {
+		/*
+		 * If our dump is encrypted and this is neither the initial
+		 * dump header nor the terminal dump header and metrics,
+		 * encrypt the buffer before writing it.
+		 */
+		if ((dump_conflags & DUMP_ENCRYPT) &&
+		    dumpbuf.vp_off > dumphdr->dump_start &&
+		    dumpbuf.vp_off < dumpbuf.vp_limit - DUMP_OFFSET) {
+			dumpvp_encrypt(size);
+		}
+
 		iotime = gethrtime();
 		dumpsync.iowait += iotime - dumpsync.iowaitts;
 		if (panicstr)
@@ -2618,6 +2681,7 @@ dumpsys_metrics(dumpsync_t *ds, char *buf, size_t size)
 	P("Dump I/O rate MBS,%d.%02d\n", iorate / 100, iorate % 100);
 	P("..total bytes,%lld\n", (u_longlong_t)ds->nwrite);
 	P("..total nsec,%lld\n", (u_longlong_t)ds->iotime);
+	P("..crypt nsec,%lld\n", (u_longlong_t)ds->crypt);
 	P("dumpbuf.iosize,%ld\n", dumpbuf.iosize);
 	P("dumpbuf.size,%ld\n", dumpbuf.size);
 
@@ -2658,6 +2722,29 @@ dumpsys_metrics(dumpsync_t *ds, char *buf, size_t size)
 }
 #endif	/* COLLECT_METRICS */
 
+CTASSERT(DUMP_CRYPT_HMACLEN <= sizeof (struct utsname));
+
+/*
+ * Mark the dump as encrypted and calculate our (crude) HMAC based on the
+ * dump_utsname.  (The purpose of the HMAC is to merely allow for incorrect
+ * keys to be quickly rejected.)
+ */
+void
+dumpsys_crypt(dumphdr_t *dumphdr, dump_crypt_t *dcrypt)
+{
+	chacha_ctx_t ctx;
+
+	dumphdr->dump_flags |= DF_ENCRYPTED;
+	bcopy(dump_crypt_nonce, dcrypt->dump_crypt_nonce, DUMP_CRYPT_NONCELEN);
+	dcrypt->dump_crypt_algo = DUMP_CRYPT_ALGO_CHACHA20;
+
+	chacha_keysetup(&ctx, dump_crypt_key, DUMP_CRYPT_KEYLEN * 8, 0);
+	chacha_ivsetup(&ctx, dump_crypt_nonce, NULL);
+
+	chacha_encrypt_bytes(&ctx, (uint8_t *)&dumphdr->dump_utsname,
+	    (uint8_t *)&dcrypt->dump_crypt_hmac, DUMP_CRYPT_HMACLEN);
+}
+
 /*
  * Dump the system.
  */
@@ -2679,6 +2766,7 @@ dumpsys(void)
 	dumpmlw_t mlw;
 	dumpcsize_t datatag;
 	dumpdatahdr_t datahdr;
+	dump_crypt_t dcrypt;
 
 	if (dumpvp == NULL || dumphdr == NULL) {
 		uprintf("skipping system dump - no dump device configured\n");
@@ -2732,6 +2820,9 @@ dumpsys(void)
 
 	/* Make sure nodename is current */
 	bcopy(utsname.nodename, dumphdr->dump_utsname.nodename, SYS_NMLN);
+
+	if (dump_conflags & DUMP_ENCRYPT)
+		dumpsys_crypt(dumphdr, &dcrypt);
 
 	/*
 	 * If this is a live dump, try to open a VCHR vnode for better
@@ -2999,11 +3090,19 @@ dumpsys(void)
 	 */
 	dumpbuf.vp_off = dumphdr->dump_start;
 	dumpvp_write(dumphdr, sizeof (dumphdr_t));
+
+	if (dump_conflags & DUMP_ENCRYPT)
+		dumpvp_write(&dcrypt, sizeof (dump_crypt_t));
+
 	(void) dumpvp_flush();
 
 	dumpbuf.vp_limit = dumpvp_size;
 	dumpbuf.vp_off = dumpbuf.vp_limit - DUMP_OFFSET;
 	dumpvp_write(dumphdr, sizeof (dumphdr_t));
+
+	if (dump_conflags & DUMP_ENCRYPT)
+		dumpvp_write(&dcrypt, sizeof (dump_crypt_t));
+
 	dumpvp_write(&datahdr, sizeof (dumpdatahdr_t));
 	dumpvp_write(dumpcfg.cbuf[0].buf, datahdr.dump_metrics);
 

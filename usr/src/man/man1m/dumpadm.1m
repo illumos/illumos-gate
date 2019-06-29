@@ -2,17 +2,18 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2015 Nexenta Systems, Inc.  All Rights Reserved.
 .\" Copyright (c) 2013 by Delphix. All rights reserved.
+.\" Copyright 2019 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DUMPADM 1M "Apr 09, 2015"
+.TH DUMPADM 1M "Jun 15, 2019"
 .SH NAME
 dumpadm \- configure operating system crash dump
 .SH SYNOPSIS
 .LP
 .nf
 \fB/usr/sbin/dumpadm\fR [\fB-enuy\fR] [\fB-c\fR \fIcontent-type\fR] [\fB-d\fR \fIdump-device\fR]
-     [\fB-m\fR \fImin\fRk | \fImin\fRm | \fImin\fR%] [\fB-s\fR \fIsavecore-dir\fR]
+     [\fB-k\fR \fIkey-file\fR] [\fB-m\fR \fImin\fRk | \fImin\fRm | \fImin\fR%] [\fB-s\fR \fIsavecore-dir\fR]
      [\fB-r\fR \fIroot-dir\fR] [\fB-z\fR on | off]
 .fi
 
@@ -41,13 +42,30 @@ write it to the file system. The directory in which the crash
 dump is saved on reboot can also be configured using \fBdumpadm\fR.
 .sp
 .LP
-When the operating system takes a crash dump the default behavior is to
-compress the crash dump. This behavior is controlled by the \fB-z\fR option.
+A crash dump is always compressed on the dump device. The dump is decompressed
+by the \fBsavecore\fR(1M) utility, which can optionally store the dump in its
+compressed state, thereby deferring decompression to a subsequent invocation
+of \fBsavecore\fR. This behavior is controlled by the \fB-z\fR option.
 When compression is turned on, the \fBsavecore\fR(1M) utility writes one file
 to the file system named \fIvmdump.X\fR. If compression is disabled, it instead
 writes two files named \fIunix.X\fR and \fIvmcore.X\fR. In the uncompressed
 case, both data files form the \fIsaved crash dump\fR. In both cases X is an
 integer identifying the dump.
+.sp
+.LP
+Crash dump encryption may be optionally enabled via the \fB-k\fR option, which
+specifies a file that contains an encryption key. When crash dump encryption
+is enabled, the contents of kernel memory as stored in the dump device will be
+encrypted. Decryption of a kernel crash dump must occur when the dump is
+extracted via \fBsavecore\fR (to which the encryption key must be separately
+provided). Decompression can only occur on a decrypted dump; when dump
+encryption is enabled, \fBsavecore\fR must store the dump in its compressed
+state. Note that \fBsavecore\fR cannot extract an encrypted dump without also
+decrypting it; when dump encryption is enabled, the operator should be sure
+to only operate \fBsavecore\fR on a directory that is separately encrypted
+or otherwise secured. Finally, note that \fBdumpadm\fR does not store the
+crash dump encryption key persistently: upon system reset, crash dump
+encryption is always disabled.
 .sp
 .LP
 For systems with a UFS root file system, the default dump device is  configured
@@ -68,6 +86,7 @@ example# \fBdumpadm\fR
 Savecore directory: /var/crash/saturn
   Savecore enabled: yes
    Save compressed: on
+    Dump encrypted: no
 .fi
 .in -2
 .sp
@@ -194,6 +213,18 @@ and crash dumps are disabled.
 .sp .6
 .RS 4n
 Estimates the size of the dump for the current running system.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-k\fR \fIkey-file\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies that the dump should be encrypted based on the key found in
+\fIkey-file\fR. Note that any invocations of \fBsavecore\fR will need to
+specify the same key to be able to correctly retrieve the dump.
 .RE
 
 .sp
@@ -346,6 +377,7 @@ example# dumpadm -d /dev/dsk/c0t2d0s2
      Savecore directory: /var/crash/saturn
        Savecore enabled: yes
         Save compressed: on
+         Dump encrypted: no
 .fi
 .in -2
 .sp

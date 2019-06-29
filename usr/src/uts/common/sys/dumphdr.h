@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _SYS_DUMPHDR_H
@@ -60,6 +61,22 @@ extern "C" {
 	sizeof (summary_dump_t) + 1024), \
 	DUMP_OFFSET))				/* summary save area */
 
+#define	DUMP_CRYPT_KEYLEN	32		/* byte len for crypto key */
+#define	DUMP_CRYPT_NONCELEN	8		/* byte len for nonce */
+#define	DUMP_CRYPT_HMACLEN	64		/* byte len for HMAC */
+#define	DUMP_CRYPT_BLOCKSHIFT	6		/* 64-byte blocks */
+
+#define	DUMP_CRYPT_ALGO_NONE		0	/* dump not encrypted */
+#define	DUMP_CRYPT_ALGO_CHACHA20	1	/* ChaCha20 */
+
+#if DUMP_OFFSET & ((1 << DUMP_CRYPT_BLOCKSHIFT) - 1)
+#error DUMP_OFFSET not DUMP_CRYPT_BLOCKSHIFT aligned
+#endif
+
+#if DUMP_LOGSIZE & ((1 << DUMP_CRYPT_BLOCKSHIFT) - 1)
+#error DUMP_LOGSIZE not DUMP_CRYPT_BLOCKSHIFT aligned
+#endif
+
 typedef struct dumphdr {
 	uint32_t dump_magic;		/* magic number */
 	uint32_t dump_version;		/* version number */
@@ -86,12 +103,22 @@ typedef struct dumphdr {
 } dumphdr_t;
 
 /*
+ * If DF_ENCRYPTED is set, this header will be found after the dumphdr.
+ */
+typedef struct dump_crypt {
+	uint8_t dump_crypt_algo;	/* encryption algorithm */
+	uint8_t	dump_crypt_hmac[DUMP_CRYPT_HMACLEN]; /* HMAC for crypto key */
+	uint8_t	dump_crypt_nonce[DUMP_CRYPT_NONCELEN]; /* encryption none */
+} dump_crypt_t;
+
+/*
  * Values for dump_flags
  */
 #define	DF_VALID	0x00000001	/* Dump is valid (savecore clears) */
 #define	DF_COMPLETE	0x00000002	/* All pages present as configured */
 #define	DF_LIVE		0x00000004	/* Dump was taken on a live system */
 #define	DF_COMPRESSED	0x00000008	/* Dump is compressed */
+#define	DF_ENCRYPTED	0x00000010	/* Dump is encrypted */
 #define	DF_KERNEL	0x00010000	/* Contains kernel pages only */
 #define	DF_ALL		0x00020000	/* Contains all pages */
 #define	DF_CURPROC	0x00040000	/* Contains kernel + cur proc pages */
@@ -175,6 +202,8 @@ extern u_offset_t dumpvp_size;
 extern struct dumphdr *dumphdr;
 extern int dump_conflags;
 extern char *dumppath;
+extern uint8_t dump_crypt_key[DUMP_CRYPT_KEYLEN];
+extern uint8_t dump_crypt_nonce[DUMP_CRYPT_NONCELEN];
 
 extern int dump_timeout;
 extern int dump_timeleft;

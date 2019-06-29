@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Delphix (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 
@@ -46,6 +47,7 @@
 #include <sys/conf.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/random.h>
 
 static dev_info_t *dump_devi;
 
@@ -141,16 +143,20 @@ dump_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 		*rvalp = dump_conflags;
 		if (dumpvp && !(dumpvp->v_flag & VISSWAP))
 			*rvalp |= DUMP_EXCL;
+
 		mutex_exit(&dump_lock);
 		break;
 
 	case DIOCSETCONF:
 		mutex_enter(&dump_lock);
 		if (arg == DUMP_KERNEL || arg == DUMP_ALL ||
-		    arg == DUMP_CURPROC)
-			dump_conflags = arg;
-		else
+		    arg == DUMP_CURPROC) {
+			dump_conflags = (dump_conflags & DUMP_STATE) |
+			    (arg & DUMP_CONTENT);
+		} else {
 			error = EINVAL;
+		}
+
 		mutex_exit(&dump_lock);
 		break;
 
@@ -180,6 +186,24 @@ dump_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 		mutex_exit(&dump_lock);
 		VN_RELE(vp);
 		break;
+
+	case DIOCSCRYPTKEY: {
+		uint8_t key[DUMP_CRYPT_KEYLEN];
+		uint8_t nonce[DUMP_CRYPT_NONCELEN];
+
+		if ((error = copyin((uint8_t *)arg, key, sizeof (key))) != 0)
+			break;
+
+		(void) random_get_pseudo_bytes(nonce, sizeof (nonce));
+
+		mutex_enter(&dump_lock);
+		bcopy(key, dump_crypt_key, DUMP_CRYPT_KEYLEN);
+		bcopy(nonce, dump_crypt_nonce, DUMP_CRYPT_NONCELEN);
+		dump_conflags |= DUMP_ENCRYPT;	/* a one-way trip */
+		mutex_exit(&dump_lock);
+
+		break;
+	}
 
 	case DIOCDUMP:
 		mutex_enter(&dump_lock);

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/stat.h>
@@ -36,10 +37,10 @@
 
 static const char USAGE[] = "\
 Usage: %s [-enuy] [-c kernel | curproc | all ]\n\
-	[-d dump-device | swap | none ] [-m min {k|m|%%} ] [-s savecore-dir]\n\
-	[-r root-dir] [-z on|off]\n";
+	[-d dump-device | swap | none ] [-k key-file] [-m min {k|m|%%} ]\n\
+	[-s savecore-dir] [-r root-dir] [-z on|off]\n";
 
-static const char OPTS[] = "einuyc:d:m:s:r:z:";
+static const char OPTS[] = "einuyc:d:m:s:r:z:k:";
 
 static const char PATH_DEVICE[] = "/dev/dump";
 static const char PATH_CONFIG[] = "/etc/dumpadm.conf";
@@ -57,6 +58,7 @@ main(int argc, char *argv[])
 	int dcmode = DC_CURRENT;	/* kernel settings override unless -u */
 	int modified = 0;		/* have we modified the dump config? */
 	char *minfstr = NULL;		/* string value of -m argument */
+	char *keyfile = NULL;		/* key file for -k argument */
 	dumpconf_t dc;			/* current configuration */
 	int chrooted = 0;
 	int douuid = 0;
@@ -136,6 +138,9 @@ main(int argc, char *argv[])
 				}
 				douuid++;
 				break;
+			case 'k':
+				keyfile = optarg;
+				break;
 
 			case 'm':
 				minfstr = optarg;
@@ -190,6 +195,9 @@ main(int argc, char *argv[])
 		if (minfree_write(dc.dc_savdir, minf) == -1)
 			return (E_ERROR);
 	}
+
+	if (keyfile != NULL && dconf_set_crypt(&dc, keyfile) == -1)
+		return (E_ERROR);
 
 	if (dcmode == DC_OVERRIDE) {
 		/*

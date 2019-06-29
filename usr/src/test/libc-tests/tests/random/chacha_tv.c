@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -285,7 +285,7 @@ chacha_test(uint8_t *key, uint8_t keylen, uint8_t *iv, uint8_t *bl0,
 	bzero(res0, sizeof (res0));
 	bzero(res1, sizeof (res1));
 	chacha_keysetup(&ctx, key, keylen * 8, 0);
-	chacha_ivsetup(&ctx, iv);
+	chacha_ivsetup(&ctx, iv, NULL);
 	chacha_encrypt_bytes(&ctx, res0, res0, sizeof (res0));
 	chacha_encrypt_bytes(&ctx, res1, res1, sizeof (res1));
 	ret = bcmp(res0, bl0, sizeof (res0));

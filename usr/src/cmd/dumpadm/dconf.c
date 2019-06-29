@@ -21,12 +21,14 @@
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/swap.h>
 #include <sys/dumpadm.h>
+#include <sys/dumphdr.h>
 #include <sys/utsname.h>
 
 #include <unistd.h>
@@ -537,6 +539,42 @@ dconf_get_dumpsize(dumpconf_t *dcp)
 	return (0);
 }
 
+int
+dconf_set_crypt(dumpconf_t *dcp, const char *keyfile)
+{
+	int fd;
+	uint8_t key[DUMP_CRYPT_KEYLEN];
+
+	if ((fd = open(keyfile, O_RDONLY)) == -1) {
+		warn(gettext("failed to open %s"), keyfile);
+		return (-1);
+	}
+
+	if (read(fd, key, sizeof (key)) != sizeof (key)) {
+		warn(gettext("failed to read %d byte key from %s"),
+		    DUMP_CRYPT_KEYLEN, keyfile);
+		(void) close(fd);
+		return (-1);
+	}
+
+	(void) close(fd);
+
+	if (ioctl(dcp->dc_dump_fd, DIOCSCRYPTKEY, key) == -1) {
+		warn(gettext("failed to set encryption key"));
+		return (-1);
+	}
+
+	/*
+	 * Reload our config flags as they may have changed.
+	 */
+	if ((dcp->dc_cflags = ioctl(dcp->dc_dump_fd, DIOCGETCONF, 0)) == -1) {
+		warn(gettext("failed to get kernel dump settings"));
+		return (-1);
+	}
+
+	return (0);
+}
+
 void
 dconf_print(dumpconf_t *dcp, FILE *fp)
 {
@@ -578,6 +616,8 @@ dconf_print(dumpconf_t *dcp, FILE *fp)
 	(void) fprintf(fp, gettext("   Save compressed: %s\n"),
 	    (dcp->dc_csave == DC_UNCOMPRESSED) ? gettext("off") :
 	    gettext("on"));
+	(void) fprintf(fp, gettext("    Dump encrypted: %s\n"),
+	    (dcp->dc_cflags & DUMP_ENCRYPT) ? gettext("yes") : gettext("no"));
 }
 
 int

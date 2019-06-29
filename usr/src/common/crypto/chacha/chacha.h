@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _CHACHA_H
@@ -27,7 +27,7 @@
  * over the data and xoring it with the generated cipher.
  */
 
-#include <inttypes.h>
+#include <sys/inttypes.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,7 +39,7 @@ typedef struct chacha_ctx {
 
 extern void chacha_keysetup(chacha_ctx_t *, const uint8_t *, uint32_t,
     uint32_t);
-extern void chacha_ivsetup(chacha_ctx_t *, const uint8_t *);
+extern void chacha_ivsetup(chacha_ctx_t *, const uint8_t *, const uint8_t *);
 extern void chacha_encrypt_bytes(chacha_ctx_t *, const uint8_t *, uint8_t *,
     uint32_t);
 

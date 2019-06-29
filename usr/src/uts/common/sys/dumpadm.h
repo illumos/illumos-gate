@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_SYS_DUMPADM_H
@@ -44,11 +45,13 @@ extern "C" {
 #define	DIOCSETUUID	(DDIOC | 0x17)
 #define	DIOCGETUUID	(DDIOC | 0x18)
 #define	DIOCRMDEV	(DDIOC | 0x19)
+#define	DIOCSCRYPTKEY	(DDIOC | 0x1a)
 
 /*
  * Kernel-controlled dump state flags for dump_conflags
  */
 #define	DUMP_EXCL	0x00000001	/* dedicated dump device (not swap) */
+#define	DUMP_ENCRYPT	0x00000002	/* encrypt dump */
 #define	DUMP_STATE	0x0000ffff	/* the set of all kernel flags */
 
 /*

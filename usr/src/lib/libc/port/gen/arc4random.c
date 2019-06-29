@@ -2,7 +2,7 @@
  * Copyright (c) 1996, David Mazieres <dm@uun.org>
  * Copyright (c) 2008, Damien Miller <djm@openbsd.org>
  * Copyright (c) 2013, Markus Friedl <markus@openbsd.org>
- * Copyright (c) 2015 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -60,7 +60,7 @@ arc4_init(uint8_t *buf, size_t n)
 		abort();
 
 	chacha_keysetup(&arc4->arc4_chacha, buf, ARC4_KEYSZ * 8, 0);
-	chacha_ivsetup(&arc4->arc4_chacha, buf + ARC4_KEYSZ);
+	chacha_ivsetup(&arc4->arc4_chacha, buf + ARC4_KEYSZ, NULL);
 }
 
 static void

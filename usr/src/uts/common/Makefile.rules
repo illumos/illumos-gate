@@ -1602,6 +1602,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/rpc/sec_gss/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(COMMONBASE)/crypto/chacha/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(COMMONBASE)/crypto/edonr/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)

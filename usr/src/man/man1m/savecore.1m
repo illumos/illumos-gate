@@ -3,13 +3,13 @@
 .\" Copyright (c) 1983 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
 .\" Copyright 2013 Nexenta Systems, Inc.  All Rights Reserved.
 .\" Copyright 2019 Joyent, Inc.
-.TH SAVECORE 1M "February 22, 2019"
+.TH SAVECORE 1M "Jun 15, 2019"
 .SH NAME
 savecore \- save a crash dump of the operating system
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/savecore\fR [\fB-L\fR | \fB-r\fR] [\fB-vd\fR] [\fB-f\fR \fIdumpfile\fR] [\fIdirectory\fR]
+\fB/usr/bin/savecore\fR [\fB-L\fR | \fB-r\fR] [\fB-vd\fR] [\fB-k\fR \fIkeyfile\fR] [\fB-f\fR \fIdumpfile\fR] [\fIdirectory\fR]
 .fi
 
 .SH DESCRIPTION
@@ -61,10 +61,21 @@ the dump has already been saved.
 \fB\fB-f\fR \fIdumpfile\fR\fR
 .ad
 .RS 15n
-Attempt to save a crash dump from the specified file instead of from the
-system's current dump device. This option may be useful if the information
-stored on the dump device has been copied to an on-disk file by means of the
-\fBdd\fR(1M) command.
+Uncompress and save a crash dump and kernel namelist data from the specified
+compressed dump file.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-k\fR \fIkeyfile\fR\fR
+.ad
+.RS 15n
+Specifies that the dump should be decrypted based on the key found
+in \fIkeyfile\fR. Encrypted dumps are always decrypted before being stored
+in the file system, and must always be stored compressed. (That is,
+decompression can only occur on a decrypted dump.) The key must match the
+key specified when dump encryption is enabled via \fBdumpadm\fR.
 .RE
 
 .sp
@@ -73,7 +84,7 @@ stored on the dump device has been copied to an on-disk file by means of the
 \fB\fB-L\fR\fR
 .ad
 .RS 15n
-Save a crash dump of the live running Solaris system, without actually
+Save a crash dump of the live running system, without actually
 rebooting or altering the system in any way. This option forces \fBsavecore\fR
 to save a live snapshot of the system to the dump device, and then immediately
 to retrieve the data and to write it out to a new set of crash dump files in
@@ -177,7 +188,7 @@ default crash dump directory
 
 .SH SEE ALSO
 .LP
-\fBadb\fR(1), \fBmdb\fR(1), \fBsvcs\fR(1), \fBdd\fR(1M), \fBdumpadm\fR(1M),
+\fBadb\fR(1), \fBmdb\fR(1), \fBsvcs\fR(1), \fBdumpadm\fR(1M),
 \fBsvcadm\fR(1M), \fBsyslog\fR(3C), \fBattributes\fR(5), \fBsmf\fR(5)
 .SH NOTES
 .LP

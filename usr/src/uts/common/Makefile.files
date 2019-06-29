@@ -120,6 +120,7 @@ GENUNIX_OBJS +=	\
 		bz2huffman.o	\
 		callb.o		\
 		callout.o	\
+		chacha.o	\
 		chdir.o		\
 		chmod.o		\
 		chown.o		\
