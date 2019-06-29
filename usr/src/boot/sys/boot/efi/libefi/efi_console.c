@@ -444,9 +444,19 @@ efi_framebuffer_setup(void)
 static void
 efi_cons_probe(struct console *cp)
 {
+	cp->c_flags |= C_PRESENTIN | C_PRESENTOUT;
+}
+
+static int
+efi_cons_init(struct console *cp, int arg __unused)
+{
 	struct efi_console_data *ecd;
+	void *coninex;
 	EFI_STATUS status;
 	UINTN i, max_dim, best_mode, cols, rows;
+
+	if (cp->c_private != NULL)
+		return (0);
 
 	ecd = calloc(1, sizeof (*ecd));
 	/*
@@ -457,9 +467,12 @@ efi_cons_probe(struct console *cp)
 		panic("efi_cons_probe: This system has not enough memory\n");
 	cp->c_private = ecd;
 
-	conout = ST->ConOut;
 	ecd->ecd_conin = ST->ConIn;
-	cp->c_flags |= C_PRESENTIN | C_PRESENTOUT;
+	conout = ST->ConOut;
+
+	conout->SetAttribute(conout, EFI_TEXT_ATTR(DEFAULT_FGCOLOR,
+	    DEFAULT_BGCOLOR));
+	memset(keybuf, 0, KEYBUFSZ);
 
 	status = BS->LocateProtocol(&ccontrol_protocol_guid, NULL,
 	    (VOID **)&console_control);
@@ -509,21 +522,7 @@ efi_cons_probe(struct console *cp)
 
 	/* some firmware enables the cursor when switching modes */
 	conout->EnableCursor(conout, FALSE);
-}
 
-static int
-efi_cons_init(struct console *cp, int arg __unused)
-{
-	struct efi_console_data *ecd;
-	void *coninex;
-	EFI_STATUS status;
-	int rc;
-
-	conout->SetAttribute(conout, EFI_TEXT_ATTR(DEFAULT_FGCOLOR,
-	    DEFAULT_BGCOLOR));
-	memset(keybuf, 0, KEYBUFSZ);
-
-	ecd = cp->c_private;
 	coninex = NULL;
 	/*
 	 * Try to set up for SimpleTextInputEx protocol. If not available,
@@ -535,9 +534,8 @@ efi_cons_init(struct console *cp, int arg __unused)
 		ecd->ecd_coninex = coninex;
 
 	gfx_framework_init(&fb_ops);
-	rc = tem_info_init(cp);
 
-	if (rc == 0 && tem == NULL) {
+	if (tem_info_init(cp) == 0 && tem == NULL) {
 		tem = tem_init();
 		if (tem != NULL)
 			tem_activate(tem, B_TRUE);

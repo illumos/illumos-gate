@@ -606,7 +606,7 @@ tests = ['rsend_001_pos', 'rsend_002_pos', 'rsend_003_pos', 'rsend_004_pos',
     'send-c_recv_dedup', 'send_encrypted_files', 'send_encrypted_hierarchy',
     'send_encrypted_truncated_files',
     'send_realloc_encrypted_files',
-    'send_mixed_raw']
+    'send_mixed_raw', 'send-wDR_encrypted_zvol']
 
 [/opt/zfs-tests/tests/functional/scrub_mirror]
 tests = ['scrub_mirror_001_pos', 'scrub_mirror_002_pos',

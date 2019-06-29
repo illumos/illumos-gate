@@ -29,6 +29,20 @@
 #
 
 . ${STF_TOOLS}/contrib/include/logapi.shlib
+. ${STF_SUITE}/include/blkdev.shlib
+
+# Determine if this is a Linux test system
+#
+# Return 0 if platform Linux, 1 if otherwise
+
+function is_linux
+{
+	if [[ $(uname -o) == "GNU/Linux" ]]; then
+		return 0
+	else
+		return 1
+	fi
+}
 
 # Determine whether a dataset is mounted
 #

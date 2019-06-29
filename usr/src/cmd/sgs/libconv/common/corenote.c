@@ -2479,7 +2479,7 @@ conv_cnote_fileflags(uint32_t fileflags, Conv_fmt_flags_t fmt_flags,
 		{ 0x2000,	MSG_PR_O_LARGEFILE },
 		{ 0x20000,	MSG_PR_O_NOFOLLOW },
 		{ 0x40000,	MSG_PR_O_NOLINKS },
-		{ 0, NULL },
+		{ 0, 0 },
 	};
 
 	arg.oflags = arg.rflags = fileflags;
@@ -2531,7 +2531,7 @@ conv_cnote_filemode(uint32_t mode, Conv_fmt_flags_t fmt_flags,
 		{ 0004,		MSG_S_IROTH },
 		{ 0002,		MSG_S_IWOTH },
 		{ 0001,		MSG_S_IXOTH },
-		{ 0, NULL },
+		{ 0, 0 },
 	};
 
 	arg.oflags = arg.rflags = mode & ~(0xf000);
@@ -2570,7 +2570,7 @@ conv_cnote_filemode(uint32_t mode, Conv_fmt_flags_t fmt_flags,
 		s = MSG_S_IFPORT;
 		break;
 	default:
-		s = NULL;
+		s = 0;
 		break;
 	}
 
