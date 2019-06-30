@@ -184,10 +184,11 @@ for raid in "${!sizes[@]}"; do
 	[[ $raid == "0" ]] && continue
 
 	for nd1 in "${!sizes["$raid"][@]}"; do
-		[[ $nd1 == "0" ]] && continue
+		# And with an empty array we get one key, ''.  Thanks, ksh!
+		[[ $nd1 == "0" || -z "$nd1" ]] && continue
 
 		for nd2 in "${!sizes["$raid"][@]}"; do
-			[[ $nd2 == "0" ]] && continue
+			[[ $nd2 == "0" || -z "$nd2" ]] && continue
 
 			check_vdevs "$raid" "$nd1" "$nd2"
 		done
