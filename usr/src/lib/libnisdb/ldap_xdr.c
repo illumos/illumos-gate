@@ -117,7 +117,7 @@ xdr_nis_name_abbrev(
 		tmp = buf;
 		if (!xdr_nis_name(xdrs, &tmp))
 		    return (FALSE);
-		if ((buf[0] == NULL) || buf[strlen(buf) - 1] == '.') {
+		if ((buf[0] == '\0') || buf[strlen(buf) - 1] == '.') {
 			/* It is either a FQN or a NULL string */
 			if (*namep) {
 				strcpy(*namep, buf);

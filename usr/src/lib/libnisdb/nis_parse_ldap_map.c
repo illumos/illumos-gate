@@ -211,7 +211,7 @@ add_mapping_attribute(
 					t_mapping->commentChar = *(s+1);
 				} else if (*s == SINGLE_QUOTE_CHAR &&
 					*(s+1) == SINGLE_QUOTE_CHAR) {
-					t_mapping->commentChar = NULL;
+					t_mapping->commentChar = 0;
 				} else {
 					/* anything else is an error */
 					p_error = parse_bad_yp_comment_error;

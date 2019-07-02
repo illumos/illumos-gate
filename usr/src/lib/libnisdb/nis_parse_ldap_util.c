@@ -290,8 +290,8 @@ free_table_mapping(__nis_table_mapping_t *mapping)
 		mapping->column = NULL;
 	}
 
-	if (mapping->commentChar != NULL)
-		mapping->commentChar = NULL;
+	if (mapping->commentChar != 0)
+		mapping->commentChar = 0;
 
 	if (mapping->objectDN != NULL)
 		free_object_dn(mapping->objectDN);

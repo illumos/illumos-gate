@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains routines necessary to convert a string buffer into
  * a printer object.
@@ -53,18 +51,18 @@ strncat_escaped(char *d, char *s, int len, char *escape)
 {
 	char *t = d;
 
-	while ((*t != NULL) && (len > 0))
+	while ((*t != '\0') && (len > 0))
 		len--, t++;
 
 	if (escape == NULL)
 		escape = "\\";
 
-	while ((*s != NULL) && (len > 0)) {
+	while ((*s != '\0') && (len > 0)) {
 		if (strchr(escape, *s) != NULL)
 			len--, *t++ = '\\';
 		len--, *t++ = *s++;
 	}
-	*t = NULL;
+	*t = '\0';
 
 	return (d);
 }
@@ -77,13 +75,13 @@ _cvt_printer_to_entry(ns_printer_t *printer, char *buf, int buflen)
 	int i, len;
 	int bufferok = 1;
 
-	(void) memset(buf, NULL, buflen);
+	(void) memset(buf, 0, buflen);
 
 	if ((printer == NULL) || (printer->attributes == NULL))
 		return (NULL);
 
 	if (snprintf(buf, buflen, "%s", printer->name) >= buflen) {
-		(void) memset(buf, NULL, buflen);
+		(void) memset(buf, 0, buflen);
 		syslog(LOG_ERR, "_cvt_printer_to_entry: buffer overflow");
 		return (NULL);
 	}
@@ -99,7 +97,7 @@ _cvt_printer_to_entry(ns_printer_t *printer, char *buf, int buflen)
 	}
 
 	if (strlcat(buf, ":", buflen) >= buflen) {
-		(void) memset(buf, NULL, buflen);
+		(void) memset(buf, 0, buflen);
 		syslog(LOG_ERR, "_cvt_printer_to_entry: buffer overflow");
 		return (NULL);
 	}
@@ -121,13 +119,13 @@ _cvt_printer_to_entry(ns_printer_t *printer, char *buf, int buflen)
 	}
 
 	if (!bufferok) {
-		(void) memset(buf, NULL, buflen);
+		(void) memset(buf, 0, buflen);
 		syslog(LOG_ERR, "_cvt_printer_to_entry: buffer overflow");
 		return (NULL);
 	}
 
 	if (strlen(buf) == len) {	/* there were no attributes */
-		(void) memset(buf, NULL, buflen);
+		(void) memset(buf, 0, buflen);
 		buf = NULL;
 	}
 
@@ -138,19 +136,15 @@ _cvt_printer_to_entry(ns_printer_t *printer, char *buf, int buflen)
 ns_printer_t *
 _cvt_nss_entry_to_printer(char *entry, char *ns)
 {
-	char	*name = NULL,
-		*key = NULL,
-		**aliases = NULL,
-		*cp,
-		buf[BUFSIZ];
+	char *name = NULL, *key = NULL, **aliases = NULL, *cp, buf[BUFSIZ];
 	int in_namelist = 1, buf_pos = 0;
 	ns_printer_t *printer = NULL;
 
 	if (entry == NULL)
 		return (NULL);
 
-	(void) memset(buf, NULL, sizeof (buf));
-	for (cp = entry; *cp != NULL; cp++) {
+	(void) memset(buf, 0, sizeof (buf));
+	for (cp = entry; *cp != '\0'; cp++) {
 		switch (*cp) {
 		case ':':	/* end of kvp */
 			if (in_namelist != 0) {
@@ -158,25 +152,27 @@ _cvt_nss_entry_to_printer(char *entry, char *ns)
 					name = strdup(buf);
 				else
 					aliases = (char **)list_append(
-							(void **)aliases,
-							(void *)strdup(buf));
+					    (void **)aliases,
+					    (void *)strdup(buf));
 				printer = (ns_printer_t *)ns_printer_create(
-						name, aliases, ns, NULL);
+				    name, aliases, ns, NULL);
 				in_namelist = 0;
-			} else if (key != NULL)
+			} else if (key != NULL) {
 				(void) ns_set_value_from_string(key, buf,
 				    printer);
-			(void) memset(buf, NULL, sizeof (buf));
+			}
+			(void) memset(buf, 0, sizeof (buf));
 			buf_pos = 0;
 			key = NULL;
 			break;
 		case '=':	/* kvp seperator */
 			if (key == NULL) {
 				key = strdup(buf);
-				(void) memset(buf, NULL, sizeof (buf));
+				(void) memset(buf, 0, sizeof (buf));
 				buf_pos = 0;
-			} else
+			} else {
 				buf[buf_pos++] = *cp;
+			}
 			break;
 		case '|':	/* namelist seperator */
 			if (in_namelist != 0) {
@@ -184,12 +180,14 @@ _cvt_nss_entry_to_printer(char *entry, char *ns)
 					name = strdup(buf);
 				else
 					aliases = (char **)list_append(
-							(void **)aliases,
-							(void *)strdup(buf));
-				(void) memset(buf, NULL, sizeof (buf));
+					    (void **)aliases,
+					    (void *)strdup(buf));
+				(void) memset(buf, 0, sizeof (buf));
 				buf_pos = 0;
-			} else	/* add it to the buffer */
+			} else {
+				/* add it to the buffer */
 				buf[buf_pos++] = *cp;
+			}
 			break;
 		case '\\':	/* escape char */
 			buf[buf_pos++] = *(++cp);
