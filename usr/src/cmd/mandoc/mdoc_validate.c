@@ -2378,6 +2378,11 @@ post_sh_head(POST_ARGS)
 		goodsec = "2, 3, 4, 7, 9";
 		/* FALLTHROUGH */
 	case SEC_RETURN_VALUES:
+		if (*mdoc->meta.msec == '7')
+			break;
+		if (NULL == goodsec)
+			goodsec = "2, 3, 7, 9";
+		/* FALLTHROUGH */
 	case SEC_LIBRARY:
 		if (*mdoc->meta.msec == '2')
 			break;

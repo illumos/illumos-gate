@@ -549,7 +549,7 @@ get_rmm_name(disk_t *dp, char *mname, int size)
 			struct extvtoc vtoc;
 
 			if (read_extvtoc(fd, &vtoc) >= 0) {
-				if (vtoc.v_volume[0] != NULL) {
+				if (vtoc.v_volume[0] != '\0') {
 					if (LEN_DKL_VVOL < size) {
 						(void) strlcpy(mname,
 						    vtoc.v_volume,

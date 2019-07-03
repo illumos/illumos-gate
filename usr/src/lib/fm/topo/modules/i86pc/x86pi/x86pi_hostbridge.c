@@ -106,7 +106,7 @@ pciex_process(topo_mod_t *mod, tnode_t *tn_hbr, di_node_t rcn,
 
 	if ((did = did_create(mod, rcn, topo_node_instance(tn_bb),
 	    topo_node_instance(tn_hbr), rci, TRUST_BDF)) == NULL)
-		return (NULL);
+		return (-1);
 
 	did_markrc(did);
 
@@ -241,7 +241,7 @@ x86pi_gen_hbr(topo_mod_t *mod, tnode_t *tn_bb,
 	smbios_pciexrc_t smb_rc;
 	int		i, rv, err = 0;
 	const char	*f = "x86pi_gen_hbr";
-	smbios_hdl_t 	*shp;
+	smbios_hdl_t	*shp;
 
 	shp = topo_mod_smbios(mod);
 	if (shp == NULL)

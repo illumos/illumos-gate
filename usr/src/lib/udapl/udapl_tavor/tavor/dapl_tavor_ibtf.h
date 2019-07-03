@@ -56,7 +56,7 @@ extern "C" {
 
 #define	true				B_TRUE
 #define	false				B_FALSE
-#define	IB_INVALID_HANDLE		NULL
+#define	IB_INVALID_HANDLE		0
 
 #define	DAPL_CQE_INVALID_PRMEVENT	0x1015
 #define	DAPL_CQE_VALID_PRMEVENT		0x1215

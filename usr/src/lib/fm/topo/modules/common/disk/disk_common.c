@@ -143,7 +143,7 @@ disk_set_props(topo_mod_t *mod, tnode_t *parent,
 	nvlist_t	*asru = NULL, *drive_attrs;
 	char		*label = NULL;
 	nvlist_t	*fmri = NULL;
-	dm_descriptor_t drive_descr = NULL;
+	dm_descriptor_t drive_descr = 0;
 	uint32_t	rpm;
 	int		err;
 
@@ -287,7 +287,7 @@ disk_set_props(topo_mod_t *mod, tnode_t *parent,
 
 	if (dnode->ddn_devid == NULL ||
 	    (drive_descr = dm_get_descriptor_by_name(DM_DRIVE,
-	    dnode->ddn_devid, &err)) == NULL ||
+	    dnode->ddn_devid, &err)) == 0 ||
 	    (drive_attrs = dm_get_attributes(drive_descr, &err)) == NULL)
 		goto out;
 
@@ -325,7 +325,7 @@ disk_set_props(topo_mod_t *mod, tnode_t *parent,
 	}
 
 out:
-	if (drive_descr != NULL)
+	if (drive_descr != 0)
 		dm_free_descriptor(drive_descr);
 	nvlist_free(fmri);
 	if (label)
@@ -373,7 +373,7 @@ disk_temp_reading(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 {
 	char *devid;
 	uint32_t temp;
-	dm_descriptor_t drive_descr = NULL;
+	dm_descriptor_t drive_descr = 0;
 	nvlist_t *drive_stats, *pargs, *nvl;
 	int err;
 
@@ -388,7 +388,7 @@ disk_temp_reading(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	}
 
 	if ((drive_descr = dm_get_descriptor_by_name(DM_DRIVE, devid,
-	    &err)) == NULL) {
+	    &err)) == 0) {
 		topo_mod_dprintf(mod, "failed to get drive decriptor for %s",
 		    devid);
 		return (topo_mod_seterrno(mod, EMOD_UNKNOWN));

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * A synchronized FIFO queue for inter-thread producer-consumer semantics.
  * This queue will handle multiple writers and readers simultaneously.
@@ -93,7 +91,7 @@ slp_queue_t *slp_new_queue(SLPError *err) {
 		slp_err(LOG_CRIT, 0, "slp_new_queue", "out of memory");
 		return (NULL);
 	}
-	(void) cond_init(wait, NULL, NULL);
+	(void) cond_init(wait, USYNC_THREAD, NULL);
 
 	/* create the queue */
 	if ((q = malloc(sizeof (*q))) == NULL) {

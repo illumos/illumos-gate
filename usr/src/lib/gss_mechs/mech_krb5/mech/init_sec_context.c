@@ -1681,7 +1681,7 @@ get_default_cred(OM_uint32 *minor_status, void *ct, gss_cred_id_t *cred_handle)
 	KRB5_LOG0(KRB5_INFO, "get_default_cred() start\n");
 
 	/* Get the default cred for user */
-	if (((major = kg_get_defcred(minor_status, cred_handle)) != NULL) &&
+	if (((major = kg_get_defcred(minor_status, cred_handle)) != 0) &&
 	    GSS_ERROR(major)) {
 
 		/* If we're not root we're done */

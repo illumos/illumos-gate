@@ -1240,7 +1240,7 @@ dapls_ib_mw_unbind(
 	    "mw_unbind: rmr 0x%p, enter\n", rmr);
 
 	retval = dapls_ib_mw_bind(rmr, lmr_context, ep, cookie,
-	    (DAT_VADDR)NULL, (DAT_VLEN)0, (DAT_MEM_PRIV_FLAGS)NULL,
+	    (DAT_VADDR)0, (DAT_VLEN)0, (DAT_MEM_PRIV_FLAGS)NULL,
 	    completion_flags);
 
 	dapl_dbg_log(DAPL_DBG_TYPE_UTIL,

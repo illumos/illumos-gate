@@ -1365,7 +1365,7 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 			if (err) {
 				MKERROR(LOG_WARNING, cookie->errorp,
 				    NS_CONFIG_SYNTAX,
-				    err, NULL);
+				    err, NS_LDAP_MEMORY);
 			}
 
 			free(filter_c);
@@ -2054,7 +2054,7 @@ multi_result(ns_ldap_cookie_t *cookie)
 			    gettext(ldap_err2string(cookie->err_rc)));
 			err = strdup(errstr);
 			MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, err,
-			    NULL);
+			    NS_LDAP_MEMORY);
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
 			return (LDAP_ERROR);
@@ -2124,7 +2124,7 @@ multi_result(ns_ldap_cookie_t *cookie)
 			    gettext(ldap_err2string(cookie->err_rc)));
 			err = strdup(errstr);
 			MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, err,
-			    NULL);
+			    NS_LDAP_MEMORY);
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
 			return (LDAP_ERROR);
@@ -2382,7 +2382,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			    state);
 			err = strdup(errstr);
 			MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, err,
-			    NULL);
+			    NS_LDAP_MEMORY);
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
 			cookie->new_state = EXIT;
@@ -2919,14 +2919,16 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			if (cookie->err_from_result) {
 				if (cookie->err_rc == LDAP_SERVER_DOWN) {
 					MKERROR(LOG_INFO, *errorp,
-					    cookie->err_rc, err, NULL);
+					    cookie->err_rc, err,
+					    NS_LDAP_MEMORY);
 				} else {
 					MKERROR(LOG_WARNING, *errorp,
-					    cookie->err_rc, err, NULL);
+					    cookie->err_rc, err,
+					    NS_LDAP_MEMORY);
 				}
 			} else {
 				MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL,
-				    err, NULL);
+				    err, NS_LDAP_MEMORY);
 			}
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
@@ -2950,7 +2952,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			    cookie->state);
 			err = strdup(errstr);
 			MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, err,
-			    NULL);
+			    NS_LDAP_MEMORY);
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
 			return (ERROR);
@@ -2975,7 +2977,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 	(void) sprintf(errstr,
 	    gettext("Unexpected State machine error.\n"));
 	err = strdup(errstr);
-	MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, err, NULL);
+	MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, err, NS_LDAP_MEMORY);
 	cookie->err_rc = NS_LDAP_INTERNAL;
 	cookie->errorp = *errorp;
 	return (ERROR);
@@ -3028,7 +3030,7 @@ check_shadow(ns_ldap_cookie_t *cookie, const char *service)
 			if (err == NULL)
 				return (NS_LDAP_MEMORY);
 			MKERROR(LOG_INFO, cookie->errorp, NS_LDAP_INTERNAL, err,
-			    NULL);
+			    NS_LDAP_MEMORY);
 			return (NS_LDAP_INTERNAL);
 		}
 		cookie->i_flags |= NS_LDAP_READ_SHADOW;
@@ -4110,7 +4112,7 @@ __ns_ldap_getAttr(const ns_ldap_entry_t *entry, const char *attrname)
 	if (entry == NULL)
 		return (NULL);
 	for (i = 0; i < entry->attr_count; i++) {
-		if (strcasecmp(entry->attr_pair[i]->attrname, attrname) == NULL)
+		if (strcasecmp(entry->attr_pair[i]->attrname, attrname) == 0)
 			return (entry->attr_pair[i]->attrvalue);
 	}
 	return (NULL);
@@ -4124,7 +4126,7 @@ __ns_ldap_getAttrStruct(const ns_ldap_entry_t *entry, const char *attrname)
 	if (entry == NULL)
 		return (NULL);
 	for (i = 0; i < entry->attr_count; i++) {
-		if (strcasecmp(entry->attr_pair[i]->attrname, attrname) == NULL)
+		if (strcasecmp(entry->attr_pair[i]->attrname, attrname) == 0)
 			return (entry->attr_pair[i]);
 	}
 	return (NULL);
@@ -4222,7 +4224,7 @@ __ns_ldap_uid2dn(const char *uid,
 		(void) sprintf(errstr,
 		    gettext("Too many entries are returned for %s"), uid);
 		MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, strdup(errstr),
-		    NULL);
+		    NS_LDAP_MEMORY);
 		return (NS_LDAP_INTERNAL);
 	}
 
@@ -4293,7 +4295,7 @@ __ns_ldap_dn2uid(const char *dn,
 		(void) sprintf(errstr,
 		    gettext("Too many entries are returned for %s"), dn);
 		MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, strdup(errstr),
-		    0);
+		    NS_LDAP_MEMORY);
 		rc = NS_LDAP_INTERNAL;
 		goto out;
 	}
@@ -4380,7 +4382,7 @@ __ns_ldap_host2dn(const char *host,
 		(void) sprintf(errstr,
 		    gettext("Too many entries are returned for %s"), host);
 		MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, strdup(errstr),
-		    NULL);
+		    NS_LDAP_MEMORY);
 		return (NS_LDAP_INTERNAL);
 	}
 
@@ -4566,7 +4568,7 @@ __ns_ldap_getServiceAuthMethods(const char *service,
 				gettext("Unsupported "
 				    "serviceAuthenticationMethod: %s.\n"), srv);
 				MKERROR(LOG_WARNING, *errorp, NS_CONFIG_SYNTAX,
-				    strdup(errstr), NULL);
+				    strdup(errstr), NS_LDAP_MEMORY);
 				__s_api_release_config(cfg);
 				return (NS_LDAP_CONFIG);
 			}
@@ -4668,7 +4670,7 @@ __s_api_convert_automountmapname(const char *service, char **dn,
 			"empty string.\n"));
 
 		MKERROR(LOG_ERR, *errp, NS_CONFIG_SYNTAX,
-			strdup(errstr), NULL);
+			strdup(errstr), NS_LDAP_MEMORY);
 
 		return (NS_LDAP_CONFIG);
 	}

@@ -842,9 +842,9 @@ zcmd_free_nvlists(zfs_cmd_t *zc)
 	free((void *)(uintptr_t)zc->zc_nvlist_conf);
 	free((void *)(uintptr_t)zc->zc_nvlist_src);
 	free((void *)(uintptr_t)zc->zc_nvlist_dst);
-	zc->zc_nvlist_conf = NULL;
-	zc->zc_nvlist_src = NULL;
-	zc->zc_nvlist_dst = NULL;
+	zc->zc_nvlist_conf = 0;
+	zc->zc_nvlist_src = 0;
+	zc->zc_nvlist_dst = 0;
 }
 
 static int

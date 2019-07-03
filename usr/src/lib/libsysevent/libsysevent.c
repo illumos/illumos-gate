@@ -74,7 +74,7 @@ static int cleanup_id(sysevent_handle_t *shp, uint32_t id, int type);
  */
 static sysevent_t *
 sysevent_alloc(char *class, int class_sz, char *subclass, int subclass_sz,
-	char *pub, int pub_sz, nvlist_t *attr_list)
+    char *pub, int pub_sz, nvlist_t *attr_list)
 {
 	int payload_sz;
 	int aligned_class_sz, aligned_subclass_sz, aligned_pub_sz;
@@ -150,7 +150,7 @@ sysevent_alloc(char *class, int class_sz, char *subclass, int subclass_sz,
  */
 int
 sysevent_post_event(char *class, char *subclass, char *vendor, char *pub_name,
-	nvlist_t *attr_list, sysevent_id_t *eid)
+    nvlist_t *attr_list, sysevent_id_t *eid)
 {
 	int error;
 	sysevent_t *ev;
@@ -270,7 +270,7 @@ sysevent_get_attr_list(sysevent_t *ev, nvlist_t **nvlist)
 	if ((error = nvlist_unpack(attr, attr_len, nvlist, 0)) != 0) {
 		if (error == ENOMEM) {
 			errno = error;
-		} else 	{
+		} else {
 			errno = EINVAL;
 		}
 		return (-1);
@@ -378,7 +378,7 @@ sysevent_attr_next(sysevent_t *ev, sysevent_attr_t *attr)
  */
 int
 sysevent_lookup_attr(sysevent_t *ev, char *name, int datatype,
-	sysevent_value_t *se_value)
+    sysevent_value_t *se_value)
 {
 	nvpair_t *nvp;
 	nvlist_t *nvl;
@@ -584,7 +584,7 @@ sysevent_get_size(sysevent_t *ev)
  */
 sysevent_t *
 sysevent_alloc_event(char *class, char *subclass, char *vendor, char *pub_name,
-	nvlist_t *attr_list)
+    nvlist_t *attr_list)
 {
 	int class_sz, subclass_sz, pub_sz;
 	char *pub_id;
@@ -764,7 +764,7 @@ subscriber_event_handler(sysevent_handle_t *shp)
 	sub_info = (subscriber_priv_t *)SH_PRIV_DATA(shp);
 
 	/* See hack alert in sysevent_bind_subscriber_cmn */
-	if (sub_info->sp_handler_tid == NULL)
+	if (sub_info->sp_handler_tid == 0)
 		sub_info->sp_handler_tid = thr_self();
 
 	(void) mutex_lock(&sub_info->sp_qlock);
@@ -921,7 +921,7 @@ return_from_door:
  */
 static int
 clnt_deliver_event(int service_door, void *data, size_t datalen,
-	void *result, size_t rlen)
+    void *result, size_t rlen)
 {
 	int error = 0;
 	door_arg_t door_arg;
@@ -950,7 +950,7 @@ clnt_deliver_event(int service_door, void *data, size_t datalen,
 
 static int
 update_publisher_cache(subscriber_priv_t *sub_info, int update_op,
-	uint32_t sub_id, size_t datasz, uchar_t *data)
+    uint32_t sub_id, size_t datasz, uchar_t *data)
 {
 	int pub_fd;
 	uint32_t result = 0;
@@ -988,7 +988,7 @@ update_publisher_cache(subscriber_priv_t *sub_info, int update_op,
  */
 static int
 update_kernel_registration(sysevent_handle_t *shp, int update_type,
-	int update_op, uint32_t *sub_id, size_t datasz, uchar_t *data)
+    int update_op, uint32_t *sub_id, size_t datasz, uchar_t *data)
 {
 	int error;
 	char *channel_name = SH_CHANNEL_NAME(shp);
@@ -1193,7 +1193,7 @@ cache_find_class(sysevent_handle_t *shp, char *class)
 
 static int
 cache_insert_subclass(class_lst_t *c_list, char **subclass_names,
-	int subclass_num, uint32_t sub_id)
+    int subclass_num, uint32_t sub_id)
 {
 	int i;
 	subclass_lst_t *sc_list;
@@ -1225,7 +1225,7 @@ cache_insert_subclass(class_lst_t *c_list, char **subclass_names,
 
 static int
 cache_insert_class(sysevent_handle_t *shp, char *class,
-	char **subclass_names, int subclass_num, uint32_t sub_id)
+    char **subclass_names, int subclass_num, uint32_t sub_id)
 {
 	class_lst_t *c_list;
 
@@ -1347,7 +1347,7 @@ free_cached_registration(sysevent_handle_t *shp)
 
 static int
 create_cached_registration(sysevent_handle_t *shp,
-	class_lst_t **class_hash)
+    class_lst_t **class_hash)
 {
 	int i, j, new_class;
 	char *class_name;
@@ -2095,8 +2095,8 @@ xdoor_server_setup(void *cookie)
 
 static int
 sysevent_bind_subscriber_cmn(sysevent_handle_t *shp,
-	void (*event_handler)(sysevent_t *ev),
-	sysevent_subattr_t *subattr)
+    void (*event_handler)(sysevent_t *ev),
+    sysevent_subattr_t *subattr)
 {
 	int fd = -1;
 	int error = 0;
@@ -2219,7 +2219,7 @@ sysevent_bind_subscriber_cmn(sysevent_handle_t *shp,
 
 	/* Create an event handler thread */
 	if (xsa == NULL || xsa->xs_thrcreate == NULL) {
-		created = thr_create(NULL, NULL,
+		created = thr_create(NULL, 0,
 		    (void *(*)(void *))subscriber_event_handler,
 		    shp, THR_BOUND, &sub_info->sp_handler_tid) == 0;
 	} else {
@@ -2283,7 +2283,7 @@ fail:
  */
 int
 sysevent_bind_subscriber(sysevent_handle_t *shp,
-	void (*event_handler)(sysevent_t *ev))
+    void (*event_handler)(sysevent_t *ev))
 {
 	return (sysevent_bind_subscriber_cmn(shp, event_handler, NULL));
 }
@@ -2294,7 +2294,7 @@ sysevent_bind_subscriber(sysevent_handle_t *shp,
  */
 int
 sysevent_bind_xsubscriber(sysevent_handle_t *shp,
-	void (*event_handler)(sysevent_t *ev), sysevent_subattr_t *subattr)
+    void (*event_handler)(sysevent_t *ev), sysevent_subattr_t *subattr)
 {
 	return (sysevent_bind_subscriber_cmn(shp, event_handler, subattr));
 }
@@ -2305,8 +2305,8 @@ sysevent_bind_xsubscriber(sysevent_handle_t *shp,
  */
 int
 sysevent_register_event(sysevent_handle_t *shp,
-	const char *ev_class, const char **ev_subclass,
-	int subclass_num)
+    const char *ev_class, const char **ev_subclass,
+    int subclass_num)
 {
 	int error;
 	char *event_class = (char *)ev_class;
@@ -2508,7 +2508,7 @@ sysevent_unbind_subscriber(sysevent_handle_t *shp)
 	/* Signal event handler and drain the subscriber's event queue */
 	(void) cond_signal(&sub_info->sp_cv);
 	(void) mutex_unlock(&sub_info->sp_qlock);
-	if (sub_info->sp_handler_tid != NULL)
+	if (sub_info->sp_handler_tid != 0)
 		(void) thr_join(sub_info->sp_handler_tid, NULL, NULL);
 
 	(void) cond_destroy(&sub_info->sp_cv);
@@ -2653,7 +2653,7 @@ sysevent_unbind_handle(sysevent_handle_t *shp)
  */
 int
 sysevent_subscribe_event(sysevent_handle_t *shp, const char *event_class,
-	const char **event_subclass_list, int num_subclasses)
+    const char **event_subclass_list, int num_subclasses)
 {
 	return (sysevent_register_event(shp, event_class,
 	    event_subclass_list, num_subclasses));

@@ -50,7 +50,7 @@
 
 #define	LIBRARY_PROPERTY_IMPLEMENTATION_VERSION	L"1.0.0"
 #define	LIBRARY_PROPERTY_VENDOR			L"Sun Microsystems, Inc."
-#define	OS_DEVICE_NAME 				"/devices/iscsi"
+#define	OS_DEVICE_NAME				"/devices/iscsi"
 #define	LIBRARY_FILE_NAME			L"libsun_ima.so"
 
 #define	OS_DEVICE_NAME_LEN		256
@@ -73,7 +73,7 @@
 /* OK */
 #define	DISC_ADDR_OK			0
 /* Incorrect IP address */
-#define	DISC_ADDR_INTEGRITY_ERROR   	1
+#define	DISC_ADDR_INTEGRITY_ERROR	1
 /* Error converting text IP address to numeric binary form */
 #define	DISC_ADDR_IP_CONV_ERROR		2
 
@@ -1331,7 +1331,7 @@ IMA_API IMA_STATUS IMA_AddStaticDiscoveryTarget(
 			return (IMA_ERROR_INVALID_PARAMETER);
 		}
 
-		*closeBracketPos = NULL;
+		*closeBracketPos = '\0';
 		(void) strlcpy(target_addr_str, &tmp_target_str[1],
 		    sizeof (target_addr_str));
 
@@ -1346,7 +1346,7 @@ IMA_API IMA_STATUS IMA_AddStaticDiscoveryTarget(
 		if (*closeBracketPos == ':') {
 			closeBracketPos++;
 
-			if (*closeBracketPos != NULL) {
+			if (*closeBracketPos != '\0') {
 				(void) strlcpy(target_port_str, closeBracketPos,
 				    sizeof (target_port_str));
 				target_port = atoi(target_port_str);
@@ -1367,12 +1367,12 @@ IMA_API IMA_STATUS IMA_AddStaticDiscoveryTarget(
 			(void) strlcpy(target_addr_str, tmp_target_str,
 			    sizeof (target_addr_str));
 		} else {
-			*colonPos = NULL;
+			*colonPos = '\0';
 			(void) strlcpy(target_addr_str, tmp_target_str,
 			    sizeof (target_addr_str));
 			/* Extract the port number */
 			colonPos++;
-			if (*colonPos != NULL) {
+			if (*colonPos != '\0') {
 				(void) strlcpy(target_port_str, colonPos,
 				    sizeof (target_port_str));
 				target_port = atoi(target_port_str);
@@ -1770,7 +1770,7 @@ IMA_API	IMA_STATUS IMA_LuInquiry(
 	cmdblk[4] = (buflen & 0x00ff);
 
 	(void) memset(&uscsi, 0, sizeof (iscsi_uscsi_t));
-	uscsi.iu_vers 	= ISCSI_INTERFACE_VERSION;
+	uscsi.iu_vers = ISCSI_INTERFACE_VERSION;
 
 	/* iu_oid is a session oid in the driver */
 	if (deviceId.objectType == IMA_OBJECT_TYPE_TARGET) {
@@ -1872,7 +1872,7 @@ IMA_API	IMA_STATUS IMA_LuReadCapacity(
 	}
 
 	(void) memset(&uscsi, 0, sizeof (iscsi_uscsi_t));
-	uscsi.iu_vers 	= ISCSI_INTERFACE_VERSION;
+	uscsi.iu_vers = ISCSI_INTERFACE_VERSION;
 
 	/* iu_oid is a session oid in the driver */
 	if (deviceId.objectType == IMA_OBJECT_TYPE_TARGET) {
@@ -1960,7 +1960,7 @@ IMA_API	IMA_STATUS IMA_LuReportLuns(
 	cmdblk[9] = (buflen & 0x000000ff);
 
 	(void) memset(&uscsi, 0, sizeof (iscsi_uscsi_t));
-	uscsi.iu_vers 	= ISCSI_INTERFACE_VERSION;
+	uscsi.iu_vers = ISCSI_INTERFACE_VERSION;
 
 	/* iu_oid is a session oid in the driver */
 	if (deviceId.objectType == IMA_OBJECT_TYPE_TARGET) {
@@ -2287,12 +2287,8 @@ IMA_API	IMA_STATUS IMA_SetInitiatorAuthParms(
 
 /* A helper function to obtain iSCSI node parameters. */
 static IMA_STATUS
-getISCSINodeParameter(
-    int paramType,
-    IMA_OID *oid,
-    void *pProps,
-    uint32_t paramIndex
-)
+getISCSINodeParameter(int paramType, IMA_OID *oid, void *pProps,
+    uint32_t paramIndex)
 {
 	int		    fd;
 	iscsi_param_get_t   pg;
@@ -2352,12 +2348,8 @@ getISCSINodeParameter(
 
 /* A helper function to set iSCSI node parameters. */
 static IMA_STATUS
-setISCSINodeParameter(
-    int paramType,
-    IMA_OID *oid,
-    void *pProp,
-    uint32_t paramIndex
-)
+setISCSINodeParameter(int paramType, IMA_OID *oid, void *pProp,
+    uint32_t paramIndex)
 {
 	int		    fd;
 	iscsi_param_set_t   ps;
@@ -2410,10 +2402,7 @@ setISCSINodeParameter(
 }
 
 static int
-prepare_discovery_entry(
-    IMA_TARGET_ADDRESS discoveryAddress,
-    entry_t *entry
-)
+prepare_discovery_entry(IMA_TARGET_ADDRESS discoveryAddress, entry_t *entry)
 {
 	(void) memset(entry, 0, sizeof (entry_t));
 	entry->e_vers = ISCSI_INTERFACE_VERSION;
@@ -2634,11 +2623,8 @@ static IMA_STATUS get_target_lun_oid_list(
 
 /* A helper function to set authentication method. */
 static IMA_STATUS
-setAuthMethods(
-    IMA_OID oid,
-    IMA_UINT *pMethodCount,
-    const IMA_AUTHMETHOD *pMethodList
-)
+setAuthMethods(IMA_OID oid, IMA_UINT *pMethodCount,
+    const IMA_AUTHMETHOD *pMethodList)
 {
 	int fd;
 	int i;
@@ -2682,11 +2668,7 @@ setAuthMethods(
 
 /* A helper function to get authentication method. */
 static IMA_STATUS
-getAuthMethods(
-    IMA_OID oid,
-    IMA_UINT	*pMethodCount,
-    IMA_AUTHMETHOD *pMethodList
-)
+getAuthMethods(IMA_OID oid, IMA_UINT *pMethodCount, IMA_AUTHMETHOD *pMethodList)
 {
 	int fd, i;
 	iscsi_auth_props_t auth;

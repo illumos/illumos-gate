@@ -686,7 +686,7 @@ int __ns_ldap_getSearchDescriptors(
 		(void) snprintf(errstr, sizeof (errstr),
 		    gettext("No configuration information available."));
 		MKERROR(LOG_ERR, *errorp, NS_CONFIG_NOTLOADED, strdup(errstr),
-		    NULL);
+		    NS_LDAP_MEMORY);
 		return (NS_LDAP_CONFIG);
 	}
 
@@ -763,7 +763,7 @@ int __ns_ldap_getSearchDescriptors(
 		if (*srv != COLONTOK)
 			continue;
 		srv++;
-		while (srv != NULL && *srv != NULL) {
+		while (srv != NULL && *srv != '\0') {
 			/* Process 1 */
 			rc = __s_api_parseASearchDesc(service, &srv, &ret);
 			if (rc != NS_LDAP_SUCCESS) {
@@ -774,7 +774,7 @@ int __ns_ldap_getSearchDescriptors(
 				(void) __ns_ldap_freeParam(&param);
 				param = NULL;
 				MKERROR(LOG_ERR, *errorp, NS_CONFIG_SYNTAX,
-				    strdup(errstr), NULL);
+				    strdup(errstr), NS_LDAP_MEMORY);
 				return (rc);
 			}
 			if (ret != NULL) {

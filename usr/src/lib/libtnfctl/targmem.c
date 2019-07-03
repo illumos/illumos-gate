@@ -23,8 +23,6 @@
  * Copyright (c) 1994, by Sun Microsytems, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Function to allocate memory in target process (used by combinations).
  */
@@ -49,7 +47,7 @@ _tnfctl_targmem_alloc(tnfctl_handle_t *hndl, size_t size, uintptr_t *addr_p)
 	tnf_memseg_t		memseg;
 
 	assert(hndl->memseg_p != NULL);
-	*addr_p = NULL;
+	*addr_p = 0;
 
 	/* read the memseg block from the target process */
 	miscstat = hndl->p_read(hndl->proc_p, hndl->memseg_p, &memseg,

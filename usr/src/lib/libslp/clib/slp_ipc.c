@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -118,7 +116,7 @@ static SLPError open_ipc() {
 	/* We now know slpd is reachable; start the management thread */
 	if (!ipc_thr_running) {
 		if ((terr = thr_create(
-			0, NULL,
+			0, 0,
 			(void *(*)(void *)) ipc_manage_thr,
 			NULL, 0, NULL)) != 0) {
 			slp_err(LOG_CRIT, 0, "slp_open_ipc",

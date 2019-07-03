@@ -346,7 +346,7 @@ libscsi_action_get_buffer(const libscsi_action_t *ap, uint8_t **bp,
 		if (bp != NULL)
 			*bp = NULL;
 		if (sp != NULL)
-			*sp = NULL;
+			*sp = 0;
 		if (vp != NULL)
 			*vp = 0;
 	} else {

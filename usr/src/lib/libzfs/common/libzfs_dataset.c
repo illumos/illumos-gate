@@ -2719,7 +2719,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 			/* 'legacy' or 'none' */
 			(void) strlcpy(propbuf, str, proplen);
 		}
-		zcp_check(zhp, prop, NULL, propbuf);
+		zcp_check(zhp, prop, 0, propbuf);
 		break;
 
 	case ZFS_PROP_ORIGIN:
@@ -2727,7 +2727,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 		if (str == NULL)
 			return (-1);
 		(void) strlcpy(propbuf, str, proplen);
-		zcp_check(zhp, prop, NULL, str);
+		zcp_check(zhp, prop, 0, str);
 		break;
 
 	case ZFS_PROP_CLONES:
@@ -2817,7 +2817,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 			abort();
 		}
 		(void) snprintf(propbuf, proplen, "%s", str);
-		zcp_check(zhp, prop, NULL, propbuf);
+		zcp_check(zhp, prop, 0, propbuf);
 		break;
 
 	case ZFS_PROP_MOUNTED:
@@ -2843,7 +2843,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 		 * consumers.
 		 */
 		(void) strlcpy(propbuf, zhp->zfs_name, proplen);
-		zcp_check(zhp, prop, NULL, propbuf);
+		zcp_check(zhp, prop, 0, propbuf);
 		break;
 
 	case ZFS_PROP_MLSLABEL:
@@ -2920,7 +2920,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 				return (-1);
 
 			(void) strlcpy(propbuf, str, proplen);
-			zcp_check(zhp, prop, NULL, str);
+			zcp_check(zhp, prop, 0, str);
 			break;
 
 		case PROP_TYPE_INDEX:
@@ -2931,7 +2931,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 				return (-1);
 
 			(void) strlcpy(propbuf, strval, proplen);
-			zcp_check(zhp, prop, NULL, strval);
+			zcp_check(zhp, prop, 0, strval);
 			break;
 
 		default:

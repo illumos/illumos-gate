@@ -608,7 +608,7 @@ ses_contract_thread(void *arg)
 				(void) snprintf(buf, sizeof (buf),
 				    "abandon old contract %d", stp->set_ctid);
 				ses_ct_print(buf);
-				stp->set_ctid = NULL;
+				stp->set_ctid = 0;
 			}
 			(void) ct_ctl_abandon(ctlfd);
 		}
@@ -730,7 +730,7 @@ ses_create_contract(topo_mod_t *mod, ses_enum_target_t *stp)
 	int tfd, len, rval;
 	char link_path[PATH_MAX];
 
-	stp->set_ctid = NULL;
+	stp->set_ctid = 0;
 
 	/* convert "/dev" path into "/devices" path */
 	if ((len = readlink(stp->set_devpath, link_path, PATH_MAX)) < 0) {
@@ -777,7 +777,7 @@ ses_target_free(topo_mod_t *mod, ses_enum_target_t *stp)
 			ctlfd = open64(path, O_WRONLY);
 			(void) ct_ctl_abandon(ctlfd);
 			(void) close(ctlfd);
-			stp->set_ctid = NULL;
+			stp->set_ctid = 0;
 		}
 		(void) pthread_mutex_unlock(&stp->set_lock);
 		ses_ssl_free(mod, stp);
@@ -967,7 +967,7 @@ ses_node_lock(topo_mod_t *mod, tnode_t *tn)
 		 * contract (ie we've had the offline event but not yet the
 		 * negend). If so, just return failure.
 		 */
-		if (tp->set_ctid != NULL) {
+		if (tp->set_ctid != 0) {
 			(void) topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP);
 			(void) pthread_mutex_unlock(&tp->set_lock);
 			return (NULL);
@@ -1927,13 +1927,13 @@ ses_create_esc_sasspecific(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 	topo_mod_t *mod = sdp->sed_mod;
 	tnode_t	*exptn, *contn;
 	boolean_t found;
-	sas_connector_phy_data_t connectors[64] = {NULL};
+	sas_connector_phy_data_t connectors[64] = {0};
 	uint64_t max;
 	ses_enum_node_t *ctlsnp, *xsnp, *consnp;
 	ses_node_t *np = snp->sen_node;
 	nvlist_t *props, *psprops;
 	uint64_t index, psindex, conindex, psstatus, i, j, count;
-	int64_t cidxlist[256] = {NULL};
+	int64_t cidxlist[256] = {0};
 	int phycount;
 
 	props = ses_node_props(np);

@@ -71,7 +71,7 @@ do_devctl_dev_create(apid_t *apidt, char *dev_path, int pathlen,
 	char		*drvr_name = "dummy";
 	la_wwn_t	pwwn;
 
-	*dev_path = NULL;
+	*dev_path = '\0';
 	if ((ddef_hdl = devctl_ddef_alloc(drvr_name, 0)) == NULL) {
 		cfga_err(errstring, errno, ERRARG_DC_DDEF_ALLOC, drvr_name, 0);
 		return (FPCFGA_LIB_ERR);

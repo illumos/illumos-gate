@@ -530,7 +530,7 @@ setup_for_devctl_cmd(const char *ap_id, devctl_hdl_t *devctl_hdl,
 	}
 
 	/* Set up to pass port number down to driver */
-	if (nvlist_alloc(user_nvlistp, NV_UNIQUE_NAME_TYPE, NULL) != 0) {
+	if (nvlist_alloc(user_nvlistp, NV_UNIQUE_NAME_TYPE, 0) != 0) {
 		DPRINTF("setup_for_devctl: nvlist_alloc failed, errno: %d\n",
 		    errno);
 		*user_nvlistp = NULL;	/* Prevent possible incorrect free in */
@@ -803,7 +803,7 @@ set_configuration(const char *ap_id, uint_t config, char *driver,
 	}
 
 	/* Notify hubd that it needs to refresh its db.  */
-	if ((rv = do_control_ioctl(ap_id, HUBD_REFRESH_DEVDB, NULL,
+	if ((rv = do_control_ioctl(ap_id, HUBD_REFRESH_DEVDB, 0,
 	    (void **)&dev_path, &size)) != CFGA_USB_OK) {
 		DPRINTF("set_configuration: HUBD_REFRESH_DEVDB failed\n");
 		goto bailout;
@@ -832,7 +832,7 @@ get_config(const char *ap_id, uint_t *config)
 	uint_t		*config_val = NULL;
 	cfga_usb_ret_t	rv;
 
-	if ((rv = do_control_ioctl(ap_id, HUBD_GET_CURRENT_CONFIG, NULL,
+	if ((rv = do_control_ioctl(ap_id, HUBD_GET_CURRENT_CONFIG, 0,
 	    (void **)&config_val, &size)) != CFGA_USB_OK) {
 		DPRINTF("get_config: get current config descr failed\n");
 		goto bailout;
@@ -901,7 +901,7 @@ fill_in_ap_info(const char *ap_id, char *info_buf, size_t info_size)
 
 	DPRINTF("fill_in_ap_info:\n");
 
-	if ((rv = do_control_ioctl(ap_id, USB_DESCR_TYPE_DEV, NULL,
+	if ((rv = do_control_ioctl(ap_id, USB_DESCR_TYPE_DEV, 0,
 	    (void **)&dev_descrp, &size)) != CFGA_USB_OK) {
 		DPRINTF("fill_in_ap_info: get dev descr failed\n");
 		return (rv);
@@ -1383,7 +1383,7 @@ cfga_private_func(
 		/*
 		 * Check that the option setting selected is in range.
 		 */
-		if ((rv = do_control_ioctl(ap_id, USB_DESCR_TYPE_DEV, NULL,
+		if ((rv = do_control_ioctl(ap_id, USB_DESCR_TYPE_DEV, 0,
 		    (void **)&dev_descrp, &size)) != CFGA_USB_OK) {
 			DPRINTF("cfga_private_func: get dev descr failed\n");
 			goto bailout;
@@ -1593,7 +1593,7 @@ cfga_list_ext(
 	(*ap_id_list)->ap_class[0] = '\0';	/* Filled by libcfgadm */
 	(*ap_id_list)->ap_busy = devctl_ap_state.ap_in_transition;
 	(*ap_id_list)->ap_status_time = devctl_ap_state.ap_last_change;
-	(*ap_id_list)->ap_info[0] = NULL;
+	(*ap_id_list)->ap_info[0] = '\0';
 
 	if ((*ap_id_list)->ap_r_state == CFGA_STAT_CONNECTED) {
 		char *str_p;
@@ -1607,7 +1607,7 @@ cfga_list_ext(
 		}
 
 		/* Fill in ap_type */
-		if ((rv = do_control_ioctl(ap_id, HUBD_GET_CFGADM_NAME, NULL,
+		if ((rv = do_control_ioctl(ap_id, HUBD_GET_CFGADM_NAME, 0,
 		    (void **)&str_p, &size)) != CFGA_USB_OK) {
 			DPRINTF("cfga_list_ext: do_control_ioctl failed\n");
 			goto bailout;
@@ -1725,7 +1725,7 @@ usb_get_devicepath(const char *ap_id)
 	size_t		size;
 	cfga_usb_ret_t	rv;
 
-	rv = do_control_ioctl(ap_id, HUBD_GET_DEVICE_PATH, NULL,
+	rv = do_control_ioctl(ap_id, HUBD_GET_DEVICE_PATH, 0,
 	    (void **)&devpath, &size);
 
 	if (rv == CFGA_USB_OK) {
@@ -1733,6 +1733,6 @@ usb_get_devicepath(const char *ap_id)
 		return (devpath);
 	} else {
 		DPRINTF("usb_get_devicepath: get device path ioctl failed\n");
-		return ((char *)NULL);
+		return (NULL);
 	}
 }

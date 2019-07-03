@@ -1912,7 +1912,7 @@ da_remove_list(devlist_t *dlist, char *link, int type, char *devname, int size)
 	struct stat	rmstat;
 	deventry_t	*dentry, *current, *prev;
 
-	if (type != NULL)
+	if (type != 0)
 		flag = type;
 	else if (link == NULL)
 		return (-1);
@@ -1949,7 +1949,7 @@ da_remove_list(devlist_t *dlist, char *link, int type, char *devname, int size)
 		return (-1);
 	}
 
-	if ((type != NULL) && (link == NULL)) {
+	if ((type != 0) && (link == NULL)) {
 		for (current = dentry, prev = dentry; current != NULL;
 		    current = current->next) {
 			oldlist = strdup(current->devinfo.devlist);

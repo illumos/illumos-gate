@@ -72,7 +72,7 @@ krb5_get_as_key_keytab(
     /* Solaris Kerberos */
     if ((ret = krb5_kt_get_entry(context, keytab, client,
 				 0, /* don't have vno available */
-				 etype, &kt_ent)) != NULL)
+				 etype, &kt_ent)) != 0)
 	return(ret);
 
     ret = krb5_copy_keyblock(context, &kt_ent.key, &kt_key);

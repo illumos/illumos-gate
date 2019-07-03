@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Module for all network transactions. SLP messages can be multicast,
  * unicast over UDP, or unicast over TCP; this module provides routines
@@ -136,7 +134,7 @@ void slp_uc_tcp_send(slp_handle_impl_t *hp, slp_target_t *target,
 				"out of memory");
 			return;
 		}
-		(void) mutex_init(hp->tcp_lock, NULL, NULL);
+		(void) mutex_init(hp->tcp_lock, USYNC_THREAD, NULL);
 	}
 	if (!hp->tcp_wait) {
 		if (!(hp->tcp_wait = malloc(sizeof (*(hp->tcp_wait))))) {
@@ -144,7 +142,7 @@ void slp_uc_tcp_send(slp_handle_impl_t *hp, slp_target_t *target,
 				"out of memory");
 			return;
 		}
-		(void) cond_init(hp->tcp_wait, NULL, NULL);
+		(void) cond_init(hp->tcp_wait, USYNC_THREAD, NULL);
 	}
 	(void) mutex_lock(hp->tcp_lock);
 	(hp->tcp_ref_cnt)++;
@@ -421,7 +419,7 @@ static SLPError start_tcp_thr() {
 	}
 
 	/* start the tcp thread */
-	if ((terr = thr_create(0, NULL, (void *(*)(void *)) tcp_thread,
+	if ((terr = thr_create(0, 0, (void *(*)(void *)) tcp_thread,
 				NULL, 0, NULL)) != 0) {
 	    slp_err(LOG_CRIT, 0, "start_tcp_thr",
 		    "could not start thread: %s", strerror(terr));

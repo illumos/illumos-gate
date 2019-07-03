@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
@@ -133,7 +131,7 @@ getdadmline(char *buff, int len, FILE *stream)
 
 	do {
 		cp = buff;
-		*cp = NULL;
+		*cp = '\0';
 		do {
 			contline = 0;
 			if (fgets(cp, len - charcnt, stream) == NULL) {
@@ -148,7 +146,7 @@ getdadmline(char *buff, int len, FILE *stream)
 				}
 				else
 					contline = 0;
-				*ccp = NULL;
+				*ccp = '\0';
 			}
 			tmpcnt = strlen(cp);
 			cp += tmpcnt;
@@ -156,7 +154,7 @@ getdadmline(char *buff, int len, FILE *stream)
 		} while ((contline) || (charcnt == 0));
 		ccp = strpbrk(buff, "#");
 		if (ccp != NULL)
-			*ccp = NULL;
+			*ccp = '\0';
 		charcnt = strlen(buff);
 	} while ((fileerr == 0) && (charcnt == 0));
 

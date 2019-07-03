@@ -128,7 +128,7 @@ _tnfctl_comb_build(tnfctl_handle_t *hndl, comb_op_t op,
 {
 	tnfctl_errcode_t	prexstat;
 
-	*comb_p = NULL;
+	*comb_p = 0;
 
 	DBG_TNF_PROBE_0(_tnfctl_comb_build_start, "libtnfctl",
 	    "start _tnfctl_comb_build; sunw%verbosity 1");
@@ -289,7 +289,7 @@ decode(tnfctl_handle_t *hndl, uintptr_t addr, char ***func_names,
 			goto Error;
 		}
 		new_p->name_ptrs[0] = NULL;
-		new_p->func_addrs[0] = NULL;
+		new_p->func_addrs[0] = 0;
 	}
 
 	DBG_TNF_PROBE_1(decode_3, "libtnfctl",
@@ -482,7 +482,7 @@ find(tnfctl_handle_t *hndl, comb_op_t op, uintptr_t down, uintptr_t next,
 	key.op = op;
 	key.down = down;
 	key.next = next;
-	key.comb = NULL;
+	key.comb = 0;
 
 	find_pp = (comb_key_t **)tfind(&key, &hndl->buildroot, comb_compare);
 	if (find_pp) {
@@ -572,7 +572,7 @@ build(tnfctl_handle_t *hndl, comb_op_t op, uintptr_t down, uintptr_t next,
 	int		miscstat;
 	tnfctl_errcode_t	prexstat;
 
-	*comb_p = NULL;
+	*comb_p = 0;
 	size = calltmpl[op].end - calltmpl[op].entry;
 
 	/* allocate memory in the target process */

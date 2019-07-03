@@ -3087,7 +3087,7 @@ init_ldata_for_accessible_FCP_dev(
 			S_FREE(inq_buf);
 			continue;
 		}
-		*dtype = NULL;
+		*dtype = '\0';
 		for (j = 0; j < N_DEVICE_TYPES; j++) {
 		    if ((inq_buf->inq_dtype & DTYPE_MASK)
 				== device_list[j].itype) {
@@ -3096,7 +3096,7 @@ init_ldata_for_accessible_FCP_dev(
 			break;
 		    }
 		}
-		if (*dtype == NULL) {
+		if (*dtype == '\0') {
 			(void) strlcpy(dtype,
 				(char *)device_list[DTYPE_UNKNOWN_INDEX].name,
 				CFGA_TYPE_LEN);

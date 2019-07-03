@@ -3548,7 +3548,7 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 	    DMU_BACKUP_FEATURE_RAW;
 	boolean_t embedded = DMU_GET_FEATUREFLAGS(drrb->drr_versioninfo) &
 	    DMU_BACKUP_FEATURE_EMBED_DATA;
-	stream_wantsnewfs = (drrb->drr_fromguid == NULL ||
+	stream_wantsnewfs = (drrb->drr_fromguid == 0 ||
 	    (drrb->drr_flags & DRR_FLAG_CLONE) || originsnap) && !resuming;
 
 	if (stream_wantsnewfs) {

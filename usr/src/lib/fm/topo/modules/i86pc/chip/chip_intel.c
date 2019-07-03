@@ -429,7 +429,7 @@ mc_nb_create(topo_mod_t *mod, uint16_t chip_smbid, tnode_t *pnode,
 		}
 	}
 
-	return (NULL);
+	return (0);
 }
 
 int
@@ -451,7 +451,7 @@ mc_node_create(topo_mod_t *mod, uint16_t chip_smbid, tnode_t *pnode,
 
 		free(buf);
 		(void) close(mc_fd);
-		return (NULL);
+		return (0);
 	}
 	(void) close(mc_fd);
 	(void) nvlist_unpack(buf, mcs.mcs_size, &nvl, 0);
@@ -460,11 +460,11 @@ mc_node_create(topo_mod_t *mod, uint16_t chip_smbid, tnode_t *pnode,
 	if (nvlist_lookup_uint8(nvl, MCINTEL_NVLIST_VERSTR, &ver) != 0) {
 		whinge(mod, NULL, "mc nvlist is not versioned\n");
 		nvlist_free(nvl);
-		return (NULL);
+		return (0);
 	} else if (ver != MCINTEL_NVLIST_VERS0) {
 		whinge(mod, NULL, "mc nvlist version mismatch\n");
 		nvlist_free(nvl);
-		return (NULL);
+		return (0);
 	}
 
 	rc = mc_nb_create(mod, chip_smbid, pnode, name, auth, nvl);

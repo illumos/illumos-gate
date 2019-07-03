@@ -26,8 +26,6 @@
 #ifndef	_POOL_INTERNAL_H
 #define	_POOL_INTERNAL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libnvpair.h>
 #include <stdarg.h>
 #include <sys/pool.h>
@@ -137,7 +135,7 @@ typedef struct char_buf
  * Initialize a pool_value_t
  */
 #define	POOL_VALUE_INITIALIZER	/* = DEFAULT POOL VALUE */	\
-	{POC_INVAL, NULL, NULL }
+	{POC_INVAL, NULL, 0 }
 
 struct pool_value {
 	pool_value_class_t	pv_class;		/* Value type */
@@ -254,7 +252,7 @@ extern int		resource_get_pinned(const pool_resource_t *,
  */
 extern char		*elem_get_name(const pool_elem_t *);
 extern id_t		elem_get_sysid(const pool_elem_t *);
-extern int    		elem_is_default(const pool_elem_t *);
+extern int		elem_is_default(const pool_elem_t *);
 extern boolean_t	elem_is_tmp(const pool_elem_t *);
 extern const pool_elem_t *get_default_elem(const pool_elem_t *);
 extern int		qsort_elem_compare(const void *, const void *);
@@ -341,7 +339,7 @@ extern int		append_char_buf(char_buf_t *, const char *, ...);
  * Internal functions for use with pool values.
  */
 extern int		pool_value_equal(pool_value_t *, pool_value_t *);
-extern int 		pool_value_from_nvpair(pool_value_t *, nvpair_t *);
+extern int		pool_value_from_nvpair(pool_value_t *, nvpair_t *);
 
 /*
  * Check to ensure that the supplied string is a valid name for a pool
@@ -398,11 +396,11 @@ extern int		pool_knl_update(pool_conf_t *, int *);
 /*
  * Resource property functions
  */
-extern int    		resource_is_default(const pool_resource_t *);
-extern int    		resource_is_system(const pool_resource_t *);
-extern int    		resource_can_associate(const pool_resource_t *);
+extern int		resource_is_default(const pool_resource_t *);
+extern int		resource_is_system(const pool_resource_t *);
+extern int		resource_can_associate(const pool_resource_t *);
 extern const pool_resource_t	*get_default_resource(const pool_resource_t *);
-extern pool_resource_t 	*resource_by_sysid(const pool_conf_t *, id_t,
+extern pool_resource_t	*resource_by_sysid(const pool_conf_t *, id_t,
     const char *);
 
 /*

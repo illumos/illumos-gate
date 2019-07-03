@@ -23,8 +23,6 @@
  * Copyright (c) 1994, by Sun Microsytems, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Interfaces for searching for elf specific information
  */
@@ -87,7 +85,7 @@ _tnfctl_elf_dbgent(tnfctl_handle_t *hndl, uintptr_t * entaddr_p)
 	Elf3264_Dyn	*dynam_tab = NULL;
 	long		dynam_tab_size;
 
-	*entaddr_p = NULL;
+	*entaddr_p = 0;
 
 	prbstat = prb_mainobj_get(hndl->proc_p, &objfd, &baseaddr);
 	if (prbstat)

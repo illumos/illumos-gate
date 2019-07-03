@@ -23,8 +23,6 @@
  * Copyright (c) 1994, by Sun Microsytems, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Generic functions that know how to traverse elf sections in an object.
  * Also functions that know how to traverse records in a section.
@@ -90,7 +88,7 @@ _tnfctl_traverse_object(int objfd, uintptr_t addr,
 	if (ehdr->e_type == ET_EXEC)
 		addr = 0;
 	/* get a pointer to the elf header string table */
-	strs = elf_strptr(elf, ehdr->e_shstrndx, NULL);
+	strs = elf_strptr(elf, ehdr->e_shstrndx, 0);
 
 	DBG_TNF_PROBE_1(_tnfctl_traverse_object_3, "libtnfctl",
 			"sunw%verbosity 3",
