@@ -3754,7 +3754,6 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		}
 
 		newfs = B_TRUE;
-		*cp = '/';
 	}
 
 	zc.zc_begin_record = *drr_noswap;
