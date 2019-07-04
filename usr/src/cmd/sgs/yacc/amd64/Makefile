@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 # This Makefile is only to produce 64-bit yacc shared library liby.so.1
 # and not for building 64-bit yacc itself.
@@ -39,7 +37,7 @@ POFILE=
 
 all_lib: $(LIBS)
 
-install_lib: all_lib $(ROOTLIBS64) $(ROOTLINKS64)
+install_lib: all_lib $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTCOMPATLINKS64)
 
 include ../Makefile.targ
 include ../../../Makefile.targ

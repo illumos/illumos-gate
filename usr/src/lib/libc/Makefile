@@ -45,6 +45,7 @@ ROOTVARIANTDIR64=	$(ROOTLIB64)/libc
 
 # include common library definitions
 include ../Makefile.lib
+include ../Makefile.rootfs
 
 #
 # on some architectures, we build multiple libc variants
@@ -92,7 +93,7 @@ $(BUILD64)SUBDIRS += $(MACH64) $(VARIANT_SUBDIRS64)
 
 LIBS =		$(DYNLIB)
 
-ROOTLIBS64=	$(ROOTLIBDIR64)/$(DYNLIB)
+ROOTLIBS64=	$(ROOTLIB64)/$(DYNLIB)
 MACHLIBS64=	$(MACH64)/$(DYNLIB)
 VARIANTLIBS=	$(VARIANTS:%=$(MACH)_%/$(VARBLD)/$(LIBBASENAME)_%.so.1)
 VARIANTLIBS64=	$(VARIANTS64:%=$(MACH)_%/$(VARBLD64)/$(LIBBASENAME)_%.so.1)
@@ -110,8 +111,8 @@ CLOBBERFILES += THIRDPARTYLICENSE extract-copyright
 $(ROOTHDRDIR)/%: port/gen/%
 	$(INS.file)
 
-$(ROOTLIBDIR)/$(DYNLIB)	:=	FILEMODE = 755
-$(ROOTLIBDIR64)/$(DYNLIB) :=	FILEMODE = 755
+$(ROOTLIB)/$(DYNLIB)	:=	FILEMODE = 755
+$(ROOTLIB64)/$(DYNLIB) :=	FILEMODE = 755
 $(ROOTFS_LIBDIR)/$(DYNLIB)	:=	FILEMODE = 755
 $(ROOTFS_LIBDIR64)/$(DYNLIB)	:=	FILEMODE = 755
 
@@ -165,7 +166,9 @@ $($(MACH)_COMP): FRC
 install:	all			\
 		etc			\
 		inslib32		\
-		$(BUILD64) inslib64
+		$(ROOTCOMPATLINKS)
+
+$(BUILD64)install: inslib64 $(ROOTCOMPATLINKS64)
 
 inslib32:	$(ROOTFS_LIBS) $(ROOTFS_LINKS) $(ROOTVARIANTLIBS)
 
@@ -176,15 +179,6 @@ install_h: all_h $(ROOTHDRS)
 all_h:	$(MACH)/assym.h $(MACH64)/assym.h
 
 check:	$(CHECKHDRS)
-
-$(ROOTFS_LIB)/%: $(MACH)/%
-	$(INS.file)
-$(ROOTFS_LIBDIR)/$(LIBLINKS): $(ROOTFS_LIBDIR)/$(LIBLINKS)$(VERS)
-	$(INS.liblink)
-$(ROOTFS_LIB64)/%: $(MACH64)/%
-	$(INS.file)
-$(ROOTFS_LIBDIR64)/$(LIBLINKS): $(ROOTFS_LIBDIR64)/$(LIBLINKS)$(VERS)
-	$(INS.liblink)
 
 $(ROOTVARIANTDIR): $(ROOTLIB)
 	$(INS.dir)
@@ -233,5 +227,6 @@ cscope.out tags: FRC
 	$(XREF) -x $@
 
 FRC:
+
 # include MACH-specific library targets
 include ../Makefile.mach

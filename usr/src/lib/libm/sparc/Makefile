@@ -18,6 +18,6 @@ include ../Makefile.com
 
 CHIP		= ultra
 
-install:	all $(ROOTLIBS) $(ROOTLINKS)
+install:	all $(ROOTLIBS) $(ROOTLINKS) $(ROOTCOMPATLINKS)
 
 include ../Makefile.targ

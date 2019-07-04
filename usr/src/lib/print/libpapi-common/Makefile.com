@@ -29,9 +29,6 @@ VERS =			.0
 OBJECTS = attribute.o common.o library.o list.o misc.o status.o uri.o
 
 include ../../../Makefile.lib
-include ../../../Makefile.rootfs
-
-ROOTLIBDIR=	$(ROOT)/usr/lib
 
 SRCDIR =	../common
 

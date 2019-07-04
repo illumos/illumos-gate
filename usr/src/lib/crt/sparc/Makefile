@@ -26,4 +26,4 @@
 
 include ../Makefile.com
 
-install:	$(ROOTOBJECTS)
+install:	$(ROOTOBJECTS) $(ROOTCOMPATLINKS)

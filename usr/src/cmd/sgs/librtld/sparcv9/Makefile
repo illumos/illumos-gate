@@ -30,12 +30,9 @@ CPPFLAGS +=	-I../../../../uts/sparc/krtld
 
 .KEEP_STATE:
 
-ROOTFS_DYNLIB64 =	$(DYNLIB:%=$(ROOTFS_LIBDIR64)/%)
-$(ROOTFS_DYNLIB64) :=	FILEMODE=755
-
 all:		$(DYNLIB) $(LIBLINKS)
 
-install:	all $(ROOTFS_DYNLIB64)
+install:	all $(ROOTLIBS64) $(ROOTCOMPATLINKS64)
 
 CPPFLAGS +=	-D_ELF64
 

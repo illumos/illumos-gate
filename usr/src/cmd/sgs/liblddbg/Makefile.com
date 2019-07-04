@@ -53,7 +53,13 @@ OBJECTS =	$(BLTOBJ) $(COMOBJS) $(COMOBJS32) $(COMOBJS64) $(SGSCOMMONOBJ)
 
 
 include		$(SRC)/lib/Makefile.lib
+include		$(SRC)/lib/Makefile.rootfs
 include		$(SRC)/cmd/sgs/Makefile.com
+
+LIBS =		$(DYNLIB)
+
+COMPATLINKS =	usr/lib/$(DYNLIB)
+COMPATLINKS64 =	usr/lib/$(MACH64)/$(DYNLIB)
 
 SRCDIR =	$(SGSHOME)/liblddbg
 MAPFILEDIR =	$(SRCDIR)/common
@@ -85,4 +91,3 @@ LIBSRCS =	$(COMOBJS:%.o=$(SRCDIR)/common/%.c) \
 CLEANFILES +=	$(BLTFILES)
 CLOBBERFILES +=	$(DYNLIB) $(LIBLINKS)
 
-ROOTFS_DYNLIB =	$(DYNLIB:%=$(ROOTFS_LIBDIR)/%)

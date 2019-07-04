@@ -20,6 +20,6 @@ include $(SRC)/lib/Makefile.lib.64
 
 CHIP		= ultra
 
-install: 	all $(ROOTLIBS64) $(ROOTLINKS64)
+install:	all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTCOMPATLINKS64)
 
 include ../Makefile.targ

@@ -38,7 +38,7 @@ include		../Makefile.com
 
 all:		$(LIBS)
 
-install:	all $(ROOTLIBS) $(ROOTLINKS)
+install:	all $(ROOTLIBS) $(ROOTLINKS) $(ROOTCOMPATLINKS)
 
 
 include		../Makefile.targ

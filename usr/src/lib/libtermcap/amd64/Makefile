@@ -14,9 +14,9 @@
 #
 
 include		$(SRC)/lib/Makefile.filter.com
-include		../Makefile.com
 include		$(SRC)/lib/Makefile.lib.64
+include		../Makefile.com
 
-install:	$(ROOTLIBS64) $(ROOTLINKS64)
+install:	$(ROOTLIBS64) $(ROOTLINKS64) $(ROOTCOMPATLINKS64)
 
 include		$(SRC)/lib/Makefile.filter.targ

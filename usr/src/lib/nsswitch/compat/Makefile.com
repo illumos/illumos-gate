@@ -23,9 +23,6 @@
 # Copyright 1993,2001-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/nsswitch/compat/Makefile.com
 
 LIBRARY =	libnss_compat.a
 VERS =		.1
@@ -43,5 +40,14 @@ include		../../Makefile.com
 # install this library in the root filesystem
 include ../../../Makefile.rootfs
 
-LDLIBS +=	-lnsl
 DYNLIB1 =	nss_compat.so$(VERS)
+
+COMPATLINKS=	usr/lib/$(DYNLIB1)
+COMPATLINKS64=	usr/lib/$(MACH64)/$(DYNLIB1)
+
+$(ROOT)/usr/lib/$(DYNLIB1) := COMPATLINKTARGET=../../lib/$(DYNLIB1)
+$(ROOT)/usr/lib/$(MACH64)/$(DYNLIB1):= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/$(DYNLIB1)
+
+LDLIBS +=	-lnsl
+

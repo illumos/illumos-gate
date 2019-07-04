@@ -26,4 +26,5 @@ include ../Makefile.com
 
 .KEEP_STATE:
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(DYNLINKLIB)
+install: all $(ROOTLIBS) $(ROOTLINKS) $(DYNLINKLIB) \
+	$(ROOTCOMPATLINKS)

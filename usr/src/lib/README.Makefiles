@@ -436,6 +436,19 @@ The third section typically consists of the following macros:
 	   necessary, and it should only contain optimization-related
 	   settings (or -g).
 
+	COMPATLINKS (if necessary)
+
+	  Set to a list of symbolic links that should also be provided for
+	  this library.  Each should also have a target-specific assignment to
+	  COMPATLINKTARGET stating what the target of each link should be
+
+          COMPATLINKS= usr/lib/libfoo.so
+          $(ROOT)/usr/lib/libfoo.so := COMPATLINKTARGET= libbar.so
+
+	COMPATLINKS64 (if necessary)
+
+          As COMPATLINKS, above, for 64bit objects.
+
 Of course, you may use other macros as necessary.
 
 The fourth section typically consists of the following targets:
@@ -538,6 +551,10 @@ Makefiles for libinetutil:
 		include ../../Makefile.lib.64
 
 		install: all $(ROOTLIBS64) $(ROOTLINKS64)
+
+If you included Makefile.rootfs to install your library into /lib, you should
+also add $(ROOTCOMPATLINKS) and $(ROOTCOMPATLINKS64) to your install: target
+to install compatibility symlinks into /usr/lib.
 
 Observe that there is no .KEEP_STATE directive in these Makefiles, since all
 of these Makefiles include libinetutil/Makefile.com, and it already has a

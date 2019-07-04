@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 
 include ../Makefile.com
@@ -32,4 +32,4 @@ DYNFLAGS += $(DYNFLAGS64)
 
 .KEEP_STATE:
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64)
+install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTCOMPATLINKS64)

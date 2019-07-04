@@ -26,6 +26,6 @@
 include		$(SRC)/lib/Makefile.filter.com
 include		../Makefile.com
 
-install:	all $(ROOTLIBDIR) .WAIT $(ROOTLIBS) $(ROOTLINKS)
+install:	all $(ROOTLIBDIR) .WAIT $(ROOTLIBS) $(ROOTLINKS) $(ROOTCOMPATLINKS)
 
 include		$(SRC)/lib/Makefile.filter.targ

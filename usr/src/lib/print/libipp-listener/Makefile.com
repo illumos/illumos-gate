@@ -36,11 +36,8 @@ OBJECTS = \
 	set-printer-attributes.o validate-job.o
 
 include ../../../Makefile.lib
-include ../../../Makefile.rootfs
 
 SRCDIR =	../common
-
-ROOTLIBDIR=	$(ROOT)/usr/lib
 
 LIBS =			$(DYNLIB)
 

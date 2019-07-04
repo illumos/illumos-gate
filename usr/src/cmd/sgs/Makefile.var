@@ -132,11 +132,6 @@ VAR_LIBLD_64_ROOTFS_LIBDIR=	$(ROOT)/lib/$(MACH64)
 VAR_TOOLS_CPPFLAGS=		$(VAR_AVLINCDIR)
 
 #
-# liblddbg
-#
-VAR_LIBLDDBG_64_ROOTFS_LIBDIR=	$(ROOT)/lib/$(MACH64)
-
-#
 # rtld
 #
 VAR_RTLD_CPICLIB=	-L ../../../../lib/libc/$(MACH)

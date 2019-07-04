@@ -34,6 +34,9 @@ include ../../Makefile.lib
 # install this library in the root filesystem
 include ../../Makefile.rootfs
 
+COMPATLINKS += usr/lib/libmp.so.1
+$(ROOT)/usr/lib/libmp.so.1 := COMPATLINKTARGET=../../lib/libmp.so.1
+
 SRCDIR =	../common
 
 OMAPFILE =	../common/mapfile_1-vers

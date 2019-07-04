@@ -29,11 +29,8 @@ VERS =			.0
 OBJECTS = ipp.o ipp_types.o read.o strings.o write.o
 
 include ../../../Makefile.lib
-include ../../../Makefile.rootfs
 
 SRCDIR =	../common
-
-ROOTLIBDIR=	$(ROOT)/usr/lib
 
 LIBS =			$(DYNLIB)
 

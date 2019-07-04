@@ -31,11 +31,8 @@ OBJECTS = \
 	ns_cmn_printer.o nss_convert.o nss_ldap.o nss_printer.o nss_write.o
 
 include ../../../Makefile.lib
-include ../../../Makefile.rootfs
 
 SRCDIR =	../common
-
-ROOTLIBDIR=	$(ROOT)/usr/lib
 
 LIBS =			$(DYNLIB)
 

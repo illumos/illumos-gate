@@ -33,4 +33,4 @@ LIBS = $(DYNLIB)
 
 all: $(LIBS)
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64)
+install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTCOMPATLINKS64)

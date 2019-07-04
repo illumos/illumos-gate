@@ -73,6 +73,13 @@ LDLIBS +=       -lcurses -lc
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 
+COMPATLINKS=	usr/ccs/lib/libmenu.so
+COMPATLINKS64=	usr/ccs/lib/$(MACH64)/libmenu.so
+
+$(ROOT)/usr/ccs/lib/libmenu.so := COMPATLINKTARGET= ../../lib/libmenu.so.1
+$(ROOT)/usr/ccs/lib/$(MACH64)/libmenu.so:= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/libmenu.so.1
+
 .KEEP_STATE:
 
 all: $(LIBS)

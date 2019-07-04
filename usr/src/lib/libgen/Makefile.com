@@ -49,6 +49,13 @@ CERRWARN +=	$(CNOWARN_UNINIT)
 # not linted
 SMATCH=off
 
+COMPATLINKS +=		usr/ccs/lib/libgen.so
+COMPATLINKS64 +=	usr/ccs/lib/$(MACH64)/libgen.so
+
+$(ROOT)/usr/ccs/lib/libgen.so := COMPATLINKTARGET=../../../lib/libgen.so.1
+$(ROOT)/usr/ccs/lib/$(MACH64)/libgen.so:= \
+	COMPATLINKTARGET=../../../../lib/$(MACH64)/libgen.so.1
+
 .KEEP_STATE:
 
 all: $(LIBS)

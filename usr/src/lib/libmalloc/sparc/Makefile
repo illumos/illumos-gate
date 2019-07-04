@@ -29,4 +29,5 @@ include ../Makefile.com
 
 all: $(LIBS)
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(DYNLINKLIB)
+install: all $(ROOTLIBS) $(ROOTLINKS) $(DYNLINKLIB) \
+	$(ROOTCOMPATLINKS)

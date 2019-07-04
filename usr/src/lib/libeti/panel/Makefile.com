@@ -49,6 +49,13 @@ LDLIBS +=       -lcurses -lc
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 
+COMPATLINKS=	usr/ccs/lib/libpanel.so
+COMPATLINKS64=	usr/ccs/lib/$(MACH64)/libpanel.so
+
+$(ROOT)/usr/ccs/lib/libpanel.so:=	COMPATLINKTARGET=../../lib/libpanel.so.1
+$(ROOT)/usr/ccs/lib/$(MACH64)/libpanel.so:= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/libpanel.so.1
+
 .KEEP_STATE:
 
 all: $(LIBS)

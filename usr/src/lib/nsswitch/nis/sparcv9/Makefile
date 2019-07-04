@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright (c) 1993,2001 by Sun Microsystems, Inc.
 # All rights reserved.
@@ -34,4 +34,4 @@ LIBS =		$(DYNLIB1)
 
 include		../../Makefile.targ
 
-install:	all $(ROOT64DYNLIB)
+install:	all $(ROOT64DYNLIB) $(ROOTCOMPATLINKS64)

@@ -17,6 +17,6 @@ TARGET_ARCH=	amd64
 include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64)
+install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTCOMPATLINKS64)
 
 include ../Makefile.targ

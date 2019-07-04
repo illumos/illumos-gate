@@ -44,6 +44,13 @@ FORMS=		nceucform ncform nrform
 
 include		../../../../lib/Makefile.lib
 
+COMPATLINKS=	usr/ccs/lib/libl.so
+COMPATLINKS64=	usr/ccs/lib/$(MACH64)/libl.so
+
+$(ROOT)/usr/ccs/lib/libl.so := COMPATLINKTARGET=../../lib/libl.so.1
+$(ROOT)/usr/ccs/lib/$(MACH64)/libl.so:= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/libl.so.1
+
 SRCDIR =	../common
 
 CSTD=	$(CSTD_GNU99)

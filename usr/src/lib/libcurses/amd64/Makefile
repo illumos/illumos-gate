@@ -31,4 +31,4 @@ include ../../Makefile.lib.64
 
 all: $(LIBS)
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64)
+install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTCOMPATLINKS64)

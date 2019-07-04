@@ -32,6 +32,6 @@ CPPFLAGS +=	-I../../../../uts/sparc/krtld
 
 all:		$(DYNLIB) $(LIBLINKS)
 
-install:	all $(ROOTFS_DYNLIB)
+install:	all $(ROOTLIBS) $(ROOTCOMPATLINKS)
 
 include		$(SRC)/cmd/sgs/librtld/Makefile.targ

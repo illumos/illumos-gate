@@ -159,7 +159,7 @@ CFLAGS64 += $(CCVERBOSE) $(CFLAGS64_$(CURTYPE)) $(CFLAGS64_common)
 pics/umem.o := SMOFF += index_overflow
 objs/umem.o := SMOFF += index_overflow
 
-INSTALL_DEPS_library =		$(ROOTLINKS) $(ROOTLIBS)
+INSTALL_DEPS_library =	$(ROOTLINKS) $(ROOTLIBS) $(ROOTCOMPATLINKS)
 
 DYNFLAGS +=     $(ZINTERPOSE)
 

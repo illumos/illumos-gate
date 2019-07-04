@@ -81,7 +81,7 @@ SGSMSGTARG +=	$(SGSMSGSPARC) $(SGSMSGSPARC32) $(SGSMSG32)
 
 all:		$(RTLD)
 
-install:	all $(ROOTDYNLIB)
+install:	all $(ROOTDYNLIB) $(ROOTCOMPATLINKS)
 
 adbmacros:	adb .WAIT $(ADBSCRIPTS)
 

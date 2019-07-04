@@ -23,10 +23,8 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/Makefile.mach
-#
+
 # included to define targets built with machine-dependent source
 #
 
@@ -55,5 +53,11 @@ $(MACHLIBS): FRC
 
 $(MACHLIBS64): FRC
 	@cd $(@D); pwd; VERSION='$(VERSION)' $(MAKE) $(@F)
+
+$(ROOTCOMPATLINKS):
+	$(RM) $@; $(SYMLINK) $(COMPATLINKTARGET) $@
+
+$(ROOTCOMPATLINKS64):
+	$(RM) $@; $(SYMLINK) $(COMPATLINKTARGET) $@
 
 FRC:

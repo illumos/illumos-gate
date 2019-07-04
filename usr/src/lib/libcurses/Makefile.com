@@ -162,24 +162,37 @@ CLOBBERFILES=	libcurses.so libcurses.so$(VERS)
 
 all: $(LIBS)
 
+COMPATLINKS +=	usr/ccs/lib/libcurses.so \
+		usr/ccs/lib/libtermlib.so \
+		usr/lib/libtermlib.so \
+		usr/lib/libtermlib.so.1 \
+		lib/libtermlib.so \
+		lib/libtermlib.so.1
 
-#
-# Install rules for libtermlib.so links.
-# Augments the rule in Makefile.targ
-#
-$(ROOTLIBDIR)/$(LIBLINKS) := INS.liblink= \
-	$(RM) $@; $(SYMLINK) $(LIBLINKPATH)$(LIBLINKS)$(VERS) $@; \
-	cd $(ROOTLIBDIR); \
-		$(RM) libtermlib.so libtermlib.so$(VERS); \
-		$(SYMLINK) libcurses.so$(VERS) libtermlib.so$(VERS); \
-		$(SYMLINK) libtermlib.so$(VERS) libtermlib.so;
+COMPATLINKS64 +=	usr/ccs/lib/$(MACH64)/libcurses.so \
+			usr/ccs/lib/$(MACH64)/libtermlib.so \
+			usr/lib/$(MACH64)/libtermlib.so \
+			usr/lib/$(MACH64)/libtermlib.so.1 \
+			lib/$(MACH64)/libtermlib.so \
+			lib/$(MACH64)/libtermlib.so.1
 
-$(ROOTLIBDIR64)/$(LIBLINKS) := INS.liblink64= \
-	$(RM) $@; $(SYMLINK) $(LIBLINKPATH)$(LIBLINKS)$(VERS) $@; \
-	cd $(ROOTLIBDIR64); \
-		$(RM) libtermlib.so libtermlib.so$(VERS);\
-		$(SYMLINK) libcurses.so$(VERS) libtermlib.so$(VERS); \
-		$(SYMLINK) libtermlib.so$(VERS) libtermlib.so;
+$(ROOT)/usr/ccs/lib/libcurses.so := COMPATLINKTARGET=../../../lib/libcurses.so.1
+$(ROOT)/usr/ccs/lib/libtermlib.so := \
+	COMPATLINKTARGET=../../../lib/libcurses.so.1
+$(ROOT)/usr/ccs/lib/$(MACH64)/libcurses.so := \
+	COMPATLINKTARGET=../../../../lib/$(MACH64)/libcurses.so.1
+$(ROOT)/usr/ccs/lib/$(MACH64)/libtermlib.so := \
+	COMPATLINKTARGET=../../../../lib/$(MACH64)/libcurses.so.1
+$(ROOT)/usr/lib/libtermlib.so.1 := COMPATLINKTARGET= ../../lib/libcurses.so.1
+$(ROOT)/usr/lib/libtermlib.so := COMPATLINKTARGET= ../../lib/libcurses.so.1
+$(ROOT)/usr/lib/$(MACH64)/libtermlib.so.1 := \
+	COMPATLINKTARGET= ../../../lib/$(MACH64)/libcurses.so.1
+$(ROOT)/usr/lib/$(MACH64)/libtermlib.so := \
+	COMPATLINKTARGET= ../../../lib/$(MACH64)/libcurses.so.1
+$(ROOT)/lib/libtermlib.so.1 := COMPATLINKTARGET= libcurses.so.1
+$(ROOT)/lib/libtermlib.so := COMPATLINKTARGET= libtermlib.so.1
+$(ROOT)/lib/$(MACH64)/libtermlib.so.1 := COMPATLINKTARGET= libcurses.so.1
+$(ROOT)/lib/$(MACH64)/libtermlib.so := COMPATLINKTARGET= libtermlib.so.1
 
 #
 # Include library targets

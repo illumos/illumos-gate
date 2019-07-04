@@ -31,7 +31,6 @@ OBJECTS = http-addr.o http-support.o http.o
 ROOTLIBDIR =	$(ROOT)/usr/lib/print
 
 include ../../../Makefile.lib
-include ../../../Makefile.rootfs
 
 SRCDIR =	../common
 

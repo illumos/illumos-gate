@@ -31,7 +31,6 @@ OBJECTS = job.o library.o lpd-cancel.o lpd-job.o lpd-query.o printer.o \
 	service.o $(COMMON_OBJS)
 
 include ../../../Makefile.lib
-include ../../../Makefile.rootfs
 
 SRCDIR =	../common
 

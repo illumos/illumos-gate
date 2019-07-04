@@ -26,4 +26,4 @@ include ../Makefile.com
 
 DYNFLAGS += -R/usr/lib/fm
 
-install: all $(ROOTLIBS) $(ROOTLINKS)
+install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTCOMPATLINKS)

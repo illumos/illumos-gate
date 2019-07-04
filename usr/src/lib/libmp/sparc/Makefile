@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 
 OLIBRARY =	libmp.so.1
@@ -51,4 +51,5 @@ pics/pics_mp.o:
 
 all: $(LIBS) $(OLIBRARY)
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLIBDIR)/$(OLIBRARY)
+install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLIBDIR)/$(OLIBRARY) \
+	$(ROOTCOMPATLINKS)

@@ -51,6 +51,7 @@ MISCOBJS64=	nlist.o
 OBJECTS=	$(BLTOBJS)  $(MACHOBJS)  $(COMOBJS)  $(CLASSOBJS) $(MISCOBJS)
 
 include $(SRC)/lib/Makefile.lib
+include $(SRC)/lib/Makefile.rootfs
 
 SRCDIR=	$(SRC)/cmd/sgs/libelf
 
@@ -91,13 +92,6 @@ SGSMSGFLAGS2=	$(SGSMSGFLAGS) -h $(BLTDEFS) -d $(BLTDATA) -n libelf_msg
 BLTSRCS=	$(BLTOBJS:%.o=%.c)
 LIBSRCS=	$(COMOBJS:%.o=$(SRCDIR)/common/%.c)  $(MISCOBJS:%.o=$(SRCDIR)/misc/%.c) \
 		$(MACHOBJS:%.o=%.c)  $(BLTSRCS)
-
-ROOTFS_DYNLIB=		$(DYNLIB:%=$(ROOTFS_LIBDIR)/%)
-
-ROOTFS_DYNLIB64=	$(DYNLIB:%=$(ROOTFS_LIBDIR64)/%)
-
-$(ROOTFS_DYNLIB) :=	FILEMODE= 755
-$(ROOTFS_DYNLIB64) :=	FILEMODE= 755
 
 LIBS =		$(DYNLIB)
 

@@ -66,13 +66,15 @@ SMATCH=off
 
 ROOTDYNLIBS=	$(DYNLIB:%=$(ROOTLIBDIR)/%)
 
+COMPATLINKS=	usr/lib/$(DYNLIB)
+
 .KEEP_STATE:
 
 LIBS = $(DYNLIB)
 
 all: $(LIBS)
 
-install: all $(ROOTDYNLIBS)
+install: all $(ROOTDYNLIBS) $(ROOTCOMPATLINKS)
 
 
 # include library targets

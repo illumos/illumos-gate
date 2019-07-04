@@ -60,4 +60,18 @@ CPPFLAGS +=	-I../../../common/inc
 LDLIBS +=	-lnsl
 DYNLIB1 =	nss_files.so$(VERS)
 
+COMPATLINKS=	usr/lib/$(DYNLIB1) \
+		etc/lib/$(DYNLIB1)
+COMPATLINKS64=	usr/lib/$(MACH64)/$(DYNLIB1)
+
+$(ROOT)/usr/lib/$(DYNLIB1) := COMPATLINKTARGET=../../lib/$(DYNLIB1)
+$(ROOT)/usr/lib/$(MACH64)/$(DYNLIB1):= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/$(DYNLIB1)
+$(ROOT)/usr/lib/$(DYNLIB1) := COMPATLINKTARGET=../../lib/$(DYNLIB1)
+$(ROOT)/usr/lib/$(MACH64)/$(DYNLIB1):= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/$(DYNLIB1)
+
+$(ROOT)/etc/lib/$(DYNLIB1) := COMPATLINKTARGET= ../../lib/$(DYNLIB1)
+
 all: $(DYNLIB1)
+

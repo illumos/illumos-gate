@@ -52,26 +52,24 @@ CERRWARN +=	$(CNOWARN_UNINIT)
 all: $(LIBS)
 
 
+COMPATLINKS =	usr/lib/libcrypt_i.so$(VERS) \
+		usr/lib/libcrypt_i.so \
+		usr/lib/libcrypt_d.so$(VERS) \
+		usr/lib/libcrypt_d.so
+
+COMPATLINKS64 =	usr/lib/$(MACH64)/libcrypt_i.so$(VERS) \
+		usr/lib/$(MACH64)/libcrypt_i.so \
+		usr/lib/$(MACH64)/libcrypt_d.so$(VERS) \
+		usr/lib/$(MACH64)/libcrypt_d.so
+
+$(ROOT)/usr/lib/libcrypt_i.so$(VERS) := COMPATLINKTARGET= libcrypt.so$(VERS)
+$(ROOT)/usr/lib/libcrypt_i.so := COMPATLINKTARGET= libcrypt.so
+$(ROOT)/usr/lib/libcrypt_d.so$(VERS) := COMPATLINKTARGET= libcrypt.so$(VERS)
+$(ROOT)/usr/lib/libcrypt_d.so := COMPATLINKTARGET= libcrypt.so
+
+$(ROOT)/usr/lib/$(MACH64)/libcrypt_i.so$(VERS) := COMPATLINKTARGET= libcrypt.so$(VERS)
+$(ROOT)/usr/lib/$(MACH64)/libcrypt_i.so := COMPATLINKTARGET= libcrypt.so
+$(ROOT)/usr/lib/$(MACH64)/libcrypt_d.so$(VERS) := COMPATLINKTARGET= libcrypt.so$(VERS)
+$(ROOT)/usr/lib/$(MACH64)/libcrypt_d.so := COMPATLINKTARGET= libcrypt.so
+
 include ../../Makefile.targ
-
-$(ROOTLINKS) := INS.liblink = \
-	$(RM) $@; $(SYMLINK) $(LIBLINKPATH)$(LIBLINKS)$(VERS) $@; \
-		cd $(ROOTLIBDIR); \
-		$(RM) libcrypt_i.so$(VERS) libcrypt_i.so ;\
-		$(RM) libcrypt_d.so$(VERS) libcrypt_d.so ;\
-		$(SYMLINK) libcrypt.so$(VERS) libcrypt_i.so$(VERS); \
-		$(SYMLINK) libcrypt.so libcrypt_i.so; \
-		$(SYMLINK) libcrypt.so$(VERS) libcrypt_d.so$(VERS); \
-		$(SYMLINK) libcrypt.so libcrypt_d.so;
-
-$(ROOTLINKS64) := INS.liblink64 = \
-	$(RM) $@; $(SYMLINK) $(LIBLINKPATH)$(LIBLINKS)$(VERS) $@; \
-		cd $(ROOTLIBDIR64); \
-		$(RM) libcrypt_i.so$(VERS) libcrypt_i.so ;\
-		$(RM) libcrypt_d.so$(VERS) libcrypt_d.so ;\
-		$(SYMLINK) libcrypt.so$(VERS) libcrypt_i.so$(VERS); \
-		$(SYMLINK) libcrypt.so libcrypt_i.so; \
-		$(SYMLINK) libcrypt.so$(VERS) libcrypt_d.so$(VERS); \
-		$(SYMLINK) libcrypt.so libcrypt_d.so;
-
-

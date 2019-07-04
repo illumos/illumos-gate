@@ -29,11 +29,8 @@ VERS =			.0
 OBJECTS = job.o nss.o printer.o psm.o service.o
 
 include ../../../Makefile.lib
-include ../../../Makefile.rootfs
 
 SRCDIR =	../common
-
-ROOTLIBDIR=	$(ROOT)/usr/lib
 
 LIBS =			$(DYNLIB)
 

@@ -75,6 +75,21 @@ $(BUILD64)$(DYNLIB) := LDLIBS64 += -lumem -lnvpair -luutil -lsysevent \
 
 CLEANFILES += ../common/fmev_errstring.c
 
+COMPATLINKS =	usr/lib/fm/$(DYNLIB) \
+		usr/lib/fm/$(LIBLINKS)
+
+COMPATLINKS64 =	usr/lib/fm/$(MACH64)/$(DYNLIB) \
+		usr/lib/fm/$(MACH64)/$(LIBLINKS)
+
+$(ROOT)/usr/lib/fm/libfmevent.so.1 := \
+	COMPATLINKTARGET=../../../lib/fm/libfmevent.so.1
+$(ROOT)/usr/lib/fm/libfmevent.so := \
+	COMPATLINKTARGET=../../../lib/fm/libfmevent.so.1
+$(ROOT)/usr/lib/fm/$(MACH64)/libfmevent.so.1:= \
+	COMPATLINKTARGET=../../../../lib/fm/$(MACH64)/libfmevent.so.1
+$(ROOT)/usr/lib/fm/$(MACH64)/libfmevent.so:= \
+	COMPATLINKTARGET=../../../../lib/fm/$(MACH64)/libfmevent.so.1
+
 .KEEP_STATE:
 
 all: $(LIBS)
