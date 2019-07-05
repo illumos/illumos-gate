@@ -25,6 +25,7 @@
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2017 James S Blachly, MD <james.blachly@gmail.com>
+# Copyright 2019 RackTop Systems
 #
 
 #
@@ -564,8 +565,6 @@ file path=kernel/misc/$(ARCH64)/tlimod group=sys mode=0755
 file path=kernel/misc/scsi_vhci/$(ARCH64)/scsi_vhci_f_asym_emc group=sys \
     mode=0755
 file path=kernel/misc/scsi_vhci/$(ARCH64)/scsi_vhci_f_asym_lsi group=sys \
-    mode=0755
-file path=kernel/misc/scsi_vhci/$(ARCH64)/scsi_vhci_f_asym_sun group=sys \
     mode=0755
 file path=kernel/misc/scsi_vhci/$(ARCH64)/scsi_vhci_f_sym group=sys mode=0755
 file path=kernel/misc/scsi_vhci/$(ARCH64)/scsi_vhci_f_sym_emc group=sys \
