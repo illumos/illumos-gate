@@ -1134,6 +1134,14 @@ mach_smpinit(void)
 	if (pops->psm_enable_intr)
 		psm_enable_intr  = pops->psm_enable_intr;
 
+	/*
+	 * Set this vector so it can be used by vmbus (for Hyper-V)
+	 * Need this even for single-CPU systems.  This works for
+	 * "pcplusmp" and "apix" platforms, but not "uppc" (because
+	 * "Uni-processor PC" does not provide a _get_ipivect).
+	 */
+	psm_get_ipivect = pops->psm_get_ipivect;
+
 	/* check for multiple CPUs */
 	if (cnt < 2 && plat_dr_support_cpu() == B_FALSE)
 		return;
@@ -1156,7 +1164,6 @@ mach_smpinit(void)
 #endif
 	}
 
-	psm_get_ipivect = pops->psm_get_ipivect;
 	psm_get_pir_ipivect = pops->psm_get_pir_ipivect;
 	psm_send_pir_ipi = pops->psm_send_pir_ipi;
 	psm_cmci_setup = pops->psm_cmci_setup;
