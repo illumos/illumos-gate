@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -41,6 +41,7 @@
 #include <mdb/mdb_ks.h>
 
 #include "nvpair.h"
+#include "pci.h"
 #include "devinfo.h"
 
 #define	DEVINFO_TREE_INDENT	4	/* Indent for devs one down in tree */
@@ -78,15 +79,22 @@ prtconf_help(void)
 	    "  -v          be verbose - print device property lists\n"
 	    "  -p          only print the ancestors of the given node\n"
 	    "  -c          only print the children of the given node\n"
-	    "  -d driver   only print instances of driver\n");
+	    "  -d driver   only print instances of driver\n"
+	    "  -i inst     only print if the driver instance number is inst\n");
 }
 
 void
 devinfo_help(void)
 {
 	mdb_printf("Switches:\n"
-	    "  -q   be quiet - don't print device property lists\n"
-	    "  -s   print summary of dev_info structures\n");
+	    "  -b type     print bus of device if it matches type\n"
+	    "  -d          print device private data\n"
+	    "  -q          be quiet - don't print device property lists\n"
+	    "  -s          print summary of dev_info structures\n"
+	    "\n"
+	    "The following types are supported for -b:\n"
+	    "\n"
+	    "  * pcie      print the PCI Express bus (pcie_bus_t)\n");
 }
 
 
@@ -995,6 +1003,11 @@ devinfo_print(uintptr_t addr, struct dev_info *dev, devinfo_cb_data_t *data)
 		return (WALK_NEXT);
 	}
 
+	if (data->di_instance != UINT64_MAX &&
+	    data->di_instance != (uint64_t)dev->devi_instance) {
+		return (WALK_NEXT);
+	}
+
 	/*
 	 * If we are output to a pipe, we only print the address of the
 	 * devinfo_t.
@@ -1048,12 +1061,14 @@ prtconf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	data.di_flags = DEVINFO_PARENT | DEVINFO_CHILD;
 	data.di_filter = NULL;
+	data.di_instance = UINT64_MAX;
 
 	if (flags & DCMD_PIPE_OUT)
 		data.di_flags |= DEVINFO_PIPE;
 
 	if (mdb_getopts(argc, argv,
 	    'd', MDB_OPT_STR, &data.di_filter,
+	    'i', MDB_OPT_UINT64, &data.di_instance,
 	    'v', MDB_OPT_SETBITS, DEVINFO_VERBOSE, &data.di_flags,
 	    'p', MDB_OPT_CLRBITS, DEVINFO_CHILD, &data.di_flags,
 	    'c', MDB_OPT_CLRBITS, DEVINFO_PARENT, &data.di_flags, NULL) != argc)
@@ -1113,6 +1128,7 @@ devinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	struct dev_info devi;
 	devinfo_node_t din;
 	devinfo_cb_data_t data;
+	char *bus = NULL;
 
 	static const mdb_bitmask_t devi_state_masks[] = {
 	    { "DEVICE_OFFLINE",	DEVI_DEVICE_OFFLINE,	DEVI_DEVICE_OFFLINE },
@@ -1155,12 +1171,26 @@ devinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	data.di_flags = DEVINFO_VERBOSE;
 	data.di_base = addr;
 	data.di_filter = NULL;
+	data.di_instance = UINT64_MAX;
 
 	if (mdb_getopts(argc, argv,
+	    'b', MDB_OPT_STR, &bus,
+	    'd', MDB_OPT_SETBITS, DEVINFO_DRIVER, &data.di_flags,
 	    'q', MDB_OPT_CLRBITS, DEVINFO_VERBOSE, &data.di_flags,
 	    's', MDB_OPT_SETBITS, DEVINFO_SUMMARY, &data.di_flags, NULL)
 	    != argc)
 		return (DCMD_USAGE);
+
+	if (bus != NULL && data.di_flags != DEVINFO_VERBOSE) {
+		mdb_warn("the -b option cannot be used with other options\n");
+		return (DCMD_USAGE);
+	}
+
+	if ((data.di_flags & DEVINFO_DRIVER) != 0 &&
+	    data.di_flags != (DEVINFO_DRIVER | DEVINFO_VERBOSE)) {
+		mdb_warn("the -d option cannot be used with other options\n");
+		return (DCMD_USAGE);
+	}
 
 	if ((flags & DCMD_ADDRSPEC) == 0) {
 		mdb_warn(
@@ -1168,7 +1198,37 @@ devinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	if (DCMD_HDRSPEC(flags) && data.di_flags & DEVINFO_SUMMARY)
+	if (mdb_vread(&devi, sizeof (devi), addr) == -1) {
+		mdb_warn("failed to read device");
+		return (DCMD_ERR);
+	}
+
+	if (bus != NULL) {
+		if (strcmp(bus, "pcie") == 0) {
+			uintptr_t bus_addr;
+			if (pcie_bus_match(&devi, &bus_addr)) {
+				mdb_printf("%p\n", bus_addr);
+				return (DCMD_OK);
+			} else {
+				mdb_warn("%p does not have a PCIe bus\n",
+				    addr);
+			}
+		}
+
+		mdb_warn("unknown bus type: %s\n", bus);
+		return (DCMD_ERR);
+	}
+
+	if ((data.di_flags & DEVINFO_DRIVER) != 0) {
+		if ((flags & DCMD_PIPE_OUT) != 0 &&
+		    devi.devi_driver_data == NULL) {
+			return (DCMD_OK);
+		}
+		mdb_printf("%p\n", devi.devi_driver_data);
+		return (DCMD_OK);
+	}
+
+	if (DCMD_HDRSPEC(flags) && data.di_flags & DEVINFO_SUMMARY) {
 		mdb_printf(
 		    "%-?s %5s %?s %-20s %-s\n"
 		    "%-?s %5s %?s %-20s %-s\n"
@@ -1176,10 +1236,6 @@ devinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    "DEVINFO", "MAJ",  "REFCNT",   "NODENAME", "NODESTATE",
 		    "",        "INST", "CIRCULAR", "BINDNAME", "STATE",
 		    "",        "",     "THREAD",   "",         "FLAGS");
-
-	if (mdb_vread(&devi, sizeof (devi), addr) == -1) {
-		mdb_warn("failed to read device");
-		return (DCMD_ERR);
 	}
 
 	if (data.di_flags & DEVINFO_SUMMARY) {

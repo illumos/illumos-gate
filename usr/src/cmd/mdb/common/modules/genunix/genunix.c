@@ -95,6 +95,7 @@
 #include "net.h"
 #include "netstack.h"
 #include "nvpair.h"
+#include "pci.h"
 #include "pg.h"
 #include "rctl.h"
 #include "sobj.h"
@@ -4121,8 +4122,8 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "devbindings", "?[-qs] [device-name | major-num]",
 	    "print devinfo nodes bound to device-name or major-num",
 	    devbindings, devinfo_help },
-	{ "devinfo", ":[-qs]", "detailed devinfo of one node", devinfo,
-	    devinfo_help },
+	{ "devinfo", ":[-qsd] [-b bus]", "detailed devinfo of one node",
+	    devinfo, devinfo_help },
 	{ "devinfo_audit", ":[-v]", "devinfo configuration audit record",
 	    devinfo_audit },
 	{ "devinfo_audit_log", "?[-v]", "system wide devinfo configuration log",
@@ -4146,8 +4147,8 @@ static const mdb_dcmd_t dcmds[] = {
 	    modctl2devinfo },
 	{ "name2major", "<dev-name>", "convert dev name to major number",
 	    name2major },
-	{ "prtconf", "?[-vpc] [-d driver]", "print devinfo tree", prtconf,
-	    prtconf_help },
+	{ "prtconf", "?[-vpc] [-d driver] [-i inst]", "print devinfo tree",
+	    prtconf, prtconf_help },
 	{ "softstate", ":<instance>", "retrieve soft-state pointer",
 	    softstate },
 	{ "devinfo_fm", ":", "devinfo fault managment configuration",
@@ -4707,6 +4708,10 @@ static const mdb_walker_t walkers[] = {
 	/* from nvpair.c */
 	{ NVPAIR_WALKER_NAME, NVPAIR_WALKER_DESCR,
 		nvpair_walk_init, nvpair_walk_step, NULL },
+
+	/* from pci.c */
+	{ "pcie_bus", "walk all pcie_bus_t's", pcie_bus_walk_init,
+		pcie_bus_walk_step, NULL },
 
 	/* from rctl.c */
 	{ "rctl_dict_list", "walk all rctl_dict_entry_t's from rctl_lists",
