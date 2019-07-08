@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2017, Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/ddi.h>
 #include <sys/dditypes.h>
@@ -302,7 +306,7 @@ pciev_eh(pf_data_t *pfd_p, pf_impl_t *impl)
 		pcie_faulty_all = B_TRUE;
 
 	} else if (severity & (PF_ERR_NO_PANIC | PF_ERR_MATCHED_DEVICE |
-	    PF_ERR_PANIC | PF_ERR_PANIC_BAD_RESPONSE)) {
+	    PF_ERR_PANIC | PF_ERR_BAD_RESPONSE)) {
 
 		uint16_t affected_flag, dev_affected_flags;
 		uint_t is_panic = 0, is_aff_dev_found = 0;

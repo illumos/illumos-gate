@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <sys/sysmacros.h>
@@ -919,10 +920,11 @@ pf_default_hdl(dev_info_t *dip, pf_impl_t *impl)
 	}
 
 	/*
-	 * Read vendor/device ID and check with cached data, if it doesn't match
-	 * could very well be a device that isn't responding anymore.  Just
-	 * stop.  Save the basic info in the error q for post mortem debugging
-	 * purposes.
+	 * Read vendor/device ID and check with cached data; if it doesn't
+	 * match, it could very well mean that the device is no longer
+	 * responding.  In this case, we return PF_SCAN_BAD_RESPONSE; should
+	 * the caller choose to panic in this case, we will have the basic
+	 * info in the error queue for the purposes of postmortem debugging.
 	 */
 	if (PCIE_GET(32, bus_p, PCI_CONF_VENID) != bus_p->bus_dev_ven_id) {
 		char buf[FM_MAX_CLASS];
@@ -933,12 +935,12 @@ pf_default_hdl(dev_info_t *dip, pf_impl_t *impl)
 		    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0, NULL);
 
 		/*
-		 * For IOV/Hotplug purposes skip gathering info fo this device,
+		 * For IOV/Hotplug purposes skip gathering info for this device,
 		 * but populate affected info and severity.  Clear out any data
 		 * that maybe been saved in the last fabric scan.
 		 */
 		pf_reset_pfd(pfd_p);
-		pfd_p->pe_severity_flags = PF_ERR_PANIC_BAD_RESPONSE;
+		pfd_p->pe_severity_flags = PF_ERR_BAD_RESPONSE;
 		PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags = PF_AFFECTED_SELF;
 
 		/* Add the snapshot to the error q */
@@ -1379,7 +1381,7 @@ pf_analyse_error(ddi_fm_error_t *derr, pf_impl_t *impl)
 		sts_flags = 0;
 
 		/* skip analysing error when no error info is gathered */
-		if (pfd_p->pe_severity_flags == PF_ERR_PANIC_BAD_RESPONSE)
+		if (pfd_p->pe_severity_flags == PF_ERR_BAD_RESPONSE)
 			goto done;
 
 		switch (PCIE_PFD2BUS(pfd_p)->bus_dev_type) {
