@@ -21,7 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
 #ifndef	_SYS_VNIC_IMPL_H
@@ -65,6 +65,7 @@ typedef struct vnic_s {
 
 	uint32_t		vn_hcksum_txflags;
 	uint32_t		vn_mtu;
+	link_state_t		vn_ls;
 } vnic_t;
 
 #define	vn_mch	vn_mc_handles[0]

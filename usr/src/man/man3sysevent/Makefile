@@ -16,7 +16,7 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3sysevent
+MANSECT=	3sysevent
 
 MANFILES=	sysevent_bind_handle.3sysevent		\
 		sysevent_free.3sysevent			\
@@ -24,7 +24,8 @@ MANFILES=	sysevent_bind_handle.3sysevent		\
 		sysevent_get_class_name.3sysevent	\
 		sysevent_get_vendor_name.3sysevent	\
 		sysevent_post_event.3sysevent		\
-		sysevent_subscribe_event.3sysevent
+		sysevent_subscribe_event.3sysevent	\
+		sysevents.3sysevent
 
 MANLINKS=	sysevent_get_pid.3sysevent		\
 		sysevent_get_pub_name.3sysevent		\

@@ -1468,6 +1468,7 @@ file path=usr/include/sys/sysdc.h
 file path=usr/include/sys/sysdc_impl.h
 file path=usr/include/sys/sysevent.h
 file path=usr/include/sys/sysevent/ap_driver.h
+file path=usr/include/sys/sysevent/datalink.h
 file path=usr/include/sys/sysevent/dev.h
 file path=usr/include/sys/sysevent/domain.h
 file path=usr/include/sys/sysevent/dr.h

@@ -18,6 +18,7 @@ file path=usr/share/man/man3sysevent/sysevent_get_class_name.3sysevent
 file path=usr/share/man/man3sysevent/sysevent_get_vendor_name.3sysevent
 file path=usr/share/man/man3sysevent/sysevent_post_event.3sysevent
 file path=usr/share/man/man3sysevent/sysevent_subscribe_event.3sysevent
+file path=usr/share/man/man3sysevent/sysevents.3sysevent
 link path=usr/share/man/man3sysevent/sysevent_get_pid.3sysevent \
     target=sysevent_get_vendor_name.3sysevent
 link path=usr/share/man/man3sysevent/sysevent_get_pub_name.3sysevent \

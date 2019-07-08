@@ -212,9 +212,11 @@ extern "C" {
 #define	ESC_ZFS_HISTORY_EVENT		"ESC_ZFS_history_event"
 
 /*
- * datalink subclass definitions.
+ * datalink subclass definitions. Supporting attributes for datalink state found
+ * in sys/sysevent/datalink.h.
  */
 #define	ESC_DATALINK_PHYS_ADD	"ESC_datalink_phys_add"	/* new physical link */
+#define	ESC_DATALINK_LINK_STATE	"ESC_datalink_link_state"	/* link state */
 
 /*
  * VRRP subclass definitions. Supporting attributes (name/value paris) are
