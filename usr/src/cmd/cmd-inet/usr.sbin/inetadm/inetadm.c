@@ -810,8 +810,8 @@ modify_inst_props_cb(void *data, scf_walkinfo_t *wip)
 
 		switch (mod[j].ip_type) {
 		case INET_TYPE_INTEGER:
-			if (uu_strtoint(value, &new_int, sizeof (new_int), NULL,
-			    NULL, NULL) == -1)
+			if (uu_strtoint(value, &new_int, sizeof (new_int), 0,
+			    0, 0) == -1)
 				uu_die(gettext("Error: \"%s\" is not a valid "
 				    "integer value.\n"), value);
 
@@ -938,8 +938,8 @@ modify_defaults(int argc, char *argv[])
 
 		switch (mod[j].ip_type) {
 		case INET_TYPE_INTEGER:
-			if (uu_strtoint(value, &new_int, sizeof (new_int), NULL,
-			    NULL, NULL) == -1)
+			if (uu_strtoint(value, &new_int, sizeof (new_int), 0,
+			    0, 0) == -1)
 				uu_die(gettext("Error: \"%s\" is not a valid "
 				    "integer value.\n"), value);
 

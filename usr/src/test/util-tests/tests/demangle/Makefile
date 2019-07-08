@@ -11,7 +11,7 @@
 
 #
 # Copyright 2018 Jason King.
-# Copyright 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
@@ -33,7 +33,8 @@ SRCS = $(OBJS:%.o=%.c)
 
 CSTD = $(CSTD_GNU99)
 
-LDLIBS += -ldemangle-sys -lumem
+LDLIBS += -ldemangle-sys
+rust := LDLIBS += -lumem
 
 all: $(PROG)
 

@@ -712,9 +712,9 @@ _is_so_matched(const char *name, const char *str, int path)
  *	path names can be supplied as dependencies, e.g. dlopen("../libx.so.1").
  *
  *  -	a PATHNAME() - this is the fully resolved path name of the object.  This
- * 	name will differ from NAME() for all dynamic executables, and may differ
+ *	name will differ from NAME() for all dynamic executables, and may differ
  *	from the NAME() of dependencies, if the dependency is not a full path
- * 	name, or the dependency resolves to a symbolic link.
+ *	name, or the dependency resolves to a symbolic link.
  *
  *  -	an ALIAS() name - these are alternative names by which the object has
  *	been found, ie. when dependencies are loaded through a variety of
@@ -1544,7 +1544,7 @@ find_file(Lm_list *lml, Rt_map *clmp, uint_t flags, Fdesc *fdp, Rej_desc *rej,
 		 * If we found a directory search for the file.
 		 */
 		if (dobj->co_id != 0) {
-			if (*strhash == NULL)
+			if (*strhash == 0)
 				*strhash = (Word)elf_hash(oname);
 			fobj = elf_config_ent(oname, *strhash,
 			    dobj->co_id, &aname);
@@ -2432,7 +2432,7 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 
 		for (APLIST_TRAVERSE(lmalp, idx2, dlmp1)) {
 			Aliste		idx3;
-			Bnd_desc 	*bdp;
+			Bnd_desc	*bdp;
 
 			/*
 			 * Add any dependencies of this dependency to the
@@ -2608,7 +2608,7 @@ load_one(Lm_list *lml, Aliste lmco, Alist *palp, Rt_map *clmp, int mode,
 {
 	Rej_desc	rej = { 0 };
 	Aliste		idx;
-	Pdesc   	*pdp;
+	Pdesc		*pdp;
 	const char	*name;
 
 	for (ALIST_TRAVERSE(palp, idx, pdp)) {
@@ -2779,7 +2779,7 @@ lookup_sym_interpose(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 	}
 
 	if ((lml->lm_flags & LML_FLG_INTRPOSE) == 0)
-		return (NULL);
+		return (0);
 
 	/*
 	 * Traverse the list of known interposers to determine whether any
@@ -3191,7 +3191,7 @@ _lookup_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 
 		lml = LIST(lmp);
 		if ((sl.sl_flags & LKUP_WEAK) || (lml->lm_lazy == 0))
-			return (NULL);
+			return (0);
 
 		DBG_CALL(Dbg_syms_lazy_rescan(lml, name));
 

@@ -37,8 +37,6 @@
  *	contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ftp_var.h"
 #include <arpa/nameser.h>
 #include <sys/types.h>
@@ -1524,7 +1522,7 @@ initconn(void)
 				    "parsing failure.\n");
 				goto bad;
 			}
-			*(c2 - 1) = NULL;
+			*(c2 - 1) = '\0';
 			/* Delimiter is the next char in the reply string */
 			delm = *(++c);
 			while (*c == delm) {

@@ -450,7 +450,7 @@ static const struct option lopts[] = {
 	{"bw-limit",	required_argument,	0, 'b'},
 	{"mac-address",	required_argument,	0, 'm'},
 	{"slot",	required_argument,	0, 'n'},
-	{ 0, 0, 0, 0 }
+	{ NULL, 0, NULL, 0 }
 };
 
 static const struct option show_lopts[] = {
@@ -463,7 +463,7 @@ static const struct option show_lopts[] = {
 	{"output",	required_argument,	0, 'o'},
 	{"persistent",	no_argument,		0, 'P'},
 	{"lacp",	no_argument,		0, 'L'},
-	{ 0, 0, 0, 0 }
+	{ NULL, 0, NULL, 0 }
 };
 
 static const struct option iptun_lopts[] = {
@@ -474,7 +474,7 @@ static const struct option iptun_lopts[] = {
 	{"parsable",	no_argument,		0, 'p'},
 	{"parseable",	no_argument,		0, 'p'},
 	{"persistent",	no_argument,		0, 'P'},
-	{ 0, 0, 0, 0 }
+	{ NULL, 0, NULL, 0 }
 };
 
 static char * const iptun_addropts[] = {
@@ -502,7 +502,7 @@ static const struct option prop_longopts[] = {
 	{"parsable",	no_argument,		0, 'c'  },
 	{"parseable",	no_argument,		0, 'c'  },
 	{"persistent",	no_argument,		0, 'P'  },
-	{ 0, 0, 0, 0 }
+	{ NULL, 0, NULL, 0 }
 };
 
 static const struct option wifi_longopts[] = {
@@ -522,7 +522,7 @@ static const struct option wifi_longopts[] = {
 	{"root-dir",	required_argument,	0, 'R'  },
 	{"persistent",	no_argument,		0, 'P'  },
 	{"file",	required_argument,	0, 'f'  },
-	{ 0, 0, 0, 0 }
+	{ NULL, 0, NULL, 0 }
 };
 
 static const struct option showeth_lopts[] = {
@@ -530,7 +530,7 @@ static const struct option showeth_lopts[] = {
 	{"parseable",	no_argument,		0, 'p'	},
 	{"extended",	no_argument,		0, 'x'	},
 	{"output",	required_argument,	0, 'o'	},
-	{ 0, 0, 0, 0 }
+	{ NULL, 0, NULL, 0 }
 };
 
 static const struct option vnic_lopts[] = {
@@ -544,7 +544,7 @@ static const struct option vnic_lopts[] = {
 	{"mac-prefix",	required_argument,	0, 'r'	},
 	{"vrid",	required_argument,	0, 'V'	},
 	{"address-family",	required_argument,	0, 'A'	},
-	{ 0, 0, 0, 0 }
+	{ NULL, 0, NULL, 0 }
 };
 
 static const struct option part_lopts[] = {
@@ -554,7 +554,7 @@ static const struct option part_lopts[] = {
 	{"force",	no_argument,		0, 'f'  },
 	{"root-dir",	required_argument,	0, 'R'  },
 	{"prop",	required_argument,	0, 'p'  },
-	{ 0, 0, 0, 0 }
+	{ NULL, 0, NULL, 0 }
 };
 
 static const struct option show_part_lopts[] = {
@@ -563,13 +563,13 @@ static const struct option show_part_lopts[] = {
 	{"link",	required_argument,	0, 'l'  },
 	{"persistent",	no_argument,		0, 'P'  },
 	{"output",	required_argument,	0, 'o'  },
-	{ 0, 0, 0, 0 }
+	{ NULL, 0, NULL, 0 }
 };
 
 static const struct option etherstub_lopts[] = {
 	{"temporary",	no_argument,		0, 't'	},
 	{"root-dir",	required_argument,	0, 'R'	},
-	{ 0, 0, 0, 0 }
+	{ NULL, 0, NULL, 0 }
 };
 
 static const struct option usage_opts[] = {
@@ -577,7 +577,7 @@ static const struct option usage_opts[] = {
 	{"format",	required_argument,	0, 'F'	},
 	{"start",	required_argument,	0, 's'	},
 	{"stop",	required_argument,	0, 'e'	},
-	{ 0, 0, 0, 0 }
+	{ NULL, 0, NULL, 0 }
 };
 
 static const struct option simnet_lopts[] = {
@@ -585,7 +585,7 @@ static const struct option simnet_lopts[] = {
 	{"root-dir",	required_argument,	0, 'R'	},
 	{"media",	required_argument,	0, 'm'	},
 	{"peer",	required_argument,	0, 'p'	},
-	{ 0, 0, 0, 0 }
+	{ NULL, 0, NULL, 0 }
 };
 
 static const struct option bridge_lopts[] = {
@@ -597,7 +597,7 @@ static const struct option bridge_lopts[] = {
 	{ "link",		required_argument,	0, 'l'	},
 	{ "max-age",		required_argument,	0, 'm'	},
 	{ "priority",		required_argument,	0, 'p'	},
-	{ NULL, NULL, 0, 0 }
+	{ NULL, 0, NULL, 0 }
 };
 
 static const struct option bridge_show_lopts[] = {
@@ -609,7 +609,7 @@ static const struct option bridge_show_lopts[] = {
 	{ "parseable",	no_argument,		0, 'p' },
 	{ "statistics",	no_argument,		0, 's' },
 	{ "trill",	no_argument,		0, 't' },
-	{ 0, 0, 0, 0 }
+	{ NULL, 0, NULL, 0 }
 };
 
 /*
@@ -862,7 +862,7 @@ static const ofmt_field_t phys_fields[] = {
 	offsetof(link_fields_buf_t, link_phys_device), print_default_cb},
 { "FLAGS",	7,
 	offsetof(link_fields_buf_t, link_flags), print_default_cb},
-{ NULL,		0, NULL, 0}}
+{ NULL,		0, 0, NULL}}
 ;
 
 /*
@@ -6348,7 +6348,7 @@ parse_wlan_keys(char *str, dladm_wlan_key_t **keys, uint_t *key_countp)
 	char			*field, *token, *lasts = NULL, c;
 
 	token = str;
-	while ((c = *token++) != NULL) {
+	while ((c = *token++) != '\0') {
 		if (c == ',')
 			nfields++;
 	}
@@ -7553,7 +7553,7 @@ do_delete_secobj(int argc, char **argv, const char *use)
 		die("secure object name required");
 
 	token = argv[optind];
-	while ((c = *token++) != NULL) {
+	while ((c = *token++) != '\0') {
 		if (c == ',')
 			nfields++;
 	}
@@ -7706,7 +7706,7 @@ do_show_secobj(int argc, char **argv, const char *use)
 		token = argv[optind];
 		if (token == NULL)
 			die("secure object name required");
-		while ((c = *token++) != NULL) {
+		while ((c = *token++) != '\0') {
 			if (c == ',')
 				obj_fields++;
 		}

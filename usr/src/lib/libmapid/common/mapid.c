@@ -959,7 +959,7 @@ get_nfs_domain(void)
 	bzero(value, NS_MAXCDNAME);
 	ret = nfs_smf_get_prop("nfsmapid_domain", value, DEFAULT_INSTANCE,
 	    SCF_TYPE_ASTRING, NFSMAPID, &bufsz);
-	if (ret == SA_OK && *value != NULL) {
+	if (ret == SA_OK && *value != '\0') {
 		char *dp = NULL;
 #ifdef DEBUG
 		char    *whoami = "get_nfs_domain";

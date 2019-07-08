@@ -54,14 +54,14 @@ ilbadm_val_type_t algo_types[] = {
 	{(int)ILB_ALG_HASH_IP, "hash-ip", "hip"},
 	{(int)ILB_ALG_HASH_IP_SPORT, "hash-ip-port", "hipp"},
 	{(int)ILB_ALG_HASH_IP_VIP, "hash-ip-vip", "hipv"},
-	{ILBD_BAD_VAL, NULL, NULL}
+	{ILBD_BAD_VAL, 0, 0}
 };
 
 ilbadm_val_type_t topo_types[] = {
 	{(int)ILB_TOPO_DSR, "DSR", "d"},
 	{(int)ILB_TOPO_NAT, "NAT", "n"},
 	{(int)ILB_TOPO_HALF_NAT, "HALF-NAT", "h"},
-	{ILBD_BAD_VAL, NULL, NULL}
+	{ILBD_BAD_VAL, 0, 0}
 };
 
 void
@@ -916,7 +916,7 @@ i_store_val(char *val, void *store, ilbadm_key_code_t keyword)
 				rc = ILBADM_INVAL_SYNTAX;
 				break;
 			}
-			*close = NULL;
+			*close = '\0';
 		}
 		rc = i_match_onehost(val, vip, &at);
 		/* re-assemble string as we found it */

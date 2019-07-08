@@ -23,7 +23,6 @@
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <unistd.h>
 #include "bart.h"
@@ -52,7 +51,7 @@ bart_compare(int argc, char **argv)
 	char			*control_fname, *test_fname;
 	int			c;
 	FILE			*rules_fd = NULL;
-	uint_t 			glob_flags;
+	uint_t			glob_flags;
 	boolean_t		prog_fmt = B_FALSE;
 
 	init_default_flags(&glob_flags);
@@ -100,13 +99,13 @@ bart_compare(int argc, char **argv)
 
 static int
 compare_manifests(FILE *rulesfile, char *control, char *test,
-boolean_t prog_fmt, uint_t flags)
+    boolean_t prog_fmt, uint_t flags)
 {
 	FILE	*control_fd, *test_fd;
 	char	*control_line, *test_line, control_buf[BUF_SIZE],
-		test_buf[BUF_SIZE], control_fname[PATH_MAX],
-		control_type[TYPE_SIZE], test_fname[PATH_MAX],
-		test_type[TYPE_SIZE];
+	    test_buf[BUF_SIZE], control_fname[PATH_MAX],
+	    control_type[TYPE_SIZE], test_fname[PATH_MAX],
+	    test_type[TYPE_SIZE];
 	int	control_pos, test_pos, ret, fname_cmp, return_status;
 
 	return_status = EXIT;
@@ -227,8 +226,8 @@ boolean_t prog_fmt, uint_t flags)
 
 static void
 parse_line(char *line, char *fname, char *type, char *size, char *mode,
-char *acl, char *mtime, char *uid, char *gid, char *contents, char *devnode,
-char *dest)
+    char *acl, char *mtime, char *uid, char *gid, char *contents, char *devnode,
+    char *dest)
 {
 	int		pos, line_len;
 
@@ -246,7 +245,7 @@ char *dest)
 
 	/* Reset these fields... */
 
-	*contents = NULL;
+	*contents = '\0';
 	*devnode = '\0';
 	*dest = '\0';
 
@@ -341,17 +340,17 @@ evaluate_differences(char *control_line, char *test_line,
     boolean_t prog_fmt, int flags)
 {
 	char		ctrl_fname[PATH_MAX], test_fname[PATH_MAX],
-			ctrl_type[TYPE_SIZE], test_type[TYPE_SIZE],
-			ctrl_size[MISC_SIZE], ctrl_mode[MISC_SIZE],
-			ctrl_acl[ACL_SIZE], ctrl_mtime[MISC_SIZE],
-			ctrl_uid[MISC_SIZE], ctrl_gid[MISC_SIZE],
-			ctrl_dest[PATH_MAX], ctrl_contents[PATH_MAX],
-			ctrl_devnode[PATH_MAX], test_size[MISC_SIZE],
-			test_mode[MISC_SIZE], test_acl[ACL_SIZE],
-			test_mtime[MISC_SIZE], test_uid[MISC_SIZE],
-			test_gid[MISC_SIZE], test_dest[PATH_MAX],
-			test_contents[PATH_MAX], test_devnode[PATH_MAX],
-			*tag;
+	    ctrl_type[TYPE_SIZE], test_type[TYPE_SIZE],
+	    ctrl_size[MISC_SIZE], ctrl_mode[MISC_SIZE],
+	    ctrl_acl[ACL_SIZE], ctrl_mtime[MISC_SIZE],
+	    ctrl_uid[MISC_SIZE], ctrl_gid[MISC_SIZE],
+	    ctrl_dest[PATH_MAX], ctrl_contents[PATH_MAX],
+	    ctrl_devnode[PATH_MAX], test_size[MISC_SIZE],
+	    test_mode[MISC_SIZE], test_acl[ACL_SIZE],
+	    test_mtime[MISC_SIZE], test_uid[MISC_SIZE],
+	    test_gid[MISC_SIZE], test_dest[PATH_MAX],
+	    test_contents[PATH_MAX], test_devnode[PATH_MAX],
+	    *tag;
 	int		ret_val;
 	struct rule	*rule_ptr;
 

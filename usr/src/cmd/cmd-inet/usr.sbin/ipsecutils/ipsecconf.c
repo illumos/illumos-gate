@@ -3026,7 +3026,7 @@ parse_address(int type, char *addr_str)
 	ptr = strchr(addr_str, '/');
 	if (ptr != NULL) {
 		has_mask = B_TRUE;
-		*ptr++ = NULL;
+		*ptr++ = '\0';
 
 		prefix_len = in_getprefixlen(ptr);
 		if (prefix_len < 0) {
@@ -3740,14 +3740,14 @@ scan:
 		/* Truncate at the beginning of a comment */
 		cp = strchr(buf, '#');
 		if (cp != NULL)
-			*cp = NULL;
+			*cp = '\0';
 
 		/* Skip any whitespace */
-		while (*buf != NULL && isspace(*buf))
+		while (*buf != '\0' && isspace(*buf))
 			buf++;
 
 		/* Empty line */
-		if (*buf == NULL)
+		if (*buf == '\0')
 			continue;
 
 		/*
@@ -3772,15 +3772,15 @@ scan:
 		tmp_buf = buf;
 
 		/* Skip until next whitespace or CURL_BEGIN */
-		while (*buf != NULL && !isspace(*buf) &&
+		while (*buf != '\0' && !isspace(*buf) &&
 		    *buf != CURL_BEGIN)
 			buf++;
 
-		if (*buf != NULL) {
+		if (*buf != '\0') {
 			if (tmp_buf == buf) /* No action token */
 				goto error;
 			if (*buf == CURL_BEGIN) {
-				*buf = NULL;
+				*buf = '\0';
 				/* Allocate an extra byte for the null also */
 				if ((*action = malloc(strlen(tmp_buf) + 1)) ==
 				    NULL) {
@@ -3791,7 +3791,7 @@ scan:
 				*buf = CURL_BEGIN;
 			} else {
 				/* We have hit a space */
-				*buf++ = NULL;
+				*buf++ = '\0';
 				/* Allocate an extra byte for the null also */
 				if ((*action = malloc(strlen(tmp_buf) + 1)) ==
 				    NULL) {
@@ -3804,7 +3804,7 @@ scan:
 			 * Copy the rest of the line into the
 			 * leftover buffer.
 			 */
-			if (*buf != NULL) {
+			if (*buf != '\0') {
 				(void) strlcpy(lo_buf, buf, sizeof (lo_buf));
 				*leftover = lo_buf;
 			} else {
@@ -3873,14 +3873,14 @@ scan:
 		/* Truncate at the beginning of a comment */
 		cp = strchr(buf, '#');
 		if (cp != NULL)
-			*cp = NULL;
+			*cp = '\0';
 
 		/* Skip any whitespace */
-		while (*buf != NULL && isspace(*buf))
+		while (*buf != '\0' && isspace(*buf))
 			buf++;
 
 		/* Empty line */
-		if (*buf == NULL)
+		if (*buf == '\0')
 			continue;
 		/*
 		 * Store the command for error reporting
@@ -3920,15 +3920,15 @@ scan:
 		 * Arguments are separated by white spaces or
 		 * newlines. Scan till you see a CURL_END.
 		 */
-		while (*buf != NULL) {
+		while (*buf != '\0') {
 			if (*buf == CURL_END) {
 ret:
-				*buf++ = NULL;
+				*buf++ = '\0';
 				/*
 				 * Copy the rest of the line into the
 				 * leftover buffer if any.
 				 */
-				if (*buf != NULL) {
+				if (*buf != '\0') {
 					(void) strlcpy(lo_buf, buf,
 					    sizeof (lo_buf));
 					*leftover = lo_buf;
@@ -3941,14 +3941,14 @@ ret:
 			 * Skip any trailing whitespace until we see a
 			 * non white-space character.
 			 */
-			while (*buf != NULL && isspace(*buf))
+			while (*buf != '\0' && isspace(*buf))
 				buf++;
 
 			if (*buf == CURL_END)
 				goto ret;
 
 			/* Scan the next line as this buffer is empty */
-			if (*buf == NULL)
+			if (*buf == '\0')
 				break;
 
 			if (i >= MAXARGS) {
@@ -3965,7 +3965,7 @@ ret:
 			 * Real scan of the argument takes place here.
 			 * Skip past till space or CURL_END.
 			 */
-			while (*buf != NULL && !isspace(*buf) &&
+			while (*buf != '\0' && !isspace(*buf) &&
 			    *buf != CURL_END) {
 				buf++;
 			}
@@ -3973,9 +3973,9 @@ ret:
 			 * Either a space or we have hit the CURL_END or
 			 * the real end.
 			 */
-			if (*buf != NULL) {
+			if (*buf != '\0') {
 				if (*buf == CURL_END) {
-					*buf++ = NULL;
+					*buf++ = '\0';
 					if ((argvec[i] = malloc(strlen(tmp_buf)
 					    + 1)) == NULL) {
 						warn("malloc");
@@ -3993,7 +3993,7 @@ ret:
 					 * Copy the rest of the line into the
 					 * leftover buffer.
 					 */
-					if (*buf != NULL) {
+					if (*buf != '\0') {
 						(void) strlcpy(lo_buf, buf,
 						    sizeof (lo_buf));
 						*leftover = lo_buf;
@@ -4002,7 +4002,7 @@ ret:
 					}
 					return (PARSE_SUCCESS);
 				} else {
-					*buf++ = NULL;
+					*buf++ = '\0';
 				}
 			}
 			/*
@@ -4151,7 +4151,7 @@ parse_one(FILE *fp, act_prop_t *act_props)
 
 			if (leftover != NULL) {
 				/* Accomodate spaces at the end */
-				while (*leftover != NULL) {
+				while (*leftover != '\0') {
 					if (*leftover == BACK_SLASH) {
 						warnx(gettext("Invalid line "
 						    "continuation character."));

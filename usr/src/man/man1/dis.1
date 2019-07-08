@@ -43,6 +43,7 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2019 Joyent, Inc.
 .\"
 .TH DIS 1 "Dec 19, 2018"
 .SH NAME
@@ -55,14 +56,12 @@ dis \- object code disassembler
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdis\fR command produces an assembly language listing of \fIfile\fR,
 which can be an object file or an archive of object files. The listing includes
 assembly statements and an octal or hexadecimal representation of the binary
 that produced those statements.
 .SH OPTIONS
-.sp
 .LP
 Options are interpreted by the disassembler and can be specified in any order.
 .sp
@@ -194,7 +193,6 @@ On output, a number enclosed in brackets at the beginning of a line, such as
 following instruction. These line numbers is printed only if the file was
 compiled with additional debugging information.
 .SH OPERANDS
-.sp
 .LP
 The following operand is supported:
 .sp
@@ -207,7 +205,6 @@ A path name of an object file or an archive (see \fBar\fR(1)) of object files.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBdis\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and
@@ -224,7 +221,6 @@ defaults to searching for the library under \fB/usr/lib\fR.
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -246,7 +242,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib\fR\fR
@@ -256,7 +251,6 @@ default \fBLIBDIR\fR
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -276,12 +270,10 @@ Interface Stability	See below.
 The human readable output is Uncommitted. The command line options are
 Committed.
 .SH SEE ALSO
-.sp
 .LP
 \fBar\fR(1), \fBas\fR(1), \fBld\fR(1), \fBa.out\fR(4), \fBattributes\fR(5),
 \fBenviron\fR(5)
 .SH DIAGNOSTICS
-.sp
 .LP
 The self-explanatory diagnostics indicate errors in the command line or
 problems encountered with the specified files.

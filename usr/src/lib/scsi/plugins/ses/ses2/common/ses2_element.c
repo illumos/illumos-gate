@@ -24,6 +24,9 @@
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 RackTop Systems.
+ */
 
 #include <sys/types.h>
 #include <stddef.h>
@@ -963,30 +966,37 @@ elem_parse_threshold(ses_plugin_t *sp, ses_node_t *np)
 	VERIFY(nvlist_lookup_uint64(nvl, SES_PROP_ELEMENT_TYPE,
 	    &type) == 0);
 
-	switch (type) {
-	case SES_ET_TEMPERATURE_SENSOR:
-	case SES_ET_UPS:
-	case SES_ET_VOLTAGE_SENSOR:
-	case SES_ET_CURRENT_SENSOR:
-		break;
-	default:
-		return (0);
-	}
-
 	if ((tp = ses_plugin_page_lookup(sp, snap,
 	    SES2_DIAGPAGE_THRESHOLD_IO, np, &len)) == NULL)
 		return (0);
 
-	SES_NV_ADD(uint64, nverr, nvl, SES_PROP_THRESH_CRIT_HI,
-	    tp->sti_high_crit);
-	SES_NV_ADD(uint64, nverr, nvl, SES_PROP_THRESH_WARN_HI,
-	    tp->sti_high_warn);
-	SES_NV_ADD(uint64, nverr, nvl, SES_PROP_THRESH_CRIT_LO,
-	    tp->sti_low_crit);
-	SES_NV_ADD(uint64, nverr, nvl, SES_PROP_THRESH_WARN_LO,
-	    tp->sti_low_warn);
+	switch (type) {
+	case SES_ET_TEMPERATURE_SENSOR:
+		SES_NV_ADD(int64, nverr, nvl, SES_PROP_THRESH_CRIT_HI,
+		    (int)tp->sti_high_crit + SES2_ES_TEMP_OFFSET);
+		SES_NV_ADD(int64, nverr, nvl, SES_PROP_THRESH_WARN_HI,
+		    (int)tp->sti_high_warn + SES2_ES_TEMP_OFFSET);
+		SES_NV_ADD(int64, nverr, nvl, SES_PROP_THRESH_CRIT_LO,
+		    (int)tp->sti_low_crit + SES2_ES_TEMP_OFFSET);
+		SES_NV_ADD(int64, nverr, nvl, SES_PROP_THRESH_WARN_LO,
+		    (int)tp->sti_low_warn + SES2_ES_TEMP_OFFSET);
+		return (0);
 
-	return (0);
+	case SES_ET_UPS:
+	case SES_ET_CURRENT_SENSOR:
+	case SES_ET_VOLTAGE_SENSOR:
+		SES_NV_ADD(uint64, nverr, nvl, SES_PROP_THRESH_CRIT_HI,
+		    tp->sti_high_crit);
+		SES_NV_ADD(uint64, nverr, nvl, SES_PROP_THRESH_WARN_HI,
+		    tp->sti_high_warn);
+		SES_NV_ADD(uint64, nverr, nvl, SES_PROP_THRESH_CRIT_LO,
+		    tp->sti_low_crit);
+		SES_NV_ADD(uint64, nverr, nvl, SES_PROP_THRESH_WARN_LO,
+		    tp->sti_low_warn);
+		return (0);
+	default:
+		return (0);
+	}
 }
 
 int

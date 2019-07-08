@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lpsched.h"
 #include <syslog.h>
 #include <strings.h>
@@ -172,7 +170,7 @@ void rmfiles ( RSTATUS * rp, int log_it )	/* funcdef */
 
 	    p = strdup(rp->req_file);		/* remove host/id file */
 	    if (q = strrchr(p, '-')) {
-		    *q = NULL;
+		    *q = '\0';
 		    path = makepath(Lp_Tmp, p, NULL);
 		    (void) Unlink(path);
 		    Free(path);

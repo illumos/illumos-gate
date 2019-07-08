@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
@@ -147,10 +145,10 @@ symtab_clear_function(void)
 	errlog(BEGIN, "symtab_clear_function() {");
 	Symtab.Function = free_entry(Symtab.Function);
 	Symtab.Args = free_entry_table(Symtab.Args);
-	Symtab.Prototype[0] = NULL;
-	Symtab.Formals[0] = NULL;
-	Symtab.Actuals[0] = NULL;
-	Symtab.Cast[0] = NULL;
+	Symtab.Prototype[0] = '\0';
+	Symtab.Formals[0] = '\0';
+	Symtab.Actuals[0] = '\0';
+	Symtab.Cast[0] = '\0';
 	errlog(END, "}");
 }
 
@@ -224,7 +222,7 @@ symtab_set_prototype(char *p)
 
 	errlog(BEGIN, "symtab_set_prototype(void) {");
 	(void) strncpy(Symtab.Prototype, p, sizeof (Symtab.Prototype));
-	Symtab.Prototype[sizeof (Symtab.Prototype)-1] = NULL;
+	Symtab.Prototype[sizeof (Symtab.Prototype)-1] = '\0';
 	errlog(END, "}");
 }
 
@@ -241,7 +239,7 @@ symtab_set_formals(char *p)
 	errlog(BEGIN, "symtab_set_formals() {");
 	errlog(VERBOSE, "p = %s", p);
 	(void) strncpy(Symtab.Formals, p, sizeof (Symtab.Formals));
-	Symtab.Formals[sizeof (Symtab.Formals)-1] = NULL;
+	Symtab.Formals[sizeof (Symtab.Formals)-1] = '\0';
 	errlog(END, "}");
 }
 
@@ -258,7 +256,7 @@ symtab_set_actuals(char *p)
 	errlog(BEGIN, "symtab_set_actuals() {"); errlog(END, "}");
 	errlog(VERBOSE, "p = %s", p);
 	(void) strncpy(Symtab.Actuals, p, sizeof (Symtab.Actuals));
-	Symtab.Actuals[sizeof (Symtab.Actuals)-1] = NULL;
+	Symtab.Actuals[sizeof (Symtab.Actuals)-1] = '\0';
 }
 
 char *
@@ -273,7 +271,7 @@ symtab_set_cast(char *p)
 {
 	errlog(BEGIN, "symtab_set_cast() {"); errlog(END, "}");
 	(void) strncpy(Symtab.Cast, p, sizeof (Symtab.Cast));
-	Symtab.Cast[sizeof (Symtab.Cast)-1] = NULL;
+	Symtab.Cast[sizeof (Symtab.Cast)-1] = '\0';
 }
 
 char *
@@ -289,7 +287,7 @@ symtab_set_filename(const char *p)
 {
 	errlog(BEGIN, "symtab_set_filename() {"); errlog(END, "}");
 	(void) strncpy(Symtab.Filename, p, sizeof (Symtab.Filename));
-	Symtab.Filename[sizeof (Symtab.Filename)-1] = NULL;
+	Symtab.Filename[sizeof (Symtab.Filename)-1] = '\0';
 }
 
 char *
@@ -686,14 +684,14 @@ type_of(ENTRY *e)
 	if (e != NULL && (e->e_kind == PRIMITIVE || e->e_kind == VARARG)) {
 		p = e->e_type;
 		q = &buffer[0];
-		while (*p != NULL) {
+		while (*p != '\0') {
 			if (*p == '%') {
 				p += 2;
 			} else {
 				*q++ = *p++;
 			}
 		}
-		*q = NULL;
+		*q = '\0';
 		return (strtrim(&buffer[0]));
 	}
 	else
@@ -715,7 +713,7 @@ levels_of(ENTRY *e)
 	if (e != NULL && (e->e_kind == PRIMITIVE || e->e_kind == VARARG))
 		return (e->e_levels);
 	else
-		return (NULL);
+		return (0);
 }
 
 char *

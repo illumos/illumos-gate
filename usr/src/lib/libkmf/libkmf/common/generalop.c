@@ -423,9 +423,9 @@ Cleanup_PK11_Session(KMF_HANDLE_T handle)
 {
 	if (handle != NULL) {
 		/* Close active session on a pkcs11 token */
-		if (handle->pk11handle != NULL) {
+		if (handle->pk11handle != 0) {
 			(void) C_CloseSession(handle->pk11handle);
-			handle->pk11handle = NULL;
+			handle->pk11handle = 0;
 		}
 	}
 }

@@ -1,5 +1,6 @@
 '\" te
 .\"  Copyright 1989 AT&T  Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2019 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -28,7 +29,6 @@ dump \- dump selected parts of an object file
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdump\fR utility dumps selected parts of each of its object \fIfile\fR
 arguments.
@@ -37,7 +37,6 @@ arguments.
 The \fBdump\fR utility is best suited for use in shell scripts, whereas the
 \fBelfdump\fR(1) command is recommended for more human-readable output.
 .SH OPTIONS
-.sp
 .LP
 This utility will accept both object files and archives of object files. It
 processes each file argument according to one or more of the following options:
@@ -315,7 +314,6 @@ The \fBdump\fR utility attempts to format the information it dumps in a
 meaningful way, printing certain information in character, hexadecimal, octal,
 or decimal representation as appropriate.
 .SH SEE ALSO
-.sp
 .LP
 \fBelfdump\fR(1), \fBnm\fR(1), \fBar.h\fR(3HEAD), \fBa.out\fR(4),
 \fBattributes\fR(5)

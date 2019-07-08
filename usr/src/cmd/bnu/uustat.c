@@ -447,7 +447,7 @@ char **envp;
 	/* Make sure the overflow entry is null since it may be incorrect */
 	M[UUSTAT_TBL].mach[0] = NULLCHAR;
 	if (Summary) {
-	    for((sortcnt = 0, m = &M[0]);*(m->mach) != NULL;(sortcnt++,m++))
+	    for((sortcnt = 0, m = &M[0]);*(m->mach) != '\0';(sortcnt++,m++))
 			;
 	    qsort((char *)M, (unsigned int)sortcnt, sizeof(struct m), machcmp);
 	    for (m = M; m->mach[0] != NULLCHAR; m++)

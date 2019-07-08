@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -41,6 +41,7 @@ uint32_t smb2_qfs_attr(smb_request_t *);
 uint32_t smb2_qfs_control(smb_request_t *);
 uint32_t smb2_qfs_fullsize(smb_request_t *);
 uint32_t smb2_qfs_obj_id(smb_request_t *);
+uint32_t smb2_qfs_sectorsize(smb_request_t *);
 
 uint32_t
 smb2_qinfo_fs(smb_request_t *sr, smb_queryinfo_t *qi)
@@ -71,9 +72,18 @@ smb2_qinfo_fs(smb_request_t *sr, smb_queryinfo_t *qi)
 	case FileFsObjectIdInformation:	/* 8 */
 		status = smb2_qfs_obj_id(sr);
 		break;
-
-	default:
+	case FileFsDriverPathInformation:	/* 9 */
+	case FileFsVolumeFlagsInformation:	/* A */
 		status = NT_STATUS_INVALID_INFO_CLASS;
+		break;
+	case FileFsSectorSizeInformation:	/* B */
+		status = smb2_qfs_sectorsize(sr);
+		break;
+	default: /* there are some infoclasses we don't yet handle */
+		status = NT_STATUS_INVALID_INFO_CLASS;
+#ifdef	DEBUG
+		cmn_err(CE_NOTE, "unknown InfoClass 0x%x", qi->qi_InfoClass);
+#endif
 		break;
 	}
 
@@ -286,4 +296,117 @@ uint32_t
 smb2_qfs_obj_id(smb_request_t *sr)
 {
 	return (NT_STATUS_INVALID_PARAMETER);
+}
+
+/*
+ * Not sure yet where these should go.
+ * Flags in FileFsSectorSizeInformation
+ */
+
+#define	SSINFO_FLAGS_ALIGNED_DEVICE	0x00000001
+// When set, this flag indicates that the first physical sector of the device
+// is aligned with the first logical sector. When not set, the first physical
+// sector of the device is misaligned with the first logical sector.
+
+#define	SSINFO_FLAGS_PARTITION_ALIGNED_ON_DEVICE	0x00000002
+// When set, this flag indicates that the partition is aligned to physical
+// sector boundaries on the storage device.
+
+#define	SSINFO_FLAGS_NO_SEEK_PENALTY	0x00000004
+// When set, the device reports that it does not incur a seek penalty (this
+// typically indicates that the device does not have rotating media, such as
+// flash-based disks).
+
+#define	SSINFO_FLAGS_TRIM_ENABLED	0x00000008
+// When set, the device supports TRIM operations, either T13 (ATA) TRIM or
+// T10 (SCSI/SAS) UNMAP.
+
+#define	SSINFO_OFFSET_UNKNOWN		0xffffffff
+// For "Alignment" fields below
+
+/*
+ * We have to lie to Windows Hyper-V about our logical record size,
+ * because with larger sizes it fails setting up a virtual disk.
+ */
+int smb2_max_logical_sector_size = 4096;
+
+/*
+ * FileFsSectorSizeInformation
+ *
+ * Returns a FILE_FS_SECTOR_SIZE_INFORMATION
+ * See: [MS-FSCC] 2.5.8 FileFsSizeInformation
+ *
+ * LogicalBytesPerSector (4 bytes): ... number of bytes in a logical sector
+ *   for the device backing the volume. This field is the unit of logical
+ *   addressing for the device and is not the unit of atomic write.
+ * PhysicalBytesPerSectorForAtomicity (4 bytes): ... number of bytes in a
+ *   physical sector for the device backing the volume.  This is the reported
+ *   physical sector size of the device and is the unit of atomic write.
+ * PhysicalBytesPerSectorForPerformance (4 bytes): ... number of bytes in a
+ *   physical sector for the device backing the volume. This is the reported
+ *   physical sector size of the device and is the unit of performance.
+ * FileSystemEffectivePhysicalBytesPerSectorForAtomicity (4 bytes): unit, in
+ *   bytes, that the file system on the volume will use for internal operations
+ *   that require alignment and atomicity.
+ * Flags (4 bytes): See ...
+ * ByteOffsetForSectorAlignment (4 bytes): ... logical sector offset within the
+ *   first physical sector where the first logical sector is placed, in bytes.
+ *   If this value is set to SSINFO_OFFSET_UNKNOWN (0xffffffff), there was
+ *   insufficient information to compute this field.
+ * ByteOffsetForPartitionAlignment (4 bytes): ... byte offset from the first
+ *   physical sector where the first partition is placed. If this value is
+ *   set to SSINFO_OFFSET_UNKNOWN (0xffffffff), there was either insufficient
+ *   information or an error was encountered in computing this field.
+ */
+uint32_t
+smb2_qfs_sectorsize(smb_request_t *sr)
+{
+	smb_fssize_t		fssize;
+	smb_tree_t *tree = sr->tid_tree;
+	uint32_t lbps, pbps;
+	uint32_t flags;
+	int rc;
+
+	if (!STYPE_ISDSK(tree->t_res_type))
+		return (NT_STATUS_INVALID_PARAMETER);
+
+	rc = smb_fssize(sr, &fssize);
+	if (rc)
+		return (smb_errno2status(rc));
+	pbps = fssize.fs_bytes_per_sector;
+	lbps = fssize.fs_sectors_per_unit * pbps;
+	if (lbps > smb2_max_logical_sector_size)
+		lbps = smb2_max_logical_sector_size;
+
+	// LogicalBytesPerSector
+	(void) smb_mbc_encodef(&sr->raw_data, "l", lbps);
+
+	// PhysicalBytesPerSectorForAtomicity
+	(void) smb_mbc_encodef(&sr->raw_data, "l", pbps);
+
+	// PhysicalBytesPerSectorForPerformance
+	// Using logical size here.
+	(void) smb_mbc_encodef(&sr->raw_data, "l", lbps);
+
+	// FileSystemEffectivePhysicalBytesPerSectorForAtomicity
+	(void) smb_mbc_encodef(&sr->raw_data, "l", pbps);
+
+	// Flags
+	// We include "no seek penalty" because our files are
+	// always ZFS-backed, which can reorder things on disk.
+	// Leaving out SSINFO_FLAGS_TRIM_ENABLED for now.
+	flags = SSINFO_FLAGS_ALIGNED_DEVICE |
+		SSINFO_FLAGS_PARTITION_ALIGNED_ON_DEVICE |
+		SSINFO_FLAGS_NO_SEEK_PENALTY;
+	(void) smb_mbc_encodef(&sr->raw_data, "l", flags);
+
+	// ByteOffsetForSectorAlignment
+	// ByteOffsetForPartitionAlignment
+	// Just say "unknown" for these two.
+	(void) smb_mbc_encodef(
+	    &sr->raw_data, "l",
+	    SSINFO_OFFSET_UNKNOWN,
+	    SSINFO_OFFSET_UNKNOWN);
+
+	return (0);
 }

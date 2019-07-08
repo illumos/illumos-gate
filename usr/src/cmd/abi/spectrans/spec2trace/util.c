@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -52,16 +50,16 @@ strnormalize(char *str)
 {
 	char	*p;
 
-	if (str == NULL || *str == NULL)
+	if (str == NULL || *str == '\0')
 		return (str);
-	for (p = str; *p != NULL; p++) {
+	for (p = str; *p != '\0'; p++) {
 		if (isspace(*p)) {
 			*p = ' ';
 		}
 	}
 	p--;
 	while (p >= str && (isspace(*p) || *p == ';'))
-		*p-- = NULL;
+		*p-- = '\0';
 
 	/* ERA - remove leading spaces */
 	while (isspace(*str))
@@ -75,11 +73,11 @@ strtrim(char *str)
 {
 	char	*p;
 
-	for (p = str; *p != NULL; p++)
+	for (p = str; *p != '\0'; p++)
 		continue;
 	p--;
 	while (p >= str && isspace(*p))
-		*p-- = NULL;
+		*p-- = '\0';
 	return (str);
 }
 
@@ -92,7 +90,7 @@ strlower(char *str)
 {
 	char	*p;
 
-	for (p = str; *p != NULL; p++) {
+	for (p = str; *p != '\0'; p++) {
 		*p = tolower(*p);
 	}
 	return (str);
@@ -144,7 +142,7 @@ in_string_set(char *p, char *set)
 			break;
 		}
 		save = *q;
-		*q = NULL;
+		*q = '\0';
 		if (strcmp(p, set) == 0) {
 			*q = save;
 			errlog(VERBOSE, "return YES");
@@ -262,14 +260,14 @@ objectname(char *name)
 	static char basename[MAXLINE];
 
 	p = strrchr(name, '/');
-	while (p != NULL && *(p+1) == NULL) {
+	while (p != NULL && *(p+1) == '\0') {
 		/* The / was at the end of the name. */
-		*p = NULL;
+		*p = '\0';
 		p = strrchr(name, '/');
 	}
 	(void) strlcpy(basename, p? p+1: name, MAXLINE);
 	if ((p = strstr(basename, ".c")) != NULL) {
-		*p = NULL;
+		*p = '\0';
 	}
 	return (strcat(basename, ".o"));
 }
@@ -362,7 +360,7 @@ in_string_table(table_t *t, char *value)
 	}
 	for (i = 0; i <= t->used; i++) {
 		if (strncmp(value, t->elements[i], len) == 0 &&
-		    (t->elements[i][len] == NULL ||
+		    (t->elements[i][len] == '\0' ||
 			t->elements[i][len] == ','))
 			return (1);
 	}

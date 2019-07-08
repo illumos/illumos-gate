@@ -302,19 +302,19 @@ unsigned	nbytes;
 	}
 
 	if (info.tsdu <= 0 || nbytes <= info.tsdu)
-		return (t_snd(fd, buf, nbytes, NULL));
+		return (t_snd(fd, buf, nbytes, 0));
 
 	/* if get here, then there is a limit on transmit size	*/
 	/* (info.tsdu > 0) and buf exceeds it			*/
 	i = ret = 0;
 	while (nbytes >= info.tsdu) {
-		if ((ret = t_snd(fd,  &buf[i], info.tsdu, NULL)) != info.tsdu)
+		if ((ret = t_snd(fd,  &buf[i], info.tsdu, 0)) != info.tsdu)
 			return ((ret >= 0 ? (i + ret) : ret));
 		i += info.tsdu;
 		nbytes -= info.tsdu;
 	}
 	if (nbytes != 0) {
-		if ((ret = t_snd(fd,  &buf[i], nbytes, NULL)) != nbytes)
+		if ((ret = t_snd(fd,  &buf[i], nbytes, 0)) != nbytes)
 			return ((ssize_t)(ret >= 0 ? (i + ret) : ret));
 		i += nbytes;
 	}

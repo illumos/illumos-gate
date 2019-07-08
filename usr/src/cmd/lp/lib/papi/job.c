@@ -971,7 +971,7 @@ papiJobQuery(papi_service_t handle, char *printer, int32_t job_id,
 		return (PAPI_DEVICE_ERROR);
 	}
 
-	if ((request_id == NULL) || (request_id[0] == NULL))
+	if ((request_id == NULL) || (request_id[0] == '\0'))
 		return (PAPI_NOT_FOUND);
 
 	if ((*job = j = calloc(1, sizeof (*j))) == NULL)

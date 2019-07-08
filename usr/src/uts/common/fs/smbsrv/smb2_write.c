@@ -127,7 +127,7 @@ smb2_write(smb_request_t *sr)
 		    (of->f_node->flags & NODE_FLAGS_WRITE_THROUGH)) {
 			stability = FSYNC;
 		}
-		rc = smb_fsop_write(sr, of->f_cr, of->f_node,
+		rc = smb_fsop_write(sr, of->f_cr, of->f_node, of,
 		    &vdb->vdb_uio, &XferCount, stability);
 		if (rc)
 			break;

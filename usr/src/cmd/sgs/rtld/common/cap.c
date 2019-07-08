@@ -362,7 +362,7 @@ cap_check(Cap *cptr, char *strs, int alt, Fdesc *fdp, Rej_desc *rej)
 	return (1);
 }
 
-#define	HWAVL_RECORDED(n)	pnavl_recorded(&capavl, n, NULL, NULL)
+#define	HWAVL_RECORDED(n)	pnavl_recorded(&capavl, n, 0, NULL)
 
 /*
  * Determine whether a link-map should use alternative system capabilities.

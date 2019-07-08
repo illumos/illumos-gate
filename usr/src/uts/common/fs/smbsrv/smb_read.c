@@ -437,7 +437,8 @@ smb_common_read(smb_request_t *sr, smb_rw_param_t *param)
 		sr->raw_data.max_bytes = vdb->vdb_uio.uio_resid;
 		top = smb_mbuf_allocate(&vdb->vdb_uio);
 
-		rc = smb_fsop_read(sr, sr->user_cr, node, &vdb->vdb_uio);
+		rc = smb_fsop_read(sr, sr->user_cr, node, ofile,
+		    &vdb->vdb_uio);
 
 		sr->raw_data.max_bytes -= vdb->vdb_uio.uio_resid;
 		smb_mbuf_trim(top, sr->raw_data.max_bytes);

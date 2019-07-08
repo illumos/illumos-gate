@@ -258,7 +258,7 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 	uint_t i;
 	Off off;
 	size_t pltsz = 0, pltentries = 0;
-	uintptr_t hptr = NULL;
+	uintptr_t hptr = (uintptr_t)NULL;
 	Word hnchains = 0, hnbuckets = 0;
 
 	if (ehdr->e_type == ET_DYN)
@@ -628,7 +628,8 @@ done_with_plt:
 			symtabptr = (Sym*)((uintptr_t)symtabptr + addr);
 		}
 
-		if ((hptr == NULL) || (hnbuckets == 0) || (hnchains == 0)) {
+		if ((hptr == (uintptr_t)NULL) || (hnbuckets == 0) ||
+		    (hnchains == 0)) {
 			dprintf("empty or missing .hash\n");
 			goto badplt;
 		}

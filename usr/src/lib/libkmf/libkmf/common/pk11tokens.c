@@ -521,7 +521,7 @@ kmf_select_token(KMF_HANDLE_T handle, char *label, int readonly)
 	}
 
 	/* Only one token can be active per thread */
-	if (handle->pk11handle != NULL) {
+	if (handle->pk11handle != 0) {
 		return (KMF_ERR_TOKEN_SELECTED);
 	}
 

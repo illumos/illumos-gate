@@ -1263,7 +1263,7 @@ printarg(char *path, struct exportdata *ep)
 		(void) printf("LOG_ALLOPS ");
 	if (ep->ex_flags == 0)
 		(void) printf("(none)");
-	(void) 	printf("\n");
+	(void) printf("\n");
 	if (ep->ex_flags & EX_LOG) {
 		(void) printf("\tex_log_buffer = %s\n",
 		    (ep->ex_log_buffer ? ep->ex_log_buffer : "(NULL)"));
@@ -2539,7 +2539,7 @@ struct proto_option_defs {
 #define	PROTO_OPT_NFSMAPID_DOMAIN		10
 	{"nfsmapid_domain",
 	    "nfsmapid_domain", PROTO_OPT_NFSMAPID_DOMAIN, OPT_TYPE_DOMAIN,
-	    NULL, SVC_NFSMAPID, 0, 0},
+	    0, SVC_NFSMAPID, 0, 0},
 #define	PROTO_OPT_NFSD_MAX_CONNECTIONS		11
 	{"nfsd_max_connections",
 	    "max_connections", PROTO_OPT_NFSD_MAX_CONNECTIONS,
@@ -2555,7 +2555,7 @@ struct proto_option_defs {
 #define	PROTO_OPT_NFSD_DEVICE			14
 	{"nfsd_device",
 	    "device", PROTO_OPT_NFSD_DEVICE,
-	    OPT_TYPE_STRING, NULL, SVC_NFSD, 0, 0},
+	    OPT_TYPE_STRING, 0, SVC_NFSD, 0, 0},
 #define	PROTO_OPT_MOUNTD_LISTEN_BACKLOG		15
 	{"mountd_listen_backlog",
 	    "mountd_listen_backlog", PROTO_OPT_MOUNTD_LISTEN_BACKLOG,

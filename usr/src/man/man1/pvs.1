@@ -1,5 +1,6 @@
 '\" te
 .\"  Copyright (c) 2008, Sun Microsystems, Inc.
+.\" Copyright 2019 Joyent, Inc.
 .\"  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
@@ -14,7 +15,6 @@ pvs \- display the internal version information of dynamic objects
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpvs\fR utility displays any internal version information contained
 within an \fBELF\fR file. Commonly, these files are dynamic executables and
@@ -53,7 +53,6 @@ dynamic object being created. At process initialization, the runtime linker
 uses any version \fIdependencies\fR as a means of validating the interface
 requirements of the dynamic objects used to construct the process.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported. If neither the \fB-d\fR or \fB-r\fR
 options are specified, both are enabled.
@@ -220,7 +219,6 @@ inheritance of the base version definition is also shown. When used with the
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported.
 .sp
@@ -234,7 +232,6 @@ The  \fBELF\fR file about which internal version information is displayed.
 
 .SH USAGE
 .SS "Matching Options"
-.sp
 .LP
 The \fB-I\fR and \fB-N\fR options are collectively referred to as the
 \fBmatching options\fR. These options are used to narrow the range of versions
@@ -388,7 +385,6 @@ specify its name:
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 If the requested version information is not found, a non-zero value is
 returned. Otherwise, a \fB0\fR value is returned.
@@ -415,7 +411,6 @@ neither the \fB-d\fR nor \fB-r\fR option is specified and no version
 definitions or version requirements are found.
 .RE
 .SH SEE ALSO
-.sp
 .LP
 \fBelfdump\fR(1), \fBld\fR(1), \fBldd\fR(1), \fBstrip\fR(1), \fBelf\fR(3ELF),
 \fBattributes\fR(5)

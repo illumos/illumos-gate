@@ -261,7 +261,7 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp, Rt_map *clmp, int *in_nfavl)
 	 * capabilities have been established, ensure that they are appropriate
 	 * for this system.
 	 */
-	if (pnavl_recorded(&capavl, ofl->ofl_name, NULL, NULL))
+	if (pnavl_recorded(&capavl, ofl->ofl_name, 0, NULL))
 		scapset = alt_scapset;
 	else
 		scapset = org_scapset;

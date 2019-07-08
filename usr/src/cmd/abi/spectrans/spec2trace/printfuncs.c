@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -60,7 +58,7 @@ generate_printf(ENTRY *f)
 	(void) fprintf(Bodyfp, "    fprintf(ABISTREAM, \"");
 	p = &arglist[0];
 	l = (int)sizeof (arglist);
-	*p = NULL;
+	*p = '\0';
 	for (e = symtab_get_first_arg(); e != NULL; e = symtab_get_next_arg()) {
 		errlog(TRACING, "arglist = '%s'", arglist);
 
@@ -72,7 +70,7 @@ generate_printf(ENTRY *f)
 		if (p != &arglist[0]) {
 			(void) fprintf(Bodyfp, ", ");
 		}
-		if (*(name =  name_of(e)) == NULL) {
+		if (*(name =  name_of(e)) == '\0') {
 			/* It's a varargs indicator instead */
 			(void) fprintf(Bodyfp, "...");
 		} else {
@@ -80,7 +78,7 @@ generate_printf(ENTRY *f)
 			n = prepare_printf_part(e, name, p, l);
 			l -= n;
 			p += n;
-			*(p+1) = NULL;
+			*(p+1) = '\0';
 		}
 	}
 
@@ -156,7 +154,7 @@ generate_printfunc_calls(ENTRY *f)
 		if (is_void(e)) {
 			break;
 		}
-		if (*(name = name_of(e)) == NULL) {
+		if (*(name = name_of(e)) == '\0') {
 			(void) fprintf(Bodyfp, "        fputs(\"  ...\\n\", "
 				"ABISTREAM);\n");
 		}
@@ -231,7 +229,7 @@ generate_print_definitions(FILE *fp)
 		print_type != NULL;
 			print_type = db_get_next_print_type()) {
 		c_type = strchr(print_type, ','); /* Safe by construction. */
-		*c_type++ = NULL;
+		*c_type++ = '\0';
 		errlog(TRACING,  "print_type=%s\n", print_type);
 
 		pf_str_name = space_to_uscore(print_type);
@@ -268,7 +266,7 @@ generate_print_declarations(FILE *fp)
 		errlog(TRACING,  "print_type, c_type=%s\n", print_type);
 
 		c_type = strchr(print_type, ','); /* Safe by construction. */
-		*c_type++ = NULL;
+		*c_type++ = '\0';
 
 		pf_str_name = space_to_uscore(print_type);
 

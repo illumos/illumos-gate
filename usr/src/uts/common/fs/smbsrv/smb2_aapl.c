@@ -24,13 +24,17 @@
 
 /* SMB2 AAPL extensions: enabled? */
 int smb2_aapl_extensions = 1;
-uint64_t smb2_aapl_server_caps =
-	kAAPL_SUPPORTS_READ_DIR_ATTR;
-	/* | kAAPL_SUPPORTS_OSX_COPYFILE; (not yet) */
-	/* | kAAPL_UNIX_BASED; */
+
 /*
- * We could turn on kAAPL_UNIX_BASED above and report UNIX modes in
- * directory listings (see smb2_aapl_get_macinfo below) but don't
+ * smb2_aapl_server_caps is a flags word containing detailed
+ * capabilities as shown in smb2_aapl.h (kAPPL_...)
+ *
+ * We actually can support OSX_COPYFILE but modern MacOS clients
+ * work better using the plain old FSCTL_SRV_COPYCHUNK ioctl, which
+ * avoids our needing to handle all the meta-data and streams.
+ *
+ * We could turn on kAAPL_UNIX_BASED below and report UNIX modes in
+ * directory listings (see smb2_aapl_get_macinfo below) but we don't
  * because the modes ZFS presents with non-trivial ACLs cause mac
  * clients to misbehave when copying files from the share to local.
  * For example, we may have a file that we can read, but which has
@@ -39,6 +43,10 @@ uint64_t smb2_aapl_server_caps =
  * kAAPL_UNIX_BASED flag.  Later we might set this flag and return
  * modes only when we have a trivial ACL.
  */
+uint64_t smb2_aapl_server_caps =
+	kAAPL_SUPPORTS_READ_DIR_ATTR;
+	/* | kAAPL_SUPPORTS_OSX_COPYFILE */
+	/* | kAAPL_UNIX_BASED; */
 
 uint64_t smb2_aapl_volume_caps = kAAPL_SUPPORTS_FULL_SYNC;
 
@@ -216,7 +224,7 @@ smb2_aapl_get_macinfo(smb_request_t *sr, smb_odir_t *od,
 		uio.uio_resid = sizeof (AfpInfo);
 		uio.uio_segflg = UIO_SYSSPACE;
 		uio.uio_extflg = UIO_COPY_DEFAULT;
-		rc = smb_fsop_read(sr, kcr, snode, &uio);
+		rc = smb_fsop_read(sr, kcr, snode, NULL, &uio);
 		if (rc == 0 && uio.uio_resid == 0) {
 			bcopy(&AfpInfo[4], &mi->mi_finderinfo,
 			    sizeof (mi->mi_finderinfo));

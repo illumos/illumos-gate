@@ -4,15 +4,13 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved.  The Berkeley Software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "sh.h"
 #include "sh.tconst.h"
@@ -130,7 +128,7 @@ collect(tchar *as)
 		printf("acollect done\n");
 #endif
 	} else if (noglob || eq(as, S_LBRA /* "{" */) ||
-			eq(as, S_BRABRA /* "{}" */)) {
+	    eq(as, S_BRABRA /* "{}" */)) {
 		Gcat(as, S_ /* "" */);
 		sort();
 	} else
@@ -193,7 +191,7 @@ expand(tchar *as)
 				(void) strcpy_(gpath, gpath + 1);
 			} else
 				(void) strcpy_(gpath,
-					value(S_home /* "home" */));
+				    value(S_home /* "home" */));
 			gpathp = strend(gpath);
 		}
 	}
@@ -241,7 +239,7 @@ matchdir_(tchar *pattern)
 	 * BSD's opendir would open "." if argument is NULL, but not S5
 	 */
 
-	if (*gpath == NULL)
+	if (*gpath == '\0')
 		dirp = opendir_(S_DOT /* "." */);
 	else
 		dirp = opendir_(gpath);
@@ -635,7 +633,7 @@ tglob(tchar **t)
 		if (*p == '~')
 			gflag |= 2;
 		else if (*p == '{' && (p[1] == '\0' ||
-			p[1] == '}' && p[2] == '\0'))
+		    p[1] == '}' && p[2] == '\0'))
 			continue;
 		while (c = *p++)
 			if (isglob(c))

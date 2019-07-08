@@ -1,6 +1,7 @@
 '\" te
 .\"  Copyright (c) 2009 by Sun Microsystems, Inc.
 .\" All rights reserved.
+.\" Copyright 2019 Joyent, Inc.
 .\" The contents of this file are subject to the
 .\" terms of the Common Development and Distribution License (the "License").
 .\"  You may not use this file except in compliance with the License. You can
@@ -22,7 +23,6 @@ elfdump \- dumps selected parts of an object file
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBelfdump\fR utility symbolically dumps selected parts of the specified
 object file(s). The options allow specific portions of the file to be
@@ -93,7 +93,6 @@ displays all available information for each object.
 For a complete description of the displayed information, refer to the \fILinker
 and Libraries Guide\fR.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -505,7 +504,6 @@ Dumps the contents of the \fB\&.SUNW_syminfo\fR section.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operand is supported:
 .sp
@@ -519,7 +517,6 @@ The name of the specified object file.
 
 .SH USAGE
 .SS "Matching Options"
-.sp
 .LP
 The options \fB-I\fR, \fB-N\fR, and \fB-T\fR are collectively referred to as
 the \fBmatching options\fR. These options are used to narrow the range of
@@ -562,7 +559,6 @@ matched by any of the matching options used. This feature allows for the
 selection of complex groupings of items using the most convenient form for
 specifying each item.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fBliblddbg.so\fR\fR
@@ -572,7 +568,6 @@ linker debugging library
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -588,7 +583,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBar\fR(1), \fBdump\fR(1), \fBnm\fR(1), \fBpvs\fR(1), \fBelf\fR(3ELF),
 \fBcore\fR(4), \fBattributes\fR(5)

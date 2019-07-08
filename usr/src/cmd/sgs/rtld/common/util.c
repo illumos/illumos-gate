@@ -1324,7 +1324,7 @@ create_cntl(Lm_list *lml, int dlopen)
 
 		if ((lmc = alist_append(&lml->lm_lists, NULL, sizeof (Lm_cntl),
 		    AL_CNT_LMLISTS)) == NULL)
-			return (NULL);
+			return (0);
 
 		return ((Aliste)((char *)lmc - (char *)lml->lm_lists));
 	}
@@ -2006,7 +2006,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 	} else if (select & SEL_ACT_SPEC_2) {
 		/*
 		 * variables can be: ENV_FLG_
-		 * 	AUDIT_ARGS, BINDING, CONFGEN, LOADFLTR, PROFILE,
+		 *	AUDIT_ARGS, BINDING, CONFGEN, LOADFLTR, PROFILE,
 		 *	SIGNAL, TRACE_OBJS
 		 */
 		switch (variable) {
@@ -2863,7 +2863,7 @@ int
 printf(const char *format, ...)
 {
 	va_list	args;
-	char 	buffer[ERRSIZE];
+	char	buffer[ERRSIZE];
 	Prfbuf	prf;
 
 	va_start(args, format);

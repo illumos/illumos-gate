@@ -249,7 +249,8 @@ open_audio(void)
 
 /* Play a list of audio files. */
 int
-main(int argc, char **argv) {
+main(int argc, char **argv)
+{
 	int		errorStatus = 0;
 	int		i;
 	int		c;
@@ -511,8 +512,8 @@ main(int argc, char **argv) {
 			/* Skip the file header and set the proper size */
 			cnt = lseek(ifd, 0, SEEK_CUR);
 			if (cnt < 0) {
-			    perror("lseek");
-			    exit(1);
+				perror("lseek");
+				exit(1);
 			}
 			inbuf = (unsigned char *) mapaddr + cnt;
 			len = cnt = st.st_size - cnt;
@@ -730,8 +731,8 @@ main(int argc, char **argv) {
 						demux(3,
 						    cnt / File_hdr.channels);
 						for (c = 0;
-							c < File_hdr.channels;
-							c++) {
+						    c < File_hdr.channels;
+						    c++) {
 						    err = g723_decode(
 							in_ch_data[c],
 							cnt /
@@ -920,8 +921,8 @@ parse_unsigned(char *str, unsigned *dst, char *flag)
 static int
 path_open(char *fname, int flags, mode_t mode, char *path)
 {
-	char		fullpath[MAXPATHLEN]; 	/* full path of file */
-	char 		*buf;			/* malloc off the tmp buff */
+	char		fullpath[MAXPATHLEN];	/* full path of file */
+	char		*buf;			/* malloc off the tmp buff */
 	char		*cp;
 	struct stat	st;
 
@@ -963,7 +964,7 @@ path_open(char *fname, int flags, mode_t mode, char *path)
 
 	for (path = buf; path && *path; ) {
 		if (cp = strchr(path, ':')) {
-			*cp++ = NULL; /* now pts to next path element */
+			*cp++ = '\0'; /* now pts to next path element */
 		}
 
 		/* the safest way to create the path string :-) */

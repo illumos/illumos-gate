@@ -419,7 +419,7 @@ ilbd_get_svr_field(char *valstr, struct in6_addr *sgs_addr,
 	ip_ver = atoi(ipverstr);
 	addrptr = (ip_ver == AF_INET) ? (void *)&temp_ip.ia_v4 :
 	    (void *)&temp_ip.ia_v6;
-	if (inet_pton(ip_ver, ipaddr, addrptr) == NULL) {
+	if (inet_pton(ip_ver, ipaddr, addrptr) == 0) {
 		logerr("ilbd_get_svr_field: inet_pton failed");
 		return;
 	}

@@ -353,9 +353,9 @@ Pstack_iter32(struct ps_prochandle *P, const prgregset_t regs,
 		if (find_uclink(&ucl, pfp + sizeof (sf_t)))
 			uc_addr = pfp + sizeof (sf_t);
 		else
-			uc_addr = NULL;
+			uc_addr = (uintptr_t)NULL;
 
-		if (uc_addr != NULL &&
+		if (uc_addr != (uintptr_t)NULL &&
 		    Pread(P, &uc, sizeof (uc), uc_addr) == sizeof (uc)) {
 			ucontext_32_to_prgregs(&uc, gregs);
 			fp = gregs[R_FP];

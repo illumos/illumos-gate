@@ -113,8 +113,9 @@ custr_append_vprintf(custr_t *cus, const char *fmt, va_list ap)
 	int len = vsnprintf(NULL, 0, fmt, ap);
 	size_t chunksz = STRING_CHUNK_SIZE;
 
-	if (len == -1)
+	if (len < 0) {
 		return (len);
+	}
 
 	while (chunksz < len) {
 		chunksz *= 2;
@@ -155,10 +156,10 @@ custr_append_vprintf(custr_t *cus, const char *fmt, va_list ap)
 	/*
 	 * Append new string to existing string:
 	 */
-	len = vsnprintf(cus->cus_data + cus->cus_strlen,
-	    (uintptr_t)cus->cus_data - (uintptr_t)cus->cus_strlen, fmt, ap);
-	if (len == -1)
+	if ((len = vsnprintf(cus->cus_data + cus->cus_strlen,
+	    cus->cus_datalen - cus->cus_strlen, fmt, ap)) < 0) {
 		return (len);
+	}
 	cus->cus_strlen += len;
 
 	return (0);

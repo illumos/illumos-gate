@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * usr/src/cmd/cmd-inet/usr.bin/telnet/encrypt.c
  */
@@ -142,7 +140,7 @@ findencryption(int type)
 
 	if (!(I_SUPPORT_ENCRYPT & remote_supports_decrypt & typemask(type)))
 		return (NULL);
-	for (; (ep->type != NULL) && (ep->type != type); ep++);
+	for (; (ep->type != 0) && (ep->type != type); ep++);
 	return (ep->type ? ep : NULL);
 }
 

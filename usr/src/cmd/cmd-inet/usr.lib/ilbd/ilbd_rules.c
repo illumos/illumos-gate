@@ -1094,7 +1094,7 @@ ilbd_ip_to_str(uint16_t ipversion, struct in6_addr *addr, char *valstr)
 	IP_COPY_IMPL_2_CLI(addr, &ipaddr);
 	addrptr = (ipversion == AF_INET) ?
 	    (void *)&ipaddr.ia_v4 : (void *)&ipaddr.ia_v6;
-	if (inet_ntop(ipversion, (void *)addrptr, valstr, vallen == NULL))
+	if (inet_ntop(ipversion, (void *)addrptr, valstr, vallen) == NULL)
 		logerr("ilbd_ip_to_str: inet_ntop failed");
 	return;
 

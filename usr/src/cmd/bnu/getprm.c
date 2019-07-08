@@ -28,8 +28,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "uucp.h"
 
 #define LQUOTE	'('
@@ -235,7 +233,7 @@ char *arg, *sys, *fwd, *file;
 	    if (cl != (cr = wcsrchr(n, (wchar_t)'!'))) {
 		/*  more than one ! */
 		wcsncpy(tmpbuf, cl+1, cr-cl-1);
-		tmpbuf[cr-cl-1] = NULL;
+		tmpbuf[cr-cl-1] = '\0';
 		(void) wcstombs(fwd, tmpbuf, MAXFULLNAME);
 	    }
 	} else {

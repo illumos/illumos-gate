@@ -218,7 +218,29 @@ fop_ioctl(
 	int *rvalp,
 	caller_context_t *ct)
 {
-	return (ENOSYS);
+	off64_t off;
+	int rv, whence;
+
+	switch (cmd) {
+	case _FIO_SEEK_DATA:
+	case _FIO_SEEK_HOLE:
+		whence = (cmd == _FIO_SEEK_DATA) ? SEEK_DATA : SEEK_HOLE;
+		bcopy((void *)arg, &off, sizeof (off));
+		off = lseek(vp->v_fd, off, whence);
+		if (off == (off64_t)-1) {
+			rv = errno;
+		} else {
+			bcopy(&off, (void *)arg, sizeof (off));
+			rv = 0;
+		}
+		break;
+
+	default:
+		rv = ENOTTY;
+		break;
+	}
+
+	return (rv);
 }
 
 /* ARGSUSED */
@@ -266,10 +288,15 @@ fop_setattr(
 	caller_context_t *ct)
 {
 	timespec_t times[2];
+	int err;
 
 	if (vap->va_mask & AT_SIZE) {
-		if (ftruncate(vp->v_fd, vap->va_size) == -1)
-			return (errno);
+		if (ftruncate(vp->v_fd, vap->va_size) == -1) {
+			err = errno;
+			if (err == EBADF)
+				err = EACCES;
+			return (err);
+		}
 	}
 
 	/* AT_MODE or anything else? */

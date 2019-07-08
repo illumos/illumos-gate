@@ -1899,6 +1899,7 @@ typedef struct smb_request {
 		smb_arg_olbrk_t		olbrk;	/* for async oplock break */
 		smb_rw_param_t		*rw;
 		int32_t			timestamp;
+		void			*other;
 	} arg;
 } smb_request_t;
 

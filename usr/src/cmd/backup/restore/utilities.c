@@ -114,7 +114,7 @@ renameit(char *fp, char *tp)
 		tofd = fromfd;
 		if ((pathend = strrchr(from, '/')) != NULL) {
 			strncpy(tobuf, from, pathend - from + 1);
-			tobuf[pathend - from + 1] = NULL;
+			tobuf[pathend - from + 1] = '\0';
 			strlcat(tobuf, tp, sizeof (tobuf));
 			to = tobuf;
 		} else {
@@ -154,8 +154,8 @@ newnode(struct entry *np)
 		if (fchdir(dfd) < 0) {
 			int saverr = errno;
 			(void) fprintf(stderr,
-				gettext("Warning: cannot create %s: %s"),
-				cp, strerror(saverr));
+			    gettext("Warning: cannot create %s: %s"),
+			    cp, strerror(saverr));
 			(void) fflush(stderr);
 			(void) close(dfd);
 			return;
@@ -200,8 +200,8 @@ removenode(struct entry *ep)
 		if (fchdir(dfd) < 0) {
 			int saverr = errno;
 			(void) fprintf(stderr,
-				gettext("Warning: cannot remove %s: %s"),
-				cp, strerror(saverr));
+			    gettext("Warning: cannot remove %s: %s"),
+			    cp, strerror(saverr));
 			(void) fflush(stderr);
 			(void) close(dfd);
 			return;
@@ -210,7 +210,7 @@ removenode(struct entry *ep)
 	if (rmdir(cp) < 0) {	/* NOTE: could use unlinkat (..,REMOVEDIR) */
 		int saverr = errno;
 		(void) fprintf(stderr, gettext("Warning: %s: %s\n"),
-			cp, strerror(saverr));
+		    cp, strerror(saverr));
 		(void) fflush(stderr);
 	} else {
 		vprintf(stdout, gettext("Remove node %s\n"), cp);
@@ -240,7 +240,7 @@ removeleaf(struct entry *ep)
 	if (unlinkat(dfd, cp, 0) < 0) {
 		int saverr = errno;
 		(void) fprintf(stderr, gettext("Warning: %s: %s\n"),
-			cp, strerror(saverr));
+		    cp, strerror(saverr));
 		(void) fflush(stderr);
 	} else {
 		vprintf(stdout, gettext("Remove leaf %s\n"), cp);
@@ -266,8 +266,8 @@ lf_linkit(char *existing, char *new, int type)
 	resolve(existing, &dfd, &name);
 	if (dfd == -1) {
 		(void) fprintf(stderr, gettext(
-			"Warning: cannot restore %s link %s->%s\n"),
-			(type == SYMLINK ? "symbolic" : "hard"), new, existing);
+		    "Warning: cannot restore %s link %s->%s\n"),
+		    (type == SYMLINK ? "symbolic" : "hard"), new, existing);
 		result = FAIL;
 		goto out;
 	}
@@ -380,7 +380,7 @@ badentry(struct entry *ep, char *msg)
 	(void) fprintf(stderr, gettext("bad entry: %s\n"), msg);
 	(void) fprintf(stderr, gettext("name: %s\n"), myname(ep));
 	(void) fprintf(stderr, gettext("parent name %s\n"),
-		myname(ep->e_parent));
+	    myname(ep->e_parent));
 	if (ep->e_sibling != NIL)
 		(void) fprintf(stderr, gettext("sibling name: %s\n"),
 		    myname(ep->e_sibling));
@@ -429,7 +429,7 @@ flagvalues(struct entry *ep)
 		(void) strlcat(flagbuf, gettext("|XATTR"), sizeof (flagbuf));
 	if (ep->e_flags & XATTRROOT)
 		(void) strlcat(flagbuf, gettext("|XATTRROOT"),
-						sizeof (flagbuf));
+		    sizeof (flagbuf));
 	return (&flagbuf[1]);
 }
 
@@ -463,7 +463,7 @@ reply(char *question)
 		while (c != '\n' && getc(terminal) != '\n') {
 			if (ferror(terminal)) {
 				(void) fprintf(stderr, gettext(
-					"Error reading response\n"));
+				    "Error reading response\n"));
 				(void) fflush(stderr);
 				return (FAIL);
 			}
@@ -521,6 +521,7 @@ panic(va_dcl)
 			abort();
 		done(1);
 	}
+}
 #endif
 
 /*
@@ -602,7 +603,7 @@ safe_open(int dfd, const char *filename, int mode, int perms)
 	    O_WRONLY|O_CREAT|O_TRUNC|O_EXCL|O_LARGEFILE, perms)) < 0) {
 		if (errno == EEXIST) {
 			if (fstatat(dfd, filename, &pre_lstat,
-						AT_SYMLINK_NOFOLLOW) < 0) {
+			    AT_SYMLINK_NOFOLLOW) < 0) {
 				saverr = errno;
 				(void) close(fd);
 				errno = saverr;
@@ -632,7 +633,7 @@ safe_open(int dfd, const char *filename, int mode, int perms)
 			}
 
 			if (fstatat(fd, NULL, &post_lstat,
-						AT_SYMLINK_NOFOLLOW) < 0) {
+			    AT_SYMLINK_NOFOLLOW) < 0) {
 				saverr = errno;
 				(void) close(fd);
 				errno = saverr;
@@ -793,10 +794,10 @@ mkentry(char *name, ino_t ino, struct arglist *ap)
 	if (ap->base == NULL) {
 		ap->nent = 20;
 		ap->base = (struct afile *)calloc((unsigned)ap->nent,
-			sizeof (*(ap->base)));
+		    sizeof (*(ap->base)));
 		if (ap->base == NULL) {
 			(void) fprintf(stderr,
-				gettext("%s: out of memory\n"), ap->cmd);
+			    gettext("%s: out of memory\n"), ap->cmd);
 			return (FAIL);
 		}
 	}
@@ -811,7 +812,7 @@ mkentry(char *name, ino_t ino, struct arglist *ap)
 		    (size_t)(2 * ap->nent * (size_t)sizeof (*(ap->base))));
 		if (ap->base == NULL) {
 			(void) fprintf(stderr,
-				gettext("%s: out of memory\n"), ap->cmd);
+			    gettext("%s: out of memory\n"), ap->cmd);
 			return (FAIL);
 		}
 		ap->head = ap->base;
@@ -860,7 +861,7 @@ expand(char *as, int rflg, struct arglist *ap)
 	char		slash;
 	char		*rs;
 	char		c;
-	wchar_t 	w_fname[PATH_MAX+1];
+	wchar_t		w_fname[PATH_MAX+1];
 	wchar_t		w_pname[PATH_MAX+1];
 
 	/*
@@ -1102,8 +1103,9 @@ resolve(char *path, int *fd, char **rpath)
 	*rpath = path;
 	path = *rpath + strlen(*rpath) +1;
 	while (*path != '\0' &&
-		(*fd = openat64(tfd, *rpath, O_RDONLY)) > 0) {
-		if (tfd != AT_FDCWD) (void) close(tfd);
+	    (*fd = openat64(tfd, *rpath, O_RDONLY)) > 0) {
+		if (tfd != AT_FDCWD)
+			(void) close(tfd);
 		tfd = *fd;
 		*rpath = path;
 		path = *rpath + strlen(*rpath) +1;
@@ -1113,8 +1115,8 @@ resolve(char *path, int *fd, char **rpath)
 	if (*fd < 0 || (*fd = openat64(tfd, ".", O_RDONLY|O_XATTR)) < 0) {
 		int saverr = errno;
 		(void) fprintf(stderr,
-			gettext("Warning: cannot fully resolve %s: %s"),
-			path, strerror(saverr));
+		    gettext("Warning: cannot fully resolve %s: %s"),
+		    path, strerror(saverr));
 		(void) fflush(stderr);
 	}
 	if (tfd != AT_FDCWD) (void) close(tfd);
@@ -1146,6 +1148,6 @@ complexcpy(char *s1, char *s2, int max)
 	if (nullseen == 0)
 		*--s1 = '\0';
 	fprintf(stderr,
-		gettext("Warning: unterminated source string in complexcpy\n"));
+	    gettext("Warning: unterminated source string in complexcpy\n"));
 	return (max-1);
 }

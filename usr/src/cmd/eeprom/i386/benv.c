@@ -360,7 +360,7 @@ add_comm(benv_des_t *bd, char *base, char *last, char **next, int *line)
 			nl = 0;
 		}
 	}
-	*(p - 1) = NULL;
+	*(p - 1) = '\0';
 	add_bent(bd->elist, base, NULL, NULL, NULL);
 	*next = p;
 	*line += lines;

@@ -37,8 +37,6 @@
 #include <smbsrv/smb_xdr.h>
 #include <smb/winioctl.h>
 
-static uint32_t smb_opipe_transceive(smb_request_t *, smb_fsctl_t *);
-
 /*
  * Allocate a new opipe and return it, or NULL, in which case
  * the caller will report "internal error".
@@ -557,13 +555,17 @@ smb_opipe_getname(smb_ofile_t *of, char *buf, size_t buflen)
 }
 
 /*
- * Handler for smb2_ioctl
+ * Handle device type FILE_DEVICE_NAMED_PIPE
+ * for smb2_ioctl
  */
 /* ARGSUSED */
 uint32_t
 smb_opipe_fsctl(smb_request_t *sr, smb_fsctl_t *fsctl)
 {
 	uint32_t status;
+
+	if (!STYPE_ISIPC(sr->tid_tree->t_res_type))
+		return (NT_STATUS_INVALID_DEVICE_REQUEST);
 
 	switch (fsctl->CtlCode) {
 	case FSCTL_PIPE_TRANSCEIVE:
@@ -585,7 +587,7 @@ smb_opipe_fsctl(smb_request_t *sr, smb_fsctl_t *fsctl)
 	return (status);
 }
 
-static uint32_t
+uint32_t
 smb_opipe_transceive(smb_request_t *sr, smb_fsctl_t *fsctl)
 {
 	smb_vdb_t	vdb;

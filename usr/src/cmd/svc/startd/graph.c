@@ -3563,7 +3563,7 @@ do_uadmin(void)
 	char *fbarg = NULL;
 #endif	/* __x86 */
 
-	mdep = NULL;
+	mdep = 0;
 	fd = creat(resetting, 0777);
 	if (fd >= 0)
 		startd_close(fd);

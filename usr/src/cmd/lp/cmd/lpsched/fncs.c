@@ -898,7 +898,7 @@ void GetRequestFiles(REQUEST *req, char *buffer, int length)
 	} else if (req->file_list)
 		strlcpy(buf, *req->file_list, sizeof (buf));
 	
-	if (*buf == NULL || !strncmp(buf, SPOOLDIR, sizeof(SPOOLDIR)-1))
+	if (*buf == '\0' || !strncmp(buf, SPOOLDIR, sizeof(SPOOLDIR)-1))
 		strcpy(buf, "<File name not available>");
 
 	if (strlen(buf) > (size_t) 24) {

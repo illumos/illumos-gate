@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -312,9 +310,7 @@ add_default_route(router_addr)
 
 
 int
-bpanswer(res, nb)
-	struct bp_whoami_res *res;
-	struct netbuf *nb;
+bpanswer(struct bp_whoami_res *res, struct netbuf *nb)
 {
 	struct in_addr router_addr;
 	static int set;
@@ -379,7 +375,7 @@ bpanswer(res, nb)
 	}
 
 	if (multiple)
-		return (NULL);
+		return (0);
 
 	/* our job is done */
 	exit(0);

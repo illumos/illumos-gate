@@ -597,7 +597,7 @@ timestamp:
 
 	/* Read reconfigure property for recovery. */
 	if (scf_handle_decode_fmri(hndl, startd_reconfigure_fmri, NULL, NULL,
-	    NULL, NULL, prop, NULL) != -1 &&
+	    NULL, NULL, prop, 0) != -1 &&
 	    scf_property_get_value(prop, val) == 0)
 		(void) scf_value_get_boolean(val, &prop_reconfig);
 

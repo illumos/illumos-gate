@@ -276,7 +276,7 @@ kmf_find_cert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	return (plugin->funclist->FindCert(handle, numattr, attrlist));
 }
 
-#define	NODATA(d) (d.Data == NULL || d.Length == NULL)
+#define	NODATA(d) (d.Data == NULL || d.Length == 0)
 
 KMF_RETURN
 kmf_encode_cert_record(KMF_X509_CERTIFICATE *CertData, KMF_DATA *encodedCert)

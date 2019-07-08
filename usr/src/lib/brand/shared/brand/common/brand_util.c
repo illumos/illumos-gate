@@ -366,7 +366,7 @@ brand_post_init(int version, int argc, char *argv[], char *envp[])
 	 * Find the aux vector on the stack.
 	 */
 	p = (uintptr_t *)envp;
-	while (*p != NULL)
+	while (*p != 0)
 		p++;
 
 	/*
@@ -401,9 +401,9 @@ brand_post_init(int version, int argc, char *argv[], char *envp[])
 		switch (ap->a_type) {
 			case AT_BASE:
 				/* Hide AT_BASE if static binary */
-				if (sed.sed_base == NULL) {
+				if (sed.sed_base == 0) {
 					ap->a_type = AT_IGNORE;
-					ap->a_un.a_val = NULL;
+					ap->a_un.a_val = 0;
 				} else {
 					ap->a_un.a_val = sed.sed_base;
 				}
@@ -432,13 +432,13 @@ brand_post_init(int version, int argc, char *argv[], char *envp[])
 				 * for the binary.
 				 */
 				ap->a_type = AT_IGNORE;
-				ap->a_un.a_val = NULL;
+				ap->a_un.a_val = 0;
 				break;
 			case AT_SUN_LDDATA:
 				/* Hide AT_SUN_LDDATA if static binary */
-				if (sed.sed_lddata == NULL) {
+				if (sed.sed_lddata == 0) {
 					ap->a_type = AT_IGNORE;
-					ap->a_un.a_val = NULL;
+					ap->a_un.a_val = 0;
 				} else {
 					ap->a_un.a_val = sed.sed_lddata;
 				}

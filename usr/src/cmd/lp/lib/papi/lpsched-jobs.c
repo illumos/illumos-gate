@@ -103,7 +103,7 @@ job_attributes_to_lpsched_request(papi_service_t svc, REQUEST *r,
 	papiAttributeListGetLPString(attributes, "form", &r->form);
 
 	/* set the page range */
-	memset(tmp, NULL, sizeof (tmp));
+	memset(tmp, 0, sizeof (tmp));
 	tmp[0] = papiAttributeListFind(attributes, "page-ranges");
 	if (tmp[0] != NULL) {
 		char buf[BUFSIZ];
@@ -369,11 +369,11 @@ lpsched_request_outcome_to_attributes(papi_attribute_t ***attributes,
 static void
 lpsched_user_to_job_attributes(papi_attribute_t ***list, char *user)
 {
-	if ((list != NULL) && (user != NULL) && (user[0] != NULL)) {
+	if ((list != NULL) && (user != NULL) && (user[0] != '\0')) {
 		char *host = strrchr(user, '@');
 
 		if (host != NULL) {
-			*host = NULL;
+			*host = '\0';
 			papiAttributeListAddString(list, PAPI_ATTR_REPLACE,
 			    "job-originating-user-name", user);
 			papiAttributeListAddString(list, PAPI_ATTR_REPLACE,

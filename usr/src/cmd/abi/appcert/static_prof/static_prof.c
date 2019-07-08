@@ -331,7 +331,7 @@ obj_init(obj_list * c)
 				    "File <<%s>> : Already opened.\n",
 				    c->obj->ename);
 		}
-		c->obj->fd = NULL;
+		c->obj->fd = 0;
 		return (FAIL);
 	}
 	/*
