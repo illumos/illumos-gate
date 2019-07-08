@@ -22,6 +22,7 @@
 /*
  *  Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -469,7 +470,7 @@ pcie_hp_create_occupant_props(dev_info_t *dip, dev_t dev, int pci_dev)
 {
 	pcie_bus_t		*bus_p = PCIE_DIP2BUS(dip);
 	pcie_hp_ctrl_t		*ctrl_p = (pcie_hp_ctrl_t *)bus_p->bus_hp_ctrl;
-	pcie_hp_slot_t		*slotp;
+	pcie_hp_slot_t		*slotp = NULL;
 	pcie_hp_cn_cfg_t	cn_cfg;
 	pcie_hp_occupant_info_t	*occupant;
 	int			circular, i;

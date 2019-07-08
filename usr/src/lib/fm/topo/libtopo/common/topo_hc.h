@@ -124,6 +124,13 @@ extern "C" {
 #define	TOPO_PCI_CLASS		"class-code"
 #define	TOPO_PCI_AADDR		"assigned-addresses"
 
+#define	TOPO_PCI_MAX_WIDTH	"link-maximum-width"
+#define	TOPO_PCI_CUR_WIDTH	"link-current-width"
+#define	TOPO_PCI_MAX_SPEED	"link-maximum-speed"
+#define	TOPO_PCI_CUR_SPEED	"link-current-speed"
+#define	TOPO_PCI_SUP_SPEED	"link-supported-speeds"
+#define	TOPO_PCI_ADMIN_SPEED	"link-admin-target-speed"
+
 #define	TOPO_PGROUP_BINDING	"binding"
 #define	TOPO_BINDING_OCCUPANT	"occupant-path"
 #define	TOPO_BINDING_DRIVER	"driver"

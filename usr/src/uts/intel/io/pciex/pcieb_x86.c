@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /* x86 specific code used by the pcieb driver */
@@ -43,7 +44,8 @@
 int pcieb_intel_workaround_disable = 0;
 
 void
-pcieb_peekpoke_cb(dev_info_t *dip, ddi_fm_error_t *derr) {
+pcieb_peekpoke_cb(dev_info_t *dip, ddi_fm_error_t *derr)
+{
 	pf_eh_enter(PCIE_DIP2BUS(dip));
 	(void) pf_scan_fabric(dip, derr, NULL);
 	pf_eh_exit(PCIE_DIP2BUS(dip));
@@ -201,7 +203,8 @@ pcieb_plat_uninitchild(dev_info_t *child)
 
 /* _OSC related */
 void
-pcieb_init_osc(dev_info_t *devi) {
+pcieb_init_osc(dev_info_t *devi)
+{
 	pcie_bus_t	*bus_p = PCIE_DIP2UPBUS(devi);
 	uint32_t	osc_flags = OSC_CONTROL_PCIE_ADV_ERR;
 
@@ -322,10 +325,10 @@ static x86_error_reg_t intel_5000_rp_regs[] = {
 	{0x144,	8,  0x0,	0x0,	0xF0},
 
 	/* EMASK_UNCOR_PEX[21:0] UE mask */
-	{0x148,	32, 0x0, 	PCIE_AER_UCE_UR,	PCIE_AER_UCE_UR},
+	{0x148,	32, 0x0,	PCIE_AER_UCE_UR,	PCIE_AER_UCE_UR},
 
 	/* EMASK_RP_PEX[2:0] FE, UE, CE message detect mask */
-	{0x150,	8,  0x0, 	0x0,	0x1},
+	{0x150,	8,  0x0,	0x0,	0x1},
 };
 #define	INTEL_5000_RP_REGS_LEN \
 	(sizeof (intel_5000_rp_regs) / sizeof (x86_error_reg_t))
@@ -353,16 +356,16 @@ static x86_error_reg_t intel_5400_rp_regs[] = {
 	{0x4E,	8, 0x0,	0x1,	0x0},
 
 	/* PEX_ERR_DOCMD[11:0] */
-	{0x144,	16,  0x0, 	0x0,	0xFF0},
+	{0x144,	16,  0x0,	0x0,	0xFF0},
 
 	/* PEX_ERR_PIN_MASK[4:0] do not mask ERR[2:0] pins used by DOCMD */
 	{0x146,	16,  0x0,	0x10,	0x10},
 
 	/* EMASK_UNCOR_PEX[21:0] UE mask */
-	{0x148,	32, 0x0, 	PCIE_AER_UCE_UR,	PCIE_AER_UCE_UR},
+	{0x148,	32, 0x0,	PCIE_AER_UCE_UR,	PCIE_AER_UCE_UR},
 
 	/* EMASK_RP_PEX[2:0] FE, UE, CE message detect mask */
-	{0x150,	8,  0x0, 	0x0,	0x1},
+	{0x150,	8,  0x0,	0x0,	0x1},
 };
 #define	INTEL_5400_RP_REGS_LEN \
 	(sizeof (intel_5400_rp_regs) / sizeof (x86_error_reg_t))
@@ -569,7 +572,7 @@ pcieb_intel_rber_workaround(dev_info_t *dip)
 	if (!rber)
 		return;
 
-	PCIE_AER_PUT(32, bus_p, PCIE_AER_UCE_SERV, pcieb_rber_sev);
+	(void) PCIE_AER_PUT(32, bus_p, PCIE_AER_UCE_SERV, pcieb_rber_sev);
 }
 
 /*

@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -449,8 +450,9 @@ pcishpc_slot_get_property(pcie_hp_slot_t *slot_p, ddi_hp_property_t *arg,
 
 	/* for each requested property, get the value and add it to nvlist */
 	prop_pair = NULL;
-	while (prop_pair = nvlist_next_nvpair(prop_list, prop_pair)) {
+	while ((prop_pair = nvlist_next_nvpair(prop_list, prop_pair)) != NULL) {
 		name = nvpair_name(prop_pair);
+		value = NULL;
 
 		if (strcmp(name, PCIEHPC_PROP_LED_FAULT) == 0) {
 			value = pcie_led_state_text(
@@ -661,7 +663,7 @@ set_prop_cleanup1:
 
 	/* Validate the request */
 	prop_pair = NULL;
-	while (prop_pair = nvlist_next_nvpair(prop_list, prop_pair)) {
+	while ((prop_pair = nvlist_next_nvpair(prop_list, prop_pair)) != NULL) {
 		name = nvpair_name(prop_pair);
 		if (nvpair_type(prop_pair) != DATA_TYPE_STRING) {
 			PCIE_DBG("Unexpected data type of setting "
@@ -699,7 +701,7 @@ set_prop_cleanup1:
 
 	// set each property
 	prop_pair = NULL;
-	while (prop_pair = nvlist_next_nvpair(prop_list, prop_pair)) {
+	while ((prop_pair = nvlist_next_nvpair(prop_list, prop_pair)) != NULL) {
 		name = nvpair_name(prop_pair);
 
 		if (strcmp(name, PCIEHPC_PROP_LED_ATTN) == 0) {
@@ -709,6 +711,8 @@ set_prop_cleanup1:
 				led_state = PCIE_HP_LED_OFF;
 			else if (strcmp(value, PCIEHPC_PROP_VALUE_BLINK) == 0)
 				led_state = PCIE_HP_LED_BLINK;
+			else
+				continue;
 
 			(void) pcishpc_setled(slot_p, PCIE_HP_ATTN_LED,
 			    led_state);

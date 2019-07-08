@@ -23,10 +23,121 @@
  */
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
  * Common x86 and SPARC PCI-E to PCI bus bridge nexus driver
+ *
+ * Background
+ * ----------
+ *
+ * The PCI Express (PCIe) specification defines that all of the PCIe devices in
+ * the system are connected together in a series of different fabrics. A way to
+ * think of these fabrics is that they are small networks where there are links
+ * between different devices and switches that allow fan out or fan in of the
+ * fabric. The entry point to that fabric is called a root complex and the
+ * fabric terminates at a what is called an endpoint, which is really just PCIe
+ * terminology for the common cards that are inserted into the system (HBAs,
+ * NICs, USB, NVMe, etc.).
+ *
+ * The PCIe specification states that every link on the system has a virtual
+ * PCI-to-PCI bridge. This allows PCIe devices to still be configured the same
+ * way traditional PCI devices are to the operating system and allows them to
+ * have a traditional PCI bus, device, and function associated with them, even
+ * though there is no actual shared bus. In addition, bridges are also used to
+ * connect traditional PCI and PCI-X devices into them.
+ *
+ * The PCIe specification refers to upstream and downstream ports. Upstream
+ * ports are considered closer the root complex and downstream ports are closer
+ * to the endpoint. We can divide the devices that the bridge driver attaches to
+ * into two groups. Those that are considered upstream ports, these include root
+ * complexes and parts of PCIe switches. And downstream ports, which are the
+ * other half of PCIe switches and endpoints (which this driver does not attach
+ * to, normal hardware-specific or class-specific drivers attach to those).
+ *
+ * Interrupt Management
+ * --------------------
+ *
+ * Upstream ports of bridges have additional things that we care about.
+ * Specifically they're the means through which we find out about:
+ *
+ *  - Advanced Error Reporting (AERs)
+ *  - Hotplug events
+ *  - Link Bandwidth Events
+ *  - Power Management Events (PME)
+ *
+ * Each of these features is an optional feature (though ones we hope are
+ * implemented). The features above are grouped into two different buckets based
+ * on which PCI capability they appear in. AER management is done through a PCI
+ * Express extended configuration header (it lives in extended PCI configuration
+ * space) called the 'Advanced Error Reporting Extended Capability'. The other
+ * events are all managed as part of the 'PCI Express Capability Structure'.
+ * This structure is found in traditional PCI configuration space.
+ *
+ * The way that the interrupts are programmed for these types of events differs
+ * a bit from the way one might expect a normal device to operate. For most
+ * devices, one allocates a number of interrupts based on a combination of what
+ * the device supports, what the OS supports per device, and the number the
+ * driver needs. Then the driver programs the device in a device-specific manner
+ * to indicate which events should trigger a specific interrupt vector.
+ *
+ * However, for both the AER and PCI capabilities, the driver has to do
+ * something different. The driver first allocates interrupts by programming the
+ * MSI or MSI-X table and then asks the device which interrupts have been
+ * assigned to these purposes. Because these events are only supported in
+ * 'upstream' devices, this does not interfere with the traditional management
+ * of MSI and MSI-X interrupts. At this time, the pcieb driver only supports the
+ * use of MSI interrupts.
+ *
+ * Once the interrupts have been allocated, we read back which vectors have been
+ * nominated by the device to cover the corresponding capability. The interrupt
+ * is allocated on a per-capability basis. Therefore, one interrupt would cover
+ * AERs, while another interrupt would cover the rest of the desired functions.
+ *
+ * To track which interrupts cover which behaviors, each driver state
+ * (pcieb_devstate_t) has a member called 'pcieb_isr_tab'. Each index represents
+ * an interrupt vector and there are a series of flags that represent the
+ * different possible interrupt sources: PCIEB_INTR_SRC_HP (hotplug),
+ * PCEIB_INTR_SRC_PME (power management event), PCIEB_INTR_SRC_AER (error
+ * reporting), PCIEB_INTR_SRC_LBW (link bandwidth).
+ *
+ * Because the hotplug, link bandwidth, and power management events all share
+ * the same vector, if an interrupt comes in, we must check all of the enabled
+ * sources that might generate this interrupt. It is highly likely that more
+ * than one will fire at the same time, for example, a hotplug event that fires
+ * because a device has been inserted or removed, will likely trigger a link
+ * bandwidth event.
+ *
+ * The pcieb driver itself does not actually have much logic to deal with and
+ * clear the interrupts in question. It generally speaking will vector most
+ * events back to the more general pcie driver or, in the case of AERs, initiate
+ * a scan of the fabric itself (also part of the pcie driver).
+ *
+ * Link Management
+ * ---------------
+ *
+ * The pcieb driver is used to take care of two different aspects of link
+ * management. The first of these, as described briefly above, is to monitor for
+ * changes to the negotiated link bandwidth. These events are managed by
+ * enabling support for the interrupts in the PCI Express Capability Structure.
+ * This is all taken care of by the pcie driver through functions like
+ * pcie_link_bw_enabled().
+ *
+ * The second aspect of link management the pcieb driver enables is the ability
+ * to retrain the link and optionally limit the speed. This is enabled through a
+ * series of private ioctls that are driven through a private userland utility,
+ * /usr/lib/pci/pcieb. Eventually, this should be more fleshed out and a more
+ * uniform interface based around the devctls that can be leveraged across
+ * different classes of devices should be used.
+ *
+ * Under the hood this basically leverages the ability of the upstream port to
+ * retrain a link by writing a bit to the PCIe link control register. See
+ * pcieb_ioctl_retrain(). From there, if the driver ever receives a request to
+ * change the maximum speed, that is updated in the card; however, it does not
+ * immediately retrain the link. A separate ioctl request is required to do so.
+ * Once the speed has been changed, regardless of whether or not it has been
+ * retrained, that fact will always be noted.
  */
 
 #include <sys/sysmacros.h>
@@ -52,6 +163,7 @@
 #include <sys/pcie_pwr.h>
 #include <sys/hotplug/pci/pcie_hp.h>
 #include "pcieb.h"
+#include "pcieb_ioctl.h"
 #ifdef PX_PLX
 #include <io/pciex/pcieb_plx.h>
 #endif /* PX_PLX */
@@ -344,7 +456,7 @@ pcieb_41210_mps_wkrnd(dev_info_t *cdip)
 			    ~(PCIE_DEVCTL_MAX_READ_REQ_MASK |
 			    PCIE_DEVCTL_MAX_PAYLOAD_MASK)) | cdip_mrrs_mps;
 
-			PCI_CAP_PUT16(cfg_hdl, 0, cap_ptr, PCIE_DEVCTL,
+			(void) PCI_CAP_PUT16(cfg_hdl, 0, cap_ptr, PCIE_DEVCTL,
 			    sdip_dev_ctrl);
 		}
 
@@ -474,6 +586,8 @@ pcieb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	(void) pcieb_intr_attach(pcieb);
 
 	(void) pcie_hpintr_enable(devi);
+
+	(void) pcie_link_bw_enable(devi);
 
 	/* Do any platform specific workarounds needed at this time */
 	pcieb_plat_attach_workaround(devi);
@@ -994,7 +1108,6 @@ FAIL:
  * by the device.  If features are not enabled first, the
  * device might not ask for any interrupts.
  */
-
 static int
 pcieb_intr_init(pcieb_devstate_t *pcieb, int intr_type)
 {
@@ -1002,39 +1115,47 @@ pcieb_intr_init(pcieb_devstate_t *pcieb, int intr_type)
 	int		nintrs, request, count, x;
 	int		intr_cap = 0;
 	int		inum = 0;
-	int		ret, hp_msi_off;
+	int		ret;
 	pcie_bus_t	*bus_p = PCIE_DIP2UPBUS(dip);
 	uint16_t	vendorid = bus_p->bus_dev_ven_id & 0xFFFF;
 	boolean_t	is_hp = B_FALSE;
 	boolean_t	is_pme = B_FALSE;
+	boolean_t	is_lbw = B_FALSE;
 
 	PCIEB_DEBUG(DBG_ATTACH, dip, "pcieb_intr_init: Attaching %s handler\n",
 	    (intr_type == DDI_INTR_TYPE_MSI) ? "MSI" : "INTx");
 
 	request = 0;
 	if (PCIE_IS_HOTPLUG_ENABLED(dip)) {
-		request++;
 		is_hp = B_TRUE;
 	}
 
-	/*
-	 * Hotplug and PME share the same MSI vector. If hotplug is not
-	 * supported check if MSI is needed for PME.
-	 */
 	if ((intr_type == DDI_INTR_TYPE_MSI) && PCIE_IS_RP(bus_p) &&
 	    (vendorid == NVIDIA_VENDOR_ID)) {
 		is_pme = B_TRUE;
-		if (!is_hp)
-			request++;
+	}
+
+	if (intr_type == DDI_INTR_TYPE_MSI && pcie_link_bw_supported(dip)) {
+		is_lbw = B_TRUE;
 	}
 
 	/*
-	 * Setup MSI if this device is a Rootport and has AER. Currently no
-	 * SPARC Root Port supports fabric errors being reported through it.
+	 * The hot-plug, link bandwidth, and power management events all are
+	 * based on the PCI Express capability. Therefore, they all share their
+	 * own interrupt.
+	 */
+	if (is_hp || is_pme || is_lbw) {
+		request++;
+	}
+
+	/*
+	 * If this device is a root port, which means it can have MSI interrupts
+	 * enabled for AERs, then we need to request one.
 	 */
 	if (intr_type == DDI_INTR_TYPE_MSI) {
-		if (PCIE_IS_RP(bus_p) && PCIE_HAS_AER(bus_p))
+		if (PCIE_IS_RP(bus_p) && PCIE_HAS_AER(bus_p)) {
 			request++;
+		}
 	}
 
 	if (request == 0)
@@ -1166,22 +1287,31 @@ pcieb_intr_init(pcieb_devstate_t *pcieb, int intr_type)
 
 	/* Get the MSI offset for hotplug/PME from the PCIe cap reg */
 	if (intr_type == DDI_INTR_TYPE_MSI) {
-		hp_msi_off = PCI_CAP_GET16(bus_p->bus_cfg_hdl, 0,
+		uint16_t pcie_msi_off;
+		pcie_msi_off = PCI_CAP_GET16(bus_p->bus_cfg_hdl, 0,
 		    bus_p->bus_pcie_off, PCIE_PCIECAP) &
 		    PCIE_PCIECAP_INT_MSG_NUM;
 
-		if (hp_msi_off >= count) {
-			PCIEB_DEBUG(DBG_ATTACH, dip, "MSI number %d in PCIe "
-			    "cap > max allocated %d\n", hp_msi_off, count);
+		if (pcie_msi_off >= count) {
+			PCIEB_DEBUG(DBG_ATTACH, dip, "MSI number %u in PCIe "
+			    "cap > max allocated %d\n", pcie_msi_off, count);
 			mutex_exit(&pcieb->pcieb_intr_mutex);
 			goto FAIL;
 		}
 
-		if (is_hp)
-			pcieb->pcieb_isr_tab[hp_msi_off] |= PCIEB_INTR_SRC_HP;
+		if (is_hp) {
+			pcieb->pcieb_isr_tab[pcie_msi_off] |= PCIEB_INTR_SRC_HP;
+		}
 
-		if (is_pme)
-			pcieb->pcieb_isr_tab[hp_msi_off] |= PCIEB_INTR_SRC_PME;
+		if (is_pme) {
+			pcieb->pcieb_isr_tab[pcie_msi_off] |=
+			    PCIEB_INTR_SRC_PME;
+		}
+
+		if (is_lbw) {
+			pcieb->pcieb_isr_tab[pcie_msi_off] |=
+			    PCIEB_INTR_SRC_LBW;
+		}
 	} else {
 		/* INTx handles only Hotplug interrupts */
 		if (is_hp)
@@ -1353,6 +1483,128 @@ pcieb_close(dev_t dev, int flags, int otyp, cred_t *credp)
 }
 
 static int
+pcieb_ioctl_retrain(pcieb_devstate_t *pcieb, cred_t *credp)
+{
+	pcie_bus_t	*bus_p = PCIE_DIP2BUS(pcieb->pcieb_dip);
+
+	if (drv_priv(credp) != 0) {
+		return (EPERM);
+	}
+
+	if (!PCIE_IS_PCIE(bus_p)) {
+		return (ENOTSUP);
+	}
+
+	if (!PCIE_IS_RP(bus_p) && !PCIE_IS_SWD(bus_p)) {
+		return (ENOTSUP);
+	}
+
+	return (pcie_link_retrain(pcieb->pcieb_dip));
+}
+
+static int
+pcieb_ioctl_get_speed(pcieb_devstate_t *pcieb, intptr_t arg, int mode,
+    cred_t *credp)
+{
+	pcie_bus_t			*bus_p = PCIE_DIP2BUS(pcieb->pcieb_dip);
+	pcieb_ioctl_target_speed_t	pits;
+
+	if (drv_priv(credp) != 0) {
+		return (EPERM);
+	}
+
+	if (!PCIE_IS_PCIE(bus_p)) {
+		return (ENOTSUP);
+	}
+
+	if (!PCIE_IS_RP(bus_p) && !PCIE_IS_SWD(bus_p)) {
+		return (ENOTSUP);
+	}
+
+	pits.pits_flags = 0;
+	pits.pits_speed = PCIEB_LINK_SPEED_UNKNOWN;
+
+	mutex_enter(&bus_p->bus_speed_mutex);
+	if ((bus_p->bus_speed_flags & PCIE_LINK_F_ADMIN_TARGET) != 0) {
+		pits.pits_flags |= PCIEB_FLAGS_ADMIN_SET;
+	}
+	switch (bus_p->bus_target_speed) {
+	case PCIE_LINK_SPEED_2_5:
+		pits.pits_speed = PCIEB_LINK_SPEED_GEN1;
+		break;
+	case PCIE_LINK_SPEED_5:
+		pits.pits_speed = PCIEB_LINK_SPEED_GEN2;
+		break;
+	case PCIE_LINK_SPEED_8:
+		pits.pits_speed = PCIEB_LINK_SPEED_GEN3;
+		break;
+	case PCIE_LINK_SPEED_16:
+		pits.pits_speed = PCIEB_LINK_SPEED_GEN4;
+		break;
+	default:
+		pits.pits_speed = PCIEB_LINK_SPEED_UNKNOWN;
+		break;
+	}
+	mutex_exit(&bus_p->bus_speed_mutex);
+
+	if (ddi_copyout(&pits, (void *)arg, sizeof (pits),
+	    mode & FKIOCTL) != 0) {
+		return (EFAULT);
+	}
+
+	return (0);
+}
+
+static int
+pcieb_ioctl_set_speed(pcieb_devstate_t *pcieb, intptr_t arg, int mode,
+    cred_t *credp)
+{
+	pcie_bus_t			*bus_p = PCIE_DIP2BUS(pcieb->pcieb_dip);
+	pcieb_ioctl_target_speed_t	pits;
+	pcie_link_speed_t		speed;
+
+	if (drv_priv(credp) != 0) {
+		return (EPERM);
+	}
+
+	if (!PCIE_IS_PCIE(bus_p)) {
+		return (ENOTSUP);
+	}
+
+	if (!PCIE_IS_RP(bus_p) && !PCIE_IS_SWD(bus_p)) {
+		return (ENOTSUP);
+	}
+
+	if (ddi_copyin((void *)arg, &pits, sizeof (pits),
+	    mode & FKIOCTL) != 0) {
+		return (EFAULT);
+	}
+
+	if (pits.pits_flags != 0) {
+		return (EINVAL);
+	}
+
+	switch (pits.pits_speed) {
+	case PCIEB_LINK_SPEED_GEN1:
+		speed = PCIE_LINK_SPEED_2_5;
+		break;
+	case PCIEB_LINK_SPEED_GEN2:
+		speed = PCIE_LINK_SPEED_5;
+		break;
+	case PCIEB_LINK_SPEED_GEN3:
+		speed = PCIE_LINK_SPEED_8;
+		break;
+	case PCIEB_LINK_SPEED_GEN4:
+		speed = PCIE_LINK_SPEED_16;
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	return (pcie_link_set_target(pcieb->pcieb_dip, speed));
+}
+
+static int
 pcieb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
     int *rvalp)
 {
@@ -1363,8 +1615,28 @@ pcieb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	if (pcieb == NULL)
 		return (ENXIO);
 
-	/* To handle devctl and hotplug related ioctls */
-	rv = pcie_ioctl(pcieb->pcieb_dip, dev, cmd, arg, mode, credp, rvalp);
+	/*
+	 * Check if this is one of the commands that the bridge driver natively
+	 * understands. There are only a handful of such private ioctls defined
+	 * in pcieb_ioctl.h. Otherwise, this ioctl should be handled by the
+	 * general pcie driver.
+	 */
+	switch (cmd) {
+	case PCIEB_IOCTL_RETRAIN:
+		rv = pcieb_ioctl_retrain(pcieb, credp);
+		break;
+	case PCIEB_IOCTL_GET_TARGET_SPEED:
+		rv = pcieb_ioctl_get_speed(pcieb, arg, mode, credp);
+		break;
+	case PCIEB_IOCTL_SET_TARGET_SPEED:
+		rv = pcieb_ioctl_set_speed(pcieb, arg, mode, credp);
+		break;
+	default:
+		/* To handle devctl and hotplug related ioctls */
+		rv = pcie_ioctl(pcieb->pcieb_dip, dev, cmd, arg, mode, credp,
+		    rvalp);
+		break;
+	}
 
 	return (rv);
 }
@@ -1395,7 +1667,7 @@ pcieb_intr_handler(caddr_t arg1, caddr_t arg2)
 	if (isrc == PCIEB_INTR_SRC_UNKNOWN)
 		goto FAIL;
 
-	if (isrc & PCIEB_INTR_SRC_HP)
+	if (isrc & (PCIEB_INTR_SRC_HP | PCIEB_INTR_SRC_LBW))
 		ret = pcie_intr(dip);
 
 	if (isrc & PCIEB_INTR_SRC_PME)
