@@ -44,11 +44,11 @@
  * ereports.  The payload is dependent on the class, and which arguments are
  * supplied to the function:
  *
- * 	EREPORT			POOL	VDEV	IO
- * 	block			X	X	X
- * 	data			X		X
- * 	device			X	X
- * 	pool			X
+ *	EREPORT			POOL	VDEV	IO
+ *	block			X	X	X
+ *	data			X		X
+ *	device			X	X
+ *	pool			X
  *
  * If we are in a loading state, all errors are chained together by the same
  * SPA-wide ENA (Error Numeric Association).
@@ -60,18 +60,18 @@
  * layered diagram:
  *
  *      +---------------+
- * 	| Aggregate I/O |	No associated logical data or device
- * 	+---------------+
+ *	| Aggregate I/O |	No associated logical data or device
+ *	+---------------+
  *              |
  *              V
- * 	+---------------+	Reads associated with a piece of logical data.
- * 	|   Read I/O    |	This includes reads on behalf of RAID-Z,
- * 	+---------------+       mirrors, gang blocks, retries, etc.
+ *	+---------------+	Reads associated with a piece of logical data.
+ *	|   Read I/O    |	This includes reads on behalf of RAID-Z,
+ *	+---------------+       mirrors, gang blocks, retries, etc.
  *              |
  *              V
- * 	+---------------+	Reads associated with a particular device, but
- * 	| Physical I/O  |	no logical data.  Issued as part of vdev caching
- * 	+---------------+	and I/O aggregation.
+ *	+---------------+	Reads associated with a particular device, but
+ *	| Physical I/O  |	no logical data.  Issued as part of vdev caching
+ *	+---------------+	and I/O aggregation.
  *
  * Note that 'physical I/O' here is not the same terminology as used in the rest
  * of ZIO.  Typically, 'physical I/O' simply means that there is no attached
@@ -273,6 +273,10 @@ zfs_ereport_start(nvlist_t **ereport_out, nvlist_t **detector_out,
 			fm_payload_set(ereport,
 			    FM_EREPORT_PAYLOAD_ZFS_VDEV_FRU,
 			    DATA_TYPE_STRING, vd->vdev_fru, NULL);
+		if (vd->vdev_ashift)
+			fm_payload_set(ereport,
+			    FM_EREPORT_PAYLOAD_ZFS_VDEV_ASHIFT,
+			    DATA_TYPE_UINT64, vd->vdev_ashift, NULL);
 
 		if (pvd != NULL) {
 			fm_payload_set(ereport,

@@ -1662,25 +1662,31 @@ vdev_open(vdev_t *vd)
 	if (vd->vdev_asize == 0) {
 		/*
 		 * This is the first-ever open, so use the computed values.
-		 * For testing purposes, a higher ashift can be requested.
+		 * For compatibility, a different ashift can be requested.
 		 */
 		vd->vdev_asize = asize;
 		vd->vdev_max_asize = max_asize;
-		vd->vdev_ashift = MAX(ashift, vd->vdev_ashift);
-		vd->vdev_ashift = MAX(zfs_ashift_min, vd->vdev_ashift);
+		if (vd->vdev_ashift == 0) {
+			vd->vdev_ashift = ashift; /* use detected value */
+		}
+		if (vd->vdev_ashift != 0 && (vd->vdev_ashift < ASHIFT_MIN ||
+		    vd->vdev_ashift > ASHIFT_MAX)) {
+			vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
+			    VDEV_AUX_BAD_ASHIFT);
+			return (SET_ERROR(EDOM));
+		}
 	} else {
 		/*
 		 * Detect if the alignment requirement has increased.
 		 * We don't want to make the pool unavailable, just
-		 * issue a warning instead.
+		 * post an event instead.
 		 */
 		if (ashift > vd->vdev_top->vdev_ashift &&
 		    vd->vdev_ops->vdev_op_leaf) {
-			cmn_err(CE_WARN,
-			    "Disk, '%s', has a block alignment that is "
-			    "larger than the pool's alignment\n",
-			    vd->vdev_path);
+			zfs_ereport_post(FM_EREPORT_ZFS_DEVICE_BAD_ASHIFT,
+			    spa, vd, NULL, NULL, 0, 0);
 		}
+
 		vd->vdev_max_asize = max_asize;
 	}
 
@@ -4185,6 +4191,9 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 				break;
 			case VDEV_AUX_BAD_LABEL:
 				class = FM_EREPORT_ZFS_DEVICE_BAD_LABEL;
+				break;
+			case VDEV_AUX_BAD_ASHIFT:
+				class = FM_EREPORT_ZFS_DEVICE_BAD_ASHIFT;
 				break;
 			default:
 				class = FM_EREPORT_ZFS_DEVICE_UNKNOWN;

@@ -25,8 +25,9 @@
 .\" Copyright (c) 2017 Datto Inc.
 .\" Copyright (c) 2017 George Melikov. All Rights Reserved.
 .\" Copyright 2019 Joyent, Inc.
+.\" Copyright (c) 2012 Cyril Plisko. All Rights Reserved.
 .\"
-.Dd May 15, 2019
+.Dd August 30, 2019
 .Dt ZPOOL 1M
 .Os
 .Sh NAME
@@ -38,10 +39,12 @@
 .Nm
 .Cm add
 .Op Fl fgLnP
+.Oo Fl o Ar property Ns = Ns Ar value Oc
 .Ar pool vdev Ns ...
 .Nm
 .Cm attach
 .Op Fl f
+.Oo Fl o Ar property Ns = Ns Ar value Oc
 .Ar pool device new_device
 .Nm
 .Cm checkpoint
@@ -667,6 +670,31 @@ changed with the
 .Nm zpool Cm set
 command:
 .Bl -tag -width Ds
+.It Sy ashift Ns = Ns Sy ashift
+Pool sector size exponent, to the power of
+.Sy 2
+(internally referred to as
+.Sy ashift
+). Values from 9 to 16, inclusive, are valid; also, the
+value 0 (the default) means to auto-detect using the kernel's block
+layer and a ZFS internal exception list.
+I/O operations will be aligned to the specified size boundaries.
+Additionally, the minimum (disk) write size will be set to the specified size,
+so this represents a space vs performance trade-off.
+For optimal performance, the pool sector size should be greater than or equal to
+the sector size of the underlying disks.
+The typical case for setting this property is when performance is important and
+the underlying disks use 4KiB sectors but report 512B sectors to the OS (for
+compatibility reasons); in that case, set
+.Sy ashift=12
+(which is 1<<12 = 4096). When set, this property is
+used as the default hint value in subsequent vdev operations (add,
+attach and replace).
+Changing this value will not modify any existing
+vdev, not even on disk replacement; however it can be used, for
+instance, to replace a dying 512B sectors disk with a newer 4KiB
+sectors device: this will probably result in bad performance but at the
+same time could prevent loss of data.
 .It Sy autoexpand Ns = Ns Sy on Ns | Ns Sy off
 Controls automatic pool expansion when the underlying LUN is grown.
 If set to
@@ -837,6 +865,7 @@ Displays a help message.
 .Nm
 .Cm add
 .Op Fl fgLnP
+.Oo Fl o Ar property Ns = Ns Ar value Oc
 .Ar pool vdev Ns ...
 .Xc
 Adds the specified virtual devices to the given pool.
@@ -880,11 +909,19 @@ instead of only the last component of the path.
 This can be used in conjunction with the
 .Fl L
 flag.
+.It Fl o Ar property Ns = Ns Ar value
+Sets the given pool properties.
+See the
+.Sx Properties
+section for a list of valid properties that can be set.
+The only property supported at the moment is
+.Sy ashift.
 .El
 .It Xo
 .Nm
 .Cm attach
 .Op Fl f
+.Oo Fl o Ar property Ns = Ns Ar value Oc
 .Ar pool device new_device
 .Xc
 Attaches
@@ -914,6 +951,13 @@ Forces use of
 .Ar new_device ,
 even if its appears to be in use.
 Not all devices can be overridden in this manner.
+.It Fl o Ar property Ns = Ns Ar value
+Sets the given pool properties.
+See the
+.Sx Properties
+section for a list of valid properties that can be set.
+The only property supported at the moment is
+.Sy ashift.
 .El
 .It Xo
 .Nm

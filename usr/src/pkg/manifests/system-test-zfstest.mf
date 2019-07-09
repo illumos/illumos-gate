@@ -1445,8 +1445,12 @@ file path=opt/zfs-tests/tests/functional/cli_root/zpool/zpool_002_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool/zpool_003_pos \
     mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/add-o_ashift \
+    mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_add/add_nested_replacing_spare \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/add_prop_ashift \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/setup mode=0555
@@ -1474,6 +1478,8 @@ file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/zpool_add_009_neg \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_add/zpool_add_010_pos \
     mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zpool_attach/attach-o_ashift \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_attach/cleanup \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_attach/setup mode=0555
@@ -1498,6 +1504,8 @@ file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_clear/zpool_clear_readonly \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_create/cleanup \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zpool_create/create-o_ashift \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_create/setup mode=0555
 file \
@@ -1904,6 +1912,12 @@ file \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_replace/cleanup \
     mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_replace/replace-o_ashift \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_replace/replace_prop_ashift \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_replace/setup \
     mode=0555
 file \
@@ -1959,6 +1973,8 @@ file path=opt/zfs-tests/tests/functional/cli_root/zpool_set/zpool_set_001_pos \
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_set/zpool_set_002_neg \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_set/zpool_set_003_neg \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zpool_set/zpool_set_ashift \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_status/cleanup \
     mode=0555

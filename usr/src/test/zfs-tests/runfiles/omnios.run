@@ -258,10 +258,10 @@ tests = ['zpool_add_001_pos', 'zpool_add_002_pos', 'zpool_add_003_pos',
     'zpool_add_004_pos', 'zpool_add_005_pos', 'zpool_add_006_pos',
     'zpool_add_007_neg', 'zpool_add_008_neg', 'zpool_add_009_neg',
     'zpool_add_010_pos',
-    'add_nested_replacing_spare']
+    'add_nested_replacing_spare', 'add-o_ashift', 'add_prop_ashift']
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_attach]
-tests = ['zpool_attach_001_neg']
+tests = ['zpool_attach_001_neg', 'attach-o_ashift']
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_clear]
 tests = ['zpool_clear_001_pos', 'zpool_clear_002_neg', 'zpool_clear_003_neg',
@@ -280,7 +280,7 @@ tests = ['zpool_create_001_pos', 'zpool_create_002_pos',
     'zpool_create_encrypted', 'zpool_create_crypt_combos',
     'zpool_create_features_001_pos', 'zpool_create_features_002_pos',
     'zpool_create_features_003_pos', 'zpool_create_features_004_neg',
-    'zpool_create_tempname']
+    'zpool_create_tempname', 'create-o_ashift']
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_destroy]
 tests = ['zpool_destroy_001_pos', 'zpool_destroy_002_pos',
@@ -358,7 +358,7 @@ tests = ['zpool_remove_001_neg', 'zpool_remove_002_pos',
     'zpool_remove_003_pos']
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_replace]
-tests = ['zpool_replace_001_neg']
+tests = ['zpool_replace_001_neg', 'replace-o_ashift', 'replace_prop_ashift']
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_resilver]
 tests = ['zpool_resilver_bad_args', 'zpool_resilver_restart']
@@ -371,7 +371,8 @@ tests = ['zpool_scrub_001_neg', 'zpool_scrub_002_pos', 'zpool_scrub_003_pos',
     'zpool_scrub_encrypted_unloaded']
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_set]
-tests = ['zpool_set_001_pos', 'zpool_set_002_neg', 'zpool_set_003_neg']
+tests = ['zpool_set_001_pos', 'zpool_set_002_neg', 'zpool_set_003_neg',
+    'zpool_set_ashift']
 pre =
 post =
 

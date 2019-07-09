@@ -43,9 +43,9 @@ uint_t num_logs(nvlist_t *nv);
  * Virtual device functions
  */
 
-nvlist_t *make_root_vdev(zpool_handle_t *zhp, int force, int check_rep,
-    boolean_t replacing, boolean_t dryrun, zpool_boot_label_t boot_type,
-    uint64_t boot_size, int argc, char **argv);
+nvlist_t *make_root_vdev(zpool_handle_t *zhp, nvlist_t *props, int force,
+    int check_rep, boolean_t replacing, boolean_t dryrun,
+    zpool_boot_label_t boot_type, uint64_t boot_size, int argc, char **argv);
 nvlist_t *split_mirror_vdev(zpool_handle_t *zhp, char *newname,
     nvlist_t *props, splitflags_t flags, int argc, char **argv);
 

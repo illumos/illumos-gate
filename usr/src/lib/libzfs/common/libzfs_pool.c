@@ -309,6 +309,7 @@ zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *buf, size_t len,
 		case ZPOOL_PROP_FREE:
 		case ZPOOL_PROP_FREEING:
 		case ZPOOL_PROP_LEAKED:
+		case ZPOOL_PROP_ASHIFT:
 			if (literal) {
 				(void) snprintf(buf, len, "%llu",
 				    (u_longlong_t)intval);
@@ -457,7 +458,8 @@ zpool_valid_proplist(libzfs_handle_t *hdl, const char *poolname,
 			if (err != 0) {
 				ASSERT3U(err, ==, ENOENT);
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-				    "invalid feature '%s'"), fname);
+				    "invalid feature '%s', '%s'"), fname,
+				    propname);
 				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
 				goto error;
 			}
@@ -526,6 +528,19 @@ zpool_valid_proplist(libzfs_handle_t *hdl, const char *poolname,
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 				    "property '%s' can only be set during pool "
 				    "creation"), propname);
+				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
+				goto error;
+			}
+			break;
+
+		case ZPOOL_PROP_ASHIFT:
+			if (intval != 0 &&
+			    (intval < ASHIFT_MIN || intval > ASHIFT_MAX)) {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "invalid '%s=%d' property: only values "
+				    "between %" PRId32 " and %" PRId32 " "
+				    "are allowed.\n"),
+				    propname, intval, ASHIFT_MIN, ASHIFT_MAX);
 				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
 				goto error;
 			}
@@ -3036,10 +3051,11 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 
 	case EDOM:
 		/*
-		 * The new device has a different alignment requirement.
+		 * The new device has a different optimal sector size.
 		 */
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-		    "devices have different sector alignment"));
+		    "new device has a different optimal sector size; use the "
+		    "option '-o ashift=N' to override the optimal size"));
 		(void) zfs_error(hdl, EZFS_BADDEV, msg);
 		break;
 

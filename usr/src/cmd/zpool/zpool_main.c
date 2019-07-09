@@ -29,6 +29,7 @@
  * Copyright (c) 2017 Datto Inc.
  * Copyright (c) 2017, Intel Corporation.
  * Copyright 2019 Joyent, Inc.
+ * Copyright (c) 2012 by Cyril Plisko. All rights reserved.
  */
 
 #include <assert.h>
@@ -223,10 +224,11 @@ get_usage(zpool_help_t idx)
 {
 	switch (idx) {
 	case HELP_ADD:
-		return (gettext("\tadd [-fgLnP] <pool> <vdev> ...\n"));
+		return (gettext("\tadd [-fgLnP] [-o property=value] "
+		    "<pool> <vdev> ...\n"));
 	case HELP_ATTACH:
-		return (gettext("\tattach [-f] <pool> <device> "
-		    "<new-device>\n"));
+		return (gettext("\tattach [-f] [-o property=value] "
+		    "<pool> <device> <new-device>\n"));
 	case HELP_CLEAR:
 		return (gettext("\tclear [-nF] <pool> [device]\n"));
 	case HELP_CREATE:
@@ -547,6 +549,7 @@ add_prop_list_default(const char *propname, char *propval, nvlist_t **props,
  *	-n	Do not add the devices, but display the resulting layout if
  *		they were to be added.
  *	-P	Display full path for vdev name.
+ *	-o	Set property=value.
  *
  * Adds the given vdevs to 'pool'.  As with create, the bulk of this work is
  * handled by get_vdev_spec(), which constructs the nvlist needed to pass to
@@ -566,9 +569,11 @@ zpool_do_add(int argc, char **argv)
 	int ret;
 	zpool_handle_t *zhp;
 	nvlist_t *config;
+	nvlist_t *props = NULL;
+	char *propval;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "fgLnP")) != -1) {
+	while ((c = getopt(argc, argv, "fgLnPo:")) != -1) {
 		switch (c) {
 		case 'f':
 			force = B_TRUE;
@@ -584,6 +589,19 @@ zpool_do_add(int argc, char **argv)
 			break;
 		case 'P':
 			name_flags |= VDEV_NAME_PATH;
+			break;
+		case 'o':
+			if ((propval = strchr(optarg, '=')) == NULL) {
+				(void) fprintf(stderr, gettext("missing "
+				    "'=' for -o option\n"));
+				usage(B_FALSE);
+			}
+			*propval = '\0';
+			propval++;
+
+			if ((strcmp(optarg, ZPOOL_CONFIG_ASHIFT) != 0) ||
+			    (add_prop_list(optarg, propval, &props, B_TRUE)))
+				usage(B_FALSE);
 			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
@@ -625,9 +643,23 @@ zpool_do_add(int argc, char **argv)
 	else
 		boot_type = ZPOOL_NO_BOOT_LABEL;
 
+	/* unless manually specified use "ashift" pool property (if set) */
+	if (!nvlist_exists(props, ZPOOL_CONFIG_ASHIFT)) {
+		int intval;
+		zprop_source_t src;
+		char strval[ZPOOL_MAXPROPLEN];
+
+		intval = zpool_get_prop_int(zhp, ZPOOL_PROP_ASHIFT, &src);
+		if (src != ZPROP_SRC_DEFAULT) {
+			(void) sprintf(strval, "%" PRId32, intval);
+			verify(add_prop_list(ZPOOL_CONFIG_ASHIFT, strval,
+			    &props, B_TRUE) == 0);
+		}
+	}
+
 	/* pass off to get_vdev_spec for processing */
 	boot_size = zpool_get_prop_int(zhp, ZPOOL_PROP_BOOTSIZE, NULL);
-	nvroot = make_root_vdev(zhp, force, !force, B_FALSE, dryrun,
+	nvroot = make_root_vdev(zhp, props, force, !force, B_FALSE, dryrun,
 	    boot_type, boot_size, argc, argv);
 	if (nvroot == NULL) {
 		zpool_close(zhp);
@@ -669,6 +701,7 @@ zpool_do_add(int argc, char **argv)
 		ret = (zpool_add(zhp, nvroot) != 0);
 	}
 
+	nvlist_free(props);
 	nvlist_free(nvroot);
 	zpool_close(zhp);
 
@@ -1152,7 +1185,7 @@ zpool_do_create(int argc, char **argv)
 	}
 
 	/* pass off to get_vdev_spec for bulk processing */
-	nvroot = make_root_vdev(NULL, force, !force, B_FALSE, dryrun,
+	nvroot = make_root_vdev(NULL, props, force, !force, B_FALSE, dryrun,
 	    boot_type, boot_size, argc - 1, argv + 1);
 	if (nvroot == NULL)
 		goto errout;
@@ -3932,13 +3965,28 @@ zpool_do_attach_or_replace(int argc, char **argv, int replacing)
 	zpool_handle_t *zhp;
 	zpool_boot_label_t boot_type;
 	uint64_t boot_size;
+	nvlist_t *props = NULL;
+	char *propval;
 	int ret;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "f")) != -1) {
+	while ((c = getopt(argc, argv, "fo:")) != -1) {
 		switch (c) {
 		case 'f':
 			force = B_TRUE;
+			break;
+		case 'o':
+			if ((propval = strchr(optarg, '=')) == NULL) {
+				(void) fprintf(stderr, gettext("missing "
+				    "'=' for -o option\n"));
+				usage(B_FALSE);
+			}
+			*propval = '\0';
+			propval++;
+
+			if ((strcmp(optarg, ZPOOL_CONFIG_ASHIFT) != 0) ||
+			    (add_prop_list(optarg, propval, &props, B_TRUE)))
+				usage(B_FALSE);
 			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
@@ -4002,7 +4050,22 @@ zpool_do_attach_or_replace(int argc, char **argv, int replacing)
 		boot_type = ZPOOL_NO_BOOT_LABEL;
 
 	boot_size = zpool_get_prop_int(zhp, ZPOOL_PROP_BOOTSIZE, NULL);
-	nvroot = make_root_vdev(zhp, force, B_FALSE, replacing, B_FALSE,
+
+	/* unless manually specified use "ashift" pool property (if set) */
+	if (!nvlist_exists(props, ZPOOL_CONFIG_ASHIFT)) {
+		int intval;
+		zprop_source_t src;
+		char strval[ZPOOL_MAXPROPLEN];
+
+		intval = zpool_get_prop_int(zhp, ZPOOL_PROP_ASHIFT, &src);
+		if (src != ZPROP_SRC_DEFAULT) {
+			(void) sprintf(strval, "%" PRId32, intval);
+			verify(add_prop_list(ZPOOL_CONFIG_ASHIFT, strval,
+			    &props, B_TRUE) == 0);
+		}
+	}
+
+	nvroot = make_root_vdev(zhp, props, force, B_FALSE, replacing, B_FALSE,
 	    boot_type, boot_size, argc, argv);
 	if (nvroot == NULL) {
 		zpool_close(zhp);
@@ -4032,9 +4095,10 @@ zpool_do_replace(int argc, char **argv)
 }
 
 /*
- * zpool attach [-f] <pool> <device> <new_device>
+ * zpool attach [-f] [-o property=value] <pool> <device> <new_device>
  *
  *	-f	Force attach, even if <new_device> appears to be in use.
+ *	-o	Set property=value.
  *
  * Attach <new_device> to the mirror containing <device>.  If <device> is not
  * part of a mirror, then <device> will be transformed into a mirror of
