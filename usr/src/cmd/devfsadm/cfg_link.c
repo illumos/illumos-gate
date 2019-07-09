@@ -61,7 +61,7 @@ static int	sata_cfg_creat_cb(di_minor_t minor, di_node_t node);
 static int	sdcard_cfg_creat_cb(di_minor_t minor, di_node_t node);
 
 static di_node_t	pci_cfg_chassis_node(di_node_t, di_prom_handle_t);
-static char 	*pci_cfg_slotname(di_node_t, di_prom_handle_t, minor_t);
+static char	*pci_cfg_slotname(di_node_t, di_prom_handle_t, minor_t);
 static int	pci_cfg_ap_node(minor_t, di_node_t, di_prom_handle_t,
 		    char *, int, int);
 static int	pci_cfg_iob_name(di_minor_t, di_node_t, di_prom_handle_t,
@@ -69,7 +69,7 @@ static int	pci_cfg_iob_name(di_minor_t, di_node_t, di_prom_handle_t,
 static minor_t	pci_cfg_pcidev(di_node_t, di_prom_handle_t);
 static int	pci_cfg_ap_path(di_minor_t, di_node_t, di_prom_handle_t,
 		    char *, int, char **);
-static char 	*pci_cfg_info_data(char *);
+static char	*pci_cfg_info_data(char *);
 static int	pci_cfg_is_ap_path(di_node_t, di_prom_handle_t);
 static int	pci_cfg_ap_legacy(di_minor_t, di_node_t, di_prom_handle_t,
 		    char *, int);
@@ -87,7 +87,7 @@ static int	di_propall_lookup_ints(di_prom_handle_t, int,
 		    dev_t, di_node_t, const char *, int **);
 static int	di_propall_lookup_strings(di_prom_handle_t, int,
 		    dev_t, di_node_t, const char *, char **);
-static int 	serid_printable(uint64_t *seridp);
+static int	serid_printable(uint64_t *seridp);
 static int	di_propall_lookup_slot_names(di_prom_handle_t, int,
 		    dev_t, di_node_t, di_slot_name_t **);
 
@@ -727,7 +727,7 @@ pci_cfg_ap_path(di_minor_t minor, di_node_t node, di_prom_handle_t ph,
 			bufsz -= len - 1;
 
 			/* set chasflag when the leaf node is within an iob */
-			if ((curnode == node) != NULL)
+			if (curnode == node)
 				chasflag = 1;
 		}
 		rv = pci_cfg_ap_node(pci_dev, curnode, ph, bufptr, bufsz, 0);

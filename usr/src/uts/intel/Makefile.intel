@@ -24,6 +24,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Nexenta Systems, Inc.
+# Copyright 2019 RackTop Systems
 #
 
 #
@@ -646,7 +647,6 @@ MISC_KMODS	+= usba usba10 usbs49_fw
 MISC_KMODS	+= scsi_vhci_f_sym_hds
 MISC_KMODS	+= scsi_vhci_f_sym
 MISC_KMODS	+= scsi_vhci_f_tpgs
-MISC_KMODS	+= scsi_vhci_f_asym_sun
 MISC_KMODS	+= scsi_vhci_f_tape
 MISC_KMODS	+= scsi_vhci_f_tpgs_tape
 MISC_KMODS	+= fctl

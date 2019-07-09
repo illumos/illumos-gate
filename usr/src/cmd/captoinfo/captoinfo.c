@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  *  NAME
@@ -956,7 +956,7 @@ adddefaults(void)
 
 	/* the rs string was renamed r2 (info rs2) */
 	if ((ostrval[uselevel][cap_rs] != NULL) &&
-	    (ostrval[uselevel][cap_rs][0] != NULL))
+	    (ostrval[uselevel][cap_rs][0] != '\0'))
 		putstr("rs2", ostrval[uselevel][cap_rs]);
 
 	handleko();

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -70,10 +70,6 @@ static void yyerror(char *);
 static void errxx();
 static void *exprmalloc(size_t size);
 
-long atol();
-char *strcpy(), *strncpy();
-void exit();
-
 static char *ltoa();
 static char *lltoa();
 static char	**Av;
@@ -112,8 +108,7 @@ static	int pri[] = {
  *		numeric output, e.g., -00001 becomes -1
  */
 static void
-clean_buf(buf)
-	char *buf;
+clean_buf(char *buf)
 {
 	int i = 0;
 	int is_a_num = 1;
@@ -388,7 +383,7 @@ match(char *s, char *p)
 
 
 /*
- * ematch 	- XCU4 mods involve calling compile/advance which simulate
+ * ematch	- XCU4 mods involve calling compile/advance which simulate
  *		  the obsolete compile/advance functions using regcomp/regexec
  */
 static int
@@ -441,7 +436,7 @@ ematch(char *s, char *p)
 		}
 		memcpy(tmptr, s, nmatch);
 		*(tmptr + nmatch) = '\0';
-		if ((nmbchars = mbstowcs(NULL, tmptr, NULL)) == -1) {
+		if ((nmbchars = mbstowcs(NULL, tmptr, 0)) == -1) {
 			yyerror("invalid multibyte character encountered");
 			if (tmptr1 != NULL)
 				free(tmptr1);

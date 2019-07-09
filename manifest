@@ -1090,7 +1090,6 @@ d kernel/misc/scsi_vhci 0755 root sys
 d kernel/misc/scsi_vhci/amd64 0755 root sys
 f kernel/misc/scsi_vhci/amd64/scsi_vhci_f_asym_emc 0755 root sys
 f kernel/misc/scsi_vhci/amd64/scsi_vhci_f_asym_lsi 0755 root sys
-f kernel/misc/scsi_vhci/amd64/scsi_vhci_f_asym_sun 0755 root sys
 f kernel/misc/scsi_vhci/amd64/scsi_vhci_f_sym 0755 root sys
 f kernel/misc/scsi_vhci/amd64/scsi_vhci_f_sym_emc 0755 root sys
 f kernel/misc/scsi_vhci/amd64/scsi_vhci_f_sym_hds 0755 root sys

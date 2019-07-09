@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -232,7 +230,7 @@ slm_init()
 	(void) mutex_init(&evq_lock, USYNC_THREAD, NULL);
 	(void) cond_init(&evq_cv, USYNC_THREAD, NULL);
 
-	if (thr_create(NULL, NULL, (void *(*)(void *))subscriber_deliver_thr,
+	if (thr_create(NULL, 0, (void *(*)(void *))subscriber_deliver_thr,
 	    NULL, 0, &deliver_thr_id) != 0) {
 		syseventd_err_print(INIT_SUB_THR_CREATE_ERR, strerror(errno));
 		return (NULL);

@@ -28,6 +28,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2016 Joyent, Inc.
  * Copyright 2017 Nexenta Systems, Inc.
+ * Copyright 2019 Racktop Systems
  */
 /*
  * Copyright 2011 cyril.galibern@opensvc.com
@@ -433,18 +434,6 @@ static sd_tunables ibm_properties = {
 	0
 };
 
-static sd_tunables purple_properties = {
-	PURPLE_THROTTLE_VALUE,
-	0,
-	0,
-	PURPLE_BUSY_RETRIES,
-	PURPLE_RESET_RETRY_COUNT,
-	PURPLE_RESERVE_RELEASE_TIME,
-	0,
-	0,
-	0
-};
-
 static sd_tunables sve_properties = {
 	SVE_THROTTLE_VALUE,
 	0,
@@ -673,11 +662,6 @@ static sd_disk_config_t sd_disk_table[] = {
 			SD_CONF_BSET_CACHE_IS_NV, &lsi_oem_properties },
 	{ "Fujitsu SX300",	SD_CONF_BSET_THROTTLE,  &lsi_oem_properties },
 	{ "LSI",		SD_CONF_BSET_NRR_COUNT, &lsi_properties },
-	{ "SUN     T3", SD_CONF_BSET_THROTTLE |
-			SD_CONF_BSET_BSY_RETRY_COUNT|
-			SD_CONF_BSET_RST_RETRIES|
-			SD_CONF_BSET_RSV_REL_TIME,
-		&purple_properties },
 	{ "SUN     SESS01", SD_CONF_BSET_THROTTLE |
 		SD_CONF_BSET_BSY_RETRY_COUNT|
 		SD_CONF_BSET_RST_RETRIES|
@@ -685,11 +669,6 @@ static sd_disk_config_t sd_disk_table[] = {
 		SD_CONF_BSET_MIN_THROTTLE|
 		SD_CONF_BSET_DISKSORT_DISABLED,
 		&sve_properties },
-	{ "SUN     T4", SD_CONF_BSET_THROTTLE |
-			SD_CONF_BSET_BSY_RETRY_COUNT|
-			SD_CONF_BSET_RST_RETRIES|
-			SD_CONF_BSET_RSV_REL_TIME,
-		&purple_properties },
 	{ "SUN     SVE01", SD_CONF_BSET_DISKSORT_DISABLED |
 		SD_CONF_BSET_LUN_RESET_ENABLED,
 		&maserati_properties },
@@ -18470,23 +18449,6 @@ sd_sense_key_not_ready(struct sd_lun *un, uint8_t *sense_datap, struct buf *bp,
 			 * Retries cannot help here so just fail right away.
 			 */
 			goto fail_command;
-
-		case 0x88:
-			/*
-			 * Vendor-unique code for T3/T4: it indicates a
-			 * path problem in a mutipathed config, but as far as
-			 * the target driver is concerned it equates to a fatal
-			 * error, so we should just fail the command right away
-			 * (without printing anything to the console). If this
-			 * is not a T3/T4, fall thru to the default recovery
-			 * action.
-			 * T3/T4 is FC only, don't need to check is_fibre
-			 */
-			if (SD_IS_T3(un) || SD_IS_T4(un)) {
-				sd_return_failed_command(un, bp, EIO);
-				return;
-			}
-			/* FALLTHRU */
 
 		case 0x04:  /* LUN NOT READY, FORMAT IN PROGRESS */
 		case 0x05:  /* LUN NOT READY, REBUILD IN PROGRESS */

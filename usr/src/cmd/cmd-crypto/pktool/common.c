@@ -185,7 +185,7 @@ static void
 close_sess(CK_SESSION_HANDLE sess)
 {
 
-	if (sess == NULL) {
+	if (sess == 0) {
 		return;
 	}
 
@@ -207,7 +207,7 @@ static void
 logout_token(CK_SESSION_HANDLE sess)
 {
 
-	if (sess == NULL) {
+	if (sess == 0) {
 		return;
 	}
 
@@ -833,7 +833,7 @@ get_pk12_password(KMF_CREDENTIAL *cred)
 
 #define	COUNTRY_DEFAULT "US"
 #define	STATE_DEFAULT	NULL
-#define	INVALID_INPUT 	gettext("Invalid input; please re-enter ...")
+#define	INVALID_INPUT	gettext("Invalid input; please re-enter ...")
 
 #define	SUBNAMESIZ	1024
 #define	RDN_MIN		1

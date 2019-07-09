@@ -516,6 +516,35 @@ tem_safe_setparam(struct tem_vt_state *tem, int count, int newparam)
 }
 
 
+static void
+tem_select_color(struct tem_vt_state *tem, text_color_t color, boolean_t fg)
+{
+	if (tems.ts_pdepth >= 24 ||
+	    (color < 8 && tems.ts_pdepth < 24)) {
+		if (fg == B_TRUE) {
+			tem->tvs_fg_color = color;
+			tem->tvs_flags &= ~TEM_ATTR_BRIGHT_FG;
+		} else {
+			tem->tvs_bg_color = color;
+			tem->tvs_flags &= ~TEM_ATTR_BRIGHT_BG;
+		}
+		return;
+	}
+
+	if (color > 15)
+		return;
+
+	/* Bright color and depth < 24 */
+	color -= 8;
+	if (fg == B_TRUE) {
+		tem->tvs_fg_color = color;
+		tem->tvs_flags |= TEM_ATTR_BRIGHT_FG;
+	} else {
+		tem->tvs_bg_color = color;
+		tem->tvs_flags |= TEM_ATTR_BRIGHT_BG;
+	}
+}
+
 /*
  * select graphics mode based on the param vals stored in a_params
  */
@@ -612,10 +641,8 @@ tem_safe_selgraph(struct tem_vt_state *tem)
 			case 5: /* 256 colors */
 				count++;
 				curparam--;
-				if (tems.ts_pdepth < 24)
-					break;
-				tem->tvs_fg_color = tem->tvs_params[count];
-				tem->tvs_flags &= ~TEM_ATTR_BRIGHT_FG;
+				tem_select_color(tem, tem->tvs_params[count],
+				    B_TRUE);
 				break;
 			default:
 				break;
@@ -661,10 +688,8 @@ tem_safe_selgraph(struct tem_vt_state *tem)
 			case 5: /* 256 colors */
 				count++;
 				curparam--;
-				if (tems.ts_pdepth < 24)
-					break;
-				tem->tvs_bg_color = tem->tvs_params[count];
-				tem->tvs_flags &= ~TEM_ATTR_BRIGHT_BG;
+				tem_select_color(tem, tem->tvs_params[count],
+				    B_FALSE);
 				break;
 			default:
 				break;

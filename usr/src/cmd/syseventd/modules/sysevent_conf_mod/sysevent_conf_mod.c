@@ -96,7 +96,7 @@ static int	first_event;		/* first event since init */
 static conftab_t		*conftab		= NULL;
 static syseventtab_t		*syseventtab		= NULL;
 static syseventtab_t		*syseventtab_tail	= NULL;
-static sysevent_handle_t	*confd_handle 		= NULL;
+static sysevent_handle_t	*confd_handle		= NULL;
 
 /*
  * The cmd queue is a queue of commands ready to be sent
@@ -1659,7 +1659,7 @@ queue_event(sysevent_t *ev, syseventtab_t *sep, sysevent_hdr_info_t *hdr)
 {
 	str_t		*line;
 	nvlist_t	*nvlist;
-	char 		*argv0;
+	char		*argv0;
 	sysevent_t	*cmd_event;
 	nvlist_t	*cmd_nvlist;
 	cmdqueue_t	*new_cmd;
@@ -2207,8 +2207,8 @@ slm_init()
 	/*
 	 * Create thread to flush cmd queue
 	 */
-	if ((err = thr_create(NULL, NULL, (void *(*)(void*))queue_flush_thr,
-	    (void *)NULL, 0, &cmdq_thr_id)) != 0) {
+	if ((err = thr_create(NULL, 0, (void *(*)(void*))queue_flush_thr,
+	    NULL, 0, &cmdq_thr_id)) != 0) {
 		syslog(LOG_ERR, THR_CREATE_ERR, strerror(err));
 		sysevent_close_channel(confd_handle);
 		confd_handle = NULL;

@@ -805,17 +805,6 @@ _NOTE(MUTEX_PROTECTS_DATA(sd_lun::un_fi_mutex,
 #define	SD_IS_LSI(un)	((un)->un_f_cfg_is_lsi == TRUE)
 
 /*
- * Macros to check if the lun is a Sun T3 or a T4
- */
-#define	SD_IS_T3(un) \
-	((bcmp(SD_INQUIRY(un)->inq_vid, "SUN", 3) == 0) && \
-	(bcmp(SD_INQUIRY(un)->inq_pid, "T3", 2) == 0))
-
-#define	SD_IS_T4(un) \
-	((bcmp(SD_INQUIRY(un)->inq_vid, "SUN", 3) == 0) && \
-	(bcmp(SD_INQUIRY(un)->inq_pid, "T4", 2) == 0))
-
-/*
  * Macros for non-512 byte writes to removable devices.
  */
 #define	NOT_DEVBSIZE(un)	\

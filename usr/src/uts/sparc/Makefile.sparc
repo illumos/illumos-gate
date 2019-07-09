@@ -25,6 +25,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2016 Gary Mills
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2019 RackTop Systems
 #
 
 #
@@ -408,7 +409,7 @@ MISC_KMODS	+= mac dls
 MISC_KMODS	+= cmlb
 MISC_KMODS	+= tem
 MISC_KMODS	+= pcicfg fcodem fcpci
-MISC_KMODS	+= scsi_vhci_f_sym scsi_vhci_f_tpgs scsi_vhci_f_asym_sun
+MISC_KMODS	+= scsi_vhci_f_sym scsi_vhci_f_tpgs
 MISC_KMODS	+= scsi_vhci_f_sym_hds
 MISC_KMODS	+= scsi_vhci_f_tape scsi_vhci_f_tpgs_tape
 MISC_KMODS	+= fctl

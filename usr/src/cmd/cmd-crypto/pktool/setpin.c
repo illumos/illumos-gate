@@ -154,7 +154,7 @@ setpin_pkcs11(KMF_HANDLE_T handle, char *token_spec, boolean_t souser)
 		if ((old_pin = (CK_UTF8CHAR_PTR) strdup(SOFT_DEFAULT_PIN)) ==
 		    NULL) {
 			cryptoerror(LOG_STDERR, "%s.", strerror(errno));
-			final_pk11(NULL);
+			final_pk11(0);
 			return (PK_ERR_PK11);
 		}
 		old_pinlen = strlen(SOFT_DEFAULT_PIN);
@@ -164,7 +164,7 @@ setpin_pkcs11(KMF_HANDLE_T handle, char *token_spec, boolean_t souser)
 			cryptoerror(LOG_STDERR,
 			    gettext("Unable to get token passphrase (%s)."),
 			    pkcs11_strerror(rv));
-			final_pk11(NULL);
+			final_pk11(0);
 			return (PK_ERR_PK11);
 		}
 	}
@@ -180,7 +180,7 @@ setpin_pkcs11(KMF_HANDLE_T handle, char *token_spec, boolean_t souser)
 			    "Unable to get and confirm new passphrase (%s)."),
 			    pkcs11_strerror(rv));
 		free(old_pin);
-		final_pk11(NULL);
+		final_pk11(0);
 		return (PK_ERR_PK11);
 	}
 

@@ -29,7 +29,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
@@ -1245,7 +1245,7 @@ readcronfile(FILE *cf, struct usr *u, time_t reftime)
 		if (strncmp(&line[cursor], ENV_TZ,
 		    strlen(ENV_TZ)) == 0) {
 			if ((tmp = strchr(&line[cursor], '\n')) != NULL) {
-				*tmp = NULL;
+				*tmp = '\0';
 			}
 
 			if (!isvalid_tz(&line[cursor + strlen(ENV_TZ)], NULL,
@@ -1263,7 +1263,7 @@ readcronfile(FILE *cf, struct usr *u, time_t reftime)
 		if (strncmp(&line[cursor], ENV_HOME,
 		    strlen(ENV_HOME)) == 0) {
 			if ((tmp = strchr(&line[cursor], '\n')) != NULL) {
-				*tmp = NULL;
+				*tmp = '\0';
 			}
 			if (home == NULL ||
 			    strcmp(&line[cursor], get_obj(home))) {
@@ -1277,7 +1277,7 @@ readcronfile(FILE *cf, struct usr *u, time_t reftime)
 		if (strncmp(&line[cursor], ENV_SHELL,
 		    strlen(ENV_SHELL)) == 0) {
 			if ((tmp = strchr(&line[cursor], '\n')) != NULL) {
-				*tmp = NULL;
+				*tmp = '\0';
 			}
 			if (shell == NULL ||
 			    strcmp(&line[cursor], get_obj(shell))) {
@@ -2919,7 +2919,7 @@ msg_wait(long tim)
 static void
 process_msg(struct message *pmsg, time_t reftime)
 {
-	if (pmsg->etype == NULL)
+	if (pmsg->etype == 0)
 		return;
 
 	switch (pmsg->etype) {
@@ -3696,7 +3696,7 @@ contract_abandon_latest(pid_t pid)
 
 static struct shared *
 create_shared(void *obj, void * (*obj_alloc)(void *obj),
-	void (*obj_free)(void *))
+    void (*obj_free)(void *))
 {
 	struct shared *out;
 

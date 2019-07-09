@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #include <sys/types.h>
@@ -427,8 +427,7 @@ main(int argc, char **argv)
 }
 
 static void
-copycron(fp)
-FILE *fp;
+copycron(FILE *fp)
 {
 	FILE *tfp;
 	char pid[6], *tnam_end;
@@ -468,7 +467,7 @@ FILE *fp;
 			strncpy(buf, &line[cursor + strlen(ENV_TZ)],
 			    sizeof (buf));
 			if ((x = strchr(buf, '\n')) != NULL)
-				*x = NULL;
+				*x = '\0';
 
 			if (isvalid_tz(buf, NULL, _VTZ_ALL)) {
 				goto cont;
@@ -484,7 +483,7 @@ FILE *fp;
 			strncpy(buf, &line[cursor + strlen(ENV_SHELL)],
 			    sizeof (buf));
 			if ((x = strchr(buf, '\n')) != NULL)
-				*x = NULL;
+				*x = '\0';
 
 			if (isvalid_shell(buf)) {
 				goto cont;
@@ -500,7 +499,7 @@ FILE *fp;
 			strncpy(buf, &line[cursor + strlen(ENV_HOME)],
 			    sizeof (buf));
 			if ((x = strchr(buf, '\n')) != NULL)
-				*x = NULL;
+				*x = '\0';
 			if (chdir(buf) == 0) {
 				goto cont;
 			} else {
@@ -546,8 +545,7 @@ cont:
 }
 
 static int
-next_field(lower, upper)
-int lower, upper;
+next_field(int lower, int upper)
 {
 	int num, num2;
 
@@ -605,8 +603,7 @@ int lower, upper;
 }
 
 static void
-cerror(msg)
-char *msg;
+cerror(char *msg)
 {
 	fprintf(stderr, gettext("%scrontab: error on previous line; %s\n"),
 	    line, msg);
@@ -622,8 +619,7 @@ catch(int x)
 }
 
 static void
-crabort(msg)
-char *msg;
+crabort(char *msg)
 {
 	int sverrno;
 

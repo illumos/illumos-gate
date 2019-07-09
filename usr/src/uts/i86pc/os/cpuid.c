@@ -3447,13 +3447,13 @@ cpuid_pass2(cpu_t *cpu)
 	 * (We already handled n == 0 and n == 1 in pass 1)
 	 */
 	for (n = 2, cp = &cpi->cpi_std[2]; n < nmax; n++, cp++) {
-		cp->cp_eax = n;
-
 		/*
 		 * leaves 6 and 7 were handled in pass 1
 		 */
 		if (n == 6 || n == 7)
 			continue;
+
+		cp->cp_eax = n;
 
 		/*
 		 * CPUID function 4 expects %ecx to be initialized
