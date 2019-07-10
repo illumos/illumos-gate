@@ -10,16 +10,12 @@
 #
 
 #
-# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2019 Joyent, Inc.
 #
 
-SUBDIRS = modes common digest hmac
+CRYPTO		= pkcs kcf
+COMMON_OBJS	= main.o
 
-all: $(SUBDIRS)
+TESTROOT	= $(ROOT)/opt/crypto-tests/tests/hmac
 
-modes: common
-digest: common
-hmac: common
-
-include $(SRC)/test/Makefile.com
+include $(SRC)/test/crypto-tests/tests/Makefile.crypto
