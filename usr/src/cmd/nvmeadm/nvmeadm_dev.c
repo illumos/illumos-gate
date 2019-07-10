@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright 2019 Western Digital Corporation
  */
 
 #include <sys/types.h>
@@ -31,39 +32,43 @@ nvme_ioctl(int fd, int ioc, size_t *bufsize, void **buf, uint64_t arg,
     uint64_t *res)
 {
 	nvme_ioctl_t nioc = { 0 };
-
-	if (buf != NULL)
-		*buf = NULL;
+	void *ptr = NULL;
+	int ret;
 
 	if (res != NULL)
 		*res = ~0ULL;
 
 	if (bufsize != NULL && *bufsize != 0) {
-		void *ptr;
-
 		assert(buf != NULL);
 
-		ptr = calloc(1, *bufsize);
-		if (ptr == NULL)
-			err(-1, "nvme_ioctl()");
+		if (*buf != NULL) {
+			nioc.n_buf = (uintptr_t)*buf;
+		} else {
+			ptr = calloc(1, *bufsize);
+			if (ptr == NULL)
+				err(-1, "nvme_ioctl()");
 
-		nioc.n_buf = (uintptr_t)ptr;
+			nioc.n_buf = (uintptr_t)ptr;
+		}
+
 		nioc.n_len = *bufsize;
 	}
 
 	nioc.n_arg = arg;
 
-	if (ioctl(fd, ioc, &nioc) != 0) {
-		if (debug)
-			warn("nvme_ioctl()");
-		if (nioc.n_buf != 0)
-			free((void *)nioc.n_buf);
-
-		return (B_FALSE);
-	}
+	ret = ioctl(fd, ioc, &nioc);
 
 	if (res != NULL)
 		*res = nioc.n_arg;
+
+	if (ret != 0) {
+		if (debug)
+			warn("nvme_ioctl()");
+		if (ptr != NULL)
+			free(ptr);
+
+		return (B_FALSE);
+	}
 
 	if (bufsize != NULL)
 		*bufsize = nioc.n_len;
@@ -143,7 +148,9 @@ nvme_intr_cnt(int fd)
 {
 	uint64_t res = 0;
 
-	(void) nvme_ioctl(fd, NVME_IOC_INTR_CNT, NULL, NULL, 0, &res);
+	if (!nvme_ioctl(fd, NVME_IOC_INTR_CNT, NULL, NULL, 0, &res))
+		return (-1);
+
 	return ((int)res);
 }
 
@@ -168,6 +175,30 @@ boolean_t
 nvme_attach(int fd)
 {
 	return (nvme_ioctl(fd, NVME_IOC_ATTACH, NULL, NULL, 0, NULL));
+}
+
+boolean_t
+nvme_firmware_load(int fd, void *buf, size_t len, offset_t offset)
+{
+	return (nvme_ioctl(fd, NVME_IOC_FIRMWARE_DOWNLOAD, &len, &buf, offset,
+	    NULL));
+}
+
+boolean_t
+nvme_firmware_commit(int fd, int slot, int action, uint16_t *sct, uint16_t *sc)
+{
+	boolean_t rv;
+	uint64_t res;
+
+	rv = nvme_ioctl(fd, NVME_IOC_FIRMWARE_COMMIT, NULL, NULL,
+	    ((uint64_t)action << 32) | slot, &res);
+
+	if (sct != NULL)
+		*sct = (uint16_t)(res >> 16);
+	if (sc != NULL)
+		*sc = (uint16_t)res;
+
+	return (rv);
 }
 
 int

@@ -869,3 +869,11 @@ usr/bin/ctfmerge
 # SPARC doesn't currently use this today, though it may in the future.
 #
 usr/include/sys/sensors.h	sparc
+
+#
+# libjedec is private
+#
+usr/include/libjedec.h		i386
+usr/lib/amd64/libjedec.so	i386
+usr/lib/sparcv9/libjedec.so	sparc
+usr/lib/libjedec.so

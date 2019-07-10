@@ -2765,6 +2765,7 @@ file path=opt/zfs-tests/tests/functional/rootpool/rootpool_003_neg mode=0555
 file path=opt/zfs-tests/tests/functional/rootpool/rootpool_007_pos mode=0555
 file path=opt/zfs-tests/tests/functional/rootpool/setup mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/cleanup mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/recv_secpolicy mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/rsend.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/rsend/rsend.kshlib mode=0444
 file path=opt/zfs-tests/tests/functional/rsend/rsend_001_pos mode=0555

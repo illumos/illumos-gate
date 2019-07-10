@@ -1058,16 +1058,16 @@ print_memdevice(smbios_hdl_t *shp, id_t id, FILE *fp)
 	}
 
 	if (md.smbmd_cache_size == UINT64_MAX) {
-		oprintf(fp, "  Volatile Size: Unknown\n");
+		oprintf(fp, "  Cache Size: Unknown\n");
 	} else if (md.smbmd_cache_size != 0) {
-		oprintf(fp, "  Volatile Size: %llu bytes\n",
+		oprintf(fp, "  Cache Size: %llu bytes\n",
 		    (u_longlong_t)md.smbmd_cache_size);
 	}
 
 	if (md.smbmd_logical_size == UINT64_MAX) {
-		oprintf(fp, "  Volatile Size: Unknown\n");
+		oprintf(fp, "  Logical Size: Unknown\n");
 	} else if (md.smbmd_logical_size != 0) {
-		oprintf(fp, "  Volatile Size: %llu bytes\n",
+		oprintf(fp, "  Logical Size: %llu bytes\n",
 		    (u_longlong_t)md.smbmd_logical_size);
 	}
 }

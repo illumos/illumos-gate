@@ -275,7 +275,6 @@ struct nvme_task_arg {
 	nvme_cmd_t *nt_cmd;
 };
 
-
 #ifdef __cplusplus
 }
 #endif

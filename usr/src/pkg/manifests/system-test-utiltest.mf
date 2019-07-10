@@ -1401,6 +1401,7 @@ file path=opt/util-tests/tests/files/test7 mode=0444
 file path=opt/util-tests/tests/files/testnl mode=0444
 file path=opt/util-tests/tests/grep_test mode=0555
 file path=opt/util-tests/tests/iconv_test mode=0555
+file path=opt/util-tests/tests/libjedec_test mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_00_blank mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_01_boolean mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_02_numbers mode=0555
@@ -1444,6 +1445,7 @@ file path=opt/util-tests/tests/mergeq/mqt mode=0555
 file path=opt/util-tests/tests/mergeq/wqt mode=0555
 file path=opt/util-tests/tests/printf_test mode=0555
 file path=opt/util-tests/tests/set-linkprop mode=0555
+file path=opt/util-tests/tests/smbios mode=0555
 file path=opt/util-tests/tests/xargs_test mode=0555
 license lic_CDDL license=lic_CDDL
 license usr/src/lib/libdemangle/THIRDPARTYLICENSE \

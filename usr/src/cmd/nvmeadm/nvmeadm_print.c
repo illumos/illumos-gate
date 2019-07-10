@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright 2019 Western Digital Corporation
  */
 
 /*
@@ -853,11 +854,13 @@ nvme_print_fwslot_log(nvme_fwslot_log_t *fwlog)
 
 	nvme_print(0, "Firmware Slot Information", -1, NULL);
 	nvme_print_uint64(2, "Active Firmware Slot", fwlog->fw_afi, NULL, NULL);
+	if (fwlog->fw_next != 0)
+		nvme_print_uint64(2, "Next Firmware Slot", fwlog->fw_next,
+		    NULL, NULL);
 
 	for (i = 0; i != ARRAYSIZE(fwlog->fw_frs); i++) {
-		if (fwlog->fw_frs[i][0] == '\0')
-			break;
 		nvme_print_str(2, "Firmware Revision for Slot", i + 1,
+		    fwlog->fw_frs[i][0] == '\0' ? "<Unused>" :
 		    fwlog->fw_frs[i], sizeof (fwlog->fw_frs[i]));
 	}
 }
@@ -1135,4 +1138,58 @@ nvme_print_feat_progress(uint64_t res, void *b, size_t s,
 	spm.r = (uint32_t)res;
 	nvme_print_uint64(4, "Pre-Boot Software Load Count",
 	    spm.b.spm_pbslc, NULL, NULL);
+}
+
+static const char *
+nvme_str_generic_error(int sc)
+{
+	switch (sc) {
+	case NVME_CQE_SC_GEN_SUCCESS:
+		return ("Success");
+	default:
+		return ("See message log (usually /var/adm/messages) "
+		    "for details");
+	}
+}
+
+static const char *
+nvme_str_specific_error(int sc)
+{
+	switch (sc) {
+	case NVME_CQE_SC_SPC_INV_FW_SLOT:
+		return ("Invalid firmware slot");
+	case NVME_CQE_SC_SPC_INV_FW_IMG:
+		return ("Invalid firmware image");
+	case NVME_CQE_SC_SPC_FW_RESET:
+		return ("Conventional reset required - use "
+		    "'reboot -p' or similar");
+	case NVME_CQE_SC_SPC_FW_NSSR:
+		return ("NVM subsystem reset required - power cycle "
+		    "your system");
+	case NVME_CQE_SC_SPC_FW_NEXT_RESET:
+		return ("Image will be activated at next reset");
+	case NVME_CQE_SC_SPC_FW_MTFA:
+		return ("Activation requires maxmimum time violation");
+	case NVME_CQE_SC_SPC_FW_PROHIBITED:
+		return ("Activation prohibited");
+	default:
+		return ("See message log (usually /var/adm/messages) "
+		    "for details");
+	}
+}
+
+const char *
+nvme_str_error(int sct, int sc)
+{
+	switch (sct) {
+	case NVME_CQE_SCT_GENERIC:
+		return (nvme_str_generic_error(sc));
+
+	case NVME_CQE_SCT_SPECIFIC:
+		return (nvme_str_specific_error(sc));
+
+	default:
+		return ("See message log (usually /var/adm/messages) "
+		    "for details");
+	}
 }

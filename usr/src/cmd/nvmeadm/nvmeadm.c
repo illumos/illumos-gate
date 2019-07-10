@@ -12,6 +12,7 @@
 /*
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Western Digital Corporation.
  */
 
 /*
@@ -29,14 +30,14 @@
  *		get-param ...
  *		set-param ...
  *		load-firmware ...
+ *		commit-firmware ...
  *		activate-firmware ...
- *		write-uncorrectable ...
- *		compare ...
- *		compare-and-write ...
  */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <strings.h>
 #include <ctype.h>
 #include <err.h>
@@ -112,6 +113,9 @@ static int do_get_features(int, const nvme_process_arg_t *);
 static int do_format(int, const nvme_process_arg_t *);
 static int do_secure_erase(int, const nvme_process_arg_t *);
 static int do_attach_detach(int, const nvme_process_arg_t *);
+static int do_firmware_load(int, const nvme_process_arg_t *);
+static int do_firmware_commit(int, const nvme_process_arg_t *);
+static int do_firmware_activate(int, const nvme_process_arg_t *);
 
 static void usage_list(const char *);
 static void usage_identify(const char *);
@@ -120,6 +124,9 @@ static void usage_get_features(const char *);
 static void usage_format(const char *);
 static void usage_secure_erase(const char *);
 static void usage_attach_detach(const char *);
+static void usage_firmware_load(const char *);
+static void usage_firmware_commit(const char *);
+static void usage_firmware_activate(const char *);
 
 int verbose;
 int debug;
@@ -173,6 +180,24 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		"attach blkdev(7d) to namespace(s) of a controller",
 		NULL,
 		do_attach_detach, usage_attach_detach, B_FALSE
+	},
+	{
+		"load-firmware",
+		"load firmware to a controller",
+		NULL,
+		do_firmware_load, usage_firmware_load, B_FALSE
+	},
+	{
+		"commit-firmware",
+		"commit downloaded firmware to a slot of a controller",
+		NULL,
+		do_firmware_commit, usage_firmware_commit, B_FALSE
+	},
+	{
+		"activate-firmware",
+		"activate a firmware slot of a controller",
+		NULL,
+		do_firmware_activate, usage_firmware_activate, B_FALSE
 	},
 	{
 		NULL, NULL, NULL,
@@ -361,7 +386,7 @@ usage(const nvmeadm_cmd_t *cmd)
 		(void) fprintf(stderr, "\ncommands:\n");
 
 		for (cmd = &nvmeadm_cmds[0]; cmd->c_name != NULL; cmd++)
-			(void) fprintf(stderr, "  %-15s - %s\n",
+			(void) fprintf(stderr, "  %-18s - %s\n",
 			    cmd->c_name, cmd->c_desc);
 	}
 	(void) fprintf(stderr, "\nflags:\n"
@@ -1006,6 +1031,205 @@ do_attach_detach(int fd, const nvme_process_arg_t *npa)
 			return (-1);
 		}
 	}
+
+	return (0);
+}
+
+static void
+usage_firmware_load(const char *c_name)
+{
+	(void) fprintf(stderr, "%s <ctl> <image file> [<offset>]\n\n"
+	    "  Load firmware <image file> to offset <offset>.\n"
+	    "  The firmware needs to be committed to a slot using "
+	    "\"nvmeadm commit-firmware\"\n  command.\n", c_name);
+}
+
+/*
+ * Read exactly len bytes, or until eof.
+ */
+static ssize_t
+read_block(int fd, char *buf, size_t len)
+{
+	size_t remain;
+	ssize_t bytes;
+
+	remain = len;
+	while (remain > 0) {
+		bytes = read(fd, buf, remain);
+		if (bytes == 0)
+			break;
+
+		if (bytes < 0) {
+			if (errno == EINTR)
+				continue;
+
+			return (-1);
+		}
+
+		buf += bytes;
+		remain -= bytes;
+	}
+
+	return (len - remain);
+}
+
+/*
+ * Convert a string to a valid firmware upload offset (in bytes).
+ */
+static offset_t
+get_fw_offsetb(char *str)
+{
+	longlong_t offsetb;
+	char *valend;
+
+	errno = 0;
+	offsetb = strtoll(str, &valend, 0);
+	if (errno != 0 || *valend != '\0' || offsetb < 0 ||
+	    offsetb > NVME_FW_OFFSETB_MAX)
+		errx(-1, "Offset must be numeric and in the range of 0 to %llu",
+		    NVME_FW_OFFSETB_MAX);
+
+	if ((offsetb & NVME_DWORD_MASK) != 0)
+		errx(-1, "Offset must be multiple of %d", NVME_DWORD_SIZE);
+
+	return ((offset_t)offsetb);
+}
+
+#define	FIRMWARE_READ_BLKSIZE	(64 * 1024)		/* 64K */
+
+static int
+do_firmware_load(int fd, const nvme_process_arg_t *npa)
+{
+	int fw_fd;
+	ssize_t len;
+	offset_t offset = 0;
+	size_t size;
+	char buf[FIRMWARE_READ_BLKSIZE];
+
+	if (npa->npa_argc > 2)
+		errx(-1, "Too many arguments");
+
+	if (npa->npa_argc == 0)
+		errx(-1, "Requires firmware file name, and an "
+		    "optional offset");
+
+	if (npa->npa_argc == 2)
+		offset = get_fw_offsetb(npa->npa_argv[1]);
+
+	fw_fd = open(npa->npa_argv[0], O_RDONLY);
+	if (fw_fd < 0)
+		errx(-1, "Failed to open \"%s\": %s", npa->npa_argv[0],
+		    strerror(errno));
+
+	size = 0;
+	do {
+		len = read_block(fw_fd, buf, sizeof (buf));
+
+		if (len < 0)
+			errx(-1, "Error reading \"%s\": %s", npa->npa_argv[0],
+			    strerror(errno));
+
+		if (len == 0)
+			break;
+
+		if (!nvme_firmware_load(fd, buf, len, offset))
+			errx(-1, "Error loading \"%s\": %s", npa->npa_argv[0],
+			    strerror(errno));
+
+		offset += len;
+		size += len;
+	} while (len == sizeof (buf));
+
+	close(fw_fd);
+
+	if (verbose)
+		(void) printf("%zu bytes downloaded.\n", size);
+
+	return (0);
+}
+
+/*
+ * Convert str to a valid firmware slot number.
+ */
+static uint_t
+get_slot_number(char *str)
+{
+	longlong_t slot;
+	char *valend;
+
+	errno = 0;
+	slot = strtoll(str, &valend, 0);
+	if (errno != 0 || *valend != '\0' ||
+	    slot < NVME_FW_SLOT_MIN || slot > NVME_FW_SLOT_MAX)
+		errx(-1, "Slot must be numeric and in the range of %d to %d",
+		    NVME_FW_SLOT_MIN, NVME_FW_SLOT_MAX);
+
+	return ((uint_t)slot);
+}
+
+static void
+usage_firmware_commit(const char *c_name)
+{
+	(void) fprintf(stderr, "%s <ctl> <slot>\n\n"
+	    "  Commit previously downloaded firmware to slot <slot>.\n"
+	    "  The firmware is only activated after a "
+	    "\"nvmeadm activate-firmware\" command.\n", c_name);
+}
+
+static int
+do_firmware_commit(int fd, const nvme_process_arg_t *npa)
+{
+	uint_t slot;
+	uint16_t sct, sc;
+
+	if (npa->npa_argc > 1)
+		errx(-1, "Too many arguments");
+
+	if (npa->npa_argc == 0)
+		errx(-1, "Firmware slot number is required");
+
+	slot = get_slot_number(npa->npa_argv[0]);
+
+	if (!nvme_firmware_commit(fd, slot, NVME_FWC_SAVE, &sct, &sc))
+		errx(-1, "Failed to commit firmware to slot %u: %s",
+		    slot, nvme_str_error(sct, sc));
+
+	if (verbose)
+		(void) printf("Firmware committed to slot %u.\n", slot);
+
+	return (0);
+}
+
+static void
+usage_firmware_activate(const char *c_name)
+{
+	(void) fprintf(stderr, "%s <ctl> <slot>\n\n"
+	    "  Activate firmware in slot <slot>.\n"
+	    "  The firmware will be in use after the next system reset.\n",
+	    c_name);
+}
+
+static int
+do_firmware_activate(int fd, const nvme_process_arg_t *npa)
+{
+	uint_t slot;
+	uint16_t sct, sc;
+
+	if (npa->npa_argc > 1)
+		errx(-1, "Too many arguments");
+
+	if (npa->npa_argc == 0)
+		errx(-1, "Firmware slot number is required");
+
+	slot = get_slot_number(npa->npa_argv[0]);
+
+	if (!nvme_firmware_commit(fd, slot, NVME_FWC_ACTIVATE, &sct, &sc))
+		errx(-1, "Failed to activate slot %u: %s", slot,
+		    nvme_str_error(sct, sc));
+
+	if (verbose)
+		printf("Slot %u activated: %s.\n", slot,
+		    nvme_str_error(sct, sc));
 
 	return (0);
 }

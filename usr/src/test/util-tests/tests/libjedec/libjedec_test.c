@@ -82,8 +82,9 @@ main(void)
 		} else if (out != NULL && libjedec_expects[i].ljtt_exp ==
 		    NULL) {
 			errs++;
-			(void) fprintf(stderr, "test %u failed, expected lookup"
-			    "failure, but it suceeded with %s\n", i, out);
+			(void) fprintf(stderr, "test %u failed, expected "
+			    "lookup failure, but it succeeded with %s\n", i,
+			    out);
 		} else if (strcmp(out, libjedec_expects[i].ljtt_exp) != 0) {
 			errs++;
 			(void) fprintf(stderr, "test %u failed, expected %s, "

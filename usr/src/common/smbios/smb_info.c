@@ -698,8 +698,8 @@ smbios_info_slot_peers(smbios_hdl_t *shp, id_t id, uint_t *npeers,
     smbios_slot_peer_t **peerp)
 {
 	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	const smb_slot_t *slotp = (const smb_slot_t *)stp->smbst_hdr;
 	smbios_slot_peer_t *peer;
-	const smb_slot_t *slotp;
 	size_t minlen;
 	uint_t i;
 
@@ -708,8 +708,6 @@ smbios_info_slot_peers(smbios_hdl_t *shp, id_t id, uint_t *npeers,
 
 	if (stp->smbst_hdr->smbh_type != SMB_TYPE_SLOT)
 		return (smb_set_errno(shp, ESMB_TYPE));
-
-	slotp = (const smb_slot_t *)stp->smbst_hdr;
 
 	if (stp->smbst_hdr->smbh_len <= offsetof(smb_slot_t, smbsl_npeers) ||
 	    slotp->smbsl_npeers == 0) {

@@ -822,12 +822,44 @@ t4_mc_transceiver_read(void *arg, uint_t id, uint_t page, void *bp,
 	return (rc);
 }
 
+static int
+t4_port_led_set(void *arg, mac_led_mode_t mode, uint_t flags)
+{
+	struct port_info *pi = arg;
+	struct adapter *sc = pi->adapter;
+	int val, rc;
+
+	if (flags != 0)
+		return (EINVAL);
+
+	switch (mode) {
+	case MAC_LED_DEFAULT:
+		val = 0;
+		break;
+	case MAC_LED_IDENT:
+		val = 0xffff;
+		break;
+
+	default:
+		return (ENOTSUP);
+	}
+
+	rc = begin_synchronized_op(pi, 1, 1);
+	if (rc != 0)
+		return (rc);
+	rc = -t4_identify_port(sc, sc->mbox, pi->viid, val);
+	end_synchronized_op(pi, 1);
+
+	return (rc);
+}
+
 static boolean_t
 t4_mc_getcapab(void *arg, mac_capab_t cap, void *data)
 {
 	struct port_info *pi = arg;
 	boolean_t status = B_TRUE;
 	mac_capab_transceiver_t *mct;
+	mac_capab_led_t *mcl;
 
 	switch (cap) {
 	case MAC_CAPAB_HCKSUM:
@@ -885,6 +917,12 @@ t4_mc_getcapab(void *arg, mac_capab_t cap, void *data)
 		mct->mct_ntransceivers = 1;
 		mct->mct_info = t4_mc_transceiver_info;
 		mct->mct_read = t4_mc_transceiver_read;
+		break;
+	case MAC_CAPAB_LED:
+		mcl = data;
+		mcl->mcl_flags = 0;
+		mcl->mcl_modes = MAC_LED_DEFAULT | MAC_LED_IDENT;
+		mcl->mcl_set = t4_port_led_set;
 		break;
 
 	default:

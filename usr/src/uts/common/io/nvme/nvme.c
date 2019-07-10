@@ -232,7 +232,6 @@
  * - support for media formatting and hard partitioning into namespaces
  * - support for big-endian systems
  * - support for fast reboot
- * - support for firmware updates
  * - support for NVMe Subsystem Reset (1.1)
  * - support for Scatter/Gather lists (1.1)
  * - support for Reservations (1.1)
@@ -304,6 +303,9 @@ int nvme_admin_cmd_timeout = 1;
 
 /* tunable for FORMAT NVM command timeout in seconds, default is 600s */
 int nvme_format_cmd_timeout = 600;
+
+/* tunable for firmware commit with NVME_FWC_SAVE, default is 15s */
+int nvme_commit_save_cmd_timeout = 15;
 
 static int nvme_attach(dev_info_t *, ddi_attach_cmd_t);
 static int nvme_detach(dev_info_t *, ddi_detach_cmd_t);
@@ -1447,6 +1449,46 @@ nvme_check_specific_cmd_status(nvme_cmd_t *cmd)
 		if (cmd->nc_xfer != NULL)
 			bd_error(cmd->nc_xfer, BD_ERR_ILLRQ);
 		return (EROFS);
+
+	case NVME_CQE_SC_SPC_INV_FW_SLOT:
+		/* Invalid Firmware Slot */
+		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_ACTIVATE);
+		return (EINVAL);
+
+	case NVME_CQE_SC_SPC_INV_FW_IMG:
+		/* Invalid Firmware Image */
+		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_ACTIVATE);
+		return (EINVAL);
+
+	case NVME_CQE_SC_SPC_FW_RESET:
+		/* Conventional Reset Required */
+		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_ACTIVATE);
+		return (0);
+
+	case NVME_CQE_SC_SPC_FW_NSSR:
+		/* NVMe Subsystem Reset Required */
+		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_ACTIVATE);
+		return (0);
+
+	case NVME_CQE_SC_SPC_FW_NEXT_RESET:
+		/* Activation Requires Reset */
+		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_ACTIVATE);
+		return (0);
+
+	case NVME_CQE_SC_SPC_FW_MTFA:
+		/* Activation Requires Maximum Time Violation */
+		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_ACTIVATE);
+		return (EAGAIN);
+
+	case NVME_CQE_SC_SPC_FW_PROHIBITED:
+		/* Activation Prohibited */
+		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_ACTIVATE);
+		return (EINVAL);
+
+	case NVME_CQE_SC_SPC_FW_OVERLAP:
+		/* Overlapping Firmware Ranges */
+		ASSERT(cmd->nc_sqe.sqe_opc == NVME_OPC_FW_IMAGE_LOAD);
+		return (EINVAL);
 
 	default:
 		return (nvme_check_unknown_cmd_status(cmd));
@@ -3871,6 +3913,129 @@ nvme_ioctl_identify(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 	return (rv);
 }
 
+/*
+ * Execute commands on behalf of the various ioctls.
+ */
+static int
+nvme_ioc_cmd(nvme_t *nvme, nvme_sqe_t *sqe, boolean_t is_admin, void *data_addr,
+    uint32_t data_len, int rwk, nvme_cqe_t *cqe, uint_t timeout)
+{
+	nvme_cmd_t *cmd;
+	nvme_qpair_t *ioq;
+	int rv = 0;
+
+	cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
+	if (is_admin) {
+		cmd->nc_sqid = 0;
+		ioq = nvme->n_adminq;
+	} else {
+		cmd->nc_sqid = (CPU->cpu_id % nvme->n_ioq_count) + 1;
+		ASSERT(cmd->nc_sqid <= nvme->n_ioq_count);
+		ioq = nvme->n_ioq[cmd->nc_sqid];
+	}
+
+	cmd->nc_callback = nvme_wakeup_cmd;
+	cmd->nc_sqe = *sqe;
+
+	if ((rwk & (FREAD | FWRITE)) != 0) {
+		if (data_addr == NULL) {
+			rv = EINVAL;
+			goto free_cmd;
+		}
+
+		/*
+		 * Because we use PRPs and haven't implemented PRP
+		 * lists here, the maximum data size is restricted to
+		 * 2 pages.
+		 */
+		if (data_len > 2 * nvme->n_pagesize) {
+			dev_err(nvme->n_dip, CE_WARN, "!Data size %u is too "
+			    "large for nvme_ioc_cmd(). Limit is 2 pages "
+			    "(%u bytes)", data_len,  2 * nvme->n_pagesize);
+
+			rv = EINVAL;
+			goto free_cmd;
+		}
+
+		if (nvme_zalloc_dma(nvme, data_len, DDI_DMA_READ,
+		    &nvme->n_prp_dma_attr, &cmd->nc_dma) != DDI_SUCCESS) {
+			dev_err(nvme->n_dip, CE_WARN,
+			    "!nvme_zalloc_dma failed for nvme_ioc_cmd()");
+
+			rv = ENOMEM;
+			goto free_cmd;
+		}
+
+		if (cmd->nc_dma->nd_ncookie > 2) {
+			dev_err(nvme->n_dip, CE_WARN,
+			    "!too many DMA cookies for nvme_ioc_cmd()");
+			atomic_inc_32(&nvme->n_too_many_cookies);
+
+			rv = E2BIG;
+			goto free_cmd;
+		}
+
+		cmd->nc_sqe.sqe_dptr.d_prp[0] =
+		    cmd->nc_dma->nd_cookie.dmac_laddress;
+
+		if (cmd->nc_dma->nd_ncookie > 1) {
+			ddi_dma_nextcookie(cmd->nc_dma->nd_dmah,
+			    &cmd->nc_dma->nd_cookie);
+			cmd->nc_sqe.sqe_dptr.d_prp[1] =
+			    cmd->nc_dma->nd_cookie.dmac_laddress;
+		}
+
+		if ((rwk & FWRITE) != 0) {
+			if (ddi_copyin(data_addr, cmd->nc_dma->nd_memp,
+			    data_len, rwk & FKIOCTL) != 0) {
+				rv = EFAULT;
+				goto free_cmd;
+			}
+		}
+	}
+
+	if (is_admin) {
+		nvme_admin_cmd(cmd, timeout);
+	} else {
+		mutex_enter(&cmd->nc_mutex);
+
+		rv = nvme_submit_io_cmd(ioq, cmd);
+
+		if (rv == EAGAIN) {
+			mutex_exit(&cmd->nc_mutex);
+			dev_err(cmd->nc_nvme->n_dip, CE_WARN,
+			    "!nvme_ioc_cmd() failed, I/O Q full");
+			goto free_cmd;
+		}
+
+		nvme_wait_cmd(cmd, timeout);
+
+		mutex_exit(&cmd->nc_mutex);
+	}
+
+	if (cqe != NULL)
+		*cqe = cmd->nc_cqe;
+
+	if ((rv = nvme_check_cmd_status(cmd)) != 0) {
+		dev_err(nvme->n_dip, CE_WARN,
+		    "!nvme_ioc_cmd() failed with sct = %x, sc = %x",
+		    cmd->nc_cqe.cqe_sf.sf_sct, cmd->nc_cqe.cqe_sf.sf_sc);
+
+		goto free_cmd;
+	}
+
+	if ((rwk & FREAD) != 0) {
+		if (ddi_copyout(cmd->nc_dma->nd_memp,
+		    data_addr, data_len, rwk & FKIOCTL) != 0)
+			rv = EFAULT;
+	}
+
+free_cmd:
+	nvme_free_cmd(cmd);
+
+	return (rv);
+}
+
 static int
 nvme_ioctl_capabilities(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
     int mode, cred_t *cred_p)
@@ -4190,6 +4355,109 @@ nvme_ioctl_attach(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 }
 
 static int
+nvme_ioctl_firmware_download(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
+    int mode, cred_t *cred_p)
+{
+	int rv = 0;
+	size_t len, copylen;
+	offset_t offset;
+	uintptr_t buf;
+	nvme_sqe_t sqe = {
+	    .sqe_opc	= NVME_OPC_FW_IMAGE_LOAD
+	};
+
+	if ((mode & FWRITE) == 0 || secpolicy_sys_config(cred_p, B_FALSE) != 0)
+		return (EPERM);
+
+	if (nsid != 0)
+		return (EINVAL);
+
+	/*
+	 * The offset (in n_len) is restricted to the number of DWORDs in
+	 * 32 bits.
+	 */
+	if (nioc->n_len > NVME_FW_OFFSETB_MAX)
+		return (EINVAL);
+
+	/* Confirm that both offset and length are a multiple of DWORD bytes */
+	if ((nioc->n_len & NVME_DWORD_MASK) != 0 ||
+	    (nioc->n_arg & NVME_DWORD_MASK) != 0)
+		return (EINVAL);
+
+	len = nioc->n_len;
+	offset = nioc->n_arg;
+	buf = (uintptr_t)nioc->n_buf;
+	while (len > 0 && rv == 0) {
+		/*
+		 * nvme_ioc_cmd() does not use SGLs or PRP lists.
+		 * It is limited to 2 PRPs per NVM command, so limit
+		 * the size of the data to 2 pages.
+		 */
+		copylen = MIN(2 * nvme->n_pagesize, len);
+
+		sqe.sqe_cdw10 = (uint32_t)(copylen >> NVME_DWORD_SHIFT) - 1;
+		sqe.sqe_cdw11 = (uint32_t)(offset >> NVME_DWORD_SHIFT);
+
+		rv = nvme_ioc_cmd(nvme, &sqe, B_TRUE, (void *)buf, copylen,
+		    FWRITE, NULL, nvme_admin_cmd_timeout);
+
+		buf += copylen;
+		offset += copylen;
+		len -= copylen;
+	}
+
+	return (rv);
+}
+
+static int
+nvme_ioctl_firmware_commit(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
+    int mode, cred_t *cred_p)
+{
+	nvme_firmware_commit_dw10_t fc_dw10 = { 0 };
+	uint32_t slot = nioc->n_arg & 0xffffffff;
+	uint32_t action = nioc->n_arg >> 32;
+	nvme_cqe_t cqe = { 0 };
+	nvme_sqe_t sqe = {
+	    .sqe_opc	= NVME_OPC_FW_ACTIVATE
+	};
+	int timeout;
+	int rv;
+
+	if ((mode & FWRITE) == 0 || secpolicy_sys_config(cred_p, B_FALSE) != 0)
+		return (EPERM);
+
+	if (nsid != 0)
+		return (EINVAL);
+
+	/* Validate slot is in range. */
+	if (slot < NVME_FW_SLOT_MIN || slot > NVME_FW_SLOT_MAX)
+		return (EINVAL);
+
+	switch (action) {
+	case NVME_FWC_SAVE:
+	case NVME_FWC_SAVE_ACTIVATE:
+		timeout = nvme_commit_save_cmd_timeout;
+		break;
+	case NVME_FWC_ACTIVATE:
+	case NVME_FWC_ACTIVATE_IMMED:
+		timeout = nvme_admin_cmd_timeout;
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	fc_dw10.b.fc_slot = slot;
+	fc_dw10.b.fc_action = action;
+	sqe.sqe_cdw10 = fc_dw10.r;
+
+	rv = nvme_ioc_cmd(nvme, &sqe, B_TRUE, NULL, 0, 0, &cqe, timeout);
+
+	nioc->n_arg = ((uint64_t)cqe.cqe_sf.sf_sct << 16) | cqe.cqe_sf.sf_sc;
+
+	return (rv);
+}
+
+static int
 nvme_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
     int *rval_p)
 {
@@ -4213,7 +4481,9 @@ nvme_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 		nvme_ioctl_version,
 		nvme_ioctl_format,
 		nvme_ioctl_detach,
-		nvme_ioctl_attach
+		nvme_ioctl_attach,
+		nvme_ioctl_firmware_download,
+		nvme_ioctl_firmware_commit
 	};
 
 	if (nvme == NULL)

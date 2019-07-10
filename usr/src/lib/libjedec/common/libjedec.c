@@ -20,7 +20,7 @@
  * This section of the library is dedicated to decoding the JEDEC vendor codes
  * as defined in JEP-106 AV (July 2017). The vendor code is encoded as a series
  * of continuation bytes and then the current vendor value. Each of the tables
- * below corresponds to one of the continuation vaues and is ordered based in
+ * below corresponds to one of the continuation values and is ordered based on
  * JEP-106.
  *
  * The value of a given vendor is encoded with a parity bit. That parity bit

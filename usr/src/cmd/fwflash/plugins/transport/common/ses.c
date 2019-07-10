@@ -118,7 +118,7 @@ static sam4_statdesc_t sam4_status[] = {
 	{ SAM4_STATUS_TASK_SET_FULL,
 	    "Status: TASK SET FULL (insufficient resources in command queue" },
 	{ SAM4_STATUS_TASK_ABORTED, "Status: TASK ABORTED" },
-	{ NULL, NULL }
+	{ 0, NULL }
 };
 
 #define	NSAM4_STATUS	\

@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #ifndef	_INET_IP_NDP_H
 #define	_INET_IP_NDP_H
 
@@ -83,7 +87,7 @@ struct ncec_s {
 	timeout_id_t	ncec_timeout_id;
 	uchar_t		ncec_ipversion;	/* IPv4(ARP)/IPv6(NDP) version */
 	uint_t		ncec_defense_count;	/* number of NDP conflicts */
-	uint_t		ncec_last_time_defended; /* last time defended (secs) */
+	clock_t		ncec_last_time_defended; /* defended last (ticks) */
 	uint64_t	ncec_init_time; /* time when it was set to ND_INITIAL */
 	boolean_t	ncec_trace_disable;	/* True when alloc fails */
 	/*

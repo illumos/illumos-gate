@@ -300,7 +300,7 @@ smbios_test_verify_table(smbios_hdl_t *hdl)
 	}
 
 	if (slot.smbl_width != SMB_SLW_16X) {
-		warnx("incorrect slot type, found %u", slot.smbl_type);
+		warnx("incorrect slot width, found %u", slot.smbl_width);
 		errs++;
 	}
 
@@ -310,7 +310,7 @@ smbios_test_verify_table(smbios_hdl_t *hdl)
 	}
 
 	if (slot.smbl_dbw != SMB_SLW_16X) {
-		warnx("incorrect slot width, found %u", slot.smbl_dbw);
+		warnx("incorrect slot data bus width, found %u", slot.smbl_dbw);
 		errs++;
 	}
 
@@ -331,7 +331,7 @@ smbios_test_verify_table(smbios_hdl_t *hdl)
 	}
 
 	if (peers[0].smblp_group != 1) {
-		warnx("incorect group for peer 0: %u", peers[0].smblp_group);
+		warnx("incorrect group for peer 0: %u", peers[0].smblp_group);
 		errs++;
 	}
 
@@ -354,7 +354,7 @@ smbios_test_verify_table(smbios_hdl_t *hdl)
 	}
 
 	if (peers[1].smblp_group != 1) {
-		warnx("incorect group for peer 1: %u", peers[1].smblp_group);
+		warnx("incorrect group for peer 1: %u", peers[1].smblp_group);
 		errs++;
 	}
 
@@ -379,7 +379,7 @@ smbios_test_verify_table(smbios_hdl_t *hdl)
 	smbios_info_slot_peers_free(hdl, npeers, peers);
 
 	if (errs > 0) {
-		errx(EXIT_FAILURE, "encountered fatal erros");
+		errx(EXIT_FAILURE, "encountered fatal errors");
 	}
 }
 
