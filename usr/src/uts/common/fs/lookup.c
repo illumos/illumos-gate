@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Joyent, Inc.
  */
@@ -431,7 +431,7 @@ checkforroot:
 	 * Traverse mount points.
 	 * XXX why don't we need to hold a read lock here (call vn_vfsrlock)?
 	 * What prevents a concurrent update to v_vfsmountedhere?
-	 * 	Possible answer: if mounting, we might not see the mount
+	 *	Possible answer: if mounting, we might not see the mount
 	 *	if it is concurrently coming into existence, but that's
 	 *	really not much different from the thread running a bit slower.
 	 *	If unmounting, we may get into traverse() when we shouldn't,
@@ -1050,7 +1050,26 @@ vnode_valid_pn(vnode_t *vp, vnode_t *vrootp, pathname_t *pn, pathname_t *rpn,
 	VN_HOLD(vrootp);
 	if (vrootp != rootdir)
 		VN_HOLD(vrootp);
-	if (lookuppnvp(pn, rpn, FOLLOW | flags, NULL, &compvp, vrootp, vrootp,
+
+	/*
+	 * The FOLLOW flag only determines, if the final path component
+	 * is a symlink, whether lookuppnvp will return the symlink, or its
+	 * target.
+	 *
+	 * If the vp is a VLNK, then passing the FOLLOW flag will cause
+	 * lookuppnvp to return the vnode of its target, instead of itself, and
+	 * so vn_compare will fail. Therefore, we do not pass FOLLOW when our vp
+	 * is a symlink.
+	 *
+	 * If the vp is not a VLNK, then we pass FOLLOW on the off-chance that
+	 * the stored v_path ends at a symlink, instead of the symlink's target.
+	 */
+	if (vp->v_type != VLNK)
+		flags |= FOLLOW;
+	else
+		flags &= ~FOLLOW;
+
+	if (lookuppnvp(pn, rpn, flags, NULL, &compvp, vrootp, vrootp,
 	    cr) == 0) {
 		/*
 		 * Check to see if the returned vnode is the same as the one we
