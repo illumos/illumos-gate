@@ -8,7 +8,7 @@
 # source.  A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 #
-# Copyright (c) 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -27,6 +27,8 @@ SMATCH_ARGS += -Wno-external-function-has-definition
 # we have lots of legacy "void foo();" in headers
 SMATCH_ARGS += -Wno-old-style-definition
 SMATCH_ARGS += -Wno-strict-prototypes
+SMATCH_ARGS += --fatal-checks
+SMATCH_ARGS += --timeout=120
 
 CERRWARN += $(SMATCH_ARGS:%=-_smatch=%)
 

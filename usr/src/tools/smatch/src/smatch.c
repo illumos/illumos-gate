@@ -13,6 +13,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, see http://www.gnu.org/copyleft/gpl.txt
+ *
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -43,6 +45,7 @@ int option_mem;
 char *option_datadir_str;
 int option_fatal_checks;
 int option_succeed;
+int option_timeout = 60;
 
 FILE *sm_outfd;
 FILE *sql_outfd;
@@ -173,7 +176,7 @@ static int match_option(const char *arg, const char *option)
 }
 
 #define OPTION(_x) do {					\
-	if (match_option((*argvp)[1], #_x)) { 		\
+	if (match_option((*argvp)[i], #_x)) { 		\
 		option_##_x = 1;			\
 	}                                               \
 } while (0)
@@ -216,6 +219,12 @@ void parse_args(int *argcp, char ***argvp)
 			enable_disable_checks((*argvp)[i] + 10, 0);
 			option_enable = 1;
 			option_disable = 1;
+		}
+
+		if (!strncmp((*argvp)[i], "--timeout=", 10)) {
+			if (sscanf((*argvp)[i] + 10, "%d",
+			    &option_timeout) != 1)
+				sm_fatal("invalid option %s", (*argvp)[i]);
 		}
 
 		OPTION(fatal_checks);

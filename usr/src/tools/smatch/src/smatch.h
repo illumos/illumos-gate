@@ -13,6 +13,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, see http://www.gnu.org/copyleft/gpl.txt
+ *
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef   	SMATCH_H_
@@ -200,6 +202,7 @@ extern int option_debug;
 extern int local_debug;
 extern int option_info;
 extern int option_spammy;
+extern int option_timeout;
 extern char *trace_variable;
 extern struct stree *global_states;
 int is_skipped_function(void);
