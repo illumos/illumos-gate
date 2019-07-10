@@ -1,0 +1,112 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2019 Joyent, Inc.
+#
+
+include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/test/Makefile.com
+include $(SRC)/cmd/Makefile.ctf
+
+PROGS_32 = $(CRYPTO:%=$(BASEPROG)_32_%)
+PROGS_64 = $(CRYPTO:%=$(BASEPROG)_64_%)
+PROGS = $(PROGS_32) $(PROGS_64)
+
+COMMON_OBJS_32 = $(COMMON_OBJS:%.o=%.32.o)
+COMMON_OBJS_64 = $(COMMON_OBJS:%.o=%.64.o)
+
+# Some tests may only be relevant for PKCS#11 or KCF.  One can use
+# a statement like 'CRYPTO_kcf = $(POUND_SIGN)' in a test's Makefile to
+# disable creation of tests for a given framework.  For an example, see
+# modes/aes/cbc_pad/Makefile
+$(CRYPTO_pkcs)PROGS_pkcs = $(BASEPROG:%=%_32_pkcs) $(BASEPROG:%=%_64_pkcs)
+$(CRYPTO_kcf)PROGS_kcf = $(BASEPROG:%=%_32_kcf) $(BASEPROG:%=%_64_kcf)
+
+# $(TESTROOT) must be set by whatever includes this file
+$(CRYPTO_pkcs)TESTDIR_pkcs = $(TESTROOT)/pkcs
+$(CRYPTO_kcf)TESTDIR_kcf = $(TESTROOT)/kcf
+
+COMMONDIR = $(SRC)/test/crypto-tests/tests/common
+$(PROGS_32) := OBJS += $(BASEPROG:%=%.32.o) $(COMMON_OBJS_32)
+$(PROGS_64) := OBJS += $(BASEPROG:%=%.64.o) $(COMMON_OBJS_64)
+$(PROGS_32) := OBJS += $(COMMONDIR)/testfuncs.32.o
+$(PROGS_64) := OBJS += $(COMMONDIR)/testfuncs.64.o
+$(CRYPTO_pkcs)$(BASEPROG)_32_pkcs := OBJS += $(COMMONDIR)/cryptotest_pkcs.32.o
+$(CRYPTO_pkcs)$(BASEPROG)_64_pkcs := OBJS += $(COMMONDIR)/cryptotest_pkcs.64.o
+$(CRYPTO_kcf)$(BASEPROG)_32_kcf	:= OBJS += $(COMMONDIR)/cryptotest_kcf.32.o
+$(CRYPTO_kcf)$(BASEPROG)_64_kcf	:= OBJS += $(COMMONDIR)/cryptotest_kcf.64.o
+
+$(CRYPTO_pkcs)$(PROGS_pkcs)	:= LDLIBS += -lpkcs11 -lcryptoutil
+
+CSTD = $(CSTD_GNU99)
+
+$(CRYPTO_pkcs)CMDS_pkcs = $(PROGS_pkcs:%_pkcs=$(TESTDIR_pkcs)/%)
+$(CRYPTO_kcf)CMDS_kcf = $(PROGS_kcf:%_kcf=$(TESTDIR_kcf)/%)
+CMDS = $(CMDS_pkcs) $(CMDS_kcf)
+
+$(CMDS) := FILEMODE = 0555
+
+CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+CPPFLAGS += -I$(COMMONDIR) -I$(SRC)/common/crypto/
+
+all: $(PROGS)
+
+%_32_pkcs: %.32.o $(COMMON_OBJS_32)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
+
+%_64_pkcs: %.64.o $(COMMON_OBJS_64)
+	$(LINK64.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
+
+%_32_kcf: %.32.o $(COMMON_OBJS_32)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
+
+%_64_kcf: %.64.o $(COMMON_OBJS_64)
+	$(LINK64.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
+
+%.32.o: %.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+%.64.o: %.c
+	$(COMPILE64.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+install: all $(CMDS)
+
+clobber: clean
+	-$(RM) $(PROGS)
+
+clean:
+	-$(RM) *.o $(COMMON_OBJS_32) $(COMMON_OBJS_64)
+
+$(CMDS): $(TESTDIR_pkcs) $(TESTDIR_kcf) $(PROGS)
+
+$(TESTDIR_pkcs) $(TESTDIR_kcf):
+	$(INS.dir)
+
+$(TESTDIR_pkcs)/%_32: %_32_pkcs
+	$(INS.rename)
+
+$(TESTDIR_pkcs)/%_64: %_64_pkcs
+	$(INS.rename)
+
+$(TESTDIR_kcf)/%_32: %_32_kcf
+	$(INS.rename)
+
+$(TESTDIR_kcf)/%_64: %_64_kcf
+	$(INS.rename)

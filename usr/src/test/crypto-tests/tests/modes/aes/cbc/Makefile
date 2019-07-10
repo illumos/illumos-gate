@@ -12,9 +12,11 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 BASEPROG = aes_cbc
+CRYPTO = pkcs kcf
 
 include $(SRC)/cmd/Makefile.cmd
 include ../Makefile.subdirs

@@ -12,7 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
-# Copyright 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 [DEFAULT]
@@ -51,4 +51,13 @@ tests = ['sha1_32', 'sha256_32', 'sha384_32', 'sha512_32', 'sha512_224_32',
          'sha512_256_32', 'md5_32',
          'sha1_64', 'sha256_64', 'sha384_64', 'sha512_64', 'sha512_224_64',
          'sha512_256_64', 'md5_64' ]
+post = cleanup
+
+[/opt/crypto-tests/tests/hmac/pkcs]
+tests = ['hmac_sha1_32', 'hmac_sha1_64']
+
+[/opt/crypto-tests/tests/hmac/kcf]
+pre = setup
+user = root
+tests = ['hmac_sha1_32', 'hmac_sha1_64']
 post = cleanup
