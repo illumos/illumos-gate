@@ -72,7 +72,7 @@ static cpu_tbl_t fma_cap_list[] = {
 	{"GenuineIntel", 6, 46, "NHMEX_fma_cap"},
 	{"GenuineIntel", 6, 44, "WSMEP_fma_cap"},
 	{"GenuineIntel", 6, 47, "INTLN_fma_cap"},
-	{NULL, 0, 0, NULL}
+	{0, 0, 0, 0}
 };
 #endif
 

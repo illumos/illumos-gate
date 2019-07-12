@@ -351,7 +351,7 @@ objectRules_t objectRules[] = {
 	ADD|REMOVE|LIST, "IP-address[:port-number]"},
 	{ISNS_SERVER_ADDRESS, ADD|REMOVE, LIST, 0, MODIFY,
 	ADD|REMOVE|LIST, "IP-address[:port-number]"},
-	{0, 0, 0, 0, 0, NULL}
+	{0, 0, 0, 0, 0, 0}
 };
 
 /*
@@ -652,10 +652,10 @@ getTargetAddress(int addrType, char *ipStr, IMA_TARGET_ADDRESS *address)
 		} else if (addrType == ISNS_SERVER_ADDRESS) {
 			inputPort = ISNS_DEFAULT_SERVER_PORT;
 		} else {
-			*colPos = NULL;
+			*colPos = '\0';
 		}
 	} else {
-		*colPos = NULL;
+		*colPos = '\0';
 	}
 
 	rval = inet_pton(addressType, tmpStrPtr,
@@ -672,7 +672,7 @@ getTargetAddress(int addrType, char *ipStr, IMA_TARGET_ADDRESS *address)
 		char *errchr;
 
 		colPos++;
-		if (*colPos == NULL) {
+		if (*colPos == '\0') {
 			(void) fprintf(stderr, "%s: %s: %s\n",
 			    cmdName, ipStr,
 			    gettext("port number missing"));
@@ -1520,7 +1520,7 @@ getSecret(char *secret, int *secretLen, int minSecretLen, int maxSecretLen)
 	if (chapSecret == NULL) {
 		(void) fprintf(stderr, "%s: %s\n", cmdName,
 		    gettext("Unable to get secret"));
-		*secret = NULL;
+		*secret = '\0';
 		return (1);
 	}
 
@@ -1528,7 +1528,7 @@ getSecret(char *secret, int *secretLen, int minSecretLen, int maxSecretLen)
 		(void) fprintf(stderr, "%s: %s %d\n", cmdName,
 		    gettext("secret too long, maximum length is"),
 		    maxSecretLen);
-		*secret = NULL;
+		*secret = '\0';
 		return (1);
 	}
 
@@ -1536,7 +1536,7 @@ getSecret(char *secret, int *secretLen, int minSecretLen, int maxSecretLen)
 		(void) fprintf(stderr, "%s: %s %d\n", cmdName,
 		    gettext("secret too short, minimum length is"),
 		    minSecretLen);
-		*secret = NULL;
+		*secret = '\0';
 		return (1);
 	}
 
@@ -1547,14 +1547,14 @@ getSecret(char *secret, int *secretLen, int minSecretLen, int maxSecretLen)
 	if (chapSecret == NULL) {
 		(void) fprintf(stderr, "%s: %s\n", cmdName,
 		    gettext("Unable to get secret"));
-		*secret = NULL;
+		*secret = '\0';
 		return (1);
 	}
 
 	if (strcmp(secret, chapSecret) != 0) {
 		(void) fprintf(stderr, "%s: %s\n", cmdName,
 		    gettext("secrets do not match, secret not changed"));
-		*secret = NULL;
+		*secret = '\0';
 		return (1);
 	}
 	*secretLen = strlen(chapSecret);
@@ -3452,7 +3452,7 @@ modifyNodeAuthMethod(IMA_OID oid, char *optarg, int *funcRet)
 	commaPos = strchr(optarg, ',');
 
 	while (commaPos && methodCount < MAX_AUTH_METHODS) {
-		*commaPos = NULL;
+		*commaPos = '\0';
 		if (getAuthMethodValue(method, &value) != 0) {
 			(void) fprintf(stderr, "%s: a: %s\n",
 			    cmdName, gettext("invalid option argument"));
@@ -3507,7 +3507,7 @@ modifyTargetAuthMethod(IMA_OID oid, char *optarg, int *funcRet)
 	commaPos = strchr(optarg, ',');
 
 	while (commaPos && methodCount < MAX_AUTH_METHODS) {
-		*commaPos = NULL;
+		*commaPos = '\0';
 		if (getAuthMethodValue(method, &value) != 0) {
 			(void) fprintf(stderr, "%s: a: %s\n",
 			    cmdName, gettext("invalid option argument"));
@@ -3705,8 +3705,8 @@ modifyNode(cmdOptions_t *options, int *funcRet)
 	int		ret;
 	iSCSINameCheckStatusType nameCheckStatus;
 	IMA_OID sharedNodeOid;
-	int 		i;
-	int 		lowerCase;
+	int		i;
+	int		lowerCase;
 	IMA_BOOL	iscsiBoot = IMA_FALSE;
 	IMA_BOOL	mpxioEnabled = IMA_FALSE;
 	char		*mb_name = NULL;
@@ -4698,7 +4698,7 @@ removeTargetParam(int operandLen, char *operand[], int *funcRet)
 		commaPos = strchr(operand[i], ',');
 		if (commaPos) {
 			/* Ignore IP address. */
-			*commaPos = NULL;
+			*commaPos = '\0';
 		}
 		(void) memset(&wcInputObject[0], 0, sizeof (wcInputObject));
 		if (mbstowcs(wcInputObject, operand[i],
@@ -5062,7 +5062,7 @@ parseAddress(char *address_port_str,
 			return (PARSE_ADDR_MISSING_CLOSING_BRACKET);
 		}
 
-		*close_bracket_pos = NULL;
+		*close_bracket_pos = '\0';
 		(void) strlcpy(address_str, &address_port_str[1],
 		    address_str_len);
 
@@ -5070,7 +5070,7 @@ parseAddress(char *address_port_str,
 		close_bracket_pos++;
 		if (*close_bracket_pos == ':') {
 			close_bracket_pos++;
-			if (*close_bracket_pos != NULL) {
+			if (*close_bracket_pos != '\0') {
 				(void) strlcpy(port_str, close_bracket_pos, 64);
 				tmp_port = strtol(port_str, &errchr, 10);
 				if (tmp_port == 0 && errchr != NULL) {
@@ -5108,13 +5108,13 @@ parseAddress(char *address_port_str,
 			(void) strlcpy(address_str, address_port_str,
 			    address_str_len);
 		} else {
-			*colon_pos = (char)NULL;
+			*colon_pos = '\0';
 			(void) strlcpy(address_str, address_port_str,
 			    address_str_len);
 
 			/* Extract the port number */
 			colon_pos++;
-			if (*colon_pos != NULL) {
+			if (*colon_pos != '\0') {
 
 				(void) strlcpy(port_str, colon_pos, 64);
 				tmp_port = strtol(port_str, &errchr, 10);
@@ -5168,7 +5168,7 @@ iSCSINameStringProfileCheck(wchar_t *name)
 	 * According to RFC 3722 iSCSI name must be either a letter,
 	 * a digit or one of the following '-' '.' ':'
 	 */
-	for (tmp = mb_name; *tmp != NULL; tmp++) {
+	for (tmp = mb_name; *tmp != '\0'; tmp++) {
 		if ((isalnum(*tmp) == 0) &&
 		    (*tmp != '-') &&
 		    (*tmp != '.') &&
@@ -5313,29 +5313,23 @@ isNaturalNumber(char *numberStr, uint32_t upperBound)
  * This helper function could go into a utility module for general use.
  * It parses a target string in the format of:
  *
- * 	<target_name>,[<ip_address>[:port][,tpgt]]
+ *	<target_name>,[<ip_address>[:port][,tpgt]]
  *
  * and creates wchar strings for target name and target address. It
  * also populates port and tpgt if found.
  *
  * Returns:
- * 	PARSE_TARGET_OK if parsing is successful.
+ *	PARSE_TARGET_OK if parsing is successful.
  *	PARSE_TARGET_INVALID_TPGT if the specified tpgt is
  *	invalid.
- * 	PARSE_TARGET_INVALID_ADDR if the address specified is
+ *	PARSE_TARGET_INVALID_ADDR if the address specified is
  *	invalid.
  */
 int
-parseTarget(char *targetStr,
-		wchar_t *targetNameStr,
-		size_t targetNameStrLen,
-		boolean_t *targetAddressSpecified,
-		wchar_t *targetAddressStr,
-		size_t targetAddressStrLen,
-		uint16_t *port,
-		boolean_t *tpgtSpecified,
-		uint16_t *tpgt,
-		boolean_t *isIpv6)
+parseTarget(char *targetStr, wchar_t *targetNameStr, size_t targetNameStrLen,
+    boolean_t *targetAddressSpecified, wchar_t *targetAddressStr,
+    size_t targetAddressStrLen, uint16_t *port, boolean_t *tpgtSpecified,
+    uint16_t *tpgt, boolean_t *isIpv6)
 {
 	char *commaPos;
 	char *commaPos2;
@@ -5350,7 +5344,7 @@ parseTarget(char *targetStr,
 
 	commaPos = strchr(targetStr, ',');
 	if (commaPos != NULL) {
-		*commaPos = NULL;
+		*commaPos = '\0';
 		commaPos++;
 		*targetAddressSpecified = B_TRUE;
 
@@ -5360,7 +5354,7 @@ parseTarget(char *targetStr,
 		 */
 		commaPos2 = strchr(commaPos, ',');
 		if (commaPos2 != NULL) {
-			*commaPos2 = NULL;
+			*commaPos2 = '\0';
 			commaPos2++;
 			if (isNaturalNumber(commaPos2, ISCSI_MAX_TPGT_VALUE) ==
 			    B_TRUE) {

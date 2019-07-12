@@ -62,7 +62,7 @@
 
 char TMP_CONF_FILE[64] = "/tmp/power.conf.XXXXXX";
 const char *sender;
-unsigned long 	uid;
+unsigned long uid;
 
 /*
  * Specify different CPUFreq related HAL activities that can be done
@@ -138,7 +138,7 @@ edit_power_conf_file(pconf_edit_type pc_edit_type,
     power_conf_hal_type pc_hal_type, char *tmp_file)
 {
 	FILE	*pfile;
-	char  	tstr[FILE_ARR_SIZE];
+	char	tstr[FILE_ARR_SIZE];
 	char	temp_str[FILE_ARR_SIZE];
 	long	fset = 0;
 	long	next_fset = 0;
@@ -189,7 +189,7 @@ edit_power_conf_file(pconf_edit_type pc_edit_type,
 		}
 		break;
 	case CPU_PERFORMANCE:
-		if (pc_edit_type.cpu_th == NULL) {
+		if (pc_edit_type.cpu_th == 0) {
 			HAL_INFO ((" CPU Threshold is not valid."));
 			res = EINVAL;
 			goto out;
@@ -252,13 +252,13 @@ edit_power_conf_file(pconf_edit_type pc_edit_type,
 		if (fgets (tstr, FILE_ARR_SIZE, pfile) != NULL) {
 			do {
 				snprintf (temp_str, FILE_ARR_SIZE,
-				    "%s\n", tstr);	  
+				    "%s\n", tstr);
 				fseek (pfile, fset, SEEK_SET);
 				fputs (temp_str, pfile);
 				fset = fset + strlen(tstr);
 				next_fset = next_fset + strlen(tstr);
 				fseek (pfile, next_fset, SEEK_SET);
-				
+
 			} while (fgets (tstr, FILE_ARR_SIZE, pfile) != NULL);
 		}
 
@@ -328,7 +328,7 @@ read_power_conf_file(pconf_edit_type *pc_value,
 {
 
 	FILE	*pfile;
-	char  	tstr[FILE_ARR_SIZE];
+	char	tstr[FILE_ARR_SIZE];
 	long	fset = 0;
 	char	*file_edit_type;
 	char	*tpstr;
@@ -767,9 +767,9 @@ set_cpufreq_gov(DBusConnection *con, DBusMessage *msg, void *udata)
 	pconf_edit_type pc_edit_type;
 #ifdef sun
 	adt_export_data_t *adt_data;
-	size_t 		adt_data_size;
-	DBusConnection 	*system_bus = NULL;
-	DBusError 	error;
+	size_t		adt_data_size;
+	DBusConnection	*system_bus = NULL;
+	DBusError	error;
 #endif
 
 	if (! dbus_message_iter_init (msg, &arg_iter)) {
@@ -914,9 +914,9 @@ set_cpufreq_performance(DBusConnection *con, DBusMessage *msg, void *udata)
 	pconf_edit_type pc_edit_type;
 #ifdef sun
 	adt_export_data_t *adt_data;
-	size_t 		adt_data_size;
-	DBusConnection 	*system_bus = NULL;
-	DBusError 	error;
+	size_t		adt_data_size;
+	DBusConnection	*system_bus = NULL;
+	DBusError	error;
 #endif
 
 	adt_res = check_authorization (con, msg);
@@ -1074,7 +1074,7 @@ get_cpufreq_gov(DBusConnection *con, DBusMessage *msg, void *udata)
 
 	DBusMessageIter rep_iter;
 	DBusMessage	*msg_reply;
-	int 		res;
+	int		res;
 	pconf_edit_type pc_type;
 	char		*param;
 
@@ -1141,7 +1141,7 @@ get_cpufreq_performance(DBusConnection *con, DBusMessage *msg, void *udata)
 
 	DBusMessageIter rep_iter;
 	DBusMessage	*msg_reply;
-	int 		res;
+	int		res;
 	pconf_edit_type pc_type;
 	int		param_int;
 

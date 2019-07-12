@@ -1275,7 +1275,7 @@ main(int argc, char *argv[])
 	int qflag = 0, needlog = 1, nosync = 0;
 	int fast_reboot = 0;
 	int prom_reboot = 0;
-	uintptr_t mdep = NULL;
+	uintptr_t mdep = 0;
 	int cmd, fcn, c, aval, r;
 	const char *usage;
 	const char *optstring;
@@ -1621,7 +1621,7 @@ main(int argc, char *argv[])
 	}
 
 	if (cmd == A_DUMP && nosync != 0)
-		(void) uadmin(A_DUMP, AD_NOSYNC, NULL);
+		(void) uadmin(A_DUMP, AD_NOSYNC, 0);
 
 	if (fast_reboot)
 		fcn = AD_FASTREBOOT;

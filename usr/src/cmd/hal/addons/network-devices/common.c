@@ -48,7 +48,7 @@ network_device_name_to_udi(char *udi, size_t size, ...)
 	}
 	va_end(ap);
 
-	for (i = 0; udi[i] != NULL; i++)
+	for (i = 0; udi[i] != '\0'; i++)
 		if (udi[i] == '.')
 			udi[i] = '_';
 }

@@ -164,7 +164,7 @@ report_hwcap(int d, const char *isa)
 
 	if (mode & EXTN_MODE) {
 		(void) printf(":");
-		if (cgh->cgh_hwcap[1] != NULL)
+		if (cgh->cgh_hwcap[1] != 0)
 			(void) printf(" %s", cap2);
 		(void) printf(" %s", buffer);
 		(void) printf("\n");

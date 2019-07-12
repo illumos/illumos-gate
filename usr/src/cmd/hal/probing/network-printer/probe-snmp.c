@@ -39,7 +39,7 @@ hrDeviceDesc_to_info(char *string, char **manufacturer, char **model,
 		*description = strdup(string);
 		*manufacturer = strdup(string);
 		if ((s = strchr(*manufacturer, ' ')) != NULL) {
-			*s++ = NULL;
+			*s++ = '\0';
 			*model = strdup(s);
 		}
 	}

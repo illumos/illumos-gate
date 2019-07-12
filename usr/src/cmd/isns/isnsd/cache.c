@@ -69,8 +69,7 @@ static cache_t *imc;
  * ****************************************************************************
  */
 int
-cache_init(
-)
+cache_init(void)
 {
 	/*
 	 * allocate global cache memory.
@@ -86,7 +85,7 @@ cache_init(
 	/*
 	 * initialize global cache rwlock.
 	 */
-	(void) rwlock_init(&imc->l, NULL, NULL);
+	(void) rwlock_init(&imc->l, USYNC_PROCESS, NULL);
 
 	/*
 	 * inintialize global cache functions.
@@ -115,8 +114,7 @@ cache_init(
  * ****************************************************************************
  */
 void
-cache_destroy(
-)
+cache_destroy(void)
 {
 	/* do nothing */
 }
@@ -132,9 +130,7 @@ cache_destroy(
  * ****************************************************************************
  */
 int
-cache_lock(
-	int mode
-)
+cache_lock(int mode)
 {
 	int ret = 0;
 
@@ -188,10 +184,7 @@ cache_lock(
  * ****************************************************************************
  */
 int
-cache_unlock(
-	int mode,
-	int ec
-)
+cache_unlock(int mode, int ec)
 {
 	if (mode != CACHE_NO_ACTION) {
 		/* sync between cache and data store */
@@ -228,8 +221,7 @@ cache_unlock(
  * ****************************************************************************
  */
 int
-cache_lock_read(
-)
+cache_lock_read(void)
 {
 	return (cache_lock(CACHE_READ));
 }
@@ -244,8 +236,7 @@ cache_lock_read(
  * ****************************************************************************
  */
 int
-cache_lock_write(
-)
+cache_lock_write(void)
 {
 	return (cache_lock(CACHE_WRITE));
 }
@@ -262,9 +253,7 @@ cache_lock_write(
  * ****************************************************************************
  */
 int
-cache_unlock_sync(
-	int ec
-)
+cache_unlock_sync(int ec)
 {
 	return (cache_unlock(CACHE_WRITE, ec));
 }
@@ -283,8 +272,7 @@ cache_unlock_sync(
  * ****************************************************************************
  */
 int
-cache_unlock_nosync(
-)
+cache_unlock_nosync(void)
 {
 	return (cache_unlock(CACHE_READ, 0));
 }
@@ -300,9 +288,7 @@ cache_unlock_nosync(
  * ****************************************************************************
  */
 htab_t *
-cache_get_htab(
-	isns_type_t type
-)
+cache_get_htab(isns_type_t type)
 {
 	if (type > 0 && type < MAX_OBJ_TYPE) {
 		return (imc->t[type]);
@@ -323,9 +309,7 @@ cache_get_htab(
  * ****************************************************************************
  */
 matrix_t *
-cache_get_matrix(
-	isns_type_t type
-)
+cache_get_matrix(isns_type_t type)
 {
 	matrix_t *x = NULL;
 
@@ -357,11 +341,8 @@ cache_get_matrix(
  * ****************************************************************************
  */
 int
-cache_lookup(
-	lookup_ctrl_t *lcp,
-	uint32_t *uid_p,
-	int (*callback)(void *, void *)
-)
+cache_lookup(lookup_ctrl_t *lcp, uint32_t *uid_p,
+    int (*callback)(void *, void *))
 {
 	return (htab_lookup(imc->t[lcp->type],
 	    lcp,
@@ -385,11 +366,8 @@ cache_lookup(
  * ****************************************************************************
  */
 int
-cache_rekey(
-	lookup_ctrl_t *lcp,
-	uint32_t *uid_p,
-	int (*callback)(void *, void *)
-)
+cache_rekey(lookup_ctrl_t *lcp, uint32_t *uid_p,
+    int (*callback)(void *, void *))
 {
 	return (htab_lookup(imc->t[lcp->type],
 	    lcp,
@@ -415,12 +393,7 @@ cache_rekey(
  * ****************************************************************************
  */
 int
-cache_add(
-	isns_obj_t *obj,
-	int flag,
-	uint32_t *uid_p,
-	int *update_p
-)
+cache_add(isns_obj_t *obj, int flag, uint32_t *uid_p, int *update_p)
 {
 	return (htab_add(imc->t[obj->type], obj, flag, uid_p, update_p));
 }
@@ -438,10 +411,7 @@ cache_add(
  * ****************************************************************************
  */
 isns_obj_t *
-cache_remove(
-	lookup_ctrl_t *lcp,
-	int flag
-)
+cache_remove(lookup_ctrl_t *lcp, int flag)
 {
 	return (htab_remove(imc->t[lcp->type],
 	    lcp,
@@ -460,9 +430,7 @@ cache_remove(
  */
 #ifdef DEBUG
 void
-cache_dump_htab(
-	isns_type_t type
-)
+cache_dump_htab(isns_type_t type)
 {
 	(void) htab_dump(imc->t[type]);
 }

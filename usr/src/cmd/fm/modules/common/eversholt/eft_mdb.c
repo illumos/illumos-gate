@@ -130,7 +130,7 @@ lut_collect(uintptr_t addr, struct lut_dump_desc *lddp)
 static int
 lut_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("lut walker requires a lut table address\n");
 		return (WALK_ERR);
 	}
@@ -269,7 +269,7 @@ eft_count(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		if (mdb_vread(&addr, sizeof (addr),
 		    (uintptr_t)sym.st_value) != sizeof (addr))
 			return (DCMD_ERR);
-		if (addr == NULL)
+		if (addr == 0)
 			return (DCMD_OK);
 		if (mdb_pwalk_dcmd("lut", "eft_count", argc, argv, addr) != 0)
 			return (DCMD_ERR);
@@ -373,7 +373,7 @@ eft_node(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			return (DCMD_USAGE);
 		}
 	}
-	if (addr == NULL)
+	if (addr == 0)
 		return (DCMD_OK);
 	if (mdb_vread(&node, sizeof (node), addr) != sizeof (node)) {
 		mdb_warn("failed to read struct node at %p", addr);

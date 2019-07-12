@@ -80,8 +80,8 @@ static int
 shell1(char *str)
 {
 	void (*sig[2])(int);
-	register int t;
-	register pid_t p;
+	int t;
+	pid_t p;
 	char *Shell;
 	char cmd[BUFSIZ];
 	
@@ -125,8 +125,8 @@ dosh(char *s)
 #endif
 {
 	void (*sig[2])(int);
-	register int t;
-	register pid_t p;
+	int t;
+	pid_t p;
 	char *Shell;
 
 	if ((Shell = value("SHELL")) == NOSTR || *Shell=='\0')
@@ -162,8 +162,8 @@ static int
 bangexp(char *str)
 {
 	char bangbuf[BUFSIZ];
-	register char *cp, *cp2;
-	register int n;
+	char *cp, *cp2;
+	int n;
 	int changed = 0;
 	int bangit = (value("bang")!=NOSTR);
 
@@ -213,7 +213,7 @@ int
 help(void)
 {
 	int c;
-	register FILE *f;
+	FILE *f;
 
 	if ((f = fopen(HELPFILE, "r")) == NULL) {
 		printf(gettext("No help just now.\n"));
@@ -232,7 +232,7 @@ help(void)
 int 
 schdir(char *str)
 {
-	register char *cp;
+	char *cp;
 	char cwd[PATHSIZE], file[PATHSIZE];
 	static char efile[PATHSIZE];
 
@@ -384,9 +384,9 @@ resp1(int *msgvec, int useauthor)
 void 
 getrecf(char *buf, char *recfile, int useauthor, int sz_recfile)
 {
-	register char *bp, *cp;
-	register char *recf = recfile;
-	register int folderize;
+	char *bp, *cp;
+	char *recf = recfile;
+	int folderize;
 	char fldr[BUFSIZ];
 
 	folderize = (value("outfolder")!=NOSTR && getfold(fldr) == 0);
@@ -438,7 +438,7 @@ static char *
 reedit(char *subj)
 {
 	char sbuf[10];
-	register char *newsubj;
+	char *newsubj;
 
 	if (subj == NOSTR)
 		return(NOSTR);
@@ -459,14 +459,14 @@ reedit(char *subj)
 int 
 preserve(int *msgvec)
 {
-	register struct message *mp;
-	register int *ip, mesg;
+	struct message *mp;
+	int *ip, mesg;
 
 	if (edit) {
 		printf(gettext("Cannot \"preserve\" in edit mode\n"));
 		return(1);
 	}
-	for (ip = msgvec; *ip != NULL; ip++) {
+	for (ip = msgvec; *ip != 0; ip++) {
 		mesg = *ip;
 		mp = &message[mesg-1];
 		mp->m_flag |= MPRESERVE;
@@ -482,9 +482,9 @@ preserve(int *msgvec)
 int 
 unread(int msgvec[])
 {
-	register int *ip;
+	int *ip;
 
-	for (ip = msgvec; *ip != NULL; ip++) {
+	for (ip = msgvec; *ip != 0; ip++) {
 		dot = &message[*ip-1];
 		dot->m_flag &= ~(MREAD|MTOUCH);
 		dot->m_flag |= MSTATUS;
@@ -499,10 +499,10 @@ unread(int msgvec[])
 int 
 messize(int *msgvec)
 {
-	register struct message *mp;
-	register int *ip, mesg;
+	struct message *mp;
+	int *ip, mesg;
 
-	for (ip = msgvec; *ip != NULL; ip++) {
+	for (ip = msgvec; *ip != 0; ip++) {
 		mesg = *ip;
 		mp = &message[mesg-1];
 		dot = mp;
@@ -538,8 +538,8 @@ rexit(int e)
 int 
 set(char **arglist)
 {
-	register struct var *vp;
-	register char *cp, *cp2;
+	struct var *vp;
+	char *cp, *cp2;
 	char varbuf[BUFSIZ], **ap, **p;
 	int errs, h, s;
 
@@ -588,8 +588,8 @@ set(char **arglist)
 int 
 unset(char **arglist)
 {
-	register int errs;
-	register char **ap;
+	int errs;
+	char **ap;
 
 	errs = 0;
 	for (ap = arglist; *ap != NOSTR; ap++)
@@ -604,9 +604,9 @@ unset(char **arglist)
 int 
 group(char **argv)
 {
-	register struct grouphead *gh;
-	register struct mgroup *gp;
-	register int h;
+	struct grouphead *gh;
+	struct mgroup *gp;
+	int h;
 	int s;
 	char **ap, *gname, **p;
 
@@ -666,9 +666,9 @@ group(char **argv)
 int 
 ungroup(char **argv)
 {
-	register struct grouphead *gh, **ghp;
-	register struct mgroup *gp, *gpnext;
-	register int h;
+	struct grouphead *gh, **ghp;
+	struct mgroup *gp, *gpnext;
+	int h;
 	char **ap, *gname;
 
 	if (argcount(argv) == 0) {
@@ -711,7 +711,7 @@ ungroup(char **argv)
 static void 
 sort(char **list)
 {
-	register char **ap;
+	char **ap;
 
 	for (ap = list; *ap != NOSTR; ap++)
 		;
@@ -753,7 +753,7 @@ null(char *s)
 int 
 file(char **argv)
 {
-	register char *cp;
+	char *cp;
 	int editing, mdot;
 
 	if (argv[0] == NOSTR) {
@@ -798,7 +798,7 @@ file(char **argv)
 static char *
 getfilename(char *name, int *aedit)
 {
-	register char *cp;
+	char *cp;
 	char savename[BUFSIZ];
 	char oldmailname[BUFSIZ];
 	char tmp[BUFSIZ];
@@ -873,9 +873,9 @@ regular:
  */
 
 int 
-echo(register char **argv)
+echo(char **argv)
 {
-	register char *cp;
+	char *cp;
 	int neednl = 0;
 
 	while (*argv != NOSTR) {
@@ -927,8 +927,8 @@ Resp1(int *msgvec, int useauthor)
 {
 	struct header head;
 	struct message *mp;
-	register int s, *ap;
-	register char *cp, *cp2, *subject;
+	int s, *ap;
+	char *cp, *cp2, *subject;
 
 	for (s = 0, ap = msgvec; *ap != 0; ap++) {
 		mp = &message[*ap - 1];
@@ -971,7 +971,7 @@ Resp1(int *msgvec, int useauthor)
 int 
 ifcmd(char **argv)
 {
-	register char *cp;
+	char *cp;
 
 	if (cond != CANY) {
 		printf(gettext("Illegal nested \"if\"\n"));
@@ -1059,8 +1059,8 @@ endifcmd(void)
 int 
 alternates(char **namelist)
 {
-	register int c;
-	register char **ap, **ap2, *cp;
+	int c;
+	char **ap, **ap2, *cp;
 
 	c = argcount(namelist) + 1;
 	if (c == 1) {
@@ -1118,8 +1118,8 @@ replyto(struct message *mp, char **f)
 static int
 reply2sender (void)
 {
-	register int rep = (value("replyall") != NOSTR);
-	register int flp = (value("flipr") != NOSTR);
+	int rep = (value("replyall") != NOSTR);
+	int flp = (value("flipr") != NOSTR);
 
 	return((rep && !flp)|| (!rep && flp));
 }

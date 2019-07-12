@@ -304,7 +304,7 @@ f_mkmtab(char *magfile, int cflg, int first)
 				    File, magfile, p, lcnt);
 			continue;
 		}
-		*p2++ = NULL;
+		*p2++ = '\0';
 		ep->e_off = strtol((const char *)p, (char **)NULL, 0);
 		while (*p2 == '\t')
 			p2++;
@@ -318,7 +318,7 @@ f_mkmtab(char *magfile, int cflg, int first)
 				    File, magfile, p, lcnt);
 			continue;
 		}
-		*p2++ = NULL;
+		*p2++ = '\0';
 		p3 = strchr(p, '&');
 		if (p3 != NULL) {
 			*p3++ = '\0';
@@ -329,10 +329,10 @@ f_mkmtab(char *magfile, int cflg, int first)
 		}
 		switch (*p) {
 			case 'd':
-				if (*(p+1) == NULL) {
+				if (*(p+1) == '\0') {
 					/* d */
 					ep->e_type = LONG;
-				} else if (*(p+2) == NULL) {	/* d? */
+				} else if (*(p+2) == '\0') {	/* d? */
 					switch (*(p+1)) {
 						case 'C':
 						case '1':
@@ -377,10 +377,10 @@ f_mkmtab(char *magfile, int cflg, int first)
 				}
 				break;
 			case 'u':
-				if (*(p+1) == NULL) {
+				if (*(p+1) == '\0') {
 					/* u */
 					ep->e_type = ULONG;
-				} else if (*(p+2) == NULL) {	/* u? */
+				} else if (*(p+2) == '\0') {	/* u? */
 					switch (*(p+1)) {
 						case 'C':
 						case '1':
@@ -450,7 +450,7 @@ f_mkmtab(char *magfile, int cflg, int first)
 				    File, magfile, p, lcnt);
 			continue;
 		}
-		*p2++ = NULL;
+		*p2++ = '\0';
 		if (ep->e_type != STR) {
 			opc = *p++;
 			switch (opc) {

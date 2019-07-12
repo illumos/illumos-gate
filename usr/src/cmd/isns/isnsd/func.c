@@ -97,9 +97,7 @@ static int msg_error(conn_arg_t *);
  * ****************************************************************************
  */
 static int
-packet_get_source(
-	conn_arg_t *conn
-)
+packet_get_source(conn_arg_t *conn)
 {
 	int ec = 0;
 
@@ -132,9 +130,7 @@ packet_get_source(
  * ****************************************************************************
  */
 static int
-packet_get_key(
-	conn_arg_t *conn
-)
+packet_get_key(conn_arg_t *conn)
 {
 	int ec = 0;
 
@@ -162,9 +158,7 @@ packet_get_key(
  * ****************************************************************************
  */
 static int
-packet_get_operand(
-	conn_arg_t *conn
-)
+packet_get_operand(conn_arg_t *conn)
 {
 	int ec = 0;
 
@@ -193,9 +187,7 @@ packet_get_operand(
  * ****************************************************************************
  */
 int
-packet_split_verify(
-	conn_arg_t *conn
-)
+packet_split_verify(conn_arg_t *conn)
 {
 	int ec = 0;
 
@@ -314,11 +306,7 @@ packet_split_verify(
  * ****************************************************************************
  */
 static int
-setup_key_lcp(
-	lookup_ctrl_t *lcp,
-	isns_tlv_t *key,
-	uint16_t key_len
-)
+setup_key_lcp(lookup_ctrl_t *lcp, isns_tlv_t *key, uint16_t key_len)
 {
 	int ec = 0;
 
@@ -421,10 +409,7 @@ setup_key_lcp(
  * ****************************************************************************
  */
 static int
-rsp_add_op(
-	conn_arg_t *conn,
-	isns_obj_t *obj
-)
+rsp_add_op(conn_arg_t *conn, isns_obj_t *obj)
 {
 	int ec = 0;
 
@@ -468,10 +453,7 @@ rsp_add_op(
  * ****************************************************************************
  */
 static int
-rsp_add_key(
-	conn_arg_t *conn,
-	isns_obj_t *entity
-)
+rsp_add_key(conn_arg_t *conn, isns_obj_t *entity)
 {
 	int ec = 0;
 
@@ -536,13 +518,8 @@ rsp_add_key(
  * ****************************************************************************
  */
 static int
-rsp_add_tlv(
-	conn_arg_t *conn,
-	uint32_t tag,
-	uint32_t len,
-	void *value,
-	int pflag
-)
+rsp_add_tlv(conn_arg_t *conn, uint32_t tag, uint32_t len, void *value,
+    int pflag)
 {
 	int ec = 0;
 
@@ -573,11 +550,7 @@ rsp_add_tlv(
  * ****************************************************************************
  */
 static int
-rsp_add_tlvs(
-	conn_arg_t *conn,
-	isns_tlv_t *tlv,
-	uint32_t tlv_len
-)
+rsp_add_tlvs(conn_arg_t *conn, isns_tlv_t *tlv, uint32_t tlv_len)
 {
 	int ec = 0;
 
@@ -611,9 +584,7 @@ rsp_add_tlvs(
  * ****************************************************************************
  */
 static int
-dev_attr_reg(
-	conn_arg_t *conn
-)
+dev_attr_reg(conn_arg_t *conn)
 {
 	int ec = 0;
 
@@ -641,7 +612,7 @@ dev_attr_reg(
 	isns_obj_t *obj;	/* child object */
 	isns_type_t ctype;	/* child object type */
 	uint32_t uid;		/* child object uid */
-	isns_attr_t pgt[3] = { NULL };
+	isns_attr_t pgt[3] = { 0 };
 
 	void const **vpp = NULL;
 	int i = 0;
@@ -828,9 +799,7 @@ reg_done:
  * ****************************************************************************
  */
 static int
-dev_attr_qry(
-	conn_arg_t *conn
-)
+dev_attr_qry(conn_arg_t *conn)
 {
 	int ec = 0;
 
@@ -999,9 +968,7 @@ qry_done:
  * ****************************************************************************
  */
 static int
-dev_get_next(
-	conn_arg_t *conn
-)
+dev_get_next(conn_arg_t *conn)
 {
 	int ec = 0;
 
@@ -1135,9 +1102,7 @@ get_next_done:
  * ****************************************************************************
  */
 static int
-dev_dereg(
-	conn_arg_t *conn
-)
+dev_dereg(conn_arg_t *conn)
 {
 	int ec = 0;
 
@@ -1257,9 +1222,7 @@ dev_dereg(
  * ****************************************************************************
  */
 static int
-scn_reg(
-	conn_arg_t *conn
-)
+scn_reg(conn_arg_t *conn)
 {
 	int ec = 0;
 
@@ -1317,9 +1280,7 @@ scn_reg_done:
  * ****************************************************************************
  */
 static int
-scn_dereg(
-	conn_arg_t *conn
-)
+scn_dereg(conn_arg_t *conn)
 {
 	int ec = 0;
 
@@ -1366,10 +1327,7 @@ scn_dereg(
 static
 #endif
 lookup_ctrl_t *
-setup_ddid_lcp(
-	lookup_ctrl_t *lcp,
-	uint32_t dd_id
-)
+setup_ddid_lcp(lookup_ctrl_t *lcp, uint32_t dd_id)
 {
 	lcp->curr_uid = 0;
 	lcp->type = OBJ_DD;
@@ -1398,10 +1356,7 @@ setup_ddid_lcp(
 static
 #endif
 lookup_ctrl_t *
-setup_ddsid_lcp(
-	lookup_ctrl_t *lcp,
-	uint32_t dds_id
-)
+setup_ddsid_lcp(lookup_ctrl_t *lcp, uint32_t dds_id)
 {
 	lcp->curr_uid = 0;
 	lcp->type = OBJ_DDS;
@@ -1425,9 +1380,7 @@ setup_ddsid_lcp(
  * ****************************************************************************
  */
 static int
-dd_reg(
-	conn_arg_t *conn
-)
+dd_reg(conn_arg_t *conn)
 {
 	int ec = 0;
 
@@ -1663,9 +1616,7 @@ dd_reg_done:
  * ****************************************************************************
  */
 static int
-dds_reg(
-	conn_arg_t *conn
-)
+dds_reg(conn_arg_t *conn)
 {
 	int ec = 0;
 
@@ -1864,9 +1815,7 @@ dds_reg_done:
  * ****************************************************************************
  */
 static int
-dd_dereg(
-	conn_arg_t *conn
-)
+dd_dereg(conn_arg_t *conn)
 {
 	int ec = 0;
 
@@ -1983,9 +1932,7 @@ dd_dereg_done:
  * ****************************************************************************
  */
 static int
-dds_dereg(
-	conn_arg_t *conn
-)
+dds_dereg(conn_arg_t *conn)
 {
 	int ec = 0;
 
@@ -2060,10 +2007,7 @@ dds_dereg_done:
  * ****************************************************************************
  */
 static int
-msg_error(
-	/* LINTED E_FUNC_ARG_UNUSED */
-	conn_arg_t *conn
-)
+msg_error(conn_arg_t *conn __unused)
 {
 	return (0);
 }
@@ -2082,11 +2026,7 @@ msg_error(
  * ****************************************************************************
  */
 static int
-isns_response_ec(
-	int so,
-	isns_pdu_t *pdu,
-	int ec
-)
+isns_response_ec(int so, isns_pdu_t *pdu, int ec)
 {
 	int status;
 
@@ -2118,9 +2058,7 @@ isns_response_ec(
  * ****************************************************************************
  */
 int
-isns_response(
-	conn_arg_t *conn
-)
+isns_response(conn_arg_t *conn)
 {
 	int status;
 

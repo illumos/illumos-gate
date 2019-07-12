@@ -58,17 +58,17 @@
 /* Function prototypes */
 #ifdef	__STDC__
 
-static struct 	swaptable *getswapentries(void);
-static void 	freeswapentries(struct swaptable *);
+static struct	swaptable *getswapentries(void);
+static void	freeswapentries(struct swaptable *);
 static int	getpartition(char *pathname);
-static int 	checkpartitions(int bm_mounted);
+static int	checkpartitions(int bm_mounted);
 
 #else	/* __STDC__ */
 
 static struct swaptable *getswapentries();
 static void freeswapentries();
 static int	getpartition();
-static int 	checkpartitions();
+static int	checkpartitions();
 
 #endif	/* __STDC__ */
 
@@ -273,10 +273,10 @@ checkdevinuse(char *cur_disk_path, diskaddr_t start, diskaddr_t end, int print,
 	int check_label)
 {
 
-	int 		error;
-	int 		found = 0;
+	int		error;
+	int		found = 0;
 	int		check = 0;
-	int 		i;
+	int		i;
 	int		bm_inuse = 0;
 	int		part = 0;
 	uint64_t	slice_start, slice_size;
@@ -353,7 +353,7 @@ checkdevinuse(char *cur_disk_path, diskaddr_t start, diskaddr_t end, int print,
 	if (slices == NULL)
 		return (found);
 
-	for (i = 0; slices[i] != NULL; i++) {
+	for (i = 0; slices[i] != 0; i++) {
 		/*
 		 * If we are checking the whole disk
 		 * then any and all in use data is

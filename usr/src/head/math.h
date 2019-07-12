@@ -25,6 +25,9 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ */
 
 #ifndef _MATH_H
 #define	_MATH_H
@@ -178,9 +181,11 @@ extern double yn(int, double);
 	_XOPEN_SOURCE - 0 >= 500 || \
 	defined(_XOPEN_SOURCE) && _XOPEN_SOURCE_EXTENDED - 0 == 1
 /*
- * SVID & XPG 4.2/5
+ * SVID & XPG 4.2/5 - removed from XPG7.
  */
+#if !defined(_STRICT_SYMBOLS) || !defined(_XPG7)
 extern double scalb(double, double);
+#endif
 
 #if defined(__MATHERR_ERRNO_DONTCARE)
 #pragma does_not_read_global_data(scalb)

@@ -133,7 +133,7 @@
  *		associated with this fault
  *
  * Action	: Schedule a repair procedure to replace the affected device.
- * 		Use fmdump -v -u <EVENT_ID> to identify the device or contact
+ *		Use fmdump -v -u <EVENT_ID> to identify the device or contact
  *		Sun for support.
  *
  * The -r flag changes the output so that it appears sorted on a per-asru basis.
@@ -909,7 +909,7 @@ print_line(char *label, char *buf)
 	while (c) {
 		i = lsz;
 		wp = NULL;
-		while ((c = *ep) != NULL && (wp == NULL || i < 80)) {
+		while ((c = *ep) != '\0' && (wp == NULL || i < 80)) {
 			if (c == ' ')
 				wp = ep;
 			else if (c == '\n') {
@@ -917,7 +917,7 @@ print_line(char *label, char *buf)
 				*ep = 0;
 				do {
 					ep++;
-				} while ((c = *ep) != NULL && c == ' ');
+				} while ((c = *ep) != '\0' && c == ' ');
 				break;
 			}
 			ep++;

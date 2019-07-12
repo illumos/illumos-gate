@@ -2425,9 +2425,7 @@ get_inputline(line, nbytes)
  * execute the shell escape command
  */
 int
-execute_shell(s, buff_size)
-	char	*s;
-	size_t	buff_size;
+execute_shell(char *s, size_t buff_size)
 {
 	struct	termio	termio;
 	struct	termios	tty;
@@ -2437,7 +2435,7 @@ execute_shell(s, buff_size)
 
 	tty_flag = -1;
 
-	if (*s == NULL) {
+	if (*s == '\0') {
 		shell_name = getenv("SHELL");
 
 		if (shell_name == NULL) {

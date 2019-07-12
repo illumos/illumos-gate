@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -232,8 +233,9 @@ typedef struct mbuf {
  */
 #define	MFREE(m, nn) \
 	{ \
-		if ((m)->m_flags & M_EXT) {		    \
-			(*((m)->m_ext.ext_ref))((m)->m_ext.ext_buf,	\
+		if ((m)->m_flags & M_EXT) {				\
+			(void) (*((m)->m_ext.ext_ref))			\
+			    ((m)->m_ext.ext_buf,			\
 			    (m)->m_ext.ext_size, -1);			\
 			(m)->m_ext.ext_buf = 0;				\
 		}							\

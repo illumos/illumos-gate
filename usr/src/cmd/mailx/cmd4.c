@@ -38,8 +38,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "rcv.h"
 #include <locale.h>
 
@@ -59,13 +57,13 @@ static char *stripquotes(char *str);
 int 
 dopipe(char str[])
 {
-	register int *ip, mesg;
-	register struct message *mp;
+	int *ip, mesg;
+	struct message *mp;
 	char *cp, *cmd;
 	int f, *msgvec, nowait=0;
 	void (*sigint)(int), (*sigpipe)(int);
 	long lc, cc, t;
-	register pid_t pid;
+	pid_t pid;
 	int page, s, pivec[2];
 	char *Shell;
 	FILE *pio = NULL;
@@ -85,11 +83,11 @@ dopipe(char str[])
 	}
 	if (!f) {
 		*msgvec = first(0, MMNORM);
-		if (*msgvec == NULL) {
+		if (*msgvec == 0) {
 			printf(gettext("No messages to pipe.\n"));
 			return(1);
 		}
-		msgvec[1] = NULL;
+		msgvec[1] = 0;
 	}
 	if (f && getmsglist(str, msgvec, 0) < 0)
 		return(1);
@@ -190,7 +188,7 @@ loadmsg(char str[])
 {
 	char *file;
 	int f, *msgvec;
-	register int c, lastc = '\n';
+	int c, lastc = '\n';
 	int blank;
 	int lines;
 	long ms;
@@ -205,15 +203,15 @@ loadmsg(char str[])
 		return(1);
 	if (!f) {
 		*msgvec = first(0, MMNORM);
-		if (*msgvec == NULL) {
+		if (*msgvec == 0) {
 			printf(gettext("No message to load into.\n"));
 			return(1);
 		}
-		msgvec[1] = NULL;
+		msgvec[1] = 0;
 	}
 	if (f && getmsglist(str, msgvec, 0) < 0)
 		return(1);
-	if (msgvec[1] != NULL) {
+	if (msgvec[1] != 0) {
 		printf(gettext("Can only load into a single message.\n"));
 		return(1);
 	}
@@ -266,9 +264,9 @@ loadmsg(char str[])
 int 
 field(char str[])
 {
-	register int *ip;
-	register struct message *mp;
-	register char *cp, *fld;
+	int *ip;
+	struct message *mp;
+	char *cp, *fld;
 	int f, *msgvec;
 
 	msgvec = (int *) salloc((msgCount + 2) * sizeof *msgvec);
@@ -281,11 +279,11 @@ field(char str[])
 	}
 	if (!f) {
 		*msgvec = first(0, MMNORM);
-		if (*msgvec == NULL) {
+		if (*msgvec == 0) {
 			printf(gettext("No messages to display.\n"));
 			return(1);
 		}
-		msgvec[1] = NULL;
+		msgvec[1] = 0;
 	}
 	if (f && getmsglist(str, msgvec, 0) < 0)
 		return(1);
@@ -307,7 +305,7 @@ field(char str[])
 static char *
 stripquotes(char *str)
 {
-	register int lastch;
+	int lastch;
 	if (str == NOSTR) {
 		return(NOSTR);
 	}

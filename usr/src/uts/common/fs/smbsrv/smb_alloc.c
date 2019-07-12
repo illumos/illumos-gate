@@ -22,6 +22,10 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/sunddi.h>
 #include <sys/kmem.h>
@@ -295,7 +299,7 @@ smb_realloc(smb_request_t *sr, void *ptr, size_t size, boolean_t zero)
 		return (NULL);
 	}
 	if (smh->smh_size >= size) {
-		if ((zero) & (smh->smh_size > size))
+		if ((zero) && (smh->smh_size > size))
 			bzero((caddr_t)ptr + size, smh->smh_size - size);
 		return (ptr);
 	}
