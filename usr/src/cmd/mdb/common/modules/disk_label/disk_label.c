@@ -16,8 +16,6 @@
 /*
  * The on-disk elements here are all little-endian, and this code doesn't make
  * any attempt to adjust for running on a big-endian system.
- *
- * We also currently assume a 512-byte sized logical block.
  */
 
 #include <sys/types.h>
@@ -92,6 +90,8 @@ stringval_t pflag_array[] = {
 	{ "ru", V_RONLY | V_UNMNT	},
 	{ NULL }
 };
+
+size_t sector_size = SECTOR_SIZE;
 
 static const char *
 array_find_string(stringval_t *array, int match_value)
@@ -248,10 +248,10 @@ mbr_info(struct mboot *mbr)
 static int
 cmd_mbr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
 {
-	struct mboot mbr;
+	struct mboot *mbr;
 	mbr_type_t type;
 
-	CTASSERT(sizeof (mbr) == SECTOR_SIZE);
+	CTASSERT(sizeof (*mbr) == SECTOR_SIZE);
 
 	if (argc != 0)
 		return (DCMD_USAGE);
@@ -259,27 +259,29 @@ cmd_mbr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
 	if (!(flags & DCMD_ADDRSPEC))
 		addr = 0;
 
-	if (mdb_vread(&mbr, sizeof (mbr), addr) == -1) {
+	mbr = mdb_zalloc(sector_size, UM_SLEEP | UM_GC);
+
+	if (mdb_vread(mbr, sector_size, addr) == -1) {
 		mdb_warn("failed to read MBR");
 		return (DCMD_ERR);
 	}
 
-	type = mbr_info(&mbr);
+	type = mbr_info(mbr);
 
 	/* If the magic is wrong, stop here. */
-	if (mbr.signature != MBB_MAGIC)
+	if (mbr->signature != MBB_MAGIC)
 		return (DCMD_ERR);
 
 	/* Also print volume boot record */
 	switch (type) {
 	case MBR_TYPE_LOADER:
 	case MBR_TYPE_LOADER_JOYENT:
-		if (*(uint16_t *)&mbr.bootinst[STAGE1_STAGE2_SIZE] == 1) {
+		if (*(uint16_t *)&mbr->bootinst[STAGE1_STAGE2_SIZE] == 1) {
 			struct mboot vbr;
 			uintptr_t vbrp;
 
-			vbrp = *(uint64_t *)&mbr.bootinst[STAGE1_STAGE2_LBA];
-			vbrp *= SECTOR_SIZE;
+			vbrp = *(uint64_t *)&mbr->bootinst[STAGE1_STAGE2_LBA];
+			vbrp *= sector_size;
 			vbrp += addr;
 			if (mdb_vread(&vbr, sizeof (vbr), vbrp) == -1) {
 				mdb_warn("failed to read VBR");
@@ -299,7 +301,7 @@ cmd_mbr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
 
 	for (size_t i = 0; i < FD_NUMPART; i++) {
 		struct ipart *ip = (struct ipart *)
-		    (mbr.parts + (sizeof (struct ipart) * i));
+		    (mbr->parts + (sizeof (struct ipart) * i));
 		print_fdisk_part(ip, i);
 	}
 
@@ -410,9 +412,9 @@ cmd_gpt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
 	char uuid[UUID_PRINTABLE_STRING_LENGTH];
 	int show_alternate = B_FALSE;
 	int show_guid = B_FALSE;
-	efi_gpt_t altheader;
+	efi_gpt_t *altheader;
 	size_t table_size;
-	efi_gpt_t header;
+	efi_gpt_t *header;
 	efi_gpe_t *gpet;
 	uint_t orig_crc;
 	uint_t crc;
@@ -425,87 +427,89 @@ cmd_gpt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
 
 	/* Primary header is at LBA 1. */
 	if (!(flags & DCMD_ADDRSPEC))
-		addr = SECTOR_SIZE;
+		addr = sector_size;
 
-	if (mdb_vread(&header, sizeof (header), addr) == -1) {
+	header = mdb_zalloc(sector_size, UM_SLEEP | UM_GC);
+	if (mdb_vread(header, sector_size, addr) == -1) {
 		mdb_warn("failed to read GPT header");
 		return (DCMD_ERR);
 	}
 
 	if (show_alternate) {
-		addr = header.efi_gpt_AlternateLBA * SECTOR_SIZE;
+		addr = header->efi_gpt_AlternateLBA * sector_size;
 
-		if (mdb_vread(&header, sizeof (header), addr) == -1) {
+		if (mdb_vread(header, sector_size, addr) == -1) {
 			mdb_warn("failed to read GPT header");
 			return (DCMD_ERR);
 		}
 	}
 
-	mdb_printf("Signature: %s (%s)\n", (char *)&header.efi_gpt_Signature,
-	    strncmp((char *)&header.efi_gpt_Signature, "EFI PART", 8) == 0 ?
+	mdb_printf("Signature: %s (%s)\n", (char *)&header->efi_gpt_Signature,
+	    strncmp((char *)&header->efi_gpt_Signature, "EFI PART", 8) == 0 ?
 	    "valid" : "invalid");
 
-	mdb_printf("Revision: %hu.%hu\n", header.efi_gpt_Revision >> 16,
-	    header.efi_gpt_Revision);
+	mdb_printf("Revision: %hu.%hu\n", header->efi_gpt_Revision >> 16,
+	    header->efi_gpt_Revision);
 
-	mdb_printf("HeaderSize: %u bytes\n", header.efi_gpt_HeaderSize);
+	mdb_printf("HeaderSize: %u bytes\n", header->efi_gpt_HeaderSize);
 
-	if (header.efi_gpt_HeaderSize > SECTOR_SIZE) {
+	if (header->efi_gpt_HeaderSize > SECTOR_SIZE) {
 		mdb_warn("invalid header size: skipping CRC\n");
 	} else {
-		orig_crc = header.efi_gpt_HeaderCRC32;
+		orig_crc = header->efi_gpt_HeaderCRC32;
 
-		header.efi_gpt_HeaderCRC32 = 0;
+		header->efi_gpt_HeaderCRC32 = 0;
 
-		crc = efi_crc32((unsigned char *)&header,
-		    header.efi_gpt_HeaderSize);
+		crc = efi_crc32((unsigned char *)header,
+		    header->efi_gpt_HeaderSize);
 
 		mdb_printf("HeaderCRC32: %#x (should be %#x)\n", orig_crc, crc);
 	}
 
 	mdb_printf("Reserved1: %#x (should be 0x0)\n",
-	    header.efi_gpt_Reserved1);
+	    header->efi_gpt_Reserved1);
 
 	mdb_printf("MyLBA: %llu (should be %llu)\n",
-	    header.efi_gpt_MyLBA, addr / SECTOR_SIZE);
+	    header->efi_gpt_MyLBA, addr / sector_size);
 
-	mdb_printf("AlternateLBA: %llu\n", header.efi_gpt_AlternateLBA);
-	mdb_printf("FirstUsableLBA: %llu\n", header.efi_gpt_FirstUsableLBA);
-	mdb_printf("LastUsableLBA: %llu\n", header.efi_gpt_LastUsableLBA);
+	mdb_printf("AlternateLBA: %llu\n", header->efi_gpt_AlternateLBA);
+	mdb_printf("FirstUsableLBA: %llu\n", header->efi_gpt_FirstUsableLBA);
+	mdb_printf("LastUsableLBA: %llu\n", header->efi_gpt_LastUsableLBA);
 
-	if (header.efi_gpt_MyLBA >= header.efi_gpt_FirstUsableLBA &&
-	    header.efi_gpt_MyLBA <= header.efi_gpt_LastUsableLBA) {
+	if (header->efi_gpt_MyLBA >= header->efi_gpt_FirstUsableLBA &&
+	    header->efi_gpt_MyLBA <= header->efi_gpt_LastUsableLBA) {
 		mdb_warn("MyLBA is within usable LBA range\n");
 	}
 
-	if (header.efi_gpt_AlternateLBA >= header.efi_gpt_FirstUsableLBA &&
-	    header.efi_gpt_AlternateLBA <= header.efi_gpt_LastUsableLBA) {
+	if (header->efi_gpt_AlternateLBA >= header->efi_gpt_FirstUsableLBA &&
+	    header->efi_gpt_AlternateLBA <= header->efi_gpt_LastUsableLBA) {
 		mdb_warn("AlternateLBA is within usable LBA range\n");
 	}
 
-	if (mdb_vread(&altheader, sizeof (altheader),
-	    header.efi_gpt_AlternateLBA * SECTOR_SIZE) == -1) {
+	altheader = mdb_zalloc(sector_size, UM_SLEEP | UM_GC);
+	if (mdb_vread(altheader, sector_size,
+	    header->efi_gpt_AlternateLBA * sector_size) == -1) {
 		mdb_warn("failed to read alternate GPT header");
 	} else {
-		if (strncmp((char *)&altheader.efi_gpt_Signature,
+		if (strncmp((char *)&altheader->efi_gpt_Signature,
 		    "EFI PART", 8) != 0) {
 			mdb_warn("found invalid alternate GPT header with "
 			    "Signature: %s\n",
-			    (char *)&altheader.efi_gpt_Signature);
+			    (char *)&altheader->efi_gpt_Signature);
 		}
 
-		if (altheader.efi_gpt_MyLBA != header.efi_gpt_AlternateLBA) {
+		if (altheader->efi_gpt_MyLBA != header->efi_gpt_AlternateLBA) {
 			mdb_warn("alternate GPT header at offset %#llx has "
 			    "invalid MyLBA %llu\n",
-			    header.efi_gpt_AlternateLBA * SECTOR_SIZE,
-			    altheader.efi_gpt_MyLBA);
+			    header->efi_gpt_AlternateLBA * sector_size,
+			    altheader->efi_gpt_MyLBA);
 		}
 
-		if (altheader.efi_gpt_AlternateLBA != header.efi_gpt_MyLBA) {
+		if (altheader->efi_gpt_AlternateLBA != header->efi_gpt_MyLBA) {
 			mdb_warn("alternate GPT header at offset %#llx has "
 			    "invalid AlternateLBA %llu\n",
-			    header.efi_gpt_AlternateLBA * SECTOR_SIZE,
-			    altheader.efi_gpt_AlternateLBA);
+			    header->efi_gpt_AlternateLBA * sector_size,
+			    altheader->efi_gpt_AlternateLBA);
 		}
 
 		/*
@@ -514,31 +518,31 @@ cmd_gpt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
 		 */
 	}
 
-	uuid_unparse((uchar_t *)&header.efi_gpt_DiskGUID, uuid);
+	uuid_unparse((uchar_t *)&header->efi_gpt_DiskGUID, uuid);
 	mdb_printf("DiskGUID: %s\n", uuid);
 
 	mdb_printf("PartitionEntryLBA: %llu\n",
-	    header.efi_gpt_PartitionEntryLBA);
+	    header->efi_gpt_PartitionEntryLBA);
 
 	mdb_printf("NumberOfPartitionEntries: %u\n",
-	    header.efi_gpt_NumberOfPartitionEntries);
+	    header->efi_gpt_NumberOfPartitionEntries);
 
 	/*
 	 * While the spec allows a different size, in practice the table
 	 * is always packed.
 	 */
-	if (header.efi_gpt_SizeOfPartitionEntry != sizeof (efi_gpe_t)) {
+	if (header->efi_gpt_SizeOfPartitionEntry != sizeof (efi_gpe_t)) {
 		mdb_warn("SizeOfPartitionEntry: %#x bytes "
 		    "(expected %#x bytes)\n",
-		    header.efi_gpt_SizeOfPartitionEntry, sizeof (efi_gpe_t));
+		    header->efi_gpt_SizeOfPartitionEntry, sizeof (efi_gpe_t));
 		return (DCMD_ERR);
 	}
 
 	mdb_printf("SizeOfPartitionEntry: %#x bytes\n",
-	    header.efi_gpt_SizeOfPartitionEntry);
+	    header->efi_gpt_SizeOfPartitionEntry);
 
-	table_size = header.efi_gpt_SizeOfPartitionEntry *
-	    header.efi_gpt_NumberOfPartitionEntries;
+	table_size = header->efi_gpt_SizeOfPartitionEntry *
+	    header->efi_gpt_NumberOfPartitionEntries;
 
 	/*
 	 * While this is a minimum reservation, it serves us ably as a
@@ -549,11 +553,11 @@ cmd_gpt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
 		return (DCMD_ERR);
 	}
 
-	gpet = mdb_alloc(header.efi_gpt_SizeOfPartitionEntry *
-	    header.efi_gpt_NumberOfPartitionEntries, UM_SLEEP | UM_GC);
+	table_size = P2ROUNDUP(table_size, sector_size);
+	gpet = mdb_alloc(table_size, UM_SLEEP | UM_GC);
 
 	if (mdb_vread(gpet, table_size,
-	    header.efi_gpt_PartitionEntryLBA * SECTOR_SIZE) == -1) {
+	    header->efi_gpt_PartitionEntryLBA * sector_size) == -1) {
 		mdb_warn("couldn't read GPT array");
 		return (DCMD_ERR);
 	}
@@ -561,7 +565,7 @@ cmd_gpt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
 	crc = efi_crc32((unsigned char *)gpet, table_size);
 
 	mdb_printf("PartitionEntryArrayCRC32: %#x (should be %#x)\n",
-	    header.efi_gpt_PartitionEntryArrayCRC32, crc);
+	    header->efi_gpt_PartitionEntryArrayCRC32, crc);
 
 	if (show_guid) {
 		mdb_printf("\n%<u>%-4s %-19s %-37s%</u>\n",
@@ -571,7 +575,7 @@ cmd_gpt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
 		    "PART", "TYPE", "STARTLBA", "ENDLBA", "ATTR", "NAME");
 	}
 
-	for (size_t i = 0; i < header.efi_gpt_NumberOfPartitionEntries; i++)
+	for (size_t i = 0; i < header->efi_gpt_NumberOfPartitionEntries; i++)
 		print_gpe(&gpet[i], i, show_guid);
 
 	return (DCMD_OK);
@@ -588,7 +592,7 @@ gpt_help(void)
 static int
 cmd_vtoc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	uint8_t buf[SECTOR_SIZE];
+	uint8_t *buf;
 	struct dk_label *dl;
 	struct dk_vtoc *dv;
 	uintptr_t vaddr;
@@ -606,10 +610,12 @@ cmd_vtoc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (!(flags & DCMD_ADDRSPEC))
 		addr = 0;
 	else
-		addr *= SECTOR_SIZE;
+		addr *= sector_size;
+
+	buf = mdb_zalloc(sector_size, UM_SLEEP | UM_GC);
 
 #if defined(_SUNOS_VTOC_16)
-	if (mdb_vread(&buf, sizeof (buf), addr) == -1) {
+	if (mdb_vread(buf, sector_size, addr) == -1) {
 		mdb_warn("failed to read VBR");
 		return (DCMD_ERR);
 	}
@@ -618,14 +624,14 @@ cmd_vtoc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	(void) mbr_info((struct mboot *)buf);
 #endif
 
-	vaddr = addr + DK_LABEL_LOC * SECTOR_SIZE;
+	vaddr = addr + DK_LABEL_LOC * sector_size;
 
-	if (mdb_vread(&buf, sizeof (buf), vaddr) == -1) {
+	if (mdb_vread(buf, sector_size, vaddr) == -1) {
 		mdb_warn("failed to read VTOC");
 		return (DCMD_ERR);
 	}
 
-	dl = (struct dk_label *)&buf;
+	dl = (struct dk_label *)buf;
 	dv = (struct dk_vtoc *)&dl->dkl_vtoc;
 
 	mdb_printf("Label magic: 0x%hx (%s)\n", dl->dkl_magic,
@@ -656,7 +662,7 @@ cmd_vtoc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (show_sectors)
 		cyl = 1;
 	else
-		addr /= (cyl * SECTOR_SIZE);
+		addr /= (cyl * sector_size);
 
 	tag_width = array_widest_str(ptag_array);
 
@@ -732,7 +738,7 @@ cmd_vtoc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			sflag = "?";
 
 		mdb_printf("%-4d %-*s %-7s ", i, tag_width, stag, sflag);
-		mdb_nicenum(size * SECTOR_SIZE, nnum);
+		mdb_nicenum(size * sector_size, nnum);
 		if (show_sectors) {
 			mdb_printf("%-11u %-11u %-*s %-10u\n", start, end,
 			    MDB_NICENUM_BUFLEN, nnum, size);
@@ -760,13 +766,54 @@ vtoc_help(void)
 	mdb_printf("Display a Virtual Table of Content (VTOC).\n\n"
 	    "-r Display relative addresses\n"
 	    "-c Use cylinder based addressing\n");
-	mdb_printf("\nThe addr is in 512-byte disk blocks.\n");
+	mdb_printf("\nThe addr is in %u-byte disk blocks.\n", sector_size);
+}
+
+static int
+cmd_sect(uintptr_t addr __unused, uint_t flags __unused, int argc,
+    const mdb_arg_t *argv)
+{
+	uint64_t size = SECTOR_SIZE;
+
+	if (argc < 1) {
+		mdb_printf("Current sector size is %u (%#x)\n", sector_size,
+		    sector_size);
+		return (DCMD_OK);
+	}
+
+	if (argc != 1)
+		return (DCMD_USAGE);
+
+	switch (argv[0].a_type) {
+	case MDB_TYPE_STRING:
+		size = mdb_strtoull(argv[0].a_un.a_str);
+		break;
+	case MDB_TYPE_IMMEDIATE:
+		size = argv[0].a_un.a_val;
+		break;
+	default:
+		return (DCMD_USAGE);
+	}
+
+	if (!ISP2(size)) {
+		mdb_printf("sector size must be power of 2\n");
+		return (DCMD_USAGE);
+	}
+	sector_size = size;
+	return (DCMD_OK);
+}
+
+void
+sect_help(void)
+{
+	mdb_printf("Show or set sector size.\n");
 }
 
 static const mdb_dcmd_t dcmds[] = {
 	{ "mbr", NULL, "dump Master Boot Record information", cmd_mbr },
 	{ "gpt", "?[-ag]", "dump an EFI GPT", cmd_gpt, gpt_help },
 	{ "vtoc", "?[-cr]", "dump VTOC information", cmd_vtoc, vtoc_help },
+	{ "sectorsize", NULL, "set or show sector size", cmd_sect, sect_help },
 	{ NULL }
 };
 
