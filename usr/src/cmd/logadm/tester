@@ -21,7 +21,7 @@
 #
 #
 # Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2013, Joyent, Inc. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 #
 # tester - run logadm tests
@@ -31,19 +31,19 @@
 # logadm itself).
 #
 # to run all the tests:
-# 	tester [-f] <bindir>
+#	tester [-f] <bindir>
 #
 # to run just a few tests, given their names:
-# 	tester [-f] <bindir> globtest1 luttest1
+#	tester [-f] <bindir> globtest1 luttest1
 #
 # to setup a test and stop so you can run it by hand:
-# 	tester [-f] -s globtest1 <bindir>
+#	tester [-f] -s globtest1 <bindir>
 #
-# 	tester will tell you what tmp directory it created for
-# 	the test.  to run it, cd there and run:
-# 		sh runtest
-# 	to check the results, run:
-# 		sh checktest
+#	tester will tell you what tmp directory it created for
+#	the test.  to run it, cd there and run:
+#		sh runtest
+#	to check the results, run:
+#		sh checktest
 #
 # -f means "fast" -- without it, watchmalloc(3MALLOC) is setup for
 # each test and they run a zillion times slower and produce core
@@ -92,7 +92,8 @@ umask 002;
 	"logadm20",
 	"logadm21",
 	"logadm22",
-	"logadm23"
+	"logadm23",
+	"stderr1"
 );
 
 use Getopt::Std;
@@ -275,7 +276,7 @@ sub set_testconffile {
 # Default settings for system log file management.
 # The -w option to logadm(1M) is the preferred way to write to this file,
 # but if you do edit it by hand, use "logadm -V" to check it for errors.
-# 
+#
 # The format of lines in this file is:
 #       <logname> <options>
 # For each logname listed here, the default options to logadm
@@ -2213,4 +2214,38 @@ $bindir/logadm -f logadm.conf -F logadm.timestamps -r regular_test 2>std.err
 exit 0
 EOF
 
+}
+
+###########################################################################
+#
+#	stderr1 -- ensure verbose stderr does not deadlock
+#
+###########################################################################
+sub stderr1 {
+	set_file('logfile', 'initially logfile');
+
+	set_file('std.err.uniq.expect', <<'EOF');
+   1 logadm: Warning: command failed: /bin/sh -c exec 1>&2; for i in {1..250000}; do echo pre-command-stuff; done
+250000 pre-command-stuff
+   1 logadm: Warning: command failed: /bin/sh -c exec 1>&2; for i in {1..250000}; do echo post-command-stuff; done
+250000 post-command-stuff
+EOF
+
+	set_file('checktest', <<'EOF');
+[ -s std.out ] && exit 1
+/bin/diff -u std.err.uniq.expect std.err.uniq || exit 1
+exit 0
+EOF
+
+	# The output redirection below looks wrong, but it is not.  The redirect
+	# of stderr before the redirect of stdout causes stderr to be piped to
+	# uniq.
+	set_file('runtest', <<"EOF");
+# test "stderr1"
+$envsetup
+exec $bindir/logadm -f /dev/null -p now logfile \\
+    -b 'exec 1>&2; for i in {1..250000}; do echo pre-command-stuff; done' \\
+    -a 'exec 1>&2; for i in {1..250000}; do echo post-command-stuff; done' \\
+    2>&1 >std.out | uniq -c >std.err.uniq
+EOF
 }
