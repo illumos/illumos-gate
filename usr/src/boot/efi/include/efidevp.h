@@ -154,9 +154,48 @@ typedef struct _ACPI_EXTENDED_HID_DEVICE_PATH {
 
 #define PNP_EISA_ID_MASK        0xffff
 #define EISA_ID_TO_NUM(_Id)     ((_Id) >> 16)
+
 /*
- *
+ * ACPI _ADR Device Path SubType.
  */
+#define	ACPI_ADR_DP			0x03
+
+/*
+ * The _ADR device path is used to contain video output device attributes to
+ * support the Graphics Output Protocol.
+ * The device path can contain multiple _ADR entries if multiple video output
+ * devices are displaying the same output.
+ */
+typedef struct {
+        EFI_DEVICE_PATH                 Header;
+	/*
+	 * _ADR value. For video output devices the value of this
+	 * field comes from Table B-2 of the ACPI 3.0 specification. At
+	 * least one _ADR value is required.
+	 */
+	UINT32				ADR;
+	/*
+	 * This device path may optionally contain more than one _ADR entry.
+	 */
+} ACPI_ADR_DEVICE_PATH;
+
+#define	ACPI_ADR_DISPLAY_TYPE_OTHER		0
+#define	ACPI_ADR_DISPLAY_TYPE_VGA		1
+#define	ACPI_ADR_DISPLAY_TYPE_TV		2
+#define	ACPI_ADR_DISPLAY_TYPE_EXTERNAL_DIGITAL	3
+#define	ACPI_ADR_DISPLAY_TYPE_INTERNAL_DIGITAL	4
+
+#define	ACPI_DISPLAY_ADR(_DeviceIdScheme, _HeadId, _NonVgaOutput, \
+    _BiosCanDetect, _VendorInfo, _Type, _Port, _Index) \
+	((UINT32)(	((UINT32)((_DeviceIdScheme) & 0x1) << 31) |  \
+			(((_HeadId)                 & 0x7) << 18) |  \
+			(((_NonVgaOutput)           & 0x1) << 17) |  \
+			(((_BiosCanDetect)          & 0x1) << 16) |  \
+			(((_VendorInfo)             & 0xf) << 12) |  \
+			(((_Type)                   & 0xf) << 8)  |  \
+			(((_Port)                   & 0xf) << 4)  |  \
+			((_Index)                   & 0xf) ))
+
 #define MESSAGING_DEVICE_PATH           0x03 
 
 #define MSG_ATAPI_DP                    0x01
