@@ -239,7 +239,7 @@ rustdem_parse_name_segment(rustdem_state_t *st, strview_t *svp, boolean_t first)
 
 	rem = sv_remaining(&sv);
 
-	if (rem < len || len > SIZE_MAX) {
+	if (rem < len || len == SIZE_MAX) {
 		st->rds_error = EINVAL;
 		return (B_FALSE);
 	}
