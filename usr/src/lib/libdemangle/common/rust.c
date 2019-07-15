@@ -239,7 +239,7 @@ rustdem_parse_name_segment(rustdem_state_t *st, strview_t *svp, boolean_t first)
 
 	rem = sv_remaining(&sv);
 
-	if (rem < len || len == SIZE_MAX) {
+	if (rem < len) {
 		st->rds_error = EINVAL;
 		return (B_FALSE);
 	}
@@ -384,13 +384,11 @@ rustdem_parse_hash(rustdem_state_t *st, strview_t *svp)
 }
 
 /*
- * A 10 digit value would imply a name 1Gb or larger in size.  It seems
- * unlikely to the point of absurdity any such value could every possibly
- * be valid (or even have compiled properly).  This also prevents the
- * uint64_t conversion from possibly overflowing since the value must always
- * be below 10 * UINT32_MAX.
+ * We have to pick an arbitrary limit here; 999,999,999 fits comfortably
+ * within an int32_t, so let's go with that, as it seems unlikely we'd
+ * ever see a larger value in context.
  */
-#define	MAX_DIGITS 10
+#define	MAX_DIGITS 9
 
 static boolean_t
 rustdem_parse_num(rustdem_state_t *restrict st, strview_t *restrict svp,
