@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2018 Joyent Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -592,7 +592,7 @@
  *        correct position in the heap (up or down depending on whether the
  *        new expiration is less than or greater than the old one).
  *    5.  If the cyclic move modified the root of the heap, the backend is
- *	  reprogrammed.
+ *        reprogrammed.
  *
  *  Reprogramming can be a frequent event (see the callout subsystem). So,
  *  the serialization used has to be efficient. As with all other cyclic
@@ -611,6 +611,13 @@
  *  some sort of synchronization for its cyclic-related activities. This
  *  little caveat exists because the cyclic ID is not really an ID. It is
  *  implemented as a pointer to a structure.
+ *
+ *  For cyclics which reprogram themselves during their own handler function,
+ *  avoiding the potential race with cyclic_remove() can be a challenge.  If a
+ *  handler is running and a remote thread issues a cyclic_remove() on its
+ *  cyclic (interrupting the handler with the removal xcall), subsequent
+ *  attempts to reprogram the cyclics from within the handler will result in a
+ *  failure return code from cyclic_reprogram().
  */
 #include <sys/cyclic_impl.h>
 #include <sys/sysmacros.h>
@@ -1952,8 +1959,9 @@ cyclic_remove_here(cyc_cpu_t *cpu, cyc_index_t ndx, cyc_time_t *when, int wait)
  * it calls this function directly. Else, it invokes this function through
  * an X-call to the cyclic's CPU.
  */
-static void
-cyclic_reprogram_cyclic(cyc_cpu_t *cpu, cyc_index_t ndx, hrtime_t expire)
+static boolean_t
+cyclic_reprogram_cyclic(cyc_cpu_t *cpu, cyc_index_t ndx, hrtime_t expire,
+    boolean_t is_local)
 {
 	cyc_backend_t *be = cpu->cyp_backend;
 	cyb_arg_t bar = be->cyb_arg;
@@ -1982,8 +1990,22 @@ cyclic_reprogram_cyclic(cyc_cpu_t *cpu, cyc_index_t ndx, hrtime_t expire)
 		if (heap[i] == ndx)
 			break;
 	}
-	if (i < 0)
+	if (i < 0) {
+		/*
+		 * Report failure (rather than panicking) if and only if the
+		 * cyclic_reprogram() is occurring on the CPU which the cyclic
+		 * resides upon, and there is evidence that a pending cyclic
+		 * was removed from that CPU.
+		 *
+		 * This covers the race where a cyclic is removed out from
+		 * under its running handler, which then attempts a reprogram.
+		 */
+		if (is_local &&
+		    cpu->cyp_state == CYS_REMOVING && cpu->cyp_rpend > 0) {
+			return (B_FALSE);
+		}
 		panic("attempt to reprogram non-existent cyclic");
+	}
 
 	cyclic = &cpu->cyp_cyclics[ndx];
 	oexpire = cyclic->cy_expire;
@@ -2008,13 +2030,18 @@ cyclic_reprogram_cyclic(cyc_cpu_t *cpu, cyc_index_t ndx, hrtime_t expire)
 	}
 
 	be->cyb_restore_level(bar, cookie);
+	return (B_TRUE);
 }
 
 static void
 cyclic_reprogram_xcall(cyc_xcallarg_t *arg)
 {
-	cyclic_reprogram_cyclic(arg->cyx_cpu, arg->cyx_ndx,
-	    arg->cyx_when->cyt_when);
+	/*
+	 * Cross-call reprogram operations should never fail due to racing
+	 * cyclic removal, as they cannot occur from the handler itself.
+	 */
+	VERIFY(cyclic_reprogram_cyclic(arg->cyx_cpu, arg->cyx_ndx,
+	    arg->cyx_when->cyt_when, B_FALSE));
 }
 
 static void
@@ -3052,6 +3079,7 @@ cyclic_reprogram(cyclic_id_t id, hrtime_t expiration)
 	cyc_cpu_t *cpu;
 	cyc_omni_cpu_t *ocpu;
 	cyc_index_t ndx;
+	int res = 1;
 
 	ASSERT(expiration > 0);
 
@@ -3097,10 +3125,18 @@ cyclic_reprogram(cyclic_id_t id, hrtime_t expiration)
 		ndx = idp->cyi_ndx;
 	}
 
-	if (cpu->cyp_cpu == CPU)
-		cyclic_reprogram_cyclic(cpu, ndx, expiration);
-	else
+	if (cpu->cyp_cpu == CPU) {
+		/*
+		 * If this reprogram is being done as part of a running cyclic
+		 * handler, it is possible that a racing cyclic_remove() on a
+		 * remote CPU will cause it to fail.
+		 */
+		if (!cyclic_reprogram_cyclic(cpu, ndx, expiration, B_TRUE)) {
+			res = 0;
+		}
+	} else {
 		cyclic_reprogram_here(cpu, ndx, expiration);
+	}
 
 	/*
 	 * Allow the cyclic to be moved or removed.
@@ -3109,7 +3145,7 @@ cyclic_reprogram(cyclic_id_t id, hrtime_t expiration)
 
 	kpreempt_enable();
 
-	return (1);
+	return (res);
 }
 
 /*
