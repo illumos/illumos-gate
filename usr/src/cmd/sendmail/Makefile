@@ -23,14 +23,16 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 Garrett D'Amore <garrett@damore.org>
+#
 # cmd/sendmail/Makefile
 #
 # Makefile for top level sendmail source directory
 #
 
 # static libraries (db, libsm, libsmdb, libsmutil) must be built before
-# src and aux
-SUBDIRS=	cf lib db libsm libsmdb libsmutil .WAIT src aux
+# src and util
+SUBDIRS=	cf lib db libsm libsmdb libsmutil .WAIT src util
 
 include 	../Makefile.cmd
 
