@@ -38,7 +38,7 @@ GENI_SRCS		= ../common/binarytables/srcs
 include $(SRC)/lib/iconv_modules/Makefile.iconv
 include $(SRC)/lib/iconv_modules/utf-8/Makefile.iconv
 
-CLEANFILES =    *.o *.so core *.bt
+CLEANFILES =    *.o *.so *.bt
 
 .NO_PARALLEL:
 

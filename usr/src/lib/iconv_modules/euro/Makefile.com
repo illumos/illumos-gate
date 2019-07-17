@@ -44,18 +44,18 @@ include $(SRC)/lib/iconv_modules/Makefile.iconv
 
 LDFLAGS = $(DYNFLAGS) $(LDLIBS)
 
-CFLAGS		+= $(INCLUDES) $(XREGSFLAG) -D_REENTRANT
+CFLAGS		+= $(XREGSFLAG) -D_REENTRANT
 
-CLEANFILES +=	core ../common/tbl.h
+CLEANFILES +=	tbl.h
 
-$(ALL_SOS): ../common/euro.h ../common/euro.c ../common/tbl.h
+$(ALL_SOS): ../common/euro.h ../common/euro.c tbl.h
 	TABLE=`echo $@ | $(TR) -d "-" | sed -e s:%:_:g | /usr/bin/cut -d. -f1` ; \
-	$(CC) $(CFLAGS) -DT_$$TABLE ../common/euro.c -c -o $@.o ; \
+	$(CC) $(CFLAGS) $(CPPFLAGS) -DT_$$TABLE ../common/euro.c -c -o $@.o ; \
 	$(LD) $(LDFLAGS) -o $@ $@.o $(LDLIBS)
 	$(POST_PROCESS_SO)
 
-../common/tbl.h: ../genincl $(TABLES:%=../tbls/%)
-	cd ..; ./genincl > common/tbl.h
+tbl.h: ../genincl $(TABLES:%=../tbls/%)
+	(cd ..; ./genincl) > $@
 
 $(CREATE_LINKS):  $(ICONV_LINK_TARGETS)
 	$(SYMLINK) -f 646%8859-1.so $(ICONV_DIR)/646%8859-15.so
