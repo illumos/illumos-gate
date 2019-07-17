@@ -32,9 +32,9 @@ set name=pkg.summary value="SNIA Multipath Management API Common Library"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Libraries
 set name=variant.arch value=$(ARCH)
-dir path=etc group=sys variant.opensolaris.zone=global
-dir path=lib variant.opensolaris.zone=global
-dir path=lib/$(ARCH64) variant.opensolaris.zone=global
+dir path=etc group=sys
+dir path=lib
+dir path=lib/$(ARCH64)
 dir path=usr group=sys
 dir path=usr/include
 dir path=usr/share/man
@@ -42,8 +42,8 @@ dir path=usr/share/man/man3lib
 dir path=usr/share/man/man3mpapi
 dir path=usr/share/man/man4
 file path=etc/mpapi.conf original_name=SUNWmpapi:etc/mpapi.conf preserve=true
-file path=lib/$(ARCH64)/libMPAPI.so.1 variant.opensolaris.zone=global
-file path=lib/libMPAPI.so.1 variant.opensolaris.zone=global
+file path=lib/$(ARCH64)/libMPAPI.so.1
+file path=lib/libMPAPI.so.1
 file path=usr/include/mpapi-sun.h
 file path=usr/include/mpapi.h
 file path=usr/share/man/man3lib/libMPAPI.3lib
@@ -104,8 +104,7 @@ license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
 license usr/src/lib/mpapi/libmpapi/THIRDPARTYLICENSE \
     license=usr/src/lib/mpapi/libmpapi/THIRDPARTYLICENSE
-link path=lib/$(ARCH64)/libMPAPI.so target=libMPAPI.so.1 \
-    variant.opensolaris.zone=global
-link path=lib/libMPAPI.so target=libMPAPI.so.1 variant.opensolaris.zone=global
+link path=lib/$(ARCH64)/libMPAPI.so target=libMPAPI.so.1
+link path=lib/libMPAPI.so target=libMPAPI.so.1
 link path=usr/share/man/man3lib/libmpapi.3lib target=libMPAPI.3lib
 depend fmri=system/library/storage/libmpscsi_vhci type=require
