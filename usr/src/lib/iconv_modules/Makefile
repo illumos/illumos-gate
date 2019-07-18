@@ -35,6 +35,8 @@ clobber		:=	TARGET = clobber
 
 all install lint clean clobber: $(SUBDIRS)
 
+.PARALLEL: $(SUBDIRS)
+
 $(SUBDIRS): FRC
 	cd $@; $(MAKE) $(TARGET)
 

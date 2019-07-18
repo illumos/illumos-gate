@@ -312,6 +312,15 @@ CLEANFILES += $(LINKS)  $(DYNOBJS) $(ALL_SOS)
 
 clobber: clean
 
+# There is no way to escape the make(1S) interpretation of '%' as a wildcard,
+# as such we can't install these files using traditional make rules, given
+# they contain a % which, while it would match a literal '%' and work
+# somewhat, would also match anything else.
+#
+# We have to, rather unfortunately, loop.
+#
+# Note especially that here, unlike in utf-8/, this is not merely theoretical
+# We have both UTF-16%PCK and UTF-16BE%PCK for example.
 $(INSTALL_MODULES):	$(DYNOBJS)
 	for f in $(DYNOBJS); do \
 		fp=`echo $$f | $(SED) -e 's/_TO_/%/'`; \
