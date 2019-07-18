@@ -39,8 +39,6 @@ echo :=         TARGET = echo
 
 all clean clobber install lint echo: $(SUBDIRS)
 
-.PARALLEL: $(SUBDIRS)
-
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 

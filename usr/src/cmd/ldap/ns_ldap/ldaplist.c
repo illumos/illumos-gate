@@ -75,12 +75,12 @@ static struct database_t {
 
 
 void
-usage(char *msg) {
+usage(char *msg)
+{
 	if (msg)
 		(void) fprintf(stderr, "%s\n", msg);
 
-	(void) fprintf(stderr,
-	gettext(
+	(void) fprintf(stderr, gettext(
 	"\n"
 	"usage: ldaplist [-dlv] [-h LDAP_server[:serverPort] [-M domainName]\n"
 	"[-N  profileName] [-a  authenticationMethod] [-P certifPath]\n"
@@ -144,9 +144,8 @@ usage(char *msg) {
  * filter, if the input SSD contains a filter "department=sds".
  */
 static int
-merge_SSD_filter(const ns_ldap_search_desc_t *desc,
-			char **realfilter,
-			const void *userdata)
+merge_SSD_filter(const ns_ldap_search_desc_t *desc, char **realfilter,
+    const void *userdata)
 {
 	int	len;
 	char *checker;
@@ -189,13 +188,13 @@ merge_SSD_filter(const ns_ldap_search_desc_t *desc,
 /* returns 0=success, 1=error */
 int
 list(char *database, char *ldapfilter, char **ldapattribute,
-char **err, char *userdata)
+    char **err, char *userdata)
 {
 	ns_ldap_result_t	*result;
 	ns_ldap_error_t	*errorp;
 	int		rc;
 	char		buf[500];
-	const char 	*sort = NULL;
+	const char	*sort = NULL;
 	int		i;
 
 	if (database) {
@@ -260,7 +259,7 @@ main(int argc, char **argv)
 	char			*attribute = "dn";
 	char			**key = NULL;
 	char			**ldapattribute = NULL;
-	char 			*buffer[100];
+	char			*buffer[100];
 	char			*err = NULL;
 	char			*p;
 	int			index = 1;
@@ -488,7 +487,7 @@ main(int argc, char **argv)
 	}
 
 	/* build the filter */
-	if (database && (strcasecmp(database, "publickey") == NULL)) {
+	if (database && (strcasecmp(database, "publickey") == 0)) {
 		/* user publickey lookup */
 		char *err1 = NULL;
 		int  rc1;

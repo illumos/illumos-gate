@@ -68,12 +68,11 @@ log_error(char *msg_id, char *input_tmplt, ...)
 	va_end(ap);
 
 	merged_msg = (char *)malloc(strlen(msg_template) +
-		strlen(input_merged_msg) +
-		strlen(msg_id) + 1);
+	    strlen(input_merged_msg) +
+	    strlen(msg_id) + 1);
 	if (merged_msg == NULL) {
-		syslog(LOG_ERR,
-		"ID[luxadm.create_fabric_device.2317] "
-			"malloc failure, %s", strerror(errno));
+		syslog(LOG_ERR, "ID[luxadm.create_fabric_device.2317] "
+		    "malloc failure, %s", strerror(errno));
 	} else {
 		sprintf(merged_msg, msg_template, msg_id, input_merged_msg);
 			/* first insert msg_id */
@@ -101,10 +100,10 @@ read_repos_file(char *repos_filename)
 	unsigned int filesize;
 	unsigned int bytes_read;
 
-	if (repos_filename == NULL || *repos_filename == NULL) {
+	if (repos_filename == NULL || *repos_filename == '\0') {
 		log_error("2310",
-		"filename missing for -f option of "
-		"luxadm -e create_fabric_device");
+		    "filename missing for -f option of "
+		    "luxadm -e create_fabric_device");
 		return (-1);
 	}
 
@@ -112,26 +111,24 @@ read_repos_file(char *repos_filename)
 
 	if (fd == -1) {
 		log_error("2311",
-		"fopen failed: cannot open repository file %s. %d",
-		repos_filename, strerror(errno));
+		    "fopen failed: cannot open repository file %s. %d",
+		    repos_filename, strerror(errno));
 		return (-1);
 	}
 
 	if (fstat(fd, &stbuf) == -1) {
 		close(fd);
-		log_error("2312",
-		"stat failed on file %s. %s",
-		repos_filename, strerror(errno));
+		log_error("2312", "stat failed on file %s. %s",
+		    repos_filename, strerror(errno));
 		return (-1);
 	}
 	filesize = stbuf.st_size;
 	tmp_ptr = mmap_ptr = mmap((caddr_t)0, filesize,
-			(PROT_READ | PROT_WRITE), MAP_PRIVATE, fd, 0);
+	    (PROT_READ | PROT_WRITE), MAP_PRIVATE, fd, 0);
 
 	if (mmap_ptr == MAP_FAILED) {
-		log_error("2315",
-		"Failed to mmap file %s. %s",
-		repos_filename, strerror(errno));
+		log_error("2315", "Failed to mmap file %s. %s",
+		    repos_filename, strerror(errno));
 		return (-1);
 	}
 
@@ -143,7 +140,7 @@ read_repos_file(char *repos_filename)
 			tmp_ptr++;
 		}
 		if (*tmp_ptr == '\n') {
-			*tmp_ptr = NULL;
+			*tmp_ptr = '\0';
 			tmp_ptr++;
 			bytes_read++;
 		}
@@ -184,22 +181,21 @@ parse_line(char *line, char *path, char *wwn, char *filename)
 
 	line_copy = strdup(line);
 	if (line_copy == NULL) {
-		log_error("2317",
-			"malloc failure, %s", strerror(errno));
+		log_error("2317", "malloc failure, %s", strerror(errno));
 	}
 	p_path = line_copy;
 	p_delim = strstr(p_path, WWN_DELIM);
 	if (p_delim == NULL) {
 		log_error("2313",
-			"Invalid line (%s) in file %s.", line, filename);
+		    "Invalid line (%s) in file %s.", line, filename);
 		free(line_copy);
 		return (-1);
 	}
-	*p_delim = NULL;	/* NULL terminate path */
+	*p_delim = '\0';	/* NULL terminate path */
 
 	if (strlcpy(path, p_path, MAXPATHLEN) >= MAXPATHLEN) {
 		log_error("2318",
-			"Path too long (%s) in file %s.", p_path, filename);
+		    "Path too long (%s) in file %s.", p_path, filename);
 		free(line_copy);
 		return (-1);
 	}
@@ -215,12 +211,12 @@ parse_line(char *line, char *path, char *wwn, char *filename)
 	p_delim = strchr(p_wwn, ' ');
 	if (p_delim != NULL) {
 		/* now p_delim points to blank */
-		*p_delim = NULL;	/* terminate wwn at delim */
+		*p_delim = '\0';	/* terminate wwn at delim */
 	} else {
 		char *p_last_char;
 		p_last_char = p_wwn+strlen(p_wwn)-1;
 		if (*p_last_char == '\n') {
-			*p_last_char = NULL;
+			*p_last_char = '\0';
 		}
 	}
 	strcpy(wwn, p_wwn);
@@ -280,7 +276,7 @@ string_to_wwn(const uchar_t *string, uchar_t *port_wwn)
 
 static int
 create_ap_instance(char *ap_id, char *wwn_string,
-		    char *filename, char *line)
+    char *filename, char *line)
 {
 	devctl_hdl_t bus_handle, dev_handle;
 	devctl_ddef_t ddef_handle;
@@ -290,9 +286,8 @@ create_ap_instance(char *ap_id, char *wwn_string,
 	ddef_handle = devctl_ddef_alloc("dummy", 0);
 	if (ddef_handle == NULL) {
 		log_error("2314",
-		"Internal error to process line (%s) "
-		"in file: %s. %s",
-		line, filename, strerror(errno));
+		    "Internal error to process line (%s) in file: %s. %s",
+		    line, filename, strerror(errno));
 		return (-1);
 	}
 	/*
@@ -301,21 +296,19 @@ create_ap_instance(char *ap_id, char *wwn_string,
 	 */
 	if (string_to_wwn((uchar_t *)wwn_string, wwn_array) != 0) {
 		log_error("2314",
-		"Internal error to process line (%s) "
-		"in file: %s. %s",
-		line, filename, strerror(errno));
+		    "Internal error to process line (%s) in file: %s. %s",
+		    line, filename, strerror(errno));
 		devctl_ddef_free(ddef_handle);
 		return (-1);
 	}
 	(void) devctl_ddef_byte_array(ddef_handle,
-		"port-wwn", FC_WWN_SIZE, wwn_array);
+	    "port-wwn", FC_WWN_SIZE, wwn_array);
 
 	if ((bus_handle = devctl_bus_acquire(ap_id, 0)) == NULL) {
 		devctl_ddef_free(ddef_handle);
 		log_error("2314",
-		"Internal error to process line (%s) "
-		"in file: %s. %s",
-		line, filename, strerror(errno));
+		    "Internal error to process line (%s) in file: %s. %s",
+		    line, filename, strerror(errno));
 		return (-1);
 	}
 	if (ret =
@@ -323,9 +316,8 @@ create_ap_instance(char *ap_id, char *wwn_string,
 		devctl_ddef_free(ddef_handle);
 		devctl_release(bus_handle);
 		log_error("2316",
-		"configuration failed for line (%s) "
-		"in file: %s. %s",
-		line, filename, strerror(errno));
+		    "configuration failed for line (%s) in file: %s. %s",
+		    line, filename, strerror(errno));
 		return (-1);
 	}
 	devctl_release(dev_handle);

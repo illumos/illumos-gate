@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <fcntl.h>
 #include <ctype.h>
@@ -235,7 +233,7 @@ sym_to_addr(char *name)
 			return (sep->addr);
 		sep++;
 	}
-	return (NULL);
+	return ((uintptr_t)NULL);
 }
 
 size_t
