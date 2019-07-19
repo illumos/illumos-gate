@@ -22,7 +22,7 @@
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
-# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2019, Joyent, Inc.
 #
 # - This file is sourced by "bldenv.sh" and "nightly.sh" and should not
@@ -79,8 +79,8 @@ export CODEMGR_WS="`git rev-parse --show-toplevel`"
 # To disable shadow compilation, unset SHADOW_* or set them to the empty string.
 #
 export GNUC_ROOT=/usr/gcc/7
-export PRIMARY_CCS=gcc7,$GNUC_ROOT/bin/gcc,gnu
-export PRIMARY_CCCS=gcc7,$GNUC_ROOT/bin/g++,gnu
+export PRIMARY_CC=gcc7,$GNUC_ROOT/bin/gcc,gnu
+export PRIMARY_CCC=gcc7,$GNUC_ROOT/bin/g++,gnu
 export SHADOW_CCS=gcc4,/opt/gcc/4.4.4/bin/gcc,gnu
 export SHADOW_CCCS=gcc4,/opt/gcc/4.4.4/bin/g++,gnu
 
