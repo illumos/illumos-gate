@@ -13,14 +13,14 @@
 
 #
 # The src/ sub-directory is un-modified copy of
-# https://github.com/illumos/smatch/tree/0.5.1-il-1
+# https://github.com/illumos/smatch/tree/0.5.1-il-3
 #
 # This Makefile installs just enough for us to be able to run smatch
 # locally.
 #
 
 PROG = smatch
-SPARSE_VERSION = 0.5.1-il-1
+SPARSE_VERSION = 0.5.1-il-3
 
 include ../Makefile.tools
 

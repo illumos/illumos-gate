@@ -84,8 +84,8 @@ export PRIMARY_CCCS=gcc7,$GNUC_ROOT/bin/g++,gnu
 export SHADOW_CCS=gcc4,/opt/gcc/4.4.4/bin/gcc,gnu
 export SHADOW_CCCS=gcc4,/opt/gcc/4.4.4/bin/g++,gnu
 
-# uncomment to enable smatch
-#export ENABLE_SMATCH=1
+# comment to disable smatch
+export ENABLE_SMATCH=1
 
 # Comment this out to disable support for SMB printing, i.e. if you
 # don't want to bother providing the CUPS headers this needs.

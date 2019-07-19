@@ -207,6 +207,7 @@ file path=opt/zfs-tests/runfiles/longevity.run mode=0444
 file path=opt/zfs-tests/runfiles/omnios.run mode=0444
 file path=opt/zfs-tests/runfiles/openindiana.run mode=0444
 file path=opt/zfs-tests/runfiles/perf-regression.run mode=0444
+file path=opt/zfs-tests/runfiles/smartos.run mode=0444
 file path=opt/zfs-tests/runfiles/stress.run mode=0444
 file path=opt/zfs-tests/tests/functional/acl/acl.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/acl/acl_common.kshlib mode=0444

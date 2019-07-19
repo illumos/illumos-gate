@@ -23,18 +23,19 @@
 # Use is subject to license terms.
 #
 # Copyright 2018 Joyent, Inc.
+# Copyright 2019 Garrett D'Amore <garrett@damore.org>
 #
 # cmd/mailx/Makefile
 
 PROG= mailx
 
-OBJS=	myfopen.o aux.o cmd1.o cmd2.o cmd3.o \
+OBJS=	myfopen.o cmd1.o cmd2.o cmd3.o \
 	cmd4.o cmdtab.o collect.o config.o edit.o \
 	init.o fio.o getname.o head.o \
 	hostname.o lex.o list.o lock.o lpaths.o \
 	main.o names.o optim.o popen.o quit.o \
 	receipt.o send.o sigretro.o stralloc.o temp.o \
-	translate.o tty.o usg.local.o vars.o
+	translate.o tty.o usg.local.o util.o vars.o
 
 SRCS=	$(OBJS:.o=.c)
 
