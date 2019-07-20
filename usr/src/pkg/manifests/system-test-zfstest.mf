@@ -826,8 +826,13 @@ file \
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_create/zfs_create_crypt_combos \
     mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zfs_create/zfs_create_dryrun \
+    mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_create/zfs_create_encrypted \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zfs_create/zfs_create_verbose \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_destroy/cleanup \
     mode=0555

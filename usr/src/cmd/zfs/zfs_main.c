@@ -238,9 +238,9 @@ get_usage(zfs_help_t idx)
 		return (gettext("\tclone [-p] [-o property=value] ... "
 		    "<snapshot> <filesystem|volume>\n"));
 	case HELP_CREATE:
-		return (gettext("\tcreate [-p] [-o property=value] ... "
+		return (gettext("\tcreate [-Pnpv] [-o property=value] ... "
 		    "<filesystem>\n"
-		    "\tcreate [-ps] [-b blocksize] [-o property=value] ... "
+		    "\tcreate [-Pnpsv] [-b blocksize] [-o property=value] ... "
 		    "-V <size> <volume>\n"));
 	case HELP_DESTROY:
 		return (gettext("\tdestroy [-fnpRrv] <filesystem|volume>\n"
@@ -795,9 +795,6 @@ usage:
  * check of arguments and properties, but does not check for permissions,
  * available space, etc.
  *
- * The following flags are private in SmartOS pending acceptance of interface
- * changes by the external ZFS community.
- *
  * The '-v' flag is for verbose output.
  *
  * The '-P' flag is used for parseable output.  It implies '-v'.
@@ -841,7 +838,7 @@ zfs_do_create(int argc, char **argv)
 				nomem();
 			volsize = intval;
 			break;
-		case 'P':	/* Private to SmartOS */
+		case 'P':
 			verbose = B_TRUE;
 			parseable = B_TRUE;
 			break;
@@ -862,7 +859,7 @@ zfs_do_create(int argc, char **argv)
 			    intval) != 0)
 				nomem();
 			break;
-		case 'n':	/* Private to SmartOS */
+		case 'n':
 			dryrun = B_TRUE;
 			break;
 		case 'o':
@@ -872,7 +869,7 @@ zfs_do_create(int argc, char **argv)
 		case 's':
 			noreserve = B_TRUE;
 			break;
-		case 'v':	/* Private to SmartOS */
+		case 'v':
 			verbose = B_TRUE;
 			break;
 		case ':':
@@ -992,7 +989,7 @@ zfs_do_create(int argc, char **argv)
 				VERIFY0(nvpair_value_uint64(nvp, &uval));
 				(void) printf(parseable ?
 				    "property\t%s\t%llu\n" : "\t%s=%llu\n",
-				    nvpair_name(nvp), uval);
+				    nvpair_name(nvp), (u_longlong_t)uval);
 				break;
 			case DATA_TYPE_STRING:
 				VERIFY0(nvpair_value_string(nvp, &sval));
