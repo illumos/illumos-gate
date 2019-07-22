@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2016 Joyent, Inc.
+.\" Copyright 2019 Joyent, Inc.
 .\"
-.Dd May 31, 2016
+.Dd July 22, 2019
 .Dt MAC_ALLOC 9F
 .Os
 .Sh NAME
@@ -67,7 +67,15 @@ When the driver is done with the
 .Xr mac_register 9S
 structure, it must call the
 .Fn mac_free
-function to release any associated memory.
+function to release any memory associated with the handle.
+.Pp
+After the driver has called
+.Xr mac_register 9F
+during its
+.Xr attach 9E
+entry point, the
+.Xr mac_register 9S
+structure is no longer needed and can be freed.
 .Sh CONTEXT
 The
 .Fn mac_alloc
@@ -82,7 +90,7 @@ and
 context.
 .Sh RETURN VALUES
 Upon successful completion, the
-.Fn mac_register
+.Fn mac_alloc
 function will return a pointer to an allocated
 .Sy mac_register_t
 structure that can be filled in by the driver.
