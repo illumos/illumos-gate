@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -234,7 +234,7 @@ static	char	*newenv[10+MAXARGS] =
 static	char	**envinit = newenv;
 static	int	basicenv;
 static	char	*zero = (char *)0;
-static	char 	**envp;
+static	char	**envp;
 #ifndef	NO_MAIL
 static	char	mail[30] = { "MAIL=/var/mail/" };
 #endif
@@ -289,9 +289,9 @@ static	int	Passreqflag	= 0;
 
 #define	DEFUMASK	022
 static	mode_t	Umask		= DEFUMASK;
-static	char 	*Def_tz		= NULL;
-static	char 	*tmp_tz		= NULL;
-static	char 	*Def_hertz	= NULL;
+static	char	*Def_tz		= NULL;
+static	char	*tmp_tz		= NULL;
+static	char	*Def_hertz	= NULL;
 #define	SET_FSIZ	2			/* ulimit() command arg */
 static	long	Def_ulimit	= 0;
 #define	MAX_TIMEOUT	(15 * 60)
@@ -299,7 +299,7 @@ static	long	Def_ulimit	= 0;
 static	unsigned Def_timeout	= DEF_TIMEOUT;
 static	char	*Def_path	= NULL;
 static	char	*Def_supath	= NULL;
-#define	DEF_PATH	"/usr/bin:" 	/* same as PATH */
+#define	DEF_PATH	"/usr/bin:"	/* same as PATH */
 #define	DEF_SUPATH	"/usr/sbin:/usr/bin" /* same as ROOTPATH */
 
 /*
@@ -312,7 +312,7 @@ static	char	*Def_supath	= NULL;
  * TTYPROMPT is set by ttymon if ttymon already wrote out the prompt.
  */
 static	char	*ttyprompt = NULL;
-static	char 	*ttyn = NULL;
+static	char	*ttyn = NULL;
 
 /*
  * Pass inherited environment.  Used by telnetd in support of the telnet
@@ -363,13 +363,13 @@ static	void	print_banner(void);
 static	void	display_last_login_time(void);
 static	void	exec_the_shell(void);
 static	int	process_chroot_logins(void);
-static 	void	chdir_to_dir_user(void);
+static	void	chdir_to_dir_user(void);
 static	void	check_log(void);
 static	void	validate_account(void);
 static	void	doremoteterm(char *);
 static	int	get_options(int, char **);
 static	void	getstr(char *, int, char *);
-static 	int	legalenvvar(char *);
+static	int	legalenvvar(char *);
 static	void	check_for_console(void);
 static	void	check_for_dueling_unix(char *);
 static	void	get_user_name(void);
@@ -687,7 +687,7 @@ catch(int sig)
  */
 
 /*
- * badlogin() 		- log to the log file 'trys'
+ * badlogin()		- log to the log file 'trys'
  *			  unsuccessful attempts
  */
 
@@ -719,7 +719,7 @@ badlogin(void)
 
 
 /*
- * log_bad_attempts 	- log each bad login attempt - called from
+ * log_bad_attempts	- log each bad login attempt - called from
  *			  login_authenticate.  Exits when the maximum attempt
  *			  count is exceeded.
  */
@@ -752,7 +752,7 @@ log_bad_attempts(void)
 				    "Login failure on %s, %.*s",
 				    ttyn, NMAX, user_name);
 			}
-		} else 	{
+		} else {
 			if (remote_host[0]) {
 				syslog(LOG_NOTICE,
 				    "Login failure on %s from %.*s",
@@ -767,7 +767,7 @@ log_bad_attempts(void)
 
 
 /*
- * turn_on_logging 	- if the logfile exist, turn on attempt logging and
+ * turn_on_logging	- if the logfile exist, turn on attempt logging and
  *			  initialize the string storage area
  */
 
@@ -803,7 +803,7 @@ login_conv(int num_msg, struct pam_message **msg,
 {
 	struct pam_message	*m;
 	struct pam_response	*r;
-	char 			*temp;
+	char			*temp;
 	int			k, i;
 
 	if (num_msg <= 0)
@@ -886,7 +886,7 @@ login_conv(int num_msg, struct pam_message **msg,
 
 				(void) strncpy(r->resp, inputline,
 				    PAM_MAX_RESP_SIZE-1);
-				r->resp[PAM_MAX_RESP_SIZE-1] = NULL;
+				r->resp[PAM_MAX_RESP_SIZE-1] = '\0';
 				len = strlen(r->resp);
 				if (r->resp[len-1] == '\n')
 					r->resp[len-1] = '\0';
@@ -1133,7 +1133,7 @@ check_for_dueling_unix(char *inputline)
 }
 
 /*
- * logins_disabled - 	if the file /etc/nologin exists and the user is not
+ * logins_disabled -	if the file /etc/nologin exists and the user is not
  *			root then do not permit them to login
  */
 static int
@@ -1244,12 +1244,12 @@ getstr(char *buf, int cnt, char *err)
 	} while (--cnt > 1 && c != 0);
 
 	*buf = 0;
-	err = err; 	/* For lint */
+	err = err;	/* For lint */
 }
 
 
 /*
- * defaults 		- read defaults
+ * defaults		- read defaults
  */
 
 static void
@@ -1330,7 +1330,7 @@ defaults(void)
 
 /*
  * get_options(argc, argv)
- * 			- parse the cmd line.
+ *			- parse the cmd line.
  *			- return 0 if successful, -1 if failed.
  *			Calls login_exit() on misuse of -r, -h, and -z flags
  */
@@ -1340,8 +1340,8 @@ get_options(int argc, char *argv[])
 {
 	int	c;
 	int	errflg = 0;
-	char    sflagname[NMAX+1];
-	const 	char *flags_message = "Only one of -r, -h and -z allowed\n";
+	char	sflagname[NMAX+1];
+	const	char *flags_message = "Only one of -r, -h and -z allowed\n";
 
 	while ((c = getopt(argc, argv, "u:s:R:f:h:r:pad:t:U:z:")) != -1) {
 		switch (c) {
@@ -1476,8 +1476,8 @@ get_options(int argc, char *argv[])
 		default:
 			errflg++;
 			break;
-		} 	/* end switch */
-	} 		/* end while */
+		}	/* end switch */
+	}		/* end while */
 
 	/*
 	 * If the 's svcname' flag was used, override the progname
@@ -1641,7 +1641,7 @@ process_rlogin(void)
 static void
 validate_account(void)
 {
-	int 	error;
+	int	error;
 	int	flag;
 	int	tries;		/* new password retries */
 
@@ -1892,7 +1892,7 @@ login_authenticate(void)
 }
 
 /*
- * 			*** Credential Related routines ***
+ *			*** Credential Related routines ***
  *
  */
 
@@ -1910,7 +1910,7 @@ login_authenticate(void)
 static void
 setup_credentials(void)
 {
-	int 	error = 0;
+	int	error = 0;
 
 	/* set the real (and effective) GID */
 	if (setgid(pwd->pw_gid) == -1) {
@@ -2107,7 +2107,7 @@ update_utmpx_entry(int sublogin)
 
 
 /*
- * process_chroot_logins 	- Chroots to the specified subdirectory and
+ * process_chroot_logins	- Chroots to the specified subdirectory and
  *				  re executes login.
  */
 

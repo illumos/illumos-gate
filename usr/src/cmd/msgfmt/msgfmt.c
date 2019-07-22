@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "sun_msgfmt.h"
 
 static void	read_psffm(char *);
@@ -294,7 +292,7 @@ read_psffm(char *file)
 		 * Process MSGID Tokens.
 		 */
 		token_found = (wcsncmp(MSGID_TOKEN, linebufptr,
-				MSGID_LEN) == 0) ? 1 : 0;
+		    MSGID_LEN) == 0) ? 1 : 0;
 
 		if (token_found || (quotefound && inmsgid)) {
 
@@ -329,7 +327,7 @@ read_psffm(char *file)
 				msgid_linenum = linenum;
 				p = linebufptr;
 				linebufptr = consume_whitespace(
-					linebufptr + MSGID_LEN);
+				    linebufptr + MSGID_LEN);
 				ln_size -= linebufptr - p;
 				bufptr = gmsgid;
 				bufptr_index = 0;
@@ -345,7 +343,7 @@ read_psffm(char *file)
 		 * Process MSGSTR Tokens.
 		 */
 		token_found = (wcsncmp(MSGSTR_TOKEN, linebufptr,
-			MSGSTR_LEN) == 0) ? 1 : 0;
+		    MSGSTR_LEN) == 0) ? 1 : 0;
 		if (token_found || (quotefound && inmsgstr)) {
 
 			if (token_found) {
@@ -374,7 +372,7 @@ read_psffm(char *file)
 				msgstr_linenum = linenum;
 				p = linebufptr;
 				linebufptr = consume_whitespace(
-					linebufptr + MSGSTR_LEN);
+				    linebufptr + MSGSTR_LEN);
 				ln_size -= linebufptr - p;
 				bufptr = gmsgstr;
 				bufptr_index = 0;
@@ -392,7 +390,7 @@ read_psffm(char *file)
 		 * if msgstr was processed last time.
 		 */
 		token_found = (wcsncmp(DOMAIN_TOKEN, linebufptr,
-			DOMAIN_LEN) == 0) ? 1 : 0;
+		    DOMAIN_LEN) == 0) ? 1 : 0;
 		if ((token_found) || (quotefound && indomain)) {
 			if (token_found) {
 				if (!CK_NXT_CH(linebufptr, DOMAIN_LEN+1)) {
@@ -423,9 +421,9 @@ read_psffm(char *file)
 			} else {
 				p = linebufptr;
 				linebufptr = consume_whitespace(
-					linebufptr + DOMAIN_LEN);
+				    linebufptr + DOMAIN_LEN);
 				(void) memset(gcurrent_domain, 0,
-						sizeof (gcurrent_domain));
+				    sizeof (gcurrent_domain));
 				ln_size -= linebufptr - p;
 				bufptr = gcurrent_domain;
 				bufptr_index = 0;
@@ -463,14 +461,14 @@ load_buffer:
 		if (bufptr == gmsgid) {
 			if (gmsgid_size < (bufptr_index + ll)) {
 				gmsgid = (char *)Xrealloc(gmsgid,
-					bufptr_index + ll);
+				    bufptr_index + ll);
 				bufptr = gmsgid;
 				gmsgid_size = bufptr_index + ll;
 			}
 		} else if (bufptr == gmsgstr) {
 			if (gmsgstr_size < (bufptr_index + ll)) {
 				gmsgstr = (char *)Xrealloc(gmsgstr,
-					bufptr_index + ll);
+				    bufptr_index + ll);
 				bufptr = gmsgstr;
 				gmsgstr_size = bufptr_index + ll;
 			}
@@ -489,7 +487,7 @@ warning(gettext(WARN_MISSING_QUOTE_AT_EOL), linenum);
 				break;
 
 			case L'\\':
-				if ((mb = expand_meta(&linebufptr)) != NULL)
+				if ((mb = expand_meta(&linebufptr)) != '\0')
 					bufptr[bufptr_index++] = mb;
 				break;
 
@@ -505,7 +503,7 @@ warning(gettext(WARN_MISSING_QUOTE_AT_EOL), linenum);
 				linebufptr = consume_whitespace(linebufptr);
 				if (*linebufptr != L'\n') {
 					warning(gettext(WARN_INVALID_STRING),
-						linenum);
+					    linenum);
 				}
 				break;
 			}
@@ -626,7 +624,7 @@ expand_meta(wchar_t **buf)
 		}
 		return (n);
 	default:
-		return (NULL);
+		return ('\0');
 	}
 } /* expand_meta */
 
@@ -642,8 +640,8 @@ sortit(char *msgid, char *msgstr)
 
 #ifdef DEBUG
 	(void) fprintf(stderr,
-		"==> sortit(), domain=<%s> msgid=<%s> msgstr=<%s>\n",
-		gcurrent_domain, msgid, msgstr);
+	    "==> sortit(), domain=<%s> msgid=<%s> msgstr=<%s>\n",
+	    gcurrent_domain, msgid, msgstr);
 #endif
 
 	/*
@@ -666,7 +664,7 @@ sortit(char *msgid, char *msgstr)
  */
 static void
 insert_message(struct domain_struct *dom,
-	char *msgid, char *msgstr)
+    char *msgid, char *msgstr)
 {
 	struct msg_chain	*p1;
 	struct msg_chain	*node, *prev_node;
@@ -684,7 +682,7 @@ insert_message(struct domain_struct *dom,
 		if (b == 0) {
 			if (verbose)
 				warning(gettext(WARN_DUP_MSG),
-					msgid, msgid_linenum);
+				    msgid, msgid_linenum);
 			return;
 		} else if (b > 0) { /* to implement descending order */
 			p1 = dom->first_elem;
@@ -705,7 +703,7 @@ insert_message(struct domain_struct *dom,
 		if (b == 0) {
 			if (verbose)
 				warning(gettext(WARN_DUP_MSG),
-					msgid, msgid_linenum);
+				    msgid, msgid_linenum);
 			return;
 		} else if (b < 0) {  /* to implement descending order */
 			/* move to the next node */
@@ -714,7 +712,7 @@ insert_message(struct domain_struct *dom,
 		} else {
 			/* insert a new msg node */
 			node = (struct msg_chain *)
-				Xmalloc(sizeof (struct msg_chain));
+			    Xmalloc(sizeof (struct msg_chain));
 			node->next = p1;
 			node->msgid  = Xstrdup(msgid);
 			node->msgstr = Xstrdup(msgstr);
@@ -735,7 +733,7 @@ insert_message(struct domain_struct *dom,
 	 * Therefore, append it.
 	 */
 	node = (struct msg_chain *)
-		Xmalloc(sizeof (struct msg_chain));
+	    Xmalloc(sizeof (struct msg_chain));
 	node->next = NULL;
 	node->msgid  = Xstrdup(msgid);
 	node->msgstr = Xstrdup(msgstr);
@@ -795,7 +793,7 @@ find_domain_node(char *domain_name)
 		} else {
 			/* insert a new domain node */
 			node = (struct domain_struct *)
-				Xmalloc(sizeof (struct domain_struct));
+			    Xmalloc(sizeof (struct domain_struct));
 			node->next = p1;
 			node->domain = Xstrdup(domain_name);
 			node->first_elem = NULL;
@@ -817,7 +815,7 @@ find_domain_node(char *domain_name)
 	 * list is empty.
 	 */
 	node = (struct domain_struct *)
-		Xmalloc(sizeof (struct domain_struct));
+	    Xmalloc(sizeof (struct domain_struct));
 	node->next = NULL;
 	node->domain = Xstrdup(domain_name);
 	node->first_elem = NULL;
@@ -864,7 +862,7 @@ binary_compute(int i, int j, int *more, int *less)
 static void
 output_all_mo_files(void)
 {
-	struct domain_struct 	*p;
+	struct domain_struct	*p;
 
 	p = first_domain;
 	while (p) {
@@ -943,8 +941,8 @@ output_one_mo_file(struct domain_struct *dom)
 		int i;
 		for (i = 0; i < message_count; i++) {
 			(void) fprintf(stderr,
-				"  less[%2d]=%2d, more[%2d]=%2d\n",
-				i, less[i], i, more[i]);
+			    "  less[%2d]=%2d, more[%2d]=%2d\n",
+			    i, less[i], i, more[i]);
 		}
 	}
 #endif
@@ -1068,7 +1066,7 @@ _mbsntowcs(wchar_t **bufhead, char **mbuf, size_t *fsize)
 				 */
 				ttbufsize = tbufsize + 2;
 				th = (wchar_t *)Xrealloc(th,
-					sizeof (wchar_t) * ttbufsize);
+				    sizeof (wchar_t) * ttbufsize);
 				tp = th + tbufsize - nc;
 				tbufsize = ttbufsize;
 			}
@@ -1083,7 +1081,7 @@ _mbsntowcs(wchar_t **bufhead, char **mbuf, size_t *fsize)
 		if (nc == 0) {
 			ttbufsize = tbufsize + LINE_SIZE;
 			th = (wchar_t *)Xrealloc(th,
-				sizeof (wchar_t) * ttbufsize);
+			    sizeof (wchar_t) * ttbufsize);
 			tp = th + tbufsize;
 			nc = LINE_SIZE;
 			tbufsize = ttbufsize;
@@ -1107,7 +1105,7 @@ _mbsntowcs(wchar_t **bufhead, char **mbuf, size_t *fsize)
 		 */
 		ttbufsize = tbufsize + 2;
 		th = (wchar_t *)Xrealloc(th,
-			sizeof (wchar_t) * ttbufsize);
+		    sizeof (wchar_t) * ttbufsize);
 		tp = th + tbufsize - nc;
 		tbufsize = ttbufsize;
 	}
@@ -1136,7 +1134,7 @@ printlist(void)
 		m = p->first_elem;
 		while (m) {
 			(void) fprintf(stderr, "   msgid=<%s>, msgstr=<%s>\n",
-					m->msgid, m->msgstr);
+			    m->msgid, m->msgstr);
 			m = m->next;
 		}
 		p = p->next;

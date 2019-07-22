@@ -20,14 +20,13 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 1.	*/
 #include "mail.h"
 /*
  * isheader(lp, ctf) - check if lp is header line and return type
- *	lp	-> 	pointer to line
+ *	lp	->	pointer to line
  *	ctfp	->	continuation flag (should be FALSE the first time
  *			isheader() is called on a message.  isheader() sets
  *			it for the remaining calls to that message)
@@ -36,24 +35,22 @@
  *	H_*     ->	type of header line found.
  */
 int
-isheader(lp, ctfp)
-char	*lp;
-int	*ctfp;
+isheader(char *lp, int *ctfp)
 {
-	register char	*p, *q;
-	register int	i;
+	char	*p, *q;
+	int	i;
 
 	p = lp;
-	while((*p) && (*p != '\n') && (isspace(*p))) {
+	while ((*p) && (*p != '\n') && (isspace(*p))) {
 		p++;
 	}
-	if((*p == NULL) || (*p == '\n')) {
+	if ((*p == '\0') || (*p == '\n')) {
 		/* blank line */
 		return (FALSE);
 	}
 
 	if ((*ctfp) && ((*lp == ' ') || (*lp == '\t'))) {
-		return(H_CONT);
+		return (H_CONT);
 	}
 
 	*ctfp = FALSE;
@@ -78,15 +75,15 @@ int	*ctfp;
 	}
 	/*
 	 * Check if name: value pair
- 	 */
-	if ((p = strpbrk(lp, ":")) != NULL ) {
-		for(q = lp; q < p; q++)  {
+	 */
+	if ((p = strpbrk(lp, ":")) != NULL) {
+		for (q = lp; q < p; q++)  {
 			if ((*q == ' ') || (!isprint(*q)))  {
-				return(FALSE);
+				return (FALSE);
 			}
 		}
 		*ctfp = TRUE;
-		return(H_NAMEVALUE);
+		return (H_NAMEVALUE);
 	}
-	return(FALSE);
+	return (FALSE);
 }
