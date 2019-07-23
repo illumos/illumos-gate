@@ -58,7 +58,7 @@
 
 /* Set this tunable to TRUE to replace corrupt data with 0x2f5baddb10c */
 int zfs_send_corrupt_data = B_FALSE;
-int zfs_send_queue_length = 16 * 1024 * 1024;
+int zfs_send_queue_length = SPA_MAXBLOCKSIZE;
 /* Set this tunable to FALSE to disable setting of DRR_FLAG_FREERECORDS */
 int zfs_send_set_freerecords_bit = B_TRUE;
 /* Set this tunable to FALSE is disable sending unmodified spill blocks. */
@@ -1143,7 +1143,8 @@ dmu_send_impl(void *tag, dsl_pool_t *dp, dsl_dataset_t *to_ds,
 		goto out;
 	}
 
-	err = bqueue_init(&to_arg.q, zfs_send_queue_length,
+	err = bqueue_init(&to_arg.q,
+	    MAX(zfs_send_queue_length, 2 * zfs_max_recordsize),
 	    offsetof(struct send_block_record, ln));
 	to_arg.error_code = 0;
 	to_arg.cancel = B_FALSE;
@@ -1295,7 +1296,6 @@ dmu_send(const char *tosnap, const char *fromsnap, boolean_t embedok,
 	err = dsl_pool_hold(tosnap, FTAG, &dp);
 	if (err != 0)
 		return (err);
-
 	if (strchr(tosnap, '@') == NULL && spa_writeable(dp->dp_spa)) {
 		/*
 		 * We are sending a filesystem or volume.  Ensure

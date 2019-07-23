@@ -38,6 +38,12 @@
 
 $mapfile_version 2
 
+SYMBOL_VERSION ILLUMOS_0.6 {
+	global:
+
+	lzc_receive_with_cmdprops;
+} ILLUMOS_0.5;
+
 SYMBOL_VERSION ILLUMOS_0.5 {
 	global:
 

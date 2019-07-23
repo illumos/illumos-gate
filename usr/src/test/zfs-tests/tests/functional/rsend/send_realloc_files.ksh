@@ -20,8 +20,8 @@
 
 #
 # Description:
-# Verify encrypted raw incremental receives handle dnode reallocation.
-
+# Verify incremental receive properly handles reallocation.
+#
 # Strategy:
 # 1. Create a pool containing an encrypted filesystem.
 # 2. Use 'zfs send -wp' to perform a raw send of the initial filesystem.
@@ -35,31 +35,22 @@
 #   e) Destroy the incremental stream and old snapshot.
 #
 
-verify_runnable "both"
-
-log_assert "Verify encrypted raw incremental receive handles reallocation"
+log_assert "Verify incremental receive handles reallocation"
 
 function cleanup
 {
 	rm -f $BACKDIR/fs@*
-	rm -f $keyfile
 	destroy_dataset $POOL/fs "-rR"
 	destroy_dataset $POOL/newfs "-rR"
 }
 
 log_onexit cleanup
 
-typeset keyfile=/$TESTPOOL/pkey
-
-# Create an encrypted dataset
-log_must eval "echo 'password' > $keyfile"
-log_must zfs create -o encryption=on -o keyformat=passphrase \
-    -o keylocation=file://$keyfile $POOL/fs
+log_must zfs create $POOL/fs
 
 last_snap=1
 log_must zfs snapshot $POOL/fs@snap${last_snap}
-log_must eval "zfs send -wp $POOL/fs@snap${last_snap} \
-    >$BACKDIR/fs@snap${last_snap}"
+log_must eval "zfs send $POOL/fs@snap${last_snap} >$BACKDIR/fs@snap${last_snap}"
 log_must eval "zfs recv $POOL/newfs < $BACKDIR/fs@snap${last_snap}"
 
 # Set atime=off to prevent the recursive_cksum from modifying newfs.
@@ -75,27 +66,18 @@ for i in {1..5}; do
 
 	# Churn the filesystem in such a way that we're likely to be both
 	# allocating and reallocating objects in the incremental stream.
-	#
-	# Disable xattrs until the following spill block issue is resolved:
-	# https://github.com/openzfs/openzfs/pull/705
-	#
 	log_must churn_files 1000 524288 $POOL/fs 0
 	expected_cksum=$(recursive_cksum /$fs)
 
 	# Create a snapshot and use it to send an incremental stream.
 	this_snap=$((last_snap + 1))
 	log_must zfs snapshot $POOL/fs@snap${this_snap}
-	log_must eval "zfs send -wp -i $POOL/fs@snap${last_snap} \
+	log_must eval "zfs send -i $POOL/fs@snap${last_snap} \
 	    $POOL/fs@snap${this_snap} > $BACKDIR/fs@snap${this_snap}"
 
 	# Receive the incremental stream and verify the received contents.
-	log_must eval "zfs recv -Fu $POOL/newfs < $BACKDIR/fs@snap${this_snap}"
-
-	log_must zfs load-key $POOL/newfs
-	log_must zfs mount $POOL/newfs
+	log_must eval "zfs recv $POOL/newfs < $BACKDIR/fs@snap${this_snap}"
 	actual_cksum=$(recursive_cksum /$POOL/newfs)
-	log_must zfs umount $POOL/newfs
-	log_must zfs unload-key $POOL/newfs
 
 	if [[ "$expected_cksum" != "$actual_cksum" ]]; then
 		log_fail "Checksums differ ($expected_cksum != $actual_cksum)"
@@ -108,4 +90,4 @@ for i in {1..5}; do
 	last_snap=$this_snap
 done
 
-log_pass "Verify encrypted raw incremental receive handles reallocation"
+log_pass "Verify incremental receive handles dnode reallocation"

@@ -46,7 +46,7 @@ function cleanup
 
 log_onexit cleanup
 
-log_assert "ZFS should receive encrypted filesystems into child dataset"
+log_assert "ZFS should receive to an encrypted child dataset"
 
 typeset passphrase="password"
 typeset snap="$TESTPOOL/$TESTFS@snap"
@@ -57,21 +57,14 @@ log_must zfs snapshot $snap
 log_must eval "echo $passphrase | zfs create -o encryption=on" \
 	"-o keyformat=passphrase $TESTPOOL/$TESTFS1"
 
-# XXX - on illumos we're currently conflicting on mount prop
-log_must zfs set mountpoint=none $TESTPOOL/$TESTFS
-
 log_note "Verifying ZFS will receive to an encrypted child"
 log_must eval "zfs send $snap | zfs receive $TESTPOOL/$TESTFS1/c1"
 
-log_note "Verifying 'send -p' will receive to an encrypted child"
-log_must eval "zfs send -p $snap | zfs receive $TESTPOOL/$TESTFS1/c2"
-# XXX - on illumos, not sending encryption prop yet
-# log_must test "$(get_prop 'encryption' $TESTPOOL/$TESTFS1/c2)" == "off"
+log_note "Verifying 'send -p' will not receive to an encrypted child"
+log_mustnot eval "zfs send -p $snap | zfs receive $TESTPOOL/$TESTFS1/c2"
 
-log_note "Verifying 'send -R' will receive to an encrypted child"
-log_must eval "zfs send -R $snap | zfs receive $TESTPOOL/$TESTFS1/c3"
-# XXX - on illumos, not sending encryption prop yet
-# log_must test "$(get_prop 'encryption' $TESTPOOL/$TESTFS1/c3)" == "off"
+log_note "Verifying 'send -R' will not receive to an encrypted child"
+log_mustnot eval "zfs send -R $snap | zfs receive $TESTPOOL/$TESTFS1/c3"
 
 log_note "Verifying ZFS will not receive to an encrypted child when the" \
 	"parent key is unloaded"
@@ -79,4 +72,4 @@ log_must zfs unmount $TESTPOOL/$TESTFS1
 log_must zfs unload-key $TESTPOOL/$TESTFS1
 log_mustnot eval "zfs send $snap | zfs receive $TESTPOOL/$TESTFS1/c4"
 
-log_pass "ZFS can receive encrypted filesystems into child dataset"
+log_pass "ZFS can receive to an encrypted child dataset"
