@@ -989,7 +989,7 @@ topo_mod_create_ufm_slot(topo_mod_t *mod, tnode_t *ufmnode,
 	if (slotinfo == NULL || slotinfo->usi_version == NULL ||
 	    slotinfo->usi_mode == 0) {
 		topo_mod_dprintf(mod, "invalid slot info");
-		topo_mod_seterrno(mod, ETOPO_MOD_INVAL);
+		(void) topo_mod_seterrno(mod, ETOPO_MOD_INVAL);
 		return (NULL);
 	}
 	if ((auth = topo_mod_auth(mod, ufmnode)) == NULL) {
