@@ -659,7 +659,7 @@ drop:
 static void
 dls_link_notify(void *arg, mac_notify_type_t type)
 {
-	dls_link_t 	*dlp = arg;
+	dls_link_t	*dlp = arg;
 	dls_dl_handle_t	dhp;
 	nvlist_t	*nvp;
 	sysevent_t	*event;

@@ -210,7 +210,7 @@ error:
 	 * Release profile, which will subsequently flush new profile to file.
 	 * If this fails then at least free profile memory.
 	 */
-	if ((code =  __profile_release(profile)) != NULL)
+	if ((code =  __profile_release(profile)) != 0)
 		__profile_abandon(profile);
 
 	return (code);

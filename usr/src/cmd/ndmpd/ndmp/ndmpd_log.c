@@ -11,10 +11,10 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 	- Redistributions of source code must retain the above copyright
+ *	- Redistributions of source code must retain the above copyright
  *	  notice, this list of conditions and the following disclaimer.
  *
- * 	- Redistributions in binary form must reproduce the above copyright
+ *	- Redistributions in binary form must reproduce the above copyright
  *	  notice, this list of conditions and the following disclaimer in
  *	  the documentation and/or other materials provided with the
  *	  distribution.
@@ -209,7 +209,7 @@ ndmp_log_open_file(boolean_t to_stderr, boolean_t override_debug)
 
 	/* Create the debug path if it doesn't exist */
 	lpath = ndmpd_get_prop(NDMP_DEBUG_PATH);
-	if ((lpath == NULL) || (*lpath == NULL))
+	if ((lpath == NULL) || (*lpath == '\0'))
 		lpath = LOG_PATH;
 
 	if (stat64(lpath, &st) < 0) {

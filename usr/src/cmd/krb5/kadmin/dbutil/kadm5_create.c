@@ -306,7 +306,7 @@ static int add_admin_princ(void *handle, krb5_context context,
 	  krb5_int32 normalsalttype;
 
 	  ret = krb5_get_permitted_enctypes(context, &enctype);
-	  if (ret || *enctype == NULL) {
+	  if (ret || *enctype == 0) {
 	       com_err(progname, ret,
 		   gettext("while getting list of permitted encryption types"));
 	       krb5_free_principal(context, ent.principal);

@@ -1163,8 +1163,8 @@ dls_devnet_hold_tmp_by_link(dls_link_t *dlp, dls_dl_handle_t *ddhp)
 	}
 
 	mutex_enter(&ddp->dd_mutex);
-	VERIFY(ddp->dd_ref > 0);
-	if (DD_NOT_VISIBLE(ddp->dd_flags)) {
+	ASSERT(ddp->dd_ref > 0);
+	if (ddp->dd_flags & DD_CONDEMNED) {
 		mutex_exit(&ddp->dd_mutex);
 		rw_exit(&i_dls_devnet_lock);
 		return (ENOENT);

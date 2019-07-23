@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2019 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBSYSEVENT 3LIB "Jan 21, 2014"
+.TH LIBSYSEVENT 3LIB "July 15, 2019"
 .SH NAME
 libsysevent \- system event interface library
 .SH SYNOPSIS
@@ -14,7 +15,6 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-lsysevent\fR [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Functions in this library extract specific identifier, publisher, and attribute
 information from a system event (sysevent) handle, defined as \fBsysevent_t\fR,
@@ -23,8 +23,12 @@ delivery to the system event daemon, \fBsyseventd\fR(1M).
 .sp
 .LP
 The \fBlibsysevent\fR interfaces do not work at all in non-global zones.
-.SH INTERFACES
 .sp
+.LP
+For a list of events, please see \fBsysevents\fR(3SYSEVENT). The actual
+events and their payload, unlike the library interfaces, are considered
+private to the system and subject to change at any time.
+.SH INTERFACES
 .LP
 The shared object \fBlibsysevent.so.1\fR provides the public interfaces defined
 below. See \fBIntro\fR(3) for additional information on shared object
@@ -42,11 +46,10 @@ l l .
 \fBsysevent_get_subclass_name\fR	\fBsysevent_get_time\fR
 \fBsysevent_get_vendor_name\fR	\fBsysevent_post_event\fR
 \fBsysevent_subscribe_event\fR	\fBsysevent_unbind_handle\fR
-\fBsysevent_unsubscribe_event\fR	
+\fBsysevent_unsubscribe_event\fR
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/libsysevent.so.1\fR \fR
@@ -67,7 +70,6 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -85,6 +87,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsyseventd\fR(1M), \fBIntro\fR(3), \fBattributes\fR(5)

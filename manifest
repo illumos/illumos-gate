@@ -18095,6 +18095,7 @@ f usr/share/man/man3sysevent/sysevent_post_event.3sysevent 0444 root bin
 f usr/share/man/man3sysevent/sysevent_subscribe_event.3sysevent 0444 root bin
 s usr/share/man/man3sysevent/sysevent_unbind_handle.3sysevent=sysevent_bind_handle.3sysevent
 s usr/share/man/man3sysevent/sysevent_unsubscribe_event.3sysevent=sysevent_subscribe_event.3sysevent
+f usr/share/man/man3sysevent/sysevents.3sysevent 0444 root bin
 d usr/share/man/man3tecla 0755 root bin
 s usr/share/man/man3tecla/cfc_file_start.3tecla=cpl_complete_word.3tecla
 s usr/share/man/man3tecla/cfc_literal_escapes.3tecla=cpl_complete_word.3tecla

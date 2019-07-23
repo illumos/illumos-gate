@@ -168,7 +168,7 @@ void kdb5_create(argc, argv)
     krb5_data pwd, seed;
     kdb_log_context *log_ctx;
     krb5_keyblock mkey;
-    krb5_data master_salt = { 0, NULL };
+    krb5_data master_salt = { 0 };
 	
     /* Solaris Kerberos */
     (void) memset(&mkey, 0, sizeof (mkey));
