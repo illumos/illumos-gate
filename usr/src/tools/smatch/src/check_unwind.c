@@ -194,21 +194,21 @@ void check_unwind(int id)
 	add_function_hook("release_resource", &match_release, INT_PTR(0));
 	release_function_indicator("release_resource");
 
-	return_implies_state("__request_region", valid_ptr_min, valid_ptr_max, &request_granted, INT_PTR(1));
+	return_implies_state_sval("__request_region", valid_ptr_min_sval, valid_ptr_max_sval, &request_granted, INT_PTR(1));
 	return_implies_state("__request_region", 0, 0, &request_denied, INT_PTR(1));
 	add_function_hook("__release_region", &match_release, INT_PTR(1));
 	release_function_indicator("__release_region");
 
-	return_implies_state("ioremap", valid_ptr_min, valid_ptr_max, &request_granted, INT_PTR(-1));
+	return_implies_state_sval("ioremap", valid_ptr_min_sval, valid_ptr_max_sval, &request_granted, INT_PTR(-1));
 	return_implies_state("ioremap", 0, 0, &request_denied, INT_PTR(-1));
 	add_function_hook("iounmap", &match_release, INT_PTR(0));
 
-	return_implies_state("pci_iomap", valid_ptr_min, valid_ptr_max, &request_granted, INT_PTR(-1));
+	return_implies_state_sval("pci_iomap", valid_ptr_min_sval, valid_ptr_max_sval, &request_granted, INT_PTR(-1));
 	return_implies_state("pci_iomap", 0, 0, &request_denied, INT_PTR(-1));
 	add_function_hook("pci_iounmap", &match_release, INT_PTR(1));
 	release_function_indicator("pci_iounmap");
 
-	return_implies_state("__create_workqueue_key", valid_ptr_min, valid_ptr_max, &request_granted,
+	return_implies_state_sval("__create_workqueue_key", valid_ptr_min_sval, valid_ptr_max_sval, &request_granted,
 			INT_PTR(-1));
 	return_implies_state("__create_workqueue_key", 0, 0, &request_denied, INT_PTR(-1));
 	add_function_hook("destroy_workqueue", &match_release, INT_PTR(0));
@@ -227,7 +227,6 @@ void check_unwind(int id)
 	return_implies_state("misc_register", -MAX_ERRNO, -1, &request_denied, INT_PTR(0));
 	add_function_hook("misc_deregister", &match_release, INT_PTR(0));
 	release_function_indicator("misc_deregister");
-
 
 	add_hook(&match_return, RETURN_HOOK);
 }

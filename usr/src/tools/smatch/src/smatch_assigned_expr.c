@@ -28,8 +28,12 @@ int check_assigned_expr_id;
 static int my_id;
 static int link_id;
 
+static struct expression *skip_mod;
+
 static void undef(struct sm_state *sm, struct expression *mod_expr)
 {
+	if (mod_expr == skip_mod)
+		return;
 	set_state(my_id, sm->name, sm->sym, &undefined);
 }
 
@@ -55,6 +59,7 @@ struct expression *get_assigned_expr_name_sym(const char *name, struct symbol *s
 
 static void match_assignment(struct expression *expr)
 {
+	static struct expression *ignored_expr;
 	struct symbol *left_sym, *right_sym;
 	char *left_name = NULL;
 	char *right_name = NULL;
@@ -71,6 +76,12 @@ static void match_assignment(struct expression *expr)
 		if (is_whole_rl(rl))
 			return;
 	}
+
+	if (expr->left == ignored_expr)
+		return;
+	ignored_expr = NULL;
+	if (__in_fake_parameter_assign)
+		ignored_expr = expr->left;
 
 	left_name = expr_to_var_sym(expr->left, &left_sym);
 	if (!left_name || !left_sym)
@@ -118,6 +129,7 @@ static void record_param_assignment(struct expression *expr, int param, char *ke
 	if (!name || !sym)
 		goto free;
 
+	skip_mod = expr;
 	set_state(my_id, name, sym, alloc_state_expr(right));
 free:
 	free_string(name);
@@ -126,6 +138,7 @@ free:
 void register_assigned_expr(int id)
 {
 	my_id = check_assigned_expr_id = id;
+	set_dynamic_states(check_assigned_expr_id);
 	add_hook(&match_assignment, ASSIGNMENT_HOOK_AFTER);
 	add_modification_hook(my_id, &undef);
 	select_return_states_hook(PARAM_SET, &record_param_assignment);
@@ -134,6 +147,7 @@ void register_assigned_expr(int id)
 void register_assigned_expr_links(int id)
 {
 	link_id = id;
+	set_dynamic_states(link_id);
 	db_ignore_states(link_id);
 	set_up_link_functions(my_id, link_id);
 }

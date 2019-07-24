@@ -1,8 +1,13 @@
 /* These are "too hairy" for smatch. */
+ECDSA_VerifyDigest
 dtrace_disx86
 elf32exec
 elfexec
 iscsi_ioctl
 lm_idle_chk
+ld64_sym_validate
+luaV_settable
+nostore_generate_key_pair
+sadb_common_add
 segvn_fault_vnodepages
 tcp_input_data

@@ -196,6 +196,7 @@ char *get_constraint_str(struct expression *expr)
 {
 	char *name;
 
+	expr = strip_expr(expr);
 	if (!expr)
 		return NULL;
 	if (expr->type == EXPR_CALL)
@@ -341,9 +342,8 @@ free_data:
 struct string_list *saved_constraints;
 static void save_new_constraint(const char *con)
 {
-	if (list_has_string(saved_constraints, con))
+	if (!insert_string(&saved_constraints, con))
 		return;
-	insert_string(&saved_constraints, con);
 	sql_save_constraint(con);
 }
 
@@ -360,17 +360,10 @@ static void handle_comparison(struct expression *left, int op, struct expression
 	if (get_value(left, &sval) || get_value(right, &sval))
 		return;
 
-	if (local_debug)
-		sm_msg("COMPARE: %s %s %s", expr_to_str(left), show_special(op), expr_to_str(right));
-
 	constraint = get_constraint_str(right);
 	if (!constraint)
 		return;
-	if (local_debug)
-		sm_msg("EXPR: %s CONSTRAINT %s", expr_to_str(right), constraint);
 	constraint_id = constraint_str_to_id(constraint);
-	if (local_debug)
-		sm_msg("CONSTRAINT ID %d", constraint_id);
 	if (constraint_id < 0)
 		save_new_constraint(constraint);
 	free_string(constraint);
@@ -383,16 +376,10 @@ static void handle_comparison(struct expression *left, int op, struct expression
 	add_constraint(&constraints, remove_unsigned_from_comparison(op), constraint_id);
 	state = alloc_constraint_state(constraints);
 
-	if (op == orig_op) {
-		if (local_debug)
-			sm_msg("SETTING %s true %s", expr_to_str(left), state->name);
+	if (op == orig_op)
 		set_true_false_states_expr(my_id, left,	state, NULL);
-	} else {
-		if (local_debug)
-			sm_msg("SETTING %s false %s", expr_to_str(left), state->name);
-
+	else
 		set_true_false_states_expr(my_id, left, NULL, state);
-	}
 }
 
 static void match_condition(struct expression *expr)
@@ -529,6 +516,7 @@ void register_constraints(int id)
 {
 	my_id = id;
 
+	set_dynamic_states(my_id);
 	add_merge_hook(my_id, &merge_func);
 	add_hook(&match_condition, CONDITION_HOOK);
 

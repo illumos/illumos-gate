@@ -12,6 +12,7 @@
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2016 RackTop Systems.
+# Copyright 2019 Joyent, Inc.
 #
 
 MACHINE=	$(MACH)
@@ -22,6 +23,9 @@ SRCS=	time.c
 include ../Makefile.com
 
 CFLAGS +=	-m32
+
+# false positive only with a 64-bit smatch
+SMOFF += uninitialized
 
 CLEANFILES +=	machine x86
 

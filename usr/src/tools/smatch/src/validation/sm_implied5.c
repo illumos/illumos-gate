@@ -23,5 +23,6 @@ void func (void)
  *
  * check-output-start
 sm_implied5.c:18 func() error: potentially dereferencing uninitialized 'aa'.
+sm_implied5.c:18 func() error: potentially dereferencing uninitialized 'aa'.
  * check-output-end
  */

@@ -35,29 +35,12 @@ static void delete(struct sm_state *sm, struct expression *mod_expr)
 	set_state(my_used_id, sm->name, sm->sym, &undefined);
 }
 
-static int get_the_max(struct expression *expr, sval_t *sval)
-{
-	struct range_list *rl;
-
-	if (get_hard_max(expr, sval))
-		return 1;
-	if (!option_spammy)
-		return 0;
-	if (get_fuzzy_max(expr, sval))
-		return 1;
-	if (get_user_rl(expr, &rl)) {
-		*sval = rl_max(rl);
-		return 1;
-	}
-	return 0;
-}
-
 static void array_check(struct expression *expr)
 {
 	struct expression *array_expr;
 	int array_size;
 	struct expression *offset;
-	sval_t max;
+	struct range_list *rl;
 
 	expr = strip_expr(expr);
 	if (!is_array(expr))
@@ -69,13 +52,17 @@ static void array_check(struct expression *expr)
 		return;
 
 	offset = get_array_offset(expr);
-	if (!get_the_max(offset, &max)) {
-		if (getting_address())
-			return;
-		if (is_capped(offset))
-			return;
-		set_state_expr(my_used_id, offset, alloc_state_num(array_size));
-	}
+	get_absolute_rl(offset, &rl);
+	if (rl_max(rl).uvalue < array_size)
+		return;
+	if (buf_comparison_index_ok(expr))
+		return;
+
+	if (getting_address())
+		return;
+	if (is_capped(offset))
+		return;
+	set_state_expr(my_used_id, offset, alloc_state_num(array_size));
 }
 
 static void match_condition(struct expression *expr)
@@ -121,6 +108,7 @@ static void match_condition(struct expression *expr)
 void check_testing_index_after_use(int id)
 {
 	my_used_id = id;
+	set_dynamic_states(my_used_id);
 	add_hook(&array_check, OP_HOOK);
 	add_hook(&match_condition, CONDITION_HOOK);
 	add_modification_hook(my_used_id, &delete);

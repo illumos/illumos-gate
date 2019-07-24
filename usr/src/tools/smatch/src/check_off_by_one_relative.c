@@ -33,17 +33,21 @@ static void array_check(struct expression *expr)
 	struct expression *size;
 	struct expression *offset;
 	char *array_str, *offset_str;
+	int limit_type;
 
 	expr = strip_expr(expr);
 	if (!is_array(expr))
 		return;
 
 	array = get_array_base(expr);
-	size = get_size_variable(array);
-	if (!size)
+	size = get_size_variable(array, &limit_type);
+	if (!size || limit_type != ELEM_COUNT)
 		return;
 	offset = get_array_offset(expr);
 	if (!possible_comparison(size, SPECIAL_EQUAL, offset))
+		return;
+
+	if (buf_comparison_index_ok(expr))
 		return;
 
 	array_str = expr_to_str(array);
@@ -51,25 +55,6 @@ static void array_check(struct expression *expr)
 	sm_warning("potentially one past the end of array '%s[%s]'", array_str, offset_str);
 	free_string(array_str);
 	free_string(offset_str);
-}
-
-static int known_access_ok_comparison(struct expression *expr)
-{
-	struct expression *array;
-	struct expression *size;
-	struct expression *offset;
-	int comparison;
-
-	array = get_array_base(expr);
-	size = get_size_variable(array);
-	if (!size)
-		return 0;
-	offset = get_array_offset(expr);
-	comparison = get_comparison(size, offset);
-	if (comparison == '>' || comparison == SPECIAL_UNSIGNED_GT)
-		return 1;
-
-	return 0;
 }
 
 static int known_access_ok_numbers(struct expression *expr)
@@ -108,7 +93,7 @@ static void array_check_data_info(struct expression *expr)
 
 	if (known_access_ok_numbers(expr))
 		return;
-	if (known_access_ok_comparison(expr))
+	if (buf_comparison_index_ok(expr))
 		return;
 
 	array = get_array_base(expr);

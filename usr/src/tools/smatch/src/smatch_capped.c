@@ -42,7 +42,7 @@ static struct smatch_state *unmatched_state(struct sm_state *sm)
 {
 	struct smatch_state *state;
 
-	state = get_state(SMATCH_EXTRA, sm->name, sm->sym);
+	state = __get_state(SMATCH_EXTRA, sm->name, sm->sym);
 	if (state && !estate_is_whole(state))
 		return &capped;
 	return &uncapped;
@@ -68,6 +68,7 @@ static int is_capped_macro(struct expression *expr)
 
 int is_capped(struct expression *expr)
 {
+	struct symbol *type;
 	sval_t dummy;
 
 	expr = strip_expr(expr);
@@ -75,6 +76,14 @@ int is_capped(struct expression *expr)
 		expr = strip_expr(expr->unop);
 	}
 	if (!expr)
+		return 0;
+
+	type = get_type(expr);
+	if (is_ptr_type(type))
+		return 0;
+	if (type == &bool_ctype)
+		return 0;
+	if (type_bits(type) >= 0 && type_bits(type) <= 2)
 		return 0;
 
 	if (get_hard_max(expr, &dummy))
@@ -90,8 +99,8 @@ int is_capped(struct expression *expr)
 			return 1;
 		if (expr->op == SPECIAL_RIGHTSHIFT)
 			return 1;
-		if (expr->op == '%')
-			return is_capped(expr->right);
+		if (expr->op == '%' && is_capped(expr->right))
+			return 1;
 		if (!is_capped(expr->left))
 			return 0;
 		if (expr->op == '/')
@@ -131,13 +140,26 @@ void set_param_capped_data(const char *name, struct symbol *sym, char *key, char
 
 static void match_condition(struct expression *expr)
 {
+	struct expression *left, *right;
 	struct smatch_state *left_true = NULL;
 	struct smatch_state *left_false = NULL;
 	struct smatch_state *right_true = NULL;
 	struct smatch_state *right_false = NULL;
+	sval_t sval;
 
 
 	if (expr->type != EXPR_COMPARE)
+		return;
+
+	left = strip_expr(expr->left);
+	right = strip_expr(expr->right);
+
+	while (left->type == EXPR_ASSIGNMENT)
+		left = strip_expr(left->left);
+
+	/* If we're dealing with known expressions, that's for smatch_extra.c */
+	if (get_implied_value(left, &sval) ||
+	    get_implied_value(right, &sval))
 		return;
 
 	switch (expr->op) {
@@ -168,12 +190,22 @@ static void match_condition(struct expression *expr)
 		return;
 	}
 
-	set_true_false_states_expr(my_id, expr->left, left_true, left_false);
-	set_true_false_states_expr(my_id, expr->right, right_true, right_false);
+	set_true_false_states_expr(my_id, left, left_true, left_false);
+	set_true_false_states_expr(my_id, right, right_true, right_false);
 }
 
 static void match_assign(struct expression *expr)
 {
+	struct symbol *type;
+
+	type = get_type(expr);
+	if (is_ptr_type(type))
+		return;
+	if (type == &bool_ctype)
+		return;
+	if (type_bits(type) >= 0 && type_bits(type) <= 2)
+		return;
+
 	if (is_capped(expr->right)) {
 		set_state_expr(my_id, expr->left, &capped);
 	} else {
@@ -206,7 +238,7 @@ static void struct_member_callback(struct expression *call, int param, char *pri
 
 	if (sm->state != &capped)
 		return;
-	estate = get_state(SMATCH_EXTRA, sm->name, sm->sym);
+	estate = __get_state(SMATCH_EXTRA, sm->name, sm->sym);
 	if (estate_get_single_value(estate, &sval))
 		return;
 	sql_insert_caller_info(call, CAPPED_DATA, param, printed_name, "1");
@@ -235,12 +267,12 @@ static void print_return_implies_capped(int return_id, char *return_ranges, stru
 		if (param < 0)
 			continue;
 
-		estate = get_state(SMATCH_EXTRA, sm->name, sm->sym);
+		estate = __get_state(SMATCH_EXTRA, sm->name, sm->sym);
 		if (estate_get_single_value(estate, &sval))
 			continue;
 
 		orig = get_state_stree(get_start_states(), my_id, sm->name, sm->sym);
-		if (orig == &capped)
+		if (orig == &capped && !param_was_set_var_sym(sm->name, sm->sym))
 			continue;
 
 		param_name = get_param_name(sm);
@@ -254,7 +286,13 @@ static void print_return_implies_capped(int return_id, char *return_ranges, stru
 	FOR_EACH_MY_SM(my_id, __get_cur_stree(), sm) {
 		if (!ret_sym)
 			break;
+		if (sm->state != &capped)
+			continue;
 		if (ret_sym != sm->sym)
+			continue;
+
+		estate = __get_state(SMATCH_EXTRA, sm->name, sm->sym);
+		if (estate_get_single_value(estate, &sval))
 			continue;
 
 		param_name = state_name_to_param_name(sm->name, return_str);

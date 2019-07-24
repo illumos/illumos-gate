@@ -30,9 +30,12 @@ static struct smatch_state *alloc_my_state(struct expression *expr)
 	struct smatch_state *state;
 	char *name;
 
-	state = __alloc_smatch_state(0);
 	expr = strip_expr(expr);
 	name = expr_to_str(expr);
+	if (!name)
+		return NULL;
+
+	state = __alloc_smatch_state(0);
 	state->name = alloc_sname(name);
 	free_string(name);
 	state->data = expr;
@@ -160,6 +163,7 @@ void check_macro_side_effects(int id)
 	if (!option_spammy)
 		return;
 
+	set_dynamic_states(my_id);
 	add_hook(&match_unop, OP_HOOK);
 	add_hook(&match_stmt, STMT_HOOK);
 	register_ignored_macros();

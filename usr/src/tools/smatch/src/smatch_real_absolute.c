@@ -103,6 +103,9 @@ static void match_assign(struct expression *expr)
 	type = get_type(expr->left);
 	if (!type)
 		return;
+	if (type->type != SYM_PTR && type->type != SYM_BASETYPE &&
+	    type->type != SYM_ENUM)
+		return;
 
 	rl = cast_rl(type, rl);
 	if (is_whole_rl(rl) && !get_state_expr(my_id, expr->left))
@@ -128,6 +131,7 @@ void register_real_absolute(int id)
 {
 	my_id = id;
 
+	set_dynamic_states(my_id);
 	add_pre_merge_hook(my_id, &pre_merge_hook);
 	add_unmatched_state_hook(my_id, &empty_state);
 	add_merge_hook(my_id, &merge_estates);

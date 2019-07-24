@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 Joyent, Inc.
 #
 
 LIBRARY = libpctx.a
@@ -33,25 +33,20 @@ OBJECTS = libpctx.o
 # include library definitions
 include ../../Makefile.lib
 
-LIBS = $(DYNLIB) $(LINTLIB)
-$(LINTLIB) :=	SRCS = ../common/llib-lpctx
+LIBS = $(DYNLIB)
 LDLIBS +=	-lproc -lc
 
 SRCDIR =	../common
 
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS += 	-D_REENTRANT -I$(SRCDIR)
+CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR)
+
+# false positive: pctx_run() error: dereferencing freed memory 'pctx'
+SMOFF += free
 
 .KEEP_STATE:
 
 all: $(LIBS)
-
-# x86 and sparc have different alignment complaints (all LINTED).
-# Make lint shut up about suppression directive not used.
-lint := LINTFLAGS += -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-lint := LINTFLAGS64 += -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-
-lint: lintcheck
 
 # include library targets
 include ../../Makefile.targ

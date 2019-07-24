@@ -4,7 +4,7 @@ TMP_DIR=/tmp
 
 help()
 {
-    echo "Usage: $0 [--no-compile|--ammend] <filename>"
+    echo "Usage: $0 [--no-compile|--amend] <filename>"
     echo "You must be at the base of the kernel tree to run this."
     exit 1
 }
@@ -37,7 +37,7 @@ while true ; do
     if [[ "$1" == "--no-compile" ]] ; then
         NO_COMPILE=true
         shift
-    elif [[ "$1" == "--ammend" ]] ; then
+    elif [[ "$1" == "--amend" ]] ; then
         AMEND="--amend"
         shift
     else
@@ -53,7 +53,11 @@ fullname=$1
 filename=$(basename $fullname)
 oname=$(echo ${fullname/.c/.o})
 
-MAIL_FILE=$TMP_DIR/${filename}.msg
+MSG_FILE=$TMP_DIR/${filename}.msg
+MAIL_FILE=$TMP_DIR/${filename}.mail
+
+# heat up the disk cache
+#git log --oneline $fullname | head -n 10 > /dev/null &
 
 echo "QC checklist"
 qc "Have you handled all the errors properly?"
@@ -71,15 +75,29 @@ if [ "$NO_COMPILE" != "true" ] ; then
 #    make C=1 CHECK="scripts/coccicheck" $oname
 fi
 
-grepmail $fullname ~/var/mail/sent* | grep -i ^subject || echo -n ""
+for file in $(grep -l $fullname ~/var/mail/sent-*) ; do
+    grepmail $fullname $file | grep -i ^subject || echo -n ""
+done
 qc "Looks OK?"
 
-git log --oneline $fullname | head -n 10
-echo "Copy and paste one of these subjects?"
-read unused
-
 git add $fullname
-git commit --signoff $AMEND
+
+cat /dev/null > $MSG_FILE
+if [ "$AMEND" != "" ] ; then
+    git format-patch HEAD^ --stdout >> $MSG_FILE
+else
+    echo "" >> $MSG_FILE
+    echo "Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>" >> $MSG_FILE
+    echo "" >> $MSG_FILE
+    echo "# $sm_err" >> $MSG_FILE
+fi
+git log -10 --oneline $fullname | sed -e 's/^/# /' >> $MSG_FILE
+vim $MSG_FILE
+
+grep -v '^#' $MSG_FILE > $MSG_FILE.1
+mv $MSG_FILE.1 $MSG_FILE
+
+git commit $AMEND -F $MSG_FILE
 
 to_addr=$(./scripts/get_maintainer.pl -f --noroles --norolestats $fullname | head -n 1)
 cc_addr=$(./scripts/get_maintainer.pl -f --noroles --norolestats $fullname | tail -n +2 | \

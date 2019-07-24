@@ -26,27 +26,77 @@ __DO_ALLOCATOR(struct data_range, sizeof(struct data_range), __alignof__(struct 
 			 "permanent ranges", perm_data_range);
 __DECLARE_ALLOCATOR(struct ptr_list, rl_ptrlist);
 
+static bool is_err_ptr(sval_t sval)
+{
+	if (option_project != PROJ_KERNEL)
+		return false;
+	if (!type_is_ptr(sval.type))
+		return false;
+	if (sval.uvalue < -4095ULL)
+		return false;
+	return true;
+}
+
+static char *get_err_pointer_str(struct data_range *drange)
+{
+	static char buf[20];
+
+	/*
+	 * The kernel has error pointers where you do essentially:
+	 *
+	 * return (void *)(unsigned long)-12;
+	 *
+	 * But what I want here is to print -12 instead of the unsigned version
+	 * of that.
+	 *
+	 */
+	if (!is_err_ptr(drange->min))
+		return NULL;
+
+	if (drange->min.value == drange->max.value)
+		snprintf(buf, sizeof(buf), "(%lld)", drange->min.value);
+	else
+		snprintf(buf, sizeof(buf), "(%lld)-(%lld)", drange->min.value, drange->max.value);
+	return buf;
+}
+
 char *show_rl(struct range_list *list)
 {
+	struct data_range *prev_drange = NULL;
 	struct data_range *tmp;
-	char full[512];
+	char full[255];
+	char *p = full;
+	char *prev = full;
+	char *err_ptr;
+	int remain;
 	int i = 0;
 
 	full[0] = '\0';
-	full[sizeof(full) - 1] = '\0';
+
 	FOR_EACH_PTR(list, tmp) {
-		if (i++)
-			strncat(full, ",", 254 - strlen(full));
-		if (sval_cmp(tmp->min, tmp->max) == 0) {
-			strncat(full, sval_to_str(tmp->min), 254 - strlen(full));
-			continue;
+		remain = full + sizeof(full) - p;
+		if (remain < 48) {
+			snprintf(prev, full + sizeof(full) - prev, ",%s-%s",
+				 sval_to_str(prev_drange->min),
+				 sval_to_str(sval_type_max(prev_drange->min.type)));
+			break;
 		}
-		strncat(full, sval_to_str(tmp->min), 254 - strlen(full));
-		strncat(full, "-", 254 - strlen(full));
-		strncat(full, sval_to_str(tmp->max), 254 - strlen(full));
+		prev_drange = tmp;
+		prev = p;
+
+		err_ptr = get_err_pointer_str(tmp);
+		if (err_ptr) {
+			p += snprintf(p, remain, "%s%s", i++ ? "," : "", err_ptr);
+		} else if (sval_cmp(tmp->min, tmp->max) == 0) {
+			p += snprintf(p, remain, "%s%s", i++ ? "," : "",
+				      sval_to_str(tmp->min));
+		} else {
+			p += snprintf(p, remain, "%s%s-%s", i++ ? "," : "",
+				      sval_to_str(tmp->min),
+				      sval_to_str(tmp->max));
+		}
 	} END_FOR_EACH_PTR(tmp);
-	if (strlen(full) == sizeof(full) - 1)
-		full[sizeof(full) - 2] = '+';
+
 	return alloc_sname(full);
 }
 
@@ -79,6 +129,18 @@ static int sval_too_big(struct symbol *type, sval_t sval)
 	return 0;
 }
 
+static int truncates_nicely(struct symbol *type, sval_t min, sval_t max)
+{
+	unsigned long long mask;
+	int bits = type_bits(type);
+
+	if (bits >= type_bits(min.type))
+		return 0;
+
+	mask = -1ULL << bits;
+	return (min.uvalue & mask) == (max.uvalue & mask);
+}
+
 static void add_range_t(struct symbol *type, struct range_list **rl, sval_t min, sval_t max)
 {
 	/* If we're just adding a number, cast it and add it */
@@ -93,11 +155,16 @@ static void add_range_t(struct symbol *type, struct range_list **rl, sval_t min,
 		return;
 	}
 
+	if (truncates_nicely(type, min, max)) {
+		add_range(rl, sval_cast(type, min), sval_cast(type, max));
+		return;
+	}
+
 	/*
 	 * If the range we are adding has more bits than the range type then
 	 * add the whole range type.  Eg:
 	 * 0x8000000000000000 - 0xf000000000000000 -> cast to int
-	 * This isn't totally the right thing to do.  We could be more granular.
+	 *
 	 */
 	if (sval_too_big(type, min) || sval_too_big(type, max)) {
 		add_range(rl, sval_type_min(type), sval_type_max(type));
@@ -138,10 +205,10 @@ static void add_range_t(struct symbol *type, struct range_list **rl, sval_t min,
 
 static int str_to_comparison_arg_helper(const char *str,
 		struct expression *call, int *comparison,
-		struct expression **arg, char **endp)
+		struct expression **arg, const char **endp)
 {
 	int param;
-	char *c = (char *)str;
+	const char *c = str;
 
 	if (*c != '[')
 		return 0;
@@ -171,6 +238,8 @@ static int str_to_comparison_arg_helper(const char *str,
 		c++;
 		c++;
 		*comparison = SPECIAL_NOTEQUAL;
+	} else if (*c == '$') {
+		*comparison = SPECIAL_EQUAL;
 	} else {
 		return 0;
 	}
@@ -179,8 +248,8 @@ static int str_to_comparison_arg_helper(const char *str,
 		return 0;
 	c++;
 
-	param = strtoll(c, &c, 10);
-	if (*c == ']')
+	param = strtoll(c, (char **)&c, 10);
+	if (*c == ',' || *c == ']')
 		c++; /* skip the ']' character */
 	if (endp)
 		*endp = (char *)c;
@@ -218,7 +287,7 @@ int str_to_comparison_arg(const char *str, struct expression *call, int *compari
 	return str_to_comparison_arg_helper(str, call, comparison, arg, NULL);
 }
 
-static int get_val_from_key(int use_max, struct symbol *type, char *c, struct expression *call, char **endp, sval_t *sval)
+static int get_val_from_key(int use_max, struct symbol *type, const char *c, struct expression *call, const char **endp, sval_t *sval)
 {
 	struct expression *arg;
 	int comparison;
@@ -318,7 +387,7 @@ void filter_by_comparison(struct range_list **rl, int comparison, struct range_l
 	*rl = cast_rl(rl_type(*rl), ret_rl);
 }
 
-static struct range_list *filter_by_comparison_call(char *c, struct expression *call, char **endp, struct range_list *start_rl)
+static struct range_list *filter_by_comparison_call(const char *c, struct expression *call, const char **endp, struct range_list *start_rl)
 {
 	struct symbol *type;
 	struct expression *arg;
@@ -344,9 +413,9 @@ static struct range_list *filter_by_comparison_call(char *c, struct expression *
 	return cast_rl(rl_type(start_rl), casted_start);
 }
 
-static sval_t parse_val(int use_max, struct expression *call, struct symbol *type, char *c, char **endp)
+static sval_t parse_val(int use_max, struct expression *call, struct symbol *type, const char *c, const char **endp)
 {
-	char *start = c;
+	const char *start = c;
 	sval_t ret;
 
 	if (!strncmp(start, "max", 3)) {
@@ -398,17 +467,17 @@ static sval_t parse_val(int use_max, struct expression *call, struct symbol *typ
 		/* this parses [==p0] comparisons */
 		get_val_from_key(1, type, start, call, &c, &ret);
 	} else if (type_positive_bits(type) == 64) {
-		ret = sval_type_val(type, strtoull(start, &c, 0));
+		ret = sval_type_val(type, strtoull(start, (char **)&c, 0));
 	} else {
-		ret = sval_type_val(type, strtoll(start, &c, 0));
+		ret = sval_type_val(type, strtoll(start, (char **)&c, 0));
 	}
 	*endp = c;
 	return ret;
 }
 
-static char *jump_to_call_math(char *value)
+static const char *jump_to_call_math(const char *value)
 {
-	char *c = value;
+	const char *c = value;
 
 	while (*c && *c != '[')
 		c++;
@@ -422,12 +491,13 @@ static char *jump_to_call_math(char *value)
 	return c;
 }
 
-static void str_to_rl_helper(struct expression *call, struct symbol *type, char *str, char **endp, struct range_list **rl)
+static void str_to_rl_helper(struct expression *call, struct symbol *type, const char *str, const char **endp, struct range_list **rl)
 {
 	struct range_list *rl_tmp = NULL;
-	sval_t min, max;
-	char *c;
+	sval_t prev_min, min, max;
+	const char *c;
 
+	prev_min = sval_type_min(type);
 	min = sval_type_min(type);
 	max = sval_type_max(type);
 	c = str;
@@ -457,8 +527,12 @@ static void str_to_rl_helper(struct expression *call, struct symbol *type, char 
 			continue;
 		}
 		if (*c == '+') {
-			min = sval_type_max(type);
+			min = prev_min;
+			max = sval_type_max(type);
+			add_range_t(type, &rl_tmp, min, max);
 			c++;
+			if (*c == '[' || *c == '\0')
+				break;
 		}
 		if (*c != '-') {
 			sm_msg("debug XXX: trouble parsing %s c = %s", str, c);
@@ -472,8 +546,12 @@ static void str_to_rl_helper(struct expression *call, struct symbol *type, char 
 			max = sval_type_max(type);
 		if (*c == '+') {
 			max = sval_type_max(type);
+			add_range_t(type, &rl_tmp, min, max);
 			c++;
+			if (*c == '[' || *c == '\0')
+				break;
 		}
+		prev_min = max;
 		add_range_t(type, &rl_tmp, min, max);
 		if (*c == ')')
 			c++;
@@ -485,11 +563,11 @@ static void str_to_rl_helper(struct expression *call, struct symbol *type, char 
 	*endp = c;
 }
 
-static void str_to_dinfo(struct expression *call, struct symbol *type, char *value, struct data_info *dinfo)
+static void str_to_dinfo(struct expression *call, struct symbol *type, const char *value, struct data_info *dinfo)
 {
 	struct range_list *math_rl;
-	char *call_math;
-	char *c;
+	const char *call_math;
+	const char *c;
 	struct range_list *rl = NULL;
 
 	if (!type)
@@ -533,15 +611,35 @@ cast:
 	dinfo->value_ranges = rl;
 }
 
+static int rl_is_sane(struct range_list *rl)
+{
+	struct data_range *tmp;
+	struct symbol *type;
+
+	type = rl_type(rl);
+	FOR_EACH_PTR(rl, tmp) {
+		if (!sval_fits(type, tmp->min))
+			return 0;
+		if (!sval_fits(type, tmp->max))
+			return 0;
+		if (sval_cmp(tmp->min, tmp->max) > 0)
+			return 0;
+	} END_FOR_EACH_PTR(tmp);
+
+	return 1;
+}
+
 void str_to_rl(struct symbol *type, char *value, struct range_list **rl)
 {
 	struct data_info dinfo = {};
 
 	str_to_dinfo(NULL, type, value, &dinfo);
+	if (!rl_is_sane(dinfo.value_ranges))
+		dinfo.value_ranges = alloc_whole_rl(type);
 	*rl = dinfo.value_ranges;
 }
 
-void call_results_to_rl(struct expression *expr, struct symbol *type, char *value, struct range_list **rl)
+void call_results_to_rl(struct expression *expr, struct symbol *type, const char *value, struct range_list **rl)
 {
 	struct data_info dinfo = {};
 
@@ -558,6 +656,25 @@ int is_whole_rl(struct range_list *rl)
 	drange = first_ptr_list((struct ptr_list *)rl);
 	if (sval_is_min(drange->min) && sval_is_max(drange->max))
 		return 1;
+	return 0;
+}
+
+int is_unknown_ptr(struct range_list *rl)
+{
+	struct data_range *drange;
+	int cnt = 0;
+
+	if (is_whole_rl(rl))
+		return 1;
+
+	FOR_EACH_PTR(rl, drange) {
+		if (++cnt >= 3)
+			return 0;
+		if (sval_cmp(drange->min, valid_ptr_min_sval) == 0 &&
+		    sval_cmp(drange->max, valid_ptr_max_sval) == 0)
+			return 1;
+	} END_FOR_EACH_PTR(drange);
+
 	return 0;
 }
 
@@ -672,6 +789,55 @@ struct range_list *alloc_whole_rl(struct symbol *type)
 	return alloc_rl(sval_type_min(type), sval_type_max(type));
 }
 
+static bool collapse_pointer_rl(struct range_list **rl, sval_t min, sval_t max)
+{
+	struct range_list *new_rl = NULL;
+	struct data_range *tmp;
+	static bool recurse;
+	bool ret = false;
+	int cnt = 0;
+
+	/*
+	 * With the mtag work, then we end up getting huge lists of mtags.
+	 * That seems cool, but the problem is that we can only store about
+	 * 8-10 mtags in the DB before we truncate the list.  Also the mtags
+	 * aren't really used at all so it's a waste of resources for now...
+	 * In the future, we maybe will revisit this code.
+	 *
+	 */
+
+	if (recurse)
+		return false;
+	recurse = true;
+	if (!type_is_ptr(min.type))
+		goto out;
+
+	if (ptr_list_size((struct ptr_list *)*rl) < 8)
+		goto out;
+	FOR_EACH_PTR(*rl, tmp) {
+		if (!is_err_ptr(tmp->min))
+			cnt++;
+	} END_FOR_EACH_PTR(tmp);
+	if (cnt < 8)
+		goto out;
+
+	FOR_EACH_PTR(*rl, tmp) {
+		if (sval_cmp(tmp->min, valid_ptr_min_sval) >= 0 &&
+		    sval_cmp(tmp->max, valid_ptr_max_sval) <= 0)
+			add_range(&new_rl, valid_ptr_min_sval, valid_ptr_max_sval);
+		else
+			add_range(&new_rl, tmp->min, tmp->max);
+	} END_FOR_EACH_PTR(tmp);
+
+	add_range(&new_rl, min, max);
+
+	*rl = new_rl;
+	ret = true;
+out:
+	recurse = false;
+	return ret;
+}
+
 extern int rl_ptrlist_hack;
 void add_range(struct range_list **list, sval_t min, sval_t max)
 {
@@ -711,6 +877,9 @@ void add_range(struct range_list **list, sval_t min, sval_t max)
 		min = sval_type_min(min.type);
 		max = sval_type_max(min.type);
 	}
+
+	if (collapse_pointer_rl(list, min, max))
+		return;
 
 	/*
 	 * FIXME:  This has a problem merging a range_list like: min-0,3-max
@@ -1219,21 +1388,15 @@ struct range_list *rl_truncate_cast(struct symbol *type, struct range_list *rl)
 	return ret;
 }
 
-static int rl_is_sane(struct range_list *rl)
+int rl_fits_in_type(struct range_list *rl, struct symbol *type)
 {
-	struct data_range *tmp;
-	struct symbol *type;
-
-	type = rl_type(rl);
-	FOR_EACH_PTR(rl, tmp) {
-		if (!sval_fits(type, tmp->min))
-			return 0;
-		if (!sval_fits(type, tmp->max))
-			return 0;
-		if (sval_cmp(tmp->min, tmp->max) > 0)
-			return 0;
-	} END_FOR_EACH_PTR(tmp);
-
+	if (type_bits(rl_type(rl)) <= type_bits(type))
+		return 1;
+	if (sval_cmp(rl_max(rl), sval_type_max(type)) > 0)
+		return 0;
+	if (sval_is_negative(rl_min(rl)) &&
+	    sval_cmp(rl_min(rl), sval_type_min(type)) < 0)
+		return 0;
 	return 1;
 }
 
@@ -1310,36 +1473,6 @@ struct range_list *cast_rl(struct symbol *type, struct range_list *rl)
 	return ret;
 }
 
-struct range_list *rl_invert(struct range_list *orig)
-{
-	struct range_list *ret = NULL;
-	struct data_range *tmp;
-	sval_t gap_min, abs_max, sval;
-
-	if (!orig)
-		return NULL;
-	if (type_bits(rl_type(orig)) < 0)  /* void type mostly */
-		return NULL;
-
-	gap_min = sval_type_min(rl_min(orig).type);
-	abs_max = sval_type_max(rl_max(orig).type);
-
-	FOR_EACH_PTR(orig, tmp) {
-		if (sval_cmp(tmp->min, gap_min) > 0) {
-			sval = sval_type_val(tmp->min.type, tmp->min.value - 1);
-			add_range(&ret, gap_min, sval);
-		}
-		if (sval_cmp(tmp->max, abs_max) == 0)
-			return ret;
-		gap_min = sval_type_val(tmp->max.type, tmp->max.value + 1);
-	} END_FOR_EACH_PTR(tmp);
-
-	if (sval_cmp(gap_min, abs_max) <= 0)
-		add_range(&ret, gap_min, abs_max);
-
-	return ret;
-}
-
 struct range_list *rl_filter(struct range_list *rl, struct range_list *filter)
 {
 	struct data_range *tmp;
@@ -1351,22 +1484,64 @@ struct range_list *rl_filter(struct range_list *rl, struct range_list *filter)
 	return rl;
 }
 
+struct range_list *do_intersection(struct range_list *one_rl, struct range_list *two_rl)
+{
+	struct data_range *one, *two;
+	struct range_list *ret = NULL;
+
+
+	PREPARE_PTR_LIST(one_rl, one);
+	PREPARE_PTR_LIST(two_rl, two);
+
+	while (true) {
+		if (!one || !two)
+			break;
+		if (sval_cmp(one->max, two->min) < 0) {
+			NEXT_PTR_LIST(one);
+			continue;
+		}
+		if (sval_cmp(one->min, two->min) < 0 && sval_cmp(one->max, two->max) <= 0) {
+			add_range(&ret, two->min, one->max);
+			NEXT_PTR_LIST(one);
+			continue;
+		}
+		if (sval_cmp(one->min, two->min) >= 0 && sval_cmp(one->max, two->max) <= 0) {
+			add_range(&ret, one->min, one->max);
+			NEXT_PTR_LIST(one);
+			continue;
+		}
+		if (sval_cmp(one->min, two->min) < 0 && sval_cmp(one->max, two->max) > 0) {
+			add_range(&ret, two->min, two->max);
+			NEXT_PTR_LIST(two);
+			continue;
+		}
+		if (sval_cmp(one->min, two->max) <= 0 && sval_cmp(one->max, two->max) > 0) {
+			add_range(&ret, one->min, two->max);
+			NEXT_PTR_LIST(two);
+			continue;
+		}
+		if (sval_cmp(one->min, two->max) <= 0) {
+			sm_fatal("error calculating intersection of '%s' and '%s'", show_rl(one_rl), show_rl(two_rl));
+			return NULL;
+		}
+		NEXT_PTR_LIST(two);
+	}
+
+	FINISH_PTR_LIST(two);
+	FINISH_PTR_LIST(one);
+
+	return ret;
+}
+
 struct range_list *rl_intersection(struct range_list *one, struct range_list *two)
 {
-	struct range_list *one_orig;
-	struct range_list *two_orig;
 	struct range_list *ret;
 	struct symbol *ret_type;
 	struct symbol *small_type;
 	struct symbol *large_type;
 
-	if (!two)
+	if (!one || !two)
 		return NULL;
-	if (!one)
-		return NULL;
-
-	one_orig = one;
-	two_orig = two;
 
 	ret_type = rl_type(one);
 	small_type = rl_type(one);
@@ -1380,23 +1555,7 @@ struct range_list *rl_intersection(struct range_list *one, struct range_list *tw
 	one = cast_rl(large_type, one);
 	two = cast_rl(large_type, two);
 
-	ret = one;
-	one = rl_invert(one);
-	two = rl_invert(two);
-
-	ret = rl_filter(ret, one);
-	ret = rl_filter(ret, two);
-
-	one = cast_rl(small_type, one_orig);
-	two = cast_rl(small_type, two_orig);
-
-	one = rl_invert(one);
-	two = rl_invert(two);
-
-	ret = cast_rl(small_type, ret);
-	ret = rl_filter(ret, one);
-	ret = rl_filter(ret, two);
-
+	ret = do_intersection(one, two);
 	return cast_rl(ret_type, ret);
 }
 
@@ -1520,9 +1679,38 @@ static struct range_list *handle_divide_rl(struct range_list *left, struct range
 	return rl_union(ret, pos_pos);
 }
 
+static struct range_list *ptr_add_mult(struct range_list *left, int op, struct range_list *right)
+{
+	struct range_list *ret;
+	sval_t l_sval, r_sval, res;
+
+	/*
+	 * This function is sort of the wrong API because it takes two pointer
+	 * and adds them together.  The caller is expected to figure out
+	 * alignment.  Neither of those are the correct things to do.
+	 *
+	 * Really this function is quite bogus...
+	 */
+
+	if (rl_to_sval(left, &l_sval) && rl_to_sval(right, &r_sval)) {
+		res = sval_binop(l_sval, op, r_sval);
+		return alloc_rl(res, res);
+	}
+
+	if (rl_min(left).value != 0 || rl_max(right).value != 0) {
+		ret = alloc_rl(valid_ptr_min_sval, valid_ptr_max_sval);
+		return cast_rl(rl_type(left), ret);
+	}
+
+	return alloc_whole_rl(rl_type(left));
+}
+
 static struct range_list *handle_add_mult_rl(struct range_list *left, int op, struct range_list *right)
 {
 	sval_t min, max;
+
+	if (type_is_ptr(rl_type(left)) || type_is_ptr(rl_type(right)))
+		return ptr_add_mult(left, op, right);
 
 	if (sval_binop_overflows(rl_min(left), op, rl_min(right)))
 		return NULL;
@@ -1645,25 +1833,155 @@ static struct range_list *handle_XOR_rl(struct range_list *left, struct range_li
 	return cast_rl(rl_type(left), alloc_rl(zero, max));
 }
 
+static sval_t sval_lowest_set_bit(sval_t sval)
+{
+	sval_t ret = { .type = sval.type };
+	int i;
+
+	for (i = 0; i < 64; i++) {
+		if (sval.uvalue & 1ULL << i) {
+			ret.uvalue = (1ULL << i);
+			return ret;
+		}
+	}
+	return ret;
+}
+
+static struct range_list *handle_AND_rl_sval(struct range_list *rl, sval_t sval)
+{
+	struct range_list *known_rl;
+	sval_t zero = { 0 };
+	sval_t min;
+
+	zero.type = sval.type;
+	zero.value = 0;
+
+	if (sm_fls64(rl_max(rl).uvalue) < find_first_zero_bit(sval.uvalue) &&
+	    sm_fls64(rl_min(rl).uvalue) < find_first_zero_bit(sval.uvalue))
+		return rl;
+
+	min = sval_lowest_set_bit(sval);
+
+	if (min.value != 0) {
+		sval_t max, mod;
+
+		max = rl_max(rl);
+		mod = sval_binop(max, '%', min);
+		if (mod.value) {
+			max = sval_binop(max, '-', mod);
+			max.value++;
+			if (max.value > 0 && sval_cmp(max, rl_max(rl)) < 0)
+				rl = remove_range(rl, max, rl_max(rl));
+		}
+	}
+
+	known_rl = alloc_rl(min, sval);
+
+	rl = rl_intersection(rl, known_rl);
+	zero = rl_min(rl);
+	zero.value = 0;
+	add_range(&rl, zero, zero);
+
+	return rl;
+}
+
+static struct range_list *fudge_AND_rl(struct range_list *rl)
+{
+	struct range_list *ret;
+	sval_t min;
+
+	min = sval_lowest_set_bit(rl_min(rl));
+	ret = clone_rl(rl);
+	add_range(&ret, min, rl_min(rl));
+
+	return ret;
+}
+
 static struct range_list *handle_AND_rl(struct range_list *left, struct range_list *right)
 {
-	unsigned long long left_set, left_maybe;
-	unsigned long long right_set, right_maybe;
-	sval_t zero, max;
+	sval_t sval, zero;
+	struct range_list *rl;
 
-	return NULL;
+	if (rl_to_sval(left, &sval))
+		return handle_AND_rl_sval(right, sval);
+	if (rl_to_sval(right, &sval))
+		return handle_AND_rl_sval(left, sval);
 
-	left_set = rl_bits_always_set(left);
-	left_maybe = rl_bits_maybe_set(left);
+	left = fudge_AND_rl(left);
+	right = fudge_AND_rl(right);
 
-	right_set = rl_bits_always_set(right);
-	right_maybe = rl_bits_maybe_set(right);
+	rl = rl_intersection(left, right);
+	zero = rl_min(rl);
+	zero.value = 0;
+	add_range(&rl, zero, zero);
 
-	zero = max = rl_min(left);
-	zero.uvalue = 0;
-	max.uvalue = fls_mask((left_maybe | right_maybe) ^ (left_set & right_set));
+	return rl;
+}
 
-	return cast_rl(rl_type(left), alloc_rl(zero, max));
+static struct range_list *handle_lshift(struct range_list *left_orig, struct range_list *right_orig)
+{
+	struct range_list *left;
+	struct data_range *tmp;
+	struct range_list *ret = NULL;
+	sval_t zero = { .type = rl_type(left_orig), };
+	sval_t shift, min, max;
+	bool add_zero = false;
+
+	if (!rl_to_sval(right_orig, &shift) || sval_is_negative(shift))
+		return NULL;
+	if (shift.value == 0)
+		return left_orig;
+
+	/* Cast to unsigned for easier left shift math */
+	if (type_positive_bits(rl_type(left_orig)) < 32)
+		left = cast_rl(&uint_ctype, left_orig);
+	else if(type_positive_bits(rl_type(left_orig)) == 63)
+		left = cast_rl(&ullong_ctype, left_orig);
+	else
+		left = left_orig;
+
+	FOR_EACH_PTR(left, tmp) {
+		min = tmp->min;
+		max = tmp->max;
+
+		if (min.value == 0 || max.value > sval_type_max(max.type).uvalue >> shift.uvalue)
+			add_zero = true;
+		if (min.value == 0 && max.value == 0)
+			continue;
+		if (min.value == 0)
+			min.value = 1;
+		min = sval_binop(min, SPECIAL_LEFTSHIFT, shift);
+		max = sval_binop(max, SPECIAL_LEFTSHIFT, shift);
+		add_range(&ret, min, max);
+	} END_FOR_EACH_PTR(tmp);
+
+	if (!rl_fits_in_type(ret, rl_type(left_orig)))
+		add_zero = true;
+	ret = cast_rl(rl_type(left_orig), ret);
+	if (add_zero)
+		add_range(&ret, zero, zero);
+
+	return ret;
+}
+
+static struct range_list *handle_rshift(struct range_list *left_orig, struct range_list *right_orig)
+{
+	struct data_range *tmp;
+	struct range_list *ret = NULL;
+	sval_t shift, min, max;
+
+	if (!rl_to_sval(right_orig, &shift) || sval_is_negative(shift))
+		return NULL;
+	if (shift.value == 0)
+		return left_orig;
+
+	FOR_EACH_PTR(left_orig, tmp) {
+		min = sval_binop(tmp->min, SPECIAL_RIGHTSHIFT, shift);
+		max = sval_binop(tmp->max, SPECIAL_RIGHTSHIFT, shift);
+		add_range(&ret, min, max);
+	} END_FOR_EACH_PTR(tmp);
+
+	return ret;
 }
 
 struct range_list *rl_binop(struct range_list *left, int op, struct range_list *right)
@@ -1712,10 +2030,10 @@ struct range_list *rl_binop(struct range_list *left, int op, struct range_list *
 	case '-':
 		ret = handle_sub_rl(left, right);
 		break;
-	/* FIXME:  Do the rest as well */
 	case SPECIAL_RIGHTSHIFT:
+		return handle_rshift(left, right);
 	case SPECIAL_LEFTSHIFT:
-		break;
+		return handle_lshift(left, right);
 	}
 
 	return ret;

@@ -420,6 +420,8 @@ static void split_conditions(struct expression *expr)
 	 * too complicated to deal with.
 	 */
 	if (expr->type == EXPR_BINOP && expr->op == '|') {
+		expr_set_parent_expr(expr->left, expr);
+		expr_set_parent_expr(expr->right, expr);
 		handle_logical(expr);
 		return;
 	}

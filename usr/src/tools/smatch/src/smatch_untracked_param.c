@@ -39,10 +39,12 @@ static int my_id;
 static int tracked;
 
 STATE(untracked);
+STATE(lost);
 
 typedef void (untracked_hook)(struct expression *call, int param);
 DECLARE_PTR_LIST(untracked_hook_list, untracked_hook *);
 static struct untracked_hook_list *untracked_hooks;
+static struct untracked_hook_list *lost_hooks;
 
 struct int_stack *tracked_stack;
 
@@ -62,12 +64,45 @@ static void call_untracked_callbacks(struct expression *expr, int param)
 	} END_FOR_EACH_PTR(fn);
 }
 
+void add_lost_param_hook(void (func)(struct expression *call, int param))
+{
+	untracked_hook **p = malloc(sizeof(untracked_hook *));
+	*p = func;
+	add_ptr_list(&lost_hooks, p);
+}
+
+static void call_lost_callbacks(struct expression *expr, int param)
+{
+	untracked_hook **fn;
+
+	FOR_EACH_PTR(lost_hooks, fn) {
+		(*fn)(expr, param);
+	} END_FOR_EACH_PTR(fn);
+}
+
 static void assume_tracked(struct expression *call_expr, int param, char *key, char *value)
 {
 	tracked = 1;
 }
 
-void mark_untracked(struct expression *expr, int param, const char *key, const char *value)
+static char *get_array_from_key(struct expression *expr, int param, const char *key, struct symbol **sym)
+{
+	struct expression *arg;
+
+	arg = get_argument_from_call_expr(expr->args, param);
+	if (!arg)
+		return NULL;
+	if (arg->type != EXPR_PREOP || arg->op != '&')
+		return NULL;
+	arg = arg->unop;
+	if (!is_array(arg))
+		return NULL;
+	arg = get_array_base(arg);
+
+	return expr_to_var_sym(arg, sym);
+}
+
+static void mark_untracked_lost(struct expression *expr, int param, const char *key, int type)
 {
 	char *name;
 	struct symbol *sym;
@@ -78,13 +113,29 @@ void mark_untracked(struct expression *expr, int param, const char *key, const c
 		return;
 
 	name = return_state_to_var_sym(expr, param, key, &sym);
-	if (!name || !sym)
-		goto free;
+	if (!name || !sym) {
+		name = get_array_from_key(expr, param, key, &sym);
+		if (!name || !sym)
+			goto free;
+	}
 
+	if (type == LOST_PARAM)
+		call_lost_callbacks(expr, param);
 	call_untracked_callbacks(expr, param);
 	set_state(my_id, name, sym, &untracked);
 free:
 	free_string(name);
+
+}
+
+void mark_untracked(struct expression *expr, int param, const char *key, const char *value)
+{
+	mark_untracked_lost(expr, param, key, UNTRACKED_PARAM);
+}
+
+void mark_lost(struct expression *expr, int param, const char *key, const char *value)
+{
+	mark_untracked_lost(expr, param, key, LOST_PARAM);
 }
 
 static int lost_in_va_args(struct expression *expr)
@@ -133,7 +184,8 @@ static void match_after_call(struct expression *expr)
 	} END_FOR_EACH_PTR(arg);
 }
 
-void mark_all_params_untracked(int return_id, char *return_ranges, struct expression *expr)
+
+static void mark_all_params(int return_id, char *return_ranges, int type)
 {
 	struct symbol *arg;
 	int param;
@@ -145,14 +197,27 @@ void mark_all_params_untracked(int return_id, char *return_ranges, struct expres
 		if (!arg->ident)
 			continue;
 		sql_insert_return_states(return_id, return_ranges,
-					 UNTRACKED_PARAM, param, "$", "");
+					 type, param, "$", "");
 	} END_FOR_EACH_PTR(arg);
+}
+
+
+void mark_all_params_untracked(int return_id, char *return_ranges, struct expression *expr)
+{
+	mark_all_params(return_id, return_ranges, UNTRACKED_PARAM);
+}
+
+void mark_all_params_lost(int return_id, char *return_ranges, struct expression *expr)
+{
+	mark_all_params(return_id, return_ranges, LOST_PARAM);
 }
 
 static void print_untracked_params(int return_id, char *return_ranges, struct expression *expr)
 {
+	struct sm_state *sm;
 	struct symbol *arg;
 	int param;
+	int type;
 
 	param = -1;
 	FOR_EACH_PTR(cur_func_sym->ctype.base_type->arguments, arg) {
@@ -160,12 +225,21 @@ static void print_untracked_params(int return_id, char *return_ranges, struct ex
 
 		if (!arg->ident)
 			continue;
-		if (!get_state(my_id, arg->ident->name, arg) &&
-		    !__bail_on_rest_of_function)  /* hairy functions are untrackable */
+
+		if (__bail_on_rest_of_function) {
+			/* hairy functions are lost */
+			type = LOST_PARAM;
+		} else if ((sm = get_sm_state(my_id, arg->ident->name, arg))) {
+			if (slist_has_state(sm->possible, &lost))
+				type = LOST_PARAM;
+			else
+				type = UNTRACKED_PARAM;
+		} else {
 			continue;
+		}
 
 		sql_insert_return_states(return_id, return_ranges,
-					 UNTRACKED_PARAM, param, "$", "");
+					 type, param, "$", "");
 	} END_FOR_EACH_PTR(arg);
 }
 
@@ -237,6 +311,7 @@ void register_untracked_param(int id)
 
 	select_return_states_hook(INTERNAL, &assume_tracked);
 	select_return_states_hook(UNTRACKED_PARAM, &mark_untracked);
+	select_return_states_hook(LOST_PARAM, &mark_lost);
 	add_hook(&match_after_call, FUNCTION_CALL_HOOK_AFTER_DB);
 
 	add_split_return_callback(&print_untracked_params);

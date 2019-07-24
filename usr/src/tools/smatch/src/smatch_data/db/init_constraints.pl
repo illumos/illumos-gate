@@ -46,6 +46,10 @@ sub load_manual_constraints($$)
     my $project = shift;
     my $dir = dirname($full_path);
 
+    if ($project =~ /^$/) {
+        return;
+    }
+
     open(FILE, "$dir/$project.constraints");
     while (<FILE>) {
         s/\n//;

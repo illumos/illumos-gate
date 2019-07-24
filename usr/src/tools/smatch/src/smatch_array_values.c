@@ -163,7 +163,7 @@ static void match_assign(struct expression *expr)
 	struct symbol *type;
 	char *name;
 
-	type = get_type(expr->right);
+	type = get_type(expr->left);
 	if (!type || type->type != SYM_BASETYPE)
 		return;
 
@@ -176,7 +176,8 @@ static void match_assign(struct expression *expr)
 		return;
 
 	if (expr->op != '=') {
-		rl = alloc_whole_rl(type);
+		rl = alloc_whole_rl(get_type(expr->right));
+		rl = cast_rl(type, rl);
 	} else {
 		get_absolute_rl(expr->right, &rl);
 		rl = cast_rl(type, rl);

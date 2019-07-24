@@ -19,6 +19,8 @@
 #include "smatch_extra.h"
 
 static int my_id;
+extern int second_half_id;
+extern void set_spectre_first_half(struct expression *expr);
 
 static int suppress_multiple = 1;
 
@@ -165,8 +167,10 @@ static void array_check(struct expression *expr)
 		return;
 
 	array_expr = get_array_base(expr);
-	if (suppress_multiple && is_ignored_expr(my_id, array_expr))
+	if (suppress_multiple && is_ignored_expr(my_id, array_expr)) {
+		set_spectre_first_half(expr);
 		return;
+	}
 
 	offset = get_array_offset(expr);
 	if (!is_user_rl(offset))
@@ -192,6 +196,8 @@ static void array_check(struct expression *expr)
 	       name,
 	       is_read(expr) ? "r" : "w",
 	       conditions ? " (local cap)" : "");
+
+	set_spectre_first_half(expr);
 	if (suppress_multiple)
 		add_ignore_expr(my_id, array_expr);
 	free_string(name);

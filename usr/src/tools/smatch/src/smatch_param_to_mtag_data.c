@@ -76,6 +76,18 @@ struct smatch_state *merge_tag_info(struct smatch_state *s1, struct smatch_state
 	return &merged;
 }
 
+static bool is_local_var(struct expression *expr)
+{
+	struct symbol *sym;
+
+	if (!expr || expr->type != EXPR_SYMBOL)
+		return false;
+	sym = expr->symbol;
+	if (!(sym->ctype.modifiers & MOD_TOPLEVEL))
+		return true;
+	return false;
+}
+
 static void match_assign(struct expression *expr)
 {
 	struct expression *left;
@@ -88,6 +100,8 @@ static void match_assign(struct expression *expr)
 	if (expr->op != '=')
 		return;
 	left = strip_expr(expr->left);
+	if (is_local_var(left))
+		return;
 	right_sym = expr_to_sym(expr->right);
 	if (!right_sym)
 		return;
@@ -104,28 +118,6 @@ static void match_assign(struct expression *expr)
 	set_state_expr(my_id, expr->right, alloc_tag_data_state(tag, name, offset));
 	free_string(name);
 }
-
-#if 0
-static void save_mtag_to_map(struct expression *expr, mtag_t tag, int offset, int param, char *key, char *value)
-{
-	struct expression *arg, *gen_expr;
-	mtag_t arg_tag;
-
-	arg = get_argument_from_call_expr(expr->args, param);
-	if (!arg)
-		return;
-
-	gen_expr = gen_expression_from_key(arg, key);
-	if (!gen_expr)
-		return;
-
-	if (!get_mtag(gen_expr, &arg_tag))
-		arg_tag = 0;
-
-	if (local_debug)
-		sm_msg("finding mtag for '%s' %lld", expr_to_str(gen_expr), arg_tag);
-}
-#endif
 
 static void propogate_assignment(struct expression *expr, mtag_t tag, int offset, int param, char *key)
 {
@@ -158,6 +150,7 @@ static void assign_to_alias(struct expression *expr, int param, mtag_t tag, int 
 	struct range_list *rl;
 	mtag_t arg_tag;
 	mtag_t alias;
+	int arg_offset;
 
 	arg = get_argument_from_call_expr(expr->args, param);
 	if (!arg)
@@ -174,7 +167,8 @@ static void assign_to_alias(struct expression *expr, int param, mtag_t tag, int 
 
 //	insert_mtag_data(alias, offset, rl);
 
-	if (get_mtag(gen_expr, &arg_tag))
+	// FIXME:  is arg_offset handled correctly?
+	if (expr_to_mtag_offset(gen_expr, &arg_tag, &arg_offset) && arg_offset == 0)
 		sql_insert_mtag_map(arg_tag, -offset, alias);
 }
 
@@ -229,6 +223,7 @@ void register_param_to_mtag_data(int id)
 {
 	my_id = id;
 
+	set_dynamic_states(my_id);
 	add_hook(&match_assign, ASSIGNMENT_HOOK);
 	select_return_states_hook(MTAG_ASSIGN, &call_does_mtag_assign);
 	add_merge_hook(my_id, &merge_tag_info);

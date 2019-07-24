@@ -102,3 +102,10 @@ read_current_timer 0
 pwrap_read 2
 dibusb_read_eeprom_byte 2
 of_fdt_unflatten_tree 2
+pci_user_read_config_byte 2
+gen11_gu_misc_irq_ack 2
+vsc73xx_read 4
+smb_hc_read 2
+smb_word_op 5
+atl1c_read_phy_reg 2
+adf7242_read_reg 2

@@ -11,6 +11,7 @@
 
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2019 Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
@@ -26,6 +27,15 @@ include $(SASRC)/Makefile.inc
 include $(ZFSSRC)/Makefile.inc
 
 CPPFLAGS +=	-I$(SRC)/uts/common
+
+# needs work
+printf.o := SMOFF += 64bit_shift
+
+# too hairy
+_inflate.o := SMATCH=off
+
+# 64-bit smatch false positive :/
+SMOFF += uninitialized
 
 clean: clobber
 clobber:

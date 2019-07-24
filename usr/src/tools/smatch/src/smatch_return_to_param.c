@@ -56,7 +56,7 @@ char *map_call_to_other_name_sym(const char *name, struct symbol *sym, struct sy
 	char buf[256];
 
 	/* skip 'foo->'.  This was checked in the caller. */
-	skip = strlen(sym->ident->name) + 2;
+	skip = sym->ident->len + 2;
 
 	state = get_state(my_id, sym->ident->name, sym);
 	if (!state || !state->data)
@@ -87,46 +87,6 @@ static char *map_my_state_long_to_short(struct sm_state *sm, const char *name, s
 	return alloc_string(buf);
 }
 
-static char *map_assignment_long_to_short(struct sm_state *sm, const char *name, struct symbol *sym, struct symbol **new_sym, bool stack)
-{
-	struct expression *orig_expr;
-	struct symbol *orig_sym;
-	int len;
-	char buf[256];
-
-	orig_expr = sm->state->data;
-	if (!orig_expr)
-		return NULL;
-
-	/*
-	 * Say we have an assignment like:
-	 *     foo->bar->my_ptr = my_ptr;
-	 * We still expect the function to carry on using "my_ptr" as the
-	 * shorter name.  That's not a long to short mapping.
-	 *
-	 */
-	if (orig_expr->type == EXPR_SYMBOL)
-		return NULL;
-
-	orig_sym = expr_to_sym(orig_expr);
-	if (!orig_sym)
-		return NULL;
-	if (sym != orig_sym)
-		return NULL;
-
-	len = strlen(sm->state->name);
-	if (strncmp(name, sm->state->name, len) != 0)
-		return NULL;
-
-	if (name[len] == '.')
-		return NULL;
-	if (!stack && name[len] != '-')
-		return NULL;
-	snprintf(buf, sizeof(buf), "%s%s", sm->name, name + len);
-	*new_sym = sm->sym;
-	return alloc_string(buf);
-}
-
 /*
  * Normally, we expect people to consistently refer to variables by the shortest
  * name.  So they use "b->a" instead of "foo->bar.a" when both point to the
@@ -136,7 +96,7 @@ static char *map_assignment_long_to_short(struct sm_state *sm, const char *name,
  * which in turn updates the longer name.
  *
  */
-static char *map_long_to_short_name_sym_helper(const char *name, struct symbol *sym, struct symbol **new_sym, bool stack)
+char *map_long_to_short_name_sym(const char *name, struct symbol *sym, struct symbol **new_sym, bool use_stack)
 {
 	char *ret;
 	struct sm_state *sm;
@@ -145,30 +105,18 @@ static char *map_long_to_short_name_sym_helper(const char *name, struct symbol *
 
 	FOR_EACH_SM(__get_cur_stree(), sm) {
 		if (sm->owner == my_id) {
-			ret = map_my_state_long_to_short(sm, name, sym, new_sym, stack);
-			if (ret)
+			ret = map_my_state_long_to_short(sm, name, sym, new_sym, use_stack);
+			if (ret) {
+				if (local_debug)
+					sm_msg("%s: my_state: name = '%s' sm = '%s'",
+					       __func__, name, show_sm(sm));
 				return ret;
-			continue;
-		}
-		if (sm->owner == check_assigned_expr_id) {
-			ret = map_assignment_long_to_short(sm, name, sym, new_sym, stack);
-			if (ret)
-				return ret;
+			}
 			continue;
 		}
 	} END_FOR_EACH_SM(sm);
 
 	return NULL;
-}
-
-char *map_long_to_short_name_sym(const char *name, struct symbol *sym, struct symbol **new_sym)
-{
-	return map_long_to_short_name_sym_helper(name, sym, new_sym, 1);
-}
-
-char *map_long_to_short_name_sym_nostack(const char *name, struct symbol *sym, struct symbol **new_sym)
-{
-	return map_long_to_short_name_sym_helper(name, sym, new_sym, 0);
 }
 
 char *map_call_to_param_name_sym(struct expression *expr, struct symbol **sym)
@@ -280,6 +228,7 @@ free:
 void register_return_to_param(int id)
 {
 	my_id = id;
+	set_dynamic_states(my_id);
 	add_modification_hook(my_id, &undef);
 }
 

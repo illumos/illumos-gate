@@ -95,6 +95,41 @@ static void match_assign(struct expression *expr)
 		set_state_expr(my_id, right->unop, &initialized);
 }
 
+static void match_negative_comparison(struct expression *expr)
+{
+	struct expression *success;
+	struct sm_state *sm;
+	sval_t max;
+
+	/*
+	 * In the kernel, people don't use "if (ret) {" and "if (ret < 0) {"
+	 * consistently.  Ideally Smatch would know the return but often it
+	 * doesn't.
+	 *
+	 */
+
+	if (option_project != PROJ_KERNEL)
+		return;
+
+	if (expr->type != EXPR_COMPARE || expr->op != '<')
+		return;
+	if (!is_zero(expr->right))
+		return;
+	if (get_implied_max(expr->left, &max) && max.value == 0)
+		return;
+
+	success = compare_expression(expr->left, SPECIAL_EQUAL, expr->right);
+	if (!assume(success))
+		return;
+
+	FOR_EACH_MY_SM(my_id, __get_cur_stree(), sm) {
+		if (sm->state == &initialized)
+			set_true_false_states(my_id, sm->name, sm->sym, NULL, &initialized);
+	} END_FOR_EACH_SM(sm);
+
+	end_assume();
+}
+
 static int is_initialized(struct expression *expr)
 {
 	struct sm_state *sm;
@@ -114,7 +149,7 @@ static void match_dereferences(struct expression *expr)
 {
 	char *name;
 
-	if (parse_error)
+	if (implications_off || parse_error)
 		return;
 
 	if (expr->type != EXPR_PREOP)
@@ -135,7 +170,7 @@ static void match_condition(struct expression *expr)
 {
 	char *name;
 
-	if (parse_error)
+	if (implications_off || parse_error)
 		return;
 
 	if (is_impossible_path())
@@ -265,7 +300,7 @@ static void match_symbol(struct expression *expr)
 {
 	char *name;
 
-	if (parse_error)
+	if (implications_off || parse_error)
 		return;
 
 	if (is_impossible_path())
@@ -352,6 +387,7 @@ void check_uninitialized(int id)
 	add_hook(&match_declarations, DECLARATION_HOOK);
 	add_extra_mod_hook(&extra_mod_hook);
 	add_hook(&match_assign, ASSIGNMENT_HOOK);
+	add_hook(&match_negative_comparison, CONDITION_HOOK);
 	add_untracked_param_hook(&match_untracked);
 	add_pre_merge_hook(my_id, &pre_merge_hook);
 

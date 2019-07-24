@@ -165,7 +165,7 @@ struct expression *string_expression(char *str)
 struct expression *gen_expression_from_key(struct expression *arg, const char *key)
 {
 	struct expression *ret;
-	struct token *token, *end;
+	struct token *token, *prev, *end;
 	const char *p = key;
 	char buf[4095];
 	char *alloc;
@@ -189,12 +189,15 @@ struct expression *gen_expression_from_key(struct expression *arg, const char *k
 
 	ret = arg;
 	while (token_type(token) == TOKEN_SPECIAL &&
-	       token->special == SPECIAL_DEREFERENCE) {
+	       (token->special == SPECIAL_DEREFERENCE || token->special == '.')) {
+		prev = token;
 		token = token->next;
 		if (token_type(token) != TOKEN_IDENT)
 			return NULL;
 		ret = deref_expression(ret);
-		ret = member_expression(ret, '*', token->ident);
+		ret = member_expression(ret,
+				        (prev->special == SPECIAL_DEREFERENCE) ? '*' : '.',
+					token->ident);
 		token = token->next;
 	}
 

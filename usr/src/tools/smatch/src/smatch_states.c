@@ -84,7 +84,7 @@ struct sm_state *set_state(int owner, const char *name, struct symbol *sym, stru
 {
 	struct sm_state *ret;
 
-	if (!name)
+	if (!name || !state)
 		return NULL;
 
 	if (read_only)
@@ -93,7 +93,7 @@ struct sm_state *set_state(int owner, const char *name, struct symbol *sym, stru
 	if (option_debug || strcmp(check_name(owner), option_debug_check) == 0) {
 		struct smatch_state *s;
 
-		s = get_state(owner, name, sym);
+		s = __get_state(owner, name, sym);
 		if (!s)
 			sm_msg("%s new [%s] '%s' %s", __func__,
 			       check_name(owner), name, show_state(state));
@@ -196,7 +196,7 @@ void __set_sm(struct sm_state *sm)
 	    strcmp(check_name(sm->owner), option_debug_check) == 0) {
 		struct smatch_state *s;
 
-		s = get_state(sm->owner, sm->name, sm->sym);
+		s = __get_state(sm->owner, sm->name, sm->sym);
 		if (!s)
 			sm_msg("%s new %s", __func__, show_sm(sm));
 		else
@@ -222,7 +222,7 @@ void __set_sm_cur_stree(struct sm_state *sm)
 	    strcmp(check_name(sm->owner), option_debug_check) == 0) {
 		struct smatch_state *s;
 
-		s = get_state(sm->owner, sm->name, sm->sym);
+		s = __get_state(sm->owner, sm->name, sm->sym);
 		if (!s)
 			sm_msg("%s new %s", __func__, show_sm(sm));
 		else
@@ -245,7 +245,7 @@ void __set_sm_fake_stree(struct sm_state *sm)
 	    strcmp(check_name(sm->owner), option_debug_check) == 0) {
 		struct smatch_state *s;
 
-		s = get_state(sm->owner, sm->name, sm->sym);
+		s = __get_state(sm->owner, sm->name, sm->sym);
 		if (!s)
 			sm_msg("%s new %s", __func__, show_sm(sm));
 		else
@@ -477,7 +477,7 @@ void set_true_false_states(int owner, const char *name, struct symbol *sym,
 	if (option_debug || strcmp(check_name(owner), option_debug_check) == 0) {
 		struct smatch_state *tmp;
 
-		tmp = get_state(owner, name, sym);
+		tmp = __get_state(owner, name, sym);
 		sm_msg("%s [%s] '%s'.  Was %s.  Now T:%s F:%s", __func__,
 		       check_name(owner),  name, show_state(tmp),
 		       show_state(true_state), show_state(false_state));
@@ -531,7 +531,7 @@ void __set_true_false_sm(struct sm_state *true_sm, struct sm_state *false_sm)
 	if (option_debug || strcmp(check_name(owner), option_debug_check) == 0) {
 		struct smatch_state *tmp;
 
-		tmp = get_state(owner, name, sym);
+		tmp = __get_state(owner, name, sym);
 		sm_msg("%s [%s] '%s'.  Was %s.  Now T:%s F:%s", __func__,
 		       check_name(owner),  name, show_state(tmp),
 		       show_state(true_sm ? true_sm->state : NULL),
@@ -789,7 +789,6 @@ void __negate_cond_stacks(void)
 {
 	struct stree *old_false, *old_true;
 
-	__use_cond_stack(&cond_false_stack);
 	old_false = pop_stree(&cond_false_stack);
 	old_true = pop_stree(&cond_true_stack);
 	push_stree(&cond_false_stack, old_true);

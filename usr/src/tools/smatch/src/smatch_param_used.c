@@ -31,7 +31,7 @@ static void get_state_hook(int owner, const char *name, struct symbol *sym)
 
 	if (!option_info)
 		return;
-	if (__in_fake_assign)
+	if (__in_fake_assign || __in_fake_parameter_assign || __in_function_def)
 		return;
 
 	arg = get_param_num_from_sym(sym);
@@ -51,7 +51,7 @@ static void set_param_used(struct expression *call, struct expression *arg, char
 
 	arg_nr = get_param_num_from_sym(sym);
 	if (arg_nr >= 0)
-		set_state(my_id, name, sym, &used);
+		set_state_stree(&used_stree, my_id, name, sym, &used);
 free:
 	free_string(name);
 }
@@ -68,6 +68,11 @@ static void process_states(void)
 			continue;
 		name = get_param_name(tmp);
 		if (!name)
+			continue;
+		if (is_recursive_member(name))
+			continue;
+
+		if (is_ignored_kernel_data(name))
 			continue;
 
 		sql_insert_return_implies(PARAM_USED, arg, name, "");

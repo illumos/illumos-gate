@@ -96,3 +96,4 @@ void overwrite_stree(struct stree *from, struct stree **to);
 
 void all_return_states_hook(void (*callback)(void));
 
+void allocate_dynamic_states_array(int num_checks);

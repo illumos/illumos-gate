@@ -222,7 +222,7 @@ void check_err_ptr_deref(int id)
 	return_implies_state("IS_ERR_OR_NULL", 0, 0, &match_checked, NULL);
 	return_implies_state("IS_ERR_OR_NULL", 1, 1, &match_err, NULL);
 	return_implies_state("PTR_RET", 0, 0, &match_checked, NULL);
-	return_implies_state("PTR_RET", -4096, -1, &match_err, NULL);
+	return_implies_state("PTR_RET", -4095, -1, &match_err, NULL);
 	register_err_ptr_funcs();
 	add_hook(&match_dereferences, DEREF_HOOK);
 	add_function_hook("ERR_PTR", &match_err_ptr_positive_const, NULL);

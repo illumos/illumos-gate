@@ -67,7 +67,7 @@ sval_t sval_type_val(struct symbol *type, long long val)
 	sval_t ret;
 
 	if (!type)
-		type = &int_ctype;
+		type = &llong_ctype;
 
 	ret.type = type;
 	ret.value = val;
@@ -94,6 +94,8 @@ int sval_is_ptr(sval_t sval)
 
 int sval_unsigned(sval_t sval)
 {
+	if (is_ptr_type(sval.type))
+		return true;
 	return type_unsigned(sval.type);
 }
 
@@ -231,7 +233,7 @@ int sval_too_low(struct symbol *type, sval_t sval)
 {
 	if (sval_is_negative(sval) && type_unsigned(type))
 		return 1;
-	if (type_signed(type) &&  sval_unsigned(sval))
+	if (type_signed(type) && sval_unsigned(sval))
 		return 0;
 	if (type_signed(sval.type) &&
 	    sval.value < sval_type_min(type).value)
@@ -458,6 +460,8 @@ static sval_t ptr_binop(struct symbol *type, sval_t left, int op, sval_t right)
 		}
 	}
 
+	if (op == '-')
+		ret.type = ssize_t_ctype;
 	return ret;
 }
 
@@ -583,15 +587,34 @@ int sval_binop_overflows_no_sign(sval_t left, int op, sval_t right)
 	return sval_binop_overflows(left, op, right);
 }
 
-unsigned long long fls_mask(unsigned long long uvalue)
+int find_first_zero_bit(unsigned long long uvalue)
 {
-	unsigned long long high_bit = 0;
+	int i;
+
+	for (i = 0; i < 64; i++) {
+		if (!(uvalue & (1ULL << i)))
+			return i;
+	}
+	return i;
+}
+
+int sm_fls64(unsigned long long uvalue)
+{
+	int high_bit = 0;
 
 	while (uvalue) {
 		uvalue >>= 1;
 		high_bit++;
 	}
 
+	return high_bit;
+}
+
+unsigned long long fls_mask(unsigned long long uvalue)
+{
+	int high_bit = 0;
+
+	high_bit = sm_fls64(uvalue);
 	if (high_bit == 0)
 		return 0;
 
@@ -607,6 +630,8 @@ const char *sval_to_str(sval_t sval)
 {
 	char buf[30];
 
+	if (sval_is_ptr(sval) && sval.value == valid_ptr_max)
+		return "ptr_max";
 	if (sval_unsigned(sval) && sval.value == ULLONG_MAX)
 		return "u64max";
 	if (sval_unsigned(sval) && sval.value == UINT_MAX)
@@ -636,6 +661,22 @@ const char *sval_to_str(sval_t sval)
 		snprintf(buf, sizeof(buf), "%lld", sval.value);
 
 	return alloc_sname(buf);
+}
+
+const char *sval_to_str_or_err_ptr(sval_t sval)
+{
+	char buf[12];
+
+	if (option_project != PROJ_KERNEL ||
+	    !is_ptr_type(sval.type))
+		return sval_to_str(sval);
+
+	if (sval.uvalue >= -4905ULL) {
+		snprintf(buf, sizeof(buf), "(%lld)", sval.value);
+		return alloc_sname(buf);
+	}
+
+	return sval_to_str(sval);
 }
 
 const char *sval_to_numstr(sval_t sval)

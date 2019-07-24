@@ -281,13 +281,16 @@ free_data:
 static void match_assign_has_buf_comparison(struct expression *expr)
 {
 	struct expression *size;
+	int limit_type;
 
 	if (expr->op != '=')
 		return;
 	if (expr->right->type == EXPR_CALL)
 		return;
-	size = get_size_variable(expr->right);
+	size = get_size_variable(expr->right, &limit_type);
 	if (!size)
+		return;
+	if (limit_type != ELEM_COUNT)
 		return;
 	match_alloc_helper(expr->left, size, 1);
 }
@@ -455,6 +458,7 @@ void register_constraints_required(int id)
 {
 	my_id = id;
 
+	set_dynamic_states(my_id);
 	add_hook(&match_assign_size, ASSIGNMENT_HOOK);
 	add_hook(&match_assign_data, ASSIGNMENT_HOOK);
 	add_hook(&match_assign_has_buf_comparison, ASSIGNMENT_HOOK);

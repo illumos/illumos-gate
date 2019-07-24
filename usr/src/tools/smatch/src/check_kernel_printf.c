@@ -521,6 +521,15 @@ static void dentry_file(const char *fmt, struct symbol *type, struct symbol *bas
 			fmt[0], tag, vaidx, type_to_str(type));
 }
 
+static void time_and_date(const char *fmt, struct symbol *type, struct symbol *basetype, int vaidx)
+{
+	assert(tolower(fmt[0]) == 't');
+
+	if (fmt[1] == 'R' && !is_struct_tag(basetype, "rtc_time"))
+		sm_error("'%%ptR' expects argument of type struct 'rtc_time', argument %d has type '%s'",
+			 vaidx, type_to_str(type));
+}
+
 static void check_clock(const char *fmt, struct symbol *type, struct symbol *basetype, int vaidx)
 {
 	assert(fmt[0] == 'C');
@@ -755,6 +764,9 @@ pointer(const char *fmt, struct expression *arg, int vaidx)
 	case 'D':
 	case 'd':
 		dentry_file(fmt, type, basetype, vaidx);
+		break;
+	case 't':
+		time_and_date(fmt, type, basetype, vaidx);
 		break;
 	case 'C':
 		check_clock(fmt, type, basetype, vaidx);

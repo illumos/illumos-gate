@@ -62,22 +62,53 @@ static bool is_non_null_array(struct expression *expr)
 	return 0;
 }
 
+static bool matches_anonymous_union(struct symbol *sym, const char *member_name)
+{
+	struct symbol *type, *tmp;
+
+	if (sym->ident)
+		return false;
+	type = get_real_base_type(sym);
+	if (!type || type->type != SYM_UNION)
+		return false;
+
+	FOR_EACH_PTR(type->symbol_list, tmp) {
+		if (tmp->ident &&
+		    strcmp(member_name, tmp->ident->name) == 0) {
+			return true;
+		}
+	} END_FOR_EACH_PTR(tmp);
+
+	return false;
+}
+
 int get_member_offset(struct symbol *type, const char *member_name)
 {
 	struct symbol *tmp;
 	int offset;
+	int bits;
 
 	if (!type || type->type != SYM_STRUCT)
 		return -1;
 
+	bits = 0;
 	offset = 0;
 	FOR_EACH_PTR(type->symbol_list, tmp) {
+		if (bits_to_bytes(bits + type_bits(tmp)) > tmp->ctype.alignment) {
+			offset += bits_to_bytes(bits);
+			bits = 0;
+		}
 		offset = ALIGN(offset, tmp->ctype.alignment);
 		if (tmp->ident &&
 		    strcmp(member_name, tmp->ident->name) == 0) {
 			return offset;
 		}
-		offset += type_bytes(tmp);
+		if (matches_anonymous_union(tmp, member_name))
+			return offset;
+		if (!(type_bits(tmp) % 8) && type_bits(tmp) / 8 == type_bytes(tmp))
+			offset += type_bytes(tmp);
+		else
+			bits += type_bits(tmp);
 	} END_FOR_EACH_PTR(tmp);
 	return -1;
 }
@@ -99,6 +130,8 @@ int get_member_offset_from_deref(struct expression *expr)
 		return -1;
 
 	type = get_type(expr->deref);
+	if (type_is_ptr(type))
+		type = get_real_base_type(type);
 	if (!type || type->type != SYM_STRUCT)
 		return -1;
 
@@ -106,23 +139,6 @@ int get_member_offset_from_deref(struct expression *expr)
 	if (offset >= 0)
 		expr->member_offset = offset;
 	return offset;
-}
-
-static struct range_list *filter_unknown_negatives(struct range_list *rl)
-{
-	struct data_range *first;
-	struct range_list *filter = NULL;
-
-	first = first_ptr_list((struct ptr_list *)rl);
-
-	if (sval_is_min(first->min) &&
-	    sval_is_negative(first->max) &&
-	    first->max.value == -1) {
-		add_ptr_list(&filter, first);
-		return rl_filter(rl, filter);
-	}
-
-	return rl;
 }
 
 static void add_offset_to_pointer(struct range_list **rl, int offset)
@@ -136,6 +152,9 @@ static void add_offset_to_pointer(struct range_list **rl, int offset)
 	 *
 	 */
 	if (offset == 0)
+		return;
+
+	if (is_unknown_ptr(orig))
 		return;
 
 	/*
@@ -164,16 +183,6 @@ static void add_offset_to_pointer(struct range_list **rl, int offset)
 		return;
 	}
 
-	orig = filter_unknown_negatives(orig);
-	/*
-	 * FIXME:  This is not really accurate but we're a bit screwed anyway
-	 * when we start doing pointer math with error pointers so it's probably
-	 * not important.
-	 *
-	 */
-	if (sval_is_negative(rl_min(orig)))
-		return;
-
 	/* no wrap around */
 	max.uvalue = rl_max(orig).uvalue;
 	if (max.uvalue > sval_type_max(&ptr_ctype).uvalue - offset) {
@@ -193,49 +202,91 @@ static struct range_list *where_allocated_rl(struct symbol *sym)
 	if (!sym)
 		return NULL;
 
-	if (sym->ctype.modifiers & (MOD_TOPLEVEL | MOD_STATIC)) {
-		if (sym->initializer)
-			return alloc_rl(data_seg_min, data_seg_max);
-		else
-			return alloc_rl(bss_seg_min, bss_seg_max);
-	}
-	return alloc_rl(stack_seg_min, stack_seg_max);
+	return alloc_rl(valid_ptr_min_sval, valid_ptr_max_sval);
 }
 
 int get_address_rl(struct expression *expr, struct range_list **rl)
 {
+	struct expression *unop;
+
 	expr = strip_expr(expr);
 	if (!expr)
 		return 0;
 
 	if (expr->type == EXPR_STRING) {
-		*rl = alloc_rl(text_seg_min, text_seg_max);
+		*rl = alloc_rl(valid_ptr_min_sval, valid_ptr_max_sval);
 		return 1;
 	}
 
-	if (expr->type == EXPR_PREOP && expr->op == '&') {
-		struct expression *unop;
+	if (expr->type == EXPR_PREOP && expr->op == '&')
+		expr = strip_expr(expr->unop);
+	else {
+		struct symbol *type;
 
-		unop = strip_expr(expr->unop);
-		if (unop->type == EXPR_SYMBOL) {
-			*rl = where_allocated_rl(unop->symbol);
+		type = get_type(expr);
+		if (!type || type->type != SYM_ARRAY)
+			return 0;
+	}
+
+	if (expr->type == EXPR_SYMBOL) {
+		*rl = where_allocated_rl(expr->symbol);
+		return 1;
+	}
+
+	if (is_array(expr)) {
+		struct expression *array;
+		struct expression *offset_expr;
+		struct range_list *array_rl, *offset_rl, *bytes_rl, *res;
+		struct symbol *type;
+		sval_t bytes;
+
+		array = get_array_base(expr);
+		offset_expr = get_array_offset(expr);
+
+		type = get_type(array);
+		type = get_real_base_type(type);
+		bytes.type = ssize_t_ctype;
+		bytes.uvalue = type_bytes(type);
+		bytes_rl = alloc_rl(bytes, bytes);
+
+		get_absolute_rl(array, &array_rl);
+		get_absolute_rl(offset_expr, &offset_rl);
+
+		if (type_bytes(type)) {
+			res = rl_binop(offset_rl, '*', bytes_rl);
+			res = rl_binop(res, '+', array_rl);
+			*rl = res;
+			return true;
+		}
+
+		if (implied_not_equal(array, 0) ||
+		    implied_not_equal(offset_expr, 0)) {
+			*rl = alloc_rl(valid_ptr_min_sval, valid_ptr_max_sval);
 			return 1;
 		}
 
-		if (unop->type == EXPR_DEREF) {
-			int offset = get_member_offset_from_deref(unop);
+		return 0;
+	}
 
+	if (expr->type == EXPR_DEREF && expr->member) {
+		struct range_list *unop_rl;
+		int offset;
+
+		offset = get_member_offset_from_deref(expr);
+		unop = strip_expr(expr->unop);
+		if (unop->type == EXPR_PREOP && unop->op == '*')
 			unop = strip_expr(unop->unop);
-			if (unop->type == EXPR_SYMBOL) {
-				*rl = where_allocated_rl(unop->symbol);
-			} else if (unop->type == EXPR_PREOP && unop->op == '*') {
-				unop = strip_expr(unop->unop);
-				get_absolute_rl(unop, rl);
-			} else {
-				return 0;
-			}
 
+		if (offset >= 0 &&
+		    get_implied_rl(unop, &unop_rl) &&
+		    !is_whole_rl(unop_rl)) {
+			*rl = unop_rl;
 			add_offset_to_pointer(rl, offset);
+			return 1;
+		}
+
+		if (implied_not_equal(unop, 0) || offset > 0) {
+			*rl = alloc_rl(valid_ptr_min_sval, valid_ptr_max_sval);
 			return 1;
 		}
 

@@ -180,8 +180,8 @@ static void print_return_comparison(int return_id, char *return_ranges, struct e
 	struct compare_data *data;
 	struct var_sym *left, *right;
 	int left_param, right_param;
-	static char left_buf[256];
-	static char right_buf[256];
+	static char left_buf[248];
+	static char right_buf[248];
 	static char info_buf[256];
 	const char *tmp_name;
 
@@ -284,7 +284,7 @@ static int split_op_param_key(char *value, int *op, int *param, char **key)
 	if (!parse_comparison(&value, op))
 		return 0;
 
-	snprintf(buf, sizeof(buf), value);
+	snprintf(buf, sizeof(buf), "%s", value);
 
 	p = buf;
 	if (*p++ != '$')
@@ -357,6 +357,7 @@ void register_param_compare_limit(int id)
 {
 	compare_id = id;
 
+	set_dynamic_states(compare_id);
 	add_merge_hook(compare_id, &merge_compare_states);
 	add_split_return_callback(&print_return_comparison);
 
@@ -367,7 +368,7 @@ void register_param_compare_limit_links(int id)
 {
 	link_id = id;
 
+	set_dynamic_states(link_id);
 	add_merge_hook(link_id, &merge_links);
-
 }
 

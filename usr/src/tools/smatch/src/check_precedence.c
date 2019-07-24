@@ -120,6 +120,16 @@ static void match_mask(struct expression *expr)
 	sm_warning("shift has higher precedence than mask");
 }
 
+static void match_mask_compare(struct expression *expr)
+{
+	if (expr->op != '&')
+		return;
+	if (expr->right->type != EXPR_COMPARE)
+		return;
+
+	sm_warning("compare has higher precedence than mask");
+}
+
 static void match_subtract_shift(struct expression *expr)
 {
 	if (expr->op != SPECIAL_LEFTSHIFT)
@@ -138,5 +148,6 @@ void check_precedence(int id)
 	add_hook(&match_condition, CONDITION_HOOK);
 	add_hook(&match_binop, BINOP_HOOK);
 	add_hook(&match_mask, BINOP_HOOK);
+	add_hook(&match_mask_compare, BINOP_HOOK);
 	add_hook(&match_subtract_shift, BINOP_HOOK);
 }

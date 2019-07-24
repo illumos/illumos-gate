@@ -1,4 +1,4 @@
-/* Copyright © International Business Machines Corp., 2006
+/* Copyright Â© International Business Machines Corp., 2006
  *              Adelard LLP, 2007
  *
  * Author: Josh Triplett <josh@freedesktop.org>

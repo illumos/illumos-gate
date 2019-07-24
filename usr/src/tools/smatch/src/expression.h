@@ -261,6 +261,7 @@ struct token *assignment_expression(struct token *token, struct expression **tre
 extern void evaluate_symbol_list(struct symbol_list *list);
 extern struct symbol *evaluate_statement(struct statement *stmt);
 extern struct symbol *evaluate_expression(struct expression *);
+struct symbol *find_identifier(struct ident *ident, struct symbol_list *_list, int *offset);
 
 extern int expand_symbol(struct symbol *);
 

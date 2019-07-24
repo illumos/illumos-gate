@@ -21,7 +21,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 #
@@ -148,6 +148,9 @@ SMOFF += all_func_returns,deref_check,signed
 $(OBJS_DIR)/fmsmb.o := SMOFF += indenting
 $(OBJS_DIR)/zutil.o := SMOFF += indenting
 $(OBJS_DIR)/bootrd_cpio.o := SMOFF += allocating_enough_data
+
+# too hairy
+$(OBJS_DIR)/inflate.o := SMATCH=off
 
 #
 #	Default build targets.

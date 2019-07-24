@@ -20,6 +20,7 @@
 
 STATE(ignore);
 static struct stree *ignored;
+static struct stree *ignored_from_file;
 
 void add_ignore(int owner, const char *name, struct symbol *sym)
 {
@@ -54,7 +55,18 @@ int is_ignored_expr(int owner, struct expression *expr)
 		return 0;
 	ret = is_ignored(owner, name, sym);
 	free_string(name);
-	return ret;
+	if (ret)
+		return true;
+
+	name = get_macro_name(expr->pos);
+	if (name && get_state_stree(ignored_from_file, owner, name, NULL))
+		return true;
+
+	name = get_function();
+	if (name && get_state_stree(ignored_from_file, owner, name, NULL))
+		return true;
+
+	return false;
 }
 
 static void clear_ignores(void)
@@ -64,7 +76,39 @@ static void clear_ignores(void)
 	free_stree(&ignored);
 }
 
+static void load_ignores(void)
+{
+	struct token *token;
+	const char *name, *str;
+	int owner;
+	char buf[64];
+
+	snprintf(buf, sizeof(buf), "%s.ignored_warnings", option_project_str);
+	token = get_tokens_file(buf);
+	if (!token)
+		return;
+	if (token_type(token) != TOKEN_STREAMBEGIN)
+		return;
+	token = token->next;
+	while (token_type(token) != TOKEN_STREAMEND) {
+		if (token_type(token) != TOKEN_IDENT)
+			break;
+		name = show_ident(token->ident);
+		token = token->next;
+		owner = id_from_name(name);
+
+		if (token_type(token) != TOKEN_IDENT)
+			break;
+		str = show_ident(token->ident);
+		token = token->next;
+
+		set_state_stree_perm(&ignored_from_file, owner, str, NULL, &ignore);
+	}
+	clear_token_alloc();
+}
+
 void register_smatch_ignore(int id)
 {
 	add_hook(&clear_ignores, AFTER_FUNC_HOOK);
+	load_ignores();
 }

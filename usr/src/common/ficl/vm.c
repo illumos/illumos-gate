@@ -47,6 +47,10 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #include "ficl.h"
 
 #if FICL_ROBUST >= 2
@@ -2165,8 +2169,8 @@ ficlVmGetWordToPad(ficlVm *vm)
 	char *pad = (char *)vm->pad;
 	s = ficlVmGetWord(vm);
 
-	if (FICL_STRING_GET_LENGTH(s) > FICL_PAD_SIZE)
-		FICL_STRING_SET_LENGTH(s, FICL_PAD_SIZE);
+	if (FICL_STRING_GET_LENGTH(s) >= FICL_PAD_SIZE)
+		FICL_STRING_SET_LENGTH(s, FICL_PAD_SIZE - 1);
 
 	(void) strncpy(pad, FICL_STRING_GET_POINTER(s),
 	    FICL_STRING_GET_LENGTH(s));

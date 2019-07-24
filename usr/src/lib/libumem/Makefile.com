@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -112,7 +112,7 @@ CLOBBERFILES_standalone = $(LINKTEST_OBJ)
 CLOBBERFILES += $(CLOBBERFILES_$(CURTYPE))
 
 LIBS_standalone = $(STANDLIBRARY)
-LIBS_library = $(DYNLIB) $(LINTLIB)
+LIBS_library = $(DYNLIB)
 LIBS =	$(LIBS_$(CURTYPE))
 
 MAPFILE_SUPPLEMENTAL_standalone = ../common/stand_mapfile
@@ -127,8 +127,6 @@ LDFLAGS = $(LDFLAGS_$(CURTYPE))
 ASFLAGS_standalone = -DUMEM_STANDALONE
 ASFLAGS_library =
 ASFLAGS += -P $(ASFLAGS_$(CURTYPE)) -D_ASM
-
-$(LINTLIB) := SRCS = ../common/$(LINTSRC)
 
 # We want the thread-specific errno in the library, but we don't want it in
 # the standalone.  $(DTS_ERRNO) is designed to add -D_TS_ERRNO to $(CPPFLAGS),
@@ -157,13 +155,11 @@ CFLAGS += $(CFLAGS_$(CURTYPE)) $(CFLAGS_common)
 CFLAGS64_standalone = $(STAND_FLAGS_64)
 CFLAGS64 += $(CCVERBOSE) $(CFLAGS64_$(CURTYPE)) $(CFLAGS64_common)
 
-INSTALL_DEPS_library =		$(ROOTLINKS) $(ROOTLINT) $(ROOTLIBS)
+# false positive for umem_alloc_sizes_add()
+pics/umem.o := SMOFF += index_overflow
+objs/umem.o := SMOFF += index_overflow
 
-#
-# turn off ptr-cast warnings, since we do them all the time
-#
-LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
-LINTFLAGS64 +=	-erroff=E_BAD_PTR_CAST_ALIGN
+INSTALL_DEPS_library =		$(ROOTLINKS) $(ROOTLIBS)
 
 DYNFLAGS +=     $(ZINTERPOSE)
 

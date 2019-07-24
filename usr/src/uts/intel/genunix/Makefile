@@ -23,13 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
-
-#
-#	This makefile drives the production of the generic
-#	unix kernel module.
-#
-#	x86 implementation architecture dependent
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -46,9 +40,6 @@ GENUNIX		= $(OBJS_DIR)/$(MODULE)
 OBJECTS		= $(GENUNIX_OBJS:%=$(OBJS_DIR)/%) \
 		  $(NOT_YET_KMODS:%=$(OBJS_DIR)/%)
 
-LINTS		= $(GENUNIX_OBJS:%.o=$(LINTS_DIR)/%.ln) \
-		  $(NOT_YET_KMODS:%.o=$(LINTS_DIR)/%.ln)
-
 ROOTMODULE	= $(ROOT_KERN_DIR)/$(MODULE)
 
 LIBGEN		= $(OBJS_DIR)/libgenunix.so
@@ -63,7 +54,6 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(LIBGEN) $(GENUNIX)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(LIBGEN) $(GENUNIX) $(ROOTMODULE)
 
 #
@@ -88,18 +78,6 @@ CPPFLAGS	+= -I$(SRC)/uts/common/fs/zfs
 
 CPPFLAGS	+= -I$(UTSBASE)/i86pc
 
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-value
@@ -110,6 +88,9 @@ CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-clobbered
 CERRWARN	+= -_gcc=-Wno-empty-body
+
+# very hairy
+$(OBJS_DIR)/u8_textprep.o := SMATCH=off
 
 # false positives
 SMOFF += index_overflow
@@ -130,12 +111,6 @@ $(OBJS_DIR)/timers.o := SMOFF += signed_integer_overflow_check
 $(OBJS_DIR)/acl_common.o := SMOFF += or_vs_and
 
 #
-# Ensure that lint sees 'struct cpu' containing a fully declared
-# embedded 'struct machcpu'
-#
-LINTFLAGS	+= -D_MACHDEP -I../../i86pc
-
-#
 #	Default build targets.
 #
 .KEEP_STATE:
@@ -147,12 +122,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
@@ -190,8 +159,3 @@ include $(UTSBASE)/intel/Makefile.targ
 include	$(UTSBASE)/i86pc/Makefile.workarounds
 
 ALL_DEFS += $(WORKAROUND_DEFS)
-
-#
-# Override.
-#
-$(MODULE).lint := GEN_LINT_LIB =

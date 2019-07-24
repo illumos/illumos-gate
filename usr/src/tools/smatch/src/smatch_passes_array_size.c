@@ -39,11 +39,15 @@ static int find_param_eq(struct expression *expr, int size)
 static void match_call(struct expression *expr)
 {
 	struct expression *arg;
-	struct symbol *type;
+	struct symbol *type, *arg_type;
 	int size, bytes;
 	int i, nr;
 	char buf[16];
+	char elem_count[8];
+	char byte_count[8];
 
+	snprintf(elem_count, sizeof(elem_count), "%d", ELEM_COUNT);
+	snprintf(byte_count, sizeof(byte_count), "%d", BYTE_COUNT);
 
 	i = -1;
 	FOR_EACH_PTR(expr->args, arg) {
@@ -51,12 +55,16 @@ static void match_call(struct expression *expr)
 		type = get_type(arg);
 		if (!type || (type->type != SYM_PTR && type->type != SYM_ARRAY))
 			continue;
+		arg_type = get_arg_type(expr->fn, i);
+		if (arg_type != type)
+			continue;
+
 		size = get_array_size(arg);
 		if (size > 0) {
 			nr = find_param_eq(expr, size);
 			if (nr >= 0) {
-				snprintf(buf, sizeof(buf), "%d", nr);
-				sql_insert_caller_info(expr, ARRAYSIZE_ARG, i, buf, "");
+				snprintf(buf, sizeof(buf), "==$%d", nr);
+				sql_insert_caller_info(expr, ELEM_COUNT, i, buf, elem_count);
 				continue;
 			}
 		}
@@ -64,8 +72,8 @@ static void match_call(struct expression *expr)
 		if (bytes > 0) {
 			nr = find_param_eq(expr, bytes);
 			if (nr >= 0) {
-				snprintf(buf, sizeof(buf), "%d", nr);
-				sql_insert_caller_info(expr, SIZEOF_ARG, i, buf, "");
+				snprintf(buf, sizeof(buf), "==$%d", nr);
+				sql_insert_caller_info(expr, BYTE_COUNT, i, buf, byte_count);
 				continue;
 			}
 		}

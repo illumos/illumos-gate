@@ -24,6 +24,8 @@
 #
 # Copyright 2015 RackTop Systems.
 #
+# Copyright 2019 Joyent, Inc.
+#
 
 MYPROG = svc.configd
 MYOBJS = \
@@ -60,9 +62,12 @@ CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-unused-function
 CERRWARN += -_gcc=-Wno-uninitialized
+
+# strange false positive
+SMOFF += free
+
 MYLDLIBS = -lumem -luutil
 LDLIBS	+= -lsecdb -lbsm $(MYLDLIBS)
-LINTFLAGS += -errtags -erroff=E_BAD_FORMAT_ARG_TYPE2 -erroff=E_NAME_DEF_NOT_USED2
 
 CLOBBERFILES +=	$(MYPROG:%=%-native)
 
@@ -124,10 +129,6 @@ clean: FRC
 	$(RM) $(MYOBJS) $(MYOBJS:%.o=%-native.o)
 
 clobber:
-
-lint:   lint_SRCS
-
-lint_SRCS:
 
 include ../../Makefile.targ
 

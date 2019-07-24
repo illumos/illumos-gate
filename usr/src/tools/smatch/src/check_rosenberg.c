@@ -382,6 +382,7 @@ void check_rosenberg2(int id)
 		return;
 
 	my_member_id = id;
+	set_dynamic_states(my_member_id);
 	add_extra_mod_hook(&extra_mod_hook);
 }
 

@@ -43,10 +43,15 @@ struct smatch_state *merge_estates(struct smatch_state *s1, struct smatch_state 
 	tmp = alloc_estate_rl(value_ranges);
 	rlist = get_shared_relations(estate_related(s1), estate_related(s2));
 	set_related(tmp, rlist);
-	if (estate_has_hard_max(s1) && estate_has_hard_max(s2))
+
+	if ((estate_has_hard_max(s1) && (!estate_rl(s2) || estate_has_hard_max(s2))) ||
+	    (estate_has_hard_max(s2) && (!estate_rl(s1) || estate_has_hard_max(s1))))
 		estate_set_hard_max(tmp);
 
 	estate_set_fuzzy_max(tmp, sval_max(estate_get_fuzzy_max(s1), estate_get_fuzzy_max(s2)));
+
+	if (estate_capped(s1) && estate_capped(s2))
+		estate_set_capped(tmp);
 
 	return tmp;
 }
@@ -134,6 +139,21 @@ int estate_get_hard_max(struct smatch_state *state, sval_t *sval)
 	return 1;
 }
 
+bool estate_capped(struct smatch_state *state)
+{
+	if (!state)
+		return false;
+	/* impossible states are capped */
+	if (!estate_rl(state))
+		return true;
+	return get_dinfo(state)->capped;
+}
+
+void estate_set_capped(struct smatch_state *state)
+{
+	get_dinfo(state)->capped = true;
+}
+
 sval_t estate_min(struct smatch_state *state)
 {
 	return rl_min(estate_rl(state));
@@ -181,6 +201,8 @@ int estates_equiv(struct smatch_state *one, struct smatch_state *two)
 	if (one == two)
 		return 1;
 	if (!rlists_equiv(estate_related(one), estate_related(two)))
+		return 0;
+	if (estate_capped(one) != estate_capped(two))
 		return 0;
 	if (strcmp(one->name, two->name) == 0)
 		return 1;
@@ -269,6 +291,25 @@ struct smatch_state *clone_estate(struct smatch_state *state)
 	ret = __alloc_smatch_state(0);
 	ret->name = state->name;
 	ret->data = clone_dinfo(get_dinfo(state));
+	return ret;
+}
+
+struct smatch_state *clone_partial_estate(struct smatch_state *state, struct range_list *rl)
+{
+	struct smatch_state *ret;
+
+	if (!state)
+		return NULL;
+
+	rl = cast_rl(estate_type(state), rl);
+
+	ret = alloc_estate_rl(rl);
+	set_related(ret, clone_related_list(estate_related(state)));
+	if (estate_has_hard_max(state))
+		estate_set_hard_max(ret);
+	if (estate_has_fuzzy_max(state))
+		estate_set_fuzzy_max(ret, estate_get_fuzzy_max(state));
+
 	return ret;
 }
 
@@ -363,29 +404,6 @@ struct smatch_state *get_implied_estate(struct expression *expr)
 	if (!get_implied_rl(expr, &rl))
 		rl = alloc_whole_rl(get_type(expr));
 	return alloc_estate_rl(rl);
-}
-
-struct smatch_state *estate_filter_range(struct smatch_state *orig,
-				 sval_t filter_min, sval_t filter_max)
-{
-	struct range_list *rl;
-	struct smatch_state *state;
-
-	if (!orig)
-		orig = alloc_estate_whole(filter_min.type);
-
-	rl = remove_range(estate_rl(orig), filter_min, filter_max);
-	state = alloc_estate_rl(rl);
-	if (estate_has_hard_max(orig))
-		estate_set_hard_max(state);
-	if (estate_has_fuzzy_max(orig))
-		estate_set_fuzzy_max(state, estate_get_fuzzy_max(orig));
-	return state;
-}
-
-struct smatch_state *estate_filter_sval(struct smatch_state *orig, sval_t sval)
-{
-	return estate_filter_range(orig, sval, sval);
 }
 
 /*

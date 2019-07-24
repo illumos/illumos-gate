@@ -44,15 +44,12 @@ if [ "$PROJ" != "" ] ; then
 fi
 
 ${bin_dir}/remove_mixed_up_pointer_params.pl $db_file
+${bin_dir}/delete_too_common_fn_ptr.sh $db_file
 ${bin_dir}/mark_function_ptrs_searchable.pl $db_file
 
 # delete duplicate entrees and speed things up
 echo "delete from function_ptr where rowid not in (select min(rowid) from function_ptr group by file, function, ptr, searchable);" | sqlite3 $db_file
 
-test -e  ${bin_dir}/${PROJ}.return_fixes && \
-cat ${bin_dir}/${PROJ}.return_fixes | \
-while read func old new ; do
-    echo "update return_states set return = '$new' where function = '$func' and return = '$old';" | sqlite3 $db_file
-done
+${bin_dir}/apply_return_fixes.sh -p=${PROJ} $db_file
 
 mv $db_file smatch_db.sqlite

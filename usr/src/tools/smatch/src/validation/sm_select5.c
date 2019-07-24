@@ -25,7 +25,7 @@ void test(void)
  *
  * check-output-start
 sm_select5.c:15 test() implied: ret = '(-12)'
-sm_select5.c:16 test() implied: a = 's32min-s32max'
+sm_select5.c:16 test() implied: a = 's32min-(-1),4-s32max'
 sm_select5.c:18 test() implied: a = '0-3'
  * check-output-end
  */

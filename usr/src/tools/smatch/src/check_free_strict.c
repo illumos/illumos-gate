@@ -291,6 +291,38 @@ free:
 	return ret;
 }
 
+static void match_untracked(struct expression *call, int param)
+{
+	struct state_list *slist = NULL;
+	struct expression *arg;
+	struct sm_state *sm;
+	char *name;
+	char buf[64];
+	int len;
+
+	arg = get_argument_from_call_expr(call->args, param);
+	if (!arg)
+		return;
+
+	name = expr_to_var(arg);
+	if (!name)
+		return;
+	snprintf(buf, sizeof(buf), "%s->", name);
+	free_string(name);
+	len = strlen(buf);
+
+	FOR_EACH_MY_SM(my_id, __get_cur_stree(), sm) {
+		if (strncmp(sm->name, buf, len) == 0)
+			add_ptr_list(&slist, sm);
+	} END_FOR_EACH_SM(sm);
+
+	FOR_EACH_PTR(slist, sm) {
+		set_state(sm->owner, sm->name, sm->sym, &ok);
+	} END_FOR_EACH_PTR(sm);
+
+	free_slist(&slist);
+}
+
 void check_free_strict(int id)
 {
 	my_id = id;
@@ -311,4 +343,5 @@ void check_free_strict(int id)
 	add_pre_merge_hook(my_id, &pre_merge_hook);
 
 	select_return_states_hook(PARAM_FREED, &set_param_freed);
+	add_untracked_param_hook(&match_untracked);
 }

@@ -24,8 +24,12 @@ sqliteVdbeExec
 AslCompilerparse
 /* cmd/fs.d/autofs */
 nfsmount
+/* cmd/mdb */
+iob_doprnt
 /* cmd/pppd */
 lcp_nakci
+/* cmd/cmd-crypto */
+execute_cmd
 
 /* generated code */
 ipf_yyparse
