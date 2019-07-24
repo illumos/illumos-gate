@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * File Descriptor I/O Backend
  *
@@ -167,19 +165,32 @@ static const mdb_io_ops_t fdio_file_ops = {
 };
 
 /*
+ * Read media logical block size. On error, return DEV_BSIZE.
+ */
+static uint_t
+fdio_bdev_info(int fd)
+{
+	struct dk_minfo disk_info;
+
+	if ((ioctl(fd, DKIOCGMEDIAINFO, (caddr_t)&disk_info)) == -1)
+		return (DEV_BSIZE);
+
+	return (disk_info.dki_lbsize);
+}
+
+/*
  * In order to read from a block-oriented device, we pick up the seek pointer,
  * read each containing block, and then copy the desired range of bytes back
- * into the caller's buffer.  Unfortunately Solaris hardcodes the notion of
- * DEV_BSIZE as the transfer unit for such devices; no ioctl() to obtain the
- * transfer unit dynamically is currently available.  At the end of the
- * transfer we reset the seek pointer to where the caller thinks it should be.
+ * into the caller's buffer. At the end of the transfer we reset the seek
+ * pointer to where the caller thinks it should be.
  */
 static ssize_t
 fdio_bdev_read(mdb_io_t *io, void *buf, size_t nbytes)
 {
 	fd_data_t *fdp = io->io_data;
 	ssize_t resid = nbytes;
-	uchar_t blk[DEV_BSIZE];
+	size_t blksize;
+	uchar_t *blk;
 	off64_t off;
 
 	if (io->io_next != NULL)
@@ -188,12 +199,14 @@ fdio_bdev_read(mdb_io_t *io, void *buf, size_t nbytes)
 	if ((off = lseek64(fdp->fd_fd, 0, SEEK_CUR)) == -1)
 		return (-1); /* errno is set for us */
 
+	blksize = fdio_bdev_info(fdp->fd_fd);
+	blk = mdb_zalloc(blksize, UM_SLEEP | UM_GC);
 	while (resid != 0) {
-		off64_t devoff = off & ~(DEV_BSIZE - 1);
-		size_t blkoff = off & (DEV_BSIZE - 1);
-		size_t len = MIN(resid, DEV_BSIZE - blkoff);
+		off64_t devoff = off & ~(blksize - 1);
+		size_t blkoff = off & (blksize - 1);
+		size_t len = MIN(resid, blksize - blkoff);
 
-		if (pread64(fdp->fd_fd, blk, DEV_BSIZE, devoff) != DEV_BSIZE)
+		if (pread64(fdp->fd_fd, blk, blksize, devoff) != blksize)
 			break; /* errno is set for us, unless EOF */
 
 		bcopy(&blk[blkoff], buf, len);
@@ -220,7 +233,8 @@ fdio_bdev_write(mdb_io_t *io, const void *buf, size_t nbytes)
 {
 	fd_data_t *fdp = io->io_data;
 	ssize_t resid = nbytes;
-	uchar_t blk[DEV_BSIZE];
+	size_t blksize;
+	uchar_t *blk;
 	off64_t off;
 
 	if (io->io_next != NULL)
@@ -229,17 +243,19 @@ fdio_bdev_write(mdb_io_t *io, const void *buf, size_t nbytes)
 	if ((off = lseek64(fdp->fd_fd, 0, SEEK_CUR)) == -1)
 		return (-1); /* errno is set for us */
 
+	blksize = fdio_bdev_info(fdp->fd_fd);
+	blk = mdb_zalloc(blksize, UM_SLEEP | UM_GC);
 	while (resid != 0) {
-		off64_t devoff = off & ~(DEV_BSIZE - 1);
-		size_t blkoff = off & (DEV_BSIZE - 1);
-		size_t len = MIN(resid, DEV_BSIZE - blkoff);
+		off64_t devoff = off & ~(blksize - 1);
+		size_t blkoff = off & (blksize - 1);
+		size_t len = MIN(resid, blksize - blkoff);
 
-		if (pread64(fdp->fd_fd, blk, DEV_BSIZE, devoff) != DEV_BSIZE)
+		if (pread64(fdp->fd_fd, blk, blksize, devoff) != blksize)
 			break; /* errno is set for us, unless EOF */
 
 		bcopy(buf, &blk[blkoff], len);
 
-		if (pwrite64(fdp->fd_fd, blk, DEV_BSIZE, devoff) != DEV_BSIZE)
+		if (pwrite64(fdp->fd_fd, blk, blksize, devoff) != blksize)
 			break; /* errno is set for us, unless EOF */
 
 		resid -= len;
