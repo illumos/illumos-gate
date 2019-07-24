@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
@@ -1003,12 +1003,33 @@ mac_pdata_update(mac_handle_t mh, void *mac_pdata, size_t dsize)
 }
 
 /*
- * Invoked by driver as well as the framework to notify its capability change.
+ * The mac provider or mac frameowrk calls this function when it wants
+ * to notify upstream consumers that the capabilities have changed and
+ * that they should modify their own internal state accordingly.
+ *
+ * We currently have no regard for the fact that a provider could
+ * decide to drop capabilities which would invalidate pending traffic.
+ * For example, if one was to disable the Tx checksum offload while
+ * TCP/IP traffic was being sent by mac clients relying on that
+ * feature, then those packets would hit the write with missing or
+ * partial checksums. A proper solution involves not only providing
+ * notfication, but also performing client quiescing. That is, a capab
+ * change should be treated as an atomic transaction that forms a
+ * barrier between traffic relying on the current capabs and traffic
+ * relying on the new capabs. In practice, simnet is currently the
+ * only provider that could hit this, and it's an easily avoidable
+ * situation (and at worst it should only lead to some dropped
+ * packets). But if we ever want better on-the-fly capab change to
+ * actual hardware providers, then we should give this update
+ * mechanism a proper implementation.
  */
 void
 mac_capab_update(mac_handle_t mh)
 {
-	/* Send MAC_NOTE_CAPAB_CHG notification */
+	/*
+	 * Send a MAC_NOTE_CAPAB_CHG notification to alert upstream
+	 * clients to renegotiate capabilities.
+	 */
 	i_mac_notify((mac_impl_t *)mh, MAC_NOTE_CAPAB_CHG);
 }
 
@@ -1308,6 +1329,19 @@ i_mac_notify_thread(void *arg)
 				mip->mi_linkstate = newstate;
 				bits |= 1 << MAC_NOTE_LINK;
 			}
+		}
+
+		/*
+		 * Depending on which capabs have changed, the Tx
+		 * checksum flags may also need to be updated.
+		 */
+		if ((bits & (1 << MAC_NOTE_CAPAB_CHG)) != 0) {
+			mac_perim_handle_t mph;
+			mac_handle_t mh = (mac_handle_t)mip;
+
+			mac_perim_enter_by_mh(mh, &mph);
+			mip->mi_tx_cksum_flags = mac_features_to_flags(mh);
+			mac_perim_exit(mph);
 		}
 
 		/*

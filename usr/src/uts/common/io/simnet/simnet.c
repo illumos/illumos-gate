@@ -1385,6 +1385,12 @@ simnet_m_setprop(void *arg, const char *name, mac_prop_id_t num,
 		break;
 	}
 
+	/*
+	 * We may have modified the configuration of hardware
+	 * offloads. Make sure to renegotiate capabilities with the
+	 * upstream clients.
+	 */
+	mac_capab_update(sdev->sd_mh);
 	return (err);
 }
 

@@ -439,7 +439,7 @@ struct mac_impl_s {
 	mac_capab_led_t		mi_led;
 
 	/* Cache of the Tx DB_CKSUMFLAGS that this MAC supports. */
-	uint16_t		mi_tx_cksum_flags; /* WO */
+	uint16_t		mi_tx_cksum_flags; /* SL */
 
 	/*
 	 * MAC address and VLAN lists. SL protected.

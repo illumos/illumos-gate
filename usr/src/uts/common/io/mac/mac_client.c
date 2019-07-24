@@ -3673,7 +3673,7 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 
 			mp->b_next = NULL;
 
-			if (needed != 0) {
+			if ((needed & (HCK_TX_FLAGS | HW_LSO_FLAGS)) != 0) {
 				mac_emul_t emul = 0;
 
 				if (needed & HCK_IPV4_HDRCKSUM)
