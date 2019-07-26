@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * PICL plug-in that listens to sysevent and posts picl events
  */
@@ -111,7 +109,7 @@ parse_piclevent(nvlist_t *nvlp)
 		return;
 
 	packed_nvl = NULL;
-	if (nvlist_pack(nvlp, &packed_nvl, &nvl_size, NV_ENCODE_NATIVE, NULL))
+	if (nvlist_pack(nvlp, &packed_nvl, &nvl_size, NV_ENCODE_NATIVE, 0))
 		return;
 
 	ename = strdup(enval);
@@ -158,7 +156,7 @@ event_handler(void *cookie, char *argp, size_t asize,
 	    (cred.dc_euid != 0))
 		(void) door_return(argp, 0, NULL, 0);
 
-	if (nvlist_unpack(argp, asize, &nvlp, NULL))
+	if (nvlist_unpack(argp, asize, &nvlp, 0))
 		(void) door_return(argp, 0, NULL, 0);
 
 	if (nvlist_lookup_string(nvlp, PICLEVENTARG_DATA_TYPE, &dtype)) {

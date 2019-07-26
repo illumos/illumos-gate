@@ -115,7 +115,7 @@ uberdata_addr(struct ps_prochandle *Pr, char dmodel)
 	GElf_Sym sym;
 
 	if (Plookup_by_name(Pr, "libc.so", "_tdb_bootstrap", &sym) < 0)
-		return (NULL);
+		return ((uintptr_t)NULL);
 #ifdef _LP64
 	if (dmodel != PR_MODEL_NATIVE) {
 		caddr32_t uaddr;
@@ -143,7 +143,7 @@ uberdata_addr(struct ps_prochandle *Pr, char dmodel)
 			return (uaddr);
 	}
 	if (Plookup_by_name(Pr, "libc.so", "_uberdata", &sym) < 0)
-		return (0);
+		return ((uintptr_t)NULL);
 	return (sym.st_value);
 }
 
@@ -335,7 +335,7 @@ look(char *arg)
 			}
 		} else if (sig == SIGCLD) {
 			s = sigflags(sig,
-			    sp->sa_flags & (SA_NOCLDWAIT|SA_NOCLDSTOP));
+			    sp->sa_flags & (SA_NOCLDWAIT | SA_NOCLDSTOP));
 			if (*s != '\0')
 				(void) printf("\t\t%s", s);
 		}
@@ -372,10 +372,10 @@ sigflags(int sig, int flags)
 	static char code_buf[100];
 	char *str = code_buf;
 	int flagmask =
-	    (SA_ONSTACK|SA_RESETHAND|SA_RESTART|SA_SIGINFO|SA_NODEFER);
+	    (SA_ONSTACK | SA_RESETHAND | SA_RESTART | SA_SIGINFO | SA_NODEFER);
 
 	if (sig == SIGCLD)
-		flagmask |= (SA_NOCLDSTOP|SA_NOCLDWAIT);
+		flagmask |= (SA_NOCLDSTOP | SA_NOCLDWAIT);
 
 	*str = '\0';
 	if (flags & ~flagmask)

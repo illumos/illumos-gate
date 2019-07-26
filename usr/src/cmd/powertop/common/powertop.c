@@ -52,13 +52,13 @@
  * These are ordered by type, grouped by usage.
  */
 int			g_bit_depth;
-int 			g_total_events, g_top_events;
+int			g_total_events, g_top_events;
 int			g_npstates, g_max_cstate, g_longest_cstate;
 uint_t			g_features;
 uint_t			g_ncpus;
 uint_t			g_ncpus_observed;
 
-processorid_t 		*g_cpu_table;
+processorid_t		*g_cpu_table;
 
 double			g_interval_length;
 hrtime_t		g_total_c_time;
@@ -67,7 +67,7 @@ uchar_t			g_op_mode;
 boolean_t		g_gui;
 uint_t			g_observed_cpu;
 
-event_info_t    	g_event_info[EVENT_NUM_MAX];
+event_info_t		g_event_info[EVENT_NUM_MAX];
 state_info_t		g_cstate_info[NSTATES];
 freq_state_info_t	g_pstate_info[NSTATES];
 cpu_power_info_t	*g_cpu_power_states;
@@ -94,7 +94,7 @@ int
 main(int argc, char **argv)
 {
 	double		interval, interval_usr;
-	hrtime_t 	interval_start;
+	hrtime_t	interval_start;
 	int		index2 = 0, c, dump_count = 0;
 	char		*endptr, key;
 	boolean_t	root_user = B_FALSE;
@@ -147,7 +147,7 @@ main(int argc, char **argv)
 			g_gui = B_FALSE;
 			dump_count = (int)strtod(optarg, &endptr);
 
-			if (dump_count <= 0 || *endptr != NULL) {
+			if (dump_count <= 0 || *endptr != '\0') {
 				pt_usage();
 				exit(EXIT_USAGE);
 			}
@@ -163,7 +163,7 @@ main(int argc, char **argv)
 			interval = interval_usr = (double)strtod(optarg,
 			    &endptr);
 
-			if (*endptr != NULL || interval < 1 ||
+			if (*endptr != '\0' || interval < 1 ||
 			    interval > INTERVAL_MAX) {
 				pt_usage();
 				exit(EXIT_USAGE);

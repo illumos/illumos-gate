@@ -24,8 +24,6 @@
  * Copyright 2012 Joyent, Inc.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/mman.h>
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -244,7 +242,7 @@ advance_prpageheader_cur_nextmapping(prpageheader_cur_t *pcp)
 next:
 	ASSERT(pcp->pr_map < pcp->pr_nmap);
 	if ((pcp->pr_map + 1) == pcp->pr_nmap)
-		return (NULL);
+		return ((uintptr_t)NULL);
 	pcp->pr_map++;
 	if (pcp->pr_pgoff < pcp->pr_npage) {
 		pcp->pr_pdaddr = (caddr_t)(uintptr_t)
@@ -430,8 +428,8 @@ OR_pagedata(prpageheader_t *src, prpageheader_t *dst, int *mappings_changedp)
 	 */
 	src_addr = (uintptr_t)set_prpageheader_cur(&src_cur, src, NULL, -1);
 	dst_addr = (uintptr_t)set_prpageheader_cur(&dst_cur, dst, NULL, -1);
-	while (src_addr != NULL && dst_addr != NULL) {
-		while (src_addr == dst_addr && src_addr != NULL) {
+	while (src_addr != (uintptr_t)NULL && dst_addr != (uintptr_t)NULL) {
+		while (src_addr == dst_addr && src_addr != (uintptr_t)NULL) {
 			*(char *)dst_cur.pr_pdaddr |=
 			    *(char *)src_cur.pr_pdaddr;
 			src_addr = (uintptr_t)advance_prpageheader_cur(
@@ -443,8 +441,8 @@ OR_pagedata(prpageheader_t *src, prpageheader_t *dst, int *mappings_changedp)
 			mappings_changed = 1;
 		src_addr = advance_prpageheader_cur_nextmapping(&src_cur);
 		dst_addr = advance_prpageheader_cur_nextmapping(&dst_cur);
-		while (src_addr != dst_addr && src_addr != NULL && dst_addr !=
-		    NULL) {
+		while (src_addr != dst_addr && src_addr != (uintptr_t)NULL &&
+		    dst_addr != (uintptr_t)NULL) {
 			mappings_changed = 1;
 			if (src_addr < dst_addr)
 				src_addr = advance_prpageheader_cur_nextmapping(
@@ -849,7 +847,8 @@ next:
 			while (endaddr != NULL &&
 			    *(caddr_t)cur.pr_pdaddr == 0 &&
 			    (((intptr_t)endaddr - (intptr_t)vicaddr) /
-				1024) < excess);
+			    1024) < excess)
+				;
 			st_debug(STDL_HIGH, lcol, "endaddr %p, *cur %d\n",
 			    endaddr, *(caddr_t)cur.pr_pdaddr);
 
@@ -992,7 +991,7 @@ void
 scan_abort(void)
 {
 	if (scan_pr != NULL)
-		(void) Prelease(scan_pr, NULL);
+		(void) Prelease(scan_pr, 0);
 }
 
 static void

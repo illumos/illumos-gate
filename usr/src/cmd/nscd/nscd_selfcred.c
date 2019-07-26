@@ -1509,7 +1509,8 @@ check_user_process(void *arg)
 }
 
 static nscd_rc_t
-init_user_proc_monitor() {
+init_user_proc_monitor(void)
+{
 
 	int	errnum;
 	char	*me = "init_user_proc_monitor";
@@ -1521,8 +1522,8 @@ init_user_proc_monitor() {
 	 * start a thread to make sure there is at least a process
 	 * running as the PUN user. If not, terminate this PUN.
 	 */
-	if (thr_create(NULL, NULL, check_user_process,
-		NULL, THR_DETACHED, NULL) != 0) {
+	if (thr_create(NULL, 0, check_user_process,
+	    NULL, THR_DETACHED, NULL) != 0) {
 		errnum = errno;
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_ERROR)
 		(me, "thr_create: %s\n", strerror(errnum));

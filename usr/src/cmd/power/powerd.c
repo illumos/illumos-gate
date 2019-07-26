@@ -308,7 +308,7 @@ main(int argc, char *argv[])
 	if ((pb_fd = open(PB, O_RDONLY)) != -1) {
 		if (powerd_debug)
 			logerror("powerd starting power button monitor.");
-		if (thr_create(NULL, NULL,
+		if (thr_create(NULL, 0,
 		    (void *(*)(void *))power_button_monitor, NULL,
 		    THR_DAEMON, NULL) != 0) {
 			logerror("Unable to monitor system's power button.");
@@ -323,7 +323,7 @@ main(int argc, char *argv[])
 	 */
 	if (powerd_debug)
 		logerror("powerd starting system activity monitor.");
-	if (thr_create(NULL, NULL,
+	if (thr_create(NULL, 0,
 	    (void *(*)(void *))system_activity_monitor, NULL,
 	    THR_DAEMON, NULL) != 0) {
 		logerror("Unable to create thread to monitor system activity.");
@@ -335,7 +335,7 @@ main(int argc, char *argv[])
 	 */
 	if (powerd_debug)
 		logerror("powerd starting autos3 monitor.");
-	if (thr_create(NULL, NULL,
+	if (thr_create(NULL, 0,
 	    (void *(*)(void *))autos3_monitor, NULL, THR_DAEMON, NULL) != 0) {
 		logerror("Unable to create thread to monitor autos3 activity.");
 	}
@@ -1246,7 +1246,7 @@ do_attach(void)
 	    (estar_v3_prop && strcmp(asinfo.apm_behavior, "default") == 0)) {
 		if (powerd_debug)
 			logerror("powerd starting device attach thread.");
-		if (thr_create(NULL, NULL, attach_devices, NULL,
+		if (thr_create(NULL, 0, attach_devices, NULL,
 		    THR_DAEMON, NULL) != 0) {
 			logerror("Unable to create thread to attach devices.");
 		}

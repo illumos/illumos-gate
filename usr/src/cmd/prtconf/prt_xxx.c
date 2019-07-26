@@ -394,7 +394,7 @@ dump_priv_data(int ilev, di_node_t node)
 	uintptr_t priv;
 	struct priv_data *pdp;
 
-	if ((priv = (uintptr_t)di_parent_private_data(node)) == NULL)
+	if ((priv = (uintptr_t)di_parent_private_data(node)) == (uintptr_t)NULL)
 		return;
 
 	if ((pdp = match_priv_data(node)) == NULL) {

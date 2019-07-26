@@ -354,6 +354,29 @@ function build {
 }
 
 #
+# Bootstrap build tools which are pre-requisites for the rest of the build.
+#
+function bootstrap_tools {
+	echo "\n==== Bootstrapping tools at `date` ====\n" >> $LOGFILE
+
+	typeset INSTALLOG=install-bootstrap-${MACH}
+
+	rm -f $TMPDIR/make-state ${TOOLS}/$INSTALLOG.out
+	cd ${TOOLS}
+	/bin/time $MAKE -K $TMPDIR/make-state -e TARGET=install bootstrap \
+	    2>&1 | tee -a ${TOOLS}/$INSTALLOG.out >> $LOGFILE
+
+	echo "\n==== Bootstrap build errors ====\n" >> $mail_msg_file
+
+	egrep ":" ${TOOLS}/$INSTALLOG.out |
+	    egrep -e "(${MAKE}:|[ 	]error[: 	\n])" | \
+	    egrep -v warning | tee $TMPDIR/bootstrap_errors >> $mail_msg_file
+
+	[[ -s $TMPDIR/bootstrap_errors ]] && return 1
+	return 0
+}
+
+#
 # Build and install the onbld tools.
 #
 # usage: build_tools DESTROOT
@@ -1521,13 +1544,8 @@ fi
 [[ -f "${CODEMGR_WS}/usr/src/Makefile" ]] || fatal_error "Error: ${CODEMGR_WS}/usr/src/Makefile not found."
 
 if [[ "$t_FLAG" = "y" ]]; then
-	echo "\n==== Bootstrapping cw ====\n" >> $LOGFILE
-	( cd ${TOOLS}
-	  set_non_debug_build_flags
-	  rm -f $TMPDIR/make-state
-	  $MAKE -K $TMPDIR/make-state -e TARGET=install cw 2>&1 >> $LOGFILE
-	  [[ "$?" -ne 0 ]] && fatal_error "Error: could not bootstrap cw"
-	)
+	set_non_debug_build_flags
+	bootstrap_tools || fatal_error "Error: could not bootstrap tools"
 
 	# Switch ONBLD_TOOLS early if -t is specified so that
 	# we could use bootstrapped cw for compiler checks.

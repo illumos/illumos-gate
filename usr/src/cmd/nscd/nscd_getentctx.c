@@ -767,7 +767,7 @@ _nscd_init_getent_ctx_monitor()
 	/*
 	 * start a thread to reclaim unused getent contexts
 	 */
-	if (thr_create(NULL, NULL, reclaim_getent_ctx,
+	if (thr_create(NULL, 0, reclaim_getent_ctx,
 	    NULL, THR_DETACHED, NULL) != 0) {
 		errnum = errno;
 		_NSCD_LOG(NSCD_LOG_GETENT_CTX, NSCD_LOG_LEVEL_ERROR)

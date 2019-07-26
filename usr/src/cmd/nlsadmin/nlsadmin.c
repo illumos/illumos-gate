@@ -356,7 +356,7 @@ main(int argc, char **argv)
 			ptr = strchr(buf, ':');
 			ptr++;
 			ptr2 = strchr(ptr, ':');
-			*ptr2 = NULL;
+			*ptr2 = '\0';
 			if (strcmp(ptr, LISTENTYPE) != 0) {
 				sprintf(mesg, "Network specification \"%s\" is not of type %s", netspec, LISTENTYPE);
 				nlsmesg(MM_ERROR, mesg);
@@ -555,7 +555,7 @@ prt_cmd(char *path, long flags, char *modules, char *addr, char *rpcp)
 	}
 
 	if ((tmp = strchr(path, ' ')) != NULL) 
-		*tmp = NULL;
+		*tmp = '\0';
 
 	if (stat(path, &sbuf) < 0) {
 		if (errno != EFAULT) {
@@ -600,7 +600,7 @@ old_addsvc(char *svc, char *addr, char *cmd, char *com, char *module,
 	}
 
 	if ((tmp = strchr(cmd, ' ')) != NULL) 
-		*tmp = NULL;
+		*tmp = '\0';
 
 	if (stat(cmd, &sbuf) < 0) {
 		if (errno != EFAULT) {
@@ -693,8 +693,8 @@ prt_nets(char *netspec)
 			return(NLS_SYSERR);
 		if ((state = nexttok(NULL, ":")) == NULL)
 			return(NLS_SYSERR);
-		if (strcmp(state, "ENABLED") == NULL ||
-		    strcmp(state, "STARTING") == NULL) {
+		if (strcmp(state, "ENABLED") == 0 ||
+		    strcmp(state, "STARTING") == 0) {
 			rtn = QZERO;
 			if (!Quietflag)
 				printf("%s\t%s\n", name, "ACTIVE");
@@ -1248,11 +1248,11 @@ svc_format(char *buf, struct svcfields *entry)
 	entry->pmtag = buf;
 	if ((ptr = strchr(buf, ':')) == NULL)
 		return(BADPMFMT);
-	*ptr++ = NULL;
+	*ptr++ = '\0';
 	entry->pmtype = ptr;
 	if ((ptr = strchr(entry->pmtype, ':')) == NULL)
 		return(BADPMFMT);
-	*ptr++ = NULL;
+	*ptr++ = '\0';
 	entry->svc_code = ptr;
 
 	if (strcmp(entry->pmtype, LISTENTYPE) != 0)
@@ -1260,35 +1260,35 @@ svc_format(char *buf, struct svcfields *entry)
 
 	if ((ptr = strchr(entry->svc_code, ':')) == NULL)
 		return(BADPMFMT);
-	*ptr++ = NULL;
+	*ptr++ = '\0';
 	entry->flags = ptr;
 	if ((ptr = strchr(entry->flags, ':')) == NULL)
 		return(BADPMFMT);
-	*ptr++ = NULL;
+	*ptr++ = '\0';
 	entry->id = ptr;
 	if ((ptr = strchr(entry->id, ':')) == NULL)
 		return(BADPMFMT);
-	*ptr++ = NULL;
+	*ptr++ = '\0';
 	entry->res1 = ptr;
 	if ((ptr = strchr(entry->res1, ':')) == NULL)
 		return(BADPMFMT);
-	*ptr++ = NULL;
+	*ptr++ = '\0';
 	entry->res2 = ptr;
 	if ((ptr = strchr(entry->res2, ':')) == NULL)
 		return(BADPMFMT);
-	*ptr++ = NULL;
+	*ptr++ = '\0';
 	entry->res3 = ptr;
 	if ((ptr = strchr(entry->res3, ':')) == NULL)
 		return(BADPMFMT);
-	*ptr++ = NULL;
+	*ptr++ = '\0';
 	entry->addr = ptr;
 	if ((ptr = strchr(entry->addr, ':')) == NULL)
 		return(BADLISFMT);
-	*ptr++ = NULL;
+	*ptr++ = '\0';
 	entry->rpc = ptr;
 	if ((ptr = strchr(entry->rpc, ':')) == NULL)
 		return(BADLISFMT);
-	*ptr++ = NULL;
+	*ptr++ = '\0';
 	if (*entry->rpc) {
 		if ((tmp = strchr(entry->rpc, ',')) == NULL)
 			return(BADLISFMT);
@@ -1297,15 +1297,15 @@ svc_format(char *buf, struct svcfields *entry)
 	entry->lflags = ptr;
 	if ((ptr = strchr(entry->lflags, ':')) == NULL)
 		return(BADLISFMT);
-	*ptr++ = NULL;
+	*ptr++ = '\0';
 	entry->modules = ptr;
 	if ((ptr = strchr(entry->modules, ':')) == NULL)
 		return(BADLISFMT);
-	*ptr++ = NULL;
+	*ptr++ = '\0';
 	entry->command = ptr;
 	if ((ptr = strchr(entry->command, '#')) == NULL)
 		return(BADLISFMT);
-	*ptr++ = NULL;
+	*ptr++ = '\0';
 	entry->comment = ptr;
 	return(NLS_OK);
 }

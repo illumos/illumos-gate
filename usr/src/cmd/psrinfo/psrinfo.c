@@ -575,7 +575,7 @@ main(int argc, char **argv)
 
 		if (strcmp(ksp->ks_module, "cpu_info") != 0)
 			continue;
-		if (kstat_read(kc, ksp, NULL) == NULL)
+		if (kstat_read(kc, ksp, NULL) == -1)
 			die(_("kstat_read() failed"));
 
 		vc = find_link(&vcpus, ksp->ks_instance, &ins);

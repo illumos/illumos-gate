@@ -24,10 +24,8 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #include	<stdio.h>
@@ -467,12 +465,8 @@ print_procs(idtype_t idtype, int idargc, char *idargv[])
  * all in the same class and then execute the sub-command for that class.
  */
 static void
-set_procs(clname, idtype, idargc, idargv, subcmdargv)
-char		*clname;
-idtype_t	idtype;
-int		idargc;
-char		**idargv;
-char		**subcmdargv;
+set_procs(char *clname, idtype_t idtype, int idargc, char **idargv,
+    char **subcmdargv)
 {
 	char			idstr[PC_IDTYPNMSZ];
 	char			myidstr[PC_IDTYPNMSZ];
@@ -739,9 +733,7 @@ retry:
  * execute the sub-command for our own current class.
  */
 static void
-exec_cmd(clname, subcmdargv)
-char	*clname;
-char	**subcmdargv;
+exec_cmd(char *clname, char **subcmdargv)
 {
 	pcinfo_t	pcinfo;
 	char		clnmbuf[PC_CLNMSZ];
@@ -791,12 +783,8 @@ char	**subcmdargv;
  * information.
  */
 static void
-ids2pids(idtype, idlist, nids, clpids, nclass)
-idtype_t	idtype;
-id_t		*idlist;
-int		nids;
-classpids_t	*clpids;
-int		nclass;
+ids2pids(idtype_t idtype, id_t *idlist, int nids, classpids_t *clpids,
+    int	 nclass)
 {
 	static psinfo_t		prinfo;
 	static prcred_t		prcred;
@@ -992,11 +980,7 @@ retry:
  * pidlist.
  */
 static void
-add_pid_tolist(clpids, nclass, clname, pid)
-classpids_t	*clpids;
-int		nclass;
-char		*clname;
-pid_t		pid;
+add_pid_tolist(classpids_t *clpids, int nclass, char *clname, pid_t pid)
 {
 	classpids_t	*clp;
 
@@ -1033,11 +1017,7 @@ increase_pidlist(classpids_t *clp)
  * just compare to curidstr.
  */
 static boolean_t
-idmatch(idstr, curidstr, idargc, idargv)
-char	*idstr;
-char	*curidstr;
-int	idargc;
-char	**idargv;
+idmatch(char *idstr, char *curidstr, int idargc, char **idargv)
 {
 	int	i;
 
@@ -1061,22 +1041,16 @@ char	**idargv;
  */
 
 static int
-prio_getopt(argc, argv, opts)
-int	argc;
-#ifdef __STDC__
-char	*const *argv, *opts;
-#else
-char	**argv, *opts;
-#endif
+prio_getopt(int argc, char * const *argv, char *opts)
 {
-	register char c;
-	register char *cp;
+	char c;
+	char *cp;
 
 	if (prio_sp == 1)
 		if (prio_optind >= argc ||
 		    argv[prio_optind][0] != '-' || argv[prio_optind][1] == '\0')
 			return (EOF);
-		else if (strcmp(argv[prio_optind], "--") == NULL) {
+		else if (strcmp(argv[prio_optind], "--") == 0) {
 			prio_optind++;
 			return (EOF);
 		}

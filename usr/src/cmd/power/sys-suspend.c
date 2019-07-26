@@ -197,7 +197,7 @@ wait_for_auqueue()
 	au_stat_t	au_stat;
 	int		retries = 10;
 
-	while (retries-- && auditon(A_GETSTAT, (caddr_t)&au_stat, NULL) == 0) {
+	while (retries-- && auditon(A_GETSTAT, (caddr_t)&au_stat, 0) == 0) {
 		if (au_stat.as_enqueue == au_stat.as_written) {
 			break;
 		}

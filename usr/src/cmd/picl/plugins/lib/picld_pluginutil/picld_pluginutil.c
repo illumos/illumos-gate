@@ -132,38 +132,38 @@ verbose_log(int pri, const char *fmt, ...)
 static void
 undo_commands(cmdbuf_t *cmds, int last_cmd_index)
 {
-	int 		i;
+	int		i;
 	command_t	*com = cmds->commands;
 
 	for (i = last_cmd_index; i >= 0; i--) {
 		switch (com[i].type) {
 		case TOK_NODE:
-			if (com[i].nodecmd_nodeh == NULL)
+			if (com[i].nodecmd_nodeh == 0)
 				break;
 
 			(void) ptree_delete_node(com[i].nodecmd_nodeh);
 			(void) ptree_destroy_node(com[i].nodecmd_nodeh);
 			break;
 		case TOK_REFNODE:
-			if (com[i].refnodecmd_nodeh == NULL)
+			if (com[i].refnodecmd_nodeh == 0)
 				break;
 			(void) ptree_delete_node(com[i].refnodecmd_nodeh);
 			(void) ptree_destroy_node(com[i].refnodecmd_nodeh);
 			break;
 		case TOK_PROP:
-			if (com[i].propcmd_proph == NULL)
+			if (com[i].propcmd_proph == 0)
 				break;
 			(void) ptree_delete_prop(com[i].propcmd_proph);
 			(void) ptree_destroy_prop(com[i].propcmd_proph);
 			break;
 		case TOK_REFPROP:
-			if (com[i].refpropcmd_proph == NULL)
+			if (com[i].refpropcmd_proph == 0)
 				break;
 			(void) ptree_delete_prop(com[i].refpropcmd_proph);
 			(void) ptree_destroy_prop(com[i].refpropcmd_proph);
 			break;
 		case TOK_TABLE:
-			if ((com[i].tablecmd_tblh == NULL) ||
+			if ((com[i].tablecmd_tblh == 0) ||
 			    (com[i].tablecmd_newtbl == 0))
 				break;
 			(void) ptree_delete_prop(com[i].tablecmd_tblh);
@@ -335,7 +335,7 @@ parse_node(char *line, command_t *command)
 
 	command->nodecmd_nodename = strdup(nametok);
 	command->nodecmd_classname = strdup(classtok);
-	command->nodecmd_nodeh = NULL;
+	command->nodecmd_nodeh = 0;
 	if ((command->nodecmd_nodename == NULL) ||
 	    (command->nodecmd_classname == NULL))
 		return (EC_FAILURE);
@@ -402,11 +402,11 @@ getpiclmode(char *mode)
 static int
 validate_size_and_cvt_val(void *outbuf, size_t size, int type, char *val)
 {
-	int64_t 	llval;
+	int64_t		llval;
 	int32_t		intval;
 	int16_t		sval;
 	int8_t		cval;
-	uint64_t 	ullval;
+	uint64_t	ullval;
 	uint32_t	uintval;
 	uint16_t	usval;
 	uint8_t		ucval;
@@ -637,7 +637,7 @@ parse_prop(char *line, command_t *command)
 		command->propcmd_type = typetok;
 		command->propcmd_accessmode = modetok;
 		command->propcmd_size = 0;
-		command->propcmd_proph = NULL;
+		command->propcmd_proph = 0;
 		return (EC_SYNTAX_OK);
 	}
 
@@ -683,7 +683,7 @@ parse_prop(char *line, command_t *command)
 	command->propcmd_type = typetok;
 	command->propcmd_accessmode = modetok;
 	command->propcmd_size = sizetok;
-	command->propcmd_proph = NULL;
+	command->propcmd_proph = 0;
 	return (EC_SYNTAX_OK);
 }
 
@@ -803,7 +803,7 @@ parse_refnode(char *line, command_t *command)
 	command->refnodecmd_name = strdup(nodenm);
 	command->refnodecmd_class = strdup(classnm);
 	command->refnodecmd_dstnode = strdup(dsttok);
-	command->refnodecmd_nodeh = NULL;
+	command->refnodecmd_nodeh = 0;
 	if ((command->refnodecmd_name == NULL) ||
 	    (command->refnodecmd_class == NULL) ||
 	    (command->refnodecmd_dstnode == NULL))
@@ -879,7 +879,7 @@ parse_refprop(char *line, command_t *command)
 
 	command->refpropcmd_pname = strdup(pnametok);
 	command->refpropcmd_dstnode = strdup(dsttok);
-	command->refpropcmd_proph = NULL;
+	command->refpropcmd_proph = 0;
 	if ((command->refpropcmd_pname == NULL) ||
 	    (command->refpropcmd_dstnode == NULL))
 		return (EC_FAILURE);
@@ -894,8 +894,8 @@ static int
 process_refprop(cmdbuf_t *cmds, command_t *command, picl_nodehdl_t nodeh)
 {
 	int			err;
-	picl_nodehdl_t 		dsth;
-	picl_prophdl_t 		proph;
+	picl_nodehdl_t		dsth;
+	picl_prophdl_t		proph;
 	ptree_propinfo_t	propinfo;
 
 	/* refprop in discarded row */
@@ -972,7 +972,7 @@ parse_table(char *line, command_t *command)
 		return (EC_FAILURE);
 
 	command->tablecmd_newtbl = 0;
-	command->tablecmd_tblh = NULL;
+	command->tablecmd_tblh = 0;
 
 	return (EC_SYNTAX_OK);
 }
@@ -985,8 +985,8 @@ static int
 process_table(command_t *command, picl_nodehdl_t nodeh)
 {
 	int			err;
-	picl_prophdl_t 		tblh;
-	picl_prophdl_t 		proph;
+	picl_prophdl_t		tblh;
+	picl_prophdl_t		proph;
 	ptree_propinfo_t	propinfo;
 
 	/* find if table already exists */
@@ -1387,7 +1387,7 @@ check_conffile_syntax(cmdbuf_t *cmds, FILE *fp)
 		if (err == EC_SYNTAX_OK)
 			(void) strlcpy(lbuf, buf, RECORD_SIZE_MAX);
 		else if (strlcat(lbuf, buf, RECORD_SIZE_MAX) >=
-		    RECORD_SIZE_MAX) { 	/* buffer overflow */
+		    RECORD_SIZE_MAX) {	/* buffer overflow */
 			err = EC_FAILURE;
 			break;
 		}
@@ -1458,7 +1458,7 @@ check_conffile_syntax(cmdbuf_t *cmds, FILE *fp)
  */
 static void
 skip_to_next_valid_path(cmdbuf_t *cmds, int starting_index,
-	picl_nodehdl_t *parent, int *last_processed_index)
+    picl_nodehdl_t *parent, int *last_processed_index)
 {
 	int	err;
 	int	index;

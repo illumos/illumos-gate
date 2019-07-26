@@ -101,7 +101,7 @@ static	int		doreinit = 0;
 static	int		door_id = -1;
 static	pthread_mutex_t door_mutex = PTHREAD_MUTEX_INITIALIZER;
 static	pthread_cond_t door_cv = PTHREAD_COND_INITIALIZER;
-static  int 		service_requests = 0;
+static  int		service_requests = 0;
 static	hrtime_t	orig_time;
 static	hrtime_t	sliding_interval_ms;
 static	uint32_t	dos_req_limit;
@@ -1174,7 +1174,7 @@ main(int argc, char **argv)
 	/*
 	 * Initialize the PICL Tree
 	 */
-	if (xptree_initialize(NULL) != PICL_SUCCESS) {
+	if (xptree_initialize(0) != PICL_SUCCESS) {
 		syslog(LOG_CRIT, INIT_FAILED);
 		exit(1);
 	}

@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #include <locale.h>
@@ -571,7 +571,7 @@ for (j = 1; j < argc; j++) {
 	if (p[0] != '\n') {
 		lnt = strlen(p);
 		if (p[lnt-1] == '\n')
-			p[lnt-1] = NULL;
+			p[lnt-1] = '\0';
 	}
 
 	if (swtch == 'y') {

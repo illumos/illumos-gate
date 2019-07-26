@@ -264,9 +264,9 @@ main(int argc, char **argv)
 	 * use default yes expression.
 	 */
 	status = regcomp(&re, yesexpr, REG_EXTENDED | REG_NOSUB);
-	if ((*yesexpr == (char)NULL) ||
-	    (*yesstr == (char)NULL) ||
-	    (*nostr == (char)NULL) ||
+	if ((*yesexpr == '\0') ||
+	    (*yesstr == '\0') ||
+	    (*nostr == '\0') ||
 	    (status != 0)) {
 		SET_DEFAULT_STRS;
 		if (regcomp(&re, default_yesexpr,
@@ -564,7 +564,7 @@ helpinfo(char *prog_namep)
  */
 static int
 do_create_cidl(char *raid_levelp, char *capacityp, char *disks_argp,
-	char *stripe_sizep, uint32_t f_flag, char **argv, uint32_t optind)
+    char *stripe_sizep, uint32_t f_flag, char **argv, uint32_t optind)
 {
 	uint32_t ctl_tag = MAX32BIT;
 	raid_obj_handle_t ctl_handle = INIT_HANDLE_VALUE;
@@ -726,7 +726,7 @@ do_create_cidl(char *raid_levelp, char *capacityp, char *disks_argp,
  */
 static int
 do_create_ctd(char *raid_levelp, char **disks_argpp, uint32_t disks_num,
-	uint32_t argindex, uint32_t f_flag)
+    uint32_t argindex, uint32_t f_flag)
 {
 	uint32_t ctl_tag = MAX32BIT;
 	raid_obj_handle_t ctl_handle = INIT_HANDLE_VALUE;
@@ -1099,7 +1099,7 @@ do_delete(uint32_t f_flag, char **argv, uint32_t optind)
  */
 static int
 do_flash(uint8_t f_flag, char *filep, char **ctls_argpp,
-	uint32_t index, uint32_t ctl_num)
+    uint32_t index, uint32_t ctl_num)
 {
 	uint32_t ctl_tag = MAX32BIT;
 	char *ctl_argp = NULL;
@@ -2239,7 +2239,7 @@ print_arraypart_attr(raidcfg_arraypart_t *attrp)
  */
 static int
 print_disk_attr(raid_obj_handle_t ctl_handle, raid_obj_handle_t disk_handle,
-	raidcfg_disk_t *attrp)
+    raidcfg_disk_t *attrp)
 {
 	char vendor[DISK_VENDER_LEN + 1];
 	char product[DISK_PRODUCT_LEN + 1];
@@ -2358,7 +2358,7 @@ print_indent(uint8_t indent)
  */
 static int
 get_disk_handle_cidl(uint32_t ctl_tag, char *disks_argp, int *comps_nump,
-	raid_obj_handle_t **handlespp)
+    raid_obj_handle_t **handlespp)
 {
 	int len = 0;
 	int i = 0, j = 0;
@@ -2458,7 +2458,7 @@ get_disk_handle_cidl(uint32_t ctl_tag, char *disks_argp, int *comps_nump,
  */
 static int
 get_disk_handle_ctd(int disks_num, char **disks_argpp, uint32_t *ctl_tagp,
-	raid_obj_handle_t *disks_handlep)
+    raid_obj_handle_t *disks_handlep)
 {
 	raid_obj_handle_t ctl_handle;
 	disk_tag_t disk_tag;

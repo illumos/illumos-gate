@@ -861,7 +861,7 @@ need_per_user_door(void *buf, int whoami, uid_t uid, char **dblist)
 
 static void
 if_selfcred_return_per_user_door(char *argp, size_t arg_size,
-	door_desc_t *dp, int whoami)
+    door_desc_t *dp, int whoami)
 {
 	nss_pheader_t	*phdr = (nss_pheader_t *)((void *)argp);
 	char		*dblist;
@@ -1252,7 +1252,7 @@ _nscd_setup_server(char *execname, char **argv)
 	/*
 	 * kick off routing socket monitor thread
 	 */
-	if (thr_create(NULL, NULL,
+	if (thr_create(NULL, 0,
 	    (void *(*)(void *))rts_mon, 0, 0, NULL) != 0) {
 		errnum = errno;
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
@@ -1318,7 +1318,7 @@ _nscd_setup_child_server(int did)
 	/*
 	 * kick off routing socket monitor thread
 	 */
-	if (thr_create(NULL, NULL,
+	if (thr_create(NULL, 0,
 	    (void *(*)(void *))rts_mon, 0, 0, NULL) != 0) {
 		errnum = errno;
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
