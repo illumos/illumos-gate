@@ -2036,7 +2036,7 @@ i40e_set_shared_vsi_props(i40e_t *i40e,
 	info->mapping_flags = LE_16(I40E_AQ_VSI_QUE_MAP_CONTIG);
 	info->queue_mapping[0] =
 	    LE_16((vsi_qp_base << I40E_AQ_VSI_QUEUE_SHIFT) &
-		I40E_AQ_VSI_QUEUE_MASK);
+	    I40E_AQ_VSI_QUEUE_MASK);
 
 	/*
 	 * tc_queues determines the size of the traffic class, where
@@ -2044,12 +2044,12 @@ i40e_set_shared_vsi_props(i40e_t *i40e,
 	 * and 128 for the X722.
 	 *
 	 * Some examples:
-	 * 	i40e_num_trqpairs_per_vsi == 1 =>  tc_queues = 0, 2^^0 = 1.
-	 * 	i40e_num_trqpairs_per_vsi == 7 =>  tc_queues = 3, 2^^3 = 8.
-	 * 	i40e_num_trqpairs_per_vsi == 8 =>  tc_queues = 3, 2^^3 = 8.
-	 * 	i40e_num_trqpairs_per_vsi == 9 =>  tc_queues = 4, 2^^4 = 16.
-	 * 	i40e_num_trqpairs_per_vsi == 17 => tc_queues = 5, 2^^5 = 32.
-	 * 	i40e_num_trqpairs_per_vsi == 64 => tc_queues = 6, 2^^6 = 64.
+	 *	i40e_num_trqpairs_per_vsi == 1 =>  tc_queues = 0, 2^^0 = 1.
+	 *	i40e_num_trqpairs_per_vsi == 7 =>  tc_queues = 3, 2^^3 = 8.
+	 *	i40e_num_trqpairs_per_vsi == 8 =>  tc_queues = 3, 2^^3 = 8.
+	 *	i40e_num_trqpairs_per_vsi == 9 =>  tc_queues = 4, 2^^4 = 16.
+	 *	i40e_num_trqpairs_per_vsi == 17 => tc_queues = 5, 2^^5 = 32.
+	 *	i40e_num_trqpairs_per_vsi == 64 => tc_queues = 6, 2^^6 = 64.
 	 */
 	tc_queues = ddi_fls(i40e->i40e_num_trqpairs_per_vsi - 1);
 
@@ -2060,9 +2060,9 @@ i40e_set_shared_vsi_props(i40e_t *i40e,
 	 */
 	info->tc_mapping[0] =
 	    LE_16(((0 << I40E_AQ_VSI_TC_QUE_OFFSET_SHIFT) &
-		    I40E_AQ_VSI_TC_QUE_OFFSET_MASK) |
-		((tc_queues << I40E_AQ_VSI_TC_QUE_NUMBER_SHIFT) &
-		    I40E_AQ_VSI_TC_QUE_NUMBER_MASK));
+	    I40E_AQ_VSI_TC_QUE_OFFSET_MASK) |
+	    ((tc_queues << I40E_AQ_VSI_TC_QUE_NUMBER_SHIFT) &
+	    I40E_AQ_VSI_TC_QUE_NUMBER_MASK));
 
 	/*
 	 * I40E_AQ_VSI_PVLAN_MODE_ALL ("VLAN driver insertion mode")
@@ -2397,7 +2397,7 @@ out:
 
 /*
  * Set up RSS.
- * 	1. Seed the hash key.
+ *	1. Seed the hash key.
  *	2. Enable PCTYPEs for the hash filter.
  *	3. Populate the LUT.
  */

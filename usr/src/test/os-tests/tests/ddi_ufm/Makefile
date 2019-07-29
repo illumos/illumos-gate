@@ -18,7 +18,7 @@ include $(SRC)/Makefile.master
 ROOTOPTPKG = $(ROOT)/opt/os-tests
 TESTDIR = $(ROOTOPTPKG)/tests/ddi_ufm
 
-PROGS = ufm-test
+PROGS = ufm-test-setup ufm-test ufm-test-cleanup
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com

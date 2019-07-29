@@ -61,9 +61,9 @@ typedef enum {
  * UFM capabilities of the device specified in ufmg_devpath.
  */
 typedef struct ufm_ioc_getcaps {
-	uint_t 		ufmg_version;	/* DDI_UFM_VERSION */
+	uint_t		ufmg_version;	/* DDI_UFM_VERSION */
 	uint_t		ufmg_caps;	/* UFM Caps */
-	char 		ufmg_devpath[MAXPATHLEN];
+	char		ufmg_devpath[MAXPATHLEN];
 } ufm_ioc_getcaps_t;
 
 /*
@@ -74,7 +74,7 @@ typedef struct ufm_ioc_getcaps {
  * to allocate a sufficiently size buffer for the UFM_IOC_REPORT ioctl.
  */
 typedef struct ufm_ioc_bufsz {
-	uint_t 		ufbz_version;	/* DDI_UFM_VERSION */
+	uint_t		ufbz_version;	/* DDI_UFM_VERSION */
 	size_t		ufbz_size;	/* sz of buf to be returned by ioctl */
 	char		ufbz_devpath[MAXPATHLEN];
 } ufm_ioc_bufsz_t;

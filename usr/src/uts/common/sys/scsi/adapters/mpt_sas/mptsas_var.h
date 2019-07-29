@@ -63,6 +63,7 @@
 #include <sys/sunmdi.h>
 #include <sys/mdi_impldefs.h>
 #include <sys/ddi_ufm.h>
+#include <sys/scsi/adapters/mpt_sas/mptsas_hash.h>
 #include <sys/scsi/adapters/mpt_sas/mptsas_ioctl.h>
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_tool.h>
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_cnfg.h>

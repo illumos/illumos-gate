@@ -18,7 +18,7 @@ UTSBASE	= ../..
 MODULE = ufmtest
 OBJECTS	= $(OBJS_DIR)/ufmtest.o
 LINTS = $(LINTS_DIR)/ufmtest.ln
-ROOTMODULE = $(ROOT_DRV_DIR)/$(MODULE)
+ROOTMODULE = $(USR_DRV_DIR)/$(MODULE)
 CONF_SRCDIR = $(UTSBASE)/common/io
 
 include $(UTSBASE)/intel/Makefile.intel

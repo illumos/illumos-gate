@@ -16,7 +16,8 @@
 .Os
 .Sh NAME
 .Nm ddi_ufm_image_set_desc ,
-.Nm ddi_ufm_image_set_misc
+.Nm ddi_ufm_image_set_misc ,
+.Nm ddi_ufm_image_set_nslots
 .Nd UFM image property routines
 .Sh SYNOPSIS
 .In sys/ddi_ufm.h

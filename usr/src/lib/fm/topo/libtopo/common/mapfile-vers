@@ -97,6 +97,8 @@ SYMBOL_VERSION SUNWprivate {
 	topo_mod_create_ufm_slot;
 	topo_mod_clrdebug;
 	topo_mod_cpufmri;
+	topo_mod_create_ufm;
+	topo_mod_create_ufm_slot;
 	topo_mod_devfmri;
 	topo_mod_devinfo;
 	topo_mod_dprintf;

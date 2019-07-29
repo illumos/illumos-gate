@@ -99,8 +99,8 @@ MANFILES=	Intro.9e		\
 
 MANLINKS=	ddi_ufm_op_fill_image.9e	\
 		ddi_ufm_op_fill_slot.9e	\
+		ddi_ufm_op_getcaps.9e	\
 		ddi_ufm_op_nimages.9e	\
-		ddi_ufm_op_nslots.9e	\
 		_info.9e		\
 		_init.9e		\
 		gldv3.9e		\
@@ -135,10 +135,10 @@ MANLINKS=	ddi_ufm_op_fill_image.9e	\
 		usba_hcdi_pipe_close.9e		\
 		usba_hcdi_pipe_stop_isoc_polling.9e
 
-ddi_ufm_op_nimages.9e		:= LINKSRC = ddi_ufm.9e
-ddi_ufm_op_nslots.9e		:= LINKSRC = ddi_ufm.9e
 ddi_ufm_op_fill_image.9e	:= LINKSRC = ddi_ufm.9e
 ddi_ufm_op_fill_slot.9e		:= LINKSRC = ddi_ufm.9e
+ddi_ufm_op_getcaps.9e		:= LINKSRC = ddi_ufm.9e
+ddi_ufm_op_nimages.9e		:= LINKSRC = ddi_ufm.9e
 intro.9e			:= LINKSRC = Intro.9e
 
 _info.9e			:= LINKSRC = _fini.9e

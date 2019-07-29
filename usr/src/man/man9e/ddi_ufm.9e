@@ -19,7 +19,8 @@
 .Nm ddi_ufm_op_nimages ,
 .Nm ddi_ufm_op_fill_image ,
 .Nm ddi_ufm_op_nslots ,
-.Nm ddi_ufm_op_fill_slot
+.Nm ddi_ufm_op_fill_slot ,
+.Nm ddi_ufm_op_getcaps
 .Nd DDI upgradable firmware module entry points
 .Sh SYNOPSIS
 .Vt typedef struct ddi_ufm_handle ddi_ufm_handle_t
@@ -58,7 +59,8 @@
 .Bl -tag -width Fa
 .It Fa uhp
 A handle corresponding to the device's UFM handle.
-This is the same value as returned in .Xr ddi_ufm_init 9F .
+This is the same value as returned in
+.Xr ddi_ufm_init 9F .
 .It Fa drv_arg
 This is a private value that the driver passed in when calling
 .Xr ddi_ufm_init 9F .
@@ -396,7 +398,7 @@ block until it is terminated.
 .Ss ioctl Interface
 Userland consumers can access UFM information via a set of ioctls that are
 implemented by the
-.Xr ufd 7D
+.Xr ufm 7D
 driver.
 .Sh CONTEXT
 The various UFM entry points that a device driver must implement will

@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 file path=usr/share/man/man9e/Intro.9e
@@ -22,6 +23,7 @@ file path=usr/share/man/man9e/awrite.9e
 file path=usr/share/man/man9e/chpoll.9e
 file path=usr/share/man/man9e/close.9e
 file path=usr/share/man/man9e/csx_event_handler.9e
+file path=usr/share/man/man9e/ddi_ufm.9e
 file path=usr/share/man/man9e/detach.9e
 file path=usr/share/man/man9e/devmap.9e
 file path=usr/share/man/man9e/devmap_access.9e
@@ -82,6 +84,10 @@ link path=usr/share/man/man9e/GLDv3.9e target=mac.9e
 link path=usr/share/man/man9e/MAC.9e target=mac.9e
 link path=usr/share/man/man9e/_info.9e target=_fini.9e
 link path=usr/share/man/man9e/_init.9e target=_fini.9e
+link path=usr/share/man/man9e/ddi_ufm_op_fill_image.9e target=ddi_ufm.9e
+link path=usr/share/man/man9e/ddi_ufm_op_fill_slot.9e target=ddi_ufm.9e
+link path=usr/share/man/man9e/ddi_ufm_op_getcaps.9e target=ddi_ufm.9e
+link path=usr/share/man/man9e/ddi_ufm_op_nimages.9e target=ddi_ufm.9e
 link path=usr/share/man/man9e/gldm_get_stats.9e target=gld.9e
 link path=usr/share/man/man9e/gldm_intr.9e target=gld.9e
 link path=usr/share/man/man9e/gldm_ioctl.9e target=gld.9e

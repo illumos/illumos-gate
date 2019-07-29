@@ -48,7 +48,7 @@ struct ddi_ufm_slot {
 
 struct ddi_ufm_image {
 	uint_t			ufmi_imageno;
-	char   			*ufmi_desc;
+	char			*ufmi_desc;
 	nvlist_t		*ufmi_misc;
 	struct ddi_ufm_slot	*ufmi_slots;
 	uint_t			ufmi_nslots;

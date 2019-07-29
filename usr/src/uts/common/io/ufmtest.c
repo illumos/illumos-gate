@@ -15,6 +15,10 @@
 
 /*
  * This is a test driver used for exercising the DDI UFM subsystem.
+ *
+ * Most of the test cases depend on the ufmtest driver being loaded.
+ * On SmartOS, this driver will need to be manually installed, as it is not
+ * part of the platform image.
  */
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -30,7 +34,7 @@
 #include "ufmtest.h"
 
 typedef struct ufmtest {
-	dev_info_t 		*ufmt_devi;
+	dev_info_t		*ufmt_devi;
 	nvlist_t		*ufmt_nvl;
 	ddi_ufm_handle_t	*ufmt_ufmh;
 	uint32_t		ufmt_failflags;

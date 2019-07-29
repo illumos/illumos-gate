@@ -16,10 +16,6 @@
 /*
  * The ufm(7D) pseudo driver provides an ioctl interface for DDI UFM
  * information.  See ddi_ufm.h.
- *
- * Most of the test cases depend on the ufmtest driver being loaded.
- * On SmartOS, this driver will need to be manually installed, as it is not
- * part of the platform image.
  */
 #include <sys/ddi.h>
 #include <sys/sunddi.h>

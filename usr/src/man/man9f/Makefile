@@ -12,14 +12,14 @@
 #
 # Copyright 2017, Richard Lowe
 # Copyright 2014 Garrett D'Amore <garrett@damore>
-# Copyright (c) 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	9f
+MANSECT=	9f
 
 MANFILES=	ASSERT.9f				\
 		Intro.9f				\
@@ -921,6 +921,7 @@ MANLINKS=	AVL_NEXT.9f					\
 		ddi_ufm_fini.9f					\
 		ddi_ufm_image_set_desc.9f			\
 		ddi_ufm_image_set_misc.9f			\
+		ddi_ufm_image_set_nslots.9f			\
 		ddi_ufm_init.9f					\
 		ddi_ufm_slot_set_attrs.9f			\
 		ddi_ufm_slot_set_misc.9f			\
@@ -1210,13 +1211,13 @@ MANLINKS=	AVL_NEXT.9f					\
 		scsi_hba_iportmap_iport_add.9f			\
 		scsi_hba_iportmap_iport_remove.9f		\
 		scsi_hba_pkt_free.9f				\
-		scsi_hba_tgtmap_destroy.9f 			\
-		scsi_hba_tgtmap_set_begin.9f 			\
-		scsi_hba_tgtmap_set_add.9f 			\
-		scsi_hba_tgtmap_set_end.9f 			\
-		scsi_hba_tgtmap_set_flush.9f 			\
-		scsi_hba_tgtmap_tgt_add.9f 			\
-		scsi_hba_tgtmap_tgt_remove.9f 			\
+		scsi_hba_tgtmap_destroy.9f			\
+		scsi_hba_tgtmap_set_begin.9f			\
+		scsi_hba_tgtmap_set_add.9f			\
+		scsi_hba_tgtmap_set_end.9f			\
+		scsi_hba_tgtmap_set_flush.9f			\
+		scsi_hba_tgtmap_tgt_add.9f			\
+		scsi_hba_tgtmap_tgt_remove.9f			\
 		scsi_hba_tran_free.9f				\
 		scsi_ifsetcap.9f				\
 		scsi_mname.9f					\
@@ -1450,7 +1451,7 @@ avl_add.9f				:= LINKSRC = avl.9f
 avl_create.9f				:= LINKSRC = avl.9f
 avl_destroy.9f				:= LINKSRC = avl.9f
 avl_destroy_nodes.9f			:= LINKSRC = avl.9f
-avl_find.9f 				:= LINKSRC = avl.9f
+avl_find.9f				:= LINKSRC = avl.9f
 avl_first.9f				:= LINKSRC = avl.9f
 avl_insert.9f				:= LINKSRC = avl.9f
 avl_insert_here.9f			:= LINKSRC = avl.9f
@@ -1769,6 +1770,7 @@ devmap_load.9f				:= LINKSRC = devmap_unload.9f
 ddi_ufm_fini.9f				:= LINKSRC = ddi_ufm.9f
 ddi_ufm_image_set_desc.9f		:= LINKSRC = ddi_ufm_image.9f
 ddi_ufm_image_set_misc.9f		:= LINKSRC = ddi_ufm_image.9f
+ddi_ufm_image_set_nslots.9f		:= LINKSRC = ddi_ufm_image.9f
 ddi_ufm_init.9f				:= LINKSRC = ddi_ufm.9f
 ddi_ufm_slot_set_attrs.9f		:= LINKSRC = ddi_ufm_slot.9f
 ddi_ufm_slot_set_misc.9f		:= LINKSRC = ddi_ufm_slot.9f
@@ -2119,8 +2121,8 @@ scsi_hba_iport_find.9f			:= LINKSRC = scsi_hba_iport_exist.9f
 
 scsi_hba_pkt_free.9f			:= LINKSRC = scsi_hba_pkt_alloc.9f
 
-scsi_hba_tgtmap_destroy.9f 		:= LINKSRC = scsi_hba_tgtmap_create.9f
-scsi_hba_tgtmap_set_begin.9f 		:= LINKSRC = scsi_hba_tgtmap_create.9f
+scsi_hba_tgtmap_destroy.9f		:= LINKSRC = scsi_hba_tgtmap_create.9f
+scsi_hba_tgtmap_set_begin.9f		:= LINKSRC = scsi_hba_tgtmap_create.9f
 scsi_hba_tgtmap_set_add.9f		:= LINKSRC = scsi_hba_tgtmap_create.9f
 scsi_hba_tgtmap_set_end.9f		:= LINKSRC = scsi_hba_tgtmap_create.9f
 scsi_hba_tgtmap_set_flush.9f		:= LINKSRC = scsi_hba_tgtmap_create.9f

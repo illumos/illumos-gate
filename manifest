@@ -19344,6 +19344,7 @@ f usr/share/man/man9e/csx_event_handler.9e 0444 root bin
 f usr/share/man/man9e/ddi_ufm.9e 0444 root bin
 s usr/share/man/man9e/ddi_ufm_op_fill_image.9e=ddi_ufm.9e
 s usr/share/man/man9e/ddi_ufm_op_fill_slot.9e=ddi_ufm.9e
+s usr/share/man/man9e/ddi_ufm_op_getcaps.9e=ddi_ufm.9e
 s usr/share/man/man9e/ddi_ufm_op_nimages.9e=ddi_ufm.9e
 s usr/share/man/man9e/ddi_ufm_op_nslots.9e=ddi_ufm.9e
 f usr/share/man/man9e/detach.9e 0444 root bin
@@ -20039,6 +20040,7 @@ s usr/share/man/man9f/ddi_ufm_update.9f=ddi_ufm.9f
 f usr/share/man/man9f/ddi_ufm_image.9f 0444 root bin
 s usr/share/man/man9f/ddi_ufm_image_set_desc.9f=ddi_ufm_image.9f
 s usr/share/man/man9f/ddi_ufm_image_set_misc.9f=ddi_ufm_image.9f
+s usr/share/man/man9f/ddi_ufm_image_set_nslots.9f=ddi_ufm_image.9f
 f usr/share/man/man9f/ddi_ufm_slot.9f 0444 root bin
 s usr/share/man/man9f/ddi_ufm_slot_set_attrs.9f=ddi_ufm_slot.9f
 s usr/share/man/man9f/ddi_ufm_slot_set_misc.9f=ddi_ufm_slot.9f
