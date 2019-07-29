@@ -561,7 +561,7 @@ ctlcmd_process(int sockfd, int stdoutfd, unsigned int *flags)
 	if (i == 0) {
 		goto fail;
 	}
-	buf[i+1] = '\0';
+	buf[i] = '\0';
 
 	if (strncmp(buf, "TIOCSWINSZ ", 11) == 0) {
 		char *next = buf + 11;
