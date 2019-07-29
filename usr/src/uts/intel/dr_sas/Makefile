@@ -21,11 +21,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# uts/intel/dr_sas/Makefile
-#
-#	This makefile drives the production of the dr_sas driver kernel module.
-#
-#	intel implementation architecture dependent
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -38,7 +34,6 @@ UTSBASE	= ../..
 #
 MODULE		= dr_sas
 OBJECTS		= $(DR_SAS_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(DR_SAS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR     = $(UTSBASE)/common/io/dr_sas
 
@@ -51,17 +46,19 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(CONFMOD)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
-# 	Kernel Module Dependencies
+#	Kernel Module Dependencies
 #
 LDFLAGS		+= -dy -Nmisc/scsi
 
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+$(OBJS_DIR)/dr_sas.o := SMOFF += index_overflow
 
 #
 #	Default build targets.
@@ -75,12 +72,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
