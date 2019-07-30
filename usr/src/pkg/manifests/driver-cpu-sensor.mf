@@ -30,19 +30,19 @@ dir path=usr/lib/devfsadm/linkmod group=sys
 dir path=usr/share/man
 dir path=usr/share/man/man7d
 driver name=amdf17nbdf \
-    alias=pci1022,1450 \
-    alias=pci1022,1460
+    alias=pci1022,1450,p \
+    alias=pci1022,1460,p
 driver name=coretemp
 driver name=pchtemp \
-    alias=pci8086,8c24 \
-    alias=pci8086,8ca4 \
-    alias=pci8086,8d24 \
-    alias=pci8086,9d31 \
-    alias=pci8086,a131 \
-    alias=pci8086,a1b1 \
-    alias=pci8086,a231 \
-    alias=pci8086,a2b1 \
-    alias=pci8086,a379
+    alias=pci8086,8c24,p \
+    alias=pci8086,8ca4,p \
+    alias=pci8086,8d24,p \
+    alias=pci8086,9d31,p \
+    alias=pci8086,a131,p \
+    alias=pci8086,a1b1,p \
+    alias=pci8086,a231,p \
+    alias=pci8086,a2b1,p \
+    alias=pci8086,a379,p
 file path=kernel/drv/$(ARCH64)/amdf17nbdf group=sys
 file path=kernel/drv/$(ARCH64)/coretemp group=sys
 file path=kernel/drv/$(ARCH64)/pchtemp group=sys

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -2172,30 +2172,52 @@ subsys_compat_exclude(ushort_t venid, ushort_t devid, ushort_t subvenid,
 	if ((venid == 0x10de) && (is_display(classcode)))
 		return (B_TRUE);
 
+	/*
+	 * 8086,166 is the Ivy Bridge built-in graphics controller on some
+	 * models. Unfortunately 8086,2044 is the Skylake Server processor
+	 * memory channel device. The Ivy Bridge device uses the Skylake
+	 * ID as its sub-device ID. The GPU is not a memory controller DIMM
+	 * channel.
+	 */
+	if (venid == 0x8086 && devid == 0x166 && subvenid == 0x8086 &&
+	    subdevid == 0x2044) {
+		return (B_TRUE);
+	}
+
 	return (B_FALSE);
 }
 
 /*
- * Set the compatible property to a value compliant with
- * rev 2.1 of the IEEE1275 PCI binding.
- * (Also used for PCI-Express devices).
+ * Set the compatible property to a value compliant with rev 2.1 of the IEEE1275
+ * PCI binding. This is also used for PCI express devices and we have our own
+ * minor additions.
  *
  *   pciVVVV,DDDD.SSSS.ssss.RR	(0)
  *   pciVVVV,DDDD.SSSS.ssss	(1)
+ *   pciSSSS,ssss,s		(2+)
  *   pciSSSS,ssss		(2)
  *   pciVVVV,DDDD.RR		(3)
+ *   pciVVVV,DDDD,p		(4+)
  *   pciVVVV,DDDD		(4)
  *   pciclass,CCSSPP		(5)
  *   pciclass,CCSS		(6)
  *
- * The Subsystem (SSSS) forms are not inserted if
- * subsystem-vendor-id is 0.
+ * The Subsystem (SSSS) forms are not inserted if subsystem-vendor-id is 0 or if
+ * it is a case where we know that the IDs overlap.
  *
- * NOTE: For PCI-Express devices "pci" is replaced with "pciex" in 0-6 above
- * property 2 is not created as per "1275 bindings for PCI Express Interconnect"
+ * NOTE: For PCI-Express devices "pci" is replaced with "pciex" in 0-6 above and
+ * property 2 is not created as per "1275 bindings for PCI Express
+ * Interconnect".
  *
- * Set with setprop and \x00 between each
- * to generate the encoded string array form.
+ * Unlike on SPARC, we generate both the "pciex" and "pci" versions of the
+ * above. The problem with property 2 is that it has an ambiguity with
+ * property 4. To make sure that drivers can specify either form of 2 or 4
+ * without ambiguity we add a suffix. The 'p' suffix represents the primary ID,
+ * meaning that it is guaranteed to be form 4. The 's' suffix means that it is
+ * sub-vendor and sub-device form, meaning it is guaranteed to be form 2.
+ *
+ * Set with setprop and \x00 between each to generate the encoded string array
+ * form.
  */
 void
 add_compatible(dev_info_t *dip, ushort_t subvenid, ushort_t subdevid,
@@ -2204,7 +2226,7 @@ add_compatible(dev_info_t *dip, ushort_t subvenid, ushort_t subdevid,
 {
 	int i = 0;
 	int size = COMPAT_BUFSIZE;
-	char *compat[13];
+	char *compat[15];
 	char *buf, *curr;
 
 	curr = buf = kmem_alloc(size, KM_SLEEP);
@@ -2262,6 +2284,12 @@ add_compatible(dev_info_t *dip, ushort_t subvenid, ushort_t subdevid,
 
 		if (subsys_compat_exclude(vendorid, deviceid, subvenid,
 		    subdevid, revid, classcode) == B_FALSE) {
+			compat[i++] = curr;	/* form 2+ */
+			(void) snprintf(curr, size, "pci%x,%x,s", subvenid,
+			    subdevid);
+			size -= strlen(curr) + 1;
+			curr += strlen(curr) + 1;
+
 			compat[i++] = curr;	/* form 2 */
 			(void) snprintf(curr, size, "pci%x,%x", subvenid,
 			    subdevid);
@@ -2271,6 +2299,11 @@ add_compatible(dev_info_t *dip, ushort_t subvenid, ushort_t subdevid,
 	}
 	compat[i++] = curr;	/* form 3 */
 	(void) snprintf(curr, size, "pci%x,%x.%x", vendorid, deviceid, revid);
+	size -= strlen(curr) + 1;
+	curr += strlen(curr) + 1;
+
+	compat[i++] = curr;	/* form 4+ */
+	(void) snprintf(curr, size, "pci%x,%x,p", vendorid, deviceid);
 	size -= strlen(curr) + 1;
 	curr += strlen(curr) + 1;
 

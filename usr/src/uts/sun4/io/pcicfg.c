@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -560,8 +561,7 @@ _fini(void)
 }
 
 int
-_info(modinfop)
-struct modinfo *modinfop;
+_info(struct modinfo *modinfop)
 {
 	return (mod_info(&modlinkage, modinfop));
 }
@@ -1324,7 +1324,7 @@ pcicfg_ntbridge_unconfigure_child(dev_info_t *new_device, uint_t devno)
 {
 
 	dev_info_t	*new_ntbridgechild;
-	int 		len, bus;
+	int		len, bus;
 	uint16_t	vid;
 	ddi_acc_handle_t	config_handle;
 	pcicfg_bus_range_t pci_bus_range;
@@ -1491,7 +1491,7 @@ pcicfg_indirect_map(dev_info_t *dip)
 
 static uint_t
 pcicfg_get_ntbridge_child_range(dev_info_t *dip, uint64_t *boundbase,
-				uint64_t *boundlen, uint_t space_type)
+    uint64_t *boundlen, uint_t space_type)
 {
 	int		length, found = DDI_FAILURE, acount, i, ibridge;
 	pci_regspec_t	*assigned;
@@ -2548,8 +2548,7 @@ pcicfg_alloc_hole(hole_t *addr_hole, uint64_t *alast, uint32_t length)
 }
 
 static void
-pcicfg_get_mem(pcicfg_phdl_t *entry,
-	uint32_t length, uint64_t *ans)
+pcicfg_get_mem(pcicfg_phdl_t *entry, uint32_t length, uint64_t *ans)
 {
 	uint64_t new_mem;
 
@@ -2565,8 +2564,7 @@ pcicfg_get_mem(pcicfg_phdl_t *entry,
 }
 
 static void
-pcicfg_get_io(pcicfg_phdl_t *entry,
-	uint32_t length, uint32_t *ans)
+pcicfg_get_io(pcicfg_phdl_t *entry, uint32_t length, uint32_t *ans)
 {
 	uint32_t new_io;
 	uint64_t io_last;
@@ -3404,7 +3402,7 @@ pcicfg_device_off(ddi_acc_handle_t config_handle)
  */
 static int
 pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
-	uint8_t pcie_dev)
+    uint8_t pcie_dev)
 {
 	int ret;
 	uint16_t val, cap_ptr;
@@ -3598,7 +3596,7 @@ pcicfg_set_busnode_props(dev_info_t *dip, uint8_t pcie_device_type,
 
 static int
 pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
-	uint8_t pcie_dev)
+    uint8_t pcie_dev)
 {
 
 	int		ret;
@@ -3720,6 +3718,10 @@ pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 
 	/* pciSSSS.ssss  -> not created for PCIe as per PCIe bindings */
 	if (!pcie_dev) {
+		(void) sprintf(buffer, "pci%x,%x,s", sub_vid, sub_sid);
+		compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
+		(void) strcpy(compat[n++], buffer);
+
 		(void) sprintf(buffer, "pci%x,%x", sub_vid, sub_sid);
 		compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
 		(void) strcpy(compat[n++], buffer);
@@ -3734,6 +3736,12 @@ pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 	(void) sprintf(buffer, "%s%x,%x", pprefix, vid, did);
 	compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
 	(void) strcpy(compat[n++], buffer);
+
+	if (!pcie_dev) {
+		(void) sprintf(buffer, "%s%x,%x,p", pprefix, vid, did);
+		compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
+		(void) strcpy(compat[n++], buffer);
+	}
 
 	/* pci[ex]class,CCSSPP */
 	(void) sprintf(buffer, "%sclass,%02x%02x%02x", pprefix,
@@ -3774,7 +3782,7 @@ pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 
 static void
 pcicfg_set_bus_numbers(ddi_acc_handle_t config_handle,
-uint_t primary, uint_t secondary, uint_t subordinate)
+    uint_t primary, uint_t secondary, uint_t subordinate)
 {
 	DEBUG3("Setting bridge bus-range %d,%d,%d\n", primary, secondary,
 	    subordinate);
@@ -3886,7 +3894,7 @@ pcicfg_setup_bridge(pcicfg_phdl_t *entry,
 
 static void
 pcicfg_update_bridge(pcicfg_phdl_t *entry,
-	ddi_acc_handle_t handle)
+    ddi_acc_handle_t handle)
 {
 	uint_t length;
 
@@ -3943,7 +3951,7 @@ pcicfg_update_bridge(pcicfg_phdl_t *entry,
 /*ARGSUSED*/
 static void
 pcicfg_disable_bridge_probe_err(dev_info_t *dip, ddi_acc_handle_t h,
-	pcicfg_err_regs_t *regs)
+    pcicfg_err_regs_t *regs)
 {
 	uint16_t val;
 
@@ -3982,7 +3990,7 @@ pcicfg_disable_bridge_probe_err(dev_info_t *dip, ddi_acc_handle_t h,
 /*ARGSUSED*/
 static void
 pcicfg_enable_bridge_probe_err(dev_info_t *dip, ddi_acc_handle_t h,
-	pcicfg_err_regs_t *regs)
+    pcicfg_err_regs_t *regs)
 {
 	/* clear any pending errors */
 	pci_config_put16(h, PCI_CONF_STAT, PCI_STAT_S_TARG_AB|
@@ -4890,7 +4898,7 @@ failedchild:
 
 static int
 pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
-	uint_t *highest_bus, boolean_t is_pcie)
+    uint_t *highest_bus, boolean_t is_pcie)
 {
 	uint64_t next_bus;
 	uint_t new_bus, num_slots;
@@ -5741,7 +5749,7 @@ pcicfg_config_teardown(ddi_acc_handle_t *handle)
 
 static int
 pcicfg_add_config_reg(dev_info_t *dip,
-	uint_t bus, uint_t device, uint_t func)
+    uint_t bus, uint_t device, uint_t func)
 {
 	int reg[10] = { PCI_ADDR_CONFIG, 0, 0, 0, 0};
 
@@ -6729,8 +6737,8 @@ pcicfg_remove_assigned_prop(dev_info_t *dip, pci_regspec_t *oldone)
 
 static int
 pcicfg_map_phys(dev_info_t *dip, pci_regspec_t *phys_spec,
-	caddr_t *addrp, ddi_device_acc_attr_t *accattrp,
-	ddi_acc_handle_t *handlep)
+    caddr_t *addrp, ddi_device_acc_attr_t *accattrp,
+    ddi_acc_handle_t *handlep)
 {
 	ddi_map_req_t mr;
 	ddi_acc_hdl_t *hp;
@@ -6805,7 +6813,7 @@ pcicfg_ari_configure(dev_info_t *dip)
 #ifdef DEBUG
 static void
 debug(char *fmt, uintptr_t a1, uintptr_t a2, uintptr_t a3,
-	uintptr_t a4, uintptr_t a5)
+    uintptr_t a4, uintptr_t a5)
 {
 	if (pcicfg_debug == 1) {
 		prom_printf("pcicfg: ");
