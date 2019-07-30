@@ -802,7 +802,7 @@ smbd_dop_vss_map_gmttoken(smbd_arg_t *arg)
 
 	if ((snapname = malloc(MAXPATHLEN)) == NULL) {
 		xdr_free(smb_gmttoken_snapname_xdr, (char *)&request);
-		return (SMB_DOP_ENCODE_ERROR);
+		return (NULL);
 	}
 
 	if ((smbd_vss_map_gmttoken(request.gts_path, request.gts_gmttoken,
