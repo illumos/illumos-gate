@@ -780,7 +780,7 @@ smbfs_smb1_get_streaminfo(smbnode_t *np, struct mdchain *mdp,
 	(void) mb_init(mbp);
 	(void) mb_put_uint16le(mbp, SMB_QFILEINFO_STREAM_INFO);
 	(void) mb_put_uint32le(mbp, 0);
-	error = smbfs_fullpath(mbp, vcp, np, NULL, NULL, 0);
+	error = smbfs_fullpath(mbp, vcp, np, NULL, 0, 0);
 	if (error)
 		goto out;
 

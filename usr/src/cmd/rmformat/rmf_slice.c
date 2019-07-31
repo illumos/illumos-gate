@@ -758,7 +758,7 @@ str2sector(char *str)
 					mul_factor = 1024;
 					s1++;
 			}
-			if ((*s1 != 'B') || (*(++s1) != NULL)) {
+			if ((*s1 != 'B') || (*(++s1) != '\0')) {
 				(void) fprintf(stderr,
 				    gettext("Extra chars at the end\n"));
 				free(base);
@@ -770,7 +770,7 @@ str2sector(char *str)
 			*s2 = '\0';
 		}
 	}
-	*s2 = NULL;
+	*s2 = '\0';
 
 	size = my_atoll(base);
 	if ((!mul_factor) || (size == -1)) {

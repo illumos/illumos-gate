@@ -26,7 +26,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -88,7 +88,7 @@ static struct utmpx dummy;
 #endif
 #define	ERR		(-1)
 
-#define	HSIZE		256		/* size of process hash table 	*/
+#define	HSIZE		256		/* size of process hash table	*/
 #define	PROCDIR		"/proc"
 #define	INITPROCESS	(pid_t)1	/* init process pid */
 #define	NONE		'n'		/* no state */
@@ -115,15 +115,15 @@ struct uproc {
 };
 
 /*
- *  	define hash table for struct uproc
+ *	define hash table for struct uproc
  *	Hash function uses process id
  *	and the size of the hash table(HSIZE)
  *	to determine process index into the table.
  */
 static struct uproc	pr_htbl[HSIZE];
 
-static struct 	uproc	*findhash(pid_t);
-static time_t  	findidle(char *);
+static struct	uproc	*findhash(pid_t);
+static time_t	findidle(char *);
 static void	clnarglist(char *);
 static void	showtotals(struct uproc *);
 static void	calctotals(struct uproc *);
@@ -134,7 +134,7 @@ static char	*prog;		/* pointer to invocation name */
 static int	header = 1;	/* true if -h flag: don't print heading */
 static int	lflag = 1;	/* set if -l flag; 0 for -s flag: short form */
 static char	*sel_user;	/* login of particular user selected */
-static char 	firstchar;	/* first char of name of prog invoked as */
+static char	firstchar;	/* first char of name of prog invoked as */
 static int	login;		/* true if invoked as login shell */
 static time_t	now;		/* current time of day */
 static time_t	uptime;		/* time of last reboot & elapsed time since */
@@ -165,10 +165,10 @@ main(int argc, char *argv[])
 	struct pstatus	statinfo;
 	size_t		size;
 	struct stat	sbuf;
-	DIR   		*dirp;
+	DIR		*dirp;
 	struct	dirent	*dp;
 	char		pname[64];
-	char 		*fname;
+	char		*fname;
 	int		procfd;
 	char		*cp;
 	int		i;
@@ -731,13 +731,13 @@ static void
 clnarglist(char *arglist)
 {
 	char	*c;
-	int 	err = 0;
+	int	err = 0;
 
 	/* get rid of unsavory characters */
-	for (c = arglist; *c != NULL; c++) {
+	for (c = arglist; *c != '\0'; c++) {
 		if ((*c < ' ') || (*c > 0176)) {
 			if (err++ > 5) {
-				*arglist = NULL;
+				*arglist = '\0';
 				break;
 			}
 			*c = '?';

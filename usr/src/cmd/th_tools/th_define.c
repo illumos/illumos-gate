@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/time_impl.h>
 #include <sys/wait.h>
 #include <stdio.h>
@@ -378,7 +376,7 @@ log_cmp2(const void *p1, const void *p2)
 
 static void
 dump_log(uint_t lvl, FILE *fp, struct acc_log_elem *items,
-	size_t nitems, uint_t logflags)
+    size_t nitems, uint_t logflags)
 {
 	if (lvl <= dbglvl) {
 		int i;
@@ -510,8 +508,8 @@ define_one_error(
 
 static void
 define_op_err(FILE *fp, int *ecnt, struct bofi_errdef *edp,
-	struct acc_log_elem *item, ulong_t nttime, ulong_t interval, char *type,
-	int fon, size_t fcnt)
+    struct acc_log_elem *item, ulong_t nttime, ulong_t interval, char *type,
+    int fon, size_t fcnt)
 {
 	coding_t *ct;
 	char	*opname;
@@ -664,13 +662,8 @@ define_op_err(FILE *fp, int *ecnt, struct bofi_errdef *edp,
 /* ARGSUSED */
 static int
 define_nerrs(int fd, FILE *fp, int *ecnt, struct bofi_errdef *edp,
-	struct acc_log_elem *items,
-	size_t nitems,
-	uint_t naccess,
-	uint_t minac,
-	uint_t maxac,
-	ulong_t	logtime,
-	ulong_t	logsize)
+    struct acc_log_elem *items, size_t nitems, uint_t naccess, uint_t minac,
+    uint_t maxac, ulong_t logtime, ulong_t logsize)
 {
 	char	*type;
 	uint_t	at;
@@ -878,7 +871,7 @@ define_nerrs(int fd, FILE *fp, int *ecnt, struct bofi_errdef *edp,
 
 static int
 reduce_log(uint16_t pol, struct acc_log *log,		/* input args */
-	struct acc_log_elem **llp, size_t *cntp)	/* output args */
+    struct acc_log_elem **llp, size_t *cntp)		/* output args */
 {
 	ulong_t logtime;
 	struct acc_log_elem *items, *item, *elem;
@@ -1050,7 +1043,7 @@ reduce_log(uint16_t pol, struct acc_log *log,		/* input args */
 
 static void
 log2errdefs(int fd, struct bofi_errdef *edp, struct acc_log *log,
-	char *devpath)
+    char *devpath)
 {
 	struct acc_log_elem	*items;
 	size_t			nitems;
@@ -1228,7 +1221,8 @@ log2errdefs(int fd, struct bofi_errdef *edp, struct acc_log *log,
 #define	LLSZMASK (sizeof (longlong_t) -1)
 
 static int
-add_edef(int fd,
+add_edef(
+	int fd,
 	struct bofi_errdef *errdef,	/* returned access criteria */
 	struct bofi_errstate *errstate,
 	struct handle_info *hdl,	/* handle to match against request */
@@ -1283,10 +1277,8 @@ add_edef(int fd,
 }
 
 static void
-collect_state(int fd, int cmd,
-	struct bofi_errstate *errstate,
-	struct bofi_errdef *errdef,
-	char *devpath)
+collect_state(int fd, int cmd, struct bofi_errstate *errstate,
+    struct bofi_errdef *errdef, char *devpath)
 {
 	int rval;
 	size_t ls = errstate->log.logsize;
@@ -1360,7 +1352,7 @@ collect_state(int fd, int cmd,
 
 static void
 print_err_reports(FILE *fp, struct bofi_errstate *esp,
-	char *fname, char *cmt, int id)
+    char *fname, char *cmt, int id)
 {
 	if (fname != 0 && *fname != 0)
 		(void) fprintf(fp, "%sErrdef file %s definition %d:",
@@ -1422,7 +1414,7 @@ thr_collect(void *arg, char *devpath)
  */
 static int
 match_hinfo(struct handle_info *hp, int instance, uint_t access_type,
-	int rnumber, offset_t offset, offset_t len)
+    int rnumber, offset_t offset, offset_t len)
 {
 
 	msg(9, "matching (%d %d) 0x%x %d offset (%llx, %llx) len (%llx %llx)\n",
@@ -1691,7 +1683,7 @@ walk_callback(di_node_t node, void *arg)
 
 	driver_name = di_driver_name(node);
 	if (driver_name != NULL) {
-		if (strcmp(driver_name, warg->name) == NULL &&
+		if (strcmp(driver_name, warg->name) == 0 &&
 		    di_instance(node) == warg->instance) {
 			path = di_devfs_path(node);
 			if (path == NULL)
@@ -1746,7 +1738,7 @@ getpath(char *path, int instance, char *name, int pathlen)
  */
 static void
 test_driver(struct bofi_errdef *edp,
-	unsigned long long collecttime)
+    unsigned long long collecttime)
 {
 	pid_t pid;
 	int statloc;
@@ -2114,13 +2106,13 @@ main(int argc, char *argv[])
 
 			if (str != optarg)
 				errdef.acc_chk = tmpl;
-			else if (strcmp(optarg, "PIO") == NULL)
+			else if (strcmp(optarg, "PIO") == 0)
 				errdef.acc_chk = 1;
-			else if (strcmp(optarg, "DMA") == NULL)
+			else if (strcmp(optarg, "DMA") == 0)
 				errdef.acc_chk = 2;
-			else if (strcmp(optarg, "U4FT_ACC_NO_PIO") == NULL)
+			else if (strcmp(optarg, "U4FT_ACC_NO_PIO") == 0)
 				errdef.acc_chk = 1;
-			else if (strcmp(optarg, "U4FT_ACC_NO_DMA") == NULL)
+			else if (strcmp(optarg, "U4FT_ACC_NO_DMA") == 0)
 				errdef.acc_chk = 2;
 			else
 				err = EINVAL;

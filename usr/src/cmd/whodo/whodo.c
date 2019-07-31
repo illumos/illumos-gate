@@ -139,7 +139,7 @@ static void	prtat(time_t *);
 static char	*prog;
 static int	header = 1;	/* true if -h flag: don't print heading */
 static int	lflag = 0;	/* true if -l flag: w command format */
-static char 	*sel_user;	/* login of particular user selected */
+static char	*sel_user;	/* login of particular user selected */
 static time_t	now;		/* current time of day */
 static time_t	uptime;		/* time of last reboot & elapsed time since */
 static int	nusers;		/* number of users logged in now */
@@ -162,7 +162,7 @@ main(int argc, char *argv[])
 	struct utmpx	*ut;
 	struct utmpx	*utmpbegin;
 	struct utmpx	*utmpend;
-	struct utmpx 	*utp;
+	struct utmpx	*utp;
 	struct tm		*tm;
 	struct uproc	*up, *parent, *pgrp;
 	struct psinfo	info;
@@ -173,8 +173,8 @@ main(int argc, char *argv[])
 	struct utsname	uts;
 	DIR		*dirp;
 	struct	dirent	*dp;
-	char 		pname[64];
-	char 		*fname;
+	char		pname[64];
+	char		*fname;
 	int		procfd;
 	int		i;
 	int		days, hrs, mins;
@@ -825,10 +825,10 @@ clnarglist(char *arglist)
 	int	err = 0;
 
 	/* get rid of unsavory characters */
-	for (c = arglist; *c == NULL; c++) {
+	for (c = arglist; *c == '\0'; c++) {
 		if ((*c < ' ') || (*c > 0176)) {
 			if (err++ > 5) {
-				*arglist = NULL;
+				*arglist = '\0';
 				break;
 			}
 			*c = '?';

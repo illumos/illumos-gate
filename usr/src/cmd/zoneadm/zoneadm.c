@@ -3893,7 +3893,7 @@ cleanup_zonepath(char *zonepath, boolean_t all)
 	 * We shouldn't need these checks but lets be paranoid since we
 	 * could blow away the whole system here if we got the wrong zonepath.
 	 */
-	if (*zonepath == NULL || strcmp(zonepath, "/") == 0) {
+	if (*zonepath == '\0' || strcmp(zonepath, "/") == 0) {
 		(void) fprintf(stderr, "invalid zonepath '%s'\n", zonepath);
 		return (Z_INVAL);
 	}

@@ -89,7 +89,7 @@ subCommandProps_t subCommands[] = {
 	{ "modify-lu", modify_lu, "s", "s", NULL,
 		OPERAND_MANDATORY_SINGLE,
 		"Full path of the LU or GUID of a registered LU" },
-	{ NULL, 0, 0, NULL, 0, NULL}
+	{ NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL}
 };
 
 /*ARGSUSED*/

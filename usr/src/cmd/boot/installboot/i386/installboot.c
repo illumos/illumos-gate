@@ -201,7 +201,8 @@ read_bootblock_from_file(char *file, ib_bootblock_t *bblock)
 		goto outfd;
 	}
 
-	if (find_multiboot(bblock->file, MBOOT_SCAN_SIZE, &mboot_off)
+	buf_size = MIN(buf_size, MBOOT_SCAN_SIZE);
+	if (find_multiboot(bblock->file, buf_size, &mboot_off)
 	    != BC_SUCCESS) {
 		(void) fprintf(stderr,
 		    gettext("Unable to find multiboot header\n"));

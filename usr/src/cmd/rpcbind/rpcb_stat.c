@@ -111,7 +111,7 @@ rpcbs_getaddr(int rtype, rpcprog_t prog, rpcvers_t vers, char *netid,
 		    (strcmp(al->netid, netid) == 0)) {
 			(void) rw_unlock(&inf_lock);
 
-			if ((uaddr == NULL) || (uaddr[0] == NULL))
+			if ((uaddr == NULL) || (uaddr[0] == '\0'))
 				atomic_add_int((uint_t *)&al->failure, 1);
 			else
 				atomic_add_int((uint_t *)&al->success, 1);
@@ -138,7 +138,7 @@ rpcbs_getaddr(int rtype, rpcprog_t prog, rpcvers_t vers, char *netid,
 	al->prog = prog;
 	al->vers = vers;
 	al->netid = nconf->nc_netid;
-	if ((uaddr == NULL) || (uaddr[0] == NULL)) {
+	if ((uaddr == NULL) || (uaddr[0] == '\0')) {
 		al->failure = 1;
 		al->success = 0;
 	} else {
@@ -154,7 +154,7 @@ rpcbs_getaddr(int rtype, rpcprog_t prog, rpcvers_t vers, char *netid,
 
 			free(al);
 
-			if ((uaddr == NULL) || (uaddr[0] == NULL))
+			if ((uaddr == NULL) || (uaddr[0] == '\0'))
 				atomic_add_int((uint_t *)&wal->failure, 1);
 			else
 				atomic_add_int((uint_t *)&wal->success, 1);

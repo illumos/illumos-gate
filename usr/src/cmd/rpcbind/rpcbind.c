@@ -312,7 +312,7 @@ main(int argc, char *argv[])
 	ipv6flag = Is_ipv6present();
 	rpcb_check_init();
 
-	nc_handle = setnetconfig(); 	/* open netconfig file */
+	nc_handle = setnetconfig();	/* open netconfig file */
 	if (nc_handle == NULL) {
 		syslog(LOG_ERR, "could not read /etc/netconfig");
 		exit(1);
@@ -323,8 +323,8 @@ main(int argc, char *argv[])
 	}
 	endnetconfig(nc_handle);
 
-	if ((loopback_dg[0] == NULL) && (loopback_vc[0] == NULL) &&
-	    (loopback_vc_ord[0] == NULL)) {
+	if ((loopback_dg[0] == '\0') && (loopback_vc[0] == '\0') &&
+	    (loopback_vc_ord[0] == '\0')) {
 		syslog(LOG_ERR, "could not find loopback transports");
 		exit(1);
 	}
@@ -617,7 +617,7 @@ init_transport(struct netconfig *nconf)
 		PMAPLIST *pml;
 
 		if (!svc_register(my_xprt, PMAPPROG, PMAPVERS,
-		    pmap_service, NULL)) {
+		    pmap_service, 0)) {
 			syslog(LOG_ERR, "could not register on %s",
 			    nconf->nc_netid);
 			goto error;

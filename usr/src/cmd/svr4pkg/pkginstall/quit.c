@@ -289,12 +289,12 @@ quit(int retcode)
 		ptext(stderr, MSG_DRYRUN_DONE);
 		ptext(stderr, MSG_NOCHANGE);
 
-		if (tmpdir[0] != NULL)
+		if (tmpdir[0] != '\0')
 			(void) rrmdir(tmpdir);
 
 	} else {
 		/* fix bug #1082589 that deletes root file */
-		if (tmpdir[0] != NULL) {
+		if (tmpdir[0] != '\0') {
 			(void) rrmdir(tmpdir);
 		}
 

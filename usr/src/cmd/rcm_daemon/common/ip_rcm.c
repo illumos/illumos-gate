@@ -121,7 +121,7 @@ typedef struct ip_pif {
 typedef struct ip_lif
 {
 	struct ip_lif		*li_next;	/* ptr to next lif */
-	struct ip_lif		*li_prev;  	/* previous next ptr */
+	struct ip_lif		*li_prev;	/* previous next ptr */
 	ip_pif_t		*li_pif;	/* back ptr to phy int */
 	ushort_t		li_ifnum;	/* interface number */
 	union {
@@ -180,20 +180,20 @@ static int ip_notify_event(rcm_handle_t *, char *, id_t, uint_t,
 			char **, nvlist_t *, rcm_info_t **);
 
 /* Module private routines */
-static void 	free_cache();
-static int 	update_cache(rcm_handle_t *);
-static void 	cache_remove(ip_cache_t *);
+static void	free_cache();
+static int	update_cache(rcm_handle_t *);
+static void	cache_remove(ip_cache_t *);
 static ip_cache_t *cache_lookup(rcm_handle_t *, char *, char);
-static void 	free_node(ip_cache_t *);
-static void 	cache_insert(ip_cache_t *);
-static char 	*ip_usage(ip_cache_t *);
-static int 	update_pif(rcm_handle_t *, int, int, struct ifaddrs *);
-static int 	ip_ipmp_offline(ip_cache_t *);
+static void	free_node(ip_cache_t *);
+static void	cache_insert(ip_cache_t *);
+static char	*ip_usage(ip_cache_t *);
+static int	update_pif(rcm_handle_t *, int, int, struct ifaddrs *);
+static int	ip_ipmp_offline(ip_cache_t *);
 static int	ip_ipmp_undo_offline(ip_cache_t *);
 static int	if_cfginfo(ip_cache_t *, uint_t);
 static int	if_unplumb(ip_cache_t *);
 static int	if_replumb(ip_cache_t *);
-static void 	ip_log_err(ip_cache_t *, char **, char *);
+static void	ip_log_err(ip_cache_t *, char **, char *);
 static char	*get_link_resource(const char *);
 static void	clr_cfg_state(ip_pif_t *);
 static int	modop(char *, char *, int, char);
@@ -204,7 +204,7 @@ static int	ip_onlinelist(rcm_handle_t *, ip_cache_t *, char **, uint_t,
 			rcm_info_t **);
 static int	ip_offlinelist(rcm_handle_t *, ip_cache_t *, char **, uint_t,
 			rcm_info_t **);
-static char 	**ip_get_addrlist(ip_cache_t *);
+static char	**ip_get_addrlist(ip_cache_t *);
 static void	ip_free_addrlist(char **);
 static void	ip_consumer_notify(rcm_handle_t *, datalink_id_t, char **,
 			uint_t, rcm_info_t **);
@@ -251,7 +251,7 @@ rcm_mod_init(void)
 	cache_head.ip_prev = NULL;
 	cache_tail.ip_prev = &cache_head;
 	cache_tail.ip_next = NULL;
-	(void) mutex_init(&cache_lock, NULL, NULL);
+	(void) mutex_init(&cache_lock, USYNC_THREAD, NULL);
 
 	if ((status = dladm_open(&dld_handle)) != DLADM_STATUS_OK) {
 		rcm_log_message(RCM_WARNING,
@@ -654,7 +654,7 @@ ip_get_info(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 /*ARGSUSED*/
 static int
 ip_suspend(rcm_handle_t *hd, char *rsrc, id_t id, timespec_t *interval,
-			uint_t flags, char **errorp, rcm_info_t **depend_info)
+    uint_t flags, char **errorp, rcm_info_t **depend_info)
 {
 	/* Guard against bad arguments */
 	assert(hd != NULL);
@@ -674,7 +674,7 @@ ip_suspend(rcm_handle_t *hd, char *rsrc, id_t id, timespec_t *interval,
 /*ARGSUSED*/
 static int
 ip_resume(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
-		char **errorp, rcm_info_t ** depend_info)
+    char **errorp, rcm_info_t ** depend_info)
 {
 	/* Guard against bad arguments */
 	assert(hd != NULL);
@@ -694,7 +694,7 @@ ip_resume(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 /*ARGSUSED*/
 static int
 ip_remove(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
-		char **errorp, rcm_info_t **depend_info)
+    char **errorp, rcm_info_t **depend_info)
 {
 	ip_cache_t *node;
 
@@ -735,7 +735,7 @@ ip_remove(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 /*ARGSUSED*/
 static int
 ip_notify_event(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
-			char **errorp, nvlist_t *nvl, rcm_info_t **depend_info)
+    char **errorp, nvlist_t *nvl, rcm_info_t **depend_info)
 {
 	datalink_id_t	linkid;
 	nvpair_t *nvp = NULL;
@@ -2091,7 +2091,7 @@ ip_plink(int mux_fd, int muxid_fd, int fd, struct lifreq *lifr)
 /*ARGSUSED*/
 static int
 ip_onlinelist(rcm_handle_t *hd, ip_cache_t *node, char **errorp, uint_t flags,
-		rcm_info_t **depend_info)
+    rcm_info_t **depend_info)
 {
 	char **addrlist;
 	int ret = RCM_SUCCESS;
@@ -2120,7 +2120,7 @@ ip_onlinelist(rcm_handle_t *hd, ip_cache_t *node, char **errorp, uint_t flags,
 /*ARGSUSED*/
 static int
 ip_offlinelist(rcm_handle_t *hd, ip_cache_t *node, char **errorp, uint_t flags,
-	rcm_info_t **depend_info)
+    rcm_info_t **depend_info)
 {
 	char **addrlist;
 	int ret = RCM_SUCCESS;

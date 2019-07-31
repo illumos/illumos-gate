@@ -224,8 +224,8 @@ xdir(int maptyp, VFP_T *vfp, PKGserver server, char *dirname)
 	errflg = 0;
 	(void) memset((char *)&mine, '\0', sizeof (struct cfent));
 	while ((drp = readdir(dirfp)) != NULL) {
-		if (strcmp(drp->d_name, ".") == NULL ||
-		    strcmp(drp->d_name, "..") == NULL)
+		if (strcmp(drp->d_name, ".") == 0 ||
+		    strcmp(drp->d_name, "..") == 0)
 			continue;
 		(void) snprintf(badpath, sizeof (badpath), "%s/%s",
 		    dirname, drp->d_name);

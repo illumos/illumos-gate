@@ -4509,7 +4509,7 @@ zsd_stat_server(void *cookie, char *argp, size_t arg_size,
 	rvals = usage->zsu_size;
 	zsd_usage_cache_rele(cache);
 
-	(void) door_return(rvalp, rvals, 0, NULL);
+	(void) door_return(rvalp, rvals, NULL, 0);
 	thr_exit(NULL);
 }
 

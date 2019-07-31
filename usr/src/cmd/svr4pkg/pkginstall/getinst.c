@@ -110,10 +110,10 @@ getinst(int *updatingExisting, struct pkginfo *info, int npkgs,
 	samearch = nsamearch = 0;
 	sameinst  = NULL;
 	for (i = 0; i < npkgs; i++) {
-		if (strcmp(info[i].arch, pkgarch) == NULL) {
+		if (strcmp(info[i].arch, pkgarch) == 0) {
 			samearch = i;
 			nsamearch++;
-			if (strcmp(info[i].version, pkgvers) == NULL) {
+			if (strcmp(info[i].version, pkgvers) == 0) {
 				sameinst = info[i].pkginst;
 			}
 		}
@@ -189,7 +189,7 @@ getinst(int *updatingExisting, struct pkginfo *info, int npkgs,
 	}
 
 	inst = prompt(info, npkgs);
-	if (strcmp(inst, "new") == NULL) {
+	if (strcmp(inst, "new") == 0) {
 		inst = nextinst();
 		return (inst);
 	}

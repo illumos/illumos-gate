@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -93,7 +93,7 @@ static int	tabflg;
 static char	options[30], fopt[30];
 static float	tdiff, sec_diff, totsec_diff = 0.0, percent;
 static float	start_time, end_time, isec;
-static int 	fin, fout;
+static int	fin, fout;
 static pid_t	childid;
 static int	pipedes[2];
 static char	arg1[10], arg2[10];
@@ -127,26 +127,26 @@ main(int argc, char **argv)
 	 */
 	while ((i = getopt(argc, argv, "ubdycwaqvmpgrkAo:s:e:i:f:")) != EOF)
 		switch (ccc = (char)i) {
-		    case 'o':
+		case 'o':
 			oflg++;
 			if (strlcpy(ofile, optarg, sizeof (ofile)) >=
 			    sizeof (ofile)) {
 				fail(2, "-o filename is too long: %s", optarg);
 			}
 			break;
-		    case 's':
+		case 's':
 			if (sscanf(optarg, "%d:%d:%d",
 			    &args.tm_hour, &args.tm_min, &args.tm_sec) < 1)
 				fail(0, "-%c %s -- illegal option argument",
 				    ccc, optarg);
 			else {
-				sflg++,
+				sflg++;
 				start_time = args.tm_hour*3600.0 +
 				    args.tm_min*60.0 +
 				    args.tm_sec;
 			}
 			break;
-		    case 'e':
+		case 'e':
 			if (sscanf(optarg, "%d:%d:%d",
 			    &arge.tm_hour, &arge.tm_min, &arge.tm_sec) < 1)
 				fail(0, "-%c %s -- illegal option argument",
@@ -158,7 +158,7 @@ main(int argc, char **argv)
 				    arge.tm_sec;
 			}
 			break;
-		    case 'i':
+		case 'i':
 			if (sscanf(optarg, "%f", &isec) < 1)
 				fail(0, "-%c %s -- illegal option argument",
 				    ccc, optarg);
@@ -167,14 +167,14 @@ main(int argc, char **argv)
 					iflg++;
 			}
 			break;
-		    case 'f':
+		case 'f':
 			fflg++;
 			if (strlcpy(flnm, optarg, sizeof (flnm)) >=
 			    sizeof (ofile)) {
 				fail(2, "-f filename is too long: %s", optarg);
 			}
 			break;
-		    case '?':
+		case '?':
 			usage();
 			exit(1);
 			break;
@@ -200,7 +200,7 @@ main(int argc, char **argv)
 	 * time or from a file.
 	 */
 	switch (argc - optind) {
-	    case 0:		/*   Get input data from file   */
+	case 0:		/*   Get input data from file   */
 		if (fflg == 0) {
 			temp = time(NULL);
 			curt = localtime(&temp);
@@ -210,12 +210,12 @@ main(int argc, char **argv)
 		if ((fin = open(flnm, 0)) == -1)
 			fail(1, "can't open %s", flnm);
 		break;
-	    case 1:		/*   Real time data; one cycle   */
+	case 1:		/*   Real time data; one cycle   */
 		realtime++;
 		t = safe_strtoi(argv[optind], "invalid sampling interval");
 		n = 2;
 		break;
-	    case 2:		/*   Real time data; specified cycles   */
+	case 2:		/*   Real time data; specified cycles   */
 	default:
 		realtime++;
 		t = safe_strtoi(argv[optind], "invalid sampling interval");
@@ -415,13 +415,13 @@ prpass(int input_pipe)
 			 * The data file must exceed this size to be valid.
 			 */
 			if (!input_pipe) {
-			    if ((curr_pos = lseek(fin, 0, SEEK_CUR)) ==
-				(off_t)-1)
-				    fail(1, "lseek failed");
-			    if (in_stat.st_size < curr_pos ||
-				size > in_stat.st_size - curr_pos)
-				    fail(2, "data file corrupt; specified size"
-					"exceeds actual");
+				if ((curr_pos = lseek(fin, 0, SEEK_CUR)) ==
+				    (off_t)-1)
+					fail(1, "lseek failed");
+				if (in_stat.st_size < curr_pos ||
+				    size > in_stat.st_size - curr_pos)
+					fail(2, "data file corrupt; "
+					    "specified size exceeds actual");
 			}
 
 			safe_zalloc((void **)&nxio, size, 1);
@@ -535,9 +535,9 @@ prpass(int input_pipe)
 
 		if (recno++ > 1) {
 			ts = ox.csi.cpu[0] + ox.csi.cpu[1] +
-				ox.csi.cpu[2] + ox.csi.cpu[3];
+			    ox.csi.cpu[2] + ox.csi.cpu[3];
 			te = nx.csi.cpu[0] + nx.csi.cpu[1] +
-				nx.csi.cpu[2] + nx.csi.cpu[3];
+			    nx.csi.cpu[2] + nx.csi.cpu[3];
 			tdiff = (float)(te - ts);
 			sec_diff = tdiff / hz;
 			percent = 100.0 / tdiff;
@@ -637,121 +637,121 @@ prthdg(void)
 
 	(void) printf("\n");
 	prttim();
-	while ((ccc = fopt[jj++]) != NULL) {
+	while ((ccc = fopt[jj++]) != '\0') {
 		tsttab();
 		switch (ccc) {
-		    case 'u':
+		case 'u':
 			(void) printf(" %7s %7s %7s %7s\n",
-				"%usr",
-				"%sys",
-				"%wio",
-				"%idle");
+			    "%usr",
+			    "%sys",
+			    "%wio",
+			    "%idle");
 			break;
-		    case 'b':
+		case 'b':
 			(void) printf(" %7s %7s %7s %7s %7s %7s %7s %7s\n",
-				"bread/s",
-				"lread/s",
-				"%rcache",
-				"bwrit/s",
-				"lwrit/s",
-				"%wcache",
-				"pread/s",
-				"pwrit/s");
+			    "bread/s",
+			    "lread/s",
+			    "%rcache",
+			    "bwrit/s",
+			    "lwrit/s",
+			    "%wcache",
+			    "pread/s",
+			    "pwrit/s");
 			break;
-		    case 'd':
+		case 'd':
 			(void) printf("   %-8.8s    %7s %7s %7s %7s %7s %7s\n",
-				"device",
-				"%busy",
-				"avque",
-				"r+w/s",
-				"blks/s",
-				"avwait",
-				"avserv");
+			    "device",
+			    "%busy",
+			    "avque",
+			    "r+w/s",
+			    "blks/s",
+			    "avwait",
+			    "avserv");
 			break;
-		    case 'y':
+		case 'y':
 			(void) printf(" %7s %7s %7s %7s %7s %7s\n",
-				"rawch/s",
-				"canch/s",
-				"outch/s",
-				"rcvin/s",
-				"xmtin/s",
-				"mdmin/s");
+			    "rawch/s",
+			    "canch/s",
+			    "outch/s",
+			    "rcvin/s",
+			    "xmtin/s",
+			    "mdmin/s");
 			break;
-		    case 'c':
+		case 'c':
 			(void) printf(" %7s %7s %7s %7s %7s %7s %7s\n",
-				"scall/s",
-				"sread/s",
-				"swrit/s",
-				"fork/s",
-				"exec/s",
-				"rchar/s",
-				"wchar/s");
+			    "scall/s",
+			    "sread/s",
+			    "swrit/s",
+			    "fork/s",
+			    "exec/s",
+			    "rchar/s",
+			    "wchar/s");
 			break;
-		    case 'w':
+		case 'w':
 			(void) printf(" %7s %7s %7s %7s %7s\n",
-				"swpin/s",
-				"bswin/s",
-				"swpot/s",
-				"bswot/s",
-				"pswch/s");
+			    "swpin/s",
+			    "bswin/s",
+			    "swpot/s",
+			    "bswot/s",
+			    "pswch/s");
 			break;
-		    case 'a':
+		case 'a':
 			(void) printf(" %7s %7s %7s\n",
-				"iget/s",
-				"namei/s",
-				"dirbk/s");
+			    "iget/s",
+			    "namei/s",
+			    "dirbk/s");
 			break;
-		    case 'q':
+		case 'q':
 			(void) printf(" %7s %7s %7s %7s\n",
-				"runq-sz",
-				"%runocc",
-				"swpq-sz",
-				"%swpocc");
+			    "runq-sz",
+			    "%runocc",
+			    "swpq-sz",
+			    "%swpocc");
 			break;
-		    case 'v':
+		case 'v':
 			(void) printf("  %s  %s  %s   %s\n",
-				"proc-sz    ov",
-				"inod-sz    ov",
-				"file-sz    ov",
-				"lock-sz");
+			    "proc-sz    ov",
+			    "inod-sz    ov",
+			    "file-sz    ov",
+			    "lock-sz");
 			break;
-		    case 'm':
+		case 'm':
 			(void) printf(" %7s %7s\n",
-				"msg/s",
-				"sema/s");
+			    "msg/s",
+			    "sema/s");
 			break;
-		    case 'p':
+		case 'p':
 			(void) printf(" %7s %7s %7s %7s %7s %7s\n",
-				"atch/s",
-				"pgin/s",
-				"ppgin/s",
-				"pflt/s",
-				"vflt/s",
-				"slock/s");
+			    "atch/s",
+			    "pgin/s",
+			    "ppgin/s",
+			    "pflt/s",
+			    "vflt/s",
+			    "slock/s");
 			break;
-		    case 'g':
+		case 'g':
 			(void) printf(" %8s %8s %8s %8s %8s\n",
-				"pgout/s",
-				"ppgout/s",
-				"pgfree/s",
-				"pgscan/s",
-				"%ufs_ipf");
+			    "pgout/s",
+			    "ppgout/s",
+			    "pgfree/s",
+			    "pgscan/s",
+			    "%ufs_ipf");
 			break;
-		    case 'r':
+		case 'r':
 			(void) printf(" %7s %8s\n",
-				"freemem",
-				"freeswap");
+			    "freemem",
+			    "freeswap");
 			break;
-		    case 'k':
+		case 'k':
 			(void) printf(" %7s %7s %5s %7s %7s %5s %11s %5s\n",
-				"sml_mem",
-				"alloc",
-				"fail",
-				"lg_mem",
-				"alloc",
-				"fail",
-				"ovsz_alloc",
-				"fail");
+			    "sml_mem",
+			    "alloc",
+			    "fail",
+			    "lg_mem",
+			    "alloc",
+			    "fail",
+			    "ovsz_alloc",
+			    "fail");
 			break;
 		}
 	}
@@ -769,16 +769,16 @@ update_counters(void)
 	iodevinfo_t *nio, *oio, *aio, *dio;
 
 	ulong_delta((uint64_t *)&nx.csi, (uint64_t *)&ox.csi,
-		(uint64_t *)&dx.csi, (uint64_t *)&ax.csi, 0, sizeof (ax.csi));
+	    (uint64_t *)&dx.csi, (uint64_t *)&ax.csi, 0, sizeof (ax.csi));
 	ulong_delta((uint64_t *)&nx.si, (uint64_t *)&ox.si,
-		(uint64_t *)&dx.si, (uint64_t *)&ax.si, 0, sizeof (ax.si));
+	    (uint64_t *)&dx.si, (uint64_t *)&ax.si, 0, sizeof (ax.si));
 	ulong_delta((uint64_t *)&nx.cvmi, (uint64_t *)&ox.cvmi,
-		(uint64_t *)&dx.cvmi, (uint64_t *)&ax.cvmi, 0,
-		sizeof (ax.cvmi));
+	    (uint64_t *)&dx.cvmi, (uint64_t *)&ax.cvmi, 0,
+	    sizeof (ax.cvmi));
 
 	ax.vmi.freemem += dx.vmi.freemem = nx.vmi.freemem - ox.vmi.freemem;
 	ax.vmi.swap_avail += dx.vmi.swap_avail =
-		nx.vmi.swap_avail - ox.vmi.swap_avail;
+	    nx.vmi.swap_avail - ox.vmi.swap_avail;
 
 	nio = nxio;
 	oio = oxio;
@@ -786,23 +786,23 @@ update_counters(void)
 	dio = dxio;
 	for (i = 0; i < niodevs; i++) {
 		aio->kios.wlastupdate += dio->kios.wlastupdate
-			= nio->kios.wlastupdate - oio->kios.wlastupdate;
+		    = nio->kios.wlastupdate - oio->kios.wlastupdate;
 		aio->kios.reads += dio->kios.reads
-			= nio->kios.reads - oio->kios.reads;
+		    = nio->kios.reads - oio->kios.reads;
 		aio->kios.writes += dio->kios.writes
-			= nio->kios.writes - oio->kios.writes;
+		    = nio->kios.writes - oio->kios.writes;
 		aio->kios.nread += dio->kios.nread
-			= nio->kios.nread - oio->kios.nread;
+		    = nio->kios.nread - oio->kios.nread;
 		aio->kios.nwritten += dio->kios.nwritten
-			= nio->kios.nwritten - oio->kios.nwritten;
+		    = nio->kios.nwritten - oio->kios.nwritten;
 		aio->kios.wlentime += dio->kios.wlentime
-			= nio->kios.wlentime - oio->kios.wlentime;
+		    = nio->kios.wlentime - oio->kios.wlentime;
 		aio->kios.rlentime += dio->kios.rlentime
-			= nio->kios.rlentime - oio->kios.rlentime;
+		    = nio->kios.rlentime - oio->kios.rlentime;
 		aio->kios.wtime += dio->kios.wtime
-			= nio->kios.wtime - oio->kios.wtime;
+		    = nio->kios.wtime - oio->kios.wtime;
 		aio->kios.rtime += dio->kios.rtime
-			= nio->kios.rtime - oio->kios.rtime;
+		    = nio->kios.rtime - oio->kios.rtime;
 		aio->ks.ks_snaptime += dio->ks.ks_snaptime
 		    = nio->ks.ks_snaptime - oio->ks.ks_snaptime;
 		nio++;
@@ -816,24 +816,24 @@ static void
 prt_u_opt(struct sa64 *xx)
 {
 	(void) printf(" %7.0f %7.0f %7.0f %7.0f\n",
-		(float)xx->csi.cpu[1] * percent,
-		(float)xx->csi.cpu[2] * percent,
-		(float)xx->csi.cpu[3] * percent,
-		(float)xx->csi.cpu[0] * percent);
+	    (float)xx->csi.cpu[1] * percent,
+	    (float)xx->csi.cpu[2] * percent,
+	    (float)xx->csi.cpu[3] * percent,
+	    (float)xx->csi.cpu[0] * percent);
 }
 
 static void
 prt_b_opt(struct sa64 *xx)
 {
 	(void) printf(" %7.0f %7.0f %7.0f %7.0f %7.0f %7.0f %7.0f %7.0f\n",
-		(float)xx->csi.bread / sec_diff,
-		(float)xx->csi.lread / sec_diff,
-		freq((float)xx->csi.lread, (float)xx->csi.bread),
-		(float)xx->csi.bwrite / sec_diff,
-		(float)xx->csi.lwrite / sec_diff,
-		freq((float)xx->csi.lwrite, (float)xx->csi.bwrite),
-		(float)xx->csi.phread / sec_diff,
-		(float)xx->csi.phwrite / sec_diff);
+	    (float)xx->csi.bread / sec_diff,
+	    (float)xx->csi.lread / sec_diff,
+	    freq((float)xx->csi.lread, (float)xx->csi.bread),
+	    (float)xx->csi.bwrite / sec_diff,
+	    (float)xx->csi.lwrite / sec_diff,
+	    freq((float)xx->csi.lwrite, (float)xx->csi.bwrite),
+	    (float)xx->csi.phread / sec_diff,
+	    (float)xx->csi.phwrite / sec_diff);
 }
 
 static void
@@ -856,57 +856,57 @@ prt_d_opt(int ii, iodevinfo_t *xio)
 
 	(void) printf("   %-8.8s    ", nxio[ii].ks.ks_name);
 	(void) printf("%7.0f %7.1f %7.0f %7.0f %7.1f %7.1f\n",
-                pbusy,
-		avq + avs,
-		tps,
-		BLKS(xio[ii].kios.nread + xio[ii].kios.nwritten) / etime,
-		(tps > 0 ? avq / tps * 1000.0 : 0.0),
-		(tps > 0 ? avs / tps * 1000.0 : 0.0));
+	    pbusy,
+	    avq + avs,
+	    tps,
+	    BLKS(xio[ii].kios.nread + xio[ii].kios.nwritten) / etime,
+	    (tps > 0 ? avq / tps * 1000.0 : 0.0),
+	    (tps > 0 ? avs / tps * 1000.0 : 0.0));
 }
 
 static void
 prt_y_opt(struct sa64 *xx)
 {
 	(void) printf(" %7.0f %7.0f %7.0f %7.0f %7.0f %7.0f\n",
-		(float)xx->csi.rawch / sec_diff,
-		(float)xx->csi.canch / sec_diff,
-		(float)xx->csi.outch / sec_diff,
-		(float)xx->csi.rcvint / sec_diff,
-		(float)xx->csi.xmtint / sec_diff,
-		(float)xx->csi.mdmint / sec_diff);
+	    (float)xx->csi.rawch / sec_diff,
+	    (float)xx->csi.canch / sec_diff,
+	    (float)xx->csi.outch / sec_diff,
+	    (float)xx->csi.rcvint / sec_diff,
+	    (float)xx->csi.xmtint / sec_diff,
+	    (float)xx->csi.mdmint / sec_diff);
 }
 
 static void
 prt_c_opt(struct sa64 *xx)
 {
 	(void) printf(" %7.0f %7.0f %7.0f %7.2f %7.2f %7.0f %7.0f\n",
-		(float)xx->csi.syscall / sec_diff,
-		(float)xx->csi.sysread / sec_diff,
-		(float)xx->csi.syswrite / sec_diff,
-		(float)(xx->csi.sysfork + xx->csi.sysvfork) / sec_diff,
-		(float)xx->csi.sysexec / sec_diff,
-		(float)xx->csi.readch / sec_diff,
-		(float)xx->csi.writech / sec_diff);
+	    (float)xx->csi.syscall / sec_diff,
+	    (float)xx->csi.sysread / sec_diff,
+	    (float)xx->csi.syswrite / sec_diff,
+	    (float)(xx->csi.sysfork + xx->csi.sysvfork) / sec_diff,
+	    (float)xx->csi.sysexec / sec_diff,
+	    (float)xx->csi.readch / sec_diff,
+	    (float)xx->csi.writech / sec_diff);
 }
 
 static void
 prt_w_opt(struct sa64 *xx)
 {
 	(void) printf(" %7.2f %7.1f %7.2f %7.1f %7.0f\n",
-		(float)xx->cvmi.swapin / sec_diff,
-		(float)PGTOBLK(xx->cvmi.pgswapin) / sec_diff,
-		(float)xx->cvmi.swapout / sec_diff,
-		(float)PGTOBLK(xx->cvmi.pgswapout) / sec_diff,
-		(float)xx->csi.pswitch / sec_diff);
+	    (float)xx->cvmi.swapin / sec_diff,
+	    (float)PGTOBLK(xx->cvmi.pgswapin) / sec_diff,
+	    (float)xx->cvmi.swapout / sec_diff,
+	    (float)PGTOBLK(xx->cvmi.pgswapout) / sec_diff,
+	    (float)xx->csi.pswitch / sec_diff);
 }
 
 static void
 prt_a_opt(struct sa64 *xx)
 {
 	(void) printf(" %7.0f %7.0f %7.0f\n",
-		(float)xx->csi.ufsiget / sec_diff,
-		(float)xx->csi.namei / sec_diff,
-		(float)xx->csi.ufsdirblk / sec_diff);
+	    (float)xx->csi.ufsiget / sec_diff,
+	    (float)xx->csi.namei / sec_diff,
+	    (float)xx->csi.ufsdirblk / sec_diff);
 }
 
 static void
@@ -943,33 +943,33 @@ static void
 prt_m_opt(struct sa64 *xx)
 {
 	(void) printf(" %7.2f %7.2f\n",
-		(float)xx->csi.msg / sec_diff,
-		(float)xx->csi.sema / sec_diff);
+	    (float)xx->csi.msg / sec_diff,
+	    (float)xx->csi.sema / sec_diff);
 }
 
 static void
 prt_p_opt(struct sa64 *xx)
 {
 	(void) printf(" %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f\n",
-		(float)xx->cvmi.pgfrec / sec_diff,
-		(float)xx->cvmi.pgin / sec_diff,
-		(float)xx->cvmi.pgpgin / sec_diff,
-		(float)(xx->cvmi.prot_fault + xx->cvmi.cow_fault) / sec_diff,
-		(float)(xx->cvmi.hat_fault + xx->cvmi.as_fault) / sec_diff,
-		(float)xx->cvmi.softlock / sec_diff);
+	    (float)xx->cvmi.pgfrec / sec_diff,
+	    (float)xx->cvmi.pgin / sec_diff,
+	    (float)xx->cvmi.pgpgin / sec_diff,
+	    (float)(xx->cvmi.prot_fault + xx->cvmi.cow_fault) / sec_diff,
+	    (float)(xx->cvmi.hat_fault + xx->cvmi.as_fault) / sec_diff,
+	    (float)xx->cvmi.softlock / sec_diff);
 }
 
 static void
 prt_g_opt(struct sa64 *xx)
 {
 	(void) printf(" %8.2f %8.2f %8.2f %8.2f %8.2f\n",
-		(float)xx->cvmi.pgout / sec_diff,
-		(float)xx->cvmi.pgpgout / sec_diff,
-		(float)xx->cvmi.dfree / sec_diff,
-		(float)xx->cvmi.scan / sec_diff,
-		(float)xx->csi.ufsipage * 100.0 /
-			denom((float)xx->csi.ufsipage +
-			(float)xx->csi.ufsinopage));
+	    (float)xx->cvmi.pgout / sec_diff,
+	    (float)xx->cvmi.pgpgout / sec_diff,
+	    (float)xx->cvmi.dfree / sec_diff,
+	    (float)xx->cvmi.scan / sec_diff,
+	    (float)xx->csi.ufsipage * 100.0 /
+	    denom((float)xx->csi.ufsipage +
+	    (float)xx->csi.ufsinopage));
 }
 
 static void
@@ -982,7 +982,7 @@ prt_r_opt(struct sa64 *xx)
 		(void) printf(" %7.0f %8.0f\n",
 		    (double)xx->vmi.freemem / (float)xx->si.updates,
 		    (double)PGTOBLK(xx->vmi.swap_avail) /
-			(float)xx->si.updates);
+		    (float)xx->si.updates);
 	}
 }
 
@@ -1029,51 +1029,51 @@ prtopt(void)
 
 	prttim();
 
-	while ((ccc = fopt[jj++]) != NULL) {
+	while ((ccc = fopt[jj++]) != '\0') {
 		if (ccc != 'd')
 			tsttab();
 		switch (ccc) {
-		    case 'u':
+		case 'u':
 			prt_u_opt(&dx);
 			break;
-		    case 'b':
+		case 'b':
 			prt_b_opt(&dx);
 			break;
-		    case 'd':
+		case 'd':
 			for (ii = 0; ii < niodevs; ii++)
 				prt_d_opt(ii, dxio);
 			break;
-		    case 'y':
+		case 'y':
 			prt_y_opt(&dx);
 			break;
-		    case 'c':
+		case 'c':
 			prt_c_opt(&dx);
 			break;
-		    case 'w':
+		case 'w':
 			prt_w_opt(&dx);
 			break;
-		    case 'a':
+		case 'a':
 			prt_a_opt(&dx);
 			break;
-		    case 'q':
+		case 'q':
 			prt_q_opt(&dx);
 			break;
-		    case 'v':
+		case 'v':
 			prt_v_opt(&dx);
 			break;
-		    case 'm':
+		case 'm':
 			prt_m_opt(&dx);
 			break;
-		    case 'p':
+		case 'p':
 			prt_p_opt(&dx);
 			break;
-		    case 'g':
+		case 'g':
 			prt_g_opt(&dx);
 			break;
-		    case 'r':
+		case 'r':
 			prt_r_opt(&dx);
 			break;
-		    case 'k':
+		case 'k':
 			prt_k_opt(&nx, 1);
 			/*
 			 * To avoid overflow, copy the data from the sa record
@@ -1114,51 +1114,51 @@ prtavg(void)
 	percent = 100.0 / tdiff;
 	(void) printf("\n");
 
-	while ((ccc = fopt[jj++]) != NULL) {
+	while ((ccc = fopt[jj++]) != '\0') {
 		if (ccc != 'v')
 			(void) printf("Average ");
 		switch (ccc) {
-		    case 'u':
+		case 'u':
 			prt_u_opt(&ax);
 			break;
-		    case 'b':
+		case 'b':
 			prt_b_opt(&ax);
 			break;
-		    case 'd':
+		case 'd':
 			tabflg = 1;
 			for (ii = 0; ii < niodevs; ii++)
 				prt_d_opt(ii, axio);
 			break;
-		    case 'y':
+		case 'y':
 			prt_y_opt(&ax);
 			break;
-		    case 'c':
+		case 'c':
 			prt_c_opt(&ax);
 			break;
-		    case 'w':
+		case 'w':
 			prt_w_opt(&ax);
 			break;
-		    case 'a':
+		case 'a':
 			prt_a_opt(&ax);
 			break;
-		    case 'q':
+		case 'q':
 			prt_q_opt(&ax);
 			break;
-		    case 'v':
+		case 'v':
 			break;
-		    case 'm':
+		case 'm':
 			prt_m_opt(&ax);
 			break;
-		    case 'p':
+		case 'p':
 			prt_p_opt(&ax);
 			break;
-		    case 'g':
+		case 'g':
 			prt_g_opt(&ax);
 			break;
-		    case 'r':
+		case 'r':
 			prt_r_opt(&ax);
 			break;
-		    case 'k':
+		case 'k':
 			prt_k_opt(&ax, lines);
 			break;
 		}
@@ -1167,7 +1167,7 @@ prtavg(void)
 
 static void
 ulong_delta(uint64_t *new, uint64_t *old, uint64_t *delta, uint64_t *accum,
-	int begin, int end)
+    int begin, int end)
 {
 	int i;
 	uint64_t n, o, d;

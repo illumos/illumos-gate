@@ -930,7 +930,7 @@ merg(struct cfextra *el_ent, struct cfent *cf_ent)
 			 * already done.
 			 */
 			if (strcmp(cf_ent->ainfo.local,
-			    el_ent->cf_ent.ainfo.local) != NULL) {
+			    el_ent->cf_ent.ainfo.local) != 0) {
 				changed++;
 
 				/*
@@ -939,7 +939,7 @@ merg(struct cfextra *el_ent, struct cfent *cf_ent)
 				 * entry.
 				 */
 				if (strcmp(el_ent->cf_ent.ainfo.local,
-				    "?") == NULL) {
+				    "?") == 0) {
 					(void) strlcpy(
 						el_ent->cf_ent.ainfo.local,
 						cf_ent->ainfo.local,

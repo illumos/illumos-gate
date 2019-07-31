@@ -4,15 +4,13 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "refer..c"
 #include <locale.h>
@@ -50,7 +48,7 @@ append(char *s)
 		;
 	lch = *--p;
 	if (postpunct && punctuat(lch))
-		*p = NULL;
+		*p = '\0';
 	else /* pre-punctuation */
 		switch (lch) {
 		case '.':
@@ -60,7 +58,7 @@ append(char *s)
 		case ';':
 		case ':':
 			*p++ = lch;
-			*p = NULL;
+			*p = '\0';
 		}
 	strcat(buff, s);
 	if (postpunct)
@@ -74,10 +72,10 @@ append(char *s)
 			for (p = buff; *p; p++)
 				;
 			if (*--p == '\n')
-				*p = NULL;
+				*p = '\0';
 			*p++ = lch;
 			*p++ = '\n';
-			*p = NULL;
+			*p = '\0';
 		}
 	if (strlen(buff) > BUFSIZ)
 		err(gettext("output buff too long (%d)"), BUFSIZ);

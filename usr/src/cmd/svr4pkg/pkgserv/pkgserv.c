@@ -580,7 +580,7 @@ pkg_door_srv(void *cookie, char *argp, size_t asz, door_desc_t *dp,
 
 err:
 	(void) mutex_unlock(&mtx);
-	(void) door_return((void *)&one, 4, NULL, NULL);
+	(void) door_return((void *)&one, 4, NULL, 0);
 }
 
 /*
@@ -1263,7 +1263,7 @@ pkgfilter(pkgfilter_t *pf, door_desc_t *dp)
 	/* Copy the file descriptor in the command field */
 	cpf->cmd = p[1];
 
-	if (thr_create(NULL, NULL, thr_pkgfilter, cpf, THR_DETACHED,
+	if (thr_create(NULL, 0, thr_pkgfilter, cpf, THR_DETACHED,
 	    &tid) != 0) {
 		(void) close(p[0]);
 		(void) close(p[1]);

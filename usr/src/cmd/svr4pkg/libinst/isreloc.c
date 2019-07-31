@@ -137,7 +137,7 @@ has_rel_path(char *entry)
 	register int entry_pos = 1;
 
 	/* If the line is a comment or special directive, return 0 */
-	if (*entry == NULL || strchr(IGNORE_START, *entry))
+	if (*entry == '\0' || strchr(IGNORE_START, *entry) != NULL)
 		return (0);
 
 	/* Skip past this data entry if it is volume number. */
@@ -158,7 +158,7 @@ has_rel_path(char *entry)
 	 * or the type indicates this line should be ignored, we return
 	 * as though not relative.
 	 */
-	if (*entry == NULL || strchr(IGNORE_TYPE, *entry))
+	if (*entry == '\0' || strchr(IGNORE_TYPE, *entry))
 		return (0);
 
 	/* The pathname is in the third position */
@@ -172,7 +172,7 @@ has_rel_path(char *entry)
 		while (*entry && isspace(*entry)) {
 			entry++;
 		}
-	} while (++entry_pos < 3 && *entry != NULL);
+	} while (++entry_pos < 3 && *entry != '\0');
 
 	/*
 	 * Now we're pointing at the first character of the pathname.

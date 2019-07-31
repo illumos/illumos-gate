@@ -156,7 +156,7 @@ char **shortp;
 
 	/* read the from line */
 	if (fgets(line, sizeof line, stdin) == NULL ||
-	    strncmp(line, "From ", 5) != NULL)
+	    strncmp(line, "From ", 5) != 0)
 	{
 		usrerr("No initial From line");
 		exit(EX_USAGE);

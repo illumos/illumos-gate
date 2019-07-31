@@ -126,13 +126,13 @@ static int		aggr_configure_all(rcm_handle_t *, datalink_id_t,
 			    boolean_t *);
 
 /* Module private routines */
-static int 		cache_update(rcm_handle_t *);
-static void 		cache_remove(link_cache_t *);
-static void 		cache_insert(link_cache_t *);
-static void 		node_free(link_cache_t *);
-static void 		aggr_list_remove(dl_aggr_t *);
-static void 		aggr_list_insert(dl_aggr_t *);
-static void 		aggr_list_free();
+static int		cache_update(rcm_handle_t *);
+static void		cache_remove(link_cache_t *);
+static void		cache_insert(link_cache_t *);
+static void		node_free(link_cache_t *);
+static void		aggr_list_remove(dl_aggr_t *);
+static void		aggr_list_insert(dl_aggr_t *);
+static void		aggr_list_free();
 static link_cache_t	*cache_lookup(rcm_handle_t *, char *, char);
 static int		aggr_consumer_offline(rcm_handle_t *, link_cache_t *,
 			    char **, uint_t, rcm_info_t **);
@@ -140,8 +140,8 @@ static int		aggr_consumer_online(rcm_handle_t *, link_cache_t *,
 			    char **, uint_t, rcm_info_t **);
 static int		aggr_offline_port(link_cache_t *, cache_node_state_t);
 static int		aggr_online_port(link_cache_t *, boolean_t *);
-static char 		*aggr_usage(link_cache_t *);
-static void 		aggr_log_err(datalink_id_t, char **, char *);
+static char		*aggr_usage(link_cache_t *);
+static void		aggr_log_err(datalink_id_t, char **, char *);
 static int		aggr_consumer_notify(rcm_handle_t *, datalink_id_t,
 			    char **, uint_t, rcm_info_t **);
 
@@ -177,12 +177,12 @@ rcm_mod_init(void)
 	cache_head.vc_prev = NULL;
 	cache_tail.vc_prev = &cache_head;
 	cache_tail.vc_next = NULL;
-	(void) mutex_init(&cache_lock, 0, NULL);
+	(void) mutex_init(&cache_lock, USYNC_THREAD, NULL);
 	aggr_head.da_next = &aggr_tail;
 	aggr_head.da_prev = NULL;
 	aggr_tail.da_prev = &aggr_head;
 	aggr_tail.da_next = NULL;
-	(void) mutex_init(&aggr_list_lock, NULL, NULL);
+	(void) mutex_init(&aggr_list_lock, USYNC_THREAD, NULL);
 
 	if ((status = dladm_open(&dld_handle)) != DLADM_STATUS_OK) {
 		rcm_log_message(RCM_WARNING,

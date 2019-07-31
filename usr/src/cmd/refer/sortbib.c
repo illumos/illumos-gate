@@ -4,15 +4,13 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <locale.h>
 #include <stdio.h>
@@ -136,7 +134,7 @@ sortbib(FILE *fp, FILE *tfp, int i)
 					error(tempfile);
 				}
 			}
-			*fld[0] = *fld[1] = *fld[2] = *fld[3] = NULL;
+			*fld[0] = *fld[1] = *fld[2] = *fld[3] = '\0';
 			oneauth = 0;		/* reset number of authors */
 			lastoffset = offset;	/* save for next time */
 		}
@@ -211,7 +209,7 @@ parse(char line[], char fld[][BUF])
 	int n, i, j;
 
 	for (i = 0; i < 8; i++)		/* zap out old strings */
-		*wd[i] = NULL;
+		*wd[i] = '\0';
 	n = sscanf(line, "%s %s %s %s %s %s %s %s",
 	    wd[0], wd[1], wd[2], wd[3], wd[4], wd[5], wd[6], wd[7]);
 	for (i = 0; i < 4; i++) {
@@ -290,11 +288,11 @@ eval(char keystr[])
 			multauth = 1;
 			i++;
 		}
-		if (keystr[i] == NULL)
+		if (keystr[i] == '\0')
 			break;
 		keystr[j] = keystr[i];
 	}
-	keystr[j] = NULL;
+	keystr[j] = '\0';
 }
 
 /* exit in case of various system errors */
@@ -321,7 +319,7 @@ endcomma(char *str)
 
 	n = strlen(str) - 1;
 	if (str[n] == ',') {
-		str[n] = NULL;
+		str[n] = '\0';
 		return (1);
 	}
 	return (0);

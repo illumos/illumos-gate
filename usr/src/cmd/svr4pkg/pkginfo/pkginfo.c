@@ -279,7 +279,7 @@ main(int argc, char **argv)
 	pkg = &argv[optind];
 	pkgcnt = (argc - optind);
 
-	if (pkg[0] && strcmp(pkg[0], "all") == NULL) {
+	if (pkg[0] && strcmp(pkg[0], "all") == 0) {
 		pkgcnt = 0;
 		pkg[0] = NULL;
 	}
@@ -358,10 +358,10 @@ report(void)
 		 * Confirm that the pkginfo file contains the
 		 * required information.
 		 */
-		if (info.name == NULL || *(info.name) == NULL ||
-		    info.arch == NULL || *(info.arch) == NULL ||
-		    info.version == NULL || *(info.version) == NULL ||
-		    info.catg == NULL || *(info.catg) == NULL) {
+		if (info.name == NULL || *(info.name) == '\0' ||
+		    info.arch == NULL || *(info.arch) == '\0' ||
+		    info.version == NULL || *(info.version) == '\0' ||
+		    info.catg == NULL || *(info.catg) == '\0') {
 			progerr(gettext(ERR_BADINFO));
 			errflg++;
 			return;
@@ -542,9 +542,9 @@ fpkg(char *pkginst)
 	struct cfstat *dp, *last;
 
 	dp = data;
-	last = (struct cfstat *)0;
+	last = NULL;
 	while (dp) {
-		if (strcmp(dp->pkginst, pkginst) == NULL)
+		if (strcmp(dp->pkginst, pkginst) == 0)
 			return (dp);
 		last = dp;
 		dp = dp->next;

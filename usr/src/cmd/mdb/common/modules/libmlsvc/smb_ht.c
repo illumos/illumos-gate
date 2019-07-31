@@ -42,7 +42,7 @@ smb_ht_walk_init(mdb_walk_state_t *wsp)
 	uintptr_t addr = wsp->walk_addr;
 	HT_HANDLE *ht;
 
-	if (addr == NULL) {
+	if (addr == (uintptr_t)NULL) {
 		mdb_printf("require address of an HT_HANDLE\n");
 		return (WALK_ERR);
 	}
@@ -63,7 +63,7 @@ smb_ht_walk_init(mdb_walk_state_t *wsp)
 	}
 
 	hw->hw_idx = -1;
-	wsp->walk_addr = NULL;
+	wsp->walk_addr = (uintptr_t)NULL;
 	wsp->walk_data = hw;
 
 	return (WALK_NEXT);
@@ -78,7 +78,7 @@ smb_ht_walk_step(mdb_walk_state_t *wsp)
 	uintptr_t he_addr;
 	int rv;
 
-	while (wsp->walk_addr == NULL) {
+	while (wsp->walk_addr == (uintptr_t)NULL) {
 		if (++hw->hw_idx >= hw->hw_handle.ht_table_size)
 			return (WALK_DONE);
 		he_addr = (uintptr_t)hw->hw_handle.ht_table +

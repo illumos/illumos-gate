@@ -100,7 +100,7 @@ rckrunlevel(void)
 	if ((pt = strtok(pt, " \t\n, ")) == NULL)
 		return (0); /* no list is no list */
 	do {
-		if (strcmp(pt, uxstate) == NULL) {
+		if (strcmp(pt, uxstate) == 0) {
 			free(rstates);
 			return (0);
 		}
@@ -220,9 +220,9 @@ rckpriv(void)
 
 	found = 0;
 	while ((dp = readdir(dirfp)) != NULL) {
-		if ((strcmp(dp->d_name, "preremove") == NULL) ||
-		    (strcmp(dp->d_name, "postremove") == NULL) ||
-		    (strncmp(dp->d_name, "r.", 2) == NULL)) {
+		if ((strcmp(dp->d_name, "preremove") == 0) ||
+		    (strcmp(dp->d_name, "postremove") == 0) ||
+		    (strncmp(dp->d_name, "r.", 2) == 0)) {
 			found++;
 			break;
 		}

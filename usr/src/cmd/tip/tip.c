@@ -161,7 +161,7 @@ notnumber:
 
 	vinit();				/* init variables */
 	setparity("none");			/* set the parity table */
-	if ((i = speed(number(value(BAUDRATE)))) == NULL) {
+	if ((i = speed(number(value(BAUDRATE)))) == 0) {
 		(void) printf("tip: bad baud rate %d\n",
 		    number(value(BAUDRATE)));
 		myperm();

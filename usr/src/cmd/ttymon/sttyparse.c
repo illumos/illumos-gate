@@ -603,7 +603,7 @@ parse_encoded(struct termios *cb
 		}
 		s[2] = '\0';
 		for (i = 0; *t != 0 && i < MAXNAMELEN; i++) {
-			if (*(t + 1) == (char)NULL) {
+			if (*(t + 1) == '\0') {
 				free((void *)r);
 				return (0);
 			}
