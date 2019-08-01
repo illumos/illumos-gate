@@ -1042,6 +1042,9 @@ file \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_receive/cleanup \
     mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zfs_receive/receive-o-x_props_override \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_receive/setup mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_receive/zfs_receive_001_pos \
@@ -1084,6 +1087,9 @@ file \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_receive/zfs_receive_014_pos \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zfs_receive/zfs_receive_015_pos \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_receive/zfs_receive_from_encrypted \
@@ -1190,6 +1196,8 @@ file \
     mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_send/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_send/setup mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zfs_send/zfs_send-b \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_send/zfs_send.cfg \
     mode=0444
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_send/zfs_send_001_pos \
@@ -2819,14 +2827,18 @@ file path=opt/zfs-tests/tests/functional/rsend/send-wDR_encrypted_zvol \
 file path=opt/zfs-tests/tests/functional/rsend/send_encrypted_files mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send_encrypted_hierarchy \
     mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send_encrypted_props mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send_encrypted_truncated_files \
     mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send_freeobjects mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send_holds mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send_mixed_raw mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send_realloc_dnode_size \
     mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send_realloc_encrypted_files \
     mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send_realloc_files mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send_spill_block mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/setup mode=0555
 file path=opt/zfs-tests/tests/functional/scrub_mirror/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/scrub_mirror/default.cfg mode=0444

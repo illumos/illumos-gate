@@ -141,6 +141,7 @@ typedef enum zfs_error {
 	EZFS_TOOMANY,		/* argument list too long */
 	EZFS_INITIALIZING,	/* currently initializing */
 	EZFS_NO_INITIALIZE,	/* no active initialize */
+	EZFS_WRONG_PARENT,	/* invalid parent dataset (e.g ZVOL) */
 	EZFS_NO_RESILVER_DEFER,	/* pool doesn't support resilver_defer */
 	EZFS_CRYPTOFAILED,	/* failed to setup encryption */
 	EZFS_UNKNOWN
@@ -516,7 +517,7 @@ extern nvlist_t *zfs_get_clones_nvl(zfs_handle_t *);
  */
 extern int zfs_crypto_get_encryption_root(zfs_handle_t *, boolean_t *, char *);
 extern int zfs_crypto_create(libzfs_handle_t *, char *, nvlist_t *, nvlist_t *,
-    uint8_t **, uint_t *);
+    boolean_t stdin_available, uint8_t **, uint_t *);
 extern int zfs_crypto_clone_check(libzfs_handle_t *, zfs_handle_t *, char *,
     nvlist_t *);
 extern int zfs_crypto_attempt_load_keys(libzfs_handle_t *, char *);
@@ -675,6 +676,12 @@ typedef struct sendflags {
 
 	/* raw encrypted records are permitted */
 	boolean_t raw;
+
+	/* only send received properties (ie. -b) */
+	boolean_t backup;
+
+	/* include snapshot holds in send stream */
+	boolean_t holds;
 } sendflags_t;
 
 typedef boolean_t (snapfilter_cb_t)(zfs_handle_t *, void *);
@@ -738,6 +745,12 @@ typedef struct recvflags {
 
 	/* do not mount file systems as they are extracted (private) */
 	boolean_t nomount;
+
+	/* Was holds flag set in the compound header? */
+	boolean_t holds;
+
+	/* skip receive of snapshot holds */
+	boolean_t skipholds;
 } recvflags_t;
 
 extern int zfs_receive(libzfs_handle_t *, const char *, nvlist_t *,

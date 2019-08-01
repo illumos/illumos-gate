@@ -180,9 +180,10 @@ tests = ['zfs_receive_001_pos', 'zfs_receive_002_pos', 'zfs_receive_003_pos',
     'zfs_receive_005_neg', 'zfs_receive_006_pos',
     'zfs_receive_007_neg', 'zfs_receive_008_pos', 'zfs_receive_009_neg',
     'zfs_receive_010_pos', 'zfs_receive_011_pos', 'zfs_receive_012_pos',
-    'zfs_receive_013_pos', 'zfs_receive_014_pos',
-    'zfs_receive_from_encrypted', 'zfs_receive_raw',
-    'zfs_receive_raw_incremental', 'zfs_receive_to_encrypted']
+    'zfs_receive_013_pos', 'zfs_receive_014_pos', 'zfs_receive_015_pos',
+    'receive-o-x_props_override', 'zfs_receive_from_encrypted',
+    'zfs_receive_to_encrypted' 'zfs_receive_raw',
+    'zfs_receive_raw_incremental']
 
 [/opt/zfs-tests/tests/functional/cli_root/zfs_remap]
 tests = ['zfs_remap_cliargs', 'zfs_remap_obsolete_counts']
@@ -205,7 +206,8 @@ tests = ['zfs_rollback_001_pos', 'zfs_rollback_002_pos',
 [/opt/zfs-tests/tests/functional/cli_root/zfs_send]
 tests = ['zfs_send_001_pos', 'zfs_send_002_pos', 'zfs_send_003_pos',
     'zfs_send_004_neg', 'zfs_send_005_pos', 'zfs_send_006_pos',
-    'zfs_send_007_pos', 'zfs_send_encrypted', 'zfs_send_raw']
+    'zfs_send_007_pos', 'zfs_send_encrypted', 'zfs_send_raw',
+    'zfs_send-b']
 
 [/opt/zfs-tests/tests/functional/cli_root/zfs_set]
 tests = ['cache_001_pos', 'cache_002_neg', 'canmount_001_pos',
@@ -605,8 +607,9 @@ tests = ['rsend_001_pos', 'rsend_002_pos', 'rsend_003_pos', 'rsend_004_pos',
     'send-c_mixed_compression', 'send-c_stream_size_estimate', 'send-cD',
     'send-c_embedded_blocks', 'send-c_resume', 'send-cpL_varied_recsize',
     'send-c_recv_dedup', 'send_encrypted_files', 'send_encrypted_hierarchy',
-    'send_encrypted_truncated_files',
-    'send_realloc_encrypted_files',
+    'send_encrypted_props', 'send_encrypted_truncated_files',
+    'send_realloc_files',
+    'send_realloc_encrypted_files', 'send_holds',
     'send_mixed_raw', 'send-wDR_encrypted_zvol']
 
 [/opt/zfs-tests/tests/functional/scrub_mirror]

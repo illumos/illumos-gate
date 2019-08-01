@@ -670,82 +670,126 @@ recv_read(int fd, void *buf, int ilen)
 }
 
 static int
-recv_impl(const char *snapname, nvlist_t *props, const char *origin,
-    boolean_t force, boolean_t resumable, boolean_t raw, int fd,
-    const dmu_replay_record_t *begin_record)
+recv_impl(const char *snapname, nvlist_t *recvdprops,  nvlist_t *localprops,
+    uint8_t *wkeydata, uint_t wkeylen, const char *origin, boolean_t force,
+    boolean_t resumable, boolean_t raw, int input_fd,
+    const dmu_replay_record_t *begin_record, int cleanup_fd,
+    uint64_t *read_bytes, uint64_t *errflags, uint64_t *action_handle,
+    nvlist_t **errors)
 {
+
 	/*
 	 * The receive ioctl is still legacy, so we need to construct our own
 	 * zfs_cmd_t rather than using zfsc_ioctl().
 	 */
 	zfs_cmd_t zc = { 0 };
-	char *atp;
 	char *packed = NULL;
 	size_t size;
+
+	dmu_replay_record_t drr;
+	char fsname[MAXPATHLEN];
+	char *atp;
 	int error;
 
 	ASSERT3S(g_refcount, >, 0);
 	VERIFY3S(g_fd, !=, -1);
 
-	/* zc_name is name of containing filesystem */
-	(void) strlcpy(zc.zc_name, snapname, sizeof (zc.zc_name));
-	atp = strchr(zc.zc_name, '@');
+	/* Set 'fsname' to the name of containing filesystem */
+	(void) strlcpy(fsname, snapname, sizeof (fsname));
+	atp = strchr(fsname, '@');
 	if (atp == NULL)
 		return (EINVAL);
 	*atp = '\0';
 
 	/* if the fs does not exist, try its parent. */
-	if (!lzc_exists(zc.zc_name)) {
-		char *slashp = strrchr(zc.zc_name, '/');
+	if (!lzc_exists(fsname)) {
+		char *slashp = strrchr(fsname, '/');
 		if (slashp == NULL)
 			return (ENOENT);
 		*slashp = '\0';
-
 	}
 
-	/* zc_value is full name of the snapshot to create */
+	/*
+	 * The begin_record is normally a non-byteswapped BEGIN record.
+	 * For resumable streams it may be set to any non-byteswapped
+	 * dmu_replay_record_t.
+	 */
+	if (begin_record == NULL) {
+		error = recv_read(input_fd, &drr, sizeof (drr));
+		if (error != 0)
+			return (error);
+	} else {
+		drr = *begin_record;
+	}
+
+	(void) strlcpy(zc.zc_name, fsname, sizeof (zc.zc_name));
 	(void) strlcpy(zc.zc_value, snapname, sizeof (zc.zc_value));
 
-	if (props != NULL) {
-		/* zc_nvlist_src is props to set */
-		packed = fnvlist_pack(props, &size);
+	if (recvdprops != NULL) {
+		packed = fnvlist_pack(recvdprops, &size);
 		zc.zc_nvlist_src = (uint64_t)(uintptr_t)packed;
 		zc.zc_nvlist_src_size = size;
 	}
 
-	/* zc_string is name of clone origin (if DRR_FLAG_CLONE) */
+	if (localprops != NULL) {
+		packed = fnvlist_pack(localprops, &size);
+		zc.zc_nvlist_conf = (uint64_t)(uintptr_t)packed;
+		zc.zc_nvlist_conf_size = size;
+	}
+
+	/* Use zc_history_ members for hidden args */
+	if (wkeydata != NULL) {
+		nvlist_t *hidden_args = fnvlist_alloc();
+		fnvlist_add_uint8_array(hidden_args, "wkeydata", wkeydata,
+		    wkeylen);
+		packed = fnvlist_pack(hidden_args, &size);
+		zc.zc_history_offset = (uint64_t)(uintptr_t)packed;
+		zc.zc_history_len = size;
+	}
+
 	if (origin != NULL)
 		(void) strlcpy(zc.zc_string, origin, sizeof (zc.zc_string));
 
-	/* zc_begin_record is non-byteswapped BEGIN record */
-	if (begin_record == NULL) {
-		error = recv_read(fd, &zc.zc_begin_record,
-		    sizeof (zc.zc_begin_record));
-		if (error != 0)
-			goto out;
-	} else {
-		zc.zc_begin_record = *begin_record;
-	}
-
-	/* zc_cookie is fd to read from */
-	zc.zc_cookie = fd;
-
-	/* zc guid is force flag */
+	ASSERT3S(drr.drr_type, ==, DRR_BEGIN);
+	zc.zc_begin_record = drr;
 	zc.zc_guid = force;
-
+	zc.zc_cookie = input_fd;
+	zc.zc_cleanup_fd = -1;
+	zc.zc_action_handle = 0;
 	zc.zc_resumable = resumable;
 
-	/* zc_cleanup_fd is unused */
-	zc.zc_cleanup_fd = -1;
+	if (cleanup_fd >= 0)
+		zc.zc_cleanup_fd = cleanup_fd;
+
+	if (action_handle != NULL)
+		zc.zc_action_handle = *action_handle;
+
+	zc.zc_nvlist_dst_size = 128 * 1024;
+	zc.zc_nvlist_dst = (uint64_t)(uintptr_t)malloc(zc.zc_nvlist_dst_size);
 
 	error = ioctl(g_fd, ZFS_IOC_RECV, &zc);
-	if (error != 0)
+	if (error != 0) {
 		error = errno;
+	} else {
+		if (read_bytes != NULL)
+			*read_bytes = zc.zc_cookie;
 
-out:
+		if (errflags != NULL)
+			*errflags = zc.zc_obj;
+
+		if (action_handle != NULL)
+			*action_handle = zc.zc_action_handle;
+
+		if (errors != NULL)
+			VERIFY0(nvlist_unpack(
+			    (void *)(uintptr_t)zc.zc_nvlist_dst,
+			    zc.zc_nvlist_dst_size, errors, KM_SLEEP));
+	}
+
 	if (packed != NULL)
 		fnvlist_pack_free(packed, size);
 	free((void*)(uintptr_t)zc.zc_nvlist_dst);
+
 	return (error);
 }
 
@@ -766,8 +810,8 @@ int
 lzc_receive(const char *snapname, nvlist_t *props, const char *origin,
     boolean_t raw, boolean_t force, int fd)
 {
-	return (recv_impl(snapname, props, origin, force, B_FALSE, raw, fd,
-	    NULL));
+	return (recv_impl(snapname, props, NULL, NULL, 0, origin, force,
+	    B_FALSE, raw, fd, NULL, -1, NULL, NULL, NULL, NULL));
 }
 
 /*
@@ -780,8 +824,8 @@ int
 lzc_receive_resumable(const char *snapname, nvlist_t *props, const char *origin,
     boolean_t force, boolean_t raw, int fd)
 {
-	return (recv_impl(snapname, props, origin, force, B_TRUE, raw, fd,
-	    NULL));
+	return (recv_impl(snapname, props, NULL, NULL, 0, origin, force,
+	    B_TRUE, raw, fd, NULL, -1, NULL, NULL, NULL, NULL));
 }
 
 /*
@@ -802,8 +846,28 @@ lzc_receive_with_header(const char *snapname, nvlist_t *props,
 {
 	if (begin_record == NULL)
 		return (EINVAL);
-	return (recv_impl(snapname, props, origin, force, resumable, raw, fd,
-	    begin_record));
+
+	return (recv_impl(snapname, props, NULL, NULL, 0, origin, force,
+	    resumable, raw, fd, begin_record, -1, NULL, NULL, NULL, NULL));
+}
+
+/*
+ * Allows the caller to pass an additional 'cmdprops' argument.
+ *
+ * The 'cmdprops' nvlist contains both override ('zfs receive -o') and
+ * exclude ('zfs receive -x') properties. Callers are responsible for freeing
+ * this nvlist
+ */
+int lzc_receive_with_cmdprops(const char *snapname, nvlist_t *props,
+    nvlist_t *cmdprops, uint8_t *wkeydata, uint_t wkeylen, const char *origin,
+    boolean_t force, boolean_t resumable, boolean_t raw, int input_fd,
+    const dmu_replay_record_t *begin_record, int cleanup_fd,
+    uint64_t *read_bytes, uint64_t *errflags, uint64_t *action_handle,
+    nvlist_t **errors)
+{
+	return (recv_impl(snapname, props, cmdprops, wkeydata, wkeylen, origin,
+	    force, resumable, raw, input_fd, begin_record, cleanup_fd,
+	    read_bytes, errflags, action_handle, errors));
 }
 
 /*
