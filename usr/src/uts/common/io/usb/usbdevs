@@ -30,6 +30,9 @@ $FreeBSD: head/sys/dev/usb/usbdevs 344959 2019-03-09 03:15:09Z bz $
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 /*
  * List of known USB vendors
@@ -327,6 +330,7 @@ vendor GUNZE		0x0637	Gunze Electronics USA
 vendor AVISION		0x0638	Avision
 vendor TEAC		0x0644	TEAC
 vendor ACTON		0x0647	Acton Research Corp.
+vendor SIGMADESIGNS	0x0658  Sigma Designs, Inc.
 vendor OPTO		0x065a	Optoelectronics Co., Ltd
 vendor SGI		0x065e	Silicon Graphics
 vendor SANWASUPPLY	0x0663	Sanwa Supply
@@ -4261,6 +4265,9 @@ product SIERRA MC7355		0x9041	MC7355
 product SIERRA MC7430		0x9071	Sierra Wireless MC7430 Qualcomm Snapdragon X7 LTE-A
 product SIERRA AC313U		0x68aa	Sierra Wireless AirCard 313U
 product SIERRA TRUINSTALL	0x0fff	Aircard Tru Installer
+
+/* Sigma Designs, Inc. products */
+product SIGMADESIGNS ZW090	0x0200  Aeotec Z-Stick Gen5 (ZW090) - UZB
 
 /* Sigmatel products */
 product SIGMATEL WBT_3052	0x4200	WBT-3052 IrDA/USB Bridge
