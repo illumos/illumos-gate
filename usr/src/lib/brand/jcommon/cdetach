@@ -1,0 +1,50 @@
+#!/bin/ksh -p
+#
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+#
+
+unset LD_LIBRARY_PATH
+PATH=/usr/bin:/usr/sbin
+export PATH
+
+. /usr/lib/brand/shared/common.ksh
+
+ZONENAME=""
+ZONEPATH=""
+
+while getopts "R:t:U:z:" opt
+do
+	case "$opt" in
+		R)	ZONEPATH="$OPTARG";;
+		z)	ZONENAME="$OPTARG";;
+		*)	printf "$m_usage\n"
+			exit $ZONE_SUBPROC_USAGE;;
+	esac
+done
+shift OPTIND-1
+
+if [[ -z $ZONEPATH || -z $ZONENAME ]]; then
+	print -u2 "Brand error: No zone path or name"
+	exit $ZONE_SUBPROC_USAGE
+fi
+
+#
+# We just need a brand hook so that we can bypass the mount checking
+# that zoneadm does.  This is needed because we have the cores dataset
+# mounted under {zonepath}/root.
+#
+cp /etc/zones/${ZONENAME}.xml ${ZONEPATH}/SUNWdetached.xml
+
+exit $ZONE_SUBPROC_OK

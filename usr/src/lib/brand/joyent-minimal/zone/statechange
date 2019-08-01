@@ -1,0 +1,42 @@
+#!/bin/ksh -p
+#
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2018 Joyent, Inc.  All rights reserved.
+#
+
+# Do we support vrrp?
+jst_vrrp="yes"
+
+# Do we support unfiltered promiscuous mode
+# jst_ufpromisc="yes"
+
+# Do we use vnd devices
+# jst_createvnd="yes"
+
+# Do we not need to have various SMF and ccs stuff created for us?
+# jst_simplefs="yes"
+
+# Should we show snapshots?
+jst_showsnap="yes"
+
+# Where does the mdata socket live?
+jst_mdatapath="/.zonecontrol/"
+
+# Ensure docker zfd(7D) log is not put in the wrong place
+if [[ "$_ZONECFG_attr_docker" == true ]]; then
+	typeset -A FORCED_ATTRS
+	FORCED_ATTRS["zlog-name"]=
+fi
+
+. /usr/lib/brand/jcommon/statechange

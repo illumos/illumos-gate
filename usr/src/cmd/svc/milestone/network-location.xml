@@ -81,14 +81,6 @@
 	</dependency>
 
 	<dependency
-		name='location_netcfg'
-		grouping='require_all'
-		restart_on='none'
-		type='service'>
-		<service_fmri value='svc:/network/netcfg:default' />
-	</dependency>
-
-	<dependency
 		name='filesystem'
 		grouping='require_all'
 		restart_on='none'
@@ -106,7 +98,7 @@
 	-->
 	<dependency
 		name='manifest-import'
-		grouping='optional_all'
+		grouping='require_all'
 		restart_on='none'
 		type='service'>
 		<service_fmri value='svc:/system/manifest-import:default' />

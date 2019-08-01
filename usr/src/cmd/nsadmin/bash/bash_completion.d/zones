@@ -1,0 +1,41 @@
+_zlogin()
+{
+    local cur prev opts base
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    # The -e and -l take non-zone arguments, otherwise complete zone
+    if [[ ${prev} != '-e' ]] && [[ ${prev} != '-l' ]]; then
+        local running=$(zoneadm list | grep -v '^global$')
+        COMPREPLY=( $(compgen -W "${running}" -- ${cur}) )
+    fi
+    return 0
+}
+
+_dash_z_zone()
+{
+    local cur prev opts base
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    # The -z takes a zone option, ignore everything else
+    if [[ ${prev} =~ -.*z$ ]]; then
+        local zones=$(zoneadm list -c | grep -v '^global$')
+        COMPREPLY=( $(compgen -W "${zones}" -- ${cur}) )
+    fi
+    return 0
+}
+
+complete -F _zlogin zlogin
+complete -F _dash_z_zone zoneadm
+complete -F _dash_z_zone zonecfg
+complete -F _dash_z_zone svcs
+complete -F _dash_z_zone svcadm
+complete -F _dash_z_zone svcprop
+complete -F _dash_z_zone pgrep
+complete -F _dash_z_zone pkill
+complete -F _dash_z_zone ps
+complete -F _dash_z_zone ptree
+complete -F _dash_z_zone wall

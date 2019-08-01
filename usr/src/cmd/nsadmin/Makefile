@@ -22,54 +22,72 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 Joyent, Inc.
+#
 
-PROG= profile .login ksh.kshrc system
-PROGSKEL= .profile .kshrc
-PROGROOT= .profile .bashrc
+ETCFILES = profile .login ksh.kshrc system zshrc
+ETCSKELFILES = .profile .kshrc .bashrc
+ETCBASHFILES = bash_completion
+ETCBASHCOMPLETIONDFILES = dladm zones
+ROOTFILES = .profile .bashrc .bash_profile
 
 include ../Makefile.cmd
 
-ROOTROOT= $(ROOT)/root
+ROOTETCFILES = $(ETCFILES:%=$(ROOTETC)/%)
 ROOTETCSKEL= $(ROOTETC)/skel
-ROOTETCSKELPROG= $(PROGSKEL:%=$(ROOTETCSKEL)/%)
-ROOTROOTPROG= $(PROGROOT:%=$(ROOTROOT)/%)
+ROOTETCSKELFILES = $(ETCSKELFILES:%=$(ROOTETCSKEL)/%)
+ETCBASHDIR = $(ROOTETC)/bash
+ROOTETCBASHFILES = $(ETCBASHFILES:%=$(ETCBASHDIR)/%)
+ETCBASHCOMPLETIONDDIR = $(ETCBASHDIR)/bash_completion.d
+ROOTETCBASHCOMPLETIONDFILES = \
+    $(ETCBASHCOMPLETIONDFILES:%=$(ETCBASHCOMPLETIONDDIR)/%)
+ROOTROOT= $(ROOT)/root
+ROOTROOTFILES = $(ROOTFILES:%=$(ROOTROOT)/%)
+
+FILES = $(ROOTETCFILES) $(ROOTETCSKELFILES) \
+    $(ROOTETCBASHFILES) $(ROOTETCBASHCOMPLETIONDFILES) \
+    $(ROOTROOTFILES)
+
 FILEMODE= 0644
-
-CLOBBERFILES = profile .bashrc .profile .login .kshrc
-
-.login: login.csh
-	$(RM) .login
-	$(CP) login.csh .login
-
-profile: etc-profile.sh
-	$(RM) profile
-	$(CP) etc-profile.sh $@
-
-.profile: dot-profile.sh
-	$(RM) .profile
-	$(CP) dot-profile.sh $@
-
-.kshrc: dot-kshrc.sh
-	$(RM) .kshrc
-	$(CP) dot-kshrc.sh $@
-
-.bashrc: bashrc.sh
-	$(RM) .bashrc
-	$(CP) bashrc.sh $@
 
 .KEEP_STATE:
 
-all: $(PROG) $(PROGSKEL)
+all:
 
-$(ROOTROOT)/% \
-$(ROOTETCSKEL)/%: %
+# Use $^ instead of $< - it's broken without %
+INS.file = $(RM) $@; $(INS) -s -m $(FILEMODE) -f $(@D) $^
+INS.rename = $(INS.file); $(MV) $(@D)/$(^F) $@
+
+$(ROOTETC)/profile: etc-profile.sh
+	$(INS.rename)
+
+$(ROOTETC)/.login: login.csh
+	$(INS.rename)
+
+# skel file and root's default
+$(ROOTROOT)/.kshrc $(ROOTETCSKEL)/.kshrc: dot-kshrc.sh
+	$(INS.rename)
+
+# skel file and root's default
+$(ROOTROOT)/.profile $(ROOTETCSKEL)/.profile: dot-profile.sh
+	$(INS.rename)
+
+$(ROOTETCSKEL)/.bashrc: etc-skel-bashrc.sh
+	$(INS.rename)
+
+$(ROOTROOT)/.bash_profile: dot-bash_profile.sh
+	$(INS.rename)
+
+$(ROOTROOT)/.bashrc: dot-bashrc.sh
+	$(INS.rename)
+
+$(ROOTETCBASHDIR)/%: %
 	$(INS.file)
 
-$(ROOTROOT) \
-$(ROOTETCSKEL):
-	$(INS.dir)
+$(ROOTETCBASHCOMPLETIONDDIR)/%: %
+	$(INS.file)
 
-install: all $(ROOTETCSKEL) $(ROOTETCPROG) $(ROOTETCSKELPROG) $(ROOTROOTPROG)
+install: all $(FILES)
 
 clean:
 

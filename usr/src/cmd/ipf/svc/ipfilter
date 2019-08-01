@@ -23,8 +23,11 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2013, Joyent, Inc. All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
+
+set -o xtrace
 
 . /lib/svc/share/smf_include.sh
 . /lib/svc/share/ipf_include.sh
@@ -152,8 +155,25 @@ upgrade_config()
 	svcadm refresh $SMF_FMRI >/dev/null 2>&1
 }
 
+symlink_persistent_file()
+{
+	persist_file=/var/fw/$1
+	etc_file=$ETC_IPF_DIR/$1
+
+	[ ! -e $persist_file ] && return 0
+	[ -L $etc_file ] && return 0
+
+	[ -e $etc_file ] && mv $etc_file{,.orig}
+
+	ln -s $persist_file $etc_file
+}
+
+
 configure_firewall()
 {
+	symlink_persistent_file ipnat.conf
+	symlink_persistent_file ipf.conf
+	symlink_persistent_file ipf6.conf
 	create_global_rules || exit $SMF_EXIT_ERR_CONFIG
 	create_global_ovr_rules || exit $SMF_EXIT_ERR_CONFIG
 	create_services_rules || exit $SMF_EXIT_ERR_CONFIG

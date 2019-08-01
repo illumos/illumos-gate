@@ -22,8 +22,127 @@
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
+# Copyright (c) 2012, Joyent Inc. All rights reserved.
+
+set -o xtrace
 
 . /lib/svc/share/smf_include.sh
+
+ZPOOL=`svcprop -p config/zpool svc:/system/smartdc/init:default 2>/dev/null`
+ZPOOL=${ZPOOL:-zones}
+
+MAN_SRCDIR=/lib/svc/manifest
+MAN_DESTDIR=/$ZPOOL/manifests
+
+MAN_DIRS="\
+	application \
+	milestone \
+	network \
+	network/dns \
+	network/ipsec \
+	network/ldap \
+	network/loadbalancer \
+	network/nfs \
+	network/nis \
+	network/routing \
+	network/rpc \
+	network/security \
+	network/shares \
+	network/smb \
+	network/ssl \
+	site \
+	system \
+	system/device \
+	system/filesystem \
+	system/fm \
+	system/install \
+	system/security \
+	system/svc"
+
+cp_brand_manifests()
+{
+	brand=$1
+
+	# Create the dir hierarchy under the dest dir for SMF manifests.
+	mkdir -m755 $MAN_DESTDIR/$brand
+
+	for dir in $MAN_DIRS
+	do
+		mkdir -m755 $MAN_DESTDIR/$brand/$dir
+	done
+
+	#
+	# Process the SMF SVC configuration list to setup the brand-specific
+	# SMF svcs.
+	#
+	nawk -v base=$MAN_SRCDIR -v dest=$MAN_DESTDIR/$brand '{
+		# Ignore comments and empty lines.
+		if (substr($1, 1, 1) == "#" || length($1) == 0)
+			next
+
+		# entry format is: name status
+		proc_file($1, $2);
+	    }
+
+	    #
+	    # Copy the manifest from the global zone to the brand-specific
+	    # manifest area.  At the same time, update any manifests whose
+	    # status needs to be changed, based on what our configuration
+	    # file indicates.
+	    #
+	    function proc_file(fname, status)
+	    {
+		f = base "/" fname
+		of =  dest "/" fname
+
+		while (getline <f > 0) {
+			# Fix up the console svc to work with zones.
+			if (fname == "system/console-login.xml")
+				sub("wscons", "console")
+
+			if (($1 == "<instance" &&
+			    $2 == "name=\047default\047") ||
+			    $1 == "<create_default_instance") {
+				if (status == "enabled")
+					n=sub("\047false\047", "\047true\047")
+				else
+					n=sub("\047true\047", "\047false\047")
+
+				if (n > 0)
+					printf("update svc state: %s %s\n",
+					    fname, $0)
+			}
+
+			print $0 >of
+		}
+		close(f)
+		close(of)
+	}' /usr/lib/brand/$brand/manifests
+}
+
+#
+# If we're running off of a live-image, setup a zone-specific collection of
+# manifest files which are mounted in a zone's /lib/svc/manifest directory.
+#
+# Regenerate the manifest data each time this service starts, so that it's
+# always in sync with the running platform (and any fixes included there).
+#
+setup_manifests()
+{
+	echo "Initializing manifest dir."
+
+	rm -rf $MAN_DESTDIR
+	mkdir -m755 -p $MAN_DESTDIR
+
+	for i in /usr/lib/brand/*
+	do
+		brand=`basename $i`
+		[[ ! -f /usr/lib/brand/$brand/manifests ]] && continue
+		# joyent-minimal uses /zones/manifests/joyent too
+		[[ "$brand" == "joyent-minimal" ]] && continue
+		cp_brand_manifests $brand
+	done
+}
 
 #
 # Return a list of running, non-global zones for which a shutdown via
@@ -32,7 +151,7 @@
 shutdown_zones()
 {
 	zoneadm list -p | nawk -F: '{
-		if (($5 != "lx") && ($2 != "global")) {
+		if ($2 != "global") {
 			print $2
 		}
 	}'
@@ -51,6 +170,16 @@ PATH=/usr/sbin:/usr/bin; export PATH
 
 case "$1" in
 'start')
+	#
+	# Generate the manifest, even if no zones, since zones could be
+	# provisioned later.
+	#
+	zfs list -H -o name $ZPOOL >/dev/null 2>&1 
+	[ $? -eq 0 ] && setup_manifests
+
+	# Create directory for zone sockets
+	mkdir -m755 -p /var/zonecontrol
+
 	egrep -vs '^#|^global:' /etc/zones/index || exit 0  # no local zones
 
 	#
@@ -68,6 +197,14 @@ case "$1" in
 			[ -z "$ZONES" ] && echo "Booting zones:\c"
 			ZONES=yes
 			echo " $zone\c"
+
+			#
+			# Make sure a site dir exists, it wasn't initially
+			# being created.
+			#
+			zonepath=`zonecfg -z $zone info zonepath | cut -d: -f2`
+			[ ! -d $zonepath/site ] && mkdir -m755 $zonepath/site
+
 			#
 			# zoneadmd puts itself into its own contract so
 			# this service will lose sight of it.  We don't
@@ -110,7 +247,7 @@ case "$1" in
 
 		for zone in $zonelist; do
 			echo " $zone\c"
-			zoneadm -z $zone shutdown &
+			zlogin -S $zone /sbin/init 0 < /dev/null >&0 2>&0 &
 			SHUTDOWN=1
 		done
 

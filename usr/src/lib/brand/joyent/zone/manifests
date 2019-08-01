@@ -1,0 +1,176 @@
+#
+# This file lists the SMF manifests which are available in the global
+# zone and which should be setup for use in non-global zones.  Not
+# all SMF services are usable within a zone, so only those that are usable
+# should be listed here.
+#
+# The format of the file is:
+#	manifest_name enable/disable
+# The manifest_name is found relative to /lib/svc/manifest on the system.
+# The second field is used to indicate if the svc should be enabled or
+# disabled by default within zones, independently of its current status in
+# the global zone.
+#
+# The following is a list of SMF svcs which could be run in a zone, but
+# which we're not currently installing on our live image.  If we add any
+# of these to the image and we want it to also be available in zones,
+# then we need to move the entry to the end and uncomment it out.
+#
+# application/cups.xml
+# application/font/fc-cache.xml
+# application/graphical-login/gdm.xml
+# application/management/net-snmp.xml
+# application/management/seaport.xml
+# application/management/snmpdx.xml
+# application/opengl/ogl-select.xml
+# application/print/service-selector.xml
+# application/security/tcsd.xml
+# application/x11/x11-server.xml
+# application/x11/xfs.xml
+# application/x11/xvnc-inetd.xml
+# network/rpc/keyserv.xml
+# network/socket-filter-kssl.xml
+# network/ssl/kssl-proxy.xml
+# network/dns/server.xml
+# network/ftp.xml
+# network/finger.xml
+# network/comsat.xml
+# network/rpc/rstat.xml
+# network/rpc/rusers.xml
+# network/rpc/spray.xml
+# network/rpc/wall.xml
+# network/talk.xml
+# network/ntp.xml
+# network/sendmail-client.xml
+# network/smtp-sendmail.xml
+# network/telnet.xml
+# network/wpa.xml
+# network/rpc/gss.xml
+# network/security/kadmin.xml
+# network/security/krb5kdc.xml
+# network/security/ktkt_warn.xml
+# network/rpc/smserver.xml
+# network/nfs/cbd.xml
+# network/ipmievd.xml
+# network/http-apache22.xml
+# system/consolekit.xml
+# system/device/devices-audio.xml
+# system/fm/notify-params.xml
+# system/install/system-config.xml
+# system/pkgserv.xml
+#
+
+#
+# The following is a list of SMF svcs which are installed on our live image and
+# which could be run in a zone, but which we choose not to run in our zones.
+# If we ever do want to run any of these, move the entry to the end and
+# uncomment it out.
+#
+# system/boot-archive-update.xml
+# system/boot-config.xml
+#
+
+#
+# The following is a list of SMF svc manifests under /lib/svc/manifest.  These
+# are available on our live image and are runnable in a zone.  Since the zones
+# are sharing the base file system with the global zone, we set up so that
+# only these svcs are configured in zones, independently of the global zone
+# /lib/svc/manifest hierarchy.
+#
+milestone/multi-user-server.xml				enabled
+milestone/multi-user.xml				enabled
+milestone/name-services.xml				enabled
+milestone/network.xml					enabled
+milestone/single-user.xml				enabled
+milestone/sysconfig.xml					enabled
+network/bridge.xml					enabled
+network/dlmgmt.xml					enabled
+network/dns/client.xml					enabled
+network/dns/install.xml					disabled
+network/dns/multicast.xml				disabled
+network/forwarding.xml					disabled
+network/inetd-upgrade.xml				enabled
+network/inetd.xml					disabled
+network/ipfilter.xml					disabled
+network/ipsec/ike.xml					disabled
+network/ipsec/ipsecalgs.xml				enabled
+network/ipsec/manual-key.xml				disabled
+network/ipsec/policy.xml				enabled
+network/ldap/client.xml					disabled
+network/loadbalancer/ilbd.xml				disabled
+network/login.xml					enabled
+network/network-initial.xml				enabled
+network/network-install.xml				disabled
+network/network-ipmgmt.xml				enabled
+network/network-ipqos.xml				disabled
+network/network-iptun.xml				enabled
+network/network-location.xml				disabled
+network/network-loopback.xml				enabled
+network/network-netcfg.xml				enabled
+network/network-netmask.xml				enabled
+network/network-physical.xml				enabled
+network/network-routing-setup.xml			enabled
+network/network-service.xml				enabled
+network/nfs/client.xml					disabled
+network/nfs/mapid.xml					disabled
+network/nfs/nlockmgr.xml				disabled
+network/nfs/rquota.xml					disabled
+network/nfs/status.xml					disabled
+network/nis/client.xml					disabled
+network/rexec.xml					disabled
+network/routing/legacy-routing.xml			enabled
+network/routing/ndp.xml					disabled
+network/routing/rdisc.xml				disabled
+network/routing/ripng.xml				disabled
+network/routing/route.xml				disabled
+network/rpc/bind.xml					enabled
+network/shares/group.xml				enabled
+network/shares/reparsed.xml				disabled
+network/shell.xml					disabled
+network/slp.xml						disabled
+network/smb/client.xml					disabled
+network/smb/server.xml					disabled
+network/ssh.xml						enabled
+network/vrrp.xml					disabled
+system/auditd.xml					disabled
+system/auditset.xml					disabled
+system/boot-archive.xml					enabled
+system/consadm.xml					disabled
+system/console-login.xml				disabled
+system/coreadm.xml					enabled
+system/cron.xml						enabled
+system/cryptosvc.xml					enabled
+system/device/allocate.xml				disabled
+system/device/devices-local.xml				enabled
+system/device/mpxio-upgrade.xml				disabled
+system/early-manifest-import.xml			enabled
+system/extended-accounting.xml				enabled
+system/filesystem/autofs.xml				disabled
+system/filesystem/joyent-fs.xml				enabled
+system/filesystem/local-fs.xml				enabled
+system/filesystem/minimal-fs.xml			enabled
+system/filesystem/root-fs.xml				enabled
+system/filesystem/usr-fs.xml				enabled
+system/fmd.xml						disabled
+system/hostid.xml					enabled
+system/hotplug.xml					disabled
+system/identity.xml					enabled
+system/idmap.xml					disabled
+system/keymap.xml					enabled
+system/logadm-upgrade.xml				enabled
+system/manifest-import.xml				enabled
+system/mdata.xml					disabled
+system/name-service-cache.xml				enabled
+system/pfexecd.xml					enabled
+system/process-security.xml				enabled
+system/rbac.xml						enabled
+system/rcap.xml						disabled
+system/rmtmpfiles.xml					enabled
+system/sac.xml						disabled
+system/sar.xml						disabled
+system/svc/global.xml					disabled
+system/svc/restarter.xml				enabled
+system/sysidtool.xml					enabled
+system/system-log.xml					enabled
+system/utmp.xml						enabled
+system/vtdaemon.xml					disabled

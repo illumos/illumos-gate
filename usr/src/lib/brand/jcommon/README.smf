@@ -1,0 +1,107 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2015 Joyent, Inc.
+#
+
+There are a few rather brand specific issues related to how SMF works inside of
+them. This README describes how the different pieces interact and where they are
+defined. Note that this README only applies to the Joyent-style sparse zones. It
+does not apply to the KVM brand or the traditional ipkg and S10 branded zones.
+
+#
+# Per-brand manifests file
+#
+
+Each brand has a file called `manifests`. This file lists the set of manifests
+that the brand cares about being available to the zone. It is formatted as:
+
+<manifest_name> <enabled | disabled>
+
+Examples are:
+
+network/smb/client.xml		disabled
+network/ssh.xml			enabled
+
+The use of enabled or disabled determines the default disposition of the service
+when it is imported.
+
+This list is used in various places throughout the rest of the system for
+determining what shows up in the SMF repositories by default and what shows up
+in /lib/svc/manifest.
+
+#
+# Files in /lib/svc/manifest
+#
+
+/lib/svc/manifest is part of the sparse filesystem that gets placed into every
+zone. Unlike /usr, /lib/svc/manifest is brand specific. The zones service
+(svc:/system/zones:default) is responsible for creating the per-brand
+/lib/svc/manifest directories and they live in /zones/manifests/<brand-name>.
+This brand specific directory is lofs-mounted read-only into each zone.
+
+The presence of the enabled and disabled option in the brand's manifests file
+determine whether or not the service is enabled by default when imported. The
+xml file is changed to match the setting.
+
+#
+# Initial SMF repositories
+#
+
+SMF in the minimal brand works differently than it does in the normal Joyent
+Brand when it comes to specifying the initial services that are inside of the
+dataset and what files are in the SMF repository.
+
+SMF has the notion of a `seed repository`. This repository is the initial one
+that is used or copied for new zones. This repository contains various services
+already imported, whether or not they are enabled or disabled, and the various
+service properties.
+
+The traditional `joyent` brand gets this from the dataset itself. In other words,
+the database is already populated with the proper SMF state.
+
+In the `joyent-minimal` brand we handle this differently. We want to be able to
+reuse the datasets that exist but not be stuck with their rather large seed
+repositories that contain many things which are harmful in the minimal context,
+particularly manifest import (both the early and normal kind). To handle this
+the joyent-minimal brand defines a seed repository of its own that gets
+installed at zone creation time and replaces any existing repository.
+
+This seed repository is generated using the `svc.configd-native` and
+`svccfg-native` binaries. Every manifest listed in the brand's manifests file is
+included.
+
+Manifests available to the `joyent` brand not imported into the database are
+available for manual import in /lib/svc/manifest. With the minimal brand, only
+the bare minimum number of manifests should be imported.
+
+#
+# Using non-imported manifests
+#
+
+To use one of the manifests that exists but hasn't been imported is pretty easy.
+At some point in time after the initial creation of the zone (during the first
+boot setup script for example), you can import the service. For example, if you
+were going to import the cron service you would run:
+
+svccfg import /lib/svc/manifest/system/cron.xml
+
+Next, you need to potentially enable the service depending on the default
+disposition of the service. You enable the service by running:
+
+svcadm enable -s <service>
+
+Adding the `-s` flag causes the enabling to be synchronous. If you do not
+include the flag then it will poke svc.startd to enable the service and return.
+If the service is already enabled by default, then this is safe to run and it
+won't change anything. It is safer to just always enable or disable the service
+after importing it based on your needs.

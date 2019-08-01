@@ -1,0 +1,116 @@
+\ Menu.rc
+\
+\ Load required Forth modules
+include /boot/forth/version.4th
+include /boot/forth/brand.4th
+include /boot/forth/menu.4th
+include /boot/forth/menu-commands.4th
+include /boot/forth/shortcuts.4th
+
+\ Screen prep
+clear         \ clear the screen (see `screen.4th')
+print_version \ print version string (bottom-right; see `version.4th')
+draw-beastie  \ draw freebsd mascot (on right; see `beastie.4th')
+draw-brand    \ draw the FreeBSD title (top-left; see `brand.4th')
+menu-init     \ initialize the menu area (see `menu.4th')
+
+\ Initialize main menu constructs (see `menu.4th')
+\ NOTE: To use `non-ansi' variants, add `loader_color=0' to loader.conf(5)
+\ NOTE: ANSI variants can use `^' in place of literal `Esc' (ASCII 27)
+
+\
+\ MAIN MENU
+\
+
+set menuset_name1="main"
+
+set mainmenu_init[1]="init_boot"
+
+set mainmenu_caption[1]="Boot SmartOS [Enter]"
+set mainansi_caption[1]="^[1mB^[moot SmartOS ^[1m[Enter]^[m"
+set mainmenu_command[1]="boot"
+\ keycode set by init_boot
+
+set mainmenu_caption[2]="[Esc]ape to loader prompt"
+set mainmenu_command[2]="goto_prompt"
+set mainmenu_keycode[2]=27
+set mainansi_caption[2]="^[1mEsc^[mape to loader prompt"
+
+\ Enable built-in "Reboot" trailing menuitem
+\ NOTE: appears before menu_options if configured
+\
+set mainmenu_reboot
+
+\ Enable "Options:" separator. When set to a numerical value (1-8), a visual
+\ separator is inserted before that menuitem number.
+\
+set mainmenu_options=4
+
+set mainmenu_caption[4]="Configure Boot [O]ptions..."
+set mainmenu_command[4]="2 goto_menu"
+set mainmenu_keycode[4]=111
+set mainansi_caption[4]="Configure Boot ^[1mO^[mptions..."
+
+\
+\ BOOT OPTIONS MENU
+\
+
+set menuset_name2="options"
+
+set optionsmenu_caption[1]="Back to Main Menu [Backspace]"
+set optionsmenu_command[1]="1 goto_menu"
+set optionsmenu_keycode[1]=8
+set optionsansi_caption[1]="Back to Main Menu ^[1m[Backspace]^[m"
+
+set optionsmenu_options=2
+set optionsmenu_optionstext="Boot Options:"
+
+set optionsmenu_osconsole=2
+set optionsmenu_command[2]="cycle_osconsole"
+set optionsmenu_keycode[2]=99
+
+set optionsmenu_init[3]="init_verbose"
+set optionsmenu_caption[3]="[V]erbose............. Off"
+set optionstoggled_text[3]="[V]erbose............. On"
+set optionsmenu_command[3]="toggle_verbose"
+set optionsmenu_keycode[3]=118
+set optionsansi_caption[3]="^[1mV^[merbose............... ^[34;1mOff^[m"
+set optionstoggled_ansi[3]="^[1mV^[merbose............... ^[32;7mOn^[m"
+
+set optionsmenu_init[4]="init_kmdb"
+set optionsmenu_caption[4]="k[m]db................ Off"
+set optionstoggled_text[4]="k[m]db................ On"
+set optionsmenu_command[4]="toggle_kmdb"
+set optionsmenu_keycode[4]=109
+set optionsansi_caption[4]="k^[1mm^[mdb.................. ^[34;1mOff^[m"
+set optionstoggled_ansi[4]="k^[1mm^[mdb.................. ^[32;7mOn^[m"
+
+set optionsmenu_init[5]="init_debug"
+set optionsmenu_caption[5]="[D]ebug............... Off"
+set optionstoggled_text[5]="[D]ebug............... On"
+set optionsmenu_command[5]="toggle_debug"
+set optionsmenu_keycode[5]=100
+set optionsansi_caption[5]="^[1mD^[mebug................. ^[34;1mOff^[m"
+set optionstoggled_ansi[5]="^[1mD^[mebug................. ^[32;7mOn^[m"
+
+set optionsmenu_init[6]="init_rescue"
+set optionsmenu_caption[6]="[R]escue Mode......... Off"
+set optionstoggled_text[6]="[R]escue Mode......... On"
+set optionsmenu_command[6]="toggle_rescue"
+set optionsmenu_keycode[6]=114
+set optionsansi_caption[6]="^[1mR^[mescue Mode........... ^[34;1mOff^[m"
+set optionstoggled_ansi[6]="^[1mR^[mescue Mode........... ^[32;7mOn^[m"
+
+\ Enable automatic booting (add ``autoboot_delay=N'' to loader.conf(5) to
+\ customize the timeout; default is 10-seconds)
+\
+set menu_timeout_command="boot"
+
+\ Include optional elements defined in a local file
+\
+try-include /boot/menu.rc.local
+
+\ Display the main menu (see `menu.4th')
+set menuset_initial=1
+menuset-loadinitial
+menu-display

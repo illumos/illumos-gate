@@ -19,163 +19,22 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
 # All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2012, Joyent, Inc. All rights reserved.
 #
-
 . /lib/svc/share/smf_include.sh
-. /lib/svc/share/fs_include.sh
 
-UPDATEFILE=/etc/svc/volatile/boot_archive_needs_update
+mount /dev/fd
 
-#
-# Once root is read/write we can enable the dedicated dumpdevice if it exists
-# locally. This is an optimization as svc-dumpadm will attempt do this later.
-#
-dump_setup()
-{
-	[ -r /etc/dumpadm.conf ] && . /etc/dumpadm.conf
-
-	readswapdev $DUMPADM_DEVICE < $vfstab
-
-	#
-	# Make sure that the dump save area has been configured before
-	# proceeding. If the variable has not been defined or does not exist
-	# then bail out early. This will prevent us from configuring a
-	# dump save area before a hostname has been configured (i.e after
-	# sys-unconfig has been invoked).
-	#
-	[ -z "$DUMPADM_SAVDIR" ] && return
-
-	#
-	# If we have a dedicated dump device, then go ahead and configure it.
-	# 
-	if [ "x$special" != "x$DUMPADM_DEVICE" ]; then
-		if [ -x /usr/sbin/dumpadm -a -b $DUMPADM_DEVICE ]; then
-			/usr/sbin/dumpadm -u || exit $SMF_EXIT_ERR_CONFIG
-		fi
-	fi
-}
-
-#
-# Write a unique id into this kernel image; this will be included
-# in the dump header and panicbuf of any crashdump of this image.
-#
-if [ -x /usr/sbin/dumpadm ]; then
-	/usr/sbin/dumpadm -i
-fi
-
-rootiszfs=0
-# get the fstype of root
-readmnttab / </etc/mnttab
-if [ "$fstype" = zfs ] ; then
-	rootiszfs=1
-	dump_setup
-fi
-
-#
-# Add physical swap.
-#
-/sbin/swapadd -1
-
-#
-# Check and remount the / (root) file system.
-# For NFS mounts, force the llock option on.
-#
-if smf_is_globalzone && [ $rootiszfs = 0 ]; then
-	readvfstab / < $vfstab
-	checkfs $fsckdev $fstype $mountp || exit $SMF_EXIT_ERR_FATAL
-	checkopt "llock" $mntopts
-	mntopts='remount'
-
-	[ -n "$otherops" ] && mntopts="${mntopts},${otherops}"
-	[ "$fstype" = nfs ] && mntopts="${mntopts},llock"
-
-	mountfs -m $mountp $fstype $mntopts - || exit $SMF_EXIT_ERR_FATAL
-fi
-
-#
-# Check and remount the /usr file system (formerly mounted read-only).
-# Unless root is zfs, in which case we've already mounted /usr read-write
-#
-if [ "$rootiszfs" = 0 ] ; then
-	readvfstab /usr < $vfstab
-	if [ "$mountp" ]; then
-		checkopt ro $mntopts
-		if [ "x$option" != xro ]; then
-			checkfs $fsckdev $fstype $mountp ||
-			    exit $SMF_EXIT_ERR_FATAL
-			if [ "x$mntopts" != x- ]; then
-				mntopts="remount,$mntopts"
-			else
-				mntopts="remount"
-			fi
-
-			mountfs - /usr $fstype $mntopts - ||
-			    exit $SMF_EXIT_ERR_FATAL
-		fi
-	fi
-fi
-
-#
-# Check and mount the /usr/platform file system.  This should only be
-# present when a SunOS 5.5 (Solaris 2.5) or greater client is being
-# administered by a SunOS 5.4 or less host.
-#
-readvfstab /usr/platform < $vfstab
-if [ "$mountp" ]; then
-	checkfs $fsckdev $fstype $mountp || exit $SMF_EXIT_ERR_FATAL
-	mountfs - $mountp $fstype $mntopts - || exit $SMF_EXIT_ERR_FATAL
-fi
-
-#
-# Mount the fd file systems if mount point exists.
-#
-readvfstab /dev/fd < $vfstab
-if [ "$mountp" -a -d /dev/fd ]; then
-	mountfs - /dev/fd - - - || exit $SMF_EXIT_ERR_FATAL
-fi
-
-if [ -f "${UPDATEFILE}" ]; then
-	/usr/sbin/bootadm update-archive
-	if [ $? != 0 ]; then
-		cecho ""
-		cecho "WARNING: Automatic update of the boot archive failed."
-		cecho "Update the archives using 'bootadm update-archive'"
-		cecho "command and then reboot the system from the same device that"
-		cecho "was previously booted." 
-		cecho ""
-		exit $SMF_EXIT_ERR_FATAL
-	fi
-	rm -f $UPDATEFILE
-	bootcmd=`/usr/sbin/eeprom bootcmd | /usr/bin/sed -e 's#bootcmd=##g'`
-	if [ `uname -p` = "i386" ]; then
-		/usr/sbin/reboot -f dryrun
-		if [ $? = 0 ]; then
-			/usr/sbin/reboot -f -- "$bootcmd" 
-			exit $SMF_EXIT_OK
-		fi
-		boot_prop=`/usr/sbin/svccfg -s svc:/system/boot-config:default listprop config/auto-reboot-safe | \
-			/usr/bin/nawk '{ print $3}'`
-		if [ "$boot_prop" != "true" ]; then 
-			cecho ""
-			cecho "WARNING: Reboot required."
-			cecho "The system has updated the cache of files (boot archive) that is used"
-			cecho "during the early boot sequence. To avoid booting and running the system"
-			cecho "with the previously out-of-sync version of these files, reboot the"
-			cecho "system from the same device that was previously booted."
-			cecho ""
-			exit $SMF_EXIT_ERR_FATAL
-		else
-			/usr/sbin/reboot -p 
-			exit $SMF_EXIT_OK
-		fi 
-	fi
-	/usr/sbin/reboot -- "$bootcmd"
+if smf_is_globalzone; then
+    # svc.startd makes a backup of the repo on boot.  Since this is a
+    # live-image, the backup takes up an unnecessary 4MB in memory, so remove
+    # it now.
+    rm -f /etc/svc/repository-*
 fi
 
 exit $SMF_EXIT_OK

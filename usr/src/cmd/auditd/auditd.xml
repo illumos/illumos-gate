@@ -142,7 +142,7 @@
 	-->
 	<property_group name='preselection' type='application'>
 		<propval name='flags' type='astring'
-			value='lo' />
+			value='lo,ex' />
 		<propval name='naflags' type='astring'
 			value='lo' />
 		<propval name='read_authorization' type='astring'
@@ -188,7 +188,7 @@
 		<propval name='arge' type='boolean'
 			value='false' />
 		<propval name='argv' type='boolean'
-			value='false' />
+			value='true' />
 		<propval name='cnt' type='boolean'
 			value='true' />
 		<propval name='group' type='boolean'
@@ -196,7 +196,7 @@
 		<propval name='path' type='boolean'
 			value='false' />
 		<propval name='perzone' type='boolean'
-			value='false' />
+			value='true' />
 		<propval name='public' type='boolean'
 			value='false' />
 		<propval name='seq' type='boolean'

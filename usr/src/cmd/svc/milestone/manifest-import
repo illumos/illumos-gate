@@ -74,13 +74,17 @@ function svccfg_apply {
 }
 
 #
-# If the smf repository has file entries that are missing
+# If the smf/manifest table has file entries that are missing
 # then there is work to be done by the cleanup process.
 #
 function cleanup_needwork {
-	smfmfiles=`svcprop -p manifestfiles '*' 2>/dev/null |
-	    nawk -v early="$early" '$2 == "astring" &&
-	    (early != "true" || $3 ~ "^/lib/") { print $3 }'`
+	if [ "$early" == true ]; then
+		smfmfiles=`/usr/bin/svcprop smf/manifest | \
+		    awk '(/^lib_/ && /\/manifestfile /) {print $3}'`
+	else
+		smfmfiles=`/usr/bin/svcprop smf/manifest | \
+		    awk '/\/manifestfile / {print $3}'`
+	fi
 
 	nw=`/lib/svc/bin/mfstscan $smfmfiles 2>&1 1>/dev/null`
 	[ "$nw" ] && return 1
@@ -201,8 +205,13 @@ function import_manifests {
 
 	rm -f $logf
 
-	nonsite_dirs=`/usr/bin/find $basedir/* -name site \
-	    -prune -o -type d -print -prune`
+	if [ "${basedir}" == "/opt/custom/smf" ]; then
+		# Special case where we will just import from the root, not subdirs
+		nonsite_dirs=${basedir}
+	else
+		nonsite_dirs=`/usr/bin/find $basedir/* -name site \
+			-prune -o -type d -print -prune`
+	fi
 
 	if [ -n "$_MFST_DEBUG" ]; then
 		nonsite_manifests=`/lib/svc/bin/mfstscan $nonsite_dirs`
@@ -454,6 +463,10 @@ else
 	import_manifests "/lib/svc/manifest" true
 	import_manifests "/var/svc/manifest" true
 
+	if [ -d "/opt/custom/smf" ]; then
+		import_manifests "/opt/custom/smf" true
+	fi
+
 	#
 	# Apply profiles
 	#
@@ -472,9 +485,9 @@ fi
 # 6.  Final actions.
 #
 
-if $activity; then
-	/usr/sbin/svcadm _smf_backup "manifest_import" || true
-fi
+#if $activity; then
+#	/usr/sbin/svcadm _smf_backup "manifest_import" || true
+#fi
 
 #
 # If the filesystem is NOT read only then move the repo back to perm

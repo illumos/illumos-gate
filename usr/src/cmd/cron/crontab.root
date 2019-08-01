@@ -1,0 +1,18 @@
+## Rotate and trim the audit logs nightly.
+0 0 * * * /smartdc/bin/sdc-lastcomm -R 30
+## Run logadm hourly so that the minimum rotate interval is 1h
+0 * * * * /usr/sbin/logadm
+## Rotate vm.log files for any KVM VMs
+0 * * * * SDC_LOG_ROLL_BACKWARD=1 /usr/vm/sbin/rotate-kvm-logs.sh >> /var/log/rotate-kvm-logs.log 2>&1
+## Headnode should phone home nightly.
+0 1 * * * [ -x /opt/smartdc/bin/sdc-phonehome ] && /opt/smartdc/bin/sdc-phonehome
+## Delete saved core dumps over 7 days old
+15 0 * * * find /zones/*/cores -type f -mtime +7 -exec rm -f "{}" \;
+## Delete archived zone data over 7 days old
+30 0 * * * find /zones/archive/ -mount -maxdepth 1 -mindepth 1 -type d -mtime +7 -exec rm -rf "{}" \;
+## Delete logs to be uploaded over 7 days old if they aren't being consumed
+45 0 * * * [ -d /var/log/sdc/upload/ ] && find /var/log/sdc/upload/ -mount -maxdepth 1 -mindepth 1 -type f -mtime +7 -exec rm -f "{}" \;
+
+# NOTE: all entries above are in root's system-defined crontab; see the
+# crontab(1) man page.
+

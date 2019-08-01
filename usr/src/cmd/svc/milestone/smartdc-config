@@ -1,0 +1,211 @@
+#!/bin/bash
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2019 Joyent, Inc.
+#
+
+#
+# Despite its "smartdc/config" name, this service is used both for SmartOS and
+# Triton. It has two jobs:
+#
+# During an initial setup, this runs through the initial (possibly interactive)
+# configuration.
+#
+# During normal operation, it does some miscellaneous configuration based on
+# /usbkey/config (which, under Triton, will have already been updated from the
+# USB key by svc:/system/filesystem/smartdc:default).
+#
+
+set -o errexit
+set -o xtrace
+
+. /lib/svc/share/smf_include.sh
+. /lib/sdc/config.sh
+
+export PATH="/usr/sbin:/sbin:/usr/bin"
+
+set_root_password() {
+    enc_password=$1
+
+    sed -e "s|^root:[^\:]*:|root:${enc_password}:|" /etc/shadow > /etc/shadow.new \
+      && chmod 400 /etc/shadow.new \
+      && mv /etc/shadow.new /etc/shadow
+}
+
+case "$1" in
+'start')
+
+    # If we're a headnode, see if we have to do interactive configuration.
+    if /bin/bootparams | grep "^headnode=true" > /dev/null 2>&1; then
+        USB_PATH=/mnt/`svcprop -p "joyentfs/usb_mountpoint" svc:/system/filesystem/smartdc:default`
+
+        # Check for config and run interactive if it doesn't exist.
+        if [[ ! -f ${USB_PATH}/config ]]; then
+            if /bin/bootparams | grep "^noimport=true" >/dev/null 2>&1; then
+                # Skipping interactive config, bypass rest of script.
+                exit $SMF_EXIT_OK
+            fi
+
+            /smartdc/lib/sdc-on-tty -d /dev/console \
+                ${USB_PATH}/scripts/prompt-config.sh "${USB_PATH}"
+
+            # If user quit from interactive configuration then we're done.
+            [[ ! -f ${USB_PATH}/config ]] && exit $SMF_EXIT_OK
+        fi
+    elif /bin/bootparams | grep "^smartos=true" > /dev/null 2>&1; then
+        USB_PATH=/`svcprop -p "joyentfs/usb_copy_path" svc:/system/filesystem/smartdc:default`
+
+        # Check for config and run interactive if it doesn't exist.
+        if [[ ! -f ${USB_PATH}/config ]]; then
+            if /bin/bootparams | grep "^noimport=true" >/dev/null 2>&1; then
+                # Skipping interactive config, bypass rest of script.
+                exit $SMF_EXIT_OK
+            fi
+
+            /smartdc/lib/sdc-on-tty -d /dev/console \
+                /smartdc/lib/smartos_prompt_config.sh "${USB_PATH}"
+
+            # If user quit from interactive configuration then we're done.
+            [[ ! -f ${USB_PATH}/config ]] && exit $SMF_EXIT_OK
+        fi
+    fi
+
+    # This puts config vars in CONFIG_
+    load_sdc_config
+    load_sdc_sysinfo
+
+    # Write the info about this datacenter to /.dcinfo so we can use in the GZ
+    echo "SDC_DATACENTER_NAME='${CONFIG_datacenter_name}'" > /.dcinfo
+
+    if [[ -n "${SYSINFO_Bootparam_smartos}" && -f /usbkey/shadow ]]; then
+        echo "setting root password from /usbkey/shadow"
+    # Boot parameter takes precidence over config
+    elif [[ -n "${SYSINFO_Bootparam_root_shadow}" ]]; then
+        set_root_password "${SYSINFO_Bootparam_root_shadow}"
+        echo "Set root password boot parameters."
+    elif [[ -n "${CONFIG_root_shadow}" ]]; then
+        set_root_password "${CONFIG_root_shadow}"
+        echo "Set root password from config."
+    else
+        echo "No root shadow entry in the config, cannot set."
+    fi
+
+    # Set authorized_keys for root
+    if [[ -n "${CONFIG_root_authorized_keys_file}" ]] \
+        && [[ -n "${CONFIG_config_inc_dir}" ]] \
+        && [[ -d "${CONFIG_config_inc_dir}" ]] \
+        && [[ -f "${CONFIG_config_inc_dir}/${CONFIG_root_authorized_keys_file}" ]]; then
+
+        mkdir -p /root/.ssh
+        cp "${CONFIG_config_inc_dir}/${CONFIG_root_authorized_keys_file}" /root/.ssh/authorized_keys
+        chmod 0600 /root/.ssh/authorized_keys
+        chmod 0700 /root/.ssh
+    fi
+
+    if [[ -n "${CONFIG_ntp_conf_file}" ]] \
+        && [[ -n "${CONFIG_config_inc_dir}" ]] \
+        && [[ -d "${CONFIG_config_inc_dir}" ]] \
+        && [[ -f "${CONFIG_config_inc_dir}/${CONFIG_ntp_conf_file}" ]]; then
+        #
+        # We were given a valid NTP configuration file, so use it without
+        # modification:
+        #
+        cp "${CONFIG_config_inc_dir}/${CONFIG_ntp_conf_file}" \
+          /etc/inet/ntp.conf
+        echo "Copied NTP configuration."
+    else
+        #
+        # If we have an admin network defined, allow time service from this
+        # network:
+        #
+        ntp_aflag=
+        if [[ -n ${CONFIG_admin_network} && -n ${CONFIG_admin_netmask} ]]; then
+            if [[ "${CONFIG_admin_network}" != "..." ]]; then
+                ntp_aflag="-a ${CONFIG_admin_network}/${CONFIG_admin_netmask}"
+            fi
+        fi
+
+        #
+        # If we were given a list of servers, use it:
+        #
+        ntp_hosts="${CONFIG_ntp_hosts}"
+        if [[ -z "${ntp_hosts}" ]]; then
+            #
+            # Otherwise, use the default SmartOS vendor pool from the NTP
+            # Pool Project:
+            #
+            ntp_hosts='0.smartos.pool.ntp.org'
+        fi
+
+        #
+        # Generate NTP configuration:
+        #
+        if ! /smartdc/lib/ntp_config -f /etc/inet/ntp.conf \
+          -s "${ntp_hosts}" ${ntp_aflag}; then
+            echo "FATAL: could not configure NTP" >&2
+            exit ${SMF_EXIT_ERR_CONFIG}
+        fi
+        echo "Generated NTP configuration."
+    fi
+
+    # set the keymap. For dvorak for instance
+    if [[ -n ${CONFIG_default_keymap} ]]; then
+        /usr/bin/loadkeys ${CONFIG_default_keymap}
+    fi
+
+    #
+    # In SmartOS, disabling SMT via the boot option is a pain, so we support a
+    # config option in /usbkey/config, the official mechanism for permanent
+    # configuration.  We'd like to do this earlier but we have to wait for
+    # /usbkey to be mounted first. This does imply we've potentially handed out
+    # "too many" interrupts for the set of CPUs remaining online.
+    #
+    if [[ -n $(/bin/bootparams | grep '^smartos=true') ]]; then
+        if [[ "$CONFIG_smt_enabled" = "false" ]]; then
+            psradm -aS || exit $SMF_EXIT_ERR_FATAL
+        fi
+    fi
+
+    # Enable virtual terminals to support interactive installation
+    vtdaemon="svc:/system/vtdaemon"
+    svccfg -s ${vtdaemon} setprop options/hotkeys=true
+    svcadm refresh ${vtdaemon}
+    svcadm enable ${vtdaemon}
+    svcadm enable svc:/system/console-login:vt2
+    svcadm enable svc:/system/console-login:vt3
+    svcadm enable svc:/system/console-login:vt4
+    svcadm enable svc:/system/console-login:vt5
+    svcadm enable svc:/system/console-login:vt6
+
+    # force update of sysinfo (and dump to stdout so we have in the log)
+    sysinfo -f
+
+    ;;
+
+'stop')
+    ;;
+
+*)
+    echo "Usage: $0 { start | stop }"
+    exit $SMF_EXIT_ERR_FATAL
+    ;;
+esac
+exit $SMF_EXIT_OK

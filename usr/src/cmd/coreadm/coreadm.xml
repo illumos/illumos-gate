@@ -48,6 +48,14 @@
 		<service_fmri value='svc:/system/filesystem/minimal' />
 	</dependency>
 
+	<dependency
+		name='coreadm_manifest-import'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/manifest-import:default' />
+	</dependency>
+
 	<instance name='default' enabled='false'>
 		<exec_method
 			type='method'
@@ -84,17 +92,17 @@
 				value='solaris.smf.value.coreadm' />
 
 			<propval name='global_pattern'
-				type='astring' value='' />
+				type='astring' value='/%Z/cores/core.%f.%p' />
 			<propval name='global_content'
 				type='astring' value='default' />
 			<propval name='init_pattern'
-				type='astring' value='core' />
+				type='astring' value='/%Z/cores/core.%f.%p' />
 			<propval name='init_content'
 				type='astring' value='default' />
 			<propval name='global_enabled'
-				type='boolean' value='false' />
-			<propval name='process_enabled'
 				type='boolean' value='true' />
+			<propval name='process_enabled'
+				type='boolean' value='false' />
 			<propval name='global_setid_enabled'
 				type='boolean' value='false' />
 			<propval name='process_setid_enabled'

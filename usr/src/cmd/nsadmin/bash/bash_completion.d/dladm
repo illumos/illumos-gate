@@ -1,0 +1,34 @@
+_dladm()
+{
+    local cur prev opts base
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    if [[ ${prev} == 'dladm' ]]; then
+        local cmds="rename-link show-link create-aggr delete-aggr add-aggr \
+            remove-aggr modify-aggr show-aggr scan-wifi connect-wifi \
+            disconnect-wifi show-wifi set-linkprop reset-linkprop \
+            show-linkprop show-ether create-secobj delete-secobj show-secobj \
+            create-vlan delete-vlan show-vlan create-iptun delete-iptun \
+            modify-iptun show-iptun delete-phys show-phys create-vnic \
+            delete-vnic show-vnic create-part delete-part show-part show-ib \
+            create-etherstub delete-etherstub show-etherstub create-bridge \
+            modify-bridge delete-bridge add-bridge remove-bridge show-bridge \
+            show-bridge show-usage"
+
+        COMPREPLY=( $(compgen -W "$cmds" -- ${cur}) )
+    # The -z takes a zone option, ignore everything else
+    elif [[ ${prev} =~ -.*z$ ]]; then
+        local zones=$(zoneadm list -c | grep -v '^global$')
+        COMPREPLY=( $(compgen -W "${zones}" -- ${cur}) )
+    elif [[ ${prev} =~ 'delete-vnic' ]]; then
+        local vnics=$(dladm show-vnic -p -o link)
+        COMPREPLY=( $(compgen -W "${vnics}" -- ${cur}) )
+    elif [[ ${prev} =~ 'delete-etherstub' ]]; then
+        local stubs=$(dladm show-etherstub -p)
+        COMPREPLY=( $(compgen -W "${stubs}" -- ${cur}) )
+    fi
+}
+
+complete -F _dladm dladm

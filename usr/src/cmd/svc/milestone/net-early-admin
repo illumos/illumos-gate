@@ -1,0 +1,214 @@
+#!/bin/ksh93
+#
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2019 Joyent, Inc.
+#
+
+# Traditionally, when a Triton compute node boots, the network is not
+# configured until after the local filesystems are mounted (in fact
+# network/physical:default depends upon /system/filesystem/smartdc).  Most
+# obviously, in the case of a head node or a standalone SmartOS install, the
+# network configuration is stored on the local zpool, so the network cannot
+# be configured until this happens.
+#
+# For Triton compute nodes with encrypted zpools, we must enable the admin
+# network before the local zpool filesytems are online -- we have to be able
+# to communicate to the head node services to obtain the pin to unlock the
+# local zpool.  For PXE booted Triton compute nodes, we therefore configure
+# the admin network sooner via the network/early-admin:default service.  When
+# network/physical:default runs, it will skip the configuration of the admin
+# network and configuring the remaining interfaces.
+#
+# If we are not a Triton compute node, we exit successfully almost immediately
+# without configuring the admin network.  When the network/physical:default
+# service runs, it will configure all the network interfaces as it traditionally
+# has
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
+. /lib/svc/share/smf_include.sh
+. /lib/sdc/config.sh
+. /lib/sdc/network.sh
+
+PS4='+ [$LINENO] '
+
+set -o xtrace
+
+if ! smf_is_globalzone; then
+    echo "Non-global zone; no action required; exiting"
+    exit $SMT_EXIT_OK
+fi
+
+if ! boot_file_config_enabled; then
+    echo "Boot-time networking files not present; exiting"
+    exit $SMF_EXIT_OK
+fi
+
+function fatal
+{
+    # XXX: For SMF methods, does it matter/better to redirect to stderr?
+    echo "Error: $*" >&2
+    exit $SMF_EXIT_ERR_FATAL
+}
+
+if ! boot_file_config_valid; then
+    echo "ERROR: boot-time network config file incorrect" >&2
+    exit $SMF_EXIT_ERR_CONFIG
+fi
+
+unset aggrs
+unset tags
+typeset -A tagv
+typeset -A aggr_links aggr_mode
+typeset -A ip ip6 netmask gateway gateway6 mtu mac
+/usr/lib/sdc/net-boot-config | while IFS="=" read var value; do
+    if [[ "$var" =~ _nic$ ]]; then
+        name=${var%_nic}
+        tags+=("${name}")
+        tagv[$name]="$value"
+    elif [[ "$var" =~ _aggr$ ]]; then
+        name=${var%_aggr}
+        aggrs+=(${name})
+        aggr_links[$name]="${value//,/ }"
+    elif [[ "$var" =~ _lacp_mode$ ]]; then
+        name=${var%_lacp_mode}
+        aggr_mode[$name]="$value"
+    elif [[ "$var" =~ _mtu$ ]]; then
+        (( value < 1500 || value > 9000 )) &&
+            fatal "ERROR: $var MTU value \'$value\' is not in" \
+            "range [1500, 9000]"
+
+        name=${var%_mtu}
+        mtu[$name]="$value"
+    elif [[ "$var" =~ _ip$ ]]; then
+        name=${var%_ip}
+        ip[$name]="$value"
+    elif [[ "$var" =~ _ip6$ ]]; then
+        name=${var%_ip6}
+        ip6[$name]="$value"
+    elif [[ "$var" =~ _netmask$ ]]; then
+        name=${var%_netmask}
+        netmask[$name]="$value"
+    elif [[ "$var" =~ _gateway$ ]]; then
+        name=${var%_gateway}
+        gateway[$name]="$value"
+    elif [[ "$var" =~ _gateway6$ ]]; then
+        name=${var%_gateway6}
+        gateway6[$name]="$value"
+    elif [[ "$var" =~ _mac$ ]]; then
+        name=${var%_mac}
+        mac[$name]="$value"
+    elif [[ "$var" == "dns_resolvers" ]]; then
+        dns_resolvers=(${value//,/ })
+    fi
+
+    eval "CONFIG_$var"="$value"
+done
+
+# This must happen befor any other dladm commands (which includes log_if_state)
+# or else dladm commands can fail
+dladm init-phys
+
+log_if_state before
+
+typeset -A mac_to_link
+out=$(dladm show-phys -mpo link,address)
+(( $? == 0 )) || fatal "dladm show-phys failed"
+while IFS=: read link addr; do
+    mac=$(normalize_mac $addr)
+    mac_to_link["$mac"]="$link"
+done <<< "$out"
+
+ADMIN_NIC_TAG=${CONFIG_admin_tag:-"admin"}
+[[ -n "${tagv[$ADMIN_NIC_TAG]}" ]] || \
+    fatal "ERROR: admin nic tag '$ADMIN_NIC_TAG' not present"
+
+nic="${tagv[$ADMIN_NIC_TAG]}"
+
+if [[ -n "${aggr_links[$nic]}" ]]; then
+    mode=${aggr_mode[$nic]:-"off"}
+
+    for l in ${aggr_links[$nic]}; do
+        [[ -n "${mac_to_link[$l]}" ]] || fatal "MAC '$l' not present"
+        links+="${mac_to_link[$l]} "
+    done
+    links="${links% }"
+
+    echo "Creating aggr: $nic (mode=$mode, links=${links})"
+    dladm create-aggr -l ${links// / -l } -L $mode $nic
+
+    if [[ -n "${mtu[$nic]}" ]]; then
+        dladm set-linkprop -p mtu=${mtu[$nic]} $nic || \
+            fatal "ERROR: Failed to set mtu on aggr $nic to ${mtu[$nic]}"
+    fi
+elif valid_mac "$nic"; then
+    [[ -n "${mac_to_link[$nic]}" ]] || \
+        fatal "ERROR: admin mac address $nic not found on system"
+    nic=${mac_to_link[$nic]}
+else
+    fatal "ERROR: Invalid value of ${ADMIN_NIC_TAG}_nic ($nic)"
+fi
+
+driver=${nic%%[0-9]*}
+get_link_state $nic
+if [[ "$link_state" == "down" ]]; then
+    echo "admin nic '${nic}' is down: unplumbing"
+    /sbin/ifconfig $nic down unplumb
+    wait_for_nic_state $nic "unknown"
+fi
+
+# There's some sort of race condition in the bnx driver: if the plumb
+# command comes too soon after the unplumb, the interface can come up
+# in a state where it never fires interrupts for link state changes.
+if [[ "$driver" == "bnx" ]]; then
+    sleep 5
+fi
+
+/sbin/ifconfig $nic plumb mtu ${mtu[$ADMIN_NIC_TAG]}
+wait_for_nic_state $nic "up"
+
+if [[ -n "${ip[$ADMIN_NIC_TAG]}" ]]; then
+    /sbin/ifconfig $nic inet ${ip[$ADMIN_NIC_TAG]} \
+        netmask ${netmask[$ADMIN_NIC_TAG]:-"+"} up
+    [[ -n "${gateway[$ADMIN_NIC_TAG]}" ]] && \
+        /usr/sbin/route add default ${gateway[$ADMIN_NIC_TAG]}
+fi
+
+if [[ -n "${ip6[$ADMIN_NIC_TAG]}" ]]; then
+    /sbin/ifconfig $nic inet6 plumb mtu ${mtu[$ADMIN_NIC_TAG]}
+    [[ "${ip6[$ADMIN_NIC_TAG]}" != "addrconf" ]] && \
+        /sbin/ifconfig $nic inet6 addif ${ip6[$ADMIN_NIC_TAG]} preferred up
+    [[ -n "${gateway6[$ADMIN_NIC_TAG]}" ]] && \
+        /usr/sbin/route add -inet6 default ${gateway6[$ADMIN_NIC_TAG]}
+fi
+
+# Add just the routes reachable through the admin network -- usually these are
+# only present with rack aware networking (RAN)
+/usr/lib/sdc/net-boot-config --routes | while read dst gw; do
+    if ! ip_in_net $gw ${ip[$ADMIN_NIC_TAG]} ${netmask[$ADMIN_NIC_TAG]}; then
+        continue
+    fi
+    route add "$dst" "$gw"
+done
+
+if [[ -n "${CONFIG_dns_domain}" && -n ${dns_resolvers[0]} ]]; then
+    echo "search ${CONFIG_dns_domain}" > /etc/resolv.conf
+    for serv in ${dns_resolvers[@]}; do
+        echo "nameserver $serv" >> /etc/resolv.conf
+    done
+fi
+
+touch /etc/svc/volatile/.early_admin_setup
+
+log_if_state after

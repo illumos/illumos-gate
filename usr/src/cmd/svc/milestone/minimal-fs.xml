@@ -44,11 +44,11 @@
 	<single_instance/>
 
 	<dependency
-		name='usr'
+		name='joyent'
 		grouping='require_all'
 		restart_on='none'
 		type='service'>
-		<service_fmri value='svc:/system/filesystem/usr' />
+		<service_fmri value='svc:/system/filesystem/smartdc' />
 	</dependency>
 
 	<dependency

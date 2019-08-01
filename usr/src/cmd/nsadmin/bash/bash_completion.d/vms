@@ -1,0 +1,62 @@
+_vmadm()
+{
+    local cur prev opts base
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    up_patterns=$(printf " running *\$\n halting *\$\n")
+
+    if [[ ${prev} == 'vmadm' ]]; then
+        COMPREPLY=( $(compgen -W "boot destroy dump kill halt list reboot reset info nmi" -- ${cur}) )
+    else
+        case ${prev} in
+            boot)
+                local not_running=$(vmadm list -v | grep -v "^UUID" | \
+                    /usr/xpg4/bin/grep -v -e "${up_patterns}" | cut -d' ' -f1)
+                COMPREPLY=( $(compgen -W "${not_running}" -- ${cur}) )
+            ;;
+            info|kill)
+                local running=$(vmadm list -v | grep -v "^UUID" | \
+                    /usr/xpg4/bin/grep -e "${up_patterns}" | cut -d ' ' -f1)
+                COMPREPLY=( $(compgen -W "${running}" -- ${cur}) )
+            ;;
+            halt|reboot|reset|nmi|screenshot)
+                local running=$(vmadm list -v | grep -v "^UUID" | \
+                    grep " running *$" | cut -d ' ' -f1)
+                COMPREPLY=( $(compgen -W "${running}" -- ${cur}) )
+            ;;
+            dump|destroy)
+                local all=$(vmadm list)
+                COMPREPLY=( $(compgen -W "${all}" -- ${cur}) )
+            ;;
+            *)
+                # Just expand files by default
+                COMPREPLY=( $(compgen -f -- ${cur}) )
+            ;;
+        esac
+    fi
+
+    return 0
+}
+
+_vmcfg()
+{
+    local cur prev opts base
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    if [[ ${prev} == 'vmcfg' ]]; then
+        vms=$(vmadm list)
+        COMPREPLY=( $(compgen -W "${vms}" -- ${cur}) )
+    else
+        # Just expand files by default
+        COMPREPLY=( $(compgen -f -- ${cur}) )
+    fi
+
+    return 0
+}
+
+complete -F _vmadm vmadm
+complete -F _vmcfg vmcfg

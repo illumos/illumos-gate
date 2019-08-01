@@ -24,12 +24,16 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 Joyent, Inc.
+#
 
 cat >console-login.xml <<EOF
 <?xml version="1.0"?>
 <!--
 	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 	Use is subject to license terms.
+
+	Copyright 2015 Joyent, Inc.
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -125,14 +129,14 @@ cat >console-login.xml <<EOF
 	<property_group name='ttymon' type='application'>
 		<propval name='value_authorization' type='astring'
 			value='solaris.smf.value.vt' />
-		<propval name='device' type='astring' value='/dev/console' />
+		<propval name='device' type='astring' value='/dev/wscons' />
 		<propval name='label' type='astring' value='console' />
 		<propval name='timeout' type='count' value='0' />
 		<propval name='nohangup' type='boolean' value='true' />
 		<propval name='modules' type='astring'
 		    value='ldterm,ttcompat' />
 		<propval name='prompt' type='astring'
-		   value='\`uname -n\` console login:' />
+		   value='\`uname -n\` wscons login:' />
 		<propval name='terminal_type' type='astring'
 		     value='' />
 	</property_group>
@@ -140,8 +144,39 @@ cat >console-login.xml <<EOF
 
 <instance name='default' enabled='true'>
 </instance>
-
 EOF
+
+for tty in a b c d; do
+	cat >>console-login.xml <<EOF
+
+<instance name='tty$tty' enabled='true'>
+
+	    <dependency
+		    name='system-console'
+		    grouping='require_all'
+		    restart_on='none'
+		    type='service'>
+		    <service_fmri value='svc:/system/console-login:default' />
+	    </dependency>
+
+        <!-- these are passed to ttymon in the method script -->
+        <property_group name='ttymon' type='application'>
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.vt' />
+		<propval name='device' type='astring' value='/dev/term/$tty' />
+		<propval name='label' type='astring' value='115200' />
+		<propval name='timeout' type='count' value='0' />
+		<propval name='nohangup' type='boolean' value='true' />
+		<propval name='modules' type='astring'
+			value='ldterm,ttcompat' />
+		<propval name='prompt' type='astring'
+			value='\`uname -n\` tty$tty login:' />
+		<propval name='terminal_type' type='astring'
+			value='xterm' />
+	</property_group>
+</instance>
+EOF
+done
 
 # Note that this script file is normally parsed during build by sh(1).
 # When the parser encounters an EOF token (like the one above), it
@@ -328,7 +363,7 @@ Sets the initial value of the TERM environment variable
 				<visibility value='readwrite'/>
 				<cardinality min='1' max='1'/>
 			</prop_pattern>
-		</pg_pattern>	 
+		</pg_pattern>
 
 	</template>
 </service>

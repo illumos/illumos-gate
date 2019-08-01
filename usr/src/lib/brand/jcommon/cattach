@@ -1,0 +1,63 @@
+#!/bin/ksh -p
+#
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+#
+
+unset LD_LIBRARY_PATH
+PATH=/usr/bin:/usr/sbin
+export PATH
+
+. /usr/lib/brand/shared/common.ksh
+
+ZONENAME=""
+ZONEPATH=""
+# Default to 10GB diskset quota
+ZQUOTA=10
+
+while getopts "R:t:U:q:z:" opt
+do
+	case "$opt" in
+		R)	ZONEPATH="$OPTARG";;
+		q)	ZQUOTA="$OPTARG";;
+		z)	ZONENAME="$OPTARG";;
+		*)	printf "$m_usage\n"
+			exit $ZONE_SUBPROC_USAGE;;
+	esac
+done
+shift OPTIND-1
+
+if [[ -z $ZONEPATH || -z $ZONENAME ]]; then
+	print -u2 "Brand error: No zone path or name"
+	exit $ZONE_SUBPROC_USAGE
+fi
+
+# The dataset quota must be a number.
+case $ZQUOTA in *[!0-9]*)
+	print -u2 "Brand error: The quota $ZQUOTA is not a number"
+	exit $ZONE_SUBPROC_USAGE;;
+esac
+
+ZROOT=$ZONEPATH/root
+
+# Get the dataset of the parent directory of the zonepath.
+dname=${ZONEPATH%/*}
+bname=${ZONEPATH##*/}
+PDS_NAME=`mount | nawk -v p=$dname '{if ($1 == p) print $3}'`
+[ -z "$PDS_NAME" ] && \
+    print -u2 "Brand error: missing parent ZFS dataset for $dname"
+
+jcommon_attach_hook
+
+exit $ZONE_SUBPROC_OK

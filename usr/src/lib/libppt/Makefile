@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 include $(SRC)/lib/Makefile.lib
@@ -20,24 +20,34 @@ SUBDIRS = $(MACH) $(BUILD64) $(MACH64)
 HDRS = libppt.h
 HDRDIR = common
 
+ETCFILES=	ppt_matches
+ROOTETC=	$(ROOT)/etc
+IETCFILES=	$(ETCFILES:%=$(ROOTETC)/%)
+
+$(IETCFILES) :=	FILEMODE = 0444
+
 all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 install_h: $(ROOTHDRS)
 
 all install: install_h
 
+install: $(IETCFILES)
+
 check: $(CHECKHDRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
+
+$(ROOTETC)/%:	%
+	$(INS.file)
 
 FRC:
 

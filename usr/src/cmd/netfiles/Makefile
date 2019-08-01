@@ -21,6 +21,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 Joyent, Inc.
+#
 
 TXTS= nsswitch.conf netconfig hosts services
 DEFAULTFILES= nss.dfl
@@ -29,7 +31,7 @@ include ../Makefile.cmd
 
 FILES= hosts services
 ETCFILES= netconfig nsswitch.conf nsswitch.files nsswitch.nis \
-		nsswitch.dns nsswitch.ldap nsswitch.ad
+		nsswitch.dns nsswitch.ldap nsswitch.ad resolv.conf
 
 ROOTNET=    $(ROOTETC)/net
 TICLTS=     $(ROOTNET)/ticlts

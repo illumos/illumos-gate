@@ -1,0 +1,183 @@
+#!/bin/ksh -p
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 2016, Joyent, Inc. All rights reserved.
+# Use is subject to license terms.
+#
+
+unset LD_LIBRARY_PATH
+PATH=/usr/bin:/usr/sbin
+export PATH
+
+. /usr/lib/brand/shared/common.ksh
+
+REPROVISONING=""
+ZONENAME=""
+ZONEPATH=""
+# Default to 10GB diskset quota
+ZQUOTA=10
+ZVOL_NAME=`/usr/bin/uuid -v 4`
+
+#
+# The following are the list of features that a corresponding brand may
+# enable. If they wish to do so, then they must set the following flags
+# to values such that [[ -z $flag ]] is true. The following are the
+# currently supported flags:
+#
+# o jst_reprovision - Brand supports reprovision
+# o jst_tmplopt - Template image optional
+#
+
+function fixup_images
+{
+	# New imgadm renames the dataset's snapshot at import to @final for us
+	# and when it exists, we use that. However, when it does not exist we
+	# still use the old method of creating a zones/<uuid>@<uuid> snapshot
+	# so we can support old datasets.
+	exists=$(zfs list -Ho name ${PDS_NAME}/${TMPLZONE}@final 2>&1)
+	if [[ $? == 0 && ${exists} == "${PDS_NAME}/${TMPLZONE}@final" ]]; then
+		zfs clone -o devices=off -F ${QUOTA_ARG} ${PDS_NAME}/${TMPLZONE}@final \
+		    ${PDS_NAME}/${bname} || fatal "failed to clone zone dataset"
+	elif [[ ${exists} =~ "dataset does not exist" ]]; then
+		zfs snapshot ${PDS_NAME}/${TMPLZONE}@${bname}
+		zfs clone -o devices=off -F ${QUOTA_ARG} ${PDS_NAME}/${TMPLZONE}@${bname} \
+		    ${PDS_NAME}/${bname} || fatal "failed to clone zone dataset"
+	else
+		fatal "Unable to determine snapshot for ${PDS_NAME}/${TMPLZONE}"
+	fi
+}
+
+while getopts "rR:t:U:q:z:" opt
+do
+	case "$opt" in
+		r)
+			set -x
+			if [[ -z "$jst_reprovision" ]]; then
+				print -u2 "unsupported reprovision requested"
+				exit $ZONE_SUBPROC_USAGE
+			fi
+			REPROVISIONING="true"
+			;;
+		R)	ZONEPATH="$OPTARG";;
+		t)	TMPLZONE="$OPTARG";;
+			# UUID is only used in the postinstall script
+		U)	UUID="$OPTARG";;
+		q)	ZQUOTA="$OPTARG";;
+		z)	ZONENAME="$OPTARG";;
+		*)	printf "$m_usage\n"
+			exit $ZONE_SUBPROC_USAGE;;
+	esac
+done
+shift OPTIND-1
+
+#
+# IMPORTANT: all actions below need to consider reprovision. If the action
+# modifies files in the zoneroot itself, it should be run on reprovision
+# any other changes to the zone or dataset should not be done on reprovision.
+#
+
+if [[ -z ${REPROVISIONING} \
+    && -n $(zonecfg -z "${ZONENAME}" info attr name=transition \
+    | grep "value: receiving:") ]]; then
+
+	# Here we're doing an install for a received zone, the dataset should have
+	# already been created.
+	exit $ZONE_SUBPROC_OK
+fi
+
+if [[ -z $ZONEPATH || -z $ZONENAME ]]; then
+	print -u2 "Brand error: No zone path or name"
+	exit $ZONE_SUBPROC_USAGE
+fi
+
+if [[ -z ${REPROVISIONING} ]]; then
+	# The install may requires a template zone.
+	if [[ -z $TMPLZONE && -z "$jst_tmplopt" ]]; then
+		print -u2 "Brand error: a zone template is required"
+		exit $ZONE_SUBPROC_USAGE
+	fi
+
+	# The dataset quota must be a number.
+	case $ZQUOTA in *[!0-9]*)
+		print -u2 "Brand error: The quota $ZQUOTA is not a number"
+		exit $ZONE_SUBPROC_USAGE;;
+	esac
+fi
+
+ZROOT=$ZONEPATH/root
+
+if [[ -z ${REPROVISIONING} ]]; then
+	# Get the dataset of the parent directory of the zonepath.
+	dname=${ZONEPATH%/*}
+	bname=${ZONEPATH##*/}
+	PDS_NAME=`mount | nawk -v p=$dname '{if ($1 == p) print $3}'`
+	[ -z "$PDS_NAME" ] && \
+	    print -u2 "Brand error: missing parent ZFS dataset for $dname"
+
+	# We expect that zoneadm was invoked with '-x nodataset', so it won't have
+	# created the dataset.
+
+	QUOTA_ARG=
+	if [[ ${ZQUOTA} != "0" ]]; then
+		QUOTA_ARG="-o quota=${ZQUOTA}g"
+	fi
+
+	#
+	# Some zone brands (KVM) optionally have a top level dataset. If
+	# they don't have one, we need to set the quota on the data
+	# disk.  Otherwise, we set it on the normal top level dataset.
+	#
+	if [[ -z ${TMPLZONE} ]]; then
+		zfs set quota=${ZQUOTA}g ${PDS_NAME}/${bname}
+	else
+		fixup_images
+	fi
+
+fi
+
+# The rest should be run when REPROVISIONING is set as well.
+
+# Make sure zoneinit is setup to use -o xtrace, this handles old datasets where
+# is not yet enabled by default.
+if [[ -f ${ZROOT}/root/zoneinit && \
+	-z $(grep "^set -o xtrace" ${ZROOT}/root/zoneinit) ]]; then
+	sed -i "" -e "s/^#set -o xtrace/set -o xtrace/" ${ZROOT}/root/zoneinit
+fi
+
+if [ ! -d ${ZONEPATH}/config ]; then
+	mkdir -p ${ZONEPATH}/config
+	chmod 755 ${ZONEPATH}/config
+fi
+
+if [ ! -d ${ZROOT}/tmp ]; then
+	mkdir -p ${ZROOT}/tmp
+	chmod 1777 ${ZROOT}/tmp
+fi
+
+# make /var/svc for the 'provisioning file'
+if [ ! -d ${ZROOT}/var/svc ]; then
+	mkdir -p ${ZROOT}/var/svc
+	chmod 0755 ${ZROOT}/var/svc
+fi
+
+jcommon_attach_hook
+
+exit $ZONE_SUBPROC_OK

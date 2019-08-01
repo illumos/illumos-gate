@@ -4,6 +4,8 @@
  Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
+ Copyright 2019 Joyent, Inc.
+
  CDDL HEADER START
 
  The contents of this file are subject to the terms of the
@@ -45,21 +47,33 @@
 		<service_fmri value='svc:/network/loopback' />
 	</dependency>
 
-	<instance name='default' enabled='true'>
-
-	<!--
-		physical:default and physical:nwam are mutually exclusive.
-		Use a one-way dependency for now since two-way exclude_all
-		does not work; enforcement of single_instance in the future
-		will fix this.
-	-->
 	<dependency
-		name='physical_nwam'
-		grouping='exclude_all'
+		name='joyent'
+		grouping='require_all'
 		restart_on='none'
 		type='service'>
-		<service_fmri value='svc:/network/physical:nwam' />
+		<service_fmri value='svc:/system/filesystem/smartdc' />
 	</dependency>
+
+	<dependency
+		name='mdata-fetch'
+		grouping='optional_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/smartdc/mdata:fetch' />
+	</dependency>
+
+	<!-- Prevent this and network/early-admin from trying to configure the
+		admin interface at the same time -->
+	<dependency
+		name='early-admin'
+		grouping='optional_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/network/early-admin:default' />
+	</dependency>
+
+	<instance name='default' enabled='true'>
 
 	<exec_method
 		type='method'
@@ -86,82 +100,6 @@
 		<documentation>
 			<manpage title='ifconfig' section='1M'
 				manpath='/usr/share/man' />
-		</documentation>
-	</template>
-
-	</instance>
-
-	<instance name='nwam' enabled='false'>
-
-	<exec_method
-		type='method'
-		name='start'
-		exec='/lib/svc/method/net-nwam start'
-		timeout_seconds='120' >
-		<method_context>
-			<method_credential user='root' group='root'
-				supp_groups='netadm' privileges='zone' />
-		</method_context>
-	</exec_method>
-
-	<exec_method
-		type='method'
-		name='stop'
-		exec='/lib/svc/method/net-nwam stop'
-		timeout_seconds='60' >
-		<method_context>
-			<method_credential user='root' group='root'
-				supp_groups='netadm' privileges='zone' />
-		</method_context>
-	</exec_method>
-
-	<exec_method
-		type='method'
-		name='refresh'
-		exec='/lib/svc/method/net-nwam refresh'
-		timeout_seconds='60' >
-		<method_context>
-			<method_credential user='root' group='root'
-				supp_groups='netadm' privileges='zone' />
-		</method_context>
-	</exec_method>
-
-	<property_group name='general' type='framework'>
-		<!-- to start/stop NWAM services -->
-		<propval name='action_authorization' type='astring'
-			value='solaris.smf.manage.nwam' />
-		<propval name='value_authorization' type='astring'
-			value='solaris.smf.manage.nwam' />
-	</property_group>
-
-	<property_group name='nwamd' type='application'>
-		<stability value='Unstable' />
-		<propval name='debug' type='boolean' value='false' />
-		<propval name='autoconf' type='boolean' value='false' />
-		<propval name='ncu_wait_time' type='count' value='60' />
-		<propval name='condition_check_interval' type='count'
-			value='120' />
-		<propval name='scan_interval' type='count' value='120' />
-		<propval name='scan_level' type='astring' value='weak' />
-		<propval name='strict_bssid' type='boolean' value='false' />
-		<propval name='active_ncp' type='astring' value='Automatic' />
-		<propval name='value_authorization' type='astring'
-			value='solaris.smf.value.nwam' />
-	</property_group>
-
-	<template>
-		<common_name>
-			<loctext xml:lang='C'>
-				physical network interface autoconfiguration
-			</loctext>
-		</common_name>
-		<documentation>
-			<manpage title='nwamd' section='1M'
-				manpath='/usr/share/man' />
-			<doc_link
-			    name='Network Auto-Magic OpenSolaris Project Page'
-				uri='http://hub.opensolaris.org/bin/view/Project+nwam/'
-				/>
 		</documentation>
 	</template>
 

@@ -1,0 +1,246 @@
+#!/bin/bash
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2018, Joyent, Inc.
+#
+
+export PS4='[\D{%FT%TZ}] ${BASH_SOURCE}:${LINENO}: ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+set -o xtrace
+
+. /lib/svc/share/smf_include.sh
+. /lib/sdc/config.sh
+
+# Make sure working directory is / to prevent unmounting problems.
+cd /
+PATH=/usr/sbin:/usr/bin; export PATH
+
+wait_and_clear()
+{
+    while [ true ]; do
+        # It seems like jobs -p can miscount if we don't run jobs first
+        jobs >/dev/null
+        local cnt=`jobs -p | wc -l`
+        [ $cnt -eq 0 ] && break
+        for s in `svcs -x | nawk '{
+            if ($1 ~ /^svc:/) nm=$1
+            if ($1 == "State:" && $2 == "maintenance") print nm
+        }'`
+        do
+            svcadm clear $s
+        done
+        sleep 1
+    done
+}
+
+# Sets the default firewall rules for a node (unless they're already set)
+set_default_fw_rules() {
+    local fw_default_v
+    if [[ -f /var/fw/.default_rules_setup ]]; then
+        read fw_default_v < /var/fw/.default_rules_setup
+    else
+        fw_default_v=0
+    fi
+
+    # Handle empty files from before we started versioning default rules
+    if [[ -z $fw_default_v ]]; then
+        fw_default_v=1
+    fi
+
+    if [[ $fw_default_v -lt 1 ]]; then
+        /usr/sbin/fwadm add -f - <<RULES
+{
+  "rules": [
+  {
+    "description": "allow all ICMPv4 types",
+    "rule": "FROM any TO all vms ALLOW icmp type all",
+    "enabled": true,
+    "global": true
+  }
+  ]
+}
+RULES
+        [[ $? -ne 0 ]] && return 1
+        echo 1 > /var/fw/.default_rules_setup
+    fi
+
+    if [[ $fw_default_v -lt 2 ]]; then
+        /usr/sbin/fwadm add -f - <<RULES
+{
+  "rules": [
+  {
+    "description": "allow all ICMPv6 types",
+    "rule": "FROM any TO all vms ALLOW icmp6 type all",
+    "enabled": true,
+    "global": true
+  }
+  ]
+}
+RULES
+        [[ $? -ne 0 ]] && return 1
+        echo 2 > /var/fw/.default_rules_setup
+    fi
+}
+
+configure_fwadm()
+{
+    if [[ ! -d /var/log/fw/logs ]]; then
+        mkdir -p /var/log/fw/logs
+        mv /var/log/fw/*-*.log /var/log/fw/logs
+    fi
+
+    # See also OS-2635
+    if [[ -f /var/log/fw/fw.log.0 ]]; then
+        for file in /var/log/fw/fw.log.[0-9]*; do
+            mv ${file} "/var/log/fw/fwadm_$(uname -n)_$(stat -c "%y" ${file} | cut -d'.' -f1 | tr ' ' 'T').log"
+        done
+    fi
+    if [[ -f /var/log/fw/fw.log ]]; then
+        mv /var/log/fw/fw.log /var/log/fw/fwadm.log
+    fi
+
+    if [[ ! -e /var/log/fw/fwadm.log ]]; then
+        touch /var/log/fw/fwadm.log
+    fi
+}
+
+configure_vmadm()
+{
+    # ensure /var/log/vm exists for VM.log logs
+    mkdir -p /var/log/vm/logs
+
+    # See also OS-2635
+    if [[ -f /var/log/vm/vm.log.0 ]]; then
+        for file in /var/log/vm/vm.log.[0-9]*; do
+            mv ${file} "/var/log/vm/vmadm_$(uname -n)_$(stat -c "%y" ${file} | cut -d'.' -f1 | tr ' ' 'T').log"
+        done
+    fi
+    if [[ -f /var/log/vm/vm.log ]]; then
+        mv /var/log/vm/vm.log /var/log/vm/vmadm.log
+    fi
+
+    # need to create this file so rotation works
+    if [[ ! -e /var/log/vm/vmadm.log ]]; then
+        touch /var/log/vm/vmadm.log
+    fi
+}
+
+update_root_password()
+{
+
+    enc_password=`nawk -F= '{
+        if ($1 == "root_shadow")
+                print substr($2, 2, length($2) - 2)
+    }' /opt/smartdc/config/node.config`
+
+    [[ -z "$enc_password" ]] && return 0
+
+    sed -e "s|^root:[^\:]*:|root:${enc_password}:|" /etc/shadow \
+      >/etc/shadow.new \
+      && chmod 400 /etc/shadow.new \
+      && mv /etc/shadow.new /etc/shadow
+}
+
+# Loads config file for the node. These are the config values from the headnode
+# plus authorized keys and anything else we want.
+# This function is only invoked on a compute node.
+install_config()
+{
+    # On standalone machines we don't do this update
+    [[ -n $(/usr/bin/bootparams | grep "^standalone=true") ]] && return 0
+
+    load_sdc_config
+
+    curl -k -o /tmp/node.config --silent \
+        "http://${CONFIG_assets_admin_ip}/extra/joysetup/node.config"
+
+    [[ ! -f /tmp/node.config ]] && return 0
+    grep datacenter_name /tmp/node.config >/dev/null 2>&1
+    if [ $? != 0 ]; then
+	# There is no valid config file served by the assets zone
+	rm -f /tmp/node.config
+	return 0
+    fi
+
+    # Install the file if the local copy is different
+    diff /tmp/node.config /opt/smartdc/config/node.config >/dev/null 2>&1
+    if [ $? != 0 ]; then
+	printf "Updating config file\n" >/dev/console
+	mkdir -p /opt/smartdc/config
+	mv /tmp/node.config /opt/smartdc/config
+        update_root_password
+    else
+	rm -f /tmp/node.config
+    fi
+}
+
+case "$1" in
+'start')
+
+    # Always setup socket filter no matter what happens next.
+    /sbin/soconfig -F datafilt datafilt prog '2:2:0,2:2:6,26:2:0,26:2:6'
+
+    USBMOUNT=
+
+    # If we're not importing the pools, we shouldn't try to setup as a headnode
+    # (since there'll be no zpool)
+    if /bin/bootparams | grep "^noimport=true" > /dev/null 2>&1; then
+        exit $SMF_EXIT_OK
+    fi
+
+    # If we're a headnode, we'll not have AMQP args on the cmdline, and we want
+    # to run an initial_script first anyway.
+    if /bin/bootparams | grep "^headnode=true" > /dev/null 2>&1; then
+        USBMOUNT=/mnt/`svcprop -p joyentfs/usb_mountpoint svc:/system/filesystem/smartdc:default`
+
+	# No config file (e.g. user quit during interactive configuration), so
+	# treat as if "noimport=true".
+	[[ ! -f $USBMOUNT/config ]] && exit $SMF_EXIT_OK
+
+        initial_script=${USBMOUNT}/$(grep "^initial_script=" $USBMOUNT/config.inc/generic 2>/dev/null | cut -d'=' -f2-)
+        if [ -n ${initial_script} ] && [ -e ${initial_script} ]; then
+            # Execute the script
+            ${initial_script}
+            result=$?
+            if [ ${result} -eq 2 ]; then
+                # we're rebooting, no need to start ur
+                echo "REBOOTING!" >> /dev/console
+                enable_ur="false"
+            elif [ ${result} -ne 0 ]; then
+                echo "WARNING: initial_script failed with exit code [${result}]."
+                exit $SMF_EXIT_ERR_FATAL
+            fi
+        fi
+    elif /bin/bootparams | grep "^smartos=true" > /dev/null 2>&1; then
+        set_default_fw_rules
+    else
+	install_config
+    fi
+
+    configure_fwadm
+    configure_vmadm
+
+    if /bin/bootparams | grep "^headnode=true" > /dev/null 2>&1; then
+        /usr/sbin/umount $USBMOUNT
+    fi
+
+    ;;
+
+'stop')
+    ;;
+
+*)
+    echo "Usage: $0 { start | stop }"
+    exit $SMF_EXIT_ERR_FATAL
+    ;;
+esac
+exit $SMF_EXIT_OK

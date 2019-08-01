@@ -36,7 +36,7 @@
 # any of the currently enabled /dev/vt/# virtual terminal devices.
 # Comment this line out to allow remote login by root.
 #
-CONSOLE=/dev/console
+#CONSOLE=/dev/console
 
 # PASSREQ determines if login requires a password.
 #
@@ -47,19 +47,16 @@ PASSREQ=YES
 ALTSHELL=YES
 
 # PATH sets the initial shell PATH variable
-# sample with GNU tools in front of the path
-# PATH=/usr/gnu/bin:/usr/bin:/usr/sbin:/sbin
-# sample with XPG4 tools in front of the path
-# PATH=/usr/xpg4/bin:/usr/bin:/usr/sbin:/sbin
-PATH=/usr/bin:/usr/sbin:/sbin:/usr/gnu/bin
+#
+#PATH=/usr/bin:
 
 # SUPATH sets the initial shell PATH variable for root
 #
-SUPATH=/usr/sbin:/sbin:/usr/bin
+#SUPATH=/usr/sbin:/usr/bin
 
 # TIMEOUT sets the number of seconds (between 0 and 900) to wait before
 # abandoning a login session.
-# 
+#
 #TIMEOUT=300
 
 # UMASK sets the initial shell file creation mode mask.  See umask(1).
@@ -80,9 +77,9 @@ SYSLOG=YES
 #SLEEPTIME=4
 
 # DISABLETIME  If present, and greater than zero, the number of seconds
-# login will wait after RETRIES failed attempts or the PAM framework returns 
+# login will wait after RETRIES failed attempts or the PAM framework returns
 # PAM_ABORT. Default is 20. Minimum is 0. No maximum is imposed.
-# 
+#
 #DISABLETIME=20
 
 # RETRIES determines the number of failed logins that will be

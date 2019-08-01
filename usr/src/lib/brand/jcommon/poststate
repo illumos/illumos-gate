@@ -1,0 +1,34 @@
+#!/bin/ksh -p
+#
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+#
+
+unset LD_LIBRARY_PATH
+PATH=/usr/bin:/usr/sbin
+export PATH
+
+if [[ -n $_ZONEADMD_brand_debug ]]; then
+	logfile=/var/log/zone_bh.$1
+	date >>$logfile
+	echo "zone $1 post-state-change $3 $4" >>$logfile
+	ksh -x /usr/lib/brand/$ps_brand/statechange "post" $@ 2>>$logfile
+	res=$?
+	echo "zone $1 post-state-change result $res" >>$logfile
+else
+	/usr/lib/brand/$ps_brand/statechange "post" $@
+	res=$?
+fi
+
+exit $res

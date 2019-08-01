@@ -4,6 +4,7 @@
  Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 
+
  CDDL HEADER START
 
  The contents of this file are subject to the terms of the
@@ -97,13 +98,13 @@
 		type='method'
 		name='refresh'
 		exec='/lib/svc/method/ipfilter reload'
-		timeout_seconds='120' >
+		timeout_seconds='1200' >
 	</exec_method>
 
-	<instance name='default' enabled='false'>
+	<instance name='default' enabled='true'>
 		<property_group name='firewall_config_default'
 			type='com.sun,fw_configuration'>
-			<propval name='policy' type='astring' value='none' />
+			<propval name='policy' type='astring' value='custom' />
 			<propval name='block_policy' type='astring'
 				value='none' />
 			<propval name='custom_policy_file' type='astring'

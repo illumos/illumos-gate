@@ -1,0 +1,906 @@
+#!/bin/ksh -p
+#
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2018 Joyent, Inc.  All rights reserved.
+#
+
+unset LD_LIBRARY_PATH
+PATH=/usr/bin:/usr/sbin
+export PATH
+
+. /lib/sdc/config.sh
+
+# subcommand:
+# pre
+# post
+
+# state
+# ZONE_STATE_CONFIGURED		0 (script will never see this)
+# ZONE_STATE_INCOMPLETE		1 (script will never see this)
+# ZONE_STATE_INSTALLED		2
+# ZONE_STATE_READY		3
+# ZONE_STATE_RUNNING		4
+# ZONE_STATE_SHUTTING_DOWN	5
+# ZONE_STATE_DOWN		6
+# ZONE_STATE_MOUNTED		7
+
+# cmd
+#
+# ready				0
+# boot				1
+# forceboot			2
+# reboot			3
+# halt				4
+# uninstalling			5
+# mount				6
+# forcemount			7
+# unmount			8
+
+subcommand=$1
+ZONENAME=$2
+ZONEPATH=$3
+state=$4
+cmd=$5
+
+VNDADM=/usr/sbin/vndadm
+SNAPSHOT_DIR=root/checkpoints
+OVERLAY_RULES=/var/run/smartdc/networking/overlay_rules.json
+DEFAULT_MTU=1500
+
+#
+# The following are the list of features that a corresponding brand may
+# enable. If they wish to do so, then they must set the following flags
+# to values such that [[ -z $flag ]] is true. The following are the
+# currently supported flags:
+#
+# o jst_vrrp - Enables vrrp
+# o jst_ufpromisc - Supports unfiltered promiscuous mode
+# o jst_createvnd - Create vnd devices
+# o jst_simplefs - Only setup lastbooted in the FS
+# o jst_showsnap - Show snapshots in the FS
+#
+# In addition, the brand must also specify the following parameters:
+#
+# o jst_mdatapath - The path the metadata socket is expected in the zone
+#
+
+get_boolean_nic_property()
+{
+	bool_val=$(eval echo \$_ZONECFG_net_${1}_${2})
+	if [[ "${bool_val}" == "1" ]] || [[ "${bool_val}" == "true" ]]; then
+		echo "true"
+	else
+		echo "false"
+	fi
+}
+
+nm2prefix()
+{
+	prefix=0
+	numparts=0
+	OLDIFS=$IFS
+	IFS=.
+	for digit in $1 ; do
+		(( numparts+=1 ))
+		case $digit in
+		255)
+			(( prefix+=8 ))
+			;;
+		254)
+			(( prefix+=7 ))
+			;;
+		252)
+			(( prefix+=6 ))
+			;;
+		248)
+			(( prefix+=5 ))
+			;;
+		240)
+			(( prefix+=4 ))
+			;;
+		224)
+			(( prefix+=3 ))
+			;;
+		192)
+			(( prefix+=2 ))
+			;;
+		128)
+			(( prefix+=1 ))
+			;;
+		0);;
+		*)
+			echo "Invalid digit in netmask: $digit" 1>&2;
+			IFS=$OLDIFS
+			return 1;;
+		esac
+	done
+	if [[ $numparts -ne 4 ]]; then
+		echo "Too many parts in the IP address" 1>&2;
+		IFS=$OLDIFS
+		return 1
+	fi
+	IFS=$OLDIFS
+	echo "$prefix"
+}
+
+#
+# Set up the vnic(s) for the zone.
+#
+setup_net()
+{
+	typeset tmp overlay tag id rule
+	for nic in $_ZONECFG_net_resources
+	do
+		# Get simplified versions of the network config. variables.
+		address=$(eval echo \$_ZONECFG_net_${nic}_address)
+		# If address set, must be a shared stack zone
+		[[ -n $address ]] && exit 0
+
+		global_nic=$(eval echo \$_ZONECFG_net_${nic}_global_nic)
+		# If no global-nic, must be a dedicated physical NIC instead
+		# of a vnic
+		[[ -z $global_nic ]] && continue
+
+		dhcp_server=$(get_boolean_nic_property ${nic} dhcp_server)
+		mac_addr=$(eval echo \$_ZONECFG_net_${nic}_mac_addr)
+		vlan_id=$(eval echo \$_ZONECFG_net_${nic}_vlan_id)
+		blocked_outgoing_ports=$(eval \
+		    echo \$_ZONECFG_net_${nic}_blocked_outgoing_ports)
+		zone_ips=$(eval echo \$_ZONECFG_net_${nic}_ips)
+		zone_ip=$(eval echo \$_ZONECFG_net_${nic}_ip)
+		zone_netmask=$(eval echo \$_ZONECFG_net_${nic}_netmask)
+		allow_dhcp_spoof=$(get_boolean_nic_property ${nic} allow_dhcp_spoofing)
+		allow_ip_spoof=$(get_boolean_nic_property ${nic} allow_ip_spoofing)
+		allow_mac_spoof=$(get_boolean_nic_property ${nic} allow_mac_spoofing)
+		allow_restricted_traffic=$(get_boolean_nic_property ${nic} \
+		    allow_restricted_traffic)
+		allow_unfiltered_promisc=$(get_boolean_nic_property ${nic} \
+		    allow_unfiltered_promisc)
+		allowed_ips=$(eval echo \$_ZONECFG_net_${nic}_allowed_ips)
+		allowed_dhcp_cids=$(eval echo \$_ZONECFG_net_${nic}_allowed_dhcp_cids)
+		vrid=$(eval echo \$_ZONECFG_net_${nic}_vrrp_vrid)
+		vrrp_primary_ip=$(eval \
+		    echo \$_ZONECFG_net_${nic}_vrrp_primary_ip)
+		mtu=$(eval echo \$_ZONECFG_net_${nic}_mtu)
+		isoverlay=
+
+		# If we don't have our zone_ips, it may be because the configuration
+		# was made on an older platform. In that case, use the "ip" and
+		# "netmask" properties for this NIC, and save it as "ips".
+		if [[ -z $zone_ips && -n $zone_ip ]]; then
+			[[ -n $zone_netmask ]] &&
+			    zone_ip=$zone_ip/`nm2prefix $zone_netmask`
+
+			zone_ips=$zone_ip
+		fi
+
+
+
+		orig_global=$global_nic
+
+		#
+		# The nic tag for a device (the zonecfg global_nic) can come in
+		# one of a few forms. It may:
+		#
+		# 1) Be a traditional tag which refers to a physical device or
+		#    aggregation to create a VNIC over. The source of this
+		#    mapping is sysinfo.
+		#
+		# 2) It can be the name of an etherstub. The source of these is
+		#    from dladm show-etherstub
+		#
+		# 3) It can take the form of an overlay device rule. An overlay
+		#    device rule is an invalid DLPI device and invalid nic tag.
+		#    It has the form of <name>/<number>. For example,
+		#    sdc_sdn/23. That refers to the overlay rule sdc_sdn. If we
+		#    have an overlay rule, we may need to dynamically create the
+		#    overlay device if it doesn't exist.
+		#
+		# To handle these cases, we first check if it's an overlay
+		# device, and then if not, check the other cases.
+		#
+
+		tmp=$(echo $orig_global | sed -E 's_[a-zA-Z_0-9]+/[0-9]+__')
+		if [[ -n "$tmp" ]]; then
+
+			#
+			# We only need sysinfo if we get here, and we only need to load it
+			# once.  Loading is about the same cost as looking up a single
+			# value.
+			#
+			if [[ -z $SYSINFO_LOADED ]]; then
+				load_sdc_sysinfo
+				SYSINFO_LOADED="LOADED"
+			fi
+			global_nic=$(eval echo \$SYSINFO_NIC_${orig_global})
+
+			# If the global nic is specified as a device or etherstub name
+			# rather than a tag.
+			if [[ -z $global_nic ]]; then
+				echo "$(dladm show-phys -p -o LINK) $(dladm show-etherstub -p -o LINK)" \
+				| egrep "(^| )${orig_global}( |$)" > /dev/null
+				(( $? == 0 )) && global_nic=${orig_global}
+			fi
+		else
+			isoverlay="true"
+			tag=${orig_global%/*}
+			num=${orig_global#*/}
+			global_nic="$tag$num"
+			rule=$(json -f $OVERLAY_RULES $tag)
+			if [[ $? -ne 0 || -z "$rule" ]]; then
+				logger -p daemon.err "zone $ZONENAME had tag " \
+				    "$tag which indicates an overlay rule, " \
+				    "no corresponding overlay rule found."
+				exit 1
+			fi
+		fi
+
+		# For backwards compatibility with the other parts of the
+		# system, check if this zone already has this vnic setup.
+		# If so, move on to the next vnic.
+		dladm show-vnic -p -o LINK -z $ZONENAME $nic >/dev/null 2>&1
+		(( $? == 0 )) && continue
+
+		if [[ -z $global_nic ]]; then
+			echo "undefined VNIC $nic " \
+			    "(global NIC $orig_global)"
+			logger -p daemon.err "zone $ZONENAME " \
+			    "undefined VNIC $nic (global NIC $orig_global)"
+			exit 1
+		fi
+
+		#
+		# If we have an overlay device, do we need to create it, or does
+		# it already exist?
+		#
+		if [[ -n "$isoverlay" ]]; then
+			if ! dladm show-overlay $global_nic 2>/dev/null; then
+				dladm create-overlay $rule -v $num $global_nic
+				if [[ $? -ne 0 ]]; then
+				    # If creation fails, ALSO check
+				    # for existence again, in case
+				    # someone beat us to it.
+				    if ! dladm show-overlay $global_nic \
+					 2> /dev/null; then
+					logger -p daemon.err "zone $ZONENAME " \
+					    "failed to create overlay device " \
+					     "$global_nic with command " \
+					     "'dladm create-overlay $rule -v " \
+					     "$num $global_nic"
+					exit 1
+				    fi
+				fi
+			fi
+		fi
+
+
+		#
+		# Create the vnic.
+		#
+
+		opt_str="-p "
+
+		#
+		# Traditionally we created VNICs without ever specifying
+		# the MTU. In the world before we supported any kind of
+		# jumbo frames, this is fine, because it would always
+		# match the physical which was 1500 by default for
+		# almost all of our devices. However, when we added
+		# support for mtu in nictagadm and changing it in boot
+		# up, we didn't properly assert the default MTU. This
+		# has led to VMs potentially getting the wrong MTU and
+		# ending up using jumbo frames when the network is
+		# expecting 1500 byte frames. Marx Brothers-esque comedy
+		# and despair ensues.
+		#
+		# Thus we always assert that if no MTU is specified by
+		# the VM, then we go back to the traditional 'default'
+		# value which is 1500.
+		#
+		if [[ -z "$mtu" ]]; then
+			mtu=$DEFAULT_MTU
+		fi
+
+		opt_str="$opt_str mtu=$mtu,"
+
+		#
+		# Always append the zone as the last property. This is
+		# to work around the fact that once we associate it with
+		# a zone, the zone will have a hold on the device and
+		# we'll not be able to delete it if a create fails due
+		# to a bad property (say an invalid MTU). Note if we
+		# have other properties, it is their responsibility to
+		# put a trailing comma on it.
+		#
+		opt_str="${opt_str}zone=$ZONENAME"
+
+		if [[ -n "$jst_vrrp" && -n $vrid ]]; then
+			# MAC addresses for VRRP vnics are determined by the VRID
+			mac_addr="vrrp"
+			opt_str="$opt_str -V $vrid -A inet"
+		fi
+
+		[[ -n $mac_addr ]] && opt_str="$opt_str -m $mac_addr"
+
+		[[ -n $vlan_id && $vlan_id != 0 ]] && \
+		    opt_str="$opt_str -v $vlan_id"
+
+
+		#
+		# Creating a VNIC in a zone is a multi-step process internally.
+		# This means there is a short window where the VNIC exists in
+		# the global zone and that could lead to a race condition if
+		# two zones boot at the same time with the same VNIC name.  Use
+		# a temp. name to create the VNIC then rename it to have the
+		# correct name.
+		#
+		tname=tmp$$0
+		dout=`dladm create-vnic -t -l $global_nic $opt_str $tname 2>&1`
+		if (( $? != 0 )); then
+			printf "error creating VNIC %s (global NIC %s)\n" \
+			   "$nic" "$orig_global"
+			printf "msg: %s\n" "$dout"
+			printf "Failed cmd: dladm create-vnic %s" \
+			    "-t -l $global_nic $opt_str $tname"
+			logger -p daemon.err "zone $ZONENAME error creating " \
+			    "VNIC $nic (global NIC $orig_global $global_nic)"
+			logger -p daemon.err "msg: $dout"
+			logger -p daemon.err "Failed cmd: dladm create-vnic " \
+			    "-t -l $global_nic $opt_str $tname"
+
+			# Show more info if dup MAC addr.
+			echo $dout | egrep -s "MAC address is already in use"
+			if (( $? == 0 )); then
+				entry=`dladm show-vnic -olink,macaddress,zone \
+				    | nawk -v addr=$mac_addr '{
+					if ($2 == addr)
+						print $0
+				    }'`
+				if [[ -n $entry ]]; then
+					print -f "LINK\tMACADDRESS\tZONE\n"
+					print -f "%s\n" "$entry"
+				fi
+			fi
+			exit 1
+		fi
+		dladm rename-link -z $ZONENAME $tname $nic
+		if (( $? != 0 )); then
+			echo "error renaming VNIC $tname $nic"
+			logger -p daemon.err "zone $ZONENAME error renaming " \
+			    "VNIC $tname $nic"
+			exit 1
+		fi
+
+		if [[ -z $mac_addr ]]; then
+			# There was no assigned mac address
+
+			# Get newly assigned mac address.
+			mac_addr=$(dladm show-vnic -z $ZONENAME -p -o \
+			    MACADDRESS ${nic})
+
+			# Save newly assigned mac address
+			[[ -n $mac_addr ]] && zonecfg -z $ZONENAME \
+			    "select net physical=$nic; " \
+			    "set mac-addr=$mac_addr; end; exit"
+		fi
+
+		# Set up antispoof options
+
+		if [[ $dhcp_server == "true" ]] || [[ $allow_dhcp_spoof == "true" ]]; then
+			enable_dhcp="true"
+			# This needs to be off for dhcp server zones
+			allow_ip_spoof="true"
+		else
+			enable_dhcp="false"
+		fi
+
+		comma=""
+		spoof_opts=""
+		if [[ $allow_mac_spoof != "true" ]]; then
+			spoof_opts="${spoof_opts}${comma}mac-nospoof"
+			comma=","
+		fi
+		if [[ $allow_ip_spoof != "true" ]]; then
+			spoof_opts="${spoof_opts}${comma}ip-nospoof"
+			comma=","
+		fi
+		if [[ $allow_restricted_traffic != "true" ]]; then
+			spoof_opts="${spoof_opts}${comma}restricted"
+			comma=","
+		fi
+		if [[ ${enable_dhcp} == "false" ]]; then
+			spoof_opts="${spoof_opts}${comma}dhcp-nospoof"
+			comma=","
+		fi
+
+		if [[ -n ${spoof_opts} ]]; then
+			dladm set-linkprop -t -z $ZONENAME -p \
+			"protection=${spoof_opts}" ${nic}
+			if (( $? != 0 )); then
+				echo "error setting VNIC protection $nic $spoof_opts"
+				    logger -p daemon.err "zone $ZONENAME error setting " \
+				    "VNIC protection $nic $spoof_opts"
+			exit 1
+			fi
+		fi
+
+		# If we aren't using IP spoofing, we'll need to set the allowed-ips
+		# property on the NIC so that the zone will be able to ifconfig the
+		# proper addresses.
+		if [[ $allow_ip_spoof != "true" ]]; then
+			unset allowed_ip_map
+			typeset -A allowed_ip_map
+
+			dynamic_methods=""
+			separator=""
+			OLDIFS=$IFS
+			IFS=,
+
+			for zone_ip in $zone_ips; do
+				# For each static IP available, add it to the list.
+				if [[ $zone_ip == "dhcp" ]]; then
+					dynamic_methods+="${separator}dhcpv4"
+					separator=","
+				elif [[ $zone_ip == "addrconf" ]]; then
+					dynamic_methods+="${separator}addrconf"
+					separator=","
+				else
+					clean_ip=`printf "%s" "${zone_ip}" | sed 's|^\([^/]*\)/.*|\1|'`
+					allowed_ip_map[${clean_ip}]=true
+				fi
+			done
+
+			# If any additional IPs have been specified (for example, older
+			# VMs set up for IPv6 before vmadm gained support), add them to
+			# the list.
+			for allowed_ip in $allowed_ips; do
+				allowed_ip_map[${allowed_ip}]=true
+			done
+			IFS=$OLDIFS
+
+			# If we're using VRRP and have the IP, add it to the list.
+			if [[ -n "$jst_vrrp" && -n $vrrp_primary_ip ]]; then
+				allowed_ip_map[${vrrp_primary_ip}]=true
+			fi
+
+			allowed_ip_list=""
+
+			separator=""
+			for allowed_ip in ${!allowed_ip_map[@]}; do
+				allowed_ip_list+="${separator}${allowed_ip}"
+				separator=","
+			done
+
+			# Set the allowed-ips property on the NIC
+			if [[ -n ${allowed_ip_list} ]] &&
+			    ! dladm set-linkprop -t -z $ZONENAME \
+			    -p "allowed-ips=${allowed_ip_list}" ${nic}; then
+				log_and_exit \
+				    "error setting VNIC allowed-ips $nic $allowed_ip_list"
+			fi
+
+			# Set the dynamic-methods property on the NIC
+			if [[ -n ${dynamic_methods} ]] &&
+			    ! dladm set-linkprop -t -z $ZONENAME \
+			    -p "dynamic-methods=${dynamic_methods}" ${nic}; then
+				log_and_exit \
+				    "error setting VNIC dynamic-methods $nic $dynamic_methods"
+			fi
+		fi
+
+		if [[ "$enable_dhcp" != "true" ]] && [[ -n "$allowed_dhcp_cids" ]] &&
+		    ! dladm set-linkprop -p "allowed-dhcp-cids=${allowed_dhcp_cids}" \
+		    -t -z $ZONENAME $nic; then
+			log_and_exit \
+			    "error setting VNIC allowed-dhcp-cids $nic $allowed_dhcp_cids"
+		fi
+
+		if [[ "$enable_dhcp" != "true" ]] && [[ -z "$allowed_dhcp_cids" ]] &&
+		    [[ "$zone_ips" == *dhcp* || "$zone_ips" == *addrconf* ]] &&
+		    ! dladm set-linkprop -p "allow-all-dhcp-cids=true" \
+		    -t -z $ZONENAME $nic; then
+			log_and_exit "error setting VNIC allow-all-dhcp-cids $nic"
+		fi
+
+		if [[ -n "$jst_ufpromisc" && ${allow_unfiltered_promisc} == "true" ]]; then
+			dladm set-linkprop -t -z $ZONENAME -p "promisc-filtered=off" ${nic}
+		fi
+
+		if [[ -n $blocked_outgoing_ports ]]; then
+			OLDIFS=$IFS
+			IFS=,
+			for port in $blocked_outgoing_ports; do
+				# br='block remote'.  Flow names should be < 31
+				# chars in length so that they get unique
+				# kstats.
+				# Use the VNIC mac addr. to generate a unique
+				# name.
+				mac_addr=`dladm show-vnic -z $ZONENAME -p \
+				    -o MACADDRESS $nic | tr ':' '_'`
+				flowadm add-flow -t -l $nic -z $ZONENAME \
+				    -a transport=tcp,remote_port=$port \
+				    -p maxbw=0 f${mac_addr}_br_${port}
+				if (( $? != 0 )); then
+					echo "error adding flow " \
+					    "$nic f${mac_addr}_br_${port}"
+					logger -p daemon.err "zone $ZONENAME " \
+					    "error adding flow " \
+					    "$nic f${mac_addr}_br_${port}"
+					exit 1
+				fi
+			done
+			IFS=$OLDIFS
+		fi
+
+		if [[ -n "$jst_createvnd" ]]; then
+			#
+			# At this point we should go ahead and set up
+			# the vnd interface for this datalink.
+			#
+			$VNDADM create -z $ZONENAME $nic
+			if [[ $? -ne 0 ]]; then
+				echo "failed to create vnd device"
+				exit 1
+			fi
+		fi
+	done
+}
+
+#
+# Log a message, then exit
+#
+log_and_exit()
+{
+	echo "$1"
+	logger -p daemon.err "zone $ZONENAME $1"
+	exit 1
+}
+
+#
+# Set up the firewall for the zone.
+#
+setup_fw()
+{
+	ipf_conf=$ZONEPATH/config/ipf.conf
+	ipf6_conf=$ZONEPATH/config/ipf6.conf
+	if [ -e $ipf_conf ]; then
+		echo "starting firewall ($ipf_conf)"
+		/usr/sbin/ipf -GE $ZONENAME
+		if (( $? != 0 )); then
+			log_and_exit "error enabling ipfilter"
+		fi
+
+		/usr/sbin/ipf -GFa $ZONENAME
+		if (( $? != 0 )); then
+			log_and_exit "error flushing ipfilter (IPv4)"
+		fi
+
+		/usr/sbin/ipf -6GFa $ZONENAME
+		if (( $? != 0 )); then
+			log_and_exit "error flushing ipfilter (IPv6)"
+		fi
+
+		/usr/sbin/ipf -Gf $ipf_conf $ZONENAME
+		if (( $? != 0 )); then
+			log_and_exit "error loading ipfilter config for IPv4"
+		fi
+
+		if [[ -e $ipf6_conf ]] &&
+		    ! /usr/sbin/ipf -6Gf $ipf6_conf $ZONENAME; then
+			log_and_exit "error loading ipfilter config for IPv6"
+		fi
+
+		/usr/sbin/ipf -Gy $ZONENAME
+		if (( $? != 0 )); then
+			log_and_exit "error syncing ipfilter interfaces"
+		fi
+	fi
+}
+
+#
+# We're readying the zone.  Make sure the per-zone writable
+# directories exist so that we can lofs mount them.  We do this here,
+# instead of in the install script, since this list has evolved and
+# there are already zones out there in the installed state.
+#
+setup_fs()
+{
+	# create directory for metadata socket
+	mkdir -m755 -p /var/zonecontrol/${ZONENAME}
+
+	uname -v > $ZONEPATH/lastbooted
+	[[ -n "$jst_simplefs" ]] && return
+
+	[ ! -d $ZONEPATH/site ] && mkdir -m755 $ZONEPATH/site
+	[ ! -d $ZONEPATH/local ] && mkdir -m755 $ZONEPATH/local
+	[ ! -d $ZONEPATH/$SNAPSHOT_DIR ] && mkdir -m755 $ZONEPATH/$SNAPSHOT_DIR
+	if [ ! -d $ZONEPATH/ccs ]; then
+		mkdir -m755 $ZONEPATH/ccs
+		(cd /usr/ccs; tar cbf 512 - *) | \
+		    (cd $ZONEPATH/ccs; tar xbf 512 -)
+	fi
+
+}
+
+setup_snapshots()
+{
+	#
+	# Because the top-level directory of each ZFS snapshot contains some
+	# internal information, mount the /root directory of each snapshot
+	# separately.
+	#
+	for snap in $(ls -1 $ZONEPATH/.zfs/snapshot); do
+		snapdir=$ZONEPATH/$SNAPSHOT_DIR/$(echo ${snap} | sed -e "s/^vmsnap-//")
+		mkdir -p ${snapdir}
+		mount -F lofs -o ro,setuid,nodevices \
+		    $ZONEPATH/.zfs/snapshot/${snap}/root ${snapdir}
+	done
+}
+
+#
+# If the zone has a CPU cap, calculate the CPU baseline and set it so we can
+# track when we're bursting.  There are many ways that the baseline can be
+# calculated based on the other settings in the zones (e.g. a simple way would
+# be as a precentage of the cap).
+#
+# For SmartMachines, our CPU baseline is calculated off of the system's
+# provisionable memory and the memory cap of the zone. We assume that 83% of
+# the system's memory is usable by zones (the rest is for the OS) and we assume
+# that the zone memory cap is set so that we're proportional to how many zones
+# we can provision on the system (i.e. we don't overprovision memory).  Using
+# these assumptions, we calculate the proportion of CPU for the zone based on
+# its proportion of memory. Thus, the zone's CPU baseline is calculated using:
+#     ((zone capped memsize in MB) * 100) / (MB/core).
+# Uncapped zones have no baseline (i.e. infrastructure zones).
+#
+# Remember that the cpu-cap rctl and the baseline are expressed in units of
+# a percent of a CPU, so 100 is 1 full CPU.
+#
+setup_cpu_baseline()
+{
+	# A brand can override the setup of bursting.
+	[ -n "$NO_BURSTING" ] && return
+
+	# If there is already a baseline, don't set one heuristically
+	curr_base=`prctl -P -n zone.cpu-baseline -i zone $ZONENAME | nawk '{
+		if ($2 == "privileged") print $3
+	    }'`
+	[ -n "$curr_base" ] && return
+
+	# Get current cap and convert from zonecfg format into rctl format
+	cap=`zonecfg -z $ZONENAME info capped-cpu | nawk '{
+	    if ($1 == "[ncpus:") print (substr($2, 1, length($2) - 1) * 100)
+	}'`
+	[ -z "$cap" ] && return
+
+	# Get zone's memory cap in MB times 100
+	zmem=`zonecfg -z $ZONENAME info capped-memory | nawk '{
+	    if ($1 == "[physical:") {
+	        val = substr($2, 1, length($2) - 2)
+	        units = substr($2, length($2) - 1, 1)
+
+	        # convert GB to MB
+	        if (units == "G")
+	            val *= 1024
+	        print (val * 100)
+	    }
+	}'`
+	[ -z "$zmem" ] && return
+
+	# Get system's total memory in MB
+	smem=`prtconf -m`
+	# provisionable memory is 83% of total memory (bash can't do floats)
+	prov_mem=$((($smem * 83) / 100))
+	nprocs=`psrinfo -v | \
+	    nawk '/virtual processor/ {cnt++} END {print cnt}'`
+
+	mb_per_core=$(($prov_mem / $nprocs))
+
+	baseline=$(($zmem / $mb_per_core))
+	[[ $baseline == 0 ]] && baseline=1
+	[[ $baseline -gt $cap ]] && baseline=$cap
+
+	prctl -n zone.cpu-baseline -v $baseline -t priv -i zone $ZONENAME
+}
+
+cleanup_snapshots()
+{
+	#
+	# Each ZFS snapshot is mounted separately, so find all mounted
+	# snapshots for this zone, and unmount them.
+	#
+	snaps=$(ls -1 $ZONEPATH/$SNAPSHOT_DIR)
+
+	for snap in ${snaps}; do
+		snapdir=$ZONEPATH/$SNAPSHOT_DIR/$(echo ${snap} | sed -e "s/^vmsnap-//")
+		umount ${snapdir}
+		rmdir ${snapdir}
+	done
+}
+
+#
+# We're halting the zone, perform network cleanup.
+#
+cleanup_net()
+{
+	# Cleanup any flows that were setup.
+	for nic in $_ZONECFG_net_resources
+	do
+		flowadm remove-flow -t -z $ZONENAME -l $nic
+		if (( $? != 0 )); then
+			echo "error removing flows for $nic"
+			logger -p daemon.err "zone $ZONENAME " \
+			    "error removing flows for $nic"
+		fi
+	done
+}
+
+id_gz_sockholder()
+{
+	echo "searching for GZ process holding socket $1"
+	logger -p daemon.err "zone $ZONENAME " \
+	    "searching for GZ process holding socket $1"
+
+	pid=`(cd /proc;
+	for i in *;
+	do
+		pfiles $i 2>/dev/null | egrep -s "AF_UNIX $1";
+		[ $? == 0 ] && echo "$i";
+	done)`
+
+	[ -z "$pid" ] && return
+
+	echo "Error: GZ process $pid holding socket $1 blocking shutdown"
+	logger -p daemon.err "Error: zone $ZONENAME:" \
+	    "GZ process $pid holding socket $1 blocking shutdown"
+}
+
+# zonadmd unable to unmount the given path, try to cleanup so unmount can
+# succeed.
+cleanup_mount()
+{
+	echo "attempting to cleanup mount $1"
+	logger -p daemon.err "zone $ZONENAME attempting to cleanup mount $1"
+
+	fnd_procs=0
+	for i in `fuser -c $1 2>/dev/null`
+	do
+		fnd_procs=1
+
+		pty=`ps -otty -p $i | \
+		    nawk '{if ($1 != "TT" && $1 != "?") print $0}'`
+
+		if [ -n "$pty" ]; then
+			echo "shell process $i blocking zone" \
+			    "$ZONENAME shutdown, killing the process" | wall
+			echo "killing GZ user shell $i under $1"
+			logger -p daemon.err "zone $ZONENAME:" \
+			    "killing GZ user shell $i under $1"
+			kill -9 $i
+		else
+			echo "Error: GZ process $i under $1 blocking shutdown"
+			logger -p daemon.err "Error: zone $ZONENAME:" \
+			    "GZ process $i under $1 blocking shutdown"
+
+			local args="pargs: `pargs $i`"
+			echo "$args"
+			logger -p daemon.err "$args"
+
+			local tree="ptree: `ptree $i`"
+			echo "$tree"
+			logger -p daemon.err "$tree"
+		fi
+	done
+
+	if [ $fnd_procs -eq 1 ]; then
+		# Exit out to give the zoneadmd umount a chance to suceed now.
+		# Zoneadmd will give us another shot if it still can't umount.
+		sleep 1
+		exit 0
+	fi
+
+	# Processes which are injected into a zone and then open a file as a
+	# socket end-point will show in pfiles with the path relative to the
+	# zone's root. For example, a zone with its root at /zones/foo/root and
+	# an open socket as /zones/foo/root/var/run/x will show up in a pfiles
+	# search as /var/run/x. This is a problem since we have no way to
+	# narrow down which process is the culprit.
+	#
+	# Because the socket doesn't have enough information for us to tie to
+	# the specific GZ process, we hardcode to id things we know will open
+	# sockets into the zone:
+	#    $jst_mdatapath/metadata.sock
+	#    /var/run/.smartdc-amon.sock
+
+	ZVR=$ZONEPATH/root/var/run
+	[ -S $ZVR/smartdc/metadata.sock ] &&
+	    id_gz_sockholder $jst_mdatapath/metadata.sock
+
+	[ -S $ZVR/.smartdc-amon.sock ] &&
+	    id_gz_sockholder /var/run/.smartdc-amon.sock
+}
+
+function fix_forced_attrs {
+	typeset attr
+
+	for attr in ${!FORCED_ATTRS[@]}; do
+		typeset nval=${FORCED_ATTRS["$attr"]}
+		typeset -n envvar=_ZONECFG_attr_${attr//-/_}
+		typeset cval=$envvar
+
+		if [[ $cval == $nval ]]; then
+			# In most cases, $nval and $cval will be the same and
+			# nothing needs to be done. This includes the case where
+			# $nval and $cval are "".
+			continue
+		elif [[ -z $nval ]]; then
+			logger -p daemon.error "[zone $ZONENAME]" \
+			    "Illegal value for attr '$attr': '$cval'." \
+			    "Removing attr '$attr'"
+			zonecfg -z "$ZONENAME" "remove -F attr name=$attr"
+
+			unset ${!envvar}
+		else
+			logger -p daemon.error "[zone $ZONENAME]" \
+			    "Illegal value for attr '$attr': '$cval'." \
+			    "Setting to '$nval'"
+			zonecfg -z "$ZONENAME" "remove -F attr name=$attr;" \
+			    "add attr; set type=string;" \
+			    "set name=$attr; set value=\"$nval\"; end;"
+
+			export ${!envvar}="$nval"
+		fi
+	done
+}
+
+#
+# Main
+#
+
+case $subcommand in
+pre)
+	case $cmd in
+	0)	# pre-ready
+		fix_forced_attrs
+		setup_fs
+		;;
+	4)	# pre-halt
+		[[ -n "$jst_showsnap" ]] && cleanup_snapshots
+		cleanup_net
+		;;
+	esac
+	;;
+post)
+	case $cmd in
+	0)	# post-ready
+		[[ -n "$jst_showsnap" ]] && setup_snapshots
+		setup_net
+		setup_fw
+		;;
+	1)	# post-boot
+		# We can't set a rctl until we have a process in the zone to
+		# grab
+		setup_cpu_baseline
+		;;
+	8)	# post-unmount
+		# Zone halt is hung unmounting, try to recover
+		if [[ $state == 6 ]]; then
+			cleanup_mount "$6"
+		fi
+		;;
+	esac
+	;;
+esac
+
+exit 0

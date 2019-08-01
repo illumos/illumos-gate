@@ -23,6 +23,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright 2019 Peter Tribble.
+# Copyright 2019 Joyent, Inc.
 #
 
 include ../../Makefile.cmd
@@ -32,6 +33,7 @@ FILEMODE = 0444
 ROOTPROFILE = $(ROOT)/etc/svc/profile
 
 PROFILESRCS = \
+	generic.xml \
 	generic_open.xml \
 	generic_limited_net.xml \
 	inetd_generic.xml \
@@ -61,7 +63,7 @@ TEST =	/usr/bin/test
 LISTSVCS = listsvcs.pl
 
 install: all $(PROFILES)
-	$(RM) $(ROOTPROFILE)/platform.xml
+	$(CP) platform_none.xml $(ROOTPROFILE)/platform.xml
 	# SUNW,Sun-Fire-V890
 	$(RM) $(ROOTPROFILE)/platform_SUNW,Sun-Fire-V890.xml
 	$(LN) $(ROOTPROFILE)/platform_SUNW,Sun-Fire-880.xml \
@@ -95,7 +97,7 @@ $(CHECK_OPEN) $(CHECK_LMTD): \
 	@$(COMM) -23 $@.enabled $@.all | $(TEE) $@.notcovered
 	@$(TEST) ! -s $@.notcovered && $(TOUCH) $@
 
-lint _msg:
+_msg:
 
 clobber clean:
 	$(RM) $(CHECK_OPEN)* $(CHECK_LMTD)*

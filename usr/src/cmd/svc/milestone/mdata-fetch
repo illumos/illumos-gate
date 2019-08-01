@@ -1,0 +1,477 @@
+#!/usr/bin/bash
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at http://smartos.org/CDDL
+#
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file.
+#
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright (c) 2017, Joyent, Inc. All rights reserved.
+#
+
+export PS4='[\D{%FT%TZ}] ${BASH_SOURCE}:${LINENO}: ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+export PATH=/usr/bin:/usr/sbin:$PATH
+
+set -o xtrace
+
+. /lib/svc/share/smf_include.sh
+smf_is_globalzone && exit ${SMF_EXIT_OK}
+
+if [ ! -x /usr/sbin/mdata-get ]; then
+  echo "Metadata mdata-get tool not found."
+  exit ${SMF_EXIT_ERR_FATAL}
+fi
+
+function fatal() {
+  if [[ -n $1 ]]; then
+      echo "FATAL: $*" >&2
+  fi
+  exit ${SMF_EXIT_ERR_FATAL}
+}
+
+# Test if an address looks like an IPv4 address.
+function isIPv4() {
+  [[ "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]
+}
+
+# Test if an address looks like an IPv4 address + CIDR.
+function isIPv4AndCIDR() {
+  [[ "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$ ]]
+}
+
+# Test if an address looks like an IPv6 address.
+function isIPv6() {
+  [[ "$1" =~ ^[0-9a-f]*:[0-9a-f]*:[:0-9a-f]*$ ]]
+}
+
+# Test if an address looks like an IPv6 address + CIDR.
+function isIPv6AndCIDR() {
+  [[ "$1" =~ ^[0-9a-f]*:[0-9a-f]*:[:0-9a-f]*/[0-9]{1,3}$ ]]
+}
+
+# For old zones that were created prior to OS-2253 and bumping the mdata:fetch
+# start timeout, we need to fix this otherwise we could timeout waiting for the
+# socket.
+cur_timeout=$(svcprop -p start/timeout_seconds svc:/smartdc/mdata:fetch)
+if [[ -z ${cur_timeout} || ${cur_timeout} -lt 1800 ]]; then
+    # The current manifest has an old timeout value, fix in case we timeout
+    # here.  XXX we can still hit OS-2296 here where smf will forget that we
+    # set this.
+    svccfg -s svc:/smartdc/mdata:fetch 'setprop start/timeout_seconds = 1800'
+    svcadm refresh svc:/smartdc/mdata:fetch
+fi
+
+# This waits until /.zonecontrol/metadata.sock exists then exits 0
+/usr/vm/sbin/filewait /.zonecontrol/metadata.sock
+
+if [[ ! -e /.zonecontrol/metadata.sock ]]; then
+    # this is a bug since filewait should not have returned until file existed.
+    fatal "missing /.zonecontrol/metadata.sock, Unable to start mdata:fetch"
+fi
+
+# Update sysinfo to ensure values that come from metadata are populated.
+/usr/bin/sysinfo -fu
+
+echo "Retrieving metadata user-data"
+/usr/sbin/mdata-get user-data >/var/db/mdata-user-data.new
+case $? in
+  0)
+    echo "Metadata user-data successfuly retrieved."
+    mv /var/db/mdata-user-data{.new,}
+    ;;
+  1)
+    echo "Metadata user-data not defined."
+    rm -f /var/db/mdata-user-data{,.new}
+    ;;
+  *)
+    echo "Metadata couldn't be retrieved."
+    exit ${SMF_EXIT_ERR_FATAL}
+    ;;
+esac
+
+echo "Retrieving metadata user-script..."
+/usr/sbin/mdata-get user-script >/var/svc/mdata-user-script.new
+case $? in
+  0)
+    echo "Metadata user-script successfuly retrieved."
+    mv /var/svc/mdata-user-script{.new,}
+    chmod +x /var/svc/mdata-user-script
+    ;;
+  1)
+    echo "Metadata user-script not defined."
+    rm -f /var/svc/mdata-user-script{,.new}
+    ;;
+  *)
+    echo "Metadata couldn't be retrieved."
+    exit ${SMF_EXIT_ERR_FATAL}
+    ;;
+esac
+
+echo "Retrieving metadata operator-script..."
+/usr/sbin/mdata-get sdc:operator-script >/var/svc/mdata-operator-script.new
+case $? in
+  0)
+    echo "Metadata operator-script successfuly retrieved."
+    mv /var/svc/mdata-operator-script{.new,}
+    chmod +x /var/svc/mdata-operator-script
+    ;;
+  1)
+    echo "Metadata operator-script not defined."
+    rm -f /var/svc/mdata-operator-script{,.new}
+    ;;
+  *)
+    echo "Metadata couldn't be retrieved."
+    exit ${SMF_EXIT_ERR_FATAL}
+    ;;
+esac
+
+echo "Retrieving tmpfs value..."
+tmpfs=$(/usr/sbin/mdata-get sdc:tmpfs)
+if [[ $? == 0 && -n ${tmpfs} && -f /etc/vfstab ]]; then
+  check="swap        -   /tmp                tmpfs";
+
+  if [[ ${tmpfs} == "0" ]]; then
+    # When tmpfs is set 0, we remove any entry from /etc/vfstab but cannot
+    # adjust the "live" value as current /tmp will be in-use. On reboot the
+    # new value will take effect.
+
+    grep -v "^${check}" /etc/vfstab > /etc/vfstab.new \
+      && mv /etc/vfstab.new /etc/vfstab
+  else
+    new="swap        -   /tmp                tmpfs    -   yes    size=${tmpfs}m";
+    if ! /usr/bin/grep "^${new}" /etc/vfstab; then
+      if ! /usr/bin/grep "^${check}" /etc/vfstab; then
+        # no tmpfs line. add it.
+        echo "${new}" >> /etc/vfstab
+      else
+        # existing tmpfs line, but wrong value. fix it.
+        /usr/bin/sed -i "" -e "s|^swap.*/tmp.*tmpfs.*$|${new}|" /etc/vfstab
+        echo $?
+      fi
+
+      if mount | grep "^/tmp"; then
+        # Also fix current size, since /etc/vfstab didn't have our correct line
+        # but only if we have /tmp mounted at all. If not, we'll have to wait
+        # until the next reboot since /tmp will be in-use.
+        /usr/sbin/mount -F tmpfs -o remount,size=${tmpfs}m /tmp
+      fi
+
+    fi
+  fi
+fi
+
+#
+# If we have NFS volumes, we'll add them to vfstab, and enable the nfs/client
+# service so that will mount the volumes for us.
+#
+echo "Retrieving volume metadata..."
+
+volumes_added=0
+while IFS="|" read -r nfsvolume mountpoint name mode type; do
+
+  cat >&2 <<EOF
+*** VOLUME ***
+NFSVOLUME: ${nfsvolume}
+MOUNTPOINT: ${mountpoint}
+MODE: ${mode}
+NAME: ${name}
+TYPE: ${type}
+EOF
+
+  if [[ -n ${type} && ${type} != "tritonnfs" ]]; then
+      fatal "unsupported volume type: ${type}"
+  fi
+
+  # if we don't have volume and mountpoint, we can't add vfstab lines
+  if [[ -z ${nfsvolume} || -z ${mountpoint} ]]; then
+      fatal "invalid volume specification (need both volume & mountpoint)"
+  fi
+
+  if ! grep "^${nfsvolume}[ 	]" /etc/vfstab; then
+      if [[ -z ${mode} ]]; then
+          mode="rw"
+      fi
+
+      if [[ ${mode} != "rw" && ${mode} != "ro" ]]; then
+          fatal "invalid volume mode: '${mode}'"
+      fi
+
+      line=$(printf "%s - %s nfs - yes %s\n" "${nfsvolume}" "${mountpoint}" "${mode}")
+      volumes_added=$((${volumes_added}+1))
+
+      mkdir -p ${mountpoint}
+      echo "${line}" >> /etc/vfstab
+  fi
+done < <(/usr/sbin/mdata-get sdc:volumes \
+    | /usr/bin/json \
+        -d '|' \
+        -a nfsvolume mountpoint name mode type)
+
+if [[ ${volumes_added} -gt 0 ]]; then
+    for svc in \
+        svc:/network/nfs/nlockmgr:default \
+        svc:/network/nfs/status:default \
+        svc:/network/rpc/bind:default \
+        svc:/network/nfs/client:default \
+        ; do
+
+        svcadm enable ${svc} || fatal "Unable to enable ${svc}"
+     done
+fi
+
+# We use the special sdc:nics value here though this is not an interface for
+# use elsewhere.  If this is changed please also update agent.js in the metadata
+# agent.
+#
+# We run this every startup in case nics have changed since last boot. As
+# network/physical has an optional_all dependency on this service, we'll have
+# had our chance to write these files out before networking comes up. This
+# might eventually be replaced by network/physical grabbing data directly.
+echo "Retrieving nics data..."
+while IFS="|" read -r iface ip ips netmask primary gateway gateways; do
+
+  # if we don't have interface name, we don't know what files to write out.
+  if [[ -z ${iface} ]]; then
+    continue;
+  fi
+
+  # A VM created on an older platform may not have the "ips" or "gateways"
+  # properties, so we will need to grab the older "ip" and "gateway" versions
+  # instead.
+  [[ -z $ips ]] && ips=$ip
+  [[ -z $gateways ]] && gateways=$gateway
+
+  # We remove the hostname.netX file first, so we can append to a clean file
+  rm -f /etc/hostname.${iface}
+
+  # remove any existing DHCP or addrconf configuration, since we'll create one
+  # if it belongs later
+  rm -f /etc/dhcp.${iface}
+  rm -f /etc/addrconf.${iface}
+
+  OLDIFS=$IFS
+  IFS=$','
+  for ip in $ips; do
+    # so it shows up in the logs
+    echo "iface[${iface}] ip[${ip}] netmask[${netmask}]" \
+      "primary[${primary}] gateway[${gateway}]"
+
+    [[ -z ${ip} ]] && continue;
+
+    if [[ ${ip} == "dhcp" ]]; then
+      touch /etc/dhcp.${iface}
+      if hostname=`mdata-get sdc:hostname`; then
+          echo "inet ${hostname}" >> /etc/hostname.${iface}
+      fi
+    elif [[ ${ip} == "addrconf" ]]; then
+      touch /etc/addrconf.${iface}
+    elif isIPv4 ${ip} && [[ -n ${netmask} ]]; then
+      # We're using an older configuration where the routing prefix is
+      # specified using a mask instead of CIDR notation. We'll need to
+      # invoke ifconfig differently.
+      echo "${ip} netmask ${netmask} up" >> /etc/hostname.${iface}
+    elif isIPv4AndCIDR ${ip} \
+        || isIPv6AndCIDR ${ip} \
+        || isIPv6 ${ip}; then
+      # Either a routing prefix was specified, or, in the case of IPv6, we
+      # won't specify one and fall back on NDP to find it when we configure
+      # our interfaces.
+      echo "${ip} up" >> /etc/hostname.${iface}
+    fi
+  done
+
+  if [[ ${primary} == "true" ]]; then
+    rm -f /etc/defaultrouter
+    for gateway in $gateways; do
+      if [[ -n ${gateway} ]] && isIPv4 ${gateway}; then
+        echo "${gateway}" >> /etc/defaultrouter
+      fi
+    done
+  fi
+  IFS=$OLDIFS
+
+  # XXX we leave old hostname.netX files around and just replace when we have
+  # one next.
+done < <(/usr/sbin/mdata-get sdc:nics \
+    | /usr/bin/json \
+        -d '|' \
+        -e 'this.ips = this.ips ? this.ips.join(",") : ""' \
+        -e 'this.gateways = this.gateways ? this.gateways.join(",") : ""' \
+        -a interface ip ips netmask primary gateway gateways)
+
+# rebuild resolv.conf
+resolvers=$(mdata-get sdc:resolvers)
+resolvers_result=$?
+
+# Determine if resolv.conf is managed for us
+maintain_resolvers=$(mdata-get sdc:maintain_resolvers)
+maintain_result=$?
+if [[ ${maintain_result} != 0 ]]; then
+    echo "Error getting maintain_resolvers, code: ${maintain_result}"
+    maintain_resolvers="false"
+fi
+
+# If this is our first boot, write an initial set of resolvers
+if [[ -f /var/svc/provisioning ]]; then
+    echo "First boot: writing resolvers"
+    maintain_resolvers="true"
+fi
+
+if [[ ${resolvers_result} == 0 && ${maintain_resolvers} == "true" ]]; then
+
+    # if dns_domain is missing or broken, we still write out, just w/o search
+    search="search $(mdata-get sdc:dns_domain)"
+    if [[ $? != 0 ]]; then
+        search=
+    fi
+
+    if [[ ${resolvers} == "[]" ]]; then
+        nameservers=
+    else
+        nameservers=$(echo ${resolvers} | json -a | sed -e "s/^/nameserver /")
+    fi
+
+    rm -f /etc/.resolv.conf.tmp
+    if [[ -n ${search} ]]; then
+        echo "${search}" > /etc/.resolv.conf.tmp
+    fi
+    if [[ -n ${nameservers} ]]; then
+        echo "${nameservers}" >> /etc/.resolv.conf.tmp
+    fi
+
+    cp /etc/.resolv.conf.tmp /etc/resolv.conf \
+        && cat /etc/.resolv.conf.tmp >&2 \
+        && rm -f /etc/.resolv.conf.tmp
+else
+    if [[ ${resolvers_result} == 0 ]]; then
+        echo "Error getting resolvers, code: ${resolvers_result}"
+    fi
+
+    if [[ ${maintain_resolvers} == "true" ]]; then
+        echo "Not setting resolvers, maintain_resolvers=${maintain_resolvers}"
+    fi
+fi
+
+
+# Fetch routes
+
+# It is possible to specify the same route in several different ways using
+# route(1m). We therefore use route(1m) itself to manage adding, deleting
+# and determining duplicates.
+zone_routes_file=/etc/inet/static_routes
+vmadm_routes_file=/etc/inet/static_routes.vmadm
+tmpdir=$(mktemp -d /tmp/mdata.XXXXXX)
+
+if [ -z $tmpdir ]; then
+    echo "Error creating temporary directory."
+    exit ${SMF_EXIT_ERR_FATAL}
+fi
+
+# directory structure for the new copy of static_routes.vmadm (the one that
+# will replace the current static_routes.vmadm once all of the adds and
+# deletes have been applied):
+new_root=${tmpdir}/new-routes
+new_inet=${new_root}/etc/inet
+# directory structure for the previous copy of static_routes.vmadm (used to
+# determine routes that have been removed since the last time mdata-fetch
+# was run):
+old_root=${tmpdir}/old-routes
+old_inet=${old_root}/etc/inet
+# directory structure for the zone's persistent routes - those not created
+# by vmadm (used to determine if vmadm routes are duplicates):
+zone_root=${tmpdir}/zone-routes
+zone_inet=${zone_root}/etc/inet
+
+mkdir -p $new_inet
+mkdir -p ${old_root}/etc/inet
+mkdir -p ${zone_root}/etc/inet
+
+if [[ -f ${vmadm_routes_file} ]]; then
+    cp $vmadm_routes_file ${old_inet}/static_routes
+fi
+
+function route_in_per_zone_file()
+{
+    cp $zone_routes_file $zone_inet
+    output=$(route -pR $zone_root add $* 2>&1)
+    [[ $output =~ "entry exists" ]]
+}
+
+# If re-running this script after initial boot, network/physical and
+# network/routing-setup are already enabled, so apply routing adds and
+# deletes manually
+if [[ $(/usr/bin/svcs -H -o state network/routing-setup) == "online" ]]; then
+    routing_up="true"
+fi
+
+while IFS="|" read -r gateway dst linklocal; do
+    echo "route: gateway[${gateway}] dst[${dst}] linklocal[${linklocal}]"
+    route_type=""
+    if [[ ${linklocal} == "true" ]]; then
+        route_type="-interface "
+    fi
+    route_str="${route_type}${dst} ${gateway}"
+
+    if route_in_per_zone_file $route_str; then
+        echo "not adding duplicate route: ${route_str}"
+        # the zone has also defined this route; do nothing
+    else
+        echo "adding route to file: ${route_str}"
+        route -pR $new_root add $route_str
+        if [[ -n "${routing_up}" ]]; then
+            route add $route_str
+        fi
+    fi
+
+    route -pR $old_root delete $route_str
+done < <(/usr/sbin/mdata-get sdc:routes \
+    | /usr/bin/json -d '|' -a gateway dst linklocal)
+
+
+# Anything left in the old static_routes file is a delete. Don't delete the
+# route from the routing tables if there's a duplicate route in the zone's
+# static_routes file
+if [[ -f ${old_inet}/static_routes ]]; then
+    egrep -v "^(#|$)" ${old_inet}/static_routes | while read -r route_str; do
+        if [[ "${route_str}" == "" ]]; then
+            continue
+        fi
+
+        if route_in_per_zone_file "$route_str"; then
+            echo "not deleting duplicate route: ${route_str}"
+        else
+            if [[ -n "${routing_up}" ]]; then
+                route delete $route_str
+            fi
+        fi
+    done
+fi
+
+if [[ -f ${new_inet}/static_routes ]]; then
+    cp ${new_inet}/static_routes ${vmadm_routes_file}
+else
+    rm ${vmadm_routes_file}
+fi
+rm -rf $tmpdir
+
+
+# Unconditionally enable mdata:execute, so that the last provisioning step
+# is always taken (regardless of whether user-script exists or not)
+svcadm enable smartdc/mdata:execute
+
+exit ${SMF_EXIT_OK}

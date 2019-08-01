@@ -21,10 +21,12 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2016, Joyent, Inc.  All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 OLD_CONF=/etc/default/syslogd
+DFLT_SUM="7c87d765805cc45a0dad9fb5c86cc4f2"
+CONF_SUM="$DFLT_SUM"
 
 . /lib/svc/share/smf_include.sh
 
@@ -52,14 +54,72 @@ convert()
 	rm -f ${OLD_CONF}.new
 }
 
-if [ ! -f /etc/syslog.conf ]; then
-	echo "/etc/syslog.conf is missing. Exiting."
-	exit $SMF_EXIT_ERR_CONFIG
+#
+# If the rsyslog.conf file doesn't exist and the syslog.conf file has not
+# been customized, generate the default rsyslog.conf.
+#
+generate_rsyslog_conf()
+{
+	if [ ! -f /etc/syslog.conf ]; then
+		return
+	fi
+
+	CONF_SUM=`nawk '{
+	    if (substr($1, 1, 1) != "#" && NF != 0) print $0
+	    }' /etc/syslog.conf | sum -x md5`
+
+	if [ "$CONF_SUM" != "$DFLT_SUM" ]; then
+		return
+	fi
+
+	cat <<-DONE >/etc/rsyslog.conf
+	#
+	# Sample rsyslog configuration file
+	#
+
+	$ModLoad immark
+	$ModLoad imsolaris
+	$ModLoad imtcp
+	$ModLoad imudp
+
+	*.err;kern.notice;auth.notice			/dev/sysmsg
+	*.err;kern.debug;daemon.notice;mail.crit	/var/adm/messages
+
+	*.alert;kern.err;daemon.err			operator
+	*.alert						root
+
+	*.emerg						*
+
+	mail.debug					/var/log/syslog
+
+	auth.info					/var/log/auth.log
+	mail.info					/var/log/postfix.log
+	DONE
+}
+
+if [ ! -f /etc/rsyslog.conf -a -x /usr/sbin/rsyslogd ]; then
+	generate_rsyslog_conf
 fi
 
-if [ ! -x /usr/sbin/syslogd ]; then
-	echo "Executable /usr/sbin/syslogd not found. Exiting"
-	exit $SMF_EXIT_ERR_CONFIG
+if [ -f /etc/rsyslog.conf ]; then
+	if [ ! -x /usr/sbin/rsyslogd ]; then
+		echo "Executable /usr/sbin/rsyslogd not found or not executable. Exiting."
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
+else
+	#
+	# Fall back to old syslogd
+	#
+	echo "/etc/rsyslog.conf is missing. Using syslogd instead."
+	if [ ! -f /etc/syslog.conf ]; then
+		echo "/etc/syslog.conf is missing. Exiting."
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
+
+	if [ ! -x /usr/sbin/syslogd ]; then
+		echo "Executable /usr/sbin/syslogd not found or not executable. Exiting."
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
 fi
 
 if smf_is_globalzone; then
@@ -80,6 +140,27 @@ if [ ! -f /var/adm/messages ]; then
 	/usr/bin/cp /dev/null /var/adm/messages
 	/usr/bin/chmod 0644 /var/adm/messages
 fi
+
+if [ -f /etc/rsyslog.conf ]; then
+	#
+	# If we have a config file for the old syslogd, only run rsyslogd
+	# if there are no customizations in the old syslog.conf file.
+	#
+	if [ -f /etc/syslog.conf ]; then
+		CONF_SUM=`nawk '{
+		    if (substr($1, 1, 1) != "#" && NF != 0) print $0
+		    }' /etc/syslog.conf | sum -x md5`
+	fi
+
+	if [ "$CONF_SUM" == "$DFLT_SUM" ]; then
+		/usr/sbin/rsyslogd -c5 -n &
+		exit $SMF_EXIT_OK
+	fi
+fi
+
+#
+# Run the old syslogd
+#
 remote=`awk -F= '
 	/^LOG_FROM_REMOTE=[yY][Ee][Ss]/ {print "true"}
 	/^LOG_FROM_REMOTE=[Nn][Oo]/     {print "false"}' < ${OLD_CONF}`
@@ -96,3 +177,10 @@ case ${remote} in
 esac
 
 /usr/sbin/syslogd >/dev/msglog 2>&1 &
+
+if [ -f /etc/rsyslog.conf ]; then
+	logger -p daemon.err \
+	    "Not using rsyslogd because there is a custom /etc/syslog.conf file"
+fi
+
+exit $SMF_EXIT_OK

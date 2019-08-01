@@ -21,9 +21,11 @@
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
-ETCFILES= ioctl.syscon passwd shadow motd
+ETCGENFILES=motd issue
+ETCFILES= ioctl.syscon passwd shadow $(ETCGENFILES)
 FTPDFILES= ftpusers
 KVMFILES= README
 SMBFILES= smbpasswd
@@ -39,41 +41,32 @@ FILEMODE= 0644
 
 ROOTETCFTPUSERSLINK= $(ROOTETC)/ftpusers
 
-$(ROOTETC)/shadow 	:=	FILEMODE =	400
+$(ROOTETC)/shadow	:=	FILEMODE =	400
 $(ROOTVARSMB)/smbpasswd :=	FILEMODE =	0400
 
 
 .KEEP_STATE:
-
-$(ROOTETCFTPUSERSLINK):	$(ROOTETCFTPDFILES)
-	$(RM) $@; $(SYMLINK) ftpd/ftpusers $@
 
 all: $(ETCFILES) $(KVMFILES) $(SMBFILES) $(FTPDFILES)
 
 install: all $(ROOTETCFILES) $(ROOTETCFTPDFILES) $(ROOTUSRKVMFILES) $(ROOTVARSMBFILES) $(ROOTETCFTPUSERSLINK)
 
 clean:
-	$(RM) $(ROOTETCFTPUSERSLINK)
+	$(RM) $(ROOTETCFTPUSERSLINK) $(ETCGENFILES) $(SMBFILES)
 
-lint:
+clobber: clean
 
-clobber:
+$(ROOTETCFTPUSERSLINK):	$(ROOTETCFTPDFILES)
+	$(RM) $@; $(SYMLINK) ftpd/ftpusers $@
 
-motd:	FRC
+motd:	$(ROOT)/buildstamp
 	@-$(ECHO) "rebuilding motd"
-	@$(RELEASE_BUILD)-$(ECHO) "The Illumos Project\tSunOS $(RELEASE)\t$(VERSION)\t$(RELEASE_DATE)" > motd
-	@$(NOT_RELEASE_BUILD)-$(ECHO) "The Illumos Project\tSunOS $(RELEASE)\t$(VERSION)\t`date +'%h. %d, %Y'`" > motd
-	@$(NOT_RELEASE_BUILD)-$(ECHO) $(DEV_CM) | sed -e "s/@(#)//" >> motd
-	@-$(CAT) release_info >> motd
+	@$(ECHO) "SmartOS (build: $$(cat $(ROOT)/buildstamp))" >$@
+
+issue: issue.in $(ROOT)/buildstamp
+	sed "s+build: 00000000T000000Z+$$(cat $(ROOT)/buildstamp)+" issue.in >$@
 
 smbpasswd:
 	$(TOUCH) smbpasswd
-
-clean:
-
-lint:
-
-clobber:
-	$(RM) motd smbpasswd
 
 FRC:

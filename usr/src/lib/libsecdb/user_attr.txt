@@ -1,5 +1,6 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2011, Joyent, Inc. All rights reserved.
 #
 # CDDL HEADER START
 #
@@ -25,11 +26,12 @@
 # user attributes. see user_attr(4)
 #
 #
-root::::auths=solaris.*,solaris.grant;profiles=All;audit_flags=lo\:no;lock_after_retries=no;min_label=admin_low;clearance=admin_high
-lp::::profiles=Printer Management
 adm::::profiles=Log Management
-dladm::::auths=solaris.smf.manage.wpa,solaris.smf.modify
+admin::::profiles=Primary Administrator;roles=root
 daemon::::auths=solaris.smf.manage.ilb,solaris.smf.modify.application
+dladm::::auths=solaris.smf.manage.wpa,solaris.smf.modify
+lp::::profiles=Printer Management
 netadm::::type=role;project=default;profiles=Network Autoconf Admin,Network Management,Service Management
 netcfg::::type=role;project=default;profiles=Network Autoconf User;auths=solaris.network.autoconf.write
+root::::auths=solaris.*,solaris.grant;profiles=All;audit_flags=lo\:no;lock_after_retries=no;min_label=admin_low;clearance=admin_high
 zfssnap::::type=role;auths=solaris.smf.manage.zfs-auto-snapshot;profiles=ZFS File System Management

@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2016 Joyent, Inc.
 #
 
 # Make sure that the libraries essential to this stage of booting can be found.
@@ -64,92 +65,27 @@ if smf_is_nonglobalzone; then
 	exit $SMF_EXIT_OK
 fi
 
+/sbin/mount -F ufs -o remount,rw,nologging /devices/ramdisk:a /
+/usr/sbin/lofiadm -X -a /usr.lgz
+
 #
-# Root is already mounted (by the kernel), but still needs to be
-# checked, possibly remounted and entered into mnttab.  First
-# mount /usr if it is a separate file system.  If the file system
-# type is something other than zfs, mount it read-only.  This must
-# be done first to allow utilities such as fsck and setmnt to
-# reside on /usr minimizing the space required by the root file
-# system.
+# Prior to mounting /usr, devfsadm is not yet available.  As such, we must
+# locate the lofi block device node in /devices rather than in /dev.  This
+# path has changed over time so we try both the old (pre-partition support)
+# and new paths.
 #
-readvfstab "/usr" < $vfstab
-if [ -n "$mountp" ]; then
-	if [ "$fstype" = zfs ]; then
-		mountfs - /usr $fstype $mntopts - || exit $SMF_EXIT_ERR_FATAL
-	else
-		#
-		# Must use -o largefiles here to ensure the
-		# read-only mount does not fail as a result of
-		# having a large file present on /usr. This gives
-		# fsck a chance to fix up the largefiles flag
-		# before we remount /usr read-write.
-		#
-		if [ "x$mntopts" = x- ]; then
-			mntopts='ro,largefiles'
-		else
-			checkopt largefiles $mntopts
-			if [ "x$option" != xlargefiles ]; then
-				mntopts="largefiles,$mntopts"
-			fi
-
-			checkopt ro $mntopts
-			if [ "x$option" != xro ]; then
-				mntopts="ro,$mntopts"
-			fi
-
-			#
-			# Requesting logging on a read-only mount
-			# causes errors to be displayed, so remove
-			# "logging" from the list of options for now.
-			# The read-write mount performed later will
-			# specify the logging option if appropriate.
-			#
-
-			checkopt logging $mntopts
-			if [ "x$option" = xlogging ]; then
-				mntopts="$otherops"
-			fi
-		fi
-
-		mountfs -O /usr $fstype $mntopts - || exit $SMF_EXIT_ERR_FATAL
+lofi_devices_path='/devices/pseudo/lofi@1:disk'
+if [ ! -b "$lofi_devices_path" ]; then
+	lofi_devices_path='/devices/pseudo/lofi@0:1'
+	if [ ! -b "$lofi_devices_path" ]; then
+		echo 'could not locate lofi block device in /devices' >&2
+		exit $SMF_EXIT_ERR_FATAL
 	fi
 fi
 
-#
-# if we are booted from zfs, the /usr mount probably won't be a
-# legacy mount.  Use the standard zfs mount command instead.
-
-readmnttab "/" < /etc/mnttab
-if [ "$fstype" = zfs ]; then
-	mountp=`/sbin/zfs get -H -o value mountpoint $special/usr 2>/dev/null`
-	#
-	# if mountp = /usr, there is a non-legacy mount of /usr
-	# in the boot environment being booted.
-	#
-	if [ "x$mountp" = "x/usr" ] ; then
-		/sbin/zfs mount $special/usr
-		if [ $? != 0 ] ; then
-				msg='zfs-mount failed'
-				echo $msg
-				echo "$SMF_FMRI:" $msg >/dev/msglog
-		 	exit $SMF_EXIT_ERR_FATAL
-		fi
-	fi
-fi
-
-#
-# Also mount /boot now so that things like keymap.sh can access
-# boot properties through eeprom.  Readonly isn't required because
-# /boot (and other pcfs filesystems) aren't fsck'ed at boot yet.
-# Also, we don't account for caching /boot as it must be on a local
-# disk.  So what's in vfstab is fine as it stands; just look to see
-# if it's there and avoid the mount if not.
-#
-readvfstab "/boot" < $vfstab
-
-if [ -n "$mountp" ]; then
-	mountfs - /boot $fstype $mntopts - || exit $SMF_EXIT_ERR_FATAL
+if ! /sbin/mount -F ufs -o ro "$lofi_devices_path" /usr; then
+	echo "could not mount /usr from $lofi_devices_path" >&2
+	exit $SMF_EXIT_ERR_FATAL
 fi
 
 #

@@ -23,8 +23,10 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 Joyent, Inc.
+#
 
-TEMPLATES=	SUNWdefault.xml SUNWblank.xml
+TEMPLATES=	SUNWblank.xml
 XMLDOCS=	config.xml platform.xml
 CLOBBERFILES=	$(ROOTXMLDOCS) $(ROOTTEMPLATES)
 

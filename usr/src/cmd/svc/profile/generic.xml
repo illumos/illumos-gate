@@ -1,0 +1,392 @@
+<?xml version='1.0'?>
+<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
+<!--
+    CDDL HEADER START
+
+    The contents of this file are subject to the terms of the
+    Common Development and Distribution License (the "License").
+    You may not use this file except in compliance with the License.
+
+    You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+    or http://www.opensolaris.org/os/licensing.
+    See the License for the specific language governing permissions
+    and limitations under the License.
+
+    When distributing Covered Code, include this CDDL HEADER in each
+    file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+    If applicable, add the following below this CDDL HEADER, with the
+    fields enclosed by brackets "[]" replaced with your own identifying
+    information: Portions Copyright [yyyy] [name of copyright owner]
+
+    CDDL HEADER END
+
+    Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+    Use is subject to license terms.
+
+    The purpose of the limited_net profile is to provide a set of
+    active services that allow one to connect to the machine via ssh
+    (requires sshd). The services which are deactivated here are those
+    that are at odds with this goal. Those which are activated are
+    explicit requirements for the goal's satisfaction.
+
+    NOTE:  Service profiles delivered by this package are not editable,
+    and their contents will be overwritten by package or patch
+    operations, including operating system upgrade.  Make customizations
+    in a distinct file.  The paths, /etc/svc/profile/site.xml and
+    /var/svc/profile/site.xml, are distinguished locations for site-specific
+    service profile, treated otherwise equivalently to this file.
+-->
+<service_bundle type='profile' name='generic_limited_net'
+	 xmlns:xi='http://www.w3.org/2003/XInclude' >
+
+  <!--
+      svc.startd(1M) services
+  -->
+  <service name='system/cryptosvc' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/coreadm' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/metainit' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='system/cron' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/dbus' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/extended-accounting' version='1' type='service'>
+    <instance name='flow'    enabled='false'/>
+    <instance name='process' enabled='false'/>
+    <instance name='task'    enabled='false'/>
+    <instance name='net'    enabled='false'/>
+  </service>
+  <service name='system/identity' version='1' type='service'>
+    <instance name='domain' enabled='true'/>
+  </service>
+  <service name='system/intrd' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/keymap' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/picl' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/sac' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='system/scheduler' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/system-log' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/utmp' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/zones' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/rcap' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='network/rpc/bind' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/name-service-cache' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='network/netmask' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/nfs/status' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/nfs/nlockmgr' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/nfs/client' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/nfs/server' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/nfs/rquota' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/nfs/cbd' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/nfs/mapid' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/smb/client' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+
+  <service name='network/ssh' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='network/smtp' version='1' type='service'>
+    <instance name='sendmail' enabled='false'/>
+  </service>
+  <service name='network/sendmail-client' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/inetd' version='1' type='restarter'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/filesystem/autofs' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='system/filesystem/rmvolmgr' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='system/power' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+
+  <service name='network/dns/multicast' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='network/dhcp-server' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='network/ntp' version='1' type='service'>
+    <instance name='default' enabled='true' />
+  </service>
+  <service name='network/rarp' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='network/slp' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='network/security/kadmin' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='network/security/krb5_prop' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='network/security/krb5kdc' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+
+  <service name='application/management/net-snmp' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='application/management/seaport' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='application/management/snmpdx' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='application/management/wbem' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='application/print/ipp-listener' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='application/print/ppd-cache-update' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='application/print/rfc1179' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='application/cups/in-lpd' version='1' type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='application/stosreg' version='1' type='service'>
+    <instance name='default' enabled='true' />
+  </service>
+
+  <!--
+	default inetd(1M) services
+  -->
+  <service name='network/finger' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/ftp' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/login' version='1' type='service'>
+    <instance name='rlogin'  enabled='false'/>
+    <instance name='klogin'  enabled='false'/>
+    <instance name='eklogin' enabled='false'/>
+  </service>
+  <service name='network/shell' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+    <instance name='kshell'  enabled='false'/>
+  </service>
+  <service name='network/telnet' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+
+  <!--
+	non-default inetd(1M) services
+  -->
+  <service name='network/uucp' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/chargen' version='1' type='service'>
+    <instance name='stream' enabled='false'/>
+    <instance name='dgram' enabled='false'/>
+  </service>
+  <service name='network/daytime' version='1' type='service'>
+    <instance name='stream' enabled='false'/>
+    <instance name='dgram' enabled='false'/>
+  </service>
+  <service name='network/discard' version='1' type='service'>
+    <instance name='stream' enabled='false'/>
+    <instance name='dgram' enabled='false'/>
+  </service>
+  <service name='network/echo' version='1' type='service'>
+    <instance name='stream' enabled='false'/>
+    <instance name='dgram' enabled='false'/>
+  </service>
+  <service name='network/time' version='1' type='service'>
+    <instance name='stream' enabled='false'/>
+    <instance name='dgram' enabled='false'/>
+  </service>
+  <service name='network/comsat' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/rexec' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/talk' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/stdiscover' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/stlisten' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+
+  <!--
+	default inetd(1M) RPC services enabled
+  -->
+  <service name='network/rpc/gss' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/rpc/mdcomm' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/rpc/smserver' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/security/ktkt_warn' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+
+  <!--
+	default inetd(1M) RPC services disabled
+  -->
+  <service name='network/rpc/rstat' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/rpc/rusers' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/rpc/meta' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/rpc/metamed' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/rpc/metamh' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+
+  <!--
+	non-default inetd(1M) RPC services disabled
+  -->
+  <service name='network/rpc/rex' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/rpc/spray' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/rpc/wall' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+
+  <!--
+      Disable Avahi mDNS bridge service
+  -->
+  <service name='system/avahi-bridge-dsd' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+
+  <!--
+      Enable CDE/ToolTalk/GDM services.
+  -->
+  <service name='network/rpc/cde-ttdbserver' version='1' type='service'>
+    <instance name='tcp' enabled='false' />
+  </service>
+  <service name='application/graphical-login/gdm' version='1'
+    type='service'>
+    <instance name='default' enabled='false' />
+  </service>
+  <service name='network/rpc/cde-calendar-manager' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+
+  <!--
+      Disable X11 services.
+  -->
+  <service name='application/x11/xfs' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+
+  <!--
+      pkg.depotd service
+  -->
+  <service name='system/pkgserv' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+
+  <!--
+      Enable VNC config service for xVM
+  -->
+  <service name='system/xvm/vnc-config' version='1' type='service'>
+     <instance name='default' enabled='false'/>
+  </service>
+
+  <service name='system/xvm/ipagent' version='1' type='service'>
+     <instance name='default' enabled='false'/>
+  </service>
+
+  <service name='application/print/service-selector' version='1' type='service'>
+     <instance name='default' enabled='false'/>
+  </service>
+
+  <service name='system/dumpadm' version='1' type='service'>
+     <instance name='default' enabled='true'/>
+  </service>
+
+  <service name='system/metasync' version='1' type='service'>
+     <instance name='default' enabled='false'/>
+  </service>
+
+  <service name='application/font/fc-cache' version='1' type='service'>
+     <instance name='default' enabled='false'/>
+  </service>
+
+  <service name='system/consolekit' version='1' type='service'>
+     <instance name='default' enabled='false'/>
+  </service>
+
+  <service name='application/opengl/ogl-select' version='1' type='service'>
+     <instance name='default' enabled='false'/>
+  </service>
+
+  <service name='system/hal' version='1' type='service'>
+     <instance name='default' enabled='false'/>
+  </service>
+
+
+</service_bundle>

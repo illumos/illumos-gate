@@ -22,12 +22,14 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/dispadmin/Makefile
+# Copyright 2019 Joyent, Inc.
 #
 
 PROG= dispadmin
 MANIFEST= scheduler.xml
 SVCMETHOD= svc-scheduler
+ETCFILES= dispadmin.conf
+
 SDC=  SDC$(PROG)
 RT=   RT$(PROG)
 TS=   TS$(PROG)
@@ -35,6 +37,8 @@ IA=   IA$(PROG)
 FSS=  FSS$(PROG)
 FX=   FX$(PROG)
 PROGS= $(PROG) $(RT) $(TS) $(IA) $(FSS) $(FX) $(SDC)
+
+ROOTETCFILES= $(ETCFILES:%=$(ROOTETC)/%)
 
 include ../Makefile.cmd
 
@@ -58,6 +62,8 @@ ROOTRT=		$(RT:%=$(ROOTDIR)/RT/%)
 ROOTSDC=	$(SDC:%=$(ROOTDIR)/SDC/%)
 ROOTTS=		$(TS:%=$(ROOTDIR)/TS/%)
 ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
+
+$(ROOTETCFILES) := FILEMODE = 644
 
 # this would be simpler if we renamed rtdispadmin.c and tsdispadmin.c
 OBJECTS= $(PROG).o rt$(PROG).o ts$(PROG).o ia$(PROG).o \
@@ -83,20 +89,15 @@ $(ROOTDIR)/TS/% : %
 	$(INS.file)
 
 .KEEP_STATE:
- 
-all: $(PROGS) 
+
+all: $(PROGS)
 
 $(PROGS): $$(OBJ) subr.o
 	$(LINK.c) -o $@ $(OBJ) subr.o $(LDLIBS)
 	$(POST_PROCESS)
 
-llib-lsubr.ln:	subr.c
-	$(LINT.c) -y -o subr subr.c
-
-lint :=	LDLIBS += -L. -lsubr
-
 install: all $(ROOTPROG) $(ROOTRT) $(ROOTTS) $(ROOTIA) $(ROOTFSS) $(ROOTFX) \
-		$(ROOTSDC) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+		$(ROOTSDC) $(ROOTMANIFEST) $(ROOTSVCMETHOD) $(ROOTETCFILES)
 
 # Don't re-install directories already installed by Targetdirs
 #$(ROOTDIRS):
@@ -105,15 +106,6 @@ install: all $(ROOTPROG) $(ROOTRT) $(ROOTTS) $(ROOTIA) $(ROOTFSS) $(ROOTFX) \
 check: $(CHKMANIFEST)
 
 clean:
-	$(RM) $(OBJECTS) $(PROGS) llib-lsubr.ln
- 
-lint:	llib-lsubr.ln
-	$(LINT.c) dispadmin.c $(LDLIBS)
-	$(LINT.c) fssdispadmin.c $(LDLIBS)
-	$(LINT.c) fxdispadmin.c $(LDLIBS)
-	$(LINT.c) iadispadmin.c $(LDLIBS)
-	$(LINT.c) rtdispadmin.c $(LDLIBS)
-	$(LINT.c) sdcdispadmin.c $(LDLIBS)
-	$(LINT.c) tsdispadmin.c $(LDLIBS)
- 
+	$(RM) $(OBJECTS) $(PROGS)
+
 include ../Makefile.targ

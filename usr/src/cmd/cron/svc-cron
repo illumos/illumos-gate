@@ -22,8 +22,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2012 Joyent, Inc.  All rights reserved.
 #
 # Start method script for the cron service.
 #
@@ -35,6 +34,45 @@ if [ -p /etc/cron.d/FIFO ]; then
 		echo "$0: cron is already running"
 		exit $SMF_EXIT_ERR_NOSMF
 	fi
+fi
+
+if smf_is_globalzone && [ -n "$(bootparams | grep '^headnode=true')" ]; then
+	#
+	# Randomize root's crontab so all HN's are not in sync.
+	#
+	utc_offset=`nawk -F= '{if ($1 == "utc_offset") print $2}' \
+	    /usbkey/config.inc/generic`
+	[ -z "$utc_offset" ] && utc_offset=0
+
+	n=$(date +%S)
+	hr=$(($n % 5))
+	hr=$(($hr + $utc_offset))
+
+	n=$(date +%M)
+	mn=$(($n % 15))
+
+	nawk -v hr=$hr -v mn=$mn '{
+		if (substr($1, 1, 1) == "#") {
+			print $0
+			next
+		}
+		if (substr($2, 1, 1) == "*") {
+			print $0
+			next
+		}
+		if (length($0) == 0) {
+			print $0
+			next
+		}
+
+		printf("%d %d %s %s %s %s", mn, hr, $3, $4, $5, $6)
+		for (i = 7; i <= NF; i++)
+			printf(" %s", $i)
+		printf("\n")
+		mn += 10
+	}' /etc/cron.d/crontabs/root >/etc/cron.d/crontabs/root.$$
+	cp /etc/cron.d/crontabs/root.$$ /etc/cron.d/crontabs/root
+	rm -f /etc/cron.d/crontabs/root.$$
 fi
 
 if [ -x /usr/sbin/cron ]; then

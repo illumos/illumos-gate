@@ -23,6 +23,7 @@
 * SYSTEM SPECIFICATION FILE
 *
 
+*
 * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NOTE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 *
 * It is not recommended to edit this file directly but rather
@@ -34,6 +35,10 @@
 * recommendations on naming fragment files.
 *
 * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NOTE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+*
+* As SmartOS ships with /etc/ off a ramdisk, we don't support using the
+* /etc/system.d mechanism.
+*
 
 * moddir:
 *
@@ -108,3 +113,66 @@
 *
 *		set test_module:debug = 0x13
 
+set ibft_noprobe=1
+
+set noexec_user_stack=1
+set noexec_user_stack_log=1
+set rlim_fd_cur=65536
+
+* Ensure that c-states are disabled
+set idle_cpu_no_deep_c=1
+
+* 10 GbE Tuning
+set ip:ip_squeue_fanout=1
+
+*
+* Machines should take a crash dump and reboot when receiving an NMI
+*
+set pcplusmp:apic_panic_on_nmi=1
+set apix:apic_panic_on_nmi=1
+
+*
+* Don't use multi-threaded fast crash dump or a high compression level
+*
+set dump_plat_mincpu=0
+set dump_bzip2_level=1
+
+*
+* See OS-1361 for dealing with the timer woes.
+*
+set pcplusmp:apic_timer_preferred_mode=0
+set apix:apic_timer_preferred_mode=0
+
+*
+* Want additional crash dump metrics
+*
+set dump_metrics_on=1
+
+*
+* The traditional (and essentially entirely brain dead) cfgadm(1M)-centric
+* model of hotpluggin' appears to be basically unnecessary.  This tunable
+* enables the system to create device nodes for newly inserted devices
+* automatically.  See: usr/src/uts/common/io/sata/impl/sata.c:97
+*
+set sata:sata_auto_online=1
+
+*
+* We want to limit the time spent in any one I/O to 10 seconds for targets
+* that are not optical.  This is still a very long time; our queue depth is
+* typically 10 or less, and disks will usually fail a command after 2-3s.
+* So we'd have to have multiple reads of bad sectors queued up to have any
+* chance of timing out.  In practice, timeouts occur because of problems with
+* disk controllers or firmware, not media errors, and in those cases it will
+* not help at all to wait longer.
+*
+set sd:sd_io_time=10
+
+* Use hires tick to improve some scheduling latency issues
+set hires_tick=1
+
+*
+* The "buildstamp" module contains information about the git sources used to
+* build the operating system image.  Once loaded, the driver will refuse to
+* detach.  We load it early to ensure it is in a crash dump wherever possible.
+*
+forceload: drv/buildstamp

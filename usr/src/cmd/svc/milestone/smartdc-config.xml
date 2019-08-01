@@ -1,0 +1,145 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2011 Joyent, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+    NOTE:  This service manifest is not editable; its contents will
+    be overwritten by package or patch operations, including
+    operating system upgrade.  Make customizations in a different
+    file.
+-->
+
+<service_bundle type='manifest' name='smartdc:config'>
+
+<!--
+	This service applies inital configuration for the GZ in smartdc.
+-->
+<service
+	name='system/smartdc/config'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='true' />
+
+	<single_instance />
+
+	<!--
+	dependency/dependent info
+	We need to wait for fs-joyent to be done so we can access the USB key
+	We need to run before sysconfig so interactive configuration can talk
+	on the console
+		(sysconfig)
+	We don't want anything else running which spews on console
+		(system/identy)
+	We don't want manifest import scribbling on the console while running
+		(manifest-import)
+	network/physical can't run without a config file
+		(network/physical)
+	-->
+	<dependency
+		name='filesystem-joyent'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/filesystem/smartdc' />
+	</dependency>
+
+	<!--
+	We don't want ssh starting if we haven't updated the passwords/keys
+	-->
+	<dependent
+		name='ssh_multi-user-server'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/network/ssh' />
+	</dependent>
+
+	<!-- Make ntp wait so we can setup the config. -->
+	<dependent
+		name='ntp'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/network/ntp' />
+	</dependent>
+
+	<dependent
+		name='headnode_config'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/milestone/sysconfig' />
+	</dependent>
+
+	<dependent
+		name='identity'
+		grouping='optional_all'
+		restart_on='none'>
+                <service_fmri value='svc:/system/identity:node' /> 
+        </dependent>   
+
+	<dependent
+		name='headnode_no_output'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/manifest-import' />
+	</dependent>
+
+	<dependent
+		name='network-physical'
+		grouping='optional_all'
+		restart_on='none'>
+		<service_fmri value='svc:/network/physical:default' />
+	</dependent>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/smartdc-config %m'
+		timeout_seconds='0'>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec='/lib/svc/method/smartdc-config %m'
+		timeout_seconds='60'>
+	</exec_method>
+
+	<property_group name='startd' type='framework'>
+		<propval name='duration' type='astring' value='transient' />
+	</property_group>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+			SmartDC live-image config management service
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='smartdc' section='5' manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

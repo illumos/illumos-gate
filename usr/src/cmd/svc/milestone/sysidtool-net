@@ -1,0 +1,5 @@
+#!/bin/sh
+
+# This exists solely to support the service on older SmartOS zone images.
+
+exit 0

@@ -1,0 +1,79 @@
+#!/bin/bash
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2010-2011 Joyent, Inc.  All rights reserved.
+# Use is subject to license terms.
+
+set -o xtrace
+
+. /lib/svc/share/smf_include.sh
+. /lib/sdc/config.sh
+
+PATH=/usr/sbin:/usr/bin; export PATH
+
+if [[ -n "$(/bin/bootparams | grep "^standalone=true")" ||
+  -n "$(/bin/bootparams | grep "^smartos=true")" ]]; then
+    # Standalone and SmartOS systems do not need ur
+    svcadm disable "${SMF_FMRI}"
+    exit $SMF_EXIT_OK
+fi
+
+case "$1" in
+'start')
+    #
+    # Grab AMQP parameters from the kernel command line or headnode config
+    #
+
+    load_sdc_config
+    load_sdc_sysinfo
+
+    if [[ -n ${SYSINFO_Bootparam_rabbitmq} ]]; then
+	rabbit=${SYSINFO_Bootparam_rabbitmq}
+    fi
+    if [[ -z ${rabbit} ]] && [[ -n ${CONFIG_rabbitmq} ]]; then
+        rabbit=${CONFIG_rabbitmq}
+    fi
+
+    if [[ -z $rabbit ]]; then
+	echo "unable to find AMQP parameters!"
+        exit $SMF_EXIT_ERR_FATAL
+    fi
+
+    export AMQP_LOGIN=$(echo $rabbit | cut -d: -f1)
+    export AMQP_PASSWORD=$(echo $rabbit | cut -d: -f2)
+    export AMQP_HOST=$(echo $rabbit | cut -d: -f3)
+    export AMQP_PORT=$(echo $rabbit | cut -d: -f4)
+    export NODE_PATH=/usr/node/node_modules
+
+    /usr/bin/ctrun -l child -o noorphan /smartdc/ur-agent/ur-agent 2>&1 &
+
+    ;;
+
+'stop')
+    ;;
+
+*)
+    echo "Usage: $0 { start | stop }"
+    exit $SMF_EXIT_ERR_FATAL
+    ;;
+esac
+exit $SMF_EXIT_OK

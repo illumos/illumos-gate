@@ -25,7 +25,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
@@ -143,7 +143,10 @@ clobber_local:
 
 # If the tarballs are included inside ON_CLOSED_BINS, use those to extract and
 # preserve the permissions (in case a distro ships them).
-
+#
+# intel_nhmex hard codes the use of older smbios structures. Therefore,
+# we disable its use of smbios. See OS-4435 for more information.
+#
 closedbins: bldtools $(ROOTDIRS) FRC
 	@CLOSED_ROOT="$$ON_CLOSED_BINS/root_$(MACH)$${RELEASE_BUILD+-nd}"; \
 	if [ -f "$$ON_CLOSED_BINS/on-closed-bins$${RELEASE_BUILD+-nd}.$(MACH).tar.bz2" ]; then \
@@ -163,9 +166,14 @@ closedbins: bldtools $(ROOTDIRS) FRC
 	(cd $$CLOSED_ROOT; \
 	    $(TAR) cfX - $(CODEMGR_WS)/exception_lists/closed-bins .) | \
 	    (cd $(ROOT); $(TAR) xBpf -); \
+	$(ECHO) "Stripping CTF from closed-bins in $$ROOT"; \
 	( cd $(ROOT); $(CTFSTRIP) $$(cd $$CLOSED_ROOT; $(FIND) \
 	    ./kernel ./usr/kernel ./platform/*/kernel -type f -a -perm -u+x | \
-	    $(EGREP) -vf $(CODEMGR_WS)/exception_lists/closed-bins) )
+	    $(EGREP) -vf $(CODEMGR_WS)/exception_lists/closed-bins) ); \
+	$(ECHO) "Fixing intel_nhmex.conf in $$ROOT"; \
+	(cd $(ROOT); \
+	   echo "no-smbios=1;" >> kernel/drv/intel_nhmex.conf)
+
 
 #
 # Declare what parts can be built in parallel

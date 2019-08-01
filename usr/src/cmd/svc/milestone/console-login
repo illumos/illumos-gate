@@ -23,6 +23,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2015 Joyent, Inc.
 #
 # This method script manages all vt logins including system
 # console login.
@@ -38,17 +39,28 @@
 
 . /lib/svc/share/smf_include.sh
 
-if [ "$1" != "default" ]; then
-	if smf_dont_configure_vt; then
-		/usr/sbin/svcadm disable $SMF_FMRI
-		exit $SMF_EXIT_OK
-	fi
-fi
-
 getproparg() {
 	val=`svcprop -p $2 $SMF_FMRI`
 	[ -n "$val" ] && [ "$val" != "\"\"" ] && echo $1 $val
 }
+
+# The service configuration invokes this script with "%i", the name of the
+# instance, as the first argument.
+instance="$1"
+if [ -z "$instance" ]; then
+	exit $SMF_EXIT_ERR_CONFIG
+fi
+
+case "$instance" in
+vt*)
+	# This instance is for one of the virtual terminal devices.  Check to
+	# see if the vt subsystem is initialised:
+	if smf_dont_configure_vt; then
+		/usr/sbin/svcadm disable "$SMF_FMRI"
+		exit $SMF_EXIT_OK
+	fi
+	;;
+esac
 
 args="-g"
 
@@ -59,6 +71,20 @@ val=`svcprop -p ttymon/device $SMF_FMRI`
 if [ "$val" = "/dev/vt/1" ]; then
 	echo "ERROR: ttymon/device cannot be configured to /dev/vt/1."
 	exit $SMF_EXIT_ERR_CONFIG
+fi
+
+# In SmartOS we use ttyb for metadata so we set to a non-existent device here
+# to disable the service and exit.
+if [[ ${val} == "/dev/term/b" && \
+    $(sysinfo | json "Product") == "SmartDC HVM" ]]; then
+
+    val=/dev/do_not_use_ttyb_in_a_vm
+fi
+
+if [[ ! -e $val ]]; then
+    # This device doesn't exist, can't run a tty on it.
+    /usr/sbin/svcadm disable $SMF_FMRI
+    exit $SMF_EXIT_OK
 fi
 
 args="$args -d $val"

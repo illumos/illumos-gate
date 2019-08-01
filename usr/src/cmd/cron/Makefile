@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 
 DEFAULTFILES =	cron.dfl
 
@@ -48,6 +48,7 @@ ROOTVAR =	$(ROOT)/var
 
 ROOTSPCRON =	$(ROOTVAR)/spool/cron
 ROOTCROND =	$(ROOTETC)/cron.d
+ROOTCRONDCRONTABS = $(ROOTCROND)/crontabs
 ROOTCRONTABS =	$(ROOTSPCRON)/crontabs
 ROOTATJOBS =	$(ROOTSPCRON)/atjobs
 ROOTLIBCRON =	$(ROOTLIB)/cron
@@ -65,9 +66,6 @@ POFILE=		$(PROG1)_cmd.po
 POFILES1=	at.po crontab.po funcs.po batch.po
 POFILES=	$(POFILES1) atrm.po
 $(POFILES1) :=	XGETFLAGS= -a -x $(PROG1).xcl
-
-ROOTDIRS =	$(ROOTSPCRON) $(ROOTCROND) \
-		$(ROOTCRONTABS) $(ROOTATJOBS)
 
 ROOTPROG =	$(PROG1:%=$(ROOTUSRSBIN)/%) $(PROG2:%=$(ROOTBIN)/%)	\
 		$(SCRIPT:%=$(ROOTBIN)/%) \
@@ -144,12 +142,8 @@ crontab :=	LDLIBS += -lsecdb -lpam -lzoneinfo
 crontab.xpg6 :=	LDLIBS += -lsecdb -lpam -lzoneinfo
 crontab.xpg4 :=	LDLIBS += -lsecdb -lpam -lzoneinfo
 
-lint :=		LDLIBS += -lproject -lsecdb -lcontract -lpam
-
 $(XPG4) := CFLAGS += -DXPG4
 $(XPG6) := CFLAGS += -DXPG6
-
-LINTFLAGS += -u
 
 $(ROOTSVCSYSTEM)/cron.xml := FILEMODE = 0444
 $(ROOTLIBSVCMETHOD)/svc-cron := FILEMODE = 0555
@@ -160,7 +154,7 @@ $(ROOTLIBSVCMETHOD)/svc-cron := FILEMODE = 0555
 all :		$(PROG) $(XPG4) $(XPG6) $(SCRIPT) $(XPG4SCRIPT) $(FILES)
 
 install :	all $(ROOTPROG) $(ROOTETCDEFAULTFILES) $(ROOTSYMLINK) \
-		$(ROOTMANIFEST) $(ROOTMETHOD)
+		$(ROOTMANIFEST) $(ROOTMETHOD) $(ROOTCRONDCRONTABS)/root
 
 $(PROG) :	$$(OBJS)
 		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
@@ -214,12 +208,13 @@ att2.c :	att2.l att2.ed att1.c
 		ed - lex.yy.c < att2.ed
 		$(MV) lex.yy.c att2.c
 
-# Don't re-install directories installed by Targetdirs
-#$(ROOTDIRS):
-#		$(INS.dir)
-
 $(ROOTSYMLINK) :
 		$(RM) $@; $(SYMLINK) $(SYMLNKDEST) $@
+
+$(ROOTCRONDCRONTABS)/root: crontab.root
+	$(RM) $@; \
+	$(INS) -s -m $(FILEMODE) -f $(@D) crontab.root; \
+	$(MV) $(@D)/crontab.root $@
 
 check:		$(CHKMANIFEST)
 
@@ -228,8 +223,6 @@ $(POFILE):	$(POFILES)
 
 clean :
 		$(RM) $(COBJS) att1.h att1.c att2.c
-
-lint :		lint_SRCS
 
 strip :
 		$(STRIP) $(PROG) $(XPG4) $(XPG6)

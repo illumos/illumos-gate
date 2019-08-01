@@ -22,42 +22,31 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#cmd/ipf/etc/Makefile
+# Copyright 2019 Joyent, Inc.
 #
 
-IPFCONF=	ipf.conf
-IPFPROG=	$(IPFCONF)
+IPFFILES = ipf.conf smartos_version
 
 include ../../Makefile.cmd
 
-
 ETCIPF= $(ROOTETC)/ipf
 
-DIRS=  $(ETCIPF)
+ROOTETCIPFFILES = $(IPFFILES:%=$(ETCIPF)/%)
 
-ETCIPFPROG=	$(IPFPROG:%=$(ETCIPF)/%)
-
-$(ETCIPFPROG):=	FILEMODE= 0644
+$(ETCIPF)/ipf.conf := FILEMODE= 0644
+$(ETCIPF)/smartos_version := FILEMODE= 0444
 
 .KEEP_STATE:
 
-all: $(IPFPROG) $(DIRS) $(ETCIPFPROG)
+all:
 
-install: all $(DIRS)
+install: all $(ROOTETCIPFFILES)
 
-$(PFILAP):
-	$(SH) $@.sh
-
-$(ETCIPF)/% : % $(ETCIPF)
+$(ETCIPF)/% : %
 	$(INS.file)
-
-$(DIRS):
-	$(INS.dir)
 
 clean:
 
 clobber:
-
-lint:
 
 .PARALLEL:

@@ -22,25 +22,19 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+# Copyright 2012 Joyent, Inc.  All rights reserved.
 
 . /lib/svc/share/smf_include.sh
-
-[ ! -f /etc/zones/global.xml ] && exit $SMF_EXIT_OK	# No global zone
-							# resource mgmt.
-							# configuration
-
-[ ! -x /usr/sbin/zoneadm ] && exit $SMF_EXIT_OK # SUNWzoneu not installed
 
 # Make sure working directory is / to prevent unmounting problems.
 cd /
 PATH=/usr/sbin:/usr/bin; export PATH
 
+smf_is_globalzone || exit $SMF_EXIT_OK
+
 case "$1" in
 'start')
-	zoneadm -z global apply
+	prctl -r -n zone.cpu-shares -v 65535 -t priv -i zone global
 	if [ $? -ne 0 ]; then
                 exit $SMF_EXIT_ERR_FATAL
         fi

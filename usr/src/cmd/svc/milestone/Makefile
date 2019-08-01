@@ -21,6 +21,8 @@
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright 2019 Joyent, Inc.
+#
 
 include ../../Makefile.cmd
 
@@ -30,6 +32,7 @@ BUILTXML= \
 	console-login.xml
 
 FSSVCS= \
+	joyent-fs.xml \
 	local-fs.xml \
 	minimal-fs.xml \
 	root-fs.xml \
@@ -38,6 +41,7 @@ FSSVCS= \
 FSMANIFESTS= $(FSSVCS:%=$(ROOTSVCSYSTEMFILESYSTEM)/%)
 
 NETSVCS= \
+	network-early-admin.xml \
 	network-initial.xml \
 	network-install.xml \
 	network-iptun.xml \
@@ -75,8 +79,12 @@ SYSTEMSVCS= \
 	early-manifest-import.xml \
 	identity.xml \
 	manifest-import.xml \
+	mdata.xml \
 	process-security.xml \
 	rmtmpfiles.xml	\
+	smartdc-config.xml \
+	smartdc-init.xml \
+	smartdc-ur.xml \
 	vtdaemon.xml
 
 SYSTEMMANIFESTS = $(SYSTEMSVCS:%=$(ROOTSVCSYSTEM)/%)
@@ -103,6 +111,7 @@ SVCMETHOD=\
 	console-login \
 	devices-audio \
 	devices-local \
+	fs-joyent \
 	fs-local \
 	fs-minimal \
 	fs-root \
@@ -110,6 +119,9 @@ SVCMETHOD=\
 	identity-domain \
 	identity-node \
 	manifest-import \
+	mdata-execute \
+	mdata-fetch \
+	net-early-admin \
 	net-loc \
 	net-loopback \
 	net-init \
@@ -122,6 +134,11 @@ SVCMETHOD=\
 	net-routing-setup \
 	net-svc \
 	rmtmpfiles \
+	smartdc-config \
+	smartdc-init \
+	smartdc-ur \
+	sysidtool-net \
+	sysidtool-system \
 	vtdaemon
 
 $(ROOTSVCMETHOD) := FILEMODE = 0555
@@ -161,4 +178,4 @@ $(ROOTSVCSYSTEM)/svc/%: %
 $(ROOT)/lib/svc/share/%: %.share
 	$(INS.rename)
 
-clean lint _msg:
+clean _msg:

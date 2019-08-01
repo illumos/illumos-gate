@@ -1,0 +1,74 @@
+#!/bin/ksh -p
+#
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2016 Joyent, Inc.  All rights reserved.
+#
+
+unset LD_LIBRARY_PATH
+PATH=/usr/bin:/usr/sbin
+export PATH
+
+. /usr/lib/brand/shared/common.ksh
+
+ZONENAME=""
+ZONEPATH=""
+
+while getopts "FR:z:" opt
+do
+	case "$opt" in
+		F)	;;
+		R)	ZONEPATH="$OPTARG";;
+		z)	ZONENAME="$OPTARG";;
+		*)	printf "$m_usage\n"
+			exit $ZONE_SUBPROC_USAGE;;
+	esac
+done
+shift OPTIND-1
+
+if [[ -z $ZONEPATH || -z $ZONENAME ]]; then
+	print -u2 "Brand error: No zone path or name"
+	exit $ZONE_SUBPROC_USAGE
+fi
+
+# Get the dataset of the parent directory of the zonepath.
+dname=${ZONEPATH%/*}
+bname=${ZONEPATH##*/}
+PDS_NAME=`mount | nawk -v p=$dname '{if ($1 == p) print $3}'`
+if [[ -z "$PDS_NAME" ]]; then
+	print -u2 "Brand error: missing parent ZFS dataset for $dname"
+	exit $ZONE_SUBPROC_USAGE
+fi
+
+# check if the origin is not an @final dataset, if not, we'll destroy it
+ORIGIN=`zfs get -H -ovalue origin $PDS_NAME/$bname | grep -v "@final$"`
+
+zfs destroy -rF $PDS_NAME/cores/$bname
+zfs destroy -rF $PDS_NAME/$bname
+if [[ $? != 0 ]]; then
+    echo "processes in zone: "
+    fuser ${ZONEPATH}
+    # Since we are destroying the zone, we don't want to leave a zoneroot behind
+    # just because something couldn't be umounted. So we'll also force the
+    # umount with the 'f' option here.
+    zfs destroy -rfF $PDS_NAME/$bname
+fi
+
+[[ -n ${ORIGIN} && ${ORIGIN} != "-" ]] && zfs destroy -F $ORIGIN
+
+rm -rf $ZONEPATH
+rm -rf /var/zonecontrol/${ZONENAME}
+
+jcommon_uninstall_hook
+
+exit $ZONE_SUBPROC_OK

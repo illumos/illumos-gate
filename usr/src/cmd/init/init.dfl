@@ -29,5 +29,6 @@
 # TZ, LANG, CMASK, or any of the LC_* environment variables.  value may
 # be enclosed in double quotes (") or single quotes (').
 #
-TZ=PST8PDT
+TZ=UTC
 CMASK=022
+LANG=en_US.UTF-8

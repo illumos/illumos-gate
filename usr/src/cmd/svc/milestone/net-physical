@@ -1,4 +1,4 @@
-#!/sbin/sh
+#!/usr/bin/ksh93
 #
 # CDDL HEADER START
 #
@@ -19,527 +19,839 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Milan Jurik. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
 # All rights reserved.
 #
 
 . /lib/svc/share/smf_include.sh
-. /lib/svc/share/net_include.sh
+. /lib/sdc/config.sh
+. /lib/sdc/network.sh
+
+set -o errexit
+set -o xtrace
 
 #
 # In a shared-IP zone we need this service to be up, but all of the work
-# it tries to do is irrelevant (and will actually lead to the service 
-# failing if we try to do it), so just bail out. 
+# it tries to do is irrelevant (and will actually lead to the service
+# failing if we try to do it), so just bail out.
 # In the global zone and exclusive-IP zones we proceed.
 #
-smf_configure_ip || exit $SMF_EXIT_OK
-
+smf_configure_ip || exit ${SMF_EXIT_OK}
 
 # Make sure that the libraries essential to this stage of booting can be found.
 LD_LIBRARY_PATH=/lib; export LD_LIBRARY_PATH
 
+# Time (in seconds) to wait for admin NIC to get DHCP address before continuing.
+ADMIN_DHCP_TIMEOUT=300
+ActiveAggrLinks=
+typeset -A ActiveAggrLinks
+
 smf_netstrategy
 
-if smf_is_globalzone; then
-	net_reconfigure || exit $SMF_EXIT_ERR_CONFIG
-
-	# Update PVID on interfaces configured with VLAN 1
-	update_pvid
-
-	# 
-	# Upgrade handling. The upgrade file consists of a series of dladm(1M)
-	# commands. Note that after we are done, we cannot rename the upgrade
-	# script file as the file system is still read-only at this point.
-	# Defer this to the manifest-import service.
-	#
-	upgrade_script=/var/svc/profile/upgrade_datalink
-	if [ -f "${upgrade_script}" ]; then 
-		. "${upgrade_script}"
-	fi
-
-	#
-	# Upgrade handling for ibd:
-	# After we are done with the upgrade handling, we can not set the
-	# ibd/ibd_upgraded property to "true" as the file system is
-	# read-only at this point. It will be done later by ibd-post-upgrade
-	# service.
-	#
-	if [ -x /sbin/ibd_upgrade ]; then
-		ibd_upgraded=`/bin/svcprop -c -p ibd/ibd_upgraded \
-		    $SMF_FMRI 2> /dev/null`
-		if [ "$ibd_upgraded" != "true" ]; then
-			/sbin/ibd_upgrade -v
-		fi
-	fi
-
-	#
-	# Bring up simnets, link aggregations and initialize security objects.
-	# Note that link property initialization is deferred until after
-	# IP interfaces are plumbed to ensure that the links will not
-	# be unloaded (and the property settings lost). We should bring
-	# up simnets prior to VLANs/Aggrs to enable creation of VLANs/Aggrs
-	# over simnets.
-	#
-	/sbin/dladm up-simnet
-	/sbin/dladm up-aggr
-	/sbin/dladm up-vlan
-	/sbin/dladm up-part
-	/sbin/dladm init-secobj
-	#
-	# Bring up VNICs
-	#
-	/sbin/dladm up-vnic
-	#
-	# Create flows via flowadm.
-	#
-	/sbin/flowadm init-flow
-fi
-
-#
-# If the system was net booted by DHCP, hand DHCP management off to the
-# DHCP agent (ifconfig communicates to the DHCP agent through the
-# loopback interface).
-#
-if [ -n "$_INIT_NET_IF" -a "$_INIT_NET_STRATEGY" = "dhcp" ]; then
-	/sbin/dhcpagent -a
-fi
-
-#
-# The network initialization is done early to support diskless and
-# dataless configurations.  For IPv4 interfaces that were configured by
-# the kernel (e.g.  those on diskless machines) and not configured by
-# DHCP, reset the netmask using the local "/etc/netmasks" file if one
-# exists, and then reset the broadcast address based on the netmask.
-#
-/sbin/ifconfig -auD4 netmask + broadcast +
-
-is_iptun ()
+function add_active_aggr_links
 {
-	intf=$1
-	# Is this a persistent IP tunnel link?
-	/sbin/dladm show-iptun -P $intf > /dev/null 2>&1
-	if [ $? -eq 0 ]; then
-		return 0
-	fi
-	# Is this an implicit IP tunnel (i.e., ip.tun0)
-	ORIGIFS="$IFS"
-	IFS="$IFS."
-	set -- $intf
-	IFS="$ORIGIFS"
-	if [ $# -eq 2 -a \( "$1" = "ip" -o "$1" = "ip6" \) ]; then
-		#
-		# It looks like one, but another type of link might be
-		# using a name that looks like an implicit IP tunnel.
-		# If dladm show-link -P finds it, then it's not an IP
-		# tunnel.
-		#
-		/sbin/dladm show-link -Pp $intf > /dev/null 2>&1
-		if [ $? -eq 0 ]; then
-			return 1
-		else
-			return 0
-		fi
-	fi
-	return 1
+    set -o xtrace
+    typeset alink
+
+    for alink in ${2//,/ }; do
+        ActiveAggrLinks[$alink]=$1
+    done
+}
+
+# Waits for up to 10 seconds for the link state to change to the given value
+function wait_for_admin_nic_state
+{
+    wait_for_nic_state "${SYSINFO_NIC_admin}" "$1"
+}
+
+# Plumbs the admin interface, and attempts to work around poorly-behaved
+# drivers that can't handle plumb commands too quickly after one another
+function plumb_admin
+{
+    set -o xtrace
+    driver=${SYSINFO_NIC_admin%%[0-9]*}
+    get_link_state ${SYSINFO_NIC_admin}
+    if [[ "$link_state" == "down" ]]; then
+        echo "admin nic '${SYSINFO_NIC_admin}' is down: unplumbing"
+        /sbin/ifconfig ${SYSINFO_NIC_admin} down unplumb
+        wait_for_admin_nic_state "unknown"
+    fi
+
+    # There's some sort of race condition in the bnx driver: if the plumb
+    # command comes too soon after the unplumb, the interface can come up
+    # in a state where it never fires interrupts for link state changes.
+    if [[ "$driver" == "bnx" ]]; then
+        sleep 5
+    fi
+    /sbin/ifconfig ${SYSINFO_NIC_admin} plumb mtu ${CONFIG_admin_mtu:-1500}
+    wait_for_admin_nic_state "up"
+}
+
+# Creates, plumbs and brings up a vnic with the specified inet parameters
+function vnic_up
+{
+    set -o xtrace
+
+    typeset link="$1"
+    typeset iface="$2"
+    typeset ip="$3"
+    typeset netmask="$4"
+    typeset vlan_id="$5"
+    typeset mac_addr="$6"
+    typeset dhcp_primary="$7"
+    typeset mtu="$8"
+    typeset details=
+    typeset vlan_opt=
+    typeset mac_addr_opt=
+    typeset prop_opt=
+
+    details="link='${link}', iface='${iface}', ip='${ip}'"
+    details="${details}, netmask='${netmask}, vlan_id='${vlan_id}'"
+
+    if [[ -z ${link} ]] || [[ -z ${iface} ]] || \
+       [[ -z ${ip} ]] || ([[ ${ip} != "dhcp" ]] && [[ -z ${netmask} ]]); then
+        echo "WARNING: not bringing up nic (insufficient configuration): " \
+             "$details"
+        return
+    fi
+
+    eval "vnic_already_up=\${vnic_${iface}_up}"
+    if [[ -n "${vnic_already_up}" ]]; then
+        echo "vnic already up: $details"
+        return
+    fi
+
+    if [[ -n ${mac_addr} ]] && [[ -n ${ActiveAggrLinks[${mac_addr}]} ]]; then
+        echo "WARNING: trying to assign MAC address \"${mac_addr}\" to vnic," \
+            " but it already belongs to link aggr " \
+            "\"${ActiveAggrLinks[${mac_addr}]}\""
+        return
+    fi
+
+    echo "Bringing up nic: $details"
+
+    if [[ -n ${vlan_id} ]] && [[ ${vlan_id} != 0 ]]; then
+        vlan_opt="-v ${vlan_id}"
+    fi
+
+    if [[ -n ${mac_addr} ]]; then
+        mac_addr_opt="-m ${mac_addr}"
+    fi
+
+    if [[ -n ${mtu} ]]; then
+        valid_mtu ${iface} ${mtu}
+        prop_opt="-p mtu=${mtu}"
+    fi
+
+    /usr/sbin/dladm create-vnic -t -l ${link} ${prop_opt} ${vlan_opt} \
+        ${mac_addr_opt} ${iface}
+    if [[ $? -ne 0 ]]; then
+        echo "Failed to create VNIC ${iface}"
+        exit $SMF_EXIT_ERR_FATAL
+    fi
+
+    /sbin/ifconfig ${iface} plumb
+    if [[ $? -ne 0 ]]; then
+        echo "Failed to plumb ${iface}"
+        exit $SMF_EXIT_ERR_FATAL
+    fi
+
+    if [[ ${ip} == "dhcp" ]]; then
+        # We ignore errors here because the most common one is that DHCP
+        # is already running.
+
+        if [[ -n ${dhcp_primary} ]]; then
+            /sbin/ifconfig ${iface} dhcp primary || /bin/true
+        else
+            /sbin/ifconfig ${iface} dhcp || /bin/true
+        fi
+    else
+        /sbin/ifconfig ${iface} inet ${ip} netmask ${netmask} up
+    fi
+    eval "vnic_${iface}_up=true"
+}
+
+# Creates, plumbs and brings up a vnic with the specified inet6 parameters
+function vnic_up6
+{
+    set -o xtrace
+
+    typeset link="$1"
+    typeset iface="$2"
+    typeset ip="$3"
+    typeset vlan_id="$4"
+    typeset mac_addr="$5"
+    typeset mtu="$6"
+    typeset details=
+    typeset vlan_opt=
+    typeset mac_addr_opt=
+    typeset prop_opt=
+
+    details="link='${link}', iface='${iface}', ip6='${ip}'"
+    details="${details}, vlan_id='${vlan_id}'"
+
+    if [[ -z ${link} ]] || [[ -z ${iface} ]] || [[ -z ${ip} ]]; then
+        echo "WARNING: not bringing up nic (insufficient configuration): " \
+             "$details"
+        return
+    fi
+
+    if [[ -n ${mac_addr} ]] && [[ -n ${ActiveAggrLinks[${mac_addr}]} ]]; then
+        echo "WARNING: trying to assign MAC address \"${mac_addr}\" to vnic," \
+            " but it already belongs to link aggr " \
+            "\"${ActiveAggrLinks[${mac_addr}]}\""
+        return
+    fi
+
+    # only bring up nic if not already up
+    eval "vnic_already_up=\${vnic_${iface}_up}"
+    if [[ -z "${vnic_already_up}" ]]; then
+        echo "Bringing up nic: $details"
+
+        if [[ -n ${vlan_id} ]] && [[ ${vlan_id} != 0 ]]; then
+            vlan_opt="-v ${vlan_id}"
+        fi
+
+        if [[ -n ${mac_addr} ]]; then
+            mac_addr_opt="-m ${mac_addr}"
+        fi
+
+        if [[ -n ${mtu} ]]; then
+            valid_mtu ${iface} ${mtu}
+            prop_opt="-p mtu=${mtu}"
+        fi
+
+        /usr/sbin/dladm create-vnic -t -l ${link} ${prop_opt} ${vlan_opt} \
+            ${mac_addr_opt} ${iface}
+        if [[ $? -ne 0 ]]; then
+            echo "Failed to create VNIC ${iface}"
+            exit $SMF_EXIT_ERR_FATAL
+        fi
+    fi
+
+    /sbin/ifconfig ${iface} inet6 plumb
+    if [[ $? -ne 0 ]]; then
+        echo "Failed to plumb ${iface}"
+        exit $SMF_EXIT_ERR_FATAL
+    fi
+
+    if [[ -n ${ip} ]]; then
+        /sbin/ifconfig ${iface} inet6 up
+    fi
+    if [[ ${ip} != "addrconf" ]]; then
+        /sbin/ifconfig ${iface} inet6 \
+            addif ${ip} preferred up
+    fi
+    eval "vnic_${iface}_up=true"
+}
+
+# If there are aggregations in sysinfo, set them up.
+function create_aggrs
+{
+    set -o xtrace
+    typeset links macs mode mtu
+    if [[ -z "${SYSINFO_Aggregations}" ]]; then
+        return 0
+    fi
+
+    aggrs=(${SYSINFO_Aggregations//,/ })
+    for aggr in "${aggrs[@]}"; do
+        eval "links=\${SYSINFO_Aggregation_${aggr}_Interfaces}"
+        eval "macs=\${SYSINFO_Aggregation_${aggr}_MACs}"
+        eval "mode=\${SYSINFO_Aggregation_${aggr}_LACP_mode}"
+        eval "mtu=\${CONFIG_${aggr}_mtu}"
+        [[ -z "$mode" ]] && mode="off"
+
+        echo "Creating aggr: ${aggr} (mode=${mode}, links=${links})"
+        dladm create-aggr -l ${links//,/ -l } -L ${mode} ${aggr}
+        if [[ $? -eq 0 ]]; then
+            add_active_aggr_links ${aggr} ${macs}
+        fi
+
+        if [[ -n "$mtu" ]]; then
+            dladm set-linkprop -p mtu=${mtu} ${aggr}
+            if [[ $? -ne 0 ]]; then
+                echo "Failed to set mtu on aggr ${aggr} to ${mtu}"
+                exit $SMF_EXIT_ERR_FATAL
+            fi
+        fi
+    done
+
+    # Creating the aggregations may affect the nic tags in sysinfo, so update:
+    /usr/bin/sysinfo -u
+    load_sdc_sysinfo
 }
 
 #
-# All the IPv4 and IPv6 interfaces are plumbed before doing any
-# interface configuration.  This prevents errors from plumb failures
-# getting mixed in with the configured interface lists that the script
-# outputs.
+# Try various config parameters to set the default route
 #
+function set_default_route
+{
+    set -o xtrace
+    typeset default_gw
+
+    if [[ -n "${CONFIG_headnode_default_gateway}" ]]; then
+        default_gw="${CONFIG_headnode_default_gateway}"
+
+    elif [[ -n ${CONFIG_admin_gateway} ]]; then
+        default_gw="${CONFIG_admin_gateway}"
+
+    elif [[ -n ${BOOT_admin_gateway} ]]; then
+        default_gw=${BOOT_admin_gateway}
+
+    elif [[ -n ${CONFIG_external_gateway} ]]; then
+        default_gw=${CONFIG_external_gateway}
+    fi
+
+    if [[ -n ${default_gw} ]]; then
+        echo "${default_gw}" > /etc/defaultrouter
+    fi
+
+    if [[ -n ${CONFIG_admin_gateway6} ]]; then
+        default_gw6="${CONFIG_admin_gateway6}"
+
+    elif [[ -n ${BOOT_admin_gateway6} ]]; then
+        default_gw6=${BOOT_admin_gateway6}
+
+    elif [[ -n ${CONFIG_external_gateway6} ]]; then
+        default_gw6=${CONFIG_external_gateway6}
+    fi
+
+    if [[ -n ${default_gw6} ]]; then
+        # add static route
+        /usr/sbin/route add -inet6 default ${default_gw6}
+    fi
+}
 
 #
-# First deal with /etc/hostname
+# Go through and set up the MTU for all of the various nic tags
 #
-# Get the list of IPv4 interfaces to configure by breaking
-# /etc/hostname.* into separate args by using "." as a shell separator
-# character.
-#
-interface_names="`echo /etc/hostname.*[0-9] 2>/dev/null`"
-if [ "$interface_names" != "/etc/hostname.*[0-9]" ]; then
-	ORIGIFS="$IFS"
-	IFS="$IFS."
-	set -- $interface_names
-	IFS="$ORIGIFS"
-	while [ $# -ge 2 ]; do
-		shift
-		intf_name=$1
-		while [ $# -gt 1 -a "$2" != "/etc/hostname" ]; do
-			intf_name="$intf_name.$2"
-			shift
-		done
-		shift
+function setup_mtu
+{
+    set -o xtrace
+    typeset tag oldifs val mac link curmtu
+    typeset -A mtus
+    typeset -A tagmap
 
-		# skip IP tunnel interfaces plumbed by net-iptun.
-		if is_iptun $intf_name; then
-			continue
-		fi
+    set -o xtrace
+    oldifs=$IFS
+    IFS=,
+    for tag in ${SYSINFO_Nic_Tags}; do
+        eval "val=\${CONFIG_${tag}_mtu}"
+        eval "mac=\${CONFIG_${tag}_nic}"
+        [[ -z "$val" ]] && continue
 
-	        read one rest < /etc/hostname.$intf_name
-		if [ "$one" = ipmp ]; then
-			ipmp_list="$ipmp_list $intf_name"
-		else
-			inet_list="$inet_list $intf_name"
-		fi
-	done
+        valid_mtu ${tag} $val
+
+        #
+        # Note, it doesn't matter what tag we use for a given mac
+        # address, because we'll always get the same link name later on.
+        #
+        if [[ -z "${tagmap[$mac]}" ]]; then
+            tagmap[$mac]=$tag
+        fi
+
+        if [[ -z "${mtus[$mac]}" ]]; then
+            mtus[$mac]=$val
+        elif [[ "${mtus[$mac]}" -lt $val ]]; then
+            mtus[$mac]=$val
+        fi
+    done
+    IFS=$oldifs
+
+    for mac in ${!mtus[@]}; do
+        tag=${tagmap[$mac]}
+        eval "link=\${SYSINFO_NIC_${tag}}"
+        if [[ -z "${link}" ]]; then
+            echo "/usbkey/config error: Missing link name for ${tag}"
+            exit $SMF_EXIT_ERR_FATAL
+        fi
+
+        #
+        # Check the current MTU of the device. To help out devices which
+        # don't support the setting of the MTU (here's looking at you
+        # bnx), if the MTU is identical to its default, don't do
+        # anything and save the poor folks stuck with bnx some grief.
+        #
+        curmtu=$(/usr/sbin/dladm show-linkprop -c -o value -p mtu ${link})
+        [[ $? -eq 0 ]] && [[ "$curmtu" -eq "${mtus[$mac]}" ]] && continue
+
+            if ! /usr/sbin/dladm set-linkprop -p mtu=${mtus[$mac]} ${link}; then
+                echo "Failed to set mtu to ${mtus[$mac]} for link ${link}"
+                exit $SMF_EXIT_ERR_FATAL
+            fi
+    done
+}
+
+
+# Helper function for plumbing an interface for an address family once
+typeset -A plumbedifs
+function plumbif
+{
+    iface=$1
+    inet=$2
+    addrtype=$3
+    if [[ -z ${plumbedifs[${iface},${inet}]} ]]; then
+        plumbedifs[${iface},${inet}]="true"
+        /sbin/ifconfig ${iface} ${inet} plumb
+        if [[ ! ${addrtype} =~ "^vrrp" ]]; then
+            /sbin/ifconfig ${iface} ${inet} up
+        fi
+    fi
+}
+
+if smf_is_globalzone; then
+    EARLY_ADMIN=
+    [[ -f /etc/svc/volatile/.early_admin_setup ]] && EARLY_ADMIN=1
+    [[ -n "$EARLY_ADMIN" ]] || /usr/sbin/dladm init-phys
+
+    # The next command is for logging purposes only
+    log_if_state before
+
+    # Load sysinfo variables with SYSINFO_ prefix: we primarily care about
+    # the NIC_variables, which contain the actual interface name for a nic
+    # tag (it has mapped the foo_nic=<MAC address> variables to interface
+    # names for us).
+    load_sdc_sysinfo
+
+    if boot_file_config_enabled; then
+        # We have a boot-time networking file present - use its values rather
+        # than ones from the config file or bootparams
+        if ! boot_file_config_valid; then
+            echo "ERROR: boot-time network config file incorrect"
+            exit ${SMF_EXIT_ERR_CONFIG}
+        fi
+
+        load_boot_file_config
+
+        # NOTE: some of the routes boot_file_config_init tries to add may
+        # fail if they are admin network routes added by the
+        # network/early-admin service.  This is expected and not a problem.
+        boot_file_config_init
+    else
+        # Load config variables with CONFIG_ prefix,
+        # and sets the headnode variable
+        load_sdc_config
+        # Load boot params with BOOT_ prefix
+        load_sdc_bootparams
+    fi
+
+    # Set up etherstubs
+    for stub in $(echo "${CONFIG_etherstub}" | sed -e "s/,/ /g"); do
+        /usr/sbin/dladm create-etherstub -t $stub || echo "ERROR: could not create etherstub ${stub}."
+    done
+
+    # Create aggregations
+    create_aggrs
+
+    # Make any mtu adjustments that may be necessary
+    setup_mtu
+
+    # Setup admin NIC
+    ADMIN_NIC_TAG=${CONFIG_admin_tag:-"admin"}
+
+    # If there is no NIC with the admin tag, and the config has
+    # admin_nic_autoselect=true, designate the first NIC reported
+    # by dladm for admin use. This is useful in environments where
+    # the NICs are known to change beneath us.
+    if [[ "${BOOT_smartos}" == "true" ]] && \
+        [[ "${CONFIG_admin_nic_autoselect}" == "true" ]] && \
+        ! nictagadm exists $ADMIN_NIC_TAG ; then
+        autoselected_admin_nic=$(dladm show-phys -m -p -o address | head -n1)
+        if [[ -z ${autoselected_admin_nic} ]] ; then
+            echo "ERROR: no NICs found, unable to autoselect admin NIC."
+            exit ${SMF_EXIT_ERR_CONFIG}
+        fi
+
+        nictagadm add $ADMIN_NIC_TAG "${autoselected_admin_nic}"
+        if [[ $? -ne 0 ]] ; then
+            echo "ERROR: unable to add admin tag to NIC ${autoselected_admin_nic}"
+            exit ${SMF_EXIT_ERR_FATAL}
+        fi
+
+        SYSINFO_NIC_admin=$(dladm show-phys -m -p -o link | head -n1)
+        if [[ -n ${SYSINFO_NIC_admin} ]] ; then
+            echo "Autoselected ${SYSINFO_NIC_admin} for use as admin NIC."
+        fi
+
+        nictagadm list
+    elif [[ -v CONFIG_admin_tag ]]; then
+        #
+        # This handles the case when the 'admin_tag' property is set to
+        # override the default admin nic tag.
+        #
+        eval SYSINFO_NIC_admin='$'SYSINFO_NIC_${CONFIG_admin_tag}
+
+        eval CONFIG_admin_ip='$'CONFIG_${CONFIG_admin_tag}_ip
+        eval CONFIG_admin_ip6='$'CONFIG_${CONFIG_admin_tag}_ip6
+        eval CONFIG_admin_netmask='$'CONFIG_${CONFIG_admin_tag}_netmask
+        eval CONFIG_admin_mtu='$'CONFIG_${CONFIG_admin_tag}_mtu
+        eval CONFIG_admin_gateway='$'CONFIG_${CONFIG_admin_tag}_gateway
+        eval CONFIG_admin_gateway6='$'CONFIG_${CONFIG_admin_tag}_gateway6
+    fi
+
+    if [[ -z "${SYSINFO_NIC_admin}" ]]; then
+        echo "ERROR: admin NIC not found, unable to bring up admin network."
+        exit ${SMF_EXIT_ERR_CONFIG}
+    fi
+
+    [[ -n "$EARLY_ADMIN" ]] || plumb_admin
+
+    # If we performed early configuration of the admin network and
+    # the admin interface is on a link aggregation, the aggregation
+    # has already been configured.  Add it to the list of active aggrs
+    # so the checks in vnic_up[6] are aware of it.
+    if [[ -n "$EARLY_ADMIN" && "${SYSINFO_NIC_admin}" =~ aggr[0-9]+$ ]]; then
+        eval "macs=\${SYSINFO_Aggregation_${SYSINFO_NIC_admin}_MACs}"
+
+        add_active_aggr_links ${SYSINFO_NIC_admin} $macs
+    fi
+
+    # Prefer the config file for admin nic values, but use
+    # bootparams if present
+    admin_ip=${CONFIG_admin_ip}
+    if [[ -z "$admin_ip" ]]; then
+        admin_ip=${BOOT_admin_ip}
+    fi
+
+    admin_netmask=${CONFIG_admin_netmask}
+    if [[ -z "$admin_netmask" ]]; then
+        admin_netmask=${BOOT_admin_netmask}
+    fi
+
+    admin_ip6=${CONFIG_admin_ip6}
+    if [[ -z "$admin_ip6" ]]; then
+        admin_ip6=${BOOT_admin_ip6}
+    fi
+
+    if [[ $admin_ip == 'none' ]]; then
+        echo 'INFO: not configuring IP on admin interface (admin_ip=none)'
+    elif [[ -n "$EARLY_ADMIN" ]]; then
+        echo 'INFO: admin interface already configured (early setup)'
+        ADMIN_NIC_UP=true
+    elif [[ -n $admin_ip ]] && [[ -n $admin_netmask ]]; then
+        /sbin/ifconfig ${SYSINFO_NIC_admin} inet ${admin_ip} \
+            netmask ${admin_netmask} up
+        ADMIN_NIC_UP=true
+
+        # also setup resolv.conf if we can
+        if [[ -n ${CONFIG_dns_domain} ]] && [[ -n ${CONFIG_dns_resolvers} ]]; then
+            echo "search ${CONFIG_dns_domain}" > /etc/resolv.conf
+            if [[ -n ${CONFIG_binder_admin_ips} ]]; then
+               for serv in $(echo "${CONFIG_binder_admin_ips}" | sed -e "s/,/ /g"); do
+                   echo "nameserver ${serv}" >> /etc/resolv.conf
+               done
+            fi
+            for serv in $(echo "${CONFIG_dns_resolvers}" | sed -e "s/,/ /g"); do
+                echo "nameserver ${serv}" >> /etc/resolv.conf
+            done
+        fi
+    else
+        if [[ ${headnode} == "true" ]]; then
+            echo "ERROR: headnode but no admin_{ip,netmask} in config, not bringing up admin network."
+            # Set a flag, but try to plumb the other interfaces anyway
+            ADMIN_NIC_MISCONFIGURED=true
+        else
+            # We ignore errors here because the most common one is that DHCP is
+            # already running.
+            /sbin/ifconfig ${SYSINFO_NIC_admin} dhcp || /bin/true
+
+            # Wait for DHCP
+            timeout=${ADMIN_DHCP_TIMEOUT}
+            dhcp_admin_ip=$(/sbin/ifconfig ${SYSINFO_NIC_admin} | grep inet | awk '{ print $2 }')
+            while [[ (-z ${dhcp_admin_ip} || ${dhcp_admin_ip} == "0.0.0.0") && ${timeout} -gt 0 ]]; do
+                dhcp_admin_ip=$(/sbin/ifconfig ${SYSINFO_NIC_admin} | grep inet | awk '{ print $2 }')
+                timeout=$((${timeout} - 1))
+                sleep 1
+            done
+
+            ADMIN_NIC_UP=true
+        fi
+    fi
+
+    if [[ -n ${admin_ip6} && -z "$EARLY_ADMIN" ]]; then
+        # Plumb interface for inet6
+        ifconfig ${SYSINFO_NIC_admin} inet6 \
+            plumb mtu ${CONFIG_admin_mtu:-1500} up
+
+        # Autodiscovery IPv6 using SLAAC
+        # NOTE: in.ndpd will be started later, due to plumbing the interface.
+        #       this means autodiscovery also happens when configuring a
+        #       static address.
+        #
+        #       in.ndpd also sets a default route and this can't be disabled.
+
+        # Configure static IPv6
+        if [[ ${admin_ip6} != "addrconf" ]]; then
+            /sbin/ifconfig ${SYSINFO_NIC_admin} inet6 \
+                addif ${admin_ip6} preferred up
+        fi
+
+        ADMIN_NIC_UP=true
+
+        # don't setup resolv.conf, IPv6 addresses already work
+    fi
+
+    # If on Parallels or VirtualBox, create a bridge which
+    # allows traffic to flow correctly to the host-only network
+    if [[ "${ADMIN_NIC_UP}" == "true" ]] \
+        && [[ ${SYSINFO_Product} == "Parallels Virtual Platform" \
+              || ${SYSINFO_Product} == "VirtualBox" ]] \
+        && [[ -z $(/usr/sbin/dladm show-bridge -p vmwarebr) ]]; then
+        /usr/sbin/dladm create-bridge -l ${SYSINFO_NIC_admin} vmwarebr
+    fi
+
+    # Setup the external NIC. The installer may have already set up external0,
+    # so, if it exists, we're not going to try and set up the vnic again.
+    if [[ -n ${SYSINFO_NIC_external} ]] \
+        && ! dladm show-vnic external0 > /dev/null; then
+
+        if [[ -n "${CONFIG_external_ip}" ]]; then
+            vnic_up "${SYSINFO_NIC_external}" "external0" \
+                "${CONFIG_external_ip}" "${CONFIG_external_netmask}" \
+                "${CONFIG_external_vlan_id}" "${CONFIG_external_mac}" \
+                "primary" "${CONFIG_external_mtu}"
+        fi
+
+        if [[ -n "${CONFIG_external_ip6}" ]]; then
+            vnic_up6 "${SYSINFO_NIC_external}" "external0" \
+                "${CONFIG_external_ip6}" \
+                "${CONFIG_external_vlan_id}" "${CONFIG_external_mac}" \
+                "${CONFIG_external_mtu}"
+        fi
+    fi
+
+    set_default_route
+
+    # Setup extra nics, if specified in the config file
+    nic_tags="${SYSINFO_Nic_Tags}"
+    if [[ -n "${nic_tags}" ]]; then
+        tags=(${nic_tags//,/ })
+
+        if boot_file_config_enabled; then
+            bootparam_ip_keys=""
+            bootparam_ip6_keys=""
+            config_ip_keys=${CONFIG_bootfile_ip_keys//,/ }
+            config_ip6_keys=${CONFIG_bootfile_ip6_keys//,/ }
+        else
+            bootparam_ip_keys=$(sdc_bootparams_keys | grep -- "-ip$" || true)
+            bootparam_ip6_keys=$(sdc_bootparams_keys | grep -- "-ip6$" || true)
+            config_ip_keys=$(sdc_config_keys | grep "_ip$" || true)
+            config_ip6_keys=$(sdc_config_keys | grep "_ip6$" || true)
+        fi
+
+        for tag in "${tags[@]}"; do
+
+            eval "link=\${SYSINFO_NIC_${tag}}"
+            if [[ -z "${link}" ]]; then
+                echo "WARNING: No link found with tag '${tag}'"
+                continue
+            fi
+
+            for key in ${config_ip_keys}; do
+                if [[ ${key} == ${tag}[0-9]_ip ]] || [[ ${key} == ${tag}[0-9][0-9]_ip ]]; then
+                    iface=${key//_ip/}
+                    #echo "   iface=$iface"
+                    eval "ip=\${CONFIG_${iface}_ip}"
+                    eval "netmask=\${CONFIG_${iface}_netmask}"
+                    eval "vlan=\${CONFIG_${iface}_vlan_id}"
+                    eval "macaddr=\${CONFIG_${iface}_mac}"
+                    eval "mtu=\${CONFIG_${iface}_mtu}"
+
+                    echo vnic_up "${link}" "${iface}" "${ip}" "${netmask}" "${vlan}" "${macaddr}" "${mtu}"
+                    vnic_up "${link}" "${iface}" "${ip}" "${netmask}" \
+                        "${vlan}" "${macaddr}" "" "${mtu}"
+                fi
+            done
+
+            for key in ${bootparam_ip_keys}; do
+                if [[ ${key} == ${tag}[0-9]-ip ]] || [[ ${key} == ${tag}[0-9][0-9]-ip ]]; then
+                    iface=${key//-ip/}
+                    eval "ip=\${BOOT_${iface}_ip}"
+                    eval "netmask=\${BOOT_${iface}_netmask}"
+                    eval "vlan=\${BOOT_${iface}_vlan_id}"
+                    eval "macaddr=\${BOOT_${iface}_mac}"
+                    eval "mtu=\${CONFIG_${iface}_mtu}"
+                    echo vnic_up "${link}" "${iface}" "${ip}" "${netmask}" "${vlan}" "${macaddr}" "${mtu}"
+                    vnic_up "${link}" "${iface}" "${ip}" "${netmask}" \
+                        "${vlan}" "${macaddr}" "" "${mtu}"
+                fi
+            done
+
+            for key in ${config_ip6_keys}; do
+                if [[ ${key} == ${tag}[0-9]_ip6 ]] || [[ ${key} == ${tag}[0-9][0-9]_ip6 ]]; then
+                    iface=${key//_ip6/}
+                    #echo "   iface=$iface"
+                    eval "ip=\${CONFIG_${iface}_ip6}"
+                    eval "vlan=\${CONFIG_${iface}_vlan_id}"
+                    eval "macaddr=\${CONFIG_${iface}_mac}"
+                    eval "mtu=\${CONFIG_${iface}_mtu}"
+
+                    echo vnic_up6 "${link}" "${iface}" "${ip}" "${vlan}" "${macaddr}" "${mtu}"
+                    vnic_up6 "${link}" "${iface}" "${ip}" \
+                        "${vlan}" "${macaddr}" "${mtu}"
+                fi
+            done
+
+            for key in ${bootparam_ip6_keys}; do
+                if [[ ${key} == ${tag}[0-9]-ip6 ]] || [[ ${key} == ${tag}[0-9][0-9]-ip6 ]]; then
+                    iface=${key//-ip6/}
+                    eval "ip=\${BOOT_${iface}_ip6}"
+                    eval "vlan=\${BOOT_${iface}_vlan_id}"
+                    eval "macaddr=\${BOOT_${iface}_mac}"
+                    eval "mtu=\${CONFIG_${iface}_mtu}"
+                    echo vnic_up6 "${link}" "${iface}" "${ip}" "${vlan}" "${macaddr}" "${mtu}"
+                    vnic_up6 "${link}" "${iface}" "${ip}" \
+                        "${vlan}" "${macaddr}" "${mtu}"
+                fi
+            done
+
+        done
+    fi
+else
+    # Non-global zones
+
+    # Bring up statically assigned interfaces, and find the primary DHCP
+    # interface, if it exists
+    while IFS=: read -r iface addrtype; do
+        # Keep track of whether or not we've configured our first IPv4
+        # address on this interface
+        first_ipv4_configured=""
+        iface_configured=""
+
+        if [[ -f /etc/dhcp.${iface} ]]; then
+            plumbif ${iface} inet ${addrtype}
+            if [[ -z "${primary}" ]]; then
+                /sbin/ifconfig ${iface} auto-dhcp primary
+                primary=${iface}
+            else
+                /sbin/ifconfig ${iface} auto-dhcp
+            fi
+            first_ipv4_configured="true"
+            iface_configured="true"
+        fi
+
+        if [[ -f /etc/hostname.${iface} ]]; then
+            while read ifparams; do
+                # For IPv4, we need to set the address on the first logical
+                # interface. For IPv6, the address on the first interface is
+                # the link-local address, and can't be changed.
+                #
+                # Lines starting with inet indicate the hostname for that
+                # interface, and are used by dhcpagent. Skip over them.
+                if [[ -f /etc/dhcp.${iface} && "${ifparams}" == inet* ]]; then
+                    continue
+                elif [[ "${ifparams}" == {3}({1,3}(\d).){1,3}(\d)* ]]; then
+                    plumbif ${iface} inet ${addrtype}
+                    if [[ -z "${first_ipv4_configured}" ]]; then
+                        first_ipv4_configured="true"
+                        ifcommand="inet"
+                    else
+                        ifcommand="inet addif"
+                    fi
+                else
+                    plumbif ${iface} inet6 ${addrtype}
+                    ifcommand="inet6 addif"
+                fi
+
+                # vrrp interfaces can't be brought up with ifconfig: vrrpadm
+                # handles that instead
+                if [[ "${addrtype}" =~ "^vrrp" ]]; then
+                    /sbin/ifconfig ${iface} ${ifcommand} \
+                        `printf "%s" "${ifparams}" | sed -e 's/ up//'`
+                else
+                    /sbin/ifconfig ${iface} ${ifcommand} ${ifparams} up
+                fi
+
+                iface_configured="true"
+            done < /etc/hostname.${iface}
+        fi
+
+        if [[ -f /etc/addrconf.${iface} ]]; then
+            # Enable the NDP daemon, so that once this script finishes, we'll
+            # be able to pick up router advertisments and finish configuring
+            # the network interface. We then just need to plumb the interface,
+            # and let in.ndpd take care of configuring addresses.
+            svcadm enable svc:/network/routing/ndp:default
+            plumbif ${iface} inet6 ${addrtype}
+            iface_configured="true"
+        fi
+
+        # If we didn't configure the device at all, mark it for DHCP if we
+        # don't do DHCP on anyone else.
+        if [[ -z ${iface_configured} && -z "${first_iface}" ]]; then
+            first_iface=${iface}
+        fi
+    done < <(/usr/sbin/dladm show-vnic -p -o link,macaddrtype 2>/dev/null)
+
+    if [[ -z "${primary}" && -n "${first_iface}" ]]; then
+        first_iface_type=$(dladm show-vnic ${first_iface} -p -o macaddrtype)
+        plumbif ${first_iface} inet ${first_iface_type}
+        /sbin/ifconfig ${first_iface} auto-dhcp
+        primary=${first_iface}
+    fi
+
+    while IFS=: read -r iface addrtype; do
+        if [[ "${iface}" == "${primary}"
+              || -f /etc/hostname.${iface}
+              || -f /etc/dhcp.${iface}
+              || -f /etc/addrconf.${iface}
+              || "${addrtype}" =~ "^vrrp" ]]; then
+            continue
+        fi
+
+        plumbif ${iface} inet ${addrtype}
+        /sbin/ifconfig ${iface} auto-dhcp start wait 0
+    done < <(/usr/sbin/dladm show-vnic -p -o link,macaddrtype 2>/dev/null)
 fi
 
-#
-# Get the list of IPv6 interfaces to configure by breaking
-# /etc/hostname6.* into separate args by using "." as a shell separator
-# character.
-#
-interface_names="`echo /etc/hostname6.*[0-9] 2>/dev/null`"
-if [ "$interface_names" != "/etc/hostname6.*[0-9]" ]; then
-	ORIGIFS="$IFS"
-	IFS="$IFS."
-	set -- $interface_names
-	IFS="$ORIGIFS"
-	while [ $# -ge 2 ]; do
-		shift
-		intf_name=$1
-		while [ $# -gt 1 -a "$2" != "/etc/hostname6" ]; do
-			intf_name="$intf_name.$2"
-			shift
-		done
-		shift
+log_if_state after
 
-		# skip IP tunnel interfaces plumbed by net-iptun.
-		if is_iptun $intf_name; then
-			continue
-		fi
-
-	        read one rest < /etc/hostname6.$intf_name
-		if [ "$one" = ipmp ]; then
-			ipmp6_list="$ipmp6_list $intf_name"
-		else
-			inet6_list="$inet6_list $intf_name"
-		fi
-	done
+# Since we hopefully made networking changes here, update the sysinfo cache
+if smf_is_globalzone; then
+    /usr/bin/sysinfo -u
 fi
 
-#
-# Create all of the IPv4 IPMP interfaces.
-#
-if [ -n "$ipmp_list" ]; then
-	set -- $ipmp_list
-	while [ $# -gt 0 ]; do
-	    	if /sbin/ifconfig $1 ipmp; then
-			ipmp_created="$ipmp_created $1"
-		else
-			ipmp_failed="$ipmp_failed $1"
-		fi	
-		shift
-	done
-	[ -n "$ipmp_failed" ] && warn_failed_ifs "create IPv4 IPMP" \
-	    "$ipmp_failed"
+# Enable symmetric routing: when there are multiple nics configured, always
+# take into account the interface a packet is being sent over when
+# selecting a route. This prevents packets being sent with another nic's
+# source IP.
+/usr/sbin/ndd -set /dev/ip ip_strict_src_multihoming 1
+
+# If the admin nic was missing config options, exit with a config error
+if [[ -n "${ADMIN_NIC_MISCONFIGURED}" ]]; then
+    exit ${SMF_EXIT_ERR_CONFIG}
 fi
 
-#
-# Step through the IPv4 interface list and try to plumb every interface.
-# Generate list of plumbed and failed IPv4 interfaces.
-#
-if [ -n "$inet_list" ]; then
-	set -- $inet_list
-	while [ $# -gt 0 ]; do
-		/sbin/ifconfig $1 plumb
-		if /sbin/ifconfig $1 inet >/dev/null 2>&1; then
-			inet_plumbed="$inet_plumbed $1"
-		else
-			inet_failed="$inet_failed $1"
-		fi
-		shift
-	done
-	[ -n "$inet_failed" ] && warn_failed_ifs "plumb IPv4" "$inet_failed"
-fi
-
-# Run autoconf to connect to a WLAN if the interface is a wireless one
-if [ -x /sbin/wificonfig -a -n "$inet_plumbed" ]; then
-	set -- $inet_plumbed
-	while [ $# -gt 0 ]; do
-			if [ -r /dev/wifi/$1 ]; then
-				/sbin/wificonfig -i $1 startconf >/dev/null
-			fi
-		shift
-	done
-fi
-
-#
-# Step through the IPv6 interface list and plumb every interface.
-# Generate list of plumbed and failed IPv6 interfaces.  Each plumbed
-# interface will be brought up later, after processing any contents of
-# the /etc/hostname6.* file.
-#
-if [ -n "$inet6_list" ]; then
-	set -- $inet6_list
-	while [ $# -gt 0 ]; do
-		/sbin/ifconfig $1 inet6 plumb
-		if /sbin/ifconfig $1 inet6 >/dev/null 2>&1; then
-			inet6_plumbed="$inet6_plumbed $1"
-		else
-			inet6_failed="$inet6_failed $1"
-		fi
-		shift
-	done
-	[ -n "$inet6_failed" ] && warn_failed_ifs "plumb IPv6" "$inet6_failed"
-fi
-
-#
-# Create all of the IPv6 IPMP interfaces.
-#
-if [ -n "$ipmp6_list" ]; then
-	set -- $ipmp6_list
-	while [ $# -gt 0 ]; do
-	    	if /sbin/ifconfig $1 inet6 ipmp; then
-			ipmp6_created="$ipmp6_created $1"
-		else
-			ipmp6_failed="$ipmp6_failed $1"
- 		fi
-		shift
-	done
-	[ -n "$ipmp6_failed" ] && warn_failed_ifs "create IPv6 IPMP" \
-	    "$ipmp6_failed"
-fi
-
-#
-# Finally configure interfaces set up with ipadm. Any /etc/hostname*.intf
-# files take precedence over ipadm defined configurations except when
-# we are in a non-global zone and Layer-3 protection of IP addresses is
-# enforced on the interface by the global zone.
-#
-for showif_output in `/sbin/ipadm show-if -p -o ifname,state,current`; do
-	intf=`echo $showif_output | /usr/bin/cut -f1 -d:`
-	state=`echo $showif_output | /usr/bin/cut -f2 -d:`
-	current=`echo $showif_output | /usr/bin/cut -f3 -d:`
-	if  [[ "$state" != "disabled" && $current != *Z* ]]; then
-		#
-		# skip if not a persistent interface, or if it should get IP
-		# configuration from the global zone ('Z' flag is set)
-		#
-		continue;
-	elif is_iptun $intf; then
-		# skip IP tunnel interfaces plumbed by net-iptun
-		continue;
-	elif [ -f /etc/hostname.$intf ] || [ -f /etc/hostname6.$intf ]; then
-		if [[ $current != *Z* ]]; then
-			echo "found /etc/hostname.$intf "\
-			    "or /etc/hostname6.$intf, "\
-			    "ignoring ipadm configuration" > /dev/msglog
-			continue;
-		else
-			echo "Ignoring /etc/hostname*.$intf" > /dev/msglog 
-			/sbin/ifconfig $intf unplumb > /dev/null 2>&1
-			/sbin/ifconfig $intf inet6 unplumb > /dev/null 2>&1
-		fi
-	fi
-
-	# Enable the interface managed by ipadm
-	/sbin/ipadm enable-if -t $intf
-done
-
-#
-# Process the /etc/hostname[6].* files for IPMP interfaces.  Processing these
-# before non-IPMP interfaces avoids accidental implicit IPMP group creation.
-#
-[ -n "$ipmp_created" ] && if_configure inet "IPMP" $ipmp_created
-[ -n "$ipmp6_created" ] && if_configure inet6 "IPMP" $ipmp6_created
-
-#
-# Process the /etc/hostname[6].* files for non-IPMP interfaces.
-#
-[ -n "$inet_plumbed" ] && if_configure inet "" $inet_plumbed
-[ -n "$inet6_plumbed" ] && if_configure inet6 "" $inet6_plumbed
-
-#
-# For the IPv4 and IPv6 interfaces that failed to plumb, find (or create)
-# IPMP meta-interfaces to host their data addresses.
-#
-[ -n "$inet_failed" ] && move_addresses inet
-[ -n "$inet6_failed" ] && move_addresses inet6
-
-# Run DHCP if requested. Skip boot-configured interface.
-interface_names="`echo /etc/dhcp.*[0-9] 2>/dev/null`"
-if [ "$interface_names" != '/etc/dhcp.*[0-9]' ]; then
-	#
-	# First find the primary interface. Default to the first
-	# interface if not specified. First primary interface found
-	# "wins". Use care not to "reconfigure" a net-booted interface
-	# configured using DHCP. Run through the list of interfaces
-	# again, this time trying DHCP.
-	#
-	i4d_fail=
-	firstif=
-	primary=
-	ORIGIFS="$IFS"
-	IFS="${IFS}."
-	set -- $interface_names
-
-	while [ $# -ge 2 ]; do
-		shift
-		[ -z "$firstif" ] && firstif=$1
-
-		for i in `shcat /etc/dhcp\.$1`; do
-			if [ "$i" = primary ]; then
-				primary=$1
-				break
-			fi
-		done
-
-		[ -n "$primary" ] && break
-		shift
-	done
-
-	[ -z "$primary" ] && primary="$firstif"
-	cmdline=`shcat /etc/dhcp\.${primary}`
-
-	if [ "$_INIT_NET_IF" != "$primary" ]; then
-		echo "starting DHCP on primary interface $primary"
-		/sbin/ifconfig $primary auto-dhcp primary $cmdline
-		# Exit code 4 means ifconfig timed out waiting for dhcpagent
-		[ $? != 0 ] && [ $? != 4 ] && i4d_fail="$i4d_fail $primary"
-	fi
-
-	set -- $interface_names
-
-	while [ $# -ge 2 ]; do
-		shift
-		cmdline=`shcat /etc/dhcp\.$1`
-		if [ "$1" != "$primary" -a \
-			"$1" != "$_INIT_NET_IF"  ]; then
-			echo "starting DHCP on interface $1"
-			/sbin/ifconfig $1 dhcp start wait 0 $cmdline
-			# Exit code can't be timeout when wait is 0
-			[ $? != 0 ] && i4d_fail="$i4d_fail $1"
-		fi
-		shift
-	done
-	IFS="$ORIGIFS"
-	unset ORIGIFS
-	[ -n "$i4d_fail" ] && warn_failed_ifs "configure IPv4 DHCP" "$i4d_fail"
-fi
-
-# In order to avoid bringing up the interfaces that have
-# intentionally been left down, perform RARP only if the system
-# has no configured hostname in /etc/nodename
-hostname="`shcat /etc/nodename 2>/dev/null`"
-if [ "$_INIT_NET_STRATEGY" = "rarp" -o -z "$hostname" ]; then
-	/sbin/ifconfig -adD4 auto-revarp netmask + broadcast + up
-fi
-
-#
-# If the /etc/defaultrouter file exists, process it now so that the next
-# stage of booting will have access to NFS.
-#
-if [ -f /etc/defaultrouter ]; then
-	while read router rubbish; do
-		case "$router" in
-			'#'* | '') ;;	#  Ignore comments, empty lines
-			*)	/sbin/route -n add default -gateway $router ;;
-		esac
-	done </etc/defaultrouter
-fi
-
-#
-# If we get here and were not asked to plumb any IPv4 interfaces, look
-# for boot properties that direct us.
-#
-# - The "network-interface" property is required and indicates the
-#   interface name.
-# - The "xpv-hcp" property, if present, is used by the hypervisor
-#   tools to indicate how the specified interface should be configured.
-#   Permitted values are "dhcp" and "off", where "off" indicates static
-#   IP configuration.
-#
-# In the case where "xpv-hcp" is set to "dhcp", no further properties
-# are required or examined.
-#
-# In the case where "xpv-hcp" is not present or set to "off", the
-# "host-ip" and "subnet-mask" properties are used to configure
-# the specified interface.  The "router-ip" property, if present,
-# is used to add a default route.
-#
-nic="`/sbin/devprop network-interface`"
-if smf_is_globalzone && [ -z "$inet_list" ] && [ -n "$nic" ]; then
-	hcp="`/sbin/devprop xpv-hcp`"
-	case "$hcp" in
-	"dhcp")
-		/sbin/ifconfig $nic plumb 2>/dev/null
-		[ -n "`/sbin/ifconfig $nic 2>/dev/null`" ] && (
-			# The interface is successfully plumbed, so
-			# modify "inet_list" to force the exit code
-			# checks to work.
-			inet_list=$nic;
-			# Given that this is the only IPv4 interface,
-			# we assert that it is primary.
-			echo "starting DHCP on primary interface $primary";
-			/sbin/ifconfig $nic auto-dhcp primary;
-			# Exit code 4 means ifconfig timed out waiting
-			# for dhcpagent
-			[ $? != 0 ] && [ $? != 4 ] && \
-			    i4d_fail="$i4d_fail $nic";
-		)
-		;;
-
-	"off"|"")
-		/sbin/devprop host-ip subnet-mask router-ip | (
-			read ip;
-			read mask;
-			read router;
-			[ -n "$ip" ] && [ -n "$mask" ] && \
-				/sbin/ifconfig $nic plumb 2>/dev/null
-			[ -n "`/sbin/ifconfig $nic 2>/dev/null`" ] && (
-				# The interface is successfully
-				# plumbed, so modify "inet_list" to
-				# force the exit code checks to work.
-				inet_list=$nic;
-				/sbin/ifconfig $nic  inet $ip \
-				    netmask $mask broadcast + up 2>/dev/null;
-				[ -n "$router" ] && route add \
-				    default $router 2>/dev/null;
-			)
-		)
-		;;
-	esac
-fi
-
-#
-# We tell smf this service is online if any of the following is true:
-# - no interfaces were configured for plumbing and no DHCP failures
-# - any non-loopback IPv4 interfaces are up and have a non-zero address
-# - there are any DHCP interfaces started
-# - any non-loopback IPv6 interfaces are up
-#
-# If we weren't asked to configure any interfaces, exit
-if [ -z "$inet_list" ] && [ -z "$inet6_list" ]; then
-	# Config error if DHCP was attempted without plumbed interfaces
-	[ -n "$i4d_fail" ] && exit $SMF_EXIT_ERR_CONFIG
-	exit $SMF_EXIT_OK
+if [[ $admin_ip == 'none' ]]; then
+    #
+    # We're done, even if there are not any usable IP addresses.
+    #
+    exit $SMF_EXIT_OK
 fi
 
 # Any non-loopback IPv4 interfaces with usable addresses up?
-if [ -n "`/sbin/ifconfig -a4u`" ]; then
-    	/sbin/ifconfig -a4u | while read intf addr rest; do
-		[ $intf = inet ] && [ $addr != 127.0.0.1 ] &&
-		[ $addr != 0.0.0.0 ] && exit $SMF_EXIT_OK
-	done && exit $SMF_EXIT_OK
+if [[ -n "`/sbin/ifconfig -a4u`" ]]; then
+    /sbin/ifconfig -a4u | while read intf addr rest; do
+        [[ ${intf} == "inet" ]] && [[ ${addr} != "127.0.0.1" ]] &&
+        [[ ${addr} != "0.0.0.0" ]] && exit ${SMF_EXIT_OK}
+    done && exit ${SMF_EXIT_OK}
 fi
 
 # Any DHCP interfaces started?
-[ -n "`/sbin/ifconfig -a4 dhcp status 2>/dev/null`" ] && exit $SMF_EXIT_OK
+[[ -n "`/sbin/ifconfig -a4 dhcp status 2>/dev/null`" ]] && exit ${SMF_EXIT_OK}
 
 # Any non-loopback IPv6 interfaces up?
-if [ -n "`/sbin/ifconfig -au6`" ]; then
-	/sbin/ifconfig -au6 | while read intf addr rest; do
-		[ $intf = inet6 ] && [ $addr != ::1/128 ] && exit $SMF_EXIT_OK
-	done && exit $SMF_EXIT_OK
+if [[ -n "`/sbin/ifconfig -au6`" ]]; then
+    /sbin/ifconfig -au6 | while read intf addr rest; do
+        [[ ${intf} = "inet6" ]] && [[ ${addr} != "::1/128" ]] && exit ${SMF_EXIT_OK}
+    done && exit ${SMF_EXIT_OK}
 fi
 
 # This service was supposed to configure something yet didn't.  Exit
 # with config error.
-exit $SMF_EXIT_ERR_CONFIG
+exit ${SMF_EXIT_ERR_CONFIG}

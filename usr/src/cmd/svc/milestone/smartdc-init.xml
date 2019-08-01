@@ -1,0 +1,124 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2012 Joyent, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+    NOTE:  This service manifest is not editable; its contents will
+    be overwritten by package or patch operations, including
+    operating system upgrade.  Make customizations in a different
+    file.
+-->
+
+<service_bundle type='manifest' name='Joyent:joyent'>
+
+<!--
+	This service imports the zone's zpool on bootup, before zones try to
+	start.  It also sets up configuration data on that zpool, if necessary.
+-->
+<service
+	name='system/smartdc/init'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='true' />
+
+	<single_instance />
+
+	<!--
+	dependency info
+	This depends on the system/zones svc which seems weird since that
+	svc runs late in boot because it depends on milestone/multi-user-server.
+	Our svc does the initial setup of the infrastructure zones on the
+	headnode so we need the system/zones svc to run first so that we can
+	install and boot the infrastructure zones.  The reason this seems
+	weird is that this svc also sets up the zpool when we first boot,
+	before we reboot to install the infrastructure zones, so it might seem
+	like it should run early in boot, but it can't because of the zone
+	issue described above.
+
+	The dependency on network/physical is needed since all of the earlier
+	svcs which have a dependency on network/physical are using optional_all.
+	That makes sense for those svcs since they can come up without a
+	network, but for SmartOS, by this point we require the network to be
+	there.
+	-->
+	<dependency
+		name='zones'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/system/zones' />
+	</dependency>
+
+        <dependency
+		name='net-physical'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/network/physical' />
+	</dependency>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/smartdc-init %m'
+		timeout_seconds='0'>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec='/lib/svc/method/smartdc-init %m'
+		timeout_seconds='60'>
+	</exec_method>
+
+	<property_group name='startd' type='framework'>
+		<propval name='duration' type='astring' value='transient' />
+	</property_group>
+
+	<!--
+		The zpool holding the zones (this must be imported).
+	-->
+	<property_group name='config' type='application'>
+		<propval name='zpool' type='astring' value='zones' />
+	</property_group>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+			Joyent live-image management service
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='zones' section='5' manpath='/usr/share/man' />
+			<manpage
+				title='zpool'
+				section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>

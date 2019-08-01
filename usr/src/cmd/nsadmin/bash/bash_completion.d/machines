@@ -1,0 +1,19 @@
+_machine()
+{
+    local cur prev opts base
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    if [[ ${prev} == 'machine-json' ]]; then
+        machines=$(zoneadm list -cp | grep -v ':global:' | cut -d':' -f2,5 | tr ':' '\n' | sort | uniq)
+        COMPREPLY=( $(compgen -W "${machines}" -- ${cur}) )
+    else
+        # Just expand files by default
+        COMPREPLY=( $(compgen -f -- ${cur}) )
+    fi
+
+    return 0
+}
+
+complete -F _machine machine-json

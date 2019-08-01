@@ -21,6 +21,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+#
 
 # The profile that all logins get before using their own .profile.
 
@@ -37,29 +38,14 @@ then
 	export TERM
 fi
 
-#
-# use less(1) as the default pager for the man(1) command.
-#
-PAGER="/usr/bin/less -ins"
-export PAGER
-
 #	Login and -su shells get /etc/profile services.
 #	-rsh is given its environment in its .profile.
-
-case "$0" in
--bash)
-	# set prompt for bash
-	PS1="\u@\h:\w\\$ "
-	export PS1
-	;;
-esac
 
 case "$0" in
 -sh | -ksh | -ksh93 | -jsh | -bash | -zsh)
 
 	if [ ! -f .hushlogin ]
 	then
-		/usr/sbin/quota
 		#	Allow the user to break the Message-Of-The-Day only.
 		trap "trap '' 2"  2
 		/bin/cat -s /etc/motd
@@ -67,12 +53,12 @@ case "$0" in
 
 		/bin/mail -E
 		case $? in
-		0)
+		0) 
 			echo "You have new mail."
-			;;
-		2)
+		  	;;
+		2) 
 			echo "You have mail."
-			;;
+		   	;;
 		esac
 	fi
 esac

@@ -20,33 +20,29 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
-# lib/brand/Makefile
-#
-# include global definitions
 include ../../Makefile.master
 
-#
-# Build everything in parallel; use .WAIT for dependencies
 .PARALLEL:
 
-i386_SUBDIRS= lx bhyve
+i386_SUBDIRS= bhyve kvm lx
 i386_MSGSUBDIRS= lx
 
-SUBDIRS= shared .WAIT sn1 solaris10 ipkg labeled $($(MACH)_SUBDIRS)
+SUBDIRS= shared .WAIT sn1 solaris10 ipkg labeled \
+    jcommon joyent joyent-minimal $($(MACH)_SUBDIRS)
+
 MSGSUBDIRS= solaris10 shared $($(MACH)_MSGSUBDIRS)
 
 all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all install clean clobber: $(SUBDIRS)
 
 _msg: $(MSGSUBDIRS)
 

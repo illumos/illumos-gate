@@ -13,7 +13,7 @@
 # Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2011 EveryCity Ltd. All rights reserved.
 # Copyright 2013 DEY Storage Systems, Inc.
-# Copyright 2016 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2017 RackTop Systems.
 #
 
@@ -22,6 +22,10 @@ include		$(SRC)/cmd/Makefile.ctf
 include		$(SRC)/cmd/localedef/Makefile.common
 
 LDLIBS +=	-lavl -lgen
+
+I18NEXTFILE = $(ROOTI18NEXT)/UTF-8.x
+
+$(I18NEXTFILE) := FILEMODE = 0444
 
 .KEEP_STATE:
 
@@ -43,9 +47,7 @@ $(POFILE):	$(PIFILES)
 		$(SED) -e '/domain/d' messages.po > $@
 		$(RM) $(PIFILES) messages.po
 
-install:	all $(ROOTPROG)
-
-lint:		lint_SRCS
+install:	all $(ROOTPROG) $(I18NEXTFILE)
 
 clean:
 		$(RM) $(CLEANFILES)

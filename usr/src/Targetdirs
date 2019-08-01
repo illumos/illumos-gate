@@ -28,7 +28,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2017 RackTop Systems.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
@@ -57,6 +57,7 @@ i386_DIRS= \
 	/lib/libmvec \
 	/platform/i86pc \
 	/usr/lib/brand/bhyve \
+	/usr/lib/brand/kvm \
 	/usr/lib/brand/lx \
 	/usr/lib/brand/lx/amd64 \
 	/usr/lib/brand/lx/distros \
@@ -116,9 +117,12 @@ DIRS= \
 	/devices \
 	/devices/pseudo \
 	/etc \
+	/etc/bash \
+	/etc/bash/bash_completion.d \
 	/etc/brand  \
 	/etc/brand/solaris10  \
 	/etc/cron.d \
+	/etc/cron.d/crontabs \
 	/etc/crypto \
 	/etc/crypto/certs \
 	/etc/crypto/crls \
@@ -148,6 +152,7 @@ DIRS= \
 	/etc/hal/fdi/preprobe/20thirdparty \
 	/etc/hal/fdi/preprobe/30user \
 	/etc/ipadm \
+	/etc/ipf \
 	/etc/iscsi \
 	/etc/rpcsec	\
 	/etc/security	\
@@ -279,6 +284,9 @@ DIRS= \
 	/usr/lib/abi \
 	/usr/lib/brand \
 	/usr/lib/brand/ipkg \
+	/usr/lib/brand/jcommon \
+	/usr/lib/brand/joyent \
+	/usr/lib/brand/joyent-minimal \
 	/usr/lib/brand/labeled \
 	/usr/lib/brand/shared \
 	/usr/lib/brand/sn1 \
@@ -305,6 +313,7 @@ DIRS= \
 	/usr/lib/inet/ilb \
 	/usr/lib/krb5 \
 	/usr/lib/link_audit \
+	/usr/lib/localedef/extensions \
 	/usr/lib/lwp \
 	/usr/lib/mdb \
 	/usr/lib/mdb/kvm \

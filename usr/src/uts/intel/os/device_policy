@@ -8,4 +8,21 @@
 #
 
 *		read_priv_set=none		write_priv_set=none
-md:admin					write_priv_set=sys_config
+bridge:*	read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
+fssnap:ctl	read_priv_set=sys_config	write_priv_set=sys_config
+icmp:*		read_priv_set=net_icmpaccess	write_priv_set=net_icmpaccess
+icmp6:*		read_priv_set=net_icmpaccess	write_priv_set=net_icmpaccess
+ipf:*		read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
+ip:*		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
+ip6:*		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
+ipnet:*		read_priv_set=net_observability	write_priv_set=net_observability
+ipsecah:*	read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
+ipsecesp:*	read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
+keysock:*	read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
+mm:allkmem	read_priv_set=all		write_priv_set=all
+mm:kmem		read_priv_set=none		write_priv_set=all
+mm:mem		read_priv_set=none		write_priv_set=all
+openeepr:*					write_priv_set=all
+random:*					write_priv_set=sys_devices
+scsi_vhci:devctl				write_priv_set=sys_devices
+spdsock:*	read_priv_set=sys_ip_config	write_priv_set=sys_ip_config
