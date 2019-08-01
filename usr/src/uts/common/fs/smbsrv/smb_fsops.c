@@ -1194,6 +1194,14 @@ smb_fsop_rename(
 	if (rc != 0)
 		return (rc);
 
+	/*
+	 * Make sure "from" vp is not a mount point.
+	 */
+	if (from_vp->v_type == VDIR && vn_ismntpt(from_vp)) {
+		VN_RELE(from_vp);
+		return (EACCES);
+	}
+
 	if (from_attr.sa_dosattr & FILE_ATTRIBUTE_REPARSE_POINT) {
 		VN_RELE(from_vp);
 		return (EACCES);
