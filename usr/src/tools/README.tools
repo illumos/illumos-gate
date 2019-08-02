@@ -20,6 +20,9 @@
 #
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+#
+# Copyright 2019 Joyent, Inc.
+#
 
 
 This directory contains the tools used to do a full build of the
@@ -49,7 +52,7 @@ Layout of /opt/onbld
 /opt/onbld/lib/python<version>/
 	python modules used by the build tools.
 
-/opt/onbld/lib/python/ 
+/opt/onbld/lib/python/
         symlink to the modules directory of the currently preferred
         python version.
 
@@ -82,10 +85,6 @@ check_rtime
 	entries, which help detect changes in software dependencies and makes
 	sure objects don't have any strange runpaths like /opt/SUNWspro/lib.
 
-codereview
-	Given two filenames, creates a postscript file with the file 
-	differences highlighted.
-
 codesign
 	Tools for signing cryptographic modules using the official
 	Sun release keys stored on a remote signing server. This
@@ -104,7 +103,7 @@ cscope-fast
 	The fast version of cscope that we use internally. Seems to work,
 	but may need more testing before it's placed in the gate. The source
 	just really needs to be here.
-	
+
 cstyle
 	checks C source for compliance with OS/Net guidelines.
 

@@ -21,8 +21,9 @@
 .\" Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
+.\" Copyright 2019 Joyent, Inc.
 .\"
-.TH WEBREV 1ONBLD "Mar 27, 2016"
+.TH WEBREV 1ONBLD "Aug 2, 2019"
 .SH NAME
 webrev \- Generate HTML codereview materials
 .SH SYNOPSIS
@@ -66,10 +67,10 @@ A basis for comparison is needed in order to determine the differences
 introduced by the code changes under review.
 
 By default, \fBwebrev\fR creates a \fIwebrev\fR directory in the
-workspace directory that contains the generated HTML files, a generated
-PDF review, and a patch representing the changes.  It also places a
-copy of the file list in that directory, and of both the old and new
-raw files in the \fB$webrev_root/raw_files\fR directory.
+workspace directory that contains the generated HTML files, and a patch
+representing the changes.  It also places a copy of the file list in
+that directory, and of both the old and new raw files in the
+\fB$webrev_root/raw_files\fR directory.
 To output the webrev somewhere other than the default location, use the
 \fI-o <outdir>\fR option, or set the \fBWDIR\fR environment variable.
 For example:
@@ -108,7 +109,6 @@ is formatted according to the following color coding:
 .fi
 
 .SH SCM INTERACTIONS
-.PP
 .B webrev
 attempts to interact with the source code management system currently in use.
 .B webrev
@@ -162,7 +162,6 @@ from the
 The file list will be created from the output of the "svn status" command.
 
 .SH CROSS REFERENCING
-.PP
 After extracting comments (see FILE LIST below),
 .B webrev
 will translate cross references into hyperlinks.  By default, information
@@ -185,7 +184,7 @@ references.
 .BI "-D"
 Delete remote webrev via SFTP. Default remote host is \fIcr.opensolaris.org\fR,
 default remote directory for removal is the same as workspace/repository
-basename. Remote target can be overriden using -t option. If combined with
+basename. Remote target can be overridden using -t option. If combined with
 -U the deletion will be performed first. Also, if used together with -U
 and the removal fails, no upload is done. Without -U option no webrev will
 be generated, just like if -n option was used. The deletion is done by
@@ -207,7 +206,7 @@ the webrev author. User content is contained by a <div> tag and
 the markup should validate as XHTML 1.0 Transitional.
 .TP 10
 .BI "-N"
-Suppress all comments from all output forms html, txt and pdf.
+Suppress all comments from all output forms.
 .TP 10
 .BI "-n"
 Do not generate webrev. Useful whenever only upload is needed.
@@ -244,7 +243,6 @@ this mode when invoking webrev.  The list is assumed to be in the
 format expected by the \fIwx\fR package.  See FILE LIST, below.
 
 .SH FILE LIST
-.PP
 .B Webrev
 needs to be told or to discover which files have changed in a
 given workspace.  By default,
