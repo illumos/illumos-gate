@@ -173,7 +173,7 @@ has_keyboard(void)
 	 */
 	hin_end = &hin[sz / sizeof (*hin)];
 	for (walker = hin; walker < hin_end; walker++) {
-		status = BS->HandleProtocol(*walker, &devid, (void **)&path);
+		status = OpenProtocolByHandle(*walker, &devid, (void **)&path);
 		if (EFI_ERROR(status))
 			continue;
 
@@ -482,7 +482,7 @@ main(int argc, CHAR16 *argv[])
 	archsw.arch_zfs_probe = efi_zfs_probe;
 
 	/* Get our loaded image protocol interface structure. */
-	BS->HandleProtocol(IH, &imgid, (void **)&img);
+	(void) OpenProtocolByHandle(IH, &imgid, (void **)&img);
 
 	/* Init the time source */
 	efi_time_init();
@@ -648,7 +648,7 @@ main(int argc, CHAR16 *argv[])
 		efi_free_devpath_name(text);
 	}
 
-	status = BS->HandleProtocol(img->DeviceHandle, &devid,
+	status = OpenProtocolByHandle(img->DeviceHandle, &devid,
 	    (void **)&imgpath);
 	if (status == EFI_SUCCESS) {
 		text = efi_devpath_name(imgpath);
@@ -1066,7 +1066,7 @@ command_chain(int argc, char *argv[])
 		command_errmsg = "LoadImage failed";
 		return (CMD_ERROR);
 	}
-	status = BS->HandleProtocol(loaderhandle, &LoadedImageGUID,
+	status = OpenProtocolByHandle(loaderhandle, &LoadedImageGUID,
 	    (void **)&loaded_image);
 
 	if (argc > 2) {

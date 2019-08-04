@@ -222,7 +222,8 @@ efifb_uga_get_pciio(void)
 	/* Get the PCI I/O interface of the first handle that supports it. */
 	pciio = NULL;
 	for (hp = buf; hp < buf + bufsz; hp++) {
-		status = BS->HandleProtocol(*hp, &pciio_guid, (void **)&pciio);
+		status = OpenProtocolByHandle(*hp, &pciio_guid,
+		    (void **)&pciio);
 		if (status == EFI_SUCCESS) {
 			free(buf);
 			return (pciio);
@@ -458,11 +459,11 @@ efifb_gop_get_edid(EFI_HANDLE gop)
 		return (NULL);
 
 	guid = &active_edid_guid;
-	status = BS->OpenProtocol(gop, guid, (VOID **)&edid, IH, NULL,
+	status = BS->OpenProtocol(gop, guid, (void **)&edid, IH, NULL,
 	    EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 	if (status != EFI_SUCCESS) {
 		guid = &discovered_edid_guid;
-		status = BS->OpenProtocol(gop, guid, (VOID **)&edid, IH, NULL,
+		status = BS->OpenProtocol(gop, guid, (void **)&edid, IH, NULL,
 		    EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 	}
 	if (status != EFI_SUCCESS)

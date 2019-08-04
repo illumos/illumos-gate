@@ -286,8 +286,8 @@ efipart_hdd(EFI_DEVICE_PATH *dp)
 		}
 
 		/* Make sure we do have the media. */
-		status = BS->HandleProtocol(efipart_handles[i],
-		    &blkio_guid, (void **)&blkio);
+		status = OpenProtocolByHandle(efipart_handles[i], &blkio_guid,
+		    (void **)&blkio);
 		if (EFI_ERROR(status))
 			return (false);
 
@@ -430,8 +430,8 @@ efipart_updatecd(void)
 		if (efipart_hdd(devpath))
 			continue;
 
-		status = BS->HandleProtocol(efipart_handles[i],
-		    &blkio_guid, (void **)&blkio);
+		status = OpenProtocolByHandle(efipart_handles[i], &blkio_guid,
+		    (void **)&blkio);
 		if (EFI_ERROR(status))
 			continue;
 		/*
@@ -683,8 +683,8 @@ efipart_updatehd(void)
 		if (!efipart_hdd(devpath))
 			continue;
 
-		status = BS->HandleProtocol(efipart_handles[i],
-		    &blkio_guid, (void **)&blkio);
+		status = OpenProtocolByHandle(efipart_handles[i], &blkio_guid,
+		    (void **)&blkio);
 		if (EFI_ERROR(status))
 			continue;
 
@@ -771,7 +771,7 @@ efipart_print_common(struct devsw *dev, pdinfo_list_t *pdlist, int verbose)
 		snprintf(line, sizeof(line),
 		    "    %s%d", dev->dv_name, pd->pd_unit);
 		printf("%s:", line);
-		status = BS->HandleProtocol(h, &blkio_guid, (void **)&blkio);
+		status = OpenProtocolByHandle(h, &blkio_guid, (void **)&blkio);
 		if (!EFI_ERROR(status)) {
 			printf("    %llu",
 			    blkio->Media->LastBlock == 0? 0:
@@ -854,7 +854,7 @@ efipart_open(struct open_file *f, ...)
 		return (EINVAL);
 
 	if (pd->pd_blkio == NULL) {
-		status = BS->HandleProtocol(pd->pd_handle, &blkio_guid,
+		status = OpenProtocolByHandle(pd->pd_handle, &blkio_guid,
 		    (void **)&pd->pd_blkio);
 		if (EFI_ERROR(status))
 			return (efi_status_to_errno(status));
