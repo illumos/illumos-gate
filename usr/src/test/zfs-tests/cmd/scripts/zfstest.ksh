@@ -130,10 +130,10 @@ function constrain_path
 	# Special case links
 	ln -s /usr/gnu/bin/dd $PATHDIR/gnu_dd
 
-	# SmartOS does not ship some required packages by default.
+	# SmartOS does not ship some required commands by default.
 	# Link to them in the package manager's namespace.
 	pkgsrc_bin=/opt/local/bin
-	pkgsrc_packages="sudo truncate python base64"
+	pkgsrc_packages="sudo truncate python base64 shuf sha256sum"
 	for pkg in $pkgsrc_packages; do
 		if [[ ! -x $PATHDIR/$pkg ]]; then
 			rm $PATHDIR/$pkg &&
