@@ -4,7 +4,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -495,7 +495,7 @@ recount:
 
 		while (limbo_dirs != NULL) {
 			limbo_victim = *(fsck_ino_t *)limbo_dirs;
-			if (limbo_victim != NULL) {
+			if (limbo_victim != 0) {
 				(void) tdelete((void *)limbo_victim,
 				    &limbo_dirs,
 				    ino_t_cmp);

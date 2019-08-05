@@ -657,9 +657,9 @@ macro_expand(key, pline, plineq, size)
  * and returns the quoting information in "qbuf". Character is
  * considered escaped when it is
  *
- * 	preceded with '\'	e.g. \a
- * 	within quotes		e.g. "string"
- * 	a ':' in brackets 	e.g. [an:ip:6::ad::d:re:s:s]
+ *	preceded with '\'	e.g. \a
+ *	within quotes		e.g. "string"
+ *	a ':' in brackets	e.g. [an:ip:6::ad::d:re:s:s]
  *
  * original str: 'the "brown" f\ox said: [fe80::20a:e4ff:fe35:8b0d]'
  * unquoted str: 'the brown fox said: [fe80::20a:e4ff:fe35:8b0d]'
@@ -1078,7 +1078,7 @@ put_automountd_env(void)
 	    SCF_TYPE_ASTRING, AUTOMOUNTD, &bufsz);
 	if (ret == SA_OK) {
 		a = c = defval;
-		if (*a == NULL)
+		if (*a == '\0')
 			return;
 		/*
 		 * Environment variables can have more than one value
@@ -1097,7 +1097,7 @@ put_automountd_env(void)
 				putenv(strdup(a));
 			a = c = p + 1;
 		}
-		if (*a != NULL) {
+		if (*a != '\0') {
 			if ((c = strchr(a, '=')) != NULL)
 				putenv(strdup(a));
 		}

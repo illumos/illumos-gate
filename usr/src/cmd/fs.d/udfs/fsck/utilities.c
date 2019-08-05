@@ -3,7 +3,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 1980, 1986, 1990 The Regents of the University of California.
@@ -521,7 +521,7 @@ mounted(char *name)
 		return (0);
 	}
 	blkname = unrawname(name);
-	while ((getmntent(mnttab, &mnt)) == NULL) {
+	while ((getmntent(mnttab, &mnt)) == 0) {
 		if (strcmp(mnt.mnt_fstype, MNTTYPE_UDFS) != 0) {
 			continue;
 		}
@@ -536,7 +536,7 @@ mounted(char *name)
 				if (hasmntopt(&mnt, MNTOPT_RO) != 0)
 					found = 2;	/* mounted as RO */
 				else
-					found = 1; 	/* mounted as R/W */
+					found = 1;	/* mounted as R/W */
 			}
 			break;
 		}

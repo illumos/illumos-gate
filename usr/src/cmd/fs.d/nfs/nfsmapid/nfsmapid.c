@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stropts.h>
@@ -173,7 +171,7 @@ thr_init(void)
 	 * signals from main thread so that any subsequent threads
 	 * don't receive said signals.
 	 */
-	(void) thr_sigsetmask(NULL, NULL, &sigset);
+	(void) thr_sigsetmask(0, NULL, &sigset);
 	(void) sigaddset(&sigset, SIGHUP);
 	(void) sigaddset(&sigset, SIGTERM);
 #ifdef	DEBUG

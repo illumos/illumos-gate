@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019 by Western Digital Corporation
  */
 
 /*
@@ -909,7 +910,7 @@ xhci_endpoint_schedule(xhci_t *xhcip, xhci_device_t *xd, xhci_endpoint_t *xep,
 	return (xhci_endpoint_ring(xhcip, xd, xep));
 }
 
-static xhci_transfer_t *
+xhci_transfer_t *
 xhci_endpoint_determine_transfer(xhci_t *xhcip, xhci_endpoint_t *xep,
     xhci_trb_t *trb, uint_t *offp)
 {
@@ -1161,7 +1162,7 @@ xhci_endpoint_dup_periodic(xhci_endpoint_t *xep, xhci_transfer_t *xt,
 	return (urp);
 }
 
-static xhci_device_t *
+xhci_device_t *
 xhci_device_lookup_by_slot(xhci_t *xhcip, int slot)
 {
 	xhci_device_t *xd;

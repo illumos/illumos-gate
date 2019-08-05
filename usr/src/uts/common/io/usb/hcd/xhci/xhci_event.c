@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2019 by Western Digital Corporation
  */
 
 /*
@@ -134,6 +135,47 @@ xhci_event_process_psc(xhci_t *xhcip, xhci_trb_t *trb)
 	return (B_TRUE);
 }
 
+boolean_t
+xhci_event_process_trb(xhci_t *xhcip, xhci_trb_t *trb)
+{
+	uint32_t type;
+
+	type = LE_32(trb->trb_flags) & XHCI_TRB_TYPE_MASK;
+	switch (type) {
+	case XHCI_EVT_PORT_CHANGE:
+		if (!xhci_event_process_psc(xhcip, trb))
+			return (B_FALSE);
+		break;
+	case XHCI_EVT_CMD_COMPLETE:
+		if (!xhci_command_event_callback(xhcip, trb))
+			return (B_FALSE);
+		break;
+	case XHCI_EVT_DOORBELL:
+		/*
+		 * Because we don't have any VF hardware, this event
+		 * should never happen. If it does, that probably means
+		 * something bad has happened and we should reset the
+		 * device.
+		 */
+		xhci_error(xhcip, "received xHCI VF interrupt even "
+		    "though virtual functions are not supported, "
+		    "resetting device");
+		xhci_fm_runtime_reset(xhcip);
+		return (B_FALSE);
+	case XHCI_EVT_XFER:
+		if (!xhci_endpoint_transfer_callback(xhcip, trb))
+			return (B_FALSE);
+		break;
+	/*
+	 * Ignore other events that come in.
+	 */
+	default:
+		break;
+	}
+
+	return (B_TRUE);
+}
+
 /*
  * Process the event ring, note we're in interrupt context while doing this.
  */
@@ -181,43 +223,12 @@ xhci_event_process(xhci_t *xhcip)
 	 */
 	for (nevents = 0; nevents < xrp->xr_ntrb; nevents++) {
 		xhci_trb_t *trb;
-		uint32_t type;
 
 		if ((trb = xhci_ring_event_advance(xrp)) == NULL)
 			break;
 
-		type = LE_32(trb->trb_flags) & XHCI_TRB_TYPE_MASK;
-		switch (type) {
-		case XHCI_EVT_PORT_CHANGE:
-			if (!xhci_event_process_psc(xhcip, trb))
-				return (B_FALSE);
-			break;
-		case XHCI_EVT_CMD_COMPLETE:
-			if (!xhci_command_event_callback(xhcip, trb))
-				return (B_FALSE);
-			break;
-		case XHCI_EVT_DOORBELL:
-			/*
-			 * Because we don't have any VF hardware, this event
-			 * should never happen. If it does, that probably means
-			 * something bad has happened and we should reset the
-			 * device.
-			 */
-			xhci_error(xhcip, "received xHCI VF interrupt even "
-			    "though virtual functions are not supported, "
-			    "resetting device");
-			xhci_fm_runtime_reset(xhcip);
+		if (!xhci_event_process_trb(xhcip, trb))
 			return (B_FALSE);
-		case XHCI_EVT_XFER:
-			if (!xhci_endpoint_transfer_callback(xhcip, trb))
-				return (B_FALSE);
-			break;
-		/*
-		 * Ignore other events that come in.
-		 */
-		default:
-			break;
-		}
 	}
 
 	addr = xhci_dma_pa(&xrp->xr_dma) + sizeof (xhci_trb_t) * xrp->xr_tail;

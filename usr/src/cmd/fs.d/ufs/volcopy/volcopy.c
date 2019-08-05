@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <signal.h>
@@ -141,25 +139,25 @@ time_t	Tvec;
 
 FILE	*Devtty;
 
-static void 	getinfs(),
+static void	getinfs(),
 		getoutfs();
 
-static char 	*getfslabel(struct fs *);
-static char 	*getvolabel(struct fs *);
+static char	*getfslabel(struct fs *);
+static char	*getvolabel(struct fs *);
 static void	prompt(int, const char *, ...);
 static void	perr(int, const char *, ...);
-static void 	mklabel(void);
+static void	mklabel(void);
 static void	get_mach_type(void);
-static void 	mem_setup(void);
+static void	mem_setup(void);
 static void	rprt(void);
-static void 	chgreel(struct file_info *, int);
+static void	chgreel(struct file_info *, int);
 static void	parent_copy(void);
-static void 	copy(void);
-static void 	flush_bufs(int);
-static void 	cleanup(void);
+static void	copy(void);
+static void	flush_bufs(int);
+static void	cleanup(void);
 
 #ifdef LOG
-static int 	fslog(void);
+static int	fslog(void);
 #endif	/* LOG */
 
 /*
@@ -274,10 +272,10 @@ g_write(int devtype, int fdes, void *buf, size_t nbytes)
  * volcopy [-options]  filesystem /dev/from From_vol /dev/to To_vol
  *
  * options are:
- * 	-feet - length of tape
- * 	-bpi  - recording density
- * 	-reel - reel number (if not starting from beginning)
- * 	-buf  - use double buffered i/o (if dens >= 1600 bpi)
+ *	-feet - length of tape
+ *	-bpi  - recording density
+ *	-reel - reel number (if not starting from beginning)
+ *	-buf  - use double buffered i/o (if dens >= 1600 bpi)
  *	-block - Set the transfer block size to NUM physical blocks (512
  *	bytes on 3B2 and 3B15).  Note that an arbitrary block size might
  *	or might not work on a given system.  Also, the block size
@@ -286,10 +284,10 @@ g_write(int devtype, int fdes, void *buf, size_t nbytes)
  *	-r - Read NUM transfer blocks from the disk at once and write it
  *	to the output device one block at a time.  Intended only to
  *	boost the 3B15 EDFC disk to tape performance.  Disabled on 3B2.
- * 	-a    - ask "y or n" instead of "DEL if wrong"
- * 	-s    - inverse of -a, from/to devices are printed followed by `?'.
- * 		User has 10 seconds to DEL if mistaken!
- * 	-y    - assume "yes" response to all questions
+ *	-a    - ask "y or n" instead of "DEL if wrong"
+ *	-s    - inverse of -a, from/to devices are printed followed by `?'.
+ *		User has 10 seconds to DEL if mistaken!
+ *	-y    - assume "yes" response to all questions
  *
  * Examples:
  *
@@ -1245,7 +1243,7 @@ tapeck(struct file_info *f_p, int dir)
 			perror("output tape");
 	}
 	alarm(0);
-	if (V_labl.v_reel == (char)NULL && dir == INPUT)
+	if (V_labl.v_reel == '\0' && dir == INPUT)
 		perr(9, "Input tape is empty\n");
 	else {
 		old_style = strncmp(V_labl.v_magic, "Volcopy", 7) == 0;

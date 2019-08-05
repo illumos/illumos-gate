@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -369,7 +367,7 @@ print_desc(uint32_t addr, int32_t id)
 	 * find out the type of tag
 	 * and print the descriptor
 	 */
-	if (addr != NULL) {
+	if (addr != 0) {
 		if ((baddr = getblk(addr & (~bmask))) == NULL) {
 			(void) fprintf(stdout,
 				gettext("Could not read block %x\n"),

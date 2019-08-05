@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -36,8 +36,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Disk quota editor.
@@ -842,7 +840,7 @@ quotactl(int cmd, char *special, uid_t uid, caddr_t addr)
 		exit(31+1);
 	}
 	qfile[0] = '\0';
-	while ((status = getmntent(fstab, &mntp)) == NULL) {
+	while ((status = getmntent(fstab, &mntp)) == 0) {
 		/*
 		 * check that it is a ufs file system
 		 * for all quotactl()s except Q_ALLSYNC check that

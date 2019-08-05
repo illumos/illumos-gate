@@ -78,10 +78,6 @@ $(OBJS_DIR)/tnet.o := SMOFF += shift_to_zero
 SMOFF += signed,all_func_returns
 SMOFF += signed_integer_overflow_check
 
-# definitely wrong
-$(OBJS_DIR)/ip_input.o := SMOFF += or_vs_and
-$(OBJS_DIR)/ip6_input.o := SMOFF += or_vs_and
-
 #
 # To get the BPF header files included by ipnet.h
 #

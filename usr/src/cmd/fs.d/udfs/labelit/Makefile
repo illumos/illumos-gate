@@ -27,13 +27,14 @@
 
 FSTYPE=		udfs
 LIBPROG=	labelit
-SRCS=		labelit.c ud_lib.c
+SRCS=		labelit.c
 ATTMK=		$(LIBPROG)
 
 include		../../Makefile.fstype
 
 LDLIBS += -ladm
 CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+CPPFLAGS += -I../fstyp
 
 LINTFLAGS += -xerroff=E_STATIC_UNUSED
 LINTFLAGS64 += -xerroff=E_STATIC_UNUSED
@@ -45,17 +46,11 @@ labelit : labelit.o  ud_lib.o
 	$(LINK.c) -o $@ labelit.o ud_lib.o $(LDLIBS)
 	$(POST_PROCESS)
 
-labelit.o : labelit.c ud_lib.h
+labelit.o : labelit.c ../fstyp/ud_lib.h
 
-ud_lib.o : ud_lib.c ud_lib.h
-
-ud_lib.h : ../fstyp/ud_lib.h
-	rm -f ud_lib.h
-	cp ../fstyp/ud_lib.h ud_lib.h
-
-ud_lib.c : ../fstyp/ud_lib.c
-	rm -f ud_lib.c
-	cp ../fstyp/ud_lib.c ud_lib.c
+ud_lib.o : ../fstyp/ud_lib.c ../fstyp/ud_lib.h
+	$(COMPILE.c) -o $@ ../fstyp/ud_lib.c
+	$(POST_PROCESS_O)
 
 # for messaging catalog
 #
@@ -65,7 +60,7 @@ POFILE= labelit.po
 #
 catalog:	$(POFILE)
 
-$(POFILE):	$(SRCS) ud_lib.h
+$(POFILE):	$(SRCS) ../fstyp/ud_lib.h
 	$(RM) $@
 	$(COMPILE.cpp) $(SRCS) > $(POFILE).i
 	$(XGETTEXT) $(XGETFLAGS) $(POFILE).i
@@ -74,12 +69,8 @@ $(POFILE):	$(SRCS) ud_lib.h
 
 clean :
 	rm -f labelit.o ud_lib.o
-	rm -f ud_lib.c ud_lib.h
 
 lint:
-	rm -f ud_lib.h
-	cp ../fstyp/ud_lib.h ud_lib.h
-	cp ../fstyp/ud_lib.c ud_lib.c
 	$(LINT.c) -mu $(SRCS)
 
 putback:

@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
@@ -64,7 +64,7 @@
 #include	<sys/filio.h>
 #include	<sys/stat.h>
 #include	<ustat.h>
-#include 	<sys/isa_defs.h>	/* for ENDIAN defines */
+#include	<sys/isa_defs.h>	/* for ENDIAN defines */
 #include	<sys/dkio.h>
 #include	<sys/fdio.h>
 #include	<sys/vtoc.h>
@@ -296,7 +296,7 @@ main(int32_t argc, int8_t *argv[])
 	if ((temp_secsz = get_bsize()) != 0) {
 		sectorsize = temp_secsz;
 	}
-	
+
 	/* Get old file system information */
 	isfs = readvolseq();
 
@@ -376,7 +376,7 @@ main(int32_t argc, int8_t *argv[])
 		 */
 		if ((special != NULL) && (*special != '\0')) {
 			mnttab = fopen(MNTTAB, "r");
-			while ((getmntent(mnttab, &mntp)) == NULL) {
+			while ((getmntent(mnttab, &mntp)) == 0) {
 				if (strcmp(special, mntp.mnt_special) == 0) {
 					(void) fprintf(stdout,
 						gettext("%s is mounted,"

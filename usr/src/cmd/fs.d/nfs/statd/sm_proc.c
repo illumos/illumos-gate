@@ -33,7 +33,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -681,7 +681,7 @@ send_notice(char *mon_name, int state)
 				 * to notify.  If error, print out msg, free
 				 * resources and continue.
 				 */
-				if (thr_create(NULL, NULL, thr_send_notice,
+				if (thr_create(NULL, 0, thr_send_notice,
 				    minfop, THR_DETACHED, NULL)) {
 					syslog(LOG_ERR, "statd: unable to "
 					    "create thread to send_notice to "

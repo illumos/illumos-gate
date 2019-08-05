@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
 
@@ -852,7 +852,7 @@ static const	struct systable ucredsystable[] = {
 const	struct systable portfstable[] = {
 {"port_create",	2, DEC, NOV, HID, DEC},				/* 0 */
 {"port_associate",	6, DEC, NOV, HID, DEC, DEC, HEX, HEX, HEX}, /* 1 */
-{"port_dissociate",	4, DEC, NOV, HID, DEC, DEC, HEX}, 	/* 2 */
+{"port_dissociate",	4, DEC, NOV, HID, DEC, DEC, HEX},	/* 2 */
 {"port_send",	4, DEC, NOV, HID, DEC, HEX, HEX},		/* 3 */
 {"port_sendn",	6, DEC, DEC, HID, HEX, HEX, DEC, HEX, HEX},	/* 4 */
 {"port_get",	4, DEC, NOV, HID, DEC, HEX, HEX},		/* 5 */
@@ -1368,7 +1368,7 @@ getsubcode(private_t *pri)
 				    Lsp->pr_sysarg[3] == 0)? 1 : 0;
 			break;
 		case SYS_fchmodat:
-			if (nsysarg > 1 && Lsp->pr_sysarg[1] == NULL) {
+			if (nsysarg > 1 && Lsp->pr_sysarg[1] == 0) {
 				subcode = 3;
 				break;
 			}
@@ -1382,7 +1382,7 @@ getsubcode(private_t *pri)
 				    2 : 0;
 			break;
 		case SYS_fchownat:
-			if (nsysarg > 1 && Lsp->pr_sysarg[1] == NULL) {
+			if (nsysarg > 1 && Lsp->pr_sysarg[1] == 0) {
 				subcode = 3;
 				break;
 			}
@@ -1427,7 +1427,7 @@ getsubcode(private_t *pri)
 			break;
 		case SYS_fstatat:
 		case SYS_fstatat64:
-			if (nsysarg > 1 && Lsp->pr_sysarg[1] == NULL) {
+			if (nsysarg > 1 && Lsp->pr_sysarg[1] == 0) {
 				subcode = 3;
 				break;
 			}

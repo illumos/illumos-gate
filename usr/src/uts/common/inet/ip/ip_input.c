@@ -202,7 +202,7 @@ ip_input_common_v4(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 	ip_recv_attr_t	iras;	/* Receive attributes */
 	rtc_t		rtc;
 	iaflags_t	chain_flags = 0;	/* Fixed for chain */
-	mblk_t 		*ahead = NULL;	/* Accepted head */
+	mblk_t		*ahead = NULL;	/* Accepted head */
 	mblk_t		*atail = NULL;	/* Accepted tail */
 	uint_t		acnt = 0;	/* Accepted count */
 
@@ -367,7 +367,7 @@ ip_input_common_v4(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 
 		/*
 		 * Call one of:
-		 * 	ill_input_full_v4
+		 *	ill_input_full_v4
 		 *	ill_input_short_v4
 		 * The former is used in unusual cases. See ill_set_inputfn().
 		 */
@@ -561,7 +561,7 @@ ill_input_short_v4(mblk_t *mp, void *iph_arg, void *nexthop_arg,
 	ill_t		*ill = ira->ira_ill;
 	ip_stack_t	*ipst = ill->ill_ipst;
 	uint_t		pkt_len;
-	ssize_t 	len;
+	ssize_t		len;
 	ipha_t		*ipha = (ipha_t *)iph_arg;
 	ipaddr_t	nexthop = *(ipaddr_t *)nexthop_arg;
 	ilb_stack_t	*ilbs = ipst->ips_netstack->netstack_ilb;
@@ -2404,7 +2404,7 @@ ip_fanout_v4(mblk_t *mp, ipha_t *ipha, ip_recv_attr_t *ira)
 	 */
 	if (IPP_ENABLED(IPP_LOCAL_IN, ipst) &&
 	    !(iraflags & IRAF_LOOPBACK) &&
-	    (protocol != IPPROTO_ESP || protocol != IPPROTO_AH)) {
+	    (protocol != IPPROTO_ESP && protocol != IPPROTO_AH)) {
 		/*
 		 * Use the interface on which the packet arrived - not where
 		 * the IP address is hosted.

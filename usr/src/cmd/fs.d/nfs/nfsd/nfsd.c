@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T		*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -856,7 +856,7 @@ dss_init(uint_t npaths, char **pathnames)
 		/* now NULL out any duplicates */
 		i = 0; j = 1; nskipped = 0;
 		while (j < npaths) {
-			if (strcmp(pathnames[i], pathnames[j]) == NULL) {
+			if (strcmp(pathnames[i], pathnames[j]) == 0) {
 				pathnames[j] = NULL;
 				j++;
 				nskipped++;

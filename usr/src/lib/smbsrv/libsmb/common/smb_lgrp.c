@@ -1408,7 +1408,7 @@ smb_lgrp_gtbl_exists(sqlite *db, char *gname)
 	int rc;
 
 	if (db == NULL)
-		return (NULL);
+		return (B_FALSE);
 
 	sql = sqlite_mprintf("SELECT name FROM groups WHERE name = '%s'",
 	    gname);
@@ -2537,7 +2537,7 @@ smb_lgrp_pgrp_valid_gname(char *group)
 	if (!group || !*group)
 		return (SMB_LGRP_PGRP_INVALID);
 
-	for (c = *ptr; c != NULL; ptr++, c = *ptr) {
+	for (c = *ptr; c != '\0'; ptr++, c = *ptr) {
 		len++;
 		if (!isprint(c) || (c == ':') || (c == '\n'))
 			return (SMB_LGRP_PGRP_INVALID);

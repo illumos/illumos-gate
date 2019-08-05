@@ -1440,7 +1440,7 @@ retry_alternate_logic:
 				    "can't open %s\n"), MNTTAB);
 				exit(32);
 			}
-			while ((getmntent(mnttab, &mntp)) == NULL) {
+			while ((getmntent(mnttab, &mntp)) == 0) {
 				if (grow) {
 					checkmount(&mntp, special);
 					continue;

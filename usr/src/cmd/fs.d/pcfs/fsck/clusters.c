@@ -25,8 +25,6 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * fsck_pcfs -- routines for manipulating clusters.
  */
@@ -367,7 +365,7 @@ writeCachedCluster(int fd, CachedCluster *clustInfo)
 		    gettext("Allocation unit %d modified.\n"),
 		    clustInfo->clusterNum);
 
-	if (seekCluster(fd, clustInfo->clusterNum) == NULL)
+	if (seekCluster(fd, clustInfo->clusterNum) == 0)
 		return;
 
 	if ((bytesWritten = write(fd, clustInfo->clusterData.bytes,

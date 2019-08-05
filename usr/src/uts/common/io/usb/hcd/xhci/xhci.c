@@ -266,6 +266,9 @@
  * xhci.c:		This provides the main kernel DDI interfaces and
  *			performs device initialization.
  *
+ * xhci_polled.c:	This provides the polled I/O functions that the
+ *			kernel debugger can use.
+ *
  * xhci.h:		This is the primary header file which defines
  *			illumos-specific data structures and constants to manage
  *			the system.
@@ -672,6 +675,16 @@
  * 4) It is safe to hold the xhci_device_t`xd_imtx while tearing down the
  *    endpoint timer. Conversely, the endpoint specific logic should never enter
  *    this lock.
+ *
+ * ----------
+ * Polled I/O
+ * ----------
+ *
+ * There is limited support for polled I/O in this driver for use by
+ * the kernel debugger. The driver currently only supports input from
+ * interrupt endpoints which is good enough for USB HID keyboard devices.
+ * Input from bulk endpoints and output are not supported which prevents
+ * using a serial console over USB for kernel debugging.
  *
  * --------------------
  * Relationship to EHCI
