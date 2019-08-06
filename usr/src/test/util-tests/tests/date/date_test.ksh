@@ -80,7 +80,7 @@ compare 04120554000 "Mon Sep  7 16:00:00 UTC 1987" UTC
 #
 # Test the file related logic
 #
-touch -t 201712042323.23 $TMPDIR/test.$$
+env TZ=UTC touch -t 201712042323.23 $TMPDIR/test.$$
 compare "$TMPDIR/test.$$" "Mon Dec  4 23:23:23 UTC 2017" UTC
 rm -f $TMPDIR/test.$$
 

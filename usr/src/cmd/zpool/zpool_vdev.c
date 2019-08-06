@@ -30,15 +30,15 @@
  * Functions to convert between a list of vdevs and an nvlist representing the
  * configuration.  Each entry in the list can be one of:
  *
- * 	Device vdevs
- * 		disk=(path=..., devid=...)
- * 		file=(path=...)
+ *	Device vdevs
+ *		disk=(path=..., devid=...)
+ *		file=(path=...)
  *
- * 	Group vdevs
- * 		raidz[1|2]=(...)
- * 		mirror=(...)
+ *	Group vdevs
+ *		raidz[1|2]=(...)
+ *		mirror=(...)
  *
- * 	Hot spares
+ *	Hot spares
  *
  * While the underlying implementation supports it, group vdevs cannot contain
  * other group vdevs.  All userland verification of devices is contained within
@@ -51,15 +51,15 @@
  * The only function exported by this file is 'make_root_vdev'.  The
  * function performs several passes:
  *
- * 	1. Construct the vdev specification.  Performs syntax validation and
+ *	1. Construct the vdev specification.  Performs syntax validation and
  *         makes sure each device is valid.
- * 	2. Check for devices in use.  Using libdiskmgt, makes sure that no
+ *	2. Check for devices in use.  Using libdiskmgt, makes sure that no
  *         devices are also in use.  Some can be overridden using the 'force'
  *         flag, others cannot.
- * 	3. Check for replication errors if the 'force' flag is not specified.
+ *	3. Check for replication errors if the 'force' flag is not specified.
  *         validates that the replication level is consistent across the
  *         entire pool.
- * 	4. Call libzfs to label any whole disks with an EFI label.
+ *	4. Call libzfs to label any whole disks with an EFI label.
  */
 
 #include <assert.h>
@@ -194,7 +194,7 @@ check_disk(const char *name, dm_descriptor_t disk, int force, int isspare)
 	 * because we already have an alias handle open for the device.
 	 */
 	if ((drive = dm_get_associated_descriptors(disk, DM_DRIVE,
-	    &err)) == NULL || *drive == NULL) {
+	    &err)) == NULL || *drive == 0) {
 		if (err)
 			libdiskmgt_error(err);
 		return (0);
@@ -214,7 +214,7 @@ check_disk(const char *name, dm_descriptor_t disk, int force, int isspare)
 	 * It is possible that the user has specified a removable media drive,
 	 * and the media is not present.
 	 */
-	if (*media == NULL) {
+	if (*media == 0) {
 		dm_free_descriptors(media);
 		vdev_error(gettext("'%s' has no media in drive\n"), name);
 		return (-1);
@@ -236,7 +236,7 @@ check_disk(const char *name, dm_descriptor_t disk, int force, int isspare)
 	 * Iterate over all slices and report any errors.  We don't care about
 	 * overlapping slices because we are using the whole disk.
 	 */
-	for (i = 0; slice[i] != NULL; i++) {
+	for (i = 0; slice[i] != 0; i++) {
 		char *name = dm_get_name(slice[i], &err);
 
 		if (check_slice(name, force, B_TRUE, isspare) != 0)
@@ -265,7 +265,7 @@ check_device(const char *path, boolean_t force, boolean_t isspare)
 	dev = strrchr(path, '/');
 	assert(dev != NULL);
 	dev++;
-	if ((desc = dm_get_descriptor_by_name(DM_ALIAS, dev, &err)) != NULL) {
+	if ((desc = dm_get_descriptor_by_name(DM_ALIAS, dev, &err)) != 0) {
 		err = check_disk(path, desc, force, isspare);
 		dm_free_descriptor(desc);
 		return (err);
@@ -383,9 +383,9 @@ is_whole_disk(const char *arg)
  * device, fill in the device id to make a complete nvlist.  Valid forms for a
  * leaf vdev are:
  *
- * 	/dev/dsk/xxx	Complete disk path
- * 	/xxx		Full path to file
- * 	xxx		Shorthand for /dev/dsk/xxx
+ *	/dev/dsk/xxx	Complete disk path
+ *	/xxx		Full path to file
+ *	xxx		Shorthand for /dev/dsk/xxx
  */
 static nvlist_t *
 make_leaf_vdev(const char *arg, uint64_t is_log)
@@ -521,14 +521,14 @@ make_leaf_vdev(const char *arg, uint64_t is_log)
  * Go through and verify the replication level of the pool is consistent.
  * Performs the following checks:
  *
- * 	For the new spec, verifies that devices in mirrors and raidz are the
- * 	same size.
+ *	For the new spec, verifies that devices in mirrors and raidz are the
+ *	same size.
  *
- * 	If the current configuration already has inconsistent replication
- * 	levels, ignore any other potential problems in the new spec.
+ *	If the current configuration already has inconsistent replication
+ *	levels, ignore any other potential problems in the new spec.
  *
- * 	Otherwise, make sure that the current spec (if there is one) and the new
- * 	spec have consistent replication levels.
+ *	Otherwise, make sure that the current spec (if there is one) and the new
+ *	spec have consistent replication levels.
  *
  *	If there is no current spec (create), make sure new spec has at least
  *	one general purpose vdev.
