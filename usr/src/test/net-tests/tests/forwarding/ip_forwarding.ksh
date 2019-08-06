@@ -16,22 +16,27 @@
 #
 # Usage:
 #
-#     ip_forwarding.ksh -flnpvu <client> <router> <server>
+#     ip_forwarding.ksh -bcflnpuv <client> <router> <server>
 #
 #     Where client, router, and server are the UUIDs of three native
 #     zones. The user must create and start these zones; but other
 #     than that there is no special configuration required for them.
 #
+#     -b	Place server and router on same underlying simnet, causing
+#		them to talk via MAC-loopback.
+#
 #     -c	Run cleanup only.
 #
-#     -f	Full ULP hardware checksum.
+#     -f	Enable Tx ULP hardware checksum.
 #
-#     -l	Hardware TCP LSO.
+#     -l	Enable TCP LSO.
 #
 #     -n	No cleanup: the various artifacts created by this script will
 #               remain after execution.
 #
-#     -p	Partial ULP hardware checksum.
+#     -p	Enabled partial Tx ULP hardware checksum.
+#
+#     -r	Enable Rx IPv4 header checksum offload.
 #
 #     -u	Run UDP tests.
 #
@@ -47,6 +52,11 @@ fi
 
 function cleanup
 {
+	if ((nt_cleanup == 0)); then
+		dbg "skipping cleanup"
+		return 0
+	fi
+
 	rm -rf ${nt_tdirprefix}*
 	zlogin $nt_client rm -rf ${nt_tdirprefix}*
 	zlogin $nt_server rm -rf ${nt_tdirprefix}*
@@ -75,28 +85,31 @@ function cleanup
 	delete_if $nt_router ipft_server_r0
 	delete_if $nt_server ipft_server0
 
-	delete_vnic ipft_client0 ipft_nic0 0 $nt_client
-	delete_vnic ipft_client_r0 ipft_nic1 0 $nt_router
-	delete_vnic ipft_server_r0 ipft_nic1 5 $nt_router
-	delete_vnic ipft_server0 ipft_nic1 5 $nt_server
+	delete_vnic ipft_client0 0 $nt_client
+	delete_vnic ipft_client_r0 0 $nt_router
+	delete_vnic ipft_server_r0 5 $nt_router
+	delete_vnic ipft_server0 5 $nt_server
 
-	delete_simnet ipft_nic0
-	delete_simnet ipft_nic1
+	for nt_name in ${nt_nics[@]}; do
+		delete_simnet $nt_name
+	done
 }
 
 function usage
 {
-	echo "$nt_tname -cflnpuv <client> <router> <server>" >&2
+	echo "$nt_tname -bcflnpruv <client> <router> <server>" >&2
 }
 
 #
 # Set test defaults.
 #
 nt_tname=${NT_TNAME:-$(basename $0)}
+nt_loopback=0
 nt_ulp_full=0
 nt_ulp_partial=0
 nt_tcp_lso=0
 nt_udp=0
+nt_rx_ip_cksum=0
 nt_cleanup=1
 nt_cleanup_only=0
 
@@ -120,9 +133,14 @@ nt_server_subnet6=fd00:0:1:58::/64
 nt_server_router_ip6=fd00:0:1:58::1
 nt_server_ip6=fd00:0:1:58::2
 nt_port6=7776
+nt_bridge=ipft_switch
+typeset -A nt_nics
 
-while getopts "cflnpuv" opt; do
+while getopts "bcflnpruv" opt; do
 	case $opt in
+	b)
+		nt_loopback=1
+		;;
 	c)
 		nt_cleanup_only=1
 		;;
@@ -137,6 +155,9 @@ while getopts "cflnpuv" opt; do
 		;;
 	p)
 		nt_ulp_partial=1
+		;;
+	r)
+		nt_rx_ip_cksum=1
 		;;
 	u)
 		nt_udp=1
@@ -188,6 +209,16 @@ if ! zlogin $nt_server ls /usr/bin/socat > /dev/null; then
 	fail "zone $nt_client missing socat"
 fi
 
+if ((nt_loopback == 0)); then
+	nt_nics[0]=ipft_client_nic0
+	nt_nics[1]=ipft_router_nic0
+	nt_nics[2]=ipft_router_nic1
+	nt_nics[3]=ipft_server_nic0
+else
+	nt_nics[0]=ipft_nic0
+	nt_nics[1]=ipft_nic1
+fi
+
 #
 # Make a best effort to cleanup artifacts from a previous run.
 #
@@ -203,34 +234,52 @@ mkdir $nt_tdir
 zlogin $nt_client mkdir $nt_tdir
 zlogin $nt_server mkdir $nt_tdir
 
-create_simnet ipft_nic0
-create_simnet ipft_nic1
-link_simnets ipft_nic0 ipft_nic1
+trap cleanup ERR
 
-if ((nt_ulp_partial == 1)); then
-	set_linkprop ipft_nic0 _tx_ulp_cksum partial
-	set_linkprop ipft_nic1 _tx_ulp_cksum partial
+for nt_name in ${nt_nics[@]}; do
+	create_simnet $nt_name
+done
+
+if ((nt_loopback == 0)); then
+	link_simnets ${nt_nics[0]} ${nt_nics[1]}
+	link_simnets ${nt_nics[2]} ${nt_nics[3]}
+else
+	link_simnets ${nt_nics[0]} ${nt_nics[1]}
 fi
 
-if ((nt_ulp_full == 1)); then
-	set_linkprop ipft_nic0 _tx_ulp_cksum fullv4
-	set_linkprop ipft_nic1 _tx_ulp_cksum fullv4
-fi
+for nt_name in ${nt_nics[@]}; do
+	if ((nt_ulp_partial == 1)); then
+		set_linkprop $nt_name _tx_ulp_cksum partial
+	fi
 
-if ((nt_ulp_full == 1)) || ((nt_ulp_partial == 1)); then
-	set_linkprop ipft_nic0 _tx_ipv4_cksum on
-	set_linkprop ipft_nic1 _tx_ipv4_cksum on
-fi
+	if ((nt_ulp_full == 1)); then
+		set_linkprop $nt_name _tx_ulp_cksum fullv4
+	fi
 
-if ((nt_tcp_lso == 1)); then
-	set_linkprop ipft_nic0 _lso on
-	set_linkprop ipft_nic1 _lso on
-fi
+	if ((nt_ulp_full == 1)) || ((nt_ulp_partial == 1)); then
+		set_linkprop $nt_name _tx_ipv4_cksum on
+	fi
 
-create_vnic ipft_client0 ipft_nic0 0 $nt_client
-create_vnic ipft_client_r0 ipft_nic1 0 $nt_router
-create_vnic ipft_server_r0 ipft_nic1 5 $nt_router
-create_vnic ipft_server0 ipft_nic1 5 $nt_server
+	if ((nt_tcp_lso == 1)); then
+		set_linkprop $nt_name _lso on
+	fi
+
+	if ((nt_rx_ip_cksum == 1)); then
+		set_linkprop $nt_name _rx_ipv4_cksum on
+	fi
+done
+
+if ((nt_loopback == 0)); then
+	create_vnic ipft_client0 ipft_client_nic0 0 $nt_client
+	create_vnic ipft_client_r0 ipft_router_nic0 0 $nt_router
+	create_vnic ipft_server_r0 ipft_router_nic1 5 $nt_router
+	create_vnic ipft_server0 ipft_server_nic0 5 $nt_server
+else
+	create_vnic ipft_client0 ipft_nic0 0 $nt_client
+	create_vnic ipft_client_r0 ipft_nic1 0 $nt_router
+	create_vnic ipft_server_r0 ipft_nic1 5 $nt_router
+	create_vnic ipft_server0 ipft_nic1 5 $nt_server
+fi
 
 ip_fwd_enable $nt_router
 
@@ -432,12 +481,6 @@ if ((nt_udp == 1)); then
 
 	dbg "test IPv6 fragmentation $nt_server_ip6 -> $nt_client_ip6"
 	ping_udp $nt_server $nt_server_ip6 $nt_client_ip6 $((1024 * 16)) 3
-fi
-
-if ((nt_cleanup == 0)); then
-	dbg "skipping cleanup"
-	echo "PASS [$nt_tname]"
-	exit 0
 fi
 
 cleanup

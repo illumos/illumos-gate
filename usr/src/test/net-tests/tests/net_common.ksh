@@ -224,20 +224,14 @@ function create_vnic
 function delete_vnic
 {
 	typeset name=$1
-	typeset over=$2
-	typeset vid=$3
-	typeset zone=$4
-	typeset vnic_info="$name, vid: $vid, over: $over, zone: $zone"
+	typeset vid=$2
+	typeset zone=$3
+	typeset vnic_info="$name, vid: $vid, zone: $zone"
 	typeset err1="failed to assign VNIC $name from $zone to GZ"
 	typeset err2="failed to delete VNIC: $vnic_info"
 
-	if (($# != 4)); then
+	if (($# != 3)); then
 		fail "$0: incorrect number of args provided"
-	fi
-
-	if ! vnic_exists $name $vid $over $zone; then
-		dbg "VNIC doesn't exist: $vnic_info"
-		return 0
 	fi
 
 	dbg "assigning VNIC $name from $zone to GZ"

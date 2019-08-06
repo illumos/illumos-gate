@@ -678,7 +678,6 @@ simnet_thread_unref(simnet_dev_t *sdev)
 /*
  * TODO: Add properties to set Rx checksum flag behavior.
  *
- * o HCK_IPV4_HDRCKSUM_OK.
  * o HCK_PARTIALCKSUM.
  * o HCK_FULLCKSUM_OK.
  */
@@ -723,12 +722,24 @@ simnet_rx(void *arg)
 		}
 	}
 
+	/*
+	 * We don't actually calculate and verify the IP header
+	 * checksum because the nature of simnet makes it redundant to
+	 * do so. The point is to test the presence of the flags. The
+	 * Tx side will have already populated the checksum field.
+	 */
+	if ((sdev->sd_rx_cksum & HCKSUM_IPHDRCKSUM) != 0) {
+		mac_hcksum_set(mp, 0, 0, 0, 0, HCK_IPV4_HDRCKSUM_OK);
+	}
+
 	sdev->sd_stats.recv_count++;
 	sdev->sd_stats.rbytes += msgdsize(mp);
 	mac_rx(sdev->sd_mh, NULL, mp);
 rx_done:
 	simnet_thread_unref(sdev);
 }
+
+#define	SIMNET_ULP_CKSUM	(HCKSUM_INET_FULL_V4 | HCKSUM_INET_PARTIAL)
 
 static mblk_t *
 simnet_m_tx(void *arg, mblk_t *mp_chain)
@@ -737,6 +748,7 @@ simnet_m_tx(void *arg, mblk_t *mp_chain)
 	simnet_dev_t *sdev_rx;
 	mblk_t *mpnext = mp_chain;
 	mblk_t *mp, *nmp;
+	mac_emul_t emul = 0;
 
 	rw_enter(&simnet_dev_lock, RW_READER);
 	if ((sdev_rx = sdev->sd_peer_dev) == NULL) {
@@ -817,8 +829,16 @@ simnet_m_tx(void *arg, mblk_t *mp_chain)
 			break;
 		}
 
-		mac_hw_emul(&mp, NULL, NULL,
-		    MAC_IPCKSUM_EMUL | MAC_HWCKSUM_EMUL | MAC_LSO_EMUL);
+		if ((sdev->sd_tx_cksum & HCKSUM_IPHDRCKSUM) != 0)
+			emul |= MAC_IPCKSUM_EMUL;
+		if ((sdev->sd_tx_cksum & SIMNET_ULP_CKSUM) != 0)
+			emul |= MAC_HWCKSUM_EMUL;
+		if (sdev->sd_lso)
+			emul |= MAC_LSO_EMUL;
+
+		if (emul != 0)
+			mac_hw_emul(&mp, NULL, NULL, emul);
+
 		if (mp == NULL) {
 			sdev->sd_stats.xmit_errors++;
 			continue;
@@ -1236,7 +1256,20 @@ static int
 simnet_set_priv_prop_ether(simnet_dev_t *sdev, const char *name,
     const uint_t len, const void *val)
 {
-	if (strcmp(name, SD_PROP_TX_ULP_CKSUM) == 0) {
+	if (strcmp(name, SD_PROP_RX_IP_CKSUM) == 0) {
+		if (val == NULL)
+			return (EINVAL);
+
+		if (strcmp(val, "off") == 0) {
+			sdev->sd_rx_cksum &= ~HCKSUM_IPHDRCKSUM;
+		} else if (strcmp(val, "on") == 0) {
+			sdev->sd_rx_cksum |= HCKSUM_IPHDRCKSUM;
+		} else {
+			return (EINVAL);
+		}
+
+		return (0);
+	} else if (strcmp(name, SD_PROP_TX_ULP_CKSUM) == 0) {
 		if (val == NULL)
 			return (EINVAL);
 
@@ -1425,7 +1458,13 @@ simnet_get_priv_prop_ether(const simnet_dev_t *sdev, const char *name,
 	int ret;
 	char *value;
 
-	if (strcmp(name, SD_PROP_TX_ULP_CKSUM) == 0) {
+	if (strcmp(name, SD_PROP_RX_IP_CKSUM) == 0) {
+		if ((sdev->sd_rx_cksum & HCKSUM_IPHDRCKSUM) != 0) {
+			value = "on";
+		} else {
+			value = "off";
+		}
+	} else if (strcmp(name, SD_PROP_TX_ULP_CKSUM) == 0) {
 		if ((sdev->sd_tx_cksum & HCKSUM_INET_FULL_V4) != 0) {
 			value = "fullv4";
 		} else if ((sdev->sd_tx_cksum & HCKSUM_INET_PARTIAL) != 0) {
@@ -1586,7 +1625,8 @@ simnet_propinfo_wifi(const char *name, const mac_prop_id_t num,
 static void
 simnet_priv_propinfo_ether(const char *name, mac_prop_info_handle_t prh)
 {
-	if (strcmp(name, SD_PROP_TX_ULP_CKSUM) == 0 ||
+	if (strcmp(name, SD_PROP_RX_IP_CKSUM) == 0 ||
+	    strcmp(name, SD_PROP_TX_ULP_CKSUM) == 0 ||
 	    strcmp(name, SD_PROP_TX_IP_CKSUM) == 0 ||
 	    strcmp(name, SD_PROP_LSO) == 0) {
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_RW);
@@ -1596,7 +1636,8 @@ simnet_priv_propinfo_ether(const char *name, mac_prop_info_handle_t prh)
 		mac_prop_info_set_default_str(prh, "none");
 	}
 
-	if (strcmp(name, SD_PROP_TX_IP_CKSUM) == 0 ||
+	if (strcmp(name, SD_PROP_RX_IP_CKSUM) == 0 ||
+	    strcmp(name, SD_PROP_TX_IP_CKSUM) == 0 ||
 	    strcmp(name, SD_PROP_LSO) == 0) {
 		mac_prop_info_set_default_str(prh, "off");
 	}

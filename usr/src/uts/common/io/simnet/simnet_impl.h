@@ -89,11 +89,13 @@ typedef struct simnet_dev {
 	simnet_stats_t		sd_stats;
 
 	/* Capabilities */
+	uint_t			sd_rx_cksum;
 	uint_t			sd_tx_cksum;
 	boolean_t		sd_lso;
 } simnet_dev_t;
 
 /* Simnet dladm private properties. */
+#define	SD_PROP_RX_IP_CKSUM	"_rx_ipv4_cksum"
 #define	SD_PROP_TX_ULP_CKSUM	"_tx_ulp_cksum"
 #define	SD_PROP_TX_IP_CKSUM	"_tx_ipv4_cksum"
 #define	SD_PROP_LSO		"_lso"

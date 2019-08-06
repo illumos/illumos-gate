@@ -1155,17 +1155,22 @@ ip_forward_xmit_v4(nce_t *nce, ill_t *ill, mblk_t *mp, ipha_t *ipha,
 		icmp_time_exceeded(mp, ICMP_TTL_EXCEEDED, ira);
 		return;
 	}
-	ipha->ipha_ttl--;
+
 	/*
-	 * Adjust the checksum to reflect the TTL decrement unless
-	 * the packet expects IP header checksum offload; in which
-	 * case we delay its calculation until later. Such a packet
-	 * occurs when it travels via MAC-loopback over a link
-	 * exposing HCKSUM_IPHDRCKSUM.
+	 * Count the forward as a hop and update the checksum
+	 * accordingly.
 	 */
-	if ((DB_CKSUMFLAGS(mp) & HCK_IPV4_HDRCKSUM) == 0) {
-		sum = (int)ipha->ipha_hdr_checksum + IP_HDR_CSUM_TTL_ADJUST;
-		ipha->ipha_hdr_checksum = (uint16_t)(sum + (sum >> 16));
+	ipha->ipha_ttl--;
+	sum = (int)ipha->ipha_hdr_checksum + IP_HDR_CSUM_TTL_ADJUST;
+	ipha->ipha_hdr_checksum = (uint16_t)(sum + (sum >> 16));
+
+	/*
+	 * Zero the IP header checksum if this is a mac-loopback
+	 * packet which has requested IP header checksum offload.
+	 */
+	if (((DB_CKSUMFLAGS(mp) & HW_LOCAL_MAC) != 0) &&
+	    (DB_CKSUMFLAGS(mp) & HCK_IPV4_HDRCKSUM) != 0) {
+		ipha->ipha_hdr_checksum = 0;
 	}
 
 	/* Check if there are options to update */

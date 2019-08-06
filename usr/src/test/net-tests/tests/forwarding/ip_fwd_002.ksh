@@ -18,21 +18,5 @@ if [[ -z $NET_TESTS ]]; then
 	exit 1
 fi
 
-. $NET_TESTS/tests/net_common
-. $NET_TESTS/config/ip_forwarding.config
-
-if [[ -z "$NT_CLIENT" ]]; then
-	fail "NT_CLIENT must be set"
-fi
-
-if [[ -z "$NT_ROUTER" ]]; then
-	fail "NT_ROUTER must be set"
-fi
-
-if [[ -z "$NT_SERVER" ]]; then
-	fail "NT_SERVER must be set"
-fi
-
-export NT_TNAME=$(basename $0)
-$NET_TESTS/tests/forwarding/ip_forwarding -pluv $NT_CLIENT $NT_ROUTER $NT_SERVER
+$NET_TESTS/tests/forwarding/ip_fwd_suite -n 002
 exit $?

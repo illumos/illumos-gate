@@ -16,51 +16,86 @@ different variations. All tests require three zones. The tests use
 these three zones, along with the simnet driver, to emulate a real IP
 forwarding scenario involving multiple hosts. All tests verify that
 TCP, UDP, ICMP, IPv4/IPv6, and fragmented IPv4/IPv6 traffic can cross
-the IP forwarding datapath. All tests send traffic across both "the
-wire" (simnet) and the special MAC-loopback path. Each test differs in
-its emulation of various hardware offload features (which would
-typically be presented by real NICs). There is no emulation of Rx
-checksum offload; all packets will be software checksummed by IP
-input. In the future we may want to add variations where Rx checksum
-offload is in play as that's a typical feature provided by NICs.
+the IP forwarding datapath. Each test differs in its emulation of
+various hardware offload features (which would typically be presented
+by real NICs). The diagrams below gives a visual representation of the
+situations we are testing and shows how the test components relate to
+each other.
 
-The diagram below gives a visual representation of the situation we
-are testing and shows how the test components relate to each other.
+no mac-loopback
+---------------
 
-+----------------------------+          +----------------------------+
-|client host (ipft_nic0)     |          |server host (ipft_nic1)     |
-|                            |          | +------------------------+ |
-|  +----------------------+  |          | |router zone             | |
-|  |ipft_client0          |  |          | |                        | |
-|  |192.168.77.2          |<-+----+     | |+----------------------+| |
-|  |fd00:0:1:4d::2        |  |    |     | ||ipft_client_r0        || |
-|  +----------------------+  |   Wire --+->|192.168.77.1          || |
-+----------------------------+          | ||fd00:0:1:4d::1        || |
-                                        | |+----------------------+| |
-                                        | |            ^           | |
-                                        | |            |           | |
-                                        | |     IP     |           | |
-                                        | | forwarding |           | |
-                                        | |            |           | |
-                                        | |            v           | |
-                                        | |+----------------------+| |
-                                        | ||ipft_server_r0        || |
-                                        | ||VLAN 5                || |
-                                  +-----+->|192.168.88.1          || |
-                                  |     | ||fd00:0:1:58::1        || |
-                                  |     | |+----------------------+| |
-                                  |     | +------------------------+ |
-                     MAC-loopback |     |                            |
-                                  |     | +------------------------+ |
-                                  |     | |server zone             | |
-                                  |     | |                        | |
-                                  |     | |+----------------------+| |
-                                  |     | ||ipft_server0          || |
-                                  |     | ||VLAN 5                || |
-                                  +-----+->|192.168.88.2          || |
-                                        | ||fd00:0:1:58::2        || |
-                                        | |+----------------------+| |
-                                        | +------------------------+ |
+In this configuration we make sure that the packet travels from server
+to router via "the wire".
+
+                                        +----------------------------+
++----------------------------+          |router zone                 |
+|client zone                 |          | +-------------------------+|
+|(ipft_client_nic0)          |          | |ipft_router_nic0         ||
+|  +----------------------+  |          | |+----------------------+ ||
+|  |ipft_client0          |  |          | ||ipft_client_r0        | ||
+|  |192.168.77.2          |<-+-- Wire --+->|192.168.77.1          | ||
+|  |fd00:0:1:4d::2        |  |          | ||fd00:0:1:4d::1        | ||
+|  +----------------------+  |          | |+----------------------+ ||
++----------------------------+          | +-------------------------+|
+                                        |              ^             |
+                                        |              |             |
+                                        |              |             |
+                                        |              |             |
+                                        |              |             |
+                                        |       IP     |             |
+                                        |   forwarding |             |
+                                        |              |             |
+                                        |              |             |
+                                        |              |             |
++----------------------------+          |              v             |
+|server zone                 |          |+-------------------------+ |
+|(ipft_server_nic0)          |          ||ipft_router_nic1         | |
+|  +----------------------+  |          || +----------------------+| |
+|  |ipft_server0          |  |          || |ipft_server_r0        || |
+|  |VLAN 5                |  |   Wire   || |VLAN 5                || |
+|  |192.168.88.2          |<-+----------++>|192.168.88.1          || |
+|  |fd00:0:1:58::2        |  |          || |fd00:0:1:58::1        || |
+|  +----------------------+  |          || +----------------------+| |
++----------------------------+          |+-------------------------+ |
+                                        +----------------------------+
+
+mac-loopback
+------------
+
+In this configuration we make sure that the packet travels from server
+to router via mac-loopback.
+
+                                        +----------------------------+
++----------------------------+          |router zone                 |
+|client zone                 |          | +-------------------------+|
+|(ipft_nic0)                 |          | |ipft_nic1                ||
+|  +----------------------+  |          | |+----------------------+ ||
+|  |ipft_client0          |  |          | ||ipft_client_r0        | ||
+|  |192.168.77.2          |<-+-- Wire --+->|192.168.77.1          | ||
+|  |fd00:0:1:4d::2        |  |          | ||fd00:0:1:4d::1        | ||
+|  +----------------------+  |          | |+----------------------+ ||
++----------------------------+          | +-------------------------+|
+                                        |              ^             |
+                                        |              |             |
+                                        |              |             |
+                                        |              |             |
+                                        |              |             |
+                                        |       IP     |             |
+                                        |   forwarding |             |
+                                        |              |             |
+                                        |              |             |
+                                        |              |             |
++----------------------------+          |              v             |
+|server zone                 |          |+-------------------------+ |
+|(ipft_nic1)                 |          ||ipft_nic1                | |
+|  +----------------------+  |          || +----------------------+| |
+|  |ipft_server0          |  |   MAC    || |ipft_server_r0        || |
+|  |VLAN 5                |  | loopback || |VLAN 5                || |
+|  |192.168.88.2          |<-+----------++>|192.168.88.1          || |
+|  |fd00:0:1:58::2        |  |          || |fd00:0:1:58::1        || |
+|  +----------------------+  |          || +----------------------+| |
++----------------------------+          |+-------------------------+ |
                                         +----------------------------+
 
 Requirements
@@ -87,38 +122,59 @@ ip_fowarding
 
 	The main test script; it provides the logic for all the tests
 	below. The different test variations are controlled by options
-	and it takes the three zones as arguments. This script is also
-	easily run by hand if you want to bypass the test-runner
-	framework. The rest of the test sripts are meant for
-	consumption by the test-runner framework and are wrappers
-	around this script.
+	and it takes the three zones as arguments. This script may be
+	run by hand but it's easier to use ip_fwd_suite for that
+	purpose.
 
-ip_fwd_no_cksum
+ip_fwd_suite
 
-	Tests IP forwarding with no hardware offloads on any of the
-	interfaces.
+	This script runs the various configurations of the IP
+	forwarding test suite. You can run the entire suite or just a
+	single test via the '-n' option. The "Test Matrix" section
+	below gives an overview of all the tests in the suite.
 
-ip_fwd_partial_cksum
+ip_fwd_XXX
 
-	Tests IP forwarding with partial Tx checksum offload and IPv4
-	header checksum offload enabled on both interfaces.
+	These scripts are mostly here to work around the fact that the
+	test-runner cannot pass arguments to individual tests. In
+	order to avoid running everything as the "ip_fwd_suite" test,
+	we create a file for each configuration. This gives individual
+	reporting of each test and steers us clear of tripping the
+	timeout. You can also run these scripts by hand like so:
 
-ip_fwd_full_cksum
-
-	Tests IP forwarding with full Tx checksum offload and IPv4
-	header checksum offload enabled on both interfaces.
-
-ip_fwd_partial_cksum_lso
-
-	Tests IP forwarding with partial Tx checksum offload, IPv4
-	header checksum offload, and TCP LSO on both interfaces.
-
-ip_fwd_full_cksum_lso
-
-	Tests IP forwarding with full Tx checksum offload, IPv4 header
-	checksum offload, and TCP LSO on both interfaces.
+	NET_TESTS=/opt/net-tests /opt/net-tests/tests/forwarding/ip_fwd_001
 
 config/ip_forwarding.config
 
 	This file must be modified to contain the names of the zones
 	the user crated for running these tests.
+
+Test Matrix
+-----------
+
+This is a breakdown of all the tests in the IP forwarding test suite.
+If a given offload is enabled or disable, it is done so for all
+interfaces involved in the test.
+
+NAME	Tx IP	Tx ULP		LSO	Rx IP	mac-loopback
+001	off	none		off	off	no
+002	on	partial		off	off	no
+003	on	partial		on	off	no
+004	on	fullv4		off	off	no
+005	on	fullv4		on	off	no
+006	off	none		off	on	no
+007	on	partial		off	on	no
+008	on	partial		on	on	no
+009	on	fullv4		off	on	no
+010	on	fullv4		on	on	no
+
+011	off	none		off	off	yes
+012	on	partial		off	off	yes
+013	on	partial		on	off	yes
+014	on	fullv4		off	off	yes
+015	on	fullv4		on	off	yes
+016	off	none		off	on	yes
+017	on	partial		off	on	yes
+018	on	partial		on	on	yes
+019	on	fullv4		off	on	yes
+020	on	fullv4		on	on	yes

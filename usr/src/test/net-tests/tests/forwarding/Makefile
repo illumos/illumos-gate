@@ -20,11 +20,27 @@ TESTDIR = $(ROOTOPTPKG)/tests/forwarding
 
 PROG = \
 	ip_forwarding \
-	ip_fwd_no_cksum \
-	ip_fwd_partial_cksum \
-	ip_fwd_full_cksum \
-	ip_fwd_partial_cksum_lso \
-	ip_fwd_full_cksum_lso
+	ip_fwd_suite \
+	ip_fwd_001 \
+	ip_fwd_002 \
+	ip_fwd_003 \
+	ip_fwd_004 \
+	ip_fwd_005 \
+	ip_fwd_006 \
+	ip_fwd_007 \
+	ip_fwd_008 \
+	ip_fwd_009 \
+	ip_fwd_010 \
+	ip_fwd_011 \
+	ip_fwd_012 \
+	ip_fwd_013 \
+	ip_fwd_014 \
+	ip_fwd_015 \
+	ip_fwd_016 \
+	ip_fwd_017 \
+	ip_fwd_018 \
+	ip_fwd_019 \
+	ip_fwd_020
 
 DOC = $(TESTDIR)/README
 
