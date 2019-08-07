@@ -970,6 +970,7 @@ rw_exit(krwlock_t *lp)
 	jnz	rw_exit_wakeup
 .rw_read_exit_lockstat_patch_point:
 	ret
+	movq	%gs:CPU_THREAD, %rcx		/* rcx = thread ptr */
 	movq	%rdi, %rsi			/* rsi = lock ptr */
 	movl	$LS_RW_EXIT_RELEASE, %edi
 	movl	$RW_READER, %edx
