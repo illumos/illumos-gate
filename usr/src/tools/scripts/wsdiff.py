@@ -119,11 +119,21 @@ wsdiff_exceptions = [
 	"usr/perl5/5.6.1/lib/i86pc-solaris-64int/CORE/libperl.so.1"
 ]
 
-def getoutput(cmd):
-	if PY3:
-		return subprocess.getstatusoutput(cmd)
-	else:
-		return commands.getstatusoutput(cmd)
+if PY3:
+	def getoutput(cmd):
+		import shlex, tempfile
+		f, fpath = tempfile.mkstemp()
+		status = os.system("{ " + cmd + "; } >" +
+			shlex.quote(fpath) + " 2>&1")
+		returncode = os.WEXITSTATUS(status)
+		with os.fdopen(f, "r") as tfile:
+			output = tfile.read()
+		os.unlink(fpath)
+		if output[-1:] == '\n':
+			output = output[:-1]
+		return returncode, output
+else:
+	getoutput = commands.getstatusoutput
 
 #####
 # Logging routines
