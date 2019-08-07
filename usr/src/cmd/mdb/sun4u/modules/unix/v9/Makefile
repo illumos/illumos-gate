@@ -41,4 +41,4 @@ CPPFLAGS += -I$(SRC)/uts/sun4
 CPPFLAGS += -I$(SRC)/uts/sun4u
 CPPFLAGS += -I$(SRC)/uts/sfmmu
 CPPFLAGS += -I$(SRC)/uts/sparc/v9
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)

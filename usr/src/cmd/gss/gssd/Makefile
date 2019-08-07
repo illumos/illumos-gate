@@ -74,7 +74,7 @@ COPTFLAG += $(XESS) #-I$(KINCDIR)
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

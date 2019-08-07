@@ -35,7 +35,7 @@ ROOTCMDDIR = $(EFCODEDIR64)
 CPPFLAGS += -DDEBUG -DFCODE_INTERNAL
 CPPFLAGS += -I ../include -I $(ROOT)/usr/platform/sun4u/include
 CERRWARN += -_gcc=-Wno-unused-variable
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 LDFLAGS += -R/usr/lib/efcode/$(MACH64) -M mapfile64
 
 LIBS	= fcode.so fcdriver.so

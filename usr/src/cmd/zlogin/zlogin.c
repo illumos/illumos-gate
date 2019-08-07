@@ -23,6 +23,7 @@
  * Copyright 2013 DEY Storage Systems, Inc.
  * Copyright (c) 2014 Gary Mills
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -612,7 +613,6 @@ process_user_input(int outfd, int infd)
 	char ibuf[ZLOGIN_BUFSIZ];
 	int nbytes;
 	char *buf = ibuf;
-	char c = *buf;
 
 	nbytes = read(STDIN_FILENO, ibuf, ZLOGIN_RDBUFSIZ);
 	if (nbytes == -1 && (errno != EINTR || dead))
@@ -625,7 +625,7 @@ process_user_input(int outfd, int infd)
 	if (nbytes == 0)
 		return (1);
 
-	for (c = *buf; nbytes > 0; c = *buf, --nbytes) {
+	for (char c = *buf; nbytes > 0; c = *buf, --nbytes) {
 		buf++;
 		if (beginning_of_line && !nocmdchar) {
 			beginning_of_line = B_FALSE;

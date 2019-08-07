@@ -45,7 +45,7 @@ include $(UTSBASE)/i86xpv/Makefile.i86xpv
 include $(UTSBASE)/i86pc/cpu/Makefile.files
 
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-unused-variable
 
 #

@@ -35,7 +35,7 @@ LDLIBS +=	-lelf
 LINTFLAGS +=	-erroff=E_NAME_USED_NOT_DEF2
 LINTFLAGS64 +=	-erroff=E_NAME_USED_NOT_DEF2
 
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 CLEANFILES	+= $(PROG) $(OBJS)
 

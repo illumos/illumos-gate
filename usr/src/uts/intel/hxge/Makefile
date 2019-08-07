@@ -83,7 +83,7 @@ LINTTAGS	+= -erroff=E_FALSE_LOGICAL_EXPR
 
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-switch
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-parentheses
 
 SMOFF += deref_check,logical_instead_of_bitwise

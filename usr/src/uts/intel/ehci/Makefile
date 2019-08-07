@@ -43,7 +43,7 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/usb/hcd/ehci
 #
 include $(UTSBASE)/intel/Makefile.intel
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-switch
 
 # needs work

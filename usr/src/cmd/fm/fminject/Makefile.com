@@ -50,7 +50,7 @@ CLEANFILES += inj_grammar.c inj_grammar.h inj_lex.c y.tab.h y.tab.c
 CPPFLAGS += -I. -I../common
 CFLAGS += $(CCVERBOSE) $(CTF_FLAGS)
 CERRWARN += -_gcc=-Wno-switch
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-type-limits
 CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-unused-variable

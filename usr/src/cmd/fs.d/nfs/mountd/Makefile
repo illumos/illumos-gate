@@ -42,7 +42,7 @@ DOBJ	  =	$(DSRC:%.d=%.o)
 LDLIBS	 +=	-lrpcsvc -lnsl -lbsm -lsocket -ltsnet -ltsol -lnvpair -lscf -lumem
 CPPFLAGS +=	-D_REENTRANT -I../lib
 
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-switch
 
 # not linted

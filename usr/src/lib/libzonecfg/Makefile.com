@@ -36,7 +36,7 @@ $(DYNLIB) :=	LDLIBS += -lxml2
 
 SRCDIR =	../common
 CPPFLAGS +=	-I$(ADJUNCT_PROTO)/usr/include/libxml2 -I$(SRCDIR) -D_REENTRANT
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-parentheses
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 

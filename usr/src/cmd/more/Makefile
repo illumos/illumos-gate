@@ -39,7 +39,7 @@ $(ROOTLIBDATA) :=	FILEMODE =	0644
 
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-clobbered
 
 # not linted

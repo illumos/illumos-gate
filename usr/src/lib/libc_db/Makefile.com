@@ -48,7 +48,7 @@ CFLAGS +=	$(CCVERBOSE)
 LDLIBS +=	-lc
 
 CERRWARN +=	-_gcc=-Wno-type-limits
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

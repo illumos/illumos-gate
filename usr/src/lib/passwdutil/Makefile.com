@@ -58,7 +58,7 @@ CPPFLAGS	+= -DENABLE_SUNOS_AGING -D_REENTRANT \
 CFLAGS		+= $(CCVERBOSE)
 
 CERRWARN	+= -_gcc=-Wno-switch
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-unused-label
 
 # not linted

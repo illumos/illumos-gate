@@ -75,7 +75,7 @@ LDFLAGS += -dy -N misc/sata
 #
 LINTTAGS        += -erroff=E_BAD_PTR_CAST_ALIGN
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
 $(OBJS_DIR)/nv_sata.o := SMOFF += deref_check

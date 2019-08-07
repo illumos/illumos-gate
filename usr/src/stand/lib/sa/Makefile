@@ -57,7 +57,7 @@ LDLIBS += -lsock
 CPPFLAGS += $(SOCKCPPFLAGS)
 
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 objs/%.o: $(MACH)/%.s
 	  $(COMPILE.s) -o $@ $<

@@ -33,7 +33,7 @@ include ../Makefile.cmd
 
 CPPFLAGS += -D_EXTVTOC
 
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

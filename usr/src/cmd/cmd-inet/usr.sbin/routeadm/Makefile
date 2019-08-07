@@ -50,7 +50,7 @@ ROOTUSRSBINLINKS=	$(PROG:%=$(ROOTUSRSBIN)/%)
 
 CPPFLAGS +=	-I../../../../common/svc -I$(CMDINETCOMMONDIR)
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 $(NOT_RELEASE_BUILD)CPPFLAGS +=	-DDEBUG
 
 LDLIBS +=		-lscf -luutil -lsocket

@@ -73,7 +73,7 @@ LDFLAGS		+= -dy -Nmisc/usba
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
 SMOFF += deref_check

@@ -68,7 +68,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 CFLAGS += $(CCVERBOSE) -DN2 -I$(COM_DIR)
 LINTFLAGS += -DN2 -I$(COM_DIR)
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 #
 # module dependencies

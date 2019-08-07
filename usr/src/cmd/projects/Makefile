@@ -35,7 +35,7 @@ LDLIBS += -lproject
 .KEEP_STATE:
 
 CFLAGS += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 all: $(PROG)
 

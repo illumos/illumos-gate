@@ -1,6 +1,10 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved. */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #include "k5-int.h"
 #include "com_err.h"
 #include <admin.h>
@@ -519,34 +523,34 @@ krb5_error_code krb5int_populate_gic_opt (
 {
   int i;
   krb5_int32 starttime;
-  krb5_get_init_creds_opt *opt;
+  krb5_get_init_creds_opt opt;
 
 
-    krb5_get_init_creds_opt_init(opt);
+    krb5_get_init_creds_opt_init(&opt);
     if (addrs)
-      krb5_get_init_creds_opt_set_address_list(opt, (krb5_address **) addrs);
+      krb5_get_init_creds_opt_set_address_list(&opt, (krb5_address **) addrs);
     if (ktypes) {
 	for (i=0; ktypes[i]; i++);
 	if (i)
-	    krb5_get_init_creds_opt_set_etype_list(opt, ktypes, i);
+	    krb5_get_init_creds_opt_set_etype_list(&opt, ktypes, i);
     }
     if (pre_auth_types) {
 	for (i=0; pre_auth_types[i]; i++);
 	if (i)
-	    krb5_get_init_creds_opt_set_preauth_list(opt, pre_auth_types, i);
+	    krb5_get_init_creds_opt_set_preauth_list(&opt, pre_auth_types, i);
     }
     if (options&KDC_OPT_FORWARDABLE)
-	krb5_get_init_creds_opt_set_forwardable(opt, 1);
-    else krb5_get_init_creds_opt_set_forwardable(opt, 0);
+	krb5_get_init_creds_opt_set_forwardable(&opt, 1);
+    else krb5_get_init_creds_opt_set_forwardable(&opt, 0);
     if (options&KDC_OPT_PROXIABLE)
-	krb5_get_init_creds_opt_set_proxiable(opt, 1);
-    else krb5_get_init_creds_opt_set_proxiable(opt, 0);
+	krb5_get_init_creds_opt_set_proxiable(&opt, 1);
+    else krb5_get_init_creds_opt_set_proxiable(&opt, 0);
     if (creds && creds->times.endtime) {
         krb5_timeofday(context, &starttime);
         if (creds->times.starttime) starttime = creds->times.starttime;
-        krb5_get_init_creds_opt_set_tkt_life(opt, creds->times.endtime - starttime);
+        krb5_get_init_creds_opt_set_tkt_life(&opt, creds->times.endtime - starttime);
     }
-    return krb5int_gic_opt_to_opte(context, opt, opte, 0,
+    return krb5int_gic_opt_to_opte(context, &opt, opte, 0,
 				   "krb5int_populate_gic_opt");
 }
 

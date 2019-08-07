@@ -31,7 +31,7 @@ include $(SRC)/lib/Makefile.lib
 
 CPPFLAGS +=	-I$(SRC)/lib/libsasl/include
 
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

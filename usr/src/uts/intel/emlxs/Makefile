@@ -81,7 +81,7 @@ LDFLAGS		+= -Nmisc/bignum -Nmisc/fctl
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-label
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
 SMOFF += indenting,deref_check,all_func_returns,index_overflow

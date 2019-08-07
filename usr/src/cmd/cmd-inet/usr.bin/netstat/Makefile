@@ -46,7 +46,7 @@ OBJS=		$(LOCALOBJS) $(COMMONOBJS) $(STAT_COMMON_OBJS)
 SRCS=		$(LOCALSRCS) $(COMMONSRCS) $(STAT_COMMON_SRCS)
 
 CPPFLAGS += -DNDEBUG -I$(CMDINETCOMMONDIR) -I$(STATCOMMONDIR)
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-parentheses
 LDLIBS += -ldhcpagent -lsocket -lnsl -lkstat -ltsnet -ltsol
 

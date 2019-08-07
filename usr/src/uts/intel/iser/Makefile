@@ -45,7 +45,7 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/iser
 #
 include $(UTSBASE)/intel/Makefile.intel
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
 $(OBJS_DIR)/iser_ib.o := SMOFF += deref_check

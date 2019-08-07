@@ -31,7 +31,7 @@ EFILE= egrep
 include ../Makefile.cmd
 
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 ROOTXPG4LINKS = $(ROOTXPG4BIN)/$(FFILE)	$(ROOTXPG4BIN)/$(EFILE) $(ROOTXPG4BIN)/$(PROG)
 ROOTLINKS = $(ROOTBIN)/$(FFILE) $(ROOTBIN)/$(EFILE)

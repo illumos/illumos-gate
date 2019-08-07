@@ -61,7 +61,7 @@ CFLAGS +=	$(CCVERBOSE)
 LDFLAGS +=	-dy -Ndacf/consconfig_dacf
 
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 #
 # For now, disable these lint checks; maintainers should endeavor

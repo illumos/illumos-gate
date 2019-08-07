@@ -66,7 +66,7 @@ CFLAGS	+= $(CCVERBOSE)
 CFLAGS += -D_EXTVTOC
 
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 LDFLAGS += -dy -Nmisc/ldc -Nmisc/platsvc -Nmisc/scsi
 

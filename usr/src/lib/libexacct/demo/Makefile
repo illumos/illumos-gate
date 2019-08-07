@@ -31,7 +31,7 @@ include ../../../cmd/Makefile.cmd
 
 LDLIBS += -lexacct -lproject -lsocket -lnsl
 CFLAGS += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 

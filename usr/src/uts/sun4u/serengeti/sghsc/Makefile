@@ -69,7 +69,7 @@ CLEANLINTFILES	+= $(LINT32_FILES)
 #
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-type-limits
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 #
 # Turn on doubleword alignment for 64 bit registers

@@ -49,7 +49,7 @@ CLEANFILES +=	$(LINTOUT) $(LINTLIB)
 CPPFLAGS +=	-D_REENTRANT
 CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 LDLIBS +=	-lc -lsecdb -lproc -lpool
 
 $(LINTLIB) :=	SRCS = ../common/llib-lproject

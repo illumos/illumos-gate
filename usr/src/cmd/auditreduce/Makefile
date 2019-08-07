@@ -41,7 +41,7 @@ MSGFILES = $(SRCS)
 CPPFLAGS += -I$(TABLEDIR) -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 LDLIBS += -lnsl -lbsm -lscf -ltsol
 
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-parentheses
 
 # false positives / need cleanup

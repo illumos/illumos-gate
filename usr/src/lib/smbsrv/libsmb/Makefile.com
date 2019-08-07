@@ -86,7 +86,7 @@ LDLIBS +=	-lsec -lidmap -lreparse -lcmdutils -lavl
 LDLIBS +=	-lnvpair -lresolv -lsocket -lnsl -lc
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 CPPFLAGS +=	-Dsyslog=smb_syslog
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-char-subscripts
 CERRWARN +=	-_gcc=-Wno-switch
 

@@ -66,7 +66,7 @@ AS_CPPFLAGS	+= -I../../$(PLATFORM)
 LINTTAGS	+= -I$(COM_DIR)
 
 CERRWARN	+= -_gcc=-Wno-switch
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-label
 

@@ -222,6 +222,11 @@ CERRWARN += -_gcc=-Wno-unknown-pragmas
 CERRWARN += -_gcc=-Wno-unused-parameter
 CERRWARN += -_gcc=-Wno-missing-field-initializers
 
+# gcc4 lacks -Wno-maybe-uninitialized
+CNOWARN_UNINIT = -_gcc4=-Wno-uninitialized \
+    -_gcc7=-Wno-maybe-uninitialized \
+    -_gcc8=-Wno-maybe-uninitialized
+
 # DEBUG v. -nd make for frequent unused variables, empty conditions, etc. in
 # -nd builds
 $(RELEASE_BUILD)CERRWARN += -_gcc=-Wno-unused

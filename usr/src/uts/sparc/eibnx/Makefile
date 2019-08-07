@@ -81,7 +81,7 @@ LDFLAGS	+= -dy -Nmisc/ibcm -Nmisc/ibtl
 LINTTAGS += -erroff=E_BAD_PTR_CAST_ALIGN
 
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 #
 # Default build targets

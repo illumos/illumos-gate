@@ -33,7 +33,7 @@ ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 
 PROG	= kbd
 CFLAGS	+= $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 LDLIBS	+= -lscf
 
 all: $(PROG)

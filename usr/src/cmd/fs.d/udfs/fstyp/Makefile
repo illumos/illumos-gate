@@ -37,7 +37,7 @@ CFLAGS +=	$(C_PICFLAGS)
 DYNLIB=		$(LIBPROG)
 
 CERRWARN +=	-_gcc=-Wno-unused-function
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 LDLIBS += -lnvpair -ladm -lc
 

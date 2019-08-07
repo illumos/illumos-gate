@@ -25,7 +25,7 @@ CERRWARN +=	-erroff=E_FUNC_HAS_NO_RETURN_STMT
 CERRWARN +=	-erroff=E_IMPLICIT_DECL_FUNC_RETURN_INT
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-return-type
 CERRWARN +=	-_gcc=-Wno-clobbered

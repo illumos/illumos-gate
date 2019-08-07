@@ -39,7 +39,7 @@ LDLIBS += -L$(ROOT)/usr/lib/fm -lfmd_log -lnvpair -ltopo -lfmd_msg
 LDFLAGS += -R/usr/lib/fm
 LINTFLAGS += -mnu
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 .NO_PARALLEL:
 .PARALLEL: $(OBJS) $(LINTFILES)

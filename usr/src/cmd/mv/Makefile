@@ -42,7 +42,7 @@ CLOBBERFILES += $(CPFILE) $(LNFILE)
 CFLAGS	+=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-variable
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 $(XPG4) := CFLAGS += -DXPG4
 LINTFLAGS += -DXPG4 -u
 XGETFLAGS += -a -x mv.xcl

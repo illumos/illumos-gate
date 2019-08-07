@@ -69,7 +69,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 
 CPPFLAGS	+= -I../../sun4
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
 $(OBJS_DIR)/bofi.o := SMOFF += signed_integer_overflow_check,deref_check

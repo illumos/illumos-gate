@@ -70,7 +70,7 @@ CPPFLAGS	+=	-I$(INCDIR) -I$(ADJUNCT_PROTO)/usr/include/libxml2 \
 CERRWARN	+=	-_gcc=-Wno-parentheses
 CERRWARN	+=	-_gcc=-Wno-switch
 CERRWARN	+=	-_gcc=-Wno-type-limits
-CERRWARN	+=	-_gcc=-Wno-uninitialized
+CERRWARN	+=	$(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

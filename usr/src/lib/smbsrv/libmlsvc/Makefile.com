@@ -93,7 +93,7 @@ CPPFLAGS += -Dsyslog=smb_syslog
 $(ENABLE_SMB_PRINTING) CPPFLAGS += -DHAVE_CUPS
 
 CERRWARN += -_gcc=-Wno-unused-function
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

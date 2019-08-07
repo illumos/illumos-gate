@@ -62,7 +62,7 @@ CPPFLAGS	+= -DINTERNAL_BUILD -DSOL2 -DMUX_FRAME
 INC_PATH	+= -I$(UTSBASE)/common/io/ppp/common
 
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
 SMOFF += indenting,index_overflow

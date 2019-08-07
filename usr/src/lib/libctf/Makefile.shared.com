@@ -85,6 +85,6 @@ CPPFLAGS +=	-I$(SRC)/lib/libctf/common	\
 		-DCTF_OLD_VERSIONS
 CFLAGS += $(CCVERBOSE)
 
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)

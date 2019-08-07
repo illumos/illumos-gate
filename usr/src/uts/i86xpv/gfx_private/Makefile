@@ -66,7 +66,7 @@ LINTTAGS +=	-erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS +=	-erroff=E_STATIC_UNUSED
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-parentheses
 
 #

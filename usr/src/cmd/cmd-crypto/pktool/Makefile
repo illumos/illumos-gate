@@ -53,7 +53,7 @@ CPPFLAGS += -I. -I$(KMFDIR)/include -I$(ADJUNCT_PROTO)/usr/include/libxml2 \
 	-I$(KMFDIR)/ber_der/inc
 
 CFLAGS += $(CCVERBOSE) -DDEBUG
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-unused-label
 
 # not linted, too much mess, but it should be

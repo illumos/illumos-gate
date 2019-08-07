@@ -38,7 +38,7 @@ SRCS= $(OBJS:.o=.c)
 LDLIBS +=	-lhal -lsecdb
 NONLINTLDLIBS =	-ldbus-1
 CFLAGS +=	$(CCVERBOSE)
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-parentheses
 CPPFLAGS +=	-D_REENTRANT -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 $(HAL_DBUS_CPPFLAGS)
 LINTFLAGS += 	-um

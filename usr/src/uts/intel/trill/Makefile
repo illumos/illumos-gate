@@ -44,7 +44,7 @@ ROOTMODULE	= $(ROOT_SOCK_DIR)/$(MODULE)
 #
 include $(UTSBASE)/intel/Makefile.intel
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
 SMOFF += all_func_returns

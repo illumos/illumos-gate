@@ -33,7 +33,7 @@ include ../../Makefile.cmd
 LDLIBS += -lelf -lkstat -ldtrace
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 SMOFF += index_overflow
 

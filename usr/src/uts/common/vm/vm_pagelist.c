@@ -4179,8 +4179,7 @@ page_get_replacement_page(page_t *orig_like_pp, struct lgrp *lgrp_target,
 	if (PP_ISKAS(like_pp))
 		pgrflags |= PGR_SAMESZC;
 
-	/* LINTED */
-	MTYPE_PGR_INIT(mtype, flags, like_pp, page_mnode, npgs);
+	MTYPE_PGR_INIT(mtype, flags, like_pp, npgs);
 
 	while (npgs) {
 		pplist = NULL;

@@ -67,7 +67,7 @@ LDFLAGS		+= -dy -Nmisc/mac -Nmac/mac_wifi -Ndrv/ip
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 CERRWARN	+= -_gcc=-Wno-switch
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-parentheses
 
 # needs work

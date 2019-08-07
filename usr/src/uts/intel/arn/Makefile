@@ -63,7 +63,7 @@ LDFLAGS		+= -dy -Nmisc/mac -Nmisc/net80211
 LINTTAGS        += -erroff=E_BAD_PTR_CAST_ALIGN
 
 CERRWARN	+= -_gcc=-Wno-unused-variable
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-char-subscripts
 
 # various issues

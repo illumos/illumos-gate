@@ -78,7 +78,7 @@ LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LDFLAGS		+= -dy -Nmisc/scsi -Nmisc/s1394 -Nmisc/sbp2
 
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 #	Default build targets.
 #

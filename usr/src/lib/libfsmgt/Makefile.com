@@ -53,7 +53,7 @@ CPPFLAGS +=	-D_REENTRANT -I$(SRC)/lib/libfsmgt/common \
 		-I$(SRC)/cmd/fs.d/nfs/lib
 
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

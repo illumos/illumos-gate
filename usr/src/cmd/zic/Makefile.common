@@ -12,6 +12,6 @@ OBJS=		ialloc.o \
 SRCS=		$(OBJS:%.o=%.c)
 
 CERRWARN +=	-_gcc=-Wno-unused-variable
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 SMOFF +=	signed

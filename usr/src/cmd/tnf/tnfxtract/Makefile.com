@@ -37,7 +37,7 @@ include	../../../Makefile.cmd
 
 LFLAGS=		-v
 LDLIBS +=	-lkvm
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

@@ -31,7 +31,7 @@ include ../Makefile.cmd
 
 CPPFLAGS= -DPORTMAP $(CPPFLAGS.master)
 LDLIBS += -lnsl
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 

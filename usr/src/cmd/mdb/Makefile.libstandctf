@@ -62,7 +62,7 @@ LINTFILES = $(OBJS:%.o=%.ln)
 
 LINTFLAGS += -n -errtags=yes
 
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 .NO_PARALLEL:
 .PARALLEL: $(OBJS)

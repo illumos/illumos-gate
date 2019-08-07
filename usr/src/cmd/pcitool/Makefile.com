@@ -31,7 +31,7 @@ UTSBASE = ../../../../src/uts
 LDLIBS += -ldevinfo
 
 CFLAGS += -D$(MACH) -I$(UTSBASE)/common
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-variable
 

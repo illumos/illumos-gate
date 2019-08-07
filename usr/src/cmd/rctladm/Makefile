@@ -35,7 +35,7 @@ include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 POFILE = rctladm_msg.po
 XGETFLAGS = -a
 FILEMODE = 0555

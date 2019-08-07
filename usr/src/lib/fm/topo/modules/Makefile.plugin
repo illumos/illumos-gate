@@ -58,7 +58,7 @@ ROOTCONF = $($(CLASS)_ROOTCONF)
 LINTFLAGS = -msux
 LINTFILES = $(MODULESRCS:%.c=%.ln) $(SHAREDSRCS:%.c=%.ln)
 
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-parentheses
 
 APIMAP = ../../../libtopo/common/topo_mod.map

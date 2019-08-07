@@ -33,7 +33,7 @@ XGETFLAGS +=	-a -x $(PROG).xcl
 LDLIBS +=	-lofmt -linetutil -lnsl -lnwam -lumem -lscf
 
 CERRWARN += -_gcc=-Wno-switch
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

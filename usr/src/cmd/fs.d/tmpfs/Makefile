@@ -31,4 +31,4 @@ include		../Makefile.fstype
 include		../Makefile.mount
 include		../Makefile.mount.targ
 
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)

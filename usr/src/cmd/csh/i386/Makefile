@@ -26,7 +26,7 @@ CPPFLAGS += -D_FILE_OFFSET_BITS=64
 LDLIBS += -lcurses
 
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-implicit-int
 CERRWARN += -_gcc=-Wno-unused-function

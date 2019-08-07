@@ -150,7 +150,7 @@ LINTFLAGS +=	-DDAPL_DBG
 LINTFLAGS64 +=	-DDAPL_DBG
 
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-switch
 
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDAPL_DBG

@@ -121,7 +121,7 @@ ASFLAGS += -P $(ASFLAGS_$(CURTYPE)) -D_ASM
 $(LINTLIB) := SRCS = $(COMDIR)/$(LINTSRC)
 
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

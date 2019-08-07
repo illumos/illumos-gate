@@ -30,7 +30,7 @@ include ../Makefile.cmd
 
 LDLIBS += -lgen
 CFLAGS += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 XGETFLAGS += -a -x rmdir.xcl
 

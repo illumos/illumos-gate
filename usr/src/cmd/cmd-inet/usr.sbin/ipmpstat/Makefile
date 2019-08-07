@@ -29,7 +29,7 @@ ROOTUSRSBINLINKS = $(PROG:%=$(ROOTUSRSBIN)/%)
 include $(SRC)/cmd/Makefile.cmd
 
 CSTD = $(CSTD_GNU99)
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 LDLIBS += -lipmp -lsocket -lsysevent -lnvpair -lofmt
 XGETFLAGS += -a -x $(PROG).xcl
 

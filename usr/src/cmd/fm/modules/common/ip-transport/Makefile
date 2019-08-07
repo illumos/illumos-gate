@@ -33,7 +33,7 @@ SRCS = ip.c
 include ../../Makefile.plugin
 
 LDLIBS += -lsocket -lnsl
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

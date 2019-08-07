@@ -23,7 +23,7 @@ CPPFLAGS= -I. $(DEFS) $(MBCHAR) $(CPPFLAGS.master)
 CPPFLAGS +=	-I../../sh
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-implicit-int
 CERRWARN += -_gcc=-Wno-unused-function

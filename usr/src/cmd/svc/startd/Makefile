@@ -71,7 +71,7 @@ CPPFLAGS += -I. -I../common
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-switch
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 # these look like real bugs here, but ...
 SMOFF += impossible_mask,signed_integer_overflow_check

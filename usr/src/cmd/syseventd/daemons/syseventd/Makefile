@@ -29,7 +29,7 @@ SRCS =	syseventd.c sysevent_signal.c sysevent_client.c
 
 include ../Makefile.com
 
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 

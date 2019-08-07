@@ -31,7 +31,7 @@ SRCS= $(OBJS:%.o=%.c)
 include ../Makefile.cmd
 CPPFLAGS += -D_FILE_OFFSET_BITS=64 -DSOLARIS_PRIVS
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

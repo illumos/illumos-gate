@@ -41,7 +41,7 @@ CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
 LDLIBS += -lipmi -lnvpair
 LINTFLAGS += -mnu
 
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 .NO_PARALLEL:
 .PARALLEL: $(OBJS) $(LINTFILES)

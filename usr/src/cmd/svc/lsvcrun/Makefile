@@ -35,7 +35,7 @@ include ../../Makefile.cmd
 
 LDLIBS +=	-lcontract -lscf -luutil
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 lint := LINTFLAGS = -ux
 

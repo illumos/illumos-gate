@@ -35,7 +35,7 @@ LLOBJS=		$(OBJS:%.o=%.ll)
 include ../../Makefile.cmd
 
 $(PROG) lint 	:= LDLIBS += -lscf -lnsl
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

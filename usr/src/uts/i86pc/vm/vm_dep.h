@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -305,9 +306,9 @@ extern int mtype_init(vnode_t *, caddr_t, uint_t *, size_t);
 	}								\
 }
 
-extern int mtype_pgr_init(int *, page_t *, int, pgcnt_t);
-#define	MTYPE_PGR_INIT(mtype, flags, pp, mnode, pgcnt)			\
-	(mtype = mtype_pgr_init(&flags, pp, mnode, pgcnt))
+extern int mtype_pgr_init(int *, page_t *, pgcnt_t);
+#define	MTYPE_PGR_INIT(mtype, flags, pp, pgcnt)				\
+	(mtype = mtype_pgr_init(&flags, pp, pgcnt))
 
 #define	MNODE_PGCNT(mnode)		mnode_pgcnt(mnode)
 

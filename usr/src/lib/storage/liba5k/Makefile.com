@@ -45,7 +45,7 @@ LINTFLAGS += $(COMMON_LINTFLAGS)
 LINTFLAGS64 +=  $(COMMON_LINTFLAGS)
 
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 LDLIBS += -lc -ldevice -lg_fc
 

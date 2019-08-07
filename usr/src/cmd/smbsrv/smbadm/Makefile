@@ -37,7 +37,7 @@ LDFLAGS += -R/usr/lib/smbsrv
 
 .KEEP_STATE:
 
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 SMOFF += free
 

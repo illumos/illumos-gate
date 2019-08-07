@@ -51,7 +51,7 @@ ROOTMODULE	= $(ROOT_STRMOD_DIR)/$(MODULE)
 #
 include $(UTSBASE)/intel/Makefile.intel
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-parentheses
 
 # needs work

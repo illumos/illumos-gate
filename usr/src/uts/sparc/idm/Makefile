@@ -62,7 +62,7 @@ LDFLAGS		+= -dy -Nfs/sockfs -Nmisc/ksocket
 
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 #	Include
 INC_PATH	+= -I$(SRC)/common/hdcrc

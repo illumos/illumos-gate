@@ -62,7 +62,7 @@ CFLAGS += $(CCVERBOSE) -I../sys
 LDFLAGS += -dy -Ndrv/su
 
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 #
 #	Default build targets.

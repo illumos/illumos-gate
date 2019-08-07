@@ -77,7 +77,7 @@ LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-function
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
 SMOFF += no_if_block,indenting,all_func_returns

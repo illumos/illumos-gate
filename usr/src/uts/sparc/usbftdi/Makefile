@@ -46,7 +46,7 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/usb/clients/usbser/usbftdi
 #
 include $(UTSBASE)/sparc/Makefile.sparc
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 LDFLAGS         += -dy -Nmisc/usba -Nmisc/usbser
 

@@ -58,7 +58,7 @@ LDLIBS +=	-lc -lm -lnvpair -lsocket -lnsl
 CPPFLAGS +=	$(INCS)
 CSTD = $(CSTD_GNU99)
 
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 

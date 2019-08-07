@@ -49,7 +49,7 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 INC_PATH	+= -I$(SRC)/common/lzma
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 #
 #	Define targets

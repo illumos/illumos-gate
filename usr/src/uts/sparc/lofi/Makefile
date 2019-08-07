@@ -58,7 +58,7 @@ LDFLAGS += -dy -Nmisc/cmlb
 #
 CFLAGS		+= $(CCVERBOSE)
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 INC_PATH	+= -I$(SRC)/common/lzma  
 

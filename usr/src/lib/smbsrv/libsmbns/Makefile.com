@@ -55,7 +55,7 @@ LDLIBS +=	-lsmb -lads -lgss -lcmdutils -lldap \
 CPPFLAGS +=	-D_REENTRANT
 CPPFLAGS +=	-Dsyslog=smb_syslog
 CERRWARN +=	-_gcc=-Wno-unused-function
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

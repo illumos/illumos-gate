@@ -47,7 +47,7 @@ CPPFLAGS +=	-D_REENTRANT -I../inc -I../../common/inc -I../../libgen/inc
 LDLIBS +=       -lgen -lc
 
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 

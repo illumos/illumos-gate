@@ -54,7 +54,7 @@ CPPFLAGS +=	-D_REENTRANT -D_FILE_OFFSET_BITS=64 \
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-switch
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off
