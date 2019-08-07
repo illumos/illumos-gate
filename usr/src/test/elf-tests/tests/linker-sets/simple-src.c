@@ -102,4 +102,6 @@ main(int __attribute__((unused)) argc, char __attribute__((unused)) **argv)
 		printf("foo[%d]: %s\n", i, (*c)->buf);
 		i++;
 	}
+
+	return (0);
 }
