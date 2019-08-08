@@ -13,7 +13,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 [DEFAULT]
@@ -46,9 +46,15 @@ tests = ['json_00_blank', 'json_01_boolean', 'json_02_numbers',
     'json_03_empty_arrays', 'json_04_number_arrays', 'json_05_strings',
     'json_06_nested', 'json_07_nested_arrays']
 
+#
+# The awk tests have a number of individual tests which can take several
+# minutes to run. Bumping the timeout to 5 minutes should cover us
+# reasonably well as of 7 Aug 2019.
+#
 [/opt/util-tests/tests/awk]
 user = nobody
 tests = [ 'runtests.sh' ]
+timeout = 300
 
 [/opt/util-tests/tests/grep_test]
 [/opt/util-tests/tests/date_test]
