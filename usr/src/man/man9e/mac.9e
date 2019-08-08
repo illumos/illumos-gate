@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2018 Joyent, Inc.
+.\" Copyright 2019 Joyent, Inc.
 .\"
-.Dd March 23, 2018
+.Dd July 22, 2019
 .Dt MAC 9E
 .Os
 .Sh NAME
@@ -179,6 +179,19 @@ failed, then it should unwind its initialization and should return
 from its
 .Xr attach 9E
 routine.
+.Pp
+The driver does not need to hold onto an allocated
+.Xr mac_register 9S
+structure after it has called the
+.Xr mac_register 9F
+function.
+Whether the
+.Xr mac_register 9F
+function returns successfully or not, the driver may free its
+.Xr mac_register 9S
+structure by calling the
+.Xr mac_free 9F
+function.
 .Ss MAC Callbacks
 The MAC framework interacts with a device driver through a series of
 callbacks.
@@ -245,6 +258,12 @@ with optional metadata.
 Often each frame has a corresponding descriptor which has information about
 whether or not there were errors or whether or not the device successfully
 checksummed the packet.
+In addition to the per-packet flow described below, there are certain
+requirements that drivers must adhere to when programming the hardware
+to receive data.
+See the section
+.Sx RECEIVE DESCRIPTOR LAYOUT
+for more information.
 .Pp
 During a single interrupt, a device driver should process a fixed number
 of frames.
@@ -1520,6 +1539,53 @@ maintains additional statistics or the device provides additional
 statistics, it should create its own kstats through the
 .Xr kstat_create 9F
 function to allow operators to observe them.
+.Sh RECEIVE DESCRIPTOR LAYOUT
+One of the important things that a device driver must do is lay out DMA
+memory, generally in a ring of descriptors, into which received Ethernet
+frames will be placed.
+When performing this, there are a few things that drivers should
+generally do:
+.Bl -enum -offset indent
+.It
+Drivers should lay out memory so that the IP header will be 4-byte
+aligned.
+The IP stack expects that the beginning of an IP header will be at a
+4-byte aligned address; however, a DMA allocation will be at a 4-
+or 8-byte aligned address by default.
+The IP hearder is at a 14 byte offset from the beginning of the Ethernet
+frame, leaving the IP header at a 2-byte alignment if the Ethernet frame
+starts at the beginning of the DMA buffer.
+If VLAN tagging is in place, then each VLAN tag adds 4 bytes, which
+doesn't change the alignment the IP header is found at.
+.Pp
+As a solution to this, the driver should program the device to start
+placing the received Ethernet frame at two bytes off of the start of the
+DMA buffer.
+This will make sure that no matter whether or not VLAN tags are present,
+that the IP header will be 4-byte aligned.
+.It
+Drivers should try to allocate the DMA memory used for receiving frames
+as a continuous buffer.
+If for some reason that would not be possible, the driver should try to
+ensure that there is enough space for all of the initial Ethernet and
+any possible layer three and layer four headers
+.Pq such as IP, TCP, or UDP
+in the initial descriptor.
+.It
+As discussed in the
+.Sx MBLKS AND DMA
+section, there are multiple strategies for managing the relationship
+between DMA data, receive descriptors, and the operating system
+representation of a packet in the
+.Xr mblk 9S
+structure.
+Drivers must limit their resource consumption.
+See the
+.Sy Considerations
+section of
+.Sx MBLKS AND DMA
+for more on this.
+.El
 .Sh TX STALL DETECTION, DEVICE RESETS, AND FAULT MANAGEMENT
 Device drivers are the first line of defense for dealing with broken
 devices and bugs in their firmware.
@@ -1876,6 +1942,7 @@ a given platform.
 .Xr kstat_create 9F ,
 .Xr mac_alloc 9F ,
 .Xr mac_fini_ops 9F ,
+.Xr mac_free 9F ,
 .Xr mac_hcksum_get 9F ,
 .Xr mac_hcksum_set 9F ,
 .Xr mac_init_ops 9F ,
