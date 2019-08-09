@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <stdlib.h>
@@ -18,6 +18,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <sys/regset.h>
+#include <sys/resource.h>
+#include <err.h>
 
 /*
  * Load a bunch of bad selectors into the seg regs: this will typically cause
@@ -117,9 +119,9 @@ inchild(void (*func)())
 	switch ((pid = fork())) {
 	case 0:
 		func();
-		exit(0);
+		exit(EXIT_SUCCESS);
 	case -1:
-		exit(1);
+		exit(EXIT_FAILURE);
 	default:
 		(void) waitpid(pid, NULL, 0);
 		return;
@@ -130,6 +132,12 @@ inchild(void (*func)())
 int
 main(int argc, char *argv[])
 {
+	struct rlimit rl = { 0, };
+
+	if (setrlimit(RLIMIT_CORE, &rl) != 0) {
+		err(EXIT_FAILURE, "failed to disable cores");
+	}
+
 	for (selector = 0; selector < 8194; selector++) {
 		inchild(resetcs);
 		inchild(resetds);
@@ -144,5 +152,5 @@ main(int argc, char *argv[])
 		inchild(badss);
 	}
 
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
