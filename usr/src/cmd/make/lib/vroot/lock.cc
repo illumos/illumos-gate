@@ -36,10 +36,8 @@
 #include <errno.h>			/* errno */
 #include <libintl.h>
 
-extern	char		*sys_errlist[];
-extern	int		sys_nerr;
-
-static	void		file_lock_error(char *msg, char *file, char *str, int arg1, int arg2);
+static	void		file_lock_error(char *msg, char *file, const char *str,
+    char *arg1, char * arg2);
 
 #define BLOCK_INTERUPTS sigfillset(&newset) ; \
 	sigprocmask(SIG_SETMASK, &newset, &oldset)
@@ -108,8 +106,8 @@ file_lock(char *name, char *lockname, int *file_locked, int timeout)
 		UNBLOCK_INTERUPTS;
 
 		if (errno != EEXIST) {
-			file_lock_error(msg, name, (char *)"symlink(%s, %s)",
-			    (int) name, (int) lockname);
+			file_lock_error(msg, name, "symlink(%s, %s)",
+			    name, lockname);
 			fprintf(stderr, "%s", msg);
 			return errno;
 		}
@@ -129,15 +127,15 @@ file_lock(char *name, char *lockname, int *file_locked, int timeout)
 			if ((counter > 5) && (!printed_warning)) {
 				/* Print waiting message after 5 secs */
 				(void) getcwd(msg, MAXPATHLEN);
-				fprintf(stderr,
-					gettext("file_lock: file %s is already locked.\n"),
-					name);
-				fprintf(stderr,
-					gettext("file_lock: will periodically check the lockfile %s for two minutes.\n"),
-					lockname);
-				fprintf(stderr,
-					gettext("Current working directory %s\n"),
-					msg);
+				fprintf(stderr, gettext(
+				    "file_lock: file %s is already locked.\n"),
+				    name);
+				fprintf(stderr, gettext(
+				    "file_lock: will periodically check the "
+				    "lockfile %s for two minutes.\n"),
+				    lockname);
+				fprintf(stderr, gettext(
+				    "Current working directory %s\n"), msg);
 
 				printed_warning = 1;
 			}
@@ -157,19 +155,23 @@ file_lock(char *name, char *lockname, int *file_locked, int timeout)
  * Format a message telling why the lock could not be created.
  */
 static	void
-file_lock_error(char *msg, char *file, char *str, int arg1, int arg2)
+file_lock_error(char *msg, char *file, const char *str, char *arg1, char *arg2)
 {
-	int		len;
+	int		len, err;
+	char		*ptr;
 
 	sprintf(msg, gettext("Could not lock file `%s'; "), file);
 	len = strlen(msg);
 	sprintf(&msg[len], str, arg1, arg2);
 	strcat(msg, gettext(" failed - "));
-	if (errno < sys_nerr) {
-		strcat(msg, strerror(errno));
+
+	err = errno;
+	errno = 0;
+	ptr = strerror(err);
+	if (errno != EINVAL) {
+		strcat(msg, ptr);
 	} else {
 		len = strlen(msg);
-		sprintf(&msg[len], "errno %d", errno);
+		sprintf(&msg[len], "errno %d", err);
 	}
 }
-

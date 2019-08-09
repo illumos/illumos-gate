@@ -102,18 +102,16 @@ static void	expand_string(register String string, register int length);
  *	Global variables used:
  */
 char *
-getmem(register int size)
+getmem(size_t size)
 {
-	register char          *result = (char *) malloc((unsigned) size);
+	char *result = (char *)malloc(size);
 	if (result == NULL) {
-		char buf[FATAL_ERROR_MSG_SIZE];
-		sprintf(buf, "*** Error: malloc(%d) failed: %s\n", size, strerror(errno));
-		strcat(buf, gettext("mksh: Fatal error: Out of memory\n"));
-		fputs(buf, stderr);
-		exit_status = 1;
+		(void) fprintf(stderr, "*** Error: malloc(%d) failed: %s\n%s",
+		    size, strerror(errno),
+		    gettext("mksh: Fatal error: Out of memory\n"));
 		exit(1);
 	}
-	return result;
+	return (result);
 }
 
 /*
@@ -338,26 +336,22 @@ setup_char_semantics(void)
  *
  *	Parameters:
  *		errnum		The number of the error we want to describe
- *
- *	Global variables used:
- *		sys_errlist	A vector of error messages
- *		sys_nerr	The size of sys_errlist
  */
 char *
 errmsg(int errnum)
 {
+	char *msg;
+	char *errbuf;
 
-	extern int		sys_nerr;
-	char			*errbuf;
-
-	if ((errnum < 0) || (errnum > sys_nerr)) {
-		errbuf = getmem(6+1+11+1);
-		(void) sprintf(errbuf, gettext("Error %d"), errnum);
-		return errbuf;
-	} else {
-		return strerror(errnum);
-
+	errno = 0;
+	msg = strerror(errnum);
+	if (errno == EINVAL) {
+		size_t size = 6 + 1 + 11 + 1;
+		errbuf = getmem(size);
+		(void) snprintf(errbuf, size, gettext("Error %d"), errnum);
+		return (errbuf);
 	}
+	return (msg);
 }
 
 static char static_buf[MAXPATHLEN*3];

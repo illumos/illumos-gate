@@ -65,7 +65,7 @@
 /*
  * File table of contents
  */
-static Boolean	exec_vp(register char *name, register char **argv, char **envp, register Boolean ignore_error, pathpt vroot_path);
+static Boolean	exec_vp(char *name, char **argv, char **envp, Boolean ignore_error, pathpt vroot_path);
 
 /*
  * Workaround for NFS bug. Sometimes, when running 'open' on a remote
@@ -145,15 +145,15 @@ redirect_io(char *stdout_file, char *stderr_file)
  *		shell_name	The Name "SHELL", used to get the path to shell
  */
 int
-doshell(wchar_t *command, register Boolean ignore_error, char *stdout_file, char *stderr_file, int nice_prio)
+doshell(wchar_t *command, Boolean ignore_error, char *stdout_file, char *stderr_file, int nice_prio)
 {
 	char			*argv[6];
 	int			argv_index = 0;
 	int			cmd_argv_index;
 	int			length;
 	char			nice_prio_buf[MAXPATHLEN];
-	register Name		shell = getvar(shell_name);
-	register char		*shellname;
+	Name			shell = getvar(shell_name);
+	char			*shellname;
 	char			*tmp_mbs_buffer;
 
 
@@ -237,10 +237,10 @@ doshell(wchar_t *command, register Boolean ignore_error, char *stdout_file, char
  *		vroot_path	The path used by the vroot package
  */
 static Boolean
-exec_vp(register char *name, register char **argv, char **envp, register Boolean ignore_error, pathpt vroot_path)
+exec_vp(char *name, char **argv, char **envp, Boolean ignore_error, pathpt vroot_path)
 {
-	register Name		shell = getvar(shell_name);
-	register char		*shellname;
+	Name			shell = getvar(shell_name);
+	char			*shellname;
 	char			*shargv[4];
 	Name			tmp_shell;
 
@@ -310,15 +310,15 @@ exec_vp(register char *name, register char **argv, char **envp, register Boolean
  *		filter_stderr	If -X is on we redirect stderr
  */
 int
-doexec(register wchar_t *command, register Boolean ignore_error, char *stdout_file, char *stderr_file, pathpt vroot_path, int nice_prio)
+doexec(wchar_t *command, Boolean ignore_error, char *stdout_file, char *stderr_file, pathpt vroot_path, int nice_prio)
 {
 	int			arg_count = 5;
 	char			**argv;
 	int			length;
 	char			nice_prio_buf[MAXPATHLEN];
-	register char		**p;
+	char			**p;
 	wchar_t			*q;
-	register wchar_t	*t;
+	wchar_t			*t;
 	char			*tmp_mbs_buffer;
 
 	/*
@@ -430,14 +430,14 @@ doexec(register wchar_t *command, register Boolean ignore_error, char *stdout_fi
  *		filter_stderr	Set if -X is on
  */
 Boolean
-await(register Boolean ignore_error, register Boolean silent_error, Name target, wchar_t *command, pid_t running_pid, void *xdrs_p, int job_msg_id)
+await(Boolean ignore_error, Boolean silent_error, Name target, wchar_t *command, pid_t running_pid, void *xdrs_p, int job_msg_id)
 {
         int                     status;
 	char			*buffer;
 	int			core_dumped;
 	int			exit_status;
 	FILE			*outfp;
-	register pid_t		pid;
+	pid_t			pid;
 	struct stat		stat_buff;
 	int			termination_signal;
 	char			tmp_buf[MAXPATHLEN];
@@ -524,14 +524,14 @@ await(register Boolean ignore_error, register Boolean silent_error, Name target,
  *	Global variables used:
  */
 void
-sh_command2string(register String command, register String destination)
+sh_command2string(String command, String destination)
 {
-	register FILE		*fd;
-	register int		chr;
-	int			status;
-	Boolean			command_generated_output = false;
+	FILE		*fd;
+	int		chr;
+	int		status;
+	Boolean		command_generated_output = false;
 
-	command->text.p = (int) nul_char;
+	command->text.p = NULL;
 	WCSTOMBS(mbs_buffer, command->buffer.start);
 	if ((fd = popen(mbs_buffer, "r")) == NULL) {
 		WCSTOMBS(mbs_buffer, command->buffer.start);
