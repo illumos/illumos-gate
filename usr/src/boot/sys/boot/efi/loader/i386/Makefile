@@ -15,7 +15,6 @@
 #
 
 MACHINE=	$(MACH)
-ASFLAGS=	-m32
 EFIPROG=	loader32.efi
 
 all:		$(EFIPROG)
@@ -27,6 +26,7 @@ LDFLAGS +=	-znocombreloc
 
 efi_main.o := CPPFLAGS += -DLOADER_EFI=L\"loader32.efi\"
 CFLAGS +=	-m32
+CCASFLAGS +=	-m32
 
 CLEANFILES +=	machine x86 $(EFIPROG)
 
