@@ -23,6 +23,7 @@
 /*
  * Copyright (c) 1990 Mentat Inc.
  * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_INET_MIB2_H
@@ -1388,6 +1389,8 @@ typedef struct mib2_tcpConnEntry {
 		Gauge		ce_rwnd;
 				/* round-trip time smoothed average (us) */
 		Gauge		ce_rtt_sa;
+				/* round-trip time smoothed deviation (us) */
+		Gauge		ce_rtt_sd;
 				/* current rto (retransmit timeout) */
 		Gauge		ce_rto;
 				/* round-trip time count */

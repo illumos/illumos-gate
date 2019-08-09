@@ -23,6 +23,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, Joyent Inc. All rights reserved.
  * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -126,9 +127,14 @@ tcp_set_conninfo(tcp_t *tcp, struct tcpConnEntryInfo_s *tcei, boolean_t ispriv)
 	tcei->ce_rto =  tcp->tcp_rto;
 	tcei->ce_mss =  tcp->tcp_mss;
 	tcei->ce_state = tcp->tcp_state;
-	tcei->ce_rtt_sa = NSEC2USEC(tcp->tcp_rtt_sa >> 3);
 	tcei->ce_rtt_sum = NSEC2USEC(tcp->tcp_rtt_sum);
 	tcei->ce_rtt_cnt = tcp->tcp_rtt_cnt;
+
+	/* tcp_rtt_sa is stored as 8 times the average RTT */
+	tcei->ce_rtt_sa = NSEC2USEC(tcp->tcp_rtt_sa >> 3);
+
+	/* tcp_rtt_sd is stored as 4 times the average RTTVAR */
+	tcei->ce_rtt_sd = NSEC2USEC(tcp->tcp_rtt_sd >> 2);
 }
 
 /*

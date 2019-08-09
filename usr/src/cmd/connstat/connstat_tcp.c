@@ -14,6 +14,7 @@
  */
 /*
  * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -77,6 +78,7 @@ typedef struct tcp_fields_buf_s {
 	uint64_t t_rtt_sum;
 	int t_state;
 	uint64_t t_rtt;
+	uint64_t t_rttvar;
 } tcp_fields_buf_t;
 
 static boolean_t print_tcp_state(ofmt_arg_t *, char *, uint_t);
@@ -126,6 +128,8 @@ static ofmt_field_t tcp_fields[] = {
 		offsetof(tcp_fields_buf_t, t_rtt_sum),	print_uint64 },
 	{ "RTTC",	11,
 		offsetof(tcp_fields_buf_t, t_rtt_cnt),	print_uint32 },
+	{ "RTTVAR",	8,
+		offsetof(tcp_fields_buf_t, t_rttvar),	print_uint64 },
 	{ "STATE",	12,
 		offsetof(tcp_fields_buf_t, t_state),	print_tcp_state },
 	{ NULL, 0, 0, NULL}
@@ -189,6 +193,7 @@ tcp_ci2buf(struct tcpConnEntryInfo_s *ci)
 	fields_buf.t_rtt = (ci->ce_out_data_segs == 0 ? 0 : ci->ce_rtt_sa);
 	fields_buf.t_rtt_sum = ci->ce_rtt_sum;
 	fields_buf.t_rtt_cnt = ci->ce_rtt_cnt;
+	fields_buf.t_rttvar = ci->ce_rtt_sd;
 	fields_buf.t_state = ci->ce_state;
 }
 
