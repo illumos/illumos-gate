@@ -5898,9 +5898,9 @@ s usr/lib/fs/smbfs/amd64/libshare_smbfs.so=libshare_smbfs.so.1
 f usr/lib/fs/smbfs/dfshares 0555 root bin
 f usr/lib/fs/smbfs/libshare_smbfs.so.1 0755 root sys
 s usr/lib/fs/smbfs/libshare_smbfs.so=libshare_smbfs.so.1
-f usr/lib/fs/smbfs/mount 0555 root bin
+f usr/lib/fs/smbfs/mount 4555 root bin
 f usr/lib/fs/smbfs/share 0555 root bin
-f usr/lib/fs/smbfs/umount 0555 root bin
+f usr/lib/fs/smbfs/umount 4555 root bin
 f usr/lib/fs/smbfs/unshare 0555 root bin
 d usr/lib/fs/tmpfs 0755 root sys
 f usr/lib/fs/tmpfs/mount 0555 root bin
