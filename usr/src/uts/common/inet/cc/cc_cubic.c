@@ -3,6 +3,7 @@
  * Copyright (c) 2010 The FreeBSD Foundation
  * All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  *
  * This software was developed by Lawrence Stewart while studying at the Centre
  * for Advanced Internet Architectures, Swinburne University of Technology, made
@@ -296,18 +297,13 @@ cubic_cong_signal(struct cc_var *ccv, uint32_t type)
 	case CC_RTO:
 		/*
 		 * Grab the current time and record it so we know when the
-		 * most recent congestion event was. Only record it when the
-		 * timeout has fired more than once, as there is a reasonable
-		 * chance the first one is a false alarm and may not indicate
-		 * congestion.
+		 * most recent congestion event was.
 		 */
-		if (CCV(ccv, tcp_timer_backoff) >= 2) {
-			cubic_data->num_cong_events++;
-			cubic_data->t_last_cong = gethrtime();
-			cubic_ssthresh_update(ccv);
-			cubic_data->max_cwnd = cwin;
-			CCV(ccv, tcp_cwnd) = mss;
-		}
+		cubic_data->num_cong_events++;
+		cubic_data->t_last_cong = gethrtime();
+		cubic_ssthresh_update(ccv);
+		cubic_data->max_cwnd = cwin;
+		CCV(ccv, tcp_cwnd) = mss;
 		break;
 	}
 }
