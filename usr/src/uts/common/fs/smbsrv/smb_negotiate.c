@@ -379,6 +379,17 @@ smb_pre_negotiate(smb_request_t *sr)
 		    skc->skc_max_protocol < SMB_VERS_2_BASE)
 			continue;
 
+		/*
+		 * We may not support SMB1; skip those dialects if true.
+		 */
+		if (dialect < DIALECT_SMB2002 &&
+		    skc->skc_min_protocol > SMB_VERS_1)
+			continue;
+
+		if (dialect == DIALECT_SMB2002 &&
+		    skc->skc_min_protocol > SMB_VERS_2_002)
+			continue;
+
 		if (negprot->ni_dialect < dialect) {
 			negprot->ni_dialect = dialect;
 			negprot->ni_index = pos;
@@ -417,6 +428,13 @@ smb_com_negotiate(smb_request_t *sr)
 		/* The protocol has already been negotiated. */
 		smbsr_error(sr, 0, ERRSRV, ERRerror);
 		return (SDRC_ERROR);
+	}
+
+	if (negprot->ni_index < 0) {
+		cmn_err(CE_NOTE, "clnt %s no supported dialect",
+		    sr->session->ip_addr_str);
+		smbsr_error(sr, 0, ERRSRV, ERRerror);
+		return (SDRC_DROP_VC);
 	}
 
 	/*

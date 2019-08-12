@@ -529,17 +529,20 @@ smb_priv_xlate(smb_token_t *token)
 {
 	uint32_t	privileges = 0;
 
+	if (smb_token_query_privilege(token, SE_SECURITY_LUID))
+		privileges |= SMB_USER_PRIV_SECURITY;
+
+	if (smb_token_query_privilege(token, SE_TAKE_OWNERSHIP_LUID))
+		privileges |= SMB_USER_PRIV_TAKE_OWNERSHIP;
+
 	if (smb_token_query_privilege(token, SE_BACKUP_LUID))
 		privileges |= SMB_USER_PRIV_BACKUP;
 
 	if (smb_token_query_privilege(token, SE_RESTORE_LUID))
 		privileges |= SMB_USER_PRIV_RESTORE;
 
-	if (smb_token_query_privilege(token, SE_TAKE_OWNERSHIP_LUID))
-		privileges |= SMB_USER_PRIV_TAKE_OWNERSHIP;
-
-	if (smb_token_query_privilege(token, SE_SECURITY_LUID))
-		privileges |= SMB_USER_PRIV_SECURITY;
+	if (smb_token_query_privilege(token, SE_CHANGE_NOTIFY_LUID))
+		privileges |= SMB_USER_PRIV_CHANGE_NOTIFY;
 
 	return (privileges);
 }

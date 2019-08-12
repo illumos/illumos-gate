@@ -277,7 +277,7 @@ smb_dfs_encode_hdr(mbuf_chain_t *mbc, dfs_info_t *referrals)
 
 static uint32_t
 smb_dfs_encode_refv1(smb_request_t *sr, mbuf_chain_t *mbc,
-	dfs_info_t *referrals)
+    dfs_info_t *referrals)
 {
 	_NOTE(ARGUNUSED(sr))
 	uint16_t entsize, rep_bufsize;
@@ -346,7 +346,7 @@ smb_dfs_encode_refv1(smb_request_t *sr, mbuf_chain_t *mbc,
  */
 static uint32_t
 smb_dfs_encode_refv2(smb_request_t *sr, mbuf_chain_t *mbc,
-	dfs_info_t *referrals)
+    dfs_info_t *referrals)
 {
 	_NOTE(ARGUNUSED(sr))
 	uint16_t entsize, rep_bufsize;
@@ -409,8 +409,7 @@ smb_dfs_encode_refv2(smb_request_t *sr, mbuf_chain_t *mbc,
  */
 static uint32_t
 smb_dfs_encode_refv3x(smb_request_t *sr, mbuf_chain_t *mbc,
-	dfs_info_t *referrals,
-    uint16_t ver)
+    dfs_info_t *referrals, uint16_t ver)
 {
 	_NOTE(ARGUNUSED(sr))
 	uint16_t entsize, rep_bufsize, hdrsize;
@@ -522,7 +521,7 @@ smb_dfs_referrals_get(smb_request_t *sr, char *dfs_path, dfs_reftype_t reftype,
 	    &req, dfs_referral_query_xdr, refrsp, dfs_referral_response_xdr);
 
 	if (rc != 0 || refrsp->rp_status != ERROR_SUCCESS) {
-		return (NT_STATUS_NO_SUCH_DEVICE);
+		return (NT_STATUS_FS_DRIVER_REQUIRED);
 	}
 
 	(void) strsubst(refrsp->rp_referrals.i_uncpath, '/', '\\');

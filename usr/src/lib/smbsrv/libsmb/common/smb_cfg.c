@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -147,6 +147,9 @@ static smb_cfg_param_t smb_cfg_table[] =
 	{SMB_CI_MAXIMUM_CREDITS, "maximum_credits", SCF_TYPE_INTEGER, 0},
 	{SMB_CI_MAX_PROTOCOL, "max_protocol", SCF_TYPE_ASTRING, 0},
 	{SMB_CI_ENCRYPT, "encrypt", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_MIN_PROTOCOL, "min_protocol", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_BYPASS_TRAVERSE_CHECKING,
+	    "bypass_traverse_checking", SCF_TYPE_BOOLEAN, 0},
 
 	/* SMB_CI_MAX */
 };
@@ -669,15 +672,42 @@ smb_config_setstr(smb_cfg_id_t id, char *value)
 	 * by requiring encryption to accidentally expose their data
 	 * by lowering the protocol, so prevent them from going below 3.0
 	 * if encryption is required.
+	 * Also, ensure that max_protocol >= min_protocol.
 	 */
-	if (id == SMB_CI_MAX_PROTOCOL &&
-	    smb_config_get_require(SMB_CI_ENCRYPT) == SMB_CONFIG_REQUIRED &&
-	    smb_config_get_max_protocol() >= SMB_VERS_3_0 &&
-	    smb_convert_version_str(value) < SMB_VERS_3_0) {
-		syslog(LOG_ERR, "Cannot set smbd/max_protocol below 3.0"
-		    " while smbd/encrypt == required.");
-		rc = SMBD_SMF_INVALID_ARG;
-	} else {
+	if (id == SMB_CI_MAX_PROTOCOL) {
+		smb_cfg_val_t encrypt;
+		uint32_t min;
+		uint32_t val;
+
+		encrypt = smb_config_get_require(SMB_CI_ENCRYPT);
+		min = smb_config_get_min_protocol();
+		val = smb_convert_version_str(value);
+
+		if (encrypt == SMB_CONFIG_REQUIRED &&
+		    val < SMB_VERS_3_0) {
+			syslog(LOG_ERR, "Cannot set smbd/max_protocol below 3.0"
+			    " while smbd/encrypt == required.");
+			rc = SMBD_SMF_INVALID_ARG;
+		} else if (val < min) {
+			syslog(LOG_ERR, "Cannot set smbd/max_protocol to less"
+			    " than smbd/min_protocol.");
+			rc = SMBD_SMF_INVALID_ARG;
+		}
+	} else if (id == SMB_CI_MIN_PROTOCOL) {
+		uint32_t max;
+		uint32_t val;
+
+		max = smb_config_get_max_protocol();
+		val = smb_convert_version_str(value);
+
+		if (val > max) {
+			syslog(LOG_ERR, "Cannot set smbd/min_protocol to more"
+			    " than smbd/max_protocol.");
+			rc = SMBD_SMF_INVALID_ARG;
+		}
+	}
+
+	if (rc == SMBD_SMF_OK) {
 		rc = smb_smf_set_string_property(handle, cfg->sc_name, value);
 	}
 
@@ -1166,6 +1196,26 @@ smb_config_getent(smb_cfg_id_t id)
 	return (NULL);
 }
 
+static uint32_t
+smb_config_get_protocol(smb_cfg_id_t id, char *name, uint32_t default_val)
+{
+	char str[SMB_VERSTR_LEN];
+	int rc;
+	uint32_t val;
+
+	rc = smb_config_getstr(id, str, sizeof (str));
+	if (rc == SMBD_SMF_OK) {
+		val = smb_convert_version_str(str);
+		if (val != 0)
+			return (val);
+		if (str[0] != '\0') {
+			syslog(LOG_ERR, "smbd/%s value invalid: %s", name, str);
+		}
+	}
+
+	return (default_val);
+}
+
 /*
  * The service manifest has empty values by default for min_protocol and
  * max_protocol. The expectation is that when those values are empty, we don't
@@ -1178,21 +1228,28 @@ uint32_t max_protocol_default = SMB_VERS_3_0;
 uint32_t
 smb_config_get_max_protocol(void)
 {
-	char str[SMB_VERSTR_LEN];
-	int rc;
 	uint32_t max;
 
-	rc = smb_config_getstr(SMB_CI_MAX_PROTOCOL, str, sizeof (str));
-	if (rc == SMBD_SMF_OK) {
-		max = smb_convert_version_str(str);
-		if (max != 0)
-			return (max);
-		if (str[0] != '\0') {
-			syslog(LOG_ERR, "smbd/max_protocol value invalid");
-		}
-	}
+	max = smb_config_get_protocol(SMB_CI_MAX_PROTOCOL, "max_protocol",
+	    max_protocol_default);
 
-	return (max_protocol_default);
+	return (max);
+}
+
+/*
+ * This should eventually be SMB_VERS_2_BASE
+ */
+uint32_t min_protocol_default = SMB_VERS_1;
+
+uint32_t
+smb_config_get_min_protocol(void)
+{
+	uint32_t min;
+
+	min = smb_config_get_protocol(SMB_CI_MIN_PROTOCOL, "min_protocol",
+	    min_protocol_default);
+
+	return (min);
 }
 
 int

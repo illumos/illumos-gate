@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <syslog.h>
@@ -108,10 +108,10 @@ static int smb_pwd_update(const char *, const char *, int);
  *
  * Simplifying assumptions
  *
- * 	o smbpasswd is a service private file and shouldn't be edited manually
- * 	o accounts are only added/modified via passwd and/or smbadm CLIs
- * 	o accounts are not removed but disabled using smbadm CLI
- * 	o editing smbpasswd manually might result in cache inconsistency
+ *	o smbpasswd is a service private file and shouldn't be edited manually
+ *	o accounts are only added/modified via passwd and/or smbadm CLIs
+ *	o accounts are not removed but disabled using smbadm CLI
+ *	o editing smbpasswd manually might result in cache inconsistency
  *
  * Cache is created and populated upon service startup.
  * Cache is updated each time users list is requested if there's been
@@ -278,7 +278,7 @@ smb_pwd_getpwnam(const char *name, smb_passwd_t *smbpw)
 	pwbuf.pw_pwd = smbpw;
 
 	while (smb_pwd_fgetent(fp, &pwbuf, SMB_PWD_GETF_ALL) != NULL) {
-		if (strcmp(name, smbpw->pw_name) == 0) {
+		if (strcasecmp(name, smbpw->pw_name) == 0) {
 			found = B_TRUE;
 			break;
 		}
@@ -524,6 +524,12 @@ smb_pwd_update(const char *name, const char *password, int control)
 	 */
 	while (smb_pwd_fgetent(src, &pwbuf, SMB_PWD_GETF_ALL) != NULL) {
 		if (strcmp(smbpw.pw_name, name) == 0) {
+			if ((control & SMB_PWC_DELETE) != 0) {
+				/* exclude the entry from the new passwd file */
+				newent = B_FALSE;
+				err = SMB_PWE_SUCCESS;
+				continue;
+			}
 			err = smb_pwd_chgpwent(&smbpw, password, control);
 			if (err == SMB_PWE_USER_DISABLE)
 				user_disable = B_TRUE;

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _MLSVC_SAM_NDL_
@@ -488,6 +488,33 @@ struct samr_CloseHandle {
 
 /*
  ***********************************************************************
+ * QuerySecObject
+ *
+ * Returns the SecurityDescriptor of the object. Support not complete.
+ *
+ * QuerySecObject (
+ *	IN samr_handle_t obj_handle,
+ *	IN SECURITY_INFO secinfo,
+ *	OUT samr_sd_t *sd,
+ *	OUT DWORD status
+ * )
+ *
+ ***********************************************************************
+ */
+
+typedef DWORD SECURITY_INFO;
+
+OPERATION(SAMR_OPNUM_QuerySecObject)
+struct samr_QuerySecObject {
+	IN	samr_handle_t obj_handle;
+	IN	SECURITY_INFO secinfo;
+	OUT	samr_sd_t *sd;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
  * LookupDomain: lookup up the domain SID.
  ***********************************************************************
  */
@@ -540,7 +567,7 @@ struct samr_EnumLocalDomain {
 /*
  ***********************************************************************
  * OpenDomain
- * 
+ *
  * Open a specific domain within the SAM. From this I assume that each
  * SAM can handle multiple domains so you need to identify the one with
  * which you want to work. Working with a domain handle does appear to
@@ -883,7 +910,7 @@ struct samr_DeleteUser {
  * offsets used by the unmarshalling code at runtime.  In order to
  * simplify things it is useful to use a naming convention that
  * indicates the switch value for each structure.
- * 
+ *
  ***********************************************************************
  */
 
@@ -1392,6 +1419,8 @@ union samr_interface {
 		struct samr_Connect		Connect;
 	CASE(SAMR_OPNUM_CloseHandle)
 		struct samr_CloseHandle		CloseHandle;
+	CASE(SAMR_OPNUM_QuerySecObject)
+		struct samr_QuerySecObject	QuerySecObject;
 	CASE(SAMR_OPNUM_LookupDomain)
 		struct samr_LookupDomain	LookupDomain;
 	CASE(SAMR_OPNUM_EnumLocalDomains)

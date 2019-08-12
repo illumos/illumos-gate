@@ -49,6 +49,11 @@ static ksidlist_t *smb_cred_set_sidlist(smb_ids_t *token_grps);
  * If the mapped UID is ephemeral, or the primary group could not be
  * obtained, the cred gid is set to whatever Solaris group is mapped
  * to the token's primary group.
+ *
+ * Also add any privileges that should always be in effect for this user.
+ * Note that an SMB user object also gets a u_privcred which is used
+ * when the client opens an object with "backup/restore intent".
+ * That cred is setup later, in smb_user_setcred().
  */
 cred_t *
 smb_cred_create(smb_token_t *token)
@@ -108,6 +113,18 @@ smb_cred_create(smb_token_t *token)
 		    PRIV_FILE_OWNER,
 		    NULL);
 	}
+
+	/*
+	 * See smb.4 bypass_traverse_checking
+	 *
+	 * For historical reasons, the Windows privilege is named
+	 * SeChangeNotifyPrivilege, though the description is
+	 * "Bypass traverse checking".
+	 */
+	if (smb_token_query_privilege(token, SE_CHANGE_NOTIFY_LUID)) {
+		(void) crsetpriv(cr, PRIV_FILE_DAC_SEARCH, NULL);
+	}
+
 
 	return (cr);
 }

@@ -1,6 +1,6 @@
 '\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
-.\" Copyright 2016, Nexenta Systems, Inc. All Rights Reserved.
+.\" Copyright 2017, Nexenta Systems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the
 .\" Common Development and Distribution License (the "License").
 .\" You may not use this file except in compliance with the License.
@@ -54,6 +54,22 @@ By default, no value is set.
 .RS 4n
 Specifies the full path for the SMD autohome map file, \fBsmbautohome\fR. The
 default path is \fB/etc\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBbypass_traverse_checking\fR\fR
+.ad
+.sp .6
+.RS 4n
+When set, allows the SMB server to bypass ACL "traverse" checks.
+The default value is \fBtrue\fR, for Windows compatibility.
+If this parameter is \fBfalse\fR, ACL checks require that
+"traverse" (directory execute) is granted on every directory
+above the directory the SMB client tries to access.
+Windows shares are normally setup with the higher level
+directories not specifically granting such access.
 .RE
 
 .sp
@@ -346,6 +362,18 @@ The UID of the Unix user.
 .RS 4n
 Specifies the maximum SMB protocol level that the SMB service
 should allow clients to negotiate.  The default value is \fB2.1\fR.
+Valid settings include: \fB1\fR, \fB2.1\fR, \fB3.0\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmin_protocol\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the minimum SMB protocol level that the SMB service
+should allow clients to negotiate.  The default value is \fB1\fR.
 Valid settings include: \fB1\fR, \fB2.1\fR, \fB3.0\fR
 .RE
 

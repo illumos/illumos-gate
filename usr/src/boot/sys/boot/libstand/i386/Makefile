@@ -22,7 +22,7 @@ all install:	$(LIBRARY)
 include ../Makefile.com
 
 CFLAGS +=	-m32
-ASFLAGS +=	-m32
+CCASFLAGS +=	-m32
 
 CLEANFILES += x86
 

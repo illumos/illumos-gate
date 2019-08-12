@@ -328,6 +328,16 @@ smb_token_create_privs(smb_token_t *token)
 		smb_privset_enable(privs, SE_SECURITY_LUID);
 	}
 
+	/*
+	 * Members of "Authenticated Users" (!anon) should normally get
+	 * "Bypass traverse checking" privilege, though we allow this
+	 * to be disabled (see smb.4).  For historical reasons, the
+	 * internal privilege name is "SeChangeNotifyPrivilege".
+	 */
+	if ((token->tkn_flags & SMB_ATF_ANON) == 0 &&
+	    smb_config_getbool(SMB_CI_BYPASS_TRAVERSE_CHECKING))
+		smb_privset_enable(privs, SE_CHANGE_NOTIFY_LUID);
+
 	return (privs);
 }
 

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
@@ -2067,6 +2067,7 @@ smb_server_store_cfg(smb_server_t *sv, smb_ioc_cfg_t *ioc)
 	sv->sv_cfg.skc_print_enable = ioc->print_enable;
 	sv->sv_cfg.skc_traverse_mounts = ioc->traverse_mounts;
 	sv->sv_cfg.skc_max_protocol = ioc->max_protocol;
+	sv->sv_cfg.skc_min_protocol = ioc->min_protocol;
 	sv->sv_cfg.skc_encrypt = ioc->encrypt;
 	sv->sv_cfg.skc_execflags = ioc->exec_flags;
 	sv->sv_cfg.skc_negtok_len = ioc->negtok_len;

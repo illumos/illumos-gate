@@ -1382,6 +1382,21 @@ user_flag_bits[] = {
 
 static const mdb_bitmask_t
 user_priv_bits[] = {
+	/*
+	 * Old definitions of these bits, for when we're
+	 * looking at an older core file.  These happen to
+	 * have no overlap with the current definitions.
+	 */
+	{ "TAKE_OWNER",	1, 1 },
+	{ "BACKUP",	2, 2 },
+	{ "RESTORE",	4, 4 },
+	{ "SECURITY",	8, 8 },
+	/*
+	 * Current definitions
+	 */
+	{ "SECURITY",
+	    SMB_USER_PRIV_SECURITY,
+	    SMB_USER_PRIV_SECURITY },
 	{ "TAKE_OWNER",
 	    SMB_USER_PRIV_TAKE_OWNERSHIP,
 	    SMB_USER_PRIV_TAKE_OWNERSHIP },
@@ -1391,9 +1406,9 @@ user_priv_bits[] = {
 	{ "RESTORE",
 	    SMB_USER_PRIV_RESTORE,
 	    SMB_USER_PRIV_RESTORE },
-	{ "SECURITY",
-	    SMB_USER_PRIV_SECURITY,
-	    SMB_USER_PRIV_SECURITY },
+	{ "CHANGE_NOTIFY",
+	    SMB_USER_PRIV_CHANGE_NOTIFY,
+	    SMB_USER_PRIV_CHANGE_NOTIFY },
 	{ NULL, 0, 0 }
 };
 
@@ -1940,7 +1955,7 @@ smb_hash_walk_init(mdb_walk_state_t *wsp)
 	int ll_off, sll_off, i;
 	uintptr_t addr = wsp->walk_addr;
 
-	if (addr == (uintptr_t)NULL) {
+	if (addr == 0) {
 		mdb_printf("require address of an smb_hash_t\n");
 		return (WALK_ERR);
 	}
@@ -2029,7 +2044,7 @@ smb_hashstat_walk_init(mdb_walk_state_t *wsp)
 	uint32_t arr_sz;
 	smb_hash_wd_t *wd;
 
-	if (addr == (uintptr_t)NULL) {
+	if (addr == 0) {
 		mdb_printf("require address of an smb_hash_t\n");
 		return (WALK_ERR);
 	}
@@ -2284,7 +2299,7 @@ smb_kshare_walk_init(mdb_walk_state_t *wsp)
 {
 	int sv_exp_off, ex_sha_off, avl_tr_off;
 
-	if (wsp->walk_addr == (uintptr_t)NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_printf("require address of an smb_server_t\n");
 		return (WALK_ERR);
 	}
@@ -2417,7 +2432,7 @@ smb_vfs_walk_init(mdb_walk_state_t *wsp)
 {
 	int sv_exp_off, ex_vfs_off, ll_off;
 
-	if (wsp->walk_addr == (uintptr_t)NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_printf("require address of an smb_server_t\n");
 		return (WALK_ERR);
 	}
@@ -2751,7 +2766,7 @@ smb_node_walk_init(mdb_walk_state_t *wsp)
 	int		ll_off;
 	int		i;
 
-	if (wsp->walk_addr == (uintptr_t)NULL) {
+	if (wsp->walk_addr == 0) {
 		if (mdb_lookup_by_obj(SMBSRV_OBJNAME, "smb_node_hash_table",
 		    &sym) == -1) {
 			mdb_warn("failed to find 'smb_node_hash_table'");
@@ -3227,7 +3242,7 @@ smb_mbuf_walk_init(mdb_walk_state_t *wsp)
 {
 	mbuf_t *m;
 
-	if (wsp->walk_addr == (uintptr_t)NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_printf("require address of an mbuf_t\n");
 		return (WALK_ERR);
 	}
@@ -3243,7 +3258,7 @@ smb_mbuf_walk_step(mdb_walk_state_t *wsp)
 	mbuf_t *m = wsp->walk_data;
 	int rc;
 
-	if (wsp->walk_addr == (uintptr_t)NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(m, sizeof (*m), addr) == -1) {
@@ -3369,7 +3384,7 @@ smb_ace_walk_init(mdb_walk_state_t *wsp)
 {
 	int sal_off;
 
-	if (wsp->walk_addr == (uintptr_t)NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_printf("smb_ace walk only supports local walks\n");
 		return (WALK_ERR);
 	}

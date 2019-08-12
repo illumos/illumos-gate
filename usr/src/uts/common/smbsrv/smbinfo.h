@@ -155,6 +155,7 @@ typedef struct smb_kmod_cfg {
 	int32_t skc_print_enable;
 	int32_t skc_traverse_mounts;
 	uint32_t skc_max_protocol;	/* SMB_VERS_... */
+	uint32_t skc_min_protocol;	/* SMB_VERS_... */
 	smb_cfg_val_t skc_encrypt; /* EncryptData and RejectUnencryptedAccess */
 	uint32_t skc_execflags;
 	uint32_t skc_negtok_len;
