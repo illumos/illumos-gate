@@ -3021,6 +3021,16 @@ lx_mcast_common(sonode_t *so, int level, int optname, void *optval,
 	return (error);
 }
 
+
+/*
+ * NOTE: For now, the following mess applies to TCP (i.e. AF_INET{,6} +
+ * SOCK_STREAM) only, until we enable SO_REUSEPORT for other socket/protocol
+ * types as well.  The lx_so_needs_reusehandling() macro indicates what
+ * socket(s) apply to the following mess.
+ */
+#define	lx_so_needs_reusehandling(so)	((so)->so_type == SOCK_STREAM && \
+	((so)->so_family == AF_INET || (so)->so_family == AF_INET6))
+
 /*
  * So in Linux, the SO_REUSEADDR includes, essentially, SO_REUSEPORT as part
  * of its functionality.  Experiments on CentOS 7 with a 3.10-ish kernel show
@@ -3611,8 +3621,15 @@ lx_setsockopt_socket(sonode_t *so, int optname, void *optval, socklen_t optlen)
 
 	case LX_SO_REUSEADDR:
 	case LX_SO_REUSEPORT:
-		/* See the function called below for the oddness of REUSE*. */
-		return (lx_set_reuse_handler(so, optname, optval, optlen));
+		if (lx_so_needs_reusehandling(so)) {
+			/*
+			 * See lx_set_reuse_handler's comments for the oddness
+			 * of REUSE* in some cases.
+			 */
+			return (lx_set_reuse_handler(so, optname, optval,
+			    optlen));
+		}
+		break;
 
 	case LX_SO_PASSCRED:
 		/*
@@ -3975,9 +3992,13 @@ lx_getsockopt_socket(sonode_t *so, int optname, void *optval,
 		break;
 
 	case LX_SO_REUSEPORT:
-		/* See lx_set_reuse_handler() for the sordid details. */
-		if (so->so_family != AF_INET && so->so_family != AF_INET6)
+		/*
+		 * See lx_so_needs_reusehandling() and lx_set_reuse_handler()
+		 * for the sordid details.
+		 */
+		if (!lx_so_needs_reusehandling(so))
 			break;
+
 		if (*optlen < sizeof (int))
 			return (EINVAL);
 		sad = lx_sad_acquire(SOTOV(so));
