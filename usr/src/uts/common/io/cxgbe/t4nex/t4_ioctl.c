@@ -27,6 +27,7 @@
 #include "t4nex.h"
 #include "common/common.h"
 #include "common/t4_regs.h"
+#include "cudbg.h"
 
 /* helpers */
 static int pci_rw(struct adapter *sc, void *data, int flags, int write);
@@ -45,6 +46,7 @@ static int read_cim_qcfg(struct adapter *sc, void *data, int flags);
 static int read_cim_ibq(struct adapter *sc, void *data, int flags);
 static int read_edc(struct adapter *sc, void *data, int flags);
 static int flash_fw(struct adapter *, void *, int);
+static int get_cudbg(struct adapter *, void *, int);
 
 int
 t4_ioctl(struct adapter *sc, int cmd, void *data, int mode)
@@ -92,6 +94,9 @@ t4_ioctl(struct adapter *sc, int cmd, void *data, int mode)
 		break;
 	case T4_IOCTL_LOAD_FW:
 		rc = flash_fw(sc, data, mode);
+		break;
+	case T4_IOCTL_GET_CUDBG:
+		rc = get_cudbg(sc, data, mode);
 		break;
 	default:
 		return (EINVAL);
@@ -1674,4 +1679,55 @@ flash_fw(struct adapter *sc, void *data, int flags)
 	kmem_free(ptr, fw.len);
 
 	return (rc);
+}
+
+static int
+get_cudbg(struct adapter *sc, void *data, int flags)
+{
+	struct t4_cudbg_dump dump;
+	struct cudbg_init *cudbg;
+	void *handle, *buf;
+	int size;
+	int rc = 0;
+
+	if (ddi_copyin(data, &dump, sizeof(struct t4_cudbg_dump), flags) < 0)
+		return EFAULT;
+
+	size = dump.len;
+	buf = (u8 *)kmem_zalloc(dump.len, KM_NOSLEEP);
+	if (buf == NULL)
+		return ENOMEM;
+
+	handle = cudbg_alloc_handle();
+	if (handle == NULL) {
+		rc = ENOMEM;
+		goto free;
+	}
+
+	cudbg = cudbg_get_init(handle);
+	cudbg->adap = sc;
+	cudbg->print = (cudbg_print_cb)cxgb_printf;
+
+	memcpy(cudbg->dbg_bitmap, dump.bitmap, sizeof(cudbg->dbg_bitmap));
+
+	rc = cudbg_collect(handle, buf, &dump.len);
+	if (rc != 0) {
+		cxgb_printf(sc->dip, CE_WARN, "cudbg collect failed\n");
+		goto exit;
+	}
+
+	if(ddi_copyout(buf, (void *)((uintptr_t)data + sizeof(dump)),
+	   dump.len, flags) < 0){
+		rc = EFAULT;
+	}
+
+	if (ddi_copyout(&dump, data, sizeof(dump), flags) < 0){
+		rc = EFAULT;
+	}
+exit:
+	cudbg_free_handle(handle);
+free:
+	kmem_free(buf, size);
+
+	return rc;
 }

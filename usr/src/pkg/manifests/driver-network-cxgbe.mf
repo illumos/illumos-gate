@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2016 by Chelsio Communications, Inc. All rights reserved.
+# Copyright (c) 2019 by Chelsio Communications, Inc. All rights reserved.
 #
 
 <include global_zone_only_component>
@@ -94,6 +94,21 @@ driver name=t4nex clone_perms="t4nex 0666 root sys" \
     alias=pciex1425,549f \
     alias=pciex1425,54a0 \
     alias=pciex1425,54a1 \
+    alias=pciex1425,54a2 \
+    alias=pciex1425,54a3 \
+    alias=pciex1425,54a4 \
+    alias=pciex1425,54a5 \
+    alias=pciex1425,54a6 \
+    alias=pciex1425,54a7 \
+    alias=pciex1425,54a8 \
+    alias=pciex1425,54a9 \
+    alias=pciex1425,54aa \
+    alias=pciex1425,54ab \
+    alias=pciex1425,54ac \
+    alias=pciex1425,54ad \
+    alias=pciex1425,54ae \
+    alias=pciex1425,54af \
+    alias=pciex1425,54b0 \
     alias=pciex1425,6400 \
     alias=pciex1425,6401 \
     alias=pciex1425,6402 \
@@ -110,7 +125,17 @@ driver name=t4nex clone_perms="t4nex 0666 root sys" \
     alias=pciex1425,6414 \
     alias=pciex1425,6415 \
     alias=pciex1425,6480 \
-    alias=pciex1425,6481
+    alias=pciex1425,6481 \
+    alias=pciex1425,6482 \
+    alias=pciex1425,6483 \
+    alias=pciex1425,6484 \
+    alias=pciex1425,6485 \
+    alias=pciex1425,6486 \
+    alias=pciex1425,6487 \
+    alias=pciex1425,6488 \
+    alias=pciex1425,6489 \
+    alias=pciex1425,648a \
+    alias=pciex1425,648b
 file path=kernel/drv/$(ARCH64)/cxgbe group=sys
 file path=kernel/drv/$(ARCH64)/t4nex group=sys
 file path=usr/sbin/cxgbetool mode=0555

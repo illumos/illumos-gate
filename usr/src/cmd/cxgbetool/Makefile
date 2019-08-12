@@ -10,19 +10,28 @@
 #
 
 #
-# Copyright (c) 2018 by Chelsio Communications, Inc.
+# Copyright (c) 2019 by Chelsio Communications, Inc.
 #
 # Copyright (c) 2018, Joyent, Inc.
 
 PROG =  cxgbetool
+OBJS =	cxgbetool.o cudbg.o cudbg_view.o fastlz_api.o fastlz.o cudbg_common.o
+SRCS =	$(OBJS:%.o=%.c)
+VPATH = $(SRC)/uts/common/io/cxgbe/t4nex/
 
 include ../Makefile.cmd
 
-CFLAGS += $(CCVERBOSE) -I$(SRC)/uts/common/io/cxgbe/t4nex -I$(SRC)/uts/common/io/cxgbe/firmware
+CFLAGS += $(CCVERBOSE) -I$(SRC)/uts/common/io/cxgbe/t4nex -I$(SRC)/uts/common/io/cxgbe/firmware \
+	  -I$(SRC)/uts/common/io/cxgbe/common
+
 
 SMOFF += all_func_returns
 
 all: $(PROG)
+
+$(PROG): $(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
 
 install: all $(ROOTUSRSBINPROG)
 

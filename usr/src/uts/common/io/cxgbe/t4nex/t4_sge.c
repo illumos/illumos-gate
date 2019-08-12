@@ -1347,7 +1347,9 @@ alloc_iq_fl(struct port_info *pi, struct sge_iq *iq, struct sge_fl *fl,
 	c.iqsize = cpu_to_be16(iq->qsize);
 	c.iqaddr = cpu_to_be64(iq->ba);
 	if (cong >= 0)
-		c.iqns_to_fl0congen = BE_32(F_FW_IQ_CMD_IQFLINTCONGEN);
+		c.iqns_to_fl0congen = BE_32(F_FW_IQ_CMD_IQFLINTCONGEN |
+					V_FW_IQ_CMD_IQTYPE(cong ?
+					FW_IQ_IQTYPE_NIC : FW_IQ_IQTYPE_OFLD));
 
 	if (fl != NULL) {
 		unsigned int chip_ver = CHELSIO_CHIP_VERSION(sc->params.chip);
@@ -1587,7 +1589,8 @@ alloc_rxq(struct port_info *pi, struct sge_rxq *rxq, int intr_idx, int i)
 	int rc;
 
 	rxq->port = pi;
-	rc = alloc_iq_fl(pi, &rxq->iq, &rxq->fl, intr_idx, 1 << pi->tx_chan);
+	rc = alloc_iq_fl(pi, &rxq->iq, &rxq->fl, intr_idx,
+			 t4_get_tp_ch_map(pi->adapter, pi->tx_chan));
 	if (rc != 0)
 		return (rc);
 
@@ -1621,7 +1624,7 @@ alloc_ofld_rxq(struct port_info *pi, struct sge_ofld_rxq *ofld_rxq,
 	int rc;
 
 	rc = alloc_iq_fl(pi, &ofld_rxq->iq, &ofld_rxq->fl, intr_idx,
-	    1 << pi->tx_chan);
+	    t4_get_tp_ch_map(pi->adapter, pi->tx_chan));
 	if (rc != 0)
 		return (rc);
 

@@ -121,6 +121,7 @@ struct port_info {
 	uint8_t  port_id;
 	uint8_t  tx_chan;
 	uint8_t  rx_chan;
+	uint8_t  rx_cchan;
 	uint8_t instance; /* Associated adapter instance */
 	uint8_t child_inst; /* Associated child instance */
 	uint8_t	tmr_idx;
@@ -133,6 +134,14 @@ struct port_info {
 	u16 viid_mirror;
 	kstat_t *ksp_config;
 	kstat_t *ksp_info;
+
+	u8 vivld;
+	u8 vin;
+	u8 smt_idx;
+
+	u8 vivld_mirror;
+	u8 vin_mirror;
+	u8 smt_idx_mirror;
 };
 
 struct fl_sdesc {
@@ -714,7 +723,7 @@ t4_os_set_hw_addr(struct adapter *sc, int idx, uint8_t hw_addr[])
 static inline bool
 is_10G_port(const struct port_info *pi)
 {
-	return ((pi->link_cfg.supported & FW_PORT_CAP_SPEED_10G) != 0);
+	return ((pi->link_cfg.pcaps & FW_PORT_CAP32_SPEED_10G) != 0);
 }
 
 static inline struct sge_rxq *
@@ -726,19 +735,19 @@ iq_to_rxq(struct sge_iq *iq)
 static inline bool
 is_25G_port(const struct port_info *pi)
 {
-	return ((pi->link_cfg.supported & FW_PORT_CAP_SPEED_25G) != 0);
+	return ((pi->link_cfg.pcaps & FW_PORT_CAP32_SPEED_25G) != 0);
 }
 
 static inline bool
 is_40G_port(const struct port_info *pi)
 {
-	return ((pi->link_cfg.supported & FW_PORT_CAP_SPEED_40G) != 0);
+	return ((pi->link_cfg.pcaps & FW_PORT_CAP32_SPEED_40G) != 0);
 }
 
 static inline bool
 is_100G_port(const struct port_info *pi)
 {
-	return ((pi->link_cfg.supported & FW_PORT_CAP_SPEED_100G) != 0);
+	return ((pi->link_cfg.pcaps & FW_PORT_CAP32_SPEED_100G) != 0);
 }
 
 static inline bool
@@ -881,4 +890,6 @@ int t4_addmac(void *arg, const uint8_t *ucaddr);
 int t4_ioctl(struct adapter *sc, int cmd, void *data, int mode);
 
 struct l2t_data *t4_init_l2t(struct adapter *sc);
+int begin_synchronized_op(struct port_info *pi, int hold, int waitok);
+void end_synchronized_op(struct port_info *pi, int held);
 #endif /* __CXGBE_ADAPTER_H */

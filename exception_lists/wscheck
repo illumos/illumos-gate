@@ -12,11 +12,13 @@
 #
 syntax: glob
 
+usr/src/cmd/cxgbetool/*
 usr/src/cmd/smbsrv/testoplock/case*.ref
 usr/src/data/hwdata/pci.ids
 usr/src/data/hwdata/usb.ids
 usr/src/data/perfmon/readme.txt
 usr/src/tools/smatch/src/*
+usr/src/uts/common/io/cxgbe/*
 usr/src/uts/common/io/qede/*
 usr/src/uts/common/io/i40e/core/*
 usr/src/uts/common/io/ixgbe/core/*
