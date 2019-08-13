@@ -24,9 +24,6 @@ include ../Makefile.com
 
 CFLAGS +=	-m32
 
-# false positive only with a 64-bit smatch
-SMOFF += uninitialized
-
 CLEANFILES +=	machine x86
 
 $(OBJS): machine x86
