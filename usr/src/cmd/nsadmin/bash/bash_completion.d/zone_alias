@@ -1,0 +1,41 @@
+_zone_alias()
+{
+    # Attempt alias -> uuid mapping
+    alias="${COMP_WORDS[COMP_CWORD]}"
+    RES=$(vmadm list -H -o alias,uuid | awk -v alias="$alias" '
+        BEGIN { count = 0; uuid = ""; }
+        $1 ~ "^"alias" " { count = 1; aliases[1] = $1; uuid = $2; exit;}
+        $1 ~ "^"alias { count += 1; aliases[count] = $1; uuid = $2; }
+        END { if (count == 1) {
+                  print "smartos_alias_completed " aliases[1] " " uuid;
+              } else {
+                  for (i=1; i <= count; i++) {
+                      print aliases[i]
+                  }
+              }
+        }
+     ')
+     results_arr=( $RES )
+     # we use 'smartos_alias_completed' as a flag to determine that
+     # a single alias was matched.
+     if [[ "${results_arr[0]}" == "smartos_alias_completed" ]]; then
+         completed_alias="${results_arr[1]}"
+         uuid="${results_arr[2]}"
+         if [[ -n "$SMARTOS_MULTILINE_ALIAS_COMPLETION" ]]; then
+             tput sc
+             tput bold
+             echo "[completed alias: ${completed_alias}]"
+             tput rc
+             tput sgr0
+             COMPREPLY=$uuid
+         elif [[ "$completed_alias" == "$alias" ]]; then
+             COMPREPLY=$uuid
+         else
+             COMPREPLY=$completed_alias
+             compopt -o nospace
+         fi
+     else
+         COMPREPLY=( $(compgen -W "$RES" -- ${cur}) )
+     fi
+     return 0
+}

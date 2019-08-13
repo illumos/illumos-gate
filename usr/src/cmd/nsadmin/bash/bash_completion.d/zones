@@ -10,6 +10,11 @@ _zlogin()
         local running=$(zoneadm list | grep -v '^global$')
         COMPREPLY=( $(compgen -W "${running}" -- ${cur}) )
     fi
+    if [[ -n "$COMPREPLY" ]]; then
+      return 0
+    fi
+
+    _zone_alias
     return 0
 }
 
@@ -24,6 +29,10 @@ _dash_z_zone()
     if [[ ${prev} =~ -.*z$ ]]; then
         local zones=$(zoneadm list -c | grep -v '^global$')
         COMPREPLY=( $(compgen -W "${zones}" -- ${cur}) )
+        if [[ -n "$COMPREPLY" ]]; then
+          return 0
+        fi
+        _zone_alias
     fi
     return 0
 }

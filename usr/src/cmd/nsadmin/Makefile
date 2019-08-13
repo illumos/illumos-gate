@@ -28,7 +28,7 @@
 ETCFILES = profile .login ksh.kshrc system zshrc
 ETCSKELFILES = .profile .kshrc .bashrc
 ETCBASHFILES = bash_completion
-ETCBASHCOMPLETIONDFILES = dladm zones
+ETCBASHCOMPLETIONDFILES = dladm zones zone_alias
 ROOTFILES = .profile .bashrc .bash_profile
 
 include ../Makefile.cmd
