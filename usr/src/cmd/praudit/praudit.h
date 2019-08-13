@@ -19,6 +19,9 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2019 Peter Tribble.
+ */
+/*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -30,8 +33,6 @@
 
 #ifndef	_PRAUDIT_H
 #define	_PRAUDIT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -164,6 +165,9 @@ struct pr_context {
 };
 typedef struct pr_context pr_context_t;
 
+
+extern void	loadgroups(FILE *f);
+extern void	loadnames(FILE *f);
 
 extern void	init_tokens(void);
 
