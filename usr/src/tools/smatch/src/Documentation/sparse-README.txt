@@ -1,5 +1,5 @@
 
-  sparse (spärs), adj,., spars-er, spars-est.
+  sparse (spÃ¤rs), adj,., spars-er, spars-est.
 	1. thinly scattered or distributed; "a sparse population"
 	2. thin; not thick or dense: "sparse hair"
 	3. scanty; meager.

@@ -16,7 +16,7 @@
  */
 
 /*
- * Idea from Michael Stefaniuc and Vincent Béron's earlier WtoA
+ * Idea from Michael Stefaniuc and Vincent BÃ©ron's earlier WtoA
  * check.
  *
  * Apparently when you are coding WINE, you are not allowed to call 

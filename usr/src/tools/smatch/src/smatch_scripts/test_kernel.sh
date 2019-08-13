@@ -41,6 +41,10 @@ while true ; do
     fi
 done
 
+# receive parameters from environment, which override
+[ -z "${SMATCH_ENV_TARGET:-}" ] || TARGET="$SMATCH_ENV_TARGET"
+[ -z "${SMATCH_ENV_BUILD_PARAM:-}" ] || BUILD_PARAM="$SMATCH_ENV_BUILD_PARAM"
+
 SCRIPT_DIR=$(dirname $0)
 if [ -e $SCRIPT_DIR/../smatch ] ; then
     cp $SCRIPT_DIR/../smatch $SCRIPT_DIR/../bak.smatch
@@ -55,9 +59,11 @@ fi
 make clean
 find -name \*.c.smatch -exec rm \{\} \;
 make -j${NR_CPU} $ENDIAN -k CHECK="$CMD -p=kernel --file-output --succeed $*" \
-	C=1 $TARGET 2>&1 | tee $LOG
+	C=1 $BUILD_PARAM $TARGET 2>&1 | tee $LOG
+BUILD_STATUS=${PIPESTATUS[0]}
 find -name \*.c.smatch -exec cat \{\} \; -exec rm \{\} \; > $WLOG
 find -name \*.c.smatch.sql -exec cat \{\} \; -exec rm \{\} \; > $WLOG.sql
 find -name \*.c.smatch.caller_info -exec cat \{\} \; -exec rm \{\} \; > $WLOG.caller_info
 
-echo "Done.  The warnings are saved to $WLOG"
+echo "Done. Build with status $BUILD_STATUS. The warnings are saved to $WLOG"
+exit $BUILD_STATUS

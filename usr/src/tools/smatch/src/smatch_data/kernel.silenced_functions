@@ -4,7 +4,6 @@ atomic_inc_and_test
 atomic64_dec_and_test
 atomic_sub_and_test
 test_and_clear_bit
-test_and_set_bit
 __copy_to_user_nocheck
 __copy_from_user_nocheck
 arch_static_branch

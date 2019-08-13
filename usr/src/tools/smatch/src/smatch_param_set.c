@@ -164,7 +164,6 @@ static void print_return_value_param(int return_id, char *return_ranges, struct 
 	struct string_list *set_list = NULL;
 	char *math_str;
 	char buf[256];
-	sval_t sval;
 
 	FOR_EACH_MY_SM(my_id, __get_cur_stree(), sm) {
 		if (!estate_rl(sm->state))
@@ -188,12 +187,13 @@ static void print_return_value_param(int return_id, char *return_ranges, struct 
 			insert_string(&set_list, (char *)sm->name);
 			continue;
 		}
-
-		if (rl_to_sval(rl, &sval)) {
+		if (is_recursive_member(param_name)) {
 			insert_string(&set_list, (char *)sm->name);
-			sql_insert_return_states(return_id, return_ranges,
-					param_has_filter_data(sm) ? PARAM_ADD : PARAM_SET,
-					param, param_name, show_rl(rl));
+			continue;
+		}
+
+		if (is_ignored_kernel_data(param_name)) {
+			insert_string(&set_list, (char *)sm->name);
 			continue;
 		}
 
@@ -260,6 +260,7 @@ void register_param_set(int id)
 {
 	my_id = id;
 
+	set_dynamic_states(my_id);
 	add_extra_mod_hook(&extra_mod_hook);
 	add_hook(match_array_assignment, ASSIGNMENT_HOOK);
 	add_unmatched_state_hook(my_id, &unmatched_state);

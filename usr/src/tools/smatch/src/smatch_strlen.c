@@ -333,6 +333,8 @@ void register_strlen(int id)
 {
 	my_strlen_id = id;
 
+	set_dynamic_states(my_strlen_id);
+
 	add_unmatched_state_hook(my_strlen_id, &unmatched_strlen_state);
 
 	select_caller_info_hook(set_param_strlen, STR_LEN);
@@ -354,6 +356,7 @@ void register_strlen(int id)
 void register_strlen_equiv(int id)
 {
 	my_equiv_id = id;
+	set_dynamic_states(my_equiv_id);
 	add_function_assign_hook("strlen", &match_strlen, NULL);
 	add_modification_hook(my_equiv_id, &set_strlen_equiv_undefined);
 }

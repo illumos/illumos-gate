@@ -330,8 +330,6 @@ static int get_bytes_from_address(struct expression *expr)
 	struct symbol *type;
 	int ret;
 
-	if (!option_spammy)
-		return 0;
 	if (expr->type != EXPR_PREOP || expr->op != '&')
 		return 0;
 	type = get_type(expr);
@@ -506,6 +504,10 @@ struct range_list *get_array_size_bytes_rl(struct expression *expr)
 		return alloc_int_rl(size - offset.value);
 	}
 
+	size = get_stored_size_end_struct_bytes(expr);
+	if (size)
+		return alloc_int_rl(size);
+
 	/* buf[4] */
 	size = get_real_array_size(expr);
 	if (size)
@@ -515,10 +517,6 @@ struct range_list *get_array_size_bytes_rl(struct expression *expr)
 	ret = get_stored_size_bytes(expr);
 	if (ret)
 		return ret;
-
-	size = get_stored_size_end_struct_bytes(expr);
-	if (size)
-		return alloc_int_rl(size);
 
 	/* char *foo = "BAR" */
 	size = get_size_from_initializer(expr);
@@ -711,17 +709,15 @@ static void match_alloc(const char *fn, struct expression *expr, void *_size_arg
 static void match_calloc(const char *fn, struct expression *expr, void *unused)
 {
 	struct expression *right;
-	struct expression *arg;
-	sval_t elements;
-	sval_t size;
+	struct expression *size, *nr, *mult;
+	struct range_list *rl;
 
 	right = strip_expr(expr->right);
-	arg = get_argument_from_call_expr(right->args, 0);
-	if (!get_implied_value(arg, &elements))
-		return; // FIXME!!!
-	arg = get_argument_from_call_expr(right->args, 1);
-	if (get_implied_value(arg, &size))
-		store_alloc(expr->left, size_to_rl(elements.value * size.value));
+	nr = get_argument_from_call_expr(right->args, 0);
+	size = get_argument_from_call_expr(right->args, 1);
+	mult = binop_expression(nr, '*', size);
+	if (get_implied_rl(mult, &rl))
+		store_alloc(expr->left, rl);
 	else
 		store_alloc(expr->left, size_to_rl(-1));
 }
@@ -873,6 +869,8 @@ void register_buf_size(int id)
 {
 	my_size_id = id;
 
+	set_dynamic_states(my_size_id);
+
 	add_unmatched_state_hook(my_size_id, &unmatched_size_state);
 
 	select_caller_info_hook(set_param_buf_size, BUF_SIZE);
@@ -908,6 +906,9 @@ void register_buf_size(int id)
 		add_allocation_function("alloc_bootmem", &match_alloc, 0);
 		add_allocation_function("kmap", &match_page, 0);
 		add_allocation_function("get_zeroed_page", &match_page, 0);
+		add_allocation_function("alloc_page", &match_page, 0);
+		add_allocation_function("page_address", &match_page, 0);
+		add_allocation_function("lowmem_page_address", &match_page, 0);
 		add_allocation_function("alloc_pages", &match_alloc_pages, 1);
 		add_allocation_function("alloc_pages_current", &match_alloc_pages, 1);
 		add_allocation_function("__get_free_pages", &match_alloc_pages, 1);

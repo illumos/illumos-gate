@@ -161,6 +161,7 @@ void check_syscall_arg_type(int id)
 	if (option_project != PROJ_KERNEL)
 		return;
 
+	set_dynamic_states(my_id);
 	add_merge_hook(my_id, &merge_states);
 	add_function_hook("fdget", &match_fdget, NULL);
 }

@@ -49,6 +49,7 @@ enum return_type {
 	ret_any,
 	ret_non_zero,
 	ret_zero,
+	ret_one,
 	ret_negative,
 	ret_positive,
 };
@@ -151,18 +152,18 @@ static struct lock_info kernel_lock_table[] = {
 	{"__spin_lock_bh",             LOCK,   "spin_lock", 0, ret_any},
 	{"__spin_unlock_bh",           UNLOCK, "spin_lock", 0, ret_any},
 
-	{"spin_trylock",               LOCK,   "spin_lock", 0, ret_non_zero},
-	{"_spin_trylock",              LOCK,   "spin_lock", 0, ret_non_zero},
-	{"__spin_trylock",             LOCK,   "spin_lock", 0, ret_non_zero},
-	{"raw_spin_trylock",           LOCK,   "spin_lock", 0, ret_non_zero},
-	{"_raw_spin_trylock",          LOCK,   "spin_lock", 0, ret_non_zero},
-	{"spin_trylock_irq",           LOCK,   "spin_lock", 0, ret_non_zero},
-	{"spin_trylock_irqsave",       LOCK,   "spin_lock", 0, ret_non_zero},
-	{"spin_trylock_bh",            LOCK,   "spin_lock", 0, ret_non_zero},
-	{"_spin_trylock_bh",           LOCK,   "spin_lock", 0, ret_non_zero},
-	{"__spin_trylock_bh",          LOCK,   "spin_lock", 0, ret_non_zero},
-	{"__raw_spin_trylock",         LOCK,   "spin_lock", 0, ret_non_zero},
-	{"_atomic_dec_and_lock",       LOCK,   "spin_lock", 1, ret_non_zero},
+	{"spin_trylock",               LOCK,   "spin_lock", 0, ret_one},
+	{"_spin_trylock",              LOCK,   "spin_lock", 0, ret_one},
+	{"__spin_trylock",             LOCK,   "spin_lock", 0, ret_one},
+	{"raw_spin_trylock",           LOCK,   "spin_lock", 0, ret_one},
+	{"_raw_spin_trylock",          LOCK,   "spin_lock", 0, ret_one},
+	{"spin_trylock_irq",           LOCK,   "spin_lock", 0, ret_one},
+	{"spin_trylock_irqsave",       LOCK,   "spin_lock", 0, ret_one},
+	{"spin_trylock_bh",            LOCK,   "spin_lock", 0, ret_one},
+	{"_spin_trylock_bh",           LOCK,   "spin_lock", 0, ret_one},
+	{"__spin_trylock_bh",          LOCK,   "spin_lock", 0, ret_one},
+	{"__raw_spin_trylock",         LOCK,   "spin_lock", 0, ret_one},
+	{"_atomic_dec_and_lock",       LOCK,   "spin_lock", 1, ret_one},
 
 	{"read_lock",                 LOCK,   "read_lock", 0, ret_any},
 	{"read_unlock",               UNLOCK, "read_lock", 0, ret_any},
@@ -197,13 +198,13 @@ static struct lock_info kernel_lock_table[] = {
 	{"__raw_read_lock_bh",        LOCK,   "read_lock", 0, ret_any},
 	{"__raw_read_unlock_bh",      UNLOCK, "read_lock", 0, ret_any},
 
-	{"generic__raw_read_trylock", LOCK,   "read_lock", 0, ret_non_zero},
-	{"read_trylock",              LOCK,   "read_lock", 0, ret_non_zero},
-	{"_read_trylock",             LOCK,   "read_lock", 0, ret_non_zero},
-	{"raw_read_trylock",          LOCK,   "read_lock", 0, ret_non_zero},
-	{"_raw_read_trylock",         LOCK,   "read_lock", 0, ret_non_zero},
-	{"__raw_read_trylock",        LOCK,   "read_lock", 0, ret_non_zero},
-	{"__read_trylock",            LOCK,   "read_lock", 0, ret_non_zero},
+	{"generic__raw_read_trylock", LOCK,   "read_lock", 0, ret_one},
+	{"read_trylock",              LOCK,   "read_lock", 0, ret_one},
+	{"_read_trylock",             LOCK,   "read_lock", 0, ret_one},
+	{"raw_read_trylock",          LOCK,   "read_lock", 0, ret_one},
+	{"_raw_read_trylock",         LOCK,   "read_lock", 0, ret_one},
+	{"__raw_read_trylock",        LOCK,   "read_lock", 0, ret_one},
+	{"__read_trylock",            LOCK,   "read_lock", 0, ret_one},
 
 	{"write_lock",                LOCK,   "write_lock", 0, ret_any},
 	{"write_unlock",              UNLOCK, "write_lock", 0, ret_any},
@@ -234,12 +235,12 @@ static struct lock_info kernel_lock_table[] = {
 	{"_raw_write_unlock",         UNLOCK, "write_lock", 0, ret_any},
 	{"__raw_write_unlock",        UNLOCK, "write_lock", 0, ret_any},
 
-	{"write_trylock",             LOCK,   "write_lock", 0, ret_non_zero},
-	{"_write_trylock",            LOCK,   "write_lock", 0, ret_non_zero},
-	{"raw_write_trylock",         LOCK,   "write_lock", 0, ret_non_zero},
-	{"_raw_write_trylock",        LOCK,   "write_lock", 0, ret_non_zero},
-	{"__write_trylock",           LOCK,   "write_lock", 0, ret_non_zero},
-	{"__raw_write_trylock",       LOCK,   "write_lock", 0, ret_non_zero},
+	{"write_trylock",             LOCK,   "write_lock", 0, ret_one},
+	{"_write_trylock",            LOCK,   "write_lock", 0, ret_one},
+	{"raw_write_trylock",         LOCK,   "write_lock", 0, ret_one},
+	{"_raw_write_trylock",        LOCK,   "write_lock", 0, ret_one},
+	{"__write_trylock",           LOCK,   "write_lock", 0, ret_one},
+	{"__raw_write_trylock",       LOCK,   "write_lock", 0, ret_one},
 
 	{"down",               LOCK,   "sem", 0, ret_any},
 	{"up",                 UNLOCK, "sem", 0, ret_any},
@@ -247,16 +248,30 @@ static struct lock_info kernel_lock_table[] = {
 	{"down_timeout",       LOCK,   "sem", 0, ret_zero},
 	{"down_interruptible", LOCK,   "sem", 0, ret_zero},
 
+
+	{"down_write",          LOCK,   "rw_sem", 0, ret_any},
+	{"downgrade_write",     UNLOCK, "rw_sem", 0, ret_any},
+	{"downgrade_write",     LOCK,   "read_sem", 0, ret_any},
+	{"up_write",            UNLOCK, "rw_sem", 0, ret_any},
+	{"down_write_trylock",  LOCK,   "rw_sem", 0, ret_one},
+	{"down_write_killable", LOCK,   "rw_sem", 0, ret_zero},
+	{"down_read",           LOCK,   "read_sem", 0, ret_any},
+	{"down_read_trylock",   LOCK,   "read_sem", 0, ret_one},
+	{"down_read_killable",  LOCK,   "read_sem", 0, ret_zero},
+	{"up_read",             UNLOCK, "read_sem", 0, ret_any},
+
 	{"mutex_lock",                      LOCK,   "mutex", 0, ret_any},
+	{"mutex_lock_io",                   LOCK,   "mutex", 0, ret_any},
 	{"mutex_unlock",                    UNLOCK, "mutex", 0, ret_any},
 	{"mutex_lock_nested",               LOCK,   "mutex", 0, ret_any},
+	{"mutex_lock_io_nested",            LOCK,   "mutex", 0, ret_any},
 
 	{"mutex_lock_interruptible",        LOCK,   "mutex", 0, ret_zero},
 	{"mutex_lock_interruptible_nested", LOCK,   "mutex", 0, ret_zero},
 	{"mutex_lock_killable",             LOCK,   "mutex", 0, ret_zero},
 	{"mutex_lock_killable_nested",      LOCK,   "mutex", 0, ret_zero},
 
-	{"mutex_trylock",                   LOCK,   "mutex", 0, ret_non_zero},
+	{"mutex_trylock",                   LOCK,   "mutex", 0, ret_one},
 
 	{"raw_local_irq_disable", LOCK,   "irq", NO_ARG, ret_any},
 	{"raw_local_irq_enable",  UNLOCK, "irq", NO_ARG, ret_any},
@@ -269,7 +284,7 @@ static struct lock_info kernel_lock_table[] = {
 	{"_raw_spin_lock_irq",    LOCK,   "irq", NO_ARG, ret_any},
 	{"_raw_spin_unlock_irq",  UNLOCK, "irq", NO_ARG, ret_any},
 	{"__raw_spin_unlock_irq", UNLOCK, "irq", NO_ARG, ret_any},
-	{"spin_trylock_irq",      LOCK,   "irq", NO_ARG, ret_non_zero},
+	{"spin_trylock_irq",      LOCK,   "irq", NO_ARG, ret_one},
 	{"read_lock_irq",         LOCK,   "irq", NO_ARG, ret_any},
 	{"read_unlock_irq",       UNLOCK, "irq", NO_ARG, ret_any},
 	{"_read_lock_irq",        LOCK,   "irq", NO_ARG, ret_any},
@@ -304,7 +319,7 @@ static struct lock_info kernel_lock_table[] = {
 	{"__raw_spin_lock_irqsave",    LOCK,   "irqsave", RETURN_VAL, ret_any},
 	{"__raw_spin_unlock_irqrestore",UNLOCK, "irqsave", 1, ret_any},
 	{"_raw_spin_lock_irqsave_nested", LOCK, "irqsave", RETURN_VAL, ret_any},
-	{"spin_trylock_irqsave",       LOCK,   "irqsave", 1, ret_non_zero},
+	{"spin_trylock_irqsave",       LOCK,   "irqsave", 1, ret_one},
 	{"read_lock_irqsave",          LOCK,   "irqsave", RETURN_VAL, ret_any},
 	{"read_lock_irqsave",          LOCK,   "irqsave", 1, ret_any},
 	{"read_unlock_irqrestore",     UNLOCK, "irqsave", 1, ret_any},
@@ -348,9 +363,9 @@ static struct lock_info kernel_lock_table[] = {
 	{"_write_unlock_bh",    UNLOCK, "bottom_half", NO_ARG, ret_any},
 	{"__write_lock_bh",     LOCK,   "bottom_half", NO_ARG, ret_any},
 	{"__write_unlock_bh",   UNLOCK, "bottom_half", NO_ARG, ret_any},
-	{"spin_trylock_bh",     LOCK,   "bottom_half", NO_ARG, ret_non_zero},
-	{"_spin_trylock_bh",    LOCK,   "bottom_half", NO_ARG, ret_non_zero},
-	{"__spin_trylock_bh",   LOCK,   "bottom_half", NO_ARG, ret_non_zero},
+	{"spin_trylock_bh",     LOCK,   "bottom_half", NO_ARG, ret_one},
+	{"_spin_trylock_bh",    LOCK,   "bottom_half", NO_ARG, ret_one},
+	{"__spin_trylock_bh",   LOCK,   "bottom_half", NO_ARG, ret_one},
 
 	{"ffs_mutex_lock",        LOCK,   "mutex", 0, ret_zero},
 };
@@ -447,6 +462,15 @@ static void pre_merge_hook(struct sm_state *sm)
 		set_state(my_id, sm->name, sm->sym, &impossible);
 }
 
+static bool nestable(const char *name)
+{
+	if (strstr(name, "read_sem:"))
+		return true;
+	if (strcmp(name, "bottom_half:") == 0)
+		return true;
+	return false;
+}
+
 static void do_lock(const char *name)
 {
 	struct sm_state *sm;
@@ -457,8 +481,7 @@ static void do_lock(const char *name)
 	sm = get_sm_state(my_id, name, NULL);
 	if (!sm)
 		add_tracker(&starts_unlocked, my_id, name, NULL);
-	if (sm && slist_has_state(sm->possible, &locked) &&
-			strcmp(name, "bottom_half:") != 0)
+	if (sm && slist_has_state(sm->possible, &locked) && !nestable(name))
 		sm_error("double lock '%s'", name);
 	if (sm)
 		func_has_transition = TRUE;
@@ -744,12 +767,15 @@ static void print_inconsistent_returns(struct tracker *lock,
 static int matches_return_type(struct range_list *rl, enum return_type type)
 {
 	sval_t zero_sval = ll_to_sval(0);
+	sval_t one_sval = ll_to_sval(1);
 
 	/* All these double negatives are super ugly!  */
 
 	switch (type) {
 	case ret_zero:
 		return !possibly_true_rl(rl, SPECIAL_NOTEQUAL, alloc_rl(zero_sval, zero_sval));
+	case ret_one:
+		return !possibly_true_rl(rl, SPECIAL_NOTEQUAL, alloc_rl(one_sval, one_sval));
 	case ret_non_zero:
 		return !possibly_true_rl(rl, SPECIAL_EQUAL, alloc_rl(zero_sval, zero_sval));
 	case ret_negative:
@@ -906,7 +932,7 @@ static void register_lock(int index)
 	void *idx = INT_PTR(index);
 
 	if (lock->return_type == ret_non_zero) {
-		return_implies_state(lock->function, valid_ptr_min, valid_ptr_max, &match_lock_held, idx);
+		return_implies_state(lock->function, 1, INT_MAX, &match_lock_held, idx);
 		return_implies_state(lock->function, 0, 0, &match_lock_failed, idx);
 	} else if (lock->return_type == ret_any && lock->arg == RETURN_VAL) {
 		add_function_assign_hook(lock->function, &match_returns_locked, idx);
@@ -915,6 +941,9 @@ static void register_lock(int index)
 	} else if (lock->return_type == ret_zero) {
 		return_implies_state(lock->function, 0, 0, &match_lock_held, idx);
 		return_implies_state(lock->function, -4095, -1, &match_lock_failed, idx);
+	} else if (lock->return_type == ret_one) {
+		return_implies_state(lock->function, 1, 1, &match_lock_held, idx);
+		return_implies_state(lock->function, 0, 0, &match_lock_failed, idx);
 	}
 }
 

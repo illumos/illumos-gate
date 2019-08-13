@@ -28,6 +28,9 @@ static void match_return(struct expression *ret_value)
 	struct symbol *func_type = get_real_base_type(cur_func_sym);
 	sval_t sval;
 
+	if (!func_type || func_type->type != SYM_FN)
+		return;
+	func_type = get_real_base_type(func_type);
 	if (!func_type)
 		return;
 	if (!type_unsigned(func_type))

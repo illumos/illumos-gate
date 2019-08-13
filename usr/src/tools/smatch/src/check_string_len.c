@@ -35,13 +35,13 @@ struct param_info {
 
 struct param_info zero_one = {0, 1};
 
-static int handle_format(struct expression *call, char **pp, int *arg_nr)
+static int handle_format(struct expression *call, char **pp, int *arg_nr, bool use_max)
 {
 	struct expression *arg;
 	char *p = *pp;
 	int ret = 1;
 	char buf[256];
-	sval_t max;
+	sval_t sval;
 
 	p++;  /* we passed it with *p == '%' */
 
@@ -141,23 +141,30 @@ static int handle_format(struct expression *call, char **pp, int *arg_nr)
 		goto out;
 	}
 
-	get_absolute_max(arg, &max);
+	if (use_max) {
+		get_absolute_max(arg, &sval);
+	} else {
+		get_absolute_min(arg, &sval);
+		if (sval_is_negative(sval))
+			sval.value = 0;
+	}
+
 
 	if (*p == 'x' || *p == 'X' || *p == 'p') {
-		ret = snprintf(buf, sizeof(buf), "%llx", max.uvalue);
+		ret = snprintf(buf, sizeof(buf), "%llx", sval.uvalue);
 	} else if (*p == 'u') {
-		ret = snprintf(buf, sizeof(buf), "%llu", max.uvalue);
+		ret = snprintf(buf, sizeof(buf), "%llu", sval.uvalue);
 	} else if (!expr_unsigned(arg)) {
 		sval_t min;
 		int tmp;
 
-		ret = snprintf(buf, sizeof(buf), "%lld", max.value);
+		ret = snprintf(buf, sizeof(buf), "%lld", sval.value);
 		get_absolute_min(arg, &min);
 		tmp = snprintf(buf, sizeof(buf), "%lld", min.value);
 		if (tmp > ret)
 			ret = tmp;
 	} else {
-		ret = snprintf(buf, sizeof(buf), "%lld", max.value);
+		ret = snprintf(buf, sizeof(buf), "%lld", sval.value);
 	}
 	p++;
 
@@ -168,7 +175,7 @@ out_no_arg:
 	return ret;
 }
 
-int get_formatted_string_size(struct expression *call, int arg)
+int get_formatted_string_size_helper(struct expression *call, int arg, bool use_max)
 {
 	struct expression *expr;
 	char *p;
@@ -184,7 +191,7 @@ int get_formatted_string_size(struct expression *call, int arg)
 	while (*p) {
 
 		if (*p == '%') {
-			count += handle_format(call, &p, &arg);
+			count += handle_format(call, &p, &arg, use_max);
 		} else if (*p == '\\') {
 			p++;
 		}else {
@@ -193,8 +200,17 @@ int get_formatted_string_size(struct expression *call, int arg)
 		}
 	}
 
-	count++; /* count the NUL terminator */
 	return count;
+}
+
+int get_formatted_string_size(struct expression *call, int arg)
+{
+	return get_formatted_string_size_helper(call, arg, true);
+}
+
+int get_formatted_string_min_size(struct expression *call, int arg)
+{
+	return get_formatted_string_size_helper(call, arg, false);
 }
 
 static void match_not_limited(const char *fn, struct expression *call, void *info)
@@ -224,10 +240,11 @@ static void match_not_limited(const char *fn, struct expression *call, void *inf
 		return;
 
 	size = get_formatted_string_size(call, params->string);
-	if (size <= 0)
+	if (size < 0)
 		return;
 	if (size < offset)
 		size -= offset;
+	size++; /* add the NULL terminator */
 	if (size <= buf_size)
 		return;
 

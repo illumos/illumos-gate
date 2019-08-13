@@ -35,6 +35,8 @@ static void match_binop(struct expression *expr)
 		return;
 	if (type_bits(type) == -1 || type_bits(type) > bits.value)
 		return;
+	if (is_ignored_expr(my_id, expr))
+		return;
 	sm_warning("right shifting more than type allows %d vs %lld", type_bits(type), bits.value);
 }
 

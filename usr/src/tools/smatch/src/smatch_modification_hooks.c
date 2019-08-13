@@ -52,9 +52,12 @@ static struct smatch_state *alloc_my_state(struct expression *expr, struct smatc
 	struct modification_data *data;
 	char *name;
 
-	state = __alloc_smatch_state(0);
 	expr = strip_expr(expr);
 	name = expr_to_str(expr);
+	if (!name)
+		return NULL;
+
+	state = __alloc_smatch_state(0);
 	state->name = alloc_sname(name);
 	free_string(name);
 
@@ -178,7 +181,7 @@ static void db_param_add(struct expression *expr, int param, char *key, char *va
 	call_modification_hooks_name_sym(name, sym, expr, BOTH);
 	__in_fake_assign--;
 
-	other_name = map_long_to_short_name_sym(name, sym, &other_sym);
+	other_name = get_other_name_sym(name, sym, &other_sym);
 	if (other_name) {
 		__in_fake_assign++;
 		call_modification_hooks_name_sym(other_name, other_sym, expr, BOTH);
@@ -278,6 +281,8 @@ struct smatch_state *get_modification_state(struct expression *expr)
 void register_modification_hooks(int id)
 {
 	my_id = id;
+
+	set_dynamic_states(my_id);
 
 	hooks = malloc((num_checks + 1) * sizeof(*hooks));
 	memset(hooks, 0, (num_checks + 1) * sizeof(*hooks));

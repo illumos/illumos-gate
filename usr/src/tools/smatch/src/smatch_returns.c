@@ -130,6 +130,7 @@ void register_returns_early(int id)
 {
 	RETURN_ID = id;
 
+	set_dynamic_states(RETURN_ID);
 	add_split_return_callback(match_return);
 }
 

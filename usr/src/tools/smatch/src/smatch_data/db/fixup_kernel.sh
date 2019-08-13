@@ -23,18 +23,8 @@ delete from caller_info where function = '(struct irq_router)->set' and type != 
 delete from caller_info where function = '(struct net_device_ops)->ndo_change_mtu' and caller = 'i40e_dbg_netdev_ops_write';
 delete from caller_info where function = '(struct timer_list)->function' and type != 0;
 
-/* type 1003 is USER_DATA */
-delete from caller_info where caller = 'hid_input_report' and type = 1003;
-delete from caller_info where caller = 'nes_process_iwarp_aeqe' and type = 1003;
-delete from caller_info where caller = 'oz_process_ep0_urb' and type = 1003;
-delete from caller_info where function = 'dev_hard_start_xmit' and key = '\$' and type = 1003;
-delete from caller_info where function like '%->ndo_start_xmit' and key = '\$' and type = 1003;
-delete from caller_info where caller = 'packet_rcv_fanout' and function = '(struct packet_type)->func' and parameter = 1 and type = 1003;
-delete from caller_info where caller = 'hptiop_probe' and type = 1003;
-delete from caller_info where caller = 'p9_fd_poll' and function = '(struct file_operations)->poll' and type = 1003;
-delete from caller_info where caller = 'proc_reg_poll' and function = 'proc_reg_poll ptr poll' and type = 1003;
-delete from caller_info where function = 'blkdev_ioctl' and type = 1003 and parameter = 0 and key = '\$';
-/* 9017 is USER_DATA3_SET */
+/* 8017 is USER_DATA and  9017 is USER_DATA_SET */
+delete from caller_info where function = 'dev_hard_start_xmit' and type = 8017;
 delete from return_states where function='vscnprintf' and type = 9017;
 delete from return_states where function='scnprintf' and type = 9017;
 delete from return_states where function='vsnprintf' and type = 9017;
@@ -49,6 +39,10 @@ delete from return_states where function='sprintf' and type = 8017;
 /* because of recursion it gets passed to everything and is impossible to debug */
 delete from caller_info where function = '__dev_queue_xmit' and type = 8017;
 delete from caller_info where function = '__netdev_start_xmit' and type = 8017;
+delete from caller_info where function = '(struct packet_type)->func' and type = 8017;
+delete from caller_info where function = '(struct bio)->bi_end_io' and type = 8017;
+delete from caller_info where caller = 'NF_HOOK_COND' and type = 8017;
+delete from caller_info where caller = 'NF_HOOK' and type = 8017;
 /* comparison doesn't deal with chunks, I guess.  */
 delete from return_states where function='get_tty_driver' and type = 8017;
 delete from caller_info where caller = 'snd_ctl_elem_write' and function = '(struct snd_kcontrol)->put' and type = 8017;
@@ -57,9 +51,9 @@ delete from caller_info where function = 'nf_tables_newexpr' and type = 8017 and
 delete from caller_info where caller = 'fb_set_var' and function = '(struct fb_ops)->fb_set_par' and type = 8017 and parameter = 0;
 delete from return_states where function = 'tty_lookup_driver' and parameter = 2 and type = 8017;
 
-insert into caller_info values ('userspace', '', 'compat_sys_ioctl', 0, 0, 1003, 0, '\$', '1');
-insert into caller_info values ('userspace', '', 'compat_sys_ioctl', 0, 0, 1003, 1, '\$', '1');
-insert into caller_info values ('userspace', '', 'compat_sys_ioctl', 0, 0, 1003, 2, '\$', '1');
+insert into caller_info values ('userspace', '', 'compat_sys_ioctl', 0, 0, 8017, 0, '\$', '1');
+insert into caller_info values ('userspace', '', 'compat_sys_ioctl', 0, 0, 8017, 1, '\$', '1');
+insert into caller_info values ('userspace', '', 'compat_sys_ioctl', 0, 0, 8017, 2, '\$', '1');
 
 delete from caller_info where function = '(struct timer_list)->function' and parameter = 0;
 
@@ -76,36 +70,15 @@ insert into return_states values ('faked', 'rw_verify_area', 0, 2, '(-4095)-(-1)
 
 delete from return_states where function = 'is_kernel_rodata';
 insert into return_states values ('faked', 'is_kernel_rodata', 0, 1, '1', 0, 0,   -1,  '', '');
-insert into return_states values ('faked', 'is_kernel_rodata', 0, 1, '1', 0, 103,  0,  '\$', '100000000-177777777');
+insert into return_states values ('faked', 'is_kernel_rodata', 0, 1, '1', 0, 103,  0,  '\$', '4096-ptr_max');
 insert into return_states values ('faked', 'is_kernel_rodata', 0, 2, '0', 0, 0,   -1,  '', '');
-
-/*
- * I am a bad person for doing this to __kmalloc() which is a very deep function
- * and can easily be removed instead of to kmalloc().  But kmalloc() is an
- * inline function so it ends up being recorded thousands of times in the
- * database.  Doing this is easier.
- *
- */
-delete from return_states where function = '__kmalloc';
-insert into return_states values ('faked', '__kmalloc', 0, 1, '16', 0,    0,  -1, '', '');
-insert into return_states values ('faked', '__kmalloc', 0, 1, '16', 0, 103,   0, '\$', '0');
-insert into return_states values ('faked', '__kmalloc', 0, 2, '0,500000000-577777777', 0,    0, -1, '', '');
-insert into return_states values ('faked', '__kmalloc', 0, 2, '0,500000000-577777777', 0, 103,  0, '\$', '1-4000000');
-insert into return_states values ('faked', '__kmalloc', 0, 2, '0,500000000-577777777', 0, 1037,  -1, '', 400);
-insert into return_states values ('faked', '__kmalloc', 0, 3, '0', 0,    0,  -1, '', '');
-insert into return_states values ('faked', '__kmalloc', 0, 3, '0', 0,    103,  0, '\$', '4000000-long_max');
 
 /*
  * Other kmalloc hacking.
  */
-update return_states set return = '0,500000000-577777777' where function = 'kmalloc_slab' and return = 's64min-s64max';
-update return_states set return = '0,500000000-577777777' where function = 'slab_alloc_node' and return = 's64min-s64max';
-update return_states set return = '0,500000000-577777777' where function = 'kmalloc_large' and return != '0';
-update return_states set return = '0,500000000-577777777' where function = 'kmalloc_order_trace' and return != '0';
-
 delete from return_states where function = 'vmalloc';
-insert into return_states values ('faked', 'vmalloc', 0, 1, '0,600000000-677777777', 0,    0, -1, '', '');
-insert into return_states values ('faked', 'vmalloc', 0, 1, '0,600000000-677777777', 0, 103,  0, '\$', '1-128000000');
+insert into return_states values ('faked', 'vmalloc', 0, 1, '4096-ptr_max', 0,    0, -1, '', '');
+insert into return_states values ('faked', 'vmalloc', 0, 1, '4096-ptr_max', 0, 103,  0, '\$', '1-128000000');
 insert into return_states values ('faked', 'vmalloc', 0, 2, '0', 0,    0,  -1, '', '');
 
 delete from return_states where function = 'ksize';
@@ -141,9 +114,6 @@ delete from return_states where function = 'bitmap_allocate_region' and return =
 /* Just delete a lot of returns that everyone ignores */
 delete from return_states where file = 'drivers/pci/access.c' and (return >= 129 and return <= 137);
 
-update return_states set return = '(-4095)-s32max[<=\$1]' where function = 'get_user_pages' and return = 's32min-s32max';
-update return_states set return = '(-4095)-s64max[<=\$1]' where function = 'get_user_pages' and return = 's64min-s64max';
-
 /* Smatch can't parse wait_for_completion() */
 update return_states set return = '(-108),(-22),0' where function = '__spi_sync' and return = '(-115),(-108),(-22)';
 
@@ -155,9 +125,9 @@ update caller_info set value = 4096 where caller='kernfs_file_direct_read' and f
 delete from caller_info where caller='init_fw_attribute_group' and function='(struct device_attribute)->show';
 /* and let's fake the next dev_attr_show() call entirely */
 delete from caller_info where caller='sysfs_kf_seq_show' and function='(struct sysfs_ops)->show';
-insert into caller_info values ('fake', 'sysfs_kf_seq_show', '(struct sysfs_ops)->show', 0, 0, 1001, 0, '\$', '4096-2117777777777777777');
+insert into caller_info values ('fake', 'sysfs_kf_seq_show', '(struct sysfs_ops)->show', 0, 0, 1001, 0, '\$', '4096-ptr_max');
 insert into caller_info values ('fake', 'sysfs_kf_seq_show', '(struct sysfs_ops)->show', 0, 0, 1002, 2, '\$', '4096');
-insert into caller_info values ('fake', 'sysfs_kf_seq_show', '(struct sysfs_ops)->show', 0, 0, 1001, 2, '\$', '4096-2117777777777777777');
+insert into caller_info values ('fake', 'sysfs_kf_seq_show', '(struct sysfs_ops)->show', 0, 0, 1001, 2, '\$', '4096-ptr_max');
 insert into caller_info values ('fake', 'sysfs_kf_seq_show', '(struct sysfs_ops)->show', 0, 0, 0,   -1, ''  , '');
 /* config fs confuses smatch a little */
 update caller_info set value = 4096 where caller='fill_read_buffer' and function='(struct configfs_item_operations)->show_attribute' and type = 1002 and parameter = 2;
@@ -198,12 +168,18 @@ delete from caller_info where function = '(struct i2c_algorithm)->master_xfer' a
 /* this if from READ_ONCE().  We can't know anything about the data.  */
 delete from type_info where key = '(union anonymous)->__val';
 
+/* This is RIO_BAD_SIZE */
+delete from return_states where file = 'drivers/rapidio/rio-access.c' and return = '129';
+
+/* Smatch sucks at loops */
+delete from return_states where function = 'ata_dev_next' and type = 103;
+
 EOF
 
 # fixme: this is totally broken
 call_id=$(echo "select distinct call_id from caller_info where function = '__kernel_write';" | sqlite3 $db_file)
 for id in $call_id ; do
-    echo "insert into caller_info values ('fake', '', '__kernel_write', $id, 0, 1003, 1, '*\$', '');" | sqlite3 $db_file
+    echo "insert into caller_info values ('fake', '', '__kernel_write', $id, 0, 8017, 1, '*\$', '');" | sqlite3 $db_file
 done
 
 for i in $(echo "select distinct return from return_states where function = 'clear_user';" | sqlite3 $db_file ) ; do
@@ -227,3 +203,17 @@ echo "select distinct file, function from function_ptr where ptr='(struct rtl_ha
          | sqlite3 $db_file
 done
 
+
+for func in __kmalloc __kmalloc_track_caller ; do
+
+    cat << EOF | sqlite3 $db_file
+delete from return_states where function = '$func';
+insert into return_states values ('faked', '$func', 0, 1, '16', 0,    0,  -1, '', '');
+insert into return_states values ('faked', '$func', 0, 1, '16', 0, 103,   0, '\$', '0');
+insert into return_states values ('faked', '$func', 0, 2, '4096-ptr_max', 0,    0, -1, '', '');
+insert into return_states values ('faked', '$func', 0, 2, '4096-ptr_max', 0, 103,  0, '\$', '1-4000000');
+insert into return_states values ('faked', '$func', 0, 2, '4096-ptr_max', 0, 1037,  -1, '', 400);
+insert into return_states values ('faked', '$func', 0, 3, '0', 0,    0,  -1, '', '');
+insert into return_states values ('faked', '$func', 0, 3, '0', 0,    103,  0, '\$', '1-long_max');
+EOF
+done

@@ -74,4 +74,6 @@ static inline void __smatch_exit(void){}
 
 static inline void __smatch_state_count(void){}
 static inline void __smatch_mem(void){}
+
+static inline void __smatch_container(long long container, long long x){}
 #endif

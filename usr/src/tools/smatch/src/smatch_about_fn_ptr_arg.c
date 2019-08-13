@@ -139,7 +139,7 @@ static char *get_data_member(char *fn_member, struct expression *expr, struct sy
 	}
 
 	strncpy(buf, fn_str, sizeof(buf));
-	snprintf(buf + len_str, sizeof(buf) - len_str, end_type);
+	snprintf(buf + len_str, sizeof(buf) - len_str, "%s", end_type);
 	*sym = tmp_sym;
 	return alloc_string(buf);
 }

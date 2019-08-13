@@ -2111,7 +2111,7 @@ build_page_tables(void)
 	 * Map framebuffer memory as PT_NOCACHE as this is memory from a
 	 * device and therefore must not be cached.
 	 */
-	if (bi->bi_framebuffer != NULL && fb->framebuffer != 0) {
+	if (fb != NULL && fb->framebuffer != 0) {
 		multiboot_tag_framebuffer_t *fb_tagp;
 		fb_tagp = (multiboot_tag_framebuffer_t *)(uintptr_t)
 		    fb->framebuffer;

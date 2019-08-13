@@ -445,6 +445,23 @@ static void match_memcpy(const char *fn, struct expression *expr, void *_arg)
 	__struct_members_copy(COPY_MEMCPY, expr, remove_addr(dest), remove_addr(src));
 }
 
+static void match_memdup(const char *fn, struct expression *call_expr,
+			struct expression *expr, void *_unused)
+{
+	struct expression *left, *right, *arg;
+
+	if (!expr || expr->type != EXPR_ASSIGNMENT)
+		return;
+
+	left = strip_expr(expr->left);
+	right = strip_expr(expr->right);
+
+	if (right->type != EXPR_CALL)
+		return;
+	arg = get_argument_from_call_expr(right->args, 0);
+	__struct_members_copy(COPY_MEMCPY, expr, left, arg);
+}
+
 static void match_memcpy_unknown(const char *fn, struct expression *expr, void *_arg)
 {
 	struct expression *dest;
@@ -547,6 +564,9 @@ void register_struct_assignment(int id)
 	add_function_hook("memmove", &match_memcpy, INT_PTR(0));
 	add_function_hook("__memcpy", &match_memcpy, INT_PTR(0));
 	add_function_hook("__memmove", &match_memcpy, INT_PTR(0));
+
+	if (option_project == PROJ_KERNEL)
+		return_implies_state_sval("kmemdup", valid_ptr_min_sval, valid_ptr_max_sval, &match_memdup, NULL);
 
 	add_function_hook("sscanf", &match_sscanf, NULL);
 

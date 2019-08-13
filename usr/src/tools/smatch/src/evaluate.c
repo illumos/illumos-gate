@@ -1946,7 +1946,7 @@ static struct symbol *evaluate_preop(struct expression *expr)
 	return ctype;
 }
 
-static struct symbol *find_identifier(struct ident *ident, struct symbol_list *_list, int *offset)
+struct symbol *find_identifier(struct ident *ident, struct symbol_list *_list, int *offset)
 {
 	struct ptr_list *head = (struct ptr_list *)_list;
 	struct ptr_list *list = head;

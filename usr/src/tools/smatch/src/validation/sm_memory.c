@@ -30,6 +30,5 @@ void func (void)
  *
  * check-output-start
 sm_memory.c:22 func() warn: possible memory leak of 'ac'
-sm_memory.c:22 func() error: memory leak of 'ac'
  * check-output-end
  */

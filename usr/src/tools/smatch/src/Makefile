@@ -1,4 +1,4 @@
-VERSION=0.5.1
+VERSION=0.5.1-il-4
 
 # Generating file version.h if current version has changed
 SPARSE_VERSION:=$(shell git describe 2>/dev/null || echo '$(VERSION)')
@@ -90,7 +90,7 @@ SMATCH_FILES=smatch_flow.o smatch_conditions.o smatch_slist.o smatch_states.o \
 	smatch_mtag_map.o smatch_mtag_data.o \
 	smatch_param_to_mtag_data.o smatch_mem_tracker.o smatch_array_values.o \
 	smatch_nul_terminator.o smatch_assigned_expr.o smatch_kernel_user_data.o \
-	smatch_statement_count.o
+	smatch_statement_count.o smatch_integer_overflow.o smatch_bits.o
 
 SMATCH_CHECKS=$(shell ls check_*.c | sed -e 's/\.c/.o/')
 SMATCH_DATA=smatch_data/kernel.allocation_funcs \

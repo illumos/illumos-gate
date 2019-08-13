@@ -21,14 +21,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
-
-#
-# uts/intel/mega_sas/Makefile
-#
-#	This makefile drives the production of the mega_sas driver kernel module.
-#
-#	intel implementation architecture dependent
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -41,7 +34,6 @@ UTSBASE	= ../..
 #
 MODULE		= mega_sas
 OBJECTS		= $(MEGA_SAS_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(MEGA_SAS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR     = $(UTSBASE)/common/io/mega_sas
 
@@ -54,18 +46,17 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(CONFMOD)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
-# 	Kernel Module Dependencies
+#	Kernel Module Dependencies
 #
 LDFLAGS		+= -dy -Nmisc/scsi
 
 CERRWARN	+= -_gcc=-Wno-uninitialized
 
 # needs work
-$(OBJS_DIR)/megaraid_sas.o := SMOFF += snprintf_overflow,all_func_returns
+$(OBJS_DIR)/megaraid_sas.o := SMOFF += snprintf_overflow,all_func_returns,index_overflow
 
 #
 #	Default build targets.
@@ -79,12 +70,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

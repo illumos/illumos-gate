@@ -641,7 +641,7 @@ static void save_link_var_sym(const char *var, struct symbol *sym, const char *l
 	set_state(link_id, var, sym, new_state);
 }
 
-static void match_inc(struct sm_state *sm)
+static void match_inc(struct sm_state *sm, bool preserve)
 {
 	struct string_list *links;
 	struct smatch_state *state, *new;
@@ -673,6 +673,8 @@ static void match_inc(struct sm_state *sm)
 		case SPECIAL_UNSIGNED_GTE:
 		case '>':
 		case SPECIAL_UNSIGNED_GT:
+			if (preserve)
+				break;
 			new = alloc_compare_state(
 					data->left, data->left_var, data->left_vsl,
 					flip ? '<' : '>',
@@ -693,7 +695,7 @@ static void match_inc(struct sm_state *sm)
 	} END_FOR_EACH_PTR(tmp);
 }
 
-static void match_dec(struct sm_state *sm)
+static void match_dec(struct sm_state *sm, bool preserve)
 {
 	struct string_list *links;
 	struct smatch_state *state;
@@ -713,6 +715,9 @@ static void match_dec(struct sm_state *sm)
 			struct compare_data *data = state->data;
 			struct smatch_state *new;
 
+			if (preserve)
+				break;
+
 			new = alloc_compare_state(
 					data->left, data->left_var, data->left_vsl,
 					'<',
@@ -726,6 +731,42 @@ static void match_dec(struct sm_state *sm)
 	} END_FOR_EACH_PTR(tmp);
 }
 
+static void reset_sm(struct sm_state *sm)
+{
+	struct string_list *links;
+	char *tmp;
+
+	links = sm->state->data;
+
+	FOR_EACH_PTR(links, tmp) {
+		set_state(compare_id, tmp, NULL, &undefined);
+	} END_FOR_EACH_PTR(tmp);
+	set_state(link_id, sm->name, sm->sym, &undefined);
+}
+
+static bool match_add_sub_assign(struct sm_state *sm, struct expression *expr)
+{
+	struct range_list *rl;
+	sval_t zero = { .type = &int_ctype };
+
+	if (!expr || expr->type != EXPR_ASSIGNMENT)
+		return false;
+	if (expr->op != SPECIAL_ADD_ASSIGN && expr->op != SPECIAL_SUB_ASSIGN)
+		return false;
+
+	get_absolute_rl(expr->right, &rl);
+	if (sval_is_negative(rl_min(rl))) {
+		reset_sm(sm);
+		return false;
+	}
+
+	if (expr->op == SPECIAL_ADD_ASSIGN)
+		match_inc(sm, rl_has_sval(rl, zero));
+	else
+		match_dec(sm, rl_has_sval(rl, zero));
+	return true;
+}
+
 static void match_inc_dec(struct sm_state *sm, struct expression *mod_expr)
 {
 	/*
@@ -733,13 +774,15 @@ static void match_inc_dec(struct sm_state *sm, struct expression *mod_expr)
 	 */
 	if (!mod_expr)
 		return;
+	if (match_add_sub_assign(sm, mod_expr))
+		return;
 	if (mod_expr->type != EXPR_PREOP && mod_expr->type != EXPR_POSTOP)
 		return;
 
 	if (mod_expr->op == SPECIAL_INCREMENT)
-		match_inc(sm);
+		match_inc(sm, false);
 	else if (mod_expr->op == SPECIAL_DECREMENT)
-		match_dec(sm);
+		match_dec(sm, false);
 }
 
 static int is_self_assign(struct expression *expr)
@@ -751,9 +794,6 @@ static int is_self_assign(struct expression *expr)
 
 static void match_modify(struct sm_state *sm, struct expression *mod_expr)
 {
-	struct string_list *links;
-	char *tmp;
-
 	if (mod_expr && is_self_assign(mod_expr))
 		return;
 
@@ -762,13 +802,11 @@ static void match_modify(struct sm_state *sm, struct expression *mod_expr)
 	    ((mod_expr->type == EXPR_PREOP || mod_expr->type == EXPR_POSTOP) &&
 	     (mod_expr->op == SPECIAL_INCREMENT || mod_expr->op == SPECIAL_DECREMENT)))
 		return;
+	if (mod_expr && mod_expr->type == EXPR_ASSIGNMENT &&
+	    (mod_expr->op == SPECIAL_ADD_ASSIGN || mod_expr->op == SPECIAL_SUB_ASSIGN))
+		return;
 
-	links = sm->state->data;
-
-	FOR_EACH_PTR(links, tmp) {
-		set_state(compare_id, tmp, NULL, &undefined);
-	} END_FOR_EACH_PTR(tmp);
-	set_state(link_id, sm->name, sm->sym, &undefined);
+	reset_sm(sm);
 }
 
 static void match_preop(struct expression *expr)
@@ -1604,7 +1642,7 @@ int get_comparison_strings(const char *one, const char *two)
 	return ret;
 }
 
-int get_comparison(struct expression *a, struct expression *b)
+static int get_comparison_helper(struct expression *a, struct expression *b, bool use_extra)
 {
 	char *one = NULL;
 	char *two = NULL;
@@ -1653,9 +1691,19 @@ free:
 	free_string(one);
 	free_string(two);
 
-	if (!ret)
+	if (!ret && use_extra)
 		return comparison_from_extra(a, b);
 	return ret;
+}
+
+int get_comparison(struct expression *a, struct expression *b)
+{
+	return get_comparison_helper(a, b, true);
+}
+
+int get_comparison_no_extra(struct expression *a, struct expression *b)
+{
+	return get_comparison_helper(a, b, false);
 }
 
 int possible_comparison(struct expression *a, int comparison, struct expression *b)
@@ -2327,7 +2375,7 @@ static int split_op_param_key(char *value, int *op, int *param, char **key)
 	if (!parse_comparison(&value, op))
 		return 0;
 
-	snprintf(buf, sizeof(buf), value);
+	snprintf(buf, sizeof(buf), "%s", value);
 
 	p = buf;
 	if (*p++ != '$')
@@ -2495,6 +2543,7 @@ static void free_data(struct symbol *sym)
 void register_comparison(int id)
 {
 	compare_id = id;
+	set_dynamic_states(compare_id);
 	add_hook(&save_start_states, AFTER_DEF_HOOK);
 	add_unmatched_state_hook(compare_id, unmatched_comparison);
 	add_pre_merge_hook(compare_id, &pre_merge_hook);
@@ -2515,6 +2564,8 @@ void register_comparison_late(int id)
 void register_comparison_links(int id)
 {
 	link_id = id;
+	db_ignore_states(link_id);
+	set_dynamic_states(link_id);
 	add_merge_hook(link_id, &merge_links);
 	add_modification_hook(link_id, &match_modify);
 	add_modification_hook_late(link_id, match_inc_dec);
@@ -2531,6 +2582,7 @@ void register_comparison_inc_dec(int id)
 void register_comparison_inc_dec_links(int id)
 {
 	inc_dec_link_id = id;
+	set_dynamic_states(inc_dec_link_id);
 	set_up_link_functions(inc_dec_id, inc_dec_link_id);
 }
 

@@ -53,8 +53,11 @@ CK(register_type_links)
 CK(register_impossible)
 CK(register_impossible_return)
 CK(register_strings)
+CK(register_integer_overflow)
+CK(register_integer_overflow_links)
 CK(register_real_absolute)
 CK(register_imaginary_absolute)
+CK(register_bits)
 CK(register_fn_arg_link)
 CK(register_parameter_names)
 CK(register_return_to_param)
@@ -71,8 +74,8 @@ CK(register_nul_terminator)
 CK(register_nul_terminator_param_set)
 CK(register_statement_count)
 
+CK(register_kernel_user_data)
 CK(register_kernel_user_data2)
-CK(register_kernel_user_data3)
 
 CK(check_debug)
 
@@ -187,6 +190,7 @@ CK(check_dma_mapping_error)
 CK(check_nospec)
 CK(check_nospec_barrier)
 CK(check_spectre)
+CK(check_spectre_second_half)
 CK(check_implicit_dependencies)
 
 /* wine specific stuff */
@@ -195,6 +199,7 @@ CK(check_wine_WtoA)
 
 /* illumos specific */
 CK(check_all_func_returns)
+CK(check_cmn_err)
 
 #include "check_list_local.h"
 

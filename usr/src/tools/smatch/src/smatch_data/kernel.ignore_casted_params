@@ -1,0 +1,15 @@
+set_bit
+clear_bit
+__clear_bit
+__set_bit
+test_and_set_bit
+find_last_bit
+change_bit
+xfs_next_bit
+find_next_bit
+find_first_bit
+__test_and_set_bit
+sync_set_bit
+bitmap_weight
+bitmap_intersects
+bitmap_empty

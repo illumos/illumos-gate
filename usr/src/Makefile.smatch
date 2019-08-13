@@ -28,7 +28,7 @@ SMATCH_ARGS += -Wno-external-function-has-definition
 SMATCH_ARGS += -Wno-old-style-definition
 SMATCH_ARGS += -Wno-strict-prototypes
 SMATCH_ARGS += --fatal-checks
-SMATCH_ARGS += --timeout=120
+SMATCH_ARGS += --timeout=0
 
 CERRWARN += $(SMATCH_ARGS:%=-_smatch=%)
 

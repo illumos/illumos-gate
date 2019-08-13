@@ -76,30 +76,23 @@ int option_two_passes = 0;
 struct symbol *cur_func_sym = NULL;
 struct stree *global_states;
 
-long long valid_ptr_min = 4096;
-long long valid_ptr_max = 2117777777;
-sval_t valid_ptr_min_sval = {
+const unsigned long valid_ptr_min = 4096;
+unsigned long valid_ptr_max = ULONG_MAX & ~(MTAG_OFFSET_MASK);
+const sval_t valid_ptr_min_sval = {
 	.type = &ptr_ctype,
 	{.value = 4096},
 };
 sval_t valid_ptr_max_sval = {
 	.type = &ptr_ctype,
-	{.value = LONG_MAX - 100000},
+	{.value = ULONG_MAX & ~(MTAG_OFFSET_MASK)},
 };
 struct range_list *valid_ptr_rl;
 
-static void set_valid_ptr_max(void)
+void alloc_valid_ptr_rl(void)
 {
-	if (type_bits(&ptr_ctype) == 32)
-		valid_ptr_max = 2117777777;
-	else if (type_bits(&ptr_ctype) == 64)
-		valid_ptr_max = 2117777777777777777LL;
-
+	valid_ptr_max = sval_type_max(&ulong_ctype).value & ~(MTAG_OFFSET_MASK);
 	valid_ptr_max_sval.value = valid_ptr_max;
-}
 
-static void alloc_valid_ptr_rl(void)
-{
 	valid_ptr_rl = alloc_rl(valid_ptr_min_sval, valid_ptr_max_sval);
 	valid_ptr_rl = cast_rl(&ptr_ctype, valid_ptr_rl);
 	valid_ptr_rl = clone_rl_permanent(valid_ptr_rl);
@@ -504,7 +497,6 @@ void __split_expr(struct expression *expr)
 		break;
 	case EXPR_OFFSETOF:
 	case EXPR_ALIGNOF:
-		evaluate_expression(expr);
 		break;
 	case EXPR_CONDITIONAL:
 	case EXPR_SELECT:
@@ -878,9 +870,14 @@ int time_parsing_function(void)
 	return ms_since(&fn_start_time) / 1000;
 }
 
-static int taking_too_long(void)
+/*
+ * This defaults to 60 * 5 == 5 minutes, so we'll just multiply
+ * whatever we're given by 5.
+ */
+bool taking_too_long(void)
 {
-	if ((ms_since(&outer_fn_start_time) / 1000) > 60 * 5) /* five minutes */
+	if (option_timeout &&
+	    (ms_since(&outer_fn_start_time) / 1000) > option_timeout * 5)
 		return 1;
 	return 0;
 }
@@ -1908,9 +1905,8 @@ static void open_output_files(char *base_file)
 		sm_fatal("Error:  Cannot open %s", buf);
 }
 
-void smatch(int argc, char **argv)
+void smatch(struct string_list *filelist)
 {
-	struct string_list *filelist = NULL;
 	struct symbol_list *sym_list;
 	struct timeval stop, start;
 	char *path;
@@ -1918,9 +1914,6 @@ void smatch(int argc, char **argv)
 
 	gettimeofday(&start, NULL);
 
-	sparse_initialize(argc, argv, &filelist);
-	set_valid_ptr_max();
-	alloc_valid_ptr_rl();
 	FOR_EACH_PTR_NOTAG(filelist, base_file) {
 		path = getcwd(NULL, 0);
 		free(full_base_file);
@@ -1940,6 +1933,7 @@ void smatch(int argc, char **argv)
 	gettimeofday(&stop, NULL);
 
 	set_position(last_pos);
+	final_pass = 1;
 	if (option_time)
 		sm_msg("time: %lu", stop.tv_sec - start.tv_sec);
 	if (option_mem)

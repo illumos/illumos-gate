@@ -26,6 +26,8 @@ static void match_assign(struct expression *expr)
 	struct symbol *left_type, *right_type;
 	struct expression *size_expr;
 	sval_t min_size;
+	int limit_type;
+	int bytes;
 
 	left_type = get_type(expr->left);
 	if (!left_type || left_type->type != SYM_PTR)
@@ -43,8 +45,14 @@ static void match_assign(struct expression *expr)
 	if (right_type != &void_ctype && type_bits(right_type) != 8)
 		return;
 
-	size_expr = get_size_variable(expr->right);
+	bytes = get_array_size_bytes(expr->right);
+	if (bytes >= type_bytes(left_type))
+		return;
+
+	size_expr = get_size_variable(expr->right, &limit_type);
 	if (!size_expr)
+		return;
+	if (limit_type != ELEM_COUNT)
 		return;
 
 	get_absolute_min(size_expr, &min_size);
@@ -62,6 +70,7 @@ static void match_dereferences(struct expression *expr)
 	char *name;
 	struct expression *size_expr;
 	sval_t min_size;
+	int limit_type;
 
 	if (expr->type != EXPR_PREOP)
 		return;
@@ -79,8 +88,10 @@ static void match_dereferences(struct expression *expr)
 		return;
 
 	right = get_assigned_expr(expr);
-	size_expr = get_size_variable(right);
+	size_expr = get_size_variable(right, &limit_type);
 	if (!size_expr)
+		return;
+	if (limit_type != ELEM_COUNT)
 		return;
 
 	get_absolute_min(size_expr, &min_size);

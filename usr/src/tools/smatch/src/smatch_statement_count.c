@@ -79,6 +79,7 @@ void register_statement_count(int id)
 {
 	my_id = id;
 
+	set_dynamic_states(my_id);
 	add_hook(match_statement, STMT_HOOK);
 	add_merge_hook(my_id, &merge_states);
 

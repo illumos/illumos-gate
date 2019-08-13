@@ -24,12 +24,14 @@ static int my_id;
 static char *get_source_parameter(struct expression *expr)
 {
 	struct expression *tmp;
+	const char *param_name;
 	struct symbol *sym;
 	char *name;
 	int param;
 	char *ret = NULL;
 	char buf[32];
 	int cnt = 0;
+	bool modified = false;
 
 	tmp = expr;
 	while ((tmp = get_assigned_expr(tmp))) {
@@ -48,10 +50,14 @@ static char *get_source_parameter(struct expression *expr)
 	param = get_param_num_from_sym(sym);
 	if (param < 0)
 		goto free;
-	if (param_was_set(expr))
+	param_name = get_param_name_var_sym(name, sym);
+	if (!param_name)
 		goto free;
+	if (param_was_set_var_sym(name, sym))
+		modified = true;
 
-	snprintf(buf, sizeof(buf), "p %d", param);
+	snprintf(buf, sizeof(buf), "$%d%s%s", param, param_name + 1,
+		 modified ? " [m]" : "");
 	ret = alloc_string(buf);
 
 free:

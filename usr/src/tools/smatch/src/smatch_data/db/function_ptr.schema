@@ -1,1 +1,9 @@
-CREATE TABLE function_ptr (file varchar(128), function varchar(64), ptr varchar(256), searchable integer);
+CREATE TABLE function_ptr (
+	file varchar(128),
+	function varchar(64),
+	ptr varchar(256),
+	searchable integer,
+
+	CONSTRAINT function_ptr_constraint UNIQUE (file, function, ptr)
+);
+

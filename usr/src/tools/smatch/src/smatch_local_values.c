@@ -234,6 +234,7 @@ void register_local_values(int id)
 	if (!option_info)
 		return;
 
+	set_dynamic_states(my_id);
 	add_extra_mod_hook(&extra_mod_hook);
 	add_unmatched_state_hook(my_id, &unmatched_state);
 	add_merge_hook(my_id, &merge_estates);

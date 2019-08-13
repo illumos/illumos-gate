@@ -25,7 +25,7 @@ fi
 next=$(($i + 1))
 
 rm -f $DIR/$next
-rm $DIR/.${i}.swp
+rm -f $DIR/.${i}.swp
 smdb $* > $DIR/$i
 
 echo "$DIR/$i" > $DIR/cur

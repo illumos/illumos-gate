@@ -23,7 +23,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 LIBRARY =	libld.a
@@ -112,6 +112,10 @@ LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(LDDBGLIBDIR) $(LDDBG_LIB) \
 DYNFLAGS +=	$(VERSREF) $(CC_USE_PROTO) '-R$$ORIGIN'
 
 native:=	DYNFLAGS	+= $(CONVLIBDIR)
+
+# too hairy
+pics/sections32.o := SMATCH=off
+pics/sections64.o := SMATCH=off
 
 BLTDEFS =	msg.h
 BLTDATA =	msg.c

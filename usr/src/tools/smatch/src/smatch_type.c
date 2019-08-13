@@ -29,6 +29,8 @@ struct symbol *get_real_base_type(struct symbol *sym)
 
 	if (!sym)
 		return NULL;
+	if (sym->type == SYM_BASETYPE)
+		return sym;
 	ret = get_base_type(sym);
 	if (!ret)
 		return NULL;
@@ -74,6 +76,10 @@ static struct symbol *get_binop_type(struct expression *expr)
 	right = get_type(expr->right);
 	if (!right)
 		return NULL;
+
+	if (expr->op == '-' &&
+	    (is_ptr_type(left) && is_ptr_type(right)))
+		return ssize_t_ctype;
 
 	if (left->type == SYM_PTR || left->type == SYM_ARRAY)
 		return left;
@@ -269,6 +275,9 @@ static struct symbol *get_type_helper(struct expression *expr)
 	case EXPR_LOGICAL:
 		ret = &int_ctype;
 		break;
+	case EXPR_OFFSETOF:
+		ret = &ulong_ctype;
+		break;
 	default:
 		return NULL;
 	}
@@ -283,16 +292,10 @@ static struct symbol *get_type_helper(struct expression *expr)
 static struct symbol *get_final_type_helper(struct expression *expr)
 {
 	/*
-	 * I'm not totally positive I understand types...
-	 *
-	 * So, when you're doing pointer math, and you do a subtraction, then
-	 * the sval_binop() and whatever need to know the type of the pointer
-	 * so they can figure out the alignment.  But the result is going to be
-	 * and ssize_t.  So get_operation_type() gives you the pointer type
-	 * and get_type() gives you ssize_t.
-	 *
-	 * Most of the time the operation type and the final type are the same
-	 * but this just handles the few places where they are different.
+	 * The problem is that I wrote a bunch of Smatch to think that
+	 * you could do get_type() on an expression and it would give
+	 * you what the comparison was type promoted to.  This is wrong
+	 * but fixing it is a big of work...  Hence this horrible hack.
 	 *
 	 */
 
@@ -300,21 +303,8 @@ static struct symbol *get_final_type_helper(struct expression *expr)
 	if (!expr)
 		return NULL;
 
-	switch (expr->type) {
-	case EXPR_COMPARE:
+	if (expr->type == EXPR_COMPARE)
 		return &int_ctype;
-	case EXPR_BINOP: {
-		struct symbol *left, *right;
-
-		if (expr->op != '-')
-			return NULL;
-
-		left = get_type(expr->left);
-		right = get_type(expr->right);
-		if (type_is_ptr(left) || type_is_ptr(right))
-			return ssize_t_ctype;
-		}
-	}
 
 	return NULL;
 }
@@ -397,16 +387,7 @@ int returns_unsigned(struct symbol *sym)
 
 int is_pointer(struct expression *expr)
 {
-	struct symbol *sym;
-
-	sym = get_type(expr);
-	if (!sym)
-		return 0;
-	if (sym == &string_ctype)
-		return 0;
-	if (sym->type == SYM_PTR)
-		return 1;
-	return 0;
+	return type_is_ptr(get_type(expr));
 }
 
 int returns_pointer(struct symbol *sym)
@@ -442,7 +423,7 @@ sval_t sval_type_min(struct symbol *base_type)
 		base_type = &llong_ctype;
 	ret.type = base_type;
 
-	if (type_unsigned(base_type)) {
+	if (type_unsigned(base_type) || is_ptr_type(base_type)) {
 		ret.value = 0;
 		return ret;
 	}
@@ -604,7 +585,7 @@ static struct symbol *get_member_from_string(struct symbol_list *symbol_list, co
 
 	if (strncmp(name, ".", 1) == 0)
 		name += 1;
-	if (strncmp(name, "->", 2) == 0)
+	else if (strncmp(name, "->", 2) == 0)
 		name += 2;
 
 	FOR_EACH_PTR(symbol_list, tmp) {
@@ -619,10 +600,12 @@ static struct symbol *get_member_from_string(struct symbol_list *symbol_list, co
 		if (strcmp(tmp->ident->name, name) == 0)
 			return tmp;
 
-		chunk_len = strlen(tmp->ident->name);
+		chunk_len = tmp->ident->len;
 		if (strncmp(tmp->ident->name, name, chunk_len) == 0 &&
 		    (name[chunk_len] == '.' || name[chunk_len] == '-')) {
 			sub = get_real_base_type(tmp);
+			if (sub->type == SYM_PTR)
+				sub = get_real_base_type(sub);
 			return get_member_from_string(sub->symbol_list, name + chunk_len);
 		}
 
@@ -741,7 +724,7 @@ static int type_str_helper(char *buf, int size, struct symbol *type)
 		return snprintf(buf, size, "<unknown>");
 
 	if (type->type == SYM_BASETYPE) {
-		return snprintf(buf, size, base_type_str(type));
+		return snprintf(buf, size, "%s", base_type_str(type));
 	} else if (type->type == SYM_PTR) {
 		type = get_real_base_type(type);
 		n = type_str_helper(buf, size, type);
@@ -795,6 +778,8 @@ static int type_str_helper(char *buf, int size, struct symbol *type)
 		if (n > size)
 			return n;
 		return n + snprintf(buf + n, size - n, "}");
+	} else if (type->type == SYM_ENUM) {
+		return snprintf(buf, size, "enum %s", type->ident ? type->ident->name : "<unknown>");
 	} else {
 		return snprintf(buf, size, "<type %d>", type->type);
 	}

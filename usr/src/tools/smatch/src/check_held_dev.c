@@ -113,7 +113,7 @@ static void register_returns_held_funcs(void)
 		if (token_type(token) != TOKEN_IDENT)
 			return;
 		func = show_ident(token->ident);
-		return_implies_state(func, valid_ptr_min, valid_ptr_max,
+		return_implies_state_sval(func, valid_ptr_min_sval, valid_ptr_max_sval,
 				     &match_returns_held, NULL);
 		return_implies_state(func, 0, 0, &match_returns_null,
 					 NULL);

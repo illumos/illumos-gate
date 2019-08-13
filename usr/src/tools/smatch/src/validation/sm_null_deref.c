@@ -44,6 +44,7 @@ static void func (void)
  *
  * check-output-start
 sm_null_deref.c:18 func() error: potentially dereferencing uninitialized 'aa'.
+sm_null_deref.c:18 func() error: potentially dereferencing uninitialized 'aa'.
 sm_null_deref.c:23 func() error: we previously assumed 'a' could be null (see line 20)
 sm_null_deref.c:25 func() warn: variable dereferenced before check 'a' (see line 23)
 sm_null_deref.c:30 func() error: we previously assumed 'b' could be null (see line 25)

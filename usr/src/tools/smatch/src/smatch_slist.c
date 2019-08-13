@@ -96,9 +96,9 @@ int cmp_tracker(const struct sm_state *a, const struct sm_state *b)
 	if (!a)
 		return 1;
 
-	if (a->owner > b->owner)
-		return -1;
 	if (a->owner < b->owner)
+		return -1;
+	if (a->owner > b->owner)
 		return 1;
 
 	ret = strcmp(a->name, b->name);
@@ -119,38 +119,67 @@ int cmp_tracker(const struct sm_state *a, const struct sm_state *b)
 	return 0;
 }
 
-static int cmp_sm_states(const struct sm_state *a, const struct sm_state *b, int preserve)
+int *dynamic_states;
+void allocate_dynamic_states_array(int num_checks)
+{
+	dynamic_states = calloc(num_checks + 1, sizeof(int));
+}
+
+void set_dynamic_states(unsigned short owner)
+{
+	dynamic_states[owner] = true;
+}
+
+bool has_dynamic_states(unsigned short owner)
+{
+	if (owner >= num_checks)
+		return false;
+	return dynamic_states[owner];
+}
+
+static int cmp_possible_sm(const struct sm_state *a, const struct sm_state *b, int preserve)
 {
 	int ret;
 
-	ret = cmp_tracker(a, b);
-	if (ret)
-		return ret;
+	if (a == b)
+		return 0;
 
-	/* todo:  add hook for smatch_extra.c */
-	if (a->state > b->state)
-		return -1;
-	if (a->state < b->state)
-		return 1;
-	/* This is obviously a massive disgusting hack but we need to preserve
-	 * the unmerged states for smatch extra because we use them in
-	 * smatch_db.c.  Meanwhile if we preserve all the other unmerged states
-	 * then it uses a lot of memory and we don't use it.  Hence this hack.
-	 *
-	 * Also sometimes even just preserving every possible SMATCH_EXTRA state
-	 * takes too much resources so we have to cap that.  Capping is probably
-	 * not often a problem in real life.
-	 */
-	if (a->owner == SMATCH_EXTRA && preserve) {
-		if (a == b)
-			return 0;
-		if (a->merged == 1 && b->merged == 0)
+	if (!has_dynamic_states(a->owner)) {
+		if (a->state > b->state)
 			return -1;
-		if (a->merged == 0)
+		if (a->state < b->state)
 			return 1;
+		return 0;
 	}
 
-	return 0;
+	if (a->owner == SMATCH_EXTRA) {
+		/*
+		 * In Smatch extra you can have borrowed implications.
+		 *
+		 * FIXME: review how borrowed implications work and if they
+		 * are the best way.  See also smatch_implied.c.
+		 *
+		 */
+		ret = cmp_tracker(a, b);
+		if (ret)
+			return ret;
+
+		/*
+		 * We want to preserve leaf states.  They're use to split
+		 * returns in smatch_db.c.
+		 *
+		 */
+		if (preserve) {
+			if (a->merged && !b->merged)
+				return -1;
+			if (!a->merged)
+				return 1;
+		}
+	}
+	if (!a->state->name || !b->state->name)
+		return 0;
+
+	return strcmp(a->state->name, b->state->name);
 }
 
 struct sm_state *alloc_sm_state(int owner, const char *name,
@@ -169,7 +198,6 @@ struct sm_state *alloc_sm_state(int owner, const char *name,
 	sm_state->pool = NULL;
 	sm_state->left = NULL;
 	sm_state->right = NULL;
-	sm_state->nr_children = 1;
 	sm_state->possible = NULL;
 	add_ptr_list(&sm_state->possible, sm_state);
 	return sm_state;
@@ -197,14 +225,16 @@ void add_possible_sm(struct sm_state *to, struct sm_state *new)
 {
 	struct sm_state *tmp;
 	int preserve = 1;
+	int cmp;
 
 	if (too_many_possible(to))
 		preserve = 0;
 
 	FOR_EACH_PTR(to->possible, tmp) {
-		if (cmp_sm_states(tmp, new, preserve) < 0)
+		cmp = cmp_possible_sm(tmp, new, preserve);
+		if (cmp < 0)
 			continue;
-		else if (cmp_sm_states(tmp, new, preserve) == 0) {
+		else if (cmp == 0) {
 			return;
 		} else {
 			INSERT_CURRENT(new, tmp);
@@ -214,11 +244,27 @@ void add_possible_sm(struct sm_state *to, struct sm_state *new)
 	add_ptr_list(&to->possible, new);
 }
 
-static void copy_possibles(struct sm_state *to, struct sm_state *from)
+static void copy_possibles(struct sm_state *to, struct sm_state *one, struct sm_state *two)
 {
+	struct sm_state *large = one;
+	struct sm_state *small = two;
 	struct sm_state *tmp;
 
-	FOR_EACH_PTR(from->possible, tmp) {
+	/*
+	 * We spend a lot of time copying the possible lists.  I've tried to
+	 * optimize the process a bit.
+	 *
+	 */
+
+	if (ptr_list_size((struct ptr_list *)two->possible) >
+	    ptr_list_size((struct ptr_list *)one->possible)) {
+		large = two;
+		small = one;
+	}
+
+	to->possible = clone_slist(large->possible);
+	add_possible_sm(to, to);
+	FOR_EACH_PTR(small->possible, tmp) {
 		add_possible_sm(to, tmp);
 	} END_FOR_EACH_PTR(tmp);
 }
@@ -234,8 +280,13 @@ char *alloc_sname(const char *str)
 	return tmp;
 }
 
+static struct symbol *oom_func;
+static int oom_limit = 3000000;  /* Start with a 3GB limit */
 int out_of_memory(void)
 {
+	if (oom_func)
+		return 1;
+
 	/*
 	 * I decided to use 50M here based on trial and error.
 	 * It works out OK for the kernel and so it should work
@@ -243,6 +294,25 @@ int out_of_memory(void)
 	 */
 	if (sm_state_counter * sizeof(struct sm_state) >= 100000000)
 		return 1;
+
+	/*
+	 * We're reading from statm to figure out how much memory we
+	 * are using.  The problem is that at the end of the function
+	 * we release the memory, so that it can be re-used but it
+	 * stays in cache, it's not released to the OS.  So then if
+	 * we allocate memory for different purposes we can easily
+	 * hit the 3GB limit on the next function, so that's why I give
+	 * the next function an extra 100MB to work with.
+	 *
+	 */
+	if (get_mem_kb() > oom_limit) {
+		oom_func = cur_func_sym;
+		final_pass++;
+		sm_perror("OOM: %luKb sm_state_count = %d", get_mem_kb(), sm_state_counter);
+		final_pass--;
+		return 1;
+	}
+
 	return 0;
 }
 
@@ -297,6 +367,10 @@ void free_every_single_sm_state(void)
 
 	free_stack_and_strees(&all_pools);
 	sm_state_counter = 0;
+	if (oom_func) {
+		oom_limit += 100000;
+		oom_func = NULL;
+	}
 }
 
 unsigned long get_pool_count(void)
@@ -316,7 +390,6 @@ struct sm_state *clone_sm(struct sm_state *s)
 	ret->possible = clone_slist(s->possible);
 	ret->left = s->left;
 	ret->right = s->right;
-	ret->nr_children = s->nr_children;
 	return ret;
 }
 
@@ -394,9 +467,8 @@ struct sm_state *merge_sm_states(struct sm_state *one, struct sm_state *two)
 	result->merged = 1;
 	result->left = one;
 	result->right = two;
-	result->nr_children = one->nr_children + two->nr_children;
-	copy_possibles(result, one);
-	copy_possibles(result, two);
+
+	copy_possibles(result, one, two);
 
 	/*
 	 * The ->line information is used by deref_check where we complain about
@@ -718,7 +790,7 @@ static void __merge_stree(struct stree **to, struct stree *stree, int add_pool)
 	struct stree *implied_two = NULL;
 	AvlIter one_iter;
 	AvlIter two_iter;
-	struct sm_state *tmp_sm;
+	struct sm_state *one, *two, *res;
 
 	if (out_of_memory())
 		return;
@@ -761,28 +833,30 @@ static void __merge_stree(struct stree **to, struct stree *stree, int add_pool)
 	for (;;) {
 		if (!one_iter.sm || !two_iter.sm)
 			break;
-		if (cmp_tracker(one_iter.sm, two_iter.sm) < 0) {
-			sm_perror(" in %s", __func__);
-			avl_iter_next(&one_iter);
-		} else if (cmp_tracker(one_iter.sm, two_iter.sm) == 0) {
-			if (add_pool && one_iter.sm != two_iter.sm) {
-				one_iter.sm->pool = implied_one;
-				if (implied_one->base_stree)
-					one_iter.sm->pool = implied_one->base_stree;
-				two_iter.sm->pool = implied_two;
-				if (implied_two->base_stree)
-					two_iter.sm->pool = implied_two->base_stree;
-			}
-			tmp_sm = merge_sm_states(one_iter.sm, two_iter.sm);
-			add_possible_sm(tmp_sm, one_iter.sm);
-			add_possible_sm(tmp_sm, two_iter.sm);
-			avl_insert(&results, tmp_sm);
-			avl_iter_next(&one_iter);
-			avl_iter_next(&two_iter);
-		} else {
-			sm_perror(" in %s", __func__);
-			avl_iter_next(&two_iter);
+
+		one = one_iter.sm;
+		two = two_iter.sm;
+
+		if (one == two) {
+			avl_insert(&results, one);
+			goto next;
 		}
+
+		if (add_pool) {
+			one->pool = implied_one;
+			if (implied_one->base_stree)
+				one->pool = implied_one->base_stree;
+			two->pool = implied_two;
+			if (implied_two->base_stree)
+				two->pool = implied_two->base_stree;
+		}
+		res = merge_sm_states(one, two);
+		add_possible_sm(res, one);
+		add_possible_sm(res, two);
+		avl_insert(&results, res);
+next:
+		avl_iter_next(&one_iter);
+		avl_iter_next(&two_iter);
 	}
 
 	free_stree(to);

@@ -30,6 +30,7 @@ struct data_info {
 	struct range_list *value_ranges;
 	sval_t fuzzy_max;
 	unsigned int hard_max:1;
+	unsigned int capped:1;
 };
 DECLARE_ALLOCATOR(data_info);
 
@@ -41,10 +42,12 @@ struct range_list *rl_one(void);
 char *show_rl(struct range_list *list);
 int str_to_comparison_arg(const char *c, struct expression *call, int *comparison, struct expression **arg);
 void str_to_rl(struct symbol *type, char *value, struct range_list **rl);
-void call_results_to_rl(struct expression *call, struct symbol *type, char *value, struct range_list **rl);
+void call_results_to_rl(struct expression *call, struct symbol *type, const char *value, struct range_list **rl);
 
 struct data_range *alloc_range(sval_t min, sval_t max);
 struct data_range *alloc_range_perm(sval_t min, sval_t max);
+
+int rl_fits_in_type(struct range_list *rl, struct symbol *type);
 
 struct range_list *alloc_rl(sval_t min, sval_t max);
 struct range_list *clone_rl(struct range_list *list);
@@ -72,6 +75,7 @@ int ranges_equiv(struct data_range *one, struct data_range *two);
 
 int rl_equiv(struct range_list *one, struct range_list *two);
 int is_whole_rl(struct range_list *rl);
+int is_unknown_ptr(struct range_list *rl);
 int is_whole_rl_non_zero(struct range_list *rl);
 int estate_is_unknown(struct smatch_state *state);
 
@@ -80,7 +84,6 @@ sval_t rl_max(struct range_list *rl);
 int rl_to_sval(struct range_list *rl, sval_t *sval);
 struct symbol *rl_type(struct range_list *rl);
 
-struct range_list *rl_invert(struct range_list *orig);
 struct range_list *rl_filter(struct range_list *rl, struct range_list *filter);
 struct range_list *rl_intersection(struct range_list *one, struct range_list *two);
 struct range_list *rl_union(struct range_list *one, struct range_list *two);
@@ -117,6 +120,7 @@ struct smatch_state *alloc_estate_rl(struct range_list *rl);
 struct smatch_state *alloc_estate_whole(struct symbol *type);
 struct smatch_state *clone_estate(struct smatch_state *state);
 struct smatch_state *clone_estate_cast(struct symbol *type, struct smatch_state *state);
+struct smatch_state *clone_partial_estate(struct smatch_state *state, struct range_list *rl);
 
 struct smatch_state *merge_estates(struct smatch_state *s1, struct smatch_state *s2);
 
@@ -140,12 +144,13 @@ int estate_has_hard_max(struct smatch_state *state);
 void estate_set_hard_max(struct smatch_state *state);
 void estate_clear_hard_max(struct smatch_state *state);
 int estate_get_hard_max(struct smatch_state *state, sval_t *sval);
+bool estate_capped(struct smatch_state *state);
+void estate_set_capped(struct smatch_state *state);
 
 int estate_get_single_value(struct smatch_state *state, sval_t *sval);
 struct smatch_state *get_implied_estate(struct expression *expr);
 
 struct smatch_state *estate_filter_sval(struct smatch_state *orig, sval_t filter);
-struct smatch_state *estate_filter_range(struct smatch_state *orig, sval_t filter_min, sval_t filter_max);
 struct data_info *clone_dinfo_perm(struct data_info *dinfo);
 struct smatch_state *clone_estate_perm(struct smatch_state *state);
 

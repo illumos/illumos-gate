@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright (c) 2011 Bayard G. Bell. All rights reserved.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 # This makefile drives the production of the emlxs driver kernel module.
 #
@@ -36,7 +36,6 @@ COMMON_BASE	= ../../../common
 #
 MODULE		= emlxs
 OBJECTS		= $(EMLXS_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(EMLXS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/fibre-channel/fca/emlxs
 
@@ -50,7 +49,6 @@ include ../Makefile.$(ARCHDIR)
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 EMLXS_FLAGS             = -DEMLXS_I386
@@ -60,7 +58,6 @@ EMLXS_FLAGS             += -DMACH=\"$(MACH)\"
 EMLXS_CFLAGS            = $(EMLXS_FLAGS)
 EMLXS_LFLAGS            = $(EMLXS_FLAGS)
 CFLAGS	                += $(EMLXS_CFLAGS) -DEMLXS_ARCH=\"$(CLASS)\"
-LINTTAGS                += $(EMLXS_LFLAGS) -DEMLXS_ARCH=\"$(CLASS)\"
 
 
 #
@@ -82,21 +79,12 @@ INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/ulp
 LDFLAGS		+= -dy -Nmisc/md5 -Nmisc/sha1
 LDFLAGS		+= -Nmisc/bignum -Nmisc/fctl
 
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-#
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_INCONS_VAL_TYPE_DECL2
-
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-uninitialized
 
-SMOFF += indenting,deref_check,all_func_returns
+# needs work
+SMOFF += indenting,deref_check,all_func_returns,index_overflow
 
 # seems definitely wrong
 $(OBJS_DIR)/emlxs_fcf.o := SMOFF += logical_instead_of_bitwise
@@ -113,12 +101,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

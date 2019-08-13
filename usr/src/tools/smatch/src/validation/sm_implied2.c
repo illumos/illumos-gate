@@ -37,5 +37,6 @@ void func (void)
  *
  * check-output-start
 sm_implied2.c:28 func() error: potentially dereferencing uninitialized 'aa'.
+sm_implied2.c:28 func() error: potentially dereferencing uninitialized 'aa'.
  * check-output-end
  */

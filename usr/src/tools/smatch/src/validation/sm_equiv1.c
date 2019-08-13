@@ -30,11 +30,11 @@ int func(void)
  * check-output-start
 sm_equiv1.c:13 func() one = 1
 sm_equiv1.c:14 func() two = 1
-sm_equiv1.c:16 func() one = s64min-s64max
-sm_equiv1.c:17 func() two = s64min-s64max
+sm_equiv1.c:16 func() one = 0-u64max
+sm_equiv1.c:17 func() two = 0-u64max
 sm_equiv1.c:19 func() one = 2
 sm_equiv1.c:20 func() two = 2
-sm_equiv1.c:22 func() one = s64min-s64max
-sm_equiv1.c:23 func() two = s64min-s64max
+sm_equiv1.c:22 func() one = 0-u64max
+sm_equiv1.c:23 func() two = 0-u64max
  * check-output-end
  */

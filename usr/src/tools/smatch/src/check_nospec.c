@@ -96,6 +96,7 @@ static void struct_member_callback(struct expression *call, int param, char *pri
 
 static void returned_struct_members(int return_id, char *return_ranges, struct expression *expr)
 {
+	struct stree *start_states = get_start_states();
 	struct symbol *returned_sym;
 	struct sm_state *sm;
 	const char *param_name;
@@ -105,6 +106,8 @@ static void returned_struct_members(int return_id, char *return_ranges, struct e
 	returned_sym = expr_to_sym(expr);
 
 	FOR_EACH_MY_SM(my_id, __get_cur_stree(), sm) {
+		if (get_state_stree(start_states, my_id, sm->name, sm->sym) == sm->state)
+			continue;
 		param = get_param_num_from_sym(sm->sym);
 		if (param < 0) {
 			if (!returned_sym || returned_sym != sm->sym)
@@ -222,7 +225,8 @@ static void match_barrier(struct statement *stmt)
 		return;
 	if (strcmp(macro, "rmb") != 0 &&
 	    strcmp(macro, "smp_rmb") != 0 &&
-	    strcmp(macro, "barrier_nospec") != 0)
+	    strcmp(macro, "barrier_nospec") != 0 &&
+	    strcmp(macro, "preempt_disable") != 0)
 		return;
 
 	set_state(barrier_id, "barrier", NULL, &nospec);
@@ -232,6 +236,15 @@ static void match_barrier(struct statement *stmt)
 static void db_returns_barrier(struct expression *expr, int param, char *key, char *value)
 {
 	mark_user_data_as_nospec();
+}
+
+static void select_return_stmt_cnt(struct expression *expr, int param, char *key, char *value)
+{
+	int cnt;
+
+	cnt = atoi(value);
+	if (cnt > 400)
+		mark_user_data_as_nospec();
 }
 
 void check_nospec(int id)
@@ -248,6 +261,7 @@ void check_nospec(int id)
 	add_split_return_callback(&returned_struct_members);
 	select_return_states_hook(NOSPEC, &db_returns_nospec);
 	select_return_states_hook(NOSPEC_WB, &db_returns_barrier);
+	select_return_states_hook(STMT_CNT, &select_return_stmt_cnt);
 
 	add_hook(&match_asm, ASM_HOOK);
 	add_hook(&match_after_nospec_asm, STMT_HOOK_AFTER);

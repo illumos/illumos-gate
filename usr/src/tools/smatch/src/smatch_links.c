@@ -102,6 +102,7 @@ void set_up_link_functions(int id, int link_id)
 	if (id + 1 != link_id)
 		sm_fatal("FATAL ERROR: links need to be registered directly after the check");
 
+	set_dynamic_states(link_id);
 	add_merge_hook(link_id, &merge_link_states);
 	add_modification_hook(link_id, &match_link_modify);
 	// free link at the end of function

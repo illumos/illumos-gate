@@ -11,6 +11,7 @@
 
 #
 # Copyright 2017 Toomas Soome <tsoome@me.com>
+# Copyright 2019 Joyent, Inc.
 #
 
 # loader.help build needs better awk
@@ -52,6 +53,10 @@ CFLAGS +=	$(CCNOAUTOINLINE) $(CCNOREORDER) $(CSTD_GNU99)
 CCASFLAGS=	-fPIC -Wa,--divide
 ASFLAGS=	--divide
 
+SMATCH_ =
+SMATCH_on =
+SMATCH_off = -_smatch=off
+
 # smatch does not define __amd64 and __amd64__
 SMATCH_amd64=	-_smatch=-D__amd64 -_smatch=-D__amd64__
 
@@ -59,6 +64,8 @@ SMATCH_amd64=	-_smatch=-D__amd64 -_smatch=-D__amd64__
 #CFLAGS +=	$(SMATCH_ARGS:%=-_smatch=%)
 CFLAGS +=	$(SMOFF:%=-_smatch=--disable=%)
 CFLAGS +=	$(SMATCH_$(MACHINE))
+CFLAGS +=	$(SMATCH_$(SMATCH))
+CFLAGS +=	-_smatch=--timeout=0
 
 COMPILE.S=	$(CC) $(SMATCH_off) $(CCASFLAGS) $(CPPFLAGS) -c
 

@@ -79,6 +79,7 @@ void check_snprintf(int id)
 		return;
 
 	my_id = id;
+	set_dynamic_states(my_id);
 	add_hook(&match_call, FUNCTION_CALL_HOOK);
 	add_function_assign_hook("snprintf", &match_snprintf, NULL);
 	add_modification_hook(my_id, &ok_to_use);

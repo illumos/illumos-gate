@@ -74,15 +74,48 @@ static int next_line_checks_IS_ERR(struct expression *call, struct expression *a
 	return expr_equiv(next, arg);
 }
 
+static int is_non_zero_int(struct range_list *rl)
+{
+	struct data_range *tmp;
+	int cnt = -1;
+
+	FOR_EACH_PTR(rl, tmp) {
+		cnt++;
+
+		if (cnt == 0) {
+			if (tmp->min.value == INT_MIN &&
+			    tmp->max.value == -1)
+				continue;
+		} else if (cnt == 1) {
+			if (tmp->min.value == 1 &&
+			    tmp->max.value == INT_MAX)
+				return 1;
+		}
+		return 0;
+	} END_FOR_EACH_PTR(tmp);
+	return 0;
+}
+
 static int is_valid_ptr(sval_t sval)
 {
-	if (sval.type == &int_ctype &&
-	    (sval.value == INT_MIN || sval.value == INT_MAX))
+	if (sval.value == INT_MIN || sval.value == INT_MAX)
 		return 0;
 
 	if (sval_cmp(valid_ptr_min_sval, sval) <= 0 &&
-	    sval_cmp(valid_ptr_max_sval, sval) >= 0)
+	    sval_cmp(valid_ptr_max_sval, sval) >= 0) {
 		return 1;
+	}
+	return 0;
+}
+
+static int has_distinct_zero(struct range_list *rl)
+{
+	struct data_range *tmp;
+
+	FOR_EACH_PTR(rl, tmp) {
+		if (tmp->min.value == 0 || tmp->max.value == 0)
+			return 1;
+	} END_FOR_EACH_PTR(tmp);
 	return 0;
 }
 
@@ -90,7 +123,9 @@ static void match_err_ptr(const char *fn, struct expression *expr, void *data)
 {
 	struct expression *arg_expr;
 	struct sm_state *sm, *tmp;
-	sval_t sval;
+
+	if (is_impossible_path())
+		return;
 
 	arg_expr = get_argument_from_call_expr(expr->args, 0);
 	sm = get_sm_state_expr(SMATCH_EXTRA, arg_expr);
@@ -109,17 +144,19 @@ static void match_err_ptr(const char *fn, struct expression *expr, void *data)
 	FOR_EACH_PTR(sm->possible, tmp) {
 		if (!estate_rl(tmp->state))
 			continue;
+		if (is_non_zero_int(estate_rl(tmp->state)))
+			continue;
+		if (has_distinct_zero(estate_rl(tmp->state))) {
+			sm_warning("passing zero to '%s'", fn);
+			return;
+		}
+		if (strcmp(fn, "PTR_ERR") != 0)
+			continue;
 		if (is_valid_ptr(estate_min(tmp->state)) &&
 		    is_valid_ptr(estate_max(tmp->state))) {
 			sm_warning("passing a valid pointer to '%s'", fn);
 			return;
 		}
-		if (!rl_to_sval(estate_rl(tmp->state), &sval))
-			continue;
-		if (sval.value != 0)
-			continue;
-		sm_warning("passing zero to '%s'", fn);
-		return;
 	} END_FOR_EACH_PTR(tmp);
 }
 

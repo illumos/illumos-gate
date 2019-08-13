@@ -16,8 +16,39 @@
  */
 
 #include "smatch.h"
+#include "smatch_extra.h"
 
 static int my_id;
+
+static void match_shift_mask(struct expression *expr)
+{
+	struct expression *right, *shifter;
+	struct range_list *rl;
+	char *str;
+
+	expr = strip_expr(expr);
+	if (expr->type != EXPR_BINOP || expr->op != '&')
+		return;
+
+	if (get_type(expr->left) != &ullong_ctype)
+		return;
+
+	if (type_bits(get_type(expr->right)) == 64)
+		return;
+
+	right = strip_expr(expr->right);
+	if (right->type != EXPR_BINOP || right->op != SPECIAL_LEFTSHIFT)
+		return;
+
+	shifter = strip_expr(right->right);
+	get_real_absolute_rl(shifter, &rl);
+	if (rl_max(rl).uvalue < 32)
+		return;
+
+	str = expr_to_str(expr->right);
+	sm_warning("should '%s' be a 64 bit type?", str);
+	free_string(str);
+}
 
 static void match_shift_assignment(struct expression *expr)
 {
@@ -63,4 +94,5 @@ void check_64bit_shift(int id)
 	my_id = id;
 
 	add_hook(&match_shift_assignment, ASSIGNMENT_HOOK);
+	add_hook(&match_shift_mask, BINOP_HOOK);
 }

@@ -149,6 +149,9 @@ $(OBJS_DIR)/fmsmb.o := SMOFF += indenting
 $(OBJS_DIR)/zutil.o := SMOFF += indenting
 $(OBJS_DIR)/bootrd_cpio.o := SMOFF += allocating_enough_data
 
+# too hairy
+$(OBJS_DIR)/inflate.o := SMATCH=off
+
 #
 #	Default build targets.
 #

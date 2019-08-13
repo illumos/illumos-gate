@@ -11,6 +11,7 @@
 
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -84,6 +85,9 @@ OBJS += uuid_create_nil.o uuid_equal.o uuid_from_string.o uuid_is_nil.o \
 _bzlib.o _crctable.o _decompress.o _huffman.o _randtable.o bzipfs.o \
 := CFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
 SRCS +=	libstand_bzlib_private.h
+
+# too hairy
+_inflate.o := SMATCH=off
 
 SRCS +=	_bzlib.c _crctable.c _decompress.c _huffman.c _randtable.c
 OBJS +=	_bzlib.o _crctable.o _decompress.o _huffman.o _randtable.o

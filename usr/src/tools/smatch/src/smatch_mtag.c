@@ -50,20 +50,6 @@
 
 static int my_id;
 
-static struct smatch_state *alloc_tag_state(mtag_t tag)
-{
-	struct smatch_state *state;
-	char buf[64];
-
-	state = __alloc_smatch_state(0);
-	snprintf(buf, sizeof(buf), "%lld", tag);
-	state->name = alloc_sname(buf);
-	state->data = malloc(sizeof(mtag_t));
-	*(mtag_t *)state->data = tag;
-
-	return state;
-}
-
 static mtag_t str_to_tag(const char *str)
 {
 	unsigned char c[MD5_DIGEST_LENGTH];
@@ -82,40 +68,84 @@ static mtag_t str_to_tag(const char *str)
 	return *tag;
 }
 
-static void alloc_assign(const char *fn, struct expression *expr, void *unused)
+const struct {
+	const char *name;
+	int size_arg;
+} allocator_info[] = {
+	{ "kmalloc", 0 },
+	{ "kzalloc", 0 },
+	{ "devm_kmalloc", 1},
+	{ "devm_kzalloc", 1},
+};
+
+static bool is_mtag_call(struct expression *expr)
+{
+	struct expression *arg;
+	int i;
+	sval_t sval;
+
+	if (expr->type != EXPR_CALL ||
+	    expr->fn->type != EXPR_SYMBOL ||
+	    !expr->fn->symbol)
+		return false;
+
+	for (i = 0; i < ARRAY_SIZE(allocator_info); i++) {
+		if (strcmp(expr->fn->symbol->ident->name, allocator_info[i].name) == 0)
+			break;
+	}
+	if (i == ARRAY_SIZE(allocator_info))
+		return false;
+
+	arg = get_argument_from_call_expr(expr->args, allocator_info[i].size_arg);
+	if (!get_implied_value(arg, &sval))
+		return false;
+
+	return true;
+}
+
+struct smatch_state *swap_mtag_return(struct expression *expr, struct smatch_state *state)
 {
 	struct expression *left, *right;
 	char *left_name, *right_name;
 	struct symbol *left_sym;
+	struct range_list *rl;
 	char buf[256];
 	mtag_t tag;
+	sval_t tag_sval;
 
+	if (!expr || expr->type != EXPR_ASSIGNMENT || expr->op != '=')
+		return state;
 
-	// FIXME:  This should only happen when the size is not a paramter of
-	// the caller
-	return;
+	if (!estate_rl(state) || strcmp(state->name, "0,4096-ptr_max") != 0)
+		return state;
 
-	if (expr->type != EXPR_ASSIGNMENT || expr->op != '=')
-		return;
 	left = strip_expr(expr->left);
 	right = strip_expr(expr->right);
-	if (right->type != EXPR_CALL || right->fn->type != EXPR_SYMBOL)
-		return;
+
+	if (!is_mtag_call(right))
+		return state;
 
 	left_name = expr_to_str_sym(left, &left_sym);
+	if (!left_name || !left_sym)
+		return state;
 	right_name = expr_to_str(right);
 
 	snprintf(buf, sizeof(buf), "%s %s %s %s", get_filename(), get_function(),
 		 left_name, right_name);
 	tag = str_to_tag(buf);
+	tag_sval.type = estate_type(state);
+	tag_sval.uvalue = tag;
 
-	sql_insert_mtag_about(tag, left_name, right_name);
+	rl = rl_filter(estate_rl(state), valid_ptr_rl);
+	rl = clone_rl(rl);
+	add_range(&rl, tag_sval, tag_sval);
 
-	if (left_name && left_sym)
-		set_state(my_id, left_name, left_sym, alloc_tag_state(tag));
+	sql_insert_mtag_about(tag, left_name, buf);
 
 	free_string(left_name);
 	free_string(right_name);
+
+	return alloc_estate_rl(rl);
 }
 
 int get_string_mtag(struct expression *expr, mtag_t *tag)
@@ -151,31 +181,23 @@ int get_toplevel_mtag(struct symbol *sym, mtag_t *tag)
 	return 1;
 }
 
-int get_deref_mtag(struct expression *expr, mtag_t *tag)
+bool get_symbol_mtag(struct symbol *sym, mtag_t *tag)
 {
-	mtag_t container_tag, member_tag;
-	int offset;
+	char buf[256];
 
-	/*
-	 * I'm not totally sure what I'm doing...
-	 *
-	 * This is supposed to get something like "global_var->ptr", but I don't
-	 * feel like it's complete at all.
-	 *
-	 */
+	if (!sym || !sym->ident)
+		return false;
 
-	if (!get_mtag(expr->unop, &container_tag))
-		return 0;
+	if (get_toplevel_mtag(sym, tag))
+		return true;
 
-	offset = get_member_offset_from_deref(expr);
-	if (offset < 0)
-		return 0;
+	if (get_param_num_from_sym(sym) >= 0)
+		return false;
 
-	if (!mtag_map_select_tag(container_tag, -offset, &member_tag))
-		return 0;
-
-	*tag = member_tag;
-	return 1;
+	snprintf(buf, sizeof(buf), "%s %s %s",
+		 get_filename(), get_function(), sym->ident->name);
+	*tag = str_to_tag(buf);
+	return true;
 }
 
 static void global_variable(struct symbol *sym)
@@ -190,87 +212,12 @@ static void global_variable(struct symbol *sym)
 			      (sym->ctype.modifiers & MOD_STATIC) ? get_filename() : "extern");
 }
 
-static void db_returns_buf_size(struct expression *expr, int param, char *unused, char *math)
-{
-	struct expression *call;
-	struct range_list *rl;
-
-	if (expr->type != EXPR_ASSIGNMENT)
-		return;
-	call = strip_expr(expr->right);
-
-	if (!parse_call_math_rl(call, math, &rl))
-		return;
-//	rl = cast_rl(&int_ctype, rl);
-//	set_state_expr(my_size_id, expr->left, alloc_estate_rl(rl));
-}
-
-static void db_returns_memory_tag(struct expression *expr, int param, char *key, char *value)
-{
-	struct expression *call, *arg;
-	mtag_t tag, alias;
-	char *name;
-	struct symbol *sym;
-
-	call = strip_expr(expr);
-	while (call->type == EXPR_ASSIGNMENT)
-		call = strip_expr(call->right);
-	if (call->type != EXPR_CALL)
-		return;
-
-	tag = strtoul(value, NULL, 10);
-
-	if (!create_mtag_alias(tag, call, &alias))
-		return;
-
-	arg = get_argument_from_call_expr(call->args, param);
-	if (!arg)
-		return;
-
-	name = get_variable_from_key(arg, key, &sym);
-	if (!name || !sym)
-		goto free;
-
-	set_state(my_id, name, sym, alloc_tag_state(alias));
-free:
-	free_string(name);
-}
-
-static void match_call_info(struct expression *expr)
-{
-	struct smatch_state *state;
-	struct expression *arg;
-	int i = -1;
-
-	FOR_EACH_PTR(expr->args, arg) {
-		i++;
-		state = get_state_expr(my_id, arg);
-		if (!state || !state->data)
-			continue;
-		sql_insert_caller_info(expr, MEMORY_TAG, i, "$", state->name);
-	} END_FOR_EACH_PTR(arg);
-}
-
-static void save_caller_info(const char *name, struct symbol *sym, char *key, char *value)
-{
-	struct smatch_state *state;
-	char fullname[256];
-	mtag_t tag;
-
-	if (strncmp(key, "$", 1) != 0)
-		return;
-
-	tag = atoll(value);
-	snprintf(fullname, 256, "%s%s", name, key + 1);
-	state = alloc_tag_state(tag);
-	set_state(my_id, fullname, sym, state);
-}
-
 static int get_array_mtag_offset(struct expression *expr, mtag_t *tag, int *offset)
 {
 	struct expression *array, *offset_expr;
 	struct symbol *type;
 	sval_t sval;
+	int start_offset;
 
 	if (!is_array(expr))
 		return 0;
@@ -285,107 +232,35 @@ static int get_array_mtag_offset(struct expression *expr, mtag_t *tag, int *offs
 	if (!type_bytes(type))
 		return 0;
 
-	if (!get_mtag(array, tag))
+	if (!expr_to_mtag_offset(array, tag, &start_offset))
 		return 0;
 
 	offset_expr = get_array_offset(expr);
 	if (!get_value(offset_expr, &sval))
 		return 0;
-	*offset = sval.value * type_bytes(type);
+	*offset = start_offset + sval.value * type_bytes(type);
 
 	return 1;
 }
 
-static int get_implied_mtag_offset(struct expression *expr, mtag_t *tag, int *offset)
+struct range_list *swap_mtag_seed(struct expression *expr, struct range_list *rl)
 {
-	struct smatch_state *state;
-	struct symbol *type;
+	char buf[256];
+	char *name;
 	sval_t sval;
+	mtag_t tag;
 
-	type = get_type(expr);
-	if (!type_is_ptr(type))
-		return 0;
-	state = get_extra_state(expr);
-	if (!state || !estate_get_single_value(state, &sval) || sval.value == 0)
-		return 0;
+	if (!rl_to_sval(rl, &sval))
+		return rl;
+	if (sval.type->type != SYM_PTR || sval.uvalue != MTAG_SEED)
+		return rl;
 
-	*tag = sval.uvalue & ~MTAG_OFFSET_MASK;
-	*offset = sval.uvalue & MTAG_OFFSET_MASK;
-	return 1;
-}
-
-static int get_mtag_cnt;
-int get_mtag(struct expression *expr, mtag_t *tag)
-{
-	struct smatch_state *state;
-	int ret = 0;
-
-	expr = strip_expr(expr);
-	if (!expr)
-		return 0;
-
-	if (get_mtag_cnt > 0)
-		return 0;
-
-	get_mtag_cnt++;
-
-	switch (expr->type) {
-	case EXPR_STRING:
-		if (get_string_mtag(expr, tag)) {
-			ret = 1;
-			goto dec_cnt;
-		}
-		break;
-	case EXPR_SYMBOL:
-		if (get_toplevel_mtag(expr->symbol, tag)) {
-			ret = 1;
-			goto dec_cnt;
-		}
-		break;
-	case EXPR_DEREF:
-		if (get_deref_mtag(expr, tag)) {
-			ret = 1;
-			goto dec_cnt;
-		}
-		break;
-	}
-
-	state = get_state_expr(my_id, expr);
-	if (!state)
-		goto dec_cnt;
-	if (state->data) {
-		*tag = *(mtag_t *)state->data;
-		ret = 1;
-		goto dec_cnt;
-	}
-
-dec_cnt:
-	get_mtag_cnt--;
-	return ret;
-}
-
-int get_mtag_offset(struct expression *expr, mtag_t *tag, int *offset)
-{
-	int val;
-
-	if (!expr)
-		return 0;
-	if (expr->type == EXPR_PREOP && expr->op == '*')
-		return get_mtag_offset(expr->unop, tag, offset);
-	if (get_implied_mtag_offset(expr, tag, offset))
-		return 1;
-	if (!get_mtag(expr, tag))
-		return 0;
-	expr = strip_expr(expr);
-	if (expr->type == EXPR_SYMBOL) {
-		*offset = 0;
-		return 1;
-	}
-	val = get_member_offset_from_deref(expr);
-	if (val < 0)
-		return 0;
-	*offset = val;
-	return 1;
+	name = expr_to_str(expr);
+	snprintf(buf, sizeof(buf), "%s %s %s", get_filename(), get_function(), name);
+	free_string(name);
+	tag = str_to_tag(buf);
+	sval.value = tag;
+	return alloc_rl(sval, sval);
 }
 
 int create_mtag_alias(mtag_t tag, struct expression *expr, mtag_t *new)
@@ -415,9 +290,44 @@ int create_mtag_alias(mtag_t tag, struct expression *expr, mtag_t *new)
 	return 1;
 }
 
+static int get_implied_mtag_offset(struct expression *expr, mtag_t *tag, int *offset)
+{
+	struct smatch_state *state;
+	struct symbol *type;
+	sval_t sval;
+
+	type = get_type(expr);
+	if (!type_is_ptr(type))
+		return 0;
+	state = get_extra_state(expr);
+	if (!state || !estate_get_single_value(state, &sval) || sval.value == 0)
+		return 0;
+
+	*tag = sval.uvalue & ~MTAG_OFFSET_MASK;
+	*offset = sval.uvalue & MTAG_OFFSET_MASK;
+	return 1;
+}
+
+/*
+ * The point of this function is to give you the mtag and the offset so
+ * you can look up the data in the DB.  It takes an expression.
+ *
+ * So say you give it "foo->bar".  Then it would give you the offset of "bar"
+ * and the implied value of "foo".  Or if you lookup "*foo" then the offset is
+ * zero and we look up the implied value of "foo.  But if the expression is
+ * foo, then if "foo" is a global variable, then we get the mtag and the offset
+ * is zero.  If "foo" is a local variable, then there is nothing to look up in
+ * the mtag_data table because that's handled by smatch_extra.c to this returns
+ * false.
+ *
+ */
 int expr_to_mtag_offset(struct expression *expr, mtag_t *tag, int *offset)
 {
+	*tag = 0;
 	*offset = 0;
+
+	if (bits_in_pointer != 64)
+		return 0;
 
 	expr = strip_expr(expr);
 	if (!expr)
@@ -426,19 +336,54 @@ int expr_to_mtag_offset(struct expression *expr, mtag_t *tag, int *offset)
 	if (is_array(expr))
 		return get_array_mtag_offset(expr, tag, offset);
 
-	if (expr->type ==  EXPR_DEREF) {
-		*offset = get_member_offset_from_deref(expr);
-		if (*offset < 0)
+	if (expr->type == EXPR_PREOP && expr->op == '*') {
+		expr = strip_expr(expr->unop);
+		return get_implied_mtag_offset(expr, tag, offset);
+	} else if (expr->type == EXPR_DEREF) {
+		int tmp, tmp_offset = 0;
+
+		while (expr->type == EXPR_DEREF) {
+			tmp = get_member_offset_from_deref(expr);
+			if (tmp < 0)
+				return 0;
+			tmp_offset += tmp;
+			expr = expr->deref;
+		}
+		*offset = tmp_offset;
+		if (expr->type == EXPR_PREOP && expr->op == '*') {
+			expr = strip_expr(expr->unop);
+
+			if (get_implied_mtag_offset(expr, tag, &tmp_offset)) {
+				// FIXME:  look it up recursively?
+				if (tmp_offset)
+					return 0;
+				return 1;
+			}
 			return 0;
-		return get_mtag(expr->deref, tag);
+		} else if (expr->type == EXPR_SYMBOL) {
+			return get_symbol_mtag(expr->symbol, tag);
+		}
+		return 0;
+	} else if (expr->type == EXPR_SYMBOL) {
+		return get_symbol_mtag(expr->symbol, tag);
 	}
-
-	if (get_implied_mtag_offset(expr, tag, offset))
-		return 1;
-
-	return get_mtag(expr, tag);
+	return 0;
 }
 
+/*
+ * This function takes an address and returns an sval.  Let's take some
+ * example things you might pass to it:
+ * foo->bar:
+ *   If we were only called from smatch_math, we wouldn't need to bother with
+ *   this because it's already been looked up in smatch_extra.c but this is
+ *   also called from other places so we have to check smatch_extra.c.
+ * &foo
+ *   If "foo" is global return the mtag for "foo".
+ * &foo.bar
+ *   If "foo" is global return the mtag for "foo" + the offset of ".bar".
+ * It also handles string literals.
+ *
+ */
 int get_mtag_sval(struct expression *expr, sval_t *sval)
 {
 	struct symbol *type;
@@ -454,79 +399,41 @@ int get_mtag_sval(struct expression *expr, sval_t *sval)
 	if (!type_is_ptr(type))
 		return 0;
 	/*
-	 * There are only three options:
+	 * There are several options:
 	 *
-	 * 1) An array address:
-	 *    p = array;
-	 * 2) An address like so:
-	 *    p = &my_struct->member;
-	 * 3) A pointer:
-	 *    p = pointer;
+	 * If the expr is a string literal, that's an address/mtag.
+	 * SYM_ARRAY and SYM_FN are mtags.  There are "&foo" type addresses.
+	 * And there are saved pointers "p = &foo;"
 	 *
 	 */
 
 	if (expr->type == EXPR_STRING && get_string_mtag(expr, &tag))
 		goto found;
 
-	if (type->type == SYM_ARRAY && get_toplevel_mtag(expr->symbol, &tag))
+	if (expr->type == EXPR_SYMBOL &&
+	    (type->type == SYM_ARRAY || type->type == SYM_FN) &&
+	    get_toplevel_mtag(expr->symbol, &tag))
 		goto found;
+
+	if (expr->type == EXPR_PREOP && expr->op == '&') {
+		expr = strip_expr(expr->unop);
+		if (expr_to_mtag_offset(expr, &tag, &offset))
+			goto found;
+		return 0;
+	}
 
 	if (get_implied_mtag_offset(expr, &tag, &offset))
 		goto found;
 
-	if (expr->type != EXPR_PREOP || expr->op != '&')
-		return 0;
-	expr = strip_expr(expr->unop);
-
-	if (!expr_to_mtag_offset(expr, &tag, &offset))
-		return 0;
-	if (offset > MTAG_OFFSET_MASK)
-		offset = MTAG_OFFSET_MASK;
-
+	return 0;
 found:
+	if (offset >= MTAG_OFFSET_MASK)
+		return 0;
+
 	sval->type = type;
 	sval->uvalue = tag | offset;
 
 	return 1;
-}
-
-static struct expression *remove_dereference(struct expression *expr)
-{
-	expr = strip_expr(expr);
-
-	if (expr->type == EXPR_PREOP && expr->op == '*')
-		return strip_expr(expr->unop);
-	return preop_expression(expr, '&');
-}
-
-int get_mtag_addr_sval(struct expression *expr, sval_t *sval)
-{
-	return get_mtag_sval(remove_dereference(expr), sval);
-}
-
-static void print_stored_to_mtag(int return_id, char *return_ranges, struct expression *expr)
-{
-	struct sm_state *sm;
-	char buf[256];
-	const char *param_name;
-	int param;
-
-	FOR_EACH_MY_SM(my_id, __get_cur_stree(), sm) {
-		if (!sm->state->data)
-			continue;
-
-		param = get_param_num_from_sym(sm->sym);
-		if (param < 0)
-			continue;
-		param_name = get_param_name(sm);
-		if (!param_name)
-			continue;
-		if (strcmp(param_name, "$") == 0)
-			continue;
-
-		snprintf(buf, sizeof(buf), "%lld", *(mtag_t *)sm->state->data);
-		sql_insert_return_states(return_id, return_ranges, MEMORY_TAG, param, param_name, buf);
-	} END_FOR_EACH_SM(sm);
 }
 
 void register_mtag(int id)
@@ -542,18 +449,6 @@ void register_mtag(int id)
 	 * bit 11-0 : offset
 	 *
 	 */
-	if (bits_in_pointer != 64)
-		return;
 
 	add_hook(&global_variable, BASE_HOOK);
-
-	add_function_assign_hook("kmalloc", &alloc_assign, NULL);
-	add_function_assign_hook("kzalloc", &alloc_assign, NULL);
-
-	select_return_states_hook(BUF_SIZE, &db_returns_buf_size);
-
-	add_hook(&match_call_info, FUNCTION_CALL_HOOK);
-	select_caller_info_hook(save_caller_info, MEMORY_TAG);
-	add_split_return_callback(&print_stored_to_mtag);
-	select_return_states_hook(MEMORY_TAG, db_returns_memory_tag);
 }

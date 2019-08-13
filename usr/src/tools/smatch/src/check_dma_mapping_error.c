@@ -32,6 +32,12 @@ static void ok_to_use(struct sm_state *sm, struct expression *mod_expr)
 
 static void match_assign(const char *fn, struct expression *expr, void *unused)
 {
+	struct range_list *rl;
+
+	if (!get_implied_rl(expr->right, &rl))
+		return;
+	if (rl_max(rl).value != 1)
+		return;
 	set_state_expr(my_id, expr->left, &positive);
 }
 

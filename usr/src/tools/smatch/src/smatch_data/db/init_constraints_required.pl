@@ -34,6 +34,10 @@ sub load_manual_constraints($$)
     my $dir = dirname($full_path);
     my ($data, $op, $limit);
 
+    if ($project =~ /^$/) {
+        return;
+    }
+
     open(FILE, "$dir/$project.constraints_required");
     while (<FILE>) {
         ($data, $op, $limit) = split(/,/);

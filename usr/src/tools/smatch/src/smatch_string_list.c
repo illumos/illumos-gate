@@ -20,37 +20,42 @@
 int list_has_string(struct string_list *str_list, const char *str)
 {
 	char *tmp;
+	int cmp;
 
 	if (!str)
 		return 0;
 
 	FOR_EACH_PTR(str_list, tmp) {
-		if (strcmp(tmp, str) < 0)
+		cmp = strcmp(tmp, str);
+		if (cmp < 0)
 			continue;
-		if (strcmp(tmp, str) == 0)
+		if (cmp == 0)
 			return 1;
 		return 0;
 	} END_FOR_EACH_PTR(tmp);
 	return 0;
 }
 
-void insert_string(struct string_list **str_list, const char *_new)
+int insert_string(struct string_list **str_list, const char *_new)
 {
 	char *new = (char *)_new;
 	char *tmp;
+	int cmp;
 
 	FOR_EACH_PTR(*str_list, tmp) {
-		if (strcmp(tmp, new) < 0)
+		cmp = strcmp(tmp, new);
+		if (cmp < 0)
 			continue;
-		else if (strcmp(tmp, new) == 0) {
-			return;
+		else if (cmp == 0) {
+			return 0;
 		} else {
 			INSERT_CURRENT(alloc_string(new), tmp);
-			return;
+			return 1;
 		}
 	} END_FOR_EACH_PTR(tmp);
 	new = alloc_string(new);
 	add_ptr_list(str_list, new);
+	return 1;
 }
 
 struct string_list *clone_str_list(struct string_list *orig)

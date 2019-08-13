@@ -16,6 +16,7 @@
  */
 
 #include "smatch.h"
+#include "smatch_slist.h"
 
 static int my_id;
 static int returned;
@@ -31,6 +32,8 @@ static void match_return(struct expression *ret_value)
 static void match_func_end(struct symbol *sym)
 {
 	if (__inline_fn)
+		return;
+	if (out_of_memory() || taking_too_long())
 		return;
 	if (!is_reachable() && !returned)
 		sm_info("info: add to no_return_funcs");
