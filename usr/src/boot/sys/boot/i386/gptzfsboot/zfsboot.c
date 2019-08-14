@@ -417,10 +417,9 @@ mount_root(char *arg)
 	struct i386_devdesc *ddesc;
 	uint8_t part;
 
-	root = malloc(strlen(arg) + 2);
-	if (root == NULL)
+	if (asprintf(&root, "%s:", arg) < 0)
 		return (1);
-	sprintf(root, "%s:", arg);
+
 	if (i386_getdev((void **)&ddesc, root, NULL)) {
 		free(root);
 		return (1);
@@ -439,6 +438,7 @@ mount_root(char *arg)
 		    bdev->dd.d_unit, part);
 		bootinfo.bi_bios_dev = bd_unit2bios(bdev);
 	}
+	strncpy(boot_devname, root, sizeof (boot_devname));
 	setenv("currdev", root, 1);
 	free(root);
 	return (0);
@@ -569,10 +569,11 @@ parse_cmd(void)
 			 * If there is a colon, switch pools.
 			 */
 			if (strncmp(arg, "zfs:", 4) == 0)
-				q = strchr(arg + 4, ':');
+				q = strrchr(arg + 4, ':');
 			else
-				q = strchr(arg, ':');
-			if (q) {
+				q = strrchr(arg, ':');
+
+			if (q != NULL) {
 				*q++ = '\0';
 				if (mount_root(arg) != 0)
 					return (-1);
