@@ -19,10 +19,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2019 Peter Tribble.
+ */
+/*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 #include <dirent.h>
+#include <errno.h>
 #include <locale.h>
 #include <libintl.h>
 #include <stdlib.h>
@@ -47,13 +51,16 @@ static int	format = PRF_DEFAULTM;	/* output mode */
 
 static char	SEPARATOR[SEP_SIZE] = ",";	/* field separator */
 
+static FILE	*gf = NULL;
+static FILE	*pf = NULL;
 
 /*
  * ----------------------------------------------------------------------
  * praudit  -  display contents of audit trail file
  *
  * main() - main control
- * input:    - command line input:   praudit -r|s -l -x -ddelim. -c filename(s)
+ * input: - command line input:
+ *    praudit -r|s -l -x -ddelim. -p pwfile -g grpfile -c filename(s)
  * ----------------------------------------------------------------------
  */
 
@@ -70,6 +77,28 @@ main(int argc, char **argv)
 	 * get audit file names
 	 */
 	if ((retstat = process_options(&argc, argv, names)) == 0) {
+		if (pf != NULL) {
+			errno = 0;
+			loadnames(pf);
+			(void) fclose(pf);
+			if (errno != 0) {
+				(void) fprintf(stderr,
+				    gettext("praudit: Problem reading passwd "
+				    "file.\n"));
+				exit(1);
+			}
+		}
+		if (gf != NULL) {
+			errno = 0;
+			loadgroups(gf);
+			(void) fclose(gf);
+			if (errno != 0) {
+				(void) fprintf(stderr,
+				    gettext("praudit: Problem reading group "
+				    "file.\n"));
+				exit(1);
+			}
+		}
 		if (format & PRF_XMLM)
 			print_audit_xml_prolog();
 		do {
@@ -100,7 +129,7 @@ main(int argc, char **argv)
 
 	if (retstat == -2) {
 		(void) printf(gettext("\nusage: praudit [-r/-s] [-l] [-x] "
-		    "[-ddel] [-c] filename...\n"));
+		    "[-ddel] [-p file] [-g file] [-c] filename...\n"));
 		exit(1);
 	} else if (retstat < 0) {
 		exit(1);
@@ -112,7 +141,8 @@ main(int argc, char **argv)
 /*
  * -------------------------------------------------------------------
  * process_options() - get command line flags and file names
- * input:    - praudit [-r]/[-s] [-l] [-x] [-ddel] [-c] {audit file names}
+ * input:    - praudit [-r]/[-s] [-l] [-x] [-ddel] [-c]
+ *                     -p pwfile -g grpfile -c {audit file names}
  * output:   - {audit file names}
  * globals set:	format:		RAWM / SHORTM / XML / ONELINE or DEFAULTM
  *			SEPARATOR:  default, ",", set here if
@@ -129,7 +159,7 @@ process_options(int *argc, char **argv, char **names)
 	 * check for flags
 	 */
 
-	while ((c = getopt(*argc, argv, "crslxd:")) != -1) {
+	while ((c = getopt(*argc, argv, "crslxd:g:p:")) != -1) {
 		switch (c) {
 		case 'c':
 			format |= PRF_NOCACHE;	/* turn off cache */
@@ -160,6 +190,20 @@ process_options(int *argc, char **argv, char **names)
 				(void) fprintf(stderr,
 				    gettext("praudit: Delimiter too "
 				    "long.  Using default.\n"));
+			}
+			break;
+		case 'g':
+			if ((gf = fopen(optarg, "r")) == NULL) {
+				(void) fprintf(stderr, gettext("praudit: Cannot"
+				    " open specified group file.\n"));
+				return (-1);
+			}
+			break;
+		case 'p':
+			if ((pf = fopen(optarg, "r")) == NULL) {
+				(void) fprintf(stderr, gettext("praudit: Cannot"
+				    " open specified passwd file.\n"));
+				return (-1);
 			}
 			break;
 		default:
