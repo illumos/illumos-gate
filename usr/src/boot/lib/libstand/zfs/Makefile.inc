@@ -19,12 +19,14 @@ SRCS +=		$(SRC)/common/crypto/edonr/edonr.c
 SRCS +=		$(SRC)/common/crypto/skein/skein.c
 SRCS +=		$(SRC)/common/crypto/skein/skein_iv.c
 SRCS +=		$(SRC)/common/crypto/skein/skein_block.c
+SRCS +=		$(SRC)/common/list/list.c
 OBJS +=		zfs.o
 OBJS +=		gzip.o
 OBJS +=		edonr.o
 OBJS +=		skein.o
 OBJS +=		skein_iv.o
 OBJS +=		skein_block.o
+OBJS +=		list.o
 
 zfs.o := CPPFLAGS +=	-I../../common
 zfs.o := CPPFLAGS +=	-I../../../cddl/boot/zfs
@@ -40,5 +42,8 @@ skein_block.o := CPPFLAGS +=	-DSKEIN_LOOP=111
 
 %.o:	$(SRC)/common/crypto/skein/%.c
 	$(COMPILE.c) -o $@ $<
+
+%.o:	$(SRC)/common/list/%.c
+	$(COMPILE.c) -DNDEBUG $<
 
 zfs.o: $(ZFSSRC)/zfsimpl.c

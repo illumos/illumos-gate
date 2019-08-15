@@ -78,7 +78,7 @@ dev_info_t		*ibnex_commsvc_initnode(dev_info_t *,
 static void		ibnex_delete_port_node_data(ibnex_node_data_t *);
 int			ibnex_get_dip_from_guid(ib_guid_t, int,
 			    ib_pkey_t, dev_info_t **);
-int 			ibnex_get_node_and_dip_from_guid(ib_guid_t, int,
+int			ibnex_get_node_and_dip_from_guid(ib_guid_t, int,
 			    ib_pkey_t, ibnex_node_data_t **, dev_info_t **);
 static ibnex_node_data_t *ibnex_is_node_data_present(ibnex_node_type_t,
 			    void *, int, ib_pkey_t);
@@ -257,7 +257,7 @@ static struct cb_ops ibnex_cbops = {
 	ddi_prop_op,		/* prop_op */
 	NULL,			/* stream */
 	D_MP,			/* cb_flag */
-	CB_REV, 		/* rev */
+	CB_REV,			/* rev */
 	nodev,			/* int (*cb_aread)() */
 	nodev			/* int (*cb_awrite)() */
 };
@@ -526,7 +526,7 @@ ibnex_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * power management of the phci and client
 	 */
 	if (ddi_prop_create(DDI_DEV_T_NONE, dip, DDI_PROP_CANSLEEP,
-	    "pm-want-child-notification?", NULL, NULL) != DDI_PROP_SUCCESS) {
+	    "pm-want-child-notification?", NULL, 0) != DDI_PROP_SUCCESS) {
 		IBTF_DPRINTF_L2("ibnex",
 		    "_attach: create pm-want-child-notification failed");
 		(void) ddi_remove_minor_node(dip, NULL);
@@ -827,7 +827,7 @@ ibt_status_t
 ibnex_ibtl_callback(ibtl_ibnex_cb_args_t *cb_args)
 {
 	int			retval = IBT_SUCCESS;
-	struct dev_ops 		*hca_dev_ops;
+	struct dev_ops		*hca_dev_ops;
 	dev_info_t		*clnt_dip;
 	ibnex_node_data_t	*node_data;
 
@@ -888,7 +888,7 @@ ibnex_ibtl_callback(ibtl_ibnex_cb_args_t *cb_args)
 
 /*
  * ibnex_map_fault
- * 	IOC drivers need not map memory. Return failure to fail any
+ *	IOC drivers need not map memory. Return failure to fail any
  *	such calls.
  */
 /*ARGSUSED*/
@@ -903,7 +903,7 @@ ibnex_map_fault(dev_info_t *dip, dev_info_t *rdip, struct hat *hat,
 
 /*
  * ibnex_busctl
- * 	bus_ctl bus_ops entry point
+ *	bus_ctl bus_ops entry point
  */
 /*ARGSUSED*/
 int
@@ -1134,7 +1134,7 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
     ddi_bus_config_op_t op, void *devname, dev_info_t **child)
 {
 	int			ret = IBNEX_SUCCESS, len, circ, need_bus_config;
-	char 			*device_name, *cname = NULL, *caddr = NULL;
+	char			*device_name, *cname = NULL, *caddr = NULL;
 	dev_info_t		*cdip;
 	ibnex_node_data_t	*node_data;
 
@@ -1478,9 +1478,9 @@ void
 ibnex_create_vppa_nodes(
     dev_info_t *parent, ibdm_port_attr_t *port_attr)
 {
-	int 		idx, ii;
+	int		idx, ii;
 	int		rval;
-	ib_pkey_t 	pkey;
+	ib_pkey_t	pkey;
 	dev_info_t	*dip;
 
 	IBTF_DPRINTF_L4("ibnex", "\tcreate_vppa_nodes: Begin");
@@ -1715,8 +1715,8 @@ int
 ibnex_get_pkey_commsvc_index_portnum(char *device_name, int *index,
     ib_pkey_t *pkey, uint8_t *port_num)
 {
-	char 	*srv, **service_name, *temp;
-	int  	ii, ncommsvcs, ret;
+	char	*srv, **service_name, *temp;
+	int	ii, ncommsvcs, ret;
 
 	if (ibnex_devname_to_portnum(device_name, port_num) !=
 	    IBNEX_SUCCESS) {
@@ -1946,7 +1946,7 @@ ibnex_pseudo_config_one(ibnex_node_data_t *node_data, char *caddr,
 		/*
 		 * This function is now called with PHCI / HCA driver
 		 * as parent. The format of devicename is :
-		 * 	<driver_name>@<driver_name>,<unit_address>
+		 *	<driver_name>@<driver_name>,<unit_address>
 		 * The "caddr" part of the devicename matches the
 		 * format of pseudo_node_addr.
 		 *
@@ -2975,7 +2975,7 @@ ibnex_commsvc_initnode(dev_info_t *parent, ibdm_port_attr_t *port_attr,
 	ibnex_node_data_t	*node_data;
 	ibnex_port_node_t	*port_node;
 	char devname[MAXNAMELEN];
-	int 			cdip_allocated = 0;
+	int			cdip_allocated = 0;
 
 	ASSERT(MUTEX_HELD(&ibnex.ibnex_mutex));
 
@@ -3303,7 +3303,7 @@ static int
 ibnex_create_port_compatible_prop(dev_info_t *child_dip,
     char *comm_svcp, ibdm_port_attr_t *port_attr)
 {
-	int 	rval, i;
+	int	rval, i;
 	char	*temp;
 	char	*compatible[IBNEX_MAX_IBPORT_COMPAT_NAMES];
 
@@ -3974,7 +3974,7 @@ ib_vhci_pi_uninit(dev_info_t *vdip, mdi_pathinfo_t *pip, int flag)
 /*ARGSUSED*/
 static int
 ib_vhci_pi_state_change(dev_info_t *vdip, mdi_pathinfo_t *pip,
-		mdi_pathinfo_state_t state, uint32_t arg1, int arg2)
+    mdi_pathinfo_state_t state, uint32_t arg1, int arg2)
 {
 	IBTF_DPRINTF_L4("ibnex",
 	    "\tpi_state_change: dip %p pip %p state %x", vdip, pip, state);

@@ -60,7 +60,7 @@ static int		ibnex_fill_nodeinfo(nvlist_t **, ibnex_node_data_t *,
 static void		ibnex_figure_ap_devstate(ibnex_node_data_t *,
 			    devctl_ap_state_t *);
 static void		ibnex_figure_ib_apid_devstate(devctl_ap_state_t *);
-static	char 		*ibnex_get_apid(struct devctl_iocdata *);
+static char		*ibnex_get_apid(struct devctl_iocdata *);
 static int		ibnex_get_dip_from_apid(char *, dev_info_t **,
 			    ibnex_node_data_t **);
 extern int		ibnex_get_node_and_dip_from_guid(ib_guid_t, int,
@@ -1010,9 +1010,9 @@ ibnex_devctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		/*
 		 * Five types of APIDs are supported:
 		 *	o HCA_GUID,0,service-name	(HCA-SVC device)
-		 *	o IOC_GUID 			(IOC device)
+		 *	o IOC_GUID			(IOC device)
 		 *	o PORT_GUID,0,service-name	(Port device)
-		 *	o pseudo_name,unit-address, 	(Pseudo device)
+		 *	o pseudo_name,unit-address,	(Pseudo device)
 		 *	o PORT_GUID,P_Key,service-name	(VPPA device)
 		 * If the apid doesn't have "," then treat it as an IOC
 		 * If the apid has one "," then it is Pseudo device
@@ -1149,7 +1149,7 @@ ibnex_get_snapshot(char **buf, size_t *sz, int allow_probe)
 {
 	int			i, j, k, l, hca_count;
 	nvlist_t		*nvl;
-	ib_pkey_t 		pkey;
+	ib_pkey_t		pkey;
 	boolean_t		found;
 	ibdm_ioc_info_t		*ioc_listp;
 	ibdm_ioc_info_t		*iocp;
@@ -2909,7 +2909,7 @@ out:
 	(x)->hca_max_rdma_in_chan	= (y)->hca_max_rdma_in_chan;	\
 	(x)->hca_max_rdma_out_chan	= (y)->hca_max_rdma_out_chan;	\
 	(x)->hca_max_ipv6_chan		= (y)->hca_max_ipv6_chan;	\
-	(x)->hca_max_ether_chan 	= (y)->hca_max_ether_chan;	\
+	(x)->hca_max_ether_chan		= (y)->hca_max_ether_chan;	\
 	(x)->hca_max_mcg_chans		= (y)->hca_max_mcg_chans;	\
 	(x)->hca_max_mcg		= (y)->hca_max_mcg;		\
 	(x)->hca_max_chan_per_mcg	= (y)->hca_max_chan_per_mcg;	\
@@ -2946,8 +2946,7 @@ out:
 	    MAX_HCA_DRVNAME_LEN);					\
 	(x)->hca_driver_instance	= (instance);			\
 									\
-	(x)->hca_device_path = ((device_path_alloc_sz) >= (device_path_len)) \
-	    ? (device_path) : NULL;					\
+	(x)->hca_device_path		= (device_path);		\
 	(x)->hca_device_path_len	= (device_path_len);		\
 }
 
@@ -2960,7 +2959,9 @@ ibnex_ctl_query_hca(dev_t dev, int cmd, intptr_t arg, int mode,
 {
 	int			rv = 0;
 	ibnex_ctl_query_hca_t	*query_hca = NULL;
+#ifdef	_MULTI_DATAMODEL
 	ibnex_ctl_query_hca_32_t *query_hca_32 = NULL;
+#endif
 	ibt_hca_attr_t		*hca_attr = NULL;
 	char			driver_name[MAX_HCA_DRVNAME_LEN];
 	int			instance;
@@ -2968,13 +2969,15 @@ ibnex_ctl_query_hca(dev_t dev, int cmd, intptr_t arg, int mode,
 	char			*device_path;
 	uint_t			device_path_alloc_sz, hca_device_path_len;
 	char			*hca_device_path = NULL;
+	uint_t			model;
 
 	IBTF_DPRINTF_L4("ibnex", "\tctl_query_hca: cmd=%x, arg=%p, "
 	    "mode=%x, cred=%p, rval=%p, dev=0x%x", cmd, arg, mode, credp,
 	    rvalp, dev);
 
+	switch (model = ddi_model_convert_from(mode & FMODELS)) {
 #ifdef	_MULTI_DATAMODEL
-	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
+	case DDI_MODEL_ILP32:
 		query_hca_32 = kmem_zalloc(
 		    sizeof (ibnex_ctl_query_hca_32_t), KM_SLEEP);
 
@@ -2989,9 +2992,9 @@ ibnex_ctl_query_hca(dev_t dev, int cmd, intptr_t arg, int mode,
 		hca_guid = query_hca_32->hca_guid;
 		device_path = (char *)(uintptr_t)query_hca_32->hca_device_path;
 		device_path_alloc_sz = query_hca_32->hca_device_path_alloc_sz;
-	} else
+		break;
 #endif
-	{
+	default:
 		query_hca = kmem_zalloc(sizeof (ibnex_ctl_query_hca_t),
 		    KM_SLEEP);
 
@@ -3006,6 +3009,7 @@ ibnex_ctl_query_hca(dev_t dev, int cmd, intptr_t arg, int mode,
 		hca_guid = query_hca->hca_guid;
 		device_path = query_hca->hca_device_path;
 		device_path_alloc_sz = query_hca->hca_device_path_alloc_sz;
+		break;
 	}
 
 	hca_attr = kmem_zalloc(sizeof (ibt_hca_attr_t), KM_SLEEP);
@@ -3020,11 +3024,19 @@ ibnex_ctl_query_hca(dev_t dev, int cmd, intptr_t arg, int mode,
 
 	hca_device_path_len = strlen(hca_device_path) + 1;
 
+	switch (model) {
+		char		*device_path64;
 #ifdef	_MULTI_DATAMODEL
-	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
+		caddr32_t	device_path32;
+	case DDI_MODEL_ILP32:
+
+		if (device_path_alloc_sz >= hca_device_path_len)
+			device_path32 = (uintptr_t)device_path;
+		else
+			device_path32 = (uintptr_t)NULL;
 
 		IBNEX_CTL_CP_HCA_INFO(&query_hca_32->hca_info, hca_attr,
-		    driver_name, instance, query_hca_32->hca_device_path,
+		    driver_name, instance, device_path32,
 		    device_path_alloc_sz, hca_device_path_len);
 
 		/* copy hca information to the user space */
@@ -3036,11 +3048,16 @@ ibnex_ctl_query_hca(dev_t dev, int cmd, intptr_t arg, int mode,
 			rv = EFAULT;
 			goto out;
 		}
-	} else
+		break;
 #endif
-	{
+	default:
+		if (device_path_alloc_sz >= hca_device_path_len)
+			device_path64 = device_path;
+		else
+			device_path64 = NULL;
+
 		IBNEX_CTL_CP_HCA_INFO(&query_hca->hca_info, hca_attr,
-		    driver_name, instance, device_path,
+		    driver_name, instance, device_path64,
 		    device_path_alloc_sz, hca_device_path_len);
 
 		/* copy hca information to the user space */
@@ -3052,6 +3069,7 @@ ibnex_ctl_query_hca(dev_t dev, int cmd, intptr_t arg, int mode,
 			rv = EFAULT;
 			goto out;
 		}
+		break;
 	}
 
 	if (device_path_alloc_sz >= hca_device_path_len) {
@@ -3067,8 +3085,10 @@ ibnex_ctl_query_hca(dev_t dev, int cmd, intptr_t arg, int mode,
 out:
 	if (query_hca)
 		kmem_free(query_hca, sizeof (ibnex_ctl_query_hca_t));
+#ifdef	_MULTI_DATAMODEL
 	if (query_hca_32)
 		kmem_free(query_hca_32, sizeof (ibnex_ctl_query_hca_32_t));
+#endif
 	if (hca_attr)
 		kmem_free(hca_attr, sizeof (ibt_hca_attr_t));
 	if (hca_device_path)

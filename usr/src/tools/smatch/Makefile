@@ -27,8 +27,11 @@ include ../Makefile.tools
 # We have to build smatch before we can use cw
 i386_CC = $(GNUC_ROOT)/bin/gcc
 sparc_CC = $(GNUC_ROOT)/bin/gcc
+# sparc doesn't recognise -msave-args
+i386_SMATCHFLAGS = -msave-args
+sparc_SMATCHFLAGS =
 
-CFLAGS = -O -m64 -msave-args -D__sun -Wall -Wno-unknown-pragmas -std=gnu99 -nodefaultlibs
+CFLAGS = -O -m64 $($(MACH)_SMATCHFLAGS) -D__sun -Wall -Wno-unknown-pragmas -std=gnu99 -nodefaultlibs
 
 SMATCHDATADIR = $(ROOTONBLDSHARE)/smatch
 
