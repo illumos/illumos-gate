@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2015, Joyent Inc. All rights reserved.
+ * Copyright 2016, Joyent Inc.
  */
 
 #include <sys/timer.h>
@@ -40,6 +40,9 @@
 #include <sys/policy.h>
 
 static clock_backend_t clock_highres;
+
+/* minimum non-privileged interval (200us) */
+long clock_highres_interval_min = 200000;
 
 /*ARGSUSED*/
 static int
@@ -68,17 +71,6 @@ clock_highres_getres(timespec_t *ts)
 static int
 clock_highres_timer_create(itimer_t *it, void (*fire)(itimer_t *))
 {
-	/*
-	 * CLOCK_HIGHRES timers of sufficiently high resolution can deny
-	 * service; only allow privileged users to create such timers.
-	 * Sites that do not wish to have this restriction should
-	 * give users the "proc_clock_highres" privilege.
-	 */
-	if (secpolicy_clock_highres(CRED()) != 0) {
-		it->it_arg = NULL;
-		return (EPERM);
-	}
-
 	it->it_arg = kmem_zalloc(sizeof (cyclic_id_t), KM_SLEEP);
 	it->it_fire = fire;
 
@@ -101,7 +93,7 @@ clock_highres_fire(void *arg)
 
 static int
 clock_highres_timer_settime(itimer_t *it, int flags,
-	const struct itimerspec *when)
+    const struct itimerspec *when)
 {
 	cyclic_id_t cyc, *cycp = it->it_arg;
 	proc_t *p = curproc;
@@ -111,6 +103,49 @@ clock_highres_timer_settime(itimer_t *it, int flags,
 	cpu_t *cpu;
 	cpupart_t *cpupart;
 	int pset;
+	boolean_t value_need_clamp = B_FALSE;
+	boolean_t intval_need_clamp = B_FALSE;
+	cred_t *cr = CRED();
+	struct itimerspec clamped;
+
+	/*
+	 * CLOCK_HIGHRES timers of sufficiently high resolution can deny
+	 * service; only allow privileged users to create such timers.
+	 * Non-privileged users (those without the "proc_clock_highres"
+	 * privilege) can create timers with lower resolution but if they
+	 * attempt to use a very low time value (< 200us) then their
+	 * timer will be clamped at 200us.
+	 */
+	if (when->it_value.tv_sec == 0 &&
+	    when->it_value.tv_nsec > 0 &&
+	    when->it_value.tv_nsec < clock_highres_interval_min)
+		value_need_clamp = B_TRUE;
+
+	if (when->it_interval.tv_sec == 0 &&
+	    when->it_interval.tv_nsec > 0 &&
+	    when->it_interval.tv_nsec < clock_highres_interval_min)
+		intval_need_clamp = B_TRUE;
+
+	if ((value_need_clamp || intval_need_clamp) &&
+	    secpolicy_clock_highres(cr) != 0) {
+		clamped.it_value.tv_sec = when->it_value.tv_sec;
+		clamped.it_interval.tv_sec = when->it_interval.tv_sec;
+
+		if (value_need_clamp) {
+			clamped.it_value.tv_nsec = clock_highres_interval_min;
+		} else {
+			clamped.it_value.tv_nsec = when->it_value.tv_nsec;
+		}
+
+		if (intval_need_clamp) {
+			clamped.it_interval.tv_nsec =
+			    clock_highres_interval_min;
+		} else {
+			clamped.it_interval.tv_nsec = when->it_interval.tv_nsec;
+		}
+
+		when = &clamped;
+	}
 
 	cyctime.cyt_when = ts2hrt(&when->it_value);
 	cyctime.cyt_interval = ts2hrt(&when->it_interval);
