@@ -11,9 +11,10 @@
 
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
+#include <aes/aes_impl.h>
 #include <strings.h>
 #include <stdio.h>
 #include <sys/debug.h>
@@ -26,6 +27,11 @@
  */
 #define	PARAM_SIZE_64 8
 
+static size_t updatelens[] = {
+	1, AES_BLOCK_LEN, AES_BLOCK_LEN + 1, 2*AES_BLOCK_LEN,
+	CTEST_UPDATELEN_WHOLE, CTEST_UPDATELEN_END
+};
+
 int
 main(void)
 {
@@ -34,14 +40,12 @@ main(void)
 	uint8_t N[1024];
 	uint64_t param[PARAM_SIZE_64];
 
-	cryptotest_t args;
-
-	args.out = N;
-
-	args.outlen = sizeof (N);
-
-	args.mechname = SUN_CKM_AES_CCM;
-	args.updatelen = 1;
+	cryptotest_t args = {
+		.out = N,
+		.outlen = sizeof (N),
+		.mechname = SUN_CKM_AES_CCM,
+		.updatelens = updatelens
+	};
 
 	args.key = CCM_KEY1;
 	args.keylen = sizeof (CCM_KEY1);

@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _CRYPTOTEST_H
@@ -21,11 +21,15 @@
 extern "C" {
 #endif
 
+#include <inttypes.h>
 #include <sys/crypto/ioctl.h>
 
 #define	CTEST_INIT_FAILED (-1)
 #define	CTEST_NAME_RESOLVE_FAILED (-2)
 #define	CTEST_MECH_NO_PROVIDER (-3)
+
+#define	CTEST_UPDATELEN_WHOLE	SIZE_MAX
+#define	CTEST_UPDATELEN_END	0
 
 typedef struct cryptotest {
 	uint8_t *in;
@@ -39,63 +43,56 @@ typedef struct cryptotest {
 	size_t plen;
 
 	char *mechname;
-	size_t updatelen;
+	size_t *updatelens;
 } cryptotest_t;
 
-typedef int (*testfunc_t)(cryptotest_t *);
+typedef struct crypto_op crypto_op_t;
 
 typedef struct test_fg {
-	testfunc_t single;
-	testfunc_t update;
+	crypto_func_group_t tf_fg;
+	int (*tf_init)(crypto_op_t *);
+	int (*tf_single)(crypto_op_t *);
+	int (*tf_update)(crypto_op_t *, size_t, size_t, size_t *);
+	int (*tf_final)(crypto_op_t *, size_t);
 } test_fg_t;
 
 #define	CRYPTO_INVALID_SESSION ((crypto_session_id_t)-1)
-typedef struct crypto_op crypto_op_t;
 
 int run_test(cryptotest_t *args, uint8_t *cmp, size_t cmplen, test_fg_t *funcs);
 
+const char *cryptotest_errstr(int e, char *buf, size_t buflen);
+
 /* utils */
 crypto_op_t *cryptotest_init(cryptotest_t *args, crypto_func_group_t fg);
-int cryptotest_close(crypto_op_t *op);
+void cryptotest_close(crypto_op_t *op);
 int get_mech_info(crypto_op_t *op);
 int get_hsession_by_mech(crypto_op_t *op);
 
 /* CRYPTO_MAC */
 int mac_init(crypto_op_t *op);
 int mac_single(crypto_op_t *op);
-int mac_update(crypto_op_t *op, int offset);
-int mac_final(crypto_op_t *op);
+int mac_update(crypto_op_t *op, size_t offset, size_t len, size_t *dummy);
+int mac_final(crypto_op_t *op, size_t dummy);
 
 /* CRYPTO_ENCRYPT */
 int encrypt_init(crypto_op_t *op);
 int encrypt_single(crypto_op_t *op);
-int encrypt_update(crypto_op_t *op, int offset, size_t *encrlen);
+int encrypt_update(crypto_op_t *op, size_t offset, size_t plainlen,
+    size_t *encrlen);
 int encrypt_final(crypto_op_t *op, size_t encrlen);
 
 /* CRYPTO_DECRYPT */
 int decrypt_init(crypto_op_t *op);
 int decrypt_single(crypto_op_t *op);
-int decrypt_update(crypto_op_t *op, int offset, size_t *encrlen);
+int decrypt_update(crypto_op_t *op, size_t offset, size_t cipherlen,
+    size_t *encrlen);
 int decrypt_final(crypto_op_t *op, size_t encrlen);
 
 /* CRYPTO_DIGEST */
 int digest_init(crypto_op_t *op);
 int digest_single(crypto_op_t *op);
-int digest_update(crypto_op_t *op, int);
-int digest_final(crypto_op_t *op);
-
-/* wrappers */
-int test_mac_single(cryptotest_t *args);
-int test_mac(cryptotest_t *args);
-
-int test_encrypt_single(cryptotest_t *args);
-int test_encrypt(cryptotest_t *args);
-
-int test_decrypt_single(cryptotest_t *args);
-int test_decrypt(cryptotest_t *args);
-
-int test_digest_single(cryptotest_t *args);
-int test_digest(cryptotest_t *args);
+int digest_update(crypto_op_t *op, size_t offset, size_t len, size_t *dummy);
+int digest_final(crypto_op_t *op, size_t dummy);
 
 extern test_fg_t cryptotest_decr_fg;
 extern test_fg_t cryptotest_encr_fg;

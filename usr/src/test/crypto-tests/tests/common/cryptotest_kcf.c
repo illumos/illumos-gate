@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <fcntl.h>
@@ -20,6 +20,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/debug.h>
 
 #include "cryptotest.h"
 
@@ -33,7 +34,7 @@ struct crypto_op {
 	size_t outlen;
 	size_t keylen;
 	size_t paramlen;
-	size_t updatelen;
+	const size_t *updatelens;
 
 	char *mechname;
 
@@ -43,7 +44,7 @@ struct crypto_op {
 	crypto_func_group_t fg;
 };
 
-static int fd;
+static int fd = -1;
 static const char CRYPTO_DEVICE[] = "/dev/crypto";
 
 int
@@ -56,13 +57,21 @@ kcf_do_ioctl(int opcode, uint_t *arg, char *opstr)
 			break;
 	}
 
-	if (ret < 0 || *arg != CRYPTO_SUCCESS)
-		(void) fprintf(stderr, "%s: Error = %d %d 0x%02x\n",
+	if (ret < 0 || *arg != CRYPTO_SUCCESS) {
+		(void) fprintf(stderr,
+		    "%s: Error = %d errno=%d (%s) 0x%02x\n",
 		    (opstr == NULL) ? "ioctl" : opstr,
-		    ret, errno, *arg);
+		    ret, errno, strerror(errno), *arg);
 
+	}
+
+	/*
+	 * The callers all expect CRYPTO_xx errors.  We've displayed the
+	 * errno value (see above), so just return a generic CRYPTO_xxx
+	 * error to signal failure.
+	 */
 	if (ret < 0)
-		return (errno);
+		return (CRYPTO_GENERAL_ERROR);
 
 	return (*arg);
 }
@@ -72,11 +81,15 @@ cryptotest_init(cryptotest_t *arg, crypto_func_group_t fg)
 {
 	crypto_op_t *op = malloc(sizeof (*op));
 
-	if (op == NULL)
+	if (op == NULL) {
+		(void) fprintf(stderr, "malloc failed: %s\n", strerror(errno));
 		return (NULL);
+	}
 
 	while ((fd = open(CRYPTO_DEVICE, O_RDWR)) < 0) {
 		if (errno != EINTR) {
+			(void) fprintf(stderr, "open of %s failed: %s",
+			    CRYPTO_DEVICE, strerror(errno));
 			free(op);
 			return (NULL);
 		}
@@ -91,7 +104,7 @@ cryptotest_init(cryptotest_t *arg, crypto_func_group_t fg)
 	op->outlen = arg->outlen;
 	op->keylen = arg->keylen * 8; /* kcf uses keylen in bits */
 	op->paramlen = arg->plen;
-	op->updatelen = arg->updatelen;
+	op->updatelens = arg->updatelens;
 
 	op->mechname = arg->mechname;
 
@@ -112,15 +125,15 @@ cryptotest_close_session(crypto_session_id_t session)
 	return (kcf_do_ioctl(CRYPTO_CLOSE_SESSION, (uint_t *)&cs, "session"));
 }
 
-int
+void
 cryptotest_close(crypto_op_t *op)
 {
 	if (op->hsession != CRYPTO_INVALID_SESSION)
 		(void) cryptotest_close_session(op->hsession);
 	free(op);
 	if (fd >= 0)
-		return (close(fd));
-	return (0);
+		VERIFY0(close(fd));
+	fd = -1;
 }
 
 int
@@ -207,7 +220,7 @@ mac_single(crypto_op_t *op)
 }
 
 int
-mac_update(crypto_op_t *op, int offset)
+mac_update(crypto_op_t *op, size_t offset, size_t len, size_t *dummy __unused)
 {
 	crypto_mac_update_t update;
 
@@ -215,13 +228,13 @@ mac_update(crypto_op_t *op, int offset)
 
 	update.mu_session = op->hsession;
 	update.mu_databuf = op->in + offset;
-	update.mu_datalen = op->updatelen;
+	update.mu_datalen = len;
 
 	return (kcf_do_ioctl(CRYPTO_MAC_UPDATE, (uint_t *)&update, "update"));
 }
 
 int
-mac_final(crypto_op_t *op)
+mac_final(crypto_op_t *op, size_t dummy __unused)
 {
 	crypto_mac_final_t final;
 
@@ -275,7 +288,7 @@ encrypt_single(crypto_op_t *op)
 }
 
 int
-encrypt_update(crypto_op_t *op, int offset, size_t *encrlen)
+encrypt_update(crypto_op_t *op, size_t offset, size_t plainlen, size_t *encrlen)
 {
 	crypto_encrypt_update_t update;
 	int ret;
@@ -283,7 +296,7 @@ encrypt_update(crypto_op_t *op, int offset, size_t *encrlen)
 
 	update.eu_session = op->hsession;
 	update.eu_databuf = op->in + offset;
-	update.eu_datalen = op->updatelen;
+	update.eu_datalen = plainlen;
 	update.eu_encrlen = op->outlen - *encrlen;
 	update.eu_encrbuf = op->out + *encrlen;
 
@@ -346,7 +359,7 @@ decrypt_single(crypto_op_t *op)
 }
 
 int
-decrypt_update(crypto_op_t *op, int offset, size_t *encrlen)
+decrypt_update(crypto_op_t *op, size_t offset, size_t len, size_t *encrlen)
 {
 	crypto_decrypt_update_t update;
 	int ret;
@@ -356,7 +369,7 @@ decrypt_update(crypto_op_t *op, int offset, size_t *encrlen)
 	update.du_session = op->hsession;
 	update.du_databuf = op->out + *encrlen;
 	update.du_datalen = op->outlen - *encrlen;
-	update.du_encrlen = op->updatelen;
+	update.du_encrlen = len;
 	update.du_encrbuf = op->in + offset;
 
 	ret = kcf_do_ioctl(CRYPTO_DECRYPT_UPDATE, (uint_t *)&update, "update");
@@ -412,7 +425,8 @@ digest_single(crypto_op_t *op)
 }
 
 int
-digest_update(crypto_op_t *op, int offset)
+digest_update(crypto_op_t *op, size_t offset, size_t len,
+    size_t *dummy __unused)
 {
 	crypto_digest_update_t update;
 
@@ -420,7 +434,7 @@ digest_update(crypto_op_t *op, int offset)
 
 	update.du_session = op->hsession;
 
-	update.du_datalen = op->updatelen;
+	update.du_datalen = len;
 	update.du_databuf = op->in + offset;
 
 	return (kcf_do_ioctl(CRYPTO_DIGEST_UPDATE, (uint_t *)&update,
@@ -428,7 +442,7 @@ digest_update(crypto_op_t *op, int offset)
 }
 
 int
-digest_final(crypto_op_t *op)
+digest_final(crypto_op_t *op, size_t dummy __unused)
 {
 	crypto_digest_final_t final;
 
@@ -441,6 +455,7 @@ digest_final(crypto_op_t *op)
 
 	return (kcf_do_ioctl(CRYPTO_DIGEST_FINAL, (uint_t *)&final, "final"));
 }
+
 void
 ccm_init_params(void *buf, ulong_t ulDataLen, uchar_t *pNonce,
     ulong_t ulNonceLen, uchar_t *pAAD, ulong_t ulAADLen, ulong_t ulMACLen)
@@ -459,4 +474,271 @@ size_t
 ccm_param_len(void)
 {
 	return (sizeof (CK_AES_CCM_PARAMS));
+}
+
+const char *
+cryptotest_errstr(int e, char *buf, size_t buflen)
+{
+	const char *valstr = NULL;
+
+	switch (e) {
+	case CRYPTO_SUCCESS:
+		valstr = "CRYPTO_SUCCESS";
+		break;
+	case CRYPTO_CANCEL:
+		valstr = "CRYPTO_CANCEL";
+		break;
+	case CRYPTO_HOST_MEMORY:
+		valstr = "CRYPTO_HOST_MEMORY";
+		break;
+	case CRYPTO_GENERAL_ERROR:
+		valstr = "CRYPTO_GENERAL_ERROR";
+		break;
+	case CRYPTO_FAILED:
+		valstr = "CRYPTO_FAILED";
+		break;
+	case CRYPTO_ARGUMENTS_BAD:
+		valstr = "CRYPTO_ARGUMENTS_BAD";
+		break;
+	case CRYPTO_ATTRIBUTE_READ_ONLY:
+		valstr = "CRYPTO_ATTRIBUTE_READ_ONLY";
+		break;
+	case CRYPTO_ATTRIBUTE_SENSITIVE:
+		valstr = "CRYPTO_ATTRIBUTE_SENSITIVE";
+		break;
+	case CRYPTO_ATTRIBUTE_TYPE_INVALID:
+		valstr = "CRYPTO_ATTRIBUTE_TYPE_INVALID";
+		break;
+	case CRYPTO_ATTRIBUTE_VALUE_INVALID:
+		valstr = "CRYPTO_ATTRIBUTE_VALUE_INVALID";
+		break;
+	case CRYPTO_CANCELED:
+		valstr = "CRYPTO_CANCELED";
+		break;
+	case CRYPTO_DATA_INVALID:
+		valstr = "CRYPTO_DATA_INVALID";
+		break;
+	case CRYPTO_DATA_LEN_RANGE:
+		valstr = "CRYPTO_DATA_LEN_RANGE";
+		break;
+	case CRYPTO_DEVICE_ERROR:
+		valstr = "CRYPTO_DEVICE_ERROR";
+		break;
+	case CRYPTO_DEVICE_MEMORY:
+		valstr = "CRYPTO_DEVICE_MEMORY";
+		break;
+	case CRYPTO_DEVICE_REMOVED:
+		valstr = "CRYPTO_DEVICE_REMOVED";
+		break;
+	case CRYPTO_ENCRYPTED_DATA_INVALID:
+		valstr = "CRYPTO_ENCRYPTED_DATA_INVALID";
+		break;
+	case CRYPTO_ENCRYPTED_DATA_LEN_RANGE:
+		valstr = "CRYPTO_ENCRYPTED_DATA_LEN_RANGE";
+		break;
+	case CRYPTO_KEY_HANDLE_INVALID:
+		valstr = "CRYPTO_KEY_HANDLE_INVALID";
+		break;
+	case CRYPTO_KEY_SIZE_RANGE:
+		valstr = "CRYPTO_KEY_SIZE_RANGE";
+		break;
+	case CRYPTO_KEY_TYPE_INCONSISTENT:
+		valstr = "CRYPTO_KEY_TYPE_INCONSISTENT";
+		break;
+	case CRYPTO_KEY_NOT_NEEDED:
+		valstr = "CRYPTO_KEY_NOT_NEEDED";
+		break;
+	case CRYPTO_KEY_CHANGED:
+		valstr = "CRYPTO_KEY_CHANGED";
+		break;
+	case CRYPTO_KEY_NEEDED:
+		valstr = "CRYPTO_KEY_NEEDED";
+		break;
+	case CRYPTO_KEY_INDIGESTIBLE:
+		valstr = "CRYPTO_KEY_INDIGESTIBLE";
+		break;
+	case CRYPTO_KEY_FUNCTION_NOT_PERMITTED:
+		valstr = "CRYPTO_KEY_FUNCTION_NOT_PERMITTED";
+		break;
+	case CRYPTO_KEY_NOT_WRAPPABLE:
+		valstr = "CRYPTO_KEY_NOT_WRAPPABLE";
+		break;
+	case CRYPTO_KEY_UNEXTRACTABLE:
+		valstr = "CRYPTO_KEY_UNEXTRACTABLE";
+		break;
+	case CRYPTO_MECHANISM_INVALID:
+		valstr = "CRYPTO_MECHANISM_INVALID";
+		break;
+	case CRYPTO_MECHANISM_PARAM_INVALID:
+		valstr = "CRYPTO_MECHANISM_PARAM_INVALID";
+		break;
+	case CRYPTO_OBJECT_HANDLE_INVALID:
+		valstr = "CRYPTO_OBJECT_HANDLE_INVALID";
+		break;
+	case CRYPTO_OPERATION_IS_ACTIVE:
+		valstr = "CRYPTO_OPERATION_IS_ACTIVE";
+		break;
+	case CRYPTO_OPERATION_NOT_INITIALIZED:
+		valstr = "CRYPTO_OPERATION_NOT_INITIALIZED";
+		break;
+	case CRYPTO_PIN_INCORRECT:
+		valstr = "CRYPTO_PIN_INCORRECT";
+		break;
+	case CRYPTO_PIN_INVALID:
+		valstr = "CRYPTO_PIN_INVALID";
+		break;
+	case CRYPTO_PIN_LEN_RANGE:
+		valstr = "CRYPTO_PIN_LEN_RANGE";
+		break;
+	case CRYPTO_PIN_EXPIRED:
+		valstr = "CRYPTO_PIN_EXPIRED";
+		break;
+	case CRYPTO_PIN_LOCKED:
+		valstr = "CRYPTO_PIN_LOCKED";
+		break;
+	case CRYPTO_SESSION_CLOSED:
+		valstr = "CRYPTO_SESSION_CLOSED";
+		break;
+	case CRYPTO_SESSION_COUNT:
+		valstr = "CRYPTO_SESSION_COUNT";
+		break;
+	case CRYPTO_SESSION_HANDLE_INVALID:
+		valstr = "CRYPTO_SESSION_HANDLE_INVALID";
+		break;
+	case CRYPTO_SESSION_READ_ONLY:
+		valstr = "CRYPTO_SESSION_READ_ONLY";
+		break;
+	case CRYPTO_SESSION_EXISTS:
+		valstr = "CRYPTO_SESSION_EXISTS";
+		break;
+	case CRYPTO_SESSION_READ_ONLY_EXISTS:
+		valstr = "CRYPTO_SESSION_READ_ONLY_EXISTS";
+		break;
+	case CRYPTO_SESSION_READ_WRITE_SO_EXISTS:
+		valstr = "CRYPTO_SESSION_READ_WRITE_SO_EXISTS";
+		break;
+	case CRYPTO_SIGNATURE_INVALID:
+		valstr = "CRYPTO_SIGNATURE_INVALID";
+		break;
+	case CRYPTO_SIGNATURE_LEN_RANGE:
+		valstr = "CRYPTO_SIGNATURE_LEN_RANGE";
+		break;
+	case CRYPTO_TEMPLATE_INCOMPLETE:
+		valstr = "CRYPTO_TEMPLATE_INCOMPLETE";
+		break;
+	case CRYPTO_TEMPLATE_INCONSISTENT:
+		valstr = "CRYPTO_TEMPLATE_INCONSISTENT";
+		break;
+	case CRYPTO_UNWRAPPING_KEY_HANDLE_INVALID:
+		valstr = "CRYPTO_UNWRAPPING_KEY_HANDLE_INVALID";
+		break;
+	case CRYPTO_UNWRAPPING_KEY_SIZE_RANGE:
+		valstr = "CRYPTO_UNWRAPPING_KEY_SIZE_RANGE";
+		break;
+	case CRYPTO_UNWRAPPING_KEY_TYPE_INCONSISTENT:
+		valstr = "CRYPTO_UNWRAPPING_KEY_TYPE_INCONSISTENT";
+		break;
+	case CRYPTO_USER_ALREADY_LOGGED_IN:
+		valstr = "CRYPTO_USER_ALREADY_LOGGED_IN";
+		break;
+	case CRYPTO_USER_NOT_LOGGED_IN:
+		valstr = "CRYPTO_USER_NOT_LOGGED_IN";
+		break;
+	case CRYPTO_USER_PIN_NOT_INITIALIZED:
+		valstr = "CRYPTO_USER_PIN_NOT_INITIALIZED";
+		break;
+	case CRYPTO_USER_TYPE_INVALID:
+		valstr = "CRYPTO_USER_TYPE_INVALID";
+		break;
+	case CRYPTO_USER_ANOTHER_ALREADY_LOGGED_IN:
+		valstr = "CRYPTO_USER_ANOTHER_ALREADY_LOGGED_IN";
+		break;
+	case CRYPTO_USER_TOO_MANY_TYPES:
+		valstr = "CRYPTO_USER_TOO_MANY_TYPES";
+		break;
+	case CRYPTO_WRAPPED_KEY_INVALID:
+		valstr = "CRYPTO_WRAPPED_KEY_INVALID";
+		break;
+	case CRYPTO_WRAPPED_KEY_LEN_RANGE:
+		valstr = "CRYPTO_WRAPPED_KEY_LEN_RANGE";
+		break;
+	case CRYPTO_WRAPPING_KEY_HANDLE_INVALID:
+		valstr = "CRYPTO_WRAPPING_KEY_HANDLE_INVALID";
+		break;
+	case CRYPTO_WRAPPING_KEY_SIZE_RANGE:
+		valstr = "CRYPTO_WRAPPING_KEY_SIZE_RANGE";
+		break;
+	case CRYPTO_WRAPPING_KEY_TYPE_INCONSISTENT:
+		valstr = "CRYPTO_WRAPPING_KEY_TYPE_INCONSISTENT";
+		break;
+	case CRYPTO_RANDOM_SEED_NOT_SUPPORTED:
+		valstr = "CRYPTO_RANDOM_SEED_NOT_SUPPORTED";
+		break;
+	case CRYPTO_RANDOM_NO_RNG:
+		valstr = "CRYPTO_RANDOM_NO_RNG";
+		break;
+	case CRYPTO_DOMAIN_PARAMS_INVALID:
+		valstr = "CRYPTO_DOMAIN_PARAMS_INVALID";
+		break;
+	case CRYPTO_BUFFER_TOO_SMALL:
+		valstr = "CRYPTO_BUFFER_TOO_SMALL";
+		break;
+	case CRYPTO_INFORMATION_SENSITIVE:
+		valstr = "CRYPTO_INFORMATION_SENSITIVE";
+		break;
+	case CRYPTO_NOT_SUPPORTED:
+		valstr = "CRYPTO_NOT_SUPPORTED";
+		break;
+	case CRYPTO_QUEUED:
+		valstr = "CRYPTO_QUEUED";
+		break;
+	case CRYPTO_BUFFER_TOO_BIG:
+		valstr = "CRYPTO_BUFFER_TOO_BIG";
+		break;
+	case CRYPTO_INVALID_CONTEXT:
+		valstr = "CRYPTO_INVALID_CONTEXT";
+		break;
+	case CRYPTO_INVALID_MAC:
+		valstr = "CRYPTO_INVALID_MAC";
+		break;
+	case CRYPTO_MECH_NOT_SUPPORTED:
+		valstr = "CRYPTO_MECH_NOT_SUPPORTED";
+		break;
+	case CRYPTO_INCONSISTENT_ATTRIBUTE:
+		valstr = "CRYPTO_INCONSISTENT_ATTRIBUTE";
+		break;
+	case CRYPTO_NO_PERMISSION:
+		valstr = "CRYPTO_NO_PERMISSION";
+		break;
+	case CRYPTO_INVALID_PROVIDER_ID:
+		valstr = "CRYPTO_INVALID_PROVIDER_ID";
+		break;
+	case CRYPTO_VERSION_MISMATCH:
+		valstr = "CRYPTO_VERSION_MISMATCH";
+		break;
+	case CRYPTO_BUSY:
+		valstr = "CRYPTO_BUSY";
+		break;
+	case CRYPTO_UNKNOWN_PROVIDER:
+		valstr = "CRYPTO_UNKNOWN_PROVIDER";
+		break;
+	case CRYPTO_MODVERIFICATION_FAILED:
+		valstr = "CRYPTO_MODVERIFICATION_FAILED";
+		break;
+	case CRYPTO_OLD_CTX_TEMPLATE:
+		valstr = "CRYPTO_OLD_CTX_TEMPLATE";
+		break;
+	case CRYPTO_WEAK_KEY:
+		valstr = "CRYPTO_WEAK_KEY";
+		break;
+	case CRYPTO_FIPS140_ERROR:
+		valstr = "CRYPTO_FIPS140_ERROR";
+		break;
+	default:
+		valstr = "Unknown KCF error";
+		break;
+	}
+
+	(void) snprintf(buf, buflen, "%s (0x%08x)", valstr, e);
+	return (buf);
 }

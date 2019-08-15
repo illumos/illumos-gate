@@ -23,9 +23,15 @@
 
 #include <aes/aes_impl.h>
 #include <stdio.h>
+#include <sys/sysmacros.h>
 
 #include "cryptotest.h"
 #include "aes_cbc_pad.h"
+
+static size_t updatelens[] = {
+	1, AES_BLOCK_LEN, AES_BLOCK_LEN + 1, 2*AES_BLOCK_LEN,
+	CTEST_UPDATELEN_WHOLE, CTEST_UPDATELEN_END
+};
 
 int
 main(void)
@@ -33,18 +39,15 @@ main(void)
 	int errs = 0;
 	int i;
 	uint8_t N[1024];
-	cryptotest_t args;
+	cryptotest_t args = {
+		.out = N,
+		.outlen = sizeof (N),
+		.plen = AES_BLOCK_LEN,
+		.mechname = CBC_PAD,
+		.updatelens = updatelens
+	};
 
-	args.out = N;
-
-	args.outlen = sizeof (N);
-	args.plen = AES_BLOCK_LEN;
-
-	args.mechname = CBC_PAD;
-	args.updatelen = 1;
-
-
-	for (i = 0; i < sizeof (RES) / sizeof (RES[0]); i++) {
+	for (i = 0; i < ARRAY_SIZE(RES); i++) {
 		args.in = DATA[i];
 		args.key = KEY[i];
 		args.param = IV[i];
@@ -58,7 +61,7 @@ main(void)
 
 	(void) fprintf(stderr, "\t\t\t=== decrypt ===\n----------\n\n");
 
-	for (i = 0; i < sizeof (RES) / sizeof (RES[0]); i++) {
+	for (i = 0; i < ARRAY_SIZE(RES); i++) {
 		args.in = RES[i];
 		args.key = KEY[i];
 		args.param = IV[i];

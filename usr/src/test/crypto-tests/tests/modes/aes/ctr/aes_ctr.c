@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <strings.h>
@@ -21,34 +22,32 @@
 #include "cryptotest.h"
 #include "aes_ctr.h"
 
+/*
+ * CTR is a stream cipher, and it runs ctr_mode_final every time
+ * it has a remainder, so the result is different
+ * if len == 0 mod block_size vs len != 0 mod block_size
+ */
+static size_t updatelens[] = { 16, CTEST_UPDATELEN_END };
+
 int
 main(void)
 {
 	int errs = 0;
 	int i;
 	uint8_t N[1024];
-	CK_AES_CTR_PARAMS param;
-	cryptotest_t args;
 	size_t cblen = sizeof (CTR_CB0);
-
-	bzero(&param, sizeof (param));
-	param.ulCounterBits = 128 - cblen*8;
-	param.cb[15] = 0x01;
-
-	args.out = N;
-	args.param = &param;
-
-	args.outlen = sizeof (N);
-	args.plen = sizeof (param);
-
-	/*
-	 * CTR is a stream cipher, and it runs ctr_mode_final every time
-	 * it has a remainder, so the result is different
-	 * if len == 0 mod block_size vs len != 0 mod block_size
-	 */
-
-	args.mechname = SUN_CKM_AES_CTR;
-	args.updatelen = 16;
+	CK_AES_CTR_PARAMS param = {
+		.ulCounterBits = 128 - cblen * 8,
+		.cb[15] = 0x01
+	};
+	cryptotest_t args = {
+		.out = N,
+		.outlen = sizeof (N),
+		.param = &param,
+		.plen = sizeof (param),
+		.mechname = SUN_CKM_AES_CTR,
+		.updatelens = updatelens
+	};
 
 	for (i = 0; i < sizeof (DATA) / sizeof (DATA[0]); i++) {
 		bcopy(CB[i], param.cb, cblen);

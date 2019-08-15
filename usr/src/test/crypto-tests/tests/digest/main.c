@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -24,18 +24,21 @@ extern uint8_t *MD[];
 extern size_t mdlen;
 extern char *mechname;
 
+static size_t updatelens[] = {
+	1, 8, 33, 67, CTEST_UPDATELEN_WHOLE, CTEST_UPDATELEN_END
+};
+
 int
 main(void)
 {
 	int i, errs = 0;
 	uint8_t N[1024];
-	cryptotest_t args = { 0 };
-
-	args.out = N;
-	args.outlen = sizeof (N);
-
-	args.mechname = mechname;
-	args.updatelen = 1;
+	cryptotest_t args = {
+		.out = N,
+		.outlen = sizeof (N),
+		.mechname = mechname,
+		.updatelens = updatelens
+	};
 
 	for (i = 0; i < msgcount; i++) {
 		args.in = MSG[i];
