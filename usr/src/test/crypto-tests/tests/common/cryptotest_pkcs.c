@@ -11,12 +11,15 @@
 
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
+#include <errno.h>
 #include <stdio.h>
+#include <string.h>
 #include <cryptoutil.h>
 #include <security/cryptoki.h>
+#include <sys/debug.h>
 
 #include "cryptotest.h"
 
@@ -30,7 +33,7 @@ struct crypto_op {
 	size_t outlen;
 	size_t keylen;
 	size_t paramlen;
-	size_t updatelen;
+	const size_t *updatelens;
 
 	char *mechname;
 
@@ -53,6 +56,11 @@ cryptotest_init(cryptotest_t *arg, crypto_func_group_t fg)
 {
 	crypto_op_t *op = malloc(sizeof (*op));
 
+	if (op == NULL) {
+		(void) fprintf(stderr, "malloc failed: %s\n", strerror(errno));
+		return (NULL);
+	}
+
 	op->in = (CK_BYTE_PTR)arg->in;
 	op->out = (CK_BYTE_PTR)arg->out;
 	op->key = (CK_BYTE_PTR)arg->key;
@@ -62,7 +70,7 @@ cryptotest_init(cryptotest_t *arg, crypto_func_group_t fg)
 	op->outlen = arg->outlen;
 	op->keylen = arg->keylen;
 	op->paramlen = arg->plen;
-	op->updatelen = arg->updatelen;
+	op->updatelens = arg->updatelens;
 
 	op->mechname = arg->mechname;
 
@@ -86,7 +94,7 @@ cryptotest_close_session(CK_SESSION_HANDLE hsession)
 	return (rv);
 }
 
-int
+void
 cryptotest_close(crypto_op_t *op)
 {
 	if (op->keyt != CK_INVALID_HANDLE)
@@ -95,7 +103,7 @@ cryptotest_close(crypto_op_t *op)
 	if (op->hsession != CK_INVALID_HANDLE)
 		(void) cryptotest_close_session(op->hsession);
 	free(op);
-	return (C_Finalize(NULL));
+	VERIFY0(C_Finalize(NULL));
 }
 
 int
@@ -168,10 +176,10 @@ sign_single(crypto_op_t *op)
 }
 
 int
-sign_update(crypto_op_t *op, int offset)
+sign_update(crypto_op_t *op, size_t offset, size_t len)
 {
 	CK_RV rv;
-	rv = C_SignUpdate(op->hsession, op->in + offset, op->updatelen);
+	rv = C_SignUpdate(op->hsession, op->in + offset, len);
 	if (rv != CKR_OK)
 		cryptotest_error("C_SignUpdate", rv);
 
@@ -204,13 +212,13 @@ mac_single(crypto_op_t *op)
 }
 
 int
-mac_update(crypto_op_t *op, int offset)
+mac_update(crypto_op_t *op, size_t offset, size_t len, size_t *dummy __unused)
 {
-	return (sign_update(op, offset));
+	return (sign_update(op, offset, len));
 }
 
 int
-mac_final(crypto_op_t *op)
+mac_final(crypto_op_t *op, size_t dummy __unused)
 {
 	return (sign_final(op));
 }
@@ -255,10 +263,10 @@ verify_single(crypto_op_t *op)
 }
 
 int
-verify_update(crypto_op_t *op, int offset)
+verify_update(crypto_op_t *op, size_t offset, size_t len)
 {
 	CK_RV rv;
-	rv = C_VerifyUpdate(op->hsession, op->in + offset, op->updatelen);
+	rv = C_VerifyUpdate(op->hsession, op->in + offset, len);
 	if (rv != CKR_OK)
 		cryptotest_error("C_VerifyUpdate", rv);
 	return (rv);
@@ -315,11 +323,11 @@ encrypt_single(crypto_op_t *op)
 }
 
 int
-encrypt_update(crypto_op_t *op, int offset, size_t *encrlen)
+encrypt_update(crypto_op_t *op, size_t offset, size_t plainlen, size_t *encrlen)
 {
 	CK_RV rv;
 	CK_ULONG outlen = op->outlen - *encrlen;
-	rv = C_EncryptUpdate(op->hsession, op->in + offset, op->updatelen,
+	rv = C_EncryptUpdate(op->hsession, op->in + offset, plainlen,
 	    op->out + *encrlen, &outlen);
 	if (rv != CKR_OK)
 		cryptotest_error("C_EncryptUpdate", rv);
@@ -379,11 +387,11 @@ decrypt_single(crypto_op_t *op)
 }
 
 int
-decrypt_update(crypto_op_t *op, int offset, size_t *encrlen)
+decrypt_update(crypto_op_t *op, size_t offset, size_t len, size_t *encrlen)
 {
 	CK_RV rv;
 	CK_ULONG outlen = op->outlen - *encrlen;
-	rv = C_DecryptUpdate(op->hsession, op->in + offset, op->updatelen,
+	rv = C_DecryptUpdate(op->hsession, op->in + offset, len,
 	    op->out + *encrlen, &outlen);
 	if (rv != CKR_OK)
 		cryptotest_error("C_DecryptUpdate", rv);
@@ -435,18 +443,19 @@ digest_single(crypto_op_t *op)
 }
 
 int
-digest_update(crypto_op_t *op, int offset)
+digest_update(crypto_op_t *op, size_t offset, size_t len,
+    size_t *dummy __unused)
 {
 	CK_RV rv;
 
-	rv = C_DigestUpdate(op->hsession, op->in + offset, op->updatelen);
+	rv = C_DigestUpdate(op->hsession, op->in + offset, len);
 	if (rv != CKR_OK)
 		cryptotest_error("C_DigestUpdate", rv);
 	return (rv);
 }
 
 int
-digest_final(crypto_op_t *op)
+digest_final(crypto_op_t *op, size_t dummy __unused)
 {
 	CK_RV rv;
 
@@ -474,4 +483,27 @@ size_t
 ccm_param_len(void)
 {
 	return (sizeof (CK_CCM_PARAMS));
+}
+
+const char *
+cryptotest_errstr(int e, char *buf, size_t buflen)
+{
+	char *valstr = NULL;
+
+	valstr = pkcs11_strerror(e);
+
+	/*
+	 * We'd like both the symbolic and numeric value for every error
+	 * value.  pkcs11_strerror() already includes the numeric value
+	 * for unknown error values (but not for known values), so we take
+	 * advantage of all known PKCS#11 error values starting with 'CKR_'
+	 * to determine if we need to include the numeric value or not.
+	 */
+	if (strcmp(valstr, "CKR_") == 0) {
+		(void) snprintf(buf, buflen, "%s (%08x)", valstr, e);
+	} else {
+		(void) strlcpy(buf, valstr, buflen);
+	}
+
+	return (buf);
 }

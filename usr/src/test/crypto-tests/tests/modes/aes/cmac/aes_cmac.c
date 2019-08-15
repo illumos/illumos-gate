@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <aes/aes_impl.h>
@@ -19,25 +20,26 @@
 #include "cryptotest.h"
 #include "aes_cmac.h"
 
+static size_t updatelens[] = {
+	1, AES_BLOCK_LEN, AES_BLOCK_LEN + 1, 2*AES_BLOCK_LEN,
+	CTEST_UPDATELEN_WHOLE, CTEST_UPDATELEN_END
+};
+
 int
 main(void)
 {
 	int errs = 0;
 	int i;
 	uint8_t N[AES_BLOCK_LEN];
-	cryptotest_t args;
-
-	args.in = M;
-	args.out = N;
-	args.key = keytest;
-	args.param = NULL;
-
-	args.outlen = sizeof (N);
-	args.keylen = sizeof (keytest);
-	args.plen = 0;
-
-	args.mechname = SUN_CKM_AES_CMAC;
-	args.updatelen = 1;
+	cryptotest_t args = {
+		.in = M,
+		.out = N,
+		.outlen = sizeof (N),
+		.key = keytest,
+		.keylen = sizeof (keytest),
+		.mechname = SUN_CKM_AES_CMAC,
+		.updatelens = updatelens
+	};
 
 	for (i = 0; i < sizeof (RES) / sizeof (RES[0]); i++) {
 		args.inlen = DATALEN[i];

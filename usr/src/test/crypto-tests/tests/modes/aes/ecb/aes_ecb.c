@@ -11,11 +11,18 @@
 
 /*
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
+#include <aes/aes_impl.h>
 #include <stdio.h>
 #include "cryptotest.h"
 #include "aes_ecb.h"
+
+static size_t updatelens[] = {
+	1, AES_BLOCK_LEN, AES_BLOCK_LEN + 1, 2*AES_BLOCK_LEN,
+	CTEST_UPDATELEN_WHOLE, CTEST_UPDATELEN_END
+};
 
 int
 main(void)
@@ -23,18 +30,14 @@ main(void)
 	int errs = 0;
 	int i;
 	uint8_t N[1024];
-	cryptotest_t args;
-
-	args.in = ECB_DATA;
-	args.out = N;
-	args.param = NULL;
-
-	args.inlen = sizeof (ECB_DATA);
-	args.outlen = sizeof (N);
-	args.plen = 0;
-
-	args.mechname = SUN_CKM_AES_ECB;
-	args.updatelen = 1;
+	cryptotest_t args = {
+		.in = ECB_DATA,
+		.inlen = sizeof (ECB_DATA),
+		.out = N,
+		.outlen = sizeof (N),
+		.updatelens = updatelens,
+		.mechname = SUN_CKM_AES_ECB
+	};
 
 	for (i = 0; i < sizeof (RES) / sizeof (RES[0]); i++) {
 		args.key = KEY[i];

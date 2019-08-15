@@ -27,6 +27,10 @@ extern uint8_t *HMAC[];
 extern size_t hmac_len;
 extern size_t msgcount;
 
+static size_t updatelens[] = {
+	1, 8, 33, 67, CTEST_UPDATELEN_WHOLE, CTEST_UPDATELEN_END
+};
+
 int
 main(void)
 {
@@ -38,7 +42,7 @@ main(void)
 		.outlen = sizeof (N),
 		.plen = 0,
 		.mechname = mechname,
-		.updatelen = 1
+		.updatelens = updatelens
 	};
 
 	for (i = 0; i < msgcount; i++) {
