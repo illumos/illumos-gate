@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2011, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -630,8 +630,6 @@ process_pg(scf_propertygroup_t *pg)
 			    "has too many components for property "
 			    "group `%s'.\n"), spn->spn_comp1, spn->spn_comp2,
 			    buf);
-
-			free(buf);
 		}
 
 		if (scf_pg_get_property(pg, spn->spn_comp1, prop) == 0) {

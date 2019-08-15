@@ -22,6 +22,8 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 Joyent, Inc.
+#
 
 CRTI = crti.o
 CRTN = crtn.o
@@ -51,9 +53,11 @@ $(INTEL_BLD)ROOTOBJECTS64 += $(ROOTLIB64)/gcrt1.o
 ASFLAGS +=	-P -D__STDC__ -D_ASM -DPIC $(AS_PICFLAGS)
 
 values-xpg6.o := CPPFLAGS += -I$(SRC)/lib/libc/inc
-values-xpg6.lint := CPPFLAGS += -I$(SRC)/lib/libc/inc
 $(COMMON_CRT) $(VALUES) := CFLAGS += $(C_PICFLAGS)
 $(COMMON_CRT) $(VALUES) := CFLAGS64 += $(C_PICFLAGS64)
+
+# intentional double exit
+SMOFF += unreachable
 
 .KEEP_STATE:
 
@@ -62,10 +66,6 @@ all:	$(OBJECTS)
 clean clobber:
 	$(RM) $(OBJECTS)
 
-%.lint: ../common/%.c
-	$(LINT.c) $(LINTCHECKFLAGS) $<
-
-lint:	$(VALUES:%.o=%.lint) $(COMMON_CRT:%.o=%.lint)
 
 $(CRT1): $(COMMON_CRT) $(MACH_CRT)
 	$(LD) -r $(MACH_CRT) $(COMMON_CRT) -o $(CRT1)

@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include <scsi/libses.h>
 #include "ses_impl.h"
@@ -54,9 +56,7 @@ ses_vpanic(const char *fmt, va_list ap)
 
 	(void) write(STDERR_FILENO, msg, strlen(msg));
 
-abort:
 	abort();
-	_exit(1);
 }
 
 /*PRINTFLIKE1*/

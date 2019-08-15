@@ -28,7 +28,7 @@
  */
 
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -84,8 +84,6 @@ ld_map_kwfind(const char *name, void *array, size_t name_offset,
 	}
 
 	/*NOTREACHED*/
-	assert(0);
-	return (NULL);
 }
 #endif
 
@@ -199,7 +197,7 @@ ld_map_cap_set_ovflag(Mapfile *mf, Word type)
 	 * override flag.
 	 */
 	static ofl_flag_t override_flag[CA_SUNW_NUM] = {
-		0, 			/* CA_SUNW_NULL */
+		0,			/* CA_SUNW_NULL */
 		FLG_OF1_OVHWCAP1,	/* CA_SUNW_HW_1 */
 		FLG_OF1_OVSFCAP1,	/* CA_SUNW_SF_1 */
 		FLG_OF1_OVHWCAP2,	/* CA_SUNW_HW_2 */

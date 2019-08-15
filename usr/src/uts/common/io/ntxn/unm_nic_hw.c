@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -704,7 +704,6 @@ unm_nic_hw_write_wx_2M(unm_adapter *adapter, u64 off, void *data, int len)
 	if (rv == -1) {
 		cmn_err(CE_PANIC, "%s: invalid offset: 0x%016llx\n",
 		    __FUNCTION__, off);
-		return (-1);
 	}
 
 	if (rv == 1) {
@@ -813,7 +812,6 @@ unm_nic_hw_read_wx_2M(unm_adapter *adapter, u64 off, void *data, int len)
 	if (rv == -1) {
 		cmn_err(CE_PANIC, "%s: invalid offset: 0x%016llx\n",
 		    __FUNCTION__, off);
-		return (-1);
 	}
 
 	if (rv == 1) {
@@ -953,7 +951,6 @@ unm_nic_pci_set_window_128M(struct unm_adapter_s *adapter,
 		/* DDR network side */
 		/* MN access should never come here */
 		cmn_err(CE_PANIC, "%s\n", __FUNCTION__);
-		addr = -1ULL;
 	} else if (ADDR_IN_RANGE(addr, UNM_ADDR_OCM0, UNM_ADDR_OCM0_MAX)) {
 		addr -= UNM_ADDR_OCM0;
 		addr += UNM_PCI_OCM0;

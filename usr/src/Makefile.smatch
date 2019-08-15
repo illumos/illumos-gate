@@ -16,7 +16,7 @@
 # simply too much legacy).
 #
 
-SMATCH_ARGS = --disable=uninitialized,check_check_deref,unreachable
+SMATCH_ARGS = --disable=uninitialized,check_check_deref
 
 # VLAs are OK by us
 SMATCH_ARGS += -Wno-vla

@@ -1684,7 +1684,6 @@ i40e_alloc_intr_handles(i40e_t *i40e, dev_info_t *devinfo, int intr_type)
 	default:
 		panic("bad interrupt type passed to i40e_alloc_intr_handles: "
 		    "%d", intr_type);
-		return (B_FALSE);
 	}
 
 	rc = ddi_intr_get_nintrs(devinfo, intr_type, &count);

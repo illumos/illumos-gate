@@ -23,6 +23,10 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/scsi/generic/commands.h>
 #include <sys/scsi/impl/spc3_types.h>
@@ -56,10 +60,7 @@ libscsi_assert(const char *expr, const char *file, int line)
 	(void) write(STDERR_FILENO, msg, strlen(msg));
 
 	abort();
-	_exit(1);
-
 	/*NOTREACHED*/
-	return (0);
 }
 
 int

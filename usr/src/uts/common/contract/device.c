@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/mutex.h>
@@ -2053,7 +2054,6 @@ contract_device_negotiate(dev_info_t *dip, dev_t dev, int spec_type,
 		cmn_err(CE_PANIC, "contract_device_negotiate(): Negotiation "
 		    "not supported: event (%d) for dev_t (%lu) and spec (%d), "
 		    "dip (%p)", evtype, dev, spec_type, (void *)dip);
-		result = CT_NACK;
 		break;
 	}
 

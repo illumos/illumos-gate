@@ -20,9 +20,9 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
+#
+# Copyright 2019 Joyent, Inc.
 #
 
 PROG= ul
@@ -31,14 +31,15 @@ include ../Makefile.cmd
 
 LDLIBS += -lcurses
 
+# false positive
+SMOFF += unreachable
+
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTPROG)
 
 clean:
-
-lint:	lint_PROG
 
 include ../Makefile.targ

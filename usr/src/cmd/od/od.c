@@ -14,6 +14,10 @@
  */
 
 /*
+ * Copyright 2019 Joyent, Inc.
+ */
+
+/*
  * od - octal dump.  Not really just octal anymore; read the POSIX
  * specification for it -- its more complex than you think!
  *
@@ -533,7 +537,6 @@ do_type_string(char *typestr)
 		default:
 			errx(1, _("unrecognized type string character: %c"),
 			    *typestr);
-			exit(1);
 		}
 	}
 }

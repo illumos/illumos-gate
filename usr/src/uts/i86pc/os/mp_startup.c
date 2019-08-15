@@ -1923,7 +1923,6 @@ mp_startup_common(boolean_t boot)
 	 * Now we are done with the startup thread, so free it up.
 	 */
 	thread_exit();
-	panic("mp_startup: cannot return");
 	/*NOTREACHED*/
 }
 

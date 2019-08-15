@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 2012, 2018 by Delphix. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/zfs_context.h>
@@ -405,7 +406,6 @@ vdev_queue_class_min_active(zio_priority_t p)
 		return (zfs_vdev_initializing_min_active);
 	default:
 		panic("invalid priority %u", p);
-		return (0);
 	}
 }
 
@@ -468,7 +468,6 @@ vdev_queue_class_max_active(spa_t *spa, zio_priority_t p)
 		return (zfs_vdev_initializing_max_active);
 	default:
 		panic("invalid priority %u", p);
-		return (0);
 	}
 }
 

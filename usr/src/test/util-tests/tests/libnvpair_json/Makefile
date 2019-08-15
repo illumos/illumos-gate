@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2014 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
@@ -43,7 +43,8 @@ $(CMDS) := FILEMODE = 0555
 
 LDLIBS += -lnvpair
 
-LINTFLAGS += -erroff=E_FUNC_ARG_UNUSED
+# intentional abort()
+SMOFF += unreachable
 
 all: $(PROG)
 

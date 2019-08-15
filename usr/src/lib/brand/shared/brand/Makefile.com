@@ -23,7 +23,7 @@
 #
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
-# Copyright (c) 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 COBJS =		brand_util.o
@@ -55,6 +55,9 @@ CPPFLAGS +=	-D_REENTRANT -U_ASM -I. -I../sys
 CFLAGS +=	$(CCVERBOSE)
 ASFLAGS =	-P $(ASFLAGS_$(CURTYPE)) -D_ASM -I. -I../sys
 
+# intentional code after abort()
+SMOFF += unreachable
+
 .KEEP_STATE:
 
 #
@@ -66,8 +69,6 @@ ASFLAGS =	-P $(ASFLAGS_$(CURTYPE)) -D_ASM -I. -I../sys
 # will see two different commands to build it (endless rebuilds).
 #
 all: pics .WAIT $$(PICS)
-
-lint: lintcheck
 
 $(OBJECTS:%=pics/%): $(OFFSETS_H)
 

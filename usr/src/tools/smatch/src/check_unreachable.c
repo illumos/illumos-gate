@@ -172,7 +172,7 @@ static void unreachable_stmt(struct statement *stmt)
 	default:
 		break;
 	}
-	sm_msg("info: ignoring unreachable code.");
+	sm_warning("ignoring unreachable code.");
 	print_unreached = 0;
 }
 

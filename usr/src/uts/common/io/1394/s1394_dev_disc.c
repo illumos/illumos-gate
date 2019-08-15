@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 /*
  * s1394_dev_disc.c
@@ -89,7 +91,7 @@ typedef enum {
 #define	SETUP_QUAD_READ(n, reset_fails, quadlet, cnt)			\
 {									\
 	int i = (reset_fails);						\
-	if (i != 0) { 							\
+	if (i != 0) {							\
 		(n)->cfgrom_read_fails = 0;				\
 		(n)->cfgrom_read_delay = (uchar_t)s1394_cfgrom_read_delay_ms; \
 	}								\
@@ -489,7 +491,6 @@ s1394_br_thread_exit(s1394_hal_t *hal)
 	hal->br_thread_ev_type &= ~BR_THR_GO_AWAY;
 	thread_exit();
 	/*NOTREACHED*/
-	TNF_PROBE_0(s1394_br_thread_exit_enter, S1394_TNF_SL_HOTPLUG_STACK, "");
 }
 
 /*

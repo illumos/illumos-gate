@@ -23,6 +23,10 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <strings.h>
 #include <fm/fmd_api.h>
@@ -112,7 +116,6 @@ fmevt_init_outbound(fmd_hdl_t *hdl)
 	    EVCH_CREAT | EVCH_HOLD_PEND_INDEF) != 0) {
 		fmd_hdl_abort(hdl, "Unable to bind channel %s",
 		    channel_name);
-		return;
 	}
 
 	channel_depth = fmd_prop_get_int32(hdl, "outbound_channel_depth");

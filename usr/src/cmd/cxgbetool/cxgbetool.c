@@ -13,6 +13,10 @@
  * Copyright (c) 2018 by Chelsio Communications, Inc.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -85,7 +89,7 @@ static void usage(FILE *fp)
 	exit(fp == stderr ? 1 : 0);
 }
 
-static void
+__NORETURN static void
 err(int code, const char *fmt, ...)
 {
 	va_list ap;

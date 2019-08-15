@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 RackTop Systems.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -1988,7 +1989,6 @@ start_audit_session(repcache_client_t *cp)
 		case EFAULT:
 		default:
 			bad_error("door_ucred", errno);
-			return;
 		}
 	}
 	if (adt_start_session(&session, NULL, 0) != 0) {
