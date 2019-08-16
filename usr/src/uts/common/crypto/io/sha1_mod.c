@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/modctl.h>
@@ -134,6 +135,8 @@ static crypto_digest_ops_t sha1_digest_ops = {
 
 static int sha1_mac_init(crypto_ctx_t *, crypto_mechanism_t *, crypto_key_t *,
     crypto_spi_ctx_template_t, crypto_req_handle_t);
+static int sha1_mac(crypto_ctx_t *, crypto_data_t *, crypto_data_t *,
+    crypto_req_handle_t);
 static int sha1_mac_update(crypto_ctx_t *, crypto_data_t *,
     crypto_req_handle_t);
 static int sha1_mac_final(crypto_ctx_t *, crypto_data_t *, crypto_req_handle_t);
@@ -146,7 +149,7 @@ static int sha1_mac_verify_atomic(crypto_provider_handle_t, crypto_session_id_t,
 
 static crypto_mac_ops_t sha1_mac_ops = {
 	sha1_mac_init,
-	NULL,
+	sha1_mac,
 	sha1_mac_update,
 	sha1_mac_final,
 	sha1_mac_atomic,
@@ -907,6 +910,103 @@ sha1_mac_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 		ctx->cc_provider_private = NULL;
 	}
 
+	return (ret);
+}
+
+static int
+sha1_mac(crypto_ctx_t *ctx, crypto_data_t *data, crypto_data_t *mac,
+    crypto_req_handle_t req)
+{
+	SHA1_CTX *ictx = NULL;
+	SHA1_CTX *octx = NULL;
+	uchar_t digest[SHA1_DIGEST_LENGTH];
+	uint32_t digest_len = SHA1_DIGEST_LENGTH;
+	int ret = CRYPTO_SUCCESS;
+
+	ASSERT(ctx->cc_provider_private != NULL);
+
+	if (PROV_SHA1_HMAC_CTX(ctx)->hc_mech_type ==
+	    SHA1_HMAC_GEN_MECH_INFO_TYPE) {
+		digest_len = PROV_SHA1_HMAC_CTX(ctx)->hc_digest_len;
+	}
+
+	if ((mac->cd_length == 0) ||
+	    (mac->cd_length < digest_len)) {
+		mac->cd_length = digest_len;
+		return (CRYPTO_BUFFER_TOO_SMALL);
+	}
+
+	ictx = &PROV_SHA1_HMAC_CTX(ctx)->hc_icontext;
+	octx = &PROV_SHA1_HMAC_CTX(ctx)->hc_ocontext;
+
+	switch (data->cd_format) {
+	case CRYPTO_DATA_RAW:
+		SHA1Update(ictx,
+		    (uint8_t *)data->cd_raw.iov_base + data->cd_offset,
+		    data->cd_length);
+		break;
+	case CRYPTO_DATA_UIO:
+		ret = sha1_digest_update_uio(ictx, data);
+		break;
+	case CRYPTO_DATA_MBLK:
+		ret = sha1_digest_update_mblk(ictx, data);
+		break;
+	default:
+		ret = CRYPTO_ARGUMENTS_BAD;
+	}
+
+	if (ret != CRYPTO_SUCCESS) {
+		kmem_free(ctx->cc_provider_private, sizeof (sha1_hmac_ctx_t));
+		ctx->cc_provider_private = NULL;
+		mac->cd_length = 0;
+		return (ret);
+	}
+
+	/*
+	 * Do a SHA1 final on the inner context.
+	 */
+	SHA1Final(digest, ictx);
+
+	/*
+	 * Do a SH1 update on the outer context, feeding the inner
+	 * digest as data.
+	 */
+	SHA1Update(octx, digest, SHA1_DIGEST_LENGTH);
+
+	switch (mac->cd_format) {
+	case CRYPTO_DATA_RAW:
+		if (digest_len != SHA1_DIGEST_LENGTH) {
+			/*
+			 * The caller requested a short digest. Digest
+			 * into a scratch buffer and return to
+			 * the user only what was requested.
+			 */
+			SHA1Final(digest, octx);
+			bcopy(digest, (unsigned char *)mac->cd_raw.iov_base +
+			    mac->cd_offset, digest_len);
+		} else {
+			SHA1Final((unsigned char *)mac->cd_raw.iov_base +
+			    mac->cd_offset, octx);
+		}
+		break;
+	case CRYPTO_DATA_UIO:
+		ret = sha1_digest_final_uio(octx, mac, digest_len, digest);
+		break;
+	case CRYPTO_DATA_MBLK:
+		ret = sha1_digest_final_mblk(octx, mac, digest_len, digest);
+		break;
+	default:
+		ret = CRYPTO_ARGUMENTS_BAD;
+	}
+
+	if (ret == CRYPTO_SUCCESS) {
+		mac->cd_length = SHA1_DIGEST_LENGTH;
+	} else {
+		mac->cd_length = 0;
+	}
+
+	kmem_free(ctx->cc_provider_private, sizeof (sha1_hmac_ctx_t));
+	ctx->cc_provider_private = NULL;
 	return (ret);
 }
 
