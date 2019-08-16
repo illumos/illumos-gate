@@ -1,90 +1,68 @@
 #
-# CDDL HEADER START
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
 #
-# The contents of this file are subject to the terms of the
-# Common Development and Distribution License (the "License").
-# You may not use this file except in compliance with the License.
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
 #
-# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-# or http://www.opensolaris.org/os/licensing.
-# See the License for the specific language governing permissions
-# and limitations under the License.
-#
-# When distributing Covered Code, include this CDDL HEADER in each
-# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
-# If applicable, add the following below this CDDL HEADER, with the
-# fields enclosed by brackets "[]" replaced with your own identifying
-# information: Portions Copyright [yyyy] [name of copyright owner]
-#
-# CDDL HEADER END
-#
+
 #
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
-#	Path to the base of the uts directory tree (usually /usr/src/uts).
+# Path to the base of the uts directory tree (usually /usr/src/uts).
 #
-UTSBASE		= ../..
+UTSBASE =		../..
 
 #
-#	Define the module and object file sets.
+# Define the module and object file sets.
 #
-MODULE		= vioblk
-OBJECTS		= $(VIOBLK_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(VIOBLK_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+MODULE =		vioblk
+OBJECTS =		$(VIOBLK_OBJS:%=$(OBJS_DIR)/%)
+ROOTMODULE =		$(ROOT_DRV_DIR)/$(MODULE)
 
 #
-#	Include common rules.
+# Include common rules.
 #
 include $(UTSBASE)/intel/Makefile.intel
 
 #
-#	Define targets
+# Define targets
 #
-ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+ALL_TARGET =		$(BINARY)
+INSTALL_TARGET =	$(BINARY) $(ROOTMODULE)
 
 #
-#	Overrides
+# Overrides
 #
-
-INC_PATH += -I$(UTSBASE)/common/io/virtio
-
-#
-# lint pass one enforcement
-#
-CFLAGS += $(CCVERBOSE)
+INC_PATH +=		-I$(UTSBASE)/common/io/virtio
 
 #
 # Driver depends on virtio and blkdev
 #
-LDFLAGS		+= -dy -N misc/virtio -N drv/blkdev
+LDFLAGS +=		-dy -N misc/virtio -N drv/blkdev
 
 #
-#	Default build targets.
+# Default build targets.
 #
 .KEEP_STATE:
 
-def:		$(DEF_DEPS)
+def: $(DEF_DEPS)
 
-all:		$(ALL_DEPS)
+all: $(ALL_DEPS)
 
-clean:		$(CLEAN_DEPS)
+clean: $(CLEAN_DEPS)
 
-clobber:	$(CLOBBER_DEPS)
+clobber: $(CLOBBER_DEPS)
 
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
-
-install:	$(INSTALL_DEPS)
+install: $(INSTALL_DEPS)
 
 #
-#	Include common targets.
+# Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
