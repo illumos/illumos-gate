@@ -36,7 +36,7 @@ CPPFLAGS +=	-I$(SRC)/cmd/svr4pkg/hdrs \
 
 
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-address
 
 # multiple issues in this old code

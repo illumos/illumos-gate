@@ -46,7 +46,7 @@ LDLIBS +=  -lnsl -lbsm
 
 CPPFLAGS += -D_REENTRANT
 CFLAGS += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-unused-variable
 
 # not linted

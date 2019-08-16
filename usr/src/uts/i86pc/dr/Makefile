@@ -62,7 +62,7 @@ ALL_BUILDS	= $(ALL_BUILDS64)
 CFLAGS += $(CCVERBOSE)
 
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-empty-body
 
 # needs work

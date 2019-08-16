@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #ifndef _THR_INLINES_H
 #define	_THR_INLINES_H
 
@@ -140,7 +144,7 @@ gethrtime(void)		/* note: caller-saved registers are trashed */
 extern __GNU_INLINE int
 set_lock_byte(volatile uint8_t *__lockp)
 {
-	int __value;
+	int __value = 0;
 #if defined(__x86)
 	__asm__ __volatile__(
 	    "movl $1, %0\n\t"

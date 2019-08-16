@@ -50,7 +50,7 @@ LIBS = $(LIBRARY)
 
 CPPFLAGS =	-I../../include $(CPPFLAGS.master)
 
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-parentheses
 
 # not linted

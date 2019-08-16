@@ -38,7 +38,7 @@ CPPFLAGS +=     -D_REENTRANT -I$(SRC)/uts/common/gssapi/include  \
 CFLAGS +=	$(XFFLAG)
 CFLAGS64 +=	$(XFFLAG)
 
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-parentheses
 
 # not linted

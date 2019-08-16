@@ -42,7 +42,7 @@ CPPFLAGS +=	-I../../libgss -I$(SRC)/uts/common/gssapi/include \
 	    	-I$(ROOT)/usr/include/gssapi
 
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 # needs work
 SMATCH=off

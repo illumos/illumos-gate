@@ -33,7 +33,7 @@ include ../../../Makefile.cmd
 
 LDLIBS +=	-lscf -luutil -linetsvc
 CERRWARN +=	-_gcc=-Wno-switch
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 lint := LINTFLAGS = -ux
 

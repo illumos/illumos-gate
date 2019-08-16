@@ -80,7 +80,7 @@ LDFLAGS	+=	-dy -Nmisc/busra -Nmisc/pcmcia -Nmisc/cardbus
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-function
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 #
 # For now, disable these lint checks; maintainers should endeavor

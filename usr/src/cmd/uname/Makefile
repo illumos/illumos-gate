@@ -28,7 +28,7 @@ ROOTFS_PROG=	$(PROG)
 include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 

@@ -64,7 +64,7 @@ LDFLAGS		+= -dy -N misc/iommulib -N misc/acpica
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-function
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
 $(OBJS_DIR)/immu_qinv.o := SMOFF += index_overflow

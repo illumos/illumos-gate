@@ -37,7 +37,7 @@ LDLIBS += -L$(ROOT)/lib
 LDLIBS += -ldladm -lofmt
 
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

@@ -38,7 +38,7 @@ CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
 CPPFLAGS +=-D_FILE_OFFSET_BITS=64
 
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 LDLIBS += -lkmf -lpkcs11 -lcryptoutil
 

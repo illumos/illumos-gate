@@ -30,7 +30,7 @@ include $(SRC)/cmd/Makefile.cmd
 
 LDLIBS   += -lraidcfg
 CFLAGS	 += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 

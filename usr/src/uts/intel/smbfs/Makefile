@@ -64,7 +64,7 @@ LDFLAGS         += -dy -Ndrv/nsmb
 # Until CR 4994570 is fixed...
 LINTTAGS	+= -erroff=E_BAD_FORMAT_ARG_TYPE2
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
 SMOFF += all_func_returns,signed,deref_check

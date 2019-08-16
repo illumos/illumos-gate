@@ -35,7 +35,7 @@ include ../../Makefile.cmd
 include ../../Makefile.cmd.64
 
 CFLAGS64	+= $(CCVERBOSE)
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 LDLIBS	+= -lproc
 

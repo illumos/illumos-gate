@@ -72,7 +72,7 @@ LDFLAGS		+= -dy -Nmisc/usba -Nmisc/scsi
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 CERRWARN	+= -_gcc=-Wno-unused-label
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
 $(OBJS_DIR)/scsa2usb.o := SMOFF += deref_check

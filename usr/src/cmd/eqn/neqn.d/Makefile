@@ -28,7 +28,7 @@ CPPFLAGS =	-DNEQN -I. -I.. $(CPPFLAGS.master)
 LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
 
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-unused-label
 
 # not linted

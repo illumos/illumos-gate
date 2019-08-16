@@ -42,7 +42,7 @@ LDLIBS += -lcfgadm
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-unused-function
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 PSMPROG = $(USR_PSM_LIB_DIR)/$(PROG)
 

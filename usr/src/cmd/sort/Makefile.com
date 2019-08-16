@@ -86,7 +86,7 @@ CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
 LINTFLAGS +=	-U_FILE_OFFSET_BITS
 
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-unused-function
 
 # not linted

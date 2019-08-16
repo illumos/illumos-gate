@@ -40,7 +40,7 @@ include ../Makefile.cmd
 
 LDLIBS += -lgen
 CFLAGS += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-unused-variable
 
 # not linted

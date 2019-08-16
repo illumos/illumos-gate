@@ -60,7 +60,7 @@ LDFLAGS		+= -dy -Nmisc/mii -Nmisc/mac
 
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-unused-label
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
 $(OBJS_DIR)/hme.o := SMOFF += indenting,deref_check

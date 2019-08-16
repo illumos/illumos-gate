@@ -21,21 +21,23 @@
 #
 # Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
+#
 
 PROG = zlogin
 
 include ../Makefile.cmd
 
-LINTFLAGS += -u
 LDLIBS += -lsocket -lzonecfg -lcontract -lbrand -lsecdb
 CFLAGS += $(CCVERBOSE)
 FILEMODE = 0555
 
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off
+
+CSTD = $(CSTD_GNU99)
 
 .KEEP_STATE:
 
@@ -45,7 +47,5 @@ install: all $(ROOTUSRSBINPROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_PROG
 
 include ../Makefile.targ

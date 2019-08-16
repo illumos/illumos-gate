@@ -30,7 +30,7 @@ CPPFLAGS.sm=	$(CPPFLAGS.master) -DSOLARIS=2$(RELEASE_MINOR)00 \
 		-D_FILE_OFFSET_BITS=64
 CERRWARN +=	-_gcc=-Wno-clobbered
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-empty-body
 CERRWARN +=	-_gcc=-Wno-unused-variable

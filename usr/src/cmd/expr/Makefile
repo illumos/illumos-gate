@@ -37,7 +37,7 @@ SRCS= expr.c compile.c
 include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-extra
 # "missing type for func"
 SMATCH=off

@@ -58,6 +58,7 @@
 ./lib/sparcv9/libc_i18n.a
 ./platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel.6.46
 ./platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel.6.47
+./platform/sun4u/kernel/drv/sparcv9/ctsmc
 ./platform/sun4v/kernel/drv/ncp.conf
 ./platform/sun4v/kernel/drv/n2cp.conf
 ./usr/has

@@ -46,7 +46,7 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 
 CPPFLAGS += -I$(EVERCMNSRC) -I.
 CFLAGS += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-switch

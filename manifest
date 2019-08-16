@@ -19328,7 +19328,6 @@ f usr/share/man/man7d/ticlts.7d 0444 root bin
 s usr/share/man/man7d/ticots.7d=ticlts.7d
 s usr/share/man/man7d/ticotsord.7d=ticlts.7d
 f usr/share/man/man7d/tty.7d 0444 root bin
-f usr/share/man/man7d/ttymux.7d 0444 root bin
 f usr/share/man/man7d/tzmon.7d 0444 root bin
 f usr/share/man/man7d/ufm.7d 0444 root bin
 f usr/share/man/man7d/ugen.7d 0444 root bin

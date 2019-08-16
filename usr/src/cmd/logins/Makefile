@@ -30,7 +30,7 @@ include ../Makefile.cmd
 TEXT_DOMAIN= SUNW_OST_ADMIN
 
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 FILEMODE= 0750
 

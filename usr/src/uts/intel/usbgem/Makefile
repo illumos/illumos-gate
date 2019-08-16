@@ -42,7 +42,7 @@ CPPFLAGS	+= \
 		-DUSBGEM_CONFIG_MAC_PROP \
 		-DVERSION=\"1.6\"
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-unused-variable

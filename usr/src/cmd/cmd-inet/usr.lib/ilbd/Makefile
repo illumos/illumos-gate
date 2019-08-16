@@ -51,7 +51,7 @@ CPPFLAGS +=	-I$(LIB_INC)
 CPPFLAGS +=	-I$(SRC)/uts/common
 
 CERRWARN +=	-_gcc=-Wno-switch
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-unused-label
 
 # not linted

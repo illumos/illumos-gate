@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 Peter Tribble.
  */
 
 /*
@@ -220,11 +222,7 @@ signal_devtree(void)
 		return;
 
 	/*
-	 * Right now (Aug. 2007) snowbird is the only other platform
-	 * which uses this event.  Since that's a sun4u platform and
-	 * this is sun4v we do not have to worry about possible confusion
-	 * or interference between the two by grabbing this event for
-	 * our own use here.  This event is consumed by the devtree
+	 * This event is consumed by the devtree
 	 * plug-in.  The event signals the plug-in to re-run its
 	 * cpu initialization function, which will cause it to add
 	 * additional information to the cpu devtree nodes (particularly,

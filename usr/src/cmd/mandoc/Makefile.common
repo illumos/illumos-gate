@@ -79,7 +79,7 @@ OBJS=		arch.o		\
 OBJS +=		compat_ohash.o
 
 # XXX gcc 4.4.4 false positive
-roff.o :=	CERRWARN += -_gcc=-Wno-uninitialized
+roff.o :=	CERRWARN += $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

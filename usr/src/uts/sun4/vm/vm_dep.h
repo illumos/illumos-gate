@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -55,7 +56,7 @@ extern u_longlong_t randtick(void);
 	mtype = (flags & PG_NORELOC) ? MTYPE_NORELOC : MTYPE_RELOC;
 
 /* mtype init for page_get_replacement_page */
-#define	MTYPE_PGR_INIT(mtype, flags, pp, mnode, pgcnt)			\
+#define	MTYPE_PGR_INIT(mtype, flags, pp, pgcnt)			\
 	mtype = (flags & PG_NORELOC) ? MTYPE_NORELOC : MTYPE_RELOC;
 
 #define	MNODETYPE_2_PFN(mnode, mtype, pfnlo, pfnhi)			\

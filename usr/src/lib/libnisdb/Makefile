@@ -162,7 +162,7 @@ pics/map_ctrl.o
 $(UVAR_PICS) := CERRWARN += -_gcc=-Wno-unused-variable
 
 # Correcting these might alter logic
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-switch
 
 # not linted

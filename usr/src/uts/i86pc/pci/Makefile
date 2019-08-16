@@ -73,7 +73,7 @@ CFLAGS		+= -D_MODULE_NAME="\"$(MODULE)\""
 # Please do not carry these forward to new Makefiles.
 #
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-unused-function
 
 #

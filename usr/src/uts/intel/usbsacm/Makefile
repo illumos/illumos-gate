@@ -45,7 +45,7 @@ include $(UTSBASE)/intel/Makefile.intel
 
 LDFLAGS         += -dy -Nmisc/usba -Nmisc/usbser
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
 SMOFF += deref_check

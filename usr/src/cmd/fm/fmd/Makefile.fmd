@@ -120,7 +120,7 @@ CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
 LINTFLAGS += -mu
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-clobbered
 $(RELEASE_BUILD)CERRWARN += -_gcc=-Wno-unused-but-set-variable
 CERRWARN += -_gcc=-Wno-unused-variable

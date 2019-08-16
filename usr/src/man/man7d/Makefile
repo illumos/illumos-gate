@@ -124,7 +124,6 @@ _MANFILES=	aac.7d		\
 		systrace.7d	\
 		ticlts.7d	\
 		tty.7d		\
-		ttymux.7d	\
 		tzmon.7d	\
 		ufm.7d		\
 		ugen.7d		\
@@ -153,7 +152,6 @@ _MANFILES=	aac.7d		\
 
 sparc_MANFILES=	audiocs.7d	\
 		bbc_beep.7d	\
-		ctsmc.7d	\
 		dad.7d		\
 		dm2s.7d		\
 		dr.7d		\

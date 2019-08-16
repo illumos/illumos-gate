@@ -47,7 +47,7 @@ CPPFLAGS +=	$(INCS)
 CPPFLAGS +=	-DPOSIX_THREADS
 
 CERRWARN +=	-_gcc=-Wno-unused-variable
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-unused-function
 
 SMOFF += indenting,all_func_returns

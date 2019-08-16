@@ -49,7 +49,7 @@ CPPFLAGS += -I../mech -I../crypto -I$(SRC)/uts/common/gssapi/include
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-variable
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 # needs work
 SMATCH=off

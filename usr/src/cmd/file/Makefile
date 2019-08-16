@@ -41,7 +41,7 @@ include ../Makefile.cmd
 CSTD=	$(CSTD_GNU99)
 C99LMODE= -Xc99=%all
 
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-type-limits
 
 POFILE= file_all.po

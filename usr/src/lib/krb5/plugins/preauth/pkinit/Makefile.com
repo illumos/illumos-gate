@@ -65,7 +65,7 @@ CPPFLAGS += 	-I$(SRC)/lib/krb5 \
 		-I$(SRC)/uts/common/gssapi/mechs/krb5/include \
 		-I$(SRC)
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-unused-function
 
 # not linted

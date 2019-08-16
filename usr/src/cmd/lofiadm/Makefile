@@ -39,7 +39,7 @@ CPPFLAGS += -I $(SRC)/common/crypto -I $(SRC)/common/lzma
 LDLIBS += -ldevinfo -lpkcs11 -lcryptoutil
 
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

@@ -44,7 +44,7 @@ LLDFLAGS =	'$(LDPASS)-R$$ORIGIN/../../lib'
 LLDFLAGS64 =	'$(LDPASS)-R$$ORIGIN/../../../lib/$(MACH64)'
 LDFLAGS +=	$(LLDFLAGS)
 
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 SMOFF += indenting
 

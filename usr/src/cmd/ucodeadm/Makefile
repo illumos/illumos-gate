@@ -41,7 +41,7 @@ POFILES = $(PROG_OBJS:%.o=%.po)
 
 CPPFLAGS = -I../../common -I../../uts/common
 CFLAGS	+= $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-type-limits
 LINTFLAGS += -errtags -erroff=E_NAME_DEF_NOT_USED2
 LINTFLAGS += -erroff=E_INCONS_ARG_DECL2,E_INCONS_VAL_TYPE_DECL2

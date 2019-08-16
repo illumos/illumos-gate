@@ -37,7 +37,7 @@ PROG = devattr devreserv getvol putdgrp devfree getdev listdgrp getdgrp \
 LDLIBS += -ladm
 
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 SMOFF += signed
 

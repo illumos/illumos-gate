@@ -44,7 +44,7 @@ CPPFLAGS +=	-I../common
 LDLIBS +=	-lscf -luutil -lmd5
 CLOBBERFILES += $(POFILES)
 
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-unused-label
 
 lint := LINTFLAGS = -ux -erroff=E_GLOBAL_COULD_BE_STATIC2

@@ -26,6 +26,7 @@
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2017 James S Blachly, MD <james.blachly@gmail.com>
+# Copyright 2019 Peter Tribble.
 # Copyright 2019 RackTop Systems
 # Copyright 2019 Joyent, Inc.
 #
@@ -279,7 +280,6 @@ driver name=tcp perms="tcp 0666 root sys"
 driver name=tcp6 perms="tcp6 0666 root sys"
 driver name=tl perms="* 0666 root sys" clone_perms="ticlts 0666 root sys" \
     clone_perms="ticots 0666 root sys" clone_perms="ticotsord 0666 root sys"
-$(sparc_ONLY)driver name=ttymux alias=multiplexer
 $(i386_ONLY)driver name=tzmon
 $(sparc_ONLY)driver name=uata \
     alias=pci1095,646 \
@@ -408,7 +408,6 @@ file path=kernel/drv/$(ARCH64)/sysmsg group=sys
 file path=kernel/drv/$(ARCH64)/tcp group=sys
 file path=kernel/drv/$(ARCH64)/tcp6 group=sys
 file path=kernel/drv/$(ARCH64)/tl group=sys
-$(sparc_ONLY)file path=kernel/drv/$(ARCH64)/ttymux group=sys
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/tzmon group=sys
 $(sparc_ONLY)file path=kernel/drv/$(ARCH64)/uata group=sys
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/ucode group=sys

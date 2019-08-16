@@ -61,7 +61,7 @@ CFLAGS		+= $(CCVERBOSE)
 
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-switch
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 #
 # Turn on doubleword alignment for 64 bit registers

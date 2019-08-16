@@ -49,7 +49,7 @@ SRCDIR =	../common
 CSTD=	$(CSTD_GNU99)
 
 CERRWARN +=	-_gcc=-Wno-unused-label
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-parentheses
 
 # Override default source file derivation rule (in Makefile.lib)

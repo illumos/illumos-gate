@@ -32,7 +32,7 @@ POFILES= $(OBJS:%.o=%.po)
 include ../Makefile.cmd
 
 LDLIBS	+= -ldevinfo
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 

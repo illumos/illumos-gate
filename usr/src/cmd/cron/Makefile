@@ -37,7 +37,7 @@ ROOTMETHOD =	$(ROOTLIBSVCMETHOD)/svc-cron
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64 -I $(SRC)/common/util
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-label
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-unused-value
 

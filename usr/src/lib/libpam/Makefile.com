@@ -39,7 +39,7 @@ LDLIBS +=	-lc
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I $(SRCDIR)
 
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 

@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #include "lint.h"
 #include <sys/types.h>
 #include "base_conversion.h"
@@ -88,7 +92,11 @@ __base_conversion_set_exception(fp_exception_field_type ef)
  * to leave it for now because it's still used by Sun's old Fortran
  * runtime libraries.  Today this is a bug; in the days of SunOS 4.x,
  * when the relevant design decisions were made, it was a feature.
+ *
+ * Regardless, on 32-bit, 'quadruple' under GCC is not 128 bits, so it
+ * uses uninitialized memory...
  */
+#pragma GCC diagnostic ignored "-Wuninitialized"
 enum fp_class_type
 __class_quadruple(quadruple *x)
 {

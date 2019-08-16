@@ -46,7 +46,7 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I../clib -I$(JAVA_ROOT)/include \
 		-I$(JAVA_ROOT)/include/solaris
 
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-parentheses
 
 # not linted

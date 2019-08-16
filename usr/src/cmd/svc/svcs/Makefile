@@ -39,7 +39,7 @@ CPPFLAGS += -I ../common
 
 lint := LINTFLAGS = -mux
 CERRWARN += -_gcc=-Wno-unused-label
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-parentheses
 
 .KEEP_STATE:

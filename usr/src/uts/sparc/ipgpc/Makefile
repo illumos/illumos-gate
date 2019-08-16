@@ -67,7 +67,7 @@ CFLAGS += $(CCVERBOSE)
 
 LDFLAGS += -dy -Ndrv/ip 
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 #
 # For now, disable these lint checks; maintainers should endeavor

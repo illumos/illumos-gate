@@ -102,7 +102,7 @@ CPPFLAGS += 	-DHAVE_CONFIG_H \
 		-I$(SRC)/lib/gss_mechs/mech_krb5/include  #for db-ndbm.h
 
 CFLAGS +=	$(CCVERBOSE) -I..
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

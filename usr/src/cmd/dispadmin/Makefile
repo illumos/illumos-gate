@@ -43,7 +43,7 @@ ROOTETCFILES= $(ETCFILES:%=$(ROOTETC)/%)
 include ../Makefile.cmd
 
 CFLAGS +=	$(CCVERBOSE)
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 ROOTDIR=	$(ROOT)/usr/lib/class
 ROOTDIRS=	$(ROOTDIR)	\

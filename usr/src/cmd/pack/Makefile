@@ -29,7 +29,7 @@ include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 XGETFLAGS += -a -x $(PROG).xcl
 CPPFLAGS +=  -D_FILE_OFFSET_BITS=64
 

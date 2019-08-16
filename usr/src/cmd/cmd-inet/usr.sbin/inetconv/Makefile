@@ -29,7 +29,7 @@ PROG =		inetconv
 include ../../../Makefile.cmd
 
 LDLIBS += -lscf -linetsvc
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 

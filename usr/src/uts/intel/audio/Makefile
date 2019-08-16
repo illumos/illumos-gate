@@ -45,7 +45,7 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/audio/impl
 #
 include $(UTSBASE)/intel/Makefile.intel
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
 $(OBJS_DIR)/audio_grc3.o := SMOFF += index_overflow

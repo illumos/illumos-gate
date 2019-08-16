@@ -51,7 +51,7 @@ OBJS +=		chap_ms.o
 EXOBJS +=	mschap_test.o
 CLOBBERFILES +=	mschap_test
 
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 # main() is too hairy for smatch
 SMATCH=off

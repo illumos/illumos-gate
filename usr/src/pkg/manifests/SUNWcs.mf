@@ -451,9 +451,6 @@ $(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,Sun-Fire-880.xml \
     group=sys mode=0444
 $(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,Sun-Fire.xml group=sys \
     mode=0444
-$(sparc_ONLY)file \
-    path=etc/svc/profile/platform_SUNW,UltraSPARC-IIi-Netract.xml group=sys \
-    mode=0444
 file path=etc/svc/profile/platform_none.xml group=sys mode=0444
 $(sparc_ONLY)file path=etc/svc/profile/platform_sun4v.xml group=sys mode=0444
 file path=etc/sysevent/config/README group=sys mode=0444
@@ -1197,7 +1194,6 @@ file path=usr/lib/rcm/modules/SUNW_ip_rcm.so mode=0555
 file path=usr/lib/rcm/modules/SUNW_mpxio_rcm.so mode=0555
 file path=usr/lib/rcm/modules/SUNW_network_rcm.so mode=0555
 file path=usr/lib/rcm/modules/SUNW_swap_rcm.so mode=0555
-$(sparc_ONLY)file path=usr/lib/rcm/modules/SUNW_ttymux_rcm.so mode=0555
 file path=usr/lib/rcm/modules/SUNW_vlan_rcm.so mode=0555
 file path=usr/lib/rcm/modules/SUNW_vnic_rcm.so mode=0555
 file path=usr/lib/rcm/rcm_daemon mode=0555
@@ -1398,12 +1394,6 @@ hardlink path=etc/rc2.d/S20sysetup target=../../etc/init.d/sysetup
 hardlink path=etc/rc2.d/S89PRESERVE target=../../etc/init.d/PRESERVE
 $(sparc_ONLY)hardlink path=etc/svc/profile/platform_SUNW,Sun-Fire-V890.xml \
     target=./platform_SUNW,Sun-Fire-880.xml
-$(sparc_ONLY)hardlink \
-    path=etc/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-40.xml \
-    target=./platform_SUNW,UltraSPARC-IIi-Netract.xml
-$(sparc_ONLY)hardlink \
-    path=etc/svc/profile/platform_SUNW,UltraSPARC-IIe-NetraCT-60.xml \
-    target=./platform_SUNW,UltraSPARC-IIi-Netract.xml
 hardlink path=sbin/rc5 target=../sbin/rc0
 hardlink path=sbin/rc6 target=../sbin/rc0
 hardlink path=usr/bin/$(ARCH32)/encrypt target=decrypt

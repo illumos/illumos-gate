@@ -36,7 +36,7 @@ include ../Makefile.lib
 LDLIBS += -lsocket -lnsl
 CPPFLAGS += -I$(SRC)/uts/common/inet/nca
 
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 POFILE = ${PROG}.po
 

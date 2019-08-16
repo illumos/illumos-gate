@@ -65,12 +65,12 @@ CERRWARN_plgrp	+= -_smatch=off
 CERRWARN_pmadvise += -_smatch=off
 
 CERRWARN_ppriv	+= -_gcc=-Wno-parentheses
-CERRWARN_ppriv	+= -_gcc=-Wno-uninitialized
+CERRWARN_ppriv	+= $(CNOWARN_UNINIT)
 
 CERRWARN_ptree	+= -_gcc=-Wno-parentheses
 CERRWARN_ptree	+= -_smatch=off
 
-CERRWARN_pstack	+= -_gcc=-Wno-uninitialized
+CERRWARN_pstack	+= $(CNOWARN_UNINIT)
 CERRWARN_pstack	+= -_gcc=-Wno-clobbered
 
 CERRWARN_pargs	+= -_gcc=-Wno-clobbered

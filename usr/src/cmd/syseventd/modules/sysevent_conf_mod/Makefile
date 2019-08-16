@@ -32,7 +32,7 @@ include ../Makefile.com
 LDLIBS +=	-lnvpair
 CPPFLAGS +=	-I ../../daemons/syseventconfd
 
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 # strange smatch false positive
 SMOFF +=       allocating_enough_data

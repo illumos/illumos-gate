@@ -34,9 +34,6 @@ dir path=usr group=sys
 dir path=usr/platform group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,A70 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,A70/lib
-$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP2300 group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP2300/lib
-$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP2300/sbin
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010/sbin
@@ -116,12 +113,6 @@ $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-4 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-4/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-Enterprise group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-Enterprise/lib
-$(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40 group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib
-$(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60 group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib
-$(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIi-Netract group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIi-Netract/lib
 $(i386_ONLY)dir path=usr/platform/i86pc group=sys
 $(i386_ONLY)dir path=usr/platform/i86pc/lib
 $(sparc_ONLY)dir path=usr/platform/sun4u group=sys
@@ -170,8 +161,6 @@ $(sparc_ONLY)file path=usr/platform/SUNW,Ultra-250/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)file path=usr/platform/SUNW,Ultra-4/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Ultra-Enterprise/lib/libprtdiag_psr.so.1
-$(sparc_ONLY)file \
-    path=usr/platform/SUNW,UltraSPARC-IIi-Netract/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)file path=usr/platform/sun4u/lib/cfgadm/$(ARCH64)/ac.so.1
 $(sparc_ONLY)file path=usr/platform/sun4u/lib/cfgadm/$(ARCH64)/sbd.so.1
 $(sparc_ONLY)file path=usr/platform/sun4u/lib/cfgadm/$(ARCH64)/sysctrl.so.1
@@ -212,12 +201,6 @@ $(sparc_ONLY)link path=usr/platform/SUNW,A70/sbin target=../sun4u/sbin
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-210 target=SUNW,Sun-Fire-V240
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-240 target=SUNW,Sun-Fire-V240
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-440 target=SUNW,Sun-Fire-V440
-$(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP2300/lib/cfgadm \
-    target=../../sun4u/lib/cfgadm
-$(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP2300/lib/fs \
-    target=../../sun4u/lib/fs
-$(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP2300/sbin/prtdiag \
-    target=../../sun4u/sbin/prtdiag
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP3010/lib/cfgadm \
     target=../../sun4u/lib/cfgadm
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP3010/lib/fs \
@@ -500,27 +483,6 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-Enterprise/lib/fs \
 $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-Enterprise/sbin \
     target=../sun4u/sbin
 $(sparc_ONLY)link path=usr/platform/SUNW,UltraAX-i2 target=sun4u
-$(sparc_ONLY)link path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/cfgadm \
-    target=../../sun4u/lib/cfgadm
-$(sparc_ONLY)link path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/fs \
-    target=../../sun4u/lib/fs
-$(sparc_ONLY)link \
-    path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/libprtdiag_psr.so.1 \
-    target=../../SUNW,UltraSPARC-IIi-Netract/lib/libprtdiag_psr.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/sbin \
-    target=../sun4u/sbin
-$(sparc_ONLY)link path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/cfgadm \
-    target=../../sun4u/lib/cfgadm
-$(sparc_ONLY)link path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/fs \
-    target=../../sun4u/lib/fs
-$(sparc_ONLY)link path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/sbin \
-    target=../sun4u/sbin
-$(sparc_ONLY)link path=usr/platform/SUNW,UltraSPARC-IIi-Netract/lib/cfgadm \
-    target=../../sun4u/lib/cfgadm
-$(sparc_ONLY)link path=usr/platform/SUNW,UltraSPARC-IIi-Netract/lib/fs \
-    target=../../sun4u/lib/fs
-$(sparc_ONLY)link path=usr/platform/SUNW,UltraSPARC-IIi-Netract/sbin \
-    target=../sun4u/sbin
 $(sparc_ONLY)link path=usr/platform/sun4u/lib/cfgadm/$(ARCH64)/ac.so \
     target=./ac.so.1
 $(sparc_ONLY)link path=usr/platform/sun4u/lib/cfgadm/$(ARCH64)/sbd.so \

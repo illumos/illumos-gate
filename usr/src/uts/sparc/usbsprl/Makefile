@@ -51,7 +51,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #
 CFLAGS += $(CCVERBOSE)
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 LDFLAGS         += -dy -Nmisc/usba -Nmisc/usbser
 

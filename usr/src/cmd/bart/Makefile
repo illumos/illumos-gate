@@ -33,7 +33,7 @@ include ../Makefile.cmd
 
 LDLIBS +=	-lsec -lmd
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 SMOFF +=	indenting
 

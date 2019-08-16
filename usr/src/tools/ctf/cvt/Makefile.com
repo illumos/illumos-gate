@@ -82,7 +82,7 @@ CFLAGS		+= $(CTF_FLAGS)
 LINTFLAGS	+= -mnux
 
 CERRWARN	+= -_gcc=-Wno-unused
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-switch
 
 CSTD		= $(CSTD_GNU99)

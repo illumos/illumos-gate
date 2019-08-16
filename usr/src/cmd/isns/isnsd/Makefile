@@ -61,7 +61,7 @@ LINTFLAGS += -xerroff=E_CASE_FALLTHRU
 
 CERRWARN += -_gcc=-Wno-char-subscripts
 CERRWARN += -_gcc=-Wno-ignored-qualifiers
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
 
 # not linted

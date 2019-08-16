@@ -24,6 +24,7 @@
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2018 Joyent, Inc.
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2019 Peter Tribble.
 #
 
 # This file provides exceptions to the usual rules applied to ELF objects by
@@ -246,10 +247,3 @@ FORBIDDEN_DEP usr/ucblib/
 FORBIDDEN libm\.so\.1
 FORBIDDEN libresolv\.so\.1
 FORBIDDEN libxcurses\.so\.1
-
-# The libprtdiag_psr.so.1 objects built under usr/src/lib/libprtdiag_psr
-# are a family, all built using the same makefile, targeted at different
-# sparc hardware variants. There are a small number of cases where this
-# one size fits all approach causes an object to be linked against an
-# unneeded library.
-UNREF_OBJ	lib/(libdevinfo|libcfgadm)\.so\.1; .*\ of\ .*SUNW,Netra-CP2300/lib/libprtdiag_psr\.so\.1

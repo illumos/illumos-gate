@@ -37,6 +37,6 @@ LDLIBS += -lsock
 CPPFLAGS += $(SOCKCPPFLAGS) -I$(TOPDIR)/psm/stand
 
 CERRWARN += -_gcc=-Wno-char-subscripts
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 include ../Makefile.targ

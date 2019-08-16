@@ -22,6 +22,7 @@
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2019 Peter Tribble.
 #
 # include global definitions
 include ../../../Makefile.master
@@ -36,7 +37,6 @@ promif.h		promimpl.h \
 ser_async.h		ser_zscc.h \
 socalio.h		socalreg.h \
 socal_cq_defs.h		socalmap.h		socalvar.h \
-ttymux.h		ttymuxuser.h \
 zsdev.h
 
 SCSIADHDRS= \
@@ -103,7 +103,7 @@ devops.check    := CSTYLE_TAIL = | grep -v "line > 80 characters" | true
 		$(ROOTSCSIADHDRS) $(ROOTSCSITARGHDRS) $(ROOTXHDRS) \
 		$(ROOTFCHDRS)
 
-install_h: 	$(ROOTDIRS) .WAIT $(ROOTHDRS) \
+install_h:	$(ROOTDIRS) .WAIT $(ROOTHDRS) \
 		$(ROOTAUDHDRS) $(ROOTAUDIMPLHDRS) \
 		$(ROOTSCSIADHDRS) $(ROOTSCSITARGHDRS) $(ROOTFCHDRS)
 

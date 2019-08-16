@@ -66,7 +66,7 @@ dmod/$(MODULE) := LDLIBS += -lproc -lm
 
 CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 %.o: $(MODSRCS_DIR)/%.c
 	$(COMPILE.c) $<

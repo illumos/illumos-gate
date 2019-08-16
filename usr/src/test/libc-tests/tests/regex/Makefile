@@ -34,7 +34,7 @@ DATA=		basic.dat basic.out \
 include		$(SRC)/cmd/Makefile.cmd
 
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-clobbered
 
 # needs work

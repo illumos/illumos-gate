@@ -46,7 +46,6 @@ PROFILESRCS = \
 	platform_SUNW,SPARC-Enterprise.xml \
 	platform_SUNW,Sun-Fire-880.xml \
 	platform_SUNW,Sun-Fire.xml \
-	platform_SUNW,UltraSPARC-IIi-Netract.xml \
 	platform_none.xml \
 	platform_sun4v.xml
 
@@ -68,13 +67,6 @@ install: all $(PROFILES)
 	$(RM) $(ROOTPROFILE)/platform_SUNW,Sun-Fire-V890.xml
 	$(LN) $(ROOTPROFILE)/platform_SUNW,Sun-Fire-880.xml \
 	    $(ROOTPROFILE)/platform_SUNW,Sun-Fire-V890.xml
-	# SUNW,UltraSPARC-IIe-NetraCT-[46]0
-	$(RM) $(ROOTPROFILE)/platform_SUNW,UltraSPARC-IIe-NetraCT-40.xml
-	$(RM) $(ROOTPROFILE)/platform_SUNW,UltraSPARC-IIe-NetraCT-60.xml
-	$(LN) $(ROOTPROFILE)/platform_SUNW,UltraSPARC-IIi-Netract.xml \
-	$(ROOTPROFILE)/platform_SUNW,UltraSPARC-IIe-NetraCT-40.xml
-	$(LN) $(ROOTPROFILE)/platform_SUNW,UltraSPARC-IIi-Netract.xml \
-	    $(ROOTPROFILE)/platform_SUNW,UltraSPARC-IIe-NetraCT-60.xml
 
 $(ROOTPROFILE)/%: %
 	$(INS.file)

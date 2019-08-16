@@ -8,11 +8,6 @@ SECTIONS
   ImageBase = .;
   .hash : { *(.hash) }  /* this MUST come first! */
   . = ALIGN(4096);
-  .eh_frame :
-  {
-    *(.eh_frame)
-  }
-  . = ALIGN(4096);
   .text		: {
     multiboot.o(.text)
     *(.text .stub .text.* .gnu.linkonce.t.*)
@@ -20,6 +15,11 @@ SECTIONS
     *(.gnu.warning)
     *(.plt)
   } =0xCCCCCCCC
+  . = ALIGN(4096);
+  .eh_frame :
+  {
+    *(.eh_frame)
+  }
   . = ALIGN(4096);
   .data		: {
     *(.rodata .rodata.* .gnu.linkonce.r.*)

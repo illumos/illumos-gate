@@ -61,7 +61,7 @@ LINTFLAGS +=	-erroff=E_NAME_USED_NOT_DEF2
 LINTFLAGS +=	-erroff=E_NAME_DEF_NOT_USED2
 
 CERRWARN +=	-_gcc=-Wno-switch
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-type-limits
 

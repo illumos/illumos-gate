@@ -50,4 +50,4 @@ LINTFLAGS += $(INCS)
 LDLIBS += -L$(ROOTLIB)/fm -ltopo -luutil -luuid -lkstat
 LDFLAGS += -R/usr/lib/fm
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)

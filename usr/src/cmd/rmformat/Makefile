@@ -35,7 +35,7 @@ SRCS= $(OBJS:.o=.c)
 
 LDLIBS +=	-lsmedia -lvolmgt -ladm -lefi
 
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

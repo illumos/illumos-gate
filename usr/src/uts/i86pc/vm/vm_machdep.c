@@ -1619,7 +1619,7 @@ mtype_init(vnode_t *vp, caddr_t vaddr, uint_t *flags, size_t pgsz)
 /* mtype init for page_get_replacement_page */
 /*ARGSUSED*/
 int
-mtype_pgr_init(int *flags, page_t *pp, int mnode, pgcnt_t pgcnt)
+mtype_pgr_init(int *flags, page_t *pp, pgcnt_t pgcnt)
 {
 	int mtype = mtypetop;
 #if !defined(__xpv)

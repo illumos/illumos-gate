@@ -68,7 +68,7 @@ LDFLAGS         += -dy -Ndrv/nsmb
 # Until CR 4994570 is fixed...
 LINTTAGS	+= -erroff=E_BAD_FORMAT_ARG_TYPE2
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # The mb_put/md_get functions are intentionally used with and without
 # return value checks, so filter those out like LGREP.2 does.

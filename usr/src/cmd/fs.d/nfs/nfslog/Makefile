@@ -40,7 +40,7 @@ SRCS=		$(LOCAL:%.o=%.c) $(COMMON:%.o=../lib/%.c)
 LDLIBS +=	-lsocket -lnsl
 CFLAGS += 	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-type-limits
 

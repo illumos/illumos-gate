@@ -56,7 +56,7 @@ LINTFLAGS64	+=	-erroff=E_STATIC_UNUSED
 
 CERRWARN	+=	-_gcc=-Wno-unused-label
 CERRWARN	+=	-_gcc=-Wno-unused-value
-CERRWARN	+=	-_gcc=-Wno-uninitialized
+CERRWARN	+=	$(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

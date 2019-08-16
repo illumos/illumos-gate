@@ -26,8 +26,8 @@
 # lib/libprtdiag_psr/sparc/Makefile
 
 PRTDIAG_PLATFORMS=	desktop tazmo javelin sunfire serengeti \
-			montecarlo littleneck daktari cherrystone \
-			lw8 snowbird ontario schumacher opl montoya monza
+			littleneck daktari cherrystone \
+			lw8 ontario schumacher opl montoya monza
 
 all :=		TARGET= all
 lint :=		TARGET= lint

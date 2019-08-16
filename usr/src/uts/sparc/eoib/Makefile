@@ -70,7 +70,7 @@ CPPFLAGS += -DEIB_DEBUG
 CFLAGS += $(CCVERBOSE)
 
 CERRWARN	+= -_gcc=-Wno-switch
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 #
 # Depends on misc/ibtl

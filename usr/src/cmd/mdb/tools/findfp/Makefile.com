@@ -44,7 +44,7 @@ include ../../common/Makefile.util
 #
 CPPFLAGS = -I../../common -I../common
 CFLAGS += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 LDFLAGS =
 LDLIBS = -lelf
 

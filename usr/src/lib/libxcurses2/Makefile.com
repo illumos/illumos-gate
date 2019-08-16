@@ -97,7 +97,7 @@ LINTSRC=	$(LINTLIB:%.ln=%)
 LDLIBS += -lc
 
 CPPFLAGS = -I../h -I../src/libc/xcurses $(CPPFLAGS.master)
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-unused-value
 
 # not linted

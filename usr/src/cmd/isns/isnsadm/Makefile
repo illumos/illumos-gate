@@ -39,7 +39,7 @@ POFILES = $(OBJS:%.o=%.po)
 LINTFLAGS += -xerroff=E_BAD_FORMAT_STR2
 
 CERRWARN += -_gcc=-Wno-parentheses
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off

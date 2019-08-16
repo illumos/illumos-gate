@@ -62,7 +62,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= -_gcc=-Wno-unused-label
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
 $(OBJS_DIR)/usb_ac.o := SMOFF += deref_check,indenting,testing_index_after_use

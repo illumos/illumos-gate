@@ -62,7 +62,7 @@ LDFLAGS		+= -dy -Ndrv/dld -Nmisc/mac -Nmisc/strplumb -Nmisc/dls
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-unused-label
 
 #

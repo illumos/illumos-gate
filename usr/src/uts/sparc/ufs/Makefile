@@ -78,7 +78,7 @@ CFLAGS		+= $(CCVERBOSE)
 LDFLAGS		+= -dy -Nfs/specfs -Nmisc/fssnap_if
 
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= -_gcc=-Wno-unused-label
 

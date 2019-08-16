@@ -127,8 +127,6 @@ $(sparc_ONLY)dir path=usr/include/v9/sys
 dir path=usr/include/vm
 dir path=usr/platform group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,A70 group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP2300 group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP2300/include
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010/include
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T12 group=sys
@@ -154,9 +152,6 @@ $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-2 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-250 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-4 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-Enterprise group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40 group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60 group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIi-Netract group=sys
 $(i386_ONLY)dir path=usr/platform/i86pc group=sys
 $(i386_ONLY)dir path=usr/platform/i86pc/include
 $(i386_ONLY)dir path=usr/platform/i86pc/include/sys
@@ -1534,8 +1529,6 @@ file path=usr/include/sys/ttold.h
 file path=usr/include/sys/tty.h
 file path=usr/include/sys/ttychars.h
 file path=usr/include/sys/ttydev.h
-$(sparc_ONLY)file path=usr/include/sys/ttymux.h
-$(sparc_ONLY)file path=usr/include/sys/ttymuxuser.h
 file path=usr/include/sys/tuneable.h
 file path=usr/include/sys/turnstile.h
 file path=usr/include/sys/types.h
@@ -1771,7 +1764,6 @@ $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/prom_plat.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/pte.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/sbd_ioctl.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/scb.h
-$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/scsb_led.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/simmstat.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/smt.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/spitregs.h
@@ -2013,12 +2005,6 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-250/include \
 $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-4/include \
     target=../sun4u/include
 $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-Enterprise/include \
-    target=../sun4u/include
-$(sparc_ONLY)link path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/include \
-    target=../sun4u/include
-$(sparc_ONLY)link path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/include \
-    target=../sun4u/include
-$(sparc_ONLY)link path=usr/platform/SUNW,UltraSPARC-IIi-Netract/include \
     target=../sun4u/include
 link path=usr/share/man/man3head/LIST_CLASS_ENTRY.3head target=queue.h.3head
 link path=usr/share/man/man3head/LIST_CLASS_HEAD.3head target=queue.h.3head

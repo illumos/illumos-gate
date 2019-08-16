@@ -31,7 +31,7 @@ include ../Makefile.ucbcmd
 # For messaging
 XGETFLAGS += -a -x mkstr.xcl
 
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 

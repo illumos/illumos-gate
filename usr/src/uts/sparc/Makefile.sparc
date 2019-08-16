@@ -26,6 +26,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2016 Gary Mills
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2019 Peter Tribble.
 # Copyright 2019 RackTop Systems
 #
 
@@ -229,7 +230,7 @@ DRV_KMODS	+= log logindmux kssl mm nca physmem pm poll pool
 DRV_KMODS	+= pseudo ptc ptm pts ptsl ramdisk random rsm rts sad
 DRV_KMODS	+= simnet softmac sppp sppptun sy sysevent sysmsg
 DRV_KMODS	+= spdsock
-DRV_KMODS	+= tcp tcp6 timerfd tl tnf ttymux udp udp6 wc winlock zcons zfd
+DRV_KMODS	+= tcp tcp6 timerfd tl tnf udp udp6 wc winlock zcons
 DRV_KMODS	+= ippctl
 DRV_KMODS	+= dld
 DRV_KMODS	+= ipd

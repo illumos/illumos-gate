@@ -43,7 +43,7 @@ CFLAGS		+= $(CCVERBOSE)
 CPPFLAGS	+= -I$(SRC)/common
 LDFLAGS		+= -dy -Ndrv/dtrace
 
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 

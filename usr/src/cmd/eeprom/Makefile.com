@@ -39,7 +39,7 @@ DIRMODE		= 755
 OBJS		= error.o
 
 CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 
 # not linted

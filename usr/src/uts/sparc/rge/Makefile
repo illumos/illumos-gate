@@ -69,7 +69,7 @@ CFLAGS		+= -dalign
 LDFLAGS		+= -dy -N misc/mac -N drv/ip
 
 CERRWARN	+= -_gcc=-Wno-switch
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 #
 # For now, disable these lint checks; maintainers should endeavor

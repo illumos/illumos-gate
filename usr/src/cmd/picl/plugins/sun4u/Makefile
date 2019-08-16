@@ -22,9 +22,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 Peter Tribble.
 #
 # cmd/picl/plugins/sun4u/Makefile
 #
@@ -34,11 +32,11 @@ include $(SRC)/Makefile.master
 SUBDIRS= lib .WAIT envmon .WAIT \
 	frudata grover excalibur psvc littleneck daktari \
 	cherrystone lw2plus lw8 taco enchilada chicago blade mpxu ents \
-	chalupa silverstone sebring snowbird schumacher seattle boston .WAIT
+	chalupa silverstone sebring schumacher seattle boston .WAIT
 
 MSGSUBDIRS=	lib frudata grover excalibur psvc littleneck daktari \
 	cherrystone lw2plus lw8 taco enchilada chicago blade envmon mpxu ents \
-	silverstone sebring snowbird
+	silverstone sebring
 
 all :=		TARGET= all
 install :=	TARGET= install

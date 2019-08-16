@@ -40,7 +40,7 @@ MYCPPFLAGS = 	-I.. -I../../sharemgr
 CPPFLAGS += $(MYCPPFLAGS)
 LDLIBS += -lshare -lumem
 
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 SRCS = $(SHARECTL_SRC)
 OBJS = $(SHARECTL_OBJ)

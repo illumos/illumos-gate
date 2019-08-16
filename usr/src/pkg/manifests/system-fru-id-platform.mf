@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 Peter Tribble.
 #
 
 set name=pkg.fmri value=pkg:/system/fru-id/platform@$(PKGVERS)
@@ -39,9 +40,6 @@ $(sparc_ONLY)dir path=usr/platform/SUNW,A70 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,A70/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,A70/lib/picl group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,A70/lib/picl/plugins group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP2300 group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP2300/lib
-$(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP2300/sbin
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010/lib/picl group=sys
@@ -139,8 +137,6 @@ dir path=usr/share/man/man1m
 $(i386_ONLY)file path=usr/lib/picl/plugins/fru_container.conf group=sys
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,A70/lib/picl/plugins/libpiclfrudata.conf group=sys
-$(sparc_ONLY)file path=usr/platform/SUNW,Netra-CP2300/lib/libfruaccess.so.1 \
-    group=sys
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Netra-CP3010/lib/picl/plugins/libpiclfrudata.conf \
     group=sys
@@ -209,10 +205,6 @@ $(sparc_ONLY)legacy pkg=SUNWfruip.u arch=$(ARCH).sun4u \
     name="FRU ID Platform Modules (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-$(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP2300/lib/libfruaccess.so \
-    target=libfruaccess.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP2300/sbin/fruadm \
-    target=../../sun4u/sbin/fruadm
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-CP3010/sbin/fruadm \
     target=../../sun4u/sbin/fruadm
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-T12/lib/libfruaccess.so \

@@ -34,8 +34,6 @@ dir path=usr group=sys
 dir path=usr/platform group=sys
 dir path=usr/platform/SUNW,A70 group=sys
 dir path=usr/platform/SUNW,A70/lib
-dir path=usr/platform/SUNW,Netra-CP2300 group=sys
-dir path=usr/platform/SUNW,Netra-CP2300/lib
 dir path=usr/platform/SUNW,Netra-CP3010 group=sys
 dir path=usr/platform/SUNW,Netra-CP3010/lib
 dir path=usr/platform/SUNW,Netra-T12 group=sys
@@ -82,12 +80,6 @@ dir path=usr/platform/SUNW,Ultra-4 group=sys
 dir path=usr/platform/SUNW,Ultra-4/lib
 dir path=usr/platform/SUNW,Ultra-Enterprise group=sys
 dir path=usr/platform/SUNW,Ultra-Enterprise/lib
-dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40 group=sys
-dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib
-dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60 group=sys
-dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib
-dir path=usr/platform/SUNW,UltraSPARC-IIi-Netract group=sys
-dir path=usr/platform/SUNW,UltraSPARC-IIi-Netract/lib
 legacy pkg=SUNWpstl.u arch=$(ARCH).sun4u \
     desc="Apptrace processor specific shared objects" \
     name="Platform specific apptrace support"

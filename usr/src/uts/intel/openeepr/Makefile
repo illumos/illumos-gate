@@ -67,7 +67,7 @@ LDFLAGS +=	-dy -Ndacf/consconfig_dacf
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
 $(OBJS_DIR)/openprom.o := SMOFF += cast_assign,strcpy_overflow

@@ -67,7 +67,7 @@ CFLAGS += $(CCVERBOSE) -I$(COM_DIR)
 CFLAGS += -DVIS_SHA1
 LINTFLAGS	+= -I$(COM_DIR)
 
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 #
 #	Default build targets.

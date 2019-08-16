@@ -40,7 +40,7 @@ LINTFLAGS += -xerroff=E_STATIC_UNUSED
 LINTFLAGS64 += -xerroff=E_STATIC_UNUSED
 
 CERRWARN += -_gcc=-Wno-unused-function
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 labelit : labelit.o  ud_lib.o
 	$(LINK.c) -o $@ labelit.o ud_lib.o $(LDLIBS)

@@ -36,7 +36,7 @@ all: $(PROG)
 
 include	../../Makefile.lib
 
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 ROOTLIBINETILB =	$(ROOTLIBINET)/ilb
 ROOTLIBINETILBPROG =	$(PROG:%=$(ROOTLIBINETILB)/%)

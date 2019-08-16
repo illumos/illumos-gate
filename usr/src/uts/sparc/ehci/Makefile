@@ -53,7 +53,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 # lint pass one enforcement
 #
 CFLAGS		+= $(CCVERBOSE)
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-switch
 
 #

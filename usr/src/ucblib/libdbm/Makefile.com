@@ -41,7 +41,7 @@ LDLIBS +=	-lc
 
 CPPFLAGS = -I$(SRC)/ucbhead $(CPPFLAGS.master)
 
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 

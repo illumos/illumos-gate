@@ -61,7 +61,7 @@ CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-function
-CERRWARN += -_gcc=-Wno-uninitialized
+CERRWARN += $(CNOWARN_UNINIT)
 
 FMLIBDIR=usr/lib/fm
 $(BUILD64)FMLIBDIR64=usr/lib/fm/$(MACH64)

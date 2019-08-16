@@ -74,7 +74,7 @@ LDFLAGS 	+= -dy -Nfs/fifofs
 LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 
 CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 # needs work
 $(OBJS_DIR)/specvnops.o := SMOFF += signed

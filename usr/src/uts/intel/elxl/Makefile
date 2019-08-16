@@ -61,7 +61,7 @@ LDFLAGS		+=  -dy -N misc/mac -N misc/mii
 #
 
 CERRWARN	+= -_gcc=-Wno-switch
-CERRWARN	+= -_gcc=-Wno-uninitialized
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 #
 #

@@ -86,7 +86,7 @@ LDLIBS +=	-lc -lmapmalloc
 LINTFLAGS +=	-erroff=E_STATIC_UNUSED
 LINTFLAGS64 +=	-erroff=E_STATIC_UNUSED
 
-CERRWARN +=	-_gcc=-Wno-uninitialized
+CERRWARN +=	$(CNOWARN_UNINIT)
 
 $(LIBS):= PICS += $(SHAREDOBJS)
 
