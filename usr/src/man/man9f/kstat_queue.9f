@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KSTAT_QUEUE 9F "Apr 4, 1994"
+.TH KSTAT_QUEUE 9F "Aug 18, 2019"
 .SH NAME
 kstat_queue, kstat_waitq_enter, kstat_waitq_exit, kstat_runq_enter,
 kstat_runq_exit, kstat_waitq_to_runq, kstat_runq_back_to_waitq \- update I/O
@@ -45,11 +45,9 @@ kstat statistics
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIkiop\fR \fR
@@ -59,7 +57,6 @@ Pointer to a \fBkstat_io\fR(9S) structure.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 A large number of \fBI/O\fR subsystems have at least two basic "lists" (or
 queues) of transactions they manage: one for transactions that have been
@@ -136,21 +133,17 @@ example).
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 None.
 .SH CONTEXT
-.sp
 .LP
-\fBkstat_create()\fR can be called from user or kernel context.
+The \fBkstat_queue()\fR family of functions can be called from user or kernel context.
 .SH WARNINGS
-.sp
 .LP
 These transitions must be protected by holding the \fBkstat\fR's \fBks_lock\fR,
 and must be completely accurate (all transitions are recorded). Forgetting a
 transition may, for example, make an idle disk appear 100% busy.
 .SH SEE ALSO
-.sp
 .LP
 \fBbiodone\fR(9F), \fBdisksort\fR(9F), \fBkstat_create\fR(9F),
 \fBkstat_delete\fR(9F), \fBkstat_named_init\fR(9F), \fBkstat\fR(9S),
