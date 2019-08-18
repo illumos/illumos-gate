@@ -14,7 +14,7 @@
 
 include ../../Makefile.master
 
-MANSECT = 	3m
+MANSECT =	3m
 
 MANFILES =	acos.3m \
 		acosh.3m \
@@ -124,15 +124,20 @@ MANFILES =	acos.3m \
 		trunc.3m \
 		y0.3m
 
-MANLINKS=	fesetenv.3m				\
-		fesetexceptflag.3m			\
-		fesetround.3m
+MANLINKS=	fesetenv.3m			\
+		fesetexceptflag.3m		\
+		fesetround.3m			\
+		nanf.3m				\
+		nanl.3m
 
 fesetenv.3m				:= LINKSRC = fegetenv.3m
 
 fesetexceptflag.3m			:= LINKSRC = fegetexceptflag.3m
 
 fesetround.3m				:= LINKSRC = fegetround.3m
+
+nanf.3m					:= LINKSRC = nan.3m
+nanl.3m					:= LINKSRC = nan.3m
 
 .KEEP_STATE:
 
