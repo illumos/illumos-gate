@@ -13,7 +13,7 @@ policy.conf \- configuration file for security policy
 .fi
 
 .SH DESCRIPTION
-.sp
+
 .LP
 The \fBpolicy.conf\fR file provides the security policy configuration for
 user-level attributes. Each entry consists of a key/value pair in the form:
@@ -132,10 +132,10 @@ another algorithm, such as \fBCRYPT_DEFAULT=1\fR for BSD and Linux MD5.
 .ad
 .sp .6
 .RS 4n
-Specify the default algorithm for new passwords. The Solaris default is the
-traditional UNIX algorithm. This is not listed in \fBcrypt.conf\fR(4) since it
-is internal to \fBlibc\fR. The reserved name \fB__unix__\fR is used to refer to
-it.
+Specify the default algorithm for new passwords. The Solaris default was once
+the traditional UNIX algorithm. This is not listed in \fBcrypt.conf\fR(4) since
+it is internal to \fBlibc\fR. The reserved name \fB__unix__\fR is used to refer
+to it.
 .RE
 
 .sp
@@ -186,7 +186,7 @@ specifications are unaffected by any future addition of privileges that might
 occur.
 
 .SH FILES
-.sp
+
 .ne 2
 .na
 \fB\fB/etc/user_attr\fR\fR
@@ -223,7 +223,7 @@ Defines policy for the system.
 .RE
 
 .SH ATTRIBUTES
-.sp
+
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -239,13 +239,13 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
+
 .LP
 \fBlogin\fR(1), \fBpfexec\fR(1), \fBchkauthattr\fR(3SECDB),
 \fBgetexecuser\fR(3SECDB), \fBauth_attr\fR(4), \fBcrypt.conf\fR(4),
 \fBprof_attr\fR(4), \fBuser_attr\fR(4), \fBattributes\fR(5),
 \fBprivileges\fR(5)
 .SH NOTES
-.sp
+
 .LP
 The \fIconsole user\fR is defined as the owner of \fB/dev/console\fR.
