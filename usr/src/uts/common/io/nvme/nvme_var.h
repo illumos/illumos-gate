@@ -38,6 +38,7 @@ extern "C" {
 #define	NVME_ADMIN_QUEUE		0x4
 #define	NVME_CTRL_LIMITS		0x8
 #define	NVME_INTERRUPTS			0x10
+#define	NVME_UFM_INIT			0x20
 
 #define	NVME_MIN_ADMIN_QUEUE_LEN	16
 #define	NVME_MIN_IO_QUEUE_LEN		16
@@ -253,6 +254,13 @@ struct nvme {
 	/* hot removal NDI event handling */
 	ddi_eventcookie_t n_rm_cookie;
 	ddi_callback_id_t n_ev_rm_cb_id;
+
+	/* DDI UFM handle */
+	ddi_ufm_handle_t *n_ufmh;
+	/* Cached Firmware Slot Information log page */
+	nvme_fwslot_log_t *n_fwslot;
+	/* Lock protecting the cached firmware slot info */
+	kmutex_t n_fwslot_mutex;
 };
 
 struct nvme_namespace {
