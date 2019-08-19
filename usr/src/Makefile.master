@@ -372,8 +372,10 @@ CCNOAUTOINLINE= \
 	-_gcc=-fno-ipa-cp \
 	-_gcc7=-fno-ipa-icf \
 	-_gcc8=-fno-ipa-icf \
+	-_gcc9=-fno-ipa-icf \
 	-_gcc7=-fno-clone-functions \
-	-_gcc8=-fno-clone-functions
+	-_gcc8=-fno-clone-functions \
+	-_gcc9=-fno-clone-functions
 
 # GCC may put functions in different named sub-sections of .text based on
 # their presumed calling frequency.  At least in the kernel, where we actually
@@ -383,7 +385,8 @@ CCNOAUTOINLINE= \
 # but the application of this may move into usr/src/uts/ in future.
 CCNOREORDER=	\
 	-_gcc7=-fno-reorder-functions \
-	-_gcc8=-fno-reorder-functions
+	-_gcc8=-fno-reorder-functions \
+	-_gcc9=-fno-reorder-functions
 
 #
 # gcc has a rather aggressive optimization on by default that infers loop
@@ -394,7 +397,8 @@ CCNOREORDER=	\
 #
 CCNOAGGRESSIVELOOPS= \
 	-_gcc7=-fno-aggressive-loop-optimizations \
-	-_gcc8=-fno-aggressive-loop-optimizations
+	-_gcc8=-fno-aggressive-loop-optimizations \
+	-_gcc9=-fno-aggressive-loop-optimizations
 
 # One optimization the compiler might perform is to turn this:
 #	#pragma weak foo
@@ -472,7 +476,8 @@ CERRWARN +=	-_gcc=-Wno-array-bounds
 # gcc4 lacks -Wno-maybe-uninitialized
 CNOWARN_UNINIT = -_gcc4=-Wno-uninitialized \
     -_gcc7=-Wno-maybe-uninitialized \
-    -_gcc8=-Wno-maybe-uninitialized
+    -_gcc8=-Wno-maybe-uninitialized \
+    -_gcc9=-Wno-maybe-uninitialized
 
 CERRWARN += -_smatch=-p=illumos_user
 include $(SRC)/Makefile.smatch

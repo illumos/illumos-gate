@@ -1623,6 +1623,9 @@ tree_flag_bits[] = {
 	{ "FORCE_L2_OPLOCK",
 	    SMB_TREE_FORCE_L2_OPLOCK,
 	    SMB_TREE_FORCE_L2_OPLOCK },
+	{ "CA",
+	    SMB_TREE_CA,
+	    SMB_TREE_CA },
 	{ NULL, 0, 0 }
 };
 
@@ -2334,17 +2337,26 @@ smb_kshare_walk_step(mdb_walk_state_t *wsp)
  * *****************************************************************************
  */
 
+typedef struct mdb_smb_vfs {
+	list_node_t		sv_lnd;
+	uint32_t		sv_magic;
+	uint32_t		sv_refcnt;
+	vfs_t			*sv_vfsp;
+	vnode_t			*sv_rootvp;
+} mdb_smb_vfs_t;
+
 struct smb_vfs_cb_args {
 	uint_t		opts;
 	vnode_t		vn;
 	char		path[MAXPATHLEN];
 };
 
+/*ARGSUSED*/
 static int
 smb_vfs_cb(uintptr_t addr, const void *data, void *varg)
 {
 	struct smb_vfs_cb_args *args = varg;
-	const smb_vfs_t *sf = data;
+	mdb_smb_vfs_t sf;
 
 	if (args->opts & SMB_OPT_VERBOSE) {
 		mdb_arg_t	argv;
@@ -2363,16 +2375,21 @@ smb_vfs_cb(uintptr_t addr, const void *data, void *varg)
 	 *
 	 * Get the vnode v_path string if we can.
 	 */
+	if (mdb_ctf_vread(&sf, SMBSRV_SCOPE "smb_vfs_t",
+	    "mdb_smb_vfs_t", addr, 0) < 0) {
+		mdb_warn("failed to read struct smb_vfs at %p", addr);
+		return (DCMD_ERR);
+	}
 	strcpy(args->path, "?");
 	if (mdb_vread(&args->vn, sizeof (args->vn),
-	    (uintptr_t)sf->sv_rootvp) == sizeof (args->vn))
+	    (uintptr_t)sf.sv_rootvp) == sizeof (args->vn))
 		(void) mdb_readstr(args->path, sizeof (args->path),
 		    (uintptr_t)args->vn.v_path);
 
 	mdb_printf("%-?p ", addr);
-	mdb_printf("%-10d ", sf->sv_refcnt);
-	mdb_printf("%-?p ", sf->sv_vfsp);
-	mdb_printf("%-?p ", sf->sv_rootvp);
+	mdb_printf("%-10d ", sf.sv_refcnt);
+	mdb_printf("%-?p ", sf.sv_vfsp);
+	mdb_printf("%-?p ", sf.sv_rootvp);
 	mdb_printf("%-s\n", args->path);
 
 	return (WALK_NEXT);
@@ -2442,7 +2459,12 @@ smb_vfs_walk_init(mdb_walk_state_t *wsp)
 	 * OFFSETOF(smb_server_t, sv_export.e_vfs_list.ll_list);
 	 */
 	GET_OFFSET(sv_exp_off, smb_server_t, sv_export);
-	GET_OFFSET(ex_vfs_off, smb_export_t, e_vfs_list);
+	/* GET_OFFSET(ex_vfs_off, smb_export_t, e_vfs_list); */
+	ex_vfs_off = mdb_ctf_offsetof_by_name("smb_export_t", "e_vfs_list");
+	if (ex_vfs_off < 0) {
+		mdb_warn("cannot lookup: smb_export_t .e_vfs_list");
+		return (WALK_ERR);
+	}
 	GET_OFFSET(ll_off, smb_llist_t, ll_list);
 	wsp->walk_addr += (sv_exp_off + ex_vfs_off + ll_off);
 

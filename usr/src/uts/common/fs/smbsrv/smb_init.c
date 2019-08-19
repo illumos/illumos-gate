@@ -247,7 +247,14 @@ smb_drv_open(dev_t *devp, int flag, int otyp, cred_t *cr)
 static int
 smb_drv_close(dev_t dev, int flag, int otyp, cred_t *credp)
 {
-	return (smb_server_delete());
+	smb_server_t	*sv;
+	int		rc;
+
+	rc = smb_server_lookup(&sv);
+	if (rc == 0)
+		rc = smb_server_delete(sv);
+
+	return (rc);
 }
 
 /* ARGSUSED */

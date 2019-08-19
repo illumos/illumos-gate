@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -71,6 +71,8 @@ smb2_close(smb_request_t *sr)
 		}
 	}
 
+	if (of->dh_persist)
+		smb2_dh_setdoc_persistent(of);
 	smb_ofile_close(of, 0);
 
 errout:

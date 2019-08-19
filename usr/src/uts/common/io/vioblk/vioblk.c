@@ -22,9 +22,50 @@
 /*
  * Copyright (c) 2015, Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012, Alexey Zaytsev <alexey.zaytsev@gmail.com>
- * Copyright 2017, Joyent Inc.
+ * Copyright 2019 Joyent Inc.
  */
 
+/*
+ * VIRTIO BLOCK DRIVER
+ *
+ * This driver provides support for Virtio Block devices.  Each driver instance
+ * attaches to a single underlying block device.
+ *
+ * REQUEST CHAIN LAYOUT
+ *
+ * Every request chain sent to the I/O queue has the following structure.  Each
+ * box in the diagram represents a descriptor entry (i.e., a DMA cookie) within
+ * the chain:
+ *
+ *    +-0-----------------------------------------+
+ *    | struct virtio_blk_hdr                     |-----------------------\
+ *    |   (written by driver, read by device)     |                       |
+ *    +-1-----------------------------------------+                       |
+ *    | optional data payload                     |--\                    |
+ *    |   (written by driver for write requests,  |  |                    |
+ *    |    or by device for read requests)        |  |                    |
+ *    +-2-----------------------------------------+  |                    |
+ *    | ,~`           :                              |-cookies loaned     |
+ *    |/              :                        ,~`|  | from blkdev        |
+ *                    :                       /   |  |                    |
+ *    +-(N - 1)-----------------------------------+  |                    |
+ *    | ... end of data payload.                  |  |                    |
+ *    |                                           |  |                    |
+ *    |                                           |--/                    |
+ *    +-N-----------------------------------------+                       |
+ *    | status byte                               |                       |
+ *    |   (written by device, read by driver)     |--------------------\  |
+ *    +-------------------------------------------+                    |  |
+ *                                                                     |  |
+ * The memory for the header and status bytes (i.e., 0 and N above)    |  |
+ * is allocated as a single chunk by vioblk_alloc_reqs():              |  |
+ *                                                                     |  |
+ *    +-------------------------------------------+                    |  |
+ *    | struct virtio_blk_hdr                     |<----------------------/
+ *    +-------------------------------------------+                    |
+ *    | status byte                               |<-------------------/
+ *    +-------------------------------------------+
+ */
 
 #include <sys/modctl.h>
 #include <sys/blkdev.h>
@@ -43,402 +84,429 @@
 #include <sys/debug.h>
 #include <sys/pci.h>
 #include <sys/containerof.h>
-#include "virtiovar.h"
-#include "virtioreg.h"
+#include <sys/ctype.h>
+#include <sys/sysmacros.h>
 
-/* Feature bits */
-#define	VIRTIO_BLK_F_BARRIER	(1<<0)
-#define	VIRTIO_BLK_F_SIZE_MAX	(1<<1)
-#define	VIRTIO_BLK_F_SEG_MAX	(1<<2)
-#define	VIRTIO_BLK_F_GEOMETRY	(1<<4)
-#define	VIRTIO_BLK_F_RO		(1<<5)
-#define	VIRTIO_BLK_F_BLK_SIZE	(1<<6)
-#define	VIRTIO_BLK_F_SCSI	(1<<7)
-#define	VIRTIO_BLK_F_FLUSH	(1<<9)
-#define	VIRTIO_BLK_F_TOPOLOGY	(1<<10)
+#include "virtio.h"
+#include "vioblk.h"
 
-/* Configuration registers */
-#define	VIRTIO_BLK_CONFIG_CAPACITY	0 /* 64bit */
-#define	VIRTIO_BLK_CONFIG_SIZE_MAX	8 /* 32bit */
-#define	VIRTIO_BLK_CONFIG_SEG_MAX	12 /* 32bit */
-#define	VIRTIO_BLK_CONFIG_GEOMETRY_C	16 /* 16bit */
-#define	VIRTIO_BLK_CONFIG_GEOMETRY_H	18 /* 8bit */
-#define	VIRTIO_BLK_CONFIG_GEOMETRY_S	19 /* 8bit */
-#define	VIRTIO_BLK_CONFIG_BLK_SIZE	20 /* 32bit */
-#define	VIRTIO_BLK_CONFIG_TOPO_PBEXP	24 /* 8bit */
-#define	VIRTIO_BLK_CONFIG_TOPO_ALIGN	25 /* 8bit */
-#define	VIRTIO_BLK_CONFIG_TOPO_MIN_SZ	26 /* 16bit */
-#define	VIRTIO_BLK_CONFIG_TOPO_OPT_SZ	28 /* 32bit */
 
-/* Command */
-#define	VIRTIO_BLK_T_IN			0
-#define	VIRTIO_BLK_T_OUT		1
-#define	VIRTIO_BLK_T_SCSI_CMD		2
-#define	VIRTIO_BLK_T_SCSI_CMD_OUT	3
-#define	VIRTIO_BLK_T_FLUSH		4
-#define	VIRTIO_BLK_T_FLUSH_OUT		5
-#define	VIRTIO_BLK_T_GET_ID		8
-#define	VIRTIO_BLK_T_BARRIER		0x80000000
-
-#define	VIRTIO_BLK_ID_BYTES	20 /* devid */
-
-/* Statuses */
-#define	VIRTIO_BLK_S_OK		0
-#define	VIRTIO_BLK_S_IOERR	1
-#define	VIRTIO_BLK_S_UNSUPP	2
-
-#define	DEF_MAXINDIRECT		(128)
-#define	DEF_MAXSECTOR		(4096)
-
-#define	VIOBLK_POISON		0xdead0001dead0001
-
-/*
- * Static Variables.
- */
-static char vioblk_ident[] = "VirtIO block driver";
-
-/* Request header structure */
-struct vioblk_req_hdr {
-	uint32_t		type;   /* VIRTIO_BLK_T_* */
-	uint32_t		ioprio;
-	uint64_t		sector;
-};
-
-struct vioblk_req {
-	struct vioblk_req_hdr	hdr;
-	uint8_t			status;
-	uint8_t			unused[3];
-	unsigned int		ndmac;
-	ddi_dma_handle_t	dmah;
-	ddi_dma_handle_t	bd_dmah;
-	ddi_dma_cookie_t	dmac;
-	bd_xfer_t		*xfer;
-};
-
-struct vioblk_stats {
-	struct kstat_named	sts_rw_outofmemory;
-	struct kstat_named	sts_rw_badoffset;
-	struct kstat_named	sts_rw_queuemax;
-	struct kstat_named	sts_rw_cookiesmax;
-	struct kstat_named	sts_rw_cacheflush;
-	struct kstat_named	sts_intr_queuemax;
-	struct kstat_named	sts_intr_total;
-	struct kstat_named	sts_io_errors;
-	struct kstat_named	sts_unsupp_errors;
-	struct kstat_named	sts_nxio_errors;
-};
-
-struct vioblk_lstats {
-	uint64_t		rw_cacheflush;
-	uint64_t		intr_total;
-	unsigned int		rw_cookiesmax;
-	unsigned int		intr_queuemax;
-	unsigned int		io_errors;
-	unsigned int		unsupp_errors;
-	unsigned int		nxio_errors;
-};
-
-struct vioblk_softc {
-	dev_info_t		*sc_dev; /* mirrors virtio_softc->sc_dev */
-	struct virtio_softc	sc_virtio;
-	struct virtqueue	*sc_vq;
-	bd_handle_t		bd_h;
-	struct vioblk_req	*sc_reqs;
-	struct vioblk_stats	*ks_data;
-	kstat_t			*sc_intrstat;
-	uint64_t		sc_capacity;
-	uint64_t		sc_nblks;
-	struct vioblk_lstats	sc_stats;
-	short			sc_blkflags;
-	boolean_t		sc_in_poll_mode;
-	boolean_t		sc_readonly;
-	int			sc_blk_size;
-	int			sc_pblk_size;
-	int			sc_seg_max;
-	int			sc_seg_size_max;
-	kmutex_t		lock_devid;
-	kcondvar_t		cv_devid;
-	char			devid[VIRTIO_BLK_ID_BYTES + 1];
-};
-
-static int vioblk_get_id(struct vioblk_softc *sc);
-
-static int vioblk_read(void *arg, bd_xfer_t *xfer);
-static int vioblk_write(void *arg, bd_xfer_t *xfer);
-static int vioblk_flush(void *arg, bd_xfer_t *xfer);
-static void vioblk_driveinfo(void *arg, bd_drive_t *drive);
-static int vioblk_mediainfo(void *arg, bd_media_t *media);
-static int vioblk_devid_init(void *, dev_info_t *, ddi_devid_t *);
-uint_t vioblk_int_handler(caddr_t arg1, caddr_t arg2);
-
-static bd_ops_t vioblk_ops = {
-	BD_OPS_VERSION_0,
-	vioblk_driveinfo,
-	vioblk_mediainfo,
-	vioblk_devid_init,
-	vioblk_flush,
-	vioblk_read,
-	vioblk_write,
-};
-
+static void vioblk_get_id(vioblk_t *);
+uint_t vioblk_int_handler(caddr_t, caddr_t);
+static uint_t vioblk_poll(vioblk_t *);
 static int vioblk_quiesce(dev_info_t *);
 static int vioblk_attach(dev_info_t *, ddi_attach_cmd_t);
 static int vioblk_detach(dev_info_t *, ddi_detach_cmd_t);
 
+
 static struct dev_ops vioblk_dev_ops = {
-	DEVO_REV,
-	0,
-	ddi_no_info,
-	nulldev,	/* identify */
-	nulldev,	/* probe */
-	vioblk_attach,	/* attach */
-	vioblk_detach,	/* detach */
-	nodev,		/* reset */
-	NULL,		/* cb_ops */
-	NULL,		/* bus_ops */
-	NULL,		/* power */
-	vioblk_quiesce	/* quiesce */
+	.devo_rev =			DEVO_REV,
+	.devo_refcnt =			0,
+
+	.devo_attach =			vioblk_attach,
+	.devo_detach =			vioblk_detach,
+	.devo_quiesce =			vioblk_quiesce,
+
+	.devo_getinfo =			ddi_no_info,
+	.devo_identify =		nulldev,
+	.devo_probe =			nulldev,
+	.devo_reset =			nodev,
+	.devo_cb_ops =			NULL,
+	.devo_bus_ops =			NULL,
+	.devo_power =			NULL,
+};
+
+static struct modldrv vioblk_modldrv = {
+	.drv_modops =			&mod_driverops,
+	.drv_linkinfo =			"VIRTIO block driver",
+	.drv_dev_ops =			&vioblk_dev_ops
+};
+
+static struct modlinkage vioblk_modlinkage = {
+	.ml_rev =			MODREV_1,
+	.ml_linkage =			{ &vioblk_modldrv, NULL }
+};
+
+/*
+ * DMA attribute template for header and status blocks.  We also make a
+ * per-instance copy of this template with negotiated sizes from the device for
+ * blkdev.
+ */
+static const ddi_dma_attr_t vioblk_dma_attr = {
+	.dma_attr_version =		DMA_ATTR_V0,
+	.dma_attr_addr_lo =		0x0000000000000000,
+	.dma_attr_addr_hi =		0xFFFFFFFFFFFFFFFF,
+	.dma_attr_count_max =		0x00000000FFFFFFFF,
+	.dma_attr_align =		1,
+	.dma_attr_burstsizes =		1,
+	.dma_attr_minxfer =		1,
+	.dma_attr_maxxfer =		0x00000000FFFFFFFF,
+	.dma_attr_seg =			0x00000000FFFFFFFF,
+	.dma_attr_sgllen =		1,
+	.dma_attr_granular =		1,
+	.dma_attr_flags =		0
 };
 
 
+static vioblk_req_t *
+vioblk_req_alloc(vioblk_t *vib)
+{
+	vioblk_req_t *vbr;
 
-/* Standard Module linkage initialization for a Streams driver */
-extern struct mod_ops mod_driverops;
+	VERIFY(MUTEX_HELD(&vib->vib_mutex));
 
-static struct modldrv modldrv = {
-	&mod_driverops,		/* Type of module.  This one is a driver */
-	vioblk_ident,    /* short description */
-	&vioblk_dev_ops	/* driver specific ops */
-};
+	if ((vbr = list_remove_head(&vib->vib_reqs)) == NULL) {
+		return (NULL);
+	}
+	vib->vib_nreqs_alloc++;
 
-static struct modlinkage modlinkage = {
-	MODREV_1,
-	{
-		(void *)&modldrv,
-		NULL,
-	},
-};
+	VERIFY0(vbr->vbr_status);
+	vbr->vbr_status |= VIOBLK_REQSTAT_ALLOCATED;
 
-ddi_device_acc_attr_t vioblk_attr = {
-	DDI_DEVICE_ATTR_V0,
-	DDI_NEVERSWAP_ACC,	/* virtio is always native byte order */
-	DDI_STORECACHING_OK_ACC,
-	DDI_DEFAULT_ACC
-};
+	VERIFY3P(vbr->vbr_xfer, ==, NULL);
+	VERIFY3S(vbr->vbr_error, ==, 0);
 
-/* DMA attr for the header/status blocks. */
-static ddi_dma_attr_t vioblk_req_dma_attr = {
-	DMA_ATTR_V0,			/* dma_attr version	*/
-	0,				/* dma_attr_addr_lo	*/
-	0xFFFFFFFFFFFFFFFFull,		/* dma_attr_addr_hi	*/
-	0x00000000FFFFFFFFull,		/* dma_attr_count_max	*/
-	1,				/* dma_attr_align	*/
-	1,				/* dma_attr_burstsizes	*/
-	1,				/* dma_attr_minxfer	*/
-	0xFFFFFFFFull,			/* dma_attr_maxxfer	*/
-	0xFFFFFFFFFFFFFFFFull,		/* dma_attr_seg		*/
-	1,				/* dma_attr_sgllen	*/
-	1,				/* dma_attr_granular	*/
-	0,				/* dma_attr_flags	*/
-};
+	return (vbr);
+}
 
-/* DMA attr for the data blocks. */
-static ddi_dma_attr_t vioblk_bd_dma_attr = {
-	DMA_ATTR_V0,			/* dma_attr version	*/
-	0,				/* dma_attr_addr_lo	*/
-	0xFFFFFFFFFFFFFFFFull,		/* dma_attr_addr_hi	*/
-	0x00000000FFFFFFFFull,		/* dma_attr_count_max	*/
-	1,				/* dma_attr_align	*/
-	1,				/* dma_attr_burstsizes	*/
-	1,				/* dma_attr_minxfer	*/
-	0,				/* dma_attr_maxxfer, set in attach */
-	0xFFFFFFFFFFFFFFFFull,		/* dma_attr_seg		*/
-	0,				/* dma_attr_sgllen, set in attach */
-	1,				/* dma_attr_granular	*/
-	0,				/* dma_attr_flags	*/
-};
+static void
+vioblk_req_free(vioblk_t *vib, vioblk_req_t *vbr)
+{
+	VERIFY(MUTEX_HELD(&vib->vib_mutex));
+
+	/*
+	 * Check that this request was allocated, then zero the status field to
+	 * clear all status bits.
+	 */
+	VERIFY(vbr->vbr_status & VIOBLK_REQSTAT_ALLOCATED);
+	vbr->vbr_status = 0;
+
+	vbr->vbr_xfer = NULL;
+	vbr->vbr_error = 0;
+	vbr->vbr_type = 0;
+
+	list_insert_head(&vib->vib_reqs, vbr);
+
+	VERIFY3U(vib->vib_nreqs_alloc, >, 0);
+	vib->vib_nreqs_alloc--;
+}
+
+static void
+vioblk_complete(vioblk_t *vib, vioblk_req_t *vbr)
+{
+	VERIFY(MUTEX_HELD(&vib->vib_mutex));
+
+	VERIFY(!(vbr->vbr_status & VIOBLK_REQSTAT_COMPLETE));
+	vbr->vbr_status |= VIOBLK_REQSTAT_COMPLETE;
+
+	if (vbr->vbr_type == VIRTIO_BLK_T_FLUSH) {
+		vib->vib_stats->vbs_rw_cacheflush.value.ui64++;
+	}
+
+	if (vbr->vbr_xfer != NULL) {
+		/*
+		 * This is a blkdev framework request.
+		 */
+		mutex_exit(&vib->vib_mutex);
+		bd_xfer_done(vbr->vbr_xfer, vbr->vbr_error);
+		mutex_enter(&vib->vib_mutex);
+		vbr->vbr_xfer = NULL;
+	}
+}
+
+static virtio_chain_t *
+vioblk_common_start(vioblk_t *vib, int type, uint64_t sector,
+    boolean_t polled)
+{
+	vioblk_req_t *vbr = NULL;
+	virtio_chain_t *vic = NULL;
+
+	if ((vbr = vioblk_req_alloc(vib)) == NULL) {
+		vib->vib_stats->vbs_rw_outofmemory.value.ui64++;
+		return (NULL);
+	}
+	vbr->vbr_type = type;
+
+	if (polled) {
+		/*
+		 * Mark this command as polled so that we can wait on it
+		 * ourselves.
+		 */
+		vbr->vbr_status |= VIOBLK_REQSTAT_POLLED;
+	}
+
+	if ((vic = virtio_chain_alloc(vib->vib_vq, KM_NOSLEEP)) == NULL) {
+		vib->vib_stats->vbs_rw_outofmemory.value.ui64++;
+		goto fail;
+	}
+
+	struct vioblk_req_hdr vbh;
+	vbh.vbh_type = type;
+	vbh.vbh_ioprio = 0;
+	vbh.vbh_sector = sector;
+	bcopy(&vbh, virtio_dma_va(vbr->vbr_dma, 0), sizeof (vbh));
+
+	virtio_chain_data_set(vic, vbr);
+
+	/*
+	 * Put the header in the first descriptor.  See the block comment at
+	 * the top of the file for more details on the chain layout.
+	 */
+	if (virtio_chain_append(vic, virtio_dma_cookie_pa(vbr->vbr_dma, 0),
+	    sizeof (struct vioblk_req_hdr), VIRTIO_DIR_DEVICE_READS) !=
+	    DDI_SUCCESS) {
+		goto fail;
+	}
+
+	return (vic);
+
+fail:
+	vbr->vbr_xfer = NULL;
+	vioblk_req_free(vib, vbr);
+	if (vic != NULL) {
+		virtio_chain_free(vic);
+	}
+	return (NULL);
+}
 
 static int
-vioblk_rw(struct vioblk_softc *sc, bd_xfer_t *xfer, int type,
-    uint32_t len)
+vioblk_common_submit(vioblk_t *vib, virtio_chain_t *vic)
 {
-	struct vioblk_req *req;
-	struct vq_entry *ve_hdr;
-	int total_cookies, write;
+	int r;
+	vioblk_req_t *vbr = virtio_chain_data(vic);
 
-	write = (type == VIRTIO_BLK_T_OUT ||
-	    type == VIRTIO_BLK_T_FLUSH_OUT) ? 1 : 0;
-	total_cookies = 2;
+	VERIFY(MUTEX_HELD(&vib->vib_mutex));
 
-	if ((xfer->x_blkno + xfer->x_nblks) > sc->sc_nblks) {
-		sc->ks_data->sts_rw_badoffset.value.ui64++;
+	/*
+	 * The device will write the status byte into this last descriptor.
+	 * See the block comment at the top of the file for more details on the
+	 * chain layout.
+	 */
+	if (virtio_chain_append(vic, virtio_dma_cookie_pa(vbr->vbr_dma, 0) +
+	    sizeof (struct vioblk_req_hdr), sizeof (uint8_t),
+	    VIRTIO_DIR_DEVICE_WRITES) != DDI_SUCCESS) {
+		r = ENOMEM;
+		goto out;
+	}
+
+	virtio_dma_sync(vbr->vbr_dma, DDI_DMA_SYNC_FORDEV);
+	virtio_chain_submit(vic, B_TRUE);
+
+	if (!(vbr->vbr_status & VIOBLK_REQSTAT_POLLED)) {
+		/*
+		 * This is not a polled request.  Our request will be freed and
+		 * the caller notified later in vioblk_poll().
+		 */
+		return (0);
+	}
+
+	/*
+	 * This is a polled request.  We need to block here and wait for the
+	 * device to complete request processing.
+	 */
+	while (!(vbr->vbr_status & VIOBLK_REQSTAT_POLL_COMPLETE)) {
+		if (ddi_in_panic()) {
+			/*
+			 * When panicking, interrupts are disabled.  We must
+			 * poll the queue manually.
+			 */
+			drv_usecwait(10);
+			(void) vioblk_poll(vib);
+			continue;
+		}
+
+		/*
+		 * When not panicking, the device will interrupt on command
+		 * completion and vioblk_poll() will be called to wake us up.
+		 */
+		cv_wait(&vib->vib_cv, &vib->vib_mutex);
+	}
+
+	vioblk_complete(vib, vbr);
+	r = vbr->vbr_error;
+
+out:
+	vioblk_req_free(vib, vbr);
+	virtio_chain_free(vic);
+	return (r);
+}
+
+static int
+vioblk_internal(vioblk_t *vib, int type, virtio_dma_t *dma,
+    uint64_t sector, virtio_direction_t dir)
+{
+	virtio_chain_t *vic;
+	vioblk_req_t *vbr;
+	int r;
+
+	VERIFY(MUTEX_HELD(&vib->vib_mutex));
+
+	/*
+	 * Allocate a polled request.
+	 */
+	if ((vic = vioblk_common_start(vib, type, sector, B_TRUE)) == NULL) {
+		return (ENOMEM);
+	}
+	vbr = virtio_chain_data(vic);
+
+	/*
+	 * If there is a request payload, it goes between the header and the
+	 * status byte.  See the block comment at the top of the file for more
+	 * detail on the chain layout.
+	 */
+	if (dma != NULL) {
+		for (uint_t n = 0; n < virtio_dma_ncookies(dma); n++) {
+			if (virtio_chain_append(vic,
+			    virtio_dma_cookie_pa(dma, n),
+			    virtio_dma_cookie_size(dma, n), dir) !=
+			    DDI_SUCCESS) {
+				r = ENOMEM;
+				goto out;
+			}
+		}
+	}
+
+	return (vioblk_common_submit(vib, vic));
+
+out:
+	vioblk_req_free(vib, vbr);
+	virtio_chain_free(vic);
+	return (r);
+}
+
+static int
+vioblk_request(vioblk_t *vib, bd_xfer_t *xfer, int type)
+{
+	virtio_chain_t *vic = NULL;
+	vioblk_req_t *vbr = NULL;
+	uint_t total_cookies = 2;
+	boolean_t polled = (xfer->x_flags & BD_XFER_POLL) != 0;
+	int r;
+
+	VERIFY(MUTEX_HELD(&vib->vib_mutex));
+
+	/*
+	 * Ensure that this request falls within the advertised size of the
+	 * block device.  Be careful to avoid overflow.
+	 */
+	if (xfer->x_nblks > SIZE_MAX - xfer->x_blkno ||
+	    (xfer->x_blkno + xfer->x_nblks) > vib->vib_nblks) {
+		vib->vib_stats->vbs_rw_badoffset.value.ui64++;
 		return (EINVAL);
 	}
 
-	/* allocate top entry */
-	ve_hdr = vq_alloc_entry(sc->sc_vq);
-	if (!ve_hdr) {
-		sc->ks_data->sts_rw_outofmemory.value.ui64++;
+	if ((vic = vioblk_common_start(vib, type, xfer->x_blkno, polled)) ==
+	    NULL) {
 		return (ENOMEM);
 	}
+	vbr = virtio_chain_data(vic);
+	vbr->vbr_xfer = xfer;
 
-	/* getting request */
-	req = &sc->sc_reqs[ve_hdr->qe_index];
-	req->hdr.type = type;
-	req->hdr.ioprio = 0;
-	req->hdr.sector = xfer->x_blkno;
-	req->xfer = xfer;
+	/*
+	 * If there is a request payload, it goes between the header and the
+	 * status byte.  See the block comment at the top of the file for more
+	 * detail on the chain layout.
+	 */
+	if ((type == VIRTIO_BLK_T_IN || type == VIRTIO_BLK_T_OUT) &&
+	    xfer->x_nblks > 0) {
+		virtio_direction_t dir = (type == VIRTIO_BLK_T_OUT) ?
+		    VIRTIO_DIR_DEVICE_READS : VIRTIO_DIR_DEVICE_WRITES;
 
-	/* Header */
-	virtio_ve_add_indirect_buf(ve_hdr, req->dmac.dmac_laddress,
-	    sizeof (struct vioblk_req_hdr), B_TRUE);
+		for (uint_t n = 0; n < xfer->x_ndmac; n++) {
+			ddi_dma_cookie_t dmac;
 
-	/* Payload */
-	if (len > 0) {
-		virtio_ve_add_cookie(ve_hdr, xfer->x_dmah, xfer->x_dmac,
-		    xfer->x_ndmac, write ? B_TRUE : B_FALSE);
+			if (n == 0) {
+				/*
+				 * The first cookie is in the blkdev request.
+				 */
+				dmac = xfer->x_dmac;
+			} else {
+				ddi_dma_nextcookie(xfer->x_dmah, &dmac);
+			}
+
+			if (virtio_chain_append(vic, dmac.dmac_laddress,
+			    dmac.dmac_size, dir) != DDI_SUCCESS) {
+				r = ENOMEM;
+				goto fail;
+			}
+		}
+
 		total_cookies += xfer->x_ndmac;
+
+	} else if (xfer->x_nblks > 0) {
+		dev_err(vib->vib_dip, CE_PANIC,
+		    "request of type %d had payload length of %lu blocks", type,
+		    xfer->x_nblks);
 	}
 
-	/* Status */
-	virtio_ve_add_indirect_buf(ve_hdr,
-	    req->dmac.dmac_laddress + sizeof (struct vioblk_req_hdr),
-	    sizeof (uint8_t), B_FALSE);
-
-	/* sending the whole chain to the device */
-	virtio_push_chain(ve_hdr, B_TRUE);
-
-	if (sc->sc_stats.rw_cookiesmax < total_cookies)
-		sc->sc_stats.rw_cookiesmax = total_cookies;
-
-	return (DDI_SUCCESS);
-}
-
-/*
- * Now in polling mode. Interrupts are off, so we
- * 1) poll for the already queued requests to complete.
- * 2) push our request.
- * 3) wait for our request to complete.
- */
-static int
-vioblk_rw_poll(struct vioblk_softc *sc, bd_xfer_t *xfer,
-    int type, uint32_t len)
-{
-	clock_t tmout;
-	int ret;
-
-	ASSERT(xfer->x_flags & BD_XFER_POLL);
-
-	/* Prevent a hard hang. */
-	tmout = drv_usectohz(30000000);
-
-	/* Poll for an empty queue */
-	while (vq_num_used(sc->sc_vq)) {
-		/* Check if any pending requests completed. */
-		ret = vioblk_int_handler((caddr_t)&sc->sc_virtio, NULL);
-		if (ret != DDI_INTR_CLAIMED) {
-			drv_usecwait(10);
-			tmout -= 10;
-			return (ETIMEDOUT);
-		}
+	if (vib->vib_stats->vbs_rw_cookiesmax.value.ui32 < total_cookies) {
+		vib->vib_stats->vbs_rw_cookiesmax.value.ui32 = total_cookies;
 	}
 
-	ret = vioblk_rw(sc, xfer, type, len);
-	if (ret)
-		return (ret);
+	return (vioblk_common_submit(vib, vic));
 
-	tmout = drv_usectohz(30000000);
-	/* Poll for an empty queue again. */
-	while (vq_num_used(sc->sc_vq)) {
-		/* Check if any pending requests completed. */
-		ret = vioblk_int_handler((caddr_t)&sc->sc_virtio, NULL);
-		if (ret != DDI_INTR_CLAIMED) {
-			drv_usecwait(10);
-			tmout -= 10;
-			return (ETIMEDOUT);
-		}
-	}
-
-	return (DDI_SUCCESS);
+fail:
+	vbr->vbr_xfer = NULL;
+	vioblk_req_free(vib, vbr);
+	virtio_chain_free(vic);
+	return (r);
 }
 
 static int
-vioblk_read(void *arg, bd_xfer_t *xfer)
+vioblk_bd_read(void *arg, bd_xfer_t *xfer)
 {
-	int ret;
-	struct vioblk_softc *sc = (void *)arg;
+	vioblk_t *vib = arg;
+	int r;
 
-	if (xfer->x_flags & BD_XFER_POLL) {
-		if (!sc->sc_in_poll_mode) {
-			virtio_stop_vq_intr(sc->sc_vq);
-			sc->sc_in_poll_mode = 1;
-		}
+	mutex_enter(&vib->vib_mutex);
+	r = vioblk_request(vib, xfer, VIRTIO_BLK_T_IN);
+	mutex_exit(&vib->vib_mutex);
 
-		ret = vioblk_rw_poll(sc, xfer, VIRTIO_BLK_T_IN,
-		    xfer->x_nblks * DEV_BSIZE);
-	} else {
-		if (sc->sc_in_poll_mode) {
-			virtio_start_vq_intr(sc->sc_vq);
-			sc->sc_in_poll_mode = 0;
-		}
-
-		ret = vioblk_rw(sc, xfer, VIRTIO_BLK_T_IN,
-		    xfer->x_nblks * DEV_BSIZE);
-	}
-
-	return (ret);
+	return (r);
 }
 
 static int
-vioblk_write(void *arg, bd_xfer_t *xfer)
+vioblk_bd_write(void *arg, bd_xfer_t *xfer)
 {
-	int ret;
-	struct vioblk_softc *sc = (void *)arg;
+	vioblk_t *vib = arg;
+	int r;
 
-	if (xfer->x_flags & BD_XFER_POLL) {
-		if (!sc->sc_in_poll_mode) {
-			virtio_stop_vq_intr(sc->sc_vq);
-			sc->sc_in_poll_mode = 1;
-		}
+	mutex_enter(&vib->vib_mutex);
+	r = vioblk_request(vib, xfer, VIRTIO_BLK_T_OUT);
+	mutex_exit(&vib->vib_mutex);
 
-		ret = vioblk_rw_poll(sc, xfer, VIRTIO_BLK_T_OUT,
-		    xfer->x_nblks * DEV_BSIZE);
-	} else {
-		if (sc->sc_in_poll_mode) {
-			virtio_start_vq_intr(sc->sc_vq);
-			sc->sc_in_poll_mode = 0;
-		}
-
-		ret = vioblk_rw(sc, xfer, VIRTIO_BLK_T_OUT,
-		    xfer->x_nblks * DEV_BSIZE);
-	}
-	return (ret);
+	return (r);
 }
 
 static int
-vioblk_flush(void *arg, bd_xfer_t *xfer)
+vioblk_bd_flush(void *arg, bd_xfer_t *xfer)
 {
-	int ret;
-	struct vioblk_softc *sc = (void *)arg;
+	vioblk_t *vib = arg;
+	int r;
 
-	ASSERT((xfer->x_flags & BD_XFER_POLL) == 0);
+	mutex_enter(&vib->vib_mutex);
+	if (!virtio_feature_present(vib->vib_virtio, VIRTIO_BLK_F_FLUSH)) {
+		/*
+		 * We don't really expect to get here, because if we did not
+		 * negotiate the flush feature we would not have installed this
+		 * function in the blkdev ops vector.
+		 */
+		mutex_exit(&vib->vib_mutex);
+		return (ENOTSUP);
+	}
 
-	ret = vioblk_rw(sc, xfer, VIRTIO_BLK_T_FLUSH_OUT,
-	    xfer->x_nblks * DEV_BSIZE);
+	r = vioblk_request(vib, xfer, VIRTIO_BLK_T_FLUSH);
+	mutex_exit(&vib->vib_mutex);
 
-	if (!ret)
-		sc->sc_stats.rw_cacheflush++;
-
-	return (ret);
+	return (r);
 }
-
 
 static void
-vioblk_driveinfo(void *arg, bd_drive_t *drive)
+vioblk_bd_driveinfo(void *arg, bd_drive_t *drive)
 {
-	struct vioblk_softc *sc = (void *)arg;
+	vioblk_t *vib = arg;
 
-	drive->d_qsize = sc->sc_vq->vq_num;
+	drive->d_qsize = vib->vib_reqs_capacity;
 	drive->d_removable = B_FALSE;
 	drive->d_hotpluggable = B_TRUE;
 	drive->d_target = 0;
@@ -450,8 +518,7 @@ vioblk_driveinfo(void *arg, bd_drive_t *drive)
 	drive->d_product = "Block Device";
 	drive->d_product_len = strlen(drive->d_product);
 
-	(void) vioblk_get_id(sc);
-	drive->d_serial = sc->devid;
+	drive->d_serial = vib->vib_devid;
 	drive->d_serial_len = strlen(drive->d_serial);
 
 	drive->d_revision = "0000";
@@ -459,618 +526,501 @@ vioblk_driveinfo(void *arg, bd_drive_t *drive)
 }
 
 static int
-vioblk_mediainfo(void *arg, bd_media_t *media)
+vioblk_bd_mediainfo(void *arg, bd_media_t *media)
 {
-	struct vioblk_softc *sc = (void *)arg;
+	vioblk_t *vib = (void *)arg;
 
-	media->m_nblks = sc->sc_nblks;
-	media->m_blksize = sc->sc_blk_size;
-	media->m_readonly = sc->sc_readonly;
-	media->m_pblksize = sc->sc_pblk_size;
-	return (0);
-}
+	/*
+	 * The device protocol is specified in terms of 512 byte logical
+	 * blocks, regardless of the recommended I/O size which might be
+	 * larger.
+	 */
+	media->m_nblks = vib->vib_nblks;
+	media->m_blksize = DEV_BSIZE;
 
-static int
-vioblk_get_id(struct vioblk_softc *sc)
-{
-	clock_t deadline;
-	int ret;
-	bd_xfer_t xfer;
-
-	deadline = ddi_get_lbolt() + (clock_t)drv_usectohz(3 * 1000000);
-	(void) memset(&xfer, 0, sizeof (bd_xfer_t));
-	xfer.x_nblks = 1;
-
-	ret = ddi_dma_alloc_handle(sc->sc_dev, &vioblk_bd_dma_attr,
-	    DDI_DMA_SLEEP, NULL, &xfer.x_dmah);
-	if (ret != DDI_SUCCESS)
-		goto out_alloc;
-
-	ret = ddi_dma_addr_bind_handle(xfer.x_dmah, NULL, (caddr_t)&sc->devid,
-	    VIRTIO_BLK_ID_BYTES, DDI_DMA_READ | DDI_DMA_CONSISTENT,
-	    DDI_DMA_SLEEP, NULL, &xfer.x_dmac, &xfer.x_ndmac);
-	if (ret != DDI_DMA_MAPPED) {
-		ret = DDI_FAILURE;
-		goto out_map;
-	}
-
-	mutex_enter(&sc->lock_devid);
-
-	ret = vioblk_rw(sc, &xfer, VIRTIO_BLK_T_GET_ID,
-	    VIRTIO_BLK_ID_BYTES);
-	if (ret) {
-		mutex_exit(&sc->lock_devid);
-		goto out_rw;
-	}
-
-	/* wait for reply */
-	ret = cv_timedwait(&sc->cv_devid, &sc->lock_devid, deadline);
-	mutex_exit(&sc->lock_devid);
-
-	(void) ddi_dma_unbind_handle(xfer.x_dmah);
-	ddi_dma_free_handle(&xfer.x_dmah);
-
-	/* timeout */
-	if (ret < 0) {
-		dev_err(sc->sc_dev, CE_WARN,
-		    "Cannot get devid from the device");
-		return (DDI_FAILURE);
-	}
-
-	return (0);
-
-out_rw:
-	(void) ddi_dma_unbind_handle(xfer.x_dmah);
-out_map:
-	ddi_dma_free_handle(&xfer.x_dmah);
-out_alloc:
-	return (ret);
-}
-
-static int
-vioblk_devid_init(void *arg, dev_info_t *devinfo, ddi_devid_t *devid)
-{
-	struct vioblk_softc *sc = (void *)arg;
-	int ret;
-
-	ret = vioblk_get_id(sc);
-	if (ret != DDI_SUCCESS)
-		return (ret);
-
-	ret = ddi_devid_init(devinfo, DEVID_ATA_SERIAL,
-	    VIRTIO_BLK_ID_BYTES, sc->devid, devid);
-	if (ret != DDI_SUCCESS) {
-		dev_err(devinfo, CE_WARN, "Cannot build devid from the device");
-		return (ret);
-	}
-
-	dev_debug(sc->sc_dev, CE_NOTE,
-	    "devid %x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x",
-	    sc->devid[0], sc->devid[1], sc->devid[2], sc->devid[3],
-	    sc->devid[4], sc->devid[5], sc->devid[6], sc->devid[7],
-	    sc->devid[8], sc->devid[9], sc->devid[10], sc->devid[11],
-	    sc->devid[12], sc->devid[13], sc->devid[14], sc->devid[15],
-	    sc->devid[16], sc->devid[17], sc->devid[18], sc->devid[19]);
-
+	media->m_readonly = vib->vib_readonly;
+	media->m_pblksize = vib->vib_pblk_size;
 	return (0);
 }
 
 static void
-vioblk_show_features(struct vioblk_softc *sc, const char *prefix,
-    uint32_t features)
+vioblk_get_id(vioblk_t *vib)
 {
-	char buf[512];
-	char *bufp = buf;
-	char *bufend = buf + sizeof (buf);
+	virtio_dma_t *dma;
+	int r;
 
-	/* LINTED E_PTRDIFF_OVERFLOW */
-	bufp += snprintf(bufp, bufend - bufp, prefix);
+	if ((dma = virtio_dma_alloc(vib->vib_virtio, VIRTIO_BLK_ID_BYTES,
+	    &vioblk_dma_attr, DDI_DMA_CONSISTENT | DDI_DMA_READ,
+	    KM_SLEEP)) == NULL) {
+		return;
+	}
 
-	/* LINTED E_PTRDIFF_OVERFLOW */
-	bufp += virtio_show_features(features, bufp, bufend - bufp);
+	mutex_enter(&vib->vib_mutex);
+	if ((r = vioblk_internal(vib, VIRTIO_BLK_T_GET_ID, dma, 0,
+	    VIRTIO_DIR_DEVICE_WRITES)) == 0) {
+		const char *b = virtio_dma_va(dma, 0);
+		uint_t pos = 0;
 
+		/*
+		 * Save the entire response for debugging purposes.
+		 */
+		bcopy(virtio_dma_va(dma, 0), vib->vib_rawid,
+		    VIRTIO_BLK_ID_BYTES);
 
-	/* LINTED E_PTRDIFF_OVERFLOW */
-	bufp += snprintf(bufp, bufend - bufp, "Vioblk ( ");
+		/*
+		 * Process the returned ID.
+		 */
+		bzero(vib->vib_devid, sizeof (vib->vib_devid));
+		for (uint_t n = 0; n < VIRTIO_BLK_ID_BYTES; n++) {
+			if (isalnum(b[n]) || b[n] == '-' || b[n] == '_') {
+				/*
+				 * Accept a subset of printable ASCII
+				 * characters.
+				 */
+				vib->vib_devid[pos++] = b[n];
+			} else {
+				/*
+				 * Stop processing at the first sign of
+				 * trouble.
+				 */
+				break;
+			}
+		}
 
-	if (features & VIRTIO_BLK_F_BARRIER)
-		/* LINTED E_PTRDIFF_OVERFLOW */
-		bufp += snprintf(bufp, bufend - bufp, "BARRIER ");
-	if (features & VIRTIO_BLK_F_SIZE_MAX)
-		/* LINTED E_PTRDIFF_OVERFLOW */
-		bufp += snprintf(bufp, bufend - bufp, "SIZE_MAX ");
-	if (features & VIRTIO_BLK_F_SEG_MAX)
-		/* LINTED E_PTRDIFF_OVERFLOW */
-		bufp += snprintf(bufp, bufend - bufp, "SEG_MAX ");
-	if (features & VIRTIO_BLK_F_GEOMETRY)
-		/* LINTED E_PTRDIFF_OVERFLOW */
-		bufp += snprintf(bufp, bufend - bufp, "GEOMETRY ");
-	if (features & VIRTIO_BLK_F_RO)
-		/* LINTED E_PTRDIFF_OVERFLOW */
-		bufp += snprintf(bufp, bufend - bufp, "RO ");
-	if (features & VIRTIO_BLK_F_BLK_SIZE)
-		/* LINTED E_PTRDIFF_OVERFLOW */
-		bufp += snprintf(bufp, bufend - bufp, "BLK_SIZE ");
-	if (features & VIRTIO_BLK_F_SCSI)
-		/* LINTED E_PTRDIFF_OVERFLOW */
-		bufp += snprintf(bufp, bufend - bufp, "SCSI ");
-	if (features & VIRTIO_BLK_F_FLUSH)
-		/* LINTED E_PTRDIFF_OVERFLOW */
-		bufp += snprintf(bufp, bufend - bufp, "FLUSH ");
-	if (features & VIRTIO_BLK_F_TOPOLOGY)
-		/* LINTED E_PTRDIFF_OVERFLOW */
-		bufp += snprintf(bufp, bufend - bufp, "TOPOLOGY ");
+		vib->vib_devid_fetched = B_TRUE;
+	}
+	mutex_exit(&vib->vib_mutex);
 
-	/* LINTED E_PTRDIFF_OVERFLOW */
-	bufp += snprintf(bufp, bufend - bufp, ")");
-	*bufp = '\0';
-
-	dev_debug(sc->sc_dev, CE_NOTE, "%s", buf);
+	virtio_dma_free(dma);
 }
 
 static int
-vioblk_dev_features(struct vioblk_softc *sc)
+vioblk_bd_devid(void *arg, dev_info_t *dip, ddi_devid_t *devid)
 {
-	uint32_t host_features;
+	vioblk_t *vib = arg;
+	size_t len;
 
-	host_features = virtio_negotiate_features(&sc->sc_virtio,
-	    VIRTIO_BLK_F_RO |
-	    VIRTIO_BLK_F_GEOMETRY |
-	    VIRTIO_BLK_F_BLK_SIZE |
-	    VIRTIO_BLK_F_FLUSH |
-	    VIRTIO_BLK_F_TOPOLOGY |
-	    VIRTIO_BLK_F_SEG_MAX |
-	    VIRTIO_BLK_F_SIZE_MAX |
-	    VIRTIO_F_RING_INDIRECT_DESC);
-
-	vioblk_show_features(sc, "Host features: ", host_features);
-	vioblk_show_features(sc, "Negotiated features: ",
-	    sc->sc_virtio.sc_features);
-
-	if (!(sc->sc_virtio.sc_features & VIRTIO_F_RING_INDIRECT_DESC)) {
-		dev_err(sc->sc_dev, CE_NOTE,
-		    "Host does not support RING_INDIRECT_DESC, bye.");
+	if ((len = strlen(vib->vib_devid)) == 0) {
+		/*
+		 * The device has no ID.
+		 */
 		return (DDI_FAILURE);
 	}
 
-	return (DDI_SUCCESS);
+	return (ddi_devid_init(dip, DEVID_ATA_SERIAL, len, vib->vib_devid,
+	    devid));
 }
 
-/* ARGSUSED */
-uint_t
-vioblk_int_handler(caddr_t arg1, caddr_t arg2)
+/*
+ * As the device completes processing of a request, it returns the chain for
+ * that request to our I/O queue.  This routine is called in two contexts:
+ *   - from the interrupt handler, in response to notification from the device
+ *   - synchronously in line with request processing when panicking
+ */
+static uint_t
+vioblk_poll(vioblk_t *vib)
 {
-	struct virtio_softc *vsc = (void *)arg1;
-	struct vioblk_softc *sc = __containerof(vsc,
-	    struct vioblk_softc, sc_virtio);
-	struct vq_entry *ve;
-	uint32_t len;
-	int i = 0, error;
+	virtio_chain_t *vic;
+	uint_t count = 0;
+	boolean_t wakeup = B_FALSE;
 
-	while ((ve = virtio_pull_chain(sc->sc_vq, &len))) {
-		struct vioblk_req *req = &sc->sc_reqs[ve->qe_index];
-		bd_xfer_t *xfer = req->xfer;
-		uint8_t status = req->status;
-		uint32_t type = req->hdr.type;
+	VERIFY(MUTEX_HELD(&vib->vib_mutex));
 
-		if (req->xfer == (void *)VIOBLK_POISON) {
-			dev_err(sc->sc_dev, CE_WARN, "Poisoned descriptor!");
-			virtio_free_chain(ve);
-			return (DDI_INTR_CLAIMED);
-		}
+	while ((vic = virtio_queue_poll(vib->vib_vq)) != NULL) {
+		vioblk_req_t *vbr = virtio_chain_data(vic);
+		uint8_t status;
 
-		req->xfer = (void *) VIOBLK_POISON;
+		virtio_dma_sync(vbr->vbr_dma, DDI_DMA_SYNC_FORCPU);
 
-		/* Note: blkdev tears down the payload mapping for us. */
-		virtio_free_chain(ve);
+		bcopy(virtio_dma_va(vbr->vbr_dma,
+		    sizeof (struct vioblk_req_hdr)), &status, sizeof (status));
 
-		/* returning payload back to blkdev */
 		switch (status) {
-			case VIRTIO_BLK_S_OK:
-				error = 0;
-				break;
-			case VIRTIO_BLK_S_IOERR:
-				error = EIO;
-				sc->sc_stats.io_errors++;
-				break;
-			case VIRTIO_BLK_S_UNSUPP:
-				sc->sc_stats.unsupp_errors++;
-				error = ENOTTY;
-				break;
-			default:
-				sc->sc_stats.nxio_errors++;
-				error = ENXIO;
-				break;
+		case VIRTIO_BLK_S_OK:
+			vbr->vbr_error = 0;
+			break;
+		case VIRTIO_BLK_S_IOERR:
+			vbr->vbr_error = EIO;
+			vib->vib_stats->vbs_io_errors.value.ui64++;
+			break;
+		case VIRTIO_BLK_S_UNSUPP:
+			vbr->vbr_error = ENOTTY;
+			vib->vib_stats->vbs_unsupp_errors.value.ui64++;
+			break;
+		default:
+			vbr->vbr_error = ENXIO;
+			vib->vib_stats->vbs_nxio_errors.value.ui64++;
+			break;
 		}
 
-		if (type == VIRTIO_BLK_T_GET_ID) {
-			/* notify devid_init */
-			mutex_enter(&sc->lock_devid);
-			cv_broadcast(&sc->cv_devid);
-			mutex_exit(&sc->lock_devid);
-		} else
-			bd_xfer_done(xfer, error);
+		count++;
 
-		i++;
+		if (vbr->vbr_status & VIOBLK_REQSTAT_POLLED) {
+			/*
+			 * This request must not be freed as it is being held
+			 * by a call to vioblk_common_submit().
+			 */
+			VERIFY(!(vbr->vbr_status &
+			    VIOBLK_REQSTAT_POLL_COMPLETE));
+			vbr->vbr_status |= VIOBLK_REQSTAT_POLL_COMPLETE;
+			wakeup = B_TRUE;
+			continue;
+		}
+
+		vioblk_complete(vib, vbr);
+
+		vioblk_req_free(vib, vbr);
+		virtio_chain_free(vic);
 	}
 
-	/* update stats */
-	if (sc->sc_stats.intr_queuemax < i)
-		sc->sc_stats.intr_queuemax = i;
-	sc->sc_stats.intr_total++;
+	if (wakeup) {
+		/*
+		 * Signal anybody waiting for polled command completion.
+		 */
+		cv_broadcast(&vib->vib_cv);
+	}
 
-	return (DDI_INTR_CLAIMED);
+	return (count);
 }
 
-/* ARGSUSED */
 uint_t
-vioblk_config_handler(caddr_t arg1, caddr_t arg2)
+vioblk_int_handler(caddr_t arg0, caddr_t arg1)
 {
+	vioblk_t *vib = (vioblk_t *)arg0;
+	uint_t count;
+
+	mutex_enter(&vib->vib_mutex);
+	if ((count = vioblk_poll(vib)) >
+	    vib->vib_stats->vbs_intr_queuemax.value.ui32) {
+		vib->vib_stats->vbs_intr_queuemax.value.ui32 = count;
+	}
+
+	vib->vib_stats->vbs_intr_total.value.ui64++;
+	mutex_exit(&vib->vib_mutex);
+
 	return (DDI_INTR_CLAIMED);
-}
-
-static int
-vioblk_register_ints(struct vioblk_softc *sc)
-{
-	int ret;
-
-	struct virtio_int_handler vioblk_conf_h = {
-		vioblk_config_handler
-	};
-
-	struct virtio_int_handler vioblk_vq_h[] = {
-		{ vioblk_int_handler },
-		{ NULL },
-	};
-
-	ret = virtio_register_ints(&sc->sc_virtio,
-	    &vioblk_conf_h, vioblk_vq_h);
-
-	return (ret);
 }
 
 static void
-vioblk_free_reqs(struct vioblk_softc *sc)
+vioblk_free_reqs(vioblk_t *vib)
 {
-	int i, qsize;
+	VERIFY3U(vib->vib_nreqs_alloc, ==, 0);
 
-	qsize = sc->sc_vq->vq_num;
+	for (uint_t i = 0; i < vib->vib_reqs_capacity; i++) {
+		struct vioblk_req *vbr = &vib->vib_reqs_mem[i];
 
-	for (i = 0; i < qsize; i++) {
-		struct vioblk_req *req = &sc->sc_reqs[i];
+		VERIFY(list_link_active(&vbr->vbr_link));
+		list_remove(&vib->vib_reqs, vbr);
 
-		if (req->ndmac)
-			(void) ddi_dma_unbind_handle(req->dmah);
+		VERIFY0(vbr->vbr_status);
 
-		if (req->dmah)
-			ddi_dma_free_handle(&req->dmah);
+		if (vbr->vbr_dma != NULL) {
+			virtio_dma_free(vbr->vbr_dma);
+			vbr->vbr_dma = NULL;
+		}
 	}
+	VERIFY(list_is_empty(&vib->vib_reqs));
 
-	kmem_free(sc->sc_reqs, sizeof (struct vioblk_req) * qsize);
+	if (vib->vib_reqs_mem != NULL) {
+		kmem_free(vib->vib_reqs_mem,
+		    sizeof (struct vioblk_req) * vib->vib_reqs_capacity);
+		vib->vib_reqs_mem = NULL;
+		vib->vib_reqs_capacity = 0;
+	}
 }
 
 static int
-vioblk_alloc_reqs(struct vioblk_softc *sc)
+vioblk_alloc_reqs(vioblk_t *vib)
 {
-	int i, qsize;
-	int ret;
+	vib->vib_reqs_capacity = MIN(virtio_queue_size(vib->vib_vq),
+	    VIRTIO_BLK_REQ_BUFS);
+	vib->vib_reqs_mem = kmem_zalloc(
+	    sizeof (struct vioblk_req) * vib->vib_reqs_capacity, KM_SLEEP);
+	vib->vib_nreqs_alloc = 0;
 
-	qsize = sc->sc_vq->vq_num;
+	for (uint_t i = 0; i < vib->vib_reqs_capacity; i++) {
+		list_insert_tail(&vib->vib_reqs, &vib->vib_reqs_mem[i]);
+	}
 
-	sc->sc_reqs = kmem_zalloc(sizeof (struct vioblk_req) * qsize, KM_SLEEP);
-
-	for (i = 0; i < qsize; i++) {
-		struct vioblk_req *req = &sc->sc_reqs[i];
-
-		ret = ddi_dma_alloc_handle(sc->sc_dev, &vioblk_req_dma_attr,
-		    DDI_DMA_SLEEP, NULL, &req->dmah);
-		if (ret != DDI_SUCCESS) {
-
-			dev_err(sc->sc_dev, CE_WARN,
-			    "Can't allocate dma handle for req "
-			    "buffer %d", i);
-			goto exit;
-		}
-
-		ret = ddi_dma_addr_bind_handle(req->dmah, NULL,
-		    (caddr_t)&req->hdr,
+	for (vioblk_req_t *vbr = list_head(&vib->vib_reqs); vbr != NULL;
+	    vbr = list_next(&vib->vib_reqs, vbr)) {
+		if ((vbr->vbr_dma = virtio_dma_alloc(vib->vib_virtio,
 		    sizeof (struct vioblk_req_hdr) + sizeof (uint8_t),
-		    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP,
-		    NULL, &req->dmac, &req->ndmac);
-		if (ret != DDI_DMA_MAPPED) {
-			dev_err(sc->sc_dev, CE_WARN,
-			    "Can't bind req buffer %d", i);
-			goto exit;
+		    &vioblk_dma_attr, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+		    KM_SLEEP)) == NULL) {
+			goto fail;
 		}
 	}
 
 	return (0);
 
-exit:
-	vioblk_free_reqs(sc);
+fail:
+	vioblk_free_reqs(vib);
 	return (ENOMEM);
 }
 
-
 static int
-vioblk_ksupdate(kstat_t *ksp, int rw)
+vioblk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	struct vioblk_softc *sc = ksp->ks_private;
+	int instance = ddi_get_instance(dip);
+	vioblk_t *vib;
+	virtio_t *vio;
+	boolean_t did_mutex = B_FALSE;
 
-	if (rw == KSTAT_WRITE)
-		return (EACCES);
-
-	sc->ks_data->sts_rw_cookiesmax.value.ui32 = sc->sc_stats.rw_cookiesmax;
-	sc->ks_data->sts_intr_queuemax.value.ui32 = sc->sc_stats.intr_queuemax;
-	sc->ks_data->sts_unsupp_errors.value.ui32 = sc->sc_stats.unsupp_errors;
-	sc->ks_data->sts_nxio_errors.value.ui32 = sc->sc_stats.nxio_errors;
-	sc->ks_data->sts_io_errors.value.ui32 = sc->sc_stats.io_errors;
-	sc->ks_data->sts_rw_cacheflush.value.ui64 = sc->sc_stats.rw_cacheflush;
-	sc->ks_data->sts_intr_total.value.ui64 = sc->sc_stats.intr_total;
-
-
-	return (0);
-}
-
-static int
-vioblk_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
-{
-	int ret = DDI_SUCCESS;
-	int instance;
-	struct vioblk_softc *sc;
-	struct virtio_softc *vsc;
-	struct vioblk_stats *ks_data;
-
-	instance = ddi_get_instance(devinfo);
-
-	switch (cmd) {
-	case DDI_ATTACH:
-		break;
-
-	case DDI_RESUME:
-	case DDI_PM_RESUME:
-		dev_err(devinfo, CE_WARN, "resume not supported yet");
-		return (DDI_FAILURE);
-
-	default:
-		dev_err(devinfo, CE_WARN, "cmd 0x%x not recognized", cmd);
+	if (cmd != DDI_ATTACH) {
 		return (DDI_FAILURE);
 	}
 
-	sc = kmem_zalloc(sizeof (struct vioblk_softc), KM_SLEEP);
-	ddi_set_driver_private(devinfo, sc);
+	if ((vio = virtio_init(dip, VIRTIO_BLK_WANTED_FEATURES, B_TRUE)) ==
+	    NULL) {
+		dev_err(dip, CE_WARN, "failed to start Virtio init");
+		return (DDI_FAILURE);
+	}
 
-	vsc = &sc->sc_virtio;
-
-	/* Duplicate for faster access / less typing */
-	sc->sc_dev = devinfo;
-	vsc->sc_dev = devinfo;
-
-	cv_init(&sc->cv_devid, NULL, CV_DRIVER, NULL);
-	mutex_init(&sc->lock_devid, NULL, MUTEX_DRIVER, NULL);
+	vib = kmem_zalloc(sizeof (*vib), KM_SLEEP);
+	vib->vib_dip = dip;
+	vib->vib_virtio = vio;
+	ddi_set_driver_private(dip, vib);
+	list_create(&vib->vib_reqs, sizeof (vioblk_req_t),
+	    offsetof(vioblk_req_t, vbr_link));
 
 	/*
-	 * Initialize interrupt kstat.  This should not normally fail, since
-	 * we don't use a persistent stat.  We do it this way to avoid having
-	 * to test for it at run time on the hot path.
+	 * Determine how many scatter-gather entries we can use in a single
+	 * request.
 	 */
-	sc->sc_intrstat = kstat_create("vioblk", instance,
-	    "intrs", "controller", KSTAT_TYPE_NAMED,
-	    sizeof (struct vioblk_stats) / sizeof (kstat_named_t),
-	    KSTAT_FLAG_PERSISTENT);
-	if (sc->sc_intrstat == NULL) {
-		dev_err(devinfo, CE_WARN, "kstat_create failed");
-		goto exit_intrstat;
-	}
-	ks_data = (struct vioblk_stats *)sc->sc_intrstat->ks_data;
-	kstat_named_init(&ks_data->sts_rw_outofmemory,
-	    "total_rw_outofmemory", KSTAT_DATA_UINT64);
-	kstat_named_init(&ks_data->sts_rw_badoffset,
-	    "total_rw_badoffset", KSTAT_DATA_UINT64);
-	kstat_named_init(&ks_data->sts_intr_total,
-	    "total_intr", KSTAT_DATA_UINT64);
-	kstat_named_init(&ks_data->sts_io_errors,
-	    "total_io_errors", KSTAT_DATA_UINT32);
-	kstat_named_init(&ks_data->sts_unsupp_errors,
-	    "total_unsupp_errors", KSTAT_DATA_UINT32);
-	kstat_named_init(&ks_data->sts_nxio_errors,
-	    "total_nxio_errors", KSTAT_DATA_UINT32);
-	kstat_named_init(&ks_data->sts_rw_cacheflush,
-	    "total_rw_cacheflush", KSTAT_DATA_UINT64);
-	kstat_named_init(&ks_data->sts_rw_cookiesmax,
-	    "max_rw_cookies", KSTAT_DATA_UINT32);
-	kstat_named_init(&ks_data->sts_intr_queuemax,
-	    "max_intr_queue", KSTAT_DATA_UINT32);
-	sc->ks_data = ks_data;
-	sc->sc_intrstat->ks_private = sc;
-	sc->sc_intrstat->ks_update = vioblk_ksupdate;
-	kstat_install(sc->sc_intrstat);
-
-	/* map BAR0 */
-	ret = ddi_regs_map_setup(devinfo, 1,
-	    (caddr_t *)&sc->sc_virtio.sc_io_addr,
-	    0, 0, &vioblk_attr, &sc->sc_virtio.sc_ioh);
-	if (ret != DDI_SUCCESS) {
-		dev_err(devinfo, CE_WARN, "unable to map bar0: [%d]", ret);
-		goto exit_map;
-	}
-
-	virtio_device_reset(&sc->sc_virtio);
-	virtio_set_status(&sc->sc_virtio, VIRTIO_CONFIG_DEVICE_STATUS_ACK);
-	virtio_set_status(&sc->sc_virtio, VIRTIO_CONFIG_DEVICE_STATUS_DRIVER);
-
-	if (vioblk_register_ints(sc)) {
-		dev_err(devinfo, CE_WARN, "Unable to add interrupt");
-		goto exit_int;
-	}
-
-	ret = vioblk_dev_features(sc);
-	if (ret)
-		goto exit_features;
-
-	if (sc->sc_virtio.sc_features & VIRTIO_BLK_F_RO)
-		sc->sc_readonly = B_TRUE;
-	else
-		sc->sc_readonly = B_FALSE;
-
-	sc->sc_capacity = virtio_read_device_config_8(&sc->sc_virtio,
-	    VIRTIO_BLK_CONFIG_CAPACITY);
-	sc->sc_nblks = sc->sc_capacity;
-
-	sc->sc_blk_size = DEV_BSIZE;
-	if (sc->sc_virtio.sc_features & VIRTIO_BLK_F_BLK_SIZE) {
-		sc->sc_blk_size = virtio_read_device_config_4(&sc->sc_virtio,
-		    VIRTIO_BLK_CONFIG_BLK_SIZE);
-	}
-
-	sc->sc_pblk_size = sc->sc_blk_size;
-	if (sc->sc_virtio.sc_features & VIRTIO_BLK_F_TOPOLOGY) {
-		sc->sc_pblk_size <<= virtio_read_device_config_1(&sc->sc_virtio,
-		    VIRTIO_BLK_CONFIG_TOPO_PBEXP);
-	}
-
-	/* Flushing is not supported. */
-	if (!(sc->sc_virtio.sc_features & VIRTIO_BLK_F_FLUSH)) {
-		vioblk_ops.o_sync_cache = NULL;
-	}
-
-	sc->sc_seg_max = DEF_MAXINDIRECT;
-	/* The max number of segments (cookies) in a request */
-	if (sc->sc_virtio.sc_features & VIRTIO_BLK_F_SEG_MAX) {
-		sc->sc_seg_max = virtio_read_device_config_4(&sc->sc_virtio,
+	vib->vib_seg_max = VIRTIO_BLK_DEFAULT_MAX_SEG;
+	if (virtio_feature_present(vio, VIRTIO_BLK_F_SEG_MAX)) {
+		vib->vib_seg_max = virtio_dev_get32(vio,
 		    VIRTIO_BLK_CONFIG_SEG_MAX);
 
-		/* That's what Linux does. */
-		if (!sc->sc_seg_max)
-			sc->sc_seg_max = 1;
-
-		/*
-		 * SEG_MAX corresponds to the number of _data_
-		 * blocks in a request
-		 */
-		sc->sc_seg_max += 2;
-	}
-	/* 2 descriptors taken for header/status */
-	vioblk_bd_dma_attr.dma_attr_sgllen = sc->sc_seg_max - 2;
-
-
-	/* The maximum size for a cookie in a request. */
-	sc->sc_seg_size_max = DEF_MAXSECTOR;
-	if (sc->sc_virtio.sc_features & VIRTIO_BLK_F_SIZE_MAX) {
-		sc->sc_seg_size_max = virtio_read_device_config_4(
-		    &sc->sc_virtio, VIRTIO_BLK_CONFIG_SIZE_MAX);
+		if (vib->vib_seg_max == 0 || vib->vib_seg_max == PCI_EINVAL32) {
+			/*
+			 * We need to be able to use at least one data segment,
+			 * so we'll assume that this device is just poorly
+			 * implemented and try for one.
+			 */
+			vib->vib_seg_max = 1;
+		}
 	}
 
-	/* The maximum request size */
-	vioblk_bd_dma_attr.dma_attr_maxxfer =
-	    vioblk_bd_dma_attr.dma_attr_sgllen * sc->sc_seg_size_max;
-
-	dev_debug(devinfo, CE_NOTE,
-	    "nblks=%" PRIu64 " blksize=%d (%d) num_seg=%d, "
-	    "seg_size=%d, maxxfer=%" PRIu64,
-	    sc->sc_nblks, sc->sc_blk_size, sc->sc_pblk_size,
-	    vioblk_bd_dma_attr.dma_attr_sgllen,
-	    sc->sc_seg_size_max,
-	    vioblk_bd_dma_attr.dma_attr_maxxfer);
-
-
-	sc->sc_vq = virtio_alloc_vq(&sc->sc_virtio, 0, 0,
-	    sc->sc_seg_max, "I/O request");
-	if (sc->sc_vq == NULL) {
-		goto exit_alloc1;
+	/*
+	 * When allocating the request queue, we include two additional
+	 * descriptors (beyond those required for request data) to account for
+	 * the header and the status byte.
+	 */
+	if ((vib->vib_vq = virtio_queue_alloc(vio, VIRTIO_BLK_VIRTQ_IO, "io",
+	    vioblk_int_handler, vib, B_FALSE, vib->vib_seg_max + 2)) == NULL) {
+		goto fail;
 	}
 
-	ret = vioblk_alloc_reqs(sc);
-	if (ret) {
-		goto exit_alloc2;
+	if (virtio_init_complete(vio, 0) != DDI_SUCCESS) {
+		dev_err(dip, CE_WARN, "failed to complete Virtio init");
+		goto fail;
 	}
 
-	sc->bd_h = bd_alloc_handle(sc, &vioblk_ops, &vioblk_bd_dma_attr,
-	    KM_SLEEP);
+	cv_init(&vib->vib_cv, NULL, CV_DRIVER, NULL);
+	mutex_init(&vib->vib_mutex, NULL, MUTEX_DRIVER, virtio_intr_pri(vio));
+	did_mutex = B_TRUE;
 
+	if ((vib->vib_kstat = kstat_create("vioblk", instance,
+	    "statistics", "controller", KSTAT_TYPE_NAMED,
+	    sizeof (struct vioblk_stats) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_PERSISTENT)) == NULL) {
+		dev_err(dip, CE_WARN, "kstat_create failed");
+		goto fail;
+	}
+	vib->vib_stats = (vioblk_stats_t *)vib->vib_kstat->ks_data;
+	kstat_named_init(&vib->vib_stats->vbs_rw_outofmemory,
+	    "total_rw_outofmemory", KSTAT_DATA_UINT64);
+	kstat_named_init(&vib->vib_stats->vbs_rw_badoffset,
+	    "total_rw_badoffset", KSTAT_DATA_UINT64);
+	kstat_named_init(&vib->vib_stats->vbs_intr_total,
+	    "total_intr", KSTAT_DATA_UINT64);
+	kstat_named_init(&vib->vib_stats->vbs_io_errors,
+	    "total_io_errors", KSTAT_DATA_UINT64);
+	kstat_named_init(&vib->vib_stats->vbs_unsupp_errors,
+	    "total_unsupp_errors", KSTAT_DATA_UINT64);
+	kstat_named_init(&vib->vib_stats->vbs_nxio_errors,
+	    "total_nxio_errors", KSTAT_DATA_UINT64);
+	kstat_named_init(&vib->vib_stats->vbs_rw_cacheflush,
+	    "total_rw_cacheflush", KSTAT_DATA_UINT64);
+	kstat_named_init(&vib->vib_stats->vbs_rw_cookiesmax,
+	    "max_rw_cookies", KSTAT_DATA_UINT32);
+	kstat_named_init(&vib->vib_stats->vbs_intr_queuemax,
+	    "max_intr_queue", KSTAT_DATA_UINT32);
+	kstat_install(vib->vib_kstat);
 
-	virtio_set_status(&sc->sc_virtio,
-	    VIRTIO_CONFIG_DEVICE_STATUS_DRIVER_OK);
-	virtio_start_vq_intr(sc->sc_vq);
+	vib->vib_readonly = virtio_feature_present(vio, VIRTIO_BLK_F_RO);
+	if ((vib->vib_nblks = virtio_dev_get64(vio,
+	    VIRTIO_BLK_CONFIG_CAPACITY)) == UINT64_MAX) {
+		dev_err(dip, CE_WARN, "invalid capacity");
+		goto fail;
+	}
 
-	ret = virtio_enable_ints(&sc->sc_virtio);
-	if (ret)
-		goto exit_enable_ints;
+	/*
+	 * Determine the optimal logical block size recommended by the device.
+	 * This size is advisory; the protocol always deals in 512 byte blocks.
+	 */
+	vib->vib_blk_size = DEV_BSIZE;
+	if (virtio_feature_present(vio, VIRTIO_BLK_F_BLK_SIZE)) {
+		uint32_t v = virtio_dev_get32(vio, VIRTIO_BLK_CONFIG_BLK_SIZE);
 
-	ret = bd_attach_handle(devinfo, sc->bd_h);
-	if (ret != DDI_SUCCESS) {
-		dev_err(devinfo, CE_WARN, "Failed to attach blkdev");
-		goto exit_attach_bd;
+		if (v != 0 && v != PCI_EINVAL32) {
+			vib->vib_blk_size = v;
+		}
+	}
+
+	/*
+	 * The device may also provide an advisory physical block size.
+	 */
+	vib->vib_pblk_size = vib->vib_blk_size;
+	if (virtio_feature_present(vio, VIRTIO_BLK_F_TOPOLOGY)) {
+		uint8_t v = virtio_dev_get8(vio, VIRTIO_BLK_CONFIG_TOPO_PBEXP);
+
+		if (v != PCI_EINVAL8) {
+			vib->vib_pblk_size <<= v;
+		}
+	}
+
+	/*
+	 * The maximum size for a cookie in a request.
+	 */
+	vib->vib_seg_size_max = VIRTIO_BLK_DEFAULT_MAX_SIZE;
+	if (virtio_feature_present(vio, VIRTIO_BLK_F_SIZE_MAX)) {
+		uint32_t v = virtio_dev_get32(vio, VIRTIO_BLK_CONFIG_SIZE_MAX);
+
+		if (v != 0 && v != PCI_EINVAL32) {
+			vib->vib_seg_size_max = v;
+		}
+	}
+
+	/*
+	 * Set up the DMA attributes for blkdev to use for request data.  The
+	 * specification is not extremely clear about whether DMA-related
+	 * parameters include or exclude the header and status descriptors.
+	 * For now, we assume they cover only the request data and not the
+	 * headers.
+	 */
+	vib->vib_bd_dma_attr = vioblk_dma_attr;
+	vib->vib_bd_dma_attr.dma_attr_sgllen = vib->vib_seg_max;
+	vib->vib_bd_dma_attr.dma_attr_count_max = vib->vib_seg_size_max;
+	vib->vib_bd_dma_attr.dma_attr_maxxfer = vib->vib_seg_max *
+	    vib->vib_seg_size_max;
+
+	if (vioblk_alloc_reqs(vib) != 0) {
+		goto fail;
+	}
+
+	/*
+	 * The blkdev framework does not provide a way to specify that the
+	 * device does not support write cache flushing, except by omitting the
+	 * "o_sync_cache" member from the ops vector.  As "bd_alloc_handle()"
+	 * makes a copy of the ops vector, we can safely assemble one on the
+	 * stack based on negotiated features.
+	 */
+	bd_ops_t vioblk_bd_ops = {
+		.o_version =		BD_OPS_VERSION_0,
+		.o_drive_info =		vioblk_bd_driveinfo,
+		.o_media_info =		vioblk_bd_mediainfo,
+		.o_devid_init =		vioblk_bd_devid,
+		.o_sync_cache =		vioblk_bd_flush,
+		.o_read =		vioblk_bd_read,
+		.o_write =		vioblk_bd_write,
+	};
+	if (!virtio_feature_present(vio, VIRTIO_BLK_F_FLUSH)) {
+		vioblk_bd_ops.o_sync_cache = NULL;
+	}
+
+	vib->vib_bd_h = bd_alloc_handle(vib, &vioblk_bd_ops,
+	    &vib->vib_bd_dma_attr, KM_SLEEP);
+
+	/*
+	 * Enable interrupts now so that we can request the device identity.
+	 */
+	if (virtio_interrupts_enable(vio) != DDI_SUCCESS) {
+		goto fail;
+	}
+
+	vioblk_get_id(vib);
+
+	if (bd_attach_handle(dip, vib->vib_bd_h) != DDI_SUCCESS) {
+		dev_err(dip, CE_WARN, "Failed to attach blkdev");
+		goto fail;
 	}
 
 	return (DDI_SUCCESS);
 
-exit_attach_bd:
-	/*
-	 * There is no virtio_disable_ints(), it's done in virtio_release_ints.
-	 * If they ever get split, don't forget to add a call here.
-	 */
-exit_enable_ints:
-	virtio_stop_vq_intr(sc->sc_vq);
-	bd_free_handle(sc->bd_h);
-	vioblk_free_reqs(sc);
-exit_alloc2:
-	virtio_free_vq(sc->sc_vq);
-exit_alloc1:
-exit_features:
-	virtio_release_ints(&sc->sc_virtio);
-exit_int:
-	virtio_set_status(&sc->sc_virtio, VIRTIO_CONFIG_DEVICE_STATUS_FAILED);
-	ddi_regs_map_free(&sc->sc_virtio.sc_ioh);
-exit_map:
-	kstat_delete(sc->sc_intrstat);
-exit_intrstat:
-	mutex_destroy(&sc->lock_devid);
-	cv_destroy(&sc->cv_devid);
-	kmem_free(sc, sizeof (struct vioblk_softc));
+fail:
+	if (vib->vib_bd_h != NULL) {
+		(void) bd_detach_handle(vib->vib_bd_h);
+		bd_free_handle(vib->vib_bd_h);
+	}
+	if (vio != NULL) {
+		(void) virtio_fini(vio, B_TRUE);
+	}
+	if (did_mutex) {
+		mutex_destroy(&vib->vib_mutex);
+		cv_destroy(&vib->vib_cv);
+	}
+	if (vib->vib_kstat != NULL) {
+		kstat_delete(vib->vib_kstat);
+	}
+	vioblk_free_reqs(vib);
+	kmem_free(vib, sizeof (*vib));
 	return (DDI_FAILURE);
 }
 
 static int
-vioblk_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
+vioblk_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	struct vioblk_softc *sc = ddi_get_driver_private(devinfo);
+	vioblk_t *vib = ddi_get_driver_private(dip);
 
-	switch (cmd) {
-	case DDI_DETACH:
-		break;
-
-	case DDI_PM_SUSPEND:
-		cmn_err(CE_WARN, "suspend not supported yet");
-		return (DDI_FAILURE);
-
-	default:
-		cmn_err(CE_WARN, "cmd 0x%x unrecognized", cmd);
+	if (cmd != DDI_DETACH) {
 		return (DDI_FAILURE);
 	}
 
-	(void) bd_detach_handle(sc->bd_h);
-	virtio_stop_vq_intr(sc->sc_vq);
-	virtio_release_ints(&sc->sc_virtio);
-	vioblk_free_reqs(sc);
-	virtio_free_vq(sc->sc_vq);
-	virtio_device_reset(&sc->sc_virtio);
-	ddi_regs_map_free(&sc->sc_virtio.sc_ioh);
-	kstat_delete(sc->sc_intrstat);
-	kmem_free(sc, sizeof (struct vioblk_softc));
+	mutex_enter(&vib->vib_mutex);
+	if (vib->vib_nreqs_alloc > 0) {
+		/*
+		 * Cannot detach while there are still outstanding requests.
+		 */
+		mutex_exit(&vib->vib_mutex);
+		return (DDI_FAILURE);
+	}
+
+	if (bd_detach_handle(vib->vib_bd_h) != DDI_SUCCESS) {
+		mutex_exit(&vib->vib_mutex);
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Tear down the Virtio framework before freeing the rest of the
+	 * resources.  This will ensure the interrupt handlers are no longer
+	 * running.
+	 */
+	virtio_fini(vib->vib_virtio, B_FALSE);
+
+	vioblk_free_reqs(vib);
+	kstat_delete(vib->vib_kstat);
+
+	mutex_exit(&vib->vib_mutex);
+	mutex_destroy(&vib->vib_mutex);
+
+	kmem_free(vib, sizeof (*vib));
 
 	return (DDI_SUCCESS);
 }
 
 static int
-vioblk_quiesce(dev_info_t *devinfo)
+vioblk_quiesce(dev_info_t *dip)
 {
-	struct vioblk_softc *sc = ddi_get_driver_private(devinfo);
+	vioblk_t *vib;
 
-	virtio_stop_vq_intr(sc->sc_vq);
-	virtio_device_reset(&sc->sc_virtio);
+	if ((vib = ddi_get_driver_private(dip)) == NULL) {
+		return (DDI_FAILURE);
+	}
 
-	return (DDI_SUCCESS);
+	return (virtio_quiesce(vib->vib_virtio));
 }
 
 int
@@ -1080,7 +1030,7 @@ _init(void)
 
 	bd_mod_init(&vioblk_dev_ops);
 
-	if ((rv = mod_install(&modlinkage)) != 0) {
+	if ((rv = mod_install(&vioblk_modlinkage)) != 0) {
 		bd_mod_fini(&vioblk_dev_ops);
 	}
 
@@ -1092,7 +1042,7 @@ _fini(void)
 {
 	int rv;
 
-	if ((rv = mod_remove(&modlinkage)) == 0) {
+	if ((rv = mod_remove(&vioblk_modlinkage)) == 0) {
 		bd_mod_fini(&vioblk_dev_ops);
 	}
 
@@ -1102,5 +1052,5 @@ _fini(void)
 int
 _info(struct modinfo *modinfop)
 {
-	return (mod_info(&modlinkage, modinfop));
+	return (mod_info(&vioblk_modlinkage, modinfop));
 }

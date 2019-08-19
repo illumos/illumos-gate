@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -115,6 +115,8 @@ smb_shr_load(void *args)
 	 */
 	new_share("test", "/var/smb/test", "fksmbd test share",
 	    SMB_SHRF_GUEST_OK);
+	new_share("testca", "/var/smb/test", "fksmbd test CA share",
+	    SMB_SHRF_CA);
 
 	/* Allow creating lots of shares for testing. */
 	shr_file = getenv("FKSMBD_SHARE_FILE");

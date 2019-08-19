@@ -40,9 +40,6 @@
 
 int smb_session_ofile_max = 32768;
 
-static volatile uint32_t smb_fids = 0;
-#define	SMB_UNIQ_FID()	atomic_inc_32_nv(&smb_fids)
-
 extern uint32_t smb_is_executable(char *);
 static void smb_delete_new_object(smb_request_t *);
 static int smb_set_open_attributes(smb_request_t *, smb_ofile_t *);
@@ -280,6 +277,7 @@ smb_common_open(smb_request_t *sr)
 	boolean_t	fnode_shrlk = B_FALSE;
 	boolean_t	did_open = B_FALSE;
 	boolean_t	did_break_handle = B_FALSE;
+	boolean_t	did_cleanup_orphans = B_FALSE;
 
 	/* Get out now if we've been cancelled. */
 	mutex_enter(&sr->sr_mutex);
@@ -350,10 +348,9 @@ smb_common_open(smb_request_t *sr)
 		/*
 		 * Most of IPC open is handled in smb_opipe_open()
 		 */
-		uniq_fid = SMB_UNIQ_FID();
 		op->create_options = 0;
 		of = smb_ofile_alloc(sr, op, NULL, SMB_FTYPE_MESG_PIPE,
-		    tree_fid, uniq_fid);
+		    tree_fid);
 		tree_fid = 0; // given to the ofile
 		status = smb_opipe_open(sr, of);
 		smb_threshold_exit(&sv->sv_opipe_ct);
@@ -449,13 +446,6 @@ smb_common_open(smb_request_t *sr)
 		status = smb_errno2status(rc);
 		goto errout;
 	}
-
-	/*
-	 * The uniq_fid is a CIFS-server-wide unique identifier for an ofile
-	 * which is used to uniquely identify open instances for the
-	 * VFS share reservation and POSIX locks.
-	 */
-	uniq_fid = SMB_UNIQ_FID();
 
 	if (last_comp_found) {
 
@@ -584,10 +574,14 @@ smb_common_open(smb_request_t *sr)
 		 * affect the sharing checks, and may delete the file due to
 		 * DELETE_ON_CLOSE. This may block, so set the file opening
 		 * count before oplock stuff.
+		 *
+		 * Need the "proposed" ofile (and its TargetOplockKey) for
+		 * correct oplock break semantics.
 		 */
 		of = smb_ofile_alloc(sr, op, fnode, SMB_FTYPE_DISK,
-		    tree_fid, uniq_fid);
+		    tree_fid);
 		tree_fid = 0; // given to the ofile
+		uniq_fid = of->f_uniqid;
 
 		smb_node_inc_opening_count(fnode);
 		opening_incr = B_TRUE;
@@ -678,6 +672,22 @@ smb_common_open(smb_request_t *sr)
 			}
 			if (status != NT_STATUS_SUCCESS)
 				goto errout;
+
+			goto shrlock_again;
+		}
+
+		/*
+		 * If we still have orphaned durable handles on this file,
+		 * let's assume the client has lost interest in those and
+		 * close them so they don't cause sharing violations.
+		 * See longer comment at smb2_dh_close_my_orphans().
+		 */
+		if (status == NT_STATUS_SHARING_VIOLATION &&
+		    sr->session->dialect >= SMB_VERS_2_BASE &&
+		    did_cleanup_orphans == B_FALSE) {
+
+			did_cleanup_orphans = B_TRUE;
+			smb2_dh_close_my_orphans(sr, of);
 
 			goto shrlock_again;
 		}
@@ -904,26 +914,16 @@ create:
 			goto errout;
 		}
 
+		/* Create done. */
 		smb_node_unlock(dnode);
 		dnode_wlock = B_FALSE;
 
 		created = B_TRUE;
 		op->action_taken = SMB_OACT_CREATED;
 
+		/* Note: hold from create */
 		fnode = op->fqi.fq_fnode;
 		fnode_held = B_TRUE;
-
-		smb_node_inc_opening_count(fnode);
-		opening_incr = B_TRUE;
-
-		smb_node_wrlock(fnode);
-		fnode_wlock = B_TRUE;
-
-		status = smb_fsop_shrlock(sr->user_cr, fnode, uniq_fid,
-		    op->desired_access, op->share_access);
-		if (status != 0)
-			goto errout;
-		fnode_shrlk = B_TRUE;
 
 		if (max_requested) {
 			smb_fsop_eaccess(sr, sr->user_cr, fnode, &max_allowed);
@@ -936,6 +936,27 @@ create:
 		 * unexpected access failures later.
 		 */
 		op->desired_access |= (READ_CONTROL | FILE_READ_ATTRIBUTES);
+
+		/* Allocate the ofile and fill in most of it. */
+		of = smb_ofile_alloc(sr, op, fnode, SMB_FTYPE_DISK,
+		    tree_fid);
+		tree_fid = 0; // given to the ofile
+		uniq_fid = of->f_uniqid;
+
+		smb_node_inc_opening_count(fnode);
+		opening_incr = B_TRUE;
+
+		/*
+		 * Share access checks...
+		 */
+		smb_node_wrlock(fnode);
+		fnode_wlock = B_TRUE;
+
+		status = smb_fsop_shrlock(sr->user_cr, fnode, uniq_fid,
+		    op->desired_access, op->share_access);
+		if (status != 0)
+			goto errout;
+		fnode_shrlk = B_TRUE;
 
 		/*
 		 * MS-FSA 2.1.5.1.1
@@ -951,9 +972,6 @@ create:
 		 *
 		 * The break never blocks, so ignore the return.
 		 */
-		of = smb_ofile_alloc(sr, op, fnode, SMB_FTYPE_DISK,
-		    tree_fid, uniq_fid);
-		tree_fid = 0; // given to the ofile
 		(void) smb_oplock_break_PARENT(dnode, of);
 	}
 
@@ -1052,8 +1070,9 @@ create:
 errout:
 	if (did_open) {
 		smb_ofile_close(of, 0);
-		/* Don't also ofile_free */
+		/* rele via sr->fid_ofile */
 	} else if (of != NULL) {
+		/* No other refs possible */
 		smb_ofile_free(of);
 	}
 

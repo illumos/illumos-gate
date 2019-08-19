@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -280,7 +280,6 @@ smb2_create(smb_request_t *sr)
 	 * many create context types are ignored too.
 	 */
 	op->dh_vers = SMB2_NOT_DURABLE;
-	op->dh_v2_flags = 0;
 	if ((cctx.cc_in_flags &
 	    (CCTX_DH_RECONNECT|CCTX_DH_RECONNECT_V2)) != 0) {
 
@@ -388,6 +387,9 @@ smb2_create(smb_request_t *sr)
 		cctx.cc_in_flags &= ~CCTX_REQUEST_LEASE;
 	}
 
+	if ((sr->tid_tree->t_flags & SMB_TREE_CA) == 0)
+		op->dh_v2_flags &= ~DH_PERSISTENT;
+
 	if ((cctx.cc_in_flags &
 	    (CCTX_DH_REQUEST|CCTX_DH_REQUEST_V2)) != 0) {
 		if ((cctx.cc_in_flags & CCTX_DH_REQUEST_V2) != 0)
@@ -441,15 +443,19 @@ smb2_create(smb_request_t *sr)
 	 * non-durable handles in case we get the ioctl
 	 * to set "resiliency" on this handle.
 	 */
-	if (of->f_ftype == SMB_FTYPE_DISK)
-		smb_ofile_set_persistid(of);
+	if (of->f_ftype == SMB_FTYPE_DISK) {
+		if ((op->dh_v2_flags & DH_PERSISTENT) != 0)
+			smb_ofile_set_persistid_ph(of);
+		else
+			smb_ofile_set_persistid_dh(of);
+	}
 
 	/*
 	 * [MS-SMB2] 3.3.5.9.8
 	 * Handling the SMB2_CREATE_REQUEST_LEASE Create Context
 	 */
 	if ((cctx.cc_in_flags & CCTX_REQUEST_LEASE) != 0) {
-		status = smb2_lease_create(sr);
+		status = smb2_lease_create(sr, sr->session->clnt_uuid);
 		if (status != NT_STATUS_SUCCESS) {
 			if (op->action_taken == SMB_OACT_CREATED) {
 				smb_ofile_set_delete_on_close(sr, of);
@@ -479,7 +485,8 @@ smb2_create(smb_request_t *sr)
 	if ((cctx.cc_in_flags &
 	    (CCTX_DH_REQUEST|CCTX_DH_REQUEST_V2)) != 0 &&
 	    smb_node_is_file(of->f_node) &&
-	    ((op->op_oplock_level == SMB2_OPLOCK_LEVEL_BATCH) ||
+	    ((op->dh_v2_flags & DH_PERSISTENT) != 0 ||
+	    (op->op_oplock_level == SMB2_OPLOCK_LEVEL_BATCH) ||
 	    (op->op_oplock_level == SMB2_OPLOCK_LEVEL_LEASE &&
 	    (op->lease_state & OPLOCK_LEVEL_CACHE_HANDLE) != 0))) {
 		/*
@@ -489,8 +496,13 @@ smb2_create(smb_request_t *sr)
 			(void) memcpy(of->dh_create_guid,
 			    op->create_guid, UUID_LEN);
 
-			/* no persistent handles yet */
-			of->dh_persist = B_FALSE;
+			if ((op->dh_v2_flags & DH_PERSISTENT) != 0) {
+				if (smb2_dh_make_persistent(sr, of) == 0) {
+					of->dh_persist = B_TRUE;
+				} else {
+					op->dh_v2_flags = 0;
+				}
+			}
 		}
 		if (op->dh_vers != SMB2_NOT_DURABLE) {
 			uint32_t msto;
@@ -503,8 +515,11 @@ smb2_create(smb_request_t *sr)
 			 * the default timeout (in mSec.)
 			 */
 			msto = op->dh_timeout;
-			if (msto == 0)
-				msto = smb2_dh_def_timeout;
+			if (msto == 0) {
+				msto = (of->dh_persist) ?
+				    smb2_persist_timeout :
+				    smb2_dh_def_timeout;
+			}
 			if (msto > smb2_dh_max_timeout)
 				msto = smb2_dh_max_timeout;
 			op->dh_timeout = msto;
@@ -512,6 +527,7 @@ smb2_create(smb_request_t *sr)
 		}
 	} else {
 		op->dh_vers = SMB2_NOT_DURABLE;
+		op->dh_v2_flags = 0;
 	}
 
 	/*

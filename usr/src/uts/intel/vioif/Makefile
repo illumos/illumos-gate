@@ -11,70 +11,58 @@
 
 #
 # Copyright 2013 Nexenta Inc.  All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
-#	Path to the base of the uts directory tree (usually /usr/src/uts).
+# Path to the base of the uts directory tree (usually /usr/src/uts).
 #
-UTSBASE		= ../..
+UTSBASE =		../..
 
 #
-#	Define the module and object file sets.
+# Define the module and object file sets.
 #
-MODULE		= vioif
-OBJECTS		= $(VIOIF_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(VIOIF_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+MODULE =		vioif
+OBJECTS =		$(VIOIF_OBJS:%=$(OBJS_DIR)/%)
+ROOTMODULE =		$(ROOT_DRV_DIR)/$(MODULE)
 
 #
-#	Include common rules.
+# Include common rules.
 #
 include $(UTSBASE)/intel/Makefile.intel
 
 #
-#	Define targets
+# Define targets
 #
-ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+ALL_TARGET =		$(BINARY)
+INSTALL_TARGET =	$(BINARY) $(ROOTMODULE)
 
 #
-#	Overrides
+# Overrides
 #
-
-INC_PATH += -I$(UTSBASE)/common/io/virtio
-
-#
-# lint pass one enforcement
-#
-CFLAGS += $(CCVERBOSE)
-#
-# Driver depends on virtio and blkdev
-#
-LDFLAGS		+= -dy -N misc/virtio -N misc/mac
+INC_PATH +=		-I$(UTSBASE)/common/io/virtio
 
 #
-#	Default build targets.
+# Driver depends on virtio and mac
+#
+LDFLAGS +=		-dy -N misc/virtio -N misc/mac
+
+#
+# Default build targets.
 #
 .KEEP_STATE:
 
-def:		$(DEF_DEPS)
+def: $(DEF_DEPS)
 
-all:		$(ALL_DEPS)
+all: $(ALL_DEPS)
 
-clean:		$(CLEAN_DEPS)
+clean: $(CLEAN_DEPS)
 
-clobber:	$(CLOBBER_DEPS)
+clobber: $(CLOBBER_DEPS)
 
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
-
-install:	$(INSTALL_DEPS)
+install: $(INSTALL_DEPS)
 
 #
-#	Include common targets.
+# Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ

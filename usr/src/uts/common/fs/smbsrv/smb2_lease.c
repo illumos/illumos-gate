@@ -122,11 +122,10 @@ smb_hash_uuid(const uint8_t *uuid)
  * Handling the SMB2_CREATE_REQUEST_LEASE Create Context
  */
 uint32_t
-smb2_lease_create(smb_request_t *sr)
+smb2_lease_create(smb_request_t *sr, uint8_t *clnt)
 {
 	smb_arg_open_t *op = &sr->arg.open;
 	uint8_t *key = op->lease_key;
-	uint8_t *clnt = sr->session->clnt_uuid;
 	smb_ofile_t *of = sr->fid_ofile;
 	smb_hash_t *ht = sr->sr_server->sv_lease_ht;
 	smb_llist_t *bucket;

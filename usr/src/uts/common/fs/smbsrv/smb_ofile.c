@@ -280,11 +280,7 @@
 #include <smbsrv/smb2_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <sys/time.h>
-
-/* XXX: May need to actually assign GUIDs for these. */
-/* Don't leak object addresses */
-#define	SMB_OFILE_PERSISTID(of) \
-	((uintptr_t)&smb_cache_ofile ^ (uintptr_t)(of))
+#include <sys/random.h>
 
 static boolean_t smb_ofile_is_open_locked(smb_ofile_t *);
 static void smb_ofile_delete(void *arg);
@@ -296,6 +292,14 @@ static int smb_ofile_netinfo_init(smb_ofile_t *, smb_netfileinfo_t *);
 static void smb_ofile_netinfo_fini(smb_netfileinfo_t *);
 
 /*
+ * The uniq_fid is a CIFS-server-wide unique identifier for an ofile
+ * which is used to uniquely identify open instances for the
+ * VFS share reservation and POSIX locks.
+ */
+static volatile uint32_t smb_fids = 0;
+#define	SMB_UNIQ_FID()	atomic_inc_32_nv(&smb_fids)
+
+/*
  * smb_ofile_alloc
  * Allocate an ofile and fill in it's "up" pointers, but
  * do NOT link it into the tree's list of ofiles or the
@@ -304,6 +308,9 @@ static void smb_ofile_netinfo_fini(smb_netfileinfo_t *);
  *
  * If we don't get as far as smb_ofile_open with this OF,
  * call smb_ofile_free() to free this object.
+ *
+ * Note: The following sr members may be null during
+ * persistent handle import: session, uid_usr, tid_tree
  */
 smb_ofile_t *
 smb_ofile_alloc(
@@ -311,10 +318,10 @@ smb_ofile_alloc(
     smb_arg_open_t	*op,
     smb_node_t		*node, /* optional (may be NULL) */
     uint16_t		ftype,
-    uint16_t		tree_fid,
-    uint32_t		uniqid)
+    uint16_t		tree_fid)
 {
-	smb_tree_t	*tree = sr->tid_tree;
+	smb_user_t	*user = sr->uid_user;	/* optional */
+	smb_tree_t	*tree = sr->tid_tree;	/* optional */
 	smb_ofile_t	*of;
 
 	of = kmem_cache_alloc(smb_cache_ofile, KM_SLEEP);
@@ -324,22 +331,28 @@ smb_ofile_alloc(
 	mutex_init(&of->f_mutex, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&of->f_notify.nc_waiters, sizeof (smb_request_t),
 	    offsetof(smb_request_t, sr_waiters));
+	mutex_init(&of->dh_nvlock, NULL, MUTEX_DEFAULT, NULL);
 
 	of->f_state = SMB_OFILE_STATE_ALLOC;
 	of->f_refcnt = 1;
 	of->f_ftype = ftype;
 	of->f_fid = tree_fid;
 	/* of->f_persistid see smb2_create */
-	of->f_uniqid = uniqid;
+	of->f_uniqid = SMB_UNIQ_FID();
 	of->f_opened_by_pid = sr->smb_pid;
 	of->f_granted_access = op->desired_access;
 	of->f_share_access = op->share_access;
 	of->f_create_options = op->create_options;
-	of->f_cr = (op->create_options & FILE_OPEN_FOR_BACKUP_INTENT) ?
-	    smb_user_getprivcred(sr->uid_user) : sr->uid_user->u_cred;
-	crhold(of->f_cr);
-	of->f_server = tree->t_server;
-	of->f_session = tree->t_session;
+	if (user != NULL) {
+		if ((op->create_options & FILE_OPEN_FOR_BACKUP_INTENT) != 0)
+			of->f_cr = smb_user_getprivcred(user);
+		else
+			of->f_cr = user->u_cred;
+		crhold(of->f_cr);
+	}
+	of->f_server = sr->sr_server;
+	of->f_session = sr->session;	/* may be NULL */
+
 	(void) memset(of->f_lock_seq, -1, SMB_OFILE_LSEQ_MAX);
 
 	of->f_mode = smb_fsop_amask_to_omode(of->f_granted_access);
@@ -361,11 +374,15 @@ smb_ofile_alloc(
 	 * held by our caller, until smb_ofile_open puts this
 	 * ofile on the node ofile list with smb_node_add_ofile.
 	 */
-	smb_user_hold_internal(sr->uid_user);
-	smb_tree_hold_internal(tree);
-	of->f_user = sr->uid_user;
-	of->f_tree = tree;
-	of->f_node = node;
+	if (user != NULL) {
+		smb_user_hold_internal(user);
+		of->f_user = user;
+	}
+	if (tree != NULL) {
+		smb_tree_hold_internal(tree);
+		of->f_tree = tree;
+	}
+	of->f_node = node;	/* may be NULL */
 
 	return (of);
 }
@@ -448,6 +465,9 @@ smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 		return;
 	}
 
+	/*
+	 * Only one thread here (the one that that set f_state closing)
+	 */
 	switch (of->f_ftype) {
 	case SMB_FTYPE_BYTE_PIPE:
 	case SMB_FTYPE_MESG_PIPE:
@@ -456,6 +476,8 @@ smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 		break;
 
 	case SMB_FTYPE_DISK:
+		if (of->dh_persist)
+			smb2_dh_close_persistent(of);
 		if (of->f_persistid != 0)
 			smb_ofile_del_persistid(of);
 		if (of->f_lease != NULL)
@@ -961,6 +983,9 @@ smb_ofile_lookup_by_persistid(smb_request_t *sr, uint64_t persistid)
 	smb_ofile_t *of;
 	uint_t idx;
 
+	if (persistid == 0)
+		return (NULL);
+
 	hash = sr->sr_server->sv_persistid_ht;
 	idx = smb_hash_uint64(hash, persistid);
 	bucket = &hash->buckets[idx];
@@ -981,25 +1006,129 @@ smb_ofile_lookup_by_persistid(smb_request_t *sr, uint64_t persistid)
 }
 
 /*
- * Create a (unique) persistent ID for a new ofile,
- * and add this ofile to the persistid hash table.
+ * Create a (unique) durable/persistent ID for a new ofile,
+ * and add this ofile to the persistid hash table.  This ID
+ * is referred to as the persistent ID in the protocol spec,
+ * so that's what we call it too, though the persistence may
+ * vary.  "Durable" handles are persistent across reconnects
+ * but not server reboots.  Persistent handles are persistent
+ * across server reboots too.
+ *
+ * Note that persistent IDs need to be unique for the lifetime of
+ * any given ofile.  For normal (non-persistent) ofiles we can just
+ * use a persistent ID derived from the ofile memory address, as
+ * these don't ever live beyond the current OS boot lifetime.
+ *
+ * Persistent handles are re-imported after server restart, and
+ * generally have a different memory address after import than
+ * they had in the previous OS boot lifetime, so for these we
+ * use a randomly assigned value that won't conflict with any
+ * non-persistent (durable) handles.  Ensuring that a randomly
+ * generated ID is unique requires a search of the ofiles in one
+ * hash bucket, which we'd rather avoid for non-persistent opens.
+ *
+ * The solution used here is to divide the persistent ID space
+ * in half (odd and even values) where durable opens use an ID
+ * derived from the ofile address (which is always even), and
+ * persistent opens use an ID generated randomly (always odd).
+ *
+ * smb_ofile_set_persistid_dh() sets a durable handle ID and
+ * smb_ofile_set_persistid_ph() sets a persistent handle ID.
  */
 void
-smb_ofile_set_persistid(smb_ofile_t *of)
+smb_ofile_set_persistid_dh(smb_ofile_t *of)
 {
 	smb_hash_t *hash = of->f_server->sv_persistid_ht;
 	smb_bucket_t *bucket;
 	smb_llist_t *ll;
+	uint64_t persistid;
 	uint_t idx;
 
-	of->f_persistid = SMB_OFILE_PERSISTID(of);
+	persistid = (uintptr_t)of;
+	/* Avoid showing object addresses */
+	persistid ^= ((uintptr_t)&smb_cache_ofile);
+	/* make sure it's even */
+	persistid &= ~((uint64_t)1);
 
-	idx = smb_hash_uint64(hash, of->f_persistid);
+	idx = smb_hash_uint64(hash, persistid);
 	bucket = &hash->buckets[idx];
 	ll = &bucket->b_list;
 	smb_llist_enter(ll, RW_WRITER);
-	smb_llist_insert_tail(ll, of);
+	if (of->f_persistid == 0) {
+		of->f_persistid = persistid;
+		smb_llist_insert_tail(ll, of);
+	}
 	smb_llist_exit(ll);
+}
+
+void
+smb_ofile_set_persistid_ph(smb_ofile_t *of)
+{
+	uint64_t persistid;
+	int rc;
+
+top:
+	(void) random_get_pseudo_bytes((uint8_t *)&persistid,
+	    sizeof (persistid));
+	if (persistid == 0) {
+		cmn_err(CE_NOTE, "random gave all zeros!");
+		goto top;
+	}
+	/* make sure it's odd */
+	persistid |= (uint64_t)1;
+
+	/*
+	 * Try inserting with this persistent ID.
+	 */
+	rc = smb_ofile_insert_persistid(of, persistid);
+	if (rc == EEXIST)
+		goto top;
+	if (rc != 0) {
+		cmn_err(CE_NOTE, "set persistid rc=%d", rc);
+	}
+}
+
+/*
+ * Insert an ofile into the persistid hash table.
+ * If the persistent ID is in use, error.
+ */
+int
+smb_ofile_insert_persistid(smb_ofile_t *new_of, uint64_t persistid)
+{
+	smb_hash_t *hash = new_of->f_server->sv_persistid_ht;
+	smb_bucket_t *bucket;
+	smb_llist_t *ll;
+	smb_ofile_t *of;
+	uint_t idx;
+
+	ASSERT(persistid != 0);
+
+	/*
+	 * Look to see if this key alreay exists.
+	 */
+	idx = smb_hash_uint64(hash, persistid);
+	bucket = &hash->buckets[idx];
+	ll = &bucket->b_list;
+
+	smb_llist_enter(ll, RW_WRITER);
+	of = smb_llist_head(ll);
+	while (of != NULL) {
+		if (of->f_persistid == persistid) {
+			/* already in use */
+			smb_llist_exit(ll);
+			return (EEXIST);
+		}
+		of = smb_llist_next(ll, of);
+	}
+
+	/* Not found, so OK to insert. */
+	if (new_of->f_persistid == 0) {
+		new_of->f_persistid = persistid;
+		smb_llist_insert_tail(ll, new_of);
+	}
+	smb_llist_exit(ll);
+
+	return (0);
 }
 
 void
@@ -1014,7 +1143,10 @@ smb_ofile_del_persistid(smb_ofile_t *of)
 	bucket = &hash->buckets[idx];
 	ll = &bucket->b_list;
 	smb_llist_enter(ll, RW_WRITER);
-	smb_llist_remove(ll, of);
+	if (of->f_persistid != 0) {
+		smb_llist_remove(ll, of);
+		of->f_persistid = 0;
+	}
 	smb_llist_exit(ll);
 }
 
@@ -1390,6 +1522,7 @@ smb_ofile_free(smb_ofile_t *of)
 
 	of->f_magic = (uint32_t)~SMB_OFILE_MAGIC;
 	list_destroy(&of->f_notify.nc_waiters);
+	mutex_destroy(&of->dh_nvlock);
 	mutex_destroy(&of->f_mutex);
 	kmem_cache_free(smb_cache_ofile, of);
 }

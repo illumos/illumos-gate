@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -92,6 +92,7 @@ extern "C" {
 #define	SHOPT_AD_CONTAINER	"ad-container"
 #define	SHOPT_ABE		"abe"
 #define	SHOPT_NAME		"name"
+#define	SHOPT_CA		"ca"
 #define	SHOPT_CSC		"csc"
 #define	SHOPT_CATIA		"catia"
 #define	SHOPT_GUEST		"guestok"
@@ -185,6 +186,7 @@ extern "C" {
 
 #define	SMB_SHRF_QUOTAS		0x1000	/* Enable SMB Quotas */
 #define	SMB_SHRF_FSO		0x2000	/* Force Shared Oplocks */
+#define	SMB_SHRF_CA		0x4000	/* Continuous Availability */
 
 /*
  * Runtime flags
@@ -193,6 +195,7 @@ extern "C" {
 #define	SMB_SHRF_TRANS		0x10000000
 #define	SMB_SHRF_PERM		0x20000000
 #define	SMB_SHRF_AUTOHOME	0x40000000
+#define	SMB_SHRF_REMOVED	0x80000000	/* unshared */
 
 #define	SMB_SHARE_PRINT		"print$"
 #define	SMB_SHARE_PRINT_LEN	6

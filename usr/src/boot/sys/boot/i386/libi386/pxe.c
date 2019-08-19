@@ -76,16 +76,21 @@ static ssize_t	pxe_netif_put(struct iodesc *desc, void *pkt, size_t len);
 static void	pxe_netif_end(struct netif *nif);
 
 extern struct netif_stats	pxe_st[];
-extern u_int16_t		__bangpxeseg;
-extern u_int16_t		__bangpxeoff;
+extern uint16_t			__bangpxeseg;
+extern uint16_t			__bangpxeoff;
 extern void			__bangpxeentry(void);
-extern u_int16_t		__pxenvseg;
-extern u_int16_t		__pxenvoff;
+extern uint16_t			__pxenvseg;
+extern uint16_t			__pxenvoff;
 extern void			__pxenventry(void);
 
 struct netif_dif pxe_ifs[] = {
-/*	dif_unit	dif_nsel	dif_stats	dif_private	*/
-	{0,		1,		&pxe_st[0],	0}
+	{
+		.dif_unit = 0,
+		.dif_nsel = 1,
+		.dif_stats = &pxe_st[0],
+		.dif_private = NULL,
+		.dif_used = 0
+	}
 };
 
 struct netif_stats pxe_st[nitems(pxe_ifs)];
@@ -218,7 +223,7 @@ pxe_init(void)
 		    pxenv_p->RMEntry.segment, pxenv_p->RMEntry.offset);
 	}
 
-	gci_p = bio_alloc(sizeof(*gci_p));
+	gci_p = bio_alloc(sizeof (*gci_p));
 	if (gci_p == NULL) {
 		pxe_p = NULL;
 		return (0);
@@ -269,7 +274,7 @@ pxe_cleanup(void)
 	if (pxe_call == NULL)
 		return;
 
-	undi_shutdown_p = bio_alloc(sizeof(*undi_shutdown_p));
+	undi_shutdown_p = bio_alloc(sizeof (*undi_shutdown_p));
 	if (undi_shutdown_p != NULL) {
 		bzero(undi_shutdown_p, sizeof (*undi_shutdown_p));
 		pxe_call(PXENV_UNDI_SHUTDOWN, undi_shutdown_p);
@@ -282,7 +287,7 @@ pxe_cleanup(void)
 		bio_free(undi_shutdown_p, sizeof (*undi_shutdown_p));
 	}
 
-	unload_stack_p = bio_alloc(sizeof(*unload_stack_p));
+	unload_stack_p = bio_alloc(sizeof (*unload_stack_p));
 	if (unload_stack_p != NULL) {
 		bzero(unload_stack_p, sizeof (*unload_stack_p));
 		pxe_call(PXENV_UNLOAD_STACK, unload_stack_p);
@@ -423,7 +428,7 @@ pxe_netif_init(struct iodesc *desc, void *machdep_hint)
 	else
 		desc->xid = 0;
 
-	bio_free(undi_info_p, sizeof(*undi_info_p));
+	bio_free(undi_info_p, sizeof (*undi_info_p));
 	undi_open_p = bio_alloc(sizeof (*undi_open_p));
 	if (undi_open_p == NULL)
 		return;

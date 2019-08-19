@@ -608,8 +608,14 @@ smb_vop_lookup(
 	char *np = name;
 	char namebuf[MAXNAMELEN];
 
-	if (*name == '\0')
-		return (EINVAL);
+	if (*name == '\0') {
+		/*
+		 * This happens creating named streams at the share root.
+		 */
+		VN_HOLD(dvp);
+		*vpp = dvp;
+		return (0);
+	}
 
 	ASSERT(vpp);
 	*vpp = NULL;

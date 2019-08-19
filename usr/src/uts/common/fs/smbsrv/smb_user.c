@@ -303,7 +303,6 @@ smb_user_logon(
 	 * we always have an auth. socket to close.
 	 */
 	authsock = user->u_authsock;
-	ASSERT(authsock != NULL);
 	user->u_authsock = NULL;
 	tmo = user->u_auth_tmo;
 	user->u_auth_tmo = NULL;
@@ -325,7 +324,8 @@ smb_user_logon(
 		(void) untimeout(tmo);
 
 	/* This close can block, so not under the mutex. */
-	smb_authsock_close(user, authsock);
+	if (authsock != NULL)
+		smb_authsock_close(user, authsock);
 
 	return (0);
 }

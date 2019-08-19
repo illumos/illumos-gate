@@ -600,6 +600,7 @@ usr/lib/smbsrv/libfksmbsrv.so.1
 usr/lib/smbsrv/libmlsvc.so
 usr/lib/smbsrv/libsmb.so
 usr/lib/smbsrv/libsmbns.so
+usr/lib/smbsrv/nvlprint
 usr/lib/smbsrv/test-msgbuf
 usr/lib/smbsrv/testoplock
 #

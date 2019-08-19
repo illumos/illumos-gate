@@ -26,8 +26,9 @@
  */
 
 #include <smbsrv/smb_door.h>
-#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_ktypes.h>
+#include <smbsrv/smb2_kproto.h>
+#include <smbsrv/smb_kstat.h>
 
 typedef struct smb_unshare {
 	list_node_t	us_lnd;
@@ -36,7 +37,6 @@ typedef struct smb_unshare {
 
 static kmem_cache_t	*smb_kshare_cache_share;
 static kmem_cache_t	*smb_kshare_cache_unexport;
-kmem_cache_t	*smb_kshare_cache_vfs;
 
 static int smb_kshare_cmp(const void *, const void *);
 static void smb_kshare_hold(const void *);
@@ -294,7 +294,6 @@ smb_export_stop(smb_server_t *sv)
 	mutex_exit(&sv->sv_export.e_mutex);
 
 	smb_avl_destroy(&sv->sv_export.e_share_avl);
-	smb_vfs_rele_all(&sv->sv_export);
 }
 
 void
@@ -305,17 +304,11 @@ smb_kshare_g_init(void)
 
 	smb_kshare_cache_unexport = kmem_cache_create("smb_unexport_cache",
 	    sizeof (smb_unshare_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
-
-	smb_kshare_cache_vfs = kmem_cache_create("smb_vfs_cache",
-	    sizeof (smb_vfs_t), 8, NULL, NULL, NULL, NULL, NULL, 0);
 }
 
 void
 smb_kshare_init(smb_server_t *sv)
 {
-
-	smb_llist_constructor(&sv->sv_export.e_vfs_list, sizeof (smb_vfs_t),
-	    offsetof(smb_vfs_t, sv_lnd));
 
 	smb_slist_constructor(&sv->sv_export.e_unexport_list,
 	    sizeof (smb_unshare_t), offsetof(smb_unshare_t, us_lnd));
@@ -348,10 +341,6 @@ smb_kshare_fini(smb_server_t *sv)
 		kmem_cache_free(smb_kshare_cache_unexport, ux);
 	}
 	smb_slist_destructor(&sv->sv_export.e_unexport_list);
-
-	smb_vfs_rele_all(&sv->sv_export);
-
-	smb_llist_destructor(&sv->sv_export.e_vfs_list);
 }
 
 void
@@ -359,7 +348,6 @@ smb_kshare_g_fini(void)
 {
 	kmem_cache_destroy(smb_kshare_cache_unexport);
 	kmem_cache_destroy(smb_kshare_cache_share);
-	kmem_cache_destroy(smb_kshare_cache_vfs);
 }
 
 
@@ -684,10 +672,8 @@ smb_kshare_release(smb_server_t *sv, smb_kshare_t *shr)
 
 /*
  * Add the given share in the specified server.
- * If the share is a disk share, smb_vfs_hold() is
- * invoked to ensure that there is a hold on the
- * corresponding file system before the share is
- * added to shares AVL.
+ * If the share is a disk share, lookup the share path
+ * and hold the smb_node_t for the share root.
  *
  * If the share is an Autohome share and it is
  * already in the AVL only a reference count for
@@ -698,7 +684,7 @@ smb_kshare_export(smb_server_t *sv, smb_kshare_t *shr)
 {
 	smb_avl_t	*share_avl;
 	smb_kshare_t	*auto_shr;
-	vnode_t		*vp;
+	smb_node_t	*snode = NULL;
 	int		rc = 0;
 
 	share_avl = &sv->sv_export.e_share_avl;
@@ -713,36 +699,53 @@ smb_kshare_export(smb_server_t *sv, smb_kshare_t *shr)
 	}
 
 	if ((auto_shr = smb_avl_lookup(share_avl, shr)) != NULL) {
-		if ((auto_shr->shr_flags & SMB_SHRF_AUTOHOME) == 0) {
-			smb_avl_release(share_avl, auto_shr);
-			return (EEXIST);
+		rc = EEXIST;
+		if ((auto_shr->shr_flags & SMB_SHRF_AUTOHOME) != 0) {
+			mutex_enter(&auto_shr->shr_mutex);
+			auto_shr->shr_autocnt++;
+			mutex_exit(&auto_shr->shr_mutex);
+			rc = 0;
 		}
-
-		mutex_enter(&auto_shr->shr_mutex);
-		auto_shr->shr_autocnt++;
-		mutex_exit(&auto_shr->shr_mutex);
 		smb_avl_release(share_avl, auto_shr);
-		return (0);
+		return (rc);
 	}
 
-	if ((rc = smb_server_sharevp(sv, shr->shr_path, &vp)) != 0) {
-		cmn_err(CE_WARN, "export[%s(%s)]: failed obtaining vnode (%d)",
+	/*
+	 * Get the root smb_node_t for this share, held.
+	 * This hold is normally released during AVL destroy,
+	 * via the element destructor:  smb_kshare_destroy
+	 */
+	rc = smb_server_share_lookup(sv, shr->shr_path, &snode);
+	if (rc != 0) {
+		cmn_err(CE_WARN, "export[%s(%s)]: lookup failed (%d)",
 		    shr->shr_name, shr->shr_path, rc);
 		return (rc);
 	}
 
-	if ((rc = smb_vfs_hold(&sv->sv_export, vp->v_vfsp)) == 0) {
-		if ((rc = smb_avl_add(share_avl, shr)) != 0) {
-			cmn_err(CE_WARN, "export[%s]: failed caching (%d)",
-			    shr->shr_name, rc);
-			smb_vfs_rele(&sv->sv_export, vp->v_vfsp);
-		}
-	} else {
-		cmn_err(CE_WARN, "export[%s(%s)]: failed holding VFS (%d)",
-		    shr->shr_name, shr->shr_path, rc);
+	shr->shr_root_node = snode;
+	if ((rc = smb_avl_add(share_avl, shr)) != 0) {
+		cmn_err(CE_WARN, "export[%s]: failed caching (%d)",
+		    shr->shr_name, rc);
+		shr->shr_root_node = NULL;
+		smb_node_release(snode);
+		return (rc);
 	}
 
-	VN_RELE(vp);
+	/*
+	 * For CA shares, find or create the CA handle dir,
+	 * and (if restarted) import persistent handles.
+	 */
+	if ((shr->shr_flags & SMB_SHRF_CA) != 0) {
+		rc = smb2_dh_new_ca_share(sv, shr);
+		if (rc != 0) {
+			/* Just make it a non-CA share. */
+			mutex_enter(&shr->shr_mutex);
+			shr->shr_flags &= ~SMB_SHRF_CA;
+			mutex_exit(&shr->shr_mutex);
+			rc = 0;
+		}
+	}
+
 	return (rc);
 }
 
@@ -764,8 +767,6 @@ smb_kshare_unexport(smb_server_t *sv, const char *shrname)
 	smb_avl_t	*share_avl;
 	smb_kshare_t	key;
 	smb_kshare_t	*shr;
-	vnode_t		*vp;
-	int		rc;
 	boolean_t	auto_unexport;
 
 	share_avl = &sv->sv_export.e_share_avl;
@@ -785,19 +786,12 @@ smb_kshare_unexport(smb_server_t *sv, const char *shrname)
 		}
 	}
 
-	if (STYPE_ISDSK(shr->shr_type)) {
-		if ((rc = smb_server_sharevp(sv, shr->shr_path, &vp)) != 0) {
-			smb_avl_release(share_avl, shr);
-			cmn_err(CE_WARN, "unexport[%s]: failed obtaining vnode"
-			    " (%d)", shrname, rc);
-			return (rc);
-		}
-
-		smb_vfs_rele(&sv->sv_export, vp->v_vfsp);
-		VN_RELE(vp);
-	}
-
 	smb_avl_remove(share_avl, shr);
+
+	mutex_enter(&shr->shr_mutex);
+	shr->shr_flags |= SMB_SHRF_REMOVED;
+	mutex_exit(&shr->shr_mutex);
+
 	smb_avl_release(share_avl, shr);
 
 	return (0);
@@ -892,6 +886,7 @@ smb_kshare_decode(nvlist_t *share)
 	    SMB_SHRF_DFSROOT);
 	tmp.shr_flags |= smb_kshare_decode_bool(smb, SHOPT_QUOTAS,
 	    SMB_SHRF_QUOTAS);
+	tmp.shr_flags |= smb_kshare_decode_bool(smb, SHOPT_CA, SMB_SHRF_CA);
 	tmp.shr_flags |= smb_kshare_decode_bool(smb, SHOPT_FSO, SMB_SHRF_FSO);
 	tmp.shr_flags |= smb_kshare_decode_bool(smb, SHOPT_AUTOHOME,
 	    SMB_SHRF_AUTOHOME);
@@ -1040,6 +1035,11 @@ smb_kshare_destroy(void *p)
 
 	ASSERT(shr);
 	ASSERT(shr->shr_magic == SMB_SHARE_MAGIC);
+
+	if (shr->shr_ca_dir != NULL)
+		smb_node_release(shr->shr_ca_dir);
+	if (shr->shr_root_node)
+		smb_node_release(shr->shr_root_node);
 
 	smb_mem_free(shr->shr_name);
 	smb_mem_free(shr->shr_path);
