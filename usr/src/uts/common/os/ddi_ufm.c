@@ -184,7 +184,10 @@ ufm_cache_fill(ddi_ufm_handle_t *ufmh)
 		if (ret != 0)
 			goto cache_fail;
 
-		ASSERT(img->ufmi_desc != NULL && img->ufmi_nslots != 0);
+		if (img->ufmi_desc == NULL || img->ufmi_nslots == 0) {
+			ret = EIO;
+			goto cache_fail;
+		}
 
 		img->ufmi_slots =
 		    kmem_zalloc((sizeof (ddi_ufm_slot_t) * img->ufmi_nslots),

@@ -201,6 +201,14 @@
  * device.
  *
  *
+ * DDI UFM Support
+ *
+ * The driver supports the DDI UFM framework for reporting information about
+ * the device's firmware image and slot configuration. This data can be
+ * queried by userland software via ioctls to the ufm driver. For more
+ * information, see ddi_ufm(9E).
+ *
+ *
  * Driver Configuration:
  *
  * The following driver properties can be changed to control some aspects of the
@@ -247,6 +255,7 @@
 #include <sys/conf.h>
 #include <sys/devops.h>
 #include <sys/ddi.h>
+#include <sys/ddi_ufm.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
 #include <sys/bitmap.h>
@@ -386,9 +395,23 @@ static void nvme_prp_dma_destructor(void *, void *);
 
 static void nvme_prepare_devid(nvme_t *, uint32_t);
 
+/* DDI UFM callbacks */
+static int nvme_ufm_fill_image(ddi_ufm_handle_t *, void *, uint_t,
+    ddi_ufm_image_t *);
+static int nvme_ufm_fill_slot(ddi_ufm_handle_t *, void *, uint_t, uint_t,
+    ddi_ufm_slot_t *);
+static int nvme_ufm_getcaps(ddi_ufm_handle_t *, void *, ddi_ufm_cap_t *);
+
 static int nvme_open(dev_t *, int, int, cred_t *);
 static int nvme_close(dev_t, int, int, cred_t *);
 static int nvme_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
+
+static ddi_ufm_ops_t nvme_ufm_ops = {
+	NULL,
+	nvme_ufm_fill_image,
+	nvme_ufm_fill_slot,
+	nvme_ufm_getcaps
+};
 
 #define	NVME_MINOR_INST_SHIFT	9
 #define	NVME_MINOR(inst, nsid)	(((inst) << NVME_MINOR_INST_SHIFT) | (nsid))
@@ -3352,6 +3375,18 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto fail;
 
 	/*
+	 * Initialize the driver with the UFM subsystem
+	 */
+	if (ddi_ufm_init(dip, DDI_UFM_CURRENT_VERSION, &nvme_ufm_ops,
+	    &nvme->n_ufmh, nvme) != 0) {
+		dev_err(dip, CE_WARN, "!failed to initialize UFM subsystem");
+		goto fail;
+	}
+	mutex_init(&nvme->n_fwslot_mutex, NULL, MUTEX_DRIVER, NULL);
+	ddi_ufm_update(nvme->n_ufmh);
+	nvme->n_progress |= NVME_UFM_INIT;
+
+	/*
 	 * Attach the blkdev driver for each namespace.
 	 */
 	for (i = 0; i != nvme->n_namespace_count; i++) {
@@ -3443,6 +3478,10 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		kmem_free(nvme->n_ns, sizeof (nvme_namespace_t) *
 		    nvme->n_namespace_count);
+	}
+	if (nvme->n_progress & NVME_UFM_INIT) {
+		ddi_ufm_fini(nvme->n_ufmh);
+		mutex_destroy(&nvme->n_fwslot_mutex);
 	}
 
 	if (nvme->n_progress & NVME_INTERRUPTS)
@@ -4354,6 +4393,18 @@ nvme_ioctl_attach(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 	return (rv);
 }
 
+static void
+nvme_ufm_update(nvme_t *nvme)
+{
+	mutex_enter(&nvme->n_fwslot_mutex);
+	ddi_ufm_update(nvme->n_ufmh);
+	if (nvme->n_fwslot != NULL) {
+		kmem_free(nvme->n_fwslot, sizeof (nvme_fwslot_log_t));
+		nvme->n_fwslot = NULL;
+	}
+	mutex_exit(&nvme->n_fwslot_mutex);
+}
+
 static int
 nvme_ioctl_firmware_download(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
     int mode, cred_t *cred_p)
@@ -4406,6 +4457,12 @@ nvme_ioctl_firmware_download(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 		len -= copylen;
 	}
 
+	/*
+	 * Let the DDI UFM subsystem know that the firmware information for
+	 * this device has changed.
+	 */
+	nvme_ufm_update(nvme);
+
 	return (rv);
 }
 
@@ -4453,6 +4510,12 @@ nvme_ioctl_firmware_commit(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 	rv = nvme_ioc_cmd(nvme, &sqe, B_TRUE, NULL, 0, 0, &cqe, timeout);
 
 	nioc->n_arg = ((uint64_t)cqe.cqe_sf.sf_sct << 16) | cqe.cqe_sf.sf_sc;
+
+	/*
+	 * Let the DDI UFM subsystem know that the firmware information for
+	 * this device has changed.
+	 */
+	nvme_ufm_update(nvme);
 
 	return (rv);
 }
@@ -4566,4 +4629,91 @@ nvme_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 #endif
 
 	return (rv);
+}
+
+/*
+ * DDI UFM Callbacks
+ */
+static int
+nvme_ufm_fill_image(ddi_ufm_handle_t *ufmh, void *arg, uint_t imgno,
+    ddi_ufm_image_t *img)
+{
+	nvme_t *nvme = arg;
+
+	if (imgno != 0)
+		return (EINVAL);
+
+	ddi_ufm_image_set_desc(img, "Firmware");
+	ddi_ufm_image_set_nslots(img, nvme->n_idctl->id_frmw.fw_nslot);
+
+	return (0);
+}
+
+/*
+ * Fill out firmware slot information for the requested slot.  The firmware
+ * slot information is gathered by requesting the Firmware Slot Information log
+ * page.  The format of the page is described in section 5.10.1.3.
+ *
+ * We lazily cache the log page on the first call and then invalidate the cache
+ * data after a successful firmware download or firmware commit command.
+ * The cached data is protected by a mutex as the state can change
+ * asynchronous to this callback.
+ */
+static int
+nvme_ufm_fill_slot(ddi_ufm_handle_t *ufmh, void *arg, uint_t imgno,
+    uint_t slotno, ddi_ufm_slot_t *slot)
+{
+	nvme_t *nvme = arg;
+	void *log = NULL;
+	size_t bufsize;
+	ddi_ufm_attr_t attr = 0;
+	char fw_ver[NVME_FWVER_SZ + 1];
+	int ret;
+
+	if (imgno > 0 || slotno > (nvme->n_idctl->id_frmw.fw_nslot - 1))
+		return (EINVAL);
+
+	mutex_enter(&nvme->n_fwslot_mutex);
+	if (nvme->n_fwslot == NULL) {
+		ret = nvme_get_logpage(nvme, B_TRUE, &log, &bufsize,
+		    NVME_LOGPAGE_FWSLOT, 0);
+		if (ret != DDI_SUCCESS ||
+		    bufsize != sizeof (nvme_fwslot_log_t)) {
+			if (log != NULL)
+				kmem_free(log, bufsize);
+			mutex_exit(&nvme->n_fwslot_mutex);
+			return (EIO);
+		}
+		nvme->n_fwslot = (nvme_fwslot_log_t *)log;
+	}
+
+	/*
+	 * NVMe numbers firmware slots starting at 1
+	 */
+	if (slotno == (nvme->n_fwslot->fw_afi - 1))
+		attr |= DDI_UFM_ATTR_ACTIVE;
+
+	if (slotno != 0 || nvme->n_idctl->id_frmw.fw_readonly == 0)
+		attr |= DDI_UFM_ATTR_WRITEABLE;
+
+	if (nvme->n_fwslot->fw_frs[slotno][0] == '\0') {
+		attr |= DDI_UFM_ATTR_EMPTY;
+	} else {
+		(void) strncpy(fw_ver, nvme->n_fwslot->fw_frs[slotno],
+		    NVME_FWVER_SZ);
+		fw_ver[NVME_FWVER_SZ] = '\0';
+		ddi_ufm_slot_set_version(slot, fw_ver);
+	}
+	mutex_exit(&nvme->n_fwslot_mutex);
+
+	ddi_ufm_slot_set_attrs(slot, attr);
+
+	return (0);
+}
+
+static int
+nvme_ufm_getcaps(ddi_ufm_handle_t *ufmh, void *arg, ddi_ufm_cap_t *caps)
+{
+	*caps = DDI_UFM_CAP_REPORT;
+	return (0);
 }

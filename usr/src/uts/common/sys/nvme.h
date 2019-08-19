@@ -436,13 +436,22 @@ typedef struct {
 	uint8_t hl_rsvd2[512 - 192];
 } nvme_health_log_t;
 
+/*
+ * The NVMe spec allows for up to seven firmware slots.
+ */
+#define	NVME_MAX_FWSLOTS	7
+#define	NVME_FWVER_SZ		8
+
 typedef struct {
-	uint8_t fw_afi:3;		/* Active Firmware Slot */
+	/* Active Firmware Slot */
+	uint8_t fw_afi:3;
 	uint8_t fw_rsvd1:1;
-	uint8_t fw_next:3;		/* Next Active Firmware Slot */
+	/* Next Active Firmware Slot */
+	uint8_t fw_next:3;
 	uint8_t fw_rsvd2:1;
 	uint8_t fw_rsvd3[7];
-	char fw_frs[7][8];		/* Firmware Revision / Slot */
+	/* Firmware Revision / Slot */
+	char fw_frs[NVME_MAX_FWSLOTS][NVME_FWVER_SZ];
 	uint8_t fw_rsvd4[512 - 64];
 } nvme_fwslot_log_t;
 
