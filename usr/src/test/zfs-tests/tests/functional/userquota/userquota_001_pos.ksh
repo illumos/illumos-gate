@@ -58,7 +58,7 @@ mkmount_writable $QFS
 log_note "Check the userquota@$QUSER1"
 log_must zfs set userquota@$QUSER1=$UQUOTA_SIZE $QFS
 log_must user_run $QUSER1 mkfile $UQUOTA_SIZE $QFILE
-sync
+sync_pool
 log_mustnot user_run $QUSER1 mkfile 1 $OFILE
 cleanup_quota
 
@@ -66,7 +66,7 @@ log_note "Check the groupquota@$QGROUP"
 log_must zfs set groupquota@$QGROUP=$GQUOTA_SIZE $QFS
 mkmount_writable $QFS
 log_must user_run $QUSER1 mkfile $GQUOTA_SIZE $QFILE
-sync
+sync_pool
 log_mustnot user_run $QUSER1 mkfile 1 $OFILE
 
 cleanup_quota

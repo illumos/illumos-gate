@@ -708,7 +708,7 @@ vdevs from an allocation class are removed.
 .sp
 .ne 2
 .na
-\fB\fBcom.datto:encryption\fR\fR
+\fB\fBencryption\fR\fR
 .ad
 .RS 4n
 .TS
@@ -744,6 +744,69 @@ running one to be immediately restarted from the beginning.
 
 This feature becomes \fBactive\fR once a resilver has been deferred, and
 returns to being \fBenabled\fR when the deferred resilver begins.
+.RE
+
+.sp
+.ne 2
+.na
+\fBuserobj_accounting\fR
+.ad
+.RS 4n
+.TS
+l l .
+GUID	org.zfsonlinux:userobj_accounting
+READ\-ONLY COMPATIBLE	yes
+DEPENDENCIES	extensible_dataset
+.TE
+
+This feature allows administrators to account the object usage information
+by user and group.
+
+This feature becomes \fBactive\fR as soon as it is enabled and will never
+return to being \fBenabled\fR.
+Each filesystem will be upgraded automatically when remounted, or when new
+files are created under that filesystem.
+The upgrade can also be started manually on filesystems by running
+`zfs set version=current <pool/fs>`.
+The upgrade process runs in the background and may take a while to complete
+for filesystems containing a large number of files.
+.RE
+
+.sp
+.ne 2
+.na
+\fBproject_quota\fR
+.ad
+.RS 4n
+.TS
+l l .
+GUID	org.zfsonlinux:project_quota
+READ\-ONLY COMPATIBLE	yes
+DEPENDENCIES	extensible_dataset
+.TE
+
+This feature allows administrators to account the space and object usage
+information against the project identifier (ID).
+
+The project ID is a new object-based attribute.
+When upgrading an existing filesystem, an object without a project ID
+attribute will be assigned a zero project ID.
+After this feature is enabled, a newly created object will inherit
+its parent directory's project ID if the parent's inherit flag is set (via
+\fBzfs project [-s|-C]\fR).
+Otherwise, the new object's project ID will be set as zero.
+An object's project ID can be changed at any time by the owner (or privileged
+user) via \fBzfs project -p $prjid\fR.
+
+This feature will become \fBactive\fR as soon as it is enabled and will never
+return to being \fBdisabled\fR.
+Each filesystem will be upgraded automatically when remounted or when a new file
+is created under that filesystem.
+The upgrade can also be triggered on filesystems via `zfs set version=current
+<pool/fs>`.
+The upgrade process runs in the background and may take a while to complete
+for the filesystems containing a large number of files.
+.RE
 
 .SH "SEE ALSO"
 \fBzfs\fR(1M), \fBzpool\fR(1M)

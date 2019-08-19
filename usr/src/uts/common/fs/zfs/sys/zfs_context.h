@@ -80,6 +80,7 @@ extern "C" {
 #endif
 
 #define	likely(x)	_zfs_expect((x) != 0, 1)
+#define	unlikely(x)	_zfs_expect((x) != 0, 0)
 
 #define	CPU_SEQID	(CPU->cpu_seqid)
 

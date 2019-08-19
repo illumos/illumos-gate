@@ -39,6 +39,7 @@
 #include <sys/zio.h>
 #include <sys/dmu_zfetch.h>
 #include <sys/range_tree.h>
+#include <sys/zfs_project.h>
 
 dnode_stats_t dnode_stats = {
 	{ "dnode_hold_dbuf_hold",		KSTAT_DATA_UINT64 },
@@ -159,8 +160,10 @@ dnode_cons(void *arg, void *unused, int kmflag)
 	dn->dn_oldflags = 0;
 	dn->dn_olduid = 0;
 	dn->dn_oldgid = 0;
+	dn->dn_oldprojid = ZFS_DEFAULT_PROJID;
 	dn->dn_newuid = 0;
 	dn->dn_newgid = 0;
+	dn->dn_newprojid = ZFS_DEFAULT_PROJID;
 	dn->dn_id_flags = 0;
 
 	dn->dn_dbufs_count = 0;
@@ -213,8 +216,10 @@ dnode_dest(void *arg, void *unused)
 	ASSERT0(dn->dn_oldflags);
 	ASSERT0(dn->dn_olduid);
 	ASSERT0(dn->dn_oldgid);
+	ASSERT0(dn->dn_oldprojid);
 	ASSERT0(dn->dn_newuid);
 	ASSERT0(dn->dn_newgid);
+	ASSERT0(dn->dn_newprojid);
 	ASSERT0(dn->dn_id_flags);
 
 	ASSERT0(dn->dn_dbufs_count);
@@ -554,8 +559,10 @@ dnode_destroy(dnode_t *dn)
 	dn->dn_oldflags = 0;
 	dn->dn_olduid = 0;
 	dn->dn_oldgid = 0;
+	dn->dn_oldprojid = ZFS_DEFAULT_PROJID;
 	dn->dn_newuid = 0;
 	dn->dn_newgid = 0;
+	dn->dn_newprojid = ZFS_DEFAULT_PROJID;
 	dn->dn_id_flags = 0;
 
 	dmu_zfetch_fini(&dn->dn_zfetch);
@@ -815,8 +822,10 @@ dnode_move_impl(dnode_t *odn, dnode_t *ndn)
 	ndn->dn_oldflags = odn->dn_oldflags;
 	ndn->dn_olduid = odn->dn_olduid;
 	ndn->dn_oldgid = odn->dn_oldgid;
+	ndn->dn_oldprojid = odn->dn_oldprojid;
 	ndn->dn_newuid = odn->dn_newuid;
 	ndn->dn_newgid = odn->dn_newgid;
+	ndn->dn_newprojid = odn->dn_newprojid;
 	ndn->dn_id_flags = odn->dn_id_flags;
 	dmu_zfetch_init(&ndn->dn_zfetch, NULL);
 	list_move_tail(&ndn->dn_zfetch.zf_stream, &odn->dn_zfetch.zf_stream);
@@ -876,8 +885,10 @@ dnode_move_impl(dnode_t *odn, dnode_t *ndn)
 	odn->dn_oldflags = 0;
 	odn->dn_olduid = 0;
 	odn->dn_oldgid = 0;
+	odn->dn_oldprojid = ZFS_DEFAULT_PROJID;
 	odn->dn_newuid = 0;
 	odn->dn_newgid = 0;
+	odn->dn_newprojid = ZFS_DEFAULT_PROJID;
 	odn->dn_id_flags = 0;
 
 	/*
@@ -1289,9 +1300,14 @@ dnode_hold_impl(objset_t *os, uint64_t object, int flag, int slots,
 
 	ASSERT((flag & DNODE_MUST_BE_ALLOCATED) || (flag & DNODE_MUST_BE_FREE));
 
-	if (object == DMU_USERUSED_OBJECT || object == DMU_GROUPUSED_OBJECT) {
-		dn = (object == DMU_USERUSED_OBJECT) ?
-		    DMU_USERUSED_DNODE(os) : DMU_GROUPUSED_DNODE(os);
+	if (object == DMU_USERUSED_OBJECT || object == DMU_GROUPUSED_OBJECT ||
+	    object == DMU_PROJECTUSED_OBJECT) {
+		if (object == DMU_USERUSED_OBJECT)
+			dn = DMU_USERUSED_DNODE(os);
+		else if (object == DMU_GROUPUSED_OBJECT)
+			dn = DMU_GROUPUSED_DNODE(os);
+		else
+			dn = DMU_PROJECTUSED_DNODE(os);
 		if (dn == NULL)
 			return (SET_ERROR(ENOENT));
 		type = dn->dn_type;

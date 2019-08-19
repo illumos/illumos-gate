@@ -24,12 +24,13 @@
 # Copyright 2010 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 # Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>.
+# Copyright 2019 Joyent, Inc.
 #
 
 PROG=		zfs
-OBJS=		zfs_main.o zfs_iter.o
+OBJS=		zfs_main.o zfs_iter.o zfs_project.o
 SRCS=		$(OBJS:%.o=%.c)
-POFILES=	zfs_main.po zfs_iter.po
+POFILES=	zfs_main.po zfs_iter.po zfs_project.po
 POFILE=		zfs.po
 
 include ../Makefile.cmd
@@ -41,8 +42,11 @@ ROOTETCFSTYPE=  $(ROOTETC)/fs/$(FSTYPE)
 USRLIBFSTYPE=	$(ROOTLIB)/fs/$(FSTYPE)
 
 LDLIBS += -lzfs_core -lzfs -luutil -lumem -lnvpair -lsec -lidmap
+# cmdutils has list(9F) functions used by the project code.
+LDLIBS += -lcmdutils
 
 INCS += -I../../common/zfs
+INCS += -I$(SRC)/uts/common/fs/zfs
 
 CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
