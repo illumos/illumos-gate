@@ -3,19 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBPAPI 3LIB "Dec 18, 2006"
+.TH LIBPAPI 3LIB "Aug 19, 2019"
 .SH NAME
 libpapi \- Free Standards Group Open Printing API (PAPI) library functions
 .SH SYNOPSIS
-.LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpapi\fR [ \fIlibrary\fR\&.\|.\|. ]
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lpapi\fR [ \fIlibrary\fR... ]
 #include <papi.h>
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 Functions in this library provide an interface for interaction with print
 services as described in v1.0 of the Free Standards Group (FSG) Open Printing
 API (PAPI).
@@ -29,15 +26,10 @@ same interface.  These modules should not be linked with directly, but can be
 used directly at runtime through the use of \fBLD_PRELOAD\fR for debugging
 purposes.
 .SH INTERFACES
-.sp
-.LP
 The shared object \fBlibpapi.so.0\fR provides the public interfaces defined
 below.  See \fBIntro\fR(3) for additional information on shared object
 interfaces.
 .SS "Attribute"
-.sp
-
-.sp
 .TS
 l l
 l l .
@@ -56,9 +48,6 @@ l l .
 .TE
 
 .SS "Service"
-.sp
-
-.sp
 .TS
 l l
 l l .
@@ -72,9 +61,6 @@ l l .
 .TE
 
 .SS "Printer"
-.sp
-
-.sp
 .TS
 l l
 l l .
@@ -88,9 +74,6 @@ l l .
 .TE
 
 .SS "Job"
-.sp
-
-.sp
 .TS
 l l
 l l .
@@ -107,21 +90,17 @@ l l .
 .TE
 
 .SS "Miscellaneous"
-.sp
-
-.sp
 .TS
 l l
 l l .
 \fBpapiLibrarySupportedCall\fR	\fBpapiLibrarySupportedCalls\fR
-\fBpapiStatusString\fR	
+\fBpapiStatusString\fR
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
-\fB\fB/usr/lib/libpapi.so.0\fR\fR
+\fB/usr/lib/libpapi.so.0\fR
 .ad
 .sp .6
 .RS 4n
@@ -131,7 +110,7 @@ shared object
 .sp
 .ne 2
 .na
-\fB\fB/usr/lib/libpapi-common.so.0\fR\fR
+\fB/usr/lib/libpapi-common.so.0\fR
 .ad
 .sp .6
 .RS 4n
@@ -141,7 +120,7 @@ private shared code
 .sp
 .ne 2
 .na
-\fB\fB/usr/lib/print/psm-lpd.so\fR\fR
+\fB/usr/lib/print/psm-lpd.so\fR
 .ad
 .sp .6
 .RS 4n
@@ -151,7 +130,7 @@ private rfc1179 support
 .sp
 .ne 2
 .na
-\fB\fB/usr/lib/print/psm-lpsched.so\fR\fR
+\fB/usr/lib/print/psm-lpsched.so\fR
 .ad
 .sp .6
 .RS 4n
@@ -161,7 +140,7 @@ private LP support
 .sp
 .ne 2
 .na
-\fB\fB/usr/lib/print/psm-ipp.so\fR\fR
+\fB/usr/lib/print/psm-ipp.so\fR
 .ad
 .sp .6
 .RS 4n
@@ -171,7 +150,7 @@ private IPP support
 .sp
 .ne 2
 .na
-\fB\fB/usr/lib/libipp-core.so\fR\fR
+\fB/usr/lib/libipp-core.so\fR
 .ad
 .sp .6
 .RS 4n
@@ -181,7 +160,7 @@ private IPP marshalling support
 .sp
 .ne 2
 .na
-\fB\fB/usr/lib/libipp-listener.so\fR\fR
+\fB/usr/lib/libipp-listener.so\fR
 .ad
 .sp .6
 .RS 4n
@@ -191,7 +170,7 @@ private IPP operations support
 .sp
 .ne 2
 .na
-\fB\fB/usr/lip/libhttp-core.so\fR\fR
+\fB/usr/lip/libhttp-core.so\fR
 .ad
 .sp .6
 .RS 4n
@@ -199,8 +178,6 @@ private HTTP support
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -217,6 +194,4 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBIntro\fR(3), \fBprinters\fR(4), \fBprinters.conf\fR(4), \fBattributes\fR(5)
