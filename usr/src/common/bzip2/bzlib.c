@@ -181,14 +181,14 @@ void default_bzfree ( void* opaque, void* addr )
 
 /*---------------------------------------------------*/
 static
-void* default_bzalloc ( void* opaque, Int32 items, Int32 size )
+void* default_bzalloc ( void* opaque __unused, Int32 items, Int32 size )
 {
    void* v = malloc ( items * size );
    return v;
 }
 
 static
-void default_bzfree ( void* opaque, void* addr )
+void default_bzfree ( void* opaque __unused, void* addr )
 {
    if (addr != NULL) free ( addr );
 }

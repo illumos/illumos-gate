@@ -5380,13 +5380,13 @@ tcp_set_rto(tcp_t *tcp, hrtime_t rtt)
 
 		/*
 		 * Update deviation estimator:
-		 *	mdev = 3/4 mdev + 1/4 abs(Error)
+		 *  mdev = 3/4 mdev + 1/4 abs(Error)
 		 *
 		 * We maintain tcp_rtt_sd as 4 * mdev, so this reduces to:
-		 *	tcp_rtt_sd = 3 * mdev + abs(Error)
-		 *	tcp_rtt_sd = tcp_rtt_sd - (tcp_rtt_sd / 4) + abs(Error)
-		 *	tcp_rtt_sd = tcp_rtt_sd - (tcp_rtt_sd / 2^2) + abs(Error)
-		 *	tcp_rtt_sd = tcp_rtt_sd - (tcp_rtt_sd >> 2) + abs(Error)
+		 *  tcp_rtt_sd = 3 * mdev + abs(Error)
+		 *  tcp_rtt_sd = tcp_rtt_sd - (tcp_rtt_sd / 4) + abs(Error)
+		 *  tcp_rtt_sd = tcp_rtt_sd - (tcp_rtt_sd / 2^2) + abs(Error)
+		 *  tcp_rtt_sd = tcp_rtt_sd - (tcp_rtt_sd >> 2) + abs(Error)
 		 */
 		if (m < 0)
 			m = -m;

@@ -636,6 +636,61 @@ tcp_calculate_rto(tcp_t *tcp, tcp_stack_t *tcps, uint32_t extra)
 	return (rto);
 }
 
+
+/*
+ * As defined in RFC 6298, the RTO is the average estimates (SRTT) plus a
+ * multiple of the deviation estimates (K * RTTVAR):
+ *
+ * RTO = SRTT + max(G, K * RTTVAR)
+ *
+ * K is defined in the RFC as 4, and G is the clock granularity. We constrain
+ * the minimum mean deviation to TCP_SD_MIN when processing new RTTs, so this
+ * becomes:
+ *
+ * RTO = SRTT + 4 * RTTVAR
+ *
+ * In practice, however, we make several additions to it. As we use a finer
+ * grained clock than BSD and update RTO for every ACK, we add in another 1/4 of
+ * RTT to the deviation of RTO to accommodate burstiness of 1/4 of window size:
+ *
+ * RTO = SRTT + (SRTT / 4) + 4 * RTTVAR
+ *
+ * Since tcp_rtt_sa is 8 times the SRTT, and tcp_rtt_sd is 4 times the RTTVAR,
+ * this becomes:
+ *
+ * RTO = (tcp_rtt_sa / 8) + ((tcp_rtt_sa / 8) / 4) + tcp_rtt_sd
+ * RTO = (tcp_rtt_sa / 2^3) + (tcp_rtt_sa / 2^5) + tcp_rtt_sd
+ * RTO = (tcp_rtt_sa >> 3) + (tcp_rtt_sa >> 5) + tcp_rtt_sd
+ *
+ * The "tcp_rexmit_interval_extra" and "tcp_conn_grace_period" tunables are
+ * used to help account for extreme environments where the algorithm fails to
+ * work; by default they should be 0. (The latter tunable is only used for
+ * calculating the intial RTO, and so is optionally passed in as "extra".) We
+ * add them here:
+ *
+ * RTO = (tcp_rtt_sa >> 3) + (tcp_rtt_sa >> 5) + tcp_rtt_sd +
+ *     tcps_rexmit_interval_extra + tcps_conn_grace_period
+ *
+ * We then pin the RTO within our configured boundaries (sections 2.4 and 2.5
+ * of RFC 6298).
+ */
+static __GNU_INLINE clock_t
+tcp_calculate_rto(tcp_t *tcp, tcp_stack_t *tcps, uint32_t extra)
+{
+	clock_t rto;
+
+	rto = NSEC2MSEC((tcp->tcp_rtt_sa >> 3) + (tcp->tcp_rtt_sa >> 5) +
+	    tcp->tcp_rtt_sd) + tcps->tcps_rexmit_interval_extra + extra;
+
+	if (rto < tcp->tcp_rto_min) {
+		rto = tcp->tcp_rto_min;
+	} else if (rto > tcp->tcp_rto_max) {
+		rto = tcp->tcp_rto_max;
+	}
+
+	return (rto);
+}
+
 extern struct qinit tcp_rinitv4, tcp_rinitv6;
 extern boolean_t do_tcp_fusion;
 

@@ -1182,6 +1182,7 @@ file path=usr/lib/newsyslog group=sys mode=0555
 file path=usr/lib/passmgmt group=sys mode=0555
 file path=usr/lib/pci/pcidr mode=0555
 file path=usr/lib/pci/pcidr_plugin.so
+file path=usr/lib/pci/pcieb mode=0555
 file path=usr/lib/pfexecd mode=0555
 file path=usr/lib/platexec mode=0555
 file path=usr/lib/rcm/modules/SUNW_aggr_rcm.so mode=0555

@@ -64,7 +64,7 @@ static split_t *split_fields(const ofmt_field_t *, uint_t, uint_t);
  * os_nfields set to the number of requested fields.
  */
 typedef struct ofmt_state_s {
-	ofmt_field_t  	*os_fields;
+	ofmt_field_t	*os_fields;
 	uint_t		os_nfields;
 	boolean_t	os_lastfield;
 	uint_t		os_overflow;

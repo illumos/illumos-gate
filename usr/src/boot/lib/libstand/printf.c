@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1986, 1988, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  * (c) UNIX System Laboratories, Inc.
@@ -53,12 +53,12 @@
  */
 #include <machine/stdarg.h>
 
-#define MAXNBUF (sizeof(intmax_t) * CHAR_BIT + 1)
+#define	MAXNBUF (sizeof (intmax_t) * CHAR_BIT + 1)
 
 typedef void (kvprintf_fn_t)(int, void *);
 
-static char	*ksprintn (char *buf, uintmax_t num, int base, int *len, int upper);
-static int	kvprintf(char const *fmt, kvprintf_fn_t *func, void *arg, int radix, va_list ap);
+static char *ksprintn(char *, uintmax_t, int, int *, int);
+static int kvprintf(char const *, kvprintf_fn_t *, void *, int, va_list);
 
 static void
 putchar_wrapper(int cc, void *arg)
@@ -76,7 +76,7 @@ printf(const char *fmt, ...)
 	va_start(ap, fmt);
 	retval = kvprintf(fmt, putchar_wrapper, NULL, 10, ap);
 	va_end(ap);
-	return retval;
+	return (retval);
 }
 
 void
@@ -96,7 +96,7 @@ sprintf(char *buf, const char *cfmt, ...)
 	retval = kvprintf(cfmt, NULL, (void *)buf, 10, ap);
 	buf[retval] = '\0';
 	va_end(ap);
-	return retval;
+	return (retval);
 }
 
 struct print_buf {
@@ -164,14 +164,14 @@ snprintf(char *buf, size_t size, const char *cfmt, ...)
 
 	if (arg.size >= 1)
 		*(arg.buf)++ = 0;
-	return retval;
+	return (retval);
 }
 
 void
 vsprintf(char *buf, const char *cfmt, va_list ap)
 {
 	int	retval;
-	
+
 	retval = kvprintf(cfmt, NULL, (void *)buf, 10, ap);
 	buf[retval] = '\0';
 }
@@ -255,7 +255,7 @@ kvprintf(char const *fmt, kvprintf_fn_t *func, void *arg, int radix, va_list ap)
 	char *d;
 	const char *p, *percent, *q;
 	uint16_t *S;
-	u_char *up;
+	uchar_t *up;
 	int ch, n;
 	uintmax_t num;
 	int base, lflag, qflag, tmp, width, ladjust, sharpflag, neg, sign, dot;
@@ -266,7 +266,7 @@ kvprintf(char const *fmt, kvprintf_fn_t *func, void *arg, int radix, va_list ap)
 
 	num = 0;
 	if (!func)
-		d = (char *) arg;
+		d = (char *)arg;
 	else
 		d = NULL;
 
@@ -279,7 +279,7 @@ kvprintf(char const *fmt, kvprintf_fn_t *func, void *arg, int radix, va_list ap)
 	for (;;) {
 		padc = ' ';
 		width = 0;
-		while ((ch = (u_char)*fmt++) != '%' || stop) {
+		while ((ch = (uchar_t)*fmt++) != '%' || stop) {
 			if (ch == '\0')
 				return (retval);
 			PCHAR(ch);
@@ -288,7 +288,7 @@ kvprintf(char const *fmt, kvprintf_fn_t *func, void *arg, int radix, va_list ap)
 		qflag = 0; lflag = 0; ladjust = 0; sharpflag = 0; neg = 0;
 		sign = 0; dot = 0; dwidth = 0; upper = 0;
 		cflag = 0; hflag = 0; jflag = 0; tflag = 0; zflag = 0;
-reswitch:	switch (ch = (u_char)*fmt++) {
+reswitch:	switch (ch = (uchar_t)*fmt++) {
 		case '.':
 			dot = 1;
 			goto reswitch;
@@ -320,9 +320,10 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				padc = '0';
 				goto reswitch;
 			}
+			/* FALLTHROUGH */
 		case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9':
-				for (n = 0;; ++fmt) {
+				for (n = 0; ; ++fmt) {
 					n = n * 10 + ch - '0';
 					ch = *fmt;
 					if (ch < '0' || ch > '9')
@@ -334,15 +335,15 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 				width = n;
 			goto reswitch;
 		case 'b':
-			num = (u_int)va_arg(ap, int);
+			num = (uint_t)va_arg(ap, int);
 			p = va_arg(ap, char *);
-			for (q = ksprintn(nbuf, num, *p++, NULL, 0); *q;)
+			for (q = ksprintn(nbuf, num, *p++, NULL, 0); *q; )
 				PCHAR(*q--);
 
 			if (num == 0)
 				break;
 
-			for (tmp = 0; *p;) {
+			for (tmp = 0; *p; ) {
 				n = *p++;
 				if (num & (1 << (n - 1))) {
 					PCHAR(tmp ? ',' : '<');
@@ -360,16 +361,16 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			PCHAR(va_arg(ap, int));
 			break;
 		case 'D':
-			up = va_arg(ap, u_char *);
+			up = va_arg(ap, uchar_t *);
 			p = va_arg(ap, char *);
 			if (!width)
 				width = 16;
-			while(width--) {
+			while (width--) {
 				PCHAR(hex2ascii(*up >> 4));
 				PCHAR(hex2ascii(*up & 0x0f));
 				up++;
 				if (width)
-					for (q=p;*q;q++)
+					for (q = p; *q; q++)
 						PCHAR(*q);
 			}
 			break;
@@ -433,7 +434,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			if (p == NULL)
 				p = "(null)";
 			if (!dot)
-				n = strlen (p);
+				n = strlen(p);
 			else
 				for (n = 0; n < dwidth && p[n]; n++)
 					continue;
@@ -480,6 +481,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			goto handle_nosign;
 		case 'X':
 			upper = 1;
+			/* FALLTHROUGH */
 		case 'x':
 			base = 16;
 			goto handle_nosign;
@@ -495,19 +497,19 @@ handle_nosign:
 			if (jflag)
 				num = va_arg(ap, uintmax_t);
 			else if (qflag)
-				num = va_arg(ap, u_quad_t);
+				num = va_arg(ap, uint64_t);
 			else if (tflag)
 				num = va_arg(ap, ptrdiff_t);
 			else if (lflag)
-				num = va_arg(ap, u_long);
+				num = va_arg(ap, ulong_t);
 			else if (zflag)
 				num = va_arg(ap, size_t);
 			else if (hflag)
-				num = (u_short)va_arg(ap, int);
+				num = (ushort_t)va_arg(ap, int);
 			else if (cflag)
-				num = (u_char)va_arg(ap, int);
+				num = (uchar_t)va_arg(ap, int);
 			else
-				num = va_arg(ap, u_int);
+				num = va_arg(ap, uint_t);
 			goto number;
 handle_sign:
 			if (jflag)
