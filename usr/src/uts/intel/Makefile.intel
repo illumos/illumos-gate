@@ -697,6 +697,8 @@ MISC_KMODS	+= uathfw
 
 MISC_KMODS	+= klmmod klmops
 
+MISC_KMODS	+= buildversion
+
 #
 #	Software Cryptographic Providers (/kernel/crypto):
 #

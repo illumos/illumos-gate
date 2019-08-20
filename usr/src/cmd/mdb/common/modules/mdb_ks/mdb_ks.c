@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -1823,16 +1823,19 @@ mdb_get_lbolt(void)
  * Dig out the branch and revision of the illumos-joyent repo, if we were
  * provided with it.  This is a rather fragile JSON parser, in that it requires
  * JSON formatted exactly as per the boot_archive.gitstatus file that
- * "gitstatus_start" is built from.
+ * "buildversion_start" is built from.
  */
 void
-mdb_print_gitstatus(void)
+mdb_print_buildversion(void)
 {
 	boolean_t in_joyent = B_FALSE;
 	GElf_Sym sym;
 
-	if (mdb_lookup_by_name("gitstatus_start", &sym) != 0)
-		return;
+	if (mdb_lookup_by_name("buildversion_start", &sym) != 0) {
+		/* Older kernels used this name. */
+		if (mdb_lookup_by_name("gitstatus_start", &sym) != 0)
+			return;
+	}
 
 	char *str = mdb_zalloc(4096, UM_SLEEP | UM_GC);
 

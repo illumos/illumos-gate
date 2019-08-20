@@ -23,7 +23,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -96,7 +96,7 @@ typedef struct kt_maparg {
 static const char KT_MODULE[] = "mdb_ks";
 static const char KT_CTFPARENT[] = "genunix";
 
-static void (*print_gitstatus)(void);
+static void (*print_buildversion)(void);
 
 static void
 kt_load_module(kt_data_t *kt, mdb_tgt_t *t, kt_module_t *km)
@@ -489,8 +489,8 @@ kt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("operating system: %s %s (%s)\n",
 	    uts.release, uts.version, uts.machine);
 
-	if (print_gitstatus != NULL)
-		print_gitstatus();
+	if (print_buildversion != NULL)
+		print_buildversion();
 
 	if (kt->k_dumphdr) {
 		dumphdr_t *dh = kt->k_dumphdr;
@@ -591,8 +591,8 @@ kt_activate(mdb_tgt_t *t)
 			    "some modules may not load\n");
 		}
 
-		print_gitstatus = (void (*)(void))dlsym(RTLD_NEXT,
-		    "mdb_print_gitstatus");
+		print_buildversion = (void (*)(void))dlsym(RTLD_NEXT,
+		    "mdb_print_buildversion");
 
 		if (mdb_prop_postmortem && kt->k_dumphdr != NULL) {
 			sym = dlsym(RTLD_NEXT, "mdb_dump_print_content");

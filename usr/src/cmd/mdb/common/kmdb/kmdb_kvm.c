@@ -22,7 +22,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  *
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <kmdb/kmdb_kvm.h>
@@ -571,7 +571,7 @@ kmt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("operating system: %s %s (%s)\n",
 	    uts.release, uts.version, uts.machine);
 
-	mdb_print_gitstatus();
+	mdb_print_buildversion();
 
 	if (mdb_readsym(uuid, sizeof (uuid),
 	    "dump_osimage_uuid") == sizeof (uuid) &&

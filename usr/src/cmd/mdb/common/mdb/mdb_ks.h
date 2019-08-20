@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_MDB_KS_H
@@ -144,7 +144,7 @@ extern const char *mdb_dlpi_prim(int);
 /* Generic function for working with MAC (network layer 2) addresses. */
 extern void mdb_mac_addr(const uint8_t *, size_t, char *, size_t);
 
-extern void mdb_print_gitstatus(void);
+extern void mdb_print_buildversion(void);
 
 /*
  * Target-specific interfaces
