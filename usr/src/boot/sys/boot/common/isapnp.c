@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998, Michael Smith
  * Copyright (c) 1996, Sujal M. Patel
  * All rights reserved.
@@ -26,7 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 /*
  * Machine-independant ISA PnP enumerator implementing a subset of the
@@ -175,10 +174,10 @@ isapnp_scan_resdata(struct pnpinfo *pi)
                     if (isapnp_get_resource_info(resinfo, PNP_SRES_LEN(tag)))
 			return(1);
 		    pnp_addident(pi, pnp_eisaformat(resinfo));
+		    return(0);
 
                 case END_TAG:
 		    return(0);
-                    break;
 
                 default:
                     /* Skip this resource */
