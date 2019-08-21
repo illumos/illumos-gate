@@ -57,7 +57,6 @@ ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 CERRWARN	+= -_gcc=-Wno-unused-value
-CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-function # safe
 
 # needs work

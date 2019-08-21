@@ -3029,11 +3029,6 @@ pcie_link_bw_intr(dev_info_t *dip)
 	pcie_bus_t *bus_p = PCIE_DIP2BUS(dip);
 	uint16_t linksts;
 	uint16_t flags = PCIE_LINKSTS_LINK_BW_MGMT | PCIE_LINKSTS_AUTO_BW;
-	dev_info_t *cdip;
-	sysevent_t *se = NULL;
-	sysevent_value_t se_val;
-	sysevent_id_t eid;
-	sysevent_attr_list_t *ev_attr_list = NULL;
 
 	if ((bus_p->bus_lbw_state & PCIE_LBW_S_ENABLED) == 0) {
 		return (DDI_INTR_UNCLAIMED);
