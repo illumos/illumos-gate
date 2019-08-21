@@ -226,7 +226,7 @@ soft_aes_init_ctx(aes_ctx_t *aes_ctx, CK_MECHANISM_PTR mech_p,
 		CK_AES_CTR_PARAMS *pp = (CK_AES_CTR_PARAMS *)mech_p->pParameter;
 
 		rc = ctr_init_ctx((ctr_ctx_t *)aes_ctx, pp->ulCounterBits,
-		    pp->cb, aes_copy_block);
+		    pp->cb, aes_encrypt_block, aes_copy_block);
 		break;
 	}
 	case CKM_AES_CCM: {
@@ -811,38 +811,47 @@ soft_aes_encrypt_update(soft_session_t *session_p, CK_BYTE_PTR pData,
 	};
 	CK_MECHANISM_TYPE mech = session_p->encrypt.mech.mechanism;
 	CK_RV rv = CKR_OK;
-	size_t out_len = aes_ctx->ac_remainder_len + ulDataLen;
+	size_t out_len;
 	int rc;
 
 	/* Check size of the output buffer */
-	if (aes_ctx->ac_flags & CMAC_MODE) {
+	switch (mech) {
+	case CKM_AES_CMAC:
 		/*
 		 * The underlying CMAC implementation handles the storing of
 		 * extra bytes and does not output any data until *_final,
 		 * so do not bother looking at the size of the output
 		 * buffer at this time.
 		 */
-		if (pData == NULL) {
-			*pulEncryptedDataLen = 0;
-			return (CKR_OK);
-		}
-	} else {
+		out_len = 0;
+		break;
+	case CKM_AES_CTR:
+		/*
+		 * CTR mode is a stream cipher, so we always output exactly as
+		 * much ciphertext as input plaintext
+		 */
+		out_len = ulDataLen;
+		break;
+	default:
+		out_len = aes_ctx->ac_remainder_len + ulDataLen;
+
 		/*
 		 * The number of complete blocks we can encrypt right now.
 		 * The underlying implementation will buffer any remaining data
 		 * until the next *_update call.
 		 */
 		out_len &= ~(AES_BLOCK_LEN - 1);
+		break;
+	}
 
-		if (pEncryptedData == NULL) {
-			*pulEncryptedDataLen = out_len;
-			return (CKR_OK);
-		}
+	if (pEncryptedData == NULL) {
+		*pulEncryptedDataLen = out_len;
+		return (CKR_OK);
+	}
 
-		if (*pulEncryptedDataLen < out_len) {
-			*pulEncryptedDataLen = out_len;
-			return (CKR_BUFFER_TOO_SMALL);
-		}
+	if (*pulEncryptedDataLen < out_len) {
+		*pulEncryptedDataLen = out_len;
+		return (CKR_BUFFER_TOO_SMALL);
 	}
 
 	rc = aes_encrypt_contiguous_blocks(aes_ctx, (char *)pData, ulDataLen,
@@ -859,15 +868,6 @@ soft_aes_encrypt_update(soft_session_t *session_p, CK_BYTE_PTR pData,
 		return (CKR_FUNCTION_FAILED);
 	}
 
-	/*
-	 * Since AES counter mode is a stream cipher, we call ctr_mode_final()
-	 * to pick up any remaining bytes.  It is an internal function that
-	 * does not destroy the context like *normal* final routines.
-	 */
-	if ((aes_ctx->ac_flags & CTR_MODE) && (aes_ctx->ac_remainder_len > 0)) {
-		rc = ctr_mode_final((ctr_ctx_t *)aes_ctx, &out,
-		    aes_encrypt_block);
-	}
 	rv = crypto2pkcs11_error_number(rc);
 
 	return (rv);
@@ -1060,6 +1060,13 @@ soft_aes_decrypt_update(soft_session_t *session_p, CK_BYTE_PTR pEncryptedData,
 			out_len &= ~(AES_BLOCK_LEN - 1);
 		}
 		break;
+	case CKM_AES_CTR:
+		/*
+		 * CKM_AES_CTR is a stream cipher, so we always output
+		 * exactly as much output plaintext as input ciphertext
+		 */
+		out_len = in_len;
+		break;
 	default:
 		out_len = aes_ctx->ac_remainder_len + in_len;
 		out_len &= ~(AES_BLOCK_LEN - 1);
@@ -1108,14 +1115,6 @@ soft_aes_decrypt_update(soft_session_t *session_p, CK_BYTE_PTR pEncryptedData,
 	*pulDataLen = out.cd_offset;
 
 	switch (mech) {
-	case CKM_AES_CTR:
-		if (aes_ctx->ac_remainder_len == 0) {
-			break;
-		}
-		rc = ctr_mode_final((ctr_ctx_t *)aes_ctx, &out,
-		    aes_encrypt_block);
-		rv = crypto2pkcs11_error_number(rc);
-		break;
 	case CKM_AES_CBC_PAD:
 		if (buffer_block == NULL) {
 			break;
@@ -1170,7 +1169,11 @@ soft_aes_encrypt_final(soft_session_t *session_p,
 		out_len = AES_BLOCK_LEN;
 		break;
 	case CKM_AES_CTR:
-		out_len = aes_ctx->ac_remainder_len;
+		/*
+		 * Since CKM_AES_CTR is a stream cipher, we never buffer any
+		 * input, so we always have 0 remaining bytes of output.
+		 */
+		out_len = 0;
 		break;
 	case CKM_AES_CCM:
 		out_len = aes_ctx->ac_remainder_len +
@@ -1219,12 +1222,11 @@ soft_aes_encrypt_final(soft_session_t *session_p,
 		break;
 	}
 	case CKM_AES_CTR:
-		if (aes_ctx->ac_remainder_len == 0) {
-			break;
-		}
-
-		rc = ctr_mode_final((ctr_ctx_t *)aes_ctx, &data,
-		    aes_encrypt_block);
+		/*
+		 * Since CKM_AES_CTR is a stream cipher, we never
+		 * buffer any data, and thus have no remaining data
+		 * to output at the end
+		 */
 		break;
 	case CKM_AES_CCM:
 		rc = ccm_encrypt_final((ccm_ctx_t *)aes_ctx, &data,
@@ -1361,7 +1363,11 @@ soft_aes_decrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastPart,
 		out_len = aes_ctx->ac_remainder_len;
 		break;
 	case CKM_AES_CTR:
-		out_len = aes_ctx->ac_remainder_len;
+		/*
+		 * Since CKM_AES_CTR is a stream cipher, we never have
+		 * any remaining bytes to output.
+		 */
+		out_len = 0;
 		break;
 	case CKM_AES_CCM:
 		out_len = aes_ctx->ac_data_len;

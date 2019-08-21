@@ -133,7 +133,8 @@ typedef struct ctr_ctx {
 	struct common_ctx ctr_common;
 	uint64_t ctr_lower_mask;
 	uint64_t ctr_upper_mask;
-	uint32_t ctr_tmp[4];
+	size_t ctr_offset;
+	uint32_t ctr_keystream[4];
 } ctr_ctx_t;
 
 /*
@@ -310,8 +311,7 @@ extern int cbc_decrypt_contiguous_blocks(cbc_ctx_t *, char *, size_t,
 
 extern int ctr_mode_contiguous_blocks(ctr_ctx_t *, char *, size_t,
     crypto_data_t *, size_t,
-    int (*cipher)(const void *, const uint8_t *, uint8_t *),
-    void (*xor_block)(uint8_t *, uint8_t *));
+    int (*cipher)(const void *, const uint8_t *, uint8_t *));
 
 extern int ccm_mode_encrypt_contiguous_blocks(ccm_ctx_t *, char *, size_t,
     crypto_data_t *, size_t,
@@ -359,15 +359,13 @@ extern int cmac_mode_final(cbc_ctx_t *, crypto_data_t *,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
     void (*xor_block)(uint8_t *, uint8_t *));
 
-extern int ctr_mode_final(ctr_ctx_t *, crypto_data_t *,
-    int (*encrypt_block)(const void *, const uint8_t *, uint8_t *));
-
 extern int cbc_init_ctx(cbc_ctx_t *, char *, size_t, size_t,
     void (*copy_block)(uint8_t *, uint64_t *));
 
 extern int cmac_init_ctx(cbc_ctx_t *, size_t);
 
 extern int ctr_init_ctx(ctr_ctx_t *, ulong_t, uint8_t *,
+    int (*encrypt_block)(const void *, const uint8_t *, uint8_t *),
     void (*copy_block)(uint8_t *, uint8_t *));
 
 extern int ccm_init_ctx(ccm_ctx_t *, char *, int, boolean_t, size_t,

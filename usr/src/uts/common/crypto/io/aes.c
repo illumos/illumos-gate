@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -660,10 +660,16 @@ aes_encrypt_update(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 
 	AES_ARG_INPLACE(plaintext, ciphertext);
 
-	/* compute number of bytes that will hold the ciphertext */
-	out_len = aes_ctx->ac_remainder_len;
-	out_len += plaintext->cd_length;
-	out_len &= ~(AES_BLOCK_LEN - 1);
+	/*
+	 * CTR mode does not accumulate plaintext across xx_update() calls --
+	 * it always outputs the same number of bytes as the input (so
+	 * ac_remainder_len is always 0).  Other modes _do_ accumulate
+	 * plaintext, and output only full blocks. For non-CTR modes, adjust
+	 * the output size to reflect this.
+	 */
+	out_len = plaintext->cd_length + aes_ctx->ac_remainder_len;
+	if ((aes_ctx->ac_flags & CTR_MODE) == 0)
+		out_len &= ~(AES_BLOCK_LEN - 1);
 
 	/*
 	 * return length needed to store the output.
@@ -701,21 +707,11 @@ aes_encrypt_update(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 		ret = CRYPTO_ARGUMENTS_BAD;
 	}
 
-	/*
-	 * Since AES counter mode is a stream cipher, we call
-	 * ctr_mode_final() to pick up any remaining bytes.
-	 * It is an internal function that does not destroy
-	 * the context like *normal* final routines.
-	 */
-	if ((aes_ctx->ac_flags & CTR_MODE) && (aes_ctx->ac_remainder_len > 0)) {
-		ret = ctr_mode_final((ctr_ctx_t *)aes_ctx,
-		    ciphertext, aes_encrypt_block);
-	}
-
 	if (ret == CRYPTO_SUCCESS) {
-		if (plaintext != ciphertext)
+		if (plaintext != ciphertext) {
 			ciphertext->cd_length =
 			    ciphertext->cd_offset - saved_offset;
+		}
 	} else {
 		ciphertext->cd_length = saved_length;
 	}
@@ -740,20 +736,28 @@ aes_decrypt_update(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 	AES_ARG_INPLACE(ciphertext, plaintext);
 
 	/*
-	 * Compute number of bytes that will hold the plaintext.
-	 * This is not necessary for CCM, GCM, and GMAC since these
-	 * mechanisms never return plaintext for update operations.
+	 * Adjust the number of bytes that will hold the plaintext (out_len).
+	 * CCM, GCM, and GMAC mechanisms never return plaintext for update
+	 * operations, so we set out_len to 0 for those.
+	 *
+	 * CTR mode does not accumulate any ciphertext across xx_decrypt
+	 * calls, and always outputs as many bytes of plaintext as
+	 * ciphertext.
+	 *
+	 * The remaining mechanisms output full blocks of plaintext, so
+	 * we round out_len down to the closest multiple of AES_BLOCK_LEN.
 	 */
-	if ((aes_ctx->ac_flags & (CCM_MODE|GCM_MODE|GMAC_MODE)) == 0) {
-		out_len = aes_ctx->ac_remainder_len;
-		out_len += ciphertext->cd_length;
+	out_len = aes_ctx->ac_remainder_len + ciphertext->cd_length;
+	if ((aes_ctx->ac_flags & (CCM_MODE|GCM_MODE|GMAC_MODE)) != 0) {
+		out_len = 0;
+	} else if ((aes_ctx->ac_flags & CTR_MODE) == 0) {
 		out_len &= ~(AES_BLOCK_LEN - 1);
+	}
 
-		/* return length needed to store the output */
-		if (plaintext->cd_length < out_len) {
-			plaintext->cd_length = out_len;
-			return (CRYPTO_BUFFER_TOO_SMALL);
-		}
+	/* return length needed to store the output */
+	if (plaintext->cd_length < out_len) {
+		plaintext->cd_length = out_len;
+		return (CRYPTO_BUFFER_TOO_SMALL);
 	}
 
 	saved_offset = plaintext->cd_offset;
@@ -783,19 +787,6 @@ aes_decrypt_update(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 		break;
 	default:
 		ret = CRYPTO_ARGUMENTS_BAD;
-	}
-
-	/*
-	 * Since AES counter mode is a stream cipher, we call
-	 * ctr_mode_final() to pick up any remaining bytes.
-	 * It is an internal function that does not destroy
-	 * the context like *normal* final routines.
-	 */
-	if ((aes_ctx->ac_flags & CTR_MODE) && (aes_ctx->ac_remainder_len > 0)) {
-		ret = ctr_mode_final((ctr_ctx_t *)aes_ctx, plaintext,
-		    aes_encrypt_block);
-		if (ret == CRYPTO_DATA_LEN_RANGE)
-			ret = CRYPTO_ENCRYPTED_DATA_LEN_RANGE;
 	}
 
 	if (ret == CRYPTO_SUCCESS) {
@@ -828,14 +819,7 @@ aes_encrypt_final(crypto_ctx_t *ctx, crypto_data_t *data,
 		return (CRYPTO_ARGUMENTS_BAD);
 	}
 
-	if (aes_ctx->ac_flags & CTR_MODE) {
-		if (aes_ctx->ac_remainder_len > 0) {
-			ret = ctr_mode_final((ctr_ctx_t *)aes_ctx, data,
-			    aes_encrypt_block);
-			if (ret != CRYPTO_SUCCESS)
-				return (ret);
-		}
-	} else if (aes_ctx->ac_flags & CCM_MODE) {
+	if (aes_ctx->ac_flags & CCM_MODE) {
 		ret = ccm_encrypt_final((ccm_ctx_t *)aes_ctx, data,
 		    AES_BLOCK_LEN, aes_encrypt_block, aes_xor_block);
 		if (ret != CRYPTO_SUCCESS) {
@@ -858,7 +842,7 @@ aes_encrypt_final(crypto_ctx_t *ctx, crypto_data_t *data,
 		if (ret != CRYPTO_SUCCESS)
 			return (ret);
 		data->cd_length = AES_BLOCK_LEN;
-	} else {
+	} else if ((aes_ctx->ac_flags & CTR_MODE) == 0) {
 		/*
 		 * There must be no unprocessed plaintext.
 		 * This happens if the length of the last data is
@@ -898,18 +882,13 @@ aes_decrypt_final(crypto_ctx_t *ctx, crypto_data_t *data,
 	 * There must be no unprocessed ciphertext.
 	 * This happens if the length of the last ciphertext is
 	 * not a multiple of the AES block length.
+	 *
+	 * For CTR mode, ac_remainder_len is always zero (we never
+	 * accumulate ciphertext across update calls with CTR mode).
 	 */
-	if (aes_ctx->ac_remainder_len > 0) {
-		if ((aes_ctx->ac_flags & CTR_MODE) == 0)
-			return (CRYPTO_ENCRYPTED_DATA_LEN_RANGE);
-		else {
-			ret = ctr_mode_final((ctr_ctx_t *)aes_ctx, data,
-			    aes_encrypt_block);
-			if (ret == CRYPTO_DATA_LEN_RANGE)
-				ret = CRYPTO_ENCRYPTED_DATA_LEN_RANGE;
-			if (ret != CRYPTO_SUCCESS)
-				return (ret);
-		}
+	if (aes_ctx->ac_remainder_len > 0 &&
+	    (aes_ctx->ac_flags & CTR_MODE) == 0) {
+		return (CRYPTO_ENCRYPTED_DATA_LEN_RANGE);
 	}
 
 	if (aes_ctx->ac_flags & CCM_MODE) {
@@ -1069,36 +1048,36 @@ aes_encrypt_atomic(crypto_provider_handle_t provider,
 	}
 
 	if (ret == CRYPTO_SUCCESS) {
-		if (mechanism->cm_type == AES_CCM_MECH_INFO_TYPE) {
+		switch (mechanism->cm_type) {
+		case AES_CCM_MECH_INFO_TYPE:
 			ret = ccm_encrypt_final((ccm_ctx_t *)&aes_ctx,
 			    ciphertext, AES_BLOCK_LEN, aes_encrypt_block,
 			    aes_xor_block);
 			if (ret != CRYPTO_SUCCESS)
 				goto out;
 			ASSERT(aes_ctx.ac_remainder_len == 0);
-		} else if (mechanism->cm_type == AES_GCM_MECH_INFO_TYPE ||
-		    mechanism->cm_type == AES_GMAC_MECH_INFO_TYPE) {
+			break;
+		case AES_GCM_MECH_INFO_TYPE:
+		case AES_GMAC_MECH_INFO_TYPE:
 			ret = gcm_encrypt_final((gcm_ctx_t *)&aes_ctx,
 			    ciphertext, AES_BLOCK_LEN, aes_encrypt_block,
 			    aes_copy_block, aes_xor_block);
 			if (ret != CRYPTO_SUCCESS)
 				goto out;
 			ASSERT(aes_ctx.ac_remainder_len == 0);
-		} else if (mechanism->cm_type == AES_CTR_MECH_INFO_TYPE) {
-			if (aes_ctx.ac_remainder_len > 0) {
-				ret = ctr_mode_final((ctr_ctx_t *)&aes_ctx,
-				    ciphertext, aes_encrypt_block);
-				if (ret != CRYPTO_SUCCESS)
-					goto out;
-			}
-		} else if (mechanism->cm_type == AES_CMAC_MECH_INFO_TYPE) {
+			break;
+		case AES_CTR_MECH_INFO_TYPE:
+			break;
+		case AES_CMAC_MECH_INFO_TYPE:
 			ret = cmac_mode_final((cbc_ctx_t *)&aes_ctx,
 			    ciphertext, aes_encrypt_block,
 			    aes_xor_block);
 			if (ret != CRYPTO_SUCCESS)
 				goto out;
-		} else {
+			break;
+		default:
 			ASSERT(aes_ctx.ac_remainder_len == 0);
+			break;
 		}
 
 		if (plaintext != ciphertext) {
@@ -1210,7 +1189,8 @@ aes_decrypt_atomic(crypto_provider_handle_t provider,
 	}
 
 	if (ret == CRYPTO_SUCCESS) {
-		if (mechanism->cm_type == AES_CCM_MECH_INFO_TYPE) {
+		switch (mechanism->cm_type) {
+		case AES_CCM_MECH_INFO_TYPE:
 			ASSERT(aes_ctx.ac_processed_data_len
 			    == aes_ctx.ac_data_len);
 			ASSERT(aes_ctx.ac_processed_mac_len
@@ -1226,8 +1206,9 @@ aes_decrypt_atomic(crypto_provider_handle_t provider,
 			} else {
 				plaintext->cd_length = saved_length;
 			}
-		} else if (mechanism->cm_type == AES_GCM_MECH_INFO_TYPE ||
-		    mechanism->cm_type == AES_GMAC_MECH_INFO_TYPE) {
+			break;
+		case AES_GCM_MECH_INFO_TYPE:
+		case AES_GMAC_MECH_INFO_TYPE:
 			ret = gcm_decrypt_final((gcm_ctx_t *)&aes_ctx,
 			    plaintext, AES_BLOCK_LEN, aes_encrypt_block,
 			    aes_xor_block);
@@ -1239,23 +1220,20 @@ aes_decrypt_atomic(crypto_provider_handle_t provider,
 			} else {
 				plaintext->cd_length = saved_length;
 			}
-		} else if (mechanism->cm_type != AES_CTR_MECH_INFO_TYPE) {
-			ASSERT(aes_ctx.ac_remainder_len == 0);
-			if (ciphertext != plaintext)
+			break;
+		case AES_CTR_MECH_INFO_TYPE:
+			if (ciphertext != plaintext) {
 				plaintext->cd_length =
 				    plaintext->cd_offset - saved_offset;
-		} else {
-			if (aes_ctx.ac_remainder_len > 0) {
-				ret = ctr_mode_final((ctr_ctx_t *)&aes_ctx,
-				    plaintext, aes_encrypt_block);
-				if (ret == CRYPTO_DATA_LEN_RANGE)
-					ret = CRYPTO_ENCRYPTED_DATA_LEN_RANGE;
-				if (ret != CRYPTO_SUCCESS)
-					goto out;
 			}
-			if (ciphertext != plaintext)
+			break;
+		default:
+			ASSERT(aes_ctx.ac_remainder_len == 0);
+			if (ciphertext != plaintext) {
 				plaintext->cd_length =
 				    plaintext->cd_offset - saved_offset;
+			}
+			break;
 		}
 	} else {
 		plaintext->cd_length = saved_length;
@@ -1391,7 +1369,7 @@ aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
 		}
 		pp = (CK_AES_CTR_PARAMS *)(void *)mechanism->cm_param;
 		rv = ctr_init_ctx((ctr_ctx_t *)aes_ctx, pp->ulCounterBits,
-		    pp->cb, aes_copy_block);
+		    pp->cb, aes_encrypt_block, aes_copy_block);
 		break;
 	}
 	case AES_CCM_MECH_INFO_TYPE:
