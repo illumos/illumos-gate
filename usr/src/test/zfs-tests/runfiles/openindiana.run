@@ -162,7 +162,7 @@ tests = ['zfs_mount_001_pos', 'zfs_mount_002_pos', 'zfs_mount_003_pos',
     'zfs_mount_004_pos', 'zfs_mount_005_pos', 'zfs_mount_006_pos',
     'zfs_mount_007_pos', 'zfs_mount_008_pos', 'zfs_mount_009_neg',
     'zfs_mount_010_neg', 'zfs_mount_011_neg', 'zfs_mount_012_neg',
-    'zfs_mount_all_001_pos', 'zfs_mount_all_fail', 'zfs_mount_all_mountpoints'
+    'zfs_mount_all_001_pos', 'zfs_mount_all_fail', 'zfs_mount_all_mountpoints',
     'zfs_mount_encrypted']
 
 [/opt/zfs-tests/tests/functional/cli_root/zfs_program]
@@ -544,6 +544,15 @@ tests = ['poolversion_001_pos', 'poolversion_002_pos']
 [/opt/zfs-tests/tests/functional/privilege]
 tests = ['privilege_001_pos', 'privilege_002_pos']
 
+[/opt/zfs-tests/tests/functional/projectquota]
+tests = ['projectid_001_pos', 'projectid_002_pos', 'projectid_003_pos',
+    'projectquota_001_pos', 'projectquota_002_pos', 'projectquota_003_pos',
+    'projectquota_004_neg', 'projectquota_005_pos', 'projectquota_006_pos',
+    'projectquota_007_pos', 'projectquota_008_pos', 'projectquota_009_pos',
+    'projectspace_001_pos', 'projectspace_002_pos', 'projectspace_003_pos',
+    'projectspace_004_pos',
+    'projecttree_002_pos', 'projecttree_003_neg' ]
+
 [/opt/zfs-tests/tests/functional/quota]
 tests = ['quota_001_pos', 'quota_002_pos', 'quota_003_pos', 'quota_004_pos',
     'quota_005_pos', 'quota_006_neg']
@@ -645,13 +654,18 @@ tests = ['threadsappend_001_pos']
 [/opt/zfs-tests/tests/functional/truncate]
 tests = ['truncate_001_pos', 'truncate_002_pos']
 
+[/opt/zfs-tests/tests/functional/upgrade]
+tests = ['upgrade_userobj_001_pos', 'upgrade_projectquota_001_pos']
+
 [/opt/zfs-tests/tests/functional/userquota]
-tests = ['groupspace_001_pos', 'groupspace_002_pos', 'userquota_001_pos',
-    'userquota_002_pos', 'userquota_003_pos', 'userquota_004_pos',
-    'userquota_005_neg', 'userquota_006_pos', 'userquota_007_pos',
-    'userquota_008_pos', 'userquota_009_pos', 'userquota_010_pos',
-    'userquota_011_pos', 'userquota_012_neg', 'userspace_001_pos',
-    'userspace_002_pos']
+tests = [
+    'userquota_001_pos', 'userquota_002_pos', 'userquota_003_pos',
+    'userquota_004_pos', 'userquota_005_neg', 'userquota_006_pos',
+    'userquota_007_pos', 'userquota_008_pos', 'userquota_009_pos',
+    'userquota_010_pos', 'userquota_011_pos', 'userquota_012_neg',
+    'userquota_013_pos',
+    'userspace_001_pos', 'userspace_002_pos', 'userspace_003_pos',
+    'groupspace_001_pos', 'groupspace_002_pos', 'groupspace_003_pos' ]
 
 [/opt/zfs-tests/tests/functional/utils_test]
 tests = ['utils_test_001_pos', 'utils_test_002_pos', 'utils_test_003_pos',

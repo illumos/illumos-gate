@@ -27,6 +27,8 @@
 #include <sys/sa.h>
 #include <sys/zfs_acl.h>
 #include <sys/zfs_sa.h>
+#include <sys/dmu_objset.h>
+#include <sys/sa_impl.h>
 
 /*
  * ZPL attribute registration table.
@@ -62,6 +64,7 @@ sa_attr_reg_t zfs_attr_table[ZPL_END+1] = {
 	{"ZPL_SYMLINK", 0, SA_UINT8_ARRAY, 0},
 	{"ZPL_SCANSTAMP", 32, SA_UINT8_ARRAY, 0},
 	{"ZPL_DACL_ACES", 0, SA_ACL, 0},
+	{"ZPL_PROJID", sizeof (uint64_t), SA_UINT64_ARRAY, 0},
 	{NULL, 0, 0, 0}
 };
 
@@ -196,7 +199,7 @@ zfs_sa_upgrade(sa_handle_t *hdl, dmu_tx_t *tx)
 	dmu_buf_t *db = sa_get_db(hdl);
 	znode_t *zp = sa_get_userdata(hdl);
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
-	sa_bulk_attr_t bulk[20];
+	sa_bulk_attr_t bulk[22];
 	int count = 0;
 	sa_bulk_attr_t sa_attrs[20] = { 0 };
 	zfs_acl_locator_cb_t locate = { 0 };
@@ -247,6 +250,11 @@ zfs_sa_upgrade(sa_handle_t *hdl, dmu_tx_t *tx)
 	if (sa_bulk_lookup_locked(hdl, bulk, count) != 0)
 		goto done;
 
+	if (dmu_objset_projectquota_enabled(hdl->sa_os) &&
+	    !(zp->z_pflags & ZFS_PROJID)) {
+		zp->z_pflags |= ZFS_PROJID;
+		zp->z_projid = ZFS_DEFAULT_PROJID;
+	}
 
 	/*
 	 * While the order here doesn't matter its best to try and organize
@@ -274,6 +282,9 @@ zfs_sa_upgrade(sa_handle_t *hdl, dmu_tx_t *tx)
 	    &crtime, 16);
 	SA_ADD_BULK_ATTR(sa_attrs, count, SA_ZPL_LINKS(zfsvfs), NULL,
 	    &zp->z_links, 8);
+	if (dmu_objset_projectquota_enabled(hdl->sa_os))
+		SA_ADD_BULK_ATTR(sa_attrs, count, SA_ZPL_PROJID(zfsvfs), NULL,
+		    &zp->z_projid, 8);
 	if (zp->z_vnode->v_type == VBLK || zp->z_vnode->v_type == VCHR)
 		SA_ADD_BULK_ATTR(sa_attrs, count, SA_ZPL_RDEV(zfsvfs), NULL,
 		    &rdev, 8);

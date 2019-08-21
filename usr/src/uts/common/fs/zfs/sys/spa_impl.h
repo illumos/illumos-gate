@@ -409,6 +409,8 @@ struct spa {
 	 */
 	spa_config_lock_t spa_config_lock[SCL_LOCKS]; /* config changes */
 	zfs_refcount_t	spa_refcount;		/* number of opens */
+
+	taskq_t		*spa_upgrade_taskq;	/* taskq for upgrade jobs */
 };
 
 extern const char *spa_config_path;

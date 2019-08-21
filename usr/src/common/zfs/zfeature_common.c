@@ -346,4 +346,24 @@ zpool_feature_init(void)
 	    "com.datto:encryption", "encryption",
 	    "Support for dataset level encryption",
 	    ZFEATURE_FLAG_PER_DATASET, encryption_deps);
+
+	static const spa_feature_t userobj_accounting_deps[] = {
+		SPA_FEATURE_EXTENSIBLE_DATASET,
+		SPA_FEATURE_NONE
+	};
+	zfeature_register(SPA_FEATURE_USEROBJ_ACCOUNTING,
+	    "org.zfsonlinux:userobj_accounting", "userobj_accounting",
+	    "User/Group object accounting.",
+	    ZFEATURE_FLAG_READONLY_COMPAT | ZFEATURE_FLAG_PER_DATASET,
+	    userobj_accounting_deps);
+
+	static const spa_feature_t project_quota_deps[] = {
+		SPA_FEATURE_EXTENSIBLE_DATASET,
+		SPA_FEATURE_NONE
+	};
+	zfeature_register(SPA_FEATURE_PROJECT_QUOTA,
+	    "org.zfsonlinux:project_quota", "project_quota",
+	    "space/object accounting based on project ID.",
+	    ZFEATURE_FLAG_READONLY_COMPAT | ZFEATURE_FLAG_PER_DATASET,
+	    project_quota_deps);
 }

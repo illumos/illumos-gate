@@ -1,15 +1,14 @@
 '\" te
-.\" Copyright 2017 Peter Tribble
+.\" Copyright 2019 Peter Tribble
 .\" Copyright 2015 Joyent, Inc.
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INTRO 3 "Nov 26, 2017"
+.TH INTRO 3 "Aug 19, 2019"
 .SH NAME
 Intro, intro \- introduction to functions and libraries
 .SH DESCRIPTION
-.LP
 This section describes functions found in various Solaris libraries, other than
 those functions described in Section 2 of this manual that directly invoke UNIX
 system primitives. Function declarations can be obtained from the
@@ -20,7 +19,6 @@ volumes as described below. The first volume contains pages describing the
 contents of each shared library and each header used by the functions, macros,
 and external variables described in the remaining volumes.
 .SS "Library Interfaces and Headers"
-.LP
 This volume describes the contents of each shared library and each header used
 by functions, macros, and external variables described in the remaining
 volumes.
@@ -58,7 +56,6 @@ development system; they do have to be present on the target execution system.
 .RE
 
 .SS "Basic Library Functions"
-.LP
 The functions described in this volume are the core C library functions that
 are basic to application development.
 .sp
@@ -117,7 +114,6 @@ link with, respectively, \fBlibmalloc\fR, \fBlibbsdmalloc\fR,
 .RE
 
 .SS "Networking Library Functions"
-.LP
 The functions described in this volume comprise the various networking
 libraries.
 .sp
@@ -313,7 +309,6 @@ portability is not required, the sockets interfaces in \fBlibsocket\fR and
 TLI APIs, the \fBXTI\fR interfaces (available with \fBlibxnet\fR) are
 recommended over the \fBTLI\fR interfaces (available with \fBlibnsl\fR).
 .SS "Curses Library Functions"
-.LP
 The functions described in this volume comprise the libraries that provide
 graphics and character screen updating capabilities.
 .sp
@@ -396,7 +391,6 @@ X/Open Extended Curses specification. See \fBlibcurses\fR(3XCURSES).
 .RE
 
 .SS "Extended Library Functions"
-.LP
 The functions described in this volume comprise the following specialized
 libraries:
 .sp
@@ -830,7 +824,7 @@ automatically linked by the C compilation system. Specify \fB-lrsm\fR on the
 .ad
 .sp .6
 .RS 4n
-These functions constitute the object-caching memory allocation library,
+These functions constitute the service configuration facility library,
 \fBlibscf\fR. This library is implemented as a shared object, \fBlibscf.so\fR,
 but is not automatically linked by the C compilation system. Specify
 \fB-lscf\fR on the \fBcc\fR command line to link with this library. See
@@ -965,7 +959,6 @@ automatically linked by the C compilation system. Specify \fB-lvolmgt\fR on the
 .RE
 
 .SH DEFINITIONS
-.LP
 A character is any bit pattern able to fit into a byte on the machine. In some
 international languages, however, a "character" might require more than one
 byte, and is represented in multi-bytes.
@@ -982,7 +975,6 @@ return pointers return \fINULL\fR to indicate an error. The macro \fINULL\fR is
 defined in <\fBstdio.h\fR>. Types of the form \fBsize_t\fR are defined in the
 appropriate headers.
 .SH MULTITHREADED APPLICATIONS
-.LP
 Both POSIX threads and Solaris threads can be used within the same application.
 Their implementations are completely compatible with each other; however, only
 POSIX threads guarantee portability to other POSIX-conforming environments.
@@ -1046,7 +1038,6 @@ and libraries manual pages (see \fBattributes\fR(5)). If a manual page does not
 state explicitly that an interface is MT-Safe, the user should assume that the
 interface is unsafe.
 .SH REALTIME APPLICATIONS
-.LP
 The environment variable \fBLD_BIND_NOW\fR must be set to a non-null value to
 enable early binding. Refer to the "When Relocations are Processed" chapter in
 \fILinker and Libraries Guide\fR for additional information.
@@ -1079,7 +1070,6 @@ shared libraries
 .RE
 
 .SH ACKNOWLEDGMENTS
-.LP
 Sun Microsystems, Inc. gratefully acknowledges The Open Group for permission to
 reproduce portions of its copyrighted documentation. Original documentation
 from The Open Group can be obtained online at
@@ -1107,7 +1097,6 @@ http://www.opengroup.org/unix/online.html\&.
 .LP
 This notice shall appear on any product containing this material.
 .SH SEE ALSO
-.LP
 \fBar\fR(1), \fBld\fR(1), \fBfork\fR(2), \fBstdio\fR(3C), \fBattributes\fR(5),
 \fBstandards\fR(5)
 .sp
@@ -1120,7 +1109,6 @@ This notice shall appear on any product containing this material.
 .LP
 \fIANSI C Programmer's Guide\fR
 .SH DIAGNOSTICS
-.LP
 For functions that return floating-point values, error handling varies
 according to compilation mode. Under the \fB-Xt\fR (default) option to
 \fBcc\fR, these functions return the conventional values \fB0\fR,
@@ -1130,7 +1118,6 @@ arguments or when the value is not representable. In the \fB-Xa\fR and
 \fB\(+-HUGE\fR\&. (\fBHUGE_VAL\fR and \fBHUGE\fR are defined in \fBmath.h\fR to
 be infinity and the largest-magnitude single-precision number, respectively.)
 .SH NOTES
-.LP
 None of the functions, external variables, or macros should be redefined in the
 user's programs. Any other name can be redefined without affecting the behavior
 of other library functions, but such redefinition might conflict with a

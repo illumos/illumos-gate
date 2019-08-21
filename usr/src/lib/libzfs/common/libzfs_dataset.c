@@ -1037,7 +1037,11 @@ zfs_valid_proplist(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 			}
 
 			if (uqtype != ZFS_PROP_USERQUOTA &&
-			    uqtype != ZFS_PROP_GROUPQUOTA) {
+			    uqtype != ZFS_PROP_GROUPQUOTA &&
+			    uqtype != ZFS_PROP_USEROBJQUOTA &&
+			    uqtype != ZFS_PROP_GROUPOBJQUOTA &&
+			    uqtype != ZFS_PROP_PROJECTQUOTA &&
+			    uqtype != ZFS_PROP_PROJECTOBJQUOTA) {
 				zfs_error_aux(hdl,
 				    dgettext(TEXT_DOMAIN, "'%s' is readonly"),
 				    propname);
@@ -1062,7 +1066,7 @@ zfs_valid_proplist(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 				if (intval == 0) {
 					zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 					    "use 'none' to disable "
-					    "userquota/groupquota"));
+					    "{user|group|project}quota"));
 					goto error;
 				}
 			} else {
@@ -3032,19 +3036,26 @@ out:
  * convert the propname into parameters needed by kernel
  * Eg: userquota@ahrens -> ZFS_PROP_USERQUOTA, "", 126829
  * Eg: userused@matt@domain -> ZFS_PROP_USERUSED, "S-1-123-456", 789
+ * Eg: groupquota@staff -> ZFS_PROP_GROUPQUOTA, "", 1234
+ * Eg: groupused@staff -> ZFS_PROP_GROUPUSED, "", 1234
+ * Eg: projectquota@123 -> ZFS_PROP_PROJECTQUOTA, "", 123
+ * Eg: projectused@789 -> ZFS_PROP_PROJECTUSED, "", 789
  */
 static int
 userquota_propname_decode(const char *propname, boolean_t zoned,
     zfs_userquota_prop_t *typep, char *domain, int domainlen, uint64_t *ridp)
 {
 	zfs_userquota_prop_t type;
-	char *cp, *end;
-	char *numericsid = NULL;
+	char *cp;
 	boolean_t isuser;
+	boolean_t isgroup;
+	boolean_t isproject;
+	struct passwd *pw;
+	struct group *gr;
 
 	domain[0] = '\0';
-	*ridp = 0;
-	/* Figure out the property type ({user|group}{quota|space}) */
+
+	/* Figure out the property type ({user|group|project}{quota|space}) */
 	for (type = 0; type < ZFS_NUM_USERQUOTA_PROPS; type++) {
 		if (strncmp(propname, zfs_userquota_prop_prefixes[type],
 		    strlen(zfs_userquota_prop_prefixes[type])) == 0)
@@ -3054,107 +3065,73 @@ userquota_propname_decode(const char *propname, boolean_t zoned,
 		return (EINVAL);
 	*typep = type;
 
-	isuser = (type == ZFS_PROP_USERQUOTA ||
-	    type == ZFS_PROP_USERUSED);
+	isuser = (type == ZFS_PROP_USERQUOTA || type == ZFS_PROP_USERUSED ||
+	    type == ZFS_PROP_USEROBJQUOTA ||
+	    type == ZFS_PROP_USEROBJUSED);
+	isgroup = (type == ZFS_PROP_GROUPQUOTA || type == ZFS_PROP_GROUPUSED ||
+	    type == ZFS_PROP_GROUPOBJQUOTA ||
+	    type == ZFS_PROP_GROUPOBJUSED);
+	isproject = (type == ZFS_PROP_PROJECTQUOTA ||
+	    type == ZFS_PROP_PROJECTUSED || type == ZFS_PROP_PROJECTOBJQUOTA ||
+	    type == ZFS_PROP_PROJECTOBJUSED);
 
 	cp = strchr(propname, '@') + 1;
 
-	if (strchr(cp, '@')) {
+	if (isuser && (pw = getpwnam(cp)) != NULL) {
+		if (zoned && getzoneid() == GLOBAL_ZONEID)
+			return (ENOENT);
+		*ridp = pw->pw_uid;
+	} else if (isgroup && (gr = getgrnam(cp)) != NULL) {
+		if (zoned && getzoneid() == GLOBAL_ZONEID)
+			return (ENOENT);
+		*ridp = gr->gr_gid;
+	} else if (!isproject && strchr(cp, '@')) {
 		/*
 		 * It's a SID name (eg "user@domain") that needs to be
 		 * turned into S-1-domainID-RID.
 		 */
-		int flag = 0;
-		idmap_stat stat, map_stat;
-		uid_t pid;
-		idmap_rid_t rid;
-		idmap_get_handle_t *gh = NULL;
+		directory_error_t e;
+		char *numericsid = NULL;
+		char *end;
 
-		stat = idmap_get_create(&gh);
-		if (stat != IDMAP_SUCCESS) {
-			idmap_get_destroy(gh);
-			return (ENOMEM);
-		}
 		if (zoned && getzoneid() == GLOBAL_ZONEID)
 			return (ENOENT);
 		if (isuser) {
-			stat = idmap_getuidbywinname(cp, NULL, flag, &pid);
-			if (stat < 0)
-				return (ENOENT);
-			stat = idmap_get_sidbyuid(gh, pid, flag, &numericsid,
-			    &rid, &map_stat);
+			e = directory_sid_from_user_name(NULL,
+			    cp, &numericsid);
 		} else {
-			stat = idmap_getgidbywinname(cp, NULL, flag, &pid);
-			if (stat < 0)
-				return (ENOENT);
-			stat = idmap_get_sidbygid(gh, pid, flag, &numericsid,
-			    &rid, &map_stat);
+			e = directory_sid_from_group_name(NULL,
+			    cp, &numericsid);
 		}
-		if (stat < 0) {
-			idmap_get_destroy(gh);
-			return (ENOENT);
-		}
-		stat = idmap_get_mappings(gh);
-		idmap_get_destroy(gh);
-
-		if (stat < 0) {
+		if (e != NULL) {
+			directory_error_free(e);
 			return (ENOENT);
 		}
 		if (numericsid == NULL)
 			return (ENOENT);
 		cp = numericsid;
-		*ridp = rid;
-		/* will be further decoded below */
-	}
-
-	if (strncmp(cp, "S-1-", 4) == 0) {
-		/* It's a numeric SID (eg "S-1-234-567-89") */
 		(void) strlcpy(domain, cp, domainlen);
+		cp = strrchr(domain, '-');
+		*cp = '\0';
+		cp++;
+
 		errno = 0;
-		if (*ridp == 0) {
-			cp = strrchr(domain, '-');
-			*cp = '\0';
-			cp++;
-			*ridp = strtoull(cp, &end, 10);
-		} else {
-			end = "";
-		}
-		if (numericsid) {
-			free(numericsid);
-			numericsid = NULL;
-		}
+		*ridp = strtoull(cp, &end, 10);
+		free(numericsid);
+
 		if (errno != 0 || *end != '\0')
 			return (EINVAL);
-	} else if (!isdigit(*cp)) {
-		/*
-		 * It's a user/group name (eg "user") that needs to be
-		 * turned into a uid/gid
-		 */
-		if (zoned && getzoneid() == GLOBAL_ZONEID)
-			return (ENOENT);
-		if (isuser) {
-			struct passwd *pw;
-			pw = getpwnam(cp);
-			if (pw == NULL)
-				return (ENOENT);
-			*ridp = pw->pw_uid;
-		} else {
-			struct group *gr;
-			gr = getgrnam(cp);
-			if (gr == NULL)
-				return (ENOENT);
-			*ridp = gr->gr_gid;
-		}
 	} else {
-		/* It's a user/group ID (eg "12345"). */
+		/* It's a user/group/project ID (eg "12345"). */
+		char *end;
 		uid_t id = strtoul(cp, &end, 10);
-		idmap_rid_t rid;
-		char *mapdomain;
-
 		if (*end != '\0')
 			return (EINVAL);
-		if (id > MAXUID) {
+		if (id > MAXUID && !isproject) {
 			/* It's an ephemeral ID. */
+			idmap_rid_t rid;
+			char *mapdomain;
+
 			if (idmap_id_to_numeric_domain_rid(id, isuser,
 			    &mapdomain, &rid) != 0)
 				return (ENOENT);
@@ -3165,7 +3142,6 @@ userquota_propname_decode(const char *propname, boolean_t zoned,
 		}
 	}
 
-	ASSERT3P(numericsid, ==, NULL);
 	return (0);
 }
 
@@ -3220,8 +3196,14 @@ zfs_prop_get_userquota(zfs_handle_t *zhp, const char *propname,
 	if (literal) {
 		(void) snprintf(propbuf, proplen, "%llu", propvalue);
 	} else if (propvalue == 0 &&
-	    (type == ZFS_PROP_USERQUOTA || type == ZFS_PROP_GROUPQUOTA)) {
+	    (type == ZFS_PROP_USERQUOTA || type == ZFS_PROP_GROUPQUOTA ||
+	    type == ZFS_PROP_USEROBJQUOTA || type == ZFS_PROP_GROUPOBJQUOTA ||
+	    type == ZFS_PROP_PROJECTQUOTA || ZFS_PROP_PROJECTOBJQUOTA)) {
 		(void) strlcpy(propbuf, "none", proplen);
+	} else if (type == ZFS_PROP_USERQUOTA || type == ZFS_PROP_GROUPQUOTA ||
+	    type == ZFS_PROP_USERUSED || type == ZFS_PROP_GROUPUSED ||
+	    type == ZFS_PROP_PROJECTUSED || type == ZFS_PROP_PROJECTQUOTA) {
+		zfs_nicenum(propvalue, propbuf, proplen);
 	} else {
 		zfs_nicenum(propvalue, propbuf, proplen);
 	}
@@ -4825,6 +4807,17 @@ zfs_userspace(zfs_handle_t *zhp, zfs_userquota_prop_t type,
 		zc.zc_nvlist_dst_size = sizeof (buf);
 		if (zfs_ioctl(hdl, ZFS_IOC_USERSPACE_MANY, &zc) != 0) {
 			char errbuf[1024];
+
+			if ((errno == ENOTSUP &&
+			    (type == ZFS_PROP_USEROBJUSED ||
+			    type == ZFS_PROP_GROUPOBJUSED ||
+			    type == ZFS_PROP_USEROBJQUOTA ||
+			    type == ZFS_PROP_GROUPOBJQUOTA ||
+			    type == ZFS_PROP_PROJECTOBJUSED ||
+			    type == ZFS_PROP_PROJECTOBJQUOTA ||
+			    type == ZFS_PROP_PROJECTUSED ||
+			    type == ZFS_PROP_PROJECTQUOTA)))
+				break;
 
 			(void) snprintf(errbuf, sizeof (errbuf),
 			    dgettext(TEXT_DOMAIN,

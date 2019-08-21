@@ -1210,6 +1210,13 @@ spa_activate(spa_t *spa, int mode)
 	    offsetof(spa_error_entry_t, se_avl));
 
 	spa_keystore_init(&spa->spa_keystore);
+
+	/*
+	 * The taskq to upgrade datasets in this pool. Currently used by
+	 * feature SPA_FEATURE_USEROBJ_ACCOUNTING/SPA_FEATURE_PROJECT_QUOTA.
+	 */
+	spa->spa_upgrade_taskq = taskq_create("z_upgrade", boot_ncpus,
+	    minclsyspri, 1, INT_MAX, TASKQ_DYNAMIC);
 }
 
 /*
@@ -1225,6 +1232,11 @@ spa_deactivate(spa_t *spa)
 	ASSERT(spa->spa_state != POOL_STATE_UNINITIALIZED);
 
 	spa_evicting_os_wait(spa);
+
+	if (spa->spa_upgrade_taskq) {
+		taskq_destroy(spa->spa_upgrade_taskq);
+		spa->spa_upgrade_taskq = NULL;
+	}
 
 	txg_list_destroy(&spa->spa_vdev_txg_list);
 

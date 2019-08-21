@@ -142,11 +142,14 @@ enum dnode_dirtycontext {
 };
 
 /* Is dn_used in bytes?  if not, it's in multiples of SPA_MINBLOCKSIZE */
-#define	DNODE_FLAG_USED_BYTES		(1<<0)
-#define	DNODE_FLAG_USERUSED_ACCOUNTED	(1<<1)
+#define	DNODE_FLAG_USED_BYTES			(1 << 0)
+#define	DNODE_FLAG_USERUSED_ACCOUNTED		(1 << 1)
 
 /* Does dnode have a SA spill blkptr in bonus? */
-#define	DNODE_FLAG_SPILL_BLKPTR	(1<<2)
+#define	DNODE_FLAG_SPILL_BLKPTR			(1 << 2)
+
+/* User/Group/Project dnode accounting */
+#define	DNODE_FLAG_USEROBJUSED_ACCOUNTED	(1 << 3)
 
 /*
  * VARIABLE-LENGTH (LARGE) DNODES
@@ -338,8 +341,8 @@ struct dnode {
 	/* used in syncing context */
 	uint64_t dn_oldused;	/* old phys used bytes */
 	uint64_t dn_oldflags;	/* old phys dn_flags */
-	uint64_t dn_olduid, dn_oldgid;
-	uint64_t dn_newuid, dn_newgid;
+	uint64_t dn_olduid, dn_oldgid, dn_oldprojid;
+	uint64_t dn_newuid, dn_newgid, dn_newprojid;
 	int dn_id_flags;
 
 	/* holds prefetch structure */

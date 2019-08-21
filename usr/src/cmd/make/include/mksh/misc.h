@@ -36,7 +36,7 @@ extern void	fatal_mksh(const char *message, ...);
 extern void	fatal_reader_mksh(const char *pattern, ...);
 extern char	*get_current_path_mksh(void);
 extern Property	get_prop(register Property start, register Property_id type);
-extern char	*getmem(register int size);
+extern char	*getmem(size_t size);
 extern Name	getname_fn(wchar_t *name, register int len, register Boolean dont_enter, register Boolean * foundp = NULL);
 extern void	store_name(Name name);
 extern void	free_name(Name name);

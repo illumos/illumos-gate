@@ -26,6 +26,7 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -38,8 +39,11 @@ function cleanup_quota
 {
 	if datasetexists $QFS; then
 		log_must zfs set userquota@$QUSER1=none $QFS
+		log_must zfs set userobjquota@$QUSER1=none $QFS
 		log_must zfs set userquota@$QUSER2=none $QFS
+		log_must zfs set userobjquota@$QUSER2=none $QFS
 		log_must zfs set groupquota@$QGROUP=none $QFS
+		log_must zfs set groupobjquota@$QGROUP=none $QFS
 		recovery_writable $QFS
 	fi
 
@@ -47,7 +51,7 @@ function cleanup_quota
 	[[ -f $OFILE ]] && log_must rm -f $OFILE
 	sync
 
-	 return 0
+	return 0
 }
 
 #

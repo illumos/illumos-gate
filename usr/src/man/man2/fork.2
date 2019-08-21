@@ -44,7 +44,7 @@
 .\" Portions Copyright (c) 1994, X/Open Company Limited.  All Rights Reserved.
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH FORK 2 "Nov 26, 2017"
+.TH FORK 2 "Aug 18, 2019"
 .SH NAME
 fork, fork1, forkall, forkx, forkallx \- create a new process
 .SH SYNOPSIS
@@ -425,8 +425,8 @@ child. The application should use \fBpthread_atfork\fR(3C) to ensure safety
 with respect to this deadlock. Should there be any outstanding mutexes
 throughout the process, the application should call \fBpthread_atfork()\fR to
 wait for and acquire those mutexes prior to calling \fBfork()\fR,
-\fBfork1()\fR, or \fBforkx()\fR. See  "MT-Level of Libraries" on the
-\fBattributes\fR(5) manual page.
+\fBfork1()\fR, or \fBforkx()\fR. See  "MT-Level" on the \fBattributes\fR(5)
+manual page.
 .sp
 .LP
 The \fBpthread_atfork()\fR mechanism is used to protect the locks that

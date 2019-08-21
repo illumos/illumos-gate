@@ -654,6 +654,9 @@ NATIVE_CFLAGS=	$(COPTFLAG) $($(NATIVE_MACH)_CFLAGS) $(CCMODE) \
 		$(IROPTFLAG) $(CGLOBALSTATIC) $(CCNOAUTOINLINE) \
 		$(CCNOREORDER) $(CSOURCEDEBUGFLAGS) $(CUSERFLAGS)
 
+NATIVE_CCFLAGS=	$(CCOPTFLAG) $($(NATIVE_MACH)_CCFLAGS) $(CCSOURCEDEBUGFLAGS) \
+		$(CCUSERFLAGS)
+
 DTEXTDOM=-DTEXT_DOMAIN=\"$(TEXT_DOMAIN)\"	# For messaging.
 DTS_ERRNO=-D_TS_ERRNO
 CPPFLAGS.first=	# Please keep empty.  Only lower makefiles should set this.
@@ -692,7 +695,7 @@ BUILD.po= $(XGETTEXT) $(XGETFLAGS) -d $(<F) $<.i ;\
 #
 POFILE= $(PROG).po
 
-sparc_CCFLAGS=		-cg92 -compat=4 \
+sparc_CCFLAGS=		$(sparc_XARCH) -cg92 -compat=4 \
 			-Qoption ccfe -messages=no%anachronism \
 			$(CCERRWARN)
 sparcv9_CCFLAGS=	$(sparcv9_XARCH) -dalign -compat=5 \
@@ -700,7 +703,7 @@ sparcv9_CCFLAGS=	$(sparcv9_XARCH) -dalign -compat=5 \
 			-Qoption ccfe -features=no%conststrings \
 			$(CCCREGSYM) \
 			$(CCERRWARN)
-i386_CCFLAGS=		-compat=4 \
+i386_CCFLAGS=		$(i386_XARCH) -compat=4 \
 			-Qoption ccfe -messages=no%anachronism \
 			-Qoption ccfe -features=no%conststrings \
 			$(CCERRWARN)

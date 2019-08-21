@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -75,7 +76,7 @@ for fs in "$QFS" "$snapfs"; do
 	log_must eval "zfs userspace $fs | grep $QUSER1 | grep 100M"
 
 	log_note "check the user used size in zfs userspace $fs"
-	log_must eval "zfs userspace $fs | grep $QUSER1 | grep 50.0M"
+	log_must eval "zfs userspace $fs | grep $QUSER1 | grep 50\\.\*M"
 done
 
 log_pass "Check the zfs userspace used and quota"

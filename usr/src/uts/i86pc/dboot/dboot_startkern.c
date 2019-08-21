@@ -683,17 +683,19 @@ dboot_loader_mmap_entries(void)
 		DBG(mb_info->flags);
 		if (mb_info->flags & 0x40) {
 			mb_memory_map_t *mmap;
+			caddr32_t mmap_addr;
 
 			DBG(mb_info->mmap_addr);
 			DBG(mb_info->mmap_length);
 			check_higher(mb_info->mmap_addr + mb_info->mmap_length);
 
-			for (mmap = (mb_memory_map_t *)mb_info->mmap_addr;
-			    (uint32_t)mmap < mb_info->mmap_addr +
+			for (mmap_addr = mb_info->mmap_addr;
+			    mmap_addr < mb_info->mmap_addr +
 			    mb_info->mmap_length;
-			    mmap = (mb_memory_map_t *)((uint32_t)mmap +
-			    mmap->size + sizeof (mmap->size)))
+			    mmap_addr += mmap->size + sizeof (mmap->size)) {
+				mmap = (mb_memory_map_t *)(uintptr_t)mmap_addr;
 				++num_entries;
+			}
 
 			num_entries_set = B_TRUE;
 		}
@@ -719,16 +721,17 @@ dboot_loader_mmap_get_type(int index)
 {
 #if !defined(__xpv)
 	mb_memory_map_t *mp, *mpend;
+	caddr32_t mmap_addr;
 	int i;
 
 	switch (multiboot_version) {
 	case 1:
-		mp = (mb_memory_map_t *)mb_info->mmap_addr;
-		mpend = (mb_memory_map_t *)
+		mp = (mb_memory_map_t *)(uintptr_t)mb_info->mmap_addr;
+		mpend = (mb_memory_map_t *)(uintptr_t)
 		    (mb_info->mmap_addr + mb_info->mmap_length);
 
 		for (i = 0; mp < mpend && i != index; i++)
-			mp = (mb_memory_map_t *)((uint32_t)mp + mp->size +
+			mp = (mb_memory_map_t *)((uintptr_t)mp + mp->size +
 			    sizeof (mp->size));
 		if (mp >= mpend) {
 			dboot_panic("dboot_loader_mmap_get_type(): index "
@@ -765,7 +768,7 @@ dboot_loader_mmap_get_base(int index)
 		    (mb_info->mmap_addr + mb_info->mmap_length);
 
 		for (i = 0; mp < mpend && i != index; i++)
-			mp = (mb_memory_map_t *)((uint32_t)mp + mp->size +
+			mp = (mb_memory_map_t *)((uintptr_t)mp + mp->size +
 			    sizeof (mp->size));
 		if (mp >= mpend) {
 			dboot_panic("dboot_loader_mmap_get_base(): index "
@@ -804,7 +807,7 @@ dboot_loader_mmap_get_length(int index)
 		    (mb_info->mmap_addr + mb_info->mmap_length);
 
 		for (i = 0; mp < mpend && i != index; i++)
-			mp = (mb_memory_map_t *)((uint32_t)mp + mp->size +
+			mp = (mb_memory_map_t *)((uintptr_t)mp + mp->size +
 			    sizeof (mp->size));
 		if (mp >= mpend) {
 			dboot_panic("dboot_loader_mmap_get_length(): index "
@@ -1722,6 +1725,7 @@ process_efi32(EFI_SYSTEM_TABLE32 *efi)
 {
 	uint32_t entries;
 	EFI_CONFIGURATION_TABLE32 *config;
+	efi_guid_t VendorGuid;
 	int i;
 
 	entries = efi->NumberOfTableEntries;
@@ -1729,21 +1733,23 @@ process_efi32(EFI_SYSTEM_TABLE32 *efi)
 	    efi->ConfigurationTable;
 
 	for (i = 0; i < entries; i++) {
-		if (dboot_same_guids(&config[i].VendorGuid, &smbios3)) {
+		(void) memcpy(&VendorGuid, &config[i].VendorGuid,
+		    sizeof (VendorGuid));
+		if (dboot_same_guids(&VendorGuid, &smbios3)) {
 			bi->bi_smbios = (native_ptr_t)(uintptr_t)
 			    config[i].VendorTable;
 		}
 		if (bi->bi_smbios == 0 &&
-		    dboot_same_guids(&config[i].VendorGuid, &smbios)) {
+		    dboot_same_guids(&VendorGuid, &smbios)) {
 			bi->bi_smbios = (native_ptr_t)(uintptr_t)
 			    config[i].VendorTable;
 		}
-		if (dboot_same_guids(&config[i].VendorGuid, &acpi2)) {
+		if (dboot_same_guids(&VendorGuid, &acpi2)) {
 			bi->bi_acpi_rsdp = (native_ptr_t)(uintptr_t)
 			    config[i].VendorTable;
 		}
 		if (bi->bi_acpi_rsdp == 0 &&
-		    dboot_same_guids(&config[i].VendorGuid, &acpi1)) {
+		    dboot_same_guids(&VendorGuid, &acpi1)) {
 			bi->bi_acpi_rsdp = (native_ptr_t)(uintptr_t)
 			    config[i].VendorTable;
 		}
@@ -1755,6 +1761,7 @@ process_efi64(EFI_SYSTEM_TABLE64 *efi)
 {
 	uint64_t entries;
 	EFI_CONFIGURATION_TABLE64 *config;
+	efi_guid_t VendorGuid;
 	int i;
 
 	entries = efi->NumberOfTableEntries;
@@ -1762,22 +1769,24 @@ process_efi64(EFI_SYSTEM_TABLE64 *efi)
 	    efi->ConfigurationTable;
 
 	for (i = 0; i < entries; i++) {
-		if (dboot_same_guids(&config[i].VendorGuid, &smbios3)) {
+		(void) memcpy(&VendorGuid, &config[i].VendorGuid,
+		    sizeof (VendorGuid));
+		if (dboot_same_guids(&VendorGuid, &smbios3)) {
 			bi->bi_smbios = (native_ptr_t)(uintptr_t)
 			    config[i].VendorTable;
 		}
 		if (bi->bi_smbios == 0 &&
-		    dboot_same_guids(&config[i].VendorGuid, &smbios)) {
+		    dboot_same_guids(&VendorGuid, &smbios)) {
 			bi->bi_smbios = (native_ptr_t)(uintptr_t)
 			    config[i].VendorTable;
 		}
 		/* Prefer acpi v2+ over v1. */
-		if (dboot_same_guids(&config[i].VendorGuid, &acpi2)) {
+		if (dboot_same_guids(&VendorGuid, &acpi2)) {
 			bi->bi_acpi_rsdp = (native_ptr_t)(uintptr_t)
 			    config[i].VendorTable;
 		}
 		if (bi->bi_acpi_rsdp == 0 &&
-		    dboot_same_guids(&config[i].VendorGuid, &acpi1)) {
+		    dboot_same_guids(&VendorGuid, &acpi1)) {
 			bi->bi_acpi_rsdp = (native_ptr_t)(uintptr_t)
 			    config[i].VendorTable;
 		}
@@ -1909,7 +1918,7 @@ print_efi64(EFI_SYSTEM_TABLE64 *efi)
 		dboot_printf("%c", (char)data[i]);
 	dboot_printf("\nEFI firmware revision: ");
 	dboot_print_efi_version(efi->FirmwareRevision);
-	dboot_printf("EFI system table number of entries: %lld\n",
+	dboot_printf("EFI system table number of entries: %" PRIu64 "\n",
 	    efi->NumberOfTableEntries);
 	conf = (EFI_CONFIGURATION_TABLE64 *)(uintptr_t)
 	    efi->ConfigurationTable;
@@ -2259,7 +2268,7 @@ dboot_loader_name(void)
 
 	switch (multiboot_version) {
 	case 1:
-		return ((char *)mb_info->boot_loader_name);
+		return ((char *)(uintptr_t)mb_info->boot_loader_name);
 
 	case 2:
 		tag = dboot_multiboot2_find_tag(mb2_info,

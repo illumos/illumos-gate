@@ -36,6 +36,9 @@ main(int argc, char **argv)
 {
 	unsigned int numfiles = 0;
 	unsigned int first_file = 0;
+	unsigned int i;
+	char buf[MAXPATHLEN];
+
 	if (argc < 3 || argc > 4)
 		usage("Invalid number of arguments", -1);
 
@@ -48,8 +51,7 @@ main(int argc, char **argv)
 	if (numfiles < first_file)
 		usage("First file larger than last file", -3);
 
-	char buf[MAXPATHLEN];
-	for (unsigned int i = first_file; i <= numfiles; i++) {
+	for (i = first_file; i < first_file + numfiles; i++) {
 		int fd;
 		(void) snprintf(buf, MAXPATHLEN, "%s%u", argv[1], i);
 		if ((fd = open(buf, O_CREAT | O_EXCL, O_RDWR)) == -1) {

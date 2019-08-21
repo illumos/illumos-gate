@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc., All Rights Reserved
+.\" Copyright 2019 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_DEVICE_ACC_ATTR 9S "May 13, 2007"
+.TH DDI_DEVICE_ACC_ATTR 9S "August 18, 2019"
 .SH NAME
 ddi_device_acc_attr \- data access attributes structure
 .SH SYNOPSIS
@@ -14,16 +15,13 @@ ddi_device_acc_attr \- data access attributes structure
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI)
 .SH DESCRIPTION
-.sp
 .LP
 The \fBddi_device_acc_attr\fR structure describes the data access
 characteristics and requirements of the device.
 .SH STRUCTURE MEMBERS
-.sp
 .in +2
 .nf
 ushort_t     devacc_attr_version;
@@ -36,7 +34,7 @@ uchar_t      devacc_attr_access;
 .sp
 .LP
 The \fBdevacc_attr_version\fR member identifies the version number of  this
-structure.  The current version number is \fBDDI_DEVICE_ATTR_V0\fR.
+structure.  The current version number is \fBDDI_DEVICE_ATTR_V1\fR.
 .sp
 .LP
 The \fBdevacc_attr_endian_flags\fR member describes the endian characteristics
@@ -209,7 +207,6 @@ additional fault-recovery code.
 .RE
 
 .SH EXAMPLES
-.sp
 .LP
 The following examples illustrate the use of device register address mapping
 setup functions and different data access functions.
@@ -219,8 +216,8 @@ setup functions and different data access functions.
 .sp
 .LP
 This example demonstrates the use of the \fBddi_device_acc_attr()\fR structure
-in  \fBddi_regs_map_setup\fR(9F). It also shows the use of  \fBddi_getw\fR(9F)
-and  \fBddi_putw\fR(9F) functions in accessing the register contents.
+in  \fBddi_regs_map_setup\fR(9F). It also shows the use of  \fBddi_get16\fR(9F)
+and  \fBddi_put16\fR(9F) functions in accessing the register contents.
 
 .sp
 .in +2
@@ -240,9 +237,10 @@ ddi_acc_handle_t handle;
  * setup the device attribute structure for little endian,
  * strict ordering and 16-bit word access.
  */
-dev_attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+dev_attr.devacc_attr_version = DDI_DEVICE_ATTR_V1;
 dev_attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
 dev_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+dev_attr.devacc_attr_access = DDI_DEFAULT_ACC;
 
 /*
  * set up the device registers address mapping
@@ -251,11 +249,11 @@ ddi_regs_map_setup(dip, rnumber, (caddr_t *)&dev_addr, offset, len,
         &dev_attr, &handle);
 
 /* read a 16-bit word command register from the device		*/
-dev_command = ddi_getw(handle, dev_addr);
+dev_command = ddi_get16(handle, dev_addr);
 
 dev_command |= DEV_INTR_ENABLE;
 /* store a new value back to the device command register	*/
-ddi_putw(handle, dev_addr, dev_command);
+ddi_put16(handle, dev_addr, dev_command);
 .fi
 .in -2
 
@@ -288,9 +286,10 @@ uchar_t buf[256];
  * setup the device attribute structure for never swap,
  * unordered and 32-bit word access.
  */
-dev_attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+dev_attr.devacc_attr_version = DDI_DEVICE_ATTR_V1;
 dev_attr.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC;
 dev_attr.devacc_attr_dataorder = DDI_UNORDERED_OK_ACC;
+dev_attr.devacc_attr_access = DDI_DEFAULT_ACC;
 
 /*
  * map in the RGB big-endian aperture
@@ -304,7 +303,7 @@ ddi_regs_map_setup(dip, 1, (caddr_t *)&dev_addr, 96*1024, 32*1024,
  * Write to the screen buffer
  *  first 1K bytes words, each size 4 bytes
  */
-ddi_rep_putl(handle, buf, dev_addr, 256, DDI_DEV_AUTOINCR);
+ddi_rep_put32(handle, buf, dev_addr, 256, DDI_DEV_AUTOINCR);
 .fi
 .in -2
 
@@ -336,28 +335,28 @@ uchar_t buf[256];
  * setup the device attribute structure for never swap,
  * strict ordering and 32-bit word access.
  */
-dev_attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+dev_attr.devacc_attr_version = DDI_DEVICE_ATTR_V1;
 dev_attr.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC;
 dev_attr.devacc_attr_dataorder= DDI_STRICTORDER_ACC;
+dev_attr.devacc_attr_access = DDI_DEFAULT_ACC;
 
 ddi_regs_map_setup(dip, 1, (caddr_t *)&dev_blkp, 0, 0,
         &dev_attr, &handle);
 
 /* write command to the 16-bit command register */
-ddi_putw(handle, &dev_blkp->d_command, START_XFER);
+ddi_put16(handle, &dev_blkp->d_command, START_XFER);
 
 /* Read the 16-bit status register */
-status = ddi_getw(handle, &dev_blkp->d_status);
+status = ddi_get16(handle, &dev_blkp->d_status);
 
 if (status & DATA_READY)
         /* Read 1K bytes off the 32-bit data register */
-        ddi_rep_getl(handle, buf, &dev_blkp->d_data,
+        ddi_rep_get32(handle, buf, &dev_blkp->d_data,
                 256, DDI_DEV_NO_AUTOINCR);
 .fi
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -373,10 +372,9 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBattributes\fR(5), \fBddi_fm_acc_err_get\fR(9F), \fBddi_getw\fR(9F),
-\fBddi_putw\fR(9F), \fBddi_regs_map_setup\fR(9F)
+\fBattributes\fR(5), \fBddi_fm_acc_err_get\fR(9F), \fBddi_get16\fR(9F),
+\fBddi_put16\fR(9F), \fBddi_regs_map_setup\fR(9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR
