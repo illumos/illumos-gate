@@ -27,7 +27,7 @@
  * it has a remainder, so the result is different
  * if len == 0 mod block_size vs len != 0 mod block_size
  */
-static size_t updatelens[] = { 16, CTEST_UPDATELEN_END };
+static size_t updatelens[] = { 16, 15, 17, CTEST_UPDATELEN_END };
 
 int
 main(void)

@@ -22,7 +22,7 @@
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2017 Jason King.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -90,7 +90,6 @@ SYMBOL_VERSION SUNWprivate {
 	cmac_init_ctx;
 	cmac_mode_final;
 	ctr_alloc_ctx;
-	ctr_mode_final;
 	ctr_init_ctx;
 	des3_crunch_block;
 	des_alloc_keysched;
