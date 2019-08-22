@@ -200,6 +200,7 @@ usr/include/sys/kmdb.h
 # for customer use, so the files are excluded from packaging.
 #
 lib/libdhcpagent.so
+lib/amd64/libdhcpagent.so
 lib/libdhcputil.so
 lib/amd64/libdhcputil.so		i386
 lib/sparcv9/libdhcputil.so		sparc
@@ -212,6 +213,7 @@ usr/include/dhcpagent_ipc.h
 usr/include/dhcpagent_util.h
 usr/include/dhcpmsg.h
 usr/lib/libdhcpagent.so
+usr/lib/amd64/libdhcpagent.so
 usr/lib/libdhcputil.so
 usr/lib/amd64/libdhcputil.so		i386
 usr/lib/sparcv9/libdhcputil.so		sparc

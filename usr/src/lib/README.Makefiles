@@ -21,9 +21,6 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 Writing Library Makefiles in ON
 ===============================
@@ -446,14 +443,14 @@ The third section typically consists of the following macros:
 	   when compiling 64-bit code.  Since all 64-bit code is compiled
 	   $(CCVERBOSE), you usually do not need to modify CFLAGS64.
 
- 	COPTFLAG (if necessary)
+	COPTFLAG (if necessary)
 
 	   Set to control the optimization level used by the C compiler when
 	   compiling 32-bit code.  You should only set this if absolutely
 	   necessary, and it should only contain optimization-related
 	   settings (or -g).
 
- 	COPTFLAG64 (if necessary)
+	COPTFLAG64 (if necessary)
 
 	   Set to control the optimization level used by the C compiler when
 	   compiling 64-bit code.  You should only set this if absolutely
@@ -619,7 +616,7 @@ outlined in this document:
 
 	lib/libdhcpagent
 
-	  Example of a simple 32-bit only library that obtains its sources
+	  Example of a simple 32/64-bit library that obtains its sources
 	  from multiple directories.
 
 	lib/ncad_addr

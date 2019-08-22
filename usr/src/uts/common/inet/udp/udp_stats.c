@@ -21,12 +21,17 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
 #include <sys/tihdr.h>
 #include <sys/policy.h>
 #include <sys/tsol/tnet.h>
+#include <sys/stropts.h>
+#include <sys/strsubr.h>
+#include <sys/socket.h>
+#include <sys/socketvar.h>
 
 #include <inet/common.h>
 #include <inet/kstatcom.h>
@@ -53,16 +58,21 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 	mblk_t			*mpdata;
 	mblk_t			*mp_conn_ctl;
 	mblk_t			*mp_attr_ctl;
+	mblk_t			*mp_info_ctl;
 	mblk_t			*mp6_conn_ctl;
 	mblk_t			*mp6_attr_ctl;
+	mblk_t			*mp6_info_ctl;
 	mblk_t			*mp_conn_tail;
 	mblk_t			*mp_attr_tail;
+	mblk_t			*mp_info_tail;
 	mblk_t			*mp6_conn_tail;
 	mblk_t			*mp6_attr_tail;
+	mblk_t			*mp6_info_tail;
 	struct opthdr		*optp;
 	mib2_udpEntry_t		ude;
 	mib2_udp6Entry_t	ude6;
 	mib2_transportMLPEntry_t mlp;
+	mib2_socketInfoEntry_t	*sie, psie;
 	int			state;
 	zoneid_t		zoneid;
 	int			i;
@@ -78,7 +88,6 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 	mib2_udp_t		udp_mib;
 	size_t			udp_mib_size, ude_size, ude6_size;
 
-
 	/*
 	 * make a copy of the original message
 	 */
@@ -89,11 +98,16 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 	    (mpdata = mpctl->b_cont) == NULL ||
 	    (mp_conn_ctl = copymsg(mpctl)) == NULL ||
 	    (mp_attr_ctl = copymsg(mpctl)) == NULL ||
+	    (mp_info_ctl = copymsg(mpctl)) == NULL ||
 	    (mp6_conn_ctl = copymsg(mpctl)) == NULL ||
-	    (mp6_attr_ctl = copymsg(mpctl)) == NULL) {
+	    (mp6_attr_ctl = copymsg(mpctl)) == NULL ||
+	    (mp6_info_ctl = copymsg(mpctl)) == NULL) {
 		freemsg(mp_conn_ctl);
 		freemsg(mp_attr_ctl);
+		freemsg(mp_info_ctl);
 		freemsg(mp6_conn_ctl);
+		freemsg(mp6_attr_ctl);
+		freemsg(mp6_info_ctl);
 		freemsg(mpctl);
 		freemsg(mp2ctl);
 		return (0);
@@ -135,6 +149,7 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 	qreply(q, mpctl);
 
 	mp_conn_tail = mp_attr_tail = mp6_conn_tail = mp6_attr_tail = NULL;
+	mp_info_tail = mp6_info_tail = NULL;
 	v4_conn_idx = v6_conn_idx = 0;
 
 	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
@@ -143,6 +158,8 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 
 		while ((connp = ipcl_get_next_conn(connfp, connp,
 		    IPCL_UDPCONN))) {
+			sonode_t *so = (sonode_t *)connp->conn_upper_handle;
+
 			udp = connp->conn_udp;
 			if (zoneid != connp->conn_zoneid)
 				continue;
@@ -249,11 +266,27 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 
 				(void) snmp_append_data2(mp_conn_ctl->b_cont,
 				    &mp_conn_tail, (char *)&ude, ude_size);
-				mlp.tme_connidx = v4_conn_idx++;
-				if (needattr)
+
+				if (needattr) {
+					mlp.tme_connidx = v4_conn_idx;
 					(void) snmp_append_data2(
 					    mp_attr_ctl->b_cont, &mp_attr_tail,
 					    (char *)&mlp, sizeof (mlp));
+				}
+
+				if ((sie = conn_get_socket_info(connp, &psie))
+				    != NULL) {
+					sie->sie_connidx = v4_conn_idx;
+					if (connp->conn_ipversion ==
+					    IPV6_VERSION)
+						sie->sie_flags |=
+						    MIB2_SOCKINFO_IPV6;
+					(void) snmp_append_data2(
+					    mp_info_ctl->b_cont, &mp_info_tail,
+					    (char *)sie, sizeof (*sie));
+				}
+
+				v4_conn_idx++;
 			}
 			if (connp->conn_ipversion == IPV6_VERSION) {
 				ude6.udp6EntryInfo.ue_state  = state;
@@ -292,12 +325,25 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 
 				(void) snmp_append_data2(mp6_conn_ctl->b_cont,
 				    &mp6_conn_tail, (char *)&ude6, ude6_size);
-				mlp.tme_connidx = v6_conn_idx++;
-				if (needattr)
+
+				if (needattr) {
+					mlp.tme_connidx = v6_conn_idx;
 					(void) snmp_append_data2(
 					    mp6_attr_ctl->b_cont,
 					    &mp6_attr_tail, (char *)&mlp,
 					    sizeof (mlp));
+				}
+
+				if ((sie = conn_get_socket_info(connp,
+				    &psie)) != NULL) {
+					sie->sie_connidx = v6_conn_idx;
+					(void) snmp_append_data2(
+					    mp6_info_ctl->b_cont,
+					    &mp6_info_tail,
+					    (char *)sie, sizeof (*sie));
+				}
+
+				v6_conn_idx++;
 			}
 		}
 	}
@@ -321,6 +367,17 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 	else
 		qreply(q, mp_attr_ctl);
 
+	/* table of socket info... */
+	optp = (struct opthdr *)&mp_info_ctl->b_rptr[
+	    sizeof (struct T_optmgmt_ack)];
+	optp->level = MIB2_UDP;
+	optp->name = EXPER_SOCK_INFO;
+	optp->len = msgdsize(mp_info_ctl->b_cont);
+	if (optp->len == 0)
+		freemsg(mp_info_ctl);
+	else
+		qreply(q, mp_info_ctl);
+
 	/* IPv6 UDP endpoints */
 	optp = (struct opthdr *)&mp6_conn_ctl->b_rptr[
 	    sizeof (struct T_optmgmt_ack)];
@@ -339,6 +396,17 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 		freemsg(mp6_attr_ctl);
 	else
 		qreply(q, mp6_attr_ctl);
+
+	/* table of socket info... */
+	optp = (struct opthdr *)&mp6_info_ctl->b_rptr[
+	    sizeof (struct T_optmgmt_ack)];
+	optp->level = MIB2_UDP6;
+	optp->name = EXPER_SOCK_INFO;
+	optp->len = msgdsize(mp6_info_ctl->b_cont);
+	if (optp->len == 0)
+		freemsg(mp6_info_ctl);
+	else
+		qreply(q, mp6_info_ctl);
 
 	return (mp2ctl);
 }

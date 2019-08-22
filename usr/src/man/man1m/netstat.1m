@@ -1,15 +1,15 @@
 '\" te
+.\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 2018, Joyent, Inc.
 .\" Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 1983 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
-.TH NETSTAT 1M "Sep 02, 2015"
+.TH NETSTAT 1M "Jul 12, 2016"
 .SH NAME
 netstat \- show network status
 .SH SYNOPSIS
-.LP
 .nf
-\fBnetstat\fR [\fB-anvR\fR] [\fB-f\fR \fIaddress_family\fR] [\fB-P\fR \fIprotocol\fR]
+\fBnetstat\fR [\fB-anuvR\fR] [\fB-f\fR \fIaddress_family\fR] [\fB-P\fR \fIprotocol\fR]
 .fi
 
 .LP
@@ -55,7 +55,6 @@ netstat \- show network status
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBnetstat\fR command displays the contents of certain network-related data
 structures in various formats, depending on the options you select.
 .LP
@@ -115,7 +114,7 @@ by the \fB-f\fR option.
 .SH OPTIONS
 .ne 2
 .na
-\fB\fB-a\fR\fR
+\fB-a\fR
 .ad
 .sp .6
 .RS 4n
@@ -128,7 +127,7 @@ default routes are shown and only the status of physical interfaces is shown.
 .sp
 .ne 2
 .na
-\fB\fB-c\fR\fR
+\fB-c\fR
 .ad
 .sp .6
 .RS 4n
@@ -141,7 +140,7 @@ IPv4 netmask will print "/NM" if this flag is enabled.
 .sp
 .ne 2
 .na
-\fB\fB-f\fR \fIaddress_family\fR\fR
+\fB-f\fR \fIaddress_family\fR
 .ad
 .sp .6
 .RS 4n
@@ -150,7 +149,7 @@ Limit all displays to those of the specified \fIaddress_family\fR. The value of
 .sp
 .ne 2
 .na
-\fB\fBinet\fR\fR
+\fBinet\fR
 .ad
 .RS 9n
 For the \fBAF_INET\fR address family showing IPv4 information.
@@ -159,7 +158,7 @@ For the \fBAF_INET\fR address family showing IPv4 information.
 .sp
 .ne 2
 .na
-\fB\fBinet6\fR\fR
+\fBinet6\fR
 .ad
 .RS 9n
 For the \fBAF_INET6\fR address family showing IPv6 information.
@@ -168,7 +167,7 @@ For the \fBAF_INET6\fR address family showing IPv6 information.
 .sp
 .ne 2
 .na
-\fB\fBunix\fR\fR
+\fBunix\fR
 .ad
 .RS 9n
 For the \fBAF_UNIX\fR address family.
@@ -179,7 +178,7 @@ For the \fBAF_UNIX\fR address family.
 .sp
 .ne 2
 .na
-\fB\fB-f\fR \fIfilter\fR\fR
+\fB-f\fR \fIfilter\fR
 .ad
 .sp .6
 .RS 4n
@@ -189,7 +188,7 @@ keywords and the value syntax are:
 .sp
 .ne 2
 .na
-\fB\fBaf:\fR{\fBinet\fR|\fBinet6\fR|\fBunix\fR|\fInumber\fR}\fR
+\fBaf:\fR{\fBinet\fR|\fBinet6\fR|\fBunix\fR|\fInumber\fR}
 .ad
 .sp .6
 .RS 4n
@@ -200,7 +199,7 @@ and both syntaxes are supported.
 .sp
 .ne 2
 .na
-\fB\fBoutif\fR:{\fIname\fR|\fIifIndex\fR|\fBany\fR|\fBnone\fR}\fR
+\fBoutif\fR:{\fIname\fR|\fIifIndex\fR|\fBany\fR|\fBnone\fR}
 .ad
 .sp .6
 .RS 4n
@@ -215,7 +214,7 @@ interface with the \fB-a\fR option of \fBifconfig\fR(1M).
 .sp
 .ne 2
 .na
-\fB\fBdst\fR:{\fIip-address\fR[/\fImask\fR]|\fBany\fR|\fBnone\fR}\fR
+\fBdst\fR:{\fIip-address\fR[/\fImask\fR]|\fBany\fR|\fBnone\fR}
 .ad
 .sp .6
 .RS 4n
@@ -228,7 +227,7 @@ address 0 is selected.
 .sp
 .ne 2
 .na
-\fB\fBflags:\fR[\fB+ -\fR]?[\fBABDGHLMSU\fR]\fB+\fR\fR
+\fBflags:\fR[\fB+ -\fR]?[\fBABDGHLMSU\fR]\fB+\fR
 .ad
 .sp .6
 .RS 4n
@@ -256,7 +255,7 @@ length 8 or greater, and an output interface of either \fBhme0\fR or
 .sp
 .ne 2
 .na
-\fB\fB-g\fR\fR
+\fB-g\fR
 .ad
 .sp .6
 .RS 4n
@@ -268,7 +267,7 @@ DISPLAYS, below.
 .sp
 .ne 2
 .na
-\fB\fB-i\fR\fR
+\fB-i\fR
 .ad
 .sp .6
 .RS 4n
@@ -281,7 +280,7 @@ See \fBifconfig\fR(1M).
 .sp
 .ne 2
 .na
-\fB\fB-m\fR\fR
+\fB-m\fR
 .ad
 .sp .6
 .RS 4n
@@ -291,7 +290,7 @@ Show the STREAMS memory statistics.
 .sp
 .ne 2
 .na
-\fB\fB-n\fR\fR
+\fB-n\fR
 .ad
 .sp .6
 .RS 4n
@@ -302,7 +301,7 @@ symbols. This option may be used with any of the display formats.
 .sp
 .ne 2
 .na
-\fB\fB-p\fR\fR
+\fB-p\fR
 .ad
 .sp .6
 .RS 4n
@@ -312,7 +311,7 @@ Show the net to media tables. See DISPLAYS, below.
 .sp
 .ne 2
 .na
-\fB\fB-r\fR\fR
+\fB-r\fR
 .ad
 .sp .6
 .RS 4n
@@ -326,7 +325,7 @@ although the kernel will derive such an entry if needed.
 .sp
 .ne 2
 .na
-\fB\fB-s\fR\fR
+\fB-s\fR
 .ad
 .sp .6
 .RS 4n
@@ -339,7 +338,7 @@ statistics global to the system. See DISPLAYS, below.
 .sp
 .ne 2
 .na
-\fB\fB-T\fR \fBu\fR | \fBd\fR\fR
+\fB-T\fR \fBu\fR | \fBd\fR
 .ad
 .sp .6
 .RS 4n
@@ -353,18 +352,38 @@ time. See \fBtime\fR(2). Specify \fBd\fR for standard date format. See
 .sp
 .ne 2
 .na
-\fB\fB-v\fR\fR
+\fB-u\fR
 .ad
 .sp .6
 .RS 4n
-Verbose. Show additional information for the sockets, STREAMS memory
-statistics, routing table, and multicast group memberships.
+For each network endpoint show the list of processes which currently have an
+open file descriptor pointing to that endpoint. For each process in that list,
+show the username, process ID and associated program; the information
+may be truncated. Where multiple processes are associated with an endpoint,
+a line will be output for each process.
+.sp
+While the system gathers this information, the processes associated with a
+given endpoint may change. If such a change occurs, it may not be reflected in
+the output.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fB-I\fR \fIinterface\fR\fR
+\fB-v\fR
+.ad
+.sp .6
+.RS 4n
+Verbose. Show additional information for the sockets, STREAMS memory
+statistics, routing table, and multicast group memberships. In conjunction with
+the \fB-u\fR flag, show the arguments with which the process was started;
+these may be truncated.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-I\fR \fIinterface\fR
 .ad
 .sp .6
 .RS 4n
@@ -377,7 +396,7 @@ for physical interfaces are displayed. When this option is combined with the
 .sp
 .ne 2
 .na
-\fB\fB-M\fR\fR
+\fB-M\fR
 .ad
 .sp .6
 .RS 4n
@@ -388,7 +407,7 @@ multicast routing statistics instead.
 .sp
 .ne 2
 .na
-\fB\fB-P\fR \fIprotocol\fR\fR
+\fB-P\fR \fIprotocol\fR
 .ad
 .sp .6
 .RS 4n
@@ -402,7 +421,7 @@ accepts protocol options only as all lowercase.
 .sp
 .ne 2
 .na
-\fB\fB-D\fR\fR
+\fB-D\fR
 .ad
 .sp .6
 .RS 4n
@@ -412,7 +431,7 @@ Show the status of \fBDHCP\fR configured interfaces.
 .sp
 .ne 2
 .na
-\fB\fB-R\fR\fR
+\fB-R\fR
 .ad
 .sp .6
 .RS 4n
@@ -442,7 +461,7 @@ The following flags can be appended to the socket's "State" output:
 .sp
 .ne 2
 .na
-\fB\fBP\fR\fR
+\fBP\fR
 .ad
 .RS 5n
 The socket is a MLP on zone-private IP addresses.
@@ -451,7 +470,7 @@ The socket is a MLP on zone-private IP addresses.
 .sp
 .ne 2
 .na
-\fB\fBS\fR\fR
+\fBS\fR
 .ad
 .RS 5n
 The socket is a MLP on IP addresses shared between zones.
@@ -484,7 +503,6 @@ the interval specified by \fIinterval\fR.
 
 .SH DISPLAYS
 .SS "Active Sockets (First Form)"
-.LP
 The display for each active socket shows the local and remote address, the send
 and receive queue sizes (in bytes), the send and receive windows (in bytes),
 and the internal state of the protocol.
@@ -521,12 +539,11 @@ For SCTP sockets, because an endpoint can be represented by multiple addresses,
 the verbose option (\fB-v\fR) displays the list of all the local and remote
 addresses.
 .SS "\fITCP Sockets\fR"
-.LP
 The possible state values for \fBTCP\fR sockets are as follows:
 .sp
 .ne 2
 .na
-\fB\fBBOUND\fR\fR
+\fBBOUND\fR
 .ad
 .RS 16n
 Bound, ready to connect or listen.
@@ -535,7 +552,7 @@ Bound, ready to connect or listen.
 .sp
 .ne 2
 .na
-\fB\fBCLOSED\fR\fR
+\fBCLOSED\fR
 .ad
 .RS 16n
 Closed. The socket is not being used.
@@ -544,7 +561,7 @@ Closed. The socket is not being used.
 .sp
 .ne 2
 .na
-\fB\fBCLOSING\fR\fR
+\fBCLOSING\fR
 .ad
 .RS 16n
 Closed, then remote shutdown; awaiting acknowledgment.
@@ -553,7 +570,7 @@ Closed, then remote shutdown; awaiting acknowledgment.
 .sp
 .ne 2
 .na
-\fB\fBCLOSE_WAIT\fR\fR
+\fBCLOSE_WAIT\fR
 .ad
 .RS 16n
 Remote shutdown; waiting for the socket to close.
@@ -562,7 +579,7 @@ Remote shutdown; waiting for the socket to close.
 .sp
 .ne 2
 .na
-\fB\fBESTABLISHED\fR\fR
+\fBESTABLISHED\fR
 .ad
 .RS 16n
 Connection has been established.
@@ -571,7 +588,7 @@ Connection has been established.
 .sp
 .ne 2
 .na
-\fB\fBFIN_WAIT_1\fR\fR
+\fBFIN_WAIT_1\fR
 .ad
 .RS 16n
 Socket closed; shutting down connection.
@@ -580,7 +597,7 @@ Socket closed; shutting down connection.
 .sp
 .ne 2
 .na
-\fB\fBFIN_WAIT_2\fR\fR
+\fBFIN_WAIT_2\fR
 .ad
 .RS 16n
 Socket closed; waiting for shutdown from remote.
@@ -589,7 +606,7 @@ Socket closed; waiting for shutdown from remote.
 .sp
 .ne 2
 .na
-\fB\fBIDLE\fR\fR
+\fBIDLE\fR
 .ad
 .RS 16n
 Idle, opened but not bound.
@@ -598,7 +615,7 @@ Idle, opened but not bound.
 .sp
 .ne 2
 .na
-\fB\fBLAST_ACK\fR\fR
+\fBLAST_ACK\fR
 .ad
 .RS 16n
 Remote shutdown, then closed; awaiting acknowledgment.
@@ -607,7 +624,7 @@ Remote shutdown, then closed; awaiting acknowledgment.
 .sp
 .ne 2
 .na
-\fB\fBLISTEN\fR\fR
+\fBLISTEN\fR
 .ad
 .RS 16n
 Listening for incoming connections.
@@ -616,7 +633,7 @@ Listening for incoming connections.
 .sp
 .ne 2
 .na
-\fB\fBSYN_RECEIVED\fR\fR
+\fBSYN_RECEIVED\fR
 .ad
 .RS 16n
 Initial synchronization of the connection under way.
@@ -625,7 +642,7 @@ Initial synchronization of the connection under way.
 .sp
 .ne 2
 .na
-\fB\fBSYN_SENT\fR\fR
+\fBSYN_SENT\fR
 .ad
 .RS 16n
 Actively trying to establish connection.
@@ -634,19 +651,18 @@ Actively trying to establish connection.
 .sp
 .ne 2
 .na
-\fB\fBTIME_WAIT\fR\fR
+\fBTIME_WAIT\fR
 .ad
 .RS 16n
 Wait after close for remote shutdown retransmission.
 .RE
 
 .SS "\fISCTP Sockets\fR"
-.LP
 The possible state values for SCTP sockets are as follows:
 .sp
 .ne 2
 .na
-\fB\fBCLOSED\fR\fR
+\fBCLOSED\fR
 .ad
 .RS 21n
 Closed. The socket is not being used.
@@ -655,7 +671,7 @@ Closed. The socket is not being used.
 .sp
 .ne 2
 .na
-\fB\fBLISTEN\fR\fR
+\fBLISTEN\fR
 .ad
 .RS 21n
 Listening for incoming associations.
@@ -664,7 +680,7 @@ Listening for incoming associations.
 .sp
 .ne 2
 .na
-\fB\fBESTABLISHED\fR\fR
+\fBESTABLISHED\fR
 .ad
 .RS 21n
 Association has been established.
@@ -673,7 +689,7 @@ Association has been established.
 .sp
 .ne 2
 .na
-\fB\fBCOOKIE_WAIT\fR\fR
+\fBCOOKIE_WAIT\fR
 .ad
 .RS 21n
 \fBINIT\fR has been sent to the peer, awaiting acknowledgment.
@@ -682,7 +698,7 @@ Association has been established.
 .sp
 .ne 2
 .na
-\fB\fBCOOKIE_ECHOED\fR\fR
+\fBCOOKIE_ECHOED\fR
 .ad
 .RS 21n
 State cookie from the INIT-ACK has been sent to the peer, awaiting
@@ -692,7 +708,7 @@ acknowledgement.
 .sp
 .ne 2
 .na
-\fB\fBSHUTDOWN_PENDING\fR\fR
+\fBSHUTDOWN_PENDING\fR
 .ad
 .RS 21n
 \fBSHUTDOWN\fR has been received from the upper layer, awaiting acknowledgement
@@ -702,7 +718,7 @@ of all outstanding \fBDATA\fR from the peer.
 .sp
 .ne 2
 .na
-\fB\fBSHUTDOWN_SENT\fR\fR
+\fBSHUTDOWN_SENT\fR
 .ad
 .RS 21n
 All outstanding data has been acknowledged in the \fBSHUTDOWN_SENT\fR state.
@@ -712,7 +728,7 @@ All outstanding data has been acknowledged in the \fBSHUTDOWN_SENT\fR state.
 .sp
 .ne 2
 .na
-\fB\fBSHUTDOWN_RECEIVED\fR\fR
+\fBSHUTDOWN_RECEIVED\fR
 .ad
 .RS 21n
 \fBSHUTDOWN\fR has been received from the peer, awaiting acknowledgement of all
@@ -722,7 +738,7 @@ outstanding \fBDATA\fR.
 .sp
 .ne 2
 .na
-\fB\fBSHUTDOWN_ACK_SENT\fR\fR
+\fBSHUTDOWN_ACK_SENT\fR
 .ad
 .RS 21n
 All outstanding data has been acknowledged in the \fBSHUTDOWN_RECEIVED\fR
@@ -730,13 +746,12 @@ state. \fBSHUTDOWN_ACK\fR has been sent to the peer.
 .RE
 
 .SS "Network Data Structures (Second Through Fifth Forms)"
-.LP
 The form of the display depends upon which of the \fB-g\fR, \fB-m\fR, \fB-p\fR,
 or \fB-s\fR options you select.
 .sp
 .ne 2
 .na
-\fB\fB-g\fR\fR
+\fB-g\fR
 .ad
 .RS 6n
 Displays the list of multicast group membership.
@@ -745,7 +760,7 @@ Displays the list of multicast group membership.
 .sp
 .ne 2
 .na
-\fB\fB-m\fR\fR
+\fB-m\fR
 .ad
 .RS 6n
 Displays the memory usage, for example, STREAMS mblks.
@@ -754,7 +769,7 @@ Displays the memory usage, for example, STREAMS mblks.
 .sp
 .ne 2
 .na
-\fB\fB-p\fR\fR
+\fB-p\fR
 .ad
 .RS 6n
 Displays the net to media mapping table. For IPv4, the address resolution table
@@ -764,7 +779,7 @@ is displayed. See \fBarp\fR(1M). For IPv6, the neighbor cache is displayed.
 .sp
 .ne 2
 .na
-\fB\fB-s\fR\fR
+\fB-s\fR
 .ad
 .RS 6n
 Displays the statistics for the various protocol layers.
@@ -777,7 +792,7 @@ The statistics use the MIB specified variables. The defined values for
 .sp
 .ne 2
 .na
-\fB\fBforwarding (1)\fR\fR
+\fBforwarding (1)\fR
 .ad
 .RS 21n
 Acting as a gateway.
@@ -786,7 +801,7 @@ Acting as a gateway.
 .sp
 .ne 2
 .na
-\fB\fBnot-forwarding (2)\fR\fR
+\fBnot-forwarding (2)\fR
 .ad
 .RS 21n
 Not acting as a gateway.
@@ -805,7 +820,6 @@ options. You can also specify \fB-m\fR (the fifth form) with any set of the
 \fB-g\fR, \fB-p\fR, and \fB-s\fR options. If you specify more than one of these
 options, \fBnetstat\fR displays the information for each one of them.
 .SS "Interface Status (Sixth Form)"
-.LP
 The interface status display lists information for all current interfaces, one
 interface per line. If an interface is specified using the \fB-I\fR option, it
 displays information for only the specified interface.
@@ -849,7 +863,6 @@ packets  errs  packets errs  colls   packets  errs  packets  errs   colls
 If the input interface is not specified, the first interface of address family
 \fBinet\fR or \fBinet6\fR will be displayed.
 .SS "Routing Table (Seventh Form)"
-.LP
 The routing table display lists the available routes and the status of each.
 Each route consists of a destination host or network, and a gateway to use in
 forwarding packets. The \fIflags\fR column shows the status of the route. These
@@ -857,7 +870,7 @@ flags are as follows:
 .sp
 .ne 2
 .na
-\fB\fBU\fR\fR
+\fBU\fR
 .ad
 .RS 5n
 Indicates route is \fBup\fR.
@@ -866,7 +879,7 @@ Indicates route is \fBup\fR.
 .sp
 .ne 2
 .na
-\fB\fBG\fR\fR
+\fBG\fR
 .ad
 .RS 5n
 Route is to a gateway.
@@ -875,7 +888,7 @@ Route is to a gateway.
 .sp
 .ne 2
 .na
-\fB\fBH\fR\fR
+\fBH\fR
 .ad
 .RS 5n
 Route is to a host and not a network.
@@ -884,7 +897,7 @@ Route is to a host and not a network.
 .sp
 .ne 2
 .na
-\fB\fBM\fR\fR
+\fBM\fR
 .ad
 .RS 5n
 Redundant route established with the \fB-multirt\fR option.
@@ -893,7 +906,7 @@ Redundant route established with the \fB-multirt\fR option.
 .sp
 .ne 2
 .na
-\fB\fBS\fR\fR
+\fBS\fR
 .ad
 .RS 5n
 Route was established using the \fB-setsrc\fR option.
@@ -902,7 +915,7 @@ Route was established using the \fB-setsrc\fR option.
 .sp
 .ne 2
 .na
-\fB\fBD\fR\fR
+\fBD\fR
 .ad
 .RS 5n
 Route was created dynamically by a redirect.
@@ -915,7 +928,7 @@ following flags:
 .sp
 .ne 2
 .na
-\fB\fBA\fR\fR
+\fBA\fR
 .ad
 .RS 5n
 Combined routing and address resolution entries.
@@ -924,7 +937,7 @@ Combined routing and address resolution entries.
 .sp
 .ne 2
 .na
-\fB\fBB\fR\fR
+\fBB\fR
 .ad
 .RS 5n
 Broadcast addresses.
@@ -933,7 +946,7 @@ Broadcast addresses.
 .sp
 .ne 2
 .na
-\fB\fBL\fR\fR
+\fBL\fR
 .ad
 .RS 5n
 Local addresses for the host.
@@ -952,11 +965,9 @@ create a new combined route and address resolution entry.
 The \fIinterface\fR entry indicates the network interface utilized for the
 route.
 .SS "Multicast Routing Tables (Eighth Form)"
-.LP
 The multicast routing table consists of the virtual interface table and the
 actual routing table.
 .SS "DHCP Interface Information (Ninth Form)"
-.LP
 The \fBDHCP\fR interface information consists of the interface name, its
 current state, lease information, packet counts, and a list of flags.
 .LP
@@ -987,7 +998,7 @@ The flags currently defined include:
 .sp
 .ne 2
 .na
-\fB\fBBOOTP\fR\fR
+\fBBOOTP\fR
 .ad
 .RS 11n
 The interface has a lease obtained through \fBBOOTP\fR (IPv4 only).
@@ -996,7 +1007,7 @@ The interface has a lease obtained through \fBBOOTP\fR (IPv4 only).
 .sp
 .ne 2
 .na
-\fB\fBBUSY\fR\fR
+\fBBUSY\fR
 .ad
 .RS 11n
 The interface is busy with a \fBDHCP\fR transaction.
@@ -1005,7 +1016,7 @@ The interface is busy with a \fBDHCP\fR transaction.
 .sp
 .ne 2
 .na
-\fB\fBPRIMARY\fR\fR
+\fBPRIMARY\fR
 .ad
 .RS 11n
 The interface is the primary interface. See \fBdhcpinfo\fR(1) and
@@ -1015,7 +1026,7 @@ The interface is the primary interface. See \fBdhcpinfo\fR(1) and
 .sp
 .ne 2
 .na
-\fB\fBFAILED\fR\fR
+\fBFAILED\fR
 .ad
 .RS 11n
 The interface is in failure state and must be manually restarted.
@@ -1033,14 +1044,13 @@ future lease.
 .SH FILES
 .ne 2
 .na
-\fB\fB/etc/default/inet_type\fR\fR
+\fB/etc/default/inet_type\fR
 .ad
 .RS 26n
 \fBDEFAULT_IP\fR setting
 .RE
 
 .SH SEE ALSO
-.LP
 \fBarp\fR(1M), \fBdhcpinfo\fR(1), \fBdhcpagent\fR(1M), \fBifconfig\fR(1M),
 \fBiostat\fR(1M), \fBkstat\fR(1M), \fBmibiisa\fR(1M), \fBndp\fR(1M), \fBsavecore\fR(1M),
 \fBvmstat\fR(1M), \fBhosts\fR(4), \fBinet_type\fR(4), \fBnetworks\fR(4),
@@ -1055,7 +1065,6 @@ Group, March 1997.
 Droms, R. \fIRFC 3315, Dynamic Host Configuration Protocol for IPv6
 (DHCPv6)\fR. Cisco Systems. July 2003.
 .SH NOTES
-.LP
 When displaying interface information, \fBnetstat\fR honors the
 \fBDEFAULT_IP\fR setting in \fB/etc/default/inet_type\fR. If it is set to
 \fBIP_VERSION4\fR, then \fBnetstat\fR will omit information relating to IPv6

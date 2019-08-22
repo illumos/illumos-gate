@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -541,6 +542,9 @@ sctp_snmp_get_mib2(queue_t *q, mblk_t *mpctl, sctp_stack_t *sctps)
 	mblk_t			*mp_attr_ctl = NULL;
 	mblk_t			*mp_attr_data;
 	mblk_t			*mp_attr_tail = NULL;
+	mblk_t			*mp_info_ctl = NULL;
+	mblk_t			*mp_info_data;
+	mblk_t			*mp_info_tail = NULL;
 	struct opthdr		*optp;
 	sctp_t			*sctp, *sctp_prev = NULL;
 	sctp_faddr_t		*fp;
@@ -548,6 +552,7 @@ sctp_snmp_get_mib2(queue_t *q, mblk_t *mpctl, sctp_stack_t *sctps)
 	mib2_sctpConnLocalEntry_t	scle;
 	mib2_sctpConnRemoteEntry_t	scre;
 	mib2_transportMLPEntry_t	mlp;
+	mib2_socketInfoEntry_t		*sie, psie;
 	int			i;
 	int			l;
 	int			scanned = 0;
@@ -567,11 +572,14 @@ sctp_snmp_get_mib2(queue_t *q, mblk_t *mpctl, sctp_stack_t *sctps)
 	mp_local_ctl = copymsg(mpctl);
 	mp_rem_ctl = copymsg(mpctl);
 	mp_attr_ctl = copymsg(mpctl);
+	mp_info_ctl = copymsg(mpctl);
 
 	mpdata = mpctl->b_cont;
 
 	if (mp_conn_ctl == NULL || mp_local_ctl == NULL ||
-	    mp_rem_ctl == NULL || mp_attr_ctl == NULL || mpdata == NULL) {
+	    mp_rem_ctl == NULL || mp_attr_ctl == NULL || mp_info_ctl == NULL ||
+	    mpdata == NULL) {
+		freemsg(mp_info_ctl);
 		freemsg(mp_attr_ctl);
 		freemsg(mp_rem_ctl);
 		freemsg(mp_local_ctl);
@@ -584,10 +592,11 @@ sctp_snmp_get_mib2(queue_t *q, mblk_t *mpctl, sctp_stack_t *sctps)
 	mp_local_data = mp_local_ctl->b_cont;
 	mp_rem_data = mp_rem_ctl->b_cont;
 	mp_attr_data = mp_attr_ctl->b_cont;
+	mp_info_data = mp_info_ctl->b_cont;
 
 	bzero(&sctp_mib, sizeof (sctp_mib));
 
-	/* hostname address parameters are not supported in Solaris */
+	/* hostname address parameters are not supported in illumos */
 	sce.sctpAssocRemHostName.o_length = 0;
 	sce.sctpAssocRemHostName.o_bytes[0] = 0;
 
@@ -807,6 +816,15 @@ done:
 		sce.sctpConnEntryInfo.ce_mss = sctp->sctp_mss;
 		(void) snmp_append_data2(mp_conn_data, &mp_conn_tail,
 		    (char *)&sce, sizeof (sce));
+
+		if ((sie = conn_get_socket_info(connp, &psie)) != NULL) {
+			sie->sie_connidx = idx;
+			(void) snmp_append_data2(
+			    mp_info_ctl->b_cont,
+			    &mp_info_tail,
+			    (char *)sie, sizeof (*sie));
+		}
+
 		mlp.tme_connidx = idx++;
 		if (needattr)
 			(void) snmp_append_data2(mp_attr_ctl->b_cont,
@@ -863,6 +881,17 @@ next_sctp:
 		freemsg(mp_attr_ctl);
 	else
 		qreply(q, mp_attr_ctl);
+
+	/* table of socket info... */
+	optp = (struct opthdr *)&mp_info_ctl->b_rptr[
+	    sizeof (struct T_optmgmt_ack)];
+	optp->level = MIB2_SCTP;
+	optp->name = EXPER_SOCK_INFO;
+	optp->len = msgdsize(mp_info_data);
+	if (optp->len == 0)
+		freemsg(mp_info_ctl);
+	else
+		qreply(q, mp_info_ctl);
 
 	return (mp_ret);
 }

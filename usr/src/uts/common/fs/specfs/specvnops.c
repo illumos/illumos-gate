@@ -23,10 +23,11 @@
  * Use is subject to license terms.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -443,7 +444,7 @@ spec_size(struct snode *csp)
 }
 
 /*
- * This function deal with vnode substitution in the case of
+ * This function deals with vnode substitution in the case of
  * device cloning.
  */
 static int
@@ -451,7 +452,7 @@ spec_clone(struct vnode **vpp, dev_t newdev, int vtype, struct stdata *stp)
 {
 	dev_t		dev = (*vpp)->v_rdev;
 	major_t		maj = getmajor(dev);
-	major_t 	newmaj = getmajor(newdev);
+	major_t		newmaj = getmajor(newdev);
 	int		sysclone = (maj == clone_major);
 	int		qassociate_used = 0;
 	struct snode	*oldsp, *oldcsp;
@@ -544,6 +545,7 @@ spec_clone(struct vnode **vpp, dev_t newdev, int vtype, struct stdata *stp)
 		mutex_enter(&newcsp->s_lock);
 		newcvp->v_stream = newvp->v_stream = stp;
 		stp->sd_vnode = newcvp;
+		stp->sd_pvnode = newvp;
 		stp->sd_strtab = STREAMSTAB(newmaj);
 		mutex_exit(&newcsp->s_lock);
 		UNLOCK_CSP(newcsp);
@@ -2573,7 +2575,7 @@ spec_dump(
 /*
  * Do i/o on the given page list from/to vp, io_off for io_len.
  * Flags are composed of:
- * 	{B_ASYNC, B_INVAL, B_FREE, B_DONTNEED, B_READ, B_WRITE}
+ *	{B_ASYNC, B_INVAL, B_FREE, B_DONTNEED, B_READ, B_WRITE}
  * If B_ASYNC is not set i/o is waited for.
  */
 /*ARGSUSED5*/

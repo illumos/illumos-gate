@@ -22,9 +22,9 @@
 /*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <deflt.h>
 #include <string.h>
@@ -58,7 +58,7 @@ get_compat_flag(char **value)
 		TURNOFF(flags, DC_CASE);
 		(void) defcntl(DC_SETFLAGS, flags);
 
-		if (cp = defread(DEFAULT_IP_LINE))
+		if ((cp = defread(DEFAULT_IP_LINE)) != NULL)
 			*value = strdup(cp);
 
 		/* close */

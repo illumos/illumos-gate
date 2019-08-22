@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _SYS_SOCKET_PROTO_H_
@@ -31,6 +32,7 @@ extern "C" {
 
 #include <sys/socket.h>
 #include <sys/stream.h>
+#include <sys/vnode.h>
 
 /*
  * Generation count
@@ -201,6 +203,7 @@ struct sock_upcalls_s {
 	void	(*su_zcopy_notify)(sock_upper_handle_t);
 	void	(*su_set_error)(sock_upper_handle_t, int);
 	void	(*su_closed)(sock_upper_handle_t);
+	vnode_t *(*su_get_vnode)(sock_upper_handle_t);
 };
 
 #define	SOCK_UC_VERSION		sizeof (sock_upcalls_t)

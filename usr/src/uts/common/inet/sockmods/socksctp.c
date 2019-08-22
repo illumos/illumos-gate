@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -107,6 +108,7 @@ static ssize_t sctp_assoc_recv(sock_upper_handle_t, mblk_t *, size_t, int,
 static void sctp_assoc_xmitted(sock_upper_handle_t, boolean_t);
 static void sctp_assoc_properties(sock_upper_handle_t,
     struct sock_proto_props *);
+static vnode_t *sctp_assoc_get_vnode(sock_upper_handle_t);
 
 sonodeops_t sosctp_sonodeops = {
 	sosctp_init,			/* sop_init	*/
@@ -124,7 +126,7 @@ sonodeops_t sosctp_sonodeops = {
 	sosctp_setsockopt,		/* sop_setsockopt */
 	sosctp_ioctl,			/* sop_ioctl	*/
 	so_poll,			/* sop_poll	*/
-	sosctp_close,			/* sop_close 	*/
+	sosctp_close,			/* sop_close	*/
 };
 
 sonodeops_t sosctp_seq_sonodeops = {
@@ -143,7 +145,7 @@ sonodeops_t sosctp_seq_sonodeops = {
 	sosctp_setsockopt,		/* sop_setsockopt */
 	sosctp_ioctl,			/* sop_ioctl	*/
 	so_poll,			/* sop_poll	*/
-	sosctp_close,			/* sop_close 	*/
+	sosctp_close,			/* sop_close	*/
 };
 
 /* All the upcalls expect the upper handle to be sonode. */
@@ -156,6 +158,10 @@ sock_upcalls_t sosctp_sock_upcalls = {
 	so_set_prop,
 	so_txq_full,
 	NULL,			/* su_signal_oob */
+	NULL,			/* su_signal_oob */
+	NULL,			/* su_set_error */
+	NULL,			/* su_closed */
+	so_get_vnode		/* su_get_vnode */
 };
 
 /* All the upcalls expect the upper handle to be sctp_sonode/sctp_soassoc. */
@@ -169,6 +175,9 @@ sock_upcalls_t sosctp_assoc_upcalls = {
 	sctp_assoc_xmitted,
 	NULL,			/* su_recv_space */
 	NULL,			/* su_signal_oob */
+	NULL,			/* su_set_error */
+	NULL,			/* su_closed */
+	sctp_assoc_get_vnode
 };
 
 /* ARGSUSED */
@@ -2182,6 +2191,20 @@ sctp_assoc_xmitted(sock_upper_handle_t handle, boolean_t qfull)
 	cv_broadcast(&ss->ss_so.so_snd_cv);
 
 	mutex_exit(&ss->ss_so.so_lock);
+}
+
+static vnode_t *
+sctp_assoc_get_vnode(sock_upper_handle_t handle)
+{
+	struct sctp_soassoc *ssa = (struct sctp_soassoc *)handle;
+	struct sonode *so;
+
+	if (ssa->ssa_type == SOSCTP_ASSOC)
+		so = &ssa->ssa_sonode->ss_so;
+	else
+		so = &((struct sctp_sonode *)handle)->ss_so;
+
+	return (so_get_vnode((sock_upper_handle_t)so));
 }
 
 static void

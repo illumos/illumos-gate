@@ -24,6 +24,7 @@
  */
 /*
  * Copyright (c) 2013, 2015 by Delphix. All rights reserved.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_DHCPAGENT_IPC_H
@@ -92,7 +93,7 @@ typedef enum {
 
 typedef enum {
 	DHCP_DROP,	DHCP_EXTEND,  DHCP_PING,    DHCP_RELEASE,
-	DHCP_START,  	DHCP_STATUS,  DHCP_INFORM,  DHCP_GET_TAG,
+	DHCP_START,	DHCP_STATUS,  DHCP_INFORM,  DHCP_GET_TAG,
 	DHCP_NIPC,	/* number of supported requests */
 	DHCP_PRIMARY = 0x100,
 	DHCP_V6 = 0x200
@@ -219,10 +220,16 @@ typedef struct dhcp_status {
 	char		if_name[LIFNAMSIZ];
 	DHCPSTATE	if_state;	/* state of interface; see above */
 
-	time_t		if_began;	/* time lease began (absolute) */
-	time_t		if_t1;		/* renewing time (absolute) */
-	time_t		if_t2;		/* rebinding time (absolute) */
-	time_t		if_lease;	/* lease expiration time (absolute) */
+	/*
+	 * We use int64_t here so that the structure is the same in both
+	 * 32 and 64-bit, since it is passed via IPC.
+	 * Once everything that uses this is 64-bit, these could be changed
+	 * to time_t.
+	 */
+	int64_t		if_began;	/* time lease began (absolute) */
+	int64_t		if_t1;		/* renewing time (absolute) */
+	int64_t		if_t2;		/* rebinding time (absolute) */
+	int64_t		if_lease;	/* lease expiration time (absolute) */
 
 	uint16_t	if_dflags;	/* DHCP flags on this if; see above */
 

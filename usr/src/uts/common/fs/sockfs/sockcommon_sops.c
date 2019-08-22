@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -1553,6 +1554,18 @@ so_closed(sock_upper_handle_t sock_handle)
 	VN_RELE(SOTOV(so));
 }
 
+vnode_t *
+so_get_vnode(sock_upper_handle_t sock_handle)
+{
+	sonode_t *so = (sonode_t *)sock_handle;
+	vnode_t *vn;
+
+	vn = SOTOV(so);
+	VN_HOLD(vn);
+
+	return (vn);
+}
+
 void
 so_zcopy_notify(sock_upper_handle_t sock_handle)
 {
@@ -1588,10 +1601,10 @@ int
 so_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
     struct cred *cr)
 {
-	rval_t 		rval;
-	int 		flags = 0;
+	rval_t		rval;
+	int		flags = 0;
 	t_uscalar_t	controllen, namelen;
-	int 		error = 0;
+	int		error = 0;
 	int ret;
 	mblk_t		*mctlp = NULL;
 	union T_primitives *tpr;
@@ -1953,5 +1966,6 @@ sock_upcalls_t so_upcalls = {
 	so_signal_oob,
 	so_zcopy_notify,
 	so_set_error,
-	so_closed
+	so_closed,
+	so_get_vnode
 };

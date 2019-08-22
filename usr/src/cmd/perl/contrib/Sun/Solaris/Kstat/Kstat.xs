@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014 Racktop Systems.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -62,8 +63,8 @@
  *
  * sockfs:*:sock_unix_list
  * This is stored as an array with one entry per active socket.  Each element
- * is of type struct k_sockinfo.  The ks_ndata and ks_data_size fields are both
- * zero.
+ * is of type struct sockinfo.  ks_ndata is the number of elements of that
+ * array and ks_data_size is the total size of the array.
  *
  * Note that the ks_ndata and ks_data_size of many non-array raw kstats are
  * also incorrect.  The relevant assertions are therefore commented out in the
