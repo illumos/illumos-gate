@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright 2019 Joyent, Inc.
+ */
+
+/*
  * Platform specific implementation code
  * Currently only suspend to RAM is supported (ACPI S3)
  */
@@ -765,7 +769,7 @@ i_cpr_is_supported(int sleeptype)
          */
 #ifdef __GNUC__
         return (0);
-#endif
+#else
 
 	/*
 	 * The next statement tests if a specific platform has turned off
@@ -781,6 +785,7 @@ i_cpr_is_supported(int sleeptype)
 		return (1);
 
 	return (pm_S3_enabled);
+#endif
 }
 
 void

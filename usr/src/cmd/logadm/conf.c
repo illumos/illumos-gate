@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2018 Sebastian Wiedenroth
  */
 
@@ -279,8 +279,6 @@ conf_scan(const char *fname, char *buf, int buflen, int timescan)
 			if (SETJMP) {
 				err(EF_FILE, "cannot process invalid entry %s",
 				    entry);
-				ret = 0;
-				LOCAL_ERR_BREAK;
 			}
 
 			if (timescan) {
@@ -529,7 +527,6 @@ conf_close(struct opts *opts)
 			(void) unlink(tuname);
 		err(EF_JMP, "unsafe to update configuration file "
 		    "or timestamps");
-		return;
 	}
 
 	/* rename updated files into place */

@@ -603,17 +603,14 @@ rotatelog(struct fn *fnp, struct opts *opts)
 		if (opts_count(opts, "N"))
 			return (1);
 		err(EF_WARN|EF_SYS, "%s", fname);
-		return (B_FALSE);
 	}
 
 	if ((stbuf.st_mode & S_IFMT) == S_IFLNK) {
 		err(EF_WARN, "%s is a symlink", fname);
-		return (B_FALSE);
 	}
 
 	if ((stbuf.st_mode & S_IFMT) != S_IFREG) {
 		err(EF_WARN, "%s is not a regular file", fname);
-		return (B_FALSE);
 	}
 
 	/* even if size condition is not met, this entry is "done" */
@@ -1074,7 +1071,6 @@ docmd(struct opts *opts, const char *msg, const char *cmd,
 					    (arg2) ? arg2 : "",
 					    (arg3) ? " " : "",
 					    (arg3) ? arg3 : "");
-					first = B_FALSE;
 				}
 				err_fromfd(pfd.fd);
 			}
@@ -1084,7 +1080,6 @@ docmd(struct opts *opts, const char *msg, const char *cmd,
 		}
 		if (waitpid(pid, &wstat, 0) < 0) {
 			err(EF_SYS, "waitpid");
-			return;
 		}
 
 		if (!first) {
@@ -1149,20 +1144,15 @@ docopytruncate(struct opts *opts, const char *file, const char *file_copy)
 	/* open log file to be rotated and remember its chmod mask */
 	if ((fi = open(file, O_RDWR)) < 0) {
 		err(EF_SYS, "cannot open file %s", file);
-		return;
 	}
 
 	if (fstat(fi, &s) < 0) {
 		err(EF_SYS, "cannot access: %s", file);
-		(void) close(fi);
-		return;
 	}
 
 	/* create new file for copy destination with correct attributes */
 	if ((fo = open(file_copy, O_CREAT|O_TRUNC|O_WRONLY, s.st_mode)) < 0) {
 		err(EF_SYS, "cannot create file: %s", file_copy);
-		(void) close(fi);
-		return;
 	}
 
 	(void) fchown(fo, s.st_uid, s.st_gid);
@@ -1188,10 +1178,6 @@ docopytruncate(struct opts *opts, const char *file, const char *file_copy)
 	do {
 		if (fstat(fi, &s) < 0) {
 			err(EF_SYS, "cannot stat: %s", file);
-			(void) close(fi);
-			(void) close(fo);
-			(void) remove(file_copy);
-			return;
 		}
 
 		if ((rem = s.st_size - written) < thresh) {
@@ -1231,10 +1217,6 @@ docopytruncate(struct opts *opts, const char *file, const char *file_copy)
 			}
 
 			err(EF_SYS, "cannot write into file %s", file_copy);
-			(void) close(fi);
-			(void) close(fo);
-			(void) remove(file_copy);
-			return;
 		}
 	} while (len >= 0);
 
@@ -1249,12 +1231,6 @@ docopytruncate(struct opts *opts, const char *file, const char *file_copy)
 	while ((len = read(fi, buf, sizeof (buf))) > 0)
 		if (write(fo, buf, len) != len) {
 			err(EF_SYS, "cannot write into file %s", file_copy);
-			(void) lockf(fi, F_ULOCK, 0);
-			(void) fchmod(fi, s.st_mode);
-			(void) close(fi);
-			(void) close(fo);
-			(void) remove(file_copy);
-			return;
 		}
 
 	(void) ftruncate(fi, 0);
