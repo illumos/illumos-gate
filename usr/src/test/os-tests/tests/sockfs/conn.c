@@ -20,6 +20,10 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -114,8 +118,6 @@ listener(void *varg)
 			exit(1);
 		}
 	}
-
-	exit(0);
 }
 
 /*

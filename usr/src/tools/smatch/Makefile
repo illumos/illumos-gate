@@ -13,14 +13,14 @@
 
 #
 # The src/ sub-directory is un-modified copy of
-# https://github.com/illumos/smatch/tree/0.5.1-il-4
+# https://github.com/illumos/smatch/tree/0.5.1-il-5
 #
 # This Makefile installs just enough for us to be able to run smatch
 # locally.
 #
 
 PROG = smatch
-SPARSE_VERSION = 0.5.1-il-4
+SPARSE_VERSION = 0.5.1-il-5
 
 include ../Makefile.tools
 
@@ -101,9 +101,7 @@ OBJS += target.o parse.o tokenize.o pre-process.o symbol.o lib.o scope.o \
 	macro_table.o token_store.o hashtable.o
 
 SMATCH_DATA = \
-	illumos_kernel.no_return_funcs \
 	illumos_kernel.skipped_functions \
-	illumos_user.no_return_funcs \
 	illumos_user.skipped_functions
 
 SMATCH_DB_DATA = \

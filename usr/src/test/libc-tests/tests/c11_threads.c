@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -172,7 +172,6 @@ static int
 cthr_test_detach_thr0(void *arg)
 {
 	thrd_exit(23);
-	abort();
 }
 
 static int

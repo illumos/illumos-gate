@@ -12,7 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 SUBDIRS = \
@@ -59,7 +59,7 @@ SCRIPTS = \
 CPPFLAGS += -D_REENTRANT
 
 # needs work
-SMOFF += all_func_returns,snprintf_overflow
+SMOFF += all_func_returns,snprintf_overflow,unreachable
 
 PROGS32 = $(PROGS:%=%.32)
 PROGS64 = \

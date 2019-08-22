@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved 	*/
 
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
@@ -32,7 +32,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*LINTLIBRARY*/
@@ -241,7 +241,7 @@ split:
 				Sentry.dsize = key.dsize;
 				Sentry.dptr = malloc(strlen(key.dptr)+1);
 				(void) strncpy(Sentry.dptr, key.dptr,
-					key.dsize);
+				    key.dsize);
 			}
 			break;
 		}
@@ -442,7 +442,8 @@ cmpdatum(datum d1, datum d2)
 	do
 		if (*p1++ != *p2++)
 			return (*--p1 - *--p2);
-	while (--n);
+	while (--n)
+		;
 	return (0);
 }
 
@@ -589,5 +590,4 @@ chkblk(char buf[PBLKSIZ])
 bad:
 	(void) printf("bad block\n");
 	abort();
-	bzero(buf, PBLKSIZ);
 }

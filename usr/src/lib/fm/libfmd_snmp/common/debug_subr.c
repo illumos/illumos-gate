@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #include <net-snmp/net-snmp-config.h>
 #include <net-snmp/net-snmp-includes.h>
 #include <net-snmp/agent/net-snmp-agent-includes.h>
@@ -35,7 +39,6 @@ sunFm_vpanic(const char *format, va_list ap)
 	(void) snmp_vlog(LOG_ERR, format, ap);
 #ifdef DEBUG
 	abort();
-	exit(1);
 #endif
 }
 

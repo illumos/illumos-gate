@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/sunddi.h>
@@ -1392,16 +1393,14 @@ amd_iommu_pci_dip(dev_info_t *rdip, const char *path)
 		}
 	}
 
-	cmn_err(
 #ifdef	DEBUG
-	    CE_PANIC,
-#else
-	    CE_WARN,
-#endif	/* DEBUG */
-	    "%s: %s%d dip = %p has no PCI parent, path = %s",
+	cmn_err(CE_PANIC, "%s: %s%d dip = %p has no PCI parent, path = %s",
 	    f, driver, instance, (void *)rdip, path);
-
+#else
+	cmn_err(CE_WARN, "%s: %s%d dip = %p has no PCI parent, path = %s",
+	    f, driver, instance, (void *)rdip, path);
 	ndi_rele_devi(rdip);
+#endif	/* DEBUG */
 
 	return (NULL);
 }

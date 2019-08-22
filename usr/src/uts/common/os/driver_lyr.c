@@ -22,7 +22,7 @@
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -1924,7 +1924,7 @@ ldi_get_size(ldi_handle_t lh, uint64_t *sizep)
 
 int
 ldi_ioctl(ldi_handle_t lh, int cmd, intptr_t arg, int mode,
-	cred_t *cr, int *rvalp)
+    cred_t *cr, int *rvalp)
 {
 	struct ldi_handle	*handlep = (struct ldi_handle *)lh;
 	vnode_t			*vp;
@@ -1999,7 +1999,7 @@ ldi_poll(ldi_handle_t lh, short events, int anyyet, short *reventsp,
 
 int
 ldi_prop_op(ldi_handle_t lh, ddi_prop_op_t prop_op,
-	int flags, char *name, caddr_t valuep, int *length)
+    int flags, char *name, caddr_t valuep, int *length)
 {
 	struct ldi_handle	*handlep = (struct ldi_handle *)lh;
 	dev_t			dev;
@@ -3493,7 +3493,6 @@ ldi_ev_notify(dev_info_t *dip, minor_t minor, int spec_type,
 	if (!ldi_ev_sync_event(evname)) {
 		cmn_err(CE_PANIC, "ldi_ev_notify(): %s not a "
 		    "negotiatable event", evname);
-		return (LDI_EV_SUCCESS);
 	}
 
 	major = ddi_driver_major(dip);

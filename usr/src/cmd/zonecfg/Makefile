@@ -22,7 +22,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
+#
 
 PROG=	zonecfg
 OBJS=	zonecfg.o zonecfg_lex.o zonecfg_grammar.tab.o
@@ -50,6 +51,9 @@ CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 
 SMOFF += all_func_returns
+
+# false positive
+zonecfg_lex.o := SMOFF += free
 
 CLOBBERFILES += $(PROG).ln
 

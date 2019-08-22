@@ -24,6 +24,8 @@
  *	  All Rights Reserved
  *
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -2073,10 +2075,6 @@ ld_map_gettoken(Mapfile *mf, int flags, ld_map_tkval_t *tkv)
 			return (tok);
 		}
 	}
-
-	/*NOTREACHED*/
-	assert(0);
-	return (TK_ERROR);
 }
 
 /*

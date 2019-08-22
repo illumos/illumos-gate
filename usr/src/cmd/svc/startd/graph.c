@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2015, Syneto S.R.L. All rights reserved.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright 2016 RackTop Systems.
@@ -5833,14 +5833,6 @@ graph_event_thread(void *unused)
 
 		MUTEX_UNLOCK(&gu->gu_lock);
 	}
-
-	/*
-	 * Unreachable for now -- there's currently no graceful cleanup
-	 * called on exit().
-	 */
-	MUTEX_UNLOCK(&gu->gu_lock);
-	scf_handle_destroy(h);
-	return (NULL);
 }
 
 static void
@@ -6206,15 +6198,6 @@ graph_thread(void *arg)
 		(void) pthread_cond_wait(&gu->gu_freeze_cv,
 		    &gu->gu_freeze_lock);
 	}
-
-	/*
-	 * Unreachable for now -- there's currently no graceful cleanup
-	 * called on exit().
-	 */
-	(void) pthread_mutex_unlock(&gu->gu_freeze_lock);
-	scf_handle_destroy(h);
-
-	return (NULL);
 }
 
 

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -101,7 +101,6 @@ flock_styleenum(char *stylestr)
 		return (LSTYLE_FLOCK);
 	} else {
 		errx(EXIT_FAILURE, BAD_LOCK_MESSAGE);
-		return (LSTYLE_LAST);
 	}
 }
 
@@ -118,7 +117,6 @@ flock_stylestr(lock_style_t style)
 		return ("flock");
 	default:
 		abort();
-		return ("<unreachable>");
 	}
 }
 
@@ -135,7 +133,6 @@ flock_stylename(lock_style_t style)
 		return ("flock(3C)");
 	default:
 		abort();
-		return ("<unreachable>");
 	}
 }
 
@@ -178,6 +175,5 @@ flock_cmdname(int cmd)
 #endif
 	default:
 		abort();
-		return ("<unreachable>");
 	}
 }

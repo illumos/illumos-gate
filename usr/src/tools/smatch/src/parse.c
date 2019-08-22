@@ -2859,6 +2859,7 @@ struct token *external_declaration(struct token *token, struct symbol_list **lis
 	/* Parse declaration-specifiers, if any */
 	token = declaration_specifiers(token, &ctx);
 	mod = storage_modifiers(&ctx);
+	mod |= ctx.ctype.modifiers & MOD_NORETURN;
 	decl = alloc_symbol(token->pos, SYM_NODE);
 	/* Just a type declaration? */
 	if (match_op(token, ';')) {

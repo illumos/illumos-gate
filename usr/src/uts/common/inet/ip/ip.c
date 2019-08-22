@@ -9048,7 +9048,6 @@ ip_forward_options(mblk_t *mp, ipha_t *ipha, ill_t *dst_ill,
 				 */
 				cmn_err(CE_PANIC, "ip_forward_options: "
 				    "unknown IT - bug in ip_input_options?\n");
-				return (B_TRUE);	/* Keep "lint" happy */
 			}
 			if (opt[IPOPT_OFFSET] - 1 + off > optlen) {
 				/* Increase overflow counter */
@@ -9275,7 +9274,6 @@ ip_input_local_options(mblk_t *mp, ipha_t *ipha, ip_recv_attr_t *ira)
 				 */
 				cmn_err(CE_PANIC, "ip_input_local_options: "
 				    "unknown IT - bug in ip_input_options?\n");
-				return (B_TRUE);	/* Keep "lint" happy */
 			}
 			if (opt[IPOPT_OFFSET] - 1 + off > optlen) {
 				/* Increase overflow counter */
@@ -11970,7 +11968,6 @@ ip_output_local_options(ipha_t *ipha, ip_stack_t *ipst)
 				 */
 				cmn_err(CE_PANIC, "ip_output_local_options: "
 				    "unknown IT - bug in ip_output_options?\n");
-				return;	/* Keep "lint" happy */
 			}
 			if (opt[IPOPT_OFFSET] - 1 + off > optlen) {
 				/* Increase overflow counter */

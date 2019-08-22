@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -187,7 +187,7 @@ main(int argc, char *argv[])
 	return (start_reparsed_svcs());
 }
 
-static void
+__NORETURN static void
 reparsed_door_call_error(int error, int buflen)
 {
 	reparsed_door_res_t rpd_res;
@@ -354,10 +354,6 @@ start_reparsed_svcs()
 	/*
 	 * Wait for incoming calls
 	 */
-	/*CONSTCOND*/
 	while (1)
 		(void) pause();
-
-	syslog(LOG_ERR, "Door server exited");
-	return (10);
 }

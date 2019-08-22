@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2019 Joyent, Inc.
+ */
+
+/*
  * Map file parsing, Version 2 syntax (solaris).
  */
 #include	<stdio.h>
@@ -3318,8 +3322,4 @@ ld_map_parse_v2(Mapfile *mf)
 			return (FALSE);
 		}
 	}
-
-	/*NOTREACHED*/
-	assert(0);
-	return (FALSE);
 }

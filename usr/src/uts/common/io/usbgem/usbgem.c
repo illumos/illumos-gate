@@ -32,6 +32,10 @@
  */
 
 /*
+ * Copyright 2019 Joyent, Inc.
+ */
+
+/*
  * Change log
  */
 
@@ -2051,7 +2055,6 @@ restart_autonego:
 	default:
 		cmn_err(CE_PANIC, "!%s: unknowm linkdown action: %d",
 		    dp->name, dp->ugc.usbgc_mii_linkdown_action);
-		dp->mii_supress_msg = B_TRUE;
 	}
 	/* NOTREACHED */
 

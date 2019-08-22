@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -1133,7 +1133,6 @@ tcreate:
 	terminate((status == MDB_ERR_QUIT || status == 0) ?
 	    (eflag != NULL && mdb.m_lastret != 0 ? 1 : 0) : 1);
 	/*NOTREACHED*/
-	return (0);
 
 reexec:
 	if ((p = strrchr(execname, '/')) == NULL)

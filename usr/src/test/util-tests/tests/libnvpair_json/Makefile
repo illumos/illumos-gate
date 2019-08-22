@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2015 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
@@ -45,7 +45,8 @@ DIRS = $(TESTDIR) $(TESTBIN)
 
 LDLIBS += -lnvpair
 
-LINTFLAGS += -erroff=E_FUNC_ARG_UNUSED
+# intentional abort()
+SMOFF += unreachable
 
 all: $(PROG)
 

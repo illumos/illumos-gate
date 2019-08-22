@@ -930,7 +930,6 @@ cons_build_upper_layer(cons_state_t *sp)
 	    &wc_lh, sp->cons_li)) {
 		cmn_err(CE_PANIC, "cons_build_upper_layer: "
 		    "unable to open wc device");
-		return;
 	}
 	ASSERT(wc_dev == sp->cons_wc_vp->v_rdev);
 

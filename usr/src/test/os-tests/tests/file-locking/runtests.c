@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -327,7 +327,6 @@ flock_wait(pid_t pid)
 		return (1);
 	} else {
 		abort();
-		return (1);
 	}
 }
 

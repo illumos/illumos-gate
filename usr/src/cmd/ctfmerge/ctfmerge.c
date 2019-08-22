@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -47,7 +47,7 @@ static uint_t g_nctf;
 #define	CTFMERGE_DEFAULT_NTHREADS	8
 #define	CTFMERGE_ALTEXEC	"CTFMERGE_ALTEXEC"
 
-static void
+static void __attribute__((__noreturn__))
 ctfmerge_fatal(const char *fmt, ...)
 {
 	va_list ap;
