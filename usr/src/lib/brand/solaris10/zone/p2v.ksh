@@ -458,7 +458,7 @@ warn_zones()
 
 	NGZ=$(/usr/bin/nawk -F: '{
 		if (substr($1, 0, 1) == "#" || $1 == "global")
-			continue
+			next
 
 		if ($2 == "installed")
 			printf("%s ", $1)

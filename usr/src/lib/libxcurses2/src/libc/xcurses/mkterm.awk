@@ -41,12 +41,12 @@ print "/*"
 print " * Copyright (c) 1998 by Sun Microsystems, Inc."
 print " * All rights reserved."
 print " */"
-print 
+print ""
 print "#ifndef	_TERM_H"
 print "#define	_TERM_H"
-print
+print ""
 print "#pragma ident	\"@(#)term.h	%I%	%E% SMI\""
-print
+print ""
 print "/*"
 print " * term.h"
 print " *"
@@ -59,12 +59,12 @@ print " * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved
 print " *"
 printf " * $Header%s\n", "$"
 print " */"
-print
-print
+print ""
+print ""
 print "#ifdef	__cplusplus"
 print "extern \"C\" {"
 print "#endif"
-print
+print ""
 print "#define	__TERM cur_term->"
 }
 
@@ -81,11 +81,11 @@ $4 == "str" {
 }
 
 END {
-print
+print ""
 printf "#define	__COUNT_BOOL\t\t%d\n", BoolCount
 printf "#define	__COUNT_NUM\t\t%d\n", NumberCount
 printf "#define	__COUNT_STR\t\t%d\n", StringCount
-print
+print ""
 #print "/*"
 #print " * MKS Header format for terminfo database files."
 #print " *"
@@ -129,16 +129,16 @@ print "#define	__MOVE_LEFT\t\t2"
 print "#define	__MOVE_RIGHT\t\t3"
 print "#define	__MOVE_TAB\t\t4"
 print "#define	__MOVE_BACK_TAB\t\t5"
-print
+print ""
 print "#define	__MOVE_MAX_RELATIVE\t6"
-print
+print ""
 print "/*"
 print " * These should have fixed costs."
 print " */"
 print "#define	__MOVE_RETURN\t\t6"
 print "#define	__MOVE_HOME\t\t7"
 print "#define	__MOVE_LAST_LINE\t8"
-print
+print ""
 print "/*"
 print " * These have worst case cost based on moving the maximum possible"
 print " * value for a parameter given the screen size."
@@ -150,20 +150,20 @@ print "#define	__MOVE_N_RIGHT\t\t12"
 print "#define	__MOVE_ROW\t\t13"
 print "#define	__MOVE_COLUMN\t\t14"
 print "#define	__MOVE_ROW_COLUMN\t15"
-print
+print ""
 print "#define	__MOVE_MAX\t\t16"
-print
+print ""
 print "/*"
 print " * For a cursor motion to be used there must be a base-cost of at least 1."
 print " */"
 print "#define	__MOVE_INFINITY\t\t1000"
-print
+print ""
 print "#define	__TERM_ISATTY_IN\t0x0001\t/* Input is a terminal */"
 print "#define	__TERM_ISATTY_OUT\t0x0002\t/* Output is a terminal */"
 print "#define	__TERM_HALF_DELAY\t0x0004\t/* halfdelay() has priority. */"
 print "#define	__TERM_INSERT_MODE\t0x0008\t/* Terminal is in insert mode. */"
 print "#define	__TERM_NL_IS_CRLF\t0x8000\t/* Newline is mapped on output. */"
-print
+print ""
 print "/*"
 print " * Opaque data type.  Keep your grubby mits off."
 print " */"
@@ -194,16 +194,16 @@ print "\t\tchar	*_seq;"
 print "\t\tshort	_cost;"
 print "\t} _move[__MOVE_MAX];"
 print "} TERMINAL;"
-print
+print ""
 print "extern TERMINAL *cur_term;"
-print
+print ""
 print "#if !(defined(__cplusplus) && defined(_BOOL))"
 print "#ifndef _BOOL_DEFINED"
 print "typedef short	bool;"
 print "#define	_BOOL_DEFINED"
 print "#endif"
 print "#endif"
-print
+print ""
 print "/*"
 print " * Globals"
 print " */"
@@ -223,10 +223,10 @@ print "extern char *tigetstr(char *);"
 print "extern char *tparm("
 print "\tchar *, long, long, long, long, long, long, long, long, long);"
 print "extern int tputs(const char *, int, int (*)(int));"
-print
+print ""
 print "#ifdef	__cplusplus"
 print "}"
 print "#endif"
-print
+print ""
 print "#endif /* _TERM_H */"
 }
