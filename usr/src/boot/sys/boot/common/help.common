@@ -209,9 +209,9 @@
 	information when the kernel is booted.
 
 ################################################################################
-# Tset Sboot_debug DDrop to the kernel debugger (kmdb)
+# Tset Sboot_drop_into_kmdb DDrop into the kernel debugger (kmdb)
 
-	set boot_debug
+	set boot_drop_into_kmdb
 
 	Instructs the kernel to start in the kmdb debugger, rather than
 	proceeding to initialize when booted. Can only be used when boot_kmdb

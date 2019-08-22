@@ -156,7 +156,7 @@ only forth also support-functions also builtins definitions
   else
     drop
   then
-  s" boot_debug" getenv dup -1 <> if
+  s" boot_drop_into_kmdb" getenv dup -1 <> if
      s" YES" compare-insensitive 0= if
        [char] d addr len + c! len 1+ to len
      then
@@ -286,7 +286,7 @@ only forth definitions also support-functions
 \ -s to boot_single=YES
 \ -v to boot_verbose=YES
 \ -k to boot_kmdb=YES
-\ -d to boot_debug=YES
+\ -d to boot_drop_into_kmdb=YES
 \ -r to boot_reconfigure=YES
 \ -B acpi-user-options=X to acpi-user-options=X
 \ 
@@ -455,7 +455,7 @@ only forth definitions also support-functions
 	else dup c@ [char] k = if
 	  s" set boot_kmdb=YES" evaluate TRUE
 	else dup c@ [char] d = if
-	  s" set boot_debug=YES" evaluate TRUE
+	  s" set boot_drop_into_kmdb=YES" evaluate TRUE
 	else dup c@ [char] r = if
 	  s" set boot_reconfigure=YES" evaluate TRUE
 	else dup c@ [char] a = if
