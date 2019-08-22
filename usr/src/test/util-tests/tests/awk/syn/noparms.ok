@@ -1,0 +1,4 @@
+$AWK: syntax error at source line 1 in function x
+ context is
+	function x(a, b, c , >>>  , <<< 
+$AWK: bailing out at source line 1 in function x

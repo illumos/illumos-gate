@@ -1,0 +1,6 @@
+$AWK: you can only delete array[element] at source line 3 in function f
+ context is
+		delete a >>> 
+ <<< 
+$AWK: syntax error at source line 3 in function f
+$AWK: illegal statement at source line 3 in function f

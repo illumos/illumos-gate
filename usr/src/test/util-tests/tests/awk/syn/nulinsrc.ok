@@ -1,0 +1,4 @@
+$AWK: syntax error at source line 1
+ context is
+	 >>> /\ <<< 
+$AWK: bailing out at source line 1

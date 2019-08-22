@@ -1,0 +1,3 @@
+# Output filenames modified from TAPE examples for illumos testing.
+$3 > 100	{ print > (ENVIRON["WORKDIR"] "/test.temp.big") }
+$3 <= 100	{ print > (ENVIRON["WORKDIR"] "/test.temp.small") }

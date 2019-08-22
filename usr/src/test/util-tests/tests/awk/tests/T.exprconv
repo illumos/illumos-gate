@@ -1,0 +1,38 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+TEMP1=$WORKDIR/test.temp.1
+TEMP2=$WORKDIR/test.temp.2
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.exprconv: check conversion of expr to number
+
+$AWK '
+BEGIN {	x = (1 > 0); print x
+	x = (1 < 0); print x
+	x = (1 == 1); print x
+	print ("a" >= "b")
+	print ("b" >= "a")
+	print (0 == 0.0)
+	# x = ((1 == 1e0) && (1 == 10e-1) && (1 == .1e2)); print x
+	exit
+}' > $TEMP1
+echo '1
+0
+1
+0
+1
+1' > $TEMP2
+cmp $TEMP1 $TEMP2 || fail 'BAD: T.exprconv (1 > 0, etc.)'
+
+exit $RESULT

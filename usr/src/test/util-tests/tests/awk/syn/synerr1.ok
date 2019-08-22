@@ -1,0 +1,4 @@
+$AWK: syntax error at source line 4
+ context is
+	 >>> print <<<  "hi"
+$AWK: bailing out at source line 4

@@ -1,0 +1,96 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+TEMP0=$WORKDIR/test.temp.0
+TEMP1=$WORKDIR/test.temp.1
+TEMP2=$WORKDIR/test.temp.2
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.overflow: test some overflow conditions
+
+$AWK 'BEGIN {
+ 	for (i = 0; i < 1000; i++) printf("abcdefghijklmnopqsrtuvwxyz")
+ 	printf("\n")
+ 	exit
+}' > $TEMP1
+$AWK '{print}' $TEMP1 > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.overflow record 1'
+
+echo 'abcdefghijklmnopqsrtuvwxyz' > $TEMP1
+echo hello | $AWK '
+ { for (i = 1; i < 500; i++) s = s "abcdefghijklmnopqsrtuvwxyz "
+   $0 = s
+   print $1
+ }'  > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.overflow abcdef'
+
+# default input record 3072, fields 200:
+$AWK '
+BEGIN {
+	for (j = 0; j < 2; j++) {
+		for (i = 0; i < 500; i++)
+			printf(" 123456789")
+		printf("\n");
+	}
+} ' > $TEMP1
+$AWK '{$1 = " 123456789"; print}' $TEMP1 > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.overflow -mr -mf set $1'
+
+$AWK '
+BEGIN {
+	for (j = 0; j < 2; j++) {
+		for (i = 0; i < 500; i++)
+			printf(" 123456789")
+		printf("\n");
+	}
+} ' > $TEMP0
+$AWK  '{print NF}' $TEMP0 > $TEMP1
+echo '500
+500' > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.overflow -mr -mf NF'
+
+rm -f core
+# this should not drop core
+$AWK 'BEGIN {
+	for (i = 1; i < 1000; i++) s = s "a-z"
+	if ("x" ~ "[" s "]")
+		print "ugh"
+}' > $TEMP0 2> $TEMP0
+[[ $? -eq 139 ]] && fail "BAD: T.overflow too long char class dropped core"
+
+echo 4000004 > $TEMP1
+$AWK '
+BEGIN {
+	x1 = sprintf("%1000000s\n", "hello")
+	x2 = sprintf("%-1000000s\n", "world")
+	x3 = sprintf("%1000000.1000000s\n", "goodbye")
+	x4 = sprintf("%-1000000.1000000s\n", "goodbye")
+	print length(x1 x2 x3 x4)
+}' > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.overflow huge sprintfs'
+
+echo 0 > $TEMP1
+$AWK '
+BEGIN {
+	for (i = 0; i < 100000; i++)
+		x[i] = i
+	for (i in x)
+		delete x[i]
+	n = 0
+	for (i in x)
+		n++
+	print n
+}' > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.overflow big array'
+
+exit $RESULT

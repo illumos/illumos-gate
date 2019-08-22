@@ -1,0 +1,207 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+TEMP1=$WORKDIR/test.temp.1
+TEMP2=$WORKDIR/test.temp.2
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.func: test user-defined functions
+
+echo '10 2
+2 10
+10 10
+10 1e1
+1e1 9' | $AWK '
+# tests whether function returns sensible type bits
+
+function assert(cond) { # assertion
+    if (cond) print 1; else print 0
+}
+
+function i(x) { return x }
+
+{ m=$1; n=i($2); assert(m>n) }
+' > $TEMP1
+echo '1
+0
+0
+0
+1' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.func (function return type)'
+
+echo 'data: data' > $TEMP1
+$AWK '
+function test1(array) { array["test"] = "data" }
+function test2(array) { return(array["test"]) }
+BEGIN { test1(foo); print "data: " test2(foo) }
+' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.func (array type)'
+
+$AWK '
+BEGIN	{ code() }
+END	{ codeout("x") }
+function code() { ; }
+function codeout(ex) { print ex }
+' /dev/null > $TEMP1
+echo x > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.func (argument passing)'
+
+$AWK '
+BEGIN { unireghf() }
+
+function unireghf(hfeed) {
+	hfeed[1]=0
+	rcell("foo",hfeed)
+	hfeed[1]=0
+	rcell("bar",hfeed)
+}
+
+function rcell(cellname,hfeed) {
+	print cellname
+}
+' > $TEMP1
+echo "foo
+bar" > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.func (convert arg to array)'
+
+$AWK '
+function f(n) {
+	if (n <= 1)
+		return 1
+	else
+		return n * f(n-1)
+}
+{ print f($1) }
+' > $TEMP2 <<!
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+!
+cat > $TEMP1 <<!
+1
+1
+2
+6
+24
+120
+720
+5040
+40320
+362880
+!
+diff $TEMP1 $TEMP2 || fail 'BAD: T.func (factorial)'
+
+$AWK '
+function ack(m,n) {
+	k = k+1
+	if (m == 0) return n+1
+	if (n == 0) return ack(m-1, 1)
+	return ack(m-1, ack(m, n-1))
+}
+{ k = 0; print ack($1,$2), "(" k " calls)" }
+' > $TEMP2 <<!
+0 0
+1 1
+2 2
+3 3
+3 4
+3 5
+!
+cat > $TEMP1 <<!
+1 (1 calls)
+3 (4 calls)
+7 (27 calls)
+61 (2432 calls)
+125 (10307 calls)
+253 (42438 calls)
+!
+diff $TEMP1 $TEMP2 || fail 'BAD: T.func (ackermann)'
+
+$AWK '
+END { print "end" }
+{ print fib($1) }
+function fib(n) {
+	if (n <= 1) return 1
+	else return add(fib(n-1), fib(n-2))
+}
+function add(m,n) { return m+n }
+BEGIN { print "begin" }
+' > $TEMP2 <<!
+1
+3
+5
+10
+!
+cat > $TEMP1 <<!
+begin
+1
+3
+8
+89
+end
+!
+diff $TEMP1 $TEMP2 || fail 'BAD: T.func (fib)'
+
+$AWK '
+function foo() {
+	for (i = 1; i <= 2; i++)
+		return 3
+	print "should not see this"
+}
+BEGIN { foo(); exit }
+' > $TEMP1
+grep 'should not' $TEMP1 && fail 'BAD: T.func (return)'
+
+# this exercises multiple free of temp cells
+echo 'eqn
+eqn2' > $TEMP1
+$AWK 'BEGIN 	{ eprocess("eqn", "x", contig) 
+	  process("tbl" )
+	  eprocess("eqn" "2", "x", contig) 
+	}
+function eprocess(file, first, contig) {
+	print file
+}
+function process(file) {
+	close(file)
+}' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.func (eqn)'
+
+echo 1 > $TEMP1
+$AWK 'function f() { n = 1; exit }
+	BEGIN { n = 0; f(); n = 2 }; END { print n}' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.func (exit in function)'
+
+echo 1 > $TEMP1
+$AWK '
+BEGIN {	n = 10
+	for (i = 1; i <= n; i++)
+	for (j = 1; j <= n; j++)
+		x[i,j] = n * i + j
+	for (i = 1; i <= n; i++)
+	for (j = 1; j <= n; j++)
+		if ((i,j) in x)
+			k++
+	print (k == n^2)
+      }
+' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.func (multi-dim subscript)'
+
+exit $RESULT

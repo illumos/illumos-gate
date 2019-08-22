@@ -1,0 +1,4 @@
+$AWK: you can only delete array[element] at source line 5 in function f
+ context is
+		delete f >>> 
+ <<< 

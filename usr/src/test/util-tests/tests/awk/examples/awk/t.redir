@@ -1,0 +1,3 @@
+# Output filenames modified from original tests for illumos testing.
+$1%2==1	{print >(ENVIRON["WORKDIR"] "/foo.odd")}
+$1%2==0	{print >(ENVIRON["WORKDIR"] "/foo.even")}

@@ -1,0 +1,137 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+TEMP0=$WORKDIR/test.temp.0
+TEMP1=$WORKDIR/test.temp.1
+TEMP2=$WORKDIR/test.temp.2
+TEMP3=$WORKDIR/test.temp.3
+TEMP4=$WORKDIR/test.temp.4
+TEMP5=$WORKDIR/test.temp.5
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.argv: misc tests of argc and argv
+
+echo > $TEMP1
+echo > $TEMP2
+$AWK '
+BEGIN {
+	for (i = 1; i < ARGC-1; i++)
+		printf "%s ", ARGV[i]
+	if (ARGC > 1)
+		printf "%s", ARGV[i]
+	printf "\n"
+	exit
+}' * > $TEMP1
+echo * > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.argv (echo1 *)'
+
+$AWK '
+BEGIN {
+	for (i = 1; i < ARGC; i++) {
+		printf "%s", ARGV[i]
+		if (i < ARGC-1)
+			printf " "
+	}
+	printf "\n"
+	exit
+}' * > $TEMP1
+echo * > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.argv (echo2 *)'
+
+$AWK '
+BEGIN {
+	print ARGC
+	ARGV[ARGC-1] = ""
+	for (i=0; i < ARGC; i++)
+		print ARGV[i]
+	exit
+}
+' a bc def gh > $TEMP1
+echo "5
+$AWK
+a
+bc
+def
+" > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.argv (argc *)'
+
+echo '1
+2
+3' > $TEMP0
+echo 'foo1
+foo2
+foo3' > $TEMP1
+$AWK '{print L $0}' L=foo <$TEMP0 > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.argv (L=foo <test.temp.1)'
+
+echo '1
+2
+3' > $TEMP0
+echo 'foo1
+foo2
+foo3' > $TEMP1
+$AWK '{print L $0}' L=foo $TEMP0 > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.argv (L=foo test.temp.1)'
+
+echo '1
+2
+3' > $TEMP0
+echo 'foo1
+foo2
+foo3' > $TEMP1
+cat $TEMP0 | $AWK '{print L $0}' L=foo - > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.argv (L=foo -)'
+
+echo '1
+2
+3' > $TEMP0
+echo 'foo1
+foo2
+foo3
+glop1
+glop2
+glop3' > $TEMP1
+$AWK '{print L $0}' L=foo $TEMP0 L=glop $TEMP0 > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.argv (L=foo L=glop)'
+
+echo '1
+2
+3' > $TEMP0
+echo '111
+112
+113
+221
+222
+223' > $TEMP1
+$AWK '{print L $0}' L=11 $TEMP0 L=22 $TEMP0 > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.argv (L=11 L=22)'
+
+echo 3.345 > $TEMP1
+$AWK 'BEGIN { print ARGV[1] + ARGV[2]}' 1 2.345 > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.argv (ARGV[1] + ARGV[2])'
+
+echo 3.345 > $TEMP1
+x1=1 x2=2.345 $AWK 'BEGIN { print ENVIRON["x1"] + ENVIRON["x2"]}' 1 2.345 > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.argv (ENVIRON[x1] + ENVIRON[x2])'
+
+
+echo 'test.temp.1' > $TEMP1
+echo 'test.temp.2' > $TEMP2
+echo 'test.temp.3' > $TEMP3
+$AWK 'BEGIN { ARGV[2] = "" }
+	{ print }' $TEMP1 $TEMP2 $TEMP3 > $TEMP4
+echo 'test.temp.1
+test.temp.3' > $TEMP5
+diff $TEMP4 $TEMP5 || fail 'BAD: T.argv zap ARGV[2]'
+
+exit $RESULT
