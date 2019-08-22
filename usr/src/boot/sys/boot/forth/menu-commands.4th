@@ -24,7 +24,7 @@
 \
 \ Copyright 2015 Toomas Soome <tsoome@me.com>
 \ Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
-\ Copyright (c) 2019 Joyent, Inc.
+\ Copyright 2019 Joyent, Inc.
 
 marker task-menu-commands.4th
 
@@ -37,9 +37,9 @@ variable acpi_state
 variable kernel_state
 variable root_state
 variable kmdb_state
-variable debug_state
+variable drop_into_kmdb_state
 0 kmdb_state !
-0 debug_state !
+0 drop_into_kmdb_state !
 0 osconsole_state !
 0 acpi_state !
 0 kernel_state !
@@ -238,11 +238,11 @@ create chaincmd 1030 chars allot
 
 : kmdb_disable ( -- )
 	s" boot_kmdb" unsetenv
-	s" boot_debug" unsetenv
+	s" boot_drop_into_kmdb" unsetenv
 ;
 
 : init_kmdb ( N -- N )
-	dup kmdb_state !		\ store entry number for kmdb+debug
+	dup kmdb_state !		\ store entry number for kmdb+drop_into_kmdb
 	kmdb_enabled? if
 		toggle_menuitem ( n -- n )
 	then
@@ -251,9 +251,9 @@ create chaincmd 1030 chars allot
 : toggle_kmdb ( N -- N TRUE )
 	toggle_menuitem
 	dup toggle_stateN @ 0= if ( kmdb is not set )
-		debug_state @ if ( debug is set? )
-			debug_state @ toggle_stateN @ if ( debug is enabled? )
-				debug_state @ toggle_menuitem drop
+		drop_into_kmdb_state @ if ( drop_into_kmdb is set? )
+			drop_into_kmdb_state @ toggle_stateN @ if ( drop_into_kmdb is enabled? )
+				drop_into_kmdb_state @ toggle_menuitem drop
 			then
 		then
 	then
@@ -271,35 +271,35 @@ create chaincmd 1030 chars allot
 ;
 
 \
-\ kmdb + debug
+\ drop into kmdb
 \
 
-: debug_disable ( -- )
-	s" boot_debug" unsetenv
+: drop_into_kmdb_disable ( -- )
+	s" boot_drop_into_kmdb" unsetenv
 ;
 
-: debug_enabled? ( -- flag )
-	\ -d is only allowed with -k
-	s" boot_debug" getenv -1 <> kmdb_enabled? and dup if
+: drop_into_kmdb_enabled? ( -- flag )
+	\ -d is only allowed with -k
+	s" boot_drop_into_kmdb" getenv -1 <> kmdb_enabled? and dup if
 		swap drop ( c-addr flag -- flag )
 	else
-		debug_disable		\ make sure env is not set
+		drop_into_kmdb_disable		\ make sure env is not set
 	then
 ;
 
-: debug_enable ( -- )
+: drop_into_kmdb_enable ( -- )
 	kmdb_enable
-	s" set boot_debug=YES" evaluate
+	s" set boot_drop_into_kmdb=YES" evaluate
 ;
 
-: init_debug ( N -- N )
-	dup debug_state !		\ store entry number for kmdb
-	kmdb_enabled? debug_enabled? and if
+: init_drop_into_kmdb ( N -- N )
+	dup drop_into_kmdb_state !		\ store entry number for kmdb
+	kmdb_enabled? drop_into_kmdb_enabled? and if
 		toggle_menuitem ( n -- n )
 	then
 ;
 
-: toggle_debug ( N -- N TRUE )
+: toggle_drop_into_kmdb ( N -- N TRUE )
 	toggle_menuitem
 	kmdb_enabled? 0= if
 		kmdb_state @ toggle_menuitem drop
@@ -309,9 +309,9 @@ create chaincmd 1030 chars allot
 	\ Now we're going to make the change effective
 
 	dup toggle_stateN @ 0= if
-		debug_disable
+		drop_into_kmdb_disable
 	else
-		debug_enable
+		drop_into_kmdb_enable
 	then
 
 	TRUE \ loop menu again
@@ -608,7 +608,7 @@ create chaincmd 1030 chars allot
 	s" boot_ask" unsetenv
 	singleuser_disable
 	verbose_disable
-	kmdb_disable		\ disables debug as well
+	kmdb_disable		\ disables drop_into_kmdb as well
 	reconfigure_disable
 ;
 

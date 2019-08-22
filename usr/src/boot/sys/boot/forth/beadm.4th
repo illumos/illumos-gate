@@ -10,6 +10,7 @@
 
 \ Copyright 2017 Toomas Soome <tsoome@me.com>
 \ Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+\ Copyright 2019 Joyent, Inc.
 
 \ This module is implementing the beadm user command to support listing
 \ and switching Boot Environments (BE) from command line and
@@ -246,7 +247,7 @@ variable page_remainder
 	s" boot_single" unsetenv
 	s" boot_verbose" unsetenv
 	s" boot_kmdb" unsetenv
-	s" boot_debug" unsetenv
+	s" boot_drop_into_kmdb" unsetenv
 	s" boot_reconfigure" unsetenv
 	start			\ load config, kernel and modules
 	." Current boot device: " s" currdev" getenv type cr

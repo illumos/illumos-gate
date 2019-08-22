@@ -78,20 +78,20 @@ set optionsansi_caption[3]="^[1mV^[merbose............... ^[34;1mOff^[m"
 set optionstoggled_ansi[3]="^[1mV^[merbose............... ^[32;7mOn^[m"
 
 set optionsmenu_init[4]="init_kmdb"
-set optionsmenu_caption[4]="k[m]db................ Off"
-set optionstoggled_text[4]="k[m]db................ On"
+set optionsmenu_caption[4]="Load [k]mdb........... Off"
+set optionstoggled_text[4]="Load [k]mdb........... On"
 set optionsmenu_command[4]="toggle_kmdb"
-set optionsmenu_keycode[4]=109
-set optionsansi_caption[4]="k^[1mm^[mdb.................. ^[34;1mOff^[m"
-set optionstoggled_ansi[4]="k^[1mm^[mdb.................. ^[32;7mOn^[m"
+set optionsmenu_keycode[4]=107
+set optionsansi_caption[4]="Load ^[1mk^[mmdb............. ^[34;1mOff^[m"
+set optionstoggled_ansi[4]="Load ^[1mk^[mmdb............. ^[32;7mOn^[m"
 
-set optionsmenu_init[5]="init_debug"
-set optionsmenu_caption[5]="[D]ebug............... Off"
-set optionstoggled_text[5]="[D]ebug............... On"
-set optionsmenu_command[5]="toggle_debug"
+set optionsmenu_init[5]="init_drop_into_kmdb"
+set optionsmenu_caption[5]="[D]rop into kmdb...... Off"
+set optionstoggled_text[5]="[D]rop into kmdb...... On"
+set optionsmenu_command[5]="toggle_drop_into_kmdb"
 set optionsmenu_keycode[5]=100
-set optionsansi_caption[5]="^[1mD^[mebug................. ^[34;1mOff^[m"
-set optionstoggled_ansi[5]="^[1mD^[mebug................. ^[32;7mOn^[m"
+set optionsansi_caption[5]="^[1mD^[mrop into kmdb........ ^[34;1mOff^[m"
+set optionstoggled_ansi[5]="^[1mD^[mrop into kmdb........ ^[32;7mOn^[m"
 
 set optionsmenu_init[6]="init_rescue"
 set optionsmenu_caption[6]="[R]escue Mode......... Off"

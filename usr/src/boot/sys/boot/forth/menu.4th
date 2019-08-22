@@ -443,20 +443,20 @@ also menu-infrastructure definitions
 
 : acpi-captions ( N -- )
   \ first entry
-  dup s" [A]CPI.... default" rot 48 menu_caption[x][y] setenv
-  dup s" ^[1mA^[mCPI.... ^[32;7mdefault^[m" rot 48 ansi_caption[x][y] setenv
+  dup s" [A]CPI............ default" rot 48 menu_caption[x][y] setenv
+  dup s" ^[1mA^[mCPI.......... ^[32;7mdefault^[m" rot 48 ansi_caption[x][y] setenv
 
-  dup s" [A]CPI........ On" rot 49 menu_caption[x][y] setenv
-  dup s" ^[1mA^[mCPI........ ^[34;1mOn^[m" rot 49 ansi_caption[x][y] setenv
+  dup s" [A]CPI................ On" rot 49 menu_caption[x][y] setenv
+  dup s" ^[1mA^[mCPI............... ^[34;1mOn^[m" rot 49 ansi_caption[x][y] setenv
 
-  dup s" [A]CPI........ Off" rot 50 menu_caption[x][y] setenv
-  dup s" ^[1mA^[mCPI........ ^[34;1mOff^[m" rot 50 ansi_caption[x][y] setenv
+  dup s" [A]CPI............... Off" rot 50 menu_caption[x][y] setenv
+  dup s" ^[1mA^[mCPI.............. ^[34;1mOff^[m" rot 50 ansi_caption[x][y] setenv
 
-  dup s" [A]CPI....... MADT" rot 51 menu_caption[x][y] setenv
-  dup s" ^[1mA^[mCPI....... ^[34;1mMADT^[m" rot 51 ansi_caption[x][y] setenv
+  dup s" [A]CPI.............. MADT" rot 51 menu_caption[x][y] setenv
+  dup s" ^[1mA^[mCPI............. ^[34;1mMADT^[m" rot 51 ansi_caption[x][y] setenv
 
-  dup s" [A]CPI..... Legacy" rot 52 menu_caption[x][y] setenv
-  s" ^[1mA^[mCPI..... ^[34;1mLegacy^[m" rot 52 ansi_caption[x][y] setenv
+  dup s" [A]CPI............ Legacy" rot 52 menu_caption[x][y] setenv
+  s" ^[1mA^[mCPI............... ^[34;1mLegacy^[m" rot 52 ansi_caption[x][y] setenv
 ;
 
 \ Illumos console has following values:

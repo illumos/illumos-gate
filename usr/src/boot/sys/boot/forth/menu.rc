@@ -130,44 +130,45 @@ set optionsmenu_command[3]="cycle_acpi"
 set optionsmenu_keycode[3]=97
 
 set optionsmenu_init[4]="init_singleuser"
-set optionsmenu_caption[4]="[S]ingle User. Off"
-set optionstoggled_text[4]="[S]ingle User. On"
+set optionsmenu_caption[4]="[S]ingle User......... Off"
+set optionstoggled_text[4]="[S]ingle User......... On"
 set optionsmenu_command[4]="toggle_singleuser"
 set optionsmenu_keycode[4]=115
-set optionsansi_caption[4]="^[1mS^[mingle User. ^[34;1mOff^[m"
-set optionstoggled_ansi[4]="^[1mS^[mingle User. ^[32;7mOn^[m"
+set optionsansi_caption[4]="^[1mS^[mingle User........... ^[34;1mOff^[m"
+set optionstoggled_ansi[4]="^[1mS^[mingle User........... ^[32;7mOn^[m"
 
 set optionsmenu_init[5]="init_verbose"
-set optionsmenu_caption[5]="[V]erbose..... Off"
-set optionstoggled_text[5]="[V]erbose..... On"
+set optionsmenu_caption[5]="[V]erbose............. Off"
+set optionstoggled_text[5]="[V]erbose............. On"
 set optionsmenu_command[5]="toggle_verbose"
 set optionsmenu_keycode[5]=118
-set optionsansi_caption[5]="^[1mV^[merbose..... ^[34;1mOff^[m"
-set optionstoggled_ansi[5]="^[1mV^[merbose..... ^[32;7mOn^[m"
+set optionsansi_caption[5]="^[1mV^[merbose............... ^[34;1mOff^[m"
+set optionstoggled_ansi[5]="^[1mV^[merbose............... ^[32;7mOn^[m"
 
 set optionsmenu_init[6]="init_reconfigure"
-set optionsmenu_caption[6]="[R]econfigure. Off"
-set optionstoggled_text[6]="[R]econfigure. On"
+set optionsmenu_caption[6]="[R]econfigure......... Off"
+set optionstoggled_text[6]="[R]econfigure......... On"
 set optionsmenu_command[6]="toggle_reconfigure"
 set optionsmenu_keycode[6]=114
-set optionsansi_caption[6]="^[1mR^[meconfigure. ^[34;1mOff^[m"
-set optionstoggled_ansi[6]="^[1mR^[meconfigure. ^[32;7mOn^[m"
+set optionsansi_caption[6]="^[1mR^[meconfigure........... ^[34;1mOff^[m"
+set optionstoggled_ansi[6]="^[1mR^[meconfigure........... ^[32;7mOn^[m"
 
 set optionsmenu_init[7]="init_kmdb"
-set optionsmenu_caption[7]="k[m]db........ Off"
-set optionstoggled_text[7]="k[m]db........ On"
+set optionsmenu_caption[7]="Load [k]mdb........... Off"
+set optionstoggled_text[7]="Load [k]mdb........... On"
 set optionsmenu_command[7]="toggle_kmdb"
-set optionsmenu_keycode[7]=109
-set optionsansi_caption[7]="k^[1mm^[mdb........ ^[34;1mOff^[m"
-set optionstoggled_ansi[7]="k^[1mm^[mdb........ ^[32;7mOn^[m"
+set optionsmenu_keycode[7]=107
+set optionsansi_caption[7]="Load ^[1mk^[mmdb............. ^[34;1mOff^[m"
+set optionstoggled_ansi[7]="Load ^[1mk^[mmdb............. ^[32;7mOn^[m"
 
-set optionsmenu_init[8]="init_debug"
-set optionsmenu_caption[8]="[D]ebug....... Off"
-set optionstoggled_text[8]="[D]ebug....... On"
-set optionsmenu_command[8]="toggle_debug"
+set optionsmenu_init[8]="init_drop_into_kmdb"
+set optionsmenu_caption[8]="[D]rop into kmdb...... Off"
+set optionstoggled_text[8]="[D]rop into kmdb...... On"
+set optionsmenu_command[8]="toggle_drop_into_kmdb"
 set optionsmenu_keycode[8]=100
-set optionsansi_caption[8]="^[1mD^[mebug....... ^[34;1mOff^[m"
-set optionstoggled_ansi[8]="^[1mD^[mebug....... ^[32;7mOn^[m"
+set optionsansi_caption[8]="^[1mD^[mrop into kmdb........ ^[34;1mOff^[m"
+set optionstoggled_ansi[8]="^[1mD^[mrop into kmdb........ ^[32;7mOn^[m"
+
 
 \
 \ BOOT ENVIRONMENT MENU
