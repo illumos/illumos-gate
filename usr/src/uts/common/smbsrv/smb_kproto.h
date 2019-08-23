@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Syneto S.R.L.  All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -552,7 +552,7 @@ int smb_pathname_reduce(smb_request_t *, cred_t *,
     const char *, smb_node_t *, smb_node_t *, smb_node_t **, char *);
 
 int smb_pathname(smb_request_t *, char *, int, smb_node_t *,
-    smb_node_t *, smb_node_t **, smb_node_t **, cred_t *);
+    smb_node_t *, smb_node_t **, smb_node_t **, cred_t *, pathname_t *);
 
 /*
  * smb_notify.c
@@ -861,9 +861,9 @@ boolean_t smb_ace_is_access(int);
 boolean_t smb_ace_is_audit(int);
 
 uint32_t smb_vss_enum_snapshots(smb_request_t *, smb_fsctl_t *);
-int smb_vss_lookup_nodes(smb_request_t *, smb_node_t *, smb_node_t *,
-    char *, smb_node_t **, smb_node_t **);
+int smb_vss_lookup_nodes(smb_request_t *, smb_node_t *, smb_node_t **, char *);
 vnode_t *smb_lookuppathvptovp(smb_request_t *, char *, vnode_t *, vnode_t *);
+int smb_vss_extract_gmttoken(char *, char *);
 
 void smb_panic(char *, const char *, int);
 #pragma	does_not_return(smb_panic)

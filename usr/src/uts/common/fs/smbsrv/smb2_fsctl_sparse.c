@@ -377,7 +377,7 @@ smb2_sparse_copy(
 			uio.uio_extflg = UIO_COPY_DEFAULT;
 
 			rc = smb_fsop_read(sr, src_ofile->f_cr,
-			    src_ofile->f_node, src_ofile, &uio);
+			    src_ofile->f_node, src_ofile, &uio, 0);
 			if (rc != 0) {
 				status = smb_errno2status(rc);
 				return (status);

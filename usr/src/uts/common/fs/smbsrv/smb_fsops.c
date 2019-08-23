@@ -1380,7 +1380,7 @@ smb_fsop_freesp(
  */
 int
 smb_fsop_read(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
-    smb_ofile_t *ofile, uio_t *uio)
+    smb_ofile_t *ofile, uio_t *uio, int ioflag)
 {
 	caller_context_t ct;
 	cred_t *kcr = zone_kcred();
@@ -1449,7 +1449,7 @@ smb_fsop_read(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 		}
 	}
 
-	rc = smb_vop_read(snode->vp, uio, cr);
+	rc = smb_vop_read(snode->vp, uio, ioflag, cr);
 	smb_node_end_crit(snode);
 
 	return (rc);
@@ -1980,7 +1980,7 @@ smb_fsop_lookup(
 	if ((flags & SMB_FOLLOW_LINKS) && (vp->v_type == VLNK) &&
 	    ((attr.sa_dosattr & FILE_ATTRIBUTE_REPARSE_POINT) == 0)) {
 		rc = smb_pathname(sr, od_name, FOLLOW, root_node, dnode,
-		    &lnk_dnode, &lnk_target_node, cr);
+		    &lnk_dnode, &lnk_target_node, cr, NULL);
 
 		if (rc != 0) {
 			/*

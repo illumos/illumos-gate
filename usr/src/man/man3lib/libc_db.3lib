@@ -3,27 +3,24 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBC_DB 3LIB "Mar 24, 2004"
+.TH LIBC_DB 3LIB "Aug 19, 2019"
 .SH NAME
 libc_db \- threads debugging library
 .SH SYNOPSIS
-.LP
 .nf
-cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lc_db\fR [ \fIlibrary \fR... ]
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lc_db\fR [ \fIlibrary\fR... ]
 #include <\fBproc_service.h\fR>
 #include <\fBthread_db.h\fR>
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBlibc_db\fR library provides support for monitoring and manipulating
 threads-related aspects of a multithreaded program. There are at least two
 processes involved,  the controlling process and one or more target processes.
 The controlling process is the \fBlibc_db\fR client, which links with
 \fBlibc_db\fR and uses \fBlibc_db\fR to inspect or modify threads-related
 aspects of one or more target processes. The target processes must be
-multithreaded processes that use \fBlibc\fR. The controlling process mignt or
+multithreaded processes that use \fBlibc\fR. The controlling process might or
 might not be multithreaded itself.
 .sp
 .LP
@@ -95,8 +92,6 @@ Callback functions are expected to return an integer.  Iteration terminates
 early if a callback function returns a non-zero value. Otherwise, iteration
 terminates when there are no more handles to pass back.
 .SH INTERFACES
-.sp
-.LP
 The shared object \fBlibc_db.so.1\fR provides the public interfaces defined
 below. See \fBIntro\fR(3) for additional information on shared object
 interfaces.
@@ -132,10 +127,9 @@ l l .
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
-\fB\fB/lib/libc_db.so.1\fR\fR
+\fB/lib/libc_db.so.1\fR
 .ad
 .RS 24n
 shared object
@@ -144,15 +138,13 @@ shared object
 .sp
 .ne 2
 .na
-\fB\fB/lib/64/libc_db.so.1\fR\fR
+\fB/lib/64/libc_db.so.1\fR
 .ad
 .RS 24n
 64-bit shared object
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for description of the following attributes:
 .sp
 
@@ -166,6 +158,4 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBIntro\fR(3), \fBtd_ta_new\fR(3C_DB), \fBattributes\fR(5), \fBthreads\fR(5)

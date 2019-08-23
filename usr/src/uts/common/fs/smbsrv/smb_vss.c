@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -78,18 +78,22 @@ smb_vss_enum_snapshots(smb_request_t *sr, smb_fsctl_t *fsctl)
 	uint32_t count = 0;
 	char *root_path;
 	uint32_t status = NT_STATUS_SUCCESS;
-	smb_node_t *tnode;
 	smb_gmttoken_response_t snaps;
 
-	ASSERT(sr->tid_tree);
-	ASSERT(sr->tid_tree->t_snode);
+	ASSERT(sr->fid_ofile);
+	ASSERT(sr->fid_ofile->f_node);
 
 	if (fsctl->MaxOutputResp < SMB_VSS_COUNT_SIZE)
 		return (NT_STATUS_INVALID_PARAMETER);
 
-	tnode = sr->tid_tree->t_snode;
+	/*
+	 * smbd will find the root of the lowest filesystem from mntpath of a
+	 * file by comparing it agaisnt mnttab, repeatedly removing components
+	 * until one matches.
+	 */
 	root_path  = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
-	if (smb_node_getmntpath(tnode, root_path, MAXPATHLEN) != 0)
+	if (smb_node_getmntpath(sr->fid_ofile->f_node, root_path,
+	    MAXPATHLEN) != 0)
 		return (NT_STATUS_INVALID_PARAMETER);
 
 	if (fsctl->MaxOutputResp == SMB_VSS_COUNT_SIZE) {
@@ -118,71 +122,43 @@ smb_vss_enum_snapshots(smb_request_t *sr, smb_fsctl_t *fsctl)
  * sr - the request info, used to find root of dataset,
  *      unicode or ascii, where the share is rooted in the
  *      dataset
- * root_node - root of the share
  * cur_node - where in the share for the command
- * buf - is the path for the command to be processed
- *       returned without @GMT if processed
  * vss_cur_node - returned value for the snapshot version
  *                of the cur_node
- * vss_root_node - returned value for the snapshot version
- *                 of the root_node
+ * gmttoken - if SMB1, the gmttoken to be used to find the snapshot.
+ *            Otherwise, NULL.
  *
  * This routine is the processing for handling the
  * SMB_FLAGS2_REPARSE_PATH bit being set in the smb header.
  *
  * By using the cur_node passed in, a new node is found or
  * created that is the same place in the directory tree, but
- * in the snapshot. We also use root_node to do the same for
- * the root.
- * Once the new smb node is found, the path is modified by
- * removing the @GMT token from the path in the buf.
+ * in the snapshot.
  */
 int
-smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
-    smb_node_t *cur_node, char *buf, smb_node_t **vss_cur_node,
-    smb_node_t **vss_root_node)
+smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *cur_node,
+    smb_node_t **vss_cur_node, char *gmttoken)
 {
 	smb_arg_open_t	*op = &sr->arg.open;
-	smb_node_t	*tnode;
 	char		*snapname, *path;
-	char		*gmttoken;
-	char		gmttok_buf[SMB_VSS_GMT_SIZE];
 	vnode_t		*fsrootvp = NULL;
 	time_t		toktime;
 	int		err = 0;
-	boolean_t	smb1;
 
 	if (sr->tid_tree == NULL)
 		return (ESTALE);
 
-	tnode = sr->tid_tree->t_snode;
-
-	ASSERT(tnode);
-	ASSERT(tnode->vp);
-	ASSERT(tnode->vp->v_vfsp);
-
-	smb1 = (sr->session->dialect < SMB_VERS_2_BASE);
-	if (smb1) {
-		const char *p;
-
-		/* get gmttoken from buf */
-		if ((p = smb_vss_find_gmttoken(buf)) == NULL)
-			return (ENOENT);
-
-		bcopy(p, gmttok_buf, SMB_VSS_GMT_SIZE);
-		gmttok_buf[SMB_VSS_GMT_SIZE - 1] = '\0';
-		gmttoken = gmttok_buf;
+	if (gmttoken != NULL) {
 		toktime = 0;
 	} else {
 		/* SMB2 and later */
-		gmttoken = NULL;
 		toktime = op->timewarp.tv_sec;
 	}
 
 	path = smb_srm_alloc(sr, MAXPATHLEN);
 	snapname = smb_srm_alloc(sr, MAXPATHLEN);
 
-	err = smb_node_getmntpath(tnode, path, MAXPATHLEN);
+	err = smb_node_getmntpath(cur_node, path, MAXPATHLEN);
 	if (err != 0)
 		return (err);
 
@@ -197,25 +173,15 @@ smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
 		return (ENOENT);
 
 	/* find snapshot nodes */
-	err = VFS_ROOT(tnode->vp->v_vfsp, &fsrootvp);
+	err = VFS_ROOT(cur_node->vp->v_vfsp, &fsrootvp);
 	if (err != 0)
 		return (err);
 
-	/* find snapshot node corresponding to root_node */
-	err = smb_vss_lookup_node(sr, root_node, fsrootvp,
-	    snapname, cur_node, vss_root_node);
-	if (err == 0) {
-		/* find snapshot node corresponding to cur_node */
-		err = smb_vss_lookup_node(sr, cur_node, fsrootvp,
-		    snapname, cur_node, vss_cur_node);
-		if (err != 0)
-			smb_node_release(*vss_root_node);
-	}
+	/* find snapshot node corresponding to cur_node */
+	err = smb_vss_lookup_node(sr, cur_node, fsrootvp,
+	    snapname, cur_node, vss_cur_node);
 
 	VN_RELE(fsrootvp);
-
-	if (smb1)
-		smb_vss_remove_first_token_from_path(buf);
 
 	return (err);
 }
@@ -426,7 +392,7 @@ smb_vss_get_snapshots_free(smb_gmttoken_response_t *reply)
  */
 static void
 smb_vss_map_gmttoken(smb_tree_t *tree, char *path, char *gmttoken,
-	time_t toktime, char *snapname)
+    time_t toktime, char *snapname)
 {
 	smb_gmttoken_snapname_t	request;
 	smb_string_t		result;
@@ -441,4 +407,21 @@ smb_vss_map_gmttoken(smb_tree_t *tree, char *path, char *gmttoken,
 	(void) smb_kdoor_upcall(tree->t_server, SMB_DR_VSS_MAP_GMTTOKEN,
 	    &request, smb_gmttoken_snapname_xdr,
 	    &result, smb_string_xdr);
+}
+
+int
+smb_vss_extract_gmttoken(char *buf, char *gmttoken)
+{
+	const char *p;
+
+	/* get gmttoken from buf */
+	if ((p = smb_vss_find_gmttoken(buf)) == NULL)
+		return (ENOENT);
+
+	bcopy(p, gmttoken, SMB_VSS_GMT_SIZE);
+	gmttoken[SMB_VSS_GMT_SIZE - 1] = '\0';
+
+	smb_vss_remove_first_token_from_path(buf);
+
+	return (0);
 }

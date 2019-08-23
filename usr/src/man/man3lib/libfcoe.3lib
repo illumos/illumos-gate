@@ -3,25 +3,20 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBFCOE 3LIB "Apr 1, 2009"
+.TH LIBFCOE 3LIB "Aug 19, 2019"
 .SH NAME
-libfcoe \- FCoE Port Mangament library
+libfcoe \- FCoE Port Management library
 .SH SYNOPSIS
-.LP
 .nf
-cc [ \fIflag\fR... ] \fIfile\fR... lfcoe [ \fIlibrary\fR... ]
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lfcoe\fR [ \fIlibrary\fR... ]
 #include <libfcoe.h>
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 Functions in this library provide management of the FCoE (Fibre Channel over
 Ethernet) ports in the system, allowing clients to create, delete and list
 information of FCoE ports.
 .SH INTERFACES
-.sp
-.LP
 The shared object \fBlibfcoe.so.1\fR provides the public interfaces defined
 below. See \fBIntro\fR(3) for additional information on shared object
 interfaces.
@@ -32,14 +27,13 @@ interfaces.
 l l
 l l .
 \fBFCOE_CreatePort\fR	\fBFCOE_DeletePort\fR
-\fBFCOE_GetPortList\fR	
+\fBFCOE_GetPortList\fR
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
-\fB\fB/lib/libfcoe.so.1\fR\fR
+\fB/lib/libfcoe.so.1\fR
 .ad
 .RS 24n
 shared object
@@ -48,15 +42,13 @@ shared object
 .sp
 .ne 2
 .na
-\fB\fB/lib/64/libfcoe.so.1\fR\fR
+\fB/lib/64/libfcoe.so.1\fR
 .ad
 .RS 24n
 64-bit shared object
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -72,7 +64,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBIntro\fR(3), \fBFCOE_CreatePort\fR(3FCOE), \fBFCOE_DeletePort\fR(3FCOE),
 \fBFCOE_GetPortList\fR(3FCOE), \fBattributes\fR(5)

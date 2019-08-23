@@ -26,35 +26,22 @@
 
 include $(SRC)/Makefile.master
 
-BTS_DIR			= $(ROOT)/usr/lib/iconv/geniconvtbl/binarytables
-
-# geniconvtbl loadmodule
-GENICONVTBL= /usr/bin/geniconvtbl
 #
 # Common sources come from following directory:
 COMMON			= ../common/
-GENI_SRCS		= ../common/binarytables/srcs
 
 include $(SRC)/lib/iconv_modules/Makefile.iconv
 include $(SRC)/lib/iconv_modules/utf-8/Makefile.iconv
 
-CLEANFILES =    *.o *.so core *.bt
+CLEANFILES =    *.o *.so
 
 .NO_PARALLEL:
 
-.PARALLEL: $(DYNOBJS) $(BINARYTABLES)
+.PARALLEL: $(DYNOBJS)
 
+all: $(DYNOBJS)
 
-all: $(DYNOBJS) $(BINARYTABLES)
-
-install: all $(ICONV_DIR) $(BTS_DIR) $(ICONV_DIR)/alias
-	for f in  $(BINARYTABLES) ; do \
-		TMP=`echo $$f | $(TR) "+" "%"` ; \
-		echo installing $$TMP to $(BTS_DIR) ; \
-		$(RM) $(BTS_DIR)/$$TMP ; \
-		$(CP) $$f $(BTS_DIR)/$$TMP ; \
-		$(CHMOD) 444 $(BTS_DIR)/$$TMP ; \
-	done
+install: all $(ICONV_DIR)
 	for f in $(DYNOBJS) ; do \
 		TMP=`echo $$f | $(TR) "+" "%"` ; \
 		echo installing $$TMP to $(ICONV_DIR) ; \
@@ -64,13 +51,7 @@ install: all $(ICONV_DIR) $(BTS_DIR) $(ICONV_DIR)/alias
 	done
 	-@echo "done."
 
-
-$(BTS_DIR):
-	$(INS.dir) $@
-
 clobber: clean
-
-$(ICONV_DIR)/alias:=	FILEMODE=0444
 
 LDLIBS			= -lc
 
@@ -248,12 +229,3 @@ $(UTF_8_TO_UTF_8_SO): $(COMMON)/common_defs.h $(COMMON)/utf8.c
 	$(CC) $(CFLAGS) $(COMMON)/utf8.c -c -o $@.o
 	$(CC) $(LDFLAGS) $(CFLAGS)  -o  $@ $@.o
 	$(POST_PROCESS_SO)
-
-
-#
-# Rules for binary tables:
-.SUFFIXES: $(SUFFIXES) .src
-.SUFFIXES: $(SUFFIXES) .bt
-
-%.bt: $(GENI_SRCS)/%.src
-	$(GENICONVTBL) -o $@ -f $<

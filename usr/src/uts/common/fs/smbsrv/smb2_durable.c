@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -844,7 +844,7 @@ smb2_dh_read_nvlist(smb_request_t *sr, smb_node_t *node,
 	uio.uio_resid = flen;
 	uio.uio_segflg = UIO_SYSSPACE;
 	uio.uio_extflg = UIO_COPY_DEFAULT;
-	rc = smb_fsop_read(sr, kcr, node, NULL, &uio);
+	rc = smb_fsop_read(sr, kcr, node, NULL, &uio, 0);
 	if (rc != 0) {
 		cmn_err(CE_NOTE, "CA import (%s/%s) read, rc=%d",
 		    shr->shr_path, node->od_name, rc);

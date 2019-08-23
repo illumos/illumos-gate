@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -68,8 +68,8 @@ static int smb_aapl_ext_maxlen = 512;
  */
 uint32_t
 smb2_aapl_crctx(smb_request_t *sr,
-	mbuf_chain_t *mbcin,
-	mbuf_chain_t *mbcout)
+    mbuf_chain_t *mbcin,
+    mbuf_chain_t *mbcout)
 {
 	uint32_t cmdcode;
 	uint32_t status;
@@ -105,7 +105,7 @@ smb2_aapl_crctx(smb_request_t *sr,
  */
 static uint32_t
 smb2_aapl_srv_query(smb_request_t *sr,
-	mbuf_chain_t *mbcin, mbuf_chain_t *mbcout)
+    mbuf_chain_t *mbcin, mbuf_chain_t *mbcout)
 {
 	uint64_t client_bitmap;
 	uint64_t client_caps;
@@ -164,8 +164,8 @@ smb2_aapl_srv_query(smb_request_t *sr,
  */
 int
 smb2_aapl_get_macinfo(smb_request_t *sr, smb_odir_t *od,
-	smb_fileinfo_t *fileinfo, smb_macinfo_t *mi,
-	char *tbuf, size_t tbuflen)
+    smb_fileinfo_t *fileinfo, smb_macinfo_t *mi,
+    char *tbuf, size_t tbuflen)
 {
 	int		rc;
 	cred_t		*kcr = zone_kcred();
@@ -224,7 +224,7 @@ smb2_aapl_get_macinfo(smb_request_t *sr, smb_odir_t *od,
 		uio.uio_resid = sizeof (AfpInfo);
 		uio.uio_segflg = UIO_SYSSPACE;
 		uio.uio_extflg = UIO_COPY_DEFAULT;
-		rc = smb_fsop_read(sr, kcr, snode, NULL, &uio);
+		rc = smb_fsop_read(sr, kcr, snode, NULL, &uio, 0);
 		if (rc == 0 && uio.uio_resid == 0) {
 			bcopy(&AfpInfo[4], &mi->mi_finderinfo,
 			    sizeof (mi->mi_finderinfo));

@@ -3,13 +3,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBRESOLV 3LIB "Mar 24, 2004"
+.TH LIBRESOLV 3LIB "Aug 19, 2019"
 .SH NAME
 libresolv \- resolver library
 .SH SYNOPSIS
-.LP
 .nf
-cc [ \fIflag\fR... ] \fIfile\fR... \fB-lresolv\fR \fB -lsocket \fR \fB -lnsl \fR [ \fIlibrary\fR... ]
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lresolv\fR \fB-lsocket\fR \fB-lnsl\fR [ \fIlibrary\fR... ]
 #include <\fBsys/types.h\fR>
 #include <\fBnetinet/in.h\fR>
 #include <\fBarpa/nameser.h\fR>
@@ -18,13 +17,9 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-lresolv\fR \fB -lsocket \fR \fB -lnsl \fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 Functions in this library provide for creating, sending, and interpreting
 packets to the Internet domain name servers.
 .SH INTERFACES
-.sp
-.LP
 The shared object \fBlibresolv.so.2\fR provides the public interfaces defined
 below. See \fBIntro\fR(3) for additional information on shared object
 interfaces.
@@ -64,7 +59,7 @@ Use of the routines in the first column is discouraged.
 .TS
 c c
 l l .
-\fBFUNCTION REFERENCED\fR 	\fBALIAS TO USE\fR
+\fBFUNCTION REFERENCED\fR	\fBALIAS TO USE\fR
 \fB__dn_skipname\fR	\fBdn_skipname\fR
 \fB__fp_query\fR	\fBfp_query\fR
 \fB__putlong\fR	\fBputlong\fR
@@ -75,10 +70,9 @@ l l .
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
-\fB\fB/lib/libresolv.so.1\fR\fR
+\fB/lib/libresolv.so.1\fR
 .ad
 .RS 26n
 shared object for backward compatibility only
@@ -87,7 +81,7 @@ shared object for backward compatibility only
 .sp
 .ne 2
 .na
-\fB\fB/lib/64/libresolv.so.1\fR\fR
+\fB/lib/64/libresolv.so.1\fR
 .ad
 .RS 26n
 64-bit shared object for backward compatibility only
@@ -96,7 +90,7 @@ shared object for backward compatibility only
 .sp
 .ne 2
 .na
-\fB\fB/lib/libresolv.so.2\fR\fR
+\fB/lib/libresolv.so.2\fR
 .ad
 .RS 26n
 shared object
@@ -105,15 +99,13 @@ shared object
 .sp
 .ne 2
 .na
-\fB\fB/lib/64/libresolv.so.2\fR\fR
+\fB/lib/64/libresolv.so.2\fR
 .ad
 .RS 26n
 64-bit shared object
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -130,6 +122,4 @@ MT-Level	See \fBresolver\fR(3RESOLV)
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBpvs\fR(1), \fBIntro\fR(3), \fBresolver\fR(3RESOLV), \fBattributes\fR(5)

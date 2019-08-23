@@ -3,18 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBPOOL 3LIB "April 9, 2016"
+.TH LIBPOOL 3LIB "Aug 19, 2019"
 .SH NAME
 libpool \- pool configuration manipulation library
 .SH SYNOPSIS
-.LP
 .nf
-\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
+\fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lpool\fR [ \fIlibrary\fR... ]
 #include <\fBpool.h\fR>
 .fi
 
 .SH DESCRIPTION
-.LP
 The functions in this library define the interface for reading and writing
 resource pools configuration files, as well as that for committing an existing
 configuration to becoming the running OS configuration (with respect to
@@ -128,7 +126,7 @@ pool does not exist, perhaps because of a reconfiguration, then this property
 controls the binding behavior for the project member. If
 \fBsystem.bind-default\fR is true, then the project member is bound to the
 default pool (identified as the pool for which \fBpool.default\fR is true);
-otherise the project member is refused access to the system. Care should be
+otherwise the project member is refused access to the system. Care should be
 taken with the pools configuration if this property is set to false, so as to
 avoid denying users access to the system.
 .sp
@@ -280,7 +278,7 @@ There are two types of objectives that can be set on a \fBpset\fR:
 .sp
 .ne 2
 .na
-\fB\fBlocality\fR\fR
+\fBlocality\fR
 .ad
 .RS 15n
 This objective influences the impact that locality, as measured by lgroup data,
@@ -288,7 +286,7 @@ has upon the chosen configuration. This objective can take one of three values:
 .sp
 .ne 2
 .na
-\fB\fBtight\fR\fR
+\fBtight\fR
 .ad
 .RS 9n
 If set, configurations that maximize resource locality are favored.
@@ -297,7 +295,7 @@ If set, configurations that maximize resource locality are favored.
 .sp
 .ne 2
 .na
-\fB\fBloose\fR\fR
+\fBloose\fR
 .ad
 .RS 9n
 If set, configurations that minimize resource locality are favored.
@@ -306,7 +304,7 @@ If set, configurations that minimize resource locality are favored.
 .sp
 .ne 2
 .na
-\fB\fBnone\fR\fR
+\fBnone\fR
 .ad
 .RS 9n
 This is the default value for this objective. If set, configuration
@@ -318,7 +316,7 @@ favorability is uninfluenced by resource locality.
 .sp
 .ne 2
 .na
-\fB\fButilization\fR\fR
+\fButilization\fR
 .ad
 .RS 15n
 This objective favors configurations that allocate resources to partitions that
@@ -332,7 +330,7 @@ operators are
 .sp
 .ne 2
 .na
-\fB\fB<\fR\fR
+\fB<\fR
 .ad
 .RS 5n
 The ``less than'' operator is used to indicate that the specified value should
@@ -342,7 +340,7 @@ be treated as a maximum target value.
 .sp
 .ne 2
 .na
-\fB\fB>\fR\fR
+\fB>\fR
 .ad
 .RS 5n
 The ``greater than'' operator is used to indicate that the specified value
@@ -352,7 +350,7 @@ should be treated as a minimum target value.
 .sp
 .ne 2
 .na
-\fB\fB~\fR\fR
+\fB~\fR
 .ad
 .RS 5n
 The ``about'' operator is used to indicate that the specified value should be
@@ -389,7 +387,7 @@ The \fBcpu.status\fR property can be set only to the following values:
 .sp
 .ne 2
 .na
-\fB\fBoff-line\fR\fR
+\fBoff-line\fR
 .ad
 .RS 12n
 Set the CPU offline.
@@ -398,7 +396,7 @@ Set the CPU offline.
 .sp
 .ne 2
 .na
-\fB\fBon-line\fR\fR
+\fBon-line\fR
 .ad
 .RS 12n
 Set the CPU online.
@@ -407,7 +405,7 @@ Set the CPU online.
 .sp
 .ne 2
 .na
-\fB\fBno-intr\fR\fR
+\fBno-intr\fR
 .ad
 .RS 12n
 Disable interrupt processing on the CPU.
@@ -418,7 +416,6 @@ Disable interrupt processing on the CPU.
 These values are defined in <\fBsys/processor.h\fR> as the \fBPS_OFFLINE\fR,
 \fBPS_ONLINE\fR, and \fBPS_NOINTR\fR macros.
 .SH INTERFACES
-.LP
 The shared object \fBlibpool.so.1\fR provides the public interfaces defined
 below. See \fBIntro\fR(3) for additional information on shared object
 interfaces.
@@ -462,13 +459,13 @@ l l .
 \fBpool_value_set_string\fR	\fBpool_value_set_uint64\fR
 \fBpool_version\fR	\fBpool_walk_components\fR
 \fBpool_walk_pools\fR	\fBpool_walk_properties\fR
-\fBpool_walk_resources\fR	
+\fBpool_walk_resources\fR
 .TE
 
 .SH FILES
 .ne 2
 .na
-\fB\fB/usr/lib/libpool.so.1\fR\fR
+\fB/usr/lib/libpool.so.1\fR
 .ad
 .RS 28n
 shared object
@@ -477,14 +474,13 @@ shared object
 .sp
 .ne 2
 .na
-\fB\fB/usr/lib/64/libpool.so.1\fR\fR
+\fB/usr/lib/64/libpool.so.1\fR
 .ad
 .RS 28n
 64-bit shared object
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -503,7 +499,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.LP
 \fBIntro\fR(3), \fBpool_component_info\fR(3POOL), \fBpool_conf_open\fR(3POOL),
 \fBpool_conf_to_elem\fR(3POOL), \fBpool_create\fR(3POOL),
 \fBpool_error\fR(3POOL), \fBpool_get_binding\fR(3POOL),
@@ -511,7 +506,6 @@ MT-Level	Safe
 \fBpool_resource_create\fR(3POOL), \fBpool_value_alloc\fR(3POOL),
 \fBpool_walk_pools\fR(3POOL), \fBattributes\fR(5), \fBsmf\fR(5)
 .SH NOTES
-.LP
 Functions in \fBlibpool\fR can be used to manipulate static configurations even
 when the pools facility is not enabled. See \fBpooladm\fR(1M) and
 \fBpool_set_status\fR(3POOL) for more information about enabling the pools

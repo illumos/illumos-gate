@@ -3,20 +3,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBFSTYP 3LIB "Jun 20, 2006"
+.TH LIBFSTYP 3LIB "Aug 19, 2019"
 .SH NAME
 libfstyp \- file system type identification library
 .SH SYNOPSIS
-.LP
 .nf
-cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lfstyp\fR \fB -lnvpair \fR [ \fIlibrary\fR\&.\|.\|. ]
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lfstyp\fR \fB-lnvpair\fR [ \fIlibrary\fR\... ]
 #include \fB<libnvpair.h>\fR
 #include \fB<libfstyp.h>\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBlibfstyp\fR library exports a set of functions to identify the file
 system type of an unmounted file system using heuristic modules.
 .sp
@@ -24,8 +21,6 @@ system type of an unmounted file system using heuristic modules.
 Internally, the library is comprised of interfaces exported by file
 system-specific modules. See \fBfstyp_mod_init\fR(3FSTYP).
 .SH INTERFACES
-.sp
-.LP
 The shared object \fBlibfstyp.so.1\fR provides the public interfaces defined
 below. See \fBIntro\fR(3) for additional information on shared object
 interfaces.
@@ -43,18 +38,15 @@ l l .
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
-\fB\fB/lib/libfstyp.so.1\fR\fR
+\fB/lib/libfstyp.so.1\fR
 .ad
 .RS 22n
 shared object
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -71,7 +63,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBIntro\fR(3), \fBfstyp_mod_init\fR(3FSTYP), \fBlibnvpair\fR(3LIB),
 \fBattributes\fR(5)

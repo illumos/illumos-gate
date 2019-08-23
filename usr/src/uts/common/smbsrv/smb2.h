@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMB_SMB2_H
@@ -318,9 +318,15 @@ typedef enum {
 #define	SMB2_CLOSE_FLAG_POSTQUERY_ATTRIB	0x0001
 
 /*
+ * SMB2 Read
+ */
+#define	SMB2_READFLAG_READ_UNBUFFERED		0x00000001
+
+/*
  * SMB2 Write
  */
 #define	SMB2_WRITEFLAG_WRITE_THROUGH		0x00000001
+#define	SMB2_WRITEFLAG_WRITE_UNBUFFERED		0x00000002
 
 /*
  * SMB2 Lock Request
