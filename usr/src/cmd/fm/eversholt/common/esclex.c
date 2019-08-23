@@ -73,7 +73,7 @@ static const char *Fileopened;
 static FILE *Fp;
 static int Line;
 static const char *File;
-static const char *Cpp = "/usr/bin/cpp";
+static const char *Cpp = "/usr/lib/cpp";
 #ifdef	ESC
 static const char *Cppargs;
 static const char *Cppstdargs = "-undef -Y.";
