@@ -30,14 +30,13 @@
 
 PROG= nawk
 
-OBJ1= b.o lib.o main.o parse.o proctab.o run.o tran.o
-OBJ2= awk.g.o awk.lx.o
+OBJ1= b.o lib.o main.o parse.o proctab.o run.o tran.o lex.o
+OBJ2= awk.g.o
 OBJS= $(OBJ2) $(OBJ1)
 SRCS= $(OBJ1:%.o=%.c)
 
 include ../Makefile.cmd
 
-CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-variable
@@ -56,13 +55,13 @@ XGETFLAGS += -a -x awk.xcl
 
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 YFLAGS += -d
-LDLIBS += -lm
+LDLIBS += -lm -lumem
 LINTFLAGS += -u
-CLEANFILES= maketab proctab.c awk.g.c awk.lx.c y.tab.h
+CLEANFILES= maketab proctab.c awk.g.c y.tab.h
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
@@ -93,8 +92,6 @@ lint: awk.g.c lint_SRCS
 awk.g.c + y.tab.h: awk.g.y
 
 awk.g.o: awk.g.c
-
-awk.lx.c: awk.lx.l
 
 proctab.o: proctab.c
 	$(COMPILE.c) proctab.c

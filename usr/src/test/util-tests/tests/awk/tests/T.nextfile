@@ -1,0 +1,103 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+TEMP0=$WORKDIR/test.temp.0
+TEMP1=$WORKDIR/test.temp.1
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.nextfile: tests of nextfile command
+
+# 1st lines of some files
+rm -f $TEMP0
+for i in T.*
+do
+	sed 1q $i >> $TEMP0
+done
+
+$AWK '
+{ print $0; nextfile }	# print first line, quit
+' T.* > $TEMP1
+
+diff $TEMP0 $TEMP1 || fail 'BAD: T.nextfile 1'
+
+$AWK '	# same test but in a for loop
+{ print $0; 
+  for (i = 1; i < 10; i++)
+	if (i == 1)
+		nextfile
+  print "nextfile for error"
+}	# print first line, quit
+' T.* > $TEMP1
+
+diff $TEMP0 $TEMP1 || fail 'BAD: T.nextfile 1f'
+
+$AWK '	# same test but in a while loop
+{ print $0; 
+  i = 1
+  while (i < 10)
+	if (i++ == 1)
+		nextfile
+  print "nextfile while error"
+}	# print first line, quit
+' T.* > $TEMP1
+
+diff $TEMP0 $TEMP1 || fail 'BAD: T.nextfile 1w'
+
+$AWK '	# same test but in a do loop
+{ print $0; 
+  i = 1
+  do {
+	if (i++ == 1)
+		nextfile	# print first line, quit
+  } while (i < 10)
+  print "nextfile do error"
+}
+' T.* > $TEMP1
+
+diff $TEMP0 $TEMP1 || fail 'BAD: T.nextfile 1d'
+
+
+# 100 lines of some files
+rm -f $TEMP0
+for i in T.*
+do
+	sed 100q $i >> $TEMP0
+done
+
+$AWK '
+{ print }
+FNR == 100 { nextfile }	# print first line, quit
+' T.* > $TEMP1
+
+diff $TEMP0 $TEMP1 || fail 'BAD: T.nextfile 2'
+
+
+> $TEMP0	# empty
+$AWK ' { nextfile; print $0 }' T.* > $TEMP1
+
+diff $TEMP0 $TEMP1 || fail 'BAD: T.nextfile 3'
+
+# skip weird args
+rm -f $TEMP0
+for i in T.*
+do
+	sed 1q $i >> $TEMP0
+done
+
+$AWK '
+{ print $0; nextfile }	# print first line, quit
+' T.* > $TEMP1
+
+diff $TEMP0 $TEMP1 || fail 'BAD: T.nextfile 4'
+
+exit $RESULT

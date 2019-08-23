@@ -5,6 +5,7 @@ if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
     exit 1
 fi
 
+TEMP0=$WORKDIR/test.temp.0
 TEMP1=$WORKDIR/test.temp.1
 TEMP2=$WORKDIR/test.temp.2
 
@@ -68,5 +69,14 @@ $AWK 'BEGIN {
 		print "BAD: T.builtin (excess length args not evaluated)"
 }' 2> $TEMP1
 grep 'too many arg' $TEMP1 >/dev/null || fail 'T.bad: too many args not caught'
+
+echo 'a
+a b
+a b c' > $TEMP0
+echo '1
+2
+3' > $TEMP1
+$AWK '{ n = split($0, x); print length(x) }' < $TEMP0 > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.builtin length array'
 
 exit $RESULT

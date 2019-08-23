@@ -1,5 +1,5 @@
-$AWK: syntax error at source line 1
+$AWK: non-terminated string ............. at source line 1
  context is
 	 >>> BEGIN{x=".........................................................................................................................................................................................................................................................} <<< 
-$AWK: illegal statement at source line 1
-	missing }
+$AWK: giving up
+ source line number 1

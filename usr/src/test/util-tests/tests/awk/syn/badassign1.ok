@@ -1,4 +1,4 @@
-$AWK: syntax error at source line 1
+$AWK: syntax error at source line 1 source file badassign1.awk
  context is
 	BEGIN { $i++ >>>  = <<<  3 ; print i }
-$AWK: illegal statement at source line 1
+$AWK: illegal statement at source line 1 source file badassign1.awk

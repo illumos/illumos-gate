@@ -1,4 +1,28 @@
 /*
+ * Copyright (C) Lucent Technologies 1997
+ * All Rights Reserved
+ *
+ * Permission to use, copy, modify, and distribute this software and
+ * its documentation for any purpose and without fee is hereby
+ * granted, provided that the above copyright notice appear in all
+ * copies and that both that the copyright notice and this
+ * permission notice and warranty disclaimer appear in supporting
+ * documentation, and that the name Lucent Technologies or any of
+ * its entities not be used in advertising or publicity pertaining
+ * to distribution of the software without specific, written prior
+ * permission.
+ *
+ * LUCENT DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+ * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.
+ * IN NO EVENT SHALL LUCENT OR ANY OF ITS ENTITIES BE LIABLE FOR ANY
+ * SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER
+ * IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ * ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+ * THIS SOFTWARE.
+ */
+
+/*
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
@@ -39,24 +63,25 @@
 #include "awk.h"
 #include "y.tab.h"
 
-char	*version = "version Oct 11, 1989";
+char	*version = "version Aug 27, 2018";
 
 int	dbg	= 0;
-uchar	*cmdname;	/* gets argv[0] for error messages */
-uchar	*lexprog;	/* points to program argument if it exists */
+Awkfloat	srand_seed = 1;
+char	*cmdname;	/* gets argv[0] for error messages */
+char	*lexprog;	/* points to program argument if it exists */
 int	compile_time = 2;	/* for error printing: */
 				/* 2 = cmdline, 1 = compile, 0 = running */
-char	radixpoint = '.';
 
-static uchar	**pfile = NULL;	/* program filenames from -f's */
+static char	**pfile = NULL;	/* program filenames from -f's */
 static int	npfile = 0;	/* number of filenames */
 static int	curpfile = 0;	/* current filename */
+
+int	safe	= 0;	/* 1 => "safe" mode */
 
 int
 main(int argc, char *argv[], char *envp[])
 {
-	uchar *fs = NULL;
-	char	*nl_radix;
+	const char *fs = NULL;
 	/*
 	 * At this point, numbers are still scanned as in
 	 * the POSIX locale.
@@ -68,7 +93,7 @@ main(int argc, char *argv[], char *envp[])
 #define	TEXT_DOMAIN	"SYS_TEST"	/* Use this only if it weren't */
 #endif
 	(void) textdomain(TEXT_DOMAIN);
-	cmdname = (uchar *)argv[0];
+	cmdname = argv[0];
 	if (argc == 1) {
 		(void) fprintf(stderr, gettext(
 		    "Usage: %s [-f programfile | 'program'] [-Ffieldsep] "
@@ -76,9 +101,19 @@ main(int argc, char *argv[], char *envp[])
 		exit(1);
 	}
 	(void) signal(SIGFPE, fpecatch);
+
+	srand_seed = 1;
+	srand((unsigned int)srand_seed);
+
 	yyin = NULL;
-	syminit();
+	symtab = makesymtab(NSYMTAB/NSYMTAB);
 	while (argc > 1 && argv[1][0] == '-' && argv[1][1] != '\0') {
+		if (strcmp(argv[1], "-version") == 0 ||
+		    strcmp(argv[1], "--version") == 0) {
+			(void) printf("awk %s\n", version);
+			exit(0);
+			break;
+		}
 		if (strcmp(argv[1], "--") == 0) {
 			/* explicit end of args */
 			argc--;
@@ -86,41 +121,66 @@ main(int argc, char *argv[], char *envp[])
 			break;
 		}
 		switch (argv[1][1]) {
+		case 's':
+			if (strcmp(argv[1], "-safe") == 0)
+				safe = 1;
+			break;
 		case 'f':	/* next argument is program filename */
-			argc--;
-			argv++;
-			if (argc <= 1)
-				ERROR "no program filename" FATAL;
-			pfile = realloc(pfile, sizeof (uchar *) * (npfile + 1));
-			if (pfile == NULL)
-				ERROR "out of space in main" FATAL;
-			pfile[npfile++] = (uchar *)argv[1];
+			if (argv[1][2] != 0) {  /* arg is -fsomething */
+				pfile = realloc(pfile,
+				    sizeof (char *) * (npfile + 1));
+				if (pfile == NULL)
+					FATAL("out of space in main");
+				pfile[npfile++] = &argv[1][2];
+			} else {		/* arg is -f something */
+				argc--; argv++;
+				if (argc <= 1)
+					FATAL("no program filename");
+				pfile = realloc(pfile,
+				    sizeof (char *) * (npfile + 1));
+				if (pfile == NULL)
+					FATAL("out of space in main");
+				pfile[npfile++] = argv[1];
+			}
 			break;
 		case 'F':	/* set field separator */
 			if (argv[1][2] != 0) {	/* arg is -Fsomething */
 				/* wart: t=>\t */
 				if (argv[1][2] == 't' && argv[1][3] == 0)
-					fs = (uchar *) "\t";
+					fs = "\t";
 				else if (argv[1][2] != 0)
-					fs = (uchar *)&argv[1][2];
+					fs = &argv[1][2];
 			} else {		/* arg is -F something */
 				argc--; argv++;
 				if (argc > 1) {
 					/* wart: t=>\t */
 					if (argv[1][0] == 't' &&
 					    argv[1][1] == 0)
-						fs = (uchar *) "\t";
+						fs = "\t";
 					else if (argv[1][0] != 0)
-						fs = (uchar *)&argv[1][0];
+						fs = &argv[1][0];
 				}
 			}
 			if (fs == NULL || *fs == '\0')
-				ERROR "field separator FS is empty" WARNING;
+				WARNING("field separator FS is empty");
 			break;
 		case 'v':	/* -v a=1 to be done NOW.  one -v for each */
-			if (argv[1][2] == '\0' && --argc > 1 &&
-			    isclvar((uchar *)(++argv)[1]))
-				setclvar((uchar *)argv[1]);
+			if (argv[1][2] != 0) {  /* arg is -vsomething */
+				if (isclvar(&argv[1][2]))
+					setclvar(&argv[1][2]);
+				else
+					FATAL("invalid -v option argument: %s",
+					    &argv[1][2]);
+			} else {		/* arg is -v something */
+				argc--; argv++;
+				if (argc <= 1)
+					FATAL("no variable name");
+				if (isclvar(argv[1]))
+					setclvar(argv[1]);
+				else
+					FATAL("invalid -v option argument: %s",
+					    argv[1]);
+			}
 			break;
 		case 'd':
 			dbg = atoi(&argv[1][2]);
@@ -129,7 +189,7 @@ main(int argc, char *argv[], char *envp[])
 			(void) printf("awk %s\n", version);
 			break;
 		default:
-			ERROR "unknown option %s ignored", argv[1] WARNING;
+			WARNING("unknown option %s ignored", argv[1]);
 			break;
 		}
 		argc--;
@@ -140,18 +200,21 @@ main(int argc, char *argv[], char *envp[])
 		if (argc <= 1) {
 			if (dbg)
 				exit(0);
-			ERROR "no program given" FATAL;
+			FATAL("no program given");
 		}
 		dprintf(("program = |%s|\n", argv[1]));
-		lexprog = (uchar *)argv[1];
+		lexprog = argv[1];
 		argc--;
 		argv++;
 	}
+	recinit(recsize);
+	syminit();
 	compile_time = 1;
-	argv[0] = (char *)cmdname;	/* put prog name at front of arglist */
+	argv[0] = cmdname;	/* put prog name at front of arglist */
 	dprintf(("argc=%d, argv[0]=%s\n", argc, argv[0]));
-	arginit(argc, (uchar **)argv);
-	envinit((uchar **)envp);
+	arginit(argc, argv);
+	if (!safe)
+		envinit(envp);
 	(void) yyparse();
 	if (fs)
 		*FS = qstring(fs, '\0');
@@ -160,9 +223,6 @@ main(int argc, char *argv[], char *envp[])
 	 * done parsing, so now activate the LC_NUMERIC
 	 */
 	(void) setlocale(LC_ALL, "");
-	nl_radix = nl_langinfo(RADIXCHAR);
-	if (nl_radix)
-		radixpoint = *nl_radix;
 
 	if (errorflag == 0) {
 		compile_time = 0;
@@ -173,7 +233,7 @@ main(int argc, char *argv[], char *envp[])
 }
 
 int
-pgetc(void)		/* get program character */
+pgetc(void)		/* get 1 character from awk program */
 {
 	int c;
 
@@ -181,17 +241,27 @@ pgetc(void)		/* get program character */
 		if (yyin == NULL) {
 			if (curpfile >= npfile)
 				return (EOF);
-			yyin = (strcmp((char *)pfile[curpfile], "-") == 0) ?
-			    stdin : fopen((char *)pfile[curpfile], "r");
+			yyin = (strcmp(pfile[curpfile], "-") == 0) ?
+			    stdin : fopen(pfile[curpfile], "rF");
 			if (yyin == NULL) {
-				ERROR "can't open file %s",
-				    pfile[curpfile] FATAL;
+				FATAL("can't open file %s", pfile[curpfile]);
 			}
+			lineno = 1;
 		}
 		if ((c = getc(yyin)) != EOF)
 			return (c);
-		(void) fclose(yyin);
+		if (yyin != stdin)
+			(void) fclose(yyin);
 		yyin = NULL;
 		curpfile++;
 	}
+}
+
+char *
+cursource(void)	/* current source file name */
+{
+	if (curpfile < npfile)
+		return (pfile[curpfile]);
+	else
+		return (NULL);
 }

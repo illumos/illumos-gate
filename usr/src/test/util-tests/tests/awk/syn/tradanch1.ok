@@ -1,4 +1,4 @@
 $AWK: syntax error in regular expression foo^bar at bar
- source line number 1
+ source line number 1 source file tradanch1.awk
  context is
 	 >>> /foo^bar/ <<< 

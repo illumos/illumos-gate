@@ -20,9 +20,12 @@ DATA_FILES =		\
 	test.countries	\
 	test.data
 
+BUGS_AWK :sh= (cd bugs-fixed; print *.awk)
+BUGS_FILES = $(BUGS_AWK) $(BUGS_AWK:%.awk=%.ok)
+
 EXAMPLES_FILES :sh= (cd examples/awk; print p.* t.*)
 
-TESTS_FILES :sh= (cd tests; print T.* *.p *.ok chem.awk latin1)
+TESTS_FILES :sh= (cd tests; print T.* *.p *.ok chem.awk latin1 lilly.progs)
 
 GNU_AWK :sh= (cd gnu; print *.awk)
 GNU_KSH :sh= (cd gnu; print *.sh)
@@ -42,11 +45,12 @@ GNU_FILES =	\
 	$(GNU_AWK) $(GNU_AWK:%.awk=%.ok) \
 	$(GNU_KSH) $(GNU_KSH:%.sh=%.ok) \
 	$(GNU_IN) $(GNU_KSH:%.in=%.awk) \
-	out1.ok out2.ok out3.ok # Used by messages.sh
+	arynocls.data out1.ok out2.ok out3.ok # arynocls.awk & messages.sh data
 
 SYN_FILES :sh= (cd syn; print *.awk)
 
 ROOTFILES =					\
+	$(BUGS_FILES:%=$(TESTDIR)/bugs-fixed/%)	\
 	$(DATA_FILES:%=$(TESTDIR)/data/%)	\
 	$(EXAMPLES_FILES:%=$(TESTDIR)/examples/awk/%) \
 	$(EXAMPLES_FILES:%=$(TESTDIR)/examples/out/%) \
@@ -56,7 +60,7 @@ ROOTFILES =					\
 	$(SYN_FILES:%.awk=$(TESTDIR)/syn/%.ok) \
 	$(TESTDIR)/runtests.sh
 
-SUBDIRS = data examples/awk examples/out gnu syn tests
+SUBDIRS = bugs-fixed data examples/awk examples/out gnu syn tests
 
 ROOTOPTPKG = $(ROOT)/opt/util-tests
 TESTDIR = $(ROOTOPTPKG)/tests/awk
@@ -74,6 +78,7 @@ $(TESTDIR)/%.in := FILEMODE=0444
 $(TESTDIR)/%.ok := FILEMODE=0444
 $(TESTDIR)/%.sh := FILEMODE=0555
 
+$(TESTDIR)/tests/lilly.progs := FILEMODE=0444
 $(TESTDIR)/tests/latin1 := FILEMODE=0444
 $(TESTDIR)/tests/T.% := FILEMODE=0555
 $(TESTDIR)/tests/%.p := FILEMODE=0444

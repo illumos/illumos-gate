@@ -18,7 +18,7 @@ fail() {
 
 echo T.close: test close built-in
 
-rm -f test.temp
+rm -f $TEMP0
 $AWK '{ print >>"'$TEMP0'"; close("'$TEMP0'") }' /etc/passwd
 diff /etc/passwd $TEMP0 || fail 'BAD: T.close (1)'
 
@@ -26,5 +26,29 @@ ls -l > $TEMP0
 tail -1 $TEMP0 > $TEMP1
 $AWK '{ print >"'$TEMP2'"; close("'$TEMP2'") }' $TEMP0
 diff $TEMP1 $TEMP2 || fail 'BAD: T.close (2)'
+
+echo 0 > $TEMP1
+$AWK '	# non-accessible file
+  BEGIN { getline <"/etc/passwd"; print close("/etc/passwd"); }
+' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.close (3)'
+
+echo -1 > $TEMP1
+$AWK '	# file not opened
+  BEGIN { print close("glotch"); }
+' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.close (4)'
+
+echo 0 > $TEMP1
+$AWK '	# normal close
+  BEGIN { print "hello" > "'$TEMP0'"; print close("'$TEMP0'"); }
+' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.close (5)'
+
+echo 0 > $TEMP1
+$AWK '	# normal close
+  BEGIN { print "hello" | "cat > '$TEMP0'"; print close("cat > '$TEMP0'"); }
+' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.close (6)'
 
 exit $RESULT

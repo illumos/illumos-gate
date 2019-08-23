@@ -29,6 +29,7 @@ dir path=opt/util-tests/bin
 dir path=opt/util-tests/runfiles
 dir path=opt/util-tests/tests
 dir path=opt/util-tests/tests/awk
+dir path=opt/util-tests/tests/awk/bugs-fixed
 dir path=opt/util-tests/tests/awk/data
 dir path=opt/util-tests/tests/awk/examples
 dir path=opt/util-tests/tests/awk/examples/awk
@@ -57,6 +58,42 @@ file path=opt/util-tests/bin/print_json mode=0555
 file path=opt/util-tests/bin/utiltest mode=0555
 file path=opt/util-tests/runfiles/default.run mode=0444
 file path=opt/util-tests/tests/allowed-ips mode=0555
+file path=opt/util-tests/tests/awk/bugs-fixed/a-format.awk mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/a-format.ok mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/concat-assign-same.awk mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/concat-assign-same.ok mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/decr-NF.awk mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/decr-NF.ok mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/fs-overflow.awk mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/fs-overflow.ok mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/negative-nf.awk mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/negative-nf.ok mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/nf-self-assign.awk mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/nf-self-assign.ok mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/numeric-fs.awk mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/numeric-fs.ok mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/numeric-output-seps.awk \
+    mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/numeric-output-seps.ok mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/numeric-rs.awk mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/numeric-rs.ok mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/numeric-subsep.awk mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/numeric-subsep.ok mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/ofs-rebuild.awk mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/ofs-rebuild.ok mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/space.awk mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/space.ok mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/split-fs-from-array.awk \
+    mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/split-fs-from-array.ok mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/string-conv.awk mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/string-conv.ok mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/subsep-overflow.awk mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/subsep-overflow.ok mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/system-status.awk mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/system-status.ok mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/unary-plus.awk mode=0444
+file path=opt/util-tests/tests/awk/bugs-fixed/unary-plus.ok mode=0444
 file path=opt/util-tests/tests/awk/data/test.countries mode=0444
 file path=opt/util-tests/tests/awk/data/test.data mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/p.1 mode=0444
@@ -166,9 +203,10 @@ file path=opt/util-tests/tests/awk/examples/awk/t.concat mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.cond mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.contin mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.count mode=0444
+file path=opt/util-tests/tests/awk/examples/awk/t.crlf mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.cum mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.d.x mode=0444
-file path=opt/util-tests/tests/awk/examples/awk/t.delete mode=0444
+file path=opt/util-tests/tests/awk/examples/awk/t.delete0 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.delete1 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.delete2 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.delete3 mode=0444
@@ -187,6 +225,7 @@ file path=opt/util-tests/tests/awk/examples/awk/t.f4 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.for mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.for1 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.for2 mode=0444
+file path=opt/util-tests/tests/awk/examples/awk/t.for3 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.format4 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.fun mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.fun0 mode=0444
@@ -195,7 +234,7 @@ file path=opt/util-tests/tests/awk/examples/awk/t.fun2 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.fun3 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.fun4 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.fun5 mode=0444
-file path=opt/util-tests/tests/awk/examples/awk/t.getline mode=0444
+file path=opt/util-tests/tests/awk/examples/awk/t.getline1 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.getval mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.gsub mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.gsub1 mode=0444
@@ -246,7 +285,7 @@ file path=opt/util-tests/tests/awk/examples/awk/t.re5 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.re7 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.reFS mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.rec mode=0444
-file path=opt/util-tests/tests/awk/examples/awk/t.redir mode=0444
+file path=opt/util-tests/tests/awk/examples/awk/t.redir1 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.reg mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.roff mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.sep mode=0444
@@ -257,17 +296,19 @@ file path=opt/util-tests/tests/awk/examples/awk/t.set0b mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.set1 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.set2 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.set3 mode=0444
-file path=opt/util-tests/tests/awk/examples/awk/t.split mode=0444
+file path=opt/util-tests/tests/awk/examples/awk/t.split1 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.split2 mode=0444
+file path=opt/util-tests/tests/awk/examples/awk/t.split2a mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.split3 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.split4 mode=0444
+file path=opt/util-tests/tests/awk/examples/awk/t.split8 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.split9 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.split9a mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.stately mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.strcmp mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.strcmp1 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.strnum mode=0444
-file path=opt/util-tests/tests/awk/examples/awk/t.sub mode=0444
+file path=opt/util-tests/tests/awk/examples/awk/t.sub0 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.sub1 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.sub2 mode=0444
 file path=opt/util-tests/tests/awk/examples/awk/t.sub3 mode=0444
@@ -386,9 +427,10 @@ file path=opt/util-tests/tests/awk/examples/out/t.concat mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.cond mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.contin mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.count mode=0444
+file path=opt/util-tests/tests/awk/examples/out/t.crlf mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.cum mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.d.x mode=0444
-file path=opt/util-tests/tests/awk/examples/out/t.delete mode=0444
+file path=opt/util-tests/tests/awk/examples/out/t.delete0 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.delete1 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.delete2 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.delete3 mode=0444
@@ -407,6 +449,7 @@ file path=opt/util-tests/tests/awk/examples/out/t.f4 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.for mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.for1 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.for2 mode=0444
+file path=opt/util-tests/tests/awk/examples/out/t.for3 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.format4 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.fun mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.fun0 mode=0444
@@ -415,7 +458,7 @@ file path=opt/util-tests/tests/awk/examples/out/t.fun2 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.fun3 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.fun4 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.fun5 mode=0444
-file path=opt/util-tests/tests/awk/examples/out/t.getline mode=0444
+file path=opt/util-tests/tests/awk/examples/out/t.getline1 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.getval mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.gsub mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.gsub1 mode=0444
@@ -466,7 +509,7 @@ file path=opt/util-tests/tests/awk/examples/out/t.re5 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.re7 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.reFS mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.rec mode=0444
-file path=opt/util-tests/tests/awk/examples/out/t.redir mode=0444
+file path=opt/util-tests/tests/awk/examples/out/t.redir1 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.reg mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.roff mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.sep mode=0444
@@ -477,17 +520,19 @@ file path=opt/util-tests/tests/awk/examples/out/t.set0b mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.set1 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.set2 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.set3 mode=0444
-file path=opt/util-tests/tests/awk/examples/out/t.split mode=0444
+file path=opt/util-tests/tests/awk/examples/out/t.split1 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.split2 mode=0444
+file path=opt/util-tests/tests/awk/examples/out/t.split2a mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.split3 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.split4 mode=0444
+file path=opt/util-tests/tests/awk/examples/out/t.split8 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.split9 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.split9a mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.stately mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.strcmp mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.strcmp1 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.strnum mode=0444
-file path=opt/util-tests/tests/awk/examples/out/t.sub mode=0444
+file path=opt/util-tests/tests/awk/examples/out/t.sub0 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.sub1 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.sub2 mode=0444
 file path=opt/util-tests/tests/awk/examples/out/t.sub3 mode=0444
@@ -517,6 +562,9 @@ file path=opt/util-tests/tests/awk/gnu/arrymem1.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/arrymem1.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/arynasty.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/arynasty.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/arynocls.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/arynocls.data mode=0444
+file path=opt/util-tests/tests/awk/gnu/arynocls.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/aryprm9.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/aryprm9.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/arysubnm.awk mode=0444
@@ -526,11 +574,19 @@ file path=opt/util-tests/tests/awk/gnu/aryunasgn.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/asgext.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/asgext.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/asgext.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/back89.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/back89.in mode=0444
+file path=opt/util-tests/tests/awk/gnu/back89.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/childin.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/childin.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/childin.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/clobber.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/clobber.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/closebad.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/closebad.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/clsflnam.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/clsflnam.in mode=0444
+file path=opt/util-tests/tests/awk/gnu/clsflnam.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/compare.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/compare.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/compare.sh mode=0555
@@ -541,11 +597,20 @@ file path=opt/util-tests/tests/awk/gnu/concat1.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/concat1.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/concat2.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/concat2.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/concat3.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/concat3.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/concat4.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/concat4.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/concat4.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/concat5.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/concat5.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/convfmt.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/convfmt.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/datanonl.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/datanonl.in mode=0444
+file path=opt/util-tests/tests/awk/gnu/datanonl.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/delarprm.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/delarprm.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/dfastress.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/dfastress.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/dynlj.awk mode=0444
@@ -563,6 +628,8 @@ file path=opt/util-tests/tests/awk/gnu/fcall_exit.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/fcall_exit2.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/fcall_exit2.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/fcall_exit2.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/fflush.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/fflush.sh mode=0555
 file path=opt/util-tests/tests/awk/gnu/fldchg.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/fldchg.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/fldchg.ok mode=0444
@@ -572,6 +639,8 @@ file path=opt/util-tests/tests/awk/gnu/fldchgnf.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/fldterm.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/fldterm.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/fldterm.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/fordel.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/fordel.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/forsimp.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/forsimp.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/fsbs.awk mode=0444
@@ -591,6 +660,8 @@ file path=opt/util-tests/tests/awk/gnu/funsemnl.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/funstack.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/funstack.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/funstack.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/gawksub.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/gawksub.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/getline2.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/getline2.sh mode=0555
 file path=opt/util-tests/tests/awk/gnu/getline3.awk mode=0444
@@ -610,6 +681,9 @@ file path=opt/util-tests/tests/awk/gnu/gsubtest.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/gsubtest.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/gsubtst2.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/gsubtst2.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/gsubtst5.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/gsubtst5.in mode=0444
+file path=opt/util-tests/tests/awk/gnu/gsubtst5.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/gsubtst7.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/gsubtst7.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/gsubtst7.ok mode=0444
@@ -642,6 +716,9 @@ file path=opt/util-tests/tests/awk/gnu/localenl.sh mode=0555
 file path=opt/util-tests/tests/awk/gnu/longsub.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/longsub.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/longsub.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/longwrds.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/longwrds.in mode=0444
+file path=opt/util-tests/tests/awk/gnu/longwrds.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/manglprm.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/manglprm.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/manglprm.ok mode=0444
@@ -707,6 +784,11 @@ file path=opt/util-tests/tests/awk/gnu/octsub.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/ofmt.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/ofmt.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/ofmt.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/ofmta.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/ofmta.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/ofmtbig.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/ofmtbig.in mode=0444
+file path=opt/util-tests/tests/awk/gnu/ofmtbig.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/ofmtfidl.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/ofmtfidl.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/ofmtfidl.ok mode=0444
@@ -736,8 +818,9 @@ file path=opt/util-tests/tests/awk/gnu/pcntplus.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/pcntplus.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/pipeio1.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/pipeio1.ok mode=0444
-file path=opt/util-tests/tests/awk/gnu/posix2008sub.awk mode=0444
-file path=opt/util-tests/tests/awk/gnu/posix2008sub.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/pipeio2.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/pipeio2.in mode=0444
+file path=opt/util-tests/tests/awk/gnu/pipeio2.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/poundbang.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/poundbang.sh mode=0555
 file path=opt/util-tests/tests/awk/gnu/prdupval.awk mode=0444
@@ -760,6 +843,9 @@ file path=opt/util-tests/tests/awk/gnu/randtest.sh mode=0555
 file path=opt/util-tests/tests/awk/gnu/range1.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/range1.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/range1.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/rebrackloc.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/rebrackloc.in mode=0444
+file path=opt/util-tests/tests/awk/gnu/rebrackloc.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/rebt8b1.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/rebt8b1.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/rebuild.awk mode=0444
@@ -768,9 +854,14 @@ file path=opt/util-tests/tests/awk/gnu/rebuild.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/redfilnm.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/redfilnm.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/redfilnm.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/regeq.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/regeq.in mode=0444
+file path=opt/util-tests/tests/awk/gnu/regeq.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/regexpbrack2.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/regexpbrack2.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/regexpbrack2.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/regexprange.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/regexprange.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/reparse.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/reparse.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/reparse.ok mode=0444
@@ -817,6 +908,8 @@ file path=opt/util-tests/tests/awk/gnu/sigpipe1.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/splitargv.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/splitargv.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/splitargv.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/splitarr.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/splitarr.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/splitdef.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/splitdef.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/splitvar.awk mode=0444
@@ -824,6 +917,8 @@ file path=opt/util-tests/tests/awk/gnu/splitvar.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/splitvar.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/splitwht.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/splitwht.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/status-close.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/status-close.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/strcat1.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/strcat1.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/strnum1.awk mode=0444
@@ -838,6 +933,8 @@ file path=opt/util-tests/tests/awk/gnu/subamp.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/subamp.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/subi18n.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/subi18n.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/subsepnm.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/subsepnm.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/subslash.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/subslash.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/substr.awk mode=0444
@@ -911,14 +1008,20 @@ file path=opt/util-tests/tests/awk/syn/fnaryscl.awk mode=0444
 file path=opt/util-tests/tests/awk/syn/fnaryscl.ok mode=0444
 file path=opt/util-tests/tests/awk/syn/fnmisc.awk mode=0444
 file path=opt/util-tests/tests/awk/syn/fnmisc.ok mode=0444
+file path=opt/util-tests/tests/awk/syn/funsmnam.awk mode=0444
+file path=opt/util-tests/tests/awk/syn/funsmnam.ok mode=0444
 file path=opt/util-tests/tests/awk/syn/gsubasgn.awk mode=0444
 file path=opt/util-tests/tests/awk/syn/gsubasgn.ok mode=0444
 file path=opt/util-tests/tests/awk/syn/nastyparm.awk mode=0444
 file path=opt/util-tests/tests/awk/syn/nastyparm.ok mode=0444
+file path=opt/util-tests/tests/awk/syn/nfneg.awk mode=0444
+file path=opt/util-tests/tests/awk/syn/nfneg.ok mode=0444
 file path=opt/util-tests/tests/awk/syn/noparms.awk mode=0444
 file path=opt/util-tests/tests/awk/syn/noparms.ok mode=0444
 file path=opt/util-tests/tests/awk/syn/nulinsrc.awk mode=0444
 file path=opt/util-tests/tests/awk/syn/nulinsrc.ok mode=0444
+file path=opt/util-tests/tests/awk/syn/paramdup.awk mode=0444
+file path=opt/util-tests/tests/awk/syn/paramdup.ok mode=0444
 file path=opt/util-tests/tests/awk/syn/parseme.awk mode=0444
 file path=opt/util-tests/tests/awk/syn/parseme.ok mode=0444
 file path=opt/util-tests/tests/awk/syn/readbuf.awk mode=0444
@@ -943,6 +1046,7 @@ file path=opt/util-tests/tests/awk/tests/T.builtin mode=0555
 file path=opt/util-tests/tests/awk/tests/T.chem mode=0555
 file path=opt/util-tests/tests/awk/tests/T.close mode=0555
 file path=opt/util-tests/tests/awk/tests/T.clv mode=0555
+file path=opt/util-tests/tests/awk/tests/T.delete mode=0555
 file path=opt/util-tests/tests/awk/tests/T.errmsg mode=0555
 file path=opt/util-tests/tests/awk/tests/T.expr mode=0555
 file path=opt/util-tests/tests/awk/tests/T.exprconv mode=0555
@@ -951,16 +1055,22 @@ file path=opt/util-tests/tests/awk/tests/T.func mode=0555
 file path=opt/util-tests/tests/awk/tests/T.gawk mode=0555
 file path=opt/util-tests/tests/awk/tests/T.getline mode=0555
 file path=opt/util-tests/tests/awk/tests/T.latin1 mode=0555
+file path=opt/util-tests/tests/awk/tests/T.lilly mode=0555
 file path=opt/util-tests/tests/awk/tests/T.main mode=0555
 file path=opt/util-tests/tests/awk/tests/T.misc mode=0555
+file path=opt/util-tests/tests/awk/tests/T.nextfile mode=0555
 file path=opt/util-tests/tests/awk/tests/T.overflow mode=0555
 file path=opt/util-tests/tests/awk/tests/T.re mode=0555
+file path=opt/util-tests/tests/awk/tests/T.recache mode=0555
 file path=opt/util-tests/tests/awk/tests/T.redir mode=0555
+file path=opt/util-tests/tests/awk/tests/T.rt mode=0555
 file path=opt/util-tests/tests/awk/tests/T.split mode=0555
 file path=opt/util-tests/tests/awk/tests/T.sub mode=0555
 file path=opt/util-tests/tests/awk/tests/T.system mode=0555
 file path=opt/util-tests/tests/awk/tests/chem.awk mode=0444
 file path=opt/util-tests/tests/awk/tests/latin1 mode=0444
+file path=opt/util-tests/tests/awk/tests/lilly.ok mode=0444
+file path=opt/util-tests/tests/awk/tests/lilly.progs mode=0444
 file path=opt/util-tests/tests/awk/tests/lsd1.ok mode=0444
 file path=opt/util-tests/tests/awk/tests/lsd1.p mode=0444
 file path=opt/util-tests/tests/awk/tests/penicil.ok mode=0444

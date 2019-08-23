@@ -1,4 +1,4 @@
-$AWK: syntax error at source line 1
+$AWK: syntax error at source line 1 source file badbuild.awk
  context is
 	$1 == $2 >>>  == <<< 
 $AWK: bailing out at source line 1

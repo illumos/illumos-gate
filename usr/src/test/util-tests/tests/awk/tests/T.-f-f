@@ -20,6 +20,7 @@ TEMP2=$WORKDIR/test.temp.2
 TEMP3=$WORKDIR/test.temp.3
 TEMP4=$WORKDIR/test.temp.4
 TEMP5=$WORKDIR/test.temp.5
+TEMP6=$WORKDIR/test.temp.6
 
 echo 'begin
 end' > $TEMP0
@@ -40,5 +41,16 @@ echo 'print' > $TEMP3
 echo '}' > $TEMP4
 $AWK -f $TEMP2 -f $TEMP3 -f $TEMP4 /etc/passwd > $TEMP5
 diff $TEMP1 $TEMP5 || fail 'BAD: T.-f-f 3 files'
+
+
+echo '/./ {' > $TEMP2
+echo 'print' > $TEMP3
+echo '
+
+
+
+]' > $TEMP4
+$AWK -f $TEMP2 -f $TEMP3 -f $TEMP4 /etc/passwd > $TEMP5 2> $TEMP6
+grep "syntax error.*file $TEMP4" $TEMP6 >/dev/null 2>&1 || fail 'BAD: T.-f-f source file name'
 
 exit $RESULT

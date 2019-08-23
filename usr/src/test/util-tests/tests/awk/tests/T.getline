@@ -95,4 +95,21 @@ $AWK ' BEGIN { print getline <"/glop/glop/glop" } ' > $TEMP1
 echo '-1' > $TEMP2
 cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.getline (non-existent file)'
 
+echo 'false false equal' > $TEMP1
+$AWK 'BEGIN {
+	"echo 0" | getline
+	if ($0) printf "true " 
+	else printf "false "
+	if ($1) printf "true " 
+	else printf "false "
+	if ($0==$1) printf "equal\n"
+	else printf "not equal\n"
+}' > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.getline bad $0 type in cmd|getline'
+
+echo 'L1
+L2' | $AWK 'BEGIN { $0="old stuff"; $1="new"; getline x; print}' > $TEMP1
+echo 'new stuff' > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.getline bad update $0'
+
 exit $RESULT

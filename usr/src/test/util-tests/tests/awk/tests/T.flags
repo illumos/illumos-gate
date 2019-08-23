@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
-    printf '$AWK must be set\n' >&2
+    printf '$AWK and $WORKDIR must be set\n' >&2
     exit 1
 fi
 
@@ -24,6 +24,9 @@ grep 'no program' $TEMP1 >/dev/null || fail 'T.flags: bad no program'
 
 $AWK -f glop/glop > $TEMP1 2>&1
 grep 'can.t open' $TEMP1 >/dev/null || fail 'T.flags: bad can.t open program'
+
+$AWK -fglop/glop > $TEMP1 2>&1
+grep 'can.t open' $TEMP1 >/dev/null || fail 'T.flags: bad can.t open program 2'
 
 $AWK -zz 'BEGIN{}' > $TEMP1 2>&1
 grep 'unknown option' $TEMP1 >/dev/null || fail 'T.flags: bad unknown option'

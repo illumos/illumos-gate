@@ -43,8 +43,9 @@
 .\" Copyright 1989 AT&T
 .\" Copyright 1992, X/Open Company Limited  All Rights Reserved
 .\" Portions Copyright (c) 2005, 2006 Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2018, Joyent, Inc.
 .\"
-.TH NAWK 1 "May 24, 2006"
+.TH NAWK 1 "Nov 9, 2018"
 .SH NAME
 nawk \- pattern scanning and processing language
 .SH SYNOPSIS
@@ -61,7 +62,6 @@ nawk \- pattern scanning and processing language
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fB/usr/bin/nawk\fR and \fB/usr/xpg4/bin/awk\fR utilities execute
 \fIprogram\fRs written in the \fBnawk\fR programming language, which is
@@ -88,8 +88,8 @@ utility denotes the first field in a record \fB$1\fR, the second \fB$2\fR, and
 so forth. The symbol \fB$0\fR refers to the entire record; setting any other
 field causes the reevaluation of \fB$0\fR. Assigning to \fB$0\fR resets the
 values of all fields and the \fBNF\fR built-in variable.
+
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -129,8 +129,18 @@ before executing the \fBnawk\fR program, including the actions associated with
 specified.
 .RE
 
-.SH OPERANDS
 .sp
+.ne 2
+.na
+\fB\fB-safe\fR\fR
+.ad
+.RS 17n
+When passed to \fBnawk\fR, this flag will prevent the program from opening new
+files or running child processes. The \fBENVIRON\fR array will also not be
+initialized.
+.RE
+
+.SH OPERANDS
 .LP
 The following operands are supported:
 .sp
@@ -193,7 +203,6 @@ assignments are executed before processing the standard input.
 .RE
 
 .SH INPUT FILES
-.sp
 .LP
 Input files to the \fBnawk\fR program from any of the following sources:
 .RS +4
@@ -230,8 +239,8 @@ program.
 .LP
 The standard input are used only if no \fIfile\fR operands are specified, or if
 a \fIfile\fR operand is \fB\(mi\fR\&.
+
 .SH EXTENDED DESCRIPTION
-.sp
 .LP
 A \fBnawk\fR program is composed of pairs of the form:
 .sp
@@ -263,8 +272,8 @@ program in the order of occurrence, and executing the action associated with
 each pattern that matches the current record. The action for a matching pattern
 is executed before evaluating subsequent patterns. Last, the actions associated
 with all \fBEND\fR patterns is executed in the order they occur in the program.
+
 .SS "Expressions in nawk"
-.sp
 .LP
 Expressions describe computations used in \fIpatterns\fR and \fIactions\fR. In
 the following table, valid expression operations are given in groups from
@@ -288,9 +297,9 @@ _
 $\fIexpr\fR	Field reference	string	n/a
 _
 ++ \fIlvalue\fR	Pre-increment	numeric	n/a
- \(mi\(mi\fIlvalue\fR	Pre-decrement	numeric	n/a
+\(mi\(mi \fIlvalue\fR	Pre-decrement	numeric	n/a
 \fIlvalue\fR ++	Post-increment	numeric	n/a
-\fIlvalue\fR \(mi\(mi	Post-decrement 	numeric	n/a
+\fIlvalue\fR \(mi\(mi	Post-decrement	numeric	n/a
 _
 \fIexpr\fR ^ \fIexpr\fR	Exponentiation	numeric	right
 _
@@ -303,7 +312,7 @@ _
 \fIexpr\fR % \fIexpr\fR	Modulus	numeric	left
 _
 \fIexpr\fR + \fIexpr\fR	Addition	numeric	left
-\fIexpr\fR \(mi \fIexpr\fR	Subtraction	numeric 	left
+\fIexpr\fR \(mi \fIexpr\fR	Subtraction	numeric	left
 _
 \fIexpr\fR \fIexpr\fR	String concatenation	string	left
 _
@@ -319,20 +328,20 @@ _
 _
 \fIexpr\fR in array	Array membership	numeric	left
 ( \fIindex\fR ) in	Multi-dimension array	numeric	left
-    \fIarray\fR	    membership		
+    \fIarray\fR	    membership
 _
 \fBexpr\fR && \fIexpr\fR	Logical AND	numeric	left
 _
 \fBexpr\fR |\|| \fIexpr\fR	Logical OR	numeric	left
 _
 \fIexpr1\fR ? \fIexpr2\fR	Conditional expression	type of selected	right
-    : \fIexpr3\fR		   \fIexpr2\fR or \fIexpr3\fR	
+    : \fIexpr3\fR		   \fIexpr2\fR or \fIexpr3\fR
 _
 \fIlvalue\fR ^= \fIexpr\fR	Exponentiation	numeric	right
-	assignment		
+	assignment
 \fIlvalue\fR %= \fIexpr\fR	Modulus assignment	numeric	right
 \fIlvalue\fR *= \fIexpr\fR	Multiplication	numeric	right
-	assignment		
+	assignment
 \fIlvalue\fR /= \fIexpr\fR	Division assignment	numeric	right
 \fIlvalue\fR +=  \fIexpr\fR	Addition assignment	numeric	right
 \fIlvalue\fR \(mi= \fIexpr\fR	Subtraction assignment	numeric	right
@@ -479,8 +488,8 @@ A multi-dimensioned \fIindex\fR used with the \fBin\fR operator must be put in
 parentheses. The \fBin\fR operator, which tests for the existence of a
 particular array element, does not create the element if it does not exist.
 Any other reference to a non-existent array element automatically creates it.
+
 .SS "Variables and Special Variables"
-.sp
 .LP
 Variables can be used in an \fBnawk\fR program by referencing them. With the
 exception of function parameters, they are not explicitly declared.
@@ -503,8 +512,8 @@ occurrence of the decimal-point character from the current locale changed to a
 period character, is considered a \fInumeric string\fR (see \fBExpressions in
 nawk\fR above), the field variable also has the numeric value of the \fInumeric
 string\fR.
+
 .SS "/usr/bin/nawk, /usr/xpg4/bin/awk"
-.sp
 .LP
 \fBnawk\fR sets the following special variables that are supported by both
 \fB/usr/bin/nawk\fR and \fB/usr/xpg4/bin/awk\fR:
@@ -534,6 +543,16 @@ that it is not treated as an input file. The name \fB\(mi\fR indicates the
 standard input. If an argument matches the format of an \fIassignment\fR
 operand, this argument is treated as an assignment rather than a \fIfile\fR
 argument.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBCONVFMT\fR\fR
+.ad
+.RS 12n
+The \fBprintf\fR format for converting numbers to strings (except for output
+statements, where \fBOFMT\fR is used). The default is \fB%.6g\fR.
 .RE
 
 .sp
@@ -644,7 +663,7 @@ The \fBprint\fR output record separator; a newline character by default.
 .sp
 .ne 2
 .na
-\fB\fBLENGTH\fR\fR
+\fB\fBRLENGTH\fR\fR
 .ad
 .RS 12n
 The length of the string matched by the \fBmatch\fR function.
@@ -685,22 +704,21 @@ The subscript separator string for multi-dimensional arrays. The default value
 is \fB\e034\fR\&.
 .RE
 
-.SS "/usr/xpg4/bin/awk"
-.sp
+.SS "/usr/bin/nawk"
 .LP
-The following variable is supported for \fB/usr/xpg4/bin/awk\fR only:
+The following variable is supported for \fB/usr/bin/nawk\fR only:
 .sp
 .ne 2
 .na
-\fB\fBCONVFMT\fR\fR
+\fB\fBRT\fR\fR
 .ad
-.RS 11n
-The \fBprintf\fR format for converting numbers to strings (except for output
-statements, where \fBOFMT\fR is used). The default is \fB%.6g\fR.
+.RS 12n
+The record terminator for the most recent record read. For most records this
+will be the same value as \fBRS\fR. At the end of a file with no trailing
+separator value, though, this will be set to the empty string (\fB""\fR).
 .RE
 
 .SS "Regular Expressions"
-.sp
 .LP
 The \fBnawk\fR utility makes use of the extended regular expression notation
 (see \fBregex\fR(5)) except that it allows the use of C-language conventions to
@@ -817,14 +835,14 @@ character and the record separator) can be embedded in the pattern and an
 appropriate pattern matches any character. However, in all \fBnawk\fR regular
 expression matching, the use of one or more NULL characters in the pattern,
 input record or text string produces undefined results.
+
 .SS "Patterns"
-.sp
 .LP
 A \fIpattern\fR is any valid \fIexpression,\fR a range specified by two
 expressions separated by comma, or one of the two special patterns \fBBEGIN\fR
 or \fBEND\fR.
+
 .SS "Special Patterns"
-.sp
 .LP
 The \fBnawk\fR utility recognizes two special patterns, \fBBEGIN\fR and
 \fBEND\fR. Each \fBBEGIN\fR pattern is matched once and its associated action
@@ -848,23 +866,23 @@ without reading its input when the last statement in the last \fBBEGIN\fR
 action is executed. If an \fBnawk\fR program consists of only actions with the
 pattern \fBEND\fR or only actions with the patterns \fBBEGIN\fR and \fBEND\fR,
 the input is read before the statements in the \fBEND\fR actions are executed.
+
 .SS "Expression Patterns"
-.sp
 .LP
 An expression pattern is evaluated as if it were an expression in a Boolean
 context. If the result is true, the pattern is considered to match, and the
 associated action (if any) is executed. If the result is false, the action is
 not executed.
+
 .SS "Pattern Ranges"
-.sp
 .LP
 A pattern range consists of two expressions separated by a comma. In this case,
 the action is performed for all records between a match of the first expression
 and the following match of the second expression, inclusive. At this point, the
 pattern range can be repeated starting at input records subsequent to the end
 of the matched range.
+
 .SS "Actions"
-.sp
 .LP
 An action is a sequence of statements. A statement can be one of the following:
 .sp
@@ -876,6 +894,7 @@ do \fIstatement\fR while ( \fIexpression\fR )
 for ( \fIexpression\fR ; \fIexpression\fR ; \fIexpression\fR ) \fIstatement\fR
 for ( \fIvar\fR in \fIarray\fR ) \fIstatement\fR
 delete \fIarray\fR[\fIsubscript\fR] #delete an array element
+delete \fIarray\fR #delete all elements within an array
 break
 continue
 { [ \fIstatement\fR ] .\|.\|. }
@@ -883,6 +902,7 @@ continue
 print [ \fIexpression-list\fR ] [ >\fIexpression\fR ]
 printf format [ ,\fIexpression-list\fR ] [ >\fIexpression\fR ]
 next              # skip remaining patterns on this input line
+nextfile          # skip remaining patterns on this input file
 exit [expr] # skip the rest of the input; exit status is expr
 return [expr]
 .fi
@@ -900,6 +920,12 @@ record to be abandoned. The behavior is undefined if a \fBnext\fR statement
 appears or is invoked in a \fBBEGIN\fR or \fBEND\fR action.
 .sp
 .LP
+The \fBnextfile\fR statement is similar to \fBnext\fR, but also skips all other
+records in the current file, and moves on to processing the next input file if
+available (or exits the program if there are none). (Note that this keyword is
+not supported by \fB/usr/xpg4/bin/awk\fR.)
+.sp
+.LP
 The \fBexit\fR statement invokes all \fBEND\fR actions in the order in which
 they occur in the program source and then terminate the program without reading
 further input. An \fBexit\fR statement inside an \fBEND\fR action terminates
@@ -907,8 +933,8 @@ the program without further execution of \fBEND\fR actions.  If an expression
 is specified in an \fBexit\fR statement, its numeric value is the exit status
 of \fBnawk\fR, unless subsequent errors are encountered or a subsequent
 \fBexit\fR statement with an expression is executed.
+
 .SS "Output Statements"
-.sp
 .LP
 Both \fBprint\fR and \fBprintf\fR statements write to standard output by
 default.  The output is written to the location specified by
@@ -1046,13 +1072,13 @@ unspecified.
 .sp
 .LP
 Both \fBprint\fR and \fBprintf\fR can output at least \fB{LINE_MAX}\fR bytes.
+
 .SS "Functions"
-.sp
 .LP
 The \fBnawk\fR language has a variety of built-in functions: arithmetic,
 string, input/output and general.
+
 .SS "Arithmetic Functions"
-.sp
 .LP
 The arithmetic functions, except for \fBint\fR, are based on the \fBISO\fR
 \fBC\fR standard. The behavior is undefined in cases where the \fBISO\fR
@@ -1144,7 +1170,6 @@ Set the seed value for \fBrand\fR to \fIexpr\fR or use the time of day if
 .RE
 
 .SS "String Functions"
-.sp
 .LP
 The string functions in the following list shall be supported. Although the
 grammar permits built-in functions to appear with no arguments or parentheses,
@@ -1176,12 +1201,15 @@ string \fIt\fR first occurs, or zero if it does not occur at all.
 .sp
 .ne 2
 .na
-\fB\fBlength\fR[([\fIs\fR])]\fR
+\fB\fBlength\fR[([\fIv\fR])]\fR
 .ad
 .sp .6
 .RS 4n
-Return the length, in characters, of its argument taken as a string, or of the
-whole record, \fB$0\fR, if there is no argument.
+Given no argument, this function returns the length of the whole record,
+\fB$0\fR. If given an array as an argument (and using \fB/usr/bin/nawk\fR),
+then this returns the number of elements it contains. Otherwise, this function
+interprets the argument as a string (performing any needed conversions) and
+returns its length in characters.
 .RE
 
 .sp
@@ -1294,8 +1322,8 @@ string by the upper-case letter specified by the mapping. Other characters in
 All of the preceding functions that take \fIERE\fR as a parameter expect a
 pattern or a string valued expression that is a regular expression as defined
 below.
+
 .SS "Input/Output and General Functions"
-.sp
 .LP
 The input/output and general functions are:
 .sp
@@ -1308,6 +1336,20 @@ Close the file or pipe opened by a \fBprint\fR or \fBprintf\fR statement or a
 call to \fBgetline\fR with the same string-valued \fIexpression\fR. If the
 close was successful, the function returns \fB0\fR; otherwise, it returns
 non-zero.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBfflush(\fR\fIexpression\fR)\fR
+.ad
+.RS 27n
+Flush any buffered output for the file or pipe opened by a \fBprint\fR or
+\fBprintf\fR statement or a call to \fBgetline\fR with the same string-valued
+\fIexpression\fR. If the flush was successful, the function returns \fB0\fR;
+otherwise, it returns \fBEOF\fR. If no arguments or the empty string
+(\fB""\fR) are given, then all open files will be flushed. (Note that
+\fBfflush\fR is supported in \fB/usr/bin/nawk\fR only.)
 .RE
 
 .sp
@@ -1343,7 +1385,7 @@ parentheses properly.
 .na
 \fB\fBgetline\fR\fR
 .ad
-.RS 30n
+.RS 27n
 Set \fB$0\fR to the next input record from the current input file. This form of
 \fBgetline\fR sets the \fBNF\fR, \fBNR\fR, and \fBFNR\fR variables.
 .RE
@@ -1353,7 +1395,7 @@ Set \fB$0\fR to the next input record from the current input file. This form of
 .na
 \fB\fBgetline\fR \fIvar\fR\fR
 .ad
-.RS 30n
+.RS 27n
 Set variable \fIvar\fR to the next input record from the current input file.
 This form of \fBgetline\fR sets the \fBFNR\fR and \fBNR\fR variables.
 .RE
@@ -1363,7 +1405,7 @@ This form of \fBgetline\fR sets the \fBFNR\fR and \fBNR\fR variables.
 .na
 \fB\fBgetline\fR [\fIvar\fR] \fB<\fR \fIexpression\fR\fR
 .ad
-.RS 30n
+.RS 27n
 Read the next record of input from a named file. The \fIexpression\fR is
 evaluated to produce a string that is used as a full pathname. If the file of
 that name is not currently open, it is opened. As long as the stream remains
@@ -1385,7 +1427,7 @@ portable applications must be put in parentheses properly.
 .na
 \fB\fBsystem\fR(\fIexpression\fR)\fR
 .ad
-.RS 30n
+.RS 27n
 Execute the command given by \fIexpression\fR in a manner equivalent to the
 \fBsystem\fR(3C) function and return the exit status of the command.
 .RE
@@ -1400,8 +1442,8 @@ Where strings are used as the name of a file or pipeline, the strings must be
 textually identical. The terminology ``same string value'' implies that
 ``equivalent strings'', even those that differ only by space characters,
 represent different files.
+
 .SS "User-defined Functions"
-.sp
 .LP
 The \fBnawk\fR language also provides user-defined functions. Such functions
 can be defined as:
@@ -1453,8 +1495,8 @@ outside of a function definition, the behavior is undefined.
 In the function definition, newline characters are optional before the opening
 brace and after the closing brace. Function definitions can appear anywhere in
 the program where a \fIpattern-action\fR pair is allowed.
+
 .SH USAGE
-.sp
 .LP
 The \fBindex\fR, \fBlength\fR, \fBmatch\fR, and \fBsubstr\fR functions should
 not be confused with similar functions in the \fBISO C\fR standard; the
@@ -1469,8 +1511,8 @@ enforce the proper evaluation precedence.
 .LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBnawk\fR when
 encountering files greater than or equal to 2 Gbyte (2^31 bytes).
+
 .SH EXAMPLES
-.sp
 .LP
 The \fBnawk\fR program specified in the command line is most easily specified
 within single-quotes (for example, \fB\&'\fR\fIprogram\fR\fB\&'\fR) for
@@ -1750,7 +1792,6 @@ then the command line
 prints the file \fBinput\fR, filling in page numbers starting at 5.
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect execution: \fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and
@@ -1769,7 +1810,6 @@ programs (including assignments in command-line arguments).
 .RE
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -1796,7 +1836,6 @@ The exit status can be altered within the program by using an \fBexit\fR
 expression.
 
 .SH SEE ALSO
-.sp
 .LP
 \fBawk\fR(1), \fBed\fR(1), \fBegrep\fR(1), \fBgrep\fR(1), \fBlex\fR(1),
 \fBsed\fR(1), \fBpopen\fR(3C), \fBprintf\fR(3C), \fBsystem\fR(3C),
@@ -1806,8 +1845,8 @@ expression.
 .LP
 Aho, A. V., B. W. Kernighan, and P. J. Weinberger, \fIThe AWK Programming
 Language\fR, Addison-Wesley, 1988.
+
 .SH DIAGNOSTICS
-.sp
 .LP
 If any \fIfile\fR operand is specified and the named file cannot be accessed,
 \fBnawk\fR writes a diagnostic message to standard error and terminate without
@@ -1817,8 +1856,8 @@ any further action.
 If the program specified by either the \fIprogram\fR operand or a
 \fIprogfile\fR operand is not a valid \fBnawk\fR program (as specified in
 \fBEXTENDED DESCRIPTION\fR), the behavior is undefined.
+
 .SH NOTES
-.sp
 .LP
 Input white space is not preserved on output if fields are involved.
 .sp

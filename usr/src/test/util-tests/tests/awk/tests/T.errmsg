@@ -39,8 +39,26 @@ $1 ~ /^#/ {
 illegal primary in regular expression
 /(/
 
+illegal break, continue, next or nextfile from BEGIN
+BEGIN { nextfile }
+
+illegal break, continue, next or nextfile from END
+END { nextfile }
+
+nextfile is illegal inside a function
+function foo() { nextfile }
+
+duplicate argument
+function f(i,j,i) { return i }
+
 nonterminated character class
 /[[/
+
+nonterminated character class
+/[]/
+
+nonterminated character class
+/[\
 
 nonterminated character class
 BEGIN { s = "[x"; if (1 ~ s) print "foo"}
@@ -95,6 +113,16 @@ function x() { function g() {} }
 return not in function
 { return }
 
+break illegal outside
+{ break }
+
+continue illegal outside
+{ continue }
+
+non-terminated string
+{ print "abc
+}
+
 illegal field $(foo)
 BEGIN { print $"foo" }
 
@@ -104,6 +132,9 @@ function f() { next }
 
 not enough args in printf(%s)
 BEGIN { printf("%s") }
+
+weird printf conversion
+BEGIN { printf("%z", "foo")}
 
 function f has .* arguments, limit .*
 function f(a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,b1,b2,b3,b4,b5,b6,b7,b8,b9,b10,
@@ -176,6 +207,12 @@ BEGIN { length("abc", "def") }
 calling undefined function foo
 BEGIN { foo() }
 
+cannot delete SYMTAB or its elements
+BEGIN { delete SYMTAB }
+
+cannot delete SYMTAB or its elements
+BEGIN { delete SYMTAB["OFS"] }
+
 # I am pretty certain that this test is _meant_ to fail,
 # to allow checking whether anything is happening. Uncomment
 # below to check whether the script then fails:
@@ -194,5 +231,20 @@ echo xxx > $TEMP0
 $AWK '{print x}' x='a
 b' $TEMP0 > $TEMP1 2> $TEMP2
 grep 'newline in string' $TEMP2 >/dev/null || fail 'BAD: T.errmsg newline in string'
+
+$AWK -safe 'BEGIN{"date" | getline}' > $TEMP0 2> $TEMP2
+grep 'cmd | getline is unsafe' $TEMP2 >/dev/null || fail 'BAD: T.errmsg cmd|getline unsafe'
+
+$AWK -safe 'BEGIN{print >"'$TEMP0'"}' > $TEMP0 2> $TEMP2
+grep 'print > is unsafe' $TEMP2 >/dev/null || fail 'BAD: T.errmsg print > unsafe'
+
+$AWK -safe 'BEGIN{print >> "'$TEMP0'"}' > $TEMP0 2> $TEMP2
+grep 'print >> is unsafe' $TEMP2 >/dev/null || fail 'BAD: T.errmsg print >> unsafe'
+
+$AWK -safe 'BEGIN{print | "'$TEMP0'"}' > $TEMP0 2> $TEMP2
+grep 'print | is unsafe' $TEMP2 >/dev/null || fail 'BAD: T.errmsg print | unsafe'
+
+$AWK -safe 'BEGIN {system("date")}' > $TEMP0 2> $TEMP2
+grep 'system is unsafe' $TEMP2 >/dev/null || fail 'BAD: T.errmsg system unsafe'
 
 exit $RESULT

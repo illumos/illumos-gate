@@ -1,2 +1,2 @@
-$AWK: can't read value of a; it's an array name.
- source line number 8
+$AWK: can't read value of b; it's an array name.
+ source line number 3

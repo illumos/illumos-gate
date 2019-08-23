@@ -93,4 +93,12 @@ BEGIN {
 }' > $TEMP2
 cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.overflow big array'
 
+echo x > $TEMP1
+$AWK '{print $40000000000000}' < $TEMP1 > $TEMP2 2> $TEMP0
+grep "out of range field" $TEMP0 >/dev/null || fail "BAD: T.overflow \$400000"
+
+rm -rf /tmp/awktestfoo*
+$AWK 'BEGIN { for (i=1; i <= 1000; i++) print i >("/tmp/awktestfoo" i) }'
+ls /tmp/awktestfoo* | grep '1000' >/dev/null || fail "BAD: T.overflow openfiles"
+
 exit $RESULT

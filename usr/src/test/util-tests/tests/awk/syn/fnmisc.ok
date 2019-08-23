@@ -1,4 +1,4 @@
-$AWK: syntax error at source line 11
+$AWK: syntax error at source line 11 source file fnmisc.awk
  context is
 	function >>>  split <<< (x) { return x }
 $AWK: bailing out at source line 11
