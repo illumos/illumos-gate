@@ -1380,6 +1380,10 @@ const struct ioc {
 		NULL},
 	{ (uint_t)DKIOCREADONLY,	"DKIOCREADONLY",
 		NULL},
+	{ (uint_t)DKIOCFREE,		"DKIOCFREE",
+		NULL},
+	{ (uint_t)DKIOC_CANFREE,	"DKIOC_CANFREE",
+		NULL},
 
 	/* disk ioctls - (0x04 << 8) - fdio.h */
 	{ (uint_t)FDIOGCHAR,		"FDIOGCHAR",

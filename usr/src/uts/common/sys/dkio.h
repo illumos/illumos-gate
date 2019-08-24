@@ -24,6 +24,7 @@
  *
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _SYS_DKIO_H
@@ -542,6 +543,13 @@ typedef struct dkioc_free_list_s {
 #define	DFL_SZ(num_exts) \
 	(sizeof (dkioc_free_list_t) + \
 	(num_exts - 1) * sizeof (dkioc_free_list_ext_t))
+
+/*
+ * ioctl to determine if free (e.g. SCSI UNMAP) is supported.
+ * See FDIOC ioctls for why we're not using '51' here.
+ */
+#define	DKIOC_CANFREE	(DKIOC|60)
+
 
 #ifdef	__cplusplus
 }
