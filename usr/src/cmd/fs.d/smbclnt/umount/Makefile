@@ -22,6 +22,8 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+#
 
 #
 # cmd/fs.d/smbclnt/umount/Makefile
@@ -37,7 +39,7 @@ COMMON=		$(FSLIB)
 OBJS=		$(LIBPROG).o $(COMMON)
 SRCS=		$(LIBPROG).c $(FSLIBSRC)
 
-$(ROOTLIBFSTYPE)/umount := FILEMODE= 04555
+$(ROOTLIBFSTYPE)/umount := FILEMODE= 0555
 
 CPPFLAGS += -I../.. -I../lib
 CFLAGS += $(CCVERBOSE)
@@ -61,5 +63,5 @@ $(LIBPROG):	$(OBJS)
 
 lint:	lint_SRCS
 
-clean:     
+clean:
 	$(RM) $(LIBPROG).o

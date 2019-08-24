@@ -21,11 +21,12 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ *
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #include	<stdio.h>
@@ -47,6 +48,7 @@
 #include	<sys/mntent.h>
 #include	<sys/ctfs.h>
 #include	<locale.h>
+#include	<priv.h>
 #include	<stdarg.h>
 #include	<sys/mount.h>
 #include	<sys/objfs.h>
@@ -138,15 +140,15 @@ static void	cleanup(int);
 
 static mountent_t	**make_mntarray(char **, int);
 static mountent_t	*getmntall();
-static mountent_t 	*new_mountent(struct mnttab *);
+static mountent_t	*new_mountent(struct mnttab *);
 static mountent_t	*getmntlast(mountent_t *, char *, char *);
 
 int
 main(int argc, char **argv)
 {
-	int 	cc;
+	int	cc;
 	struct mnttab  mget;
-	char 	*mname, *is_special;
+	char	*mname, *is_special;
 	int	fscnt;
 	mountent_t	*mp;
 
@@ -329,7 +331,7 @@ main(int argc, char **argv)
 void
 doexec(struct mnttab *ment)
 {
-	int 	ret;
+	int	ret;
 
 #ifdef DEBUG
 	if (dflg)
@@ -342,7 +344,7 @@ doexec(struct mnttab *ment)
 		char	full_path[FULLPATH_MAX];
 		char	alter_path[FULLPATH_MAX];
 		char	*newargv[ARGV_MAX];
-		int 	ii;
+		int	ii;
 
 		if (strlen(ment->mnt_fstype) > (size_t)FSTYPE_MAX) {
 			fprintf(stderr, gettext(
@@ -386,6 +388,17 @@ doexec(struct mnttab *ment)
 			printf("\n");
 			fflush(stdout);
 			exit(0);
+		}
+
+		/*
+		 * Some file system types need pfexec.
+		 */
+		if (strcmp(ment->mnt_fstype, "smbfs") == 0 &&
+		    setpflags(PRIV_PFEXEC, 1) != 0) {
+			(void) fprintf(stderr,
+			    gettext("umount: unable to set PFEXEC flag: %s\n"),
+			    strerror(errno));
+			/* Keep going as best we can */
 		}
 
 		/* Try to exec the fstype dependent umount. */
@@ -559,8 +572,8 @@ getmntlast(mountent_t *mlist, char *specp, char *mntp)
 int
 parumount(char **mntlist, int count)
 {
-	int 		maxfd = OPEN_MAX;
-	struct rlimit 	rl;
+	int		maxfd = OPEN_MAX;
+	struct rlimit	rl;
 	mountent_t	**mntarray, **ml, *mp;
 
 	/*
@@ -648,8 +661,8 @@ parumount(char **mntlist, int count)
 mountent_t **
 make_mntarray(char **mntlist, int count)
 {
-	mountent_t 	*mp, **mpp;
-	int 		ndx;
+	mountent_t	*mp, **mpp;
+	int		ndx;
 	char		*cp;
 
 	if (count > 0)
@@ -867,7 +880,7 @@ int
 dowait(void)
 {
 	int		wstat, child, ret;
-	mountent_t 	*mp, *prevp;
+	mountent_t	*mp, *prevp;
 
 	if ((child = wait(&wstat)) == -1)
 		return (-1);
