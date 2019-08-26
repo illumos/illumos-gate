@@ -12,8 +12,6 @@
 .SH NAME
 epoll_ctl \- control an epoll instance
 .SH SYNOPSIS
-
-.LP
 .nf
 #include <sys/epoll.h>
 
@@ -21,7 +19,6 @@ epoll_ctl \- control an epoll instance
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBepoll_ctl()\fR function executes the operation specified by
 \fIop\fR (as parameterized by \fIevent\fR) on the \fIepfd\fR epoll instance.
 Valid values for \fIop\fR:
@@ -244,13 +241,11 @@ with caution.
 .RE
 
 .SH RETURN VALUES
-.LP
 Upon successful completion, \fBepoll_ctl()\fR returns 0.
 If an error occurs, -1 is returned and errno is set to indicate
 the error.
 
 .SH ERRORS
-.LP
 \fBepoll_ctl()\fR will fail if:
 .sp
 .ne 2
@@ -294,8 +289,6 @@ specified \fBepoll\fR(5) instance.
 
 .sp
 .SH NOTES
-.LP
-
 The \fBepoll\fR(5) facility is implemented for purposes of offering
 compatibility for Linux-borne applications; native
 applications should continue to prefer using event ports via the
@@ -303,7 +296,6 @@ applications should continue to prefer using event ports via the
 interfaces.  See \fBepoll\fR(5) for compatibility details and restrictions.
 
 .SH SEE ALSO
-.LP
 \fBepoll_create\fR(3C), \fBepoll_wait\fR(3C),
 \fBport_create\fR(3C), \fBport_associate\fR(3C), \fBport_get\fR(3C),
 \fBepoll\fR(5)

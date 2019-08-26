@@ -1,6 +1,6 @@
 '\" te
 .\" To view license terms, attribution, and copyright for IP Filter, the
-.\" default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Illumos operating
+.\" default path is /usr/lib/ipf/IPFILTER.LICENCE. If the illumos operating
 .\" environment has been installed anywhere other than the default, modify the
 .\" given path to access the file at the installed location.
 .\" Portions Copyright (c) 2015, Joyent, Inc.
@@ -8,7 +8,6 @@
 .SH NAME
 ipf, ipf.conf, ipf6.conf \- IP packet filter rule syntax
 .SH DESCRIPTION
-.PP
 A rule file for \fBipf\fP may have any name or even be stdin.  As
 \fBipfstat\fP produces parsable rules as output when displaying the internal
 kernel filter lists, it is quite plausible to use its output to feed back
@@ -16,13 +15,11 @@ into \fBipf\fP.  Thus, to remove all filters on input packets, the following
 could be done:
 .nf
 
-\fC# ipfstat \-i | ipf \-rf \-\fP
+# ipfstat \-i | ipf \-rf \-\fP
 .fi
 .SH GRAMMAR
-.PP
 The format used by \fBipf\fP for construction of filtering rules can be
 described using the following grammar in BNF:
-\fC
 .nf
 filter-rule = [ insert ] action in-out [ options ] [ tos ] [ ttl ]
 	      [ proto ] ip [ group ].
@@ -115,7 +112,6 @@ This syntax is somewhat simplified for readability, some combinations
 that match this grammar are disallowed by the software because they do
 not make sense (such as tcp \fBflags\fP for non-TCP packets).
 .SH FILTER RULES
-.PP
 The "briefest" valid rules are (currently) no-ops and are of the form:
 .nf
        block in all
@@ -134,7 +130,6 @@ as the n'th entry in the current list. This is especially useful when
 modifying and testing active filter rulesets. See \fBipf\fP(1M) for more
 information.
 .SH ACTIONS
-.PP
 The action indicates what to do with the packet if it matches the rest
 of the filter rule. Each rule MUST have an action. The following
 actions are recognised:
@@ -210,7 +205,6 @@ outbound (transmitted or forwarded by the stack, and on its way to an
 interface). There is a requirement that each filter rule explicitly
 state which side of the I/O it is to be used on.
 .SH OPTIONS
-.PP
 The list of options is brief, and all are indeed optional. Where
 options are used, they must be present in the order shown here. These
 are the currently supported options:
@@ -269,7 +263,6 @@ construct a firewall that behaves transparently, like a filtering hub
 or switch, rather than a router. The \fBfastroute\fP keyword is a
 synonym for this option.
 .SH MATCHING PARAMETERS
-.PP
 The keywords described in this section are used to describe attributes
 of the packet to be used when determining whether rules match or don't
 match. The following general-purpose attributes are provided for
@@ -413,7 +406,6 @@ referred to by an abbreviation recognised by this language, or the numbers
 with which they are associated can be used.  The most important from
 a security point of view is the ICMP redirect.
 .SH KEEP HISTORY
-.PP
 The second last parameter which can be set for a filter rule is whether or not
 to record historical information for that packet, and what sort to keep. The
 following information can be kept:
@@ -446,7 +438,6 @@ indicates that a new group (number n) should be created.
 .B "group <n>"
 indicates that the rule should be put in group (number n) rather than group 0.
 .SH LOGGING
-.PP
 When a packet is logged, with either the \fBlog\fP action or option,
 the headers of the packet are written to the \fBipl\fP packet logging
 pseudo-device. Immediately following the \fBlog\fP keyword, the
@@ -475,9 +466,7 @@ See ipl(4) for the format of records written
 to this device. The ipmon(1M) program can be used to read and format
 this log.
 .SH EXAMPLES
-.PP
 The \fBquick\fP option is good for rules such as:
-\fC
 .nf
 block in quick from any to any with ipopts
 .fi
@@ -523,7 +512,6 @@ all inbound packets, we would do something like:
        block in quick on lo0 all head 300
 .fi
 .PP
-
 and to then allow ICMP packets in on le0, only, we would do:
 .LP
 .nf

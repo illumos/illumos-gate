@@ -7,7 +7,6 @@
 .SH NAME
 ypserv, ypxfrd \- NIS server and binder processes
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/lib/netsvc/yp/ypserv\fR [\fB-dv\fR] [\fB-i\fR | \fB-I\fR] [\fB-r\fR | \fB-R\fR]
 .fi
@@ -18,8 +17,6 @@ ypserv, ypxfrd \- NIS server and binder processes
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The Network Information Service (\fBNIS\fR) provides a simple network lookup
 service consisting of databases and processes. The databases are \fBndbm\fR
 files in a directory tree rooted at \fB/var/yp\fR. See \fBndbm\fR(3C). These
@@ -167,7 +164,6 @@ map is transferred from the cache. The most up to date map will be transferred
 on subsequent \fBypxfrd\fR operations.
 .SH OPTIONS
 .SS "ypserv"
-.sp
 .ne 2
 .na
 \fB\fB-d\fR\fR
@@ -267,7 +263,6 @@ prefixe maps are also generated or updated. Since these maps will be more
 recent than the old style maps, \fBypmake\fR will not be reported as erroneous
 when it is run.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/yp/securenets\fR\fR
@@ -301,8 +296,6 @@ Lists the \fBNIS\fR server hosts that \fBypbind\fR can bind to.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBsvcs\fR(1), \fBypcat\fR(1), \fBypmatch\fR(1), \fBypwhich\fR(1),
 \fBdomainname\fR(1M), \fBmakedbm\fR(1M), \fBsvcadm\fR(1M), \fBypbind\fR(1M),
 \fBypinit\fR(1M), \fBypmake\fR(1M), \fByppoll\fR(1M), \fByppush\fR(1M),
@@ -310,15 +303,8 @@ Lists the \fBNIS\fR server hosts that \fBypbind\fR can bind to.
 \fBndbm\fR(3C), \fBypclnt\fR(3NSL), \fBlibnsl\fR(3LIB),
 \fBNISLDAPmapping\fR(4), \fBsecurenets\fR(4), \fBypfiles\fR(4),
 \fBypserv\fR(4), \fBattributes\fR(5), \fBsmf\fR(5)
-.sp
-.LP
 
-.sp
-.LP
-\fI\fR
 .SH NOTES
-.sp
-.LP
 \fBypserv\fR supports multiple domains. The \fBypserv\fR process determines the
 domains it serves by looking for directories of the same name in the directory
 \fB/var/yp\fR. It replies to all broadcasts requesting yp service for that

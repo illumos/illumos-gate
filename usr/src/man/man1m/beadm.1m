@@ -5,7 +5,6 @@
 .SH NAME
 beadm \- utility for managing zfs boot environments
 .SH SYNOPSIS
-.LP
 .nf
 \fBbeadm\fR \fBcreate\fR [\fB-a\fR] [\fB-d\fR \fIdescription\fR]
      [\fB-e\fR \fInon-activeBeName\fR | \fIbeName@snapshot\fR]
@@ -557,13 +556,11 @@ Verbose mode. Displays verbose error messages from \fBbeadm\fR.
 .RE
 
 .SH ALTERNATE BE LOCATION
-.LP
 The alternate BE location outside rpool/ROOT can be configured
 by modifying the BENAME_STARTS_WITH parameter in /etc/default/be.
 For example: BENAME_STARTS_WITH=rootfs
 
 .SH EXAMPLES
-.LP
 \fBExample 1\fR: Create a new BE named BE1, by cloning the current live BE.
 .sp
 .in +2
@@ -798,7 +795,6 @@ BE5;215b8387-4968-627c-d2d0-f4a011414bab;NR;/;7786206208;static;1221004384
 .sp
 
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -822,8 +818,6 @@ Failure
 
 
 .SH FILES
-.LP
-.sp
 .ne 2
 .na
 \fB/var/log/beadm/<beName>/create.log.<yyyymmdd_hhmmss>\fR
@@ -846,7 +840,6 @@ Log used for capturing beadm create output
 .RE
 .sp
 .LP
-.sp
 .ne 2
 .na
 \fB/etc/default/be\fR
@@ -858,7 +851,6 @@ Contains default value for BENAME_STARTS_WITH parameter
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the  following  attributes:
 .sp
 
@@ -874,5 +866,4 @@ Interface Stability	Uncommitted
 
 
 .SH SEE ALSO
-.LP
 .BR zfs (1M)

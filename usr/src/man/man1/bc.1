@@ -48,7 +48,6 @@
 .SH NAME
 bc \- arbitrary precision arithmetic language
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/bin/bc\fR [\fB-c\fR] [\fB-l\fR] [\fIfile\fR]...
 .fi
@@ -59,8 +58,6 @@ bc \- arbitrary precision arithmetic language
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBbc\fR utility implements an arbitrary precision calculator. It takes
 input from any files given, then reads from the standard input. If the standard
 input and standard output to \fBbc\fR are attached to a terminal, the
@@ -70,8 +67,6 @@ resembles C and is a preprocessor for the desk calculator program \fBdc\fR,
 which it invokes automatically unless the \fB-c\fR option is specified. In this
 case the \fBdc\fR input is sent to the standard output instead.
 .SH USAGE
-.sp
-.LP
 The syntax for  \fBbc\fR programs is as follows:
 .sp
 .ne 2
@@ -102,11 +97,8 @@ Means a statement.
 .RE
 
 .SS "Comments"
-.sp
-.LP
 Enclosed in \fB/*\fR and \fB*/\fR.
 .SS "Names (Operands)"
-.br
 .in +2
 Simple variables: \fIL\fR.
 .in -2
@@ -120,8 +112,6 @@ The words \fBibase\fR, \fBobase\fR (limited to \fBBC_BASE_MAX\fR), and
 \fBscale\fR (limited to \fBBC_SCALE_MAX\fR).
 .in -2
 .SS "Other Operands"
-.sp
-.LP
 Arbitrarily long numbers with optional sign and decimal point. Strings of fewer
 than \fBBC_STRING_MAX\fR characters, between double quotes ("). \fB(\fR \fIE\fR
 \fB)\fR
@@ -162,7 +152,6 @@ Number of digits right of decimal point.
 .RE
 
 .SS "Operators"
-.sp
 .ne 2
 .na
 \fB\fB+   \(mi   *   /   %   ^\fR\fR
@@ -203,7 +192,6 @@ Number of digits right of decimal point.
 .RE
 
 .SS "Statements"
-.br
 .in +2
 \fIE\fR
 .in -2
@@ -239,7 +227,6 @@ null statement
 .LP
 \&.string
 .SS "Function Definitions"
-.br
 .in +2
 \fBdefine\fR \fIL\fR \fB(\fR \fIL\fR \fB,\fR.\|.\|.\|\fB,\fR \fIL\fR \fB) {\fR
 .in -2
@@ -260,7 +247,6 @@ null statement
 \fB}\fR
 .in -2
 .SS "Functions in \fB-l\fR Math Library"
-.sp
 .ne 2
 .na
 \fB\fBs(\fR\fIx\fR\fB)\fR\fR
@@ -332,8 +318,6 @@ are stacked during function calls. When using arrays as function arguments or
 defining them as automatic variables, empty square brackets must follow the
 array name.
 .SH OPTIONS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -346,7 +330,6 @@ output.
 .RE
 
 .SS "/usr/bin/bc"
-.sp
 .ne 2
 .na
 \fB\fB-l\fR\fR
@@ -357,7 +340,6 @@ the default zero.
 .RE
 
 .SS "/usr/xpg6/bin/bc"
-.sp
 .ne 2
 .na
 \fB\fB-l\fR\fR
@@ -368,8 +350,6 @@ the default zero. All math results have the scale of \fB20\fR.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -382,7 +362,6 @@ cases of \fIfile\fR have been read, \fBbc\fR reads the standard input.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRSetting the precision of a variable
 .sp
 .LP
@@ -452,14 +431,10 @@ or
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBbc\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -480,7 +455,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/lib.b\fR\fR
@@ -499,8 +473,6 @@ to define BC_ parameters
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -515,13 +487,9 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBdc\fR(1), \fBawk\fR(1), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBstandards\fR(5)
 .SH NOTES
-.sp
-.LP
 The \fBbc\fR command does not recognize the logical operators \fB&&\fR and
 \fB|\||\fR.
 .sp

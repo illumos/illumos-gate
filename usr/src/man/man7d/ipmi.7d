@@ -25,14 +25,11 @@
 .SH NAME
 ipmi \- OpenIPMI compatible IPMI interface driver
 .SH SYNOPSIS
-.LP
 .nf
 \fB/dev/ipmi0\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBipmi\fR device is a character special file that provides access to the
 Intelligent Platform Management Interface for the system.  For more
 information on \fBIPMI\fR and to obtain a copy of the \fBIPMI\fR
@@ -42,12 +39,8 @@ The driver is adapted from the FreeBSD driver which is in turn adapted from
 the Linux driver, however, not all features described in the standard are
 supported. The current implementation depends on the \fBsmbios\fR(7d) to
 discover the existence of an IPMI device.
-.sp
-.LP
 
 .SH IOCTLS
-.sp
-.LP
 Sending and receiving messages through the IPMI drivers requires the use of
 \fBioctl\fR(2).
 
@@ -167,8 +160,6 @@ Unregister to receive a specific command
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBipmitool\fR(1), \fBioctl\fR(2), \fBsmbios\fR(7d)
 .sp
 .LP
@@ -176,6 +167,4 @@ Unregister to receive a specific command
 Generation\fR, v2.0 \(em
 June 12, 2009 Markup
 .SH NOTES
-.sp
-.LP
 Not all systems include an \fBIPMI\fR.

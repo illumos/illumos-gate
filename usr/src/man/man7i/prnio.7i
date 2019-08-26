@@ -8,14 +8,11 @@
 .SH NAME
 prnio \- generic printer interface
 .SH SYNOPSIS
-.LP
 .nf
 \fB#include <sys/prnio.h>\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBprnio\fR generic printer interface defines ioctl commands and data
 structures for printer device drivers.
 .sp
@@ -84,7 +81,6 @@ The Abort phase is accomplished by interrupting the \fBwrite\fR(2) and
 \fBread\fR(2) system calls. The application can perform some additional cleanup
 during the Abort phase as described in \fBPRNIOC_GET_IFCAP\fR section.
 .SH IOCTLS
-.sp
 .ne 2
 .na
 \fB\fBPRNIOC_GET_IFCAP\fR\fR
@@ -271,7 +267,6 @@ argument is a pointer to \fBuint_t\fR, where the status word is returned.
 Status is a combination of the following bits:
 .RE
 
-.br
 .in +2
 \fBPRN_ONLINE\fR - For devices that support \fBPRN_HOTPLUG\fR capability,
 this bit is set when the device is online, otherwise the device is offline.
@@ -347,8 +342,6 @@ only valid for drivers that support \fBPRN_TIMEOUTS\fR capability.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -365,8 +358,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBclose\fR(2), \fBioctl\fR(2), \fBread\fR(2), \fBwrite\fR(2),
 \fBattributes\fR(5), \fBecpp\fR(7D), \fBusbprn\fR(7D), \fBlp\fR(7D)
 .sp

@@ -7,7 +7,6 @@
 .SH NAME
 pfmt \- display error message in standard format
 .SH SYNOPSIS
-.LP
 .nf
 #include <pfmt.h>
 
@@ -15,8 +14,6 @@ pfmt \- display error message in standard format
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpfmt()\fR retrieves a format string from a locale-specific message
 database (unless \fBMM_NOGET\fR is specified) and uses it for \fBprintf\fR(3C)
 style formatting of \fIargs\fR. The output is displayed on \fIstream\fR.
@@ -191,8 +188,6 @@ localized version of \fBTO FIX\fR.
 .RE
 
 .SH STANDARD ERROR MESSAGE FORMAT
-.sp
-.LP
 The \fBpfmt()\fR function displays error messages in the following format:
 .sp
 .in +2
@@ -223,17 +218,7 @@ If \fBpfmt()\fR is called twice to display an error message and a helpful
 .fi
 .in -2
 
-.br
-.in +2
-
-.in -2
-.br
-.in +2
-
-.in -2
 .SH RETURN VALUES
-.sp
-.LP
 Upon success, \fBpfmt()\fR returns the number of bytes transmitted. Upon
 failure, it returns a negative value:
 .sp
@@ -246,7 +231,6 @@ Write error to \fIstream\fR.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRExample of \fBpfmt()\fR function.
 .sp
 .LP
@@ -292,12 +276,8 @@ UX:test: TO FIX: Usage ...
 .in -2
 
 .SH USAGE
-.sp
-.LP
 Since it uses \fBgettxt\fR(3C), \fBpfmt()\fR should not be used.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -312,8 +292,6 @@ MT-Level	MT-safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBaddsev\fR(3C), \fBgettxt\fR(3C), \fBlfmt\fR(3C), \fBprintf\fR(3C),
 \fBsetcat\fR(3C), \fBsetlabel\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5),
 \fBenviron\fR(5)

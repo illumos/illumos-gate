@@ -7,7 +7,6 @@
 .SH NAME
 monitor \- SPARC system PROM monitor
 .SH SYNOPSIS
-.LP
 .nf
 \fBSTOP\(miA\fR
 .fi
@@ -28,15 +27,11 @@ monitor \- SPARC system PROM monitor
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBCPU\fR board of a workstation contains one or more \fBEPROMs\fR or
 \fBEEPROMs.\fR The program which executes from the \fBPROMs\fR is referred to
 as "the monitor". Among other things, the monitor performs system
 initialization at power-on and provides a user interface.
 .SS "Monitor Prompt"
-.sp
-.LP
 The monitor of earlier workstations was known as the \fBSunMON\fR monitor and
 displayed the \fB>\fR for its prompt. See the \fBSunMON MONITOR USAGE\fR
 section for further details.
@@ -67,20 +62,14 @@ OpenBoot monitor displays the message: \fBType b (boot), c (continue), or n
 .LP
 and the \fB>\fR prompt appears.
 .SH OPENBOOT PROM USAGE
-.sp
-.LP
 Some of the more useful commands that can be issued from OpenBoot's \fBok \fR
 prompt are described here.  Refer to the   book for a complete list of
 commands.
 .SS "Help"
-.sp
-.LP
 Help for various functional areas of the OpenBoot monitor can be obtained by
 typing \fBhelp\fR. The help listing provides a number of other key words which
 can then be used in the help command to provide further details.
 .SS "NVRAM Parameters"
-.sp
-.LP
 Each workstation contains one or more \fBNVRAM\fR devices which contains unique
 system ID information, as well as a set of user-configurable parameters.  The
 \fBNVRAM\fR parameters allow the user a certain level of flexibility in
@@ -135,8 +124,6 @@ values.)
 .RE
 
 .SS "Security Parameters"
-.sp
-.LP
 Newer OpenBoot monitors contain user interfaces that support the storage and
 listing of keys for later use by client programs.
 .sp
@@ -164,8 +151,6 @@ deleted.
 .RE
 
 .SS "Hardware Checks and Diagnostics"
-.sp
-.LP
 The following commands are available for testing or checking the system's
 hardware.  If the \fB\&'diag-switch?'\fR \fBNVRAM\fR parameter is set to true
 when the system is powered on, then a Power-On Self Test (POST) diagnostic is
@@ -239,8 +224,6 @@ Test the system's clock function.
 .RE
 
 .SS "System Information"
-.sp
-.LP
 The following commands are available for displaying information about the
 system.  Not all commands are available on all workstations.
 .sp
@@ -371,8 +354,6 @@ Display the version and date of the OpenBoot PROM.
 .RE
 
 .SS "Emergency Commands"
-.sp
-.LP
 These commands must be typed from the keyboard, they do not work from a console
 which is attached by way of the serial ports.  With the exception of the
 \fBStop-A\fR command, these commands are issued by pressing and holding down
@@ -436,8 +417,6 @@ that not all parameters have default values.
 .RE
 
 .SS "Line Editor Commands"
-.sp
-.LP
 The following commands can be used while the monitor is displaying the \fBok\fR
 prompt.  Not all of these editing commands are available on all workstations.
 .sp
@@ -605,16 +584,12 @@ of the cursor.
 .RE
 
 .SS "nvramrc"
-.sp
-.LP
 The \fBnvramrc\fR is an area of the system's \fBNVRAM\fR where users may store
 Forth programs. The programs which are stored in the \fBnvramrc\fR are executed
 each time the system is reset, provided that the \fB\&'use-nvramrc?'\fR
 \fBNVRAM\fR parameter has been set to \fB\&'true'\fR. Refer to the book for
 information on how to edit and use the \fBnvramrc\fR.
 .SS "Restricted Monitor"
-.sp
-.LP
 The command \fB\&'old-mode'\fR is used to move OpenBoot into a restricted
 monitor mode, causing the \fB> \fR prompt to be displayed.  Only three commands
 are allowed while in the restricted monitor; the \fB\&'go'\fR command (to
@@ -627,8 +602,6 @@ environment.  The restricted monitor may also become the default environment if
 the \fB\&'sunmon-compat?' \fR \fBNVRAM\fR parameter is set to true.  Not all
 workstations have the \fB\&'sunmon-compat?'\fR parameter.
 .SH SUNMON PROM USAGE
-.sp
-.LP
 The following commands are available systems with older  \fBSunMON\fR-based
 PROM:
 .sp
@@ -1784,8 +1757,6 @@ flush the segment beginning at \fIvirtual_address\fR within context
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -1800,9 +1771,4 @@ Architecture	SPARC
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBtip\fR(1), \fBboot\fR(1M), \fBeeprom\fR(1M), \fBattributes\fR(5)
-.sp
-.LP
-

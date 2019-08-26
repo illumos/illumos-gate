@@ -7,7 +7,6 @@
 .SH NAME
 pcfs \- FAT formatted file system
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/param.h>
 #include <sys/mount.h>
@@ -20,8 +19,6 @@ pcfs \- FAT formatted file system
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBpcfs\fR is a file system type that enables direct access to files on
 \fBFAT\fR formatted disks from within the SunOS operating system.
 .sp
@@ -76,8 +73,6 @@ filesystem.
 The FAT filesystem doesn't support multiple links. As a result, the link count
 for all files and directories in \fBpcfs\fR is hard-coded as "1."
 .SS "Mounting File Systems"
-.sp
-.LP
 Use the following command to mount \fBpcfs\fR from diskette:
 .sp
 .in +2
@@ -212,8 +207,6 @@ mount \fB-F\fR pcfs /dev/dsk/c\fIN\fRt\fIN\fRd\fIN\fRs\fIN\fR /pcfs
 .sp
 
 .SS "Conventions"
-.sp
-.LP
 Files and directories created through \fBpcfs\fR must comply with either the
 \fBFAT\fR short file name convention or the long file name convention
 introduced with Windows 95. The \fBFAT\fR short file name convention is of the
@@ -260,8 +253,6 @@ To format a diskette or a \fBPCMCIA\fR pseudo-floppy memory card in \fBFAT\fR
 format in the SunOS system, use either the \fBfdformat\fR \fB-d\fR or the
 \fBDOS\fR \fBFORMAT\fR command.
 .SS "Boot Partitions"
-.sp
-.LP
 On x86 systems, hard drives may contain an \fBfdisk\fR partition reserved for
 the Solaris boot utilities. These partitions are special instances of
 \fBpcfs\fR. You can mount an x86 boot partition with the command:
@@ -307,7 +298,6 @@ hard disk (\fB/dev/dsk/c\fIN\fRt\fIN\fRd\fIN\fRp0\fR)
 All files on a boot partition are owned by super-user. Only the super-user may
 create, delete, or modify files on a boot partition.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRSample Displays of File Names
 .sp
 .LP
@@ -320,7 +310,6 @@ it displays as \fBfinancial.data\fR in \fBpcfs\fR, but may show up as
 The following are legal long file names. They are also \fBillegal\fR short file
 names:
 
-.br
 .in +2
 \fBtest.sh.orig\fR
 .in -2
@@ -336,7 +325,6 @@ names:
 .LP
 Other systems that do not support long file names may see:
 
-.br
 .in +2
 \fBTESTSH~1.ORI\fR
 .in -2
@@ -354,7 +342,6 @@ The short file name is generated from the initial characters of the long file
 name, so differentiate names in the first few characters. For example, these
 names:
 
-.br
 .in +2
 \fBWorkReport.January.Data\fR
 .in -2
@@ -370,7 +357,6 @@ names:
 .LP
 result in these short names, which are not distinguishable:
 
-.br
 .in +2
 \fBWORKRE~1.DAT\fR
 .in -2
@@ -386,7 +372,6 @@ result in these short names, which are not distinguishable:
 .LP
 These names, however:
 
-.br
 .in +2
 \fBJanuary.WorkReport.Data\fR
 .in -2
@@ -402,7 +387,6 @@ These names, however:
 .LP
 result in the more descriptive short names:
 
-.br
 .in +2
 \fBJANUAR~1.DAT\fR
 .in -2
@@ -415,7 +399,6 @@ result in the more descriptive short names:
 \fBMARCHW~1.DAT\fR
 .in -2
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/fs/pcfs/mount\fR\fR
@@ -434,20 +417,14 @@ result in the more descriptive short names:
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 for the current locale setting: LANG, LC_ALL, LC_CTYPE, and LC_COLLATE.
 .SH SEE ALSO
-.sp
-.LP
 \fBchgrp\fR(1), \fBchown\fR(1), \fBdos2unix\fR(1), \fBeject\fR(1),
 \fBfdformat\fR(1), \fBunix2dos\fR(1), \fBvolcheck\fR(1), \fBmount\fR(1M),
 \fBmount_pcfs\fR(1M), \fBumount\fR(1M), \fBctime\fR(3C), \fBvfstab\fR(4),
 \fBenviron\fR(5), \fBpcmem\fR(7D)
 .SH WARNINGS
-.sp
-.LP
 Do not physically eject a \fBFAT\fR floppy while the device is mounted as
 \fBpcfs\fR. If Volume Management is managing a device, use the \fBeject\fR(1)
 command before physically removing media.
@@ -462,8 +439,6 @@ files, \fBchown\fR(1) or \fBchgrp\fR(1) may generate various errors. This is a
 limitation of \fBpcfs\fR, but it should not cause problems other than error
 messages.
 .SH NOTES
-.sp
-.LP
 Only the following characters are allowed in \fBpcfs\fR short file names and
 extensions:
 .br
@@ -508,8 +483,6 @@ created, \fBpcfs\fR expects that such file names are in UTF-8. This feature
 increases the interoperability of \fBpcfs\fR on Solaris with other operating
 systems.
 .SH BUGS
-.sp
-.LP
 \fBpcfs\fR should handle the disk change condition in the same way that
 \fBDOS\fR does, so you do not need to unmount the file system to change
 floppies.
