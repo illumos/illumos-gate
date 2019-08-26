@@ -43,12 +43,11 @@
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
 .\"
-.TH WCSTOD 3C "Mar 31, 2003"
+.TH WCSTOD 3C "Aug 25, 2019"
 .SH NAME
 wcstod, wcstof, wcstold, wstod, watof \- convert wide character string to
 floating-point number
 .SH SYNOPSIS
-.LP
 .nf
 #include <wchar.h>
 
@@ -79,8 +78,6 @@ floating-point number
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBwcstod()\fR, \fBwcstof()\fR, and \fBwcstold()\fR functions convert the
 initial portion of the wide-character string pointed to by \fInptr\fR to
 \fBdouble\fR, \fBfloat\fR, and \fBlong double\fR representation, respectively.
@@ -153,13 +150,13 @@ n-wchar-sequence:
 .sp
 .LP
 In default mode for \fBwcstod()\fR, only decimal, INF/INFINITY, and
-NAN/NAN(\fIn-char-sequence\fR) forms are recognized. In C99/SUSv3 mode,
+NAN/NAN(\fIn-wchar-sequence\fR) forms are recognized. In C99/SUSv3 mode,
 hexadecimal strings are also recognized.
 .sp
 .LP
-In default mode for \fBwcstod()\fR, the \fIn-char-sequence\fR in the
-NAN(\fIn-char-equence\fR) form can contain any character except ')' (right
-parenthesis) or '\e0' (null).  In C99/SUSv3 mode, the \fIn-char-sequence\fR can
+In default mode for \fBwcstod()\fR, the \fIn-wchar-sequence\fR in the
+NAN(\fIn-wchar-sequence\fR) form can contain any character except ')' (right
+parenthesis) or '\e0' (null).  In C99/SUSv3 mode, the \fIn-wchar-sequence\fR can
 contain only upper and lower case letters, digits, and '_' (underscore).
 .sp
 .LP
@@ -215,8 +212,6 @@ The \fBwstod()\fR function is identical to \fBwcstod()\fR.
 The \fBwatof\fR(\fIstr\fR) function is equivalent to \fBwstod(\fR\fInptr\fR\fB,
 (wchar_t **)NULL)\fR.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, these functions return the converted value. If no
 conversion could be performed, \fB0\fR is returned.
 .sp
@@ -231,13 +226,11 @@ If the correct value would cause an underflow, the correctly rounded result
 (which may be normal, subnormal, or zero) is returned, a floating point
 underflow exception is raised, and \fBerrno\fR is set to \fBERANGE\fR.
 .SH ERRORS
-.sp
-.LP
 The \fBwcstod()\fR and \fBwstod()\fR functions will fail if:
 .sp
 .ne 2
 .na
-\fB\fBERANGE\fR\fR
+\fBERANGE\fR
 .ad
 .RS 10n
 The value to be returned would cause overflow or underflow.
@@ -249,22 +242,18 @@ The \fBwcstod()\fR and \fBwcstod()\fR functions may fail if:
 .sp
 .ne 2
 .na
-\fB\fBEINVAL\fR\fR
+\fBEINVAL\fR
 .ad
 .RS 10n
 No conversion could be performed.
 .RE
 
 .SH USAGE
-.sp
-.LP
 Because 0 is returned on error and is also a valid return on success, an
 application wishing to check for error situations should set \fBerrno\fR to 0
 call \fBwcstod()\fR, \fBwcstof()\fR, \fBwcstold()\fR, or \fBwstod()\fR, then
 check  \fBerrno\fR and if it is non-zero, assume an error has occurred.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -283,7 +272,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBiswspace\fR(3C), \fBlocaleconv\fR(3C), \fBscanf\fR(3C), \fBsetlocale\fR(3C),
 \fBwcstol\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
