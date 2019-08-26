@@ -126,8 +126,8 @@ typeset -A mac_to_link
 out=$(dladm show-phys -mpo link,address)
 (( $? == 0 )) || fatal "dladm show-phys failed"
 while IFS=: read link addr; do
-    mac=$(normalize_mac $addr)
-    mac_to_link["$mac"]="$link"
+    macaddr=$(normalize_mac $addr)
+    mac_to_link["$macaddr"]="$link"
 done <<< "$out"
 
 ADMIN_NIC_TAG=${CONFIG_admin_tag:-"admin"}
@@ -147,17 +147,40 @@ if [[ -n "${aggr_links[$nic]}" ]]; then
 
     echo "Creating aggr: $nic (mode=$mode, links=${links})"
     dladm create-aggr -l ${links// / -l } -L $mode $nic
-
-    if [[ -n "${mtu[$nic]}" ]]; then
-        dladm set-linkprop -p mtu=${mtu[$nic]} $nic || \
-            fatal "ERROR: Failed to set mtu on aggr $nic to ${mtu[$nic]}"
-    fi
 elif valid_mac "$nic"; then
     [[ -n "${mac_to_link[$nic]}" ]] || \
         fatal "ERROR: admin mac address $nic not found on system"
     nic=${mac_to_link[$nic]}
 else
     fatal "ERROR: Invalid value of ${ADMIN_NIC_TAG}_nic ($nic)"
+fi
+
+# If there are other nic tags configured on the same link as
+# the admin tag, find the largest MTU to use to set the
+# datalink MTU
+dlmtu="${mtu[$ADMIN_NIC_TAG]}"
+for tag in ${tags[@]}; do
+    tagmac="${tagv[$tag]}"
+
+    # If the 'mac' for the nic tag is actually an aggr, the
+    # tag will appear in $aggr_links (and we want to use that as
+    # the link name).  If it is not an aggr, we need to map the
+    # MAC address to the link name so we can check if $tag
+    # resides on the same link as the admin interface
+    if [[ -n "${aggr_links[$tagmac]}" ]]; then
+        link="$tagmac"
+    else
+        link="${mac_to_link[$tagmac]}"
+    fi
+
+    if [[ "$link" == "$nic" && $dlmtu -lt ${mtu[$tag]} ]]; then
+        dlmtu=${mtu[$tag]}
+    fi
+done
+
+if [[ -n "$dlmtu" ]]; then
+    dladm set-linkprop -p mtu=$dlmtu $nic || \
+        fatal "ERROR: Failed to set mtu on aggr $nic to $dlmtu"
 fi
 
 driver=${nic%%[0-9]*}
