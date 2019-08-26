@@ -102,7 +102,7 @@ ds_new_dslibentry(void)
 	int newndslib;
 	dslibentry_t *dsp;
 
-	if ((dsp = ds_hdl_to_dslibentry(NULL)) != NULL)
+	if ((dsp = ds_hdl_to_dslibentry(0)) != NULL)
 		return (dsp);
 
 	/* double the size */
@@ -125,7 +125,7 @@ ds_service_count(char *service, boolean_t is_client)
 	uint_t count = 0;
 
 	for (i = 0, dsp = dslibtab; i < ndslib; i++, dsp++) {
-		if (dsp->dsl_hdl != NULL &&
+		if (dsp->dsl_hdl != 0 &&
 		    strcmp(dsp->dsl_service, service) == 0 &&
 		    (dsp->dsl_flags & VLDS_REG_CLIENT) == is_client_flag) {
 			count++;
@@ -142,7 +142,7 @@ ds_lookup_dslibentry(char *service, boolean_t is_client)
 	uint_t is_client_flag = is_client ? VLDS_REG_CLIENT : 0;
 
 	for (i = 0, dsp = dslibtab; i < ndslib; i++, dsp++) {
-		if (dsp->dsl_hdl != NULL &&
+		if (dsp->dsl_hdl != 0 &&
 		    strcmp(dsp->dsl_service, service) == 0 &&
 		    (dsp->dsl_flags & VLDS_REG_CLIENT) == is_client_flag) {
 			return (dsp);
@@ -201,7 +201,7 @@ ds_free_dslibentry(dslibentry_t *dsp, int force_unreg)
 	    (dsp->dsl_flags & VLDS_REG_CLIENT) != 0);
 
 	if ((nhdls == 1 && force_unreg) || nhdls >= 2) {
-		dsp->dsl_hdl = NULL;
+		dsp->dsl_hdl = 0;
 		if (dsp->dsl_service) {
 			free(dsp->dsl_service);
 		}
@@ -297,7 +297,7 @@ static void
 ds_string_arg(vlds_string_t *dsp, char *str)
 {
 	if (str == NULL) {
-		dsp->vlds_strp = NULL;
+		dsp->vlds_strp = 0;
 		dsp->vlds_strlen = 0;
 	} else {
 		dsp->vlds_strp = PTRTOUINT64(str);
@@ -714,7 +714,7 @@ ds_fini(void)
 	if (ndslib > 0) {
 		(void) mutex_lock(&dslib_lock);
 		for (i = 0, dsp = dslibtab; i < ndslib; i++, dsp++) {
-			if (dsp->dsl_hdl == NULL)
+			if (dsp->dsl_hdl == 0)
 				continue;
 			if (dsp->dsl_service) {
 				free(dsp->dsl_service);
