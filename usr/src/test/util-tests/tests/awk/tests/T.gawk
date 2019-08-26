@@ -46,9 +46,9 @@ $AWK '{ print $3; $4 = "a"; print }' $TEMP0 > $TEMP2
 diff $TEMP1 $TEMP2 || fail 'BAD: T.gawk asgext'
 
 # backgsub:
-echo 'x\y
+cat <<< 'x\y
 x\\y' > $TEMP0
-echo 'x\y
+cat <<< 'x\y
 xAy
 xAy
 xAAy' > $TEMP1
@@ -60,10 +60,10 @@ diff $TEMP1 $TEMP2 || fail 'BAD: T.gawk backgsub'
 
 
 # backgsub2:
-echo 'x\y
+cat <<< 'x\y
 x\\y
 x\\\y' > $TEMP0
-echo '	x\y
+cat <<< '	x\y
 	x\y
 	x\y
 	x\y
@@ -82,9 +82,9 @@ diff $TEMP1 $TEMP2 || fail 'BAD: T.gawk backgsub2'
 
 
 # backgsub3:
-echo 'xax
+cat <<< 'xax
 xaax' > $TEMP0
-echo '	xax
+cat <<< '	xax
 	x&x
 	x&x
 	x\ax
@@ -109,9 +109,9 @@ diff $TEMP1 $TEMP2 || fail 'BAD: T.gawk backgsub3'
 
 
 # backsub3:
-echo 'xax
+cat <<< 'xax
 xaax' > $TEMP0
-echo '	xax
+cat <<< '	xax
 	x&x
 	x&x
 	x\ax
@@ -136,9 +136,9 @@ diff $TEMP1 $TEMP2 || fail 'BAD: T.gawk backsub3'
 
 
 # backsub:
-echo 'x\y
+cat <<< 'x\y
 x\\y' > $TEMP0
-echo 'x\y
+cat <<< 'x\y
 x\\y
 x\\y
 x\\\y' > $TEMP1

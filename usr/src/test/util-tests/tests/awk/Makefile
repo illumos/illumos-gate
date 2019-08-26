@@ -25,7 +25,7 @@ BUGS_FILES = $(BUGS_AWK) $(BUGS_AWK:%.awk=%.ok)
 
 EXAMPLES_FILES :sh= (cd examples/awk; print p.* t.*)
 
-TESTS_FILES :sh= (cd tests; print T.* chem.awk latin1 lilly.progs lsd1.p penicil.p res.p)
+TESTS_FILES :sh= (cd tests; print T.* *.p *.ok chem.awk latin1 lilly.progs)
 
 GNU_AWK :sh= (cd gnu; print *.awk)
 GNU_KSH :sh= (cd gnu; print *.sh)
@@ -69,6 +69,19 @@ TESTSUBDIRS = $(SUBDIRS:%=$(TESTDIR)/%)
 all lint clean clobber:
 
 install: all $(ROOTFILES)
+
+$(TESTDIR)/examples/% := FILEMODE=0444
+$(TESTDIR)/data/% := FILEMODE=0444
+$(TESTDIR)/%.data := FILEMODE=0444
+$(TESTDIR)/%.awk := FILEMODE=0444
+$(TESTDIR)/%.in := FILEMODE=0444
+$(TESTDIR)/%.ok := FILEMODE=0444
+$(TESTDIR)/%.sh := FILEMODE=0555
+
+$(TESTDIR)/tests/lilly.progs := FILEMODE=0444
+$(TESTDIR)/tests/latin1 := FILEMODE=0444
+$(TESTDIR)/tests/T.% := FILEMODE=0555
+$(TESTDIR)/tests/%.p := FILEMODE=0444
 
 $(TESTDIR):
 	$(INS.dir)

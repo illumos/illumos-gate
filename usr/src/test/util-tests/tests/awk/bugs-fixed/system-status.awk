@@ -12,7 +12,7 @@ BEGIN {
 	status = system("kill -HUP $$")
 	print "death by signal status", status
 
-	status = system("kill -ABRT $$")
+	status = system("cd $WORKDIR && kill -ABRT $$")
 	print "death by signal with core dump status", status
 
 	system("rm -f core*")

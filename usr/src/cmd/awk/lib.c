@@ -254,8 +254,11 @@ nextfile(void)
 	argno++;
 }
 
+/*
+ * read one record into buf
+ */
 int
-readrec(char **pbuf, size_t *pbufsize, FILE *inf)	/* read one record into buf */
+readrec(char **pbuf, size_t *pbufsize, FILE *inf)
 {
 	int sep, c;
 	char *rr, *rt, *buf = *pbuf;

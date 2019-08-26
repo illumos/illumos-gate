@@ -263,6 +263,22 @@ The process must have the
 .Dv PRIV_SYS_NET_CONFIG
 privilege if it wants to specify a number greater than that
 calculated by RFC 3390.
+.Pp
+The operating system also provides alternative algorithms that may be more
+appropriate for your application, including the CUBIC congestion control
+algorithm described in RFC 8312.
+These can be configured system-wide using
+.Xr ipadm 1M ,
+or on a per-connection basis with the TCP-level socket option
+.Dv TCP_CONGESTION ,
+whose argument is the name of the algorithm to use
+.Pq for example Dq cubic .
+If the requested algorithm does not exist, then
+.Fn setsockopt
+will fail, and
+.Va errno
+will be set to
+.Er ENOENT .
 .Ss "TCP Keep-Alive"
 Since TCP determines whether a remote peer is no longer reachable by timing out
 waiting for acknowledgements, a host that never sends any new data may never

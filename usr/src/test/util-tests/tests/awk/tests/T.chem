@@ -5,6 +5,8 @@ if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
     exit 1
 fi
 
+set -x
+
 TEMP1=$WORKDIR/test.temp.1
 TEMP2=$WORKDIR/test.temp.2
 
@@ -20,8 +22,7 @@ echo T.chem: test chem.awk
 for i in lsd1.p penicil.p res.p
 do
 	$AWK -f chem.awk $i > $TEMP1
-	awk -f chem.awk $i > $TEMP2
-	diff $TEMP1 $TEMP2 || fail "BAD: T.chem on $i"
+	diff $TEMP1 ${i/.p/.ok} || fail "BAD: T.chem on $i"
 done
 
 exit $RESULT

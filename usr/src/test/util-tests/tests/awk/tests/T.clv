@@ -170,7 +170,7 @@ diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=16a)'
 # special chars in commandline assigned value;
 # have to use local echo to avoid quoting problems.
 
-echo 'a\\b\z' > $TEMP1
+cat <<< 'a\\b\z' > $TEMP1
 echo 'hello' | $AWK '{print x}' x='\141\\\\\142\\z' > $TEMP2
 diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=17)'
 

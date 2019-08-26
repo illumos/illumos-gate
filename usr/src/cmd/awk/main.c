@@ -63,7 +63,7 @@
 #include "awk.h"
 #include "y.tab.h"
 
-char	*version = "version Oct 11, 1989";
+char	*version = "version Aug 27, 2018";
 
 int	dbg	= 0;
 Awkfloat	srand_seed = 1;

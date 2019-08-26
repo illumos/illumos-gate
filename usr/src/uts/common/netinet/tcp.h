@@ -129,6 +129,7 @@ struct tcphdr {
 #define	TCP_KEEPIDLE			0x22
 #define	TCP_KEEPCNT			0x23
 #define	TCP_KEEPINTVL			0x24
+#define	TCP_CONGESTION			0x25
 
 #ifdef	__cplusplus
 }

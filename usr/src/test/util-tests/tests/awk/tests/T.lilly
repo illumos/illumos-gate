@@ -38,26 +38,17 @@ foo=bar=fribble
 =foo=bar
 EOF
 
-rm -f $TEMP3
-awk '
-/./ {
-	print $0 >"'$TEMP3'"
-	print "###", NR, $0
-	system(ENVIRON["AWK"] " -f '$TEMP3' <\"'$TEMP0'\" ")
-	close "test.temp"
-}' < lilly.progs > $TEMP1 2>&1
-
-rm -f $TEMP3
+rm -f $TEMP2
 $AWK '
 /./ {
-	print $0 >"'$TEMP3'"
+	print $0 >"'$TEMP2'"
 	print "###", NR, $0
-	system(ENVIRON["AWK"] " -f '$TEMP3' <\"'$TEMP0'\" ")
-	close "test.temp"
-}' < lilly.progs > $TEMP2 2>&1
+	system(ENVIRON["AWK"] " -f '$TEMP2' <\"'$TEMP0'\" ")
+	close "'$TEMP2'"
+}' < lilly.progs > $TEMP1 2>&1
 
 echo `wc -l lilly.progs` tests
 
-diff $TEMP1 $TEMP2 > $WORKDIR/lilly.diff || fail 'bad: T.lilly is different'
+diff $TEMP1 lilly.ok > $WORKDIR/lilly.diff || fail 'bad: T.lilly is different'
 
 exit $RESULT

@@ -55,11 +55,8 @@ file path=usr/share/man/man3m/fabs.3m
 file path=usr/share/man/man3m/fdim.3m
 file path=usr/share/man/man3m/feclearexcept.3m
 file path=usr/share/man/man3m/fegetenv.3m
-link path=usr/share/man/man3m/fesetenv.3m target=fegetenv.3m
 file path=usr/share/man/man3m/fegetexceptflag.3m
-link path=usr/share/man/man3m/fesetexceptflag.3m target=fegetexceptflag.3m
 file path=usr/share/man/man3m/fegetround.3m
-link path=usr/share/man/man3m/fesetround.3m target=fegetround.3m
 file path=usr/share/man/man3m/feholdexcept.3m
 file path=usr/share/man/man3m/feraiseexcept.3m
 file path=usr/share/man/man3m/fesetprec.3m
@@ -122,3 +119,8 @@ file path=usr/share/man/man3m/tanh.3m
 file path=usr/share/man/man3m/tgamma.3m
 file path=usr/share/man/man3m/trunc.3m
 file path=usr/share/man/man3m/y0.3m
+link path=usr/share/man/man3m/fesetenv.3m target=fegetenv.3m
+link path=usr/share/man/man3m/fesetexceptflag.3m target=fegetexceptflag.3m
+link path=usr/share/man/man3m/fesetround.3m target=fegetround.3m
+link path=usr/share/man/man3m/nanf.3m target=nan.3m
+link path=usr/share/man/man3m/nanl.3m target=nan.3m

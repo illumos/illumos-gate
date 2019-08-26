@@ -1,0 +1,974 @@
+### 1 BEGIN{foo=6;print foo/2}
+3
+### 2 BEGIN{foo=10;foo/=2;print foo}
+5
+### 3 /=/ {print $0}
+foo=bar
+foo==bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo=bar=fribble
+=foo=bar
+### 4 /==/ {print $0}
+foo==bar
+### 5 /\+=/ {print $0}
+foo+=bar
+### 6 /\*=/ {print $0}
+foo*=bar
+### 7 /-=/ {print $0}
+foo-=bar
+### 8 /\/=/ {print $0}
+foo/=bar
+### 9 /%=/ {print $0}
+foo%=bar
+### 10 /^=/ {print $0}
+=foo=bar
+### 11 /!=/ {print $0}
+foo!=bar
+### 12 /<=/ {print $0}
+foo<=bar
+### 13 />=/ {print $0}
+foo>=bar
+### 14 !/=/ {print $0}
+foo+bar
+foo bar
+foo/bar
+### 15 !/==/ {print $0}
+foo=bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 16 !/\+=/ {print $0}
+foo=bar
+foo==bar
+foo+bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 17 !/\*=/ {print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 18 !/-=/ {print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 19 !/\/=/ {print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 20 !/%=/ {print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 21 !/^=/ {print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+### 22 !/!=/ {print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 23 !/<=/ {print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 24 !/>=/ {print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 25 $0~/=/ {print $0}
+foo=bar
+foo==bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo=bar=fribble
+=foo=bar
+### 26 $0~/==/ {print $0}
+foo==bar
+### 27 $0~/\+=/ {print $0}
+foo+=bar
+### 28 $0~/\*=/ {print $0}
+foo*=bar
+### 29 $0~/-=/ {print $0}
+foo-=bar
+### 30 $0~/\/=/ {print $0}
+foo/=bar
+### 31 $0~/%=/ {print $0}
+foo%=bar
+### 32 $0~/^=/ {print $0}
+=foo=bar
+### 33 $0~/!=/ {print $0}
+foo!=bar
+### 34 $0~/<=/ {print $0}
+foo<=bar
+### 35 $0~/>=/ {print $0}
+foo>=bar
+### 36 $0!~/=/ {print $0}
+foo+bar
+foo bar
+foo/bar
+### 37 $0!~/==/ {print $0}
+foo=bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 38 $0!~/\+=/ {print $0}
+foo=bar
+foo==bar
+foo+bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 39 $0!~/\*=/ {print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 40 $0!~/-=/ {print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 41 $0!~/%=/ {print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 42 $0!~/^=/ {print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+### 43 $0!~/!=/ {print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 44 $0!~/<=/ {print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 45 $0!~/>=/ {print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 46 {if(match($0,/=/))print $0}
+foo=bar
+foo==bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo=bar=fribble
+=foo=bar
+### 47 {if(match($0,/\=/))print $0}
+foo=bar
+foo==bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo=bar=fribble
+=foo=bar
+### 48 {if(match($0,/==/))print $0}
+foo==bar
+### 49 {if(match($0,/\+=/))print $0}
+foo+=bar
+### 50 {if(match($0,/\*=/))print $0}
+foo*=bar
+### 51 {if(match($0,/-=/))print $0}
+foo-=bar
+### 52 {if(match($0,/%=/))print $0}
+foo%=bar
+### 53 {if(match($0,/^=/))print $0}
+=foo=bar
+### 54 {if(match($0,/!=/))print $0}
+foo!=bar
+### 55 {if(match($0,/<=/))print $0}
+foo<=bar
+### 56 {if(match($0,/>=/))print $0}
+foo>=bar
+### 57 {if(!match($0,/=/))print $0}
+foo+bar
+foo bar
+foo/bar
+### 58 {if(!match($0,/==/))print $0}
+foo=bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 59 {if(!match($0,/\+=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 60 {if(!match($0,/\*=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 61 {if(!match($0,/-=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 62 {if(!match($0,/%=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 63 {if(!match($0,/^=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+### 64 {if(!match($0,/!=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 65 {if(!match($0,/<=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 66 {if(!match($0,/>=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 67 {if(split($0,foo,/=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 68 {if(split($0,foo,/\=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 69 {if(split($0,foo,/==/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 70 {if(split($0,foo,/\+=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 71 {if(split($0,foo,/\*=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 72 {if(split($0,foo,/-=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 73 {if(split($0,foo,/\/=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 74 {if(split($0,foo,/%=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 75 {if(split($0,foo,/^=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 76 {if(split($0,foo,/!=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 77 {if(split($0,foo,/<=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 78 {if(split($0,foo,/>=/))print $0}
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+### 79 {if(sub(/=/,"#"))print $0}
+foo#bar
+foo#=bar
+foo+#bar
+foo-#bar
+foo*#bar
+foo/#bar
+foo^#bar
+foo%#bar
+foo!#bar
+foo<#bar
+foo>#bar
+foo#bar=fribble
+#foo=bar
+### 80 {if(sub(/\=/,"#"))print $0}
+foo#bar
+foo#=bar
+foo+#bar
+foo-#bar
+foo*#bar
+foo/#bar
+foo^#bar
+foo%#bar
+foo!#bar
+foo<#bar
+foo>#bar
+foo#bar=fribble
+#foo=bar
+### 81 {if(sub(/==/,"#"))print $0}
+foo#bar
+### 82 {if(sub(/\+=/,"#"))print $0}
+foo#bar
+### 83 {if(sub(/\*=/,"#"))print $0}
+foo#bar
+### 84 {if(sub(/-=/,"#"))print $0}
+foo#bar
+### 85 {if(sub(/\/=/,"#"))print $0}
+foo#bar
+### 86 {if(sub(/%=/,"#"))print $0}
+foo#bar
+### 87 {if(sub(/^=/,"#"))print $0}
+#foo=bar
+### 88 {if(sub(/!=/,"#"))print $0}
+foo#bar
+### 89 {if(sub(/<=/,"#"))print $0}
+foo#bar
+### 90 {if(sub(/>=/,"#"))print $0}
+foo#bar
+### 91 {if(gsub(/=/,"#"))print $0}
+foo#bar
+foo##bar
+foo+#bar
+foo-#bar
+foo*#bar
+foo/#bar
+foo^#bar
+foo%#bar
+foo!#bar
+foo<#bar
+foo>#bar
+foo#bar#fribble
+#foo#bar
+### 92 {if(gsub(/\=/,"#"))print $0}
+foo#bar
+foo##bar
+foo+#bar
+foo-#bar
+foo*#bar
+foo/#bar
+foo^#bar
+foo%#bar
+foo!#bar
+foo<#bar
+foo>#bar
+foo#bar#fribble
+#foo#bar
+### 93 {if(gsub(/==/,"#"))print $0}
+foo#bar
+### 94 {if(gsub(/\+=/,"#"))print $0}
+foo#bar
+### 95 {if(gsub(/\*=/,"#"))print $0}
+foo#bar
+### 96 {if(gsub(/-=/,"#"))print $0}
+foo#bar
+### 97 {if(gsub(/\/=/,"#"))print $0}
+foo#bar
+### 98 {if(gsub(/%=/,"#"))print $0}
+foo#bar
+### 99 {if(gsub(/^=/,"#"))print $0}
+#foo=bar
+### 100 {if(gsub(/!=/,"#"))print $0}
+foo#bar
+### 101 {if(gsub(/<=/,"#"))print $0}
+foo#bar
+### 102 {if(gsub(/>=/,"#"))print $0}
+foo#bar
+### 103 {if(sub(/=/,"#",$0))print $0}
+foo#bar
+foo#=bar
+foo+#bar
+foo-#bar
+foo*#bar
+foo/#bar
+foo^#bar
+foo%#bar
+foo!#bar
+foo<#bar
+foo>#bar
+foo#bar=fribble
+#foo=bar
+### 104 {if(sub(/\=/,"#",$0))print $0}
+foo#bar
+foo#=bar
+foo+#bar
+foo-#bar
+foo*#bar
+foo/#bar
+foo^#bar
+foo%#bar
+foo!#bar
+foo<#bar
+foo>#bar
+foo#bar=fribble
+#foo=bar
+### 105 {if(sub(/==/,"#",$0))print $0}
+foo#bar
+### 106 {if(sub(/\+=/,"#",$0))print $0}
+foo#bar
+### 107 {if(sub(/\*=/,"#",$0))print $0}
+foo#bar
+### 108 {if(sub(/-=/,"#",$0))print $0}
+foo#bar
+### 109 {if(sub(/\/=/,"#",$0))print $0}
+foo#bar
+### 110 {if(sub(/%=/,"#",$0))print $0}
+foo#bar
+### 111 {if(sub(/^=/,"#",$0))print $0}
+#foo=bar
+### 112 {if(sub(/!=/,"#",$0))print $0}
+foo#bar
+### 113 {if(sub(/<=/,"#",$0))print $0}
+foo#bar
+### 114 {if(sub(/>=/,"#",$0))print $0}
+foo#bar
+### 115 {if(sub(/=/,"#",$0))print $0}
+foo#bar
+foo#=bar
+foo+#bar
+foo-#bar
+foo*#bar
+foo/#bar
+foo^#bar
+foo%#bar
+foo!#bar
+foo<#bar
+foo>#bar
+foo#bar=fribble
+#foo=bar
+### 116 {if(gsub(/\=/,"#",$0))print $0}
+foo#bar
+foo##bar
+foo+#bar
+foo-#bar
+foo*#bar
+foo/#bar
+foo^#bar
+foo%#bar
+foo!#bar
+foo<#bar
+foo>#bar
+foo#bar#fribble
+#foo#bar
+### 117 {if(gsub(/==/,"#",$0))print $0}
+foo#bar
+### 118 {if(gsub(/\+=/,"#",$0))print $0}
+foo#bar
+### 119 {if(gsub(/\*=/,"#",$0))print $0}
+foo#bar
+### 120 {if(gsub(/-=/,"#",$0))print $0}
+foo#bar
+### 121 {if(gsub(/\/=/,"#",$0))print $0}
+foo#bar
+### 122 {if(gsub(/%=/,"#",$0))print $0}
+foo#bar
+### 123 {if(gsub(/^=/,"#",$0))print $0}
+#foo=bar
+### 124 {if(gsub(/!=/,"#",$0))print $0}
+foo#bar
+### 125 {if(gsub(/<=/,"#",$0))print $0}
+foo#bar
+### 126 {if(gsub(/>=/,"#",$0))print $0}
+foo#bar
