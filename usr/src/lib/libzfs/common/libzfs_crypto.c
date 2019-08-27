@@ -15,6 +15,7 @@
 
 /*
  * Copyright (c) 2017, Datto, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <string.h>
@@ -25,9 +26,9 @@
 #include <sys/fs/zfs.h>
 #include <sys/dsl_crypt.h>
 #ifdef sun
-#include <kmfapi.h>
-#include <security/pkcs11.h>
-#include <cryptoutil.h>
+#include <stdlib.h>
+#include <security/cryptoki.h>
+#include <cryptoutil.h> /* for pkcs11_strerror */
 #else
 #include <sys/crypto/icp.h>
 #endif
@@ -573,13 +574,7 @@ populate_create_encryption_params_nvlists(libzfs_handle_t *hdl,
 	/* passphrase formats require a salt and pbkdf2 iters property */
 	if (keyformat == ZFS_KEYFORMAT_PASSPHRASE) {
 #ifdef sun
-		/* always generate a new salt */
-		ret = pkcs11_get_random(&salt, sizeof (uint64_t));
-		if (ret != 0) {
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "Failed to generate salt."));
-			goto error;
-		}
+		arc4random_buf(&salt, sizeof (salt));
 #else
 		random_init();
 
