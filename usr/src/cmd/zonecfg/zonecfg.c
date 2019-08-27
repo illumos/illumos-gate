@@ -23,7 +23,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2014 Gary Mills
- * Copyright 2016, Joyent Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -2972,7 +2972,7 @@ normalize_mac_addr(char *dst, const char *src, int len)
 	p = strtok(buf, ":");
 	while (p != NULL) {
 		n = strtol(p, &e, 16);
-		if (*e != NULL || n > 0xff)
+		if (*e != '\0' || n > 0xff)
 			return;
 		(void) snprintf(tmp, sizeof (tmp), "%s%02x", sep, n);
 		(void) strlcat(dst, tmp, len);

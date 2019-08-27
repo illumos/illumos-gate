@@ -22,7 +22,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -322,7 +322,7 @@ lx_wait4(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 long
 lx_waitpid(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 {
-	return (lx_wait4(p1, p2, p3, NULL));
+	return (lx_wait4(p1, p2, p3, (uintptr_t)NULL));
 }
 
 long

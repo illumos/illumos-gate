@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2015 The MathWorks, Inc.  All rights reserved.
  */
 
@@ -1121,7 +1121,7 @@ inotify_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 	if (ddi_soft_state_zalloc(inotify_softstate, minor) != DDI_SUCCESS) {
 		vmem_free(inotify_minor, (void *)(uintptr_t)minor, 1);
 		mutex_exit(&inotify_lock);
-		return (NULL);
+		return (EINVAL);
 	}
 
 	state = ddi_get_soft_state(inotify_softstate, minor);
@@ -1414,7 +1414,7 @@ inotify_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_create_minor_node(devi, "inotify", S_IFCHR,
-	    INOTIFYMNRN_INOTIFY, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    INOTIFYMNRN_INOTIFY, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		cmn_err(CE_NOTE, "/dev/inotify couldn't create minor node");
 		ddi_soft_state_fini(&inotify_softstate);
 		mutex_exit(&inotify_lock);

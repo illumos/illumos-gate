@@ -6847,7 +6847,7 @@ i_mac_clients_hw(mac_group_t *grp, uint32_t mask)
 	for (mgcip = grp->mrg_clients; mgcip != NULL; mgcip = mgcip->mgc_next) {
 		mcip = mgcip->mgc_client;
 		mrp = MCIP_RESOURCE_PROPS(mcip);
-		if (mcip->mci_share != NULL || (mrp->mrp_mask & mask) != 0)
+		if (mcip->mci_share != 0 || (mrp->mrp_mask & mask) != 0)
 			return (B_TRUE);
 	}
 

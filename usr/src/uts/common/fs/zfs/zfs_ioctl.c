@@ -25,7 +25,7 @@
  * Portions Copyright 2011 Martin Matuska
  * Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2014, 2016 Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
@@ -2193,7 +2193,7 @@ zfs_ioc_objset_stats(zfs_cmd_t *zc)
 	boolean_t cachedpropsonly = B_FALSE;
 	int error;
 
-	if (zc->zc_nvlist_src != NULL &&
+	if (zc->zc_nvlist_src != (uintptr_t)NULL &&
 	    (error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
 	    zc->zc_iflags, &nvl) != 0))
 		return (error);
@@ -2405,7 +2405,7 @@ zfs_ioc_snapshot_list_next(zfs_cmd_t *zc)
 	boolean_t cachedpropsonly = B_FALSE;
 	int error;
 
-	if (zc->zc_nvlist_src != NULL &&
+	if (zc->zc_nvlist_src != (uintptr_t)NULL &&
 	    (error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
 	    zc->zc_iflags, &nvl) != 0))
 		return (error);

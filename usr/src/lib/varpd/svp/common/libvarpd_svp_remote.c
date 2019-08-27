@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -347,7 +347,7 @@ svp_remote_vl2_lookup(svp_t *svp, svp_query_t *sqp, const uint8_t *mac,
 
 	mutex_enter(&srp->sr_lock);
 	if (svp_remote_conn_queue(srp, sqp) == B_FALSE)
-		svp->svp_cb.scb_vl2_lookup(svp, SVP_S_FATAL, NULL, NULL, arg);
+		svp->svp_cb.scb_vl2_lookup(svp, SVP_S_FATAL, NULL, 0, arg);
 	mutex_exit(&srp->sr_lock);
 }
 

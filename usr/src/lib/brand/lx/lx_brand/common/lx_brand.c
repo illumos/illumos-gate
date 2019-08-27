@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -519,7 +519,7 @@ lx_start(uintptr_t sp, uintptr_t entry)
 	jump_uc.uc_flags = UC_CPU;
 	jump_uc.uc_brand_data[0] = (void *)LX_UC_STACK_BRAND;
 
-	LX_REG(&jump_uc, REG_FP) = NULL;
+	LX_REG(&jump_uc, REG_FP) = (uintptr_t)NULL;
 	LX_REG(&jump_uc, REG_SP) = sp;
 	LX_REG(&jump_uc, REG_PC) = entry;
 
@@ -531,29 +531,29 @@ lx_start(uintptr_t sp, uintptr_t entry)
 	 * zeroed prior to initial execution.
 	 */
 #if defined(_LP64)
-	LX_REG(&jump_uc, REG_RAX) = NULL;
-	LX_REG(&jump_uc, REG_RCX) = NULL;
-	LX_REG(&jump_uc, REG_RDX) = NULL;
-	LX_REG(&jump_uc, REG_RBX) = NULL;
-	LX_REG(&jump_uc, REG_RBP) = NULL;
-	LX_REG(&jump_uc, REG_RSI) = NULL;
-	LX_REG(&jump_uc, REG_RDI) = NULL;
-	LX_REG(&jump_uc, REG_R8) = NULL;
-	LX_REG(&jump_uc, REG_R9) = NULL;
-	LX_REG(&jump_uc, REG_R10) = NULL;
-	LX_REG(&jump_uc, REG_R11) = NULL;
-	LX_REG(&jump_uc, REG_R12) = NULL;
-	LX_REG(&jump_uc, REG_R13) = NULL;
-	LX_REG(&jump_uc, REG_R14) = NULL;
-	LX_REG(&jump_uc, REG_R15) = NULL;
+	LX_REG(&jump_uc, REG_RAX) = 0;
+	LX_REG(&jump_uc, REG_RCX) = 0;
+	LX_REG(&jump_uc, REG_RDX) = 0;
+	LX_REG(&jump_uc, REG_RBX) = 0;
+	LX_REG(&jump_uc, REG_RBP) = 0;
+	LX_REG(&jump_uc, REG_RSI) = 0;
+	LX_REG(&jump_uc, REG_RDI) = 0;
+	LX_REG(&jump_uc, REG_R8) = 0;
+	LX_REG(&jump_uc, REG_R9) = 0;
+	LX_REG(&jump_uc, REG_R10) = 0;
+	LX_REG(&jump_uc, REG_R11) = 0;
+	LX_REG(&jump_uc, REG_R12) = 0;
+	LX_REG(&jump_uc, REG_R13) = 0;
+	LX_REG(&jump_uc, REG_R14) = 0;
+	LX_REG(&jump_uc, REG_R15) = 0;
 #else
-	LX_REG(&jump_uc, EAX) = NULL;
-	LX_REG(&jump_uc, ECX) = NULL;
-	LX_REG(&jump_uc, EDX) = NULL;
-	LX_REG(&jump_uc, EBX) = NULL;
-	LX_REG(&jump_uc, EBP) = NULL;
-	LX_REG(&jump_uc, ESI) = NULL;
-	LX_REG(&jump_uc, EDI) = NULL;
+	LX_REG(&jump_uc, EAX) = 0;
+	LX_REG(&jump_uc, ECX) = 0;
+	LX_REG(&jump_uc, EDX) = 0;
+	LX_REG(&jump_uc, EBX) = 0;
+	LX_REG(&jump_uc, EBP) = 0;
+	LX_REG(&jump_uc, ESI) = 0;
+	LX_REG(&jump_uc, EDI) = 0;
 #endif /* defined(_LP64) */
 
 	lx_debug("starting Linux program sp %p ldentry %p", sp, entry);
@@ -736,7 +736,7 @@ lx_init(int argc, char *argv[], char *envp[])
 	 * Find the aux vector on the stack.
 	 */
 	p = (long *)envp;
-	while (*p != NULL)
+	while (*p != (uintptr_t)NULL)
 		p++;
 
 	/*
@@ -755,7 +755,7 @@ lx_init(int argc, char *argv[], char *envp[])
 	 */
 	p++;
 	oap = (auxv_t *)p;
-	while (*p == NULL)
+	while (*p == (uintptr_t)NULL)
 		p++;
 	ap = (auxv_t *)p;
 

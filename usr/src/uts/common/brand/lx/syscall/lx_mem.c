@@ -12,7 +12,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -891,7 +891,7 @@ lx_mremap(uintptr_t old_addr, size_t old_size, size_t new_size, int flags,
 			return (old_addr);
 
 		/* new_addr is optional and only valid when LX_MREMAP_FIXED. */
-		new_addr = NULL;
+		new_addr = (uintptr_t)NULL;
 	}
 
 	if (old_addr & PAGEOFFSET)

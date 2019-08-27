@@ -2163,7 +2163,7 @@ normalize_mac_addr(char *dst, const char *src, int len)
 	p = strtok(buf, ":");
 	while (p != NULL) {
 		n = strtol(p, &e, 16);
-		if (*e != NULL || n > 0xff)
+		if (*e != '\0' || n > 0xff)
 			return;
 		(void) snprintf(tmp, sizeof (tmp), "%s%02x", sep, n);
 		(void) strlcat(dst, tmp, len);

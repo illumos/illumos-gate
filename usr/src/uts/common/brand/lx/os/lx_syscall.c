@@ -22,7 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -106,7 +106,7 @@ struct lx_vsyscall
 	{ LX_VSYS_gettimeofday, LX_SYS_gettimeofday },
 	{ LX_VSYS_time, LX_SYS_time },
 	{ LX_VSYS_getcpu, LX_SYS_getcpu },
-	{ NULL, NULL }
+	{ (uintptr_t)NULL, (uintptr_t)NULL }
 };
 #endif
 
@@ -509,7 +509,7 @@ lx_vsyscall_iscall(klwp_t *lwp, uintptr_t addr, int *scnum)
 		return (B_FALSE);
 	}
 
-	for (i = 0; lx_vsyscalls[i].lv_addr != NULL; i++) {
+	for (i = 0; lx_vsyscalls[i].lv_addr != (uintptr_t)NULL; i++) {
 		if (addr == lx_vsyscalls[i].lv_addr) {
 			/*
 			 * This is a valid vsyscall address.

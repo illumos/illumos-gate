@@ -2585,7 +2585,7 @@ service_mfi_aen(struct drsas_instance *instance, struct drsas_cmd *cmd)
 		for (tgt = 0; tgt < MRDRV_MAX_LD; tgt++) {
 			if (instance->dr_ld_list[tgt].dip != NULL) {
 				rval = drsas_service_evt(instance, tgt, 0,
-				    DRSAS_EVT_UNCONFIG_TGT, NULL);
+				    DRSAS_EVT_UNCONFIG_TGT);
 				con_log(CL_ANN1, (CE_WARN,
 				    "dr_sas: CFG CLEARED AEN rval = %d "
 				    "tgt id = %d", rval, tgt));
@@ -2597,7 +2597,7 @@ service_mfi_aen(struct drsas_instance *instance, struct drsas_cmd *cmd)
 	case DR_EVT_LD_DELETED: {
 		rval = drsas_service_evt(instance,
 		    ddi_get16(acc_handle, &evt_detail->args.ld.target_id), 0,
-		    DRSAS_EVT_UNCONFIG_TGT, NULL);
+		    DRSAS_EVT_UNCONFIG_TGT);
 		con_log(CL_ANN1, (CE_WARN, "dr_sas: LD DELETED AEN rval = %d "
 		    "tgt id = %d index = %d", rval,
 		    ddi_get16(acc_handle, &evt_detail->args.ld.target_id),
@@ -2608,7 +2608,7 @@ service_mfi_aen(struct drsas_instance *instance, struct drsas_cmd *cmd)
 	case DR_EVT_LD_CREATED: {
 		rval = drsas_service_evt(instance,
 		    ddi_get16(acc_handle, &evt_detail->args.ld.target_id), 0,
-		    DRSAS_EVT_CONFIG_TGT, NULL);
+		    DRSAS_EVT_CONFIG_TGT);
 		con_log(CL_ANN1, (CE_WARN, "dr_sas: LD CREATED AEN rval = %d "
 		    "tgt id = %d index = %d", rval,
 		    ddi_get16(acc_handle, &evt_detail->args.ld.target_id),
@@ -3442,7 +3442,7 @@ build_cmd(struct drsas_instance *instance, struct scsi_address *ap,
 			switch (page_code) {
 			case 0x3:
 			case 0x4:
-				(void) drsas_mode_sense_build(pkt);
+				drsas_mode_sense_build(pkt);
 				return_mfi_pkt(instance, cmd);
 				*cmd_done = 1;
 				return (NULL);
@@ -5352,10 +5352,8 @@ finish:
 	return (rval);
 }
 
-/*ARGSUSED*/
 static int
-drsas_service_evt(struct drsas_instance *instance, int tgt, int lun, int event,
-    uint64_t wwn)
+drsas_service_evt(struct drsas_instance *instance, int tgt, int lun, int event)
 {
 	struct drsas_eventinfo *mrevt = NULL;
 
@@ -5454,7 +5452,7 @@ drsas_issue_evt_taskq(struct drsas_eventinfo *mrevt)
 	ndi_devi_exit(instance->dip, circ1);
 }
 
-static int
+static void
 drsas_mode_sense_build(struct scsi_pkt *pkt)
 {
 	union scsi_cdb		*cdbp;
@@ -5470,7 +5468,7 @@ drsas_mode_sense_build(struct scsi_pkt *pkt)
 	if ((!bp) && bp->b_un.b_addr && bp->b_bcount && acmd->cmd_dmacount) {
 		con_log(CL_ANN1, (CE_WARN, "Failing MODESENSE Command"));
 		/* ADD pkt statistics as Command failed. */
-		return (NULL);
+		return;
 	}
 
 	bp_mapin(bp);
@@ -5508,5 +5506,4 @@ drsas_mode_sense_build(struct scsi_pkt *pkt)
 		default:
 			break;
 	}
-	return (NULL);
 }

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -378,7 +378,7 @@ libvarpd_c_prop_set(varpd_client_prop_handle_t *phdl, const void *buf,
 	varpd_client_prop_arg_t *vcpap = &carg.vca_un.vca_prop;
 	varpd_client_prop_info_t *infop = (varpd_client_prop_info_t *)phdl;
 
-	if (len == NULL || buf == NULL || infop->vcprop_propid == UINT_MAX)
+	if (len == 0 || buf == NULL || infop->vcprop_propid == UINT_MAX)
 		return (EINVAL);
 	if (len > LIBVARPD_PROP_SIZEMAX)
 		return (EOVERFLOW);

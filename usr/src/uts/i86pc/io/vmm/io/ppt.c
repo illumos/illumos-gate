@@ -29,7 +29,7 @@
  */
 
 /*
- * Copyright 2019 Joyent, Inc
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -690,7 +690,7 @@ ppt_wait_for_pending_txn(dev_info_t *dip, uint_t max_delay_us)
 		return (B_FALSE);
 	}
 
-	devsts = PCI_CAP_GET16(hdl, NULL, cap_ptr, PCIE_DEVSTS);
+	devsts = PCI_CAP_GET16(hdl, 0, cap_ptr, PCIE_DEVSTS);
 	while ((devsts & PCIE_DEVSTS_TRANS_PENDING) != 0) {
 		if (max_delay_us == 0) {
 			pci_config_teardown(&hdl);
@@ -705,7 +705,7 @@ ppt_wait_for_pending_txn(dev_info_t *dip, uint_t max_delay_us)
 			delay(drv_usectohz(max_delay_us));
 			max_delay_us = 0;
 		}
-		devsts = PCI_CAP_GET16(hdl, NULL, cap_ptr, PCIE_DEVSTS);
+		devsts = PCI_CAP_GET16(hdl, 0, cap_ptr, PCIE_DEVSTS);
 	}
 
 	pci_config_teardown(&hdl);
@@ -743,15 +743,15 @@ ppt_max_completion_tmo_us(dev_info_t *dip)
 	if (PCI_CAP_LOCATE(hdl, PCI_CAP_ID_PCI_E, &cap_ptr) != DDI_SUCCESS)
 		goto out;
 
-	if ((PCI_CAP_GET16(hdl, NULL, cap_ptr, PCIE_PCIECAP) &
+	if ((PCI_CAP_GET16(hdl, 0, cap_ptr, PCIE_PCIECAP) &
 	    PCIE_PCIECAP_VER_MASK) < PCIE_PCIECAP_VER_2_0)
 		goto out;
 
-	if ((PCI_CAP_GET16(hdl, NULL, cap_ptr, PCIE_DEVCAP2) &
+	if ((PCI_CAP_GET16(hdl, 0, cap_ptr, PCIE_DEVCAP2) &
 	    PCIE_DEVCTL2_COM_TO_RANGE_MASK) == 0)
 		goto out;
 
-	timo = timo_ranges[PCI_CAP_GET16(hdl, NULL, cap_ptr, PCIE_DEVCTL2) &
+	timo = timo_ranges[PCI_CAP_GET16(hdl, 0, cap_ptr, PCIE_DEVCTL2) &
 	    PCIE_DEVCAP2_COM_TO_RANGE_MASK];
 
 out:
@@ -775,7 +775,7 @@ ppt_flr(dev_info_t *dip, boolean_t force)
 	if (PCI_CAP_LOCATE(hdl, PCI_CAP_ID_PCI_E, &cap_ptr) != DDI_SUCCESS)
 		goto fail;
 
-	if ((PCI_CAP_GET16(hdl, NULL, cap_ptr, PCIE_DEVCAP) & PCIE_DEVCAP_FLR)
+	if ((PCI_CAP_GET16(hdl, 0, cap_ptr, PCIE_DEVCAP) & PCIE_DEVCAP_FLR)
 	    == 0)
 		goto fail;
 
@@ -806,8 +806,8 @@ ppt_flr(dev_info_t *dip, boolean_t force)
 	}
 
 	/* Initiate the reset. */
-	ctl = PCI_CAP_GET16(hdl, NULL, cap_ptr, PCIE_DEVCTL);
-	(void) PCI_CAP_PUT16(hdl, NULL, cap_ptr, PCIE_DEVCTL,
+	ctl = PCI_CAP_GET16(hdl, 0, cap_ptr, PCIE_DEVCTL);
+	(void) PCI_CAP_PUT16(hdl, 0, cap_ptr, PCIE_DEVCTL,
 	    ctl | PCIE_DEVCTL_INITIATE_FLR);
 
 	/* Wait for at least 100ms */
@@ -1044,10 +1044,10 @@ ppt_reset_pci_power_state(dev_info_t *dip)
 	if (PCI_CAP_LOCATE(cfg, PCI_CAP_ID_PM, &cap_ptr) == DDI_SUCCESS) {
 		uint16_t val;
 
-		val = PCI_CAP_GET16(cfg, NULL, cap_ptr, PCI_PMCSR);
+		val = PCI_CAP_GET16(cfg, 0, cap_ptr, PCI_PMCSR);
 		if ((val & PCI_PMCSR_STATE_MASK) != PCI_PMCSR_D0) {
 			val = (val & ~PCI_PMCSR_STATE_MASK) | PCI_PMCSR_D0;
-			(void) PCI_CAP_PUT16(cfg, NULL, cap_ptr, PCI_PMCSR,
+			(void) PCI_CAP_PUT16(cfg, 0, cap_ptr, PCI_PMCSR,
 			    val);
 		}
 	}

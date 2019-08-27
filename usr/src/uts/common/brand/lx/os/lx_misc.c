@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -89,7 +89,7 @@ lx_exec()
 	 * Any l_handler handlers set as a result of B_REGISTER are now
 	 * invalid; clear them.
 	 */
-	pd->l_handler = NULL;
+	pd->l_handler = (uintptr_t)NULL;
 
 	/*
 	 * If this was a multi-threaded Linux process and this lwp wasn't the
@@ -107,10 +107,10 @@ lx_exec()
 	(void) lx_ptrace_stop_for_option(LX_PTRACE_O_TRACEEXEC, B_FALSE, 0, 0);
 
 	/* clear the fs/gsbase values until the app. can reinitialize them */
-	lwpd->br_lx_fsbase = NULL;
-	lwpd->br_ntv_fsbase = NULL;
-	lwpd->br_lx_gsbase = NULL;
-	lwpd->br_ntv_gsbase = NULL;
+	lwpd->br_lx_fsbase = (uintptr_t)NULL;
+	lwpd->br_ntv_fsbase = (uintptr_t)NULL;
+	lwpd->br_lx_gsbase = (uintptr_t)NULL;
+	lwpd->br_ntv_gsbase = (uintptr_t)NULL;
 
 	/*
 	 * Clear the native stack flags.  This will be reinitialised by
@@ -227,7 +227,7 @@ lx_exitlwp(klwp_t *lwp)
 	if (lwpd->br_clear_ctidp != NULL) {
 		(void) suword32(lwpd->br_clear_ctidp, 0);
 		(void) lx_futex((uintptr_t)lwpd->br_clear_ctidp, FUTEX_WAKE, 1,
-		    NULL, NULL, 0);
+		    (uintptr_t)NULL, (uintptr_t)NULL, 0);
 		lwpd->br_clear_ctidp = NULL;
 	}
 
@@ -712,7 +712,7 @@ lx_fsbase(klwp_t *lwp, uintptr_t fsbase)
 	lx_lwp_data_t *lwpd = lwp->lwp_brand;
 
 	if (lwpd->br_stack_mode != LX_STACK_MODE_BRAND ||
-	    lwpd->br_ntv_fsbase == NULL) {
+	    lwpd->br_ntv_fsbase == (uintptr_t)NULL) {
 		return (fsbase);
 	}
 
@@ -1094,7 +1094,7 @@ lx_read_argv_bounds(proc_t *p)
 	 * to a large amount of stack growth and anonymous memory allocation,
 	 * all of which is pointless since the first page can't be mapped.
 	 */
-	if (addr_arg != NULL || addr_env != NULL) {
+	if (addr_arg != (uintptr_t)NULL || addr_env != (uintptr_t)NULL) {
 		mutex_exit(&p->p_lock);
 #if defined(_LP64)
 		if (p->p_model != DATAMODEL_NATIVE) {
@@ -1180,7 +1180,7 @@ lx_regs_location(lx_lwp_data_t *lwpd, void **ucp, boolean_t for_write)
 		break;
 	}
 
-	if (lwpd->br_ptrace_stopucp != NULL) {
+	if (lwpd->br_ptrace_stopucp != (uintptr_t)NULL) {
 		/*
 		 * The LWP was stopped in the usermode emulation library
 		 * but a ucontext_t for the preserved brand stack and

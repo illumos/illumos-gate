@@ -34,7 +34,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -469,7 +469,7 @@ pci_viona_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 
 	/* BAR 0 for legacy-style virtio register access. */
 	error = pci_emul_alloc_bar(pi, 0, PCIBAR_IO, VIONA_REGSZ);
-	if (error != NULL) {
+	if (error != 0) {
 		WPRINTF(("could not allocate virtio BAR\n"));
 		free(sc);
 		return (1);

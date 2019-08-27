@@ -1265,7 +1265,7 @@ lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
 	memid_t memid, memid2;
 	timestruc_t timeout;
 	timestruc_t *tptr = NULL;
-	int val2 = NULL;
+	int val2 = 0;
 	int rval = 0;
 	int cmd = op & FUTEX_CMD_MASK;
 	int private = op & FUTEX_PRIVATE_FLAG;
@@ -1314,7 +1314,7 @@ lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
 
 	/* Copy in the timeout structure from userspace. */
 	if ((cmd == FUTEX_WAIT || cmd == FUTEX_WAIT_BITSET ||
-	    cmd == FUTEX_LOCK_PI) && lx_timeout != NULL) {
+	    cmd == FUTEX_LOCK_PI) && lx_timeout != (uintptr_t)NULL) {
 		rval = get_timeout((timespec_t *)lx_timeout, &timeout, cmd);
 
 		if (rval != 0)
@@ -1562,7 +1562,7 @@ lx_futex_robust_exit(uintptr_t addr, uint32_t tid)
 	/*
 	 * Finally, drop the pending lock if there is one.
 	 */
-	if (list.frl_pending != NULL && list.frl_pending +
+	if (list.frl_pending != (uint32_t)(uintptr_t)NULL && list.frl_pending +
 	    list.frl_offset + sizeof (uint32_t) < KERNELBASE)
 		lx_futex_robust_drop(list.frl_pending + list.frl_offset, tid);
 

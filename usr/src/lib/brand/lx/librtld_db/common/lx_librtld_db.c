@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -687,7 +687,7 @@ lx_elf_props32(struct ps_prochandle *php, uint32_t addr, psaddr_t *data_addr)
 	int		i;
 	uint32_t	min = (uint32_t)-1;
 	uint32_t	max = 0;
-	size_t		sz = NULL;
+	size_t		sz = 0;
 
 	if (ps_pread(php, addr, &ehdr, sizeof (ehdr)) != PS_OK) {
 		ps_plog("lx_elf_props: Couldn't read ELF header at 0x%p",
@@ -742,7 +742,7 @@ lx_ldb_loadobj_iter32(rd_helper_data_t rhd, rl_iter_f *cb, void *client_data)
 	struct ps_prochandle	*php = lx_rd->lr_php;
 	lx_r_debug_t		r_debug;
 	lx_link_map_t		map;
-	uint32_t		p = NULL;
+	uint32_t		p = (uint32_t)(uintptr_t)NULL;
 	int			rc;
 	rd_loadobj_t		exec;
 
@@ -786,7 +786,8 @@ lx_ldb_loadobj_iter32(rd_helper_data_t rhd, rl_iter_f *cb, void *client_data)
 	ps_plog("lx_ldb_loadobj_iter: exec base 0x%p dyn 0x%p",
 	    exec.rl_base, exec.rl_dynamic);
 
-	for (p = map.lxm_next; p != NULL; p = map.lxm_next) {
+	for (p = map.lxm_next; p != (uint32_t)(uintptr_t)NULL;
+	    p = map.lxm_next) {
 		rd_loadobj_t	obj;
 
 		if ((rc = ps_pread(php, (psaddr_t)p, &map, sizeof (map))) !=
@@ -805,7 +806,7 @@ lx_ldb_loadobj_iter32(rd_helper_data_t rhd, rl_iter_f *cb, void *client_data)
 		obj.rl_nameaddr = (psaddr_t)map.lxm_name;
 		obj.rl_base = map.lxm_addr;
 		obj.rl_refnameaddr = (psaddr_t)map.lxm_name;
-		obj.rl_plt_base = NULL;
+		obj.rl_plt_base = (psaddr_t)NULL;
 		obj.rl_plt_size = 0;
 		obj.rl_lmident = LM_ID_BASE;
 

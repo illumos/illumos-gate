@@ -22,7 +22,7 @@
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 1990 Mentat Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright (c) 2016, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
@@ -3513,7 +3513,7 @@ ill_init_common(ill_t *ill, queue_t *q, boolean_t isv6, boolean_t is_loopback,
 	ill->ill_max_buf = ND_MAX_Q;
 	ill->ill_refcnt = 0;
 
-	cv_init(&ill->ill_dlpi_capab_cv, NULL, NULL, NULL);
+	cv_init(&ill->ill_dlpi_capab_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&ill->ill_dlpi_capab_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	return (0);

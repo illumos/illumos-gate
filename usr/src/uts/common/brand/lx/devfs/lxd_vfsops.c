@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -179,7 +179,7 @@ lxd_devt_translator_t lxd_devt_translators[] = {
 	{ "zcons",	0, DTT_LIST,	(uintptr_t)&lxd_mtranslator_zcons },
 	{ LX_PTM_DRV,	0, DTT_CUSTOM,	(uintptr_t)lxd_ptm_devt_translator },
 	{ "pts",	0, DTT_CUSTOM,	(uintptr_t)lxd_pts_devt_translator },
-	{ NULL,		0, DTT_INVALID,	NULL }
+	{ NULL,		0, DTT_INVALID,	(uintptr_t)NULL }
 };
 
 int

@@ -26,7 +26,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	   All Rights Reserved	*/
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -269,7 +269,7 @@ mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
 		*lddatap = 0;
 
 	if (minaddrp != NULL)
-		*minaddrp = NULL;
+		*minaddrp = (uintptr_t)NULL;
 
 	if (error = execpermissions(vp, &vat, args)) {
 		uprintf("%s: Cannot execute %s\n", exec_file, args->pathname);

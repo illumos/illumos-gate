@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -293,8 +293,7 @@ update_pt_load_size(vdso_t *v)
 
 		phdr.p_memsz = phdr.p_filesz = v->v_max_offset;
 
-		if (gelf_update_phdr(v->v_elf, v->v_ptload_phdr, &phdr) ==
-		    NULL) {
+		if (gelf_update_phdr(v->v_elf, v->v_ptload_phdr, &phdr) == 0) {
 			(void) fprintf(stderr, "could not update PT_LOAD "
 			    "phdr: %s", elf_errmsg(-1));
 			goto errout;

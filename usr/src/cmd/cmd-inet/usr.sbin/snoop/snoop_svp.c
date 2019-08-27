@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019 Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -20,6 +20,7 @@
 #include <inttypes.h>
 #include <sys/crc32.h>
 #include <uuid/uuid.h>
+#include <arpa/inet.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <libvarpd_svp_prot.h>
@@ -51,7 +52,7 @@
 
 static uint32_t svp_crc32_tab[] = { CRC32_TABLE };
 
-#define STR(_x, _buf, _len)				\
+#define	STR(_x, _buf, _len)				\
 	case _x:					\
 		(void) strlcpy(_buf, #_x, _len);	\
 		break

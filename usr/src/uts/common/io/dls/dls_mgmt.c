@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 /*
  * Copyright (c) 2016 by Delphix. All rights reserved.
@@ -986,8 +986,8 @@ done:
 			*ddpp = ddp;
 
 		mutex_enter(&ddp->dd_mutex);
-		if (linkid != DATALINK_INVALID_LINKID &&
-		    !ddp->dd_prop_loaded && ddp->dd_prop_taskid == NULL) {
+		if (linkid != DATALINK_INVALID_LINKID && !ddp->dd_prop_loaded &&
+		    ddp->dd_prop_taskid == TASKQID_INVALID) {
 			ddp->dd_prop_taskid = taskq_dispatch(system_taskq,
 			    dls_devnet_prop_task, ddp, TQ_SLEEP);
 		}

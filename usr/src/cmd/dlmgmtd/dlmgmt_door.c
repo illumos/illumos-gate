@@ -1320,7 +1320,7 @@ dlmgmt_zonehalt(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 	dlmgmt_zonehalt_retval_t *retvalp = retp;
 	static char my_pid[10];
 
-	if (my_pid[0] == NULL)
+	if (my_pid[0] == '\0')
 		(void) snprintf(my_pid, sizeof (my_pid), "%d\n", getpid());
 
 	if ((err = dlmgmt_checkprivs(0, cred)) == 0) {

@@ -1044,7 +1044,7 @@ spa_spare_poll(spa_t *spa)
 		mutex_enter(&spa_spare_lock);
 		found = avl_find(&spa_spare_avl, &search, NULL);
 		/* This spare is in use by a pool. */
-		if (found != NULL && found->aux_pool != NULL) {
+		if (found != NULL && found->aux_pool != 0ULL) {
 			mutex_exit(&spa_spare_lock);
 			continue;
 		}

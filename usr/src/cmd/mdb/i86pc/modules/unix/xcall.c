@@ -9,7 +9,7 @@
  * http://www.illumos.org/license/CDDL.
  */
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -67,7 +67,7 @@ cpu_id_to_addr(processorid_t cpun, uintptr_t *addrp)
 		return (-1);
 	}
 
-	if (addr != NULL) {
+	if (addr != (uintptr_t)NULL) {
 		*addrp = addr;
 		return (0);
 	}
@@ -122,7 +122,7 @@ xcall_get_msgs(uintptr_t addr, const void *wdata, void *priv)
 	}
 
 	for (msgaddr = (uintptr_t)xcpu.cpu_m.xc_msgbox;
-	    msgaddr != NULL; msgaddr = (uintptr_t)msg.xc_next) {
+	    msgaddr != (uintptr_t)NULL; msgaddr = (uintptr_t)msg.xc_next) {
 		if (mdb_vread(&msg, sizeof (msg), msgaddr) != sizeof (msg))
 			return (WALK_ERR);
 
@@ -203,7 +203,7 @@ xcall_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	data.xd_cpu_id = xcpu.cpu_id;
 	data.xd_flags = flags;
 
-	if (mdb_pwalk("cpu", xcall_get_msgs, &data, NULL) == -1) {
+	if (mdb_pwalk("cpu", xcall_get_msgs, &data, (uintptr_t)NULL) == -1) {
 		mdb_warn("can't walk CPUs");
 		return (DCMD_ERR);
 	}

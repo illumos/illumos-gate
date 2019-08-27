@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/systeminfo.h>
@@ -327,12 +327,12 @@ lx_reboot(int magic1, int magic2, uint_t flag, uintptr_t p4)
 
 	case LINUX_REBOOT_CMD_POWER_OFF:
 	case LINUX_REBOOT_CMD_HALT:
-		return (uadmin(A_SHUTDOWN, AD_HALT, NULL));
+		return (uadmin(A_SHUTDOWN, AD_HALT, (uintptr_t)NULL));
 
 	case LINUX_REBOOT_CMD_RESTART:
 	case LINUX_REBOOT_CMD_RESTART2:
 		/* RESTART2 may need more work */
-		return (uadmin(A_SHUTDOWN, AD_BOOT, NULL));
+		return (uadmin(A_SHUTDOWN, AD_BOOT, (uintptr_t)NULL));
 
 	default:
 		return (set_errno(EINVAL));

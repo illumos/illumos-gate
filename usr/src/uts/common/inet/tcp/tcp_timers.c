@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2014, 2017 by Delphix. All rights reserved.
  */
 
@@ -784,7 +784,7 @@ tcp_timer(void *arg)
 					    SL_TRACE, "tcp_timer: zero win");
 				}
 			} else {
-				cc_cong_signal(tcp, NULL, CC_RTO);
+				cc_cong_signal(tcp, 0, CC_RTO);
 			}
 			break;
 		}

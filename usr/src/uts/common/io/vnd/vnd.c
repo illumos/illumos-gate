@@ -2246,7 +2246,7 @@ vnd_mac_flow_control(void *arg, vnd_mac_cookie_t cookie)
 	ASSERT(vsp->vns_flags & VNS_F_FLOW_CONTROLLED);
 	ASSERT(vsp->vns_caps.vsc_fc_cookie == cookie);
 	vsp->vns_flags &= ~VNS_F_FLOW_CONTROLLED;
-	vsp->vns_caps.vsc_fc_cookie = NULL;
+	vsp->vns_caps.vsc_fc_cookie = (vnd_mac_cookie_t)NULL;
 	vsp->vns_fclatch = 0;
 	DTRACE_VND3(flow__resumed, vnd_str_t *, vsp, uint64_t,
 	    vsp->vns_dq_write.vdq_cur, uintptr_t, cookie);
@@ -3656,18 +3656,18 @@ vnd_squeue_tx_one(vnd_str_t *vsp, mblk_t *mp)
 	 * punch (txtime > vns_fcupdate), then we know that it's safe to wait
 	 * for a notification.
 	 */
-	if (vc != NULL) {
+	if (vc != (vnd_mac_cookie_t)NULL) {
 		hrtime_t diff;
 
 		if (vsp->vns_caps.vsc_is_fc_f(vsp->vns_caps.vsc_is_fc_hdl,
 		    vc) == 0)
-			return (NULL);
+			return ((vnd_mac_cookie_t)NULL);
 		mutex_enter(&vsp->vns_lock);
 		diff = vsp->vns_fcupdate - txtime;
 		if (diff > 0) {
 			mutex_exit(&vsp->vns_lock);
 			vnd_mac_flow_control_stat(vsp, diff);
-			return (NULL);
+			return ((vnd_mac_cookie_t)NULL);
 		}
 		vsp->vns_flags |= VNS_F_FLOW_CONTROLLED;
 		vsp->vns_caps.vsc_fc_cookie = vc;
@@ -3737,7 +3737,7 @@ vnd_squeue_tx_drain(void *arg, mblk_t *drain_mp, gsqueue_t *gsp, void *dummy)
 
 		nmps++;
 		mptot += msgsize(mp);
-		if (vnd_squeue_tx_one(vsp, mp) != NULL) {
+		if (vnd_squeue_tx_one(vsp, mp) != (vnd_mac_cookie_t)NULL) {
 			blocked = B_TRUE;
 			break;
 		}
@@ -5588,7 +5588,7 @@ vnd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	vnd_sdev_hdl = sdev_plugin_register(VND_SDEV_NAME, &vnd_sdev_ops,
 	    &errp);
-	if (vnd_sdev_hdl == NULL) {
+	if (vnd_sdev_hdl == (sdev_plugin_hdl_t)NULL) {
 		ddi_remove_minor_node(vnd_dip, NULL);
 		ddi_prop_remove_all(vnd_dip);
 		vnd_dip = NULL;

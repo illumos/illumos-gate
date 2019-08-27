@@ -36,7 +36,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2014 Pluribus Networks Inc.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -99,7 +99,8 @@ pmap_invalidate_cache(void)
 
 	kpreempt_disable();
 	cpuset_all_but(&cpuset, CPU->cpu_id);
-	xc_call(NULL, NULL, NULL, CPUSET2BV(cpuset), (xc_func_t)invalidate_cache);
+	xc_call((xc_arg_t)NULL, (xc_arg_t)NULL, (xc_arg_t)NULL,
+	    CPUSET2BV(cpuset), (xc_func_t)invalidate_cache);
 	invalidate_cache();
 	kpreempt_enable();
 }

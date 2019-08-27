@@ -15,7 +15,7 @@
  *********************************************************/
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -1681,7 +1681,7 @@ Vxn_FreeDmaMem(dma_buf_t *dma)
    ddi_dma_free_handle(&dma->dmaHdl);
 
    dma->buf = NULL;
-   dma->phyBuf = NULL;
+   dma->phyBuf = (uint32_t)(uintptr_t)NULL;
    dma->bufLen = 0;
 }
 

@@ -22,7 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <assert.h>
@@ -687,7 +687,7 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 		return (-ENOMEM);
 	}
 
-	rval = thr_create(NULL, NULL, clone_start, cs, THR_DETACHED, &tid);
+	rval = thr_create(NULL, 0, clone_start, cs, THR_DETACHED, &tid);
 
 	/*
 	 * If the thread did not start, free the resources we allocated:

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -1449,7 +1449,7 @@ lx_ptrace_stop_common(proc_t *p, lx_lwp_data_t *lwpd, ushort_t what)
 	 */
 	lwpd->br_ptrace_flags &= ~(LX_PTF_STOPPING | LX_PTF_STOPPED |
 	    LX_PTF_CLDPEND);
-	lwpd->br_ptrace_stopucp = NULL;
+	lwpd->br_ptrace_stopucp = (uintptr_t)NULL;
 	cv_broadcast(&lx_ptrace_busy_cv);
 	mutex_exit(&p->p_lock);
 

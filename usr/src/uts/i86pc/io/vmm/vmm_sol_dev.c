@@ -1844,7 +1844,7 @@ vmm_is_supported(intptr_t arg)
 		msg = "Unsupported CPU vendor";
 	}
 
-	if (r != 0 && arg != NULL) {
+	if (r != 0 && arg != (intptr_t)NULL) {
 		if (copyoutstr(msg, (char *)arg, strlen(msg), NULL) != 0)
 			return (EFAULT);
 	}
@@ -2089,7 +2089,8 @@ vmm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
-	if ((sph = sdev_plugin_register("vmm", &vmm_sdev_ops, NULL)) == NULL) {
+	if ((sph = sdev_plugin_register("vmm", &vmm_sdev_ops, NULL)) ==
+	    (sdev_plugin_hdl_t)NULL) {
 		ddi_remove_minor_node(dip, NULL);
 		goto fail;
 	}
@@ -2140,12 +2141,12 @@ vmm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 	mutex_exit(&vmm_mtx);
 
-	VERIFY(vmmdev_sdev_hdl != NULL);
+	VERIFY(vmmdev_sdev_hdl != (sdev_plugin_hdl_t)NULL);
 	if (sdev_plugin_unregister(vmmdev_sdev_hdl) != 0) {
 		mutex_exit(&vmmdev_mtx);
 		return (DDI_FAILURE);
 	}
-	vmmdev_sdev_hdl = NULL;
+	vmmdev_sdev_hdl = (sdev_plugin_hdl_t)NULL;
 
 	/* Remove the control node. */
 	ddi_remove_minor_node(dip, "ctl");

@@ -22,7 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2017 Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <errno.h>
@@ -93,7 +93,7 @@ lx_settimeofday(uintptr_t p1, uintptr_t p2)
 	struct timeval tv;
 	struct lx_timezone tz;
 
-	if ((p1 != NULL) &&
+	if ((p1 != (uintptr_t)NULL) &&
 	    (uucopy((struct timeval *)p1, &tv, sizeof (tv)) < 0))
 		return (-errno);
 
@@ -102,11 +102,11 @@ lx_settimeofday(uintptr_t p1, uintptr_t p2)
 	 * but settimeofday(2) should still return EFAULT if it is set
 	 * to a bad non-NULL pointer (sigh...)
 	 */
-	if ((p2 != NULL) &&
+	if ((p2 != (uintptr_t)NULL) &&
 	    (uucopy((struct lx_timezone *)p2, &tz, sizeof (tz)) < 0))
 		return (-errno);
 
-	if ((p1 != NULL) && (settimeofday(&tv, NULL) < 0))
+	if ((p1 != (uintptr_t)NULL) && (settimeofday(&tv, NULL) < 0))
 		return (-errno);
 
 	return (0);

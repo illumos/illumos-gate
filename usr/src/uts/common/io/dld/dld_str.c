@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright 2019 Joyent, Inc.
+ */
+
+/*
  * Data-Link Driver
  */
 
@@ -916,14 +920,14 @@ str_mdata_raw_fastpath_put(dld_str_t *dsp, mblk_t *mp, uintptr_t f_hint,
 			goto discard;
 	}
 
-	if ((cookie = DLD_TX(dsp, mp, f_hint, flag)) != NULL) {
+	if ((cookie = DLD_TX(dsp, mp, f_hint, flag)) != (mac_tx_cookie_t)NULL) {
 		DLD_SETQFULL(dsp);
 	}
 	return (cookie);
 discard:
 	/* TODO: bump kstat? */
 	freemsg(mp);
-	return (NULL);
+	return ((mac_tx_cookie_t)NULL);
 }
 
 

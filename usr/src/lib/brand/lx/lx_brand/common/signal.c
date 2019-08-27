@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -617,7 +617,7 @@ lx_sigaltstack(uintptr_t ssp, uintptr_t oss)
 	lx_tsd_t *lxtsd = lx_get_tsd();
 	lx_stack_t ss;
 
-	if (ssp != NULL) {
+	if (ssp != (uintptr_t)NULL) {
 		if (lxtsd->lxtsd_sigaltstack.ss_flags & LX_SS_ONSTACK) {
 			/*
 			 * If we are currently using the installed alternate
@@ -650,7 +650,7 @@ lx_sigaltstack(uintptr_t ssp, uintptr_t oss)
 		}
 	}
 
-	if (oss != NULL) {
+	if (oss != (uintptr_t)NULL) {
 		/*
 		 * User provided old and new stack_t pointers may point to
 		 * the same location.  Copy out before we modify.
@@ -661,7 +661,7 @@ lx_sigaltstack(uintptr_t ssp, uintptr_t oss)
 		}
 	}
 
-	if (ssp != NULL) {
+	if (ssp != (uintptr_t)NULL) {
 		lxtsd->lxtsd_sigaltstack = ss;
 	}
 
@@ -891,7 +891,7 @@ lx_rt_sigtimedwait(uintptr_t set, uintptr_t sinfo, uintptr_t toutp,
 	 */
 	if ((rc = sigtimedwait(&s_set, s_sinfop,
 	    (struct timespec *)toutp)) == -1)
-		return (toutp == NULL ? -EINTR : -errno);
+		return (toutp == (uintptr_t)NULL ? -EINTR : -errno);
 
 	if (s_sinfop == NULL)
 		return (stol_signo[rc]);
@@ -1331,7 +1331,7 @@ lx_build_signal_frame(int lx_sig, siginfo_t *sip, void *p, void *sp,
 	 *   hdlr(int sig, siginfo_t *sip, void *ucp);
 	 */
 	hargs[0] = lx_sig;
-	hargs[1] = sip != NULL ? (uintptr_t)&lx_ssp->si : NULL;
+	hargs[1] = sip != NULL ? (uintptr_t)&lx_ssp->si : (uintptr_t)NULL;
 	hargs[2] = (uintptr_t)lx_ucp;
 #endif
 

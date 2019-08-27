@@ -38,6 +38,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #ifndef	_DR_SAS_H_
 #define	_DR_SAS_H_
 
@@ -1755,9 +1759,8 @@ static dev_info_t *drsas_find_child(struct drsas_instance *, uint16_t,
 			uint8_t);
 static int	drsas_name_node(dev_info_t *, char *, int);
 static void	drsas_issue_evt_taskq(struct drsas_eventinfo *);
-static int	drsas_service_evt(struct drsas_instance *, int, int, int,
-			uint64_t);
-static int	drsas_mode_sense_build(struct scsi_pkt *);
+static int	drsas_service_evt(struct drsas_instance *, int, int, int);
+static void	drsas_mode_sense_build(struct scsi_pkt *);
 
 #ifdef	__cplusplus
 }

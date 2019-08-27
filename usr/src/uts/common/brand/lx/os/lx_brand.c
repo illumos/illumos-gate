@@ -824,7 +824,7 @@ lx_savecontext32(ucontext32_t *ucp)
 			flags |= LX_UC_RESTART_SYSCALL;
 		}
 	} else {
-		ucp->uc_brand_data[2] = NULL;
+		ucp->uc_brand_data[2] = (caddr32_t)(uintptr_t)NULL;
 	}
 
 	ucp->uc_brand_data[0] = flags;
@@ -920,7 +920,7 @@ lx_zvol_props(ldi_handle_t lh, zfs_cmd_t *zc, uint64_t *vsz, uint64_t *bsz)
 	ASSERT(rc == 0);
 
 	kmem_free((void *)(uintptr_t)zc->zc_nvlist_dst, size);
-	zc->zc_nvlist_dst = NULL;
+	zc->zc_nvlist_dst = (uintptr_t)NULL;
 	zc->zc_nvlist_dst_size = 0;
 
 	if ((rc = nvlist_lookup_nvlist(nv, "volsize", &nv2)) == 0) {
@@ -1727,7 +1727,7 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		 * arg1 = ucontext_t pointer for jump state
 		 */
 
-		if (arg1 == NULL)
+		if (arg1 == (uintptr_t)NULL)
 			return (EINVAL);
 
 		switch (lwpd->br_stack_mode) {
@@ -2061,8 +2061,8 @@ lx_map_vdso(struct uarg *args, struct cred *cred)
 	/*
 	 * The comm page should have been mapped in already.
 	 */
-	if (args->commpage == NULL) {
-		return (NULL);
+	if (args->commpage == (uintptr_t)NULL) {
+		return ((uintptr_t)NULL);
 	}
 
 	/*
@@ -2075,7 +2075,7 @@ lx_map_vdso(struct uarg *args, struct cred *cred)
 	fpath++;
 	if (lookupnameat(fpath, UIO_SYSSPACE, FOLLOW, NULLVPP, &vp,
 	    curzone->zone_rootvp) != 0) {
-		return (NULL);
+		return ((uintptr_t)NULL);
 	}
 
 	/*
@@ -2088,14 +2088,14 @@ lx_map_vdso(struct uarg *args, struct cred *cred)
 	if (VOP_GETATTR(vp, &attr, 0, cred, NULL) != 0 ||
 	    attr.va_size > LX_VDSO_SIZE) {
 		VN_RELE(vp);
-		return (NULL);
+		return ((uintptr_t)NULL);
 	}
 
 	err = execmap(vp, addr, attr.va_size, 0, 0,
 	    PROT_USER|PROT_READ|PROT_EXEC, 1, 0);
 	VN_RELE(vp);
 	if (err != 0) {
-		return (NULL);
+		return ((uintptr_t)NULL);
 	}
 	return ((uintptr_t)addr);
 }
@@ -2116,7 +2116,7 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	Addr		uphdr_vaddr;
 	intptr_t	voffset;
 	char		*interp = NULL;
-	uintptr_t	ldaddr = NULL;
+	uintptr_t	ldaddr = (uintptr_t)NULL;
 	proc_t		*p = ttoproc(curthread);
 	klwp_t		*lwp = ttolwp(curthread);
 	lx_proc_data_t	*lxpd = ptolxproc(p);

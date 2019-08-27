@@ -306,8 +306,8 @@ pci_vtnet_tap_tx(struct pci_vtnet_softc *sc, struct iovec *iov, int iovcnt,
 	int i;
 
 	for (i = 0; i < iovcnt; i++) {
-		(void) dlpi_send(sc->vsc_dhp, NULL, NULL,
-				 iov[i].iov_base, iov[i].iov_len, NULL);
+		(void) dlpi_send(sc->vsc_dhp, NULL, 0,
+		    iov[i].iov_base, iov[i].iov_len, NULL);
 	}
 }
 #endif /* __FreeBSD__ */

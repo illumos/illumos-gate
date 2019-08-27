@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 
@@ -335,7 +335,7 @@ lx_systrace_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_create_minor_node(devi, "lx_systrace", S_IFCHR,
-	    0, DDI_PSEUDO, NULL) == DDI_FAILURE ||
+	    0, DDI_PSEUDO, 0) == DDI_FAILURE ||
 	    dtrace_register("lx-syscall", &lx_systrace_attr,
 	    DTRACE_PRIV_USER, 0, &lx_systrace_pops, NULL,
 	    &lx_systrace_id) != 0) {

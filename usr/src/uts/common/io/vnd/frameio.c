@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -286,7 +286,7 @@ failed:
 	if (error == EAGAIN) {
 		if (frame != 0)
 			error = 0;
-		if (*nvecs != NULL)
+		if (nvecs != NULL)
 			*nvecs = frame;
 		ASSERT(*mpp != NULL);
 	} else {

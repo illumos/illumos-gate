@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -1467,7 +1467,7 @@ ict_siocgifconf32(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 		return (set_errno(EFAULT));
 
 	/* They want to know how many interfaces there are. */
-	if (conf.if_len <= 0 || conf.if_buf == NULL) {
+	if (conf.if_len <= 0 || conf.if_buf == (uint32_t)(uintptr_t)NULL) {
 		error = ict_if_ioctl(fp->f_vnode, SIOCGIFNUM,
 		    (intptr_t)&ifcount, FLFAKE(fp), fp->f_cred);
 		if (error != 0)

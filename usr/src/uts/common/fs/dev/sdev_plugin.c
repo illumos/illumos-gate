@@ -566,23 +566,23 @@ sdev_plugin_register(const char *name, sdev_plugin_ops_t *ops, int *errp)
 
 	if (sdev_plugin_name_isvalid(name, SDEV_PLUGIN_NAMELEN) == 0) {
 		*errp = EINVAL;
-		return (NULL);
+		return ((sdev_plugin_hdl_t)NULL);
 	}
 
 	if (ops->spo_version != 1) {
 		*errp = EINVAL;
-		return (NULL);
+		return ((sdev_plugin_hdl_t)NULL);
 	}
 
 	if (ops->spo_validate == NULL || ops->spo_filldir == NULL ||
 	    ops->spo_inactive == NULL) {
 		*errp = EINVAL;
-		return (NULL);
+		return ((sdev_plugin_hdl_t)NULL);
 	}
 
 	if ((ops->spo_flags & ~SDEV_PLUGIN_FLAGS_MASK) != 0) {
 		*errp = EINVAL;
-		return (NULL);
+		return ((sdev_plugin_hdl_t)NULL);
 	}
 
 	spp = kmem_cache_alloc(sdev_plugin_cache, KM_SLEEP);
@@ -619,7 +619,7 @@ sdev_plugin_register(const char *name, sdev_plugin_ops_t *ops, int *errp)
 	if (ret != 0) {
 		*errp = ret;
 		kmem_cache_free(sdev_plugin_cache, spp);
-		return (NULL);
+		return ((sdev_plugin_hdl_t)NULL);
 	}
 	/* Make sure we have the real vnode */
 	if (VOP_REALVP(vp, &nvp, NULL) == 0) {
@@ -638,7 +638,7 @@ sdev_plugin_register(const char *name, sdev_plugin_ops_t *ops, int *errp)
 		VN_RELE(vp);
 		*errp = EEXIST;
 		kmem_cache_free(sdev_plugin_cache, spp);
-		return (NULL);
+		return ((sdev_plugin_hdl_t)NULL);
 	}
 
 	mutex_enter(&sdev_plugin_lock);
@@ -650,7 +650,7 @@ sdev_plugin_register(const char *name, sdev_plugin_ops_t *ops, int *errp)
 			VN_RELE(vp);
 			*errp = EEXIST;
 			kmem_cache_free(sdev_plugin_cache, spp);
-			return (NULL);
+			return ((sdev_plugin_hdl_t)NULL);
 		}
 	}
 

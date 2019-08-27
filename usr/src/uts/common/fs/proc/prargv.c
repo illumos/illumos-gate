@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -90,7 +90,7 @@ prreadargv(proc_t *p, char *buf, size_t bufsz, size_t *slen)
 	up = PTOU(p);
 	as = p->p_as;
 
-	if ((p->p_flag & SSYS) || as == &kas || up->u_argv == NULL) {
+	if ((p->p_flag & SSYS) || as == &kas || up->u_argv == (uintptr_t)NULL) {
 		/*
 		 * Return the regular psargs string to the caller.
 		 */
@@ -146,7 +146,7 @@ prreadargv(proc_t *p, char *buf, size_t bufsz, size_t *slen)
 		 * Stop trying to read arguments if we reach a NULL
 		 * pointer in the vector.
 		 */
-		if (arg == NULL)
+		if (arg == (uintptr_t)NULL)
 			break;
 
 		/*
@@ -249,7 +249,7 @@ prreadenvv(proc_t *p, char *buf, size_t bufsz, size_t *slen)
 	struct as *as;
 	size_t pos = 0;
 	caddr_t *envp = NULL;
-	uintptr_t tmpp = NULL;
+	uintptr_t tmpp = (uintptr_t)NULL;
 	size_t envpsz = 0, rdsz = 0;
 	int i;
 	int cnt, bound;
@@ -260,7 +260,7 @@ prreadenvv(proc_t *p, char *buf, size_t bufsz, size_t *slen)
 	up = PTOU(p);
 	as = p->p_as;
 
-	if ((p->p_flag & SSYS) || as == &kas || up->u_envp == NULL) {
+	if ((p->p_flag & SSYS) || as == &kas || up->u_envp == (uintptr_t)NULL) {
 		/*
 		 * Return empty string.
 		 */
@@ -350,7 +350,7 @@ prreadenvv(proc_t *p, char *buf, size_t bufsz, size_t *slen)
 		 * Stop trying to read env entries if we reach a NULL
 		 * pointer in the vector.
 		 */
-		if (ev == NULL)
+		if (ev == (uintptr_t)NULL)
 			break;
 
 		/*

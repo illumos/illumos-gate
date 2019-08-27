@@ -568,7 +568,7 @@ ipmi_enum_sp(topo_mod_t *mod, tnode_t *pnode)
 	}
 
 	if (topo_node_fru(pnode, &fmri, NULL, &err) != 0 ||
-	    topo_node_fru_set(sp_node, fmri, NULL, &err) != 0) {
+	    topo_node_fru_set(sp_node, fmri, 0, &err) != 0) {
 		topo_mod_dprintf(mod, "failed to set FRU on %s=%d: %s", SP, 0,
 		    topo_strerror(err));
 		nvlist_free(fmri);
