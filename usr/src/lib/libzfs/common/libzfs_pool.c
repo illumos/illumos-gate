@@ -3686,6 +3686,76 @@ path_to_devid(const char *path)
 	return (ret);
 }
 
+struct path_from_physpath_walker_args {
+	char *pfpwa_path;
+};
+
+/*
+ * Walker for use with di_devlink_walk().  Stores the "/dev" path of the first
+ * primary devlink (i.e., the first devlink which refers to our "/devices"
+ * node) and stops walking.
+ */
+static int
+path_from_physpath_walker(di_devlink_t devlink, void *arg)
+{
+	struct path_from_physpath_walker_args *pfpwa = arg;
+
+	if (di_devlink_type(devlink) != DI_PRIMARY_LINK) {
+		return (DI_WALK_CONTINUE);
+	}
+
+	verify(pfpwa->pfpwa_path == NULL);
+	if ((pfpwa->pfpwa_path = strdup(di_devlink_path(devlink))) != NULL) {
+		return (DI_WALK_TERMINATE);
+	}
+
+	return (DI_WALK_CONTINUE);
+}
+
+/*
+ * Search for a "/dev" path that refers to our physical path.  Returns the new
+ * path if one is found and it does not match the existing "path" value.  If
+ * the value is unchanged, or one could not be found, returns NULL.
+ */
+static char *
+path_from_physpath(libzfs_handle_t *hdl, const char *path,
+    const char *physpath)
+{
+	struct path_from_physpath_walker_args pfpwa;
+
+	if (physpath == NULL) {
+		return (NULL);
+	}
+
+	if (hdl->libzfs_devlink == NULL) {
+		if ((hdl->libzfs_devlink = di_devlink_init(NULL, 0)) ==
+		    DI_LINK_NIL) {
+			/*
+			 * We may not be able to open a handle if this process
+			 * is insufficiently privileged, or we are too early in
+			 * boot for devfsadm to be ready.  Ignore this error
+			 * and defer the path check to a subsequent run.
+			 */
+			return (NULL);
+		}
+	}
+
+	pfpwa.pfpwa_path = NULL;
+	(void) di_devlink_walk(hdl->libzfs_devlink, NULL, physpath,
+	    DI_PRIMARY_LINK, &pfpwa, path_from_physpath_walker);
+
+	if (path != NULL && pfpwa.pfpwa_path != NULL &&
+	    strcmp(path, pfpwa.pfpwa_path) == 0) {
+		/*
+		 * If the path is already correct, no change is required.
+		 */
+		free(pfpwa.pfpwa_path);
+		return (NULL);
+	}
+
+	return (pfpwa.pfpwa_path);
+}
+
 /*
  * Issue the necessary ioctl() to update the stored path value for the vdev.  We
  * ignore any failure here, since a common case is for an unprivileged user to
@@ -3723,11 +3793,9 @@ char *
 zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv,
     int name_flags)
 {
-	char *path, *devid, *env;
+	char *path, *env;
 	uint64_t value;
 	char buf[64];
-	vdev_stat_t *vs;
-	uint_t vsc;
 
 	env = getenv("ZPOOL_VDEV_NAME_PATH");
 	if (env && (strtoul(env, NULL, 0) > 0 ||
@@ -3750,6 +3818,11 @@ zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv,
 		(void) snprintf(buf, sizeof (buf), "%llu", (u_longlong_t)value);
 		path = buf;
 	} else if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0) {
+		vdev_stat_t *vs;
+		uint_t vsc;
+		char *newpath = NULL;
+		char *physpath = NULL;
+		char *devid = NULL;
 
 		/*
 		 * If the device is dead (faulted, offline, etc) then don't
@@ -3757,36 +3830,48 @@ zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv,
 		 * open a misbehaving device, which can have undesirable
 		 * effects.
 		 */
-		if ((nvlist_lookup_uint64_array(nv, ZPOOL_CONFIG_VDEV_STATS,
+		if (nvlist_lookup_uint64_array(nv, ZPOOL_CONFIG_VDEV_STATS,
 		    (uint64_t **)&vs, &vsc) != 0 ||
-		    vs->vs_state >= VDEV_STATE_DEGRADED) &&
-		    zhp != NULL &&
-		    nvlist_lookup_string(nv, ZPOOL_CONFIG_DEVID, &devid) == 0) {
+		    vs->vs_state < VDEV_STATE_DEGRADED ||
+		    zhp == NULL) {
+			goto after_open;
+		}
+
+		if (nvlist_lookup_string(nv, ZPOOL_CONFIG_DEVID, &devid) == 0) {
 			/*
-			 * Determine if the current path is correct.
+			 * This vdev has a devid.  We can use it to check the
+			 * current path.
 			 */
 			char *newdevid = path_to_devid(path);
 
-			if (newdevid == NULL ||
-			    strcmp(devid, newdevid) != 0) {
-				char *newpath;
-
-				if ((newpath = devid_to_path(devid)) != NULL) {
-					/*
-					 * Update the path appropriately.
-					 */
-					set_path(zhp, nv, newpath);
-					if (nvlist_add_string(nv,
-					    ZPOOL_CONFIG_PATH, newpath) == 0)
-						verify(nvlist_lookup_string(nv,
-						    ZPOOL_CONFIG_PATH,
-						    &path) == 0);
-					free(newpath);
-				}
+			if (newdevid == NULL || strcmp(devid, newdevid) != 0) {
+				newpath = devid_to_path(devid);
 			}
 
-			if (newdevid)
+			if (newdevid != NULL)
 				devid_str_free(newdevid);
+
+		} else if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PHYS_PATH,
+		    &physpath) == 0) {
+			/*
+			 * This vdev does not have a devid, but it does have a
+			 * physical path.  Attempt to translate this to a /dev
+			 * path.
+			 */
+			newpath = path_from_physpath(hdl, path, physpath);
+		}
+
+		if (newpath != NULL) {
+			/*
+			 * Update the path appropriately.
+			 */
+			set_path(zhp, nv, newpath);
+			if (nvlist_add_string(nv, ZPOOL_CONFIG_PATH,
+			    newpath) == 0) {
+				verify(nvlist_lookup_string(nv,
+				    ZPOOL_CONFIG_PATH, &path) == 0);
+			}
+			free(newpath);
 		}
 
 		if (name_flags & VDEV_NAME_FOLLOW_LINKS) {
@@ -3798,6 +3883,7 @@ zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv,
 			}
 		}
 
+after_open:
 		if (strncmp(path, ZFS_DISK_ROOTD, strlen(ZFS_DISK_ROOTD)) == 0)
 			path += strlen(ZFS_DISK_ROOTD);
 
