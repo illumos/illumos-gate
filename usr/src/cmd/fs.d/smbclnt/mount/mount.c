@@ -36,7 +36,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -80,9 +80,9 @@ const char * const optlist[] = {
 	MNTOPT_RO,
 #define	OPT_RW		1
 	MNTOPT_RW,
-#define	OPT_SUID 	2
+#define	OPT_SUID	2
 	MNTOPT_SUID,
-#define	OPT_NOSUID 	3
+#define	OPT_NOSUID	3
 	MNTOPT_NOSUID,
 #define	OPT_DEVICES	4
 	MNTOPT_DEVICES,
@@ -182,16 +182,25 @@ main(int argc, char *argv[])
 	/*
 	 * Normal users are allowed to run "mount -F smbfs ..."
 	 * to mount on a directory they own.  To allow that, this
-	 * program is installed setuid root, and it adds SYS_MOUNT
-	 * privilege here (if needed), and then restores the user's
-	 * normal privileges.  When root runs this, it's a no-op.
+	 * program has an exec_attr that adds SYS_MOUNT priv.
+	 *
+	 * The __init_suid_priv call was designed for SUID programs,
+	 * but also works for privileges granted via exec_attr with
+	 * one difference: the added privileges are already effective
+	 * when the program starts, and remain effective after the call.
+	 * To make this work more like the SUID case we'll turn off the
+	 * additional privileges with a __priv_bracket() call here.
+	 * Later calls to __priv_bracket() make the extra privileges
+	 * effective only when we need them.
 	 */
 	if (__init_suid_priv(0, PRIV_SYS_MOUNT, (char *)NULL) < 0) {
 		(void) fprintf(stderr,
 		    gettext("Insufficient privileges, "
-		    "%s must be set-uid root\n"), argv[0]);
+		    "%s should have sys_mount privilege via exec_attr\n"),
+		    argv[0]);
 		exit(RET_ERR);
 	}
+	(void) __priv_bracket(PRIV_OFF);
 
 	if (argc == 2) {
 		if (strcmp(argv[1], "-h") == 0) {

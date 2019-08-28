@@ -26,7 +26,7 @@
  * Copyright (c) 2011 Bayard G. Bell.  All rights reserved.
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2019 Racktop Systems
  */
@@ -22712,6 +22712,7 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 		case DKIOCGMEDIAINFO:
 		case DKIOCGMEDIAINFOEXT:
 		case DKIOCSOLIDSTATE:
+		case DKIOC_CANFREE:
 		case MHIOCENFAILFAST:
 		case MHIOCSTATUS:
 		case MHIOCTKOWN:
@@ -23558,6 +23559,16 @@ skip_ready_valid:
 			}
 			/* synchronous UNMAP request */
 			err = sd_send_scsi_UNMAP(dev, ssc, dfl, flag);
+		}
+		break;
+
+	case DKIOC_CANFREE:
+		SD_TRACE(SD_LOG_IOCTL, un, "DKIOC_CANFREE\n");
+		i = (un->un_thin_flags & SD_THIN_PROV_ENABLED) ? 1 : 0;
+		if (ddi_copyout(&i, (void *)arg, sizeof (int), flag) != 0) {
+			err = EFAULT;
+		} else {
+			err = 0;
 		}
 		break;
 

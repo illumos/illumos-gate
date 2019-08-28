@@ -239,6 +239,7 @@ do_tags() {
 do_tar() {
 	git_rev=`git rev-parse --short=8 HEAD`
 	files="
+etc/security/exec_attr.d/SUNWsmbfs
 lib/svc/manifest/network/smb/client.xml
 lib/svc/method/smb-client
 usr/bin/smbutil

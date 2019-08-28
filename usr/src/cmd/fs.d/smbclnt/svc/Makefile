@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
 #
 
 MANIFEST=	client.xml
@@ -30,11 +30,20 @@ SVCMETHOD=	smb-client
 
 include $(SRC)/cmd/Makefile.cmd
 
+ETCSECURITYFILES =	exec_attr.d/SUNWsmbfs
+ROOTETCSECURITY =	$(ROOT)/etc/security
+$(ROOTETCSECURITY) :=   DIRMODE = 0755
+ROOTETCSECURITYFILES =  $(ETCSECURITYFILES:%=$(ROOTETCSECURITY)/%)
+$(ROOTETCSECURITYFILES) := FILEMODE = 0644
+
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORKSMB)
 
 all lint:
 
-install:	$(ROOTMANIFEST) $(ROOTSVCMETHOD)
+install:	$(ROOTMANIFEST) $(ROOTSVCMETHOD) $(ROOTETCSECURITYFILES)
+
+$(ROOTETCSECURITY)/exec_attr.d/%:%
+	$(INS.file)
 
 clean:
 

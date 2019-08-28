@@ -7,7 +7,6 @@
 .SH NAME
 cryptoadm \- cryptographic framework administration
 .SH SYNOPSIS
-.LP
 .nf
 \fBcryptoadm\fR list [\fB-mpv\fR] [provider=\fIprovider-name\fR]
      [mechanism=\fImechanism-list\fR]
@@ -82,8 +81,6 @@ cryptoadm \- cryptographic framework administration
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBcryptoadm\fR utility displays cryptographic provider information for a
 system, configures the mechanism policy for each provider, and installs or
 uninstalls a cryptographic provider. The cryptographic framework supports three
@@ -143,8 +140,6 @@ subcommand \fBlist\fR, any options
 subcommand \fB-\fR\fB-help\fR
 .RE
 .SH OPTIONS
-.sp
-.LP
 The \fBcryptoadm\fR utility has the various combinations of subcommands and
 options shown below.
 .sp
@@ -443,7 +438,6 @@ Display the command usage.
 .RE
 
 .SH OPERANDS
-.sp
 .ne 2
 .na
 \fBprovider=\fIprovider-name\fR\fR
@@ -597,7 +591,6 @@ You can also use \fBall\fR as an argument to \fBmechanism\fR, as in:
 provider-features, such as \fBrandom\fR.
 .RE
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRDisplay List of Providers Installed in System
 .sp
 .LP
@@ -763,8 +756,6 @@ example# \fBcryptoadm enable metaslot token="SUNW,venus"\fR
 .sp
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -787,8 +778,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -807,20 +796,14 @@ Interface Stability	See below
 The \fBstart\fR, \fBstop\fR, and \fBrefresh\fR options are Private interfaces.
 All other options are Evolving. The utility name is Stable.
 .SH SEE ALSO
-.sp
-.LP
 \fBlogadm\fR(1M), \fBsvcadm\fR(1M), \fBsyslogd\fR(1M), \fBlibpkcs11\fR(3LIB),
 \fBexec_attr\fR(4), \fBprof_attr\fR(4), \fBattributes\fR(5), \fBsmf\fR(5),
 \fBrandom\fR(7D)
-.sp
-.LP
 
 .sp
 .LP
 \fISolaris Security for Developer's Guide\fR
 .SH NOTES
-.sp
-.LP
 If a hardware provider's policy was made explicitly (that is, some of its
 mechanisms were disabled) and the hardware provider has been detached, the
 policy of this hardware provider is still listed.

@@ -1,0 +1,2 @@
+Basic Solaris User:solaris:cmd:::/usr/lib/fs/smbfs/mount:privs=sys_mount
+Basic Solaris User:solaris:cmd:::/usr/lib/fs/smbfs/umount:privs=sys_mount

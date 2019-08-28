@@ -1762,7 +1762,7 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 {
 	zvol_state_t *zv;
 	struct dk_callback *dkc;
-	int error = 0;
+	int i, error = 0;
 	locked_range_t *lr;
 
 	mutex_enter(&zfsdev_state_lock);
@@ -1987,6 +1987,15 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 
 		return (error);
 	}
+
+	case DKIOC_CANFREE:
+		i = zvol_unmap_enabled ? 1 : 0;
+		if (ddi_copyout(&i, (void *)arg, sizeof (int), flag) != 0) {
+			error = EFAULT;
+		} else {
+			error = 0;
+		}
+		break;
 
 	default:
 		error = SET_ERROR(ENOTTY);

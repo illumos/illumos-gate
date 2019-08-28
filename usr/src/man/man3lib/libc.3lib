@@ -10,14 +10,12 @@
 .SH NAME
 libc \- C library
 .SH DESCRIPTION
-.LP
 Functions in this library provide various facilities defined by System V, ANSI
 C, POSIX, and so on.  See \fBstandards\fR(5). In addition, those facilities
 previously defined in the internationalization and the wide-character libraries
 are now defined in this library, as are the facilities previously defined in
 the multithreading libraries, \fBlibthread\fR and \fBlibpthread\fR.
 .SH INTERFACES
-.LP
 The shared object \fBlibc.so.1\fR provides the public interfaces defined below.
 See \fBIntro\fR(3) for additional information on shared object interfaces.
 .sp
@@ -92,7 +90,7 @@ l l .
 \fBalarm\fR	\fBalphasort\fR
 \fBaltzone\fR	\fBascftime\fR
 \fBasctime\fR	\fBasctime_r\fR
-\fBasprintf\fR	
+\fBasprintf\fR
 \fBatexit\fR	\fBatof\fR
 \fBatoi\fR	\fBatol\fR
 \fBatoll\fR	\fBatomic_add_16\fR
@@ -180,7 +178,7 @@ l l .
 \fBcsetlen\fR	\fBctermid\fR
 \fBctermid_r\fR	\fBctime\fR
 \fBctime_r\fR	\fBcuserid\fR
-\fBdaemon\fR	
+\fBdaemon\fR
 \fBdaylight\fR	\fBdbm_clearerr\fR
 \fBdbm_close\fR	\fBdbm_delete\fR
 \fBdbm_error\fR	\fBdbm_fetch\fR
@@ -207,7 +205,7 @@ l l .
 \fBdup\fR	\fBdup2\fR
 \fBduplocale\fR
 \fBeconvert\fR	\fBecvt\fR
-\fBenable_extended_FILE_stdio\fR	
+\fBenable_extended_FILE_stdio\fR
 \fBencrypt\fR	\fBendgrent\fR
 \fBendnetgrent\fR	\fBendpwent\fR
 \fBendspent\fR	\fBendusershell\fR
@@ -220,7 +218,7 @@ l l .
 \fBexeclp\fR	\fBexecv\fR
 \fBexecve\fR	\fBexecvp\fR
 \fBexit\fR	\fBextended_to_decimal\fR
-\fBfaccessat\fR	
+\fBfaccessat\fR
 \fBfacl\fR	\fBfattach\fR
 \fBfchdir\fR	\fBfchmod\fR
 \fBfchmodat\fR
@@ -228,14 +226,14 @@ l l .
 \fBfchroot\fR	\fBfclose\fR
 \fBfcloseall\fR	\fBfcntl\fR
 \fBfconvert\fR	\fBfcvt\fR
-\fBfdatasync\fR	\fBfdetach\fR	
+\fBfdatasync\fR	\fBfdetach\fR
 \fBfdopen\fR	\fBfdopendir\fR
 \fBfdwalk\fR	\fBfeof\fR
 \fBferror\fR	\fBfflush\fR
 \fBffs\fR	\fBffsl\fR
 \fBffsll\fR	\fBfls\fR
 \fBflsl\fR	\fBflsll\fR
-\fBfgetattr\fR	\fBfgetc\fR	
+\fBfgetattr\fR	\fBfgetc\fR
 \fBfgetgrent\fR	\fBfgetgrent_r\fR
 \fBfgetpos\fR	\fBfgetpwent\fR
 \fBfgetpwent_r\fR	\fBfgets\fR
@@ -259,7 +257,7 @@ l l .
 \fBfreopen\fR
 \fBfrexp\fR	\fBfscanf\fR
 \fBfseek\fR	\fBfseeko\fR
-\fBfsetattr\fR	
+\fBfsetattr\fR
 \fBfsetpos\fR	\fBfstat\fR
 \fBfstatat\fR	\fBfstatfs\fR
 \fBfstatvfs\fR	\fBfsync\fR
@@ -268,12 +266,12 @@ l l .
 \fBftruncate\fR	\fBftrylockfile\fR
 \fBftw\fR	\fBfunc_to_decimal\fR
 \fBfunlockfile\fR	\fBfutimens\fR
-\fBfutimesat\fR	
+\fBfutimesat\fR
 \fBfwide\fR	\fBfwprintf\fR
 \fBfwrite\fR	\fBfwscanf\fR
 \fBgconvert\fR	\fBgcvt\fR
 \fBgetacct\fR	\fBgetattrat\fR
-\fBgetc\fR	
+\fBgetc\fR
 \fBgetc_unlocked\fR	\fBgetchar\fR
 \fBgetchar_unlocked\fR	\fBgetcontext\fR
 \fBgetcpuid\fR	\fBgetcwd\fR
@@ -302,7 +300,7 @@ l l .
 \fBgetpgid\fR	\fBgetpgrp\fR
 \fBgetpid\fR	\fBgetpmsg\fR
 \fBgetppid\fR	\fBgetppriv\fR
-\fBgetpriority\fR	\fbgetprogname\fR
+\fBgetpriority\fR	\fBgetprogname\fR
 \fBgetprojid\fR
 \fBgetpw\fR	\fBgetpwent\fR
 \fBgetpwent_r\fR	\fBgetpwnam\fR
@@ -339,7 +337,7 @@ l l .
 \fBindex\fR	\fBinitgroups\fR
 \fBinitstate\fR	\fBinnetgr\fR
 \fBinsque\fR	\fBioctl\fR
-\fBis_system_labeled\fR	
+\fBis_system_labeled\fR
 \fBisaexec\fR
 \fBisalnum\fR	\fBisalnum_l\fR
 \fBisalpha\fR	\fBisalpha_l\fR
@@ -388,7 +386,7 @@ l l .
 \fBldivide\fR	\fBlexp10\fR
 \fBlfind\fR	\fBlfmt\fR
 \fBlink\fR	\fBlinkat\fR
-\fBlio_listio\fR	\fBllabs\fR	
+\fBlio_listio\fR	\fBllabs\fR
 \fBlldiv\fR	\fBllog10\fR
 \fBllseek\fR	\fBlltostr\fR
 \fBlocaleconv\fR	\fBlocaltime\fR
@@ -424,7 +422,7 @@ l l .
 \fBmktemp\fR	\fBmktime\fR
 \fBmlock\fR	\fBmlockall\fR
 \fBmmap\fR	\fBmmapobj\fR
-\fBmodctl\fR	
+\fBmodctl\fR
 \fBmodf\fR	\fBmodff\fR
 \fBmodutx\fR	\fBmonitor\fR
 \fBmount\fR	\fBmprotect\fR
@@ -470,7 +468,7 @@ l l .
 \fBposix_memalign\fR	\fBposix_openpt\fR
 \fBposix_spawn\fR	\fBposix_spawn_file_actions_addclose\fR
 \fBposix_spawn_file_actions_addclosefrom_np\fR	\fBposix_spawn_file_actions_adddup2\fR
-\fBposix_spawn_file_actions_addopen\fR	
+\fBposix_spawn_file_actions_addopen\fR
 \fBposix_spawn_file_actions_destroy\fR
 \fBposix_spawn_file_actions_init\fR
 \fBposix_spawn_pipe_np\fR
@@ -533,7 +531,7 @@ l l .
 \fBpthread_getconcurrency\fR	\fBpthread_getschedparam\fR
 \fBpthread_getspecific\fR	\fBpthread_join\fR
 \fBpthread_key_create\fR	\fBpthread_key_create_once_np\fR
-\fBpthread_key_delete\fR	
+\fBpthread_key_delete\fR
 \fBpthread_kill\fR	\fBpthread_mutex_consistent\fR
 \fBpthread_mutex_destroy\fR	\fBpthread_mutex_getprioceiling\fR
 \fBpthread_mutex_init\fR	\fBpthread_mutex_lock\fR
@@ -619,14 +617,14 @@ l l .
 \fBsem_open\fR	\fBsem_post\fR
 \fBsem_reltimedwait_np\fR	\fBsem_timedwait\fR
 \fBsem_trywait\fR	\fBsem_unlink\fR
-\fBsem_wait\fR	
+\fBsem_wait\fR
 \fBsema_destroy\fR	\fBsema_held\fR
 \fBsema_init\fR	\fBsema_post\fR
 \fBsema_trywait\fR	\fBsema_wait\fR
 \fBsemctl\fR	\fBsemget\fR
 \fBsemids\fR	\fBsemop\fR
 \fBsemtimedop\fR	\fBsetattrat\fR
-\fBsetbuf\fR	
+\fBsetbuf\fR
 \fBsetbuffer\fR	\fBsetcat\fR
 \fBsetcontext\fR	\fBsetegid\fR
 \fBsetenv\fR	\fBseteuid\fR
@@ -661,7 +659,7 @@ l l .
 \fBsiglongjmp\fR	\fBsignal\fR
 \fBsigpause\fR	\fBsigpending\fR
 \fBsigprocmask\fR	\fBsigqueue\fR
-\fBsigrelse\fR	
+\fBsigrelse\fR
 \fBsigsend\fR	\fBsigsendset\fR
 \fBsigset\fR	\fBsigsetjmp\fR
 \fBsigstack\fR	\fBsigsuspend\fR
@@ -692,7 +690,7 @@ l l .
 \fBstrncmp\fR	\fBstrncpy\fR
 \fBstrnstr\fR	\fBstrpbrk\fR
 \fBstrptime\fR	\fBstrptime_l\fR
-\fBstrrchr\fR	\fBstrsep\fR	
+\fBstrrchr\fR	\fBstrsep\fR
 \fBstrsignal\fR	\fBstrspn\fR
 \fBstrstr\fR	\fBstrtod\fR
 \fBstrtof\fR	\fBstrtoimax\fR
@@ -720,7 +718,7 @@ l l .
 \fBthr_exit\fR	\fBthr_getconcurrency\fR
 \fBthr_getprio\fR	\fBthr_getspecific\fR
 \fBthr_join\fR	\fBthr_keycreate\fR
-\fBthr_keycreate_once\fR	
+\fBthr_keycreate_once\fR
 \fBthr_kill\fR	\fBthr_main\fR
 \fBthr_min_stack\fR	\fBthr_self\fR
 \fBthr_setconcurrency\fR	\fBthr_setprio\fR
@@ -729,7 +727,7 @@ l l .
 \fBthr_yield\fR	\fBtime\fR
 \fBtimer_create\fR	\fBtimer_delete\fR
 \fBtimer_getoverrun\fR	\fBtimer_gettime\fR
-\fBtimer_settime\fR	
+\fBtimer_settime\fR
 \fBtimes\fR	\fBtimezone\fR
 \fBtmpfile\fR	\fBtmpnam\fR
 \fBtmpnam_r\fR	\fBtoascii\fR
@@ -744,7 +742,7 @@ l l .
 \fBtwalk\fR	\fBtzname\fR
 \fBtzset\fR	\fBu8_strcmp\fR
 \fBu8_textprep_str\fR	\fBu8_validate\fR
-\fBuadmin\fR	
+\fBuadmin\fR
 \fBualarm\fR	\fBuconv_u16tou32\fR
 \fBuconv_u16tou8\fR	\fBuconv_u32tou16\fR
 \fBuconv_u32tou8\fR	\fBuconv_u8tou16\fR
@@ -908,7 +906,7 @@ l l .
 \fB__dtoll\fR	\fB__dtou\fR
 \fB__dtoull\fR	\fB__ftoll\fR
 \fB__ftou\fR	\fB__ftoull\fR
-\fB__umul64\fR	
+\fB__umul64\fR
 .TE
 
 .sp
@@ -995,7 +993,6 @@ symbols
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -1009,11 +1006,9 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.LP
 \fBpvs\fR(1), \fBIntro\fR(2), \fBIntro\fR(3), \fBattributes\fR(5),
 \fBlf64\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.LP
 The synonyms compatibility library, \fBc_synonyms.so.1\fR, provides a mechanism
 to support old applications and libraries that were mistakenly built using
 now-obsolete synonym symbols from \fBlibc\fR.

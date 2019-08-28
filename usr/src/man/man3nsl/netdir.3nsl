@@ -11,7 +11,6 @@ netdir, netdir_getbyname, netdir_getbyaddr, netdir_free, netdir_options,
 taddr2uaddr, uaddr2taddr, netdir_perror, netdir_sperror, netdir_mergeaddr \-
 generic transport name-to-address translation
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lnsl\fR [ \fIlibrary\fR...]
 #include <netdir.h>
@@ -58,7 +57,6 @@ generic transport name-to-address translation
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBnetdir\fR functions provide a generic interface for name-to-address
 mapping that will work with all transport protocols. This interface provides a
 generic way for programs to convert transport specific addresses into common
@@ -185,7 +183,6 @@ and option management. \fIfildes\fR is the associated file descriptor.
 \fIoption\fR, \fIfildes\fR, and \fIpointer_to_args\fR are passed to the
 \fBnetdir_options()\fR function for the transport specified in \fIconfig\fR.
 Currently four values are defined for \fIoption\fR:
-.br
 
 .in +2
 \fBND_SET_BROADCAST\fR
@@ -303,7 +300,6 @@ The \fBnetdir_sperror()\fR function returns a string with an error message that
 states the cause of a name-to-address mapping failure.
 
 .SH RETURN VALUES
-.LP
 The \fBnetdir_sperror()\fR function returns a pointer to a buffer which
 contains the error message string. The buffer is overwritten on each call. In
 multithreaded applications, this buffer is implemented as thread-specific
@@ -313,7 +309,6 @@ data.
 The \fBnetdir_getbyname()\fR, \fBnetdir_getbyaddr()\fR, and \fBnetdir_options()\fR
 functions return \fB0\fR on success and a non-zero value on failure.
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -328,6 +323,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.LP
 \fBgethostname\fR(3C), \fBgetnetconfig\fR(3NSL), \fBgetnetpath\fR(3NSL),
 \fBnetconfig\fR(4), \fBattributes\fR(5)

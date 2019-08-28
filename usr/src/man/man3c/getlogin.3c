@@ -49,7 +49,6 @@
 .SH NAME
 getlogin, getlogin_r \- get login name
 .SH SYNOPSIS
-.LP
 .nf
 #include <unistd.h>
 
@@ -62,7 +61,6 @@ getlogin, getlogin_r \- get login name
 .fi
 
 .SS "Standard conforming"
-.LP
 .nf
 cc [ \fIflag \fR... ] \fIfile\fR... \fB-D_POSIX_PTHREAD_SEMANTICS\fR [ \fIlibrary \fR... ]
 
@@ -70,8 +68,6 @@ cc [ \fIflag \fR... ] \fIfile\fR... \fB-D_POSIX_PTHREAD_SEMANTICS\fR [ \fIlibrar
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBgetlogin()\fR function returns a pointer to the login name as found in
 \fB/var/adm/utmpx\fR. It can be used in conjunction with \fBgetpwnam\fR(3C) to
 locate the correct password file entry when the same user \fBID\fR is shared by
@@ -106,7 +102,6 @@ login name is to call \fBcuserid\fR(3C), or to call \fBgetlogin()\fR and if it
 fails to call \fBgetpwuid\fR(3C).
 .sp
 .LP
-
 The \fBgetlogin_r()\fR function has the same functionality as \fBgetlogin()\fR
 except that the caller must supply a buffer \fIname\fR with length \fInamelen\fR
 to store the result.  The \fIname\fR buffer should be at least
@@ -118,8 +113,6 @@ terminator, does not fit inside the buffer, than an error will be generated.
 Otherwise, the buffer \fIname\fR will be updated with the login name.
 
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBgetlogin()\fR returns a pointer to the login
 name or a null pointer if the user's login name cannot be found.  Otherwise it
 returns a null pointer and sets \fBerrno\fR to indicate the error.
@@ -128,8 +121,6 @@ returns a null pointer and sets \fBerrno\fR to indicate the error.
 The standard-conforming \fBgetlogin_r()\fR returns \fB0\fR if successful, or
 the error number upon failure.
 .SH ERRORS
-.sp
-.LP
 The \fBgetlogin_r()\fR function will fail if:
 .sp
 .ne 2
@@ -193,8 +184,6 @@ The size of the buffer is smaller than the result to be returned.
 .RE
 
 .SH USAGE
-.sp
-.LP
 The return value of \fBgetlogin()\fR points to thread-specific data whose
 content is overwritten on each call by the same thread.
 .sp
@@ -205,7 +194,6 @@ effective user ID of the process; \fBgetlogin()\fR returns the name associated
 with the current login activity; and \fBgetpwuid(\fR\fBgetuid()\fR\fB)\fR
 returns the name associated with the real user ID of the process.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/adm/utmpx\fR\fR
@@ -233,8 +221,6 @@ A 64-bit compatibility library to return long login names.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -251,14 +237,10 @@ MT-Level	See below.
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBgeteuid\fR(2), \fBgetuid\fR(2), \fBcuserid\fR(3C), \fBgetgrnam\fR(3C),
 \fBgetpwnam\fR(3C), \fBgetpwuid\fR(3C), \fButmpx\fR(4), \fBattributes\fR(5),
 \fBstandards\fR(5)
 .SH NOTES
-.sp
-.LP
 When compiling multithreaded programs, see \fBIntro\fR(3).
 .sp
 .LP

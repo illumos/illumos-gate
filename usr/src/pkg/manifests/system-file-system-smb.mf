@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/system/file-system/smb@$(PKGVERS)
@@ -63,6 +63,8 @@ dir path=usr/share/man/man4
 dir path=usr/share/man/man5
 dir path=usr/share/man/man7fs
 driver name=nsmb perms="* 0666 root sys"
+file path=etc/security/exec_attr.d/SUNWsmbfs mode=0644 \
+    restart_fmri=svc:/system/rbac:default
 file path=lib/svc/manifest/network/smb/client.xml group=sys mode=0444
 file path=lib/svc/method/smb-client mode=0555
 file path=usr/bin/smbutil mode=0555
@@ -75,9 +77,9 @@ file path=usr/lib/$(ARCH64)/libsmbfs.so.1
 file path=usr/lib/fs/smbfs/$(ARCH64)/libshare_smbfs.so.1
 file path=usr/lib/fs/smbfs/dfshares mode=0555
 file path=usr/lib/fs/smbfs/libshare_smbfs.so.1
-file path=usr/lib/fs/smbfs/mount mode=4555
+file path=usr/lib/fs/smbfs/mount mode=0555
 file path=usr/lib/fs/smbfs/share mode=0555
-file path=usr/lib/fs/smbfs/umount mode=4555
+file path=usr/lib/fs/smbfs/umount mode=0555
 file path=usr/lib/fs/smbfs/unshare mode=0555
 file path=usr/lib/libmlrpc.so.2
 file path=usr/lib/libsmbfs.so.1
