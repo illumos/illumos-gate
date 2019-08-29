@@ -16,6 +16,7 @@
 
 #
 # Copyright (c) 2017 by Lawrence Livermore National Security, LLC.
+# Copyright 2019 Joyent, Inc.
 #
 
 # DESCRIPTION:
@@ -44,7 +45,7 @@ verify_runnable "both"
 function cleanup
 {
 	default_cleanup_noexit
-	log_must set_tunable64 zfs_txg_timeout $TXG_TIMEOUT_DEFAULT
+	log_must set_tunable32 zfs_txg_timeout $TXG_TIMEOUT_DEFAULT
 	log_must set_tunable64 zfs_multihost_interval $MMP_INTERVAL_DEFAULT
 	log_must rm -f $PREV_UBER $CURR_UBER
 	log_must mmp_clear_hostid
@@ -54,7 +55,7 @@ log_assert "mmp thread won't write uberblocks with multihost=off"
 log_onexit cleanup
 
 log_must set_tunable64 zfs_multihost_interval $MMP_INTERVAL_MIN
-log_must set_tunable64 zfs_txg_timeout $TXG_TIMEOUT_LONG
+log_must set_tunable32 zfs_txg_timeout $TXG_TIMEOUT_LONG
 log_must mmp_set_hostid $HOSTID1
 
 default_setup_noexit $DISK

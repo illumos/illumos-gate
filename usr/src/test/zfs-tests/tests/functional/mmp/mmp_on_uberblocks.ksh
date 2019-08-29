@@ -16,6 +16,7 @@
 
 #
 # Copyright (c) 2017 by Lawrence Livermore National Security, LLC.
+# Copyright 2019 Joyent, Inc.
 #
 
 # DESCRIPTION:
@@ -45,14 +46,14 @@ MAX=$((EXPECTED + FUDGE))
 function cleanup
 {
 	default_cleanup_noexit
-	set_tunable64 zfs_txg_timeout $TXG_TIMEOUT_DEFAULT
+	set_tunable32 zfs_txg_timeout $TXG_TIMEOUT_DEFAULT
 	log_must mmp_clear_hostid
 }
 
 log_assert "Ensure MMP uberblocks update at the correct interval"
 log_onexit cleanup
 
-log_must set_tunable64 zfs_txg_timeout $TXG_TIMEOUT_LONG
+log_must set_tunable32 zfs_txg_timeout $TXG_TIMEOUT_LONG
 log_must mmp_set_hostid $HOSTID1
 
 default_setup_noexit "$DISKS"
