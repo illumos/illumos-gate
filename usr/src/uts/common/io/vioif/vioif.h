@@ -342,7 +342,6 @@ struct vioif {
 	vioif_runstate_t		vif_runstate;
 
 	mac_handle_t			vif_mac_handle;
-	mac_register_t			*vif_macp;
 
 	virtio_queue_t			*vif_rx_vq;
 	virtio_queue_t			*vif_tx_vq;
