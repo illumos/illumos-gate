@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd "Jan 13, 2015"
+.Dd "Aug 27, 2019"
 .Dt THRD_JOIN 3C
 .Os
 .Sh NAME
@@ -27,7 +27,7 @@
 .Sh DESCRIPTION
 The
 .Fn thrd_join
-function suspends the exection of the current thread and waits for the
+function suspends the execution of the current thread and waits for the
 thread indicated by
 .Fa thrd
 to terminate and stores the exit status, as set by a call to
@@ -59,7 +59,7 @@ the system, see
 .Xr pthread_join 3C
 and
 .Xr thr_join 3C .
-.Sh RETURN_VALUES
+.Sh RETURN VALUES
 Upon successful completion, the
 .Fn thrd_join
 function returns

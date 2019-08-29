@@ -20,6 +20,11 @@
 
 #ifndef	NULL
 
+#if defined(__sparc)
+/*
+ * SPARC code is not yet NULL pointer clean.
+ */
+
 /*
  * POSIX.1-2008 requires that the NULL macro be cast to type void *.
  * Historically, this has not been done, so we only enable this in a
@@ -46,6 +51,32 @@
 #endif	/* _LP64 */
 #endif	/* C++11 */
 #endif	/* _XPG7 */
+#else
+/*
+ * POSIX.1-2008 requires that the NULL macro be cast to type void *.
+ */
+
+#if !defined(__cplusplus)
+#define	NULL	((void *)0)
+#else
+
+/*
+ * ISO C++ requires that the NULL macro be a constant integral type evaluating
+ * to zero until C++11, and an integer or pointer literal with value zero from
+ * C++11 onwards.
+ */
+
+#if __cplusplus >= 201103L
+#define	NULL	nullptr
+#else
+#if defined(_LP64)
+#define	NULL	0L
+#else
+#define	NULL	0
+#endif	/* _LP64 */
+#endif	/* C++11 */
+#endif	/* !__cplusplus */
+#endif	/* __sparc */
 
 #endif	/* NULL */
 

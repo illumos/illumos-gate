@@ -1,21 +1,19 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
+.\" Copyright 2019 Peter Tribble
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FMADM 1M "Oct 22, 2008"
+.TH FMADM 1M "Aug 26, 2019"
 .SH NAME
 fmadm \- fault management configuration tool
 .SH SYNOPSIS
-.LP
 .nf
 \fBfmadm\fR [\fB-q\fR] [\fIsubcommand\fR [\fIarguments\fR]]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBfmadm\fR utility can be used by administrators and service personnel to
 view and modify system configuration parameters maintained by the Fault
 Manager, \fBfmd\fR(1M). \fBfmd\fR receives telemetry information relating to
@@ -56,13 +54,10 @@ to gather more information or perform additional tasks. The documentation for
 to observe fault management activities.
 .sp
 .LP
-The \fBfmadm\fR utility requires the user to possess the \fBSYS_CONFIG\fR
-privilege. Refer to the \fI\fR for more information about how to configure
-privileges. The \fBfmadm\fR \fBload\fR subcommand requires that the
-user possess all privileges.
+The \fBfmadm\fR utility requires the user to possess the \fBPRIV_SYS_ADMIN\fR
+privilege. See \fBprivileges\fR(5). The \fBfmadm\fR \fBload\fR subcommand
+requires that the user possess all privileges.
 .SS "SUBCOMMANDS"
-.sp
-.LP
 \fBfmadm\fR accepts the following subcommands. Some of the subcommands accept
 or require additional options and operands:
 .sp
@@ -385,8 +380,6 @@ logfile to be rotated, if the current one is not zero in size:
 .RE
 
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -399,8 +392,6 @@ successful operations to standard output.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -422,8 +413,6 @@ as described in \fBSUBCOMMANDS\fR.
 .RE
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -454,8 +443,6 @@ Invalid command-line options were specified.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -474,13 +461,8 @@ Interface Stability	See below.
 The command-line options are Committed. The human-readable output is
 not-an-interface.
 .SH SEE ALSO
-.sp
-.LP
 \fBfmd\fR(1M), \fBfmdump\fR(1M), \fBfmstat\fR(1M), \fBlogadm\fR(1M),
-\fBsyslogd\fR(1M), \fBattributes\fR(5)
-.sp
-.LP
-\fI\fR
+\fBsyslogd\fR(1M), \fBattributes\fR(5), \fBprivileges\fR(5)
 .sp
 .LP
 http://illumos.org/msg/

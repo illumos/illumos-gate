@@ -465,7 +465,7 @@ i40e_intr_init_queue_msix(i40e_t *i40e)
 		boolean_t head = B_TRUE;
 
 		for (uint_t qidx = vec; qidx < i40e->i40e_num_trqpairs;
-		     qidx += intr_count) {
+		    qidx += intr_count) {
 			uint_t next_qidx = qidx + intr_count;
 
 			next_qidx = (next_qidx > i40e->i40e_num_trqpairs) ?
@@ -757,7 +757,7 @@ i40e_intr_msix(void *arg1, void *arg2)
 	 * performed during i40e_map_intrs_to_vectors().
 	 */
 	for (uint_t i = vector_idx - 1; i < i40e->i40e_num_trqpairs;
-	     i += (i40e->i40e_intr_count - 1)) {
+	    i += (i40e->i40e_intr_count - 1)) {
 		i40e_trqpair_t *itrq = &i40e->i40e_trqpairs[i];
 
 		ASSERT3U(i, <, i40e->i40e_num_trqpairs);

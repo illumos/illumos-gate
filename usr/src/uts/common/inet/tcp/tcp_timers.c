@@ -50,7 +50,7 @@
  * There are two basic functions dealing with tcp timers:
  *
  *	timeout_id_t	tcp_timeout(connp, func, time)
- * 	clock_t		tcp_timeout_cancel(connp, timeout_id)
+ *	clock_t		tcp_timeout_cancel(connp, timeout_id)
  *	TCP_TIMER_RESTART(tcp, intvl)
  *
  * tcp_timeout() starts a timer for the 'tcp' instance arranging to call 'func'
@@ -68,7 +68,7 @@
  * call-back is called.
  *
  * NOTE: The call-back function 'func' is never called if tcp is in
- * 	the TCPS_CLOSED state.
+ *	the TCPS_CLOSED state.
  *
  * tcp_timeout_cancel() attempts to cancel a pending tcp_timeout()
  * request. locks acquired by the call-back routine should not be held across
@@ -78,7 +78,7 @@
  * Otherwise, it returns an integer value greater than or equal to 0.
  *
  * NOTE: both tcp_timeout() and tcp_timeout_cancel() should always be called
- * 	within squeue context corresponding to the tcp instance. Since the
+ *	within squeue context corresponding to the tcp instance. Since the
  *	call-back is also called via the same squeue, there are no race
  *	conditions described in untimeout(9F) manual page since all calls are
  *	strictly serialized.
@@ -419,7 +419,7 @@ tcp_keepalive_timer(void *arg)
 {
 	mblk_t	*mp;
 	conn_t	*connp = (conn_t *)arg;
-	tcp_t  	*tcp = connp->conn_tcp;
+	tcp_t	*tcp = connp->conn_tcp;
 	int32_t	firetime;
 	int32_t	idletime;
 	int32_t	ka_intrvl;
@@ -1067,7 +1067,7 @@ void
 tcp_close_linger_timeout(void *arg)
 {
 	conn_t	*connp = (conn_t *)arg;
-	tcp_t 	*tcp = connp->conn_tcp;
+	tcp_t	*tcp = connp->conn_tcp;
 
 	tcp->tcp_client_errno = ETIMEDOUT;
 	tcp_stop_lingering(tcp);

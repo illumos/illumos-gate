@@ -1,20 +1,20 @@
 '\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2016, Joyent, Inc. All Rights Reserved.
+.\" Copyright 2019 Peter Tribble
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRIVILEGES 5 "Feb 28, 2018"
+.TH PRIVILEGES 5 "Aug 26, 2019"
 .SH NAME
 privileges \- process privilege model
 .SH DESCRIPTION
-.LP
-Solaris software implements a set of privileges that provide fine-grained
+In illumos, software implements a set of privileges that provide fine-grained
 control over the actions of processes. The possession of a certain privilege
 allows a process to perform a specific set of restricted operations.
 .sp
 .LP
-The change to a primarily privilege-based security model in the Solaris
+The change to a primarily privilege-based security model in the
 operating system gives developers an opportunity to restrict processes to those
 privileged operations actually needed instead of all (super-user) or no
 privileges (non-zero UIDs). Additionally, a set of previously unrestricted
@@ -651,7 +651,7 @@ Allow a process to enable and disable and manage accounting through
 .sp .6
 .RS 4n
 Allow a process to perform system administration tasks such as setting node and
-domain name and specifying \fBcoreadm\fR(1M) and \fBnscd\fR(1M) settings
+domain name and managing \fBfmd\fR(1M) and \fBnscd\fR(1M).
 .RE
 
 .sp
@@ -865,7 +865,7 @@ bind to NetBIOS or SMB reserved ports: ports 137, 138, 139 (NetBIOS) and 445
 Allow a process to successfully call a third party loadable module that calls
 the kernel \fBsuser()\fR function to check for allowed access. This privilege
 exists only for third party loadable module compatibility and is not used by
-Solaris proper.
+illumos.
 .RE
 
 .sp
@@ -1116,7 +1116,7 @@ in the Limit set (see below) of a process in order for set-uid root \fBexec\fRs
 to be successful, that is, get an effective UID of 0 and additional privileges.
 .sp
 .LP
-The privilege implementation in Solaris extends the process credential with
+The privilege implementation in illumos extends the process credential with
 four privilege sets:
 .sp
 .ne 2
@@ -1279,7 +1279,6 @@ set, the system does not honor the set-uid bit of set-uid root applications.
 The following unsafe privileges have been identified: \fBproc_setid\fR,
 \fBsys_resource\fR and \fBproc_audit\fR.
 .SS "Privilege Escalation"
-.LP
 In certain circumstances, a single privilege could lead to a process gaining
 one or more additional privileges that were not explicitly granted to that
 process. To prevent such an escalation of privileges, the security policy
@@ -1287,7 +1286,7 @@ requires explicit permission for those additional privileges.
 .sp
 .LP
 Common examples of escalation are those mechanisms that allow modification of
-system resources through "raw'' interfaces; for example, changing kernel data
+system resources through "raw" interfaces; for example, changing kernel data
 structures through \fB/dev/kmem\fR or changing files through \fB/dev/dsk/*\fR.
 Escalation also occurs when a process controls processes with more privileges
 than the controlling process. A special case of this is manipulating or
@@ -1303,7 +1302,7 @@ In situations where a process might obtain UID 0, the security policy requires
 additional privileges, up to the full set of privileges. Such restrictions
 could be relaxed or removed at such time as additional mechanisms for
 protection of system files became available. There are no such mechanisms in
-the current Solaris release.
+the current release.
 .sp
 .LP
 The use of UID 0 processes should be limited as much as possible. They should
@@ -1314,7 +1313,6 @@ privileges they need.
 Daemons that never need to \fBexec\fR subprocesses should remove the
 \fBPRIV_PROC_EXEC\fR privilege from their permitted and limit sets.
 .SS "Assigned Privileges and Safeguards"
-.LP
 When privileges are assigned to a user, the system administrator could give
 that user more powers than intended. The administrator should consider whether
 safeguards are needed. For example, if the \fBPRIV_PROC_LOCK_MEMORY\fR
@@ -1322,7 +1320,6 @@ privilege is given to a user, the administrator should consider setting the
 \fBproject.max-locked-memory\fR resource control as well, to prevent that user
 from locking all memory.
 .SS "Privilege Debugging"
-.LP
 When a system call fails with a permission error, it is not always immediately
 obvious what caused the problem. To debug such a problem, you can use a tool
 called \fBprivilege debugging\fR. When privilege debugging is enabled for a
@@ -1342,13 +1339,11 @@ set priv_debug = 1
 .LP
 On a running system, you can use \fBmdb\fR(1) to change this variable.
 .SS "Privilege Administration"
-.LP
 Use \fBusermod\fR(1M) or \fBrolemod\fR(1M)
 to assign privileges to or modify privileges for, respectively, a user or a
 role. Use \fBppriv\fR(1) to enumerate the privileges supported on a system and
 \fBtruss\fR(1) to determine which privileges a program requires.
 .SH SEE ALSO
-.LP
 \fBmdb\fR(1), \fBppriv\fR(1), \fBadd_drv\fR(1M), \fBifconfig\fR(1M),
 \fBlockd\fR(1M), \fBnfsd\fR(1M), \fBpppd\fR(1M), \fBrem_drv\fR(1M),
 \fBsmbd\fR(1M), \fBsppptun\fR(1M), \fBupdate_drv\fR(1M), \fBIntro\fR(2),

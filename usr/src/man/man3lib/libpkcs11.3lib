@@ -1,10 +1,11 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All rights reserved.
 .\" Copyright 2016 Jason King.
+.\" Copyright 2019 Peter Tribble.
 .\"
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd Oct 19, 2016
+.Dd Aug 27, 2019
 .Dt LIBPKCS11 3LIB
 .Os
 .Sh NAME
@@ -59,7 +60,8 @@ environment variables are used to specify an alternate token object store.
 A user can specify either slot-description in
 .Ev ${METASLOT_OBJECTSTORE_SLOT}
 or token-label in
-.Ev ${METASLOT_OBJECTSTORE_TOKEN} , or both.
+.Ev ${METASLOT_OBJECTSTORE_TOKEN} ,
+or both.
 Valid values for slot-description and token-label are available from output of
 the command:
 .Bd -literal -offset indent
@@ -95,7 +97,7 @@ the policy set by
 .Lp
 This library provides entry points for all PKCS#11 v2.40 functions.
 See the PKCS#11 v2.40 specifications at
-.Lk http://www.oasis-open.org.
+.Lk http://www.oasis-open.org .
 .Lp
 Plug-ins are added to
 .Nm
@@ -108,7 +110,7 @@ The available mechanisms are administered by the
 .Xr cryptoadm 1M
 utility.
 .Lp
-Plug-ins must have all of their library dependancies specified, including
+Plug-ins must have all of their library dependencies specified, including
 .Xr libc 3LIB .
 Libraries that have unresolved symbols, including those from
 .Xr libc 3LIB ,
@@ -206,9 +208,6 @@ The SUNW Extension functions are MT-Safe.
 The PKCS#11 Standard functions are MT-Safe with exceptions.
 See Section 2.5.3 of PKCS#11 Cryptographic Token Usage Guide v2.40 and
 Section 5.1.5 of PKCS#11 Cryptographic Token Interface Base Standard v2.40
-.Sh STANDARD
-The PKCS#11 Standard functions conform to PKCS#11 Cryptographic Token
-Interface Profiles v2.40 Extended Provider.
 .Sh SEE ALSO
 .Xr cryptoadm 1M ,
 .Xr pkgadd 1M ,
@@ -230,6 +229,9 @@ Interface Profiles v2.40 Extended Provider.
 .%T "PKCS#11 Cryptographic Token Interface Usage Guide v2.40"
 .%U http://docs.oasis-open.org/pkcs11/pkcs11-ug/v2.40/pkcs11-ug-v2.40.html
 .Re
+.Sh STANDARDS
+The PKCS#11 Standard functions conform to PKCS#11 Cryptographic Token
+Interface Profiles v2.40 Extended Provider.
 .Sh NOTES
 If an application calls
 .Fn C_WaitForSlotEvent
@@ -245,11 +247,8 @@ is set,
 returns
 .Dv CKR_FUNCTION_FAILED .
 .Lp
-The PKCS#11 library does not work with Netscape 4.\fIx\fR but does work with
-more recent versions of Netscape and Mozilla.
-.Lp
 Because
-.Fn C_Initalize
+.Fn C_Initialize
 might have been called by both an application and a
 library, it is not safe for a library or its plugins to call
 .Fn C_Finalize .
