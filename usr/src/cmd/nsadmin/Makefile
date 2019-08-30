@@ -22,6 +22,8 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 Joyent, Inc.
+#
 
 PROG= profile .login ksh.kshrc system
 PROGSKEL= .profile .kshrc
@@ -32,6 +34,8 @@ include ../Makefile.cmd
 ROOTROOT= $(ROOT)/root
 ROOTETCSKEL= $(ROOTETC)/skel
 ROOTETCSKELPROG= $(PROGSKEL:%=$(ROOTETCSKEL)/%)
+ROOTETCVERSIONS= $(ROOTETC)/versions
+ROOTETCVERSIONSPROG= $(ROOTETCVERSIONS)/build
 ROOTROOTPROG= $(PROGROOT:%=$(ROOTROOT)/%)
 FILEMODE= 0644
 
@@ -66,14 +70,23 @@ $(ROOTETCSKEL)/%: %
 	$(INS.file)
 
 $(ROOTROOT) \
+$(ROOTETCVERSIONS) \
 $(ROOTETCSKEL):
 	$(INS.dir)
 
-install: all $(ROOTETCSKEL) $(ROOTETCPROG) $(ROOTETCSKELPROG) $(ROOTROOTPROG)
+$(ROOTETCVERSIONSPROG): $(ROOTETCVERSIONS) FRC
+	if [[ -n "$$BUILDVERSION_EXEC" ]]; then \
+		$$BUILDVERSION_EXEC >$(ROOTETCVERSIONSPROG) ; \
+	else \
+		touch $(ROOTETCVERSIONSPROG) ; \
+	fi
+
+install: all $(ROOTETCSKEL) $(ROOTETCPROG) \
+    $(ROOTETCSKELPROG) $(ROOTROOTPROG) $(ROOTETCVERSIONSPROG)
 
 clean:
 
 clobber:
 	$(RM) $(CLOBBERFILES)
 
-lint:
+FRC:

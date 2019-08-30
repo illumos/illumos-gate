@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -1012,9 +1012,9 @@ find_mbind(const char *name, uintptr_t *hashtab)
 int
 mdb_name_to_major(const char *name, major_t *major)
 {
-	uintptr_t	mbind;
-	uintptr_t	mb_hashtab[MOD_BIND_HASHSIZE];
-	struct bind	mbind_local;
+	uintptr_t mbind;
+	uintptr_t mb_hashtab[MOD_BIND_HASHSIZE];
+	struct bind mbind_local;
 
 
 	if (mdb_readsym(mb_hashtab, sizeof (mb_hashtab), "mb_hashtab") == -1) {
@@ -1809,4 +1809,20 @@ mdb_get_lbolt(void)
 	}
 
 	return ((ts/nsec) - lbi.lbi_debug_time);
+}
+
+void
+mdb_print_buildversion(void)
+{
+	GElf_Sym sym;
+
+	if (mdb_lookup_by_name("buildversion", &sym) != 0)
+		return;
+
+	char *str = mdb_zalloc(4096, UM_SLEEP | UM_GC);
+
+	if (mdb_readstr(str, 4096, sym.st_value) < 1)
+		return;
+
+	mdb_printf("build version: %s\n", str);
 }
