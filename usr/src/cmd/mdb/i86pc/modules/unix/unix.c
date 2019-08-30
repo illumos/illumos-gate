@@ -803,7 +803,7 @@ scalehrtime_help(void)
 
 /*ARGSUSED*/
 static int
-scalehrtime_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+scalehrtime_cmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uint32_t nsec_scale;
 	hrtime_t tsc = addr, hrt, tsc_last, base, mult = 1;
