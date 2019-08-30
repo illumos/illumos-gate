@@ -1013,7 +1013,7 @@ static const mdb_dcmd_t dcmds[] = {
 	    mfntopfn_dcmd },
 	{ "memseg_list", ":", "show memseg list", memseg_list },
 	{ "scalehrtime", ":[-a|-r]", "scale an unscaled high-res time",
-	    scalehrtime_dcmd, scalehrtime_help },
+	    scalehrtime_cmd, scalehrtime_help },
 	{ "x86_featureset", NULL, "dump the x86_featureset vector",
 		x86_featureset_dcmd },
 	{ "xcall", ":", "print CPU cross-call state", xcall_dcmd, xcall_help },

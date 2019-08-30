@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright (c) 2012, Joyent, Inc. All Rights Reserved
+.\" Copyright 2019 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -34,7 +34,7 @@ ld \- link-editor for object files
 [\fB-z\fR nopartial] [\fB-z\fR noversion] [\fB-z\fR now] [\fB-z\fR origin]
 [\fB-z\fR preinitarray=\fIfunction\fR] [\fB-z\fR redlocsym] [\fB-z\fR relaxreloc]
 [\fB-z\fR rescan-now] [\fB-z\fR recan] [\fB-z\fR rescan-start \fI\&...\fR \fB-z\fR rescan-end]]
-[\fB-z\fR target=sparc|x86] [\fB-z\fR text | textwarn | textoff]
+[\fB-z\fR symbolcap] [\fB-z\fR target=sparc|x86] [\fB-z\fR text | textwarn | textoff]
 [\fB-z\fR type=\fIexec\fR|\fIkmod\fR|\fIreloc\fR|\fIshared\fR]
 [\fB-z\fR verbose] [\fB-z\fR wrap=\fIsymbol\fR] \fIfilename\fR...
 .fi
@@ -1516,6 +1516,28 @@ reprocessed as a group in an attempt to locate additional archive members that
 resolve symbol references. This archive rescanning is repeated until a pass
 over the archives occurs in which no new members are extracted.
 Archive rescan groups cannot be nested.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-z\fR \fBsymbolcap\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies that a relocatable object that defines object capabilities
+should have those converted to symbol capabilities. A relocatable object
+that does not have any object capabilities will ignore this option.
+.sp
+Symbol capabilities provide a means for multiple implementations of a
+function to co-exist and have one picked at runtime based upon the
+hardware capabilities of the system. When \fB-z symbolcap\fR is invoked,
+all global functions are converted into local functions that have the
+corresponding capability name appended to them and an undefined symbol
+with the original name left in the resulting relocatable object. At
+runtime, the global symbol will be bound to the corresponding
+implementation that is appropriate based on the capabilities of the
+system.
 .RE
 
 .sp
