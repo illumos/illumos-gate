@@ -5,8 +5,8 @@
  */
 /*
  * Copyright (c) 2012, OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2018 RackTop Systems.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 /*
  * Written by Dr Stephen N Henson (shenson@bigfoot.com) for the OpenSSL
@@ -151,7 +151,6 @@ DECLARE_STACK_OF(EVP_PKEY)
 	(free_func))
 
 #else
-/* LINTED E_STATIC_UNUSED */
 DEFINE_STACK_OF(EVP_PKEY)
 #endif
 
@@ -159,116 +158,85 @@ mutex_t init_lock = DEFAULTMUTEX;
 static int ssl_initialized = 0;
 static BIO *bio_err = NULL;
 
-static int
-test_for_file(char *, mode_t);
-static KMF_RETURN
-openssl_parse_bag(PKCS12_SAFEBAG *, char *, int,
+static int test_for_file(char *, mode_t);
+
+static KMF_RETURN openssl_parse_bag(PKCS12_SAFEBAG *, char *, int,
     STACK_OF(EVP_PKEY) *, STACK_OF(X509) *);
 
-static KMF_RETURN
-local_export_pk12(KMF_HANDLE_T, KMF_CREDENTIAL *, int, KMF_X509_DER_CERT *,
-    int, KMF_KEY_HANDLE *, char *);
+static KMF_RETURN local_export_pk12(KMF_HANDLE_T, KMF_CREDENTIAL *, int,
+    KMF_X509_DER_CERT *, int, KMF_KEY_HANDLE *, char *);
 
 static KMF_RETURN set_pkey_attrib(EVP_PKEY *, ASN1_TYPE *, int);
 
-static KMF_RETURN
-extract_pem(KMF_HANDLE *, char *, char *, KMF_BIGINT *, char *,
-    CK_UTF8CHAR *, CK_ULONG, EVP_PKEY **, KMF_DATA **, int *);
+static KMF_RETURN extract_pem(KMF_HANDLE *, char *, char *, KMF_BIGINT *,
+    char *, CK_UTF8CHAR *, CK_ULONG, EVP_PKEY **, KMF_DATA **, int *);
 
-static KMF_RETURN
-kmf_load_cert(KMF_HANDLE *, char *, char *, KMF_BIGINT *, KMF_CERT_VALIDITY,
-    char *, KMF_DATA *);
+static KMF_RETURN kmf_load_cert(KMF_HANDLE *, char *, char *, KMF_BIGINT *,
+    KMF_CERT_VALIDITY, char *, KMF_DATA *);
 
-static KMF_RETURN
-load_certs(KMF_HANDLE *, char *, char *, KMF_BIGINT *, KMF_CERT_VALIDITY,
-    char *, KMF_DATA **, uint32_t *);
+static KMF_RETURN load_certs(KMF_HANDLE *, char *, char *, KMF_BIGINT *,
+    KMF_CERT_VALIDITY, char *, KMF_DATA **, uint32_t *);
 
-static KMF_RETURN
-sslBN2KMFBN(BIGNUM *, KMF_BIGINT *);
+static KMF_RETURN sslBN2KMFBN(BIGNUM *, KMF_BIGINT *);
 
-static EVP_PKEY *
-ImportRawRSAKey(KMF_RAW_RSA_KEY *);
+static EVP_PKEY *ImportRawRSAKey(KMF_RAW_RSA_KEY *);
 
-static KMF_RETURN
-convertToRawKey(EVP_PKEY *, KMF_RAW_KEY_DATA *);
+static KMF_RETURN convertToRawKey(EVP_PKEY *, KMF_RAW_KEY_DATA *);
 
-KMF_RETURN
-OpenSSL_FindCert(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
+KMF_RETURN OpenSSL_FindCert(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
-void
-OpenSSL_FreeKMFCert(KMF_HANDLE_T, KMF_X509_DER_CERT *);
+void OpenSSL_FreeKMFCert(KMF_HANDLE_T, KMF_X509_DER_CERT *);
 
-KMF_RETURN
-OpenSSL_StoreCert(KMF_HANDLE_T handle, int, KMF_ATTRIBUTE *);
+KMF_RETURN OpenSSL_StoreCert(KMF_HANDLE_T handle, int, KMF_ATTRIBUTE *);
 
-KMF_RETURN
-OpenSSL_DeleteCert(KMF_HANDLE_T handle, int, KMF_ATTRIBUTE *);
+KMF_RETURN OpenSSL_DeleteCert(KMF_HANDLE_T handle, int, KMF_ATTRIBUTE *);
 
-KMF_RETURN
-OpenSSL_CreateKeypair(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
+KMF_RETURN OpenSSL_CreateKeypair(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
-KMF_RETURN
-OpenSSL_StoreKey(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
+KMF_RETURN OpenSSL_StoreKey(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
-KMF_RETURN
-OpenSSL_EncodePubKeyData(KMF_HANDLE_T,  KMF_KEY_HANDLE *, KMF_DATA *);
+KMF_RETURN OpenSSL_EncodePubKeyData(KMF_HANDLE_T,  KMF_KEY_HANDLE *,
+    KMF_DATA *);
 
-KMF_RETURN
-OpenSSL_SignData(KMF_HANDLE_T, KMF_KEY_HANDLE *, KMF_OID *,
-	KMF_DATA *, KMF_DATA *);
+KMF_RETURN OpenSSL_SignData(KMF_HANDLE_T, KMF_KEY_HANDLE *, KMF_OID *,
+    KMF_DATA *, KMF_DATA *);
 
-KMF_RETURN
-OpenSSL_DeleteKey(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
+KMF_RETURN OpenSSL_DeleteKey(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
-KMF_RETURN
-OpenSSL_ImportCRL(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
+KMF_RETURN OpenSSL_ImportCRL(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
-KMF_RETURN
-OpenSSL_DeleteCRL(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
+KMF_RETURN OpenSSL_DeleteCRL(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
-KMF_RETURN
-OpenSSL_ListCRL(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
+KMF_RETURN OpenSSL_ListCRL(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
-KMF_RETURN
-OpenSSL_FindCertInCRL(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
+KMF_RETURN OpenSSL_FindCertInCRL(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
-KMF_RETURN
-OpenSSL_CertGetPrintable(KMF_HANDLE_T, const KMF_DATA *,
-	KMF_PRINTABLE_ITEM, char *);
+KMF_RETURN OpenSSL_CertGetPrintable(KMF_HANDLE_T, const KMF_DATA *,
+    KMF_PRINTABLE_ITEM, char *);
 
-KMF_RETURN
-OpenSSL_GetErrorString(KMF_HANDLE_T, char **);
+KMF_RETURN OpenSSL_GetErrorString(KMF_HANDLE_T, char **);
 
-KMF_RETURN
-OpenSSL_FindPrikeyByCert(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
+KMF_RETURN OpenSSL_FindPrikeyByCert(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
-KMF_RETURN
-OpenSSL_DecryptData(KMF_HANDLE_T, KMF_KEY_HANDLE *, KMF_OID *,
-	KMF_DATA *, KMF_DATA *);
+KMF_RETURN OpenSSL_DecryptData(KMF_HANDLE_T, KMF_KEY_HANDLE *, KMF_OID *,
+    KMF_DATA *, KMF_DATA *);
 
-KMF_RETURN
-OpenSSL_CreateOCSPRequest(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
+KMF_RETURN OpenSSL_CreateOCSPRequest(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
-KMF_RETURN
-OpenSSL_GetOCSPStatusForCert(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
+KMF_RETURN OpenSSL_GetOCSPStatusForCert(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
-KMF_RETURN
-OpenSSL_FindKey(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
+KMF_RETURN OpenSSL_FindKey(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
-KMF_RETURN
-OpenSSL_ExportPK12(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
+KMF_RETURN OpenSSL_ExportPK12(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
-KMF_RETURN
-OpenSSL_CreateSymKey(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
+KMF_RETURN OpenSSL_CreateSymKey(KMF_HANDLE_T, int, KMF_ATTRIBUTE *);
 
-KMF_RETURN
-OpenSSL_GetSymKeyValue(KMF_HANDLE_T, KMF_KEY_HANDLE *, KMF_RAW_SYM_KEY *);
+KMF_RETURN OpenSSL_GetSymKeyValue(KMF_HANDLE_T, KMF_KEY_HANDLE *,
+    KMF_RAW_SYM_KEY *);
 
-KMF_RETURN
-OpenSSL_VerifyCRLFile(KMF_HANDLE_T, char *, KMF_DATA *);
+KMF_RETURN OpenSSL_VerifyCRLFile(KMF_HANDLE_T, char *, KMF_DATA *);
 
-KMF_RETURN
-OpenSSL_CheckCRLDate(KMF_HANDLE_T, char *);
+KMF_RETURN OpenSSL_CheckCRLDate(KMF_HANDLE_T, char *);
 
 static
 KMF_PLUGIN_FUNCLIST openssl_plugin_table =
@@ -306,7 +274,6 @@ static mutex_t *lock_cs;
 static long *lock_count;
 
 static void
-/* ARGSUSED1 */
 locking_cb(int mode, int type, char *file, int line)
 {
 	if (mode & CRYPTO_LOCK) {
@@ -594,8 +561,7 @@ cleanup:
  * values.  If it matches, then return the X509 data structure.
  */
 static KMF_RETURN
-load_X509cert(KMF_HANDLE *kmfh,
-    char *issuer, char *subject, KMF_BIGINT *serial,
+load_X509cert(KMF_HANDLE *kmfh, char *issuer, char *subject, KMF_BIGINT *serial,
     char *pathname, X509 **outcert)
 {
 	KMF_RETURN rv = KMF_OK;
@@ -769,11 +735,8 @@ load_certs(KMF_HANDLE *kmfh, char *issuer, char *subject, KMF_BIGINT *serial,
 }
 
 static KMF_RETURN
-kmf_load_cert(KMF_HANDLE *kmfh,
-    char *issuer, char *subject, KMF_BIGINT *serial,
-    KMF_CERT_VALIDITY validity,
-    char *pathname,
-    KMF_DATA *cert)
+kmf_load_cert(KMF_HANDLE *kmfh, char *issuer, char *subject, KMF_BIGINT *serial,
+    KMF_CERT_VALIDITY validity, char *pathname, KMF_DATA *cert)
 {
 	KMF_RETURN rv = KMF_OK;
 	X509 *x509cert = NULL;
@@ -1213,9 +1176,7 @@ exit:
 }
 
 void
-/*ARGSUSED*/
-OpenSSL_FreeKMFCert(KMF_HANDLE_T handle,
-	KMF_X509_DER_CERT *kmf_cert)
+OpenSSL_FreeKMFCert(KMF_HANDLE_T handle, KMF_X509_DER_CERT *kmf_cert)
 {
 	if (kmf_cert != NULL) {
 		if (kmf_cert->certificate.Data != NULL) {
@@ -1226,7 +1187,6 @@ OpenSSL_FreeKMFCert(KMF_HANDLE_T handle,
 	}
 }
 
-/*ARGSUSED*/
 KMF_RETURN
 OpenSSL_StoreCert(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
@@ -1381,7 +1341,7 @@ out:
 
 KMF_RETURN
 OpenSSL_EncodePubKeyData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
-	KMF_DATA *keydata)
+    KMF_DATA *keydata)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
@@ -1425,7 +1385,7 @@ cleanup:
 
 static KMF_RETURN
 ssl_write_key(KMF_HANDLE *kmfh, KMF_ENCODE_FORMAT format, BIO *out,
-	KMF_CREDENTIAL *cred, EVP_PKEY *pkey, boolean_t private)
+    KMF_CREDENTIAL *cred, EVP_PKEY *pkey, boolean_t private)
 {
 	int rv = 0;
 	RSA *rsa;
@@ -1482,8 +1442,7 @@ ssl_write_key(KMF_HANDLE *kmfh, KMF_ENCODE_FORMAT format, BIO *out,
 }
 
 KMF_RETURN
-OpenSSL_CreateKeypair(KMF_HANDLE_T handle, int numattr,
-	KMF_ATTRIBUTE *attrlist)
+OpenSSL_CreateKeypair(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
@@ -1556,7 +1515,6 @@ OpenSSL_CreateKeypair(KMF_HANDLE_T handle, int numattr,
 			if (rsaexp->len > 0 &&
 			    rsaexp->len <= sizeof (eValue) &&
 			    rsaexp->val != NULL) {
-				/* LINTED E_BAD_PTR_CAST_ALIGN */
 				eValue = *(uint32_t *)rsaexp->val;
 				if (BN_set_word(eValue_bn, eValue) == 0) {
 					rv = KMF_ERR_BAD_PARAMETER;
@@ -1753,7 +1711,8 @@ cleanup:
  * all of the bits.
  */
 static int
-fixbnlen(const BIGNUM *bn, unsigned char *buf, int len) {
+fixbnlen(const BIGNUM *bn, unsigned char *buf, int len)
+{
 	int bytes = len - BN_num_bytes(bn);
 
 	/* prepend with leading 0x00 if necessary */
@@ -1770,7 +1729,7 @@ fixbnlen(const BIGNUM *bn, unsigned char *buf, int len) {
 
 KMF_RETURN
 OpenSSL_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
-	KMF_OID *AlgOID, KMF_DATA *tobesigned, KMF_DATA *output)
+    KMF_OID *AlgOID, KMF_DATA *tobesigned, KMF_DATA *output)
 {
 	KMF_RETURN ret = KMF_OK;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
@@ -1909,9 +1868,7 @@ cleanup:
 }
 
 KMF_RETURN
-/*ARGSUSED*/
-OpenSSL_DeleteKey(KMF_HANDLE_T handle,
-	int numattr, KMF_ATTRIBUTE *attrlist)
+OpenSSL_DeleteKey(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_KEY_HANDLE *key;
@@ -2031,7 +1988,7 @@ ext2NID(int kmfext)
 
 KMF_RETURN
 OpenSSL_CertGetPrintable(KMF_HANDLE_T handle, const KMF_DATA *pcert,
-	KMF_PRINTABLE_ITEM flag, char *resultStr)
+    KMF_PRINTABLE_ITEM flag, char *resultStr)
 {
 	KMF_RETURN ret = KMF_OK;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
@@ -2260,7 +2217,6 @@ out:
 }
 
 KMF_RETURN
-/*ARGSUSED*/
 OpenSSL_FindPrikeyByCert(KMF_HANDLE_T handle, int numattr,
     KMF_ATTRIBUTE *attrlist)
 {
@@ -2320,10 +2276,8 @@ OpenSSL_FindPrikeyByCert(KMF_HANDLE_T handle, int numattr,
 }
 
 KMF_RETURN
-/*ARGSUSED*/
 OpenSSL_DecryptData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
-	KMF_OID *AlgOID, KMF_DATA *ciphertext,
-	KMF_DATA *output)
+    KMF_OID *AlgOID, KMF_DATA *ciphertext, KMF_DATA *output)
 {
 	KMF_RETURN		ret = KMF_OK;
 	RSA *rsa = NULL;
@@ -2438,7 +2392,7 @@ end:
 
 KMF_RETURN
 OpenSSL_CreateOCSPRequest(KMF_HANDLE_T handle,
-	int numattr, KMF_ATTRIBUTE *attrlist)
+    int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN ret = KMF_OK;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
@@ -2542,7 +2496,6 @@ static X509 *ocsp_find_signer_sk(STACK_OF(X509) *certs, OCSP_BASICRESP *bs)
 	keyhash = pid->data;
 	/* Calculate hash of each key and compare */
 	for (i = 0; i < sk_X509_num(certs); i++) {
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		X509 *x = sk_X509_value(certs, i);
 		/* Use pubkey_digest to get the key ID value */
 		(void) X509_pubkey_digest(x, EVP_sha1(), tmphash, NULL);
@@ -2553,7 +2506,6 @@ static X509 *ocsp_find_signer_sk(STACK_OF(X509) *certs, OCSP_BASICRESP *bs)
 }
 
 /* ocsp_find_signer() is copied from openssl source */
-/* ARGSUSED2 */
 static int
 ocsp_find_signer(X509 **psigner, OCSP_BASICRESP *bs, STACK_OF(X509) *certs,
     X509_STORE *st, unsigned long flags)
@@ -2668,7 +2620,7 @@ check_response_signature(KMF_HANDLE_T handle, OCSP_BASICRESP *bs,
 		goto end;
 	}
 
-	if (sk_X509_push(cert_stack2, signer) == NULL) {
+	if (sk_X509_push(cert_stack2, signer) == 0) {
 		ret = KMF_ERR_INTERNAL;
 		goto end;
 	}
@@ -2708,8 +2660,8 @@ end:
 }
 
 KMF_RETURN
-OpenSSL_GetOCSPStatusForCert(KMF_HANDLE_T handle,
-	int numattr, KMF_ATTRIBUTE *attrlist)
+OpenSSL_GetOCSPStatusForCert(KMF_HANDLE_T handle, int numattr,
+    KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN ret = KMF_OK;
 	BIO *derbio = NULL;
@@ -2881,8 +2833,8 @@ end:
 }
 
 static KMF_RETURN
-fetch_key(KMF_HANDLE_T handle, char *path,
-	KMF_KEY_CLASS keyclass, KMF_KEY_HANDLE *key)
+fetch_key(KMF_HANDLE_T handle, char *path, KMF_KEY_CLASS keyclass,
+    KMF_KEY_HANDLE *key)
 {
 	KMF_RETURN rv = KMF_OK;
 	EVP_PKEY *pkey = NULL;
@@ -2977,8 +2929,7 @@ out:
 }
 
 KMF_RETURN
-OpenSSL_FindKey(KMF_HANDLE_T handle,
-	int numattr, KMF_ATTRIBUTE *attrlist)
+OpenSSL_FindKey(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN rv = KMF_OK;
 	char *fullpath = NULL;
@@ -3107,7 +3058,7 @@ add_alias_to_bag(PKCS12_SAFEBAG *bag, X509 *xcert)
 
 static PKCS7 *
 add_cert_to_safe(X509 *sslcert, KMF_CREDENTIAL *cred,
-	uchar_t *keyid, unsigned int keyidlen)
+    uchar_t *keyid, unsigned int keyidlen)
 {
 	PKCS12_SAFEBAG *bag = NULL;
 	PKCS7 *cert_authsafe = NULL;
@@ -3150,8 +3101,7 @@ out:
 
 static PKCS7 *
 add_key_to_safe(EVP_PKEY *pkey, KMF_CREDENTIAL *cred,
-	uchar_t *keyid,  unsigned int keyidlen,
-	char *label, int label_len)
+    uchar_t *keyid,  unsigned int keyidlen, char *label, int label_len)
 {
 	PKCS8_PRIV_KEY_INFO *p8 = NULL;
 	STACK_OF(PKCS12_SAFEBAG) *bag_stack = NULL;
@@ -3203,9 +3153,8 @@ ImportRawRSAKey(KMF_RAW_RSA_KEY *key)
 {
 	RSA		*rsa = NULL;
 	EVP_PKEY	*newkey = NULL;
-	BIGNUM		*n = NULL, *e = NULL, *d = NULL,
-			*p = NULL, *q = NULL,
-			*dmp1 = NULL, *dmq1 = NULL, *iqmp = NULL;
+	BIGNUM		*n = NULL, *e = NULL, *d = NULL, *p = NULL, *q = NULL;
+	BIGNUM		*dmp1 = NULL, *dmq1 = NULL, *iqmp = NULL;
 
 	if ((rsa = RSA_new()) == NULL)
 		goto cleanup;
@@ -3276,8 +3225,8 @@ ImportRawDSAKey(KMF_RAW_DSA_KEY *key)
 {
 	DSA		*dsa = NULL;
 	EVP_PKEY	*newkey = NULL;
-	BIGNUM		*p = NULL, *q = NULL, *g = NULL,
-			*priv_key = NULL, *pub_key = NULL;
+	BIGNUM		*p = NULL, *q = NULL, *g = NULL;
+	BIGNUM		*priv_key = NULL, *pub_key = NULL;
 
 	if ((dsa = DSA_new()) == NULL)
 		goto cleanup;
@@ -3418,11 +3367,9 @@ find_matching_key(X509 *xcert, int numkeys, KMF_KEY_HANDLE *keylist)
 }
 
 static KMF_RETURN
-local_export_pk12(KMF_HANDLE_T handle,
-	KMF_CREDENTIAL *cred,
-	int numcerts, KMF_X509_DER_CERT *certlist,
-	int numkeys, KMF_KEY_HANDLE *keylist,
-	char *filename)
+local_export_pk12(KMF_HANDLE_T handle, KMF_CREDENTIAL *cred, int numcerts,
+    KMF_X509_DER_CERT *certlist, int numkeys, KMF_KEY_HANDLE *keylist,
+    char *filename)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
@@ -3700,12 +3647,9 @@ end:
  * However, the file may be just a list of X509 certs with no keys.
  */
 static KMF_RETURN
-extract_pem(KMF_HANDLE *kmfh,
-	char *issuer, char *subject, KMF_BIGINT *serial,
-	char *filename, CK_UTF8CHAR *pin,
-	CK_ULONG pinlen, EVP_PKEY **priv_key, KMF_DATA **certs,
-	int *numcerts)
-/* ARGSUSED6 */
+extract_pem(KMF_HANDLE *kmfh, char *issuer, char *subject, KMF_BIGINT *serial,
+    char *filename, CK_UTF8CHAR *pin, CK_ULONG pinlen, EVP_PKEY **priv_key,
+    KMF_DATA **certs, int *numcerts)
 {
 	KMF_RETURN rv = KMF_OK;
 	FILE *fp;
@@ -3739,7 +3683,6 @@ extract_pem(KMF_HANDLE *kmfh,
 	}
 
 	for (i = 0; i < sk_X509_INFO_num(x509_info_stack); i++) {
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		cert_infos[ncerts] = sk_X509_INFO_value(x509_info_stack, i);
 		ncerts++;
 	}
@@ -3789,7 +3732,7 @@ extract_pem(KMF_HANDLE *kmfh,
 		}
 
 		rv = ssl_cert2KMFDATA(kmfh, info->x509,
-			&certlist[matchcerts++]);
+		    &certlist[matchcerts++]);
 
 		if (rv != KMF_OK) {
 			int j;
@@ -3821,7 +3764,6 @@ extract_pem(KMF_HANDLE *kmfh,
 err:
 	/* Cleanup the stack of X509 info records */
 	for (i = 0; i < sk_X509_INFO_num(x509_info_stack); i++) {
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		info = (X509_INFO *)sk_X509_INFO_value(x509_info_stack, i);
 		X509_INFO_free(info);
 	}
@@ -3836,13 +3778,12 @@ err:
 
 static KMF_RETURN
 openssl_parse_bags(const STACK_OF(PKCS12_SAFEBAG) *bags, char *pin,
-	STACK_OF(EVP_PKEY) *keys, STACK_OF(X509) *certs)
+    STACK_OF(EVP_PKEY) *keys, STACK_OF(X509) *certs)
 {
 	KMF_RETURN ret;
 	int i;
 
 	for (i = 0; i < sk_PKCS12_SAFEBAG_num(bags); i++) {
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		PKCS12_SAFEBAG *bag = sk_PKCS12_SAFEBAG_value(bags, i);
 		ret = openssl_parse_bag(bag, pin, (pin ? strlen(pin) : 0),
 		    keys, certs);
@@ -3881,7 +3822,7 @@ set_pkey_attrib(EVP_PKEY *pkey, ASN1_TYPE *attrib, int nid)
 
 static KMF_RETURN
 openssl_parse_bag(PKCS12_SAFEBAG *bag, char *pass, int passlen,
-	STACK_OF(EVP_PKEY) *keylist, STACK_OF(X509) *certlist)
+    STACK_OF(EVP_PKEY) *keylist, STACK_OF(X509) *certlist)
 {
 	KMF_RETURN ret = KMF_OK;
 	PKCS8_PRIV_KEY_INFO *p8 = NULL;
@@ -4011,11 +3952,8 @@ end:
 }
 
 static KMF_RETURN
-openssl_pkcs12_parse(PKCS12 *p12, char *pin,
-	STACK_OF(EVP_PKEY) *keys,
-	STACK_OF(X509) *certs,
-	STACK_OF(X509) *ca)
-/* ARGSUSED3 */
+openssl_pkcs12_parse(PKCS12 *p12, char *pin, STACK_OF(EVP_PKEY) *keys,
+    STACK_OF(X509) *certs, STACK_OF(X509) *ca)
 {
 	KMF_RETURN ret = KMF_OK;
 	STACK_OF(PKCS7) *asafes = NULL;
@@ -4043,7 +3981,6 @@ openssl_pkcs12_parse(PKCS12 *p12, char *pin,
 
 	for (i = 0; ret == KMF_OK && i < sk_PKCS7_num(asafes); i++) {
 		bags = NULL;
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		p7 = sk_PKCS7_value(asafes, i);
 		bagnid = OBJ_obj2nid(p7->type);
 
@@ -4077,9 +4014,7 @@ out:
  */
 static KMF_RETURN
 extract_pkcs12(BIO *fbio, CK_UTF8CHAR *pin, CK_ULONG pinlen,
-	STACK_OF(EVP_PKEY) **priv_key, STACK_OF(X509) **certs,
-	STACK_OF(X509) **ca)
-/* ARGSUSED2 */
+    STACK_OF(EVP_PKEY) **priv_key, STACK_OF(X509) **certs, STACK_OF(X509) **ca)
 {
 	PKCS12			*pk12, *pk12_tmp;
 	STACK_OF(EVP_PKEY)	*pkeylist = NULL;
@@ -4258,7 +4193,7 @@ cleanup:
 
 static KMF_RETURN
 add_cert_to_list(KMF_HANDLE *kmfh, X509 *sslcert,
-	KMF_X509_DER_CERT **certlist, int *ncerts)
+    KMF_X509_DER_CERT **certlist, int *ncerts)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_X509_DER_CERT *list = (*certlist);
@@ -4298,7 +4233,7 @@ add_cert_to_list(KMF_HANDLE *kmfh, X509 *sslcert,
 
 static KMF_RETURN
 add_key_to_list(KMF_RAW_KEY_DATA **keylist,
-	KMF_RAW_KEY_DATA *newkey, int *nkeys)
+    KMF_RAW_KEY_DATA *newkey, int *nkeys)
 {
 	KMF_RAW_KEY_DATA *list = (*keylist);
 	int n = (*nkeys);
@@ -4402,7 +4337,6 @@ convertPK12Objects(
 	int i;
 
 	for (i = 0; sslkeys != NULL && i < sk_EVP_PKEY_num(sslkeys); i++) {
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		EVP_PKEY *pkey = sk_EVP_PKEY_value(sslkeys, i);
 		rv = convertToRawKey(pkey, &key);
 		if (rv == KMF_OK)
@@ -4414,7 +4348,6 @@ convertPK12Objects(
 
 	/* Now add the certificate to the certlist */
 	for (i = 0; sslcert != NULL && i < sk_X509_num(sslcert); i++) {
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		X509 *cert = sk_X509_value(sslcert, i);
 		rv = add_cert_to_list(kmfh, cert, certlist, ncerts);
 		if (rv != KMF_OK)
@@ -4430,7 +4363,6 @@ convertPK12Objects(
 		 * Lint is complaining about the embedded casting, and
 		 * to fix it, you need to fix openssl header files.
 		 */
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		c = sk_X509_value(sslcacerts, i);
 
 		/* Now add the ca cert to the certlist */
@@ -4442,10 +4374,9 @@ convertPK12Objects(
 }
 
 KMF_RETURN
-openssl_import_objects(KMF_HANDLE *kmfh,
-	char *filename, KMF_CREDENTIAL *cred,
-	KMF_X509_DER_CERT **certlist, int *ncerts,
-	KMF_RAW_KEY_DATA **keylist, int *nkeys)
+openssl_import_objects(KMF_HANDLE *kmfh, char *filename, KMF_CREDENTIAL *cred,
+    KMF_X509_DER_CERT **certlist, int *ncerts,
+    KMF_RAW_KEY_DATA **keylist, int *nkeys)
 {
 	KMF_RETURN	rv = KMF_OK;
 	KMF_ENCODE_FORMAT format;
@@ -4659,8 +4590,7 @@ out:
 }
 
 KMF_RETURN
-OpenSSL_CreateSymKey(KMF_HANDLE_T handle,
-	int numattr, KMF_ATTRIBUTE *attrlist)
+OpenSSL_CreateSymKey(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN ret = KMF_OK;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
@@ -4816,7 +4746,7 @@ OpenSSL_IsCRLFile(KMF_HANDLE_T handle, char *filename, int *pformat)
 	KMF_RETURN	ret = KMF_OK;
 	KMF_HANDLE	*kmfh = (KMF_HANDLE *)handle;
 	BIO		*bio = NULL;
-	X509_CRL   	*xcrl = NULL;
+	X509_CRL	*xcrl = NULL;
 
 	if (filename == NULL) {
 		return (KMF_ERR_BAD_PARAMETER);
@@ -4929,8 +4859,7 @@ test_for_file(char *filename, mode_t mode)
 }
 
 KMF_RETURN
-OpenSSL_StoreKey(KMF_HANDLE_T handle, int numattr,
-	KMF_ATTRIBUTE *attrlist)
+OpenSSL_StoreKey(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_HANDLE	*kmfh = (KMF_HANDLE *)handle;
@@ -5498,7 +5427,6 @@ OpenSSL_FindCertInCRL(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 	}
 
 	for (i = 0; i < sk_X509_REVOKED_num(revoke_stack); i++) {
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		revoke = sk_X509_REVOKED_value(revoke_stack, i);
 		if (ASN1_INTEGER_cmp(X509_get_serialNumber(xcert),
 		    X509_REVOKED_get0_serialNumber(revoke)) == 0) {
@@ -5529,7 +5457,7 @@ OpenSSL_VerifyCRLFile(KMF_HANDLE_T handle, char *crlname, KMF_DATA *tacert)
 	KMF_RETURN	ret = KMF_OK;
 	KMF_HANDLE	*kmfh = (KMF_HANDLE *)handle;
 	BIO		*bcrl = NULL;
-	X509_CRL   	*xcrl = NULL;
+	X509_CRL	*xcrl = NULL;
 	X509		*xcert = NULL;
 	EVP_PKEY	*pkey;
 	int		sslret;
@@ -5616,7 +5544,7 @@ OpenSSL_CheckCRLDate(KMF_HANDLE_T handle, char *crlname)
 	KMF_HANDLE	*kmfh = (KMF_HANDLE *)handle;
 	KMF_ENCODE_FORMAT crl_format;
 	BIO		*bcrl = NULL;
-	X509_CRL   	*xcrl = NULL;
+	X509_CRL	*xcrl = NULL;
 	int		i;
 
 	if (handle == NULL || crlname == NULL) {
