@@ -248,7 +248,7 @@ lx_io_cp_hold(lx_aio_context_t cid)
 
 	if (lxpd->l_io_ctxs == NULL) {
 		ASSERT(lxpd->l_io_ctx_cnt == 0);
-		ASSERT(lxpd->l_io_ctxpage == NULL);
+		ASSERT(lxpd->l_io_ctxpage == (uintptr_t)NULL);
 		goto bad;
 	}
 
@@ -622,7 +622,7 @@ lx_io_setup(uint_t nr_events, void *ctxp)
 		uintptr_t ctxpage;
 
 		ASSERT(lxpd->l_io_ctx_cnt == 0);
-		ASSERT(lxpd->l_io_ctxpage == NULL);
+		ASSERT(lxpd->l_io_ctxpage == (uintptr_t)NULL);
 
 		ttolwp(curthread)->lwp_errno = 0;
 		ctxpage = (uintptr_t)smmap64(0, PAGESIZE, PROT_READ,
