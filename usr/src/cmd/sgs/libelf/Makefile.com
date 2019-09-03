@@ -74,11 +74,6 @@ CERRWARN +=	$(CNOWARN_UNINIT)
 
 SMOFF += indenting
 
-BUILD.AR=	$(RM) $@ ; \
-		$(AR) q $@ `$(LORDER) $(OBJECTS:%=$(DIR)/%)| $(TSORT)`
-		$(POST_PROCESS_A)
-
-
 BLTDEFS=	msg.h
 BLTDATA=	msg.c
 BLTMESG=	$(SGSMSGDIR)/libelf

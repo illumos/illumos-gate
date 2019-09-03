@@ -76,7 +76,6 @@ objs/%_e.o:=	DEFLIST = -DEUC -DJLSLEX  -DEOPTION -D$*=$*_e
 pics/%_e.o:=	DEFLIST = -DEUC -DJLSLEX  -DEOPTION -D$*=$*_e
 
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
-BUILD.AR=	$(AR) $(ARFLAGS) $@ `$(LORDER) $(OBJS) | $(TSORT)`
 
 $(ROOTPROG):=	FILEMODE = 0555
 
