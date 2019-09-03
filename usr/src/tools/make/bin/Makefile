@@ -30,7 +30,6 @@ OBJS=	ar.o		\
 	read2.o		\
 	rep.o		\
 	state.o
-SRCS=$(OBJS:%.o:$(CMDDIR)/%.cc)
 
 include ../../Makefile.tools
 include ../Makefile.com
