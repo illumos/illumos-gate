@@ -665,7 +665,7 @@ xhci_mdb_find(uintptr_t addr, uint_t flags, int argc,
 
 	ep_set = slot_set = B_FALSE;
 	if (mdb_getopts(argc, argv, 'e', MDB_OPT_UINTPTR_SET, &ep_set, &ep,
-	    's', MDB_OPT_UINTPTR_SET, &slot_set, &slot) != argc)
+	    's', MDB_OPT_UINTPTR_SET, &slot_set, &slot, NULL) != argc)
 		return (DCMD_USAGE);
 
 	if (!slot_set) {

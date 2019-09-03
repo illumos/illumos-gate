@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <mdb/mdb_param.h>
@@ -695,7 +695,7 @@ pagelookup(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (mdb_getopts(argc, argv,
 	    'v', MDB_OPT_UINTPTR, &vp,
 	    'o', MDB_OPT_UINT64, &offset,
-	    0) != argc) {
+	    NULL) != argc) {
 		return (DCMD_USAGE);
 	}
 

@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright (c) 2013 Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_MDB_MODAPI_H
@@ -250,7 +250,7 @@ extern int mdb_getareg(mdb_tid_t, const char *, mdb_reg_t *);
 #define	MDB_OPT_UINT64	5			/* uint64_t argument */
 #define	MDB_OPT_UINTPTR_SET	6		/* boolean_t+uintptr_t args */
 
-extern int mdb_getopts(int, const mdb_arg_t *, ...);
+extern int mdb_getopts(int, const mdb_arg_t *, ...)	__attribute((sentinel));
 
 extern u_longlong_t mdb_strtoull(const char *);
 

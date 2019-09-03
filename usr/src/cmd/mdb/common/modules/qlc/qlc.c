@@ -34,6 +34,10 @@
  *
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #pragma ident	"Copyright 2010 QLogic Corporation; ql_mdb.c"
 
 #include <sys/mdb_modapi.h>
@@ -1099,8 +1103,8 @@ qlcstate_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 	}
 
-	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, TRUE, &verbose) !=
-	    argc) {
+	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, TRUE, &verbose,
+	    NULL) != argc) {
 		return (DCMD_USAGE);
 	}
 
@@ -1741,8 +1745,8 @@ qlc_getdump_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 	}
 
-	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, TRUE, &verbose) !=
-	    argc) {
+	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, TRUE, &verbose,
+	    NULL) != argc) {
 		return (DCMD_USAGE);
 	}
 
@@ -3193,8 +3197,8 @@ qlc_gettrace_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 	}
 
-	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, TRUE, &verbose) !=
-	    argc) {
+	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, TRUE, &verbose,
+	    NULL) != argc) {
 		return (DCMD_USAGE);
 	}
 

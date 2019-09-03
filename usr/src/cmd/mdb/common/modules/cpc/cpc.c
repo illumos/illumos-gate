@@ -22,6 +22,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/mdb_modapi.h>
@@ -57,7 +59,8 @@ cpc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	int		j;
 	uint_t		opt_v = FALSE;
 
-	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, TRUE, &opt_v) != argc)
+	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, TRUE, &opt_v, NULL) !=
+	    argc)
 		return (DCMD_USAGE);
 
 	if ((flags & DCMD_ADDRSPEC) == 0) {

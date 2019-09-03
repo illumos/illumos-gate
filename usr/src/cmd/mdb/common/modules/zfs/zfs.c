@@ -22,7 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2011, 2018 by Delphix. All rights reserved.
- * Copyright (c) 2019 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -948,7 +948,8 @@ dbufs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'n', MDB_OPT_STR, &data.osname,
 	    'o', MDB_OPT_STR, &object,
 	    'l', MDB_OPT_UINT64, &data.level,
-	    'b', MDB_OPT_STR, &blkid) != argc) {
+	    'b', MDB_OPT_STR, &blkid,
+	    NULL) != argc) {
 		return (DCMD_USAGE);
 	}
 
@@ -3499,7 +3500,7 @@ zfs_acl_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 
 	if (mdb_getopts(argc, argv,
-	    'v', MDB_OPT_SETBITS, TRUE, &verbose, TRUE, NULL) != argc)
+	    'v', MDB_OPT_SETBITS, TRUE, &verbose, NULL) != argc)
 		return (DCMD_USAGE);
 
 	if (mdb_vread(&zacl, sizeof (zfs_acl_t), addr) == -1) {
@@ -3932,7 +3933,8 @@ arc_compression_stats(uintptr_t addr, uint_t flags, int argc,
 	    'a', MDB_OPT_SETBITS, ARC_CFLAG_ANON, &data.arc_cflags,
 	    'b', MDB_OPT_SETBITS, ARC_CFLAG_BUFS, &data.arc_cflags,
 	    'r', MDB_OPT_SETBITS, ARC_CFLAG_MRU, &data.arc_cflags,
-	    'f', MDB_OPT_SETBITS, ARC_CFLAG_MFU, &data.arc_cflags) != argc)
+	    'f', MDB_OPT_SETBITS, ARC_CFLAG_MFU, &data.arc_cflags,
+	    NULL) != argc)
 		return (DCMD_USAGE);
 
 	if (mdb_lookup_by_obj(ZFS_OBJ_NAME, "ARC_anon", &data.anon_sym) ||

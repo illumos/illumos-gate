@@ -408,7 +408,8 @@ bhyve_cpustack_dcmd(uintptr_t addr, uint_t flags, int argc,
 
 	i = mdb_getopts(argc, argv,
 	    'c', MDB_OPT_UINT64, &cpu,
-	    'v', MDB_OPT_SETBITS, 1, &verbose);
+	    'v', MDB_OPT_SETBITS, 1, &verbose,
+	    NULL);
 
 	argc -= i;
 	argv += i;

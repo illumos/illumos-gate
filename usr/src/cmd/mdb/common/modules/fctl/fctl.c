@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/mdb_modapi.h>
@@ -134,7 +134,7 @@ ports(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (mdb_getopts(argc, argv,
-	    'l', MDB_OPT_SETBITS, TRUE, &longlist) != argc) {
+	    'l', MDB_OPT_SETBITS, TRUE, &longlist, NULL) != argc) {
 		return (DCMD_USAGE);
 	}
 
@@ -1104,7 +1104,8 @@ fc_trace_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (mdb_getopts(argc, argv,
 	    's', MDB_OPT_UINTPTR, &pktstart,
-	    'e', MDB_OPT_UINTPTR, &pktend) != argc) {
+	    'e', MDB_OPT_UINTPTR, &pktend,
+	    NULL) != argc) {
 		return (DCMD_USAGE);
 	}
 

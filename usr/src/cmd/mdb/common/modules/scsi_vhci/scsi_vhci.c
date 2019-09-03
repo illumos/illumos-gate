@@ -21,9 +21,9 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/kmem.h>
 #include <sys/proc.h>
@@ -193,10 +193,10 @@ mdiclient(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	dump_condvar(value.ct_failover_cv, "ct_failover_cv");
 
 	mdb_printf("\n");
-	mdb_printf("ct_failover_flags TEMP_VAR: %8d\n", value.ct_failover_flags)
-;
-	mdb_printf("ct_failover_status UNUSED: %9d\n", value.ct_failover_status)
-;
+	mdb_printf("ct_failover_flags TEMP_VAR: %8d\n",
+	    value.ct_failover_flags);
+	mdb_printf("ct_failover_status UNUSED: %9d\n",
+	    value.ct_failover_status);
 
 	return (DCMD_OK);
 }
@@ -250,7 +250,7 @@ vhciguid(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 
 	if (flags & DCMD_ADDRSPEC)
-	    mdb_warn("This command doesn't use an address\n");
+		mdb_warn("This command doesn't use an address\n");
 
 	if (i_vhci_states(0, 0, 0, 0, &ss) != DCMD_OK)
 		return (DCMD_ERR);
@@ -517,7 +517,7 @@ i_vhci_states(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,
 	}
 	if (sp == NULL) {
 		if (mdb_getopts(argc, argv,
-		    'v', MDB_OPT_SETBITS, TRUE, &verbose) != argc) {
+		    'v', MDB_OPT_SETBITS, TRUE, &verbose, NULL) != argc) {
 			return (DCMD_USAGE);
 		}
 	}

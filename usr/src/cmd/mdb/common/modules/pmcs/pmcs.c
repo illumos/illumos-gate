@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <limits.h>
@@ -2646,7 +2647,8 @@ pmcs_tag(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (mdb_getopts(argc, argv,
 	    'i', MDB_OPT_UINT64, &index,
 	    's', MDB_OPT_UINT64, &snum,
-	    't', MDB_OPT_UINT64, &tag_type) != argc)
+	    't', MDB_OPT_UINT64, &tag_type,
+	    NULL) != argc)
 		return (DCMD_USAGE);
 
 	/*

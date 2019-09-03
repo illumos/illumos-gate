@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -78,7 +80,7 @@ sockparams_prt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		 */
 		if (mdb_getopts(argc, argv,
 		    'e', MDB_OPT_SETBITS, 1, &opt_e,
-		    'E', MDB_OPT_SETBITS, 1, &opt_E) != argc)
+		    'E', MDB_OPT_SETBITS, 1, &opt_E, NULL) != argc)
 			return (DCMD_USAGE);
 
 		if (!opt_E) {

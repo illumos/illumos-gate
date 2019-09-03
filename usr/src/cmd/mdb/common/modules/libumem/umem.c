@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2013, 2015 by Delphix. All rights reserved.
  */
 
@@ -4089,7 +4089,7 @@ umem_malloc_dist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'g', MDB_OPT_SETBITS, TRUE, &geometric,
 	    'b', MDB_OPT_UINTPTR, &maxbuckets,
 	    'B', MDB_OPT_UINTPTR, &minbucketsize,
-	    0) != argc)
+	    NULL) != argc)
 		return (DCMD_USAGE);
 
 	bzero(&mi, sizeof (mi));
@@ -4165,7 +4165,7 @@ umem_malloc_info(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'g', MDB_OPT_SETBITS, TRUE, &geometric,
 	    'b', MDB_OPT_UINTPTR, &maxbuckets,
 	    'B', MDB_OPT_UINTPTR, &minbucketsize,
-	    0) != argc)
+	    NULL) != argc)
 		return (DCMD_USAGE);
 
 	if (dump || geometric || (maxbuckets != 0) || (minbucketsize != 0))

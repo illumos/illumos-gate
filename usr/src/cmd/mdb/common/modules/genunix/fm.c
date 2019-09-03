@@ -21,6 +21,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -158,7 +160,8 @@ ereport(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (!(flags & DCMD_ADDRSPEC))
 		return (DCMD_USAGE);
 
-	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, TRUE, &opt_v) != argc)
+	if (mdb_getopts(argc, argv, 'v', MDB_OPT_SETBITS, TRUE, &opt_v, NULL) !=
+	    argc)
 		return (DCMD_USAGE);
 
 	if (mdb_vread(&nvl, sizeof (nvl), addr) == -1) {

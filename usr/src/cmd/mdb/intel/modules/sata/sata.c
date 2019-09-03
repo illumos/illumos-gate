@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/mdb_modapi.h>
@@ -216,7 +217,7 @@ sata_rbuf_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (mdb_getopts(argc, argv,
-	    'a', MDB_OPT_SETBITS, TRUE, &print_pathname) != argc) {
+	    'a', MDB_OPT_SETBITS, TRUE, &print_pathname, NULL) != argc) {
 		return (DCMD_USAGE);
 	}
 
