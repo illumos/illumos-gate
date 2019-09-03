@@ -810,7 +810,7 @@ lxpr_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 	return (0);
 }
 
-static void (*lxpr_read_function[LXPR_NFILES])() = {
+static void (*lxpr_read_function[])() = {
 	NULL,				/* invalid		*/
 	lxpr_read_isdir,		/* /proc		*/
 	lxpr_read_isdir,		/* /proc/<pid>		*/
@@ -941,9 +941,12 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_sys_net_ipv4_icmp_eib, /* .../icmp_echo_ignore_broadcasts */
 	lxpr_read_sys_net_ipv4_ip_forward, /* .../ipv4/ip_forward */
 	lxpr_read_sys_net_ipv4_ip_lport_range, /* ../ipv4/ip_local_port_range */
-	lxpr_read_sys_net_ipv4_tcp_cc_allow, /* .../tcp_allowed_congestion_control */
-	lxpr_read_sys_net_ipv4_tcp_cc_avail, /* .../tcp_available_congestion_control */
-	lxpr_read_sys_net_ipv4_tcp_cc_curr, /* .../tcp_congestion_control */
+	/* .../tcp_allowed_congestion_control */
+	lxpr_read_sys_net_ipv4_tcp_cc_allow,
+	/* .../tcp_available_congestion_control */
+	lxpr_read_sys_net_ipv4_tcp_cc_avail,
+	/* .../tcp_congestion_control */
+	lxpr_read_sys_net_ipv4_tcp_cc_curr,
 	lxpr_read_sys_net_ipv4_tcp_fin_to, /* .../ipv4/tcp_fin_timeout */
 	lxpr_read_sys_net_ipv4_tcp_ka_int, /* .../ipv4/tcp_keepalive_intvl */
 	lxpr_read_sys_net_ipv4_tcp_ka_tim, /* .../ipv4/tcp_keepalive_time */
@@ -971,10 +974,12 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_vmstat,		/* /proc/vmstat		*/
 };
 
+CTASSERT(ARRAY_SIZE(lxpr_read_function) == LXPR_NFILES);
+
 /*
  * Array of lookup functions, indexed by lx /proc file type.
  */
-static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
+static vnode_t *(*lxpr_lookup_function[])() = {
 	NULL,				/* invalid		*/
 	lxpr_lookup_procdir,		/* /proc		*/
 	lxpr_lookup_piddir,		/* /proc/<pid>		*/
@@ -1105,6 +1110,12 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* .../icmp_echo_ignore_broadcasts */
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/ip_forward */
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/ip_local_port_range */
+	/* .../tcp_allowed_congestion_control */
+	lxpr_lookup_not_a_dir,
+	/* .../tcp_available_congestion_control */
+	lxpr_lookup_not_a_dir,
+	/* .../tcp_congestion_control */
+	lxpr_lookup_not_a_dir,
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_fin_timeout */
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_keepalive_intvl */
 	lxpr_lookup_not_a_dir,		/* .../net/ipv4/tcp_keepalive_time */
@@ -1132,10 +1143,12 @@ static vnode_t *(*lxpr_lookup_function[LXPR_NFILES])() = {
 	lxpr_lookup_not_a_dir,		/* /proc/vmstat		*/
 };
 
+CTASSERT(ARRAY_SIZE(lxpr_lookup_function) == LXPR_NFILES);
+
 /*
  * Array of readdir functions, indexed by /proc file type.
  */
-static int (*lxpr_readdir_function[LXPR_NFILES])() = {
+static int (*lxpr_readdir_function[])() = {
 	NULL,				/* invalid		*/
 	lxpr_readdir_procdir,		/* /proc		*/
 	lxpr_readdir_piddir,		/* /proc/<pid>		*/
@@ -1266,6 +1279,12 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* .../icmp_echo_ignore_broadcasts */
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/ip_forward */
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/ip_local_port_range */
+	/* .../tcp_allowed_congestion_control */
+	lxpr_readdir_not_a_dir,
+	/* .../tcp_available_congestion_control */
+	lxpr_readdir_not_a_dir,
+	/* .../tcp_congestion_control */
+	lxpr_readdir_not_a_dir,
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_fin_timeout */
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_keepalive_intvl */
 	lxpr_readdir_not_a_dir,		/* .../net/ipv4/tcp_keepalive_time */
@@ -1293,6 +1312,7 @@ static int (*lxpr_readdir_function[LXPR_NFILES])() = {
 	lxpr_readdir_not_a_dir,		/* /proc/vmstat		*/
 };
 
+CTASSERT(ARRAY_SIZE(lxpr_readdir_function) == LXPR_NFILES);
 
 /*
  * lxpr_read(): Vnode operation for VOP_READ()
