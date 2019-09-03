@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -491,7 +491,7 @@ pte_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 
 	if (mdb_getopts(argc, argv,
-	    'l', MDB_OPT_UINT64, &level) != argc)
+	    'l', MDB_OPT_UINT64, &level, NULL) != argc)
 		return (DCMD_USAGE);
 
 	if (level > mmu.max_level) {
@@ -647,7 +647,7 @@ va2pfn_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 
 	if (mdb_getopts(argc, argv,
-	    'a', MDB_OPT_STR, &addrspace_str) != argc)
+	    'a', MDB_OPT_STR, &addrspace_str, NULL) != argc)
 		return (DCMD_USAGE);
 
 	if ((flags & DCMD_ADDRSPEC) == 0)

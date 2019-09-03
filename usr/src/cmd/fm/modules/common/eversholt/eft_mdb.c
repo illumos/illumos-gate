@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/mdb_modapi.h>
@@ -316,8 +318,8 @@ eft_time(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (argc) {
 		if (mdb_getopts(argc, argv,
 		    'l', MDB_OPT_UINT64, &ull,
-		    'p', MDB_OPT_SETBITS, TRUE, &opt_p,
-		    MDB_OPT_UINT64) != argc) {
+		    'p', MDB_OPT_SETBITS, TRUE, &opt_p, MDB_OPT_UINT64,
+		    NULL) != argc) {
 			return (DCMD_USAGE);
 		}
 	}

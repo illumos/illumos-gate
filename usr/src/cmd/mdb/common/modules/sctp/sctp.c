@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -726,7 +727,8 @@ sctp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'c', MDB_OPT_SETBITS, MDB_SCTP_SHOW_CLOSE, &opts,
 	    'e', MDB_OPT_SETBITS, MDB_SCTP_SHOW_EXT, &opts,
 	    'P', MDB_OPT_SETBITS, 1, &paddr,
-	    'd', MDB_OPT_SETBITS, MDB_SCTP_DUMP_ADDRS, &opts) != argc) {
+	    'd', MDB_OPT_SETBITS, MDB_SCTP_DUMP_ADDRS, &opts,
+	    NULL) != argc) {
 		return (DCMD_USAGE);
 	}
 
