@@ -23,6 +23,8 @@
     Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
 
+    Copyright 2019 Joyent, Inc.
+
     The purpose of the limited_net profile is to provide a set of
     active services that allow one to connect to the machine via ssh
     (requires sshd). The services which are deactivated here are those
@@ -91,6 +93,9 @@
     <instance name='default' enabled='true'/>
   </service>
   <service name='system/rcap' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
+  <service name='system/hotplug' version='1' type='service'>
     <instance name='default' enabled='true'/>
   </service>
   <service name='network/rpc/bind' version='1' type='service'>
