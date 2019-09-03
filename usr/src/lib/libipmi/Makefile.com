@@ -44,15 +44,13 @@ OBJECTS=	ipmi_bmc.o	\
 		ipmi_util.o	\
 		libipmi.o
 
-SRCS=		$(OBJECTS:%.o:$(SRCDIR)/%c.)
-
 include ../../Makefile.lib
 
-LIBS=		$(DYNLIB) $(LINTLIB)
+LIBS=		$(DYNLIB)
 
 SRCDIR=		../common
 
-CLEANFILES +=	$(SRCDIR)/ipmi_tables.c	
+CLEANFILES +=	$(SRCDIR)/ipmi_tables.c
 INCS +=		-I$(SRCDIR)
 LDLIBS +=	-lc -lm -lnvpair -lsocket -lnsl
 CPPFLAGS +=	$(INCS)
@@ -60,13 +58,9 @@ CSTD = $(CSTD_GNU99)
 
 CERRWARN +=	$(CNOWARN_UNINIT)
 
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
-
 .KEEP_STATE:
 
 all: $(LIBS)
-
-lint: lintcheck
 
 $(SRCDIR)/ipmi_tables.c: $(SRCDIR)/mktables.sh $(SRCDIR)/libipmi.h
 	sh $(SRCDIR)/mktables.sh $(SRCDIR)/libipmi.h > $@
