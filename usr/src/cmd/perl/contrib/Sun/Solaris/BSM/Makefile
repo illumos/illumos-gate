@@ -9,14 +9,15 @@
 # http://www.illumos.org/license/CDDL.
 #
 #
-# Copyright (c) 2014 Racktop Systems.
+# Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2016 RackTop Systems.
 #
 
 MODULE = _BSMparse
 
 include $(SRC)/cmd/perl/Makefile.perl
 
-# Install module into arch independant directory
+# Install module into arch independent directory
 ROOTPERLMODDIR = $(ROOTPERLDIR)/lib/Sun/Solaris/BSM
 
 include $(SRC)/cmd/perl/Makefile.targ
@@ -28,4 +29,3 @@ all: $(PERLMOD)
 install: $(ROOTPERLMOD)
 
 clean clobber:
-	$(RM) -r $(MACH)
