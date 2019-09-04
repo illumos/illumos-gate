@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -38,8 +38,6 @@
 #define	CTFCONVERT_USAGE	2
 
 #define	CTFCONVERT_DEFAULT_NTHREADS	4
-
-#define	CTFCONVERT_ALTEXEC	"CTFCONVERT_ALTEXEC"
 
 static char *ctfconvert_progname;
 
@@ -222,28 +220,6 @@ ctfconvert_fixup_genunix(ctf_file_t *fp)
 	VERIFY(ctf_type_size(fp, cpuid) == sz);
 }
 
-static void
-ctfconvert_altexec(char **argv)
-{
-	const char *alt;
-	char *altexec;
-
-	alt = getenv(CTFCONVERT_ALTEXEC);
-	if (alt == NULL || *alt == '\0')
-		return;
-
-	altexec = strdup(alt);
-	if (altexec == NULL)
-		ctfconvert_fatal("failed to allocate memory for altexec\n");
-	if (unsetenv(CTFCONVERT_ALTEXEC) != 0)
-		ctfconvert_fatal("failed to unset %s from environment: %s\n",
-		    CTFCONVERT_ALTEXEC, strerror(errno));
-
-	(void) execv(altexec, argv);
-	ctfconvert_fatal("failed to execute alternate program %s: %s",
-	    altexec, strerror(errno));
-}
-
 int
 main(int argc, char *argv[])
 {
@@ -263,8 +239,6 @@ main(int argc, char *argv[])
 	boolean_t ignore_non_c = B_FALSE;
 
 	ctfconvert_progname = basename(argv[0]);
-
-	ctfconvert_altexec(argv);
 
 	while ((c = getopt(argc, argv, ":ij:kl:L:mo:X")) != -1) {
 		switch (c) {

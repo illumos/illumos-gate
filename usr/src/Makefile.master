@@ -993,15 +993,6 @@ CTFCVTFLAGS=		-L VERSION
 #
 CTFMRGFLAGS=
 
-#
-# Make the transition between old and new CTF Tools. The new ctf tools
-# do not support stabs (eg. Sun Studio). By setting BUILD_OLD_CTF_TOOLS
-# here or in the environment file, the old ones will be built.
-#
-BUILD_NEW_CTF_TOOLS=
-BUILD_OLD_CTF_TOOLS=$(POUND_SIGN)
-$(BUILD_OLD_CTF_TOOLS)BUILD_NEW_CTF_TOOLS= $(POUND_SIGN)
-
 CTFCONVERT_O		= $(CTFCONVERT) $(CTFCVTFLAGS) $@
 
 # Rules (normally from make.rules) and macros which are used for post
