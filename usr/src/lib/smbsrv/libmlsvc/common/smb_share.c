@@ -20,6 +20,7 @@
  *
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2019 RackTop Systems.
  */
 
 /*
@@ -1360,6 +1361,8 @@ smb_shr_cache_create(void)
 			break;
 		}
 
+		(void) ht_set_cmpfn(smb_shr_cache.sc_cache,
+		    (HT_CMP)smb_strcasecmp);
 		(void) ht_register_callback(smb_shr_cache.sc_cache,
 		    smb_shr_cache_freent);
 		smb_shr_cache.sc_nops = 0;
@@ -1462,7 +1465,6 @@ smb_shr_cache_findent(char *sharename)
 {
 	HT_ITEM *item;
 
-	(void) smb_strlwr(sharename);
 	item = ht_find_item(smb_shr_cache.sc_cache, sharename);
 	if (item && item->hi_data)
 		return ((smb_share_t *)item->hi_data);
@@ -1509,8 +1511,6 @@ smb_shr_cache_addent(smb_share_t *si)
 	if ((cache_ent = malloc(sizeof (smb_share_t))) == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	(void) smb_strlwr(si->shr_name);
-
 	si->shr_type |= smb_shr_is_special(cache_ent->shr_name);
 
 	if (smb_shr_is_admin(cache_ent->shr_name))
@@ -1538,7 +1538,6 @@ smb_shr_cache_addent(smb_share_t *si)
 static void
 smb_shr_cache_delent(char *sharename)
 {
-	(void) smb_strlwr(sharename);
 	(void) ht_remove_item(smb_shr_cache.sc_cache, sharename);
 }
 
