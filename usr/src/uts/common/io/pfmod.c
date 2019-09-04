@@ -35,7 +35,7 @@
  *
  * Based on SunOS 4.x version.  This version has minor changes:
  *	- general SVR4 porting stuff
- * 	- change name and prefixes from "nit" buffer to streams buffer
+ *	- change name and prefixes from "nit" buffer to streams buffer
  *	- multithreading assumes configured as D_MTQPAIR
  */
 
@@ -87,12 +87,8 @@ static	int	pfopen(queue_t *, dev_t *, int, int, cred_t *);
 static	int	pfclose(queue_t *, int, cred_t *);
 static void	pfioctl(queue_t *wq, mblk_t *mp);
 static	int	FilterPacket(struct packdesc *, struct epacketfilt *);
-/*
- * To save instructions, since STREAMS ignores the return value
- * from these functions, they are defined as void here. Kind of icky, but...
- */
-static void	pfwput(queue_t *, mblk_t *);
-static void	pfrput(queue_t *, mblk_t *);
+static int	pfwput(queue_t *, mblk_t *);
+static int	pfrput(queue_t *, mblk_t *);
 
 static struct module_info pf_minfo = {
 	22,		/* mi_idnum */
@@ -104,7 +100,7 @@ static struct module_info pf_minfo = {
 };
 
 static struct qinit pf_rinit = {
-	(int (*)())pfrput,	/* qi_putp */
+	pfrput,			/* qi_putp */
 	NULL,
 	pfopen,			/* qi_qopen */
 	pfclose,		/* qi_qclose */
@@ -114,7 +110,7 @@ static struct qinit pf_rinit = {
 };
 
 static struct qinit pf_winit = {
-	(int (*)())pfwput,	/* qi_putp */
+	pfwput,			/* qi_putp */
 	NULL,			/* qi_srvp */
 	NULL,			/* qi_qopen */
 	NULL,			/* qi_qclose */
@@ -207,7 +203,7 @@ pfclose(queue_t	*rq, int flags __unused, cred_t *credp __unused)
  * Write-side put procedure.  Its main task is to detect ioctls.
  * Other message types are passed on through.
  */
-static void
+static int
 pfwput(queue_t *wq, mblk_t *mp)
 {
 	switch (mp->b_datap->db_type) {
@@ -219,6 +215,7 @@ pfwput(queue_t *wq, mblk_t *mp)
 		putnext(wq, mp);
 		break;
 	}
+	return (0);
 }
 
 /*
@@ -230,7 +227,7 @@ pfwput(queue_t *wq, mblk_t *mp)
  * which are skipped over before executing the packet filter
  * on any remaining M_DATA mblks.
  */
-static void
+static int
 pfrput(queue_t *rq, mblk_t *mp)
 {
 	struct	epacketfilt	*pfp = (struct epacketfilt *)rq->q_ptr;
@@ -308,7 +305,7 @@ pfrput(queue_t *rq, mblk_t *mp)
 		if (mbp) {
 			pd.pd_body = (ushort_t *)mbp->b_rptr;
 			pd.pd_bodylen = (mbp->b_wptr - mbp->b_rptr) /
-							sizeof (ushort_t);
+			    sizeof (ushort_t);
 		} else {
 			pd.pd_body = NULL;
 			pd.pd_bodylen = 0;
@@ -328,7 +325,7 @@ pfrput(queue_t *rq, mblk_t *mp)
 		putnext(rq, mp);
 		break;
 	}
-
+	return (0);
 }
 
 /*

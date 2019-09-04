@@ -26,7 +26,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
@@ -102,7 +102,7 @@
 
 static struct instats ins;
 
-static 	int ufs_getpage_ra(struct vnode *, u_offset_t, struct seg *, caddr_t);
+static	int ufs_getpage_ra(struct vnode *, u_offset_t, struct seg *, caddr_t);
 static	int ufs_getpage_miss(struct vnode *, u_offset_t, size_t, struct seg *,
 		caddr_t, struct page **, size_t, enum seg_rw, int);
 static	int ufs_open(struct vnode **, int, struct cred *, caller_context_t *);
@@ -245,7 +245,7 @@ struct dump {
 	struct inode	*ip;		/* the file we contain */
 	daddr_t		fsbs;		/* number of blocks stored */
 	struct timeval32 time;		/* time stamp for the struct */
-	daddr32_t 	dblk[1];	/* place holder for block info */
+	daddr32_t	dblk[1];	/* place holder for block info */
 };
 
 static struct dump *dump_info = NULL;
@@ -1233,7 +1233,7 @@ out:
 	 *   --------------------------
 	 *   always@	  IATTCHG|IBDWRITE
 	 *
-	 * @ - 	If we are doing synchronous write the only time we should
+	 * @ -	If we are doing synchronous write the only time we should
 	 *	not be sync'ing the ip here is if we have the stickyhack
 	 *	activated, the file is marked with the sticky bit and
 	 *	no exec bit, the file length has not been changed and
@@ -4409,14 +4409,14 @@ ufs_getpage(struct vnode *vp, offset_t off, size_t len, uint_t *protp,
 	u_offset_t	uoff = (u_offset_t)off; /* type conversion */
 	u_offset_t	pgoff;
 	u_offset_t	eoff;
-	struct inode 	*ip = VTOI(vp);
+	struct inode	*ip = VTOI(vp);
 	struct ufsvfs	*ufsvfsp = ip->i_ufsvfs;
-	struct fs 	*fs;
+	struct fs	*fs;
 	struct ulockfs	*ulp;
 	page_t		**pl;
 	caddr_t		pgaddr;
 	krw_t		rwtype;
-	int 		err;
+	int		err;
 	int		has_holes;
 	int		beyond_eof;
 	int		seqmode;
@@ -5206,7 +5206,7 @@ ufs_putpages(struct vnode *vp, offset_t off, size_t len, int flags,
 	return (err);
 }
 
-static void
+static int
 ufs_iodone(buf_t *bp)
 {
 	struct inode *ip;
@@ -5228,6 +5228,7 @@ ufs_iodone(buf_t *bp)
 
 	mutex_exit(&ip->i_tlock);
 	iodone(bp);
+	return (0);
 }
 
 /*
@@ -5419,7 +5420,7 @@ ufs_putapage(struct vnode *vp, page_t *pp, u_offset_t *offp, size_t *lenp,
 	/* write throttle */
 
 	ASSERT(bp->b_iodone == NULL);
-	bp->b_iodone = (int (*)())ufs_iodone;
+	bp->b_iodone = ufs_iodone;
 	mutex_enter(&ip->i_tlock);
 	ip->i_writes += bp->b_bcount;
 	mutex_exit(&ip->i_tlock);
@@ -5617,7 +5618,7 @@ ufs_delmap(struct vnode *vp, offset_t off, struct as *as, caddr_t addr,
 	}
 
 	mutex_enter(&ip->i_tlock);
-	ip->i_mapcnt -= btopr(len); 	/* Count released mappings */
+	ip->i_mapcnt -= btopr(len);	/* Count released mappings */
 	ASSERT(ip->i_mapcnt >= 0);
 	mutex_exit(&ip->i_tlock);
 	return (0);
@@ -5690,9 +5691,9 @@ ufs_l_pathconf(struct vnode *vp, int cmd, ulong_t *valp, struct cred *cr,
 {
 	struct ufsvfs	*ufsvfsp = VTOI(vp)->i_ufsvfs;
 	struct ulockfs	*ulp = NULL;
-	struct inode 	*sip = NULL;
+	struct inode	*sip = NULL;
 	int		error;
-	struct inode 	*ip = VTOI(vp);
+	struct inode	*ip = VTOI(vp);
 	int		issync;
 
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_PATHCONF_MASK);

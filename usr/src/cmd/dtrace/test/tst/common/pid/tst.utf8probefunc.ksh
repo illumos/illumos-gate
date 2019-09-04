@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright (c) 2013 Joyent, Inc.  All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 DIR=/var/tmp/dtest.$$
@@ -43,7 +43,7 @@ fi
 # There's the right way, the wrong way, and the Max Power way!
 #
 cat foo.orig.s | sed 's/foo/foø/g' > foo.s
-gcc -o foo foo.s
+gcc -m32 -o foo foo.s
 
 if ! dtrace -n 'pid$target:a.out:f*:entry{printf("probefunc: %s\n", \
     probefunc)}' -qc ./foo ; then

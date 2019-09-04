@@ -10,13 +10,13 @@
 #
 
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
-PROGS += ldt badseg
+PROGS += ldt badseg_exec badseg
 
 ROOTOPTPKG = $(ROOT)/opt/os-tests
 TESTDIR = $(ROOTOPTPKG)/tests/i386
@@ -24,14 +24,12 @@ ROOTOPTPROGS = $(PROGS:%=$(TESTDIR)/%)
 
 CSTD = $(CSTD_GNU99)
 
-# for badseg
+# for badseg_exec
 COPTFLAG =
 
 all: $(PROGS)
 
 install: all $(ROOTOPTPROGS)
-
-lint:
 
 clobber: clean
 	-$(RM) $(PROGS)

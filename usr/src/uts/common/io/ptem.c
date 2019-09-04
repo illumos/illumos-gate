@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -97,9 +97,9 @@ _info(struct modinfo *modinfop)
  */
 static int ptemopen(queue_t *, dev_t  *, int, int, cred_t *);
 static int ptemclose(queue_t *, int, cred_t *);
-static void ptemrput(queue_t *, mblk_t *);
-static void ptemwput(queue_t *, mblk_t *);
-static void ptemwsrv(queue_t *);
+static int ptemrput(queue_t *, mblk_t *);
+static int ptemwput(queue_t *, mblk_t *);
+static int ptemwsrv(queue_t *);
 
 static struct module_info ptem_info = {
 	0xabcd,
@@ -111,7 +111,7 @@ static struct module_info ptem_info = {
 };
 
 static struct qinit ptemrinit = {
-	(int (*)()) ptemrput,
+	ptemrput,
 	NULL,
 	ptemopen,
 	ptemclose,
@@ -121,8 +121,8 @@ static struct qinit ptemrinit = {
 };
 
 static struct qinit ptemwinit = {
-	(int (*)()) ptemwput,
-	(int (*)()) ptemwsrv,
+	ptemwput,
+	ptemwsrv,
 	ptemopen,
 	ptemclose,
 	nulldev,
@@ -267,7 +267,7 @@ ptemclose(queue_t *q, int flag, cred_t *credp)
  *
  * This is called from the module or driver downstream.
  */
-static void
+static int
 ptemrput(queue_t *q, mblk_t *mp)
 {
 	struct iocblk *iocp;	/* M_IOCTL data */
@@ -425,6 +425,7 @@ ptemrput(queue_t *q, mblk_t *mp)
 		putnext(q, mp);
 		break;
 	}
+	return (0);
 }
 
 
@@ -437,7 +438,7 @@ ptemrput(queue_t *q, mblk_t *mp)
  *	basically just giving up and reporting failure.  It really ought to
  *	set up bufcalls and only fail when it's absolutely necessary.
  */
-static void
+static int
 ptemwput(queue_t *q, mblk_t *mp)
 {
 	struct ptem *ntp = (struct ptem *)q->q_ptr;
@@ -514,7 +515,7 @@ ptemwput(queue_t *q, mblk_t *mp)
 			putnext(q, mp);
 			break;
 		}
-		return;
+		return (0);
 	}
 	/*
 	 * If our queue is nonempty or flow control persists
@@ -546,13 +547,13 @@ ptemwput(queue_t *q, mblk_t *mp)
 			 */
 			default:
 				(void) ptemwmsg(q, mp);
-				return;
+				return (0);
 			}
 			break;
 
 		case M_DELAY: /* tty delays not supported */
 			freemsg(mp);
-			return;
+			return (0);
 
 		case M_DATA:
 			if ((mp->b_wptr - mp->b_rptr) < 0) {
@@ -560,28 +561,29 @@ ptemwput(queue_t *q, mblk_t *mp)
 				 * Free all bad length messages.
 				 */
 				freemsg(mp);
-				return;
+				return (0);
 			} else if ((mp->b_wptr - mp->b_rptr) == 0) {
 				if (!(ntp->state & IS_PTSTTY)) {
 					freemsg(mp);
-					return;
+					return (0);
 				}
 			}
 		}
 		(void) putq(q, mp);
-		return;
+		return (0);
 	}
 	/*
 	 * fast path into ptemwmsg to dispose of mp.
 	 */
 	if (!ptemwmsg(q, mp))
 		(void) putq(q, mp);
+	return (0);
 }
 
 /*
  * ptem write queue service procedure.
  */
-static void
+static int
 ptemwsrv(queue_t *q)
 {
 	mblk_t *mp;
@@ -592,6 +594,7 @@ ptemwsrv(queue_t *q)
 			break;
 		}
 	}
+	return (0);
 }
 
 

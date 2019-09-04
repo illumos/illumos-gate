@@ -40,13 +40,9 @@
 #define	DEFAULT_NOEXPR	"^[nN]"
 
 #define	FREE_MEM        \
-	if (yesstr)     \
 		free(yesstr);   \
-	if (nostr)      \
 		free(nostr);    \
-	if (yesexpr)    \
 		free(yesexpr);  \
-	if (noexpr)     \
 		free(noexpr)
 
 #define	SET_DEFAULT_STRS \
@@ -112,7 +108,22 @@ init_yes(void)
 		SET_DEFAULT_STRS;
 		fallback = 1;
 	}
+	if (fallback == 0) {
+		free(yesexpr);
+		free(noexpr);
+	}
 	return (0);
+}
+
+void
+fini_yes(void)
+{
+	free(yesstr);
+	free(nostr);
+	yesstr = DEFAULT_YESSTR;
+	nostr = DEFAULT_NOSTR;
+	regfree(&preg_yes);
+	regfree(&preg_no);
 }
 
 static int

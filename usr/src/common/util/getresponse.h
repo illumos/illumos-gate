@@ -26,8 +26,6 @@
 #ifndef _UTIL_GETRESPONSE_H
 #define	_UTIL_GETRESPONSE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Declarations for getresponse().
  */
@@ -41,6 +39,7 @@ extern "C" {
 extern char	*yesstr;
 extern char	*nostr;
 extern int	init_yes(void);
+extern void	fini_yes(void);
 extern int	yes(void);
 extern int	yes_check(char *);
 extern int	no(void);

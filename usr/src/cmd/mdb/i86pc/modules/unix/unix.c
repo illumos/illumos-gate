@@ -803,7 +803,7 @@ scalehrtime_help(void)
 
 /*ARGSUSED*/
 static int
-scalehrtime_cmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+scalehrtime_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uint32_t nsec_scale;
 	hrtime_t tsc = addr, hrt, tsc_last, base, mult = 1;
@@ -1013,7 +1013,7 @@ static const mdb_dcmd_t dcmds[] = {
 	    mfntopfn_dcmd },
 	{ "memseg_list", ":", "show memseg list", memseg_list },
 	{ "scalehrtime", ":[-a|-r]", "scale an unscaled high-res time",
-	    scalehrtime_cmd, scalehrtime_help },
+	    scalehrtime_dcmd, scalehrtime_help },
 	{ "x86_featureset", NULL, "dump the x86_featureset vector",
 		x86_featureset_dcmd },
 	{ "xcall", ":", "print CPU cross-call state", xcall_dcmd, xcall_help },

@@ -1725,7 +1725,6 @@ vioif_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		dev_err(dip, CE_WARN, "!MAC unregister failed (%d)", r);
 		return (DDI_FAILURE);
 	}
-	mac_free(vif->vif_macp);
 
 	/*
 	 * Shut down the device so that we can recover any previously
@@ -1743,9 +1742,13 @@ vioif_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		vioif_rxbuf_free(vif, rb);
 	}
 
-	(void) virtio_fini(vif->vif_virtio, B_FALSE);
-
+	/*
+	 * vioif_free_bufs() must be called before virtio_fini()
+	 * as it uses virtio_chain_free() which itself depends on some
+	 * virtio data structures still being around.
+	 */
 	vioif_free_bufs(vif);
+	(void) virtio_fini(vif->vif_virtio, B_FALSE);
 
 	mutex_exit(&vif->vif_mutex);
 	mutex_destroy(&vif->vif_mutex);

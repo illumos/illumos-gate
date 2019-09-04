@@ -81,6 +81,7 @@ static int virtio_interrupts_setup(virtio_t *, int);
 static void virtio_interrupts_teardown(virtio_t *);
 static void virtio_interrupts_disable_locked(virtio_t *);
 static void virtio_queue_free(virtio_queue_t *);
+static void virtio_device_reset_locked(virtio_t *);
 
 /*
  * We use the same device access attributes for BAR mapping and access to the
@@ -194,7 +195,7 @@ virtio_fini(virtio_t *vio, boolean_t failed)
 		 */
 		virtio_set_status(vio, VIRTIO_STATUS_FAILED);
 	} else {
-		virtio_device_reset(vio);
+		virtio_device_reset_locked(vio);
 	}
 
 	/*
@@ -215,6 +216,7 @@ virtio_fini(virtio_t *vio, boolean_t failed)
 	/*
 	 * Ensure we have torn down everything we set up.
 	 */
+	vio->vio_initlevel &= ~VIRTIO_INITLEVEL_SHUTDOWN;
 	VERIFY0(vio->vio_initlevel);
 
 	mutex_exit(&vio->vio_mutex);
