@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
 # Copyright 2011 EveryCity Ltd. All rights reserved.
 # Copyright 2013 DEY Storage Systems, Inc.
 # Copyright 2016 Joyent, Inc.
@@ -92,7 +92,8 @@ ISO8859_15_LOCALES= \
 
 KOI8_R_LOCALES=	ru_RU
 
-_UTF_8_LOCALES= af_ZA \
+_UTF_8_LOCALES=	C \
+		af_ZA \
 		ar_AE ar_BH ar_DZ ar_EG ar_IQ ar_JO ar_KW ar_LB ar_LY ar_MA \
 		ar_OM ar_QA ar_SA ar_TN ar_YE \
 		as_IN \
@@ -181,4 +182,4 @@ UTF_8_LOCALES=	$(_UTF_8_LOCALES) \
 # List of locales that happen to have translations for them present in the gate
 # zz_AA.UTF-8	locale used for testing translation
 TRANSLOCS=	zz_AA.UTF-8
-PRIVTRANSLOCS= 	zz_AA.UTF-8
+PRIVTRANSLOCS=	zz_AA.UTF-8

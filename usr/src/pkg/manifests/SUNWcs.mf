@@ -208,6 +208,13 @@ dir path=usr/lib/inet
 dir path=usr/lib/inet/$(ARCH64)
 dir path=usr/lib/locale
 dir path=usr/lib/locale/C
+dir path=usr/lib/locale/C.UTF-8
+dir path=usr/lib/locale/C.UTF-8/LC_COLLATE
+dir path=usr/lib/locale/C.UTF-8/LC_CTYPE
+dir path=usr/lib/locale/C.UTF-8/LC_MESSAGES
+dir path=usr/lib/locale/C.UTF-8/LC_MONETARY
+dir path=usr/lib/locale/C.UTF-8/LC_NUMERIC
+dir path=usr/lib/locale/C.UTF-8/LC_TIME
 dir path=usr/lib/locale/C/LC_COLLATE
 dir path=usr/lib/locale/C/LC_CTYPE
 dir path=usr/lib/locale/C/LC_MESSAGES
@@ -1179,6 +1186,7 @@ file path=usr/lib/isaexec mode=0555
 file path=usr/lib/kssladm mode=0555
 $(sparc_ONLY)file path=usr/lib/ld.so
 file path=usr/lib/libshare.so.1
+file path=usr/lib/locale/C.UTF-8/LC_CTYPE/LCL_DATA mode=0444
 file path=usr/lib/makekey mode=0555
 file path=usr/lib/more.help
 file path=usr/lib/newsyslog group=sys mode=0555
