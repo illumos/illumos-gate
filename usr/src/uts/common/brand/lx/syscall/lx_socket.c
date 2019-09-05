@@ -3824,6 +3824,16 @@ lx_getsockopt_icmpv6(sonode_t *so, int optname, void *optval,
 	return (error);
 }
 
+/*
+ * When attempting to get socket options on AF_UNIX sockets we need to be a bit
+ * careful with the returned errno values. It turns out different OSes return
+ * different errno values here:
+ *     - illumos: ENOPROTOOPT
+ *     - Linux: EOPNOTSUPP
+ *     - FreeBSD: EINVAL
+ * Therefore we remap ENOPROTOOPT to EOPNOTSUPP when a userland program attempts
+ * to get one of the various TCP_XXX options under this condition.
+ */
 static int
 lx_getsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t *optlen)
 {
@@ -3843,7 +3853,10 @@ lx_getsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t *optlen)
 		 * oath.
 		 */
 		if (*optlen < sizeof (int)) {
-			error = EINVAL;
+			return (EINVAL);
+		}
+		if (so->so_family == AF_UNIX) {
+			return (EOPNOTSUPP);
 		} else {
 			*intval = 0;
 		}
@@ -3865,12 +3878,12 @@ lx_getsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t *optlen)
 			    TCP_CONN_NOTIFY_THRESHOLD, &syn_backoff, &len, 0,
 			    cr);
 			if (error != 0)
-				return (error);
+				goto out;
 			error = socket_getsockopt(so, IPPROTO_TCP,
 			    TCP_CONN_ABORT_THRESHOLD, &syn_abortconn, &len, 0,
 			    cr);
 			if (error != 0)
-				return (error);
+				goto out;
 
 			syn_cnt = 0;
 			while (syn_backoff < syn_abortconn) {
@@ -3884,7 +3897,7 @@ lx_getsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t *optlen)
 			*optlen = sizeof (int);
 		}
 
-		return (error);
+		goto out;
 
 	case LX_TCP_DEFER_ACCEPT:
 		/*
@@ -3902,7 +3915,7 @@ lx_getsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t *optlen)
 			if ((error = socket_getsockopt(so, SOL_FILTER,
 			    FIL_LIST, fi, &len, 0, cr)) != 0) {
 				*optlen = sizeof (int);
-				return (error);
+				goto out;
 			}
 
 			*intval = 0;
@@ -3916,17 +3929,26 @@ lx_getsockopt_tcp(sonode_t *so, int optname, void *optval, socklen_t *optlen)
 			}
 		}
 		*optlen = sizeof (int);
-		return (error);
+		goto out;
 	default:
 		break;
 	}
 
 	if (!lx_sockopt_lookup(sockopts_tbl, &optname, optlen)) {
+		if (optname <= sockopts_tbl.lpo_max &&
+		    so->so_family == AF_UNIX) {
+			return (EOPNOTSUPP);
+		}
 		return (ENOPROTOOPT);
 	}
 
 	error = socket_getsockopt(so, IPPROTO_TCP, optname, optval, optlen, 0,
 	    cr);
+
+out:
+	if (error == ENOPROTOOPT && so->so_family == AF_UNIX) {
+		return (EOPNOTSUPP);
+	}
 	return (error);
 }
 
