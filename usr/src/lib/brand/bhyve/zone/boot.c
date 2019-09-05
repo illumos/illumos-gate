@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -382,7 +382,8 @@ add_nets(int *argc, char **argv)
 	char slotconf[MAXNAMELEN];
 	char *primary = NULL;
 
-	if ((nets = get_zcfg_var("net", "resources", NULL)) == NULL) {
+	if ((nets = get_zcfg_var("net", "resources", NULL)) == NULL ||
+	    strcmp(nets, "") == 0) {
 		return (0);
 	}
 
@@ -421,6 +422,12 @@ add_nets(int *argc, char **argv)
 		    add_arg(argc, argv, slotconf) != 0) {
 			return (-1);
 		}
+	}
+
+	/* Make sure there is a "primary" net */
+	if (primary == NULL) {
+		(void) printf("Error: no primary net has been specified\n");
+		return (-1);
 	}
 
 	return (0);
