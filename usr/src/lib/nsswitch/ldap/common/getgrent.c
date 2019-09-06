@@ -207,10 +207,12 @@ getmembers_UID(char **bufpp, int *lenp, ns_ldap_attr_t *members)
 		    strpbrk(member_str, " ,:=") != NULL)
 			continue;
 
-		if (firsttime)
+		if (firsttime) {
 			len = snprintf(buffer, buflen, "%s", member_str);
-		else
+			firsttime = 0;
+		} else {
 			len = snprintf(buffer, buflen, ",%s", member_str);
+		}
 		TEST_AND_ADJUST(len, buffer, buflen, out);
 	}
 
@@ -279,10 +281,12 @@ getmembers_DN(char **bufpp, int *lenp, ns_ldap_attr_t *members)
 			continue;
 		}
 
-		if (firsttime)
+		if (firsttime) {
 			len = snprintf(buffer, buflen, "%s", member_uid);
-		else
+			firsttime = 0;
+		} else {
 			len = snprintf(buffer, buflen, ",%s", member_uid);
+		}
 		free(member_uid);
 		TEST_AND_ADJUST(len, buffer, buflen, out);
 	}
@@ -522,7 +526,7 @@ static ldap_backend_op_t gr_ops[] = {
 /*ARGSUSED0*/
 nss_backend_t *
 _nss_ldap_group_constr(const char *dummy1, const char *dummy2,
-			const char *dummy3)
+    const char *dummy3)
 {
 
 	return ((nss_backend_t *)_nss_ldap_constr(gr_ops,
