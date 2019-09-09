@@ -4550,6 +4550,9 @@ nvme_ioctl_detach(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 	if (nsid == 0)
 		return (EINVAL);
 
+	if (nvme->n_ns[nsid - 1].ns_ignore)
+		return (0);
+
 	rv = bd_detach_handle(nvme->n_ns[nsid - 1].ns_bd_hdl);
 	if (rv != DDI_SUCCESS)
 		rv = EBUSY;
@@ -4579,6 +4582,14 @@ nvme_ioctl_attach(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 		return (EIO);
 
 	kmem_free(idns, sizeof (nvme_identify_nsid_t));
+
+	if (nvme->n_ns[nsid - 1].ns_ignore)
+		return (ENOTSUP);
+
+	if (nvme->n_ns[nsid - 1].ns_bd_hdl == NULL)
+		nvme->n_ns[nsid - 1].ns_bd_hdl = bd_alloc_handle(
+		    &nvme->n_ns[nsid - 1], &nvme_bd_ops, &nvme->n_prp_dma_attr,
+		    KM_SLEEP);
 
 	rv = bd_attach_handle(nvme->n_dip, nvme->n_ns[nsid - 1].ns_bd_hdl);
 	if (rv != DDI_SUCCESS)
