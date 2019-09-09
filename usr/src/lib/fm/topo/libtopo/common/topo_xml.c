@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <libxml/parser.h>
@@ -1346,12 +1346,17 @@ pad_process(topo_mod_t *mp, tf_rdata_t *rd, xmlNodePtr pxn, tnode_t *ptn,
 		*rpad = new;
 	}
 
-	if (new->tpad_dcnt > 0)
-		if (dependents_create(mp, rd->rd_finfo, new, pxn, ptn) < 0)
-			return (-1);
-
+	/*
+	 * We need to process the property groups before enumerating any
+	 * dependents as that enuemration can itself have dependencies on
+	 * properties set on the parent node.
+	 */
 	if (new->tpad_pgcnt > 0)
 		if (pgroups_create(mp, new, ptn) < 0)
+			return (-1);
+
+	if (new->tpad_dcnt > 0)
+		if (dependents_create(mp, rd->rd_finfo, new, pxn, ptn) < 0)
 			return (-1);
 
 	return (0);

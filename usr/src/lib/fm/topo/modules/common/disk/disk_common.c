@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -62,18 +62,6 @@ typedef struct disk_cbdata {
 } disk_cbdata_t;
 
 /*
- * Given a /devices path for a whole disk, appending this extension gives the
- * path to a raw device that can be opened.
- */
-#if defined(__i386) || defined(__amd64)
-#define	PHYS_EXTN	":q,raw"
-#elif defined(__sparc) || defined(__sparcv9)
-#define	PHYS_EXTN	":c,raw"
-#else
-#error	Unknown architecture
-#endif
-
-/*
  * Methods for disks. This is used by the disk-transport module to
  * generate ereports based off SCSI disk status.
  */
@@ -99,27 +87,6 @@ static const topo_method_t disk_fac_methods[] = {
 	    TOPO_METH_DISK_TEMP_VERSION, TOPO_STABILITY_INTERNAL,
 	    disk_temp_reading },
 	{ NULL }
-};
-
-static const topo_pgroup_info_t io_pgroup = {
-	TOPO_PGROUP_IO,
-	TOPO_STABILITY_PRIVATE,
-	TOPO_STABILITY_PRIVATE,
-	1
-};
-
-static const topo_pgroup_info_t disk_auth_pgroup = {
-	FM_FMRI_AUTHORITY,
-	TOPO_STABILITY_PRIVATE,
-	TOPO_STABILITY_PRIVATE,
-	1
-};
-
-static const topo_pgroup_info_t storage_pgroup = {
-	TOPO_PGROUP_STORAGE,
-	TOPO_STABILITY_PRIVATE,
-	TOPO_STABILITY_PRIVATE,
-	1
 };
 
 /*

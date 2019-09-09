@@ -22,7 +22,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 # Copyright 2019 Peter Tribble.
 #
 
@@ -54,6 +54,7 @@ i386_SUBDIRS = i86pc \
 		Joyent,Joyent-Compute-Platform-330x \
 		Joyent,Joyent-Storage-Platform-7001 \
 		SMCI,SSG-2028R-ACR24L \
+		SMCI,SYS-2028U-E1CNRT+ \
 		SMCI,SSG-6049P-E1CR36L \
 		SMCI,SSG-2029P-ACR24L
 

@@ -9,7 +9,7 @@
  * http://www.illumos.org/license/CDDL.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef _DISK_DRIVERS_H
@@ -22,7 +22,11 @@
 extern "C" {
 #endif
 
+#define	MPTSAS_DRV	"mpt_sas"
+#define	NVME_DRV	"nvme"
+
 int disk_mptsas_find_disk(topo_mod_t *, tnode_t *, char **);
+int disk_nvme_enum_disk(topo_mod_t *, tnode_t *);
 
 #ifdef __cplusplus
 }

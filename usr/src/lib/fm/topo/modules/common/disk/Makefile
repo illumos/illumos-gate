@@ -22,13 +22,13 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 MODULE = disk
 CLASS = common
 
-MODULESRCS = disk.c disk_common.c disk_mptsas.c
+MODULESRCS = disk.c disk_common.c disk_mptsas.c disk_nvme.c
 
 include ../../Makefile.plugin
 

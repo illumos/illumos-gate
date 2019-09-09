@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2016 Nexenta Systems, Inc.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation
  */
 
@@ -137,13 +137,16 @@ typedef struct {
 	uint8_t psd_rsvd10[9];
 } nvme_idctl_psd_t;
 
+#define	NVME_SERIAL_SZ	20
+#define	NVME_MODEL_SZ	40
+
 /* NVMe Identify Controller Data Structure */
 typedef struct {
 	/* Controller Capabilities & Features */
 	uint16_t id_vid;		/* PCI vendor ID */
 	uint16_t id_ssvid;		/* PCI subsystem vendor ID */
-	char id_serial[20];		/* Serial Number */
-	char id_model[40];		/* Model Number */
+	char id_serial[NVME_SERIAL_SZ];	/* Serial Number */
+	char id_model[NVME_MODEL_SZ];	/* Model Number */
 	char id_fwrev[8];		/* Firmware Revision */
 	uint8_t id_rab;			/* Recommended Arbitration Burst */
 	uint8_t id_oui[3];		/* vendor IEEE OUI */

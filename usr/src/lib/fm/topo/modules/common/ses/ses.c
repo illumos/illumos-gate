@@ -23,7 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2020, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <alloca.h>
@@ -225,14 +225,6 @@ typedef enum {
 	SES_DUP_CHASSIS		= 0x4,
 	SES_DUP_SUBCHASSIS	= 0x8
 } ses_chassis_type_e;
-
-
-static const topo_pgroup_info_t storage_pgroup = {
-	TOPO_PGROUP_STORAGE,
-	TOPO_STABILITY_PRIVATE,
-	TOPO_STABILITY_PRIVATE,
-	1
-};
 
 static const topo_pgroup_info_t smp_pgroup = {
 	TOPO_PGROUP_SMP,

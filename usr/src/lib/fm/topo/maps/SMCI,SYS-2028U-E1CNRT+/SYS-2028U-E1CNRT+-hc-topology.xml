@@ -1,0 +1,161 @@
+<?xml version="1.0"?>
+<!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
+<!--
+
+ This file and its contents are supplied under the terms of the
+ Common Development and Distribution License ("CDDL"), version 1.0.
+ You may only use this file in accordance with the terms of version
+ 1.0 of the CDDL.
+
+ A full copy of the text of the CDDL should have accompanied this
+ source.  A copy of the CDDL is also available via the Internet at
+ http://www.illumos.org/license/CDDL.
+
+ Copyright 2020 Joyent, Inc.
+
+-->
+
+<topology name='i86pc' scheme='hc'>
+
+  <range name='motherboard' min='0' max='0'>
+    <enum-method name='smbios' version='1' />
+    <node instance='0' static='true'>
+        <fac-enum provider='fac_prov_ipmi' />
+        <propgroup name='protocol' version='1'
+            name-stability='Private' data-stability='Private' >
+            <propval name='label' type='string' value='MB' />
+        </propgroup>
+        <propgroup name='ipmi' version='1'
+            name-stability='Private' data-stability='Private' >
+            <propval name='entity-list' type='string_array' >
+                <propitem value='CPU1 Temp' />
+                <propitem value='CPU2 Temp' />
+                <propitem value='MB_NIC_Temp1' />
+                <propitem value='MB_NIC_Temp2' />
+                <propitem value='PCH Temp' />
+                <propitem value='Peripheral Temp' />
+                <propitem value='5VSB' />
+                <propitem value='5VCC' />
+                <propitem value='3.3VSB' />
+                <propitem value='3.3VCC' />
+                <propitem value='1.5V PCH' />
+                <propitem value='1.2V BMC' />
+                <propitem value='1.05V PCH' />
+                <propitem value='12V' />
+                <propitem value='5VCC' />
+                <propitem value='5VSB' />
+                <propitem value='NVMe_SSD Temp' />
+                <propitem value='VBAT' />
+                <propitem value='Vcpu1' />
+                <propitem value='Vcpu2' />
+                <propitem value='VDIMMAB' />
+                <propitem value='VDIMMCD' />
+                <propitem value='VDIMMEF' />
+                <propitem value='VDIMMGH' />
+                <propitem value='VmemABVRM' />
+                <propitem value='VmemCDVRM' />
+                <propitem value='VmemEFVRM' />
+                <propitem value='VmemGHVRM' />
+           </propval>
+        </propgroup>
+    </node>
+
+    <dependents grouping='children'>
+      <range name='chip' min='0' max='1'>
+        <enum-method name='chip' version='1' />
+      </range>
+      <range name='hostbridge' min='0' max='254'>
+        <enum-method name='hostbridge' version='1' />
+      </range>
+      <range name='sp' min='0' max='0'>
+        <enum-method name='ipmi' version='1' />
+      </range>
+      <range name='usb-mobo' min='0' max='256'>
+        <enum-method name='usb' version='1' />
+      </range>
+    </dependents>
+
+  </range>
+
+  <range name='chassis' min='0' max='0'>
+    <propmap name='SYS-2028U-E1CNRT+-chassis' />
+
+    <dependents grouping='children'>
+
+       <range name='psu' min='0' max='1'>
+          <enum-method name='ipmi' version='1' />
+       </range>
+       <range name='fan' min='0' max='8'>
+          <enum-method name='ipmi' version='1' />
+       </range>
+      <range name='usb-chassis' min='0' max='256'>
+        <enum-method name='usb' version='1' />
+      </range>
+
+    </dependents>
+
+  </range>
+
+  <range name='ses-enclosure' min='0' max='0'>
+      <enum-method name='ses' version='1' />
+      <node instance='0' static='true'>
+      <dependents grouping='children'>
+      <range name='bay' min='0' max='23'>
+        <node instance='20' static='true'>
+          <propgroup name='binding' version='1'
+              name-stability='Private' data-stability='Private' >
+              <propval name='driver' type='string' value='nvme' />
+              <propval name='parent-device' type='string'
+                value='/pci@0,0/pci8086,6f08@3' />
+          </propgroup>
+          <dependents grouping='children'>
+          <range name='nvme' min='0' max='0'>
+            <enum-method name='disk' version='1' />
+          </range>
+          </dependents>
+        </node>
+        <node instance='21' static='true'>
+          <propgroup name='binding' version='1'
+              name-stability='Private' data-stability='Private' >
+              <propval name='driver' type='string' value='nvme' />
+              <propval name='parent-device' type='string'
+                value='/pci@0,0/pci8086,6f09@3,1' />
+          </propgroup>
+          <dependents grouping='children'>
+          <range name='nvme' min='0' max='0'>
+            <enum-method name='disk' version='1' />
+          </range>
+          </dependents>
+        </node>
+        <node instance='22' static='true'>
+          <propgroup name='binding' version='1'
+            name-stability='Private' data-stability='Private' >
+              <propval name='driver' type='string' value='nvme' />
+              <propval name='parent-device' type='string'
+                value='/pci@0,0/pci8086,6f0a@3,2' />
+          </propgroup>
+          <dependents grouping='children'>
+          <range name='nvme' min='0' max='0'>
+            <enum-method name='disk' version='1' />
+          </range>
+          </dependents>
+        </node>
+        <node instance='23' static='true'>
+          <propgroup name='binding' version='1'
+              name-stability='Private' data-stability='Private' >
+              <propval name='driver' type='string' value='nvme' />
+              <propval name='parent-device' type='string'
+                value='/pci@0,0/pci8086,6f0b@3,3' />
+          </propgroup>
+          <dependents grouping='children'>
+          <range name='nvme' min='0' max='0'>
+            <enum-method name='disk' version='1' />
+          </range>
+          </dependents>
+        </node>
+      </range> <!-- bay -->
+      </dependents>
+    </node> <!-- ses-enclosure=0 -->
+  </range> <!-- ses-enclosure -->
+
+</topology>
