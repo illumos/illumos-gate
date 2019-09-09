@@ -37,6 +37,7 @@ LIBSRC=		$(SRC)/boot/lib
 SASRC=		$(LIBSRC)/libstand
 ZFSSRC=		$(SASRC)/zfs
 ZLIB=		$(SRC)/contrib/zlib
+LZ4=		$(SRC)/common/lz4
 
 # set standard values
 AS_CPPFLAGS=

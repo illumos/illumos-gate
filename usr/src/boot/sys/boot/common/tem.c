@@ -68,8 +68,7 @@
 #include <sys/consplat.h>
 #include <sys/kd.h>
 #include <stdbool.h>
-
-extern int lz4_decompress(void *, void *, size_t, size_t, int);
+#include <lz4.h>
 
 /* Terminal emulator internal helper functions */
 static void	tems_setup_terminal(struct vis_devinit *, size_t, size_t);

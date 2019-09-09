@@ -17,7 +17,8 @@
 PROG=	vtfontcvt
 OBJS=	vtfontcvt.o
 
-LZ4COMMONDIR= $(SRC)/common/ficl/softcore
+LZ4=	$(SRC)/common/lz4
+CPPFLAGS +=	-I$(LZ4)
 LZ4_OBJS=	lz4.o
 OBJS	+=	$(LZ4_OBJS)
 
@@ -26,7 +27,7 @@ LDLIBS += -lumem
 # not linted
 SMATCH=off
 
-%.o:	$(LZ4COMMONDIR)/%.c
+%.o:	$(LZ4)/%.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 

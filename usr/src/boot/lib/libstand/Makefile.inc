@@ -163,6 +163,11 @@ libstand_gzguts.h: $(ZLIB)/gzguts.h
 
 CLEANFILES += libstand_zutil.h libstand_gzguts.h
 
+# lz4 decompression functionality
+lz4.o := CPPFLAGS += -I$(LZ4)
+SRCS += $(LZ4)/lz4.c
+OBJS += lz4.o
+
 # io routines
 SRCS +=	$(SASRC)/closeall.c $(SASRC)/dev.c \
 	$(SASRC)/ioctl.c $(SASRC)/nullfs.c \

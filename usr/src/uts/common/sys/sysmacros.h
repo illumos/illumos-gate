@@ -66,6 +66,10 @@ extern "C" {
 #define	SIGNOF(a)	((a) < 0 ? -1 : (a) > 0)
 #endif
 
+#ifndef	__DECONST
+#define	__DECONST(type, var)	((type)(uintptr_t)(const void *)(var))
+#endif
+
 #ifdef _KERNEL
 
 /*

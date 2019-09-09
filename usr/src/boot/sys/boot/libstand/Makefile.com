@@ -63,3 +63,6 @@ x86:
 
 %.o:	$(ZLIB)/%.c
 	$(COMPILE.c) $<
+
+%.o:	$(LZ4)/%.c
+	$(COMPILE.c) $<
