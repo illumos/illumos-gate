@@ -76,7 +76,7 @@ tsalarm_get(uint32_t alarm_type, uint32_t *alarm_state)
 	req_ptr->alarm_id = alarm_type;
 
 	send_msg.msg_type = TSALARM_CONTROL;
-	send_msg.sub_type = NULL;
+	send_msg.sub_type = 0;
 	send_msg.msg_len = sizeof (tsalarm_req_t);
 	send_msg.msg_data = (uint8_t *)req_ptr;
 
@@ -171,7 +171,7 @@ tsalarm_set(uint32_t alarm_type, uint32_t alarm_state)
 		req_ptr->alarm_action = TSALARM_DISABLE;
 
 	send_msg.msg_type = TSALARM_CONTROL;
-	send_msg.sub_type = NULL;
+	send_msg.sub_type = 0;
 	send_msg.msg_len = sizeof (tsalarm_req_t);
 	send_msg.msg_data = (uint8_t *)req_ptr;
 

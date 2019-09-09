@@ -52,30 +52,27 @@ OBJECTS=	$(BLTOBJS)  $(MACHOBJS)  $(COMOBJS)  $(CLASSOBJS) $(MISCOBJS)
 
 include $(SRC)/lib/Makefile.lib
 
+SRCDIR=	$(SRC)/cmd/sgs/libelf
+
 # Use the value of M4 set in Makefile.master via Makefile.lib
 
 DEMOFILES=	Makefile	00README	acom.c		dcom.c \
 		pcom.c		tpcom.c		dispsyms.c
-DEMOFILESRCDIR=	../demo
+DEMOFILESRCDIR=	$(SRCDIR)/demo
 ROOTDEMODIRBASE=$(ROOT)/usr/demo/ELF
 ROOTDEMODIRS=   $(ROOTDEMODIRBASE)
 
 include $(SRC)/cmd/sgs/Makefile.com
 
-MAPFILES =	../common/mapfile-vers
+MAPFILES =	$(SRCDIR)/common/mapfile-vers
 
 DYNFLAGS +=	$(VERSREF)
-LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
+LDLIBS +=	$(CONVLIBDIR) -lconv -lc
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	$(CNOWARN_UNINIT)
 
 SMOFF += indenting
-
-BUILD.AR=	$(RM) $@ ; \
-		$(AR) q $@ `$(LORDER) $(OBJECTS:%=$(DIR)/%)| $(TSORT)`
-		$(POST_PROCESS_A)
-
 
 BLTDEFS=	msg.h
 BLTDATA=	msg.c
@@ -83,8 +80,8 @@ BLTMESG=	$(SGSMSGDIR)/libelf
 
 BLTFILES=	$(BLTDEFS) $(BLTDATA) $(BLTMESG)
 
-SGSMSGCOM=	../common/libelf.msg
-SGSMSG32=	../common/libelf.32.msg
+SGSMSGCOM=	$(SRCDIR)/common/libelf.msg
+SGSMSG32=	$(SRCDIR)/common/libelf.32.msg
 SGSMSGTARG=	$(SGSMSGCOM)
 SGSMSGALL=	$(SGSMSGCOM) $(SGSMSG32)
 
@@ -92,7 +89,7 @@ SGSMSGFLAGS1=	$(SGSMSGFLAGS) -m $(BLTMESG)
 SGSMSGFLAGS2=	$(SGSMSGFLAGS) -h $(BLTDEFS) -d $(BLTDATA) -n libelf_msg
 
 BLTSRCS=	$(BLTOBJS:%.o=%.c)
-LIBSRCS=	$(COMOBJS:%.o=../common/%.c)  $(MISCOBJS:%.o=../misc/%.c) \
+LIBSRCS=	$(COMOBJS:%.o=$(SRCDIR)/common/%.c)  $(MISCOBJS:%.o=$(SRCDIR)/misc/%.c) \
 		$(MACHOBJS:%.o=%.c)  $(BLTSRCS)
 
 ROOTFS_DYNLIB=		$(DYNLIB:%=$(ROOTFS_LIBDIR)/%)

@@ -47,7 +47,7 @@ COMOBJS64 =	args64.o	entry64.o	exit64.o	groups64.o \
 		sunwmove64.o	support64.o	syms64.o	update64.o \
 		unwind64.o	version64.o	wrap64.o
 
-TOOLOBJS =	alist.o		assfail.o	findprime.o	string_table.o \
+SGSCOMMONOBJ =	alist.o		assfail.o	findprime.o	string_table.o \
 		strhash.o
 AVLOBJ =	avl.o
 
@@ -60,13 +60,13 @@ L_SPARC_MACHOBJS32 =	machrel.sparc32.o	machsym.sparc32.o
 L_SPARC_MACHOBJS64 =	machrel.sparc64.o	machsym.sparc64.o
 
 # Target specific objects (i386/amd64)
-E_X86_TOOLOBJS =	leb128.o
+E_X86_COMMONOBJ =	leb128.o
 L_X86_MACHOBJS32 =	machrel.intel32.o
 L_X86_MACHOBJS64 =	machrel.amd64.o
 
 # All target specific objects rolled together
-E_TOOLOBJS =	$(E_SPARC_TOOLOBJS) \
-	$(E_X86_TOOLOBJS)
+E_COMMONOBJ =	$(E_SPARC_COMMONOBJ) \
+	$(E_X86_COMMONOBJ)
 L_MACHOBJS32 =	$(L_SPARC_MACHOBJS32) \
 	$(L_X86_MACHOBJS32)
 L_MACHOBJS64 =	$(L_SPARC_MACHOBJS64) \
@@ -79,12 +79,13 @@ ELFCAPOBJ =	elfcap.o
 OBJECTS =	$(BLTOBJ) $(G_MACHOBJS32) $(G_MACHOBJS64) \
 		$(L_MACHOBJS32) $(L_MACHOBJS64) \
 		$(COMOBJS) $(COMOBJS32) $(COMOBJS64) \
-		$(TOOLOBJS) $(E_TOOLOBJS) $(AVLOBJ) $(ELFCAPOBJ)
+		$(SGSCOMMONOBJ) $(E_COMMONOBJ) $(AVLOBJ) $(ELFCAPOBJ)
 
 include		$(SRC)/lib/Makefile.lib
 include		$(SRC)/cmd/sgs/Makefile.com
 
-SRCDIR =	../common
+SRCDIR =	$(SGSHOME)/libld
+MAPFILEDIR =	$(SRCDIR)/common
 
 CERRWARN += -_gcc=-Wno-unused-value
 CERRWARN += -_gcc=-Wno-parentheses
@@ -98,20 +99,18 @@ SMOFF += no_if_block
 
 # Location of the shared relocation engines maintained under usr/src/uts.
 #
-KRTLD_I386 = $(SRCBASE)/uts/$(VAR_PLAT_i386)/krtld
-KRTLD_AMD64 = $(SRCBASE)/uts/$(VAR_PLAT_amd64)/krtld
-KRTLD_SPARC = $(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld
+KRTLD_I386 = $(SRC)/uts/$(VAR_PLAT_i386)/krtld
+KRTLD_AMD64 = $(SRC)/uts/$(VAR_PLAT_amd64)/krtld
+KRTLD_SPARC = $(SRC)/uts/$(VAR_PLAT_sparc)/krtld
 
 
-CPPFLAGS +=	-DUSE_LIBLD_MALLOC -I$(SRCBASE)/lib/libc/inc \
-		    -I$(SRCBASE)/uts/common/krtld -I$(SRCBASE)/uts/sparc \
+CPPFLAGS +=	-DUSE_LIBLD_MALLOC -I$(SRC)/lib/libc/inc \
+		    -I$(SRC)/uts/common/krtld -I$(SRC)/uts/sparc \
 		    $(VAR_LIBLD_CPPFLAGS)
-LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(LDDBGLIBDIR) $(LDDBG_LIB) \
+LDLIBS +=	$(CONVLIBDIR) -lconv $(LDDBGLIBDIR) -llddbg \
 		    $(ELFLIBDIR) -lelf $(DLLIB) -lc
 
-DYNFLAGS +=	$(VERSREF) $(CC_USE_PROTO) '-R$$ORIGIN'
-
-native:=	DYNFLAGS	+= $(CONVLIBDIR)
+DYNFLAGS +=	$(VERSREF) '-R$$ORIGIN'
 
 # too hairy
 pics/sections32.o := SMATCH=off
@@ -127,26 +126,26 @@ BLTFILES =	$(BLTDEFS) $(BLTDATA) $(BLTMESG)
 # However, we keep target specific messages in their own separate files for
 # organizational reasons.
 #
-SGSMSGCOM =	../common/libld.msg
-SGSMSGSPARC =	../common/libld.sparc.msg
-SGSMSGINTEL =	../common/libld.intel.msg
+SGSMSGCOM =	$(SRCDIR)/common/libld.msg
+SGSMSGSPARC =	$(SRCDIR)/common/libld.sparc.msg
+SGSMSGINTEL =	$(SRCDIR)/common/libld.intel.msg
 SGSMSGTARG =	$(SGSMSGCOM) $(SGSMSGSPARC) $(SGSMSGINTEL)
 SGSMSGALL =	$(SGSMSGCOM) $(SGSMSGSPARC) $(SGSMSGINTEL)
 
 SGSMSGFLAGS1 =	$(SGSMSGFLAGS) -m $(BLTMESG)
 SGSMSGFLAGS2 =	$(SGSMSGFLAGS) -h $(BLTDEFS) -d $(BLTDATA) -n libld_msg
 
-CHKSRCS =	$(SRCBASE)/uts/common/krtld/reloc.h \
-		$(COMOBJS32:%32.o=../common/%.c) \
-		$(L_MACHOBJS32:%32.o=../common/%.c) \
-		$(L_MACHOBJS64:%64.o=../common/%.c) \
+CHKSRCS =	$(SRC)/uts/common/krtld/reloc.h \
+		$(COMOBJS32:%32.o=$(SRCDIR)/common/%.c) \
+		$(L_MACHOBJS32:%32.o=$(SRCDIR)/common/%.c) \
+		$(L_MACHOBJS64:%64.o=$(SRCDIR)/common/%.c) \
 		$(KRTLD_I386)/doreloc.c \
 		$(KRTLD_AMD64)/doreloc.c \
 		$(KRTLD_SPARC)/doreloc.c
 
-LIBSRCS =	$(TOOLOBJS:%.o=$(SGSTOOLS)/common/%.c) \
-		$(E_TOOLOBJS:%.o=$(SGSTOOLS)/common/%.c) \
-		$(COMOBJS:%.o=../common/%.c) \
+LIBSRCS =	$(SGSCOMMONOBJ:%.o=$(SGSCOMMON)/%.c) \
+		$(SGSCOMMONOBJ:%.o=$(SGSCOMMON)/%.c) \
+		$(COMOBJS:%.o=$(SRCDIR)/common/%.c) \
 		$(AVLOBJS:%.o=$(VAR_AVLDIR)/%.c) \
 		$(BLTDATA)
 

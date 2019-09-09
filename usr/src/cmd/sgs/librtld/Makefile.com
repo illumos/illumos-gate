@@ -41,11 +41,11 @@ include		$(SRC)/lib/Makefile.lib
 include		$(SRC)/cmd/sgs/Makefile.com
 
 SRCDIR =	../common
-CPPFLAGS +=	-I../../rtld/common -I$(SRCBASE)/lib/libc/inc \
-		-I$(SRCBASE)/uts/common/krtld -I$(SRC)/common/sgsrtcid \
-		-I$(SRCBASE)/uts/sparc
-DYNFLAGS +=	$(VERSREF) $(CC_USE_PROTO)  '-R$$ORIGIN'
-LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf -lc
+CPPFLAGS +=	-I../../rtld/common -I$(SRC)/lib/libc/inc \
+		-I$(SRC)/uts/common/krtld -I$(SRC)/common/sgsrtcid \
+		-I$(SRC)/uts/sparc
+DYNFLAGS +=	$(VERSREF) '-R$$ORIGIN'
+LDLIBS +=	$(CONVLIBDIR) -lconv $(ELFLIBDIR) -lelf -lc
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-value

@@ -25,12 +25,10 @@
  *
  * Tazmo Platform specific functions.
  *
- * 	called when :
- * 	machine_type == MTYPE_TAZMO
+ *	called when :
+ *	machine_type == MTYPE_TAZMO
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -75,9 +73,9 @@ void	display_hp_fail_fault(Sys_tree *tree, struct system_kstat_data *kstats);
 void	display_diaginfo(int flag, Prom_node *root, Sys_tree *tree,
 				struct system_kstat_data *kstats);
 void	display_boardnum(int num);
-void 	display_pci(Board_node *);
+void	display_pci(Board_node *);
 void	display_io_cards(struct io_card *list);
-void 	display_ffb(Board_node *, int);
+void	display_ffb(Board_node *, int);
 void	read_platform_kstats(Sys_tree *tree,
 		struct system_kstat_data *sys_kstat,
 		struct bd_kstat_data *bdp, struct envctrl_kstat_data *ep);
@@ -88,7 +86,7 @@ static	void check_disk_presence(Sys_tree *, int *, int *, int *);
 static	void modify_device_path(char *, char *);
 static	int disk_present(char *);
 static	void tazjav_disp_asic_revs(Sys_tree *);
-static 	int tazmo_physical_slot(Prom_node *, Prom_node *, int, char *);
+static	int tazmo_physical_slot(Prom_node *, Prom_node *, int, char *);
 static	Prom_node *dev_next_node_sibling(Prom_node *root, char *name);
 
 
@@ -172,15 +170,15 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
 
 	dimm = bnode->nodes;
 	for (bank = dev_find_node(bnode->nodes, "bank"); bank != NULL;
-		bank = dev_next_node(bank, "bank")) {
+	    bank = dev_next_node(bank, "bank")) {
 		int bank_size = 0;
 		uint_t *reg_prop;
 
 		preg = (uint_t *)(get_prop_val(
-				find_prop(bank, "bank-interleave")));
+		    find_prop(bank, "bank-interleave")));
 
 		reg_prop = (uint_t *)(get_prop_val(
-				find_prop(bank, "reg")));
+		    find_prop(bank, "reg")));
 
 		/*
 		 * Skip empty banks
@@ -202,11 +200,11 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
 			}
 		}
 		for (dimm = dev_find_node(bank, "dimm"); dimm != NULL;
-			dimm = dev_next_node_sibling(dimm, "dimm")) {
+		    dimm = dev_next_node_sibling(dimm, "dimm")) {
 			char dimm_status[16];
 
 			sock_name = (char *)(get_prop_val(
-				find_prop(dimm, "socket-name")));
+			    find_prop(dimm, "socket-name")));
 			preg = (uint_t *)(get_prop_val(find_prop(dimm, "reg")));
 			size = (preg[2]<<12) + (preg[3]>>20);
 			if ((status_prop = find_prop(dimm, "status")) == NULL) {
@@ -216,8 +214,8 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
 				(void) sprintf(dimm_status, "%s", status);
 			}
 			log_printf("%3d     %5s    %6s  %4d  %6s\n",
-				bank_count, interleave, sock_name,
-				size, dimm_status, 0);
+			    bank_count, interleave, sock_name,
+			    size, dimm_status, 0);
 		}
 		total_size += bank_size;
 		bank_count++;
@@ -258,9 +256,9 @@ disp_fail_parts(Sys_tree *tree)
 			}
 			log_printf("\n", 0);
 			log_printf(dgettext(TEXT_DOMAIN, "Failed Field "
-				"Replaceable Units (FRU) in System:\n"), 0);
+			    "Replaceable Units (FRU) in System:\n"), 0);
 			log_printf("=========================="
-				"====================\n", 0);
+			    "====================\n", 0);
 		}
 
 		while (pnode != NULL) {
@@ -279,14 +277,14 @@ disp_fail_parts(Sys_tree *tree)
 
 
 			log_printf(dgettext(TEXT_DOMAIN, "%s unavailable :\n"),
-				name, 0);
+			    name, 0);
 
 			log_printf(dgettext(TEXT_DOMAIN,
-				"\tPROM fault string: %s\n"),
-				value, 0);
+			    "\tPROM fault string: %s\n"),
+			    value, 0);
 
 			log_printf(dgettext(TEXT_DOMAIN,
-				"\tFailed Field Replaceable Unit is "), 0);
+			    "\tFailed Field Replaceable Unit is "), 0);
 
 			/*
 			 * Determine whether FRU is CPU module, system
@@ -295,53 +293,53 @@ disp_fail_parts(Sys_tree *tree)
 			if ((name != NULL) && (strstr(name, "sbus"))) {
 
 				log_printf(dgettext(TEXT_DOMAIN, "SBus "
-					"Card %d\n"), get_sbus_slot(pnode), 0);
+				    "Card %d\n"), get_sbus_slot(pnode), 0);
 
 			} else if (((name = get_node_name(pnode)) !=
 			    NULL) && (strstr(name, "pci"))) {
 
 				log_printf(dgettext(TEXT_DOMAIN,
-					"system board\n"), 0);
+				    "system board\n"), 0);
 
 			} else if (((name = get_node_name(pnode)) !=
 			    NULL) && (strstr(name, "ffb"))) {
 
 				log_printf(dgettext(TEXT_DOMAIN,
-					"FFB Card %d\n"),
-					tazmo_physical_slot(
-					dev_find_node(bnode->nodes, "slot2dev"),
-					    pnode, -1, slot_str), 0);
+				    "FFB Card %d\n"),
+				    tazmo_physical_slot(
+				    dev_find_node(bnode->nodes, "slot2dev"),
+				    pnode, -1, slot_str), 0);
 
 			} else if (((name = get_node_name(pnode->parent)) !=
 			    NULL) && (strstr(name, "pci"))) {
 
 				(void) tazmo_physical_slot(
-					NULL,
-					    pnode->parent,
-					    get_pci_device(pnode),
-					    slot_str);
+				    NULL,
+				    pnode->parent,
+				    get_pci_device(pnode),
+				    slot_str);
 				log_printf(dgettext(TEXT_DOMAIN,
-					"PCI Card in %s\n"), slot_str, 0);
+				    "PCI Card in %s\n"), slot_str, 0);
 
 			} else if (((type = get_node_type(pnode)) != NULL) &&
 			    (strstr(type, "cpu"))) {
 
 				log_printf(
-					dgettext(TEXT_DOMAIN,
-					"UltraSPARC module Module %d\n"),
-						get_id(pnode));
+				    dgettext(TEXT_DOMAIN,
+				    "UltraSPARC module Module %d\n"),
+				    get_id(pnode));
 
 			} else if (((type = get_node_type(pnode)) != NULL) &&
 			    (strstr(type, "memory-module"))) {
 
 				fru = (char *)(get_prop_val(
-					find_prop(pnode, "fru")));
+				    find_prop(pnode, "fru")));
 				sock_name = (char *)(get_prop_val(
-					find_prop(pnode, "socket-name")));
+				    find_prop(pnode, "socket-name")));
 				log_printf(
-					dgettext(TEXT_DOMAIN,
-						"%s in socket %s\n"),
-						fru, sock_name, 0);
+				    dgettext(TEXT_DOMAIN,
+				    "%s in socket %s\n"),
+				    fru, sock_name, 0);
 			}
 			pnode = next_failed_node(pnode);
 		}
@@ -351,7 +349,7 @@ disp_fail_parts(Sys_tree *tree)
 	if (!system_failed) {
 		log_printf("\n", 0);
 		log_printf(dgettext(TEXT_DOMAIN,
-			"No failures found in System\n"), 0);
+		    "No failures found in System\n"), 0);
 		log_printf("===========================\n", 0);
 	}
 
@@ -374,7 +372,7 @@ display_hp_fail_fault(Sys_tree *tree, struct system_kstat_data *kstats)
 
 void
 display_diaginfo(int flag, Prom_node *root, Sys_tree *tree,
-	struct system_kstat_data *kstats)
+    struct system_kstat_data *kstats)
 {
 	/*
 	 * Now display the last powerfail time and the fatal hardware
@@ -449,9 +447,9 @@ display_pci(Board_node *board)
 		 */
 		if (find_prop(pci, "upa-portid") == NULL) {
 			if ((pci->parent->sibling != NULL) &&
-				(strcmp(get_prop_val(
-				find_prop(pci->parent->sibling,
-				"name")), PCI_NAME) == 0))
+			    (strcmp(get_prop_val(
+			    find_prop(pci->parent->sibling,
+			    "name")), PCI_NAME) == 0))
 				pci = pci->parent->sibling;
 			else {
 				pci = pci->parent->sibling;
@@ -477,7 +475,7 @@ display_pci(Board_node *board)
 
 			/* If it doesn't have a name, skip it */
 			name = (char *)get_prop_val(
-				find_prop(card_node, "name"));
+			    find_prop(card_node, "name"));
 			if (name == NULL) {
 				card_node = card_node->sibling;
 				continue;
@@ -496,26 +494,24 @@ display_pci(Board_node *board)
 			/* Get the slot number for this card */
 			if (pci_pci_bridge) {
 				card.slot = tazmo_physical_slot(
-					dev_find_node(board->nodes, "slot2dev"),
-					    pci,
-					    get_pci_to_pci_device(
-						card_node->parent),
-						    card.slot_str);
+				    dev_find_node(board->nodes, "slot2dev"),
+				    pci,
+				    get_pci_to_pci_device(card_node->parent),
+				    card.slot_str);
 			} else
 				card.slot = tazmo_physical_slot(
-					dev_find_node(board->nodes,
-					"slot2dev"),
-					    pci,
-					    get_pci_device(card_node),
-					    card.slot_str);
+				    dev_find_node(board->nodes, "slot2dev"),
+				    pci,
+				    get_pci_device(card_node),
+				    card.slot_str);
 
 			/*
 			 * Check that duplicate devices are not reported
 			 * on Tazmo.
 			 */
 			if ((card_node->parent == prev_parent) &&
-				(get_pci_device(card_node) == prev_device) &&
-				(pci_pci_bridge == 0))
+			    (get_pci_device(card_node) == prev_device) &&
+			    (pci_pci_bridge == 0))
 					card.slot = -1;
 			prev_parent = card_node->parent;
 			prev_device = get_pci_device(card_node);
@@ -535,7 +531,7 @@ display_pci(Board_node *board)
 				card.model[0] = '\0';
 			else
 				(void) sprintf(card.model, "%s",
-					(char *)value);
+				    (char *)value);
 
 			/*
 			 * Check if further processing is necessary to display
@@ -550,11 +546,11 @@ display_pci(Board_node *board)
 			value = get_prop_val(find_prop(pci, "clock-frequency"));
 			if (value != NULL && card.freq == -1)
 				card.freq = ((*(int *)value) + 500000)
-					/ 1000000;
+				    / 1000000;
 
 
 			value = get_prop_val(find_prop(card_node,
-				"compatible"));
+			    "compatible"));
 
 			/*
 			 * On Tazmo, we would like to print out the last
@@ -572,7 +568,7 @@ display_pci(Board_node *board)
 				compat = find_prop(card_node, "compatible");
 				while (always) {
 					if ((strlen(tval) + 1) ==
-						(compat->size - index))
+					    (compat->size - index))
 						break;
 					index += strlen(tval) + 1;
 					tval += strlen(tval) + 1;
@@ -582,10 +578,10 @@ display_pci(Board_node *board)
 
 			if (value != NULL)
 				(void) sprintf(card.name, "%s-%s",
-					(char *)name, (char *)value);
+				    (char *)name, (char *)value);
 			else
 				(void) sprintf(card.name, "%s",
-					(char *)name);
+				    (char *)name);
 
 			if (card.freq != -1)
 				card_list = insert_io_card(card_list, &card);
@@ -624,11 +620,11 @@ display_io_cards(struct io_card *list)
 	if (banner == 0) {
 		log_printf("     Bus   Freq\n", 0);
 		log_printf("Brd  Type  MHz   Slot  "
-			"Name                              Model", 0);
+		    "Name                              Model", 0);
 		log_printf("\n", 0);
 		log_printf("---  ----  ----  ----  "
-			"--------------------------------  "
-			"----------------------", 0);
+		    "--------------------------------  "
+		    "----------------------", 0);
 		log_printf("\n", 0);
 		banner = 1;
 	}
@@ -679,10 +675,10 @@ display_ffb(Board_node *board, int table)
 
 			/* XXX - Get the slot number (hack) */
 			card.slot = tazmo_physical_slot(
-				dev_find_node(board->nodes, "slot2dev"),
-				    ffb,
-				    -1,
-				    card.slot_str);
+			    dev_find_node(board->nodes, "slot2dev"),
+			    ffb,
+			    -1,
+			    card.slot_str);
 
 			/* Find out if it's single or double buffered */
 			(void) sprintf(card.name, "FFB");
@@ -690,17 +686,17 @@ display_ffb(Board_node *board, int table)
 			if (value != NULL)
 				if ((*(int *)value) & FFB_B_BUFF)
 					(void) sprintf(card.name,
-						"FFB, Double Buffered");
+					    "FFB, Double Buffered");
 				else
 					(void) sprintf(card.name,
-						"FFB, Single Buffered");
+					    "FFB, Single Buffered");
 
 			/* Print model number */
 			card.model[0] = '\0';
 			value = get_prop_val(find_prop(ffb, "model"));
 			if (value != NULL)
 				(void) sprintf(card.model, "%s",
-					(char *)value);
+				    (char *)value);
 
 			card_list = insert_io_card(card_list, &card);
 		} else {
@@ -715,17 +711,17 @@ display_ffb(Board_node *board, int table)
 			/* Find the device node using upa address */
 			value = get_prop_val(find_prop(ffb, "upa-portid"));
 			if (value == NULL)
-			    continue;
+				continue;
 
 			(void) sprintf(device, "%s@%x", FFB_NAME,
-				*(int *)value);
+			    *(int *)value);
 			if ((dirp = opendir("/devices")) == NULL)
 				continue;
 
 			while ((direntp = readdir(dirp)) != NULL) {
 				if (strstr(direntp->d_name, device) != NULL) {
 					(void) sprintf(device, "/devices/%s",
-						direntp->d_name);
+					    direntp->d_name);
 					fd = open(device, O_RDWR, 0666);
 					break;
 				}
@@ -743,12 +739,12 @@ display_ffb(Board_node *board, int table)
 
 			strap.ffb_strap_bits = fsi.ffb_strap_bits;
 			log_printf("\tBoard rev: %d\n",
-				(int)strap.fld.board_rev, 0);
+			    (int)strap.fld.board_rev, 0);
 			log_printf("\tFBC version: 0x%x\n", fsi.fbc_version, 0);
 			log_printf("\tDAC: %s\n",
-				fmt_manf_id(fsi.dac_version, device), 0);
+			    fmt_manf_id(fsi.dac_version, device), 0);
 			log_printf("\t3DRAM: %s\n",
-				fmt_manf_id(fsi.fbram_version, device), 0);
+			    fmt_manf_id(fsi.fbram_version, device), 0);
 			log_printf("\n", 0);
 		}
 	}
@@ -763,7 +759,7 @@ display_ffb(Board_node *board, int table)
  */
 void
 read_platform_kstats(Sys_tree *tree, struct system_kstat_data *sys_kstat,
-	struct bd_kstat_data *bdp, struct envctrl_kstat_data *ep)
+    struct bd_kstat_data *bdp, struct envctrl_kstat_data *ep)
 {
 	kstat_ctl_t		*kc;
 	kstat_t			*ksp;
@@ -780,11 +776,11 @@ read_platform_kstats(Sys_tree *tree, struct system_kstat_data *sys_kstat,
 
 	/* Read the power supply kstats */
 	ksp = kstat_lookup(kc, ENVCTRL_MODULE_NAME, INSTANCE_0,
-		ENVCTRL_KSTAT_PSNAME);
+	    ENVCTRL_KSTAT_PSNAME);
 
 	if (ksp != NULL && (kstat_read(kc, ksp, NULL) != -1)) {
 		(void) memcpy(ep->ps_kstats, ksp->ks_data,
-			MAX_DEVS * sizeof (envctrl_ps_t));
+		    MAX_DEVS * sizeof (envctrl_ps_t));
 	} else {
 		sys_kstat->envctrl_kstat_ok = B_FALSE;
 		return;
@@ -792,11 +788,11 @@ read_platform_kstats(Sys_tree *tree, struct system_kstat_data *sys_kstat,
 
 	/* Read the fan status kstats */
 	ksp = kstat_lookup(kc, ENVCTRL_MODULE_NAME, INSTANCE_0,
-		ENVCTRL_KSTAT_FANSTAT);
+	    ENVCTRL_KSTAT_FANSTAT);
 
 	if (ksp != NULL && (kstat_read(kc, ksp, NULL) != -1)) {
 		(void) memcpy(ep->fan_kstats, ksp->ks_data,
-			ksp->ks_ndata * sizeof (envctrl_fan_t));
+		    ksp->ks_ndata * sizeof (envctrl_fan_t));
 	} else {
 		sys_kstat->envctrl_kstat_ok = B_FALSE;
 		return;
@@ -804,11 +800,11 @@ read_platform_kstats(Sys_tree *tree, struct system_kstat_data *sys_kstat,
 
 	/* Read the enclosure kstats */
 	ksp = kstat_lookup(kc, ENVCTRL_MODULE_NAME, INSTANCE_0,
-		ENVCTRL_KSTAT_ENCL);
+	    ENVCTRL_KSTAT_ENCL);
 
 	if (ksp != NULL && (kstat_read(kc, ksp, NULL) != -1)) {
 		(void) memcpy(ep->encl_kstats, ksp->ks_data,
-			ksp->ks_ndata * sizeof (envctrl_encl_t));
+		    ksp->ks_ndata * sizeof (envctrl_encl_t));
 	} else {
 		sys_kstat->envctrl_kstat_ok = B_FALSE;
 		return;
@@ -888,16 +884,16 @@ walk(Sys_tree *tree, Prom_node *root, int id)
 			board_node = 1;
 #ifdef DEBUG
 			printf("ADDED BOARD name=%s type=%s model=%s\n",
-				name, type, model);
+			    name, type, model);
 #endif
 		} else if ((strcmp(name, FFB_NAME)  == 0)		||
 		    (strcmp(type, "cpu") == 0)				||
 
 		    ((strcmp(name, "pci") == 0) && (model != NULL) &&
-			(strcmp(model, "SUNW,psycho") == 0))		||
+		    (strcmp(model, "SUNW,psycho") == 0))		||
 
 		    ((strcmp(name, "pci") == 0) && (model != NULL) &&
-			(strcmp(model, "SUNW,sabre") == 0))		||
+		    (strcmp(model, "SUNW,sabre") == 0))			||
 
 		    (strcmp(name, "counter-timer") == 0)		||
 		    (strcmp(name, "sbus") == 0)				||
@@ -908,7 +904,7 @@ walk(Sys_tree *tree, Prom_node *root, int id)
 			board_node = 1;
 #ifdef DEBUG
 			printf("ADDED BOARD name=%s type=%s model=%s\n",
-				name, type, model);
+			    name, type, model);
 #endif
 		}
 #ifdef DEBUG
@@ -972,9 +968,9 @@ disp_envctrl_status(Sys_tree *tree, struct system_kstat_data *sys_kstats)
 	if (sys_kstats->envctrl_kstat_ok == 0) {
 		log_printf("\n", 0);
 		log_printf(dgettext(TEXT_DOMAIN, "Environmental information "
-			"is not available\n"), 0);
+		    "is not available\n"), 0);
 		log_printf(dgettext(TEXT_DOMAIN, "Environmental driver may "
-			"not be installed\n"), 0);
+		    "not be installed\n"), 0);
 		log_printf("\n", 0);
 		return (1);
 	}
@@ -982,7 +978,7 @@ disp_envctrl_status(Sys_tree *tree, struct system_kstat_data *sys_kstats)
 	ep = &sys_kstats->env_data;
 
 	check_disk_presence(tree, &first_4disk_bp, &first_8disk_bp,
-		&second_8disk_bp);
+	    &second_8disk_bp);
 
 	log_printf("\n", 0);
 	log_printf("=========================", 0);
@@ -998,7 +994,7 @@ disp_envctrl_status(Sys_tree *tree, struct system_kstat_data *sys_kstats)
 		switch (encl.type) {
 		case ENVCTRL_ENCL_AMBTEMPR:
 			if (encl.instance == I2C_NODEV)
-			    continue;
+				continue;
 			(void) sprintf(name, "%s", "AMBIENT");
 			log_printf("%s    %d", name, encl.value);
 			if (encl.value > MAX_AMB_TEMP) {
@@ -1009,7 +1005,7 @@ disp_envctrl_status(Sys_tree *tree, struct system_kstat_data *sys_kstats)
 			break;
 		case ENVCTRL_ENCL_CPUTEMPR:
 			if (encl.instance == I2C_NODEV)
-			    continue;
+				continue;
 			(void) sprintf(name, "%s %d", "CPU", encl.instance);
 			log_printf("%s      %d", name, encl.value);
 			if (encl.value > MAX_CPU_TEMP) {
@@ -1020,7 +1016,7 @@ disp_envctrl_status(Sys_tree *tree, struct system_kstat_data *sys_kstats)
 			break;
 		case ENVCTRL_ENCL_FSP:
 			if (encl.instance == I2C_NODEV)
-			    continue;
+				continue;
 			val = encl.value & ENVCTRL_FSP_KEYMASK;
 			fsp_value = encl.value;
 			switch (val) {
@@ -1071,23 +1067,23 @@ disp_envctrl_status(Sys_tree *tree, struct system_kstat_data *sys_kstats)
 	log_printf("Keyswitch position is in %s mode.\n", state);
 	log_printf("\n", 0);
 	val = fsp_value & (ENVCTRL_FSP_DISK_ERR | ENVCTRL_FSP_PS_ERR |
-		ENVCTRL_FSP_TEMP_ERR | ENVCTRL_FSP_GEN_ERR |
-		ENVCTRL_FSP_ACTIVE);
+	    ENVCTRL_FSP_TEMP_ERR | ENVCTRL_FSP_GEN_ERR |
+	    ENVCTRL_FSP_ACTIVE);
 	log_printf("System LED Status:    POWER     GENERAL ERROR  "
-		"    ACTIVITY\n", 0);
+	    "    ACTIVITY\n", 0);
 	log_printf("                      [ ON]         [%3s]      "
-		"     [%3s]\n", val & ENVCTRL_FSP_GEN_ERR ? "ON" : "OFF",
-		    val & ENVCTRL_FSP_ACTIVE ? "ON" : "OFF");
+	    "     [%3s]\n", val & ENVCTRL_FSP_GEN_ERR ? "ON" : "OFF",
+	    val & ENVCTRL_FSP_ACTIVE ? "ON" : "OFF");
 	log_printf("                    DISK ERROR  "
-			"THERMAL ERROR  POWER SUPPLY ERROR\n", 0);
+	    "THERMAL ERROR  POWER SUPPLY ERROR\n", 0);
 	log_printf("                      [%3s]         [%3s]      "
-		"     [%3s]\n", val & ENVCTRL_FSP_DISK_ERR ? "ON" : "OFF",
-		    val & ENVCTRL_FSP_TEMP_ERR ? "ON" : "OFF",
-		    val & ENVCTRL_FSP_PS_ERR ? "ON" : "OFF");
+	    "     [%3s]\n", val & ENVCTRL_FSP_DISK_ERR ? "ON" : "OFF",
+	    val & ENVCTRL_FSP_TEMP_ERR ? "ON" : "OFF",
+	    val & ENVCTRL_FSP_PS_ERR ? "ON" : "OFF");
 	log_printf("\n", 0);
 	/* record error conditions */
 	if (val & (ENVCTRL_FSP_GEN_ERR | ENVCTRL_FSP_DISK_ERR |
-		ENVCTRL_FSP_TEMP_ERR | ENVCTRL_FSP_PS_ERR)) {
+	    ENVCTRL_FSP_TEMP_ERR | ENVCTRL_FSP_PS_ERR)) {
 		exit_code = 1;
 	}
 
@@ -1098,67 +1094,67 @@ disp_envctrl_status(Sys_tree *tree, struct system_kstat_data *sys_kstats)
 		log_printf("		DISK 18: %7s	DISK 19: %7s\n",
 		    second_8disk_bp & ENVCTRL_DISK_6 ?
 		    j8slot_backplane_value & ENVCTRL_DISK_6 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]", second_8disk_bp & ENVCTRL_DISK_7 ?
+		    : "[EMPTY]", second_8disk_bp & ENVCTRL_DISK_7 ?
 		    j8slot_backplane_value & ENVCTRL_DISK_7 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]");
+		    : "[EMPTY]");
 		log_printf("		DISK 16: %7s	DISK 17: %7s\n",
 		    second_8disk_bp & ENVCTRL_DISK_4 ?
 		    j8slot_backplane_value & ENVCTRL_DISK_4 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]", second_8disk_bp & ENVCTRL_DISK_5 ?
+		    : "[EMPTY]", second_8disk_bp & ENVCTRL_DISK_5 ?
 		    j8slot_backplane_value & ENVCTRL_DISK_5 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]");
+		    : "[EMPTY]");
 		log_printf("		DISK 14: %7s	DISK 15: %7s\n",
 		    second_8disk_bp & ENVCTRL_DISK_2 ?
 		    j8slot_backplane_value & ENVCTRL_DISK_2 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]", second_8disk_bp & ENVCTRL_DISK_3 ?
+		    : "[EMPTY]", second_8disk_bp & ENVCTRL_DISK_3 ?
 		    j8slot_backplane_value & ENVCTRL_DISK_3 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]");
+		    : "[EMPTY]");
 		log_printf("		DISK 12: %7s	DISK 13: %7s\n",
 		    second_8disk_bp & ENVCTRL_DISK_0 ?
 		    j8slot_backplane_value & ENVCTRL_DISK_0 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]", second_8disk_bp & ENVCTRL_DISK_1 ?
+		    : "[EMPTY]", second_8disk_bp & ENVCTRL_DISK_1 ?
 		    j8slot_backplane_value & ENVCTRL_DISK_1 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]");
+		    : "[EMPTY]");
 	}
 	if (i8slot_backplane_value != -1) {
 		log_printf("		DISK 10: %7s	DISK 11: %7s\n",
 		    first_8disk_bp & ENVCTRL_DISK_6 ?
 		    i8slot_backplane_value & ENVCTRL_DISK_6 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]", first_8disk_bp & ENVCTRL_DISK_7 ?
+		    : "[EMPTY]", first_8disk_bp & ENVCTRL_DISK_7 ?
 		    i8slot_backplane_value & ENVCTRL_DISK_7 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]");
+		    : "[EMPTY]");
 		log_printf("		DISK  8: %7s	DISK  9: %7s\n",
 		    first_8disk_bp & ENVCTRL_DISK_4 ?
 		    i8slot_backplane_value & ENVCTRL_DISK_4 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]", first_8disk_bp & ENVCTRL_DISK_5 ?
+		    : "[EMPTY]", first_8disk_bp & ENVCTRL_DISK_5 ?
 		    i8slot_backplane_value & ENVCTRL_DISK_5 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]");
+		    : "[EMPTY]");
 		log_printf("		DISK  6: %7s	DISK  7: %7s\n",
 		    first_8disk_bp & ENVCTRL_DISK_2 ?
 		    i8slot_backplane_value & ENVCTRL_DISK_2 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]", first_8disk_bp & ENVCTRL_DISK_3 ?
+		    : "[EMPTY]", first_8disk_bp & ENVCTRL_DISK_3 ?
 		    i8slot_backplane_value & ENVCTRL_DISK_3 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]");
+		    : "[EMPTY]");
 		log_printf("		DISK  4: %7s	DISK  5: %7s\n",
 		    first_8disk_bp & ENVCTRL_DISK_0 ?
 		    i8slot_backplane_value & ENVCTRL_DISK_0 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]", first_8disk_bp & ENVCTRL_DISK_1 ?
+		    : "[EMPTY]", first_8disk_bp & ENVCTRL_DISK_1 ?
 		    i8slot_backplane_value & ENVCTRL_DISK_1 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]");
+		    : "[EMPTY]");
 	}
 	if (i4slot_backplane_value != -1) {
 		log_printf("		DISK  2: %7s	DISK  3: %7s\n",
 		    first_4disk_bp & ENVCTRL_DISK_2 ?
 		    i4slot_backplane_value & ENVCTRL_DISK_2 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]", first_4disk_bp & ENVCTRL_DISK_3 ?
+		    : "[EMPTY]", first_4disk_bp & ENVCTRL_DISK_3 ?
 		    i4slot_backplane_value & ENVCTRL_DISK_3 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]");
+		    : "[EMPTY]");
 		log_printf("		DISK  0: %7s	DISK  1: %7s\n",
 		    first_4disk_bp & ENVCTRL_DISK_0 ?
 		    i4slot_backplane_value & ENVCTRL_DISK_0 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]", first_4disk_bp & ENVCTRL_DISK_1 ?
+		    : "[EMPTY]", first_4disk_bp & ENVCTRL_DISK_1 ?
 		    i4slot_backplane_value & ENVCTRL_DISK_1 ? "[ERROR]" : "[OK]"
-		: "[EMPTY]");
+		    : "[EMPTY]");
 	}
 
 	log_printf("=================================\n", 0);
@@ -1191,13 +1187,13 @@ disp_envctrl_status(Sys_tree *tree, struct system_kstat_data *sys_kstats)
 			(void) sprintf(state, "%s", "  OK  ");
 		} else {
 			(void) sprintf(state, "FAILED (FAN# %d)",
-				fan.fanflt_num);
+			    fan.fanflt_num);
 			/* we know fan.instance != I2C_NODEV */
 			exit_code = 1;
 		}
 		if (fan.instance != I2C_NODEV)
 			log_printf("%s          %d     %s\n", fan_type,
-				fan.fanspeed, state);
+			    fan.fanspeed, state);
 	}
 
 
@@ -1217,15 +1213,15 @@ disp_envctrl_status(Sys_tree *tree, struct system_kstat_data *sys_kstats)
 		} else {
 			if (ps.ps_ok != B_TRUE) {
 				(void) sprintf(state, "%s",
-					"FAILED: DC Power Failure");
+				    "FAILED: DC Power Failure");
 				possible_failure = 1;
 			} else if (ps.curr_share_ok != B_TRUE) {
 				(void) sprintf(state, "%s",
-					"WARNING: Current Share Imbalance");
+				    "WARNING: Current Share Imbalance");
 				possible_failure = 1;
 			} else if (ps.limit_ok != B_TRUE) {
 				(void) sprintf(state, "%s",
-					"WARNING: Current Overload");
+				    "WARNING: Current Overload");
 				possible_failure = 1;
 			}
 		}
@@ -1271,7 +1267,7 @@ check_disk_presence(Sys_tree *tree, int *i4disk, int *i8disk, int *j8disk)
 		(void) sprintf(slotx, "slot#%d", slot);
 		if ((slotprop = find_prop(slot2disk, slotx)) != NULL)
 			if ((devpath_p = (char *)(get_prop_val(slotprop)))
-				!= NULL) {
+			    != NULL) {
 				modify_device_path(devpath_p, devpath);
 				if (disk_present(devpath)) {
 					if (slot < 4)
@@ -1393,7 +1389,7 @@ tazjav_disp_asic_revs(Sys_tree *tree)
 
 		if ((version != NULL) && (name != NULL)) {
 			log_printf("SBus: %s Rev %d\n",
-				name, *version, 0);
+			    name, *version, 0);
 		}
 	}
 
@@ -1404,9 +1400,9 @@ tazjav_disp_asic_revs(Sys_tree *tree)
 
 		if (find_prop(pnode, "upa-portid") == NULL) {
 			if ((parsib != NULL) &&
-				(strcmp(get_prop_val(
-				find_prop(parsib, "name")),
-					PCI_NAME) == 0))
+			    (strcmp(get_prop_val(
+			    find_prop(parsib, "name")),
+			    PCI_NAME) == 0))
 				pnode = parsib;
 			else {
 				pnode = parsib;
@@ -1514,7 +1510,7 @@ tazmo_physical_slot(Prom_node *slotd, Prom_node *parent, int device, char *str)
 		offset = reg[1];
 		if (strcmp(name, "pci") == 0) {
 			(void) sprintf(controller, "/pci@%x,%x/*@%x,*",
-				*upa_id, offset, device);
+			    *upa_id, offset, device);
 			slots = 20;
 		} else if (strcmp(name, "SUNW,ffb") == 0) {
 			(void) sprintf(controller, "/*@%x,0", *upa_id);
@@ -1529,9 +1525,8 @@ tazmo_physical_slot(Prom_node *slotd, Prom_node *parent, int device, char *str)
 				(void) sprintf(slotx, "graphics#%d", slot);
 			if ((prop = find_prop(slotd, slotx)) != NULL)
 				if ((devpath_p = (char *)(get_prop_val
-					(prop))) != NULL)
-					if (strcmp(devpath_p, controller) ==
-						NULL)
+				    (prop))) != NULL)
+					if (strcmp(devpath_p, controller) == 0)
 						return (slot);
 		}
 		return (-1);

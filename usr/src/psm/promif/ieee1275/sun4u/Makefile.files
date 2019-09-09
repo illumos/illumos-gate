@@ -55,6 +55,5 @@ CORE_OBJS +=				\
 	prom_sparc.o			\
 	prom_sunfire.o			\
 	prom_tlb.o			\
-	prom_vercheck.o			\
 	prom_vername.o			\
 	prom_opl.o

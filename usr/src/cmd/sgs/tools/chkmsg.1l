@@ -1,4 +1,3 @@
-.\" ident	"%Z%%M%	%I%	%E% SMI"
 .\" Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
@@ -23,9 +22,9 @@
 .\" CDDL HEADER END
 .\"
 .if n .tr \--
-.TH chkmsg 1l "5 Apr 1997"
+.TH chkmsg 1l "Apr 5, 1997"
 .SH NAME
-chkmsg \- cross check messages 
+chkmsg \- cross check messages
 .SH SYNOPSIS
 .B chkmsg
 .BI [ -64 ]
@@ -38,7 +37,7 @@ chkmsg  checks the message identifiers defined in the input file
 and the message identifyer used in the input source_files. The input
 file is the input file which is used by the sgsmsg command.
 .P
-The chkmsg command reads the input file and 
+The chkmsg command reads the input file and
 generates two sets of message identifiers.
 The first set is
 the identifiers defined in between the _START_ and _END_ key words.
@@ -83,8 +82,8 @@ directly passed to MSG_INTL() or MSG_ORIG(). Therefore, for example:
 .RE
 the identifyer MSG_ERROR_01 will not be included in MSG_INTL_FROM_SRC set.
 .P
-There are two key words which can be used in the input file 
-to control whether the identifier will be extracted into 
+There are two key words which can be used in the input file
+to control whether the identifier will be extracted into
 MSG_{INTL,ORIG}_FROM_ORIG or not. If the identifyer are
 surrounded by _CHKMSG_SKIP_BEGIN_ {sparc,i386}
 and _CHKMSG_SKIP_END_ {sparc,i386}, then
@@ -114,8 +113,6 @@ Note that this option must be specified first on the command line.
 .BR ld (1),
 .BR msgfmt (1),
 .BR catgets (3C),
-.BR gettext (3I).
-.BR sgsmsg (1l).
-.br
-.TZ LLM
+.BR gettext (3C).
+.BR sgsmsg (1ONBLD).
 .if n .tr \-\-

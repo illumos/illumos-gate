@@ -1171,6 +1171,7 @@ file path=usr/include/sys/ldterm.h
 file path=usr/include/sys/lgrp.h
 file path=usr/include/sys/lgrp_user.h
 file path=usr/include/sys/link.h
+file path=usr/include/sys/linker_set.h
 file path=usr/include/sys/list.h
 file path=usr/include/sys/list_impl.h
 file path=usr/include/sys/llc1.h

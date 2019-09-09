@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Peter Tribble.
  */
 
 #ifndef	_SYS_OPENPROMIO_H
@@ -85,7 +86,7 @@ struct openpromio {
 #define	OPROMDEV2PROMNAME (OIOC | 15)	/* Convert devfs path to prom path */
 #define	OPROMPROM2DEVNAME (OIOC | 16)	/* Convert devfs path to prom path */
 #define	OPROMGETPROPLEN	(OIOC | 17)	/* interface to raw config_ops */
-#define	OPROMREADY64	(OIOC | 18)	/* is prom 64-bit ready? */
+#define	OPROMREADY64	(OIOC | 18)	/* DEPRECATED is prom 64-bit ready? */
 #define	OPROMSETNODEID	(OIOC | 19)	/* set current node_id */
 #define	OPROMSNAPSHOT	(OIOC | 20)	/* create a snapshot */
 #define	OPROMCOPYOUT	(OIOC | 21)	/* copyout and free snapshot */
@@ -103,30 +104,6 @@ struct openpromio {
 #define	OPROMCONS_STDIN_IS_KBD	0x1	/* stdin device is kbd */
 #define	OPROMCONS_STDOUT_IS_FB	0x2	/* stdout is a framebuffer */
 #define	OPROMCONS_OPENPROM	0x4	/* supports openboot */
-
-#if defined(__sparc)
-
-/*
- * Data structure returned in oprom_array, from OPROMREADY64:
- *
- * With return codes 1 and 2, also returns nodeid, a nodeid
- * of a flashprom node, and a message string with the minimum version
- * requirement for this platform.
- */
-struct openprom_opr64 {
-	int return_code;		/* See below */
-	int nodeid;			/* Valid with positive return codes */
-	char message[1];		/* NULL terminated message string */
-};
-
-/*
- * return_code values from OPROMREADY64:
- */
-#define	OP64R_READY			0	/* ready or not applicable */
-#define	OP64R_UPGRADE_REQUIRED		1	/* Upgrade required */
-#define	OP64R_UPGRADE_RECOMMENDED 	2	/* Upgrade recommended */
-
-#endif
 
 #ifdef __cplusplus
 }

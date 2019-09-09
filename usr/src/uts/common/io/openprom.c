@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Peter Tribble.
  */
 
 /*
@@ -490,7 +491,6 @@ opromioctl_cb(void *avp, int has_changed)
 #if !defined(__i386) && !defined(__amd64)
 	case OPROMGETFBNAME:
 	case OPROMDEV2PROMNAME:
-	case OPROMREADY64:
 #endif	/* !__i386 && !__amd64 */
 		if ((mode & FREAD) == 0) {
 			return (EPERM);
@@ -977,38 +977,6 @@ opromioctl_cb(void *avp, int has_changed)
 
 		break;
 	}
-
-	case OPROMREADY64: {
-		struct openprom_opr64 *opr =
-		    (struct openprom_opr64 *)opp->oprom_array;
-		int i;
-		pnode_t id;
-
-		if (userbufsize < sizeof (*opr)) {
-			error = EINVAL;
-			break;
-		}
-
-		valsize = userbufsize -
-		    offsetof(struct openprom_opr64, message);
-
-		i = prom_version_check(opr->message, valsize, &id);
-		opr->return_code = i;
-		opr->nodeid = (int)id;
-
-		valsize = offsetof(struct openprom_opr64, message);
-		valsize += strlen(opr->message) + 1;
-
-		/*
-		 * copyout only the part of the user buffer we need to.
-		 */
-		if (copyout(opp, (void *)arg,
-		    (size_t)(min((uint_t)valsize, userbufsize) +
-		    sizeof (uint_t))) != 0)
-			error = EFAULT;
-		break;
-
-	}	/* case OPROMREADY64 */
 #endif	/* !__i386 && !__amd64 */
 	}	/* switch (cmd)	*/
 

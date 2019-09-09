@@ -233,6 +233,7 @@ typedef enum {
 	ZPOOL_PROP_TNAME,
 	ZPOOL_PROP_MAXDNODESIZE,
 	ZPOOL_PROP_MULTIHOST,
+	ZPOOL_PROP_ASHIFT,
 	ZPOOL_NUM_PROPS
 } zpool_prop_t;
 
@@ -768,7 +769,8 @@ typedef enum vdev_aux {
 	VDEV_AUX_EXTERNAL,	/* external diagnosis			*/
 	VDEV_AUX_SPLIT_POOL,	/* vdev was split off into another pool	*/
 	VDEV_AUX_ACTIVE,	/* vdev active on a different host	*/
-	VDEV_AUX_CHILDREN_OFFLINE /* all children are offline		*/
+	VDEV_AUX_CHILDREN_OFFLINE, /* all children are offline		*/
+	VDEV_AUX_BAD_ASHIFT	/* vdev ashift is invalid		*/
 } vdev_aux_t;
 
 /*

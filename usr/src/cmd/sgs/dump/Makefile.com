@@ -48,4 +48,4 @@ CERRWARN +=	$(CNOWARN_UNINIT)
 
 SMOFF += indenting
 
-LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
+LDLIBS +=	$(CONVLIBDIR) -lconv $(ELFLIBDIR) -lelf

@@ -877,3 +877,29 @@ usr/include/libjedec.h
 usr/lib/amd64/libjedec.so	i386
 usr/lib/sparcv9/libjedec.so	sparc
 usr/lib/libjedec.so
+
+#
+# the tools copy of the link-editor is not delivered
+#
+opt/onbld/bin/i386/ld			i386
+opt/onbld/bin/sparc/ld			sparc
+opt/onbld/bin/i386/sgsmsg		i386
+opt/onbld/bin/sparc/sgsmsg		sparc
+opt/onbld/lib/i386/libelf.so		i386
+opt/onbld/lib/i386/libelf.so.1		i386
+opt/onbld/lib/i386/libld.so		i386
+opt/onbld/lib/i386/libld.so.4		i386
+opt/onbld/lib/i386/liblddbg.so		i386
+opt/onbld/lib/i386/liblddbg.so.4	i386
+opt/onbld/lib/sparc/libelf.so		sparc
+opt/onbld/lib/sparc/libelf.so.1		sparc
+opt/onbld/lib/sparc/libld.so		sparc
+opt/onbld/lib/sparc/libld.so.4		sparc
+opt/onbld/lib/sparc/liblddbg.so		sparc
+opt/onbld/lib/sparc/liblddbg.so.4	sparc
+opt/onbld/man/man1onbld/sgsmsg.1onbld
+
+#
+# The built link-editor demos are not delivered
+#
+opt/SUNWonld/

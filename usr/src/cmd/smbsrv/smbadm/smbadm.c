@@ -1164,7 +1164,7 @@ smbadm_group_setprop(int argc, char **argv)
 	smbadm_prop_handle_t *phandle;
 	char option;
 	int pcnt = 0;
-	int ret;
+	int ret = 0;
 	int p;
 
 	bzero(props, SMBADM_NPROP * sizeof (smbadm_prop_t));
@@ -1224,7 +1224,7 @@ smbadm_group_getprop(int argc, char **argv)
 	smbadm_prop_handle_t *phandle;
 	char option;
 	int pcnt = 0;
-	int ret;
+	int ret = 0;
 	int p;
 
 	bzero(props, SMBADM_NPROP * sizeof (smbadm_prop_t));
@@ -1398,7 +1398,7 @@ smbadm_group_add_del_member(char *gname, char *mname,
 	lsa_account_t	acct;
 	smb_gsid_t msid;
 	char *sidstr;
-	char *act_str;
+	char *act_str = NULL;
 	int rc;
 
 	if (strncmp(mname, "S-1-", 4) == 0) {

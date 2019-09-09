@@ -28,6 +28,7 @@ include	../Makefile.tools
 
 PROG	= chk4ubin
 
+DYNFLAGS += '-R$$ORIGIN/../../lib/$(MACH)'
 LDLIBS += -lelf
 
 LINTFLAGS += -ux

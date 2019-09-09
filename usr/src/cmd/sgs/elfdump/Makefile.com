@@ -39,23 +39,23 @@ COMOBJ32 =	elfdump32.o fake_shdr32.o
 
 COMOBJ64 =	elfdump64.o fake_shdr64.o
 
-TOOLOBJ =	leb128.o
+SGSCOMMONOBJ =	leb128.o
 
 BLTOBJ =	msg.o
 
-OBJS=		$(BLTOBJ) $(COMOBJ) $(COMOBJ32) $(COMOBJ64) $(TOOLOBJ)
+OBJS=		$(BLTOBJ) $(COMOBJ) $(COMOBJ32) $(COMOBJ64) $(SGSCOMMONOBJ)
 
 MAPFILE=	$(MAPFILE.NGB)
 MAPOPT=		$(MAPFILE:%=-M%)
 
 CPPFLAGS=	-I. -I../common -I../../include -I../../include/$(MACH) \
-		-I$(SRCBASE)/lib/libc/inc -I$(SRCBASE)/uts/$(ARCH)/sys \
+		-I$(SRC)/lib/libc/inc -I$(SRC)/uts/$(ARCH)/sys \
 		$(CPPFLAGS.master) -I$(ELFCAP)
 LLDFLAGS =	$(VAR_ELFDUMP_LLDFLAGS)
 LLDFLAGS64 =	$(VAR_ELFDUMP_LLDFLAGS64)
-LDFLAGS +=	$(VERSREF) $(CC_USE_PROTO) $(MAPOPT) $(LLDFLAGS)
-LDLIBS +=	$(ELFLIBDIR) -lelf $(LDDBGLIBDIR) $(LDDBG_LIB) \
-		    $(CONVLIBDIR) $(CONV_LIB)
+LDFLAGS +=	$(VERSREF) $(MAPOPT) $(LLDFLAGS)
+LDLIBS +=	$(ELFLIBDIR) -lelf $(LDDBGLIBDIR) -llddbg \
+		    $(CONVLIBDIR) -lconv
 
 CERRWARN +=	$(CNOWARN_UNINIT)
 
@@ -75,6 +75,6 @@ SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n elfdump_msg
 
 SRCS =		$(COMOBJ:%.o=../common/%.c) \
 		$(COMOBJ32:%32.o=../common/%.c) \
-		$(TOOLOBJ:%.o=../../tools/common/%.c) $(BLTDATA)
+		$(SGSCOMMONOBJ:%.o=$(SGSCOMMON)/%.c) $(BLTDATA)
 
 CLEANFILES +=	$(BLTFILES) gen_struct_layout

@@ -351,6 +351,7 @@ CHKHDRS=			\
 	libc_kernel.h		\
 	limits.h		\
 	link.h			\
+	linker_set.h		\
 	list.h			\
 	list_impl.h		\
 	llc1.h			\

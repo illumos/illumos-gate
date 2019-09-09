@@ -37,16 +37,7 @@ pics/%64.o:	../common/%.c
 delete:
 		-$(RM) $(DYNLIB)
 
-# Special target for native builds (ie. when we need to build a version of ld
-# to build a version of ld :-).
-
-native:		$(SGSLIBDIR)/$(DYNLIB)
-
 $(PICS):	pics
-
-$(SGSLIBDIR)/$(DYNLIB): $(PICS) $(SGSLIBDIR)
-		$(BUILD.SO)
-		$(POST_PROCESS_SO)
 
 include		$(SRC)/lib/Makefile.targ
 include		$(SRC)/cmd/sgs/Makefile.targ

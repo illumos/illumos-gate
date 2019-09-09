@@ -55,6 +55,10 @@ LDLIBS=
 LDFLAGS=		$(MAPFILE.NES:%=-M%) $(MAPFILE.NED:%=-M%) \
 			    $(MAPFILE.PGA:%=-M%)
 
+# Unset CW_LINKER so we run the default.  We don't set LD here to avoid taking
+# the journey through LD_ALTEXEC unnecessarily.
+CW_LINKER=
+
 ROOTONBLDPROG=		$(PROG:%=$(ROOTONBLDBIN)/%)
 ROOTONBLDMACHPROG=	$(PROG:%=$(ROOTONBLDBINMACH)/%)
 ROOTONBLDSHFILES=	$(SHFILES:%=$(ROOTONBLDBIN)/%)

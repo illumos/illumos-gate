@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Peter Tribbble.
  */
 
 #include <sys/param.h>
@@ -453,12 +454,9 @@ redirect_boot_path(char *bpath, char *redirect)
 	prom_panic("redirect_boot_path: mangled boot path!");
 }
 
-#define	PROM_VERS_MAX_LEN	64
-
 void
 system_check(void)
 {
-	char buf[PROM_VERS_MAX_LEN];
 	pnode_t	n;
 	char	arch[128];
 	size_t	len;
@@ -483,12 +481,6 @@ system_check(void)
 		dprintf("device_type: no such property, len=%d\n", (int)len);
 	}
 
-	if (!is_sun4v && cpu_is_ultrasparc_1()) {
-		printf("UltraSPARC I processors are not supported by this "
-		    "release of Solaris.\n");
-		prom_exit_to_mon();
-	}
-
 	/*
 	 * Set up defaults per platform
 	 */
@@ -502,13 +494,6 @@ system_check(void)
 	dprintf("default_name: %s\n", default_name);
 	dprintf("default_path: %s\n", default_path);
 	dprintf("vac: %d\n", vac);
-
-	if (prom_version_check(buf, PROM_VERS_MAX_LEN, NULL) != PROM_VER64_OK) {
-		printf("The firmware on this system does not support the 64-bit"
-		    " OS.\n\tPlease upgrade to at least the following version:"
-		    "\n\n\t%s\n", buf);
-		prom_exit_to_mon();
-	}
 }
 
 /*

@@ -60,10 +60,6 @@ $(ROOTLIBDIR64)/$(LIBLINKSCCC): $(ROOTLIBDIR64)/$(LIBLINKSCCC)$(VERS)
 objs pics:
 	-@mkdir -p $@
 
-$(LIBRARY): objs .WAIT $$(OBJS)
-	$(BUILD.AR)
-	$(POST_PROCESS_A)
-
 $(DYNLIB): pics .WAIT $$(PICS)
 	$(BUILD.SO)
 	$(POST_PROCESS_SO)

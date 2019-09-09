@@ -23,6 +23,7 @@
 #
 
 include		$(SRC)/Makefile.master
+include		$(SRC)/cmd/sgs/Makefile.sub
 
 MACHDEMOFILES= \
 		i386/regs.c \

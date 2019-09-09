@@ -38,14 +38,13 @@ ROOTLIBDIR=	$(ROOT)/usr/lib/link_audit
 
 MAPFILES =	../common/mapfile-vers
 
-DYNFLAGS +=	$(CC_USE_PROTO)
 CPPFLAGS=	-I. -I../common -I../../include \
 		-I../../rtld/common \
 		-I../../include/$(MACH) \
-		-I$(SRCBASE)/lib/libc/inc \
-		-I$(SRCBASE)/uts/common/krtld \
+		-I$(SRC)/lib/libc/inc \
+		-I$(SRC)/uts/common/krtld \
 		-I$(SRC)/common/sgsrtcid \
-		-I$(SRCBASE)/uts/$(ARCH)/sys \
+		-I$(SRC)/uts/$(ARCH)/sys \
 		$(CPPFLAGS.master) -I$(ELFCAP)
 CFLAGS +=	$(C_PICFLAGS)
 

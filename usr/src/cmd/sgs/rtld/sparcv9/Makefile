@@ -52,7 +52,7 @@ CRTI=		pics/crti.o
 CRTN=		pics/crtn.o
 CRTS=		$(CRTI)		$(CRTN)
 
-CHKSRCS=	$(SRCBASE)/uts/common/krtld/reloc.h
+CHKSRCS=	$(SRC)/uts/common/krtld/reloc.h
 
 BASEPLAT =	sparc
 

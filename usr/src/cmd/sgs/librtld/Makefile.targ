@@ -36,20 +36,8 @@ $(LIBLINKS):
 delete:
 		$(RM) $(DYNLIB)
 
-# Special target for native builds (ie. when we need to build a version of ld
-# to build a version of ld :-).
-
-native:		$(SGSLIBDIR)/$(LIBLINKS)
-
 $(PICS):	pics
 
-$(SGSLIBDIR)/$(DYNLIB): $(PICS) $(SGSLIBDIR)
-		$(BUILD.SO)
-		$(POST_PROCESS_SO)
-
-$(SGSLIBDIR)/$(LIBLINKS): $(SGSLIBDIR)/$(DYNLIB)
-		-@$(RM) $(SGSLIBDIR)/$(LIBLINKS)
-		$(SYMLINK) $(DYNLIB) $(SGSLIBDIR)/$(LIBLINKS)
 
 include		$(SRC)/lib/Makefile.targ
 include		$(SRC)/cmd/sgs/Makefile.targ

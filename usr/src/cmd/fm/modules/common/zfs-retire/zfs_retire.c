@@ -22,6 +22,9 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  */
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 /*
  * The ZFS retire agent is responsible for managing hot spares across all pools.
@@ -231,6 +234,8 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 	nvlist_t **spares;
 	uint_t s, nspares;
 	char *dev_name;
+	zprop_source_t source;
+	int ashift;
 
 	config = zpool_get_config(zhp, NULL);
 	if (nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
@@ -243,6 +248,11 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 	if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
 	    &spares, &nspares) != 0)
 		return;
+
+	/*
+	 * lookup "ashift" pool property, we may need it for the replacement
+	 */
+	ashift = zpool_get_prop_int(zhp, ZPOOL_PROP_ASHIFT, &source);
 
 	replacement = fmd_nvl_alloc(hdl, FMD_SLEEP);
 
@@ -261,6 +271,11 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 		if (nvlist_lookup_string(spares[s], ZPOOL_CONFIG_PATH,
 		    &spare_name) != 0)
 			continue;
+
+		/* if set, add the "ashift" pool property to the spare nvlist */
+		if (source != ZPROP_SRC_DEFAULT)
+			(void) nvlist_add_uint64(spares[s],
+			    ZPOOL_CONFIG_ASHIFT, ashift);
 
 		(void) nvlist_add_nvlist_array(replacement,
 		    ZPOOL_CONFIG_CHILDREN, &spares[s], 1);

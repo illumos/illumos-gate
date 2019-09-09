@@ -28,7 +28,7 @@
 		$(COMPILE.c) $<
 		$(POST_PROCESS_O)
 
-%.o:            $(SGSTOOLS)/common/%.c
+%.o:		$(SGSCOMMON)/%.c
 		$(COMPILE.c) $<
 		$(POST_PROCESS_O)
 

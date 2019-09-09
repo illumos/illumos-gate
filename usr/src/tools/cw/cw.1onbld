@@ -36,6 +36,7 @@
 .Op Fl -noecho
 .Fl -primary Ar compiler
 .Op Fl -shadow Ar compiler ...
+.Op Fl -linker Ar linker
 .Fl -
 .Ar compiler args ...
 .Sh DESCRIPTION
@@ -77,6 +78,11 @@ and pre-processing, and whos objects we deliver).
 .It Fl -shadow Ar compiler
 Specify a shadow compiler, which builds sources for the sake of checking code
 quality and compatibility, but has its output discarded.
+.It Fl -linker Ar linker
+Specify a link-editor to use in place of
+.Pa /usr/bin/ld .
+.Xr ld 1
+itself arranges for this to be executed by any subprocesses.
 .It Fl -noecho
 Do not echo the actual command line of any compilers invoked.
 .It Fl -versions
@@ -210,7 +216,8 @@ exit status.
 .Sh SEE ALSO
 .Xr cc 1 ,
 .Xr CC 1 ,
-.Xr gcc 1
+.Xr gcc 1 ,
+.Xr ld 1
 .Sh BUGS
 The translations provided for gcc are not always exact and in some cases
 reflect local policy rather than actual equivalence.

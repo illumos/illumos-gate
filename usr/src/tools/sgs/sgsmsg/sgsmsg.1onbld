@@ -1,4 +1,3 @@
-.\" ident	"%Z%%M%	%I%	%E% SMI"
 .\" Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
@@ -23,7 +22,7 @@
 .\" CDDL HEADER END
 .\"
 .if n .tr \--
-.TH sgsmsg 1l "2 Jun 1999"
+.TH sgsmsg 1ONBLD "Jun 2, 1999"
 .SH NAME
 sgsmsg \- generate message strings for SGS subsystem.
 .SH SYNOPSIS
@@ -69,7 +68,6 @@ translated into a form suitable for
 .BR catgets (3C)
 manipulation.
 .SH OPERANDS
-.LP
 One of more input \f2file\f1s contains a definition for each character
 string used by a particular code group.  The interpretation of a
 definition is determined by the first character of each line within
@@ -227,9 +225,6 @@ strings used by
 
 % cat libld.msg
 .ft 1
-.if t .sp 0.35
-.if n .sp
-# ident "%Z%%M% %I%    %E% SMI"
 .if t .sp 0.35
 .if n .sp
 @ _START_
@@ -417,17 +412,15 @@ _ld_msg(int mid)
 {
 	return (gettext(MSG_ORIG(mid)));
 }
+.RE
 .sp
 .SH "EXIT STATUS"
 A non-zero error return indicates a processing error.
-.RE
 .PD
 .SH "SEE ALSO"
 .BR gencat (1),
 .BR ld (1),
 .BR msgfmt (1),
 .BR catgets (3C),
-.BR gettext (3I).
-.br
-.TZ LLM
+.BR gettext (3C).
 .if n .tr \-\-

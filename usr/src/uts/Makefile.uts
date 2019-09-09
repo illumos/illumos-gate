@@ -251,8 +251,8 @@ CFLAGS_uts_i386 += -_gcc8=-mindirect-branch=thunk-extern
 CFLAGS_uts_i386 += -_gcc8=-mindirect-branch-register
 
 #
-# Ensure that the standard function prologue remains at the very start of a function,
-# so DTrace fbt will instrument the right place.
+# Ensure that the standard function prologue remains at the very start
+# of a function, so DTrace fbt will instrument the right place.
 #
 CFLAGS_uts_i386 += -_gcc7=-fno-shrink-wrap
 CFLAGS_uts_i386 += -_gcc8=-fno-shrink-wrap

@@ -42,7 +42,7 @@ SRCS += $(STAT_COMMON_SRCS)
 
 LDLIBS += -lzfs -lnvpair -ldevid -lefi -ldiskmgt -luutil -lumem
 
-INCS += -I../../common/zfs -I$(STATCOMMONDIR)
+INCS += -I../../common/zfs -I../../uts/common/fs/zfs -I$(STATCOMMONDIR)
 
 CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all

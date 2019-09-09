@@ -19,14 +19,13 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1996 by Sun Microsystems, Inc.
 # All rights reserved.
 
 include		../Makefile.com
 
 .KEEP_STATE:
+
+package install:	all $(VAR_SGSBINPROG) $(VAR_SGSCCSLINK)
 
 include		../Makefile.targ

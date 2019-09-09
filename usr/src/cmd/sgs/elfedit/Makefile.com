@@ -44,13 +44,13 @@ OBJS=		$(BLTOBJ) $(COMOBJ) $(COMOBJ32) $(COMOBJ64)
 MAPFILE=	../common/mapfile-vers
 
 CPPFLAGS=	-I. -I../common -I../../include -I../../include/$(MACH) \
-		-I$(SRCBASE)/lib/libc/inc -I$(SRCBASE)/uts/$(ARCH)/sys \
+		-I$(SRC)/lib/libc/inc -I$(SRC)/uts/$(ARCH)/sys \
 		$(CPPFLAGS.master) -I$(ELFCAP)
 LLDFLAGS =	$(VAR_ELFEDIT_LLDFLAGS)
 LLDFLAGS64 =	$(VAR_ELFEDIT_LLDFLAGS64)
-LDFLAGS +=	$(VERSREF) $(CC_USE_PROTO) -M$(MAPFILE) $(LLDFLAGS)
-LDLIBS +=	$(ELFLIBDIR) -lelf $(LDDBGLIBDIR) $(LDDBG_LIB) \
-		    $(CONVLIBDIR) $(CONV_LIB) -ltecla
+LDFLAGS +=	$(VERSREF) -M$(MAPFILE) $(LLDFLAGS)
+LDLIBS +=	$(ELFLIBDIR) -lelf $(LDDBGLIBDIR) -llddbg \
+		    $(CONVLIBDIR) -lconv -ltecla
 
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	$(CNOWARN_UNINIT)

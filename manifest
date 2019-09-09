@@ -4342,6 +4342,7 @@ f usr/include/sys/libc_kernel.h 0644 root bin
 f usr/include/sys/libdevid.h 0644 root bin
 f usr/include/sys/limits.h 0644 root bin
 f usr/include/sys/link.h 0644 root bin
+f usr/include/sys/linker_set.h 0644 root bin
 f usr/include/sys/list.h 0644 root bin
 f usr/include/sys/list_impl.h 0644 root bin
 f usr/include/sys/llc1.h 0644 root bin

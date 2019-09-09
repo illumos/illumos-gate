@@ -42,11 +42,11 @@ SRCS=		$(COMOBJS:%.o=../common/%.c)
 
 LLDFLAGS =	'-R$$ORIGIN/../../lib'
 INCLIST=	-I../../include -I../../include/i386 \
-		-I$(SRCBASE)/uts/$(ARCH)/sys
+		-I$(SRC)/uts/$(ARCH)/sys
 DEFLIST=	-DTARGET=I386 -DI386=1 -D$(ARFORMAT) -DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master) -I$(ELFCAP)
 
-LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
+LDLIBS +=	$(CONVLIBDIR) -lconv $(ELFLIBDIR) -lelf
 objs.xpg4/%.o := CPPFLAGS += -DXPG4
 
 $(DEMOBJS):=	DEFLIST = -DELF_OBJ

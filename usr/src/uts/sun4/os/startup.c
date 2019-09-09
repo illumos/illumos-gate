@@ -277,11 +277,6 @@ uint_t hblk1_min = H1MIN;
 
 
 /*
- * Hook for down-rev firmware
- */
-static void do_prom_version_check(void);
-
-/*
  * After receiving a thermal interrupt, this is the number of seconds
  * to delay before shutting off the system, assuming
  * shutdown fails.  Use /etc/system to change the delay if this isn't
@@ -1516,12 +1511,6 @@ startup_modules(void)
 	param_calc(0);
 
 	mod_setup();
-
-	/*
-	 * If we are running firmware that isn't 64-bit ready
-	 * then complain and halt.
-	 */
-	do_prom_version_check();
 
 	/*
 	 * Initialize system parameters
@@ -3087,43 +3076,6 @@ static void
 startup_create_io_node(void)
 {
 	prom_interpret(create_node, 0, 0, 0, 0, 0);
-}
-
-
-static void
-do_prom_version_check(void)
-{
-	int i;
-	pnode_t node;
-	char buf[64];
-	static char drev[] = "Down-rev firmware detected%s\n"
-	    "\tPlease upgrade to the following minimum version:\n"
-	    "\t\t%s\n";
-
-	i = prom_version_check(buf, sizeof (buf), &node);
-
-	if (i == PROM_VER64_OK)
-		return;
-
-	if (i == PROM_VER64_UPGRADE) {
-		cmn_err(CE_WARN, drev, "", buf);
-
-#ifdef	DEBUG
-		prom_enter_mon();	/* Type 'go' to continue */
-		cmn_err(CE_WARN, "Booting with down-rev firmware\n");
-		return;
-#else
-		halt(0);
-#endif
-	}
-
-	/*
-	 * The other possibility is that this is a server running
-	 * good firmware, but down-rev firmware was detected on at
-	 * least one other cpu board. We just complain if we see
-	 * that.
-	 */
-	cmn_err(CE_WARN, drev, " on one or more CPU boards", buf);
 }
 
 

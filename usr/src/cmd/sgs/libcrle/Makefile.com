@@ -42,8 +42,8 @@ SRCDIR =	../common
 
 LDLIBS +=	$(ZRECORD) -lmapmalloc $(DLLIB) -lc
 
-CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc -I$(SRC)/common/sgsrtcid
-DYNFLAGS +=	$(VERSREF) $(CONVLIBDIR) -lconv $(CC_USE_PROTO)
+CPPFLAGS +=	-I$(SRC)/lib/libc/inc -I$(SRC)/common/sgsrtcid
+DYNFLAGS +=	$(VERSREF) $(CONVLIBDIR) -lconv
 
 BLTDEFS=	msg.h
 BLTDATA=	msg.c

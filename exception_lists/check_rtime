@@ -247,3 +247,11 @@ FORBIDDEN_DEP usr/ucblib/
 FORBIDDEN libm\.so\.1
 FORBIDDEN libresolv\.so\.1
 FORBIDDEN libxcurses\.so\.1
+
+#
+# the SUNWonld directory contains built versions of demos, built only to
+# ensure their correctness.
+#
+EXEC_STACK	^opt/SUNWonld
+EXEC_DATA	^opt/SUNWonld
+NODIRECT	^opt/SUNWonld

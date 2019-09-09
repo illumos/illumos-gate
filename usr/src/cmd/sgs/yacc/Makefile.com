@@ -61,7 +61,6 @@ $(DYNLIBCCC):= ZDEFS = $(ZNODEFS)
 INCLIST=	-I../../include -I../../include/$(MACH)
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
 $(PROG):=	LDLIBS = $(LDLIBS.cmd)
-BUILD.AR=	$(AR) $(ARFLAGS) $@ `$(LORDER) $(OBJS) | $(TSORT)`
 
 CSTD= $(CSTD_GNU99)
 CFLAGS += $(CCVERBOSE)

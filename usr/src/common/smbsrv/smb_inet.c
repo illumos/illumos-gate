@@ -22,11 +22,12 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2017 Nexenta Systems, Inc.
+ *
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
- * This file was originally generated using rpcgen.
+ * Wrappers for inet address manipulation to do what SMB needs.
  */
 
 #include <sys/types.h>
@@ -42,6 +43,7 @@
 #include <sys/errno.h>
 #include <sys/sunddi.h>
 /* Don't want the rest of what's in inet/ip.h */
+#define	inet_ntop _inet_ntop	// illumos.org/issues/5980
 extern char	*inet_ntop(int, const void *, char *, int);
 extern int	inet_pton(int, char *, void *);
 #endif	/* !_KERNEL */
