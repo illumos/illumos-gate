@@ -23,6 +23,7 @@
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2011, 2017 by Delphix. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -251,6 +252,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_skip_pool;
 	zpool_state_to_name;
 	zpool_sync_one;
+	zpool_trim;
 	zpool_tryimport;
 	zpool_unmount_datasets;
 	zpool_upgrade;

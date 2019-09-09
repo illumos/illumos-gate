@@ -39,7 +39,7 @@ extern "C" {
 #define	TXG_CONCURRENT_STATES	3	/* open, quiescing, syncing	*/
 #define	TXG_SIZE		4		/* next power of 2	*/
 #define	TXG_MASK		(TXG_SIZE - 1)	/* mask for size	*/
-#define	TXG_INITIAL		TXG_SIZE	/* initial txg 		*/
+#define	TXG_INITIAL		TXG_SIZE	/* initial txg		*/
 #define	TXG_IDX			(txg & TXG_MASK)
 
 /* Number of txgs worth of frees we defer adding to in-core spacemaps */
@@ -95,10 +95,11 @@ extern boolean_t txg_wait_synced_sig(struct dsl_pool *dp, uint64_t txg);
 /*
  * Wait until the given transaction group, or one after it, is
  * the open transaction group.  Try to make this happen as soon
- * as possible (eg. kick off any necessary syncs immediately).
- * If txg == 0, wait for the next open txg.
+ * as possible (eg. kick off any necessary syncs immediately) when
+ * should_quiesce is set.  If txg == 0, wait for the next open txg.
  */
-extern void txg_wait_open(struct dsl_pool *dp, uint64_t txg);
+extern void txg_wait_open(struct dsl_pool *dp, uint64_t txg,
+    boolean_t should_quiesce);
 
 /*
  * Returns TRUE if we are "backed up" waiting for the syncing
