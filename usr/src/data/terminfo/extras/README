@@ -1,0 +1,10 @@
+This directory contains extra terminfo and termcap entries that are
+widely distributed by various operating systems, but are not part of the
+classic terminfo and termcap databases maintained by Thomas Dickey. The
+following terminal types and their source are listed below:
+
+rxvt-unicode, rxvt-unicode-256color
+	The rxvt-unicode package is a variant on the rxvt terminal. It
+	provides both a color and non-color variant. The data files come
+	from the rxvt-unicode project at
+	http://software.schmorp.de/pkg/rxvt-unicode.html.

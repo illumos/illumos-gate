@@ -38,6 +38,14 @@ TABSETSRC=	3101 \
 TERMCAPSRC=	termcap.src
 TERMINFOSRC=	terminfo.src
 
+#
+# These represent the target termcap entries that we build from extra
+# termcap and terminfo data. See extras/README.
+#
+EXTRATERM=	rxvt-unicode
+EXTRATC=	$(EXTRATERM:%=extras/%.termcap)
+EXTRATI=	r/rxvt-unicode
+
 include		$(SRC)/data/Makefile.data
 
 FILEMODE=	0644
@@ -53,6 +61,8 @@ RELROOTLIB=	../share/lib
 
 ROOTTABSET=	$(TABSETSRC:%=$(ROOTTABDIR)/%)
 
+ROOTEXTRATI=	$(EXTRATI:%=$(ROOTTERMDIR)/%)
+
 $(ROOTTABDIR)/%: tabset/%
 		$(INS.file)
 
@@ -66,17 +76,21 @@ $(DIRS):
 $(ROOTTERMDIR)/s/sun: $(TERMINFOSRC)
 		TERMINFO=$(ROOTTERMDIR) $(TIC) $(TERMINFOSRC) 2>/dev/null
 
-$(ROOTSHLIB)/termcap:
-		$(EGREP) -v '^(#|$$)' $(TERMCAPSRC) > $@
+$(ROOTSHLIB)/termcap: $(TERMCAPSRC) $(EXTRATC)
+		echo $(EXTRATERM) $(EXTRATC)
+		$(EGREP) -hv '^(#|$$)' $(TERMCAPSRC) $(EXTRATC) > $@
 
 install:	all $(ROOTTERMDIR) $(ROOTTERMDIR)/s/sun $(ROOTTABDIR) \
 		$(ROOTTABSET) $(ROOTSHLIB)/termcap  $(ROOTSYMLINK) \
-		$(ROOTLIBSYMLINK)
+		$(ROOTLIBSYMLINK) $(ROOTEXTRATI)
 
 $(ROOTSYMLINK):
 		$(RM) $@; $(SYMLINK) $(RELROOTETC)/termcap $@
 
 $(ROOTLIBSYMLINK):
 		$(RM) $@; $(SYMLINK) $(RELROOTLIB)/tabset $@
+
+$(ROOTTERMDIR)/r/%: extras/%.terminfo
+		TERMINFO=$(ROOTTERMDIR) $(TIC) $< 2>/dev/null
 
 clean clobber:
