@@ -443,20 +443,20 @@ also menu-infrastructure definitions
 
 : acpi-captions ( N -- )
   \ first entry
-  dup s" [A]CPI............ default" rot 48 menu_caption[x][y] setenv
-  dup s" ^[1mA^[mCPI.......... ^[32;7mdefault^[m" rot 48 ansi_caption[x][y] setenv
+  dup s" [A]CPI.............. default" rot 48 menu_caption[x][y] setenv
+  dup s" ^[1mA^[mCPI.............. ^[32;7mdefault^[m" rot 48 ansi_caption[x][y] setenv
 
-  dup s" [A]CPI................ On" rot 49 menu_caption[x][y] setenv
-  dup s" ^[1mA^[mCPI............... ^[34;1mOn^[m" rot 49 ansi_caption[x][y] setenv
+  dup s" [A]CPI.............. On" rot 49 menu_caption[x][y] setenv
+  dup s" ^[1mA^[mCPI.............. ^[34;1mOn^[m" rot 49 ansi_caption[x][y] setenv
 
-  dup s" [A]CPI............... Off" rot 50 menu_caption[x][y] setenv
+  dup s" [A]CPI.............. Off" rot 50 menu_caption[x][y] setenv
   dup s" ^[1mA^[mCPI.............. ^[34;1mOff^[m" rot 50 ansi_caption[x][y] setenv
 
   dup s" [A]CPI.............. MADT" rot 51 menu_caption[x][y] setenv
-  dup s" ^[1mA^[mCPI............. ^[34;1mMADT^[m" rot 51 ansi_caption[x][y] setenv
+  dup s" ^[1mA^[mCPI.............. ^[34;1mMADT^[m" rot 51 ansi_caption[x][y] setenv
 
-  dup s" [A]CPI............ Legacy" rot 52 menu_caption[x][y] setenv
-  s" ^[1mA^[mCPI............... ^[34;1mLegacy^[m" rot 52 ansi_caption[x][y] setenv
+  dup s" [A]CPI.............. Legacy" rot 52 menu_caption[x][y] setenv
+  s" ^[1mA^[mCPI.............. ^[34;1mLegacy^[m" rot 52 ansi_caption[x][y] setenv
 ;
 
 \ Illumos console has following values:
@@ -464,20 +464,20 @@ also menu-infrastructure definitions
 
 : osconsole-captions ( N -- )
   \ first entry
-  dup s" OS [C]onsole.......... text" rot 48 menu_caption[x][y] setenv
-  dup s" OS ^[1mC^[monsole........... ^[32;7mtext^[m" rot 48 ansi_caption[x][y] setenv
+  dup s" Os[C]onsole............ text" rot 48 menu_caption[x][y] setenv
+  dup s" Os^[1mC^[monsole............ ^[32;7mtext^[m" rot 48 ansi_caption[x][y] setenv
 
-  dup s" OS [C]onsole.......... ttya" rot 49 menu_caption[x][y] setenv
-  dup s" OS ^[1mC^[monsole........... ^[34;1mttya^[m" rot 49 ansi_caption[x][y] setenv
+  dup s" Os[C]onsole............ ttya" rot 49 menu_caption[x][y] setenv
+  dup s" Os^[1mC^[monsole............ ^[34;1mttya^[m" rot 49 ansi_caption[x][y] setenv
 
-  dup s" OS [C]onsole.......... ttyb" rot 50 menu_caption[x][y] setenv
-  dup s" OS ^[1mC^[monsole........... ^[34;1mttyb^[m" rot 50 ansi_caption[x][y] setenv
+  dup s" Os[C]onsole............ ttyb" rot 50 menu_caption[x][y] setenv
+  dup s" Os^[1mC^[monsole............ ^[34;1mttyb^[m" rot 50 ansi_caption[x][y] setenv
 
-  dup s" OS [C]onsole.......... ttyc" rot 51 menu_caption[x][y] setenv
-  dup s" OS ^[1mC^[monsole........... ^[34;1mttyc^[m" rot 51 ansi_caption[x][y] setenv
+  dup s" Os[C]onsole............ ttyc" rot 51 menu_caption[x][y] setenv
+  dup s" Os^[1mC^[monsole............ ^[34;1mttyc^[m" rot 51 ansi_caption[x][y] setenv
 
-  dup s" OS [C]onsole.......... ttyd" rot 52 menu_caption[x][y] setenv
-  s" OS ^[1mC^[monsole........... ^[34;1mttyd^[m" rot 52 ansi_caption[x][y] setenv
+  dup s" Os[C]onsole............ ttyd" rot 52 menu_caption[x][y] setenv
+  s" Os^[1mC^[monsole............ ^[34;1mttyd^[m" rot 52 ansi_caption[x][y] setenv
 ;
 
 \ This function creates the list of menu items. This function is called by the
