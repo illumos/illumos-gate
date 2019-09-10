@@ -1948,11 +1948,6 @@ mac_hwring_send_priv(mac_client_handle_t mch, mac_ring_handle_t rh, mblk_t *mp)
  * the ring will no longer exist. It's important to give aggr a case where the
  * rings can still exist such that it may be able to continue to send LACP PDUs
  * to potentially restore the link.
- *
- * Finally, we explicitly don't do anything if the ring hasn't been enabled yet.
- * This is to help out aggr which doesn't really know the internal state that
- * MAC does about the rings and can't know that it's not quite ready for use
- * yet.
  */
 void
 mac_hwring_set_default(mac_handle_t mh, mac_ring_handle_t rh)
@@ -1963,9 +1958,19 @@ mac_hwring_set_default(mac_handle_t mh, mac_ring_handle_t rh)
 	ASSERT(MAC_PERIM_HELD(mh));
 	VERIFY(mip->mi_state_flags & MIS_IS_AGGR);
 
-	if (ring->mr_state != MR_INUSE)
-		return;
-
+	/*
+	 * We used to condition this assignment on the ring's
+	 * 'mr_state' being one of 'MR_INUSE'. However, there are
+	 * cases where this is called before the ring has any active
+	 * clients, and therefore is not marked as in use. Since the
+	 * sole purpose of this function is for aggr to make sure
+	 * 'mi_default_tx_ring' matches 'lg_tx_ports[0]', its
+	 * imperative that we update its value regardless of ring
+	 * state. Otherwise, we can end up in a state where
+	 * 'mi_default_tx_ring' points to a pseudo ring of a downed
+	 * port, even when 'lg_tx_ports[0]' points to a port that is
+	 * up.
+	 */
 	mip->mi_default_tx_ring = rh;
 }
 
