@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -125,6 +125,8 @@ add_share(struct vnode *vp, struct shrlock *shr)
 				    (shr->s_deny & F_RDDNY) ||
 				    (shrl->shr->s_access & F_WRACC)) {
 					mutex_exit(&vp->v_lock);
+					DTRACE_PROBE1(conflict_shrlock,
+					    struct shrlock *, shrl->shr);
 					return (EAGAIN);
 				}
 				/*
@@ -135,6 +137,8 @@ add_share(struct vnode *vp, struct shrlock *shr)
 				if (isreadonly(vp))
 					break;
 				mutex_exit(&vp->v_lock);
+				DTRACE_PROBE1(conflict_shrlock,
+				    struct shrlock *, shrl->shr);
 				return (EAGAIN);
 			}
 			/*
@@ -147,6 +151,8 @@ add_share(struct vnode *vp, struct shrlock *shr)
 			    (shrl->shr->s_access == F_RDACC))
 				break;
 			mutex_exit(&vp->v_lock);
+			DTRACE_PROBE1(conflict_shrlock,
+			    struct shrlock *, shrl->shr);
 			return (EAGAIN);
 		}
 
@@ -171,6 +177,8 @@ add_share(struct vnode *vp, struct shrlock *shr)
 			    (shrl->shr->s_deny & F_RDDNY) ||
 			    (shrl->shr->s_access & F_WRACC)) {
 				mutex_exit(&vp->v_lock);
+				DTRACE_PROBE1(conflict_shrlock,
+				    struct shrlock *, shrl->shr);
 				return (EAGAIN);
 			}
 			/*
@@ -183,6 +191,8 @@ add_share(struct vnode *vp, struct shrlock *shr)
 					break;
 				}
 				mutex_exit(&vp->v_lock);
+				DTRACE_PROBE1(conflict_shrlock,
+				    struct shrlock *, shrl->shr);
 				return (EAGAIN);
 			}
 			/*
@@ -199,6 +209,8 @@ add_share(struct vnode *vp, struct shrlock *shr)
 		if ((shr->s_access & shrl->shr->s_deny) ||
 		    (shr->s_deny & shrl->shr->s_access)) {
 			mutex_exit(&vp->v_lock);
+			DTRACE_PROBE1(conflict_shrlock,
+			    struct shrlock *, shrl->shr);
 			return (EAGAIN);
 		}
 	}
@@ -609,8 +621,11 @@ nbl_share_conflict(vnode_t *vp, nbl_op_t op, caller_context_t *ct)
 			break;
 #endif
 		}
-		if (conflict)
+		if (conflict) {
+			DTRACE_PROBE1(conflict_shrlock,
+			    struct shrlock *, shrl->shr);
 			break;
+		}
 	}
 
 	mutex_exit(&vp->v_lock);
