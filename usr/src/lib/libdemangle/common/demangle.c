@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2021 Jason King
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <stdlib.h>
@@ -86,6 +86,8 @@ is_mangled(const char *str, size_t n)
 	(void) sv_consume_if_c(&sv, '_');
 	if (sv_consume_if_c(&sv, 'Z'))
 		return (B_TRUE);
+	if (sv_consume_if_c(&sv, 'R'))
+		return (B_TRUE);
 
 	return (B_FALSE);
 }
@@ -101,6 +103,7 @@ char *
 sysdemangle(const char *str, sysdem_lang_t lang, sysdem_ops_t *ops)
 {
 	char *res = NULL;
+
 	/*
 	 * While the language specific demangler code can handle non-NUL
 	 * terminated strings, we currently don't expose this to consumers.

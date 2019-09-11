@@ -12,8 +12,6 @@
 /*
  * Copyright 2017 Jason King
  */
-#include <sys/debug.h>
-#include <sys/sysmacros.h>
 #include <string.h>
 #include "str.h"
 #include "demangle_int.h"

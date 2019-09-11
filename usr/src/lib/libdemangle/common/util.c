@@ -14,7 +14,8 @@
  * Copyright 2019, Joyent, Inc.
  */
 
-#include <sys/debug.h>
+#include <errno.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include "demangle-sys.h"
@@ -42,6 +43,25 @@ zalloc(sysdem_ops_t *ops, size_t len)
 	return (p);
 }
 
+void *
+xcalloc(sysdem_ops_t *ops, size_t n, size_t elsize)
+{
+	uint64_t sz;
+
+	if (mul_overflow(n, elsize, &sz)) {
+		errno = ENOMEM;
+		return (NULL);
+	}
+
+#ifndef _LP64
+	if (sz > SIZE_MAX) {
+		errno = ENOMEM;
+		return (NULL);
+	}
+#endif
+
+	return (zalloc(ops, sz));
+}
 void
 xfree(sysdem_ops_t *ops, void *p, size_t len)
 {

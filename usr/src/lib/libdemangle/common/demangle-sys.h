@@ -26,7 +26,7 @@ extern "C" {
 typedef enum sysdem_lang_e {
 	SYSDEM_LANG_AUTO,
 	SYSDEM_LANG_CPP,
-	SYSDEM_LANG_RUST
+	SYSDEM_LANG_RUST,
 } sysdem_lang_t;
 
 typedef struct sysdem_alloc_s {
