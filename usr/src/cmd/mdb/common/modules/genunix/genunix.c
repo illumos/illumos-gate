@@ -4082,6 +4082,8 @@ time_help(void)
 	    "  -x   report times in hexadecimal\n");
 }
 
+extern int cmd_refstr(uintptr_t, uint_t, int, const mdb_arg_t *);
+
 static const mdb_dcmd_t dcmds[] = {
 
 	/* from genunix.c */
@@ -4112,6 +4114,7 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "pgrep", "[-x] [-n | -o] pattern",
 		"pattern match against all processes", pgrep },
 	{ "ptree", NULL, "print process tree", ptree },
+	{ "refstr", NULL, "print string from a refstr_t", cmd_refstr, NULL },
 	{ "sysevent", "?[-sv]", "print sysevent pending or sent queue",
 		sysevent},
 	{ "sysevent_channel", "?", "print sysevent channel database",
