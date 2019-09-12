@@ -59,6 +59,7 @@ dir path=opt/util-tests/tests/files/make_l
 dir path=opt/util-tests/tests/libnvpair_json
 dir path=opt/util-tests/tests/libsff
 dir path=opt/util-tests/tests/mergeq
+dir path=opt/util-tests/tests/sleep
 file path=opt/util-tests/README mode=0444
 file path=opt/util-tests/bin/print_json mode=0555
 file path=opt/util-tests/bin/utiltest mode=0555
@@ -1467,6 +1468,9 @@ file path=opt/util-tests/tests/mergeq/mqt mode=0555
 file path=opt/util-tests/tests/mergeq/wqt mode=0555
 file path=opt/util-tests/tests/printf_test mode=0555
 file path=opt/util-tests/tests/set-linkprop mode=0555
+file path=opt/util-tests/tests/sleep/sleep.awk mode=0444
+file path=opt/util-tests/tests/sleep/sleep.d mode=0444
+file path=opt/util-tests/tests/sleep/sleeptest mode=0555
 file path=opt/util-tests/tests/smbios mode=0555
 file path=opt/util-tests/tests/xargs_test mode=0555
 license lic_CDDL license=lic_CDDL
@@ -1474,5 +1478,6 @@ license usr/src/lib/libdemangle/THIRDPARTYLICENSE \
     license=usr/src/lib/libdemangle/THIRDPARTYLICENSE
 license usr/src/test/util-tests/tests/demangle/THIRDPARTYLICENSE.rust \
     license=usr/src/test/util-tests/tests/demangle/THIRDPARTYLICENSE.rust
+depend fmri=locale/de type=require
 depend fmri=system/library/iconv/utf-8 type=require
 depend fmri=system/test/testrunner type=require

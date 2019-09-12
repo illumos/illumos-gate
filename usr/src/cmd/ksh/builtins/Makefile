@@ -49,7 +49,6 @@ ALIASPROG= \
 	print \
 	read \
 	rev \
-	sleep \
 	sum \
 	tee \
 	test \

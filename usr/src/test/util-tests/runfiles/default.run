@@ -32,6 +32,13 @@ outputdir = /var/tmp/test_results
 [/opt/util-tests/tests/libjedec_test]
 [/opt/util-tests/tests/smbios]
 
+#
+# The sleep tests require destructive DTrace. Therefore they must be run
+# as root.
+#
+[/opt/util-tests/tests/sleep/sleeptest]
+user = root
+
 [/opt/util-tests/tests/xargs_test]
 
 [/opt/util-tests/tests/mergeq/mqt]
