@@ -26,7 +26,10 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-/* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
+/*
+ * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
@@ -306,6 +309,7 @@ extern void freezero(void *, size_t);
 extern void *reallocarray(void *, size_t, size_t);
 extern void *recallocarray(void *, size_t, size_t, size_t);
 extern long long strtonum(const char *, long long, long long, const char **);
+extern void *reallocf(void *, size_t);
 
 #endif	/* !_STRICT_SYBMOLS */
 
