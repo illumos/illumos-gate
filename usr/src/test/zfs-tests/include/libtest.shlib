@@ -23,12 +23,14 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright (c) 2012, 2017 by Delphix. All rights reserved.
-# Copyright 2016 Nexenta Systems, Inc.
+# Copyright (c) 2017 by Tim Chase. All rights reserved.
+# Copyright (c) 2017 by Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2017 Datto Inc.
 # Copyright 2019 Joyent, Inc.
 #
 
 . ${STF_TOOLS}/contrib/include/logapi.shlib
+. ${STF_SUITE}/include/math.shlib
 . ${STF_SUITE}/include/blkdev.shlib
 
 # Determine if this is a Linux test system
@@ -860,14 +862,14 @@ function fill_fs # destdir dirnum filenum bytes num_writes data
 	typeset -i filenum=${3:-50}
 	typeset -i bytes=${4:-8192}
 	typeset -i num_writes=${5:-10240}
-	typeset -i data=${6:-0}
+	typeset data=${6:-0}
 
 	typeset -i odirnum=1
 	typeset -i idirnum=0
 	typeset -i fn=0
 	typeset -i retval=0
 
-	log_must mkdir -p $destdir/$idirnum
+	mkdir -p $destdir/$idirnum
 	while (($odirnum > 0)); do
 		if ((dirnum >= 0 && idirnum >= dirnum)); then
 			odirnum=0
@@ -883,7 +885,7 @@ function fill_fs # destdir dirnum filenum bytes num_writes data
 		if (($fn >= $filenum)); then
 			fn=0
 			((idirnum = idirnum + 1))
-			log_must mkdir -p $destdir/$idirnum
+			mkdir -p $destdir/$idirnum
 		else
 			((fn = fn + 1))
 		fi

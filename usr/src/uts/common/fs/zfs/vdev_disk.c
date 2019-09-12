@@ -31,6 +31,7 @@
 #include <sys/refcount.h>
 #include <sys/vdev_disk.h>
 #include <sys/vdev_impl.h>
+#include <sys/vdev_trim.h>
 #include <sys/abd.h>
 #include <sys/fs/zfs.h>
 #include <sys/zio.h>
@@ -296,7 +297,7 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
 	} dks;
 	struct dk_minfo_ext *dkmext = &dks.ude;
 	struct dk_minfo *dkm = &dks.ud;
-	int error;
+	int error, can_free;
 	dev_t dev;
 	int otyp;
 	boolean_t validate_devid = B_FALSE;
@@ -641,6 +642,7 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
 		(void) ldi_ev_register_callbacks(dvd->vd_lh, ecookie,
 		    &vdev_disk_dgrd_callb, (void *) vd, &lcb->lcb_id);
 	}
+
 skip_open:
 	/*
 	 * Determine the actual size of the device.
@@ -705,6 +707,16 @@ skip_open:
 	 * try again.
 	 */
 	vd->vdev_nowritecache = B_FALSE;
+
+	if (ldi_ioctl(dvd->vd_lh, DKIOC_CANFREE, (intptr_t)&can_free, FKIOCTL,
+	    kcred, NULL) == 0 && can_free == 1) {
+		vd->vdev_has_trim = B_TRUE;
+	} else {
+		vd->vdev_has_trim = B_FALSE;
+	}
+
+	/* Currently only supported for ZoL. */
+	vd->vdev_has_securetrim = B_FALSE;
 
 	/* Inform the ZIO pipeline that we are non-rotational */
 	vd->vdev_nonrot = B_FALSE;
@@ -865,6 +877,7 @@ vdev_disk_io_start(zio_t *zio)
 {
 	vdev_t *vd = zio->io_vd;
 	vdev_disk_t *dvd = vd->vdev_tsd;
+	unsigned long trim_flags = 0;
 	vdev_buf_t *vb;
 	struct dk_callback *dkc;
 	buf_t *bp;
@@ -880,7 +893,8 @@ vdev_disk_io_start(zio_t *zio)
 		return;
 	}
 
-	if (zio->io_type == ZIO_TYPE_IOCTL) {
+	switch (zio->io_type) {
+	case ZIO_TYPE_IOCTL:
 		/* XXPOLICY */
 		if (!vdev_readable(vd)) {
 			zio->io_error = SET_ERROR(ENXIO);
@@ -928,6 +942,37 @@ vdev_disk_io_start(zio_t *zio)
 		}
 
 		zio_execute(zio);
+		return;
+
+	case ZIO_TYPE_TRIM:
+		if (!vd->vdev_has_trim) {
+			zio->io_error = SET_ERROR(ENOTSUP);
+			zio_execute(zio);
+			return;
+		}
+		/* Currently only supported on ZoL. */
+		ASSERT0(zio->io_trim_flags & ZIO_TRIM_SECURE);
+
+		/* dkioc_free_list_t is already declared to hold one entry */
+		dkioc_free_list_t dfl;
+		dfl.dfl_flags = 0;
+		dfl.dfl_num_exts = 1;
+		dfl.dfl_offset = VDEV_LABEL_START_SIZE;
+		dfl.dfl_exts[0].dfle_start = zio->io_offset;
+		dfl.dfl_exts[0].dfle_length = zio->io_size;
+
+		zio->io_error = ldi_ioctl(dvd->vd_lh, DKIOCFREE,
+		    (uintptr_t)&dfl, FKIOCTL, kcred, NULL);
+
+		if (zio->io_error == ENOTSUP || zio->io_error == ENOTTY) {
+			/*
+			 * The device must have changed and now TRIM is
+			 * no longer supported.
+			 */
+			vd->vdev_has_trim = B_FALSE;
+		}
+
+		zio_interrupt(zio);
 		return;
 	}
 

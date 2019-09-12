@@ -45,7 +45,6 @@ static uint_t g_nctf;
 #define	CTFMERGE_USAGE	2
 
 #define	CTFMERGE_DEFAULT_NTHREADS	8
-#define	CTFMERGE_ALTEXEC	"CTFMERGE_ALTEXEC"
 
 static void __attribute__((__noreturn__))
 ctfmerge_fatal(const char *fmt, ...)
@@ -312,28 +311,6 @@ ctfmerge_usage(const char *fmt, ...)
 	    g_progname);
 }
 
-static void
-ctfmerge_altexec(char **argv)
-{
-	const char *alt;
-	char *altexec;
-
-	alt = getenv(CTFMERGE_ALTEXEC);
-	if (alt == NULL || *alt == '\0')
-		return;
-
-	altexec = strdup(alt);
-	if (altexec == NULL)
-		ctfmerge_fatal("failed to allocate memory for altexec\n");
-	if (unsetenv(CTFMERGE_ALTEXEC) != 0)
-		ctfmerge_fatal("failed to unset %s from environment: %s\n",
-		    CTFMERGE_ALTEXEC, strerror(errno));
-
-	(void) execv(altexec, argv);
-	ctfmerge_fatal("failed to execute alternate program %s: %s",
-	    altexec, strerror(errno));
-}
-
 int
 main(int argc, char *argv[])
 {
@@ -348,8 +325,6 @@ main(int argc, char *argv[])
 	char *eptr;
 
 	g_progname = basename(argv[0]);
-
-	ctfmerge_altexec(argv);
 
 	/*
 	 * We support a subset of the old CTF merge flags, mostly for

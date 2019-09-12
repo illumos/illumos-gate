@@ -690,8 +690,12 @@ txg_wait_synced_sig(dsl_pool_t *dp, uint64_t txg)
 	return (txg_wait_synced_impl(dp, txg, B_TRUE));
 }
 
+/*
+ * Wait for the specified open transaction group.  Set should_quiesce
+ * when the current open txg should be quiesced immediately.
+ */
 void
-txg_wait_open(dsl_pool_t *dp, uint64_t txg)
+txg_wait_open(dsl_pool_t *dp, uint64_t txg, boolean_t should_quiesce)
 {
 	tx_state_t *tx = &dp->dp_tx;
 
@@ -701,7 +705,7 @@ txg_wait_open(dsl_pool_t *dp, uint64_t txg)
 	ASSERT3U(tx->tx_threads, ==, 2);
 	if (txg == 0)
 		txg = tx->tx_open_txg + 1;
-	if (tx->tx_quiesce_txg_waiting < txg)
+	if (tx->tx_quiesce_txg_waiting < txg && should_quiesce)
 		tx->tx_quiesce_txg_waiting = txg;
 	dprintf("txg=%llu quiesce_txg=%llu sync_txg=%llu\n",
 	    txg, tx->tx_quiesce_txg_waiting, tx->tx_sync_txg_waiting);

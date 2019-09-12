@@ -34,7 +34,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -265,6 +265,7 @@ smbfs_smb_setfattr(
 	mb_put_uint64le(mbp, tm);		/* last write time */
 	mb_put_uint64le(mbp, 0);		/* change time */
 	mb_put_uint32le(mbp, attr);
+	mb_put_uint32le(mbp, 0);		/* reserved */
 
 	if (SSTOVC(ssp)->vc_flags & SMBV_SMB2) {
 		error = smbfs_smb2_setfattr(ssp, &fhp->fh_fid2, mbp, scrp);

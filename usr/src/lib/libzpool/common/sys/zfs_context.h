@@ -21,8 +21,8 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2017 RackTop Systems.
  */
 
@@ -252,6 +252,7 @@ extern int fop_getattr(vnode_t *vp, vattr_t *vap);
 #define	VOP_CLOSE(vp, f, c, o, cr, ct)	0
 #define	VOP_PUTPAGE(vp, of, sz, fl, cr, ct)	0
 #define	VOP_GETATTR(vp, vap, fl, cr, ct)  fop_getattr((vp), (vap));
+#define	VOP_SPACE(vp, cmd, a, f, o, cr, ct)  0
 
 #define	VOP_FSYNC(vp, f, cr, ct)	fsync((vp)->v_fd)
 

@@ -23,12 +23,12 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 Joyent, Inc.
+#
 
 include ../Makefile.tools
 
-SUBDIRS = stabs ctfstrip libctf ctfdiff ctfdump
-$(BUILD_OLD_CTF_TOOLS)SUBDIRS += cvt
-$(BUILD_NEW_CTF_TOOLS)SUBDIRS += ctfmerge ctfconvert
+SUBDIRS = stabs ctfstrip libctf ctfdiff ctfdump ctfmerge ctfconvert
 
 .PARALLEL: $(SUBDIRS)
 

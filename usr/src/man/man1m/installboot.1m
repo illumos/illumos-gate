@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2018 Toomas Soome <tsoome@me.com>
+.\" Copyright 2019 Toomas Soome <tsoome@me.com>
 .\"
-.Dd July 20, 2018
+.Dd Aug 28, 2019
 .Dt INSTALLBOOT 1M
 .Os
 .Sh NAME
@@ -37,8 +37,10 @@
 .Ss x86
 .Nm
 .Op Fl fFmn
+.Op Fl b Ar boot_dir
 .Op Fl u Ar verstr
-.Ar stage1 stage2 raw-device
+.Op Ar stage1 stage2
+raw-device
 .Nm
 .Op Fl enV
 .Fl i
@@ -61,7 +63,7 @@ the disk slice,
 command will split the zfs boot loader between disk slice boot area, and zfs
 pool boot area.
 .Pp
-The x86 systems have boot loader implemented as three stages:
+The x86 BIOS systems have boot loader implemented as three stages:
 .Bl -tag -width Ds
 .It Sy stage1
 .Pa /boot/pmbr
@@ -116,11 +118,39 @@ tag in
 .Xr format 1M
 partition menu.
 .El
+.Pp
+The x86 UEFI systems load and start boot loader program from
+.Sy /EFI/Boot
+directory of the EFI System Partition (ESP).
+The boot loader program in ESP is named
+.Sy bootx86.efi
+for AMD64 system and
+.Sy bootia32.efi
+for i386 system.
+Note, only a 64-bit kernel is supported, even on i386 systems.
+The
+.Sy bootia32.efi
+boot program is only provided to support systems with 32-bit UEFI firmware,
+but which can support 64-bit mode.
+.Pp
+The
+.Sy bootx86.efi
+is copied from
+.Sy /boot/loader64.efi
+and
+.Sy bootia32.efi
+is copied from
+.Sy /boot/loader32.efi .
 .Ss Options
 The
 .Nm
 command accepts the following options:
 .Bl -tag -width Ds
+.It Fl b Ar boot_dir
+Provide path to the directory, where loader boot programs are located.
+.Nm
+will automatically pick the needed programs and will install to the
+specified disk device.
 .It Fl h
 Prints short usage message.
 .It Fl m

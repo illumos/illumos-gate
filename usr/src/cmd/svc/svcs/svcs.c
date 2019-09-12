@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2019, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
  */
 
@@ -2937,10 +2937,10 @@ add_processes(scf_walkinfo_t *wip, char *line, scf_propertygroup_t *lpg)
 	for (i = 0; i < n; ++i) {
 		char *cp, stime[9];
 		psinfo_t psi;
-		struct tm *tm;
+		const char *name = NULL;
 		int len = 1 + 15 + 8 + 3 + 6 + 1 + PRFNSZ;
 
-		if (proc_get_psinfo(pids[i], &psi) != 0 || IS_ZOMBIE(&psi))
+		if (proc_get_psinfo(pids[i], &psi) != 0)
 			continue;
 
 		line = realloc(line, strlen(line) + len);
@@ -2949,25 +2949,40 @@ add_processes(scf_walkinfo_t *wip, char *line, scf_propertygroup_t *lpg)
 
 		cp = strchr(line, '\0');
 
-		tm = localtime(&psi.pr_start.tv_sec);
+		if (!IS_ZOMBIE(&psi)) {
+#define	DAY (24 * 60 * 60)
+#define	YEAR (12 * 30 * 24 * 60 * 60)
 
-		/*
-		 * Print time if started within the past 24 hours, print date
-		 * if within the past 12 months, print year if started greater
-		 * than 12 months ago.
-		 */
-		if (now - psi.pr_start.tv_sec < 24 * 60 * 60)
-			(void) strftime(stime, sizeof (stime),
-			    gettext(FORMAT_TIME), tm);
-		else if (now - psi.pr_start.tv_sec < 12 * 30 * 24 * 60 * 60)
-			(void) strftime(stime, sizeof (stime),
-			    gettext(FORMAT_DATE), tm);
-		else
-			(void) strftime(stime, sizeof (stime),
-			    gettext(FORMAT_YEAR), tm);
+			struct tm *tm;
+
+			tm = localtime(&psi.pr_start.tv_sec);
+
+			/*
+			 * Print time if started within the past 24 hours,
+			 * print date if within the past 12 months, print year
+			 * if started greater than 12 months ago.
+			 */
+			if (now - psi.pr_start.tv_sec < DAY) {
+				(void) strftime(stime, sizeof (stime),
+				    gettext(FORMAT_TIME), tm);
+			} else if (now - psi.pr_start.tv_sec < YEAR) {
+				(void) strftime(stime, sizeof (stime),
+				    gettext(FORMAT_DATE), tm);
+			} else {
+				(void) strftime(stime, sizeof (stime),
+				    gettext(FORMAT_YEAR), tm);
+			}
+
+			name = psi.pr_fname;
+#undef DAY
+#undef YEAR
+		} else {
+			(void) snprintf(stime, sizeof (stime), "-");
+			name = "<defunct>";
+		}
 
 		(void) snprintf(cp, len, "\n               %-8s   %6ld %.*s",
-		    stime, pids[i], PRFNSZ, psi.pr_fname);
+		    stime, pids[i], PRFNSZ, name);
 	}
 
 	free(pids);

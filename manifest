@@ -7002,6 +7002,14 @@ d usr/lib/locale/C/LC_MONETARY 0755 root bin
 d usr/lib/locale/C/LC_NUMERIC 0755 root bin
 d usr/lib/locale/C/LC_TIME 0755 root bin
 f usr/lib/locale/C/LC_TIME/SUNW_OST_OSCMD.po 0644 root bin
+d usr/lib/locale/C.UTF-8 0755 root bin
+d usr/lib/locale/C.UTF-8/LC_COLLATE 0755 root bin
+d usr/lib/locale/C.UTF-8/LC_CTYPE 0755 root bin
+f usr/lib/locale/C.UTF-8/LC_CTYPE/LCL_DATA 0444 root bin
+d usr/lib/locale/C.UTF-8/LC_MESSAGES 0755 root bin
+d usr/lib/locale/C.UTF-8/LC_MONETARY 0755 root bin
+d usr/lib/locale/C.UTF-8/LC_NUMERIC 0755 root bin
+d usr/lib/locale/C.UTF-8/LC_TIME 0755 root bin
 s usr/lib/locale/POSIX=C
 d usr/lib/locale/af_ZA.UTF-8 0755 root bin
 d usr/lib/locale/af_ZA.UTF-8/LC_COLLATE 0755 root bin

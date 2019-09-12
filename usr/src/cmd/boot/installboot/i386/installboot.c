@@ -21,10 +21,11 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2017 Toomas Soome <tsoome@me.com>
+ * Copyright 2019 Toomas Soome <tsoome@me.com>
  */
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -33,6 +34,8 @@
 #include <strings.h>
 #include <libfdisk.h>
 #include <err.h>
+#include <time.h>
+#include <spawn.h>
 
 #include <sys/dktp/fdisk.h>
 #include <sys/dkio.h>
@@ -42,6 +45,11 @@
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <sys/efi_partition.h>
+#include <sys/queue.h>
+#include <sys/mount.h>
+#include <sys/mntent.h>
+#include <sys/mnttab.h>
+#include <sys/wait.h>
 #include <libfstyp.h>
 #include <libgen.h>
 #include <uuid/uuid.h>
@@ -97,17 +105,49 @@
  * reinstalled in case the partition content is relocated.
  */
 
-static boolean_t	write_mbr = B_FALSE;
-static boolean_t	force_mbr = B_FALSE;
-static boolean_t	force_update = B_FALSE;
-static boolean_t	do_getinfo = B_FALSE;
-static boolean_t	do_version = B_FALSE;
-static boolean_t	do_mirror_bblk = B_FALSE;
-static boolean_t	strip = B_FALSE;
-static boolean_t	verbose_dump = B_FALSE;
+static bool	write_mbr = false;
+static bool	force_mbr = false;
+static bool	force_update = false;
+static bool	do_getinfo = false;
+static bool	do_version = false;
+static bool	do_mirror_bblk = false;
+static bool	strip = false;
+static bool	verbose_dump = false;
+static size_t	sector_size = SECTOR_SIZE;
 
 /* Versioning string, if present. */
 static char		*update_str;
+
+/* Default location of boot programs. */
+static char		*boot_dir = "/boot";
+
+/* Our boot programs */
+#define	STAGE1		"pmbr"
+#define	STAGE2		"gptzfsboot"
+#define	BOOTIA32	"bootia32.efi"
+#define	BOOTX64		"bootx64.efi"
+#define	LOADER32	"loader32.efi"
+#define	LOADER64	"loader64.efi"
+
+static char *stage1;
+static char *stage2;
+static char *efi32;
+static char *efi64;
+
+#define	GRUB_VERSION_OFF (0x3e)
+#define	GRUB_COMPAT_VERSION_MAJOR 3
+#define	GRUB_COMPAT_VERSION_MINOR 2
+#define	GRUB_VERSION (2 << 8 | 3) /* 3.2 */
+
+#define	LOADER_VERSION (1)
+#define	LOADER_JOYENT_VERSION (2)
+
+typedef enum {
+	MBR_TYPE_UNKNOWN,
+	MBR_TYPE_GRUB1,
+	MBR_TYPE_LOADER,
+	MBR_TYPE_LOADER_JOYENT,
+} mbr_type_t;
 
 /*
  * Temporary buffer to store the first 32K of data looking for a multiboot
@@ -117,47 +157,1580 @@ char			mboot_scan[MBOOT_SCAN_SIZE];
 
 /* Function prototypes. */
 static void check_options(char *);
-static int get_start_sector(ib_device_t *);
+static int open_device(const char *);
+static char *make_blkdev(const char *);
 
-static int read_stage1_from_file(char *, ib_data_t *);
-static int read_bootblock_from_file(char *, ib_bootblock_t *);
-static int read_bootblock_from_disk(ib_device_t *, ib_bootblock_t *, char **);
+static int read_bootblock_from_file(const char *, ib_bootblock_t *);
 static void add_bootblock_einfo(ib_bootblock_t *, char *);
-static int prepare_stage1(ib_data_t *);
-static int prepare_bootblock(ib_data_t *, char *);
-static int write_stage1(ib_data_t *);
-static int write_bootblock(ib_data_t *);
-static int init_device(ib_device_t *, char *);
-static void cleanup_device(ib_device_t *);
-static int commit_to_disk(ib_data_t *, char *);
-static int handle_install(char *, char **);
-static int handle_getinfo(char *, char **);
-static int handle_mirror(char *, char **);
-static boolean_t is_update_necessary(ib_data_t *, char *);
-static int propagate_bootblock(ib_data_t *, ib_data_t *, char *);
+static void prepare_bootblock(ib_data_t *, struct partlist *, char *);
+static int handle_install(char *, int, char **);
+static int handle_getinfo(char *, int, char **);
+static int handle_mirror(char *, int, char **);
 static void usage(char *, int) __NORETURN;
 
-static int
-read_stage1_from_file(char *path, ib_data_t *dest)
+static char *
+stagefs_mount(char *blkdev, struct partlist *plist)
 {
-	int	fd;
+	char *path;
+	char optbuf[MAX_MNTOPT_STR] = { '\0', };
+	char *template = strdup("/tmp/ibootXXXXXX");
+	int ret;
 
-	assert(dest != NULL);
+	if (template == NULL)
+		return (NULL);
+
+	if ((path = mkdtemp(template)) == NULL) {
+		free(template);
+		return (NULL);
+	}
+
+	(void) snprintf(optbuf, MAX_MNTOPT_STR, "timezone=%d",
+	    timezone);
+	ret = mount(blkdev, path, MS_OPTIONSTR,
+	    MNTTYPE_PCFS, NULL, 0, optbuf, MAX_MNTOPT_STR);
+	if (ret != 0) {
+		(void) rmdir(path);
+		free(path);
+		path = NULL;
+	}
+	plist->pl_device->stage.mntpnt = path;
+	return (path);
+}
+
+static void
+install_stage1_cb(void *data, struct partlist *plist)
+{
+	int rv, fd;
+	ib_device_t *device = plist->pl_device;
+
+	if (plist->pl_type == IB_BBLK_MBR && !write_mbr)
+		return;
+
+	if ((fd = open_device(plist->pl_devname)) == -1) {
+		(void) fprintf(stdout, gettext("cannot open "
+		    "device %s\n"), plist->pl_devname);
+		perror("open");
+		return;
+	}
+
+	rv = write_out(fd, plist->pl_stage, sector_size, 0);
+	if (rv != BC_SUCCESS) {
+		(void) fprintf(stdout, gettext("cannot write "
+		    "partition boot sector\n"));
+		perror("write");
+	} else {
+		(void) fprintf(stdout, gettext("stage1 written to "
+		    "%s %d sector 0 (abs %d)\n"),
+		    device->devtype == IB_DEV_MBR? "partition" : "slice",
+		    device->stage.id, device->stage.start);
+	}
+}
+
+static void
+install_stage2_cb(void *data, struct partlist *plist)
+{
+	ib_bootblock_t *bblock = plist->pl_src_data;
+	int fd, ret;
+	off_t offset;
+	uint64_t abs;
+
+	/*
+	 * ZFS bootblock area is 3.5MB, make sure we can fit.
+	 * buf_size is size of bootblk+EINFO.
+	 */
+	if (bblock->buf_size > BBLK_ZFS_BLK_SIZE) {
+		(void) fprintf(stderr, gettext("bootblock is too large\n"));
+		return;
+	}
+
+	abs = plist->pl_device->stage.start + plist->pl_device->stage.offset;
+
+	if ((fd = open_device(plist->pl_devname)) == -1) {
+		(void) fprintf(stdout, gettext("cannot open "
+		    "device %s\n"), plist->pl_devname);
+		perror("open");
+		return;
+	}
+	offset = plist->pl_device->stage.offset * SECTOR_SIZE;
+	ret = write_out(fd, bblock->buf, bblock->buf_size, offset);
+	(void) close(fd);
+	if (ret != BC_SUCCESS) {
+		BOOT_DEBUG("Error writing the ZFS bootblock "
+		    "to %s at offset %d\n", plist->pl_devname, offset);
+		return;
+	}
+	(void) fprintf(stdout, gettext("bootblock written for %s,"
+	    " %d sectors starting at %d (abs %lld)\n"), plist->pl_devname,
+	    (bblock->buf_size / SECTOR_SIZE) + 1, offset / SECTOR_SIZE, abs);
+}
+
+static bool
+mkfs_pcfs(const char *dev)
+{
+	pid_t pid, w;
+	posix_spawnattr_t attr;
+	posix_spawn_file_actions_t file_actions;
+	int status;
+	char *cmd[7];
+
+	if (posix_spawnattr_init(&attr))
+		return (false);
+	if (posix_spawn_file_actions_init(&file_actions)) {
+		(void) posix_spawnattr_destroy(&attr);
+		return (false);
+	}
+
+	if (posix_spawnattr_setflags(&attr,
+	    POSIX_SPAWN_NOSIGCHLD_NP | POSIX_SPAWN_WAITPID_NP)) {
+		(void) posix_spawnattr_destroy(&attr);
+		(void) posix_spawn_file_actions_destroy(&file_actions);
+		return (false);
+	}
+	if (posix_spawn_file_actions_addopen(&file_actions, 0, "/dev/null",
+	    O_RDONLY, 0)) {
+		(void) posix_spawnattr_destroy(&attr);
+		(void) posix_spawn_file_actions_destroy(&file_actions);
+		return (false);
+	}
+
+	cmd[0] = "/usr/sbin/mkfs";
+	cmd[1] = "-F";
+	cmd[2] = "pcfs";
+	cmd[3] = "-o";
+	cmd[4] = "fat=32";
+	cmd[5] = (char *)dev;
+	cmd[6] = NULL;
+
+	if (posix_spawn(&pid, cmd[0], &file_actions, &attr, cmd, NULL))
+		return (false);
+	(void) posix_spawnattr_destroy(&attr);
+	(void) posix_spawn_file_actions_destroy(&file_actions);
+
+	do {
+		w = waitpid(pid, &status, 0);
+	} while (w == -1 && errno == EINTR);
+	if (w == -1)
+		status = -1;
+
+	return (status != -1);
+}
+
+static void
+install_esp_cb(void *data, struct partlist *plist)
+{
+	fstyp_handle_t fhdl;
+	const char *fident;
+	bool pcfs;
+	char *blkdev, *path, *file;
+	FILE *fp;
+	struct mnttab mp, mpref = { 0 };
+	ib_bootblock_t *bblock = plist->pl_src_data;
+	int fd, ret;
+
+	if ((fd = open_device(plist->pl_devname)) == -1)
+		return;
+
+	if (fstyp_init(fd, 0, NULL, &fhdl) != 0) {
+		(void) close(fd);
+		return;
+	}
+
+	pcfs = false;
+	if (fstyp_ident(fhdl, NULL, &fident) == 0) {
+		if (strcmp(fident, MNTTYPE_PCFS) == 0)
+			pcfs = true;
+	}
+	fstyp_fini(fhdl);
+	(void) close(fd);
+
+	if (!pcfs) {
+		(void) printf(gettext("Creating pcfs on ESP %s\n"),
+		    plist->pl_devname);
+
+		if (!mkfs_pcfs(plist->pl_devname)) {
+			(void) fprintf(stderr, gettext("mkfs -F pcfs failed "
+			    "on %s\n"), plist->pl_devname);
+			return;
+		}
+	}
+	blkdev = make_blkdev(plist->pl_devname);
+	if (blkdev == NULL)
+		return;
+
+	fp = fopen(MNTTAB, "r");
+	if (fp == NULL) {
+		perror("fopen");
+		free(blkdev);
+		return;
+	}
+
+	mpref.mnt_special = blkdev;
+	ret = getmntany(fp, &mp, &mpref);
+	(void) fclose(fp);
+	if (ret == 0)
+		path = mp.mnt_mountp;
+	else
+		path = stagefs_mount(blkdev, plist);
+
+	free(blkdev);
+	if (path == NULL)
+		return;
+
+	if (asprintf(&file, "%s%s", path, "/EFI") < 0) {
+		perror(gettext("Memory allocation failure"));
+		return;
+	}
+
+	ret = mkdir(file, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+	if (ret == 0 || errno == EEXIST) {
+		free(file);
+		if (asprintf(&file, "%s%s", path, "/EFI/Boot") < 0) {
+			perror(gettext("Memory allocation failure"));
+			return;
+		}
+		ret = mkdir(file,
+		    S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+		if (errno == EEXIST)
+			ret = 0;
+	}
+	free(file);
+	if (ret < 0) {
+		perror("mkdir");
+		return;
+	}
+
+	if (asprintf(&file, "%s%s", path, plist->pl_device->stage.path) < 0) {
+		perror(gettext("Memory allocation failure"));
+		return;
+	}
+
+	/* Write stage file. Should create temp file and rename. */
+	(void) chmod(file, S_IRUSR | S_IWUSR);
+	fd = open(file, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+	if (fd != -1) {
+		ret = write_out(fd, bblock->buf, bblock->buf_size, 0);
+		if (ret == BC_SUCCESS) {
+			(void) fprintf(stdout,
+			    gettext("bootblock written to %s\n"), file);
+		} else {
+			(void) fprintf(stdout,
+			    gettext("error while writing %s\n"), file);
+		}
+		(void) fchmod(fd, S_IRUSR | S_IRGRP | S_IROTH);
+		(void) close(fd);
+	}
+	free(file);
+}
+
+/*
+ * MBR setup only depends on write_mbr toggle.
+ */
+static bool
+compare_mbr_cb(struct partlist *plist)
+{
+	/* get confirmation for -m */
+	if (write_mbr && !force_mbr) {
+		(void) fprintf(stdout, gettext("Updating master boot sector "
+		    "destroys existing boot managers (if any).\n"
+		    "continue (y/n)? "));
+		if (!yes()) {
+			write_mbr = false;
+			(void) fprintf(stdout, gettext("master boot sector "
+			    "not updated\n"));
+		}
+	}
+	if (write_mbr)
+		(void) printf("%s is newer than one in %s\n",
+		    plist->pl_src_name, plist->pl_devname);
+	return (write_mbr);
+}
+
+/*
+ * VBR setup is always done.
+ */
+static bool
+compare_stage1_cb(struct partlist *plist)
+{
+	(void) printf("%s will be written to %s\n", plist->pl_src_name,
+	    plist->pl_devname);
+	return (true);
+}
+
+/*
+ * Return true if we can update, false if not.
+ */
+static bool
+compare_einfo_cb(struct partlist *plist)
+{
+	ib_bootblock_t *bblock, *bblock_file;
+	bblk_einfo_t *einfo, *einfo_file;
+	bblk_hs_t bblock_hs;
+	bool rv;
+
+	bblock = plist->pl_stage;
+	if (bblock == NULL || bblock->extra == NULL || bblock->extra_size == 0)
+		return (true);
+
+	einfo = find_einfo(bblock->extra, bblock->extra_size);
+	if (einfo == NULL) {
+		BOOT_DEBUG("No extended information available on disk\n");
+		return (true);
+	}
+
+	bblock_file = plist->pl_src_data;
+	einfo_file = find_einfo(bblock_file->extra, bblock_file->extra_size);
+	if (einfo_file == NULL) {
+		/*
+		 * loader bootblock is versioned. missing version means
+		 * probably incompatible block. installboot can not install
+		 * grub, for example.
+		 */
+		(void) fprintf(stderr,
+		    gettext("ERROR: non versioned bootblock in file\n"));
+		return (false);
+	} else {
+		if (update_str == NULL) {
+			update_str = einfo_get_string(einfo_file);
+			do_version = true;
+		}
+	}
+
+	if (!do_version || update_str == NULL) {
+		(void) fprintf(stderr,
+		    gettext("WARNING: target device %s has a "
+		    "versioned bootblock that is going to be overwritten by a "
+		    "non versioned one\n"), plist->pl_devname);
+		return (true);
+	}
+
+	if (force_update) {
+		BOOT_DEBUG("Forcing update of %s bootblock\n",
+		    plist->pl_devname);
+		return (true);
+	}
+
+	BOOT_DEBUG("Ready to check installed version vs %s\n", update_str);
+
+	bblock_hs.src_buf = (unsigned char *)bblock_file->file;
+	bblock_hs.src_size = bblock_file->file_size;
+
+	rv = einfo_should_update(einfo, &bblock_hs, update_str);
+	if (rv == false) {
+		(void) fprintf(stderr, gettext("\nBootblock version installed "
+		    "on %s is more recent or identical to\n%s\n"
+		    "Use -F to override or install without the -u option.\n"),
+		    plist->pl_devname, plist->pl_src_name);
+	} else {
+		(void) printf("%s is newer than one in %s\n",
+		    plist->pl_src_name, plist->pl_devname);
+	}
+	return (rv);
+}
+
+static bool
+read_stage1_cb(struct partlist *plist)
+{
+	int fd;
+	bool rv = false;
+
+	if ((fd = open_device(plist->pl_devname)) == -1)
+		return (rv);
+
+	if (plist->pl_stage == NULL)
+		plist->pl_stage = calloc(1, sector_size);
+
+	if (plist->pl_stage == NULL) {
+		perror("calloc");
+		goto done;
+	}
+
+	if (pread(fd, plist->pl_stage, sector_size, 0) == -1) {
+		perror("pread");
+		goto done;
+	}
+	rv = true;
+done:
+	(void) close(fd);
+	return (rv);
+}
+
+static bool
+read_stage1_bbl_cb(struct partlist *plist)
+{
+	int fd;
+	void *data;
+	bool rv = false;
+
+	data = malloc(SECTOR_SIZE);
+	if (data == NULL)
+		return (rv);
 
 	/* read the stage1 file from filesystem */
-	fd = open(path, O_RDONLY);
+	fd = open(plist->pl_src_name, O_RDONLY);
 	if (fd == -1 ||
-	    read(fd, dest->stage1, SECTOR_SIZE) != SECTOR_SIZE) {
+	    read(fd, data, SECTOR_SIZE) != SECTOR_SIZE) {
 		(void) fprintf(stderr, gettext("cannot read stage1 file %s\n"),
-		    path);
-		return (BC_ERROR);
+		    plist->pl_src_name);
+		free(data);
+		if (fd != -1)
+			(void) close(fd);
+		return (rv);
+	}
+
+	plist->pl_src_data = data;
+	(void) close(fd);
+	return (true);
+}
+
+static bool
+read_stage2_cb(struct partlist *plist)
+{
+	ib_device_t		*device;
+	ib_bootblock_t		*bblock;
+	int			fd;
+	uint32_t		size, offset;
+	uint32_t		buf_size;
+	uint32_t		mboot_off;
+	multiboot_header_t	*mboot;
+
+	bblock = calloc(1, sizeof (ib_bootblock_t));
+	if (bblock == NULL)
+		return (false);
+
+	if ((fd = open_device(plist->pl_devname)) == -1) {
+		free(bblock);
+		return (false);
+	}
+
+	device = plist->pl_device;
+	plist->pl_stage = bblock;
+	offset = device->stage.offset * SECTOR_SIZE;
+
+	if (read_in(fd, mboot_scan, sizeof (mboot_scan), offset)
+	    != BC_SUCCESS) {
+		BOOT_DEBUG("Error reading bootblock area\n");
+		perror("read");
+		(void) close(fd);
+		return (false);
+	}
+
+	/* No multiboot means no chance of knowing bootblock size */
+	if (find_multiboot(mboot_scan, sizeof (mboot_scan), &mboot_off)
+	    != BC_SUCCESS) {
+		BOOT_DEBUG("Unable to find multiboot header\n");
+		(void) close(fd);
+		return (false);
+	}
+	mboot = (multiboot_header_t *)(mboot_scan + mboot_off);
+
+	/*
+	 * make sure mboot has sane values
+	 */
+	if (mboot->load_end_addr == 0 ||
+	    mboot->load_end_addr < mboot->load_addr) {
+		(void) close(fd);
+		return (false);
+	}
+
+	/*
+	 * Currently, the amount of space reserved for extra information
+	 * is "fixed". We may have to scan for the terminating extra payload
+	 * in the future.
+	 */
+	size = mboot->load_end_addr - mboot->load_addr;
+	buf_size = P2ROUNDUP(size + SECTOR_SIZE, SECTOR_SIZE);
+	bblock->file_size = size;
+
+	bblock->buf = malloc(buf_size);
+	if (bblock->buf == NULL) {
+		BOOT_DEBUG("Unable to allocate enough memory to read"
+		    " the extra bootblock from the disk\n");
+		perror(gettext("Memory allocation failure"));
+		(void) close(fd);
+		return (false);
+	}
+	bblock->buf_size = buf_size;
+
+	if (read_in(fd, bblock->buf, buf_size, offset) != BC_SUCCESS) {
+		BOOT_DEBUG("Error reading the bootblock\n");
+		(void) free(bblock->buf);
+		bblock->buf = NULL;
+		(void) close(fd);
+		return (false);
+	}
+
+	/* Update pointers. */
+	bblock->file = bblock->buf;
+	bblock->mboot_off = mboot_off;
+	bblock->mboot = (multiboot_header_t *)(bblock->buf + bblock->mboot_off);
+	bblock->extra = bblock->buf + P2ROUNDUP(bblock->file_size, 8);
+	bblock->extra_size = bblock->buf_size - P2ROUNDUP(bblock->file_size, 8);
+
+	BOOT_DEBUG("mboot at %p offset %d, extra at %p size %d, buf=%p "
+	    "(size=%d)\n", bblock->mboot, bblock->mboot_off, bblock->extra,
+	    bblock->extra_size, bblock->buf, bblock->buf_size);
+
+	return (true);
+}
+
+static bool
+read_einfo_file_cb(struct partlist *plist)
+{
+	plist->pl_stage = calloc(1, sizeof (ib_bootblock_t));
+	if (plist->pl_stage == NULL)
+		return (false);
+
+	return (read_bootblock_from_file(plist->pl_devname,
+	    plist->pl_stage) == BC_SUCCESS);
+}
+
+static bool
+read_stage2_file_cb(struct partlist *plist)
+{
+	plist->pl_src_data = calloc(1, sizeof (ib_bootblock_t));
+	if (plist->pl_src_data == NULL)
+		return (false);
+
+	return (read_bootblock_from_file(plist->pl_src_name,
+	    plist->pl_src_data) == BC_SUCCESS);
+}
+
+/*
+ * convert /dev/rdsk/... to /dev/dsk/...
+ */
+static char *
+make_blkdev(const char *path)
+{
+	char *tmp;
+	char *ptr = strdup(path);
+
+	if (ptr == NULL)
+		return (ptr);
+
+	tmp = strstr(ptr, "rdsk");
+	if (tmp == NULL) {
+		free(ptr);
+		return (NULL); /* Something is very wrong */
+	}
+	/* This is safe because we do shorten the string */
+	(void) memmove(tmp, tmp + 1, strlen(tmp));
+	return (ptr);
+}
+
+/*
+ * Try to mount ESP and read boot program.
+ */
+static bool
+read_einfo_esp_cb(struct partlist *plist)
+{
+	fstyp_handle_t fhdl;
+	const char *fident;
+	char *blkdev, *path, *file;
+	bool rv = false;
+	FILE *fp;
+	struct mnttab mp, mpref = { 0 };
+	int fd, ret;
+
+	if ((fd = open_device(plist->pl_devname)) == -1)
+		return (rv);
+
+	if (fstyp_init(fd, 0, NULL, &fhdl) != 0) {
+		(void) close(fd);
+		return (rv);
+	}
+
+	if (fstyp_ident(fhdl, NULL, &fident) != 0) {
+		fstyp_fini(fhdl);
+		(void) close(fd);
+		(void) fprintf(stderr, gettext("Failed to detect file "
+		    "system type\n"));
+		return (rv);
+	}
+
+	/* We only do expect pcfs. */
+	if (strcmp(fident, MNTTYPE_PCFS) != 0) {
+		(void) fprintf(stderr,
+		    gettext("File system %s is not supported.\n"), fident);
+		fstyp_fini(fhdl);
+		(void) close(fd);
+		return (rv);
+	}
+	fstyp_fini(fhdl);
+	(void) close(fd);
+
+	blkdev = make_blkdev(plist->pl_devname);
+	if (blkdev == NULL)
+		return (rv);
+
+	/* mount ESP if needed, read boot program(s) and unmount. */
+	fp = fopen(MNTTAB, "r");
+	if (fp == NULL) {
+		perror("fopen");
+		free(blkdev);
+		return (rv);
+	}
+
+	mpref.mnt_special = blkdev;
+	ret = getmntany(fp, &mp, &mpref);
+	(void) fclose(fp);
+	if (ret == 0)
+		path = mp.mnt_mountp;
+	else
+		path = stagefs_mount(blkdev, plist);
+
+	free(blkdev);
+	if (path == NULL)
+		return (rv);
+
+	if (asprintf(&file, "%s%s", path, plist->pl_device->stage.path) < 0) {
+		return (rv);
+	}
+
+	plist->pl_stage = calloc(1, sizeof (ib_bootblock_t));
+	if (plist->pl_stage == NULL) {
+		free(file);
+		return (rv);
+	}
+	if (read_bootblock_from_file(file, plist->pl_stage) != BC_SUCCESS) {
+		free(plist->pl_stage);
+		plist->pl_stage = NULL;
+	} else {
+		rv = true;
+	}
+
+	free(file);
+	return (rv);
+}
+
+static void
+print_stage1_cb(struct partlist *plist)
+{
+	struct mboot *mbr;
+	struct ipart *part;
+	mbr_type_t type = MBR_TYPE_UNKNOWN;
+	bool pmbr = false;
+	char *label;
+
+	mbr = plist->pl_stage;
+
+	if (*((uint16_t *)&mbr->bootinst[GRUB_VERSION_OFF]) == GRUB_VERSION) {
+		type = MBR_TYPE_GRUB1;
+	} else if (mbr->bootinst[STAGE1_MBR_VERSION] == LOADER_VERSION) {
+		type = MBR_TYPE_LOADER;
+	} else if (mbr->bootinst[STAGE1_MBR_VERSION] == LOADER_JOYENT_VERSION) {
+		type = MBR_TYPE_LOADER_JOYENT;
+	}
+
+	part = (struct ipart *)mbr->parts;
+	for (int i = 0; i < FD_NUMPART; i++) {
+		if (part[i].systid == EFI_PMBR)
+			pmbr = true;
+	}
+
+	if (plist->pl_type == IB_BBLK_MBR)
+		label = pmbr ? "PMBR" : "MBR";
+	else
+		label = "VBR";
+
+	printf("%s block from %s:\n", label, plist->pl_devname);
+
+	switch (type) {
+	case MBR_TYPE_UNKNOWN:
+		printf("Format: unknown\n");
+		break;
+	case MBR_TYPE_GRUB1:
+		printf("Format: grub1\n");
+		break;
+	case MBR_TYPE_LOADER:
+		printf("Format: loader (illumos)\n");
+		break;
+	case MBR_TYPE_LOADER_JOYENT:
+		printf("Format: loader (joyent)\n");
+		break;
+	}
+
+	printf("Signature: 0x%hx (%s)\n", mbr->signature,
+	    mbr->signature == MBB_MAGIC ? "valid" : "invalid");
+
+	printf("UniqueMBRDiskSignature: %#lx\n",
+	    *(uint32_t *)&mbr->bootinst[STAGE1_SIG]);
+
+	if (type == MBR_TYPE_LOADER || type == MBR_TYPE_LOADER_JOYENT) {
+		char uuid[UUID_PRINTABLE_STRING_LENGTH];
+
+		printf("Loader STAGE1_STAGE2_LBA: %llu\n",
+		    *(uint64_t *)&mbr->bootinst[STAGE1_STAGE2_LBA]);
+
+		printf("Loader STAGE1_STAGE2_SIZE: %hu\n",
+		    *(uint16_t *)&mbr->bootinst[STAGE1_STAGE2_SIZE]);
+
+		uuid_unparse((uchar_t *)&mbr->bootinst[STAGE1_STAGE2_UUID],
+		    uuid);
+
+		printf("Loader STAGE1_STAGE2_UUID: %s\n", uuid);
+	}
+	printf("\n");
+}
+
+static void
+print_einfo_cb(struct partlist *plist)
+{
+	uint8_t flags = 0;
+	ib_bootblock_t *bblock;
+	bblk_einfo_t *einfo = NULL;
+	const char *filepath;
+
+	/* No stage, get out. */
+	bblock = plist->pl_stage;
+	if (bblock == NULL)
+		return;
+
+	if (plist->pl_device->stage.path == NULL)
+		filepath = "";
+	else
+		filepath = plist->pl_device->stage.path;
+
+	printf("Boot block from %s:%s\n", plist->pl_devname, filepath);
+
+	if (bblock->extra != NULL)
+		einfo = find_einfo(bblock->extra, bblock->extra_size);
+
+	if (einfo == NULL) {
+		(void) fprintf(stderr,
+		    gettext("No extended information found.\n\n"));
+		return;
+	}
+
+	/* Print the extended information. */
+	if (strip)
+		flags |= EINFO_EASY_PARSE;
+	if (verbose_dump)
+		flags |= EINFO_PRINT_HEADER;
+
+	print_einfo(flags, einfo, bblock->extra_size);
+	printf("\n");
+}
+
+static size_t
+get_media_info(int fd)
+{
+	struct dk_minfo disk_info;
+
+	if ((ioctl(fd, DKIOCGMEDIAINFO, (caddr_t)&disk_info)) == -1)
+		return (SECTOR_SIZE);
+
+	return (disk_info.dki_lbsize);
+}
+
+static struct partlist *
+partlist_alloc(void)
+{
+	struct partlist *pl;
+
+	if ((pl = calloc(1, sizeof (*pl))) == NULL) {
+		perror("calloc");
+		return (NULL);
+	}
+
+	pl->pl_device = calloc(1, sizeof (*pl->pl_device));
+	if (pl->pl_device == NULL) {
+		perror("calloc");
+		free(pl);
+		return (NULL);
+	}
+
+	return (pl);
+}
+
+static void
+partlist_free(struct partlist *pl)
+{
+	ib_bootblock_t *bblock;
+	ib_device_t *device;
+
+	switch (pl->pl_type) {
+	case IB_BBLK_MBR:
+	case IB_BBLK_STAGE1:
+		free(pl->pl_stage);
+		break;
+	default:
+		if (pl->pl_stage != NULL) {
+			bblock = pl->pl_stage;
+			free(bblock->buf);
+			free(bblock);
+		}
+	}
+
+	/* umount the stage fs. */
+	if (pl->pl_device->stage.mntpnt != NULL) {
+		if (umount(pl->pl_device->stage.mntpnt) == 0)
+			(void) rmdir(pl->pl_device->stage.mntpnt);
+		free(pl->pl_device->stage.mntpnt);
+	}
+	device = pl->pl_device;
+	free(device->target.path);
+	free(pl->pl_device);
+
+	free(pl->pl_src_data);
+	free(pl->pl_devname);
+	free(pl);
+}
+
+static bool
+probe_fstyp(ib_data_t *data)
+{
+	fstyp_handle_t fhdl;
+	const char *fident;
+	char *ptr;
+	int fd;
+	bool rv = false;
+
+	/* Record partition id */
+	ptr = strrchr(data->target.path, 'p');
+	if (ptr == NULL)
+		ptr = strrchr(data->target.path, 's');
+	data->target.id = atoi(++ptr);
+	if ((fd = open_device(data->target.path)) == -1)
+		return (rv);
+
+	if (fstyp_init(fd, 0, NULL, &fhdl) != 0) {
+		(void) close(fd);
+		return (rv);
+	}
+
+	if (fstyp_ident(fhdl, NULL, &fident) != 0) {
+		fstyp_fini(fhdl);
+		(void) fprintf(stderr, gettext("Failed to detect file "
+		    "system type\n"));
+		(void) close(fd);
+		return (rv);
+	}
+
+	rv = true;
+	if (strcmp(fident, MNTTYPE_ZFS) == 0)
+		data->target.fstype = IB_FS_ZFS;
+	else if (strcmp(fident, MNTTYPE_UFS) == 0) {
+		data->target.fstype = IB_FS_UFS;
+	} else if (strcmp(fident, MNTTYPE_PCFS) == 0) {
+		data->target.fstype = IB_FS_PCFS;
+	} else {
+		(void) fprintf(stderr, gettext("File system %s is not "
+		    "supported by loader\n"), fident);
+		rv = false;
+	}
+	fstyp_fini(fhdl);
+	(void) close(fd);
+	return (rv);
+}
+
+static bool
+get_slice(ib_data_t *data, struct partlist *pl, struct dk_gpt *vtoc,
+    uint16_t tag)
+{
+	uint_t i;
+	ib_device_t *device = pl->pl_device;
+	char *path, *ptr;
+
+	if (tag != V_BOOT && tag != V_SYSTEM)
+		return (false);
+
+	for (i = 0; i < vtoc->efi_nparts; i++) {
+		if (vtoc->efi_parts[i].p_tag == tag) {
+			if ((path = strdup(data->target.path)) == NULL) {
+				perror(gettext("Memory allocation failure"));
+				return (false);
+			}
+			ptr = strrchr(path, 's');
+			ptr++;
+			*ptr = '\0';
+			(void) asprintf(&ptr, "%s%d", path, i);
+			free(path);
+			if (ptr == NULL) {
+				perror(gettext("Memory allocation failure"));
+				return (false);
+			}
+			pl->pl_devname = ptr;
+			device->stage.id = i;
+			device->stage.devtype = IB_DEV_EFI;
+			switch (vtoc->efi_parts[i].p_tag) {
+			case V_BOOT:
+				device->stage.fstype = IB_FS_NONE;
+				/* leave sector 0 for VBR */
+				device->stage.offset = 1;
+				break;
+			case V_SYSTEM:
+				device->stage.fstype = IB_FS_PCFS;
+				break;
+			}
+			device->stage.tag = vtoc->efi_parts[i].p_tag;
+			device->stage.start = vtoc->efi_parts[i].p_start;
+			device->stage.size = vtoc->efi_parts[i].p_size;
+			break;
+		}
+	}
+	return (true);
+}
+
+static bool
+allocate_slice(ib_data_t *data, struct dk_gpt *vtoc, uint16_t tag,
+    struct partlist **plp)
+{
+	struct partlist *pl;
+
+	*plp = NULL;
+	if ((pl = partlist_alloc()) == NULL)
+		return (false);
+
+	pl->pl_device = calloc(1, sizeof (*pl->pl_device));
+	if (pl->pl_device == NULL) {
+		perror("calloc");
+		partlist_free(pl);
+		return (false);
+	}
+	if (!get_slice(data, pl, vtoc, tag)) {
+		partlist_free(pl);
+		return (false);
+	}
+
+	/* tag was not found */
+	if (pl->pl_devname == NULL)
+		partlist_free(pl);
+	else
+		*plp = pl;
+
+	return (true);
+}
+
+static bool
+probe_gpt(ib_data_t *data)
+{
+	struct partlist *pl;
+	struct dk_gpt *vtoc;
+	ib_device_t *device;
+	int slice, fd;
+	bool rv = false;
+
+	if ((fd = open_device(data->target.path)) < 0)
+		return (rv);
+
+	slice = efi_alloc_and_read(fd, &vtoc);
+	(void) close(fd);
+	if (slice < 0)
+		return (rv);
+
+	data->device.devtype = IB_DEV_EFI;
+	data->target.start = vtoc->efi_parts[slice].p_start;
+	data->target.size = vtoc->efi_parts[slice].p_size;
+
+	/* Always update PMBR. */
+	force_mbr = 1;
+	write_mbr = 1;
+
+	/*
+	 * With GPT we can have boot partition and ESP.
+	 * Boot partition can have both stage 1 and stage 2.
+	 */
+	if (!allocate_slice(data, vtoc, V_BOOT, &pl))
+		goto done;
+	if (pl != NULL) {
+		pl->pl_src_name = stage1;
+		pl->pl_type = IB_BBLK_STAGE1;
+		pl->pl_cb.compare = compare_stage1_cb;
+		pl->pl_cb.install = install_stage1_cb;
+		pl->pl_cb.read = read_stage1_cb;
+		pl->pl_cb.read_bbl = read_stage1_bbl_cb;
+		pl->pl_cb.print = print_stage1_cb;
+		STAILQ_INSERT_TAIL(data->plist, pl, pl_next);
+	} else if (data->target.fstype != IB_FS_ZFS) {
+		(void) fprintf(stderr, gettext("Booting %s from EFI "
+		    "labeled disks requires the boot partition.\n"),
+		    data->target.fstype == IB_FS_UFS?
+		    MNTTYPE_UFS : MNTTYPE_PCFS);
+		goto done;
+	}
+	/* Add stage 2 */
+	if (!allocate_slice(data, vtoc, V_BOOT, &pl))
+		goto done;
+	if (pl != NULL) {
+		pl->pl_src_name = stage2;
+		pl->pl_type = IB_BBLK_STAGE2;
+		pl->pl_cb.compare = compare_einfo_cb;
+		pl->pl_cb.install = install_stage2_cb;
+		pl->pl_cb.read = read_stage2_cb;
+		pl->pl_cb.read_bbl = read_stage2_file_cb;
+		pl->pl_cb.print = print_einfo_cb;
+		STAILQ_INSERT_TAIL(data->plist, pl, pl_next);
+	}
+
+	/* ESP can have 32- and 64-bit boot code. */
+	if (!allocate_slice(data, vtoc, V_SYSTEM, &pl))
+		goto done;
+	if (pl != NULL) {
+		pl->pl_device->stage.path = "/EFI/Boot/" BOOTIA32;
+		pl->pl_src_name = efi32;
+		pl->pl_type = IB_BBLK_EFI;
+		pl->pl_cb.compare = compare_einfo_cb;
+		pl->pl_cb.install = install_esp_cb;
+		pl->pl_cb.read = read_einfo_esp_cb;
+		pl->pl_cb.read_bbl = read_stage2_file_cb;
+		pl->pl_cb.print = print_einfo_cb;
+		STAILQ_INSERT_TAIL(data->plist, pl, pl_next);
+	}
+	if (!allocate_slice(data, vtoc, V_SYSTEM, &pl))
+		goto done;
+	if (pl != NULL) {
+		pl->pl_device->stage.path = "/EFI/Boot/" BOOTX64;
+		pl->pl_src_name = efi64;
+		pl->pl_type = IB_BBLK_EFI;
+		pl->pl_cb.compare = compare_einfo_cb;
+		pl->pl_cb.install = install_esp_cb;
+		pl->pl_cb.read = read_einfo_esp_cb;
+		pl->pl_cb.read_bbl = read_stage2_file_cb;
+		pl->pl_cb.print = print_einfo_cb;
+		STAILQ_INSERT_TAIL(data->plist, pl, pl_next);
+	}
+
+	/* add stage for our target file system slice */
+	pl = partlist_alloc();
+	if (pl == NULL)
+		goto done;
+
+	device = pl->pl_device;
+	device->stage.devtype = data->device.devtype;
+	if ((pl->pl_devname = strdup(data->target.path)) == NULL) {
+		perror(gettext("Memory allocation failure"));
+		partlist_free(pl);
+		goto done;
+	}
+
+	device->stage.id = slice;
+	device->stage.start = vtoc->efi_parts[slice].p_start;
+	device->stage.size = vtoc->efi_parts[slice].p_size;
+
+	/* ZFS and UFS can have stage1 in boot area. */
+	if (data->target.fstype == IB_FS_ZFS ||
+	    data->target.fstype == IB_FS_UFS) {
+		pl->pl_src_name = stage1;
+		pl->pl_type = IB_BBLK_STAGE1;
+		pl->pl_cb.compare = compare_stage1_cb;
+		pl->pl_cb.install = install_stage1_cb;
+		pl->pl_cb.read = read_stage1_cb;
+		pl->pl_cb.read_bbl = read_stage1_bbl_cb;
+		pl->pl_cb.print = print_stage1_cb;
+		STAILQ_INSERT_TAIL(data->plist, pl, pl_next);
+	}
+
+	if (data->target.fstype == IB_FS_ZFS) {
+		pl = partlist_alloc();
+		if (pl == NULL)
+			goto done;
+
+		device = pl->pl_device;
+		device->stage.devtype = data->device.devtype;
+
+		if ((pl->pl_devname = strdup(data->target.path)) == NULL) {
+			perror(gettext("Memory allocation failure"));
+			goto done;
+		}
+
+		device->stage.id = slice;
+		device->stage.start = vtoc->efi_parts[slice].p_start;
+		device->stage.size = vtoc->efi_parts[slice].p_size;
+
+		device->stage.offset = BBLK_ZFS_BLK_OFF;
+		pl->pl_src_name = stage2;
+		pl->pl_type = IB_BBLK_STAGE2;
+		pl->pl_cb.compare = compare_einfo_cb;
+		pl->pl_cb.install = install_stage2_cb;
+		pl->pl_cb.read = read_stage2_cb;
+		pl->pl_cb.read_bbl = read_stage2_file_cb;
+		pl->pl_cb.print = print_einfo_cb;
+		STAILQ_INSERT_TAIL(data->plist, pl, pl_next);
+	}
+	rv = true;
+done:
+	efi_free(vtoc);
+	return (rv);
+}
+
+static bool
+get_start_sector(ib_data_t *data, struct extpartition *v_part,
+    diskaddr_t *start)
+{
+	struct partlist *pl;
+	struct mboot *mbr;
+	struct ipart *part;
+	struct part_info dkpi;
+	struct extpart_info edkpi;
+	uint32_t secnum, numsec;
+	ext_part_t *epp;
+	ushort_t i;
+	int fd, rval, pno;
+
+	if ((fd = open_device(data->target.path)) < 0)
+		return (false);
+
+	if (ioctl(fd, DKIOCEXTPARTINFO, &edkpi) < 0) {
+		if (ioctl(fd, DKIOCPARTINFO, &dkpi) < 0) {
+			(void) fprintf(stderr, gettext("cannot get the "
+			    "slice information of the disk\n"));
+			(void) close(fd);
+			return (false);
+		} else {
+			edkpi.p_start = dkpi.p_start;
+			edkpi.p_length = dkpi.p_length;
+		}
 	}
 	(void) close(fd);
-	return (BC_SUCCESS);
+
+	/* Set target file system start and size */
+	data->target.start = edkpi.p_start;
+	data->target.size = edkpi.p_length;
+
+	/* This is our MBR partition start. */
+	edkpi.p_start -= v_part->p_start;
+
+	/* Head is always MBR */
+	pl = STAILQ_FIRST(data->plist);
+	if (!read_stage1_cb(pl))
+		return (false);
+
+	mbr = (struct mboot *)pl->pl_stage;
+	part = (struct ipart *)mbr->parts;
+
+	for (i = 0; i < FD_NUMPART; i++) {
+		if (part[i].relsect == edkpi.p_start) {
+			*start = part[i].relsect;
+			return (true);
+		}
+	}
+
+	rval = libfdisk_init(&epp, pl->pl_devname, part, FDISK_READ_DISK);
+	if (rval != FDISK_SUCCESS) {
+		switch (rval) {
+			/*
+			 * The first 3 cases are not an error per-se, just that
+			 * there is no Solaris logical partition
+			 */
+			case FDISK_EBADLOGDRIVE:
+			case FDISK_ENOLOGDRIVE:
+			case FDISK_EBADMAGIC:
+				(void) fprintf(stderr, gettext("Solaris "
+				    "partition not found. "
+				    "Aborting operation. %d\n"), rval);
+				return (false);
+			case FDISK_ENOVGEOM:
+				(void) fprintf(stderr, gettext("Could not get "
+				    "virtual geometry\n"));
+				return (false);
+			case FDISK_ENOPGEOM:
+				(void) fprintf(stderr, gettext("Could not get "
+				    "physical geometry\n"));
+				return (false);
+			case FDISK_ENOLGEOM:
+				(void) fprintf(stderr, gettext("Could not get "
+				    "label geometry\n"));
+				return (false);
+			default:
+				(void) fprintf(stderr, gettext("Failed to "
+				    "initialize libfdisk.\n"));
+				return (false);
+		}
+	}
+	rval = fdisk_get_solaris_part(epp, &pno, &secnum, &numsec);
+	libfdisk_fini(&epp);
+	if (rval != FDISK_SUCCESS) {
+		/* No solaris logical partition */
+		(void) fprintf(stderr, gettext("Solaris partition not found. "
+		    "Aborting operation.\n"));
+		return (false);
+	}
+	*start = secnum;
+	return (true);
+}
+
+/*
+ * On x86 the VTOC table is inside MBR partition and to get
+ * absolute sectors, we need to add MBR partition start to VTOC slice start.
+ */
+static bool
+probe_vtoc(ib_data_t *data)
+{
+	struct partlist *pl;
+	struct extvtoc exvtoc;
+	ib_device_t *device;
+	char *path, *ptr;
+	ushort_t i;
+	int slice, fd;
+	diskaddr_t start;
+	bool rv;
+
+	rv = false;
+
+	if ((fd = open_device(data->target.path)) < 0)
+		return (rv);
+
+	slice = read_extvtoc(fd, &exvtoc);
+	(void) close(fd);
+	if (slice < 0)
+		return (rv);
+	data->device.devtype = IB_DEV_VTOC;
+
+	if (!get_start_sector(data, exvtoc.v_part + slice, &start))
+		return (rv);
+
+	if (exvtoc.v_part[slice].p_tag == V_BACKUP) {
+		/*
+		 * NOTE: we could relax there and allow zfs boot on
+		 * slice 2, but lets keep traditional limits.
+		 */
+		(void) fprintf(stderr, gettext(
+		    "raw device must be a root slice (not backup)\n"));
+		return (rv);
+	}
+
+	if ((path = strdup(data->target.path)) == NULL) {
+		perror(gettext("Memory allocation failure"));
+		return (false);
+	}
+
+	data->target.start = start + exvtoc.v_part[slice].p_start;
+	data->target.size = exvtoc.v_part[slice].p_size;
+
+	/* Search for boot slice. */
+	for (i = 0; i < exvtoc.v_nparts; i++) {
+		if (exvtoc.v_part[i].p_tag == V_BOOT)
+			break;
+	}
+
+	if (i == exvtoc.v_nparts ||
+	    exvtoc.v_part[i].p_size == 0) {
+		/* fall back to slice V_BACKUP */
+		for (i = 0; i < exvtoc.v_nparts; i++) {
+			if (exvtoc.v_part[i].p_tag == V_BACKUP)
+				break;
+		}
+		/* Still nothing? Error out. */
+		if (i == exvtoc.v_nparts ||
+		    exvtoc.v_part[i].p_size == 0) {
+			free(path);
+			return (false);
+		}
+	}
+
+	/* Create path. */
+	ptr = strrchr(path, 's');
+	ptr++;
+	*ptr = '\0';
+	(void) asprintf(&ptr, "%s%d", path, i);
+	free(path);
+	if (ptr == NULL) {
+		perror(gettext("Memory allocation failure"));
+		return (false);
+	}
+
+	pl = partlist_alloc();
+	if (pl == NULL) {
+		free(ptr);
+		return (false);
+	}
+	pl->pl_devname = ptr;
+	device = pl->pl_device;
+	device->stage.devtype = data->device.devtype;
+	device->stage.id = i;
+	device->stage.tag = exvtoc.v_part[i].p_tag;
+	device->stage.start = start + exvtoc.v_part[i].p_start;
+	device->stage.size = exvtoc.v_part[i].p_size;
+
+	/* Fix size if this slice is in fact V_BACKUP */
+	if (exvtoc.v_part[i].p_tag == V_BACKUP) {
+		for (i = 0; i < exvtoc.v_nparts; i++) {
+			if (exvtoc.v_part[i].p_start == 0)
+				continue;
+			if (exvtoc.v_part[i].p_size == 0)
+				continue;
+			if (exvtoc.v_part[i].p_start <
+			    device->stage.size)
+				device->stage.size =
+				    exvtoc.v_part[i].p_start;
+		}
+	}
+
+	pl->pl_src_name = stage1;
+	pl->pl_type = IB_BBLK_STAGE1;
+	pl->pl_cb.compare = compare_stage1_cb;
+	pl->pl_cb.install = install_stage1_cb;
+	pl->pl_cb.read = read_stage1_cb;
+	pl->pl_cb.read_bbl = read_stage1_bbl_cb;
+	pl->pl_cb.print = print_stage1_cb;
+	STAILQ_INSERT_TAIL(data->plist, pl, pl_next);
+
+	/* Create instance for stage 2 */
+	pl = partlist_alloc();
+	if (pl == NULL) {
+		free(ptr);
+		return (false);
+	}
+	pl->pl_devname = strdup(ptr);
+	if (pl->pl_devname == NULL) {
+		partlist_free(pl);
+		return (false);
+	}
+	pl->pl_device->stage.devtype = data->device.devtype;
+	pl->pl_device->stage.id = device->stage.id;
+	pl->pl_device->stage.offset = BBLK_BLKLIST_OFF;
+	pl->pl_device->stage.tag = device->stage.tag;
+	pl->pl_device->stage.start = device->stage.start;
+	pl->pl_device->stage.size = device->stage.size;
+	pl->pl_src_name = stage2;
+	pl->pl_type = IB_BBLK_STAGE2;
+	pl->pl_cb.compare = compare_einfo_cb;
+	pl->pl_cb.install = install_stage2_cb;
+	pl->pl_cb.read = read_stage2_cb;
+	pl->pl_cb.read_bbl = read_stage2_file_cb;
+	pl->pl_cb.print = print_einfo_cb;
+	STAILQ_INSERT_TAIL(data->plist, pl, pl_next);
+
+	/* And we are done. */
+	rv = true;
+	return (rv);
+}
+
+static bool
+probe_mbr(ib_data_t *data)
+{
+	struct partlist *pl;
+	struct ipart *part;
+	struct mboot *mbr;
+	ib_device_t *device;
+	char *path, *ptr;
+	int i, rv;
+
+	data->device.devtype = IB_DEV_MBR;
+
+	/* Head is always MBR */
+	pl = STAILQ_FIRST(data->plist);
+	if (!read_stage1_cb(pl))
+		return (false);
+
+	mbr = (struct mboot *)pl->pl_stage;
+	part = (struct ipart *)mbr->parts;
+
+	/* Set target file system start and size */
+	data->target.start = part[data->target.id - 1].relsect;
+	data->target.size = part[data->target.id - 1].numsect;
+
+	/* Use X86BOOT partition if we have one. */
+	for (i = 0; i < FD_NUMPART; i++) {
+		if (part[i].systid == X86BOOT)
+			break;
+	}
+
+	/* Keep device name of whole disk device. */
+	path = (char *)pl->pl_devname;
+	if ((pl = partlist_alloc()) == NULL)
+		return (false);
+	device = pl->pl_device;
+
+	/*
+	 * No X86BOOT, try to use space between MBR and first
+	 * partition.
+	 */
+	if (i == FD_NUMPART) {
+		/* with pcfs we always write MBR */
+		if (data->target.fstype == IB_FS_PCFS) {
+			force_mbr = true;
+			write_mbr = true;
+		}
+
+		pl->pl_devname = strdup(path);
+		if (pl->pl_devname == NULL) {
+			perror(gettext("Memory allocation failure"));
+			partlist_free(pl);
+			return (false);
+		}
+		device->stage.id = 0;
+		device->stage.devtype = IB_DEV_MBR;
+		device->stage.fstype = IB_FS_NONE;
+		device->stage.start = 0;
+		device->stage.size = part[0].relsect;
+		device->stage.offset = BBLK_BLKLIST_OFF;
+		pl->pl_src_name = stage2;
+		pl->pl_type = IB_BBLK_STAGE2;
+		pl->pl_cb.compare = compare_einfo_cb;
+		pl->pl_cb.install = install_stage2_cb;
+		pl->pl_cb.read = read_stage2_cb;
+		pl->pl_cb.read_bbl = read_stage2_file_cb;
+		pl->pl_cb.print = print_einfo_cb;
+		STAILQ_INSERT_TAIL(data->plist, pl, pl_next);
+
+		/* We have MBR for stage1 and gap for stage2, we are done. */
+		return (true);
+	}
+
+	if ((path = strdup(path)) == NULL) {
+		perror(gettext("Memory allocation failure"));
+		partlist_free(pl);
+		return (false);
+	}
+	ptr = strrchr(path, 'p');
+	ptr++;
+	*ptr = '\0';
+	/* partitions are p1..p4 */
+	rv = asprintf(&ptr, "%s%d", path, i + 1);
+	free(path);
+	if (rv < 0) {
+		perror(gettext("Memory allocation failure"));
+		partlist_free(pl);
+		return (false);
+	}
+	pl->pl_devname = ptr;
+	device->stage.id = i + 1;
+	device->stage.devtype = IB_DEV_MBR;
+	device->stage.fstype = IB_FS_NONE;
+	device->stage.start = part[i].relsect;
+	device->stage.size = part[i].numsect;
+	pl->pl_src_name = stage1;
+	pl->pl_type = IB_BBLK_STAGE1;
+	pl->pl_cb.compare = compare_stage1_cb;
+	pl->pl_cb.install = install_stage1_cb;
+	pl->pl_cb.read = read_stage1_cb;
+	pl->pl_cb.read_bbl = read_stage1_bbl_cb;
+	pl->pl_cb.print = print_stage1_cb;
+	STAILQ_INSERT_TAIL(data->plist, pl, pl_next);
+
+	pl = partlist_alloc();
+	if (pl == NULL)
+		return (false);
+	device = pl->pl_device;
+	pl->pl_devname = strdup(ptr);
+	if (pl->pl_devname == NULL) {
+		perror(gettext("Memory allocation failure"));
+		partlist_free(pl);
+		return (false);
+	}
+	device->stage.id = i + 1;
+	device->stage.devtype = IB_DEV_MBR;
+	device->stage.fstype = IB_FS_NONE;
+	device->stage.start = part[i].relsect;
+	device->stage.size = part[i].numsect;
+	device->stage.offset = 1;
+	/* This is boot partition */
+	device->stage.tag = V_BOOT;
+	pl->pl_src_name = stage2;
+	pl->pl_type = IB_BBLK_STAGE2;
+	pl->pl_cb.compare = compare_einfo_cb;
+	pl->pl_cb.install = install_stage2_cb;
+	pl->pl_cb.read = read_stage2_cb;
+	pl->pl_cb.read_bbl = read_stage2_file_cb;
+	pl->pl_cb.print = print_einfo_cb;
+	STAILQ_INSERT_TAIL(data->plist, pl, pl_next);
+
+	return (true);
+}
+
+static bool
+probe_device(ib_data_t *data, const char *dev)
+{
+	struct partlist *pl;
+	struct stat sb;
+	const char *ptr;
+	char *p0;
+	int fd, len;
+
+	if (dev == NULL)
+		return (NULL);
+
+	len = strlen(dev);
+
+	if ((pl = partlist_alloc()) == NULL)
+		return (false);
+
+	if (stat(dev, &sb) == -1) {
+		perror("stat");
+		partlist_free(pl);
+		return (false);
+	}
+
+	/* We have regular file, register it and we are done. */
+	if (S_ISREG(sb.st_mode) != 0) {
+		pl->pl_devname = (char *)dev;
+
+		pl->pl_type = IB_BBLK_FILE;
+		pl->pl_cb.read = read_einfo_file_cb;
+		pl->pl_cb.print = print_einfo_cb;
+		STAILQ_INSERT_TAIL(data->plist, pl, pl_next);
+		return (true);
+	}
+
+	/*
+	 * This is block device.
+	 * We do not allow to specify whole disk device (cXtYdZp0 or cXtYdZ).
+	 */
+	if ((ptr = strrchr(dev, '/')) == NULL)
+		ptr = dev;
+	if ((strrchr(ptr, 'p') == NULL && strrchr(ptr, 's') == NULL) ||
+	    (dev[len - 2] == 'p' && dev[len - 1] == '0')) {
+		(void) fprintf(stderr,
+		    gettext("whole disk device is not supported\n"));
+		partlist_free(pl);
+		return (false);
+	}
+
+	data->target.path = (char *)dev;
+	if (!probe_fstyp(data)) {
+		partlist_free(pl);
+		return (false);
+	}
+
+	/* We start from identifying the whole disk. */
+	if ((p0 = strdup(dev)) == NULL) {
+		perror("calloc");
+		partlist_free(pl);
+		return (false);
+	}
+
+	pl->pl_devname = p0;
+	/* Change device name to p0 */
+	if ((ptr = strrchr(p0, 'p')) == NULL)
+		ptr = strrchr(p0, 's');
+	p0 = (char *)ptr;
+	p0[0] = 'p';
+	p0[1] = '0';
+	p0[2] = '\0';
+
+	if ((fd = open_device(pl->pl_devname)) == -1) {
+		partlist_free(pl);
+		return (false);
+	}
+
+	sector_size = get_media_info(fd);
+	(void) close(fd);
+
+	pl->pl_src_name = stage1;
+	pl->pl_type = IB_BBLK_MBR;
+	pl->pl_cb.compare = compare_mbr_cb;
+	pl->pl_cb.install = install_stage1_cb;
+	pl->pl_cb.read = read_stage1_cb;
+	pl->pl_cb.read_bbl = read_stage1_bbl_cb;
+	pl->pl_cb.print = print_stage1_cb;
+	STAILQ_INSERT_TAIL(data->plist, pl, pl_next);
+
+	if (probe_gpt(data))
+		return (true);
+
+	if (data->device.devtype == IB_DEV_UNKNOWN)
+		if (probe_vtoc(data))
+			return (true);
+
+	if (data->device.devtype == IB_DEV_UNKNOWN)
+		return (probe_mbr(data));
+
+	return (false);
 }
 
 static int
-read_bootblock_from_file(char *file, ib_bootblock_t *bblock)
+read_bootblock_from_file(const char *file, ib_bootblock_t *bblock)
 {
 	struct stat	sb;
 	uint32_t	buf_size;
@@ -171,7 +1744,6 @@ read_bootblock_from_file(char *file, ib_bootblock_t *bblock)
 	fd = open(file, O_RDONLY);
 	if (fd == -1) {
 		BOOT_DEBUG("Error opening %s\n", file);
-		perror("open");
 		goto out;
 	}
 
@@ -232,157 +1804,20 @@ outbuf:
 outfd:
 	(void) close(fd);
 out:
+	if (retval == BC_ERROR) {
+		(void) fprintf(stderr,
+		    gettext("Error reading bootblock from %s\n"),
+		    file);
+	}
+
+	if (retval == BC_NOEXTRA) {
+		BOOT_DEBUG("No multiboot header found on %s, unable to "
+		    "locate extra information area (old/non versioned "
+		    "bootblock?) \n", file);
+		(void) fprintf(stderr, gettext("No extended information"
+		    " found\n"));
+	}
 	return (retval);
-}
-
-static int
-read_bootblock_from_disk(ib_device_t *device, ib_bootblock_t *bblock,
-    char **path)
-{
-	int			dev_fd;
-	uint32_t		size, offset;
-	uint32_t		buf_size;
-	uint32_t		mboot_off;
-	multiboot_header_t	*mboot;
-
-	assert(device != NULL);
-	assert(bblock != NULL);
-
-	if (device->target.fstype == IG_FS_ZFS) {
-		dev_fd = device->target.fd;
-		offset = BBLK_ZFS_BLK_OFF * SECTOR_SIZE;
-		*path = device->target.path;
-	} else {
-		dev_fd = device->stage.fd;
-		offset = device->stage.offset * SECTOR_SIZE;
-		*path = device->stage.path;
-	}
-
-	if (read_in(dev_fd, mboot_scan, sizeof (mboot_scan), offset)
-	    != BC_SUCCESS) {
-		BOOT_DEBUG("Error reading bootblock area\n");
-		perror("read");
-		return (BC_ERROR);
-	}
-
-	/* No multiboot means no chance of knowing bootblock size */
-	if (find_multiboot(mboot_scan, sizeof (mboot_scan), &mboot_off)
-	    != BC_SUCCESS) {
-		BOOT_DEBUG("Unable to find multiboot header\n");
-		return (BC_NOEXTRA);
-	}
-	mboot = (multiboot_header_t *)(mboot_scan + mboot_off);
-
-	/*
-	 * make sure mboot has sane values
-	 */
-	if (mboot->load_end_addr == 0 ||
-	    mboot->load_end_addr < mboot->load_addr)
-		return (BC_NOEXTRA);
-
-	/*
-	 * Currently, the amount of space reserved for extra information
-	 * is "fixed". We may have to scan for the terminating extra payload
-	 * in the future.
-	 */
-	size = mboot->load_end_addr - mboot->load_addr;
-	buf_size = P2ROUNDUP(size + SECTOR_SIZE, SECTOR_SIZE);
-	bblock->file_size = size;
-
-	bblock->buf = malloc(buf_size);
-	if (bblock->buf == NULL) {
-		BOOT_DEBUG("Unable to allocate enough memory to read"
-		    " the extra bootblock from the disk\n");
-		perror(gettext("Memory allocation failure"));
-		return (BC_ERROR);
-	}
-	bblock->buf_size = buf_size;
-
-	if (read_in(dev_fd, bblock->buf, buf_size, offset) != BC_SUCCESS) {
-		BOOT_DEBUG("Error reading the bootblock\n");
-		(void) free(bblock->buf);
-		bblock->buf = NULL;
-		return (BC_ERROR);
-	}
-
-	/* Update pointers. */
-	bblock->file = bblock->buf;
-	bblock->mboot_off = mboot_off;
-	bblock->mboot = (multiboot_header_t *)(bblock->buf + bblock->mboot_off);
-	bblock->extra = bblock->buf + P2ROUNDUP(bblock->file_size, 8);
-	bblock->extra_size = bblock->buf_size - P2ROUNDUP(bblock->file_size, 8);
-
-	BOOT_DEBUG("mboot at %p offset %d, extra at %p size %d, buf=%p "
-	    "(size=%d)\n", bblock->mboot, bblock->mboot_off, bblock->extra,
-	    bblock->extra_size, bblock->buf, bblock->buf_size);
-
-	return (BC_SUCCESS);
-}
-
-static boolean_t
-is_update_necessary(ib_data_t *data, char *updt_str)
-{
-	bblk_einfo_t	*einfo;
-	bblk_einfo_t	*einfo_file;
-	bblk_hs_t	bblock_hs;
-	ib_bootblock_t	bblock_disk;
-	ib_bootblock_t	*bblock_file = &data->bootblock;
-	ib_device_t	*device = &data->device;
-	int		ret;
-	char		*path;
-
-	assert(data != NULL);
-
-	bzero(&bblock_disk, sizeof (ib_bootblock_t));
-
-	ret = read_bootblock_from_disk(device, &bblock_disk, &path);
-	if (ret != BC_SUCCESS) {
-		BOOT_DEBUG("Unable to read bootblock from %s\n", path);
-		return (B_TRUE);
-	}
-
-	einfo = find_einfo(bblock_disk.extra, bblock_disk.extra_size);
-	if (einfo == NULL) {
-		BOOT_DEBUG("No extended information available on disk\n");
-		return (B_TRUE);
-	}
-
-	einfo_file = find_einfo(bblock_file->extra, bblock_file->extra_size);
-	if (einfo_file == NULL) {
-		/*
-		 * loader bootblock is versioned. missing version means
-		 * probably incompatible block. installboot can not install
-		 * grub, for example.
-		 */
-		(void) fprintf(stderr,
-		    gettext("ERROR: non versioned bootblock in file\n"));
-		return (B_FALSE);
-	} else {
-		if (updt_str == NULL) {
-			updt_str = einfo_get_string(einfo_file);
-			do_version = B_TRUE;
-		}
-	}
-
-	if (!do_version || updt_str == NULL) {
-		(void) fprintf(stderr,
-		    gettext("WARNING: target device %s has a "
-		    "versioned bootblock that is going to be overwritten by a "
-		    "non versioned one\n"), device->path);
-		return (B_TRUE);
-	}
-
-	if (force_update) {
-		BOOT_DEBUG("Forcing update of %s bootblock\n", device->path);
-		return (B_TRUE);
-	}
-
-	BOOT_DEBUG("Ready to check installed version vs %s\n", updt_str);
-
-	bblock_hs.src_buf = (unsigned char *)bblock_file->file;
-	bblock_hs.src_size = bblock_file->file_size;
-
-	return (einfo_should_update(einfo, &bblock_hs, updt_str));
 }
 
 static void
@@ -413,64 +1848,58 @@ add_bootblock_einfo(ib_bootblock_t *bblock, char *updt_str)
  * set up location and size of bootblock
  * set disk guid to provide unique information for biosdev command
  */
-static int
-prepare_stage1(ib_data_t *data)
+static void
+prepare_stage1(struct partlist *stage1, struct partlist *stage2, uuid_t uuid)
 {
-	ib_device_t	*device;
+	char *src, *dest;
+	ib_bootblock_t *bblk;
+	ib_device_t *device;
+	uint16_t size;
+	struct mboot *mbr;
 
-	assert(data != NULL);
-	device = &data->device;
+	src = stage1->pl_stage;
+	dest = stage1->pl_src_data;
+	device = stage2->pl_device;
 
-	/* copy BPB */
-	bcopy(device->mbr + STAGE1_BPB_OFFSET,
-	    data->stage1 + STAGE1_BPB_OFFSET, STAGE1_BPB_SIZE);
+	/* Only copy from valid source. */
+	mbr = stage1->pl_stage;
+	if (mbr->signature == MBB_MAGIC) {
+		/* copy BPB */
+		bcopy(src + STAGE1_BPB_OFFSET, dest + STAGE1_BPB_OFFSET,
+		    STAGE1_BPB_SIZE);
 
-
-	/* copy MBR, note STAGE1_SIG == BOOTSZ */
-	bcopy(device->mbr + STAGE1_SIG, data->stage1 + STAGE1_SIG,
-	    SECTOR_SIZE - STAGE1_SIG);
-
-	/* set stage2 size */
-	*((uint16_t *)(data->stage1 + STAGE1_STAGE2_SIZE)) =
-	    (uint16_t)(data->bootblock.buf_size / SECTOR_SIZE);
-
-	/*
-	 * set stage2 location.
-	 * for zfs always use zfs embedding, for ufs/pcfs use partition_start
-	 * as base for stage2 location, for ufs/pcfs in MBR partition, use
-	 * free space after MBR record.
-	 */
-	if (device->target.fstype == IG_FS_ZFS)
-		*((uint64_t *)(data->stage1 + STAGE1_STAGE2_LBA)) =
-		    device->target.start + device->target.offset;
-	else {
-		*((uint64_t *)(data->stage1 + STAGE1_STAGE2_LBA)) =
-		    device->stage.start + device->stage.offset;
+		/* copy MBR, note STAGE1_SIG == BOOTSZ */
+		bcopy(src + STAGE1_SIG, dest + STAGE1_SIG,
+		    SECTOR_SIZE - STAGE1_SIG);
 	}
 
-	/*
-	 * set disk uuid. we only need reasonable amount of uniqueness
-	 * to allow biosdev to identify disk based on mbr differences.
-	 */
-	uuid_generate(data->stage1 + STAGE1_STAGE2_UUID);
+	bcopy(uuid, dest + STAGE1_STAGE2_UUID, UUID_LEN);
 
-	return (BC_SUCCESS);
+	/* set stage2 size */
+	bblk = stage2->pl_src_data;
+	size = bblk->buf_size / SECTOR_SIZE;
+	*((uint16_t *)(dest + STAGE1_STAGE2_SIZE)) = size;
+
+	/* set stage2 LBA */
+	*((uint64_t *)(dest + STAGE1_STAGE2_LBA)) =
+	    device->stage.start + device->stage.offset;
+
+	/* Copy prepared data to stage1 block read from the disk. */
+	bcopy(dest, src, SECTOR_SIZE);
 }
 
-static int
-prepare_bootblock(ib_data_t *data, char *updt_str)
+static void
+prepare_bootblock(ib_data_t *data, struct partlist *pl, char *updt_str)
 {
 	ib_bootblock_t		*bblock;
-	ib_device_t		*device;
 	uint64_t		*ptr;
 
-	assert(data != NULL);
+	assert(pl != NULL);
 
-	bblock = &data->bootblock;
-	device = &data->device;
+	bblock = pl->pl_src_data;
 
 	ptr = (uint64_t *)(&bblock->mboot->bss_end_addr);
-	*ptr = device->target.start;
+	*ptr = data->target.start;
 
 	/*
 	 * the loader bootblock has built in version, if custom
@@ -478,381 +1907,10 @@ prepare_bootblock(ib_data_t *data, char *updt_str)
 	 */
 	if (do_version)
 		add_bootblock_einfo(bblock, updt_str);
-
-	return (BC_SUCCESS);
 }
 
 static int
-write_bootblock(ib_data_t *data)
-{
-	ib_device_t	*device = &data->device;
-	ib_bootblock_t	*bblock = &data->bootblock;
-	uint64_t abs;
-	int dev_fd, ret;
-	off_t offset;
-	char *path;
-
-	assert(data != NULL);
-
-	/*
-	 * ZFS bootblock area is 3.5MB, make sure we can fit.
-	 * buf_size is size of bootblk+EINFO.
-	 */
-	if (bblock->buf_size > BBLK_ZFS_BLK_SIZE) {
-		(void) fprintf(stderr, gettext("bootblock is too large\n"));
-		return (BC_ERROR);
-	}
-
-	if (device->target.fstype == IG_FS_ZFS) {
-		dev_fd = device->target.fd;
-		abs = device->target.start + device->target.offset;
-		offset = BBLK_ZFS_BLK_OFF * SECTOR_SIZE;
-		path = device->target.path;
-	} else {
-		dev_fd = device->stage.fd;
-		abs = device->stage.start + device->stage.offset;
-		offset = device->stage.offset * SECTOR_SIZE;
-		path = device->stage.path;
-		if (bblock->buf_size >
-		    (device->stage.size - device->stage.offset) * SECTOR_SIZE) {
-			(void) fprintf(stderr, gettext("Device %s is "
-			    "too small to fit the stage2\n"), path);
-			return (BC_ERROR);
-		}
-	}
-	ret = write_out(dev_fd, bblock->buf, bblock->buf_size, offset);
-	if (ret != BC_SUCCESS) {
-		BOOT_DEBUG("Error writing the ZFS bootblock "
-		    "to %s at offset %d\n", path, offset);
-		return (BC_ERROR);
-	}
-
-	(void) fprintf(stdout, gettext("bootblock written for %s,"
-	    " %d sectors starting at %d (abs %lld)\n"), path,
-	    (bblock->buf_size / SECTOR_SIZE) + 1, offset / SECTOR_SIZE, abs);
-
-	return (BC_SUCCESS);
-}
-
-/*
- * Partition boot block or volume boot record (VBR). The VBR is
- * stored on partition relative sector 0 and allows chainloading
- * to read boot program from partition.
- *
- * As the VBR will use the first sector of the partition,
- * this means, we need to be sure the space is not used.
- * We do support three partitioning chemes:
- * 1. GPT: zfs and ufs have reserved space for first 8KB, but
- *	only zfs does have space for boot2. The pcfs has support
- *	for VBR, but no space for boot2. So with GPT, to support
- *	ufs or pcfs boot, we must have separate dedicated boot
- *	partition and we will store VBR on it.
- * 2. MBR: we have almost the same situation as with GPT, except that
- *	if the partitions start from cylinder 1, we will have space
- *	between MBR and cylinder 0. If so, we do not require separate
- *	boot partition.
- * 3. MBR+VTOC: with this combination we store VBR in sector 0 of the
- *	solaris2 MBR partition. The slice 0 will start from cylinder 1,
- *	and we do have space for boot2, so we do not require separate
- *	boot partition.
- */
-static int
-write_stage1(ib_data_t *data)
-{
-	ib_device_t	*device = &data->device;
-	uint64_t	start = 0;
-
-	assert(data != NULL);
-
-	/*
-	 * We have separate partition for boot programs and the stage1
-	 * location is not absolute sector 0.
-	 * We will write VBR and trigger MBR to read 1 sector from VBR.
-	 * This case does also cover MBR+VTOC case, as the solaris 2 partition
-	 * name and the root file system slice names are different.
-	 */
-	if (device->stage.start != 0 &&
-	    strcmp(device->target.path, device->stage.path)) {
-		/* we got separate stage area, use it */
-		if (write_out(device->stage.fd, data->stage1,
-		    sizeof (data->stage1), 0) != BC_SUCCESS) {
-			(void) fprintf(stdout, gettext("cannot write "
-			    "partition boot sector\n"));
-			perror("write");
-			return (BC_ERROR);
-		}
-
-		(void) fprintf(stdout, gettext("stage1 written to "
-		    "%s %d sector 0 (abs %d)\n"),
-		    device->devtype == IG_DEV_MBR? "partition":"slice",
-		    device->stage.id, device->stage.start);
-		start = device->stage.start;
-	}
-
-	/*
-	 * We have either GPT or MBR (without VTOC) and if the root
-	 * file system is not pcfs, we can store VBR. Also trigger
-	 * MBR to read 1 sector from VBR.
-	 */
-	if (device->devtype != IG_DEV_VTOC &&
-	    device->target.fstype != IG_FS_PCFS) {
-		if (write_out(device->target.fd, data->stage1,
-		    sizeof (data->stage1), 0) != BC_SUCCESS) {
-			(void) fprintf(stdout, gettext("cannot write "
-			    "partition boot sector\n"));
-			perror("write");
-			return (BC_ERROR);
-		}
-
-		(void) fprintf(stdout, gettext("stage1 written to "
-		    "%s %d sector 0 (abs %d)\n"),
-		    device->devtype == IG_DEV_MBR? "partition":"slice",
-		    device->target.id, device->target.start);
-		start = device->target.start;
-	}
-
-	if (write_mbr) {
-		/*
-		 * If we did write partition boot block, update MBR to
-		 * read partition boot block, not boot2.
-		 */
-		if (start != 0) {
-			*((uint16_t *)(data->stage1 + STAGE1_STAGE2_SIZE)) = 1;
-			*((uint64_t *)(data->stage1 + STAGE1_STAGE2_LBA)) =
-			    start;
-		}
-		if (write_out(device->fd, data->stage1,
-		    sizeof (data->stage1), 0) != BC_SUCCESS) {
-			(void) fprintf(stdout,
-			    gettext("cannot write master boot sector\n"));
-			perror("write");
-			return (BC_ERROR);
-		}
-		(void) fprintf(stdout,
-		    gettext("stage1 written to master boot sector\n"));
-	}
-
-	return (BC_SUCCESS);
-}
-
-/*
- * find partition/slice start sector. will be recorded in stage2 and used
- * by stage2 to identify partition with boot file system.
- */
-static int
-get_start_sector(ib_device_t *device)
-{
-	uint32_t		secnum = 0, numsec = 0;
-	int			i, pno, rval, log_part = 0;
-	struct mboot		*mboot;
-	struct ipart		*part = NULL;
-	ext_part_t		*epp;
-	struct part_info	dkpi;
-	struct extpart_info	edkpi;
-
-	if (device->devtype == IG_DEV_EFI) {
-		struct dk_gpt *vtoc;
-
-		if (efi_alloc_and_read(device->fd, &vtoc) < 0)
-			return (BC_ERROR);
-
-		if (device->stage.start == 0) {
-			/* zero size means the fstype must be zfs */
-			assert(device->target.fstype == IG_FS_ZFS);
-
-			device->stage.start =
-			    vtoc->efi_parts[device->stage.id].p_start;
-			device->stage.size =
-			    vtoc->efi_parts[device->stage.id].p_size;
-			device->stage.offset = BBLK_ZFS_BLK_OFF;
-			device->target.offset = BBLK_ZFS_BLK_OFF;
-		}
-
-		device->target.start =
-		    vtoc->efi_parts[device->target.id].p_start;
-		device->target.size =
-		    vtoc->efi_parts[device->target.id].p_size;
-
-		/* with pcfs we always write MBR */
-		if (device->target.fstype == IG_FS_PCFS) {
-			force_mbr = 1;
-			write_mbr = 1;
-		}
-
-		efi_free(vtoc);
-		goto found_part;
-	}
-
-	mboot = (struct mboot *)device->mbr;
-
-	/* For MBR we have device->stage filled already. */
-	if (device->devtype == IG_DEV_MBR) {
-		/* MBR partition starts from 0 */
-		pno = device->target.id - 1;
-		part = (struct ipart *)mboot->parts + pno;
-
-		if (part->relsect == 0) {
-			(void) fprintf(stderr, gettext("Partition %d of the "
-			    "disk has an incorrect offset\n"),
-			    device->target.id);
-			return (BC_ERROR);
-		}
-		device->target.start = part->relsect;
-		device->target.size = part->numsect;
-
-		/* with pcfs we always write MBR */
-		if (device->target.fstype == IG_FS_PCFS) {
-			force_mbr = 1;
-			write_mbr = 1;
-		}
-		if (device->target.fstype == IG_FS_ZFS)
-			device->target.offset = BBLK_ZFS_BLK_OFF;
-
-		goto found_part;
-	}
-
-	/*
-	 * Search for Solaris fdisk partition
-	 * Get the solaris partition information from the device
-	 * and compare the offset of S2 with offset of solaris partition
-	 * from fdisk partition table.
-	 */
-	if (ioctl(device->target.fd, DKIOCEXTPARTINFO, &edkpi) < 0) {
-		if (ioctl(device->target.fd, DKIOCPARTINFO, &dkpi) < 0) {
-			(void) fprintf(stderr, gettext("cannot get the "
-			    "slice information of the disk\n"));
-			return (BC_ERROR);
-		} else {
-			edkpi.p_start = dkpi.p_start;
-			edkpi.p_length = dkpi.p_length;
-		}
-	}
-
-	device->target.start = edkpi.p_start;
-	device->target.size = edkpi.p_length;
-	if (device->target.fstype == IG_FS_ZFS)
-		device->target.offset = BBLK_ZFS_BLK_OFF;
-
-	for (i = 0; i < FD_NUMPART; i++) {
-		part = (struct ipart *)mboot->parts + i;
-
-		if (part->relsect == 0) {
-			(void) fprintf(stderr, gettext("Partition %d of the "
-			    "disk has an incorrect offset\n"), i+1);
-			return (BC_ERROR);
-		}
-
-		if (edkpi.p_start >= part->relsect &&
-		    edkpi.p_start < (part->relsect + part->numsect)) {
-			/* Found the partition */
-			break;
-		}
-	}
-
-	if (i == FD_NUMPART) {
-		/* No solaris fdisk partitions (primary or logical) */
-		(void) fprintf(stderr, gettext("Solaris partition not found. "
-		    "Aborting operation.\n"));
-		return (BC_ERROR);
-	}
-
-	/*
-	 * We have found a Solaris fdisk partition (primary or extended)
-	 * Handle the simple case first: Solaris in a primary partition
-	 */
-	if (!fdisk_is_dos_extended(part->systid)) {
-		device->stage.start = part->relsect;
-		device->stage.size = part->numsect;
-		if (device->target.fstype == IG_FS_ZFS)
-			device->stage.offset = BBLK_ZFS_BLK_OFF;
-		else
-			device->stage.offset = BBLK_BLKLIST_OFF;
-		device->stage.id = i + 1;
-		goto found_part;
-	}
-
-	/*
-	 * Solaris in a logical partition. Find that partition in the
-	 * extended part.
-	 */
-
-	if ((rval = libfdisk_init(&epp, device->path, NULL, FDISK_READ_DISK))
-	    != FDISK_SUCCESS) {
-		switch (rval) {
-			/*
-			 * The first 3 cases are not an error per-se, just that
-			 * there is no Solaris logical partition
-			 */
-			case FDISK_EBADLOGDRIVE:
-			case FDISK_ENOLOGDRIVE:
-			case FDISK_EBADMAGIC:
-				(void) fprintf(stderr, gettext("Solaris "
-				    "partition not found. "
-				    "Aborting operation.\n"));
-				return (BC_ERROR);
-			case FDISK_ENOVGEOM:
-				(void) fprintf(stderr, gettext("Could not get "
-				    "virtual geometry\n"));
-				return (BC_ERROR);
-			case FDISK_ENOPGEOM:
-				(void) fprintf(stderr, gettext("Could not get "
-				    "physical geometry\n"));
-				return (BC_ERROR);
-			case FDISK_ENOLGEOM:
-				(void) fprintf(stderr, gettext("Could not get "
-				    "label geometry\n"));
-				return (BC_ERROR);
-			default:
-				(void) fprintf(stderr, gettext("Failed to "
-				    "initialize libfdisk.\n"));
-				return (BC_ERROR);
-		}
-	}
-
-	rval = fdisk_get_solaris_part(epp, &pno, &secnum, &numsec);
-	libfdisk_fini(&epp);
-	if (rval != FDISK_SUCCESS) {
-		/* No solaris logical partition */
-		(void) fprintf(stderr, gettext("Solaris partition not found. "
-		    "Aborting operation.\n"));
-		return (BC_ERROR);
-	}
-
-	device->stage.start = secnum;
-	device->stage.size = numsec;
-	device->stage.id = pno;
-	log_part = 1;
-
-found_part:
-	/* get confirmation for -m */
-	if (write_mbr && !force_mbr) {
-		(void) fprintf(stdout, gettext("Updating master boot sector "
-		    "destroys existing boot managers (if any).\n"
-		    "continue (y/n)? "));
-		if (!yes()) {
-			write_mbr = 0;
-			(void) fprintf(stdout, gettext("master boot sector "
-			    "not updated\n"));
-			return (BC_ERROR);
-		}
-	}
-
-	/*
-	 * warn, if illumos in primary partition and loader not in MBR and
-	 * partition is not active
-	 */
-	if (device->devtype != IG_DEV_EFI) {
-		if (!log_part && part->bootid != 128 && !write_mbr) {
-			(void) fprintf(stdout, gettext("Solaris fdisk "
-			    "partition is inactive.\n"), device->stage.id);
-		}
-	}
-
-	return (BC_SUCCESS);
-}
-
-static int
-open_device(char *path)
+open_device(const char *path)
 {
 	struct stat	statbuf = {0};
 	int		fd = -1;
@@ -885,357 +1943,69 @@ open_device(char *path)
 	return (fd);
 }
 
-static int
-get_boot_partition(ib_device_t *device, struct mboot *mbr)
-{
-	struct ipart *part;
-	char *path, *ptr;
-	int i;
-
-	part = (struct ipart *)mbr->parts;
-	for (i = 0; i < FD_NUMPART; i++) {
-		if (part[i].systid == X86BOOT)
-			break;
-	}
-
-	/* no X86BOOT, try to use space between MBR and first partition */
-	if (i == FD_NUMPART) {
-		device->stage.path = strdup(device->path);
-		if (device->stage.path == NULL) {
-			perror(gettext("Memory allocation failure"));
-			return (BC_ERROR);
-		}
-		device->stage.fd = dup(device->fd);
-		device->stage.id = 0;
-		device->stage.devtype = IG_DEV_MBR;
-		device->stage.fstype = IG_FS_NONE;
-		device->stage.start = 0;
-		device->stage.size = part[0].relsect;
-		device->stage.offset = BBLK_BLKLIST_OFF;
-		return (BC_SUCCESS);
-	}
-
-	if ((path = strdup(device->path)) == NULL) {
-		perror(gettext("Memory allocation failure"));
-		return (BC_ERROR);
-	}
-
-	ptr = strrchr(path, 'p');
-	ptr++;
-	*ptr = '\0';
-	(void) asprintf(&ptr, "%s%d", path, i+1); /* partitions are p1..p4 */
-	free(path);
-	if (ptr == NULL) {
-		perror(gettext("Memory allocation failure"));
-		return (BC_ERROR);
-	}
-	device->stage.path = ptr;
-	device->stage.fd = open_device(ptr);
-	device->stage.id = i + 1;
-	device->stage.devtype = IG_DEV_MBR;
-	device->stage.fstype = IG_FS_NONE;
-	device->stage.start = part[i].relsect;
-	device->stage.size = part[i].numsect;
-	device->stage.offset = 1; /* leave sector 0 for VBR */
-	return (BC_SUCCESS);
-}
-
-static int
-get_boot_slice(ib_device_t *device, struct dk_gpt *vtoc)
-{
-	uint_t i;
-	char *path, *ptr;
-
-	for (i = 0; i < vtoc->efi_nparts; i++) {
-		if (vtoc->efi_parts[i].p_tag == V_BOOT) {
-			if ((path = strdup(device->target.path)) == NULL) {
-				perror(gettext("Memory allocation failure"));
-				return (BC_ERROR);
-			}
-			ptr = strrchr(path, 's');
-			ptr++;
-			*ptr = '\0';
-			(void) asprintf(&ptr, "%s%d", path, i);
-			free(path);
-			if (ptr == NULL) {
-				perror(gettext("Memory allocation failure"));
-				return (BC_ERROR);
-			}
-			device->stage.path = ptr;
-			device->stage.fd = open_device(ptr);
-			device->stage.id = i;
-			device->stage.devtype = IG_DEV_EFI;
-			device->stage.fstype = IG_FS_NONE;
-			device->stage.start = vtoc->efi_parts[i].p_start;
-			device->stage.size = vtoc->efi_parts[i].p_size;
-			device->stage.offset = 1; /* leave sector 0 for VBR */
-			return (BC_SUCCESS);
-		}
-	}
-	return (BC_SUCCESS);
-}
-
-static int
-init_device(ib_device_t *device, char *path)
-{
-	struct dk_gpt *vtoc;
-	fstyp_handle_t fhdl;
-	const char *fident;
-	char *p;
-	int pathlen = strlen(path);
-	int ret;
-
-	bzero(device, sizeof (*device));
-	device->fd = -1;	/* whole disk fd */
-	device->stage.fd = -1;	/* bootblock partition fd */
-	device->target.fd = -1;	/* target fs partition fd */
-
-	/* basic check, whole disk is not allowed */
-	if ((p = strrchr(path, '/')) == NULL)
-		p = path;
-	if ((strrchr(p, 'p') == NULL && strrchr(p, 's') == NULL) ||
-	    (path[pathlen-2] == 'p' && path[pathlen-1] == '0')) {
-		(void) fprintf(stderr, gettext("installing loader to "
-		    "whole disk device is not supported\n"));
-	}
-
-	device->target.path = strdup(path);
-	if (device->target.path == NULL) {
-		perror(gettext("Memory allocation failure"));
-		return (BC_ERROR);
-	}
-	device->path = strdup(path);
-	if (device->path == NULL) {
-		perror(gettext("Memory allocation failure"));
-		return (BC_ERROR);
-	}
-
-	/* change device name to p0 */
-	device->path[pathlen - 2] = 'p';
-	device->path[pathlen - 1] = '0';
-
-	if (strstr(device->target.path, "diskette")) {
-		(void) fprintf(stderr, gettext("installing loader to a floppy "
-		    "disk is not supported\n"));
-		return (BC_ERROR);
-	}
-
-	/* Detect if the target device is a pcfs partition. */
-	if (strstr(device->target.path, "p0:boot")) {
-		(void) fprintf(stderr, gettext("installing loader to x86 boot "
-		    "partition is not supported\n"));
-		return (BC_ERROR);
-	}
-
-	if ((device->fd = open_device(device->path)) == -1)
-		return (BC_ERROR);
-
-	/* read in the device boot sector. */
-	if (read(device->fd, device->mbr, SECTOR_SIZE) != SECTOR_SIZE) {
-		(void) fprintf(stderr, gettext("Error reading boot sector\n"));
-		perror("read");
-		return (BC_ERROR);
-	}
-
-	device->devtype = IG_DEV_VTOC;
-	if (efi_alloc_and_read(device->fd, &vtoc) >= 0) {
-		ret = get_boot_slice(device, vtoc);
-		device->devtype = IG_DEV_EFI;
-		efi_free(vtoc);
-		if (ret == BC_ERROR)
-			return (BC_ERROR);
-	} else if (device->target.path[pathlen - 2] == 'p') {
-		device->devtype = IG_DEV_MBR;
-		ret = get_boot_partition(device, (struct mboot *)device->mbr);
-		if (ret == BC_ERROR)
-			return (BC_ERROR);
-	} else if (device->target.path[pathlen - 1] == '2') {
-		/*
-		 * NOTE: we could relax there and allow zfs boot on
-		 * slice 2 for instance, but lets keep traditional limits.
-		 */
-		(void) fprintf(stderr,
-		    gettext("raw device must be a root slice (not s2)\n"));
-		return (BC_ERROR);
-	}
-
-	/* fill stage partition for case there is no boot partition */
-	if (device->stage.path == NULL) {
-		if ((device->stage.path = strdup(path)) == NULL) {
-			perror(gettext("Memory allocation failure"));
-			return (BC_ERROR);
-		}
-		if (device->devtype == IG_DEV_VTOC) {
-			/* use slice 2 */
-			device->stage.path[pathlen - 2] = 's';
-			device->stage.path[pathlen - 1] = '2';
-			device->stage.id = 2;
-		} else {
-			p = strrchr(device->stage.path, 'p');
-			if (p == NULL)
-				p = strrchr(device->stage.path, 's');
-			device->stage.id = atoi(++p);
-		}
-		device->stage.devtype = device->devtype;
-		device->stage.fd = open_device(device->stage.path);
-	}
-
-	p = strrchr(device->target.path, 'p');
-	if (p == NULL)
-		p = strrchr(device->target.path, 's');
-	device->target.id = atoi(++p);
-
-	if (strcmp(device->stage.path, device->target.path) == 0)
-		device->target.fd = dup(device->stage.fd);
-	else
-		device->target.fd = open_device(device->target.path);
-
-	if (fstyp_init(device->target.fd, 0, NULL, &fhdl) != 0)
-		return (BC_ERROR);
-
-	if (fstyp_ident(fhdl, NULL, &fident) != 0) {
-		fstyp_fini(fhdl);
-		(void) fprintf(stderr, gettext("Failed to detect file "
-		    "system type\n"));
-		return (BC_ERROR);
-	}
-
-	/* at this moment non-boot partition has no size set, use this fact */
-	if (device->devtype == IG_DEV_EFI && strcmp(fident, "zfs") &&
-	    device->stage.size == 0) {
-		fstyp_fini(fhdl);
-		(void) fprintf(stderr, gettext("Booting %s of EFI labeled "
-		    "disks requires the boot partition.\n"), fident);
-		return (BC_ERROR);
-	}
-	if (strcmp(fident, "zfs") == 0)
-		device->target.fstype = IG_FS_ZFS;
-	else if (strcmp(fident, "ufs") == 0) {
-		device->target.fstype = IG_FS_UFS;
-	} else if (strcmp(fident, "pcfs") == 0) {
-		device->target.fstype = IG_FS_PCFS;
-	} else {
-		(void) fprintf(stderr, gettext("File system %s is not "
-		    "supported by loader\n"), fident);
-		fstyp_fini(fhdl);
-		return (BC_ERROR);
-	}
-	fstyp_fini(fhdl);
-
-	/* check for boot partition content */
-	if (device->stage.size) {
-		if (fstyp_init(device->stage.fd, 0, NULL, &fhdl) != 0)
-			return (BC_ERROR);
-
-		if (fstyp_ident(fhdl, NULL, &fident) == 0) {
-			(void) fprintf(stderr, gettext("Unexpected %s file "
-			    "system on boot partition\n"), fident);
-			fstyp_fini(fhdl);
-			return (BC_ERROR);
-		}
-		fstyp_fini(fhdl);
-	}
-	return (get_start_sector(device));
-}
-
-static void
-cleanup_device(ib_device_t *device)
-{
-	if (device->path)
-		free(device->path);
-	if (device->stage.path)
-		free(device->stage.path);
-	if (device->target.path)
-		free(device->target.path);
-
-	if (device->fd != -1)
-		(void) close(device->fd);
-	if (device->stage.fd != -1)
-		(void) close(device->stage.fd);
-	if (device->target.fd != -1)
-		(void) close(device->target.fd);
-	bzero(device, sizeof (*device));
-}
-
-static void
-cleanup_bootblock(ib_bootblock_t *bblock)
-{
-	free(bblock->buf);
-	bzero(bblock, sizeof (ib_bootblock_t));
-}
-
 /*
- * Propagate the bootblock on the source disk to the destination disk and
- * version it with 'updt_str' in the process. Since we cannot trust any data
- * on the attaching disk, we do not perform any specific check on a potential
- * target extended information structure and we just blindly update.
+ * We need to record stage2 location and size into pmbr/vbr.
+ * We need to record target partiton LBA to stage2.
  */
-static int
-propagate_bootblock(ib_data_t *src, ib_data_t *dest, char *updt_str)
+static void
+prepare_bblocks(ib_data_t *data)
 {
-	ib_bootblock_t	*src_bblock = &src->bootblock;
-	ib_bootblock_t	*dest_bblock = &dest->bootblock;
+	struct partlist *pl;
+	struct partlist *mbr, *stage1, *stage2;
+	uuid_t uuid;
 
-	assert(src != NULL);
-	assert(dest != NULL);
-
-	/* read the stage1 file from source disk */
-	if (read(src->device.fd, dest->stage1, SECTOR_SIZE) != SECTOR_SIZE) {
-		(void) fprintf(stderr, gettext("cannot read stage1 from %s\n"),
-		    src->device.path);
-		return (BC_ERROR);
+	mbr = stage1 = stage2 = NULL;
+	/*
+	 * Walk list and pick up BIOS boot blocks. EFI boot programs
+	 * can be set in place.
+	 */
+	STAILQ_FOREACH(pl, data->plist, pl_next) {
+		switch (pl->pl_type) {
+		case IB_BBLK_MBR:
+			mbr = pl;
+			break;
+		case IB_BBLK_STAGE1:
+			stage1 = pl;
+			break;
+		case IB_BBLK_STAGE2:
+			stage2 = pl;
+			/* FALLTHROUGH */
+		case IB_BBLK_EFI:
+			prepare_bootblock(data, pl, update_str);
+			break;
+		default:
+			break;
+		}
 	}
 
-	cleanup_bootblock(dest_bblock);
+	/* If stage2 is missing, we are done. */
+	if (stage2 == NULL)
+		return;
 
-	dest_bblock->buf_size = src_bblock->buf_size;
-	dest_bblock->buf = malloc(dest_bblock->buf_size);
-	if (dest_bblock->buf == NULL) {
-		perror(gettext("Memory Allocation Failure"));
-		return (BC_ERROR);
-	}
-	dest_bblock->file = dest_bblock->buf;
-	dest_bblock->file_size = src_bblock->file_size;
-	(void) memcpy(dest_bblock->buf, src_bblock->buf,
-	    dest_bblock->buf_size);
+	/*
+	 * Create disk uuid. We only need reasonable amount of uniqueness
+	 * to allow biosdev to identify disk based on mbr differences.
+	 */
+	uuid_generate(uuid);
 
-	dest_bblock->mboot = (multiboot_header_t *)(dest_bblock->file +
-	    src_bblock->mboot_off);
-	dest_bblock->mboot_off = src_bblock->mboot_off;
-	dest_bblock->extra = (char *)dest_bblock->file +
-	    P2ROUNDUP(dest_bblock->file_size, 8);
-	dest_bblock->extra_size = src_bblock->extra_size;
+	if (mbr != NULL) {
+		prepare_stage1(mbr, stage2, uuid);
 
-	(void) fprintf(stdout, gettext("Propagating %s bootblock to %s\n"),
-	    src->device.path, dest->device.path);
+		/*
+		 * If we have stage1, we point MBR to read stage 1.
+		 */
+		if (stage1 != NULL) {
+			char *dest = mbr->pl_stage;
 
-	return (commit_to_disk(dest, updt_str));
-}
-
-static int
-commit_to_disk(ib_data_t *data, char *update_str)
-{
-	assert(data != NULL);
-
-	if (prepare_bootblock(data, update_str) != BC_SUCCESS) {
-		(void) fprintf(stderr, gettext("Error updating the bootblock "
-		    "image\n"));
-		return (BC_ERROR);
+			*((uint16_t *)(dest + STAGE1_STAGE2_SIZE)) = 1;
+			*((uint64_t *)(dest + STAGE1_STAGE2_LBA)) =
+			    stage1->pl_device->stage.start;
+		}
 	}
 
-	if (prepare_stage1(data) != BC_SUCCESS) {
-		(void) fprintf(stderr, gettext("Error updating the stage1 "
-		    "image\n"));
-		return (BC_ERROR);
+	if (stage1 != NULL) {
+		prepare_stage1(stage1, stage2, uuid);
 	}
-
-	if (write_bootblock(data) != BC_SUCCESS) {
-		(void) fprintf(stderr, gettext("Error writing bootblock to "
-		    "disk\n"));
-		return (BC_ERROR);
-	}
-
-	return (write_stage1(data));
 }
 
 /*
@@ -1251,67 +2021,116 @@ commit_to_disk(ib_data_t *data, char *update_str)
  *
  */
 static int
-handle_install(char *progname, char **argv)
+handle_install(char *progname, int argc, char **argv)
 {
-	ib_data_t	install_data;
-	ib_bootblock_t	*bblock = &install_data.bootblock;
-	char		*stage1 = NULL;
-	char		*bootblock = NULL;
+	struct partlist	*pl;
+	ib_data_t	data = { 0 };
 	char		*device_path = NULL;
 	int		ret = BC_ERROR;
 
-	stage1 = strdup(argv[0]);
-	bootblock = strdup(argv[1]);
-	device_path = strdup(argv[2]);
-
-	if (!device_path || !bootblock || !stage1) {
-		(void) fprintf(stderr, gettext("Missing parameter"));
-		usage(progname, BC_ERROR);
+	switch (argc) {
+	case 1:
+		if ((device_path = strdup(argv[0])) == NULL) {
+			perror(gettext("Memory Allocation Failure"));
+			goto done;
+		}
+		if (asprintf(&stage1, "%s/%s", boot_dir, STAGE1) < 0) {
+			perror(gettext("Memory Allocation Failure"));
+			goto done;
+		}
+		if (asprintf(&stage2, "%s/%s", boot_dir, STAGE2) < 0) {
+			perror(gettext("Memory Allocation Failure"));
+			goto done;
+		}
+		if (asprintf(&efi32, "%s/%s", boot_dir, LOADER32) < 0) {
+			perror(gettext("Memory Allocation Failure"));
+			goto done;
+		}
+		if (asprintf(&efi64, "%s/%s", boot_dir, LOADER64) < 0) {
+			perror(gettext("Memory Allocation Failure"));
+			goto done;
+		}
+		break;
+	case 3:
+		if ((stage1 = strdup(argv[0])) == NULL) {
+			perror(gettext("Memory Allocation Failure"));
+			goto done;
+		}
+		if ((stage2 = strdup(argv[1])) == NULL) {
+			perror(gettext("Memory Allocation Failure"));
+			goto done;
+		}
+		if ((device_path = strdup(argv[2])) == NULL) {
+			perror(gettext("Memory Allocation Failure"));
+			goto done;
+		}
+		if (asprintf(&efi32, "%s/%s", boot_dir, LOADER32) < 0) {
+			perror(gettext("Memory Allocation Failure"));
+			goto done;
+		}
+		if (asprintf(&efi64, "%s/%s", boot_dir, LOADER64) < 0) {
+			perror(gettext("Memory Allocation Failure"));
+			goto done;
+		}
+		break;
+	default:
+		usage(progname, ret);
 	}
+
+	data.plist = malloc(sizeof (*data.plist));
+	if (data.plist == NULL) {
+		perror(gettext("Memory Allocation Failure"));
+		goto done;
+	}
+	STAILQ_INIT(data.plist);
 
 	BOOT_DEBUG("device path: %s, stage1 path: %s bootblock path: %s\n",
-	    device_path, stage1, bootblock);
-	bzero(&install_data, sizeof (ib_data_t));
+	    device_path, stage1, stage2);
 
-	if (init_device(&install_data.device, device_path) != BC_SUCCESS) {
-		(void) fprintf(stderr, gettext("Unable to open device %s\n"),
-		    device_path);
-		goto out;
+	if (probe_device(&data, device_path)) {
+		/* Read all data. */
+		STAILQ_FOREACH(pl, data.plist, pl_next) {
+			if (!pl->pl_cb.read(pl)) {
+				printf("\n");
+			}
+			if (!pl->pl_cb.read_bbl(pl)) {
+				(void) fprintf(stderr,
+				    gettext("Error reading %s\n"),
+				    pl->pl_src_name);
+				goto cleanup;
+			}
+		}
+
+		/* Prepare data. */
+		prepare_bblocks(&data);
+
+		/* Commit data to disk. */
+		while ((pl = STAILQ_LAST(data.plist, partlist, pl_next)) !=
+		    NULL) {
+			if (pl->pl_cb.compare != NULL &&
+			    pl->pl_cb.compare(pl)) {
+				if (pl->pl_cb.install != NULL)
+					pl->pl_cb.install(&data, pl);
+			} else {
+				printf("\n");
+			}
+			STAILQ_REMOVE(data.plist, pl, partlist, pl_next);
+			partlist_free(pl);
+		}
 	}
+	ret = BC_SUCCESS;
 
-	if (read_stage1_from_file(stage1, &install_data) != BC_SUCCESS) {
-		(void) fprintf(stderr, gettext("Error opening %s\n"), stage1);
-		goto out_dev;
+cleanup:
+	while ((pl = STAILQ_LAST(data.plist, partlist, pl_next)) != NULL) {
+		STAILQ_REMOVE(data.plist, pl, partlist, pl_next);
+		partlist_free(pl);
 	}
-
-	if (read_bootblock_from_file(bootblock, bblock) != BC_SUCCESS) {
-		(void) fprintf(stderr, gettext("Error reading %s\n"),
-		    bootblock);
-		goto out_dev;
-	}
-
-	/*
-	 * is_update_necessary() will take care of checking if versioning and/or
-	 * forcing the update have been specified. It will also emit a warning
-	 * if a non-versioned update is attempted over a versioned bootblock.
-	 */
-	if (!is_update_necessary(&install_data, update_str)) {
-		(void) fprintf(stderr, gettext("bootblock version installed "
-		    "on %s is more recent or identical\n"
-		    "Use -F to override or install without the -u option\n"),
-		    device_path);
-		ret = BC_NOUPDT;
-		goto out_dev;
-	}
-
-	BOOT_DEBUG("Ready to commit to disk\n");
-	ret = commit_to_disk(&install_data, update_str);
-
-out_dev:
-	cleanup_device(&install_data.device);
-out:
+	free(data.plist);
+done:
 	free(stage1);
-	free(bootblock);
+	free(stage2);
+	free(efi32);
+	free(efi64);
 	free(device_path);
 	return (ret);
 }
@@ -1327,83 +2146,46 @@ out:
  *        - BC_NOEINFO (no extended information available)
  */
 static int
-handle_getinfo(char *progname, char **argv)
+handle_getinfo(char *progname, int argc, char **argv)
 {
-	struct stat	sb;
-	ib_bootblock_t	bblock;
-	ib_device_t	device;
-	bblk_einfo_t	*einfo;
-	uint8_t		flags = 0;
-	char		*device_path, *path;
-	int		retval = BC_ERROR;
-	int		ret;
+	struct partlist	*pl;
+	ib_data_t	data = { 0 };
+	char		*device_path;
 
-	device_path = strdup(argv[0]);
-	if (!device_path) {
+	if (argc != 1) {
 		(void) fprintf(stderr, gettext("Missing parameter"));
 		usage(progname, BC_ERROR);
 	}
 
-	if (stat(device_path, &sb) == -1) {
-		perror("stat");
-		goto out;
+	if ((device_path = strdup(argv[0])) == NULL) {
+		perror(gettext("Memory Allocation Failure"));
+		return (BC_ERROR);
 	}
 
-	bzero(&bblock, sizeof (bblock));
-	bzero(&device, sizeof (device));
-	BOOT_DEBUG("device path: %s\n", device_path);
+	data.plist = malloc(sizeof (*data.plist));
+	if (data.plist == NULL) {
+		perror("malloc");
+		free(device_path);
+		return (BC_ERROR);
+	}
+	STAILQ_INIT(data.plist);
 
-	if (S_ISREG(sb.st_mode) != 0) {
-		path = device_path;
-		ret = read_bootblock_from_file(device_path, &bblock);
-	} else {
-		if (init_device(&device, device_path) != BC_SUCCESS) {
-			(void) fprintf(stderr, gettext("Unable to gather "
-			    "device information from %s\n"), device_path);
-			goto out_dev;
+	if (probe_device(&data, device_path)) {
+		STAILQ_FOREACH(pl, data.plist, pl_next) {
+			if (pl->pl_cb.read(pl))
+				pl->pl_cb.print(pl);
+			else
+				printf("\n");
 		}
-		ret = read_bootblock_from_disk(&device, &bblock, &path);
 	}
 
-	if (ret == BC_ERROR) {
-		(void) fprintf(stderr, gettext("Error reading bootblock from "
-		    "%s\n"), path);
-		goto out_dev;
+	while ((pl = STAILQ_LAST(data.plist, partlist, pl_next)) != NULL) {
+		STAILQ_REMOVE(data.plist, pl, partlist, pl_next);
+		partlist_free(pl);
 	}
+	free(data.plist);
 
-	if (ret == BC_NOEXTRA) {
-		BOOT_DEBUG("No multiboot header found on %s, unable "
-		    "to locate extra information area (old/non versioned "
-		    "bootblock?) \n", device_path);
-		(void) fprintf(stderr, gettext("No extended information "
-		    "found\n"));
-		retval = BC_NOEINFO;
-		goto out_dev;
-	}
-
-	einfo = find_einfo(bblock.extra, bblock.extra_size);
-	if (einfo == NULL) {
-		retval = BC_NOEINFO;
-		(void) fprintf(stderr, gettext("No extended information "
-		    "found\n"));
-		goto out_dev;
-	}
-
-	/* Print the extended information. */
-	if (strip)
-		flags |= EINFO_EASY_PARSE;
-	if (verbose_dump)
-		flags |= EINFO_PRINT_HEADER;
-
-	print_einfo(flags, einfo, bblock.extra_size);
-	retval = BC_SUCCESS;
-
-out_dev:
-	if (S_ISREG(sb.st_mode) == 0)
-		cleanup_device(&device);
-out:
-	free(device_path);
-	return (retval);
+	return (BC_SUCCESS);
 }
 
 /*
@@ -1416,85 +2198,124 @@ out:
  *			there is no multiboot information)
  */
 static int
-handle_mirror(char *progname, char **argv)
+handle_mirror(char *progname, int argc, char **argv)
 {
-	ib_data_t	curr_data;
-	ib_data_t	attach_data;
-	ib_device_t	*curr_device = &curr_data.device;
-	ib_device_t	*attach_device = &attach_data.device;
-	ib_bootblock_t	*bblock_curr = &curr_data.bootblock;
-	ib_bootblock_t	*bblock_attach = &attach_data.bootblock;
-	bblk_einfo_t	*einfo_curr = NULL;
-	char		*curr_device_path;
-	char		*attach_device_path;
-	char		*updt_str = NULL;
-	char		*path;
+	ib_data_t src = { 0 };
+	ib_data_t dest = { 0 };
+	struct partlist *pl_src, *pl_dest;
+	char		*curr_device_path = NULL;
+	char		*attach_device_path = NULL;
 	int		retval = BC_ERROR;
-	int		ret;
 
-	curr_device_path = strdup(argv[0]);
-	attach_device_path = strdup(argv[1]);
+	if (argc == 2) {
+		curr_device_path = strdup(argv[0]);
+		attach_device_path = strdup(argv[1]);
+	}
 
 	if (!curr_device_path || !attach_device_path) {
+		free(curr_device_path);
+		free(attach_device_path);
 		(void) fprintf(stderr, gettext("Missing parameter"));
 		usage(progname, BC_ERROR);
 	}
 	BOOT_DEBUG("Current device path is: %s, attaching device path is: "
 	    " %s\n", curr_device_path, attach_device_path);
 
-	bzero(&curr_data, sizeof (ib_data_t));
-	bzero(&attach_data, sizeof (ib_data_t));
+	src.plist = malloc(sizeof (*src.plist));
+	if (src.plist == NULL) {
+		perror("malloc");
+		return (BC_ERROR);
+	}
+	STAILQ_INIT(src.plist);
 
-	if (init_device(curr_device, curr_device_path) != BC_SUCCESS) {
+	dest.plist = malloc(sizeof (*dest.plist));
+	if (dest.plist == NULL) {
+		perror("malloc");
+		goto out;
+	}
+	STAILQ_INIT(dest.plist);
+
+	if (!probe_device(&src, curr_device_path)) {
 		(void) fprintf(stderr, gettext("Unable to gather device "
 		    "information from %s (current device)\n"),
 		    curr_device_path);
-		goto out_currdev;
+		goto out;
 	}
 
-	if (init_device(attach_device, attach_device_path) != BC_SUCCESS) {
+	if (!probe_device(&dest, attach_device_path) != BC_SUCCESS) {
 		(void) fprintf(stderr, gettext("Unable to gather device "
 		    "information from %s (attaching device)\n"),
 		    attach_device_path);
-		goto out_devs;
+		goto cleanup_src;
 	}
 
-	ret = read_bootblock_from_disk(curr_device, bblock_curr, &path);
-	if (ret == BC_ERROR) {
-		BOOT_DEBUG("Error reading bootblock from %s\n", path);
-		retval = BC_ERROR;
-		goto out_devs;
+	write_mbr = true;
+	force_mbr = true;
+
+	pl_dest = STAILQ_FIRST(dest.plist);
+	STAILQ_FOREACH(pl_src, src.plist, pl_next) {
+		if (pl_dest == NULL) {
+			(void) fprintf(stderr,
+			    gettext("Destination disk layout is different "
+			    "from source, can not mirror.\n"));
+			goto cleanup;
+		}
+		if (!pl_src->pl_cb.read(pl_src)) {
+			(void) fprintf(stderr, gettext("Failed to read "
+			    "boot block from %s\n"), pl_src->pl_devname);
+			goto cleanup;
+		}
+		if (!pl_dest->pl_cb.read(pl_dest)) {
+			(void) fprintf(stderr, gettext("Failed to read "
+			    "boot block from %s\n"), pl_dest->pl_devname);
+		}
+
+		/* Set source pl_stage to destination source data */
+		pl_dest->pl_src_data = pl_src->pl_stage;
+		pl_src->pl_stage = NULL;
+
+		pl_dest = STAILQ_NEXT(pl_dest, pl_next);
 	}
 
-	if (ret == BC_NOEXTRA) {
-		BOOT_DEBUG("No multiboot header found on %s, unable to retrieve"
-		    " the bootblock\n", path);
-		retval = BC_NOEXTRA;
-		goto out_devs;
+	/* Prepare data. */
+	prepare_bblocks(&dest);
+
+	/* Commit data to disk. */
+	while ((pl_dest = STAILQ_LAST(dest.plist, partlist, pl_next)) != NULL) {
+		pl_dest->pl_cb.install(&dest, pl_dest);
+		STAILQ_REMOVE(dest.plist, pl_dest, partlist, pl_next);
+		partlist_free(pl_dest);
+
+		/* Free source list */
+		pl_src = STAILQ_LAST(src.plist, partlist, pl_next);
+		STAILQ_REMOVE(src.plist, pl_src, partlist, pl_next);
+		partlist_free(pl_src);
 	}
+	retval = BC_SUCCESS;
 
-	write_mbr = B_TRUE;
-	force_mbr = B_TRUE;
-	einfo_curr = find_einfo(bblock_curr->extra, bblock_curr->extra_size);
-	if (einfo_curr != NULL)
-		updt_str = einfo_get_string(einfo_curr);
-
-	retval = propagate_bootblock(&curr_data, &attach_data, updt_str);
-	cleanup_bootblock(bblock_curr);
-	cleanup_bootblock(bblock_attach);
-out_devs:
-	cleanup_device(attach_device);
-out_currdev:
-	cleanup_device(curr_device);
+cleanup:
+	while ((pl_dest = STAILQ_LAST(dest.plist, partlist, pl_next)) != NULL) {
+		STAILQ_REMOVE(dest.plist, pl_dest, partlist, pl_next);
+		partlist_free(pl_dest);
+	}
+	free(dest.plist);
+cleanup_src:
+	while ((pl_src = STAILQ_LAST(src.plist, partlist, pl_next)) != NULL) {
+		STAILQ_REMOVE(src.plist, pl_src, partlist, pl_next);
+		partlist_free(pl_src);
+	}
+	free(src.plist);
+out:
 	free(curr_device_path);
 	free(attach_device_path);
 	return (retval);
 }
 
-#define	USAGE_STRING	"Usage:\t%s [-h|-m|-f|-n|-F|-u verstr] stage1 stage2 " \
-			"raw-device\n"				\
-			"\t%s -M [-n] raw-device attach-raw-device\n"	\
-			"\t%s [-e|-V] -i raw-device | file\n"
+#define	USAGE_STRING	\
+"Usage:\t%s [-fFmn] [-b boot_dir] [-u verstr]\n"	\
+"\t\t[stage1 stage2] raw-device\n"			\
+"\t%s -M [-n] raw-device attach-raw-device\n"		\
+"\t%s [-e|-V] -i raw-device | file\n"
 
 #define	CANON_USAGE_STR	gettext(USAGE_STRING)
 
@@ -1502,6 +2323,7 @@ static void
 usage(char *progname, int rc)
 {
 	(void) fprintf(stdout, CANON_USAGE_STR, progname, progname, progname);
+	fini_yes();
 	exit(rc);
 }
 
@@ -1509,52 +2331,66 @@ int
 main(int argc, char **argv)
 {
 	int	opt;
-	int	params = 3;
 	int	ret;
 	char	*progname;
-	char	**handle_args;
+	struct stat sb;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 	if (init_yes() < 0)
 		errx(BC_ERROR, gettext(ERR_MSG_INIT_YES), strerror(errno));
 
+	/* Needed for mount pcfs. */
+	tzset();
+
 	/* Determine our name */
 	progname = basename(argv[0]);
 
-	while ((opt = getopt(argc, argv, "deFfhiMmnu:V")) != EOF) {
+	while ((opt = getopt(argc, argv, "b:deFfhiMmnu:V")) != EOF) {
 		switch (opt) {
+		case 'b':
+			boot_dir = strdup(optarg);
+			if (boot_dir == NULL) {
+				err(BC_ERROR,
+				    gettext("Memory allocation failure"));
+			}
+			if (lstat(boot_dir, &sb) != 0) {
+				err(BC_ERROR, boot_dir);
+			}
+			if (!S_ISDIR(sb.st_mode)) {
+				errx(BC_ERROR, gettext("%s: not a directory"),
+				    boot_dir);
+			}
+			break;
 		case 'd':
-			boot_debug = B_TRUE;
+			boot_debug = true;
 			break;
 		case 'e':
-			strip = B_TRUE;
+			strip = true;
 			break;
 		case 'F':
-			force_update = B_TRUE;
+			force_update = true;
 			break;
 		case 'f':
-			force_mbr = B_TRUE;
+			force_mbr = true;
 			break;
 		case 'h':
 			usage(progname, BC_SUCCESS);
 			break;
 		case 'i':
-			do_getinfo = B_TRUE;
-			params = 1;
+			do_getinfo = true;
 			break;
 		case 'M':
-			do_mirror_bblk = B_TRUE;
-			params = 2;
+			do_mirror_bblk = true;
 			break;
 		case 'm':
-			write_mbr = B_TRUE;
+			write_mbr = true;
 			break;
 		case 'n':
-			nowrite = B_TRUE;
+			nowrite = true;
 			break;
 		case 'u':
-			do_version = B_TRUE;
+			do_version = true;
 
 			update_str = strdup(optarg);
 			if (update_str == NULL) {
@@ -1563,7 +2399,7 @@ main(int argc, char **argv)
 			}
 			break;
 		case 'V':
-			verbose_dump = B_TRUE;
+			verbose_dump = true;
 			break;
 		default:
 			/* fall through to process non-optional args */
@@ -1572,23 +2408,20 @@ main(int argc, char **argv)
 	}
 
 	/* check arguments */
-	if (argc != optind + params) {
-		usage(progname, BC_ERROR);
-	}
 	check_options(progname);
-	handle_args = argv + optind;
 
 	if (nowrite)
 		(void) fprintf(stdout, gettext("Dry run requested. Nothing will"
 		    " be written to disk.\n"));
 
 	if (do_getinfo) {
-		ret = handle_getinfo(progname, handle_args);
+		ret = handle_getinfo(progname, argc - optind, argv + optind);
 	} else if (do_mirror_bblk) {
-		ret = handle_mirror(progname, handle_args);
+		ret = handle_mirror(progname, argc - optind, argv + optind);
 	} else {
-		ret = handle_install(progname, handle_args);
+		ret = handle_install(progname, argc - optind, argv + optind);
 	}
+	fini_yes();
 	return (ret);
 }
 
@@ -1612,24 +2445,27 @@ check_options(char *progname)
 		 */
 		if (do_version) {
 			(void) fprintf(stderr, MEANINGLESS_OPT, "-u");
-			do_version = B_FALSE;
+			do_version = false;
 		}
 		if (force_update) {
 			(void) fprintf(stderr, MEANINGLESS_OPT, "-F");
-			force_update = B_FALSE;
+			force_update = false;
 		}
 		if (strip || verbose_dump) {
 			BOOT_DEBUG(MEANINGLESS_OPT, "-e|-V");
-			strip = B_FALSE;
-			verbose_dump = B_FALSE;
+			strip = false;
+			verbose_dump = false;
 		}
 	}
+
+	if ((strip || verbose_dump) && !do_getinfo)
+		usage(progname, BC_ERROR);
 
 	if (do_getinfo) {
 		if (write_mbr || force_mbr || do_version || force_update) {
 			BOOT_DEBUG(MEANINGLESS_OPT, "-m|-f|-u|-F");
-			write_mbr = force_mbr = do_version = B_FALSE;
-			force_update = B_FALSE;
+			write_mbr = force_mbr = do_version = false;
+			force_update = false;
 		}
 	}
 }

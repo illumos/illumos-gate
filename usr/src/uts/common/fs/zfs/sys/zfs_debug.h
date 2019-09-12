@@ -60,6 +60,7 @@ extern boolean_t zfs_free_leak_on_eio;
 #define	ZFS_DEBUG_HISTOGRAM_VERIFY	(1 << 7)
 #define	ZFS_DEBUG_METASLAB_VERIFY	(1 << 8)
 #define	ZFS_DEBUG_INDIRECT_REMAP	(1 << 9)
+#define	ZFS_DEBUG_TRIM			(1 << 11)
 
 #ifdef ZFS_DEBUG
 extern void __dprintf(const char *file, const char *func,

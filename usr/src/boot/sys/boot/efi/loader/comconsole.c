@@ -676,16 +676,18 @@ comc_setup(struct console *cp)
 	if (EFI_ERROR(status))
 		return (false);
 
+	status = sp->sio->GetControl(sp->sio, &control);
+	if (EFI_ERROR(status))
+		return (false);
 	if (sp->rtsdtr_off) {
-		status = sp->sio->GetControl(sp->sio, &control);
-		if (EFI_ERROR(status))
-			return (false);
 		control &= ~(EFI_SERIAL_REQUEST_TO_SEND |
 		    EFI_SERIAL_DATA_TERMINAL_READY);
-		status = sp->sio->SetControl(sp->sio, control);
-		if (EFI_ERROR(status))
-			return (false);
+	} else {
+		control |= EFI_SERIAL_REQUEST_TO_SEND;
 	}
+
+	(void) sp->sio->SetControl(sp->sio, control);
+
 	/* Mark this port usable. */
 	cp->c_flags |= (C_PRESENTIN | C_PRESENTOUT);
 	return (true);

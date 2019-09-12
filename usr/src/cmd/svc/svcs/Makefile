@@ -21,7 +21,7 @@
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# Copyright (c) 2019, Joyent, Inc. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 PROG =		svcs

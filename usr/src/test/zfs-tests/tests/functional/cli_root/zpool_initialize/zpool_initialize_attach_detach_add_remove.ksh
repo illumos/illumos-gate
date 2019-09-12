@@ -22,6 +22,7 @@
 
 #
 # Copyright (c) 2016 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/cli_root/zpool_initialize/zpool_initialize.kshlib
@@ -62,6 +63,10 @@ progress="$new_progress"
 
 log_must zpool add $TESTPOOL $DISK2
 log_must zpool remove $TESTPOOL $DISK1
+while $(zpool status $TESTPOOL | grep -q Evacuation); do
+	sleep 0.5
+done
+
 [[ -z "$(initialize_prog_line $TESTPOOL $DISK1)" ]] || \
         log_fail "Initializing continued after initiating removal"
 

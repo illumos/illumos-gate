@@ -375,6 +375,7 @@ struct spa {
 	uint64_t	spa_deadman_synctime;	/* deadman expiration timer */
 	uint64_t	spa_all_vdev_zaps;	/* ZAP of per-vd ZAP obj #s */
 	spa_avz_action_t	spa_avz_action;	/* destroy/rebuild AVZ? */
+	uint64_t	spa_autotrim;		/* automatic background trim? */
 	spa_keystore_t	spa_keystore;	/* loaded crypto keys */
 	uint64_t	spa_errata;	/* errata issues detected */
 
