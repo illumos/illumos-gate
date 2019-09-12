@@ -44,13 +44,12 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright (c) 2013 Gary Mills
-.\" Copyright (c) 2018, Joyent, Inc.
+.\" Copyright 2019 Joyent, Inc.
 .\"
-.TH PS 1 "August 22, 2018"
+.TH PS 1 "August 28, 2019"
 .SH NAME
 ps \- report process status
 .SH SYNOPSIS
-.LP
 .nf
 \fBps\fR [\fB-aAcdefjHlLPWyZ\fR] [\fB-g\fR \fIgrplist\fR] [\fB-h\fR \fIlgrplist\fR]
      [\fB-n\fR \fInamelist\fR] [\fB-o\fR \fIformat\fR]... [\fB-p\fR \fIproclist\fR]
@@ -59,7 +58,6 @@ ps \- report process status
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBps\fR command prints information about active processes. Without
 options, \fBps\fR prints information about processes that have the same
 effective user \fBID\fR and the same controlling terminal as the invoker. The
@@ -75,7 +73,6 @@ for \fIproclist\fR and \fIgrplist\fR must be numeric.
 .LP
 The \fBps\fR command also accepts BSD-style options.  See \fBps\fR(1b).
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -375,9 +372,9 @@ Many of the options shown are used to select processes to list. If any are
 specified, the default list is ignored and \fBps\fR selects the processes
 represented by the inclusive OR of all the selection-criteria options.
 .SH DISPLAY FORMATS
-.LP
-Under the \fB-f\fR option, \fBps\fR tries to determine the command name and
-arguments given when the process was created by examining the user block.
+Under the \fB-f\fR option, \fBps\fR uses the \fB\fB/proc/\fInnnnn\fR\fB/cmdline\fR\fR
+file to read the full process arguments. The process may have changed these
+since it was started.
 Failing this, the command name is printed, as it would have appeared without
 the \fB-f\fR option, in square brackets.
 .sp
@@ -608,8 +605,8 @@ The execution time for the lwp being reported.
 \fB\fBCMD\fR(all)\fR
 .ad
 .RS 14n
-The command name (the full command name and its arguments, up to a limit of 80
-characters, are printed under the \fB-f\fR option).
+The command name (or, with the \fB-f\fR option, the full current process
+arguments).
 .RE
 
 .sp
@@ -667,7 +664,6 @@ lwp.
 A process that has exited and has a parent, but has not yet been waited for by
 the parent, is marked \fB<defunct>\fR\&.
 .SS "\fB-o\fR format"
-.LP
 The \fB-o\fR option allows the output format to be specified under user
 control.
 .sp
@@ -885,9 +881,9 @@ is a version of the argument list as it was passed to the command when it
 started, or is a version of the arguments as they might have been modified by
 the application. Applications cannot depend on being able to modify their
 argument list and having that modification be reflected in the output of
-\fBps\fR. The illumos implementation limits the string to 80 bytes; the string
-is the version of the argument list as it was passed to the command when it
-started.
+\fBps\fR. However, the current implementation will display the full modified
+process arguments when given the \fB-f\fR argument; otherwise this is the
+initial process arguments, but limited to 80 bytes.
 .RE
 
 .sp
@@ -1244,7 +1240,6 @@ ctid	CTID
 .TE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing \fBps\fR Command
 .sp
 .LP
@@ -1277,7 +1272,6 @@ The contents of the \fBCOMMAND\fR field need not be the same due to possible
 truncation.
 
 .SH ENVIRONMENT VARIABLES
-.LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBps\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_TIME\fR, and \fBNLSPATH\fR.
@@ -1292,7 +1286,6 @@ number of text columns to display.
 .RE
 
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -1349,7 +1342,6 @@ process control files
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -1368,14 +1360,12 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.LP
 \fBkill\fR(1), \fBlgrpinfo\fR(1), \fBnice\fR(1), \fBpagesize\fR(1),
 \fBpmap\fR(1), \fBpriocntl\fR(1), \fBps\fR(1b), \fBwho\fR(1), \fBgetty\fR(1M),
 \fBproc\fR(4),
 \fBttysrch\fR(4), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBresource_controls\fR(5), \fBstandards\fR(5), \fBzones\fR(5)
 .SH NOTES
-.LP
 Things can change while \fBps\fR is running. The snapshot it gives is true only
 for a split-second, and it might not be accurate by the time you see it. Some
 data printed for defunct processes is irrelevant.

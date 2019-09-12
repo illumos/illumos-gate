@@ -21,7 +21,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -47,6 +47,8 @@
 #include <sys/ctfs.h>
 #include <libcontract_priv.h>
 #include <sys/stat.h>
+#include <stdbool.h>
+
 #include "ptools_common.h"
 
 #define	FAKEDPID0(p)	(p->pid == 0 && p->psargs[0] == '\0')
@@ -61,6 +63,7 @@ typedef struct ps {
 	pid_t	sid;
 	zoneid_t zoneid;
 	ctid_t	ctid;
+	char *svc_fmri;
 	timestruc_t start;
 	char	psargs[PRARGSZ];
 	struct ps *pp;		/* parent */
@@ -81,16 +84,21 @@ static	char	*command;
 
 static	int	aflag = 0;
 static	int	cflag = 0;
+static	int	sflag = 0;
 static	int	zflag = 0;
 static	zoneid_t zoneid;
+static  const char *svc_fmri;
 static	int	columns = 80;
 
-static void markprocs(ps_t *p);
-static int printone(ps_t *p, int level);
+static bool match_proc(ps_t *);
+static void markprocs(ps_t *);
+static int printone(ps_t *, int);
 static void insertchild(ps_t *, ps_t *);
-static void prsort(ps_t *p);
-static void printsubtree(ps_t *p, int level);
-static zoneid_t getzone(char *arg);
+static void prsort(ps_t *);
+static void printsubtree(ps_t *, int);
+static void p_get_svc_fmri(ps_t *, ct_stathdl_t);
+static char *stripsvc(const char *);
+static zoneid_t getzone(const char *);
 static ps_t *fakepid0(void);
 
 int
@@ -118,13 +126,17 @@ main(int argc, char **argv)
 		command++;
 
 	/* options */
-	while ((opt = getopt(argc, argv, "acz:")) != EOF) {
+	while ((opt = getopt(argc, argv, "acs:z:")) != EOF) {
 		switch (opt) {
 		case 'a':		/* include children of process 0 */
 			aflag = 1;
 			break;
 		case 'c':		/* display contract ownership */
 			aflag = cflag = 1;
+			break;
+		case 's':
+			sflag = 1;
+			svc_fmri = stripsvc(optarg);
 			break;
 		case 'z':		/* only processes in given zone */
 			zflag = 1;
@@ -141,7 +153,7 @@ main(int argc, char **argv)
 
 	if (errflg) {
 		(void) fprintf(stderr,
-		    "usage:\t%s [-ac] [-z zone] [ {pid|user} ... ]\n",
+		    "usage:\t%s [-ac] [-s svc] [-z zone] [ {pid|user} ... ]\n",
 		    command);
 		(void) fprintf(stderr,
 		    "  (show process trees)\n");
@@ -150,7 +162,9 @@ main(int argc, char **argv)
 		(void) fprintf(stderr,
 		    "  -a : include children of process 0\n");
 		(void) fprintf(stderr,
-		    "  -c : show contract ownership\n");
+		    "  -c : show contracts\n");
+		(void) fprintf(stderr,
+		    "  -s : print only processes with given service FMRI\n");
 		(void) fprintf(stderr,
 		    "  -z : print only processes in given zone\n");
 		return (2);
@@ -224,8 +238,8 @@ retry:
 				return (1);
 			}
 		}
-		if ((p = malloc(sizeof (ps_t))) == NULL) {
-			perror("malloc()");
+		if ((p = calloc(1, sizeof (ps_t))) == NULL) {
+			perror("calloc()");
 			return (1);
 		}
 		ps[nps++] = p;
@@ -252,6 +266,10 @@ retry:
 		p->pp = NULL;
 		p->sp = NULL;
 		p->cp = NULL;
+
+		if (sflag)
+			p_get_svc_fmri(p, NULL);
+
 		if (p->pid == p->ppid)
 			proc0 = p;
 		if (p->pid == 1)
@@ -338,8 +356,7 @@ retry:
 					    p->done != 1 && p->pid != 0;
 					    p = p->pp)
 						if ((p->ppid != 0 || aflag) &&
-						    (!zflag ||
-						    p->zoneid == zoneid))
+						    match_proc(p))
 							p->done = 1;
 				if (uid == (uid_t)-1)
 					break;
@@ -371,8 +388,9 @@ printone(ps_t *p, int level)
 			    PIDWIDTH, (int)p->pid, n, p->psargs);
 		} else {
 			assert(cflag != 0);
-			(void) printf("%*.*s[process contract %d]\n",
-			    indent, indent, " ", (int)p->ctid);
+			(void) printf("%*.*s[process contract %d: %s]\n",
+			    indent, indent, " ", (int)p->ctid,
+			    p->svc_fmri == NULL ? "?" : p->svc_fmri);
 		}
 		return (1);
 	}
@@ -401,11 +419,50 @@ insertchild(ps_t *pp, ps_t *cp)
 	*here = cp;
 }
 
+static ct_stathdl_t
+ct_status_open(ctid_t ctid, struct stat64 *stp)
+{
+	ct_stathdl_t hdl;
+	int fd;
+
+	if ((fd = contract_open(ctid, "process", "status", O_RDONLY)) == -1)
+		return (NULL);
+
+	if (fstat64(fd, stp) == -1 || ct_status_read(fd, CTD_FIXED, &hdl)) {
+		(void) close(fd);
+		return (NULL);
+	}
+
+	(void) close(fd);
+
+	return (hdl);
+}
+
+/*
+ * strdup() failure is OK - better to report something than fail totally.
+ */
+static void
+p_get_svc_fmri(ps_t *p, ct_stathdl_t inhdl)
+{
+	ct_stathdl_t hdl = inhdl;
+	struct stat64 st;
+	char *fmri;
+
+	if (hdl == NULL && (hdl = ct_status_open(p->ctid, &st)) == NULL)
+		return;
+
+	if (ct_pr_status_get_svc_fmri(hdl, &fmri) == 0)
+		p->svc_fmri = strdup(fmri);
+
+	if (inhdl == NULL)
+		ct_status_free(hdl);
+}
+
 static void
 ctsort(ctid_t ctid, ps_t *p)
 {
 	ps_t *pp;
-	int fd, n;
+	int n;
 	ct_stathdl_t hdl;
 	struct stat64 st;
 
@@ -415,13 +472,8 @@ ctsort(ctid_t ctid, ps_t *p)
 			return;
 		}
 
-	if ((fd = contract_open(ctid, "process", "status", O_RDONLY)) == -1)
+	if ((hdl = ct_status_open(ctid, &st)) == NULL)
 		return;
-	if (fstat64(fd, &st) == -1 || ct_status_read(fd, CTD_COMMON, &hdl)) {
-		(void) close(fd);
-		return;
-	}
-	(void) close(fd);
 
 	if (nctps >= ctsize) {
 		if ((ctsize *= 2) == 0)
@@ -440,10 +492,14 @@ ctsort(ctid_t ctid, ps_t *p)
 
 	pp->pid = -1;
 	pp->ctid = ctid;
+
+	p_get_svc_fmri(pp, hdl);
+
 	pp->start.tv_sec = st.st_ctime;
 	insertchild(pp, p);
 
 	pp->zoneid = ct_status_get_zoneid(hdl);
+
 	/*
 	 * In a zlogin <zonename>, the contract belongs to the
 	 * global zone and the shell opened belongs to <zonename>.
@@ -513,11 +569,52 @@ printsubtree(ps_t *p, int level)
 		printsubtree(p, level);
 }
 
+/*
+ * For the service matching, we don't go the whole hog like svcs(1), but we will
+ * strip svc:/ and a :default prefix, and allow a match of the final part of the
+ * service such as "name-service-cache".
+ */
+static bool
+match_proc(ps_t *p)
+{
+	const char *cp;
+	char *psvc;
+
+	if (zflag && p->zoneid != zoneid)
+		return (false);
+
+	if (!sflag)
+		return (true);
+
+	if (p->svc_fmri == NULL)
+		return (false);
+
+	if (strcmp(p->svc_fmri, svc_fmri) == 0)
+		return (true);
+
+	psvc = stripsvc(p->svc_fmri);
+
+	if (strcmp(psvc, svc_fmri) == 0) {
+		free(psvc);
+		return (true);
+	}
+
+	if ((cp = strrchr(psvc, '/')) != NULL &&
+	    strcmp(cp + 1, svc_fmri) == 0) {
+		free(psvc);
+		return (true);
+	}
+
+	free(psvc);
+	return (false);
+}
+
 static void
 markprocs(ps_t *p)
 {
-	if (!zflag || p->zoneid == zoneid)
+	if (match_proc(p))
 		p->done = 1;
+
 	for (p = p->cp; p != NULL; p = p->sp)
 		markprocs(p);
 }
@@ -532,8 +629,8 @@ fakepid0(void)
 	ps_t *p0, *p;
 	int n;
 
-	if ((p0 = malloc(sizeof (ps_t))) == NULL) {
-		perror("malloc()");
+	if ((p0 = calloc(1, sizeof (ps_t))) == NULL) {
+		perror("calloc()");
 		exit(1);
 	}
 	(void) memset(p0, '\0', sizeof (ps_t));
@@ -559,7 +656,7 @@ fakepid0(void)
 
 /* convert string containing zone name or id to a numeric id */
 static zoneid_t
-getzone(char *arg)
+getzone(const char *arg)
 {
 	zoneid_t zoneid;
 
@@ -568,4 +665,27 @@ getzone(char *arg)
 		exit(1);
 	}
 	return (zoneid);
+}
+
+/* svc:/...:default -> ... */
+static char *
+stripsvc(const char *arg)
+{
+	const char *p = arg;
+	char *ret;
+	char *cp;
+
+	if (strncmp(p, "svc:/", strlen("svc:/")) == 0)
+		p += strlen("svc:/");
+
+	if ((ret = strdup(p)) == NULL) {
+		perror("strdup()");
+		exit(1);
+	}
+
+	if ((cp = strrchr(ret, ':')) != NULL &&
+	    strcmp(cp, ":default") == 0)
+		*cp = '\0';
+
+	return (ret);
 }

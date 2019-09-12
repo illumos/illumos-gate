@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -65,8 +65,10 @@
 #include <wctype.h>
 #include <stdarg.h>
 #include <sys/proc.h>
+#include <sys/procfs.h>
 #include <priv_utils.h>
 #include <zone.h>
+#include <stdbool.h>
 
 #define	NTTYS	2	/* max ttys that can be specified with the -t option */
 			/* only one tty can be specified with SunOS ps */
@@ -101,6 +103,7 @@ static	int	nflg;	/* Numerical output */
 static	int	pflg;	/* Specific process id passed as argument */
 static	int	Uflg;	/* Update private database, ups_data */
 static	int	errflg;
+static	int	wflag;
 
 static	char	*gettty();
 static	char	argbuf[ARGSIZ];
@@ -133,8 +136,7 @@ static	void	getarg(void);
 static	void	prtime(timestruc_t st);
 static	void	przom(psinfo_t *psinfo);
 static	int	num(char *);
-static	int	preadargs(int, psinfo_t *, char *);
-static	int	preadenvs(int, psinfo_t *, char *);
+static	int	preadenvs(int, psinfo_t *, char *, size_t);
 static	int	prcom(int, psinfo_t *, char *);
 static	int	namencnt(char *, int, int);
 static	int	pscompare(const void *, const void *);
@@ -142,12 +144,18 @@ static	char	*err_string(int);
 
 extern int	scrwidth(wchar_t);	/* header file? */
 
+/* from ps.c */
+void get_psargs(bool, bool, psinfo_t *, char *, size_t);
+void print_psargs(char *, int);
+
 int
 ucbmain(int argc, char **argv)
 {
 	psinfo_t info;		/* process information structure from /proc */
-	char *psargs = NULL;	/* pointer to buffer for -w and -ww options */
-	char *svpsargs = NULL;
+	/*
+	 * This can also store env vars, so we bump up the size.
+	 */
+	char psargs[PRMAXARGVLEN * 2] = "";
 	struct psent *psent;
 	int entsize;
 	int nent;
@@ -236,11 +244,12 @@ ucbmain(int argc, char **argv)
 		case 'U':	/* update private database ups_data */
 			Uflg++;
 			break;
-		case 'w':	/* increase display width */
+		case 'w':
 			if (twidth < 132)
 				twidth = 132;
-			else	/* second w option */
+			if (wflag)
 				twidth = NCARGS;
+			wflag++;
 			break;
 		case 'v':	/* display virtual memory format */
 			vflg++;
@@ -372,14 +381,8 @@ ucbmain(int argc, char **argv)
 		(void) sprintf(hdr, "%*s TT       S  TIME COMMAND",
 		    pidwidth + 1, "PID");
 
-	twidth = twidth - strlen(hdr) + 6;
+	twidth = twidth - strlen(hdr) + 7;
 	(void) printf("%s\n", hdr);
-
-	if (twidth > PRARGSZ && (psargs = malloc(twidth)) == NULL) {
-		(void) fprintf(stderr, "ps: no memory\n");
-		exit(1);
-	}
-	svpsargs = psargs;
 
 	/*
 	 * Determine which processes to print info about by searching
@@ -410,7 +413,7 @@ retry:
 		if ((psfd = open(psname, O_RDONLY)) == -1)
 			continue;
 		asfd = -1;
-		if (psargs != NULL || eflg) {
+		if (eflg) {
 
 			/* now we need the proc_owner privilege */
 			(void) __priv_bracket(PRIV_ON);
@@ -470,26 +473,20 @@ retry:
 		if (!found && !tflg && !aflg && info.pr_euid != my_uid)
 			goto closeit;
 
-		/*
-		 * Read the args for the -w and -ww cases
-		 */
-		if (asfd > 0) {
-			if ((psargs != NULL &&
-			    preadargs(asfd, &info, psargs) == -1) ||
-			    (eflg && preadenvs(asfd, &info, psargs) == -1)) {
-				int	saverr = errno;
+		get_psargs(false, wflag, &info, psargs, sizeof (psargs));
 
-				(void) close(asfd);
-				if (saverr == EAGAIN)
-					goto retry;
-				if (saverr != ENOENT)
-					(void) fprintf(stderr,
-					    "ps: read() on %s: %s\n",
-					    asname, err_string(saverr));
-				continue;
+		if (eflg && asfd > 0 &&
+		    preadenvs(asfd, &info, psargs, sizeof (psargs)) == -1) {
+			int saverr = errno;
+
+			(void) close(asfd);
+			if (saverr == EAGAIN)
+				goto retry;
+			if (saverr != ENOENT) {
+				(void) fprintf(stderr, "ps: read() on %s: %s\n",
+				    asname, err_string(saverr));
 			}
-		} else {
-			psargs = info.pr_psargs;
+			continue;
 		}
 
 		if (nent >= entsize) {
@@ -507,22 +504,17 @@ retry:
 			exit(1);
 		}
 		*psent[nent].psinfo = info;
-		if (psargs == NULL)
-			psent[nent].psargs = NULL;
-		else {
-			if ((psent[nent].psargs = malloc(strlen(psargs)+1))
-			    == NULL) {
-				(void) fprintf(stderr, "ps: no memory\n");
-				exit(1);
-			}
-			(void) strcpy(psent[nent].psargs, psargs);
+
+		if ((psent[nent].psargs = strndup(psargs, twidth)) == NULL) {
+			(void) fprintf(stderr, "ps: no memory\n");
+			exit(1);
 		}
+
 		psent[nent].found = found;
 		nent++;
 closeit:
 		if (asfd > 0)
 			(void) close(asfd);
-		psargs = svpsargs;
 	}
 
 	/* revert to non-privileged user */
@@ -553,100 +545,17 @@ usage()		/* print usage message and quit */
 }
 
 /*
- * Read the process arguments from the process.
- * This allows >PRARGSZ characters of arguments to be displayed but,
- * unlike pr_psargs[], the process may have changed them.
- */
-#define	NARG	100
-static int
-preadargs(int pfd, psinfo_t *psinfo, char *psargs)
-{
-	off_t argvoff = (off_t)psinfo->pr_argv;
-	size_t len;
-	char *psa = psargs;
-	int bsize = twidth;
-	int narg = NARG;
-	off_t argv[NARG];
-	off_t argoff;
-	off_t nextargoff;
-	int i;
-#ifdef _LP64
-	caddr32_t argv32[NARG];
-	int is32 = (psinfo->pr_dmodel != PR_MODEL_LP64);
-#endif
-
-	if (psinfo->pr_nlwp == 0 ||
-	    strcmp(psinfo->pr_lwp.pr_clname, "SYS") == 0)
-		goto out;
-
-	(void) memset(psa, 0, bsize--);
-	nextargoff = 0;
-	errno = EIO;
-	while (bsize > 0) {
-		if (narg == NARG) {
-			(void) memset(argv, 0, sizeof (argv));
-#ifdef _LP64
-			if (is32) {
-				if ((i = pread(pfd, argv32, sizeof (argv32),
-				    argvoff)) <= 0) {
-					if (i == 0 || errno == EIO)
-						break;
-					return (-1);
-				}
-				for (i = 0; i < NARG; i++)
-					argv[i] = argv32[i];
-			} else
-#endif
-				if ((i = pread(pfd, argv, sizeof (argv),
-				    argvoff)) <= 0) {
-					if (i == 0 || errno == EIO)
-						break;
-					return (-1);
-				}
-			narg = 0;
-		}
-		if ((argoff = argv[narg++]) == 0)
-			break;
-		if (argoff != nextargoff &&
-		    (i = pread(pfd, psa, bsize, argoff)) <= 0) {
-			if (i == 0 || errno == EIO)
-				break;
-			return (-1);
-		}
-		len = strlen(psa);
-		psa += len;
-		*psa++ = ' ';
-		bsize -= len + 1;
-		nextargoff = argoff + len + 1;
-#ifdef _LP64
-		argvoff += is32? sizeof (caddr32_t) : sizeof (caddr_t);
-#else
-		argvoff += sizeof (caddr_t);
-#endif
-	}
-	while (psa > psargs && isspace(*(psa-1)))
-		psa--;
-
-out:
-	*psa = '\0';
-	if (strlen(psinfo->pr_psargs) > strlen(psargs))
-		(void) strcpy(psargs, psinfo->pr_psargs);
-
-	return (0);
-}
-
-/*
  * Read environment variables from the process.
  * Append them to psargs if there is room.
  */
+#define	NARG	100
 static int
-preadenvs(int pfd, psinfo_t *psinfo, char *psargs)
+preadenvs(int pfd, psinfo_t *psinfo, char *psargs, size_t bufsize)
 {
 	off_t envpoff = (off_t)psinfo->pr_envp;
 	int len;
 	char *psa;
-	char *psainit;
-	int bsize;
+	int remaining;
 	int nenv = NARG;
 	off_t envp[NARG];
 	off_t envoff;
@@ -657,18 +566,18 @@ preadenvs(int pfd, psinfo_t *psinfo, char *psargs)
 	int is32 = (psinfo->pr_dmodel != PR_MODEL_LP64);
 #endif
 
-	psainit = psa = (psargs != NULL)? psargs : psinfo->pr_psargs;
+	psa = psargs;
 	len = strlen(psa);
 	psa += len;
-	bsize = twidth - len - 1;
+	remaining = bufsize - len - 1;
 
-	if (bsize <= 0 || psinfo->pr_nlwp == 0 ||
+	if (remaining <= 0 || psinfo->pr_nlwp == 0 ||
 	    strcmp(psinfo->pr_lwp.pr_clname, "SYS") == 0)
 		return (0);
 
 	nextenvoff = 0;
 	errno = EIO;
-	while (bsize > 0) {
+	while (remaining > 0) {
 		if (nenv == NARG) {
 			(void) memset(envp, 0, sizeof (envp));
 #ifdef _LP64
@@ -694,7 +603,7 @@ preadenvs(int pfd, psinfo_t *psinfo, char *psargs)
 		if ((envoff = envp[nenv++]) == 0)
 			break;
 		if (envoff != nextenvoff &&
-		    (i = pread(pfd, psa+1, bsize, envoff)) <= 0) {
+		    (i = pread(pfd, psa+1, remaining, envoff)) <= 0) {
 			if (i == 0 || errno == EIO)
 				break;
 			return (-1);
@@ -702,7 +611,7 @@ preadenvs(int pfd, psinfo_t *psinfo, char *psargs)
 		*psa++ = ' ';
 		len = strlen(psa);
 		psa += len;
-		bsize -= len + 1;
+		remaining -= len + 1;
 		nextenvoff = envoff + len + 1;
 #ifdef _LP64
 		envpoff += is32? sizeof (caddr32_t) : sizeof (caddr_t);
@@ -710,7 +619,7 @@ preadenvs(int pfd, psinfo_t *psinfo, char *psargs)
 		envpoff += sizeof (caddr_t);
 #endif
 	}
-	while (psa > psainit && isspace(*(psa-1)))
+	while (psa > psargs && isspace(*(psa-1)))
 		psa--;
 	*psa = '\0';
 
@@ -842,12 +751,9 @@ prtpct(ushort_t pct)
 static int
 prcom(int found, psinfo_t *psinfo, char *psargs)
 {
-	char	*cp;
 	char	*tp;
-	char	*psa;
 	long	tm;
-	int	i, wcnt, length;
-	wchar_t	wchar;
+	int	wcnt;
 	struct tty *ttyp;
 
 	/*
@@ -867,7 +773,6 @@ prcom(int found, psinfo_t *psinfo, char *psargs)
 	 * info.  If 't' is set, check if term is in list of desired terminals
 	 * and print it if it is.
 	 */
-	i = 0;
 	tp = gettty(psinfo);
 
 	if (*tp == '?' && !found && !xflg)
@@ -999,37 +904,9 @@ prcom(int found, psinfo_t *psinfo, char *psargs)
 		(void) printf(" %.*s", wcnt, psinfo->pr_fname);
 		return (1);
 	}
-	/*
-	 * PRARGSZ == length of cmd arg string.
-	 */
-	if (psargs == NULL) {
-		psa = &psinfo->pr_psargs[0];
-		i = PRARGSZ;
-		tp = &psinfo->pr_psargs[PRARGSZ];
-	} else {
-		psa = psargs;
-		i = strlen(psargs);
-		tp = psa + i;
-	}
 
-	for (cp = psa; cp < tp; /* empty */) {
-		if (*cp == 0)
-			break;
-		length = mbtowc(&wchar, cp, MB_LEN_MAX);
-		if (length < 0 || !iswprint(wchar)) {
-			(void) printf(" [ %.16s ]", psinfo->pr_fname);
-			return (1);
-		}
-		cp += length;
-	}
-	wcnt = namencnt(psa, i, maxlen);
-#if 0
-	/* dumps core on really long strings */
-	(void) printf(" %.*s", wcnt, psa);
-#else
-	(void) putchar(' ');
-	(void) fwrite(psa, 1, wcnt, stdout);
-#endif
+	printf(" ");
+	print_psargs(psargs, wflag < 2 ? maxlen : 0);
 	return (1);
 }
 

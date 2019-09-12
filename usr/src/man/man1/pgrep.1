@@ -1,13 +1,13 @@
 '\" te
-.\"  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2019 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PGREP 1 "Jan 17, 2014"
+.TH PGREP 1 "Aug 13, 2019"
 .SH NAME
 pgrep, pkill \- find or signal processes by name and other attributes
 .SH SYNOPSIS
-.LP
 .nf
 \fBpgrep\fR [\fB-flvx\fR] [\fB-n\fR | \fB-o\fR] [\fB-d\fR \fIdelim\fR] [\fB-P\fR \fIppidlist\fR]
      [\fB-g\fR \fIpgrplist\fR] [\fB-s\fR \fIsidlist\fR] [\fB-u\fR \fIeuidlist\fR] [\fB-U\fR \fIuidlist\fR]
@@ -26,8 +26,6 @@ pgrep, pkill \- find or signal processes by name and other attributes
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpgrep\fR utility examines the active processes on the system and reports
 the process \fBID\fRs of the processes whose attributes match the criteria
 specified on the command line. Each process \fBID\fR is printed as a decimal
@@ -74,8 +72,6 @@ process is signaled as if by \fBkill\fR(1) instead of having its process
 \fBID\fR printed. A signal name or number may be specified as the first command
 line option to \fBpkill\fR.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -104,11 +100,11 @@ character. The \fB-d\fR option is only valid when specified as an option to
 \fB\fB-f\fR\fR
 .ad
 .RS 17n
-The regular expression \fIpattern\fR should be matched against the full process
-argument string (obtained from the \fBpr_psargs\fR field of the
-\fB/proc/\fInnnnn\fR/psinfo\fR file). If no \fB-f\fR option is specified, the
-expression is matched only against the name of the executable file (obtained
-from the \fBpr_fname\fR field of the \fB/proc/\fInnnnn\fR/psinfo\fR file).
+The regular expression \fIpattern\fR should be matched against all the process
+arguments, not just the executable file name.
+The process arguments are read from \fB\fB/proc/\fInnnnn\fR\fB/cmdline\fR: this
+does not truncate the arguments, but reflects the current value, which may have
+been changed.
 .RE
 
 .sp
@@ -150,11 +146,9 @@ project \fBID\fR.
 \fB\fB-l\fR\fR
 .ad
 .RS 17n
-Long output format. Prints the process name along with the process \fBID\fR of
-each matching process. The process name is obtained from the \fBpr_psargs\fR or
-\fBpr_fname\fR field, depending on whether the \fB-f\fR option was specified
-(see above). The \fB-l\fR option is only valid when specified as an option to
-\fBpgrep\fR.
+Long output format. Prints the process arguments along with the process \fBID\fR of
+each matching process, depending on how the \fB-f\fR option was specified.
+The \fB-l\fR option is only valid when specified as an option to \fBpgrep\fR.
 .RE
 
 .sp
@@ -258,8 +252,8 @@ which meet the specified matching criteria.
 .RS 17n
 Matches only processes whose executable file name (ignoring any path)
 \fBexactly\fR matches the specified \fIpattern\fR. However, when used with -f,
-the \fIpattern\fR should be matched against the full process argument
-string. For example if there exists a process `/bin/ls /home' then:
+the \fIpattern\fR is matched against the full process argument
+string. For example, if there exists a process `/bin/ls /home' then:
 .sp
 .in +2
 .nf
@@ -308,8 +302,6 @@ one of the symbolic names defined in \fBsignal.h\fR(3HEAD) without the
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operand is supported:
 .sp
 .ne 2
@@ -323,7 +315,6 @@ either the executable file name or full process argument string. See
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRObtaining a Process ID
 .sp
 .LP
@@ -352,9 +343,20 @@ example% \fBpkill -n xterm\fR
 .in -2
 .sp
 
-.SH EXIT STATUS
+.LP
+\fBExample 3 \fRMatching against all process arguments
 .sp
 .LP
+Match against any process argument and report the arguments:
+
+.sp
+.in +2
+.nf
+example% \fBpgrep -fl myfile.txt\fR
+.fi
+.in -2
+.sp
+.SH EXIT STATUS
 The following exit values are returned:
 .sp
 .ne 2
@@ -393,30 +395,33 @@ A fatal error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
-\fB\fB/proc/\fInnnnn\fR/psinfo\fR\fR
+\fB\fB/proc/\fInnnnn\fR\fB/psinfo\fR\fR
 .ad
 .RS 22n
 Process information files
 .RE
 
-.SH SEE ALSO
 .sp
-.LP
+.ne 2
+.na
+\fB\fB/proc/\fInnnnn\fR\fB/cmdline\fR\fR
+.ad
+.RS 22n
+Process arguments.
+.RE
+
+.SH SEE ALSO
 \fBkill\fR(1), \fBproc\fR(1), \fBps\fR(1), \fBtruss\fR(1), \fBkill\fR(2),
 \fBsignal.h\fR(3HEAD), \fBproc\fR(4), \fBattributes\fR(5), \fBprivileges\fR(5),
 \fBregex\fR(5), \fBzones\fR(5)
 .SH NOTES
-.sp
-.LP
 Both utilities match the \fBERE\fR \fIpattern\fR argument against either the
-\fBpr_fname\fR or \fBpr_psargs\fR fields of the
-\fB/proc/\fR\fInnnnn\fR\fB/psinfo\fR files. The lengths of these strings are
-limited according to definitions in \fB<sys/procfs.h>\fR\&. Patterns which can
-match strings longer than the current limits may fail to match the intended set
-of processes.
+\fBpr_fname\fR field of the \fB/proc/\fR\fInnnnn\fR\fB/psinfo\fR file, or
+\fB/proc/\fR\fInnnnn\fR\fB/cmdline\fR, and may be truncated.
+Patterns which can match strings longer than the current limits may fail to
+match the intended set of processes.
 .sp
 .LP
 If the \fIpattern\fR argument contains \fBERE\fR meta-characters which are also

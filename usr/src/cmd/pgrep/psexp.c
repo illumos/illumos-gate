@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include <string.h>
 #include <stdlib.h>
@@ -110,10 +112,9 @@ psexp_compile(psexp_t *psexp)
 	psexp->__f1.id_data && !idtab_search(&psexp->__f1, psinfo->__f2)
 
 int
-psexp_match(psexp_t *psexp, psinfo_t *psinfo, int flags)
+psexp_match(psexp_t *psexp, psinfo_t *psinfo, const char *argv, int flags)
 {
 	regmatch_t pmatch;
-	const char *s;
 
 	if (NOMATCH(ps_euids, pr_euid))
 		return (0);
@@ -139,14 +140,11 @@ psexp_match(psexp_t *psexp, psinfo_t *psinfo, int flags)
 		return (0);
 
 	if (psexp->ps_pat != NULL) {
-		s = (flags & PSEXP_PSARGS) ?
-		    psinfo->pr_psargs : psinfo->pr_fname;
-
-		if (regexec(&psexp->ps_reg, s, 1, &pmatch, 0) != 0)
+		if (regexec(&psexp->ps_reg, argv, 1, &pmatch, 0) != 0)
 			return (0);
 
 		if ((flags & PSEXP_EXACT) &&
-		    (pmatch.rm_so != 0 || s[pmatch.rm_eo] != '\0'))
+		    (pmatch.rm_so != 0 || argv[pmatch.rm_eo] != '\0'))
 			return (0);
 	}
 

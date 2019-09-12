@@ -26,7 +26,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 
@@ -227,7 +227,11 @@ typedef	struct	user {
 	char	u_psargs[PSARGSZ];	/* arguments from exec */
 	int	u_argc;			/* value of argc passed to main() */
 	uintptr_t u_argv;		/* value of argv passed to main() */
+	uintptr_t u_argvstrs;		/* argv string space pointer */
+	size_t u_argvstrsize;		/* size of argv string space */
 	uintptr_t u_envp;		/* value of envp passed to main() */
+	uintptr_t u_envstrs;		/* env string space pointer */
+	size_t u_envstrsize;		/* size of env string space */
 	uintptr_t u_commpagep;		/* address of mapped comm page */
 
 	/*

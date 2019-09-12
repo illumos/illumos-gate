@@ -1,27 +1,23 @@
 '\" te
 .\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2019 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PTREE 1 "Oct 11, 2005"
+.TH PTREE 1 "Sep 3, 2019"
 .SH NAME
 ptree \- print process trees
 .SH SYNOPSIS
-.LP
 .nf
-\fB/usr/bin/ptree\fR [\fB-a\fR] [\fB-c\fR] [\fB-z\fR \fIzone\fR] [\fIpid\fR | \fIuser\fR]...
+\fB/usr/bin/ptree\fR [\fB-a\fR] [\fB-c\fR] [\fB-s\fR \fIsvc\fR] [\fB-z\fR \fIzone\fR] [\fIpid\fR | \fIuser\fR]...
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBptree\fR utility prints the process trees containing the specified
 \fIpid\fRs or \fIuser\fRs, with child processes indented from their respective
 parent processes. An argument of all digits is taken to be a process-ID,
 otherwise it is assumed to be a user login name. The default is all processes.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -38,8 +34,21 @@ All. Print all processes, including children of process 0.
 \fB\fB-c\fR\fR
 .ad
 .RS 11n
-Contracts. Print process contract memberships in addition to parent-child
-relationships. See \fBprocess\fR(4). This option implies the \fB-a\fR option.
+Contracts. Print process contract memberships and their associated SMF FMRIs,
+in addition to parent-child relationships. See \fBprocess\fR(4).
+This option implies the \fB-a\fR option.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR \fIsvc\fR\fR
+.ad
+.RS 11n
+Print only processes with an SMF service FMRI matching the argument. The FMRI
+may be in truncated form (such as 'console-login'). This includes children
+processes even if they are not members of the service contract.
+See \fBprocess\fR(4).
 .RE
 
 .sp
@@ -55,8 +64,6 @@ This option is only useful when executed in the global zone.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -80,7 +87,6 @@ given are displayed.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing ptree
 .sp
 .LP
@@ -104,8 +110,6 @@ $ ptree -a `pgrep ssh`
 .sp
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -126,7 +130,6 @@ An error has occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/proc/*\fR\fR
@@ -136,8 +139,6 @@ process files
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -155,8 +156,6 @@ Interface Stability	See below.
 .LP
 The human readable output is Unstable. The options are Evolving.
 .SH SEE ALSO
-.sp
-.LP
 \fBgcore\fR(1), \fBldd\fR(1), \fBpargs\fR(1), \fBpgrep\fR(1), \fBpkill\fR(1),
 \fBplimit\fR(1), \fBpmap\fR(1), \fBpreap\fR(1), \fBproc\fR(1), \fBps\fR(1),
 \fBppgsz\fR(1), \fBpwd\fR(1), \fBrlogin\fR(1), \fBtime\fR(1), \fBtruss\fR(1),

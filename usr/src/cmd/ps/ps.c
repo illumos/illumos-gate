@@ -27,7 +27,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -64,6 +64,8 @@
 #include <sys/pset.h>
 #include <project.h>
 #include <zone.h>
+#include <assert.h>
+#include <stdbool.h>
 
 #define	min(a, b)	((a) > (b) ? (b) : (a))
 #define	max(a, b)	((a) < (b) ? (b) : (a))
@@ -336,6 +338,10 @@ static	int	pidcmp(const void *p1, const void *p2);
 
 extern	int	ucbmain(int, char **);
 static	int	stdmain(int, char **);
+
+/* also used by ucbps.c */
+void get_psargs(bool, bool, psinfo_t *, char *, size_t);
+void print_psargs(char *, int);
 
 int
 main(int argc, char **argv)
@@ -1370,14 +1376,12 @@ prfind(int found, psinfo_t *psinfo, char **tpp)
 static void
 prcom(psinfo_t *psinfo, char *ttyp)
 {
-	char	*cp;
-	long	tm;
-	int	bytesleft;
-	int	wcnt, length;
-	wchar_t	wchar;
+	long tm;
+	int wcnt;
 	struct passwd *pwd;
-	int	zombie_lwp;
-	char	zonename[ZONENAME_MAX];
+	int zombie_lwp;
+	char zonename[ZONENAME_MAX];
+	char psargs[PRMAXARGVLEN] = "";
 
 	/*
 	 * If process is zombie, call zombie print routine and return.
@@ -1566,44 +1570,22 @@ prcom(psinfo_t *psinfo, char *ttyp)
 		if (psinfo->pr_time.tv_nsec > 500000000)
 			tm++;
 	}
-	(void) printf(" %4ld:%.2ld", tm / 60, tm % 60);		/* [L]TIME */
+	(void) printf(" %4ld:%.2ld ", tm / 60, tm % 60);	/* [L]TIME */
 
 	if (zombie_lwp) {
-		(void) printf(" <defunct>\n");
+		(void) printf("<defunct>\n");
 		return;
 	}
 
 	if (!fflg) {						/* CMD */
 		wcnt = namencnt(psinfo->pr_fname, 16, 8);
-		(void) printf(" %.*s\n", wcnt, psinfo->pr_fname);
+		(void) printf("%.*s\n", wcnt, psinfo->pr_fname);
 		return;
 	}
 
-
-	/*
-	 * PRARGSZ == length of cmd arg string.
-	 */
-	psinfo->pr_psargs[PRARGSZ-1] = '\0';
-	bytesleft = PRARGSZ;
-	for (cp = psinfo->pr_psargs; *cp != '\0'; cp += length) {
-		length = mbtowc(&wchar, cp, MB_LEN_MAX);
-		if (length == 0)
-			break;
-		if (length < 0 || !iswprint(wchar)) {
-			if (length < 0)
-				length = 1;
-			if (bytesleft <= length) {
-				*cp = '\0';
-				break;
-			}
-			/* omit the unprintable character */
-			(void) memmove(cp, cp+length, bytesleft-length);
-			length = 0;
-		}
-		bytesleft -= length;
-	}
-	wcnt = namencnt(psinfo->pr_psargs, PRARGSZ, lflg ? 35 : PRARGSZ);
-	(void) printf(" %.*s\n", wcnt, psinfo->pr_psargs);
+	get_psargs(false, fflg, psinfo, psargs, sizeof (psargs));
+	print_psargs(psargs, 0);
+	printf("\n");
 }
 
 /*
@@ -1658,20 +1640,98 @@ print_time(time_t tim, int width)
 	(void) printf("%*s", width, buf);
 }
 
+void
+get_psargs(bool comm, bool full, psinfo_t *psinfo, char *buf, size_t bufsize)
+{
+	char *path = NULL;
+	ssize_t size = 0;
+	char *cp;
+	int fd;
+
+	assert(psinfo->pr_psargs[PRARGSZ - 1] == '\0');
+
+	if (full && getenv("SHORT_PSARGS") == NULL &&
+	    asprintf(&path, "%s/%d/cmdline", procdir,
+	    (int)psinfo->pr_pid) != -1 && (fd = open(path, O_RDONLY)) != -1) {
+		size = read(fd, buf, bufsize);
+		(void) close(fd);
+	}
+
+	free(path);
+
+	if (size <= 0) {
+		(void) strlcpy(buf, psinfo->pr_psargs, bufsize);
+	} else {
+		ssize_t i;
+
+		buf[bufsize - 1] = '\0';
+
+		for (cp = buf; cp - buf < size; cp++) {
+			if (*cp == '\0' && (cp - buf) + 1 < size)
+				*cp = ' ';
+		}
+
+		for (i = strlen(buf) - 1; i >= 0 && isspace(buf[i]); i--) {
+			buf[i] = '\0';
+		}
+	}
+
+	if (comm && (cp = strpbrk(buf, " \t\r\v\f\n")) != NULL)
+		*cp = '\0';
+}
+
+void
+print_psargs(char *psargs, int width)
+{
+	int bytesleft;
+	int length;
+	char *cp;
+	int wcnt;
+
+	bytesleft = strlen(psargs);
+
+	for (cp = psargs; *cp != '\0'; cp += length) {
+		wchar_t	wchar;
+
+		length = mbtowc(&wchar, cp, MB_LEN_MAX);
+
+		if (length == 0)
+			break;
+
+		if (length < 0 || !iswprint(wchar)) {
+			if (length < 0)
+				length = 1;
+			if (bytesleft <= length) {
+				*cp = '\0';
+				break;
+			}
+			/* omit the unprintable character */
+			(void) memmove(cp, cp + length, bytesleft - length);
+			bytesleft -= length;
+			length = 0;
+		}
+		bytesleft -= length;
+	}
+
+	wcnt = namencnt(psargs, PRMAXARGVLEN, width);
+
+	if (width != 0) {
+		(void) printf("%.*s", width, psargs);
+	} else {
+		(void) printf("%-.*s", wcnt, psargs);
+	}
+}
+
 static void
 print_field(psinfo_t *psinfo, struct field *f, const char *ttyp)
 {
+	char psargs[PRMAXARGVLEN] = "";
 	int width = f->width;
 	struct passwd *pwd;
 	struct group *grp;
 	time_t cputime;
-	int bytesleft;
 	int wcnt;
-	wchar_t	wchar;
-	char *cp;
-	int length;
 	ulong_t mask;
-	char c = '\0', *csave = NULL;
 	int zombie_lwp;
 
 	zombie_lwp = (Lflg && psinfo->pr_lwp.pr_sname == 'Z');
@@ -1924,12 +1984,11 @@ print_field(psinfo_t *psinfo, struct field *f, const char *ttyp)
 				(void) printf("%s", "<defunct>");
 			break;
 		}
-		csave = strpbrk(psinfo->pr_psargs, " \t\r\v\f\n");
-		if (csave) {
-			c = *csave;
-			*csave = '\0';
-		}
-		/* FALLTHROUGH */
+
+		get_psargs(true, false, psinfo, psargs, sizeof (psargs));
+		print_psargs(psargs, f->next != NULL ? width : 0);
+		break;
+
 	case F_ARGS:
 		/*
 		 * PRARGSZ == length of cmd arg string.
@@ -1938,38 +1997,11 @@ print_field(psinfo_t *psinfo, struct field *f, const char *ttyp)
 			(void) printf("%-*s", width, "<defunct>");
 			break;
 		}
-		psinfo->pr_psargs[PRARGSZ-1] = '\0';
-		bytesleft = PRARGSZ;
-		for (cp = psinfo->pr_psargs; *cp != '\0'; cp += length) {
-			length = mbtowc(&wchar, cp, MB_LEN_MAX);
-			if (length == 0)
-				break;
-			if (length < 0 || !iswprint(wchar)) {
-				if (length < 0)
-					length = 1;
-				if (bytesleft <= length) {
-					*cp = '\0';
-					break;
-				}
-				/* omit the unprintable character */
-				(void) memmove(cp, cp+length, bytesleft-length);
-				length = 0;
-			}
-			bytesleft -= length;
-		}
-		wcnt = namencnt(psinfo->pr_psargs, PRARGSZ, width);
-		/*
-		 * Print full width unless this is the last format.
-		 */
-		if (f->next != NULL)
-			(void) printf("%-*.*s", width, wcnt,
-			    psinfo->pr_psargs);
-		else
-			(void) printf("%-.*s", wcnt,
-			    psinfo->pr_psargs);
-		if (f->fname == F_COMM && csave)
-			*csave = c;
+
+		get_psargs(false, fflg, psinfo, psargs, sizeof (psargs));
+		print_psargs(psargs, f->next != NULL ? width : 0);
 		break;
+
 	case F_TASKID:
 		(void) printf("%*d", width, (int)psinfo->pr_taskid);
 		break;
@@ -2430,7 +2462,8 @@ namencnt(char *cmd, int csisize, int scrsize)
 			return (8); /* default to use for illegal chars */
 		if ((nscrsz = wcwidth(wchar)) <= 0)
 			return (8);
-		if (csiwcnt + ncsisz > csisize || scrwcnt + nscrsz > scrsize)
+		if (csiwcnt + ncsisz > csisize ||
+		    (scrsize != 0 && scrwcnt + nscrsz > scrsize))
 			break;
 		csiwcnt += ncsisz;
 		scrwcnt += nscrsz;

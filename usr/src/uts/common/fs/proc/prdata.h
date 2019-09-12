@@ -27,7 +27,7 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _SYS_PROC_PRDATA_H
@@ -124,6 +124,7 @@ typedef enum prnodetype {
 	PR_LDT,			/* /proc/<pid>/ldt			*/
 #endif
 	PR_ARGV,		/* /proc/<pid>/argv			*/
+	PR_CMDLINE,		/* /proc/<pid>/cmdline			*/
 	PR_USAGE,		/* /proc/<pid>/usage			*/
 	PR_LUSAGE,		/* /proc/<pid>/lusage			*/
 	PR_PAGEDATA,		/* /proc/<pid>/pagedata			*/
@@ -351,6 +352,7 @@ extern	void	pr_sethold(prnode_t *, sigset_t *);
 extern	void	pr_setfault(proc_t *, fltset_t *);
 extern	int	prusrio(proc_t *, enum uio_rw, struct uio *, int);
 extern	int	prreadargv(proc_t *, char *, size_t, size_t *);
+extern	int	prreadcmdline(proc_t *, char *, size_t, size_t *);
 extern	int	prreadenvv(proc_t *, char *, size_t, size_t *);
 extern	int	prwritectl(vnode_t *, struct uio *, cred_t *);
 extern	int	prlock(prnode_t *, int);

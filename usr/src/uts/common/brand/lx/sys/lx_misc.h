@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _SYS__LX_MISC_H
@@ -62,7 +62,6 @@ extern int ltos_at_flag(int, int, boolean_t);
 #if defined(_SYSCALL32_IMPL)
 extern int stol_ksiginfo32_copyout(k_siginfo_t *, void *);
 #endif
-extern void lx_read_argv_bounds(proc_t *p);
 
 typedef enum lx_regs_location {
 	LX_REG_LOC_UNAVAIL,

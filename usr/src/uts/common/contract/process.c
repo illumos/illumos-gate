@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/mutex.h>
@@ -737,13 +737,11 @@ contract_process_status(contract_t *ct, zone_t *zone, int detail, nvlist_t *nvl,
 	 * if we are in a local zone and svc_fmri was inherited from
 	 * the global zone, we provide fake svc_fmri and svc_ctid
 	 */
-	if (local_svc_zone_enter == 0||
+	if (local_svc_zone_enter == 0 ||
 	    zone->zone_uniqid == GLOBAL_ZONEUNIQID) {
 		if (detail > CTD_COMMON) {
 			VERIFY(nvlist_add_int32(nvl, CTPS_SVC_CTID,
 			    ctp->conp_svc_ctid) == 0);
-		}
-		if (detail == CTD_ALL) {
 			VERIFY(nvlist_add_string(nvl, CTPS_SVC_FMRI,
 			    refstr_value(ctp->conp_svc_fmri)) == 0);
 		}
@@ -751,8 +749,6 @@ contract_process_status(contract_t *ct, zone_t *zone, int detail, nvlist_t *nvl,
 		if (detail > CTD_COMMON) {
 			VERIFY(nvlist_add_int32(nvl, CTPS_SVC_CTID,
 			    local_svc_zone_enter) == 0);
-		}
-		if (detail == CTD_ALL) {
 			VERIFY(nvlist_add_string(nvl, CTPS_SVC_FMRI,
 			    CT_PR_SVC_FMRI_ZONE_ENTER) == 0);
 		}

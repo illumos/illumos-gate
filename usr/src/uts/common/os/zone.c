@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
@@ -4478,7 +4478,11 @@ zsched(void *arg)
 	bcopy("zsched", PTOU(pp)->u_comm, sizeof ("zsched"));
 	PTOU(pp)->u_argc = 0;
 	PTOU(pp)->u_argv = 0;
+	PTOU(pp)->u_argvstrs = 0;
+	PTOU(pp)->u_argvstrsize = 0;
 	PTOU(pp)->u_envp = 0;
+	PTOU(pp)->u_envstrs = 0;
+	PTOU(pp)->u_envstrsize = 0;
 	PTOU(pp)->u_commpagep = 0;
 	closeall(P_FINFO(pp));
 

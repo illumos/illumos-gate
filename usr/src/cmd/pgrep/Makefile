@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 Joyent, Inc.
+#
 
 PROG = pgrep
 PKILLFILE = pkill
@@ -31,13 +33,14 @@ ROOTLINKS = $(ROOTBIN)/$(PKILLFILE)
 OBJS = pgrep.o idtab.o psexp.o
 SRCS = $(OBJS:.o=.c)
 POFILES = $(OBJS:.o=.po)
-lint := LINTFLAGS = -ux
 
 include ../Makefile.cmd
 
 CLOBBERFILES += $(PKILLFILE)
+
 CFLAGS += $(CCVERBOSE)
-CERRWARN += -_gcc=-Wno-parentheses
+CSTD = $(CSTD_GNU99)
+
 LDLIBS += -luutil -lproject -lcontract
 
 POFILE = ppgrep.po
@@ -68,7 +71,5 @@ $(ROOTLINKS): $(ROOTPROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint: lint_SRCS
 
 include ../Makefile.targ

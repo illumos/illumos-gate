@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
@@ -98,11 +98,6 @@ struct prdirect {
 #define	PRSDSIZE	(sizeof (struct prdirect))
 
 /*
- * Maximum length of the /proc/$$/argv file:
- */
-int prmaxargvlen = 4096;
-
-/*
  * Directory characteristics.
  */
 typedef struct prdirent {
@@ -171,12 +166,14 @@ static prdirent_t piddir[] = {
 		"contracts" },
 	{ PR_SECFLAGS,	27 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"secflags" },
-#if defined(__x86)
-	{ PR_LDT,	28 * sizeof (prdirent_t), sizeof (prdirent_t),
-		"ldt" },
-#endif
 	{ PR_ARGV,	28 * sizeof (prdirent_t), sizeof (prdirent_t),
 		"argv" },
+	{ PR_CMDLINE,	29 * sizeof (prdirent_t), sizeof (prdirent_t),
+		"cmdline" },
+#if defined(__x86)
+	{ PR_LDT,	30 * sizeof (prdirent_t), sizeof (prdirent_t),
+		"ldt" },
+#endif
 };
 
 #define	NPIDDIRFILES	(sizeof (piddir) / sizeof (piddir[0]) - 2)
@@ -595,7 +592,7 @@ static int pr_read_inval(), pr_read_as(), pr_read_status(),
 #if defined(__x86)
 	pr_read_ldt(),
 #endif
-	pr_read_argv(),
+	pr_read_argv(), pr_read_cmdline(),
 	pr_read_usage(), pr_read_lusage(), pr_read_pagedata(),
 	pr_read_watch(), pr_read_lwpstatus(), pr_read_lwpsinfo(),
 	pr_read_lwpusage(), pr_read_lwpname(),
@@ -626,6 +623,7 @@ static int (*pr_read_function[PR_NFILES])() = {
 	pr_read_ldt,		/* /proc/<pid>/ldt			*/
 #endif
 	pr_read_argv,		/* /proc/<pid>/argv			*/
+	pr_read_cmdline,	/* /proc/<pid>/cmdline			*/
 	pr_read_usage,		/* /proc/<pid>/usage			*/
 	pr_read_lusage,		/* /proc/<pid>/lusage			*/
 	pr_read_pagedata,	/* /proc/<pid>/pagedata			*/
@@ -690,11 +688,46 @@ pr_uioread(void *base, long count, uio_t *uiop)
 }
 
 static int
+pr_read_cmdline(prnode_t *pnp, uio_t *uiop)
+{
+	char *args;
+	int error;
+	size_t asz = PRMAXARGVLEN, sz;
+
+	/*
+	 * Allocate a scratch buffer for collection of the process arguments.
+	 */
+	args = kmem_alloc(asz, KM_SLEEP);
+
+	ASSERT(pnp->pr_type == PR_CMDLINE);
+
+	if ((error = prlock(pnp, ZNO)) != 0) {
+		kmem_free(args, asz);
+		return (error);
+	}
+
+	if ((error = prreadcmdline(pnp->pr_common->prc_proc, args, asz,
+	    &sz)) != 0) {
+		prunlock(pnp);
+		kmem_free(args, asz);
+		return (error);
+	}
+
+	prunlock(pnp);
+
+	error = pr_uioread(args, sz, uiop);
+
+	kmem_free(args, asz);
+
+	return (error);
+}
+
+static int
 pr_read_argv(prnode_t *pnp, uio_t *uiop)
 {
 	char *args;
 	int error;
-	size_t asz = prmaxargvlen, sz;
+	size_t asz = PRMAXARGVLEN, sz;
 
 	/*
 	 * Allocate a scratch buffer for collection of the process arguments.
@@ -1872,6 +1905,7 @@ static int (*pr_read_function_32[PR_NFILES])() = {
 	pr_read_ldt,		/* /proc/<pid>/ldt			*/
 #endif
 	pr_read_argv,		/* /proc/<pid>/argv			*/
+	pr_read_cmdline,	/* /proc/<pid>/cmdline			*/
 	pr_read_usage_32,	/* /proc/<pid>/usage			*/
 	pr_read_lusage_32,	/* /proc/<pid>/lusage			*/
 	pr_read_pagedata_32,	/* /proc/<pid>/pagedata			*/
@@ -3317,7 +3351,7 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 		if ((p->p_flag & SSYS) || p->p_as == &kas) {
 			vap->va_size = PSARGSZ;
 		} else {
-			vap->va_size = prmaxargvlen;
+			vap->va_size = PRMAXARGVLEN;
 		}
 		break;
 #if defined(__x86)
@@ -3442,6 +3476,7 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 #endif
 	case PR_CTL:
 	case PR_LWPCTL:
+	case PR_CMDLINE:
 	default:
 		vap->va_size = 0;
 		break;
@@ -3497,6 +3532,7 @@ praccess(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 	case PR_LUSAGE:
 	case PR_LWPUSAGE:
 	case PR_ARGV:
+	case PR_CMDLINE:
 		p = pr_p_lock(pnp);
 		mutex_exit(&pr_pidlock);
 		if (p == NULL)
@@ -3583,6 +3619,7 @@ static vnode_t *(*pr_lookup_function[PR_NFILES])() = {
 	pr_lookup_notdir,	/* /proc/<pid>/ldt			*/
 #endif
 	pr_lookup_notdir,	/* /proc/<pid>/argv			*/
+	pr_lookup_notdir,	/* /proc/<pid>/cmdline			*/
 	pr_lookup_notdir,	/* /proc/<pid>/usage			*/
 	pr_lookup_notdir,	/* /proc/<pid>/lusage			*/
 	pr_lookup_notdir,	/* /proc/<pid>/pagedata			*/
@@ -4871,6 +4908,7 @@ prgetnode(vnode_t *dp, prnodetype_t type)
 	case PR_LUSAGE:
 	case PR_LWPUSAGE:
 	case PR_ARGV:
+	case PR_CMDLINE:
 		pnp->pr_mode = 0444;	/* read-only by all */
 		break;
 
@@ -4977,6 +5015,7 @@ static int (*pr_readdir_function[PR_NFILES])() = {
 	pr_readdir_notdir,	/* /proc/<pid>/ldt			*/
 #endif
 	pr_readdir_notdir,	/* /proc/<pid>/argv			*/
+	pr_readdir_notdir,	/* /proc/<pid>/cmdline			*/
 	pr_readdir_notdir,	/* /proc/<pid>/usage			*/
 	pr_readdir_notdir,	/* /proc/<pid>/lusage			*/
 	pr_readdir_notdir,	/* /proc/<pid>/pagedata			*/
@@ -5129,6 +5168,7 @@ pr_readdir_piddir(prnode_t *pnp, uio_t *uiop, int *eofp)
 			case PR_PSINFO:
 			case PR_USAGE:
 			case PR_ARGV:
+			case PR_CMDLINE:
 				break;
 			default:
 				continue;

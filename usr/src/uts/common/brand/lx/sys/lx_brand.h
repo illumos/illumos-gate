@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _LX_BRAND_H
@@ -132,8 +132,8 @@ typedef enum lx_ptrace_options {
 } lx_ptrace_options_t;
 
 #define	LX_PTRACE_O_ALL							\
-	(LX_PTRACE_O_TRACESYSGOOD | LX_PTRACE_O_TRACEFORK | 		\
-	LX_PTRACE_O_TRACEVFORK | LX_PTRACE_O_TRACECLONE | 		\
+	(LX_PTRACE_O_TRACESYSGOOD | LX_PTRACE_O_TRACEFORK |		\
+	LX_PTRACE_O_TRACEVFORK | LX_PTRACE_O_TRACECLONE |		\
 	LX_PTRACE_O_TRACEEXEC | LX_PTRACE_O_TRACEVFORKDONE |		\
 	LX_PTRACE_O_TRACEEXIT | LX_PTRACE_O_TRACESECCOMP)
 #endif /* !_ASM */
@@ -344,11 +344,6 @@ typedef struct lx_proc_data {
 	uint_t l_io_ctx_cnt;
 	struct lx_io_ctx  **l_io_ctxs;
 
-	/* original start/end bounds of arg/env string data */
-	uintptr_t l_args_start;
-	uintptr_t l_envs_start;
-	uintptr_t l_envs_end;
-
 	/* Override zone-wide settings for uname release and version */
 	char l_uname_release[LX_KERN_RELEASE_MAX];
 	char l_uname_version[LX_KERN_VERSION_MAX];
@@ -365,7 +360,7 @@ typedef struct lx_proc_data {
 	lx_segmap_t l_remap_anoncache[LX_REMAP_ANONCACHE_NENTRIES];
 
 	/* Block all signals to all threads; used during vfork */
-	uint_t	 l_block_all_signals;
+	uint_t l_block_all_signals;
 } lx_proc_data_t;
 
 #endif	/* _KERNEL */
@@ -545,7 +540,7 @@ struct lx_lwp_data {
 	lx_ptrace_accord_t *br_ptrace_tracer; /* accord tracing this LWP */
 	list_node_t br_ptrace_linkage;	/* linkage for lxpa_tracees list */
 
-	ushort_t br_ptrace_whystop; 	/* stop reason, 0 for no stop */
+	ushort_t br_ptrace_whystop;	/* stop reason, 0 for no stop */
 	ushort_t br_ptrace_whatstop;	/* stop sub-reason */
 
 	int32_t br_ptrace_stopsig;	/* stop signal, 0 for no signal */

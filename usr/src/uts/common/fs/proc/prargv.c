@@ -28,7 +28,7 @@
  * returned to the caller via 'rdsz'.
  */
 int
-prreadbuf(proc_t *p, uintptr_t ustart, uint8_t *buf, size_t sz, size_t *rdsz)
+prreadbuf(proc_t *p, uintptr_t ustart, char *buf, size_t sz, size_t *rdsz)
 {
 	int error = 0;
 	size_t rem = sz;
@@ -62,6 +62,95 @@ prreadbuf(proc_t *p, uintptr_t ustart, uint8_t *buf, size_t sz, size_t *rdsz)
 
 	return (error);
 }
+
+
+/*
+ * Effectively a truncating version of copyinstr().
+ *
+ * The resulting string is guaranteed to be truncated to fit within the buffer
+ * (hence sz == 0 is not supported). The returned size includes the truncating
+ * NUL.
+ */
+int
+prreadstr(proc_t *p, uintptr_t ustart, char *buf, size_t bufsz, size_t *rdsz)
+{
+	size_t slen;
+	int err;
+
+	VERIFY(bufsz != 0);
+
+	if ((err = prreadbuf(p, ustart, buf, bufsz, &slen)) != 0)
+		return (err);
+
+	slen = strnlen(buf, slen);
+
+	if (slen == bufsz)
+		slen--;
+
+	buf[slen++] = '\0';
+
+	if (rdsz != NULL)
+		*rdsz = slen;
+	return (0);
+}
+
+/*
+ * /proc/pid/cmdline: Linux-compatible '\0'-separated process argv.
+ *
+ * Unlike /proc/pid/argv, this looks at the exec()-time argv string area, rather
+ * than starting from the argv[] array. Thus changes to the array are not
+ * noticed, but direct modifications of the string are visible here. Since it's
+ * common for applications to expect it, we implement the Linux semantics here.
+ *
+ * There is special handling if the process has modified its argv: if the last
+ * byte of the argv string area is no longer NUL, then we presume that it has
+ * done setproctitle() or similar, and we should copy it as a single string from
+ * the start, even though it overflows into the env string area. Note that we
+ * can't use copyinstr() as that returns ENAMETOOLONG rather than truncating as
+ * we need.
+ *
+ * Otherwise, we provide the argv string area in toto.
+ */
+int
+prreadcmdline(proc_t *p, char *buf, size_t bufsz, size_t *slen)
+{
+	user_t *up = &p->p_user;
+	uint8_t term;
+	int err = 0;
+
+	VERIFY(bufsz == PRMAXARGVLEN);
+	VERIFY(MUTEX_HELD(&p->p_lock));
+
+	if ((p->p_flag & SSYS) || p->p_as == &kas || up->u_argvstrsize == 0) {
+		bcopy(up->u_psargs, buf, MIN(bufsz, sizeof (up->u_psargs)));
+		buf[bufsz - 1] = '\0';
+		*slen = strlen(buf) + 1;
+		return (0);
+	}
+
+	VERIFY(up->u_argvstrs != (uintptr_t)NULL);
+
+	mutex_exit(&p->p_lock);
+
+	if (uread(p, &term, sizeof (term),
+	    up->u_argvstrs + up->u_argvstrsize - 1) != 0) {
+		err = EFAULT;
+		goto out;
+	}
+
+	if (term != '\0') {
+		err = prreadstr(p, up->u_argvstrs, buf, bufsz, slen);
+	} else {
+		size_t size = MIN(bufsz, up->u_argvstrsize);
+		err = prreadbuf(p, up->u_argvstrs, buf, size, slen);
+	}
+
+out:
+	mutex_enter(&p->p_lock);
+	VERIFY(p->p_proc_flag & P_PR_LOCK);
+	return (err);
+}
+
 
 /*
  * Attempt to read the argument vector (argv) from this process.  The caller
@@ -113,8 +202,8 @@ prreadargv(proc_t *p, char *buf, size_t bufsz, size_t *slen)
 	 * while we do I/O to avoid deadlock with the clock thread.
 	 */
 	mutex_exit(&p->p_lock);
-	if ((error = prreadbuf(p, up->u_argv, (uint8_t *)argv, argvsz,
-	    NULL)) != 0) {
+	if ((error = prreadbuf(p, up->u_argv, (char *)argv,
+	    argvsz, NULL)) != 0) {
 		kmem_free(argv, argvsz);
 		mutex_enter(&p->p_lock);
 		VERIFY(p->p_proc_flag & P_PR_LOCK);
@@ -175,7 +264,7 @@ retry:
 		 * Read string data for this argument.  Leave room
 		 * in the buffer for a final NUL terminator.
 		 */
-		if ((error = prreadbuf(p, arg, (uint8_t *)&buf[pos], trysz,
+		if ((error = prreadbuf(p, arg, (char *)&buf[pos], trysz,
 		    &rdsz)) != 0) {
 			/*
 			 * There was a problem reading this string
@@ -288,7 +377,7 @@ prreadenvv(proc_t *p, char *buf, size_t bufsz, size_t *slen)
 	for (cnt = 0, tmpp = up->u_envp; cnt < bound; cnt++, tmpp += rdsz) {
 		caddr_t tmp = NULL;
 
-		if ((error = prreadbuf(p, tmpp, (uint8_t *)&tmp, rdsz,
+		if ((error = prreadbuf(p, tmpp, (char *)&tmp, rdsz,
 		    NULL)) != 0) {
 			mutex_enter(&p->p_lock);
 			VERIFY(p->p_proc_flag & P_PR_LOCK);
@@ -317,7 +406,7 @@ prreadenvv(proc_t *p, char *buf, size_t bufsz, size_t *slen)
 	/*
 	 * Extract the env array from the target process.
 	 */
-	if ((error = prreadbuf(p, up->u_envp, (uint8_t *)envp, envpsz,
+	if ((error = prreadbuf(p, up->u_envp, (char *)envp, envpsz,
 	    NULL)) != 0) {
 		kmem_free(envp, envpsz);
 		mutex_enter(&p->p_lock);
@@ -379,7 +468,7 @@ retry:
 		 * Read string data for this env var.  Leave room
 		 * in the buffer for a final NUL terminator.
 		 */
-		if ((error = prreadbuf(p, ev, (uint8_t *)&buf[pos], trysz,
+		if ((error = prreadbuf(p, ev, (char *)&buf[pos], trysz,
 		    &rdsz)) != 0) {
 			/*
 			 * There was a problem reading this string

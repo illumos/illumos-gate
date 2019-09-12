@@ -80,7 +80,8 @@ typedef struct uarg {
 	ssize_t	na;
 	ssize_t	ne;
 	ssize_t	nc;
-	ssize_t arglen;
+	size_t	argstrlen;
+	size_t	envstrlen;
 	char	*fname;
 	char	*pathname;
 	size_t	auxsize;

@@ -25,7 +25,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _SYS_PROCFS_H
@@ -271,10 +271,12 @@ typedef struct lwpsinfo {
 	int	pr_filler[4];	/* reserved for future use */
 } lwpsinfo_t;
 
+#define	PRARGSZ		80	/* number of chars of arguments */
+#define	PRMAXARGVLEN	4096	/* max len of /proc/%s/argv */
+
 /*
  * process ps(1) information file.  /proc/<pid>/psinfo
  */
-#define	PRARGSZ		80	/* number of chars of arguments */
 typedef struct psinfo {
 	int	pr_flag;	/* process flags (DEPRECATED; do not use) */
 	int	pr_nlwp;	/* number of active lwps in the process */

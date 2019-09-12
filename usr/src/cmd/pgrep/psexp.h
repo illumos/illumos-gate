@@ -24,10 +24,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #ifndef	_PSEXP_H
 #define	_PSEXP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <procfs.h>
@@ -39,8 +41,7 @@ extern "C" {
 
 #include "idtab.h"
 
-#define	PSEXP_PSARGS	0x1	/* Match against psargs rather than fname */
-#define	PSEXP_EXACT	0x2	/* Match must be exact (entire string) */
+#define	PSEXP_EXACT	0x1	/* Match must be exact (entire string) */
 
 typedef struct psexp {
 	idtab_t ps_euids;	/* Table of effective uids to match */
@@ -54,14 +55,14 @@ typedef struct psexp {
 	idtab_t ps_taskids;	/* Table of task ids to match */
 	idtab_t ps_zoneids;	/* Table of zone ids to match */
 	idtab_t ps_ctids;	/* Table of contract ids to match */
-	const char *ps_pat;	/* Uncompiled fname/psargs regexp pattern */
-	regex_t ps_reg;		/* Compiled fname/psargs regexp */
+	const char *ps_pat;	/* Uncompiled fname/argv regexp pattern */
+	regex_t ps_reg;		/* Compiled fname/argv regexp */
 } psexp_t;
 
 extern void psexp_create(psexp_t *);
 extern void psexp_destroy(psexp_t *);
 extern int psexp_compile(psexp_t *);
-extern int psexp_match(psexp_t *, psinfo_t *, int);
+extern int psexp_match(psexp_t *, psinfo_t *, const char *, int);
 
 #ifdef	__cplusplus
 }

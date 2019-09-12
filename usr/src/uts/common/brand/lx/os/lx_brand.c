@@ -379,8 +379,6 @@ lx_setbrand(proc_t *p)
 {
 	/* Send SIGCHLD to parent by default when child exits */
 	ptolxproc(p)->l_signal = stol_signo[SIGCHLD];
-
-	lx_read_argv_bounds(p);
 }
 
 /* ARGSUSED */

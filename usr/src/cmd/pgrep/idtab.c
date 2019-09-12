@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include <libintl.h>
 #include <string.h>
@@ -61,7 +63,8 @@ idtab_append(idtab_t *idt, idkey_t id)
 	if (idt->id_nelems >= idt->id_size) {
 		size = idt->id_size ? idt->id_size * IDTAB_GROW : IDTAB_DEFSIZE;
 
-		if (data = realloc(idt->id_data, sizeof (idkey_t) * size)) {
+		if ((data = realloc(idt->id_data,
+		    sizeof (idkey_t) * size)) != NULL) {
 			idt->id_data = data;
 			idt->id_size = size;
 		} else {

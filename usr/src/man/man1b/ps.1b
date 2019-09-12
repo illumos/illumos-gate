@@ -1,17 +1,16 @@
 '\" te
 .\" Copyright (c) 2002, Sun Microsystems, Inc. - All Rights Reserved.
 .\" Copyright (c), 1980 Regents of the University of California.  All rights reserved.  The Berkeley software License Agreement  specifies the terms and conditions for redistribution.
-.TH PS 1B "May 13, 2017"
+.\" Copyright 2019 Joyent, Inc.
+.TH PS 1B "Aug 13, 2019"
 .SH NAME
 ps \- display the status of current processes
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/ucb/ps\fR [\fB-aceglnrSuUvwx\fR] [\fB-t\fR \fIterm\fR] [\fInum\fR]
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBps\fR command displays information about processes. Normally, only those
 processes that are running with your effective user \fBID\fR and are attached
 to a controlling terminal (see \fBtermio\fR(7I)) are shown. Additional
@@ -78,7 +77,6 @@ Traced. Process stopped by a signal because parent is tracing it.
 .RE
 
 .SH OPTIONS
-.LP
 The following options must all be combined to form the first argument:
 .sp
 .ne 2
@@ -206,11 +204,10 @@ fields \fBSIZE\fR, \fB%CPU\fR, \fB%MEM\fR, and \fBRSS\fR, described below.
 \fB\fB-w\fR\fR
 .ad
 .RS 11n
-Uses a wide output format, that is, 132 columns rather than 80. If the option
+Uses a wide output format, that is, truncate process arguments at 132 columns
+rather than 80. If the option
 letter is repeated, that is, \fB-ww\fR, this option uses arbitrarily wide
 output. This information is used to decide how much of long commands to print.
-\fBNote:\fR The wide output option can be viewed only by a superuser or the
-user who owns the process.
 .RE
 
 .sp
@@ -233,7 +230,6 @@ process. This option must be supplied last.
 .RE
 
 .SH DISPLAY FORMATS
-.LP
 Fields that are not common to all output formats:
 .sp
 .ne 2
@@ -376,7 +372,6 @@ the parent, is marked <\fBdefunct\fR>\|; otherwise, \fBps\fR tries to determine
 the command name and arguments given when the process was created by examining
 the user block.
 .SH FILES
-.LP
 \fB/dev/tty*\fR
 .sp
 .ne 2
@@ -388,11 +383,9 @@ the user block.
 .RE
 
 .SH SEE ALSO
-.LP
 \fBkill\fR(1), \fBps\fR(1), \fBwhodo\fR(1M), \fBgetpriority\fR(3C),
 \fBnice\fR(2), \fBproc\fR(4), \fBattributes\fR(5), \fBtermio\fR(7I)
 .SH NOTES
-.LP
 Things can change while \fBps\fR is running. The picture \fBps\fR gives is only
 a close approximation to the current state. Some data printed for defunct
 processes is irrelevant.

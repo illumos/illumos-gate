@@ -135,11 +135,6 @@ lx_exec()
 	lx_restore(lwp);
 	kpreempt_enable();
 
-	/* Grab the updated argv bounds */
-	mutex_enter(&p->p_lock);
-	lx_read_argv_bounds(p);
-	mutex_exit(&p->p_lock);
-
 	/*
 	 * The exec syscall doesn't return (so we don't call lx_syscall_return)
 	 * but for our ptrace emulation we need to do this so that a tracer
@@ -1057,72 +1052,6 @@ stol_ksiginfo32_copyout(k_siginfo_t *sip, void *ulxsip)
 	return (0);
 }
 #endif
-
-/*
- * Linux uses the original bounds of the argv array when determining the
- * contents of /proc/<pid/cmdline.  We mimic those bounds using argv[0] and
- * envp[0] as the beginning and end, respectively.
- */
-void
-lx_read_argv_bounds(proc_t *p)
-{
-	user_t *up = PTOU(p);
-	lx_proc_data_t *pd = ptolxproc(p);
-	uintptr_t addr_arg = up->u_argv;
-	uintptr_t addr_env = up->u_envp;
-	uintptr_t arg_start = 0, env_start = 0, env_end = 0;
-	int i = 0;
-
-	VERIFY(pd != NULL);
-	VERIFY(MUTEX_HELD(&p->p_lock));
-
-	/*
-	 * Use AT_SUN_PLATFORM in the aux vector to find the end of the envp
-	 * strings.
-	 */
-	for (i = 0; i < __KERN_NAUXV_IMPL; i++) {
-		if (up->u_auxv[i].a_type == AT_SUN_PLATFORM) {
-			env_end = (uintptr_t)up->u_auxv[i].a_un.a_val;
-		}
-	}
-
-	/*
-	 * If we come through here for a kernel process (zsched), which happens
-	 * with our cgroupfs when we fork the release agent, then u_argv and
-	 * u_envp will be NULL. While this won't cause a failure, it does
-	 * cause a lot of overhead when the fuword causes a fault, which leads
-	 * to a large amount of stack growth and anonymous memory allocation,
-	 * all of which is pointless since the first page can't be mapped.
-	 */
-	if (addr_arg != (uintptr_t)NULL || addr_env != (uintptr_t)NULL) {
-		mutex_exit(&p->p_lock);
-#if defined(_LP64)
-		if (p->p_model != DATAMODEL_NATIVE) {
-			uint32_t buf32;
-			if (fuword32((void *)addr_arg, &buf32) == 0) {
-				arg_start = (uintptr_t)buf32;
-			}
-			if (fuword32((void *)addr_env, &buf32) == 0) {
-				env_start = (uintptr_t)buf32;
-			}
-		} else
-#endif /* defined(_LP64) */
-		{
-			ulong_t buf;
-			if (fulword((void *)addr_arg, &buf) == 0) {
-				arg_start = (uintptr_t)buf;
-			}
-			if (fulword((void *)addr_env, &buf) == 0) {
-				env_start = (uintptr_t)buf;
-			}
-		}
-		mutex_enter(&p->p_lock);
-	}
-
-	pd->l_args_start = arg_start;
-	pd->l_envs_start = env_start;
-	pd->l_envs_end = env_end;
-}
 
 /* Given an LX LWP, determine where user register state is stored. */
 lx_regs_location_t
