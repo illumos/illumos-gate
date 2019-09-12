@@ -2051,6 +2051,9 @@ dmu_objset_do_userquota_updates(objset_t *os, dmu_tx_t *tx)
 	if (os->os_encrypted && dmu_objset_is_receiving(os))
 		return;
 
+	if (tx->tx_txg <= os->os_spa->spa_claim_max_txg)
+		return;
+
 	/* Allocate the user/group/project used objects if necessary. */
 	if (DMU_USERUSED_DNODE(os)->dn_type == DMU_OT_NONE) {
 		VERIFY0(zap_create_claim(os,
@@ -2390,7 +2393,8 @@ dmu_objset_projectquota_upgradable(objset_t *os)
 	return (dmu_objset_type(os) == DMU_OST_ZFS &&
 	    !dmu_objset_is_snapshot(os) &&
 	    dmu_objset_projectquota_enabled(os) &&
-	    !dmu_objset_projectquota_present(os));
+	    !dmu_objset_projectquota_present(os) &&
+	    spa_writeable(dmu_objset_spa(os)));
 }
 
 void
