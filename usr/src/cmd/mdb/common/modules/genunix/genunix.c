@@ -61,6 +61,7 @@
 #include <sys/panic.h>
 #include <regex.h>
 #include <sys/port_impl.h>
+#include <sys/contract/process_impl.h>
 
 #include "avl.h"
 #include "bio.h"
@@ -144,6 +145,7 @@ pstat2ch(uchar_t state)
 #define	PS_TASKS	0x8
 #define	PS_PROJECTS	0x10
 #define	PS_ZONES	0x20
+#define	PS_SERVICES	0x40
 
 static int
 ps_threadprint(uintptr_t addr, const void *data, void *private)
@@ -273,6 +275,7 @@ typedef struct mdb_ps_proc {
 	struct sess	*p_sessp;
 	struct task	*p_task;
 	struct zone	*p_zone;
+	struct cont_process *p_ct_process;
 	pid_t		p_ppid;
 	uint_t		p_flag;
 	struct {
@@ -280,6 +283,12 @@ typedef struct mdb_ps_proc {
 		char		u_psargs[PSARGSZ];
 	} p_user;
 } mdb_ps_proc_t;
+
+/*
+ * A reasonable enough limit. Note that we purposefully let this column over-run
+ * if needed.
+ */
+#define	FMRI_LEN (128)
 
 int
 ps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -292,6 +301,8 @@ ps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	task_t tk;
 	kproject_t pj;
 	zone_t zn;
+	struct cont_process cp;
+	char fmri[FMRI_LEN] = "";
 
 	if (!(flags & DCMD_ADDRSPEC)) {
 		if (mdb_walk_dcmd("proc", "ps", argc, argv) == -1) {
@@ -304,6 +315,7 @@ ps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (mdb_getopts(argc, argv,
 	    'f', MDB_OPT_SETBITS, PS_PSARGS, &prt_flags,
 	    'l', MDB_OPT_SETBITS, PS_PRTLWPS, &prt_flags,
+	    's', MDB_OPT_SETBITS, PS_SERVICES, &prt_flags,
 	    'T', MDB_OPT_SETBITS, PS_TASKS, &prt_flags,
 	    'P', MDB_OPT_SETBITS, PS_PROJECTS, &prt_flags,
 	    'z', MDB_OPT_SETBITS, PS_ZONES, &prt_flags,
@@ -311,15 +323,17 @@ ps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 
 	if (DCMD_HDRSPEC(flags)) {
-		mdb_printf("%<u>%1s %6s %6s %6s %6s ",
+		mdb_printf("%<u>%-1s %-6s %-6s %-6s %-6s ",
 		    "S", "PID", "PPID", "PGID", "SID");
 		if (prt_flags & PS_TASKS)
-			mdb_printf("%5s ", "TASK");
+			mdb_printf("%-5s ", "TASK");
 		if (prt_flags & PS_PROJECTS)
-			mdb_printf("%5s ", "PROJ");
+			mdb_printf("%-5s ", "PROJ");
 		if (prt_flags & PS_ZONES)
-			mdb_printf("%5s ", "ZONE");
-		mdb_printf("%6s %10s %?s %s%</u>\n",
+			mdb_printf("%-5s ", "ZONE");
+		if (prt_flags & PS_SERVICES)
+			mdb_printf("%-40s ", "SERVICE");
+		mdb_printf("%-6s %-10s %-?s %-s%</u>\n",
 		    "UID", "FLAGS", "ADDR", "NAME");
 	}
 
@@ -337,17 +351,39 @@ ps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_vread(&pj, sizeof (pj), (uintptr_t)tk.tk_proj);
 	if (prt_flags & PS_ZONES)
 		mdb_vread(&zn, sizeof (zn), (uintptr_t)pr.p_zone);
+	if ((prt_flags & PS_SERVICES) && pr.p_ct_process != NULL) {
+		mdb_vread(&cp, sizeof (cp), (uintptr_t)pr.p_ct_process);
 
-	mdb_printf("%c %6d %6d %6d %6d ",
+		if (mdb_read_refstr((uintptr_t)cp.conp_svc_fmri, fmri,
+		    sizeof (fmri)) <= 0)
+			(void) strlcpy(fmri, "?", sizeof (fmri));
+
+		/* Strip any standard prefix and suffix. */
+		if (strncmp(fmri, "svc:/", sizeof ("svc:/") - 1) == 0) {
+			char *i = fmri;
+			char *j = fmri + sizeof ("svc:/") - 1;
+			for (; *j != '\0'; i++, j++) {
+				if (strcmp(j, ":default") == 0)
+					break;
+				*i = *j;
+			}
+
+			*i = '\0';
+		}
+	}
+
+	mdb_printf("%-c %-6d %-6d %-6d %-6d ",
 	    pstat2ch(pr.p_stat), pid.pid_id, pr.p_ppid, pgid.pid_id,
 	    sid.pid_id);
 	if (prt_flags & PS_TASKS)
-		mdb_printf("%5d ", tk.tk_tkid);
+		mdb_printf("%-5d ", tk.tk_tkid);
 	if (prt_flags & PS_PROJECTS)
-		mdb_printf("%5d ", pj.kpj_id);
+		mdb_printf("%-5d ", pj.kpj_id);
 	if (prt_flags & PS_ZONES)
-		mdb_printf("%5d ", zn.zone_id);
-	mdb_printf("%6d 0x%08x %0?p %s\n",
+		mdb_printf("%-5d ", zn.zone_id);
+	if (prt_flags & PS_SERVICES)
+		mdb_printf("%-40s ", fmri);
+	mdb_printf("%-6d 0x%08x %0?p %-s\n",
 	    cred.cr_uid, pr.p_flag, addr,
 	    (prt_flags & PS_PSARGS) ? pr.p_user.u_psargs : pr.p_user.u_comm);
 
@@ -366,6 +402,7 @@ ps_help(void)
 	    "    -l\tDisplay LWPs\n"
 	    "    -T\tDisplay tasks\n"
 	    "    -P\tDisplay projects\n"
+	    "    -s\tDisplay SMF FMRI\n"
 	    "    -z\tDisplay zones\n"
 	    "    -t\tDisplay threads\n\n");
 
@@ -389,6 +426,7 @@ ps_help(void)
 	mdb_printf("TASK\tThe task id of the process.\n");
 	mdb_printf("PROJ\tThe project id of the process.\n");
 	mdb_printf("ZONE\tThe zone id of the process.\n");
+	mdb_printf("SERVICE The SMF service FMRI of the process.\n");
 	mdb_printf("UID\tThe user id of the process.\n");
 	mdb_printf("FLAGS\tThe process flags (see ::pflags).\n");
 	mdb_printf("ADDR\tThe kernel address of the proc_t structure of the "
