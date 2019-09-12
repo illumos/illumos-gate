@@ -140,7 +140,6 @@ clobber_local:
 	@cd tools; pwd; $(MAKE) clobber
 	@cd common/mapfiles; pwd; $(MAKE) clobber
 	@cd msg; pwd; $(MAKE) clobber
-	$(RM) buildversion
 
 # If the tarballs are included inside ON_CLOSED_BINS, use those to extract and
 # preserve the permissions (in case a distro ships them).

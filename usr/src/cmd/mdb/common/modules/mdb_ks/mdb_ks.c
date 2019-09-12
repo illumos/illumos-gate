@@ -1018,9 +1018,9 @@ find_mbind(const char *name, uintptr_t *hashtab)
 int
 mdb_name_to_major(const char *name, major_t *major)
 {
-	uintptr_t	mbind;
-	uintptr_t	mb_hashtab[MOD_BIND_HASHSIZE];
-	struct bind	mbind_local;
+	uintptr_t mbind;
+	uintptr_t mb_hashtab[MOD_BIND_HASHSIZE];
+	struct bind mbind_local;
 
 
 	if (mdb_readsym(mb_hashtab, sizeof (mb_hashtab), "mb_hashtab") == -1) {
@@ -1823,7 +1823,7 @@ mdb_get_lbolt(void)
  * Dig out the branch and revision of the illumos-joyent repo, if we were
  * provided with it.  This is a rather fragile JSON parser, in that it requires
  * JSON formatted exactly as per the boot_archive.gitstatus file that
- * "buildversion_start" is built from.
+ * "buildversion" is built from.
  */
 void
 mdb_print_buildversion(void)
@@ -1831,7 +1831,7 @@ mdb_print_buildversion(void)
 	boolean_t in_joyent = B_FALSE;
 	GElf_Sym sym;
 
-	if (mdb_lookup_by_name("buildversion_start", &sym) != 0) {
+	if (mdb_lookup_by_name("buildversion", &sym) != 0) {
 		/* Older kernels used this name. */
 		if (mdb_lookup_by_name("gitstatus_start", &sym) != 0)
 			return;

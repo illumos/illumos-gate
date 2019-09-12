@@ -432,8 +432,6 @@ MISC_KMODS	+= mii
 
 MISC_KMODS	+= klmmod klmops
 
-MISC_KMODS	+= buildversion
-
 #
 #	Software Cryptographic Providers (/kernel/crypto):
 #

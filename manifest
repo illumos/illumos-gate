@@ -563,6 +563,8 @@ f etc/user_attr 0644 root sys
 d etc/user_attr.d 0755 root sys
 f etc/user_attr.d/SUNWcs 0644 root sys
 s etc/utmpx=../var/adm/utmpx
+d etc/versions 0755 root sys
+f etc/versions/build 0644 root other
 f etc/vfstab 0644 root sys
 s etc/wtmpx=../var/adm/wtmpx
 d etc/xdg 0755 root sys
@@ -1065,7 +1067,6 @@ f kernel/misc/amd64/ac97 0755 root sys
 f kernel/misc/amd64/acpica 0755 root sys
 f kernel/misc/amd64/bignum 0755 root sys
 f kernel/misc/amd64/bootdev 0755 root sys
-f kernel/misc/amd64/buildversion 0755 root sys
 f kernel/misc/amd64/busra 0755 root sys
 f kernel/misc/amd64/cc 0755 root sys
 f kernel/misc/amd64/cmlb 0755 root sys

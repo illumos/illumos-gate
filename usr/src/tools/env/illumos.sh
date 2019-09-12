@@ -135,6 +135,9 @@ export ENABLE_SMB_PRINTING=
 # nightly(1) for interactions between environment variables and this command.
 #POST_NIGHTLY=
 
+# Populates /etc/versions/build on each nightly run
+export BUILDVERSION_EXEC="git describe --all --long --dirty"
+
 # -----------------------------------------------------------------------------
 # You are less likely to need to modify parameters below.
 # -----------------------------------------------------------------------------

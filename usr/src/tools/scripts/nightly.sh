@@ -1543,19 +1543,6 @@ fi
 [[ -d "${CODEMGR_WS}" ]] || fatal_error "Error: ${CODEMGR_WS} is not a directory."
 [[ -f "${CODEMGR_WS}/usr/src/Makefile" ]] || fatal_error "Error: ${CODEMGR_WS}/usr/src/Makefile not found."
 
-TMPFILE=/tmp/tmp.nightly.$$
-if [[ -n "${BUILDVERSION_EXEC}" ]]; then
-	${BUILDVERSION_EXEC} >$TMPFILE || \
-	    fatal_error "${BUILDVERSION_EXEC} failed"
-else
-	echo "version unset" >$TMPFILE
-fi
-
-if ! cmp $TMPFILE $SRC/buildversion >/dev/null 2>&1; then
-	mv $TMPFILE $SRC/buildversion
-fi
-rm -f $TMPFILE
-
 if [[ "$t_FLAG" = "y" ]]; then
 	set_non_debug_build_flags
 	bootstrap_tools || fatal_error "Error: could not bootstrap tools"

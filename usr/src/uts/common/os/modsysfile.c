@@ -22,8 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018 Joyent, Inc.
  * Copyright 2017 Nexenta Systems, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -69,6 +69,11 @@ static char dacffile[] = DACFFILE;
 
 char *self_assembly = "/etc/system.d/.self-assembly";
 char *systemfile = "/etc/system";	/* name of ascii system file */
+
+#define	BUILDVERSION_LEN (4096)
+
+char *versionfile = "/etc/versions/build";
+char buildversion[BUILDVERSION_LEN];
 
 static struct sysparam *sysparam_hd;	/* head of parameters list */
 static struct sysparam *sysparam_tl;	/* tail of parameters list */
@@ -814,6 +819,8 @@ read_system_file(char *name)
 void
 mod_read_system_file(int ask)
 {
+	struct _buf *file;
+
 	mod_sysfile_arena = vmem_create("mod_sysfile", NULL, 0, 8,
 	    segkmem_alloc, segkmem_free, heap_arena, 0, VM_SLEEP);
 
@@ -841,6 +848,18 @@ mod_read_system_file(int ask)
 
 	if (ask == 0)
 		setparams();
+
+	/*
+	 * A convenient place to read in our build version string.
+	 */
+
+	if ((file = kobj_open_file(versionfile)) != (struct _buf *)-1) {
+		if (kobj_read_file(file, buildversion,
+		    sizeof (buildversion) - 1, 0) == -1) {
+			cmn_err(CE_WARN, "failed to read %s\n", versionfile);
+		}
+		kobj_close_file(file);
+	}
 }
 
 /*

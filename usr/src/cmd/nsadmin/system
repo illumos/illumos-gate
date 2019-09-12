@@ -169,8 +169,3 @@ set sd:sd_io_time=10
 
 * Use hires tick to improve some scheduling latency issues
 set hires_tick=1
-
-*
-* See usr/src/uts/common/os/buildversion.c
-*
-forceload: misc/buildversion
