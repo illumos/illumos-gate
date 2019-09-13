@@ -363,6 +363,11 @@
 311:AUE_AUDITON_SETAMASK:auditon(2) - set default user preselection mask:as
 312:AUE_PSECFLAGS:psecflags(2) - set process security flags:pm
 313:AUE_SACL:SACL-based File Access Auditing:sa
+314:AUE_AUDITON_GETPINFO:auditon(2) - get process info:aa
+315:AUE_AUDITON_SETPMASK:auditon(2) - set process preselection mask:as
+316:AUE_AUDITON_GETKAUDIT:auditon(2) - get kernel audit characteristics:aa
+317:AUE_AUDITON_SETKAUDIT:auditon(2) - set kernel audit characteristics:as
+318:AUE_AUDITON_OTHER:auditon(2) - other event:aa
 #
 # user level audit events
 #	2048 -  6143	Reserved
