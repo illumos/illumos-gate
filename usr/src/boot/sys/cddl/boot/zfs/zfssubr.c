@@ -35,11 +35,6 @@ static uint64_t zfs_crc64_table[256];
 #define	ASSERT0(x)		((void)0)
 #define	ASSERT(x)		((void)0)
 
-#define	panic(...)	do {						\
-	printf(__VA_ARGS__);						\
-	for (;;) ;							\
-} while (0)
-
 #define	kmem_alloc(size, flag)	zfs_alloc((size))
 #define	kmem_free(ptr, size)	zfs_free((ptr), (size))
 
@@ -54,10 +49,13 @@ zfs_init_crc(void)
 	 * function).
 	 */
 	if (zfs_crc64_table[128] != ZFS_CRC64_POLY) {
-		memset(zfs_crc64_table, 0, sizeof(zfs_crc64_table));
-		for (i = 0; i < 256; i++)
-			for (ct = zfs_crc64_table + i, *ct = i, j = 8; j > 0; j--)
-				*ct = (*ct >> 1) ^ (-(*ct & 1) & ZFS_CRC64_POLY);
+		memset(zfs_crc64_table, 0, sizeof (zfs_crc64_table));
+		for (i = 0; i < 256; i++) {
+			ct = zfs_crc64_table + i;
+			for (*ct = i, j = 8; j > 0; j--)
+				*ct = (*ct >> 1) ^
+				    (-(*ct & 1) & ZFS_CRC64_POLY);
+		}
 	}
 }
 
@@ -288,7 +286,7 @@ zio_checksum_verify(const spa_t *spa, const blkptr_t *bp, void *data)
 		return (EINVAL);
 
 	if (spa != NULL) {
-		zio_checksum_template_init(checksum, (spa_t *) spa);
+		zio_checksum_template_init(checksum, (spa_t *)spa);
 		ctx = spa->spa_cksum_tmpls[checksum];
 	}
 
@@ -336,7 +334,7 @@ zio_checksum_verify(const spa_t *spa, const blkptr_t *bp, void *data)
 
 static int
 zio_decompress_data(int cpfunc, void *src, uint64_t srcsize,
-	void *dest, uint64_t destsize)
+    void *dest, uint64_t destsize)
 {
 	zio_compress_info_t *ci;
 
@@ -1640,8 +1638,11 @@ reconstruct:
 	 * any errors.
 	 */
 	if (total_errors <= rm->rm_firstdatacol - parity_untried) {
+		int rv;
+
 		if (data_errors == 0) {
-			if (raidz_checksum_verify(vd->spa, bp, data, bytes) == 0) {
+			rv = raidz_checksum_verify(vd->spa, bp, data, bytes);
+			if (rv == 0) {
 				/*
 				 * If we read parity information (unnecessarily
 				 * as it happens since no reconstruction was
@@ -1686,7 +1687,8 @@ reconstruct:
 
 			code = vdev_raidz_reconstruct(rm, tgts, n);
 
-			if (raidz_checksum_verify(vd->spa, bp, data, bytes) == 0) {
+			rv = raidz_checksum_verify(vd->spa, bp, data, bytes);
+			if (rv == 0) {
 				/*
 				 * If we read more parity disks than were used
 				 * for reconstruction, confirm that the other
@@ -1761,7 +1763,7 @@ reconstruct:
 		error = EIO;
 	} else if (total_errors < rm->rm_firstdatacol &&
 	    (code = vdev_raidz_combrec(vd->spa, rm, bp, data, offset, bytes,
-	     total_errors, data_errors)) != 0) {
+	    total_errors, data_errors)) != 0) {
 		/*
 		 * If we didn't use all the available parity for the
 		 * combinatorial reconstruction, verify that the remaining

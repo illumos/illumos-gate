@@ -1153,12 +1153,12 @@ zfsvfs_init(zfsvfs_t *zfsvfs, objset_t *os)
 }
 
 int
-zfsvfs_create(const char *osname, zfsvfs_t **zfvp)
+zfsvfs_create(const char *osname, boolean_t readonly, zfsvfs_t **zfvp)
 {
 	objset_t *os;
 	zfsvfs_t *zfsvfs;
 	int error;
-	boolean_t ro = (strchr(osname, '@') != NULL);
+	boolean_t ro = (readonly || (strchr(osname, '@') != NULL));
 
 	zfsvfs = kmem_zalloc(sizeof (zfsvfs_t), KM_SLEEP);
 
@@ -1346,11 +1346,12 @@ zfs_domount(vfs_t *vfsp, char *osname)
 	uint64_t recordsize, fsid_guid;
 	int error = 0;
 	zfsvfs_t *zfsvfs;
+	boolean_t readonly = vfsp->vfs_flag & VFS_RDONLY ? B_TRUE : B_FALSE;
 
 	ASSERT(vfsp);
 	ASSERT(osname);
 
-	error = zfsvfs_create(osname, &zfsvfs);
+	error = zfsvfs_create(osname, readonly, &zfsvfs);
 	if (error)
 		return (error);
 	zfsvfs->z_vfs = vfsp;
@@ -2228,7 +2229,7 @@ zfs_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp)
 	uint64_t	fid_gen = 0;
 	uint64_t	gen_mask;
 	uint64_t	zp_gen;
-	int 		i, err;
+	int		i, err;
 
 	*vpp = NULL;
 
