@@ -23,6 +23,7 @@
 # All Rights Reserved.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 PROG = latencytop
 OBJS = latencytop.o display.o dwrapper.o klog.o stat.o table.o util.o
@@ -35,20 +36,20 @@ CFLAGS64 += $(CCVERBOSE)
 
 CERRWARN += $(CNOWARN_UNINIT)
 
-SMOFF += all_func_returns
+# glib2 >= 2.62 suppresses warnings about deprecated declarations in header
+# files using pragma "GCC diagnostic ignored \"-Wdeprecated-declarations\""
+# This is not supported before GCC 4.6 so just globally suppress these
+# warnings under the shadow compiler
+CERRWARN +=	-_gcc4=-Wno-deprecated-declarations
+
+# smatch has problems parsing the glib header files
+SMATCH=off
 
 CPPFLAGS += -DEMBED_CONFIGS -I$(ADJUNCT_PROTO)/usr/include/glib-2.0 \
 	-I$(ADJUNCT_PROTO)/usr/lib/glib-2.0/include
 CSTD = $(CSTD_GNU99)
 LDLIBS += -lcurses -ldtrace
 all install	:= LDLIBS += -lglib-2.0
-
-LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
-LINTFLAGS += -erroff=E_FUNC_RET_ALWAYS_IGNOR2
-LINTFLAGS += -erroff=E_FUNC_RET_MAYBE_IGNORED2
-LINTFLAGS64 += -erroff=E_NAME_USED_NOT_DEF2
-LINTFLAGS64 += -erroff=E_FUNC_RET_ALWAYS_IGNOR2
-LINTFLAGS64 += -erroff=E_FUNC_RET_MAYBE_IGNORED2
 
 FILEMODE = 0555
 
@@ -80,8 +81,6 @@ latencytop_trans:
 
 clean:
 	$(RM) $(CLEANFILES)
-
-lint:	lint_SRCS
 
 %.o: ../common/%.c
 	$(COMPILE.c) $<
