@@ -730,6 +730,21 @@ test_set_bootenv(const char *pool)
 }
 
 static void
+test_wait(const char *pool)
+{
+	nvlist_t *required = fnvlist_alloc();
+	nvlist_t *optional = fnvlist_alloc();
+
+	fnvlist_add_int32(required, "wait_activity", 2);
+	fnvlist_add_uint64(optional, "wait_tag", 0xdeadbeefdeadbeef);
+
+	IOC_INPUT_TEST(ZFS_IOC_WAIT, pool, required, optional, EINVAL);
+
+	nvlist_free(required);
+	nvlist_free(optional);
+}
+
+static void
 zfs_ioc_input_tests(const char *pool)
 {
 	char filepath[] = "/tmp/ioc_test_file_XXXXXX";
@@ -815,6 +830,8 @@ zfs_ioc_input_tests(const char *pool)
 
 	test_set_bootenv(pool);
 	test_get_bootenv(pool);
+
+	test_wait(pool);
 
 	/*
 	 * cleanup
@@ -977,6 +994,7 @@ validate_ioc_values(void)
 	CHECK(ZFS_IOC_BASE + 79 == ZFS_IOC_POOL_TRIM);
 	CHECK(ZFS_IOC_BASE + 80 == ZFS_IOC_REDACT);
 	CHECK(ZFS_IOC_BASE + 81 == ZFS_IOC_GET_BOOKMARK_PROPS);
+	CHECK(ZFS_IOC_BASE + 82 == ZFS_IOC_WAIT);
 #endif
 	CHECK(ZFS_IOC_PLATFORM_BASE + 7 == ZFS_IOC_SET_BOOTENV);
 	CHECK(ZFS_IOC_PLATFORM_BASE + 8 == ZFS_IOC_GET_BOOTENV);

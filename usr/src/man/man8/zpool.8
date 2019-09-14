@@ -45,12 +45,12 @@
 .Ar pool vdev Ns ...
 .Nm
 .Cm attach
-.Op Fl f
+.Op Fl fw
 .Oo Fl o Ar property Ns = Ns Ar value Oc
 .Ar pool device new_device
 .Nm
 .Cm checkpoint
-.Op Fl d , -discard
+.Op Fl d, -discard Oo Fl w, -wait Oc
 .Ar pool
 .Nm
 .Cm clear
@@ -115,6 +115,7 @@
 .Nm
 .Cm initialize
 .Op Fl c | Fl s
+.Op Fl w
 .Ar pool
 .Op Ar device Ns ...
 .Nm
@@ -151,7 +152,7 @@
 .Ar pool
 .Nm
 .Cm remove
-.Op Fl np
+.Op Fl npw
 .Ar pool Ar device Ns ...
 .Nm
 .Cm remove
@@ -159,7 +160,7 @@
 .Ar pool
 .Nm
 .Cm replace
-.Op Fl f
+.Op Fl fw
 .Ar pool Ar device Op Ar new_device
 .Nm
 .Cm resilver
@@ -167,6 +168,7 @@
 .Nm
 .Cm scrub
 .Op Fl s | Fl p
+.Op Fl w
 .Ar pool Ns ...
 .Nm
 .Cm trim
@@ -203,6 +205,15 @@
 .Cm upgrade
 .Op Fl V Ar version
 .Fl a Ns | Ns Ar pool Ns ...
+.Nm
+.Cm wait
+.Op Fl Hp
+.Op Fl T Sy u Ns | Ns Sy d
+.Op Fl t Ar activity Ns Oo , Ns Ar activity Ns Oc Ns ...
+.Ar pool
+.Op Ar interval
+.Nm
+.Cm version
 .Sh DESCRIPTION
 The
 .Nm
@@ -958,7 +969,7 @@ The only property supported at the moment is
 .It Xo
 .Nm
 .Cm attach
-.Op Fl f
+.Op Fl fw
 .Oo Fl o Ar property Ns = Ns Ar value Oc
 .Ar pool device new_device
 .Xc
@@ -989,6 +1000,10 @@ Forces use of
 .Ar new_device ,
 even if its appears to be in use.
 Not all devices can be overridden in this manner.
+.It Fl w
+Waits until
+.Ar new_device
+has finished resilvering before returning.
 .It Fl o Ar property Ns = Ns Ar value
 Sets the given pool properties.
 See the
@@ -1000,7 +1015,7 @@ The only property supported at the moment is
 .It Xo
 .Nm
 .Cm checkpoint
-.Op Fl d , -discard
+.Op Fl d, -discard Oo Fl w, -wait Oc
 .Ar pool
 .Xc
 Checkpoints the current state of
@@ -1031,6 +1046,9 @@ command reports how much space the checkpoint takes from the pool.
 Discards an existing checkpoint from
 .Ar pool
 without rewinding.
+.Ar pool .
+.It Fl w, -wait
+Waits until the checkpoint has finished being discarded before returning.
 .El
 .It Xo
 .Nm
@@ -1602,6 +1620,7 @@ to fully rewind.
 .Nm
 .Cm initialize
 .Op Fl c | Fl s
+.Op Fl w
 .Ar pool
 .Op Ar device Ns ...
 .Xc
@@ -1623,6 +1642,8 @@ initialized, the command will fail and no suspension will occur on any device.
 Initializing can then be resumed by running
 .Nm zpool Cm initialize
 with no flags on the relevant target devices.
+.It Fl w, -wait
+Wait until the devices have finished initializing before returning.
 .El
 .It Xo
 .Nm
@@ -1913,7 +1934,7 @@ Reopen all the vdevs associated with the pool.
 .It Xo
 .Nm
 .Cm remove
-.Op Fl np
+.Op Fl npw
 .Ar pool Ar device Ns ...
 .Xc
 Removes the specified device from the pool.
@@ -1950,6 +1971,8 @@ This is nonzero only for top-level vdevs.
 Used in conjunction with the
 .Fl n
 flag, displays numbers as parsable (exact) values.
+.It Fl w
+Waits until the removal has completed before returning.
 .El
 .It Xo
 .Nm
@@ -1961,7 +1984,7 @@ Stops and cancels an in-progress removal of a top-level vdev.
 .It Xo
 .Nm
 .Cm replace
-.Op Fl f
+.Op Fl fw
 .Ar pool Ar device Op Ar new_device
 .Xc
 Replaces
@@ -1996,6 +2019,8 @@ Forces use of
 .Ar new_device ,
 even if its appears to be in use.
 Not all devices can be overridden in this manner.
+.It Fl w
+Waits until the replacement has completed before returning.
 .El
 .It Xo
 .Nm
@@ -2014,6 +2039,7 @@ feature.
 .Nm
 .Cm scrub
 .Op Fl s | Fl p
+.Op Fl w
 .Ar pool Ns ...
 .Xc
 Begins a scrub or resumes a paused scrub.
@@ -2063,6 +2089,8 @@ checkpointed to disk.
 To resume a paused scrub issue
 .Nm zpool Cm scrub
 again.
+.It Fl w
+Wait until scrub has completed before returning.
 .El
 .It Xo
 .Nm
@@ -2316,6 +2344,64 @@ If the
 flag is specified, no features will be enabled on the pool.
 This option can only be used to increase the version number up to the last
 supported legacy version number.
+.El
+.It Xo
+.Nm
+.Cm wait
+.Op Fl Hp
+.Op Fl T Sy u Ns | Ns Sy d
+.Op Fl t Ar activity Ns Oo , Ns Ar activity Ns Oc Ns ...
+.Ar pool
+.Op Ar interval
+.Xc
+Waits until all background activity of the given types has ceased in the given
+pool.
+The activity could cease because it has completed, or because it has been
+paused or canceled by a user, or because the pool has been exported or
+destroyed.
+If no activities are specified, the command waits until background activity of
+every type listed below has ceased.
+If there is no activity of the given types in progress, the command returns
+immediately.
+.Pp
+These are the possible values for
+.Ar activity ,
+along with what each one waits for:
+.Bd -literal
+        discard       Checkpoint to be discarded
+        free          'freeing' property to become 0
+        initialize    All initializations to cease
+        replace       All device replacements to cease
+        remove        Device removal to cease
+        resilver      Resilver to cease
+        scrub         Scrub to cease
+.Ed
+.Pp
+If an
+.Ar interval
+is provided, the amount of work remaining, in bytes, for each activity is
+printed every
+.Ar interval
+seconds.
+.Bl -tag -width Ds
+.It Fl H
+Scripted mode.
+Do not display headers, and separate fields by a single tab instead of arbitrary
+space.
+.It Fl p
+Display numbers in parsable (exact) values.
+.It Fl T Sy u Ns | Ns Sy d
+Display a time stamp.
+Specify
+.Sy u
+for a printed representation of the internal representation of time.
+See
+.Xr time 2 .
+Specify
+.Sy d
+for standard date format.
+See
+.Xr date 1 .
 .El
 .El
 .Sh EXIT STATUS

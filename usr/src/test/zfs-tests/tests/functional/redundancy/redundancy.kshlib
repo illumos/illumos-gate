@@ -253,14 +253,7 @@ function replace_missing_devs
 	typeset vdev
 	for vdev in $@; do
 		log_must mkfile $MINVDEVSIZE $vdev
-		log_must zpool replace -f $pool $vdev $vdev
-		while true; do
-			if ! is_pool_resilvered $pool ; then
-				log_must sleep 2
-			else
-				break
-			fi
-		done
+		log_must zpool replace -wf $pool $vdev $vdev
 	done
 }
 

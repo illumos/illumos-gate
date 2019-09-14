@@ -252,6 +252,7 @@ $endif
 	zpool_import_status;
 	zpool_in_use;
 	zpool_initialize;
+	zpool_initialize_wait;
 	zpool_is_bootable;
 	zpool_iter;
 	zpool_label_disk;
@@ -271,6 +272,7 @@ $endif
 	zpool_prop_to_name;
 	zpool_prop_unsupported;
 	zpool_prop_values;
+	zpool_props_refresh;
 	zpool_refresh_stats;
 	zpool_reguid;
 	zpool_reopen;
@@ -296,6 +298,8 @@ $endif
 	zpool_vdev_remove;
 	zpool_vdev_remove_cancel;
 	zpool_vdev_split;
+	zpool_wait;
+	zpool_wait_status;
 	zprop_free_list;
 	zprop_get_list;
 	zprop_iter;

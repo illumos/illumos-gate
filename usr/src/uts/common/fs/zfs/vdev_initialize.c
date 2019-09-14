@@ -42,7 +42,7 @@ uint64_t zfs_initialize_value = 0xdeadbeefdeadbeefULL;
 int zfs_initialize_limit = 1;
 
 /* size of initializing writes; default 1MiB, see zfs_remove_max_segment */
-uint64_t zfs_initialize_chunk_size = 1024 * 1024;
+unsigned long zfs_initialize_chunk_size = 1024 * 1024;
 
 static boolean_t
 vdev_initialize_should_stop(vdev_t *vd)
@@ -146,6 +146,9 @@ vdev_initialize_change_state(vdev_t *vd, vdev_initializing_state_t new_state)
 	}
 
 	dmu_tx_commit(tx);
+
+	if (new_state != VDEV_INITIALIZE_ACTIVE)
+		spa_notify_waiters(spa);
 }
 
 static void

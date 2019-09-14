@@ -54,12 +54,7 @@ typeset -i cnt=$(random 2 5)
 setup_test_env $TESTPOOL "" $cnt
 
 damage_devs $TESTPOOL 1 "keep_label"
-log_must zpool clear $TESTPOOL
-
-# Wait for the scrub intiated by the clear to wrap, or is_healthy will be wrong.
-while ! is_pool_scrubbed $TESTPOOL; do
-	sync
-done
+log_must zpool scrub -w $TESTPOOL
 
 log_mustnot is_healthy $TESTPOOL
 

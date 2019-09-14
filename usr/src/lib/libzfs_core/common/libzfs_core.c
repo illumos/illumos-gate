@@ -1390,3 +1390,39 @@ lzc_get_bootenv(const char *pool, nvlist_t **outnvl)
 {
 	return (lzc_ioctl(ZFS_IOC_GET_BOOTENV, pool, NULL, outnvl));
 }
+
+static int
+wait_common(const char *pool, zpool_wait_activity_t activity, boolean_t use_tag,
+    uint64_t tag, boolean_t *waited)
+{
+	nvlist_t *args = fnvlist_alloc();
+	nvlist_t *result = NULL;
+
+	fnvlist_add_int32(args, ZPOOL_WAIT_ACTIVITY, activity);
+	if (use_tag)
+		fnvlist_add_uint64(args, ZPOOL_WAIT_TAG, tag);
+
+	int error = lzc_ioctl(ZFS_IOC_WAIT, pool, args, &result);
+
+	if (error == 0 && waited != NULL)
+		*waited = fnvlist_lookup_boolean_value(result,
+		    ZPOOL_WAIT_WAITED);
+
+	fnvlist_free(args);
+	fnvlist_free(result);
+
+	return (error);
+}
+
+int
+lzc_wait(const char *pool, zpool_wait_activity_t activity, boolean_t *waited)
+{
+	return (wait_common(pool, activity, B_FALSE, 0, waited));
+}
+
+int
+lzc_wait_tag(const char *pool, zpool_wait_activity_t activity, uint64_t tag,
+    boolean_t *waited)
+{
+	return (wait_common(pool, activity, B_TRUE, tag, waited));
+}

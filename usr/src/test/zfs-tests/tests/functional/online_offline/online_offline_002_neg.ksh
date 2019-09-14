@@ -89,6 +89,8 @@ while [[ $i -lt ${#disks[*]} ]]; do
 		log_must zpool online $TESTPOOL ${disks[$i]}
 		check_state $TESTPOOL ${disks[$i]} "online" || \
 		    log_fail "Failed to set ${disks[$i]} online"
+		log_must zpool wait -t resilver $TESTPOOL
+		log_must zpool clear $TESTPOOL
 		while [[ $j -lt ${#disks[*]} ]]; do
 			if [[ $j -eq $i ]]; then
 				((j++))
@@ -119,6 +121,8 @@ while [[ $i -lt ${#disks[*]} ]]; do
 		log_must zpool online $TESTPOOL ${disks[$i]}
 		check_state $TESTPOOL ${disks[$i]} "online" || \
 		    log_fail "Failed to set ${disks[$i]} online"
+		log_must zpool wait -t resilver $TESTPOOL
+		log_must zpool clear $TESTPOOL
 	fi
 	((i++))
 done

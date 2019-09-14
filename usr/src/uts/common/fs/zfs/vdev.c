@@ -4685,3 +4685,32 @@ vdev_xlate(vdev_t *vd, const range_seg64_t *logical_rs,
 	physical_rs->rs_start = intermediate.rs_start;
 	physical_rs->rs_end = intermediate.rs_end;
 }
+
+/*
+ * Look at the vdev tree and determine whether any devices are currently being
+ * replaced.
+ */
+boolean_t
+vdev_replace_in_progress(vdev_t *vdev)
+{
+	ASSERT(spa_config_held(vdev->vdev_spa, SCL_ALL, RW_READER) != 0);
+
+	if (vdev->vdev_ops == &vdev_replacing_ops)
+		return (B_TRUE);
+
+	/*
+	 * A 'spare' vdev indicates that we have a replace in progress, unless
+	 * it has exactly two children, and the second, the hot spare, has
+	 * finished being resilvered.
+	 */
+	if (vdev->vdev_ops == &vdev_spare_ops && (vdev->vdev_children > 2 ||
+	    !vdev_dtl_empty(vdev->vdev_child[1], DTL_MISSING)))
+		return (B_TRUE);
+
+	for (int i = 0; i < vdev->vdev_children; i++) {
+		if (vdev_replace_in_progress(vdev->vdev_child[i]))
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
