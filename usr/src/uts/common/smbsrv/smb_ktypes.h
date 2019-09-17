@@ -964,6 +964,7 @@ typedef struct smb_session {
 	uint32_t		challenge_len;
 	unsigned char		challenge_key[SMB_CHALLENGE_SZ];
 	int64_t			activity_timestamp;
+	timeout_id_t		s_auth_tmo;
 
 	/*
 	 * Maximum negotiated buffer sizes between SMB client and server
