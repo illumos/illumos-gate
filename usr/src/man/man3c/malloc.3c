@@ -18,8 +18,9 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 2017 Nexenta Systems, Inc.
+.\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd July 28, 2017
+.Dd September 12, 2019
 .Dt MALLOC 3C
 .Os
 .Sh NAME
@@ -29,6 +30,7 @@
 .Nm freezero ,
 .Nm memalign ,
 .Nm realloc ,
+.Nm reallocf ,
 .Nm reallocarray ,
 .Nm recallocarray ,
 .Nm valloc ,
@@ -61,6 +63,11 @@
 .Fc
 .Ft void *
 .Fo realloc
+.Fa "void *ptr"
+.Fa "size_t size"
+.Fc
+.Ft void *
+.Fo reallocf
 .Fa "void *ptr"
 .Fa "size_t size"
 .Fc
@@ -107,6 +114,7 @@ is a pointer to a block previously allocated by
 .Fn malloc ,
 .Fn calloc ,
 .Fn realloc ,
+.Fn reallocf ,
 .Fn reallocarray ,
 or
 .Fn recallocarray .
@@ -197,6 +205,12 @@ is 0 and
 is not a null pointer, the space pointed to is freed.
 .Pp
 The
+.Fn reallocf
+function behaves in the same way as
+.Fn realloc
+except that the passed pointer is freed automatically on failure.
+.Pp
+The
 .Fn reallocarray
 function is similar to
 .Fn realloc ,
@@ -259,6 +273,7 @@ If there is no available memory,
 .Fn malloc ,
 .Fn calloc ,
 .Fn realloc ,
+.Fn reallocf ,
 .Fn reallocarray ,
 .Fn recallocarray ,
 .Fn memalign ,
@@ -275,6 +290,16 @@ is called with
 the block pointed to by
 .Fa ptr
 is left intact.
+By contrast, when
+.Fn reallocf
+is called with
+.Fa size
+> 0 and returns
+.Dv NULL ,
+the block pointed to by
+.Fa ptr
+will have been freed.
+.Pp
 If
 .Fa size ,
 .Fa nelem ,
@@ -288,6 +313,7 @@ If
 .Fn malloc ,
 .Fn calloc ,
 .Fn realloc ,
+.Fn reallocf ,
 .Fn reallocarray ,
 or
 .Fn recallocarray
@@ -305,6 +331,7 @@ The
 .Fn malloc ,
 .Fn calloc ,
 .Fn realloc ,
+.Fn reallocf ,
 and
 .Fn reallocarray
 functions will fail if:
@@ -382,6 +409,7 @@ functions are
 .Pp
 The
 .Fn freezero ,
+.Fn reallocf ,
 .Fn reallocarray ,
 and
 .Fn recallocarray

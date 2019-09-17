@@ -13933,6 +13933,7 @@ f usr/share/man/man3c/readdir.3c 0444 root bin
 s usr/share/man/man3c/readdir_r.3c=readdir.3c
 s usr/share/man/man3c/realloc.3c=malloc.3c
 s usr/share/man/man3c/reallocarray.3c=malloc.3c
+s usr/share/man/man3c/reallocf.3c=malloc.3c
 f usr/share/man/man3c/realpath.3c 0444 root bin
 f usr/share/man/man3c/reboot.3c 0444 root bin
 s usr/share/man/man3c/recallocarray.3c=malloc.3c

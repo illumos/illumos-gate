@@ -16,6 +16,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Jason King
 # Copyright 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 file path=usr/share/man/man3c/__fbufsize.3c
@@ -1242,6 +1243,7 @@ link path=usr/share/man/man3c/re_exec.3c target=re_comp.3c
 link path=usr/share/man/man3c/readdir_r.3c target=readdir.3c
 link path=usr/share/man/man3c/realloc.3c target=malloc.3c
 link path=usr/share/man/man3c/reallocarray.3c target=malloc.3c
+link path=usr/share/man/man3c/reallocf.3c target=malloc.3c
 link path=usr/share/man/man3c/recallocarray.3c target=malloc.3c
 link path=usr/share/man/man3c/regerror.3c target=regcomp.3c
 link path=usr/share/man/man3c/regex.3c target=regcmp.3c
@@ -1372,8 +1374,7 @@ link path=usr/share/man/man3c/thr_getspecific.3c target=thr_keycreate.3c
 link path=usr/share/man/man3c/thr_keycreate_once.3c target=thr_keycreate.3c
 link path=usr/share/man/man3c/thr_setconcurrency.3c \
     target=thr_getconcurrency.3c
-link path=usr/share/man/man3c/thr_setname.3c \
-    target=thr_getname.3c
+link path=usr/share/man/man3c/thr_setname.3c target=thr_getname.3c
 link path=usr/share/man/man3c/thr_setprio.3c target=thr_getprio.3c
 link path=usr/share/man/man3c/thr_setspecific.3c target=thr_keycreate.3c
 link path=usr/share/man/man3c/thrd_sleep.3c target=nanosleep.3c

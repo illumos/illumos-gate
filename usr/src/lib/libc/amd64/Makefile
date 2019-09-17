@@ -516,6 +516,7 @@ PORTGEN=			\
 	readdir.o		\
 	readdir_r.o		\
 	reallocarray.o		\
+	reallocf.o		\
 	recallocarray.o		\
 	realpath.o		\
 	reboot.o		\

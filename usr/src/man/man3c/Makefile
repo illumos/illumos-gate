@@ -16,6 +16,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Joyent, Inc.
 # Copyright 2018 Jason King
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		$(SRC)/Makefile.master
@@ -1172,6 +1173,7 @@ MANLINKS=	FD_CLR.3c				\
 		re_exec.3c				\
 		readdir_r.3c				\
 		realloc.3c				\
+		reallocf.3c				\
 		reallocarray.3c				\
 		recallocarray.3c			\
 		regerror.3c				\
@@ -1998,6 +2000,7 @@ free.3c					:= LINKSRC = malloc.3c
 freezero.3c				:= LINKSRC = malloc.3c
 memalign.3c				:= LINKSRC = malloc.3c
 realloc.3c				:= LINKSRC = malloc.3c
+reallocf.3c				:= LINKSRC = malloc.3c
 reallocarray.3c				:= LINKSRC = malloc.3c
 recallocarray.3c			:= LINKSRC = malloc.3c
 valloc.3c				:= LINKSRC = malloc.3c
