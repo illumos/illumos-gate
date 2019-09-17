@@ -1,5 +1,5 @@
 /*
- * This module derived from code donated to the FreeBSD Project by 
+ * This module derived from code donated to the FreeBSD Project by
  * Matthew Dillon <dillon@backplane.com>
  *
  * Copyright (c) 1998 The FreeBSD Project
@@ -25,11 +25,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
+
+#ifndef _ZALLOC_PROTOS_H
+#define	_ZALLOC_PROTOS_H
 
 Library void *znalloc(struct MemPool *mpool, uintptr_t bytes);
 Library void zfree(struct MemPool *mpool, void *ptr, uintptr_t bytes);
 Library void zextendPool(MemPool *mp, void *base, uintptr_t bytes);
 Library void zallocstats(struct MemPool *mp);
+
+#endif	/* _ZALLOC_PROTOS_H */
