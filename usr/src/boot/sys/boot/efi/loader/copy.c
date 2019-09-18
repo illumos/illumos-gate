@@ -36,7 +36,6 @@
 
 #include <efi.h>
 #include <efilib.h>
-#include <assert.h>
 
 #include "loader_efi.h"
 
@@ -48,7 +47,7 @@ addr_verify(multiboot_tag_module_t *module, vm_offset_t addr, size_t size)
 {
 	vm_offset_t start, end;
 
-	for (;module->mb_type == MULTIBOOT_TAG_TYPE_MODULE;
+	for (; module->mb_type == MULTIBOOT_TAG_TYPE_MODULE;
 	    module = (multiboot_tag_module_t *)
 	    roundup((uintptr_t)module + module->mb_size, MULTIBOOT_TAG_ALIGN)) {
 
@@ -154,7 +153,7 @@ efi_physaddr(multiboot_tag_module_t *module, vm_offset_t addr,
  * about the order of the allocated blocks.
  */
 vm_offset_t
-efi_loadaddr(u_int type, void *data, vm_offset_t addr)
+efi_loadaddr(uint_t type, void *data, vm_offset_t addr)
 {
 	EFI_PHYSICAL_ADDRESS paddr;
 	struct stat st;
@@ -177,7 +176,7 @@ efi_loadaddr(u_int type, void *data, vm_offset_t addr)
 
 	pages = EFI_SIZE_TO_PAGES(size);
 	/* 4GB upper limit */
-	paddr = 0x0000000100000000;
+	paddr = UINT32_MAX;
 
 	status = BS->AllocatePages(AllocateMaxAddress, EfiLoaderData,
 	    pages, &paddr);
@@ -206,24 +205,37 @@ efi_translate(vm_offset_t ptr)
 ssize_t
 efi_copyin(const void *src, vm_offset_t dest, const size_t len)
 {
-	assert(dest < 0x100000000);
-	bcopy(src, (void *)(uintptr_t)dest, len);
-	return (len);
+	if (dest + len >= dest && (uint64_t)dest + len <= UINT32_MAX) {
+		bcopy(src, (void *)(uintptr_t)dest, len);
+		return (len);
+	} else {
+		errno = EFBIG;
+		return (-1);
+	}
 }
 
 ssize_t
 efi_copyout(const vm_offset_t src, void *dest, const size_t len)
 {
-	assert(src < 0x100000000);
-	bcopy((void *)(uintptr_t)src, dest, len);
-	return (len);
+	if (src + len >= src && (uint64_t)src + len <= UINT32_MAX) {
+		bcopy((void *)(uintptr_t)src, dest, len);
+		return (len);
+	} else {
+		errno = EFBIG;
+		return (-1);
+	}
 }
 
 
 ssize_t
 efi_readin(const int fd, vm_offset_t dest, const size_t len)
 {
-	return (read(fd, (void *)dest, len));
+	if (dest + len >= dest && (uint64_t)dest + len <= UINT32_MAX) {
+		return (read(fd, (void *)dest, len));
+	} else {
+		errno = EFBIG;
+		return (-1);
+	}
 }
 
 /*

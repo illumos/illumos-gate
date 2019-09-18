@@ -27,7 +27,7 @@ cleanup() {
 trap cleanup EXIT
 
 # Check that lower implies setting of inheritable
-echo "Setting lower also adds to inheritable" 
+echo "Setting lower also adds to inheritable"
 /usr/bin/psecflags -s L=aslr $$
 
 cat > expected <<EOF
@@ -45,7 +45,7 @@ echo "Setting in lower cannot be removed"
 
 
 echo "Setting in lower cannot be removed from upper"
-/usr/bin/psecflags -s U=current,-aslr $$ 2>/devlnull && exit 1
+/usr/bin/psecflags -s U=current,-aslr $$ 2>/dev/null && exit 1
 
 /usr/bin/psecflags -s U=current,-noexecstack $$
 
