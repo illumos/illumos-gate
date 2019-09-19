@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _SYS_ARCHSYSTM_H
@@ -94,10 +94,8 @@ extern void brand_sys_call();
 #endif
 extern void sys_sysenter();
 extern void tr_sys_sysenter();
-extern void _sys_sysenter_post_swapgs();
 extern void brand_sys_sysenter();
 extern void tr_brand_sys_sysenter();
-extern void _brand_sys_sysenter_post_swapgs();
 
 extern void dosyscall(void);
 

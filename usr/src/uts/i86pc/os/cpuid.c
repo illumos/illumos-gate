@@ -910,6 +910,7 @@
  * more work in the system to mitigate against:
  *
  *   - Spectre v1
+ *   - swapgs (Spectre v1 variant)
  *   - Spectre v2
  *   - Meltdown (Spectre v3)
  *   - Rogue Register Read (Spectre v3a)
@@ -926,7 +927,7 @@
  * overall approach that the system has taken to address these as well as their
  * shortcomings. Unfortunately, not all of the above have been handled today.
  *
- * SPECTRE FAMILY (Spectre v2, ret2spec, SpectreRSB)
+ * SPECTRE v2, ret2spec, SpectreRSB
  *
  * The second variant of the spectre attack focuses on performing branch target
  * injection. This generally impacts indirect call instructions in the system.
@@ -1035,10 +1036,42 @@
  * it may make more sense to investigate using prediction barriers as the whole
  * system is only executing a single instruction at a time while in kmdb.
  *
- * SPECTRE FAMILY (v1, v4)
+ * SPECTRE v1, v4
  *
  * The v1 and v4 variants of spectre are not currently mitigated in the
  * system and require other classes of changes to occur in the code.
+ *
+ * SPECTRE v1 (SWAPGS VARIANT)
+ *
+ * The class of Spectre v1 vulnerabilities aren't all about bounds checks, but
+ * can generally affect any branch-dependent code. The swapgs issue is one
+ * variant of this. If we are coming in from userspace, we can have code like
+ * this:
+ *
+ *	cmpw	$KCS_SEL, REGOFF_CS(%rsp)
+ *	je	1f
+ *	movq	$0, REGOFF_SAVFP(%rsp)
+ *	swapgs
+ *	1:
+ *	movq	%gs:CPU_THREAD, %rax
+ *
+ * If an attacker can cause a mis-speculation of the branch here, we could skip
+ * the needed swapgs, and use the /user/ %gsbase as the base of the %gs-based
+ * load. If subsequent code can act as the usual Spectre cache gadget, this
+ * would potentially allow KPTI bypass. To fix this, we need an lfence prior to
+ * any use of the %gs override.
+ *
+ * The other case is also an issue: if we're coming into a trap from kernel
+ * space, we could mis-speculate and swapgs the user %gsbase back in prior to
+ * using it. AMD systems are not vulnerable to this version, as a swapgs is
+ * serializing with respect to subsequent uses. But as AMD /does/ need the other
+ * case, and the fix is the same in both cases (an lfence at the branch target
+ * 1: in this example), we'll just do it unconditionally.
+ *
+ * Note that we don't enable user-space "wrgsbase" via CR4_FSGSBASE, making it
+ * harder for user-space to actually set a useful %gsbase value: although it's
+ * not clear, it might still be feasible via lwp_setprivate(), though, so we
+ * mitigate anyway.
  *
  * MELTDOWN
  *
@@ -1159,12 +1192,13 @@
  * and what's done in various places:
  *
  *  - Spectre v1: Not currently mitigated
+ *  - swapgs: lfences after swapgs paths
  *  - Spectre v2: Retpolines/RSB Stuffing or EIBRS if HW support
  *  - Meltdown: Kernel Page Table Isolation
  *  - Spectre v3a: Updated CPU microcode
  *  - Spectre v4: Not currently mitigated
  *  - SpectreRSB: SMEP and RSB Stuffing
- *  - L1TF: spec_uarch_flush, smt exclusion, requires microcode
+ *  - L1TF: spec_uarch_flush, SMT exclusion, requires microcode
  *  - MDS: x86_md_clear, requires microcode, disabling hyper threading
  *
  * The following table indicates the x86 feature set bits that indicate that a

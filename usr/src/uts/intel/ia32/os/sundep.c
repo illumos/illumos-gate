@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
@@ -551,16 +551,19 @@ update_sregs(struct regs *rp,  klwp_t *lwp)
 		 *
 		 * We've just mucked up the kernel's gsbase.  Oops.  In
 		 * particular we can't take any traps at all.  Make the newly
-		 * computed gsbase be the hidden gs via __swapgs, and fix
+		 * computed gsbase be the hidden gs via swapgs, and fix
 		 * the kernel's gsbase back again. Later, when we return to
 		 * userland we'll swapgs again restoring gsbase just loaded
 		 * above.
 		 */
-		__swapgs();
+		__asm__ __volatile__("mfence; swapgs");
+
 		rp->r_gs = pcb->pcb_gs;
 
 		/*
-		 * restore kernel's gsbase
+		 * Restore kernel's gsbase. Note that this also serializes any
+		 * attempted speculation from loading the user-controlled
+		 * %gsbase.
 		 */
 		wrmsr(MSR_AMD_GSBASE, kgsbase);
 

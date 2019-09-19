@@ -23,7 +23,7 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -271,6 +271,9 @@
 	 * KDI_SAVE_REGS macro to prevent a usermode process's GSBASE from being
 	 * blown away.  On the hypervisor, we don't need to do this, since it's
 	 * ensured we're on our requested kernel GSBASE already.
+	 *
+	 * No need to worry about swapgs speculation here as it's unconditional
+	 * and via wrmsr anyway.
 	 */
 	subq	$10, %rsp
 	sgdt	(%rsp)

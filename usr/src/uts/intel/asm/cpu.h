@@ -172,17 +172,6 @@ __set_gs(selector_t value)
 	    : "r" (value));
 }
 
-#if !defined(__xpv)
-
-extern __GNU_INLINE void
-__swapgs(void)
-{
-	__asm__ __volatile__(
-	    "mfence; swapgs");
-}
-
-#endif /* !__xpv */
-
 #endif	/* __amd64 */
 
 #endif	/* !__lint && __GNUC__ */
