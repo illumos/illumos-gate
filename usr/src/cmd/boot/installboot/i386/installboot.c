@@ -467,6 +467,10 @@ compare_einfo_cb(struct partlist *plist)
 	bblk_hs_t bblock_hs;
 	bool rv;
 
+	bblock_file = plist->pl_src_data;
+	if (bblock_file == NULL)
+		return (false);	/* source is missing, cannot update */
+
 	bblock = plist->pl_stage;
 	if (bblock == NULL || bblock->extra == NULL || bblock->extra_size == 0)
 		return (true);
@@ -477,7 +481,6 @@ compare_einfo_cb(struct partlist *plist)
 		return (true);
 	}
 
-	bblock_file = plist->pl_src_data;
 	einfo_file = find_einfo(bblock_file->extra, bblock_file->extra_size);
 	if (einfo_file == NULL) {
 		/*
@@ -676,23 +679,39 @@ read_stage2_cb(struct partlist *plist)
 static bool
 read_einfo_file_cb(struct partlist *plist)
 {
-	plist->pl_stage = calloc(1, sizeof (ib_bootblock_t));
-	if (plist->pl_stage == NULL)
+	int rc;
+	void *stage;
+
+	stage = calloc(1, sizeof (ib_bootblock_t));
+	if (stage == NULL)
 		return (false);
 
-	return (read_bootblock_from_file(plist->pl_devname,
-	    plist->pl_stage) == BC_SUCCESS);
+	rc =  read_bootblock_from_file(plist->pl_devname, stage);
+	if (rc != BC_SUCCESS) {
+		free(stage);
+		stage = NULL;
+	}
+	plist->pl_stage = stage;
+	return (rc == BC_SUCCESS);
 }
 
 static bool
 read_stage2_file_cb(struct partlist *plist)
 {
-	plist->pl_src_data = calloc(1, sizeof (ib_bootblock_t));
-	if (plist->pl_src_data == NULL)
+	int rc;
+	void *data;
+
+	data = calloc(1, sizeof (ib_bootblock_t));
+	if (data == NULL)
 		return (false);
 
-	return (read_bootblock_from_file(plist->pl_src_name,
-	    plist->pl_src_data) == BC_SUCCESS);
+	rc = read_bootblock_from_file(plist->pl_src_name, data);
+	if (rc != BC_SUCCESS) {
+		free(data);
+		data = NULL;
+	}
+	plist->pl_src_data = data;
+	return (rc == BC_SUCCESS);
 }
 
 /*
@@ -1755,6 +1774,8 @@ read_bootblock_from_file(const char *file, ib_bootblock_t *bblock)
 
 	/* loader bootblock has version built in */
 	buf_size = sb.st_size;
+	if (buf_size == 0)
+		goto outfd;
 
 	bblock->buf_size = buf_size;
 	BOOT_DEBUG("bootblock in-memory buffer size is %d\n",
@@ -1897,6 +1918,8 @@ prepare_bootblock(ib_data_t *data, struct partlist *pl, char *updt_str)
 	assert(pl != NULL);
 
 	bblock = pl->pl_src_data;
+	if (bblock == NULL)
+		return;
 
 	ptr = (uint64_t *)(&bblock->mboot->bss_end_addr);
 	*ptr = data->target.start;
@@ -2094,10 +2117,13 @@ handle_install(char *progname, int argc, char **argv)
 				printf("\n");
 			}
 			if (!pl->pl_cb.read_bbl(pl)) {
-				(void) fprintf(stderr,
-				    gettext("Error reading %s\n"),
-				    pl->pl_src_name);
-				goto cleanup;
+				/*
+				 * We will ignore ESP updates in case of
+				 * older system where we are missing
+				 * loader64.efi and loader32.efi.
+				 */
+				if (pl->pl_type != IB_BBLK_EFI)
+					goto cleanup;
 			}
 		}
 
