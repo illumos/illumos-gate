@@ -26,6 +26,7 @@
 # Copyright (c) 2017 by Tim Chase. All rights reserved.
 # Copyright (c) 2017 by Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2017 Datto Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 . ${STF_TOOLS}/contrib/include/logapi.shlib
@@ -1531,6 +1532,24 @@ function verify_filesys # pool filesystem dir
 
 	log_must zfs mount -a
 	log_must rm -rf $zdbout
+}
+
+#
+# Given a pool issue a scrub and verify that no checksum errors are reported.
+#
+function verify_pool
+{
+	typeset pool=${1:-$TESTPOOL}
+
+	log_must zpool scrub $pool
+	log_must wait_scrubbed $pool
+
+	cksum=$(zpool status $pool | \
+	    awk '{if ($5 == "CKSUM"){L=1; next} if (L) {print $NF;L=0}}')
+	if [[ $cksum != 0 ]]; then
+		log_must zpool status -v
+	        log_fail "Unexpected CKSUM errors found on $pool ($cksum)"
+	fi
 }
 
 #
