@@ -649,13 +649,13 @@ zvol_first_open(zvol_state_t *zv, boolean_t rdonly)
 	error = zap_lookup(os, ZVOL_ZAP_OBJ, "size", 8, 1, &volsize);
 	if (error) {
 		ASSERT(error == 0);
-		dmu_objset_disown(os, 1, zvol_tag);
+		dmu_objset_disown(os, 1, zv);
 		return (error);
 	}
 
 	error = dnode_hold(os, ZVOL_OBJ, zvol_tag, &zv->zv_dn);
 	if (error) {
-		dmu_objset_disown(os, 1, zvol_tag);
+		dmu_objset_disown(os, 1, zv);
 		return (error);
 	}
 
@@ -689,7 +689,7 @@ zvol_last_close(zvol_state_t *zv)
 		txg_wait_synced(dmu_objset_pool(zv->zv_objset), 0);
 	dmu_objset_evict_dbufs(zv->zv_objset);
 
-	dmu_objset_disown(zv->zv_objset, 1, zvol_tag);
+	dmu_objset_disown(zv->zv_objset, 1, zv);
 	zv->zv_objset = NULL;
 }
 
