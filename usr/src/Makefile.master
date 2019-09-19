@@ -1073,6 +1073,7 @@ RELEASE_DATE=	release date not set
 PATCH_DATE=	$(RELEASE_DATE)
 RELEASE_CM=	"@($(POUND_SIGN))SunOS $(RELEASE) $(PATCHID) $(PATCH_DATE)"
 DEV_CM=		"@($(POUND_SIGN))SunOS Internal Development: non-nightly build"
+UTS_LABEL=	$(RELEASE)
 
 PROCESS_COMMENT=  @?${MCS} -d -a $(RELEASE_CM) -a $(DEV_CM)
 $(RELEASE_BUILD)PROCESS_COMMENT=   @?${MCS} -d -a $(RELEASE_CM)
