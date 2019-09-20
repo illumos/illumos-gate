@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -60,17 +60,10 @@
 size_t	spt_used;
 
 /*
- * segspt_minfree is the memory left for system after ISM
- * locked its pages; it is set up to 5% of availrmem in
- * sptcreate when ISM is created.  ISM should not use more
- * than ~90% of availrmem; if it does, then the performance
- * of the system may decrease. Machines with large memories may
- * be able to use up more memory for ISM so we set the default
- * segspt_minfree to 5% (which gives ISM max 95% of availrmem.
- * If somebody wants even more memory for ISM (risking hanging
- * the system) they can patch the segspt_minfree to smaller number.
+ * See spt_setminfree().
  */
 pgcnt_t segspt_minfree = 0;
+size_t segspt_minfree_clamp = (1UL << 30); /* 1Gb in bytes */
 
 static int segspt_create(struct seg **segpp, void *argsp);
 static int segspt_unmap(struct seg *seg, caddr_t raddr, size_t ssize);
@@ -316,9 +309,33 @@ static int segspt_reclaim(void *, caddr_t, size_t, struct page **,
 static int spt_anon_getpages(struct seg *seg, caddr_t addr, size_t len,
 		page_t **ppa);
 
+/*
+ * This value corresponds to headroom in availrmem that ISM can never allocate
+ * (but others can).  The original intent here was to prevent ISM from locking
+ * all of the remaining availrmem into memory, making forward progress
+ * difficult. It's not clear how much this matters on modern systems.
+ *
+ * The traditional default value of 5% of total memory is used, except on
+ * systems where that quickly gets ridiculous: in that case we clamp at a rather
+ * arbitrary value of 1Gb.
+ *
+ * Note that since this is called lazily on the first sptcreate(), in theory,
+ * this could represent a very small value if the system is heavily loaded
+ * already. In practice, the first ISM user is pretty likely to come along
+ * earlier during the system's operation.
+ *
+ * This never gets re-figured.
+ */
+static void
+spt_setminfree(void)
+{
+	segspt_minfree = availrmem / 20;
 
+	if (segspt_minfree_clamp != 0 &&
+	    segspt_minfree > (segspt_minfree_clamp / PAGESIZE))
+		segspt_minfree = segspt_minfree_clamp / PAGESIZE;
+}
 
-/*ARGSUSED*/
 int
 sptcreate(size_t size, struct seg **sptseg, struct anon_map *amp,
     uint_t prot, uint_t flags, uint_t share_szc)
@@ -331,8 +348,8 @@ sptcreate(size_t size, struct seg **sptseg, struct anon_map *amp,
 	TNF_PROBE_1(sptcreate, "spt", /* CSTYLED */,
 			tnf_ulong, size, size );
 #endif
-	if (segspt_minfree == 0)	/* leave min 5% of availrmem for */
-		segspt_minfree = availrmem/20;	/* for the system */
+	if (segspt_minfree == 0)
+		spt_setminfree();
 
 	if (!hat_supported(HAT_SHARED_PT, (void *)0))
 		return (EINVAL);
