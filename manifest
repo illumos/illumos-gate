@@ -1758,6 +1758,7 @@ f lib/svc/manifest/system/svc/global.xml 0444 root sys
 f lib/svc/manifest/system/svc/restarter.xml 0444 root sys
 f lib/svc/manifest/system/sysevent.xml 0444 root sys
 f lib/svc/manifest/system/system-log.xml 0444 root sys
+f lib/svc/manifest/system/update-man-index.xml 0444 root sys
 f lib/svc/manifest/system/utmp.xml 0444 root sys
 f lib/svc/manifest/system/vtdaemon.xml 0444 root sys
 f lib/svc/manifest/system/zones.xml 0444 root sys
@@ -1854,6 +1855,7 @@ f lib/svc/method/svc-zones 0555 root sys
 f lib/svc/method/sysidtool-net 0555 root bin
 f lib/svc/method/sysidtool-system 0555 root bin
 f lib/svc/method/system-log 0555 root bin
+f lib/svc/method/update-man-index 0555 root bin
 f lib/svc/method/vtdaemon 0555 root bin
 f lib/svc/method/yp 0555 root bin
 d lib/svc/monitor 0755 root bin

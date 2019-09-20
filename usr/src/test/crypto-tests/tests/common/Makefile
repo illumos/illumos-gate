@@ -12,7 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
-# Copyright (c) 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 include $(SRC)/cmd/Makefile.cmd
@@ -34,8 +34,6 @@ all install: $(OBJS)
 %.64.o: %.c
 	$(COMPILE64.c) -o $@ $<
 	$(POST_PROCESS_O)
-
-lint:
 
 clobber clean:
 	-$(RM) $(OBJS)

@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ */
 
 #pragma weak _isaexec = isaexec
 
@@ -67,9 +69,10 @@ isaexec(const char *execname, char *const *argv, char *const *envp)
 		}
 		if (ret > isalen) {
 			isalen = ret;
-			isalist = realloc(isalist, isalen);
-		} else
+			isalist = reallocf(isalist, isalen);
+		} else {
 			break;
+		}
 	} while (isalist != NULL);
 
 	if (isalist == NULL) {

@@ -1,0 +1,56 @@
+#!/bin/ksh
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source. A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
+
+[ -f /lib/svc/share/smf_include.sh ] || exit 1
+
+. /lib/svc/share/smf_include.sh
+
+# Associative array to hold unique components for manpath
+typeset -A manpath
+
+default_system_path=
+if [ -f /etc/default/login ]; then
+	default_system_path="`grep '^PATH=' /etc/default/login | sed -n '
+	    s/PATH=//
+	    p
+	    q
+	    '`"
+fi
+
+oIFS="$IFS"; IFS=":"
+# The config/manpath property from the service will have been passed as
+# arguments to this method script.
+for p in $@; do
+	manpath["$p"]=1
+done
+
+# Add any additional man directories from the default system path
+for p in $default_system_path; do
+	dir="`dirname "$p"`"
+	for suffix in man share/man; do
+		[ -d "$dir/$suffix" ] && manpath["$dir/$suffix"]=1
+	done
+done
+IFS="$oIFS"
+
+MANPATH=
+for p in "${!manpath[@]}"; do
+	MANPATH+="${MANPATH:+:}$p"
+done
+
+echo "Rebuilding man page index using $MANPATH"
+export MANPATH
+/usr/bin/man -w
+
+exit 0

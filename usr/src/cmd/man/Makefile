@@ -12,10 +12,19 @@
 #
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
-include 	Makefile.com
+PROG=		man
+LINKS=		apropos whatis catman
+LIBLINKS =	makewhatis
+OBJS=		makewhatis.o man.o stringlist.o
+MANIFEST=	update-man-index.xml
+SVCMETHOD=	update-man-index
+
 include		$(SRC)/cmd/Makefile.cmd
+
+ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
 
 CFLAGS +=	$(CCVERBOSE)
 
@@ -28,9 +37,9 @@ all:		$(PROG)
 clean:
 		$(RM) $(OBJS)
 
-install:	all $(ROOTPROG) $(ROOTLINKS)
+install:	all $(ROOTPROG) $(ROOTLINKS) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
-lint: 		lint_SRCS
+check:		$(CHKMANIFEST)
 
 $(PROG):	$(OBJS)
 		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)

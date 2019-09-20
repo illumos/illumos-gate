@@ -126,7 +126,7 @@ sdp_gen_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 /* open routine. */
 /*ARGSUSED*/
 static int
-sdp_gen_close(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
+sdp_gen_close(queue_t *q, int flag, cred_t *credp)
 {
 	qprocsoff(q);
 	return (0);
@@ -250,7 +250,7 @@ done:
 /*
  * Received a put from sockfs. We only support ndd get/set
  */
-static void
+static int
 sdp_gen_wput(queue_t *q, mblk_t *mp)
 {
 	switch (mp->b_datap->db_type) {
@@ -266,8 +266,9 @@ sdp_gen_wput(queue_t *q, mblk_t *mp)
 		break;
 	default:
 		freemsg(mp);
-		return;
+		return (0);
 	}
+	return (0);
 }
 
 static struct module_info info = {
@@ -275,12 +276,12 @@ static struct module_info info = {
 };
 
 static struct qinit rinit = {
-	NULL, (pfi_t)NULL, (pfi_t)sdp_gen_open, (pfi_t)sdp_gen_close, NULL,
+	NULL, NULL, sdp_gen_open, sdp_gen_close, NULL,
 	&info, NULL, NULL, NULL, STRUIOT_NONE
 };
 
 static struct qinit winit = {
-	(pfi_t)sdp_gen_wput, NULL,  (pfi_t)sdp_gen_open,  (pfi_t)sdp_gen_close,
+	sdp_gen_wput, NULL,  sdp_gen_open, sdp_gen_close,
 	NULL, &info, NULL, NULL, NULL, STRUIOT_NONE
 };
 

@@ -1,0 +1,81 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ This file and its contents are supplied under the terms of the
+ Common Development and Distribution License ("CDDL"), version 1.0.
+ You may only use this file in accordance with the terms of version
+ 1.0 of the CDDL.
+
+ A full copy of the text of the CDDL should have accompanied this
+ source. A copy of the CDDL is also available via the Internet at
+ http://www.illumos.org/license/CDDL.
+
+ Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+-->
+
+<service_bundle type='manifest' name='system/man:update-man-index'>
+
+<service
+	name='system/update-man-index'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='true' />
+
+	<single_instance/>
+
+	<dependency
+		name='fs-local'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/filesystem/local' />
+	</dependency>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/update-man-index %{config/manpath:}'
+		timeout_seconds='300' />
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':true'
+		timeout_seconds='3' />
+
+	<exec_method
+		type='method'
+		name='refresh'
+		exec=':true'
+		timeout_seconds='3' />
+
+	<property_group name='startd' type='framework'>
+		<propval name='duration' type='astring' value='transient' />
+	</property_group>
+
+        <property_group name='config' type='application'>
+                <property name='manpath' type='astring'>
+			<astring_list>
+				<value_node value='/usr/share/man' />
+				<value_node value='/usr/has/man' />
+			</astring_list>
+		</property>
+        </property_group>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				Man page index database updater
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='man' section='1'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+</service>
+
+</service_bundle>
