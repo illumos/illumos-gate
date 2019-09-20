@@ -25,6 +25,10 @@
 #
 
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
+
+#
 # When we process the synthetic manifests, we don't know if a "make
 # clobber" was done or not.  This keeps us from having silly,
 # self-referential dependencies in 'em, even when they make it into
@@ -33,3 +37,6 @@
 <transform depend fmri=pkg:/on_all@.+ -> drop>
 <transform depend fmri=pkg:/on_extra@.+ -> drop>
 <transform depend fmri=pkg:/consolidation/osnet/osnet-incorporation@.+ -> drop>
+<transform depend vlfacet=true type=incorporate fmri=pkg:/([^@]+) -> \
+    set facet.version-lock.%<1> true>
+<transform depend vlfacet=. -> delete vlfacet .>

@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/data/hardware-registry@$(PKGVERS)
@@ -30,6 +30,7 @@ set name=pkg.description \
 set name=pkg.summary value="Hardware data files"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Hardware
+set name=org.opensolaris.incorp-facet value=true
 set name=variant.arch value=$(ARCH)
 dir path=usr group=sys
 dir path=usr/share
