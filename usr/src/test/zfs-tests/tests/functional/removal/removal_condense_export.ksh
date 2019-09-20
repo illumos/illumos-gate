@@ -37,7 +37,7 @@ function reset
 
 default_setup_noexit "$DISKS" "true"
 log_onexit reset
-log_must set_condense_delay 100
+log_must set_condense_delay 500
 log_must set_min_bytes 1
 
 log_must zfs set recordsize=512 $TESTPOOL/$TESTFS
@@ -75,7 +75,7 @@ log_mustnot vdevs_in_pool $TESTPOOL $REMOVEDISK
 
 log_must zfs remap $TESTPOOL/$TESTFS
 sync
-sleep 5
+sleep 4
 sync
 log_must zpool export $TESTPOOL
 zdb -e $TESTPOOL | grep 'Condensing indirect vdev' || \
