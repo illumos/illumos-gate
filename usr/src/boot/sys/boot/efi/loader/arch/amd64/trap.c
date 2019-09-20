@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2016 The FreeBSD Foundation
  * All rights reserved.
  *
@@ -376,7 +376,7 @@ efi_unredirect_exceptions(void)
 }
 
 static int
-command_grab_faults(int argc, char *argv[])
+command_grab_faults(int argc __unused, char *argv[] __unused)
 {
 	int res;
 
@@ -388,7 +388,7 @@ command_grab_faults(int argc, char *argv[])
 COMMAND_SET(grap_faults, "grab_faults", "grab faults", command_grab_faults);
 
 static int
-command_ungrab_faults(int argc, char *argv[])
+command_ungrab_faults(int argc __unused, char *argv[] __unused)
 {
 
 	efi_unredirect_exceptions();
@@ -398,7 +398,7 @@ COMMAND_SET(ungrab_faults, "ungrab_faults", "ungrab faults",
     command_ungrab_faults);
 
 static int
-command_fault(int argc, char *argv[])
+command_fault(int argc __unused, char *argv[] __unused)
 {
 
 	__asm("ud2");

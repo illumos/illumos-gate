@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
  * All rights reserved.
  *
@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #define __ELF_WORD_SIZE 64
 #include <sys/param.h>
@@ -120,7 +119,7 @@ elf64_exec(struct preloaded_file *fp)
 }
 
 static int
-elf64_obj_exec(struct preloaded_file *fp)
+elf64_obj_exec(struct preloaded_file *fp __unused)
 {
 	return (EFTYPE);
 }

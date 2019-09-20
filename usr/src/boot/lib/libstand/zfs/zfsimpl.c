@@ -2383,7 +2383,8 @@ objset_get_dnode(const spa_t *spa, const objset_phys_t *os, uint64_t objnum, dno
 }
 
 static int
-mzap_rlookup(const spa_t *spa, const dnode_phys_t *dnode, char *name, uint64_t value)
+mzap_rlookup(const spa_t *spa __unused, const dnode_phys_t *dnode, char *name,
+    uint64_t value)
 {
 	const mzap_phys_t *mz;
 	const mzap_ent_phys_t *mze;

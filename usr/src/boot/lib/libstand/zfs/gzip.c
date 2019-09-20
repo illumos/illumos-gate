@@ -55,7 +55,8 @@ z_uncompress(void *dst, size_t *dstlen, const void *src, size_t srclen)
 }
 
 int
-gzip_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len, int n)
+gzip_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len,
+    int n __unused)
 {
 	size_t dstlen = d_len;
 

@@ -279,7 +279,7 @@ bootpsend(struct iodesc *d, void *pkt, size_t len)
 
 static ssize_t
 bootprecv(struct iodesc *d, void **pkt, void **payload, time_t tleft,
-    void *extra)
+    void *extra __unused)
 {
 	ssize_t n;
 	struct bootp *bp;

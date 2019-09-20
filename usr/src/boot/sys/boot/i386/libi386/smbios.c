@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2005-2009 Jung-uk Kim <jkim@FreeBSD.org>
  * All rights reserved.
  *
@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <stand.h>
 #include <bootstrap.h>
@@ -213,7 +212,7 @@ smbios_setenv(const char *name, caddr_t addr, const int offset)
 #define	UUID_GET(base, off)	(*(UUID_TYPE *)((base) + (off)))
 
 static void
-smbios_setuuid(const char *name, const caddr_t addr, const int ver)
+smbios_setuuid(const char *name, const caddr_t addr)
 {
 	char		uuid[37];
 	int		byteorder, i, ones, zeros;
@@ -300,7 +299,7 @@ smbios_parse_table(const caddr_t addr)
 		smbios_setenv("smbios.system.version", addr, 0x06);
 #ifdef SMBIOS_SERIAL_NUMBERS
 		smbios_setenv("smbios.system.serial", addr, 0x07);
-		smbios_setuuid("smbios.system.uuid", addr + 0x08, smbios.ver);
+		smbios_setuuid("smbios.system.uuid", addr + 0x08);
 #endif
 		if (smbios.major > 2 ||
 		    (smbios.major == 2 && smbios.minor >= 4)) {

@@ -61,8 +61,8 @@ zfs_init_crc(void)
 }
 
 static void
-zio_checksum_off(const void *buf, uint64_t size,
-    const void *ctx_template, zio_cksum_t *zcp)
+zio_checksum_off(const void *buf __unused, uint64_t size __unused,
+    const void *ctx_template __unused, zio_cksum_t *zcp)
 {
 	ZIO_SET_CHECKSUM(zcp, 0, 0, 0, 0);
 }
@@ -841,7 +841,7 @@ vdev_raidz_generate_parity(raidz_map_t *rm)
 /* END CSTYLED */
 
 static void
-vdev_raidz_matrix_init(raidz_map_t *rm, int n, int nmap, int *map,
+vdev_raidz_matrix_init(raidz_map_t *rm __unused, int n, int nmap, int *map,
     uint8_t **rows)
 {
 	int i, j;
@@ -1336,7 +1336,7 @@ vdev_child(vdev_t *pvd, uint64_t devidx)
  */
 static int
 raidz_checksum_verify(const spa_t *spa, const blkptr_t *bp, void *data,
-    uint64_t size)
+    uint64_t size __unused)
 {
 
 	return (zio_checksum_verify(spa, bp, data));
@@ -1389,7 +1389,8 @@ raidz_parity_verify(raidz_map_t *rm)
  */
 static int
 vdev_raidz_combrec(const spa_t *spa, raidz_map_t *rm, const blkptr_t *bp,
-    void *data, off_t offset, uint64_t bytes, int total_errors, int data_errors)
+    void *data, off_t offset __unused, uint64_t bytes, int total_errors,
+    int data_errors)
 {
 	raidz_col_t *rc;
 	void *orig[VDEV_RAIDZ_MAXPARITY];

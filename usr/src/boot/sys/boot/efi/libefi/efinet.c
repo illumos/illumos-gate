@@ -198,7 +198,7 @@ efinet_get(struct iodesc *desc, void **pkt, time_t timeout)
 }
 
 static void
-efinet_init(struct iodesc *desc, void *machdep_hint)
+efinet_init(struct iodesc *desc, void *machdep_hint __unused)
 {
 	struct netif *nif = desc->io_netif;
 	EFI_SIMPLE_NETWORK *net;

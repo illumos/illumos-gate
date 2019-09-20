@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-/*#pragma ident	"%Z%%M%	%I%	%E% SMI"*/
-
 /*
  * We keep our own copy of this algorithm for 2 main reasons:
  * 	1. If we didn't, anyone modifying common/os/compress.c would
@@ -45,7 +43,8 @@
 
 /*ARGSUSED*/
 static int
-lzjb_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len, int n)
+lzjb_decompress(void *s_start, void *d_start, size_t s_len __unused,
+    size_t d_len, int n __unused)
 {
 	unsigned char *src = s_start;
 	unsigned char *dst = d_start;

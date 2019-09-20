@@ -216,7 +216,8 @@ rpc_call(struct iodesc *d, n_long prog, n_long vers, n_long proc,
  * Remaining checks are done by callrpc
  */
 static ssize_t
-recvrpc(struct iodesc *d, void **pkt, void **payload, time_t tleft, void *extra)
+recvrpc(struct iodesc *d, void **pkt, void **payload, time_t tleft,
+    void *extra __unused)
 {
 	void *ptr;
 	struct rpc_reply *reply;

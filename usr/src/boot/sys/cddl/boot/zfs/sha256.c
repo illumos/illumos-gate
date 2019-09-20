@@ -287,7 +287,7 @@ SHA512(uint64_t *H, const void *buf, uint64_t size, zio_cksum_t *zcp)
 
 static void
 zio_checksum_SHA256(const void *buf, uint64_t size,
-    const void *ctx_template, zio_cksum_t *zcp)
+    const void *ctx_template __unused, zio_cksum_t *zcp)
 {
 	/* SHA-256 as per FIPS 180-4. */
 	uint32_t	H[] = {
@@ -299,7 +299,7 @@ zio_checksum_SHA256(const void *buf, uint64_t size,
 
 static void
 zio_checksum_SHA512_native(const void *buf, uint64_t size,
-    const void *ctx_template, zio_cksum_t *zcp)
+    const void *ctx_template __unused, zio_cksum_t *zcp)
 {
 	/* SHA-512/256 as per FIPS 180-4. */
 	uint64_t	H[] = {

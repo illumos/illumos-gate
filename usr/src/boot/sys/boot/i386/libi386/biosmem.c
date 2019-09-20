@@ -225,7 +225,7 @@ bios_getmem(void)
 }
 
 static int
-command_biosmem(int argc, char *argv[])
+command_biosmem(int argc __unused, char *argv[] __unused)
 {
 	int bq = bios_getquirks();
 

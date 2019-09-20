@@ -358,7 +358,8 @@ zfs_readdir(struct open_file *f, struct dirent *d)
 }
 
 static int
-vdev_read(vdev_t *vdev, void *priv, off_t offset, void *buf, size_t bytes)
+vdev_read(vdev_t *vdev __unused, void *priv, off_t offset, void *buf,
+    size_t bytes)
 {
 	int fd, ret;
 	size_t res, size, remainder, rb_size, blksz;
@@ -648,8 +649,9 @@ zfs_dev_close(struct open_file *f)
 }
 
 static int
-zfs_dev_strategy(void *devdata, int rw, daddr_t dblk, size_t size,
-    char *buf, size_t *rsize)
+zfs_dev_strategy(void *devdata __unused, int rw __unused,
+    daddr_t dblk __unused, size_t size __unused,
+    char *buf __unused, size_t *rsize __unused)
 {
 
 	return (ENOSYS);

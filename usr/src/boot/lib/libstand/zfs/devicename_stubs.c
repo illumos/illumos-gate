@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2012 Andriy Gapon <avg@FreeBSD.org>
  * All rights reserved.
  *
@@ -25,21 +25,21 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <stand.h>
 #include "libzfs.h"
 
 __attribute__((weak))
 int
-zfs_parsedev(struct zfs_devdesc *dev, const char *devspec, const char **path)
+zfs_parsedev(struct zfs_devdesc *dev __unused, const char *devspec __unused,
+    const char **path __unused)
 {
 	return (EINVAL);
 }
 
 __attribute__((weak))
 char *
-zfs_fmtdev(void *vdev)
+zfs_fmtdev(void *vdev __unused)
 {
     static char	buf[128];
 

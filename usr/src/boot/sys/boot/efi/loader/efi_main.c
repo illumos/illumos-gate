@@ -42,7 +42,7 @@ efi_exit(EFI_STATUS exit_code)
 }
 
 void
-exit(int status)
+exit(int status __unused)
 {
 
 	efi_exit(EFI_LOAD_ERROR);

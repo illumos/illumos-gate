@@ -392,7 +392,8 @@ efi_print_other_value(uint8_t *data, UINTN datasz)
 
 /* This appears to be some sort of UEFI shell alias table. */
 static int
-efi_print_shell_str(const CHAR16 *varnamearg, uint8_t *data, UINTN datasz)
+efi_print_shell_str(const CHAR16 *varnamearg __unused, uint8_t *data,
+    UINTN datasz __unused)
 {
 	printf(" = %S", (CHAR16 *)data);
 	if (pager_output("\n"))
@@ -445,7 +446,8 @@ efi_memory_type(EFI_MEMORY_TYPE type)
 
 /* Print memory type table. */
 static int
-efi_print_mem_type(const CHAR16 *varnamearg, uint8_t *data, UINTN datasz)
+efi_print_mem_type(const CHAR16 *varnamearg __unused, uint8_t *data,
+    UINTN datasz)
 {
 	int i, n;
 	EFI_MEMORY_TYPE_INFORMATION *ti;
@@ -470,7 +472,8 @@ efi_print_mem_type(const CHAR16 *varnamearg, uint8_t *data, UINTN datasz)
  * We have LoaderPath and LoaderDev as CHAR16 strings.
  */
 static int
-efi_print_illumos(const CHAR16 *varnamearg, uint8_t *data, UINTN datasz)
+efi_print_illumos(const CHAR16 *varnamearg, uint8_t *data,
+    UINTN datasz __unused)
 {
 	int rv = -1;
 	char *var = NULL;
