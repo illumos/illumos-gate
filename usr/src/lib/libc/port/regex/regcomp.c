@@ -1,6 +1,6 @@
 /*
  * Copyright 2013 Garrett D'Amore <garrett@damore.org>
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright (c) 1992, 1993, 1994 Henry Spencer.
  * Copyright (c) 1992, 1993, 1994
@@ -1778,7 +1778,7 @@ computejumps(struct parse *p, struct re_guts *g)
 	if (p->error != 0)
 		return;
 
-	g->charjump = (int *)malloc((NC + 1) * sizeof (int));
+	g->charjump = (int *)malloc((NC_MAX + 1) * sizeof (int));
 	if (g->charjump == NULL)	/* Not a fatal error */
 		return;
 	/* Adjust for signed chars, if necessary */
