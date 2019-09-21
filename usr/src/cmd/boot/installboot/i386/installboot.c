@@ -1032,6 +1032,9 @@ probe_fstyp(ib_data_t *data)
 		data->target.fstype = IB_FS_UFS;
 	} else if (strcmp(fident, MNTTYPE_PCFS) == 0) {
 		data->target.fstype = IB_FS_PCFS;
+		/* with pcfs we always write MBR */
+		force_mbr = true;
+		write_mbr = true;
 	} else {
 		(void) fprintf(stderr, gettext("File system %s is not "
 		    "supported by loader\n"), fident);
@@ -1142,8 +1145,8 @@ probe_gpt(ib_data_t *data)
 	data->target.size = vtoc->efi_parts[slice].p_size;
 
 	/* Always update PMBR. */
-	force_mbr = 1;
-	write_mbr = 1;
+	force_mbr = true;
+	write_mbr = true;
 
 	/*
 	 * With GPT we can have boot partition and ESP.
@@ -1556,12 +1559,6 @@ probe_mbr(ib_data_t *data)
 	 * partition.
 	 */
 	if (i == FD_NUMPART) {
-		/* with pcfs we always write MBR */
-		if (data->target.fstype == IB_FS_PCFS) {
-			force_mbr = true;
-			write_mbr = true;
-		}
-
 		pl->pl_devname = strdup(path);
 		if (pl->pl_devname == NULL) {
 			perror(gettext("Memory allocation failure"));
