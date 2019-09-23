@@ -1,0 +1,95 @@
+#!/bin/ksh
+
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source. A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2019 Joyent, Inc.
+
+# A simple update script that extracts an Intel microcode download file
+# into the intel/ directory, and updates the hardlinks in the
+# system/kernel/platform manifest.
+
+set -e
+set -o pipefail
+
+[[ -z "$1" ]] || [[ ! -f "$1" ]] && {
+	echo "Syntax: $0 <path to microcode tar>" >&2
+	exit 1
+}
+
+ucodetar="$1"
+
+mf=../../pkg/manifests/system-kernel-platform.mf
+[[ -f $mf ]] || {
+	echo "Run from usr/src/data/ucode" 2>&1
+	exit 1
+}
+
+fw=platform/i86pc/ucode/GenuineIntel
+
+tmp=$(mktemp -d)
+mkdir $tmp/out
+
+gtar -C $tmp -xvf "$ucodetar"
+
+find $tmp/Intel-Linux-Processor-Microcode-Data*/intel-ucode*/ -type f \
+    | while read f; do
+	echo "Converting $(basename $f)"
+	cp $f $tmp/intel-fw
+	ucodeadm -i -R $tmp/out $tmp/intel-fw
+	rm -f $tmp/intel-fw
+done
+
+pkgfmt -u $mf
+mv $mf $mf.tmp
+egrep -v "(file|hardlink) path=$fw" $mf.tmp > $mf
+rm -f $mf.tmp
+
+rm -f intel/*
+rm -f Makefile.links
+
+typeset -A seen
+typeset -A inodes
+typeset -A links
+
+for f in $tmp/out/*; do
+	bf=$(basename $f)
+	[[ -n "${seen[$bf]}" ]] && continue
+	inode=$(stat -c %i $f)
+	if [[ -n "${inodes[$inode]}" ]]; then
+		links[$bf]=${inodes[$inode]}
+	else
+		inodes[$inode]=$bf
+		seen[$bf]=1
+		cp $f intel/$bf
+	fi
+	seen[$bf]=1
+done
+
+for f in intel/*; do
+	bf=$(basename $f)
+	echo "\$(i386_ONLY)file path=$fw/$bf group=sys mode=0444 reboot-needed=true" >> $mf
+done
+
+echo "INTEL_LINKS = ${!links[@]}" > Makefile.links
+echo >> Makefile.links
+
+for i in "${!links[@]}"; do
+	echo "\$(i386_ONLY)hardlink path=$fw/$i target=${links[$i]}" >> $mf
+	cat << EOM >> Makefile.links
+\$(ROOTINTELDIR)/$i: \$(ROOTINTELDIR)/${links[$i]}
+	\$(RM) \$@; \$(LN) \$^ \$@
+
+EOM
+done
+
+pkgfmt $mf
+
+rm -rf $tmp
