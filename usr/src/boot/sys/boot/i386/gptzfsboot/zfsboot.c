@@ -274,8 +274,7 @@ main(void)
 void
 exit(int x)
 {
-	while (1)
-		;
+	__exit(x);
 }
 
 static void

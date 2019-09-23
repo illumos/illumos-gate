@@ -40,6 +40,11 @@
 #include <sys/fm/fs/zfs.h>
 
 /*
+ * Tunable to enable TRIM, which is temporarily disabled by default.
+ */
+uint_t zfs_no_trim = 1;
+
+/*
  * Tunable parameter for debugging or performance analysis. Setting this
  * will cause pool corruption on power loss if a volatile out-of-order
  * write cache is enabled.
@@ -715,6 +720,9 @@ skip_open:
 		vd->vdev_has_trim = B_FALSE;
 	}
 
+	if (zfs_no_trim == 1)
+		vd->vdev_has_trim = B_FALSE;
+
 	/* Currently only supported for ZoL. */
 	vd->vdev_has_securetrim = B_FALSE;
 
@@ -945,7 +953,7 @@ vdev_disk_io_start(zio_t *zio)
 		return;
 
 	case ZIO_TYPE_TRIM:
-		if (!vd->vdev_has_trim) {
+		if (zfs_no_trim == 1 || !vd->vdev_has_trim) {
 			zio->io_error = SET_ERROR(ENOTSUP);
 			zio_execute(zio);
 			return;
