@@ -355,10 +355,6 @@ RO	+4426+02606	Europe/Bucharest	-
 RS	+4450+02030	Europe/Belgrade	-
 RU	+5443+02030	Europe/Kaliningrad	-	MSK-01 - Kaliningrad
 RU	+554521+0373704	Europe/Moscow	-	MSK+00 - Moscow area
-# The obsolescent zone.tab format cannot represent Europe/Simferopol well.
-# Put it in RU section and list as UA.  See "territorial claims" above.
-# Programs should use zone1970.tab instead; see above.
-UA	+4457+03406	Europe/Simferopol	-	MSK+00 - Crimea
 RU	+5836+04939	Europe/Kirov	-	MSK+00 - Kirov
 RU	+4621+04803	Europe/Astrakhan	-	MSK+01 - Astrakhan
 RU	+4844+04425	Europe/Volgograd	-	MSK+01 - Volgograd
@@ -422,6 +418,11 @@ TV	-0831+17913	Pacific/Funafuti	-
 TW	+2503+12130	Asia/Taipei	-
 TZ	-0648+03917	Africa/Dar_es_Salaam	-
 UA	+5026+03031	Europe/Kiev	-	Ukraine (most areas)
+# The obsolescent zone.tab format cannot represent Europe/Simferopol well.
+# Upstream zoneinfo have put it in RU section but listed it as UA
+# However, libzoneinfo relies on this file being sorted and so we place it in
+# the UA section.
+UA	+4457+03406	Europe/Simferopol	-	MSK+00 - Crimea
 UA	+4837+02218	Europe/Uzhgorod	-	Ruthenia
 UA	+4750+03510	Europe/Zaporozhye	-	Zaporozh'ye/Zaporizhia; Lugansk/Luhansk (east)
 UG	+0019+03225	Africa/Kampala	-

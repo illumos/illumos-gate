@@ -49,6 +49,10 @@ diff zone.tab.txt' and see what changed and fix zone_sun.tab
 appropriately. Usually this means deleting removed entries and adding
 new ones.
 
+********** IMPORTANT **********
+*** zone_sun.tab must remain sorted.
+*** The upstream zone.tab.txt is not always completely in alphabetical order.
+
 After that's done, you'll need to go through the more agonizing process of
 packaging. To do this, you'll want to look through the differences that have
 occurred in zone.tab.txt and backward. The contents of backward describe
