@@ -175,7 +175,7 @@ static int	nfs4_open_non_reg_file(vnode_t **, int, cred_t *);
 static int	nfs4_safelock(vnode_t *, const struct flock64 *, cred_t *);
 static void	nfs4_register_lock_locally(vnode_t *, struct flock64 *, int,
 			u_offset_t);
-static int 	nfs4_lockrelease(vnode_t *, int, offset_t, cred_t *);
+static int	nfs4_lockrelease(vnode_t *, int, offset_t, cred_t *);
 static int	nfs4_block_and_wait(clock_t *, rnode4_t *);
 static cred_t  *state_to_cred(nfs4_open_stream_t *);
 static void	denied_to_flk(LOCK4denied *, flock64_t *, LOCKT4args *);
@@ -184,7 +184,7 @@ static void	nfs4_reinstitute_local_lock_state(vnode_t *, flock64_t *,
 			cred_t *, nfs4_lock_owner_t *);
 static void	push_reinstate(vnode_t *, int, flock64_t *, cred_t *,
 			nfs4_lock_owner_t *);
-static int 	open_and_get_osp(vnode_t *, cred_t *, nfs4_open_stream_t **);
+static int	open_and_get_osp(vnode_t *, cred_t *, nfs4_open_stream_t **);
 static void	nfs4_delmap_callback(struct as *, void *, uint_t);
 static void	nfs4_free_delmapcall(nfs4_delmapcall_t *);
 static nfs4_delmapcall_t	*nfs4_init_delmapcall();
@@ -440,7 +440,7 @@ const fs_operation_def_t nfs4_vnodeops_template[] = {
 	VOPNAME_SETSECATTR,	{ .vop_setsecattr = nfs4_setsecattr },
 	VOPNAME_GETSECATTR,	{ .vop_getsecattr = nfs4_getsecattr },
 	VOPNAME_SHRLOCK,	{ .vop_shrlock = nfs4_shrlock },
-	VOPNAME_VNEVENT, 	{ .vop_vnevent = fs_vnevent_support },
+	VOPNAME_VNEVENT,	{ .vop_vnevent = fs_vnevent_support },
 	NULL,			NULL
 };
 
@@ -1556,6 +1556,8 @@ recov_retry:
 
 		e.error = nfs4setattr(vp, in_va, 0, cr, NULL);
 		if (e.error) {
+			nfs4_error_t err;
+
 			/*
 			 * Couldn't correct the attributes of
 			 * the newly created file and the
@@ -1567,8 +1569,23 @@ recov_retry:
 			NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE,
 			    "nfs4open_otw: EXCLUSIVE4: error %d on SETATTR:"
 			    " remove file", e.error));
+
+			/*
+			 * The file is currently open so try to close it first.
+			 *
+			 * If we do not close the file explicitly here then the
+			 * VN_RELE() would do an (implicit and asynchronous)
+			 * close for us.  But such async close could race with
+			 * the nfs4_remove() below.  If the async close is
+			 * slower than nfs4_remove() then nfs4_remove()
+			 * wouldn't remove the file but rename it to .nfsXXXX
+			 * instead.
+			 */
+			nfs4close_one(vp, NULL, cr, open_flag, NULL, &err,
+			    CLOSE_NORM, 0, 0, 0);
 			VN_RELE(vp);
 			(void) nfs4_remove(dvp, file_name, cr, NULL, 0);
+
 			/*
 			 * Since we've reled the vnode and removed
 			 * the file we now need to return the error.
@@ -3102,8 +3119,8 @@ nfs4rdwr_check_osid(vnode_t *vp, nfs4_error_t *ep, cred_t *cr)
 	nfs4_open_owner_t	*oop;
 	nfs4_open_stream_t	*osp;
 	rnode4_t		*rp = VTOR4(vp);
-	mntinfo4_t 		*mi = VTOMI4(vp);
-	int 			reopen_needed;
+	mntinfo4_t		*mi = VTOMI4(vp);
+	int			reopen_needed;
 
 	ASSERT(nfs_zone() == mi->mi_zone);
 
@@ -12406,8 +12423,8 @@ nfs4_getsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr,
 
 /*
  * The function returns:
- * 	- 0 (zero) if the passed in "acl_mask" is a valid request.
- * 	- EINVAL if the passed in "acl_mask" is an invalid request.
+ *	- 0 (zero) if the passed in "acl_mask" is a valid request.
+ *	- EINVAL if the passed in "acl_mask" is an invalid request.
  *
  * In the case of getting an acl (op == NFS4_ACL_GET) the mask is invalid if:
  * - We have a mixture of ACE and ACL requests (e.g. VSA_ACL | VSA_ACE)
@@ -13218,7 +13235,7 @@ nfs4frlock_check_deleg(vnode_t *vp, nfs4_error_t *ep, cred_t *cr, int lt)
 	open_delegation_type4	dt;
 	bool_t			reopen_needed, force;
 	nfs4_open_stream_t	*osp;
-	open_claim_type4 	oclaim;
+	open_claim_type4	oclaim;
 	rnode4_t		*rp = VTOR4(vp);
 	mntinfo4_t		*mi = VTOMI4(vp);
 

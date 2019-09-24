@@ -595,6 +595,7 @@ read_stage2_cb(struct partlist *plist)
 	uint32_t		buf_size;
 	uint32_t		mboot_off;
 	multiboot_header_t	*mboot;
+	size_t			scan_size;
 
 	bblock = calloc(1, sizeof (ib_bootblock_t));
 	if (bblock == NULL)
@@ -608,8 +609,10 @@ read_stage2_cb(struct partlist *plist)
 	device = plist->pl_device;
 	plist->pl_stage = bblock;
 	offset = device->stage.offset * SECTOR_SIZE;
+	scan_size = MIN(sizeof (mboot_scan),
+	    (device->stage.size - device->stage.offset) * sector_size);
 
-	if (read_in(fd, mboot_scan, sizeof (mboot_scan), offset)
+	if (read_in(fd, mboot_scan, scan_size, offset)
 	    != BC_SUCCESS) {
 		BOOT_DEBUG("Error reading bootblock area\n");
 		perror("read");
@@ -618,7 +621,7 @@ read_stage2_cb(struct partlist *plist)
 	}
 
 	/* No multiboot means no chance of knowing bootblock size */
-	if (find_multiboot(mboot_scan, sizeof (mboot_scan), &mboot_off)
+	if (find_multiboot(mboot_scan, scan_size, &mboot_off)
 	    != BC_SUCCESS) {
 		BOOT_DEBUG("Unable to find multiboot header\n");
 		(void) close(fd);
@@ -1032,6 +1035,9 @@ probe_fstyp(ib_data_t *data)
 		data->target.fstype = IB_FS_UFS;
 	} else if (strcmp(fident, MNTTYPE_PCFS) == 0) {
 		data->target.fstype = IB_FS_PCFS;
+		/* with pcfs we always write MBR */
+		force_mbr = true;
+		write_mbr = true;
 	} else {
 		(void) fprintf(stderr, gettext("File system %s is not "
 		    "supported by loader\n"), fident);
@@ -1142,8 +1148,8 @@ probe_gpt(ib_data_t *data)
 	data->target.size = vtoc->efi_parts[slice].p_size;
 
 	/* Always update PMBR. */
-	force_mbr = 1;
-	write_mbr = 1;
+	force_mbr = true;
+	write_mbr = true;
 
 	/*
 	 * With GPT we can have boot partition and ESP.
@@ -1556,12 +1562,6 @@ probe_mbr(ib_data_t *data)
 	 * partition.
 	 */
 	if (i == FD_NUMPART) {
-		/* with pcfs we always write MBR */
-		if (data->target.fstype == IB_FS_PCFS) {
-			force_mbr = true;
-			write_mbr = true;
-		}
-
 		pl->pl_devname = strdup(path);
 		if (pl->pl_devname == NULL) {
 			perror(gettext("Memory allocation failure"));

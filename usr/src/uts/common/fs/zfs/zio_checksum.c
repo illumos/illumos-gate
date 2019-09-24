@@ -316,13 +316,15 @@ zio_checksum_compute(zio_t *zio, enum zio_checksum checksum,
 	static const uint64_t zec_magic = ZEC_MAGIC;
 	blkptr_t *bp = zio->io_bp;
 	uint64_t offset = zio->io_offset;
-	zio_checksum_info_t *ci = &zio_checksum_table[checksum];
+	zio_checksum_info_t *ci;
 	zio_cksum_t cksum, saved;
 	spa_t *spa = zio->io_spa;
-	boolean_t insecure = (ci->ci_flags & ZCHECKSUM_FLAG_DEDUP) == 0;
+	boolean_t insecure;
 
 	ASSERT((uint_t)checksum < ZIO_CHECKSUM_FUNCTIONS);
+	ci = &zio_checksum_table[checksum];
 	ASSERT(ci->ci_func[0] != NULL);
+	insecure = (ci->ci_flags & ZCHECKSUM_FLAG_DEDUP) == 0;
 
 	zio_checksum_template_init(checksum, spa);
 
@@ -386,12 +388,17 @@ zio_checksum_error_impl(spa_t *spa, const blkptr_t *bp,
     enum zio_checksum checksum, abd_t *abd, uint64_t size,
     uint64_t offset, zio_bad_cksum_t *info)
 {
-	zio_checksum_info_t *ci = &zio_checksum_table[checksum];
+	zio_checksum_info_t *ci;
 	zio_cksum_t actual_cksum, expected_cksum;
 	zio_eck_t eck;
 	int byteswap;
 
-	if (checksum >= ZIO_CHECKSUM_FUNCTIONS || ci->ci_func[0] == NULL)
+	if (checksum >= ZIO_CHECKSUM_FUNCTIONS)
+		return (SET_ERROR(EINVAL));
+
+	ci = &zio_checksum_table[checksum];
+
+	if (ci->ci_func[0] == NULL)
 		return (SET_ERROR(EINVAL));
 
 	zio_checksum_template_init(checksum, spa);
