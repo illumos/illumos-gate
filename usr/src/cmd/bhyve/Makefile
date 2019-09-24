@@ -131,8 +131,6 @@ $(PROG) := LDLIBS += -lsocket -lnsl -ldlpi -ldladm -lmd -luuid -lvmmapi -lz
 $(ZHYVE_PROG) := LDLIBS += -lnvpair
 $(MEVENT_TEST_PROG) := LDLIBS += -lsocket
 
-POST_PROCESS += ; $(GENSETDEFS) $@
-
 .KEEP_STATE:
 
 all: $(PROG) $(MEVENT_TEST_PROG) $(ZHYVE_PROG) $(SUBDIRS)

@@ -23,7 +23,7 @@
 #
 # Copyright 2010, Richard Lowe
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 
 SHELL=/usr/bin/ksh93
 
@@ -49,7 +49,6 @@ SHFILES= \
 PERLFILES= \
 	check_rtime \
 	find_elf \
-	gensetdefs \
 	interface_check \
 	interface_cmp \
 	jstyle \

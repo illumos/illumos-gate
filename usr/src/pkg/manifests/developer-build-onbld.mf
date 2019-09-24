@@ -115,7 +115,6 @@ file path=opt/onbld/bin/find_elf mode=0555
 file path=opt/onbld/bin/findcrypto mode=0555
 file path=opt/onbld/bin/flg.flp mode=0555
 file path=opt/onbld/bin/genoffsets mode=0555
-file path=opt/onbld/bin/gensetdefs mode=0555
 file path=opt/onbld/bin/git-pbchk mode=0555
 file path=opt/onbld/bin/hdrchk mode=0555
 file path=opt/onbld/bin/interface_check mode=0555

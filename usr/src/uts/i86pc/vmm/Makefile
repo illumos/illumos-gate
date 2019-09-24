@@ -109,7 +109,7 @@ $(OBJS_DIR)/svm.o := CERRWARN += -_gcc=-Wno-pointer-sign -_gcc=-Wno-type-limits
 $(OBJS_DIR)/vmx.o := CERRWARN += -_gcc=-Wno-unused-variable
 $(OBJS_DIR)/iommu.o := CERRWARN += -_gcc=-Wno-unused-variable
 
-LDFLAGS         += -dy -N misc/acpica -N misc/pcie -N fs/dev
+LDFLAGS         += -N misc/acpica -N misc/pcie -N fs/dev -z type=kmod
 LDFLAGS         += -M $(MAPFILE)
 
 OFFSETS_VMX	= $(CONF_SRCDIR)/intel/offsets.in
@@ -119,9 +119,6 @@ ASSYM_SVM	= $(OBJS_DIR)/svm_assym.h
 ASSYM_H		= $(ASSYM_VMX) $(ASSYM_SVM)
 
 CLEANFILES	+= $(ASSYM_H)
-
-# create linker set start/stop symbols, needed by VMM stats
-POST_PROCESS	+= ; $(GENSETDEFS) $@
 
 #
 #	Default build targets.
