@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -43,6 +43,21 @@ smb2_setinfo_file(smb_request_t *sr, smb_setinfo_t *si, int InfoClass)
 	uint32_t status;
 
 	si->si_node = of->f_node;
+
+	/* Most info levels need a disk file */
+	switch (of->f_ftype) {
+	case SMB_FTYPE_DISK:
+	case SMB_FTYPE_PRINTER:
+		break;
+	case SMB_FTYPE_BYTE_PIPE:
+	case SMB_FTYPE_MESG_PIPE:
+		if (InfoClass != FilePipeInformation)
+			return (NT_STATUS_INVALID_PARAMETER);
+		break;
+	default:
+		return (NT_STATUS_INTERNAL_ERROR);
+		break;
+	}
 
 	switch (InfoClass) {
 	case FileBasicInformation:		/* 4 */

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -276,6 +276,9 @@ smb_set_by_path(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev)
 		    ERRDOS, ERROR_ACCESS_DENIED);
 		return (-1);
 	}
+
+	if (STYPE_ISIPC(sr->tid_tree->t_res_type))
+		return (0);
 
 	pn = &sr->arg.dirop.fqi.fq_path;
 	smb_pathname_init(sr, pn, pn->pn_path);
