@@ -124,6 +124,7 @@ dir path=opt/zfs-tests/tests/functional/large_files
 dir path=opt/zfs-tests/tests/functional/largest_pool
 dir path=opt/zfs-tests/tests/functional/libzfs
 dir path=opt/zfs-tests/tests/functional/link_count
+dir path=opt/zfs-tests/tests/functional/log_spacemap
 dir path=opt/zfs-tests/tests/functional/mdb
 dir path=opt/zfs-tests/tests/functional/migration
 dir path=opt/zfs-tests/tests/functional/mmap
@@ -2563,6 +2564,8 @@ file path=opt/zfs-tests/tests/functional/libzfs/many_fds mode=0555
 file path=opt/zfs-tests/tests/functional/link_count/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/link_count/link_count_001 mode=0555
 file path=opt/zfs-tests/tests/functional/link_count/setup mode=0555
+file path=opt/zfs-tests/tests/functional/log_spacemap/log_spacemap_import_logs \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/mdb/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/mdb/mdb_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/mdb/setup mode=0555

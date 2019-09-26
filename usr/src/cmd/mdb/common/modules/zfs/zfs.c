@@ -1465,6 +1465,9 @@ spa_print_config(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 
 typedef struct mdb_range_tree {
+	struct {
+		uint64_t avl_numnodes;
+	} rt_root;
 	uint64_t rt_space;
 } mdb_range_tree_t;
 
@@ -1486,6 +1489,8 @@ typedef struct mdb_metaslab {
 	uintptr_t ms_freeing;
 	uintptr_t ms_freed;
 	uintptr_t ms_allocatable;
+	uintptr_t ms_unflushed_frees;
+	uintptr_t ms_unflushed_allocs;
 	uintptr_t ms_sm;
 } mdb_metaslab_t;
 
@@ -1501,12 +1506,23 @@ typedef struct mdb_space_map {
 } mdb_space_map_t;
 
 typedef struct mdb_vdev {
-	uintptr_t vdev_path;
-	uintptr_t vdev_ms;
-	uintptr_t vdev_ops;
-	uint64_t vdev_ms_count;
 	uint64_t vdev_id;
-	vdev_stat_t vdev_stat;
+	uint64_t vdev_state;
+	uintptr_t vdev_ops;
+	struct {
+		uint64_t vs_aux;
+		uint64_t vs_ops[VS_ZIO_TYPES];
+		uint64_t vs_bytes[VS_ZIO_TYPES];
+		uint64_t vs_read_errors;
+		uint64_t vs_write_errors;
+		uint64_t vs_checksum_errors;
+	} vdev_stat;
+	uintptr_t vdev_child;
+	uint64_t vdev_children;
+	uint64_t vdev_ms_count;
+	uintptr_t vdev_mg;
+	uintptr_t vdev_ms;
+	uintptr_t vdev_path;
 } mdb_vdev_t;
 
 typedef struct mdb_vdev_ops {
@@ -1514,37 +1530,31 @@ typedef struct mdb_vdev_ops {
 } mdb_vdev_ops_t;
 
 static int
-metaslab_stats(uintptr_t addr, int spa_flags)
+metaslab_stats(mdb_vdev_t *vd, int spa_flags)
 {
-	mdb_vdev_t vdev;
-	uintptr_t *vdev_ms;
-
-	if (mdb_ctf_vread(&vdev, "vdev_t", "mdb_vdev_t",
-	    (uintptr_t)addr, 0) == -1) {
-		mdb_warn("failed to read vdev at %p\n", addr);
-		return (DCMD_ERR);
-	}
-
 	mdb_inc_indent(4);
-	mdb_printf("%<u>%-?s %6s %20s %10s %9s%</u>\n", "ADDR", "ID",
-	    "OFFSET", "FREE", "FRAGMENTATION");
+	mdb_printf("%<u>%-?s %6s %20s %10s %10s %10s%</u>\n", "ADDR", "ID",
+	    "OFFSET", "FREE", "FRAG", "UCMU");
 
-	vdev_ms = mdb_alloc(vdev.vdev_ms_count * sizeof (void *),
+	uintptr_t *vdev_ms = mdb_alloc(vd->vdev_ms_count * sizeof (vdev_ms),
 	    UM_SLEEP | UM_GC);
-	if (mdb_vread(vdev_ms, vdev.vdev_ms_count * sizeof (void *),
-	    (uintptr_t)vdev.vdev_ms) == -1) {
-		mdb_warn("failed to read vdev_ms at %p\n", vdev.vdev_ms);
+	if (mdb_vread(vdev_ms, vd->vdev_ms_count * sizeof (uintptr_t),
+	    vd->vdev_ms) == -1) {
+		mdb_warn("failed to read vdev_ms at %p\n", vd->vdev_ms);
 		return (DCMD_ERR);
 	}
 
-	for (int m = 0; m < vdev.vdev_ms_count; m++) {
+	for (int m = 0; m < vd->vdev_ms_count; m++) {
 		mdb_metaslab_t ms;
 		mdb_space_map_t sm = { 0 };
-		mdb_space_map_phys_t smp;
+		mdb_space_map_phys_t smp = { 0 };
+		mdb_range_tree_t rt;
+		uint64_t uallocs, ufrees, raw_free, raw_uchanges_mem;
 		char free[MDB_NICENUM_BUFLEN];
+		char uchanges_mem[MDB_NICENUM_BUFLEN];
 
 		if (mdb_ctf_vread(&ms, "metaslab_t", "mdb_metaslab_t",
-		    (uintptr_t)vdev_ms[m], 0) == -1)
+		    vdev_ms[m], 0) == -1)
 			return (DCMD_ERR);
 
 		if (ms.ms_sm != 0 &&
@@ -1552,25 +1562,40 @@ metaslab_stats(uintptr_t addr, int spa_flags)
 		    ms.ms_sm, 0) == -1)
 			return (DCMD_ERR);
 
-		if (sm.sm_phys != 0) {
+		if (mdb_ctf_vread(&rt, "range_tree_t", "mdb_range_tree_t",
+		    ms.ms_unflushed_frees, 0) == -1)
+			return (DCMD_ERR);
+		ufrees = rt.rt_space;
+		raw_uchanges_mem = rt.rt_root.avl_numnodes *
+		    mdb_ctf_sizeof_by_name("range_seg_t");
+
+		if (mdb_ctf_vread(&rt, "range_tree_t", "mdb_range_tree_t",
+		    ms.ms_unflushed_allocs, 0) == -1)
+			return (DCMD_ERR);
+		uallocs = rt.rt_space;
+		raw_uchanges_mem += rt.rt_root.avl_numnodes *
+		    mdb_ctf_sizeof_by_name("range_seg_t");
+		mdb_nicenum(raw_uchanges_mem, uchanges_mem);
+
+		raw_free = ms.ms_size;
+		if (ms.ms_sm != 0 && sm.sm_phys != 0) {
 			(void) mdb_ctf_vread(&smp, "space_map_phys_t",
 			    "mdb_space_map_phys_t", sm.sm_phys, 0);
-			mdb_nicenum(ms.ms_size - smp.smp_alloc, free);
-		} else {
-			(void) mdb_snprintf(free, MDB_NICENUM_BUFLEN, "-");
+			raw_free -= smp.smp_alloc;
 		}
+		raw_free += ufrees - uallocs;
+		mdb_nicenum(raw_free, free);
 
 		mdb_printf("%0?p %6llu %20llx %10s ", vdev_ms[m], ms.ms_id,
 		    ms.ms_start, free);
 		if (ms.ms_fragmentation == ZFS_FRAG_INVALID)
-			mdb_printf("%9s\n", "-");
+			mdb_printf("%9s ", "-");
 		else
-			mdb_printf("%9llu%%\n", ms.ms_fragmentation);
+			mdb_printf("%9llu%% ", ms.ms_fragmentation);
+		mdb_printf("%10s\n", uchanges_mem);
 
-		if ((spa_flags & SPA_FLAG_HISTOGRAMS) && ms.ms_sm != 0) {
-			if (sm.sm_phys == 0)
-				continue;
-
+		if ((spa_flags & SPA_FLAG_HISTOGRAMS) && ms.ms_sm != 0 &&
+		    sm.sm_phys != 0) {
 			dump_histogram(smp.smp_histogram,
 			    SPACE_MAP_HISTOGRAM_SIZE, sm.sm_shift);
 		}
@@ -1580,21 +1605,56 @@ metaslab_stats(uintptr_t addr, int spa_flags)
 }
 
 static int
-metaslab_group_stats(uintptr_t addr, int spa_flags)
+metaslab_group_stats(mdb_vdev_t *vd, int spa_flags)
 {
 	mdb_metaslab_group_t mg;
 	if (mdb_ctf_vread(&mg, "metaslab_group_t", "mdb_metaslab_group_t",
-	    (uintptr_t)addr, 0) == -1) {
-		mdb_warn("failed to read vdev_mg at %p\n", addr);
+	    vd->vdev_mg, 0) == -1) {
+		mdb_warn("failed to read vdev_mg at %p\n", vd->vdev_mg);
 		return (DCMD_ERR);
 	}
 
 	mdb_inc_indent(4);
-	mdb_printf("%<u>%-?s %15s%</u>\n", "ADDR", "FRAGMENTATION");
+	mdb_printf("%<u>%-?s %7s %9s%</u>\n", "ADDR", "FRAG", "UCMU");
+
 	if (mg.mg_fragmentation == ZFS_FRAG_INVALID)
-		mdb_printf("%0?p %15s\n", addr, "-");
+		mdb_printf("%0?p %6s\n", vd->vdev_mg, "-");
 	else
-		mdb_printf("%0?p %15llu%%\n", addr, mg.mg_fragmentation);
+		mdb_printf("%0?p %6llu%%", vd->vdev_mg, mg.mg_fragmentation);
+
+
+	uintptr_t *vdev_ms = mdb_alloc(vd->vdev_ms_count * sizeof (vdev_ms),
+	    UM_SLEEP | UM_GC);
+	if (mdb_vread(vdev_ms, vd->vdev_ms_count * sizeof (uintptr_t),
+	    vd->vdev_ms) == -1) {
+		mdb_warn("failed to read vdev_ms at %p\n", vd->vdev_ms);
+		return (DCMD_ERR);
+	}
+
+	uint64_t raw_uchanges_mem = 0;
+	char uchanges_mem[MDB_NICENUM_BUFLEN];
+	for (int m = 0; m < vd->vdev_ms_count; m++) {
+		mdb_metaslab_t ms;
+		mdb_range_tree_t rt;
+
+		if (mdb_ctf_vread(&ms, "metaslab_t", "mdb_metaslab_t",
+		    vdev_ms[m], 0) == -1)
+			return (DCMD_ERR);
+
+		if (mdb_ctf_vread(&rt, "range_tree_t", "mdb_range_tree_t",
+		    ms.ms_unflushed_frees, 0) == -1)
+			return (DCMD_ERR);
+		raw_uchanges_mem +=
+		    rt.rt_root.avl_numnodes * sizeof (range_seg_t);
+
+		if (mdb_ctf_vread(&rt, "range_tree_t", "mdb_range_tree_t",
+		    ms.ms_unflushed_allocs, 0) == -1)
+			return (DCMD_ERR);
+		raw_uchanges_mem +=
+		    rt.rt_root.avl_numnodes * sizeof (range_seg_t);
+	}
+	mdb_nicenum(raw_uchanges_mem, uchanges_mem);
+	mdb_printf("%10s\n", uchanges_mem);
 
 	if (spa_flags & SPA_FLAG_HISTOGRAMS)
 		dump_histogram(mg.mg_histogram, RANGE_TREE_HISTOGRAM_SIZE, 0);
@@ -1618,33 +1678,28 @@ static int
 do_print_vdev(uintptr_t addr, int flags, int depth, boolean_t recursive,
     int spa_flags)
 {
-	vdev_t vdev;
-	char desc[MAXNAMELEN];
-	int c, children;
-	uintptr_t *child;
-	const char *state, *aux;
-
-	if (mdb_vread(&vdev, sizeof (vdev), (uintptr_t)addr) == -1) {
-		mdb_warn("failed to read vdev_t at %p\n", (uintptr_t)addr);
+	mdb_vdev_t vd;
+	if (mdb_ctf_vread(&vd, "vdev_t", "mdb_vdev_t",
+	    (uintptr_t)addr, 0) == -1)
 		return (DCMD_ERR);
-	}
 
 	if (flags & DCMD_PIPE_OUT) {
 		mdb_printf("%#lr\n", addr);
 	} else {
-		if (vdev.vdev_path != NULL) {
+		char desc[MAXNAMELEN];
+		if (vd.vdev_path != 0) {
 			if (mdb_readstr(desc, sizeof (desc),
-			    (uintptr_t)vdev.vdev_path) == -1) {
+			    (uintptr_t)vd.vdev_path) == -1) {
 				mdb_warn("failed to read vdev_path at %p\n",
-				    vdev.vdev_path);
+				    vd.vdev_path);
 				return (DCMD_ERR);
 			}
-		} else if (vdev.vdev_ops != NULL) {
+		} else if (vd.vdev_ops != 0) {
 			vdev_ops_t ops;
 			if (mdb_vread(&ops, sizeof (ops),
-			    (uintptr_t)vdev.vdev_ops) == -1) {
+			    (uintptr_t)vd.vdev_ops) == -1) {
 				mdb_warn("failed to read vdev_ops at %p\n",
-				    vdev.vdev_ops);
+				    vd.vdev_ops);
 				return (DCMD_ERR);
 			}
 			(void) strcpy(desc, ops.vdev_op_type);
@@ -1660,7 +1715,8 @@ do_print_vdev(uintptr_t addr, int flags, int depth, boolean_t recursive,
 
 		mdb_printf("%0?p ", addr);
 
-		switch (vdev.vdev_state) {
+		const char *state, *aux;
+		switch (vd.vdev_state) {
 		case VDEV_STATE_CLOSED:
 			state = "CLOSED";
 			break;
@@ -1687,7 +1743,7 @@ do_print_vdev(uintptr_t addr, int flags, int depth, boolean_t recursive,
 			break;
 		}
 
-		switch (vdev.vdev_stat.vs_aux) {
+		switch (vd.vdev_stat.vs_aux) {
 		case VDEV_AUX_NONE:
 			aux = "-";
 			break;
@@ -1747,7 +1803,6 @@ do_print_vdev(uintptr_t addr, int flags, int depth, boolean_t recursive,
 		mdb_printf("%-9s %-12s %*s%s\n", state, aux, depth, "", desc);
 
 		if (spa_flags & SPA_FLAG_ERRORS) {
-			vdev_stat_t *vs = &vdev.vdev_stat;
 			int i;
 
 			mdb_inc_indent(4);
@@ -1756,48 +1811,50 @@ do_print_vdev(uintptr_t addr, int flags, int depth, boolean_t recursive,
 			    "%12s%</u>\n", "READ", "WRITE", "FREE", "CLAIM",
 			    "IOCTL");
 			mdb_printf("OPS     ");
-			for (i = 1; i < ZIO_TYPES; i++)
-				mdb_printf("%11#llx%s", vs->vs_ops[i],
-				    i == ZIO_TYPES - 1 ? "" : "  ");
+			for (i = 1; i < VS_ZIO_TYPES; i++)
+				mdb_printf("%11#llx%s",
+				    vd.vdev_stat.vs_ops[i],
+				    i == VS_ZIO_TYPES - 1 ? "" : "  ");
 			mdb_printf("\n");
 			mdb_printf("BYTES   ");
-			for (i = 1; i < ZIO_TYPES; i++)
-				mdb_printf("%11#llx%s", vs->vs_bytes[i],
-				    i == ZIO_TYPES - 1 ? "" : "  ");
+			for (i = 1; i < VS_ZIO_TYPES; i++)
+				mdb_printf("%11#llx%s",
+				    vd.vdev_stat.vs_bytes[i],
+				    i == VS_ZIO_TYPES - 1 ? "" : "  ");
 
 
 			mdb_printf("\n");
-			mdb_printf("EREAD    %10#llx\n", vs->vs_read_errors);
-			mdb_printf("EWRITE   %10#llx\n", vs->vs_write_errors);
+			mdb_printf("EREAD    %10#llx\n",
+			    vd.vdev_stat.vs_read_errors);
+			mdb_printf("EWRITE   %10#llx\n",
+			    vd.vdev_stat.vs_write_errors);
 			mdb_printf("ECKSUM   %10#llx\n",
-			    vs->vs_checksum_errors);
+			    vd.vdev_stat.vs_checksum_errors);
 			mdb_dec_indent(4);
 			mdb_printf("\n");
 		}
 
-		if (spa_flags & SPA_FLAG_METASLAB_GROUPS &&
-		    vdev.vdev_mg != NULL) {
-			metaslab_group_stats((uintptr_t)vdev.vdev_mg,
-			    spa_flags);
+		if ((spa_flags & SPA_FLAG_METASLAB_GROUPS) &&
+		    vd.vdev_mg != 0) {
+			metaslab_group_stats(&vd, spa_flags);
 		}
-		if (spa_flags & SPA_FLAG_METASLABS && vdev.vdev_ms != NULL) {
-			metaslab_stats((uintptr_t)addr, spa_flags);
+		if ((spa_flags & SPA_FLAG_METASLABS) && vd.vdev_ms != 0) {
+			metaslab_stats(&vd, spa_flags);
 		}
 	}
 
-	children = vdev.vdev_children;
-
+	uint64_t children = vd.vdev_children;
 	if (children == 0 || !recursive)
 		return (DCMD_OK);
 
-	child = mdb_alloc(children * sizeof (void *), UM_SLEEP | UM_GC);
-	if (mdb_vread(child, children * sizeof (void *),
-	    (uintptr_t)vdev.vdev_child) == -1) {
-		mdb_warn("failed to read vdev children at %p", vdev.vdev_child);
+	uintptr_t *child = mdb_alloc(children * sizeof (child),
+	    UM_SLEEP | UM_GC);
+	if (mdb_vread(child, children * sizeof (void *), vd.vdev_child) == -1) {
+		mdb_warn("failed to read vdev children at %p", vd.vdev_child);
 		return (DCMD_ERR);
 	}
 
-	for (c = 0; c < children; c++) {
+	for (uint64_t c = 0; c < children; c++) {
 		if (do_print_vdev(child[c], flags, depth + 2, recursive,
 		    spa_flags)) {
 			return (DCMD_ERR);
@@ -2111,9 +2168,11 @@ typedef struct space_data {
 	uint64_t ms_checkpointing;
 	uint64_t ms_freeing;
 	uint64_t ms_freed;
+	uint64_t ms_unflushed_frees;
+	uint64_t ms_unflushed_allocs;
 	uint64_t ms_allocatable;
 	int64_t ms_deferspace;
-	uint64_t nowavail;
+	uint64_t avail;
 } space_data_t;
 
 /* ARGSUSED */
@@ -2125,6 +2184,7 @@ space_cb(uintptr_t addr, const void *unknown, void *arg)
 	mdb_range_tree_t rt;
 	mdb_space_map_t sm = { 0 };
 	mdb_space_map_phys_t smp = { 0 };
+	uint64_t uallocs, ufrees;
 	int i;
 
 	if (mdb_ctf_vread(&ms, "metaslab_t", "mdb_metaslab_t",
@@ -2135,9 +2195,7 @@ space_cb(uintptr_t addr, const void *unknown, void *arg)
 		if (mdb_ctf_vread(&rt, "range_tree_t",
 		    "mdb_range_tree_t", ms.ms_allocating[i], 0) == -1)
 			return (WALK_ERR);
-
 		sd->ms_allocating[i] += rt.rt_space;
-
 	}
 
 	if (mdb_ctf_vread(&rt, "range_tree_t",
@@ -2160,6 +2218,18 @@ space_cb(uintptr_t addr, const void *unknown, void *arg)
 		return (WALK_ERR);
 	sd->ms_allocatable += rt.rt_space;
 
+	if (mdb_ctf_vread(&rt, "range_tree_t",
+	    "mdb_range_tree_t", ms.ms_unflushed_frees, 0) == -1)
+		return (WALK_ERR);
+	sd->ms_unflushed_frees += rt.rt_space;
+	ufrees = rt.rt_space;
+
+	if (mdb_ctf_vread(&rt, "range_tree_t",
+	    "mdb_range_tree_t", ms.ms_unflushed_allocs, 0) == -1)
+		return (WALK_ERR);
+	sd->ms_unflushed_allocs += rt.rt_space;
+	uallocs = rt.rt_space;
+
 	if (ms.ms_sm != 0 &&
 	    mdb_ctf_vread(&sm, "space_map_t",
 	    "mdb_space_map_t", ms.ms_sm, 0) == -1)
@@ -2171,7 +2241,7 @@ space_cb(uintptr_t addr, const void *unknown, void *arg)
 	}
 
 	sd->ms_deferspace += ms.ms_deferspace;
-	sd->nowavail += sm.sm_size - smp.smp_alloc;
+	sd->avail += sm.sm_size - smp.smp_alloc + ufrees - uallocs;
 
 	return (WALK_NEXT);
 }
@@ -2251,12 +2321,16 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    sd.ms_freeing >> shift, suffix);
 	mdb_printf("ms_freed = %llu%s\n",
 	    sd.ms_freed >> shift, suffix);
+	mdb_printf("ms_unflushed_frees = %llu%s\n",
+	    sd.ms_unflushed_frees >> shift, suffix);
+	mdb_printf("ms_unflushed_allocs = %llu%s\n",
+	    sd.ms_unflushed_allocs >> shift, suffix);
 	mdb_printf("ms_allocatable = %llu%s\n",
 	    sd.ms_allocatable >> shift, suffix);
 	mdb_printf("ms_deferspace = %llu%s\n",
 	    sd.ms_deferspace >> shift, suffix);
-	mdb_printf("current syncing avail = %llu%s\n",
-	    sd.nowavail >> shift, suffix);
+	mdb_printf("current avail = %llu%s\n",
+	    sd.avail >> shift, suffix);
 
 	return (DCMD_OK);
 }
@@ -4096,6 +4170,121 @@ out:
 	return (rc);
 }
 
+typedef struct mdb_range_seg {
+	uint64_t rs_start;
+	uint64_t rs_end;
+} mdb_range_seg_t;
+
+/* ARGSUSED */
+static int
+range_tree_cb(uintptr_t addr, const void *unknown, void *arg)
+{
+	mdb_range_seg_t rs;
+
+	if (mdb_ctf_vread(&rs, ZFS_STRUCT "range_seg", "mdb_range_seg_t",
+	    addr, 0) == -1)
+		return (DCMD_ERR);
+
+	mdb_printf("\t[%llx %llx) (length %llx)\n",
+	    rs.rs_start, rs.rs_end, rs.rs_end - rs.rs_start);
+
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+range_tree(uintptr_t addr, uint_t flags, int argc,
+    const mdb_arg_t *argv)
+{
+	mdb_range_tree_t rt;
+	uintptr_t avl_addr;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_ctf_vread(&rt, ZFS_STRUCT "range_tree", "mdb_range_tree_t",
+	    addr, 0) == -1)
+		return (DCMD_ERR);
+
+	mdb_printf("%p: range tree of %llu entries, %llu bytes\n",
+	    addr, rt.rt_root.avl_numnodes, rt.rt_space);
+
+	avl_addr = addr +
+	    mdb_ctf_offsetof_by_name(ZFS_STRUCT "range_tree", "rt_root");
+
+	if (mdb_pwalk("avl", range_tree_cb, NULL, avl_addr) != 0) {
+		mdb_warn("can't walk range_tree segments");
+		return (DCMD_ERR);
+	}
+	return (DCMD_OK);
+}
+
+typedef struct mdb_spa_log_sm {
+	uint64_t sls_sm_obj;
+	uint64_t sls_txg;
+	uint64_t sls_nblocks;
+	uint64_t sls_mscount;
+} mdb_spa_log_sm_t;
+
+/* ARGSUSED */
+static int
+logsm_stats_cb(uintptr_t addr, const void *unknown, void *arg)
+{
+	mdb_spa_log_sm_t sls;
+	if (mdb_ctf_vread(&sls, ZFS_STRUCT "spa_log_sm", "mdb_spa_log_sm_t",
+	    addr, 0) == -1)
+		return (WALK_ERR);
+
+	mdb_printf("%7lld %7lld %7lld %7lld\n",
+	    sls.sls_txg, sls.sls_nblocks, sls.sls_mscount, sls.sls_sm_obj);
+
+	return (WALK_NEXT);
+}
+typedef struct mdb_log_summary_entry {
+	uint64_t lse_start;
+	uint64_t lse_blkcount;
+	uint64_t lse_mscount;
+} mdb_log_summary_entry_t;
+
+/* ARGSUSED */
+static int
+logsm_summary_cb(uintptr_t addr, const void *unknown, void *arg)
+{
+	mdb_log_summary_entry_t lse;
+	if (mdb_ctf_vread(&lse, ZFS_STRUCT "log_summary_entry",
+	    "mdb_log_summary_entry_t", addr, 0) == -1)
+		return (WALK_ERR);
+
+	mdb_printf("%7lld %7lld %7lld\n",
+	    lse.lse_start, lse.lse_blkcount, lse.lse_mscount);
+	return (WALK_NEXT);
+}
+
+/* ARGSUSED */
+static int
+logsm_stats(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	uintptr_t sls_avl_addr = addr +
+	    mdb_ctf_offsetof_by_name(ZFS_STRUCT "spa", "spa_sm_logs_by_txg");
+	uintptr_t summary_addr = addr +
+	    mdb_ctf_offsetof_by_name(ZFS_STRUCT "spa", "spa_log_summary");
+
+	mdb_printf("Log Entries:\n");
+	mdb_printf("%7s %7s %7s %7s\n", "txg", "blk", "ms", "obj");
+	if (mdb_pwalk("avl", logsm_stats_cb, NULL, sls_avl_addr) != 0)
+		return (DCMD_ERR);
+
+	mdb_printf("\nSummary Entries:\n");
+	mdb_printf("%7s %7s %7s\n", "txg", "blk", "ms");
+	if (mdb_pwalk("list", logsm_summary_cb, NULL, summary_addr) != 0)
+		return (DCMD_ERR);
+
+	return (DCMD_OK);
+}
+
 /*
  * MDB module linkage information:
  *
@@ -4117,6 +4306,8 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "abuf_find", "dva_word[0] dva_word[1]",
 	    "find arc_buf_hdr_t of a specified DVA",
 	    abuf_find },
+	{ "logsm_stats", ":", "print log space map statistics of a spa_t",
+	    logsm_stats},
 	{ "spa", "?[-cevmMh]\n"
 	    "\t-c display spa config\n"
 	    "\t-e display vdev statistics\n"
@@ -4182,6 +4373,8 @@ static const mdb_dcmd_t dcmds[] = {
 	    "\t-b display histogram of buffer counts\n",
 	    "print a histogram of compressed arc buffer sizes",
 	    arc_compression_stats},
+	{ "range_tree", ":",
+	    "print entries in range_tree_t", range_tree},
 	{ NULL }
 };
 

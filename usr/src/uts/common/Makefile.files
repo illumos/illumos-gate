@@ -1413,6 +1413,7 @@ ZFS_COMMON_OBJS +=		\
 	spa_config.o		\
 	spa_errlog.o		\
 	spa_history.o		\
+	spa_log_spacemap.o	\
 	spa_misc.o		\
 	space_map.o		\
 	space_reftree.o		\

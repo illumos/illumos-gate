@@ -32,6 +32,7 @@
  * Copyright (c) 2019, loli10K <ezomori.nozomu@gmail.com>
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2012 by Cyril Plisko. All rights reserved.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <assert.h>
@@ -3229,6 +3230,7 @@ print_vdev_stats(zpool_handle_t *zhp, const char *name, nvlist_t *oldnv,
 	 * print all other top-level devices
 	 */
 	for (uint_t n = 0; n < 3; n++) {
+		boolean_t printed = B_FALSE;
 		for (c = 0; c < children; c++) {
 			uint64_t islog = B_FALSE;
 			char *bias = NULL;
@@ -3248,6 +3250,17 @@ print_vdev_stats(zpool_handle_t *zhp, const char *name, nvlist_t *oldnv,
 				continue;
 			if (!islog && strcmp(type, VDEV_TYPE_INDIRECT) == 0)
 				continue;
+
+			if (!printed) {
+				if (!cb->cb_scripted) {
+					(void) printf(
+					    "%-*s      -      -      -      -"
+					    "      -      -",
+					    cb->cb_namewidth, class_name[n]);
+				}
+				printf("\n");
+				printed = B_TRUE;
+			}
 
 			vname = zpool_vdev_name(g_zfs, zhp, newchild[c],
 			    cb->cb_name_flags);
