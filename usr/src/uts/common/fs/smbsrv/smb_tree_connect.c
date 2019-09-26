@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -315,6 +315,7 @@ smb_com_tree_connect_andx(smb_request_t *sr)
 		if (tree != NULL) {
 			smb_tree_disconnect(tree, B_TRUE);
 			smb_session_cancel_requests(sr->session, tree, sr);
+			smb_tree_release(tree);
 		}
 	}
 
