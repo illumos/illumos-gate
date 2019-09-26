@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2007-2008
- * 	Swinburne University of Technology, Melbourne, Australia.
+ *	Swinburne University of Technology, Melbourne, Australia.
  * Copyright (c) 2009-2010 Lawrence Stewart <lstewart@freebsd.org>
  * Copyright (c) 2010 The FreeBSD Foundation
  * All rights reserved.
@@ -51,6 +51,8 @@
 
 #ifndef _NETINET_CC_H_
 #define	_NETINET_CC_H_
+
+#if (defined(_KERNEL) || defined(_KMEMUSER))
 
 #ifdef	__cplusplus
 extern "C" {
@@ -210,5 +212,7 @@ extern int	cc_walk_algos(cc_walk_func_t *, void *);
 #ifdef	__cplusplus
 }
 #endif
+
+#endif	/* (defined(_KERNEL) || defined(_KMEMUSER)) */
 
 #endif /* _NETINET_CC_H_ */

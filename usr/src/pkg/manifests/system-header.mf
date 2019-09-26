@@ -402,6 +402,7 @@ file path=usr/include/idmap.h
 file path=usr/include/ieeefp.h
 file path=usr/include/ifaddrs.h
 file path=usr/include/inet/arp.h
+file path=usr/include/inet/cc.h
 file path=usr/include/inet/common.h
 file path=usr/include/inet/ip.h
 file path=usr/include/inet/ip6.h
