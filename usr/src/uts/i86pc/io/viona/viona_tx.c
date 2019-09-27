@@ -283,6 +283,7 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 
 	ASSERT(MUTEX_HELD(&ring->vr_lock));
 
+	ring->vr_state = VRS_STOP;
 	viona_tx_wait_outstanding(ring);
 }
 

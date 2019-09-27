@@ -389,6 +389,8 @@ viona_worker(void *arg)
 		panic("unexpected ring: %p", (void *)ring);
 	}
 
+	VERIFY3U(ring->vr_state, ==, VRS_STOP);
+
 cleanup:
 	if (ring->vr_txdesb != NULL) {
 		/*

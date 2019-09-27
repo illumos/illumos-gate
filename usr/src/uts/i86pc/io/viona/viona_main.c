@@ -133,8 +133,14 @@
  *  +-----------+
  *        |						^
  *        |---* ioctl(VNA_IOC_RING_RESET) issued	|
- *        |	(or bhyve process begins exit)		|
- *        V						|
+ *        |	(or bhyve process begins exit)		^
+ *        |
+ *  +-----------+	The worker thread associated with the ring is in the
+ *  | VRS_STOP  |	process of exiting. All outstanding TX and RX
+ *  +-----------+	requests are allowed to complete, but new requests
+ *        |		must be ignored.
+ *        |						^
+ *        |						|
  *        +-------------------------------------------->+
  *
  *

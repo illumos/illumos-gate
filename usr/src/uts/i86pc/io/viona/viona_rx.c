@@ -123,6 +123,17 @@ viona_worker_rx(viona_vring_t *ring, viona_link_t *link)
 		(void) cv_wait_sig(&ring->vr_cv, &ring->vr_lock);
 	} while (!VRING_NEED_BAIL(ring, p));
 
+	ring->vr_state = VRS_STOP;
+
+	/*
+	 * The RX ring is stopping, before we start tearing it down it
+	 * is imperative that we perform an RX barrier so that
+	 * incoming packets are dropped at viona_rx_classified().
+	 */
+	mutex_exit(&ring->vr_lock);
+	mac_rx_barrier(link->l_mch);
+	mutex_enter(&ring->vr_lock);
+
 	*ring->vr_used_flags &= ~VRING_USED_F_NO_NOTIFY;
 }
 

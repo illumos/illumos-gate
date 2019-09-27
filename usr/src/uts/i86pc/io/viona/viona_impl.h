@@ -70,6 +70,7 @@ enum viona_ring_state {
 	VRS_SETUP	= 0x1,	/* addrs setup and starting worker thread */
 	VRS_INIT	= 0x2,	/* worker thread started & waiting to run */
 	VRS_RUN		= 0x3,	/* running work routine */
+	VRS_STOP	= 0x4,	/* worker is exiting */
 };
 enum viona_ring_state_flags {
 	VRSF_REQ_START	= 0x1,	/* start running from INIT state */
