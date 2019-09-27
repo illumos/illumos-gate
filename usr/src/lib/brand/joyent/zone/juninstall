@@ -15,11 +15,9 @@
 # Copyright (c) 2014 Joyent, Inc.  All rights reserved.
 #
 
-. /usr/lib/brand/jcommon/libhooks.ksh
-
 function jcommon_uninstall_hook
 {
-	juninstall_delegated_dataset
+	:
 }
 
 . /usr/lib/brand/jcommon/cuninstall
