@@ -1461,54 +1461,67 @@ ict_siocgifconf32(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	lx_ifconf32_t	conf;
 	lx_ifreq32_t	*oreq;
 	struct ifconf	sconf;
-	int		ifcount, error, i, buf_len;
+	int		ifcount, error, i;
+	size_t		native_len, lx_len;
 
 	if (copyin((lx_ifconf32_t *)arg, &conf, sizeof (conf)) != 0)
 		return (set_errno(EFAULT));
 
+	/*
+	 * First, figure out how many interfaces exist so that kmem allocations
+	 * are no larger than needed.
+	 */
+	error = ict_if_ioctl(fp->f_vnode, SIOCGIFNUM, (intptr_t)&ifcount,
+	    FLFAKE(fp), fp->f_cred);
+	if (error != 0) {
+		return (set_errno(error));
+	}
+
 	/* They want to know how many interfaces there are. */
 	if (conf.if_len <= 0 || conf.if_buf == (uint32_t)(uintptr_t)NULL) {
-		error = ict_if_ioctl(fp->f_vnode, SIOCGIFNUM,
-		    (intptr_t)&ifcount, FLFAKE(fp), fp->f_cred);
-		if (error != 0)
-			return (set_errno(error));
-
 		conf.if_len = ifcount * sizeof (lx_ifreq32_t);
 
 		if (copyout(&conf, (lx_ifconf32_t *)arg, sizeof (conf)) != 0)
 			return (set_errno(EFAULT));
 		return (0);
-	} else {
-		ifcount = conf.if_len / sizeof (lx_ifreq32_t);
 	}
 
+	ifcount = MIN(ifcount, conf.if_len / sizeof (lx_ifreq32_t));
+
 	/* Get interface configuration list. */
-	sconf.ifc_len = ifcount * sizeof (struct ifreq);
+	native_len = ifcount * sizeof (struct ifreq);
+	sconf.ifc_len = native_len;
 	sconf.ifc_req = (struct ifreq *)kmem_alloc(sconf.ifc_len, KM_SLEEP);
 
 	error = ict_if_ioctl(fp->f_vnode, cmd, (intptr_t)&sconf, FLFAKE(fp),
 	    fp->f_cred);
 	if (error != 0) {
-		kmem_free(sconf.ifc_req, ifcount * sizeof (struct ifreq));
+		kmem_free(sconf.ifc_req, native_len);
 		return (set_errno(error));
 	}
+	/* Recalculate in case a nic was removed between ict_if_ioctl calls. */
+	ifcount = sconf.ifc_len / sizeof (struct ifreq);
 
 	/* Convert data to Linux format & rename interfaces */
-	buf_len = ifcount * sizeof (lx_ifreq32_t);
-	oreq = (lx_ifreq32_t *)kmem_alloc(buf_len, KM_SLEEP);
-	for (i = 0; i < sconf.ifc_len / sizeof (struct ifreq); i++) {
+	lx_len = ifcount * sizeof (lx_ifreq32_t);
+	oreq = (lx_ifreq32_t *)kmem_alloc(lx_len, KM_SLEEP);
+	for (i = 0; i < ifcount; i++) {
+		/*
+		 * struct ifreq and lx_ifreq32_t are the same size, unlike the
+		 * 64-bit version of this function.
+		 */
 		bcopy(&sconf.ifc_req[i], oreq + i, sizeof (lx_ifreq32_t));
 		lx_ifname_convert(oreq[i].ifr_name, LX_IF_FROMNATIVE);
 	}
-	conf.if_len = i * sizeof (*oreq);
-	kmem_free(sconf.ifc_req, ifcount * sizeof (struct ifreq));
+	conf.if_len = lx_len;
+	kmem_free(sconf.ifc_req, native_len);
 
 	error = 0;
 	if (copyout(oreq, (caddr_t)(uintptr_t)conf.if_buf, conf.if_len) != 0 ||
 	    copyout(&conf, (lx_ifconf32_t *)arg, sizeof (conf)) != 0)
 		error = set_errno(EFAULT);
 
-	kmem_free(oreq, buf_len);
+	kmem_free(oreq, lx_len);
 	return (error);
 }
 
@@ -1519,54 +1532,69 @@ ict_siocgifconf64(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 	lx_ifconf64_t	conf;
 	lx_ifreq64_t	*oreq;
 	struct ifconf	sconf;
-	int		ifcount, error, i, buf_len;
+	int		ifcount, error, i;
+	size_t		native_len, lx_len;
 
 	if (copyin((lx_ifconf64_t *)arg, &conf, sizeof (conf)) != 0)
 		return (set_errno(EFAULT));
 
+	/*
+	 * First, figure out how many interfaces exist so that kmem allocations
+	 * are no larger than needed.
+	 */
+	error = ict_if_ioctl(fp->f_vnode, SIOCGIFNUM, (intptr_t)&ifcount,
+	    FLFAKE(fp), fp->f_cred);
+	if (error != 0) {
+		return (set_errno(error));
+	}
+
 	/* They want to know how many interfaces there are. */
 	if (conf.if_len <= 0 || conf.if_buf == NULL) {
-		error = ict_if_ioctl(fp->f_vnode, SIOCGIFNUM,
-		    (intptr_t)&ifcount, FLFAKE(fp), fp->f_cred);
-		if (error != 0)
-			return (set_errno(error));
-
 		conf.if_len = ifcount * sizeof (lx_ifreq64_t);
 
 		if (copyout(&conf, (lx_ifconf64_t *)arg, sizeof (conf)) != 0)
 			return (set_errno(EFAULT));
 		return (0);
-	} else {
-		ifcount = conf.if_len / sizeof (lx_ifreq64_t);
 	}
 
+	ifcount = MIN(ifcount, conf.if_len / sizeof (lx_ifreq64_t));
+
 	/* Get interface configuration list. */
-	sconf.ifc_len = ifcount * sizeof (struct ifreq);
+	native_len = ifcount * sizeof (struct ifreq);
+	sconf.ifc_len = native_len;
 	sconf.ifc_req = (struct ifreq *)kmem_alloc(sconf.ifc_len, KM_SLEEP);
 
 	error = ict_if_ioctl(fp->f_vnode, cmd, (intptr_t)&sconf, FLFAKE(fp),
 	    fp->f_cred);
 	if (error != 0) {
-		kmem_free(sconf.ifc_req, ifcount * sizeof (struct ifreq));
+		kmem_free(sconf.ifc_req, native_len);
 		return (set_errno(error));
 	}
+	/* Recalculate in case a nic was removed between ict_if_ioctl calls. */
+	ifcount = sconf.ifc_len / sizeof (struct ifreq);
 
 	/* Convert data to Linux format & rename interfaces */
-	buf_len = ifcount * sizeof (lx_ifreq64_t);
-	oreq = (lx_ifreq64_t *)kmem_alloc(buf_len, KM_SLEEP);
-	for (i = 0; i < sconf.ifc_len / sizeof (struct ifreq); i++) {
-		bcopy(&sconf.ifc_req[i], oreq + i, sizeof (lx_ifreq64_t));
+	lx_len = ifcount * sizeof (lx_ifreq64_t);
+	oreq = (lx_ifreq64_t *)kmem_zalloc(lx_len, KM_SLEEP);
+	for (i = 0; i < ifcount; i++) {
+		/*
+		 * struct ifreq and lx_ifreq64_t start with common elements.
+		 * Anything after that is padding, which is zeroed with
+		 * kmem_zalloc above.
+		 */
+		bcopy(&sconf.ifc_req[i], oreq + i, sizeof (oreq->ifr_name) +
+		    sizeof (oreq->ifr_ifrn.ifru_addr));
 		lx_ifname_convert(oreq[i].ifr_name, LX_IF_FROMNATIVE);
 	}
-	conf.if_len = i * sizeof (*oreq);
-	kmem_free(sconf.ifc_req, ifcount * sizeof (struct ifreq));
+	conf.if_len = lx_len;
+	kmem_free(sconf.ifc_req, native_len);
 
 	error = 0;
 	if (copyout(oreq, (caddr_t)(uintptr_t)conf.if_buf, conf.if_len) != 0 ||
 	    copyout(&conf, (lx_ifconf64_t *)arg, sizeof (conf)) != 0)
 		error = set_errno(EFAULT);
 
-	kmem_free(oreq, buf_len);
+	kmem_free(oreq, lx_len);
 	return (error);
 }
 
