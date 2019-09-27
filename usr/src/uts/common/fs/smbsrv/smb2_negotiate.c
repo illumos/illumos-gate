@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 RackTop Systems.
  */
 
 /*
@@ -22,6 +23,7 @@
 
 static int smb2_negotiate_common(smb_request_t *, uint16_t);
 
+/* List of supported capabilities.  Can be patched for testing. */
 uint32_t smb2srv_capabilities =
 	SMB2_CAP_DFS |
 	SMB2_CAP_LEASING |
@@ -363,7 +365,10 @@ smb2_negotiate_common(smb_request_t *sr, uint16_t version)
 	 * One additional check: If KCF is missing something we
 	 * require for encryption, turn off that capability.
 	 */
-	if (s->dialect < SMB_VERS_3_0) {
+	if (s->dialect < SMB_VERS_2_1) {
+		/* SMB 2.002 */
+		s->srv_cap = smb2srv_capabilities & SMB2_CAP_DFS;
+	} else if (s->dialect < SMB_VERS_3_0) {
 		/* SMB 2.x */
 		s->srv_cap = smb2srv_capabilities & SMB_2X_CAPS;
 	} else {
