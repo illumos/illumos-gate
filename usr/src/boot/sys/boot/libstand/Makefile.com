@@ -26,6 +26,9 @@ $(LIBRARY): $(SRCS) $(OBJS)
 include $(SASRC)/Makefile.inc
 include $(ZFSSRC)/Makefile.inc
 
+LIBCSRC=	$(SRC)/lib/libc
+OBJS +=		explicit_bzero.o
+
 CPPFLAGS +=	-I$(SRC)/uts/common
 
 # needs work
@@ -65,4 +68,7 @@ x86:
 	$(COMPILE.c) $<
 
 %.o:	$(LZ4)/%.c
+	$(COMPILE.c) $<
+
+%.o:	$(LIBCSRC)/port/gen/%.c
 	$(COMPILE.c) $<

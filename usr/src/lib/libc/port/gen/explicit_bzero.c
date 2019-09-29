@@ -7,9 +7,9 @@
 #include <string.h>
 
 #pragma weak __explicit_bzero_hook
-/* ARGSUSED */
+
 void
-__explicit_bzero_hook(void *buf, size_t len)
+__explicit_bzero_hook(void *buf __unused, size_t len __unused)
 {
 }
 
