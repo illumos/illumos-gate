@@ -48,6 +48,7 @@ typedef struct {
 	} buf_un;
 } SHA1_CTX;
 
+#define	SHA1_BLOCK_LENGTH 64
 #define	SHA1_DIGEST_LENGTH 20
 
 void SHA1Init(SHA1_CTX *);
