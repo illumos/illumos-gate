@@ -267,7 +267,6 @@ int  file_addmodule(struct preloaded_file *, char *, int,
 void build_environment_module(void);
 void build_font_module(void);
 vm_offset_t bi_copyenv(vm_offset_t);
-bool sha1(void *, size_t, uint8_t *);
 
 /* MI module loaders */
 #ifdef __elfN
@@ -279,7 +278,7 @@ bool sha1(void *, size_t, uint8_t *);
 extern uint64_t __elfN(relocation_offset);
 
 struct elf_file;
-typedef Elf_Addr (symaddr_fn)(struct elf_file *, Elf_Size);
+typedef Elf_Addr(symaddr_fn)(struct elf_file *, Elf_Size);
 
 int	elf64_loadfile(char *, uint64_t, struct preloaded_file **);
 int	elf32_loadfile(char *, uint64_t, struct preloaded_file **);

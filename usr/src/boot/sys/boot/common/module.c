@@ -40,6 +40,7 @@
 #include <sys/tem_impl.h>
 #include <sys/font.h>
 #include <sys/sha1.h>
+#include <libcrypto.h>
 
 #include "bootstrap.h"
 
