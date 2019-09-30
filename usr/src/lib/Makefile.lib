@@ -21,6 +21,7 @@
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2015 Gary Mills
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
+# Copyright 2016 RackTop Systems.
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2019, Joyent, Inc.
 #
@@ -163,8 +164,12 @@ SRCS=		$(OBJECTS:%.o=$(SRCDIR)/%.c)
 BUILD.AR=	$(AR) $(ARFLAGS) $@ $(AROBJS)
 BUILD.SO=	$(CC) $(CFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) \
 		$(PICS) $(EXTPICS) $(USDT_PICS) $(LDLIBS)
+BUILD64.SO=	$(CC64) $(CFLAGS64) -o $@ $(GSHARED) $(DYNFLAGS) \
+		$(PICS) $(EXTPICS) -L $(ROOTLIBDIR64) $(LDLIBS)
 BUILDCCC.SO=	$(CCC) $(CCFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) \
 		$(PICS) $(EXTPICS) $(LDLIBS)
+BUILDCCC64.SO=	$(CCC64) $(CCFLAGS64) -o $@ $(GSHARED) $(DYNFLAGS) \
+		$(PICS) $(EXTPICS) $(LDLIBS) $(CCNEEDED64)
 
 # default dynamic library symlink
 INS.liblink=	-$(RM) $@; $(SYMLINK) $(LIBLINKPATH)$(LIBLINKS)$(VERS) $@

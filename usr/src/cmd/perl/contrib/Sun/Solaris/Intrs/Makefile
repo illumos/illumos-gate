@@ -9,7 +9,8 @@
 # http://www.illumos.org/license/CDDL.
 #
 #
-# Copyright (c) 2014 Racktop Systems.
+# Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2016 RackTop Systems.
 #
 
 MODULE = Intrs
@@ -24,9 +25,11 @@ include $(SRC)/cmd/perl/Makefile.targ
 
 .KEEP_STATE:
 
-all: $(PERLEXT) $(PERLMOD)
+$(BUILDPERL32)all: $(PERLEXT) $(PERLMOD)
+$(BUILDPERL64)all: $(PERLEXT64) $(PERLMOD)
 
-install: $(ROOTPERLEXT) $(ROOTPERLMOD)
+$(BUILDPERL32)install: $(ROOTPERLEXT) $(ROOTPERLMOD)
+$(BUILDPERL64)install: $(ROOTPERLEXT64) $(ROOTPERLMOD64)
 
 clean clobber:
-	$(RM) -r $(MACH)
+	$(RM) -r $(MACH) $(MACH64)

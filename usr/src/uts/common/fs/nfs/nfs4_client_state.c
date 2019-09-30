@@ -929,7 +929,7 @@ nfs4_end_open_seqid_sync(nfs4_open_owner_t *oop)
 	mutex_enter(&oop->oo_lock);
 	ASSERT(oop->oo_seqid_inuse);
 	oop->oo_seqid_inuse = 0;
-	cv_broadcast(&oop->oo_cv_seqid_sync);
+	cv_signal(&oop->oo_cv_seqid_sync);
 	mutex_exit(&oop->oo_lock);
 }
 
@@ -1294,7 +1294,7 @@ nfs4_end_lock_seqid_sync(nfs4_lock_owner_t *lop)
 	ASSERT(lop->lo_seqid_holder == curthread);
 	lop->lo_flags &= ~NFS4_LOCK_SEQID_INUSE;
 	lop->lo_seqid_holder = NULL;
-	cv_broadcast(&lop->lo_cv_seqid_sync);
+	cv_signal(&lop->lo_cv_seqid_sync);
 	mutex_exit(&lop->lo_lock);
 }
 
@@ -2036,7 +2036,7 @@ nfs4_resend_open_otw(vnode_t **vpp, nfs4_lost_rqst_t *resend_rqstp,
 	bool_t			retry_open = FALSE;
 	int			created_osp = 0;
 	hrtime_t		t;
-	char 			*failed_msg = "";
+	char			*failed_msg = "";
 	int			fh_different;
 	int			reopen = 0;
 

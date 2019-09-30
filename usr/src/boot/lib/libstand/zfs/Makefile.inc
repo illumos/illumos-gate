@@ -29,7 +29,7 @@ OBJS +=		skein_block.o
 OBJS +=		list.o
 
 zfs.o := CPPFLAGS +=	-I../../common
-zfs.o := CPPFLAGS +=	-I../../../cddl/boot/zfs
+zfs.o := CPPFLAGS +=	-I../../../cddl/boot/zfs -I$(LZ4)
 
 # Do not unroll skein loops, reduce code size
 skein_block.o := CPPFLAGS +=	-DSKEIN_LOOP=111

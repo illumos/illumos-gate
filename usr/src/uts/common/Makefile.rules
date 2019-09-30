@@ -49,6 +49,7 @@
 $(OBJS_DIR)/decompress.o := CPPFLAGS += -I$(SRC)/contrib/zlib
 $(OBJS_DIR)/zmod.o := CPPFLAGS += -I$(SRC)/contrib/zlib
 $(OBJS_DIR)/zmod_subr.o := CPPFLAGS += -I$(SRC)/contrib/zlib
+$(OBJS_DIR)/lz4.o := CPPFLAGS += -I$(COMMONBASE)/lz4
 
 $(OBJS_DIR)/%.o:		$(COMMONBASE)/crypto/aes/%.c
 	$(COMPILE.c) -o $@ $<
@@ -370,6 +371,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/zfs/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/zfs/lua/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(COMMONBASE)/lz4/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 

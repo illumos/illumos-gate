@@ -22,6 +22,7 @@
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+# Copyright 2016 RackTop Systems.
 #
 
 # rebind basic build macros to 64-bit versions
@@ -57,25 +58,19 @@ GCCLIBDIR=	$(GCCLIBDIR64)
 #
 # Override Makefile.master's settings of CC, CCC, AS and LINT
 #
-CC=		$($(MACH64)_CC)
-CCC=		$($(MACH64)_CCC)
-CPP=		$($(MACH64)_CPP)
-AS=		$($(MACH64)_AS)
-LD=		$($(MACH64)_LD)
-LINT=		$($(MACH64)_LINT)
+CC=		$(CC64)
+CCC=		$(CCC64)
+CPP=		$(CPP64)
+AS=		$(AS64)
+LD=		$(LD64)
+LINT=		$(LINT64)
 
-BUILD.SO=	$(CC) $(CFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) \
-		$(PICS) $(EXTPICS) $(USDT_PICS) -L $(ROOTLIBDIR64) $(LDLIBS)
+BUILD.SO=	$(BUILD64.SO)
+BUILDCCC.SO=	$(BUILDCCC64.SO)
 
 #
 # ld(1) requires the -64 option to create a 64-bit filter solely from a mapfile
 #
 MAPFILECLASS=	-64
 
-CCNEEDED =		-lCrun
-$(__GNUC64)CCNEEDED =	-L$(GCCLIBDIR) -lstdc++
-$(__GNUC64)CCNEEDED +=	-lgcc_s
-
-BUILDCCC.SO=    $(CCC) $(CCFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) \
-		$(PICS) $(EXTPICS) $(LDLIBS) $(CCNEEDED)
 MAPFILE.NGB =	$(MAPFILE.NGB_$(MACH64))

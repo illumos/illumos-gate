@@ -9,45 +9,66 @@
 # http://www.illumos.org/license/CDDL.
 #
 #
-# Copyright (c) 2014 Racktop Systems.
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright (c) 2016 Racktop Systems.
 # Copyright (c) 2018, Joyent, Inc.
 
-# Link against libc as perl solaris specs
+# Link against libc as per solaris specs
 $(PERLEXT):= LDLIBS += -lc
+$(PERLEXT64):= LDLIBS += -lc
 
 # Allow for undefined symbols satisfied by perl
 $(PERLEXT):= ZDEFS =
+$(PERLEXT64):= ZDEFS =
 
 $(ROOTPERLEXT) := FILEMODE = 0555
 $(ROOTPERLMOD) := FILEMODE = 0444
+$(ROOTPERLEXT64) := FILEMODE = 0555
+$(ROOTPERLMOD64) := FILEMODE = 0444
 
 # CFLAGS for perl, specifically.
 PCFLAGS= -DPERL_EUPXS_ALWAYS_EXPORT -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 \
 	-DPERL_USE_SAFE_PUTENV -D_TS_ERRNO
+PCFLAGS64= -DPERL_EUPXS_ALWAYS_EXPORT -D_LARGEFILE_SOURCE64 \
+	 -DPERL_USE_SAFE_PUTENV -D_TS_ERRNO
 
 SMATCH=off
 
-$(MACH):
+$(MACH) $(MACH64):
 	$(INS.dir)
 
 $(PERLEXT): $(MACH)/$(MODULE).o
 	$(BUILD.SO) $(MACH)/$(MODULE).o
 
+$(PERLEXT64): $(MACH64)/$(MODULE).o
+	$(BUILD64.SO) $(MACH64)/$(MODULE).o
+
 $(MACH)/$(MODULE).o: $(MACH)/$(MODULE).c
 	$(COMPILE.c) $(PCFLAGS) $(C_PICFLAGS) -I$(PERLINCDIR) $< -o $@
 
-$(MACH)/$(MODULE).c: $(MACH) $(MODULE).xs 
-	$(PERLDIR)/bin/xsubpp $(XSUBPPFLAGS) $(MODULE).xs >$@
+$(MACH64)/$(MODULE).o: $(MACH64)/$(MODULE).c
+	$(COMPILE64.c) $(PCFLAGS64) $(C_PICFLAGS) -I$(PERLINCDIR64) $< -o $@
 
-$(ROOTPERLMODDIR):
+$(MACH)/$(MODULE).c: $(MACH) $(MODULE).xs
+	$(XSUBPP) $(XSUBPPFLAGS) $(MODULE).xs >$@
+
+$(MACH64)/$(MODULE).c: $(MACH64) $(MODULE).xs
+	$(XSUBPP64) $(XSUBPPFLAGS64) $(MODULE).xs >$@
+
+$(ROOTPERLMODDIR) $(ROOTPERLMODDIR64):
 	$(INS.dir)
 
 $(ROOTPERLMOD): $(ROOTPERLMODDIR) $(MODULE).pm
 	$(RM) $@; $(INS) -s -m $(FILEMODE) -f $^
 
-$(ROOTPERLEXTDIR):
+$(ROOTPERLMOD64): $(ROOTPERLMODDIR64) $(MODULE).pm
+	$(RM) $@; $(INS) -s -m $(FILEMODE) -f $^
+
+$(ROOTPERLEXTDIR) $(ROOTPERLEXTDIR64):
 	$(INS.dir)
 
 $(ROOTPERLEXT): $(ROOTPERLEXTDIR) $(MACH)/$(MODULE).so
+	$(RM) $@; $(INS) -s -m $(FILEMODE) -f $^
+
+$(ROOTPERLEXT64): $(ROOTPERLEXTDIR64) $(MACH64)/$(MODULE).so
 	$(RM) $@; $(INS) -s -m $(FILEMODE) -f $^

@@ -35,12 +35,30 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 #include <sys/zfs_context.h>
+#elif defined(_STANDALONE)
+#include <sys/cdefs.h>
+#include <stand.h>
+#include <sys/types.h>
+#include <sys/endian.h>
+#include <assert.h>
+
+#define	ASSERT	assert
+#else
+#include <string.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/sysmacros.h>
+#include <netinet/in.h>
+#include <assert.h>
+
+#define	ASSERT	assert
+#endif
+#include <lz4.h>
 
 static int real_LZ4_compress(const char *source, char *dest, int isize,
     int osize);
-static int real_LZ4_uncompress(const char *source, char *dest, int osize);
-static int LZ4_compressBound(int isize);
 static int LZ4_uncompress_unknownOutputSize(const char *source, char *dest,
     int isize, int maxOutputSize);
 static int LZ4_compressCtx(void *ctx, const char *source, char *dest,
@@ -48,9 +66,9 @@ static int LZ4_compressCtx(void *ctx, const char *source, char *dest,
 static int LZ4_compress64kCtx(void *ctx, const char *source, char *dest,
     int isize, int osize);
 
-/*ARGSUSED*/
 size_t
-lz4_compress(void *s_start, void *d_start, size_t s_len, size_t d_len, int n)
+lz4_compress(void *s_start, void *d_start, size_t s_len, size_t d_len,
+    int n __unused)
 {
 	uint32_t bufsiz;
 	char *dest = d_start;
@@ -70,17 +88,25 @@ lz4_compress(void *s_start, void *d_start, size_t s_len, size_t d_len, int n)
 	 * added to the compressed buffer and which, if unhandled, would
 	 * confuse the hell out of our decompression function.
 	 */
-	*(uint32_t *)dest = BE_32(bufsiz);
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
+	*(uint32_t *)(void *)dest = BE_32(bufsiz);
+#else
+	*(uint32_t *)(void *)dest = htonl(bufsiz);
+#endif
 
 	return (bufsiz + sizeof (bufsiz));
 }
 
-/*ARGSUSED*/
 int
-lz4_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len, int n)
+lz4_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len,
+    int n __unused)
 {
 	const char *src = s_start;
-	uint32_t bufsiz = BE_IN32(src);
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
+	uint32_t bufsiz = BE_IN32(s_start);
+#else
+	uint32_t bufsiz = htonl(*(uint32_t *)s_start);
+#endif
 
 	/* invalid compressed buffer size encoded at start */
 	if (bufsiz + sizeof (bufsiz) > s_len)
@@ -99,63 +125,51 @@ lz4_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len, int n)
  *
  * Simple Functions:
  * real_LZ4_compress() :
- * 	isize  : is the input size. Max supported value is ~1.9GB
- * 	return : the number of bytes written in buffer dest
+ *	isize  : is the input size. Max supported value is ~1.9GB
+ *	return : the number of bytes written in buffer dest
  *		 or 0 if the compression fails (if LZ4_COMPRESSMIN is set).
- * 	note : destination buffer must be already allocated.
- * 		destination buffer must be sized to handle worst cases
- * 		situations (input data not compressible) worst case size
- * 		evaluation is provided by function LZ4_compressBound().
- *
- * real_LZ4_uncompress() :
- * 	osize  : is the output size, therefore the original size
- * 	return : the number of bytes read in the source buffer.
- * 		If the source stream is malformed, the function will stop
- * 		decoding and return a negative result, indicating the byte
- * 		position of the faulty instruction. This function never
- * 		writes beyond dest + osize, and is therefore protected
- * 		against malicious data packets.
- * 	note : destination buffer must be already allocated
+ *	note : destination buffer must be already allocated.
+ *		destination buffer must be sized to handle worst cases
+ *		situations (input data not compressible).
  *
  * Advanced Functions
  *
  * LZ4_compressBound() :
- * 	Provides the maximum size that LZ4 may output in a "worst case"
- * 	scenario (input data not compressible) primarily useful for memory
- * 	allocation of output buffer.
+ *	Provides the maximum size that LZ4 may output in a "worst case"
+ *	scenario (input data not compressible) primarily useful for memory
+ *	allocation of output buffer.
  *
- * 	isize  : is the input size. Max supported value is ~1.9GB
- * 	return : maximum output size in a "worst case" scenario
- * 	note : this function is limited by "int" range (2^31-1)
+ *	isize  : is the input size. Max supported value is ~1.9GB
+ *	return : maximum output size in a "worst case" scenario
+ *	note : this function is limited by "int" range (2^31-1)
  *
  * LZ4_uncompress_unknownOutputSize() :
- * 	isize  : is the input size, therefore the compressed size
- * 	maxOutputSize : is the size of the destination buffer (which must be
- * 		already allocated)
- * 	return : the number of bytes decoded in the destination buffer
- * 		(necessarily <= maxOutputSize). If the source stream is
- * 		malformed, the function will stop decoding and return a
- * 		negative result, indicating the byte position of the faulty
- * 		instruction. This function never writes beyond dest +
- * 		maxOutputSize, and is therefore protected against malicious
- * 		data packets.
- * 	note   : Destination buffer must be already allocated.
- *		This version is slightly slower than real_LZ4_uncompress()
+ *	isize  : is the input size, therefore the compressed size
+ *	maxOutputSize : is the size of the destination buffer (which must be
+ *		already allocated)
+ *	return : the number of bytes decoded in the destination buffer
+ *		(necessarily <= maxOutputSize). If the source stream is
+ *		malformed, the function will stop decoding and return a
+ *		negative result, indicating the byte position of the faulty
+ *		instruction. This function never writes beyond dest +
+ *		maxOutputSize, and is therefore protected against malicious
+ *		data packets.
+ *	note   : Destination buffer must be already allocated.
  *
  * LZ4_compressCtx() :
- * 	This function explicitly handles the CTX memory structure.
+ *	This function explicitly handles the CTX memory structure.
  *
- * 	ILLUMOS CHANGES: the CTX memory structure must be explicitly allocated
- * 	by the caller (either on the stack or using kmem_zalloc). Passing NULL
- * 	isn't valid.
+ *	ILLUMOS CHANGES: the CTX memory structure must be explicitly allocated
+ *	by the caller (either on the stack or using kmem_zalloc). Passing NULL
+ *	isn't valid.
  *
  * LZ4_compress64kCtx() :
- * 	Same as LZ4_compressCtx(), but specific to small inputs (<64KB).
- * 	isize *Must* be <64KB, otherwise the output will be corrupted.
+ *	Same as LZ4_compressCtx(), but specific to small inputs (<64KB).
+ *	isize *Must* be <64KB, otherwise the output will be corrupted.
  *
- * 	ILLUMOS CHANGES: the CTX memory structure must be explicitly allocated
- * 	by the caller (either on the stack or using kmem_zalloc). Passing NULL
- * 	isn't valid.
+ *	ILLUMOS CHANGES: the CTX memory structure must be explicitly allocated
+ *	by the caller (either on the stack or using kmem_zalloc). Passing NULL
+ *	isn't valid.
  */
 
 /*
@@ -216,6 +230,16 @@ lz4_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len, int n)
  * Little Endian or Big Endian?
  * Note: overwrite the below #define if you know your architecture endianess.
  */
+#if defined(BYTE_ORDER)
+#if BYTE_ORDER == BIG_ENDIAN	/* This is sys/endian.h API */
+#define	LZ4_BIG_ENDIAN 1
+#else
+/*
+ * Little Endian assumed. PDP Endian and other very rare endian format
+ * are unsupported.
+ */
+#endif
+#else /* !defined(BYTE_ORDER) */
 #if (defined(__BIG_ENDIAN__) || defined(__BIG_ENDIAN) || \
 	defined(_BIG_ENDIAN) || defined(_ARCH_PPC) || defined(__PPC__) || \
 	defined(__PPC) || defined(PPC) || defined(__powerpc__) || \
@@ -228,6 +252,7 @@ lz4_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len, int n)
  * are unsupported.
  */
 #endif
+#endif /* defined(BYTE_ORDER) */
 
 /*
  * Unaligned memory access is automatically enabled for "common" CPU,
@@ -326,9 +351,9 @@ typedef struct _U64_S {
 #pragma pack()
 #endif
 
-#define	A64(x) (((U64_S *)(x))->v)
-#define	A32(x) (((U32_S *)(x))->v)
-#define	A16(x) (((U16_S *)(x))->v)
+#define	A64(x) (((U64_S *)(__DECONST(void *, x)))->v)
+#define	A32(x) (((U32_S *)(__DECONST(void *, x)))->v)
+#define	A16(x) (((U16_S *)(__DECONST(void *, x)))->v)
 
 /*
  * Constants
@@ -510,14 +535,6 @@ LZ4_NbCommonBytes(register U32 val)
 
 #endif
 
-/* Public functions */
-
-static int
-LZ4_compressBound(int isize)
-{
-	return (isize + (isize / 255) + 16);
-}
-
 /* Compression functions */
 
 /*ARGSUSED*/
@@ -532,7 +549,7 @@ LZ4_compressCtx(void *ctx, const char *source, char *dest, int isize,
 	HTYPE HashTable[HASHTABLESIZE] = { 0 };
 #endif
 
-	const BYTE *ip = (BYTE *) source;
+	const BYTE *ip = (const BYTE *) source;
 	INITBASE(base);
 	const BYTE *anchor = ip;
 	const BYTE *const iend = ip + isize;
@@ -581,7 +598,7 @@ LZ4_compressCtx(void *ctx, const char *source, char *dest, int isize,
 		} while ((ref < ip - MAX_DISTANCE) || (A32(ref) != A32(ip)));
 
 		/* Catch up */
-		while ((ip > anchor) && (ref > (BYTE *) source) &&
+		while ((ip > anchor) && (ref > (const BYTE *) source) &&
 		    unlikely(ip[-1] == ref[-1])) {
 			ip--;
 			ref--;
@@ -727,7 +744,7 @@ LZ4_compress64kCtx(void *ctx, const char *source, char *dest, int isize,
 	U16 HashTable[HASH64KTABLESIZE] = { 0 };
 #endif
 
-	const BYTE *ip = (BYTE *) source;
+	const BYTE *ip = (const BYTE *) source;
 	const BYTE *anchor = ip;
 	const BYTE *const base = ip;
 	const BYTE *const iend = ip + isize;
@@ -774,7 +791,7 @@ LZ4_compress64kCtx(void *ctx, const char *source, char *dest, int isize,
 		} while (A32(ref) != A32(ip));
 
 		/* Catch up */
-		while ((ip > anchor) && (ref > (BYTE *) source) &&
+		while ((ip > anchor) && (ref > (const BYTE *) source) &&
 		    (ip[-1] == ref[-1])) {
 			ip--;
 			ref--;
@@ -901,7 +918,11 @@ static int
 real_LZ4_compress(const char *source, char *dest, int isize, int osize)
 {
 #if HEAPMODE
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 	void *ctx = kmem_zalloc(sizeof (struct refTables), KM_NOSLEEP);
+#else
+	void *ctx = malloc(sizeof (struct refTables));
+#endif
 	int result;
 
 	/*
@@ -916,7 +937,11 @@ real_LZ4_compress(const char *source, char *dest, int isize, int osize)
 	else
 		result = LZ4_compressCtx(ctx, source, dest, isize, osize);
 
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 	kmem_free(ctx, sizeof (struct refTables));
+#else
+	free(ctx);
+#endif
 	return (result);
 #else
 	if (isize < (int)LZ4_64KLIMIT)
@@ -928,129 +953,14 @@ real_LZ4_compress(const char *source, char *dest, int isize, int osize)
 /* Decompression functions */
 
 /*
- * Note: The decoding functions real_LZ4_uncompress() and
- *	LZ4_uncompress_unknownOutputSize() are safe against "buffer overflow"
- *	attack type. They will never write nor read outside of the provided
- *	output buffers. LZ4_uncompress_unknownOutputSize() also insures that
+ * Note: The decoding function LZ4_uncompress_unknownOutputSize() is safe
+ *	against "buffer overflow" attack type. It will never write nor
+ *	read outside of the provided output buffers.
+ *	LZ4_uncompress_unknownOutputSize() also insures that
  *	it will never read outside of the input buffer. A corrupted input
  *	will produce an error result, a negative int, indicating the position
  *	of the error within input stream.
  */
-
-static int
-real_LZ4_uncompress(const char *source, char *dest, int osize)
-{
-	/* Local Variables */
-	const BYTE *restrict ip = (const BYTE *) source;
-	const BYTE *ref;
-
-	BYTE *op = (BYTE *) dest;
-	BYTE *const oend = op + osize;
-	BYTE *cpy;
-
-	unsigned token;
-
-	size_t length;
-	size_t dec32table[] = {0, 3, 2, 3, 0, 0, 0, 0};
-#if LZ4_ARCH64
-	size_t dec64table[] = {0, 0, 0, (size_t)-1, 0, 1, 2, 3};
-#endif
-
-	/* Main Loop */
-	for (;;) {
-		/* get runlength */
-		token = *ip++;
-		if ((length = (token >> ML_BITS)) == RUN_MASK) {
-			size_t len;
-			for (; (len = *ip++) == 255; length += 255) {
-			}
-			length += len;
-		}
-		/* copy literals */
-		cpy = op + length;
-		/* CORNER-CASE: cpy might overflow. */
-		if (cpy < op)
-			goto _output_error;	/* cpy was overflowed, bail! */
-		if unlikely(cpy > oend - COPYLENGTH) {
-			if (cpy != oend)
-				/* Error: we must necessarily stand at EOF */
-				goto _output_error;
-			(void) memcpy(op, ip, length);
-			ip += length;
-			break;	/* EOF */
-			}
-		LZ4_WILDCOPY(ip, op, cpy);
-		ip -= (op - cpy);
-		op = cpy;
-
-		/* get offset */
-		LZ4_READ_LITTLEENDIAN_16(ref, cpy, ip);
-		ip += 2;
-		if unlikely(ref < (BYTE * const) dest)
-			/*
-			 * Error: offset create reference outside destination
-			 * buffer
-			 */
-			goto _output_error;
-
-		/* get matchlength */
-		if ((length = (token & ML_MASK)) == ML_MASK) {
-			for (; *ip == 255; length += 255) {
-				ip++;
-			}
-			length += *ip++;
-		}
-		/* copy repeated sequence */
-		if unlikely(op - ref < STEPSIZE) {
-#if LZ4_ARCH64
-			size_t dec64 = dec64table[op-ref];
-#else
-			const int dec64 = 0;
-#endif
-			op[0] = ref[0];
-			op[1] = ref[1];
-			op[2] = ref[2];
-			op[3] = ref[3];
-			op += 4;
-			ref += 4;
-			ref -= dec32table[op-ref];
-			A32(op) = A32(ref);
-			op += STEPSIZE - 4;
-			ref -= dec64;
-		} else {
-			LZ4_COPYSTEP(ref, op);
-		}
-		cpy = op + length - (STEPSIZE - 4);
-		if (cpy > oend - COPYLENGTH) {
-			if (cpy > oend)
-				/*
-				 * Error: request to write beyond destination
-				 * buffer
-				 */
-				goto _output_error;
-			LZ4_SECURECOPY(ref, op, (oend - COPYLENGTH));
-			while (op < cpy)
-				*op++ = *ref++;
-			op = cpy;
-			if (op == oend)
-				/*
-				 * Check EOF (should never happen, since last
-				 * 5 bytes are supposed to be literals)
-				 */
-				goto _output_error;
-			continue;
-		}
-		LZ4_SECURECOPY(ref, op, cpy);
-		op = cpy;	/* correction */
-	}
-
-	/* end of decoding */
-	return (int)(((char *)ip) - source);
-
-	/* write overflow error detected */
-	_output_error:
-	return (int)(-(((char *)ip) - source));
-}
 
 static int
 LZ4_uncompress_unknownOutputSize(const char *source, char *dest, int isize,
@@ -1178,5 +1088,5 @@ LZ4_uncompress_unknownOutputSize(const char *source, char *dest, int isize,
 
 	/* write overflow error detected */
 	_output_error:
-	return (int)(-(((char *)ip) - source));
+	return (int)(-(((const char *)ip) - source));
 }

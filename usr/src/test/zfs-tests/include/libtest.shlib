@@ -1542,6 +1542,24 @@ function verify_filesys # pool filesystem dir
 }
 
 #
+# Given a pool issue a scrub and verify that no checksum errors are reported.
+#
+function verify_pool
+{
+	typeset pool=${1:-$TESTPOOL}
+
+	log_must zpool scrub $pool
+	log_must wait_scrubbed $pool
+
+	cksum=$(zpool status $pool | \
+	    awk '{if ($5 == "CKSUM"){L=1; next} if (L) {print $NF;L=0}}')
+	if [[ $cksum != 0 ]]; then
+		log_must zpool status -v
+	        log_fail "Unexpected CKSUM errors found on $pool ($cksum)"
+	fi
+}
+
+#
 # Given a pool, and this function list all disks in the pool
 #
 function get_disklist # pool

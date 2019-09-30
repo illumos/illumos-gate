@@ -19,6 +19,7 @@ CMDDIR=		$(SRC)/cmd/vtfontcvt
 include		../Makefile.tools
 include		$(CMDDIR)/Makefile.common
 
+CPPFLAGS	+= -I../../uts/common
 .KEEP_STATE:
 
 all:		$(PROG)

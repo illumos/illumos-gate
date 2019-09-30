@@ -22,6 +22,7 @@
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2016 RackTop Systems.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2019, Joyent, Inc.
 #
@@ -95,8 +96,13 @@ export ENABLE_SMB_PRINTING=
 # contains your new defaults OR your .env file sets them.
 # These are how you would override for building on OmniOS r151028, for example.
 #export PERL_VERSION=5.28
-#export PERL_ARCH=i86pc-solaris-thread-multi-64int
+#export PERL_VARIANT=-thread-multi
 #export PERL_PKGVERS=
+
+# To disable building of the 32-bit or 64-bit perl modules (or both),
+# uncomment these lines:
+#export BUILDPERL32='#'
+#export BUILDPERL64='#'
 
 # If your distro uses certain versions of Python, make sure either
 # Makefile.master contains your new defaults OR your .env file sets them.

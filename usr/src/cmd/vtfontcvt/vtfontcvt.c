@@ -40,6 +40,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
+#include <lz4.h>
 #include "fnv_hash.h"
 
 #define	VFNT_MAPS 4
@@ -47,8 +48,6 @@
 #define	VFNT_MAP_NORMAL_RH 1
 #define	VFNT_MAP_BOLD 2
 #define	VFNT_MAP_BOLD_RH 3
-
-extern size_t lz4_compress(void *, void *, size_t, size_t, int);
 
 static unsigned int width = 8, wbytes, height = 16;
 

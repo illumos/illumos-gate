@@ -54,6 +54,7 @@ INCS += -I../common
 INCS += -I../../../uts/common/fs/zfs
 INCS += -I../../../uts/common/fs/zfs/lua
 INCS += -I../../../common/zfs
+INCS += -I../../../common/lz4
 INCS += -I../../../common
 
 CLEANFILES += ../common/zfs.h
@@ -111,6 +112,10 @@ pics/%.o: ../../../uts/common/fs/zfs/lua/%.c
 	$(POST_PROCESS_O)
 
 pics/%.o: ../../../common/zfs/%.c ../common/zfs.h
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o: ../../../common/lz4/%.c ../common/zfs.h
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 

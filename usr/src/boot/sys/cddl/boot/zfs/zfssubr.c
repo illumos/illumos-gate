@@ -24,6 +24,7 @@
  */
 
 #include <sys/cdefs.h>
+#include <lz4.h>
 
 static uint64_t zfs_crc64_table[256];
 
@@ -163,7 +164,6 @@ typedef struct zio_compress_info {
 
 #include "lzjb.c"
 #include "zle.c"
-#include "lz4.c"
 
 /*
  * Compression vectors.
