@@ -388,7 +388,7 @@ static int64_t portfs(int, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
 static struct sysent port_sysent = {
 	6,
 	SE_ARGC | SE_64RVAL | SE_NOUNLOAD,
-	(int (*)())portfs,
+	(int (*)())(uintptr_t)portfs,
 };
 
 static struct modlsys modlsys = {
@@ -404,7 +404,7 @@ portfs32(uint32_t arg1, int32_t arg2, uint32_t arg3, uint32_t arg4,
 static struct sysent port_sysent32 = {
 	6,
 	SE_ARGC | SE_64RVAL | SE_NOUNLOAD,
-	(int (*)())portfs32,
+	(int (*)())(uintptr_t)portfs32,
 };
 
 static struct modlsys modlsys32 = {

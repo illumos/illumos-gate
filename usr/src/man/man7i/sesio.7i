@@ -1,135 +1,95 @@
-'\" te
 .\"  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SESIO 7I "Mar 27, 1997"
-.SH NAME
-sesio \- enclosure services device driver interface
-.SH SYNOPSIS
-.LP
-.nf
-\fB#include <sys/sesio.h>\fR
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The  \fBses\fR device driver provides the following ioctls as a means to access
+.\"  Copyright (c) 2017, Joyent, Inc.
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd October 23, 2017
+.Dt SESIO 7I
+.Os
+.Sh NAME
+.Nm sesio
+.Nd enclosure services device driver interface
+.Sh SYNOPSIS
+.In sys/scsi/targets/sesio.h
+.Sh DESCRIPTION
+The
+.Nm ses
+device driver provides the following ioctls as a means to access
 SCSI enclosure services devices.
-.SH IOCTLS
-.sp
-.LP
-The  \fBses\fR driver supports the following ioctls:
-.sp
-.ne 2
-.na
-\fB\fBSES_IOCTL_GETSTATE\fR\fR
-.ad
-.RS 22n
-This ioctl obtains enclosure state in the  \fBses_ioctl\fR structure.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSES_IOCTL_SETSTATE\fR\fR
-.ad
-.RS 22n
-This ioctl is used to set parameters on the enclosure services device. The
-\fBses_ioctl\fR structure is used to pass information into the driver.
-.RE
-
-.SH ERRORS
-.sp
-.ne 2
-.na
-\fB\fBEIO\fR\fR
-.ad
-.RS 10n
-The \fBses\fR driver was unable to obtain data from the enclosure services
-device or the  data transfer could not be completed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOTTY\fR\fR
-.ad
-.RS 10n
-The  \fBses\fR driver does not support the requested ioctl function.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENXIO\fR\fR
-.ad
-.RS 10n
-The enclosure services device does not exist.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 10n
-The user specified a bad data length.
-.RE
-
-.SH STRUCTURES
-.sp
-.LP
-The  \fBses_ioctl\fR structure has the following fields:
-.sp
-.in +2
-.nf
-uint32_t;               /* Size of buffer that follows */
-uint8_t page_code:      /* Page to be read/written */
-uint8_t reserved[3];    /* Reserved; Set to 0 */
-unit8t  buffer[1];      /* Size arbitrary, user specifies */
-.fi
-.in -2
-
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRUsing the  \fBSES_IOCTL_GETSTATE\fR ioctl
-.sp
-.LP
-The following example uses the  \fBSES_IOCTL_GETSTATE\fR ioctl to recover 20
-bytes of page 4 from a previously opened device.
-
-.sp
-.in +2
-.nf
+.Sh IOCTLS
+The
+.Nm ses
+driver supports the following ioctls:
+.Bl -tag -width SES_IOCTL_GETSTATE
+.It Dv SES_IOCTL_GETSTATE
+This ioctl obtains enclosure state in the
+.Vt ses_ioctl
+structure.
+.It Dv SES_IOCTL_SETSTATE
+This ioctl is used to set parameters on the enclosure services device.
+The
+.Vt ses_ioctl
+structure is used to pass information into the driver.
+.El
+.Sh EXAMPLES
+.Bl -tag -width "Example 1"
+.It Sy "Example 1"
+Using the
+.Dv SES_IOCTL_GETSTATE
+ioctl
+.El
+.Pp
+The following example uses the
+.Dv SES_IOCTL_GETSTATE
+ioctl to recover 20 bytes of page 4 from a previously opened device.
+.Bd -literal -offset 2n
 char   abuf[30];
 struct ses_ioctl *sesp;
 int    status;
+
 sesp = (ses_ioctl *)abuf;
 sesp->size = 20;
 sesp->page_code = 4;
 status = ioctl(fd, SES_IOCTL_GETSTATE, abuf);
-.fi
-.in -2
-
-.SH ATTRIBUTES
-.sp
-.LP
-See  \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Architecture	SPARC
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBses\fR(7D), \fBioctl\fR(9E)
+.Ed
+.Sh ERRORS
+.Bl -tag -width ENOTTY
+.It Er EIO
+The
+.Nm ses
+driver was unable to obtain data from the enclosure services
+device or the  data transfer could not be completed.
+.It Er ENOTTY
+The
+.Nm ses
+driver does not support the requested ioctl function.
+.It Er ENXIO
+The enclosure services device does not exist.
+.It Er EFAULT
+The user specified a bad data length.
+.El
+.Sh STRUCTURES
+The
+.Vt ses_ioctl
+structure has the following fields:
+.Bd -literal -offset 2n
+uint32_t page_size;      /* Size of buffer that follows */
+uint8_t  page_code:      /* Page to be read/written */
+uint8_t  reserved[3];    /* Reserved; Set to 0 */
+.Ed
+.Sh ARCHITECTURE
+SPARC
+.Sh SEE ALSO
+.Xr ses 7D ,
+.Xr ioctl 9E

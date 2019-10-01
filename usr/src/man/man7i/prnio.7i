@@ -1,365 +1,370 @@
-'\" te
 .\"  Copyright (c) 20002 Sun Microsystems, Inc.
 .\"  All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRNIO 7I "Jan 2, 2002"
-.SH NAME
-prnio \- generic printer interface
-.SH SYNOPSIS
-.nf
-\fB#include <sys/prnio.h>\fR
-.fi
-
-.SH DESCRIPTION
-The \fBprnio\fR generic printer interface defines ioctl commands and data
+.\"  Copyright 2018, Joyent, Inc.
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd August 31, 2018
+.Dt PRNIO 7I
+.Os
+.Sh NAME
+.Nm prnio
+.Nd generic printer interface
+.Sh SYNOPSIS
+.In sys/prnio.h
+.Sh DESCRIPTION
+The
+.Nm
+generic printer interface defines ioctl commands and data
 structures for printer device drivers.
-.sp
-.LP
-\fBprnio\fR defines and provides facilities for five basic phases of the
-printing process:
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.Pp
+.Nm
+defines and provides facilities for five basic phases of the printing process:
+.Bl -bullet -offset indent
+.It
 Identification \(em Retrieve device information/attributes
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
 Setup \(em Set device attributes
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
 Transfer \(em Transfer data to or from the device
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
 Cleanup \(em Transfer phase conclusion
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
 Abort \(em Transfer phase interruption
-.RE
-.sp
-.LP
+.El
+.Pp
 During the Identification phase, the application retrieves a set of device
-capabilities and additional information using the \fBPRNIOC_GET_IFCAP\fR,
-\fBPRNIOC_GET_STATUS\fR, \fBPRNIOC_GET_TIMEOUTS\fR, \fBPRNIOC_GET_IFINFO\fR and
-\fBPRNIOC_GET_1284_DEVID\fR commands.
-.sp
-.LP
+capabilities and additional information using the
+.Dv PRNIOC_GET_IFCAP ,
+.Dv PRNIOC_GET_STATUS ,
+.Dv PRNIOC_GET_TIMEOUTS ,
+.Dv PRNIOC_GET_IFINFO ,
+and
+.Dv PRNIOC_GET_1284_DEVID
+commands.
+.Pp
 During the Setup phase the application sets some interface attributes and
-probably resets the printer as described in the \fBPRNIOC_SET_IFCAP\fR,
-\fBPRNIOC_SET_TIMEOUTS\fR and \fBPRNIOC_RESET\fR sections.
-.sp
-.LP
+probably resets the printer as described in the
+.Dv PRNIOC_SET_IFCAP ,
+.Dv PRNIOC_SET_TIMEOUTS ,
+and
+.Dv PRNIOC_RESET
+sections.
+.Pp
 During the Transfer phase, data is transferred in a forward (host to
-peripheral) or reverse direction (peripheral to host). Transfer is accomplished
-using \fBwrite\fR(2) and \fBread\fR(2) system calls. For \fBprnio\fR compliant
+peripheral) or reverse direction (peripheral to host).
+Transfer is accomplished
+using
+.Xr write 2
+and
+.Xr read 2
+system calls.
+For
+.Nm
+compliant
 printer drivers, forward transfer support is mandatory, while reverse transfer
-support is optional. Applications can also use \fBPRNIOC_GET_STATUS\fR and
-\fBPRNIOC_GET_1284_STATUS\fR commands during the transfer to monitor the device
-state.
-.sp
-.LP
-The Cleanup phase is accomplished by closing the device using \fBclose\fR(2).
-Device drivers supporting \fBprnio\fR may set non-zero error code as
-appropriate. Applications should explicitly \fBclose\fR(2) a device before
-exiting and check \fBerrno\fR value.
-.sp
-.LP
-The Abort phase is accomplished by interrupting the \fBwrite\fR(2) and
-\fBread\fR(2) system calls. The application can perform some additional cleanup
-during the Abort phase as described in \fBPRNIOC_GET_IFCAP\fR section.
-.SH IOCTLS
-.ne 2
-.na
-\fB\fBPRNIOC_GET_IFCAP\fR\fR
-.ad
-.RS 21n
-Application can retrieve printer interface capabilities using this command. The
-\fBioctl\fR(2) argument is a pointer to \fBuint_t\fR, a bit field representing
-a set of properties and services provided by a printer driver. Set bit means
-supported capability. The following values are defined:
-.br
-.in +2
-\fBPRN_BIDI\fR - When this bit is set,  the interface operates in a
-bidirectional mode,  instead of forward-only mode.
-.in -2
-.br
-.in +2
-\fBPRN_HOTPLUG\fR - If this bit is set, the interface allows device
-hot-plugging.
-.in -2
-.br
-.in +2
-\fBPRN_1284_DEVID\fR - If this bit is set, the device is capable of returning
-\fI1284\fR device ID (see \fBPRNIOC_GET_1284_DEVID\fR.)
-.in -2
-.br
-.in +2
-\fBPRN_1284_STATUS\fR - If this bit is set, the device driver can return device
-status lines (see \fBPRNIOC_GET_1284_STATUS\fR). Some devices support this
+support is optional.
+Applications can also use
+.Dv PRNIOC_GET_STATUS
+and
+.Dv PRNIOC_GET_1284_STATUS
+commands during the transfer to monitor the device state.
+.Pp
+The Cleanup phase is accomplished by closing the device using
+.Xr close 2 .
+Device drivers supporting
+.Nm
+may set non-zero error code as appropriate.
+Applications should explicitly
+.Xr close 2
+a device before
+exiting and check
+.Va errno
+value.
+.Pp
+The Abort phase is accomplished by interrupting the
+.Xr write 2
+and
+.Xr read 2
+system calls.
+The application can perform some additional cleanup
+during the Abort phase as described in
+.Dv PRNIOC_GET_IFCAP
+section.
+.Sh IOCTLS
+.Bl -tag -width PRNIOC_GET_IFINFO
+.It Dv PRNIOC_GET_IFCAP
+Application can retrieve printer interface capabilities using this command.
+The
+.Xr ioctl 2
+argument is a pointer to
+.Vt uint_t ,
+a bit field representing
+a set of properties and services provided by a printer driver.
+Set bit means supported capability.
+The following values are defined:
+.Bl -tag -width PRN_1284_STATUS
+.It Dv PRN_BIDI
+When this bit is set, the interface operates in a
+bidirectional mode, instead of forward-only mode.
+.It Dv PRN_HOTPLUG
+If this bit is set, the interface allows device hot-plugging.
+.It Dv PRN_1284_DEVID
+If this bit is set, the device is capable of returning
+.Em 1284
+device ID (see
+.Dv PRNIOC_GET_1284_DEVID ) .
+.It Dv PRN_1284_STATUS
+If this bit is set, the device driver can return device
+status lines (see
+.Dv PRNIOC_GET_1284_STATUS ) .
+Some devices support this
 ioctl in unidirectional mode only.
-.in -2
-.br
-.in +2
-\fBPRN_TIMEOUTS\fR - If this bit is set the peripheral may stall during the
-transfer phase and the driver can timeout and return from the \fBwrite\fR(2)
-and \fBread\fR(2) returning the number of bytes that have been transferred. If
-\fBPRN_TIMEOUTS\fR is set, the driver supports this functionality and the
-timeout values can be retrieved and modified via the \fBPRNIOC_GET_TIMEOUTS\fR
-and \fBPRNIOC_SET_TIMEOUTS\fR ioctls. Otherwise, applications can implement
+.It Dv PRN_TIMEOUTS
+If this bit is set the peripheral may stall during the
+transfer phase and the driver can timeout and return from the
+.Xr write 2
+and
+.Xr read 2
+returning the number of bytes that have been transferred.
+If
+.Dv PRN_TIMEOUTS
+is set, the driver supports this functionality and the
+timeout values can be retrieved and modified via the
+.Dv PRNIOC_GET_TIMEOUTS
+and
+.Dv PRNIOC_SET_TIMEOUTS
+ioctls.
+Otherwise, applications can implement
 their own timeouts and abort phase.
-.in -2
-.br
-.in +2
-\fBPRN_STREAMS\fR - This bit impacts the application abort phase behaviour. If
-the device claimed \fBPRN_STREAMS\fR capability, the application must issue an
-\fBI_FLUSH\fR \fBioctl\fR(2) before \fBclose\fR(2) to dismiss the untransferred
-data. Only STREAMS drivers can support this capability.
-.in -2
-.RE
-
-.sp
-.ne 2
-.na
-\fBPRNIOC_SET_IFCAP\fR
-.ad
-.RS 21n
-This ioctl can be used to change interface capabilities. The argument is a
-pointer to \fBuint_t\fR bit field that is described in detail in the
-\fBPRNIOC_GET_IFCAP\fR section. Capabilities should be set one at a time;
-otherwise the command will return \fBEINVAL\fR. The following capabilities can
-be changed by this ioctl:
-.br
-.in +2
-\fBPRN_BIDI\fR - When this capability is set, the interface operates in a
-bidirectional mode, instead of forward-only mode. Devices that support only one
-mode will not return error; applications should use \fBPRNIOC_GET_IFCAP\fR to
-check if the mode was successfully changed. Because some capabilities may be
+.It Dv PRN_STREAMS
+This bit impacts the application abort phase behaviour.
+If the device claimed
+.Dv PRN_STREAMS
+capability, the application must issue an
+.Dv I_FLUSH
+.Xr ioctl 2
+before
+.Xr close 2
+to dismiss the untransferred
+data.
+Only STREAMS drivers can support this capability.
+.El
+.It Dv PRNIOC_SET_IFCAP
+This ioctl can be used to change interface capabilities.
+The argument is a pointer to
+.Vt uint_t
+bit field that is described in detail in the
+.Dv PRNIOC_GET_IFCAP
+section.
+Capabilities should be set one at a time;
+otherwise the command will return
+.Er EINVAL .
+The following capabilities can be changed by this ioctl:
+.Bl -tag -width PRN_BIDI
+.It Dv PRN_BIDI
+When this capability is set, the interface operates in a
+bidirectional mode, instead of forward-only mode.
+Devices that support only one
+mode will not return error; applications should use
+.Dv PRNIOC_GET_IFCAP
+to check if the mode was successfully changed.
+Because some capabilities may be
 altered as a side effect of changing other capabilities, this command should be
-followed by \fBPRNIOC_GET_IFCAP\fR.
-.in -2
-.RE
-
-.sp
-.ne 2
-.na
-\fBPRNIOC_GET_IFINFO\fR
-.ad
-.RS 21n
+followed by
+.Dv PRNIOC_GET_IFCAP .
+.El
+.It Dv PRNIOC_GET_IFINFO
 This command can be used to retrieve printer interface info string, which is an
-arbitrary format string usually describing the bus type. The argument is a
-pointer to \fBstruct prn_interface_info\fR as described below.
-.RE
-
-.sp
-.in +2
-.nf
+arbitrary format string usually describing the bus type.
+The argument is a
+pointer to
+.Vt struct prn_interface_info
+as described below.
+.Bd -literal -offset 2n
 struct prn_interface_info {
   uint_t	  if_len;   /* length of buffer */
   uint_t	  if_rlen;  /* actual info length */
-  char   *if_data;  /* buffer address */
+  char   *if_data;          /* buffer address */
 };
-.fi
-.in -2
-
-.sp
-.LP
-The application allocates a buffer and sets \fBif_data\fR and \fBif_len\fR
-values to its address and length, respectively. The driver returns the string
-to this buffer and sets  \fBif_len\fR to its length. If   \fBif_len\fR is less
-that \fBif_rlen\fR, the driver must return the first \fBif_len\fR bytes of the
-string. The application  may then repeat the command with a bigger buffer.
-.sp
-.LP
-Although \fBprnio\fR does not limit the contents of the interface info string,
-some values are recommended and defined in <\fBsys/prnio.h\fR> by the following
-macros:
-.br
-.in +2
-\fBPRN_PARALLEL\fR - Centronics or \fIIEEE 1284\fR compatible devices
-.in -2
-.br
-.in +2
-\fBPRN_SERIAL\fR - EIA-232/EIA-485 serial ports
-.in -2
-.br
-.in +2
-\fBPRN_USB\fR - Universal Serial Bus printers
-.in -2
-.br
-.in +2
-\fBPRN_1394\fR - \fIIEEE 1394\fR peripherals
-.in -2
-.br
-.in +2
+.Ed
+.Pp
+The application allocates a buffer and sets
+.Fa if_data
+and
+.Fa if_len
+values to its address and length, respectively.
+The driver returns the string
+to this buffer and sets
+.Fa if_len
+to its length.
+If
+.Fa if_len
+is less
+than
+.Fa if_rlen ,
+the driver must return the first
+.Fa if_len
+bytes of the string.
+The application may then repeat the command with a bigger buffer.
+.Pp
+Although
+.Nm
+does not limit the contents of the interface info string,
+some values are recommended and defined in
+.In sys/prnio.h
+by the following macros:
+.Pp
+.Bl -tag -width PRN_PARALLEL -compact
+.It Dv PRN_PARALLEL
+Centronics or
+.Em IEEE 1284
+compatible devices
+.It Dv PRN_SERIAL
+EIA-232/EIA-485 serial ports
+.It Dv PRN_USB
+Universal Serial Bus printers
+.It Dv PRN_1394
+.Em IEEE 1394
+peripherals
+.El
+.Pp
 Printer interface info string is for information only: no implications should
 be made from its value.
-.in -2
-.sp
-.ne 2
-.na
-\fBPRNIOC_RESET\fR
-.ad
-.RS 25n
+.It Dv PRNIOC_RESET
 Some applications may want to reset the printer state during Setup and/or
-Cleanup phase using \fBPRNIOC_RESET\fR command. Reset semantics are
+Cleanup phase using
+.Dv PRNIOC_RESET
+command.
+Reset semantics are
 device-specific, and in general, applications using this command should be
 aware of the printer type.
-.sp
-Each \fBprnio\fR compliant driver is required to accept this request, although
-performed actions are completely driver-dependent. More information on the
-\fBPRNIOC_RESET\fR implementation for the particular driver is available in the
+.Pp
+Each
+.Nm
+compliant driver is required to accept this request, although
+performed actions are completely driver-dependent.
+More information on the
+.Dv PRNIOC_RESET
+implementation for the particular driver is available in the
 corresponding man page and printer manual.
-.RE
-
-.sp
-.ne 2
-.na
-\fBPRNIOC_GET_1284_DEVID\fR
-.ad
-.RS 25n
-This command can be used to retrieve printer device ID as defined by \fIIEEE
-1284-1994\fR.The \fBioctl\fR(2) argument is a pointer to \fBstruct
-prn_1284_device_id\fR as described below.
-.RE
-
-.sp
-.in +2
-.nf
+.It Dv PRNIOC_GET_1284_DEVID
+This command can be used to retrieve printer device ID as defined by
+.Em IEEE 1284-1994 .
+The
+.Xr ioctl 2
+argument is a pointer to
+.Vt struct prn_1284_device_id
+as described below.
+.Bd -literal -offset 2n
 struct prn_1284_device_id {
    uint_t	  id_len;   /* length of buffer */
    uint_t	  id_rlen;  /* actual ID length */
-   char      *id_data;  /* buffer address */
+   char           *id_data; /* buffer address */
 };
-.fi
-.in -2
-
-.sp
-.LP
+.Ed
+.Pp
 For convenience, the two-byte length field is not considered part of device ID
-string and is not returned in the user buffer. Instead, \fBid_rlen\fR  value
-shall be set to (length - 2) by the driver, where length is the ID length field
-value. If buffer length is less than \fBid_rlen\fR, the driver returns the
-first \fBid_len\fR bytes of the ID.
-.sp
-.LP
+string and is not returned in the user buffer.
+Instead,
+.Fa id_rlen
+value shall be set to (length - 2) by the driver, where length is the ID
+length field value.
+If buffer length is less than
+.Fa id_rlen ,
+the driver returns the first
+.Fa id_len
+bytes of the ID.
+.Pp
 The printer driver must return the most up-to-date value of the device ID.
-.sp
-.ne 2
-.na
-\fBPRNIOC_GET_STATUS\fR
-.ad
-.RS 21n
-This command can be used by applications to retrieve current device status. The
-argument is a pointer to \fBuint_t\fR, where the status word is returned.
+.It Dv PRNIOC_GET_STATUS
+This command can be used by applications to retrieve current device status.
+The argument is a pointer to
+.Vt uint_t ,
+where the status word is returned.
 Status is a combination of the following bits:
-.RE
-
-.in +2
-\fBPRN_ONLINE\fR - For devices that support \fBPRN_HOTPLUG\fR capability,
-this bit is set when the device is online, otherwise the device is offline.
-Devices without \fBPRN_HOTPLUG\fR support should always have this bit set.
-.in -2
-.br
-.in +2
-\fBPRN_READY\fR - This bit indicates if the device is ready to receive/send
-data. Applications may use this bit for an outbound flow control
-.in -2
-.sp
-.ne 2
-.na
-\fB\fBPRNIOC_GET_1284_STATUS\fR\fR
-.ad
-.RS 26n
-Devices that support \fBPRN_1284_STATUS\fR capability accept this ioctl to
-retrieve the device status lines defined in \fIIEEE 1284\fR for use in
-Compatibility mode. The following bits may be set by the driver:
-.br
-.in +2
-\fBPRN_1284_NOFAULT\fR - Device is not in error state
-.in -2
-.br
-.in +2
-\fBPRN_1284_SELECT\fR - Device is selected
-.in -2
-.br
-.in +2
-\fBPRN_1284_PE\fR - Paper error
-.in -2
-.br
-.in +2
-\fBPRN_1284_BUSY\fR - Device is busy
-.in -2
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBPRNIOC_GET_TIMEOUTS\fR\fR
-.ad
-.RS 26n
-This command  retrieves current transfer timeout values for  the driver. The
-argument is  a pointer to \fBstruct prn_timeouts\fR as described below.
-.RE
-
-.sp
-.in +2
-.nf
+.Bl -tag -width PRN_ONLINE
+.It Dv PRN_ONLINE
+For devices that support
+.Dv PRN_HOTPLUG
+capability, this bit is set when the device is online, otherwise the device is
+offline.
+Devices without
+.Dv PRN_HOTPLUG
+support should always have this bit set.
+.It Dv PRN_READY
+This bit indicates if the device is ready to receive/send data.
+Applications may use this bit for an outbound flow control.
+.El
+.It Dv PRNIOC_GET_1284_STATUS
+Devices that support
+.Dv PRN_1284_STATUS
+capability accept this ioctl to
+retrieve the device status lines defined in
+.Em IEEE 1284
+for use in Compatibility mode.
+The following bits may be set by the driver:
+.Pp
+.Bl -tag -width PRN_1284_NOFAULT -compact
+.It Dv PRN_1284_NOFAULT
+Device is not in error state
+.It Dv PRN_1284_SELECT
+Device is selected
+.It Dv PRN_1284_PE
+Paper error
+.It Dv PRN_1284_BUSY
+Device is busy
+.El
+.It Dv PRNIOC_GET_TIMEOUTS
+This command retrieves current transfer timeout values for the driver.
+The argument is a pointer to
+.Vt struct prn_timeouts
+as described below.
+.Bd -literal -offset 2n
 struct prn_timeouts {
-  uint_t	tmo_forward;  /* forward transfer timeout */
-  uint_t	tmo_reverse;  /* reverse transfer timeout */
-	};
-.fi
-.in -2
-
-.sp
-.LP
-\fBtmo_forward\fR and \fBtmo_reverse\fR define forward and reverse transfer
-timeouts in seconds. This command is only valid for drivers that support
-\fBPRN_TIMEOUTS\fR capability.
-.sp
-.ne 2
-.na
-\fB\fBPRNIOC_SET_TIMEOUTS\fR\fR
-.ad
-.RS 23n
-This command sets current transfer  timeout values for the driver. The
-argument is  a pointer to \fBstruct prn_timeouts\fR. See
-\fBPRNIOC_GET_TIMEOUTS\fR for description of  this structure. This  command is
-only valid for drivers that support \fBPRN_TIMEOUTS\fR capability.
-.RE
-
-.SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Architecture	 SPARC, IA
-_
-Interface Stability	Evolving
-.TE
-
-.SH SEE ALSO
-\fBclose\fR(2), \fBioctl\fR(2), \fBread\fR(2), \fBwrite\fR(2),
-\fBattributes\fR(5), \fBecpp\fR(7D), \fBusbprn\fR(7D), \fBlp\fR(7D)
-.sp
-.LP
-\fIIEEE Std 1284-1994\fR
+    uint_t tmo_forward; /* forward transfer timeout */
+    uint_t tmo_reverse; /* reverse transfer timeout */
+};
+.Ed
+.Pp
+.Fa tmo_forward
+and
+.Fa tmo_reverse
+define forward and reverse transfer timeouts in seconds.
+This command is only valid for drivers that support
+.Dv PRN_TIMEOUTS
+capability.
+.It Dv PRNIOC_SET_TIMEOUTS
+This command sets current transfer timeout values for the driver.
+The argument is a pointer to
+.Vt struct prn_timeouts .
+See
+.Sx PRNIOC_GET_TIMEOUTS
+for description of this structure.
+This command is only valid for drivers that support
+.Dv PRN_TIMEOUTS
+capability.
+.El
+.Sh SEE ALSO
+.Xr close 2 ,
+.Xr ioctl 2 ,
+.Xr read 2 ,
+.Xr write 2 ,
+.Xr attributes 5 ,
+.Xr ecpp 7D ,
+.Xr lp 7D ,
+.Xr usbprn 7D
+.Rs
+.%T IEEE Std 1284-1994
+.Re

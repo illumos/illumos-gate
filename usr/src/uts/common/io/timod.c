@@ -311,10 +311,10 @@ int dotilog = 0;
 
 static int timodopen(queue_t *, dev_t *, int, int, cred_t *);
 static int timodclose(queue_t *, int, cred_t *);
-static void timodwput(queue_t *, mblk_t *);
-static void timodrput(queue_t *, mblk_t *);
-static void timodrsrv(queue_t *);
-static void timodwsrv(queue_t *);
+static int timodwput(queue_t *, mblk_t *);
+static int timodrput(queue_t *, mblk_t *);
+static int timodrsrv(queue_t *);
+static int timodwsrv(queue_t *);
 static int timodrproc(queue_t *, mblk_t *);
 static int timodwproc(queue_t *, mblk_t *);
 
@@ -323,8 +323,8 @@ static int timodwproc(queue_t *, mblk_t *);
 static struct module_info timod_info =
 	{TIMOD_ID, "timod", 0, INFPSZ, 512, 128};
 static struct qinit timodrinit = {
-	(int (*)())timodrput,
-	(int (*)())timodrsrv,
+	timodrput,
+	timodrsrv,
 	timodopen,
 	timodclose,
 	nulldev,
@@ -332,8 +332,8 @@ static struct qinit timodrinit = {
 	NULL
 };
 static struct qinit timodwinit = {
-	(int (*)())timodwput,
-	(int (*)())timodwsrv,
+	timodwput,
+	timodwsrv,
 	timodopen,
 	timodclose,
 	nulldev,
@@ -567,7 +567,7 @@ timodclose(
  *		and T_UNITDATA_IND) messages. All others are queued to
  *		be handled by the service procedures.
  */
-static void
+static int
 timodrput(queue_t *q, mblk_t *mp)
 {
 	union T_primitives *pptr;
@@ -578,7 +578,7 @@ timodrput(queue_t *q, mblk_t *mp)
 	 */
 	if (q->q_first != 0 && mp->b_datap->db_type < QPCTL) {
 		(void) putq(q, mp);
-		return;
+		return (0);
 	}
 
 	/*
@@ -623,6 +623,7 @@ timodrput(queue_t *q, mblk_t *mp)
 		(void) timodrproc(q, mp);
 		break;
 	}
+	return (0);
 }
 
 /*
@@ -636,7 +637,7 @@ timodrput(queue_t *q, mblk_t *mp)
  *		from the put procedure.
  */
 /*ARGSUSED*/
-static void
+static int
 timodrsrv(queue_t *q)
 {
 	mblk_t *mp;
@@ -646,7 +647,7 @@ timodrsrv(queue_t *q)
 
 	tp = (struct tim_tim *)q->q_ptr;
 	if (!tp)
-		return;
+		return (0);
 
 	while ((mp = getq(q)) != NULL) {
 		if (timodrproc(q, mp)) {
@@ -654,9 +655,10 @@ timodrsrv(queue_t *q)
 			 * timodrproc did a putbq - stop processing
 			 * messages.
 			 */
-			return;
+			return (0);
 		}
 	}
+	return (0);
 }
 
 /*
@@ -1446,7 +1448,7 @@ timodrproc(queue_t *q, mblk_t *mp)
  *		be handled by the service procedures.
  */
 
-static void
+static int
 timodwput(queue_t *q, mblk_t *mp)
 {
 	union T_primitives *pptr;
@@ -1465,7 +1467,7 @@ timodwput(queue_t *q, mblk_t *mp)
 			switch (iocbp->ioc_cmd) {
 			default:
 				(void) putq(q, mp);
-				return;
+				return (0);
 
 			case TI_GETINFO:
 			case TI_SYNC:
@@ -1474,7 +1476,7 @@ timodwput(queue_t *q, mblk_t *mp)
 			}
 		} else {
 			(void) putq(q, mp);
-			return;
+			return (0);
 		}
 	}
 	/*
@@ -1541,6 +1543,7 @@ timodwput(queue_t *q, mblk_t *mp)
 		(void) timodwproc(q, mp);
 		break;
 	}
+	return (0);
 }
 /*
  * timodwsrv -	Module write queue service procedure.
@@ -1552,14 +1555,14 @@ timodwput(queue_t *q, mblk_t *mp)
  *		memory allocation could fail, and there is no reasonable
  *		recovery mechanism from the put procedure.
  */
-static void
+static int
 timodwsrv(queue_t *q)
 {
 	mblk_t *mp;
 
 	ASSERT(q != NULL);
 	if (q->q_ptr == NULL)
-		return;
+		return (0);
 
 	while ((mp = getq(q)) != NULL) {
 		if (timodwproc(q, mp)) {
@@ -1567,9 +1570,10 @@ timodwsrv(queue_t *q)
 			 * timodwproc did a putbq - stop processing
 			 * messages.
 			 */
-			return;
+			return (0);
 		}
 	}
+	return (0);
 }
 
 /*

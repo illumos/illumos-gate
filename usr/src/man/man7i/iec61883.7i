@@ -1,108 +1,130 @@
-'\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IEC61883 7I "Mar 27, 2009"
-.SH NAME
-iec61883 \- IEC 61883 interfaces
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/av/iec61883.h>
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
+.Dd July  9, 2018
+.Dt IEC61883 7I
+.Os
+.Sh NAME
+.Nm iec61883
+.Nd IEC 61883 interfaces
+.Sh SYNOPSIS
+.In sys/av/iec61883.h
+.Sh DESCRIPTION
 The set of interfaces described in this man page can be used to control and
 exchange data with consumer audio/video devices using protocols specified
-in\fIIEC 61883 Consumer Electronic Audio/Video Equipment - Digital
-Interface\fR, including Common Isochronous Packet (CIP), Connection Management
+in
+.%T "IIEC 61883 Consumer Electronic Audio/Video Equipment - Digital Interface"
+including Common Isochronous Packet (CIP), Connection Management
 Procedures (CMP) and Function Control Protocol (FCP).
-.sp
-.LP
-An \fBiec61883\fR compliant driver exports two device nodes for isochronous and
-for asynchronous transactions. See the \fBFILES\fR section of this man page for
-the namespace definition.
-.SS "Isochronous Transfers"
-.sp
-.LP
+.Pp
+An
+.Nm
+compliant driver exports two device nodes for isochronous and
+for asynchronous transactions.
+See the
+.Sx FILES
+section of this man page for the namespace definition.
+.Ss "Isochronous Transfers"
 Two methods are provided to receive/transmit isochronous data: using
-\fBmmap\fR(2) in combination with \fBioctl\fR(2), and \fBread\fR(2) or
-\fBwrite\fR(2).
-.SS "Mmap/Ioctl"
-.sp
-.LP
+.Xr mmap 2
+in combination with
+.Xr ioctl 2 ,
+and
+.Xr read 2
+or
+.Xr write 2 .
+.Ss "Mmap/Ioctl"
 This method provides better performance and finer-grained control than
-read/write, and is a method of choice for most applications. The data buffer is
+read/write, and is a method of choice for most applications.
+The data buffer is
 mapped into a user process address space, which means no data copying between
-the kernel and an application is necessary. Synchronization between user
-processes and the driver is performed using \fBioctl\fR(2) commands.
-.sp
-.LP
+the kernel and an application is necessary.
+Synchronization between user
+processes and the driver is performed using
+.Xr ioctl 2
+commands.
+.Pp
 An application allocates resources for isochronous transfer using
-\fBIEC61883_ISOCH_INIT\fR. Then the data buffer can be mapped into the process
-space using \fBmmap\fR(2).
-.sp
-.LP
+.Dv IEC61883_ISOCH_INIT .
+Then the data buffer can be mapped into the process
+space using
+.Xr mmap 2 .
+.Pp
 A circular data buffer consists of one or more equal size frame buffers
 (further referred to as frames, unless to avoid ambiguity with AV frames).
 Frames are numbered starting with zero and are always transferred sequentially.
-Frames consist equal sized packets. Each packet contains a CIP header and one
-or more data blocks.
-.sp
-.LP
+Frames consist equal sized packets.
+Each packet contains a CIP header and one or more data blocks.
+.Pp
 A driver and an application act as a producer and a consumer: producer supplies
-\fBfull\fR frames (filled with data) to the consumer, and the producer is not
-allowed to access those frames until the consumer claims them \fBempty\fR.
-.sp
-.LP
-A transfer can be initiated and suspended with \fBIEC61883_START\fR and
-\fBIEC61883_STOP\fR commands respectively. \fBIEC61883_RECV\fR or
-\fBIEC61883_XMIT\fR is used for producer-consumer synchronization.
-.SS "Read/Write"
-.sp
-.LP
-Using this method, an application calls \fBread\fR(2) or \fBwrite\fR(2) to
-receive or transmit a specified amount of data. Bus-specific overhead, such as
-isochronous packet headers, is handled by the driver and is not exposed to
-applications. Data returned by \fBread\fR(2) contains CIP headers and data
-blocks. Empty packets are not returned by \fBread\fR(2). \fBwrite\fR(2) data
-should meet the same requirements.
-.sp
-.LP
-If one or more channels have been allocated since \fBopen\fR(2) (see
-\fBIEC61883_ISOCH_INIT\fR), the data is received/transmitted using channel that
-was created the last.
-.sp
-.LP
+.Em full
+frames (filled with data) to the consumer, and the producer is not
+allowed to access those frames until the consumer claims them
+.Em empty .
+.Pp
+A transfer can be initiated and suspended with
+.Dv IEC61883_START
+and
+.Dv IEC61883_STOP
+commands respectively.
+.Dv IEC61883_RECV
+or
+.Dv IEC61883_XMIT
+is used for producer-consumer synchronization.
+.Ss "Read/Write"
+Using this method, an application calls
+.Xr read 2
+or
+.Xr write 2
+to receive or transmit a specified amount of data.
+Bus-specific overhead, such as isochronous packet headers, is handled by the driver
+and is not exposed to applications.
+Data returned by
+.Xr read 2
+contains CIP headers and data blocks.
+Empty packets are not returned by
+.Xr read 2 .
+.Xr write 2
+data should meet the same requirements.
+.Pp
+If one or more channels have been allocated since
+.Xr open 2
+(see
+.Dv IEC61883_ISOCH_INIT ) ,
+the data is received/transmitted using channel that was created the last.
+.Pp
 If no channels were allocated, the driver uses the broadcast channel by default
-and allocates the default-size data buffer. During transmit, the first packet's
-CIP header is used to auto-detect the data format. If it is one of the formats
-supported by the driver, it is properly transmitted (with inserted empty
-packets and timestamps).
-.sp
-.LP
+and allocates the default-size data buffer.
+During transmit, the first packet's CIP header is used to auto-detect the data format.
+If it is one of the formats supported by the driver, it is properly transmitted (with
+inserted empty packets and timestamps).
+.Pp
 For both methods, if during transmit the driver runs out of data, it transmits
 empty packets containing only a CIP header of the next to be transmitted
-packet, as defined in \fIIEC 61883-1\fR.
-.SS "Connection Management Procedures"
-.sp
-.LP
+packet, as defined in
+.Em IEC 61883-1 .
+.Ss "Connection Management Procedures"
 Applications wishing to follow Connection Management Procedures (CMP) in
-combination with isochronous transfers should use the \fBioctl\fR(2)
-\fBIEC61883_PLUG_INIT, IEC61883_PLUG_FINI, IEC61883_PLUG_REG_READ\fR and
-\fBIEC61883_PLUG_REG_CAS\fR commands.
-.SS "Asynchronous Transactions"
-.sp
-.LP
-\fBread\fR(2), \fBwrite\fR(2), \fBioctl\fR(2), and \fBpoll\fR(2) can be used
-with asynchronous nodes. Asynchronous data exchange between a driver and an
+combination with isochronous transfers should use the
+.Xr ioctl 2
+.Dv IEC61883_PLUG_INIT ,
+.Dv IEC61883_PLUG_FINI ,
+.Dv IEC61883_PLUG_REG_READ
+and
+.Dv IEC61883_PLUG_REG_CAS
+commands.
+.Ss "Asynchronous Transactions"
+.Xr read 2 ,
+.Xr write 2 ,
+.Xr ioctl 2 ,
+and
+.Xr poll 2
+can be used
+with asynchronous nodes.
+Asynchronous data exchange between a driver and an
 application utilizes a common data structure called asynchronous request (ARQ):
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 typedef struct iec61883_arq {
         int        arq_type;
         int        arq_len;
@@ -112,101 +134,106 @@ typedef struct iec61883_arq {
                 uint8_t    buf[8];
         } arq_data;
 } iec61883_arq_t;
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-\fBarq_type\fR contains \fBARQ\fR type:
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_ARQ_FCP_CMD\fR\fR
-.ad
-.br
-.na
-\fB\fBIEC61883_ARQ_FCP_RESP\fR\fR
-.ad
-.sp .6
-.RS 4n
-\fBFCP\fR command and response frame respectively. Outgoing frames are sent
-using \fBwrite\fR(2), incoming frames are received with \fBread\fR(2).
-.sp
-See \fIIEC 61883-1\fR for the FCP frame structure definition.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_ARQ_BUS_RESET\fR\fR
-.ad
-.sp .6
-.RS 4n
-Returned by the driver when a bus reset occurs. There is no data associated
-with this request type, and \fBarq_len\fR is set to 0.
-.RE
-
-.sp
-.LP
-If \fBarq_len\fR is 4 or 8, then data should be supplied in
-\fBarq_data.quadlet\fR or \fBarq_data.octlet\fR respectively, otherwise up to 8
-bytes can be put in \fBarq_data.buf\fR, with the rest of the data following
-immediately after.
-.SS "write(2)"
-.sp
-.LP
-For a request to be sent to a target, an \fBiec61883_arq_t\fR structure along
-with associated data is passed to the driver using \fBwrite\fR(2).
-\fBwrite()\fR blocks until the request is completed.
-.SS "read(2)"
-.sp
-.LP
-A driver collects incoming ARQs in the internal buffer. Buffer size can be
-changed using the \fBioctl\fR(2) command \fBIEC61883_FCP_SET_IBUF_SIZE\fR.
-.sp
-.LP
-Reading an ARQ takes one or two steps depending on data length. An application
-first reads \fBsizeof (iec61883_arq_t)\fR bytes: if \fBarq_len\fR is less than
-or equal 4, which is usually the case, no additional step is needed. Otherwise,
-the remaining \fBarq_len - 4\fR bytes should be read and concatenated.
-.sp
-.LP
-\fBread\fR(2) blocks until the specified amount of data is available, unless
-\fBO_NONBLOCK\fR or \fBO_NDELAY\fR flag was set during \fBopen\fR(2), in which
-case \fBread\fR(2) returns immediately.
-.SS "poll(2)"
-.sp
-.LP
-Applications can \fBpoll\fR(2) asynchronous nodes on the \fBPOLLIN\fR event.
-.SS "Bus Reset"
-.sp
-.LP
+.Ed
+.Pp
+.Fa arq_type
+contains
+.Sy ARQ
+type:
+.Pp
+.Bl -tag -width " " -compact
+.It Dv IEC61883_ARQ_FCP_CMD
+.It Dv IEC61883_ARQ_FCP_RESP
+.Pp
+.Sy FCP
+command and response frame respectively.
+Outgoing frames are sent using
+.Xr write 2 ,
+incoming frames are received with
+.Xr read 2 .
+.Pp
+See
+.Em IIEC 61883-1
+for the FCP frame structure definition.
+.Pp
+.It Dv IEC61883_ARQ_BUS_RESET
+.Pp
+Returned by the driver when a bus reset occurs.
+There is no data associated with this request type, and \fBarq_len\fR is set to 0.
+.El
+.Pp
+If
+.Fa arq_len
+is 4 or 8, then data should be supplied in
+.Fa arq_data.quadlet
+or
+.Fa arq_data.octlet
+respectively, otherwise up to 8 bytes can be put in
+.Fa arq_data.buf ,
+with the rest of the data following immediately after.
+.Ss "write(2)"
+For a request to be sent to a target, an
+.Vt iec61883_arq_t
+structure along with associated data is passed to the driver using
+.Xr write 2 .
+.Xr write 2
+blocks until the request is completed.
+.Ss "read(2)"
+A driver collects incoming ARQs in the internal buffer.
+Buffer size can be changed using the
+.Xr ioctl 2
+command
+.Vt IEC61883_FCP_SET_IBUF_SIZE .
+.Pp
+Reading an ARQ takes one or two steps depending on data length.
+An application
+first reads
+.Ql sizeof (iec61883_arq_t)
+bytes: if
+.Fa arq_len
+is less than or equal 4, which is usually the case, no additional step is needed.
+Otherwise,
+the remaining
+.Ql arq_len - 4
+bytes should be read and concatenated.
+.Pp
+.Xr read 2
+blocks until the specified amount of data is available, unless
+.Dv O_NONBLOCK
+or
+.Dv O_NDELAY
+flag was set during
+.Xr open 2 ,
+in which case
+.Xr read 2
+returns immediately.
+.Ss "poll(2)"
+Applications can
+.Xr poll 2
+asynchronous nodes on the
+.Dv POLLIN
+event.
+.Ss "Bus Reset"
 In case of a bus reset, the driver notifies an application by generating an
-\fBARQ\fR of type \fBIEC61883_ARQ_BUS_RESET\fR.
-.sp
-.LP
+.Sy ARQ
+of type
+.Dv IEC61883_ARQ_BUS_RESET .
+.Pp
 If there were established isochronous connections before bus reset, the driver
-attempts to restore all connections as described in \fIIEC 61883\fR and resume
-any active transfers that were in progress.
-.SH IOCTLS
-.sp
-.LP
+attempts to restore all connections as described in
+.Em IEC 61883
+and resume any active transfers that were in progress.
+.Sh IOCTLS
 The following commands only apply to isochronous nodes:
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_ISOCH_INIT\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Bl -tag -width " "
+.It Dv IEC61883_ISOCH_INIT
+.Pp
 This command allocates a data buffer and isochronous resources (if necessary)
-for the isochronous transfer. The argument is a pointer to the structure:
-.sp
-.in +2
-.nf
+for the isochronous transfer.
+The argument is a pointer to the structure:
+.Bd -literal -offset 2n
 typedef struct iec61883_isoch_init {
-      int ii_version;       /* interface version */
+      int   ii_version;     /* interface version */
       int   ii_pkt_size;    /* packet size */
       int   ii_frame_size;  /* packets/frame */
       int   ii_frame_cnt;   /* # of frames */
@@ -221,325 +248,272 @@ typedef struct iec61883_isoch_init {
       int   ii_flags;       /* flags */
       int   ii_handle;      /* isoch handle */
       int   ii_frame_rcnt;  /* # of frames */
-      off_t   *ii_mmap_off  /* mmap offset */
+      off_t *ii_mmap_off    /* mmap offset */
       int   ii_rchannel;    /* channel */
       int   ii_error;       /* error code */
 } iec61883_isoch_init_t;
-.fi
-.in -2
-.sp
-
-\fBii_version\fR should be set to \fBIEC61883_V1_0\fR.
-.sp
-The driver attempts to allocate a data buffer consisting of \fBii_frame_cnt\fR
-frames, with \fBii_frame_size\fR packets in each frame. Packet size in bytes is
-specified by \fBii_pkt_size\fR specifies and should be a multiple of 512 and
-compatible with \fBii_bus_speed\fR.
-.sp
-\fBii_direction\fR can take one of the following values:
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_DIR_RECV\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Ed
+.Pp
+.Fa ii_version
+should be set to
+.Dv IEC61883_V1_0 .
+.Pp
+The driver attempts to allocate a data buffer consisting of
+.Fa ii_frame_cnt
+frames, with
+.Fa ii_frame_size
+packets in each frame.
+Packet size in bytes is specified by
+.Fa ii_pkt_size
+specifies and should be a multiple of 512 and compatible with
+.Fa ii_bus_speed .
+.Pp
+.Fa ii_direction
+can take one of the following values:
+.Bl -tag -width "IEC61883_DIR_RECV"
+.It Dv IEC61883_DIR_RECV
 Receiving isochronous data.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_DIR_XMIT\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Dv IEC61883_DIR_XMIT
 Transmitting isochronous data.
-.RE
-
-\fBii_bus_speed\fR chooses bus speed to be used and can be either
-\fBIEC61883_S100, IEC61883_S200\fR or \fBIEC61883_S400\fR.
-.sp
-\fBii_channel\fR is a mask that specifies an isochronous channel number to be
-used, with the \fIN\fRth bit representing channel \fIN\fR. When transmitting
-data, several bits can be set at a time, in which case the driver chooses one,
-for example, \fB0x3FF\fR means a range from 0 to 9. In case of receive, only
-one bit can be set.
-.sp
-\fBii_dbs\fR specifies data block size in quadlets, for example, DBS value for
-\fBSD-DVCR\fR is \fB0x78\fR. Refer to \fIIEC 61883\fR for more details on DBS.
-.sp
-ii_fn specifies fraction number, which defines the number of blocks in which a
-source packet is divided. Allowed values are from 0 to 3. Refer to IEC 61883
+.El
+.Pp
+.Fa ii_bus_speed
+chooses bus speed to be used and can be either
+.Dv IEC61883_S100 ,
+.Dv IEC61883_S200
+or
+.Dv IEC61883_S400 .
+.Pp
+.Fa ii_channel
+is a mask that specifies an isochronous channel number to be
+used, with the
+.Em N Ns th
+bit representing channel
+.Em N .
+When transmitting data, several bits can be set at a time, in which case the
+driver chooses one, for example,
+.Sy 0x3FF
+means a range from 0 to 9.
+In case of receive, only one bit can be set.
+.Pp
+.Fa ii_dbs
+specifies data block size in quadlets, for example, DBS value for
+.Dv SD-DVCR
+is
+.Sy 0x78 .
+Refer to
+.Em IEC 61883
+for more details on DBS.
+.Pp
+.Fa ii_fn
+specifies fraction number, which defines the number of blocks in which a
+source packet is divided.
+Allowed values are from 0 to 3.
+Refer to
+.Em IEC 61883
 for more details on FN.
-.sp
+.Pp
 Data rate expected by the AV device can be lower than the bus speed, in which
 case the driver has to periodically insert empty packets into the data stream
-to avoid device buffer overflows. This rate is specified with a fraction N/D,
-set by \fBii_rate_n\fR and \fBii_rate_d\fR respectively. Any integer numbers
-can be used, or the following predefined constants:
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_RATE_N_DV_NTSC IEC61883_RATE_D_DV_NTSC\fR\fR
-.ad
-.sp .6
-.RS 4n
-Data rate expected by \fBDV-NTSC\fR devices.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_RATE_N_DV_PAL IEC61883_RATE_D_DV_PAL\fR\fR
-.ad
-.sp .6
-.RS 4n
-Data rate expected by \fBDV-PAL\fR devices.
-.RE
-
+to avoid device buffer overflows.
+This rate is specified with a fraction N/D,
+set by
+.Fa ii_rate_n
+and
+.Fa ii_rate_d
+respectively.
+Any integer numbers can be used, or the following predefined constants:
+.Pp
+.Bl -tag -width "IEC61883_RATE_N_DV_NTSC" -compact
+.It Dv IEC61883_RATE_N_DV_NTSC
+.It Dv IEC61883_RATE_D_DV_NTSC
+Data rate expected by
+.Sy DV-NTSC
+devices.
+.Pp
+.It Dv IEC61883_RATE_N_DV_PAL
+.It Dv IEC61883_RATE_D_DV_PAL
+Data rate expected by
+.Sy DV-PAL
+devices.
+.El
+.Pp
 During data transmission, a timestamp based on the current value of the cycle
-timer is usually required. \fBii_ts_mode\fR defines timestamp mode to be used:
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_TS_SYT\fR\fR
-.ad
-.sp .6
-.RS 4n
+timer is usually required.
+.Fa ii_ts_mode
+defines timestamp mode to be used:
+.Bl -tag -width IEC61883_TS_NONE
+.It Dv IEC61883_TS_SYT
 Driver puts a timestamp in the SYT field of the first CIP header of each frame.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_TS_NONE\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Dv IEC61883_TS_NONE
 No timestamps.
-.RE
-
-\fBii_dbs, ii_fn, ii_rate_n, ii_rate_d\fR and \fBii_ts_mode\fR are only
-required for transmission. In other case these should be set to 0.
-.sp
-\fBii_flags\fR should be set to 0.
-.sp
-If command succeeds, \fBii_handle\fR contains a handle that should be used with
-other isochronous commands. \fBii_frame_rcnt\fR contains the number of
-allocated frames (can be less than \fBii_frame_cnt\fR). \fBii_mmap_off\fR
-contains an offset to be used in \fBmmap\fR(2), for example, to map an entire
-data receive buffer:
-.sp
-.in +2
-.nf
+.El
+.Pp
+.Fa ii_dbs ,
+.Fa ii_fn ,
+.Fa ii_rate_n ,
+.Fa ii_rate_d
+and
+.Fa ii_ts_mode
+are only required for transmission.
+In other case these should be set to 0.
+.Pp
+.Fa ii_flags
+should be set to 0.
+.Pp
+If command succeeds,
+.Fa ii_handle
+contains a handle that should be used with other isochronous commands.
+.Fa ii_frame_rcnt
+contains the number of allocated frames (can be less than
+.Fa ii_frame_cnt ) .
+.Fa ii_mmap_off
+contains an offset to be used in
+.Xr mmap 2 ,
+for example, to map an entire data receive buffer:
+.Bd -literal -offset 2n
 pa = mmap(NULL, init.ii_pkt_size *
       init.ii_frame_size * init.ii_frame_rcnt,
       PROT_READ, MAP_PRIVATE, fd, init.ii_mmap_off);
-.fi
-.in -2
-.sp
-
-\fBii_rchannel\fR contains channel number.
-.sp
-In case of command success, \fBii_error\fR is set to 0; otherwise one of the
-following values can be returned:
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_ERR_NOMEM\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Ed
+.Pp
+.Fa ii_rchannel
+contains channel number.
+.Pp
+In case of command success,
+.Fa ii_error
+is set to 0; otherwise one of the following values can be returned:
+.Bl -tag -width IEC61883_ERR_NOCHANNEL
+.It Dv IEC61883_ERR_NOMEM
 Not enough memory for the data buffer.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_ERR_NOCHANNEL\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Dv IEC61883_ERR_NOCHANNEL
 Cannot allocate isochronous channel.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_ERR_PKT_SIZE\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Dv IEC61883_ERR_PKT_SIZE
 Packet size is not allowed at this bus speed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_ERR_VERSION\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Dv IEC61883_ERR_VERSION
 Interface version is not supported.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_ERR_INVAL\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Dv IEC61883_ERR_INVAL
 One or more the parameters are invalid
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_ERR_OTHER\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Dv IEC61883_ERR_OTHER
 Unspecified error type.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_ISOCH_FINI\fR\fR
-.ad
-.sp .6
-.RS 4n
-Argument is a handle returned by \fBIEC61883_ISOCH_INIT\fR. This command frees
-any resources associated with this handle. There must be no active transfers
+.El
+.It Dv IEC61883_ISOCH_FINI
+.Pp
+Argument is a handle returned by
+.Dv IEC61883_ISOCH_INIT .
+This command frees any resources associated with this handle.
+There must be no active transfers
 and the data buffer must be unmapped; otherwise the command fails.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_START\fR\fR
-.ad
-.sp .6
-.RS 4n
-This command starts an isochronous transfer. The argument is a handle returned
-by \fBIEC61883_ISOCH_INIT\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_STOP\fR\fR
-.ad
-.sp .6
-.RS 4n
-This command stops an isochronous transfer. The argument is a handle returned
-by \fBIEC61883_ISOCH_INIT\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_RECV\fR\fR
-.ad
-.sp .6
-.RS 4n
-This command is used to receive full frames and return empty frames to the
-driver. The argument is a pointer to the structure:
-.sp
-.in +2
-.nf
+.It Dv IEC61883_START
+.Pp
+This command starts an isochronous transfer.
+The argument is a handle returned
+by
+.Dv IEC61883_ISOCH_INIT .
+.It Dv IEC61883_STOP
+.Pp
+This command stops an isochronous transfer.
+The argument is a handle returned by
+.Dv IEC61883_ISOCH_INIT .
+.It Dv IEC61883_RECV
+.Pp
+This command is used to receive full frames and return empty frames to the driver.
+The argument is a pointer to the structure:
+.Bd -literal -offset 2n
 typedef struct iec61883_recv {
-        int rx_handle;     /* isoch handle */
-        int rx_flags;      /* flags */
-iec61883_xfer_t rx_xfer;   /* xfer params */
+        int   rx_handle;    /* isoch handle */
+        int   rx_flags;     /* flags */
+        iec61883_xfer_t rx_xfer;   /* xfer params */
 } iec61883_recv_t;
 
 typedef struct iec61883_xfer {
         int   xf_empty_idx; /* first empty frame */
-        int xf_empty_cnt;   /* empty frame count */
+        int   xf_empty_cnt; /* empty frame count */
         int   xf_full_idx;  /* first full frame */
         int   xf_full_cnt;  /* full frame count */
         int   xf_error;     /* error */
 } iec61883_xfer_t;
-.fi
-.in -2
-.sp
-
-\fBrx_flags\fR should be set to 0.
-.sp
-An application sets \fBxf_empty_idx\fR and \fBxf_empty_cnt\fR to indicate
-frames it no longer needs. E.g. if a buffer consists of 6 frames,
-\fBxf_empty_idx\fR is 4, \fBxf_empty_cnt\fR is 3 - means that frames 4, 5 and 0
-can now be reused by the driver. If there are no empty frames, for example, the
-first time this command is called, \fBxf_empty_cnt\fR should be set to 0.
-.sp
-When the command returns, \fBxf_full_idx\fR and \fBxf_full_cnt\fR specifies the
-frames that are full. \fBxf_error\fR is always 0.
-.sp
+.Ed
+.Pp
+.Fa rx_flags
+should be set to 0.
+.Pp
+An application sets
+.Fa xf_empty_idx
+and
+.Fa xf_empty_cnt
+to indicate frames it no longer needs.
+E. g.  if a buffer consists of 6 frames,
+.Fa xf_empty_idx
+is 4,
+.Fa xf_empty_cnt
+is 3 - means that frames 4, 5 and 0 can now be reused by the driver.
+If there are no empty frames, for example, the
+first time this command is called,
+.Fa xf_empty_cnt
+should be set to 0.
+.Pp
+When the command returns,
+.Fa xf_full_idx
+and
+.Fa xf_full_cnt
+specifies the frames that are full.
+.Fa xf_error
+is always 0.
+.Pp
 In general, AV frame boundaries are not aligned with the frame buffer
 boundaries, because the first received packet might not be the first packet of
 an AV frame, and, in contrast with the read/write method, the driver does not
 remove empty CIP packets.
-.sp
+.Pp
 Applications should detect empty packets by comparing adjacent packets'
 continuity counters (DBC field of the CIP header).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_XMIT\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Dv IEC61883_XMIT
+.Pp
 This command is used to transmit full frames and get more empty frames from the
-driver. The argument is a pointer to the structure:
-.sp
-.in +2
-.nf
+driver.
+The argument is a pointer to the structure:
+.Bd -literal -offset 2n
 typedef struct iec61883_xmit {
         int   tx_handle;         /* isoch handle */
         int   tx_flags;          /* flags */
         iec61883_xfer_t tx_xfer; /* xfer params */
         int   tx_miss_cnt;       /* missed cycles */
  } iec61883_xmit_t;
-.fi
-.in -2
-.sp
-
-\fBtx_flags\fR should be set to zero.
-.sp
-The application sets \fBxf_full_idx\fR and \fBxf_full_cnt\fR to specify frames
-it wishes to transmit. If there are no frames to transmit (e.g. the first time
-this command is called), \fBxf_full_cnt\fR should be set to 0.
-.sp
-When the command returns, \fBxf_empty_idx\fR and \fBxf_empty_cnt\fR specifies
-empty frames which can be to transmit more data. \fBxf_error\fR is always 0.
-.sp
-\fBtx_miss_cnt\fR contains the number of isochronous cycles missed since last
-transfer due to data buffer under run. This can happen when an application does
-not supply data fast enough.
-.sp
+.Ed
+.Pp
+.Fa tx_flags
+should be set to zero.
+.Pp
+The application sets
+.Fa xf_full_idx
+and
+.Fa xf_full_cnt
+to specify frames it wishes to transmit.
+If there are no frames to transmit (e. g. the first time this command is called),
+.Fa xf_full_cnt
+should be set to 0.
+.Pp
+When the command returns,
+.Fa xf_empty_idx
+and
+.Fa xf_empty_cnt
+specifies empty frames which can be to transmit more data.
+.Fa xf_error
+is always 0.
+.Pp
+.Fa tx_miss_cnt
+contains the number of isochronous cycles missed since last
+transfer due to data buffer under run.
+This can happen when an application does not supply data fast enough.
 For the purposes of time stamping, the driver considers the first packet in a
 frame buffer to be the first packet of an AV frame.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_PLUG_INIT\fR\fR
-.ad
-.sp .6
-.RS 4n
-This command returns a handle for the specified plug. The argument is a pointer
+.It Dv IEC61883_PLUG_INIT
+.Pp
+This command returns a handle for the specified plug.
+The argument is a pointer
 to the structure:
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 typedef struct iec61883_plug_init {
         int   pi_ver;     /* interface version */
         int   pi_loc;     /* plug location */
@@ -549,239 +523,152 @@ typedef struct iec61883_plug_init {
         int   pi_handle;  /* plug handle */
         int   pi_rnum;    /* plug number */
  } iec61883_plug_init_t;
-.fi
-.in -2
-.sp
-
-\fBpi_ver\fR should be set to \fBIEC61883_V1_0\fR.
-.sp
-\fBpi_loc\fR specifies plug location:
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_LOC_LOCAL\fR\fR
-.ad
-.sp .6
-.RS 4n
-On the local unit (local plug). A plug control register (PCR) is allocated.
+.Ed
+.Pp
+.Fa pi_ver
+should be set to
+.Dv IEC61883_V1_0 .
+.Pp
+.Fa pi_loc
+specifies plug location:
+.Bl -tag -width IEC61883_LOC_REMOTE
+.It Dv IEC61883_LOC_LOCAL
+On the local unit (local plug).
+A plug control register (PCR) is allocated.
 Command fails if the plug already exists
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_LOC_REMOTE\fR\fR
-.ad
-.sp .6
-.RS 4n
-On the remote unit (remote plug). The plug should exist on the remote unit,
+.It Dv IEC61883_LOC_REMOTE
+On the remote unit (remote plug).
+The plug should exist on the remote unit,
 otherwise the command fails.
-.RE
-
-\fBpi_type\fR specifies isochronous plug type:
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_PLUG_IN IEC61883_PLUG_OUT\fR\fR
-.ad
-.sp .6
-.RS 4n
+.El
+.Pp
+.Fa pi_type
+specifies isochronous plug type:
+.Pp
+.Bl -tag -width " " -compact
+.It Dv IEC61883_PLUG_IN
+.It Dv IEC61883_PLUG_OUT
+.Pp
 Input or output plugs.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_PLUG_MASTER_IN IEC61883_PLUG_MASTER_OUT\fR\fR
-.ad
-.sp .6
-.RS 4n
-Master input or master output plug. These plugs always exist on the local unit.
-.RE
-
-\fBpi_num\fR specifies plug number. This should be 0 for master plugs, and from
-0 to 31 for input/output plugs. Alternatively, a special value
-\fBIEC61883_PLUG_ANY\fR can be used to let the driver choose a free plug
-number, create the plug and return the number in \fBpi_rnum\fR.
-.sp
-\fBpi_flags\fR should be set to 0.
-.sp
-If the command succeeds, \fBpi_handle\fR contains a handle that should be used
-with other plug commands.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_PLUG_FINI\fR\fR
-.ad
-.sp .6
-.RS 4n
-Argument is a handle returned by \fBIEC61883_PLUG_INIT\fR. This command frees
-any resources associated with this handle, including the PCR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_PLUG_REG_READ\fR\fR
-.ad
-.sp .6
-.RS 4n
-Read plug register value. The argument is a pointer to the structure:
-.sp
-.in +2
-.nf
+.Pp
+.It Dv IEC61883_PLUG_MASTER_IN
+.It Dv IEC61883_PLUG_MASTER_OUT
+.Pp
+Master input or master output plug.
+These plugs always exist on the local unit.
+.El
+.Pp
+.Fa pi_num
+specifies plug number.
+This should be 0 for master plugs, and from 0 to 31 for input/output plugs.
+Alternatively, a special value
+.Dv IEC61883_PLUG_ANY
+can be used to let the driver choose a free plug
+number, create the plug and return the number in
+.Fa pi_rnum .
+.Pp
+.Fa pi_flags
+should be set to 0.
+.Pp
+If the command succeeds,
+.Fa pi_handle
+contains a handle that should be used with other plug commands.
+.It Dv IEC61883_PLUG_FINI
+.Pp
+Argument is a handle returned by
+.Dv IEC61883_PLUG_INIT .
+This command frees any resources associated with this handle, including the PCR.
+.It Dv IEC61883_PLUG_REG_READ
+.Pp
+Read plug register value.
+The argument is a pointer to the structure:
+.Bd -literal -offset 2n
 typedef struct iec61883_plug_reg_val {
         int         pr_handle; /* plug handle */
-        uint32_t     pr_val;    /* register value */
+        uint32_t    pr_val;    /* register value */
 } iec61883_plug_reg_val_t;
-.fi
-.in -2
-.sp
-
-\fBpr_handle\fR is a handle returned by \fBIEC61883_PLUG_INIT\fR. Register
-value is returned in \fBpr_val\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_PLUG_REG_CAS\fR\fR
-.ad
-.sp .6
-.RS 4n
-Atomically compare and swap plug register value. The argument is a pointer to
-the structure:
-.sp
-.in +2
-.nf
+.Ed
+.Pp
+.Fa pr_handle
+is a handle returned by
+.Dv IEC61883_PLUG_INIT .
+Register
+value is returned in
+.Fa pr_val .
+.It Dv IEC61883_PLUG_REG_CAS
+.Pp
+Atomically compare and swap plug register value.
+The argument is a pointer to the structure:
+.Bd -literal -offset 2n
 typedef struct iec61883_plug_reg_lock {
         int        pl_handle; /* plug handle */
         uint32_t   pl_arg;    /* compare arg */
         uint32_t   pl_data;   /* write value */
         UINT32_t   pl_old;    /* original value */
 } iec61883_plug_reg_lock_t;
-.fi
-.in -2
-.sp
-
-pr_handle is a handle returned by IEC61883_PLUG_INIT.
-.sp
-Original register value is compared with pl_arg and if they are equal, register
-value is replaced with pl_data. In any case, the original value is stored in
-pl_old.
-.RE
-
-.sp
-.LP
+.Ed
+.Pp
+.Fa pr_handle
+is a handle returned by IEC61883_PLUG_INIT.
+.Pp
+Original register value is compared with
+.Fa pl_arg
+and if they are equal, register value is replaced with
+.Fa pl_data .
+In any case, the original value is stored in
+.Fa pl_old .
+.El
+.Pp
 The following commands only apply to asynchronous nodes:
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_ARQ_GET_IBUF_SIZE\fR\fR
-.ad
-.sp .6
-.RS 4n
-This command returns current incoming ARQ buffer size. The argument is a
-pointer to \fBint\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIEC61883_ARQ_SET_IBUF_SIZE\fR\fR
-.ad
-.sp .6
-.RS 4n
-This command changes incoming ARQ buffer size. The argument is the new buffer
+.Bl -tag -width " "
+.It Dv IEC61883_ARQ_GET_IBUF_SIZE
+.Pp
+This command returns current incoming ARQ buffer size.
+The argument is a
+pointer to
+.Vt int .
+.It Dv IEC61883_ARQ_SET_IBUF_SIZE
+.Pp
+This command changes incoming ARQ buffer size.
+The argument is the new buffer
 size in bytes.
-.RE
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/dev/av/N/async\fR\fR
-.ad
-.RS 19n
+.El
+.Sh FILES
+.Bl -tag -width /dev/av/N/async
+.It Pa /dev/av/N/async
 Device node for asynchronous data
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/dev/av/N/isoch\fR\fR
-.ad
-.RS 19n
+.It Pa /dev/av/N/isoch
 Device has been disconnected
-.RE
-
-.SH ERRORS
-.sp
-.ne 2
-.na
-\fB\fBEIO\fR\fR
-.ad
-.RS 10n
+.El
+.Sh ERRORS
+.Bl -tag -width EFAULT
+.It Er EIO
 Bus operation failed.
-.sp
 DMA failure.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 10n
-\fBioctl\fR(2) argument points to an illegal address.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
+.It Er EFAULT
+.Xr ioctl 2
+argument points to an illegal address.
+.It Er EINVAL
 Invalid argument or argument combination.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENODEV\fR\fR
-.ad
-.RS 10n
+.It Er ENODEV
 Device has been disconnected.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Architecture	All
-_
-Stability level	Committed
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBioctl\fR(2), \fBmmap\fR(2), \fBopen\fR(2), \fBpoll\fR(2), \fBread\fR(2),
-\fBwrite\fR(2), \fBattributes\fR(5), \fBav1394\fR(7D)
-.sp
-.LP
-\fIIEC 61883 Consumer audio/video equipment - Digital interface\fR
-.sp
-.LP
-\fIIEEE Std 1394-1995 Standard for a High Performance Serial Bus\fR
+.El
+.Sh ARCHITECTURE
+All
+.Sh INTERFACE STABILITY
+Committed
+.Sh SEE ALSO
+.Xr ioctl 2 ,
+.Xr mmap 2 ,
+.Xr open 2 ,
+.Xr poll 2 ,
+.Xr read 2 ,
+.Xr write 2 ,
+.Xr attributes 5 ,
+.Xr av1394 7D
+.Rs
+.%B IIEC 61883 Consumer audio/video equipment - Digital interface
+.Re
+.Rs
+.%B IEEE Std 1394-1995 Standard for a High Performance Serial Bus
+.Re

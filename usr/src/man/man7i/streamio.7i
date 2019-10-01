@@ -1,1812 +1,1550 @@
-'\" te
+.\" Copyright (c) 2017, Joyent, Inc.
 .\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
-.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
-.\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STREAMIO 7I "Apr 8, 2009"
-.SH NAME
-streamio \- STREAMS ioctl commands
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/types.h>
-#include <stropts.h>
-#include <sys/conf.h>
-
-\fBint\fR \fBioctl\fR(\fBint\fR \fIfildes\fR, \fBint\fR \fIcommand\fR, \fB\&... /*arg*/\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-STREAMS (see \fBIntro\fR(3)) \fBioctl\fR commands are a subset of the
-\fBioctl\fR(2) commands and perform a variety of control functions on streams.
-.sp
-.LP
-The \fIfildes\fR argument is an open file descriptor that refers to a stream.
-The \fIcommand\fR argument determines the control function to be performed as
-described below. The \fIarg\fR argument represents additional information that
-is needed by this command. The type of \fIarg\fR depends upon the command, but
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd October 29, 2017
+.Dt STREAMIO 7I
+.Os
+.Sh NAME
+.Nm streamio
+.Nd STREAMS ioctl commands
+.Sh SYNOPSIS
+.In sys/types.h
+.In stropts.h
+.In sys/conf.h
+.Ft int
+.Fo ioctl
+.Fa "int fildes"
+.Fa "int command"
+.Fa "\&... /*arg*/"
+.Fc
+.Sh DESCRIPTION
+STREAMS (see
+.Xr Intro 3 )
+.Fn ioctl
+commands are a subset of the
+.Xr ioctl 2
+commands and perform a variety of control functions on streams.
+.Pp
+The
+.Fa fildes
+argument is an open file descriptor that refers to a stream.
+The
+.Fa command
+argument determines the control function to be performed as
+described below.
+The
+.Fa arg
+argument represents additional information that
+is needed by this command.
+The type of
+.Fa arg
+depends upon the command, but
 it is generally an integer or a pointer to a command-specific data structure.
-The \fIcommand\fR and \fIarg\fR arguments are interpreted by the STREAM head.
+The
+.Fa command
+and
+.Fa arg
+arguments are interpreted by the STREAM head.
 Certain combinations of these arguments may be passed to a module or driver in
 the stream.
-.sp
-.LP
-Since these STREAMS commands are \fBioctls\fR, they are subject to the errors
-described in \fBioctl\fR(2). In addition to those errors, the call will fail
-with \fBerrno\fR set to \fBEINVAL,\fR without processing a control function, if
-the STREAM referenced by \fIfildes\fR is linked below a multiplexor, or if
-\fIcommand\fR is not a valid value for a stream.
-.sp
-.LP
-Also, as described in \fBioctl\fR(2), STREAMS modules and drivers can detect
-errors. In this case, the module or driver sends an error message to the STREAM
-head containing an error value. This causes subsequent calls to fail with
-\fBerrno\fR set to this value.
-.SH IOCTLS
-.sp
-.LP
-The following \fBioctl\fR commands, with error values indicated, are applicable
-to all STREAMS files:
-.sp
-.ne 2
-.na
-\fB\fBI_PUSH\fR\fR
-.ad
-.RS 15n
-Pushes the module whose name is pointed to by \fIarg\fR onto the top of the
-current stream, just below the STREAM head. If the STREAM is a pipe, the module
-will be inserted between the stream heads of both ends of the pipe. It then
-calls the open routine of the newly-pushed module. On failure, \fBerrno\fR is
-set to one of the following values:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 11n
+.Pp
+Since these STREAMS commands are
+.Sy ioctls ,
+they are subject to the errors described in
+.Xr ioctl 2 .
+In addition to those errors, the call will fail
+with
+.Va errno
+set to
+.Er EINVAL ,
+without processing a control function, if the STREAM referenced by
+.Fa fildes
+is linked below a multiplexor, or if
+.Fa command
+is not a valid value for a stream.
+.Pp
+Also, as described in
+.Xr ioctl 2 ,
+STREAMS modules and drivers can detect
+errors.
+In this case, the module or driver sends an error message to the STREAM
+head containing an error value.
+This causes subsequent calls to fail with
+.Va errno
+set to this value.
+.Sh IOCTLS
+The following
+.Fn ioctl
+commands, with error values indicated, are applicable to all STREAMS files:
+.Bl -tag -width I_SETCLTIME
+.It Dv I_PUSH
+Pushes the module whose name is pointed to by
+.Va arg
+onto the top of the current stream, just below the STREAM head.
+If the STREAM is a pipe, the module
+will be inserted between the stream heads of both ends of the pipe.
+It then calls the open routine of the newly-pushed module.
+On failure,
+.Va errno
+is set to one of the following values:
+.Bl -tag -width ENOTSUP
+.It Er EINVAL
 Invalid module name.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 11n
-\fIarg\fR points outside the allocated address space.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENXIO\fR\fR
-.ad
-.RS 11n
+.It Er EFAULT
+.Va arg
+points outside the allocated address space.
+.It Er ENXIO
 Open routine of new module failed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENXIO\fR\fR
-.ad
-.RS 11n
-Hangup received on \fIfildes\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOTSUP\fR\fR
-.ad
-.RS 11n
+.It Er ENXIO
+Hangup received on
+.Va fildes .
+.It Er ENOTSUP
 Pushing a module is not supported on this stream.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_POP\fR\fR
-.ad
-.RS 15n
+.El
+.It Dv I_POP
 Removes the module just below the STREAM head of the STREAM pointed to by
-\fIfildes\fR. To remove a module from a pipe requires that the module was
-pushed on the side it is being removed from. \fIarg\fR should be  \fB0\fR in an
-\fBI_POP\fR request. On failure, \fBerrno\fR is set to one of the following
-values:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 11n
+.Fa fildes .
+To remove a module from a pipe requires that the module was
+pushed on the side it is being removed from.
+.Fa arg
+should be
+.Sy 0
+in an
+.Dv I_POP
+request.
+On failure,
+.Va errno
+is set to one of the following values:
+.Bl -tag -width ENOTSUP
+.It Er EINVAL
 No module present in the stream.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENXIO\fR\fR
-.ad
-.RS 11n
-Hangup received on \fIfildes\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEPERM\fR\fR
-.ad
-.RS 11n
+.It Er ENXIO
+Hangup received on
+.Fa fildes .
+.It Er EPERM
 Attempt to pop through an anchor by an unprivileged process.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOTSUP\fR\fR
-.ad
-.RS 11n
+.It Er ENOTSUP
 Removal is not supported.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_ANCHOR\fR\fR
-.ad
-.RS 15n
+.El
+.It Dv I_ANCHOR
 Positions the stream anchor to be at the stream's module directly below the
-stream head. Once this has been done, only a privileged process may pop modules
-below the anchor on the stream. \fIarg\fR must be \fB0\fR in an \fBI_ANCHOR\fR
-request. On failure, \fBerrno\fR is set to the following value:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
+stream head.
+Once this has been done, only a privileged process may pop modules
+below the anchor on the stream.
+.Va arg
+must be
+.Sy 0
+in an
+.Dv I_ANCHOR
+request.
+On failure,
+.Va errno
+is set to the following value:
+.Bl -tag -width EINVAL
+.It Er EINVAL
 Request to put an anchor on a pipe.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_LOOK\fR\fR
-.ad
-.RS 15n
+.El
+.It Dv I_LOOK
 Retrieves the name of the module just below the stream head of the stream
-pointed to by \fIfildes\fR, and places it in a null terminated character string
-pointed at by \fIarg\fR. The buffer pointed to by \fIarg\fR should be at least
-\fBFMNAMESZ\fR+1 bytes long. This requires the declaration \fB#include
-<sys/conf.h>\fR. On failure, \fBerrno\fR is set to one of the following values:
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 10n
-\fIarg\fR points outside the allocated address space.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
+pointed to by
+.Fa fildes ,
+and places it in a null terminated character string
+pointed at by
+.Fa arg .
+The buffer pointed to by
+.Fa arg
+should be at least
+.Dv FMNAMESZ Ns +1
+bytes long.
+This requires the declaration
+.Ql "#include <sys/conf.h>" .
+On failure,
+.Dv errno
+is set to one of the following values:
+.Bl -tag -width EFAULT
+.It Er EFAULT
+.Fa arg
+points outside the allocated address space.
+.It Er EINVAL
 No module present in stream.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_FLUSH\fR\fR
-.ad
-.RS 15n
+.El
+.It Dv I_FLUSH
 This request flushes all input and/or output queues, depending on the value of
-\fIarg\fR. Legal \fIarg\fR values are:
-.sp
-.ne 2
-.na
-\fBFLUSHR\fR
-.ad
-.RS 11n
+.Fa arg .
+Legal
+.Fa arg
+values are:
+.Bl -tag -width FLUSHRW
+.It Dv FLUSHR
 Flush read queues.
-.RE
-
-.sp
-.ne 2
-.na
-\fBFLUSHW\fR
-.ad
-.RS 11n
+.It Dv FLUSHW
 Flush write queues.
-.RE
-
-.sp
-.ne 2
-.na
-\fBFLUSHRW\fR
-.ad
-.RS 11n
+.It Dv FLUSHRW
 Flush read and write queues.
-.RE
-
+.El
+.Pp
 If a pipe or FIFO does not have any modules pushed, the read queue of the
-stream head on either end is flushed depending on the value of \fIarg\fR.
-.sp
-If \fBFLUSHR\fR is set and \fIfildes\fR is a pipe, the read queue for that end
-of the pipe is flushed and the write queue for the other end is flushed. If
-\fIfildes\fR is a FIFO, both queues are flushed.
-.sp
-If \fBFLUSHW\fR is set and \fIfildes\fR is a pipe and the other end of the pipe
+stream head on either end is flushed depending on the value of
+.Fa arg .
+.Pp
+If
+.Dv FLUSHR
+is set and
+.Fa fildes
+is a pipe, the read queue for that end
+of the pipe is flushed and the write queue for the other end is flushed.
+If
+.Fa fildes
+is a FIFO, both queues are flushed.
+.Pp
+If
+.Dv FLUSHW
+is set and
+.Fa fildes
+is a pipe and the other end of the pipe
 exists, the read queue for the other end of the pipe is flushed and the write
-queue for this end is flushed. If \fIfildes\fR is a FIFO, both queues of the
+queue for this end is flushed.
+If
+.Fa fildes
+is a FIFO, both queues of the
 FIFO are flushed.
-.sp
-If \fBFLUSHRW\fR is set, all read queues are flushed, that is, the read queue
+.Pp
+If
+.Dv FLUSHRW
+is set, all read queues are flushed, that is, the read queue
 for the FIFO and the read queue on both ends of the pipe are flushed.
-.sp
+.Pp
 Correct flush handling of a pipe or FIFO with modules pushed is achieved via
-the \fBpipemod\fR module.  This module should be the first module pushed onto a
+the
+.Sy pipemod
+module.
+This module should be the first module pushed onto a
 pipe so that it is at the midpoint of the pipe itself.
-.sp
-On failure, \fBerrno\fR is set to one of the following values:
-.sp
-.ne 2
-.na
-\fB\fBENOSR\fR\fR
-.ad
-.RS 10n
+.Pp
+On failure,
+.Va errno
+is set to one of the following values:
+.Bl -tag -width EINVAL
+.It Er ENOSR
 Unable to allocate buffers for flush message due to insufficient stream memory
 resources.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-Invalid \fIarg\fR value.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENXIO\fR\fR
-.ad
-.RS 10n
-Hangup received on \fIfildes\fR.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_FLUSHBAND\fR\fR
-.ad
-.RS 15n
-Flushes a particular band of messages. \fIarg\fR points to a \fBbandinfo\fR
+.It Er EINVAL
+Invalid
+.Va arg
+value.
+.It Er ENXIO
+Hangup received on
+.Fa fildes .
+.El
+.It Dv I_FLUSHBAND
+Flushes a particular band of messages.
+.Fa arg
+points to a
+.Vt bandinfo
 structure that has the following members:
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 unsigned char bi_pri;
 int bi_flag;
-.fi
-.in -2
-
-The \fBbi_flag\fR field may be one of \fBFLUSHR\fR, \fBFLUSHW\fR, or
-\fBFLUSHRW\fR as described earlier.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_SETSIG\fR\fR
-.ad
-.RS 15n
+.Ed
+.Pp
+The
+.Fa bi_flag
+field may be one of
+.Dv FLUSHR ,
+.Dv FLUSHW ,
+or
+.Dv FLUSHRW
+as described earlier.
+.It Dv I_SETSIG
 Informs the stream head that the user wishes the kernel to issue the
-\fBSIGPOLL\fR signal (see \fBsignal\fR(3C)) when a particular event has
-occurred on the stream associated with \fIfildes\fR. \fBI_SETSIG\fR supports an
-asynchronous processing capability in streams. The value of \fIarg\fR is a
-bitmask that specifies the events for which the user should be signaled. It is
-the bitwise OR of any combination of the following constants:
-.sp
-.ne 2
-.na
-\fB\fBS_INPUT\fR\fR
-.ad
-.RS 13n
-Any message other than an \fBM_PCPROTO\fR has arrived on a stream head read
-queue. This event is maintained for compatibility with previous releases. This
-event is triggered even if the message is of zero length.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBS_RDNORM\fR\fR
-.ad
-.RS 13n
+.Dv SIGPOLL
+signal (see
+.Xr signal 3C )
+when a particular event has occurred on the stream associated with
+.Fa fildes .
+.Dv I_SETSIG
+supports an asynchronous processing capability in streams.
+The value of
+.Fa arg
+is a bitmask that specifies the events for which the user should be signaled.
+It is the bitwise OR of any combination of the following constants:
+.Bl -tag -width S_BANDURG
+.It Dv S_INPUT
+Any message other than an
+.Dv M_PCPROTO
+has arrived on a stream head read queue.
+This event is maintained for compatibility with previous releases.
+This event is triggered even if the message is of zero length.
+.It Dv S_RDNORM
 An ordinary (non-priority) message has arrived on a stream head read queue.
 This event is triggered even if the message is of zero length.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBS_RDBAND\fR\fR
-.ad
-.RS 13n
+.It Dv S_RDBAND
 A priority band message (band > 0) has arrived on a stream head read queue.
 This event is triggered even if the message is of zero length.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBS_HIPRI\fR\fR
-.ad
-.RS 13n
-A high priority message is present on the stream head read queue. This event is
-triggered even if the message is of zero length.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBS_OUTPUT\fR\fR
-.ad
-.RS 13n
-The write queue just below the stream head is no longer full. This notifies the
+.It Dv S_HIPRI
+A high priority message is present on the stream head read queue.
+This event is triggered even if the message is of zero length.
+.It Dv S_OUTPUT
+The write queue just below the stream head is no longer full.
+This notifies the
 user that there is room on the queue for sending (or writing) data downstream.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBS_WRNORM\fR\fR
-.ad
-.RS 13n
-This event is the same as \fBS_OUTPUT\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBS_WRBAND\fR\fR
-.ad
-.RS 13n
+.It Dv S_WRNORM
+This event is the same as
+.Dv S_OUTPUT .
+.It Dv S_WRBAND
 A priority band greater than 0 of a queue downstream exists and is writable.
 This notifies the user that there is room on the queue for sending (or writing)
 priority data downstream.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBS_MSG\fR\fR
-.ad
-.RS 13n
-A STREAMS signal message that contains the \fBSIGPOLL\fR signal has reached the
+.It Dv S_MSG
+A STREAMS signal message that contains the
+.Dv SIGPOLL
+signal has reached the
 front of the stream head read queue.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBS_ERROR\fR\fR
-.ad
-.RS 13n
-An \fBM_ERROR\fR message has reached the stream head.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBS_HANGUP\fR\fR
-.ad
-.RS 13n
-An \fBM_HANGUP\fR message has reached the stream head.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBS_BANDURG\fR\fR
-.ad
-.RS 13n
-When used in conjunction with \fBS_RDBAND\fR, \fBSIGURG\fR is generated instead
-of \fBSIGPOLL\fR when a priority message reaches the front of the stream head
+.It Dv S_ERROR
+An
+.Dv M_ERROR
+message has reached the stream head.
+.It Dv S_HANGUP
+An
+.Dv M_HANGUP
+message has reached the stream head.
+.It Dv S_BANDURG
+When used in conjunction with
+.Dv S_RDBAND ,
+.Dv SIGURG
+is generated instead of
+.Dv SIGPOLL
+when a priority message reaches the front of the stream head
 read queue.
-.RE
-
+.El
+.Pp
 A user process may choose to be signaled only of high priority messages by
-setting the \fIarg\fR bitmask to the value \fBS_HIPRI\fR.
-.sp
-Processes that wish to receive \fBSIGPOLL\fR signals must explicitly register
-to receive them using \fBI_SETSIG\fR. If several processes register to receive
+setting the
+.Fa arg
+bitmask to the value
+.Dv S_HIPRI .
+.Pp
+Processes that wish to receive
+.Dv SIGPOLL
+signals must explicitly register
+to receive them using
+.Dv I_SETSIG .
+If several processes register to receive
 this signal for the same event on the same stream, each process will be
 signaled when the event occurs.
-.sp
-If the value of \fIarg\fR is zero, the calling process will be unregistered and
-will not receive further \fBSIGPOLL\fR signals.  On failure, \fBerrno\fR is set
-to one of the following values:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-\fIarg\fR value is invalid or \fIarg\fR is zero and process is not registered
-to receive the \fBSIGPOLL\fR signal.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 10n
+.Pp
+If the value of
+.Fa arg
+is zero, the calling process will be unregistered and
+will not receive further
+.Dv SIGPOLL
+signals.
+On failure,
+.Va errno
+is set to one of the following values:
+.Bl -tag -width EINVAL
+.It Sy EINVAL
+.Fa arg
+value is invalid or
+.Fa arg
+is zero and process is not registered to receive the
+.Dv SIGPOLL
+signal.
+.It Sy EAGAIN
 Allocation of a data structure to store the signal request failed.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_GETSIG\fR\fR
-.ad
-.RS 15n
+.El
+.It Dv I_GETSIG
 Returns the events for which the calling process is currently registered to be
-sent a \fBSIGPOLL\fR signal.  The events are returned as a bitmask pointed to
-by \fIarg\fR, where the events are those specified in the description of
-\fBI_SETSIG\fR above. On failure, \fBerrno\fR is set to one of the following
-values:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-Process not registered to receive the \fBSIGPOLL\fR signal.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 10n
-\fIarg\fR points outside the allocated address space.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_FIND\fR\fR
-.ad
-.RS 15n
+sent a
+.Dv SIGPOLL
+signal.
+The events are returned as a bitmask pointed to by
+.Va arg ,
+where the events are those specified in the description of
+.Dv I_SETSIG
+above.
+On failure,
+.Va errno
+is set to one of the following values:
+.Bl -tag -width EINVAL
+.It Sy EINVAL
+Process not registered to receive the
+.Dv SIGPOLL
+signal.
+.It Sy EFAULT
+.Fa arg
+points outside the allocated address space.
+.El
+.It Dv I_FIND
 Compares the names of all modules currently present in the stream to the name
-pointed to by \fIarg\fR, and returns 1 if the named module is present in the
-stream. It returns 0 if the named module is not present. On failure,
-\fBerrno\fR is set to one of the following values:
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 10n
-\fIarg\fR points outside the allocated address space.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-\fIarg\fR does not contain a valid module name.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_PEEK\fR\fR
-.ad
-.RS 15n
+pointed to by
+.Fa arg ,
+and returns 1 if the named module is present in the stream.
+It returns 0 if the named module is not present.
+On failure,
+.Va errno
+is set to one of the following values:
+.Bl -tag -width EINVAL
+.It Sy EFAULT
+.Fa arg
+points outside the allocated address space.
+.It Sy EINVAL
+.Fa arg
+does not contain a valid module name.
+.El
+.It Dv I_PEEK
 Allows a user to retrieve the information in the first message on the stream
-head read queue without taking the message off the queue. \fBI_PEEK\fR is
-analogous to \fBgetmsg\fR(2) except that it does not remove the message from
-the queue. \fIarg\fR points to a \fBstrpeek\fR structure, which contains the
-following members:
-.sp
-.in +2
-.nf
+head read queue without taking the message off the queue.
+.Dv I_PEEK
+is analogous to
+.Xr getmsg 2
+except that it does not remove the message from the queue.
+.Fa arg
+points to a
+.Vt strpeek
+structure, which contains the following members:
+.Bd -literal -offset 2n
 struct strbuf ctlbuf;
-struct strbuf	databuf;
+struct strbuf databuf;
 long flags;
-.fi
-.in -2
-
-The \fBmaxlen\fR field in the \fBctlbuf\fR and \fBdatabuf\fR \fBstrbuf\fR
-structures (see \fBgetmsg\fR(2)) must be set to the number of bytes of control
-information and/or data information, respectively, to retrieve. \fBflags\fR may
-be set to \fBRS_HIPRI\fR or \fB0\fR. If \fBRS_HIPRI\fR is set, \fBI_PEEK\fR
-will look for a high priority message on the stream head read queue. Otherwise,
-\fBI_PEEK\fR will look for the first message on the stream head read queue.
-.sp
-\fBI_PEEK\fR returns \fB1\fR if a message was retrieved, and returns \fB0\fR if
-no message was found on the stream head read queue. It does not wait for a
-message to arrive. On return, \fBctlbuf\fR specifies information in the control
-buffer, \fBdatabuf\fR specifies information in the data buffer, and \fBflags\fR
-contains the value \fBRS_HIPRI\fR or \fB0\fR. On failure, \fBerrno\fR is set to
-the following value:
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 11n
-\fIarg\fR points, or the buffer area specified in \fBctlbuf\fR or \fBdatabuf\fR
+.Ed
+.Pp
+The
+.Ft maxlen
+field in the
+.Vt ctlbuf
+and
+.Vt databuf
+.Vt strbuf
+structures (see
+.Xr getmsg 2 )
+must be set to the number of bytes of control
+information and/or data information, respectively, to retrieve.
+.Fa flags
+may be set to
+.Dv RS_HIPRI
+or
+.Sy 0 .
+If
+.Dv RS_HIPRI
+is set,
+.Dv I_PEEK
+will look for a high priority message on the stream head read queue.
+Otherwise,
+.Dv I_PEEK
+will look for the first message on the stream head read queue.
+.Pp
+.Dv I_PEEK
+returns
+.Sy 1
+if a message was retrieved, and returns
+.Sy 0
+if no message was found on the stream head read queue.
+It does not wait for a message to arrive.
+On return,
+.Vt ctlbuf
+specifies information in the control buffer,
+.Vt databuf
+specifies information in the data buffer, and
+.Fa flags
+contains the value
+.Dv RS_HIPRI
+or
+.Sy 0 .
+On failure,
+.Va errno
+is set to the following value:
+.Bl -tag -width EBADMSG
+.It Er EFAULT
+.Fa arg
+points, or the buffer area specified in
+.Vt ctlbuf
+or
+.Vt databuf
 is, outside the allocated address space.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEBADMSG\fR\fR
-.ad
-.RS 11n
-Queued message to be read is not valid for \fBI_PEEK\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 11n
-Illegal value for \fBflags\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOSR\fR\fR
-.ad
-.RS 11n
-Unable to allocate buffers to perform the I_PEEK due to insufficient STREAMS
-memory resources.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_SRDOPT\fR\fR
-.ad
-.RS 15n
-Sets the read mode (see \fBread\fR(2)) using the value of the argument
-\fIarg\fR. Legal \fIarg\fR values are:
-.sp
-.ne 2
-.na
-\fBRNORM\fR
-.ad
-.RS 9n
+.It Er EBADMSG
+Queued message to be read is not valid for
+.Dv I_PEEK .
+.It Er EINVAL
+Illegal value for
+.Vt flags .
+.It Er ENOSR
+Unable to allocate buffers to perform the
+.Dv I_PEEK
+due to insufficient STREAMS memory resources.
+.El
+.It Dv I_SRDOPT
+Sets the read mode (see
+.Xr read 2 )
+using the value of the argument
+.Va arg .
+Legal
+.Va arg
+values are:
+.Bl -tag -width RNORM
+.It Dv RNORM
 Byte-stream mode, the default.
-.RE
-
-.sp
-.ne 2
-.na
-\fBRMSGD\fR
-.ad
-.RS 9n
+.It Dv RMSGD
 Message-discard mode.
-.RE
-
-.sp
-.ne 2
-.na
-\fBRMSGN\fR
-.ad
-.RS 9n
+.It Dv RMSGN
 Message-nondiscard mode.
-.RE
-
+.El
+.Pp
 In addition, the stream head's treatment of control messages may be changed by
-setting the following flags in \fIarg\fR:
-.sp
-.ne 2
-.na
-\fBRPROTNORM\fR
-.ad
-.RS 13n
-Reject \fBread()\fR with \fBEBADMSG\fR if a control message is at the front of
-the stream head read queue.
-.RE
-
-.sp
-.ne 2
-.na
-\fBRPROTDAT\fR
-.ad
-.RS 13n
+setting the following flags in
+.Va arg :
+.Bl -tag -width RPROTNORM
+.It Dv RPROTNORM
+Reject
+.Xr read 2
+with
+.Er EBADMSG
+if a control message is at the front of the stream head read queue.
+.It Dv RPROTDAT
 Deliver the control portion of a message as data when a user issues
-\fBread()\fR. This is the default behavior.
-.RE
-
-.sp
-.ne 2
-.na
-\fBRPROTDIS\fR
-.ad
-.RS 13n
+.Xr read 2 .
+This is the default behavior.
+.It Dv RPROTDIS
 Discard the control portion of a message, delivering any data portion, when a
-user issues a \fBread\fR(\|).
-.RE
-
-On failure, \fBerrno\fR is set to the following value:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-\fIarg\fR is not one of the above legal values, or \fIarg\fR is the bitwise
-inclusive \fBOR\fR of \fBRMSGD\fR and \fBRMSGN\fR.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_GRDOPT\fR\fR
-.ad
-.RS 15n
-Returns the current read mode setting in an \fBint\fR pointed to by the
-argument \fIarg\fR. Read modes are described in \fBread\fR(\|). On failure,
-\fBerrno\fR is set to the following value:
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 10n
-\fIarg\fR points outside the allocated address space.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_NREAD\fR\fR
-.ad
-.RS 15n
+user issues a
+.Xr read 2 .
+.El
+.Pp
+On failure,
+.Va errno
+is set to the following value:
+.Bl -tag -width EINVAL
+.It Er EINVAL
+.Va arg
+is not one of the above legal values, or
+.Va arg
+is the bitwise
+inclusive
+.Sy OR
+of
+.Dv RMSGD
+and
+.Dv RMSGN .
+.El
+.It Dv I_GRDOPT
+Returns the current read mode setting in an
+.Vt int
+pointed to by the argument
+.Fa arg .
+Read modes are described in
+.Xr read 2 .
+On failure,
+.Va errno
+is set to the following value:
+.Bl -tag -width EFAULT
+.It Er EFAULT
+.Fa arg
+points outside the allocated address space.
+.El
+.It Dv I_NREAD
 Counts the number of data bytes in data blocks in the first message on the
 stream head read queue, and places this value in the location pointed to by
-\fIarg\fR. The return value for the command is the number of messages on the
-stream head read queue. For example, if zero is returned in \fIarg\fR, but the
-\fBioctl\fR return value is greater than zero, this indicates that a
-zero-length message is next on the queue. On failure, \fBerrno\fR is set to the
-following value:
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 10n
-\fIarg\fR points outside the allocated address space.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_FDINSERT\fR\fR
-.ad
-.RS 15n
+.Fa arg .
+The return value for the command is the number of messages on the
+stream head read queue.
+For example, if zero is returned in
+.Fa arg ,
+but the
+.Fn ioctl
+return value is greater than zero, this indicates that a
+zero-length message is next on the queue.
+On failure,
+.Va errno
+is set to the following value:
+.Bl -tag -width EFAULT
+.It Er EFAULT
+.Fa arg
+points outside the allocated address space.
+.El
+.It Dv I_FDINSERT
 Creates a message from specified buffer(s), adds information about another
-stream and sends the message downstream. The message contains a control part
-and an optional data part. The data and control parts to be sent are
+stream and sends the message downstream.
+The message contains a control part and an optional data part.
+The data and control parts to be sent are
 distinguished by placement in separate buffers, as described below.
-.sp
-The \fIarg\fR argument points to a \fBstrfdinsert\fR structure, which contains
+.Pp
+The
+.Fa arg
+argument points to a
+.Vt strfdinsert
+structure, which contains
 the following members:
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 struct  strbuf  ctlbuf;
 struct  strbuf	databuf;
-t_uscalar_t  flags;
-int  fildes;
-int  offset;
-.fi
-.in -2
-
-The \fBlen\fR member in the \fBctlbuf strbuf\fR structure (see \fBputmsg\fR(2))
-must be set to the size of a  \fBt_uscalar_t\fR plus the number of bytes of
-control information to be sent with the message. The \fBfildes\fR member
-specifies the file descriptor of the other stream, and the \fBoffset\fR member,
-which must be suitably aligned for use as a \fBt_uscalar_t\fR, specifies the
-offset from the start of the control buffer where \fBI_FDINSERT\fR will store a
-\fBt_uscalar_t\fR whose interpretation is specific to the stream end. The
-\fBlen\fR member in the \fBdatabuf strbuf\fR structure must be set to the
-number of bytes of data information to be sent with the message, or to 0 if no
-data part is to be sent.
-.sp
-The \fBflags\fR member specifies the type of message to be created. A normal
-message is created if \fBflags\fR is set to 0, and a high-priority message is
-created if \fBflags\fR is set to \fBRS_HIPRI\fR. For non-priority messages,
-\fBI_FDINSERT\fR will block if the stream write queue is full due to internal
-flow control conditions. For priority messages,  \fBI_FDINSERT\fR does not
-block on this condition. For non-priority messages,  \fBI_FDINSERT\fR does not
-block when the write queue is full and  \fBO_NDELAY\fR or  \fBO_NONBLOCK\fR is
-set. Instead, it fails and sets \fBerrno\fR to \fBEAGAIN\fR.
-.sp
-\fBI_FDINSERT\fR also blocks, unless prevented by lack of internal resources,
-waiting for the availability of message blocks in the stream, regardless of
-priority or whether \fBO_NDELAY\fR or \fBO_NONBLOCK\fR has been specified. No
-partial message is sent.
-.sp
-The \fBioctl()\fR function with the \fBI_FDINSERT\fR command will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 10n
-A non-priority message is specified, the \fBO_NDELAY\fR or \fBO_NONBLOCK\fR
+t_uscalar_t	flags;
+int		fildes;
+int		offset;
+.Ed
+.Pp
+The
+.Fa len
+member in the
+.Vt ctlbuf
+.Vt strbuf
+structure (see
+.Xr putmsg 2 )
+must be set to the size of a
+.Vt t_uscalar_t
+plus the number of bytes of
+control information to be sent with the message.
+The
+.Fa fildes
+member specifies the file descriptor of the other stream, and the
+.Fa offset
+member, which must be suitably aligned for use as a
+.Vt t_uscalar_t ,
+specifies the offset from the start of the control buffer where
+.Dv I_FDINSERT
+will store a
+.Vt t_uscalar_t
+whose interpretation is specific to the stream end.
+The
+.Fa len
+member in the
+.Vt databuf
+.Vt strbuf
+structure must be set to the number of bytes of data information to be sent with
+the message, or to 0 if no data part is to be sent.
+.Pp
+The
+.Fa flags
+member specifies the type of message to be created.
+A normal message is created if
+.Fa flags
+is set to 0, and a high-priority message is created if
+.Fa flags
+is set to
+.Dv RS_HIPRI .
+For non-priority messages,
+.Dv I_FDINSERT
+will block if the stream write queue is full due to internal
+flow control conditions.
+For priority messages,
+.Dv I_FDINSERT
+does not block on this condition.
+or non-priority messages,
+.Dv I_FDINSERT
+does not
+block when the write queue is full and
+.Dv O_NDELAY
+or
+.Dv O_NONBLOCK
+is set.
+Instead, it fails and sets
+.Va errno
+to
+.Er EAGAIN .
+.Pp
+.Dv I_FDINSERT
+also blocks, unless prevented by lack of internal resources, waiting for the
+availability of message blocks in the stream, regardless of priority or whether
+.Dv O_NDELAY
+or
+.Dv O_NONBLOCK
+has been specified.
+No partial message is sent.
+.Pp
+The
+.Fn ioctl
+function with the
+.Dv I_FDINSERT
+command will fail if:
+.Bl -tag -width EAGAIN
+.It Er EAGAIN
+A non-priority message is specified, the
+.Dv O_NDELAY
+or
+.Dv O_NONBLOCK
 flag is set, and the stream write queue is full due to internal flow control
 conditions.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOSR\fR\fR
-.ad
-.RS 10n
+.It Er ENOSR
 Buffers can not be allocated for the message that is to be created.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 10n
-The \fIarg\fR argument points, or the buffer area specified in \fBctlbuf\fR or
-\fBdatabuf\fR is, outside the allocated address space.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-One of the following: The \fBfildes\fR member of the \fBstrfdinsert\fR
+.It Er EFAULT
+The
+.Fa arg
+argument points, or the buffer area specified in
+.Vt ctlbuf
+or
+.Vt databuf
+is, outside the allocated address space.
+.It Er EINVAL
+One of the following: The
+.Fa fildes
+member of the
+.Vt strfdinsert
 structure is not a valid, open stream file descriptor; the size of a
-\fBt_uscalar_t\fR plus \fBoffset\fR is greater than the \fBlen\fR member for
-the buffer specified through \fBctlptr\fR; the \fBoffset\fR member does not
-specify a properly-aligned location in the data buffer; or an undefined value
-is stored in \fBflags\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENXIO\fR\fR
-.ad
-.RS 10n
-Hangup received on the \fBfildes\fR argument of the \fBioctl\fR call or the
-\fBfildes\fR member of the \fBstrfdinsert\fR structure.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBERANGE\fR\fR
-.ad
-.RS 10n
-The \fBlen\fR field for the buffer specified through \fBdatabuf\fR does not
-fall within the range specified by the maximum and minimum packet sizes of the
-topmost stream module; or the \fBlen\fR member for the buffer specified through
-\fBdatabuf\fR is larger than the maximum configured size of the data part of a
-message; or the \fBlen\fR member for the buffer specified through \fBctlbuf\fR
+.Vt t_uscalar_t
+plus
+.Fa offset
+is greater than the
+.Fa len
+member for the buffer specified through
+.Fa ctlptr ;
+the
+.Fa offset
+member does not specify a properly-aligned location in the data buffer; or an
+undefined value is stored in
+.Fa flags .
+.It Er ENXIO
+Hangup received on the
+.Fa fildes
+argument of the
+.Fn ioctl
+call or the
+.Fa fildes
+member of the
+.Vt strfdinsert
+structure.
+.It Er ERANGE
+The
+.Fa len
+field for the buffer specified through
+.Vt databuf
+does not fall within the range specified by the maximum and minimum packet
+sizes of the topmost stream module; or the
+.Fa len
+member for the buffer specified through
+.Vt databuf
+is larger than the maximum configured size of the data part of a message; or the
+.Fa len
+member for the buffer specified through
+.Vt ctlbuf
 is larger than the maximum configured size of the control part of a message.
-.RE
-
-\fBI_FDINSERT\fR can also fail if an error message was received by the stream
-head of the stream corresponding to the \fBfildes\fR member of the
-\fBstrfdinsert\fR structure. In this case, \fBerrno\fR will be set to the value
-in the message.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_STR\fR\fR
-.ad
-.RS 15n
-Constructs an internal \fBSTREAMS\fR ioctl message from the data pointed to by
-\fIarg\fR, and sends that message downstream.
-.sp
-This mechanism is provided to send user \fBioctl\fR requests to downstream
-modules and drivers. It allows information to be sent with the \fBioctl\fR, and
-will return to the user any information sent upstream by the downstream
-recipient. \fBI_STR\fR blocks until the system responds with either a positive
-or negative acknowledgement message, or until the request times out after some
-period of time. If the request times out, it fails with \fBerrno\fR set to
-\fBETIME\fR.
-.sp
-To send requests downstream, \fIarg\fR must point to a \fBstrioctl\fR structure
-which contains the following members:
-.sp
-.in +2
-.nf
+.El
+.Pp
+.Dv I_FDINSERT
+can also fail if an error message was received by the stream
+head of the stream corresponding to the
+.Fa fildes
+member of the
+.Vt strfdinsert
+structure.
+In this case,
+.Va errno
+will be set to the value in the message.
+.It Dv I_STR
+Constructs an internal
+.Sy STREAMS
+ioctl message from the data pointed to by
+.Fa arg ,
+and sends that message downstream.
+.Pp
+This mechanism is provided to send user
+.Fn ioctl
+requests to downstream modules and drivers.
+It allows information to be sent with the
+.Fn ioctl ,
+and will return to the user any information sent upstream by the downstream
+recipient.
+.Dv I_STR
+blocks until the system responds with either a positive or negative
+acknowledgement message, or until the request times out after some period of
+time.
+If the request times out, it fails with
+.Va errno
+set to
+.Er ETIME .
+.Pp
+To send requests downstream,
+.Fa arg
+must point to a
+.Vt strioctl
+structure which contains the following members:
+.Bd -literal -offset 2n
 int  ic_cmd;
 int  ic_timout;
 int  ic_len;
 char  *ic_dp;
-.fi
-.in -2
-
-\fBic_cmd\fR is the internal \fBioctl\fR command intended for a downstream
-module or driver and \fBic_timout\fR is the number of seconds (-1 = infinite, 0
-= use default, >0 = as specified) an \fBI_STR\fR request will wait for
-acknowledgement before timing out. \fBic_len\fR is the number of bytes in the
-data argument and \fBic_dp\fR is a pointer to the data argument. The
-\fBic_len\fR field has two uses: on input, it contains the length of the data
+.Ed
+.Pp
+.Fa ic_cmd
+is the internal
+.Fn ioctl
+command intended for a downstream module or driver and
+.Fa ic_timout
+is the number of seconds (-1 = infinite, 0 = use default, >0 = as specified) an
+.Dv I_STR
+request will wait for acknowledgement before timing out.
+.Fa ic_len
+is the number of bytes in the data argument and
+.Fa ic_dp
+is a pointer to the data argument.
+The
+.Fa ic_len
+field has two uses: on input, it contains the length of the data
 argument passed in, and on return from the command, it contains the number of
-bytes being returned to the user (the buffer pointed to by \fBic_dp\fR should
-be large enough to contain the maximum amount of data that any module or the
-driver in the stream can return).
-.sp
-At most one \fBI_STR\fR can be active on a stream.  Further \fBI_STR\fR calls
-will block until the active \fBI_STR\fR completes via  a  positive  or negative
-acknowlegment, a timeout, or an error condition at the stream head.  By setting
-the \fBic_timout\fR  field  to  0, the  user is requesting STREAMS to provide
-the  \fBDEFAULT\fR timeout. The default timeout is specific to the STREAMS
+bytes being returned to the user (the buffer pointed to by
+.Fa ic_dp
+should be large enough to contain the maximum amount of data that any module or
+the driver in the stream can return).
+.Pp
+At most one
+.Dv I_STR
+can be active on a stream.
+Further
+.Dv I_STR
+calls
+will block until the active
+.Dv I_STR
+completes via a positive or negative
+acknowlegment, a timeout, or an error condition at the stream head.
+By setting the
+.Fa ic_timout
+field to 0, the user is requesting STREAMS to provide
+the
+.Sy DEFAULT
+timeout.
+The default timeout is specific to the STREAMS
 implementation and may vary depending on which release of Solaris you are
-using. For Solaris 8 (and earlier versions), the default timeout is fifteen
-seconds. The \fBO_NDELAY\fR and \fBO_NONBLOCK\fR (see \fBopen\fR(2)) flags have
-no effect on this call.
-.sp
-The stream head will convert the information pointed to by the \fBstrioctl\fR
-structure to an internal \fBioctl\fR command message and send it downstream. On
-failure, \fBerrno\fR is set to one of the following values:
-.sp
-.ne 2
-.na
-\fB\fBENOSR\fR\fR
-.ad
-.RS 10n
-Unable to allocate buffers for the \fBioctl\fR message due to insufficient
-STREAMS memory resources.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 10n
-Either \fIarg\fR points outside the allocated address space, or the buffer area
-specified by \fBic_dp\fR and \fBic_len\fR (separately for data sent and data
-returned) is outside the allocated address space.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-\fBic_len\fR is less than 0 or \fBic_len\fR is larger than the maximum
-configured size of the data part of a message or \fBic_timout\fR is less than
--1.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENXIO\fR\fR
-.ad
-.RS 10n
-Hangup received on \fIfildes\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBETIME\fR\fR
-.ad
-.RS 10n
-A downstream \fBioctl\fR timed out before acknowledgement was received.
-.RE
-
-An \fBI_STR\fR can also fail while waiting for an acknowledgement if a message
-indicating an error or a hangup is received at the stream head. In addition, an
+using.
+For Solaris 8 (and earlier versions), the default timeout is fifteen
+seconds.
+The
+.Dv O_NDELAY
+and
+.Dv O_NONBLOCK
+(see
+.Xr open 2 )
+flags have no effect on this call.
+.Pp
+The stream head will convert the information pointed to by the
+.Vt strioctl
+structure to an internal
+.Fn ioctl
+command message and send it downstream.
+On failure,
+.Va errno
+is set to one of the following values:
+.Bl -tag -width EFAULT
+.It Er ENOSR
+Unable to allocate buffers for the
+.Fn ioctl
+message due to insufficient STREAMS memory resources.
+.It Er EFAULT
+Either
+.Fa arg
+points outside the allocated address space, or the buffer area
+specified by
+.Fa ic_dp
+and
+.Fa ic_len
+(separately for data sent and data returned) is outside the allocated address
+space.
+.It Er EINVAL
+.Fa ic_len
+is less than 0 or
+.Fa ic_len
+is larger than the maximum configured size of the data part of a message or
+.Fa ic_timout
+is less than \(mi1.
+.It Er ENXIO
+Hangup received on
+.Fa fildes .
+.It Er ETIME
+A downstream
+.Fn ioctl
+timed out before acknowledgement was received.
+.El
+.Pp
+An
+.Dv I_STR
+can also fail while waiting for an acknowledgement if a message
+indicating an error or a hangup is received at the stream head.
+In addition, an
 error code can be returned in the positive or negative acknowledgement message,
-in the event the ioctl command sent downstream fails. For these cases,
-\fBI_STR\fR will fail with \fBerrno\fR set to the value in the message.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_SWROPT\fR\fR
-.ad
-.RS 15n
-Sets the write mode using the value of the argument \fIarg\fR. Legal bit
-settings for \fIarg\fR are:
-.sp
-.ne 2
-.na
-\fB\fBSNDZERO\fR\fR
-.ad
-.RS 11n
+in the event the ioctl command sent downstream fails.
+For these cases,
+.Dv I_STR
+will fail with
+.Va errno
+set to the value in the message.
+.It Dv I_SWROPT
+Sets the write mode using the value of the argument
+.Fa arg .
+Legal bit settings for
+.Fa arg
+are:
+.Bl -tag -width SNDZERO
+.It Dv SNDZERO
 Send a zero-length message downstream when a write of 0 bytes occurs.
-.RE
-
+.El
+.Pp
 To not send a zero-length message when a write of 0 bytes occurs, this bit must
-not be set in \fIarg\fR.
-.sp
-On failure, \fBerrno\fR may be set to the following value:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-\fIarg\fR is not the above legal value.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_GWROPT\fR\fR
-.ad
-.RS 15n
-Returns the current write mode setting, as described above, in the \fBint\fR
-that is pointed to by the argument \fIarg\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_SENDFD\fR\fR
-.ad
-.RS 15n
-Requests the stream associated with \fIfildes\fR to send a message, containing
-a file pointer, to the stream head at the other end of a stream pipe. The file
-pointer corresponds to \fIarg\fR, which must be an open file descriptor.
-.sp
-\fBI_SENDFD\fR converts \fIarg\fR into the corresponding system file pointer.
-It allocates a message block and inserts the file pointer in the block.  The
-user id and group id associated with the sending process are also inserted.
-This message is placed directly on the read queue (see \fBIntro\fR(3)) of the
-stream head at the other end of the stream pipe to which it is connected.  On
-failure, \fBerrno\fR is set to one of the following values:
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 10n
+not be set in
+.Fa arg .
+.Pp
+On failure,
+.Va errno
+may be set to the following value:
+.Bl -tag -width EINVAL
+.It Sy EINVAL
+.Fa arg
+is not the above legal value.
+.El
+.It Dv I_GWROPT
+Returns the current write mode setting, as described above, in the
+.Vt int
+that is pointed to by the argument
+.Fa arg .
+.It Dv I_SENDFD
+Requests the stream associated with
+.Fa fildes
+to send a message, containing
+a file pointer, to the stream head at the other end of a stream pipe.
+The file
+pointer corresponds to
+.Fa arg ,
+which must be an open file descriptor.
+.Pp
+.Dv I_SENDFD
+converts
+.Fa arg
+into the corresponding system file pointer.
+It allocates a message block and inserts the file pointer in the block.
+The user id and group id associated with the sending process are also inserted.
+This message is placed directly on the read queue (see
+.Xr Intro 3 )
+of the stream head at the other end of the stream pipe to which it is connected.
+On failure,
+.Va errno
+is set to one of the following values:
+.Bl -tag -width EAGAIN
+.It Er EAGAIN
 The sending stream is unable to allocate a message block to contain the file
 pointer.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 10n
+.It Er EAGAIN
 The read queue of the receiving stream head is full and cannot accept the
-message sent by \fBI_SENDFD.\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEBADF\fR\fR
-.ad
-.RS 10n
-\fIarg\fR is not a valid, open file descriptor.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-\fIfildes\fR is not connected to a stream pipe.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENXIO\fR\fR
-.ad
-.RS 10n
-Hangup received on \fIfildes\fR.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_RECVFD\fR\fR
-.ad
-.RS 15n
+message sent by
+.Dv I_SENDFD .
+.It Er EBADF
+.Fa arg
+is not a valid, open file descriptor.
+.It Er EINVAL
+.Va fildes
+is not connected to a stream pipe.
+.It Er ENXIO
+Hangup received on
+.Fa fildes .
+.El
+.It Dv I_RECVFD
 Retrieves the file descriptor associated with the message sent by an
-\fBI_SENDFD\fR \fBioctl\fR over a stream pipe. \fIarg\fR is a pointer to a data
-buffer large enough to hold an \fBstrrecvfd\fR data structure containing the
-following members:
-.sp
-.in +2
-.nf
-int  fd;
-uid_t  uid;
-gid_t  gid;
-.fi
-.in -2
-
-\fBfd\fR is an integer file descriptor. \fBuid\fR and \fBgid\fR are the user id
-and group id, respectively, of the sending stream.
-.sp
-If \fBO_NDELAY\fR and \fBO_NONBLOCK\fR are clear (see \fBopen\fR(2)),
-\fBI_RECVFD\fR will block until a message is present at the stream head. If
-\fBO_NDELAY\fR or \fBO_NONBLOCK\fR is set, \fBI_RECVFD\fR will fail with
-\fBerrno\fR set to \fBEAGAIN\fR if no message is present at the stream head.
-.sp
-If the message at the stream head is a message sent by an \fBI_SENDFD\fR, a new
+.Dv I_SENDFD
+.Fn ioctl
+over a stream pipe.
+.Fa arg
+is a pointer to a data buffer large enough to hold an
+.Vt strrecvfd
+data structure containing the following members:
+.Bd -literal -offset 2n
+int	fd;
+uid_t	uid;
+gid_t	gid;
+.Ed
+.Pp
+.Fa fd
+is an integer file descriptor.
+.Fa uid
+and
+.Fa gid
+are the user id and group id, respectively, of the sending stream.
+.Pp
+If
+.Dv O_NDELAY
+and
+.Dv O_NONBLOCK
+are clear (see
+.Xr open 2 ) ,
+.Dv I_RECVFD
+will block until a message is present at the stream head.
+If
+.Dv O_NDELAY
+or
+.Dv O_NONBLOCK
+is set,
+.Dv I_RECVFD
+will fail with
+.Va errno
+set to
+.Er EAGAIN
+if no message is present at the stream head.
+.Pp
+If the message at the stream head is a message sent by an
+.Dv I_SENDFD ,
+a new
 user file descriptor is allocated for the file pointer contained in the
-message. The new file descriptor is placed in the \fBfd\fR field of the
-\fBstrrecvfd\fR structure. The structure is copied into the user data buffer
-pointed to by \fIarg\fR. On failure, \fBerrno\fR is set to one of the following
-values:
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 13n
-A message is not present at the stream head read queue, and the \fBO_NDELAY\fR
-or \fBO_NONBLOCK\fR flag is set.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEBADMSG\fR\fR
-.ad
-.RS 13n
+message.
+The new file descriptor is placed in the
+.Fa fd
+field of the
+.Vt strrecvfd
+structure.
+The structure is copied into the user data buffer pointed to by
+.Fa arg .
+On failure,
+.Va errno
+is set to one of the following values:
+.Bl -tag -width EOVERFLOW
+.It Er EAGAIN
+A message is not present at the stream head read queue, and the
+.Dv O_NDELAY
+or
+.Dv O_NONBLOCK
+flag is set.
+.It Er EBADMSG
 The message at the stream head read queue is not a message containing a passed
 file descriptor.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 13n
-\fIarg\fR points outside the allocated address space.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEMFILE\fR\fR
-.ad
-.RS 13n
-\fBNOFILES\fR file descriptors are currently open.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENXIO\fR\fR
-.ad
-.RS 13n
-Hangup received on \fIfildes\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEOVERFLOW\fR\fR
-.ad
-.RS 13n
-\fIuid\fR or \fIgid\fR is too large to be stored in the structure pointed to by
-\fIarg\fR.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_LIST\fR\fR
-.ad
-.RS 15n
+.It Er EFAULT
+.Fa arg
+points outside the allocated address space.
+.It Er EMFILE
+.Dv NOFILES
+file descriptors are currently open.
+.It Er ENXIO
+Hangup received on
+.Fa fildes .
+.It Er EOVERFLOW
+.Fa uid
+or
+.Fa gid
+is too large to be stored in the structure pointed to by
+.Fa arg .
+.El
+.It Dv I_LIST
 Allows the user to list all the module names on the stream, up to and including
-the topmost driver name. If \fIarg\fR is \fINULL\fR, the return value is the
-number of modules, including the driver, that are on the stream pointed to by
-\fIfildes\fR. This allows the user to allocate enough space for the module
-names. If \fIarg\fR is non-null, it should point to an \fBstr_list\fR structure
-that has the following members:
-.sp
-.in +2
-.nf
+the topmost driver name.
+If
+.Fa arg
+is
+.Dv NULL ,
+the return value is the number of modules, including the driver, that are on
+the stream pointed to by
+.Fa fildes .
+This allows the user to allocate enough space for the module
+names.
+If
+.Fa arg
+is non-null, it should point to an
+.Vt str_list
+structure that has the following members:
+.Bd -literal -offset 2n
 int sl_nmods;
 struct  str_mlist  *sl_modlist;
-.fi
-.in -2
-
-The \fBstr_mlist\fR structure has the following member:
-.sp
-.in +2
-.nf
+.Ed
+.Pp
+The
+.Vt str_mlist
+structure has the following member:
+.Bd -literal -offset 2n
 char l_name[FMNAMESZ+1];
-.fi
-.in -2
-
-The \fBsl_nmods\fR member indicates the number of entries the process has
-allocated in the array.  Upon return, the \fBsl_modlist\fR member of the
-\fBstr_list\fR structure contains the list of module names, and the number of
-entries that have been filled into the \fBsl_modlist\fR array is found in the
-\fBsl_nmods\fR member (the number includes the number of modules including the
-driver).  The return value from \fBioctl()\fR is 0.  The entries are filled in
+.Ed
+.Pp
+The
+.Fa sl_nmods
+member indicates the number of entries the process has allocated in the array.
+Upon return, the
+.Fa sl_modlist
+member of the
+.Vt str_list
+structure contains the list of module names, and the number of
+entries that have been filled into the
+.Fa sl_modlist
+array is found in the
+.Fa sl_nmods
+member (the number includes the number of modules including the driver).
+The return value from
+.Fn ioctl
+is 0.
+The entries are filled in
 starting at the top of the stream and continuing downstream until either the
 end of the stream is reached, or the number of requested modules
-(\fBsl_nmods\fR) is satisfied. On failure, \fBerrno\fR may be set to one of the
-following values:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The \fBsl_nmods\fR member is less than 1.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 10n
+.Pq Fa sl_nmods
+is satisfied.
+On failure,
+.Va errno
+may be set to one of the following values:
+.Bl -tag -width EINVAL
+.It Er EINVAL
+The
+.Fa sl_nmods
+member is less than 1.
+.It Er EAGAIN
 Unable to allocate buffers
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_ATMARK\fR\fR
-.ad
-.RS 15n
+.El
+.It Dv I_ATMARK
 Allows the user to see if the current message on the stream head read queue is
-``marked'' by some module downstream. \fIarg\fR determines how the checking is
+.Dq marked
+by some module downstream.
+.Fa arg
+determines how the checking is
 done when there may be multiple marked messages on the stream head read queue.
 It may take the following values:
-.sp
-.ne 2
-.na
-\fB\fBANYMARK\fR\fR
-.ad
-.RS 12n
+.Bl -tag -width LASTMARK
+.It Dv ANYMARK
 Check if the message is marked.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBLASTMARK\fR\fR
-.ad
-.RS 12n
+.It Dv LASTMARK
 Check if the message is the last one marked on the queue.
-.RE
-
-The return value is \fB1\fR if the mark condition is satisfied and \fB0\fR
-otherwise. On failure, \fBerrno\fR is set to the following value:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-Invalid \fIarg\fR value.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_CKBAND\fR\fR
-.ad
-.RS 15n
+.El
+.Pp
+The return value is
+.Sy 1
+if the mark condition is satisfied and
+.Sy 0
+otherwise.
+On failure,
+.Va errno
+is set to the following value:
+.Bl -tag -width EINVAL
+.It Er EINVAL
+Invalid
+.Fa arg
+value.
+.El
+.It Dv I_CKBAND
 Check if the message of a given priority band exists on the stream head read
-queue. This returns \fB1\fR if a message of a given priority exists, \fB0\fR if
-not, or \fB\(mi1\fR on error. \fIarg\fR should be an integer containing the
-value of the priority band in question. On failure, \fBerrno\fR is set to the
-following value:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-Invalid \fIarg\fR value.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_GETBAND\fR\fR
-.ad
-.RS 15n
+queue.
+This returns
+.Sy 1
+if a message of a given priority exists,
+.Sy 0
+if not, or
+.Sy \(mi1
+on error.
+.Fa arg
+should be an integer containing the value of the priority band in question.
+On failure,
+.Va errno
+is set to the following value:
+.Bl -tag -width EINVAL
+.It Er EINVAL
+Invalid
+.Fa arg
+value.
+.El
+.It Dv I_GETBAND
 Returns the priority band of the first message on the stream head read queue in
-the integer referenced by \fIarg\fR. On failure, \fBerrno\fR is set to the
-following value:
-.sp
-.ne 2
-.na
-\fB\fBENODATA\fR\fR
-.ad
-.RS 11n
+the integer referenced by
+.Fa arg .
+On failure,
+.Va errno
+is set to the following value:
+.Bl -tag -width ENODATA
+.It Er ENODATA
 No message on the stream head read queue.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_CANPUT\fR\fR
-.ad
-.RS 15n
-Check if a certain band is writable. \fIarg\fR is set to the priority band in
-question. The return value is \fB0\fR if the priority band \fIarg\fR is flow
-controlled, \fB1\fR if the band is writable, or \fB\(mi1\fR on error. On
-failure, \fBerrno\fR is set to the following value:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-Invalid \fIarg\fR value.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_SETCLTIME\fR\fR
-.ad
-.RS 15n
+.El
+.It Dv I_CANPUT
+Check if a certain band is writable.
+.Fa arg
+is set to the priority band in question.
+The return value is
+.Sy 0
+if the priority band
+.Fa arg
+is flow controlled,
+.Sy 1
+if the band is writable, or
+.Sy \(mi1
+on error.
+On failure,
+.Va errno
+is set to the following value:
+.Bl -tag -width EINVAL
+.It Sy EINVAL
+Invalid
+.Va arg
+value.
+.El
+.It Dv I_SETCLTIME
 Allows the user to set the time the stream head will delay when a stream is
-closing and there are data on the write queues.  Before closing each module and
-driver, the stream head will delay for the specified amount of time to allow
-the data to drain. Note, however, that the module or driver may itself delay in
-its close routine; this delay is independent of the stream head's delay and is
-not settable. If, after the delay, data are still present, data will be
-flushed. \fIarg\fR is a pointer to an integer containing the number of
+closing and there are data on the write queues.
+Before closing each module and driver, the stream head will delay for the
+specified amount of time to allow the data to drain.
+Note, however, that the module or driver may itself delay in its close routine;
+this delay is independent of the stream head's delay and is not settable.
+If, after the delay, data are still present, data will be flushed.
+.Fa arg
+is a pointer to an integer containing the number of
 milliseconds to delay, rounded up to the nearest legal value on the system.
-The default is fifteen seconds. On failure, \fBerrno\fR is set to the following
-value:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-Invalid \fIarg\fR value.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_GETCLTIME\fR\fR
-.ad
-.RS 15n
-Returns the close time delay in the integer pointed by \fIarg\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_SERROPT\fR\fR
-.ad
-.RS 15n
-Sets the error mode using the value of the argument \fIarg\fR.
-.sp
+The default is fifteen seconds.
+On failure,
+.Va errno
+is set to the following value:
+.Bl -tag -width EINVAL
+.It Er EINVAL
+Invalid
+.Fa arg
+value.
+.El
+.It Dv I_GETCLTIME
+Returns the close time delay in the integer pointed by
+.Va arg .
+.It Dv I_SERROPT
+Sets the error mode using the value of the argument
+.Fa arg .
+.Pp
 Normally stream head errors are persistent; once they are set due to an
-\fBM_ERROR\fR or \fBM_HANGUP\fR, the error condition will remain until the
-stream is closed. This option can be used to set the stream head into
-non-persistent error mode i.e. once the error has been returned in response to
-a \fBread\fR(2), \fBgetmsg\fR(2), \fBioctl\fR(2), \fBwrite\fR(2), or
-\fBputmsg\fR(2) call the error condition will be cleared. The error mode can be
-controlled independently for read and write side errors. Legal \fIarg\fR values
+.Dv M_ERROR
+or
+.Dv M_HANGUP ,
+the error condition will remain until the stream is closed.
+This option can be used to set the stream head into
+non-persistent error mode i\.e\. once the error has been returned in response
+to a
+.Xr read 2 ,
+.Xr getmsg 2 ,
+.Xr ioctl 2 ,
+.Xr write 2 ,
+or
+.Xr putmsg 2
+call the error condition will be cleared.
+The error mode can be controlled independently for read and write side errors.
+Legal
+.Fa arg
+values
 are either none or one of:
-.sp
-.ne 2
-.na
-\fB\fBRERRNORM\fR\fR
-.ad
-.RS 18n
+.Bl -tag -width RERRNONPERSIST
+.It Dv RERRNORM
 Persistent read errors, the default.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBRERRNONPERSIST\fR\fR
-.ad
-.RS 18n
+.It Dv RERRNONPERSIST
 Non-persistent read errors.
-.RE
-
-\fBOR'ed\fR with either none or one of:
-.sp
-.ne 2
-.na
-\fB\fBWERRNORM\fR\fR
-.ad
-.RS 18n
+.El
+.Pp
+.Sy OR Ns 'ed
+with either none or one of:
+.Bl -tag -width WERRNONPERSIST
+.It Dv WERRNORM
 Persistent write errors, the default.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBWERRNONPERSIST\fR\fR
-.ad
-.RS 18n
+.It Dv WERRNONPERSIST
 Non-persistent write errors.
-.sp
-When no value is specified e.g. for the read side error behavior then the
+.El
+.Pp
+When no value is specified e\.g\.  for the read side error behavior then the
 behavior for that side will be left unchanged.
-.RE
-
-On failure, \fBerrno\fR is set to the following value:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-\fIarg\fR is not one of the above legal values.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_GERROPT\fR\fR
-.ad
-.RS 15n
-Returns the current error mode setting in an \fBint\fR pointed to by the
-argument \fIarg\fR. Error modes are described above for \fBI_SERROPT\fR. On
-failure,\fBerrno\fR is set to the following value:
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 10n
-\fIarg\fR points outside the allocated address space.
-.RE
-
-.RE
-
-.sp
-.LP
+.Pp
+On failure,
+.Va errno
+is set to the following value:
+.Bl -tag -width EINVAL
+.It Er EINVAL
+.Va arg
+is not one of the above legal values.
+.El
+.It Dv I_GERROPT
+Returns the current error mode setting in an
+.Vt int
+pointed to by the argument
+.Fa arg .
+Error modes are described above for
+.Dv I_SERROPT .
+On failure,
+.Va errno
+is set to the following value:
+.Bl -tag -width EFAULT
+.It Sy EFAULT
+.Fa arg
+points outside the allocated address space.
+.El
+.El
+.Pp
 The following four commands are used for connecting and disconnecting
 multiplexed STREAMS configurations.
-.sp
-.ne 2
-.na
-\fB\fBI_LINK\fR\fR
-.ad
-.RS 13n
-Connects two streams, where \fIfildes\fR is the file descriptor of the stream
-connected to the multiplexing driver, and \fIarg\fR is the file descriptor of
-the stream connected to another driver. The stream designated by \fIarg\fR gets
-connected below the multiplexing driver. \fBI_LINK\fR requires the multiplexing
+.Bl -tag -width I_PUNLINK
+.It Dv I_LINK
+Connects two streams, where
+.Fa fildes
+is the file descriptor of the stream
+connected to the multiplexing driver, and
+.Fa arg
+is the file descriptor of the stream connected to another driver.
+The stream designated by
+.Va arg
+gets
+connected below the multiplexing driver.
+.Dv I_LINK
+requires the multiplexing
 driver to send an acknowledgement message to the stream head regarding the
-linking operation. This call returns a multiplexor ID number (an identifier
-used to disconnect the multiplexor, see \fBI_UNLINK\fR) on success, and -1 on
-failure. On failure, \fBerrno\fR is set to one of the following values:
-.sp
-.ne 2
-.na
-\fB\fBENXIO\fR\fR
-.ad
-.RS 10n
-Hangup received on \fIfildes\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBETIME\fR\fR
-.ad
-.RS 10n
+linking operation.
+This call returns a multiplexor ID number (an identifier
+used to disconnect the multiplexor, see
+.Dv I_UNLINK )
+on success, and \(mi1 on failure.
+On failure,
+.Va errno
+is set to one of the following values:
+.Bl -tag -width EAGAIN
+.It Er ENXIO
+Hangup received on
+.Va fildes .
+.It Er ETIME
 Time out before acknowledgement message was received at stream head.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 10n
-Temporarily unable to allocate storage to perform the \fBI_LINK.\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOSR\fR\fR
-.ad
-.RS 10n
-Unable to allocate storage to perform the \fBI_LINK\fR due to insufficient
-\fBSTREAMS\fR memory resources.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEBADF\fR\fR
-.ad
-.RS 10n
-\fIarg\fR is not a valid, open file descriptor.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-\fIfildes\fR stream does not support multiplexing.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-\fIarg\fR is not a stream, or is already linked under a multiplexor.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The specified link operation would cause a ``cycle'' in the resulting
-configuration; that is, a driver would be linked into the multiplexing
-configuration in more than one place.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-\fIfildes\fR is the file descriptor of a pipe or FIFO.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-Either the upper or lower stream has a major number >= the maximum major number
-on the system.
-.RE
-
-An \fBI_LINK\fR can also fail while waiting for the multiplexing driver to
+.It Er EAGAIN
+Temporarily unable to allocate storage to perform the
+.Dv I_LINK .
+.It Er ENOSR
+Unable to allocate storage to perform the
+.Dv I_LINK
+due to insufficient
+.Sy STREAMS
+memory resources.
+.It Er EBADF
+.Va arg
+is not a valid, open file descriptor.
+.It Er EINVAL
+.Va fildes
+stream does not support multiplexing.
+.It Er EINVAL
+is not a stream, or is already linked under a multiplexor.
+.It Er EINVAL
+The specified link operation would cause a
+.Dq cycle
+in the resulting configuration; that is, a driver would be linked into the
+multiplexing configuration in more than one place.
+.It Er EINVAL
+.Va fildes
+is the file descriptor of a pipe or FIFO.
+.It Er EINVAL
+Either the upper or lower stream has a major number \(>= the maximum major
+number on the system.
+.El
+.Pp
+An
+.Dv I_LINK
+can also fail while waiting for the multiplexing driver to
 acknowledge the link request, if a message indicating an error or a hangup is
-received at the stream head of \fIfildes\fR. In addition, an error code can be
-returned in the positive or negative acknowledgement message.  For these cases,
-\fBI_LINK\fR will fail with \fBerrno\fR set to the value in the message.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_UNLINK\fR\fR
-.ad
-.RS 13n
-Disconnects the two streams specified by \fIfildes\fR and \fIarg\fR.
-\fIfildes\fR is the file descriptor of the stream connected to the multiplexing
-driver. \fIarg\fR is the multiplexor ID number that was returned by the
-\fBI_LINK\fR. If \fIarg\fR is -1, then all streams that were linked to
-\fIfildes\fR are disconnected.  As in \fBI_LINK\fR, this command requires the
-multiplexing driver to acknowledge the unlink. On failure, \fBerrno\fR is set
-to one of the following values:
-.sp
-.ne 2
-.na
-\fB\fBENXIO\fR\fR
-.ad
-.RS 10n
-Hangup received on \fIfildes\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBETIME\fR\fR
-.ad
-.RS 10n
+received at the stream head of
+.Fa fildes .
+In addition, an error code can be
+returned in the positive or negative acknowledgement message.
+For these cases,
+.Dv I_LINK
+will fail with
+.Va errno
+set to the value in the message.
+.It Dv I_UNLINK
+Disconnects the two streams specified by
+.Fa fildes
+and
+.Fa arg .
+.Fa fildes
+is the file descriptor of the stream connected to the multiplexing
+driver.
+.Fa arg
+is the multiplexor ID number that was returned by the
+.Dv I_LINK .
+If
+.Fa arg
+is \(mi1, then all streams that were linked to
+.Fa fildes
+are disconnected.
+As in
+.Dv I_LINK ,
+this command requires the multiplexing driver to acknowledge the unlink.
+On failure,
+.Va errno
+is set to one of the following values:
+.Bl -tag -width EINVAL
+.It Er ENXIO
+Hangup received on
+.Va fildes .
+.It Er ETIME
 Time out before acknowledgement message was received at stream head.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOSR\fR\fR
-.ad
-.RS 10n
-Unable to allocate storage to perform the \fBI_UNLINK\fR due to insufficient
+.It Er ENOSR
+Unable to allocate storage to perform the
+.Dv I_UNLINK
+due to insufficient
 STREAMS memory resources.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-\fIarg\fR is an invalid multiplexor ID number or \fIfildes\fR is not the stream
-on which the \fBI_LINK\fR that returned \fIarg\fR was performed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-\fIfildes\fR is the file descriptor of a pipe or FIFO.
-.RE
-
-An  \fBI_UNLINK\fR can also fail while waiting for the multiplexing driver to
+.It Er EINVAL
+.Fa arg
+is an invalid multiplexor ID number or
+.Fa fildes
+is not the stream on which the
+.Dv I_LINK
+that returned
+.Fa arg
+was performed.
+.It Er EINVAL
+.Fa fildes
+is the file descriptor of a pipe or FIFO.
+.El
+.Pp
+An
+.Dv I_UNLINK
+can also fail while waiting for the multiplexing driver to
 acknowledge the link request, if a message indicating an error or a hangup is
-received at the stream head of \fIfildes\fR. In addition, an error code can be
-returned in the positive or negative acknowledgement message. For these cases,
-\fBI_UNLINK\fR will fail with \fBerrno\fR set to the value in the message.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_PLINK\fR\fR
-.ad
-.RS 13n
-Connects two streams, where \fIfildes\fR is the file descriptor of the stream
-connected to the multiplexing driver, and \fIarg\fR is the file descriptor of
-the stream connected to another driver. The stream designated by \fIarg\fR gets
-connected via a persistent link below the multiplexing driver. \fBI_PLINK\fR
+received at the stream head of
+.Fa fildes .
+In addition, an error code can be
+returned in the positive or negative acknowledgement message.
+For these cases,
+.Dv I_UNLINK
+will fail with
+.Va errno
+set to the value in the message.
+.It Dv I_PLINK
+Connects two streams, where
+.Fa fildes
+is the file descriptor of the stream
+connected to the multiplexing driver, and
+.Fa arg
+is the file descriptor of
+the stream connected to another driver.
+The stream designated by
+.Fa arg
+gets
+connected via a persistent link below the multiplexing driver.
+.Dv I_PLINK
 requires the multiplexing driver to send an acknowledgement message to the
-stream head regarding the linking operation. This call creates a persistent
-link that continues to exist even if the file descriptor \fIfildes\fR
-associated with the upper stream to the multiplexing driver is closed. This
+stream head regarding the linking operation.
+This call creates a persistent
+link that continues to exist even if the file descriptor
+.Fa fildes
+associated with the upper stream to the multiplexing driver is closed.
+This
 call returns a multiplexor ID number (an identifier that may be used to
-disconnect the multiplexor, see \fBI_PUNLINK\fR) on success, and -1 on failure.
-On failure, \fBerrno\fR is set to one of the following values:
-.sp
-.ne 2
-.na
-\fB\fBENXIO\fR\fR
-.ad
-.RS 10n
-Hangup received on \fIfildes\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBETIME\fR\fR
-.ad
-.RS 10n
+disconnect the multiplexor, see
+.Dv I_PUNLINK )
+on success, and \(mi1 on failure.
+On failure,
+.Va errno
+is set to one of the following values:
+.Bl -tag -width EAGAIN
+.It Er ENXIO
+Hangup received on
+.Fa fildes .
+.It Er ETIME
 Time out before acknowledgement message was received at the stream head.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 10n
-Unable to allocate STREAMS storage to perform the  \fBI_PLINK.\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEBADF\fR\fR
-.ad
-.RS 10n
-\fIarg\fR is not a valid, open file descriptor.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-\fIfildes\fR does not support multiplexing.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-\fIarg\fR is not a stream or is already linked under a multiplexor.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The specified link operation would cause a ``cycle'' in the resulting
-configuration; that is, if a driver would be linked into the multiplexing
-configuration in more than one place.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-\fIfildes\fR is the file descriptor of a pipe or FIFO.
-.RE
-
-An \fBI_PLINK\fR can also fail while waiting for the multiplexing driver to
+.It Er EAGAIN
+Unable to allocate STREAMS storage to perform the
+.Dv I_PLINK .
+.It Er EBADF
+.Va arg
+is not a valid, open file descriptor.
+.It Er EINVAL
+.Va fildes
+does not support multiplexing.
+.It Er EINVAL
+.Va arg
+is not a stream or is already linked under a multiplexor.
+.It Er EINVAL
+The specified link operation would cause a
+.Dq cycle
+in the resulting configuration; that is, if a driver would be linked into the
+multiplexing configuration in more than one place.
+.It Er EINVAL
+.Fa fildes
+is the file descriptor of a pipe or FIFO.
+.El
+.Pp
+An
+.Dv I_PLINK
+can also fail while waiting for the multiplexing driver to
 acknowledge the link request, if a message indicating an error on a hangup is
-received at the stream head of \fIfildes\fR. In addition, an error code can be
-returned in the positive or negative acknowledgement message.  For these cases,
-\fBI_PLINK\fR will fail with \fBerrno\fR set to the value in the message.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBI_PUNLINK\fR\fR
-.ad
-.RS 13n
-Disconnects the two streams specified by \fIfildes\fR and \fIarg\fR that are
-connected with a persistent link. \fIfildes\fR is the file descriptor of the
-stream connected to the multiplexing driver. \fIarg\fR is the multiplexor ID
-number that was returned by \fBI_PLINK\fR when a stream was linked below the
-multiplexing driver. If \fIarg\fR is  \fBMUXID_ALL\fR then all streams that are
-persistent links to \fIfildes\fR are disconnected. As in  \fBI_PLINK,\fR this
-command requires the multiplexing driver to acknowledge the unlink. On failure,
-\fBerrno\fR is set to one of the following values:
-.sp
-.ne 2
-.na
-\fB\fBENXIO\fR\fR
-.ad
-.RS 10n
-Hangup received on \fIfildes\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBETIME\fR\fR
-.ad
-.RS 10n
+received at the stream head of
+.Fa fildes .
+In addition, an error code can be
+returned in the positive or negative acknowledgement message.
+For these cases,
+.Dv I_PLINK
+will fail with
+.Va errno
+set to the value in the message.
+.It Dv I_PUNLINK
+Disconnects the two streams specified by
+.Fa fildes
+and
+.Fa arg
+that are
+connected with a persistent link.
+.Fa fildes
+is the file descriptor of the
+stream connected to the multiplexing driver.
+.Fa arg
+is the multiplexor ID number that was returned by
+.Dv I_PLINK
+when a stream was linked below the multiplexing driver.
+If
+.Fa arg
+is
+.Dv MUXID_ALL
+then all streams that are persistent links to
+.Fa fildes
+are disconnected.
+As in
+.Dv I_PLINK ,
+this command requires the multiplexing driver to acknowledge the unlink.
+On failure,
+.Va errno
+is set to one of the following values:
+.Bl -tag -width EAGAIN
+.It Sy ENXIO
+Hangup received on
+.Fa fildes .
+.It Er ETIME
 Time out before acknowledgement message was received at the stream head.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 10n
+.It Er EAGAIN
 Unable to allocate buffers for the acknowledgement message.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
+.It Er EINVAL
 Invalid multiplexor ID number.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-\fIfildes\fR is the file descriptor of a pipe or FIFO.
-.RE
-
-An \fBI_PUNLINK\fR can also fail while waiting for the multiplexing driver to
+.It Er EINVAL
+.Fa fildes
+is the file descriptor of a pipe or FIFO.
+.El
+.Pp
+An
+.Dv I_PUNLINK
+can also fail while waiting for the multiplexing driver to
 acknowledge the link request if a message indicating an error or a hangup is
-received at the stream head of \fIfildes\fR. In addition, an error code can be
-returned in the positive or negative acknowledgement message.  For these cases,
-\fBI_PUNLINK\fR will fail with \fBerrno\fR set to the value in the message.
-.RE
-
-.SH RETURN VALUES
-.sp
-.LP
-Unless specified otherwise above, the return value from \fBioctl()\fR is
-\fB0\fR upon success and  \fB\(mi1\fR upon failure, with \fIerrno\fR set as
-indicated.
-.SH SEE ALSO
-.sp
-.LP
-\fBIntro\fR(3), \fBclose\fR(2), \fBfcntl\fR(2), \fBgetmsg\fR(2),
-\fBioctl\fR(2), \fBopen\fR(2), \fBpoll\fR(2), \fBputmsg\fR(2), \fBread\fR(2),
-\fBwrite\fR(2), \fBsignal\fR(3C), \fBsignal.h\fR(3HEAD),
-.sp
-.LP
-\fISTREAMS Programming Guide\fR
+received at the stream head of
+.Fa fildes .
+In addition, an error code can be
+returned in the positive or negative acknowledgement message.
+For these cases,
+.Dv I_PUNLINK
+will fail with
+.Va errno
+set to the value in the message.
+.El
+.Sh RETURN VALUES
+Unless specified otherwise above, the return value from
+.Xr ioctl 2
+is
+.Sy 0
+upon success and
+.Sy \(mi1
+upon failure, with
+.Va errno
+set as indicated.
+.Sh SEE ALSO
+.Xr close 2 ,
+.Xr fcntl 2 ,
+.Xr getmsg 2 ,
+.Xr ioctl 2 ,
+.Xr open 2 ,
+.Xr poll 2 ,
+.Xr putmsg 2 ,
+.Xr read 2 ,
+.Xr write 2 ,
+.Xr Intro 3 ,
+.Xr signal 3C ,
+.Xr signal.h 3HEAD
+.Pp
+.%B STREAMS Programming Guide

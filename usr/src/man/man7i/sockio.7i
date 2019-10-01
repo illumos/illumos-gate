@@ -1,65 +1,97 @@
-'\" te
+.\"  Copyright (c) 2017, Joyent, Inc.
 .\"  Copyright 1989 AT&T  Copyright (c) 1996, Sun Microsystems, Inc.  All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SOCKIO 7I "Nov 8, 1996"
-.SH NAME
-sockio \- ioctls that operate directly on sockets
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/sockio.h>
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBioctls\fR listed in this manual page apply directly to sockets,
-independent of any underlying protocol. The \fBsetsockopt()\fR call (see
-\fBgetsockopt\fR(3SOCKET)) is the primary method for operating on sockets,
-rather than on the underlying protocol or network interface. \fBioctl\fRs for a
-specific network interface or protocol are documented in the manual page for
-that interface or protocol.
-.sp
-.ne 2
-.na
-\fB\fBSIOCSPGRP\fR\fR
-.ad
-.RS 15n
-The argument is a pointer to an \fBint\fR. Set the process-group \fBID\fR that
-will subsequently receive \fBSIGIO\fR or \fBSIGURG\fR signals for the socket
-referred to by the descriptor passed to \fBioctl\fR to the value of that
-\fBint\fR. The argument must be either positive (in which case it must  be a
-process \fBID)\fR or negative (in which case it must be a process group).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSIOCGPGRP\fR\fR
-.ad
-.RS 15n
-The argument is a pointer to an \fBint\fR. Set the value of that \fBint\fR to
-the process-group \fBID\fR that is receiving \fBSIGIO\fR or \fBSIGURG\fR
-signals for the socket referred to by the descriptor passed to \fBioctl\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSIOCCATMARK\fR\fR
-.ad
-.RS 15n
-The argument is a pointer to an \fBint\fR. Set the value of that \fBint\fR to
-\fB1\fR if the read pointer for the socket referred to by the descriptor passed
-to \fBioctl\fR points to a mark in the data stream for an out-of-band message.
-Set the value of that \fBint\fR to \fB0\fR if the read pointer for the socket
-referred to by the descriptor passed to \fBioctl\fR  does not point to a mark
-in the data stream for an  out-of-band message.
-.RE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBioctl\fR(2), \fBgetsockopt\fR(3SOCKET)
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd October 29, 2017
+.Dt SOCKIO 7I
+.Os
+.Sh NAME
+.Nm sockio
+.Nd ioctls that operate directly on sockets
+.Sh SYNOPSIS
+.In sys/sockio.h
+.Sh DESCRIPTION
+The
+.Sy ioctl Ns s
+listed in this manual page apply directly to sockets,
+independent of any underlying protocol.
+The
+.Xr setsockopt 3SOCKET
+call
+.Po
+see
+.Xr getsockopt 3SOCKET
+.Pc
+is the primary method for operating on sockets,
+rather than on the underlying protocol or network interface.
+.Sy ioctl Ns s
+for a specific network interface or protocol are documented in the manual page
+for that interface or protocol.
+.Bl -tag -width SIOCCATMARK
+.It Dv SIOCSPGRP
+The argument is a pointer to an
+.Vt int .
+Set the process-group
+.Sy ID
+that will subsequently receive
+.Dv SIGIO
+or
+.Dv SIGURG
+signals for the socket
+referred to by the descriptor passed to
+.Sy ioctl
+to the value of that
+.Vt int .
+The argument must be either positive (in which case it must be a
+process
+.Sy ID )
+or negative (in which case it must be a process group).
+.It Dv SIOCGPGRP
+The argument is a pointer to an
+.Vt int .
+Get the value of that
+.Vt int
+to the process-group
+.Sy ID
+that is receiving
+.Dv SIGIO
+or
+.Dv SIGURG
+signals for the socket referred to by the descriptor passed to
+.Sy ioctl .
+.It Dv SIOCCATMARK
+The argument is a pointer to an
+.Vt int .
+Set the value of that
+.Vt int
+to
+.Sy 1
+if the read pointer for the socket referred to by the descriptor passed
+to
+.Xr ioctl 2
+points to a mark in the data stream for an out-of-band message.
+Set the value of that
+.Vt int
+to
+.Sy 0
+if the read pointer for the socket
+referred to by the descriptor passed to
+.Sy ioctl
+does not point to a mark
+in the data stream for an out-of-band message.
+.El
+.Sh SEE ALSO
+.Xr ioctl 2 ,
+.Xr getsockopt 3SOCKET

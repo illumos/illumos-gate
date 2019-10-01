@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -111,8 +111,8 @@ _info(struct modinfo *modinfop)
 
 static int ttcompatopen(queue_t *, dev_t *, int, int, cred_t *);
 static int ttcompatclose(queue_t *, int, cred_t *);
-static void ttcompatrput(queue_t *, mblk_t *);
-static void ttcompatwput(queue_t *, mblk_t *);
+static int ttcompatrput(queue_t *, mblk_t *);
+static int ttcompatwput(queue_t *, mblk_t *);
 
 static struct module_info ttycompatmiinfo = {
 	0,
@@ -124,7 +124,7 @@ static struct module_info ttycompatmiinfo = {
 };
 
 static struct qinit ttycompatrinit = {
-	(int (*)())ttcompatrput,
+	ttcompatrput,
 	NULL,
 	ttcompatopen,
 	ttcompatclose,
@@ -142,7 +142,7 @@ static struct module_info ttycompatmoinfo = {
 };
 
 static struct qinit ttycompatwinit = {
-	(int (*)())ttcompatwput,
+	ttcompatwput,
 	NULL,
 	ttcompatopen,
 	ttcompatclose,
@@ -217,7 +217,7 @@ ttcompatclose(queue_t *q, int flag, cred_t *crp)
  * "ioctl" replies, and if it's an "ioctl" whose reply we plan to do
  * something with, we do it.
  */
-static void
+static int
 ttcompatrput(queue_t *q, mblk_t *mp)
 {
 	switch (mp->b_datap->db_type) {
@@ -234,13 +234,14 @@ ttcompatrput(queue_t *q, mblk_t *mp)
 		putnext(q, mp);
 		break;
 	}
+	return (0);
 }
 
 /*
  * Line discipline output queue put procedure: speeds M_IOCTL
  * messages.
  */
-static void
+static int
 ttcompatwput(queue_t *q, mblk_t *mp)
 {
 	ttcompat_state_t *tp;
@@ -257,7 +258,7 @@ ttcompatwput(queue_t *q, mblk_t *mp)
 
 	default:
 		putnext(q, mp);
-		return;
+		return (0);
 
 	case M_IOCTL:
 		iocbp = (struct iocblk *)mp->b_rptr;
@@ -268,7 +269,7 @@ ttcompatwput(queue_t *q, mblk_t *mp)
 	/* these are ioctls with no arguments or are known to stream head */
 	/* process them right away */
 			ttcompat_do_ioctl(tp, q, mp);
-			return;
+			return (0);
 		case TIOCSETN:
 		case TIOCSLTC:
 		case TIOCSETC:
@@ -278,7 +279,7 @@ ttcompatwput(queue_t *q, mblk_t *mp)
 		case TIOCFLUSH:
 			if (iocbp->ioc_count != TRANSPARENT) {
 				putnext(q, mp);
-				return;
+				return (0);
 			}
 
 			mp->b_datap->db_type = M_COPYIN;
@@ -311,7 +312,7 @@ ttcompatwput(queue_t *q, mblk_t *mp)
 			tp->t_ioccmd = iocbp->ioc_cmd;
 			tp->t_state |= TS_W_IN;
 			qreply(q, mp);
-			return;
+			return (0);
 
 		} /* switch ioc_cmd */
 	case M_IOCDATA:
@@ -321,7 +322,7 @@ ttcompatwput(queue_t *q, mblk_t *mp)
 
 		default:
 			putnext(q, mp);
-			return;
+			return (0);
 
 		case TIOCSETN:
 		case TIOCSLTC:
@@ -333,7 +334,7 @@ ttcompatwput(queue_t *q, mblk_t *mp)
 			tp->t_state &= ~TS_W_IN;
 			if (csp->cp_rval != 0) {	/* failure */
 				freemsg(mp);
-				return;
+				return (0);
 			}
 
 			/* make it look like an ioctl */
@@ -344,7 +345,7 @@ ttcompatwput(queue_t *q, mblk_t *mp)
 			iocbp->ioc_error = 0;
 			iocbp->ioc_rval = 0;
 			ttcompat_do_ioctl(tp, q, mp);
-			return;
+			return (0);
 
 		case TIOCGLTC:
 		case TIOCLGET:
@@ -352,7 +353,7 @@ ttcompatwput(queue_t *q, mblk_t *mp)
 			tp->t_state &= ~TS_W_OUT;
 			if (csp->cp_rval != 0) {	/* failure */
 				freemsg(mp);
-				return;
+				return (0);
 			}
 
 			iocbp = (struct iocblk *)mp->b_rptr;
@@ -361,10 +362,11 @@ ttcompatwput(queue_t *q, mblk_t *mp)
 			iocbp->ioc_rval = 0;
 			mp->b_datap->db_type = M_IOCACK;
 			qreply(q, mp);
-			return;
+			return (0);
 
 		} /* switch cp_cmd */
 	} /* end message switch */
+	return (0);
 }
 
 /*
@@ -697,7 +699,7 @@ allocfailure:
  * If this wasn't the response we were waiting for, just pass it up.
  */
 static void
-ttcompat_ioctl_ack(queue_t *q, 	mblk_t *mp)
+ttcompat_ioctl_ack(queue_t *q, mblk_t *mp)
 {
 	ttcompat_state_t *tp;
 	struct iocblk *iocp;

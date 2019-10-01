@@ -965,7 +965,7 @@ vdev_disk_io_start(zio_t *zio)
 		dkioc_free_list_t dfl;
 		dfl.dfl_flags = 0;
 		dfl.dfl_num_exts = 1;
-		dfl.dfl_offset = VDEV_LABEL_START_SIZE;
+		dfl.dfl_offset = 0;
 		dfl.dfl_exts[0].dfle_start = zio->io_offset;
 		dfl.dfl_exts[0].dfle_length = zio->io_size;
 

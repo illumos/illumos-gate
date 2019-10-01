@@ -1,404 +1,386 @@
-'\" te
 .\" Copyright (c) 2005 Sun Microsystems, Inc.  All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MHD 7I "Mar 18, 2011"
-.SH NAME
-mhd \- multihost disk control operations
-.SH SYNOPSIS
-.LP
-.nf
-\fB#include\fR \fB<sys/mhd.h>\fR
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The  \fBmhd\fR \fBioctl\fR(2) control access rights of a multihost disk, using
+.\" Copyright (c) 2017, Joyent, Inc.
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd October 23, 2017
+.Dt MHD 7I
+.Os
+.Sh NAME
+.Nm mhd
+.Nd multihost disk control operations
+.Sh SYNOPSIS
+.In sys/mhd.h
+.Sh DESCRIPTION
+The
+.Nm
+.Xr ioctl 2
+control access rights of a multihost disk, using
 disk reservations on the disk device.
-.sp
-.LP
-The stability level of this interface (see \fBattributes\fR(5)) is evolving. As
-a result, the interface is subject to change and you should limit your use of
+.Pp
+The stability level of this interface (see
+.Xr attributes 5 )
+is evolving.
+As a result, the interface is subject to change and you should limit your use of
 it.
-.sp
-.LP
+.Pp
 The mhd ioctls fall into two major categories: (1) ioctls for non-shared
-multihost disks and (2)  ioctls for shared multihost disks.
-.sp
-.LP
-One ioctl, \fBMHIOCENFAILFAST\fR, is applicable to both non-shared and shared
-multihost disks.  It is described after the first two categories.
-.sp
-.LP
+multihost disks and (2) ioctls for shared multihost disks.
+.Pp
+One ioctl,
+.Dv MHIOCENFAILFAST ,
+is applicable to both non-shared and shared multihost disks.
+It is described after the first two categories.
+.Pp
 All the ioctls require root privilege.
-.sp
-.LP
+.Pp
 For all of the ioctls, the caller should obtain the file descriptor for the
-device by calling  \fBopen\fR(2) with the \fBO_NDELAY\fR flag; without the
-\fBO_NDELAY\fR flag, the open may fail due to another host already having a
-conflicting reservation on the device. Some of the ioctls below permit the
-caller to forcibly clear a conflicting reservation held by another host,
-however, in order to call the ioctl, the caller must first obtain the open file
-descriptor.
-.SS "Non-shared multihost disks"
-.sp
-.LP
-Non-shared multihost disks ioctls consist of \fBMHIOCTKOWN\fR,
-\fBMHIOCRELEASE\fR, \fBHIOCSTATUS\fR, and \fBMHIOCQRESERVE\fR. These ioctl
-requests control the access rights of non-shared multihost disks. A non-shared
-multihost disk is one that supports serialized, mutually exclusive I/O mastery
-by the connected hosts. This is in contrast to the shared-disk model, in which
+device by calling
+.Xr open 2
+with the
+.Dv O_NDELAY
+flag; without the
+.Dv O_NDELAY
+flag, the open may fail due to another host already having a
+conflicting reservation on the device.
+Some of the ioctls below permit the caller to forcibly clear a conflicting
+reservation held by another host, however, in order to call the ioctl, the
+caller must first obtain the open file descriptor.
+.Ss "Non-shared multihost disks"
+Non-shared multihost disks ioctls consist of
+.Dv MHIOCTKOWN ,
+.Dv MHIOCRELEASE ,
+.Dv HIOCSTATUS ,
+and
+.Dv MHIOCQRESERVE .
+These ioctl requests control the access rights of non-shared multihost disks.
+A non-shared multihost disk is one that supports serialized, mutually exclusive
+I/O mastery by the connected hosts.
+This is in contrast to the shared-disk model, in which
 concurrent access is allowed from more than one host (see below).
-.sp
-.LP
+.Pp
 A non-shared multihost disk can be in one of two states:
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.Bl -bullet -width indent
+.It
 Exclusive access state, where only one connected host has I/O access
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Non-exclusive access state, where all connected hosts have I/O access. An
-external hardware reset can cause the disk to enter the non-exclusive access
+.It
+Non-exclusive access state, where all connected hosts have I/O access.
+An external hardware reset can cause the disk to enter the non-exclusive access
 state.
-.RE
-.sp
-.LP
+.El
+.Pp
 Each multihost disk driver views the machine on which it's running as the
-"local host"; each views all other machines as "remote hosts".  For each I/O or
-ioctl request, the requesting host is the local host.
-.sp
-.LP
-Note that the non-shared ioctls are designed to work with SCSI-2 disks. The
+.Dq local host ;
+each views all other machines as
+.Dq remote hosts .
+For each I/O or ioctl request, the requesting host is the local host.
+.Pp
+Note that the non-shared ioctls are designed to work with SCSI-2 disks.
+The
 SCSI-2 RESERVE/RELEASE command set is the underlying hardware facility in the
 device that supports the non-shared ioctls.
-.sp
-.LP
+.Pp
 The function prototypes for the non-shared ioctls are:
-.sp
-.in +2
-.nf
-ioctl(fd, MHIOCTKOWN);
-ioctl(fd, MHIOCRELEASE);
-ioctl(fd, MHIOCSTATUS);
-ioctl(fd, MHIOCQRESERVE);
-.fi
-.in -2
-
-.sp
-.ne 2
-.na
-\fB\fBMHIOCTKOWN\fR \fR
-.ad
-.RS 18n
+.Bd -literal -offset 2n
+.Fn ioctl fd MHIOCTKOWN ;
+.Fn ioctl fd MHIOCRELEASE ;
+.Fn ioctl fd MHIOCSTATUS ;
+.Fn ioctl fd MHIOCQRESERVE ;
+.Ed
+.Bl -tag -width MHIOCQRESERVE
+.It Dv MHIOCTKOWN
 Forcefully acquires exclusive access rights to the multihost disk for the local
-host. Revokes all access rights to the multihost disk from remote hosts.
+host.
+Revokes all access rights to the multihost disk from remote hosts.
 Causes the disk to enter the exclusive access state.
-.sp
+.Pp
 Implementation Note: Reservations (exclusive access rights) broken via random
 resets should be reinstated by the driver upon their detection, for example, in
 the automatic probe function described below.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMHIOCRELEASE\fR \fR
-.ad
-.RS 18n
+.It Dv MHIOCRELEASE
 Relinquishes exclusive access rights to the multihost disk for the local host.
-On success, causes the disk to enter the  non- exclusive access state.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMHIOCSTATUS\fR \fR
-.ad
-.RS 18n
+On success, causes the disk to enter the non- exclusive access state.
+.It Dv MHIOCSTATUS
 Probes a multihost disk to determine whether the local host has access rights
-to the disk. Returns  \fB0\fR if the local host has access to the disk,
-\fB1\fR if it doesn't, and \fB-1\fR with errno set to  \fBEIO\fR if the probe
-failed for some other reason.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBMHIOCQRESERVE\fR \fR
-.ad
-.RS 18n
-Issues, simply and only, a SCSI-2 Reserve command. If the attempt to reserve
+to the disk.
+Returns
+.Sy 0
+if the local host has access to the disk,
+.Sy 1
+if it doesn't, and
+.Sy -1
+with
+.Va errno
+set to
+.Er EIO
+if the probe failed for some other reason.
+.It Dv MHIOCQRESERVE
+Issues, simply and only, a SCSI-2 Reserve command.
+If the attempt to reserve
 fails due to the SCSI error Reservation Conflict (which implies that some other
-host has the device reserved), then the ioctl will return  \fB-1\fR with errno
-set to  \fBEACCES\fR. The \fBMHIOCQRESERVE\fR ioctl does NOT issue a bus device
-reset or bus reset prior to attempting the SCSI-2 reserve command.  It also
+host has the device reserved), then the ioctl will return
+.Sy -1
+with
+.Va errno
+set to
+.Er EACCES .
+The
+.Dv MHIOCQRESERVE
+ioctl does NOT issue a bus device
+reset or bus reset prior to attempting the SCSI-2 reserve command.
+It also
 does not take care of re-instating reservations that disappear due to bus
 resets or bus device resets; if that behavior is desired, then the caller can
-call \fBMHIOCTKOWN\fR after the \fBMHIOCQRESERVE\fR has returned success.  If
+call
+.Dv MHIOCTKOWN
+after the
+.Dv MHIOCQRESERVE
+has returned success.
+If
 the device does not support the SCSI-2 Reserve command, then the ioctl returns
-\fB-1\fR with  \fBerrno\fR set to \fBENOTSUP.\fR The \fBMHIOCQRESERVE\fR ioctl
-is intended to be used by high-availability or clustering software for a
-"quorum" disk, hence, the "Q" in the name of the ioctl.
-.RE
-
-.SS "Shared Multihost Disks"
-.sp
-.LP
-Shared multihost disks ioctls control access to shared multihost disks. The
-ioctls are merely a veneer on the SCSI-3 Persistent Reservation facility.
+.Er -1
+with
+.Va errno
+set to
+.Er ENOTSUP .
+The
+.Dv MHIOCQRESERVE
+ioctl is intended to be used by high-availability or clustering software for a
+.Dq quorum
+disk, hence, the
+.Dq Q
+in the name of the ioctl.
+.El
+.Ss "Shared Multihost Disks"
+Shared multihost disks ioctls control access to shared multihost disks.
+The ioctls are merely a veneer on the SCSI-3 Persistent Reservation facility.
 Therefore, the underlying semantic model is not described in detail here, see
-instead the SCSI-3 standard. The SCSI-3 Persistent Reservations support the
+instead the SCSI-3 standard.
+The SCSI-3 Persistent Reservations support the
 concept of a group of hosts all sharing access to a disk.
-.sp
-.LP
+.Pp
 The function prototypes and descriptions for the shared multihost ioctls are as
 follows:
-.sp
-.ne 2
-.na
-\fB\fBioctl\fR(\fBfd\fR, \fBMHIOCGRP_INKEYS\fR, (\fBmhioc_inkeys_t\fR)
-\fI*k\fR\fB);\fR\fR
-.ad
-.sp .6
-.RS 4n
-Issues the SCSI-3 command Persistent Reserve In Read Keys to the device.  On
-input, the field \fBk->li\fR should be initialized by the caller with
-\fBk->li.listsize\fR reflecting how big of an array the caller has allocated
-for the \fBk->li.list\fR field and with \fBk->li.listlen\fR \fB==\fR \fB0.\fR
-On return, the field \fBk->li.listlen\fR is updated to indicate the number of
+.Bl -tag -width 1n
+.It Fn ioctl fd MHIOCGRP_INKEYS "(mhioc_inkeys_t *)k"
+.Pp
+Issues the SCSI-3 command Persistent Reserve In Read Keys to the device.
+On input, the field
+.Fa k->li
+should be initialized by the caller with
+.Fa k->li.listsize
+reflecting how big of an array the caller has allocated for the
+.Fa k->lilist
+field and with
+.Ql k->li.listlen\& ==\& 0 .
+On return, the field
+.Fa k->li.listlen
+is updated to indicate the number of
 reservation keys the device currently has: if this value is larger than
-\fBk->li.listsize\fR then that indicates that the caller should have passed a
-bigger \fBk->li.list\fR array with a bigger \fBk->li.listsize.\fR The number of
-array elements actually written by the callee into \fBk->li.list\fR is the
-minimum of \fBk->li.listlen\fR and \fBk->li.listsize.\fR The field
-k->generation is updated with the generation information returned by the SCSI-3
-Read Keys query. If the device does not support SCSI-3 Persistent Reservations,
-then this ioctl returns \fB-1\fR with \fBerrno\fR set to  \fBENOTSUP\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBioctl\fR(\fBfd\fR, \fBMHIOCGRP_INRESV\fR, (\fBmhioc_inresvs_t\fR)
-\fI*r\fR\fB);\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Fa k->li.listsize
+then that indicates that the caller should have passed a bigger
+.Fa k->li.list
+array with a bigger
+.Fa k->li.listsize .
+The number of array elements actually written by the callee into
+.Fa k->li.list
+is the minimum of
+.Fa k->li.listlen
+and
+.Fa k->li.listsize .
+The field
+.Fa k->generation
+is updated with the generation information returned by the SCSI-3
+Read Keys query.
+If the device does not support SCSI-3 Persistent Reservations,
+then this ioctl returns
+.Sy -1
+with
+.Va errno
+set to
+.Er ENOTSUP .
+.It Fn ioctl fd MHIOCGRP_INRESV "(mhioc_inresvs_t *)r"
+.Pp
 Issues the SCSI-3 command Persistent Reserve In Read Reservations to the
-device. Remarks similar to \fBMHIOCGRP_INKEYS\fR apply to the array
-manipulation.  If the device does not support SCSI-3 Persistent Reservations,
-then this ioctl returns \fB-1\fR with \fBerrno\fR set to \fBENOTSUP\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBioctl\fR(\fBfd\fR, \fBMHIOCGRP_REGISTER\fR, (\fBmhioc_register_t\fR)
-\fI*r\fR\fB);\fR\fR
-.ad
-.sp .6
-.RS 4n
-Issues the SCSI-3 command Persistent Reserve Out Register. The fields of
-structure \fIr\fR are all inputs; none of the fields are modified by the ioctl.
-The field \fBr->aptpl\fR should be set to true to specify that  registrations
+device.
+Remarks similar to
+.Dv MHIOCGRP_INKEYS
+apply to the array manipulation.
+If the device does not support SCSI-3 Persistent Reservations,
+then this ioctl returns
+.Sy -1
+with
+.Va errno
+set to
+.Er ENOTSUP .
+.It Fn ioctl fd MHIOCGRP_REGISTER "(mhioc_register_t *)r"
+.Pp
+Issues the SCSI-3 command Persistent Reserve Out Register.
+The fields of structure
+.Va r
+are all inputs; none of the fields are modified by the ioctl.
+The field
+.Fa r->aptpl
+should be set to true to specify that registrations
 and reservations should persist across device power failures, or to false to
 specify that registrations and reservations should be cleared upon device power
-failure; true is the recommended setting. The field \fBr->oldkey\fR is the key
-that the caller believes the device may already have for this host initiator;
-if the caller believes that that this host initiator is not already registered
-with this device, it should pass the special key of all zeros.  To achieve the
-effect of unregistering with the device, the caller should pass its current key
-for the \fBr->oldkey\fR field and an \fBr->newkey\fR field containing the
-special key of all zeros.  If the device returns the SCSI error code
-Reservation Conflict, this ioctl returns \fB-1\fR with \fBerrno\fR set to
-\fBEACCES\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBioctl\fR(\fBfd\fR, \fBMHIOCGRP_RESERVE\fR, (\fBmhioc_resv_desc_t\fR)
-\fI*r\fR\fB);\fR\fR
-.ad
-.sp .6
-.RS 4n
-Issues the SCSI-3 command Persistent Reserve Out Reserve. The fields of
-structure \fIr\fR are all inputs; none of the fields are modified by the ioctl.
+failure; true is the recommended setting.
+The field
+.Fa r->oldkey
+is the key that the caller believes the device may already have for this host
+initiator; if the caller believes that that this host initiator is not already
+registered with this device, it should pass the special key of all zeros.
+To achieve the effect of unregistering with the device, the caller should pass
+its current key for the
+.Fa r->oldkey
+field and an
+.Fa r->newkey
+field containing the special key of all zeros.
+If the device returns the SCSI error code
+Reservation Conflict, this ioctl returns
+.Sy -1
+with
+.Va errno
+set to
+.Er EACCES .
+.It Fn ioctl fd MHIOCGRP_RESERVE "(mhioc_resv_desc_t *)r"
+.Pp
+Issues the SCSI-3 command Persistent Reserve Out Reserve.
+The fields of
+structure
+.Va r
+are all inputs; none of the fields are modified by the ioctl.
 If the device returns the SCSI error code Reservation Conflict, this ioctl
-returns \fB-1\fR with \fBerrno\fR set to \fBEACCES.\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBioctl\fR(\fBfd\fR, \fBMHIOCGRP_PREEMPTANDABORT\fR,
-(\fBmhioc_preemptandabort_t\fR) \fI*r\fR\fB);\fR\fR
-.ad
-.sp .6
-.RS 4n
-Issues the SCSI-3 command Persistent Reserve Out Preempt-And-Abort.  The fields
-of structure \fIr\fR are all inputs; none of the fields are modified by the
-ioctl. The key of the victim host is specified by the field
-\fBr->victim_key\fR. The field \fBr->resvdesc\fR supplies the preempter's key
-and the reservation that it is requesting as part of the SCSI-3
-Preempt-And-Abort command.  If the device returns the SCSI error code
-Reservation Conflict, this ioctl returns \fB-1\fR with \fBerrno\fR set to
-\fBEACCES.\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBioctl\fR(\fBfd\fR, \fBMHIOCGRP_PREEMPT\fR,
-(\fBmhioc_preemptandabort_t\fR) \fI*r\fR\fB);\fR\fR
-.ad
-.sp .6
-.RS 4n
-Similar to \fBMHIOCGRP_PREEMPTANDABORT\fR, but instead issues the SCSI-3
-command Persistent Reserve Out Preempt. (Note: This command is not
-implemented).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBioctl\fR(\fBfd\fR, \fBMHIOCGRP_CLEAR\fR, (\fBmhioc_resv_key_t\fR)
-\fI*r\fR\fB);\fR\fR
-.ad
-.sp .6
-.RS 4n
-Issues the SCSI-3 command Persistent Reserve Out Clear. The input parameter
-\fIr\fR is the reservation key of the caller, which should have been already
-registered with the device, by an earlier call to \fBMHIOCGRP_REGISTER\fR.
-.RE
-
-.sp
-.LP
+returns
+.Sy -1
+with
+.Va errno
+set to
+.Er EACCES .
+.It Fn ioctl fd MHIOCGRP_PREEMPTANDABORT "(mhioc_preemptandabort_t *)r"
+.Pp
+Issues the SCSI-3 command Persistent Reserve Out Preempt-And-Abort.
+The fields
+of structure
+.Va r
+are all inputs; none of the fields are modified by the ioctl.
+The key of the victim host is specified by the field
+.Fa r->victim_key .
+The field
+.Fa r->resvdesc
+supplies the preempter's key and the reservation that it is requesting as part
+of the SCSI-3 Preempt-And-Abort command.
+If the device returns the SCSI error code
+Reservation Conflict, this ioctl returns
+.Sy -1
+with
+.Va errno
+set to
+.Er EACCES .
+.It Fn ioctl fd MHIOCGRP_PREEMPT "(mhioc_preemptandabort_t *)r"
+.Pp
+Similar to
+.Dv MHIOCGRP_PREEMPTANDABORT ,
+but instead issues the SCSI-3 command Persistent Reserve Out Preempt.
+(Note: This command is not implemented).
+.It Fn ioctl fd MHIOCGRP_CLEAR "(mhioc_resv_key_t *)r"
+Issues the SCSI-3 command Persistent Reserve Out Clear.
+The input parameter
+.Va r
+is the reservation key of the caller, which should have been already
+registered with the device, by an earlier call to
+.Dv MHIOCGRP_REGISTER .
+.El
+.Pp
 For each device, the non-shared ioctls should not be mixed with the Persistent
 Reserve Out shared ioctls, and vice-versa,  otherwise, the underlying device is
 likely to return errors, because SCSI does not permit SCSI-2 reservations to be
-mixed with SCSI-3 reservations on a single device. It is, however, legitimate
+mixed with SCSI-3 reservations on a single device.
+It is, however, legitimate
 to call the Persistent Reserve In ioctls, because these are query only.
-Issuing the \fBMHIOCGRP_INKEYS\fR ioctl  is the recommended way for a caller to
-determine if the device  supports SCSI-3 Persistent Reservations (the ioctl
-will return \fB-1\fR with  \fBerrno\fR set to  \fBENOTSUP\fR if the device does
-not).
-.SS "MHIOCENFAILFAST Ioctl"
-.sp
-.LP
-The \fBMHIOCENFAILFAST\fR ioctl is applicable for both non-shared and shared
+Issuing the
+.Dv MHIOCGRP_INKEYS
+ioctl is the recommended way for a caller to
+determine if the device supports SCSI-3 Persistent Reservations (the ioctl
+will return
+.Sy -1
+with
+.Va errno
+set to
+.Er ENOTSUP
+if the device does not).
+.Ss "MHIOCENFAILFAST Ioctl"
+The
+.Dv MHIOCENFAILFAST
+ioctl is applicable for both non-shared and shared
 disks, and may be used with either the non-shared or shared ioctls.
-.sp
-.ne 2
-.na
-\fB\fBioctl\fR(\fBfd\fR, \fBMHIOENFAILFAST\fR, (unsigned int \fI*\fR)
-\fImillisecs\fR\fB);\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Bl -tag -width 1n
+.It Fn ioctl fd MHIOENFAILFAST "(unsigned int *)millisecs"
+.Pp
 Enables or disables the failfast option in the multihost disk driver and
 enables or disables automatic probing of a multihost disk, described below.
 The argument is an unsigned integer specifying the number of milliseconds to
-wait between executions of the automatic probe function.  An argument of zero
-disables the failfast option and disables automatic probing.  If the
-\fBMHIOCENFAILFAST\fR ioctl is never called, the effect is defined to be that
+wait between executions of the automatic probe function.
+An argument of zero disables the failfast option and disables automatic probing.
+If the
+.Dv MHIOCENFAILFAST
+ioctl is never called, the effect is defined to be that
 both the failfast option and automatic probing are disabled.
-.RE
-
-.SS "Automatic Probing"
-.sp
-.LP
-The \fBMHIOCENFAILFAST\fR ioctl sets up a timeout in the driver to periodically
-schedule automatic probes of  the  disk. The automatic probe function works in
-this manner: The driver is scheduled  to probe the multihost disk every n
-milliseconds, rounded up to the next integral multiple of the system  clock's
-resolution. If
-.RS +4
-.TP
-1.
-the local host no longer has access  rights  to  the multihost disk, and
-.RE
-.RS +4
-.TP
-2.
-access rights were expected to be held by the  local host,
-.RE
-.sp
-.LP
+.El
+.Ss "Automatic Probing"
+The
+.Dv MHIOCENFAILFAST
+ioctl sets up a timeout in the driver to periodically
+schedule automatic probes of the disk.
+The automatic probe function works in this manner: The driver is scheduled to
+probe the multihost disk every n milliseconds, rounded up to the next integral
+multiple of the system clock's resolution.
+If
+.Bl -enum -offset indent
+.It
+the local host no longer has access rights to the multihost disk, and
+.It
+access rights were expected to be held by the local host,
+.El
+.Pp
 the driver immediately panics the machine to comply with the failfast model.
-.sp
-.LP
+.Pp
 If the driver makes this discovery outside the timeout function, especially
 during a read or write operation, it is imperative that it panic the system
 then as well.
-.SH RETURN VALUES
-.sp
-.LP
-Each request returns \fB-1\fR on failure and sets \fBerrno\fR to indicate the
-error.
-.sp
-.ne 2
-.na
-\fB\fBEPERM\fR \fR
-.ad
-.RS 14n
+.Sh RETURN VALUES
+Each request returns
+.Sy -1
+on failure and sets
+.Va errno
+to indicate the error.
+.Bl -tag -width Er
+.It Er EPERM
 Caller is not root.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEACCES\fR \fR
-.ad
-.RS 14n
+.It Er EACCES
 Access rights were denied.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEIO\fR\fR
-.ad
-.RS 14n
+.It Er EIO
 The multihost disk or controller was unable to successfully complete the
 requested operation.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEOPNOTSUP\fR \fR
-.ad
-.RS 14n
-The multihost disk does not support the operation. For example, it does not
-support the SCSI-2 Reserve/Release command set, or the SCSI-3 Persistent
-Reservation command set.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for a description of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Stability	Evolving
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBioctl\fR(2), \fBopen\fR(2), \fBattributes\fR(5), open(2)
+.It Er EOPNOTSUP
+The multihost disk does not support the operation.
+For example, it does not support the SCSI-2 Reserve/Release command set, or the
+SCSI-3 Persistent Reservation command set.
+.El
+.Sh STABILITY
+Uncommitted
+.Sh SEE ALSO
+.Xr ioctl 2 ,
+.Xr open 2 ,
+.Xr attributes 5

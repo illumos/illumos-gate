@@ -1,528 +1,627 @@
-'\" te
 .\"  Copyright (c) 2009 Sun Microsystems, Inc. All rights reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
-.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
-.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MIXER 7I "May 21, 2009"
-.SH NAME
-mixer \- generic mixer device interface
-.SH SYNOPSIS
-.LP
-.nf
-\fB#include\fR \fB<sys/soundcard.h>\fR
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-\&.
-.SS "Mixer Pseudo-Device"
-.sp
-.LP
-The \fB/dev/mixer\fR pseudo-device is provided for two purposes:
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.\" Copyright 2019, Joyent, Inc.
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd February 1, 2019
+.Dt MIXER 7I
+.Os
+.Sh NAME
+.Nm mixer
+.Nd generic mixer device interface
+.Sh SYNOPSIS
+.In sys/soundcard.h
+.Sh DESCRIPTION
+.Ss "Mixer Pseudo-Device"
+The
+.Pa /dev/mixer
+pseudo-device is provided for two purposes:
+.Bl -bullet -offset indent
+.It
 The first purpose is for applications that wish to learn about the list of
 audio devices on the system, so that they can select (or provide for users to
-select) an appropriate audio device. The \fB/dev/mixer\fR pseudo-device
+select) an appropriate audio device.
+The
+.Pa /dev/mixer
+pseudo-device
 provides interfaces to enumerate all of the audio devices on the system.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
 The second purpose is for mixer panel type applications which need to control
 master settings for the audio hardware in the system, such as gain levels,
 balance, port functionality, and other device features.
-.RE
-.sp
-.LP
-Ordinary audio applications should \fBnot\fR attempt to adjust their playback
-or record volumes or other device settings using this device. Instead, they
-should use the \fBSNDCTL_DSP_SETPLAYVOL\fR and \fBSNDCTL_DSP_SETRECVOL\fR
-ioctls that are documented in \fBdsp\fR(7I).
-.SS "Sndstat Device"
-.sp
-.LP
-The \fB/dev/sndstat\fR device supports \fBread\fR(2), and can be read to
+.El
+.Pp
+Ordinary audio applications should
+.Em not
+attempt to adjust their playback
+or record volumes or other device settings using this device.
+Instead, they
+should use the
+.Dv SNDCTL_DSP_SETPLAYVOL
+and
+.Dv SNDCTL_DSP_SETRECVOL
+ioctls that are documented in
+.Xr dsp 7I .
+.Ss "Sndstat Device"
+The
+.Pa /dev/sndstat
+device supports
+.Xr read 2 ,
+and can be read to
 retrieve human-readable information about the audio devices on the system.
 Software should not attempt to interpret the contents of this device.
-.SH IOCTLS
-.SS "Information IOCTLs"
-.sp
-.LP
+.Sh IOCTLS
+.Ss "Information IOCTLs"
 The following ioctls are intended to aid applications in identifying the audio
-devices available on the system. These ioctls can be issued against either the
-pseudo-device \fB/dev/mixer\fR, or a against a file descriptor open to any
+devices available on the system.
+These ioctls can be issued against either the
+pseudo-device
+.Pa /dev/mixer ,
+or a against a file descriptor open to any
 other audio device in the system.
-.sp
-.LP
-Applications should issue \fBSNDCTL_SYSINFO\fR first to learn what audio
+.Pp
+Applications should issue
+.Dv SNDCTL_SYSINFO
+first to learn what audio
 devices and mixers are available on the system, and then use
-\fBSNDCTL_AUDIOINFO\fR or \fBSNDCTL_MIXERINFO\fR to obtain more information
+.Dv SNDCTL_AUDIOINFO
+or
+.Dv SNDCTL_MIXERINFO
+to obtain more information
 about the audio devices or mixers, respectively.
-.sp
-.ne 2
-.na
-\fB\fBOSS_GETVERSION\fR\fR
-.ad
-.RS 20n
+.Bl -tag -width SNDCTL_AUDIOINFO
+.It Dv OSS_GETVERSION
 The argument is a pointer to an integer, which retrieves the version of the
-\fBOSS API\fR used. The value is encoded with the major version (currently 4)
+.Sy OSS API
+used.
+The value is encoded with the major version (currently 4)
 encoded in the most significant 16 bits, and a minor version encoded in the
 lower 16 bits.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_SYSINFO\fR\fR
-.ad
-.RS 20n
-The argument is a pointer to an \fBoss_sysinfo\fR structure, which has the
-following definition:
-.sp
-.in +2
-.nf
+.It Dv SNDCTL_SYSINFO
+The argument is a pointer to an
+.Vt oss_sysinfo
+structure, which has the following definition:
+.Bd -literal -offset 2n
 typedef struct oss_sysinfo {
-   char product[32];   /* E.g. SunOS Audio */
-   char version[32];   /* E.g. 4.0a */
-   int versionnum;     /* See OSS_GETVERSION */
-   char options[128];  /* NOT SUPPORTED */
+   char product[32];     /* E.g. SunOS Audio */
+   char version[32];     /* E.g. 4.0a */
+   int versionnum;       /* See OSS_GETVERSION */
+   char options[128];    /* NOT SUPPORTED */
 
-   int numaudios;      /* # of audio/dsp devices */
-   int openedaudio[8]; /* Reserved, always 0 */
+   int numaudios;        /* # of audio/dsp devices */
+   int openedaudio[8];   /* Reserved, always 0 */
 
- int numsynths;        /* NOT SUPPORTED, always 0 */
- int nummidis;         /* NOT SUPPORTED, always 0 */
- int numtimers;        /* NOT SUPPORTED, always 0 */
- int nummixers;        /* # of mixer devices */
+   int numsynths;        /* NOT SUPPORTED, always 0 */
+   int nummidis;         /* NOT SUPPORTED, always 0 */
+   int numtimers;        /* NOT SUPPORTED, always 0 */
+   int nummixers;        /* # of mixer devices */
 
- int openedmidi[8];    /* Mask of midi devices are
-                          busy */
- int numcards;         /* Number of sound cards in
-                          the system */
- int numaudioengines;  /* Number of audio engines in
-                          the system */
- char license[16];     /* E.g. "GPL" or "CDDL" */
- char revision_info[256];  /* Reserved */
- int filler[172];          /* Reserved */
+   /* Mask of midi devices are busy */
+   int openedmidi[8];
+
+   /* Number of sound cards in the system */
+   int numcards;
+
+   /* Number of audio engines in the system */
+   int numaudioengines;
+   char license[16];         /* E.g. "GPL" or "CDDL" */
+   char revision_info[256];  /* Reserved */
+   int filler[172];          /* Reserved */
 } oss_sysinfo;
-.fi
-.in -2
-.sp
-
-The important fields here are \fBnumaudios\fR, which is used to determine the
-number of audio devices that can be queried with \fBSNDCTL_AUDIOINFO\fR,
-\fBnummixers\fR which provides a count of mixers on the system, and
-\fBnumcards\fR which counts to total number of aggregate devices. A \fBcard\fR
+.Ed
+.Pp
+The important fields here are
+.Fa numaudios ,
+which is used to determine the
+number of audio devices that can be queried with
+.Dv SNDCTL_AUDIOINFO ,
+.Fa nummixers
+which provides a count of mixers on the system, and
+.Fa numcards
+which counts to total number of aggregate devices.
+A
+.Sy card
 can consist of one or more audio devices and one or more mixers, although more
 typically there is exactly one audio device and one mixer for each card.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_AUDIOINFO\fR\fR
-.ad
-.RS 20n
-The argument is a pointer to an \fBoss_audioinfo\fR structure, which has the
-following structure:
-.sp
-.in +2
-.nf
+.It Dv SNDCTL_AUDIOINFO
+The argument is a pointer to an
+.Vt oss_audioinfo
+structure, which has the following structure:
+.Bd -literal -offset 2n
 typedef struct oss_audioinfo {
-   int dev;  /* Device to query */
-   char name[64];  /* Human readable name */
-   int busy;  /* reserved */
-   int pid;  /* reserved */
-   int caps;  /* PCM_CAP_INPUT, PCM_CAP_OUTPUT */
-   int iformats;  /* Supported input formats */
-   int oformats;  /* Supported output formats */
-   int magic;  /* reserved */
-   char cmd[64];  /* reserved */
+   int dev;             /* Device to query */
+   char name[64];       /* Human readable name */
+   int busy;            /* reserved */
+   int pid;             /* reserved */
+
+   /* PCM_CAP_INPUT, PCM_CAP_OUTPUT */
+   int caps;
+   int iformats;        /* Supported input formats */
+   int oformats;        /* Supported output formats */
+   int magic;           /* reserved */
+   char cmd[64];        /* reserved */
    int card_number;
-   int port_number;  /* reserved */
+   int port_number;     /* reserved */
    int mixer_dev;
-   int legacy_device; /* Obsolete field.
-                         Replaced by devnode */
-   int enabled;  /* reserved */
-   int flags;  /* reserved */
-   int min_rate;  /* Minimum sample rate */
-   int max_rate;  /* Maximum sample rate */
-   int min_channels;  /* Minimum number
-                         of channels */
-   int max_channels;  /* Maximum number
-                         of channels */
-   int binding;  /* reserved */
-   int rate_source;  /* reserved */
-   char handle[32];  /* reserved */
-   unsigned int nrates;  /* reserved */
+
+   /* Obsolete field.  Replaced by devnode */
+   int legacy_device;
+   int enabled;         /* reserved */
+   int flags;           /* reserved */
+   int min_rate;        /* Minimum sample rate */
+   int max_rate;        /* Maximum sample rate */
+   int min_channels;  /* Minimum number of channels */
+   int max_channels;  /* Maximum number of channels */
+   int binding;         /* reserved */
+   int rate_source;     /* reserved */
+   char handle[32];     /* reserved */
+   unsigned int nrates;     /* reserved */
    unsigned int rates[20];  /* reserved */
    char song_name[64];  /* reserved */
-   char label[16];  /* reserved */
-   int latency;  /* reserved */
-   char devnode[32];  /* Device special file
-                         name (absolute path) */
-   int next_play_engine;  /* reserved */
-   int next_rec_engine;  /* reserved */
-   int filler[184];  /* reserved */
-} oss_audioinfo;
-.fi
-.in -2
-.sp
+   char label[16];      /* reserved */
+   int latency;         /* reserved */
 
+   /* Device special file name (absolute path) */
+   char devnode[32];
+   int next_play_engine;    /* reserved */
+   int next_rec_engine;     /* reserved */
+   int filler[184];         /* reserved */
+} oss_audioinfo;
+.Ed
+.Pp
 In the above structure, all of the fields are reserved except the following:
-d\fBev, name, card_number, mixer_dev, caps, min_rate, max_rate, min_channels,
-max_channels,\fR and \fBdevnode\fR. The reserved fields are provided for
-compatibility with other OSS implementations, and available for legacy
-applications. New applications should not attempt to use these fields.
-.sp
-The \fBdev\fR field should be initialized by the application to the number of
-the device to query. This is a number between zero (inclusive) and value of
-\fBnumaudios\fR (exclusive) returned by \fBSNDCTL_SYSINFO\fR. Alternatively,
-when issuing the ioctl against a real mixer or \fBdsp\fR device, the special
-value \fB-1\fR can be used to indicate that the query is being made against the
-device opened. If \fB-1\fR is used, the field is overwritten with the device
+.Fa dev ,
+.Fa name ,
+.Fa card_number ,
+.Fa mixer_dev ,
+.Fa caps ,
+.Fa min_rate ,
+.Fa max_rate ,
+.Fa min_channels ,
+.Fa max_channels ,
+and
+.Fa devnode .
+The reserved fields are provided for compatibility with other OSS
+implementations, and available for legacy applications.
+New applications should not attempt to use these fields.
+.Pp
+The
+.Fa dev
+field should be initialized by the application to the number of
+the device to query.
+This is a number between zero (inclusive) and value of
+.Fa numaudios
+(exclusive) returned by
+.Dv SNDCTL_SYSINFO .
+Alternatively,
+when issuing the ioctl against a real mixer or
+.Sy dsp
+device, the special
+value
+.Sy -1
+can be used to indicate that the query is being made against the device opened.
+If
+.Sy -1
+is used, the field is overwritten with the device
 number for the current device on successful return.
-.sp
+.Pp
 No other fields are significant upon entry, but a successful return contains
 details of the device.
-.sp
-The \fBname\fR field is a human readable name representing the device.
+.Pp
+The
+.Fa name
+field is a human readable name representing the device.
 Applications should not try to interpret it.
-.sp
-The \fBcard_number\fR field indicates the number assigned to the aggregate
-device. This can be used with the \fBSNDCTL_CARDINFO\fR ioctl.
-.sp
-The \fBmixer_dev\fR is the mixer device number for the mixing device associated
-with the audio device. This can be used with the \fBSNDCTL_MIXERINFO\fR ioctl.
-.sp
-The caps field contains any of the bits \fBPCM_CAP_INPUT\fR,
-\fBPCM_CAP_OUTPUT\fR, and \fBPCM_CAP_DUPLEX\fR. Indicating whether the device
+.Pp
+The
+.Fa card_number
+field indicates the number assigned to the aggregate device.
+This can be used with the
+.Dv SNDCTL_CARDINFO
+ioctl.
+.Pp
+The
+.Fa mixer_dev
+is the mixer device number for the mixing device associated
+with the audio device.
+This can be used with the
+.Dv SNDCTL_MIXERINFO
+ioctl.
+.Pp
+The
+.Fa caps
+field contains any of the bits
+.Dv PCM_CAP_INPUT ,
+.Dv PCM_CAP_OUTPUT ,
+and
+.Dv PCM_CAP_DUPLEX .
+Indicating whether the device
 support input, output, and whether input and output can be used simultaneously.
 All other bits are reserved.
-.sp
-The \fBmin_rate\fR and \fBmax_rate\fR fields indicate the minimum and maximum
-sample rates supported by the device. Most applications should try to use the
-maximum supported rate for the best audio quality and lowest system resource
-consumption.
-.sp
-The \fBmin_channels\fR and \fBmax_channels\fR provide an indication of the
-number of channels (1 for mono, 2 for stereo, 6 for 5.1, etc.) supported by the
-device.
-.sp
-The \fBdevnode\fR field contains the actual full path to the device node for
-this device, such as \fB/dev/sound/audio810:0dsp\fR. Applications should open
-this file to access the device.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_CARDINFO\fR\fR
-.ad
-.RS 20n
-The argument is a pointer to a \fBstruct oss_card_info\fR, which has the
-following definition:
-.sp
-.in +2
-.nf
+.Pp
+The
+.Fa min_rate
+and
+.Fa max_rate
+fields indicate the minimum and maximum sample rates supported by the device.
+Most applications should try to use the maximum supported rate for the best
+audio quality and lowest system resource consumption.
+.Pp
+The
+.Fa min_channels
+and
+.Fa max_channels
+provide an indication of the number of channels (1 for mono, 2 for stereo,
+6 for 5\&.1, etc\&.) supported by the device.
+.Pp
+The
+.Fa devnode
+field contains the actual full path to the device node for this device, such as
+.Pa /dev/sound/audio810:0dsp .
+Applications should open this file to access the device.
+.It Dv SNDCTL_CARDINFO
+The argument is a pointer to a
+.Vt struct oss_card_info ,
+which has the following definition:
+.Bd -literal -offset 2n
 typedef struct oss_card_info {
-int card;
- char shortname[16];
- char longname[128];
- int flags;/* reserved */
- char hw_info[400];
- int intr_count;/* reserved */
- int ack_count;/* reserved */
- int filler[154];
+   int card;
+   char shortname[16];
+   char longname[128];
+   int flags;          /* reserved */
+   char hw_info[400];
+   int intr_count;     /* reserved */
+   int ack_count;      /* reserved */
+   int filler[154];
 } oss_card_info;
-.fi
-.in -2
-.sp
-
+.Ed
+.Pp
 This ioctl is used to query for information about the aggregate audio device.
-.sp
-The \fBcard\fR field should be initialized by the application to the number of
-the card to query. This is a number between zero inclusive and value of
-\fBnumcards\fR (exclusive) returned by \fBSNDCTL_SYSINFO\fR.) Alternatively,
-when issuing the ioctl against a real mixer or \fBdsp\fR device, the special
-value \fB-1\fR can be used to indicate that the query is being made against the
-device opened. If \fB-1\fR is used, the field is overwritten with the number
+.Pp
+The
+.Fa card
+field should be initialized by the application to the number of
+the card to query.
+This is a number between zero
+.Pq inclusive
+and value of
+.Fa numcards
+.Pq exclusive
+returned by
+.Dv SNDCTL_SYSINFO .
+Alternatively,
+when issuing the ioctl against a real mixer or
+.Sy dsp
+device, the special value
+.Sy -1
+can be used to indicate that the query is being made against the device opened.
+If
+.Sy -1
+is used, the field is overwritten with the number
 for the current hardware device on successful return.
-.sp
-The \fBshortname\fR, \fBlongname\fR, and \fBhw_info\fR contain \fBASCIIZ\fR
-strings describing the device in more detail. The \fBhw_info\fR member can
-contain multiple lines of detail, each line ending in a NEWLINE.
-.sp
-The flag, intr_count, and ack_count fields are not used by this implementation.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_MIXERINFO\fR\fR
-.ad
-.RS 20n
-The argument is a pointer to a \fBstruct oss_mixer_info\fR, which has the
-following definition:
-.sp
-.in +2
-.nf
+.Pp
+The
+.Fa shortname ,
+.Fa longname ,
+and
+.Fa hw_info
+contain
+.Sy ASCIIZ
+strings describing the device in more detail.
+The
+.Fa hw_info
+member can contain multiple lines of detail, each line ending in a NEWLINE.
+.Pp
+The
+.Fa flag ,
+.Fa intr_count ,
+and
+.Fa ack_count
+fields are not used by this implementation.
+.It Dv SNDCTL_MIXERINFO
+The argument is a pointer to a
+.Vt struct oss_mixer_info ,
+which has the following definition:
+.Bd -literal -offset 2n
 typedef struct oss_mixerinfo {
-  int dev;
-  char id[16];/* Reserved */
-  char name[32];
-  int modify_counter;
-  int card_number;
-  int port_number;/* Reserved */
-  char handle[32];/* Reserved */
-  int magic;/* Reserved */
-  int enabled;/* Reserved */
-  int caps;/* Reserved */
-  int flags;/* Reserved */
-  int nrext;
-  int priority;
-  char devnode[32];/* Device special file name
-                     (absolute path) */
-  int legacy_device;/* Reserved */
-  int filler[245];/* Reserved */
-} oss_mixerinfo;
-.fi
-.in -2
-.sp
+    int dev;
+    char id[16];        /* Reserved */
+    char name[32];
+    int modify_counter;
+    int card_number;
+    int port_number;    /* Reserved */
+    char handle[32];    /* Reserved */
+    int magic;          /* Reserved */
+    int enabled;        /* Reserved */
+    int caps;           /* Reserved */
+    int flags;          /* Reserved */
+    int nrext;
+    int priority;
 
+    /* Deice special file name (absolute path) */
+    char devnode[32];
+    int legacy_device;  /* Reserved */
+    int filler[245];    /* Reserved */
+} oss_mixerinfo;
+.Ed
+.Pp
 In the above structure, all of the fields are reserved except the following:
-\fBdev, name, modify_counter, card_number, nrext, priority,\fR and
-\fBdevnode\fR. The reserved fields are provided for compatibility with other
-OSS implementations, and available for legacy applications.  New applications
-should not attempt to use these fields.
-.sp
-The \fBdev\fR field should be initialized by the application to the number of
-the device to query. This is a number between zero inclusive and value of
-\fBnummixers\fR (exclusive) returned by \fBSNDCTL_SYSINFO\fR, or by
-\fBSNDCTL_MIX_NRMIX\fR. Alternatively, when issuing the ioctl against a real
-mixer or \fBdsp\fR device, the special value \fB-1\fR can be used to indicate
-that the query is being made against the device opened. If \fB-1\fR is used,
+.Fa dev ,
+.Fa name ,
+.Fa modify_counter ,
+.Fa card_number ,
+.Fa nrext ,
+.Fa priority ,
+and
+.Fa devnode .
+The reserved fields are provided for compatibility with other
+OSS implementations, and available for legacy applications.
+New applications should not attempt to use these fields.
+.Pp
+The
+.Fa dev
+field should be initialized by the application to the number of
+the device to query.
+This is a number between zero inclusive and value of
+.Fa nummixers
+(exclusive) returned by
+.Dv SNDCTL_SYSINFO ,
+or by
+.Dv SNDCTL_MIX_NRMIX .
+Alternatively, when issuing the ioctl against a real mixer or
+.Sy dsp
+device, the special value
+.Sy -1
+can be used to indicate
+that the query is being made against the device opened.
+If
+.Sy -1
+is used,
 the field is overwritten with the mixer number for the current open file on
 successful return.
-.sp
+.Pp
 No other fields are significant upon entry, but on successful return contains
 details of the device.
-.sp
-The \fBname\fR field is a human readable name representing the device.
+.Pp
+The
+.Fa name
+field is a human readable name representing the device.
 Applications should not try to interpret it.
-.sp
-The \fBmodify_counter\fR is changed by the mixer framework each time the
+.Pp
+The
+.Fa modify_counter
+is changed by the mixer framework each time the
 settings for the various controls or extensions of the device are changed.
 Applications can poll this value to learn if any other changes need to be
 searched for.
-.sp
-The \fBcard_number\fR field is the number of the aggregate audio device this
-mixer is located on. It can be used with the \fBSNDCTL_CARDINFO\fR ioctl.
-.sp
-The \fBnrext\fR field is the number of mixer extensions available on this
-mixer. See the \fBSNDCTL_MIX_NREXT\fR description.
-.sp
+.Pp
+The
+.Fa card_number
+field is the number of the aggregate audio device this
+mixer is located on.
+It can be used with the
+.Dv SNDCTL_CARDINFO
+ioctl.
+.Pp
+The
+.Fa nrext
+field is the number of mixer extensions available on this mixer.
+See the
+.Dv SNDCTL_MIX_NREXT
+description.
+.Pp
 The priority is used by the framework to assign a preference that applications
-can use in choosing a device. Higher values are preferable. Mixers with
-priorities less than -1 should never be selected by default.
-.sp
-The \fBdevnode\fR field contains the actual full path to the device node for
-the physical mixer, such as \fB/dev/sound/audio810:0mixer\fR. Applications
+can use in choosing a device.
+Higher values are preferable.
+Mixers with priorities less than -1 should never be selected by default.
+.Pp
+The
+.Fa devnode
+field contains the actual full path to the device node for
+the physical mixer, such as
+.Pa /dev/sound/audio810:0mixer .
+Applications
 should open this file to access the mixer settings.
-.RE
-
-.SS "Mixer Extension IOCTLs"
-.sp
-.LP
-The pseudo \fB/dev/mixer\fR device supports ioctls that can change     the
-various settings for the audio hardware in the system.
-.sp
-.LP
-Those ioctls should only be used by dedicated mixer applications  or desktop
-volume controls, and not by typical ordinary audio applications such as media
-players. Ordinary applications that wish to adjust their own volume settings
-should use the \fBSNDCTL_DSP_SETPLAYVOL\fR or \fBSNDCTL_DSP_SETRECVOL\fR ioctls
-for that purpose.  See \fBdsp\fR(7I) for more information.  Ordinary
+.El
+.Ss "Mixer Extension IOCTLs"
+The pseudo
+.Pa /dev/mixer
+device supports ioctls that can change the
+oarious settings for the audio hardware in the system.
+.Pp
+Those ioctls should only be used by dedicated mixer applications or desktop
+olumme controls, and not by typical ordinary audio applications such as media
+players.
+Ordinary applications that wish to adjust their own volume settings
+should use the
+.Dv SNDCTL_DSP_SETPLAYVOL
+or
+.Dv SNDCTL_DSP_SETRECVOL
+ioctls for that purpose.
+See
+.Xr dsp 7I
+for more information.
+Ordinary
 applications should never attempt to change master port selection or hardware
 settings such as monitor gain settings.
-.sp
-.LP
+.Pp
 The ioctls in this section can only be used to access the mixer device that is
 associated with the current file descriptor.
-.sp
-.LP
-Applications should not assume that a single \fB/dev/mixer\fR node is able to
-access any physical settings. Instead, they should use the ioctl
-\fBSNDCTL_MIXERINFO\fR to determine the device path for the real mixer device,
+.Pp
+Applications should not assume that a single
+.Pa /dev/mixer
+node is able to access any physical settings.
+Instead, they should use the ioctl
+.Dv SNDCTL_MIXERINFO
+to determine the device path for the real mixer device,
 and issue ioctls on a file descriptor opened against the corresponding
-\fBdevnode\fR field.
-.sp
-.LP
-When a \fBdev\fR member is specified in each of the following ioctls, the
-application should specify \fB-1\fR, although for compatibility the mixer
+.Fa devnode
+field.
+.Pp
+When a
+.Fa dev
+member is specified in each of the following ioctls, the
+application should specify
+.Sy -1 ,
+although for compatibility the mixer
 allows the application to specify the mixer device number.
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_MIX_NRMIX\fR\fR
-.ad
-.RS 23n
+.Pp
+.Bl -tag -width SNDCTL_MIX_ENUMINFO -compact
+.It Dv SNDCTL_MIX_NRMIX
 The argument is a pointer to an integer, which receives the number of mixer
-devices in the system. Each can be queried by using its number with the
-\fBSNDCTL_MIXERINFO\fR ioctl. The same information is available using the
-\fBSNDCTL_SYSINFO\fR ioctl.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_MIX_NREXT\fR\fR
-.ad
-.RS 23n
-The argument is a pointer to an integer. On entry, the integer should contain
-the special value \fB-1\fR. On return the argument receives the number of mixer
-extensions (or mixer controls) supported by the mixer device. More details
-about each extension can be obtained by \fBSNDCTL_MIX_EXTINFO\fR ioctl.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_MIX_EXTINFO\fR\fR
-.ad
-.RS 23n
-The argument is a pointer to an \fBoss_mixext\fR structure which is defined as
-follows:
-.sp
-.in +2
-.nf
+devices in the system.
+Each can be queried by using its number with the
+.Dv SNDCTL_MIXERINFO
+ioctl.
+The same information is available using the
+.Fa SNDCTL_SYSINFO
+ioctl.
+.Pp
+.It Dv SNDCTL_MIX_NREXT
+The argument is a pointer to an integer.
+On entry, the integer should contain
+the special value
+.Sy -1 .
+On return the argument receives the number of mixer
+extensions (or mixer controls) supported by the mixer device.
+More details
+about each extension can be obtained by
+.Fa SNDCTL_MIX_EXTINFO
+ioctl.
+.Pp
+.It Dv SNDCTL_MIX_EXTINFO
+The argument is a pointer to an
+.Vt oss_mixext
+structure which is defined as follows:
+.Bd -literal -offset 2n
 typedef struct oss_mixext {
-   int dev;  /* Mixer device number */
-   int ctrl;  /* Extension number */
-   int type;  /* Entry type */
+   int dev;            /* Mixer device number */
+   int ctrl;           /* Extension number */
+   int type;           /* Entry type */
    int maxvalue;
    int minvalue;
    int flags;
    char id[16];  /* Mnemonic ID (internal use) */
-   int parent;   /* Entry# of parent
-                    (-1 if root) */
-   int dummy;   /* NOT SUPPORTED */
+   int parent;   /* Entry# of parent (-1 if root) */
+   int dummy;          /* NOT SUPPORTED */
    int timestamp;
-   char data[64];  /* Reserved */
-   unsigned char enum_present[32];  /* Mask
-                                       of allowed
-                                       enum
-                                       values */
-   int control_no;  /* Reserved */
+   char data[64];      /* Reserved */
+
+   /* Mask of allowed enum values */
+   unsigned char enum_present[32];
+   int control_no;     /* Reserved */
    unsigned int desc;  /* NOT SUPPORTED */
    char extname[32];
    int update_counter;
-   int filler[7];  /* Reserved */
+   int filler[7];      /* Reserved */
 } oss_mixext;
-.fi
-.in -2
-.sp
-
-On entry, the \fBdev\fR field should be initialized to the value \fB-1\fR, and
-the \fBctrl\fR field should be initialized with the number of the extension
-being accessed. Between 0, inclusive, and the value returned by
-\fBSNDCTL_MIX_NREXT\fR, exclusive.
-.sp
+.Ed
+.Pp
+On entry, the
+.Fa dev
+field should be initialized to the value
+.Sy -1 ,
+and
+the
+.Fa ctrl
+field should be initialized with the number of the extension
+being accessed.
+Between 0, inclusive, and the value returned by
+.Dv SNDCTL_MIX_NREXT ,
+exclusive.
+.Pp
 Mixer extensions are organized as a logical tree, starting with a root node.
-The root node always has a \fBctrl\fR value of zero. The structure of the tree
-can be determined by looking at the parent field, which contains the extension
-number of the parent extension, or \fB-1\fR if the extension is the root
-extension.
-.sp
-The type indicates the type of extension used. This implementation supports the
-following values:
-.sp
-.in +2
-.nf
-MIXT_DEVROOT      Root node for extension tree
-MIXT_GROUP        Logical grouping of controls
-MXIT_ONOFF        Boolean value, 0 = off, 1 = on.
-MIXT_ENUM         Enumerated value, 0 to maxvalue.
-MIXT_MONOSLIDER   Monophonic slider, 0 to 255.
-MIXT_STEREOSLIDER Stereophonic slider, 0 to 255
-                  (encoded as
-                  lower two bytes in value.)
-MIXT_MARKER       Place holder, can ignore.
-.fi
-.in -2
-.sp
-
-The flags field is a bit array. This implementation makes use of the following
+The root node always has a
+.Fa ctrl
+value of zero.
+The structure of the tree can be determined by looking at the parent field,
+which contains the extension number of the parent extension, or
+.Sy -1
+if the extension is the root extension.
+.Pp
+The type indicates the type of extension used.
+This implementation supports the following values:
+.Bl -column -offset 2n "MIXT_STEREOSLIDER" "Enumerated value, 0 to maxvalue"
+.It Dv MIXT_DEVROOT      Ta Root node for extension tree
+.It Dv MIXT_GROUP        Ta Logical grouping of controls
+.It Dv MXIT_ONOFF        Ta Boolean value, 0 = off, 1 = on.
+.It Dv MIXT_ENUM         Ta Enumerated value, 0 to maxvalue.
+.It Dv MIXT_MONOSLIDER   Ta Monophonic slider, 0 to 255.
+.It Dv MIXT_STEREOSLIDER Ta Stereophonic slider, 0 to 255 (encoded as lower two bytes in value.)
+.It Dv MIXT_MARKER       Ta Place holder, can ignore.
+.El
+.Pp
+The flags field is a bit array.
+This implementation makes use of the following
 possible bits:
-.sp
-.in +2
-.nf
-MIXF_READABLE    Extension's value is readable.
-MIXF_WRITEABLE   Extension's value is modifiable.
-MIXF_POLL        Extension can self-update.
-MIXF_PCMVOL      Extension is for master
-                 PCM playback volume.
-MIXF_MAINVOL     Extension is for a typical
-                 analog volume
-MIXF_RECVOL      Extension is for master
-                 record gain.
-MIXF_MONVOL      Extension is for a monitor
-                 source's gain.
-.fi
-.in -2
-.sp
-
-The \fBid\fR field contains an \fBASCIIZ\fR identifier for the extension.
-.sp
+.Bl -column -offset 2n "MIXF_WRITEABLE" "Extensions value is modifiable"
+.It Dv MIXF_READABLE  Ta Extension's value is readable.
+.It Dv MIXF_WRITEABLE Ta Extension's value is modifiable.
+.It Dv MIXF_POLL      Ta Extension can self-update.
+.It Dv MIXF_PCMVOL    Ta Extension is for master PCM playback volume.
+.It Dv MIXF_MAINVOL   Ta Extension is for a typical analog volume
+.It Dv MIXF_RECVOL    Ta Extension is for master record gain.
+.It Dv MIXF_MONVOL    Ta Extension is for a monitor source's gain.
+.El
+.Pp
+The
+.Fa id
+field contains an
+.Sy ASCIIZ
+identifier for the extension.
+.Pp
 The timestamp field is set when the extension tree is first initialized.
 Applications must use the same timestamp value when attempting to change the
-values. A change in the timestamp indicates a change a in the structure of the
+values.
+A change in the timestamp indicates a change a in the structure of the
 extension tree.
-.sp
-The \fBenum_present\fR field is a bit mask of possible enumeration values. If a
-bit is present in the \fBenum_present\fR mask, then the corresponding
-enumeration value is legal. The mask is in little endian order.
-.sp
-The \fBdesc\fR field provides information about scoping, which can be useful as
-layout hints to applications. The following hints are available:
-.sp
-.in +2
-.nf
-MIXEXT_SCOPE_MASK    Mask of possible scope
-                     values.
-MIXEXT_SCOPE_INPUT   Extension is an input
-                     control.
-MIXEXT_SCOPE_OUTPUT  Extension is an
-                     output control.
-MIXEXT_SCOPE_MONITOR Extension relates to
-                     input monitoring.
-MIXEXT_SCOPE_OTHER   No scoping hint provided.
-.fi
-.in -2
-.sp
-
-The \fBextname\fR is the full name of the extension.
-.sp
-The \fBupdate_counter\fR is incremented each time the control's value is
-changed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_MIX_ENUMINFO\fR\fR
-.ad
-.RS 23n
-The argument is a pointer to an \fBoss_mixer_enuminfo\fR structure, which is
-defined as follows:
-.sp
-.in +2
-.nf
+.Pp
+The
+.Fa enum_present
+field is a bit mask of possible enumeration values.
+If a
+bit is present in the
+.Fa enum_present
+mask, then the corresponding enumeration value is legal.
+The mask is in little endian order.
+.Pp
+The
+.Fa desc
+field provides information about scoping, which can be useful as
+layout hints to applications.
+The following hints are available:
+.Bl -column -offset 2n "MIXEXT_SCOPE_MONITOR" "No scoping hint provided."
+.It Dv MIXEXT_SCOPE_MASK    Ta Mask of possible scope values.
+.It Dv MIXEXT_SCOPE_INPUT   Ta Extension is an input control.
+.It Dv MIXEXT_SCOPE_OUTPUT  Ta Extension is an output control.
+.It Dv MIXEXT_SCOPE_MONITOR Ta Extension relates to input monitoring.
+.It Dv MIXEXT_SCOPE_OTHER   Ta No scoping hint provided.
+.El
+.Pp
+The
+.Fa extname
+is the full name of the extension.
+.Pp
+The
+.Fa update_counter
+is incremented each time the control's value is changed.
+.Pp
+.It Dv SNDCTL_MIX_ENUMINFO
+The argument is a pointer to an
+.Vt oss_mixer_enuminfo
+structure, which is defined as follows:
+.Bd -literal -offset 2n
 typedef struct oss_mixer_enuminfo {
    int dev;
    int ctrl;
@@ -531,169 +630,138 @@ typedef struct oss_mixer_enuminfo {
    short strindex[255];
    char strings[3000];
 } oss_mixer_enuminfo;
-.fi
-.in -2
-.sp
-
-On entry, the \fBdev\fR field should be initialized to the value \fB-1\fR, and
-the \fBctrl\fR field should be initialized with the number of the extension
-being accessed. Between 0, inclusive, and the value returned by
-\fBSNDCTL_MIX_NREXT\fR, exclusive.
-.sp
-On return the \fBnvalues\fR field contains the number of values, and
-\fBstrindex\fR contains an array of indices into the strings member, each index
-pointing to an \fBASCIIZ\fR describing the enumeration value.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_MIX_READ\fR\fR
-.ad
-.br
-.na
-\fB\fBSNDCTL_MIX_WRITE\fR\fR
-.ad
-.RS 23n
-The argument is a pointer to an \fBoss_mixer_value\fR structure, defined as
-follows:
-.sp
-.in +2
-.nf
+.Ed
+.Pp
+On entry, the
+.Fa dev
+field should be initialized to the value
+.Sy -1 ,
+and
+the
+.Fa ctrl
+field should be initialized with the number of the extension being accessed.
+Between 0, inclusive, and the value returned by
+.Dv SNDCTL_MIX_NREXT ,
+exclusive.
+.Pp
+On return the
+.Fa nvalues
+field contains the number of values, and
+.Fa strindex
+contains an array of indices into the strings member, each index
+pointing to an
+.Sy ASCIIZ
+describing the enumeration value.
+.Pp
+.It Dv SNDCTL_MIX_READ
+.It Dv SNDCTL_MIX_WRITE
+The argument is a pointer to an
+.Vt oss_mixer_value
+structure, defined as follows:
+.Bd -literal -offset 2n
 typedef struct oss_mixer_value {
    int dev;
    int ctrl;
    int value;
-   int flags;  /* Reserved for future use.
-                  Initialize to 0 */
-   int timestamp;  /* Must be set to
-                      oss_mixext.timestamp */
-   int filler[8];  /* Reserved for future use.
-                      Initialize to 0 */
+
+   /* Reserved for future use.  Initialize to 0 */
+   int flags;
+
+   /* Must be set to oss_mixext.timestamp */
+   int timestamp;
+
+   /* Reserved for future use.  Initialize to 0 */
+   int filler[8];
 } oss_mixer_value;
-.fi
-.in -2
-.sp
-
-On entry, the \fBdev\fR field should be initialized to the value \fB-1\fR, and
-the \fBctrl\fR field should be initialized with the number of the extension
-being accessed. Between 0, inclusive, and the value returned by
-\fBSNDCTL_MIX_NREXT\fR, exclusive. Additionally, the timestamp member must be
-initialized to the same value as was supplied in the \fBoss_mixext\fR structure
-used with \fBSNDCTL_MIX_EXTINFO\fR.
-.sp
-For \fBSNDCTL_MIX_WRITE\fR, the application should supply the new value for the
-extension. For \fBSNDCTL_MIX_READ\fR, the mixer returns the extensions current
-value in value.
-.RE
-
-.SS "Compatibility IOCTLs"
-.sp
-.LP
+.Pp
+.Ed
+On entry, the
+.Fa dev
+field should be initialized to the value
+.Sy -1 ,
+and the
+.Fa ctrl
+field should be initialized with the number of the extension
+being accessed.
+Between 0, inclusive, and the value returned by
+.Dv SNDCTL_MIX_NREXT ,
+exclusive.
+Additionally, the timestamp member must be
+initialized to the same value as was supplied in the
+.Vt oss_mixext
+structure
+used with
+.Dv SNDCTL_MIX_EXTINFO .
+.Pp
+For
+.Dv SNDCTL_MIX_WRITE ,
+the application should supply the new value for the extension.
+For
+.Dv SNDCTL_MIX_READ ,
+the mixer returns the extensions current value in value.
+.El
+.Ss "Compatibility IOCTLs"
 The following ioctls are for compatibility use only:
-.sp
-.in +2
-.nf
-SOUND_MIXER_READ_VOLUME
-SOUND_MIXER_READ_PCM
-SOUND_MIXER_READ_OGAIN
-SOUND_MIXER_READ_RECGAIN
-SOUND_MIXER_READ_RECLEV
-SOUND_MIXER_READ_IGAIN
-SOUND_MIXER_READ_RECSRC
-SOUND_MIXER_READ_RECMASK
-SOUND_MIXER_READ_DEVMASK
-SOUND_MIXER_READ_STEREODEVS
-SOUND_MIXER_WRITE_VOLUME
-SOUND_MIXER_WRITE_PCM
-SOUND_MIXER_WRITE_OGAIN
-SOUND_MIXER_WRITE_RECGAIN
-SOUND_MIXER_WRITE_RECLEV
-SOUND_MIXER_WRITE_IGAIN
-SOUND_MIXER_WRITE_RECSRC
-SOUND_MIXER_WRITE_RECMASK
-SOUND_MIXER_INFO
-SNDCTL_AUDIOINFO_EX
-SNDCTL_ENGINEINFO
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Pp
+.Bl -tag -offset 2n -width SNDCTL_MIX_ENUMINFO -compact
+.It Dv SOUND_MIXER_READ_VOLUME
+.It Dv SOUND_MIXER_READ_PCM
+.It Dv SOUND_MIXER_READ_OGAIN
+.It Dv SOUND_MIXER_READ_RECGAIN
+.It Dv SOUND_MIXER_READ_RECLEV
+.It Dv SOUND_MIXER_READ_IGAIN
+.It Dv SOUND_MIXER_READ_RECSRC
+.It Dv SOUND_MIXER_READ_RECMASK
+.It Dv SOUND_MIXER_READ_DEVMASK
+.It Dv SOUND_MIXER_READ_STEREODEVS
+.It Dv SOUND_MIXER_WRITE_VOLUME
+.It Dv SOUND_MIXER_WRITE_PCM
+.It Dv SOUND_MIXER_WRITE_OGAIN
+.It Dv SOUND_MIXER_WRITE_RECGAIN
+.It Dv SOUND_MIXER_WRITE_RECLEV
+.It Dv SOUND_MIXER_WRITE_IGAIN
+.It Dv SOUND_MIXER_WRITE_RECSRC
+.It Dv SOUND_MIXER_WRITE_RECMASK
+.It Dv SOUND_MIXER_INFO
+.It Dv SNDCTL_AUDIOINFO_EX
+.It Dv SNDCTL_ENGINEINFO
+.El
+.Pp
 These ioctls can affect the software volume levels associated with the calling
-process. They have no effect on the physical hardware levels or settings. They
-should not be used in new applications.
-.SH ERRORS
-.sp
-.LP
-An \fBioctl()\fR fails if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
+process.
+They have no effect on the physical hardware levels or settings.
+They should not be used in new applications.
+.Sh FILES
+.Bl -tag -width /dev/sndstat
+.It Pa /dev/mixer
+Symbolic link to the pseudo mixer device for the system
+.It Pa /dev/sndstat
+Sound status device
+.El
+.Sh ERRORS
+An
+.Xr ioctl 2
+fails if:
+.Bl -tag -width EINVAL
+.It Er EINVAL
 The parameter changes requested in the ioctl are invalid or are not supported
 by the device.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENXIO\fR\fR
-.ad
-.RS 10n
+.It Er ENXIO
 The device or extension referenced does not exist.
-.RE
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/dev/mixer\fR\fR
-.ad
-.RS 16n
-Symbolic link to the pseudo mixer device for the system
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/dev/sndstat\fR\fR
-.ad
-.RS 16n
-Sound status device
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for a description of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Architecture	SPARC, x86
-_
-Stability Level	See below.
-.TE
-
-.sp
-.LP
-The information and mixer extension IOCTLs are Uncommitted. The Compatibility
-IOCTLs are Obsolete Uncommitted. The extension names are Uncommitted.
-.SH SEE ALSO
-.sp
-.LP
-\fBclose\fR(2), \fBioctl\fR(2), \fBopen\fR(2), , \fBread\fR(2),
-\fBattributes\fR(5), \fBdsp\fR(7I)
-.SH BUGS
-.sp
-.LP
+.El
+.Sh ARCHITECTURE
+SPARC
+x86
+.Sh INTERFACE STABILITY
+The information and mixer extension IOCTLs are Uncommitted.
+The Compatibility IOCTLs are Obsolete Uncommitted.
+The extension names are Uncommitted.
+.Sh SEE ALSO
+.Xr close 2 ,
+.Xr ioctl 2 ,
+.Xr open 2 ,
+.Xr read 2 ,
+.Xr attributes 5 ,
+.Xr dsp 7I
+.Sh BUGS
 The names of mixer extensions are not guaranteed to be predictable.

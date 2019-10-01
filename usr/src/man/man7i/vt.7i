@@ -1,330 +1,329 @@
-'\" te
+.\" Copyright (c) 2017, Joyent, Inc.
 .\" Copyright (c) 2008 Sun Microsystems, Inc.  All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH VT 7I "Sep 22, 2008"
-.SH NAME
-vt \- Solaris virtual console interface
-.SH SYNOPSIS
-.LP
-.nf
-\fB#include <sys/kd.h> \fR
-.fi
-
-.LP
-.nf
-\fB#include <sys/vt.h> \fR
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd October 29, 2017
+.Dt VT 7I
+.Os
+.Sh NAME
+.Nm vt
+.Nd Solaris virtual console interface
+.Sh SYNOPSIS
+.In sys/kd.h
+.In sys/vt.h
+.Sh DESCRIPTION
 The virtual console device driver \(em also known as virtual terminal
-(\fBVT\fR) \(em is a layer of management functions that provides facilities to
+.Pq Sy VT
+\(em is a layer of management functions that provides facilities to
 support and switch between multiple screen faces on a single physical device.
-.sp
-.LP
-VT's are accessed in the same way as other devices. The \fBopen\fR(2) system
-call is used to open the virtual console and \fBread\fR(2), \fBwrite\fR(2) and
-\fBioctl\fR(2) are used in the normal way and support the functionality of the
-underlying device.  In addition, some virtual console-specific ioctls are
+.Pp
+VT's are accessed in the same way as other devices.
+The
+.Xr open 2
+system
+call is used to open the virtual console and
+.Xr read 2 ,
+.Xr write 2
+and
+.Xr ioctl 2
+are used in the normal way and support the functionality of the
+underlying device.
+In addition, some virtual console-specific ioctls are
 provided and described below.
-.sp
-.LP
-The VT provides a link between different screen faces and the device. The
-\fBactive virtual console\fR corresponds to the currently visible screen face.
+.Pp
+The VT provides a link between different screen faces and the device.
+The
+.Sy "active virtual console"
+corresponds to the currently visible screen face.
 Device input is directed to the active console and any device-specific modes
 that change on a per virtual terminal basis are set to the characteristics
 associated with the active console.
-.sp
-.LP
-You manage VT's by intercepting keyboard sequences ("hot key"). To maintain
-consistency with Xserver, the virtual console device driver supports the Ctrl,
-Alt, F# and arrow keys.
-.sp
-.LP
-The sequence \fBAltL + F#\fR (where AltL represents the Alt key and F#
-represents function keys 1 through 12) is used to select virtual console 1-12.
-The sequence \fBAltGraph + F#\fR (where AltGraph represents the right Alt key
-and F# represent function keys 1 through 12) is for virtual console 13-24.
-\fBAlt + F1\fR chooses the system console (also known as virtual console 1).
-The sequence \fBAlt + ->\fR (where ">" represents the right directional arrow)
-selects the next  VT in a circular ring fashion and  \fBAlt + <-\fR ( where "<"
-represents the left directional arrow) changes to the previous console in a
-circular  fashion. The sequence \fBAlt + ^\fR (where "^" represents the up
-directional arrow) is for the last used console.
-.sp
-.LP
-Virtual console switching can be done automatically (\fBVT_AUTO\fR) on receipt
-of a ``hot-key'' or by the process owning the VT (\fBVT_PROCESS\fR). When
-performed automatically, the process associated with the virtual console is
-unaware of the switch. Saving and restoring the device are handled by the
-underlying device driver and the virtual console manager.  Note that automatic
-switching is the default mode.
-.sp
-.LP
-When a ``hot-key'' is sent when in process-controlled switch mode, the process
+.Pp
+You manage VT's by intercepting keyboard sequences
+.Pq Dq "hot key" .
+To maintain consistency with Xserver, the virtual console device driver
+supports the Ctrl, Alt, F# and arrow keys.
+.Pp
+The sequence
+.Sy "AltL + F#"
+(where AltL represents the left Alt key and F# represents function keys 1
+through 12) is used to select virtual console 1-12.
+The sequence
+.Sy "AltGraph + F#"
+(where AltGraph represents the right Alt key and F# represent function keys 1
+through 12) is for virtual console 13-24.
+.Sy "Alt + F1"
+chooses the system console (also known as virtual console 1).
+The sequence
+.Sy "Alt + \(->"
+(where "\(->" represents the right directional arrow)
+selects the next VT in a circular ring fashion and
+.Sy "Alt + \(<-"
+(where "\(<-" represents the left directional arrow) changes to the previous
+console in a circular fashion.
+The sequence
+.Sy "Alt + \(ua"
+(where "\(ua" represents the up directional arrow) is for the last used console.
+.Pp
+Virtual console switching can be done automatically
+.Pq Dv VT_AUTO
+on receipt of a
+.Dq hot-key
+or by the process owning the VT
+.Pq Dv VT_PROCESS .
+When performed automatically, the process associated with the virtual console is
+unaware of the switch.
+Saving and restoring the device are handled by the
+underlying device driver and the virtual console manager.
+Note that automatic switching is the default mode.
+.Pp
+When a
+.Dq hot-key
+is sent when in process-controlled switch mode, the process
 owning the VT is sent a signal (relsig) it has specified to the virtual console
-manager (see \fBsignal\fR(3C)) requesting the process to release the physical
-device. At this point, the virtual console manager awaits the \fBVT_RELDISP\fR
-ioctl from the process. If the process refuses to release the device (meaning
-the switch does not occur), it performs a \fBVT_RELDISP\fR ioctl with an
-argument of 0 (zero).  If the process desires to release the device, it saves
+manager (see
+.Xr signal 3C )
+requesting the process to release the physical device.
+At this point, the virtual console manager awaits the
+.Dv VT_RELDISP
+ioctl from the process.
+If the process refuses to release the device (meaning
+the switch does not occur), it performs a
+.Dv VT_RELDISP
+ioctl with an argument of 0 (zero).
+If the process desires to release the device, it saves
 the device state (keyboard, display, and I/O registers) and then performs a
-\fBVT_RELDISP\fR with an argument of 1 to complete the switch.
-.sp
-.LP
+.Dv VT_RELDISP
+with an argument of 1 to complete the switch.
+.Pp
 A ring of VT's can contain intermixed auto mode and process control mode
-consoles.  When an auto mode process becomes active, the underlying device
+consoles.
+When an auto mode process becomes active, the underlying device
 driver and the virtual console manager handle the restoring of the device.
 Process control mode processes are sent a specified signal (acqsig) when they
-become the active console.  The process then restores the device state
-(keyboard, display, and I/O registers) and performs \fBVT_RELDISP\fR ioctl with
-an argument of \fBVT_ACKACQ\fR to complete the switching protocol.
-.sp
-.LP
-The modify-operations ioctls (\fBVT_SETMODE\fR, \fBVT_RELDISP\fR,
-\fBVT_WAITACTIVE\fR, \fBKDSETMODE\fR) check if the VT is the controlling tty of
-the calling process. If not, the sys_devices privilege is enforced.
-\fBVT_ACTIVATE\fR requires the sys_devices privilege. Note that there is no
+become the active console.
+The process then restores the device state
+(keyboard, display, and I/O registers) and performs
+.Dv VT_RELDISP
+ioctl with an argument of
+.Dv VT_ACKACQ
+to complete the switching protocol.
+.Pp
+The modify-operations ioctls
+.Po
+.Dv VT_SETMODE ,
+.Dv VT_RELDISP ,
+.Dv VT_WAITACTIVE ,
+.Dv KDSETMODE
+.Pc
+check if the VT is the controlling tty of
+the calling process.
+If not, the sys_devices privilege is enforced.
+.Dv VT_ACTIVATE
+requires the sys_devices privilege.
+Note that there is no
 controlling tty and privilege check for query/view operations.
-.SH IOCTLS
-.sp
-.LP
+.Sh IOCTLS
 The following ioctls apply to devices that support virtual consoles:
-.sp
-.ne 2
-.na
-\fB\fBVT_ENABLED\fR\fR
-.ad
-.sp .6
-.RS 4n
-Queries to determine if VT functionality is available on the system. The
-argument is a pointer to an integer. If VT functionality is available, the
+.Bl -tag -width VT_ENABLED
+.It Dv VT_ENABLED
+Queries to determine if VT functionality is available on the system.
+The argument is a pointer to an integer.
+If VT functionality is available, the
 integer is 1, otherwise it is 0.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBVT_OPENQRY\fR\fR
-.ad
-.sp .6
-.RS 4n
-Finds an available VT. The argument is a pointer to an integer. The integer is
+.It Dv VT_OPENQRY
+Finds an available VT.
+The argument is a pointer to an integer.
+The integer is
 filled in with the number of the first available console that no other process
-has open (and hence, is available to be opened).  If there are no available
+has open (and hence, is available to be opened).
+If there are no available
 VT's, -1 is filled in.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBVT_GETMODE\fR\fR
-.ad
-.sp .6
-.RS 4n
-Determines the VT's current mode, either \fBVT_AUTO\fR or \fBVT_PROCESS\fR. The
+.It Dv VT_GETMODE
+Determines the VT's current mode, either
+.Dv VT_AUTO
+or
+.Dv VT_PROCESS .
+The
 argument is the address of the following structure, as defined in
-<\fBsys/vt.h\fR>
-.sp
-.in +2
-.nf
+.In sys/vt.h
+.Bd -literal -offset 2n
 struct vt_mode {
-	      char mode;  /* VT	mode */
-	      char waitv; /* not used */
-	      short relsig;/* signal to use for release request */
-	      short acqsig;/* signal to use for display acquired */
-	      short frsig;/* not used */
-	    }
+      char mode;     /* VT mode */
+      char waitv;    /* not used */
+      short relsig;  /* signal to use for release request */
+      short acqsig;  /* signal to use for display acquired */
+      short frsig;   /* not used */
+}
 
-	    /* Virtual console Modes */
-	    #define	VT_AUTO		0 /* automatic VT switching	*/
-	    #define	VT_PROCESS 	1 /* process controls switching */
-
-
-	    The structure will be filled in with the current value
-	    for each field.
-.fi
-.in -2
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBVT_SETMODE\fR\fR
-.ad
-.sp .6
-.RS 4n
-Sets the VT mode. The argument is a pointer to a vt_mode structure as defined
-above. The structure should be filled in with the desired mode.  If
-process-control mode is specified, the signals used to communicate with the
-process should be specified.  If any signals are not specified (value is zero),
-the signal default is \fBSIGUSR1\fR (for relsig and acqsig).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBVT_RELDISP\fR\fR
-.ad
-.sp .6
-.RS 4n
+/* Virtual console Modes */
+#define	VT_AUTO		0 /* automatic VT switching	*/
+#define	VT_PROCESS	1 /* process controls switching */
+.Ed
+.Pp
+The structure will be filled in with the current value for each field.
+.It Dv VT_SETMODE
+Sets the VT mode.
+The argument is a pointer to a vt_mode structure as defined above.
+The structure should be filled in with the desired mode.
+If process-control mode is specified, the signals used to communicate with the
+process should be specified.
+If any signals are not specified (value is zero), the signal default is
+.Dv SIGUSR1
+(for relsig and acqsig).
+.It Dv VT_RELDISP
 Tells the VT manager if the process releases (or refuses to release) the
-display. An argument of 1 indicates the VT is released. An argument of 0
-indicates refusal to release. The \fBVT_ACKACQ\fR argument indicates if
-acquisition of the VT has been completed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBVT_ACTIVATE\fR\fR
-.ad
-.sp .6
-.RS 4n
+display.
+An argument of 1 indicates the VT is released.
+An argument of 0 indicates refusal to release.
+The
+.Dv VT_ACKACQ
+argument indicates if acquisition of the VT has been completed.
+.It Dv VT_ACTIVATE
 Makes the VT specified in the argument the active VT (in the same manner as if
-a hotkey initiated the switch).  If the specified VT is not open or does not
-exist, the call fails and errno is set to \fBENXIO\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBVT_WAITACTIVE\fR\fR
-.ad
-.sp .6
-.RS 4n
+a hotkey initiated the switch).
+If the specified VT is not open or does not exist, the call fails and errno is
+set to
+.Er ENXIO .
+.It Dv VT_WAITACTIVE
 If the specified VT is currently active, this call returns immediately.
 Otherwise, it sleeps until the specified VT becomes active, at which point it
 returns.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBVT_GETSTATE\fR\fR
-.ad
-.sp .6
-.RS 4n
-Obtains the active VT number and a list of open VTs. The argument is an address
-to the following structure:
-.sp
-.in +2
-.nf
+.It Dv VT_GETSTATE
+Obtains the active VT number and a list of open VTs.
+The argument is an address to the following structure:
+.Bd -literal -offset 2n
 struct vt_stat {
-	    unsigned short	v_active, /* number of the active VT */
-	              	v_signal, /* not used */
-	              	v_state;  /* count of open VTs.  For every 1 in this
-	                             field, there is an open VT */
-	    }
-.fi
-.in -2
-
-With \fBVT_GETSTATE\fR, the VT manager first gets the number of the active VT,
+    unsigned short v_active, /* number of the active VT */
+	           v_signal, /* not used */
+                   /*
+                    * count of open VTs.  For every 1 in this
+                    * field, there is an open VT
+                    */
+	           v_state;
+}
+.Ed
+.Pp
+With
+.Dv VT_GETSTATE ,
+the VT manager first gets the number of the active VT,
 then determines the number of open VTs in the system and sets a 1 for each open
-VT in v_state. Next, the VT manager transfers the information in structure
-\fBvt_stat\fR passed by the user process.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBKDGETMODE\fR\fR
-.ad
-.sp .6
-.RS 4n
+VT in v_state.
+Next, the VT manager transfers the information in structure
+.Vt vt_stat
+passed by the user process.
+.It Dv KDGETMODE
 Obtains the text/graphics mode associated with the VT.
-.sp
-.in +2
-.nf
-            #define KD_TEXT         0
-            #define KD_GRAPHICS     1
-.fi
-.in -2
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBKDSETMODE\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Bd -literal -offset 2n
+#define KD_TEXT         0
+#define KD_GRAPHICS     1
+.Ed
+.It Dv KDSETMODE
 Sets the text/graphics mode to the VT.
-.sp
-\fBKD_TEXT\fR indicates that console text is displayed on the screen. Normally
-\fBKD_TEXT\fR is combined with \fBVT_AUTO\fR mode for text console terminals,
+.It Dv KD_TEXT
+indicates that console text is displayed on the screen.
+Normally
+.Dv KD_TEXT
+is combined with
+.Dv VT_AUTO
+mode for text console terminals,
 so that the console text display automatically is saved and restored on the hot
 key screen switches.
-.sp
-\fBKD_GRAPHICS\fR indicates that the user/application (usually Xserver) has
-direct control of the display for this VT in graphics mode. Normally
-\fBKD_GRAPHICS\fR is combined with \fBVT_PROCESS\fR mode for this VT indicating
-direct control of the display in graphics mode. In this mode, all writes to the
+.Pp
+.Dv KD_GRAPHICS
+indicates that the user/application (usually Xserver) has
+direct control of the display for this VT in graphics mode.
+Normally
+.Dv KD_GRAPHICS
+is combined with
+.Dv VT_PROCESS
+mode for this VT indicating
+direct control of the display in graphics mode.
+In this mode, all writes to the
 VT using the write system call are ignored, and you must save and restore the
 display on the hot key screen switches.
-.sp
-When the mode of the active VT is changed from \fBKD_TEXT\fR to
-\fBKD_GRAPHICS\fR or a VT of \fBKD_GRAPHICS\fR mode is made active from a
-previous active VT of \fBKD_TEXT\fR mode, the virtual console manager initiates
-a \fBKDSETMODE\fR ioctl with \fBKD_GRAPHICS\fR as the argument to the
-underlying console frame buffer device indicating that current display is
-running into graphics mode.
-.sp
-When the mode of the active VT is changed from \fBKD_GRAPHICS\fR to
-\fBKD_TEXT\fR or a VT of \fBKD_TEXT\fR mode is actived from a previous active
-VT of \fBKD_GRAPHICS\fR mode, the virtual console manager initiates a
-\fBKDSETMODE\fR ioctl with \fBKD_TEXT\fR as the argument to the underlying
-console frame buffer device indicating that current display is running into
-console text mode.
-.RE
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/dev/vt/#\fR \fR
-.ad
-.RS 14n
+.Pp
+When the mode of the active VT is changed from
+.Dv KD_TEXT
+to
+.Dv KD_GRAPHICS
+or a VT of
+.Dv KD_GRAPHICS
+mode is made active from a
+previous active VT of
+.Dv KD_TEXT
+mode, the virtual console manager initiates a
+.Dv KDSETMODE
+ioctl with
+.Dv KD_GRAPHICS
+as the argument to the underlying console frame buffer device indicating that
+current display is running into graphics mode.
+.Pp
+When the mode of the active VT is changed from
+.Dv KD_GRAPHICS
+to
+.Dv KD_TEXT
+or a VT of
+.Dv KD_TEXT
+mode is actived from a previous active VT of
+.Dv KD_GRAPHICS
+mode, the virtual console manager initiates a
+.Dv KDSETMODE
+ioctl with
+.Dv KD_TEXT
+as the argument to the underlying console frame buffer device indicating that
+current display is running into console text mode.
+.El
+.Sh FILES
+.Bl -tag -width xxxxxxxxx
+.It Pa /dev/vt/#
 VT devices.
-.RE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBioctl\fR(2), \fBsignal\fR(3C), \fBwscons\fR(7D)
-.SH NOTES
-.sp
-.LP
+.El
+.Sh SEE ALSO
+.Xr ioctl 2 ,
+.Xr signal 3C ,
+.Xr wscons 7D
+.Sh NOTES
 By default, there are only five virtual console instance login prompts running
-on \fB/dev/vt/#\fR (where "#" represents 2 to 6) in addition to the system
-console running on \fB/dev/console\fR. Normally Xorg uses the seventh virtual
-console (\fB/dev/vt/7\fR.) To switch from consoles to Xserver (which normally
+on
+.Pa /dev/vt/#
+(where "#" represents 2 to 6) in addition to the system
+console running on
+.Pa /dev/console .
+Normally Xorg uses the seventh virtual console
+.Pq Pa /dev/vt/7 .
+To switch from consoles to Xserver (which normally
 picks up the first available virtual console), use [ Ctrl + ] Alt + F7 .
-.sp
-.in +2
-.nf
-       # svcs  | grep login
-       online         17:49:11 svc:/system/console-login:default
-       online         17:49:11 svc:/system/console-login:vt2
-       online         17:49:11 svc:/system/console-login:vt3
-       online         17:49:11 svc:/system/console-login:vt4
-       online         17:49:11 svc:/system/console-login:vt5
-       online         17:49:11 svc:/system/console-login:vt6
-
-       console-login:default is for the system console, others for
-       virtual consoles.
-
-       You can modify properties/disable/enable and remove/add
-       virtual consoles using smf(5):
-
-       # svccfg -s console-login add vt8
-       # svccfg -s console-login:vt8 setprop ttymon/device=astring: "/dev/vt/8"
-       # svcadm enable console-login:vt8
-.fi
-.in -2
-
+.Bd -literal -offset indent
+# svcs  | grep login
+online         17:49:11 svc:/system/console-login:default
+online         17:49:11 svc:/system/console-login:vt2
+online         17:49:11 svc:/system/console-login:vt3
+online         17:49:11 svc:/system/console-login:vt4
+online         17:49:11 svc:/system/console-login:vt5
+online         17:49:11 svc:/system/console-login:vt6
+.Ed
+.Pp
+.Sy console-login:default
+is for the system console, others for virtual consoles.
+.Pp
+You can modify properties/disable/enable and remove/add virtual consoles using
+.Xr smf 5 :
+.Bd -literal -offset indent
+# svccfg -s console-login add vt8
+# svccfg -s console-login:vt8 setprop \e
+  ttymon/device=astring: "/dev/vt/8"
+# svcadm enable console-login:vt8
+.Ed

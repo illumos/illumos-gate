@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/acctctl.h>
 #include <sys/cmn_err.h>
 #include <sys/cred.h>
@@ -353,7 +351,7 @@ exacct(int code, idtype_t idtype, id_t id, void *buf, size_t bufsize,
 static struct sysent exacctsys_sysent = {
 	6,
 	SE_NOUNLOAD | SE_ARGC | SE_LRVAL,
-	(int (*)())exacct
+	(int (*)())(uintptr_t)exacct
 };
 
 static struct modlsys modlsys = {
@@ -367,7 +365,7 @@ static struct modlsys modlsys = {
 static struct sysent exacctsys_sysent32 = {
 	6,
 	SE_NOUNLOAD | SE_ARGC | SE_32RVAL1,
-	(int (*)())exacct
+	(int (*)())(uintptr_t)exacct
 };
 
 static struct modlsys modlsys32 = {

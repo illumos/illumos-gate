@@ -75,6 +75,7 @@ static mblk_t	*usb_ah_mk_mctl(struct iocblk, void *, size_t);
 static int	usb_ah_open(queue_t *, dev_t *, int, int, cred_t *);
 static int	usb_ah_close(queue_t *, int, cred_t *);
 static int	usb_ah_rput(queue_t *, mblk_t *);
+static int	usb_ah_wput(queue_t *, mblk_t *);
 
 /*
  * Global Variables
@@ -140,7 +141,7 @@ static struct qinit usb_ah_rinit = {
 
 /* write side -- just pass everything down */
 static struct qinit usb_ah_winit = {
-	(int (*)(queue_t *, mblk_t *))putnext,
+	usb_ah_wput,
 	NULL,
 	usb_ah_open,
 	usb_ah_close,
@@ -317,7 +318,7 @@ usb_ah_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
  */
 /* ARGSUSED1 */
 static int
-usb_ah_close(register queue_t *q, int flag, cred_t *crp)
+usb_ah_close(queue_t *q, int flag, cred_t *crp)
 {
 	usb_ah_state_t *usb_ahd = (usb_ah_state_t *)q->q_ptr;
 
@@ -346,13 +347,19 @@ usb_ah_close(register queue_t *q, int flag, cred_t *crp)
 	return (0);
 }
 
+static int
+usb_ah_wput(queue_t *q, mblk_t *mp)
+{
+	putnext(q, mp);
+	return (0);
+}
 
 /*
  * usb_ah_rput :
  *	Put procedure for input from driver end of stream (read queue).
  */
 static int
-usb_ah_rput(register queue_t *q, register mblk_t *mp)
+usb_ah_rput(queue_t *q, mblk_t *mp)
 {
 	usb_ah_state_t		*usb_ahd;
 
@@ -422,10 +429,10 @@ usb_ah_rput(register queue_t *q, register mblk_t *mp)
  *	the command, send it up.
  */
 static void
-usb_ah_mctl_receive(register queue_t *q, register mblk_t *mp)
+usb_ah_mctl_receive(queue_t *q, mblk_t *mp)
 {
-	register usb_ah_state_t *usb_ahd = (usb_ah_state_t *)q->q_ptr;
-	register struct iocblk *iocp;
+	usb_ah_state_t *usb_ahd = (usb_ah_state_t *)q->q_ptr;
+	struct iocblk *iocp;
 	caddr_t  data;
 
 	iocp = (struct iocblk *)mp->b_rptr;
@@ -478,7 +485,7 @@ usb_ah_mctl_receive(register queue_t *q, register mblk_t *mp)
  */
 static void
 usb_ah_repeat_send(usb_ah_state_t *usb_ahd, usb_ah_button_descr_t *bd,
-		struct iocblk mctlmsg, char *buf, int len)
+    struct iocblk mctlmsg, char *buf, int len)
 {
 	mblk_t	*dup_mp;
 

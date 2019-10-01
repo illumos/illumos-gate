@@ -2289,7 +2289,7 @@ cardbus_enable_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 
 	sih.socket = socket;
 	sih.handler_id = (unsigned)(long)rdip;
-	sih.handler = (f_tt *)hdlp->ih_cb_func;
+	sih.handler = (f_tt *)(uintptr_t)hdlp->ih_cb_func;
 	sih.arg1 = hdlp->ih_cb_arg1;
 	sih.arg2 = hdlp->ih_cb_arg2;
 	sih.irq = cardbus_get_pil(dip);
@@ -2325,7 +2325,7 @@ cardbus_disable_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 
 	cih.socket = socket;
 	cih.handler_id = (unsigned)(long)rdip;
-	cih.handler = (f_tt *)hdlp->ih_cb_func;
+	cih.handler = (f_tt *)(uintptr_t)hdlp->ih_cb_func;
 
 	if ((*anp->an_if->pcif_clr_interrupt)(dip, &cih) != SUCCESS)
 		return (DDI_FAILURE);

@@ -894,7 +894,7 @@ usbwcm_copyreq(mblk_t *mp, uint_t pvtsize, uint_t state, uint_t reqsize,
 		 * overlaps iocp->ioc_count. If user address (cq_addr)
 		 * is invalid, it would cause panic later in
 		 * usbwcm_copyin:
-		 * 	freemsg((mblk_t *)copyresp->cp_private);
+		 *	freemsg((mblk_t *)copyresp->cp_private);
 		 */
 		cq->cq_private = NULL;
 	}
@@ -959,7 +959,7 @@ usbwcm_iocpy(queue_t *q, mblk_t *mp)
 	usbwcm_state_t		*usbwcmp = (usbwcm_state_t *)q->q_ptr;
 	struct uwacom_softc	*sc = &usbwcmp->usbwcm_softc;
 	struct copyresp		*copyresp;
-	usbwcm_copyin_t 	*copystat;
+	usbwcm_copyin_t		*copystat;
 	mblk_t			*datap, *ioctmp;
 	struct iocblk		*iocbp;
 	int			err = 0;
@@ -1542,7 +1542,7 @@ usbwcm_wput(queue_t *q, mblk_t *mp)
  * usbwcm_rput() :
  *	Put procedure for input from driver end of stream (read queue).
  */
-static void
+static int
 usbwcm_rput(queue_t *q, mblk_t *mp)
 {
 	usbwcm_state_t		*usbwcmp = q->q_ptr;
@@ -1552,7 +1552,7 @@ usbwcm_rput(queue_t *q, mblk_t *mp)
 
 	if (usbwcmp == 0) {
 		freemsg(mp);	/* nobody's listening */
-		return;
+		return (0);
 	}
 
 	switch (mp->b_datap->db_type) {
@@ -1564,7 +1564,7 @@ usbwcm_rput(queue_t *q, mblk_t *mp)
 			flushq(q, FLUSHDATA);
 
 		freemsg(mp);
-		return;
+		return (0);
 
 	case M_BREAK:
 		/*
@@ -1572,13 +1572,13 @@ usbwcm_rput(queue_t *q, mblk_t *mp)
 		 * because nothing is sent from the downstream
 		 */
 		freemsg(mp);
-		return;
+		return (0);
 
 	case M_DATA:
 		if (!(usbwcmp->usbwcm_flags & USBWCM_OPEN)) {
 			freemsg(mp);	/* not ready to listen */
 
-			return;
+			return (0);
 		}
 
 		/*
@@ -1598,18 +1598,19 @@ usbwcm_rput(queue_t *q, mblk_t *mp)
 
 	case M_CTL:
 		usbwcm_mctl(q, mp);
-		return;
+		return (0);
 
 	case M_ERROR:
 		/* REMOVE */
 		usbwcmp->usbwcm_flags &= ~USBWCM_QWAIT;
 
 		freemsg(mp);
-		return;
+		return (0);
 	default:
 		putnext(q, mp);
-		return;
+		return (0);
 	}
+	return (0);
 }
 
 
@@ -1619,24 +1620,24 @@ static struct module_info modinfo;
 
 /* read side queue */
 static struct qinit rinit = {
-	(int (*)())usbwcm_rput,	/* put procedure not needed */
-	NULL, 			/* service procedure */
-	usbwcm_open,		/* called on startup */
-	usbwcm_close,		/* called on finish */
-	NULL,			/* for future use */
-	&modinfo,		/* module information structure */
-	NULL			/* module statistics structure */
+	.qi_putp = usbwcm_rput,
+	.qi_srvp = NULL,
+	.qi_qopen = usbwcm_open,
+	.qi_qclose = usbwcm_close,
+	.qi_qadmin = NULL,
+	.qi_minfo = &modinfo,
+	.qi_mstat = NULL
 };
 
 /* write side queue */
 static struct qinit winit = {
-	usbwcm_wput,		/* put procedure */
-	NULL,			/* no service proecedure needed */
-	NULL,			/* open not used on write side */
-	NULL,			/* close not used on write side */
-	NULL,			/* for future use */
-	&modinfo,		/* module information structure */
-	NULL			/* module statistics structure */
+	.qi_putp = usbwcm_wput,
+	.qi_srvp = NULL,
+	.qi_qopen = NULL,
+	.qi_qclose = NULL,
+	.qi_qadmin = NULL,
+	.qi_minfo = &modinfo,
+	.qi_mstat = NULL
 };
 
 /* STREAMS table */

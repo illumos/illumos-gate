@@ -1,308 +1,322 @@
-'\" te
 .\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH VISUAL_IO 7I "Oct 14, 2005"
-.SH NAME
-visual_io \- Solaris VISUAL I/O control operations
-.SH SYNOPSIS
-.LP
-.nf
-\fB#include <sys/visual_io.h>\fR
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The Solaris VISUAL environment defines a small set of ioctls for controlling
+.\" Copyright 2018, Joyent, Inc.
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd August 31, 2018
+.Dt VISUAL_IO 7I
+.Os
+.Sh NAME
+.Nm visual_io
+.Nd illumos VISUAL I/O control operations
+.Sh SYNOPSIS
+.In sys/visual_io.h
+.Sh DESCRIPTION
+The illumos VISUAL environment defines a small set of ioctls for controlling
 graphics and imaging devices.
-.sp
-.LP
-The \fBVIS_GETIDENTIFIER\fR ioctl is mandatory and must be implemented in
-device drivers for graphics devices using the Solaris VISUAL environment. The
-\fBVIS_GETIDENTIFIER\fR ioctl is defined to return a device identifier from the
-device driver. This identifier must be a uniquely-defined string.
-.sp
-.LP
-There are two additional sets of ioctls. One supports mouse tracking via
-hardware cursor operations. Use of this set is optional, however, if a graphics
+.Pp
+The
+.Dv VIS_GETIDENTIFIER
+ioctl is mandatory and must be implemented in
+device drivers for graphics devices using the illumos VISUAL environment.
+The
+.Dv VIS_GETIDENTIFIER
+ioctl is defined to return a device identifier from the device driver.
+This identifier must be a uniquely-defined string.
+.Pp
+There are two additional sets of ioctls.
+One supports mouse tracking via hardware cursor operations.
+Use of this set is optional, however, if a graphics
 device has hardware cursor support and implements these ioctls, the mouse
-tracking performance is improved. The remaining set supports the device acting
-as the system console device. Use of this set is optional, but if a graphics
-device is to be used as the system console device, it must implement these
-ioctls.
-.sp
-.LP
+tracking performance is improved.
+The remaining set supports the device acting
+as the system console device.
+Use of this set is optional, but if a graphics device is to be used as the
+system console device, it must implement these ioctls.
+.Pp
 The VISUAL environment also defines interfaces for non-ioctl entry points into
-the driver that the Solaris operating environment calls when it is running in
-standalone  mode (for example, when using a stand-alone  debugger, entering
-the  PROM  monitor, or when the system panicking). These are also known as
-"Polled I/O" entry points, which operate under an an explicit set of
-restrictions, described below.
-.SH IOCTLS
-.sp
-.ne 2
-.na
-\fB\fBVIS_GETIDENTIFIER\fR\fR
-.ad
-.RS 21n
-This \fBioctl()\fR returns an identifier string to uniquely identify a device
-used in the Solaris VISUAL environment.  This is a mandatory ioctl and must
-return a unique string. We suggest that the name be formed as
-\fI<companysymbol><devicetype>\fR\&. For example, the \fBcgsix\fR driver
-returns \fBSUNWcg6\fR.
-.sp
-\fBVIS_GETIDENTIFIER\fR takes a \fBvis_identifier\fR structure as its
-parameter.  This structure has the form:
-.sp
-.in +2
-.nf
+the driver that the illumos operating environment calls when it is running in
+standalone mode (for example, when using a stand-alone debugger, entering
+the PROM monitor, or when the system panicking).
+These are also known as
+.Dq Polled I/O
+entry points, which operate under an an explicit set of restrictions, described below.
+.Sh IOCTLS
+.Bl -tag -width VIS_GETIDENTIFIER -compact
+.It Dv VIS_GETIDENTIFIER
+This
+.Xr ioctl 2
+returns an identifier string to uniquely identify a device
+used in the illumos VISUAL environment.
+This is a mandatory ioctl and must return a unique string.
+We suggest that the name be formed as
+.Ao companysymbol Ac Ns Ao devicetype Ac .
+For example, the
+.Xr cgsix 7D
+driver
+returns
+.Sy SUNWcg6 .
+.Pp
+.Dv VIS_GETIDENTIFIER
+takes a
+.Vt vis_identifier
+structure as its parameter.
+This structure has the form:
+.Bd -literal -offset 2n
 #define VIS_MAXNAMELEN 128
 struct vis_identifier {
        char name[VIS_MAXNAMELEN];
 };
-.fi
-.in -2
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBVIS_GETCURSOR\fR\fR
-.ad
-.br
-.na
-\fB\fBVIS_SETCURSOR\fR\fR
-.ad
-.RS 21n
+.Ed
+.Pp
+.It Dv VIS_GETCURSOR
+.It Dv VIS_SETCURSOR
 These ioctls fetch and set various cursor attributes, using the
-\fBvis_cursor\fR structure.
-.sp
-.in +2
-.nf
+.Vt vis_cursor
+structure.
+.Bd -literal -offset 2n
 struct vis_cursorpos {
-	   short	x;	     /* cursor x coordinate */
-	   short	y;	     /* cursor y coordinate */
+   short x; /* cursor x coordinate */
+   short y; /* cursor y coordinate */
 };
 
 struct vis_cursorcmap {
-	  int	version;	         /* version */
-	  int	reserved;
-	  unsigned char *red;  /* red color map elements */
-	  unsigned char *green;/* green color map elements */
-	  unsigned char *blue; /* blue color map elements */
+    int	version;          /* version */
+    int	reserved;
+    /* red color map elements */
+    unsigned char *red;
+    /* green color map elements */
+    unsigned char *green;
+    /* blue color map elements */
+    unsigned char *blue;
 };
 
 #define VIS_CURSOR_SETCURSOR   0x01  /* set cursor */
-#define VIS_CURSOR_SETPOSITION 0x02  /* set cursor position */
-#define VIS_CURSOR_SETHOTSPOT  0x04  /* set cursor hot spot */
-#define VIS_CURSOR_SETCOLORMAP 0x08  /* set cursor colormap */
-#define VIS_CURSOR_SETSHAPE 0x10     /* set cursor shape */
+        /* set cursor position */
+#define VIS_CURSOR_SETPOSITION 0x02
+        /* set cursur hot spot */
+#define VIS_CURSOR_SETHOTSPOT  0x04
+        /* set cursor colormap */
+#define VIS_CURSOR_SETCOLORMAP 0x08
+        /* set cursor shape */
+#define VIS_CURSOR_SETSHAPE 0x10
 #define VIS_CURSOR_SETALL	\e
     (VIS_CURSOR_SETCURSOR | VIS_CURSOR_SETPOSITION | \e
     VIS_CURSOR_SETHOTSPOT | VIS_CURSOR_SETCOLORMAP | \e
     VIS_CURSOR_SETSHAPE)
 
 struct vis_cursor {
-    short set;                    /* what to set */
-    short enable;                 /* cursor on/off */
-    struct vis_cursorpos pos;     /* cursor position */
-    struct  vis_cursorpos hot;    /* cursor hot spot */
-    struct vis_cursorcmap cmap;   /* color map info */
-    struct vis_cursorpos size;    /* cursor bitmap size */
-    char  *image;                 /* cursor image bits */
-    char  *mask;                  /* cursor mask bits */
+    short set;                  /* what to set */
+    short enable;               /* cursor on/off */
+    struct vis_cursorpos pos;   /* cursor position */
+    struct  vis_cursorpos hot;  /* cursor hot spot */
+    struct vis_cursorcmap cmap; /* color map info */
+    /* cursor bitmap size */
+    struct vis_cursorpos size;
+    char  *image;              /* cursor image bits */
+    char  *mask;               /* cursor mask bits */
 };
-.fi
-.in -2
-
-.RE
-
-.sp
-.LP
-The \fBvis_cursorcmap\fR structure should contain pointers to two elements,
+.Ed
+.Pp
+The
+.Vt vis_cursorcmap
+structure should contain pointers to two elements,
 specifying the red, green, and blue values for foreground and background.
-.sp
-.ne 2
-.na
-\fB\fBVIS_SETCURSORPOS\fR\fR
-.ad
-.br
-.na
-\fB\fBVIS_MOVECURSOR\fR\fR
-.ad
-.RS 20n
+.Pp
+.It Dv VIS_SETCURSORPOS
+.It Dv VIS_MOVECURSOR
 These ioctls fetch and move the current cursor position, using the
-\fBvis_cursorpos\fR structure.
-.RE
-
-.SS "Console Optional Ioctls"
-.sp
-.LP
+.Vt vis_cursorpos
+structure.
+.El
+.Ss "Console Optional Ioctls"
 The following ioctl sets are used by graphics drivers that are part of the
-system console device. All of the ioctls must be implemented to be a  console
-device.  In addition, if the system does not have a prom or the prom goes away
+system console device.
+All of the ioctls must be implemented to be a console device.
+In addition, if the system does not have a prom or the prom goes away
 during boot, the special standalone ioctls (listed below) must also be
 implemented.
-.sp
-.LP
+.Pp
 The coordinate system for the console device places 0,0 at the upper left
 corner of the device, with rows increasing toward the bottom of the device and
 columns increasing from left to right.
-.sp
-.ne 2
-.na
-\fBVIS_PUTCMAP\fR
-.ad
-.br
-.na
-\fB\fBVIS_GETCMAP\fR\fR
-.ad
-.RS 15n
+.Pp
+.Bl -tag -width VIS_CONSDISPLAY -compact -offset 2n
+.It Dv VIS_PUTCMAP
+.It Dv VIS_GETCMAP
 Set or get color map entries.
-.RE
-
-.sp
-.LP
-The argument is a pointer to a \fBvis_cmap\fR structure, which contains the
+.Pp
+The argument is a pointer to a
+.Vt vis_cmap
+structure, which contains the
 following fields:
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 struct vis_cmap {
-    int	index;
-    int	count;
+    int		index;
+    int		count;
     uchar_t	*red;
     uchar_t	*green;
     uchar_t	*blue;
 }
-.fi
-.in -2
-
-.sp
-.LP
-\fBindex\fR is the starting index in the color map where you want to start
+.Ed
+.Pp
+.Fa index
+is the starting index in the color map where you want to start
 setting or getting color map entries.
-.sp
-.LP
-\fBcount\fR is the number of color map entries to set or get.  It also is the
-size of the \fBred\fR, \fBgreen\fR, and \fBblue\fR color arrays.
-.sp
-.LP
-\fB*red\fR, \fB*green\fR, and \fB*blue\fR are pointers to unsigned character
-arrays which contain the color map info to set or where the color map info is
-placed on a get.
-.sp
-.ne 2
-.na
-\fB\fBVIS_DEVINIT\fR\fR
-.ad
-.RS 15n
+.Pp
+.Fa count
+is the number of color map entries to set or get.
+It also is the
+size of the
+.Fa red ,
+.Fa green ,
+and
+.Fa blue
+color arrays.
+.Pp
+.Fa *red ,
+.Fa *green ,
+and
+.Fa *blue
+are pointers to unsigned character arrays which contain the color map info to
+set or where the color map info is placed on a get.
+.Pp
+.It Dv VIS_DEVINIT
 Initializes the graphics driver as a console device.
-.RE
-
-.sp
-.LP
-The argument is a pointer to a \fBvis_devinit\fR structure. The graphics driver
+.Pp
+The argument is a pointer to a
+.Vt vis_devinit
+structure.
+The graphics driver
 is expected to allocate any local state information needed to be a console
 device and fill in this structure.
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 struct vis_devinit {
     int  version;
     screen_size_t  width;
     screen_size_t  height;
     screen_size_t  linebytes;
-    unit_t	size;
-    int	   depth;
-    short  mode;
+    unit_t	   size;
+    int	           depth;
+    short          mode;
     struct vis_polledio    *polledio;
     vis_modechg_cb_t       modechg_cb;
     struct vis_modechg_arg *modechg_arg;
 };
-.fi
-.in -2
-
-.sp
-.LP
-\fBversion\fR is the version of this structure and should be set to
-\fBVIS_CONS_REV\fR.
-.sp
-.LP
-\fBwidth\fR and \fBheight\fR are the width and height of the device.  If
-\fBmode\fR (see below) is \fBVIS_TEXT\fR then \fBwidth\fR and \fBheight\fR are
-the number of characters wide and high of the device. If \fBmode\fR is
-\fBVIS_PIXEL\fR then \fBwidth\fR and \fBheight\fR are the number of pixels wide
-and high of the device.
-.sp
-.LP
-\fBlinebytes\fR is the number of bytes per line of the device.
-.sp
-.LP
-\fBsize\fR is the total size of the device in pixels.
-.sp
-.LP
-\fBdepth\fR is the pixel depth in device bits. Currently supported depths are:
-\fB1\fR, \fB4\fR, \fB8\fR and \fB24\fR.
-.sp
-.LP
-\fBmode\fR is the mode of the device.  Either \fBVIS_PIXEL\fR (data to be
-displayed is in bitmap format) or \fBVIS_TEXT\fR (data to be displayed is in
-ascii format).
-.sp
-.LP
-\fBpolledio\fR is used to pass the address of the structure containing the
+.Ed
+.Pp
+.Fa version
+is the version of this structure and should be set to
+.Dv VIS_CONS_REV .
+.Pp
+.Fa width
+and
+.Fa height
+are the width and height of the device.
+If
+.Fa mode
+(see below) is
+.Dv VIS_TEXT
+then
+.Fa width
+and
+.Fa height
+are the number of characters wide and high of the device.
+If
+.Fa mode
+is
+.Dv VIS_PIXEL
+then
+.Fa width
+and
+.Fa height
+are the number of pixels wide and high of the device.
+.Pp
+.Fa linebytes
+is the number of bytes per line of the device.
+.Pp
+.Fa size
+is the total size of the device in pixels.
+.Pp
+.Fa depth
+is the pixel depth in device bits.
+Currently supported depths are:
+.Sy 1 ,
+.Sy 4 ,
+.Sy 8
+and
+.Sy 24 .
+.Pp
+.Fa mode
+is the mode of the device.
+Either
+.Dv VIS_PIXEL
+(data to be displayed is in bitmap format) or
+.Dv VIS_TEXT
+(data to be displayed is in ascii format).
+.Pp
+.Fa polledio
+is used to pass the address of the structure containing the
 standalone mode polled I/O entry points to the device driver back to the
-terminal emulator. The \fBvis_polledio\fR interfaces are described in the
-Console Standalone Entry Points section of this manpage. These entry points are
-where the operating system enters the driver when the system is running in
-standalone mode. These functions perform identically to the VIS_CONSDISPLAY,
-VIS_CONSCURSOR and VIS_CONSCOPY ioctls, but are called directly by the Solaris
+terminal emulator.
+The
+.Vt vis_polledio
+interfaces are described in the
+Console Standalone Entry Points section of this manpage.
+These entry points are where the operating system enters the driver when the
+system is running in standalone mode.
+These functions perform identically to the
+.Dv VIS_CONSDISPLAY ,
+.Dv VIS_CONSCURSOR ,
+and
+.Dv VIS_CONSCOPY
+ioctls, but are called directly by the illumos
 operating environment and must operate under a very strict set of assumptions.
-.sp
-.LP
-\fBmodechg_cb\fR is a callback function passed from the terminal emulator to
+.Pp
+.Fa modechg_cb
+is a callback function passed from the terminal emulator to
 the framebuffer driver which the frame-buffer driver must call whenever a video
-mode change event occurs that changes the screen height, width or depth. The
-callback takes two arguments, an opaque handle, \fBmodechg_arg\fR, and the
-address of a vis_devinit struct containing the new video mode information.
-.sp
-.LP
-\fBmodechg_arg\fR is an opaque handle passed from the terminal emulator to the
+mode change event occurs that changes the screen height, width or depth.
+The callback takes two arguments, an opaque handle,
+.Fa modechg_arg ,
+and the address of a
+.Vt vis_devinit
+struct containing the new video mode information.
+.Pp
+.Fa modechg_arg
+is an opaque handle passed from the terminal emulator to the
 driver, which the driver must pass back to the terminal emulator as an argument
-to the \fBmodechg_cb\fR function when the driver notifies the terminal emulator
-of a video mode change.
-.sp
-.ne 2
-.na
-\fB\fBVIS_DEVFINI\fR\fR
-.ad
-.RS 18n
-Tells the graphics driver that it is no longer the system console device. There
-is no argument to this ioctl. The driver is expected to free any locally kept
+to the
+.Fa modechg_cb
+function when the driver notifies the terminal emulator of a video mode change.
+.Pp
+.It Dv VIS_DEVFINI
+Tells the graphics driver that it is no longer the system console device.
+There is no argument to this ioctl.
+The driver is expected to free any locally kept
 state information related to the console.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBVIS_CONSCURSOR\fR\fR
-.ad
-.RS 18n
-Describes the size and placement of the cursor on the screen. The graphics
+.Pp
+.It Dv VIS_CONSCURSOR
+Describes the size and placement of the cursor on the screen.
+The graphics
 driver is expected to display or hide the cursor at the indicated position.
-.RE
-
-.sp
-.LP
-The argument is a pointer to a \fBvis_conscursor\fR structure which contains
+.Pp
+The argument is a pointer to a
+.Vt vis_conscursor
+structure which contains
 the following fields:
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 struct vis_conscursor {
     screen_pos_t   row;
     screen_pos_t   col;
@@ -312,48 +326,71 @@ struct vis_conscursor {
     color_t        bg_color;
     short          action;
 };
-.fi
-.in -2
-
-.sp
-.LP
-\fBrow\fR and \fBcol\fR are the first row and column (upper left corner of the
-cursor).
-.sp
-.LP
-\fBwidth\fR and \fBheight\fR are the width and height of the cursor.
-.sp
-.LP
-If \fBmode\fR in the \fBVIS_DEVINIT\fR ioctl is set to \fBVIS_PIXEL\fR, then
-\fBcol\fR, \fBrow\fR, \fBwidth\fR and \fBheight\fR are in pixels. If \fBmode\fR
-in the \fBVIS_DEVINIT\fR ioctl was set to \fBVIS_TEXT\fR, then \fBcol\fR,
-\fBrow\fR, \fBwidth\fR and \fBheight\fR are in characters.
-.sp
-.LP
-\fBfg_color\fR and \fBbg_color\fR are the foreground and background color map
-indexes to use when  the \fBaction\fR (see below) is set to
-\fBVIS_DISPLAY_CURSOR\fR.
-.sp
-.LP
-\fBaction\fR indicates whether to display or hide the cursor.  It is set to
-either \fBVIS_HIDE_CURSOR\fR or \fBVIS_DISPLAY_CURSOR\fR.
-.sp
-.ne 2
-.na
-\fB\fBVIS_CONSDISPLAY\fR\fR
-.ad
-.RS 19n
-Display data on the graphics device. The graphics driver is expected to display
-the data contained in the  \fBvis_display\fR structure at the specified
-position on the console.
-.RE
-
-.sp
-.LP
-The \fBvis_display\fR structure contains the following fields:
-.sp
-.in +2
-.nf
+.Ed
+.Pp
+.Fa row
+and
+.Fa col
+are the first row and column (upper left corner of the cursor).
+.Pp
+.Fa width
+and
+.Fa height
+are the width and height of the cursor.
+.Pp
+If
+.Fa mode
+in the
+.Dv VIS_DEVINIT
+ioctl is set to
+.Dv VIS_PIXEL ,
+then
+.Fa col ,
+.Fa row ,
+.Fa width
+and
+.Fa height
+are in pixels.
+If
+.Fa mode
+in the
+.Dv VIS_DEVINIT
+ioctl was set to
+.Dv VIS_TEXT ,
+then
+.Fa col ,
+.Fa row ,
+.Fa width
+and
+.Fa height
+are in characters.
+.Pp
+.Fa fg_color
+and
+.Fa bg_color
+are the foreground and background color map
+indexes to use when the
+.Fa action
+(see below) is set to
+.Dv VIS_DISPLAY_CURSOR .
+.Pp
+.Fa action
+indicates whether to display or hide the cursor.
+It is set to either
+.Dv VIS_HIDE_CURSOR
+or
+.Dv VIS_DISPLAY_CURSOR .
+.Pp
+.It Dv VIS_CONSDISPLAY
+Display data on the graphics device.
+The graphics driver is expected to display the data contained in the
+.Vt vis_display
+structure at the specified position on the console.
+.Pp
+The
+.Vt vis_display
+structure contains the following fields:
+.Bd -literal -offset 2n
 struct vis_display {
     screen_pos_t   row;
     screen_pos_t   col;
@@ -363,62 +400,135 @@ struct vis_display {
     color_t        fg_color;
     color_t        bg_color;
 };
-.fi
-.in -2
-
-.sp
-.LP
-\fBrow\fR and \fBcol\fR specify at which starting row and column the date is to
-be displayed. If \fBmode\fR in the \fBVIS_DEVINIT\fR ioctl was set to
-\fBVIS_TEXT\fR, \fBrow\fR and  \fBcol\fR are defined to be a character offset
-from the starting  position of the console device. If \fBmode\fR in the
-\fBVIS_DEVINIT\fR ioctl was set to \fBVIS_PIXEL\fR, \fBrow\fR and  \fBcol\fR
-are defined to be a pixel offset from the starting position of  the console
+.Ed
+.Pp
+.Fa row
+and
+.Fa col
+specify at which starting row and column the date is to be displayed.
+If
+.Fa mode
+in the
+.Dv VIS_DEVINIT
+ioctl was set to
+.Dv VIS_TEXT ,
+.Fa row
+and
+.Fa col
+are defined to be a character offset
+from the starting position of the console device.
+If
+.Fa mode
+in the
+.Dv VIS_DEVINIT
+ioctl was set to
+.Dv VIS_PIXEL ,
+.Fa row
+and
+.Fa col
+are defined to be a pixel offset from the starting position of the console
 device.
-.sp
-.LP
-\fBwidth\fR and \fBheight\fR specify the size of the  \fBdata\fR to be
-displayed. If \fBmode\fR in the \fBVIS_DEVINIT\fR ioctl was set to
-\fBVIS_TEXT\fR, \fBwidth\fR and \fBheight\fR define the size of  \fBdata\fR as
-a rectangle that is \fBwidth\fR characters wide and \fBheight\fR characters
-high. If \fBmode\fR in the \fBVIS_DEVINIT\fR ioctl was set to \fBVIS_PIXEL\fR,
-\fBwidth\fR and \fBheight\fR define the size of  \fBdata\fR as a rectangle that
-is \fBwidth\fR pixels wide and \fBheight\fR pixels high.
-.sp
-.LP
-\fB*data\fR is a pointer to the data to be displayed on the console device. If
-\fBmode\fR in the \fBVIS_DEVINIT\fR ioctl was set to \fBVIS_TEXT\fR, \fBdata\fR
-is an array of \fBASCII\fR characters to be displayed on the console device.
-The driver must break these characters up appropriately and display it in  the
-retangle defined by \fBrow\fR, \fBcol\fR, \fBwidth\fR, and \fBheight\fR. If
-\fBmode\fR in the \fBVIS_DEVINIT\fR ioctl was set to \fBVIS_PIXEL\fR,
-\fBdata\fR is an array of bitmap data to be displayed on the console device.
+.Pp
+.Fa width
+and
+.Fa height
+specify the size of the
+.Fa data
+to be displayed.
+If
+.Fa mode
+in the
+.Dv VIS_DEVINIT
+ioctl was set to
+.Dv VIS_TEXT ,
+.Fa width
+and
+.Fa height
+define the size of
+.Fa data
+as rectangle that is
+.Fa width
+characters wide and
+.Fa height
+characters high.
+If
+.Fa mode
+in the
+.Dv VIS_DEVINIT
+ioctl was set to
+.Dv VIS_PIXEL ,
+.Fa width
+and
+.Fa height
+define the size of
+.Fa data
+as a rectangle that is
+.Fa width
+pixels wide and
+.Fa height
+pixels high.
+.Pp
+.Fa *data
+is a pointer to the data to be displayed on the console device.
+If
+.Fa mode
+in the
+.Dv VIS_DEVINIT
+ioctl was set to
+.Dv VIS_TEXT ,
+.Fa data
+is an array of
+.Sy ASCII
+characters to be displayed on the console device.
+The driver must break these characters up appropriately and display it in the
+rectangle defined by
+.Fa row ,
+.Fa col ,
+.Fa width ,
+and
+.Fa height .
+If
+.Fa mode
+in the
+.Dv VIS_DEVINIT
+ioctl was set to
+.Dv VIS_PIXEL ,
+.Fa data
+is an array of bitmap data to be displayed on the console device.
 The driver must break this data up appropriately and display it in the retangle
-defined by \fBrow\fR, \fBcol\fR, \fBwidth\fR, and \fBheight\fR.
-.sp
-.LP
-The \fBfg_color\fR and \fBbg_color\fR fields define the foreground and
-background color map indexes to use when displaying the data. \fBfb_color\fR is
-used for "on" pixels and \fBbg_color\fR is used for "off" pixels.
-.sp
-.ne 2
-.na
-\fB\fBVIS_CONSCOPY\fR\fR
-.ad
-.RS 16n
-Copy data from one location on the device to another.  The driver is expected
-to copy the specified data.  The source data should not be modified. Any
-modifications to the source data should be as a side effect of the copy
+defined by
+.Fa row ,
+.Fa col ,
+.Fa width ,
+and
+.Fa height .
+.Pp
+The
+.Fa fg_color
+and
+.Fa bg_color
+fields define the foreground and
+background color map indexes to use when displaying the data.
+.Fa fb_color
+is used for
+.Dq on
+pixels and
+.Fa bg_color
+is used for
+.Dq off
+pixels.
+.Pp
+.It Dv VIS_CONSCOPY
+Copy data from one location on the device to another.
+The driver is expected to copy the specified data.
+The source data should not be modified.
+Any modifications to the source data should be as a side effect of the copy
 destination overlapping the copy source.
-.RE
-
-.sp
-.LP
-The argument is a pointer to a  \fBvis_copy\fR structure which contains the
-following fields:
-.sp
-.in +2
-.nf
+.Pp
+The argument is a pointer to a
+.Vt vis_copy
+structure which contains the following fields:
+.Bd -literal -offset 2n
 struct vis_copy {
     screen_pos_t  s_row;
     screen_pos_t  s_col;
@@ -428,135 +538,201 @@ struct vis_copy {
     screen_pos_t  t_col;
     short         direction;
 };
-.fi
-.in -2
-
-.sp
-.LP
-\fBs_row\fR, \fBs_col\fR, \fBe_row\fR, and \fBe_col\fR define the source
-rectangle of the copy. \fBs_row\fR and \fBs_col\fR are the upper left corner of
-the source rectangle. \fBe_row\fR and \fBe_col\fR are the lower right corner of
-the source rectangle. If \fBmode\fR in the \fBVIS_DEVINIT\fR \fBioctl()\fR was
-set to \fBVIS_TEXT\fR, \fBs_row\fR, \fBs_col,\fR \fBe_row,\fR and \fBe_col\fR
-are defined to be character offsets from the starting  position of the console
-device. If \fBmode\fR in the \fBVIS_DEVINIT\fR ioctl was set to
-\fBVIS_PIXEL\fR, \fBs_row\fR, \fBs_col,\fR \fBe_row,\fR and \fBe_col\fR are
-defined to be pixel offsets from the starting  position of the console device.
-.sp
-.LP
-\fBt_row\fR and \fBt_col\fR define the upper left corner of the destination
-rectangle of the copy. The entire rectangle is copied to this location. If
-\fBmode\fR in the \fBVIS_DEVINIT\fR ioctl was set to \fBVIS_TEXT\fR,
-\fBt_row\fR, and \fBt_col\fR are defined to be character offsets from the
-starting  position of the console device.   If \fBmode\fR in the
-\fBVIS_DEVINIT\fR ioctl was set to \fBVIS_PIXEL\fR, \fBt_row\fR, and
-\fBt_col\fR are defined to be pixel offsets from the starting  position of the
-console device.
-.sp
-.LP
-\fBdirection\fR specifies which way to do the copy.  If direction is
-\fBVIS_COPY_FORWARD\fR the graphics driver should copy data from position
-(\fBs_row\fR, \fBs_col\fR) in the source rectangle to position (\fBt_row\fR,
-\fBt_col\fR) in the destination rectangle. If direction is
-\fBVIS_COPY_BACKWARDS\fR the graphics driver should copy data from position
-(\fBe_row\fR, \fBe_col\fR) in the source rectangle to position
-\fB(t_row+(e_row-s_row)\fR, \fBt_col+(e_col-s_col))\fR in the destination
-rectangle.
-.SS "Console Standalone Entry Points  (Polled I/O Interfaces)"
-.sp
-.LP
+.Ed
+.Pp
+.Fa s_row ,
+.Fa s_col ,
+.Fa e_row ,
+and
+.Fa e_col
+define the source rectangle of the copy.
+.Fa s_row
+and
+.Fa s_col
+are the upper left corner of the source rectangle.
+.Fa e_row
+and
+.Fa e_col
+are the lower right corner of the source rectangle.
+If
+.Fa mode
+in the
+.Dv VIS_DEVINIT
+.Fn ioctl
+was set to
+.Dv VIS_TEXT ,
+.Fa s_row ,
+.Fa s_col ,
+.Fa e_row ,
+and
+.Fa e_col
+are defined to be character offsets from the starting position of the console
+device.
+If
+.Fa mode
+in the
+.Dv VIS_DEVINIT
+.Fn ioctl
+was set to
+.Dv VIS_PIXEL ,
+.Fa s_row ,
+.Fa s_col ,
+.Fa e_row ,
+and
+.Fa e_col
+are
+defined to be pixel offsets from the starting position of the console device.
+.Pp
+.Fa t_row
+and
+.Fa t_col
+define the upper left corner of the destination rectangle of the copy.
+The entire rectangle is copied to this location.
+If
+.Fa mode
+in the
+.Dv VIS_DEVINIT
+ioctl was set to
+.Dv VIS_TEXT ,
+.Fa t_row ,
+and
+.Fa t_col
+are defined to be character offsets from the
+starting position of the console device.
+If
+.Fa mode
+in the
+.Dv VIS_DEVINIT
+ioctl was set to
+.Dv VIS_PIXEL ,
+.Fa t_row ,
+and
+.Fa t_col
+are defined to be pixel offsets from the starting position of the
+onssole device.
+.Pp
+.Fa direction
+specifies which way to do the copy.
+If direction is
+.Dv VIS_COPY_FORWARD
+the graphics driver should copy data from position
+.Po
+.Fa s_row ,
+.Fa s_col
+.Pc
+in the source rectangle to position
+.Po
+.Fa t_row ,
+.Fa t_col
+.Pc
+in the destination rectangle.
+If direction is
+.Dv VIS_COPY_BACKWARDS
+the graphics driver should copy data from position
+.Po
+.Fa e_row ,
+.Fa e_col
+.Pc
+in the source rectangle to position
+.Po
+.Fa t_row Ns + Ns
+.Po
+.Fa e_row Ns \- Ns
+.Fa s_row
+.Pc ,
+.Fa t_col Ns + Ns
+.Po
+.Fa e_col Ns \- Ns
+.Fa s_col
+.Pc
+.Pc
+in the destination rectangle.
+.El
+.Ss "Console Standalone Entry Points  (Polled I/O Interfaces)"
 Console standalone entry points are necessary only if the driver is
-implementing console-compatible extensions. All console vectored standalone
+implementing console-compatible extensions.
+All console vectored standalone
 entry points must be implemented along with all console-related ioctls if the
 console extension is implemented.
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 struct vis_polledio {
     struct vis_polledio_arg *arg;
     void    (*display)(vis_polledio_arg *, struct vis_consdisplay *);
     void    (*copy)(vis_polledio_arg *, struct vis_conscopy *);
     void    (*cursor)(vis_polledio_arg *, struct vis_conscursor *);
 };
-.fi
-.in -2
-
-.sp
-.LP
-The \fBvis_polledio\fR structure is passed from the driver to the Solaris
+.Ed
+.Pp
+The
+.Vt vis_polledio
+structure is passed from the driver to the illumos
 operating environment, conveying the entry point addresses of three functions
 which perform the same operations of their similarly named ioctl counterparts.
 The rendering parameters for each entry point are derived from the same
-structure passed as the respective ioctl. See the Console Optional Ioctls
+structure passed as the respective ioctl.
+See the
+.Sx "Console Optional Ioctls"
 section of this manpage for an explanation of the specific function each of the
-entry points, display(), copy() and cursor() are required to implement. In
+entry points,
+.Fn display ,
+.Fn copy ,
+and
+.Fn cursor
+are required to implement.
+In
 addition to performing the prescribed function of their ioctl counterparts, the
 standalone vectors operate in a special context and must adhere to a strict set
-of rules. The polled I/O vectors are called directly whenever the system is
+of rules.
+The polled I/O vectors are called directly whenever the system is
 quisced (running in a limited context) and must send output to the display.
 Standalone mode describes the state in which the system is running in
-single-threaded mode and only one processor is active.  Solaris operating
+single-threaded mode and only one processor is active.
+illumos operating
 environment services are stopped, along with all other threads on the system,
-prior to entering any of the polled I/O interfaces. The polled I/O vectors are
+prior to entering any of the polled I/O interfaces.
+The polled I/O vectors are
 called when the system is running in a standalone debugger, when executing the
 PROM monitor (OBP) or when panicking.
-.sp
-.LP
+.Pp
 The following restrictions must be observed in the polled I/O functions:
-.RS +4
-.TP
-1.
+.Bl -enum -offset indent
+.It
 The driver must not allocate memory.
-.RE
-.RS +4
-.TP
-2.
+.It
 The driver must not wait on mutexes.
-.RE
-.RS +4
-.TP
-3.
+.It
 The driver must not wait for interrupts.
-.RE
-.RS +4
-.TP
-4.
+.It
 The driver must not call any DDI or LDI services.
-.RE
-.RS +4
-.TP
-5.
+.It
 The driver must not call any system services.
-.RE
-.sp
-.LP
+.El
+.Pp
 The system is single-threaded when calling these functions, meaning that all
-other threads are effectively halted. Single-threading makes mutexes (which
+other threads are effectively halted.
+Single-threading makes mutexes (which
 cannot be held) easier to deal with, so long as the driver does not disturb any
-shared state. See \fIWriting Device Drivers\fR for more information about
-implementing polled I/O entry points.
-.SH SEE ALSO
-.sp
-.LP
-\fBioctl\fR(2)
-.sp
-.LP
-\fIWriting Device Drivers\fR
-.SH NOTES
-.sp
-.LP
+shared state.
+See
+.%T Writing Device Drivers
+for more information about implementing polled I/O entry points.
+.Sh SEE ALSO
+.Xr ioctl 2
+.Rs
+.%T Writing Device Drivers
+.Re
+.Sh NOTES
 On SPARC systems, compatible drivers supporting the kernel terminal emulator
-should export the \fBtem-support\fR DDI property.\fBtem-support\fR indicates
-that the driver supports the kernel terminal emulator. By exporting
-\fBtem-support\fR it's possible to avoid premature handling of an incompatible
-driver.
-.sp
-.ne 2
-.na
-\fBtem-support\fR
-.ad
-.RS 15n
+should export the
+.Sy tem-support
+DDI property.
+.Sy tem-support
+indicates that the driver supports the kernel terminal emulator.
+By exporting
+.Sy tem-support
+it's possible to avoid premature handling of an incompatible driver.
+.Bl -tag -width tem-support
+.It Sy tem-support
 This DDI property, set to 1, means driver is compatible with the console
 kernel framebuffer interface.
-.RE
-
+.El
