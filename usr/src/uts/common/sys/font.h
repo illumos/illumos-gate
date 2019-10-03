@@ -123,6 +123,7 @@ extern bitmap_data_t font_data_8x16;
 #endif
 #define	BORDER_PIXELS		10	/* space from screen border */
 
+void reset_font_flags(void);
 bitmap_data_t *set_font(short *, short *, short, short);
 const uint8_t *font_lookup(const struct font *, uint32_t);
 void font_bit_to_pix4(struct font *, uint8_t *, uint32_t, uint8_t, uint8_t);

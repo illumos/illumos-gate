@@ -164,6 +164,19 @@ rgb_color_map(const rgb_t *rgb, uint8_t index)
  */
 font_list_t fonts = STAILQ_HEAD_INITIALIZER(fonts);
 
+/*
+ * Reset font flags to FONT_AUTO.
+ */
+void
+reset_font_flags(void)
+{
+	struct fontlist *fl;
+
+	STAILQ_FOREACH(fl, &fonts, font_next) {
+		fl->font_flags = FONT_AUTO;
+	}
+}
+
 bitmap_data_t *
 set_font(short *rows, short *cols, short h, short w)
 {
