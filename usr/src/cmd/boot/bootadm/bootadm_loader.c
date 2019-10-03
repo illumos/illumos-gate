@@ -793,8 +793,9 @@ list_menu_entry(menu_entry_t *entry, char *setting)
 	ficlVm *vm;
 	int mounted;
 
+	ptr = strrchr(entry->me_bootfs, ':');
 	if (strcmp(entry->me_type, "bootfs") != 0 ||
-	    strchr(entry->me_bootfs, ':') != NULL) {
+	    (ptr != NULL && ptr[1] == '\0')) {
 		(void) printf("\nTitle:       %s\n", entry->me_title);
 		(void) printf("Type:        %s\n", entry->me_type);
 		(void) printf("Device:      %s\n", entry->me_bootfs);
