@@ -33,6 +33,7 @@
 #include <sys/endian.h>
 #include <sys/font.h>
 #include <sys/consplat.h>
+#include <sys/limits.h>
 
 #include <efi.h>
 #include <efilib.h>
@@ -52,10 +53,10 @@ static EFI_GUID active_edid_guid = EFI_EDID_ACTIVE_PROTOCOL_GUID;
 static EFI_GUID discovered_edid_guid = EFI_EDID_DISCOVERED_PROTOCOL_GUID;
 
 /* Saved initial GOP mode. */
-static uint32_t default_mode = (uint32_t)-1;
+static uint32_t default_mode = UINT32_MAX;
 
 static uint32_t gop_default_mode(void);
-static int efifb_set_mode(EFI_GRAPHICS_OUTPUT *, u_int);
+static int efifb_set_mode(EFI_GRAPHICS_OUTPUT *, uint_t);
 
 static uint_t
 efifb_color_depth(struct efi_fb *efifb)
@@ -124,7 +125,7 @@ efifb_from_gop(struct efi_fb *efifb, EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE *mode,
 }
 
 static ssize_t
-efifb_uga_find_pixel(EFI_UGA_DRAW_PROTOCOL *uga, u_int line,
+efifb_uga_find_pixel(EFI_UGA_DRAW_PROTOCOL *uga, uint_t line,
     EFI_PCI_IO_PROTOCOL *pciio, uint64_t addr, uint64_t size)
 {
 	EFI_UGA_PIXEL pix0, pix1;
@@ -132,7 +133,7 @@ efifb_uga_find_pixel(EFI_UGA_DRAW_PROTOCOL *uga, u_int line,
 	size_t count, maxcount = 1024;
 	ssize_t ofs;
 	EFI_STATUS status;
-	u_int idx;
+	uint_t idx;
 
 	status = uga->Blt(uga, &pix0, EfiUgaVideoToBltBuffer,
 	    0, line, 0, 0, 1, 1, 0);
@@ -193,7 +194,7 @@ efifb_uga_find_pixel(EFI_UGA_DRAW_PROTOCOL *uga, u_int line,
 	}
 	printf("No change detected in frame buffer");
 
- fail:
+fail:
 	printf(" -- error %lu\n", EFI_ERROR_CODE(status));
 	free(data1);
 	return (-1);
@@ -218,7 +219,7 @@ efifb_uga_get_pciio(void)
 		free(buf);
 		return (NULL);
 	}
-	bufsz /= sizeof(EFI_HANDLE);
+	bufsz /= sizeof (EFI_HANDLE);
 
 	/* Get the PCI I/O interface of the first handle that supports it. */
 	pciio = NULL;
@@ -241,7 +242,7 @@ efifb_uga_locate_framebuffer(EFI_PCI_IO_PROTOCOL *pciio, uint64_t *addrp,
 	uint8_t *resattr;
 	uint64_t addr, size;
 	EFI_STATUS status;
-	u_int bar;
+	uint_t bar;
 
 	if (pciio == NULL)
 		return (EFI_DEVICE_ERROR);
@@ -324,9 +325,9 @@ efifb_from_uga(struct efi_fb *efifb, EFI_UGA_DRAW_PROTOCOL *uga)
 	 */
 	offset = -1;
 	ev = getenv("smbios.system.maker");
-	if (ev != NULL && !strcmp(ev, "Apple Inc.")) {
+	if (ev != NULL && strcmp(ev, "Apple Inc.") == 0) {
 		ev = getenv("smbios.system.product");
-		if (ev != NULL && !strcmp(ev, "iMac7,1")) {
+		if (ev != NULL && strcmp(ev, "iMac7,1") == 0) {
 			/* These are the expected values we should have. */
 			horiz = 1680;
 			vert = 1050;
@@ -334,7 +335,7 @@ efifb_from_uga(struct efi_fb *efifb, EFI_UGA_DRAW_PROTOCOL *uga)
 			/* These are the missing bits. */
 			offset = 0x10000;
 			stride = 1728;
-		} else if (ev != NULL && !strcmp(ev, "MacBook3,1")) {
+		} else if (ev != NULL && strcmp(ev, "MacBook3,1") == 0) {
 			/* These are the expected values we should have. */
 			horiz = 1280;
 			vert = 800;
@@ -478,7 +479,7 @@ efifb_gop_get_edid(EFI_HANDLE gop)
 	status = BS->CloseProtocol(gop, guid, IH, NULL);
 
 	/* Validate EDID */
-	if (memcmp(edid_info, magic, sizeof(magic)) != 0)
+	if (memcmp(edid_info, magic, sizeof (magic)) != 0)
 		goto error;
 
 	if (edid_info->header.version == 1 &&
@@ -521,10 +522,10 @@ efi_find_framebuffer(struct efi_fb *efifb)
 	if (gop != NULL)
 		return (efifb_from_gop(efifb, gop->Mode, gop->Mode->Info));
 
-	status = BS->LocateProtocol(&gop_guid, NULL, (VOID **)&gop);
+	status = BS->LocateProtocol(&gop_guid, NULL, (void **)&gop);
 	if (status == EFI_SUCCESS) {
 		/* Save default mode. */
-		if (default_mode == (uint32_t)-1) {
+		if (default_mode == UINT32_MAX) {
 			default_mode = gop->Mode->Mode;
 		}
 		mode = gop_default_mode();
@@ -536,7 +537,7 @@ efi_find_framebuffer(struct efi_fb *efifb)
 	if (uga != NULL)
 		return (efifb_from_uga(efifb, uga));
 
-	status = BS->LocateProtocol(&uga_guid, NULL, (VOID **)&uga);
+	status = BS->LocateProtocol(&uga_guid, NULL, (void **)&uga);
 	if (status == EFI_SUCCESS)
 		return (efifb_from_uga(efifb, uga));
 
@@ -581,7 +582,7 @@ print_efifb(int mode, struct efi_fb *efifb, int verbose)
 }
 
 static int
-efifb_set_mode(EFI_GRAPHICS_OUTPUT *gop, u_int mode)
+efifb_set_mode(EFI_GRAPHICS_OUTPUT *gop, uint_t mode)
 {
 	EFI_STATUS status;
 
@@ -609,16 +610,16 @@ efifb_find_mode_xydm(UINT32 x, UINT32 y, int depth, int m)
 	UINTN infosz;
 	struct efi_fb fb;
 	UINT32 mode;
-        uint_t d, i;
+	uint_t d, i;
 
-        if (m != -1)
-                i = 8;
-        else if (depth == -1)
-                i = 32;
-        else
-                i = depth;
+	if (m != -1)
+		i = 8;
+	else if (depth == -1)
+		i = 32;
+	else
+		i = depth;
 
-        while (i > 0) {
+	while (i > 0) {
 		for (mode = 0; mode < gop->Mode->MaxMode; mode++) {
 			status = gop->QueryMode(gop, mode, &infosz, &info);
 			if (EFI_ERROR(status))
@@ -688,7 +689,7 @@ command_gop(int argc, char *argv[])
 	struct efi_fb fb;
 	EFI_STATUS status;
 	char *arg, *cp;
-	u_int mode;
+	uint_t mode;
 
 	if (gop == NULL) {
 		snprintf(command_errbuf, sizeof (command_errbuf),
@@ -728,7 +729,7 @@ command_gop(int argc, char *argv[])
 		return (CMD_OK);
 	}
 
-	if (!strcmp(argv[1], "set")) {
+	if (strcmp(argv[1], "set") == 0) {
 		int rv;
 
 		if (argc != 3)
@@ -758,7 +759,7 @@ command_gop(int argc, char *argv[])
 		return (rv);
 	}
 
-	if (!strcmp(argv[1], "get")) {
+	if (strcmp(argv[1], "get") == 0) {
 		if (argc != 2)
 			goto usage;
 
@@ -767,7 +768,7 @@ command_gop(int argc, char *argv[])
 		return (CMD_OK);
 	}
 
-	if (!strcmp(argv[1], "list")) {
+	if (strcmp(argv[1], "list") == 0) {
 		EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info;
 		UINTN infosz;
 		int depth, d = -1;
@@ -837,7 +838,7 @@ command_uga(int argc, char *argv[])
 	printf("\n");
 	return (CMD_OK);
 
- usage:
+usage:
 	snprintf(command_errbuf, sizeof (command_errbuf), "usage: %s", argv[0]);
 	return (CMD_ERROR);
 }
