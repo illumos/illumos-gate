@@ -24,6 +24,7 @@ CDDL HEADER END
 Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+Copyright 2019 RackTop Systems.
 
 NOTE:  This service manifest is not editable; its contents will
 be overwritten by package or patch operations, including
@@ -220,7 +221,7 @@ file.
 		<propval name='ipv6_enable' type='boolean'
 			value='false' override='true'/>
 		<propval name='sv_version' type='astring'
-			value='5.0' override='true'/>
+			value='6.1' override='true'/>
 		<propval name='dfs_stdroot_num' type='integer'
 			value='0' override='true'/>
 		<propval name='print_enable' type='boolean'
