@@ -527,7 +527,7 @@ multiboot_obj_loadfile(char *filename, u_int64_t dest,
 }
 
 static int
-multiboot_obj_exec(struct preloaded_file *fp)
+multiboot_obj_exec(struct preloaded_file *fp __unused)
 {
 
 	return (EFTYPE);

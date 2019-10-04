@@ -156,7 +156,8 @@ arpsend(struct iodesc *d, void *pkt, size_t len)
  * else -1 (and errno == 0)
  */
 static ssize_t
-arprecv(struct iodesc *d, void **pkt, void **payload, time_t tleft, void *extra)
+arprecv(struct iodesc *d, void **pkt, void **payload, time_t tleft,
+    void *extra __unused)
 {
 	ssize_t n;
 	struct ether_arp *ah;

@@ -302,7 +302,7 @@ pxe_cleanup(void)
 }
 
 void
-pxe_perror(int err)
+pxe_perror(int err __unused)
 {
 }
 
@@ -352,14 +352,14 @@ bangpxe_call(int func, void *ptr)
 
 
 static int
-pxe_netif_match(struct netif *nif, void *machdep_hint)
+pxe_netif_match(struct netif *nif __unused, void *machdep_hint __unused)
 {
 	return (1);
 }
 
 
 static int
-pxe_netif_probe(struct netif *nif, void *machdep_hint)
+pxe_netif_probe(struct netif *nif __unused, void *machdep_hint __unused)
 {
 	if (pxe_call == NULL)
 		return (-1);
@@ -368,7 +368,7 @@ pxe_netif_probe(struct netif *nif, void *machdep_hint)
 }
 
 static void
-pxe_netif_end(struct netif *nif)
+pxe_netif_end(struct netif *nif __unused)
 {
 	t_PXENV_UNDI_CLOSE *undi_close_p;
 
@@ -383,7 +383,7 @@ pxe_netif_end(struct netif *nif)
 }
 
 static void
-pxe_netif_init(struct iodesc *desc, void *machdep_hint)
+pxe_netif_init(struct iodesc *desc, void *machdep_hint __unused)
 {
 	t_PXENV_UNDI_GET_INFORMATION *undi_info_p;
 	t_PXENV_UNDI_OPEN *undi_open_p;
@@ -515,7 +515,7 @@ pxe_netif_receive(void **pkt)
 }
 
 static ssize_t
-pxe_netif_get(struct iodesc *desc, void **pkt, time_t timeout)
+pxe_netif_get(struct iodesc *desc __unused, void **pkt, time_t timeout)
 {
 	time_t t;
 	void *ptr;
@@ -533,7 +533,7 @@ pxe_netif_get(struct iodesc *desc, void **pkt, time_t timeout)
 }
 
 static ssize_t
-pxe_netif_put(struct iodesc *desc, void *pkt, size_t len)
+pxe_netif_put(struct iodesc *desc __unused, void *pkt, size_t len)
 {
 	t_PXENV_UNDI_TRANSMIT *trans_p;
 	t_PXENV_UNDI_TBD *tbd_p;

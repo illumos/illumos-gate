@@ -31,6 +31,7 @@
 #include <stand.h>
 #include <bootstrap.h>
 #include <sys/endian.h>
+#include <sys/font.h>
 #include <sys/consplat.h>
 
 #include <efi.h>
@@ -706,6 +707,7 @@ command_gop(int argc, char *argv[])
 		if (argc != 2)
 			goto usage;
 
+		reset_font_flags();
 		plat_cons_update_mode(EfiConsoleControlScreenText);
 		return (CMD_OK);
 	}
@@ -717,6 +719,7 @@ command_gop(int argc, char *argv[])
 		if (argc != 2)
 			goto usage;
 
+		reset_font_flags();
 		mode = gop_default_mode();
 		if (mode != gop->Mode->Mode)
 			efifb_set_mode(gop, mode);
@@ -749,6 +752,7 @@ command_gop(int argc, char *argv[])
 		if (mode == gop->Mode->MaxMode)
 			mode = gop->Mode->Mode;
 
+		reset_font_flags();
 		rv = efifb_set_mode(gop, mode);
 		plat_cons_update_mode(EfiConsoleControlScreenGraphics);
 		return (rv);

@@ -1642,7 +1642,7 @@ insert_font(char *name)
 static int
 font_set(struct env_var *ev __unused, int flags __unused, const void *value)
 {
-	struct fontlist *fl, *tmp;
+	struct fontlist *fl;
 	char *eptr;
 	unsigned long x = 0, y = 0;
 
@@ -1662,9 +1662,9 @@ font_set(struct env_var *ev __unused, int flags __unused, const void *value)
 	}
 	if (fl != NULL) {
 		/* Reset any FONT_MANUAL flag. */
-		STAILQ_FOREACH(tmp, &fonts, font_next)
-			tmp->font_flags = FONT_AUTO;
+		reset_font_flags();
 
+		/* Mark this font manually loaded */
 		fl->font_flags = FONT_MANUAL;
 		/* Trigger tem update. */
 		tems.update_font = true;

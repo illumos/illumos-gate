@@ -38,6 +38,7 @@
 #include "libi386.h"
 #include "gfx_fb.h"	/* for EDID */
 #include "vbe.h"
+#include <sys/font.h>
 #include <sys/vgareg.h>
 #include <sys/vgasubr.h>
 
@@ -756,6 +757,7 @@ command_vesa(int argc, char *argv[])
 		if (vbestate.vbe_mode == 0)
 			return (CMD_OK);
 
+		reset_font_flags();
 		bios_set_text_mode(VGA_TEXT_MODE);
 		plat_cons_update_mode(0);
 		return (CMD_OK);
@@ -802,6 +804,7 @@ command_vesa(int argc, char *argv[])
 
 	if (modenum >= 0x100) {
 		if (vbestate.vbe_mode != modenum) {
+			reset_font_flags();
 			vbe_set_mode(modenum);
 			plat_cons_update_mode(1);
 		}

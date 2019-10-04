@@ -52,7 +52,7 @@ void mallocstats(void);
 static void *Malloc_align(size_t, size_t);
 
 void *
-Malloc(size_t bytes, const char *file, int line)
+Malloc(size_t bytes, const char *file __unused, int line __unused)
 {
 	return (Malloc_align(bytes, 1));
 }

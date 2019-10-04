@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
  * All rights reserved.
  *
@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/exec.h>
@@ -78,7 +77,7 @@ elf32_exec(struct preloaded_file *fp)
 }
 
 static int
-elf32_obj_exec(struct preloaded_file *fp)
+elf32_obj_exec(struct preloaded_file *fp __unused)
 {
 	return (EFTYPE);
 }

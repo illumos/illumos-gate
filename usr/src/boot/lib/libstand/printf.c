@@ -61,7 +61,7 @@ static char *ksprintn(char *, uintmax_t, int, int *, int);
 static int kvprintf(char const *, kvprintf_fn_t *, void *, int, va_list);
 
 static void
-putchar_wrapper(int cc, void *arg)
+putchar_wrapper(int cc, void *arg __unused)
 {
 
 	putchar(cc);

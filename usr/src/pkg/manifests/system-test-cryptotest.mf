@@ -136,6 +136,18 @@ file opt/crypto-tests/tests/digest/kcf/sha384_32 \
 file opt/crypto-tests/tests/digest/kcf/sha384_64 \
     path=opt/crypto-tests/tests/digest/kcf/sha384_64 group=root mode=0555 \
     owner=root
+file opt/crypto-tests/tests/digest/kcf/sha512_224_32 \
+    path=opt/crypto-tests/tests/digest/kcf/sha512_224_32 group=root mode=0555 \
+    owner=root
+file opt/crypto-tests/tests/digest/kcf/sha512_224_64 \
+    path=opt/crypto-tests/tests/digest/kcf/sha512_224_64 group=root mode=0555 \
+    owner=root
+file opt/crypto-tests/tests/digest/kcf/sha512_256_32 \
+    path=opt/crypto-tests/tests/digest/kcf/sha512_256_32 group=root mode=0555 \
+    owner=root
+file opt/crypto-tests/tests/digest/kcf/sha512_256_64 \
+    path=opt/crypto-tests/tests/digest/kcf/sha512_256_64 group=root mode=0555 \
+    owner=root
 file opt/crypto-tests/tests/digest/kcf/sha512_32 \
     path=opt/crypto-tests/tests/digest/kcf/sha512_32 group=root mode=0555 \
     owner=root
@@ -160,6 +172,18 @@ file opt/crypto-tests/tests/digest/pkcs/sha384_32 \
 file opt/crypto-tests/tests/digest/pkcs/sha384_64 \
     path=opt/crypto-tests/tests/digest/pkcs/sha384_64 group=root mode=0555 \
     owner=root
+file opt/crypto-tests/tests/digest/pkcs/sha512_224_32 \
+    path=opt/crypto-tests/tests/digest/pkcs/sha512_224_32 group=root \
+    mode=0555 owner=root
+file opt/crypto-tests/tests/digest/pkcs/sha512_224_64 \
+    path=opt/crypto-tests/tests/digest/pkcs/sha512_224_64 group=root \
+    mode=0555 owner=root
+file opt/crypto-tests/tests/digest/pkcs/sha512_256_32 \
+    path=opt/crypto-tests/tests/digest/pkcs/sha512_256_32 group=root \
+    mode=0555 owner=root
+file opt/crypto-tests/tests/digest/pkcs/sha512_256_64 \
+    path=opt/crypto-tests/tests/digest/pkcs/sha512_256_64 group=root \
+    mode=0555 owner=root
 file opt/crypto-tests/tests/digest/pkcs/sha512_32 \
     path=opt/crypto-tests/tests/digest/pkcs/sha512_32 group=root mode=0555 \
     owner=root

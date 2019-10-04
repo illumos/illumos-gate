@@ -166,7 +166,7 @@ efi_addsmapdata(struct preloaded_file *kfp)
 COMMAND_SET(smap, "smap", "show BIOS SMAP", command_smap);
 
 static int
-command_smap(int argc, char *argv[])
+command_smap(int argc __unused, char *argv[] __unused)
 {
 	u_int i;
 

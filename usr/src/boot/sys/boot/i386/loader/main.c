@@ -295,7 +295,7 @@ extract_currdev(void)
 COMMAND_SET(reboot, "reboot", "reboot the system", command_reboot);
 
 static int
-command_reboot(int argc, char *argv[])
+command_reboot(int argc __unused, char *argv[] __unused)
 {
 	int i;
 
@@ -318,7 +318,7 @@ exit(int code)
 COMMAND_SET(heap, "heap", "show heap usage", command_heap);
 
 static int
-command_heap(int argc, char *argv[])
+command_heap(int argc __unused, char *argv[] __unused)
 {
 
 	mallocstats();

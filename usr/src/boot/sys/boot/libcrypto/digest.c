@@ -1,12 +1,11 @@
 
 #include <sys/cdefs.h>
-#include <stdbool.h>
 #include <stand.h>
 #include <sys/sha1.h>
 
 #include <bootstrap.h>
 
-bool
+void
 sha1(void *data, size_t size, uint8_t *result)
 {
 	SHA1_CTX sha1_ctx;
@@ -14,8 +13,6 @@ sha1(void *data, size_t size, uint8_t *result)
 	SHA1Init(&sha1_ctx);
 	SHA1Update(&sha1_ctx, data, size);
 	SHA1Final(result, &sha1_ctx);
-
-	return (true);
 }
 
 static int
@@ -35,9 +32,7 @@ command_sha1(int argc, char **argv)
 
 	ptr = (void *)(uintptr_t)strtol(argv[1], NULL, 0);
 	size = strtol(argv[2], NULL, 0);
-
-	if (sha1(ptr, size, resultbuf) == false)
-		return (CMD_OK);
+	sha1(ptr, size, resultbuf);
 
 	for (i = 0; i < SHA1_DIGEST_LENGTH; i++)
 		printf("%02x", resultbuf[i]);

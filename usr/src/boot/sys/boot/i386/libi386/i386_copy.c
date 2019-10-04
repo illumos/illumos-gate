@@ -38,11 +38,14 @@
 #include <stand.h>
 #include <sys/param.h>
 #include <sys/multiboot2.h>
+#include <sys/consplat.h>
 #include <machine/metadata.h>
 #include <machine/pc/bios.h>
 #include "libi386.h"
 #include "btxv86.h"
 #include "bootstrap.h"
+
+extern multiboot_tag_framebuffer_t gfx_fb;
 
 /*
  * Verify the address is not in use by existing modules.
@@ -56,7 +59,7 @@ addr_verify(struct preloaded_file *fp, vm_offset_t addr, size_t size)
 		f_addr = fp->f_addr;
 
 		if ((f_addr <= addr) &&
-		     (f_addr + fp->f_size >= addr)) {
+		    (f_addr + fp->f_size >= addr)) {
 			return (0);
 		}
 		if ((f_addr >= addr) && (f_addr <= addr + size)) {
@@ -106,7 +109,7 @@ smap_find(struct bios_smap *smap, int smaplen, vm_offset_t addr, size_t size)
  * aligned to page boundary and we have to fit into smap entry.
  */
 vm_offset_t
-i386_loadaddr(u_int type, void *data, vm_offset_t addr)
+i386_loadaddr(uint_t type, void *data, vm_offset_t addr)
 {
 	struct stat st;
 	size_t size, smaplen;
@@ -152,7 +155,7 @@ i386_loadaddr(u_int type, void *data, vm_offset_t addr)
 		return (0);
 
 	smap = (struct bios_smap *)md->md_data;
-	smaplen = md->md_size / sizeof(struct bios_smap);
+	smaplen = md->md_size / sizeof (struct bios_smap);
 
 	/* Start from the end of the kernel. */
 	mfp = fp;
@@ -170,6 +173,24 @@ i386_loadaddr(u_int type, void *data, vm_offset_t addr)
 		if (off < SAFE_LOAD_BASE)
 			off = SAFE_LOAD_BASE;
 
+		/* Avoid possible framebuffer memory */
+		if (plat_stdout_is_framebuffer()) {
+			vm_offset_t fb_addr;
+			size_t fb_size;
+
+			fb_addr = gfx_fb.framebuffer_common.framebuffer_addr;
+			fb_size = gfx_fb.framebuffer_common.framebuffer_height *
+			    gfx_fb.framebuffer_common.framebuffer_pitch;
+
+			if ((off >= fb_addr && off <= fb_addr + fb_size) ||
+			    (off + size >= fb_addr &&
+			    off + size <= fb_addr + fb_size)) {
+				printf("\nSkipping framebuffer memory %#x "
+				    "size %#x\n", fb_addr, fb_size);
+				off = roundup2(fb_addr + fb_size + 1,
+				    MULTIBOOT_MOD_ALIGN);
+			}
+		}
 		off = smap_find(smap, smaplen, off, size);
 		off = addr_verify(fp, off, size);
 		if (off != 0)

@@ -227,8 +227,8 @@ net_cleanup(void)
 }
 
 static int
-net_strategy(void *devdata, int rw, daddr_t blk, size_t size, char *buf,
-    size_t *rsize)
+net_strategy(void *devdata __unused, int rw __unused, daddr_t blk __unused,
+    size_t size __unused, char *buf __unused, size_t *rsize __unused)
 {
 
 	return (EIO);

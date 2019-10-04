@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
  * All rights reserved.
  *
@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 /*
  * Obtain memory configuration information from the BIOS
@@ -136,7 +135,7 @@ bios_addsmapdata(struct preloaded_file *kfp)
 COMMAND_SET(smap, "smap", "show BIOS SMAP", command_smap);
 
 static int
-command_smap(int argc, char *argv[])
+command_smap(int argc __unused, char *argv[] __unused)
 {
 	u_int			i;
 
