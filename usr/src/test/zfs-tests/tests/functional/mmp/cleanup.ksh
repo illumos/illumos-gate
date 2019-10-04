@@ -31,6 +31,6 @@ SunOS)	h=$(cat /var/tmp/zfs_test_hostid.txt)
 	rm /var/tmp/zfs_test_hostid.txt
 	;;
 esac
-log_must set_tunable64 zfs_multihost_history 0
+log_must set_tunable64 zfs_multihost_history $MMP_HISTORY_OFF
 
 log_pass "mmp cleanup passed"
