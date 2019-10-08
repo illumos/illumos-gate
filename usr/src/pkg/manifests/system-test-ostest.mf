@@ -29,6 +29,7 @@ dir path=opt/os-tests/tests/ddi_ufm
 dir path=opt/os-tests/tests/file-locking
 $(i386_ONLY)dir path=opt/os-tests/tests/i386
 dir path=opt/os-tests/tests/pf_key
+dir path=opt/os-tests/tests/poll
 dir path=opt/os-tests/tests/sdevfs
 dir path=opt/os-tests/tests/secflags
 dir path=opt/os-tests/tests/sigqueue
@@ -40,7 +41,6 @@ file path=opt/os-tests/runfiles/default.run mode=0444
 file path=opt/os-tests/tests/ddi_ufm/ufm-test mode=0555
 file path=opt/os-tests/tests/ddi_ufm/ufm-test-cleanup mode=0555
 file path=opt/os-tests/tests/ddi_ufm/ufm-test-setup mode=0555
-file path=opt/os-tests/tests/epoll_test mode=0555
 file path=opt/os-tests/tests/file-locking/acquire-lock.32 mode=0555
 file path=opt/os-tests/tests/file-locking/acquire-lock.64 mode=0555
 file path=opt/os-tests/tests/file-locking/runtests.32 mode=0555
@@ -53,7 +53,8 @@ file path=opt/os-tests/tests/pf_key/acquire-spray mode=0555
 file path=opt/os-tests/tests/pf_key/eacq-enabler mode=0555
 file path=opt/os-tests/tests/pf_key/kmc-update mode=0555
 file path=opt/os-tests/tests/pf_key/kmc-updater mode=0555
-file path=opt/os-tests/tests/poll_test mode=0555
+file path=opt/os-tests/tests/poll/epoll_test mode=0555
+file path=opt/os-tests/tests/poll/poll_test mode=0555
 file path=opt/os-tests/tests/sdevfs/sdevfs_eisdir mode=0555
 file path=opt/os-tests/tests/secflags/addrs-32 mode=0555
 file path=opt/os-tests/tests/secflags/addrs-64 mode=0555
