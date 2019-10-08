@@ -37,12 +37,6 @@ then
 	export TERM
 fi
 
-#
-# use less(1) as the default pager for the man(1) command.
-#
-PAGER="/usr/bin/less -ins"
-export PAGER
-
 #	Login and -su shells get /etc/profile services.
 #	-rsh is given its environment in its .profile.
 
