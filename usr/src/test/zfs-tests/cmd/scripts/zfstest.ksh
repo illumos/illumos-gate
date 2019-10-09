@@ -21,6 +21,7 @@
 export PATH="/usr/bin"
 export NOINUSE_CHECK=1
 export STF_SUITE="/opt/zfs-tests"
+export COMMON="$STF_SUITE/runfiles/common.run"
 export STF_TOOLS="/opt/test-runner/stf"
 export PATHDIR=""
 runner="/opt/test-runner/bin/run"
@@ -73,7 +74,7 @@ function find_runfile
 		distro=omnios
 	fi
 
-	[[ -n $distro ]] && echo $STF_SUITE/runfiles/$distro.run
+	[[ -n $distro ]] && echo $COMMON,$STF_SUITE/runfiles/$distro.run
 }
 
 function verify_id
@@ -133,14 +134,14 @@ constrain_path
 export PATH=$PATHDIR
 
 verify_id
-while getopts ac:l:q c; do
+while getopts ac:l:qT: c; do
 	case $c in
 	'a')
 		auto_detect=true
 		;;
 	'c')
-		runfile=$OPTARG
-		[[ -f $runfile ]] || fail "Cannot read file: $runfile"
+		runfiles=$OPTARG
+		[[ -f $runfiles ]] || fail "Cannot read file: $runfiles"
 		;;
 	'l')
 		logfile=$OPTARG
@@ -149,6 +150,9 @@ while getopts ac:l:q c; do
 		;;
 	'q')
 		xargs+=" -q"
+		;;
+	'T')
+		xargs+=" -T $OPTARG"
 		;;
 	esac
 done
@@ -174,8 +178,8 @@ fi
 export __ZFS_POOL_EXCLUDE="$KEEP"
 export KEEP="^$(echo $KEEP | sed 's/ /$|^/g')\$"
 
-[[ -z $runfile ]] && runfile=$(find_runfile)
-[[ -z $runfile ]] && fail "Couldn't determine distro"
+[[ -z $runfiles ]] && runfiles=$(find_runfile)
+[[ -z $runfiles ]] && fail "Couldn't determine distro"
 
 . $STF_SUITE/include/default.cfg
 
@@ -183,7 +187,7 @@ num_disks=$(echo $DISKS | awk '{print NF}')
 [[ $num_disks -lt 3 ]] && fail "Not enough disks to run ZFS Test Suite"
 
 # Ensure user has only basic privileges.
-ppriv -s EIP=basic -e $runner -c $runfile $xargs
+ppriv -s EIP=basic -e $runner -c $runfiles $xargs
 ret=$?
 
 rm -rf $PATHDIR || fail "Couldn't remove $PATHDIR"
