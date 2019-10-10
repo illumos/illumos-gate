@@ -20,7 +20,7 @@
 #include <sys/comm_page.h>
 #include <sys/tsc.h>
 
-#if defined(_GENCTF) || defined(__lint)
+#if defined(_GENCTF)
 
 hrtime_t tsc_last;
 hrtime_t tsc_resume_cap;
@@ -37,7 +37,7 @@ hrtime_t tsc_sync_tick_delta[NCPU];
 
 comm_page_t comm_page;
 
-#else /* defined(_GENCTF) || defined(__lint) */
+#else /* defined(_GENCTF) */
 
 #include "assym.h"
 
@@ -85,4 +85,4 @@ comm_page_t comm_page;
 	/* pad out the rest of the page from the struct end */
 	.fill	_CONST(COMM_PAGE_SIZE - COMM_PAGE_S_SIZE), 1, 0
 
-#endif /* defined(_GENCTF) || defined(__lint) */
+#endif /* defined(_GENCTF) */

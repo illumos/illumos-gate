@@ -64,14 +64,6 @@ DBOOT_OBJS +=		\
 	retpoline.o
 
 #
-# 64-bit multiply/divide compiler helper routines
-# used only for ia32
-#
-
-SPECIAL_OBJS_32 +=	\
-	muldiv.o
-
-#
 #	Generic-unix Module
 #
 GENUNIX_OBJS +=		\

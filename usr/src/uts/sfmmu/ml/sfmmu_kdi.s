@@ -24,10 +24,8 @@
  * Use is subject to license terms.
  */
 
-#if !defined(lint)
 #include <sys/asm_linkage.h>
 #include "assym.h"
-#endif
 
 #include <sys/sun4asi.h>
 #include <sys/machparam.h>
@@ -250,21 +248,6 @@ ttep_calc:	/* idx in %g1 */				\
  * }
  */
 
-#if defined(lint)
-/*ARGSUSED*/
-int
-kdi_vatotte(uintptr_t va, int cnum, tte_t *ttep)
-{
-	return (0);
-}
-
-void
-kdi_trap_vatotte(void)
-{
-}
-
-#else
-
 	/*
 	 * Invocation in normal context as a VA-to-TTE translator
 	 * for kernel context only. This routine returns 0 on
@@ -343,4 +326,3 @@ kdi_trap_vatotte(void)
 	nop
 	SET_SIZE(kdi_trap_vatotte)
 
-#endif	/* lint */

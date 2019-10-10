@@ -27,12 +27,7 @@
  * General machine architecture & implementation specific
  * assembly language routines.
  */
-#if defined(lint)
-#include <sys/types.h>
-#include <sys/t_lock.h>
-#else	/* lint */
 #include "assym.h"
-#endif	/* lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/machsystm.h>
@@ -41,14 +36,6 @@
 #include <sys/cmpregs.h>
 #include <sys/clock.h>
 #include <sys/fpras.h>
-
-#if defined(lint)
-
-uint64_t
-ultra_gettick(void)
-{ return (0); }
-
-#else	/* lint */
 
 /*
  * This isn't the routine you're looking for.
@@ -63,17 +50,6 @@ ultra_gettick(void)
 	rdpr	%tick, %o0
 	SET_SIZE(ultra_gettick)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-int
-getprocessorid(void)
-{ return (0); }
-
-#else	/* lint */
-
 /*
  * Get the processor ID.
  * === MID reg as specified in 15dec89 sun4u spec, sec 5.4.3
@@ -84,26 +60,6 @@ getprocessorid(void)
 	retl
 	nop
 	SET_SIZE(getprocessorid)
-
-#endif	/* lint */
-
-#if defined(lint)
-/*ARGSUSED*/
-void
-set_error_enable_tl1(uint64_t neer, uint64_t action)
-{}
-
-/* ARGSUSED */
-void
-set_error_enable(uint64_t neer)
-{}
-
-uint64_t
-get_error_enable()
-{
-	return ((uint64_t)0);
-}
-#else /* lint */
 
 	ENTRY(set_error_enable_tl1)
 	cmp	%g2, EER_SET_ABSOLUTE
@@ -133,31 +89,11 @@ get_error_enable()
 	ldxa	[%g0]ASI_ESTATE_ERR, %o0	/* ecache error enable reg */
 	SET_SIZE(get_error_enable)
 
-#endif /* lint */
-
-#if defined(lint)
-void
-get_asyncflt(uint64_t *afsr)
-{
-	afsr = afsr;
-}
-#else /* lint */
-
 	ENTRY(get_asyncflt)
 	ldxa	[%g0]ASI_AFSR, %o1		! afsr reg
 	retl
 	stx	%o1, [%o0]
 	SET_SIZE(get_asyncflt)
-
-#endif /* lint */
-
-#if defined(lint)
-void
-set_asyncflt(uint64_t afsr)
-{
-	afsr = afsr;
-}
-#else /* lint */
 
 	ENTRY(set_asyncflt)
 	stxa	%o0, [%g0]ASI_AFSR		! afsr reg
@@ -166,32 +102,11 @@ set_asyncflt(uint64_t afsr)
 	nop
 	SET_SIZE(set_asyncflt)
 
-#endif /* lint */
-
-#if defined(lint)
-void
-get_asyncaddr(uint64_t *afar)
-{
-	afar = afar;
-}
-#else /* lint */
-
 	ENTRY(get_asyncaddr)
 	ldxa	[%g0]ASI_AFAR, %o1		! afar reg
 	retl
 	stx	%o1, [%o0]
 	SET_SIZE(get_asyncaddr)
-
-#endif /* lint */
-
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-hrtime_t
-tick2ns(hrtime_t tick, uint_t cpuid)
-{ return 0; }
-
-#else	/* lint */
 
 	ENTRY_NP(tick2ns)
 	sethi	%hi(cpunodes), %o4
@@ -210,17 +125,6 @@ tick2ns(hrtime_t tick, uint_t cpuid)
 	nop
 	SET_SIZE(tick2ns)
 
-#endif  /* lint */
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-set_cmp_error_steering(void)
-{}
-
-#else	/* lint */
-
 	ENTRY(set_cmp_error_steering)
 	membar	#Sync
 	set	ASI_CORE_ID, %o0		! %o0 = ASI_CORE_ID
@@ -233,33 +137,10 @@ set_cmp_error_steering(void)
 	nop
 	SET_SIZE(set_cmp_error_steering)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/* ARGSUSED */
-uint64_t
-ultra_getver(void)
-{
-	return (0); 
-}
-
-#else /* lint */
-
 	ENTRY(ultra_getver)
 	retl
 	rdpr	%ver, %o0
 	SET_SIZE(ultra_getver)
-
-#endif /* lint */
-
-#if defined(lint)
-
-int
-fpras_chkfn_type1(void)
-{ return 0; }
-
-#else	/* lint */
 
 	/*
 	 * Check instructions using just the AX pipelines, designed by
@@ -421,19 +302,9 @@ fpras_chkfn_type1(void)
 	  mov	FPRAS_BADTRAP, %o0	! 16, how detected
 	SET_SIZE(fpras_chkfn_type1)
 
-#endif	/* lint */
-
 /*
  * fp_zero() - clear all fp data registers and the fsr
  */
-
-#if defined(lint) || defined(__lint)
-
-void
-fp_zero(void)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(fp_zero)
 	std	%g0, [%sp + ARGPUSH + STACK_BIAS]
@@ -473,4 +344,3 @@ fp_zero(void)
 	fmuld	%f0, %f2, %f62
 	SET_SIZE(fp_zero)
 
-#endif	/* lint */

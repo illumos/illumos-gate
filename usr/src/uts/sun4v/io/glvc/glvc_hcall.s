@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Hypervisor calls called by glvc driver.
 */
@@ -32,37 +30,6 @@
 #include <sys/asm_linkage.h>
 #include <sys/hypervisor_api.h>
 #include <sys/glvc.h>
-
-#if defined(lint) || defined(__lint)
-
-/*ARGSUSED*/
-uint64_t
-hv_service_recv(uint64_t s_id, uint64_t buf_pa, uint64_t size,
-    uint64_t *recv_bytes)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-hv_service_send(uint64_t s_id, uint64_t buf_pa, uint64_t size,
-    uint64_t *send_bytes)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-hv_service_getstatus(uint64_t s_id, uint64_t *vreg)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-hv_service_setstatus(uint64_t s_id, uint64_t bits)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-hv_service_clrstatus(uint64_t s_id, uint64_t bits)
-{ return (0); }
-
-#else	/* lint || __lint */
 
 	/*
 	 * hv_service_recv(uint64_t s_id, uint64_t buf_pa,
@@ -138,4 +105,3 @@ hv_service_clrstatus(uint64_t s_id, uint64_t bits)
 	nop
 	SET_SIZE(hv_service_clrstatus)
 
-#endif	/* lint || __lint */

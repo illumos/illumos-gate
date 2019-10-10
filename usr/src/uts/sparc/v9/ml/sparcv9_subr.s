@@ -35,17 +35,6 @@
  * name has something to do with the routine you are moving.
  */
 
-#if defined(lint)
-#include <sys/types.h>
-#include <sys/scb.h>
-#include <sys/systm.h>
-#include <sys/regset.h>
-#include <sys/sunddi.h>
-#include <sys/lockstat.h>
-#include <sys/dtrace.h>
-#include <sys/ftrace.h>
-#endif	/* lint */
-
 #include <sys/asm_linkage.h>
 #include <sys/privregs.h>
 #include <sys/machparam.h>	/* To get SYSBASE and PAGESIZE */
@@ -58,7 +47,6 @@
 #include <sys/machlock.h>
 #include <sys/ontrap.h>
 
-#if !defined(lint)
 #include "assym.h"
 
 	.seg	".text"
@@ -134,8 +122,6 @@
 	retl;								\
 	mov	%o1, %o0		/* return old PIL */
 
-#endif	/* lint */
-
 	/*
 	 * Berkley 4.3 introduced symbolically named interrupt levels
 	 * as a way deal with priority in a machine independent fashion.
@@ -178,18 +164,6 @@
 	 *	spl0()		Used to lower priority to 0.
 	 */
 
-#if defined(lint)
-
-int spl0(void)		{ return (0); }
-int spl6(void)		{ return (0); }
-int spl7(void)		{ return (0); }
-int spl8(void)		{ return (0); }
-int splhi(void)		{ return (0); }
-int splhigh(void)	{ return (0); }
-int splzs(void)		{ return (0); }
-
-#else	/* lint */
-
 	/* locks out all interrupts, including memory errors */
 	ENTRY(spl8)
 	SETPRI_HIGH(15)
@@ -224,29 +198,16 @@ int splzs(void)		{ return (0); }
 	SETPRI(0)
 	SET_SIZE(spl0)
 
-#endif	/* lint */
-
 /*
  * splx - set PIL back to that indicated by the old %pil passed as an argument,
  * or to the CPU's base priority, whichever is higher.
  */
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-splx(int level)
-{}
-
-#else	/* lint */
 
 	ENTRY(splx)
 	ALTENTRY(i_ddi_splx)
 	SETPRI(%o0)		/* set PIL */
 	SET_SIZE(i_ddi_splx)
 	SET_SIZE(splx)
-
-#endif	/* level */
 
 /*
  * splr()
@@ -258,19 +219,9 @@ splx(int level)
  * look at CPU->cpu_base_pri.
  */
 
-#if defined(lint)
-
-/* ARGSUSED */
-int
-splr(int level)
-{ return (0); }
-
-#else	/* lint */
 	ENTRY(splr)
 	RAISE(%o0)
 	SET_SIZE(splr)
-
-#endif	/* lint */
 
 /*
  * on_fault()
@@ -278,15 +229,6 @@ splr(int level)
  * if code following causes uncorrectable fault. Turned off
  * by calling no_fault().
  */
-
-#if defined(lint)
-
-/* ARGSUSED */
-int
-on_fault(label_t *ljb)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(on_fault)
 	membar	#Sync			! sync error barrier (see copy.s)
@@ -304,20 +246,10 @@ catch_fault:
 	stn	%g0, [THREAD_REG + T_LOFAULT]	! turn off lofault
 	SET_SIZE(on_fault)
 
-#endif	/* lint */
-
 /*
  * no_fault()
  * turn off fault catching.
  */
-
-#if defined(lint)
-
-void
-no_fault(void)
-{}
-
-#else	/* lint */
 
 	ENTRY(no_fault)
 	membar	#Sync				! sync error barrier
@@ -326,29 +258,18 @@ no_fault(void)
 	stn	%g0, [THREAD_REG + T_LOFAULT]	! turn off lofault
 	SET_SIZE(no_fault)
 
-#endif	/* lint */
-
 /*
  * Default trampoline code for on_trap() (see <sys/ontrap.h>).  On sparcv9,
  * the trap code will complete trap processing but reset the return %pc to
  * ot_trampoline, which will by default be set to the address of this code.
  * We longjmp(&curthread->t_ontrap->ot_jmpbuf) to return back to on_trap().
  */
-#if defined(lint)
-
-void 
-on_trap_trampoline(void)
-{}
-
-#else	/* lint */
 
 	ENTRY(on_trap_trampoline)
 	ldn	[THREAD_REG + T_ONTRAP], %o0    
 	b	longjmp                 
 	add	%o0, OT_JMPBUF, %o0
 	SET_SIZE(on_trap_trampoline)
-
-#endif	/* lint */
 
 /*
  * Push a new element on to the t_ontrap stack.  Refer to <sys/ontrap.h> for
@@ -359,14 +280,6 @@ on_trap_trampoline(void)
  * we go any further.  We want these errors to be processed before we modify
  * our current error protection.
  */
-#if defined(lint)
-
-/*ARGSUSED*/
-int
-on_trap(on_trap_data_t *otp, uint_t prot)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(on_trap)
 	membar	#Sync				! force error barrier
@@ -388,21 +301,10 @@ on_trap(on_trap_data_t *otp, uint_t prot)
 	add	%o0, OT_JMPBUF, %o0		! %o0 = &ot_jmpbuf
 	SET_SIZE(on_trap)
 
-#endif	/* lint */
-
 /*
  * Setjmp and longjmp implement non-local gotos using state vectors
  * type label_t.
  */
-
-#if defined(lint)
-
-/* ARGSUSED */
-int
-setjmp(label_t *lp)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(setjmp)
 	stn	%o7, [%o0 + L_PC]	! save return address
@@ -411,17 +313,6 @@ setjmp(label_t *lp)
 	clr	%o0			! return 0
 	SET_SIZE(setjmp)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-longjmp(label_t *lp)
-{}
-
-#else	/* lint */
 
 	ENTRY(longjmp)
 	!
@@ -442,22 +333,11 @@ longjmp(label_t *lp)
 	restore	%g0, 1, %o0		! takes underflow, switches stacks
 	SET_SIZE(longjmp)
 
-#endif	/* lint */
-
 /*
  * movtuc(length, from, to, table)
  *
  * VAX movtuc instruction (sort of).
  */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-int
-movtuc(size_t length, u_char *from, u_char *to, u_char table[])
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(movtuc)
 	tst     %o0
@@ -483,22 +363,11 @@ movtuc(size_t length, u_char *from, u_char *to, u_char table[])
 	mov     %o4, %o0
 	SET_SIZE(movtuc)
 
-#endif	/* lint */
-
 /*
  * scanc(length, string, table, mask)
  *
  * VAX scanc instruction.
  */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-int
-scanc(size_t length, u_char *string, u_char table[], u_char mask)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(scanc)
 	tst	%o0	
@@ -517,85 +386,43 @@ scanc(size_t length, u_char *string, u_char table[], u_char mask)
 	sub	%o0, %o4, %o0
 	SET_SIZE(scanc)
 
-#endif	/* lint */
-
 /*
  * if a() calls b() calls caller(),
  * caller() returns return address in a().
  */
-
-#if defined(lint)
-
-caddr_t
-caller(void)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(caller)
 	retl
 	mov	%i7, %o0
 	SET_SIZE(caller)
 
-#endif	/* lint */
-
 /*
  * if a() calls callee(), callee() returns the
  * return address in a();
  */
-
-#if defined(lint)
-
-caddr_t
-callee(void)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(callee)
 	retl
 	mov	%o7, %o0
 	SET_SIZE(callee)
 
-#endif	/* lint */
-
 /*
  * return the current frame pointer
  */
-
-#if defined(lint)
-
-greg_t
-getfp(void)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(getfp)
 	retl
 	mov	%fp, %o0
 	SET_SIZE(getfp)
 
-#endif	/* lint */
-
 /*
  * Get vector base register
  */
-
-#if defined(lint)
-
-greg_t
-gettbr(void)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(gettbr)
 	retl
 	mov     %tbr, %o0
 	SET_SIZE(gettbr)
-
-#endif	/* lint */
 
 /*
  * Get processor state register, V9 faked to look like V8.
@@ -603,14 +430,6 @@ gettbr(void)
  * PSTATE.PEF, because PSTATE.PEF is always on in order to allow the
  * libc_psr memcpy routines to run without hitting the fp_disabled trap.
  */
-
-#if defined(lint)
-
-greg_t
-getpsr(void)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(getpsr)
 	rd	%ccr, %o1			! get ccr
@@ -624,42 +443,19 @@ getpsr(void)
         or	%o0, %o1, %o0			! or into psr.impl/ver
 	SET_SIZE(getpsr)
 
-#endif	/* lint */
-
 /*
  * Get current processor interrupt level
  */
-
-#if defined(lint)
-
-u_int
-getpil(void)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(getpil)
 	retl
 	rdpr	%pil, %o0
 	SET_SIZE(getpil)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-setpil(u_int pil)
-{}
-
-#else	/* lint */
-
 	ENTRY(setpil)
 	retl
 	wrpr	%g0, %o0, %pil
 	SET_SIZE(setpil)
-
-#endif	/* lint */
 
 
 /*
@@ -667,15 +463,6 @@ setpil(u_int pil)
  *
  * Insert entryp after predp in a doubly linked list.
  */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-_insque(caddr_t entryp, caddr_t predp)
-{}
-
-#else	/* lint */
 
 	ENTRY(_insque)
 	ldn	[%o1], %g1		! predp->forw
@@ -686,22 +473,11 @@ _insque(caddr_t entryp, caddr_t predp)
 	stn	%o0, [%g1 + CPTRSIZE]	! predp->forw->back = entryp
 	SET_SIZE(_insque)
 
-#endif	/* lint */
-
 /*
  * _remque(entryp)
  *
  * Remove entryp from a doubly linked list
  */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-_remque(caddr_t entryp)
-{}
-
-#else	/* lint */
 
 	ENTRY(_remque)
 	ldn	[%o0], %g1		! entryp->forw
@@ -710,8 +486,6 @@ _remque(caddr_t entryp)
 	retl
 	stn	%g2, [%g1 + CPTRSIZE]	! entryp->forw->back = entryp->back
 	SET_SIZE(_remque)
-
-#endif	/* lint */
 
 
 /*
@@ -722,15 +496,6 @@ _remque(caddr_t entryp)
  * XXX -  why is this here, rather than the traditional file?
  *	  why does it have local labels which don't start with a `.'?
  */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-size_t
-strlen(const char *str)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(strlen)
 	mov	%o0, %o1
@@ -816,91 +581,10 @@ $done3:
 	inc	3, %o0
 	SET_SIZE(strlen)
 
-#endif	/* lint */
-
 /*
  * Provide a C callable interface to the membar instruction.
  */
 
-#if defined(lint)
-
-void
-membar_ldld(void)
-{}
-
-void
-membar_stld(void)
-{}
-
-void
-membar_ldst(void)
-{}
-
-void
-membar_stst(void)
-{}
-
-void
-membar_ldld_ldst(void)
-{}
-
-void
-membar_ldld_stld(void)
-{}
-
-void
-membar_ldld_stst(void)
-{}
-
-void
-membar_stld_ldld(void)
-{}
-
-void
-membar_stld_ldst(void)
-{}
-
-void
-membar_stld_stst(void)
-{}
-
-void
-membar_ldst_ldld(void)
-{}
-
-void
-membar_ldst_stld(void)
-{}
-
-void
-membar_ldst_stst(void)
-{}
-
-void
-membar_stst_ldld(void)
-{}
-
-void
-membar_stst_stld(void)
-{}
-
-void
-membar_stst_ldst(void)
-{}
-
-void
-membar_lookaside(void)
-{}
-
-void
-membar_memissue(void)
-{}
-
-void
-membar_sync(void)
-{}
-
-#else
 	ENTRY(membar_ldld)
 	retl
 	membar	#LoadLoad
@@ -978,42 +662,6 @@ membar_sync(void)
 	membar	#Sync
 	SET_SIZE(membar_sync)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/*ARGSUSED*/
-int
-fuword64(const void *addr, uint64_t *dst)
-{ return (0); }
-
-/*ARGSUSED*/
-int
-fuword32(const void *addr, uint32_t *dst)
-{ return (0); }
-
-/*ARGSUSED*/
-int
-fuword16(const void *addr, uint16_t *dst)
-{ return (0); }
-
-/*ARGSUSED*/
-int
-fuword8(const void *addr, uint8_t *dst)
-{ return (0); }
-
-/*ARGSUSED*/
-int
-dtrace_ft_fuword64(const void *addr, uint64_t *dst)
-{ return (0); }
-
-/*ARGSUSED*/
-int
-dtrace_ft_fuword32(const void *addr, uint32_t *dst)
-{ return (0); }
-
-#else	/* lint */
 
 /*
  * Since all of the fuword() variants are so similar, we have a macro to spit
@@ -1052,32 +700,6 @@ dtrace_ft_fuword32(const void *addr, uint32_t *dst)
 	FUWORD(fuword16, lduha, sth, CP_FUWORD16)
 	FUWORD(fuword8, lduba, stb, CP_FUWORD8)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/*ARGSUSED*/
-int
-suword64(void *addr, uint64_t value)
-{ return (0); }
-
-/*ARGSUSED*/
-int
-suword32(void *addr, uint32_t value)
-{ return (0); }
-
-/*ARGSUSED*/
-int
-suword16(void *addr, uint16_t value)
-{ return (0); }
-
-/*ARGSUSED*/
-int
-suword8(void *addr, uint8_t value)
-{ return (0); }
-
-#else	/* lint */
 
 /*
  * Since all of the suword() variants are so similar, we have a macro to spit
@@ -1115,32 +737,6 @@ suword8(void *addr, uint8_t value)
 	SUWORD(suword16, stha, CP_SUWORD16)
 	SUWORD(suword8, stba, CP_SUWORD8)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-fuword8_noerr(const void *addr, uint8_t *dst)
-{}
-
-/*ARGSUSED*/
-void
-fuword16_noerr(const void *addr, uint16_t *dst)
-{}
-
-/*ARGSUSED*/
-void
-fuword32_noerr(const void *addr, uint32_t *dst)
-{}
-
-/*ARGSUSED*/
-void
-fuword64_noerr(const void *addr, uint64_t *dst)
-{}
-
-#else	/* lint */
-
 	ENTRY(fuword8_noerr)
 	lduba	[%o0]ASI_USER, %o0	
 	retl
@@ -1165,32 +761,6 @@ fuword64_noerr(const void *addr, uint64_t *dst)
 	stx	%o0, [%o1]
 	SET_SIZE(fuword64_noerr)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-suword8_noerr(void *addr, uint8_t value)
-{}
-
-/*ARGSUSED*/
-void
-suword16_noerr(void *addr, uint16_t value)
-{}
-
-/*ARGSUSED*/
-void
-suword32_noerr(void *addr, uint32_t value)
-{}
-
-/*ARGSUSED*/
-void
-suword64_noerr(void *addr, uint64_t value)
-{}
-
-#else	/* lint */
-
 	ENTRY(suword8_noerr)
 	retl
 	stba	%o1, [%o0]ASI_USER
@@ -1210,42 +780,6 @@ suword64_noerr(void *addr, uint64_t value)
 	retl
 	stxa	%o1, [%o0]ASI_USER
 	SET_SIZE(suword64_noerr)
-
-#endif	/* lint */
-
-#if defined(__lint)
-
-/*ARGSUSED*/
-int
-subyte(void *addr, uchar_t value)
-{ return (0); }
-
-/*ARGSUSED*/
-void
-subyte_noerr(void *addr, uchar_t value)
-{}
-
-/*ARGSUSED*/
-int
-fulword(const void *addr, ulong_t *valuep)
-{ return (0); }
-
-/*ARGSUSED*/
-void
-fulword_noerr(const void *addr, ulong_t *valuep)
-{}
-
-/*ARGSUSED*/
-int
-sulword(void *addr, ulong_t valuep)
-{ return (0); }
-
-/*ARGSUSED*/
-void
-sulword_noerr(void *addr, ulong_t valuep)
-{}
-
-#else
 
 	.weak	subyte
 	subyte=suword8
@@ -1271,8 +805,6 @@ sulword_noerr(void *addr, ulong_t valuep)
 	sulword_noerr=suword32_noerr
 #endif	/* LP64 */
 
-#endif	/* lint */
-
 /*
  * We define rdtick here, but not for sun4v. On sun4v systems, the %tick
  * and %stick should not be read directly without considering the tick
@@ -1281,34 +813,16 @@ sulword_noerr(void *addr, ulong_t valuep)
  */
 #if !defined (sun4v)
 
-#if defined (lint)
-
-hrtime_t
-rdtick()
-{ return (0); }
-
-#else /* lint */
-
 	ENTRY(rdtick)
 	retl
 	rd	%tick, %o0
         SET_SIZE(rdtick)
-
-#endif /* lint */
 
 #endif /* !sun4v */
 
 /*
  * Set tba to given address, no side effects.
  */
-#if defined (lint)
-
-/*ARGSUSED*/
-void *
-set_tba(void *new_tba)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(set_tba)
 	mov	%o0, %o1
@@ -1318,62 +832,20 @@ set_tba(void *new_tba)
 	nop
 	SET_SIZE(set_tba)
 
-#endif	/* lint */
-
-#if defined (lint)
-
-/*ARGSUSED*/
-void *
-get_tba()
-{ return (0); }
-
-#else	/* lint */
-
 	ENTRY(get_tba)
 	retl
 	rdpr	%tba, %o0
 	SET_SIZE(get_tba)
-
-#endif	/* lint */
-
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-void
-setpstate(u_int pstate)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(setpstate)
 	retl
 	wrpr	%g0, %o0, %pstate
 	SET_SIZE(setpstate)
 
-#endif	/* lint */
-
-#if defined(lint) || defined(__lint)
-
-u_int
-getpstate(void)
-{ return(0); }
-
-#else	/* lint */
-
 	ENTRY_NP(getpstate)
 	retl
 	rdpr	%pstate, %o0
 	SET_SIZE(getpstate)
-
-#endif	/* lint */
-
-#if defined(lint) || defined(__lint)
-
-dtrace_icookie_t
-dtrace_interrupt_disable(void)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY_NP(dtrace_interrupt_disable)
 	rdpr	%pstate, %o0
@@ -1382,35 +854,10 @@ dtrace_interrupt_disable(void)
 	wrpr	%g0, %o1, %pstate
 	SET_SIZE(dtrace_interrupt_disable)
 
-#endif	/* lint */
-
-#if defined(lint) || defined(__lint)
-
-/*ARGSUSED*/
-void
-dtrace_interrupt_enable(dtrace_icookie_t cookie)
-{}
-
-#else
-
 	ENTRY_NP(dtrace_interrupt_enable)
 	retl
 	wrpr	%g0, %o0, %pstate 
 	SET_SIZE(dtrace_interrupt_enable)
-
-#endif /* lint*/
-
-#if defined(lint)
-
-void
-dtrace_membar_producer(void)
-{}
-
-void
-dtrace_membar_consumer(void)
-{}
-
-#else	/* lint */
 
 #ifdef SF_ERRATA_51
 	.align 32
@@ -1433,33 +880,10 @@ dtrace_membar_consumer(void)
 	membar	#LoadLoad
 	SET_SIZE(dtrace_membar_consumer)
 
-#endif	/* lint */
-
-#if defined(lint) || defined(__lint)
-
-void
-dtrace_flush_windows(void)
-{}
-
-#else
-
 	ENTRY_NP(dtrace_flush_windows)
 	retl
 	flushw
 	SET_SIZE(dtrace_flush_windows)
-
-#endif	/* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-int
-getpcstack_top(pc_t *pcstack, int limit, uintptr_t *lastfp, pc_t *lastpc)
-{
-	return (0);
-}
-
-#else	/* lint */
 
 	/*
 	 * %g1	pcstack
@@ -1531,39 +955,16 @@ getpcstack_top(pc_t *pcstack, int limit, uintptr_t *lastfp, pc_t *lastpc)
 	ldn	[%fp + STACK_BIAS + 15*CLONGSIZE], %g4	! and pc
 	SET_SIZE(getpcstack_top)
 
-#endif	/* lint */
-
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-void
-setwstate(u_int wstate)
-{}
-
-#else	/* lint */
-
 	ENTRY_NP(setwstate)
 	retl
 	wrpr	%g0, %o0, %wstate
 	SET_SIZE(setwstate)
 
-#endif	/* lint */
-
-
-#if defined(lint) || defined(__lint)
-
-u_int
-getwstate(void)
-{ return(0); }
-
-#else	/* lint */
 
 	ENTRY_NP(getwstate)
 	retl
 	rdpr	%wstate, %o0
 	SET_SIZE(getwstate)
-
-#endif	/* lint */
 
 
 /*
@@ -1576,15 +977,6 @@ getwstate(void)
  * partially corrupt trigger to still trigger correctly.  DTrace has its own
  * version of this function to allow it to panic correctly from probe context.
  */
-#if defined(lint)
-
-/*ARGSUSED*/
-int panic_trigger(int *tp) { return (0); }
-
-/*ARGSUSED*/
-int dtrace_panic_trigger(int *tp) { return (0); }
-
-#else	/* lint */
 
 	ENTRY_NP(panic_trigger)
 	ldstub	[%o0], %o0		! store 0xFF, load byte into %o0
@@ -1606,8 +998,6 @@ int dtrace_panic_trigger(int *tp) { return (0); }
 	mov	%o1, %o0		! return (%o1);
 	SET_SIZE(dtrace_panic_trigger)
 
-#endif	/* lint */
-
 /*
  * void vpanic(const char *format, va_list alist)
  *
@@ -1624,15 +1014,6 @@ int dtrace_panic_trigger(int *tp) { return (0); }
  * sets up the initial stack as vpanic does, calls dtrace_panic_trigger(), and
  * branches back into vpanic().
  */
-#if defined(lint)
-
-/*ARGSUSED*/
-void vpanic(const char *format, va_list alist) {}
-
-/*ARGSUSED*/
-void dtrace_vpanic(const char *format, va_list alist) {}
-
-#else	/* lint */
 
 	ENTRY_NP(vpanic)
 
@@ -1761,34 +1142,12 @@ vpanic_common:
 	ba,a	vpanic_common
 	SET_SIZE(dtrace_vpanic)
 	
-#endif	/* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-
-uint_t
-get_subcc_ccr( uint64_t addrl, uint64_t addrr)
-{ return (0); }
-
-#else   /* lint */
-
 	ENTRY(get_subcc_ccr)
 	wr	%g0, %ccr	! clear condition codes
 	subcc	%o0, %o1, %g0
 	retl
 	rd	%ccr, %o0	! return condition codes
 	SET_SIZE(get_subcc_ccr)
-
-#endif  /* lint */
-
-#if defined(lint) || defined(__lint)
-
-ftrace_icookie_t
-ftrace_interrupt_disable(void)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY_NP(ftrace_interrupt_disable)
 	rdpr	%pstate, %o0
@@ -1797,20 +1156,8 @@ ftrace_interrupt_disable(void)
 	wrpr	%g0, %o1, %pstate
 	SET_SIZE(ftrace_interrupt_disable)
 
-#endif	/* lint */
-
-#if defined(lint) || defined(__lint)
-
-/*ARGSUSED*/
-void
-ftrace_interrupt_enable(ftrace_icookie_t cookie)
-{}
-
-#else
-
 	ENTRY_NP(ftrace_interrupt_enable)
 	retl
 	wrpr	%g0, %o0, %pstate 
 	SET_SIZE(ftrace_interrupt_enable)
 
-#endif /* lint*/

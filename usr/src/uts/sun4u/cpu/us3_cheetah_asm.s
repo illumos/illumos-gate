@@ -26,11 +26,7 @@
  * Assembly code support for the Cheetah module
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#if !defined(lint)
 #include "assym.h"
-#endif	/* lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/mmu.h>
@@ -54,8 +50,6 @@
 #include <sys/traptrace.h>
 #endif /* TRAPTRACE */
 
-#if !defined(lint)
-
 /* BEGIN CSTYLED */
 
 /*
@@ -75,8 +69,6 @@
 
 /* END CSTYLED */
 
-#endif	/* !lint */
-
 
 /*
  * Fast ECC error at TL>0 handler
@@ -86,13 +78,6 @@
  * comment block "Cheetah/Cheetah+ Fast ECC at TL>0 trap strategy" in
  * us3_common_asm.s
  */
-#if defined(lint)
-
-void
-fast_ecc_tl1_err(void)
-{}
-
-#else	/* lint */
 
 	.section ".text"
 	.align	64
@@ -312,10 +297,7 @@ skip_traptrace:
 
 	SET_SIZE(fast_ecc_tl1_err)
 
-#endif	/* lint */
 
-
-#if defined(lint)
 /*
  * scrubphys - Pass in the aligned physical memory address
  * that you want to scrub, along with the ecache set size.
@@ -338,12 +320,6 @@ skip_traptrace:
  * will stay E, if the store doesn't happen. So the first displacement flush
  * should ensure that the CAS will miss in the E$.  Arrgh.
  */
-/* ARGSUSED */
-void
-scrubphys(uint64_t paddr, int ecache_set_size)
-{}
-
-#else	/* lint */
 	ENTRY(scrubphys)
 	rdpr	%pstate, %o4
 	andn	%o4, PSTATE_IE | PSTATE_AM, %o5
@@ -359,11 +335,8 @@ scrubphys(uint64_t paddr, int ecache_set_size)
 	membar	#Sync			! move the data out of the load buffer
 	SET_SIZE(scrubphys)
 
-#endif	/* lint */
 
-
-#if defined(lint)
- /*
+/*
  * clearphys - Pass in the physical memory address of the checkblock
  * that you want to push out, cleared with a recognizable pattern,
  * from the ecache.
@@ -373,13 +346,6 @@ scrubphys(uint64_t paddr, int ecache_set_size)
  * in an entire ecache subblock's worth of data, and write it back out.
  * Then we overwrite the 16 bytes of bad data with the pattern.
  */
-/* ARGSUSED */
-void
-clearphys(uint64_t paddr, int ecache_set_size, int ecache_linesize)
-{
-}
-
-#else	/* lint */
 	ENTRY(clearphys)
 	/* turn off IE, AM bits */
 	rdpr	%pstate, %o4
@@ -427,10 +393,7 @@ clearphys(uint64_t paddr, int ecache_set_size, int ecache_linesize)
 	  wrpr	%g0, %o4, %pstate
 	SET_SIZE(clearphys)
 
-#endif	/* lint */
 
-
-#if defined(lint)
 /*
  * Cheetah Ecache displacement flush the specified line from the E$
  *
@@ -438,12 +401,6 @@ clearphys(uint64_t paddr, int ecache_set_size, int ecache_linesize)
  *	%o0 - 64 bit physical address for flushing
  *	%o1 - Ecache set size
  */
-/*ARGSUSED*/
-void
-ecache_flush_line(uint64_t flushaddr, int ec_set_size)
-{
-}
-#else	/* lint */
 	ENTRY(ecache_flush_line)
 
 	ECACHE_FLUSH_LINE(%o0, %o1, %o2, %o3)
@@ -451,22 +408,12 @@ ecache_flush_line(uint64_t flushaddr, int ec_set_size)
 	retl
 	  nop
 	SET_SIZE(ecache_flush_line)
-#endif	/* lint */
 
-
-#if defined(lint)
 /*
  * This routine will not be called in Cheetah systems.
  */
-void
-flush_ipb(void)
-{ return; }
-
-#else	/* lint */
-
 	ENTRY(flush_ipb)
 	retl
 	nop
 	SET_SIZE(flush_ipb)
 
-#endif	/* lint */

@@ -25,12 +25,6 @@
 
 #ident	"%Z%%M%	%I%	%E% SMI"	/* From SunOS 4.1 1.6 */
 
-#if defined(lint)
-#include <sys/types.h>
-#include <sys/regset.h>
-#include <sys/privregs.h>
-#endif  /* lint */
-
 #include <sys/asm_linkage.h>
 #include <sys/trap.h>
 #include <sys/machtrap.h>
@@ -42,8 +36,6 @@
  *	Those beginning in `.' are not callable from C and hence do not
  *	get lint prototypes.
  */
-
-#if !defined(lint)
 
 /*
  * Structure return
@@ -158,4 +150,3 @@
 	srax	%o1, 32, %o0
 	SET_SIZE(__urem64)
 
-#endif /* !lint */

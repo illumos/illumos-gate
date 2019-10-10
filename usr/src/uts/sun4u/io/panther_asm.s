@@ -25,11 +25,7 @@
  * Assembly code support for the Cheetah+ module
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#if !defined(lint)
 #include "assym.h"
-#endif	/* lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/mmu.h>
@@ -53,8 +49,6 @@
 #include <sys/traptrace.h>
 #endif /* TRAPTRACE */
 
-
-#if !defined(lint)
 
 	.global retire_l2_start
 	.global retire_l2_end
@@ -127,16 +121,6 @@
 	PN_ECACHE_REFLUSH_LINE(l2_idx_out, l3_idx_out, scr3, scr4)
 
 
-#endif	/* !lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-int
-retire_l2(uint64_t tag_addr, uint64_t pattern)
-{return 0;}
-
-#else
 	.align 4096
 	ENTRY(retire_l2)
 retire_l2_start:
@@ -198,18 +182,6 @@ retire_l2_start:
 retire_l2_end:
 	SET_SIZE(retire_l2)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/*
- */
-/*ARGSUSED*/
-int
-unretire_l2(uint64_t tag_addr, uint64_t pattern)
-{return 0;}
-
-#else
 	ENTRY(unretire_l2)
 unretire_l2_start:
 
@@ -257,16 +229,6 @@ unretire_l2_start:
 unretire_l2_end:
 	SET_SIZE(unretire_l2)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-int
-retire_l3(uint64_t tag_addr, uint64_t pattern)
-{return 0;}
-
-#else
 	ENTRY(retire_l3)
 retire_l3_start:
 
@@ -323,18 +285,6 @@ retire_l3_start:
 retire_l3_end:
 	SET_SIZE(retire_l3)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/*
- */
-/*ARGSUSED*/
-int
-unretire_l3(uint64_t tag_addr, uint64_t pattern)
-{return 0;}
-
-#else
 	ENTRY(unretire_l3)
 unretire_l3_start:
 
@@ -382,16 +332,6 @@ unretire_l3_start:
 unretire_l3_end:
 	SET_SIZE(unretire_l3)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-int
-retire_l2_alternate(uint64_t tag_addr, uint64_t pattern)
-{return 0;}
-
-#else
 	.align 2048
 
 	ENTRY(retire_l2_alternate)
@@ -452,18 +392,6 @@ retire_l2_alternate(uint64_t tag_addr, uint64_t pattern)
 	 dec	%o5
 	SET_SIZE(retire_l2_alternate)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/*
- */
-/*ARGSUSED*/
-int
-unretire_l2_alternate(uint64_t tag_addr, uint64_t pattern)
-{return 0;}
-
-#else
 	ENTRY(unretire_l2_alternate)
 
 	! since we disable interrupts, we don't need to do kpreempt_disable()
@@ -509,16 +437,6 @@ unretire_l2_alternate(uint64_t tag_addr, uint64_t pattern)
 	 mov	%o5, %o0
 	SET_SIZE(unretire_l2_alternate)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-int
-retire_l3_alternate(uint64_t tag_addr, uint64_t pattern)
-{return 0;}
-
-#else
 	ENTRY(retire_l3_alternate)
 
 	! since we disable interrupts, we don't need to do kpreempt_disable()
@@ -573,18 +491,6 @@ retire_l3_alternate(uint64_t tag_addr, uint64_t pattern)
 	 dec	%o5
 	SET_SIZE(retire_l3_alternate)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/*
- */
-/*ARGSUSED*/
-int
-unretire_l3_alternate(uint64_t tag_addr, uint64_t pattern)
-{return 0;}
-
-#else
 	ENTRY(unretire_l3_alternate)
 
 	! since we disable interrupts, we don't need to do kpreempt_disable()
@@ -630,16 +536,6 @@ unretire_l3_alternate(uint64_t tag_addr, uint64_t pattern)
 	 mov	%o5, %o0
 	SET_SIZE(unretire_l3_alternate)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-get_ecache_dtags_tl1(uint64_t afar, ch_cpu_logout_t *clop)
-{ }
-
-#else
 	ENTRY(get_ecache_dtags_tl1)
 
 
@@ -654,15 +550,6 @@ get_ecache_dtags_tl1(uint64_t afar, ch_cpu_logout_t *clop)
 	retry
 	SET_SIZE(get_ecache_dtags_tl1)
 
-#endif	/* lint */
-
-#if defined(lint)
-/*ARGSUSED*/
-void
-get_l2_tag_tl1(uint64_t tag_addr, uint64_t tag_data_ptr)
-{ }
-
-#else
 	ENTRY(get_l2_tag_tl1)
 
 	/*
@@ -674,15 +561,6 @@ get_l2_tag_tl1(uint64_t tag_addr, uint64_t tag_data_ptr)
 	retry
 	SET_SIZE(get_l2_tag_tl1)
 
-#endif	/* lint */
-
-#if defined(lint)
-/*ARGSUSED*/
-void
-get_l3_tag_tl1(uint64_t tag_addr, uint64_t tag_data_ptr)
-{ }
-
-#else
 	ENTRY(get_l3_tag_tl1)
 
 	/*
@@ -693,6 +571,4 @@ get_l3_tag_tl1(uint64_t tag_addr, uint64_t tag_data_ptr)
 
 	retry
 	SET_SIZE(get_l3_tag_tl1)
-
-#endif	/* lint */
 

@@ -24,15 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
 #include "dboot_xboot.h"
-
-#if defined(__lint)
-
-#else /* __lint */
 
 #if defined(__amd64)
 
@@ -125,4 +119,3 @@
 
 #endif	/* __i386 */
 
-#endif /* __lint */

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/asm_linkage.h>
@@ -34,11 +32,7 @@
 #include <sys/privregs.h>
 #include <sys/spitregs.h>
 
-#if defined(lint)
-
-#else	/* lint */
 #include "assym.h"
-#endif	/* lint */
 
 /*
  * fhc_shutdown_asm(u_longlong_t base, int size)
@@ -57,14 +51,6 @@
  * function must be position independent code that doesn't reference 
  * cacheable real memory.
  */
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-fhc_shutdown_asm(u_longlong_t base, int size)
-{}
-
-#else	/* lint */
 
 	ENTRY(fhc_shutdown_asm)
 	! turn off errors (we'll be writing to non-existent memory)
@@ -94,4 +80,3 @@ fhc_shutdown_asm(u_longlong_t base, int size)
 	.global	fhc_shutdown_asm_end
 fhc_shutdown_asm_end:
 
-#endif	/* lint */

@@ -42,12 +42,7 @@
 #include <sys/errno.h>
 #include <sys/asm_linkage.h>
 
-#if defined(__lint)
-#include <sys/types.h>
-#include <sys/systm.h>
-#else	/* __lint */
 #include "assym.h"
-#endif	/* __lint */
 
 #define	KCOPY_MIN_SIZE	128	/* Must be >= 16 bytes */
 #define	XCOPY_MIN_SIZE	128	/* Must be >= 16 bytes */
@@ -143,13 +138,8 @@
  * I'm sorry about these macros, but copy.s is unsurprisingly sensitive to
  * additional call instructions.
  */
-#if defined(__amd64)
 #define	SMAP_DISABLE_COUNT	16
 #define	SMAP_ENABLE_COUNT	26
-#elif defined(__i386)
-#define	SMAP_DISABLE_COUNT	0
-#define	SMAP_ENABLE_COUNT	0
-#endif
 
 #define	SMAP_DISABLE_INSTR(ITER)		\
 	.globl	_smap_disable_patch_/**/ITER;	\
@@ -161,19 +151,8 @@
 	_smap_enable_patch_/**/ITER/**/:;	\
 	nop; nop; nop;
 
-#if defined(__lint)
-
-/* ARGSUSED */
-int
-kcopy(const void *from, void *to, size_t count)
-{ return (0); }
-
-#else	/* __lint */
-
 	.globl	kernelbase
 	.globl	postbootkernelbase
-
-#if defined(__amd64)
 
 	ENTRY(kcopy)
 	pushq	%rbp
@@ -211,85 +190,9 @@ _kcopy_copyerr:
 	ret
 	SET_SIZE(kcopy)
 
-#elif defined(__i386)
-
-#define	ARG_FROM	8
-#define	ARG_TO		12
-#define	ARG_COUNT	16
-
-	ENTRY(kcopy)
-#ifdef DEBUG
-	pushl	%ebp
-	movl	%esp, %ebp
-	movl	postbootkernelbase, %eax
-	cmpl	%eax, ARG_FROM(%ebp)
-	jb	0f
-	cmpl	%eax, ARG_TO(%ebp)
-	jnb	1f
-0:	pushl	$.kcopy_panic_msg
-	call	panic
-1:	popl	%ebp
-#endif
-	lea	_kcopy_copyerr, %eax	/* lofault value */
-	movl	%gs:CPU_THREAD, %edx
-
-do_copy_fault:
-	pushl	%ebp
-	movl	%esp, %ebp		/* setup stack frame */
-	pushl	%esi
-	pushl	%edi			/* save registers */
-
-	movl	T_LOFAULT(%edx), %edi
-	pushl	%edi			/* save the current lofault */
-	movl	%eax, T_LOFAULT(%edx)	/* new lofault */
-
-	movl	ARG_COUNT(%ebp), %ecx
-	movl	ARG_FROM(%ebp), %esi
-	movl	ARG_TO(%ebp), %edi
-	shrl	$2, %ecx		/* word count */
-	rep
-	  smovl
-	movl	ARG_COUNT(%ebp), %ecx
-	andl	$3, %ecx		/* bytes left over */
-	rep
-	  smovb
-	xorl	%eax, %eax
-
-	/*
-	 * A fault during do_copy_fault is indicated through an errno value
-	 * in %eax and we iret from the trap handler to here.
-	 */
-_kcopy_copyerr:
-	popl	%ecx
-	popl	%edi
-	movl	%ecx, T_LOFAULT(%edx)	/* restore the original lofault */
-	popl	%esi
-	popl	%ebp
-	ret
-	SET_SIZE(kcopy)
-
 #undef	ARG_FROM
 #undef	ARG_TO
 #undef	ARG_COUNT
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
-#if defined(__lint)
-
-/*
- * Copy a block of storage.  Similar to kcopy but uses non-temporal
- * instructions.
- */
-
-/* ARGSUSED */
-int
-kcopy_nta(const void *from, void *to, size_t count, int copy_cached)
-{ return (0); }
-
-#else	/* __lint */
-
-#if defined(__amd64)
 
 #define	COPY_LOOP_INIT(src, dst, cnt)	\
 	addq	cnt, src;			\
@@ -366,88 +269,6 @@ _kcopy_nta_copyerr:
 	ret
 	SET_SIZE(do_copy_fault_nta)
 	SET_SIZE(kcopy_nta)
-
-#elif defined(__i386)
-
-#define	ARG_FROM	8
-#define	ARG_TO		12
-#define	ARG_COUNT	16
-
-#define	COPY_LOOP_INIT(src, dst, cnt)	\
-	addl	cnt, src;			\
-	addl	cnt, dst;			\
-	shrl	$3, cnt;			\
-	neg	cnt
-
-#define	COPY_LOOP_BODY(src, dst, cnt)	\
-	prefetchnta	0x100(src, cnt, 8);	\
-	movl	(src, cnt, 8), %esi;		\
-	movnti	%esi, (dst, cnt, 8);		\
-	movl	0x4(src, cnt, 8), %esi;		\
-	movnti	%esi, 0x4(dst, cnt, 8);		\
-	movl	0x8(src, cnt, 8), %esi;		\
-	movnti	%esi, 0x8(dst, cnt, 8);		\
-	movl	0xc(src, cnt, 8), %esi;		\
-	movnti	%esi, 0xc(dst, cnt, 8);		\
-	addl	$2, cnt
-
-	/*
-	 * kcopy_nta is not implemented for 32-bit as no performance
-	 * improvement was shown.  We simply jump directly to kcopy
-	 * and discard the 4 arguments.
-	 */
-	ENTRY(kcopy_nta)
-	jmp	kcopy
-
-	lea	_kcopy_nta_copyerr, %eax	/* lofault value */
-	ALTENTRY(do_copy_fault_nta)
-	pushl	%ebp
-	movl	%esp, %ebp		/* setup stack frame */
-	pushl	%esi
-	pushl	%edi
-
-	movl	%gs:CPU_THREAD, %edx
-	movl	T_LOFAULT(%edx), %edi
-	pushl	%edi			/* save the current lofault */
-	movl	%eax, T_LOFAULT(%edx)	/* new lofault */
-
-	/* COPY_LOOP_BODY needs to use %esi */
-	movl	ARG_COUNT(%ebp), %ecx
-	movl	ARG_FROM(%ebp), %edi
-	movl	ARG_TO(%ebp), %eax
-	COPY_LOOP_INIT(%edi, %eax, %ecx)
-1:	COPY_LOOP_BODY(%edi, %eax, %ecx)
-	jnz	1b
-	mfence
-
-	xorl	%eax, %eax
-_kcopy_nta_copyerr:
-	popl	%ecx
-	popl	%edi
-	movl	%ecx, T_LOFAULT(%edx)	/* restore the original lofault */
-	popl	%esi
-	leave
-	ret
-	SET_SIZE(do_copy_fault_nta)
-	SET_SIZE(kcopy_nta)
-
-#undef	ARG_FROM
-#undef	ARG_TO
-#undef	ARG_COUNT
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
-#if defined(__lint)
-
-/* ARGSUSED */
-void
-bcopy(const void *from, void *to, size_t count)
-{}
-
-#else	/* __lint */
-
-#if defined(__amd64)
 
 	ENTRY(bcopy)
 #ifdef DEBUG
@@ -977,71 +798,12 @@ call_panic:
 	SET_SIZE(bcopy_altentry)
 	SET_SIZE(bcopy)
 
-#elif defined(__i386)
-
-#define	ARG_FROM	4
-#define	ARG_TO		8
-#define	ARG_COUNT	12
-
-	ENTRY(bcopy)
-#ifdef DEBUG
-	movl	ARG_COUNT(%esp), %eax
-	orl	%eax, %eax
-	jz	1f
-	movl	postbootkernelbase, %eax
-	cmpl	%eax, ARG_FROM(%esp)
-	jb	0f
-	cmpl	%eax, ARG_TO(%esp)
-	jnb	1f
-0:	pushl	%ebp
-	movl	%esp, %ebp
-	pushl	$.bcopy_panic_msg
-	call	panic
-1:
-#endif
-do_copy:
-	movl	%esi, %eax		/* save registers */
-	movl	%edi, %edx
-	movl	ARG_COUNT(%esp), %ecx
-	movl	ARG_FROM(%esp), %esi
-	movl	ARG_TO(%esp), %edi
-
-	shrl	$2, %ecx		/* word count */
-	rep
-	  smovl
-	movl	ARG_COUNT(%esp), %ecx
-	andl	$3, %ecx		/* bytes left over */
-	rep
-	  smovb
-	movl	%eax, %esi		/* restore registers */
-	movl	%edx, %edi
-	ret
-	SET_SIZE(bcopy)
-
-#undef	ARG_COUNT
-#undef	ARG_FROM
-#undef	ARG_TO
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
 
 /*
  * Zero a block of storage, returning an error code if we
  * take a kernel pagefault which cannot be resolved.
  * Returns errno value on pagefault error, 0 if all ok
  */
-
-#if defined(__lint)
-
-/* ARGSUSED */
-int
-kzero(void *addr, size_t count)
-{ return (0); }
-
-#else	/* __lint */
-
-#if defined(__amd64)
 
 	ENTRY(kzero)
 #ifdef DEBUG
@@ -1073,77 +835,9 @@ _kzeroerr:
 	ret
 	SET_SIZE(kzero)
 
-#elif defined(__i386)
-
-#define	ARG_ADDR	8
-#define	ARG_COUNT	12
-
-	ENTRY(kzero)
-#ifdef DEBUG
-	pushl	%ebp
-	movl	%esp, %ebp
-	movl	postbootkernelbase, %eax
-        cmpl	%eax, ARG_ADDR(%ebp)
-        jnb	0f
-        pushl   $.kzero_panic_msg
-        call    panic
-0:	popl	%ebp
-#endif
-	lea	_kzeroerr, %eax		/* kzeroerr is lofault value */
-
-	pushl	%ebp			/* save stack base */
-	movl	%esp, %ebp		/* set new stack base */
-	pushl	%edi			/* save %edi */
-
-	mov	%gs:CPU_THREAD, %edx
-	movl	T_LOFAULT(%edx), %edi
-	pushl	%edi			/* save the current lofault */
-	movl	%eax, T_LOFAULT(%edx)	/* new lofault */
-
-	movl	ARG_COUNT(%ebp), %ecx	/* get size in bytes */
-	movl	ARG_ADDR(%ebp), %edi	/* %edi <- address of bytes to clear */
-	shrl	$2, %ecx		/* Count of double words to zero */
-	xorl	%eax, %eax		/* sstol val */
-	rep
-	  sstol			/* %ecx contains words to clear (%eax=0) */
-
-	movl	ARG_COUNT(%ebp), %ecx	/* get size in bytes */
-	andl	$3, %ecx		/* do mod 4 */
-	rep
-	  sstob			/* %ecx contains residual bytes to clear */
-
-	/*
-	 * A fault during kzero is indicated through an errno value
-	 * in %eax when we iret to here.
-	 */
-_kzeroerr:
-	popl	%edi
-	movl	%edi, T_LOFAULT(%edx)	/* restore the original lofault */
-	popl	%edi
-	popl	%ebp
-	ret
-	SET_SIZE(kzero)
-
-#undef	ARG_ADDR
-#undef	ARG_COUNT
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
 /*
  * Zero a block of storage.
  */
-
-#if defined(__lint)
-
-/* ARGSUSED */
-void
-bzero(void *addr, size_t count)
-{}
-
-#else	/* __lint */
-
-#if defined(__amd64)
 
 	ENTRY(bzero)
 #ifdef DEBUG
@@ -1459,44 +1153,6 @@ L(use_rep):
 	SET_SIZE(bzero_altentry)
 	SET_SIZE(bzero)
 
-#elif defined(__i386)
-
-#define	ARG_ADDR	4
-#define	ARG_COUNT	8
-
-	ENTRY(bzero)
-#ifdef DEBUG
-	movl	postbootkernelbase, %eax
-	cmpl	%eax, ARG_ADDR(%esp)
-	jnb	0f
-	pushl	%ebp
-	movl	%esp, %ebp
-	pushl	$.bzero_panic_msg
-	call	panic
-0:
-#endif
-do_zero:
-	movl	%edi, %edx
-	movl	ARG_COUNT(%esp), %ecx
-	movl	ARG_ADDR(%esp), %edi
-	shrl	$2, %ecx
-	xorl	%eax, %eax
-	rep
-	  sstol
-	movl	ARG_COUNT(%esp), %ecx
-	andl	$3, %ecx
-	rep
-	  sstob
-	movl	%edx, %edi
-	ret
-	SET_SIZE(bzero)
-
-#undef	ARG_ADDR
-#undef	ARG_COUNT
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
 /*
  * Transfer data to and from user space -
  * Note that these routines can cause faults
@@ -1518,17 +1174,6 @@ do_zero:
 /*
  * Copy user data to kernel space.
  */
-
-#if defined(__lint)
-
-/* ARGSUSED */
-int
-copyin(const void *uaddr, void *kaddr, size_t count)
-{ return (0); }
-
-#else	/* lint */
-
-#if defined(__amd64)
 
 	ENTRY(copyin)
 	pushq	%rbp
@@ -1584,62 +1229,6 @@ _copyin_err:
 	leave
 	ret
 	SET_SIZE(copyin)
-
-#elif defined(__i386)
-
-#define	ARG_UADDR	4
-#define	ARG_KADDR	8
-
-	ENTRY(copyin)
-	movl	kernelbase, %ecx
-#ifdef DEBUG
-	cmpl	%ecx, ARG_KADDR(%esp)
-	jnb	1f
-	pushl	%ebp
-	movl	%esp, %ebp
-	pushl	$.copyin_panic_msg
-	call	panic
-1:
-#endif
-	lea	_copyin_err, %eax
-
-	movl	%gs:CPU_THREAD, %edx
-	cmpl	%ecx, ARG_UADDR(%esp)	/* test uaddr < kernelbase */
-	jb	do_copy_fault
-	jmp	3f
-
-_copyin_err:
-	popl	%ecx
-	popl	%edi
-	movl	%ecx, T_LOFAULT(%edx)	/* restore original lofault */
-	popl	%esi
-	popl	%ebp
-3:
-	movl	T_COPYOPS(%edx), %eax
-	cmpl	$0, %eax
-	jz	2f
-	jmp	*CP_COPYIN(%eax)
-
-2:	movl	$-1, %eax
-	ret
-	SET_SIZE(copyin)
-
-#undef	ARG_UADDR
-#undef	ARG_KADDR
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
-#if defined(__lint)
-
-/* ARGSUSED */
-int
-xcopyin_nta(const void *uaddr, void *kaddr, size_t count, int copy_cached)
-{ return (0); }
-
-#else	/* __lint */
-
-#if defined(__amd64)
 
 	ENTRY(xcopyin_nta)
 	pushq	%rbp
@@ -1730,94 +1319,9 @@ _xcopyin_nta_err:
 	ret
 	SET_SIZE(xcopyin_nta)
 
-#elif defined(__i386)
-
-#define	ARG_UADDR	4
-#define	ARG_KADDR	8
-#define	ARG_COUNT	12
-#define	ARG_CACHED	16
-
-	.globl	use_sse_copy
-
-	ENTRY(xcopyin_nta)
-	movl	kernelbase, %ecx
-	lea	_xcopyin_err, %eax
-	movl	%gs:CPU_THREAD, %edx
-	cmpl	%ecx, ARG_UADDR(%esp)	/* test uaddr < kernelbase */
-	jae	4f
-
-	cmpl	$0, use_sse_copy	/* no sse support */
-	jz	do_copy_fault
-
-	cmpl	$0, ARG_CACHED(%esp)	/* copy_cached hint set? */
-	jnz	do_copy_fault
-
-	/*
-	 * Make sure cnt is >= XCOPY_MIN_SIZE bytes
-	 */
-	cmpl	$XCOPY_MIN_SIZE, ARG_COUNT(%esp)
-	jb	do_copy_fault
-
-	/*
-	 * Make sure src and dst are NTA_ALIGN_SIZE aligned,
-	 * count is COUNT_ALIGN_SIZE aligned.
-	 */
-	movl	ARG_UADDR(%esp), %ecx
-	orl	ARG_KADDR(%esp), %ecx
-	andl	$NTA_ALIGN_MASK, %ecx
-	orl	ARG_COUNT(%esp), %ecx
-	andl	$COUNT_ALIGN_MASK, %ecx
-	jnz	do_copy_fault
-
-	jmp	do_copy_fault_nta	/* use regular access */
-
-4:
-	movl	$EFAULT, %eax
-	jmp	3f
-
-	/*
-	 * A fault during do_copy_fault or do_copy_fault_nta is
-	 * indicated through an errno value in %eax and we iret from the
-	 * trap handler to here.
-	 */
-_xcopyin_err:
-	popl	%ecx
-	popl	%edi
-	movl	%ecx, T_LOFAULT(%edx)	/* restore original lofault */
-	popl	%esi
-	popl	%ebp
-3:
-	cmpl	$0, T_COPYOPS(%edx)
-	jz	2f
-	movl	T_COPYOPS(%edx), %eax
-	jmp	*CP_XCOPYIN(%eax)
-
-2:	rep;	ret	/* use 2 byte return instruction when branch target */
-			/* AMD Software Optimization Guide - Section 6.2 */
-	SET_SIZE(xcopyin_nta)
-
-#undef	ARG_UADDR
-#undef	ARG_KADDR
-#undef	ARG_COUNT
-#undef	ARG_CACHED
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
 /*
  * Copy kernel data to user space.
  */
-
-#if defined(__lint)
-
-/* ARGSUSED */
-int
-copyout(const void *kaddr, void *uaddr, size_t count)
-{ return (0); }
-
-#else	/* __lint */
-
-#if defined(__amd64)
 
 	ENTRY(copyout)
 	pushq	%rbp
@@ -1874,61 +1378,6 @@ _copyout_err:
 	leave
 	ret
 	SET_SIZE(copyout)
-
-#elif defined(__i386)
-
-#define	ARG_KADDR	4
-#define	ARG_UADDR	8
-
-	ENTRY(copyout)
-	movl	kernelbase, %ecx
-#ifdef DEBUG
-	cmpl	%ecx, ARG_KADDR(%esp)
-	jnb	1f
-	pushl	%ebp
-	movl	%esp, %ebp
-	pushl	$.copyout_panic_msg
-	call	panic
-1:
-#endif
-	lea	_copyout_err, %eax
-	movl	%gs:CPU_THREAD, %edx
-	cmpl	%ecx, ARG_UADDR(%esp)	/* test uaddr < kernelbase */
-	jb	do_copy_fault
-	jmp	3f
-
-_copyout_err:
-	popl	%ecx
-	popl	%edi
-	movl	%ecx, T_LOFAULT(%edx)	/* restore original lofault */
-	popl	%esi
-	popl	%ebp
-3:
-	movl	T_COPYOPS(%edx), %eax
-	cmpl	$0, %eax
-	jz	2f
-	jmp	*CP_COPYOUT(%eax)
-
-2:	movl	$-1, %eax
-	ret
-	SET_SIZE(copyout)
-
-#undef	ARG_UADDR
-#undef	ARG_KADDR
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
-#if defined(__lint)
-
-/* ARGSUSED */
-int
-xcopyout_nta(const void *kaddr, void *uaddr, size_t count, int copy_cached)
-{ return (0); }
-
-#else	/* __lint */
-
-#if defined(__amd64)
 
 	ENTRY(xcopyout_nta)
 	pushq	%rbp
@@ -2020,93 +1469,10 @@ _xcopyout_nta_err:
 	ret
 	SET_SIZE(xcopyout_nta)
 
-#elif defined(__i386)
-
-#define	ARG_KADDR	4
-#define	ARG_UADDR	8
-#define	ARG_COUNT	12
-#define	ARG_CACHED	16
-
-	ENTRY(xcopyout_nta)
-	movl	kernelbase, %ecx
-	lea	_xcopyout_err, %eax
-	movl	%gs:CPU_THREAD, %edx
-	cmpl	%ecx, ARG_UADDR(%esp)	/* test uaddr < kernelbase */
-	jae	4f
-
-	cmpl	$0, use_sse_copy	/* no sse support */
-	jz	do_copy_fault
-
-	cmpl	$0, ARG_CACHED(%esp)	/* copy_cached hint set? */
-	jnz	do_copy_fault
-
-	/*
-	 * Make sure cnt is >= XCOPY_MIN_SIZE bytes
-	 */
-	cmpl	$XCOPY_MIN_SIZE, %edx
-	jb	do_copy_fault
-
-	/*
-	 * Make sure src and dst are NTA_ALIGN_SIZE aligned,
-	 * count is COUNT_ALIGN_SIZE aligned.
-	 */
-	movl	ARG_UADDR(%esp), %ecx
-	orl	ARG_KADDR(%esp), %ecx
-	andl	$NTA_ALIGN_MASK, %ecx
-	orl	ARG_COUNT(%esp), %ecx
-	andl	$COUNT_ALIGN_MASK, %ecx
-	jnz	do_copy_fault
-	jmp	do_copy_fault_nta
-
-4:
-	movl	$EFAULT, %eax
-	jmp	3f
-
-	/*
-	 * A fault during do_copy_fault or do_copy_fault_nta is
-	 * indicated through an errno value in %eax and we iret from the
-	 * trap handler to here.
-	 */
-_xcopyout_err:
-	/ restore the original lofault
-	popl	%ecx
-	popl	%edi
-	movl	%ecx, T_LOFAULT(%edx)	/ original lofault
-	popl	%esi
-	popl	%ebp
-3:
-	cmpl	$0, T_COPYOPS(%edx)
-	jz	2f
-	movl	T_COPYOPS(%edx), %eax
-	jmp	*CP_XCOPYOUT(%eax)
-
-2:	rep;	ret	/* use 2 byte return instruction when branch target */
-			/* AMD Software Optimization Guide - Section 6.2 */
-	SET_SIZE(xcopyout_nta)
-
-#undef	ARG_UADDR
-#undef	ARG_KADDR
-#undef	ARG_COUNT
-#undef	ARG_CACHED
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
 /*
  * Copy a null terminated string from one point to another in
  * the kernel address space.
  */
-
-#if defined(__lint)
-
-/* ARGSUSED */
-int
-copystr(const char *from, char *to, size_t maxlength, size_t *lencopied)
-{ return (0); }
-
-#else	/* __lint */
-
-#if defined(__amd64)
 
 	ENTRY(copystr)
 	pushq	%rbp
@@ -2172,108 +1538,10 @@ copystr_done:
 	ret
 	SET_SIZE(copystr)
 
-#elif defined(__i386)
-
-#define	ARG_FROM	8
-#define	ARG_TO		12
-#define	ARG_MAXLEN	16
-#define	ARG_LENCOPIED	20
-
-	ENTRY(copystr)
-#ifdef DEBUG
-	pushl	%ebp
-	movl	%esp, %ebp
-	movl	kernelbase, %eax
-	cmpl	%eax, ARG_FROM(%esp)
-	jb	0f
-	cmpl	%eax, ARG_TO(%esp)
-	jnb	1f
-0:	pushl	$.copystr_panic_msg
-	call	panic
-1:	popl	%ebp
-#endif
-	/* get the current lofault address */
-	movl	%gs:CPU_THREAD, %eax
-	movl	T_LOFAULT(%eax), %eax
-do_copystr:
-	pushl	%ebp			/* setup stack frame */
-	movl	%esp, %ebp
-	pushl	%ebx			/* save registers */
-	pushl	%edi
-
-	movl	%gs:CPU_THREAD, %ebx
-	movl	T_LOFAULT(%ebx), %edi
-	pushl	%edi			/* save the current lofault */
-	movl	%eax, T_LOFAULT(%ebx)	/* new lofault */
-
-	movl	ARG_MAXLEN(%ebp), %ecx
-	cmpl	$0, %ecx
-	je	copystr_enametoolong	/* maxlength == 0 */
-
-	movl	ARG_FROM(%ebp), %ebx	/* source address */
-	movl	ARG_TO(%ebp), %edx	/* destination address */
-
-copystr_loop:
-	decl	%ecx
-	movb	(%ebx), %al
-	incl	%ebx
-	movb	%al, (%edx)
-	incl	%edx
-	cmpb	$0, %al
-	je	copystr_null		/* null char */
-	cmpl	$0, %ecx
-	jne	copystr_loop
-
-copystr_enametoolong:
-	movl	$ENAMETOOLONG, %eax
-	jmp	copystr_out
-
-copystr_null:
-	xorl	%eax, %eax		/* no error */
-
-copystr_out:
-	cmpl	$0, ARG_LENCOPIED(%ebp)	/* want length? */
-	je	copystr_done		/* no */
-	movl	ARG_MAXLEN(%ebp), %edx
-	subl	%ecx, %edx		/* compute length and store it */
-	movl	ARG_LENCOPIED(%ebp), %ecx
-	movl	%edx, (%ecx)
-
-copystr_done:
-	popl	%edi
-	movl	%gs:CPU_THREAD, %ebx
-	movl	%edi, T_LOFAULT(%ebx)	/* restore the original lofault */
-
-	popl	%edi
-	popl	%ebx
-	popl	%ebp
-	ret
-	SET_SIZE(copystr)
-
-#undef	ARG_FROM
-#undef	ARG_TO
-#undef	ARG_MAXLEN
-#undef	ARG_LENCOPIED
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
 /*
  * Copy a null terminated string from the user address space into
  * the kernel address space.
  */
-
-#if defined(__lint)
-
-/* ARGSUSED */
-int
-copyinstr(const char *uaddr, char *kaddr, size_t maxlength,
-    size_t *lencopied)
-{ return (0); }
-
-#else	/* __lint */
-
-#if defined(__amd64)
 
 	ENTRY(copyinstr)
 	pushq	%rbp
@@ -2336,68 +1604,10 @@ _copyinstr_error:
 	ret
 	SET_SIZE(copyinstr)
 
-#elif defined(__i386)
-
-#define	ARG_UADDR	4
-#define	ARG_KADDR	8
-
-	ENTRY(copyinstr)
-	movl	kernelbase, %ecx
-#ifdef DEBUG
-	cmpl	%ecx, ARG_KADDR(%esp)
-	jnb	1f
-	pushl	%ebp
-	movl	%esp, %ebp
-	pushl	$.copyinstr_panic_msg
-	call	panic
-1:
-#endif
-	lea	_copyinstr_error, %eax
-	cmpl	%ecx, ARG_UADDR(%esp)	/* test uaddr < kernelbase */
-	jb	do_copystr
-	movl	%gs:CPU_THREAD, %edx
-	jmp	3f
-
-_copyinstr_error:
-	popl	%edi
-	movl	%gs:CPU_THREAD, %edx
-	movl	%edi, T_LOFAULT(%edx)	/* original lofault */
-
-	popl	%edi
-	popl	%ebx
-	popl	%ebp
-3:
-	movl	T_COPYOPS(%edx), %eax
-	cmpl	$0, %eax
-	jz	2f
-	jmp	*CP_COPYINSTR(%eax)
-
-2:	movl	$EFAULT, %eax		/* return EFAULT */
-	ret
-	SET_SIZE(copyinstr)
-
-#undef	ARG_UADDR
-#undef	ARG_KADDR
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
 /*
  * Copy a null terminated string from the kernel
  * address space to the user address space.
  */
-
-#if defined(__lint)
-
-/* ARGSUSED */
-int
-copyoutstr(const char *kaddr, char *uaddr, size_t maxlength,
-    size_t *lencopied)
-{ return (0); }
-
-#else	/* __lint */
-
-#if defined(__amd64)
 
 	ENTRY(copyoutstr)
 	pushq	%rbp
@@ -2459,86 +1669,10 @@ _copyoutstr_error:
 	ret
 	SET_SIZE(copyoutstr)
 
-#elif defined(__i386)
-
-#define	ARG_KADDR	4
-#define	ARG_UADDR	8
-
-	ENTRY(copyoutstr)
-	movl	kernelbase, %ecx
-#ifdef DEBUG
-	cmpl	%ecx, ARG_KADDR(%esp)
-	jnb	1f
-	pushl	%ebp
-	movl	%esp, %ebp
-	pushl	$.copyoutstr_panic_msg
-	call	panic
-1:
-#endif
-	lea	_copyoutstr_error, %eax
-	cmpl	%ecx, ARG_UADDR(%esp)	/* test uaddr < kernelbase */
-	jb	do_copystr
-	movl	%gs:CPU_THREAD, %edx
-	jmp	3f
-
-_copyoutstr_error:
-	popl	%edi
-	movl	%gs:CPU_THREAD, %edx
-	movl	%edi, T_LOFAULT(%edx)	/* restore the original lofault */
-
-	popl	%edi
-	popl	%ebx
-	popl	%ebp
-3:
-	movl	T_COPYOPS(%edx), %eax
-	cmpl	$0, %eax
-	jz	2f
-	jmp	*CP_COPYOUTSTR(%eax)
-
-2:	movl	$EFAULT, %eax		/* return EFAULT */
-	ret
-	SET_SIZE(copyoutstr)
-
-#undef	ARG_KADDR
-#undef	ARG_UADDR
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
 /*
  * Since all of the fuword() variants are so similar, we have a macro to spit
  * them out.  This allows us to create DTrace-unobservable functions easily.
  */
-
-#if defined(__lint)
-
-#if defined(__amd64)
-
-/* ARGSUSED */
-int
-fuword64(const void *addr, uint64_t *dst)
-{ return (0); }
-
-#endif
-
-/* ARGSUSED */
-int
-fuword32(const void *addr, uint32_t *dst)
-{ return (0); }
-
-/* ARGSUSED */
-int
-fuword16(const void *addr, uint16_t *dst)
-{ return (0); }
-
-/* ARGSUSED */
-int
-fuword8(const void *addr, uint8_t *dst)
-{ return (0); }
-
-#else	/* __lint */
-
-#if defined(__amd64)
 
 /*
  * Note that we don't save and reload the arguments here
@@ -2580,78 +1714,11 @@ _flt_/**/NAME:					\
 	FUWORD(fuword16, movw, %ax, CP_FUWORD16,10,14,15)
 	FUWORD(fuword8, movb, %al, CP_FUWORD8,11,16,17)
 
-#elif defined(__i386)
-
-#define	FUWORD(NAME, INSTR, REG, COPYOP)	\
-	ENTRY(NAME)				\
-	movl	%gs:CPU_THREAD, %ecx;		\
-	movl	kernelbase, %eax;		\
-	cmpl	%eax, 4(%esp);			\
-	jae	1f;				\
-	lea	_flt_/**/NAME, %edx;		\
-	movl	%edx, T_LOFAULT(%ecx);		\
-	movl	4(%esp), %eax;			\
-	movl	8(%esp), %edx;			\
-	INSTR	(%eax), REG;			\
-	movl	$0, T_LOFAULT(%ecx);		\
-	INSTR	REG, (%edx);			\
-	xorl	%eax, %eax;			\
-	ret;					\
-_flt_/**/NAME:					\
-	movl	$0, T_LOFAULT(%ecx);		\
-1:						\
-	movl	T_COPYOPS(%ecx), %eax;		\
-	cmpl	$0, %eax;			\
-	jz	2f;				\
-	jmp	*COPYOP(%eax);			\
-2:						\
-	movl	$-1, %eax;			\
-	ret;					\
-	SET_SIZE(NAME)
-
-	FUWORD(fuword32, movl, %eax, CP_FUWORD32)
-	FUWORD(fuword16, movw, %ax, CP_FUWORD16)
-	FUWORD(fuword8, movb, %al, CP_FUWORD8)
-
-#endif	/* __i386 */
-
 #undef	FUWORD
-
-#endif	/* __lint */
 
 /*
  * Set user word.
  */
-
-#if defined(__lint)
-
-#if defined(__amd64)
-
-/* ARGSUSED */
-int
-suword64(void *addr, uint64_t value)
-{ return (0); }
-
-#endif
-
-/* ARGSUSED */
-int
-suword32(void *addr, uint32_t value)
-{ return (0); }
-
-/* ARGSUSED */
-int
-suword16(void *addr, uint16_t value)
-{ return (0); }
-
-/* ARGSUSED */
-int
-suword8(void *addr, uint8_t value)
-{ return (0); }
-
-#else	/* lint */
-
-#if defined(__amd64)
 
 /*
  * Note that we don't save and reload the arguments here
@@ -2690,74 +1757,7 @@ _flt_/**/NAME:					\
 	SUWORD(suword16, movw, %si, CP_SUWORD16,14,22,23)
 	SUWORD(suword8, movb, %sil, CP_SUWORD8,15,24,25)
 
-#elif defined(__i386)
-
-#define	SUWORD(NAME, INSTR, REG, COPYOP)	\
-	ENTRY(NAME)				\
-	movl	%gs:CPU_THREAD, %ecx;		\
-	movl	kernelbase, %eax;		\
-	cmpl	%eax, 4(%esp);			\
-	jae	1f;				\
-	lea	_flt_/**/NAME, %edx;		\
-	movl	%edx, T_LOFAULT(%ecx);		\
-	movl	4(%esp), %eax;			\
-	movl	8(%esp), %edx;			\
-	INSTR	REG, (%eax);			\
-	movl	$0, T_LOFAULT(%ecx);		\
-	xorl	%eax, %eax;			\
-	ret;					\
-_flt_/**/NAME:					\
-	movl	$0, T_LOFAULT(%ecx);		\
-1:						\
-	movl	T_COPYOPS(%ecx), %eax;		\
-	cmpl	$0, %eax;			\
-	jz	3f;				\
-	movl	COPYOP(%eax), %ecx;		\
-	jmp	*%ecx;				\
-3:						\
-	movl	$-1, %eax;			\
-	ret;					\
-	SET_SIZE(NAME)
-
-	SUWORD(suword32, movl, %edx, CP_SUWORD32)
-	SUWORD(suword16, movw, %dx, CP_SUWORD16)
-	SUWORD(suword8, movb, %dl, CP_SUWORD8)
-
-#endif	/* __i386 */
-
 #undef	SUWORD
-
-#endif	/* __lint */
-
-#if defined(__lint)
-
-#if defined(__amd64)
-
-/*ARGSUSED*/
-void
-fuword64_noerr(const void *addr, uint64_t *dst)
-{}
-
-#endif
-
-/*ARGSUSED*/
-void
-fuword32_noerr(const void *addr, uint32_t *dst)
-{}
-
-/*ARGSUSED*/
-void
-fuword8_noerr(const void *addr, uint8_t *dst)
-{}
-
-/*ARGSUSED*/
-void
-fuword16_noerr(const void *addr, uint16_t *dst)
-{}
-
-#else   /* __lint */
-
-#if defined(__amd64)
 
 #define	FUWORD_NOERR(NAME, INSTR, REG)		\
 	ENTRY(NAME)				\
@@ -2773,59 +1773,7 @@ fuword16_noerr(const void *addr, uint16_t *dst)
 	FUWORD_NOERR(fuword16_noerr, movw, %ax)
 	FUWORD_NOERR(fuword8_noerr, movb, %al)
 
-#elif defined(__i386)
-
-#define	FUWORD_NOERR(NAME, INSTR, REG)		\
-	ENTRY(NAME)				\
-	movl	4(%esp), %eax;			\
-	cmpl	kernelbase, %eax;		\
-	jb	1f;				\
-	movl	kernelbase, %eax;		\
-1:	movl	8(%esp), %edx;			\
-	INSTR	(%eax), REG;			\
-	INSTR	REG, (%edx);			\
-	ret;					\
-	SET_SIZE(NAME)
-
-	FUWORD_NOERR(fuword32_noerr, movl, %ecx)
-	FUWORD_NOERR(fuword16_noerr, movw, %cx)
-	FUWORD_NOERR(fuword8_noerr, movb, %cl)
-
-#endif	/* __i386 */
-
 #undef	FUWORD_NOERR
-
-#endif	/* __lint */
-
-#if defined(__lint)
-
-#if defined(__amd64)
-
-/*ARGSUSED*/
-void
-suword64_noerr(void *addr, uint64_t value)
-{}
-
-#endif
-
-/*ARGSUSED*/
-void
-suword32_noerr(void *addr, uint32_t value)
-{}
-
-/*ARGSUSED*/
-void
-suword16_noerr(void *addr, uint16_t value)
-{}
-
-/*ARGSUSED*/
-void
-suword8_noerr(void *addr, uint8_t value)
-{}
-
-#else	/* lint */
-
-#if defined(__amd64)
 
 #define	SUWORD_NOERR(NAME, INSTR, REG)		\
 	ENTRY(NAME)				\
@@ -2840,71 +1788,13 @@ suword8_noerr(void *addr, uint8_t value)
 	SUWORD_NOERR(suword16_noerr, movw, %si)
 	SUWORD_NOERR(suword8_noerr, movb, %sil)
 
-#elif defined(__i386)
-
-#define	SUWORD_NOERR(NAME, INSTR, REG)		\
-	ENTRY(NAME)				\
-	movl	4(%esp), %eax;			\
-	cmpl	kernelbase, %eax;		\
-	jb	1f;				\
-	movl	kernelbase, %eax;		\
-1:						\
-	movl	8(%esp), %edx;			\
-	INSTR	REG, (%eax);			\
-	ret;					\
-	SET_SIZE(NAME)
-
-	SUWORD_NOERR(suword32_noerr, movl, %edx)
-	SUWORD_NOERR(suword16_noerr, movw, %dx)
-	SUWORD_NOERR(suword8_noerr, movb, %dl)
-
-#endif	/* __i386 */
-
 #undef	SUWORD_NOERR
 
-#endif	/* lint */
-
-
-#if defined(__lint)
-
-/*ARGSUSED*/
-int
-subyte(void *addr, uchar_t value)
-{ return (0); }
-
-/*ARGSUSED*/
-void
-subyte_noerr(void *addr, uchar_t value)
-{}
-
-/*ARGSUSED*/
-int
-fulword(const void *addr, ulong_t *valuep)
-{ return (0); }
-
-/*ARGSUSED*/
-void
-fulword_noerr(const void *addr, ulong_t *valuep)
-{}
-
-/*ARGSUSED*/
-int
-sulword(void *addr, ulong_t valuep)
-{ return (0); }
-
-/*ARGSUSED*/
-void
-sulword_noerr(void *addr, ulong_t valuep)
-{}
-
-#else
 
 	.weak	subyte
 	subyte=suword8
 	.weak	subyte_noerr
 	subyte_noerr=suword8_noerr
-
-#if defined(__amd64)
 
 	.weak	fulword
 	fulword=fuword64
@@ -2914,69 +1804,6 @@ sulword_noerr(void *addr, ulong_t valuep)
 	sulword=suword64
 	.weak	sulword_noerr
 	sulword_noerr=suword64_noerr
-
-#elif defined(__i386)
-
-	.weak	fulword
-	fulword=fuword32
-	.weak	fulword_noerr
-	fulword_noerr=fuword32_noerr
-	.weak	sulword
-	sulword=suword32
-	.weak	sulword_noerr
-	sulword_noerr=suword32_noerr
-
-#endif /* __i386 */
-
-#endif /* __lint */
-
-#if defined(__lint)
-
-/*
- * Copy a block of storage - must not overlap (from + len <= to).
- * No fault handler installed (to be called under on_fault())
- */
-
-/* ARGSUSED */
-void
-copyout_noerr(const void *kfrom, void *uto, size_t count)
-{}
-
-/* ARGSUSED */
-void
-copyin_noerr(const void *ufrom, void *kto, size_t count)
-{}
-
-/*
- * Zero a block of storage in user space
- */
-
-/* ARGSUSED */
-void
-uzero(void *addr, size_t count)
-{}
-
-/*
- * copy a block of storage in user space
- */
-
-/* ARGSUSED */
-void
-ucopy(const void *ufrom, void *uto, size_t ulength)
-{}
-
-/*
- * copy a string in user space
- */
-
-/* ARGSUSED */
-void
-ucopystr(const char *ufrom, char *uto, size_t umaxlength, size_t *lencopied)
-{}
-
-#else /* __lint */
-
-#if defined(__amd64)
 
 	ENTRY(copyin_noerr)
 	movq	kernelbase(%rip), %rax
@@ -3045,76 +1872,6 @@ ucopystr(const char *ufrom, char *uto, size_t umaxlength, size_t *lencopied)
 	jmp	do_copystr
 	SET_SIZE(ucopystr)
 
-#elif defined(__i386)
-
-	ENTRY(copyin_noerr)
-	movl	kernelbase, %eax
-#ifdef DEBUG
-	cmpl	%eax, 8(%esp)
-	jae	1f
-	pushl	$.cpyin_ne_pmsg
-	call	panic
-1:
-#endif
-	cmpl	%eax, 4(%esp)
-	jb	do_copy
-	movl	%eax, 4(%esp)	/* force fault at kernelbase */
-	jmp	do_copy
-	SET_SIZE(copyin_noerr)
-
-	ENTRY(copyout_noerr)
-	movl	kernelbase, %eax
-#ifdef DEBUG
-	cmpl	%eax, 4(%esp)
-	jae	1f
-	pushl	$.cpyout_ne_pmsg
-	call	panic
-1:
-#endif
-	cmpl	%eax, 8(%esp)
-	jb	do_copy
-	movl	%eax, 8(%esp)	/* force fault at kernelbase */
-	jmp	do_copy
-	SET_SIZE(copyout_noerr)
-
-	ENTRY(uzero)
-	movl	kernelbase, %eax
-	cmpl	%eax, 4(%esp)
-	jb	do_zero
-	movl	%eax, 4(%esp)	/* force fault at kernelbase */
-	jmp	do_zero
-	SET_SIZE(uzero)
-
-	ENTRY(ucopy)
-	movl	kernelbase, %eax
-	cmpl	%eax, 4(%esp)
-	jb	1f
-	movl	%eax, 4(%esp)	/* force fault at kernelbase */
-1:
-	cmpl	%eax, 8(%esp)
-	jb	do_copy
-	movl	%eax, 8(%esp)	/* force fault at kernelbase */
-	jmp	do_copy
-	SET_SIZE(ucopy)
-
-	ENTRY(ucopystr)
-	movl	kernelbase, %eax
-	cmpl	%eax, 4(%esp)
-	jb	1f
-	movl	%eax, 4(%esp)	/* force fault at kernelbase */
-1:
-	cmpl	%eax, 8(%esp)
-	jb	2f
-	movl	%eax, 8(%esp)	/* force fault at kernelbase */
-2:
-	/* do_copystr expects the lofault address in %eax */
-	movl	%gs:CPU_THREAD, %eax
-	movl	T_LOFAULT(%eax), %eax
-	jmp	do_copystr
-	SET_SIZE(ucopystr)
-
-#endif	/* __i386 */
-
 #ifdef DEBUG
 	.data
 .kcopy_panic_msg:
@@ -3145,8 +1902,6 @@ ucopystr(const char *ufrom, char *uto, size_t umaxlength, size_t *lencopied)
 	.string "copyout_noerr: argument not in kernel address space"
 #endif
 
-#endif	/* __lint */
-
 /*
  * These functions are used for SMAP, supervisor mode access protection. They
  * are hotpatched to become real instructions when the system starts up which is
@@ -3157,19 +1912,6 @@ ucopystr(const char *ufrom, char *uto, size_t umaxlength, size_t *lencopied)
  * out of paranoia, the kernel will likely call it at several points.
  */
 
-#if defined(__lint)
-
-void
-smap_enable(void)
-{}
-
-void
-smap_disable(void)
-{}
-
-#else
-
-#if defined (__amd64) || defined(__i386)
 	ENTRY(smap_disable)
 	nop
 	nop
@@ -3184,12 +1926,6 @@ smap_disable(void)
 	ret
 	SET_SIZE(smap_enable)
 
-#endif /* __amd64 || __i386 */
-
-#endif /* __lint */
-
-#ifndef __lint
-
 .data
 .align	4
 .globl	_smap_enable_patch_count
@@ -3203,5 +1939,3 @@ _smap_enable_patch_count:
 .size	_smap_disable_patch_count, 4
 _smap_disable_patch_count:
 	.long SMAP_DISABLE_COUNT
-
-#endif /* __lint */

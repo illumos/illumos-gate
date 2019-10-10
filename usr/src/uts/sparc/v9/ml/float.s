@@ -32,9 +32,7 @@
 #include <sys/machsig.h>
 #include <sys/machthread.h>
 
-#if !defined(lint) && !defined(__lint)
 #include "assym.h"
-#endif	/* lint */
 
 /*
  * Floating point trap handling.
@@ -81,16 +79,6 @@
  *		that appear to be a kaos bug, so don't use them!
  */
 
-#if defined(lint) || defined(__lint)
-
-#ifdef FP_DISABLED
-int fpu_exists = 0;
-#else
-int fpu_exists = 1;
-#endif
-
-#else	/* lint */
-
 	.section ".data"
 	.align	8
 fsrholder:
@@ -107,23 +95,12 @@ fsrholder:
 	DGDEF(fpu_version)
 	.word	-1
 
-#endif	/* lint */
-
 /*
  * FPU probe - read the %fsr and get fpu_version.
  * Called from autoconf. If a %fq is created for
  * future cpu versions, a fq_exists variable
  * could be created by this function.
  */
-
-#if defined(lint) || defined(__lint)
-
-/*ARGSUSED*/
-void
-fpu_probe(void)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(fpu_probe)
 	wr	%g0, FPRS_FEF, %fprs	! enable fpu in fprs
@@ -144,8 +121,6 @@ fpu_probe(void)
 	wr	%g0, %g0, %fprs		! disable fpu and clear fprs
 	SET_SIZE(fpu_probe)
 
-#endif	/* lint */
-
 /*
  * fp_clearregs(fp)
  *	struct v9_fpu *fp;
@@ -155,15 +130,6 @@ fpu_probe(void)
  * The caller (fp_disabled) is supposed to update the fprs
  * so when the return to userland is made, the fpu is enabled.
  */
-
-#if defined(lint) || defined(__lint)
-
-/*ARGSUSED*/
-void
-fp_clearregs(kfpu_t *fp)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(fp_clearregs)
 	ldx	[%o0 + FPU_FSR], %fsr		! load fsr
@@ -205,8 +171,6 @@ fp_clearregs(kfpu_t *fp)
 	ldd	[%o0], %d62
 	SET_SIZE(fp_clearregs)
 
-#endif	/* lint */
-
 /*
  * void _fp_read_pfreg(pf, n)
  *	uint32_t	*pf;	Old freg value.
@@ -225,20 +189,6 @@ fp_clearregs(kfpu_t *fp)
  *	%f[n] = *pf;
  * }
  */
-
-#if defined(lint) || defined(__lint)
-
-/*ARGSUSED*/
-void
-_fp_read_pfreg(uint32_t *pf, u_int n)
-{}
-
-/*ARGSUSED*/
-void
-_fp_write_pfreg(uint32_t *pf, u_int n)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(_fp_read_pfreg)
 	sll	%o1, 3, %o1		! Table entries are 8 bytes each.
@@ -326,8 +276,6 @@ _fp_write_pfreg(uint32_t *pf, u_int n)
 	SET_SIZE(_fp_read_pfreg)
 	SET_SIZE(_fp_write_pfreg)
 
-#endif	/* lint */
-
 /*
  * void _fp_read_pdreg(
  *	uint64_t	*pd,	Old dreg value.
@@ -346,20 +294,6 @@ _fp_write_pfreg(uint32_t *pf, u_int n)
  *	%d[n] = *pd;
  * }
  */
-
-#if defined(lint) || defined(__lint)
-
-/*ARGSUSED*/
-void
-_fp_read_pdreg(uint64_t *pd, u_int n)
-{}
-
-/*ARGSUSED*/
-void
-_fp_write_pdreg(uint64_t *pd, u_int n)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(_fp_read_pdreg)
 	sll	%o1, 3, %o1		! Table entries are 8 bytes each.
@@ -447,86 +381,31 @@ _fp_write_pdreg(uint64_t *pd, u_int n)
 	SET_SIZE(_fp_read_pdreg)
 	SET_SIZE(_fp_write_pdreg)
 
-#endif	/* lint */
-
-#if defined(lint) || defined(__lint)
-
-/*ARGSUSED*/
-void
-_fp_write_pfsr(uint64_t *fsr)
-{}
-
-#else	/* lint */
-
 	ENTRY_NP(_fp_write_pfsr)
 	retl
 	ldx	[%o0], %fsr
 	SET_SIZE(_fp_write_pfsr)
-
-#endif	/* lint */
-
-#if defined(lint) || defined(__lint)
-
-/*ARGSUSED*/
-void
-_fp_read_pfsr(uint64_t *fsr)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(_fp_read_pfsr)
 	retl
 	stx	%fsr, [%o0]
 	SET_SIZE(_fp_read_pfsr)
 
-#endif	/* lint */
-
-#if defined(lint) || defined(__lint)
-
-/*ARGSUSED*/
-void
-_fp_write_fprs(u_int fprs_val)
-{}
-
-#else	/* lint */
-
 	ENTRY_NP(_fp_write_fprs)
 	retl
 	wr	%o0, %g0, %fprs			! write fprs
 	SET_SIZE(_fp_write_fprs)
-
-#endif	/* lint */
-
-#if defined(lint) || defined(__lint)
-
-unsigned
-_fp_read_fprs(void)
-{return 0;}
-
-#else	/* lint */
 
 	ENTRY_NP(_fp_read_fprs)
 	retl
 	rd	%fprs, %o0			! save fprs
 	SET_SIZE(_fp_read_fprs)
 
-#endif	/* lint */
-
-#if defined(lint) || defined(__lint)
-
-unsigned
-_fp_subcc_ccr(void)
-{return 0;}
-
-#else	/* lint */
-
 	ENTRY_NP(_fp_subcc_ccr)
 	subcc	%o0, %o1, %g0
 	retl
 	rd	%ccr, %o0			! save ccr
 	SET_SIZE(_fp_subcc_ccr)
-
-#endif	/* lint */
 
 /*
  * Floating Point Exceptions handled according to type:
@@ -546,15 +425,6 @@ _fp_subcc_ccr(void)
  * Note: this code could be changed to be part of the cpu-specific
  * (ie, Spitfire-specific) module code before final release.
  */
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-_fp_exception(struct regs *rp, uint64_t fsr)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(_fp_exception)
 	mov	%o7, %l0		! saved return address
@@ -615,8 +485,6 @@ fp_ret:
 	.asciz	"No floating point ftt, fsr %llx"
 #endif	/* DEBUG */
 
-#endif	/* lint */
-
 /*
  * Floating Point Exceptions.
  * handled according to type:
@@ -627,15 +495,6 @@ fp_ret:
  * This code assumes the trap preamble has set up the window environment
  * for execution of kernel code.
  */
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-_fp_ieee_exception(struct regs *rp, uint64_t fsr)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(_fp_ieee_exception)
 	mov	%o7, %l0		! saved return address
@@ -723,4 +582,3 @@ fpok:
 .badfpcexcmsg:
 	.asciz	"No floating point exception, fsr %llx"
 
-#endif	/* lint */

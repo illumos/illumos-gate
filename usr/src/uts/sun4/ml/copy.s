@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/asm_linkage.h>
@@ -35,9 +33,7 @@
 #include <sys/fsr.h>
 #include <sys/privregs.h>
 
-#if !defined(lint)
 #include "assym.h"
-#endif	/* lint */
 
 /*
  * Error barrier:
@@ -59,15 +55,6 @@
  *	caddr_t from, to;
  *	u_int maxlength, *lencopied;
  */
-
-#if defined(lint)
-
-/* ARGSUSED */
-int
-copystr(const char *from, char *to, size_t maxlength, size_t *lencopied)
-{ return(0); }
-
-#else	/* lint */
 
 	ENTRY(copystr)
 	orcc	%o2, %g0, %o4		! save original count
@@ -113,22 +100,11 @@ copystr(const char *from, char *to, size_t maxlength, size_t *lencopied)
 	nop
 	SET_SIZE(copystr)
 
-#endif	/* lint */
-
 
 /*
  * Copy a null terminated string from the user address space into
  * the kernel address space.
  */
-#if defined(lint)
-
-/* ARGSUSED */
-int
-copyinstr(const char *uaddr, char *kaddr, size_t maxlength,
-    size_t *lencopied)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(copyinstr)
 	sethi	%hi(.copyinstr_err), %o4
@@ -194,17 +170,6 @@ copyinstr(const char *uaddr, char *kaddr, size_t maxlength,
 	retl
 	stn	%o5, [THREAD_REG + T_LOFAULT]	! stop catching faults
 	SET_SIZE(copyinstr)
-#endif
-
-#if defined(lint)
-
-/* ARGSUSED */
-int
-copyinstr_noerr(const char *uaddr, char *kaddr, size_t maxlength,
-    size_t *lencopied)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(copyinstr_noerr)
 	mov	%o2, %o4		! save original count
@@ -247,22 +212,10 @@ copyinstr_noerr(const char *uaddr, char *kaddr, size_t maxlength,
 	nop
 	SET_SIZE(copyinstr_noerr)
 
-#endif	/* lint */
-
 /*
  * Copy a null terminated string from the kernel
  * address space to the user address space.
  */
-
-#if defined(lint)
-
-/* ARGSUSED */
-int
-copyoutstr(const char *kaddr, char *uaddr, size_t maxlength,
-    size_t *lencopied)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(copyoutstr)
 	sethi	%hi(.copyoutstr_err), %o5
@@ -330,18 +283,6 @@ copyoutstr(const char *kaddr, char *uaddr, size_t maxlength,
 	stn	%o5, [THREAD_REG + T_LOFAULT]	! stop catching faults
 	SET_SIZE(copyoutstr)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/* ARGSUSED */
-int
-copyoutstr_noerr(const char *kaddr, char *uaddr, size_t maxlength,
-    size_t *lencopied)
-{ return (0); }
-
-#else	/* lint */
-
 	ENTRY(copyoutstr_noerr)
 	mov	%o2, %o4		! save original count
 
@@ -382,8 +323,6 @@ copyoutstr_noerr(const char *kaddr, char *uaddr, size_t maxlength,
 	nop
 	SET_SIZE(copyoutstr_noerr)
 
-#endif	/* lint */
-
 
 /*
  * Copy a block of storage.  If the source and target regions overlap,
@@ -391,15 +330,6 @@ copyoutstr_noerr(const char *kaddr, char *uaddr, size_t maxlength,
  * No fault handler installed (to be called under on_fault())
  */
 
-#if defined(lint)
- 
-/* ARGSUSED */
-void
-ucopy(const void *ufrom, void *uto, size_t ulength)
-{}
- 
-#else /* lint */
- 
 	ENTRY(ucopy)
 	save	%sp, -SA(MINFRAME), %sp ! get another window
 
@@ -417,7 +347,6 @@ ucopy(const void *ufrom, void *uto, size_t ulength)
 	restore %g0, 0, %o0		! return (0)
 
 	SET_SIZE(ucopy)
-#endif /* lint */
 
 /*
  * Copy a user-land string.  If the source and target regions overlap,
@@ -425,15 +354,6 @@ ucopy(const void *ufrom, void *uto, size_t ulength)
  * No fault handler installed (to be called under on_fault())
  */
 
-#if defined(lint)
- 
-/* ARGSUSED */
-void
-ucopystr(const char *ufrom, char *uto, size_t umaxlength, size_t *ulencopied)
-{}
- 
-#else /* lint */
- 
 	ENTRY(ucopystr)
 	save	%sp, -SA(MINFRAME), %sp ! get another window
 
@@ -455,4 +375,3 @@ ucopystr(const char *ufrom, char *uto, size_t umaxlength, size_t *ulencopied)
 	restore %g0, 0, %o0		! return (0)
 
 	SET_SIZE(ucopystr)
-#endif /* lint */

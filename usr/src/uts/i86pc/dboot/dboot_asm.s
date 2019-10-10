@@ -27,27 +27,6 @@
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
 
-#if defined(__lint)
-
-#include "dboot_asm.h"
-
-/* ARGSUSED */
-uint32_t
-get_cpuid_edx(uint32_t *eax)
-{ return (0); }
-
-/* ARGSUSED */
-void
-outb(int port, uint8_t value)
-{}
-
-/* ARGSUSED */
-uint8_t
-inb(int port)
-{ return (0); }
-
-#else /* __lint */
-
 #if defined(__amd64)
 
 	/*
@@ -140,4 +119,3 @@ inb(int port)
 
 #endif	/* __i386 */
 
-#endif /* __lint */

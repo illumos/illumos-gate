@@ -25,17 +25,9 @@
  * Copyright (c) 2017, Joyent, Inc. All rights reserved.
  */
 
-#if !defined(lint)
 #include "assym.h"
-#endif /* !lint */
 
 #include <sys/asm_linkage.h>
-
-#if defined(lint)
-
-char stubs_base[1], stubs_end[1];
-
-#else	/* lint */
 
 /*
  * WARNING: there is no check for forgetting to write END_MODULE,
@@ -1284,4 +1276,3 @@ stubs_base:
 stubs_end:
 	nop
 
-#endif	/* lint */

@@ -21,21 +21,18 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-	
+
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #include <sys/elf_notes.h>
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#if defined(lint)
-#include <sys/types.h>
-#else
 
 #include "assym.h"
 
-/
-/ Tell the booter that we'd like to load unix on a large page
-/ if the chip supports it.
-/
+/*
+ * Tell the booter that we'd like to load unix on a large page.
+ */
 	.section        .note
 	.align          4
 	.4byte           .name1_end - .name1_begin 
@@ -49,4 +46,3 @@
 	.4byte		FOUR_MEG
 .desc1_end:
 	.align		4
-#endif

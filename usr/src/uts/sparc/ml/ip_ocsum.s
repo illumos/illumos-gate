@@ -28,10 +28,6 @@
 
 #include <sys/asm_linkage.h>
 
-#if defined(lint)
-#include <sys/types.h>
-#endif	/* lint */
-
 /*
  * ip_ocsum(address, halfword_count, sum)
  * Do a 16 bit one's complement sum of a given number of (16-bit)
@@ -42,15 +38,6 @@
  * (from @(#)ocsum.s 1.3 89/02/24 SMI)
  *
  */
-
-#if defined(lint) 
-
-/* ARGSUSED */
-unsigned int
-ip_ocsum(u_short *address, int halfword_count, unsigned int sum)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(ip_ocsum)
 	cmp	%o1, 31		! less than 62 bytes?
@@ -124,4 +111,3 @@ ip_ocsum(u_short *address, int halfword_count, unsigned int sum)
 	addxcc	%o2, 0, %o0	! add in carry if any. result in %o0
 	SET_SIZE(ip_ocsum)
 
-#endif 	/* lint */

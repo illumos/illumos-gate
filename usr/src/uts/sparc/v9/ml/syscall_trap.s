@@ -35,22 +35,11 @@
 #include <sys/pcb.h>
 #include <sys/machparam.h>
 
-#if !defined(lint) && !defined(__lint)
 #include "assym.h"
-#endif
 
 #ifdef TRAPTRACE
 #include <sys/traptrace.h>
 #endif /* TRAPTRACE */
-
-#if defined(lint) || defined(__lint)
-
-/*ARGSUSED*/
-void
-syscall_trap(struct regs *rp)	/* for tags only; not called from C */
-{}
-
-#else /* lint */
 
 #if (1 << SYSENT_SHIFT) != SYSENT_SIZE
 #error	"SYSENT_SHIFT does not correspond to size of sysent structure"
@@ -290,15 +279,6 @@ _syscall_post:
 	jmp	%l0 + 8				! return to user_rtt
 	nop
 	SET_SIZE(syscall_trap)
-#endif	/* lint */
-
-#if defined(lint) || defined(__lint)
-
-void
-syscall_trap32(void)	/* for tags only - trap handler - not called from C */
-{}
-
-#else /* lint */
 
 /*
  * System call trap handler for ILP32 processes.
@@ -550,8 +530,6 @@ _syscall_post32:
 	nop
 	SET_SIZE(syscall_trap32)
 
-#endif /* lint */
-
 
 /*
  * lwp_rtt - start execution in newly created LWP.
@@ -560,17 +538,6 @@ _syscall_post32:
  *	simply be restored.
  *	This must go out through sys_rtt instead of syscall_rtt.
  */
-#if defined(lint) || defined(__lint)
-
-void
-lwp_rtt_initial(void)
-{}
-
-void
-lwp_rtt(void)
-{}
-
-#else	/* lint */
 	ENTRY_NP(lwp_rtt_initial)
 	ldn	[THREAD_REG + T_STACK], %l7
 	call	__dtrace_probe___proc_start
@@ -592,4 +559,3 @@ lwp_rtt(void)
 	SET_SIZE(lwp_rtt)
 	SET_SIZE(lwp_rtt_initial)
 
-#endif	/* lint */

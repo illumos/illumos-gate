@@ -154,20 +154,12 @@ CORE_OBJS +=			\
 #	locore.o is special. It must be the first file relocated so that it
 #	it is relocated just where its name implies.
 #
-SPECIAL_OBJS_32 +=		\
-	locore.o		\
-	fast_trap_asm.o		\
-	interrupt.o		\
-	syscall_asm.o
-
-SPECIAL_OBJS_64 +=		\
+SPECIAL_OBJS +=			\
 	locore.o		\
 	fast_trap_asm.o		\
 	interrupt.o		\
 	syscall_asm_amd64.o	\
 	kpti_trampolines.o
-
-SPECIAL_OBJS += $(SPECIAL_OBJS_$(CLASS))
 
 #
 # object files used to boot into full kernel
@@ -254,7 +246,6 @@ ASSYM_DEPS      +=		\
 	panic_asm.o		\
 	sseblk.o		\
 	swtch.o			\
-	syscall_asm.o		\
 	syscall_asm_amd64.o
 
 $(KDI_ASSYM_DEPS:%=$(OBJS_DIR)/%):	$(DSF_DIR)/$(OBJS_DIR)/kdi_assym.h

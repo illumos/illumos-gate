@@ -31,15 +31,6 @@
 #include <sys/asm_linkage.h>
 #include <sys/hypervisor_api.h>
 
-#if defined(lint) || defined(__lint)
-
-/*ARGSUSED*/
-uint64_t
-hv_mach_pri(uint64_t buffer_ra, uint64_t *buffer_sizep)
-{ return (0); }
-
-#else	/* lint || __lint */
-
 	/*
 	 * MACH_PRI
 	 * arg0 buffer real address
@@ -56,4 +47,3 @@ hv_mach_pri(uint64_t buffer_ra, uint64_t *buffer_sizep)
 	stx	%o1, [%o4]
 	SET_SIZE(hv_mach_pri)
 
-#endif	/* lint || __lint */

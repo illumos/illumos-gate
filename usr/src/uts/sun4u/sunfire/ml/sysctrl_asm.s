@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/asm_linkage.h>
@@ -39,19 +37,10 @@
 #include <sys/mmu.h>
 #include <sys/spitregs.h>
 
-#if defined(lint)
-
-#else	/* lint */
 #include "assym.h"
-#endif	/* lint */
 
 #define	TT_HSM	0x99
 
-#if defined(lint)
-void
-sysctrl_freeze(void)
-{}
-#else /* lint */
 /*
  * This routine quiets a cpu and has it spin on a barrier.
  * It is used during memory sparing so that no memory operation
@@ -89,4 +78,3 @@ sysctrl_freeze(void)
 	membar	#Sync
 	SET_SIZE(sysctrl_freeze)
 
-#endif	/* lint */

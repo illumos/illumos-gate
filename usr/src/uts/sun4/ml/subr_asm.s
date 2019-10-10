@@ -23,33 +23,17 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * General machine architecture & implementation specific
  * assembly language routines.
  */
-#if defined(lint)
-#include <sys/types.h>
-#include <sys/machsystm.h>
-#include <sys/t_lock.h>
-#else	/* lint */
 #include "assym.h"
-#endif	/* lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/async.h>
 #include <sys/machthread.h>
 #include <sys/vis.h>
 #include <sys/machsig.h>
-
-#if defined(lint)
-caddr_t
-set_trap_table(void)
-{
-	return ((caddr_t)0);
-}
-#else /* lint */
 
 	ENTRY(set_trap_table)
 	set	trap_table, %o1
@@ -58,72 +42,6 @@ set_trap_table(void)
 	retl
 	wrpr	%g0, WSTATE_KERN, %wstate
 	SET_SIZE(set_trap_table)
-
-#endif /* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-stphys(uint64_t physaddr, int value)
-{}
-
-/*ARGSUSED*/
-int
-ldphys(uint64_t physaddr)
-{ return (0); }
-
-/*ARGSUSED*/
-void
-stdphys(uint64_t physaddr, uint64_t value)
-{}
-
-/*ARGSUSED*/
-uint64_t
-lddphys(uint64_t physaddr)
-{ return (0x0ull); }
-
-/* ARGSUSED */
-void
-stphysio(u_longlong_t physaddr, uint_t value)
-{}
-
-/* ARGSUSED */
-uint_t
-ldphysio(u_longlong_t physaddr)
-{ return(0); }
-
-/* ARGSUSED */
-void
-sthphysio(u_longlong_t physaddr, ushort_t value)
-{}
-
-/* ARGSUSED */
-ushort_t
-ldhphysio(u_longlong_t physaddr)
-{ return(0); }
-
-/* ARGSUSED */
-void
-stbphysio(u_longlong_t physaddr, uchar_t value)
-{}
-
-/* ARGSUSED */
-uchar_t
-ldbphysio(u_longlong_t physaddr)
-{ return(0); }
-
-/*ARGSUSED*/
-void
-stdphysio(u_longlong_t physaddr, u_longlong_t value)
-{}
-
-/*ARGSUSED*/
-u_longlong_t
-lddphysio(u_longlong_t physaddr)
-{ return (0ull); }
-
-#else
 
 	! Store long word value at physical address
 	!
@@ -300,38 +218,17 @@ lddphysio(u_longlong_t physaddr)
 	retl
 	wrpr	%g0, %o4, %pstate	/* restore pstate */
 	SET_SIZE(ldbphysio)
-#endif  /* lint */
 
 /*
  * save_gsr(kfpu_t *fp)
  * Store the graphics status register
  */
 
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-void
-save_gsr(kfpu_t *fp)
-{}
-
-#else	/* lint */
-
 	ENTRY_NP(save_gsr)
 	rd	%gsr, %g2			! save gsr
 	retl
 	stx	%g2, [%o0 + FPU_GSR]
 	SET_SIZE(save_gsr)
-
-#endif	/* lint */
-
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-void
-restore_gsr(kfpu_t *fp)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(restore_gsr)
 	ldx	[%o0 + FPU_GSR], %g2
@@ -340,29 +237,16 @@ restore_gsr(kfpu_t *fp)
 	nop
 	SET_SIZE(restore_gsr)
 
-#endif	/* lint */
-
 /*
  * uint64_t
  * _fp_read_pgsr()
  * Get the graphics status register info from fp and return it
  */
 
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-uint64_t
-_fp_read_pgsr(kfpu_t *fp)
-{ return 0; }
-
-#else	/* lint */
-
 	ENTRY_NP(_fp_read_pgsr)
 	retl
 	rd	%gsr, %o0
 	SET_SIZE(_fp_read_pgsr)
-
-#endif	/* lint */
 
 
 /*
@@ -371,71 +255,30 @@ _fp_read_pgsr(kfpu_t *fp)
  * Get the graphics status register info from fp and return it
  */
 
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-uint64_t
-get_gsr(kfpu_t *fp)
-{ return 0; }
-
-#else	/* lint */
-
 	ENTRY_NP(get_gsr)
 	retl
 	ldx	[%o0 + FPU_GSR], %o0
 	SET_SIZE(get_gsr)
-
-#endif
 
 /*
  * _fp_write_pgsr(uint64_t *buf, kfpu_t *fp)
  * Set the graphics status register info to fp from buf
  */
 
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-void
-_fp_write_pgsr(uint64_t buf, kfpu_t *fp)
-{}
-
-#else	/* lint */
-
 	ENTRY_NP(_fp_write_pgsr)
 	retl
 	mov	%o0, %gsr
 	SET_SIZE(_fp_write_pgsr)
-
-#endif	/* lint */
 
 /*	
  * set_gsr(uint64_t buf, kfpu_t *fp)
  * Set the graphics status register info to fp from buf
  */
 
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-void
-set_gsr(uint64_t buf, kfpu_t *fp)
-{}
-
-#else	/* lint */
-
 	ENTRY_NP(set_gsr)
 	retl
 	stx	%o0, [%o1 + FPU_GSR]
 	SET_SIZE(set_gsr)
-
-#endif	/* lint */
-
-#if defined(lint) || defined(__lint)
-void
-kdi_cpu_index(void)
-{
-}
-
-#else	/* lint */
 
 	ENTRY_NP(kdi_cpu_index)
 	CPU_INDEX(%g1, %g2)
@@ -443,23 +286,11 @@ kdi_cpu_index(void)
 	nop
 	SET_SIZE(kdi_cpu_index)
 
-#endif	/* lint */
-
-#if defined(lint) || defined(__lint)
-void
-kmdb_enter(void)
-{
-}
-
-#else	/* lint */
-
 	ENTRY_NP(kmdb_enter)
 	t	ST_KMDB_TRAP
 	retl
 	nop
 	SET_SIZE(kmdb_enter)
-
-#endif	/* lint */
 
 /*
  * The Spitfire floating point code has been changed not to use install/
@@ -492,20 +323,6 @@ kmdb_enter(void)
  * Store the floating point registers.
  */
 
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-void
-fp_save(kfpu_t *fp)
-{}
-
-/* ARGSUSED */
-void
-fp_fksave(kfpu_t *fp)
-{}
-
-#else	/* lint */
-
 	ENTRY_NP(fp_save)
 	ALTENTRY(fp_fksave)
 	BSTORE_FPREGS(%o0, %o1)			! store V9 regs
@@ -514,22 +331,11 @@ fp_fksave(kfpu_t *fp)
 	SET_SIZE(fp_fksave)
 	SET_SIZE(fp_save)
 
-#endif	/* lint */
-
 /*
  * fp_v8_fksave(kfpu_t *fp)
  *
  * This is like the above routine but only saves the lower half.
  */
-
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-void
-fp_v8_fksave(kfpu_t *fp)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(fp_v8_fksave)
 	BSTORE_V8_FPREGS(%o0, %o1)		! store V8 regs
@@ -537,22 +343,11 @@ fp_v8_fksave(kfpu_t *fp)
 	stx	%fsr, [%o0 + FPU_FSR]		! store fsr
 	SET_SIZE(fp_v8_fksave)
 
-#endif	/* lint */
-
 /*
  * fp_v8p_fksave(kfpu_t *fp)
  *
  * This is like the above routine but only saves the upper half.
  */
-
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-void
-fp_v8p_fksave(kfpu_t *fp)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(fp_v8p_fksave)
 	BSTORE_V8P_FPREGS(%o0, %o1)		! store V9 extra regs
@@ -560,20 +355,9 @@ fp_v8p_fksave(kfpu_t *fp)
 	stx	%fsr, [%o0 + FPU_FSR]		! store fsr
 	SET_SIZE(fp_v8p_fksave)
 
-#endif	/* lint */
-
 /*
  * fp_restore(kfpu_t *fp)
  */
-
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-void
-fp_restore(kfpu_t *fp)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(fp_restore)
 	BLOAD_FPREGS(%o0, %o1)			! load V9 regs
@@ -581,20 +365,9 @@ fp_restore(kfpu_t *fp)
 	ldx	[%o0 + FPU_FSR], %fsr		! restore fsr
 	SET_SIZE(fp_restore)
 
-#endif	/* lint */
-
 /*
  * fp_v8_load(kfpu_t *fp)
  */
-
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-void
-fp_v8_load(kfpu_t *fp)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(fp_v8_load)
 	BLOAD_V8_FPREGS(%o0, %o1)		! load V8 regs
@@ -602,20 +375,9 @@ fp_v8_load(kfpu_t *fp)
 	ldx	[%o0 + FPU_FSR], %fsr		! restore fsr
 	SET_SIZE(fp_v8_load)
 
-#endif	/* lint */
-
 /*
  * fp_v8p_load(kfpu_t *fp)
  */
-
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-void
-fp_v8p_load(kfpu_t *fp)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(fp_v8p_load)
 	BLOAD_V8P_FPREGS(%o0, %o1)		! load V9 extra regs
@@ -623,4 +385,3 @@ fp_v8p_load(kfpu_t *fp)
 	ldx	[%o0 + FPU_FSR], %fsr		! restore fsr
 	SET_SIZE(fp_v8p_load)
 
-#endif	/* lint */

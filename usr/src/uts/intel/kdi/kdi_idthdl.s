@@ -33,10 +33,6 @@
  * different number.
  */
 
-#if defined(__lint)
-#include <sys/types.h>
-#else
-
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
 #include <sys/machprivregs.h>
@@ -325,4 +321,3 @@ kdi_isr_end:
 	nop
 #endif
 
-#endif /* !__lint */

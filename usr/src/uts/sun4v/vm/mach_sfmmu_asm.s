@@ -28,11 +28,7 @@
  * routines.
  */
 
-#if defined(lint)
-#include <sys/types.h>
-#else	/* lint */
 #include "assym.h"
-#endif	/* lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/machtrap.h>
@@ -53,34 +49,6 @@
 /*
  * sfmmu related subroutines
  */
-
-#if defined (lint)
-
-/* ARGSUSED */
-void
-sfmmu_raise_tsb_exception(uint64_t sfmmup, uint64_t rctx)
-{}
-
-int
-sfmmu_getctx_pri()
-{ return(0); }
-
-int
-sfmmu_getctx_sec()
-{ return(0); }
-
-/* ARGSUSED */
-void
-sfmmu_setctx_sec(uint_t ctx)
-{}
-
-/* ARGSUSED */
-void
-sfmmu_load_mmustate(sfmmu_t *sfmmup)
-{
-}
-
-#else	/* lint */
 
 /*
  * Invalidate either the context of a specific victim or any process
@@ -430,24 +398,6 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 
 	SET_SIZE(sfmmu_load_mmustate)
 	
-#endif /* lint */
-
-#if defined(lint)
-
-/* Prefetch "struct tsbe" while walking TSBs */
-/*ARGSUSED*/
-void
-prefetch_tsbe_read(struct tsbe *tsbep)
-{}
-
-/* Prefetch the tsbe that we are about to write */
-/*ARGSUSED*/
-void
-prefetch_tsbe_write(struct tsbe *tsbep)
-{}
-
-#else /* lint */
-
 	ENTRY(prefetch_tsbe_read)
 	retl
 	nop
@@ -457,4 +407,3 @@ prefetch_tsbe_write(struct tsbe *tsbep)
 	retl
 	nop
 	SET_SIZE(prefetch_tsbe_write)
-#endif /* lint */

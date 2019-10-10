@@ -35,22 +35,6 @@
 #include <io/px/px_ioapi.h>
 #include <io/px/px_lib4v.h>
 
-#if defined(lint) || defined(__lint)
-
-/*ARGSUSED*/
-uint64_t
-hvio_config_get(devhandle_t dev_hdl, pci_device_t bdf, pci_config_offset_t off, 
-    pci_config_size_t size, pci_cfg_data_t *data_p)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-hvio_config_put(devhandle_t dev_hdl, pci_device_t bdf, pci_config_offset_t off, 
-    pci_config_size_t size, pci_cfg_data_t data)
-{ return (0); }
-
-#else	/* lint || __lint */
-
 	/*
 	 * arg0 - devhandle
 	 * arg1 - pci_device
@@ -90,4 +74,3 @@ hvio_config_put(devhandle_t dev_hdl, pci_device_t bdf, pci_config_offset_t off,
 	retl
 	nop
 	SET_SIZE(hvio_config_put)
-#endif

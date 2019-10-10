@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * sun4v processor initialization
  *
@@ -33,9 +31,7 @@
  * directly from the hypervisor. i.e. without going through OBP.
  */
 
-#if !defined(lint)
 #include "assym.h"
-#endif /* !lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/hypervisor_api.h>
@@ -44,15 +40,6 @@
 #include <sys/machlock.h>
 #include <sys/mmu.h>
 #include <sys/lpad.h>
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-mach_cpu_startup(uint64_t rabase, uint64_t memsz)
-{}
-
-#else	/* lint */
 
 	/*
 	 * %o0 - hcall specified arg (cpuid)
@@ -208,4 +195,3 @@ startup_complete:
 	.global mach_cpu_startup_end
 mach_cpu_startup_end:
 
-#endif	/* lint */

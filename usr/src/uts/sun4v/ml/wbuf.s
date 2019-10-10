@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/asm_linkage.h>
 #include <sys/machthread.h>
 #include <sys/privregs.h>
@@ -36,7 +34,6 @@
 #include <sys/machtrap.h>
 #include <sys/traptrace.h>
 
-#if !defined(lint)
 #include "assym.h"
 
 	/*
@@ -513,4 +510,3 @@
 	mov	PTL1_BAD_WTRAP, %g1
 	SET_SIZE(fault_32bit_not)
 	SET_SIZE(fault_64bit_not)
-#endif /* !lint */

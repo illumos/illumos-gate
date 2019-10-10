@@ -32,22 +32,11 @@
  * These routines should ONLY be ISA-dependent.
  */
 
-#if defined(lint)
-
-#include <sys/types.h>
-#include <sys/systm.h>
-#include <sys/file.h>
-#include <sys/sunddi.h>
-
-#else	/* lint */
-
 #include <sys/asm_linkage.h>
 #include <sys/clock.h>
 #include <sys/intreg.h>
 
 #include "assym.h"		/* for FKIOCTL etc. */
-
-#endif	/* lint */
 
 
 /*
@@ -72,18 +61,6 @@
 	call	routine;	\
 	mov	%g1, %o7
 
-#ifdef	lint
-
-int
-ddi_copyin(const void *buf, void *kernbuf, size_t size, int flags)
-{
-	if (flags & FKIOCTL)
-		return (kcopy(buf, kernbuf, size) ? -1 : 0);
-	return (copyin(buf, kernbuf, size));
-}
-
-#else	/* lint */
-
 	ENTRY(ddi_copyin)
 	set	FKIOCTL, %o4
 	andcc	%o3, %o4, %g0
@@ -104,20 +81,6 @@ ddi_copyin(const void *buf, void *kernbuf, size_t size, int flags)
 	restore
 	SET_SIZE(ddi_copyin)
 
-#endif	/* lint */
-
-#ifdef	lint
-
-int
-ddi_copyout(const void *buf, void *kernbuf, size_t size, int flags)
-{
-	if (flags & FKIOCTL)
-		return (kcopy(buf, kernbuf, size) ? -1 : 0);
-	return (copyout(buf, kernbuf, size));
-}
-
-#else	/* lint */
-
 	ENTRY(ddi_copyout)
 	set	FKIOCTL, %o4
 	andcc	%o3, %o4, %g0
@@ -126,23 +89,10 @@ ddi_copyout(const void *buf, void *kernbuf, size_t size, int flags)
 	/*NOTREACHED*/
 	SET_SIZE(ddi_copyout)
 
-#endif	/* lint */
-
 /*
  * DDI spine wrapper routines - here so as to not have to
  * buy register windows when climbing the device tree (which cost!)
  */
-
-#if	defined(lint)
-
-/*ARGSUSED*/
-int
-ddi_ctlops(dev_info_t *d, dev_info_t *r, ddi_ctl_enum_t op, void *a, void *v)
-{
-	return (DDI_SUCCESS);
-}
-
-#else	/* lint */
 
 	ENTRY(ddi_ctlops)
 	tst	%o0		! dip != 0?
@@ -162,20 +112,6 @@ ddi_ctlops(dev_info_t *d, dev_info_t *r, ddi_ctl_enum_t op, void *a, void *v)
 	sub	%g0, 1, %o0	! return (DDI_FAILURE);
 	SET_SIZE(ddi_ctlops)
 
-#endif	/* lint */
-
-#if	defined(lint)
-
-/* ARGSUSED */
-int
-ddi_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attr,
-	int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *handlep)
-{
-	return (DDI_SUCCESS);
-}
-
-#else	/* lint */
-
 	ENTRY(ddi_dma_allochdl)
 	ldn	[%o0 + DEVI_BUS_DMA_ALLOCHDL], %o0
 			! dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_allochdl;
@@ -186,19 +122,6 @@ ddi_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attr,
 	jmpl	%g1, %g0	! bop off to new routine
 	nop			! as if we had never been here
 	SET_SIZE(ddi_dma_allochdl)
-
-#endif	/* lint */
-
-#if	defined(lint)
-
-/* ARGSUSED */
-int
-ddi_dma_freehdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handlep)
-{
-	return (DDI_SUCCESS);
-}
-
-#else	/* lint */
 
 	ENTRY(ddi_dma_freehdl)
 	ldn	[%o0 + DEVI_BUS_DMA_FREEHDL], %o0
@@ -211,21 +134,6 @@ ddi_dma_freehdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handlep)
 	nop			! as if we had never been here
 	SET_SIZE(ddi_dma_freehdl)
 
-#endif	/* lint */
-
-#if	defined(lint)
-
-/* ARGSUSED */
-int
-ddi_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
-	ddi_dma_handle_t handle, struct ddi_dma_req *dmareq,
-	ddi_dma_cookie_t *cp, u_int *ccountp)
-{
-	return (DDI_SUCCESS);
-}
-
-#else	/* lint */
-
 	ENTRY(ddi_dma_bindhdl)
 	ldn	[%o0 + DEVI_BUS_DMA_BINDHDL], %o0
 			! dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_bindhdl;
@@ -236,20 +144,6 @@ ddi_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 	jmpl	%g1, %g0	! bop off to new routine
 	nop			! as if we had never been here
 	SET_SIZE(ddi_dma_bindhdl)
-
-#endif	/* lint */
-
-#if	defined(lint)
-
-/* ARGSUSED */
-int
-ddi_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
-	ddi_dma_handle_t handle)
-{
-	return (DDI_SUCCESS);
-}
-
-#else	/* lint */
 
 	ENTRY(ddi_dma_unbindhdl)
 	ldn	[%o0 + DEVI_BUS_DMA_UNBINDHDL], %o0
@@ -262,21 +156,6 @@ ddi_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 	nop			! as if we had never been here
 	SET_SIZE(ddi_dma_unbindhdl)
 
-#endif	/* lint */
-
-#if	defined(lint)
-
-/* ARGSUSED */
-int
-ddi_dma_flush(dev_info_t *dip, dev_info_t *rdip,
-	ddi_dma_handle_t handle, off_t off, size_t len,
-	u_int cache_flags)
-{
-	return (DDI_SUCCESS);
-}
-
-#else	/* lint */
-
 	ENTRY(ddi_dma_flush)
 	ldn	[%o0 + DEVI_BUS_DMA_FLUSH], %o0
 			! dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_flush;
@@ -288,21 +167,6 @@ ddi_dma_flush(dev_info_t *dip, dev_info_t *rdip,
 	nop			! as if we had never been here
 	SET_SIZE(ddi_dma_flush)
 
-#endif	/* lint */
-
-#if	defined(lint)
-
-/* ARGSUSED */
-int
-ddi_dma_win(dev_info_t *dip, dev_info_t *rdip,
-	ddi_dma_handle_t handle, uint_t win, off_t *offp,
-	size_t *lenp, ddi_dma_cookie_t *cookiep, uint_t *ccountp)
-{
-	return (DDI_SUCCESS);
-}
-
-#else	/* lint */
-
 	ENTRY(ddi_dma_win)
 	ldn	[%o0 + DEVI_BUS_DMA_WIN], %o0
 			! dip = (dev_info_t *)DEVI(dip)->devi_bus_dma_win;
@@ -313,19 +177,6 @@ ddi_dma_win(dev_info_t *dip, dev_info_t *rdip,
 	jmpl	%g1, %g0	! bop off to new routine
 	nop			! as if we had never been here
 	SET_SIZE(ddi_dma_win)
-
-#endif	/* lint */
-
-#if	defined(lint)
-
-/* ARGSUSED */
-int
-ddi_dma_sync(ddi_dma_handle_t h, off_t o, size_t l, u_int whom)
-{
-	return (DDI_SUCCESS);
-}
-
-#else	/* lint */
 
 	ENTRY(ddi_dma_sync)
 	ld	[%o0 + DMA_HANDLE_RFLAGS], %o4	! hp->dmai_rflags;
@@ -351,19 +202,6 @@ ddi_dma_sync(ddi_dma_handle_t h, off_t o, size_t l, u_int whom)
 	nop			! as if we had never been here
 	SET_SIZE(ddi_dma_sync)
 
-#endif	/* lint */
-
-#if	defined(lint)
-
-/* ARGSUSED */
-int
-ddi_dma_unbind_handle(ddi_dma_handle_t h)
-{
-	return (DDI_SUCCESS);
-}
-
-#else	/* lint */
-
 	ENTRY(ddi_dma_unbind_handle)
 	ldn	[%o0 + DMA_HANDLE_RDIP], %o1	! dip = hp->dmai_rdip;
 	mov	%o0, %o2
@@ -374,21 +212,6 @@ ddi_dma_unbind_handle(ddi_dma_handle_t h)
 		    ! hdip = (dev_info_t *)DEVI(dip)->devi_bus_dma_unbindhdl;
 	SET_SIZE(ddi_dma_unbind_handle)
 
-#endif	/* lint */
-
-
-#if	defined(lint)
-
-/*ARGSUSED*/
-int
-ddi_dma_mctl(register dev_info_t *dip, dev_info_t *rdip,
-    ddi_dma_handle_t handle, enum ddi_dma_ctlops request,
-    off_t *offp, size_t *lenp, caddr_t *objp, u_int flags)
-{
-	return (DDI_SUCCESS);
-}
-
-#else	/* lint */
 
 	ENTRY(ddi_dma_mctl)
 	ldn	[%o0 + DEVI_BUS_DMA_CTL], %o0
@@ -400,4 +223,3 @@ ddi_dma_mctl(register dev_info_t *dip, dev_info_t *rdip,
 	nop			! as if we had never been here
 	SET_SIZE(ddi_dma_mctl)
 
-#endif	/* lint */

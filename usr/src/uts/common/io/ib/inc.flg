@@ -103,7 +103,6 @@ echo_file  usr/src/uts/intel/Makefile.files
 echo_file  usr/src/uts/intel/Makefile.rules
 echo_file  usr/src/uts/intel/Makefile.intel
 echo_file  usr/src/uts/intel/Makefile.targ
-echo_file  usr/src/uts/intel/ia32/ml/ia32.il
 echo_file  usr/src/uts/sun4/Makefile.files
 echo_file  usr/src/uts/sun4/Makefile.rules
 echo_file  usr/src/uts/sun4u/Makefile

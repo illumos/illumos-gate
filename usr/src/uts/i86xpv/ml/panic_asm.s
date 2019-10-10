@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/asm_linkage.h>
 #include <sys/hypervisor.h>
 #include <sys/privregs.h>
@@ -37,30 +35,7 @@
 #include <sys/asm_misc.h>
 #include <sys/panic.h>
 
-#if !defined(__lint)
 #include "assym.h"
-#endif
-
-#if defined(__lint)
-
-void
-xpv_panic_callback(void)
-{}
-
-/* ARGSUSED */
-void
-xpv_panic_setcr3(ulong_t cr3)
-{}
-
-void
-xpv_panic_reload_cr3(void)
-{}
-
-void
-xpv_resetgs(void)
-{}
-
-#else	/* __lint */
 
 #if defined(__amd64)
 	ENTRY_NP(xpv_panic_getcr3)
@@ -392,4 +367,3 @@ xpv_resetgs(void)
 	jmp	xpv_panic_prep
 	SET_SIZE(xpv_xmtrap)
 
-#endif	/* __lint */

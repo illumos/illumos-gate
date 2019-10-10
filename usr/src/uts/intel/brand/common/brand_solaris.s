@@ -32,49 +32,13 @@
  * use brand-specific #defines to replace the XXX_brand_... definitions.
  */
 
-#ifdef lint
-
-#include <sys/systm.h>
-
-#else /* !lint */
-
 #include <sys/asm_linkage.h>
 #include <sys/privregs.h>
 #include <sys/segments.h>
 #include "assym.h"
 #include "brand_asm.h"
 
-#endif	/* !lint */
-
-#ifdef  lint
-
-void
-XXX_brand_sysenter_callback(void)
-{
-}
-
-void
-XXX_brand_syscall_callback(void)
-{
-}
-
-#if defined(__amd64)
-void
-XXX_brand_syscall32_callback(void)
-{
-}
-#endif  /* amd64 */
-
-void
-XXX_brand_int91_callback(void)
-{
-}
-
-#else   /* !lint */
-
 #ifdef _ASM	/* The remainder of this file is only for assembly files */
-
-#if defined(__amd64)
 
 /*
  * syscall handler for 32-bit user processes:
@@ -155,44 +119,4 @@ ENTRY(XXX_brand_int91_callback)
 	retq
 SET_SIZE(XXX_brand_int91_callback)
 
-#else	/* !__amd64 */
-
-/*
- * To 'return' to our user-space handler, we need to replace the iret target
- * address.  The original return address is passed back in %eax.
- * See "32-BIT INTERPOSITION STACK" and "32-BIT INT STACK" in brand_asm.h.
- */
-ENTRY(XXX_brand_syscall_callback)
-	CALLBACK_PROLOGUE(XXX_emulation_table, SPD_HANDLER, SYSCALL_REG,
-	    SCR_REG, SCR_REGB);
-	CALC_TABLE_ADDR(SCR_REG, SPD_HANDLER); /* new ret addr is in scratch */
-	mov	SCR_REG, SYSCALL_REG;	/* place new ret addr in syscallreg */
-	GET_V(SP_REG, 0, V_U_EBX, SCR_REG); /* restore scratch register */
-	add	$V_END, SP_REG;		/* restore intr stack pointer */
-	/*CSTYLED*/
-	xchg	(SP_REG), SYSCALL_REG	/* swap new and orig. return addrs */
-	jmp	nopop_sys_rtt_syscall
-9:
-	ret
-SET_SIZE(XXX_brand_syscall_callback)
-
-/*
- * To 'return' to our user-space handler, we just need to place its address
- * into %edx.  The original return address is passed back in SYSCALL_REG.
- * See "32-BIT INTERPOSITION STACK" in brand_asm.h.
- */
-ENTRY(XXX_brand_sysenter_callback)
-	CALLBACK_PROLOGUE(XXX_emulation_table, SPD_HANDLER, SYSCALL_REG,
-	    SCR_REG, SCR_REGB);
-	mov	%edx, SCR_REG;	/* save orig return addr in scr reg */
-	CALC_TABLE_ADDR(%edx, SPD_HANDLER); /* new return addr is in %edx */
-	mov	SCR_REG, SYSCALL_REG;	/* save orig return addr in %eax */
-	GET_V(SP_REG, 0, V_U_EBX, SCR_REG) /* restore scratch register */
-	sysexit
-9:
-	ret
-SET_SIZE(XXX_brand_sysenter_callback)
-
-#endif	/* !__amd64 */
 #endif	/* _ASM */
-#endif  /* !lint */

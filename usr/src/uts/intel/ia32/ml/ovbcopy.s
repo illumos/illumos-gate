@@ -3,7 +3,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 /*-
  * Copyright (c) 1993 The Regents of the University of California.
@@ -42,18 +44,6 @@
 
 #include <sys/asm_linkage.h>
 
-#if defined(__lint)
-
-/*
- * Overlapping bcopy (source and target may overlap arbitrarily).
- */
-/* ARGSUSED */
-void
-ovbcopy(const void *from, void *to, size_t count)
-{}
-
-#else	/* __lint */
-
 /*
  * Adapted from fbsd bcopy().
  *
@@ -61,8 +51,6 @@ ovbcopy(const void *from, void *to, size_t count)
  *       rdi, rsi, rdx
  *  ws@tools.de     (Wolfgang Solfrank, TooLs GmbH) +49-228-985800
  */
-
-#if defined(__amd64)
 
 	ENTRY(ovbcopy)
 	xchgq	%rsi,%rdi
@@ -102,53 +90,3 @@ reverse:
 	ret
 	SET_SIZE(ovbcopy)
 
-#elif defined(__i386)
-
-	ENTRY(ovbcopy)
-	pushl	%esi
-	pushl	%edi
-	movl	12(%esp),%esi
-	movl	16(%esp),%edi
-	movl	20(%esp),%ecx
-
-	movl	%edi,%eax
-	subl	%esi,%eax
-	cmpl	%ecx,%eax		/* overlapping && src < dst? */
-	jb	reverse
-
-	shrl	$2,%ecx			/* copy by 32-bit words */
-	cld				/* nope, copy forwards */
-	rep
-	movsl
-	movl	20(%esp),%ecx
-	andl	$3,%ecx			/* any bytes left? */
-	rep
-	movsb
-	popl	%edi
-	popl	%esi
-	ret
-
-reverse:
-	addl	%ecx,%edi		/* copy backwards */
-	addl	%ecx,%esi
-	decl	%edi
-	decl	%esi
-	andl	$3,%ecx			/* any fractional bytes? */
-	std
-	rep
-	movsb
-	movl	20(%esp),%ecx		/* copy remainder by 32-bit words */
-	shrl	$2,%ecx
-	subl	$3,%esi
-	subl	$3,%edi
-	rep
-	movsl
-	popl	%edi
-	popl	%esi
-	cld
-	ret
-	SET_SIZE(ovbcopy)
-
-#endif	/* __i386 */
-
-#endif	/* __lint */

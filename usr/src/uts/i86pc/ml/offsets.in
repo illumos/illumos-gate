@@ -1,7 +1,7 @@
 \
 \ Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 \ Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
-\ Copyright 2018 Joyent, Inc.
+\ Copyright 2019 Joyent, Inc.
 \
 \ CDDL HEADER START
 \
@@ -124,9 +124,7 @@ _kthread	THREAD_SIZE
 	_tu._ts._t_post_sys	T_POST_SYS
 	_tu._t_post_sys_ast	T_POST_SYS_AST
 	t_copyops
-#ifdef	__amd64
 	t_useracc
-#endif
 
 ctxop
 	save_op			CTXOP_SAVE

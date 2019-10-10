@@ -25,9 +25,7 @@
  * Assembly code support for the Olympus-C module
  */
 
-#if !defined(lint)
 #include "assym.h"
-#endif	/* lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/mmu.h>
@@ -66,15 +64,6 @@
 /*
  * SPARC64-VI MMU and Cache operations.
  */
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-vtag_flushpage(caddr_t vaddr, uint64_t sfmmup)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(vtag_flushpage)
 	/*
@@ -144,16 +133,6 @@ vtag_flushpage(caddr_t vaddr, uint64_t sfmmup)
 	wrpr	%g0, %o5, %pstate		/* enable interrupts */
 	SET_SIZE(vtag_flushpage)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-void
-vtag_flushall(void)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP2(vtag_flushall, demap_all)
 	/*
@@ -169,17 +148,6 @@ vtag_flushall(void)
 	SET_SIZE(demap_all)
 	SET_SIZE(vtag_flushall)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-vtag_flushpage_tl1(uint64_t vaddr, uint64_t sfmmup)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(vtag_flushpage_tl1)
 	/*
@@ -225,17 +193,6 @@ vtag_flushpage_tl1(uint64_t vaddr, uint64_t sfmmup)
 	retry
 	SET_SIZE(vtag_flushpage_tl1)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-vtag_flush_pgcnt_tl1(uint64_t vaddr, uint64_t sfmmup_pgcnt)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(vtag_flush_pgcnt_tl1)
 	/*
@@ -315,17 +272,6 @@ vtag_flush_pgcnt_tl1(uint64_t vaddr, uint64_t sfmmup_pgcnt)
 	retry
 	SET_SIZE(vtag_flush_pgcnt_tl1)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-vtag_flushall_tl1(uint64_t dummy1, uint64_t dummy2)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(vtag_flushall_tl1)
 	/*
@@ -337,8 +283,6 @@ vtag_flushall_tl1(uint64_t dummy1, uint64_t dummy2)
 	retry
 	SET_SIZE(vtag_flushall_tl1)
 
-#endif	/* lint */
-
 
 /*
  * VAC (virtual address conflict) does not apply to OPL.
@@ -346,80 +290,26 @@ vtag_flushall_tl1(uint64_t dummy1, uint64_t dummy2)
  * As a result, all OPL VAC flushing routines are no-ops.
  */
 
-#if defined(lint)
-
-/* ARGSUSED */
-void
-vac_flushpage(pfn_t pfnum, int vcolor)
-{}
-
-#else	/* lint */
-
 	ENTRY(vac_flushpage)
 	retl
 	  nop
 	SET_SIZE(vac_flushpage)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-vac_flushpage_tl1(uint64_t pfnum, uint64_t vcolor)
-{}
-
-#else	/* lint */
-
 	ENTRY_NP(vac_flushpage_tl1)
 	retry
 	SET_SIZE(vac_flushpage_tl1)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-vac_flushcolor(int vcolor, pfn_t pfnum)
-{}
-
-#else	/* lint */
 
 	ENTRY(vac_flushcolor)
 	retl
 	 nop
 	SET_SIZE(vac_flushcolor)
 
-#endif  /* lint */
 
-
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-vac_flushcolor_tl1(uint64_t vcolor, uint64_t pfnum)
-{}
-
-#else	/* lint */
 
 	ENTRY(vac_flushcolor_tl1)
 	retry
 	SET_SIZE(vac_flushcolor_tl1)
-
-#endif	/* lint */
-
-#if defined(lint)
-
-int
-idsr_busy(void)
-{
-	return (0);
-}
-
-#else	/* lint */
 
 /*
  * Determine whether or not the IDSR is busy.
@@ -436,22 +326,6 @@ idsr_busy(void)
 	retl
 	nop
 	SET_SIZE(idsr_busy)
-
-#endif	/* lint */
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-init_mondo(xcfunc_t *func, uint64_t arg1, uint64_t arg2)
-{}
-
-/* ARGSUSED */
-void
-init_mondo_nocheck(xcfunc_t *func, uint64_t arg1, uint64_t arg2)
-{}
-
-#else	/* lint */
 
 	.global _dispatch_status_busy
 _dispatch_status_busy:
@@ -506,17 +380,6 @@ _dispatch_status_busy:
 	SET_SIZE(init_mondo_nocheck)
 	SET_SIZE(init_mondo)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-shipit(int upaid, int bn)
-{ return; }
-
-#else	/* lint */
 
 /*
  * Ship mondo to aid using busy/nack pair bn
@@ -532,17 +395,6 @@ shipit(int upaid, int bn)
 	nop
 	SET_SIZE(shipit)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-flush_instr_mem(caddr_t vaddr, size_t len)
-{}
-
-#else	/* lint */
 
 /*
  * flush_instr_mem:
@@ -563,8 +415,6 @@ flush_instr_mem(caddr_t vaddr, size_t len)
 	nop
 	SET_SIZE(flush_instr_mem)
 
-#endif	/* lint */
-
 
 /*
  * flush_ecache:
@@ -572,14 +422,6 @@ flush_instr_mem(caddr_t vaddr, size_t len)
  *	%o1 - ecache size
  *	%o2 - ecache linesize
  */
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-flush_ecache(uint64_t physaddr, size_t ecache_size, size_t ecache_linesize)
-{}
-
-#else /* !lint */
 
 	ENTRY(flush_ecache)
 
@@ -591,19 +433,6 @@ flush_ecache(uint64_t physaddr, size_t ecache_size, size_t ecache_linesize)
 	nop
 	SET_SIZE(flush_ecache)
 
-#endif /* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-kdi_flush_idcache(int dcache_size, int dcache_lsize, int icache_size,
-    int icache_lsize)
-{
-}
-
-#else	/* lint */
-
 	/*
 	 * I/D cache flushing is not needed for OPL processors
 	 */
@@ -611,8 +440,6 @@ kdi_flush_idcache(int dcache_size, int dcache_lsize, int icache_size,
 	retl
 	nop
 	SET_SIZE(kdi_flush_idcache)
-
-#endif	/* lint */
 
 #ifdef	TRAPTRACE
 /*
@@ -1001,7 +828,6 @@ label/**/1:
  * registers.
  */
 
-#if !defined(lint)
 #define	RESET_MMU_REGS(tmp1, tmp2, tmp3)			\
 	FLUSH_ALL_TLB(tmp1)					;\
 	set	MMU_PCONTEXT, tmp1				;\
@@ -1023,7 +849,6 @@ label/**/1:
 	stxa	%g0, [tmp]ASI_IMMU				;\
 	stxa	%g0, [tmp]ASI_DMMU				;\
 	membar	#Sync
-#endif /* lint */
 
 /*
  * In case of errors in the MMU_TSB_PREFETCH registers we have to
@@ -1031,7 +856,6 @@ label/**/1:
  * the "V" bit of the registers to 0, which will disable the prefetch
  * so the values of the other fields are irrelevant.
  */
-#if !defined(lint)
 #define	RESET_TSB_PREFETCH(tmp)			\
 	set	VA_UTSBPREF_8K, tmp 		;\
 	stxa	%g0, [tmp]ASI_ITSB_PREFETCH	;\
@@ -1049,7 +873,6 @@ label/**/1:
 	stxa	%g0, [tmp]ASI_DTSB_PREFETCH	;\
 	set	VA_KTSBPREF_4M, tmp 		;\
 	stxa	%g0, [tmp]ASI_DTSB_PREFETCH
-#endif /* lint */
 
 /*
  * In case of errors in the MMU_SHARED_CONTEXT register we have to
@@ -1057,11 +880,9 @@ label/**/1:
  * 0 in the IV field disabling the shared context support, and
  * making values of all the other fields of the register irrelevant.
  */
-#if !defined(lint)
 #define	RESET_SHARED_CTXT(tmp)			\
 	set	MMU_SHARED_CONTEXT, tmp		;\
 	stxa	%g0, [tmp]ASI_DMMU
-#endif /* lint */
 
 /*
  * RESET_TO_PRIV()
@@ -1125,14 +946,6 @@ label/**/1:
 	wrpr	%g0, %tpc
 
 
-#if defined(lint)
-
-void
-ce_err(void)
-{}
-
-#else	/* lint */
-
 /*
  * We normally don't expect CE traps since we disable the
  * 0x63 trap reporting at the start of day. There is a
@@ -1160,16 +973,6 @@ ce_err(void)
 	sub	%g0, 1, %g4
 	SET_SIZE(ce_err)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-void
-ce_err_tl1(void)
-{}
-
-#else	/* lint */
 
 /*
  * We don't use trap for CE detection.
@@ -1182,16 +985,6 @@ ce_err_tl1(void)
 	sub	%g0, 1, %g4
 	SET_SIZE(ce_err_tl1)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-void
-async_err(void)
-{}
-
-#else	/* lint */
 
 /*
  * async_err is the default handler for IAE/DAE traps.
@@ -1206,14 +999,6 @@ async_err(void)
 	jmp	%g5 + %lo(sys_trap)
 	sub	%g0, 1, %g4
 	SET_SIZE(async_err)
-
-#endif	/* lint */
-
-#if defined(lint)
-void
-opl_sync_trap(void)
-{}
-#else	/* lint */
 
 	.seg	".data"
 	.global	opl_clr_freg
@@ -1401,13 +1186,7 @@ opl_sync_trap_resetskip:
 	jmp	%g5 + %lo(sys_trap)
 	 mov	PIL_15, %g4
 	SET_SIZE(opl_sync_trap)
-#endif	/* lint */
 
-#if defined(lint)
-void
-opl_uger_trap(void)
-{}
-#else	/* lint */
 /*
  * Common Urgent error trap handler (tt=0x40)
  * All TL=0 and TL>0 0x40 traps vector to this handler.
@@ -1622,16 +1401,7 @@ opl_uger_panic_resetskip:
 	jmp	%g5 + %lo(sys_trap)
 	 mov	PIL_15, %g4
 	SET_SIZE(opl_uger_trap)
-#endif	/* lint */
 
-#if defined(lint)
-void
-opl_ta3_trap(void)
-{}
-void
-opl_cleanw_subr(void)
-{}
-#else	/* lint */
 /*
  * OPL ta3 support (note please, that win_reg
  * area size for each cpu is 2^7 bytes)
@@ -1727,15 +1497,7 @@ opl_cleanw_subr(void)
 	jmp	%g7
 	  nop
 	SET_SIZE(opl_cleanw_subr)
-#endif	/* lint */
 
-#if defined(lint)
-
-void
-opl_serr_instr(void)
-{}
-
-#else	/* lint */
 /*
  * The actual trap handler for tt=0x0a, and tt=0x32
  */
@@ -1747,15 +1509,6 @@ opl_serr_instr(void)
 	.align  32
 	SET_SIZE(opl_serr_instr)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-void
-opl_ugerr_instr(void)
-{}
-
-#else	/* lint */
 /*
  * The actual trap handler for tt=0x40
  */
@@ -1766,15 +1519,6 @@ opl_ugerr_instr(void)
 	.align  32
 	SET_SIZE(opl_ugerr_instr)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-void
-opl_ta3_instr(void)
-{}
-
-#else	/* lint */
 /*
  * The actual trap handler for tt=0x103 (flushw)
  */
@@ -1785,15 +1529,6 @@ opl_ta3_instr(void)
 	.align  32
 	SET_SIZE(opl_ta3_instr)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-void
-opl_ta4_instr(void)
-{}
-
-#else	/* lint */
 /*
  * The patch for the .clean_windows code
  */
@@ -1807,20 +1542,6 @@ opl_ta4_instr(void)
 	nop
 	SET_SIZE(opl_ta4_instr)
 
-#endif	/* lint */
-
-#if defined(lint)
-/*
- *  Get timestamp (stick).
- */
-/* ARGSUSED */
-void
-stick_timestamp(int64_t *ts)
-{
-}
-
-#else	/* lint */
-
 	ENTRY_NP(stick_timestamp)
 	rd	STICK, %g1	! read stick reg
 	sllx	%g1, 1, %g1
@@ -1830,20 +1551,6 @@ stick_timestamp(int64_t *ts)
 	stx	%g1, [%o0]	! store the timestamp
 	SET_SIZE(stick_timestamp)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-/*
- * Set STICK adjusted by skew.
- */
-/* ARGSUSED */
-void
-stick_adj(int64_t skew)
-{
-}
-
-#else	/* lint */
 
 	ENTRY_NP(stick_adj)
 	rdpr	%pstate, %g1		! save processor state
@@ -1862,38 +1569,12 @@ stick_adj(int64_t skew)
 	wrpr	%g1, %pstate		! restore processor state
 	SET_SIZE(stick_adj)
 
-#endif	/* lint */
-
-#if defined(lint)
-/*
- * Debugger-specific stick retrieval
- */
-/*ARGSUSED*/
-int
-kdi_get_stick(uint64_t *stickp)
-{
-	return (0);
-}
-
-#else	/* lint */
-
 	ENTRY_NP(kdi_get_stick)
 	rd	STICK, %g1
 	stx	%g1, [%o0]
 	retl
 	mov	%g0, %o0
 	SET_SIZE(kdi_get_stick)
-
-#endif	/* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-int
-dtrace_blksuword32(uintptr_t addr, uint32_t *data, int tryagain)
-{ return (0); }
-
-#else
 
 	ENTRY(dtrace_blksuword32)
 	save	%sp, -SA(MINFRAME + 4), %sp
@@ -1959,15 +1640,7 @@ dtrace_blksuword32(uintptr_t addr, uint32_t *data, int tryagain)
 	restore
 
 	SET_SIZE(dtrace_blksuword32)
-#endif /* lint */
 
-#if defined(lint)
-/*ARGSUSED*/
-void
-ras_cntr_reset(void *arg)
-{
-}
-#else
 	ENTRY_NP(ras_cntr_reset)
 	set	OPL_SCRATCHPAD_ERRLOG, %o1
 	ldxa	[%o1]ASI_SCRATCHPAD, %o0
@@ -1975,16 +1648,7 @@ ras_cntr_reset(void *arg)
 	retl
 	 stxa	%o0, [%o1]ASI_SCRATCHPAD
 	SET_SIZE(ras_cntr_reset)
-#endif /* lint */
 
-#if defined(lint)
-/* ARGSUSED */
-void
-opl_error_setup(uint64_t cpu_err_log_pa)
-{
-}
-
-#else	/* lint */
 	ENTRY_NP(opl_error_setup)
 	/*
 	 * Initialize the error log scratchpad register
@@ -2007,15 +1671,7 @@ opl_error_setup(uint64_t cpu_err_log_pa)
 	retl
 	  stxa	%o0, [%o1]ASI_AFSR
 	SET_SIZE(opl_error_setup)
-#endif /* lint */
 
-#if defined(lint)
-/* ARGSUSED */
-void
-cpu_early_feature_init(void)
-{
-}
-#else	/* lint */
 	ENTRY_NP(cpu_early_feature_init)
 	/*
 	 * Enable MMU translating multiple page sizes for
@@ -2035,18 +1691,11 @@ cpu_early_feature_init(void)
 	retl
 	  flush	%o1
 	SET_SIZE(cpu_early_feature_init)
-#endif /* lint */
 
-#if	defined(lint)
 /*
  * This function is called for each (enabled) CPU. We use it to
  * initialize error handling related registers.
  */
-/*ARGSUSED*/
-void
-cpu_feature_init(void)
-{}
-#else	/* lint */
 	ENTRY(cpu_feature_init)
 	!
 	! get the device_id and store the device_id
@@ -2064,15 +1713,7 @@ cpu_feature_init(void)
 	ba	opl_cpu_reg_init
 	nop
 	SET_SIZE(cpu_feature_init)
-#endif	/* lint */
 
-#if defined(lint)
-
-void
-cpu_cleartickpnt(void)
-{}
-
-#else	/* lint */
 	/*
 	 * Clear the NPT (non-privileged trap) bit in the %tick/%stick
 	 * registers. In an effort to make the change in the
@@ -2112,20 +1753,6 @@ cpu_cleartickpnt(void)
 
 	SET_SIZE(cpu_clearticknpt)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-void
-cpu_halt_cpu(void)
-{}
-
-void
-cpu_smt_pause(void)
-{}
-
-#else	/* lint */
-
 	/*
 	 * Halt the current strand with the suspend instruction.
 	 * The compiler/asm currently does not support this suspend
@@ -2148,4 +1775,3 @@ cpu_smt_pause(void)
 	nop
 	SET_SIZE(cpu_smt_pause)
 
-#endif	/* lint */

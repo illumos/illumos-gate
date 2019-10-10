@@ -29,11 +29,7 @@
  * routines.
  */
 
-#if defined(lint)
-#include <sys/types.h>
-#else	/* lint */
 #include "assym.h"
-#endif	/* lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/machtrap.h>
@@ -67,18 +63,12 @@
 
 #endif /* TRAPTRACE */
 
-#ifndef	lint
-
 #if (TTE_SUSPEND_SHIFT > 0)
 #define	TTE_SUSPEND_INT_SHIFT(reg)				\
 	sllx	reg, TTE_SUSPEND_SHIFT, reg
 #else
 #define	TTE_SUSPEND_INT_SHIFT(reg)
 #endif
-
-#endif /* lint */
-
-#ifndef	lint
 
 /*
  * Assumes TSBE_TAG is 0
@@ -470,61 +460,6 @@ label/**/2:
 	nop				/* for perf reasons */		;\
 	or	tmp, dest, dest		/* contents of patched value */
 
-#endif /* lint */
-
-
-#if defined (lint)
-
-/*
- * sfmmu related subroutines
- */
-uint_t
-sfmmu_disable_intrs()
-{ return(0); }
-
-/* ARGSUSED */
-void
-sfmmu_enable_intrs(uint_t pstate_save)
-{}
-
-/* ARGSUSED */
-int
-sfmmu_alloc_ctx(sfmmu_t *sfmmup, int allocflag, struct cpu *cp, int shflag)
-{ return(0); }
-
-/*
- * Use cas, if tte has changed underneath us then reread and try again.
- * In the case of a retry, it will update sttep with the new original.
- */
-/* ARGSUSED */
-int
-sfmmu_modifytte(tte_t *sttep, tte_t *stmodttep, tte_t *dttep)
-{ return(0); }
-
-/*
- * Use cas, if tte has changed underneath us then return 1, else return 0
- */
-/* ARGSUSED */
-int
-sfmmu_modifytte_try(tte_t *sttep, tte_t *stmodttep, tte_t *dttep)
-{ return(0); }
-
-/* ARGSUSED */
-void
-sfmmu_copytte(tte_t *sttep, tte_t *dttep)
-{}
-
-/*ARGSUSED*/
-struct tsbe *
-sfmmu_get_tsbe(uint64_t tsbeptr, caddr_t vaddr, int vpshift, int tsb_szc)
-{ return(0); }
-
-/*ARGSUSED*/
-uint64_t
-sfmmu_make_tsbtag(caddr_t va)
-{ return(0); }
-
-#else	/* lint */
 
 	.seg	".data"
 	.global	sfmmu_panic1
@@ -931,59 +866,10 @@ sfmmu_panic11:
 	srln	%o0, TTARGET_VA_SHIFT, %o0
 	SET_SIZE(sfmmu_make_tsbtag)
 
-#endif /* lint */
-
 /*
  * Other sfmmu primitives
  */
 
-
-#if defined (lint)
-void
-sfmmu_patch_ktsb(void)
-{
-}
-
-void
-sfmmu_kpm_patch_tlbm(void)
-{
-}
-
-void
-sfmmu_kpm_patch_tsbm(void)
-{
-}
-
-void
-sfmmu_patch_shctx(void)
-{
-}
-
-/* ARGSUSED */
-void
-sfmmu_load_tsbe(struct tsbe *tsbep, uint64_t vaddr, tte_t *ttep, int phys)
-{
-}
-
-/* ARGSUSED */
-void
-sfmmu_unload_tsbe(struct tsbe *tsbep, uint64_t vaddr, int phys)
-{
-}
-
-/* ARGSUSED */
-void
-sfmmu_kpm_load_tsb(caddr_t addr, tte_t *ttep, int vpshift)
-{
-}
-
-/* ARGSUSED */
-void
-sfmmu_kpm_unload_tsb(caddr_t addr, int vpshift)
-{
-}
-
-#else /* lint */
 
 #define	I_SIZE		4
 
@@ -1562,17 +1448,6 @@ do_patch:
 	  membar	#StoreStore|#StoreLoad
 	SET_SIZE(sfmmu_kpm_unload_tsb)
 
-#endif /* lint */
-
-
-#if defined (lint)
-
-/*ARGSUSED*/
-pfn_t
-sfmmu_ttetopfn(tte_t *tte, caddr_t vaddr)
-{ return(0); }
-
-#else /* lint */
 
 	ENTRY_NP(sfmmu_ttetopfn)
 	ldx	[%o0], %g1			/* read tte */
@@ -1583,8 +1458,6 @@ sfmmu_ttetopfn(tte_t *tte, caddr_t vaddr)
 	retl
 	mov	%g1, %o0
 	SET_SIZE(sfmmu_ttetopfn)
-
-#endif /* !lint */
 
 /*
  * These macros are used to update global sfmmu hme hash statistics
@@ -1681,36 +1554,6 @@ label:
 #define	KPM_TLBMISS_STAT_INCR(tagacc, val, tsbma, tmp1, label)
 #endif	/* KPM_TLBMISS_STATS_GATHER */
 
-#if defined (lint)
-/*
- * The following routines are jumped to from the mmu trap handlers to do
- * the setting up to call systrap.  They are separate routines instead of
- * being part of the handlers because the handlers would exceed 32
- * instructions and since this is part of the slow path the jump
- * cost is irrelevant.
- */
-void
-sfmmu_pagefault(void)
-{
-}
-
-void
-sfmmu_mmu_trap(void)
-{
-}
-
-void
-sfmmu_window_trap(void)
-{
-}
-
-void
-sfmmu_kpm_exception(void)
-{
-}
-
-#else /* lint */
-
 #ifdef	PTL1_PANIC_DEBUG
 	.seg	".data"
 	.global	test_ptl1_panic
@@ -1722,6 +1565,13 @@ test_ptl1_panic:
 	.align	4
 #endif	/* PTL1_PANIC_DEBUG */
 
+	/*
+	 * The following routines are jumped to from the mmu trap handlers to do
+	 * the setting up to call systrap.  They are separate routines instead
+	 * of being part of the handlers because the handlers would exceed 32
+	 * instructions and since this is part of the slow path the jump cost is
+	 * irrelevant.
+	 */
 
 	ENTRY_NP(sfmmu_pagefault)
 	SET_GL_REG(1)
@@ -1959,27 +1809,6 @@ test_ptl1_panic:
 	ba,pt	%xcc, sys_trap
 	mov	-1, %g4
 	SET_SIZE(sfmmu_kpm_exception)
-
-#endif /* lint */
-
-#if defined (lint)
-
-void
-sfmmu_tsb_miss(void)
-{
-}
-
-void
-sfmmu_kpm_dtsb_miss(void)
-{
-}
-
-void
-sfmmu_kpm_dtsb_miss_small(void)
-{
-}
-
-#else /* lint */
 
 #if (IMAP_SEG != 0)
 #error - ism_map->ism_seg offset is not zero
@@ -3871,30 +3700,12 @@ tsb_protfault:
 	ba,pt	%icc, sfmmu_window_trap
 	  nop
 	SET_SIZE(sfmmu_tsb_miss)
-#endif  /* lint */
 
-#if defined (lint)
-/*
- * This routine will look for a user or kernel vaddr in the hash
- * structure.  It returns a valid pfn or PFN_INVALID.  It doesn't
- * grab any locks.  It should only be used by other sfmmu routines.
- */
-/* ARGSUSED */
-pfn_t
-sfmmu_vatopfn(caddr_t vaddr, sfmmu_t *sfmmup, tte_t *ttep)
-{
-	return(0);
-}
-
-/* ARGSUSED */
-pfn_t
-sfmmu_kvaszc2pfn(caddr_t vaddr, int hashno)
-{
-	return(0);
-}
-
-#else /* lint */
-
+	/*
+	 * This routine will look for a user or kernel vaddr in the hash
+	 * structure.  It returns a valid pfn or PFN_INVALID.  It doesn't grab
+	 * any locks.  It should only be used by other sfmmu routines.
+	 */
 	ENTRY_NP(sfmmu_vatopfn)
  	/*
  	 * disable interrupts
@@ -4113,11 +3924,7 @@ kvaszc2pfn_nohblk:
 
 	SET_SIZE(sfmmu_kvaszc2pfn)
 
-#endif /* lint */
 
-
-
-#if !defined(lint)
 
 /*
  * kpm lock used between trap level tsbmiss handler and kpm C level.
@@ -4663,36 +4470,6 @@ locked_tsb_l2:
 #error - KPMTSBM_SHIFT does not correspond to size of kpmtsbm struct
 #endif
 
-#endif /* lint */
-
-#ifdef	lint
-/*
- * Enable/disable tsbmiss handling at trap level for a kpm (large) page.
- * Called from C-level, sets/clears "go" indication for trap level handler.
- * khl_lock is a low level spin lock to protect the kp_tsbmtl field.
- * Assumed that &kp->kp_refcntc is checked for zero or -1 at C-level.
- * Assumes khl_mutex is held when called from C-level.
- */
-/* ARGSUSED */
-void
-sfmmu_kpm_tsbmtl(short *kp_refcntc, uint_t *khl_lock, int cmd)
-{
-}
-
-/*
- * kpm_smallpages: stores val to byte at address mapped within
- * low level lock brackets. The old value is returned.
- * Called from C-level.
- */
-/* ARGSUSED */
-int
-sfmmu_kpm_stsbmtl(uchar_t *mapped, uint_t *kshl_lock, int val)
-{
-	return (0);
-}
-
-#else /* lint */
-
 	.seg	".data"
 sfmmu_kpm_tsbmtl_panic:
 	.ascii	"sfmmu_kpm_tsbmtl: interrupts disabled"
@@ -4703,6 +4480,13 @@ sfmmu_kpm_stsbmtl_panic:
 	.align	4
 	.seg	".text"
 
+	/*
+	 * Enable/disable tsbmiss handling at trap level for a kpm (large) page.
+	 * Called from C-level, sets/clears "go" indication for trap level
+	 * handler.  khl_lock is a low level spin lock to protect the kp_tsbmtl
+	 * field.  Assumed that &kp->kp_refcntc is checked for zero or -1 at
+	 * C-level.  Assumes khl_mutex is held when called from C-level.
+	 */
 	ENTRY_NP(sfmmu_kpm_tsbmtl)
 	rdpr	%pstate, %o3
 	/*
@@ -4737,6 +4521,10 @@ sfmmu_kpm_stsbmtl_panic:
 	  wrpr	%g0, %o3, %pstate		/* enable interrupts */
 	SET_SIZE(sfmmu_kpm_tsbmtl)
 
+	/*
+	 * kpm_smallpages: stores val to byte at address mapped within low level
+	 * lock brackets. The old value is returned.  Called from C-level.
+	 */
 	ENTRY_NP(sfmmu_kpm_stsbmtl)
 	rdpr	%pstate, %o3
 	/*
@@ -4769,9 +4557,6 @@ sfmmu_kpm_stsbmtl_panic:
 	  wrpr	%g0, %o3, %pstate		/* enable interrupts */
 	SET_SIZE(sfmmu_kpm_stsbmtl)
 
-#endif /* lint */
-
-#ifndef lint
 #ifdef sun4v
 	/*
 	 * User/kernel data miss w// multiple TSBs
@@ -4853,9 +4638,6 @@ sfmmu_dslow_patch_ktsb4m_szcode:
 	SET_SIZE(sfmmu_slow_immu_miss)
 
 #endif /* sun4v */
-#endif	/* lint */
-
-#ifndef lint
 
 /*
  * Per-CPU tsbmiss areas to avoid cache misses in TSB miss handlers.
@@ -4870,4 +4652,3 @@ tsbmiss_area:
 	.global kpmtsbm_area
 kpmtsbm_area:
 	.skip	(KPMTSBM_SIZE * NCPU)
-#endif	/* lint */
