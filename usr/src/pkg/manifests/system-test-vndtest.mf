@@ -1,0 +1,82 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2019 Joyent, Inc.
+#
+
+set name=pkg.fmri value=pkg:/system/test/vndtest@$(PKGVERS)
+set name=pkg.description value="vndtest"
+set name=pkg.summary value="vndtest execution"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir path=opt/vndtest
+dir path=opt/vndtest/bin
+dir path=opt/vndtest/tst
+dir path=opt/vndtest/tst/cmd
+dir path=opt/vndtest/tst/dld
+dir path=opt/vndtest/tst/ioctl
+dir path=opt/vndtest/tst/lib
+file path=opt/vndtest/bin/vndtest mode=0555
+file path=opt/vndtest/tst/cmd/cmd.common.ksh mode=0555
+file path=opt/vndtest/tst/cmd/create.list.ksh mode=0555
+file path=opt/vndtest/tst/cmd/create.list.ksh.out mode=0555
+file path=opt/vndtest/tst/cmd/create.sdev.ksh mode=0555
+file path=opt/vndtest/tst/cmd/create.setbuf.ksh mode=0555
+file path=opt/vndtest/tst/cmd/ecreate.destroy.ksh mode=0555
+file path=opt/vndtest/tst/cmd/ecreate.setbadprop.ksh mode=0555
+file path=opt/vndtest/tst/cmd/ecreate.setbadvalue.ksh mode=0555
+file path=opt/vndtest/tst/cmd/ecreate.setbuftoobig.ksh mode=0555
+file path=opt/vndtest/tst/cmd/ecreate.setrdonlyprop.ksh mode=0555
+file path=opt/vndtest/tst/dld/create.reuse.ksh mode=0555
+file path=opt/vndtest/tst/dld/dld.common.ksh mode=0555
+file path=opt/vndtest/tst/dld/ecreate.ipfirst.ksh mode=0555
+file path=opt/vndtest/tst/dld/ecreate.vndfirst.ksh mode=0555
+file path=opt/vndtest/tst/ioctl/create.attach.exe mode=0555
+file path=opt/vndtest/tst/ioctl/create.attachnolink.exe mode=0555
+file path=opt/vndtest/tst/ioctl/create.badlinkname.exe mode=0555
+file path=opt/vndtest/tst/ioctl/create.doublelink.exe mode=0555
+file path=opt/vndtest/tst/ioctl/create.gioctlattach.exe mode=0555
+file path=opt/vndtest/tst/ioctl/create.link.exe mode=0555
+file path=opt/vndtest/tst/ioctl/create.linkexists.exe mode=0555
+file path=opt/vndtest/tst/ioctl/create.ngioctlfault.exe mode=0555
+file path=opt/vndtest/tst/ioctl/create.nopriv1.exe mode=0555
+file path=opt/vndtest/tst/ioctl/create.nopriv2.exe mode=0555
+file path=opt/vndtest/tst/ioctl/create.nopriv3.exe mode=0555
+file path=opt/vndtest/tst/ioctl/create.nopriv4.exe mode=0555
+file path=opt/vndtest/tst/ioctl/create.olink.exe mode=0555
+file path=opt/vndtest/tst/ioctl/create.olinknopriv.exe mode=0555
+file path=opt/vndtest/tst/ioctl/create.rmenolink.exe mode=0555
+file path=opt/vndtest/tst/ioctl/tst.attachrdonly.exe mode=0555
+file path=opt/vndtest/tst/ioctl/tst.badioctl.exe mode=0555
+file path=opt/vndtest/tst/ioctl/tst.basicopenctl.exe mode=0555
+file path=opt/vndtest/tst/ioctl/tst.gioctlfault.exe mode=0555
+file path=opt/vndtest/tst/ioctl/tst.gioctlnattach.exe mode=0555
+file path=opt/vndtest/tst/ioctl/tst.iocsize.ksh mode=0555
+file path=opt/vndtest/tst/ioctl/tst.openctlbadflags.exe mode=0555
+file path=opt/vndtest/tst/lib/create.badlink.exe mode=0555
+file path=opt/vndtest/tst/lib/create.badpropid.exe mode=0555
+file path=opt/vndtest/tst/lib/create.badpropsize.exe mode=0555
+file path=opt/vndtest/tst/lib/create.badzone.exe mode=0555
+file path=opt/vndtest/tst/lib/create.basic.exe mode=0555
+file path=opt/vndtest/tst/lib/create.enomem.exe mode=0555
+file path=opt/vndtest/tst/lib/create.frameioeagain.exe mode=0555
+file path=opt/vndtest/tst/lib/create.open.exe mode=0555
+file path=opt/vndtest/tst/lib/create.propiter.exe mode=0555
+file path=opt/vndtest/tst/lib/create.proprdonly.exe mode=0555
+file path=opt/vndtest/tst/lib/err.badclose.exe mode=0555
+file path=opt/vndtest/tst/lib/tst.badopen.exe mode=0555
+file path=opt/vndtest/tst/lib/tst.strerror.exe mode=0555
+file path=opt/vndtest/tst/lib/tst.strerror.exe.out mode=0555
+file path=opt/vndtest/tst/lib/tst.strsyserror.exe mode=0555
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

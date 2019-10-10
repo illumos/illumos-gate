@@ -1,0 +1,51 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2019 Joyent, Inc.
+#
+
+#
+# The SmartOS test package is expressly intended *not* to be
+# installable on other distributions, and should not be
+# up-streamed to the illumos-gate. It redelivers isaexec,
+# ctfconvert and ctfmerge, which violates IPS requirements
+# that only a single package deliver a given file,
+# unless IPS variants are used.
+#
+# This package is used as part of the generation of the
+# test archive .tgz during the smartos-live build in
+# order to ensure files not normally delivered by SmartOS
+# will appear in /usr when the smartos-test script has
+# configured the system for testing.
+#
+set name=pkg.fmri value=pkg:/system/test/smartostest@$(PKGVERS)
+set name=pkg.description value="SmartOS test setup and execution"
+set name=pkg.summary value="SmartOS test execution"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir path=opt owner=root group=sys
+dir path=opt/smartos-test
+dir path=opt/smartos-test/bin
+file path=opt/smartos-test/README mode=0444
+file path=opt/smartos-test/bin/smartos-test mode=0555
+# Needed by the /opt/utils-test suite
+file path=usr/bin/ctfconvert mode=0555
+file path=usr/bin/ctfmerge mode=0555
+# The libc-tests attempt to forge a hardlink to isaexec
+# so we need to redeliver isaexec in order to create the
+# proto area correctly.
+file path=usr/lib/isaexec
+
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+depend fmri=system/test/testrunner type=require

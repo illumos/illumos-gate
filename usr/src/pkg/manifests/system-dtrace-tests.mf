@@ -22,7 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 set name=pkg.fmri value=pkg:/system/dtrace/tests@$(PKGVERS)
@@ -1598,8 +1598,6 @@ file path=opt/SUNWdtrt/tst/common/scalars/tst.16kglobal.d mode=0444
 file path=opt/SUNWdtrt/tst/common/scalars/tst.16klocal.d mode=0444
 file path=opt/SUNWdtrt/tst/common/scalars/tst.basicvar.d mode=0444
 file path=opt/SUNWdtrt/tst/common/scalars/tst.basicvar.d.out mode=0444
-file path=opt/SUNWdtrt/tst/common/scalars/err.bigglobal.d mode=0444
-file path=opt/SUNWdtrt/tst/common/scalars/err.biglocal.d mode=0444
 file path=opt/SUNWdtrt/tst/common/scalars/tst.localvar.d mode=0444
 file path=opt/SUNWdtrt/tst/common/scalars/tst.misc.d mode=0444
 file path=opt/SUNWdtrt/tst/common/scalars/tst.self.d mode=0444

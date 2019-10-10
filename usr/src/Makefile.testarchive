@@ -1,0 +1,35 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+# Copyright 2019 Joyent, Inc.
+#
+
+#
+# Used by smartos-live.git, this Makefile simply defines a macro
+# that contains the set of illumos-joyent tests that get built
+# into the test archive deliverable.
+#
+TEST_IPS_MANIFEST_FILES = \
+    system-bhyve-tests.mf \
+    system-dtrace-tests.mf \
+    system-file-system-zfs-tests.mf \
+    system-io-tests.mf \
+    system-test-cryptotest.mf \
+    system-test-elftest.mf \
+    system-test-libctest.mf \
+    system-test-nettest.mf \
+    system-test-ostest.mf \
+    system-test-smbclient.mf \
+    system-test-testrunner.mf \
+    system-test-utiltest.mf \
+    system-test-vndtest.mf \
+    system-test-smartostest.mf \
+    system-test-zfstest.mf
+

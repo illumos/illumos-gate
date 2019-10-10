@@ -12,14 +12,20 @@
 #
 
 # Copyright 2015, Richard Lowe.
+# Copyright 2019 Joyent, Inc.
 
 # Verify that zones can be configured with security-flags
 LC_ALL=C                        # Collation is important
 
+IS_SMARTOS=$(uname -v | grep ^joyent_)
+if [[ -z "$IS_SMARTOS" ]]; then
+    create_flag="-b"
+fi
+
 expect_success() {
     name=$1
 
-    (echo "create -b";
+    (echo "create $create_flag";
      echo "set zonepath=/$name.$$";
      cat /dev/stdin;
      echo "verify";
@@ -46,7 +52,7 @@ expect_fail() {
     name=$1
     expect=$2
 
-    (echo "create -b";
+    (echo "create $create_flag";
      echo "set zonepath=/$name.$$";
      cat /dev/stdin;
      echo "verify";

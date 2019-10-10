@@ -16,6 +16,8 @@
 #
 
 XGREP=${XGREP:=/usr/bin/grep}
+
+MY_TESTS=${MY_TESTS:=/opt/util-tests}
 FILEDIR=$MY_TESTS/tests/files
 
 fail() {

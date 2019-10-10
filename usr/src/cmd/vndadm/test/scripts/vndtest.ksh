@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright (c) 2014, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -199,9 +199,7 @@ function run_all
 {
 	typeset tests t dir
 
-	cd $vt_root || fatal "failed to enter root test directory"
-	tests=$(ls -1 */*/@(ecreate|create|tst|err).*.@(ksh|exe))
-	cd - > /dev/null
+	tests=$(ls -1 $vt_root/*/*/@(ecreate|create|tst|err).*.@(ksh|exe))
 	for t in $tests; do
 		run_single $t
 	done

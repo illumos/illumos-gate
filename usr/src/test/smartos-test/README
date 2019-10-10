@@ -1,0 +1,103 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2019 Joyent. Inc.
+#
+
+Strictly speaking, this is not a set of tests. Rather, it is a wrapper that
+automates the configuration of a SmartOS system to prepare it for test
+execution, optionally running those tests.
+
+The smartos-test script should be extracted from the test archive to ensure
+the correct version is being executed.
+
+For example:
+
+[root@kura /var/tmp]# tar zvxf tests-test_archive-master-20191001T134222Z.tgz ./opt/smartos-test
+Decompressing 'tests-test_archive-master-20191001T134222Z.tgz' with '/usr/bin/gzcat'...
+x ./opt/smartos-test, 0 bytes, 0 tape blocks
+x ./opt/smartos-test/README, 958 bytes, 2 tape blocks
+x ./opt/smartos-test/bin, 0 bytes, 0 tape blocks
+x ./opt/smartos-test/bin/smartos-test, 10062 bytes, 20 tape blocks
+[root@kura /var/tmp]# ./opt/smartos-test/bin/smartos-test -h
+Usage: smartos-test [-h] [-c] [-e] [-r] [-w] <path to tests.tgz>
+
+At least one of -c, -e, -r is required.
+
+  -h       print usage
+  -c       configure the system for testing
+  -e       execute known tests
+  -f       skip the check to ensure platform version == test version
+  -r       snapshot or rollback to zones/opt@system-test-smartos-test
+           before doing any system configuration or test execution
+  -w       when mounting the lofs /usr, make it writable
+
+
+Specifically, the script will:
+
+* verify that the user has declared that no production data exists on the
+  test system
+* verify we're running in the global zone
+* verify the test archive version matches the version of the platform we're
+  running
+* optionally snapshot or rollback /opt to "zones/opt@system-test-smartos-test"
+* setup loopback mounts for any files from the smartos "tests-[stamp].tgz"
+  file that need to be installed to a normally read-only location, and
+  extract the portions of test archive that must appear in /usr
+* extract the remaining test archive contents to /opt and /kernel
+* configure pkgsrc
+* install required test packages
+* execute tests that should all pass
+
+Over time, we hope to add to the set of tests that are executed.
+
+After configuring the system for testing, you may choose to run individual
+test suites, for example:
+
+    # /opt/util-tests/bin/utiltest
+or
+    # /opt/os-tests/bin/ostest
+
+
+A note on ZFS testing:
+
+At present, this wrapper does *not* execute the ZFS tests, since they're
+more invasive than the other packaged tests. To run those, after configuring
+the system for testing, change to the 'ztest' user and set environment
+variables.
+
+In this example, DISKS is the list of three unused disks that will be used
+to run the tests. KEEP is a list of zpools that the tests should *not*
+destroy:
+
+    # su ztest
+    $ export DISKS='c2t1d0 c2t2d0 c2t3d0'
+    $ export KEEP='zones'
+    $ /opt/zfs-tests/bin/zfstest
+
+Beware that data loss will occur for any data residing on DISKS and failure to
+specify a KEEP pool may also lead to data loss.
+
+
+A note for SmartOS developers:
+
+The test archive .tgz file is built by the 'tests-tar' Makefile target in
+smartos-live.git.
+
+The manifest of files included in the archive is generated at build-time by
+parsing the IPS package manifests from $SRC/pkg/manifests that are listed in
+$SRC/Makefile.testarchive in this repository.
+
+It is important when adding or removing tests that the IPS manifests are
+updated. If new test packages are created, they should be added to
+$SRC/Makefile.testarchive.
+

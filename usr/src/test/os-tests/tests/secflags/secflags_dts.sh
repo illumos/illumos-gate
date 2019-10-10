@@ -12,6 +12,7 @@
 #
 
 # Copyright 2015, Richard Lowe.
+# Copyright 2019 Joyent, Inc.
 
 tmpdir=/tmp/test.$$
 mkdir $tmpdir
@@ -36,12 +37,12 @@ main(int argc, char **argv)
 }
 EOF
 
-gcc -o tester-aslr tester.c -Wl,-z,aslr=enabled
-gcc -o tester-noaslr tester.c -Wl,-z,aslr=disabled
+gcc -m32 -o tester-aslr tester.c -Wl,-z,aslr=enabled
+gcc -m32 -o tester-noaslr tester.c -Wl,-z,aslr=disabled
 
 # This is the easiest way I've found to get many many DTs, but it's gross
-gcc -o many-dts-aslr tester.c -Wl,-z,aslr=enabled $(for elt in /usr/lib/lib*.so; do echo -Wl,-N,$(basename $elt); done)
-gcc -o many-dts-noaslr tester.c -Wl,-z,aslr=disabled $(for elt in /usr/lib/lib*.so; do echo -Wl,-N,$(basename $elt); done)
+gcc -m32 -o many-dts-aslr tester.c -Wl,-z,aslr=enabled $(for elt in /usr/lib/lib*.so; do echo -Wl,-N,$(basename $elt); done)
+gcc -m32 -o many-dts-noaslr tester.c -Wl,-z,aslr=disabled $(for elt in /usr/lib/lib*.so; do echo -Wl,-N,$(basename $elt); done)
 
 check() {
     bin=$1

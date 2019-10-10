@@ -12,7 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
@@ -21,11 +21,17 @@ include $(SRC)/test/Makefile.com
 ROOTOPTPKG = $(ROOT)/opt/crypto-tests
 ROOTAES = $(ROOTOPTPKG)/tests/aes/kcf
 ROOTDIGEST = $(ROOTOPTPKG)/tests/digest/kcf
-ROOTDIRS = $(ROOTAES) $(ROOTDIGEST)
+ROOTHMAC = $(ROOTOPTPKG)/tests/hmac/kcf
+
+ROOTDIRS = $(ROOTAES) $(ROOTDIGEST) $(ROOTHMAC)
 
 PROGS = cleanup setup
 
-CMDS = $(PROGS:%=$(ROOTAES)/%) $(PROGS:%=$(ROOTDIGEST)/%)
+CMDS = \
+	$(PROGS:%=$(ROOTAES)/%)  \
+	$(PROGS:%=$(ROOTDIGEST)/%) \
+	$(PROGS:%=$(ROOTHMAC)/%)
+
 $(CMDS) := FILEMODE = 0555
 
 all lint clean clobber:
@@ -41,3 +47,6 @@ $(ROOTAES)/%: %.ksh
 	$(INS.rename)
 $(ROOTDIGEST)/%: %.ksh
 	$(INS.rename)
+$(ROOTHMAC)/%: %.ksh
+	$(INS.rename)
+

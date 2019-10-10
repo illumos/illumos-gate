@@ -23,6 +23,7 @@ SUBDIRS = \
 	libc-tests \
 	net-tests \
 	os-tests \
+	smartos-test \
 	smbclient-tests \
 	test-runner \
 	util-tests \

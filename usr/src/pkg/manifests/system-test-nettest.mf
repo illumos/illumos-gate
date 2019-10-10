@@ -1,0 +1,54 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2019 Joyent, Inc.
+#
+
+set name=pkg.fmri value=pkg:/system/test/nettest@$(PKGVERS)
+set name=pkg.description value="net-tests"
+set name=pkg.summary value="net-tests execution"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir path=opt/net-tests
+dir path=opt/net-tests/bin
+dir path=opt/net-tests/config
+dir path=opt/net-tests/runfiles
+dir path=opt/net-tests/tests
+dir path=opt/net-tests/tests/forwarding
+file path=opt/net-tests/bin/nettest mode=0555
+file path=opt/net-tests/config/ip_forwarding.config
+file path=opt/net-tests/runfiles/default.run
+file path=opt/net-tests/tests/forwarding/ip_forwarding mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_001 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_002 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_003 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_004 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_005 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_006 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_007 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_008 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_009 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_010 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_011 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_012 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_013 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_014 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_015 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_016 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_017 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_018 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_019 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_020 mode=0555
+file path=opt/net-tests/tests/forwarding/ip_fwd_suite mode=0555
+file path=opt/net-tests/tests/forwarding/README
+file path=opt/net-tests/tests/net_common
