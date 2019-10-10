@@ -346,6 +346,17 @@ INS.conffile= \
 	$(RM) $@; $(INS) -s -m $(CFILEMODE) -f $(@D) $(SRC_CONFFILE)
 
 #
+# By default, instead of $VERSION, we use $(UTS_LABEL), which is by
+# default set to $RELEASE aka "5.11".
+#
+# $VERSION changes when the git HEAD changes, leading to annoying merge
+# uniquification conflicts when doing partial builds during development.
+# The information from $VERSION is available via "buildversion" anyway.
+#
+CTFCVTFLAGS = -X -l "$(UTS_LABEL)"
+CTFMRGFLAGS += -l "$(UTS_LABEL)"
+
+#
 # The CTF merge of child kernel modules is performed against one of the genunix
 # modules.  For Intel builds, all modules will be used with a single genunix:
 # the one built in intel/genunix.  For SPARC builds, a given
@@ -363,26 +374,26 @@ CTFMERGE_GENUNIX	= \
 	$(UTSBASE)/$(CTFMERGE_GUDIR)/genunix/$(OBJS_DIR)/genunix
 
 #
-# Used to uniquify a non-genunix module against genunix. $VERSION is used
-# for the label.
+# Used to uniquify a non-genunix module against genunix.
 #
 # For the ease of developers dropping modules onto possibly unrelated systems,
 # you can set NO_GENUNIX_UNIQUIFY= in the environment to skip uniquifying
 # against genunix.
 #
+#
 NO_GENUNIX_UNIQUIFY=$(POUND_SIGN)
 CTFMERGE_GENUNIX_DFLAG=-d $(CTFMERGE_GENUNIX)
 $(NO_GENUNIX_UNIQUIFY)CTFMERGE_GENUNIX_DFLAG=
 
-CTFMERGE_UNIQUIFY_AGAINST_GENUNIX	= \
-	$(CTFMERGE) $(CTFMRGFLAGS) -L VERSION \
-	$(CTFMERGE_GENUNIX_DFLAG) -o $@ $(OBJECTS) $(CTFEXTRAOBJS)
+CTFMERGE_UNIQUIFY_AGAINST_GENUNIX = \
+	$(CTFMERGE) $(CTFMRGFLAGS) $(CTFMERGE_GENUNIX_DFLAG) \
+	-o $@ $(OBJECTS) $(CTFEXTRAOBJS)
 
 #
 # Used to merge the genunix module.
 #
-CTFMERGE_GENUNIX_MERGE		= \
-	$(CTFMERGE) $(CTFMRGFLAGS) -L VERSION -o $@ \
+CTFMERGE_GENUNIX_MERGE = \
+	$(CTFMERGE) $(CTFMRGFLAGS) -o $@ \
 	$(OBJECTS) $(CTFEXTRAOBJS) $(IPCTF_TARGET)
 
 #
@@ -675,11 +686,3 @@ PRIVS_DEF = $(SRC)/uts/common/os/priv_defs
 #
 USBDEVS_AWK =	$(SRC)/uts/common/io/usb/usbdevs2h.awk
 USBDEVS_DATA =	$(SRC)/uts/common/io/usb/usbdevs
-
-
-#
-# If we're using the newer CTF tools, then we need to make sure that we
-# are building with the private -X option to ctfconvert which allows us
-# to fixup the struct cpu to account for machcpu.
-#
-$(BUILD_NEW_CTF_TOOLS)CTFCVTFLAGS += -X

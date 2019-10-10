@@ -1666,7 +1666,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/zmod/%.c
 $(OBJS_DIR)/zlib_obj.o:		$(ZLIB_OBJS:%=$(OBJS_DIR)/%)
 	$(LD) -r -Breduce -M$(UTSBASE)/common/zmod/mapfile -o $@ \
 	    $(ZLIB_OBJS:%=$(OBJS_DIR)/%)
-	$(CTFMERGE) -t -f -L VERSION -o $@ $(ZLIB_OBJS:%=$(OBJS_DIR)/%)
+	$(CTFMERGE) $(CTFMRGFLAGS) -o $@ $(ZLIB_OBJS:%=$(OBJS_DIR)/%)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/hxge/%.c
 	$(COMPILE.c) -o $@ $<

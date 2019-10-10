@@ -22,6 +22,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 Joyent, Inc.
+#
 
 ROOTTERMINFO = $(ROOTSHLIB)/terminfo
 
@@ -31,7 +33,7 @@ $(PROG).core: $(OBJS) $(KMDBLIBS) $(MAPFILE)
 
 $(PROG): $(PROG).core $(KCTLOBJS)
 	$(LD) -dy -r -o $@ $@.core -Nmisc/ctf $(KCTLOBJS)
-	$(CTFMERGE) -L VERSION -o $@ $(OBJS) $(KCTLOBJS)
+	$(CTFMERGE) -l "$(UTS_LABEL)" -o $@ $(OBJS) $(KCTLOBJS)
 	$(KMDB_FPTEST)
 	$(POST_PROCESS)
 	$(SETDYNFLAG) -f DF_1_IGNMULDEF,DF_1_NOKSYMS $@
@@ -54,7 +56,7 @@ dmods:
 #
 # Specialized object construction
 #
-kmdb_terminfo.c: 	../../../common/mdb/mdb_termio.c \
+kmdb_terminfo.c:	../../../common/mdb/mdb_termio.c \
 			../../../common/kmdb/kmdb_terminfo_skel.c \
 			$(ROOTTERMINFO)
 	TERMINFO=$(ROOTTERMINFO) $(TIGEN) -s \

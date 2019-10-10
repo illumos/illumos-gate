@@ -23,12 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-#
-#	This makefile drives the production of the client-side network lock
-#	manager kernel module.
-#
-#	sparc architecture dependent
-#
+# Copyright 2019 Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -61,7 +56,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 CFLAGS		+= $(CCVERBOSE)
 LDFLAGS		+= -dy -Nstrmod/rpcmod -Nfs/nfs
 LDFLAGS		+= -M $(UTSBASE)/common/klm/mapfile-ops
-CTFMRGFLAGS	+= -f
 
 #
 #	Default build targets.

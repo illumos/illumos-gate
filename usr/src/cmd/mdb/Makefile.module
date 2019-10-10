@@ -25,7 +25,7 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright (c) 2019 Carlos Neira <cneirabustos@gmail.com>
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
-# Copyright (c) 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 .KEEP_STATE:
@@ -217,7 +217,7 @@ $(KMODFILE): kmod .WAIT $(KMODOBJS) $(MAPFILE)
 	$(STANDOBJS)
 	$(KMDB_LINKTEST_CMD)
 	$(KMDB_FPTEST_CMD)
-	$(CTFMERGE) -f -L VERSION -o $@ $(KMODOBJS)
+	$(CTFMERGE) -l "$(UTS_LABEL)" -o $@ $(KMODOBJS)
 	$(POST_PROCESS)
 	$(SETDYNFLAG) -f DF_1_NOKSYMS $@
 

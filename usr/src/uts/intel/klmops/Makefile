@@ -23,11 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-#
-#	This makefile drives the production of the network lock manager client
-#	side module.
-#
-#	intel implementation architecture dependent
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -60,7 +56,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 LDFLAGS		+= -dy -Nstrmod/rpcmod -Nfs/nfs -Nmisc/klmmod
 LDFLAGS		+= -M $(UTSBASE)/common/klm/mapfile-ops
-CTFMRGFLAGS	+= -f
 
 #
 #	Default build targets.

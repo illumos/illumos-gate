@@ -35,4 +35,7 @@ SunOS)	hostid >/var/tmp/zfs_test_hostid.txt
 	;;
 esac
 
+log_must set_tunable64 zfs_multihost_interval $MMP_INTERVAL_DEFAULT
+log_must set_tunable32 zfs_multihost_fail_intervals $MMP_FAIL_INTERVALS_DEFAULT
+
 log_pass "mmp setup pass"
