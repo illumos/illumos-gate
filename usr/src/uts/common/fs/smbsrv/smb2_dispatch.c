@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 RackTop Systems.
  */
 
 
@@ -910,7 +911,7 @@ cmd_done:
 		cmn_err(CE_NOTE, "handler for %u returned 0x%x",
 		    sr->smb2_cmd_code, rc);
 #endif
-		sr->smb2_status = NT_STATUS_INTERNAL_ERROR;
+		smb2sr_put_error(sr, NT_STATUS_INTERNAL_ERROR);
 		break;
 	case SDRC_ERROR:
 		/*
@@ -921,6 +922,7 @@ cmd_done:
 		 */
 		if (sr->smb2_status == 0)
 			sr->smb2_status = NT_STATUS_INVALID_PARAMETER;
+		smb2sr_put_error(sr, sr->smb2_status);
 		break;
 	case SDRC_DROP_VC:
 		disconnect = B_TRUE;
