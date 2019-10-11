@@ -181,8 +181,12 @@ mdb_module_create(const char *name, const char *fname, int mode,
 	/*
 	 * Load modules compiled for the current API version.
 	 */
+#if MDB_API_VERSION != 5
+#error "MDB_API_VERSION needs to be checked here"
+#endif
 	switch (info->mi_dvers) {
 	case MDB_API_VERSION:
+	case 4:
 	case 3:
 	case 2:
 	case 1:
