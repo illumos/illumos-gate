@@ -1834,12 +1834,6 @@ typedef struct smb_request {
 
 	list_node_t		sr_waiters;	/* smb_notify.c */
 
-	/* Info from session service header */
-	uint32_t		sr_req_length; /* Excluding NBT header */
-
-	/* Request buffer excluding NBT header */
-	void			*sr_request_buf;
-
 	struct mbuf_chain	command;
 	struct mbuf_chain	reply;
 	struct mbuf_chain	raw_data;

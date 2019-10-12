@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2015-2021 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2022 RackTop Systems, Inc.
  */
 
@@ -1482,10 +1482,13 @@ void
 smb2_send_reply(smb_request_t *sr)
 {
 	struct mbuf_chain enc_reply;
+	struct mbuf_chain tmp_reply;
 	smb_session_t *session = sr->session;
-	void *tmpbuf;
+	mbuf_t *mbuf;
 	size_t buflen;
-	struct mbuf_chain tmp;
+
+	bzero(&enc_reply, sizeof (enc_reply));
+	bzero(&tmp_reply, sizeof (tmp_reply));
 
 	/*
 	 * [MS-SMB2] 3.3.4.1.4 Encrypting the Message
@@ -1509,32 +1512,35 @@ smb2_send_reply(smb_request_t *sr)
 	}
 
 	sr->msgsize = sr->reply.chain_offset;
-	(void) MBC_SHADOW_CHAIN(&tmp, &sr->reply,
+	(void) MBC_SHADOW_CHAIN(&tmp_reply, &sr->reply,
 	    0, sr->msgsize);
 
-	buflen = SMB3_TFORM_HDR_SIZE + sr->msgsize;
+	/*
+	 * Setup a contiguous buffer for the encrypted reply,
+	 * including prepend space for the NBT header.
+	 */
+	buflen = SMB3_TFORM_HDR_SIZE + sr->msgsize + NETBIOS_HDR_SZ;
+	mbuf = smb_mbuf_alloc_kmem(buflen);
+	mbuf->m_data += NETBIOS_HDR_SZ;
+	mbuf->m_len  -= NETBIOS_HDR_SZ;
 
-	/* taken from smb_request_init_command_mbuf */
-	tmpbuf = kmem_alloc(buflen, KM_SLEEP);
-	MBC_ATTACH_BUF(&enc_reply, tmpbuf, buflen);
-	enc_reply.flags = 0;
-	enc_reply.shadow_of = NULL;
+	MBC_ATTACH_MBUF(&enc_reply, mbuf);
+	enc_reply.max_bytes = mbuf->m_len;
 
 	if (smb3_encode_tform_header(sr, &enc_reply) != 0) {
 		cmn_err(CE_WARN, "couldn't encode transform header");
 		goto errout;
 	}
-	if (smb3_encrypt_sr(sr, &tmp, &enc_reply) != 0) {
+	if (smb3_encrypt_sr(sr, &tmp_reply, &enc_reply) != 0) {
 		cmn_err(CE_WARN, "smb3 encryption failed");
 		goto errout;
 	}
 
 	(void) smb_session_send(sr->session, 0, &enc_reply);
-	kmem_free(tmpbuf, buflen);
 	return;
 
 errout:
-	kmem_free(tmpbuf, buflen);
+	MBC_FLUSH(&enc_reply);
 	smb_session_disconnect(sr->session);
 }
 
