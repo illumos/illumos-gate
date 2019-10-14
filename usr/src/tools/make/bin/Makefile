@@ -10,6 +10,7 @@
 #
 
 # Copyright 2015, Richard Lowe.
+# Copyright 2019 RackTop Systems.
 
 PROG=	make
 CMDDIR=	$(SRC)/cmd/make/bin
@@ -38,6 +39,13 @@ LDLIBS += ../lib/mksh/libmksh.a ../lib/vroot/libvroot.a
 LDLIBS += ../lib/bsd/libbsd.a -lc -lnsl -lumem
 
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
+
+CCERRWARN += -_gcc=-Wno-unused-variable
+CCERRWARN += -_gcc=-Wno-switch
+CCERRWARN += -_gcc=-Wno-parentheses
+CCERRWARN += -_gcc=-Wno-unused-function
+CCERRWARN += -_gcc=-Wno-clobbered
+CCERRWARN += -_gcc=-Wno-uninitialized
 
 ROOTLINKS = $(ROOTONBLDBINMACH)/dmake
 ROOTRULES = $(ROOTONBLDSHARE)/make.rules

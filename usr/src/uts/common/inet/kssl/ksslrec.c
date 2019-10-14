@@ -77,16 +77,25 @@ static ssl3CipherSuiteDef cipher_suite_defs[] = {
 static int cipher_suite_defs_nentries =
     sizeof (cipher_suite_defs) / sizeof (cipher_suite_defs[0]);
 
+static void KSSL_SHA1Update(void *, uchar_t *, uint32_t);
+
 static KSSLMACDef mac_defs[] = { /* indexed by SSL3MACAlgorithm */
 	/* macsz padsz HashInit HashUpdate HashFinal */
 
-	{MD5_HASH_LEN, SSL3_MD5_PAD_LEN,
-	    (hashinit_func_t)MD5Init, (hashupdate_func_t)MD5Update,
-	    (hashfinal_func_t)MD5Final},
-
-	{SHA1_HASH_LEN, SSL3_SHA1_PAD_LEN,
-	    (hashinit_func_t)SHA1Init, (hashupdate_func_t)SHA1Update,
-	    (hashfinal_func_t)SHA1Final},
+	{
+		.hashsz = MD5_HASH_LEN,
+		.padsz = SSL3_MD5_PAD_LEN,
+		.HashInit = (hashinit_func_t)MD5Init,
+		.HashUpdate = (hashupdate_func_t)MD5Update,
+		.HashFinal = (hashfinal_func_t)MD5Final
+	},
+	{
+		.hashsz = SHA1_HASH_LEN,
+		.padsz = SSL3_SHA1_PAD_LEN,
+		.HashInit = (hashinit_func_t)SHA1Init,
+		.HashUpdate = KSSL_SHA1Update,
+		.HashFinal = (hashfinal_func_t)SHA1Final
+	}
 };
 
 static uchar_t kssl_pad_1[60] = {
@@ -151,6 +160,17 @@ static void kssl_cke_done(void *, int);
 	mac.cd_raw.iov_base = (char *)d; \
 	mac.cd_length = mac.cd_raw.iov_len = l; \
 	rv = crypto_mac_final(c, &mac, NULL); if (CRYPTO_ERR(rv)) goto end;
+
+/*
+ * Wrapper for SHA1Update to translate arguments. We need this because
+ * the KSSL hash update function expects the size argument to be a
+ * uint32_t, but SHA1Update uses a size_t.
+ */
+static void
+KSSL_SHA1Update(void *ctx, uchar_t *in, uint32_t size)
+{
+	SHA1Update(ctx, in, size);
+}
 
 /*
  * This hack can go away once we have SSL3 MAC support by KCF

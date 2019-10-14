@@ -171,7 +171,7 @@ static ddi_dma_attr_t xb_dma_attr = {
 	(uint64_t)XB_BSIZE,		/* alignment in bytes */
 	XB_BSIZE - 1,			/* bitmap of burst sizes */
 	XB_BSIZE,			/* min transfer */
-	(uint64_t)XB_MAX_XFER, 		/* maximum transfer */
+	(uint64_t)XB_MAX_XFER,		/* maximum transfer */
 	(uint64_t)PAGEOFFSET,		/* 1 page segment length  */
 	BLKIF_MAX_SEGMENTS_PER_REQUEST,	/* maximum number of segments */
 	XB_BSIZE,			/* granularity */
@@ -203,16 +203,22 @@ xdf_timeout_handler(void *arg)
  * Note: we only register one callback function to grant table subsystem
  * since we only have one 'struct gnttab_free_callback' in xdf_t.
  */
-static int
-xdf_dmacallback(caddr_t arg)
+static void
+xdf_gncallback(void *arg)
 {
-	xdf_t *vdp = (xdf_t *)arg;
+	xdf_t *vdp = arg;
 	ASSERT(vdp != NULL);
 
 	DPRINTF(DMA_DBG, ("xdf@%s: DMA callback started\n",
 	    vdp->xdf_addr));
 
 	ddi_trigger_softintr(vdp->xdf_softintr_id);
+}
+
+static int
+xdf_dmacallback(caddr_t arg)
+{
+	xdf_gncallback(arg);
 	return (DDI_DMA_CALLBACK_DONE);
 }
 
@@ -229,7 +235,7 @@ gs_get(xdf_t *vdp, int isread)
 			SETDMACBON(vdp);
 			gnttab_request_free_callback(
 			    &vdp->xdf_gnt_callback,
-			    (void (*)(void *))xdf_dmacallback,
+			    xdf_gncallback,
 			    (void *)vdp,
 			    BLKIF_MAX_SEGMENTS_PER_REQUEST);
 		}
@@ -1518,7 +1524,7 @@ xdf_setstate_init(xdf_t *vdp)
 	xenbus_transaction_t	xbt;
 	grant_ref_t		gref;
 	char			*xsname, *str;
-	int 			rv;
+	int			rv;
 
 	ASSERT(MUTEX_HELD(&vdp->xdf_cb_lk));
 	ASSERT(MUTEX_NOT_HELD(&vdp->xdf_dev_lk));

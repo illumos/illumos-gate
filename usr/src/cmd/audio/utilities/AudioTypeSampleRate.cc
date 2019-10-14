@@ -22,9 +22,9 @@
 /*
  * Copyright (c) 1992-2001 by Sun Microsystems, Inc.
  * All rights reserved.
+ *
+ * Copyright 2019 RackTop Systems.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <memory.h>
@@ -80,7 +80,9 @@ Convert(
 	Double		length;
 	int		i;
 	size_t		nsamps;
+#ifdef DEBUG
 	size_t		insamps;
+#endif
 	AudioError	err;
 
 	inhdr = inbuf->GetHeader();
@@ -133,6 +135,7 @@ Convert(
 		    (int)inbuf->GetHeader().Time_to_Samples(inbuf->GetLength()),
 		    (short *)outbuf->GetAddress());
 
+#ifdef DEBUG
 	// do a sanity check. did we write more bytes then we had
 	// available in the output buffer?
 	insamps = (unsigned int)
@@ -140,6 +143,7 @@ Convert(
 
 	AUDIO_DEBUG((2, "TypeResample: after filter, insamps=%d, outsamps=%d\n",
 		    insamps, nsamps));
+#endif
 
 	if (nsamps > outbuf->GetHeader().Time_to_Samples(outbuf->GetSize())) {
 		AudioStderrMsg(outbuf, AUDIO_NOERROR, Fatal,

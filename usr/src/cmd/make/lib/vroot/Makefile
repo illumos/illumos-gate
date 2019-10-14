@@ -10,6 +10,7 @@
 #
 
 # Copyright 2015, Richard Lowe.
+# Copyright 2019 RackTop Systems.
 
 LIBRARY =	libvroot.a
 VERS =		.1
@@ -46,6 +47,9 @@ LIBS = $(LIBRARY)
 SRCDIR = ../
 MAPFILES=
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
+
+CCERRWARN += -_gcc=-Wno-unused-variable
+CCERRWARN += -_gcc=-Wno-parentheses
 
 all: $(LIBS)
 

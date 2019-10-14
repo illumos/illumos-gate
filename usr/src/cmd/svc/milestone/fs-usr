@@ -25,6 +25,7 @@
 # All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright 2012, Joyent, Inc. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 . /lib/svc/share/smf_include.sh
 

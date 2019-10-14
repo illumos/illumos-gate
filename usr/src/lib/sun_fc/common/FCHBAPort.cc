@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 RackTop Systems.
  */
 
 
@@ -305,7 +307,6 @@ void FCHBAPort::sendSCSIPassThru(struct fcp_scsi_cmd *fscsi,
 	Trace log("FCHBAPort::sendSCSIPassThru");
 	int		    fd;
 	HBA_STATUS	    ret;
-	int		    count;
 	char		    fcioErrorString[MAX_FCIO_MSG_LEN] = "";
 	hrtime_t	    start;
 	hrtime_t	    end;
@@ -325,7 +326,6 @@ void FCHBAPort::sendSCSIPassThru(struct fcp_scsi_cmd *fscsi,
 	fscsi->scsi_fc_port_num	= instanceNumber;
 
 	fd = HBA::_open(FCP_DRIVER_PATH, O_RDONLY | O_NDELAY);
-	count = 0;
 	ioctl_errno = 0;
 
 	if (ioctl(fd, FCP_TGT_SEND_SCSI, fscsi) != 0) {

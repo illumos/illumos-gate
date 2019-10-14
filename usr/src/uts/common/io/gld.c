@@ -2902,10 +2902,10 @@ gld_sendup(gld_mac_info_t *macinfo, pktinfo_t *pktinfo,
 	 * device might need this, so it's here but undocumented.
 	 */
 	if (macinfo->gldm_options & GLDOPT_FAST_RECV) {
-		send = (void (*)(queue_t *, mblk_t *))putq;
+		send = (void (*)(queue_t *, mblk_t *))(uintptr_t)putq;
 		cansend = canput;
 	} else {
-		send = (void (*)(queue_t *, mblk_t *))putnext;
+		send = putnext;
 		cansend = canputnext;
 	}
 

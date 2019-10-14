@@ -23,7 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2015 RackTop Systems.
+ * Copyright 2019 RackTop Systems.
  */
 
 #include <sys/types.h>
@@ -668,7 +668,9 @@ entriesFromLDAPreal(__entries_from_ldap_arg_t *arg) {
 	entry_col	ec[NIS_MAXCOLUMNS+1];
 	for (i = 0, na = 0; i < nq; i++) {
 		entry_object	eo, *e;
+#ifdef	SET_ENTRY_FLAGS
 		table_col	*tc;
+#endif	/* SET_ENTRY_FLAGS */
 		nis_object	o, *to;
 		int		j, nc;
 		db_qcomp	*qc;
@@ -694,10 +696,12 @@ entriesFromLDAPreal(__entries_from_ldap_arg_t *arg) {
 			o.zo_name = to->zo_name;
 			o.zo_data.objdata_u.en_data.en_type =
 				to->zo_data.objdata_u.ta_data.ta_type;
+#ifdef	SET_ENTRY_FLAGS
 			tc = to->zo_data.objdata_u.ta_data.ta_cols.ta_cols_val;
 			if (to->zo_data.objdata_u.ta_data.ta_cols.ta_cols_len
 					!= t->numColumns)
 				tc = 0;
+#endif	/* SET_ENTRY_FLAGS */
 			if (o.zo_owner == 0)
 				o.zo_owner = to->zo_owner;
 			if (o.zo_group == 0)
@@ -709,7 +713,9 @@ entriesFromLDAPreal(__entries_from_ldap_arg_t *arg) {
 			if (o.zo_ttl == 0)
 				o.zo_ttl = to->zo_ttl;
 		} else {
+#ifdef	SET_ENTRY_FLAGS
 			tc = 0;
+#endif	/* SET_ENTRY_FLAGS */
 			o.zo_owner = (nis_name)"";
 			o.zo_group = (nis_name)"";
 			o.zo_domain = (nis_name)"";

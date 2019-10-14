@@ -21,6 +21,8 @@
 /*
  * Copyright 2003 Sun Microsystems, Inc. All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 RackTop Systems.
  */
 
 /*
@@ -682,6 +684,7 @@ top:
 					k |= (lower_bound <= string_ch) &&
 					     (string_ch <=
 					      (pattern_ch = pattern[1]));
+					/* FALLTHROUGH */
 				default:
 					if (string_ch ==
 					    (lower_bound = pattern_ch)) {

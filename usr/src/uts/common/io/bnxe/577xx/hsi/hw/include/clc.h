@@ -234,15 +234,15 @@ struct elink_vars;
 struct elink_params;
 struct elink_phy;
 
-typedef u8 (*config_init_t)(struct elink_phy *phy, struct elink_params *params,
-			    struct elink_vars *vars);
-typedef u8 (*read_status_t)(struct elink_phy *phy, struct elink_params *params,
-			    struct elink_vars *vars);
+typedef elink_status_t (*config_init_t)(struct elink_phy *phy,
+    struct elink_params *params, struct elink_vars *vars);
+typedef elink_status_t (*read_status_t)(struct elink_phy *phy,
+    struct elink_params *params, struct elink_vars *vars);
 typedef void (*link_reset_t)(struct elink_phy *phy,
 			     struct elink_params *params);
 typedef void (*config_loopback_t)(struct elink_phy *phy,
 				  struct elink_params *params);
-typedef u8 (*format_fw_ver_t)(u32 raw, u8 *str, u16 *len);
+typedef elink_status_t (*format_fw_ver_t)(u32 raw, u8 *str, u16 *len);
 typedef void (*hw_reset_t)(struct elink_phy *phy, struct elink_params *params);
 typedef void (*set_link_led_t)(struct elink_phy *phy,
 			       struct elink_params *params, u8 mode);

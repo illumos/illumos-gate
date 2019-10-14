@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 RackTop Systems.
 
 include ../../Makefile.cmd
 
@@ -36,6 +37,11 @@ CFLAGS += $(CCVERBOSE)
 CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-parentheses
+
+CCERRWARN += -_gcc=-Wno-reorder
+CCERRWARN += -_gcc=-Wno-ignored-qualifiers
+CCERRWARN += -_gcc=-Wno-return-type
+CCERRWARN += -_gcc=-Wno-switch
 
 # not linted
 SMATCH=off

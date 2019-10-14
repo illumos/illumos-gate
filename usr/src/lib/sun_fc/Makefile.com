@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 RackTop Systems.
 #
 
 LIBRARYCCC =	libsun_fc.a
@@ -136,6 +137,17 @@ CCFLAGS +=	-compat=5 -_g++=-std=c++98
 CCFLAGS64 +=	-D_POSIX_PTHREAD_SEMANTICS
 CCFLAGS64 +=	-compat=5 -_g++=-std=c++98
 CPPFLAGS +=	$(INCS) -DBUILD_TIME='"Wed Sep 24 12:00:00 2008"'
+
+CCERRWARN +=	-_gcc=-Wno-reorder
+CCERRWARN +=	-_gcc=-Wno-unused-variable
+CCERRWARN +=	-_gcc=-Wno-unused-value
+CCERRWARN +=	-_gcc=-Wno-unused-function
+CCERRWARN +=	-_gcc=-Wno-type-limits
+CCERRWARN +=	-_gcc=-Wno-return-type
+
+CCERRWARN +=	-_gcc7=-Wno-c++11-compat
+CCERRWARN +=	-_gcc8=-Wno-c++11-compat
+CCERRWARN +=	-_gcc9=-Wno-c++11-compat
 
 LDLIBS			+= -ldevinfo
 LDLIBS			+= -lsysevent

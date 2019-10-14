@@ -21,6 +21,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc. All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 RackTop Systems.
  */
 
 /*
@@ -1169,7 +1171,7 @@ case scan_name_state:
 			if (paren_count + brace_count == 0) {
 				source_p++;
 			}
-			/* Fall into */
+			/* FALLTHROUGH */
 		case tab_char:
 		case space_char:
 			if (paren_count + brace_count > 0) {

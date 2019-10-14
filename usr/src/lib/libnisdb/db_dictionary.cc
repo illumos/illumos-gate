@@ -24,6 +24,8 @@
  *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 RackTop Systems.
  */
 
 #include "db_headers.h"
@@ -206,10 +208,11 @@ delete_dictionary(db_dict_desc *dict)
 	if (dict) {
 		if (dict->tables.tables_val) {
 			/* delete each bucket */
-			for (i = 0; i < dict->tables.tables_len; i++)
+			for (i = 0; i < dict->tables.tables_len; i++) {
 				bucket = dict->tables.tables_val[i];
 				if (bucket)
 					delete_bucket(bucket);
+			}
 			/* delete table */
 			delete dict->tables.tables_val;
 		}
@@ -318,19 +321,17 @@ remove_from_bucket(db_table_desc_p bucket,
 static bool_t
 add_to_bucket(db_table_desc_p bucket, db_table_desc **head, db_table_desc_p td)
 {
-	db_table_desc_p curr, prev;
+	db_table_desc_p curr;
 	register char *target_name;
 	unsigned long target_hval;
 	target_name = td->table_name;
 	target_hval = td->hashval;
 
 	/* Search for it in the bucket */
-	for (prev = curr = bucket; curr != NULL; curr = curr->next) {
+	for (curr = bucket; curr != NULL; curr = curr->next) {
 		if (curr->hashval == target_hval &&
 		    strcmp(curr->table_name, target_name) == 0) {
 			break;
-		} else {
-			prev = curr;
 		}
 	}
 

@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 RackTop Systems.
  */
 
 
@@ -111,6 +113,7 @@ void Lockable::lock(pthread_mutex_t *myMutex) {
 		    break;
 		case ENOTRECOVERABLE:
 		    cerr << "Lock failed: not recoverable" << endl;
+		    /* FALLTHROUGH */
 		default:
 		    if (loop > DEADLOCK_WARNING) {
 			cerr << "Lock failed: " <<strerror(status) << endl;

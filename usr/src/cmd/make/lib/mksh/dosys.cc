@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2015, Joyent, Inc.
+ * Copyright 2019 RackTop Systems.
  */
 
 
@@ -440,7 +441,6 @@ await(Boolean ignore_error, Boolean silent_error, Name target, wchar_t *command,
 	pid_t			pid;
 	struct stat		stat_buff;
 	int			termination_signal;
-	char			tmp_buf[MAXPATHLEN];
 
 	while ((pid = wait(&status)) != running_pid) {
 		if (pid == -1) {
@@ -477,8 +477,7 @@ await(Boolean ignore_error, Boolean silent_error, Name target, wchar_t *command,
 	 * If the child returned an error, we now try to print a
 	 * nice message about it.
 	 */
-	
-	tmp_buf[0] = (int) nul_char;
+
 	if (!silent_error) {
 		if (exit_status != 0) {
 			(void) fprintf(stdout,
