@@ -22,6 +22,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Western Digital Corporation.
  */
 
 #ifndef	_SYS_BLKDEV_H
@@ -93,6 +94,7 @@ struct bd_xfer {
 	unsigned		x_ndmac;
 	caddr_t			x_kaddr;
 	unsigned		x_flags;
+	unsigned		x_qnum;
 };
 
 #define	BD_XFER_POLL		(1U << 0)	/* no interrupts (dump) */
@@ -115,6 +117,8 @@ struct bd_drive {
 	size_t			d_revision_len;
 	char			*d_revision;
 	uint8_t			d_eui64[8];
+	/* Added at the end to maintain binary compatibility */
+	uint32_t		d_qcount;
 };
 
 struct bd_media {
@@ -142,17 +146,25 @@ struct bd_media {
 #define	BD_INFO_FLAG_HOTPLUGGABLE	(1U << 1)
 #define	BD_INFO_FLAG_READ_ONLY		(1U << 2)
 
-struct bd_ops {
-	int	o_version;
-	void	(*o_drive_info)(void *, bd_drive_t *);
-	int	(*o_media_info)(void *, bd_media_t *);
-	int	(*o_devid_init)(void *, dev_info_t *, ddi_devid_t *);
-	int	(*o_sync_cache)(void *, bd_xfer_t *);
-	int	(*o_read)(void *, bd_xfer_t *);
-	int	(*o_write)(void *, bd_xfer_t *);
-};
+/*
+ * If the API changes and we want to bump the version, add another
+ * enum value, Eg BD_OPS_VERSION_1. BD_OPS_CURRENT_VERSION should always
+ * be last.
+ */
+typedef enum {
+	BD_OPS_VERSION_0 = 0,
+	BD_OPS_CURRENT_VERSION
+} bd_version_t;
 
-#define	BD_OPS_VERSION_0		0
+struct bd_ops {
+	bd_version_t	o_version;
+	void		(*o_drive_info)(void *, bd_drive_t *);
+	int		(*o_media_info)(void *, bd_media_t *);
+	int		(*o_devid_init)(void *, dev_info_t *, ddi_devid_t *);
+	int		(*o_sync_cache)(void *, bd_xfer_t *);
+	int		(*o_read)(void *, bd_xfer_t *);
+	int		(*o_write)(void *, bd_xfer_t *);
+};
 
 struct bd_errstats {
 	/* these are managed by blkdev itself */

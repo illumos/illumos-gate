@@ -24,6 +24,7 @@
  * Copyright 2013 STEC, Inc.  All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Western Digital Corporation.
  */
 
 #include	<sys/types.h>
@@ -129,7 +130,7 @@ static int  skd_devid_init(void *arg, dev_info_t *, ddi_devid_t *);
 
 
 static bd_ops_t skd_bd_ops = {
-	BD_OPS_VERSION_0,
+	BD_OPS_CURRENT_VERSION,
 	skd_bd_driveinfo,
 	skd_bd_mediainfo,
 	skd_devid_init,
