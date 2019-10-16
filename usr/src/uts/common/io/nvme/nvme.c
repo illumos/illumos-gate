@@ -542,7 +542,7 @@ static struct modlinkage nvme_modlinkage = {
 };
 
 static bd_ops_t nvme_bd_ops = {
-	.o_version	= BD_OPS_VERSION_0,
+	.o_version	= BD_OPS_CURRENT_VERSION,
 	.o_drive_info	= nvme_bd_driveinfo,
 	.o_media_info	= nvme_bd_mediainfo,
 	.o_devid_init	= nvme_bd_devid,
@@ -831,6 +831,9 @@ nvme_free_cq(nvme_cq_t *cq)
 {
 	mutex_destroy(&cq->ncq_mutex);
 
+	if (cq->ncq_cmd_taskq != NULL)
+		taskq_destroy(cq->ncq_cmd_taskq);
+
 	if (cq->ncq_dma != NULL)
 		nvme_free_dma(cq->ncq_dma);
 
@@ -876,9 +879,11 @@ nvme_destroy_cq_array(nvme_t *nvme, uint_t start)
 }
 
 static int
-nvme_alloc_cq(nvme_t *nvme, uint32_t nentry, nvme_cq_t **cqp, uint16_t idx)
+nvme_alloc_cq(nvme_t *nvme, uint32_t nentry, nvme_cq_t **cqp, uint16_t idx,
+    uint_t nthr)
 {
 	nvme_cq_t *cq = kmem_zalloc(sizeof (*cq), KM_SLEEP);
+	char name[64];		/* large enough for the taskq name */
 
 	mutex_init(&cq->ncq_mutex, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(nvme->n_intr_pri));
@@ -891,6 +896,21 @@ nvme_alloc_cq(nvme_t *nvme, uint32_t nentry, nvme_cq_t **cqp, uint16_t idx)
 	cq->ncq_nentry = nentry;
 	cq->ncq_id = idx;
 	cq->ncq_hdbl = NVME_REG_CQHDBL(nvme, idx);
+
+	/*
+	 * Each completion queue has its own command taskq.
+	 */
+	(void) snprintf(name, sizeof (name), "%s%d_cmd_taskq%u",
+	    ddi_driver_name(nvme->n_dip), ddi_get_instance(nvme->n_dip), idx);
+
+	cq->ncq_cmd_taskq = taskq_create(name, nthr, minclsyspri, 64, INT_MAX,
+	    TASKQ_PREPOPULATE);
+
+	if (cq->ncq_cmd_taskq == NULL) {
+		dev_err(nvme->n_dip, CE_WARN, "!failed to create cmd "
+		    "taskq for cq %u", idx);
+		goto fail;
+	}
 
 	*cqp = cq;
 	return (DDI_SUCCESS);
@@ -909,7 +929,7 @@ fail:
  * max number of entries to UINT16_MAX + 1.
  */
 static int
-nvme_create_cq_array(nvme_t *nvme, uint_t ncq, uint32_t nentry)
+nvme_create_cq_array(nvme_t *nvme, uint_t ncq, uint32_t nentry, uint_t nthr)
 {
 	nvme_cq_t **cq;
 	uint_t i, cq_count;
@@ -926,7 +946,7 @@ nvme_create_cq_array(nvme_t *nvme, uint_t ncq, uint32_t nentry)
 		nvme->n_cq[i] = cq[i];
 
 	for (; i < nvme->n_cq_count; i++)
-		if (nvme_alloc_cq(nvme, nentry, &nvme->n_cq[i], i) !=
+		if (nvme_alloc_cq(nvme, nentry, &nvme->n_cq[i], i, nthr) !=
 		    DDI_SUCCESS)
 			goto fail;
 
@@ -1158,8 +1178,8 @@ nvme_process_iocq(nvme_t *nvme, nvme_cq_t *cq)
 	mutex_enter(&cq->ncq_mutex);
 
 	while ((cmd = nvme_get_completed(nvme, cq)) != NULL) {
-		taskq_dispatch_ent((taskq_t *)cmd->nc_nvme->n_cmd_taskq,
-		    cmd->nc_callback, cmd, TQ_NOSLEEP, &cmd->nc_tqent);
+		taskq_dispatch_ent(cq->ncq_cmd_taskq, cmd->nc_callback, cmd,
+		    TQ_NOSLEEP, &cmd->nc_tqent);
 
 		completed++;
 	}
@@ -2494,6 +2514,7 @@ nvme_init_ns(nvme_t *nvme, int nsid)
 {
 	nvme_namespace_t *ns = &nvme->n_ns[nsid - 1];
 	nvme_identify_nsid_t *idns;
+	boolean_t was_ignored;
 	int last_rp;
 
 	ns->ns_nvme = nvme;
@@ -2552,6 +2573,8 @@ nvme_init_ns(nvme_t *nvme, int nsid)
 	if (ns->ns_best_block_size < nvme->n_min_block_size)
 		ns->ns_best_block_size = nvme->n_min_block_size;
 
+	was_ignored = ns->ns_ignore;
+
 	/*
 	 * We currently don't support namespaces that use either:
 	 * - protection information
@@ -2571,6 +2594,25 @@ nvme_init_ns(nvme_t *nvme, int nsid)
 		ns->ns_ignore = B_FALSE;
 	}
 
+	/*
+	 * Keep a count of namespaces which are attachable.
+	 * See comments in nvme_bd_driveinfo() to understand its effect.
+	 */
+	if (was_ignored) {
+		/*
+		 * Previously ignored, but now not. Count it.
+		 */
+		if (!ns->ns_ignore)
+			nvme->n_namespaces_attachable++;
+	} else {
+		/*
+		 * Wasn't ignored previously, but now needs to be.
+		 * Discount it.
+		 */
+		if (ns->ns_ignore)
+			nvme->n_namespaces_attachable--;
+	}
+
 	return (DDI_SUCCESS);
 }
 
@@ -2586,6 +2628,7 @@ nvme_init(nvme_t *nvme)
 	nvme_reg_csts_t csts;
 	int i = 0;
 	uint16_t nqueues;
+	uint_t tq_threads;
 	char model[sizeof (nvme->n_idctl->id_model) + 1];
 	char *vendor, *product;
 
@@ -2655,9 +2698,9 @@ nvme_init(nvme_t *nvme)
 
 	/*
 	 * Create the cq array with one completion queue to be assigned
-	 * to the admin queue pair.
+	 * to the admin queue pair and a limited number of taskqs (4).
 	 */
-	if (nvme_create_cq_array(nvme, 1, nvme->n_admin_queue_len) !=
+	if (nvme_create_cq_array(nvme, 1, nvme->n_admin_queue_len, 4) !=
 	    DDI_SUCCESS) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!failed to pre-allocate admin completion queue");
@@ -2911,6 +2954,7 @@ nvme_init(nvme_t *nvme)
 	for (i = 0; i != nvme->n_namespace_count; i++) {
 		mutex_init(&nvme->n_ns[i].ns_minor.nm_mutex, NULL, MUTEX_DRIVER,
 		    NULL);
+		nvme->n_ns[i].ns_ignore = B_TRUE;
 		if (nvme_init_ns(nvme, i + 1) != DDI_SUCCESS)
 			goto fail;
 	}
@@ -2983,8 +3027,21 @@ nvme_init(nvme_t *nvme)
 	(void) ddi_prop_update_int(DDI_DEV_T_NONE, nvme->n_dip, "io-cqueue-len",
 	    nvme->n_io_cqueue_len);
 
+	/*
+	 * Assign the equal quantity of taskq threads to each completion
+	 * queue, capping the total number of threads to the number
+	 * of CPUs.
+	 */
+	tq_threads = MIN(UINT16_MAX, ncpus) / nvme->n_completion_queues;
+
+	/*
+	 * In case the calculation above is zero, we need at least one
+	 * thread per completion queue.
+	 */
+	tq_threads = MAX(1, tq_threads);
+
 	if (nvme_create_cq_array(nvme, nvme->n_completion_queues + 1,
-	    nvme->n_io_cqueue_len) != DDI_SUCCESS) {
+	    nvme->n_io_cqueue_len, tq_threads) != DDI_SUCCESS) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!failed to pre-allocate completion queues");
 		goto fail;
@@ -3351,18 +3408,6 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	nvme->n_progress |= NVME_REGS_MAPPED;
 
 	/*
-	 * Create taskq for command completion.
-	 */
-	(void) snprintf(name, sizeof (name), "%s%d_cmd_taskq",
-	    ddi_driver_name(dip), ddi_get_instance(dip));
-	nvme->n_cmd_taskq = ddi_taskq_create(dip, name, MIN(UINT16_MAX, ncpus),
-	    TASKQ_DEFAULTPRI, 0);
-	if (nvme->n_cmd_taskq == NULL) {
-		dev_err(dip, CE_WARN, "!failed to create cmd taskq");
-		goto fail;
-	}
-
-	/*
 	 * Create PRP DMA cache
 	 */
 	(void) snprintf(name, sizeof (name), "%s%d_prp_cache",
@@ -3487,8 +3532,10 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (nvme->n_progress & NVME_INTERRUPTS)
 		nvme_release_interrupts(nvme);
 
-	if (nvme->n_cmd_taskq)
-		ddi_taskq_wait(nvme->n_cmd_taskq);
+	for (i = 0; i < nvme->n_cq_count; i++) {
+		if (nvme->n_cq[i]->ncq_cmd_taskq != NULL)
+			taskq_wait(nvme->n_cq[i]->ncq_cmd_taskq);
+	}
 
 	if (nvme->n_ioq_count > 0) {
 		for (i = 1; i != nvme->n_ioq_count + 1; i++) {
@@ -3510,9 +3557,6 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		nvme_shutdown(nvme, NVME_CC_SHN_NORMAL, B_FALSE);
 		(void) nvme_reset(nvme, B_FALSE);
 	}
-
-	if (nvme->n_cmd_taskq)
-		ddi_taskq_destroy(nvme->n_cmd_taskq);
 
 	if (nvme->n_progress & NVME_CTRL_LIMITS)
 		sema_destroy(&nvme->n_abort_sema);
@@ -3693,15 +3737,40 @@ nvme_bd_driveinfo(void *arg, bd_drive_t *drive)
 {
 	nvme_namespace_t *ns = arg;
 	nvme_t *nvme = ns->ns_nvme;
+	uint_t ns_count = MAX(1, nvme->n_namespaces_attachable);
 
 	/*
-	 * blkdev maintains one queue size per instance (namespace),
-	 * but all namespace share the I/O queues.
-	 * TODO: need to figure out a sane default, or use per-NS I/O queues,
-	 * or change blkdev to handle EAGAIN
+	 * Set the blkdev qcount to the number of submission queues.
+	 * It will then create one waitq/runq pair for each submission
+	 * queue and spread I/O requests across the queues.
 	 */
-	drive->d_qsize = nvme->n_ioq_count * nvme->n_io_squeue_len
-	    / nvme->n_namespace_count;
+	drive->d_qcount = nvme->n_ioq_count;
+
+	/*
+	 * I/O activity to individual namespaces is distributed across
+	 * each of the d_qcount blkdev queues (which has been set to
+	 * the number of nvme submission queues). d_qsize is the number
+	 * of submitted and not completed I/Os within each queue that blkdev
+	 * will allow before it starts holding them in the waitq.
+	 *
+	 * Each namespace will create a child blkdev instance, for each one
+	 * we try and set the d_qsize so that each namespace gets an
+	 * equal portion of the submission queue.
+	 *
+	 * If post instantiation of the nvme drive, n_namespaces_attachable
+	 * changes and a namespace is attached it could calculate a
+	 * different d_qsize. It may even be that the sum of the d_qsizes is
+	 * now beyond the submission queue size. Should that be the case
+	 * and the I/O rate is such that blkdev attempts to submit more
+	 * I/Os than the size of the submission queue, the excess I/Os
+	 * will be held behind the semaphore nq_sema.
+	 */
+	drive->d_qsize = nvme->n_io_squeue_len / ns_count;
+
+	/*
+	 * Don't let the queue size drop below the minimum, though.
+	 */
+	drive->d_qsize = MAX(drive->d_qsize, NVME_MIN_IO_QUEUE_LEN);
 
 	/*
 	 * d_maxxfer is not set, which means the value is taken from the DMA
@@ -3758,7 +3827,7 @@ nvme_bd_cmd(nvme_namespace_t *ns, bd_xfer_t *xfer, uint8_t opc)
 	if (cmd == NULL)
 		return (ENOMEM);
 
-	cmd->nc_sqid = (CPU->cpu_id % nvme->n_ioq_count) + 1;
+	cmd->nc_sqid = xfer->x_qnum + 1;
 	ASSERT(cmd->nc_sqid <= nvme->n_ioq_count);
 	ioq = nvme->n_ioq[cmd->nc_sqid];
 
