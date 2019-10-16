@@ -16,12 +16,12 @@
 #include <sys/crypto/ioctl.h>
 #include <sys/md5.h>
 
-/*BEGIN CSTYLED*/
+/* BEGIN CSTYLED */
 /*
  * NIST Test Vectors
  * Downloaded from https://s3.amazonaws.com/docs.nsrl.nist.gov/legacy/NSRLvectors.zip
  */
-/*END CSTYLED*/
+/* END CSTYLED */
 
 static uint8_t MSG1[] = {
 	0x24,
