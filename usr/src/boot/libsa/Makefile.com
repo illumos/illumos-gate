@@ -16,8 +16,8 @@
 
 include $(SRC)/boot/Makefile.inc
 
-CPPFLAGS +=	-I../../include -I$(SASRC)
-CPPFLAGS +=	-I../../sys -I.
+CPPFLAGS +=	-I$(BOOTSRC)/include -I$(SASRC)
+CPPFLAGS +=	-I$(BOOTSRC)/sys -I.
 
 include $(SASRC)/Makefile.inc
 include $(CRYPTOSRC)/Makefile.inc
@@ -34,11 +34,11 @@ pics/printf.o := SMOFF += 64bit_shift
 
 machine:
 	$(RM) machine
-	$(SYMLINK) ../../sys/$(MACHINE)/include machine
+	$(SYMLINK) $(BOOTSRC)/sys/$(MACHINE)/include machine
 
 x86:
 	$(RM) x86
-	$(SYMLINK) ../../sys/x86/include x86
+	$(SYMLINK) $(BOOTSRC)/sys/x86/include x86
 
 pics/%.o objs/%.o:	%.c
 	$(COMPILE.c) -o $@ $<

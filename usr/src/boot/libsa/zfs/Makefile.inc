@@ -21,12 +21,12 @@ OBJECTS +=	gzip.o
 OBJECTS +=	nvlist.o
 OBJECTS +=	list.o
 
-objs/zfs.o pics/zfs.o := CPPFLAGS +=	-I../../common
-objs/zfs.o pics/zfs.o := CPPFLAGS +=	-I../../sys/cddl/boot/zfs -I$(LZ4)
+objs/zfs.o pics/zfs.o := CPPFLAGS +=	-I$(BOOTSRC)/common
+objs/zfs.o pics/zfs.o := CPPFLAGS +=	-I$(BOOTSRC)/sys/cddl/boot/zfs -I$(LZ4)
 objs/zfs.o pics/zfs.o := CPPFLAGS +=	-I$(SRC)/uts/common/fs/zfs
 objs/zfs.o pics/zfs.o := CPPFLAGS +=	-I$(CRYPTOSRC)
-objs/nvlist.o pics/nvlist.o := CPPFLAGS +=	-I../../common
-objs/nvlist.o pics/nvlist.o := CPPFLAGS +=	-I../../sys/cddl/boot/zfs
+objs/nvlist.o pics/nvlist.o := CPPFLAGS +=	-I$(BOOTSRC)/common
+objs/nvlist.o pics/nvlist.o := CPPFLAGS +=	-I$(BOOTSRC)/sys/cddl/boot/zfs
 
 pics/%.o objs/%.o:	$(ZFSSRC)/%.c
 	$(COMPILE.c) -o $@ $<

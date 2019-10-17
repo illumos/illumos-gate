@@ -13,31 +13,20 @@
 # Copyright 2015 Toomas Soome <tsoome@me.com>
 #
 
-.KEEP_STATE:
-
 include $(SRC)/Makefile.master
 
-INSTDIRS = i386 efi forth
-SUBDIRS = libsa libficl $(INSTDIRS) userboot
+SUBDIRS = $(MACH64)
 
-all	:=	TARGET = all
+all	:=	TARGET = all SOURCEDEBUG=yes
 clean	:=	TARGET = clean
 clobber	:=	TARGET = clobber
 install	:=	TARGET = install
 
-all clean clobber: $(SUBDIRS)
+.KEEP_STATE:
 
-#
-# The directories in INSTDIRS depend implicitly on SUBDIRS being built already.
-# We use .WAIT instead of explicit dependencies because we only want to make
-# the "install" target in INSTDIRS, not in SUBDIRS.
-#
-# If adding SUBDIRS which are not dependencies of INSTDIRS, "install: all"
-# rules should be added to the Makefiles in those directories.
-#
-install: all .WAIT $(INSTDIRS)
+all clean clobber install: $(SUBDIRS)
 
-.PARALLEL: libsa libficl
+.PARALLEL:
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

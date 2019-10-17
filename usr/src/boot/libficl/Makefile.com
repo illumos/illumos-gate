@@ -18,19 +18,20 @@ include $(SRC)/boot/Makefile.inc
 FICLDIR=	$(SRC)/common/ficl
 PNGLITE=	$(SRC)/common/pnglite
 
-CPPFLAGS += -I. -I..
-CPPFLAGS += -I../../sys
-CPPFLAGS += -I../../include
-CPPFLAGS += -I../../libsa
-CPPFLAGS += -I$(FICLDIR) -I../../common -I$(PNGLITE)
+CPPFLAGS += -I. -I$(BOOTSRC)/libficl
+CPPFLAGS += -I$(BOOTSRC)/sys
+CPPFLAGS += -I$(BOOTSRC)/include
+CPPFLAGS += -I$(BOOTSRC)/libsa
+CPPFLAGS += -I$(FICLDIR) -I$(BOOTSRC)/common -I$(PNGLITE)
 
 # For multiboot2.h, must be last, to avoid conflicts
 CPPFLAGS += -I$(SRC)/uts/common
 
-OBJECTS= dictionary.o system.o fileaccess.o float.o double.o prefix.o search.o
+OBJECTS = dictionary.o system.o fileaccess.o float.o double.o prefix.o search.o
 OBJECTS += softcore.o stack.o tools.o vm.o primitives.o unix.o utility.o
 OBJECTS += hash.o callback.o word.o loader.o
-HEADERS= $(FICLDIR)/ficl.h $(FICLDIR)/ficlplatform/unix.h ../ficllocal.h
+HEADERS = $(FICLDIR)/ficl.h $(FICLDIR)/ficlplatform/unix.h
+HEADERS += $(BOOTSRC)/libficl/ficllocal.h
 #
 
 # disable inner loop variable 'fw' check
@@ -42,11 +43,11 @@ MINOR = 1.0
 
 machine:
 	$(RM) machine
-	$(SYMLINK) ../../sys/$(MACHINE)/include machine
+	$(SYMLINK) $(BOOTSRC)/sys/$(MACHINE)/include machine
 
 x86:
 	$(RM) x86
-	$(SYMLINK) ../../sys/x86/include x86
+	$(SYMLINK) $(BOOTSRC)/sys/x86/include x86
 
 objs/%.o pics/%.o:	../softcore/%.c $(HEADERS)
 	$(COMPILE.c) -o $@ $<

@@ -17,6 +17,7 @@ PICS=	$(OBJECTS:%=pics/%)
 
 .PARALLEL:	$(OBJS) $(PICS) DUMMY
 
+CSTD=$(CSTD_GNU99)
 $(PICS) := CFLAGS += -_gcc=-fPIC
 $(PICS) := CCASFLAGS += -_gcc=-fPIC
 

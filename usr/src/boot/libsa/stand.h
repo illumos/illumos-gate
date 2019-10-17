@@ -438,7 +438,14 @@ void *Realloc(void *, size_t, const char *, int);
 void *Reallocf(void *, size_t, const char *, int);
 void Free(void *, const char *, int);
 
-#if DEBUG_MALLOC
+#if defined(USER_MALLOC)
+extern void *malloc(size_t);
+extern void *memalign(size_t, size_t);
+extern void *calloc(size_t, size_t);
+extern void free(void *);
+extern void *realloc(void *, size_t);
+extern void *reallocf(void *, size_t);
+#elif DEBUG_MALLOC
 #define	malloc(x)	Malloc(x, __FILE__, __LINE__)
 #define	memalign(x, y)	Memalign(x, y, __FILE__, __LINE__)
 #define	calloc(x, y)	Calloc(x, y, __FILE__, __LINE__)
