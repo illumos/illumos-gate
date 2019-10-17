@@ -13,6 +13,7 @@
 
 #
 # Copyright 2015, Richard Lowe.
+# Copyright 2019 Joyent, Inc.
 #
 
 mkdir /tmp/secflags-test.$$
@@ -29,6 +30,9 @@ cleanup() {
 }
 
 trap cleanup EXIT
+
+# We need to wait for sleep to get exec()ed
+sleep 1
 
 ## gcore-produced core
 gcore $pid >/dev/null

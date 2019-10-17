@@ -13,6 +13,7 @@
 
 #
 # Copyright 2015, Richard Lowe.
+# Copyright 2019 Joyent, Inc.
 #
 
 /usr/bin/psecflags -s aslr -e sleep 100000 &
@@ -31,6 +32,9 @@ $pid:	sleep 100000
 	E:	aslr
 	I:	aslr
 EOF
+
+# We need to wait for sleep to get exec()ed
+sleep 1
 
 /usr/bin/psecflags $pid | grep -v '[LU]:' > /tmp/output.$$
 

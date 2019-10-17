@@ -13,7 +13,14 @@
 
 #
 # Copyright 2015, Richard Lowe.
+# Copyright 2019 Joyent, Inc.
 #
+
+# check secflags, waiting a little bit for the change to happen
+secflags() {
+    sleep 1
+    /usr/bin/psecflags $*
+}
 
 mkdir /tmp/$$-secflags-test
 cd /tmp/$$-secflags-test
@@ -23,7 +30,7 @@ cat > expected <<EOF
 	I:	none
 EOF
 
-/usr/bin/psecflags $$ | grep I: > output
+secflags $$ | grep I: > output
 diff -u expected output || exit 1 # Make sure the setting of 'none' worked
 
 cleanup() {
@@ -42,7 +49,7 @@ self_set() {
 	I:	aslr
 EOF
 
-    /usr/bin/psecflags $$ | grep I: > output
+    secflags $$ | grep I: > output
     diff -u expected output || exit 1
 }
 
@@ -53,7 +60,7 @@ self_add() {
 	I:	aslr,noexecstack
 EOF
 
-    /usr/bin/psecflags $$ | grep I: > output
+    secflags $$ | grep I: > output
     diff -u expected output || exit 1
 }
 
@@ -64,14 +71,14 @@ self_remove() {
 	I:	noexecstack
 EOF
 
-    /usr/bin/psecflags $$ | grep I: > output
+    secflags $$ | grep I: > output
     diff -u expected output || exit 1
 }
 
 self_all() {
     echo "All (self)"
     /usr/bin/psecflags -s all $$
-    /usr/bin/psecflags $$ | grep -q 'I:.*,.*,' || exit 1 # This is lame, but functional
+    secflags $$ | grep -q 'I:.*,.*,' || exit 1 # This is lame, but functional
 }
 
 self_none() {
@@ -81,14 +88,14 @@ self_none() {
     cat > expected <<EOF
 	I:	none
 EOF
-    /usr/bin/psecflags $$ | grep I: > output
+    secflags $$ | grep I: > output
     diff -u expected output || exit 1
 }
 
 child_set() {
     echo "Set (child)"
 
-    typeset pid; 
+    typeset pid;
 
     /usr/bin/psecflags -s aslr -e sleep 10000 &
     pid=$!
@@ -96,7 +103,7 @@ child_set() {
 	E:	aslr
 	I:	aslr
 EOF
-    /usr/bin/psecflags $pid | grep '[IE]:' > output
+    secflags $pid | grep '[IE]:' > output
     kill $pid
     diff -u expected output || exit 1
 }
@@ -104,7 +111,7 @@ EOF
 child_add() {
     echo "Add (child)"
 
-    typeset pid; 
+    typeset pid;
 
     /usr/bin/psecflags -s aslr $$
     /usr/bin/psecflags -s current,noexecstack -e sleep 10000 &
@@ -113,7 +120,7 @@ child_add() {
 	E:	aslr,noexecstack
 	I:	aslr,noexecstack
 EOF
-    /usr/bin/psecflags $pid | grep '[IE]:' > output
+    secflags $pid | grep '[IE]:' > output
     kill $pid
     /usr/bin/psecflags -s none $$
     diff -u expected output || exit 1
@@ -122,7 +129,7 @@ EOF
 child_remove() {
     echo "Remove (child)"
 
-    typeset pid; 
+    typeset pid;
 
     /usr/bin/psecflags -s aslr $$
     /usr/bin/psecflags -s current,-aslr -e sleep 10000 &
@@ -131,7 +138,7 @@ child_remove() {
 	E:	none
 	I:	none
 EOF
-    /usr/bin/psecflags $pid | grep '[IE]:' > output
+    secflags $pid | grep '[IE]:' > output
     kill $pid
     /usr/bin/psecflags -s none $$
     diff -u expected output || exit 1
@@ -144,7 +151,7 @@ child_all() {
 
     /usr/bin/psecflags -s all -e sleep 10000 &
     pid=$!
-    /usr/bin/psecflags $pid | grep -q 'E:.*,.*,' # This is lame, but functional
+    secflags $pid | grep -q 'E:.*,.*,' # This is lame, but functional
     ret=$?
     kill $pid
     (( $ret != 0 )) && exit $ret
@@ -154,7 +161,7 @@ child_none() {
     echo "None (child)"
 
     typeset pid
-    
+
     /usr/bin/psecflags -s all $$
 
     /usr/bin/psecflags -s none -e sleep 10000 &
@@ -163,7 +170,7 @@ child_none() {
 	E:	none
 	I:	none
 EOF
-    /usr/bin/psecflags $pid | grep '[IE]:' > output
+    secflags $pid | grep '[IE]:' > output
     kill $pid
     diff -u expected output || exit 1
 }
