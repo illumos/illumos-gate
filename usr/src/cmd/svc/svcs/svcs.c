@@ -2651,9 +2651,8 @@ restarter_common:
 	return (0);
 }
 
-/* ARGSUSED */
 static int
-print_log(void *unused, scf_walkinfo_t *wip)
+print_log(void *unused __unused, scf_walkinfo_t *wip)
 {
 	scf_propertygroup_t *rpg;
 	char buf[MAXPATHLEN];
@@ -2669,6 +2668,9 @@ print_log(void *unused, scf_walkinfo_t *wip)
 	}
 
 	if (pg_get_single_val(rpg, SCF_PROPERTY_LOGFILE,
+	    SCF_TYPE_ASTRING, buf, sizeof (buf), 0) == 0) {
+		(void) printf("%s\n", buf);
+	} else if (pg_get_single_val(rpg, SCF_PROPERTY_ALT_LOGFILE,
 	    SCF_TYPE_ASTRING, buf, sizeof (buf), 0) == 0) {
 		(void) printf("%s\n", buf);
 	}
