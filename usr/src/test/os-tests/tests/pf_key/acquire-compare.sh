@@ -12,12 +12,27 @@
 #
 
 #
-# Copyright (c) 2017 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
-if [ `id -u` -ne 0 ]; then
-	echo "Need to be root or have effective UID of root."
-	exit 255
+# we can't presume /usr/bin/timeout is there
+timeout_cmd() {
+    $* &
+    sleep 3
+    kill $!
+    # we want to pause a while to make sure the monitor log is
+    # updated...
+    sleep 2
+}
+
+if [[ `id -u` -ne 0 ]]; then
+    echo "Error: need to be root or have effective UID of root." >&2
+    exit 255
+fi
+
+if [[ ! -x "$(type -p curl)" ]]; then
+    echo "Error: curl binary not found." >&2
+    exit 255
 fi
 
 # NOTE: If multihomed, this may fail in interesting ways...
@@ -34,6 +49,11 @@ T2_SRC=10.51.50.4
 T2_DST=10.51.50.5
 T2_PREFIX=10.51.50.0/24
 
+CURL_DST3_LPORT=10001
+CURL_DST4_LPORT=10002
+CURL_DST1_LPORT=10003
+CURL_PORT=80
+
 MONITOR_LOG=/tmp/ipseckey-monitor.$$
 
 EACQ_PROG=/opt/os-tests/tests/pf_key/eacq-enabler
@@ -48,10 +68,10 @@ ipsecconf -Fq
 ipsecconf -qa - << EOF
 # Global policy...
 # Remote-port-based policy.  Use different algorithms...
-{ raddr $TEST_REMOTE_DST3 rport 23 ulp tcp } ipsec { encr_algs aes encr_auth_algs sha512 }
+{ raddr $TEST_REMOTE_DST3 rport $CURL_PORT ulp tcp } ipsec { encr_algs aes encr_auth_algs sha512 }
 
 # Unique policy...
-{ raddr $TEST_REMOTE_DST4 rport 23 ulp tcp } ipsec { encr_algs aes encr_auth_algs sha256 sa unique }
+{ raddr $TEST_REMOTE_DST4 rport $CURL_PORT ulp tcp } ipsec { encr_algs aes encr_auth_algs sha256 sa unique }
 
 # Simple IP address policy.  Use an AH + ESP for it.
 { raddr $TEST_REMOTE_DST1 } ipsec { auth_algs sha512 encr_algs aes(256) }
@@ -75,38 +95,27 @@ ipseckey flush
 ipseckey -np monitor > $MONITOR_LOG &
 IPSECKEY_PID=$!
 
-# Launch pings and telnets to different addresses (each requiring an ACQUIRE).
-ping -svn $TEST_REMOTE_DST1 1024 1 2>&1 > /dev/null &
-p1=$!
-ping -svn $TEST_REMOTE_DST2 1024 1 2>&1 > /dev/null &
-p2=$!
-ping -svn $T1_DST 1024 1 2>&1 > /dev/null &
-p3=$!
-ping -svn $T2_DST 1024 1 2>&1 > /dev/null &
-p4=$!
+# give the monitor some time to get set up
+sleep 3
 
-echo "Waiting for pings..."
-pwait $p1 $p2 $p3 $p4
+# Launch pings to various addresses (each requiring an ACQUIRE).
 
-# Now try some telnets to trigger port and unique policy.
+timeout_cmd ping -svn $TEST_REMOTE_DST1 1024 1
+timeout_cmd ping -svn $TEST_REMOTE_DST2 1024 1
+timeout_cmd ping -svn $T1_DST 1024 1
+timeout_cmd ping -svn $T2_DST 1024 1
+
+# Now try some curls to trigger local port and unique policy.
+
 # port-only for DST3
-telnet $TEST_REMOTE_DST3 &
-tpid=$!
-t1port=`pfiles $tpid | grep sockname | awk '{print $5}'`
-echo "First local port == $t1port"
-sleep 10 ; kill $tpid
+timeout_cmd curl --local-port $CURL_DST3_LPORT \
+    http://$TEST_REMOTE_DST3:$CURL_PORT
 # unique for DST4
-telnet $TEST_REMOTE_DST4 &
-tpid=$!
-t2port=`pfiles $tpid | grep sockname | awk '{print $5}'`
-echo "Second local port == $t2port"
-sleep 10 ; kill $tpid
+timeout_cmd curl --local-port $CURL_DST4_LPORT \
+    http://$TEST_REMOTE_DST4:$CURL_PORT
 # Nothing specced for DST1
-telnet $TEST_REMOTE_DST1 &
-tpid=$!
-t3port=`pfiles $tpid | grep sockname | awk '{print $5}'`
-echo "Third local port == $t3port"
-sleep 10 ; kill $tpid
+timeout_cmd curl --local-port $CURL_DST1_LPORT \
+    http://$TEST_REMOTE_DST1:$CURL_PORT
 
 # Clean up.
 kill $IPSECKEY_PID
@@ -127,14 +136,20 @@ ipsecconf -Fq
 # /etc/inet/ipsecinit.conf reloaded.
 svcadm restart ipsec/policy
 
+# give the monitor some time to finish up
+sleep 5
+
 # Process MONITOR_LOG's output...
 echo "Checking for unique local port only in one ACQUIRE case."
-egrep "$t1port|$t2port|$t3port" $MONITOR_LOG > /tmp/egrep.$$
-grep $t2port $MONITOR_LOG > /tmp/grep.$$
+egrep "$CURL_DST3_LPORT|$CURL_DST4_LPORT|$CURL_DST1_LPORT" \
+    $MONITOR_LOG > /tmp/egrep.$$
+grep $CURL_DST4_LPORT $MONITOR_LOG > /tmp/grep.$$ || {
+    echo "unique port $CURL_DST4_LPORT missing from monitor log."
+    exit 1
+}
 diff /tmp/grep.$$ /tmp/egrep.$$
 if [[ $? != 0 ]]; then
-    echo "More than just the one unique port, $tport2, found in monitor output."
-    /bin/rm -f /tmp/grep.$$ /tmp/egrep.$$ $MONITOR_LOG
+    echo "More than just the one unique port $CURL_DST4_LPORT found."
     exit 1
 fi
 
