@@ -62,7 +62,7 @@ tests = ['conn', 'dgram', 'drop_priv', 'nosignal', 'sockpair']
 [/opt/os-tests/tests/pf_key]
 user = root
 timeout = 180
-tests = ['acquire-compare', 'acquire-spray']
+tests = ['acquire-compare', 'kmc-update']
 
 [/opt/os-tests/tests/ddi_ufm]
 user = root
