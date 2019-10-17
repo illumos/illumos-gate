@@ -138,7 +138,7 @@ main(int argc, char *argv[])
 		err(EXIT_FAILURE, "failed to disable cores");
 	}
 
-	for (selector = 0; selector < 8194; selector++) {
+	for (selector = 0; selector < 512; selector++) {
 		inchild(resetcs);
 		inchild(resetds);
 		inchild(resetes);
