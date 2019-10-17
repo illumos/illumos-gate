@@ -488,6 +488,7 @@ i386_SUBDIRS=		\
 	cxgbetool	\
 	diskscan	\
 	nvmeadm		\
+	rdmsr		\
 	rtc		\
 	ucodeadm	\
 	xhci		\
@@ -754,6 +755,7 @@ sparc_MSGSUBDIRS=	\
 	vntsd
 
 i386_MSGSUBDIRS=	\
+	rdmsr		\
 	ucodeadm
 
 #

@@ -1,0 +1,43 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\" Copyright 2019 Joyent, Inc.
+.\"
+.Dd October 14, 2019
+.Dt RDMSR 1M
+.Os
+.Sh NAME
+.Nm rdmsr
+.Nd Read Model-Specific Register
+.Sh SYNOPSIS
+.Nm
+.Ar [0x<msrnr>]...
+.Sh DESCRIPTION
+The
+.Nm
+command can be used to read a value out of one or more x86 MSRs, as defined by
+the Intel and AMD CPU specifications.
+The integer MSR number should be given (typically in 0x-prefixed hexadecimal).
+It is the command-line equivalent of the
+.Fn rdmsr
+instruction).
+.Pp
+The read is done on the current CPU, which may change arbitrarily
+between MSR reads: to read from a particular CPU,
+.Xr pbind 1M
+can be used to execute this utility.
+.Sh EXIT STATUS
+The
+.Nm
+utility exits 0 on success, or 1 if an error occurs, or at least one MSR
+could not be read.
+.Sh SEE ALSO
+Intel 64 and IA-32 Architectures Software Developer's Manual Volume 4:
+Model-Specific Registers

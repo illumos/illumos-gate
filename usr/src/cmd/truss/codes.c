@@ -23,7 +23,7 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  */
 
@@ -103,6 +103,7 @@
 #include <sys/usb/clients/hid/hid.h>
 #include <sys/pm.h>
 #include <sys/soundcard.h>
+#include <sys/cpuid_drv.h>
 
 #include "ramdata.h"
 #include "proto.h"
@@ -1669,6 +1670,12 @@ const struct ioc {
 	{ (uint_t)PM_SEARCH_LIST,	"PM_SEARCH_LIST",
 		"pm_searchargs_t" },
 #endif /* _SYSCALL */
+
+	/* cpuid ioctls */
+	{ (uint_t)CPUID_GET_HWCAP,		"CPUID_GET_HWCAP", NULL },
+#if defined(__i386) || defined(__amd64)
+	{ (uint_t)CPUID_RDMSR,			"CPUID_RDMSR", NULL },
+#endif
 
 	{ (uint_t)0, NULL, NULL	}
 };
