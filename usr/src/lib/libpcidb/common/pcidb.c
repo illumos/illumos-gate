@@ -340,10 +340,13 @@ pcidb_open(int version)
 	}
 
 	if (parse_db(f, h) < 0) {
+		(void) fclose(f);
 		pcidb_close(h);
 		free(h);
 		return (NULL);
 	}
+
+	(void) fclose(f);
 
 	return (h);
 }
