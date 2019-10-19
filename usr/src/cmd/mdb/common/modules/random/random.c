@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include <sys/mdb_modapi.h>
 #include <mdb/mdb_ctf.h>
@@ -39,10 +41,9 @@ rnd_get_stats(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	rnd_stats_t rnd_stats, rnd_stats_cpu;
 	uint32_t random_max_ncpus;
-	size_t rndmag_t_size;
+	size_t rndmag_pad_t_size;
 	ulong_t rndmag_t_offset;
 	uintptr_t rndmag;
-	mdb_ctf_id_t rndmag_id;
 	int i;
 
 	if ((flags & DCMD_ADDRSPEC) || argc != 0)
@@ -53,23 +54,20 @@ rnd_get_stats(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	if ((mdb_ctf_lookup_by_name("rndmag_t", &rndmag_id) != 0) ||
-	    (mdb_ctf_offsetof(rndmag_id, "rm_stats", &rndmag_t_offset) != 0) ||
+	if (((rndmag_t_offset = mdb_ctf_offsetof_by_name("rndmag_t", "rm_stats")) == -1) ||
 	    (mdb_readvar(&random_max_ncpus, "random_max_ncpus") == -1) ||
 	    (mdb_readvar(&rndmag, "rndmag") == -1) ||
-	    ((rndmag_t_size = mdb_ctf_type_size(rndmag_id)) == 0)) {
+	    ((rndmag_pad_t_size = mdb_ctf_sizeof_by_name("rndmag_pad_t")) == -1)) {
 		/* Can't find per-cpu stats.  Don't add them in. */
 		random_max_ncpus = 0;
 	}
-
-	rndmag_t_offset /= 8;
 
 	/*
 	 * Read and aggregate per-cpu stats if we have them.
 	 */
 	for (i = 0; i < random_max_ncpus; i++) {
 		mdb_vread(&rnd_stats_cpu, sizeof (rnd_stats_cpu),
-		    rndmag + rndmag_t_offset + i * rndmag_t_size);
+		    rndmag + rndmag_t_offset + i * rndmag_pad_t_size);
 
 		rnd_stats.rs_rndOut += rnd_stats_cpu.rs_rndOut;
 		rnd_stats.rs_rndcOut += rnd_stats_cpu.rs_rndcOut;
