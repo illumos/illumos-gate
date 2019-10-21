@@ -21,8 +21,9 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
  * Copyright 2012 Milan Jurik. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -586,7 +587,7 @@ ndr_run_outer_queue(ndr_stream_t *nds)
 int
 ndr_outer(ndr_ref_t *outer_ref)
 {
-	ndr_stream_t 	*nds = outer_ref->stream;
+	ndr_stream_t	*nds = outer_ref->stream;
 	ndr_typeinfo_t	*ti = outer_ref->ti;
 	int	is_varlen = ti->pdu_size_variable_part;
 	int	is_union = NDR_IS_UNION(ti);
@@ -653,7 +654,7 @@ ndr_outer_fixed(ndr_ref_t *outer_ref)
 	ndr_stream_t	*nds = outer_ref->stream;
 	ndr_typeinfo_t	*ti = outer_ref->ti;
 	ndr_ref_t	myref;
-	char 		*valp = NULL;
+	char		*valp = NULL;
 	int		is_varlen = ti->pdu_size_variable_part;
 	int		is_union = NDR_IS_UNION(ti);
 	int		is_string = NDR_IS_STRING(ti);
@@ -743,7 +744,7 @@ ndr_outer_fixed_array(ndr_ref_t *outer_ref)
 	ndr_stream_t	*nds = outer_ref->stream;
 	ndr_typeinfo_t	*ti = outer_ref->ti;
 	ndr_ref_t	myref;
-	char 		*valp = NULL;
+	char		*valp = NULL;
 	int		is_varlen = ti->pdu_size_variable_part;
 	int		is_union = NDR_IS_UNION(ti);
 	int		is_string = NDR_IS_STRING(ti);
@@ -834,7 +835,7 @@ ndr_outer_conformant_array(ndr_ref_t *outer_ref)
 	ndr_stream_t	*nds = outer_ref->stream;
 	ndr_typeinfo_t	*ti = outer_ref->ti;
 	ndr_ref_t	myref;
-	char 		*valp = NULL;
+	char		*valp = NULL;
 	int		is_varlen = ti->pdu_size_variable_part;
 	int		is_union = NDR_IS_UNION(ti);
 	int		is_string = NDR_IS_STRING(ti);
@@ -962,7 +963,7 @@ ndr_outer_conformant_construct(ndr_ref_t *outer_ref)
 	ndr_stream_t	*nds = outer_ref->stream;
 	ndr_typeinfo_t	*ti = outer_ref->ti;
 	ndr_ref_t	myref;
-	char 		*valp = NULL;
+	char		*valp = NULL;
 	int		is_varlen = ti->pdu_size_variable_part;
 	int		is_union = NDR_IS_UNION(ti);
 	int		is_string = NDR_IS_STRING(ti);
@@ -1091,8 +1092,8 @@ ndr_outer_conformant_construct(ndr_ref_t *outer_ref)
 int
 ndr_size_is(ndr_ref_t *ref)
 {
-	ndr_stream_t 		*nds = ref->stream;
-	ndr_ref_t 		*outer_ref = nds->outer_current;
+	ndr_stream_t		*nds = ref->stream;
+	ndr_ref_t		*outer_ref = nds->outer_current;
 	ndr_typeinfo_t		*ti = outer_ref->ti;
 	unsigned long		size_is;
 	int			rc;
@@ -1161,9 +1162,9 @@ int
 ndr_outer_string(ndr_ref_t *outer_ref)
 {
 	ndr_stream_t	*nds = outer_ref->stream;
-	ndr_typeinfo_t 	*ti = outer_ref->ti;
+	ndr_typeinfo_t	*ti = outer_ref->ti;
 	ndr_ref_t	myref;
-	char 		*valp = NULL;
+	char		*valp = NULL;
 	unsigned	is_varlen = ti->pdu_size_variable_part;
 	int		is_union = NDR_IS_UNION(ti);
 	int		is_string = NDR_IS_STRING(ti);
@@ -1266,6 +1267,8 @@ ndr_outer_string(ndr_ref_t *outer_ref)
 			return (0);		/* error already set */
 
 		/*
+		 * Enforce bounds on: size_is, first_is, length_is
+		 *
 		 * In addition to the first_is check, we used to check that
 		 * size_is or size_is-1 was equal to length_is but Windows95
 		 * doesn't conform to this "rule" (see variable part below).
@@ -1280,8 +1283,16 @@ ndr_outer_string(ndr_ref_t *outer_ref)
 		 * size_is was the maximum path length rather than being
 		 * related to length_is.
 		 */
+		if (size_is > NDR_STRING_MAX) {
+			NDR_SET_ERROR(outer_ref, NDR_ERR_STRING_SIZING);
+			return (0);
+		}
 		if (first_is != 0) {
 			NDR_SET_ERROR(outer_ref, NDR_ERR_STRING_SIZING);
+			return (0);
+		}
+		if (length_is > size_is) {
+			NDR_SET_ERROR(outer_ref, NDR_ERR_STRLEN);
 			return (0);
 		}
 
@@ -1377,7 +1388,7 @@ int
 ndr_outer_peek_sizing(ndr_ref_t *outer_ref, unsigned offset,
     unsigned long *sizing_p)
 {
-	ndr_stream_t 	*nds = outer_ref->stream;
+	ndr_stream_t	*nds = outer_ref->stream;
 	unsigned long	pdu_offset;
 	int		rc;
 
@@ -1412,7 +1423,7 @@ int
 ndr_outer_poke_sizing(ndr_ref_t *outer_ref, unsigned offset,
     unsigned long *sizing_p)
 {
-	ndr_stream_t 	*nds = outer_ref->stream;
+	ndr_stream_t	*nds = outer_ref->stream;
 	unsigned long	pdu_offset;
 	int		rc;
 
@@ -1451,7 +1462,7 @@ ndr_outer_poke_sizing(ndr_ref_t *outer_ref, unsigned offset,
 int
 ndr_outer_align(ndr_ref_t *outer_ref)
 {
-	ndr_stream_t 	*nds = outer_ref->stream;
+	ndr_stream_t	*nds = outer_ref->stream;
 	int		rc;
 	unsigned	n_pad;
 	unsigned	align;
@@ -1493,7 +1504,7 @@ ndr_outer_align(ndr_ref_t *outer_ref)
 int
 ndr_outer_grow(ndr_ref_t *outer_ref, unsigned n_total)
 {
-	ndr_stream_t 	*nds = outer_ref->stream;
+	ndr_stream_t	*nds = outer_ref->stream;
 	unsigned long	pdu_want_size;
 	int		rc, is_ok = 0;
 
@@ -1549,7 +1560,7 @@ ndr_outer_grow(ndr_ref_t *outer_ref, unsigned n_total)
 int
 ndr_inner(ndr_ref_t *arg_ref)
 {
-	ndr_typeinfo_t 	*ti = arg_ref->ti;
+	ndr_typeinfo_t	*ti = arg_ref->ti;
 	int	is_varlen = ti->pdu_size_variable_part;
 	int	is_union = NDR_IS_UNION(ti);
 	int	error = NDR_ERR_INNER_PARAMS_BAD;
@@ -1623,8 +1634,8 @@ ndr_inner_pointer(ndr_ref_t *arg_ref)
 {
 	ndr_stream_t	*nds = arg_ref->stream;
 	/*LINTED E_BAD_PTR_CAST_ALIGN*/
-	char 		**valpp = (char **)arg_ref->datum;
-	ndr_ref_t 	*outer_ref;
+	char		**valpp = (char **)arg_ref->datum;
+	ndr_ref_t	*outer_ref;
 
 	if (!ndr__ulong(arg_ref))
 		return (0);	/* error */
@@ -1800,6 +1811,7 @@ ndr_inner_array(ndr_ref_t *encl_ref)
 int ndr_basic_integer(ndr_ref_t *, unsigned);
 int ndr_string_basic_integer(ndr_ref_t *, ndr_typeinfo_t *);
 
+/* BEGIN CSTYLED */
 /* Comments to be nice to those searching for these types. */
 MAKE_BASIC_TYPE(_char, 1)	/* ndt__char,  ndt_s_char */
 MAKE_BASIC_TYPE(_uchar, 1)	/* ndt__uchar, ndt_s_uchar */
@@ -1809,12 +1821,13 @@ MAKE_BASIC_TYPE(_long, 4)	/* ndt__long,  ndt_s_long */
 MAKE_BASIC_TYPE(_ulong, 4)	/* ndt__ulong, ndt_s_ulong */
 
 MAKE_BASIC_TYPE_BASE(_wchar, 2)	/* ndt__wchar, ndt_s_wchar */
+/* END CSTYLED */
 
 int
 ndr_basic_integer(ndr_ref_t *ref, unsigned size)
 {
 	ndr_stream_t	*nds = ref->stream;
-	char 		*valp = (char *)ref->datum;
+	char		*valp = (char *)ref->datum;
 	int		rc;
 
 	switch (nds->m_op) {

@@ -22,7 +22,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Syneto S.R.L. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -954,6 +954,10 @@ smb_ofile_lookup_by_uniqid(smb_tree_t *tree, uint32_t uniqid)
 	return (NULL);
 }
 
+/*
+ * Durable ID (or persistent ID)
+ */
+
 static smb_ofile_t *
 smb_ofile_hold_cb(smb_ofile_t *of)
 {
@@ -1509,6 +1513,9 @@ smb_ofile_free(smb_ofile_t *of)
 	smb_tree_t	*tree = of->f_tree;
 
 	ASSERT(of->f_state == SMB_OFILE_STATE_ALLOC);
+
+	/* Make sure it's not in the persistid hash. */
+	ASSERT(of->f_persistid == 0);
 
 	if (tree != NULL) {
 		if (of->f_fid != 0)

@@ -234,6 +234,7 @@ smb_user_new(smb_session_t *session)
 {
 	smb_user_t	*user;
 	uint_t		gen;	// generation (low 3 bits of ssnid)
+	uint32_t	ucount;
 
 	ASSERT(session);
 	ASSERT(session->s_magic == SMB_SESSION_MAGIC);
@@ -256,9 +257,26 @@ smb_user_new(smb_session_t *session)
 	user->u_magic = SMB_USER_MAGIC;
 
 	smb_llist_enter(&session->s_user_list, RW_WRITER);
+	ucount = smb_llist_get_count(&session->s_user_list);
 	smb_llist_insert_tail(&session->s_user_list, user);
 	smb_llist_exit(&session->s_user_list);
 	smb_server_inc_users(session->s_server);
+
+	/*
+	 * If we added the first user to the session, cancel the
+	 * timeout that was started in smb_session_receiver().
+	 */
+	if (ucount == 0) {
+		timeout_id_t tmo = NULL;
+
+		smb_rwx_rwenter(&session->s_lock, RW_WRITER);
+		tmo = session->s_auth_tmo;
+		session->s_auth_tmo = NULL;
+		smb_rwx_rwexit(&session->s_lock);
+
+		if (tmo != NULL)
+			(void) untimeout(tmo);
+	}
 
 	return (user);
 
@@ -672,9 +690,19 @@ smb_user_delete(void *arg)
 	ucount = smb_llist_get_count(&session->s_user_list);
 	smb_llist_exit(&session->s_user_list);
 
+	/*
+	 * When the last smb_user_t object goes away, schedule a timeout
+	 * after which we'll terminate this session if the client hasn't
+	 * authenticated another smb_user_t on this session by then.
+	 */
 	if (ucount == 0) {
 		smb_rwx_rwenter(&session->s_lock, RW_WRITER);
-		session->s_state = SMB_SESSION_STATE_SHUTDOWN;
+		if (session->s_state == SMB_SESSION_STATE_NEGOTIATED &&
+		    session->s_auth_tmo == NULL) {
+			session->s_auth_tmo =
+			    timeout((tmo_func_t)smb_session_disconnect,
+			    session, SEC_TO_TICK(smb_session_auth_tmo));
+		}
 		smb_rwx_cvbcast(&session->s_lock);
 		smb_rwx_rwexit(&session->s_lock);
 	}

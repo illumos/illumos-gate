@@ -276,7 +276,7 @@ smbd_authsvc_listen(void *arg)
 			smbd_authsvc_thrcnt--;
 			(void) mutex_unlock(&smbd_authsvc_mutex);
 			(void) close(ns);
-			goto out;
+			continue;
 		}
 		ctx->ctx_socket = ns;
 
@@ -287,9 +287,8 @@ smbd_authsvc_listen(void *arg)
 			smbd_authsvc_thrcnt--;
 			(void) mutex_unlock(&smbd_authsvc_mutex);
 			smbd_authctx_destroy(ctx);
-			goto out;
 		}
-		ctx = NULL; /* given to the new thread */
+		ctx = NULL; /* given to the new thread or destroyed */
 	}
 
 out:

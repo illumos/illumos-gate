@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -1948,15 +1948,16 @@ smb_server_session_disconnect(smb_server_t *sv,
 		for (user = smb_llist_head(ulist);
 		    user != NULL;
 		    user = smb_llist_next(ulist, user)) {
-			SMB_USER_VALID(user);
-
-			if (*name != '\0' && !smb_user_namecmp(user, name))
-				continue;
 
 			if (smb_user_hold(user)) {
-				smb_user_logoff(user);
+
+				if (*name == '\0' ||
+				    smb_user_namecmp(user, name)) {
+					smb_user_logoff(user);
+					count++;
+				}
+
 				smb_user_release(user);
-				count++;
 			}
 		}
 

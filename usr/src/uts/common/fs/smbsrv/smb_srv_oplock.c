@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -199,7 +199,14 @@ smb_oplock_ind_break_in_ack(smb_request_t *ack_sr, smb_ofile_t *ofile,
 	new_sr->smb2_async = B_TRUE;
 	new_sr->user_cr = zone_kcred();
 	new_sr->fid_ofile = ofile;
-	/* Leave tid_tree, uid_user NULL. */
+	if (ofile->f_tree != NULL) {
+		new_sr->tid_tree = ofile->f_tree;
+		smb_tree_hold_internal(ofile->f_tree);
+	}
+	if (ofile->f_user != NULL) {
+		new_sr->uid_user = ofile->f_user;
+		smb_user_hold_internal(ofile->f_user);
+	}
 	new_sr->arg.olbrk.NewLevel = NewLevel;
 	new_sr->arg.olbrk.AckRequired = AckRequired;
 
@@ -271,6 +278,7 @@ smb_oplock_ind_break(smb_ofile_t *ofile, uint32_t NewLevel,
 	 * _ORPHANED will have f_session == NULL, but the
 	 * f_session won't _change_ while we have a ref,
 	 * and won't be torn down under our feet.
+	 * Same for f_tree and f_user
 	 *
 	 * If f_session is NULL, or it's in a state that doesn't
 	 * allow new requests, use the special "server" session.
@@ -284,7 +292,14 @@ smb_oplock_ind_break(smb_ofile_t *ofile, uint32_t NewLevel,
 	sr->smb2_async = B_TRUE;
 	sr->user_cr = zone_kcred();
 	sr->fid_ofile = ofile;
-	/* Leave tid_tree, uid_user NULL. */
+	if (ofile->f_tree != NULL) {
+		sr->tid_tree = ofile->f_tree;
+		smb_tree_hold_internal(sr->tid_tree);
+	}
+	if (ofile->f_user != NULL) {
+		sr->uid_user = ofile->f_user;
+		smb_user_hold_internal(sr->uid_user);
+	}
 	sr->arg.olbrk.NewLevel = NewLevel;
 	sr->arg.olbrk.AckRequired = AckRequired;
 	sr->smb2_status = CompletionStatus;
@@ -364,7 +379,7 @@ int smb_oplock_debug_wait = 0;
  * then process the oplock break locally.
  *
  * Note that we have sr->fid_ofile here but all the other
- * normal sr members are NULL:  uid_user, tid_tree.
+ * normal sr members may be NULL:  uid_user, tid_tree.
  * Also sr->session may or may not be the same session as
  * the ofile came from (ofile->f_session) depending on
  * whether this is a "live" open or an orphaned DH,

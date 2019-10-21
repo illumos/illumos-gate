@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Syneto S.R.L.  All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -56,6 +56,9 @@ extern "C" {
 #include <smbsrv/smb_ktypes.h>
 #include <smbsrv/smb_ioctl.h>
 
+/* For timeout(9F). Not in any system header, apparently. */
+typedef void (*tmo_func_t)(void *);
+
 extern	int smb_maxbufsize;
 extern	int smb_flush_required;
 extern	int smb_dirsymlink_enable;
@@ -69,6 +72,8 @@ extern	int smb_ssetup_timeout;
 extern	int smb_tcon_timeout;
 extern	int smb_opipe_timeout;
 extern	int smb_allow_advisory_locks;
+extern	int smb_session_auth_tmo;
+
 extern const uint32_t smb_vop_dosattr_settable;
 
 /* Thread priorities - see smb_init.c */
