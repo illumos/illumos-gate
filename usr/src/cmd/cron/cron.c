@@ -26,6 +26,7 @@
  *
  * Copyright (c) 2014 Gary Mills
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -33,11 +34,6 @@
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
-
-#ifdef lint
-/* make lint happy */
-#define	__EXTENSIONS__
-#endif
 
 #include <sys/contract/process.h>
 #include <sys/ctfs.h>
@@ -315,7 +311,6 @@ static struct usr *find_usr(char *);
 static int ex(struct event *e);
 static void read_dirs(int);
 static void mail(char *, char *, int);
-static char *next_field(int, int);
 static void readcron(struct usr *, time_t);
 static int next_ge(int, char *);
 static void free_if_unused(struct usr *);
@@ -460,7 +455,7 @@ begin:
 	(void) setlocale(LC_ALL, "");
 	/* fork unless 'nofork' is specified */
 	if ((argc <= 1) || (strcmp(argv[1], "nofork"))) {
-		if (rfork = fork()) {
+		if ((rfork = fork()) != 0) {
 			if (rfork == (pid_t)-1) {
 				(void) sleep(30);
 				goto begin;
@@ -978,7 +973,8 @@ mod_ctab(char *name, time_t reftime)
 			return;
 		}
 #ifdef DEBUG
-		(void) fprintf(stderr, "%s has revised his crontab\n", u->name);
+		(void) fprintf(stderr, "%s has revised their crontab\n",
+		    u->name);
 #endif
 		rm_ctevents(u);
 		el_remove(u->ctid, 0);
@@ -986,9 +982,8 @@ mod_ctab(char *name, time_t reftime)
 	}
 }
 
-/* ARGSUSED */
 static void
-mod_atjob(char *name, time_t reftime)
+mod_atjob(char *name, time_t reftime __unused)
 {
 	char	*ptr;
 	time_t	tim;
@@ -1211,11 +1206,18 @@ readcron(struct usr *u, time_t reftime)
 
 		e = xmalloc(sizeof (struct event));
 		e->etype = CRONEVENT;
-		if (!(((e->of.ct.minute = next_field(0, 59)) != NULL) &&
-		    ((e->of.ct.hour = next_field(0, 23)) != NULL) &&
-		    ((e->of.ct.daymon = next_field(1, 31)) != NULL) &&
-		    ((e->of.ct.month = next_field(1, 12)) != NULL) &&
-		    ((e->of.ct.dayweek = next_field(0, 6)) != NULL))) {
+
+		if (next_field(0, 59, line, &cursor,
+		    &e->of.ct.minute) != CFOK ||
+		    next_field(0, 23, line, &cursor, &e->of.ct.hour) != CFOK ||
+		    next_field(1, 31, line, &cursor,
+		    &e->of.ct.daymon) != CFOK ||
+		    next_field(1, 12, line, &cursor, &e->of.ct.month) != CFOK ||
+		    next_field(0, 6, line, &cursor,
+		    &e->of.ct.dayweek) != CFOK) {
+#ifdef DEBUG
+			(void) fprintf(stderr, "Error: %d %s", lineno, line);
+#endif
 			free(e);
 			cte_add(lineno, line);
 			continue;
@@ -1442,67 +1444,6 @@ mail(char *usrname, char *mesg, int format)
 	if (cron_pid == getpid()) {
 		miscpid_insert(fork_val);
 	}
-}
-
-static char *
-next_field(int lower, int upper)
-{
-	/*
-	 * next_field returns a pointer to a string which holds the next
-	 * field of a line of a crontab file.
-	 *   if (numbers in this field are out of range (lower..upper),
-	 *	or there is a syntax error) then
-	 *	NULL is returned, and a mail message is sent to the
-	 *	user telling them which line the error was in.
-	 */
-
-	char *s;
-	int num, num2, start;
-
-	while ((line[cursor] == ' ') || (line[cursor] == '\t'))
-		cursor++;
-	start = cursor;
-	if (line[cursor] == '\0') {
-		return (NULL);
-	}
-	if (line[cursor] == '*') {
-		cursor++;
-		if ((line[cursor] != ' ') && (line[cursor] != '\t'))
-			return (NULL);
-		s = xmalloc(2);
-		(void) strcpy(s, "*");
-		return (s);
-	}
-	for (;;) {
-		if (!isdigit(line[cursor]))
-			return (NULL);
-		num = 0;
-		do {
-			num = num*10 + (line[cursor]-'0');
-		} while (isdigit(line[++cursor]));
-		if ((num < lower) || (num > upper))
-			return (NULL);
-		if (line[cursor] == '-') {
-			if (!isdigit(line[++cursor]))
-				return (NULL);
-			num2 = 0;
-			do {
-				num2 = num2*10 + (line[cursor]-'0');
-			} while (isdigit(line[++cursor]));
-			if ((num2 < lower) || (num2 > upper))
-				return (NULL);
-		}
-		if ((line[cursor] == ' ') || (line[cursor] == '\t'))
-			break;
-		if (line[cursor] == '\0')
-			return (NULL);
-		if (line[cursor++] != ',')
-			return (NULL);
-	}
-	s = xmalloc(cursor-start + 1);
-	(void) strncpy(s, line + start, cursor-start);
-	s[cursor-start] = '\0';
-	return (s);
 }
 
 #define	tm_cmp(t1, t2) (\
@@ -2931,24 +2872,21 @@ rinfo_free(struct runinfo *entry)
 	}
 }
 
-/* ARGSUSED */
 static void
-thaw_handler(int sig)
+thaw_handler(int sig __unused)
 {
 	refresh = 1;
 }
 
 
-/* ARGSUSED */
 static void
-cronend(int sig)
+cronend(int sig __unused)
 {
 	crabort("SIGTERM", REMOVE_FIFO);
 }
 
-/*ARGSUSED*/
 static void
-child_handler(int sig)
+child_handler(int sig __unused)
 {
 	;
 }
@@ -3474,10 +3412,9 @@ process_anc_files(int del)
 	}
 }
 
-/*ARGSUSED*/
 static int
 cron_conv(int num_msg, struct pam_message **msgs,
-    struct pam_response **response, void *appdata_ptr)
+    struct pam_response **response __unused, void *appdata_ptr __unused)
 {
 	struct pam_message	**m = msgs;
 	int i;
@@ -3599,14 +3536,14 @@ contract_abandon_latest(pid_t pid)
 		crabort("repeated failure to abandon contracts",
 		    REMOVE_FIFO | CONSOLE_MSG);
 
-	if (r = contract_latest(&id)) {
+	if ((r = contract_latest(&id)) != 0) {
 		msg("could not obtain latest contract for "
 		    "PID %ld: %s", pid, strerror(r));
 		cts_lost++;
 		return;
 	}
 
-	if (r = contract_abandon_id(id)) {
+	if ((r = contract_abandon_id(id)) != 0) {
 		msg("could not abandon latest contract %ld: %s", id,
 		    strerror(r));
 		cts_lost++;

@@ -23,13 +23,17 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #ifndef	_CRON_H
 #define	_CRON_H
 
 #include <unistd.h>
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #ifdef	__cplusplus
 extern "C" {
@@ -71,6 +75,18 @@ struct	message {
 	char	logname[LLEN];
 };
 
+/*
+ * Errors from the crontab field parser.
+ */
+typedef enum {
+	CFOK = 0,
+	CFEOLN,
+	CFUNEXPECT,
+	CFOUTOFBOUND,
+	CFEOVERFLOW,
+	CFENOMEM
+} cferror_t;
+
 #define	CRONDIR		"/var/spool/cron/crontabs"
 #define	ATDIR		"/var/spool/cron/atjobs"
 #define	ACCTFILE	"/var/cron/log"
@@ -104,6 +120,7 @@ extern int	isvalid_shell(const char *shell);
 extern int	isvalid_dir(const char *dir);
 
 extern int	cron_admin(const char *);
+extern cferror_t next_field(uint_t, uint_t, char *, int *, char **);
 
 #ifdef	__cplusplus
 }
