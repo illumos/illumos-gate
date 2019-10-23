@@ -205,6 +205,17 @@ emulate_rdmsr(struct vmctx *ctx, int vcpu, uint32_t num, uint64_t *val)
 			*val = 1;
 			break;
 
+#ifndef	__FreeBSD__
+		case MSR_VM_CR:
+			/*
+			 * We currently don't support nested virt.
+			 * Windows seems to ignore the cpuid bits and reads this
+			 * MSR anyways.
+			 */
+			*val = VM_CR_SVMDIS;
+			break;
+#endif
+
 		default:
 			error = -1;
 			break;
