@@ -1,5 +1,5 @@
 /*
- * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright (c) 1992, 1993, 1994 Henry Spencer.
  * Copyright (c) 1992, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -35,7 +35,9 @@
 /* utility definitions */
 #define	DUPMAX		_POSIX2_RE_DUP_MAX	/* xxx is this right? */
 #define	INFINITY	(DUPMAX + 1)
-#define	NC		(CHAR_MAX - CHAR_MIN + 1)
+
+#define	NC_MAX		(CHAR_MAX - CHAR_MIN + 1)
+#define	NC		((MB_CUR_MAX) == 1 ? (NC_MAX) : (128))
 typedef unsigned char uch;
 
 /* switch off assertions (if not already off) if no REDEBUG */

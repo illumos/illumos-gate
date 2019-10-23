@@ -81,6 +81,7 @@ tests = ['ufm-test-setup', 'ufm-test', 'ufm-test-cleanup']
 [/opt/os-tests/tests/i386]
 user = root
 arch = i86pc
+timeout = 300
 tests = ['ldt', 'badseg']
 
 [/opt/os-tests/tests/imc_test]

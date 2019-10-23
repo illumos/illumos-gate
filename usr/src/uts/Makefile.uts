@@ -258,6 +258,16 @@ CFLAGS_uts_i386 += -_gcc7=-fno-shrink-wrap
 CFLAGS_uts_i386 += -_gcc8=-fno-shrink-wrap
 CFLAGS_uts_i386 += -_gcc9=-fno-shrink-wrap
 
+#
+# retpoline support
+#
+CFLAGS_uts_i386 += -_gcc7=-mindirect-branch=thunk-extern
+CFLAGS_uts_i386 += -_gcc7=-mindirect-branch-register
+CFLAGS_uts_i386 += -_gcc8=-mindirect-branch=thunk-extern
+CFLAGS_uts_i386 += -_gcc8=-mindirect-branch-register
+CFLAGS_uts_i386 += -_gcc9=-mindirect-branch=thunk-extern
+CFLAGS_uts_i386 += -_gcc9=-mindirect-branch-register
+
 CSTD = $(CSTD_GNU99)
 
 CFLAGS_uts		=

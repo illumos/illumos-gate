@@ -91,8 +91,6 @@ char stubs_base[1], stubs_end[1];
  * This file contains the stubs routines for modules which can be autoloaded.
  */
 
-#if defined(__amd64)
-
 /*
  * See the 'struct mod_modinfo' definition to see what this declaration
  * is trying to achieve here.
@@ -1292,10 +1290,8 @@ fcnname/**/_info:							\
 	MODULE(elfexec,exec);
 	STUB(elfexec, elfexec,		nomod_einval);
 	STUB(elfexec, mapexec_brand,	nomod_einval);
-#if defined(__amd64)
 	STUB(elfexec, elf32exec,	nomod_einval);
 	STUB(elfexec, mapexec32_brand,	nomod_einval);
-#endif
 	END_MODULE(elfexec);
 #endif
 

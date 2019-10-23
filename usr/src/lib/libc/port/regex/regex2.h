@@ -35,14 +35,14 @@
  * First, the stuff that ends up in the outside-world include file
  * typedef off_t regoff_t;
  * typedef struct {
- * 	int re_magic;
- * 	size_t re_nsub;		// number of parenthesized subexpressions
- * 	const char *re_endp;	// end pointer for REG_PEND
- * 	struct re_guts *re_g;	// none of your business :-)
+ *	int re_magic;
+ *	size_t re_nsub;		// number of parenthesized subexpressions
+ *	const char *re_endp;	// end pointer for REG_PEND
+ *	struct re_guts *re_g;	// none of your business :-)
  * } regex_t;
  * typedef struct {
- * 	regoff_t rm_so;		// start of match
- * 	regoff_t rm_eo;		// end of match
+ *	regoff_t rm_so;		// start of match
+ *	regoff_t rm_eo;		// end of match
  * } regmatch_t;
  */
 /*
@@ -108,7 +108,7 @@ typedef struct {
 	wint_t		max;
 } crange;
 typedef struct {
-	unsigned char	bmp[NC / 8];
+	unsigned char	bmp[NC_MAX / 8];
 	wctype_t	*types;
 	unsigned int	ntypes;
 	wint_t		*wides;
@@ -128,9 +128,14 @@ CHIN1(cset *cs, wint_t ch)
 	if (ch < NC)
 		return (((cs->bmp[ch >> 3] & (1 << (ch & 7))) != 0) ^
 		    cs->invert);
-	for (i = 0; i < cs->nwides; i++)
-		if (ch == cs->wides[i])
+	for (i = 0; i < cs->nwides; i++) {
+		if (cs->icase) {
+			if (ch == towlower(cs->wides[i]) ||
+			    ch == towupper(cs->wides[i]))
+				return (!cs->invert);
+		} else if (ch == cs->wides[i])
 			return (!cs->invert);
+	}
 	for (i = 0; i < cs->nranges; i++)
 		if (cs->ranges[i].min <= ch && ch <= cs->ranges[i].max)
 			return (!cs->invert);
@@ -186,4 +191,5 @@ struct re_guts {
 
 /* misc utilities */
 #define	OUT	(CHAR_MIN - 1)	/* a non-character value */
+#define	IGN	(CHAR_MIN - 2)
 #define	ISWORD(c)	(iswalnum((uch)(c)) || (c) == '_')
