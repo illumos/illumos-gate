@@ -237,10 +237,6 @@ fcnname/**/_info:							\
 	ret
 	SET_SIZE(stubs_common_code)
 
-#else
-#error "Trying to build modstubs on an unsupported arch"
-#endif	/* __amd64 */
-
 #define STUB(module, fcnname, retfcn)	\
     STUB_COMMON(module, fcnname, mod_hold_stub, retfcn, 0)
 
