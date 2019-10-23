@@ -23,17 +23,21 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include <sun_sas.h>
 
 /*
  * Returns the number of HBAs supported by the library.  This returns the
  * current number of HBAs, even if this changes
- *
  */
-HBA_UINT32 Sun_sasGetNumberOfAdapters() {
-	    int count;
-	    struct sun_sas_hba	*hba_ptr;
+HBA_UINT32
+Sun_sasGetNumberOfAdapters(void)
+{
+	int count;
+	struct sun_sas_hba	*hba_ptr;
 
 	lock(&all_hbas_lock);
 	/* goes through hba list counting all the hbas found */

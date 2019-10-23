@@ -23,7 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include <sys/byteorder.h>
 #include <sun_sas.h>
@@ -156,7 +158,7 @@ RetrieveOpenHandle(HBA_HANDLE handle)
 struct sun_sas_hba *
 RetrieveHandle(int index)
 {
-	struct sun_sas_hba 	*hba_ptr = NULL;
+	struct sun_sas_hba *hba_ptr = NULL;
 
 	for (hba_ptr = global_hba_head; hba_ptr != NULL;
 	    hba_ptr = hba_ptr->next) {
@@ -176,8 +178,8 @@ RetrieveHandle(int index)
 struct sun_sas_hba *
 ExtractHandle(int index)
 {
-	struct sun_sas_hba 	*last = NULL;
-	struct sun_sas_hba 	*hba_ptr = NULL;
+	struct sun_sas_hba *last = NULL;
+	struct sun_sas_hba *hba_ptr = NULL;
 
 	for (hba_ptr = global_hba_head;
 	    hba_ptr != NULL;
@@ -344,7 +346,7 @@ getFirstAdapterPortWWN(HBA_HANDLE handle)
 
 	if (hba_ptr->first_port == NULL) {
 		/* This is probably an internal failure of the library */
-		if (hba_ptr->device_path) {
+		if (hba_ptr->device_path[0] != '\0') {
 			log(LOG_DEBUG, ROUTINE,
 			    "Internal failure:  Adapter %s contains no "
 			    "port data", hba_ptr->device_path);

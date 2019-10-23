@@ -23,15 +23,19 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 #include <kstat.h>
 #include <sun_sas.h>
 
 /*
  * Retrieves the statistics for a specified port.phy on an adapter
  */
-HBA_STATUS Sun_sasGetPhyStatistics(HBA_HANDLE handle,
-    HBA_UINT32 port, HBA_UINT32 phy, SMHBA_PHYSTATISTICS *pStatistics) {
+HBA_STATUS
+Sun_sasGetPhyStatistics(HBA_HANDLE handle, HBA_UINT32 port, HBA_UINT32 phy,
+    SMHBA_PHYSTATISTICS *pStatistics)
+{
 	const char	ROUTINE[] = "Sun_sasGetPhyStatistics";
 	HBA_STATUS		status = HBA_STATUS_OK;
 	struct sun_sas_hba	*hba_ptr;
@@ -125,7 +129,7 @@ HBA_STATUS Sun_sasGetPhyStatistics(HBA_HANDLE handle,
 
 
 	/* First, we need the deivce path to locate the devinfo node. */
-	(void *) strlcpy(path, hba_port_ptr->device_path,
+	(void) strlcpy(path, hba_port_ptr->device_path,
 	    sizeof (path));
 	charptr = strrchr(path, ':');
 	if (charptr) {
@@ -216,7 +220,7 @@ HBA_STATUS Sun_sasGetPhyStatistics(HBA_HANDLE handle,
 	for (i = 0; i < ksp->ks_ndata; i++, kname++) {
 		if (strcmp(kname->name,
 		    "SecondsSinceLastReset") == 0) {
-		    psas->SecondsSinceLastReset = kname->value.ull;
+			psas->SecondsSinceLastReset = kname->value.ull;
 			continue;
 		}
 		if (strcmp(kname->name, "TxFrames") == 0) {

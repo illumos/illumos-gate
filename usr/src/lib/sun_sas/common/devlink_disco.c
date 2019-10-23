@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include <sun_sas.h>
 #include <sys/types.h>
@@ -198,7 +201,7 @@ lookupLink(char *path, char *link, const char *dir, const char *mname)
 		charptr = dirp->d_name;
 		(void) snprintf(node, strlen(charptr) + strlen(dir) + 2,
 		    "%s/%s", dir, charptr);
-		if (count = readlink(node, buf, sizeof (buf))) {
+		if ((count = readlink(node, buf, sizeof (buf))) > 0) {
 			subpath = NULL;
 			subpath = strstr(buf, path);
 			buf[count] = '\0';

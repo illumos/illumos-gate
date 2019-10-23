@@ -22,47 +22,47 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 
 LIBRARY =	libsun_sas.a
 VERS =		.1
 
 OBJECTS	=	devtree_hba_disco.o \
-	      	devtree_device_disco.o \
-	      	devtree_phy_disco.o \
-	      	devlink_disco.o \
-	      	event.o \
-	      	verify.o \
-	      	SMHBA_RegisterLibrary.o \
-	      	Sun_sasLoadLibrary.o \
-	      	Sun_sasGetNumberOfAdapters.o \
-	      	Sun_sasGetTargetMapping.o \
-	      	Sun_sasGetAdapterName.o \
+		devtree_device_disco.o \
+		devtree_phy_disco.o \
+		devlink_disco.o \
+		event.o \
+		verify.o \
+		SMHBA_RegisterLibrary.o \
+		Sun_sasLoadLibrary.o \
+		Sun_sasGetNumberOfAdapters.o \
+		Sun_sasGetTargetMapping.o \
+		Sun_sasGetAdapterName.o \
 		Sun_sasGetAdapterAttributes.o \
 		Sun_sasGetAdapterPortAttributes.o \
 		Sun_sasGetDiscoveredPortAttributes.o \
 		Sun_sasGetPortAttributesByWWN.o \
 		Sun_sasGetSASPhyAttributes.o \
 		Sun_sasGetPortType.o \
-	      	Sun_sasGetNumberOfPorts.o \
-	      	Sun_sasGetVersion.o \
-	      	Sun_sasGetPhyStatistics.o \
-	      	Sun_sasGetVendorLibraryAttributes.o \
-	      	Sun_sasFreeLibrary.o \
-	      	Sun_sasOpenAdapter.o \
-	      	Sun_sasCloseAdapter.o \
-	      	Sun_sasRefreshInformation.o \
-	      	Sun_sasRefreshAdapterConfiguration.o \
-	      	Sun_sasGetLUNStatistics.o \
-	      	Sun_sasGetProtocolStatistics.o \
-	      	Sun_sasGetPersistentBinding.o \
-	      	Sun_sasSetPersistentBinding.o \
+		Sun_sasGetNumberOfPorts.o \
+		Sun_sasGetVersion.o \
+		Sun_sasGetPhyStatistics.o \
+		Sun_sasGetVendorLibraryAttributes.o \
+		Sun_sasFreeLibrary.o \
+		Sun_sasOpenAdapter.o \
+		Sun_sasCloseAdapter.o \
+		Sun_sasRefreshInformation.o \
+		Sun_sasRefreshAdapterConfiguration.o \
+		Sun_sasGetLUNStatistics.o \
+		Sun_sasGetProtocolStatistics.o \
+		Sun_sasGetPersistentBinding.o \
+		Sun_sasSetPersistentBinding.o \
 		Sun_sasSendSMPPassThru.o \
 		Sun_sasScsiInquiry.o \
 		Sun_sasScsiReportLUNs.o \
 		Sun_sasScsiReadCapacity.o \
 		sun_sas.o \
-		log.o 
+		log.o
 
 include ../../Makefile.lib
 
@@ -80,12 +80,6 @@ CFLAGS64 +=	-mt
 CFLAGS64 +=	$(CCVERBOSE)
 CPPFLAGS +=	$(INCS) -D_POSIX_PTHREAD_SEMANTICS
 CPPFLAGS +=	-DBUILD_TIME='"Wed Feb 4 12:00:00 2009"'
-
-CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	-_gcc=-Wno-unused-value
-
-# not linted
-SMATCH=off
 
 LDLIBS		+= -ldevinfo
 LDLIBS		+= -lsysevent
