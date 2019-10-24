@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013, 2017 by Delphix. All rights reserved.
  * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
@@ -4349,11 +4349,11 @@ tcp_do_listen(conn_t *connp, struct sockaddr *sa, socklen_t len,
 		}
 		return (-TOUTSTATE);
 	} else {
-		if (sa == NULL) {
-			sin6_t	addr;
-			sin_t *sin;
-			sin6_t *sin6;
+		sin6_t	addr;
+		sin_t *sin;
+		sin6_t *sin6;
 
+		if (sa == NULL) {
 			ASSERT(IPCL_IS_NONSTR(connp));
 			/* Do an implicit bind: Request for a generic port. */
 			if (connp->conn_family == AF_INET) {

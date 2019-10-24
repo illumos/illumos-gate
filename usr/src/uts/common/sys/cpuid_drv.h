@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_SYS_CPUID_DRV_H
@@ -64,10 +64,16 @@ extern "C" {
 #define	CPUID_IOC		(('c'<<24)|('i'<<16)|('d'<<8))
 
 #define	CPUID_GET_HWCAP		(CPUID_IOC|0)
+#define	CPUID_RDMSR		(CPUID_IOC|1)
 
 struct cpuid_get_hwcap {
 	char *cgh_archname;
 	uint_t cgh_hwcap[2];
+};
+
+struct cpuid_rdmsr {
+	uint64_t cr_msr_nr;
+	uint64_t cr_msr_val;
 };
 
 #if defined(_SYSCALL32_IMPL)

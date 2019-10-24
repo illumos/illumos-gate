@@ -10888,6 +10888,7 @@ f usr/sbin/raidctl 0555 root bin
 f usr/sbin/ramdiskadm 0555 root bin
 f usr/sbin/rcapadm 0555 root bin
 f usr/sbin/rctladm 0555 root bin
+f usr/sbin/rdmsr 0555 root bin
 h usr/sbin/reboot=usr/sbin/halt
 f usr/sbin/rem_drv 0555 root sys
 s usr/sbin/repquota=../lib/fs/ufs/repquota
@@ -12536,6 +12537,7 @@ f usr/share/man/man1m/rcapadm.1m 0444 root bin
 f usr/share/man/man1m/rcapd.1m 0444 root bin
 f usr/share/man/man1m/rctladm.1m 0444 root bin
 f usr/share/man/man1m/rdate.1m 0444 root bin
+f usr/share/man/man1m/rdmsr.1m 0444 root bin
 s usr/share/man/man1m/rdisc.1m=in.rdisc.1m
 f usr/share/man/man1m/reboot.1m 0444 root bin
 f usr/share/man/man1m/rem_drv.1m 0444 root bin

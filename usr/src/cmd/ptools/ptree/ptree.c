@@ -87,7 +87,8 @@ static	int	cflag = 0;
 static	int	sflag = 0;
 static	int	zflag = 0;
 static	zoneid_t zoneid;
-static  const char *svc_fmri;
+static	char *match_svc;
+static	char *match_inst;
 static	int	columns = 80;
 
 static bool match_proc(ps_t *);
@@ -97,7 +98,7 @@ static void insertchild(ps_t *, ps_t *);
 static void prsort(ps_t *);
 static void printsubtree(ps_t *, int);
 static void p_get_svc_fmri(ps_t *, ct_stathdl_t);
-static char *stripsvc(const char *);
+static char *parse_svc(const char *, char **);
 static zoneid_t getzone(const char *);
 static ps_t *fakepid0(void);
 
@@ -136,7 +137,7 @@ main(int argc, char **argv)
 			break;
 		case 's':
 			sflag = 1;
-			svc_fmri = stripsvc(optarg);
+			match_svc = parse_svc(optarg, &match_inst);
 			break;
 		case 'z':		/* only processes in given zone */
 			zflag = 1;
@@ -570,15 +571,16 @@ printsubtree(ps_t *p, int level)
 }
 
 /*
- * For the service matching, we don't go the whole hog like svcs(1), but we will
- * strip svc:/ and a :default prefix, and allow a match of the final part of the
- * service such as "name-service-cache".
+ * Match against the service name (and just the final component), and any
+ * specified instance name.
  */
 static bool
 match_proc(ps_t *p)
 {
+	bool matched = false;
 	const char *cp;
-	char *psvc;
+	char *p_inst;
+	char *p_svc;
 
 	if (zflag && p->zoneid != zoneid)
 		return (false);
@@ -589,24 +591,22 @@ match_proc(ps_t *p)
 	if (p->svc_fmri == NULL)
 		return (false);
 
-	if (strcmp(p->svc_fmri, svc_fmri) == 0)
-		return (true);
+	p_svc = parse_svc(p->svc_fmri, &p_inst);
 
-	psvc = stripsvc(p->svc_fmri);
-
-	if (strcmp(psvc, svc_fmri) == 0) {
-		free(psvc);
-		return (true);
+	if (strcmp(p_svc, match_svc) != 0 &&
+	    ((cp = strrchr(p_svc, '/')) == NULL ||
+	    strcmp(cp + 1, match_svc) != 0)) {
+		goto out;
 	}
 
-	if ((cp = strrchr(psvc, '/')) != NULL &&
-	    strcmp(cp + 1, svc_fmri) == 0) {
-		free(psvc);
-		return (true);
-	}
+	if (strlen(match_inst) == 0 ||
+	    strcmp(p_inst, match_inst) == 0)
+		matched = true;
 
-	free(psvc);
-	return (false);
+out:
+	free(p_svc);
+	free(p_inst);
+	return (matched);
 }
 
 static void
@@ -667,9 +667,9 @@ getzone(const char *arg)
 	return (zoneid);
 }
 
-/* svc:/...:default -> ... */
+/* svc:/mysvc:default ->  mysvc, default */
 static char *
-stripsvc(const char *arg)
+parse_svc(const char *arg, char **instp)
 {
 	const char *p = arg;
 	char *ret;
@@ -686,6 +686,17 @@ stripsvc(const char *arg)
 	if ((cp = strrchr(ret, ':')) != NULL &&
 	    strcmp(cp, ":default") == 0)
 		*cp = '\0';
+	if ((cp = strrchr(ret, ':')) != NULL) {
+		*cp = '\0';
+		cp++;
+	} else {
+		cp = "";
+	}
+
+	if ((*instp = strdup(cp)) == NULL) {
+		perror("strdup()");
+		exit(1);
+	}
 
 	return (ret);
 }

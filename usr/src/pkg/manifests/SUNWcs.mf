@@ -1332,6 +1332,7 @@ file path=usr/sbin/pwconv group=sys mode=0555
 file path=usr/sbin/raidctl mode=0555
 file path=usr/sbin/ramdiskadm mode=0555
 file path=usr/sbin/rctladm mode=0555
+$(i386_ONLY)file path=usr/sbin/rdmsr mode=0555 variant.opensolaris.zone=global
 file path=usr/sbin/rem_drv group=sys mode=0555
 file path=usr/sbin/root_archive group=sys mode=0555
 file path=usr/sbin/rpcbind mode=0555

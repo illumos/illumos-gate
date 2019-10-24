@@ -15,6 +15,7 @@
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
 # Copyright (c) 2016 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 file path=usr/share/man/man1m/6to4relay.1m
@@ -204,6 +205,7 @@ file path=usr/share/man/man1m/quotaon.1m
 file path=usr/share/man/man1m/raidctl.1m
 file path=usr/share/man/man1m/ramdiskadm.1m
 file path=usr/share/man/man1m/rctladm.1m
+$(i386_ONLY) file path=usr/share/man/man1m/rdmsr.1m variant.opensolaris.zone=global
 file path=usr/share/man/man1m/reboot.1m
 file path=usr/share/man/man1m/rem_drv.1m
 file path=usr/share/man/man1m/repquota.1m

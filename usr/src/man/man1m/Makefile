@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2016 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
@@ -548,6 +548,7 @@ i386_MANFILES=				\
 		acpixtract.1m		\
 		nvmeadm.1m		\
 		pptadm.1m
+		rdmsr.1m
 
 sparc_MANFILES=	dcs.1m			\
 		drd.1m			\

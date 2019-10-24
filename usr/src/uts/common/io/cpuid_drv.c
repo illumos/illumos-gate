@@ -22,7 +22,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 
@@ -39,6 +39,7 @@
 #include <sys/modctl.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/policy.h>
 
 #include <sys/auxv.h>
 #include <sys/cpuid_drv.h>
@@ -182,6 +183,35 @@ cpuid_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr, int *rval)
 			return (EFAULT);
 		return (0);
 	}
+
+#ifdef __x86
+	case CPUID_RDMSR: {
+		struct cpuid_rdmsr crm = { 0, };
+		label_t label;
+
+		if (secpolicy_sys_config(cr, B_FALSE) != 0)
+			return (EPERM);
+
+		if (ddi_copyin((void *)arg, &crm, sizeof (crm), mode))
+			return (EFAULT);
+
+		kpreempt_disable();
+
+		if (on_fault(&label)) {
+			kpreempt_enable();
+			return (ENOENT);
+		}
+
+		crm.cr_msr_val = rdmsr(crm.cr_msr_nr);
+
+		no_fault();
+		kpreempt_enable();
+
+		if (ddi_copyout(&crm, (void *)arg, sizeof (crm), mode))
+			return (EFAULT);
+		return (0);
+	}
+#endif
 
 	default:
 		return (ENOTTY);
