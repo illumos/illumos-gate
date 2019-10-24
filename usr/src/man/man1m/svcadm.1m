@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2019 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SVCADM 1M "Oct 17, 2017"
+.TH SVCADM 1M "Oct 24, 2019"
 .SH NAME
 svcadm \- manipulate service instances
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] enable [\fB-rst\fR]
      [{\fIFMRI\fR | \fIpattern\fR}...]
@@ -15,7 +15,7 @@ svcadm \- manipulate service instances
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] disable [\fB-s\fR]
+\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] disable [\fB-st\fR]
      [{\fIFMRI\fR | \fIpattern\fR}...]
 .fi
 
@@ -49,13 +49,11 @@ svcadm \- manipulate service instances
 .fi
 
 .SH DESCRIPTION
-.LP
 \fBsvcadm\fR issues requests for actions on services executing within the
 service management facility (see \fBsmf\fR(5)). Actions for a service are
 carried out by its assigned service restarter agent. The default service
 restarter is \fBsvc.startd\fR (see \fBsvc.startd\fR(1M)).
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -99,7 +97,6 @@ from the global zone, see \fBzones\fR(5).
 
 .SH SUBCOMMANDS
 .SS "Common Operations"
-.LP
 The subcommands listed below are used during the typical administration of a
 service instance.
 .sp
@@ -223,7 +220,6 @@ service instance (see \fBsmf_security\fR(5)).
 .RE
 
 .SS "Exceptional Operations"
-.LP
 The following subcommands are used for service development and temporary
 administrative manipulation.
 .sp
@@ -299,7 +295,6 @@ group of the \fBsvc:/system/svc/restarter:default\fR service instance (see
 .RE
 
 .SS "Operands"
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -365,7 +360,6 @@ is displayed and that operand is ignored.
 If a pattern matches more than one service or instance, the subcommand is
 applied to all matches.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRRestarting a Service Instance
 .sp
 .LP
@@ -457,7 +451,6 @@ The following command restores the running services:
 .sp
 
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -510,7 +503,6 @@ with the service's dependencies.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -529,12 +521,10 @@ Interface Stability	See below.
 The interactive output is Uncommitted. The invocation and non-interactive
 output are Committed.
 .SH SEE ALSO
-.LP
 \fBsvcprop\fR(1), \fBsvcs\fR(1), \fBinetd\fR(1M), \fBinit\fR(1M),
 \fBsvccfg\fR(1M), \fBsvc.startd\fR(1M), \fBlibscf\fR(3LIB), \fBcontract\fR(4),
 \fBattributes\fR(5), \fBsmf\fR(5), \fBsmf_security\fR(5), \fBzones\fR(5)
 .SH NOTES
-.LP
 The amount of time \fBsvcadm\fR will spend waiting for services and their
 dependencies to change state is implicitly limited by their method timeouts.
 For example, a service using the default restarter whose start method hangs
