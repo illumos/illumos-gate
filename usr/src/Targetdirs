@@ -996,6 +996,10 @@ $(ROOT)/usr/lib/$(MACH64)/libdevinfo.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libdevinfo.so.1
 $(ROOT)/usr/lib/$(MACH64)/libdevinfo.so:= \
 	REALPATH=../../../lib/$(MACH64)/libdevinfo.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdhcpagent.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libdhcpagent.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdhcpagent.so:= \
+	REALPATH=../../../lib/$(MACH64)/libdhcpagent.so.1
 $(ROOT)/usr/lib/$(MACH64)/libdhcputil.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libdhcputil.so.1
 $(ROOT)/usr/lib/$(MACH64)/libdhcputil.so:= \
@@ -1401,6 +1405,8 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libdevid.so.1 \
 	/usr/lib/$(MACH64)/libdevinfo.so \
 	/usr/lib/$(MACH64)/libdevinfo.so.1 \
+	/usr/lib/$(MACH64)/libdhcpagent.so \
+	/usr/lib/$(MACH64)/libdhcpagent.so.1 \
 	/usr/lib/$(MACH64)/libdhcputil.so \
 	/usr/lib/$(MACH64)/libdhcputil.so.1 \
 	/usr/lib/$(MACH64)/libdl.so \

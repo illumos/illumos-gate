@@ -26,6 +26,7 @@
 # Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2017 RackTop Systems.
 # Copyright 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 <include system-library.man3.inc>
@@ -195,6 +196,7 @@ file path=lib/$(ARCH64)/libcustr.so.1
 file path=lib/$(ARCH64)/libdevice.so.1
 file path=lib/$(ARCH64)/libdevid.so.1
 file path=lib/$(ARCH64)/libdevinfo.so.1
+file path=lib/$(ARCH64)/libdhcpagent.so.1
 file path=lib/$(ARCH64)/libdhcputil.so.1
 file path=lib/$(ARCH64)/libdl.so.1
 file path=lib/$(ARCH64)/libdladm.so.1
@@ -842,6 +844,8 @@ link path=usr/lib/$(ARCH64)/libdevinfo.so \
     target=../../../lib/$(ARCH64)/libdevinfo.so.1
 link path=usr/lib/$(ARCH64)/libdevinfo.so.1 \
     target=../../../lib/$(ARCH64)/libdevinfo.so.1
+link path=usr/lib/$(ARCH64)/libdhcpagent.so.1 \
+    target=../../../lib/$(ARCH64)/libdhcpagent.so.1
 link path=usr/lib/$(ARCH64)/libdhcputil.so.1 \
     target=../../../lib/$(ARCH64)/libdhcputil.so.1
 link path=usr/lib/$(ARCH64)/libdisasm.so target=libdisasm.so.1

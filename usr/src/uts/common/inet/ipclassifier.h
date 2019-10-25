@@ -24,6 +24,10 @@
  * Copyright 2015 Joyent, Inc.
  */
 
+/*
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #ifndef	_INET_IPCLASSIFIER_H
 #define	_INET_IPCLASSIFIER_H
 
@@ -66,7 +70,7 @@ typedef boolean_t (*edesc_vpf)(conn_t *, void *, struct icmph_s *,
 /* Unused			0x00040000 */
 #define	IPCL_FULLY_BOUND	0x00080000	/* Bound to correct squeue */
 /* Unused			0x00100000 */
-/* Unused 			0x00200000 */
+/* Unused			0x00200000 */
 /* Unused			0x00400000 */
 #define	IPCL_CL_LISTENER	0x00800000	/* Cluster listener */
 /* Unused			0x01000000 */
@@ -143,15 +147,15 @@ typedef struct ip_helper_minor_info_s {
  */
 typedef struct ip_helper_stream_info_s {
 	ldi_handle_t		iphs_handle;
-	queue_t 		*iphs_rq;
-	queue_t 		*iphs_wq;
+	queue_t			*iphs_rq;
+	queue_t			*iphs_wq;
 	ip_helper_minfo_t	*iphs_minfo;
 } ip_helper_stream_info_t;
 
 /*
  * Mandatory Access Control mode, in conn_t's conn_mac_mode field.
- * 	CONN_MAC_DEFAULT: strict enforcement of MAC.
- * 	CONN_MAC_AWARE:   allows communications between unlabeled systems
+ *	CONN_MAC_DEFAULT: strict enforcement of MAC.
+ *	CONN_MAC_AWARE:   allows communications between unlabeled systems
  *			  and privileged daemons
  *	CONN_MAC_IMPLICIT: allows communications without explicit labels
  *		           on the wire with privileged daemons.
@@ -285,7 +289,7 @@ struct conn_s {
 		conn_debug : 1,			/* SO_DEBUG */
 
 		conn_ipv6_v6only : 1,		/* IPV6_V6ONLY */
-		conn_oobinline : 1, 		/* SO_OOBINLINE state */
+		conn_oobinline : 1,		/* SO_OOBINLINE state */
 		conn_dgram_errind : 1,		/* SO_DGRAM_ERRIND state */
 		conn_exclbind : 1,		/* SO_EXCLBIND state */
 
@@ -357,12 +361,12 @@ struct conn_s {
 
 	kcondvar_t	conn_refcv;		/* For conn_oper_pending_ill */
 
-	struct conn_s 	*conn_drain_next;	/* Next conn in drain list */
+	struct conn_s	*conn_drain_next;	/* Next conn in drain list */
 	struct conn_s	*conn_drain_prev;	/* Prev conn in drain list */
 	idl_t		*conn_idl;		/* Ptr to the drain list head */
 	mblk_t		*conn_ipsec_opt_mp;	/* ipsec option mblk */
 	zoneid_t	conn_zoneid;		/* zone connection is in */
-	int		conn_rtaware; 		/* RT_AWARE sockopt value */
+	int		conn_rtaware;		/* RT_AWARE sockopt value */
 	kcondvar_t	conn_sq_cv;		/* For non-STREAMS socket IO */
 	sock_upcalls_t	*conn_upcalls;		/* Upcalls to sockfs */
 	sock_upper_handle_t conn_upper_handle;	/* Upper handle: sonode * */
@@ -476,7 +480,7 @@ struct connf_s {
 
 #define	CONN_INC_REF_LOCKED(connp)	{			\
 	DTRACE_PROBE1(conn__inc__ref, conn_t *, connp);		\
-	ASSERT(MUTEX_HELD(&(connp)->conn_lock));	 	\
+	ASSERT(MUTEX_HELD(&(connp)->conn_lock));		\
 	ASSERT(conn_trace_ref(connp));				\
 	(connp)->conn_ref++;					\
 	ASSERT((connp)->conn_ref != 0);				\
@@ -516,7 +520,7 @@ struct connf_s {
 /*
  * For matching between a conn_t and a zoneid.
  */
-#define	IPCL_ZONE_MATCH(connp, zoneid) 					\
+#define	IPCL_ZONE_MATCH(connp, zoneid)					\
 	(((connp)->conn_allzones) ||					\
 	    ((zoneid) == ALL_ZONES) ||					\
 	    (connp)->conn_zoneid == (zoneid))
@@ -572,14 +576,14 @@ struct connf_s {
 
 #define	IPCL_CONN_MATCH(connp, proto, src, dst, ports)			\
 	((connp)->conn_proto == (proto) &&				\
-		(connp)->conn_ports == (ports) &&      			\
+		(connp)->conn_ports == (ports) &&			\
 		_IPCL_V4_MATCH((connp)->conn_faddr_v6, (src)) &&	\
 		_IPCL_V4_MATCH((connp)->conn_laddr_v6, (dst)) &&	\
 		!(connp)->conn_ipv6_v6only)
 
 #define	IPCL_CONN_MATCH_V6(connp, proto, src, dst, ports)		\
 	((connp)->conn_proto == (proto) &&				\
-		(connp)->conn_ports == (ports) &&      			\
+		(connp)->conn_ports == (ports) &&			\
 		IN6_ARE_ADDR_EQUAL(&(connp)->conn_faddr_v6, &(src)) &&	\
 		IN6_ARE_ADDR_EQUAL(&(connp)->conn_laddr_v6, &(dst)))
 
@@ -731,6 +735,8 @@ extern int ip_create_helper_stream(conn_t *, ldi_ident_t);
 extern void ip_free_helper_stream(conn_t *);
 extern int	ip_helper_stream_setup(queue_t *, dev_t *, int, int,
     cred_t *, boolean_t);
+extern mib2_socketInfoEntry_t *conn_get_socket_info(conn_t *,
+    mib2_socketInfoEntry_t *);
 
 #ifdef	__cplusplus
 }

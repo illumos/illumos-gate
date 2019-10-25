@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -45,6 +46,7 @@ extern "C" {
 #include <sys/processor.h>
 #include <sys/pset.h>
 #include <sys/avl.h>
+#include <sys/ccompile.h>
 
 /* No CPU present at this CPU position */
 #define	ID_NO_CPU -1
@@ -66,13 +68,13 @@ extern "C" {
 
 enum snapshot_types {
 	/* All CPUs separately */
-	SNAP_CPUS 		= 1 << 0,
+	SNAP_CPUS		= 1 << 0,
 	/* Aggregated processor sets */
 	SNAP_PSETS		= 1 << 1,
 	/* sys-wide stats including aggregated CPU stats */
 	SNAP_SYSTEM		= 1 << 2,
 	/* interrupt sources and counts */
-	SNAP_INTERRUPTS 	= 1 << 3,
+	SNAP_INTERRUPTS		= 1 << 3,
 	/* disk etc. stats */
 	SNAP_IODEVS		= 1 << 4,
 	/* disk controller aggregates */
@@ -228,7 +230,7 @@ struct snapshot {
 };
 
 /* print a message and exit with failure */
-void fail(int do_perror, char *message, ...);
+void fail(int do_perror, char *message, ...) __NORETURN;
 
 /* strdup str, or exit with failure */
 char *safe_strdup(char *str);

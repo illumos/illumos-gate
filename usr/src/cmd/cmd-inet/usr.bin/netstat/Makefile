@@ -25,13 +25,19 @@
 # Copyright (c) 1990 Mentat Inc.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 PROG=		netstat
 
-LOCALOBJS=	netstat.o unix.o
+LOCALOBJS=	netstat.o
 COMMONOBJS=	compat.o
 
 include ../../../Makefile.cmd
+# netstat uses libproc to grab processes and extract information about their
+# sockets. In order to be able to grab 64-bit processes, netstat itself must
+# be built 64-bit.
+$(BUILD64) include ../../../Makefile.cmd.64
+
 include ../../Makefile.cmd-inet
 
 LOCALSRCS=	$(LOCALOBJS:%.o=%.c)
@@ -46,12 +52,9 @@ OBJS=		$(LOCALOBJS) $(COMMONOBJS) $(STAT_COMMON_OBJS)
 SRCS=		$(LOCALSRCS) $(COMMONSRCS) $(STAT_COMMON_SRCS)
 
 CPPFLAGS += -DNDEBUG -I$(CMDINETCOMMONDIR) -I$(STATCOMMONDIR)
-CERRWARN += $(CNOWARN_UNINIT)
-CERRWARN += -_gcc=-Wno-parentheses
-LDLIBS += -ldhcpagent -lsocket -lnsl -lkstat -ltsnet -ltsol
+LDLIBS += -ldhcpagent -lsocket -lnsl -lkstat -ltsnet -ltsol -lproc
 
-# not linted
-SMATCH=off
+CSTD=		$(CSTD_GNU99)
 
 .KEEP_STATE:
 
@@ -67,12 +70,10 @@ $(PROG): $(OBJS)
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-install: all $(ROOTPROG) 
+install: all $(ROOTPROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_SRCS
 
 include ../../../Makefile.targ
 

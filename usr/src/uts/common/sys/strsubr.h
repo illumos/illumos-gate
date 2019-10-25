@@ -28,6 +28,10 @@
  * Copyright 2018 Joyent, Inc.
  */
 
+/*
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #ifndef _SYS_STRSUBR_H
 #define	_SYS_STRSUBR_H
 
@@ -243,6 +247,17 @@ typedef struct stdata {
 	uint_t		sd_copyflag;	/* copy-related flags */
 	zoneid_t	sd_anchorzone;	/* Allow removal from same zone only */
 	struct msgb	*sd_cmdblk;	/* reply from _I_CMD */
+
+	/*
+	 * When a STREAMS device is cloned, the sd_vnode element of this
+	 * structure is replaced by a pointer to a common vnode shared across
+	 * all streams that are using the device. In this case, it is no longer
+	 * possible to get from the stream head back to the original vnode via
+	 * sd_vnode. Therefore, when such a device is cloned, the parent vnode -
+	 * i.e. that which was created during the device clone in spec_clone()
+	 * - is kept in sd_pvnode.
+	 */
+	struct vnode	*sd_pvnode;
 } stdata_t;
 
 /*

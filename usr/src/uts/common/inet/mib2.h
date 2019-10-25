@@ -26,6 +26,10 @@
  * Copyright 2019 Joyent, Inc.
  */
 
+/*
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #ifndef	_INET_MIB2_H
 #define	_INET_MIB2_H
 
@@ -189,6 +193,7 @@ typedef uint32_t	DeviceIndex;	/* Interface index */
  * There can be one of each of these tables per transport (MIB2_* above).
  */
 #define	EXPER_XPORT_MLP		105	/* transportMLPEntry */
+#define	EXPER_SOCK_INFO		106	/* socketInfoEntry */
 
 /* Old names retained for compatibility */
 #define	MIB2_IP_20	MIB2_IP_ADDR
@@ -240,7 +245,7 @@ typedef struct mib2_ip {
 	int	ipRouteEntrySize;
 		/* {ip 22} */
 	int	ipNetToMediaEntrySize;
-		/* # of valid route entries discarded 	{ip 23} */
+		/* # of valid route entries discarded	{ip 23} */
 	Counter	ipRoutingDiscards;
 /*
  * following defined in MIB-II as part of TCP & UDP groups:
@@ -326,11 +331,11 @@ typedef struct mib2_ipv6IfStatsEntry {
 	Counter	ipv6InHdrErrors;
 	/* # exceeds outgoing link MTU		{ ipv6IfStatsEntry 3 } */
 	Counter	ipv6InTooBigErrors;
-	/* # discarded due to no route to dest 	{ ipv6IfStatsEntry 4 } */
+	/* # discarded due to no route to dest	{ ipv6IfStatsEntry 4 } */
 	Counter	ipv6InNoRoutes;
 	/* # invalid or unsupported addresses	{ ipv6IfStatsEntry 5 } */
 	Counter	ipv6InAddrErrors;
-	/* # unknown next header 		{ ipv6IfStatsEntry 6 } */
+	/* # unknown next header		{ ipv6IfStatsEntry 6 } */
 	Counter	ipv6InUnknownProtos;
 	/* # too short packets			{ ipv6IfStatsEntry 7 } */
 	Counter	ipv6InTruncatedPkts;
@@ -449,11 +454,11 @@ typedef struct mib2_ipIfStatsEntry {
 	Counter	ipIfStatsInHdrErrors;
 	/* # exceeds outgoing link MTU(v6 only)	{ ipv6IfStatsEntry 3 } */
 	Counter	ipIfStatsInTooBigErrors;
-	/* # discarded due to no route to dest 	{ ipIfStatsEntry 8 } */
+	/* # discarded due to no route to dest	{ ipIfStatsEntry 8 } */
 	Counter	ipIfStatsInNoRoutes;
 	/* # invalid or unsupported addresses	{ ipIfStatsEntry 9 } */
 	Counter	ipIfStatsInAddrErrors;
-	/* # unknown next header 		{ ipIfStatsEntry 10 } */
+	/* # unknown next header		{ ipIfStatsEntry 10 } */
 	Counter	ipIfStatsInUnknownProtos;
 	/* # too short packets			{ ipIfStatsEntry 11 } */
 	Counter	ipIfStatsInTruncatedPkts;
@@ -488,7 +493,7 @@ typedef struct mib2_ipIfStatsEntry {
 	 * In addition to defined MIBs
 	 */
 
-	/* # discarded due to no route to dest 	{ ipSystemStatsEntry 22 } */
+	/* # discarded due to no route to dest	{ ipSystemStatsEntry 22 } */
 	Counter	ipIfStatsOutNoRoutes;
 	/* # of complete duplicates in reassembly */
 	Counter	ipIfStatsReasmDuplicates;
@@ -544,7 +549,7 @@ typedef struct mib2_ipIfStatsEntry {
 	Counter64	ipIfStatsHCOutRequests;
 	/* # forwarded out interface		{ ipIfStatsEntry 23 } */
 	Counter64	ipIfStatsHCOutForwDatagrams;
-	/* # dg's requiring fragmentation 	{ ipIfStatsEntry 26 } */
+	/* # dg's requiring fragmentation	{ ipIfStatsEntry 26 } */
 	Counter		ipIfStatsOutFragReqds;
 	/* # output datagrams			{ ipIfStatsEntry 31 } */
 	Counter64	ipIfStatsHCOutTransmits;
@@ -702,13 +707,13 @@ typedef struct mib2_ipRouteEntry {
 	IpAddress	ipRouteDest;
 		/* unique interface index for this hop	{ipRouteEntry 2 } RW */
 	DeviceName	ipRouteIfIndex;
-		/* primary route metric 		{ipRouteEntry 3 } RW */
+		/* primary route metric			{ipRouteEntry 3 } RW */
 	int		ipRouteMetric1;
-		/* alternate route metric 		{ipRouteEntry 4 } RW */
+		/* alternate route metric		{ipRouteEntry 4 } RW */
 	int		ipRouteMetric2;
-		/* alternate route metric 		{ipRouteEntry 5 } RW */
+		/* alternate route metric		{ipRouteEntry 5 } RW */
 	int		ipRouteMetric3;
-		/* alternate route metric 		{ipRouteEntry 6 } RW */
+		/* alternate route metric		{ipRouteEntry 6 } RW */
 	int		ipRouteMetric4;
 		/* ip addr of next hop on this route	{ipRouteEntry 7 } RW */
 	IpAddress	ipRouteNextHop;
@@ -718,9 +723,9 @@ typedef struct mib2_ipRouteEntry {
 	int		ipRouteProto;
 		/* sec's since last update of route	{ipRouteEntry 10} RW */
 	int		ipRouteAge;
-		/* 					{ipRouteEntry 11} RW */
+		/*					{ipRouteEntry 11} RW */
 	IpAddress	ipRouteMask;
-		/* alternate route metric 		{ipRouteEntry 12} RW */
+		/* alternate route metric		{ipRouteEntry 12} RW */
 	int		ipRouteMetric5;
 		/* additional info from ire's		{ipRouteEntry 13 } */
 	struct ipRouteInfo_s {
@@ -742,7 +747,7 @@ typedef struct mib2_ipRouteEntry {
 		 */
 		DeviceName	re_in_ill;	/* Input interface */
 		IpAddress	re_in_src_addr;	/* Input source address */
-	} 		ipRouteInfo;
+	}		ipRouteInfo;
 } mib2_ipRouteEntry_t;
 
 /*
@@ -764,16 +769,16 @@ typedef struct mib2_ipRouteEntry {
 typedef struct mib2_ipv6RouteEntry {
 		/* dest ip addr for this route		{ ipv6RouteEntry 1 } */
 	Ip6Address	ipv6RouteDest;
-		/* prefix length 			{ ipv6RouteEntry 2 } */
+		/* prefix length			{ ipv6RouteEntry 2 } */
 	int		ipv6RoutePfxLength;
-		/* unique route index 			{ ipv6RouteEntry 3 } */
+		/* unique route index			{ ipv6RouteEntry 3 } */
 	unsigned	ipv6RouteIndex;
 		/* unique interface index for this hop	{ ipv6RouteEntry 4 } */
 	DeviceName	ipv6RouteIfIndex;
 		/* IPv6 addr of next hop on this route	{ ipv6RouteEntry 5 } */
 	Ip6Address	ipv6RouteNextHop;
 		/* other(1), discard(2), local(3), remote(4) */
-		/* 					{ ipv6RouteEntry 6 } */
+		/*					{ ipv6RouteEntry 6 } */
 	int		ipv6RouteType;
 		/* mechanism by which route was learned	{ ipv6RouteEntry 7 } */
 		/*
@@ -802,7 +807,7 @@ typedef struct mib2_ipv6RouteEntry {
 		Counter		re_obpkt;
 		Counter		re_ibpkt;
 		int		re_flags;
-	} 		ipv6RouteInfo;
+	}		ipv6RouteInfo;
 } mib2_ipv6RouteEntry_t;
 
 /*
@@ -968,6 +973,22 @@ typedef struct mib2_transportMLPEntry {
 	int		tme_doi;
 	bslabel_t	tme_label;
 } mib2_transportMLPEntry_t;
+
+/*
+ * This is not part of mib2 but is used to communicate additional information
+ * about a socket alongside the mib2 data. This is used by netstat to
+ * associate sockets with processes that are connected to them.
+ */
+
+#define	MIB2_SOCKINFO_STREAM	0x1
+#define	MIB2_SOCKINFO_IPV6	0x2	/* IPV6 entry in an IPv4 table */
+
+typedef struct mib2_socketInfoEntry {
+	uint64_t	sie_connidx;
+	uint64_t	sie_inode;
+	uint64_t	sie_flags;
+	uint64_t	sie_dev;
+} mib2_socketInfoEntry_t;
 
 #define	MIB2_TMEF_PRIVATE	0x00000001	/* MLP on private addresses */
 #define	MIB2_TMEF_SHARED	0x00000002	/* MLP on shared addresses */
@@ -1547,7 +1568,7 @@ typedef	struct mib2_udp6Entry {
 	Ip6Address	udp6LocalAddress;
 		/* local port of listener		{ ipv6UdpEntry 2 } */
 	int		udp6LocalPort;		/* In host byte order */
-		/* interface index or zero 		{ ipv6UdpEntry 3 } */
+		/* interface index or zero		{ ipv6UdpEntry 3 } */
 	DeviceIndex	udp6IfIndex;
 	struct udp6EntryInfo_s {
 		int	ue_state;
@@ -1762,7 +1783,7 @@ typedef struct mib2_sctp {
 		/* # of received SACK chunks with duplicate TSN */
 	Counter		sctpInDupAck;
 		/* # of SACK chunks acking unsent data */
-	Counter 	sctpInAckUnsent;
+	Counter		sctpInAckUnsent;
 		/* # of Fragmented User Messages	{ sctpStats 14 } */
 	Counter64	sctpFragUsrMsgs;
 		/* # of Reassembled User Messages	{ sctpStats 15 } */

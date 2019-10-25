@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_SOCKCOMMON_H_
@@ -162,23 +163,25 @@ extern void	so_connected(sock_upper_handle_t, sock_connid_t, struct cred *,
     pid_t);
 extern int	so_disconnected(sock_upper_handle_t, sock_connid_t, int);
 extern void	so_txq_full(sock_upper_handle_t, boolean_t);
-extern void 	so_opctl(sock_upper_handle_t, sock_opctl_action_t, uintptr_t);
+extern void	so_opctl(sock_upper_handle_t, sock_opctl_action_t, uintptr_t);
+extern vnode_t *so_get_vnode(sock_upper_handle_t);
+
 /* Common misc. functions */
 
 	/* accept queue */
-extern int 	so_acceptq_enqueue(struct sonode *, struct sonode *);
-extern int 	so_acceptq_enqueue_locked(struct sonode *, struct sonode *);
+extern int	so_acceptq_enqueue(struct sonode *, struct sonode *);
+extern int	so_acceptq_enqueue_locked(struct sonode *, struct sonode *);
 extern int	so_acceptq_dequeue(struct sonode *, boolean_t,
     struct sonode **);
 extern void	so_acceptq_flush(struct sonode *, boolean_t);
 
 	/* connect */
-extern int 	so_wait_connected(struct sonode *, boolean_t, sock_connid_t);
+extern int	so_wait_connected(struct sonode *, boolean_t, sock_connid_t);
 
 	/* send */
-extern int 	so_snd_wait_qnotfull(struct sonode *, boolean_t);
+extern int	so_snd_wait_qnotfull(struct sonode *, boolean_t);
 extern void	so_snd_qfull(struct sonode *so);
-extern void 	so_snd_qnotfull(struct sonode *so);
+extern void	so_snd_qnotfull(struct sonode *so);
 
 extern int	socket_chgpgrp(struct sonode *, pid_t);
 extern void	socket_sendsig(struct sonode *, int);
@@ -189,7 +192,7 @@ extern void	so_process_new_message(struct sonode *, mblk_t *, mblk_t *);
 extern boolean_t	so_check_flow_control(struct sonode *);
 
 extern mblk_t	*socopyinuio(uio_t *, ssize_t, size_t, ssize_t, size_t, int *);
-extern mblk_t 	*socopyoutuio(mblk_t *, struct uio *, ssize_t, int *);
+extern mblk_t	*socopyoutuio(mblk_t *, struct uio *, ssize_t, int *);
 
 extern boolean_t somsghasdata(mblk_t *);
 extern void	so_rcv_flush(struct sonode *);
@@ -228,9 +231,9 @@ extern void	so_notify_shutdown(struct sonode *);
 extern void	so_notify_error(struct sonode *);
 
 /* Common sonode functions */
-extern int 	sonode_constructor(void *, void *, int);
+extern int	sonode_constructor(void *, void *, int);
 extern void	sonode_destructor(void *, void *);
-extern void 	sonode_init(struct sonode *, struct sockparams *,
+extern void	sonode_init(struct sonode *, struct sockparams *,
     int, int, int, sonodeops_t *);
 extern void	sonode_fini(struct sonode *);
 

@@ -21,9 +21,9 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, Joyent Inc. All rights reserved.
  * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -31,6 +31,10 @@
 #include <sys/policy.h>
 #include <sys/tsol/tnet.h>
 #include <sys/kstat.h>
+#include <sys/stropts.h>
+#include <sys/strsubr.h>
+#include <sys/socket.h>
+#include <sys/socketvar.h>
 
 #include <inet/common.h>
 #include <inet/ip.h>
@@ -148,18 +152,23 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 	mblk_t			*mp_conn_tail;
 	mblk_t			*mp_attr_ctl = NULL;
 	mblk_t			*mp_attr_tail;
+	mblk_t			*mp_info_ctl = NULL;
+	mblk_t			*mp_info_tail;
 	mblk_t			*mp6_conn_ctl = NULL;
 	mblk_t			*mp6_conn_tail;
 	mblk_t			*mp6_attr_ctl = NULL;
 	mblk_t			*mp6_attr_tail;
+	mblk_t			*mp6_info_ctl = NULL;
+	mblk_t			*mp6_info_tail;
 	struct opthdr		*optp;
 	mib2_tcpConnEntry_t	tce;
 	mib2_tcp6ConnEntry_t	tce6;
 	mib2_transportMLPEntry_t mlp;
+	mib2_socketInfoEntry_t	*sie, psie;
 	connf_t			*connfp;
 	int			i;
-	boolean_t 		ispriv;
-	zoneid_t 		zoneid;
+	boolean_t		ispriv;
+	zoneid_t		zoneid;
 	int			v4_conn_idx;
 	int			v6_conn_idx;
 	conn_t			*connp = Q_TO_CONN(q);
@@ -178,12 +187,16 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 	    (mpdata = mpctl->b_cont) == NULL ||
 	    (mp_conn_ctl = copymsg(mpctl)) == NULL ||
 	    (mp_attr_ctl = copymsg(mpctl)) == NULL ||
+	    (mp_info_ctl = copymsg(mpctl)) == NULL ||
 	    (mp6_conn_ctl = copymsg(mpctl)) == NULL ||
-	    (mp6_attr_ctl = copymsg(mpctl)) == NULL) {
+	    (mp6_attr_ctl = copymsg(mpctl)) == NULL ||
+	    (mp6_info_ctl = copymsg(mpctl)) == NULL) {
 		freemsg(mp_conn_ctl);
 		freemsg(mp_attr_ctl);
+		freemsg(mp_info_ctl);
 		freemsg(mp6_conn_ctl);
 		freemsg(mp6_attr_ctl);
+		freemsg(mp6_info_ctl);
 		freemsg(mpctl);
 		freemsg(mp2ctl);
 		return (NULL);
@@ -217,6 +230,7 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 
 	v4_conn_idx = v6_conn_idx = 0;
 	mp_conn_tail = mp_attr_tail = mp6_conn_tail = mp6_attr_tail = NULL;
+	mp_info_tail = mp6_info_tail = NULL;
 
 	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
 		ipst = tcps->tcps_netstack->netstack_ip;
@@ -279,33 +293,55 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 
 			/* Create a message to report on IPv6 entries */
 			if (connp->conn_ipversion == IPV6_VERSION) {
-			tce6.tcp6ConnLocalAddress = connp->conn_laddr_v6;
-			tce6.tcp6ConnRemAddress = connp->conn_faddr_v6;
-			tce6.tcp6ConnLocalPort = ntohs(connp->conn_lport);
-			tce6.tcp6ConnRemPort = ntohs(connp->conn_fport);
-			if (connp->conn_ixa->ixa_flags & IXAF_SCOPEID_SET) {
-				tce6.tcp6ConnIfIndex =
-				    connp->conn_ixa->ixa_scopeid;
-			} else {
-				tce6.tcp6ConnIfIndex = connp->conn_bound_if;
+				tce6.tcp6ConnLocalAddress =
+				    connp->conn_laddr_v6;
+				tce6.tcp6ConnRemAddress =
+				    connp->conn_faddr_v6;
+				tce6.tcp6ConnLocalPort =
+				    ntohs(connp->conn_lport);
+				tce6.tcp6ConnRemPort =
+				    ntohs(connp->conn_fport);
+				if (connp->conn_ixa->ixa_flags &
+				    IXAF_SCOPEID_SET) {
+					tce6.tcp6ConnIfIndex =
+					    connp->conn_ixa->ixa_scopeid;
+				} else {
+					tce6.tcp6ConnIfIndex =
+					    connp->conn_bound_if;
+				}
+
+				tcp_set_conninfo(tcp, &tce6.tcp6ConnEntryInfo,
+				    ispriv);
+
+				tce6.tcp6ConnCreationProcess =
+				    (connp->conn_cpid < 0) ?
+				    MIB2_UNKNOWN_PROCESS : connp->conn_cpid;
+				tce6.tcp6ConnCreationTime =
+				    connp->conn_open_time;
+
+				(void) snmp_append_data2(mp6_conn_ctl->b_cont,
+				    &mp6_conn_tail, (char *)&tce6, tce6_size);
+
+				if (needattr) {
+					mlp.tme_connidx = v6_conn_idx;
+					(void) snmp_append_data2(
+					    mp6_attr_ctl->b_cont,
+					    &mp6_attr_tail,
+					    (char *)&mlp, sizeof (mlp));
+				}
+
+				if ((sie = conn_get_socket_info(connp,
+				    &psie)) != NULL) {
+					sie->sie_connidx = v6_conn_idx;
+					(void) snmp_append_data2(
+					    mp6_info_ctl->b_cont,
+					    &mp6_info_tail,
+					    (char *)sie, sizeof (*sie));
+				}
+
+				v6_conn_idx++;
 			}
 
-			tcp_set_conninfo(tcp, &tce6.tcp6ConnEntryInfo,
-			    ispriv);
-
-			tce6.tcp6ConnCreationProcess =
-			    (connp->conn_cpid < 0) ? MIB2_UNKNOWN_PROCESS :
-			    connp->conn_cpid;
-			tce6.tcp6ConnCreationTime = connp->conn_open_time;
-
-			(void) snmp_append_data2(mp6_conn_ctl->b_cont,
-			    &mp6_conn_tail, (char *)&tce6, tce6_size);
-
-			mlp.tme_connidx = v6_conn_idx++;
-			if (needattr)
-				(void) snmp_append_data2(mp6_attr_ctl->b_cont,
-				    &mp6_attr_tail, (char *)&mlp, sizeof (mlp));
-			}
 			/*
 			 * Create an IPv4 table entry for IPv4 entries and also
 			 * for IPv6 entries which are bound to in6addr_any
@@ -340,12 +376,27 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 				(void) snmp_append_data2(mp_conn_ctl->b_cont,
 				    &mp_conn_tail, (char *)&tce, tce_size);
 
-				mlp.tme_connidx = v4_conn_idx++;
-				if (needattr)
+				if (needattr) {
+					mlp.tme_connidx = v4_conn_idx;
 					(void) snmp_append_data2(
 					    mp_attr_ctl->b_cont,
 					    &mp_attr_tail, (char *)&mlp,
 					    sizeof (mlp));
+				}
+
+				if ((sie = conn_get_socket_info(connp, &psie))
+				    != NULL) {
+					sie->sie_connidx = v4_conn_idx;
+					if (connp->conn_ipversion ==
+					    IPV6_VERSION)
+						sie->sie_flags |=
+						    MIB2_SOCKINFO_IPV6;
+					(void) snmp_append_data2(
+					    mp_info_ctl->b_cont, &mp_info_tail,
+					    (char *)sie, sizeof (*sie));
+				}
+
+				v4_conn_idx++;
 			}
 		}
 	}
@@ -391,6 +442,17 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 	else
 		qreply(q, mp_attr_ctl);
 
+	/* table of socket info... */
+	optp = (struct opthdr *)&mp_info_ctl->b_rptr[
+	    sizeof (struct T_optmgmt_ack)];
+	optp->level = MIB2_TCP;
+	optp->name = EXPER_SOCK_INFO;
+	optp->len = msgdsize(mp_info_ctl->b_cont);
+	if (optp->len == 0)
+		freemsg(mp_info_ctl);
+	else
+		qreply(q, mp_info_ctl);
+
 	/* table of IPv6 connections... */
 	optp = (struct opthdr *)&mp6_conn_ctl->b_rptr[
 	    sizeof (struct T_optmgmt_ack)];
@@ -409,6 +471,18 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 		freemsg(mp6_attr_ctl);
 	else
 		qreply(q, mp6_attr_ctl);
+
+	/* table of IPv6 socket info.. */
+	optp = (struct opthdr *)&mp6_info_ctl->b_rptr[
+	    sizeof (struct T_optmgmt_ack)];
+	optp->level = MIB2_TCP6;
+	optp->name = EXPER_SOCK_INFO;
+	optp->len = msgdsize(mp6_info_ctl->b_cont);
+	if (optp->len == 0)
+		freemsg(mp6_info_ctl);
+	else
+		qreply(q, mp6_info_ctl);
+
 	return (mp2ctl);
 }
 
@@ -539,7 +613,7 @@ tcp_kstat_update(kstat_t *kp, int rw)
 	tcp_t		*tcp;
 	connf_t		*connfp;
 	conn_t		*connp;
-	int 		i;
+	int		i;
 	netstackid_t	stackid = (netstackid_t)(uintptr_t)kp->ks_private;
 	netstack_t	*ns;
 	tcp_stack_t	*tcps;

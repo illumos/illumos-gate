@@ -22,7 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include ../Makefile.lib
@@ -30,16 +30,16 @@ include ../Makefile.lib
 HDRS =		dhcp_hostconf.h dhcpagent_ipc.h dhcpagent_util.h dhcp_stable.h
 HDRDIR =	common
 SUBDIRS =	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
 all :=		TARGET = all
 clean :=	TARGET = clean
 clobber :=	TARGET = clobber
 install :=	TARGET = install
-lint :=		TARGET = lint
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 install_h:	$(ROOTHDRS)
 

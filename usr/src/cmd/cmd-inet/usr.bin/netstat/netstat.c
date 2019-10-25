@@ -24,21 +24,11 @@
  * netstat.c 2.2, last change 9/9/91
  * MROUTING Revision 3.5
  * Copyright 2018, Joyent, Inc.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
  * simple netstat based on snmp/mib-2 interface to the TCP/IP stack
- *
- * NOTES:
- * 1. A comment "LINTED: (note 1)" appears before certain lines where
- *    lint would have complained, "pointer cast may result in improper
- *    alignment". These are lines where lint had suspected potential
- *    improper alignment of a data structure; in each such situation
- *    we have relied on the kernel guaranteeing proper alignment.
- * 2. Some 'for' loops have been commented as "'for' loop 1", etc
- *    because they have 'continue' or 'break' statements in their
- *    bodies. 'continue' statements have been used inside some loops
- *    where avoiding them would have led to deep levels of indentation.
  *
  * TODO:
  *	Add ability to request subsets from kernel (with level = MIB2_IP;
@@ -58,14 +48,21 @@
 #include <locale.h>
 #include <synch.h>
 #include <thread.h>
+#include <pwd.h>
+#include <limits.h>
+#include <sys/ccompile.h>
 
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/stream.h>
 #include <stropts.h>
 #include <sys/strstat.h>
 #include <sys/tihdr.h>
+#include <procfs.h>
+#include <dirent.h>
 
 #include <sys/socket.h>
+#include <sys/socketvar.h>
 #include <sys/sockio.h>
 #include <netinet/in.h>
 #include <net/if.h>
@@ -88,13 +85,14 @@
 #include <dhcpagent_ipc.h>
 #include <dhcpagent_util.h>
 #include <compat.h>
+#include <sys/mkdev.h>
 
 #include <libtsnet.h>
 #include <tsol/label.h>
 
-#include "statcommon.h"
+#include <libproc.h>
 
-extern void	unixpr(kstat_ctl_t *kc);
+#include "statcommon.h"
 
 #define	STR_EXPAND	4
 
@@ -138,25 +136,24 @@ struct iflist {
 	struct ifstat	tot;
 };
 
+static void fatal(int, char *, ...) __NORETURN;
+
 static	mib_item_t	*mibget(int sd);
 static	void		mibfree(mib_item_t *firstitem);
 static	int		mibopen(void);
 static void		mib_get_constants(mib_item_t *item);
 static mib_item_t	*mib_item_dup(mib_item_t *item);
-static mib_item_t	*mib_item_diff(mib_item_t *item1,
-    mib_item_t *item2);
+static mib_item_t	*mib_item_diff(mib_item_t *item1, mib_item_t *item2);
 static void		mib_item_destroy(mib_item_t **item);
 
 static boolean_t	octetstrmatch(const Octet_t *a, const Octet_t *b);
 static char		*octetstr(const Octet_t *op, int code,
 			    char *dst, uint_t dstlen);
-static char		*pr_addr(uint_t addr,
-			    char *dst, uint_t dstlen);
+static char		*pr_addr(uint_t addr, char *dst, uint_t dstlen);
 static char		*pr_addrnz(ipaddr_t addr, char *dst, uint_t dstlen);
 static char		*pr_addr6(const in6_addr_t *addr,
 			    char *dst, uint_t dstlen);
-static char		*pr_mask(uint_t addr,
-			    char *dst, uint_t dstlen);
+static char		*pr_mask(uint_t addr, char *dst, uint_t dstlen);
 static char		*pr_prefix6(const struct in6_addr *addr,
 			    uint_t prefixlen, char *dst, uint_t dstlen);
 static char		*pr_ap(uint_t addr, uint_t port,
@@ -194,6 +191,7 @@ static void		if_report_ip6(mib2_ipv6AddrEntry_t *ap6,
 static void		ire_report(const mib_item_t *item);
 static void		tcp_report(const mib_item_t *item);
 static void		udp_report(const mib_item_t *item);
+static void		uds_report(kstat_ctl_t *);
 static void		group_report(mib_item_t *item);
 static void		dce_report(mib_item_t *item);
 static void		print_ip_stats(mib2_ip_t *ip);
@@ -225,7 +223,10 @@ static char		*ifindex2str(uint_t, char *);
 static boolean_t	family_selected(int family);
 
 static void		usage(char *);
-static void 		fatal(int errcode, char *str1, ...);
+static char		*get_username(uid_t);
+
+static void		process_hash_build(void);
+static void		process_hash_free(void);
 
 #define	PLURAL(n) plural((int)n)
 #define	PLURALY(n) pluraly((int)n)
@@ -233,7 +234,6 @@ static void 		fatal(int errcode, char *str1, ...);
 #define	IFLAGMOD(flg, val1, val2)	if (flg == val1) flg = val2
 #define	MDIFF(diff, elem2, elem1, member)	(diff)->member = \
 	(elem2)->member - (elem1)->member
-
 
 static	boolean_t	Aflag = B_FALSE;	/* All sockets/ifs/rtng-tbls */
 static	boolean_t	CIDRflag = B_FALSE;	/* CIDR for IPv4 -i/-r addrs */
@@ -245,6 +245,7 @@ static	boolean_t	Rflag = B_FALSE;	/* Routing Tables */
 static	boolean_t	RSECflag = B_FALSE;	/* Security attributes */
 static	boolean_t	Sflag = B_FALSE;	/* Per-protocol Statistics */
 static	boolean_t	Vflag = B_FALSE;	/* Verbose */
+static	boolean_t	Uflag = B_FALSE;	/* Show PID and UID info. */
 static	boolean_t	Pflag = B_FALSE;	/* Net to Media Tables */
 static	boolean_t	Gflag = B_FALSE;	/* Multicast group membership */
 static	boolean_t	MMflag = B_FALSE;	/* Multicast routing table */
@@ -406,10 +407,8 @@ ns_warning_thr(void *unsued)
 		mutex_exit(&ns_lock);
 	}
 
-	/* LINTED: E_STMT_NOT_REACHED */
 	return (NULL);
 }
-
 
 int
 main(int argc, char **argv)
@@ -447,7 +446,7 @@ main(int argc, char **argv)
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "acdimnrspMgvxf:P:I:DRT:")) != -1) {
+	while ((c = getopt(argc, argv, "acdimnrspMguvxf:P:I:DRT:")) != -1) {
 		switch ((char)c) {
 		case 'a':		/* all connections */
 			Aflag = B_TRUE;
@@ -509,6 +508,10 @@ main(int argc, char **argv)
 		case 'v':		/* verbose output format */
 			Vflag = B_TRUE;
 			IFLAGMOD(Iflag_only, 1, 0); /* see macro def'n */
+			break;
+
+		case 'u':		/* show pid and uid information */
+			Uflag = B_TRUE;
 			break;
 
 		case 'x':		/* turn on debugging */
@@ -617,8 +620,7 @@ main(int argc, char **argv)
 		}
 	}
 	if (optind < argc) {
-		(void) fprintf(stderr,
-		    "%s: extra arguments\n", name);
+		(void) fprintf(stderr, "%s: extra arguments\n", name);
 		usage(name);
 	}
 	if (interval)
@@ -637,6 +639,9 @@ main(int argc, char **argv)
 		dhcp_report(Iflag ? ifname : NULL);
 		exit(0);
 	}
+
+	if (Uflag)
+		process_hash_build();
 
 	/*
 	 * Get this process's security label if the -R switch is set.
@@ -672,7 +677,6 @@ main(int argc, char **argv)
 		count = 1;
 		once_only = B_TRUE;
 	}
-	/* 'for' loop 1: */
 	for (;;) {
 		mib_item_t *curritem = NULL; /* only for -[M]s */
 
@@ -729,7 +733,7 @@ main(int argc, char **argv)
 		if (family_selected(AF_UNIX) &&
 		    (!(Dflag || Iflag || Rflag || Sflag || Mflag ||
 		    MMflag || Pflag || Gflag)))
-			unixpr(kc);
+			uds_report(kc);
 		(void) kstat_close(kc);
 
 		/* iteration handling code */
@@ -758,15 +762,17 @@ main(int argc, char **argv)
 		if ((kc = kstat_open()) == NULL)
 			fail(1, "kstat_open(): can't open /dev/kstat");
 
-	} /* 'for' loop 1 ends */
+	}
 	mibfree(item);
 	(void) close(sd);
 	if (zone_security_label != NULL)
 		m_label_free(zone_security_label);
 
+	if (Uflag)
+		process_hash_free();
+
 	return (0);
 }
-
 
 static int
 isnum(char *p)
@@ -781,6 +787,427 @@ isnum(char *p)
 	return (1);
 }
 
+/*
+ * ------------------------------ Process Hash -----------------------------
+ *
+ * When passed the -u option, netstat presents additional information against
+ * each socket showing the associated process ID(s), user(s) and command(s).
+ *
+ * The kernel provides some additional information for each socket, namely:
+ *   - inode;
+ *   - address family;
+ *   - socket type;
+ *   - major number;
+ *   - flags.
+ *
+ * Netstat must correlate this information against processes running on the
+ * system and the files which they have open.
+ *
+ * It does this by traversing /proc and checking each process' open files,
+ * looking for BSD sockets or file descriptors relating to TLI/XTI sockets.
+ * When it finds one, it retrieves information and records it in the
+ * 'process_table' hash table with the entry hashed by its inode.
+ *
+ * For a BSD socket, libproc is used to grab the process and retrieve
+ * further information. This is not necessary for TLI/XTI sockets since the
+ * information can be derived directly via stat().
+ *
+ * Note that each socket can be associated with more than one process.
+ */
+
+/*
+ * The size of the hash table for recording sockets found under /proc.
+ * This should be a prime number. The value below was chosen after testing
+ * on a busy web server to reduce the number of hash table collisions to
+ * fewer than five per slot.
+ */
+#define	PROC_HASH_SIZE		2003
+/* Maximum length of a username - anything larger will be truncated */
+#define	PROC_USERNAME_SIZE	128
+/* Maximum length of the string representation of a process ID */
+#define	PROC_PID_SIZE		15
+
+#define	PROC_HASH(k) ((k) % PROC_HASH_SIZE)
+
+typedef struct proc_fdinfo {
+	uint64_t ph_inode;
+	uint64_t ph_fd;
+	mode_t ph_mode;
+	major_t ph_major;
+	int ph_family;
+	int ph_type;
+
+	char ph_fname[PRFNSZ];
+	char ph_psargs[PRARGSZ];
+	char ph_username[PROC_USERNAME_SIZE];
+	pid_t ph_pid;
+	char ph_pidstr[PROC_PID_SIZE];
+
+	struct proc_fdinfo *ph_next; /* Next (for collisions) */
+	struct proc_fdinfo *ph_next_proc; /* Next process with this inode */
+} proc_fdinfo_t;
+
+static proc_fdinfo_t *process_table[PROC_HASH_SIZE];
+
+static proc_fdinfo_t unknown_proc = {
+	.ph_pid = 0,
+	.ph_pidstr = "",
+	.ph_username = "",
+	.ph_fname = "",
+	.ph_psargs = "",
+	.ph_next_proc = NULL
+};
+
+/*
+ * Gets username given uid. It doesn't return NULL.
+ */
+static char *
+get_username(uid_t u)
+{
+	static uid_t saved_uid = UID_MAX;
+	static char saved_username[PROC_USERNAME_SIZE];
+	struct passwd *pw = NULL;
+
+	if (u == UID_MAX)
+		return ("<unknown>");
+
+	if (u == saved_uid && saved_username[0] != '\0')
+		return (saved_username);
+
+	setpwent();
+
+	if ((pw = getpwuid(u)) != NULL) {
+		(void) strlcpy(saved_username, pw->pw_name,
+		    sizeof (saved_username));
+	} else {
+		(void) snprintf(saved_username, sizeof (saved_username),
+		    "(%u)", u);
+	}
+
+	saved_uid = u;
+	return (saved_username);
+}
+
+static proc_fdinfo_t *
+process_hash_find(const mib2_socketInfoEntry_t *sie, int type, int family)
+{
+	proc_fdinfo_t *ph;
+	uint_t idx = PROC_HASH(sie->sie_inode);
+
+	for (ph = process_table[idx]; ph != NULL; ph = ph->ph_next) {
+		if (ph->ph_inode != sie->sie_inode)
+			continue;
+		if ((sie->sie_flags & MIB2_SOCKINFO_STREAM)) {
+			/* TLI/XTI socket */
+			if (S_ISCHR(ph->ph_mode) &&
+			    major(sie->sie_dev) == ph->ph_major) {
+				return (ph);
+			}
+		} else {
+			if (S_ISSOCK(ph->ph_mode) && ph->ph_type == type &&
+			    ph->ph_family == family) {
+				return (ph);
+			}
+		}
+	}
+
+	return (NULL);
+}
+
+static proc_fdinfo_t *
+process_hash_get(const mib2_socketInfoEntry_t *sie, int type, int family)
+{
+	proc_fdinfo_t *ph;
+
+	if (sie != NULL && sie->sie_inode > 0 &&
+	    (ph = process_hash_find(sie, type, family)) != NULL) {
+		return (ph);
+	}
+
+	return (&unknown_proc);
+}
+
+static void
+process_hash_insert(proc_fdinfo_t *ph)
+{
+	uint_t idx = PROC_HASH(ph->ph_inode);
+	proc_fdinfo_t *slotp;
+
+	mib2_socketInfoEntry_t sie = {
+		.sie_inode = ph->ph_inode,
+		.sie_dev = makedev(ph->ph_major, 0),
+		.sie_flags = S_ISCHR(ph->ph_mode) ? MIB2_SOCKINFO_STREAM : 0
+	};
+
+	slotp = process_hash_find(&sie, ph->ph_type, ph->ph_family);
+
+	if (slotp == NULL) {
+		ph->ph_next = process_table[idx];
+		process_table[idx] = ph;
+	} else {
+		ph->ph_next_proc = slotp->ph_next_proc;
+		slotp->ph_next_proc = ph;
+	}
+}
+
+static void
+process_hash_dump(void)
+{
+	unsigned int i;
+
+	(void) printf("--- Process hash table\n");
+	for (i = 0; i < PROC_HASH_SIZE; i++) {
+		proc_fdinfo_t *ph;
+
+		if (process_table[i] == NULL)
+			continue;
+
+		(void) printf("Slot %d\n", i);
+
+		for (ph = process_table[i]; ph != NULL; ph = ph->ph_next) {
+			proc_fdinfo_t *ph2;
+
+			(void) printf("    -> Inode %" PRIu64 "\n",
+			    ph->ph_inode);
+
+			for (ph2 = ph; ph2 != NULL; ph2 = ph2->ph_next_proc) {
+				(void) printf("        -> "
+				    "/proc/%ld/fd/%" PRIu64 " %s - "
+				    "fname %s - "
+				    "psargs %s - "
+				    "major %" PRIx32 " - "
+				    "type/fam %d/%d\n",
+				    ph2->ph_pid, ph2->ph_fd,
+				    S_ISCHR(ph2->ph_mode) ? "CHR" : "SOCK",
+				    ph2->ph_fname, ph2->ph_psargs,
+				    ph2->ph_major,
+				    ph2->ph_type, ph2->ph_family);
+			}
+		}
+	}
+}
+
+static int
+process_hash_iter(const psinfo_t *psinfo, const prfdinfo_t *pr,
+    struct ps_prochandle *Pr)
+{
+	proc_fdinfo_t *ph;
+
+	/*
+	 * We are interested both in sockets and in descriptors linked to
+	 * network STREAMS character devices.
+	 */
+	if (S_ISCHR(pr->pr_mode)) {
+		/*
+		 * There's no elegant way to determine if a character device
+		 * supports TLI, so just check a hardcoded list of known TLI
+		 * devices.
+		 */
+		const char *tlidevs[] = {
+		    "tcp", "tcp6", "udp", "udp6", NULL
+		};
+		boolean_t istli = B_FALSE;
+		char *dev;
+		int i;
+
+		/* global zone: /devices paths */
+		dev = strrchr(pr->pr_path, ':');
+		/* also check the /dev path for zones */
+		if (dev == NULL)
+			dev = strrchr(pr->pr_path, '/');
+		if (dev == NULL)
+			return (0);
+		dev++; /* skip past the `:' or '/' */
+
+		for (i = 0; tlidevs[i] != NULL; i++) {
+			if (strcmp(dev, tlidevs[i]) == 0) {
+				istli = B_TRUE;
+				break;
+			}
+		}
+		if (!istli)
+			return (0);
+	} else if (!S_ISSOCK(pr->pr_mode)) {
+		return (0);
+	}
+
+	if ((ph = calloc(1, sizeof (proc_fdinfo_t))) == NULL)
+		fatal(1, "out of memory\n");
+
+	ph->ph_pid = psinfo->pr_pid;
+	if (ph->ph_pid > 0)
+		(void) snprintf(ph->ph_pidstr, PROC_PID_SIZE, "%" PRIu64,
+		    ph->ph_pid);
+	ph->ph_inode = pr->pr_ino;
+	ph->ph_fd = pr->pr_fd;
+	ph->ph_major = pr->pr_rmajor;
+	ph->ph_mode = pr->pr_mode;
+	(void) strlcpy(ph->ph_fname, psinfo->pr_fname, sizeof (ph->ph_fname));
+	(void) strlcpy(ph->ph_psargs, psinfo->pr_psargs,
+	    sizeof (ph->ph_psargs));
+	(void) strlcpy(ph->ph_username, get_username(psinfo->pr_uid),
+	    sizeof (ph->ph_username));
+
+	if (S_ISSOCK(pr->pr_mode) && Pr != NULL) {
+		struct sockaddr sa;
+		socklen_t slen;
+		int type, tlen;
+
+		/* Determine the socket type */
+		tlen = sizeof (type);
+		if (pr_getsockopt(Pr, pr->pr_fd, SOL_SOCKET, SO_TYPE, &type,
+		    &tlen) == 0)
+			ph->ph_type = type;
+
+		/* Determine the protocol family */
+		slen = sizeof (sa);
+		if (pr_getsockname(Pr, pr->pr_fd, &sa, &slen) == 0)
+			ph->ph_family = sa.sa_family;
+	}
+
+	process_hash_insert(ph);
+
+	return (0);
+}
+
+static void
+process_hash_iterate(psinfo_t *psinfo)
+{
+	char dir_name[PATH_MAX];
+	struct dirent *ent;
+	struct ps_prochandle *ph = NULL;
+	int err;
+
+	DIR *dirp;
+
+	if (snprintf(dir_name, sizeof (dir_name), "/proc/%d/path",
+	    psinfo->pr_pid) >= sizeof (dir_name))
+		return;
+	dirp = opendir(dir_name);
+	if (dirp == NULL)
+		return;
+	while ((ent = readdir(dirp)) != NULL) {
+		char path[PATH_MAX];
+		struct stat st;
+		prfdinfo_t info;
+		int fd, len;
+
+		if (!isdigit(ent->d_name[0]))
+			continue;
+
+		fd = atoi(ent->d_name);
+
+		if (snprintf(path, sizeof (path), "/proc/%d/fd/%d",
+		    psinfo->pr_pid, fd) >= sizeof (path))
+			continue;
+		if (stat(path, &st) != 0)
+			continue;
+		bzero(&info, sizeof (info));
+		info.pr_fd = fd;
+		info.pr_mode = st.st_mode;
+		info.pr_uid = st.st_uid;
+		info.pr_gid = st.st_gid;
+		info.pr_major = major(st.st_dev);
+		info.pr_minor = minor(st.st_dev);
+		info.pr_rmajor = major(st.st_rdev);
+		info.pr_rminor = minor(st.st_rdev);
+		info.pr_size = st.st_size;
+		info.pr_ino = st.st_ino;
+
+		len = -1;
+		switch (info.pr_mode & S_IFMT) {
+		case S_IFDOOR:
+			break;
+		case S_IFSOCK:
+			/*
+			 * Grab the process so that we can interrogate it
+			 * for further details on the socket.
+			 */
+			if (ph == NULL &&
+			    (ph = Pgrab(psinfo->pr_pid,
+			    PGRAB_RETAIN | PGRAB_NOSTOP, &err)) == NULL) {
+				/* unreadable or SYS process */
+				if (Xflag) {
+					printf("Could not grab %d - %s\n",
+					    psinfo->pr_pid, Pgrab_error(err));
+				}
+			}
+			break;
+		default:
+			/* attempt to determine the path */
+			if (snprintf(path, sizeof (path), "%s/%d",
+			    dir_name, fd) < sizeof (path)) {
+				len = readlink(path, info.pr_path,
+				    sizeof (info.pr_path) - 1);
+			}
+			break;
+		}
+
+		if (len <= 0)
+			len = 0;
+		info.pr_path[len] = '\0';
+
+		if (process_hash_iter(psinfo, &info, ph) != 0)
+			break;
+	}
+	(void) closedir(dirp);
+
+	if (ph != NULL)
+		Prelease(ph, PRELEASE_RETAIN);
+}
+
+static void
+process_hash_build(void)
+{
+	struct dirent *proce;
+	DIR *proc;
+	int err;
+	pid_t me = getpid();
+
+	if ((proc = opendir("/proc")) == NULL)
+		return;
+
+	while ((proce = readdir(proc)) != NULL) {
+		psinfo_t psinfo;
+		pid_t pid;
+
+		if (!isdigit(proce->d_name[0]))
+			continue;
+
+		pid = proc_arg_psinfo(proce->d_name, PR_ARG_PIDS, &psinfo,
+		    &err);
+		if (pid < 0 || pid == me)
+			continue;
+
+		/*
+		 * We do not use libproc's Pfdinfo_iter() here as it requires
+		 * grabbing the process in read/write mode. Instead, the
+		 * process is grabbed if (and only if) details about an open
+		 * socket need to be retrieved.
+		 */
+		process_hash_iterate(&psinfo);
+	}
+	(void) closedir(proc);
+
+	if (Xflag)
+		process_hash_dump();
+}
+
+static void
+process_hash_free(void)
+{
+	unsigned int i;
+
+	for (i = 0; i < PROC_HASH_SIZE; i++) {
+		proc_fdinfo_t *ph, *ph_next;
+
+		for (ph = process_table[i]; ph != NULL; ph = ph_next) {
+			ph_next = ph->ph_next;
+			free(ph);
+		}
+		process_table[i] = NULL;
+	}
+}
 
 /* --------------------------------- MIBGET -------------------------------- */
 
@@ -810,7 +1237,6 @@ mibget(int sd)
 	tor->OPT_offset = sizeof (struct T_optmgmt_req);
 	tor->OPT_length = sizeof (struct opthdr);
 	tor->MGMT_flags = T_CURRENT;
-
 
 	/*
 	 * Note: we use the special level value below so that IP will return
@@ -915,7 +1341,7 @@ mibget(int sd)
 		if (last_item->valp == NULL)
 			goto error_exit;
 		if (Xflag)
-			(void) printf("msg %d: group = %4d   mib_id = %5d"
+			(void) printf("msg %4d: group = %-4d mib_id = %-5d "
 			    "length = %d\n",
 			    j, last_item->group, last_item->mib_id,
 			    last_item->length);
@@ -1091,21 +1517,19 @@ mib_item_diff(mib_item_t *item1, mib_item_t *item2)
 		return (diffp);
 	}
 
-	diffp = (mib_item_t *)calloc(nitems, sizeof (mib_item_t));
+	diffp = calloc(nitems, sizeof (mib_item_t));
 	if (diffp == NULL)
 		return (NULL);
 	diffptr = diffp;
-	/* 'for' loop 1: */
 	for (tempp2 = item2; tempp2 != NULL; tempp2 = tempp2->next_item) {
 		if (tempp2->mib_id != 0)
-			continue; /* 'for' loop 1 */
-		/* 'for' loop 2: */
+			continue;
 		for (tempp1 = item1; tempp1 != NULL;
 		    tempp1 = tempp1->next_item) {
 			if (!(tempp1->mib_id == 0 &&
 			    tempp1->group == tempp2->group &&
 			    tempp1->mib_id == tempp2->mib_id))
-				continue; /* 'for' loop 2 */
+				continue;
 			/* found comparable data sets */
 			if (prevp != NULL)
 				prevp->next_item = diffptr;
@@ -1123,7 +1547,7 @@ mib_item_diff(mib_item_t *item1, mib_item_t *item2)
 				diffptr->group = tempp2->group;
 				diffptr->mib_id = tempp2->mib_id;
 				diffptr->length = tempp2->length;
-				d = (mib2_ip_t *)calloc(tempp2->length, 1);
+				d = calloc(1, tempp2->length);
 				if (d == NULL)
 					goto mibdiff_out_of_memory;
 				diffptr->valp = d;
@@ -1174,8 +1598,7 @@ mib_item_diff(mib_item_t *item1, mib_item_t *item2)
 			diffptr->group = tempp2->group;
 			diffptr->mib_id = tempp2->mib_id;
 			diffptr->length = tempp2->length;
-			d = (mib2_ipv6IfStatsEntry_t *)calloc(
-			    tempp2->length, 1);
+			d = calloc(1, tempp2->length);
 			if (d == NULL)
 				goto mibdiff_out_of_memory;
 			diffptr->valp = d;
@@ -1226,7 +1649,7 @@ mib_item_diff(mib_item_t *item1, mib_item_t *item2)
 				diffptr->group = tempp2->group;
 				diffptr->mib_id = tempp2->mib_id;
 				diffptr->length = tempp2->length;
-				d = (struct mrtstat *)calloc(tempp2->length, 1);
+				d = calloc(1, tempp2->length);
 				if (d == NULL)
 					goto mibdiff_out_of_memory;
 				diffptr->valp = d;
@@ -1264,8 +1687,7 @@ mib_item_diff(mib_item_t *item1, mib_item_t *item2)
 				diffptr->group = tempp2->group;
 				diffptr->mib_id = tempp2->mib_id;
 				diffptr->length = tempp2->length;
-				d = (struct igmpstat *)calloc(
-				    tempp2->length, 1);
+				d = calloc(1, tempp2->length);
 				if (d == NULL)
 					goto mibdiff_out_of_memory;
 				diffptr->valp = d;
@@ -1291,7 +1713,7 @@ mib_item_diff(mib_item_t *item1, mib_item_t *item2)
 				diffptr->group = tempp2->group;
 				diffptr->mib_id = tempp2->mib_id;
 				diffptr->length = tempp2->length;
-				d = (mib2_icmp_t *)calloc(tempp2->length, 1);
+				d = calloc(1, tempp2->length);
 				if (d == NULL)
 					goto mibdiff_out_of_memory;
 				diffptr->valp = d;
@@ -1340,7 +1762,7 @@ mib_item_diff(mib_item_t *item1, mib_item_t *item2)
 	diffptr->group = tempp2->group;
 	diffptr->mib_id = tempp2->mib_id;
 	diffptr->length = tempp2->length;
-	d = (mib2_ipv6IfIcmpEntry_t *)calloc(tempp2->length, 1);
+	d = calloc(1, tempp2->length);
 	if (d == NULL)
 		goto mibdiff_out_of_memory;
 	diffptr->valp = d;
@@ -1393,7 +1815,7 @@ mib_item_diff(mib_item_t *item1, mib_item_t *item2)
 				diffptr->group = tempp2->group;
 				diffptr->mib_id = tempp2->mib_id;
 				diffptr->length = tempp2->length;
-				d = (mib2_tcp_t *)calloc(tempp2->length, 1);
+				d = calloc(1, tempp2->length);
 				if (d == NULL)
 					goto mibdiff_out_of_memory;
 				diffptr->valp = d;
@@ -1460,7 +1882,7 @@ mib_item_diff(mib_item_t *item1, mib_item_t *item2)
 				diffptr->group = tempp2->group;
 				diffptr->mib_id = tempp2->mib_id;
 				diffptr->length = tempp2->length;
-				d = (mib2_udp_t *)calloc(tempp2->length, 1);
+				d = calloc(1, tempp2->length);
 				if (d == NULL)
 					goto mibdiff_out_of_memory;
 				diffptr->valp = d;
@@ -1481,7 +1903,7 @@ mib_item_diff(mib_item_t *item1, mib_item_t *item2)
 				diffptr->group = tempp2->group;
 				diffptr->mib_id = tempp2->mib_id;
 				diffptr->length = tempp2->length;
-				d = (mib2_sctp_t *)calloc(tempp2->length, 1);
+				d = calloc(1, tempp2->length);
 				if (d == NULL)
 					goto mibdiff_out_of_memory;
 				diffptr->valp = d;
@@ -1538,7 +1960,7 @@ mib_item_diff(mib_item_t *item1, mib_item_t *item2)
 				diffptr->group = tempp2->group;
 				diffptr->mib_id = tempp2->mib_id;
 				diffptr->length = tempp2->length;
-				d = (mib2_rawip_t *)calloc(tempp2->length, 1);
+				d = calloc(1, tempp2->length);
 				if (d == NULL)
 					goto mibdiff_out_of_memory;
 				diffptr->valp = d;
@@ -1555,9 +1977,9 @@ mib_item_diff(mib_item_t *item1, mib_item_t *item2)
 			 * required for the -s and -Ms options
 			 */
 			}
-		} /* 'for' loop 2 ends */
+		}
 		tempp1 = NULL;
-	} /* 'for' loop 1 ends */
+	}
 	tempp2 = NULL;
 	diffptr--;
 	diffptr->next_item = NULL;
@@ -1828,10 +2250,9 @@ prval_end(void)
 static void
 mib_get_constants(mib_item_t *item)
 {
-	/* 'for' loop 1: */
 	for (; item; item = item->next_item) {
 		if (item->mib_id != 0)
-			continue; /* 'for' loop 1 */
+			continue;
 
 		switch (item->group) {
 		case MIB2_IP: {
@@ -1939,7 +2360,7 @@ mib_get_constants(mib_item_t *item)
 			break;
 		}
 		}
-	} /* 'for' loop 1 ends */
+	}
 
 	if (Xflag) {
 		(void) puts("mib_get_constants:");
@@ -1976,7 +2397,6 @@ mib_get_constants(mib_item_t *item)
 	}
 }
 
-
 /* ----------------------------- STAT_REPORT ------------------------------- */
 
 static void
@@ -1985,17 +2405,15 @@ stat_report(mib_item_t *item)
 	int	jtemp = 0;
 	char	ifname[LIFNAMSIZ + 1];
 
-	/* 'for' loop 1: */
 	for (; item; item = item->next_item) {
 		if (Xflag) {
-			(void) printf("\n--- Entry %d ---\n", ++jtemp);
-			(void) printf("Group = %d, mib_id = %d, "
+			(void) printf("[%4d] Group = %d, mib_id = %d, "
 			    "length = %d, valp = 0x%p\n",
-			    item->group, item->mib_id,
+			    jtemp++, item->group, item->mib_id,
 			    item->length, item->valp);
 		}
 		if (item->mib_id != 0)
-			continue; /* 'for' loop 1 */
+			continue;
 
 		switch (item->group) {
 		case MIB2_IP: {
@@ -2029,10 +2447,8 @@ stat_report(mib_item_t *item)
 			    !(family_selected(AF_INET6)))
 				break;
 			bzero(&sum6, sizeof (sum6));
-			/* 'for' loop 2a: */
 			for (ip6 = (mib2_ipv6IfStatsEntry_t *)item->valp;
 			    (char *)ip6 < (char *)item->valp + item->length;
-			    /* LINTED: (note 1) */
 			    ip6 = (mib2_ipv6IfStatsEntry_t *)((char *)ip6 +
 			    ipv6IfStatsEntrySize)) {
 				if (ip6->ipv6IfIndex == 0) {
@@ -2041,7 +2457,7 @@ stat_report(mib_item_t *item)
 					 * mib. Just add to the sum.
 					 */
 					sum_ip6_stats(ip6, &sum6);
-					continue; /* 'for' loop 2a */
+					continue;
 				}
 				if (Aflag) {
 					(void) printf("\nIPv6 for %s\n",
@@ -2050,7 +2466,7 @@ stat_report(mib_item_t *item)
 					print_ip6_stats(ip6);
 				}
 				sum_ip6_stats(ip6, &sum6);
-			} /* 'for' loop 2a ends */
+			}
 			(void) fputs("\nIPv6", stdout);
 			print_ip6_stats(&sum6);
 			break;
@@ -2063,7 +2479,6 @@ stat_report(mib_item_t *item)
 			    !(family_selected(AF_INET6)))
 				break;
 			bzero(&sum6, sizeof (sum6));
-			/* 'for' loop 2b: */
 			for (icmp6 = (mib2_ipv6IfIcmpEntry_t *)item->valp;
 			    (char *)icmp6 < (char *)item->valp + item->length;
 			    icmp6 = (void *)((char *)icmp6 +
@@ -2074,7 +2489,7 @@ stat_report(mib_item_t *item)
 					 * mib. Just add to the sum.
 					 */
 					sum_icmp6_stats(icmp6, &sum6);
-					continue; /* 'for' loop 2b: */
+					continue;
 				}
 				if (Aflag) {
 					(void) printf("\nICMPv6 for %s\n",
@@ -2083,7 +2498,7 @@ stat_report(mib_item_t *item)
 					print_icmp6_stats(icmp6);
 				}
 				sum_icmp6_stats(icmp6, &sum6);
-			} /* 'for' loop 2b ends */
+			}
 			(void) fputs("\nICMPv6", stdout);
 			print_icmp6_stats(&sum6);
 			break;
@@ -2145,7 +2560,7 @@ stat_report(mib_item_t *item)
 			break;
 		}
 		}
-	} /* 'for' loop 1 ends */
+	}
 	(void) putchar('\n');
 	(void) fflush(stdout);
 }
@@ -2630,15 +3045,13 @@ mrt_stat_report(mib_item_t *curritem)
 		return;
 
 	(void) putchar('\n');
-	/* 'for' loop 1: */
 	for (tempitem = curritem;
 	    tempitem;
 	    tempitem = tempitem->next_item) {
 		if (Xflag) {
-			(void) printf("\n--- Entry %d ---\n", ++jtemp);
-			(void) printf("Group = %d, mib_id = %d, "
+			(void) printf("[%4d] Group = %d, mib_id = %d, "
 			    "length = %d, valp = 0x%p\n",
-			    tempitem->group, tempitem->mib_id,
+			    jtemp++, tempitem->group, tempitem->mib_id,
 			    tempitem->length, tempitem->valp);
 		}
 
@@ -2649,14 +3062,14 @@ mrt_stat_report(mib_item_t *curritem)
 				mrts = (struct mrtstat *)tempitem->valp;
 
 				if (!(family_selected(AF_INET)))
-					continue; /* 'for' loop 1 */
+					continue;
 
 				print_mrt_stats(mrts);
 				break;
 			}
 			}
 		}
-	} /* 'for' loop 1 ends */
+	}
 	(void) putchar('\n');
 	(void) fflush(stdout);
 }
@@ -2693,12 +3106,10 @@ if_report(mib_item_t *item, char *matchname,
 	uint32_t		ifindex_v6 = 0;
 	boolean_t		first_header = B_TRUE;
 
-	/* 'for' loop 1: */
 	for (; item; item = item->next_item) {
 		if (Xflag) {
-			(void) printf("\n--- Entry %d ---\n", ++jtemp);
-			(void) printf("Group = %d, mib_id = %d, "
-			    "length = %d, valp = 0x%p\n",
+			(void) printf("[%4d] Group = %d, mib_id = %d, "
+			    "length = %d, valp = 0x%p\n", jtemp++,
 			    item->group, item->mib_id, item->length,
 			    item->valp);
 		}
@@ -2707,7 +3118,7 @@ if_report(mib_item_t *item, char *matchname,
 		case MIB2_IP:
 		if (item->mib_id != MIB2_IP_ADDR ||
 		    !family_selected(AF_INET))
-			continue; /* 'for' loop 1 */
+			continue;
 		{
 			static struct ifstat	old = {0L, 0L, 0L, 0L, 0L};
 			static struct ifstat	new = {0L, 0L, 0L, 0L, 0L};
@@ -2729,7 +3140,6 @@ if_report(mib_item_t *item, char *matchname,
 					    (item->length)
 					    / sizeof (mib2_ipAddrEntry_t));
 
-				/* 'for' loop 2a: */
 				for (ap = (mib2_ipAddrEntry_t *)item->valp;
 				    (char *)ap < (char *)item->valp
 				    + item->length;
@@ -2742,7 +3152,7 @@ if_report(mib_item_t *item, char *matchname,
 					if (matchname != NULL &&
 					    strcmp(matchname, ifname) != 0 &&
 					    strcmp(matchname, logintname) != 0)
-						continue; /* 'for' loop 2a */
+						continue;
 					new_ifindex =
 					    if_nametoindex(logintname);
 					/*
@@ -2775,19 +3185,22 @@ if_report(mib_item_t *item, char *matchname,
 						    "collisions");
 						if (first) {
 							if (!first_header)
-							(void) putchar('\n');
+								(void) putchar(
+								    '\n');
 							first_header = B_FALSE;
-						(void) printf(
-						    "%-5.5s %-5.5s%-13.13s "
-						    "%-14.14s %-6.6s %-5.5s "
-						    "%-6.6s %-5.5s %-6.6s "
-						    "%-6.6s\n",
-						    "Name", "Mtu", "Net/Dest",
-						    "Address", "Ipkts",
-						    "Ierrs", "Opkts", "Oerrs",
-						    "Collis", "Queue");
-
-						first = B_FALSE;
+							(void) printf(
+							    "%-5.5s %-5.5s"
+							    "%-13.13s %-14.14s "
+							    "%-6.6s %-5.5s "
+							    "%-6.6s %-5.5s "
+							    "%-6.6s %-6.6s\n",
+							    "Name", "Mtu",
+							    "Net/Dest",
+							    "Address", "Ipkts",
+							    "Ierrs", "Opkts",
+							    "Oerrs", "Collis",
+							    "Queue");
+							first = B_FALSE;
 						}
 						if_report_ip4(ap, ifname,
 						    logintname, &stat, B_TRUE);
@@ -2796,7 +3209,7 @@ if_report(mib_item_t *item, char *matchname,
 						if_report_ip4(ap, ifname,
 						    logintname, &stat, B_FALSE);
 					}
-				} /* 'for' loop 2a ends */
+				}
 			} else if (!alreadydone) {
 				char    ifname[LIFNAMSIZ + 1];
 				char    buf[LIFNAMSIZ + 1];
@@ -2819,7 +3232,7 @@ if_report(mib_item_t *item, char *matchname,
 				}
 
 				/*
-				 * 'for' loop 2b: find the "right" entry:
+				 * Find the "right" entry:
 				 * If an interface name to match has been
 				 * supplied then try and find it, otherwise
 				 * match the first non-loopback interface found.
@@ -2836,13 +3249,12 @@ if_report(mib_item_t *item, char *matchname,
 					if (matchname) {
 						if (strcmp(matchname,
 						    ifname) == 0) {
-							/* 'for' loop 2b */
 							found_if = B_TRUE;
 							break;
 						}
 					} else if (strcmp(ifname, "lo0") != 0)
-						break; /* 'for' loop 2b */
-				} /* 'for' loop 2b ends */
+						break;
+				}
 
 				if (matchname == NULL) {
 					matchname = ifname;
@@ -2870,7 +3282,6 @@ if_report(mib_item_t *item, char *matchname,
 
 				sum = zerostat;
 
-				/* 'for' loop 2c: */
 				for (ap = (mib2_ipAddrEntry_t *)item->valp;
 				    (char *)ap < (char *)item->valp
 				    + item->length;
@@ -2984,7 +3395,7 @@ if_report(mib_item_t *item, char *matchname,
 						}
 					}
 
-				} /* 'for' loop 2c ends */
+				}
 
 				*nextnew = NULL;
 
@@ -3019,7 +3430,7 @@ if_report(mib_item_t *item, char *matchname,
 		case MIB2_IP6:
 		if (item->mib_id != MIB2_IP6_ADDR ||
 		    !family_selected(AF_INET6))
-			continue; /* 'for' loop 1 */
+			continue;
 		{
 			static struct ifstat	old6 = {0L, 0L, 0L, 0L, 0L};
 			static struct ifstat	new6 = {0L, 0L, 0L, 0L, 0L};
@@ -3040,7 +3451,6 @@ if_report(mib_item_t *item, char *matchname,
 					(void) printf("if_report: %d items\n",
 					    (item->length)
 					    / sizeof (mib2_ipv6AddrEntry_t));
-				/* 'for' loop 2d: */
 				for (ap6 = (mib2_ipv6AddrEntry_t *)item->valp;
 				    (char *)ap6 < (char *)item->valp
 				    + item->length;
@@ -3053,7 +3463,7 @@ if_report(mib_item_t *item, char *matchname,
 					if (matchname != NULL &&
 					    strcmp(matchname, ifname) != 0 &&
 					    strcmp(matchname, logintname) != 0)
-						continue; /* 'for' loop 2d */
+						continue;
 					new_ifindex =
 					    if_nametoindex(logintname);
 
@@ -3087,7 +3497,8 @@ if_report(mib_item_t *item, char *matchname,
 						    "collisions");
 						if (first) {
 							if (!first_header)
-							(void) putchar('\n');
+								(void) putchar(
+								    '\n');
 							first_header = B_FALSE;
 							(void) printf(
 							    "%-5.5s %-5.5s%"
@@ -3109,7 +3520,7 @@ if_report(mib_item_t *item, char *matchname,
 						if_report_ip6(ap6, ifname,
 						    logintname, &stat, B_FALSE);
 					}
-				} /* 'for' loop 2d ends */
+				}
 			} else if (!alreadydone) {
 				char    ifname[LIFNAMSIZ + 1];
 				char    buf[IFNAMSIZ + 1];
@@ -3132,7 +3543,7 @@ if_report(mib_item_t *item, char *matchname,
 				}
 
 				/*
-				 * 'for' loop 2e: find the "right" entry:
+				 * Find the "right" entry:
 				 * If an interface name to match has been
 				 * supplied then try and find it, otherwise
 				 * match the first non-loopback interface found.
@@ -3149,13 +3560,12 @@ if_report(mib_item_t *item, char *matchname,
 					if (matchname) {
 						if (strcmp(matchname,
 						    ifname) == 0) {
-							/* 'for' loop 2e */
 							found_if = B_TRUE;
 							break;
 						}
 					} else if (strcmp(ifname, "lo0") != 0)
-						break; /* 'for' loop 2e */
-				} /* 'for' loop 2e ends */
+						break;
+				}
 
 				if (matchname == NULL) {
 					matchname = ifname;
@@ -3184,7 +3594,6 @@ if_report(mib_item_t *item, char *matchname,
 
 				sum6 = zerostat;
 
-				/* 'for' loop 2f: */
 				for (ap6 = (mib2_ipv6AddrEntry_t *)item->valp;
 				    (char *)ap6 < (char *)item->valp
 				    + item->length;
@@ -3299,7 +3708,7 @@ if_report(mib_item_t *item, char *matchname,
 						}
 					}
 
-				} /* 'for' loop 2f ends */
+				}
 
 				*nextnew = NULL;
 
@@ -3333,7 +3742,7 @@ if_report(mib_item_t *item, char *matchname,
 		}
 		}
 		(void) fflush(stdout);
-	} /* 'for' loop 1 ends */
+	}
 	if ((Iflag_only == 0) && (!once_only))
 		(void) putchar('\n');
 	reentry = B_TRUE;
@@ -3581,13 +3990,11 @@ group_report(mib_item_t *item)
 	ipv6_grpsrc_t	*ips6;
 	boolean_t	first, first_src;
 
-	/* 'for' loop 1: */
 	for (; item; item = item->next_item) {
 		if (Xflag) {
-			(void) printf("\n--- Entry %d ---\n", ++jtemp);
-			(void) printf("Group = %d, mib_id = %d, "
+			(void) printf("[%4d] Group = %d, mib_id = %d, "
 			    "length = %d, valp = 0x%p\n",
-			    item->group, item->mib_id, item->length,
+			    jtemp++, item->group, item->mib_id, item->length,
 			    item->valp);
 		}
 		if (item->group == MIB2_IP && family_selected(AF_INET)) {
@@ -3633,7 +4040,6 @@ group_report(mib_item_t *item)
 		first = B_TRUE;
 		for (ipmp = (ip_member_t *)v4grp->valp;
 		    (char *)ipmp < (char *)v4grp->valp + v4grp->length;
-		    /* LINTED: (note 1) */
 		    ipmp = (ip_member_t *)((char *)ipmp + ipMemberEntrySize)) {
 			if (first) {
 				(void) puts(v4compat ?
@@ -3653,7 +4059,6 @@ group_report(mib_item_t *item)
 			    abuf, sizeof (abuf)),
 			    ipmp->ipGroupMemberRefCnt);
 
-
 			if (!Vflag || v4src == NULL)
 				continue;
 
@@ -3665,7 +4070,6 @@ group_report(mib_item_t *item)
 			first_src = B_TRUE;
 			for (ips = (ip_grpsrc_t *)v4src->valp;
 			    (char *)ips < (char *)v4src->valp + v4src->length;
-			    /* LINTED: (note 1) */
 			    ips = (ip_grpsrc_t *)((char *)ips +
 			    ipGroupSourceEntrySize)) {
 				/*
@@ -3709,7 +4113,6 @@ group_report(mib_item_t *item)
 		first = B_TRUE;
 		for (ipmp6 = (ipv6_member_t *)v6grp->valp;
 		    (char *)ipmp6 < (char *)v6grp->valp + v6grp->length;
-		    /* LINTED: (note 1) */
 		    ipmp6 = (ipv6_member_t *)((char *)ipmp6 +
 		    ipv6MemberEntrySize)) {
 			if (first) {
@@ -3739,7 +4142,6 @@ group_report(mib_item_t *item)
 			first_src = B_TRUE;
 			for (ips6 = (ipv6_grpsrc_t *)v6src->valp;
 			    (char *)ips6 < (char *)v6src->valp + v6src->length;
-			    /* LINTED: (note 1) */
 			    ips6 = (ipv6_grpsrc_t *)((char *)ips6 +
 			    ipv6GroupSourceEntrySize)) {
 				/* same assumption as in the v4 case above */
@@ -3810,12 +4212,10 @@ dce_report(mib_item_t *item)
 	boolean_t	first;
 	dest_cache_entry_t *dce;
 
-	/* 'for' loop 1: */
 	for (; item; item = item->next_item) {
 		if (Xflag) {
-			(void) printf("\n--- Entry %d ---\n", ++jtemp);
-			(void) printf("Group = %d, mib_id = %d, "
-			    "length = %d, valp = 0x%p\n",
+			(void) printf("[%4d] Group = %d, mib_id = %d, "
+			    "length = %d, valp = 0x%p\n", jtemp++,
 			    item->group, item->mib_id, item->length,
 			    item->valp);
 		}
@@ -3841,7 +4241,6 @@ dce_report(mib_item_t *item)
 		first = B_TRUE;
 		for (dce = (dest_cache_entry_t *)v4dce->valp;
 		    (char *)dce < (char *)v4dce->valp + v4dce->length;
-		    /* LINTED: (note 1) */
 		    dce = (dest_cache_entry_t *)((char *)dce +
 		    ipDestEntrySize)) {
 			if (first) {
@@ -3869,7 +4268,6 @@ dce_report(mib_item_t *item)
 		first = B_TRUE;
 		for (dce = (dest_cache_entry_t *)v6dce->valp;
 		    (char *)dce < (char *)v6dce->valp + v6dce->length;
-		    /* LINTED: (note 1) */
 		    dce = (dest_cache_entry_t *)((char *)dce +
 		    ipDestEntrySize)) {
 			if (first) {
@@ -3914,17 +4312,15 @@ arp_report(mib_item_t *item)
 	if (!(family_selected(AF_INET)))
 		return;
 
-	/* 'for' loop 1: */
 	for (; item; item = item->next_item) {
 		if (Xflag) {
-			(void) printf("\n--- Entry %d ---\n", ++jtemp);
-			(void) printf("Group = %d, mib_id = %d, "
-			    "length = %d, valp = 0x%p\n",
+			(void) printf("[%4d] Group = %d, mib_id = %d, "
+			    "length = %d, valp = 0x%p\n", jtemp++,
 			    item->group, item->mib_id, item->length,
 			    item->valp);
 		}
 		if (!(item->group == MIB2_IP && item->mib_id == MIB2_IP_MEDIA))
-			continue; /* 'for' loop 1 */
+			continue;
 
 		if (Xflag)
 			(void) printf("%u records for "
@@ -3932,10 +4328,8 @@ arp_report(mib_item_t *item)
 			    item->length/sizeof (mib2_ipNetToMediaEntry_t));
 
 		first = B_TRUE;
-		/* 'for' loop 2: */
 		for (np = (mib2_ipNetToMediaEntry_t *)item->valp;
 		    (char *)np < (char *)item->valp + item->length;
-		    /* LINTED: (note 1) */
 		    np = (mib2_ipNetToMediaEntry_t *)((char *)np +
 		    ipNetToMediaEntrySize)) {
 			if (first) {
@@ -3987,8 +4381,8 @@ arp_report(mib_item_t *item)
 			    flbuf,
 			    octetstr(&np->ipNetToMediaPhysAddress, 'h',
 			    xbuf, sizeof (xbuf)));
-		} /* 'for' loop 2 ends */
-	} /* 'for' loop 1 ends */
+		}
+	}
 	(void) fflush(stdout);
 }
 
@@ -4009,7 +4403,6 @@ ndp_report(mib_item_t *item)
 	if (!(family_selected(AF_INET6)))
 		return;
 
-	/* 'for' loop 1: */
 	for (; item; item = item->next_item) {
 		if (Xflag) {
 			(void) printf("\n--- Entry %d ---\n", ++jtemp);
@@ -4020,13 +4413,11 @@ ndp_report(mib_item_t *item)
 		}
 		if (!(item->group == MIB2_IP6 &&
 		    item->mib_id == MIB2_IP6_MEDIA))
-			continue; /* 'for' loop 1 */
+			continue;
 
 		first = B_TRUE;
-		/* 'for' loop 2: */
 		for (np6 = (mib2_ipv6NetToMediaEntry_t *)item->valp;
 		    (char *)np6 < (char *)item->valp + item->length;
-		    /* LINTED: (note 1) */
 		    np6 = (mib2_ipv6NetToMediaEntry_t *)((char *)np6 +
 		    ipv6NetToMediaEntrySize)) {
 			if (first) {
@@ -4075,6 +4466,8 @@ ndp_report(mib_item_t *item)
 			case 4:
 				type = "local";
 				break;
+			default:
+				type = "UNKNOWN";
 			}
 			(void) printf("%-5s %-17s  %-7s %-12s %-27s\n",
 			    ifindex2str(np6->ipv6NetToMediaIfIndex, ifname),
@@ -4084,8 +4477,8 @@ ndp_report(mib_item_t *item)
 			    state,
 			    pr_addr6(&np6->ipv6NetToMediaNetAddress,
 			    abuf, sizeof (abuf)));
-		} /* 'for' loop 2 ends */
-	} /* 'for' loop 1 ends */
+		}
+	}
 	(void) putchar('\n');
 	(void) fflush(stdout);
 }
@@ -4173,7 +4566,6 @@ ire_report(const mib_item_t *item)
 		}
 		for (iae = iptr->valp;
 		    (char *)iae < (char *)iptr->valp + iptr->length;
-		    /* LINTED: (note 1) */
 		    iae = (mib2_ipAttributeEntry_t *)((char *)iae +
 		    ipRouteAttributeSize)) {
 			aptr->sal_next = alp[iae->iae_routeidx];
@@ -4182,14 +4574,12 @@ ire_report(const mib_item_t *item)
 		}
 	}
 
-	/* 'for' loop 1: */
 	v4a = v4_attrs;
 	v6a = v6_attrs;
 	for (; item != NULL; item = item->next_item) {
 		if (Xflag) {
-			(void) printf("\n--- Entry %d ---\n", ++jtemp);
-			(void) printf("Group = %d, mib_id = %d, "
-			    "length = %d, valp = 0x%p\n",
+			(void) printf("[%4d] Group = %d, mib_id = %d, "
+			    "length = %d, valp = 0x%p\n", jtemp++,
 			    item->group, item->mib_id,
 			    item->length, item->valp);
 		}
@@ -4197,12 +4587,12 @@ ire_report(const mib_item_t *item)
 		    item->mib_id == MIB2_IP_ROUTE) ||
 		    (item->group == MIB2_IP6 &&
 		    item->mib_id == MIB2_IP6_ROUTE)))
-			continue; /* 'for' loop 1 */
+			continue;
 
 		if (item->group == MIB2_IP && !family_selected(AF_INET))
-			continue; /* 'for' loop 1 */
+			continue;
 		else if (item->group == MIB2_IP6 && !family_selected(AF_INET6))
-			continue; /* 'for' loop 1 */
+			continue;
 
 		if (Xflag) {
 			if (item->group == MIB2_IP) {
@@ -4220,7 +4610,6 @@ ire_report(const mib_item_t *item)
 		if (item->group == MIB2_IP) {
 			for (rp = (mib2_ipRouteEntry_t *)item->valp;
 			    (char *)rp < (char *)item->valp + item->length;
-			    /* LINTED: (note 1) */
 			    rp = (mib2_ipRouteEntry_t *)((char *)rp +
 			    ipRouteEntrySize)) {
 				aptr = v4a == NULL ? NULL : *v4a++;
@@ -4230,7 +4619,6 @@ ire_report(const mib_item_t *item)
 		} else {
 			for (rp6 = (mib2_ipv6RouteEntry_t *)item->valp;
 			    (char *)rp6 < (char *)item->valp + item->length;
-			    /* LINTED: (note 1) */
 			    rp6 = (mib2_ipv6RouteEntry_t *)((char *)rp6 +
 			    ipv6RouteEntrySize)) {
 				aptr = v6a == NULL ? NULL : *v6a++;
@@ -4238,7 +4626,7 @@ ire_report(const mib_item_t *item)
 				    print_hdr_once_v6, aptr);
 			}
 		}
-	} /* 'for' loop 1 ends */
+	}
 	(void) fflush(stdout);
 ire_report_done:
 	if (v4_attrs != NULL)
@@ -4305,9 +4693,7 @@ v4_addr_match(IpAddress addr, IpAddress mask, const filter_t *fp)
 		mask = fmask;
 	}
 	for (app = fp->u.a.f_address->h_addr_list; (aptr = *app) != NULL; app++)
-		/* LINTED: (note 1) */
 		if (IN6_IS_ADDR_V4MAPPED((in6_addr_t *)aptr)) {
-			/* LINTED: (note 1) */
 			IN6_V4MAPPED_TO_IPADDR((in6_addr_t *)aptr, faddr);
 			if (((faddr ^ addr) & mask) == 0)
 				return (B_TRUE);
@@ -4327,39 +4713,36 @@ ire_filter_match_v4(const mib2_ipRouteEntry_t *rp, uint_t flag_b)
 	filter_t *fp;
 	int idx;
 
-	/* 'for' loop 1: */
 	for (idx = 0; idx < NFILTERKEYS; idx++)
 		if ((fp = filters[idx]) != NULL) {
-			/* 'for' loop 2: */
 			for (; fp != NULL; fp = fp->f_next) {
 				switch (idx) {
 				case FK_AF:
 					if (fp->u.f_family != AF_INET)
-						continue; /* 'for' loop 2 */
+						continue;
 					break;
 				case FK_OUTIF:
 					if (!dev_name_match(&rp->ipRouteIfIndex,
 					    fp->u.f_ifname))
-						continue; /* 'for' loop 2 */
+						continue;
 					break;
 				case FK_DST:
 					if (!v4_addr_match(rp->ipRouteDest,
 					    rp->ipRouteMask, fp))
-						continue; /* 'for' loop 2 */
+						continue;
 					break;
 				case FK_FLAGS:
 					if ((flag_b & fp->u.f.f_flagset) !=
 					    fp->u.f.f_flagset ||
 					    (flag_b & fp->u.f.f_flagclear))
-						continue; /* 'for' loop 2 */
+						continue;
 					break;
 				}
 				break;
-			} /* 'for' loop 2 ends */
+			}
 			if (fp == NULL)
 				return (B_FALSE);
 		}
-	/* 'for' loop 1 ends */
 	return (B_TRUE);
 }
 
@@ -4425,20 +4808,74 @@ form_v4_route_flags(const mib2_ipRouteEntry_t *rp, char *flags)
 	return (flag_b);
 }
 
+/*
+ * Central definitions for the columns used in the reports.
+ * For each column, there's a definition for the heading, the underline and
+ * the formatted value.
+ * Since most reports select different columns depending on command line
+ * options, defining everything here avoids duplication in the report
+ * format strings and makes it easy to make changes as necessary.
+ */
+#define	IRE_V4_DEST		"  Destination       "
+#define	IRE_V4_DEST_		"--------------------"
+#define	IRE_V4_DEST_F		"%-20s"
+#define	IRE_V4_MASK		"     Mask      "
+#define	IRE_V4_MASK_		"---------------"
+#define	IRE_V4_MASK_F		"%-15s"
+#define	IRE_V4_GATEWAY		"    Gateway         "
+#define	IRE_V4_GATEWAY_		"--------------------"
+#define	IRE_V4_GATEWAY_F	"%-20s"
+#define	IRE_V4_DEVICE		"Device"
+#define	IRE_V4_DEVICE_		"------"
+#define	IRE_V4_DEVICE_F		"%-6s"
+#define	IRE_V4_MTU		" MTU "
+#define	IRE_V4_MTU_		"-----"
+#define	IRE_V4_MTU_F		"%5u"
+#define	IRE_V4_REF		"Ref"
+#define	IRE_V4_REF_		"---"
+#define	IRE_V4_REF_F		"%3u"
+#define	IRE_V4_FLAGS		"Flg"
+#define	IRE_V4_FLAGS_		"---"
+#define	IRE_V4_FLAGS_F		"%-4s"
+#define	IRE_V4_OUT		" Out  "
+#define	IRE_V4_OUT_		"------"
+#define	IRE_V4_OUT_F		"%-6s"
+#define	IRE_V4_INFWD		"In/Fwd"
+#define	IRE_V4_INFWD_		"------"
+#define	IRE_V4_INFWD_F		"%6u"
+#define	IRE_V4_LFLAGS		"Flags"
+#define	IRE_V4_LFLAGS_		"-----"
+#define	IRE_V4_LFLAGS_F		"%-5s"
+#define	IRE_V4_LREF		" Ref "
+#define	IRE_V4_LREF_		"-----"
+#define	IRE_V4_LREF_F		" %4u"
+#define	IRE_V4_USE		"   Use    "
+#define	IRE_V4_USE_		"----------"
+#define	IRE_V4_USE_F		"%10u"
+#define	IRE_V4_INTERFACE	"Interface"
+#define	IRE_V4_INTERFACE_	"---------"
+#define	IRE_V4_INTERFACE_F	"%-9s"
+
 static const char ire_hdr_v4[] =
 "\n%s Table: IPv4\n";
 static const char ire_hdr_v4_compat[] =
 "\n%s Table:\n";
+
 static const char ire_hdr_v4_verbose[] =
-"  Destination             Mask           Gateway          Device "
-" MTU  Ref Flg  Out  In/Fwd %s\n"
-"-------------------- --------------- -------------------- ------ "
-"----- --- --- ----- ------ %s\n";
+    IRE_V4_DEST " " IRE_V4_MASK " " IRE_V4_GATEWAY " " IRE_V4_DEVICE " "
+    IRE_V4_MTU " " IRE_V4_REF " " IRE_V4_FLAGS " "
+    IRE_V4_OUT " " IRE_V4_INFWD " %s\n"
+    IRE_V4_DEST_" " IRE_V4_MASK_" " IRE_V4_GATEWAY_" " IRE_V4_DEVICE_" "
+    IRE_V4_MTU_" " IRE_V4_REF_" " IRE_V4_FLAGS_" "
+    IRE_V4_OUT_" " IRE_V4_INFWD_" %s\n";
 
 static const char ire_hdr_v4_normal[] =
-"  Destination           Gateway           Flags  Ref     Use     Interface"
-" %s\n-------------------- -------------------- ----- ----- ---------- "
-"--------- %s\n";
+    IRE_V4_DEST " " IRE_V4_GATEWAY " "
+    IRE_V4_LFLAGS " " IRE_V4_LREF " " IRE_V4_USE " "
+    IRE_V4_INTERFACE " %s\n"
+    IRE_V4_DEST_" " IRE_V4_GATEWAY_" "
+    IRE_V4_LFLAGS_" " IRE_V4_LREF_" " IRE_V4_USE_" "
+    IRE_V4_INTERFACE_" %s\n";
 
 static boolean_t
 ire_report_item_v4(const mib2_ipRouteEntry_t *rp, boolean_t first,
@@ -4480,8 +4917,10 @@ ire_report_item_v4(const mib2_ipRouteEntry_t *rp, boolean_t first,
 		    dstbuf, sizeof (dstbuf));
 	}
 	if (Vflag) {
-		(void) printf("%-20s %-15s %-20s %-6s %5u %3u "
-		    "%-4s%6u %6u %s\n",
+		(void) printf(
+		    IRE_V4_DEST_F " " IRE_V4_MASK_F " " IRE_V4_GATEWAY_F " "
+		    IRE_V4_DEVICE_F " " IRE_V4_MTU_F " " IRE_V4_REF_F " "
+		    IRE_V4_FLAGS_F IRE_V4_INFWD_F " " IRE_V4_INFWD_F " %s\n",
 		    dstbuf,
 		    pr_mask(rp->ipRouteMask, maskbuf, sizeof (maskbuf)),
 		    pr_addrnz(rp->ipRouteNextHop, gwbuf, sizeof (gwbuf)),
@@ -4493,7 +4932,10 @@ ire_report_item_v4(const mib2_ipRouteEntry_t *rp, boolean_t first,
 		    rp->ipRouteInfo.re_ibpkt,
 		    pr_secattr(attrs));
 	} else {
-		(void) printf("%-20s %-20s %-5s  %4u %10u %-9s %s\n",
+		(void) printf(
+		    IRE_V4_DEST_F " " IRE_V4_GATEWAY_F " "
+		    IRE_V4_LFLAGS_F " " IRE_V4_LREF_F " "
+		    IRE_V4_USE_F " " IRE_V4_INTERFACE_F " %s\n",
 		    dstbuf,
 		    pr_addrnz(rp->ipRouteNextHop, gwbuf, sizeof (gwbuf)),
 		    flags,
@@ -4530,36 +4972,33 @@ v6_addr_match(const Ip6Address *addr, int masklen, const filter_t *fp)
 		return (IN6_IS_ADDR_UNSPECIFIED(addr));		/* "none" */
 	}
 	fmasklen = 0;
-	/* 'for' loop 1a: */
 	for (ucp = fp->u.a.f_mask.s6_addr;
 	    ucp < fp->u.a.f_mask.s6_addr + sizeof (fp->u.a.f_mask.s6_addr);
 	    ucp++) {
 		if (*ucp != 0xff) {
 			if (*ucp != 0)
 				fmasklen += 9 - ffs(*ucp);
-			break; /* 'for' loop 1a */
+			break;
 		}
 		fmasklen += 8;
-	} /* 'for' loop 1a ends */
+	}
 	if (fmasklen != IPV6_ABITS) {
 		if (fmasklen > masklen)
 			return (B_FALSE);
 		masklen = fmasklen;
 	}
-	/* 'for' loop 1b: */
 	for (app = fp->u.a.f_address->h_addr_list;
 	    (aptr = (uint8_t *)*app) != NULL; app++) {
-		/* LINTED: (note 1) */
 		if (IN6_IS_ADDR_V4MAPPED((in6_addr_t *)aptr))
-			continue; /* 'for' loop 1b */
+			continue;
 		ucp = addr->s6_addr;
 		for (i = masklen; i >= 8; i -= 8)
 			if (*ucp++ != *aptr++)
-				break; /* 'for' loop 1b */
+				break;
 		if (i == 0 ||
 		    (i < 8 && ((*ucp ^ *aptr) & ~(0xff >> i)) == 0))
 			return (B_TRUE);
-	} /* 'for' loop 1b ends */
+	}
 	return (B_FALSE);
 }
 
@@ -4576,43 +5015,36 @@ ire_filter_match_v6(const mib2_ipv6RouteEntry_t *rp6, uint_t flag_b)
 	filter_t *fp;
 	int idx;
 
-	/* 'for' loop 1: */
 	for (idx = 0; idx < NFILTERKEYS; idx++)
 		if ((fp = filters[idx]) != NULL) {
-			/* 'for' loop 2: */
 			for (; fp != NULL; fp = fp->f_next) {
 				switch (idx) {
 				case FK_AF:
 					if (fp->u.f_family != AF_INET6)
-						/* 'for' loop 2 */
 						continue;
 					break;
 				case FK_OUTIF:
 					if (!dev_name_match(&rp6->
 					    ipv6RouteIfIndex, fp->u.f_ifname))
-						/* 'for' loop 2 */
 						continue;
 					break;
 				case FK_DST:
 					if (!v6_addr_match(&rp6->ipv6RouteDest,
 					    rp6->ipv6RoutePfxLength, fp))
-						/* 'for' loop 2 */
 						continue;
 					break;
 				case FK_FLAGS:
 					if ((flag_b & fp->u.f.f_flagset) !=
 					    fp->u.f.f_flagset ||
 					    (flag_b & fp->u.f.f_flagclear))
-						/* 'for' loop 2 */
 						continue;
 					break;
 				}
 				break;
-			} /* 'for' loop 2 ends */
+			}
 			if (fp == NULL)
 				return (B_FALSE);
 		}
-	/* 'for' loop 1 ends */
 	return (B_TRUE);
 }
 
@@ -4676,18 +5108,54 @@ form_v6_route_flags(const mib2_ipv6RouteEntry_t *rp6, char *flags)
 	return (flag_b);
 }
 
+/*
+ * Central definitions for the columns used in the reports.
+ * For each column, there's a definition for the heading, the underline and
+ * the formatted value.
+ * Since most reports select different columns depending on command line
+ * options, defining everything here avoids duplication in the report
+ * format strings and makes it easy to make changes as necessary.
+ */
+#define	IRE_V6_DEST		"  Destination/Mask         "
+#define	IRE_V6_DEST_		"---------------------------"
+#define	IRE_V6_DEST_F		"%-27s"
+#define	IRE_V6_GATEWAY		"  Gateway                  "
+#define	IRE_V6_GATEWAY_		"---------------------------"
+#define	IRE_V6_GATEWAY_F	"%-27s"
+#define	IRE_V6_IF		" If  "
+#define	IRE_V6_IF_		"-----"
+#define	IRE_V6_IF_F		"%-5s"
+#define	IRE_V6_MTU		" MTU "
+#define	IRE_V6_MTU_		"-----"
+#define	IRE_V6_MTU_F		"%5u"
+#define	IRE_V6_REF		"Ref"
+#define	IRE_V6_REF_		"---"
+#define	IRE_V6_REF_F		"%3u"
+#define	IRE_V6_USE		"  Use  "
+#define	IRE_V6_USE_		"-------"
+#define	IRE_V6_USE_F		"%7u"
+#define	IRE_V6_FLAGS		"Flags"
+#define	IRE_V6_FLAGS_		"-----"
+#define	IRE_V6_FLAGS_F		"%-5s"
+#define	IRE_V6_OUT		" Out  "
+#define	IRE_V6_OUT_		"------"
+#define	IRE_V6_OUT_F		"%6u"
+#define	IRE_V6_INFWD		"In/Fwd"
+#define	IRE_V6_INFWD_		"------"
+#define	IRE_V6_INFWD_F		"%6u"
+
 static const char ire_hdr_v6[] =
 "\n%s Table: IPv6\n";
 static const char ire_hdr_v6_verbose[] =
-"  Destination/Mask            Gateway                    If    MTU  "
-"Ref Flags  Out   In/Fwd %s\n"
-"--------------------------- --------------------------- ----- ----- "
-"--- ----- ------ ------ %s\n";
+    IRE_V6_DEST " " IRE_V6_GATEWAY " " IRE_V6_IF " " IRE_V6_MTU " "
+    IRE_V6_REF " " IRE_V6_FLAGS " " IRE_V6_OUT " " IRE_V6_INFWD " %s\n"
+    IRE_V6_DEST_" " IRE_V6_GATEWAY_" " IRE_V6_IF_" " IRE_V6_MTU_" "
+    IRE_V6_REF_" " IRE_V6_FLAGS_" " IRE_V6_OUT_" " IRE_V6_INFWD_" %s\n";
 static const char ire_hdr_v6_normal[] =
-"  Destination/Mask            Gateway                   Flags Ref   Use  "
-"  If   %s\n"
-"--------------------------- --------------------------- ----- --- ------- "
-"----- %s\n";
+    IRE_V6_DEST " " IRE_V6_GATEWAY " "
+    IRE_V6_FLAGS " " IRE_V6_REF " " IRE_V6_USE " " IRE_V6_IF " %s\n"
+    IRE_V6_DEST_" " IRE_V6_GATEWAY_" "
+    IRE_V6_FLAGS_" " IRE_V6_REF_" " IRE_V6_USE_" " IRE_V6_IF_" %s\n";
 
 static boolean_t
 ire_report_item_v6(const mib2_ipv6RouteEntry_t *rp6, boolean_t first,
@@ -4720,8 +5188,10 @@ ire_report_item_v6(const mib2_ipv6RouteEntry_t *rp6, boolean_t first,
 	}
 
 	if (Vflag) {
-		(void) printf("%-27s %-27s %-5s %5u %3u "
-		    "%-5s %6u %6u %s\n",
+		(void) printf(
+		    IRE_V6_DEST_F " " IRE_V6_GATEWAY_F " "
+		    IRE_V6_IF_F " " IRE_V6_MTU_F " " IRE_V6_REF_F " "
+		    IRE_V6_FLAGS_F " " IRE_V6_OUT_F " " IRE_V6_INFWD_F " %s\n",
 		    pr_prefix6(&rp6->ipv6RouteDest,
 		    rp6->ipv6RoutePfxLength, dstbuf, sizeof (dstbuf)),
 		    IN6_IS_ADDR_UNSPECIFIED(&rp6->ipv6RouteNextHop) ?
@@ -4736,7 +5206,10 @@ ire_report_item_v6(const mib2_ipv6RouteEntry_t *rp6, boolean_t first,
 		    rp6->ipv6RouteInfo.re_ibpkt,
 		    pr_secattr(attrs));
 	} else {
-		(void) printf("%-27s %-27s %-5s %3u %7u %-5s %s\n",
+		(void) printf(
+		    IRE_V6_DEST_F " " IRE_V6_GATEWAY_F " "
+		    IRE_V6_FLAGS_F " " IRE_V6_REF_F " "
+		    IRE_V6_USE_F " " IRE_V6_IF_F " %s\n",
 		    pr_prefix6(&rp6->ipv6RouteDest,
 		    rp6->ipv6RoutePfxLength, dstbuf, sizeof (dstbuf)),
 		    IN6_IS_ADDR_UNSPECIFIED(&rp6->ipv6RouteNextHop) ?
@@ -4758,26 +5231,36 @@ ire_report_item_v6(const mib2_ipv6RouteEntry_t *rp6, boolean_t first,
 static mib2_transportMLPEntry_t **
 gather_attrs(const mib_item_t *item, int group, int mib_id, int esize)
 {
-	int transport_count = 0;
+	size_t transport_count = 0;
 	const mib_item_t *iptr;
 	mib2_transportMLPEntry_t **attrs, *tme;
 
 	for (iptr = item; iptr != NULL; iptr = iptr->next_item) {
-		if (iptr->group == group && iptr->mib_id == mib_id)
-			transport_count += iptr->length / esize;
+		if (iptr->group == group && iptr->mib_id == mib_id) {
+			size_t els = iptr->length / esize;
+			if (transport_count > SIZE_MAX - els) {
+				fprintf(stderr, "Connection table too large\n");
+				return (NULL);
+			} else {
+				transport_count += els;
+			}
+		}
 	}
-	if (transport_count <= 0)
+
+	if (transport_count == 0)
 		return (NULL);
-	attrs = calloc(transport_count, sizeof (*attrs));
+
+	attrs = recallocarray(NULL, 0, transport_count, sizeof (*attrs));
+
 	if (attrs == NULL) {
-		perror("gather_attrs calloc failed");
+		perror("gather_attrs allocation failed");
 		return (NULL);
 	}
+
 	for (iptr = item; iptr != NULL; iptr = iptr->next_item) {
 		if (iptr->group == group && iptr->mib_id == EXPER_XPORT_MLP) {
 			for (tme = iptr->valp;
 			    (char *)tme < (char *)iptr->valp + iptr->length;
-			    /* LINTED: (note 1) */
 			    tme = (mib2_transportMLPEntry_t *)((char *)tme +
 			    transportMLPSize)) {
 				attrs[tme->tme_connidx] = tme;
@@ -4785,6 +5268,89 @@ gather_attrs(const mib_item_t *item, int group, int mib_id, int esize)
 		}
 	}
 	return (attrs);
+}
+
+static void
+sie_report(const mib2_socketInfoEntry_t *sie)
+{
+	if (sie == NULL)
+		return;
+
+	(void) printf("INFO[%" PRIu64 "] = "
+	    "inode %" PRIu64 ", "
+	    "major %" PRIx32 ", "
+	    "flags %#" PRIx64 "\n",
+	    sie->sie_connidx, sie->sie_inode,
+	    major((dev_t)sie->sie_dev), sie->sie_flags);
+}
+
+/*
+ * Common info-gathering routine for all transports.
+ *
+ * The linked list of MIB data pointed to by item consists of a number of
+ * tables covering several protocol families and socket types, one after
+ * another. These are generally tables containing information about network
+ * connections, such as mib2_tcpConnEntry, as defined in RFC 1213/4022.
+ *
+ * There are also ancilliary tables which contain optional additional
+ * information about each socket. The data in these ancilliary tables is
+ * indexed by the table position of the connection to which it relates, and
+ * data may not be available for all connections.
+ *
+ * The code here determines the size of the connection table, allocates an
+ * array of that size to hold the ancilliary data and then fills that in
+ * if data is present.
+ *
+ * As an example, if the data contains a mib2_tcpConnEntry table containing
+ * three connections, but there is no ancilliary data for the second, then
+ * the accompanying mib2_socketInfoEntry table will only contain two entries.
+ * However, the first entry is tagged as referring to connection slot 0, and
+ * the second is tagged with connection slot 2.
+ * This function would return an array with:
+ * { <data for conn0>, NULL, <data for conn2> }
+ *
+ */
+static mib2_socketInfoEntry_t **
+gather_info(const mib_item_t *item, int group, int mib_id, int esize)
+{
+	size_t transport_count = 0;
+	const mib_item_t *iptr;
+	mib2_socketInfoEntry_t **info, *sie;
+
+	for (iptr = item; iptr != NULL; iptr = iptr->next_item) {
+		if (iptr->group == group && iptr->mib_id == mib_id) {
+			size_t els = iptr->length / esize;
+			if (transport_count > SIZE_MAX - els) {
+				fprintf(stderr, "Connection table too large\n");
+				return (NULL);
+			} else {
+				transport_count += els;
+			}
+		}
+	}
+
+	if (transport_count == 0)
+		return (NULL);
+
+	info = recallocarray(NULL, 0, transport_count, sizeof (*info));
+
+	if (info == NULL) {
+		perror("gather_info allocation failed");
+		return (NULL);
+	}
+
+	for (iptr = item; iptr != NULL; iptr = iptr->next_item) {
+		if (iptr->group != group || iptr->mib_id != EXPER_SOCK_INFO)
+			continue;
+
+		for (sie = (mib2_socketInfoEntry_t *)iptr->valp;
+		    (uintptr_t)sie < (uintptr_t)iptr->valp + iptr->length;
+		    sie++) {
+			assert(sie->sie_connidx < transport_count);
+			info[sie->sie_connidx] = sie;
+		}
+	}
+	return (info);
 }
 
 static void
@@ -4811,55 +5377,226 @@ static const char tcp_hdr_v4[] =
 "\nTCP: IPv4\n";
 static const char tcp_hdr_v4_compat[] =
 "\nTCP\n";
-static const char tcp_hdr_v4_verbose[] =
-"Local/Remote Address Swind  Snext     Suna   Rwind  Rnext     Rack   "
-" Rto   Mss     State\n"
-"-------------------- ----- -------- -------- ----- -------- -------- "
-"----- ----- -----------\n";
+
+/*
+ * Central definitions for the columns used in the reports.
+ * For each column, there's a definition for the heading, the underline and
+ * the formatted value.
+ * Since most reports select different columns depending on command line
+ * options, defining everything here avoids duplication in the report
+ * format strings and makes it easy to make changes as necessary.
+ */
+#define	TCP_V4_LOCAL		"   Local Address    "
+#define	TCP_V4_LOCAL_		"--------------------"
+#define	TCP_V4_LOCAL_F		"%-20s"
+#define	TCP_V4_REMOTE		"   Remote Address   "
+#define	TCP_V4_REMOTE_		"--------------------"
+#define	TCP_V4_REMOTE_F		"%-20s"
+#define	TCP_V4_ADDRESS		"Local/Remote Address"
+#define	TCP_V4_ADDRESS_		"--------------------"
+#define	TCP_V4_ADDRESS_F	"%-20s"
+#define	TCP_V4_SWIND		"Swind "
+#define	TCP_V4_SWIND_		"------"
+#define	TCP_V4_SWIND_F		"%6u"
+#define	TCP_V4_SENDQ		"Send-Q"
+#define	TCP_V4_SENDQ_		"------"
+#define	TCP_V4_SENDQ_F		"%6" PRId64
+#define	TCP_V4_RWIND		"Rwind "
+#define	TCP_V4_RWIND_		"------"
+#define	TCP_V4_RWIND_F		"%6u"
+#define	TCP_V4_RECVQ		"Recv-Q"
+#define	TCP_V4_RECVQ_		"------"
+#define	TCP_V4_RECVQ_F		"%6" PRId64
+#define	TCP_V4_SNEXT		" Snext  "
+#define	TCP_V4_SNEXT_		"--------"
+#define	TCP_V4_SNEXT_F		"%08x"
+#define	TCP_V4_SUNA		"  Suna  "
+#define	TCP_V4_SUNA_		"--------"
+#define	TCP_V4_SUNA_F		"%08x"
+#define	TCP_V4_RNEXT		" Rnext  "
+#define	TCP_V4_RNEXT_		"--------"
+#define	TCP_V4_RNEXT_F		"%08x"
+#define	TCP_V4_RACK		"  Rack  "
+#define	TCP_V4_RACK_		"--------"
+#define	TCP_V4_RACK_F		"%08x"
+#define	TCP_V4_RTO		" Rto "
+#define	TCP_V4_RTO_		"-----"
+#define	TCP_V4_RTO_F		"%5u"
+#define	TCP_V4_MSS		" Mss "
+#define	TCP_V4_MSS_		"-----"
+#define	TCP_V4_MSS_F		"%5u"
+#define	TCP_V4_STATE		"   State   "
+#define	TCP_V4_STATE_		"-----------"
+#define	TCP_V4_STATE_F		"%-11s"
+#define	TCP_V4_USER		"  User  "
+#define	TCP_V4_USER_		"--------"
+#define	TCP_V4_USER_F		"%-8.8s"
+#define	TCP_V4_PID		" Pid  "
+#define	TCP_V4_PID_		"------"
+#define	TCP_V4_PID_F		"%6s"
+#define	TCP_V4_COMMAND		"   Command    "
+#define	TCP_V4_COMMAND_		"--------------"
+#define	TCP_V4_COMMAND_F	"%-14.14s"
+
 static const char tcp_hdr_v4_normal[] =
-"   Local Address        Remote Address    Swind Send-Q Rwind Recv-Q "
-"   State\n"
-"-------------------- -------------------- ----- ------ ----- ------ "
-"-----------\n";
+    TCP_V4_LOCAL " " TCP_V4_REMOTE " "
+    TCP_V4_SWIND " " TCP_V4_SENDQ " " TCP_V4_RWIND " " TCP_V4_RECVQ " "
+    TCP_V4_STATE "\n"
+    TCP_V4_LOCAL_" " TCP_V4_REMOTE_" "
+    TCP_V4_SWIND_" " TCP_V4_SENDQ_" " TCP_V4_RWIND_" " TCP_V4_RECVQ_" "
+    TCP_V4_STATE_"\n";
+static const char tcp_hdr_v4_normal_pid[] =
+    TCP_V4_LOCAL " " TCP_V4_REMOTE " "
+    TCP_V4_USER " " TCP_V4_PID " " TCP_V4_COMMAND " "
+    TCP_V4_SWIND " " TCP_V4_SENDQ " " TCP_V4_RWIND " " TCP_V4_RECVQ " "
+    TCP_V4_STATE "\n"
+    TCP_V4_LOCAL_" " TCP_V4_REMOTE_" "
+    TCP_V4_USER_" " TCP_V4_PID_" " TCP_V4_COMMAND_" "
+    TCP_V4_SWIND_" " TCP_V4_SENDQ_" " TCP_V4_RWIND_" " TCP_V4_RECVQ_" "
+    TCP_V4_STATE_"\n";
+static const char tcp_hdr_v4_verbose[] =
+    TCP_V4_ADDRESS " "
+    TCP_V4_SWIND " " TCP_V4_SNEXT " " TCP_V4_SUNA " "
+    TCP_V4_RWIND " " TCP_V4_RNEXT " " TCP_V4_RACK " "
+    TCP_V4_RTO " " TCP_V4_MSS " " TCP_V4_STATE "\n"
+    TCP_V4_ADDRESS_" "
+    TCP_V4_SWIND_" " TCP_V4_SNEXT_" " TCP_V4_SUNA_" "
+    TCP_V4_RWIND_" " TCP_V4_RNEXT_" " TCP_V4_RACK_" "
+    TCP_V4_RTO_" " TCP_V4_MSS_" " TCP_V4_STATE_"\n";
+static const char tcp_hdr_v4_verbose_pid[] =
+    TCP_V4_ADDRESS " "
+    TCP_V4_SWIND " " TCP_V4_SNEXT " " TCP_V4_SUNA " "
+    TCP_V4_RWIND " " TCP_V4_RNEXT " " TCP_V4_RACK " "
+    TCP_V4_RTO " " TCP_V4_MSS " " TCP_V4_STATE " "
+    TCP_V4_USER " " TCP_V4_PID " " TCP_V4_COMMAND "\n"
+    TCP_V4_ADDRESS_" "
+    TCP_V4_SWIND_" " TCP_V4_SNEXT_" " TCP_V4_SUNA_" "
+    TCP_V4_RWIND_" " TCP_V4_RNEXT_" " TCP_V4_RACK_" "
+    TCP_V4_RTO_" " TCP_V4_MSS_" " TCP_V4_STATE_" "
+    TCP_V4_USER_" " TCP_V4_PID_" " TCP_V4_COMMAND_"\n";
+
+#define	TCP_V6_LOCAL		"   Local Address                 "
+#define	TCP_V6_LOCAL_		"---------------------------------"
+#define	TCP_V6_LOCAL_F		"%-33s"
+#define	TCP_V6_REMOTE		"   Remote Address                "
+#define	TCP_V6_REMOTE_		"---------------------------------"
+#define	TCP_V6_REMOTE_F		"%-33s"
+#define	TCP_V6_ADDRESS		"Local/Remote Address             "
+#define	TCP_V6_ADDRESS_		"---------------------------------"
+#define	TCP_V6_ADDRESS_F	"%-33s"
+#define	TCP_V6_IF		"  If "
+#define	TCP_V6_IF_		"-----"
+#define	TCP_V6_IF_F		"%-5.5s"
+#define	TCP_V6_SWIND		TCP_V4_SWIND
+#define	TCP_V6_SWIND_		TCP_V4_SWIND_
+#define	TCP_V6_SWIND_F		TCP_V4_SWIND_F
+#define	TCP_V6_SENDQ		TCP_V4_SENDQ
+#define	TCP_V6_SENDQ_		TCP_V4_SENDQ_
+#define	TCP_V6_SENDQ_F		TCP_V4_SENDQ_F
+#define	TCP_V6_RWIND		TCP_V4_RWIND
+#define	TCP_V6_RWIND_		TCP_V4_RWIND_
+#define	TCP_V6_RWIND_F		TCP_V4_RWIND_F
+#define	TCP_V6_RECVQ		TCP_V4_RECVQ
+#define	TCP_V6_RECVQ_		TCP_V4_RECVQ_
+#define	TCP_V6_RECVQ_F		TCP_V4_RECVQ_F
+#define	TCP_V6_SNEXT		TCP_V4_SNEXT
+#define	TCP_V6_SNEXT_		TCP_V4_SNEXT_
+#define	TCP_V6_SNEXT_F		TCP_V4_SNEXT_F
+#define	TCP_V6_SUNA		TCP_V4_SUNA
+#define	TCP_V6_SUNA_		TCP_V4_SUNA_
+#define	TCP_V6_SUNA_F		TCP_V4_SUNA_F
+#define	TCP_V6_RNEXT		TCP_V4_RNEXT
+#define	TCP_V6_RNEXT_		TCP_V4_RNEXT_
+#define	TCP_V6_RNEXT_F		TCP_V4_RNEXT_F
+#define	TCP_V6_RACK		TCP_V4_RACK
+#define	TCP_V6_RACK_		TCP_V4_RACK_
+#define	TCP_V6_RACK_F		TCP_V4_RACK_F
+#define	TCP_V6_RTO		TCP_V4_RTO
+#define	TCP_V6_RTO_		TCP_V4_RTO_
+#define	TCP_V6_RTO_F		TCP_V4_RTO_F
+#define	TCP_V6_MSS		TCP_V4_MSS
+#define	TCP_V6_MSS_		TCP_V4_MSS_
+#define	TCP_V6_MSS_F		TCP_V4_MSS_F
+#define	TCP_V6_STATE		TCP_V4_STATE
+#define	TCP_V6_STATE_		TCP_V4_STATE_
+#define	TCP_V6_STATE_F		TCP_V4_STATE_F
+#define	TCP_V6_USER		TCP_V4_USER
+#define	TCP_V6_USER_		TCP_V4_USER_
+#define	TCP_V6_USER_F		TCP_V4_USER_F
+#define	TCP_V6_PID		TCP_V4_PID
+#define	TCP_V6_PID_		TCP_V4_PID_
+#define	TCP_V6_PID_F		TCP_V4_PID_F
+#define	TCP_V6_COMMAND		TCP_V4_COMMAND
+#define	TCP_V6_COMMAND_		TCP_V4_COMMAND_
+#define	TCP_V6_COMMAND_F	TCP_V4_COMMAND_F
 
 static const char tcp_hdr_v6[] =
 "\nTCP: IPv6\n";
-static const char tcp_hdr_v6_verbose[] =
-"Local/Remote Address              Swind  Snext     Suna   Rwind  Rnext   "
-"  Rack    Rto   Mss    State      If\n"
-"--------------------------------- ----- -------- -------- ----- -------- "
-"-------- ----- ----- ----------- -----\n";
 static const char tcp_hdr_v6_normal[] =
-"   Local Address                     Remote Address                 "
-"Swind Send-Q Rwind Recv-Q   State      If\n"
-"--------------------------------- --------------------------------- "
-"----- ------ ----- ------ ----------- -----\n";
+    TCP_V6_LOCAL " " TCP_V6_REMOTE " "
+    TCP_V6_SWIND " " TCP_V6_SENDQ " " TCP_V6_RWIND " " TCP_V6_RECVQ " "
+    TCP_V6_STATE " " TCP_V6_IF "\n"
+    TCP_V6_LOCAL_" " TCP_V6_REMOTE_" "
+    TCP_V6_SWIND_" " TCP_V6_SENDQ_" " TCP_V6_RWIND_" " TCP_V6_RECVQ_" "
+    TCP_V6_STATE_" " TCP_V6_IF_"\n";
+static const char tcp_hdr_v6_normal_pid[] =
+    TCP_V6_LOCAL " " TCP_V6_REMOTE " "
+    TCP_V6_USER " " TCP_V6_PID " " TCP_V6_COMMAND " "
+    TCP_V6_SWIND " " TCP_V6_SENDQ " " TCP_V6_RWIND " " TCP_V6_RECVQ " "
+    TCP_V6_STATE " " TCP_V6_IF "\n"
+    TCP_V6_LOCAL_" " TCP_V6_REMOTE_" "
+    TCP_V6_USER_" " TCP_V6_PID_" " TCP_V6_COMMAND_" "
+    TCP_V6_SWIND_" " TCP_V6_SENDQ_" " TCP_V6_RWIND_" " TCP_V6_RECVQ_" "
+    TCP_V6_STATE_" " TCP_V6_IF_"\n";
+static const char tcp_hdr_v6_verbose[] =
+    TCP_V6_ADDRESS " "
+    TCP_V6_SWIND " " TCP_V6_SNEXT " " TCP_V6_SUNA " "
+    TCP_V6_RWIND " " TCP_V6_RNEXT " " TCP_V6_RACK " "
+    TCP_V6_RTO " " TCP_V6_MSS " " TCP_V6_STATE " " TCP_V6_IF "\n"
+    TCP_V6_ADDRESS_" "
+    TCP_V6_SWIND_" " TCP_V6_SNEXT_" " TCP_V6_SUNA_" "
+    TCP_V6_RWIND_" " TCP_V6_RNEXT_" " TCP_V6_RACK_" "
+    TCP_V6_RTO_" " TCP_V6_MSS_" " TCP_V6_STATE_" " TCP_V6_IF_"\n";
+static const char tcp_hdr_v6_verbose_pid[] =
+    TCP_V6_ADDRESS " "
+    TCP_V6_SWIND " " TCP_V6_SNEXT " " TCP_V6_SUNA " "
+    TCP_V6_RWIND " " TCP_V6_RNEXT " " TCP_V6_RACK " "
+    TCP_V6_RTO " " TCP_V6_MSS " " TCP_V6_STATE " " TCP_V6_IF " "
+    TCP_V6_USER " " TCP_V6_PID " " TCP_V6_COMMAND "\n"
+    TCP_V6_ADDRESS_" "
+    TCP_V6_SWIND_" " TCP_V6_SNEXT_" " TCP_V6_SUNA_" "
+    TCP_V6_RWIND_" " TCP_V6_RNEXT_" " TCP_V6_RACK_" "
+    TCP_V6_RTO_" " TCP_V6_MSS_" " TCP_V6_STATE_" " TCP_V6_IF_" "
+    TCP_V6_USER_" " TCP_V6_PID_" " TCP_V6_COMMAND_"\n";
 
 static boolean_t tcp_report_item_v4(const mib2_tcpConnEntry_t *,
-    boolean_t first, const mib2_transportMLPEntry_t *);
+    boolean_t first, const mib2_transportMLPEntry_t *,
+    const mib2_socketInfoEntry_t *);
 static boolean_t tcp_report_item_v6(const mib2_tcp6ConnEntry_t *,
-    boolean_t first, const mib2_transportMLPEntry_t *);
+    boolean_t first, const mib2_transportMLPEntry_t *,
+    const mib2_socketInfoEntry_t *);
 
 static void
 tcp_report(const mib_item_t *item)
 {
-	int			jtemp = 0;
-	boolean_t		print_hdr_once_v4 = B_TRUE;
-	boolean_t		print_hdr_once_v6 = B_TRUE;
-	mib2_tcpConnEntry_t	*tp;
-	mib2_tcp6ConnEntry_t	*tp6;
-	mib2_transportMLPEntry_t **v4_attrs, **v6_attrs;
-	mib2_transportMLPEntry_t **v4a, **v6a;
-	mib2_transportMLPEntry_t *aptr;
+	int				jtemp = 0;
+	boolean_t			print_hdr_once_v4 = B_TRUE;
+	boolean_t			print_hdr_once_v6 = B_TRUE;
+	mib2_tcpConnEntry_t		*tp;
+	mib2_tcp6ConnEntry_t		*tp6;
+	mib2_transportMLPEntry_t	**v4_attrs, **v6_attrs, **v4a, **v6a;
+	mib2_transportMLPEntry_t	*aptr;
+	mib2_socketInfoEntry_t		**v4_info, **v6_info, **v4i, **v6i;
+	mib2_socketInfoEntry_t		*iptr;
 
 	if (!protocol_selected(IPPROTO_TCP))
 		return;
 
 	/*
 	 * Preparation pass: the kernel returns separate entries for TCP
-	 * connection table entries and Multilevel Port attributes.  We loop
-	 * through the attributes first and set up an array for each address
-	 * family.
+	 * connection table entries, Multilevel Port attributes and extra
+	 * socket information.  We loop through the attributes first and set up
+	 * an array for each address family.
 	 */
 	v4_attrs = family_selected(AF_INET) && RSECflag ?
 	    gather_attrs(item, MIB2_TCP, MIB2_TCP_CONN, tcpConnEntrySize) :
@@ -4868,14 +5605,21 @@ tcp_report(const mib_item_t *item)
 	    gather_attrs(item, MIB2_TCP6, MIB2_TCP6_CONN, tcp6ConnEntrySize) :
 	    NULL;
 
-	/* 'for' loop 1: */
+	v4_info = Uflag && family_selected(AF_INET) ?
+	    gather_info(item, MIB2_TCP, MIB2_TCP_CONN, tcpConnEntrySize) :
+	    NULL;
+	v6_info = Uflag && family_selected(AF_INET6) ?
+	    gather_info(item, MIB2_TCP6, MIB2_TCP6_CONN, tcp6ConnEntrySize) :
+	    NULL;
+
 	v4a = v4_attrs;
 	v6a = v6_attrs;
+	v4i = v4_info;
+	v6i = v6_info;
 	for (; item != NULL; item = item->next_item) {
 		if (Xflag) {
-			(void) printf("\n--- Entry %d ---\n", ++jtemp);
-			(void) printf("Group = %d, mib_id = %d, "
-			    "length = %d, valp = 0x%p\n",
+			(void) printf("[%4d] Group = %d, mib_id = %d, "
+			    "length = %d, valp = 0x%p\n", jtemp++,
 			    item->group, item->mib_id,
 			    item->length, item->valp);
 		}
@@ -4884,46 +5628,46 @@ tcp_report(const mib_item_t *item)
 		    item->mib_id == MIB2_TCP_CONN) ||
 		    (item->group == MIB2_TCP6 &&
 		    item->mib_id == MIB2_TCP6_CONN)))
-			continue; /* 'for' loop 1 */
+			continue;
 
 		if (item->group == MIB2_TCP && !family_selected(AF_INET))
-			continue; /* 'for' loop 1 */
-		else if (item->group == MIB2_TCP6 && !family_selected(AF_INET6))
-			continue; /* 'for' loop 1 */
+			continue;
+		if (item->group == MIB2_TCP6 && !family_selected(AF_INET6))
+			continue;
 
 		if (item->group == MIB2_TCP) {
 			for (tp = (mib2_tcpConnEntry_t *)item->valp;
 			    (char *)tp < (char *)item->valp + item->length;
-			    /* LINTED: (note 1) */
 			    tp = (mib2_tcpConnEntry_t *)((char *)tp +
 			    tcpConnEntrySize)) {
 				aptr = v4a == NULL ? NULL : *v4a++;
+				iptr = v4i == NULL ? NULL : *v4i++;
 				print_hdr_once_v4 = tcp_report_item_v4(tp,
-				    print_hdr_once_v4, aptr);
+				    print_hdr_once_v4, aptr, iptr);
 			}
 		} else {
 			for (tp6 = (mib2_tcp6ConnEntry_t *)item->valp;
 			    (char *)tp6 < (char *)item->valp + item->length;
-			    /* LINTED: (note 1) */
 			    tp6 = (mib2_tcp6ConnEntry_t *)((char *)tp6 +
 			    tcp6ConnEntrySize)) {
 				aptr = v6a == NULL ? NULL : *v6a++;
+				iptr = v6i == NULL ? NULL : *v6i++;
 				print_hdr_once_v6 = tcp_report_item_v6(tp6,
-				    print_hdr_once_v6, aptr);
+				    print_hdr_once_v6, aptr, iptr);
 			}
 		}
-	} /* 'for' loop 1 ends */
+	}
 	(void) fflush(stdout);
 
-	if (v4_attrs != NULL)
-		free(v4_attrs);
-	if (v6_attrs != NULL)
-		free(v6_attrs);
+	free(v4_attrs);
+	free(v6_attrs);
+	free(v4_info);
+	free(v6_info);
 }
 
 static boolean_t
 tcp_report_item_v4(const mib2_tcpConnEntry_t *tp, boolean_t first,
-    const mib2_transportMLPEntry_t *attr)
+    const mib2_transportMLPEntry_t *attr, const mib2_socketInfoEntry_t *sie)
 {
 	/*
 	 * lname and fname below are for the hostname as well as the portname
@@ -4932,18 +5676,44 @@ tcp_report_item_v4(const mib2_tcpConnEntry_t *tp, boolean_t first,
 	 */
 	char	lname[MAXHOSTNAMELEN + MAXHOSTNAMELEN + 1];
 	char	fname[MAXHOSTNAMELEN + MAXHOSTNAMELEN + 1];
+	proc_fdinfo_t	*ph;
 
 	if (!(Aflag || tp->tcpConnEntryInfo.ce_state >= TCPS_ESTABLISHED))
 		return (first); /* Nothing to print */
 
 	if (first) {
 		(void) printf(v4compat ? tcp_hdr_v4_compat : tcp_hdr_v4);
-		(void) printf(Vflag ? tcp_hdr_v4_verbose : tcp_hdr_v4_normal);
+		if (Vflag)
+			(void) printf(Uflag ? tcp_hdr_v4_verbose_pid :
+			    tcp_hdr_v4_verbose);
+		else
+			(void) printf(Uflag ? tcp_hdr_v4_normal_pid :
+			    tcp_hdr_v4_normal);
 	}
 
-	if (Vflag) {
-		(void) printf("%-20s\n%-20s %5u %08x %08x %5u %08x %08x "
-		    "%5u %5u %s\n",
+	int64_t sq = (int64_t)tp->tcpConnEntryInfo.ce_snxt -
+	    (int64_t)tp->tcpConnEntryInfo.ce_suna - 1;
+	int64_t rq = (int64_t)tp->tcpConnEntryInfo.ce_rnxt -
+	    (int64_t)tp->tcpConnEntryInfo.ce_rack;
+
+	if (Xflag)
+		sie_report(sie);
+
+	if (Uflag) {
+		ph = process_hash_get(sie, SOCK_STREAM, AF_INET);
+		if (ph->ph_pid == 0 && sie != NULL &&
+		    (sie->sie_flags & MIB2_SOCKINFO_IPV6)) {
+			ph = process_hash_get(sie, SOCK_STREAM, AF_INET6);
+		}
+	}
+
+	if (!Uflag && Vflag) {
+		(void) printf(
+		    TCP_V4_LOCAL_F "\n" TCP_V4_REMOTE_F " "
+		    TCP_V4_SWIND_F " " TCP_V4_SNEXT_F " "
+		    TCP_V4_SUNA_F " " TCP_V4_RWIND_F " "
+		    TCP_V4_RNEXT_F " " TCP_V4_RACK_F " "
+		    TCP_V4_RTO_F " " TCP_V4_MSS_F " %s\n",
 		    pr_ap(tp->tcpConnLocalAddress,
 		    tp->tcpConnLocalPort, "tcp", lname, sizeof (lname)),
 		    pr_ap(tp->tcpConnRemAddress,
@@ -4957,13 +5727,11 @@ tcp_report_item_v4(const mib2_tcpConnEntry_t *tp, boolean_t first,
 		    tp->tcpConnEntryInfo.ce_rto,
 		    tp->tcpConnEntryInfo.ce_mss,
 		    mitcp_state(tp->tcpConnEntryInfo.ce_state, attr));
-	} else {
-		int sq = (int)tp->tcpConnEntryInfo.ce_snxt -
-		    (int)tp->tcpConnEntryInfo.ce_suna - 1;
-		int rq = (int)tp->tcpConnEntryInfo.ce_rnxt -
-		    (int)tp->tcpConnEntryInfo.ce_rack;
-
-		(void) printf("%-20s %-20s %5u %6d %5u %6d %s\n",
+	} else if (!Uflag) {
+		(void) printf(
+		    TCP_V4_LOCAL_F " " TCP_V4_REMOTE_F " "
+		    TCP_V4_SWIND_F " " TCP_V4_SENDQ_F " "
+		    TCP_V4_RWIND_F " " TCP_V4_RECVQ_F " %s\n",
 		    pr_ap(tp->tcpConnLocalAddress,
 		    tp->tcpConnLocalPort, "tcp", lname, sizeof (lname)),
 		    pr_ap(tp->tcpConnRemAddress,
@@ -4973,6 +5741,50 @@ tcp_report_item_v4(const mib2_tcpConnEntry_t *tp, boolean_t first,
 		    tp->tcpConnEntryInfo.ce_rwnd,
 		    (rq >= 0) ? rq : 0,
 		    mitcp_state(tp->tcpConnEntryInfo.ce_state, attr));
+	} else if (Uflag && Vflag) {
+		for (; ph != NULL; ph = ph->ph_next_proc) {
+			(void) printf(
+			    TCP_V4_LOCAL_F "\n" TCP_V4_REMOTE_F " "
+			    TCP_V4_SWIND_F " " TCP_V4_SNEXT_F " "
+			    TCP_V4_SUNA_F " " TCP_V4_RWIND_F " "
+			    TCP_V4_RNEXT_F " " TCP_V4_RACK_F " "
+			    TCP_V4_RTO_F " " TCP_V4_MSS_F " "
+			    TCP_V4_STATE_F " " TCP_V4_USER_F " "
+			    TCP_V4_PID_F " %s\n",
+			    pr_ap(tp->tcpConnLocalAddress,
+			    tp->tcpConnLocalPort, "tcp", lname, sizeof (lname)),
+			    pr_ap(tp->tcpConnRemAddress,
+			    tp->tcpConnRemPort, "tcp", fname, sizeof (fname)),
+			    tp->tcpConnEntryInfo.ce_swnd,
+			    tp->tcpConnEntryInfo.ce_snxt,
+			    tp->tcpConnEntryInfo.ce_suna,
+			    tp->tcpConnEntryInfo.ce_rwnd,
+			    tp->tcpConnEntryInfo.ce_rnxt,
+			    tp->tcpConnEntryInfo.ce_rack,
+			    tp->tcpConnEntryInfo.ce_rto,
+			    tp->tcpConnEntryInfo.ce_mss,
+			    mitcp_state(tp->tcpConnEntryInfo.ce_state, attr),
+			    ph->ph_username, ph->ph_pidstr, ph->ph_psargs);
+		}
+	} else if (Uflag) {
+		for (; ph != NULL; ph = ph->ph_next_proc) {
+			(void) printf(
+			    TCP_V4_LOCAL_F " " TCP_V4_REMOTE_F " "
+			    TCP_V4_USER_F " "TCP_V4_PID_F " "
+			    TCP_V4_COMMAND_F " "
+			    TCP_V4_SWIND_F " " TCP_V4_SENDQ_F " "
+			    TCP_V4_RWIND_F " " TCP_V4_RECVQ_F " %s\n",
+			    pr_ap(tp->tcpConnLocalAddress,
+			    tp->tcpConnLocalPort, "tcp", lname, sizeof (lname)),
+			    pr_ap(tp->tcpConnRemAddress,
+			    tp->tcpConnRemPort, "tcp", fname, sizeof (fname)),
+			    ph->ph_username, ph->ph_pidstr, ph->ph_fname,
+			    tp->tcpConnEntryInfo.ce_swnd,
+			    (sq >= 0) ? sq : 0,
+			    tp->tcpConnEntryInfo.ce_rwnd,
+			    (rq >= 0) ? rq : 0,
+			    mitcp_state(tp->tcpConnEntryInfo.ce_state, attr));
+		}
 	}
 
 	print_transport_label(attr);
@@ -4982,7 +5794,7 @@ tcp_report_item_v4(const mib2_tcpConnEntry_t *tp, boolean_t first,
 
 static boolean_t
 tcp_report_item_v6(const mib2_tcp6ConnEntry_t *tp6, boolean_t first,
-    const mib2_transportMLPEntry_t *attr)
+    const mib2_transportMLPEntry_t *attr, const mib2_socketInfoEntry_t *sie)
 {
 	/*
 	 * lname and fname below are for the hostname as well as the portname
@@ -4993,13 +5805,19 @@ tcp_report_item_v6(const mib2_tcp6ConnEntry_t *tp6, boolean_t first,
 	char	fname[MAXHOSTNAMELEN + MAXHOSTNAMELEN + 1];
 	char	ifname[LIFNAMSIZ + 1];
 	char	*ifnamep;
+	proc_fdinfo_t	*ph;
 
 	if (!(Aflag || tp6->tcp6ConnEntryInfo.ce_state >= TCPS_ESTABLISHED))
 		return (first); /* Nothing to print */
 
 	if (first) {
 		(void) printf(tcp_hdr_v6);
-		(void) printf(Vflag ? tcp_hdr_v6_verbose : tcp_hdr_v6_normal);
+		if (Vflag)
+			(void) printf(Uflag ? tcp_hdr_v6_verbose_pid :
+			    tcp_hdr_v6_verbose);
+		else
+			(void) printf(Uflag ? tcp_hdr_v6_normal_pid :
+			    tcp_hdr_v6_normal);
 	}
 
 	ifnamep = (tp6->tcp6ConnIfIndex != 0) ?
@@ -5007,9 +5825,22 @@ tcp_report_item_v6(const mib2_tcp6ConnEntry_t *tp6, boolean_t first,
 	if (ifnamep == NULL)
 		ifnamep = "";
 
-	if (Vflag) {
-		(void) printf("%-33s\n%-33s %5u %08x %08x %5u %08x %08x "
-		    "%5u %5u %-11s %s\n",
+	int64_t sq = (int64_t)tp6->tcp6ConnEntryInfo.ce_snxt -
+	    (int64_t)tp6->tcp6ConnEntryInfo.ce_suna - 1;
+	int64_t rq = (int64_t)tp6->tcp6ConnEntryInfo.ce_rnxt -
+	    (int64_t)tp6->tcp6ConnEntryInfo.ce_rack;
+
+	if (Xflag)
+		sie_report(sie);
+
+	if (!Uflag && Vflag) {
+		(void) printf(
+		    TCP_V6_LOCAL_F "\n" TCP_V6_REMOTE_F " "
+		    TCP_V6_SWIND_F " " TCP_V6_SNEXT_F " "
+		    TCP_V6_SUNA_F " " TCP_V6_RWIND_F " "
+		    TCP_V6_RNEXT_F " " TCP_V6_RACK_F " "
+		    TCP_V6_RTO_F " " TCP_V6_MSS_F " "
+		    TCP_V6_STATE_F " %s\n",
 		    pr_ap6(&tp6->tcp6ConnLocalAddress,
 		    tp6->tcp6ConnLocalPort, "tcp", lname, sizeof (lname)),
 		    pr_ap6(&tp6->tcp6ConnRemAddress,
@@ -5024,13 +5855,12 @@ tcp_report_item_v6(const mib2_tcp6ConnEntry_t *tp6, boolean_t first,
 		    tp6->tcp6ConnEntryInfo.ce_mss,
 		    mitcp_state(tp6->tcp6ConnEntryInfo.ce_state, attr),
 		    ifnamep);
-	} else {
-		int sq = (int)tp6->tcp6ConnEntryInfo.ce_snxt -
-		    (int)tp6->tcp6ConnEntryInfo.ce_suna - 1;
-		int rq = (int)tp6->tcp6ConnEntryInfo.ce_rnxt -
-		    (int)tp6->tcp6ConnEntryInfo.ce_rack;
-
-		(void) printf("%-33s %-33s %5u %6d %5u %6d %-11s %s\n",
+	} else if (!Uflag) {
+		(void) printf(
+		    TCP_V6_LOCAL_F " " TCP_V6_REMOTE_F " "
+		    TCP_V6_SWIND_F " " TCP_V6_SENDQ_F " "
+		    TCP_V6_RWIND_F " " TCP_V6_RECVQ_F " "
+		    TCP_V6_STATE_F " %s\n",
 		    pr_ap6(&tp6->tcp6ConnLocalAddress,
 		    tp6->tcp6ConnLocalPort, "tcp", lname, sizeof (lname)),
 		    pr_ap6(&tp6->tcp6ConnRemAddress,
@@ -5041,6 +5871,58 @@ tcp_report_item_v6(const mib2_tcp6ConnEntry_t *tp6, boolean_t first,
 		    (rq >= 0) ? rq : 0,
 		    mitcp_state(tp6->tcp6ConnEntryInfo.ce_state, attr),
 		    ifnamep);
+	} else if (Uflag && Vflag) {
+		for (ph = process_hash_get(sie, SOCK_STREAM, AF_INET6);
+		    ph != NULL; ph = ph->ph_next_proc) {
+			(void) printf(
+			    TCP_V6_LOCAL_F "\n" TCP_V6_REMOTE_F " "
+			    TCP_V6_SWIND_F " " TCP_V6_SNEXT_F " "
+			    TCP_V6_SUNA_F " " TCP_V6_RWIND_F " "
+			    TCP_V6_RNEXT_F " " TCP_V6_RACK_F " "
+			    TCP_V6_RTO_F " " TCP_V6_MSS_F " "
+			    TCP_V6_STATE_F " " TCP_V6_IF_F " "
+			    TCP_V6_USER_F " " TCP_V6_PID_F " %s\n",
+			    pr_ap6(&tp6->tcp6ConnLocalAddress,
+			    tp6->tcp6ConnLocalPort, "tcp", lname,
+			    sizeof (lname)),
+			    pr_ap6(&tp6->tcp6ConnRemAddress,
+			    tp6->tcp6ConnRemPort, "tcp", fname,
+			    sizeof (fname)),
+			    tp6->tcp6ConnEntryInfo.ce_swnd,
+			    tp6->tcp6ConnEntryInfo.ce_snxt,
+			    tp6->tcp6ConnEntryInfo.ce_suna,
+			    tp6->tcp6ConnEntryInfo.ce_rwnd,
+			    tp6->tcp6ConnEntryInfo.ce_rnxt,
+			    tp6->tcp6ConnEntryInfo.ce_rack,
+			    tp6->tcp6ConnEntryInfo.ce_rto,
+			    tp6->tcp6ConnEntryInfo.ce_mss,
+			    mitcp_state(tp6->tcp6ConnEntryInfo.ce_state, attr),
+			    ifnamep,
+			    ph->ph_username, ph->ph_pidstr, ph->ph_psargs);
+		}
+	} else if (Uflag) {
+		for (ph = process_hash_get(sie, SOCK_STREAM, AF_INET6);
+		    ph != NULL; ph = ph->ph_next_proc) {
+			(void) printf(
+			    TCP_V6_LOCAL_F " " TCP_V6_REMOTE_F " "
+			    TCP_V6_USER_F " " TCP_V6_PID_F " "
+			    TCP_V6_COMMAND_F " "
+			    TCP_V6_SWIND_F " " TCP_V6_SENDQ_F " "
+			    TCP_V6_RWIND_F " " TCP_V6_RECVQ_F " "
+			    TCP_V6_STATE_F " %s\n",
+			    pr_ap6(&tp6->tcp6ConnLocalAddress,
+			    tp6->tcp6ConnLocalPort, "tcp", lname,
+			    sizeof (lname)),
+			    pr_ap6(&tp6->tcp6ConnRemAddress,
+			    tp6->tcp6ConnRemPort, "tcp", fname, sizeof (fname)),
+			    ph->ph_username, ph->ph_pidstr, ph->ph_fname,
+			    tp6->tcp6ConnEntryInfo.ce_swnd,
+			    (sq >= 0) ? sq : 0,
+			    tp6->tcp6ConnEntryInfo.ce_rwnd,
+			    (rq >= 0) ? rq : 0,
+			    mitcp_state(tp6->tcp6ConnEntryInfo.ce_state, attr),
+			    ifnamep);
+		}
 	}
 
 	print_transport_label(attr);
@@ -5050,32 +5932,109 @@ tcp_report_item_v6(const mib2_tcp6ConnEntry_t *tp6, boolean_t first,
 
 /* ------------------------------- UDP_REPORT------------------------------- */
 
-static boolean_t udp_report_item_v4(const mib2_udpEntry_t *ude,
-    boolean_t first, const mib2_transportMLPEntry_t *attr);
-static boolean_t udp_report_item_v6(const mib2_udp6Entry_t *ude6,
-    boolean_t first, const mib2_transportMLPEntry_t *attr);
+static boolean_t udp_report_item_v4(const mib2_udpEntry_t *, boolean_t,
+    const mib2_transportMLPEntry_t *, const mib2_socketInfoEntry_t *);
+static boolean_t udp_report_item_v6(const mib2_udp6Entry_t *, boolean_t,
+    const mib2_transportMLPEntry_t *, const mib2_socketInfoEntry_t *);
+
+/*
+ * Central definitions for the columns used in the reports.
+ * For each column, there's a definition for the heading, the underline and
+ * the formatted value.
+ * Since most reports select different columns depending on command line
+ * options, defining everything here avoids duplication in the report
+ * format strings and makes it easy to make changes as necessary.
+ */
+#define	UDP_V4_LOCAL		"   Local Address    "
+#define	UDP_V4_LOCAL_		"--------------------"
+#define	UDP_V4_LOCAL_F		"%-20s"
+#define	UDP_V4_REMOTE		"   Remote Address   "
+#define	UDP_V4_REMOTE_		"--------------------"
+#define	UDP_V4_REMOTE_F		"%-20s"
+#define	UDP_V4_STATE		"  State   "
+#define	UDP_V4_STATE_		"----------"
+#define	UDP_V4_STATE_F		"%-10.10s"
+#define	UDP_V4_USER		"  User  "
+#define	UDP_V4_USER_		"--------"
+#define	UDP_V4_USER_F		"%-8.8s"
+#define	UDP_V4_PID		" Pid  "
+#define	UDP_V4_PID_		"------"
+#define	UDP_V4_PID_F		"%6s"
+#define	UDP_V4_COMMAND		"   Command    "
+#define	UDP_V4_COMMAND_		"--------------"
+#define	UDP_V4_COMMAND_F	"%-14.14s"
 
 static const char udp_hdr_v4[] =
-"   Local Address        Remote Address      State\n"
-"-------------------- -------------------- ----------\n";
+    UDP_V4_LOCAL " " UDP_V4_REMOTE " " UDP_V4_STATE "\n"
+    UDP_V4_LOCAL_" " UDP_V4_REMOTE_" " UDP_V4_STATE_"\n";
+
+static const char udp_hdr_v4_pid[] =
+    UDP_V4_LOCAL " " UDP_V4_REMOTE " "
+    UDP_V4_USER " " UDP_V4_PID " " UDP_V4_COMMAND " " UDP_V4_STATE "\n"
+    UDP_V4_LOCAL_" " UDP_V4_REMOTE_" "
+    UDP_V4_USER_" " UDP_V4_PID_" " UDP_V4_COMMAND_" " UDP_V4_STATE_"\n";
+static const char udp_hdr_v4_pid_verbose[] =
+    UDP_V4_LOCAL " " UDP_V4_REMOTE " "
+    UDP_V4_USER " " UDP_V4_PID " " UDP_V4_STATE " " UDP_V4_COMMAND "\n"
+    UDP_V4_LOCAL_" " UDP_V4_REMOTE_" "
+    UDP_V4_USER_" " UDP_V4_PID_" " UDP_V4_STATE_" " UDP_V4_COMMAND_"\n";
+
+#define	UDP_V6_LOCAL		"   Local Address                 "
+#define	UDP_V6_LOCAL_		"---------------------------------"
+#define	UDP_V6_LOCAL_F		"%-33s"
+#define	UDP_V6_REMOTE		"   Remote Address                "
+#define	UDP_V6_REMOTE_		"---------------------------------"
+#define	UDP_V6_REMOTE_F		"%-33s"
+#define	UDP_V6_STATE		UDP_V4_STATE
+#define	UDP_V6_STATE_		UDP_V4_STATE_
+#define	UDP_V6_STATE_F		UDP_V4_STATE_F
+#define	UDP_V6_USER		UDP_V4_USER
+#define	UDP_V6_USER_		UDP_V4_USER_
+#define	UDP_V6_USER_F		UDP_V4_USER_F
+#define	UDP_V6_PID		UDP_V4_PID
+#define	UDP_V6_PID_		UDP_V4_PID_
+#define	UDP_V6_PID_F		UDP_V4_PID_F
+#define	UDP_V6_COMMAND		UDP_V4_COMMAND
+#define	UDP_V6_COMMAND_		UDP_V4_COMMAND_
+#define	UDP_V6_COMMAND_F	UDP_V4_COMMAND_F
+#define	UDP_V6_IF		"  If "
+#define	UDP_V6_IF_		"-----"
+#define	UDP_V6_IF_F		"%-5.5s"
 
 static const char udp_hdr_v6[] =
-"   Local Address                     Remote Address                 "
-"  State      If\n"
-"--------------------------------- --------------------------------- "
-"---------- -----\n";
+    UDP_V6_LOCAL " " UDP_V6_REMOTE " " UDP_V6_STATE " "
+    UDP_V6_IF "\n"
+    UDP_V6_LOCAL_" " UDP_V6_REMOTE_" " UDP_V6_STATE_" "
+    UDP_V6_IF_"\n";
+
+static const char udp_hdr_v6_pid[] =
+    UDP_V6_LOCAL " " UDP_V6_REMOTE " "
+    UDP_V6_USER " " UDP_V6_PID " " UDP_V6_COMMAND " "
+    UDP_V6_STATE " " UDP_V6_IF "\n"
+    UDP_V6_LOCAL_" " UDP_V6_REMOTE_" "
+    UDP_V6_USER_" " UDP_V6_PID_" " UDP_V6_COMMAND_" "
+    UDP_V6_STATE_" " UDP_V6_IF_"\n";
+
+static const char udp_hdr_v6_pid_verbose[] =
+    UDP_V6_LOCAL " " UDP_V6_REMOTE " "
+    UDP_V6_USER " " UDP_V6_PID " " UDP_V6_STATE " "
+    UDP_V6_IF " " UDP_V6_COMMAND "\n"
+    UDP_V6_LOCAL_" " UDP_V6_REMOTE_" "
+    UDP_V6_USER_" " UDP_V6_PID_" " UDP_V6_STATE_" "
+    UDP_V6_IF_" " UDP_V6_COMMAND_ "\n";
 
 static void
 udp_report(const mib_item_t *item)
 {
-	int			jtemp = 0;
-	boolean_t		print_hdr_once_v4 = B_TRUE;
-	boolean_t		print_hdr_once_v6 = B_TRUE;
-	mib2_udpEntry_t		*ude;
-	mib2_udp6Entry_t	*ude6;
-	mib2_transportMLPEntry_t **v4_attrs, **v6_attrs;
-	mib2_transportMLPEntry_t **v4a, **v6a;
-	mib2_transportMLPEntry_t *aptr;
+	int				jtemp = 0;
+	boolean_t			print_hdr_once_v4 = B_TRUE;
+	boolean_t			print_hdr_once_v6 = B_TRUE;
+	mib2_udpEntry_t			*ude;
+	mib2_udp6Entry_t		*ude6;
+	mib2_transportMLPEntry_t	**v4_attrs, **v6_attrs, **v4a, **v6a;
+	mib2_transportMLPEntry_t	*aptr;
+	mib2_socketInfoEntry_t		**v4_info, **v6_info, **v4i, **v6i;
+	mib2_socketInfoEntry_t		*iptr;
 
 	if (!protocol_selected(IPPROTO_UDP))
 		return;
@@ -5092,14 +6051,21 @@ udp_report(const mib_item_t *item)
 	    gather_attrs(item, MIB2_UDP6, MIB2_UDP6_ENTRY, udp6EntrySize) :
 	    NULL;
 
+	v4_info = Uflag && family_selected(AF_INET) ?
+	    gather_info(item, MIB2_UDP, MIB2_UDP_ENTRY, udpEntrySize) :
+	    NULL;
+	v6_info = Uflag && family_selected(AF_INET6) ?
+	    gather_info(item, MIB2_UDP6, MIB2_UDP6_ENTRY, udp6EntrySize) :
+	    NULL;
+
 	v4a = v4_attrs;
 	v6a = v6_attrs;
-	/* 'for' loop 1: */
+	v4i = v4_info;
+	v6i = v6_info;
 	for (; item; item = item->next_item) {
 		if (Xflag) {
-			(void) printf("\n--- Entry %d ---\n", ++jtemp);
-			(void) printf("Group = %d, mib_id = %d, "
-			    "length = %d, valp = 0x%p\n",
+			(void) printf("[%4d] Group = %d, mib_id = %d, "
+			    "length = %d, valp = 0x%p\n", jtemp++,
 			    item->group, item->mib_id,
 			    item->length, item->valp);
 		}
@@ -5107,121 +6073,263 @@ udp_report(const mib_item_t *item)
 		    item->mib_id == MIB2_UDP_ENTRY) ||
 		    (item->group == MIB2_UDP6 &&
 		    item->mib_id == MIB2_UDP6_ENTRY)))
-			continue; /* 'for' loop 1 */
+			continue;
 
 		if (item->group == MIB2_UDP && !family_selected(AF_INET))
-			continue; /* 'for' loop 1 */
+			continue;
 		else if (item->group == MIB2_UDP6 && !family_selected(AF_INET6))
-			continue; /* 'for' loop 1 */
+			continue;
 
-		/*	xxx.xxx.xxx.xxx,pppp  sss... */
 		if (item->group == MIB2_UDP) {
 			for (ude = (mib2_udpEntry_t *)item->valp;
 			    (char *)ude < (char *)item->valp + item->length;
-			    /* LINTED: (note 1) */
 			    ude = (mib2_udpEntry_t *)((char *)ude +
 			    udpEntrySize)) {
 				aptr = v4a == NULL ? NULL : *v4a++;
+				iptr = v4i == NULL ? NULL : *v4i++;
 				print_hdr_once_v4 = udp_report_item_v4(ude,
-				    print_hdr_once_v4, aptr);
+				    print_hdr_once_v4, aptr, iptr);
 			}
 		} else {
 			for (ude6 = (mib2_udp6Entry_t *)item->valp;
 			    (char *)ude6 < (char *)item->valp + item->length;
-			    /* LINTED: (note 1) */
 			    ude6 = (mib2_udp6Entry_t *)((char *)ude6 +
 			    udp6EntrySize)) {
 				aptr = v6a == NULL ? NULL : *v6a++;
+				iptr = v6i == NULL ? NULL : *v6i++;
 				print_hdr_once_v6 = udp_report_item_v6(ude6,
-				    print_hdr_once_v6, aptr);
+				    print_hdr_once_v6, aptr, iptr);
 			}
 		}
-	} /* 'for' loop 1 ends */
+
+	}
 	(void) fflush(stdout);
 
-	if (v4_attrs != NULL)
-		free(v4_attrs);
-	if (v6_attrs != NULL)
-		free(v6_attrs);
+	free(v4_attrs);
+	free(v6_attrs);
+	free(v4_info);
+	free(v6_info);
 }
 
 static boolean_t
 udp_report_item_v4(const mib2_udpEntry_t *ude, boolean_t first,
-    const mib2_transportMLPEntry_t *attr)
+    const mib2_transportMLPEntry_t *attr, const mib2_socketInfoEntry_t *sie)
 {
+	char	*leadin;
 	char	lname[MAXHOSTNAMELEN + MAXHOSTNAMELEN + 1];
 			/* hostname + portname */
+	proc_fdinfo_t	*ph;
 
 	if (!(Aflag || ude->udpEntryInfo.ue_state >= MIB2_UDP_connected))
 		return (first); /* Nothing to print */
 
 	if (first) {
 		(void) printf(v4compat ? "\nUDP\n" : "\nUDP: IPv4\n");
-		(void) printf(udp_hdr_v4);
+
+		if (Uflag)
+			(void) printf(Vflag ? udp_hdr_v4_pid_verbose :
+			    udp_hdr_v4_pid);
+		else
+			(void) printf(udp_hdr_v4);
+
 		first = B_FALSE;
 	}
 
-	(void) printf("%-20s ",
+	if (Xflag)
+		sie_report(sie);
+
+	if (asprintf(&leadin,
+	    UDP_V4_LOCAL_F " " UDP_V4_REMOTE_F " ",
 	    pr_ap(ude->udpLocalAddress, ude->udpLocalPort, "udp",
-	    lname, sizeof (lname)));
-	(void) printf("%-20s %s\n",
+	    lname, sizeof (lname)),
 	    ude->udpEntryInfo.ue_state == MIB2_UDP_connected ?
 	    pr_ap(ude->udpEntryInfo.ue_RemoteAddress,
 	    ude->udpEntryInfo.ue_RemotePort, "udp", lname, sizeof (lname)) :
-	    "",
-	    miudp_state(ude->udpEntryInfo.ue_state, attr));
+	    "") == -1) {
+		fatal(1, "Out of memory");
+	}
+	if (!Uflag) {
+		(void) printf("%s%s\n",
+		    leadin, miudp_state(ude->udpEntryInfo.ue_state, attr));
+	} else {
+		ph = process_hash_get(sie, SOCK_DGRAM, AF_INET);
+		if (ph->ph_pid == 0 && sie != NULL &&
+		    (sie->sie_flags & MIB2_SOCKINFO_IPV6))
+			ph = process_hash_get(sie, SOCK_DGRAM, AF_INET6);
+		for (; ph != NULL; ph = ph->ph_next_proc) {
+			(void) printf("%s" UDP_V4_USER_F " " UDP_V4_PID_F " ",
+			    leadin, ph->ph_username, ph->ph_pidstr);
+			if (Vflag) {
+				(void) printf(UDP_V4_STATE_F " %s\n",
+				    miudp_state(ude->udpEntryInfo.ue_state,
+				    attr),
+				    ph->ph_psargs);
+			} else {
+				(void) printf(UDP_V4_COMMAND_F " %s\n",
+				    ph->ph_fname,
+				    miudp_state(ude->udpEntryInfo.ue_state,
+				    attr));
+			}
+		}
+	}
 
 	print_transport_label(attr);
+
+	free(leadin);
 
 	return (first);
 }
 
 static boolean_t
 udp_report_item_v6(const mib2_udp6Entry_t *ude6, boolean_t first,
-    const mib2_transportMLPEntry_t *attr)
+    const mib2_transportMLPEntry_t *attr, const mib2_socketInfoEntry_t *sie)
 {
-	char	lname[MAXHOSTNAMELEN + MAXHOSTNAMELEN + 1];
+	char		*leadin;
+	char		lname[MAXHOSTNAMELEN + MAXHOSTNAMELEN + 1];
 			/* hostname + portname */
-	char	ifname[LIFNAMSIZ + 1];
-	const char *ifnamep;
+	char		ifname[LIFNAMSIZ + 1];
+	const char	*ifnamep;
+	proc_fdinfo_t	*ph;
 
 	if (!(Aflag || ude6->udp6EntryInfo.ue_state >= MIB2_UDP_connected))
 		return (first); /* Nothing to print */
 
 	if (first) {
 		(void) printf("\nUDP: IPv6\n");
-		(void) printf(udp_hdr_v6);
+
+		if (Uflag)
+			(void) printf(Vflag ? udp_hdr_v6_pid_verbose :
+			    udp_hdr_v6_pid);
+		else
+			(void) printf(udp_hdr_v6);
+
 		first = B_FALSE;
 	}
 
 	ifnamep = (ude6->udp6IfIndex != 0) ?
 	    if_indextoname(ude6->udp6IfIndex, ifname) : NULL;
 
-	(void) printf("%-33s ",
+	if (Xflag)
+		sie_report(sie);
+
+	if (asprintf(&leadin,
+	    UDP_V6_LOCAL_F " " UDP_V6_REMOTE_F " ",
 	    pr_ap6(&ude6->udp6LocalAddress,
-	    ude6->udp6LocalPort, "udp", lname, sizeof (lname)));
-	(void) printf("%-33s %-10s %s\n",
+	    ude6->udp6LocalPort, "udp", lname, sizeof (lname)),
 	    ude6->udp6EntryInfo.ue_state == MIB2_UDP_connected ?
 	    pr_ap6(&ude6->udp6EntryInfo.ue_RemoteAddress,
 	    ude6->udp6EntryInfo.ue_RemotePort, "udp", lname, sizeof (lname)) :
-	    "",
-	    miudp_state(ude6->udp6EntryInfo.ue_state, attr),
-	    ifnamep == NULL ? "" : ifnamep);
+	    "") == -1) {
+		fatal(1, "Out of memory");
+	}
+	if (!Uflag) {
+		(void) printf("%s" UDP_V6_STATE_F " %s\n", leadin,
+		    miudp_state(ude6->udp6EntryInfo.ue_state, attr),
+		    ifnamep == NULL ? "" : ifnamep);
+	} else {
+		for (ph = process_hash_get(sie, SOCK_DGRAM, AF_INET6);
+		    ph != NULL; ph = ph->ph_next_proc) {
+			(void) printf("%s" UDP_V6_USER_F " " UDP_V6_PID_F " ",
+			    leadin, ph->ph_username, ph->ph_pidstr);
+			if (Vflag) {
+				(void) printf(
+				    UDP_V6_STATE_F " " UDP_V6_IF_F " %s\n",
+				    miudp_state(ude6->udp6EntryInfo.ue_state,
+				    attr),
+				    ifnamep == NULL ? "" : ifnamep,
+				    ph->ph_psargs);
+			} else {
+				(void) printf(
+				    UDP_V6_COMMAND_F " " UDP_V6_STATE_F " %s\n",
+				    ph->ph_fname,
+				    miudp_state(ude6->udp6EntryInfo.ue_state,
+				    attr),
+				    ifnamep == NULL ? "" : ifnamep);
+			}
+		}
+	}
 
 	print_transport_label(attr);
+
+	free(leadin);
 
 	return (first);
 }
 
 /* ------------------------------ SCTP_REPORT------------------------------- */
 
+/*
+ * Central definitions for the columns used in the reports.
+ * For each column, there's a definition for the heading, the underline and
+ * the formatted value.
+ * Since most reports select different columns depending on command line
+ * options, defining everything here avoids duplication in the report
+ * format strings and makes it easy to make changes as necessary.
+ */
+#define	SCTP_LOCAL		"        Local Address          "
+#define	SCTP_LOCAL_		"-------------------------------"
+#define	SCTP_LOCAL_F		"%-31s"
+#define	SCTP_REMOTE		"        Remote Address         "
+#define	SCTP_REMOTE_		"-------------------------------"
+#define	SCTP_REMOTE_F		"%-31s"
+#define	SCTP_SWIND		"Swind "
+#define	SCTP_SWIND_		"------"
+#define	SCTP_SWIND_F		"%6u"
+#define	SCTP_SENDQ		"Send-Q"
+#define	SCTP_SENDQ_		"------"
+#define	SCTP_SENDQ_F		"%6d"
+#define	SCTP_RWIND		"Rwind "
+#define	SCTP_RWIND_		"------"
+#define	SCTP_RWIND_F		"%6d"
+#define	SCTP_RECVQ		"Recv-Q"
+#define	SCTP_RECVQ_		"------"
+#define	SCTP_RECVQ_F		"%6u"
+#define	SCTP_STRS		"StrsI/O"
+#define	SCTP_STRS_		"-------"
+#define	SCTP_STRS_FI		"%3d"
+#define	SCTP_STRS_FO		"%-3d"
+#define	SCTP_STATE		" State     "
+#define	SCTP_STATE_		"-----------"
+#define	SCTP_STATE_F		"%-11.11s"
+#define	SCTP_USER		"  User  "
+#define	SCTP_USER_		"--------"
+#define	SCTP_USER_F		"%-8.8s"
+#define	SCTP_PID		" Pid  "
+#define	SCTP_PID_		"------"
+#define	SCTP_PID_F		"%6s"
+#define	SCTP_COMMAND		"   Command    "
+#define	SCTP_COMMAND_		"--------------"
+#define	SCTP_COMMAND_F		"%-14.14s"
+
 static const char sctp_hdr[] =
 "\nSCTP:";
 static const char sctp_hdr_normal[] =
-"        Local Address                   Remote Address          "
-"Swind  Send-Q Rwind  Recv-Q StrsI/O  State\n"
-"------------------------------- ------------------------------- "
-"------ ------ ------ ------ ------- -----------";
+    SCTP_LOCAL " " SCTP_REMOTE " "
+    SCTP_SWIND " " SCTP_SENDQ " " SCTP_RWIND " " SCTP_RECVQ " "
+    SCTP_STRS " " SCTP_STATE "\n"
+    SCTP_LOCAL_" " SCTP_REMOTE_" "
+    SCTP_SWIND_" " SCTP_SENDQ_" " SCTP_RWIND_" " SCTP_RECVQ_" "
+    SCTP_STRS_" " SCTP_STATE_"\n";
+
+static const char sctp_hdr_pid[] =
+    SCTP_LOCAL " " SCTP_REMOTE " "
+    SCTP_SWIND " " SCTP_SENDQ " " SCTP_RWIND " " SCTP_RECVQ " "
+    SCTP_STRS " "
+    SCTP_USER " " SCTP_PID " " SCTP_COMMAND " " SCTP_STATE "\n"
+    SCTP_LOCAL_" " SCTP_REMOTE_" "
+    SCTP_SWIND_" " SCTP_SENDQ_" " SCTP_RWIND_" " SCTP_RECVQ_" "
+    SCTP_STRS_" "
+    SCTP_USER_" " SCTP_PID_" " SCTP_COMMAND_" " SCTP_STATE_"\n";
+
+static const char sctp_hdr_pid_verbose[] =
+    SCTP_LOCAL " " SCTP_REMOTE " "
+    SCTP_SWIND " " SCTP_SENDQ " " SCTP_RWIND " " SCTP_RECVQ " "
+    SCTP_STRS_" "
+    SCTP_USER " " SCTP_PID " " SCTP_STATE " " SCTP_COMMAND "\n"
+    SCTP_LOCAL_" " SCTP_REMOTE_" "
+    SCTP_SWIND_" " SCTP_SENDQ_" " SCTP_RWIND_" " SCTP_RECVQ_" "
+    SCTP_STRS_" "
+    SCTP_USER_" " SCTP_PID_" " SCTP_STATE_" " SCTP_COMMAND_"\n";
 
 static const char *
 nssctp_state(int state, const mib2_transportMLPEntry_t *attr)
@@ -5292,14 +6400,12 @@ sctp_getnext_rem(const mib_item_t **itemp,
 		}
 
 		if (current != NULL) {
-			/* LINTED: (note 1) */
 			sre = (const mib2_sctpConnRemoteEntry_t *)
 			    ((const char *)current + sctpRemoteEntrySize);
 		} else {
 			sre = item->valp;
 		}
 		for (; (char *)sre < (char *)item->valp + item->length;
-		    /* LINTED: (note 1) */
 		    sre = (const mib2_sctpConnRemoteEntry_t *)
 		    ((const char *)sre + sctpRemoteEntrySize)) {
 			if (sre->sctpAssocId != associd) {
@@ -5327,14 +6433,12 @@ sctp_getnext_local(const mib_item_t **itemp,
 		}
 
 		if (current != NULL) {
-			/* LINTED: (note 1) */
 			sle = (const mib2_sctpConnLocalEntry_t *)
 			    ((const char *)current + sctpLocalEntrySize);
 		} else {
 			sle = item->valp;
 		}
 		for (; (char *)sle < (char *)item->valp + item->length;
-		    /* LINTED: (note 1) */
 		    sle = (const mib2_sctpConnLocalEntry_t *)
 		    ((const char *)sle + sctpLocalEntrySize)) {
 			if (sle->sctpAssocId != associd) {
@@ -5388,9 +6492,10 @@ sctp_pr_addr(int type, char *name, int namelen, const in6_addr_t *addr,
 	}
 }
 
-static void
-sctp_conn_report_item(const mib_item_t *head, const mib2_sctpConnEntry_t *sp,
-    const mib2_transportMLPEntry_t *attr)
+static boolean_t
+sctp_conn_report_item(const mib_item_t *head, boolean_t print_sctp_hdr,
+    const mib2_sctpConnEntry_t *sp, const mib2_transportMLPEntry_t *attr,
+    const mib2_socketInfoEntry_t *sie)
 {
 	char		lname[MAXHOSTNAMELEN + MAXHOSTNAMELEN + 1];
 	char		fname[MAXHOSTNAMELEN + MAXHOSTNAMELEN + 1];
@@ -5400,26 +6505,72 @@ sctp_conn_report_item(const mib_item_t *head, const mib2_sctpConnEntry_t *sp,
 	const mib_item_t *remote = head;
 	uint32_t	id = sp->sctpAssocId;
 	boolean_t	printfirst = B_TRUE;
+	proc_fdinfo_t	*ph;
+
+	if (print_sctp_hdr == B_TRUE) {
+		(void) puts(sctp_hdr);
+		if (Uflag)
+			(void) puts(Vflag ? sctp_hdr_pid_verbose: sctp_hdr_pid);
+		else
+			(void) puts(sctp_hdr_normal);
+
+		print_sctp_hdr = B_FALSE;
+	}
 
 	sctp_pr_addr(sp->sctpAssocRemPrimAddrType, fname, sizeof (fname),
 	    &sp->sctpAssocRemPrimAddr, sp->sctpAssocRemPort);
 	sctp_pr_addr(sp->sctpAssocRemPrimAddrType, lname, sizeof (lname),
 	    &sp->sctpAssocLocPrimAddr, sp->sctpAssocLocalPort);
 
-	(void) printf("%-31s %-31s %6u %6d %6u %6d %3d/%-3d %s\n",
-	    lname, fname,
-	    sp->sctpConnEntryInfo.ce_swnd,
-	    sp->sctpConnEntryInfo.ce_sendq,
-	    sp->sctpConnEntryInfo.ce_rwnd,
-	    sp->sctpConnEntryInfo.ce_recvq,
-	    sp->sctpAssocInStreams, sp->sctpAssocOutStreams,
-	    nssctp_state(sp->sctpAssocState, attr));
+	if (Xflag)
+		sie_report(sie);
+
+	if (Uflag) {
+		for (ph = process_hash_get(sie, SOCK_STREAM, AF_INET);
+		    ph != NULL; ph = ph->ph_next_proc) {
+			(void) printf(
+			    SCTP_LOCAL_F " " SCTP_REMOTE_F " "
+			    SCTP_SWIND_F " " SCTP_SENDQ_F " "
+			    SCTP_RWIND_F " " SCTP_RECVQ_F " "
+			    SCTP_STRS_FI "/" SCTP_STRS_FO " "
+			    SCTP_USER_F " " SCTP_PID_F " ",
+			    lname, fname,
+			    sp->sctpConnEntryInfo.ce_swnd,
+			    sp->sctpConnEntryInfo.ce_sendq,
+			    sp->sctpConnEntryInfo.ce_rwnd,
+			    sp->sctpConnEntryInfo.ce_recvq,
+			    sp->sctpAssocInStreams,
+			    sp->sctpAssocOutStreams,
+			    ph->ph_username, ph->ph_pidstr);
+			if (Vflag) {
+				(void) printf(SCTP_STATE_F " %s\n",
+				    nssctp_state(sp->sctpAssocState, attr),
+				    ph->ph_psargs);
+			} else {
+				(void) printf(SCTP_COMMAND_F " %s\n",
+				    ph->ph_fname,
+				    nssctp_state(sp->sctpAssocState, attr));
+			}
+		}
+	} else {
+		(void) printf(
+		    SCTP_LOCAL_F " " SCTP_REMOTE_F " "
+		    SCTP_SWIND_F " " SCTP_SENDQ_F " "
+		    SCTP_RWIND_F " " SCTP_RECVQ_F " "
+		    SCTP_STRS_FI "/" SCTP_STRS_FO " %s\n",
+		    lname, fname,
+		    sp->sctpConnEntryInfo.ce_swnd,
+		    sp->sctpConnEntryInfo.ce_sendq,
+		    sp->sctpConnEntryInfo.ce_rwnd,
+		    sp->sctpConnEntryInfo.ce_recvq,
+		    sp->sctpAssocInStreams, sp->sctpAssocOutStreams,
+		    nssctp_state(sp->sctpAssocState, attr));
+	}
 
 	print_transport_label(attr);
 
-	if (!Vflag) {
-		return;
-	}
+	if (!Vflag)
+		return (print_sctp_hdr);
 
 	/* Print remote addresses/local addresses on following lines */
 	while ((sre = sctp_getnext_rem(&remote, sre, id)) != NULL) {
@@ -5461,16 +6612,17 @@ sctp_conn_report_item(const mib_item_t *head, const mib2_sctpConnEntry_t *sp,
 	if (printfirst == B_FALSE) {
 		(void) puts(">");
 	}
+
+	return (print_sctp_hdr);
 }
 
 static void
 sctp_report(const mib_item_t *item)
 {
-	const mib_item_t		*head;
 	const mib2_sctpConnEntry_t	*sp;
-	boolean_t		first = B_TRUE;
-	mib2_transportMLPEntry_t **attrs, **aptr;
-	mib2_transportMLPEntry_t *attr;
+	boolean_t			print_sctp_hdr_once = B_TRUE;
+	mib2_transportMLPEntry_t	**attrs, **a, *aptr;
+	mib2_socketInfoEntry_t		**info, **i, *iptr;
 
 	/*
 	 * Preparation pass: the kernel returns separate entries for SCTP
@@ -5481,9 +6633,12 @@ sctp_report(const mib_item_t *item)
 	attrs = RSECflag ?
 	    gather_attrs(item, MIB2_SCTP, MIB2_SCTP_CONN, sctpEntrySize) :
 	    NULL;
+	info = Uflag ?
+	    gather_info(item, MIB2_SCTP, MIB2_SCTP_CONN, sctpEntrySize) :
+	    NULL;
 
-	aptr = attrs;
-	head = item;
+	a = attrs;
+	i = info;
 	for (; item != NULL; item = item->next_item) {
 
 		if (!(item->group == MIB2_SCTP &&
@@ -5492,22 +6647,18 @@ sctp_report(const mib_item_t *item)
 
 		for (sp = item->valp;
 		    (char *)sp < (char *)item->valp + item->length;
-		    /* LINTED: (note 1) */
 		    sp = (mib2_sctpConnEntry_t *)((char *)sp + sctpEntrySize)) {
-			attr = aptr == NULL ? NULL : *aptr++;
-			if (Aflag ||
-			    sp->sctpAssocState >= MIB2_SCTP_established) {
-				if (first == B_TRUE) {
-					(void) puts(sctp_hdr);
-					(void) puts(sctp_hdr_normal);
-					first = B_FALSE;
-				}
-				sctp_conn_report_item(head, sp, attr);
-			}
+			if (!(Aflag ||
+			    sp->sctpAssocState >= MIB2_SCTP_established))
+				continue;
+			aptr = a == NULL ? NULL : *a++;
+			iptr = i == NULL ? NULL : *i++;
+			print_sctp_hdr_once = sctp_conn_report_item(
+			    item, print_sctp_hdr_once, sp, aptr, iptr);
 		}
 	}
-	if (attrs != NULL)
-		free(attrs);
+	free(attrs);
+	free(info);
 }
 
 static char *
@@ -5567,17 +6718,15 @@ mrt_report(mib_item_t *item)
 	if (!(family_selected(AF_INET)))
 		return;
 
-	/* 'for' loop 1: */
 	for (; item; item = item->next_item) {
 		if (Xflag) {
-			(void) printf("\n--- Entry %d ---\n", ++jtemp);
-			(void) printf("Group = %d, mib_id = %d, "
-			    "length = %d, valp = 0x%p\n",
+			(void) printf("[%4d] Group = %d, mib_id = %d, "
+			    "length = %d, valp = 0x%p\n", jtemp++,
 			    item->group, item->mib_id, item->length,
 			    item->valp);
 		}
 		if (item->group != EXPER_DVMRP)
-			continue; /* 'for' loop 1 */
+			continue;
 
 		switch (item->mib_id) {
 
@@ -5595,14 +6744,12 @@ mrt_report(mib_item_t *item)
 			    " Vif Threshold Rate_Limit Local-Address"
 			    "   Remote-Address     Pkt_in   Pkt_out");
 
-			/* 'for' loop 2: */
 			for (vip = (struct vifctl *)item->valp;
 			    (char *)vip < (char *)item->valp + item->length;
-			    /* LINTED: (note 1) */
 			    vip = (struct vifctl *)((char *)vip +
 			    vifctlSize)) {
 				if (vip->vifc_lcl_addr.s_addr == 0)
-					continue; /* 'for' loop 2 */
+					continue;
 				/* numvifs = vip->vifc_vifi; */
 
 				numvifs++;
@@ -5619,7 +6766,7 @@ mrt_report(mib_item_t *item)
 				    abuf, sizeof (abuf)) : "",
 				    vip->vifc_pkt_in,
 				    vip->vifc_pkt_out);
-			} /* 'for' loop 2 ends */
+			}
 
 			(void) printf("Numvifs: %d\n", numvifs);
 			break;
@@ -5640,7 +6787,6 @@ mrt_report(mib_item_t *item)
 
 			for (mfccp = (struct mfcctl *)item->valp;
 			    (char *)mfccp < (char *)item->valp + item->length;
-			    /* LINTED: (note 1) */
 			    mfccp = (struct mfcctl *)((char *)mfccp +
 			    mfcctlSize)) {
 
@@ -5669,7 +6815,7 @@ mrt_report(mib_item_t *item)
 			    nmfc);
 			break;
 		}
-	} /* 'for' loop 1 ends */
+	}
 	(void) putchar('\n');
 	(void) fflush(stdout);
 }
@@ -5696,11 +6842,10 @@ kmem_cache_stats(char *title, char *name, int prefix, int64_t *total_bytes)
 
 	len = prefix ? strlen(name) : 256;
 
-	/* 'for' loop 1: */
 	for (ksp = kc->kc_chain; ksp != NULL; ksp = ksp->ks_next) {
 
 		if (strcmp(ksp->ks_class, "kmem_cache") != 0)
-			continue; /* 'for' loop 1 */
+			continue;
 
 		/*
 		 * Hack alert: because of the way streams messages are
@@ -5717,11 +6862,11 @@ kmem_cache_stats(char *title, char *name, int prefix, int64_t *total_bytes)
 			(void) safe_kstat_read(kc, ksp, NULL);
 			total_buf_inuse -=
 			    kstat_named_value(ksp, "buf_constructed");
-			continue; /* 'for' loop 1 */
+			continue;
 		}
 
 		if (strncmp(ksp->ks_name, name, len) != 0)
-			continue; /* 'for' loop 1 */
+			continue;
 
 		(void) safe_kstat_read(kc, ksp, NULL);
 
@@ -5745,7 +6890,7 @@ kmem_cache_stats(char *title, char *name, int prefix, int64_t *total_bytes)
 		total_buf_max		+= buf_max;
 		total_buf_inuse		+= buf_inuse;
 		*total_bytes		+= (int64_t)buf_inuse * buf_size;
-	} /* 'for' loop 1 ends */
+	}
 
 	if (buf_size == 0) {
 		(void) printf("%-22s [couldn't find statistics for %s]\n",
@@ -6303,7 +7448,6 @@ portname(uint_t port, char *proto, char *dst, uint_t dstlen)
 	return (dst);
 }
 
-/*PRINTFLIKE2*/
 void
 fail(int do_perror, char *message, ...)
 {
@@ -6318,6 +7462,25 @@ fail(int do_perror, char *message, ...)
 	(void) fputc('\n', stderr);
 	exit(2);
 }
+
+/*
+ * fatal: print error message to stderr and
+ * call exit(errcode)
+ */
+static void
+fatal(int errcode, char *format, ...)
+{
+	if (format != NULL) {
+		va_list argp;
+
+		va_start(argp, format);
+		(void) vfprintf(stderr, format, argp);
+		va_end(argp);
+	}
+
+	exit(errcode);
+}
+
 
 /*
  * Return value of named statistic for given kstat_named kstat;
@@ -6489,7 +7652,6 @@ process_filter(char *arg)
 				 * into a mask.
 				 */
 				if (hp->h_addr_list[0] != NULL &&
-				    /* LINTED: (note 1) */
 				    IN6_IS_ADDR_V4MAPPED((in6_addr_t *)
 				    hp->h_addr_list[0])) {
 					maxv = IP_ABITS;
@@ -6575,7 +7737,7 @@ ifindex2str(uint_t ifindex, char *ifname)
 static void
 usage(char *cmdname)
 {
-	(void) fprintf(stderr, "usage: %s [-anv] [-f address_family] "
+	(void) fprintf(stderr, "usage: %s [-anuv] [-f address_family] "
 	    "[-T d|u]\n", cmdname);
 	(void) fprintf(stderr, "       %s [-n] [-f address_family] "
 	    "[-P protocol] [-T d|u] [-g | -p | -s [interval [count]]]\n",
@@ -6593,22 +7755,225 @@ usage(char *cmdname)
 	exit(EXIT_FAILURE);
 }
 
+/* -------------------UNIX Domain Sockets Report---------------------------- */
+
+#define	UDS_SO_PAIR	"(socketpair)"
+
+static char		*typetoname(t_scalar_t);
+static boolean_t	uds_report_item(struct sockinfo *, boolean_t);
+
 /*
- * fatal: print error message to stderr and
- * call exit(errcode)
+ * Central definitions for the columns used in the reports.
+ * For each column, there's a definition for the heading, the underline and
+ * the formatted value.
+ * Since most reports select different columns depending on command line
+ * options, defining everything here avoids duplication in the report
+ * format strings and makes it easy to make changes as necessary.
  */
-/*PRINTFLIKE2*/
+#define	UDS_ADDRESS		"Address         "
+#define	UDS_ADDRESS_		"----------------"
+#define	UDS_ADDRESS_F		"%-16.16s"
+#define	UDS_TYPE		"Type      "
+#define	UDS_TYPE_		"----------"
+#define	UDS_TYPE_F		"%-10.10s"
+#define	UDS_VNODE		"Vnode           "
+#define	UDS_VNODE_		"----------------"
+#define	UDS_VNODE_F		"%-16.16s"
+#define	UDS_CONN		"Conn            "
+#define	UDS_CONN_		"----------------"
+#define	UDS_CONN_F		"%-16.16s"
+#define	UDS_LOCAL		"Local Address                          "
+#define	UDS_LOCAL_		"---------------------------------------"
+#define	UDS_LOCAL_F		"%-39.39s"
+#define	UDS_REMOTE		"Remote Address                         "
+#define	UDS_REMOTE_		"---------------------------------------"
+#define	UDS_REMOTE_F		"%-39.39s"
+#define	UDS_USER		"User    "
+#define	UDS_USER_		"--------"
+#define	UDS_USER_F		"%-8.8s"
+#define	UDS_PID			"Pid   "
+#define	UDS_PID_		"------"
+#define	UDS_PID_F		"%6s"
+#define	UDS_COMMAND		"Command       "
+#define	UDS_COMMAND_		"--------------"
+#define	UDS_COMMAND_F		"%-14.14s"
+
+static const char uds_hdr[] = "\nActive UNIX domain sockets\n";
+
+static const char uds_hdr_normal[] =
+    UDS_ADDRESS " " UDS_TYPE " " UDS_VNODE " " UDS_CONN " "
+    UDS_LOCAL " " UDS_REMOTE "\n"
+    UDS_ADDRESS_" " UDS_TYPE_" " UDS_VNODE_" " UDS_CONN_" "
+    UDS_LOCAL_" " UDS_REMOTE_"\n";
+
+static const char uds_hdr_pid[] =
+    UDS_ADDRESS " " UDS_TYPE " " UDS_USER " " UDS_PID " " UDS_COMMAND " "
+    UDS_LOCAL " " UDS_REMOTE "\n"
+    UDS_ADDRESS_ " " UDS_TYPE_" " UDS_USER_" " UDS_PID_" " UDS_COMMAND_" "
+    UDS_LOCAL_" " UDS_REMOTE_"\n";
+
+static const char uds_hdr_pid_verbose[] =
+    UDS_ADDRESS " " UDS_TYPE " " UDS_USER " " UDS_PID " "
+    UDS_LOCAL " " UDS_REMOTE " " UDS_COMMAND "\n"
+    UDS_ADDRESS_ " " UDS_TYPE_" " UDS_USER_" " UDS_PID_" "
+    UDS_LOCAL_" " UDS_REMOTE_" " UDS_COMMAND_"\n";
+
+/*
+ * Print a summary of connections related to unix protocols.
+ */
 static void
-fatal(int errcode, char *format, ...)
+uds_report(kstat_ctl_t *kc)
 {
-	va_list argp;
+	uint32_t	i;
+	kstat_t		*ksp;
+	struct sockinfo	*psi;
+	boolean_t	print_uds_hdr_once = B_TRUE;
 
-	if (format == NULL)
-		return;
+	if (kc == NULL) {
+		fail(0, "uds_report: No kstat");
+		exit(3);
+	}
 
-	va_start(argp, format);
-	(void) vfprintf(stderr, format, argp);
-	va_end(argp);
+	if ((ksp = kstat_lookup(kc, "sockfs", 0, "sock_unix_list")) == NULL)
+		fail(0, "kstat_data_lookup failed\n");
 
-	exit(errcode);
+	if (kstat_read(kc, ksp, NULL) == -1)
+		fail(0, "kstat_read failed for sock_unix_list\n");
+
+	if (ksp->ks_ndata == 0)
+		return;			/* no AF_UNIX sockets found	*/
+
+	/*
+	 * Having ks_data set with ks_data == NULL shouldn't happen;
+	 * If it does, the sockfs kstat is seriously broken.
+	 */
+	if ((psi = ksp->ks_data) == NULL)
+		fail(0, "uds_report: no kstat data\n");
+
+	for (i = 0; i < ksp->ks_ndata; i++) {
+
+		print_uds_hdr_once = uds_report_item(psi, print_uds_hdr_once);
+
+		/* If si_size didn't get filled in, then we're done */
+		if (psi->si_size == 0 ||
+		    !IS_P2ALIGNED(psi->si_size, sizeof (psi)))
+			break;
+
+		/* Point to the next sockinfo in the array */
+		psi = (struct sockinfo *)(((char *)psi) + psi->si_size);
+	}
+}
+
+static boolean_t
+uds_report_item(struct sockinfo *psi, boolean_t first)
+{
+	char *laddr, *raddr;
+	proc_fdinfo_t *ph;
+
+	if (first) {
+		(void) printf("%s", uds_hdr);
+		if (Uflag)
+			(void) printf("%s",
+			    Vflag ? uds_hdr_pid_verbose : uds_hdr_pid);
+		else
+			(void) printf("%s", uds_hdr_normal);
+
+		first = B_FALSE;
+	}
+
+	raddr = laddr = "";
+
+	if ((psi->si_state & SS_ISBOUND) &&
+	    strlen(psi->si_laddr_sun_path) != 0 &&
+	    psi->si_laddr_soa_len != 0) {
+		if (psi->si_faddr_noxlate) {
+			laddr = UDS_SO_PAIR;
+		} else {
+			if (psi->si_laddr_soa_len >
+			    sizeof (psi->si_laddr_family))
+				laddr = psi->si_laddr_sun_path;
+		}
+	}
+
+	if ((psi->si_state & SS_ISCONNECTED) &&
+	    strlen(psi->si_faddr_sun_path) != 0 &&
+	    psi->si_faddr_soa_len != 0) {
+		if (psi->si_faddr_noxlate) {
+			raddr = UDS_SO_PAIR;
+		} else {
+			if (psi->si_faddr_soa_len >
+			    sizeof (psi->si_faddr_family))
+				raddr = psi->si_faddr_sun_path;
+		}
+	}
+
+	/* Traditional output */
+	if (!Uflag) {
+		(void) printf(
+		    UDS_ADDRESS_F " " UDS_TYPE_F " " UDS_VNODE_F " "
+		    UDS_CONN_F " " UDS_LOCAL_F " " UDS_REMOTE_F "\n",
+		    psi->si_son_straddr,
+		    typetoname(psi->si_serv_type),
+		    (psi->si_state & SS_ISBOUND) &&
+		    psi->si_ux_laddr_sou_magic == SOU_MAGIC_EXPLICIT ?
+		    psi->si_lvn_straddr : "0000000",
+		    (psi->si_state & SS_ISCONNECTED) &&
+		    psi->si_ux_faddr_sou_magic == SOU_MAGIC_EXPLICIT ?
+		    psi->si_fvn_straddr : "0000000",
+		    laddr, raddr);
+		return (first);
+	}
+
+	mib2_socketInfoEntry_t sie = {
+		.sie_inode = psi->si_inode,
+		.sie_flags = 0
+	};
+
+	if (Xflag)
+		sie_report(&sie);
+
+	for (ph = process_hash_get(&sie,
+	    psi->si_serv_type == T_CLTS ?  SOCK_DGRAM : SOCK_STREAM, AF_UNIX);
+	    ph != NULL; ph = ph->ph_next_proc) {
+		if (Vflag) {
+			(void) printf(
+			    UDS_ADDRESS_F " " UDS_TYPE_F " "
+			    UDS_USER_F " " UDS_PID_F " "
+			    UDS_LOCAL_F " " UDS_REMOTE_F " %s\n",
+			    psi->si_son_straddr,
+			    typetoname(psi->si_serv_type),
+			    ph->ph_username, ph->ph_pidstr,
+			    laddr, raddr, ph->ph_psargs);
+		} else {
+			(void) printf(
+			    UDS_ADDRESS_F " " UDS_TYPE_F " "
+			    UDS_USER_F " " UDS_PID_F " " UDS_COMMAND_F " "
+			    UDS_LOCAL_F " " UDS_REMOTE_F "\n",
+			    psi->si_son_straddr,
+			    typetoname(psi->si_serv_type),
+			    ph->ph_username, ph->ph_pidstr, ph->ph_fname,
+			    laddr, raddr);
+		}
+
+	}
+
+	return (first);
+}
+
+static char *
+typetoname(t_scalar_t type)
+{
+	switch (type) {
+	case T_CLTS:
+		return ("dgram");
+
+	case T_COTS:
+		return ("stream");
+
+	case T_COTS_ORD:
+		return ("stream-ord");
+
+	default:
+		return ("");
+	}
 }

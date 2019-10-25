@@ -25,7 +25,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Joyent, Inc.
- * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -385,6 +385,7 @@ ckreturn:
 	stp->sd_sidp = NULL;
 	stp->sd_pgidp = NULL;
 	stp->sd_vnode = vp;
+	stp->sd_pvnode = NULL;
 	stp->sd_rerror = 0;
 	stp->sd_werror = 0;
 	stp->sd_wroff = 0;
@@ -804,7 +805,7 @@ strclose(struct vnode *vp, int flag, cred_t *crp)
 		}
 		stp->sd_iocblk = NULL;
 	}
-	stp->sd_vnode = NULL;
+	stp->sd_vnode = stp->sd_pvnode = NULL;
 	vp->v_stream = NULL;
 	mutex_exit(&vp->v_lock);
 	mutex_enter(&stp->sd_lock);

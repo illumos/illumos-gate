@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 by Western Digital Corporation
  */
 
 /*
@@ -29,6 +31,7 @@
  */
 
 #include <sys/types.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <bsm/audit.h>
@@ -150,11 +153,10 @@ load_map()
 	event_count = 0;
 	setauevent();
 	while ((evp = getauevent()) != (au_event_ent_t *)NULL) {
-		if (event_count > alloc_count)
-			if (realloc_map() == -1) {
-				endauevent();
-				return (-1);
-			}
+		if (event_count == alloc_count && realloc_map() == -1) {
+			endauevent();
+			return (-1);
+		}
 		event_map[event_count].event = evp->ae_number;
 		event_map[event_count].class = evp->ae_class;
 		++event_count;
@@ -170,12 +172,21 @@ load_map()
 static int
 realloc_map()
 {
-	register size_t rsize;
-	rsize = sizeof (event_map_t) * (alloc_count + ALLOC_INCR);
+	uint_t new_alloc_count;
+	event_map_t *new_event_map;
 
-	if ((event_map = (event_map_t *)
-	    realloc(event_map, rsize)) == (event_map_t *)NULL)
+	new_alloc_count = alloc_count + ALLOC_INCR;
+	if (new_alloc_count <= alloc_count) {
+		errno = ENOMEM;
 		return (-1);
+	}
+
+	if ((new_event_map = recallocarray(event_map, alloc_count,
+	    new_alloc_count, sizeof (event_map_t))) == NULL)
+		return (-1);
+
+	alloc_count = new_alloc_count;
+	event_map = new_event_map;
 
 	return (0);
 }

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -61,7 +62,7 @@
  *
  * Classifier uses several hash tables:
  *
- * 	ipcl_conn_fanout:	contains all TCP connections in CONNECTED state
+ *	ipcl_conn_fanout:	contains all TCP connections in CONNECTED state
  *	ipcl_bind_fanout:	contains all connections in BOUND state
  *	ipcl_proto_fanout:	IPv4 protocol fanout
  *	ipcl_proto_fanout_v6:	IPv6 protocol fanout
@@ -103,7 +104,7 @@
  *	hdr_len: The size of IP header. It is used to find TCP or UDP header in
  *		 the packet.
  *
- * 	ira->ira_zoneid: The zone in which the returned connection must be; the
+ *	ira->ira_zoneid: The zone in which the returned connection must be; the
  *		zoneid corresponding to the ire_zoneid on the IRE located for
  *		the packet's destination address.
  *
@@ -168,13 +169,13 @@
  * conn_t	*ipcl_lookup_listener_v6(lport, laddr, protocol, ifindex,
  *					 zoneid, ip_stack);
  *
- * 	Lookup routine to find a listener with the tuple {lport, laddr,
- * 	protocol} in the ipcl_bind_fanout table. For IPv6, an additional
- * 	parameter interface index is also compared.
+ *	Lookup routine to find a listener with the tuple {lport, laddr,
+ *	protocol} in the ipcl_bind_fanout table. For IPv6, an additional
+ *	parameter interface index is also compared.
  *
  * void ipcl_walk(func, arg, ip_stack)
  *
- * 	Apply 'func' to every connection available. The 'func' is called as
+ *	Apply 'func' to every connection available. The 'func' is called as
  *	(*func)(connp, arg). The walk is non-atomic so connections may be
  *	created and destroyed during the walk. The CONN_CONDEMNED and
  *	CONN_INCIPIENT flags ensure that connections which are newly created
@@ -188,7 +189,7 @@
  * int ipcl_conn_insert_v6(connp);
  *
  *	Insert 'connp' in the ipcl_conn_fanout.
- *	Arguements :
+ *	Arguments :
  *		connp		conn_t to be inserted
  *
  *	Return value :
@@ -200,22 +201,22 @@
  * int ipcl_bind_insert_v4(connp);
  * int ipcl_bind_insert_v6(connp);
  *
- * 	Insert 'connp' in ipcl_bind_fanout.
- * 	Arguements :
- * 		connp		conn_t to be inserted
+ *	Insert 'connp' in ipcl_bind_fanout.
+ *	Arguments :
+ *		connp		conn_t to be inserted
  *
  *
  * void ipcl_hash_remove(connp);
  *
- * 	Removes the 'connp' from the connection fanout table.
+ *	Removes the 'connp' from the connection fanout table.
  *
  * Connection Creation/Destruction
  * -------------------------------
  *
  * conn_t *ipcl_conn_create(type, sleep, netstack_t *)
  *
- * 	Creates a new conn based on the type flag, inserts it into
- * 	globalhash table.
+ *	Creates a new conn based on the type flag, inserts it into
+ *	globalhash table.
  *
  *	type:	This flag determines the type of conn_t which needs to be
  *		created i.e., which kmem_cache it comes from.
@@ -228,8 +229,8 @@
  *
  * void ipcl_conn_destroy(connp)
  *
- * 	Destroys the connection state, removes it from the global
- * 	connection hash table and frees its memory.
+ *	Destroys the connection state, removes it from the global
+ *	connection hash table and frees its memory.
  */
 
 #include <sys/types.h>
@@ -1951,7 +1952,7 @@ static int
 tcp_conn_constructor(void *buf, void *cdrarg, int kmflags)
 {
 	itc_t	*itc = (itc_t *)buf;
-	conn_t 	*connp = &itc->itc_conn;
+	conn_t	*connp = &itc->itc_conn;
 	tcp_t	*tcp = (tcp_t *)&itc[1];
 
 	bzero(connp, sizeof (conn_t));
@@ -1985,7 +1986,7 @@ static void
 tcp_conn_destructor(void *buf, void *cdrarg)
 {
 	itc_t	*itc = (itc_t *)buf;
-	conn_t 	*connp = &itc->itc_conn;
+	conn_t	*connp = &itc->itc_conn;
 	tcp_t	*tcp = (tcp_t *)&itc[1];
 
 	ASSERT(connp->conn_flags & IPCL_TCPCONN);
@@ -2011,7 +2012,7 @@ static int
 ip_conn_constructor(void *buf, void *cdrarg, int kmflags)
 {
 	itc_t	*itc = (itc_t *)buf;
-	conn_t 	*connp = &itc->itc_conn;
+	conn_t	*connp = &itc->itc_conn;
 
 	bzero(connp, sizeof (conn_t));
 	mutex_init(&connp->conn_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -2032,7 +2033,7 @@ static void
 ip_conn_destructor(void *buf, void *cdrarg)
 {
 	itc_t	*itc = (itc_t *)buf;
-	conn_t 	*connp = &itc->itc_conn;
+	conn_t	*connp = &itc->itc_conn;
 
 	ASSERT(connp->conn_flags & IPCL_IPCCONN);
 	ASSERT(connp->conn_priv == NULL);
@@ -2054,7 +2055,7 @@ static int
 udp_conn_constructor(void *buf, void *cdrarg, int kmflags)
 {
 	itc_t	*itc = (itc_t *)buf;
-	conn_t 	*connp = &itc->itc_conn;
+	conn_t	*connp = &itc->itc_conn;
 	udp_t	*udp = (udp_t *)&itc[1];
 
 	bzero(connp, sizeof (conn_t));
@@ -2081,7 +2082,7 @@ static void
 udp_conn_destructor(void *buf, void *cdrarg)
 {
 	itc_t	*itc = (itc_t *)buf;
-	conn_t 	*connp = &itc->itc_conn;
+	conn_t	*connp = &itc->itc_conn;
 	udp_t	*udp = (udp_t *)&itc[1];
 
 	ASSERT(connp->conn_flags & IPCL_UDPCONN);
@@ -2105,7 +2106,7 @@ static int
 rawip_conn_constructor(void *buf, void *cdrarg, int kmflags)
 {
 	itc_t	*itc = (itc_t *)buf;
-	conn_t 	*connp = &itc->itc_conn;
+	conn_t	*connp = &itc->itc_conn;
 	icmp_t	*icmp = (icmp_t *)&itc[1];
 
 	bzero(connp, sizeof (conn_t));
@@ -2133,7 +2134,7 @@ static void
 rawip_conn_destructor(void *buf, void *cdrarg)
 {
 	itc_t	*itc = (itc_t *)buf;
-	conn_t 	*connp = &itc->itc_conn;
+	conn_t	*connp = &itc->itc_conn;
 	icmp_t	*icmp = (icmp_t *)&itc[1];
 
 	ASSERT(connp->conn_flags & IPCL_RAWIPCONN);
@@ -2158,7 +2159,7 @@ static int
 rts_conn_constructor(void *buf, void *cdrarg, int kmflags)
 {
 	itc_t	*itc = (itc_t *)buf;
-	conn_t 	*connp = &itc->itc_conn;
+	conn_t	*connp = &itc->itc_conn;
 	rts_t	*rts = (rts_t *)&itc[1];
 
 	bzero(connp, sizeof (conn_t));
@@ -2183,7 +2184,7 @@ static void
 rts_conn_destructor(void *buf, void *cdrarg)
 {
 	itc_t	*itc = (itc_t *)buf;
-	conn_t 	*connp = &itc->itc_conn;
+	conn_t	*connp = &itc->itc_conn;
 	rts_t	*rts = (rts_t *)&itc[1];
 
 	ASSERT(connp->conn_flags & IPCL_RTSCONN);
@@ -2749,3 +2750,52 @@ conn_untrace_ref(conn_t *connp)
 	return (1);
 }
 #endif
+
+mib2_socketInfoEntry_t *
+conn_get_socket_info(conn_t *connp, mib2_socketInfoEntry_t *sie)
+{
+	vnode_t *vn = NULL;
+	vattr_t attr;
+	uint64_t flags = 0;
+
+	/*
+	 * If the connection is closing, it is not safe to make an upcall or
+	 * access the stream associated with the connection.
+	 * The callers of this function have a reference on connp itself
+	 * so, as long as it is not closing, it's safe to continue.
+	 */
+	mutex_enter(&connp->conn_lock);
+
+	if ((connp->conn_state_flags & CONN_CLOSING)) {
+		mutex_exit(&connp->conn_lock);
+		return (NULL);
+	}
+
+	mutex_exit(&connp->conn_lock);
+
+	if (connp->conn_upper_handle != NULL) {
+		vn = (*connp->conn_upcalls->su_get_vnode)
+		    (connp->conn_upper_handle);
+	} else if (!IPCL_IS_NONSTR(connp) && connp->conn_rq != NULL) {
+		vn = STREAM(connp->conn_rq)->sd_pvnode;
+		if (vn != NULL)
+			VN_HOLD(vn);
+		flags |= MIB2_SOCKINFO_STREAM;
+	}
+
+	if (vn == NULL || VOP_GETATTR(vn, &attr, 0, CRED(), NULL) != 0) {
+		if (vn != NULL)
+			VN_RELE(vn);
+		return (NULL);
+	}
+
+	VN_RELE(vn);
+
+	bzero(sie, sizeof (*sie));
+
+	sie->sie_flags = flags;
+	sie->sie_inode = attr.va_nodeid;
+	sie->sie_dev = attr.va_rdev;
+
+	return (sie);
+}
