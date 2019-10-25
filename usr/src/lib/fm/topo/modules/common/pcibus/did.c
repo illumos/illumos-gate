@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -104,11 +105,37 @@ di_devtype_get(topo_mod_t *mp, di_node_t src, char **devtype)
 
 typedef struct smbios_slot_cb {
 	int		cb_slotnum;
+	int		cb_bdf;
 	const char	*cb_label;
 } smbios_slot_cb_t;
 
 static int
-di_smbios_find_slot(smbios_hdl_t *shp, const smbios_struct_t *strp, void *data)
+di_smbios_find_slot_by_bdf(smbios_hdl_t *shp, const smbios_struct_t *strp,
+    void *data)
+{
+	smbios_slot_cb_t *cbp = data;
+	smbios_slot_t slot;
+	int bus, df;
+
+	bus = (cbp->cb_bdf & 0xFF00) >> 8;
+	df = cbp->cb_bdf & 0xFF;
+
+	if (strp->smbstr_type != SMB_TYPE_SLOT ||
+	    smbios_info_slot(shp, strp->smbstr_id, &slot) != 0)
+		return (0);
+
+	if (slot.smbl_bus == bus && slot.smbl_df == df) {
+		cbp->cb_label = slot.smbl_name;
+		cbp->cb_slotnum = slot.smbl_id;
+		return (1);
+	}
+
+	return (0);
+}
+
+static int
+di_smbios_find_slot_by_id(smbios_hdl_t *shp, const smbios_struct_t *strp,
+    void *data)
 {
 	smbios_slot_cb_t *cbp = data;
 	smbios_slot_t slot;
@@ -126,9 +153,10 @@ di_smbios_find_slot(smbios_hdl_t *shp, const smbios_struct_t *strp, void *data)
 }
 
 static int
-di_physlotinfo_get(topo_mod_t *mp, di_node_t src, int *slotnum, char **slotname)
+di_physlotinfo_get(topo_mod_t *mp, di_node_t src, int bdf, int *slotnum,
+    char **slotname)
 {
-	char *slotbuf;
+	char *slotbuf = NULL;
 	int sz;
 	uchar_t *buf;
 	smbios_hdl_t *shp;
@@ -154,55 +182,90 @@ di_physlotinfo_get(topo_mod_t *mp, di_node_t src, int *slotnum, char **slotname)
 		(void) sscanf((char *)&buf[4], "Slot%d", slotnum);
 	}
 
-	if (*slotnum == -1)
-		return (0);
-
 	/*
-	 * Order of preference
-	 * 1) take slotnum and look up in SMBIOS table
-	 * 2) use slot-names
-	 * 3) fabricate name based on slotnum
+	 * If the system supports SMBIOS (virtual certainty on X86) then we will
+	 * source the label from the Type 9 (Slot) records.  If we're unable
+	 * to correlate the device with a slot record (as would happen with
+	 * onboard PCIe devices), we return without setting slotname, which will
+	 * ultimately result in the node inheriting the FRU label from its
+	 * parent node.
+	 *
+	 * In the absence of any SMBIOS support (i.e. SPARC) then we will use
+	 * the slot-names property, if available.  Otherwise we'll fall back
+	 * to fabricating a label based on the slot number.
 	 */
 	if ((shp = topo_mod_smbios(mp)) != NULL) {
 		/*
 		 * The PCI spec describes slot number 0 as reserved for
-		 * internal PCI devices.  Not all platforms respect
-		 * this, so we have to treat slot 0 as a valid device.
-		 * But other platforms use 0 to identify an internal
-		 * device.  We deal with this by letting SMBIOS be the
-		 * final decision maker.  If SMBIOS is supported, but
-		 * the given slot number is not represented in the
-		 * SMBIOS tables, then ignore the slot entirely.
+		 * internal PCI devices.  Unfortunately, not all platforms
+		 * respect this.  For that reason, we prefer to lookup the slot
+		 * record using the device's BDF.  However, SMBIOS
+		 * implementations prior to 2.6 don't encode the BDF in the
+		 * slot record.  In that case we resort to looking up the
+		 * slot record using the slot number.
 		 */
 		smbios_slot_cb_t cbdata;
+		smbios_version_t smbv;
+		boolean_t bdf_supp = B_TRUE;
 
 		cbdata.cb_slotnum = *slotnum;
+		cbdata.cb_bdf = bdf;
 		cbdata.cb_label = NULL;
-		if (smbios_iter(shp, di_smbios_find_slot, &cbdata) <= 0)
+
+		/*
+		 * The bus and device/fn payload members of the SMBIOS slot
+		 * record were added in SMBIOS 2.6.
+		 */
+		smbios_info_smbios_version(shp, &smbv);
+		if (smbv.smbv_major < 2 ||
+		    (smbv.smbv_major == 2 && smbv.smbv_minor < 6)) {
+			bdf_supp = B_FALSE;
+		}
+
+		/*
+		 * If the SMBIOS implementation is too old to look up the slot
+		 * records by BDF and we weren't able to derive a slotnum then
+		 * there is nothing we can do here.
+		 */
+		if (!bdf_supp && *slotnum == -1)
 			return (0);
+
+		if (bdf_supp)
+			(void) smbios_iter(shp, di_smbios_find_slot_by_bdf,
+			    &cbdata);
+		else
+			(void) smbios_iter(shp, di_smbios_find_slot_by_id,
+			    &cbdata);
+
+		if (cbdata.cb_label == NULL)
+			return (0);
+
 		slotbuf = (char *)cbdata.cb_label;
-		topo_mod_dprintf(mp, "%s: node=%p: using smbios name\n",
-		    __func__, src);
-	} else if (got_slotprop == B_TRUE) {
+		topo_mod_dprintf(mp, "%s: di_node=%p: using smbios name: %s\n",
+		    __func__, src, slotbuf);
+	} else if (got_slotprop) {
 		slotbuf = (char *)&buf[4];
-		topo_mod_dprintf(mp, "%s: node=%p: found %s property\n",
-		    __func__, src, DI_SLOTPROP);
+		topo_mod_dprintf(mp, "%s: di_node=%p: using %s property: %s\n",
+		    __func__, src, DI_SLOTPROP, slotbuf);
 	} else {
 		/*
 		 * Make generic description string "SLOT <num>", allow up to
-		 * 10 digits for number
+		 * 10 digits for number.  Bail, if we weren't able to derive
+		 * a slotnum.
 		 */
+		if (*slotnum == -1)
+			return (0);
+
 		slotbuf = alloca(16);
 		(void) snprintf(slotbuf, 16, "SLOT %d", *slotnum);
-		topo_mod_dprintf(mp, "%s: node=%p: using generic slot name\n",
-		    __func__, src);
+		topo_mod_dprintf(mp, "%s: di_node=%p: using fabricated slot "
+		    "name: %s\n", __func__, src, slotbuf);
 	}
-	if ((*slotname = topo_mod_strdup(mp, slotbuf)) == NULL)
+
+	if ((*slotname = topo_mod_strdup(mp, slotbuf)) == NULL) {
+		/* topo errno set */
 		return (-1);
-
-	topo_mod_dprintf(mp, "%s: node=%p: slotname=%s\n",
-	    __func__, src, *slotname);
-
+	}
 	return (0);
 }
 
@@ -325,7 +388,7 @@ did_create(topo_mod_t *mp, di_node_t src,
 		/*
 		 * This is a pciex node.
 		 */
-		if (di_physlotinfo_get(mp, src, &np->dp_physlot,
+		if (di_physlotinfo_get(mp, src, np->dp_bdf, &np->dp_physlot,
 		    &np->dp_physlot_name) < 0) {
 			if (np->dp_devtype != NULL)
 				topo_mod_strfree(mp, np->dp_devtype);
