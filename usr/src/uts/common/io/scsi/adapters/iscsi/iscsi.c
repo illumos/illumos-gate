@@ -21,6 +21,7 @@
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
  *
  * iSCSI Software Initiator
  */
@@ -365,278 +366,273 @@ iscsi_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd,
 static int
 iscsi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	int			rval		= DDI_SUCCESS;
 	int			instance	= ddi_get_instance(dip);
 	iscsi_hba_t		*ihp		= NULL;
 	scsi_hba_tran_t		*tran		= NULL;
 	char			init_port_name[MAX_NAME_PROP_SIZE];
 
-	switch (cmd) {
-	case DDI_ATTACH:
-		/* create iSCSH HBA devctl device node */
-		if (ddi_create_minor_node(dip, ISCSI_DEVCTL, S_IFCHR, 0,
-		    DDI_PSEUDO, 0) == DDI_SUCCESS) {
+	if (cmd == DDI_RESUME) {
+		return (DDI_SUCCESS);
+	} else if (cmd != DDI_ATTACH) {
+		return (DDI_FAILURE);
+	}
 
-			/* allocate HBA soft state */
-			if (ddi_soft_state_zalloc(iscsi_state, instance) !=
-			    DDI_SUCCESS) {
-				ddi_remove_minor_node(dip, NULL);
-				rval = DDI_FAILURE;
-				break;
-			}
+	if (!modrootloaded && iscsiboot_prop == NULL) {
+		/*
+		 * The root file system has not yet been mounted, and we're not
+		 * trying to boot from an iSCSI device.  Fail to attach now so
+		 * that we can retry after root has been mounted.
+		 */
+		return (DDI_FAILURE);
+	}
 
-			/* get reference to soft state */
-			if ((ihp = (iscsi_hba_t *)ddi_get_soft_state(
-			    iscsi_state, instance)) == NULL) {
-				ddi_remove_minor_node(dip, NULL);
-				ddi_soft_state_free(iscsi_state, instance);
-				rval = DDI_FAILURE;
-				break;
-			}
+	/* create iSCSI HBA devctl device node */
+	if (ddi_create_minor_node(dip, ISCSI_DEVCTL, S_IFCHR, 0,
+	    DDI_PSEUDO, 0) != DDI_SUCCESS) {
+		goto iscsi_attach_failed3;
+	}
 
-			/* init HBA mutex used to protect discovery events */
-			mutex_init(&ihp->hba_discovery_events_mutex, NULL,
-			    MUTEX_DRIVER, NULL);
+	/* allocate HBA soft state */
+	if (ddi_soft_state_zalloc(iscsi_state, instance) !=
+	    DDI_SUCCESS) {
+		ddi_remove_minor_node(dip, NULL);
+		goto iscsi_attach_failed3;
+	}
 
-			/* Get LDI ident */
-			rval = ldi_ident_from_dip(dip, &ihp->hba_li);
-			ASSERT(rval == 0); /* Failure indicates invalid arg */
+	/* get reference to soft state */
+	if ((ihp = (iscsi_hba_t *)ddi_get_soft_state(
+	    iscsi_state, instance)) == NULL) {
+		ddi_remove_minor_node(dip, NULL);
+		ddi_soft_state_free(iscsi_state, instance);
+		goto iscsi_attach_failed3;
+	}
 
-			/* init HBA mutex used to protect service status */
-			mutex_init(&ihp->hba_service_lock, NULL,
-			    MUTEX_DRIVER, NULL);
-			cv_init(&ihp->hba_service_cv, NULL, CV_DRIVER, NULL);
+	/* init HBA mutex used to protect discovery events */
+	mutex_init(&ihp->hba_discovery_events_mutex, NULL,
+	    MUTEX_DRIVER, NULL);
 
-			/*
-			 * init SendTargets semaphore that is used to allow
-			 * only one operation at a time
-			 */
-			sema_init(&ihp->hba_sendtgts_semaphore, 1, NULL,
-			    SEMA_DRIVER, NULL);
+	VERIFY0(ldi_ident_from_dip(dip, &ihp->hba_li));
 
-			ihp->hba_sess_list = NULL;
-			rw_init(&ihp->hba_sess_list_rwlock, NULL,
-			    RW_DRIVER, NULL);
+	/* init HBA mutex used to protect service status */
+	mutex_init(&ihp->hba_service_lock, NULL,
+	    MUTEX_DRIVER, NULL);
+	cv_init(&ihp->hba_service_cv, NULL, CV_DRIVER, NULL);
 
-			/* allocate scsi_hba_tran */
-			if ((tran = scsi_hba_tran_alloc(dip, SCSI_HBA_CANSLEEP))
-			    == NULL) {
-				ddi_remove_minor_node(dip, NULL);
-				goto iscsi_attach_failed2;
-			}
+	/*
+	 * init SendTargets semaphore that is used to allow
+	 * only one operation at a time
+	 */
+	sema_init(&ihp->hba_sendtgts_semaphore, 1, NULL,
+	    SEMA_DRIVER, NULL);
 
-			/* soft state setup */
-			ihp->hba_sig	= ISCSI_SIG_HBA;
-			ihp->hba_tran	= tran;
-			ihp->hba_dip	= dip;
-			if (iscsiboot_prop == NULL) {
-				ihp->hba_service_status =
-				    ISCSI_SERVICE_DISABLED;
-				ihp->hba_service_status_overwrite = B_FALSE;
-			} else {
-				ihp->hba_service_status =
-				    ISCSI_SERVICE_ENABLED;
-				ihp->hba_service_status_overwrite = B_TRUE;
-			}
-			ihp->hba_service_client_count = 0;
+	ihp->hba_sess_list = NULL;
+	rw_init(&ihp->hba_sess_list_rwlock, NULL,
+	    RW_DRIVER, NULL);
 
-			mutex_enter(&iscsi_oid_mutex);
-			ihp->hba_oid		  = iscsi_oid++;
-			mutex_exit(&iscsi_oid_mutex);
+	/* allocate scsi_hba_tran */
+	if ((tran = scsi_hba_tran_alloc(dip, SCSI_HBA_CANSLEEP))
+	    == NULL) {
+		ddi_remove_minor_node(dip, NULL);
+		goto iscsi_attach_failed2;
+	}
 
-			ihp->hba_name[0]	  = '\0';
-			ihp->hba_name_length	  = 0;
-			ihp->hba_alias_length	  = 0;
-			ihp->hba_alias[0]	  = '\0';
+	/* soft state setup */
+	ihp->hba_sig	= ISCSI_SIG_HBA;
+	ihp->hba_tran	= tran;
+	ihp->hba_dip	= dip;
+	if (iscsiboot_prop == NULL) {
+		ihp->hba_service_status =
+		    ISCSI_SERVICE_DISABLED;
+		ihp->hba_service_status_overwrite = B_FALSE;
+	} else {
+		ihp->hba_service_status =
+		    ISCSI_SERVICE_ENABLED;
+		ihp->hba_service_status_overwrite = B_TRUE;
+	}
+	ihp->hba_service_client_count = 0;
 
-			iscsi_net->tweaks.rcvbuf = ddi_prop_get_int(
-			    DDI_DEV_T_ANY, ihp->hba_dip, 0, "so-rcvbuf",
-			    ISCSI_SOCKET_RCVBUF_SIZE);
+	mutex_enter(&iscsi_oid_mutex);
+	ihp->hba_oid		  = iscsi_oid++;
+	mutex_exit(&iscsi_oid_mutex);
 
-			iscsi_net->tweaks.sndbuf = ddi_prop_get_int(
-			    DDI_DEV_T_ANY, ihp->hba_dip, 0, "so-sndbuf",
-			    ISCSI_SOCKET_SNDBUF_SIZE);
+	ihp->hba_name[0]	  = '\0';
+	ihp->hba_name_length	  = 0;
+	ihp->hba_alias_length	  = 0;
+	ihp->hba_alias[0]	  = '\0';
 
-			iscsi_net->tweaks.nodelay = ddi_prop_get_int(
-			    DDI_DEV_T_ANY, ihp->hba_dip, 0, "tcp-nodelay",
-			    ISCSI_TCP_NODELAY_DEFAULT);
+	iscsi_net->tweaks.rcvbuf = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, ihp->hba_dip, 0, "so-rcvbuf",
+	    ISCSI_SOCKET_RCVBUF_SIZE);
 
-			iscsi_net->tweaks.conn_notify_threshold =
-			    ddi_prop_get_int(DDI_DEV_T_ANY,
-			    ihp->hba_dip, 0, "tcp-conn-notify-threshold",
-			    ISCSI_TCP_CNOTIFY_THRESHOLD_DEFAULT);
+	iscsi_net->tweaks.sndbuf = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, ihp->hba_dip, 0, "so-sndbuf",
+	    ISCSI_SOCKET_SNDBUF_SIZE);
 
-			iscsi_net->tweaks.conn_abort_threshold =
-			    ddi_prop_get_int(DDI_DEV_T_ANY, ihp->hba_dip,
-			    0, "tcp-conn-abort-threshold",
-			    ISCSI_TCP_CABORT_THRESHOLD_DEFAULT);
+	iscsi_net->tweaks.nodelay = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, ihp->hba_dip, 0, "tcp-nodelay",
+	    ISCSI_TCP_NODELAY_DEFAULT);
 
-			iscsi_net->tweaks.abort_threshold = ddi_prop_get_int(
-			    DDI_DEV_T_ANY, ihp->hba_dip, 0,
-			    "tcp-abort-threshold",
-			    ISCSI_TCP_ABORT_THRESHOLD_DEFAULT);
+	iscsi_net->tweaks.conn_notify_threshold =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    ihp->hba_dip, 0, "tcp-conn-notify-threshold",
+	    ISCSI_TCP_CNOTIFY_THRESHOLD_DEFAULT);
 
-			ihp->hba_config_storm_delay = ddi_prop_get_int(
-			    DDI_DEV_T_ANY, ihp->hba_dip, 0,
-			    "config-storm-delay",
-			    ISCSI_CONFIG_STORM_DELAY_DEFAULT);
+	iscsi_net->tweaks.conn_abort_threshold =
+	    ddi_prop_get_int(DDI_DEV_T_ANY, ihp->hba_dip,
+	    0, "tcp-conn-abort-threshold",
+	    ISCSI_TCP_CABORT_THRESHOLD_DEFAULT);
 
-			(void) ddi_prop_update_int(DDI_DEV_T_NONE, ihp->hba_dip,
-			    "so-rcvbuf", iscsi_net->tweaks.rcvbuf);
+	iscsi_net->tweaks.abort_threshold = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, ihp->hba_dip, 0,
+	    "tcp-abort-threshold",
+	    ISCSI_TCP_ABORT_THRESHOLD_DEFAULT);
 
-			(void) ddi_prop_update_int(DDI_DEV_T_NONE, ihp->hba_dip,
-			    "so-sndbuf", iscsi_net->tweaks.sndbuf);
+	ihp->hba_config_storm_delay = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, ihp->hba_dip, 0,
+	    "config-storm-delay",
+	    ISCSI_CONFIG_STORM_DELAY_DEFAULT);
 
-			(void) ddi_prop_update_int(DDI_DEV_T_NONE, ihp->hba_dip,
-			    "tcp-nodelay", iscsi_net->tweaks.nodelay);
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, ihp->hba_dip,
+	    "so-rcvbuf", iscsi_net->tweaks.rcvbuf);
 
-			(void) ddi_prop_update_int(DDI_DEV_T_NONE, ihp->hba_dip,
-			    "tcp-conn-notify-threshold",
-			    iscsi_net->tweaks.conn_notify_threshold);
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, ihp->hba_dip,
+	    "so-sndbuf", iscsi_net->tweaks.sndbuf);
 
-			(void) ddi_prop_update_int(DDI_DEV_T_NONE, ihp->hba_dip,
-			    "tcp-conn-abort-threshold",
-			    iscsi_net->tweaks.conn_abort_threshold);
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, ihp->hba_dip,
+	    "tcp-nodelay", iscsi_net->tweaks.nodelay);
 
-			(void) ddi_prop_update_int(DDI_DEV_T_NONE, ihp->hba_dip,
-			    "tcp-abort-threshold",
-			    iscsi_net->tweaks.abort_threshold);
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, ihp->hba_dip,
+	    "tcp-conn-notify-threshold",
+	    iscsi_net->tweaks.conn_notify_threshold);
 
-			(void) ddi_prop_update_int(DDI_DEV_T_NONE, ihp->hba_dip,
-			    "config-storm-delay",
-			    ihp->hba_config_storm_delay);
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, ihp->hba_dip,
+	    "tcp-conn-abort-threshold",
+	    iscsi_net->tweaks.conn_abort_threshold);
 
-			/* setup hba defaults */
-			iscsi_set_default_login_params(&ihp->hba_params);
-			iscsi_set_default_tunable_params(
-			    &ihp->hba_tunable_params);
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, ihp->hba_dip,
+	    "tcp-abort-threshold",
+	    iscsi_net->tweaks.abort_threshold);
 
-			/* setup minimal initiator params */
-			iscsid_set_default_initiator_node_settings(ihp, B_TRUE);
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, ihp->hba_dip,
+	    "config-storm-delay",
+	    ihp->hba_config_storm_delay);
 
-			/* hba set up */
-			tran->tran_hba_private  = ihp;
-			tran->tran_tgt_private  = NULL;
-			tran->tran_tgt_init	= iscsi_tran_lun_init;
-			tran->tran_tgt_probe	= iscsi_tran_lun_probe;
-			tran->tran_tgt_free	= iscsi_tran_lun_free;
-			tran->tran_start	= iscsi_tran_start;
-			tran->tran_abort	= iscsi_tran_abort;
-			tran->tran_reset	= iscsi_tran_reset;
-			tran->tran_getcap	= iscsi_tran_getcap;
-			tran->tran_setcap	= iscsi_tran_setcap;
-			tran->tran_init_pkt	= iscsi_tran_init_pkt;
-			tran->tran_destroy_pkt	= iscsi_tran_destroy_pkt;
-			tran->tran_dmafree	= iscsi_tran_dmafree;
-			tran->tran_sync_pkt	= iscsi_tran_sync_pkt;
-			tran->tran_reset_notify	= iscsi_tran_reset_notify;
-			tran->tran_bus_config	= iscsi_tran_bus_config;
-			tran->tran_bus_unconfig	= iscsi_tran_bus_unconfig;
+	/* setup hba defaults */
+	iscsi_set_default_login_params(&ihp->hba_params);
+	iscsi_set_default_tunable_params(
+	    &ihp->hba_tunable_params);
 
-			tran->tran_get_name	= iscsi_tran_get_name;
-			tran->tran_get_bus_addr	= iscsi_tran_get_bus_addr;
-			tran->tran_interconnect_type = INTERCONNECT_ISCSI;
+	/* setup minimal initiator params */
+	iscsid_set_default_initiator_node_settings(ihp, B_TRUE);
 
-			/* register scsi hba with scsa */
-			if (scsi_hba_attach_setup(dip, &iscsi_dma_attr,
-			    tran, SCSI_HBA_TRAN_CLONE) != DDI_SUCCESS) {
-				goto iscsi_attach_failed1;
-			}
+	/* hba set up */
+	tran->tran_hba_private  = ihp;
+	tran->tran_tgt_private  = NULL;
+	tran->tran_tgt_init	= iscsi_tran_lun_init;
+	tran->tran_tgt_probe	= iscsi_tran_lun_probe;
+	tran->tran_tgt_free	= iscsi_tran_lun_free;
+	tran->tran_start	= iscsi_tran_start;
+	tran->tran_abort	= iscsi_tran_abort;
+	tran->tran_reset	= iscsi_tran_reset;
+	tran->tran_getcap	= iscsi_tran_getcap;
+	tran->tran_setcap	= iscsi_tran_setcap;
+	tran->tran_init_pkt	= iscsi_tran_init_pkt;
+	tran->tran_destroy_pkt	= iscsi_tran_destroy_pkt;
+	tran->tran_dmafree	= iscsi_tran_dmafree;
+	tran->tran_sync_pkt	= iscsi_tran_sync_pkt;
+	tran->tran_reset_notify	= iscsi_tran_reset_notify;
+	tran->tran_bus_config	= iscsi_tran_bus_config;
+	tran->tran_bus_unconfig	= iscsi_tran_bus_unconfig;
 
-			/* register scsi hba with mdi (MPxIO/vhci) */
-			if (mdi_phci_register(MDI_HCI_CLASS_SCSI, dip, 0) !=
-			    MDI_SUCCESS) {
-				ihp->hba_mpxio_enabled = B_FALSE;
-			} else {
-				ihp->hba_mpxio_enabled = B_TRUE;
-			}
+	tran->tran_get_name	= iscsi_tran_get_name;
+	tran->tran_get_bus_addr	= iscsi_tran_get_bus_addr;
+	tran->tran_interconnect_type = INTERCONNECT_ISCSI;
 
-			(void) iscsi_hba_kstat_init(ihp);
+	/* register scsi hba with scsa */
+	if (scsi_hba_attach_setup(dip, &iscsi_dma_attr,
+	    tran, SCSI_HBA_TRAN_CLONE) != DDI_SUCCESS) {
+		goto iscsi_attach_failed1;
+	}
 
-			/* Initialize targetparam list */
-			iscsi_targetparam_init();
+	/* register scsi hba with mdi (MPxIO/vhci) */
+	if (mdi_phci_register(MDI_HCI_CLASS_SCSI, dip, 0) !=
+	    MDI_SUCCESS) {
+		ihp->hba_mpxio_enabled = B_FALSE;
+	} else {
+		ihp->hba_mpxio_enabled = B_TRUE;
+	}
 
-			/* Initialize ISID */
-			ihp->hba_isid[0] = ISCSI_SUN_ISID_0;
-			ihp->hba_isid[1] = ISCSI_SUN_ISID_1;
-			ihp->hba_isid[2] = ISCSI_SUN_ISID_2;
-			ihp->hba_isid[3] = ISCSI_SUN_ISID_3;
-			ihp->hba_isid[4] = ISCSI_SUN_ISID_4;
-			ihp->hba_isid[5] = ISCSI_SUN_ISID_5;
+	(void) iscsi_hba_kstat_init(ihp);
 
-			/* Setup iSNS transport services and client */
-			isns_client_init();
+	/* Initialize targetparam list */
+	iscsi_targetparam_init();
 
-			/*
-			 * initialize persistent store,
-			 * or boot target info in case of iscsi boot
-			 */
-			ihp->hba_persistent_loaded = B_FALSE;
-			if (iscsid_init(ihp) == B_FALSE) {
-				goto iscsi_attach_failed0;
-			}
+	/* Initialize ISID */
+	ihp->hba_isid[0] = ISCSI_SUN_ISID_0;
+	ihp->hba_isid[1] = ISCSI_SUN_ISID_1;
+	ihp->hba_isid[2] = ISCSI_SUN_ISID_2;
+	ihp->hba_isid[3] = ISCSI_SUN_ISID_3;
+	ihp->hba_isid[4] = ISCSI_SUN_ISID_4;
+	ihp->hba_isid[5] = ISCSI_SUN_ISID_5;
 
-			/* Setup init_port_name for MPAPI */
-			(void) snprintf(init_port_name, MAX_NAME_PROP_SIZE,
-			    "%s,%02x%02x%02x%02x%02x%02x",
-			    (char *)ihp->hba_name, ihp->hba_isid[0],
-			    ihp->hba_isid[1], ihp->hba_isid[2],
-			    ihp->hba_isid[3], ihp->hba_isid[4],
-			    ihp->hba_isid[5]);
+	/* Setup iSNS transport services and client */
+	isns_client_init();
 
-			if (ddi_prop_update_string(DDI_DEV_T_NONE, dip,
-			    SCSI_ADDR_PROP_INITIATOR_PORT, init_port_name) !=
-			    DDI_PROP_SUCCESS) {
-				cmn_err(CE_WARN, "iscsi_attach: Creating "
-				    SCSI_ADDR_PROP_INITIATOR_PORT
-				    " property on iSCSI "
-				    "HBA(%s) with dip(%d) Failed",
-				    (char *)ihp->hba_name,
-				    ddi_get_instance(dip));
-			}
+	/*
+	 * initialize persistent store,
+	 * or boot target info in case of iscsi boot
+	 */
+	ihp->hba_persistent_loaded = B_FALSE;
+	if (iscsid_init(ihp) == B_FALSE) {
+		goto iscsi_attach_failed0;
+	}
 
-			ddi_report_dev(dip);
-		} else {
-			rval = DDI_FAILURE;
-		}
-		break;
+	/* Setup init_port_name for MPAPI */
+	(void) snprintf(init_port_name, MAX_NAME_PROP_SIZE,
+	    "%s,%02x%02x%02x%02x%02x%02x",
+	    (char *)ihp->hba_name, ihp->hba_isid[0],
+	    ihp->hba_isid[1], ihp->hba_isid[2],
+	    ihp->hba_isid[3], ihp->hba_isid[4],
+	    ihp->hba_isid[5]);
+
+	if (ddi_prop_update_string(DDI_DEV_T_NONE, dip,
+	    SCSI_ADDR_PROP_INITIATOR_PORT, init_port_name) !=
+	    DDI_PROP_SUCCESS) {
+		cmn_err(CE_WARN, "iscsi_attach: Creating "
+		    SCSI_ADDR_PROP_INITIATOR_PORT
+		    " property on iSCSI "
+		    "HBA(%s) with dip(%d) Failed",
+		    (char *)ihp->hba_name,
+		    ddi_get_instance(dip));
+	}
+
+	ddi_report_dev(dip);
+	return (DDI_SUCCESS);
 
 iscsi_attach_failed0:
-		isns_client_cleanup();
-		if (ihp->stats.ks) {
-			(void) iscsi_hba_kstat_term(ihp);
-		}
-		if (ihp->hba_mpxio_enabled == B_TRUE) {
-			(void) mdi_phci_unregister(dip, 0);
-		}
-		(void) scsi_hba_detach(ihp->hba_dip);
+	isns_client_cleanup();
+	if (ihp->stats.ks) {
+		(void) iscsi_hba_kstat_term(ihp);
+	}
+	if (ihp->hba_mpxio_enabled == B_TRUE) {
+		(void) mdi_phci_unregister(dip, 0);
+	}
+	(void) scsi_hba_detach(ihp->hba_dip);
 iscsi_attach_failed1:
-		ddi_remove_minor_node(dip, NULL);
-		ddi_prop_remove_all(ihp->hba_dip);
-		scsi_hba_tran_free(tran);
+	ddi_remove_minor_node(dip, NULL);
+	ddi_prop_remove_all(ihp->hba_dip);
+	scsi_hba_tran_free(tran);
 iscsi_attach_failed2:
-		cv_destroy(&ihp->hba_service_cv);
-		mutex_destroy(&ihp->hba_service_lock);
-		mutex_destroy(&ihp->hba_discovery_events_mutex);
-		sema_destroy(&ihp->hba_sendtgts_semaphore);
-		rw_destroy(&ihp->hba_sess_list_rwlock);
-		ddi_soft_state_free(iscsi_state, instance);
-		rval = DDI_FAILURE;
-		break;
-
-	case DDI_RESUME:
-		break;
-
-	default:
-		rval = DDI_FAILURE;
-	}
-
-	if (rval != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "iscsi driver unable to attach "
-		    "hba instance %d", instance);
-	}
-
-	return (rval);
+	cv_destroy(&ihp->hba_service_cv);
+	mutex_destroy(&ihp->hba_service_lock);
+	mutex_destroy(&ihp->hba_discovery_events_mutex);
+	sema_destroy(&ihp->hba_sendtgts_semaphore);
+	rw_destroy(&ihp->hba_sess_list_rwlock);
+	ddi_soft_state_free(iscsi_state, instance);
+iscsi_attach_failed3:
+	cmn_err(CE_WARN, "iscsi driver unable to attach "
+	    "hba instance %d", instance);
+	return (DDI_FAILURE);
 }
 
 /*
@@ -1479,7 +1475,7 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	iscsi_auth_props_t	    *auth		= NULL;
 	iscsi_lun_list_t	    *ll, *llp		= NULL;
 	iscsi_lun_props_t	    *lun		= NULL;
-	iscsi_lun_t		    *ilp 		= NULL;
+	iscsi_lun_t		    *ilp		= NULL;
 	iSCSIDiscoveryMethod_t	    method;
 	iSCSIDiscoveryProperties_t  discovery_props;
 	iscsi_uscsi_t		    iu;
@@ -5009,7 +5005,8 @@ iscsi_set_default_tunable_params(iscsi_tunable_params_t *params)
  */
 int
 iscsi_get_param(iscsi_login_params_t *params, boolean_t valid_flag,
-    iscsi_param_get_t *ipgp) {
+    iscsi_param_get_t *ipgp)
+{
 	int rtn = 0;
 
 	/* ---- Default to settable, possibly changed later ---- */
@@ -5399,7 +5396,8 @@ iscsi_cmp_boot_sess_oid(iscsi_hba_t *ihp, uint32_t oid)
  *     blocks until the service status is either enabled or disabled
  */
 boolean_t
-iscsi_client_request_service(iscsi_hba_t *ihp) {
+iscsi_client_request_service(iscsi_hba_t *ihp)
+{
 	boolean_t	rval = B_TRUE;
 
 	mutex_enter(&ihp->hba_service_lock);
@@ -5422,7 +5420,8 @@ iscsi_client_request_service(iscsi_hba_t *ihp) {
  *     blocking threads if the count reaches zero
  */
 void
-iscsi_client_release_service(iscsi_hba_t *ihp) {
+iscsi_client_release_service(iscsi_hba_t *ihp)
+{
 	mutex_enter(&ihp->hba_service_lock);
 	ASSERT(ihp->hba_service_client_count > 0);
 	ihp->hba_service_client_count--;
@@ -5439,7 +5438,8 @@ iscsi_client_release_service(iscsi_hba_t *ihp) {
  *	  FALSE if no need to enter the zone
  */
 static boolean_t
-iscsi_enter_service_zone(iscsi_hba_t *ihp, uint32_t status) {
+iscsi_enter_service_zone(iscsi_hba_t *ihp, uint32_t status)
+{
 	if ((status != ISCSI_SERVICE_ENABLED) &&
 	    (status != ISCSI_SERVICE_DISABLED)) {
 		return (B_FALSE);
@@ -5465,7 +5465,8 @@ iscsi_enter_service_zone(iscsi_hba_t *ihp, uint32_t status) {
  * iscsi_exit_service_zone - exits the service zone and wakes up waiters
  */
 static void
-iscsi_exit_service_zone(iscsi_hba_t *ihp, uint32_t status) {
+iscsi_exit_service_zone(iscsi_hba_t *ihp, uint32_t status)
+{
 	if ((status != ISCSI_SERVICE_ENABLED) &&
 	    (status != ISCSI_SERVICE_DISABLED)) {
 		return;
@@ -5479,7 +5480,8 @@ iscsi_exit_service_zone(iscsi_hba_t *ihp, uint32_t status) {
 }
 
 static void
-iscsi_check_miniroot(iscsi_hba_t *ihp) {
+iscsi_check_miniroot(iscsi_hba_t *ihp)
+{
 	if (strncmp(rootfs.bo_name, "/ramdisk", 8) == 0) {
 		/*
 		 * in miniroot we don't have the persistent store
@@ -5490,7 +5492,8 @@ iscsi_check_miniroot(iscsi_hba_t *ihp) {
 }
 
 static void
-iscsi_get_tunable_default(iscsi_tunable_object_t *param) {
+iscsi_get_tunable_default(iscsi_tunable_object_t *param)
+{
 	int	param_id = 0;
 
 	param_id = 1 << (param->t_param - 1);
@@ -5514,7 +5517,7 @@ iscsi_get_tunable_default(iscsi_tunable_object_t *param) {
  * iscsi_get_persisted_tunable_param * - a helper to ISCSI_TUNABLE_PARAM_GET
  * ioctl
  * return:
- *    0 	persisted tunable parameter found
+ *    0		persisted tunable parameter found
  *    1		persisted tunable parameter not found
  */
 static int

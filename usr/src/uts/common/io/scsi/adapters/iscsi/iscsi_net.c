@@ -149,7 +149,6 @@ const int   is_incoming_opcode_invalid[256] = {
 #define	IP_4_BITS	32
 #define	IP_6_BITS	128
 
-extern int modrootloaded;
 extern ib_boot_prop_t   *iscsiboot_prop;
 
 /* prototypes */
@@ -270,7 +269,7 @@ static void *
 iscsi_net_socket(int domain, int type, int protocol)
 {
 	ksocket_t	socket;
-	int 		err	= 0;
+	int		err	= 0;
 
 	err = ksocket_socket(&socket, domain, type, protocol, KSOCKET_SLEEP,
 	    CRED());
@@ -287,7 +286,7 @@ iscsi_net_socket(int domain, int type, int protocol)
 /* ARGSUSED */
 static int
 iscsi_net_bind(void *socket, struct sockaddr *name, int name_len,
-	int backlog, int flags)
+    int backlog, int flags)
 {
 	ksocket_t ks = (ksocket_t)socket;
 	int error;
@@ -304,7 +303,7 @@ iscsi_net_bind(void *socket, struct sockaddr *name, int name_len,
 /* ARGSUSED */
 static int
 iscsi_net_connect(void *socket, struct sockaddr *name, int name_len,
-	int fflag, int flags)
+    int fflag, int flags)
 {
 	ksocket_t ks = (ksocket_t)socket;
 	int rval;
@@ -356,7 +355,7 @@ iscsi_net_getsockname(void *socket, struct sockaddr *addr, socklen_t *addrlen)
 /* ARGSUSED */
 static int
 iscsi_net_getsockopt(void *socket, int level, int option_name,
-	void *option_val, int *option_len, int flags)
+    void *option_val, int *option_len, int flags)
 {
 	ksocket_t ks = (ksocket_t)socket;
 	return (ksocket_getsockopt(ks, level, option_name, option_val,
@@ -368,7 +367,7 @@ iscsi_net_getsockopt(void *socket, int level, int option_name,
  */
 static int
 iscsi_net_setsockopt(void *socket, int level, int option_name,
-	void *option_val, int option_len)
+    void *option_val, int option_len)
 {
 	ksocket_t ks = (ksocket_t)socket;
 	return (ksocket_setsockopt(ks, level, option_name, option_val,
@@ -457,7 +456,7 @@ iscsi_net_recvmsg(void *socket, struct msghdr *msg, int timeout)
 {
 	int		prflag	    = msg->msg_flags;
 	ksocket_t	ks	    = (ksocket_t)socket;
-	size_t 		recv	    = 0;
+	size_t		recv	    = 0;
 
 	/* Set recv timeout */
 	if (get_udatamodel() == DATAMODEL_NONE ||

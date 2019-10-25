@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
  */
 
 /*
@@ -255,16 +256,27 @@ iscsid_init(iscsi_hba_t *ihp)
 	persistent_init();
 	iscsid_threads_create(ihp);
 
-	if (modrootloaded == 1) {
-		/* normal case, load the persistent store */
+	if (modrootloaded) {
+		/*
+		 * The root file system is available so we can load the
+		 * persistent store.
+		 */
 		if (persistent_load() == B_TRUE) {
 			ihp->hba_persistent_loaded = B_TRUE;
 		} else {
 			return (B_FALSE);
 		}
-	}
+	} else {
+		/*
+		 * If the root file system is not yet mounted then we _must_ be
+		 * booting from an iSCSI device.  If not, we want to fail to
+		 * attach so that we can try again after the VFS root is
+		 * available.
+		 */
+		if (iscsiboot_prop == NULL) {
+			return (B_FALSE);
+		}
 
-	if ((modrootloaded == 0) && (iscsiboot_prop != NULL)) {
 		if (!iscsid_boot_init_config(ihp)) {
 			rval = B_FALSE;
 		} else {
@@ -272,7 +284,7 @@ iscsid_init(iscsi_hba_t *ihp)
 			iscsi_boot_wd_handle =
 			    iscsi_thread_create(ihp->hba_dip,
 			    "BootWD", iscsid_thread_boot_wd, ihp);
-			if (iscsi_boot_wd_handle) {
+			if (iscsi_boot_wd_handle != NULL) {
 				rval = iscsi_thread_start(
 				    iscsi_boot_wd_handle);
 			} else {
@@ -294,7 +306,8 @@ iscsid_init(iscsi_hba_t *ihp)
  * persistent store, as an economic way to present the 'daemon' funtionality
  */
 boolean_t
-iscsid_start(iscsi_hba_t *ihp) {
+iscsid_start(iscsi_hba_t *ihp)
+{
 	boolean_t		rval = B_FALSE;
 	iSCSIDiscoveryMethod_t	dm;
 	iSCSIDiscoveryMethod_t	*fdm;
@@ -339,7 +352,8 @@ iscsid_start(iscsi_hba_t *ihp) {
  * (and therefore session) there and just return.
  */
 boolean_t
-iscsid_stop(iscsi_hba_t *ihp) {
+iscsid_stop(iscsi_hba_t *ihp)
+{
 	boolean_t		rval = B_FALSE;
 	iscsi_sess_t		*isp = NULL;
 
