@@ -16,27 +16,32 @@
  */
 
 #include "smatch.h"
+#include <fcntl.h>
 #include <unistd.h>
+#include <sys/procfs.h>
 
 static int my_id;
+static int my_fd = -2;
 
 static unsigned long max_size;
 
 unsigned long get_mem_kb(void)
 {
-	FILE *file;
-	char buf[1024];
-	unsigned long size;
+	prpsinfo_t pbuf;
 
-	file = fopen("/proc/self/statm", "r");
-	if (!file)
-		return 0;
-	fread(buf, 1, sizeof(buf), file);
-	fclose(file);
+	if (my_fd == -2) {
+		/* Do not repeatedly attempt this if it fails. */
+		my_fd = open("/proc/self/psinfo", O_RDONLY);
+	}
+	if (my_fd == -1) {
+		return (0);
+	}
 
-	size = strtoul(buf, NULL, 10);
-	size = size * sysconf(_SC_PAGESIZE) / 1024;
-	return size;
+	if (pread(my_fd, &pbuf, sizeof (pbuf), 0) != sizeof (pbuf)) {
+		return (0);
+	}
+
+	return (pbuf.pr_rssize);
 }
 
 static void match_end_func(struct symbol *sym)
