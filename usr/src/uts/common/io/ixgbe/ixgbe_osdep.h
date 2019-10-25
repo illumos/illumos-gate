@@ -59,7 +59,7 @@ extern "C" {
 #include "ixgbe_debug.h"
 
 /* Cheesy hack for EWARN() */
-#define	EWARN(H, W, S) cmn_err(CE_NOTE, W)
+#define	EWARN(H, W) cmn_err(CE_NOTE, W)
 
 /* function declarations */
 struct ixgbe_hw;
@@ -77,8 +77,8 @@ boolean_t ixgbe_removed(struct ixgbe_hw *);
 #define	FALSE		B_FALSE
 #define	TRUE		B_TRUE
 
-#define	IXGBE_READ_PCIE_WORD 	ixgbe_read_pci_cfg
-#define	IXGBE_WRITE_PCIE_WORD 	ixgbe_write_pci_cfg
+#define	IXGBE_READ_PCIE_WORD	ixgbe_read_pci_cfg
+#define	IXGBE_WRITE_PCIE_WORD	ixgbe_write_pci_cfg
 #define	CMD_MEM_WRT_INVALIDATE	0x0010	/* BIT_4 */
 #define	PCI_COMMAND_REGISTER	0x04
 #define	PCI_EX_CONF_CAP		0xE0
@@ -111,15 +111,19 @@ boolean_t ixgbe_removed(struct ixgbe_hw *);
 #define	IXGBE_NTOHS	ntohs
 
 #ifdef _BIG_ENDIAN
+#define	IXGBE_CPU_TO_LE16	BSWAP_16
 #define	IXGBE_CPU_TO_LE32	BSWAP_32
 #define	IXGBE_LE32_TO_CPUS	BSWAP_32
 #define	IXGBE_CPU_TO_BE16(x)	(x)
 #define	IXGBE_CPU_TO_BE32(x)	(x)
+#define	IXGBE_BE32_TO_CPU(x)	(x)
 #else
+#define	IXGBE_CPU_TO_LE16(x)	(x)
 #define	IXGBE_CPU_TO_LE32(x)	(x)
 #define	IXGBE_LE32_TO_CPUS(x)	(x)
 #define	IXGBE_CPU_TO_BE16	BSWAP_16
 #define	IXGBE_CPU_TO_BE32	BSWAP_32
+#define	IXGBE_BE32_TO_CPU	BSWAP_32
 #endif /* _BIG_ENDIAN */
 
 #define	UNREFERENCED_PARAMETER(x)		_NOTE(ARGUNUSED(x))
@@ -135,11 +139,11 @@ typedef	int8_t		s8;
 typedef	int16_t		s16;
 typedef	int32_t		s32;
 typedef	int64_t		s64;
-typedef uint8_t		u8;
-typedef	uint16_t 	u16;
+typedef	uint8_t		u8;
+typedef	uint16_t	u16;
 typedef	uint32_t	u32;
 typedef	uint64_t	u64;
-typedef boolean_t	bool;
+typedef	boolean_t	bool;
 
 /* shared code requires this */
 #define	__le16  u16

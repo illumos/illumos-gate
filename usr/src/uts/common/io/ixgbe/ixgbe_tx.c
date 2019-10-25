@@ -1103,6 +1103,7 @@ ixgbe_tx_fill_ring(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list,
 	case ixgbe_mac_X540:
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
+	case ixgbe_mac_X550EM_a:
 		if (ctx != NULL && ctx->lso_flag) {
 			first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_TSE;
 			first_tbd->read.olinfo_status |=

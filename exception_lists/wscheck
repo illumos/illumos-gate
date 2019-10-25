@@ -19,3 +19,4 @@ usr/src/data/perfmon/readme.txt
 usr/src/tools/smatch/src/*
 usr/src/uts/common/io/qede/*
 usr/src/uts/common/io/i40e/core/*
+usr/src/uts/common/io/ixgbe/core/*

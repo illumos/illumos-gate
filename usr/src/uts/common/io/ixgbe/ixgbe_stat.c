@@ -122,6 +122,7 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 		case ixgbe_mac_X540:
 		case ixgbe_mac_X550:
 		case ixgbe_mac_X550EM_x:
+		case ixgbe_mac_X550EM_a:
 			ixgbe_ks->qbtc[i].value.ui64 +=
 			    IXGBE_READ_REG(hw, IXGBE_QBTC_L(i));
 			ixgbe_ks->qbtc[i].value.ui64 +=
@@ -178,6 +179,7 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 	case ixgbe_mac_X540:
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
+	case ixgbe_mac_X550EM_a:
 		ixgbe_ks->lxonrxc.value.ui64 += IXGBE_READ_REG(hw,
 		    IXGBE_LXONRXCNT);
 		break;
@@ -196,6 +198,7 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 	case ixgbe_mac_X540:
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
+	case ixgbe_mac_X550EM_a:
 		ixgbe_ks->lxoffrxc.value.ui64 += IXGBE_READ_REG(hw,
 		    IXGBE_LXOFFRXCNT);
 		break;
@@ -591,6 +594,7 @@ ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
 			case ixgbe_mac_X540:
 			case ixgbe_mac_X550:
 			case ixgbe_mac_X550EM_x:
+			case ixgbe_mac_X550EM_a:
 				ixgbe_ks->qbtc[i].value.ui64 +=
 				    IXGBE_READ_REG(hw, IXGBE_QBTC_L(i));
 				ixgbe_ks->qbtc[i].value.ui64 +=

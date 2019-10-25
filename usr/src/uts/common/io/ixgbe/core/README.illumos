@@ -12,3 +12,13 @@ check. Instead we modify all users of this macro to pass the struct
 ixgbe_hw of the ixgbe_t. Importantly, we also remove the current
 definition of IXGBE_REMOVED in ixbe_common.h and instead use the
 definition in ixgbe_osdep.h.
+
+o ixgbe_get_oem_prod_version()
+
+This function has a smatch error. It checks for:
+
+	if (offset == 0x0 && offset == NVM_INVALID_PTR)
+
+That condition can never occur. It should instead be:
+
+	if (offset == 0x0 || offset == NVM_INVALID_PTR)
