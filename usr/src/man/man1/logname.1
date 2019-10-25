@@ -44,44 +44,23 @@
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved
 .\"
-.TH LOGNAME 1 "Aug 11, 2009"
+.TH LOGNAME 1 "October 25, 2019"
 .SH NAME
 logname \- return user's login name
 .SH SYNOPSIS
-.LP
 .nf
-\fB/usr/bin/logname\fR
-.fi
-
-.SS "ksh93"
-.sp
-.LP
 \fBlogname\fR
 .SH DESCRIPTION
-.SS "/usr/bin/logname"
-.sp
-.LP
-The \fBlogname\fR utility writes the user's login name to standard output. The
-login name is the string that would be returned by the \fBgetlogin\fR(3C)
-function. Under the conditions where \fBgetlogin()\fR would fail, \fBlogname\fR
-will write a diagnostic message to standard error and exit with a non-zero exit
-status.
-.SS "ksh93"
-.sp
-.LP
 The \fBlogname\fR utility writes the user's login name to standard output. The
 login name is the string that would be returned by the \fBgetlogin\fR(3C)
 function. If \fBgetlogin()\fR does not return successfully, the name
-corresponding to the real user IDof the calling process is used instead.
+corresponding to the real user ID of the calling process is used instead.
+If a name cannot be found, the user's ID will be printed.
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBlogname\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
-.LP
 The following error values are returned:
 .sp
 .ne 2
@@ -102,7 +81,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/profile\fR\fR
@@ -121,8 +99,6 @@ user and accounting information
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -139,7 +115,5 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBenv\fR(1), \fBlogin\fR(1), \fBgetlogin\fR(3C), \fButmpx\fR(4),
 \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
