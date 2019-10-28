@@ -373,14 +373,15 @@ u_int flags;
 	if (fin->fin_fr != NULL) {
 		ipfl.fl_loglevel = fin->fin_fr->fr_loglevel;
 		ipfl.fl_logtag = fin->fin_fr->fr_logtag;
+		bcopy(fin->fin_fr->fr_uuid, ipfl.fl_uuid, sizeof (uuid_t));
 	} else {
 		ipfl.fl_loglevel = 0xffff;
 		ipfl.fl_logtag = FR_NOLOGTAG;
+		bzero(ipfl.fl_uuid, sizeof (uuid_t));
 	}
 	if (fin->fin_nattag != NULL)
 		bcopy(fin->fin_nattag, (void *)&ipfl.fl_nattag,
 		      sizeof(ipfl.fl_nattag));
-	bcopy(fin->fin_fr->fr_uuid, ipfl.fl_uuid, sizeof (ipfl.fl_uuid));
 	ipfl.fl_flags = flags;
 	ipfl.fl_dir = fin->fin_out;
 	ipfl.fl_lflags = fin->fin_flx;
