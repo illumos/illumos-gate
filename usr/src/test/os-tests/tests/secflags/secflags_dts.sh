@@ -52,6 +52,7 @@ check() {
 
     $bin &
     pid=$!
+    sleep 1
     psecflags $pid | grep -q "${set}:.*aslr"
     (( $? != $state )) && ret=1
     kill -9 $pid

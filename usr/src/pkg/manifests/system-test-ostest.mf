@@ -84,6 +84,5 @@ file path=opt/os-tests/tests/spoof-ras mode=0555
 file path=opt/os-tests/tests/stress/dladm-kstat mode=0555
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-depend fmri=pkg:/network/telnet type=require
 depend fmri=system/io/tests type=require
 depend fmri=system/test/testrunner type=require

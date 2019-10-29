@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _BSM_AUDIT_RECORD_H
@@ -189,6 +191,12 @@ extern "C" {
 #define	AUT_IN_ADDR_EX		((char)0x7e)
 #define	AUT_SOCKET_EX		((char)0x7f)
 
+/*
+ * Can't do >= 0x80 because these are chars. 0x16/0x17 seem to be free here,
+ * but who knows if they have historical uses
+ */
+#define	AUT_ACCESS_MASK		((char)0x16)
+#define	AUT_WSID		((char)0x17)
 
 /*
  * Audit print suggestion types.

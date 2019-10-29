@@ -41,20 +41,15 @@ else
 	endif
 endif
 
-#
-# use less(1) as the default pager for the man(1) command.
-#
-setenv PAGER "/usr/bin/less -ins"
-
 if (! -e .hushlogin ) then
 	/usr/sbin/quota
 	/bin/cat -s /etc/motd
 	/bin/mail -E
 	switch ( $status )
-	case 0: 
+	case 0:
 		echo "You have new mail."
 		breaksw;
-	case 2: 
+	case 2:
 		echo "You have mail."
 		breaksw;
 	endsw

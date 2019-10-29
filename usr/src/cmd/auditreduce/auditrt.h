@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _AUDITRT_H
@@ -155,6 +157,7 @@ typedef struct audit_pcb audit_pcb_t;
 #define	OBJ_SHMOWNER	0x10000  /* 'o' shared memory [c]owner */
 #define	OBJ_FMRI	0x20000  /* 'o' fmri object */
 #define	OBJ_USER	0x40000  /* 'o' user object */
+#define	OBJ_WSID	0x80000  /* 'o' windows sid object */
 
 #define	SOCKFLG_MACHINE 0	/* search socket token by machine name */
 #define	SOCKFLG_PORT    1	/* search socket token by port number */

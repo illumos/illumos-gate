@@ -11127,6 +11127,9 @@ d usr/share/lib/terminfo/a 0755 root bin
 f usr/share/lib/terminfo/a/ansi 0644 root bin
 f usr/share/lib/terminfo/a/ansi+arrows 0644 root bin
 f usr/share/lib/terminfo/a/at386 0644 root bin
+d usr/share/lib/terminfo/r 0755 root bin
+f usr/share/lib/terminfo/r/rxvt-unicode 0644 root bin
+f usr/share/lib/terminfo/r/rxvt-unicode-256color 0644 root bin
 d usr/share/lib/terminfo/s 0755 root bin
 f usr/share/lib/terminfo/s/screen 0644 root bin
 f usr/share/lib/terminfo/s/screen-256color 0644 root bin

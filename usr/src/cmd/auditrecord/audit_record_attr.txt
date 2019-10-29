@@ -3,6 +3,7 @@
 # other comments are removed.
 ##
 ## Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+## Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 ## Copyright 2019 Joyent, Inc.
 ##
 ## CDDL HEADER START
@@ -1484,6 +1485,14 @@ label=AUE_RFSSYS
 
 label=AUE_RMDIR
   format=path:[attr]
+
+label=AUE_SACL
+  title=File Access Audit
+  syscall=none
+  see=none
+  format=head:path:arg1:[text]2:subj
+    comment="access_mask":
+    comment="Windows SID"
 
 label=AUE_SEMCTL
   format=arg1:[ipc]:[ipc_perm]
