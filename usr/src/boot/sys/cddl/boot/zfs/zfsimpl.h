@@ -1671,7 +1671,8 @@ typedef struct vdev {
 	const char	*v_phys_path;	/* vdev bootpath */
 	const char	*v_devid;	/* vdev devid */
 	uint64_t	v_guid;		/* vdev guid */
-	int		v_id;		/* index in parent */
+	uint64_t	v_id;		/* index in parent */
+	uint64_t	v_psize;	/* physical device capacity */
 	int		v_ashift;	/* offset to block shift */
 	int		v_nparity;	/* # parity for raidz */
 	struct vdev	*v_top;		/* parent vdev */
