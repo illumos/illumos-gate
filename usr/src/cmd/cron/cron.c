@@ -311,7 +311,6 @@ static struct usr *find_usr(char *);
 static int ex(struct event *e);
 static void read_dirs(int);
 static void mail(char *, char *, int);
-static char *next_field(int, int);
 static void readcron(char *, struct usr *, time_t);
 static void readcronfile(FILE *, struct usr *, time_t);
 static int next_ge(int, char *);

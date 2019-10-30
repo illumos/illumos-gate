@@ -102,15 +102,15 @@ XPG4ATOBJS=	$(ATOBJS:%=objs.xpg4/%) $(XPG4OBJS:%=objs.xpg4/%)
 XPG6COMMONOBJS=	$(COMMONOBJS:%=objs.xpg6/%)
 XPG6CTOBJS=	$(CRONTABOBJS:%=objs.xpg6/%)
 
-cron :=		POBJS = $(CRONOBJS) $(COMMONOBJ2)
-at :=		POBJS = $(ATOBJS) $(COMMONOBJS)
-at.xpg4 :=	POBJS = $(XPG4ATOBJS) $(XPG4COMMONOBJS)
-atrm :=		POBJS = $(ATRMOBJS) $(COMMONOBJS)
-atq :=		POBJS = $(ATQOBJS) $(COMMONOBJS)
-crontab :=	POBJS = $(CRONTABOBJS) $(COMMONOBJS)
-crontab.xpg4 :=	POBJS = $(XPG4CTOBJS) $(XPG4COMMONOBJS)
-crontab.xpg6 :=	POBJS = $(XPG6CTOBJS) $(XPG6COMMONOBJS)
-parsetest :=	POBJS = $(PARSETESTOBJS)
+cron :=		OBJS = $(CRONOBJS) $(COMMONOBJ2)
+at :=		OBJS = $(ATOBJS) $(COMMONOBJS)
+at.xpg4 :=	OBJS = $(XPG4ATOBJS) $(XPG4COMMONOBJS)
+atrm :=		OBJS = $(ATRMOBJS) $(COMMONOBJS)
+atq :=		OBJS = $(ATQOBJS) $(COMMONOBJS)
+crontab :=	OBJS = $(CRONTABOBJS) $(COMMONOBJS)
+crontab.xpg4 :=	OBJS = $(XPG4CTOBJS) $(XPG4COMMONOBJS)
+crontab.xpg6 :=	OBJS = $(XPG6CTOBJS) $(XPG6COMMONOBJS)
+parsetest :=	OBJS = $(PARSETESTOBJS)
 
 CFLAGS += $(CCVERBOSE)
 
@@ -163,8 +163,8 @@ all :		$(PROG) $(XPG4) $(XPG6) $(SCRIPT) $(XPG4SCRIPT) $(FILES) \
 install :	all $(ROOTPROG) $(ROOTETCDEFAULTFILES) $(ROOTSYMLINK) \
 		$(ROOTMANIFEST) $(ROOTMETHOD) $(ROOTCRONDCRONTABS)/root
 
-$(PROG) $(PARSETEST):	$$(POBJS)
-		$(LINK.c) $(POBJS) -o $@ $(LDLIBS)
+$(PROG) $(PARSETEST):	$$(OBJS)
+		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
 $(XPG4) :	objs.xpg4 $$(OBJS)
@@ -229,7 +229,7 @@ $(POFILE):	$(POFILES)
 	$(RM) $@; cat $(POFILES) > $@
 
 clean :
-		$(RM) $(OBJS) att1.h att1.c att2.c
+		$(RM) $(COBJS) att1.h att1.c att2.c
 
 strip :
 		$(STRIP) $(PROG) $(XPG4) $(XPG6)
