@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include <sun_sas.h>
 #include <sys/scsi/impl/usmp.h>
@@ -32,7 +35,8 @@
  */
 static HBA_STATUS
 SendSMPPassThru(const char *devpath, void *reqframe, HBA_UINT32 *reqsize,
-    void *rspframe, HBA_UINT32 *rspsize) {
+    void *rspframe, HBA_UINT32 *rspsize)
+{
 	const char		ROUTINE[] = "SendSMPPassThru";
 	int			fd;
 	usmp_cmd_t		ucmd_buf;
@@ -63,11 +67,11 @@ SendSMPPassThru(const char *devpath, void *reqframe, HBA_UINT32 *reqsize,
 	if (ioctl(fd, USMPFUNC, &ucmd_buf) == -1) {
 		if ((errno == ETIME) || (errno == ETIMEDOUT) ||
 		    (errno == EAGAIN)) {
-		    ret = HBA_STATUS_ERROR_TRY_AGAIN;
+			ret = HBA_STATUS_ERROR_TRY_AGAIN;
 		} else if (errno == EBUSY) {
-		    ret = HBA_STATUS_ERROR_BUSY;
+			ret = HBA_STATUS_ERROR_BUSY;
 		} else {
-		    ret = HBA_STATUS_ERROR;
+			ret = HBA_STATUS_ERROR;
 		}
 		log(LOG_DEBUG, ROUTINE, "ioctl:USMPFUNC failed due to %s",
 		    strerror(errno));
@@ -133,9 +137,9 @@ Sun_sasSendSMPPassThru(HBA_HANDLE handle, HBA_WWN hbaPortWWN,
 	 * hit.  This check will be done later only if the Inquiry ioctl fails
 	 */
 
-	if (hba_ptr->device_path == NULL) {
+	if (hba_ptr->device_path[0] == '\0') {
 		log(LOG_DEBUG, ROUTINE,
-		    "HBA handle had NULL device path.\
+		    "HBA handle had empty device path.\
 		    Unable to send SCSI cmd");
 		unlock(&all_hbas_lock);
 		return (HBA_STATUS_ERROR);

@@ -23,7 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 #include <sun_sas.h>
 
 /*
@@ -31,8 +33,8 @@
  * current number of HBAs, even if this changes
  *
  */
-HBA_UINT32 Sun_sasGetPortType(HBA_HANDLE handle, HBA_UINT32 port,
-    HBA_PORTTYPE *porttype)
+HBA_UINT32
+Sun_sasGetPortType(HBA_HANDLE handle, HBA_UINT32 port, HBA_PORTTYPE *porttype)
 {
 	const char		    ROUTINE[] = "Sun_sasGetPortType";
 	int			    index;
@@ -58,8 +60,8 @@ HBA_UINT32 Sun_sasGetPortType(HBA_HANDLE handle, HBA_UINT32 port,
 	}
 
 	if (hba_ptr->first_port == NULL) {
-	    /* This is probably an internal failure of the library */
-		if (hba_ptr->device_path) {
+		/* This is probably an internal failure of the library */
+		if (hba_ptr->device_path[0] != '\0') {
 			log(LOG_DEBUG, ROUTINE,
 			    "Internal failure:  Adapter %s contains no port "
 			    "data.", hba_ptr->device_path);

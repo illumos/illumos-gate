@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include    <sun_sas.h>
 
@@ -56,7 +59,7 @@ find_matching_hba(di_node_t node, void *arg)
 		    devpath);
 
 		if ((strstr(fulldevpath, wa->devpath)) != NULL) {
-				*wa->flag = B_TRUE;
+			*wa->flag = B_TRUE;
 			/* Found a node. No need to walk any more. */
 			di_devfs_path_free(devpath);
 			return (DI_WALK_TERMINATE);

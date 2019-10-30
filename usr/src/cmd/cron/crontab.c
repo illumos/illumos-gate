@@ -25,6 +25,9 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
+/*
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ */
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -81,6 +84,7 @@
 #define	EOLN		"unexpected end of line."
 #define	UNEXPECT	"unexpected character found in line."
 #define	OUTOFBOUND	"number out of bounds."
+#define	OVERFLOW	"too many elements."
 #define	ERRSFND		"errors detected in input, no crontab file generated."
 #define	ED_ERROR	\
 	"     The editor indicates that an error occurred while you were\n"\
@@ -108,7 +112,6 @@ char		edtemp[5+13+1];
 char		line[CTLINESIZE];
 static		char	login[UNAMESIZE];
 
-static int	next_field(int, int);
 static void	catch(int);
 static void	crabort(char *);
 static void	cerror(char *);
@@ -433,6 +436,7 @@ copycron(FILE *fp)
 	char pid[6], *tnam_end;
 	int t;
 	char buf[LINE_MAX];
+	cferror_t cferr;
 
 	sprintf(pid, "%-5d", getpid());
 	tnam = xmalloc(strlen(CRONDIR)+strlen(TMPFILE)+7);
@@ -510,11 +514,34 @@ copycron(FILE *fp)
 			}
 		}
 
-		if (next_field(0, 59)) continue;
-		if (next_field(0, 23)) continue;
-		if (next_field(1, 31)) continue;
-		if (next_field(1, 12)) continue;
-		if (next_field(0, 06)) continue;
+		if ((cferr = next_field(0, 59, line, &cursor, NULL)) != CFOK ||
+		    (cferr = next_field(0, 23, line, &cursor, NULL)) != CFOK ||
+		    (cferr = next_field(1, 31, line, &cursor, NULL)) != CFOK ||
+		    (cferr = next_field(1, 12, line, &cursor, NULL)) != CFOK ||
+		    (cferr = next_field(0, 6, line, &cursor, NULL)) != CFOK) {
+			switch (cferr) {
+			case CFEOLN:
+				cerror(EOLN);
+				break;
+			case CFUNEXPECT:
+				cerror(UNEXPECT);
+				break;
+			case CFOUTOFBOUND:
+				cerror(OUTOFBOUND);
+				break;
+			case CFEOVERFLOW:
+				cerror(OVERFLOW);
+				break;
+			case CFENOMEM:
+				(void) fprintf(stderr, "Out of memory\n");
+				exit(55);
+				break;
+			default:
+				break;
+			}
+			continue;
+		}
+
 		if (line[++cursor] == '\0') {
 			cerror(EOLN);
 			continue;
@@ -542,64 +569,6 @@ cont:
 		crabort(ERRSFND);
 	}
 	unlink(tnam);
-}
-
-static int
-next_field(int lower, int upper)
-{
-	int num, num2;
-
-	while ((line[cursor] == ' ') || (line[cursor] == '\t')) cursor++;
-	if (line[cursor] == '\0') {
-		cerror(EOLN);
-		return (1);
-	}
-	if (line[cursor] == '*') {
-		cursor++;
-		if ((line[cursor] != ' ') && (line[cursor] != '\t')) {
-			cerror(UNEXPECT);
-			return (1);
-		}
-		return (0);
-	}
-	while (TRUE) {
-		if (!isdigit(line[cursor])) {
-			cerror(UNEXPECT);
-			return (1);
-		}
-		num = 0;
-		do {
-			num = num*10 + (line[cursor]-'0');
-		} while (isdigit(line[++cursor]));
-		if ((num < lower) || (num > upper)) {
-			cerror(OUTOFBOUND);
-			return (1);
-		}
-		if (line[cursor] == '-') {
-			if (!isdigit(line[++cursor])) {
-				cerror(UNEXPECT);
-				return (1);
-			}
-			num2 = 0;
-			do {
-				num2 = num2*10 + (line[cursor]-'0');
-			} while (isdigit(line[++cursor]));
-			if ((num2 < lower) || (num2 > upper)) {
-				cerror(OUTOFBOUND);
-				return (1);
-			}
-		}
-		if ((line[cursor] == ' ') || (line[cursor] == '\t')) break;
-		if (line[cursor] == '\0') {
-			cerror(EOLN);
-			return (1);
-		}
-		if (line[cursor++] != ',') {
-			cerror(UNEXPECT);
-			return (1);
-		}
-	}
-	return (0);
 }
 
 static void

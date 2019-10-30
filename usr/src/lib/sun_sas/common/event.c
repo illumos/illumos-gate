@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include	<sun_sas.h>
 #include	<libsysevent.h>
@@ -133,10 +136,10 @@ syseventHandler(sysevent_t *ev)
 {
 
 	const char	ROUTINE[] = "syseventHandler";
-	nvlist_t 	*attrList = NULL;
+	nvlist_t	*attrList = NULL;
 	char		*eventStr, *portAddrStr, *charptr;
 	int		update;
-	uint64_t 	addr;
+	uint64_t	addr;
 	uint8_t		phyId, linkRate;
 	HBA_WWN		portAddr;
 
@@ -226,8 +229,8 @@ syseventHandler(sysevent_t *ev)
 
 /* Registers events to the sysevent framework */
 HBA_STATUS
-registerSysevent() {
-
+registerSysevent(void)
+{
 	const char ROUTINE[] = "registerSysevent";
 	const char *hba_subclass_list[] = {
 		ESC_SAS_PHY_EVENT

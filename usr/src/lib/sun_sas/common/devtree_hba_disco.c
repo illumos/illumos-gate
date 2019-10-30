@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include	<sun_sas.h>
 #include	<sys/modctl.h>
@@ -595,9 +598,9 @@ devtree_get_one_hba(di_node_t hbaNode)
 static int
 lookup_smhba_sas_hba(di_node_t node, void *arg)
 {
-	const char	ROUTINE[] = "lookup_smhba_sas_hba";
-	int 		*propData, rval;
-	walkarg_t 	*wa = (walkarg_t *)arg;
+	const char ROUTINE[] = "lookup_smhba_sas_hba";
+	int *propData, rval;
+	walkarg_t *wa = (walkarg_t *)arg;
 
 	/* Skip stub(instance -1) nodes */
 	if (IS_STUB_NODE(node)) {

@@ -158,6 +158,7 @@ CFLAGS			+= -xstrconst
 STACKPROTECT_		= -_gcc4=-fstack-protector
 STACKPROTECT_		+= -_gcc7=-fstack-protector-strong
 STACKPROTECT_		+= -_gcc8=-fstack-protector-strong
+STACKPROTECT_		+= -_gcc9=-fstack-protector-strong
 
 STACKPROTECT_strong	= $(STACKPROTECT_)
 STACKPROTECT_none	= -_gcc=-fstack-protector-none

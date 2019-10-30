@@ -8,19 +8,19 @@
 # source.  A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 #
-# Copyright (c) 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
 # The src/ sub-directory is un-modified copy of
-# https://github.com/illumos/smatch/tree/0.5.1-il-5
+# https://github.com/illumos/smatch/tree/0.5.1-il-6
 #
 # This Makefile installs just enough for us to be able to run smatch
 # locally.
 #
 
 PROG = smatch
-SPARSE_VERSION = 0.5.1-il-5
+SPARSE_VERSION = 0.5.1-il-6
 
 include ../Makefile.tools
 

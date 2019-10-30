@@ -349,10 +349,15 @@ extern "C" {
 #define	AUE_AUDITON_GETAMASK	310	/* =aa */
 #define	AUE_AUDITON_SETAMASK	311	/* =as */
 #define	AUE_PSECFLAGS		312	/* =pm psecflags */
-#define	AUE_SACL		313	/* =sa SACL auditing */
+#define	AUE_SACL		313	/* =sa SACL auditing (reserved) */
+#define	AUE_AUDITON_GETPINFO	314	/* =aa */
+#define	AUE_AUDITON_SETPMASK	315	/* =as */
+#define	AUE_AUDITON_GETKAUDIT	316	/* =aa */
+#define	AUE_AUDITON_SETKAUDIT	317	/* =as */
+#define	AUE_AUDITON_OTHER	318	/* =aa */
 
 /* NOTE: update MAX_KEVENTS below if events are added. */
-#define	MAX_KEVENTS		313
+#define	MAX_KEVENTS		318
 
 #ifdef __cplusplus
 }

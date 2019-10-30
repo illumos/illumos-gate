@@ -3039,8 +3039,21 @@ aui_auditsys(au_event_t e)
 		case A_SETCLASS:
 			e = AUE_AUDITON_SETCLASS;
 			break;
+		case A_GETPINFO:
+		case A_GETPINFO_ADDR:
+			e = AUE_AUDITON_GETPINFO;
+			break;
+		case A_SETPMASK:
+			e = AUE_AUDITON_SETPMASK;
+			break;
+		case A_GETKAUDIT:
+			e = AUE_AUDITON_GETKAUDIT;
+			break;
+		case A_SETKAUDIT:
+			e = AUE_AUDITON_SETKAUDIT;
+			break;
 		default:
-			e = AUE_NULL;
+			e = AUE_AUDITON_OTHER;
 			break;
 		}
 		break;
@@ -3061,6 +3074,7 @@ aus_auditsys(struct t_audit_data *tad)
 	uintptr_t a1, a2;
 	STRUCT_DECL(auditinfo, ainfo);
 	STRUCT_DECL(auditinfo_addr, ainfo_addr);
+	STRUCT_DECL(auditpinfo, apinfo);
 	au_evclass_map_t event;
 	au_mask_t mask;
 	int auditstate, policy;
@@ -3238,6 +3252,53 @@ aus_auditsys(struct t_audit_data *tad)
 		au_uwrite(au_to_arg32(
 		    3, "setclass:ec_class", (uint32_t)event.ec_class));
 		break;
+	case AUE_AUDITON_SETPMASK:
+		STRUCT_INIT(apinfo, get_udatamodel());
+		if (copyin((caddr_t)uap->a2, STRUCT_BUF(apinfo),
+		    STRUCT_SIZE(apinfo))) {
+			return;
+		}
+		au_uwrite(au_to_arg32(3, "setpmask:pid",
+		    (uint32_t)STRUCT_FGET(apinfo, ap_pid)));
+		au_uwrite(au_to_arg32(3, "setpmask:as_success",
+		    (uint32_t)STRUCT_FGET(apinfo, ap_mask.as_success)));
+		au_uwrite(au_to_arg32(3, "setpmask:as_failure",
+		    (uint32_t)STRUCT_FGET(apinfo, ap_mask.as_failure)));
+		break;
+	case AUE_AUDITON_SETKAUDIT:
+		STRUCT_INIT(ainfo_addr, get_udatamodel());
+		if (copyin((caddr_t)a1, STRUCT_BUF(ainfo_addr),
+		    STRUCT_SIZE(ainfo_addr))) {
+				return;
+		}
+		au_uwrite(au_to_arg32((char)1, "auid",
+		    (uint32_t)STRUCT_FGET(ainfo_addr, ai_auid)));
+#ifdef _LP64
+		au_uwrite(au_to_arg64((char)1, "port",
+		    (uint64_t)STRUCT_FGET(ainfo_addr, ai_termid.at_port)));
+#else
+		au_uwrite(au_to_arg32((char)1, "port",
+		    (uint32_t)STRUCT_FGET(ainfo_addr, ai_termid.at_port)));
+#endif
+		au_uwrite(au_to_arg32((char)1, "type",
+		    (uint32_t)STRUCT_FGET(ainfo_addr, ai_termid.at_type)));
+		if ((uint32_t)STRUCT_FGET(ainfo_addr, ai_termid.at_type) ==
+		    AU_IPv4) {
+			au_uwrite(au_to_in_addr(
+			    (struct in_addr *)STRUCT_FGETP(ainfo_addr,
+			    ai_termid.at_addr)));
+		} else {
+			au_uwrite(au_to_in_addr_ex(
+			    (int32_t *)STRUCT_FGETP(ainfo_addr,
+			    ai_termid.at_addr)));
+		}
+		au_uwrite(au_to_arg32((char)1, "as_success",
+		    (uint32_t)STRUCT_FGET(ainfo_addr, ai_mask.as_success)));
+		au_uwrite(au_to_arg32((char)1, "as_failure",
+		    (uint32_t)STRUCT_FGET(ainfo_addr, ai_mask.as_failure)));
+		au_uwrite(au_to_arg32((char)1, "asid",
+		    (uint32_t)STRUCT_FGET(ainfo_addr, ai_asid)));
+		break;
 	case AUE_GETAUID:
 	case AUE_GETAUDIT:
 	case AUE_GETAUDIT_ADDR:
@@ -3252,6 +3313,9 @@ aus_auditsys(struct t_audit_data *tad)
 	case AUE_AUDITON_SETSTAT:
 	case AUE_AUDITON_GETCOND:
 	case AUE_AUDITON_GETCLASS:
+	case AUE_AUDITON_GETPINFO:
+	case AUE_AUDITON_GETKAUDIT:
+	case AUE_AUDITON_OTHER:
 		break;
 	default:
 		break;

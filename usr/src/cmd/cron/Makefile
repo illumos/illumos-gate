@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 DEFAULTFILES =	cron.dfl
 
@@ -58,6 +59,7 @@ PROG2 =		at atq atrm crontab
 XPG6PROG =	crontab
 XPG4PROG =	at crontab
 PROG =		$(PROG1) $(PROG2)
+PARSETEST =	parsetest
 
 SCRIPT =	batch
 XPG4SCRIPT =	batch.xpg4
@@ -80,14 +82,15 @@ GETRESPOBJ=	getresponse.o
 COMMONOBJ1=	permit.o
 COMMONOBJ2=	funcs.o
 COMMONOBJS=	$(COMMONOBJ1) $(COMMONOBJ2)
-CRONOBJS=	cron.o elm.o
+CRONOBJS=	cron.o elm.o parse.o
 ATOBJS=		at.o att1.o att2.o
 XPG4OBJS=	values-xpg4.o
 ATRMOBJS1=	atrm.o
 ATRMOBJS=	$(ATRMOBJS1) $(GETRESPOBJ)
 ATQOBJS=	atq.o
-CRONTABOBJS1=	crontab.o
+CRONTABOBJS1=	crontab.o parse.o
 CRONTABOBJS=	$(CRONTABOBJS1) $(GETRESPOBJ)
+PARSETESTOBJS=	parse.o
 
 # /usr/xpg*/bin/crontab isn't linked with values-xpg*.o since it isn't
 # required by any specific behavior differences; this makes these
@@ -99,14 +102,15 @@ XPG4ATOBJS=	$(ATOBJS:%=objs.xpg4/%) $(XPG4OBJS:%=objs.xpg4/%)
 XPG6COMMONOBJS=	$(COMMONOBJS:%=objs.xpg6/%)
 XPG6CTOBJS=	$(CRONTABOBJS:%=objs.xpg6/%)
 
-cron :=		OBJS = $(CRONOBJS) $(COMMONOBJ2)
-at :=		OBJS = $(ATOBJS) $(COMMONOBJS)
-at.xpg4 :=	OBJS = $(XPG4ATOBJS) $(XPG4COMMONOBJS)
-atrm :=		OBJS = $(ATRMOBJS) $(COMMONOBJS)
-atq :=		OBJS = $(ATQOBJS) $(COMMONOBJS)
-crontab :=	OBJS = $(CRONTABOBJS) $(COMMONOBJS)
-crontab.xpg4 :=	OBJS = $(XPG4CTOBJS) $(XPG4COMMONOBJS)
-crontab.xpg6 :=	OBJS = $(XPG6CTOBJS) $(XPG6COMMONOBJS)
+cron :=		POBJS = $(CRONOBJS) $(COMMONOBJ2)
+at :=		POBJS = $(ATOBJS) $(COMMONOBJS)
+at.xpg4 :=	POBJS = $(XPG4ATOBJS) $(XPG4COMMONOBJS)
+atrm :=		POBJS = $(ATRMOBJS) $(COMMONOBJS)
+atq :=		POBJS = $(ATQOBJS) $(COMMONOBJS)
+crontab :=	POBJS = $(CRONTABOBJS) $(COMMONOBJS)
+crontab.xpg4 :=	POBJS = $(XPG4CTOBJS) $(XPG4COMMONOBJS)
+crontab.xpg6 :=	POBJS = $(XPG6CTOBJS) $(XPG6COMMONOBJS)
+parsetest :=	POBJS = $(PARSETESTOBJS)
 
 CFLAGS += $(CCVERBOSE)
 
@@ -137,13 +141,15 @@ at :=		LDLIBS += -lproject -lsecdb
 at.xpg4 :=	LDLIBS += -lproject -lsecdb
 atq :=		LDLIBS += -lsecdb
 atrm :=		LDLIBS += -lsecdb
-cron :=		LDLIBS += -lpam -lproject -lcontract -lzoneinfo
-crontab :=	LDLIBS += -lsecdb -lpam -lzoneinfo
-crontab.xpg6 :=	LDLIBS += -lsecdb -lpam -lzoneinfo
-crontab.xpg4 :=	LDLIBS += -lsecdb -lpam -lzoneinfo
+cron :=		LDLIBS += -lpam -lproject -lcontract -lzoneinfo -lcustr
+crontab :=	LDLIBS += -lsecdb -lpam -lzoneinfo -lcustr
+crontab.xpg6 :=	LDLIBS += -lsecdb -lpam -lzoneinfo -lcustr
+crontab.xpg4 :=	LDLIBS += -lsecdb -lpam -lzoneinfo -lcustr
+parsetest :=	LDLIBS += -lcustr
 
-$(XPG4) := CFLAGS += -DXPG4
-$(XPG6) := CFLAGS += -DXPG6
+$(XPG4) :=	CFLAGS += -DXPG4
+$(XPG6) :=	CFLAGS += -DXPG6
+parsetest :=	CFLAGS += -DPARSETEST
 
 $(ROOTSVCSYSTEM)/cron.xml := FILEMODE = 0444
 $(ROOTLIBSVCMETHOD)/svc-cron := FILEMODE = 0555
@@ -151,13 +157,14 @@ $(ROOTLIBSVCMETHOD)/svc-cron := FILEMODE = 0555
 
 .KEEP_STATE:
 
-all :		$(PROG) $(XPG4) $(XPG6) $(SCRIPT) $(XPG4SCRIPT) $(FILES)
+all :		$(PROG) $(XPG4) $(XPG6) $(SCRIPT) $(XPG4SCRIPT) $(FILES) \
+		$(PARSETEST)
 
 install :	all $(ROOTPROG) $(ROOTETCDEFAULTFILES) $(ROOTSYMLINK) \
 		$(ROOTMANIFEST) $(ROOTMETHOD) $(ROOTCRONDCRONTABS)/root
 
-$(PROG) :	$$(OBJS)
-		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+$(PROG) $(PARSETEST):	$$(POBJS)
+		$(LINK.c) $(POBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
 $(XPG4) :	objs.xpg4 $$(OBJS)
@@ -222,7 +229,7 @@ $(POFILE):	$(POFILES)
 	$(RM) $@; cat $(POFILES) > $@
 
 clean :
-		$(RM) $(COBJS) att1.h att1.c att2.c
+		$(RM) $(OBJS) att1.h att1.c att2.c
 
 strip :
 		$(STRIP) $(PROG) $(XPG4) $(XPG6)

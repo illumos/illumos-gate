@@ -23,15 +23,18 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 #include    <sun_sas.h>
 
 /*
  * Retrieves the attributes for a specified port of an adapter
  */
 HBA_STATUS
-Sun_sasGetAdapterPortAttributes(HBA_HANDLE handle,
-	    HBA_UINT32 port, PSMHBA_PORTATTRIBUTES attributes) {
+Sun_sasGetAdapterPortAttributes(HBA_HANDLE handle, HBA_UINT32 port,
+    PSMHBA_PORTATTRIBUTES attributes)
+{
 	const char		ROUTINE[] = "Sun_sasGetAdapterPortAttributes";
 	HBA_STATUS		status;
 	struct sun_sas_hba	*hba_ptr;
@@ -41,8 +44,8 @@ Sun_sasGetAdapterPortAttributes(HBA_HANDLE handle,
 	/* Validate the arguments */
 	if ((attributes == NULL) ||
 	    (attributes->PortSpecificAttribute.SASPort == NULL)) {
-	    log(LOG_DEBUG, ROUTINE, "NULL attributes");
-	    return (HBA_STATUS_ERROR_ARG);
+		log(LOG_DEBUG, ROUTINE, "NULL attributes");
+		return (HBA_STATUS_ERROR_ARG);
 	}
 
 	lock(&all_hbas_lock);
@@ -66,19 +69,17 @@ Sun_sasGetAdapterPortAttributes(HBA_HANDLE handle,
 	}
 
 	if (hba_ptr->first_port == NULL) {
-	    /* This is probably an internal failure of the library */
-	    if (hba_ptr->device_path) {
-		log(LOG_DEBUG, ROUTINE,
-		    "Internal failure:  Adapter %s contains no port data",
-		    hba_ptr->device_path);
-	    } else {
-		log(LOG_DEBUG, ROUTINE,
-		    "Internal failure:  Adapter at index %d contains no port "
-		    "data", hba_ptr->index);
-	    }
-	    unlock(&open_handles_lock);
-	    unlock(&all_hbas_lock);
-	    return (HBA_STATUS_ERROR);
+		/* This is probably an internal failure of the library */
+		if (hba_ptr->device_path[0] != '\0') {
+			log(LOG_DEBUG, ROUTINE, "Internal failure:  Adapter "
+			    "%s contains no port data", hba_ptr->device_path);
+		} else {
+			log(LOG_DEBUG, ROUTINE, "Internal failure:  Adapter at"
+			    " index %d contains no port data", hba_ptr->index);
+		}
+		unlock(&open_handles_lock);
+		unlock(&all_hbas_lock);
+		return (HBA_STATUS_ERROR);
 	}
 	for (hba_port_ptr = hba_ptr->first_port;
 	    hba_port_ptr != NULL; hba_port_ptr = hba_port_ptr->next) {

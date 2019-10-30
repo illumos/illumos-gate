@@ -45,12 +45,12 @@
 .\" Copyright (c) 2011, Joyent, Inc. All Rights Reserved
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.TH CRONTAB 1 "Mar 6, 2017"
+.TH CRONTAB 1 "Oct 22, 2019"
 .SH NAME
 crontab \- user crontab file
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/bin/crontab\fR [\fIfilename\fR]
 .fi
@@ -111,7 +111,6 @@ crontab \- user crontab file
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBcrontab\fR utility manages a user's access with \fBcron\fR (see
 \fBcron\fR(1M)) by copying, creating, listing, and removing \fBcrontab\fR
 files. If invoked without options, \fBcrontab\fR copies the specified file, or
@@ -133,7 +132,6 @@ of interest to system-defined users such as \fBroot\fR.  Except where
 otherwise explicitly indicated, all variants of the \fBcrontab\fR command
 act only on the editable crontab files found in \fB/var/spool/cron/crontabs\fR.
 .SS "\fBcrontab\fR Access Control"
-.LP
 Users: Access to \fBcrontab\fR is allowed:
 .RS +4
 .TP
@@ -188,7 +186,6 @@ The rules for \fBallow\fR and \fBdeny\fR apply to \fBroot\fR only if the
 .LP
 The \fBallow\fR/\fBdeny\fR files consist of one user name per line.
 .SS "\fBcrontab\fR Entry Format"
-.LP
 A \fBcrontab\fR file consists of lines of six fields each. The fields are
 separated by spaces or tabs. The first five are integer patterns that specify
 the following:
@@ -208,10 +205,16 @@ day of the week (0\(mi6 with 0=Sunday).
 .LP
 Each of these patterns can be either an asterisk (meaning all legal values) or
 a list of elements separated by commas. An element is either a number or two
-numbers separated by a minus sign (meaning an inclusive range). Time specified
-here is interpreted in the currently active timezone. At the top of the crontab
-file this is the timezone which is set system-wide in /etc/default/init. A user
-can add a line such as:
+numbers separated by a hyphen (meaning an inclusive range).
+.LP
+A range or asterisk can optionally be followed by a step value as
+\fI/<number>\fR. For example, \fI2\(mi59/3\fR can be used in the minutes field
+to specify every three minutes starting at 2 past the hour, or \fI*/2\fR in
+the hours field means every two hours.
+.LP
+Time specified here is interpreted in the currently active timezone. At the top
+of the crontab file this is the timezone which is set system-wide in
+/etc/default/init. A user can add a line such as:
 .sp
 .in +2
 .nf
@@ -278,7 +281,6 @@ environment variables are set to match those that are in effect in the
 If you do not redirect the standard output and standard error of your commands,
 any generated output or errors are mailed to you.
 .SS "\fBcrontab\fR Environment Variables"
-.LP
 The following variables are supported:
 .sp
 .ne 2
@@ -350,7 +352,6 @@ The lines that are not setting these environment variables are  the same as
 crontab entries that conform to the UNIX standard and are described elsewhere
 in this man page.
 .SS "Setting \fBcron\fR Jobs Across Timezones"
-.LP
 The default timezone of the \fBcron\fR daemon sets the system-wide timezone for
 \fBcron\fR entries. This, in turn, is by set by default system-wide using
 \fB/etc/default/init\fR.
@@ -360,7 +361,6 @@ If some form of \fBdaylight savings\fR or \fBsummer/winter time\fR is in
 effect, then jobs scheduled during the switchover period could be executed
 once, twice, or not at all.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -429,7 +429,6 @@ user.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCleaning up Core Files
 .sp
 .LP
@@ -490,7 +489,33 @@ example:
 would run a command only on Mondays.
 
 .LP
-\fBExample 4 \fRUsing Environment Variables
+\fBExample 4 \fRUsing step values:
+.sp
+.LP
+This example runs a job every hour during the night and every 3 hours during
+working hours.
+
+.sp
+.in +2
+.nf
+\fB0 8-18/3,19-7 * * *\fR
+.fi
+.in -2
+.sp
+
+.LP
+and to run a job every 2 minutes, use:
+
+.sp
+.in +2
+.nf
+\fB*/2 * * * *\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRUsing Environment Variables
 .sp
 .LP
 The following entries take advantage of \fBcrontab\fR support for certain
@@ -521,7 +546,6 @@ Korn shell. The file concludes with \fBTZ\fR, \fBHOME\fR, and \fBSHELL\fR
 entries that return those variable to their default values.
 
 .SH ENVIRONMENT VARIABLES
-.LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBcrontab\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
@@ -578,7 +602,6 @@ default editor is \fB/usr/xpg6/bin/vi\fR.
 .RE
 
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -662,7 +685,6 @@ spool area for \fBcrontab\fR
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .SS "\fB/usr/bin/crontab\fR"
 
@@ -698,12 +720,10 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.LP
 \fBatq\fR(1), \fBatrm\fR(1), \fBauths\fR(1), \fBed\fR(1), \fBsh\fR(1),
 \fBvi\fR(1), \fBcron\fR(1M), \fBsu\fR(1M), \fBauth_attr\fR(4),
 \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.LP
 If you inadvertently enter the \fBcrontab\fR command with no arguments, do not
 attempt to get out with Control-d. This removes all entries in your
 \fBcrontab\fR file. Instead, exit with Control-c.

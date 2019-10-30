@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include    <sun_sas.h>
 /*
@@ -30,14 +33,15 @@
  */
 HBA_STATUS
 Sun_sasGetAdapterAttributes(HBA_HANDLE handle,
-	    PSMHBA_ADAPTERATTRIBUTES attributes) {
+    PSMHBA_ADAPTERATTRIBUTES attributes)
+{
 	const char		ROUTINE[] = "Sun_sasGetAdapterAttributes";
-	struct sun_sas_hba 	*hba_ptr;
-	int 			index = 0;
+	struct sun_sas_hba	*hba_ptr;
+	int			index = 0;
 
 	if (attributes == NULL) {
-	    log(LOG_DEBUG, ROUTINE, "NULL attributes pointer");
-	    return (HBA_STATUS_ERROR_ARG);
+		log(LOG_DEBUG, ROUTINE, "NULL attributes pointer");
+		return (HBA_STATUS_ERROR_ARG);
 	}
 
 	lock(&all_hbas_lock);
@@ -45,11 +49,10 @@ Sun_sasGetAdapterAttributes(HBA_HANDLE handle,
 	lock(&open_handles_lock);
 	hba_ptr = RetrieveHandle(index);
 	if (hba_ptr == NULL) {
-	    log(LOG_DEBUG, ROUTINE,
-		"Invalid handle %08lx", handle);
-	    unlock(&open_handles_lock);
-	    unlock(&all_hbas_lock);
-	    return (HBA_STATUS_ERROR_INVALID_HANDLE);
+		log(LOG_DEBUG, ROUTINE, "Invalid handle %08lx", handle);
+		unlock(&open_handles_lock);
+		unlock(&all_hbas_lock);
+		return (HBA_STATUS_ERROR_INVALID_HANDLE);
 	}
 
 	(void) memcpy(attributes, &hba_ptr->adapter_attributes,

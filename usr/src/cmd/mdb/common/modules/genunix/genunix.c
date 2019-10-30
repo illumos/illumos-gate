@@ -2061,13 +2061,25 @@ lminfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (mdb_pwalk("lock_graph", lminfo_cb, NULL, 0));
 }
 
+typedef struct mdb_whereopen {
+	uint_t mwo_flags;
+	uintptr_t mwo_target;
+	boolean_t mwo_found;
+} mdb_whereopen_t;
+
 /*ARGSUSED*/
 int
-whereopen_fwalk(uintptr_t addr, struct file *f, uintptr_t *target)
+whereopen_fwalk(uintptr_t addr, const void *farg, void *arg)
 {
-	if ((uintptr_t)f->f_vnode == *target) {
-		mdb_printf("file %p\n", addr);
-		*target = 0;
+	const struct file *f = farg;
+	mdb_whereopen_t *mwo = arg;
+
+	if ((uintptr_t)f->f_vnode == mwo->mwo_target) {
+		if ((mwo->mwo_flags & DCMD_PIPE_OUT) == 0 &&
+		    !mwo->mwo_found) {
+			mdb_printf("file %p\n", addr);
+		}
+		mwo->mwo_found = B_TRUE;
 	}
 
 	return (WALK_NEXT);
@@ -2075,17 +2087,19 @@ whereopen_fwalk(uintptr_t addr, struct file *f, uintptr_t *target)
 
 /*ARGSUSED*/
 int
-whereopen_pwalk(uintptr_t addr, void *ignored, uintptr_t *target)
+whereopen_pwalk(uintptr_t addr, const void *ignored, void *arg)
 {
-	uintptr_t t = *target;
+	mdb_whereopen_t *mwo = arg;
 
-	if (mdb_pwalk("file", (mdb_walk_cb_t)whereopen_fwalk, &t, addr) == -1) {
+	mwo->mwo_found = B_FALSE;
+	if (mdb_pwalk("file", whereopen_fwalk, mwo, addr) == -1) {
 		mdb_warn("couldn't file walk proc %p", addr);
 		return (WALK_ERR);
 	}
 
-	if (t == 0)
+	if (mwo->mwo_found) {
 		mdb_printf("%p\n", addr);
+	}
 
 	return (WALK_NEXT);
 }
@@ -2094,12 +2108,16 @@ whereopen_pwalk(uintptr_t addr, void *ignored, uintptr_t *target)
 int
 whereopen(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	uintptr_t target = addr;
+	mdb_whereopen_t mwo;
 
 	if (!(flags & DCMD_ADDRSPEC) || addr == 0)
 		return (DCMD_USAGE);
 
-	if (mdb_walk("proc", (mdb_walk_cb_t)whereopen_pwalk, &target) == -1) {
+	mwo.mwo_flags = flags;
+	mwo.mwo_target = addr;
+	mwo.mwo_found = B_FALSE;
+
+	if (mdb_walk("proc", whereopen_pwalk, &mwo) == -1) {
 		mdb_warn("can't proc walk");
 		return (DCMD_ERR);
 	}

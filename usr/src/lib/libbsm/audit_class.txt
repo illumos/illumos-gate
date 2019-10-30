@@ -25,8 +25,6 @@
 #
 # User Level Class Masks
 #
-# Developers: If you change this file you must also edit audit.h.
-#
 # "Meta-classes" can be created; these are supersets composed of multiple base
 # classes, and thus will have more than 1 bit in its mask. See "ad", "all",
 # "am", and "pc" below for examples.

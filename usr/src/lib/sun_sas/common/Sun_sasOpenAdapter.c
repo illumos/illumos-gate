@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include    <sun_sas.h>
 
@@ -36,7 +39,7 @@
  */
 HBA_HANDLE Sun_sasOpenAdapter(char *name) {
 	const char		ROUTINE[] = "Sun_sasOpenAdapter";
-	struct sun_sas_hba 	*hba_ptr;
+	struct sun_sas_hba	*hba_ptr;
 
 	if (name == NULL) {
 	    log(LOG_DEBUG, ROUTINE, "NULL adapter name.");
