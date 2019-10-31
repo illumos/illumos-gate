@@ -32,7 +32,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <err.h>
 #include <fcntl.h>
+#include <sys/debug.h>
 #include <sys/types.h>
 #include <sys/termios.h>
 #include <unistd.h>
@@ -43,13 +45,17 @@
 #include <libzonecfg.h>
 #include <limits.h>
 #include <libcontract.h>
+#include <locale.h>
 #include <sys/contract.h>
 #include <sys/ctfs.h>
 #include <libcontract_priv.h>
 #include <sys/stat.h>
 #include <stdbool.h>
 
+#define	COLUMN_DEFAULT	80
+#define	CHUNK_SIZE	256 /* Arbitrary amount */
 #define	FAKEDPID0(p)	(p->pid == 0 && p->psargs[0] == '\0')
+#define	HAS_SIBLING(p)	((p)->sp != NULL && (p)->sp->done != 0)
 
 typedef struct ps {
 	int	done;
@@ -69,6 +75,8 @@ typedef struct ps {
 	struct ps *cp;		/* child */
 } ps_t;
 
+enum { DASH = 0, BAR, CORNER, VRIGHT };
+
 static	ps_t	**ps;		/* array of ps_t's */
 static	unsigned psize;		/* size of array */
 static	int	nps;		/* number of ps_t's */
@@ -78,17 +86,35 @@ static	int	nctps;		/* number of contract ps_t's */
 static	ps_t	*proc0;		/* process 0 */
 static	ps_t	*proc1;		/* process 1 */
 
-static	char	*command;
-
 static	int	aflag = 0;
 static	int	cflag = 0;
+static	int	gflag = 0;
 static	int	sflag = 0;
 static	int	zflag = 0;
 static	zoneid_t zoneid;
 static	char *match_svc;
 static	char *match_inst;
-static	int	columns = 80;
+static	int	columns;
 
+static const char *box_ascii[] = {
+	[DASH] =	"-",
+	[BAR] =		"|",
+	[CORNER] =	"`",
+	[VRIGHT] =	"+"
+};
+
+static const char *box_utf8[] = {
+	[DASH] =	"\xe2\x94\x80", /* \u2500 */
+	[BAR] =		"\xe2\x94\x82", /* \u2502 */
+	[CORNER] =	"\xe2\x94\x94", /* \u2514 */
+	[VRIGHT] =	"\xe2\x94\x9c", /* \u251c */
+};
+
+static const char **box;
+
+static size_t get_termwidth(void);
+static const char **get_boxchars(void);
+static int add_proc(psinfo_t *, lwpsinfo_t *, void *);
 static bool match_proc(ps_t *);
 static void markprocs(ps_t *);
 static int printone(ps_t *, int);
@@ -100,37 +126,55 @@ static char *parse_svc(const char *, char **);
 static zoneid_t getzone(const char *);
 static ps_t *fakepid0(void);
 
+static void *zalloc(size_t);
+static void *xreallocarray(void *, size_t, size_t);
+static char *xstrdup(const char *);
+
+static void __NORETURN
+usage(void)
+{
+	(void) fprintf(stderr,
+	    "usage:\t%s [-ac] [-s svc] [-z zone] [ {pid|user} ... ]\n",
+	    getprogname());
+	(void) fprintf(stderr,
+	    "  (show process trees)\n");
+	(void) fprintf(stderr,
+	    "  list can include process-ids and user names\n");
+	(void) fprintf(stderr,
+	    "  -a : include children of process 0\n");
+	(void) fprintf(stderr,
+	    "  -c : show contracts\n");
+	(void) fprintf(stderr,
+	    "  -g : use line drawing characters in output\n");
+	(void) fprintf(stderr,
+	    "  -s : print only processes with given service FMRI\n");
+	(void) fprintf(stderr,
+	    "  -z : print only processes in given zone\n");
+	exit(2);
+}
+
 int
 main(int argc, char **argv)
 {
-	psinfo_t info;	/* process information structure from /proc */
 	int opt;
 	int errflg = 0;
-	struct winsize winsize;
-	char *s;
 	int n;
 	int retc = 0;
 
-	DIR *dirp;
-	struct dirent *dentp;
-	char	pname[100];
-	int	pdlen;
-
 	ps_t *p;
 
-	if ((command = strrchr(argv[0], '/')) == NULL)
-		command = argv[0];
-	else
-		command++;
-
 	/* options */
-	while ((opt = getopt(argc, argv, "acs:z:")) != EOF) {
+	while ((opt = getopt(argc, argv, "acgs:z:")) != EOF) {
 		switch (opt) {
 		case 'a':		/* include children of process 0 */
 			aflag = 1;
 			break;
 		case 'c':		/* display contract ownership */
 			aflag = cflag = 1;
+			break;
+		case 'g':
+			gflag = 1;
+			box = get_boxchars();
 			break;
 		case 's':
 			sflag = 1;
@@ -149,130 +193,19 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if (errflg) {
-		(void) fprintf(stderr,
-		    "usage:\t%s [-ac] [-s svc] [-z zone] [ {pid|user} ... ]\n",
-		    command);
-		(void) fprintf(stderr,
-		    "  (show process trees)\n");
-		(void) fprintf(stderr,
-		    "  list can include process-ids and user names\n");
-		(void) fprintf(stderr,
-		    "  -a : include children of process 0\n");
-		(void) fprintf(stderr,
-		    "  -c : show contracts\n");
-		(void) fprintf(stderr,
-		    "  -s : print only processes with given service FMRI\n");
-		(void) fprintf(stderr,
-		    "  -z : print only processes in given zone\n");
-		return (2);
-	}
+	if (errflg)
+		usage();
 
-	/*
-	 * Kind of a hack to determine the width of the output...
-	 */
-	if ((s = getenv("COLUMNS")) != NULL && (n = atoi(s)) > 0)
-		columns = n;
-	else if (isatty(fileno(stdout)) &&
-	    ioctl(fileno(stdout), TIOCGWINSZ, &winsize) == 0 &&
-	    winsize.ws_col != 0)
-		columns = winsize.ws_col;
+	columns = get_termwidth();
+	VERIFY3S(columns, >, 0);
 
 	nps = 0;
 	psize = 0;
 	ps = NULL;
 
-	/*
-	 * Search the /proc directory for all processes.
-	 */
-	if ((dirp = opendir("/proc")) == NULL) {
-		(void) fprintf(stderr, "%s: cannot open /proc directory\n",
-		    command);
-		return (1);
-	}
+	/* Currently, this can only fail if the 3rd argument is invalid */
+	VERIFY0(proc_walk(add_proc, NULL, PR_WALK_PROC));
 
-	(void) strcpy(pname, "/proc");
-	pdlen = strlen(pname);
-	pname[pdlen++] = '/';
-
-	/* for each active process --- */
-	while (dentp = readdir(dirp)) {
-		int	procfd;	/* filedescriptor for /proc/nnnnn/psinfo */
-
-		if (dentp->d_name[0] == '.')		/* skip . and .. */
-			continue;
-		(void) strcpy(pname + pdlen, dentp->d_name);
-		(void) strcpy(pname + strlen(pname), "/psinfo");
-retry:
-		if ((procfd = open(pname, O_RDONLY)) == -1)
-			continue;
-
-		/*
-		 * Get the info structure for the process and close quickly.
-		 */
-		if (read(procfd, &info, sizeof (info)) != sizeof (info)) {
-			int	saverr = errno;
-
-			(void) close(procfd);
-			if (saverr == EAGAIN)
-				goto retry;
-			if (saverr != ENOENT)
-				perror(pname);
-			continue;
-		}
-		(void) close(procfd);
-
-		/*
-		 * We make sure there's always a free slot in the table
-		 * in case we need to add a fake p0.
-		 */
-		if (nps + 1 >= psize) {
-			if ((psize *= 2) == 0)
-				psize = 20;
-			if ((ps = realloc(ps, psize*sizeof (ps_t *))) == NULL) {
-				perror("realloc()");
-				return (1);
-			}
-		}
-		if ((p = calloc(1, sizeof (ps_t))) == NULL) {
-			perror("calloc()");
-			return (1);
-		}
-		ps[nps++] = p;
-		p->done = 0;
-		p->uid = info.pr_uid;
-		p->gid = info.pr_gid;
-		p->pid = info.pr_pid;
-		p->ppid = info.pr_ppid;
-		p->pgrp = info.pr_pgid;
-		p->sid = info.pr_sid;
-		p->zoneid = info.pr_zoneid;
-		p->ctid = info.pr_contract;
-		p->start = info.pr_start;
-		proc_unctrl_psinfo(&info);
-		if (info.pr_nlwp == 0)
-			(void) strcpy(p->psargs, "<defunct>");
-		else if (info.pr_psargs[0] == '\0')
-			(void) strncpy(p->psargs, info.pr_fname,
-			    sizeof (p->psargs));
-		else
-			(void) strncpy(p->psargs, info.pr_psargs,
-			    sizeof (p->psargs));
-		p->psargs[sizeof (p->psargs)-1] = '\0';
-		p->pp = NULL;
-		p->sp = NULL;
-		p->cp = NULL;
-
-		if (sflag)
-			p_get_svc_fmri(p, NULL);
-
-		if (p->pid == p->ppid)
-			proc0 = p;
-		if (p->pid == 1)
-			proc1 = p;
-	}
-
-	(void) closedir(dirp);
 	if (proc0 == NULL)
 		proc0 = fakepid0();
 	if (proc1 == NULL)
@@ -324,9 +257,7 @@ retry:
 		if (errno != 0 || *next != '\0') {
 			struct passwd *pw = getpwnam(arg);
 			if (pw == NULL) {
-				(void) fprintf(stderr,
-				    "%s: invalid username: %s\n",
-				    command, arg);
+				warnx("invalid username: %s", arg);
 				retc = 1;
 				continue;
 			}
@@ -368,7 +299,33 @@ retry:
 	return (retc || errflg);
 }
 
-#define	PIDWIDTH	5
+
+#define	PIDWIDTH	6
+
+static void
+printlines(ps_t *p, int level)
+{
+	if (level == 0)
+		return;
+
+	if (!gflag) {
+		(void) printf("%*s", level * 2, "");
+		return;
+	}
+
+	for (int i = 1; i < level; i++) {
+		ps_t *ancestor = p;
+
+		/* Find our ancestor at depth 'i' */
+		for (int j = i; j < level; j++)
+			ancestor = ancestor->pp;
+
+		(void) printf("%s ", HAS_SIBLING(ancestor) ? box[BAR] : " ");
+	}
+
+	(void) printf("%s%s", HAS_SIBLING(p) ? box[VRIGHT] : box[CORNER],
+	    box[DASH]);
+}
 
 static int
 printone(ps_t *p, int level)
@@ -379,13 +336,14 @@ printone(ps_t *p, int level)
 		indent = level * 2;
 		if ((n = columns - PIDWIDTH - indent - 2) < 0)
 			n = 0;
+		printlines(p, level);
 		if (p->pid >= 0) {
-			(void) printf("%*.*s%-*d %.*s\n", indent, indent, " ",
-			    PIDWIDTH, (int)p->pid, n, p->psargs);
+			(void) printf("%-*d %.*s\n", PIDWIDTH, (int)p->pid, n,
+			    p->psargs);
 		} else {
 			assert(cflag != 0);
-			(void) printf("%*.*s[process contract %d: %s]\n",
-			    indent, indent, " ", (int)p->ctid,
+			(void) printf("[process contract %d: %s]\n",
+			    (int)p->ctid,
 			    p->svc_fmri == NULL ? "?" : p->svc_fmri);
 		}
 		return (1);
@@ -472,18 +430,10 @@ ctsort(ctid_t ctid, ps_t *p)
 		return;
 
 	if (nctps >= ctsize) {
-		if ((ctsize *= 2) == 0)
-			ctsize = 20;
-		if ((ctps = realloc(ctps, ctsize * sizeof (ps_t *))) == NULL) {
-			perror("realloc()");
-			exit(1);
-		}
+		ctsize += CHUNK_SIZE;
+		ctps = xreallocarray(ctps, ctsize, sizeof (ps_t *));
 	}
-	pp = calloc(sizeof (ps_t), 1);
-	if (pp == NULL) {
-		perror("calloc()");
-		exit(1);
-	}
+	pp = zalloc(sizeof (*pp));
 	ctps[nctps++] = pp;
 
 	pp->pid = -1;
@@ -624,11 +574,7 @@ fakepid0(void)
 	ps_t *p0, *p;
 	int n;
 
-	if ((p0 = calloc(1, sizeof (ps_t))) == NULL) {
-		perror("calloc()");
-		exit(1);
-	}
-	(void) memset(p0, '\0', sizeof (ps_t));
+	p0 = zalloc(sizeof (*p0));
 
 	/* First build all partial process trees. */
 	for (n = 0; n < nps; n++) {
@@ -655,10 +601,9 @@ getzone(const char *arg)
 {
 	zoneid_t zoneid;
 
-	if (zone_get_id(arg, &zoneid) != 0) {
-		(void) fprintf(stderr, "%s: unknown zone: %s\n", command, arg);
-		exit(1);
-	}
+	if (zone_get_id(arg, &zoneid) != 0)
+		err(EXIT_FAILURE, "unknown zone: %s", arg);
+
 	return (zoneid);
 }
 
@@ -673,10 +618,7 @@ parse_svc(const char *arg, char **instp)
 	if (strncmp(p, "svc:/", strlen("svc:/")) == 0)
 		p += strlen("svc:/");
 
-	if ((ret = strdup(p)) == NULL) {
-		perror("strdup()");
-		exit(1);
-	}
+	ret = xstrdup(p);
 
 	if ((cp = strrchr(ret, ':')) != NULL) {
 		*cp = '\0';
@@ -685,10 +627,136 @@ parse_svc(const char *arg, char **instp)
 		cp = "";
 	}
 
-	if ((*instp = strdup(cp)) == NULL) {
-		perror("strdup()");
-		exit(1);
+	*instp = xstrdup(cp);
+	return (ret);
+}
+
+static int
+add_proc(psinfo_t *info, lwpsinfo_t *lwp __unused, void *arg __unused)
+{
+	ps_t *p;
+
+	/*
+	 * We make sure there is always a free slot in the table
+	 * in case we need to add a fake p0;
+	 */
+	if (nps + 1 >= psize) {
+		psize += CHUNK_SIZE;
+		ps = xreallocarray(ps, psize, sizeof (ps_t));
 	}
 
-	return (ret);
+	p = zalloc(sizeof (*p));
+	ps[nps++] = p;
+	p->done = 0;
+	p->uid = info->pr_uid;
+	p->gid = info->pr_gid;
+	p->pid = info->pr_pid;
+	p->ppid = info->pr_ppid;
+	p->pgrp = info->pr_pgid;
+	p->sid = info->pr_sid;
+	p->zoneid = info->pr_zoneid;
+	p->ctid = info->pr_contract;
+	p->start = info->pr_start;
+	proc_unctrl_psinfo(info);
+	if (info->pr_nlwp == 0)
+		(void) strcpy(p->psargs, "<defunct>");
+	else if (info->pr_psargs[0] == '\0')
+		(void) strncpy(p->psargs, info->pr_fname,
+		    sizeof (p->psargs));
+	else
+		(void) strncpy(p->psargs, info->pr_psargs,
+		    sizeof (p->psargs));
+	p->psargs[sizeof (p->psargs)-1] = '\0';
+	p->pp = NULL;
+	p->sp = NULL;
+
+	if (sflag)
+		p_get_svc_fmri(p, NULL);
+
+	if (p->pid == p->ppid)
+		proc0 = p;
+	if (p->pid == 1)
+		proc1 = p;
+
+	return (0);
+}
+
+
+static size_t
+get_termwidth(void)
+{
+	char *s;
+
+	if ((s = getenv("COLUMNS")) != NULL) {
+		unsigned long n;
+
+		errno = 0;
+		n = strtoul(s, NULL, 10);
+		if (n != 0 && errno == 0) {
+			/* Sanity check on the range */
+			if (n > INT_MAX)
+				n = COLUMN_DEFAULT;
+			return (n);
+		}
+	}
+
+	struct winsize winsize;
+
+	if (isatty(STDOUT_FILENO) &&
+	    ioctl(STDOUT_FILENO, TIOCGWINSZ, &winsize) == 0 &&
+	    winsize.ws_col != 0) {
+		return (winsize.ws_col);
+	}
+
+	return (COLUMN_DEFAULT);
+}
+
+static const char **
+get_boxchars(void)
+{
+	char *loc = setlocale(LC_ALL, "");
+
+	if (loc == NULL)
+		return (box_ascii);
+
+	const char *p = strstr(loc, "UTF-8");
+
+	/*
+	 * Only use the UTF-8 box drawing characters if the locale ends
+	 * with "UTF-8".
+	 */
+	if (p != NULL && p[5] == '\0')
+		return (box_utf8);
+
+	return (box_ascii);
+}
+
+static void *
+zalloc(size_t len)
+{
+	void *p = calloc(1, len);
+
+	if (p == NULL)
+		err(EXIT_FAILURE, "calloc");
+	return (p);
+}
+
+static void *
+xreallocarray(void *ptr, size_t nelem, size_t elsize)
+{
+	void *p = reallocarray(ptr, nelem, elsize);
+
+	if (p == NULL)
+		err(EXIT_FAILURE, "reallocarray");
+	return (p);
+}
+
+static char *
+xstrdup(const char *s)
+{
+	char *news = strdup(s);
+
+	if (news == NULL)
+		err(EXIT_FAILURE, "strdup");
+	return (news);
 }
