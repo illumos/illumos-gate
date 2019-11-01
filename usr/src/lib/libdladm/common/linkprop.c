@@ -1107,6 +1107,21 @@ dladm_set_linkprop(dladm_handle_t handle, datalink_id_t linkid,
 	}
 
 	/*
+	 * For well-known property names, normalize the case.  We can also
+	 * save the property name itself, so that we can just do a pointer
+	 * equality test later and avoid an extra strcmp.
+	 */
+	if (prop_name != NULL) {
+		int i;
+		for (i = 0; i < DLADM_MAX_PROPS; i++) {
+			if (strcasecmp(prop_name, prop_table[i].pd_name) == 0) {
+				prop_name = prop_table[i].pd_name;
+				break;
+			}
+		}
+	}
+
+	/*
 	 * Check for valid link property against the flags passed
 	 * and set the link property when active flag is passed.
 	 */
@@ -1136,7 +1151,7 @@ dladm_set_linkprop(dladm_handle_t handle, datalink_id_t linkid,
 				if (!(pdp->pd_flags & PD_AFTER_PERM))
 					continue;
 				if (prop_name != NULL &&
-				    strcasecmp(prop_name, pdp->pd_name) != 0)
+				    prop_name != pdp->pd_name)
 					continue;
 				status = pdp->pd_set(handle, pdp, linkid, NULL,
 				    0, flags, 0);
@@ -1216,9 +1231,12 @@ dladm_get_linkprop(dladm_handle_t handle, datalink_id_t linkid,
 	    prop_val == NULL || val_cntp == NULL || *val_cntp == 0)
 		return (DLADM_STATUS_BADARG);
 
-	for (i = 0; i < DLADM_MAX_PROPS; i++)
-		if (strcasecmp(prop_name, prop_table[i].pd_name) == 0)
+	for (i = 0; i < DLADM_MAX_PROPS; i++) {
+		if (strcasecmp(prop_name, prop_table[i].pd_name) == 0) {
+			prop_name = prop_table[i].pd_name;
 			break;
+		}
+	}
 
 	if (i == DLADM_MAX_PROPS) {
 		if (prop_name[0] == '_') {
@@ -1348,9 +1366,12 @@ dladm_get_linkprop_values(dladm_handle_t handle, datalink_id_t linkid,
 	    ret_val == NULL || val_cntp == NULL || *val_cntp == 0)
 		return (DLADM_STATUS_BADARG);
 
-	for (pdp = prop_table; pdp < prop_table + DLADM_MAX_PROPS; pdp++)
-		if (strcasecmp(prop_name, pdp->pd_name) == 0)
+	for (pdp = prop_table; pdp < prop_table + DLADM_MAX_PROPS; pdp++) {
+		if (strcasecmp(prop_name, pdp->pd_name) == 0) {
+			prop_name = pdp->pd_name;
 			break;
+		}
+	}
 
 	if (pdp == prop_table + DLADM_MAX_PROPS)
 		return (DLADM_STATUS_NOTFOUND);
