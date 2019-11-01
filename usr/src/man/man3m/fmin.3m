@@ -43,12 +43,11 @@
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
 .\"
-.TH FMIN 3M "Jul 12, 2006" "SunOS 5.11" "Mathematical Library Functions"
+.TH FMIN 3M "Oct 27, 2019" "SunOS 5.11" "Mathematical Library Functions"
 .SH NAME
 fmin, fminf, fminl \- determine minimum numeric value of two floating-point
 numbers
 .SH SYNOPSIS
-.LP
 .nf
 c99 [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
 #include <math.h>
@@ -58,7 +57,7 @@ c99 [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
 
 .LP
 .nf
-\fBfloat\fR \fBfminf\fR(\fBfloat float\fR \fIx\fR, \fBfloat\fR \fIy\fR);
+\fBfloat\fR \fBfminf\fR(\fBfloat\fR \fIx\fR, \fBfloat\fR \fIy\fR);
 .fi
 
 .LP
@@ -67,14 +66,10 @@ c99 [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions determine the minimum numeric value of their arguments. NaN
 arguments are treated as missing data: if one argument is a NaN and the other
 numeric, these functions choose the numeric value.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, these functions return the minimum numeric value of
 their arguments.
 .sp
@@ -84,12 +79,8 @@ If just one argument is a NaN, the other argument is returned.
 .LP
 If \fIx\fR and \fIy\fR are NaN, a NaN is returned.
 .SH ERRORS
-.sp
-.LP
 No errors are defined.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -107,7 +98,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBfdim\fR(3M), \fBfmax\fR(3M), \fBmath.h\fR(3HEAD), \fBattributes\fR(5),
 \fBstandards\fR(5)
