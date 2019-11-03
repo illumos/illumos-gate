@@ -108,9 +108,10 @@ zfs_open(const char *upath, struct open_file *f)
 		return (EINVAL);
 
 	/* allocate file system specific data structure */
-	fp = malloc(sizeof(struct file));
-	bzero(fp, sizeof(struct file));
-	f->f_fsdata = (void *)fp;
+	fp = calloc(1, sizeof (struct file));
+	if (fp == NULL)
+		return (ENOMEM);
+	f->f_fsdata = fp;
 
 	rc = zfs_lookup(mount, upath, &fp->f_dnode);
 	fp->f_seekp = 0;
@@ -127,9 +128,7 @@ zfs_close(struct open_file *f)
 	struct file *fp = (struct file *)f->f_fsdata;
 
 	dnode_cache_obj = 0;
-	f->f_fsdata = (void *)0;
-	if (fp == (struct file *)0)
-		return (0);
+	f->f_fsdata = NULL;
 
 	free(fp);
 	return (0);
@@ -248,7 +247,9 @@ zfs_readdir(struct open_file *f, struct dirent *d)
 				return (rc);
 
 			fp->f_seekp = bsize;
-			fp->f_zap_leaf = (zap_leaf_phys_t *)malloc(bsize);
+			fp->f_zap_leaf = malloc(bsize);
+			if (fp->f_zap_leaf == NULL)
+				return (ENOMEM);
 			rc = dnode_read(spa, &fp->f_dnode,
 					fp->f_seekp,
 					fp->f_zap_leaf,
@@ -622,8 +623,11 @@ zfs_dev_open(struct open_file *f, ...)
 		spa = spa_find_by_guid(dev->pool_guid);
 	if (!spa)
 		return (ENXIO);
-	mount = malloc(sizeof(*mount));
-	rv = zfs_mount(spa, dev->root_guid, mount);
+	mount = malloc(sizeof (*mount));
+	if (mount == NULL)
+		rv = ENOMEM;
+	else
+		rv = zfs_mount(spa, dev->root_guid, mount);
 	if (rv != 0) {
 		free(mount);
 		return (rv);
@@ -845,191 +849,3 @@ zfs_list(const char *name)
 
 	return (zfs_list_dataset(spa, objid));
 }
-
-#ifdef __FreeBSD__
-void
-init_zfs_bootenv(char *currdev)
-{
-	char *beroot;
-
-	if (strlen(currdev) == 0)
-		return;
-	if(strncmp(currdev, "zfs:", 4) != 0)
-		return;
-	/* Remove the trailing : */
-	currdev[strlen(currdev) - 1] = '\0';
-	setenv("zfs_be_active", currdev, 1);
-	setenv("zfs_be_currpage", "1", 1);
-	/* Forward past zfs: */
-	currdev = strchr(currdev, ':');
-	currdev++;
-	/* Remove the last element (current bootenv) */
-	beroot = strrchr(currdev, '/');
-	if (beroot != NULL)
-		beroot[0] = '\0';
-	beroot = currdev;
-	setenv("zfs_be_root", beroot, 1);
-}
-
-int
-zfs_bootenv(const char *name)
-{
-	static char	poolname[ZFS_MAXNAMELEN], *dsname, *root;
-	char		becount[4];
-	uint64_t	objid;
-	spa_t		*spa;
-	int		len, rv, pages, perpage, currpage;
-
-	if (name == NULL)
-		return (EINVAL);
-	if ((root = getenv("zfs_be_root")) == NULL)
-		return (EINVAL);
-
-	if (strcmp(name, root) != 0) {
-		if (setenv("zfs_be_root", name, 1) != 0)
-			return (ENOMEM);
-	}
-
-	SLIST_INIT(&zfs_be_head);
-	zfs_env_count = 0;
-	len = strlen(name);
-	dsname = strchr(name, '/');
-	if (dsname != NULL) {
-		len = dsname - name;
-		dsname++;
-	} else
-		dsname = "";
-	memcpy(poolname, name, len);
-	poolname[len] = '\0';
-
-	spa = spa_find_by_name(poolname);
-	if (!spa)
-		return (ENXIO);
-	rv = zfs_lookup_dataset(spa, dsname, &objid);
-	if (rv != 0)
-		return (rv);
-	rv = zfs_callback_dataset(spa, objid, zfs_belist_add);
-
-	/* Calculate and store the number of pages of BEs */
-	perpage = (ZFS_BE_LAST - ZFS_BE_FIRST + 1);
-	pages = (zfs_env_count / perpage) + ((zfs_env_count % perpage) > 0 ? 1 : 0);
-	snprintf(becount, 4, "%d", pages);
-	if (setenv("zfs_be_pages", becount, 1) != 0)
-		return (ENOMEM);
-
-	/* Roll over the page counter if it has exceeded the maximum */
-	currpage = strtol(getenv("zfs_be_currpage"), NULL, 10);
-	if (currpage > pages) {
-		if (setenv("zfs_be_currpage", "1", 1) != 0)
-			return (ENOMEM);
-	}
-
-	/* Populate the menu environment variables */
-	zfs_set_env();
-
-	/* Clean up the SLIST of ZFS BEs */
-	while (!SLIST_EMPTY(&zfs_be_head)) {
-		zfs_be = SLIST_FIRST(&zfs_be_head);
-		SLIST_REMOVE_HEAD(&zfs_be_head, entries);
-		free(zfs_be);
-	}
-
-	return (rv);
-}
-
-int
-zfs_belist_add(const char *name, uint64_t value __unused)
-{
-
-	/* Skip special datasets that start with a $ character */
-	if (strncmp(name, "$", 1) == 0) {
-		return (0);
-	}
-	/* Add the boot environment to the head of the SLIST */
-	zfs_be = malloc(sizeof(struct zfs_be_entry));
-	if (zfs_be == NULL) {
-		return (ENOMEM);
-	}
-	zfs_be->name = name;
-	SLIST_INSERT_HEAD(&zfs_be_head, zfs_be, entries);
-	zfs_env_count++;
-
-	return (0);
-}
-
-int
-zfs_set_env(void)
-{
-	char envname[32], envval[256];
-	char *beroot, *pagenum;
-	int rv, page, ctr;
-
-	beroot = getenv("zfs_be_root");
-	if (beroot == NULL) {
-		return (1);
-	}
-
-	pagenum = getenv("zfs_be_currpage");
-	if (pagenum != NULL) {
-		page = strtol(pagenum, NULL, 10);
-	} else {
-		page = 1;
-	}
-
-	ctr = 1;
-	rv = 0;
-	zfs_env_index = ZFS_BE_FIRST;
-	SLIST_FOREACH_SAFE(zfs_be, &zfs_be_head, entries, zfs_be_tmp) {
-		/* Skip to the requested page number */
-		if (ctr <= ((ZFS_BE_LAST - ZFS_BE_FIRST + 1) * (page - 1))) {
-			ctr++;
-			continue;
-		}
-
-		snprintf(envname, sizeof(envname), "bootenvmenu_caption[%d]", zfs_env_index);
-		snprintf(envval, sizeof(envval), "%s", zfs_be->name);
-		rv = setenv(envname, envval, 1);
-		if (rv != 0) {
-			break;
-		}
-
-		snprintf(envname, sizeof(envname), "bootenvansi_caption[%d]", zfs_env_index);
-		rv = setenv(envname, envval, 1);
-		if (rv != 0){
-			break;
-		}
-
-		snprintf(envname, sizeof(envname), "bootenvmenu_command[%d]", zfs_env_index);
-		rv = setenv(envname, "set_bootenv", 1);
-		if (rv != 0){
-			break;
-		}
-
-		snprintf(envname, sizeof(envname), "bootenv_root[%d]", zfs_env_index);
-		snprintf(envval, sizeof(envval), "zfs:%s/%s", beroot, zfs_be->name);
-		rv = setenv(envname, envval, 1);
-		if (rv != 0){
-			break;
-		}
-
-		zfs_env_index++;
-		if (zfs_env_index > ZFS_BE_LAST) {
-			break;
-		}
-
-	}
-
-	for (; zfs_env_index <= ZFS_BE_LAST; zfs_env_index++) {
-		snprintf(envname, sizeof(envname), "bootenvmenu_caption[%d]", zfs_env_index);
-		(void)unsetenv(envname);
-		snprintf(envname, sizeof(envname), "bootenvansi_caption[%d]", zfs_env_index);
-		(void)unsetenv(envname);
-		snprintf(envname, sizeof(envname), "bootenvmenu_command[%d]", zfs_env_index);
-		(void)unsetenv(envname);
-		snprintf(envname, sizeof(envname), "bootenv_root[%d]", zfs_env_index);
-		(void)unsetenv(envname);
-	}
-
-	return (rv);
-}
-#endif
