@@ -49,9 +49,9 @@
 
 static mutex_t umem_error_lock = DEFAULTMUTEX;
 
-static char umem_error_buffer[ERR_SIZE] = "";
-static uint_t umem_error_begin = 0;
-static uint_t umem_error_end = 0;
+char umem_error_buffer[ERR_SIZE] = "";
+uint_t umem_error_begin = 0;
+uint_t umem_error_end = 0;
 
 #define	WRITE_AND_INC(var, value) { \
 	umem_error_buffer[(var)++] = (value); \

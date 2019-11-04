@@ -49,4 +49,3 @@ $(ROOTDIGEST)/%: %.ksh
 	$(INS.rename)
 $(ROOTHMAC)/%: %.ksh
 	$(INS.rename)
-
