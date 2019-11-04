@@ -24,6 +24,7 @@
  */
 /*
  * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019 by Western Digital Corporation
  */
 #include <unistd.h>
 #include <stdio.h>
@@ -423,6 +424,13 @@ ipmi_sensor_state(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		topo_mod_dprintf(mod, "Failed to get sensor reading for sensor "
 		    "%s, sensor_num=%d (%s)\n", entity_refs[i], sensor_num,
 		    ipmi_errmsg(hdl));
+		strarr_free(mod, entity_refs, nelems);
+		topo_mod_ipmi_rele(mod);
+		return (-1);
+	}
+	if (reading->isr_state_unavailable) {
+		topo_mod_dprintf(mod, "Unavailable sensor %s, sensor_num=%d\n",
+		    entity_refs[i], sensor_num);
 		strarr_free(mod, entity_refs, nelems);
 		topo_mod_ipmi_rele(mod);
 		return (-1);
