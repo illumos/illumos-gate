@@ -64,6 +64,7 @@ static const uuid_t gpt_uuid_illumos_boot = GPT_ENT_TYPE_ILLUMOS_BOOT;
 static const uuid_t gpt_uuid_illumos_ufs = GPT_ENT_TYPE_ILLUMOS_UFS;
 static const uuid_t gpt_uuid_illumos_zfs = GPT_ENT_TYPE_ILLUMOS_ZFS;
 static const uuid_t gpt_uuid_reserved = GPT_ENT_TYPE_RESERVED;
+static const uuid_t gpt_uuid_apple_apfs = GPT_ENT_TYPE_APPLE_APFS;
 #endif
 
 struct pentry {
@@ -114,7 +115,8 @@ static struct parttypes {
 	{ PART_VTOC_USR,	"usr" },
 	{ PART_VTOC_STAND,	"stand" },
 	{ PART_VTOC_VAR,	"var" },
-	{ PART_VTOC_HOME,	"home" }
+	{ PART_VTOC_HOME,	"home" },
+	{ PART_APFS,		"APFS" }
 };
 
 const char *
@@ -168,6 +170,8 @@ gpt_parttype(uuid_t type)
 		return (PART_ILLUMOS_ZFS);
 	else if (uuid_equal(&type, &gpt_uuid_reserved, NULL))
 		return (PART_RESERVED);
+	else if (uuid_equal(&type, &gpt_uuid_apple_apfs, NULL))
+		return (PART_APFS);
 	return (PART_UNKNOWN);
 }
 

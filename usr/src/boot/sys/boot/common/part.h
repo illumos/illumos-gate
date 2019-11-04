@@ -64,7 +64,8 @@ enum partition_type {
 	PART_VTOC_BACKUP,
 	PART_VTOC_STAND,
 	PART_VTOC_VAR,
-	PART_VTOC_HOME
+	PART_VTOC_HOME,
+	PART_APFS
 };
 
 struct ptable_entry {
