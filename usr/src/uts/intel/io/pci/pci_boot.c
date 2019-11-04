@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2019 Western Digital Corporation
  */
 
 #include <sys/types.h>
@@ -189,8 +190,6 @@ int		pua_cache_valid = 0;
 static ACPI_STATUS
 pci_process_acpi_device(ACPI_HANDLE hdl, UINT32 level, void *ctx, void **rv)
 {
-	ACPI_BUFFER	rb;
-	ACPI_OBJECT	ro;
 	ACPI_DEVICE_INFO *adi;
 	int		busnum;
 
@@ -218,18 +217,12 @@ pci_process_acpi_device(ACPI_HANDLE hdl, UINT32 level, void *ctx, void **rv)
 	AcpiOsFree(adi);
 
 	/*
-	 * XXX: ancient Big Bear broken _BBN will result in two
-	 * bus 0 _BBNs being found, so we need to handle duplicate
-	 * bus 0 gracefully.  However, broken _BBN does not
-	 * hide a childless root-bridge so no need to work-around it
-	 * here
+	 * acpica_get_busno() will check the presence of _BBN and
+	 * fail if not present. It will then use the _CRS method to
+	 * retrieve the actual bus number assigned, it will fall back
+	 * to _BBN should the _CRS method fail.
 	 */
-	rb.Pointer = &ro;
-	rb.Length = sizeof (ro);
-	if (ACPI_SUCCESS(AcpiEvaluateObjectTyped(hdl, "_BBN",
-	    NULL, &rb, ACPI_TYPE_INTEGER))) {
-		busnum = ro.Integer.Value;
-
+	if (ACPI_SUCCESS(acpica_get_busno(hdl, &busnum))) {
 		/*
 		 * Ignore invalid _BBN return values here (rather
 		 * than panic) and emit a warning; something else

@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Western Digital Corporation
  */
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
@@ -1259,6 +1260,73 @@ AcpiOsGetLine(char *Buffer, UINT32 len, UINT32 *BytesRead)
 	return (0);
 }
 
+static ACPI_STATUS
+acpica_crs_cb(ACPI_RESOURCE *rp, void *context)
+{
+	int	*busno = context;
+
+	if (rp->Data.Address.ProducerConsumer == 1)
+		return (AE_OK);
+
+	switch (rp->Type) {
+	case ACPI_RESOURCE_TYPE_ADDRESS16:
+		if (rp->Data.Address16.Address.AddressLength == 0)
+			break;
+		if (rp->Data.Address16.ResourceType != ACPI_BUS_NUMBER_RANGE)
+			break;
+
+		*busno = rp->Data.Address16.Address.Minimum;
+		break;
+
+	case ACPI_RESOURCE_TYPE_ADDRESS32:
+		if (rp->Data.Address32.Address.AddressLength == 0)
+			break;
+		if (rp->Data.Address32.ResourceType != ACPI_BUS_NUMBER_RANGE)
+			break;
+
+		*busno = rp->Data.Address32.Address.Minimum;
+		break;
+
+	case ACPI_RESOURCE_TYPE_ADDRESS64:
+		if (rp->Data.Address64.Address.AddressLength == 0)
+			break;
+		if (rp->Data.Address64.ResourceType != ACPI_BUS_NUMBER_RANGE)
+			break;
+
+		*busno = (int)rp->Data.Address64.Address.Minimum;
+		break;
+
+	default:
+		break;
+	}
+
+	return (AE_OK);
+}
+
+/*
+ * Retrieve the bus number for a root bus.
+ *
+ * _CRS (Current Resource Setting) holds the bus number as set in
+ * PCI configuration, this may differ from _BBN and is a more reliable
+ * indicator of what the bus number is.
+ */
+ACPI_STATUS
+acpica_get_busno(ACPI_HANDLE hdl, int *busno)
+{
+	ACPI_STATUS	rv;
+	int		bus = -1;
+	int		bbn;
+
+	if (ACPI_FAILURE(rv = acpica_eval_int(hdl, "_BBN", &bbn)))
+		return (rv);
+
+	(void) AcpiWalkResources(hdl, "_CRS", acpica_crs_cb, &bus);
+
+	*busno = bus == -1 ? bbn : bus;
+
+	return (AE_OK);
+}
+
 /*
  * Device tree binding
  */
@@ -1304,7 +1372,7 @@ acpica_find_pcibus_walker(ACPI_HANDLE hdl, UINT32 lvl, void *ctxp, void **rvpp)
 			*hdlp = hdl;
 			return (AE_CTRL_TERMINATE);
 		}
-	} else if (ACPI_SUCCESS(acpica_eval_int(hdl, "_BBN", &bbn))) {
+	} else if (ACPI_SUCCESS(acpica_get_busno(hdl, &bbn))) {
 		if (bbn == busno) {
 			*hdlp = hdl;
 			return (AE_CTRL_TERMINATE);
