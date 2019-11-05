@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -60,21 +60,22 @@ mdb_module_load(const char *name, int mode)
 		/*
 		 * Remove any .so(.[0-9]+)? suffix
 		 */
-		while ((p = strrchr(buf, '.')) != NULL) {
+		if ((p = strrchr(buf, '.')) != NULL) {
 			for (q = p + 1; isdigit(*q); q++)
 				;
 
 			if (*q == '\0') {
-				/* found digits to remove */
-				*p = '\0';
-				continue;
-			}
+				if (q > p + 1) {
 
-			if (strcmp(p, ".so") == 0) {
-				*p = '\0';
-				break;
+					/* found digits to remove */
+					*p = '\0';
+				}
 			}
-
+			if ((p = strrchr(buf, '.')) != NULL) {
+				if (strcmp(p, ".so") == 0) {
+					*p = '\0';
+				}
+			}
 		}
 		fullname = name;
 		name = buf;
