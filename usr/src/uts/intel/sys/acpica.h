@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
+ * Copyright 2019 Western Digital Corporation.
  */
 
 #ifndef _SYS_ACPICA_H
@@ -141,7 +142,7 @@ typedef struct iflag {
  */
 typedef struct device_id {
 	struct device_id *next;
-	char 	*id;
+	char	*id;
 } device_id_t;
 
 typedef struct property {
@@ -192,6 +193,7 @@ extern ACPI_STATUS acpica_get_cpu_object_by_apicid(UINT32, ACPI_HANDLE *);
 extern ACPI_STATUS acpica_get_cpu_id_by_object(ACPI_HANDLE, processorid_t *);
 extern ACPI_STATUS acpica_get_apicid_by_object(ACPI_HANDLE, UINT32 *);
 extern ACPI_STATUS acpica_get_procid_by_object(ACPI_HANDLE, UINT32 *);
+extern ACPI_STATUS acpica_get_busno(ACPI_HANDLE, int *);
 
 extern uint64_t acpica_get_core_feature(uint64_t);
 extern void acpica_set_core_feature(uint64_t);

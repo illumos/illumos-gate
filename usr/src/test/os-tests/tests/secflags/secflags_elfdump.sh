@@ -21,12 +21,21 @@ cd /tmp/secflags-test.$$
 
 /usr/bin/psecflags -s aslr -e sleep 100000 &
 pid=$!
-coreadm -p core $pid # We need to be able to reliably find the core
+# Make sure we generate a kernel core we can find
+coreadm -p core $pid
+enabled=$(/usr/bin/svcprop -p config_params/process_enabled coreadm)
+coreadm_restore=""
+if [[ "$enabled" = "false" ]]; then
+    coreadm_restore="/usr/bin/coreadm -d process"
+    coreadm -e process
+fi
 
 cleanup() {
     kill $pid >/dev/null 2>&1
     cd /
     rm -fr /tmp/secflags-test.$$
+
+    $coreadm_restore
 }
 
 trap cleanup EXIT
@@ -54,12 +63,14 @@ EOF
 /usr/bin/elfdump -n core.${pid} | grep -B5 -A5 prsecflags_t > gcore-output.$$
 
 if ! diff -u gcore-expected.$$ gcore-output.$$; then
+    $coreadm_restore
     exit 1;
 fi
 
 ## kernel-produced core
 kill -SEGV $pid
 wait $pid >/dev/null 2>&1
+$coreadm_restore
 
 cat > core-expected.$$ <<EOF
     namesz: 0x5
