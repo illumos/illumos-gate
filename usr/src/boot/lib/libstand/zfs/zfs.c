@@ -51,12 +51,12 @@
 #define		ZFS_BE_FIRST	4
 #define		ZFS_BE_LAST	8
 
-static int	zfs_open(const char *path, struct open_file *f);
-static int	zfs_close(struct open_file *f);
-static int	zfs_read(struct open_file *f, void *buf, size_t size, size_t *resid);
-static off_t	zfs_seek(struct open_file *f, off_t offset, int where);
-static int	zfs_stat(struct open_file *f, struct stat *sb);
-static int	zfs_readdir(struct open_file *f, struct dirent *d);
+static int	zfs_open(const char *, struct open_file *);
+static int	zfs_close(struct open_file *);
+static int	zfs_read(struct open_file *, void *, size_t, size_t *);
+static off_t	zfs_seek(struct open_file *, off_t, int);
+static int	zfs_stat(struct open_file *, struct stat *);
+static int	zfs_readdir(struct open_file *, struct dirent *);
 
 struct devsw zfs_dev;
 
@@ -82,12 +82,8 @@ struct file {
 	zap_leaf_phys_t	*f_zap_leaf;	/* zap leaf buffer */
 };
 
-#ifdef __FreeBSD__
-static int	zfs_env_index;
-static int	zfs_env_count;
-#endif
-
-SLIST_HEAD(zfs_be_list, zfs_be_entry) zfs_be_head = SLIST_HEAD_INITIALIZER(zfs_be_head);
+SLIST_HEAD(zfs_be_list, zfs_be_entry) zfs_be_head =
+    SLIST_HEAD_INITIALIZER(zfs_be_head);
 struct zfs_be_list *zfs_be_headp;
 struct zfs_be_entry {
 	const char *name;
@@ -139,7 +135,7 @@ zfs_close(struct open_file *f)
  * Cross block boundaries when necessary.
  */
 static int
-zfs_read(struct open_file *f, void *start, size_t size, size_t *resid	/* out */)
+zfs_read(struct open_file *f, void *start, size_t size, size_t *resid)
 {
 	const spa_t *spa = ((struct zfsmount *)f->f_devdata)->spa;
 	struct file *fp = (struct file *)f->f_fsdata;
@@ -158,11 +154,6 @@ zfs_read(struct open_file *f, void *start, size_t size, size_t *resid	/* out */)
 	if (rc)
 		return (rc);
 
-	if (0) {
-	    int i;
-	    for (i = 0; i < n; i++)
-		putchar(((char*) start)[i]);
-	}
 	fp->f_seekp += n;
 	if (resid)
 		*resid = size - n;
@@ -174,6 +165,9 @@ static off_t
 zfs_seek(struct open_file *f, off_t offset, int where)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
+	struct stat sb;
+	int error;
+
 
 	switch (where) {
 	case SEEK_SET:
@@ -183,10 +177,6 @@ zfs_seek(struct open_file *f, off_t offset, int where)
 		fp->f_seekp += offset;
 		break;
 	case SEEK_END:
-	    {
-		struct stat sb;
-		int error;
-
 		error = zfs_stat(f, &sb);
 		if (error != 0) {
 			errno = error;
@@ -194,7 +184,6 @@ zfs_seek(struct open_file *f, off_t offset, int where)
 		}
 		fp->f_seekp = sb.st_size - offset;
 		break;
-	    }
 	default:
 		errno = EINVAL;
 		return (-1);
@@ -231,8 +220,8 @@ zfs_readdir(struct open_file *f, struct dirent *d)
 	 * If this is the first read, get the zap type.
 	 */
 	if (fp->f_seekp == 0) {
-		rc = dnode_read(spa, &fp->f_dnode,
-				0, &fp->f_zap_type, sizeof(fp->f_zap_type));
+		rc = dnode_read(spa, &fp->f_dnode, 0, &fp->f_zap_type,
+		    sizeof (fp->f_zap_type));
 		if (rc)
 			return (rc);
 
@@ -240,9 +229,8 @@ zfs_readdir(struct open_file *f, struct dirent *d)
 			fp->f_seekp = offsetof(mzap_phys_t, mz_chunk);
 		} else {
 			rc = dnode_read(spa, &fp->f_dnode,
-					offsetof(zap_phys_t, zap_num_leafs),
-					&fp->f_num_leafs,
-					sizeof(fp->f_num_leafs));
+			    offsetof(zap_phys_t, zap_num_leafs),
+			    &fp->f_num_leafs, sizeof (fp->f_num_leafs));
 			if (rc)
 				return (rc);
 
@@ -250,10 +238,8 @@ zfs_readdir(struct open_file *f, struct dirent *d)
 			fp->f_zap_leaf = malloc(bsize);
 			if (fp->f_zap_leaf == NULL)
 				return (ENOMEM);
-			rc = dnode_read(spa, &fp->f_dnode,
-					fp->f_seekp,
-					fp->f_zap_leaf,
-					bsize);
+			rc = dnode_read(spa, &fp->f_dnode, fp->f_seekp,
+			    fp->f_zap_leaf, bsize);
 			if (rc)
 				return (rc);
 		}
@@ -264,11 +250,11 @@ zfs_readdir(struct open_file *f, struct dirent *d)
 		if (fp->f_seekp >= bsize)
 			return (ENOENT);
 
-		rc = dnode_read(spa, &fp->f_dnode,
-				fp->f_seekp, &mze, sizeof(mze));
+		rc = dnode_read(spa, &fp->f_dnode, fp->f_seekp, &mze,
+		    sizeof (mze));
 		if (rc)
 			return (rc);
-		fp->f_seekp += sizeof(mze);
+		fp->f_seekp += sizeof (mze);
 
 		if (!mze.mze_name[0])
 			goto mzap_next;
@@ -310,10 +296,8 @@ zfs_readdir(struct open_file *f, struct dirent *d)
 			if (fp->f_seekp >= bsize * fp->f_num_leafs)
 				return (ENOENT);
 
-			rc = dnode_read(spa, &fp->f_dnode,
-					fp->f_seekp,
-					fp->f_zap_leaf,
-					bsize);
+			rc = dnode_read(spa, &fp->f_dnode, fp->f_seekp,
+			    fp->f_zap_leaf, bsize);
 			if (rc)
 				return (rc);
 		}
@@ -324,8 +308,8 @@ zfs_readdir(struct open_file *f, struct dirent *d)
 			goto fzap_next;
 
 		namelen = zc->l_entry.le_name_numints;
-		if (namelen > sizeof(d->d_name))
-			namelen = sizeof(d->d_name);
+		if (namelen > sizeof (d->d_name))
+			namelen = sizeof (d->d_name);
 
 		/*
 		 * Paste the name back together.
@@ -342,7 +326,7 @@ zfs_readdir(struct open_file *f, struct dirent *d)
 			namelen -= len;
 			nc = &ZAP_LEAF_CHUNK(&zl, nc->l_array.la_next);
 		}
-		d->d_name[sizeof(d->d_name) - 1] = 0;
+		d->d_name[sizeof (d->d_name) - 1] = 0;
 
 		/*
 		 * Assume the first eight bytes of the value are
@@ -368,7 +352,7 @@ vdev_read(vdev_t *vdev __unused, void *priv, off_t offset, void *buf,
 	off_t off;
 	char *bouncebuf, *rb_buf;
 
-	fd = (uintptr_t) priv;
+	fd = (uintptr_t)priv;
 	bouncebuf = NULL;
 
 	ret = ioctl(fd, DIOCGSECTORSIZE, &secsz);
@@ -449,7 +433,7 @@ struct zfs_probe_args {
 	int		fd;
 	const char	*devname;
 	uint64_t	*pool_guid;
-	u_int		secsz;
+	unsigned	secsz;
 };
 
 static int
@@ -762,7 +746,7 @@ zfs_bootfs(void *zdev)
 	 * the environment and we can stop caring about old kernels,
 	 * we can remove this part.
 	 */
-	snprintf(buf, sizeof(buf), "zfs-bootfs=%s/%" PRIu64, spa->spa_name,
+	snprintf(buf, sizeof (buf), "zfs-bootfs=%s/%" PRIu64, spa->spa_name,
 	    objnum);
 	n = strlen(buf);
 	if (spa->spa_boot_vdev->v_phys_path != NULL) {
