@@ -22,6 +22,7 @@
 /*
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -1936,7 +1937,8 @@ use_new_conn:
 				if (srcaddr->len > 0)
 					kmem_free(srcaddr->buf,
 					    srcaddr->maxlen);
-				srcaddr->buf = kmem_zalloc(
+				ASSERT(lru_entry->x_src.len != 0);
+				srcaddr->buf = kmem_alloc(
 				    lru_entry->x_src.len, KM_SLEEP);
 				srcaddr->maxlen = srcaddr->len =
 				    lru_entry->x_src.len;
@@ -2091,7 +2093,7 @@ start_retry_loop:
 	cm_entry = (struct cm_xprt *)
 	    kmem_zalloc(sizeof (struct cm_xprt), KM_SLEEP);
 
-	cm_entry->x_server.buf = kmem_zalloc(destaddr->len, KM_SLEEP);
+	cm_entry->x_server.buf = kmem_alloc(destaddr->len, KM_SLEEP);
 	bcopy(destaddr->buf, cm_entry->x_server.buf, destaddr->len);
 	cm_entry->x_server.len = cm_entry->x_server.maxlen = destaddr->len;
 
@@ -2256,9 +2258,11 @@ start_retry_loop:
 	/*
 	 * Set up a transport entry in the connection manager's list.
 	 */
-	cm_entry->x_src.buf = kmem_zalloc(srcaddr->len, KM_SLEEP);
-	bcopy(srcaddr->buf, cm_entry->x_src.buf, srcaddr->len);
-	cm_entry->x_src.len = cm_entry->x_src.maxlen = srcaddr->len;
+	if (srcaddr->len > 0) {
+		cm_entry->x_src.buf = kmem_alloc(srcaddr->len, KM_SLEEP);
+		bcopy(srcaddr->buf, cm_entry->x_src.buf, srcaddr->len);
+		cm_entry->x_src.len = cm_entry->x_src.maxlen = srcaddr->len;
+	} /* Else kmem_zalloc() of cm_entry already sets its x_src to NULL. */
 
 	cm_entry->x_tiptr = tiptr;
 	cm_entry->x_time = ddi_get_lbolt();
@@ -2440,10 +2444,10 @@ connmgr_wrapconnect(
 		if (srcaddr->len != cm_entry->x_src.len) {
 			if (srcaddr->maxlen > 0)
 				kmem_free(srcaddr->buf, srcaddr->maxlen);
-			srcaddr->buf = kmem_zalloc(cm_entry->x_src.len,
+			ASSERT(cm_entry->x_src.len != 0);
+			srcaddr->buf = kmem_alloc(cm_entry->x_src.len,
 			    KM_SLEEP);
-			srcaddr->maxlen = srcaddr->len =
-			    cm_entry->x_src.len;
+			srcaddr->maxlen = srcaddr->len = cm_entry->x_src.len;
 		}
 		bcopy(cm_entry->x_src.buf, srcaddr->buf, srcaddr->len);
 	}
@@ -2631,11 +2635,11 @@ connmgr_connect(
 	queue_t			*wq,
 	struct netbuf		*addr,
 	int			addrfmly,
-	calllist_t 		*e,
-	int 			*tidu_ptr,
-	bool_t 			reconnect,
-	const struct timeval 	*waitp,
-	bool_t 			nosignal,
+	calllist_t		*e,
+	int			*tidu_ptr,
+	bool_t			reconnect,
+	const struct timeval	*waitp,
+	bool_t			nosignal,
 	cred_t			*cr)
 {
 	mblk_t *mp;
