@@ -299,11 +299,14 @@ efipart_floppy(EFI_DEVICE_PATH *node)
 static pdinfo_t *
 efipart_find_parent(pdinfo_list_t *pdi, EFI_DEVICE_PATH *devpath)
 {
-	pdinfo_t *pd;
+	pdinfo_t *pd, *part;
 
 	STAILQ_FOREACH(pd, pdi, pd_link) {
 		if (efi_devpath_is_prefix(pd->pd_devpath, devpath))
 			return (pd);
+		part = efipart_find_parent(&pd->pd_part, devpath);
+		if (part != NULL)
+			return (part);
 	}
 	return (NULL);
 }
@@ -486,21 +489,64 @@ efipart_initcd(void)
 	return (0);
 }
 
-static void
-efipart_hdinfo_add(pdinfo_t *hd, HARDDRIVE_DEVICE_PATH *node)
+static bool
+efipart_hdinfo_add_node(pdinfo_t *hd, EFI_DEVICE_PATH *node)
 {
-	pdinfo_t *pd, *last;
+	pdinfo_t *pd, *ptr;
 
+	if (node == NULL)
+		return (false);
+
+	/* Find our disk device. */
 	STAILQ_FOREACH(pd, &hdinfo, pd_link) {
-		if (efi_devpath_is_prefix(pd->pd_devpath, hd->pd_devpath)) {
-			/* Add the partition. */
-			hd->pd_unit = node->PartitionNumber;
-			hd->pd_parent = pd;
-			hd->pd_devsw = &efipart_hddev;
-			STAILQ_INSERT_TAIL(&pd->pd_part, hd, pd_link);
-			return;
-		}
+		if (efi_devpath_is_prefix(pd->pd_devpath, hd->pd_devpath))
+			break;
 	}
+	if (pd == NULL)
+		return (false);
+
+	/* If the node is not MEDIA_HARDDRIVE_DP, it is sub-partition. */
+	if (DevicePathSubType(node) != MEDIA_HARDDRIVE_DP) {
+		STAILQ_FOREACH(ptr, &pd->pd_part, pd_link) {
+			if (efi_devpath_is_prefix(ptr->pd_devpath,
+			    hd->pd_devpath))
+				break;
+		}
+		/*
+		 * If we don't find a pdinfo_t for this node, then that
+		 * means that the partition list we got from firmware isn't
+		 * properly ordered. We assume that firmware has ordered it.
+		 * In case we don't find anything, rather than blow up, we
+		 * add this node as another partition.
+		 */
+		if (ptr != NULL)
+			pd = ptr;
+
+		/* Add the partition. */
+		ptr = STAILQ_LAST(&pd->pd_part, pdinfo, pd_link);
+		if (ptr != NULL)
+			hd->pd_unit = ptr->pd_unit + 1;
+		else
+			hd->pd_unit = 0;
+	} else {
+		/* Add the partition. */
+		hd->pd_unit = ((HARDDRIVE_DEVICE_PATH *)node)->PartitionNumber;
+	}
+
+	hd->pd_parent = pd;
+	hd->pd_devsw = &efipart_hddev;
+
+	STAILQ_INSERT_TAIL(&pd->pd_part, hd, pd_link);
+	return (true);
+}
+
+static void
+efipart_hdinfo_add(pdinfo_t *hd, EFI_DEVICE_PATH *node)
+{
+	pdinfo_t *last;
+
+	if (efipart_hdinfo_add_node(hd, node))
+		return;
 
 	last = STAILQ_LAST(&hdinfo, pdinfo, pd_link);
 	if (last != NULL)
@@ -663,7 +709,7 @@ restart:
 			efipart_hdinfo_add(parent, NULL);
 		}
 
-		efipart_hdinfo_add(hd, (HARDDRIVE_DEVICE_PATH *)node);
+		efipart_hdinfo_add(hd, node);
 		goto restart;
 	}
 }
