@@ -1,0 +1,90 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\" Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+.\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd April 04, 2019
+.Dt zonestatd 1M
+.Os
+.Sh NAME
+.Nm zonestatd
+.Nd zones monitoring daemon
+.Sh SYNOPSIS
+.Nm /usr/lib/zones/zonestatd
+.Sh DESCRIPTION
+.Nm
+is a system daemon that is started during system boot.
+It monitors the utilization of system resources by zones, as well
+as zone and system configuration information such as psrset psets,
+pool psets, and resource control settings.
+.Pp
+This daemon is started automatically by the zone management
+software and should not be invoked directly.
+It does not constitute a programming interface, but is classified as a
+private interface.
+.Sh IMPLEMENTATION NOTES
+The zonestat service is managed by the service management
+facility,
+.Xr smf 5 ,
+under the service identifier:
+.Pp
+.D1 svc:/system/zones-monitoring:default
+.Pp
+Administrative actions on this service, such as enabling, disabling, or
+requesting restart, can be performed using
+.Xr svcadm 1m .
+The service's status can be queried using the
+.Xr svcs 1
+command.
+.Pp
+The zonestat service has the following SMF configuration property:
+.Bd -ragged -offset indent
+config/sample_interval
+.Pp
+This property sets the
+.Nm
+sample interval.
+This is the interval used by the zones monitoring daemon,
+.Nm
+to sample resource utilization.
+This is also the interval used to determine configuration changes such as
+processor set changes, resource control changes, and zone state changes.
+.Pp
+The default interval is 5 seconds.
+.Ed
+.Pp
+The zonestat service makes use of extended accounting facility.
+If not already enabled, it enables the tracking of process accounting
+resources, and configures a process accounting file.
+The zonestat service will roll the process accounting log at its configured
+interval.
+.Pp
+If extended process accounting is enabled externally, the zonestat
+service will use the process accounting log as configured.
+It will not roll the accounting log, but will operate correctly if
+the accounting log is rolled externally.
+.Sh INTERFACE STABILITY
+.Sy Private
+.Sh SECURITY
+The zonestat service in the global zone must be online for the zonestat
+service in each non-global zone (NGZ) to function properly.
+The zonestat service in each NGZ does not directly read system configuration
+and utilization data, but rather reads from the zonestat service on the
+global zone.
+.Sh SEE ALSO
+.Xr zonestat 1 ,
+.Xr acctadm 1m ,
+.Xr pooladm 1m ,
+.Xr poolcfg 1m ,
+.Xr prctl 1m ,
+.Xr rcapadm 1m ,
+.Xr smf 5 ,
+.Xr zones 5
