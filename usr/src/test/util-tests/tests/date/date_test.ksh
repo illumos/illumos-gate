@@ -11,18 +11,14 @@
 #
 
 #
-# Copyright (c) 2017, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
 # Basic tests of date -r.
 #
 
-#
-# Make sure that we're executing in the C locale and that a given user's
-# locale doesn't impact this test.
-#
-export LANG=C
+export LC_ALL=C
 
 date_arg0="$(basename $0)"
 date_prog=/usr/bin/date
