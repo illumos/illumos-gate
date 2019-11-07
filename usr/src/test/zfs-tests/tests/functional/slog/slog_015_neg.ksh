@@ -47,6 +47,7 @@ function cleanup
 
 ORIG_TIMEOUT=$(mdb -ke "zfs_commit_timeout_pct/J" | tail -1 | awk '{print $NF}')
 log_onexit cleanup
+log_must setup
 
 for PCT in 0 1 2 4 8 16 32 64 128 256 512 1024; do
 	log_must mdb -kwe "zfs_commit_timeout_pct/Z $PCT"
