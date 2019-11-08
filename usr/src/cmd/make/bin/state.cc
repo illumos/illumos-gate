@@ -145,22 +145,22 @@ write_state_file(int, Boolean exiting)
 		return;
 	}
 	/* Lock the file for writing. */
- 	make_state_lockfile = getmem(strlen(make_state->string_mb) + strlen(".lock") + 1);
- 	(void) sprintf(make_state_lockfile,
- 	               "%s.lock",
- 	               make_state->string_mb);
-	if (lock_err = file_lock(make_state->string_mb, 
-				 make_state_lockfile, 
+	make_state_lockfile = getmem(strlen(make_state->string_mb) + strlen(".lock") + 1);
+	(void) sprintf(make_state_lockfile,
+	               "%s.lock",
+	               make_state->string_mb);
+	if (lock_err = file_lock(make_state->string_mb,
+				 make_state_lockfile,
 				 (int *) &make_state_locked, 0)) {
- 		retmem_mb(make_state_lockfile);
+		retmem_mb(make_state_lockfile);
 		make_state_lockfile = NULL;
-		
+
 		/*
 		 * We need to make sure that we are not being
 		 * called by the exit handler so we don't call
 		 * it again.
 		 */
-		
+
 		if (exiting) {
 			(void) sprintf(buffer, "%s/.make.state.%d.XXXXXX", tmpdir, getpid());
 			report_pwd = true;
@@ -187,7 +187,7 @@ write_state_file(int, Boolean exiting)
 	if ((fd = fopen(make_state_tempfile, "w")) == NULL) {
 		lock_err = errno; /* Save it! unlink() can change errno */
 		(void) unlink(make_state_lockfile);
- 		retmem_mb(make_state_lockfile);
+		retmem_mb(make_state_lockfile);
 		make_state_lockfile = NULL;
 		make_state_locked = false;
 		fatal(gettext("Could not open temporary statefile `%s': %s"),
@@ -204,7 +204,7 @@ write_state_file(int, Boolean exiting)
 			if ((make_state_lockfile != NULL) &&
 			    make_state_locked) {
 				(void) unlink(make_state_lockfile);
- 				retmem_mb(make_state_lockfile);
+				retmem_mb(make_state_lockfile);
 				make_state_lockfile = NULL;
 				make_state_locked = false;
 			}
@@ -362,7 +362,7 @@ write_state_file(int, Boolean exiting)
 			/* Delete temporary statefile */
 			(void) unlink(make_state_tempfile);
 			(void) unlink(make_state_lockfile);
-	 		retmem_mb(make_state_lockfile);
+			retmem_mb(make_state_lockfile);
 			make_state_lockfile = NULL;
 			make_state_locked = false;
 			fatal(gettext("Could not delete old statefile `%s': %s"),
@@ -374,7 +374,7 @@ write_state_file(int, Boolean exiting)
 			/* Delete temporary statefile */
 			(void) unlink(make_state_tempfile);
 			(void) unlink(make_state_lockfile);
-	 		retmem_mb(make_state_lockfile);
+			retmem_mb(make_state_lockfile);
 			make_state_lockfile = NULL;
 			make_state_locked = false;
 			fatal(gettext("Could not rename `%s' to `%s': %s"),
@@ -385,7 +385,7 @@ write_state_file(int, Boolean exiting)
 	}
 	if ((make_state_lockfile != NULL) && make_state_locked) {
 		(void) unlink(make_state_lockfile);
- 		retmem_mb(make_state_lockfile);
+		retmem_mb(make_state_lockfile);
 		make_state_lockfile = NULL;
 		make_state_locked = false;
 	}
@@ -417,7 +417,7 @@ print_auto_depes(register Dependency dependency, register FILE *fd, register Boo
 	    (dependency->name == force)) {
 		return;
 	}
-	XFWRITE(dependency->name->string_mb, 
+	XFWRITE(dependency->name->string_mb,
 		strlen(dependency->name->string_mb),
 		fd);
 	/*

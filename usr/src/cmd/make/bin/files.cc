@@ -67,7 +67,7 @@ static	timestruc_t&	vpath_exists(register Name target);
 static	Name		enter_file_name(wchar_t *name_string, wchar_t *library);
 static	Boolean		star_match(register char *string, register char *pattern);
 static	Boolean		amatch(register wchar_t *string, register wchar_t *pattern);
-  
+
 /*
  *	exists(target)
  *
@@ -382,7 +382,7 @@ vpath_loop:
 		 */
 		if ((dp->d_name[0] == 's') &&
 		    (dp->d_name[1] == (int) period_char)) {
-	
+
 			MBSTOWCS(tmp_wcs_buffer, dp->d_name + 2);
 			plain_file_name_p = plain_file_name;
 			(void) wcscpy(plain_file_name_p, tmp_wcs_buffer);
@@ -507,7 +507,7 @@ vpath_loop:
 		 */
 		if ((dp->d_name[0] == 's') &&
 		    (dp->d_name[1] == (int) period_char)) {
-	
+
 			MBSTOWCS(wcs_buffer, dp->d_name + 2);
 			(void) wcscpy(plain_file_name_p, wcs_buffer);
 			plain_file = GETNAME(plain_file_name, FIND_LENGTH);

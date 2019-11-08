@@ -60,7 +60,7 @@ extern	Doname		find_ar_suffix_rule(register Name target, Name true_target, Prope
 extern	Doname		find_double_suffix_rule(register Name target, Property *command, Boolean rechecking);
 extern	void		build_suffix_list(register Name target_suffix);
 extern	Doname		find_percent_rule(register Name target, Property *command, Boolean rechecking);
-static	void 		create_target_group_and_dependencies_list(Name target, Percent pat_rule, String percent);
+static	void		create_target_group_and_dependencies_list(Name target, Percent pat_rule, String percent);
 static	Boolean		match_found_with_pattern(Name target, Percent pat_rule, String percent, wchar_t *percent_buf);
 static	void		construct_string_from_pattern(Percent pat_rule, String percent, String result);
 static	Boolean		dependency_exists(Name target, Property line);
@@ -69,7 +69,7 @@ extern	void		add_target_to_chain(Name target, Chain * query);
 
 /*
  *	find_suffix_rule(target, target_body, target_suffix, command, rechecking)
- * 
+ *
  *	Does the lookup for single and double suffix rules.
  *	It calls build_suffix_list() to build the list of possible suffixes
  *	for the given target.
@@ -105,7 +105,7 @@ static Boolean actual_doname = false;
  * Usage of "we_are_in_tilde" is intended to avoid this recursion.
  */
 
-static Boolean we_are_in_tilde = false; 
+static Boolean we_are_in_tilde = false;
 
 Doname
 find_suffix_rule(Name target, Name target_body, Name target_suffix, Property *command, Boolean rechecking)
@@ -118,9 +118,9 @@ find_suffix_rule(Name target, Name target_body, Name target_suffix, Property *co
 	register Name		source;
 	Doname			result;
 	register Property	line;
-	extern Boolean 		tilde_rule;
-	Boolean 		name_found = true;
-	Boolean 		posix_tilde_attempt = true;
+	extern Boolean		tilde_rule;
+	Boolean			name_found = true;
+	Boolean			posix_tilde_attempt = true;
 	int			src_len = MAXPATHLEN + strlen(target_body->string_mb);
 
 	/*
@@ -201,7 +201,7 @@ posix_attempts:
 			 * a file, this source suffix did not match.
 			 */
 			if(vpath_defined && !posix && !svr4) {
-				(void) exists(source);	
+				(void) exists(source);
 			}
 			if (!source->stat.is_file) {
 			   if(!(posix|svr4))
@@ -224,16 +224,16 @@ posix_attempts:
 			   if(source->string_mb[source->hash.length - 1] == '~' &&
 			      ( svr4 || posix_tilde_attempt ) )
 			   {
-				char *p, *np; 
+				char *p, *np;
 				char *tmpbuf;
 
-				tmpbuf = getmem(source->hash.length + 8); 
+				tmpbuf = getmem(source->hash.length + 8);
 				/* + 8 to add "s." or "SCCS/s." */
 			        memset(tmpbuf,0,source->hash.length + 8);
 			        source->string_mb[source->hash.length - 1] = '\0';
-			        if(p = (char *) memchr((char *)source->string_mb,'/',source->hash.length)) 
+			        if(p = (char *) memchr((char *)source->string_mb,'/',source->hash.length))
 				{
-			          while(1) {  	
+			          while(1) {
 				    if(np = (char *) memchr((char *)p+1,'/',source->hash.length - (p - source->string_mb))) {
 			              p = np;
 			            } else {break;}
@@ -242,15 +242,15 @@ posix_attempts:
 				  strncpy(tmpbuf, source->string_mb, p - source->string_mb + 1);
 				  strcat(tmpbuf, "s.");
 				  strcat(tmpbuf, p+1);
-				  retmem((wchar_t *) source->string_mb); 
+				  retmem((wchar_t *) source->string_mb);
 				  source->string_mb = tmpbuf;
-				
+
 			        } else {
 				  strcpy(tmpbuf, "s.");
 				  strcat(tmpbuf, source->string_mb);
-				  retmem((wchar_t *) source->string_mb); 
+				  retmem((wchar_t *) source->string_mb);
 				  source->string_mb = tmpbuf;
-				
+
 			        }
 				source->hash.length = strlen(source->string_mb);
 				if(exists(source) == file_doesnt_exist)
@@ -271,9 +271,9 @@ posix_attempts:
 					}
 					continue;
 				}
-			   } 
+			   }
 			}
-			
+
 			if (command != NULL) {
 				if(!name_found) {
 					store_name(source);
@@ -297,10 +297,10 @@ posix_attempts:
 							true,
 							true);
 #endif
-				}	
+				}
 			} else {
 				result = target_can_be_built(source);
-				
+
 				if (result == build_ok) {
 					return result;
 				} else {
@@ -310,7 +310,7 @@ posix_attempts:
 					continue;
 				}
 			}
-			
+
 			switch (result) {
 			case build_dont_know:
 				/*
@@ -348,7 +348,7 @@ posix_attempts:
 				}
 				return build_failed;
 			}
-			
+
 			if (debug_level > 1) {
 				WCSTOMBS(mbs_buffer, sourcename);
 				(void) printf(gettext("%*sFound %s\n"),
@@ -356,7 +356,7 @@ posix_attempts:
 					      "",
 					      mbs_buffer);
 			}
-			
+
 			if (source->depends_on_conditional) {
 				target->depends_on_conditional = true;
 			}
@@ -542,7 +542,7 @@ find_ar_suffix_rule(register Name target, Name true_target, Property *command, B
 		 */
 		target->suffix_scan_done = false;
 		body = GETNAME(targ_string.get_string(),
-  			       (int)(true_target->hash.length -
+			       (int)(true_target->hash.length -
 				     suffix_length));
 		we_are_in_tilde = false;
 		switch (find_suffix_rule(target,
@@ -562,7 +562,7 @@ find_ar_suffix_rule(register Name target, Name true_target, Property *command, B
 		 * if it matches the target tail, and so on.
 		 * Go here if the suffix did not match the target tail.
 		 */
-	not_this_one:;			 
+	not_this_one:;
 	}
 	return build_dont_know;
 }
@@ -669,7 +669,7 @@ find_double_suffix_rule(register Name target, Property *command, Boolean recheck
 		 * if it matches the target tail. And so on.
 		 * Go here if the suffix did not match the target tail.
 		 */
-	not_this_one:;			 
+	not_this_one:;
 	}
 	if (scanned_once)
 		true_target->suffix_scan_done = true;
@@ -872,7 +872,7 @@ find_percent_rule(register Name target, Property *command, Boolean rechecking)
 					is_pattern = true;
 					/* build dependency name */
 					INIT_STRING_FROM_STACK(string, string_buf);
-					construct_string_from_pattern(pat_depe, &percent, &string); 
+					construct_string_from_pattern(pat_depe, &percent, &string);
 					depe_to_check = getname_fn(string.buffer.start,
 						FIND_LENGTH,
 						false,
@@ -1054,7 +1054,7 @@ find_percent_rule(register Name target, Property *command, Boolean rechecking)
 	if (line->body.line.dependencies != NULL) {
 		/* build all collected dependencies */
 		for (depe = line->body.line.dependencies;
-		     depe != NULL; 
+		     depe != NULL;
 		     depe = depe->next) {
 			actual_doname = true;
 			result = doname_check(depe->name, true, true, depe->automatic);
@@ -1109,9 +1109,9 @@ find_percent_rule(register Name target, Property *command, Boolean rechecking)
 						(void) printf(" %s", pat_depe->name->string_mb);
 					}
 
-					(void) printf(gettext(" because it is out of date relative to %s\n"), 
+					(void) printf(gettext(" because it is out of date relative to %s\n"),
 						      depe->name->string_mb);
-				}	
+				}
 			}
 		}
 	} else {
@@ -1133,7 +1133,7 @@ find_percent_rule(register Name target, Property *command, Boolean rechecking)
 		}
 	}
 
-	/* enter explicit rule from percent rule */	
+	/* enter explicit rule from percent rule */
 	Name lmn_target = true_target;
 	if (true_target->has_long_member_name) {
 		lmn_target = get_prop(true_target->prop, long_member_name_prop)->body.long_member_name.member_name;
@@ -1164,9 +1164,9 @@ find_percent_rule(register Name target, Property *command, Boolean rechecking)
 }
 
 /*
- *	match_found_with_pattern 
+ *	match_found_with_pattern
  *           ( target, pat_rule, percent, percent_buf)
- *	
+ *
  *	matches "target->string" with a % pattern.
  *	If pattern contains a MACRO definition, it's expanded first.
  *
@@ -1175,9 +1175,9 @@ find_percent_rule(register Name target, Property *command, Boolean rechecking)
  *
  *	Parameters:
  *		target		The target we're trying to match
- *     		pattern		
+ *		pattern
  *		percent		record that contains "percent_buf" below
- *		percent_buf	This is where the patched % part of pattern is stored 
+ *		percent_buf	This is where the patched % part of pattern is stored
  *
  */
 
@@ -1194,7 +1194,7 @@ match_found_with_pattern(Name target, Percent pat_rule, String percent, wchar_t 
 	Wstring pref_string(prefix);
 	Wstring suf_string;
 
-	if (prefix->dollar) {	
+	if (prefix->dollar) {
 		INIT_STRING_FROM_STACK(string, string_buf);
 		expand_value(prefix, &string, false);
 		prefix_length = string.text.p - string.buffer.start;
@@ -1240,7 +1240,7 @@ match_found_with_pattern(Name target, Percent pat_rule, String percent, wchar_t 
 
 	Boolean match_found = false;
 	int percent_length = target->hash.length - prefix_length - suffix_length;
-	
+
 	while (!match_found && (percent_length >= 0)) {
 		/* init result string */
 		INIT_STRING_FROM_STACK(string, string_buf);
@@ -1263,7 +1263,7 @@ match_found_with_pattern(Name target, Percent pat_rule, String percent, wchar_t 
 			percent_length--;
 		}
 	}
-	
+
 	/* result */
 	return match_found;
 }
@@ -1272,27 +1272,27 @@ match_found_with_pattern(Name target, Percent pat_rule, String percent, wchar_t 
 /*
  *	create_target_group_and_dependencies_list
  *           (target, pat_rule, percent)
- *	
+ *
  *	constructs dependency list and a target group from pattern.
  *
  *	If we have the lines
  *		%/%.a + %/%.b + C%/CC%.c: yyy %.d bb%/BB%.e
  *			commands
  *
- * 	and we have matched the pattern xx/xx.a with %/%.a, then we
+ *	and we have matched the pattern xx/xx.a with %/%.a, then we
  *	construct a target group that looks like this:
  *		xx/xx.a + xx/xx.b + Cxx/CCxx.c: dependencies
  *
  *	and construct dependency list that looks like this:
  *	yyy xx.d bbxx/BBxx.e + already existed dependencies
- *	
+ *
  *	Return value:
  *				none
  *
  *	Parameters:
  *		target		The target we are building, in the previous
  *				example, this is xx/xx.a
- *     		pat_rule        the % pattern that matched "target", here %/%.a
+ *		pat_rule        the % pattern that matched "target", here %/%.a
  *		percent		string containing matched % part. In the example=xx.
  *
  *	Global variables used:
@@ -1309,7 +1309,7 @@ create_target_group_and_dependencies_list(Name target, Percent pat_rule, String 
 	Chain		new_target_group = NULL;
 	Chain		*new_target_group_tail = &new_target_group;
 	Chain		group_member;
-	
+
 	/* create and append dependencies from rule */
 	for (pat_depe = pat_rule->dependencies; pat_depe != NULL; pat_depe = pat_depe->next) {
 		if (pat_depe->name->percent) {
@@ -1329,7 +1329,7 @@ create_target_group_and_dependencies_list(Name target, Percent pat_rule, String 
 			enter_dependency(line, depe, false);
 		}
 	}
-	
+
 	/* if matched pattern is a group member, create new target group */
 	for (group_member = pat_rule->target_group; group_member != NULL; group_member = group_member->next) {
 		Name new_target = group_member->name;
@@ -1352,14 +1352,14 @@ create_target_group_and_dependencies_list(Name target, Percent pat_rule, String 
 		if (tgm != NULL) {
 			continue;
 		}
-		
+
 		/* insert it into the targets list */
 		(*new_target_group_tail) = ALLOC(Chain);
 		(*new_target_group_tail)->name = new_target;
 		(*new_target_group_tail)->next = NULL;
 		new_target_group_tail = &(*new_target_group_tail)->next;
 	}
-	
+
 	/* now we gathered all dependencies and created target group */
 	line->body.line.target_group = new_target_group;
 
@@ -1383,7 +1383,7 @@ create_target_group_and_dependencies_list(Name target, Percent pat_rule, String 
  *				none
  *
  *	Parameters:
- *     		pat_rule 	matched pattern rule
+ *		pat_rule	matched pattern rule
  *		percent		string containing matched % sign part.
  *		result		holds the result of string construction.
  *
@@ -1395,20 +1395,20 @@ construct_string_from_pattern(Percent pat_rule, String percent, String result) {
 			expand_value(pat_rule->patterns[i],
 				     result,
 				     false);
-			
+
 		} else {
 			append_string(pat_rule->patterns[i]->string_mb,
 				      result,
 				      pat_rule->patterns[i]->hash.length);
 		}
-		
+
 		if (i < pat_rule->patterns_total - 1) {
 			append_string(percent->buffer.start,
 				      result,
 				      percent->text.p - percent->buffer.start);
 		}
 	}
-	
+
 	if ((result->buffer.start[0] == (int) period_char) &&
 	    (result->buffer.start[1] == (int) slash_char)) {
 		result->buffer.start += 2;

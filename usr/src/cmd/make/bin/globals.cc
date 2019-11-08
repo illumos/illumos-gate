@@ -60,7 +60,7 @@
 	Boolean		sdot_target;	/* used to identify s.m(/M)akefile */
 	Boolean		all_parallel;
 	Boolean		assign_done;
-	int foo;	
+	int foo;
 	Boolean		build_failed_seen;
 	Name		built_last_make_run;
 	Name		c_at;
@@ -132,7 +132,7 @@
         Name		primary_makefile;
 	Boolean		quest;				/* `-q' */
 	short		read_trace_level;
-        Boolean 	reading_dependencies = false;
+        Boolean		reading_dependencies = false;
 	Name		recursive_name;
 	int		recursion_level;
 	short		report_dependencies_level = 0;	/* -P */

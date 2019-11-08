@@ -124,10 +124,10 @@ dosys(register Name command, register Boolean ignore_error, register Boolean cal
 		  target,
 		  wcb.get_string(),
                   command->meta ?
-	            doshell(q, ignore_error, 
+	            doshell(q, ignore_error,
 			    stdout_file, stderr_file, 0) :
-	            doexec(q, ignore_error, 
-		 	   stdout_file, stderr_file,
+	            doexec(q, ignore_error,
+			   stdout_file, stderr_file,
 	                   vroot_path, 0),
                   NULL,
                   -1

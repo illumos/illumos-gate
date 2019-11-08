@@ -77,7 +77,7 @@ static Boolean		pskip_white_space(wchar_t **cp_address);
 int
 read_make_machines(Name make_machines_name)
 {
-	wchar_t 		c;
+	wchar_t			c;
 	Boolean			default_make_machines;
 	struct hostent		*hp;
 	wchar_t			local_host[MAX_HOSTNAMELEN + 1];
@@ -215,8 +215,8 @@ read_make_machines(Name make_machines_name)
 		 * machine name.
 		 */
 		if (*ms) {
-			/* 
-			 * If invalid machine name decrement counter 
+			/*
+			 * If invalid machine name decrement counter
 			 * and skip line.
 			 */
 			mp = ms;
@@ -282,8 +282,8 @@ read_make_machines(Name make_machines_name)
 							pskip_comment(&ms);
 						} else if (IS_WEQUALN(ms, wcs_buffer, 3)) {
 							/* Skip "max". */
-							ms += 3; 
-							pmake_max_jobs = get_max(&ms, mp); 
+							ms += 3;
+							pmake_max_jobs = get_max(&ms, mp);
 							SKIPSPACE(ms);
 						} else {
 							warning(gettext("unknown option for host %s"), mbs_buffer);
@@ -386,7 +386,7 @@ pskip_comment(wchar_t **cp_address)
 static int
 get_max(wchar_t **ms_address, wchar_t *hostname)
 {
-	wchar_t 	*ms = *ms_address;
+	wchar_t		*ms = *ms_address;
 	int		limit = PMAKE_DEF_MAX_JOBS; /* Default setting. */
 
 	WCSTOMBS(mbs_buffer, hostname);

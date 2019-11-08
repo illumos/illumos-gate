@@ -113,13 +113,13 @@ typedef struct {	/* 5.0 ar member format: vax family; 3b family */
 typedef struct {	/* Portable (6.0) ar format: vax family; 3b family */
 	char			ar_name[16];	/* Space terminated */
 	/* left-adjusted fields; decimal ascii; blank filled */
-	char			ar_date[12];	
+	char			ar_date[12];
 	char			ar_uid[6];
 	char			ar_gid[6];
 	char			ar_mode[8];	/* octal ascii */
 	char			ar_size[10];
 	/* special end-of-header string (AR_PORT_END_MAGIC) */
-	char			ar_fmag[2];	
+	char			ar_fmag[2];
 }			Ar_port;
 
 enum ar_type {
@@ -173,7 +173,7 @@ static	long		sgetl(char *);
  *		target		The member to find time for
  *
  *	Global variables used:
- *		empty_name 	The Name ""
+ *		empty_name	The Name ""
  */
 
 int read_member_header (Ar_port *header, FILE *fd, char* filename);
@@ -230,7 +230,7 @@ read_archive(register Name target)
 		}
 	}
 	if (target->stat.time == file_no_time) {
-		if (read_archive_dir(&ar, member->body.member.library, 
+		if (read_archive_dir(&ar, member->body.member.library,
 				     &long_names_table)
 		    == failed){
 			fatal(gettext("Can't access archive `%s': %s"),
@@ -287,7 +287,7 @@ open_archive(char *filename, register Ar *arp)
 	if (IS_EQUALN(mag_port, AR_PORT_MAGIC, AR_PORT_MAGIC_LENGTH)) {
 		arp->type = AR_PORT;
 		/*
-		 * Read in first member header to find out if there is 
+		 * Read in first member header to find out if there is
 		 * a symbol definition table.
 		 */
 
@@ -301,7 +301,7 @@ open_archive(char *filename, register Ar *arp)
 			return succeeded;
 		}
 		/*
-		 * The following values are the default if there is 
+		 * The following values are the default if there is
 		 * no symbol directory and long member names.
 		 */
 		arp->sym_size = arp->num_symbols = arp->sym_begin = 0L;
@@ -309,7 +309,7 @@ open_archive(char *filename, register Ar *arp)
 
 		/*
 		 * Do we have a symbol table? A symbol table is always
-		 * the first member in an archive. In 4.1.x it has the 
+		 * the first member in an archive. In 4.1.x it has the
 		 * name __.SYMDEF, in SVr4, it has the name "/        "
 		 */
 /*
@@ -369,7 +369,7 @@ close_archive(register Ar *arp)
  *		library		Name of lib to enter members for.
  *				Used to form "lib(member)" string.
  *		long_names_table table that contains list of members
- * 				with names > 15 characters long
+ *				with names > 15 characters long
  *
  *	Global variables used:
  */
@@ -485,10 +485,10 @@ read_archive_dir(register Ar *arp, Name library, char **long_names_table)
 				   &offset);
 			    q = *long_names_table + offset;
 		    } else {
-			    q = arp->ar_port.ar_name;	
+			    q = arp->ar_port.ar_name;
 			    len = sizeof arp->ar_port.ar_name;
 		    }
-		    
+
 		    for (p = member_string;
 			 (len > 0) &&
 			 (*q != (int) nul_char) &&
@@ -520,8 +520,8 @@ read_archive_dir(register Ar *arp, Name library, char **long_names_table)
 		     * [tolik] Fix for dmake bug 1234018.
 		     */
 		    if(name->stat.time == file_no_time) {
-		   	name->stat.time.tv_sec = date;
-		   	name->stat.time.tv_nsec = LONG_MAX;
+			name->stat.time.tv_sec = date;
+			name->stat.time.tv_nsec = LONG_MAX;
 		    }
 		    if (sscanf(arp->ar_port.ar_size, "%ld", &ptr) != 1) {
 			    WCSTOMBS(mbs_buffer, name_string);
@@ -532,7 +532,7 @@ read_archive_dir(register Ar *arp, Name library, char **long_names_table)
 		    ptr += (ptr & 1);
 		    if (fseek(arp->fd, ptr, 1) != 0) {
 			    goto read_error;
-		    }	
+		    }
 	    }
 	    break;
 	}
@@ -563,18 +563,18 @@ read_error:
  */
 int
 process_long_names_member(register Ar *arp, char **long_names_table, char *filename)
-{  
+{
 	Ar_port			*ar_member_header;
 	int			table_size;
 
 	if (fseek(arp->fd, arp->first_ar_mem, 0) != 0) {
 		return failed;
 	}
-	if ((ar_member_header = 
+	if ((ar_member_header =
 	     (Ar_port *) alloca((int) sizeof(Ar_port))) == NULL){
 		perror(gettext("memory allocation failure"));
 		return failed;
-	} 
+	}
 	int ret = read_member_header(ar_member_header, arp->fd, filename);
 	if (ret == failed) {
 		return failed;
@@ -583,7 +583,7 @@ process_long_names_member(register Ar *arp, char **long_names_table, char *filen
 		return succeeded;
 	}
 	/* Do we have special member containing long names? */
-	if (IS_EQUALN(ar_member_header->ar_name, 
+	if (IS_EQUALN(ar_member_header->ar_name,
 		      "//              ",
 		      16)){
 		if (sscanf(ar_member_header->ar_size,
@@ -740,7 +740,7 @@ translate_entry(register Ar *arp, Name target, register Property member, char **
 			    hp = *long_names_table + offset;
 		    } else {
 			    len = sizeof arp->ar_port.ar_name;
-			    hp = arp->ar_port.ar_name;	
+			    hp = arp->ar_port.ar_name;
 		    }
 				ap = member_string;
 				while (*hp &&
@@ -813,14 +813,14 @@ sgetl(register char *buffer)
  *
  *	Return value:
  *				fails if read error or member
- * 				header is not the right format
+ *				header is not the right format
  *	Parameters:
  *		header		There's one before each archive member
  *		fd		file descriptor for the archive file.
  *
  *	Global variables used:
  */
-int 
+int
 read_member_header(Ar_port *header, FILE *fd, char* filename)
 {
 	int num = fread((char *) header, sizeof (Ar_port), 1, fd);

@@ -83,9 +83,6 @@ Boolean		dollarget_seen;
 Boolean		dollarless_flag;
 Name		dollarless_value;
 Envvar		envvar;
-#ifdef lint
-char		**environ;
-#endif
 int		exit_status;
 wchar_t		*file_being_read;
 /* Variable gnu_style=true if env. var. SUN_MAKE_COMPAT_MODE=GNU (RFE 4866328) */

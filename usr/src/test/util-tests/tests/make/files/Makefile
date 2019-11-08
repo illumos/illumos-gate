@@ -10,15 +10,31 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2014 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2017 Jason King
-# Copyright 2019 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
-SUBDIRS = date dis dladm iconv libnvpair_json libsff printf xargs grep_xpg4
-SUBDIRS += demangle mergeq workq chown ctf smbios libjedec awk make
-
+include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
+
+ROOTOPTPKG = $(ROOT)/opt/util-tests
+TESTDIR = $(ROOTOPTPKG)/tests/files
+
+DIRS = make_a make_a/a make_a/b make_a/c
+LDIR = make_l
+FILES = $(DIRS:%=%/Makefile) $(DIRS:%=%/make.rules)
+
+IDIRS = $(DIRS:%=$(TESTDIR)/%) $(LDIR:%=$(TESTDIR)/%)
+CMDS = $(FILES:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0444
+
+all lint clean clobber:
+
+install: $(IDIRS) $(CMDS)
+
+$(CMDS): $(TESTDIR)
+
+$(TESTDIR) $(IDIRS):
+	$(INS.dir)
+
+$(TESTDIR)/%: %
+	$(INS.file)

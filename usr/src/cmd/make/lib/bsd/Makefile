@@ -26,8 +26,6 @@ all: $(LIBS)
 
 install: all
 
-lint:
-
 _msg:
 
 include $(SRC)/lib/Makefile.targ

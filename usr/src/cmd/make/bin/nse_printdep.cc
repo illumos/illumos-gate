@@ -70,7 +70,7 @@ print_dependencies(register Name target, register Property line)
 	if (target_variants) {
 		depvar_print_results();
 	}
-	
+
 	if (!makefiles_printed) {
 		/*
 		 * Search the makefile list for the primary makefile,
@@ -174,11 +174,11 @@ print_deps(register Name target, register Property line)
 			}
 		}
 		print_filename(target);
-	    	(void) printf(":\t");
-	    	print_deplist(line->body.line.dependencies);
+		(void) printf(":\t");
+		print_deplist(line->body.line.dependencies);
 		print_rec_info(target);
-	   	(void) printf("\n");
-	 	for (dep = line->body.line.dependencies;
+		(void) printf("\n");
+		for (dep = line->body.line.dependencies;
 		     dep != NULL;
 		     dep = dep->next) {
 			print_deps(dep->name,
@@ -286,7 +286,7 @@ print_forest(Name target)
 	Name_set::iterator np, e;
 	Property	line;
 
- 	for (np = hashtab.begin(), e = hashtab.end(); np != e; np++) {
+	for (np = hashtab.begin(), e = hashtab.end(); np != e; np++) {
 			if (np->is_target && !np->has_parent && np != target) {
 				(void) doname_check(np, true, false, false);
 				line = get_prop(np->prop, line_prop);
@@ -303,8 +303,6 @@ print_forest(Name target)
  */
 void
 print_value(register Name value, Daemon daemon)
-	             		      
-              			       
 {
 	Chain			cp;
 
@@ -340,7 +338,7 @@ print_rule(register Name target)
 }
 
 
-/* 
+/*
  *  If target is recursive,  print the following to standard out:
  *	.RECURSIVE subdir targ Makefile
  */
@@ -355,11 +353,11 @@ print_rec_info(Name target)
 	rp = find_recursive_target(target);
 
 	if (rp) {
-		/* 
+		/*
 		 * if found,  print starting with the space after the ':'
 		 */
 		colon = (wchar_t *) wcschr(rp->oldline, (int) colon_char);
 		(void) printf("%s", colon + 1);
 	}
 }
-		
+
