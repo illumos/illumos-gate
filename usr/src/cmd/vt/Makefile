@@ -23,43 +23,42 @@
 # Use is subject to license terms.
 #
 # Copyright 2015 RackTop Systems.
+# Copyright 2020 Joyent, Inc.
 #
 
 PROG= vtdaemon vtinfo vtxlock
 
 VTDAEMON_SRC= vtdaemon.c
-VTINFO_SRC= vtinfo.c
+VTDAEMON_OBJ= $(VTDAEMON_SRC:%.c=%.o)
+vtdaemon := OBJS = $(VTDAEMON_OBJ)
 
-include ../Makefile.cmd
+VTINFO_SRC= vtinfo.c
+VTINFO_OBJ= $(VTINFO_SRC:%.c=%.o)
+vtinfo := OBJS = $(VTINFO_OBJ)
+
+include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/cmd/Makefile.ctf
 
 CFLAGS += $(CCVERBOSE)
 CERRWARN += $(CNOWARN_UNINIT)
 
 vtdaemon := LDLIBS += -lpam -lbsm
-lint_vtdaemon := LDLIBS += -lpam -lbsm
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
-vtdaemon: $(VTDAEMON_SRC)
-	$(LINK.c) -o $@ $(VTDAEMON_SRC) $(LDLIBS)
+vtdaemon: $(VTDAEMON_OBJ)
+	$(LINK.c) -o $@ $(VTDAEMON_OBJ) $(LDLIBS)
 	$(POST_PROCESS)
 
-vtinfo: $(VTINFO_SRC)
-	$(LINK.c) -o $@ $(VTINFO_SRC) $(LDLIBS)
+vtinfo: $(VTINFO_OBJ)
+	$(LINK.c) -o $@ $(VTINFO_OBJ) $(LDLIBS)
 	$(POST_PROCESS)
 
 install: all $(ROOTLIBPROG)
 
 clean:
-
-lint: lint_vtdaemon lint_vtinfo
-
-lint_vtdaemon:
-	$(LINT.c) $(VTDAEMON_SRC) $(LDLIBS)
-
-lint_vtinfo:
-	$(LINT.c) $(VTINFO_SRC) $(LDLIBS)
+	-$(RM) $(VTDAEMON_OBJ) $(VTINFO_OBJ)
 
 include ../Makefile.targ
