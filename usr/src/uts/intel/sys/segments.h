@@ -2,7 +2,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_SYS_SEGMENTS_H
@@ -179,7 +179,6 @@ extern void __set_ds(selector_t);
 extern void __set_es(selector_t);
 extern void __set_fs(selector_t);
 extern void __set_gs(selector_t);
-extern void __swapgs(void);
 #endif	/* __amd64 */
 
 #if defined(__amd64)

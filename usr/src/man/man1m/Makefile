@@ -18,6 +18,7 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
 # Copyright 2019 Peter Tribble
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		$(SRC)/Makefile.master
@@ -539,6 +540,7 @@ _MANFILES=	6to4relay.1m		\
 		zoneadm.1m		\
 		zoneadmd.1m		\
 		zonecfg.1m		\
+		zonestatd.1m		\
 		zpool.1m		\
 		zstreamdump.1m		\
 		ztest.1m

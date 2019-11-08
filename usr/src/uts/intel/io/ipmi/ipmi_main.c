@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -151,6 +151,7 @@ ipmi_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 {
 	minor_t minor;
 	ipmi_device_t *dev;
+	id_t mid;
 
 	if (ipmi_attached == B_FALSE)
 		return (ENXIO);
@@ -162,8 +163,9 @@ ipmi_open(dev_t *devp, int flag, int otyp, cred_t *cred)
 	if (flag & FEXCL)
 		return (ENOTSUP);
 
-	if ((minor = (minor_t)id_alloc_nosleep(minor_ids)) == 0)
+	if ((mid = id_alloc_nosleep(minor_ids)) == -1)
 		return (ENODEV);
+	minor = (minor_t)mid;
 
 	/* Initialize the per file descriptor data. */
 	dev = kmem_zalloc(sizeof (ipmi_device_t), KM_SLEEP);

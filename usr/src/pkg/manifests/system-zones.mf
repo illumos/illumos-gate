@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/zones@$(PKGVERS)
@@ -96,9 +97,11 @@ file path=usr/share/lib/xml/dtd/brand.dtd.1 mode=0644
 file path=usr/share/lib/xml/dtd/zone_platform.dtd.1 mode=0644
 file path=usr/share/lib/xml/dtd/zonecfg.dtd.1
 file path=usr/share/man/man1/zlogin.1
+file path=usr/share/man/man1/zonestat.1
 file path=usr/share/man/man1m/zoneadm.1m
 file path=usr/share/man/man1m/zoneadmd.1m
 file path=usr/share/man/man1m/zonecfg.1m
+file path=usr/share/man/man1m/zonestatd.1m
 file path=usr/share/man/man5/brands.5
 file path=usr/share/man/man5/zones.5
 file path=usr/share/man/man7d/zcons.7d

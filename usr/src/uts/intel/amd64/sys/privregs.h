@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #ifndef	_AMD64_SYS_PRIVREGS_H
 #define	_AMD64_SYS_PRIVREGS_H
 
@@ -206,7 +210,8 @@ struct regs {
 	je	6f;				\
 	movq	$0, REGOFF_SAVFP(%rsp);		\
 	SWAPGS;					\
-6:	CLEAN_CS
+6:	lfence; /* swapgs mitigation */		\
+	CLEAN_CS
 
 #define	INTR_POP			\
 	leaq	sys_lcall32(%rip), %r11;\
@@ -216,8 +221,13 @@ struct regs {
 	cmpw	$KCS_SEL, REGOFF_CS(%rsp);\
 	je	8f;			\
 5:	SWAPGS;				\
-8:	addq	$REGOFF_RIP, %rsp
+8:	lfence; /* swapgs mitigation */	\
+	addq	$REGOFF_RIP, %rsp
 
+/*
+ * No need for swapgs mitigation: it's unconditional, and we're heading
+ * back to userspace.
+ */
 #define	USER_POP			\
 	__RESTORE_REGS;			\
 	SWAPGS;				\

@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		$(SRC)/Makefile.master
@@ -421,7 +422,8 @@ MANFILES=	acctcom.1			\
 		yppasswd.1			\
 		ypwhich.1			\
 		zlogin.1			\
-		zonename.1
+		zonename.1			\
+		zonestat.1
 
 MANLINKS=	batch.1		\
 		bg.1		\

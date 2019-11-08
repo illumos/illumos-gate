@@ -2610,7 +2610,7 @@ mac_client_restart(mac_client_impl_t *mcip)
 minor_t
 mac_minor_hold(boolean_t sleep)
 {
-	minor_t	minor;
+	id_t id;
 
 	/*
 	 * Grab a value from the arena.
@@ -2618,16 +2618,14 @@ mac_minor_hold(boolean_t sleep)
 	atomic_inc_32(&minor_count);
 
 	if (sleep)
-		minor = (uint_t)id_alloc(minor_ids);
-	else
-		minor = (uint_t)id_alloc_nosleep(minor_ids);
+		return ((uint_t)id_alloc(minor_ids));
 
-	if (minor == 0) {
+	if ((id = id_alloc_nosleep(minor_ids)) == -1) {
 		atomic_dec_32(&minor_count);
 		return (0);
 	}
 
-	return (minor);
+	return ((uint_t)id);
 }
 
 /*

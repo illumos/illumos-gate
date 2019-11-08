@@ -174,8 +174,9 @@
 	leaq	tr_brand_sys_sysenter(%rip), %r11
 	cmpq	%r11, 24(%rsp)
 	jne	2f
-1:	SWAPGS
-2:	popq	%r11
+1:	swapgs
+2:	lfence /* swapgs mitigation */
+	popq	%r11
 #endif	/* !__xpv */
 
 	INTR_PUSH

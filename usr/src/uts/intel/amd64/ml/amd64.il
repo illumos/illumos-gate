@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 /
 / In-line functions for amd64 kernels.
 /
@@ -189,34 +193,26 @@
         movw    %di, %gs
         .end
 
-	/*
-	 * OPTERON_ERRATUM_88 requires mfence
-	 */
-        .inline __swapgs, 0
-        mfence
-        swapgs
-	.end
-
 /*
  * prefetch 64 bytes
  */
 
- 	.inline	prefetch_read_many,8
+	.inline	prefetch_read_many,8
 	prefetcht0	(%rdi)
 	prefetcht0	32(%rdi)
 	.end
 
- 	.inline	prefetch_read_once,8
+	.inline	prefetch_read_once,8
 	prefetchnta	(%rdi)
 	prefetchnta	32(%rdi)
 	.end
 
- 	.inline	prefetch_write_many,8
+	.inline	prefetch_write_many,8
 	prefetcht0	(%rdi)
 	prefetcht0	32(%rdi)
 	.end
 
- 	.inline	prefetch_write_once,8
+	.inline	prefetch_write_once,8
 	prefetcht0	(%rdi)
 	prefetcht0	32(%rdi)
 	.end

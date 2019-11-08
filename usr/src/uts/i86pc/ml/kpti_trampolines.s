@@ -9,7 +9,7 @@
  * http://www.illumos.org/license/CDDL.
  */
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -88,7 +88,7 @@
  * Syscalls are different to interrupts (at least in the SYSENTER/SYSCALL64
  * cases) in that they do not push an interrupt frame (and also have some other
  * effects). In the syscall trampolines, we assume that we can only be taking
- * the call from userland and use SWAPGS and an unconditional overwrite of %cr3.
+ * the call from userland and use swapgs and an unconditional overwrite of %cr3.
  * We do not do any stack pivoting for syscalls (and we leave SYSENTER's
  * existing %rsp pivot untouched) -- instead we spill registers into
  * %gs:CPU_KPTI_* as we need to.
@@ -503,7 +503,7 @@ tr_sysc_ret_end:
 	pushq	%gs:CPU_KPTI_CS;		\
 	pushq	%gs:CPU_KPTI_RIP;		\
 	mov	%gs:CPU_KPTI_R13, %r13;		\
-	SWAPGS;					\
+	swapgs;					\
 	jmp	isr;				\
 	SET_SIZE(tr_/**/isr)
 
@@ -536,10 +536,9 @@ tr_intr_ret_start:
 	ENTRY_NP(tr_iret_user)
 #if DEBUG
 	/*
-	 * Ensure that we return to user land with CR0.TS clear. We do this
-	 * before we trampoline back and pivot the stack and %cr3. This way
-	 * we're still on the kernel stack and kernel %cr3, though we are on the
-	 * user GSBASE.
+	 * Panic if we find CR0.TS set. We're still on the kernel stack and
+	 * %cr3, but we do need to swap back to the kernel gs. (We don't worry
+	 * about swapgs speculation here.)
 	 */
 	pushq	%rax
 	mov	%cr0, %rax
@@ -559,14 +558,24 @@ tr_intr_ret_start:
 	cmpq	$1, kpti_enable
 	jne	1f
 
+	/*
+	 * KPTI enabled: we're on the user gsbase at this point, so we
+	 * need to swap back so we can pivot stacks.
+	 *
+	 * The swapgs lfence mitigation is probably not needed here
+	 * since a mis-speculation of the above branch would imply KPTI
+	 * is disabled, but we'll do so anyway.
+	 */
 	swapgs
+	lfence
 	mov	%r13, %gs:CPU_KPTI_R13
 	PIVOT_KPTI_STK(%r13)
 	SET_USER_CR3(%r13)
 	mov	%gs:CPU_KPTI_R13, %r13
-	/* Zero these to make sure they didn't leak from a kernel trap */
+	/* Zero these to make sure they didn't leak from a kernel trap. */
 	movq	$0, %gs:CPU_KPTI_R13
 	movq	$0, %gs:CPU_KPTI_R14
+	/* And back to user gsbase again. */
 	swapgs
 1:
 	iretq
