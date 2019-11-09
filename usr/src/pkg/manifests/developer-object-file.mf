@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 Joyent, Inc.
 #
 
 set name=pkg.fmri value=pkg:/developer/object-file@$(PKGVERS)
@@ -53,6 +54,7 @@ file path=usr/bin/$(ARCH64)/mcs mode=0555
 file path=usr/bin/$(ARCH64)/nm mode=0555
 file path=usr/bin/$(ARCH64)/size mode=0555
 file path=usr/bin/ar mode=0555
+file path=usr/bin/demangle mode=0555
 file path=usr/bin/dis mode=0555
 file path=usr/bin/dump mode=0555
 file path=usr/bin/elfdump mode=0555
@@ -95,6 +97,7 @@ file path=usr/share/lib/ccs/ncform
 file path=usr/share/lib/ccs/nrform
 file path=usr/share/lib/ccs/yaccpar
 file path=usr/share/man/man1/ar.1
+file path=usr/share/man/man1/demangle.1
 file path=usr/share/man/man1/dis.1
 file path=usr/share/man/man1/dump.1
 file path=usr/share/man/man1/elfdump.1

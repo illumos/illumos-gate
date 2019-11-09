@@ -14,6 +14,7 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 Joyent, Inc.
 #
 
 include		$(SRC)/Makefile.master
@@ -94,6 +95,7 @@ MANFILES=	acctcom.1			\
 		date.1				\
 		dc.1				\
 		deallocate.1			\
+		demangle.1			\
 		deroff.1			\
 		dhcpinfo.1			\
 		diff.1				\
