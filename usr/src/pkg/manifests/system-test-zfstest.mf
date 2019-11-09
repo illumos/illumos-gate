@@ -53,6 +53,7 @@ dir path=opt/zfs-tests/tests/functional/cli_root/zfs_clone
 dir path=opt/zfs-tests/tests/functional/cli_root/zfs_copies
 dir path=opt/zfs-tests/tests/functional/cli_root/zfs_create
 dir path=opt/zfs-tests/tests/functional/cli_root/zfs_destroy
+dir path=opt/zfs-tests/tests/functional/cli_root/zfs_diff
 dir path=opt/zfs-tests/tests/functional/cli_root/zfs_get
 dir path=opt/zfs-tests/tests/functional/cli_root/zfs_inherit
 dir path=opt/zfs-tests/tests/functional/cli_root/zfs_load-key
@@ -891,6 +892,19 @@ file \
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_destroy/zfs_destroy_common.kshlib \
     mode=0444
+file path=opt/zfs-tests/tests/functional/cli_root/zfs_diff/cleanup mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zfs_diff/setup mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zfs_diff/socket mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zfs_diff/zfs_diff_changes \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zfs_diff/zfs_diff_cliargs \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zfs_diff/zfs_diff_encrypted \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zfs_diff/zfs_diff_timestamp \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zfs_diff/zfs_diff_types \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_get/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_get/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_get/zfs_get_001_pos \
