@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 # Copyright 2015 Joyent, Inc.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 
 PROG:sh = basename `cd ..; pwd`
 
@@ -127,6 +127,9 @@ LN_pargs =		penv pauxv
 CPPFLAGS +=	$(CPPFLAGS_$(PROG))
 OBJS +=		$(OBJS_$(PROG))
 SRCS +=		$(SRCS_$(PROG))
+
+$(OBJS_ptree) :=	CSTD = $(CSTD_GNU99)
+ptree :=		CSTD = $(CSTD_GNU99)
 
 INSTALL_NEW=
 INSTALL_LEGACY=$(RM) $(ROOTPROCBINSYMLINK) ; \
