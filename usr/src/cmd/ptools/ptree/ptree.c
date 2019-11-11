@@ -52,8 +52,6 @@
 #include <sys/stat.h>
 #include <stdbool.h>
 
-#include "ptools_common.h"
-
 #define	COLUMN_DEFAULT	80
 #define	CHUNK_SIZE	256 /* Arbitrary amount */
 #define	FAKEDPID0(p)	(p->pid == 0 && p->psargs[0] == '\0')
@@ -162,12 +160,6 @@ main(int argc, char **argv)
 	int errflg = 0;
 	int n;
 	int retc = 0;
-	char ppath[PATH_MAX];
-
-	DIR *dirp;
-	struct dirent *dentp;
-	char	pname[PATH_MAX];
-	int	pdlen;
 
 	ps_t *p;
 
@@ -211,99 +203,9 @@ main(int argc, char **argv)
 	psize = 0;
 	ps = NULL;
 
-	(void) proc_snprintf(ppath, sizeof (ppath), "/proc");
+	/* Currently, this can only fail if the 3rd argument is invalid */
+	VERIFY0(proc_walk(add_proc, NULL, PR_WALK_PROC));
 
-	/*
-	 * Search the /proc directory for all processes.
-	 */
-	if ((dirp = opendir(ppath)) == NULL) {
-		(void) fprintf(stderr, "%s: cannot open %s directory\n",
-		    command, ppath);
-		return (1);
-	}
-
-	(void) strcpy(pname, ppath);
-	pdlen = strlen(pname);
-	pname[pdlen++] = '/';
-
-	/* for each active process --- */
-	while (dentp = readdir(dirp)) {
-		int	procfd;	/* filedescriptor for /proc/nnnnn/psinfo */
-
-		if (dentp->d_name[0] == '.')		/* skip . and .. */
-			continue;
-		(void) strcpy(pname + pdlen, dentp->d_name);
-		(void) strcpy(pname + strlen(pname), "/psinfo");
-retry:
-		if ((procfd = open(pname, O_RDONLY)) == -1)
-			continue;
-
-		/*
-		 * Get the info structure for the process and close quickly.
-		 */
-		if (read(procfd, &info, sizeof (info)) != sizeof (info)) {
-			int	saverr = errno;
-
-			(void) close(procfd);
-			if (saverr == EAGAIN)
-				goto retry;
-			if (saverr != ENOENT)
-				perror(pname);
-			continue;
-		}
-		(void) close(procfd);
-
-		/*
-		 * We make sure there's always a free slot in the table
-		 * in case we need to add a fake p0.
-		 */
-		if (nps + 1 >= psize) {
-			if ((psize *= 2) == 0)
-				psize = 20;
-			if ((ps = realloc(ps, psize*sizeof (ps_t *))) == NULL) {
-				perror("realloc()");
-				return (1);
-			}
-		}
-		if ((p = calloc(1, sizeof (ps_t))) == NULL) {
-			perror("calloc()");
-			return (1);
-		}
-		ps[nps++] = p;
-		p->done = 0;
-		p->uid = info.pr_uid;
-		p->gid = info.pr_gid;
-		p->pid = info.pr_pid;
-		p->ppid = info.pr_ppid;
-		p->pgrp = info.pr_pgid;
-		p->sid = info.pr_sid;
-		p->zoneid = info.pr_zoneid;
-		p->ctid = info.pr_contract;
-		p->start = info.pr_start;
-		proc_unctrl_psinfo(&info);
-		if (info.pr_nlwp == 0)
-			(void) strcpy(p->psargs, "<defunct>");
-		else if (info.pr_psargs[0] == '\0')
-			(void) strncpy(p->psargs, info.pr_fname,
-			    sizeof (p->psargs));
-		else
-			(void) strncpy(p->psargs, info.pr_psargs,
-			    sizeof (p->psargs));
-		p->psargs[sizeof (p->psargs)-1] = '\0';
-		p->pp = NULL;
-		p->sp = NULL;
-		p->cp = NULL;
-
-		if (sflag)
-			p_get_svc_fmri(p, NULL);
-
-		if (p->pid == p->ppid)
-			proc0 = p;
-		if (p->pid == 1)
-			proc1 = p;
-	}
-
-	(void) closedir(dirp);
 	if (proc0 == NULL)
 		proc0 = fakepid0();
 	if (proc1 == NULL)
@@ -718,9 +620,6 @@ parse_svc(const char *arg, char **instp)
 
 	ret = xstrdup(p);
 
-	if ((cp = strrchr(ret, ':')) != NULL &&
-	    strcmp(cp, ":default") == 0)
-		*cp = '\0';
 	if ((cp = strrchr(ret, ':')) != NULL) {
 		*cp = '\0';
 		cp++;
