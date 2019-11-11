@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <libxml/parser.h>
@@ -54,16 +54,6 @@ static int fac_enum_process(topo_mod_t *, xmlNodePtr, tnode_t *);
 static int decorate_nodes(topo_mod_t *, tf_rdata_t *, xmlNodePtr, tnode_t *,
     tf_pad_t **);
 
-
-static void
-strarr_free(topo_mod_t *mod, char **arr, uint_t nelems)
-{
-	int i;
-
-	for (i = 0; i < nelems; i++)
-		topo_mod_strfree(mod, arr[i]);
-	topo_mod_free(mod, arr, (nelems * sizeof (char *)));
-}
 
 int
 xmlattr_to_stab(topo_mod_t *mp, xmlNodePtr n, const char *stabname,
@@ -388,7 +378,7 @@ xlate_common(topo_mod_t *mp, xmlNodePtr xn, topo_type_t ptype, nvlist_t *nvl,
 		}
 
 		rv = nvlist_add_string_array(nvl, name, strarrbuf, nelems);
-		strarr_free(mp, strarrbuf, nelems);
+		topo_mod_strfreev(mp, strarrbuf, nelems);
 		break;
 	case TOPO_TYPE_FMRI_ARRAY:
 		if ((nvlarrbuf = topo_mod_alloc(mp, (nelems *

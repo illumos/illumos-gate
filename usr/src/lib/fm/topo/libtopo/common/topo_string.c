@@ -23,8 +23,9 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include <strings.h>
 #include <ctype.h>
@@ -55,6 +56,15 @@ topo_hdl_strfree(topo_hdl_t *thp, char *s)
 		topo_hdl_free(thp, s, strlen(s) + 1);
 }
 
+void
+topo_hdl_strfreev(topo_hdl_t *thp, char **strarr, uint_t nelem)
+{
+	for (uint_t i = 0; i < nelem; i++)
+		topo_hdl_strfree(thp, strarr[i]);
+
+	topo_hdl_free(thp, strarr, (nelem * sizeof (char *)));
+}
+
 char *
 topo_mod_strdup(topo_mod_t *mod, const char *s)
 {
@@ -65,6 +75,12 @@ void
 topo_mod_strfree(topo_mod_t *mod, char *s)
 {
 	topo_hdl_strfree(mod->tm_hdl, s);
+}
+
+void
+topo_mod_strfreev(topo_mod_t *mod, char **strarr, uint_t nelem)
+{
+	topo_hdl_strfreev(mod->tm_hdl, strarr, nelem);
 }
 
 const char *

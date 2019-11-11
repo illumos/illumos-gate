@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -77,6 +77,7 @@ SYMBOL_VERSION SUNWprivate {
 	topo_hdl_prominfo;
 	topo_hdl_strdup;
 	topo_hdl_strfree;
+	topo_hdl_strfreev;
 	topo_hdl_zalloc;
 	topo_led_state_name;
 	topo_led_type_name;
@@ -125,6 +126,7 @@ SYMBOL_VERSION SUNWprivate {
 	topo_mod_str2nvl;
 	topo_mod_strdup;
 	topo_mod_strfree;
+	topo_mod_strfreev;
 	topo_mod_unload;
 	topo_mod_unregister;
 	topo_mod_walk_init;

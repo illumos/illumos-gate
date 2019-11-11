@@ -23,7 +23,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2019, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _TOPO_MOD_H
@@ -220,6 +220,7 @@ extern void *topo_mod_zalloc(topo_mod_t *, size_t);
 extern void topo_mod_free(topo_mod_t *, void *, size_t);
 extern char *topo_mod_strdup(topo_mod_t *, const char *);
 extern void topo_mod_strfree(topo_mod_t *, char *);
+extern void topo_mod_strfreev(topo_mod_t *, char **, uint_t);
 extern int topo_mod_nvalloc(topo_mod_t *, nvlist_t **, uint_t);
 extern int topo_mod_nvdup(topo_mod_t *, nvlist_t *, nvlist_t **);
 

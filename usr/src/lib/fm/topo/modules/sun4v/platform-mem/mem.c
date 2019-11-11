@@ -24,6 +24,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include <strings.h>
 #include <umem.h>
@@ -207,18 +210,6 @@ mem_replaced(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	}
 
 	return (0);
-}
-
-void
-mem_strarray_free(topo_mod_t *mod, char **arr, size_t dim)
-{
-	int i;
-
-	for (i = 0; i < dim; i++) {
-		if (arr[i] != NULL)
-			topo_mod_strfree(mod, arr[i]);
-	}
-	topo_mod_free(mod, arr, sizeof (char *) * dim);
 }
 
 /*
