@@ -264,6 +264,9 @@ function add_test_accounts {
 # By using log_test or log_testrunner, we accumulate the exit codes from each
 # test run to $RESULT.
 #
+# We don't - yet - run net-tests, smbclient-tests, zfs-tests, or the dtrace
+# suite.
+#
 function execute_tests {
 
     log "Starting test runs"
@@ -273,6 +276,7 @@ function execute_tests {
     log_testrunner libc-tests /opt/libc-tests/runfiles/default.run
     log_test vndtest /opt/vndtest/bin/vndtest -a
     log_testrunner util-tests /opt/util-tests/runfiles/default.run
+    log_testrunner os-tests /opt/os-tests/runfiles/default.run
 
     if [[ -n "$FAILED_TESTS" ]]; then
         echo ""

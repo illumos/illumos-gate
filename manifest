@@ -5342,7 +5342,6 @@ f usr/lib/amd64/libsoftcrypto.so.1 0755 root bin
 s usr/lib/amd64/libsoftcrypto.so=libsoftcrypto.so.1
 f usr/lib/amd64/libsrpt.so.1 0755 root bin
 s usr/lib/amd64/libsrpt.so=libsrpt.so.1
-f usr/lib/amd64/libstanddisasm.so 0644 root bin
 f usr/lib/amd64/libstmf.so.1 0755 root bin
 s usr/lib/amd64/libstmf.so=libstmf.so.1
 f usr/lib/amd64/libstmfproxy.so.1 0755 root bin
@@ -6856,7 +6855,6 @@ f usr/lib/libsoftcrypto.so.1 0755 root bin
 s usr/lib/libsoftcrypto.so=libsoftcrypto.so.1
 f usr/lib/libsrpt.so.1 0755 root bin
 s usr/lib/libsrpt.so=libsrpt.so.1
-f usr/lib/libstanddisasm.so 0644 root bin
 f usr/lib/libstmf.so.1 0755 root bin
 s usr/lib/libstmf.so=libstmf.so.1
 f usr/lib/libstmfproxy.so.1 0755 root bin
