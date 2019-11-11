@@ -423,11 +423,11 @@ ipmi_sensor_state(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	if (reading->isr_state_unavailable) {
 		topo_mod_dprintf(mod, "Unavailable sensor %s, sensor_num=%d\n",
 		    entity_refs[i], sensor_num);
-		strarr_free(mod, entity_refs, nelems);
+		topo_mod_strfreev(mod, entity_refs, nelems);
 		topo_mod_ipmi_rele(mod);
 		return (-1);
 	}
-	strarr_free(mod, entity_refs, nelems);
+	topo_mod_strfreev(mod, entity_refs, nelems);
 	topo_mod_ipmi_rele(mod);
 
 	if (topo_prop_get_string(node, TOPO_PGROUP_FACILITY, TOPO_SENSOR_CLASS,
