@@ -12,9 +12,10 @@
 #
 syntax: glob
 
-usr/src/uts/common/io/qede/*
-usr/src/tools/smatch/src/*
+usr/src/cmd/smbsrv/testoplock/case*.ref
 usr/src/data/hwdata/pci.ids
 usr/src/data/hwdata/usb.ids
 usr/src/data/perfmon/readme.txt
-usr/src/cmd/smbsrv/testoplock/case*.ref
+usr/src/tools/smatch/src/*
+usr/src/uts/common/io/qede/*
+usr/src/uts/common/io/i40e/core/*
