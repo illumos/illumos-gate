@@ -624,6 +624,7 @@ clnt_cots_kcreate(dev_t dev, struct netbuf *addr, int family, rpcprog_t prog,
 	 * The zalloc initialized the fields below.
 	 * p->cku_xid = 0;
 	 * p->cku_flags = 0;
+	 * p->cku_srcaddr.buf = NULL;
 	 * p->cku_srcaddr.len = 0;
 	 * p->cku_srcaddr.maxlen = 0;
 	 */
@@ -1580,8 +1581,7 @@ clnt_cots_kinit(CLIENT *h, dev_t dev, int family, struct netbuf *addr,
 	p->cku_cred = cred;
 
 	if (p->cku_addr.maxlen < addr->len) {
-		if (p->cku_addr.maxlen != 0 && p->cku_addr.buf != NULL)
-			kmem_free(p->cku_addr.buf, p->cku_addr.maxlen);
+		kmem_free(p->cku_addr.buf, p->cku_addr.maxlen);
 		p->cku_addr.buf = kmem_zalloc(addr->maxlen, KM_SLEEP);
 		p->cku_addr.maxlen = addr->maxlen;
 	}
@@ -1934,9 +1934,7 @@ use_new_conn:
 			 * a later retry.
 			 */
 			if (srcaddr->len != lru_entry->x_src.len) {
-				if (srcaddr->len > 0)
-					kmem_free(srcaddr->buf,
-					    srcaddr->maxlen);
+				kmem_free(srcaddr->buf, srcaddr->maxlen);
 				ASSERT(lru_entry->x_src.len != 0);
 				srcaddr->buf = kmem_alloc(
 				    lru_entry->x_src.len, KM_SLEEP);
@@ -2442,8 +2440,7 @@ connmgr_wrapconnect(
 		 * in case of a later retry.
 		 */
 		if (srcaddr->len != cm_entry->x_src.len) {
-			if (srcaddr->maxlen > 0)
-				kmem_free(srcaddr->buf, srcaddr->maxlen);
+			kmem_free(srcaddr->buf, srcaddr->maxlen);
 			ASSERT(cm_entry->x_src.len != 0);
 			srcaddr->buf = kmem_alloc(cm_entry->x_src.len,
 			    KM_SLEEP);
@@ -2569,10 +2566,8 @@ connmgr_close(struct cm_xprt *cm_entry)
 	cv_destroy(&cm_entry->x_conn_cv);
 	cv_destroy(&cm_entry->x_dis_cv);
 
-	if (cm_entry->x_server.buf != NULL)
-		kmem_free(cm_entry->x_server.buf, cm_entry->x_server.maxlen);
-	if (cm_entry->x_src.buf != NULL)
-		kmem_free(cm_entry->x_src.buf, cm_entry->x_src.maxlen);
+	kmem_free(cm_entry->x_server.buf, cm_entry->x_server.maxlen);
+	kmem_free(cm_entry->x_src.buf, cm_entry->x_src.maxlen);
 	kmem_free(cm_entry, sizeof (struct cm_xprt));
 }
 
