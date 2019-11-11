@@ -405,15 +405,18 @@ sa_add_layout_entry(objset_t *os, sa_attr_type_t *attrs, int attr_count,
 {
 	sa_os_t *sa = os->os_sa;
 	sa_lot_t *tb, *findtb;
-	int i;
+	int i, size;
 	avl_index_t loc;
 
 	ASSERT(MUTEX_HELD(&sa->sa_lock));
 	tb = kmem_zalloc(sizeof (sa_lot_t), KM_SLEEP);
 	tb->lot_attr_count = attr_count;
-	tb->lot_attrs = kmem_alloc(sizeof (sa_attr_type_t) * attr_count,
-	    KM_SLEEP);
-	bcopy(attrs, tb->lot_attrs, sizeof (sa_attr_type_t) * attr_count);
+
+	if ((size = sizeof (sa_attr_type_t) * attr_count) != 0) {
+		tb->lot_attrs = kmem_alloc(size, KM_SLEEP);
+		bcopy(attrs, tb->lot_attrs, size);
+	}
+
 	tb->lot_num = lot_num;
 	tb->lot_hash = hash;
 	tb->lot_instance = 0;

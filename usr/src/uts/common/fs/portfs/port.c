@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
+ */
+
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/cred.h>
@@ -1379,12 +1383,18 @@ portnowait:
 
 	if (model == DATAMODEL_NATIVE) {
 		eventsz = sizeof (port_event_t);
-		kevp = kmem_alloc(eventsz * nmax, KM_NOSLEEP);
-		if (kevp == NULL) {
-			if (nmax > pp->port_max_list)
-				nmax = pp->port_max_list;
-			kevp = kmem_alloc(eventsz * nmax, KM_SLEEP);
+
+		if (nmax == 0) {
+			kevp = NULL;
+		} else {
+			kevp = kmem_alloc(eventsz * nmax, KM_NOSLEEP);
+			if (kevp == NULL) {
+				if (nmax > pp->port_max_list)
+					nmax = pp->port_max_list;
+				kevp = kmem_alloc(eventsz * nmax, KM_SLEEP);
+			}
 		}
+
 		results = kevp;
 		lev = NULL;	/* start with first event in the queue */
 		for (nevents = 0; nevents < nmax; ) {
@@ -1421,12 +1431,18 @@ portnowait:
 		port_event32_t	*kevp32;
 
 		eventsz = sizeof (port_event32_t);
-		kevp32 = kmem_alloc(eventsz * nmax, KM_NOSLEEP);
-		if (kevp32 == NULL) {
-			if (nmax > pp->port_max_list)
-				nmax = pp->port_max_list;
-			kevp32 = kmem_alloc(eventsz * nmax, KM_SLEEP);
+
+		if (nmax == 0) {
+			kevp32 = NULL;
+		} else {
+			kevp32 = kmem_alloc(eventsz * nmax, KM_NOSLEEP);
+			if (kevp32 == NULL) {
+				if (nmax > pp->port_max_list)
+					nmax = pp->port_max_list;
+				kevp32 = kmem_alloc(eventsz * nmax, KM_SLEEP);
+			}
 		}
+
 		results = kevp32;
 		lev = NULL;	/* start with first event in the queue */
 		for (nevents = 0; nevents < nmax; ) {

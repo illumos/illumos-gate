@@ -3917,6 +3917,8 @@ kmalog(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			logname = "kmem_failure_log";
 		else if (strcmp(argv->a_un.a_str, "slab") == 0)
 			logname = "kmem_slab_log";
+		else if (strcmp(argv->a_un.a_str, "zerosized") == 0)
+			logname = "kmem_zerosized_log";
 		else
 			return (DCMD_USAGE);
 	}

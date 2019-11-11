@@ -1011,12 +1011,21 @@ size_t kmem_transaction_log_size; /* transaction log size [2% of memory] */
 size_t kmem_content_log_size;	/* content log size [2% of memory] */
 size_t kmem_failure_log_size;	/* failure log [4 pages per CPU] */
 size_t kmem_slab_log_size;	/* slab create log [4 pages per CPU] */
+size_t kmem_zerosized_log_size;	/* zero-sized log [4 pages per CPU] */
 size_t kmem_content_maxsave = 256; /* KMF_CONTENTS max bytes to log */
 size_t kmem_lite_minsize = 0;	/* minimum buffer size for KMF_LITE */
 size_t kmem_lite_maxalign = 1024; /* maximum buffer alignment for KMF_LITE */
 int kmem_lite_pcs = 4;		/* number of PCs to store in KMF_LITE mode */
 size_t kmem_maxverify;		/* maximum bytes to inspect in debug routines */
 size_t kmem_minfirewall;	/* hardware-enforced redzone threshold */
+
+#ifdef DEBUG
+int kmem_warn_zerosized = 1;	/* whether to warn on zero-sized KM_SLEEP */
+#else
+int kmem_warn_zerosized = 0;	/* whether to warn on zero-sized KM_SLEEP */
+#endif
+
+int kmem_panic_zerosized = 0;	/* whether to panic on zero-sized KM_SLEEP */
 
 #ifdef _LP64
 size_t	kmem_max_cached = KMEM_BIG_MAXBUF;	/* maximum kmem_alloc cache */
@@ -1050,6 +1059,8 @@ static vmem_t		*kmem_va_arena;
 static vmem_t		*kmem_default_arena;
 static vmem_t		*kmem_firewall_va_arena;
 static vmem_t		*kmem_firewall_arena;
+
+static int		kmem_zerosized;		/* # of zero-sized allocs */
 
 /*
  * kmem slab consolidator thresholds (tunables)
@@ -1098,6 +1109,7 @@ kmem_log_header_t	*kmem_transaction_log;
 kmem_log_header_t	*kmem_content_log;
 kmem_log_header_t	*kmem_failure_log;
 kmem_log_header_t	*kmem_slab_log;
+kmem_log_header_t	*kmem_zerosized_log;
 
 static int		kmem_lite_count; /* # of PCs in kmem_buftag_lite_t */
 
@@ -2853,8 +2865,33 @@ kmem_alloc(size_t size, int kmflag)
 		/* fall through to kmem_cache_alloc() */
 
 	} else {
-		if (size == 0)
+		if (size == 0) {
+			if (kmflag != KM_SLEEP && !(kmflag & KM_PANIC))
+				return (NULL);
+
+			/*
+			 * If this is a sleeping allocation or one that has
+			 * been specified to panic on allocation failure, we
+			 * consider it to be deprecated behavior to allocate
+			 * 0 bytes.  If we have been configured to panic under
+			 * this condition, we panic; if to warn, we warn -- and
+			 * regardless, we log to the kmem_zerosized_log that
+			 * that this condition has occurred (which gives us
+			 * enough information to be able to debug it).
+			 */
+			if (kmem_panic && kmem_panic_zerosized)
+				panic("attempted to kmem_alloc() size of 0");
+
+			if (kmem_warn_zerosized) {
+				cmn_err(CE_WARN, "kmem_alloc(): sleeping "
+				    "allocation with size of 0; "
+				    "see kmem_zerosized_log for details");
+			}
+
+			kmem_log_event(kmem_zerosized_log, NULL, NULL, NULL);
+
 			return (NULL);
+		}
 
 		buf = vmem_alloc(kmem_oversize_arena, size,
 		    kmflag & KM_VMFLAGS);
@@ -4397,8 +4434,8 @@ kmem_init(void)
 	}
 
 	kmem_failure_log = kmem_log_init(kmem_failure_log_size);
-
 	kmem_slab_log = kmem_log_init(kmem_slab_log_size);
+	kmem_zerosized_log = kmem_log_init(kmem_zerosized_log_size);
 
 	/*
 	 * Initialize STREAMS message caches so allocb() is available.

@@ -25,7 +25,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/smbios_impl.h>
 #include <sys/cmn_err.h>
@@ -43,13 +45,13 @@ smb_strerror(int err)
 void *
 smb_alloc(size_t len)
 {
-	return (kmem_alloc(len, KM_SLEEP));
+	return (len > 0 ? kmem_alloc(len, KM_SLEEP) : NULL);
 }
 
 void *
 smb_zalloc(size_t len)
 {
-	return (kmem_zalloc(len, KM_SLEEP));
+	return (len > 0 ? kmem_zalloc(len, KM_SLEEP) : NULL);
 }
 
 void

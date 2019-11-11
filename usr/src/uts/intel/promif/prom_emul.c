@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
+ */
 
 #include <sys/promif.h>
 #include <sys/promimpl.h>
@@ -46,7 +48,7 @@ promif_create_prop(prom_node_t *pnp, char *name, void *val, int len, int flags)
 	q = kmem_zalloc(sizeof (*q), KM_SLEEP);
 	q->pp_name = kmem_zalloc(strlen(name) + 1, KM_SLEEP);
 	(void) strcpy(q->pp_name, name);
-	q->pp_val = kmem_alloc(len, KM_SLEEP);
+	q->pp_val = len > 0 ? kmem_alloc(len, KM_SLEEP) : NULL;
 	q->pp_len = len;
 	switch (flags) {
 	case DDI_PROP_TYPE_INT:

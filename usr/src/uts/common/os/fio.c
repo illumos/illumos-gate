@@ -852,7 +852,8 @@ flist_fork(uf_info_t *pfip, uf_info_t *cfip)
 	 */
 	cfip->fi_nfiles = nfiles = flist_minsize(pfip);
 
-	cfip->fi_list = kmem_zalloc(nfiles * sizeof (uf_entry_t), KM_SLEEP);
+	cfip->fi_list = nfiles == 0 ? NULL :
+	    kmem_zalloc(nfiles * sizeof (uf_entry_t), KM_SLEEP);
 
 	for (fd = 0, pufp = pfip->fi_list, cufp = cfip->fi_list; fd < nfiles;
 	    fd++, pufp++, cufp++) {
@@ -1492,8 +1493,8 @@ int
 fgetstartvp(int fd, char *path, vnode_t **startvpp)
 {
 	vnode_t		*startvp;
-	file_t 		*startfp;
-	char 		startchar;
+	file_t		*startfp;
+	char		startchar;
 
 	if (fd == AT_FDCWD && path == NULL)
 		return (EFAULT);
@@ -1539,7 +1540,7 @@ fsetattrat(int fd, char *path, int flags, struct vattr *vap)
 {
 	vnode_t		*startvp;
 	vnode_t		*vp;
-	int 		error;
+	int		error;
 
 	/*
 	 * Since we are never called to set the size of a file, we don't

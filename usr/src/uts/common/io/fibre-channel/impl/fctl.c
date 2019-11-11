@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
  */
 /*
  * Fibre channel Transport Library (fctl)
@@ -5498,6 +5499,11 @@ fc_ulp_get_adapter_paths(char *pathList, int count)
 	for (fca_port = fctl_fca_portlist; fca_port != NULL;
 	    fca_port = fca_port->port_next) {
 		maxPorts ++;
+	}
+
+	if (maxPorts == 0) {
+		mutex_exit(&fctl_port_lock);
+		return (0);
 	}
 
 	/* Now allocate a buffer to store all the pointers for comparisons */
