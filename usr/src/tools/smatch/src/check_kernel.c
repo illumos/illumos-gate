@@ -104,14 +104,18 @@ static void match_param_err_or_null(const char *fn, struct expression *call_expr
 {
 	int param = PTR_INT(_param);
 	struct expression *arg;
-	struct range_list *rl;
+	struct range_list *pre, *rl;
 	struct smatch_state *pre_state;
 	struct smatch_state *end_state;
 
 	arg = get_argument_from_call_expr(call_expr->args, param);
 	pre_state = get_state_expr(SMATCH_EXTRA, arg);
+	if (pre_state)
+		pre = estate_rl(pre_state);
+	else
+		pre = alloc_whole_rl(&ptr_ctype);
 	call_results_to_rl(call_expr, &ptr_ctype, "0,(-4095)-(-1)", &rl);
-	rl = rl_intersection(estate_rl(pre_state), rl);
+	rl = rl_intersection(pre, rl);
 	rl = cast_rl(get_type(arg), rl);
 	end_state = alloc_estate_rl(rl);
 	set_extra_expr_nomod(arg, end_state);

@@ -70,4 +70,11 @@ if  echo $oname | grep -q .o$ ; then
     rm -f $oname
 fi
 
-make C=2 $ENDIAN CHECK="$PRE $CMD $POST" $oname
+if [[ ! -z $ARCH ]]; then
+	KERNEL_ARCH="ARCH=$ARCH"
+fi
+if [[ ! -z $CROSS_COMPILE ]] ; then
+	KERNEL_CROSS_COMPILE="CROSS_COMPILE=$CROSS_COMPILE"
+fi
+
+make $KERNEL_CROSS_COMPILE $KERNEL_ARCH C=2 $ENDIAN CHECK="$PRE $CMD $POST" $oname

@@ -14,7 +14,7 @@ static int a[] = {
 
 };
 /*
- * check-name: Expression constness propagation in casts
+ * check-name: constexprness in casts
  *
  * check-error-start
 constexpr-cast.c:9:11: error: bad integer constant expression

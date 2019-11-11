@@ -63,18 +63,18 @@ static void test_tls(void)
  * check-error-start
 ptr-inherit.c:12:19: warning: incorrect type in initializer (different modifiers)
 ptr-inherit.c:12:19:    expected int *p
-ptr-inherit.c:12:19:    got int const *<noident>
+ptr-inherit.c:12:19:    got int const *
 ptr-inherit.c:18:19: warning: incorrect type in initializer (different modifiers)
 ptr-inherit.c:18:19:    expected int *p
-ptr-inherit.c:18:19:    got int volatile *<noident>
+ptr-inherit.c:18:19:    got int volatile *
 ptr-inherit.c:24:19: warning: incorrect type in initializer (different modifiers)
 ptr-inherit.c:24:19:    expected int *p
-ptr-inherit.c:24:19:    got int [noderef] *<noident>
+ptr-inherit.c:24:19:    got int [noderef] *
 ptr-inherit.c:30:19: warning: incorrect type in initializer (different base types)
 ptr-inherit.c:30:19:    expected int *p
-ptr-inherit.c:30:19:    got restricted int *<noident>
+ptr-inherit.c:30:19:    got restricted int *
 ptr-inherit.c:36:19: warning: incorrect type in initializer (different address spaces)
 ptr-inherit.c:36:19:    expected int *p
-ptr-inherit.c:36:19:    got int <asn:1>*<noident>
+ptr-inherit.c:36:19:    got int <asn:1> *
  * check-error-end
  */

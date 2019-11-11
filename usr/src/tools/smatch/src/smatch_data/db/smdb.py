@@ -7,6 +7,7 @@
 import sqlite3
 import sys
 import re
+import subprocess
 
 try:
     con = sqlite3.connect('smatch_db.sqlite')
@@ -25,6 +26,8 @@ def usage():
     print "data_info <struct_type> <member> - information about a given data type"
     print "function_ptr <function> - which function pointers point to this"
     print "trace_param <function> <param> - trace where a parameter came from"
+    print "find_tagged <function> <param> - find the source of a tagged value (arm64)"
+    print "parse_warns_tagged <smatch_warns.txt> - parse warns file for summary of tagged issues (arm64)"
     print "locals <file> - print the local values in a file."
     sys.exit(1)
 
@@ -267,7 +270,7 @@ def get_next_str(txt):
         if txt[0] == '-':
             parsed += 1
         for char in txt[parsed:]:
-            if char == '-':
+            if char == '-' or char == '[':
                 break
             parsed += 1
         val = txt[:parsed]
@@ -542,6 +545,107 @@ def function_type_value(struct_type, member):
     for txt in cur:
         print "%-30s | %-30s | %s | %s" %(txt[0], txt[1], txt[2], txt[3])
 
+def rl_too_big(txt):
+    rl = txt_to_rl(txt)
+    ret = ""
+    for idx in range(len(rl)):
+        cur_max = rl[idx][1]
+        if (cur_max > 0xFFFFFFFFFFFFFF):
+            return 1
+
+    return 0
+
+def rl_has_min_untagged(txt):
+    rl = txt_to_rl(txt)
+    ret = ""
+    for idx in range(len(rl)):
+        cur_min = rl[idx][0]
+        if (cur_min == 0xff80000000000000):
+            return 1
+
+    return 0
+
+def rl_is_tagged(txt):
+    if not rl_too_big(txt):
+        return 0
+
+    if rl_has_min_untagged(txt):
+        return 0
+
+    return 1
+
+def rl_is_treat_untagged(txt):
+    if "[u]" in txt:
+        return 1;
+
+    return 0
+
+def parse_warns_tagged(filename):
+    proc = subprocess.Popen(['cat %s | grep "potentially tagged" | sort | uniq' %(filename)], shell=True, stdout=subprocess.PIPE)
+    while True:
+        line = proc.stdout.readline()
+        if not line:
+            break
+
+	linepos = re.search("([^\s]+)", line).group(1)
+	groupre = re.search("potentially tagged address \(([^,]+), ([^,]+), ([^\)]+)\)", line)
+	groupre.group(1)
+
+	func = groupre.group(1)
+	param = int(groupre.group(2))
+	var = groupre.group(3)
+
+	if ("end" in var or "size" in var or "len" in var):
+		continue
+
+	print "\n%s (func: %s, param: %d:%s) may be caused by:" %(linepos, func, param, var)
+
+	if (param != -1):
+		if not find_tagged(func, param, 0, []):
+			print "    %s (param %d) (can't walk call tree)" % (func, param)
+	else:
+		print "    %s (variable %s (can't walk call tree)" % (func, var)
+
+def find_tagged(func, param, caller_call_id, printed):
+
+    callers = {}
+    cur = con.cursor()
+    ptrs = get_function_pointers(func)
+    found = 0
+
+    for ptr in ptrs:
+        cur.execute("select call_id, value from caller_info where function = '%s' and parameter=%d and type=%d" %(ptr, param, type_to_int("DATA_SOURCE")))
+
+        for row in cur:
+            if (row[1][0] == '$'):
+                if row[0] not in callers:
+                    callers[row[0]] = {}
+                callers[row[0]]["param"] = int(row[1][1])
+
+    for ptr in ptrs:
+        cur.execute("select caller, call_id, value from caller_info where function = '%s' and parameter=%d and type=%d" %(ptr, param, type_to_int("USER_DATA")))
+
+        for row in cur:
+            if not rl_is_tagged(row[2]):
+                continue
+	    if rl_is_treat_untagged(row[2]):
+	        continue
+            found = 1
+            if row[1] not in callers:
+                callers[row[1]] = {}
+            if "param" not in callers[row[1]]:
+                line = "    %s (param ?) -> %s (param %d)" % (row[0], func, param)
+                if line not in printed:
+                        printed.append(line)
+                        print line
+                continue
+            if row[0] not in printed:
+                printed.append(row[0])
+                if not find_tagged(row[0], callers[row[1]]["param"], row[1], printed):
+                    print "    %s (param %d)" % (row[0], param)
+
+    return found
+
 def trace_callers(func, param):
     sources = []
     prev_type = 0
@@ -574,8 +678,8 @@ def trace_param_helper(func, param, indent = 0):
     sources = trace_callers(func, param)
     for path in sources:
 
-        if len(path[1]) and path[1][0] == 'p' and path[1][1] == ' ':
-            p = int(path[1][2:])
+        if len(path[1]) and path[1][0] == '$':
+            p = int(re.findall('\d+', path[1][1:])[0])
             trace_param_helper(path[0], p, indent + 2)
         elif len(path[0]) and path[0][0] == '%':
             print "  %s%s" %(" " * indent, path[1])
@@ -641,6 +745,13 @@ elif sys.argv[1] == "data_info":
 elif sys.argv[1] == "call_tree":
     func = sys.argv[2]
     print_call_tree(func)
+elif sys.argv[1] == "find_tagged":
+    func = sys.argv[2]
+    param = int(sys.argv[3])
+    find_tagged(func, param, 0, [])
+elif sys.argv[1] == "parse_warns_tagged":
+    filename = sys.argv[2]
+    parse_warns_tagged(filename)
 elif sys.argv[1] == "where":
     if len(sys.argv) == 3:
         struct_type = "%"
@@ -677,9 +788,5 @@ elif sys.argv[1] == "constraint":
         struct_type = sys.argv[2]
         member = sys.argv[3]
     constraint(struct_type, member)
-elif sys.argv[1] == "test":
-    filename = sys.argv[2]
-    func = sys.argv[3]
-    caller_info_values(filename, func)
 else:
     usage()

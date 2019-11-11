@@ -58,7 +58,7 @@ static void array_check(struct expression *expr)
 	if (buf_comparison_index_ok(expr))
 		return;
 
-	if (getting_address())
+	if (getting_address(expr))
 		return;
 	if (is_capped(offset))
 		return;

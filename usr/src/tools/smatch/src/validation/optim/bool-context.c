@@ -8,5 +8,5 @@ bool bool_and(int a, int b) { return a && b; }
  * check-command: test-linearize -Wno-decl $file
  * check-output-ignore
  *
- * check-output-pattern-4-times: setne\\..* %arg[12]
+ * check-output-pattern(4): setne\\..* %arg[12]
  */

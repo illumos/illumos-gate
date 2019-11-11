@@ -34,11 +34,6 @@
 #include <assert.h>
 
 
-static inline int nbr_pseudo_users(pseudo_t p)
-{
-	return ptr_list_size((struct ptr_list *)p->users);
-}
-
 static int simplify_phi_node(struct instruction *phi, pseudo_t tmp)
 {
 	pseudo_t target = phi->target;
@@ -95,7 +90,7 @@ static void replace_phi_node(struct instruction *phi)
 		src = def->phi_src;
 		if (src->type != PSEUDO_REG)
 			continue;
-		switch (nbr_pseudo_users(src)) {
+		switch (nbr_users(src)) {
 			struct instruction *insn;
 		case 1:
 			insn = src->def;

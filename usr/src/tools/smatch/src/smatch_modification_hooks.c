@@ -143,9 +143,6 @@ static void call_modification_hooks(struct expression *expr, struct expression *
 	char *name;
 	struct symbol *sym;
 
-	if (late == LATE)
-		update_mtag_data(expr);
-
 	name = expr_to_known_chunk_sym(expr, &sym);
 	if (!name)
 		goto free;
@@ -156,7 +153,7 @@ free:
 
 static void db_param_add(struct expression *expr, int param, char *key, char *value)
 {
-	struct expression *arg, *gen_expr;
+	struct expression *arg;
 	char *name, *other_name;
 	struct symbol *sym, *other_sym;
 
@@ -168,10 +165,6 @@ static void db_param_add(struct expression *expr, int param, char *key, char *va
 	arg = get_argument_from_call_expr(expr->args, param);
 	if (!arg)
 		return;
-
-	gen_expr = gen_expression_from_key(arg, key);
-	if (gen_expr)
-		update_mtag_data(gen_expr);
 
 	name = get_variable_from_key(arg, key, &sym);
 	if (!name || !sym)
@@ -226,22 +219,13 @@ static void match_call(struct expression *expr)
 static void asm_expr(struct statement *stmt, int late)
 {
 	struct expression *expr;
-	int state = 0;
 
 	FOR_EACH_PTR(stmt->asm_outputs, expr) {
-		switch (state) {
-		case 0: /* identifier */
-		case 1: /* constraint */
-			state++;
+		if (expr->type != EXPR_ASM_OPERAND)
 			continue;
-		case 2: /* expression */
-			state = 0;
-			call_modification_hooks(expr, NULL, late);
-			continue;
-		}
+		call_modification_hooks(expr->expr, NULL, late);
 	} END_FOR_EACH_PTR(expr);
 }
-
 
 static void match_assign_early(struct expression *expr)
 {

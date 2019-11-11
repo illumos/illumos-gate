@@ -7,6 +7,7 @@ static unsigned long b = BIGUL;
 /*
  * check-name: constant-suffix
  * check-command: sparse -m64 -Wconstant-suffix $file
+ * check-assert: sizeof(long) == 8
  *
  * check-error-start
 constant-suffix-64.c:4:26: warning: constant 0xfffff00000000000U is so big it is unsigned long

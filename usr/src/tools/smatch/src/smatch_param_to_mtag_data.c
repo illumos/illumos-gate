@@ -76,18 +76,6 @@ struct smatch_state *merge_tag_info(struct smatch_state *s1, struct smatch_state
 	return &merged;
 }
 
-static bool is_local_var(struct expression *expr)
-{
-	struct symbol *sym;
-
-	if (!expr || expr->type != EXPR_SYMBOL)
-		return false;
-	sym = expr->symbol;
-	if (!(sym->ctype.modifiers & MOD_TOPLEVEL))
-		return true;
-	return false;
-}
-
 static void match_assign(struct expression *expr)
 {
 	struct expression *left;
@@ -100,7 +88,7 @@ static void match_assign(struct expression *expr)
 	if (expr->op != '=')
 		return;
 	left = strip_expr(expr->left);
-	if (is_local_var(left))
+	if (is_local_variable(left))
 		return;
 	right_sym = expr_to_sym(expr->right);
 	if (!right_sym)

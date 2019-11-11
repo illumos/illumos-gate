@@ -18,6 +18,7 @@
 #include "smatch.h"
 
 enum data_type {
+	NO_DATA,
 	EXPR_PTR,
 	STMT_PTR,
 	SYMBOL_PTR,
@@ -26,15 +27,61 @@ enum data_type {
 
 struct hook_container {
 	int hook_type;
-	enum data_type data_type;
+	int owner;
 	void *fn;
 };
 ALLOCATOR(hook_container, "hook functions");
 DECLARE_PTR_LIST(hook_func_list, struct hook_container);
+
+typedef void (expr_func)(struct expression *expr);
+typedef void (stmt_func)(struct statement *stmt);
+typedef void (sym_func)(struct symbol *sym);
+typedef void (sym_list_func)(struct symbol_list *sym_list);
+
 static struct hook_func_list *merge_funcs;
 static struct hook_func_list *unmatched_state_funcs;
 static struct hook_func_list *hook_array[NUM_HOOKS] = {};
-void (**pre_merge_hooks)(struct sm_state *sm);
+static const enum data_type data_types[NUM_HOOKS] = {
+	[EXPR_HOOK] = EXPR_PTR,
+	[EXPR_HOOK_AFTER] = EXPR_PTR,
+	[STMT_HOOK] = STMT_PTR,
+	[STMT_HOOK_AFTER] = STMT_PTR,
+	[SYM_HOOK] = EXPR_PTR,
+	[STRING_HOOK] = EXPR_PTR,
+	[DECLARATION_HOOK] = SYMBOL_PTR,
+	[ASSIGNMENT_HOOK] = EXPR_PTR,
+	[ASSIGNMENT_HOOK_AFTER] = EXPR_PTR,
+	[RAW_ASSIGNMENT_HOOK] = EXPR_PTR,
+	[GLOBAL_ASSIGNMENT_HOOK] = EXPR_PTR,
+	[CALL_ASSIGNMENT_HOOK] = EXPR_PTR,
+	[MACRO_ASSIGNMENT_HOOK] = EXPR_PTR,
+	[BINOP_HOOK] = EXPR_PTR,
+	[OP_HOOK] = EXPR_PTR,
+	[LOGIC_HOOK] = EXPR_PTR,
+	[PRELOOP_HOOK] = STMT_PTR,
+	[CONDITION_HOOK] = EXPR_PTR,
+	[SELECT_HOOK] = EXPR_PTR,
+	[WHOLE_CONDITION_HOOK] = EXPR_PTR,
+	[FUNCTION_CALL_HOOK] = EXPR_PTR,
+	[CALL_HOOK_AFTER_INLINE] = EXPR_PTR,
+	[FUNCTION_CALL_HOOK_AFTER_DB] = EXPR_PTR,
+	[DEREF_HOOK] = EXPR_PTR,
+	[CASE_HOOK] = NO_DATA,
+	[ASM_HOOK] = STMT_PTR,
+	[CAST_HOOK] = EXPR_PTR,
+	[SIZEOF_HOOK] = EXPR_PTR,
+	[BASE_HOOK] = SYMBOL_PTR,
+	[FUNC_DEF_HOOK] = SYMBOL_PTR,
+	[AFTER_DEF_HOOK] = SYMBOL_PTR,
+	[END_FUNC_HOOK] = SYMBOL_PTR,
+	[AFTER_FUNC_HOOK] = SYMBOL_PTR,
+	[RETURN_HOOK] = EXPR_PTR,
+	[INLINE_FN_START] = EXPR_PTR,
+	[INLINE_FN_END] = EXPR_PTR,
+	[END_FILE_HOOK] = SYM_LIST_PTR,
+};
+
+void (**pre_merge_hooks)(struct sm_state *cur, struct sm_state *other);
 
 struct scope_container {
 	void *fn;
@@ -51,123 +98,14 @@ void add_hook(void *func, enum hook_type type)
 
 	container->hook_type = type;
 	container->fn = func;
-	switch (type) {
-	case EXPR_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case STMT_HOOK:
-		container->data_type = STMT_PTR;
-		break;
-	case STMT_HOOK_AFTER:
-		container->data_type = STMT_PTR;
-		break;
-	case SYM_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case STRING_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case DECLARATION_HOOK:
-		container->data_type = SYMBOL_PTR;
-		break;
-	case ASSIGNMENT_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case ASSIGNMENT_HOOK_AFTER:
-		container->data_type = EXPR_PTR;
-		break;
-	case RAW_ASSIGNMENT_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case GLOBAL_ASSIGNMENT_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case CALL_ASSIGNMENT_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case MACRO_ASSIGNMENT_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case BINOP_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case OP_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case LOGIC_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case PRELOOP_HOOK:
-		container->data_type = STMT_PTR;
-		break;
-	case CONDITION_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case SELECT_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case WHOLE_CONDITION_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case FUNCTION_CALL_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case CALL_HOOK_AFTER_INLINE:
-		container->data_type = EXPR_PTR;
-		break;
-	case FUNCTION_CALL_HOOK_AFTER_DB:
-		container->data_type = EXPR_PTR;
-		break;
-	case DEREF_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case CASE_HOOK:
-		/* nothing needed */
-		break;
-	case ASM_HOOK:
-		container->data_type = STMT_PTR;
-		break;
-	case CAST_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case SIZEOF_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case BASE_HOOK:
-		container->data_type = SYMBOL_PTR;
-		break;
-	case FUNC_DEF_HOOK:
-		container->data_type = SYMBOL_PTR;
-		break;
-	case AFTER_DEF_HOOK:
-		container->data_type = SYMBOL_PTR;
-		break;
-	case END_FUNC_HOOK:
-		container->data_type = SYMBOL_PTR;
-		break;
-	case AFTER_FUNC_HOOK:
-		container->data_type = SYMBOL_PTR;
-		break;
-	case RETURN_HOOK:
-		container->data_type = EXPR_PTR;
-		break;
-	case INLINE_FN_START:
-		container->data_type = EXPR_PTR;
-		break;
-	case INLINE_FN_END:
-		container->data_type = EXPR_PTR;
-		break;
-	case END_FILE_HOOK:
-		container->data_type = SYM_LIST_PTR;
-		break;
-	}
+
 	add_ptr_list(&hook_array[type], container);
 }
 
 void add_merge_hook(int client_id, merge_func_t *func)
 {
 	struct hook_container *container = __alloc_hook_container(0);
-	container->data_type = client_id;
+	container->owner = client_id;
 	container->fn = func;
 	add_ptr_list(&merge_funcs, container);
 }
@@ -175,53 +113,42 @@ void add_merge_hook(int client_id, merge_func_t *func)
 void add_unmatched_state_hook(int client_id, unmatched_func_t *func)
 {
 	struct hook_container *container = __alloc_hook_container(0);
-	container->data_type = client_id;
+	container->owner = client_id;
 	container->fn = func;
 	add_ptr_list(&unmatched_state_funcs, container);
 }
 
-void add_pre_merge_hook(int client_id, void (*hook)(struct sm_state *sm))
+void add_pre_merge_hook(int client_id, void (*hook)(struct sm_state *cur, struct sm_state *other))
 {
 	pre_merge_hooks[client_id] = hook;
 }
 
-static void pass_to_client(void *fn)
-{
-	typedef void (expr_func)();
-	((expr_func *) fn)();
-}
-
 static void pass_expr_to_client(void *fn, void *data)
 {
-	typedef void (expr_func)(struct expression *expr);
-	((expr_func *) fn)((struct expression *) data);
+	((expr_func *)fn)((struct expression *)data);
 }
 
 static void pass_stmt_to_client(void *fn, void *data)
 {
-	typedef void (stmt_func)(struct statement *stmt);
-	((stmt_func *) fn)((struct statement *) data);
+	((stmt_func *)fn)((struct statement *)data);
 }
 
 static void pass_sym_to_client(void *fn, void *data)
 {
-	typedef void (sym_func)(struct symbol *sym);
-	((sym_func *) fn)((struct symbol *) data);
+	((sym_func *)fn)((struct symbol *)data);
 }
 
 static void pass_sym_list_to_client(void *fn, void *data)
 {
-	typedef void (sym_func)(struct symbol_list *sym_list);
-	((sym_func *) fn)((struct symbol_list *) data);
+	((sym_list_func *)fn)((struct symbol_list *)data);
 }
 
 void __pass_to_client(void *data, enum hook_type type)
 {
 	struct hook_container *container;
 
-
 	FOR_EACH_PTR(hook_array[type], container) {
-		switch (container->data_type) {
+		switch (data_types[type]) {
 		case EXPR_PTR:
 			pass_expr_to_client(container->fn, data);
 			break;
@@ -238,15 +165,6 @@ void __pass_to_client(void *data, enum hook_type type)
 	} END_FOR_EACH_PTR(container);
 }
 
-void __pass_to_client_no_data(enum hook_type type)
-{
-	struct hook_container *container;
-
-	FOR_EACH_PTR(hook_array[type], container) {
-		pass_to_client(container->fn);
-	} END_FOR_EACH_PTR(container);
-}
-
 void __pass_case_to_client(struct expression *switch_expr,
 			   struct range_list *rl)
 {
@@ -255,7 +173,7 @@ void __pass_case_to_client(struct expression *switch_expr,
 	struct hook_container *container;
 
 	FOR_EACH_PTR(hook_array[CASE_HOOK], container) {
-		((case_func *) container->fn)(switch_expr, rl);
+		((case_func *)container->fn)(switch_expr, rl);
 	} END_FOR_EACH_PTR(container);
 }
 
@@ -264,7 +182,7 @@ int __has_merge_function(int client_id)
 	struct hook_container *tmp;
 
 	FOR_EACH_PTR(merge_funcs, tmp) {
-		if (tmp->data_type == client_id)
+		if (tmp->owner == client_id)
 			return 1;
 	} END_FOR_EACH_PTR(tmp);
 	return 0;
@@ -285,8 +203,8 @@ struct smatch_state *__client_merge_function(int owner,
 	}
 
 	FOR_EACH_PTR(merge_funcs, tmp) {
-		if (tmp->data_type == owner)
-			return ((merge_func_t *) tmp->fn)(s1, s2);
+		if (tmp->owner == owner)
+			return ((merge_func_t *)tmp->fn)(s1, s2);
 	} END_FOR_EACH_PTR(tmp);
 	return &undefined;
 }
@@ -296,19 +214,19 @@ struct smatch_state *__client_unmatched_state_function(struct sm_state *sm)
 	struct hook_container *tmp;
 
 	FOR_EACH_PTR(unmatched_state_funcs, tmp) {
-		if (tmp->data_type == sm->owner)
-			return ((unmatched_func_t *) tmp->fn)(sm);
+		if (tmp->owner == sm->owner)
+			return ((unmatched_func_t *)tmp->fn)(sm);
 	} END_FOR_EACH_PTR(tmp);
 	return &undefined;
 }
 
-void call_pre_merge_hook(struct sm_state *sm)
+void call_pre_merge_hook(struct sm_state *cur, struct sm_state *other)
 {
-	if (sm->owner >= num_checks)
+	if (cur->owner >= num_checks)
 		return;
 
-	if (pre_merge_hooks[sm->owner])
-		pre_merge_hooks[sm->owner](sm);
+	if (pre_merge_hooks[cur->owner])
+		pre_merge_hooks[cur->owner](cur, other);
 }
 
 static struct scope_hook_list *pop_scope_hook_list(struct scope_hook_stack **stack)
@@ -355,7 +273,7 @@ void __call_scope_hooks(void)
 
 	hook_list = pop_scope_hook_list(&scope_hooks);
 	FOR_EACH_PTR(hook_list, tmp) {
-		((scope_hook *) tmp->fn)(tmp->data);
+		((scope_hook *)tmp->fn)(tmp->data);
 		__free_scope_container(tmp);
 	} END_FOR_EACH_PTR(tmp);
 }

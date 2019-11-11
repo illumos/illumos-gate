@@ -88,10 +88,10 @@ int main(int argc, char **argv)
 
 	sparse_initialize(argc, argv, &filelist);
 
-	FOR_EACH_PTR_NOTAG(filelist, file) {
+	FOR_EACH_PTR(filelist, file) {
 		dotc_stream = input_stream_nr;
 		dissect(__sparse(file), &reporter);
-	} END_FOR_EACH_PTR_NOTAG(file);
+	} END_FOR_EACH_PTR(file);
 
 	return 0;
 }

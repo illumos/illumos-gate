@@ -39,7 +39,7 @@ static void s(void) {
 }
 
 /*
- * check-name: static storage object initializer constness verification.
+ * check-name: constexprness static storage object initializer
  * check-command: sparse -Wconstexpr-not-const $file
  *
  * check-error-start

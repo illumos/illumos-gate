@@ -13,7 +13,7 @@ static int o[] = {
 };
 
 /*
- * check-name: __builtin_offsetof() constness verification.
+ * check-name: constexprness __builtin_offsetof()
  *
  * check-error-start
 constexpr-offsetof.c:12:39: error: bad constant expression

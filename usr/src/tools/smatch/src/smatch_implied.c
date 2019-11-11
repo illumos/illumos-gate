@@ -58,7 +58,6 @@
  * a pool:  a pool is an slist that has been merged with another slist.
  */
 
-#include <sys/time.h>
 #include <time.h>
 #include "smatch.h"
 #include "smatch_slist.h"
@@ -70,6 +69,11 @@ bool implications_off;
 
 #define implied_debug 0
 #define DIMPLIED(msg...) do { if (implied_debug) printf(msg); } while (0)
+
+bool debug_implied(void)
+{
+	return implied_debug;
+}
 
 /*
  * tmp_range_list():
@@ -298,13 +302,14 @@ static void __separate_pools(struct sm_state *sm, int comparison, struct range_l
 {
 	int free_checked = 0;
 	struct state_list *checked_states = NULL;
-	struct timeval now;
+	struct timeval now, diff;
 
 	if (!sm)
 		return;
 
 	gettimeofday(&now, NULL);
-	if (now.tv_usec - start_time->tv_usec > 1000000) {
+	timersub(&now, start_time, &diff);
+	if (diff.tv_sec >= 1) {
 		if (implied_debug) {
 			sm_msg("debug: %s: implications taking too long.  (%s %s %s)",
 			       __func__, sm->state->name, show_special(comparison), show_rl(rl));
@@ -451,14 +456,15 @@ struct sm_state *filter_pools(struct sm_state *sm,
 	struct sm_state *left;
 	struct sm_state *right;
 	int removed = 0;
-	struct timeval now;
+	struct timeval now, diff;
 
 	if (!sm)
 		return NULL;
 	if (*bail)
 		return NULL;
 	gettimeofday(&now, NULL);
-	if (now.tv_usec - start->tv_usec > 3000000) {
+	timersub(&now, start, &diff);
+	if (diff.tv_sec >= 3) {
 		DIMPLIED("%s: implications taking too long: %s\n", __func__, sm_state_info(sm));
 		*bail = 1;
 		return NULL;
@@ -599,14 +605,6 @@ static void separate_and_filter(struct sm_state *sm, int comparison, struct rang
 	*false_states = filter_stack(sm, pre_stree, true_stack, false_stack);
 	free_slist(&true_stack);
 	free_slist(&false_stack);
-	if (implied_debug) {
-		printf("These are the implied states for the true path: (%s (%s) %s %s)\n",
-		       sm->name, sm->state->name, show_special(comparison), show_rl(rl));
-		__print_stree(*true_states);
-		printf("These are the implied states for the false path: (%s (%s) %s %s)\n",
-		       sm->name, sm->state->name, show_special(comparison), show_rl(rl));
-		__print_stree(*false_states);
-	}
 
 	gettimeofday(&time_after, NULL);
 	sec = time_after.tv_sec - time_before.tv_sec;
@@ -797,6 +795,12 @@ static int handled_by_extra_states(struct expression *expr,
 				   struct stree **implied_true,
 				   struct stree **implied_false)
 {
+	sval_t sval;
+
+	/* If the expression is known then it has no implications.  */
+	if (get_implied_value(expr, &sval))
+		return true;
+
 	if (expr->type == EXPR_COMPARE)
 		return handle_comparison(expr, implied_true, implied_false);
 	else
@@ -882,6 +886,18 @@ static void save_implications_hook(struct expression *expr)
 static void set_implied_states(struct expression *expr)
 {
 	struct sm_state *sm;
+
+	if (implied_debug &&
+	    (expr || saved_implied_true || saved_implied_false)) {
+		char *name;
+
+		name = expr_to_str(expr);
+		printf("These are the implied states for the true path: (%s)\n", name);
+		__print_stree(saved_implied_true);
+		printf("These are the implied states for the false path: (%s)\n", name);
+		__print_stree(saved_implied_false);
+		free_string(name);
+	}
 
 	FOR_EACH_SM(saved_implied_true, sm) {
 		__set_true_false_sm(sm, NULL);

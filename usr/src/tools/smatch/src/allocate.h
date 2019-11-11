@@ -1,6 +1,8 @@
 #ifndef ALLOCATE_H
 #define ALLOCATE_H
 
+#include "compat.h"
+
 struct allocation_blob {
 	struct allocation_blob *next;
 	unsigned int left, offset;

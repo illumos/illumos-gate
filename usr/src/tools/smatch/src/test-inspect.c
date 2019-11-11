@@ -32,11 +32,11 @@ int main(int argc, char **argv)
 
 	gtk_init(&argc,&argv);
 	expand_symbols(sparse_initialize(argc, argv, &filelist));
-	FOR_EACH_PTR_NOTAG(filelist, file) {
+	FOR_EACH_PTR(filelist, file) {
 		struct symbol_list *syms = sparse(file);
 		expand_symbols(syms);
 		concat_symbol_list(syms, &view_syms);
-	} END_FOR_EACH_PTR_NOTAG(file);
+	} END_FOR_EACH_PTR(file);
 	treeview_main(view_syms);
 	return 0;
 }

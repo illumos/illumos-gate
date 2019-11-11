@@ -1,6 +1,7 @@
 static int foo(volatile int *a, int v)
 {
 	*a = v;
+	*a = 0;
 	return *a;
 }
 
@@ -8,14 +9,8 @@ static int foo(volatile int *a, int v)
  * check-name: memops-volatile
  * check-command: test-linearize $file
  *
- * check-output-start
-foo:
-.L0:
-	<entry-point>
-	store.32    %arg2 -> 0[%arg1]
-	load.32     %r5 <- 0[%arg1]
-	ret.32      %r5
-
-
- * check-output-end
+ * check-output-ignore
+ * check-output-contains: store\\..*%arg2 -> 0\\[%arg1]
+ * check-output-contains: store\\..*\\$0 -> 0\\[%arg1]
+ * check-output-contains: load\\..*%r.* <- 0\\[%arg1]
  */

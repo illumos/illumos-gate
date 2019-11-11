@@ -2,6 +2,9 @@
 
 set +e
 
+SPARSEOPTS=
+JIT_OPT=
+
 DIRNAME=`dirname $0`
 LLI=`"${LLVM_CONFIG:-llvm-config}" --bindir`/lli
 
@@ -10,4 +13,19 @@ if [ $# -eq 0 ]; then
   exit 1
 fi
 
-$DIRNAME/sparse-llvm $@ | $LLI
+while [ $# -gt 0 ]; do
+	case $1 in
+	--jit)
+		JIT_OPT=
+		;;
+	--no-jit)
+		JIT_OPT="-force-interpreter"
+		;;
+	*)
+		SPARSEOPTS="$SPARSEOPTS $1 "
+		;;
+	esac
+	shift
+done
+
+$DIRNAME/sparse-llvm ${SPARSEOPTS} | $LLI ${JIT_OPT}

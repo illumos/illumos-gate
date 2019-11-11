@@ -53,6 +53,9 @@ struct smatch_state *merge_estates(struct smatch_state *s1, struct smatch_state 
 	if (estate_capped(s1) && estate_capped(s2))
 		estate_set_capped(tmp);
 
+	if (estate_treat_untagged(s1) && estate_treat_untagged(s2))
+		estate_set_treat_untagged(tmp);
+
 	return tmp;
 }
 
@@ -116,7 +119,7 @@ void estate_clear_fuzzy_max(struct smatch_state *state)
 
 int estate_has_hard_max(struct smatch_state *state)
 {
-	if (!state)
+	if (!state || !estate_rl(state))
 		return 0;
 	return get_dinfo(state)->hard_max;
 }
@@ -152,6 +155,23 @@ bool estate_capped(struct smatch_state *state)
 void estate_set_capped(struct smatch_state *state)
 {
 	get_dinfo(state)->capped = true;
+}
+
+bool estate_treat_untagged(struct smatch_state *state)
+{
+	if (!state)
+		return false;
+
+	/* impossible states are capped */
+	if (!estate_rl(state))
+		return true;
+
+	return get_dinfo(state)->treat_untagged;
+}
+
+void estate_set_treat_untagged(struct smatch_state *state)
+{
+	get_dinfo(state)->treat_untagged = true;
 }
 
 sval_t estate_min(struct smatch_state *state)
@@ -204,6 +224,8 @@ int estates_equiv(struct smatch_state *one, struct smatch_state *two)
 		return 0;
 	if (estate_capped(one) != estate_capped(two))
 		return 0;
+	if (estate_treat_untagged(one) != estate_treat_untagged(two))
+		return 0;
 	if (strcmp(one->name, two->name) == 0)
 		return 1;
 	return 0;
@@ -234,6 +256,8 @@ int estate_get_single_value(struct smatch_state *state, sval_t *sval)
 {
 	sval_t min, max;
 
+	if (!estate_rl(state))
+		return 0;
 	min = rl_min(estate_rl(state));
 	max = rl_max(estate_rl(state));
 	if (sval_cmp(min, max) != 0)

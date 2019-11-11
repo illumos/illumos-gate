@@ -41,6 +41,8 @@ delete from caller_info where function = '__dev_queue_xmit' and type = 8017;
 delete from caller_info where function = '__netdev_start_xmit' and type = 8017;
 delete from caller_info where function = '(struct packet_type)->func' and type = 8017;
 delete from caller_info where function = '(struct bio)->bi_end_io' and type = 8017;
+delete from caller_info where type = 8017 and key = '*\$->bi_private';
+delete from caller_info where type = 8017 and key = '\$->bi_private';
 delete from caller_info where caller = 'NF_HOOK_COND' and type = 8017;
 delete from caller_info where caller = 'NF_HOOK' and type = 8017;
 /* comparison doesn't deal with chunks, I guess.  */
@@ -50,6 +52,7 @@ delete from caller_info where caller = 'snd_ctl_elem_read' and function = '(stru
 delete from caller_info where function = 'nf_tables_newexpr' and type = 8017 and key = '\$->family';
 delete from caller_info where caller = 'fb_set_var' and function = '(struct fb_ops)->fb_set_par' and type = 8017 and parameter = 0;
 delete from return_states where function = 'tty_lookup_driver' and parameter = 2 and type = 8017;
+delete from caller_info where function = 'iomap_apply' and type = 8017 and key = '*\$';
 
 insert into caller_info values ('userspace', '', 'compat_sys_ioctl', 0, 0, 8017, 0, '\$', '1');
 insert into caller_info values ('userspace', '', 'compat_sys_ioctl', 0, 0, 8017, 1, '\$', '1');
@@ -173,6 +176,9 @@ delete from return_states where file = 'drivers/rapidio/rio-access.c' and return
 
 /* Smatch sucks at loops */
 delete from return_states where function = 'ata_dev_next' and type = 103;
+
+/* The problem is that parsing big function pointers is hard. */
+delete from return_states where function = 'vfs_get_tree' and type = 1024;
 
 EOF
 

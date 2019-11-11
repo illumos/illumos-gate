@@ -41,11 +41,17 @@
 #include "symbol.h"
 #include "target.h"
 #include "expression.h"
+#include "evaluate.h"
 #include "expand.h"
 
 
 static int expand_expression(struct expression *);
 static int expand_statement(struct statement *);
+
+// If set, don't issue a warning on divide-by-0, invalid shift, ...
+// and don't mark the expression as erroneous but leave it as-is.
+// This allows testing some characteristics of the expression
+// without creating any side-effects (e.g.: is_zero_constant()).
 static int conservative;
 
 static int expand_symbol_expression(struct expression *expr)
@@ -157,11 +163,33 @@ Float:
 	expr->type = EXPR_FVALUE;
 }
 
-static int check_shift_count(struct expression *expr, struct symbol *ctype, unsigned int count)
+static void warn_shift_count(struct expression *expr, struct symbol *ctype, long long count)
 {
-	warning(expr->pos, "shift too big (%u) for type %s", count, show_typename(ctype));
-	count &= ctype->bit_size-1;
-	return count;
+	if (count < 0) {
+		if (!Wshift_count_negative)
+			return;
+		warning(expr->pos, "shift count is negative (%lld)", count);
+		return;
+	}
+	if (ctype->type == SYM_NODE)
+		ctype = ctype->ctype.base_type;
+
+	if (!Wshift_count_overflow)
+		return;
+	warning(expr->pos, "shift too big (%llu) for type %s", count, show_typename(ctype));
+}
+
+/* Return true if constant shift size is valid */
+static bool check_shift_count(struct expression *expr, struct expression *right)
+{
+	struct symbol *ctype = expr->ctype;
+	long long count = get_longlong(right);
+
+	if (count >= 0 && count < ctype->bit_size)
+		return true;
+	if (!conservative)
+		warn_shift_count(expr, ctype, count);
+	return false;
 }
 
 /*
@@ -182,12 +210,8 @@ static int simplify_int_binop(struct expression *expr, struct symbol *ctype)
 		return 0;
 	r = right->value;
 	if (expr->op == SPECIAL_LEFTSHIFT || expr->op == SPECIAL_RIGHTSHIFT) {
-		if (r >= ctype->bit_size) {
-			if (conservative)
-				return 0;
-			r = check_shift_count(expr, ctype, r);
-			right->value = r;
-		}
+		if (!check_shift_count(expr, right))
+			return 0;
 	}
 	if (left->type != EXPR_VALUE)
 		return 0;
@@ -478,7 +502,7 @@ static int expand_comma(struct expression *expr)
 	return cost;
 }
 
-#define MOD_IGN (MOD_VOLATILE | MOD_CONST)
+#define MOD_IGN (MOD_QUALIFIER)
 
 static int compare_types(int op, struct symbol *left, struct symbol *right)
 {
@@ -529,27 +553,27 @@ static int expand_compare(struct expression *expr)
 static int expand_conditional(struct expression *expr)
 {
 	struct expression *cond = expr->conditional;
-	struct expression *true = expr->cond_true;
-	struct expression *false = expr->cond_false;
+	struct expression *valt = expr->cond_true;
+	struct expression *valf = expr->cond_false;
 	int cost, cond_cost;
 
 	cond_cost = expand_expression(cond);
 	if (cond->type == EXPR_VALUE) {
 		unsigned flags = expr->flags;
 		if (!cond->value)
-			true = false;
-		if (!true)
-			true = cond;
-		cost = expand_expression(true);
-		*expr = *true;
+			valt = valf;
+		if (!valt)
+			valt = cond;
+		cost = expand_expression(valt);
+		*expr = *valt;
 		expr->flags = flags;
 		if (expr->type == EXPR_VALUE)
 			expr->taint |= cond->taint;
 		return cost;
 	}
 
-	cost = expand_expression(true);
-	cost += expand_expression(false);
+	cost = expand_expression(valt);
+	cost += expand_expression(valf);
 
 	if (cost < SELECT_COST) {
 		expr->type = EXPR_SELECT;
@@ -558,11 +582,30 @@ static int expand_conditional(struct expression *expr)
 
 	return cost + cond_cost + BRANCH_COST;
 }
-		
+
+static void check_assignment(struct expression *expr)
+{
+	struct expression *right;
+
+	switch (expr->op) {
+	case SPECIAL_SHL_ASSIGN:
+	case SPECIAL_SHR_ASSIGN:
+		right = expr->right;
+		if (right->type != EXPR_VALUE)
+			break;
+		check_shift_count(expr, right);
+		break;
+	}
+	return;
+}
+
 static int expand_assignment(struct expression *expr)
 {
 	expand_expression(expr->left);
 	expand_expression(expr->right);
+
+	if (!conservative)
+		check_assignment(expr);
 	return SIDE_EFFECTS;
 }
 
@@ -582,7 +625,7 @@ static struct expression *constant_symbol_value(struct symbol *sym, int offset)
 {
 	struct expression *value;
 
-	if (sym->ctype.modifiers & (MOD_ASSIGNED | MOD_ADDRESSABLE))
+	if (sym->ctype.modifiers & MOD_ACCESS)
 		return NULL;
 	value = sym->initializer;
 	if (!value)
@@ -644,6 +687,8 @@ static int expand_dereference(struct expression *expr)
 		if (value) {
 			/* FIXME! We should check that the size is right! */
 			if (value->type == EXPR_VALUE) {
+				if (is_bitfield_type(value->ctype))
+					return UNSAFE;
 				expr->type = EXPR_VALUE;
 				expr->value = value->value;
 				expr->taint = 0;
@@ -787,6 +832,8 @@ static int expand_symbol_call(struct expression *expr, int cost)
 {
 	struct expression *fn = expr->fn;
 	struct symbol *ctype = fn->ctype;
+
+	expand_expression(fn);
 
 	if (fn->type != EXPR_PREOP)
 		return SIDE_EFFECTS;
@@ -1048,6 +1095,9 @@ static int expand_expression(struct expression *expr)
 	case EXPR_OFFSETOF:
 		expression_error(expr, "internal front-end error: sizeof in expansion?");
 		return UNSAFE;
+	case EXPR_ASM_OPERAND:
+		expression_error(expr, "internal front-end error: ASM_OPERAND in expansion?");
+		return UNSAFE;
 	}
 	return SIDE_EFFECTS;
 }
@@ -1248,10 +1298,12 @@ static long long __get_expression_value(struct expression *expr, int strict)
 			expression_error(expr, "bad constant expression");
 		return 0;
 	}
+#if 0	// This complains about "1 ? 1 :__bits_per()" which the kernel use
 	if ((strict == 1) && bad_integer_constant_expression(expr)) {
 		expression_error(expr, "bad integer constant expression");
 		return 0;
 	}
+#endif
 
 	value = expr->value;
 	mask = 1ULL << (ctype->bit_size-1);

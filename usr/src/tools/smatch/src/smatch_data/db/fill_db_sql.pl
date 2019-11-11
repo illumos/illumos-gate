@@ -7,7 +7,7 @@ my $project = shift;
 my $warns = shift;
 my $db_file = shift;
 
-if (!defined($warns)) {
+if (!defined($db_file)) {
     print "usage:  $0 <-p=project> <smatch_warns.txt> <db_file>\n";
     exit(1);
 }

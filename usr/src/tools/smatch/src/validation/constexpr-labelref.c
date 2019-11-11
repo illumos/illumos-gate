@@ -6,7 +6,7 @@ label1:
 }
 
 /*
- * check-name: label reference constness verification.
+ * check-name: constexprness label reference
  * check-command: sparse -Wconstexpr-not-const $file
  *
  * check-error-start

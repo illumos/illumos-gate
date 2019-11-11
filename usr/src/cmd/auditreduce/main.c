@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2019 Joyent, Inc.
+ */
+
+/*
  * The Secure SunOS audit reduction tool - auditreduce.
  * Document SM0071 is the primary source of information on auditreduce.
  *
@@ -247,11 +251,13 @@ mfork(audit_pcb_t *pcb, int nsp, int lo, int hi)
 			 * Convert descriptors to streams.
 			 */
 			if ((pcbn->pcb_fpr = fdopen(fildes[0], "r")) == NULL) {
-	perror(gettext("auditreduce: couldn't get read stream for pipe"));
+				perror(gettext("auditreduce: couldn't get read "
+				    "stream for pipe"));
 				return (-1);
 			}
 			if ((pcbn->pcb_fpw = fdopen(fildes[1], "w")) == NULL) {
-	perror(gettext("auditreduce: couldn't get write stream for pipe"));
+				perror(gettext("auditreduce: couldn't get "
+				    "write stream for pipe"));
 				return (-1);
 			}
 			if ((procno = fork()) == -1) {
@@ -400,8 +406,10 @@ c_close(audit_pcb_t *pcb, int	i)
 	for (j = 0; j <= i; j++) {
 		pcbt = &pcb->pcb_below[j];
 		if (fclose(pcbt->pcb_fpr) == EOF) {
-			if (!f_quiet)
-		perror(gettext("auditreduce: initial close on pipe failed"));
+			if (!f_quiet) {
+				perror(gettext("auditreduce: initial close "
+				    "on pipe failed"));
+			}
 		}
 		/*
 		 * Free the buffer allocated to hold incoming records.
@@ -426,8 +434,10 @@ static void
 p_close(audit_pcb_t *pcbn)
 {
 	if (fclose(pcbn->pcb_fpw) == EOF) {
-		if (!f_quiet)
-		perror(gettext("auditreduce: close for write pipe failed"));
+		if (!f_quiet) {
+			perror(gettext("auditreduce: close for write "
+			    "pipe failed"));
+		}
 	}
 }
 

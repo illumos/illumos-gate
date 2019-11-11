@@ -19,20 +19,37 @@
 
 static int my_id;
 
-static void match_memset(const char *fn, struct expression *expr, void *data)
+static void check_size_not_zero(struct expression *expr)
 {
-	struct expression *arg_expr;
 	sval_t sval;
 
-	arg_expr = get_argument_from_call_expr(expr->args, 2);
-
-	if (arg_expr->type != EXPR_VALUE)
+	if (expr->type != EXPR_VALUE)
 		return;
-	if (!get_value(arg_expr, &sval))
+	if (!get_value(expr, &sval))
 		return;
 	if (sval.value != 0)
 		return;
 	sm_error("calling memset(x, y, 0);");
+}
+
+static void check_size_not_ARRAY_SIZE(struct expression *expr)
+{
+	char *name;
+
+	name = get_macro_name(expr->pos);
+	if (name && strcmp(name, "ARRAY_SIZE") == 0)
+		sm_warning("calling memset(x, y, ARRAY_SIZE());");
+}
+
+static void match_memset(const char *fn, struct expression *expr, void *data)
+{
+	struct expression *arg_expr;
+
+	arg_expr = get_argument_from_call_expr(expr->args, 2);
+	if (!arg_expr)
+		return;
+	check_size_not_zero(arg_expr);
+	check_size_not_ARRAY_SIZE(arg_expr);
 }
 
 void check_memset(int id)

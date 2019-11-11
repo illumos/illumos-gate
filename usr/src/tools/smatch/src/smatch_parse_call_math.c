@@ -588,6 +588,9 @@ static char *get_allocation_recipe_from_call(struct expression *expr)
 		BUF_SIZE, sql_filter);
 	if (!buf_size_recipe || strcmp(buf_size_recipe, "invalid") == 0)
 		return NULL;
+	/* Known sizes should be handled in smatch_buf_size.c */
+	if (!strchr(buf_size_recipe, '$'))
+		return NULL;
 	return swap_format(expr, buf_size_recipe);
 }
 
@@ -601,26 +604,10 @@ static void match_call_assignment(struct expression *expr)
 	set_state_expr(my_id, expr->left, alloc_state_sname(sname));
 }
 
-static void match_returns_call(int return_id, char *return_ranges, struct expression *call)
-{
-	char *sname;
-
-	sname = get_allocation_recipe_from_call(call);
-	if (option_debug)
-		sm_msg("sname = %s", sname);
-	if (!sname)
-		return;
-
-	sql_insert_return_states(return_id, return_ranges, BUF_SIZE, -1, "",
-			sname);
-}
-
-static void print_returned_allocations(int return_id, char *return_ranges, struct expression *expr)
+const char *get_allocation_math(struct expression *expr)
 {
 	struct expression *tmp;
 	struct smatch_state *state;
-	struct symbol *sym;
-	char *name;
 	int cnt = 0;
 
 	expr = strip_expr(expr);
@@ -630,25 +617,16 @@ static void print_returned_allocations(int return_id, char *return_ranges, struc
 		expr = strip_expr(tmp);
 	}
 	if (!expr)
-		return;
+		return NULL;
 
-	if (expr->type == EXPR_CALL) {
-		match_returns_call(return_id, return_ranges, expr);
-		return;
-	}
+	if (expr->type == EXPR_CALL)
+		return get_allocation_recipe_from_call(expr);
 
-	name = expr_to_var_sym(expr, &sym);
-	if (!name || !sym)
-		goto free;
-
-	state = get_state(my_id, name, sym);
+	state = get_state_expr(my_id, expr);
 	if (!state || !state->data)
-		goto free;
+		return NULL;
 
-	sql_insert_return_states(return_id, return_ranges, BUF_SIZE, -1, "",
-			state->name);
-free:
-	free_string(name);
+	return state->name;
 }
 
 void register_parse_call_math(int id)
@@ -663,6 +641,5 @@ void register_parse_call_math(int id)
 		add_function_assign_hook(alloc_functions[i].func, &match_alloc,
 				         INT_PTR(alloc_functions[i].param));
 	add_hook(&match_call_assignment, CALL_ASSIGNMENT_HOOK);
-	add_split_return_callback(print_returned_allocations);
 }
 

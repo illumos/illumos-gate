@@ -20,6 +20,12 @@ off those warnings, pass the negation of the associated warning option,
 .
 .SH WARNING OPTIONS
 .TP
+.B \-fmax-warnings=COUNT
+Set the maximum number of displayed warnings to COUNT, which should be
+a numerical value or 'unlimited'.
+The default limit is 100.
+.
+.TP
 .B \-Wsparse\-all
 Turn on all sparse warnings, except for those explicitly disabled via
 \fB\-Wno\-something\fR.
@@ -31,12 +37,20 @@ Turn all sparse warnings into errors.
 Warn about code which mixes pointers to different address spaces.
 
 Sparse allows an extended attribute
-.BI __attribute__((address_space( num )))
-on pointers, which designates a pointer target in address space \fInum\fR (a
-constant integer).  With \fB\-Waddress\-space\fR, Sparse treats pointers with
-identical target types but different address spaces as distinct types.  To
-override this warning, such as for functions which convert pointers between
-address spaces, use a type that includes \fB__attribute__((force))\fR.
+.BI __attribute__((address_space( id )))
+on pointers, which designates a pointer target in address space \fIid\fR (an
+identifier or a constant integer).
+With \fB\-Waddress\-space\fR, Sparse treats pointers with
+identical target types but different address spaces as distinct types and
+will warn accordingly.
+
+Sparse will also warn on casts which remove the address space (casts to an
+integer type or to a plain pointer type). An exception to this is when the
+destination type is \fBuintptr_t\fR (or \fBunsigned long\fR) since such casts
+are often used to "get a pointer value representation in an integer type" and
+such values are independent of the address space.
+
+To override these warnings, use a type that includes \fB__attribute__((force))\fR.
 
 Sparse issues these warnings by default.  To turn them off, use
 \fB\-Wno\-address\-space\fR.
@@ -71,10 +85,27 @@ Sparse issues these warnings by default.  To turn them off, use
 \fB\-Wno\-bitwise\fR.
 .
 .TP
+.B \-Wbitwise\-pointer
+Same as \fB\-Wbitwise\fR but for casts to or from pointers to bitwise types.
+
+Sparse does not issue these warnings by default.
+.
+.TP
+.B \-Wcast\-from\-as
+Warn about casts which remove an address space from a pointer type.
+
+This is similar to \fB\-Waddress\-space\fR but will also warn
+on casts to \fBunsigned long\fR.
+
+Sparse does not issues these warnings by default.
+.
+.TP
 .B \-Wcast\-to\-as
 Warn about casts which add an address space to a pointer type.
 
 A cast that includes \fB__attribute__((force))\fR will suppress this warning.
+No warning is generated if the original type is \fBuintptr_t\fR
+(or \fBunsigned long\fR).
 
 Sparse does not issue these warnings by default.
 .
@@ -213,13 +244,6 @@ Sparse issues these warnings by default.  To turn them off, use
 \fB\-Wno\-enum\-mismatch\fR.
 .
 .TP
-.B \-Wempty\-character\-constant
-Warn about a constant such as ''.
-
-Sparse issues these warnings by default.  To turn them off, use
-\fB\-Wno\-empty\-character\-constant\fR.
-.
-.TP
 .B \-Wexternal\-function\-has\-definition
 Warn about function definitions that are declared with external linkage.
 
@@ -254,13 +278,6 @@ Sparse issues these warnings by default. To turn them off, use
 
 The limit can be changed with \fB\-fmemcpy\-max\-count=COUNT\fR,
 the default being \fB100000\fR.
-.
-.TP
-.B \-Wnon\-ansi\-function\-declaration
-Warn about non-ANSI function declarations.
-
-Sparse issues these warnings by default.  To turn them off, use
-\fB\-Wno\-non\-ansi\-function\-declaration\fR.
 .
 .TP
 .B \-Wnon\-pointer\-null
@@ -366,10 +383,22 @@ Such declarations can lead to error-prone code.
 Sparse does not issue these warnings by default.
 .
 .TP
+.B \-Wshift-count-negative
+Warn if a shift count is negative.
+
+Sparse issues these warnings by default.
+.
+.TP
+.B \-Wshift-count-overflow
+Warn if a shift count is bigger than the operand's width.
+
+Sparse issues these warnings by default.
+.
+.TP
 .B \-Wsizeof-bool
 Warn when checking the sizeof a _Bool.
 
-C99 does not specify the sizeof a _Bool.  gcc uses 1.
+C99 does not specify the size of a _Bool. GCC, by default, uses \fI1\fR.
 
 Sparse does not issue these warnings by default.
 .
@@ -412,19 +441,20 @@ normalized GNU triplet. (e.g. i386-linux-gnu).
 .
 .SH DEBUG OPTIONS
 .TP
-.B \-fdump-linearize[=only]
-Dump the IR code of a function directly after its linearization,
-before any simplifications are made. If the argument \fB=only\fR is
-also given no further processing is done on the function.
-.
 .B \-fmem-report
 Report some statistics about memory allocation used by the tool.
 .
 .SH OTHER OPTIONS
 .TP
+.B \-fdiagnostic-prefix[=PREFIX]
+Prefix all diagnostics by the given PREFIX, followed by ": ".
+If no one is given "sparse" is used.
+The default is to not use a prefix at all.
+.
+.TP
 .B \-fmemcpy-max-count=COUNT
 Set the limit for the warnings given by \fB-Wmemcpy-max-count\fR.
-A COUNT of 0, useless in itself, will effectively disable the warning.
+A COUNT of 'unlimited' or '0' will effectively disable the warning.
 The default limit is 100000.
 .
 .TP
@@ -432,6 +462,11 @@ The default limit is 100000.
 Set the distance between tab stops.  This helps sparse report correct
 column numbers in warnings or errors.  If the value is less than 1 or
 greater than 100, the option is ignored.  The default is 8.
+.
+.TP
+.B \-f[no-]unsigned-char, \-f[no-]signed-char
+Let plain 'char' be unsigned or signed.
+By default chars are signed.
 .
 .SH SEE ALSO
 .BR cgcc (1)
@@ -442,5 +477,18 @@ http://www.kernel.org/pub/software/devel/sparse/
 .SH MAILING LIST
 linux-sparse@vger.kernel.org
 .
-.SH MAINTAINER
-Christopher Li <sparse@chrisli.org>
+.SH CONTRIBUTINGS AND REPORTING BUGS
+Submission of patches and reporting of bugs, as well as discussions
+related to Sparse, should be done via the mailing list (linux-sparse@vger.kernel.org)
+where the development and maintenance is primarily done.
+You do not have to be subscribed to the list to send a message there.
+
+Bugs can also be reported and tracked via the Linux kernel's bugzilla:
+http://bugzilla.kernel.org/enter_bug.cgi?component=Sparse&product=Tools .
+.
+.SH AUTHORS
+Sparse was started by Linus Torvalds.
+The complete list of contributors can be find at
+https://www.openhub.net/p/sparse/contributors .
+
+Luc Van Oostenryck is Sparse's current maintainer.

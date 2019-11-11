@@ -19,7 +19,7 @@ static int a[] = {
 };
 
 /*
- * check-name: Expression constness propagation in binops and alike
+ * check-name: constexprness in binops and alike
  *
  * check-error-start
 constexpr-binop.c:3:12: error: bad constant expression

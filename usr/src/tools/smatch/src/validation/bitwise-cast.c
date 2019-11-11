@@ -29,6 +29,12 @@ static __be32 quux(void)
 	return (__be32)1729;
 }
 
+/* Explicit case of nonzero forced, legal */
+static __be32 quuy(void)
+{
+	return (__attribute__((force)) __be32) 1730;
+}
+
 /*
  * check-name: conversions to bitwise types
  * check-command: sparse -Wbitwise $file

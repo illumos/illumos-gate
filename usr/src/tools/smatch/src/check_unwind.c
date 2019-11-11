@@ -125,7 +125,7 @@ static int func_returns_int(void)
 	if (!type || type->type != SYM_FN)
 		return 0;
 	type = get_base_type(type);
-	if (type->ctype.base_type == &int_type) {
+	if (type && type->ctype.base_type == &int_type) {
 		return 1;
 	}
 	return 0;

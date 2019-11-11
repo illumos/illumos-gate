@@ -64,6 +64,7 @@ enum expression_type {
 	EXPR_FVALUE,
 	EXPR_SLICE,
 	EXPR_OFFSETOF,
+	EXPR_ASM_OPERAND,
 };
 
 
@@ -194,7 +195,8 @@ struct expression {
 			struct expression *base;
 			unsigned r_bitpos, r_nrbits;
 		};
-		// EXPR_CAST and EXPR_SIZEOF
+		// EXPR_CAST, EXPR_FORCE_CAST, EXPR_IMPLIED_CAST,
+		// EXPR_SIZEOF, EXPR_ALIGNOF and EXPR_PTRSIZEOF
 		struct /* cast_arg */ {
 			struct symbol *cast_type;
 			struct expression *cast_expression;
@@ -241,12 +243,32 @@ struct expression {
 				struct expression *index;
 			};
 		};
+		// EXPR_ASM_OPERAND
+		struct {
+			struct ident *name;
+			struct expression *constraint;
+			struct expression *expr;
+		};
 	};
 };
 
-/* Constant expression values */
-int is_zero_constant(struct expression *);
+///
+// Constant expression values
+// --------------------------
+
+///
+// test if an expression evaluates to the constant ``0``.
+// @return: ``1`` if @expr evaluate to ``0``,
+//	``0`` otherwise.
+int is_zero_constant(struct expression *expr);
+
+///
+// test the compile time truth value of an expression
+// @return:
+//	* ``-1`` if @expr is not constant,
+//	* ``0`` or ``1`` depending on the truth value of @expr.
 int expr_truth_value(struct expression *expr);
+
 long long get_expression_value(struct expression *);
 long long const_expression_value(struct expression *);
 long long get_expression_value_silent(struct expression *expr);

@@ -103,6 +103,8 @@ void *allocate(struct allocator_struct *desc, unsigned int size)
 		struct allocation_blob *newblob = blob_alloc(chunking);
 		if (!newblob)
 			die("out of memory");
+		if (size > chunking)
+			die("alloc too big");
 		desc->total_bytes += chunking;
 		newblob->next = blob;
 		blob = newblob;

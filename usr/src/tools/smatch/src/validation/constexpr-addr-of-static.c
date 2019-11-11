@@ -25,7 +25,7 @@ static void m(void) {
 }
 
 /*
- * check-name: address of static object constness verification.
+ * check-name: constexpr static object address
  * check-command: sparse -Wconstexpr-not-const $file
  *
  * check-error-start

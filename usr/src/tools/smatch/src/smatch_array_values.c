@@ -188,10 +188,37 @@ static void match_assign(struct expression *expr)
 	update_cache(name, is_file_local(array), rl);
 }
 
+static void mark_strings_unknown(const char *fn, struct expression *expr, void *_arg)
+{
+	struct expression *dest;
+	struct symbol *type;
+	int arg = PTR_INT(_arg);
+	char *name;
+
+	dest = get_argument_from_call_expr(expr->args, arg);
+	if (!dest)
+		return;
+	name = get_array_name(dest);
+	if (!name)
+		return;
+	type = get_type(dest);
+	if (type_is_ptr(type))
+		type = get_real_base_type(type);
+	update_cache(name, is_file_local(dest), alloc_whole_rl(type));
+}
+
 void register_array_values(int id)
 {
 	my_id = id;
 
 	add_hook(&match_assign, ASSIGNMENT_HOOK);
 	add_hook(&match_assign, GLOBAL_ASSIGNMENT_HOOK);
+
+	add_function_hook("sprintf", &mark_strings_unknown, INT_PTR(0));
+	add_function_hook("snprintf", &mark_strings_unknown, INT_PTR(0));
+
+	add_function_hook("strcpy", &mark_strings_unknown, INT_PTR(0));
+	add_function_hook("strncpy", &mark_strings_unknown, INT_PTR(0));
+	add_function_hook("strlcpy", &mark_strings_unknown, INT_PTR(0));
+	add_function_hook("strscpy", &mark_strings_unknown, INT_PTR(0));
 }

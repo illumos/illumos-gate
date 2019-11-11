@@ -51,7 +51,7 @@ struct expression *get_assigned_expr_name_sym(const char *name, struct symbol *s
 {
 	struct smatch_state *state;
 
-	state = get_state(my_id, name, sym);
+	state = __get_state(my_id, name, sym);
 	if (!state)
 		return NULL;
 	return (struct expression *)state->data;

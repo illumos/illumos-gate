@@ -126,7 +126,7 @@ static void before_loop(struct statement *stmt)
 
 	if (!stmt || stmt->type != STMT_ITERATOR)
 		return;
-	if (ptr_list_empty(state_at_start))
+	if (ptr_list_empty((struct ptr_list *)state_at_start))
 		returned = 0;
 	state = get_state(my_id, "depends on", NULL);
 	push_state_at_start(state);

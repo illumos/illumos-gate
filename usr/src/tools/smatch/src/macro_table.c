@@ -31,14 +31,14 @@
 
 static struct hashtable *macro_table;
 
-static DEFINE_HASHTABLE_INSERT(do_insert_macro, struct position, char);
-static DEFINE_HASHTABLE_SEARCH(do_search_macro, struct position, char);
+static DEFINE_HASHTABLE_INSERT(do_insert_macro, struct position, struct string_list);
+static DEFINE_HASHTABLE_SEARCH(do_search_macro, struct position, struct string_list);
 
 static inline unsigned int position_hash(void *_pos)
 {
 	struct position *pos = _pos;
 
-	return pos->line | (pos->pos << 22) | (pos->stream << 18); 
+	return pos->line | (pos->pos << 22) | (pos->stream << 18);
 }
 
 static inline int equalkeys(void *_pos1, void *_pos2)
@@ -50,18 +50,47 @@ static inline int equalkeys(void *_pos1, void *_pos2)
 		pos1->stream == pos2->stream;
 }
 
+static void insert_macro_string(struct string_list **str_list, char *new)
+{
+	add_ptr_list(str_list, new);
+}
+
 void store_macro_pos(struct token *token)
 {
+	struct string_list *list;
+
 	if (!macro_table)
 		macro_table = create_hashtable(5000, position_hash, equalkeys);
 
-	if (get_macro_name(token->pos))
-		return;
+	list = do_search_macro(macro_table, &token->pos);
+	insert_macro_string(&list, token->ident->name);
 
-	do_insert_macro(macro_table, &token->pos, token->ident->name);
+	do_insert_macro(macro_table, &token->pos, list);
 }
 
 char *get_macro_name(struct position pos)
 {
+	struct string_list *list;
+
+	if (!macro_table)
+		return NULL;
+	list = do_search_macro(macro_table, &pos);
+	return first_ptr_list((struct ptr_list *)list);
+}
+
+char *get_inner_macro(struct position pos)
+{
+	struct string_list *list;
+
+	if (!macro_table)
+		return NULL;
+	list = do_search_macro(macro_table, &pos);
+	return last_ptr_list((struct ptr_list *)list);
+}
+
+struct string_list *get_all_macros(struct position pos)
+{
+	if (!macro_table)
+		return NULL;
 	return do_search_macro(macro_table, &pos);
 }

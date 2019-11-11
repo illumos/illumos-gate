@@ -103,9 +103,8 @@ $(OBJS_DIR)/zfs_vnops.o := SMOFF += signed
 # needs work
 $(OBJS_DIR)/zvol.o := SMOFF += deref_check,signed
 
-# false positives
+# false positive
 $(OBJS_DIR)/zfs_ctldir.o := SMOFF += strcpy_overflow
-$(OBJS_DIR)/zfs_ioctl.o := SMOFF += strcpy_overflow
 
 #
 #	Default build targets.

@@ -21,7 +21,7 @@ static int a[] = {
 };
 
 /*
- * check-name: Expression constness propagation in conditional expressions
+ * check-name: constexprness in conditionals
  *
  * check-error-start
 constexpr-conditional.c:12:13: error: bad constant expression

@@ -58,6 +58,8 @@ static declarator_t
 	typedef_specifier, inline_specifier, auto_specifier,
 	register_specifier, static_specifier, extern_specifier,
 	thread_specifier, const_qualifier, volatile_qualifier;
+static declarator_t restrict_qualifier;
+static declarator_t atomic_qualifier;
 
 static struct token *parse_if_statement(struct token *token, struct statement *stmt);
 static struct token *parse_return_statement(struct token *token, struct statement *stmt);
@@ -80,6 +82,7 @@ typedef struct token *attr_t(struct token *, struct symbol *,
 
 static attr_t
 	attribute_packed, attribute_aligned, attribute_modifier,
+	attribute_ext_visible,
 	attribute_bitwise,
 	attribute_address_space, attribute_context,
 	attribute_designated_init,
@@ -89,7 +92,8 @@ static attr_t
 typedef struct symbol *to_mode_t(struct symbol *);
 
 static to_mode_t
-	to_QI_mode, to_HI_mode, to_SI_mode, to_DI_mode, to_TI_mode, to_word_mode;
+	to_QI_mode, to_HI_mode, to_SI_mode, to_DI_mode, to_TI_mode;
+static to_mode_t to_pointer_mode, to_word_mode;
 
 enum {
 	Set_T = 1,
@@ -115,6 +119,23 @@ enum {
 	SNone = 0, STypedef, SAuto, SRegister, SExtern, SStatic, SForced, SMax,
 };
 
+static void asm_modifier(struct token *token, unsigned long *mods, unsigned long mod)
+{
+	if (*mods & mod)
+		warning(token->pos, "duplicated asm modifier");
+	*mods |= mod;
+}
+
+static void asm_modifier_volatile(struct token *token, unsigned long *mods)
+{
+	asm_modifier(token, mods, MOD_VOLATILE);
+}
+
+static void asm_modifier_inline(struct token *token, unsigned long *mods)
+{
+	asm_modifier(token, mods, MOD_INLINE);
+}
+
 static struct symbol_op typedef_op = {
 	.type = KW_MODIFIER,
 	.declarator = typedef_specifier,
@@ -123,6 +144,7 @@ static struct symbol_op typedef_op = {
 static struct symbol_op inline_op = {
 	.type = KW_MODIFIER,
 	.declarator = inline_specifier,
+	.asm_modifier = asm_modifier_inline,
 };
 
 static declarator_t noreturn_specifier;
@@ -170,10 +192,17 @@ static struct symbol_op const_op = {
 static struct symbol_op volatile_op = {
 	.type = KW_QUALIFIER,
 	.declarator = volatile_qualifier,
+	.asm_modifier = asm_modifier_volatile,
 };
 
 static struct symbol_op restrict_op = {
 	.type = KW_QUALIFIER,
+	.declarator = restrict_qualifier,
+};
+
+static struct symbol_op atomic_op = {
+	.type = KW_QUALIFIER,
+	.declarator = atomic_qualifier,
 };
 
 static struct symbol_op typeof_op = {
@@ -232,14 +261,6 @@ static struct symbol_op double_op = {
 	.type = KW_SPECIFIER,
 	.test = Set_T|Set_Signed|Set_Unsigned|Set_Short|Set_Vlong,
 	.set = Set_T|Set_Double,
-	.class = CReal,
-};
-
-/* FIXME: this is not even slightly right. */
-static struct symbol_op complex_op = {
-	.type = KW_SPECIFIER,
-	.test = 0, //Set_T|Set_Signed|Set_Unsigned|Set_Short|Set_Vlong,
-	.set = 0, //Set_Double, //Set_T,Set_Double,
 	.class = CReal,
 };
 
@@ -353,6 +374,10 @@ static struct symbol_op attr_mod_op = {
 	.attribute = attribute_modifier,
 };
 
+static struct symbol_op ext_visible_op = {
+	.attribute = attribute_ext_visible,
+};
+
 static struct symbol_op attr_bitwise_op = {
 	.attribute = attribute_bitwise,
 };
@@ -410,6 +435,11 @@ static struct symbol_op mode_TI_op = {
 	.to_mode = to_TI_mode
 };
 
+static struct symbol_op mode_pointer_op = {
+	.type = KW_MODE,
+	.to_mode = to_pointer_mode
+};
+
 static struct symbol_op mode_word_op = {
 	.type = KW_MODE,
 	.to_mode = to_word_mode
@@ -430,6 +460,10 @@ static struct init_keyword {
 	{ "volatile",	NS_TYPEDEF, .op = &volatile_op },
 	{ "__volatile",		NS_TYPEDEF, .op = &volatile_op },
 	{ "__volatile__", 	NS_TYPEDEF, .op = &volatile_op },
+	{ "restrict",	NS_TYPEDEF, .op = &restrict_op},
+	{ "__restrict",	NS_TYPEDEF, .op = &restrict_op},
+	{ "__restrict__",	NS_TYPEDEF, .op = &restrict_op},
+	{ "_Atomic",	NS_TYPEDEF, .op = &atomic_op},
 
 	/* Typedef.. */
 	{ "typedef",	NS_TYPEDEF, .op = &typedef_op },
@@ -448,13 +482,17 @@ static struct init_keyword {
 	{ "unsigned",	NS_TYPEDEF, .op = &unsigned_op },
 	{ "__int128",	NS_TYPEDEF, .op = &int128_op },
 	{ "_Bool",	NS_TYPEDEF, .type = &bool_ctype, .op = &spec_op },
-	{ "_Complex",   NS_TYPEDEF, .op = &complex_op },
 
 	/* Predeclared types */
 	{ "__builtin_va_list", NS_TYPEDEF, .type = &ptr_ctype, .op = &spec_op },
 	{ "__builtin_ms_va_list", NS_TYPEDEF, .type = &ptr_ctype, .op = &spec_op },
 	{ "__int128_t",	NS_TYPEDEF, .type = &lllong_ctype, .op = &spec_op },
 	{ "__uint128_t",NS_TYPEDEF, .type = &ulllong_ctype, .op = &spec_op },
+	{ "_Float32",	NS_TYPEDEF, .type = &float32_ctype, .op = &spec_op },
+	{ "_Float32x",	NS_TYPEDEF, .type = &float32x_ctype, .op = &spec_op },
+	{ "_Float64",	NS_TYPEDEF, .type = &float64_ctype, .op = &spec_op },
+	{ "_Float64x",	NS_TYPEDEF, .type = &float64x_ctype, .op = &spec_op },
+	{ "_Float128",	NS_TYPEDEF, .type = &float128_ctype, .op = &spec_op },
 
 	/* Extended types */
 	{ "typeof", 	NS_TYPEDEF, .op = &typeof_op },
@@ -475,11 +513,6 @@ static struct init_keyword {
 	{ "_Noreturn",	NS_TYPEDEF, .op = &noreturn_op },
 
 	{ "_Alignas",	NS_TYPEDEF, .op = &alignas_op },
-
-	/* Ignored for now.. */
-	{ "restrict",	NS_TYPEDEF, .op = &restrict_op},
-	{ "__restrict",	NS_TYPEDEF, .op = &restrict_op},
-	{ "__restrict__",	NS_TYPEDEF, .op = &restrict_op},
 
 	/* Static assertion */
 	{ "_Static_assert", NS_KEYWORD, .op = &static_assert_op },
@@ -522,9 +555,10 @@ static struct init_keyword {
 	{ "bitwise",	NS_KEYWORD,	MOD_BITWISE,	.op = &attr_bitwise_op },
 	{ "__bitwise__",NS_KEYWORD,	MOD_BITWISE,	.op = &attr_bitwise_op },
 	{ "address_space",NS_KEYWORD,	.op = &address_space_op },
-	{ "mode",	NS_KEYWORD,	.op = &mode_op },
 	{ "context",	NS_KEYWORD,	.op = &context_op },
 	{ "designated_init",	NS_KEYWORD,	.op = &designated_init_op },
+	{ "__designated_init__",	NS_KEYWORD,	.op = &designated_init_op },
+	{ "transparent_union",	NS_KEYWORD,	.op = &transparent_union_op },
 	{ "__transparent_union__",	NS_KEYWORD,	.op = &transparent_union_op },
 	{ "noreturn",	NS_KEYWORD,	MOD_NORETURN,	.op = &attr_mod_op },
 	{ "__noreturn__",	NS_KEYWORD,	MOD_NORETURN,	.op = &attr_mod_op },
@@ -533,20 +567,27 @@ static struct init_keyword {
 	{"const",	NS_KEYWORD,	MOD_PURE,	.op = &attr_mod_op },
 	{"__const",	NS_KEYWORD,	MOD_PURE,	.op = &attr_mod_op },
 	{"__const__",	NS_KEYWORD,	MOD_PURE,	.op = &attr_mod_op },
+	{"externally_visible",	NS_KEYWORD,	.op = &ext_visible_op },
+	{"__externally_visible__",	NS_KEYWORD,	.op = &ext_visible_op },
 
+	{ "mode",	NS_KEYWORD,	.op = &mode_op },
 	{ "__mode__",	NS_KEYWORD,	.op = &mode_op },
-	{ "QI",		NS_KEYWORD,	MOD_CHAR,	.op = &mode_QI_op },
-	{ "__QI__",	NS_KEYWORD,	MOD_CHAR,	.op = &mode_QI_op },
-	{ "HI",		NS_KEYWORD,	MOD_SHORT,	.op = &mode_HI_op },
-	{ "__HI__",	NS_KEYWORD,	MOD_SHORT,	.op = &mode_HI_op },
-	{ "SI",		NS_KEYWORD,			.op = &mode_SI_op },
-	{ "__SI__",	NS_KEYWORD,			.op = &mode_SI_op },
-	{ "DI",		NS_KEYWORD,	MOD_LONGLONG,	.op = &mode_DI_op },
-	{ "__DI__",	NS_KEYWORD,	MOD_LONGLONG,	.op = &mode_DI_op },
-	{ "TI",		NS_KEYWORD,	MOD_LONGLONGLONG,	.op = &mode_TI_op },
-	{ "__TI__",	NS_KEYWORD,	MOD_LONGLONGLONG,	.op = &mode_TI_op },
-	{ "word",	NS_KEYWORD,	MOD_LONG,	.op = &mode_word_op },
-	{ "__word__",	NS_KEYWORD,	MOD_LONG,	.op = &mode_word_op },
+	{ "QI",		NS_KEYWORD,	.op = &mode_QI_op },
+	{ "__QI__",	NS_KEYWORD,	.op = &mode_QI_op },
+	{ "HI",		NS_KEYWORD,	.op = &mode_HI_op },
+	{ "__HI__",	NS_KEYWORD,	.op = &mode_HI_op },
+	{ "SI",		NS_KEYWORD,	.op = &mode_SI_op },
+	{ "__SI__",	NS_KEYWORD,	.op = &mode_SI_op },
+	{ "DI",		NS_KEYWORD,	.op = &mode_DI_op },
+	{ "__DI__",	NS_KEYWORD,	.op = &mode_DI_op },
+	{ "TI",		NS_KEYWORD,	.op = &mode_TI_op },
+	{ "__TI__",	NS_KEYWORD,	.op = &mode_TI_op },
+	{ "byte",	NS_KEYWORD,	.op = &mode_QI_op },
+	{ "__byte__",	NS_KEYWORD,	.op = &mode_QI_op },
+	{ "pointer",	NS_KEYWORD,	.op = &mode_pointer_op },
+	{ "__pointer__",NS_KEYWORD,	.op = &mode_pointer_op },
+	{ "word",	NS_KEYWORD,	.op = &mode_word_op },
+	{ "__word__",	NS_KEYWORD,	.op = &mode_word_op },
 };
 
 
@@ -767,76 +808,108 @@ static struct token *union_specifier(struct token *token, struct decl_state *ctx
 	return struct_union_enum_specifier(SYM_UNION, token, ctx, parse_union_declaration);
 }
 
-
-typedef struct {
-	int x;
-	unsigned long long y;
-} Num;
-
-static void upper_boundary(Num *n, Num *v)
+///
+// safe right shift
+//
+// This allow to use a shift amount as big (or bigger)
+// than the width of the value to be shifted, in which case
+// the result is, of course, 0.
+static unsigned long long rshift(unsigned long long val, unsigned int n)
 {
-	if (n->x > v->x)
-		return;
-	if (n->x < v->x) {
-		*n = *v;
-		return;
-	}
-	if (n->y < v->y)
-		n->y = v->y;
+	if (n >= (sizeof(val) * 8))
+		return 0;
+	return val >> n;
 }
 
-static void lower_boundary(Num *n, Num *v)
+struct range {
+	long long		neg;
+	unsigned long long	pos;
+};
+
+static void update_range(struct range *range, unsigned long long uval, struct symbol *vtype)
 {
-	if (n->x < v->x)
-		return;
-	if (n->x > v->x) {
-		*n = *v;
-		return;
+	long long sval = uval;
+
+	if (is_signed_type(vtype) && (sval < 0)) {
+		if (sval < range->neg)
+			range->neg = sval;
+	} else {
+		if (uval > range->pos)
+			range->pos = uval;
 	}
-	if (n->y > v->y)
-		n->y = v->y;
 }
 
-static int type_is_ok(struct symbol *type, Num *upper, Num *lower)
+static int type_is_ok(struct symbol *type, struct range range)
 {
 	int shift = type->bit_size;
 	int is_unsigned = type->ctype.modifiers & MOD_UNSIGNED;
 
 	if (!is_unsigned)
 		shift--;
-	if (upper->x == 0 && upper->y >> shift)
+	if (rshift(range.pos, shift))
 		return 0;
-	if (lower->x == 0 || (!is_unsigned && (~lower->y >> shift) == 0))
+	if (range.neg == 0)
 		return 1;
-	return 0;
+	if (is_unsigned)
+		return 0;
+	if (rshift(~range.neg, shift))
+		return 0;
+	return 1;
 }
 
-static struct symbol *bigger_enum_type(struct symbol *s1, struct symbol *s2)
+static struct range type_range(struct symbol *type)
 {
-	if (s1->bit_size < s2->bit_size) {
-		s1 = s2;
-	} else if (s1->bit_size == s2->bit_size) {
-		if (s2->ctype.modifiers & MOD_UNSIGNED)
-			s1 = s2;
+	struct range range;
+	unsigned int size = type->bit_size;
+	unsigned long long max;
+	long long min;
+
+	if (is_signed_type(type)) {
+		min = sign_bit(size);
+		max = min - 1;
+	} else {
+		min = 0;
+		max = bits_mask(size);
 	}
-	if (s1->bit_size < bits_in_int)
-		return &int_ctype;
-	return s1;
+
+	range.pos = max;
+	range.neg = min;
+	return range;
+}
+
+static int val_in_range(struct range *range, long long sval, struct symbol *vtype)
+{
+	unsigned long long uval = sval;
+
+	if (is_signed_type(vtype) && (sval < 0))
+		return range->neg <= sval;
+	else
+		return uval <= range->pos;
 }
 
 static void cast_enum_list(struct symbol_list *list, struct symbol *base_type)
 {
+	struct range irange = type_range(&int_ctype);
 	struct symbol *sym;
 
 	FOR_EACH_PTR(list, sym) {
 		struct expression *expr = sym->initializer;
 		struct symbol *ctype;
+		long long val;
 		if (expr->type != EXPR_VALUE)
 			continue;
 		ctype = expr->ctype;
-		if (ctype->bit_size == base_type->bit_size)
+		val = get_expression_value(expr);
+		if (is_int_type(ctype) && val_in_range(&irange, val, ctype)) {
+			expr->ctype = &int_ctype;
 			continue;
+		}
+		if (ctype->bit_size == base_type->bit_size) {
+			expr->ctype = base_type;
+			continue;
+		}
 		cast_value(expr, base_type, expr, ctype);
+		expr->ctype = base_type;
 	} END_FOR_EACH_PTR(sym);
 }
 
@@ -844,7 +917,8 @@ static struct token *parse_enum_declaration(struct token *token, struct symbol *
 {
 	unsigned long long lastval = 0;
 	struct symbol *ctype = NULL, *base_type = NULL;
-	Num upper = {-1, 0}, lower = {1, 0};
+	struct range range = { };
+	int mix_bitwise = 0;
 
 	parent->examined = 1;
 	parent->ctype.base_type = &int_ctype;
@@ -900,26 +974,29 @@ static struct token *parse_enum_declaration(struct token *token, struct symbol *
 			 *    base type is at least "int_ctype".
 			 *  - otherwise the base_type is "bad_ctype".
 			 */
-			if (!base_type) {
+			if (!base_type || ctype == &bad_ctype) {
 				base_type = ctype;
 			} else if (ctype == base_type) {
 				/* nothing */
 			} else if (is_int_type(base_type) && is_int_type(ctype)) {
-				base_type = bigger_enum_type(base_type, ctype);
-			} else
+				base_type = &int_ctype;
+			} else if (is_restricted_type(base_type) != is_restricted_type(ctype)) {
+				if (!mix_bitwise++) {
+					warning(expr->pos, "mixed bitwiseness");
+				}
+			} else if (is_restricted_type(base_type) && base_type != ctype) {
+				sparse_error(expr->pos, "incompatible restricted type");
+				info(expr->pos, "   expected: %s", show_typename(base_type));
+				info(expr->pos, "        got: %s", show_typename(ctype));
 				base_type = &bad_ctype;
+			} else if (base_type != &bad_ctype) {
+				sparse_error(token->pos, "bad enum definition");
+				base_type = &bad_ctype;
+			}
 			parent->ctype.base_type = base_type;
 		}
 		if (is_int_type(base_type)) {
-			Num v = {.y = lastval};
-			if (ctype->ctype.modifiers & MOD_UNSIGNED)
-				v.x = 0;
-			else if ((long long)lastval >= 0)
-				v.x = 0;
-			else
-				v.x = -1;
-			upper_boundary(&upper, &v);
-			lower_boundary(&lower, &v);
+			update_range(&range, lastval, ctype);
 		}
 		token = next;
 
@@ -930,31 +1007,31 @@ static struct token *parse_enum_declaration(struct token *token, struct symbol *
 		token = token->next;
 	}
 	if (!base_type) {
-		sparse_error(token->pos, "bad enum definition");
+		sparse_error(token->pos, "empty enum definition");
 		base_type = &bad_ctype;
 	}
 	else if (!is_int_type(base_type))
-		base_type = base_type;
-	else if (type_is_ok(base_type, &upper, &lower))
-		base_type = base_type;
-	else if (type_is_ok(&int_ctype, &upper, &lower))
-		base_type = &int_ctype;
-	else if (type_is_ok(&uint_ctype, &upper, &lower))
+		;
+	else if (type_is_ok(&uint_ctype, range))
 		base_type = &uint_ctype;
-	else if (type_is_ok(&long_ctype, &upper, &lower))
-		base_type = &long_ctype;
-	else if (type_is_ok(&ulong_ctype, &upper, &lower))
+	else if (type_is_ok(&int_ctype, range))
+		base_type = &int_ctype;
+	else if (type_is_ok(&ulong_ctype, range))
 		base_type = &ulong_ctype;
-	else if (type_is_ok(&llong_ctype, &upper, &lower))
-		base_type = &llong_ctype;
-	else if (type_is_ok(&ullong_ctype, &upper, &lower))
+	else if (type_is_ok(&long_ctype, range))
+		base_type = &long_ctype;
+	else if (type_is_ok(&ullong_ctype, range))
 		base_type = &ullong_ctype;
+	else if (type_is_ok(&llong_ctype, range))
+		base_type = &llong_ctype;
 	else
 		base_type = &bad_ctype;
 	parent->ctype.base_type = base_type;
 	parent->ctype.modifiers |= (base_type->ctype.modifiers & MOD_UNSIGNED);
 	parent->examined = 0;
 
+	if (mix_bitwise)
+		return token;
 	cast_enum_list(parent->symbol_list, base_type);
 
 	return token;
@@ -1043,6 +1120,12 @@ static struct token *attribute_modifier(struct token *token, struct symbol *attr
 	return token;
 }
 
+static struct token *attribute_ext_visible(struct token *token, struct symbol *attr, struct decl_state *ctx)
+{
+	ctx->is_ext_visible = 1;
+	return token;
+}
+
 static struct token *attribute_bitwise(struct token *token, struct symbol *attr, struct decl_state *ctx)
 {
 	if (Wbitwise)
@@ -1050,18 +1133,49 @@ static struct token *attribute_bitwise(struct token *token, struct symbol *attr,
 	return token;
 }
 
+static struct ident *numerical_address_space(int asn)
+{
+	char buff[32];
+
+	if (!asn)
+		return NULL;
+	sprintf(buff, "<asn:%d>", asn);
+	return built_in_ident(buff);
+}
+
 static struct token *attribute_address_space(struct token *token, struct symbol *attr, struct decl_state *ctx)
 {
 	struct expression *expr = NULL;
-	int as;
+	struct ident *as = NULL;
+	struct token *next;
+
 	token = expect(token, '(', "after address_space attribute");
-	token = conditional_expression(token, &expr);
-	if (expr) {
-		as = const_expression_value(expr);
-		if (Waddress_space && as)
-			ctx->ctype.as = as;
+	switch (token_type(token)) {
+	case TOKEN_NUMBER:
+		next = primary_expression(token, &expr);
+		if (expr->type != EXPR_VALUE)
+			goto invalid;
+		as = numerical_address_space(expr->value);
+		break;
+	case TOKEN_IDENT:
+		next = token->next;
+		as = token->ident;
+		break;
+	default:
+		next = token->next;
+	invalid:
+		as = NULL;
+		warning(token->pos, "invalid address space name");
 	}
-	token = expect(token, ')', "after address_space attribute");
+
+	if (Waddress_space && as) {
+		if (ctx->ctype.as)
+			sparse_error(token->pos,
+				     "multiple address space given: %s & %s",
+				     show_as(ctx->ctype.as), show_as(as));
+		ctx->ctype.as = as;
+	}
+	token = expect(next, ')', "after address_space attribute");
 	return token;
 }
 
@@ -1107,6 +1221,14 @@ static struct symbol *to_TI_mode(struct symbol *ctype)
 						     : &slllong_ctype;
 }
 
+static struct symbol *to_pointer_mode(struct symbol *ctype)
+{
+	if (ctype->ctype.base_type != &int_type)
+		return NULL;
+	return ctype->ctype.modifiers & MOD_UNSIGNED ? uintptr_ctype
+						     :  intptr_ctype;
+}
+
 static struct symbol *to_word_mode(struct symbol *ctype)
 {
 	if (ctype->ctype.base_type != &int_type)
@@ -1123,7 +1245,7 @@ static struct token *attribute_mode(struct token *token, struct symbol *attr, st
 		if (mode && mode->op->type == KW_MODE)
 			ctx->mode = mode->op;
 		else
-			sparse_error(token->pos, "unknown mode attribute %s\n", show_ident(token->ident));
+			sparse_error(token->pos, "unknown mode attribute %s", show_ident(token->ident));
 		token = token->next;
 	} else
 		sparse_error(token->pos, "expect attribute mode symbol\n");
@@ -1135,43 +1257,24 @@ static struct token *attribute_context(struct token *token, struct symbol *attr,
 {
 	struct context *context = alloc_context();
 	struct expression *args[3];
-	int argc = 0;
+	int idx = 0;
 
 	token = expect(token, '(', "after context attribute");
-	while (!match_op(token, ')')) {
-		struct expression *expr = NULL;
-		token = conditional_expression(token, &expr);
-		if (!expr)
-			break;
-		if (argc < 3)
-			args[argc++] = expr;
-		if (!match_op(token, ','))
-			break;
+	token = conditional_expression(token, &args[0]);
+	token = expect(token, ',', "after context 1st argument");
+	token = conditional_expression(token, &args[1]);
+	if (match_op(token, ',')) {
 		token = token->next;
-	}
-
-	switch(argc) {
-	case 0:
-		sparse_error(token->pos, "expected context input/output values");
-		break;
-	case 1:
-		context->in = get_expression_value(args[0]);
-		break;
-	case 2:
-		context->in = get_expression_value(args[0]);
-		context->out = get_expression_value(args[1]);
-		break;
-	case 3:
+		token = conditional_expression(token, &args[2]);
+		token = expect(token, ')', "after context 3rd argument");
 		context->context = args[0];
-		context->in = get_expression_value(args[1]);
-		context->out = get_expression_value(args[2]);
-		break;
+		idx++;
+	} else {
+		token = expect(token, ')', "after context 2nd argument");
 	}
-
-	if (argc)
-		add_ptr_list(&ctx->ctype.contexts, context);
-
-	token = expect(token, ')', "after context attribute");
+	context->in =  get_expression_value(args[idx++]);
+	context->out = get_expression_value(args[idx++]);
+	add_ptr_list(&ctx->ctype.contexts, context);
 	return token;
 }
 
@@ -1201,7 +1304,7 @@ static struct token *recover_unknown_attribute(struct token *token)
 	struct expression *expr = NULL;
 
 	if (Wunknown_attribute)
-		warning(token->pos, "attribute '%s': unknown attribute", show_ident(token->ident));
+		warning(token->pos, "unknown attribute '%s'", show_ident(token->ident));
 	token = token->next;
 	if (match_op(token, '('))
 		token = parens_expression(token, &expr, "in attribute");
@@ -1260,7 +1363,8 @@ static unsigned long storage_modifiers(struct decl_state *ctx)
 		[SRegister] = MOD_REGISTER
 	};
 	return mod[ctx->storage_class] | (ctx->is_inline ? MOD_INLINE : 0)
-		| (ctx->is_tls ? MOD_TLS : 0);
+		| (ctx->is_tls ? MOD_TLS : 0)
+		| (ctx->is_ext_visible ? MOD_EXT_VISIBLE : 0);
 }
 
 static void set_storage_class(struct position *pos, struct decl_state *ctx, int class)
@@ -1388,6 +1492,18 @@ static struct token *const_qualifier(struct token *next, struct decl_state *ctx)
 static struct token *volatile_qualifier(struct token *next, struct decl_state *ctx)
 {
 	apply_qualifier(&next->pos, &ctx->ctype, MOD_VOLATILE);
+	return next;
+}
+
+static struct token *restrict_qualifier(struct token *next, struct decl_state *ctx)
+{
+	apply_qualifier(&next->pos, &ctx->ctype, MOD_RESTRICT);
+	return next;
+}
+
+static struct token *atomic_qualifier(struct token *next, struct decl_state *ctx)
+{
+	apply_qualifier(&next->pos, &ctx->ctype, MOD_ATOMIC);
 	return next;
 }
 
@@ -1705,7 +1821,6 @@ static enum kind which_func(struct token *token,
 
 	if (next->special == ')') {
 		/* don't complain about those */
-		if (!n || match_op(next->next, ';'))
 		if (!n || match_op(next->next, ';') || match_op(next->next, ','))
 			return Empty;
 		if (Wstrict_prototypes)
@@ -1781,7 +1896,7 @@ static struct token *pointer(struct token *token, struct decl_state *ctx)
 		ptr->ctype.contexts = ctx->ctype.contexts;
 		ctx->ctype.modifiers = 0;
 		ctx->ctype.base_type = ptr;
-		ctx->ctype.as = 0;
+		ctx->ctype.as = NULL;
 		ctx->ctype.contexts = NULL;
 		ctx->ctype.alignment = 0;
 
@@ -1964,24 +2079,20 @@ static struct token *expression_statement(struct token *token, struct expression
 static struct token *parse_asm_operands(struct token *token, struct statement *stmt,
 	struct expression_list **inout)
 {
-	struct expression *expr;
-
 	/* Allow empty operands */
 	if (match_op(token->next, ':') || match_op(token->next, ')'))
 		return token->next;
 	do {
-		struct ident *ident = NULL;
+		struct expression *op = alloc_expression(token->pos, EXPR_ASM_OPERAND);
 		if (match_op(token->next, '[') &&
 		    token_type(token->next->next) == TOKEN_IDENT &&
 		    match_op(token->next->next->next, ']')) {
-			ident = token->next->next->ident;
+			op->name = token->next->next->ident;
 			token = token->next->next->next;
 		}
-		add_expression(inout, (struct expression *)ident); /* UGGLEE!!! */
-		token = primary_expression(token->next, &expr);
-		add_expression(inout, expr);
-		token = parens_expression(token, &expr, "in asm parameter");
-		add_expression(inout, expr);
+		token = primary_expression(token->next, &op->constraint);
+		token = parens_expression(token, &op->expr, "in asm parameter");
+		add_expression(inout, op);
 	} while (match_op(token, ','));
 	return token;
 }
@@ -2017,15 +2128,16 @@ static struct token *parse_asm_labels(struct token *token, struct statement *stm
 
 static struct token *parse_asm_statement(struct token *token, struct statement *stmt)
 {
-	int is_goto = 0;
+	unsigned long mods = 0;
 
 	token = token->next;
 	stmt->type = STMT_ASM;
-	if (match_idents(token, &__volatile___ident, &__volatile_ident, &volatile_ident, NULL)) {
-		token = token->next;
-	}
-	if (token_type(token) == TOKEN_IDENT && token->ident == &goto_ident) {
-		is_goto = 1;
+	while (token_type(token) == TOKEN_IDENT) {
+		struct symbol *s = lookup_keyword(token->ident, NS_TYPEDEF);
+		if (s && s->op  && s->op->asm_modifier)
+			s->op->asm_modifier(token, &mods);
+		else if (token->ident == &goto_ident)
+			asm_modifier(token, &mods, MOD_ASM_GOTO);
 		token = token->next;
 	}
 	token = expect(token, '(', "after asm");
@@ -2036,7 +2148,7 @@ static struct token *parse_asm_statement(struct token *token, struct statement *
 		token = parse_asm_operands(token, stmt, &stmt->asm_inputs);
 	if (match_op(token, ':'))
 		token = parse_asm_clobbers(token, stmt, &stmt->asm_clobbers);
-	if (is_goto && match_op(token, ':'))
+	if (match_op(token, ':') && (mods & MOD_ASM_GOTO))
 		token = parse_asm_labels(token, stmt, &stmt->asm_labels);
 	token = expect(token, ')', "after asm");
 	return expect(token, ';', "at end of asm-statement");
@@ -2129,7 +2241,7 @@ static struct statement *start_function(struct symbol *sym)
 	start_function_scope(sym->pos);
 	ret = alloc_symbol(sym->pos, SYM_NODE);
 	ret->ctype = sym->ctype.base_type->ctype;
-	ret->ctype.modifiers &= ~(MOD_STORAGE | MOD_CONST | MOD_VOLATILE | MOD_TLS | MOD_INLINE | MOD_ADDRESSABLE | MOD_NOCAST | MOD_NODEREF | MOD_ACCESSED | MOD_TOPLEVEL);
+	ret->ctype.modifiers &= ~(MOD_STORAGE | MOD_QUALIFIER | MOD_TLS | MOD_ACCESS | MOD_NOCAST | MOD_NODEREF);
 	ret->ctype.modifiers |= (MOD_AUTO | MOD_REGISTER);
 	bind_symbol(ret, &return_ident, NS_ITERATOR);
 	stmt->ret = ret;
@@ -2372,26 +2484,33 @@ static struct token *parse_goto_statement(struct token *token, struct statement 
 static struct token *parse_context_statement(struct token *token, struct statement *stmt)
 {
 	stmt->type = STMT_CONTEXT;
-	token = parse_expression(token->next, &stmt->expression);
-	if (stmt->expression->type == EXPR_PREOP
-	    && stmt->expression->op == '('
-	    && stmt->expression->unop->type == EXPR_COMMA) {
-		struct expression *expr;
-		expr = stmt->expression->unop;
-		stmt->context = expr->left;
-		stmt->expression = expr->right;
+	token = token->next;
+	token = expect(token, '(', "after __context__ statement");
+	token = assignment_expression(token, &stmt->expression);
+	if (!stmt->expression)
+		unexpected(token, "expression expected after '('");
+	if (match_op(token, ',')) {
+		token = token->next;
+		stmt->context = stmt->expression;
+		token = assignment_expression(token, &stmt->expression);
+		if (!stmt->expression)
+			unexpected(token, "expression expected after ','");
 	}
+	token = expect(token, ')', "at end of __context__ statement");
 	return expect(token, ';', "at end of statement");
 }
 
 static struct token *parse_range_statement(struct token *token, struct statement *stmt)
 {
 	stmt->type = STMT_RANGE;
-	token = assignment_expression(token->next, &stmt->range_expression);
+	token = token->next;
+	token = expect(token, '(', "after __range__ statement");
+	token = assignment_expression(token, &stmt->range_expression);
 	token = expect(token, ',', "after range expression");
 	token = assignment_expression(token, &stmt->range_low);
 	token = expect(token, ',', "after low range");
 	token = assignment_expression(token, &stmt->range_high);
+	token = expect(token, ')', "after range statement");
 	return expect(token, ';', "after range statement");
 }
 
@@ -2407,12 +2526,15 @@ static struct token *statement(struct token *token, struct statement **tree)
 
 		if (match_op(token->next, ':')) {
 			struct symbol *s = label_symbol(token);
+			token = skip_attributes(token->next->next);
+			if (s->stmt) {
+				sparse_error(stmt->pos, "label '%s' redefined", show_ident(s->ident));
+				// skip the label to avoid multiple definitions
+				return statement(token, tree);
+			}
 			stmt->type = STMT_LABEL;
 			stmt->label_identifier = s;
-			if (s->stmt)
-				sparse_error(stmt->pos, "label '%s' redefined", show_ident(token->ident));
 			s->stmt = stmt;
-			token = skip_attributes(token->next->next);
 			return statement(token, &stmt->label_statement);
 		}
 	}
@@ -2697,11 +2819,10 @@ static struct token *parse_function_body(struct token *token, struct symbol *dec
 	function_computed_target_list = NULL;
 	function_computed_goto_list = NULL;
 
-	if (decl->ctype.modifiers & MOD_EXTERN &&
-		!(decl->ctype.modifiers & MOD_INLINE) &&
-		Wexternal_function_has_definition)
-		warning(decl->pos, "function '%s' with external linkage has definition", show_ident(decl->ident));
-
+	if ((decl->ctype.modifiers & (MOD_EXTERN|MOD_INLINE)) == MOD_EXTERN) {
+		if (Wexternal_function_has_definition)
+			warning(decl->pos, "function '%s' with external linkage has definition", show_ident(decl->ident));
+	}
 	if (!(decl->ctype.modifiers & MOD_STATIC))
 		decl->ctype.modifiers |= MOD_EXTERN;
 
@@ -2777,7 +2898,9 @@ static void apply_k_r_types(struct symbol_list *argtypes, struct symbol *fn)
 			sparse_error(arg->pos, "missing type declaration for parameter '%s'",
 				show_ident(arg->ident));
 		}
-		continue;
+		type = alloc_symbol(arg->pos, SYM_NODE);
+		type->ident = arg->ident;
+		type->ctype.base_type = &int_ctype;
 match:
 		type->used = 1;
 		/* "char" and "short" promote to "int" */
@@ -2950,6 +3073,10 @@ struct token *external_declaration(struct token *token, struct symbol_list **lis
 		if (decl->same_symbol) {
 			decl->definition = decl->same_symbol->definition;
 			decl->op = decl->same_symbol->op;
+			if (is_typedef) {
+				// TODO: handle -std=c89 --pedantic
+				check_duplicates(decl);
+			}
 		}
 
 		if (!match_op(token, ','))

@@ -36,5 +36,5 @@ c11-alignas.c:10:17: error: Syntax error in unary expression
  * check-error-end
  *
  * check-output-ignore
- * check-output-contains: ret\\.32 *\$0
+ * check-output-contains: ret\\.32 *\\$0
  */

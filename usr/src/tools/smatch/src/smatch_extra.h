@@ -31,6 +31,7 @@ struct data_info {
 	sval_t fuzzy_max;
 	unsigned int hard_max:1;
 	unsigned int capped:1;
+	unsigned int treat_untagged:1;
 };
 DECLARE_ALLOCATOR(data_info);
 
@@ -72,6 +73,8 @@ int possibly_false_rl_LR(int comparison, struct range_list *a, struct range_list
 
 int rl_has_sval(struct range_list *rl, sval_t sval);
 int ranges_equiv(struct data_range *one, struct data_range *two);
+
+bool is_err_ptr(sval_t sval);
 
 int rl_equiv(struct range_list *one, struct range_list *two);
 int is_whole_rl(struct range_list *rl);
@@ -146,6 +149,8 @@ void estate_clear_hard_max(struct smatch_state *state);
 int estate_get_hard_max(struct smatch_state *state, sval_t *sval);
 bool estate_capped(struct smatch_state *state);
 void estate_set_capped(struct smatch_state *state);
+bool estate_treat_untagged(struct smatch_state *state);
+void estate_set_treat_untagged(struct smatch_state *state);
 
 int estate_get_single_value(struct smatch_state *state, sval_t *sval);
 struct smatch_state *get_implied_estate(struct expression *expr);
@@ -211,6 +216,7 @@ struct expression *string_expression(char *str);
 struct expression *compare_expression(struct expression *left, int op, struct expression *right);
 struct expression *unknown_value_expression(struct expression *expr);
 int is_fake_call(struct expression *expr);
+struct expression *gen_expression_from_name_sym(const char *name, struct symbol *sym);
 struct expression *gen_expression_from_key(struct expression *arg, const char *key);
 void free_tmp_expressions(void);
 void expr_set_parent_expr(struct expression *expr, struct expression *parent);

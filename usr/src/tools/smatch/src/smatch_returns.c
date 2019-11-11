@@ -59,12 +59,13 @@ void all_return_states_hook(void (*callback)(void))
 static void call_hooks(void)
 {
 	struct return_states_callback *rs_cb;
+	struct stree *orig;
 
-	__set_fake_cur_stree_fast(all_return_states);
+	orig = __swap_cur_stree(all_return_states);
 	FOR_EACH_PTR(callback_list, rs_cb) {
 		rs_cb->callback();
 	} END_FOR_EACH_PTR(rs_cb);
-	__pop_fake_cur_stree_fast();
+	__swap_cur_stree(orig);
 }
 
 static void match_return(int return_id, char *return_ranges, struct expression *expr)
@@ -116,14 +117,8 @@ struct stree_stack *get_all_return_strees(void)
 
 static void free_resources(struct symbol *sym)
 {
-	struct stree *tmp;
-
 	free_stree(&all_return_states);
-
-	FOR_EACH_PTR(return_stree_stack, tmp) {
-		free_stree(&tmp);
-	} END_FOR_EACH_PTR(tmp);
-	free_stree_stack(&return_stree_stack);
+	free_stack_and_strees(&return_stree_stack);
 }
 
 void register_returns_early(int id)

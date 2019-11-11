@@ -3,6 +3,14 @@
 
 extern struct symbol *size_t_ctype;
 extern struct symbol *ssize_t_ctype;
+extern struct symbol *intmax_ctype;
+extern struct symbol *uintmax_ctype;
+extern struct symbol *int64_ctype;
+extern struct symbol *uint64_ctype;
+extern struct symbol *int32_ctype;
+extern struct symbol *uint32_ctype;
+extern struct symbol *wchar_ctype;
+extern struct symbol *wint_ctype;
 
 /*
  * For "__attribute__((aligned))"
@@ -19,8 +27,6 @@ extern int bits_in_int;
 extern int bits_in_long;
 extern int bits_in_longlong;
 extern int bits_in_longlonglong;
-
-extern int bits_in_wchar;
 
 extern int max_int_alignment;
 

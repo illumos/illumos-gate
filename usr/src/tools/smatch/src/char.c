@@ -84,7 +84,7 @@ void get_char_constant(struct token *token, unsigned long long *val)
 		end = p + type - TOKEN_WIDE_CHAR;
 	}
 	p = parse_escape(p, &v, end,
-			type < TOKEN_WIDE_CHAR ? bits_in_char : bits_in_wchar, token->pos);
+			type < TOKEN_WIDE_CHAR ? bits_in_char : wchar_ctype->bit_size, token->pos);
 	if (p != end)
 		warning(token->pos,
 			"multi-character character constant");
@@ -113,7 +113,7 @@ struct token *get_string_constant(struct token *token, struct expression *expr)
 			done = next;
 		}
 	}
-	bits = is_wide ? bits_in_wchar : bits_in_char;
+	bits = is_wide ? wchar_ctype->bit_size: bits_in_char;
 	while (token != done) {
 		unsigned v;
 		const char *p = token->string->data;

@@ -5,5 +5,5 @@ static _Thread_local int foo;
  * check-command: test-parsing -std=c11 $file
  *
  * check-output-ignore
- * check-output-contains: \[tls\]
+ * check-output-contains: \\[tls\\]
  */

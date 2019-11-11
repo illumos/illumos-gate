@@ -24,10 +24,10 @@ static int my_id;
 STATE(uninitialized);
 STATE(initialized);
 
-static void pre_merge_hook(struct sm_state *sm)
+static void pre_merge_hook(struct sm_state *cur, struct sm_state *other)
 {
 	if (is_impossible_path())
-		set_state(my_id, sm->name, sm->sym, &initialized);
+		set_state(my_id, cur->name, cur->sym, &initialized);
 }
 
 static void mark_members_uninitialized(struct symbol *sym)
@@ -113,7 +113,7 @@ static void match_negative_comparison(struct expression *expr)
 
 	if (expr->type != EXPR_COMPARE || expr->op != '<')
 		return;
-	if (!is_zero(expr->right))
+	if (!expr_is_zero(expr->right))
 		return;
 	if (get_implied_max(expr->left, &max) && max.value == 0)
 		return;

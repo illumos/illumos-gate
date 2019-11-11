@@ -184,7 +184,7 @@ int can_integer_overflow_expr(struct expression *expr)
 	struct smatch_state *state;
 	char *name;
 	struct symbol *sym;
-	int ret;
+	int ret = 1;
 
 	type = get_type(expr);
 	if (!type)

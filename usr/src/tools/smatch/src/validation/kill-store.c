@@ -12,5 +12,5 @@ void dead(int *p, int i) { int v = i++; if (i && 0) p[v] = 0; }
  *	- bb unreachable.
  *
  * check-output-ignore
- * check-output-pattern-1-times: store\\.
+ * check-output-pattern(1): store\\.
  */

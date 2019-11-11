@@ -50,6 +50,46 @@ static char *get_from__symbol_get(struct expression *expr)
 	return alloc_string(arg->string->data);
 }
 
+static int xxx_is_array(struct expression *expr)
+{
+	struct symbol *type;
+
+	expr = strip_expr(expr);
+	if (!expr)
+		return 0;
+
+	if (expr->type == EXPR_PREOP && expr->op == '*') {
+		expr = strip_expr(expr->unop);
+		if (!expr)
+			return 0;
+		if (expr->type == EXPR_BINOP && expr->op == '+')
+			return 1;
+	}
+
+	if (expr->type != EXPR_BINOP || expr->op != '+')
+		return 0;
+
+	type = get_type(expr->left);
+	if (!type)
+		return 0;
+	if (type->type != SYM_ARRAY && type->type != SYM_PTR)
+		return 0;
+
+	return 1;
+}
+
+static struct expression *xxx_get_array_base(struct expression *expr)
+{
+	if (!xxx_is_array(expr))
+		return NULL;
+	expr = strip_expr(expr);
+	if (expr->type == EXPR_PREOP && expr->op == '*')
+		expr = strip_expr(expr->unop);
+	if (expr->type != EXPR_BINOP || expr->op != '+')
+		return NULL;
+	return strip_parens(expr->left);
+}
+
 static char *get_array_ptr(struct expression *expr)
 {
 	struct expression *array;
@@ -57,7 +97,7 @@ static char *get_array_ptr(struct expression *expr)
 	char *name;
 	char buf[256];
 
-	array = get_array_base(expr);
+	array = xxx_get_array_base(expr);
 
 	if (array) {
 		name = get_member_name(array);
@@ -78,7 +118,7 @@ static char *get_array_ptr(struct expression *expr)
 	}
 
 	expr = get_assigned_expr(expr);
-	array = get_array_base(expr);
+	array = xxx_get_array_base(expr);
 	if (!array)
 		return NULL;
 	name = expr_to_var(array);
@@ -141,7 +181,7 @@ char *get_fnptr_name(struct expression *expr)
 {
 	char *name;
 
-	if (is_zero(expr))
+	if (expr_is_zero(expr))
 		return NULL;
 
 	expr = strip_expr(expr);
@@ -255,6 +295,12 @@ static int can_hold_function_ptr(struct expression *expr)
 		if (!type)
 			return 0;
 	}
+	/* pointer to a pointer */
+	if (type->type == SYM_PTR || type->type == SYM_ARRAY) {
+		type = get_real_base_type(type);
+		if (!type)
+			return 0;
+	}
 	if (type->type == SYM_FN)
 		return 1;
 	if (type == &ulong_ctype && expr->type == EXPR_DEREF)
@@ -279,7 +325,8 @@ static void match_function_assign(struct expression *expr)
 		right = strip_expr(right->unop);
 
 	if (right->type != EXPR_SYMBOL &&
-	    right->type != EXPR_DEREF)
+	    right->type != EXPR_DEREF &&
+	    right->type != EXPR_CALL)
 		return;
 
 	if (!can_hold_function_ptr(right) ||

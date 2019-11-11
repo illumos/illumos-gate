@@ -12,7 +12,7 @@ extern int test(int __user *ip);
 
 static int broken(struct hello __user *sp)
 {
-	test(&sp->a);
+	return test(&sp->a);
 }
 /*
  * check-name: Address space of a struct member

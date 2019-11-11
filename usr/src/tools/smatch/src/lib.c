@@ -23,6 +23,7 @@
  * THE SOFTWARE.
  */
 #include <ctype.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -40,20 +41,19 @@
 #include "parse.h"
 #include "symbol.h"
 #include "expression.h"
+#include "evaluate.h"
 #include "scope.h"
 #include "linearize.h"
 #include "target.h"
+#include "machine.h"
 #include "version.h"
+#include "bits.h"
 
-static const char *progname;
-
-int sparse_errors = 0;
-int sparse_warnings = 0;
-
-int verbose, optimize, optimize_size, preprocessing;
+int verbose, optimize_level, optimize_size, preprocessing;
 int die_if_error = 0;
 int parse_error;
 int has_error = 0;
+int do_output = 0;
 
 #ifndef __GNUC__
 # define __GNUC__ 2
@@ -65,8 +65,12 @@ int gcc_major = __GNUC__;
 int gcc_minor = __GNUC_MINOR__;
 int gcc_patchlevel = __GNUC_PATCHLEVEL__;
 
+const char *base_filename;
+
+static const char *diag_prefix = "";
 static const char *gcc_base_dir = GCC_BASE;
 static const char *multiarch_dir = MULTIARCH_TRIPLET;
+static const char *outfile = NULL;
 
 struct token *skip_to(struct token *token, int op)
 {
@@ -75,10 +79,10 @@ struct token *skip_to(struct token *token, int op)
 	return token;
 }
 
+static struct token bad_token = { .pos.type = TOKEN_BAD };
 struct token *expect(struct token *token, int op, const char *where)
 {
 	if (!match_op(token, op)) {
-		static struct token bad_token;
 		if (token != &bad_token) {
 			bad_token.next = token;
 			sparse_error(token->pos, "Expected %s %s", show_special(op), where);
@@ -89,6 +93,21 @@ struct token *expect(struct token *token, int op, const char *where)
 		return &bad_token;
 	}
 	return token->next;
+}
+
+///
+// issue an error message on new parsing errors
+// @token: the current token
+// @errmsg: the error message
+// If the current token is from a previous error, an error message
+// has already been issued, so nothing more is done.
+// Otherwise, @errmsg is displayed followed by the current token.
+void unexpected(struct token *token, const char *errmsg)
+{
+	if (token == &bad_token)
+		return;
+	sparse_error(token->pos, "%s", errmsg);
+	sparse_error(token->pos, "got %s", show_token(token));
 }
 
 unsigned int hexval(unsigned int c)
@@ -113,14 +132,19 @@ static void do_warn(const char *type, struct position pos, const char * fmt, va_
 	static char buffer[512];
 	const char *name;
 
+	/* Shut up warnings if position is bad_token.pos */
+	if (pos.type == TOKEN_BAD)
+		return;
+
 	vsprintf(buffer, fmt, args);	
 	name = stream_name(pos.stream);
 		
+	fflush(stdout);
 	fprintf(stderr, "%s: %s:%d:%d: %s%s\n",
-		progname, name, pos.line, pos.pos, type, buffer);
+		diag_prefix, name, pos.line, pos.pos, type, buffer);
 }
 
-static int max_warnings = 100;
+unsigned int fmax_warnings = 100;
 static int show_info = 1;
 
 void info(struct position pos, const char * fmt, ...)
@@ -141,6 +165,9 @@ static void do_error(struct position pos, const char * fmt, va_list args)
 	parse_error = 1;
         die_if_error = 1;
 	show_info = 1;
+	/* Shut up warnings if position is bad_token.pos */
+	if (pos.type == TOKEN_BAD)
+		return;
 	/* Shut up warnings after an error */
 	has_error |= ERROR_CURR_PHASE;
 	if (errors > 100) {
@@ -167,12 +194,12 @@ void warning(struct position pos, const char * fmt, ...)
 		return;
 	}
 
-	if (!max_warnings || has_error) {
+	if (!fmax_warnings || has_error) {
 		show_info = 0;
 		return;
 	}
 
-	if (!--max_warnings) {
+	if (!--fmax_warnings) {
 		show_info = 0;
 		fmt = "too many warnings";
 	}
@@ -219,7 +246,7 @@ void die(const char *fmt, ...)
 	vsnprintf(buffer, sizeof(buffer), fmt, args);
 	va_end(args);
 
-	fprintf(stderr, "%s: %s\n", progname, buffer);
+	fprintf(stderr, "%s: %s\n", diag_prefix, buffer);
 	exit(1);
 }
 
@@ -229,6 +256,8 @@ static struct token *pre_buffer_end = NULL;
 int Waddress = 0;
 int Waddress_space = 1;
 int Wbitwise = 1;
+int Wbitwise_pointer = 0;
+int Wcast_from_as = 0;
 int Wcast_to_as = 0;
 int Wcast_truncate = 1;
 int Wconstant_suffix = 0;
@@ -241,6 +270,7 @@ int Wdesignated_init = 1;
 int Wdo_while = 0;
 int Wimplicit_int = 1;
 int Winit_cstring = 0;
+int Wint_to_pointer_cast = 1;
 int Wenum_mismatch = 1;
 int Wexternal_function_has_definition = 1;
 int Wsparse_error = 0;
@@ -254,9 +284,12 @@ int Woverride_init_all = 0;
 int Woverride_init_whole_range = 0;
 int Wparen_string = 0;
 int Wpointer_arith = 0;
+int Wpointer_to_int_cast = 1;
 int Wptr_subtraction_blows = 0;
 int Wreturn_void = 0;
 int Wshadow = 0;
+int Wshift_count_negative = 1;
+int Wshift_count_overflow = 1;
 int Wsizeof_bool = 0;
 int Wstrict_prototypes = 1;
 int Wtautological_compare = 0;
@@ -268,13 +301,20 @@ int Wunknown_attribute = 0;
 int Wvla = 1;
 
 int dump_macro_defs = 0;
+int dump_macros_only = 0;
 
-int dbg_entry = 0;
+int dbg_compound = 0;
 int dbg_dead = 0;
+int dbg_domtree = 0;
+int dbg_entry = 0;
+int dbg_ir = 0;
+int dbg_postorder = 0;
 
+unsigned long fdump_ir;
 int fmem_report = 0;
-int fdump_linearize;
 unsigned long long fmemcpy_max_count = 100000;
+unsigned long fpasses = ~0UL;
+int funsigned_char = UNSIGNED_CHAR;
 
 int preprocess_only;
 
@@ -286,25 +326,10 @@ static enum { STANDARD_C89,
               STANDARD_GNU89,
               STANDARD_GNU99, } standard = STANDARD_GNU89;
 
-#define ARCH_LP32  0
-#define ARCH_LP64  1
-#define ARCH_LLP64 2
-
-#ifdef __x86_64__
-#define ARCH_M64_DEFAULT ARCH_LP64
-#else
-#define ARCH_M64_DEFAULT ARCH_LP32
-#endif
-
 int arch_m64 = ARCH_M64_DEFAULT;
 int arch_msize_long = 0;
-
-#ifdef __BIG_ENDIAN__
-#define ARCH_BIG_ENDIAN 1
-#else
-#define ARCH_BIG_ENDIAN 0
-#endif
 int arch_big_endian = ARCH_BIG_ENDIAN;
+int arch_mach = MACH_NATIVE;
 
 
 #define CMDLINE_INCLUDE 20
@@ -433,8 +458,10 @@ static char **handle_switch_m(char *arg, char **next)
 {
 	if (!strcmp(arg, "m64")) {
 		arch_m64 = ARCH_LP64;
-	} else if (!strcmp(arg, "m32")) {
+	} else if (!strcmp(arg, "m32") || !strcmp(arg, "m16")) {
 		arch_m64 = ARCH_LP32;
+	} else if (!strcmp(arg, "mx32")) {
+		arch_m64 = ARCH_X32;
 	} else if (!strcmp(arg, "msize-llp64")) {
 		arch_m64 = ARCH_LLP64;
 	} else if (!strcmp(arg, "msize-long")) {
@@ -449,44 +476,6 @@ static char **handle_switch_m(char *arg, char **next)
 	return next;
 }
 
-static void handle_arch_m64_finalize(void)
-{
-	switch (arch_m64) {
-	case ARCH_LP32:
-		/* default values */
-#if defined(__x86_64__) || defined (__i386)
- 		add_pre_buffer("#weak_define __i386__ 1\n");
- 		add_pre_buffer("#weak_define __i386 1\n");
- 		add_pre_buffer("#weak_define i386 1\n");
-#endif
-		return;
-	case ARCH_LP64:
-		bits_in_long = 64;
-		max_int_alignment = 8;
-		size_t_ctype = &ulong_ctype;
-		ssize_t_ctype = &long_ctype;
-		add_pre_buffer("#weak_define __LP64__ 1\n");
-		add_pre_buffer("#weak_define __LP64 1\n");
-		add_pre_buffer("#weak_define _LP64 1\n");
-		goto case_64bit_common;
-	case ARCH_LLP64:
-		bits_in_long = 32;
-		max_int_alignment = 4;
-		size_t_ctype = &ullong_ctype;
-		ssize_t_ctype = &llong_ctype;
-		add_pre_buffer("#weak_define __LLP64__ 1\n");
-		goto case_64bit_common;
-	case_64bit_common:
-		bits_in_pointer = 64;
-		pointer_alignment = 8;
-#if defined(__x86_64__) || defined (__i386)
-		add_pre_buffer("#weak_define __x86_64__ 1\n");
-		add_pre_buffer("#weak_define __x86_64 1\n");
-#endif
-		break;
-	}
-}
-
 static void handle_arch_msize_long_finalize(void)
 {
 	if (arch_msize_long) {
@@ -497,13 +486,80 @@ static void handle_arch_msize_long_finalize(void)
 
 static void handle_arch_finalize(void)
 {
-	handle_arch_m64_finalize();
 	handle_arch_msize_long_finalize();
 }
 
-
-static int handle_simple_switch(const char *arg, const char *name, int *flag)
+static const char *match_option(const char *arg, const char *prefix)
 {
+	unsigned int n = strlen(prefix);
+	if (strncmp(arg, prefix, n) == 0)
+		return arg + n;
+	return NULL;
+}
+
+
+struct mask_map {
+	const char *name;
+	unsigned long mask;
+};
+
+static int apply_mask(unsigned long *val, const char *str, unsigned len, const struct mask_map *map, int neg)
+{
+	const char *name;
+
+	for (;(name = map->name); map++) {
+		if (!strncmp(name, str, len) && !name[len]) {
+			if (neg == 0)
+				*val |= map->mask;
+			else
+				*val &= ~map->mask;
+			return 0;
+		}
+	}
+	return 1;
+}
+
+static int handle_suboption_mask(const char *arg, const char *opt, const struct mask_map *map, unsigned long *flag)
+{
+	if (*opt == '\0') {
+		apply_mask(flag, "", 0, map, 0);
+		return 1;
+	}
+	if (*opt++ != '=')
+		return 0;
+	while (1) {
+		unsigned int len = strcspn(opt, ",+");
+		int neg = 0;
+		if (len == 0)
+			goto end;
+		if (!strncmp(opt, "no-", 3)) {
+			opt += 3;
+			len -= 3;
+			neg = 1;
+		}
+		if (apply_mask(flag, opt, len, map, neg))
+			die("error: wrong option '%.*s' for \'%s\'", len, opt, arg);
+
+end:
+		opt += len;
+		if (*opt++ == '\0')
+			break;
+	}
+	return 1;
+}
+
+
+#define OPT_INVERSE	1
+struct flag {
+	const char *name;
+	int *flag;
+	int (*fun)(const char *arg, const char *opt, const struct flag *, int options);
+	unsigned long mask;
+};
+
+static int handle_switches(const char *ori, const char *opt, const struct flag *flags)
+{
+	const char *arg = opt;
 	int val = 1;
 
 	// Prefixe "no-" mean to turn flag off.
@@ -512,33 +568,79 @@ static int handle_simple_switch(const char *arg, const char *name, int *flag)
 		val = 0;
 	}
 
-	if (strcmp(arg, name) == 0) {
-		*flag = val;
-		return 1;
+	for (; flags->name; flags++) {
+		const char *opt = match_option(arg, flags->name);
+		int rc;
+
+		if (!opt)
+			continue;
+
+		if (flags->fun) {
+			int options = 0;
+			if (!val)
+				options |= OPT_INVERSE;
+			if ((rc = flags->fun(ori, opt, flags, options)))
+				return rc;
+		}
+
+		// boolean flag
+		if (opt[0] == '\0' && flags->flag) {
+			if (flags->mask & OPT_INVERSE)
+				val = !val;
+			*flags->flag = val;
+			return 1;
+		}
 	}
 
 	// not handled
 	return 0;
 }
 
+
+#define	OPTNUM_ZERO_IS_INF		1
+#define	OPTNUM_UNLIMITED		2
+
+#define OPT_NUMERIC(NAME, TYPE, FUNCTION)	\
+static int opt_##NAME(const char *arg, const char *opt, TYPE *ptr, int flag)	\
+{									\
+	char *end;							\
+	TYPE val;							\
+									\
+	val = FUNCTION(opt, &end, 0);					\
+	if (*end != '\0' || end == opt) {				\
+		if ((flag & OPTNUM_UNLIMITED) && !strcmp(opt, "unlimited"))	\
+			val = ~val;					\
+		else							\
+			die("error: wrong argument to \'%s\'", arg);	\
+	}								\
+	if ((flag & OPTNUM_ZERO_IS_INF) && val == 0)			\
+		val = ~val;						\
+	*ptr = val;							\
+	return 1;							\
+}
+
+OPT_NUMERIC(ullong, unsigned long long, strtoull)
+OPT_NUMERIC(uint, unsigned int, strtoul)
+
+
 static char **handle_switch_o(char *arg, char **next)
 {
 	if (!strcmp (arg, "o")) {       // "-o foo"
 		if (!*++next)
 			die("argument to '-o' is missing");
+		outfile = *next;
 	}
 	// else "-ofoo"
 
 	return next;
 }
 
-static const struct warning {
-	const char *name;
-	int *flag;
-} warnings[] = {
+static const struct flag warnings[] = {
 	{ "address", &Waddress },
 	{ "address-space", &Waddress_space },
 	{ "bitwise", &Wbitwise },
+	{ "bitwise-pointer", &Wbitwise_pointer},
+	{ "cast-from-as", &Wcast_from_as },
 	{ "cast-to-as", &Wcast_to_as },
 	{ "cast-truncate", &Wcast_truncate },
 	{ "constant-suffix", &Wconstant_suffix },
@@ -553,6 +655,7 @@ static const struct warning {
 	{ "external-function-has-definition", &Wexternal_function_has_definition },
 	{ "implicit-int", &Wimplicit_int },
 	{ "init-cstring", &Winit_cstring },
+	{ "int-to-pointer-cast", &Wint_to_pointer_cast },
 	{ "memcpy-max-count", &Wmemcpy_max_count },
 	{ "non-pointer-null", &Wnon_pointer_null },
 	{ "old-initializer", &Wold_initializer },
@@ -561,9 +664,12 @@ static const struct warning {
 	{ "override-init", &Woverride_init },
 	{ "override-init-all", &Woverride_init_all },
 	{ "paren-string", &Wparen_string },
+	{ "pointer-to-int-cast", &Wpointer_to_int_cast },
 	{ "ptr-subtraction-blows", &Wptr_subtraction_blows },
 	{ "return-void", &Wreturn_void },
 	{ "shadow", &Wshadow },
+	{ "shift-count-negative", &Wshift_count_negative },
+	{ "shift-count-overflow", &Wshift_count_overflow },
 	{ "sizeof-bool", &Wsizeof_bool },
 	{ "strict-prototypes", &Wstrict_prototypes },
 	{ "pointer-arith", &Wpointer_arith },
@@ -584,7 +690,7 @@ enum {
 };
 
 
-static char **handle_onoff_switch(char *arg, char **next, const struct warning warnings[], int n)
+static char **handle_onoff_switch(char *arg, char **next, const struct flag warnings[], int n)
 {
 	int flag = WARNING_ON;
 	char *p = arg + 1;
@@ -595,6 +701,7 @@ static char **handle_onoff_switch(char *arg, char **next, const struct warning w
 			if (*warnings[i].flag != WARNING_FORCE_OFF && warnings[i].flag != &Wsparse_error)
 				*warnings[i].flag = WARNING_ON;
 		}
+		return NULL;
 	}
 
 	// Prefixes "no" and "no-" mean to turn warning off.
@@ -626,9 +733,13 @@ static char **handle_switch_W(char *arg, char **next)
 	return next;
 }
 
-static struct warning debugs[] = {
-	{ "entry", &dbg_entry},
+static struct flag debugs[] = {
+	{ "compound", &dbg_compound},
 	{ "dead", &dbg_dead},
+	{ "domtree", &dbg_domtree},
+	{ "entry", &dbg_entry},
+	{ "ir", &dbg_ir},
+	{ "postorder", &dbg_postorder},
 };
 
 
@@ -645,21 +756,39 @@ static char **handle_switch_v(char *arg, char **next)
 	return next;
 }
 
-static struct warning dumps[] = {
-	{ "D", &dump_macro_defs},
-};
-
 static char **handle_switch_d(char *arg, char **next)
 {
-	char ** ret = handle_onoff_switch(arg, next, dumps, ARRAY_SIZE(dumps));
-	if (ret)
-		return ret;
+	char *arg_char = arg + 1;
 
+	/*
+	 * -d<CHARS>, where <CHARS> is a sequence of characters, not preceded
+	 * by a space. If you specify characters whose behaviour conflicts,
+	 * the result is undefined.
+	 */
+	while (*arg_char) {
+		switch (*arg_char) {
+		case 'M': /* dump just the macro definitions */
+			dump_macros_only = 1;
+			dump_macro_defs = 0;
+			break;
+		case 'D': /* like 'M', but also output pre-processed text */
+			dump_macro_defs = 1;
+			dump_macros_only = 0;
+			break;
+		case 'N': /* like 'D', but only output macro names not bodies */
+			break;
+		case 'I': /* like 'D', but also output #include directives */
+			break;
+		case 'U': /* like 'D', but only output expanded macros */
+			break;
+		}
+		arg_char++;
+	}
 	return next;
 }
 
 
-static void handle_onoff_switch_finalize(const struct warning warnings[], int n)
+static void handle_onoff_switch_finalize(const struct flag warnings[], int n)
 {
 	unsigned i;
 
@@ -717,88 +846,115 @@ static char **handle_switch_O(char *arg, char **next)
 	int level = 1;
 	if (arg[1] >= '0' && arg[1] <= '9')
 		level = arg[1] - '0';
-	optimize = level;
+	optimize_level = level;
 	optimize_size = arg[1] == 's';
 	return next;
 }
 
-static char **handle_switch_fmemcpy_max_count(char *arg, char **next)
+static int handle_ftabstop(const char *arg, const char *opt, const struct flag *flag, int options)
 {
-	unsigned long long val;
-	char *end;
-
-	val = strtoull(arg, &end, 0);
-	if (*end != '\0' || end == arg)
-		die("error: missing argument to \"-fmemcpy-max-count=\"");
-
-	if (val == 0)
-		val = ~0ULL;
-	fmemcpy_max_count = val;
-	return next;
-}
-
-static char **handle_switch_ftabstop(char *arg, char **next)
-{
-	char *end;
 	unsigned long val;
+	char *end;
 
-	if (*arg == '\0')
-		die("error: missing argument to \"-ftabstop=\"");
+	if (*opt == '\0')
+		die("error: missing argument to \"%s\"", arg);
 
 	/* we silently ignore silly values */
-	val = strtoul(arg, &end, 10);
+	val = strtoul(opt, &end, 10);
 	if (*end == '\0' && 1 <= val && val <= 100)
 		tabstop = val;
 
-	return next;
+	return 1;
 }
 
-static int funsigned_char;
-static void handle_funsigned_char(void)
+static int handle_fpasses(const char *arg, const char *opt, const struct flag *flag, int options)
 {
-	if (funsigned_char) {
-		char_ctype.ctype.modifiers &= ~MOD_SIGNED;
-		char_ctype.ctype.modifiers |= MOD_UNSIGNED;
-	}
-}
+	unsigned long mask;
 
-	static char **handle_switch_fdump(char *arg, char **next)
-{
-	if (!strncmp(arg, "linearize", 9)) {
-		arg += 9;
-		if (*arg == '\0')
-			fdump_linearize = 1;
-		else if (!strcmp(arg, "=only"))
-			fdump_linearize = 2;
+	mask = flag->mask;
+	if (*opt == '\0') {
+		if (options & OPT_INVERSE)
+			fpasses &= ~mask;
 		else
-			goto err;
+			fpasses |=  mask;
+		return 1;
 	}
-
-	/* ignore others flags */
-	return next;
-
-err:
-	die("error: unknown flag \"-fdump-%s\"", arg);
+	if (options & OPT_INVERSE)
+		return 0;
+	if (!strcmp(opt, "-enable")) {
+		fpasses |= mask;
+		return 1;
+	}
+	if (!strcmp(opt, "-disable")) {
+		fpasses &= ~mask;
+		return 1;
+	}
+	if (!strcmp(opt, "=last")) {
+		// clear everything above
+		mask |= mask - 1;
+		fpasses &= mask;
+		return 1;
+	}
+	return 0;
 }
+
+static int handle_fdiagnostic_prefix(const char *arg, const char *opt, const struct flag *flag, int options)
+{
+	switch (*opt) {
+	case '\0':
+		diag_prefix = "sparse";
+		return 1;
+	case '=':
+		diag_prefix = xasprintf("%s", opt+1);
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+static int handle_fdump_ir(const char *arg, const char *opt, const struct flag *flag, int options)
+{
+	static const struct mask_map dump_ir_options[] = {
+		{ "",			PASS_LINEARIZE },
+		{ "linearize",		PASS_LINEARIZE },
+		{ "mem2reg",		PASS_MEM2REG },
+		{ "final",		PASS_FINAL },
+		{ },
+	};
+
+	return handle_suboption_mask(arg, opt, dump_ir_options, &fdump_ir);
+}
+
+static int handle_fmemcpy_max_count(const char *arg, const char *opt, const struct flag *flag, int options)
+{
+	opt_ullong(arg, opt, &fmemcpy_max_count, OPTNUM_ZERO_IS_INF|OPTNUM_UNLIMITED);
+	return 1;
+}
+
+static int handle_fmax_warnings(const char *arg, const char *opt, const struct flag *flag, int options)
+{
+	opt_uint(arg, opt, &fmax_warnings, OPTNUM_UNLIMITED);
+	return 1;
+}
+
+static struct flag fflags[] = {
+	{ "diagnostic-prefix",	NULL,	handle_fdiagnostic_prefix },
+	{ "dump-ir",		NULL,	handle_fdump_ir },
+	{ "linearize",		NULL,	handle_fpasses,	PASS_LINEARIZE },
+	{ "max-warnings=",	NULL,	handle_fmax_warnings },
+	{ "mem-report",		&fmem_report },
+	{ "memcpy-max-count=",	NULL,	handle_fmemcpy_max_count },
+	{ "tabstop=",		NULL,	handle_ftabstop },
+	{ "mem2reg",		NULL,	handle_fpasses,	PASS_MEM2REG },
+	{ "optim",		NULL,	handle_fpasses,	PASS_OPTIM },
+	{ "signed-char",	&funsigned_char, NULL,	OPT_INVERSE },
+	{ "unsigned-char",	&funsigned_char, NULL, },
+	{ },
+};
 
 static char **handle_switch_f(char *arg, char **next)
 {
-	arg++;
-
-	if (!strncmp(arg, "tabstop=", 8))
-		return handle_switch_ftabstop(arg+8, next);
-	if (!strncmp(arg, "dump-", 5))
-		return handle_switch_fdump(arg+5, next);
-	if (!strncmp(arg, "memcpy-max-count=", 17))
-		return handle_switch_fmemcpy_max_count(arg+17, next);
-
-	if (!strcmp(arg, "unsigned-char")) {
-		funsigned_char = 1;
-		return next;
-	}
-
-	/* handle switches w/ arguments above, boolean and only boolean below */
-	if (handle_simple_switch(arg, "mem-report", &fmem_report))
+	if (handle_switches(arg-1, arg+1, fflags))
 		return next;
 
 	return next;
@@ -820,12 +976,9 @@ static char **handle_switch_a(char *arg, char **next)
 	return next;
 }
 
-static char **handle_switch_s(char *arg, char **next)
+static char **handle_switch_s(const char *arg, char **next)
 {
-	if (!strncmp (arg, "std=", 4))
-	{
-		arg += 4;
-
+	if ((arg = match_option(arg, "std="))) {
 		if (!strcmp (arg, "c89") ||
 		    !strcmp (arg, "iso9899:1990"))
 			standard = STANDARD_C89;
@@ -896,6 +1049,13 @@ static char **handle_switch_g(char *arg, char **next)
 	return next;
 }
 
+static char **handle_switch_x(char *arg, char **next)
+{
+	if (!*++next)
+		die("missing argument for -x option");
+	return next;
+}
+
 static char **handle_version(char *arg, char **next)
 {
 	printf("%s\n", SPARSE_VERSION);
@@ -909,7 +1069,6 @@ static char **handle_param(char *arg, char **next)
 	/* Ignore smatch's --param-mapper */
 	if (strcmp(arg, "-mapper") == 0)
 		return next;
-
 
 	/* For now just skip any '--param=*' or '--param *' */
 	if (*arg == '\0') {
@@ -972,6 +1131,7 @@ static char **handle_switch(char *arg, char **next)
 	case 'U': return handle_switch_U(arg, next);
 	case 'v': return handle_switch_v(arg, next);
 	case 'W': return handle_switch_W(arg, next);
+	case 'x': return handle_switch_x(arg, next);
 	case '-': return handle_long_options(arg + 1, next);
 	default:
 		break;
@@ -984,246 +1144,283 @@ static char **handle_switch(char *arg, char **next)
 	return next;
 }
 
-static void predefined_sizeof(const char *name, unsigned bits)
+#define	PTYPE_SIZEOF	(1U << 0)
+#define	PTYPE_T		(1U << 1)
+#define	PTYPE_MAX	(1U << 2)
+#define	PTYPE_MIN	(1U << 3)
+#define	PTYPE_WIDTH	(1U << 4)
+#define	PTYPE_TYPE	(1U << 5)
+#define	PTYPE_ALL	(PTYPE_MAX|PTYPE_SIZEOF|PTYPE_WIDTH)
+#define	PTYPE_ALL_T	(PTYPE_MAX|PTYPE_SIZEOF|PTYPE_WIDTH|PTYPE_T)
+
+static void predefined_sizeof(const char *name, const char *suffix, unsigned bits)
 {
-	add_pre_buffer("#weak_define __SIZEOF_%s__ %d\n", name, bits/8);
+	char buf[32];
+
+	snprintf(buf, sizeof(buf), "__SIZEOF_%s%s__", name, suffix);
+	predefine(buf, 1, "%d", bits/8);
 }
 
-static void predefined_max(const char *name, const char *suffix, unsigned bits)
+static void predefined_width(const char *name, unsigned bits)
 {
-	unsigned long long max = (1ULL << (bits - 1 )) - 1;
+	char buf[32];
 
-	add_pre_buffer("#weak_define __%s_MAX__ %#llx%s\n", name, max, suffix);
+	snprintf(buf, sizeof(buf), "__%s_WIDTH__", name);
+	predefine(buf, 1, "%d", bits);
 }
 
-static void predefined_type_size(const char *name, const char *suffix, unsigned bits)
+static void predefined_max(const char *name, struct symbol *type)
 {
-	predefined_max(name, suffix, bits);
-	predefined_sizeof(name, bits);
+	const char *suffix = builtin_type_suffix(type);
+	unsigned bits = type->bit_size - is_signed_type(type);
+	unsigned long long max = bits_mask(bits);
+	char buf[32];
+
+	snprintf(buf, sizeof(buf), "__%s_MAX__", name);
+	predefine(buf, 1, "%#llx%s", max, suffix);
+}
+
+static void predefined_min(const char *name, struct symbol *type)
+{
+	const char *suffix = builtin_type_suffix(type);
+	char buf[32];
+
+	snprintf(buf, sizeof(buf), "__%s_MIN__", name);
+
+	if (is_signed_type(type))
+		predefine(buf, 1, "(-__%s_MAX__ - 1)", name);
+	else
+		predefine(buf, 1, "0%s", suffix);
+}
+
+static void predefined_type(const char *name, struct symbol *type)
+{
+	const char *typename = builtin_typename(type);
+	add_pre_buffer("#weak_define __%s_TYPE__ %s\n", name, typename);
+}
+
+static void predefined_ctype(const char *name, struct symbol *type, int flags)
+{
+	unsigned bits = type->bit_size;
+
+	if (flags & PTYPE_SIZEOF) {
+		const char *suffix = (flags & PTYPE_T) ? "_T" : "";
+		predefined_sizeof(name, suffix, bits);
+	}
+	if (flags & PTYPE_MAX)
+		predefined_max(name, type);
+	if (flags & PTYPE_MIN)
+		predefined_min(name, type);
+	if (flags & PTYPE_TYPE)
+		predefined_type(name, type);
+	if (flags & PTYPE_WIDTH)
+		predefined_width(name, bits);
 }
 
 static void predefined_macros(void)
 {
-	add_pre_buffer("#define __CHECKER__ 1\n");
+	predefine("__CHECKER__", 0, "1");
+	predefine("__GNUC__", 1, "%d", gcc_major);
+	predefine("__GNUC_MINOR__", 1, "%d", gcc_minor);
+	predefine("__GNUC_PATCHLEVEL__", 1, "%d", gcc_patchlevel);
 
-	predefined_sizeof("SHORT", bits_in_short);
-	predefined_max("SHRT", "", bits_in_short);
-	predefined_max("SCHAR", "", bits_in_char);
-	predefined_max("WCHAR", "", bits_in_wchar);
-	add_pre_buffer("#weak_define __CHAR_BIT__ %d\n", bits_in_char);
+	predefine("__STDC__", 1, "1");
+	switch (standard) {
+	case STANDARD_C89:
+		predefine("__STRICT_ANSI__", 1, "1");
+		break;
 
-	predefined_type_size("INT", "", bits_in_int);
-	predefined_type_size("LONG", "L", bits_in_long);
-	predefined_type_size("LONG_LONG", "LL", bits_in_longlong);
+	case STANDARD_C94:
+		predefine("__STDC_VERSION__", 1, "199409L");
+		predefine("__STRICT_ANSI__", 1, "1");
+		break;
 
-	predefined_sizeof("INT128", 128);
+	case STANDARD_C99:
+		predefine("__STDC_VERSION__", 1, "199901L");
+		predefine("__STRICT_ANSI__", 1, "1");
+		break;
 
-	predefined_sizeof("SIZE_T", bits_in_pointer);
-	predefined_sizeof("PTRDIFF_T", bits_in_pointer);
-	predefined_sizeof("POINTER", bits_in_pointer);
+	case STANDARD_GNU89:
+	default:
+		break;
 
-	predefined_sizeof("FLOAT", bits_in_float);
-	predefined_sizeof("DOUBLE", bits_in_double);
-	predefined_sizeof("LONG_DOUBLE", bits_in_longdouble);
+	case STANDARD_GNU99:
+		predefine("__STDC_VERSION__", 1, "199901L");
+		break;
 
-	add_pre_buffer("#weak_define __%s_ENDIAN__ 1\n",
-		arch_big_endian ? "BIG" : "LITTLE");
+	case STANDARD_C11:
+		predefine("__STRICT_ANSI__", 1, "1");
+	case STANDARD_GNU11:
+		predefine("__STDC_NO_ATOMICS__", 1, "1");
+		predefine("__STDC_NO_COMPLEX__", 1, "1");
+		predefine("__STDC_NO_THREADS__", 1, "1");
+		predefine("__STDC_VERSION__", 1, "201112L");
+		break;
+	}
 
-	add_pre_buffer("#weak_define __ORDER_LITTLE_ENDIAN__ 1234\n");
-	add_pre_buffer("#weak_define __ORDER_BIG_ENDIAN__ 4321\n");
-	add_pre_buffer("#weak_define __ORDER_PDP_ENDIAN__ 3412\n");
-	add_pre_buffer("#weak_define __BYTE_ORDER__ __ORDER_%s_ENDIAN__\n",
-		arch_big_endian ? "BIG" : "LITTLE");
+	predefine("__CHAR_BIT__", 1, "%d", bits_in_char);
+	if (funsigned_char)
+		predefine("__CHAR_UNSIGNED__", 1, "1");
 
-	add_pre_buffer("#weak_define __PRAGMA_REDEFINE_EXTNAME 1\n");
+	predefined_ctype("SHORT",     &short_ctype, PTYPE_SIZEOF);
+	predefined_ctype("SHRT",      &short_ctype, PTYPE_MAX|PTYPE_WIDTH);
+	predefined_ctype("SCHAR",     &schar_ctype, PTYPE_MAX|PTYPE_WIDTH);
+	predefined_ctype("WCHAR",      wchar_ctype, PTYPE_ALL_T|PTYPE_MIN|PTYPE_TYPE);
+	predefined_ctype("WINT",        wint_ctype, PTYPE_ALL_T|PTYPE_MIN|PTYPE_TYPE);
+	predefined_ctype("CHAR16",   &ushort_ctype, PTYPE_TYPE);
+	predefined_ctype("CHAR32",     &uint_ctype, PTYPE_TYPE);
 
-	/*
-	 * This is far from perfect...
-	 */
+	predefined_ctype("INT",         &int_ctype, PTYPE_ALL);
+	predefined_ctype("LONG",       &long_ctype, PTYPE_ALL);
+	predefined_ctype("LONG_LONG", &llong_ctype, PTYPE_ALL);
+
+	predefined_ctype("INT8",      &schar_ctype, PTYPE_MAX|PTYPE_TYPE);
+	predefined_ctype("UINT8",     &uchar_ctype, PTYPE_MAX|PTYPE_TYPE);
+	predefined_ctype("INT16",     &short_ctype, PTYPE_MAX|PTYPE_TYPE);
+	predefined_ctype("UINT16",   &ushort_ctype, PTYPE_MAX|PTYPE_TYPE);
+	predefined_ctype("INT32",      int32_ctype, PTYPE_MAX|PTYPE_TYPE);
+	predefined_ctype("UINT32",    uint32_ctype, PTYPE_MAX|PTYPE_TYPE);
+	predefined_ctype("INT64",      int64_ctype, PTYPE_MAX|PTYPE_TYPE);
+	predefined_ctype("UINT64",    uint64_ctype, PTYPE_MAX|PTYPE_TYPE);
+
+	predefined_sizeof("INT128", "", 128);
+
+	predefined_ctype("INTMAX",    intmax_ctype, PTYPE_MAX|PTYPE_TYPE|PTYPE_WIDTH);
+	predefined_ctype("UINTMAX",  uintmax_ctype, PTYPE_MAX|PTYPE_TYPE);
+	predefined_ctype("INTPTR",   ssize_t_ctype, PTYPE_MAX|PTYPE_TYPE|PTYPE_WIDTH);
+	predefined_ctype("UINTPTR",   size_t_ctype, PTYPE_MAX|PTYPE_TYPE);
+	predefined_ctype("PTRDIFF",  ssize_t_ctype, PTYPE_ALL_T|PTYPE_TYPE);
+	predefined_ctype("SIZE",      size_t_ctype, PTYPE_ALL_T|PTYPE_TYPE);
+	predefined_ctype("POINTER",     &ptr_ctype, PTYPE_SIZEOF);
+
+	predefined_sizeof("FLOAT", "", bits_in_float);
+	predefined_sizeof("DOUBLE", "", bits_in_double);
+	predefined_sizeof("LONG_DOUBLE", "", bits_in_longdouble);
+
+	predefine("__ORDER_LITTLE_ENDIAN__", 1, "1234");
+	predefine("__ORDER_BIG_ENDIAN__", 1, "4321");
+	predefine("__ORDER_PDP_ENDIAN__", 1, "3412");
+	if (arch_big_endian) {
+		predefine("__BIG_ENDIAN__", 1, "1");
+		predefine("__BYTE_ORDER__", 1, "__ORDER_BIG_ENDIAN__");
+	} else {
+		predefine("__LITTLE_ENDIAN__", 1, "1");
+		predefine("__BYTE_ORDER__", 1, "__ORDER_LITTLE_ENDIAN__");
+	}
+
+	if (optimize_level)
+		predefine("__OPTIMIZE__", 0, "1");
+	if (optimize_size)
+		predefine("__OPTIMIZE_SIZE__", 0, "1");
+
+	// Temporary hacks
+	predefine("__extension__", 0, NULL);
+	predefine("__pragma__", 0, NULL);
+
+	switch (arch_m64) {
+	case ARCH_LP32:
+		break;
+	case ARCH_X32:
+		predefine("__ILP32__", 1, "1");
+		predefine("_ILP32", 1, "1");
+		break;
+	case ARCH_LP64:
+		predefine("__LP64__", 1, "1");
+		predefine("__LP64", 1, "1");
+		predefine("_LP64", 1, "1");
+		break;
+	case ARCH_LLP64:
+		predefine("__LLP64__", 1, "1");
+		break;
+	}
+
+	switch (arch_mach) {
+	case MACH_ARM64:
+		predefine("__aarch64__", 1, "1");
+		break;
+	case MACH_ARM:
+		predefine("__arm__", 1, "1");
+		break;
+	case MACH_M68K:
+		predefine("__m68k__", 1, "1");
+		break;
+	case MACH_MIPS64:
+		if (arch_m64 == ARCH_LP64)
+			predefine("__mips64", 1, "64");
+		/* fall-through */
+	case MACH_MIPS32:
+		predefine("__mips", 1, "%d", ptr_ctype.bit_size);
+		predefine("_MIPS_SZINT", 1, "%d", int_ctype.bit_size);
+		predefine("_MIPS_SZLONG", 1, "%d", long_ctype.bit_size);
+		predefine("_MIPS_SZPTR", 1, "%d", ptr_ctype.bit_size);
+		break;
+	case MACH_PPC64:
+		if (arch_m64 == ARCH_LP64) {
+			predefine("__powerpc64__", 1, "1");
+			predefine("__ppc64__", 1, "1");
+			predefine("__PPC64__", 1, "1");
+		}
+		/* fall-through */
+	case MACH_PPC32:
+		predefine("__powerpc__", 1, "1");
+		predefine("__powerpc", 1, "1");
+		predefine("__ppc__", 1, "1");
+		predefine("__PPC__", 1, "1");
+		break;
+	case MACH_RISCV64:
+	case MACH_RISCV32:
+		predefine("__riscv", 1, "1");
+		predefine("__riscv_xlen", 1, "%d", ptr_ctype.bit_size);
+		break;
+	case MACH_S390X:
+		predefine("__zarch__", 1, "1");
+		predefine("__s390x__", 1, "1");
+		predefine("__s390__", 1, "1");
+		break;
+	case MACH_SPARC64:
+		if (arch_m64 == ARCH_LP64) {
+			predefine("__sparc_v9__", 1, "1");
+			predefine("__sparcv9__", 1, "1");
+			predefine("__sparcv9", 1, "1");
+			predefine("__sparc64__", 1, "1");
+			predefine("__arch64__", 1, "1");
+		}
+		/* fall-through */
+	case MACH_SPARC32:
+		predefine("__sparc__", 1, "1");
+		predefine("__sparc", 1, "1");
+		break;
+	case MACH_X86_64:
+		if (arch_m64 != ARCH_LP32) {
+			predefine("__x86_64__", 1, "1");
+			predefine("__x86_64", 1, "1");
+			break;
+		}
+		/* fall-through */
+	case MACH_I386:
+		predefine("__i386__", 1, "1");
+		predefine("__i386", 1, "1");
+		predefine("i386", 1, "1");
+		break;
+	}
+
+	predefine("__PRAGMA_REDEFINE_EXTNAME", 1, "1");
+
 #ifdef	__sun
-	add_pre_buffer("#weak_define __unix__ 1\n");
-	add_pre_buffer("#weak_define __unix 1\n");
-	add_pre_buffer("#weak_define unix 1\n");
-	add_pre_buffer("#weak_define __sun__ 1\n");
-	add_pre_buffer("#weak_define __sun 1\n");
-	add_pre_buffer("#weak_define sun 1\n");
-	add_pre_buffer("#weak_define __svr4__ 1\n");
+	predefine("__unix__", 1, "1");
+	predefine("__unix", 1, "1");
+	predefine("unix", 1, "1");
+	predefine("__sun__", 1, "1");
+	predefine("__sun", 1, "1");
+	predefine("sun", 1, "1");
+	predefine("__svr4__", 1, "1");
 #endif
 }
 
-void declare_builtin_functions(void)
+static void create_builtin_stream(void)
 {
-	/* Gaah. gcc knows tons of builtin <string.h> functions */
-	add_pre_buffer("extern void *__builtin_memchr(const void *, int, __SIZE_TYPE__);\n");
-	add_pre_buffer("extern void *__builtin_memcpy(void *, const void *, __SIZE_TYPE__);\n");
-	add_pre_buffer("extern void *__builtin_mempcpy(void *, const void *, __SIZE_TYPE__);\n");
-	add_pre_buffer("extern void *__builtin_memmove(void *, const void *, __SIZE_TYPE__);\n");
-	add_pre_buffer("extern void *__builtin_memset(void *, int, __SIZE_TYPE__);\n");
-	add_pre_buffer("extern int __builtin_memcmp(const void *, const void *, __SIZE_TYPE__);\n");
-	add_pre_buffer("extern char *__builtin_strcat(char *, const char *);\n");
-	add_pre_buffer("extern char *__builtin_strncat(char *, const char *, __SIZE_TYPE__);\n");
-	add_pre_buffer("extern int __builtin_strcmp(const char *, const char *);\n");
-	add_pre_buffer("extern int __builtin_strncmp(const char *, const char *, __SIZE_TYPE__);\n");
-	add_pre_buffer("extern int __builtin_strcasecmp(const char *, const char *);\n");
-	add_pre_buffer("extern int __builtin_strncasecmp(const char *, const char *, __SIZE_TYPE__);\n");
-	add_pre_buffer("extern char *__builtin_strchr(const char *, int);\n");
-	add_pre_buffer("extern char *__builtin_strrchr(const char *, int);\n");
-	add_pre_buffer("extern char *__builtin_strcpy(char *, const char *);\n");
-	add_pre_buffer("extern char *__builtin_strncpy(char *, const char *, __SIZE_TYPE__);\n");
-	add_pre_buffer("extern char *__builtin_strdup(const char *);\n");
-	add_pre_buffer("extern char *__builtin_strndup(const char *, __SIZE_TYPE__);\n");
-	add_pre_buffer("extern __SIZE_TYPE__ __builtin_strspn(const char *, const char *);\n");
-	add_pre_buffer("extern __SIZE_TYPE__ __builtin_strcspn(const char *, const char *);\n");
-	add_pre_buffer("extern char * __builtin_strpbrk(const char *, const char *);\n");
-	add_pre_buffer("extern char* __builtin_stpcpy(const char *, const char*);\n");
-	add_pre_buffer("extern char* __builtin_stpncpy(const char *, const char*, __SIZE_TYPE__);\n");
-	add_pre_buffer("extern __SIZE_TYPE__ __builtin_strlen(const char *);\n");
-	add_pre_buffer("extern char *__builtin_strstr(const char *, const char *);\n");
-	add_pre_buffer("extern char *__builtin_strcasestr(const char *, const char *);\n");
-	add_pre_buffer("extern char *__builtin_strnstr(const char *, const char *, __SIZE_TYPE__);\n");
-
-	/* And even some from <strings.h> */
-	add_pre_buffer("extern int  __builtin_bcmp(const void *, const void *, __SIZE_TYPE__);\n");
-	add_pre_buffer("extern void __builtin_bcopy(const void *, void *, __SIZE_TYPE__);\n");
-	add_pre_buffer("extern void __builtin_bzero(void *, __SIZE_TYPE__);\n");
-	add_pre_buffer("extern char*__builtin_index(const char *, int);\n");
-	add_pre_buffer("extern char*__builtin_rindex(const char *, int);\n");
-
-	/* And bitwise operations.. */
-	add_pre_buffer("extern int __builtin_clrsb(int);\n");
-	add_pre_buffer("extern int __builtin_clrsbl(long);\n");
-	add_pre_buffer("extern int __builtin_clrsbll(long long);\n");
-	add_pre_buffer("extern int __builtin_clz(int);\n");
-	add_pre_buffer("extern int __builtin_clzl(long);\n");
-	add_pre_buffer("extern int __builtin_clzll(long long);\n");
-	add_pre_buffer("extern int __builtin_ctz(int);\n");
-	add_pre_buffer("extern int __builtin_ctzl(long);\n");
-	add_pre_buffer("extern int __builtin_ctzll(long long);\n");
-	add_pre_buffer("extern int __builtin_ffs(int);\n");
-	add_pre_buffer("extern int __builtin_ffsl(long);\n");
-	add_pre_buffer("extern int __builtin_ffsll(long long);\n");
-	add_pre_buffer("extern int __builtin_parity(unsigned int);\n");
-	add_pre_buffer("extern int __builtin_parityl(unsigned long);\n");
-	add_pre_buffer("extern int __builtin_parityll(unsigned long long);\n");
-	add_pre_buffer("extern int __builtin_popcount(unsigned int);\n");
-	add_pre_buffer("extern int __builtin_popcountl(unsigned long);\n");
-	add_pre_buffer("extern int __builtin_popcountll(unsigned long long);\n");
-
-	/* And byte swaps.. */
-	add_pre_buffer("extern unsigned short __builtin_bswap16(unsigned short);\n");
-	add_pre_buffer("extern unsigned int __builtin_bswap32(unsigned int);\n");
-	add_pre_buffer("extern unsigned long long __builtin_bswap64(unsigned long long);\n");
-
-	/* And atomic memory access functions.. */
-	add_pre_buffer("extern int __sync_fetch_and_add(void *, ...);\n");
-	add_pre_buffer("extern int __sync_fetch_and_sub(void *, ...);\n");
-	add_pre_buffer("extern int __sync_fetch_and_or(void *, ...);\n");
-	add_pre_buffer("extern int __sync_fetch_and_and(void *, ...);\n");
-	add_pre_buffer("extern int __sync_fetch_and_xor(void *, ...);\n");
-	add_pre_buffer("extern int __sync_fetch_and_nand(void *, ...);\n");
-	add_pre_buffer("extern int __sync_add_and_fetch(void *, ...);\n");
-	add_pre_buffer("extern int __sync_sub_and_fetch(void *, ...);\n");
-	add_pre_buffer("extern int __sync_or_and_fetch(void *, ...);\n");
-	add_pre_buffer("extern int __sync_and_and_fetch(void *, ...);\n");
-	add_pre_buffer("extern int __sync_xor_and_fetch(void *, ...);\n");
-	add_pre_buffer("extern int __sync_nand_and_fetch(void *, ...);\n");
-	add_pre_buffer("extern int __sync_bool_compare_and_swap(void *, ...);\n");
-	add_pre_buffer("extern int __sync_val_compare_and_swap(void *, ...);\n");
-	add_pre_buffer("extern void __sync_synchronize();\n");
-	add_pre_buffer("extern int __sync_lock_test_and_set(void *, ...);\n");
-	add_pre_buffer("extern void __sync_lock_release(void *, ...);\n");
-
-	/* And some random ones.. */
-	add_pre_buffer("extern void *__builtin_return_address(unsigned int);\n");
-	add_pre_buffer("extern void *__builtin_extract_return_addr(void *);\n");
-	add_pre_buffer("extern void *__builtin_frame_address(unsigned int);\n");
-	add_pre_buffer("extern void __builtin_trap(void);\n");
-	add_pre_buffer("extern void *__builtin_alloca(__SIZE_TYPE__);\n");
-	add_pre_buffer("extern void __builtin_prefetch (const void *, ...);\n");
-	add_pre_buffer("extern long __builtin_alpha_extbl(long, long);\n");
-	add_pre_buffer("extern long __builtin_alpha_extwl(long, long);\n");
-	add_pre_buffer("extern long __builtin_alpha_insbl(long, long);\n");
-	add_pre_buffer("extern long __builtin_alpha_inswl(long, long);\n");
-	add_pre_buffer("extern long __builtin_alpha_insql(long, long);\n");
-	add_pre_buffer("extern long __builtin_alpha_inslh(long, long);\n");
-	add_pre_buffer("extern long __builtin_alpha_cmpbge(long, long);\n");
-	add_pre_buffer("extern int  __builtin_abs(int);\n");
-	add_pre_buffer("extern long __builtin_labs(long);\n");
-	add_pre_buffer("extern long long __builtin_llabs(long long);\n");
-	add_pre_buffer("extern double __builtin_fabs(double);\n");
-	add_pre_buffer("extern __SIZE_TYPE__ __builtin_va_arg_pack_len(void);\n");
-
-	/* Add Blackfin-specific stuff */
-	add_pre_buffer(
-		"#ifdef __bfin__\n"
-		"extern void __builtin_bfin_csync(void);\n"
-		"extern void __builtin_bfin_ssync(void);\n"
-		"extern int __builtin_bfin_norm_fr1x32(int);\n"
-		"#endif\n"
-	);
-
-	/* And some floating point stuff.. */
-	add_pre_buffer("extern int __builtin_isgreater(float, float);\n");
-	add_pre_buffer("extern int __builtin_isgreaterequal(float, float);\n");
-	add_pre_buffer("extern int __builtin_isless(float, float);\n");
-	add_pre_buffer("extern int __builtin_islessequal(float, float);\n");
-	add_pre_buffer("extern int __builtin_islessgreater(float, float);\n");
-	add_pre_buffer("extern int __builtin_isunordered(float, float);\n");
-
-	/* And some INFINITY / NAN stuff.. */
-	add_pre_buffer("extern double __builtin_huge_val(void);\n");
-	add_pre_buffer("extern float __builtin_huge_valf(void);\n");
-	add_pre_buffer("extern long double __builtin_huge_vall(void);\n");
-	add_pre_buffer("extern double __builtin_inf(void);\n");
-	add_pre_buffer("extern float __builtin_inff(void);\n");
-	add_pre_buffer("extern long double __builtin_infl(void);\n");
-	add_pre_buffer("extern double __builtin_nan(const char *);\n");
-	add_pre_buffer("extern float __builtin_nanf(const char *);\n");
-	add_pre_buffer("extern long double __builtin_nanl(const char *);\n");
-	add_pre_buffer("extern int __builtin_isinf_sign(float);\n");
-	add_pre_buffer("extern int __builtin_isfinite(float);\n");
-	add_pre_buffer("extern int __builtin_isnan(float);\n");
-
-	/* And some __FORTIFY_SOURCE ones.. */
-	add_pre_buffer ("extern __SIZE_TYPE__ __builtin_object_size(const void *, int);\n");
-	add_pre_buffer ("extern void * __builtin___memcpy_chk(void *, const void *, __SIZE_TYPE__, __SIZE_TYPE__);\n");
-	add_pre_buffer ("extern void * __builtin___memmove_chk(void *, const void *, __SIZE_TYPE__, __SIZE_TYPE__);\n");
-	add_pre_buffer ("extern void * __builtin___mempcpy_chk(void *, const void *, __SIZE_TYPE__, __SIZE_TYPE__);\n");
-	add_pre_buffer ("extern void * __builtin___memset_chk(void *, int, __SIZE_TYPE__, __SIZE_TYPE__);\n");
-	add_pre_buffer ("extern int __builtin___sprintf_chk(char *, int, __SIZE_TYPE__, const char *, ...);\n");
-	add_pre_buffer ("extern int __builtin___snprintf_chk(char *, __SIZE_TYPE__, int , __SIZE_TYPE__, const char *, ...);\n");
-	add_pre_buffer ("extern char * __builtin___stpcpy_chk(char *, const char *, __SIZE_TYPE__);\n");
-	add_pre_buffer ("extern char * __builtin___strcat_chk(char *, const char *, __SIZE_TYPE__);\n");
-	add_pre_buffer ("extern char * __builtin___strcpy_chk(char *, const char *, __SIZE_TYPE__);\n");
-	add_pre_buffer ("extern char * __builtin___strncat_chk(char *, const char *, __SIZE_TYPE__, __SIZE_TYPE__);\n");
-	add_pre_buffer ("extern char * __builtin___strncpy_chk(char *, const char *, __SIZE_TYPE__, __SIZE_TYPE__);\n");
-	add_pre_buffer ("extern int __builtin___vsprintf_chk(char *, int, __SIZE_TYPE__, const char *, __builtin_va_list);\n");
-	add_pre_buffer ("extern int __builtin___vsnprintf_chk(char *, __SIZE_TYPE__, int, __SIZE_TYPE__, const char *, __builtin_va_list ap);\n");
-	add_pre_buffer ("extern void __builtin_unreachable(void);\n");
-
-	/* And some from <stdlib.h> */
-	add_pre_buffer("extern void __builtin_abort(void);\n");
-	add_pre_buffer("extern void *__builtin_calloc(__SIZE_TYPE__, __SIZE_TYPE__);\n");
-	add_pre_buffer("extern void __builtin_exit(int);\n");
-	add_pre_buffer("extern void *__builtin_malloc(__SIZE_TYPE__);\n");
-	add_pre_buffer("extern void *__builtin_realloc(void *, __SIZE_TYPE__);\n");
-	add_pre_buffer("extern void __builtin_free(void *);\n");
-
-	/* And some from <stdio.h> */
-	add_pre_buffer("extern int __builtin_printf(const char *, ...);\n");
-	add_pre_buffer("extern int __builtin_sprintf(char *, const char *, ...);\n");
-	add_pre_buffer("extern int __builtin_snprintf(char *, __SIZE_TYPE__, const char *, ...);\n");
-	add_pre_buffer("extern int __builtin_puts(const char *);\n");
-	add_pre_buffer("extern int __builtin_vprintf(const char *, __builtin_va_list);\n");
-	add_pre_buffer("extern int __builtin_vsprintf(char *, const char *, __builtin_va_list);\n");
-	add_pre_buffer("extern int __builtin_vsnprintf(char *, __SIZE_TYPE__, const char *, __builtin_va_list ap);\n");
-}
-
-void create_builtin_stream(void)
-{
-	add_pre_buffer("#weak_define __GNUC__ %d\n", gcc_major);
-	add_pre_buffer("#weak_define __GNUC_MINOR__ %d\n", gcc_minor);
-	add_pre_buffer("#weak_define __GNUC_PATCHLEVEL__ %d\n", gcc_patchlevel);
+	// Temporary hack
+	add_pre_buffer("#define _Pragma(x)\n");
 
 	/* add the multiarch include directories, if any */
 	if (multiarch_dir && *multiarch_dir) {
@@ -1236,57 +1433,8 @@ void create_builtin_stream(void)
 	add_pre_buffer("#add_system \"%s/include\"\n", gcc_base_dir);
 	add_pre_buffer("#add_system \"%s/include-fixed\"\n", gcc_base_dir);
 
-	add_pre_buffer("#define __extension__\n");
-	add_pre_buffer("#define __pragma__\n");
-	add_pre_buffer("#define _Pragma(x)\n");
-
-	// gcc defines __SIZE_TYPE__ to be size_t.  For linux/i86 and
-	// solaris/sparc that is really "unsigned int" and for linux/x86_64
-	// it is "long unsigned int".  In either case we can probably
-	// get away with this.  We need the #weak_define as cgcc will define
-	// the right __SIZE_TYPE__.
-	if (size_t_ctype == &ulong_ctype)
-		add_pre_buffer("#weak_define __SIZE_TYPE__ long unsigned int\n");
-	else
-		add_pre_buffer("#weak_define __SIZE_TYPE__ unsigned int\n");
-	add_pre_buffer("#weak_define __STDC__ 1\n");
-
-	switch (standard)
-	{
-		case STANDARD_C89:
-			add_pre_buffer("#weak_define __STRICT_ANSI__\n");
-			break;
-
-		case STANDARD_C94:
-			add_pre_buffer("#weak_define __STDC_VERSION__ 199409L\n");
-			add_pre_buffer("#weak_define __STRICT_ANSI__\n");
-			break;
-
-		case STANDARD_C99:
-			add_pre_buffer("#weak_define __STDC_VERSION__ 199901L\n");
-			add_pre_buffer("#weak_define __STRICT_ANSI__\n");
-			break;
-
-		case STANDARD_GNU89:
-			break;
-
-		case STANDARD_GNU99:
-			add_pre_buffer("#weak_define __STDC_VERSION__ 199901L\n");
-			break;
-
-		case STANDARD_C11:
-			add_pre_buffer("#weak_define __STRICT_ANSI__ 1\n");
-		case STANDARD_GNU11:
-			add_pre_buffer("#weak_define __STDC_NO_ATOMICS__ 1\n");
-			add_pre_buffer("#weak_define __STDC_NO_COMPLEX__ 1\n");
-			add_pre_buffer("#weak_define __STDC_NO_THREADS__ 1\n");
-			add_pre_buffer("#weak_define __STDC_VERSION__ 201112L\n");
-			break;
-
-		default:
-			assert (0);
-	}
-
+	add_pre_buffer("#define __has_builtin(x) 0\n");
+	add_pre_buffer("#define __has_attribute(x) 0\n");
 	add_pre_buffer("#define __builtin_stdarg_start(a,b) ((a) = (__builtin_va_list)(&(b)))\n");
 	add_pre_buffer("#define __builtin_va_start(a,b) ((a) = (__builtin_va_list)(&(b)))\n");
 	add_pre_buffer("#define __builtin_ms_va_start(a,b) ((a) = (__builtin_ms_va_list)(&(b)))\n");
@@ -1298,14 +1446,6 @@ void create_builtin_stream(void)
 	add_pre_buffer("#define __builtin_va_end(arg)\n");
 	add_pre_buffer("#define __builtin_ms_va_end(arg)\n");
 	add_pre_buffer("#define __builtin_va_arg_pack()\n");
-
-	/* FIXME! We need to do these as special magic macros at expansion time! */
-	add_pre_buffer("#define __BASE_FILE__ \"base_file.c\"\n");
-
-	if (optimize)
-		add_pre_buffer("#define __OPTIMIZE__ 1\n");
-	if (optimize_size)
-		add_pre_buffer("#define __OPTIMIZE_SIZE__ 1\n");
 }
 
 static struct symbol_list *sparse_tokenstream(struct token *token)
@@ -1315,8 +1455,12 @@ static struct symbol_list *sparse_tokenstream(struct token *token)
 	// Preprocess the stream
 	token = preprocess(token);
 
-	if (dump_macro_defs && !builtin)
-		dump_macro_definitions();
+	if (dump_macro_defs || dump_macros_only) {
+		if (!builtin)
+			dump_macro_definitions();
+		if (dump_macros_only)
+			return NULL;
+	}
 
 	if (preprocess_only) {
 		while (!eof_token(token)) {
@@ -1357,6 +1501,7 @@ static struct symbol_list *sparse_file(const char *filename)
 		if (fd < 0)
 			die("No such file: %s", filename);
 	}
+	base_filename = filename;
 
 	// Tokenize the input stream
 	token = tokenize(filename, fd, NULL, includepath);
@@ -1364,12 +1509,6 @@ static struct symbol_list *sparse_file(const char *filename)
 	close(fd);
 
 	return sparse_tokenstream(token);
-}
-
-static int endswith(const char *str, const char *suffix)
-{
-	const char *found = strstr(str, suffix);
-	return (found && strcmp(found, suffix) == 0);
 }
 
 /*
@@ -1393,6 +1532,12 @@ static struct symbol_list *sparse_initial(void)
 	return sparse_tokenstream(pre_buffer_begin);
 }
 
+static int endswith(const char *str, const char *suffix)
+{
+	const char *found = strstr(str, suffix);
+	return (found && strcmp(found, suffix) == 0);
+}
+
 struct symbol_list *sparse_initialize(int argc, char **argv, struct string_list **filelist)
 {
 	char **args;
@@ -1402,7 +1547,7 @@ struct symbol_list *sparse_initialize(int argc, char **argv, struct string_list 
 	init_symbols();
 	init_include_path();
 
-	progname = argv[0];
+	diag_prefix = argv[0];
 
 	args = argv;
 	for (;;) {
@@ -1419,23 +1564,32 @@ struct symbol_list *sparse_initialize(int argc, char **argv, struct string_list 
 		    endswith(arg, ".so.1") || endswith(arg, ".o"))
 			continue;
 
-		add_ptr_list_notag(filelist, arg);
+		add_ptr_list(filelist, arg);
 	}
 	handle_switch_W_finalize();
 	handle_switch_v_finalize();
 
-	handle_arch_finalize();
+	// Redirect stdout if needed
+	if (dump_macro_defs || preprocess_only)
+		do_output = 1;
+	if (do_output && outfile && strcmp(outfile, "-")) {
+		if (!freopen(outfile, "w", stdout))
+			die("error: cannot open %s: %s", outfile, strerror(errno));
+	}
+
+	if (fdump_ir == 0)
+		fdump_ir = PASS_FINAL;
 
 	list = NULL;
-	if (!ptr_list_empty(filelist)) {
+	if (filelist) {
 		// Initialize type system
+		init_target();
+		handle_arch_finalize();
 		init_ctype();
-		handle_funsigned_char();
 
-		create_builtin_stream();
 		predefined_macros();
-		if (!preprocess_only)
-			declare_builtin_functions();
+		create_builtin_stream();
+		declare_builtins();
 
 		list = sparse_initial();
 

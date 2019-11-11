@@ -36,32 +36,37 @@
 
 static int my_id;
 
-static void pre_merge_hook(struct sm_state *sm)
+static void extra_mod_hook(const char *name, struct symbol *sym, struct expression *expr, struct smatch_state *state)
 {
 	struct smatch_state *abs;
+	struct range_list *rl;
+
+	abs = get_state(my_id, name, sym);
+	if (!abs || !estate_rl(abs))
+		return;
+	rl = rl_intersection(estate_rl(abs), estate_rl(state));
+	set_state(my_id, name, sym, alloc_estate_rl(clone_rl(rl)));
+}
+
+static void pre_merge_hook(struct sm_state *cur, struct sm_state *other)
+{
 	struct smatch_state *extra;
 	struct range_list *rl;
 
-	extra = get_state(SMATCH_EXTRA, sm->name, sm->sym);
+	extra = get_state(SMATCH_EXTRA, cur->name, cur->sym);
 	if (!extra || !estate_rl(extra))
 		return;
-	abs = get_state(my_id, sm->name, sm->sym);
-	if (!abs || !estate_rl(abs)) {
-		set_state(my_id, sm->name, sm->sym, clone_estate(extra));
+	if (!estate_rl(cur->state)) {
+		set_state(my_id, cur->name, cur->sym, clone_estate(extra));
 		return;
 	}
-	rl = rl_intersection(estate_rl(abs), estate_rl(extra));
-	set_state(my_id, sm->name, sm->sym, alloc_estate_rl(clone_rl(rl)));
+	rl = rl_intersection(estate_rl(cur->state), estate_rl(extra));
+	set_state(my_id, cur->name, cur->sym, alloc_estate_rl(clone_rl(rl)));
 }
 
 static struct smatch_state *empty_state(struct sm_state *sm)
 {
 	return alloc_estate_empty();
-}
-
-static void reset(struct sm_state *sm, struct expression *mod_expr)
-{
-	set_state(my_id, sm->name, sm->sym, alloc_estate_whole(estate_type(sm->state)));
 }
 
 static int in_iterator_pre_statement(void)
@@ -124,7 +129,7 @@ struct smatch_state *get_real_absolute_state(struct expression *expr)
 
 struct smatch_state *get_real_absolute_state_var_sym(const char *name, struct symbol *sym)
 {
-	return get_state(my_id, name, sym);
+	return __get_state(my_id, name, sym);
 }
 
 void register_real_absolute(int id)
@@ -135,7 +140,7 @@ void register_real_absolute(int id)
 	add_pre_merge_hook(my_id, &pre_merge_hook);
 	add_unmatched_state_hook(my_id, &empty_state);
 	add_merge_hook(my_id, &merge_estates);
-	add_modification_hook(my_id, &reset);
+	add_extra_mod_hook(&extra_mod_hook);
 
 	add_hook(&match_assign, ASSIGNMENT_HOOK);
 }

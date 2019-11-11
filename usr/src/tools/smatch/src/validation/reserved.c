@@ -81,7 +81,7 @@ static int (__builtin_va_list);
 
 /*
  * check-name: const et.al. are reserved identifiers
- * check-error-start:
+ * check-error-start
 reserved.c:1:12: error: Trying to use reserved word 'auto' as identifier
 reserved.c:2:12: error: Trying to use reserved word 'break' as identifier
 reserved.c:3:12: error: Trying to use reserved word 'case' as identifier
@@ -154,5 +154,5 @@ reserved.c:77:12: error: Trying to use reserved word '__builtin_ms_va_list' as i
 reserved.c:78:12: error: Trying to use reserved word '__builtin_offsetof' as identifier
 reserved.c:79:12: error: Trying to use reserved word '__builtin_types_compatible_p' as identifier
 reserved.c:80:12: error: Trying to use reserved word '__builtin_va_list' as identifier
- * check-error-end:
+ * check-error-end
  */

@@ -186,7 +186,7 @@ static void match_assign(struct expression *expr)
 {
 	struct statement *stmt;
 
-	if (!is_zero(expr->right))
+	if (!expr_is_zero(expr->right))
 		return;
 
 	if (__in_fake_assign)

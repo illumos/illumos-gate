@@ -47,6 +47,8 @@ static int context_increase(struct basic_block *bb, int entry)
 
 	FOR_EACH_PTR(bb->insns, insn) {
 		int val;
+		if (!insn->bb)
+			continue;
 		if (insn->opcode != OP_CONTEXT)
 			continue;
 		val = insn->increment;
@@ -120,7 +122,7 @@ static void check_cast_instruction(struct instruction *insn)
 		int old = orig_type->bit_size;
 		int new = insn->size;
 		int oldsigned = (orig_type->ctype.modifiers & MOD_SIGNED) != 0;
-		int newsigned = insn->opcode == OP_SCAST;
+		int newsigned = insn->opcode == OP_SEXT;
 
 		if (new > old) {
 			if (oldsigned == newsigned)
@@ -214,7 +216,8 @@ static void check_call_instruction(struct instruction *insn)
 static void check_one_instruction(struct instruction *insn)
 {
 	switch (insn->opcode) {
-	case OP_CAST: case OP_SCAST:
+	case OP_SEXT: case OP_ZEXT:
+	case OP_TRUNC:
 		if (verbose)
 			check_cast_instruction(insn);
 		break;
@@ -243,6 +246,7 @@ static void check_instructions(struct entrypoint *ep)
 {
 	struct basic_block *bb;
 	FOR_EACH_PTR(ep->bbs, bb) {
+		bb->context = -1;
 		check_bb_instructions(bb);
 	} END_FOR_EACH_PTR(bb);
 }
@@ -271,6 +275,37 @@ static void check_context(struct entrypoint *ep)
 	check_bb_context(ep, ep->entry->bb, in_context, out_context);
 }
 
+/* list_compound_symbol - symbol info for arrays, structures, unions */
+static void list_compound_symbol(struct symbol *sym)
+{
+	struct symbol *base;
+
+	/* Only show symbols that have a positive size */
+	if (sym->bit_size <= 0)
+		return;
+	if (!sym->ctype.base_type)
+		return;
+	/* Don't show unnamed types */
+	if (!sym->ident)
+		return;
+
+	if (sym->type == SYM_NODE)
+		base = sym->ctype.base_type;
+	else
+		base = sym;
+	switch (base->type) {
+	case SYM_STRUCT: case SYM_UNION: case SYM_ARRAY:
+		break;
+	default:
+		return;
+	}
+
+	info(sym->pos, "%s: compound size %u, alignment %lu",
+		show_typename(sym),
+		bits_to_bytes(sym->bit_size),
+		sym->ctype.alignment);
+}
+
 static void check_symbols(struct symbol_list *list)
 {
 	struct symbol *sym;
@@ -280,12 +315,14 @@ static void check_symbols(struct symbol_list *list)
 
 		expand_symbol(sym);
 		ep = linearize_symbol(sym);
-		if (ep) {
+		if (ep && ep->entry) {
 			if (dbg_entry)
 				show_entry(ep);
 
 			check_context(ep);
 		}
+		if (dbg_compound)
+			list_compound_symbol(sym);
 	} END_FOR_EACH_PTR(sym);
 
 	if (Wsparse_error && die_if_error)
@@ -297,11 +334,14 @@ int main(int argc, char **argv)
 	struct string_list *filelist = NULL;
 	char *file;
 
+	// by default ignore -o <file>
+	do_output = 0;
+
 	// Expand, linearize and show it.
 	check_symbols(sparse_initialize(argc, argv, &filelist));
-	FOR_EACH_PTR_NOTAG(filelist, file) {
+	FOR_EACH_PTR(filelist, file) {
 		check_symbols(sparse(file));
-	} END_FOR_EACH_PTR_NOTAG(file);
+	} END_FOR_EACH_PTR(file);
 
 	report_stats();
 	return 0;

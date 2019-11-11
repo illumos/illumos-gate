@@ -53,3 +53,7 @@ security_kernel_post_read_file s32min-(-1),1-s32max (-4095)-(-1)
 array_index_mask_nospec 0-u64max u64max
 array_index_mask_nospec 0-u32max u32max
 nla_len (-4)-65531[$0->nla_len\ -\ 4] 0-65531[$0->nla_len\ -\ 4]
+__rounddown_pow_of_two 0-u64max 0-u64max[<=$0]
+__roundup_pow_of_two 0-u64max 0-u64max[>=$0]
+kthread_probe_data 0 0-u64max
+bus_for_each_dev (-4095)-1 (-4095)-1[r\ $3]

@@ -9,7 +9,7 @@ static void foo(void)
 }
 
 /*
- * check-name: compound literal address constness verification
+ * check-name: constexpr compound literal address
  * check-command: sparse -Wconstexpr-not-const $file
  *
  * check-error-start

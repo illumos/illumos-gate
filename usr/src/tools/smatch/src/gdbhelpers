@@ -107,6 +107,12 @@ define gdb_show_ctype
 	if ($arg0->modifiers & MOD_VOLATILE)
 		printf "MOD_VOLATILE "
 	end
+	if ($arg0->modifiers & MOD_RESTRICT)
+		printf "MOD_RESTRICT "
+	end
+	if ($arg0->modifiers & MOD_ATOMIC)
+		printf "MOD_ATOMIC "
+	end
 	if ($arg0->modifiers & MOD_SIGNED)
 		printf "MOD_SIGNED "
 	end
@@ -128,9 +134,6 @@ define gdb_show_ctype
 	if ($arg0->modifiers & MOD_LONGLONGLONG)
 		printf "MOD_LONGLONGLONG "
 	end
-	if ($arg0->modifiers & MOD_TYPEDEF)
-		printf "MOD_TYPEDEF "
-	end
 	if ($arg0->modifiers & MOD_INLINE)
 		printf "MOD_INLINE "
 	end
@@ -142,9 +145,6 @@ define gdb_show_ctype
 	end
 	if ($arg0->modifiers & MOD_NODEREF)
 		printf "MOD_NODEREF "
-	end
-	if ($arg0->modifiers & MOD_ACCESSED)
-		printf "MOD_ACCESSED "
 	end
 	if ($arg0->modifiers & MOD_TOPLEVEL)
 		printf "MOD_TOPLEVEL "

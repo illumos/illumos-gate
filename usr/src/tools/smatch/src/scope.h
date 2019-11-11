@@ -29,7 +29,7 @@ struct symbol;
 struct position;
 
 struct scope {
-	struct token *token;		/* Scope start information */
+	struct token *token;
 	struct symbol_list *symbols;	/* List of symbols in this scope */
 	struct scope *next;
 };

@@ -1,0 +1,207 @@
+Detecting ARM64 tagged pointers
+===============================
+
+The ARM64 ABI allows tagged memory addresses to be passed through the
+user-kernel syscall ABI boundary. Tagged memory addresses are those which
+contain a non-zero top byte - the hardware will always ignore this top
+byte, however software does not. Therefore it is helpful to be able to
+detect code that erroneously compares tagged memory addresses with
+untagged memory addresses. This document describes how smatch can be used
+for this.
+
+Smatch will provide a warning when it detects that a comparison is being
+made between a user originated 64 bit data where the top byte may be
+non-zero and any variable which may contain an untagged address.
+
+Untagged variables are detected by looking for hard-coded known struct
+members (such as vm_start, vm_end and addr_limit) and hard-coded known
+macros (such as PAGE_SIZE, PAGE_MASK and TASK_SIZE). This check is
+also able to detect when comparisons are made against variables that
+have been assigned from these known untagged variables, though this
+tracking is limited to the scope of the function.
+
+This check is only performed when the ARCH environment variable is set to
+arm64. To provide a worked example, consider the following command which is
+used to perform Smatch static analysis on the Linux kernel:
+
+$ ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- ~/smatch/smatch_scripts/build_kernel_data.sh
+
+It is recommended that this command is run multiple times (6 or more) to
+provide Smatch with a deeper knowledge of the call stack. Before running
+multiple iterations of Smatch, it may be beneficial to delete any smatch*
+files in the root of the linux tree.
+
+Once Smatch has run, you can observe warnings as follows:
+
+$ cat smatch_warns.txt | grep "tagged address"
+mm/gup.c:818 __get_user_pages() warn: comparison of a potentially tagged
+address (__get_user_pages, 2, start)
+...
+
+This warning tells us that on line 818 of mm/gup.c an erroneous comparison
+may have been made between a tagged address (variable 'start' which originated
+from parameter 2 of the function) and existing kernel addresses (untagged).
+
+The code that this relates to follows:
+
+790: static long __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
+791:                unsigned long start, unsigned long nr_pages,
+792:                unsigned int gup_flags, struct page **pages,
+793:                struct vm_area_struct **vmas, int *nonblocking)
+794:{
+...
+818:                if (!vma || start >= vma->vm_end) {
+
+Through manual inspection of this code, we can verify that the variable 'start'
+originated from parameter 2 of its function '__get_user_pages'.
+
+A suggested fix at this point may be to call the untagged_addr macro prior
+to the comparison on line 818. However it's often helpful to follow the
+parameter up the call stack, we can do this with the following Smatch command:
+
+$ ~/smatch/smatch_data/db/smdb.py find_tagged __get_user_pages 2
+    copy_strings (param ?) -> get_arg_page (param 1)
+    vfio_pin_map_dma (param ?) -> vfio_pin_pages_remote (param 1)
+    __se_sys_ptrace (param 2)
+    environ_read (param ?) -> access_remote_vm (param 1)
+    io_sqe_buffer_register (param ?) -> get_user_pages (param 0)
+    gntdev_grant_copy_seg (param ?) -> gntdev_get_page (param 1)
+    get_futex_key (param ?) -> get_user_pages_fast (param 0)
+    __se_sys_madvise (param 0)
+    __mm_populate (param ?) -> populate_vma_page_range (param 1)
+    __se_sys_mprotect (param 0)
+
+
+This script will examine all of the possible callers of __get_user_pages where
+parameter 2 contains user data and where the top byte of the parameter may be
+non-zero. It will recurse up the possible call stacks as far as it can go. This
+will leave a list of functions that provide tagged addresses to __get_user_pages
+and the parameter of interest (or variable if Smatch cannot determine the
+function parameter).
+
+Sometimes Smatch is able to determine a caller of a function but is unable
+to determine which parameter of that function relates to the parameter of the
+called function, when this happens the following output it shown:
+
+get_futex_key (param ?) -> get_user_pages_fast (param 0)
+
+This shows that when following up the call tree from __get_user_pages, we stop
+at get_user_pages_fast with parameter 0 of that function containing user data.
+Smatch knows that get_futex_key calls get_user_pages_fast but cannot determine
+which parameter of get_futex_key provided the data of interest. In these cases
+manual inspection of the source tree can help and if necessary re-run the
+smdb.py script with new parameters (e.g. smdb.py find_tagged get_futex_key 0).
+
+To provide a summary of all of the tagged issues found, the following command
+can be run directly on the smatch_warns.txt file:
+
+$ ~/smatch/smatch_data/db/smdb.py parse_warns_tagged smatch_warns.txt
+
+This will run find_tagged for each issue found, e.g.
+
+mm/mmap.c:2918 (func: __do_sys_remap_file_pages, param: 0:start) may be caused by:
+    __se_sys_remap_file_pages (param 0)
+
+mm/mmap.c:2963 (func: __do_sys_remap_file_pages, param: -1:__UNIQUE_ID___y73) may be caused by:
+    __do_sys_remap_file_pages (variable __UNIQUE_ID___y73 (can't walk call tree)
+
+mm/mmap.c:3000 (func: do_brk_flags, param: -1:error) may be caused by:
+    do_brk_flags (variable error (can't walk call tree)
+
+mm/mmap.c:540 (func: find_vma_links, param: 1:addr) may be caused by:
+    find_vma_links (param 1) (can't walk call tree)
+
+mm/mmap.c:570 (func: count_vma_pages_range, param: -1:__UNIQUE_ID___x64) may be caused by:
+    count_vma_pages_range (variable __UNIQUE_ID___x64 (can't walk call tree)
+
+mm/mmap.c:580 (func: count_vma_pages_range, param: -1:__UNIQUE_ID___x68) may be caused by:
+    count_vma_pages_range (variable __UNIQUE_ID___x68 (can't walk call tree)
+
+mm/mmap.c:856 (func: __vma_adjust, param: 1:start) may be caused by:
+    __se_sys_mprotect (param 0)
+    __se_sys_mlock (param 0)
+    __se_sys_mlock2 (param 0)
+    __se_sys_munlock (param 0)
+    mbind_range (param ?) -> vma_merge (param 2)
+    __se_sys_madvise (param 0)
+    __se_sys_mbind (param 0)
+
+
+The above commands do not output a call stack, instead they provide the 'highest'
+caller found, to provide a call stack perform the following:
+
+$ ~/smatch/smatch_data/db/smdb.py call_tree __get_user_pages
+__get_user_pages()
+  __get_user_pages_locked()
+    get_user_pages_remote()
+      get_arg_page()
+        copy_strings()
+        remove_arg_zero()
+      vaddr_get_pfn()
+        vfio_pin_pages_remote()
+        vfio_pin_page_external()
+      process_vm_rw_single_vec()
+        process_vm_rw_core()
+      __access_remote_vm()
+        ptrace_access_vm()
+        access_remote_vm()
+        access_process_vm()
+    check_and_migrate_cma_pages()
+      __gup_longterm_locked()
+        get_user_pages()
+        __gup_longterm_unlocked()
+    get_user_pages_locked()
+      get_vaddr_frames()
+        vb2_create_framevec()
+      lookup_node()
+        do_get_mempolicy()
+    get_user_pages_unlocked()
+      hva_to_pfn_slow()
+        hva_to_pfn()
+
+Please note that this will show all the callers and is not filtered for those
+carrying tagged addresses in their parameters.
+
+It is possible to filter out false positives by annotating function parameters
+with __untagged. For example:
+
+unsigned long do_mmap(struct file *file, unsigned long addr,
+			unsigned long __untagged len, unsigned long prot,
+			unsigned long flags, vm_flags_t vm_flags,
+			unsigned long pgoff, unsigned long *populate,
+			struct list_head *uf)
+{
+
+This annotation tells smatch that regardless to the value stored in 'len' it
+should be treated as an untagged address. As Smatch is able to track the
+potential ranges of values a variable may hold, it will also track the
+annotation - therefore it is not necessary to use the annotation in every
+function that do_mmap calls. When using this annotation smdb.py will filter
+out functions that carry a value which has been annotated as untagged. Please
+note that due to limitations in parameter tracking some annotations will be
+ignored and not propogated all the way down the call tree.
+
+Finally, the following patch is required to add annotations to the Linux
+kernel:
+
+diff --git a/include/linux/compiler_types.h b/include/linux/compiler_types.h
+index 19e58b9138a0..755e8df375a5 100644
+--- a/include/linux/compiler_types.h
++++ b/include/linux/compiler_types.h
+@@ -19,6 +19,7 @@
+ # define __cond_lock(x,c)      ((c) ? ({ __acquire(x); 1; }) : 0)
+ # define __percpu      __attribute__((noderef, address_space(3)))
+ # define __rcu         __attribute__((noderef, address_space(4)))
++# define __untagged    __attribute__((address_space(5)))
+ # define __private     __attribute__((noderef))
+ extern void __chk_user_ptr(const volatile void __user *);
+ extern void __chk_io_ptr(const volatile void __iomem *);
+@@ -45,6 +46,7 @@ extern void __chk_io_ptr(const volatile void __iomem *);
+ # define __cond_lock(x,c) (c)
+ # define __percpu
+ # define __rcu
++# define __untagged
+ # define __private
+ # define ACCESS_PRIVATE(p, member) ((p)->member)
+ #endif /* __CHECKER__ */
+

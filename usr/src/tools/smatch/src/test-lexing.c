@@ -41,9 +41,9 @@ int main(int argc, char **argv)
 
 	preprocess_only = 1;
 	sparse_initialize(argc, argv, &filelist);
-	FOR_EACH_PTR_NOTAG(filelist, file) {
+	FOR_EACH_PTR(filelist, file) {
 		sparse(file);
-	} END_FOR_EACH_PTR_NOTAG(file);
+	} END_FOR_EACH_PTR(file);
 	show_identifier_stats();
 	return 0;
 }

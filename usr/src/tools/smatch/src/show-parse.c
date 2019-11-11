@@ -72,10 +72,11 @@ static void do_debug_symbol(struct symbol *sym, int indent)
 
 	if (!sym)
 		return;
-	fprintf(stderr, "%.*s%s%3d:%lu %s %s (as: %d) %p (%s:%d:%d) %s\n",
+	fprintf(stderr, "%.*s%s%3d:%lu %s %s (as: %s) %p (%s:%d:%d) %s\n",
 		indent, indent_string, typestr[sym->type],
 		sym->bit_size, sym->ctype.alignment,
-		modifier_string(sym->ctype.modifiers), show_ident(sym->ident), sym->ctype.as,
+		modifier_string(sym->ctype.modifiers), show_ident(sym->ident),
+		show_as(sym->ctype.as),
 		sym, stream_name(sym->pos.stream), sym->pos.line, sym->pos.pos,
 		builtin_typename(sym) ?: "");
 	i = 0;
@@ -125,6 +126,8 @@ const char *modifier_string(unsigned long mod)
 		{MOD_EXTERN,		"extern"},
 		{MOD_CONST,		"const"},
 		{MOD_VOLATILE,		"volatile"},
+		{MOD_RESTRICT,		"restrict"},
+		{MOD_ATOMIC,		"[atomic]"},
 		{MOD_SIGNED,		"[signed]"},
 		{MOD_UNSIGNED,		"[unsigned]"},
 		{MOD_CHAR,		"[char]"},
@@ -132,13 +135,11 @@ const char *modifier_string(unsigned long mod)
 		{MOD_LONG,		"[long]"},
 		{MOD_LONGLONG,		"[long long]"},
 		{MOD_LONGLONGLONG,	"[long long long]"},
-		{MOD_TYPEDEF,		"[typedef]"},
 		{MOD_TLS,		"[tls]"},
 		{MOD_INLINE,		"inline"},
 		{MOD_ADDRESSABLE,	"[addressable]"},
 		{MOD_NOCAST,		"[nocast]"},
 		{MOD_NODEREF,		"[noderef]"},
-		{MOD_ACCESSED,		"[accessed]"},
 		{MOD_TOPLEVEL,		"[toplevel]"},
 		{MOD_ASSIGNED,		"[assigned]"},
 		{MOD_TYPE,		"[type]"},
@@ -182,6 +183,13 @@ void show_symbol_list(struct symbol_list *list, const char *sep)
 	} END_FOR_EACH_PTR(sym);
 }
 
+const char *show_as(struct ident *as)
+{
+	if (!as)
+		return "";
+	return show_ident(as);
+}
+
 struct type_name {
 	char *start;
 	char *end;
@@ -218,38 +226,38 @@ static void FORMAT_ATTR(2) append(struct type_name *name, const char *fmt, ...)
 static struct ctype_name {
 	struct symbol *sym;
 	const char *name;
+	const char *suffix;
 } typenames[] = {
-	{ & char_ctype,  "char" },
-	{ &schar_ctype,  "signed char" },
-	{ &uchar_ctype,  "unsigned char" },
-	{ & short_ctype, "short" },
-	{ &sshort_ctype, "signed short" },
-	{ &ushort_ctype, "unsigned short" },
-	{ & int_ctype,   "int" },
-	{ &sint_ctype,   "signed int" },
-	{ &uint_ctype,   "unsigned int" },
-	{ &slong_ctype,  "signed long" },
-	{ & long_ctype,  "long" },
-	{ &ulong_ctype,  "unsigned long" },
-	{ & llong_ctype, "long long" },
-	{ &sllong_ctype, "signed long long" },
-	{ &ullong_ctype, "unsigned long long" },
-	{ & lllong_ctype, "long long long" },
-	{ &slllong_ctype, "signed long long long" },
-	{ &ulllong_ctype, "unsigned long long long" },
+	{ & char_ctype,  "char", "" },
+	{ &schar_ctype,  "signed char", "" },
+	{ &uchar_ctype,  "unsigned char", "" },
+	{ & short_ctype, "short", "" },
+	{ &sshort_ctype, "signed short", "" },
+	{ &ushort_ctype, "unsigned short", "" },
+	{ & int_ctype,   "int", "" },
+	{ &sint_ctype,   "signed int", "" },
+	{ &uint_ctype,   "unsigned int", "U" },
+	{ & long_ctype,  "long", "L" },
+	{ &slong_ctype,  "signed long", "L" },
+	{ &ulong_ctype,  "unsigned long", "UL" },
+	{ & llong_ctype, "long long", "LL" },
+	{ &sllong_ctype, "signed long long", "LL" },
+	{ &ullong_ctype, "unsigned long long", "ULL" },
+	{ & lllong_ctype, "long long long", "LLL" },
+	{ &slllong_ctype, "signed long long long", "LLL" },
+	{ &ulllong_ctype, "unsigned long long long", "ULLL" },
 
-	{ &void_ctype,   "void" },
-	{ &bool_ctype,   "bool" },
-	{ &string_ctype, "string" },
+	{ &void_ctype,   "void", "" },
+	{ &bool_ctype,   "bool", "" },
 
-	{ &float_ctype,  "float" },
-	{ &double_ctype, "double" },
-	{ &ldouble_ctype,"long double" },
-	{ &incomplete_ctype, "incomplete type" },
-	{ &int_type, "abstract int" },
-	{ &fp_type, "abstract fp" },
-	{ &label_ctype, "label type" },
-	{ &bad_ctype, "bad type" },
+	{ &float_ctype,  "float", "F" },
+	{ &double_ctype, "double", "" },
+	{ &ldouble_ctype,"long double", "L" },
+	{ &incomplete_ctype, "incomplete type", "" },
+	{ &int_type, "abstract int", "" },
+	{ &fp_type, "abstract fp", "" },
+	{ &label_ctype, "label type", "" },
+	{ &bad_ctype, "bad type", "" },
 };
 
 const char *builtin_typename(struct symbol *sym)
@@ -259,6 +267,16 @@ const char *builtin_typename(struct symbol *sym)
 	for (i = 0; i < ARRAY_SIZE(typenames); i++)
 		if (typenames[i].sym == sym)
 			return typenames[i].name;
+	return NULL;
+}
+
+const char *builtin_type_suffix(struct symbol *sym)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(typenames); i++)
+		if (typenames[i].sym == sym)
+			return typenames[i].suffix;
 	return NULL;
 }
 
@@ -276,7 +294,7 @@ static void do_show_type(struct symbol *sym, struct type_name *name)
 {
 	const char *typename;
 	unsigned long mod = 0;
-	int as = 0;
+	struct ident *as = NULL;
 	int was_ptr = 0;
 	int restr = 0;
 	int fouled = 0;
@@ -288,14 +306,16 @@ deeper:
 		size_t len;
 
 		if (as)
-			prepend(name, "<asn:%d>", as);
+			prepend(name, "%s ", show_as(as));
 
+		if (sym->type == SYM_BASETYPE || sym->type == SYM_ENUM)
+			mod &= ~MOD_SPECIFIER;
 		s = modifier_string(mod);
 		len = strlen(s);
 		name->start -= len;    
 		memcpy(name->start, s, len);  
 		mod = 0;
-		as = 0;
+		as = NULL;
 	}
 
 	if (!sym)
@@ -345,14 +365,15 @@ deeper:
 		break;
 
 	case SYM_NODE:
-		append(name, "%s", show_ident(sym->ident));
+		if (sym->ident)
+			append(name, "%s", show_ident(sym->ident));
 		mod |= sym->ctype.modifiers;
-		as |= sym->ctype.as;
+		combine_address_space(sym->pos, &as, sym->ctype.as);
 		break;
 
 	case SYM_BITFIELD:
 		mod |= sym->ctype.modifiers;
-		as |= sym->ctype.as;
+		combine_address_space(sym->pos, &as, sym->ctype.as);
 		append(name, ":%d", sym->bit_size);
 		break;
 
@@ -362,7 +383,7 @@ deeper:
 
 	case SYM_ARRAY:
 		mod |= sym->ctype.modifiers;
-		as |= sym->ctype.as;
+		combine_address_space(sym->pos, &as, sym->ctype.as);
 		if (was_ptr) {
 			prepend(name, "( ");
 			append(name, " )");
@@ -400,6 +421,10 @@ out:
 		prepend(name, "restricted ");
 	if (fouled)
 		prepend(name, "fouled ");
+
+	// strip trailing space
+	if (name->end > name->start && name->end[-1] == ' ')
+		name->end--;
 }
 
 void show_type(struct symbol *sym)
@@ -927,7 +952,7 @@ static int show_symbol_expr(struct symbol *sym)
 		return new;
 	}
 	if (sym->ctype.modifiers & MOD_ADDRESSABLE) {
-		printf("\taddi.%d\t\tv%d,vFP,$%lld\n", bits_in_pointer, new, sym->value);
+		printf("\taddi.%d\t\tv%d,vFP,$%lld\n", bits_in_pointer, new, 0LL);
 		return new;
 	}
 	printf("\taddi.%d\t\tv%d,vFP,$offsetof(%s:%p)\n", bits_in_pointer, new, show_ident(sym->ident), sym);
@@ -949,15 +974,6 @@ static int show_symbol_init(struct symbol *sym)
 	return 0;
 }
 
-static int type_is_signed(struct symbol *sym)
-{
-	if (sym->type == SYM_NODE)
-		sym = sym->ctype.base_type;
-	if (sym->type == SYM_PTR)
-		return 0;
-	return !(sym->ctype.modifiers & MOD_UNSIGNED);
-}
-
 static int show_cast_expr(struct expression *expr)
 {
 	struct symbol *old_type, *new_type;
@@ -973,7 +989,7 @@ static int show_cast_expr(struct expression *expr)
 	if (oldbits >= newbits)
 		return op;
 	new = new_pseudo();
-	is_signed = type_is_signed(old_type);
+	is_signed = is_signed_type(old_type);
 	if (is_signed) {
 		printf("\tsext%d.%d\tv%d,v%d\n", oldbits, newbits, new, op);
 	} else {
@@ -996,7 +1012,7 @@ static int show_fvalue(struct expression *expr)
 	int new = new_pseudo();
 	long double value = expr->fvalue;
 
-	printf("\tmovf.%d\t\tv%d,$%Lf\n", expr->ctype->bit_size, new, value);
+	printf("\tmovf.%d\t\tv%d,$%Le\n", expr->ctype->bit_size, new, value);
 	return new;
 }
 
@@ -1018,11 +1034,11 @@ static int show_label_expr(struct expression *expr)
 static int show_conditional_expr(struct expression *expr)
 {
 	int cond = show_expression(expr->conditional);
-	int true = show_expression(expr->cond_true);
-	int false = show_expression(expr->cond_false);
+	int valt = show_expression(expr->cond_true);
+	int valf = show_expression(expr->cond_false);
 	int new = new_pseudo();
 
-	printf("[v%d]\tcmov.%d\t\tv%d,v%d,v%d\n", cond, expr->ctype->bit_size, new, true, false);
+	printf("[v%d]\tcmov.%d\t\tv%d,v%d,v%d\n", cond, expr->ctype->bit_size, new, valt, valf);
 	return new;
 }
 
@@ -1168,6 +1184,9 @@ int show_expression(struct expression *expr)
 		return 0;
 	case EXPR_TYPE:
 		warning(expr->pos, "unable to show type expression");
+		return 0;
+	case EXPR_ASM_OPERAND:
+		warning(expr->pos, "unable to show asm operand expression");
 		return 0;
 	}
 	return 0;

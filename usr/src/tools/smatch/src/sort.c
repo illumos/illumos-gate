@@ -138,7 +138,7 @@ merge_block_seqs (struct ptr_list *b1, int n,
 	// Do a quick skip in case entire blocks from b1 are
 	// already less than smallest element in b2.
 	while (b1->nr == 0 ||
-	       cmp (PTR_ENTRY(b1, b1->nr - 1), PTR_ENTRY(b2,0)) < 0) {
+	       cmp (PTR_ENTRY_NOTAG(b1, b1->nr - 1), PTR_ENTRY_NOTAG(b2,0)) < 0) {
 		// printf ("Skipping whole block.\n");
 		BEEN_THERE('H');
 		b1 = b1->next;
@@ -149,8 +149,8 @@ merge_block_seqs (struct ptr_list *b1, int n,
 	}
 
 	while (1) {
-		const void *d1 = PTR_ENTRY(b1,i1);
-		const void *d2 = PTR_ENTRY(b2,i2);
+		const void *d1 = PTR_ENTRY_NOTAG(b1,i1);
+		const void *d2 = PTR_ENTRY_NOTAG(b2,i2);
 
 		assert (i1 >= 0 && i1 < b1->nr);
 		assert (i2 >= 0 && i2 < b2->nr);

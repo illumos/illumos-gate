@@ -36,7 +36,7 @@ static int is_do_while_zero(struct statement *stmt)
 {
 	if (!stmt->iterator_post_condition)
 		return 0;
-	if (!is_zero(stmt->iterator_post_condition))
+	if (!expr_is_zero(stmt->iterator_post_condition))
 		return 0;
 	return 1;
 }

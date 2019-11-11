@@ -13,4 +13,5 @@ static void foo(int *buf)
 /*
  * check-name: infinite loop 03
  * check-command: sparse -Wno-decl $file
+ * check-timeout:
  */

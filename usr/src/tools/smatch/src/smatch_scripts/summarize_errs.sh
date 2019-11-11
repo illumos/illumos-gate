@@ -28,7 +28,7 @@ save_thoughts()
     echo -n "What do you think?:  "
     read ans
     if echo $ans | grep ^$ > /dev/null ; then
-        continue
+        return
     fi 
 
     #store the result

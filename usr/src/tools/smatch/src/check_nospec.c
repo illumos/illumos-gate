@@ -179,6 +179,8 @@ static int is_nospec_asm(struct statement *stmt)
 
 	if (!stmt || stmt->type != STMT_ASM)
 		return 0;
+	if (!stmt->asm_string)
+		return 0;
 	macro = get_macro_name(stmt->asm_string->pos);
 	if (!macro || strcmp(macro, "CALL_NOSPEC") != 0)
 		return 0;

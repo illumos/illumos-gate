@@ -508,17 +508,19 @@ static int is_local_symbol(struct expression *expr)
 void sql_select_return_states(const char *cols, struct expression *call,
 	int (*callback)(void*, int, char**, char**), void *info)
 {
+	struct expression *fn;
 	int row_count = 0;
 
 	if (is_fake_call(call))
 		return;
 
-	if (call->fn->type != EXPR_SYMBOL || !call->fn->symbol || is_local_symbol(call->fn)) {
+	fn = strip_expr(call->fn);
+	if (fn->type != EXPR_SYMBOL || !fn->symbol || is_local_symbol(fn)) {
 		sql_select_return_states_pointer(cols, call, callback, info);
 		return;
 	}
 
-	if (inlinable(call->fn)) {
+	if (inlinable(fn)) {
 		mem_sql(callback, info,
 			"select %s from return_states where call_id = '%lu' order by return_id, type;",
 			cols, (unsigned long)call);
@@ -526,12 +528,12 @@ void sql_select_return_states(const char *cols, struct expression *call,
 	}
 
 	run_sql(get_row_count, &row_count, "select count(*) from return_states where %s;",
-		get_static_filter(call->fn->symbol));
+		get_static_filter(fn->symbol));
 	if (row_count > 3000)
 		return;
 
 	run_sql(callback, info, "select %s from return_states where %s order by file, return_id, type;",
-		cols, get_static_filter(call->fn->symbol));
+		cols, get_static_filter(fn->symbol));
 }
 
 #define CALL_IMPLIES 0
@@ -715,6 +717,33 @@ struct range_list *db_return_vals_from_str(const char *fn_name)
 	run_sql(db_return_callback, &ret_info,
 		"select distinct return from return_states where function = '%s';",
 		fn_name);
+	return ret_info.return_range_list;
+}
+
+/*
+ * This is used when we have a function that takes a function pointer as a
+ * parameter.  "frob(blah, blah, my_function);"  We know that the return values
+ * from frob() come from my_funcion() so we want to find the possible returns
+ * of my_function(), but we don't know which arguments are passed to it.
+ *
+ */
+struct range_list *db_return_vals_no_args(struct expression *expr)
+{
+	struct return_info ret_info = {};
+
+	if (!expr || expr->type != EXPR_SYMBOL)
+		return NULL;
+
+	ret_info.static_returns_call = expr;
+	ret_info.return_type = get_type(expr);
+	ret_info.return_type = get_real_base_type(ret_info.return_type);
+	if (!ret_info.return_type)
+		return NULL;
+
+	run_sql(db_return_callback, &ret_info,
+		"select distinct return from return_states where %s;",
+		get_static_filter(expr->symbol));
+
 	return ret_info.return_range_list;
 }
 
@@ -1106,8 +1135,7 @@ static void match_data_from_db(struct symbol *sym)
 		if (ptr_list_size((struct ptr_list *)ptr_names) > 20) {
 			__free_ptr_list((struct ptr_list **)&ptr_names);
 			__free_ptr_list((struct ptr_list **)&ptr_names_done);
-			stree = __pop_fake_cur_stree();
-			free_stree(&stree);
+			__free_fake_cur_stree();
 			return;
 		}
 
@@ -1124,6 +1152,7 @@ static void match_data_from_db(struct symbol *sym)
 		__unnullify_path();
 		data.prev_func_id = -1;
 		data.ignore = 0;
+		data.results = 0;
 
 		FOR_EACH_PTR(ptr_names, ptr) {
 			run_sql(caller_info_callback, &data,
@@ -1261,6 +1290,29 @@ static void match_call_implies(struct symbol *sym)
 			   call_implies_callbacks);
 }
 
+static char *get_fn_param_str(struct expression *expr)
+{
+	struct expression *tmp;
+	int param;
+	char buf[32];
+
+	tmp = get_assigned_expr(expr);
+	if (tmp)
+		expr = tmp;
+	expr = strip_expr(expr);
+	if (!expr || expr->type != EXPR_CALL)
+		return NULL;
+	expr = strip_expr(expr->fn);
+	if (!expr || expr->type != EXPR_SYMBOL)
+		return NULL;
+	param = get_param_num(expr);
+	if (param < 0)
+		return NULL;
+
+	snprintf(buf, sizeof(buf), "[r $%d]", param);
+	return alloc_sname(buf);
+}
+
 static char *get_return_compare_is_param(struct expression *expr)
 {
 	char *var;
@@ -1306,6 +1358,7 @@ static const char *get_return_ranges_str(struct expression *expr, struct range_l
 	struct range_list *rl;
 	char *return_ranges;
 	sval_t sval;
+	char *fn_param_str;
 	char *compare_str;
 	char *math_str;
 	char buf[128];
@@ -1321,6 +1374,7 @@ static const char *get_return_ranges_str(struct expression *expr, struct range_l
 		return sval_to_str_or_err_ptr(sval);
 	}
 
+	fn_param_str = get_fn_param_str(expr);
 	compare_str = expr_equal_to_param(expr, -1);
 	math_str = get_value_in_terms_of_parameter_math(expr);
 
@@ -1337,6 +1391,10 @@ static const char *get_return_ranges_str(struct expression *expr, struct range_l
 	}
 	*rl_p = rl;
 
+	if (fn_param_str) {
+		snprintf(buf, sizeof(buf), "%s%s", return_ranges, fn_param_str);
+		return alloc_sname(buf);
+	}
 	if (compare_str) {
 		snprintf(buf, sizeof(buf), "%s%s", return_ranges, compare_str);
 		return alloc_sname(buf);
@@ -1851,8 +1909,6 @@ static int split_on_bool_sm(struct sm_state *sm, struct expression *expr)
 	struct sm_state *tmp;
 	int ret = 0;
 	int nr_possible, nr_states;
-	char *compare_str = NULL;
-	char buf[128];
 	struct state_list *already_handled = NULL;
 
 	if (!sm || !sm->merged)
@@ -1881,12 +1937,6 @@ static int split_on_bool_sm(struct sm_state *sm, struct expression *expr)
 
 		return_ranges = get_return_ranges_str(expr, &ret_rl);
 		set_state(RETURN_ID, "return_ranges", NULL, alloc_estate_rl(ret_rl));
-		compare_str = get_return_compare_str(expr);
-		if (compare_str) {
-			snprintf(buf, sizeof(buf), "%s%s", return_ranges, compare_str);
-			return_ranges = alloc_sname(buf);
-		}
-
 		return_id++;
 		FOR_EACH_PTR(returned_state_callbacks, cb) {
 			cb->callback(return_id, (char *)return_ranges, expr);
@@ -2014,6 +2064,7 @@ vanilla:
 	nr_states = get_db_state_count();
 	if (nr_states >= 10000) {
 		match_return_info(return_id, (char *)return_ranges, expr);
+		print_limited_param_set(return_id, (char *)return_ranges, expr);
 		mark_all_params_untracked(return_id, (char *)return_ranges, expr);
 		return;
 	}
@@ -2287,25 +2338,38 @@ static char *get_next_string(char **str)
 	static char string[256];
 	char *start;
 	char *p = *str;
-	int len;
+	int len, i, j;
 
 	if (*p == '\0')
 		return NULL;
 	start = p;
 
-	while (*p != '\0' && *p != ' ' && *p != '\n')
+	while (*p != '\0' && *p != '\n') {
+		if (*p == '\\' && *(p + 1) == ' ') {
+			p += 2;
+			continue;
+		}
+		if (*p == ' ')
+			break;
 		p++;
+	}
 
 	len = p - start;
-	if (len > 256) {
-		memcpy(string, start, 255);
-		string[255] = '\0';
+	if (len >= sizeof(string)) {
+		memcpy(string, start, sizeof(string));
+		string[sizeof(string) - 1] = '\0';
 		sm_ierror("return_fix: '%s' too long", string);
 		**str = '\0';
 		return NULL;
 	}
 	memcpy(string, start, len);
 	string[len] = '\0';
+	for (i = 0; i < sizeof(string) - 1; i++) {
+		if (string[i] == '\\' && string[i + 1] == ' ') {
+			for (j = i; string[j] != '\0'; j++)
+				string[j] = string[j + 1];
+		}
+	}
 	if (*p != '\0')
 		p++;
 	*str = p;
@@ -2499,14 +2563,14 @@ const char *state_name_to_param_name(const char *state_name, const char *param_n
 
 	if (strcmp(state_name, param_name) == 0) {
 		snprintf(buf, sizeof(buf), "%s$", add_star ? "*" : "");
-		return buf;
+		return alloc_sname(buf);
 	}
 
 	if (state_name[name_len] == '-' && /* check for '-' from "->" */
 	    strncmp(state_name, param_name, name_len) == 0) {
 		snprintf(buf, sizeof(buf), "%s$%s",
 			 add_star ? "*" : "", state_name + name_len);
-		return buf;
+		return alloc_sname(buf);
 	}
 	return NULL;
 }

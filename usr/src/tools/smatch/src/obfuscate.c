@@ -69,8 +69,8 @@ int main(int argc, char **argv)
 	char *file;
 
 	emit_symbol_list(sparse_initialize(argc, argv, &filelist));
-	FOR_EACH_PTR_NOTAG(filelist, file) {
+	FOR_EACH_PTR(filelist, file) {
 		emit_symbol_list(sparse(file));
-	} END_FOR_EACH_PTR_NOTAG(file);
+	} END_FOR_EACH_PTR(file);
 	return 0;
 }

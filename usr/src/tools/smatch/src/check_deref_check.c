@@ -66,11 +66,14 @@ free:
 static void match_condition(struct expression *expr)
 {
 	struct sm_state *sm;
+	char *name;
 
 	if (__in_pre_condition)
 		return;
 
-	if (get_macro_name(expr->pos))
+	name = get_macro_name(expr->pos);
+	if (name &&
+	    (strcmp(name, "likely") != 0 && strcmp(name, "unlikely") != 0))
 		return;
 
 	if (!is_pointer(expr))

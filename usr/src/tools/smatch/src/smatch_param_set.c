@@ -130,6 +130,24 @@ free:
 	free_string(name);
 }
 
+static char *get_two_dots(const char *name)
+{
+	static char buf[80];
+	int i, cnt = 0;
+
+	for (i = 0; i < sizeof(buf); i++) {
+		if (name[i] == '.') {
+			cnt++;
+			if (cnt >= 2) {
+				buf[i] = '\0';
+				return buf;
+			}
+		}
+		buf[i] = name[i];
+	}
+	return NULL;
+}
+
 /*
  * This relies on the fact that these states are stored so that
  * foo->bar is before foo->bar->baz.
@@ -154,7 +172,7 @@ static int parent_set(struct string_list *list, const char *name)
 	return 0;
 }
 
-static void print_return_value_param(int return_id, char *return_ranges, struct expression *expr)
+static void print_return_value_param_helper(int return_id, char *return_ranges, struct expression *expr, int limit)
 {
 	struct sm_state *sm;
 	struct smatch_state *extra;
@@ -164,11 +182,13 @@ static void print_return_value_param(int return_id, char *return_ranges, struct 
 	struct string_list *set_list = NULL;
 	char *math_str;
 	char buf[256];
+	char two_dot[80] = "";
+	int count = 0;
 
 	FOR_EACH_MY_SM(my_id, __get_cur_stree(), sm) {
 		if (!estate_rl(sm->state))
 			continue;
-		extra = get_state(SMATCH_EXTRA, sm->name, sm->sym);
+		extra = __get_state(SMATCH_EXTRA, sm->name, sm->sym);
 		if (extra) {
 			rl = rl_intersection(estate_rl(sm->state), estate_rl(extra));
 			if (!rl)
@@ -196,6 +216,18 @@ static void print_return_value_param(int return_id, char *return_ranges, struct 
 			insert_string(&set_list, (char *)sm->name);
 			continue;
 		}
+		if (limit) {
+			char *new = get_two_dots(param_name);
+
+			if (new) {
+				if (strcmp(new, two_dot) == 0)
+					continue;
+				strncpy(two_dot, new, sizeof(two_dot));
+				sql_insert_return_states(return_id, return_ranges,
+					 PARAM_SET, param, new, "s64min-s64max");
+				continue;
+			}
+		}
 
 		math_str = get_value_in_terms_of_parameter_math_var_sym(sm->name, sm->sym);
 		if (math_str) {
@@ -215,27 +247,65 @@ static void print_return_value_param(int return_id, char *return_ranges, struct 
 		sql_insert_return_states(return_id, return_ranges,
 					 param_has_filter_data(sm) ? PARAM_ADD : PARAM_SET,
 					 param, param_name, show_rl(rl));
+		if (limit && ++count > limit)
+			break;
 
 	} END_FOR_EACH_SM(sm);
 
 	free_ptr_list((struct ptr_list **)&set_list);
 }
 
+static void print_return_value_param(int return_id, char *return_ranges, struct expression *expr)
+{
+	print_return_value_param_helper(return_id, return_ranges, expr, 0);
+}
+
+void print_limited_param_set(int return_id, char *return_ranges, struct expression *expr)
+{
+	print_return_value_param_helper(return_id, return_ranges, expr, 1000);
+}
+
+static int possibly_empty(struct sm_state *sm)
+{
+	struct sm_state *tmp;
+
+	FOR_EACH_PTR(sm->possible, tmp) {
+		if (strcmp(tmp->name, "") == 0)
+			return 1;
+	} END_FOR_EACH_PTR(tmp);
+	return 0;
+}
+
 int param_was_set_var_sym(const char *name, struct symbol *sym)
 {
 	struct sm_state *sm;
-	int len;
+	char buf[80];
+	int len, i;
 
-	FOR_EACH_MY_SM(my_id, __get_cur_stree(), sm) {
-		if (sm->sym != sym)
+	if (!name)
+		return 0;
+
+	len = strlen(name);
+	if (len >= sizeof(buf))
+		len = sizeof(buf) - 1;
+
+	for (i = 0; i <= len; i++) {
+		if (name[i] != '-' && name[i] != '\0')
 			continue;
-		len = strlen(sm->name);
-		if (strncmp(sm->name, name, len) != 0)
+
+		memcpy(buf, name, i);
+		buf[i] = '\0';
+
+		sm = get_sm_state(my_id, buf, sym);
+		if (!sm)
 			continue;
-		if (name[len] == '\0' ||
-		    name[len] == '-')
-			return 1;
-	} END_FOR_EACH_SM(sm);
+		if (possibly_empty(sm))
+			continue;
+		return 1;
+	}
+
+	if (name[0] == '*')
+		return param_was_set_var_sym(name + 1, sym);
 
 	return 0;
 }

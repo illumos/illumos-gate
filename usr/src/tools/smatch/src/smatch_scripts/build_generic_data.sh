@@ -52,7 +52,14 @@ if [ ! -e smatch_db.sqlite ] ; then
     fi
 fi
 
-make -j${NR_CPU} CHECK="$BIN_DIR/smatch --call-tree --info --param-mapper --spammy --file-output" $TARGET
+if [[ ! -z $ARCH ]]; then
+	KERNEL_ARCH="ARCH=$ARCH"
+fi
+if [[ ! -z $CROSS_COMPILE ]] ; then
+	KERNEL_CROSS_COMPILE="CROSS_COMPILE=$CROSS_COMPILE"
+fi
+
+make $KERNEL_ARCH $KERNEL_CROSS_COMPILE -j${NR_CPU} CHECK="$BIN_DIR/smatch --call-tree --info --param-mapper --spammy --file-output" $TARGET
 
 find -name \*.c.smatch -exec cat \{\} \; -exec rm \{\} \; > smatch_warns.txt
 

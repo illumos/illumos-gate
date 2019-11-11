@@ -10,5 +10,5 @@ int qux(void) { if (f && a) return 1; return 0; }
  * check-command: test-linearize -Wno-decl $file
  * check-output-ignore
  *
- * check-excludes: VOID
+ * check-output-excludes: VOID
  */

@@ -52,9 +52,16 @@ else
     exit 1
 fi
 
-make clean
+if [[ ! -z $ARCH ]]; then
+	KERNEL_ARCH="ARCH=$ARCH"
+fi
+if [[ ! -z $CROSS_COMPILE ]] ; then
+	KERNEL_CROSS_COMPILE="CROSS_COMPILE=$CROSS_COMPILE"
+fi
+
+make $KERNEL_ARCH $KERNEL_CROSS_COMPILE clean
 find -name \*.c.smatch -exec rm \{\} \;
-make -j${NR_CPU} $ENDIAN -k CHECK="$CMD --file-output $*" \
+make $KERNEL_ARCH $KERNEL_CROSS_COMPILE -j${NR_CPU} $ENDIAN -k CHECK="$CMD --file-output $*" \
 	C=1 $TARGET 2>&1 | tee $LOG
 find -name \*.c.smatch -exec cat \{\} \; -exec rm \{\} \; > $WLOG
 

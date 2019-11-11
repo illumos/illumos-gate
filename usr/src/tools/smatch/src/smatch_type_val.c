@@ -227,13 +227,46 @@ static int is_container_of(void)
 	return 1;
 }
 
+static bool is_driver_data(void)
+{
+	static struct expression *prev_expr;
+	struct expression *expr;
+	char *name;
+	static bool prev_ret;
+	bool ret = false;
+
+	expr = get_faked_expression();
+	if (!expr || expr->type != EXPR_ASSIGNMENT)
+		return false;
+
+	if (expr == prev_expr)
+		return prev_ret;
+	prev_expr = expr;
+
+	name = expr_to_str(expr->right);
+	if (!name) {
+		prev_ret = false;
+		return false;
+	}
+
+	if (strstr(name, "get_drvdata(") ||
+	    strstr(name, "dev.driver_data") ||
+	    strstr(name, "dev->driver_data"))
+		ret = true;
+
+	free_string(name);
+
+	prev_ret = ret;
+	return ret;
+}
+
 static int is_ignored_macro(void)
 {
 	struct expression *expr;
 	char *name;
 
 	expr = get_faked_expression();
-	if (!expr || expr->type != EXPR_ASSIGNMENT)
+	if (!expr || expr->type != EXPR_ASSIGNMENT || expr->op != '=')
 		return 0;
 	name = get_macro_name(expr->right->pos);
 	if (!name)
@@ -248,6 +281,20 @@ static int is_ignored_macro(void)
 		return 1;
 	if (strcmp(name, "hlist_entry") == 0)
 		return 1;
+	if (strcmp(name, "per_cpu_ptr") == 0)
+		return 1;
+	if (strcmp(name, "raw_cpu_ptr") == 0)
+		return 1;
+	if (strcmp(name, "this_cpu_ptr") == 0)
+		return 1;
+
+	if (strcmp(name, "TRACE_EVENT") == 0)
+		return 1;
+	if (strcmp(name, "DECLARE_EVENT_CLASS") == 0)
+		return 1;
+	if (strcmp(name, "DEFINE_EVENT") == 0)
+		return 1;
+
 	if (strstr(name, "for_each"))
 		return 1;
 	return 0;
@@ -266,9 +313,29 @@ static int is_ignored_function(void)
 
 	if (sym_name_is("kmalloc", expr->fn))
 		return 1;
+	if (sym_name_is("vmalloc", expr->fn))
+		return 1;
+	if (sym_name_is("kvmalloc", expr->fn))
+		return 1;
+	if (sym_name_is("kmalloc_array", expr->fn))
+		return 1;
+	if (sym_name_is("vmalloc_array", expr->fn))
+		return 1;
+	if (sym_name_is("kvmalloc_array", expr->fn))
+		return 1;
+
+	if (sym_name_is("mmu_memory_cache_alloc", expr->fn))
+		return 1;
+	if (sym_name_is("kmem_alloc", expr->fn))
+		return 1;
+	if (sym_name_is("alloc_pages", expr->fn))
+		return 1;
+
 	if (sym_name_is("netdev_priv", expr->fn))
 		return 1;
 	if (sym_name_is("dev_get_drvdata", expr->fn))
+		return 1;
+	if (sym_name_is("i2c_get_clientdata", expr->fn))
 		return 1;
 
 	return 0;
@@ -293,6 +360,9 @@ static int is_uncasted_pointer_assign(void)
 
 	if (!left_type || !right_type)
 		return 0;
+
+	if (left_type->type == SYM_STRUCT && left_type == right_type)
+		return 1;
 
 	if (left_type->type != SYM_PTR &&
 	    left_type->type != SYM_ARRAY)
@@ -396,6 +466,8 @@ static void match_assign_value(struct expression *expr)
 		return;
 
 	type = get_type(expr->left);
+	if (type && type->type == SYM_STRUCT)
+		return;
 	member = get_member_name(expr->left);
 	if (!member)
 		return;
@@ -415,6 +487,8 @@ static void match_assign_value(struct expression *expr)
 		if (is_uncasted_fn_param_from_db())
 			goto free;
 		if (is_container_of())
+			goto free;
+		if (is_driver_data())
 			goto free;
 		add_fake_type_val(member, alloc_whole_rl(get_type(expr->left)), is_ignored_fake_assignment());
 		goto free;
@@ -501,24 +575,14 @@ static void asm_expr(struct statement *stmt)
 	struct expression *expr;
 	struct range_list *rl;
 	char *member;
-	int state = 0;
 
 	FOR_EACH_PTR(stmt->asm_outputs, expr) {
-		switch (state) {
-		case 0: /* identifier */
-		case 1: /* constraint */
-			state++;
+		member = get_member_name(expr->expr);
+		if (!member)
 			continue;
-		case 2: /* expression */
-			state = 0;
-			member = get_member_name(expr);
-			if (!member)
-				continue;
-			rl = alloc_whole_rl(get_type(expr));
-			add_type_val(member, rl);
-			free_string(member);
-			continue;
-		}
+		rl = alloc_whole_rl(get_type(expr->expr));
+		add_type_val(member, rl);
+		free_string(member);
 	} END_FOR_EACH_PTR(expr);
 }
 
@@ -542,6 +606,19 @@ static void db_param_add(struct expression *expr, int param, char *key, char *va
 	if (!arg)
 		return;
 	type = get_member_type_from_key(arg, key);
+	/*
+	 * The situation here is that say we memset() a void pointer to zero
+	 * then that's returned to the called as "*$ = 0;" but on the caller's
+	 * side it's not void, it's a struct.
+	 *
+	 * So the question is should we be passing that slightly bogus
+	 * information back to the caller?  Maybe, maybe not, but either way we
+	 * are not going to record it here because a struct can't be zero.
+	 *
+	 */
+	if (type && type->type == SYM_STRUCT)
+		return;
+
 	if (arg->type != EXPR_PREOP || arg->op != '&')
 		return;
 	arg = strip_expr(arg->unop);

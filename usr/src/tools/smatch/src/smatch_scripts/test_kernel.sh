@@ -56,9 +56,16 @@ else
     exit 1
 fi
 
-make clean
+if [[ ! -z $ARCH ]]; then
+	KERNEL_ARCH="ARCH=$ARCH"
+fi
+if [[ ! -z $CROSS_COMPILE ]] ; then
+	KERNEL_CROSS_COMPILE="CROSS_COMPILE=$CROSS_COMPILE"
+fi
+
+make $KERNEL_ARCH $KERNEL_CROSS_COMPILE clean
 find -name \*.c.smatch -exec rm \{\} \;
-make -j${NR_CPU} $ENDIAN -k CHECK="$CMD -p=kernel --file-output --succeed $*" \
+make $KERNEL_ARCH $KERNEL_CROSS_COMPILE -j${NR_CPU} $ENDIAN -k CHECK="$CMD -p=kernel --file-output --succeed $*" \
 	C=1 $BUILD_PARAM $TARGET 2>&1 | tee $LOG
 BUILD_STATUS=${PIPESTATUS[0]}
 find -name \*.c.smatch -exec cat \{\} \; -exec rm \{\} \; > $WLOG

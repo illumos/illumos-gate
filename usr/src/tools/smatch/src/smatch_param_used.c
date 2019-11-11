@@ -31,12 +31,16 @@ static void get_state_hook(int owner, const char *name, struct symbol *sym)
 
 	if (!option_info)
 		return;
-	if (__in_fake_assign || __in_fake_parameter_assign || __in_function_def)
+
+	if (__in_fake_assign || __in_fake_parameter_assign || __in_function_def || __in_unmatched_hook)
 		return;
 
 	arg = get_param_num_from_sym(sym);
-	if (arg >= 0)
-		set_state_stree(&used_stree, my_id, name, sym, &used);
+	if (arg < 0)
+		return;
+	if (param_was_set_var_sym(name, sym))
+		return;
+	set_state_stree(&used_stree, my_id, name, sym, &used);
 }
 
 static void set_param_used(struct expression *call, struct expression *arg, char *key, char *unused)
@@ -45,13 +49,19 @@ static void set_param_used(struct expression *call, struct expression *arg, char
 	char *name;
 	int arg_nr;
 
+	if (!option_info)
+		return;
+
 	name = get_variable_from_key(arg, key, &sym);
 	if (!name || !sym)
 		goto free;
 
 	arg_nr = get_param_num_from_sym(sym);
-	if (arg_nr >= 0)
-		set_state_stree(&used_stree, my_id, name, sym, &used);
+	if (arg_nr < 0)
+		goto free;
+	if (param_was_set_var_sym(name, sym))
+		goto free;
+	set_state_stree(&used_stree, my_id, name, sym, &used);
 free:
 	free_string(name);
 }

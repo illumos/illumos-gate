@@ -23,3 +23,6 @@ iterate_all_kinds
 netdev_for_each_lower_dev
 for_each_clear_bit_from
 idr_for_each_entry_continue
+for_each_engine_masked
+drm_mm_for_each_hole
+for_each_set_bit
