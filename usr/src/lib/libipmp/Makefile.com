@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2019 Joyent, Inc.
 #
 
 LIBRARY =	libipmp.a
@@ -38,6 +39,10 @@ $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR)
+
+# ipmp_snap_take() generates false double free and dereferencing freed memory
+# errors
+pics/ipmp_query.o := SMOFF = check_free
 
 .KEEP_STATE:
 

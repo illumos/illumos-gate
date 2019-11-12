@@ -25,6 +25,7 @@
  */
 /*
  * Copyright 2015 EveryCity Ltd. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_SYS_CCOMPILE_H
@@ -134,6 +135,12 @@ extern "C" {
 #define	__sun_attr___unused__
 
 #endif	/* __ATTRIBUTE_IMPLEMENTED || __GNUC__ */
+
+#if __GNUC_VERSION >= 40100
+#define	__sentinel(__n)	__attribute__((__sentinel__(__n)))
+#else
+#define	__sentinel(__n)
+#endif
 
 /*
  * Shorthand versions for readability
