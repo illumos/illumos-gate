@@ -22,6 +22,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
  */
 
 #ifndef _SYS_USB_SCSA2USB_H
@@ -546,7 +547,7 @@ typedef struct scsa2usb_cmd {
 	/* used in multiple xfers */
 	size_t			cmd_total_xfercount;	/* total xfer val */
 	size_t			cmd_offset;		/* offset into buf */
-	int			cmd_lba;		/* current xfer lba */
+	uint64_t		cmd_lba;		/* current xfer lba */
 	int			cmd_done;		/* command done? */
 	int			cmd_blksize;		/* block size */
 	usba_list_entry_t	cmd_waitQ;		/* waitQ element */
@@ -567,7 +568,9 @@ _NOTE(SCHEME_PROTECTS_DATA("stable data", scsi_device scsi_address))
 #define	SCSA2USB_LEN_0		7		/* LEN[0] field */
 #define	SCSA2USB_LEN_1		8		/* LEN[1] field */
 
-/* macros to calculate LBA for 6/10/12-byte commands */
+/*
+ * Extract LBA and length from 6, 10, 12, and 16-byte commands:
+ */
 #define	SCSA2USB_LBA_6BYTE(pkt) \
 	(((pkt)->pkt_cdbp[1] & 0x1f) << 16) + \
 	((pkt)->pkt_cdbp[2] << 8) + (pkt)->pkt_cdbp[3]
@@ -586,9 +589,22 @@ _NOTE(SCHEME_PROTECTS_DATA("stable data", scsi_device scsi_address))
 	((pkt)->pkt_cdbp[2] << 24) + ((pkt)->pkt_cdbp[3] << 16) + \
 	    ((pkt)->pkt_cdbp[4] << 8) +  (pkt)->pkt_cdbp[5]
 
+#define	SCSA2USB_LEN_16BYTE(pkt) \
+	(((pkt)->pkt_cdbp[10] << 24) + ((pkt)->pkt_cdbp[11] << 16) + \
+	    ((pkt)->pkt_cdbp[12] << 8) + (pkt)->pkt_cdbp[13])
+#define	SCSA2USB_LBA_16BYTE(pkt) ((uint64_t)( \
+	((uint64_t)(pkt)->pkt_cdbp[2] << 56) + \
+	((uint64_t)(pkt)->pkt_cdbp[3] << 48) + \
+	((uint64_t)(pkt)->pkt_cdbp[4] << 40) + \
+	((uint64_t)(pkt)->pkt_cdbp[5] << 32) + \
+	((uint64_t)(pkt)->pkt_cdbp[6] << 24) + \
+	((uint64_t)(pkt)->pkt_cdbp[7] << 16) + \
+	((uint64_t)(pkt)->pkt_cdbp[8] << 8) + \
+	((uint64_t)(pkt)->pkt_cdbp[9])))
+
 /* macros to convert a pkt to cmd and vice-versa */
 #define	PKT2CMD(pkt)		((scsa2usb_cmd_t *)(pkt)->pkt_ha_private)
-#define	CMD2PKT(sp)		((sp)->cmd_pkt
+#define	CMD2PKT(sp)		((sp)->cmd_pkt)
 
 /* bulk pipe default timeout value - how long the command to be tried? */
 #define	SCSA2USB_BULK_PIPE_TIMEOUT	(2 * USB_PIPE_TIMEOUT)

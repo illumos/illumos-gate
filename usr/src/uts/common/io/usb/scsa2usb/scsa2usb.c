@@ -24,6 +24,7 @@
  *
  * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
  */
 
 
@@ -150,9 +151,11 @@ static int	scsa2usb_open_usb_pipes(scsa2usb_state_t *);
 void		scsa2usb_close_usb_pipes(scsa2usb_state_t *);
 
 static void	scsa2usb_fill_up_cdb_len(scsa2usb_cmd_t *, int);
-static void	scsa2usb_fill_up_cdb_lba(scsa2usb_cmd_t *, int);
+static void	scsa2usb_fill_up_cdb_lba(scsa2usb_cmd_t *, uint64_t);
+static void	scsa2usb_fill_up_g4_cdb_lba(scsa2usb_cmd_t *, uint64_t);
 static void	scsa2usb_fill_up_ReadCD_cdb_len(scsa2usb_cmd_t *, int, int);
 static void	scsa2usb_fill_up_12byte_cdb_len(scsa2usb_cmd_t *, int, int);
+static void	scsa2usb_fill_up_16byte_cdb_len(scsa2usb_cmd_t *, int, int);
 static int	scsa2usb_read_cd_blk_size(uchar_t);
 int		scsa2usb_rw_transport(scsa2usb_state_t *, struct scsi_pkt *);
 void		scsa2usb_setup_next_xfer(scsa2usb_state_t *, scsa2usb_cmd_t *);
@@ -242,6 +245,8 @@ static char *scsa2usb_cmds[] = {
 	"\135sendcuesheet",
 	"\136prin",
 	"\137prout",
+	"\210read16",
+	"\212write16",
 	"\241blankcd",
 	"\245playaudio12",
 	"\250read12",
@@ -477,7 +482,7 @@ static struct cb_ops scsa2usb_cbops = {
 	ddi_prop_op,		/* prop_op */
 	NULL,			/* stream */
 	D_MP,			/* cb_flag */
-	CB_REV, 		/* rev */
+	CB_REV,			/* rev */
 	nodev,			/* int (*cb_aread)() */
 	nodev			/* int (*cb_awrite)() */
 };
@@ -627,7 +632,7 @@ scsa2usb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	usb_ep_data_t		*ep_data;
 	usb_client_dev_data_t	*dev_data;
 	usb_alt_if_data_t	*altif_data;
-	usb_ugen_info_t 	usb_ugen_info;
+	usb_ugen_info_t		usb_ugen_info;
 
 	USB_DPRINTF_L4(DPRINT_MASK_SCSA, NULL,
 	    "scsa2usb_attach: dip = 0x%p", (void *)dip);
@@ -663,7 +668,7 @@ scsa2usb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	scsa2usbp->scsa2usb_dip 	= dip;
+	scsa2usbp->scsa2usb_dip		= dip;
 	scsa2usbp->scsa2usb_instance	= instance;
 
 	/* allocate a log handle for debug/error messages */
@@ -698,7 +703,7 @@ scsa2usb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    dev_data->dev_iblock_cookie);
 	}
 	mutex_enter(&scsa2usbp->scsa2usb_mutex);
-	scsa2usbp->scsa2usb_dip 	= dip;
+	scsa2usbp->scsa2usb_dip		= dip;
 	scsa2usbp->scsa2usb_instance	= instance;
 	scsa2usbp->scsa2usb_attrs	= SCSA2USB_ALL_ATTRS;
 	scsa2usbp->scsa2usb_dev_data	= dev_data;
@@ -3375,6 +3380,8 @@ scsa2usb_handle_scsi_cmd_sub_class(scsa2usb_state_t *scsa2usbp,
 	case SCMD_WRITE:
 	case SCMD_READ_G1:
 	case SCMD_WRITE_G1:
+	case SCMD_READ_G4:
+	case SCMD_WRITE_G4:
 	case SCMD_READ_G5:
 	case SCMD_WRITE_G5:
 	case SCMD_READ_LONG:
@@ -3719,12 +3726,13 @@ scsa2usb_handle_ufi_subclass_cmd(scsa2usb_state_t *scsa2usbp,
 	case SCMD_WRITE:
 	case SCMD_READ_G1:
 	case SCMD_WRITE_G1:
+	case SCMD_READ_G4:
+	case SCMD_WRITE_G4:
 	case SCMD_READ_G5:
 	case SCMD_WRITE_G5:
 	case SCMD_READ_LONG:
 	case SCMD_WRITE_LONG:
 	case SCMD_READ_CD:
-
 		return (scsa2usb_rw_transport(scsa2usbp, pkt));
 
 	case SCMD_TEST_UNIT_READY:
@@ -3811,7 +3819,8 @@ int
 scsa2usb_rw_transport(scsa2usb_state_t *scsa2usbp, struct scsi_pkt *pkt)
 {
 	scsa2usb_cmd_t *cmd = PKT2CMD(pkt);
-	int lba, dir, opcode;
+	int dir, opcode;
+	uint64_t lba;
 	struct buf *bp = cmd->cmd_bp;
 	size_t len, xfer_count;
 	size_t blk_size;	/* calculate the block size to be used */
@@ -3823,7 +3832,7 @@ scsa2usb_rw_transport(scsa2usb_state_t *scsa2usbp, struct scsi_pkt *pkt)
 	ASSERT(mutex_owned(&scsa2usbp->scsa2usb_mutex));
 
 	opcode = pkt->pkt_cdbp[0];
-	blk_size  = scsa2usbp->scsa2usb_lbasize[pkt->pkt_address.a_lun];
+	blk_size = scsa2usbp->scsa2usb_lbasize[pkt->pkt_address.a_lun];
 						/* set to default */
 
 	switch (opcode) {
@@ -3854,8 +3863,9 @@ scsa2usb_rw_transport(scsa2usb_state_t *scsa2usbp, struct scsi_pkt *pkt)
 		lba = SCSA2USB_LBA_10BYTE(pkt);
 		len = SCSA2USB_LEN_10BYTE(pkt);
 		dir = USB_EP_DIR_OUT;
-		if (len) {
-			sz = SCSA2USB_CDRW_BLKSZ(bp ? bp->b_bcount : 0, len);
+		if (len > 0) {
+			sz = SCSA2USB_CDRW_BLKSZ(bp != NULL ?
+			    bp->b_bcount : 0, len);
 			if (SCSA2USB_VALID_CDRW_BLKSZ(sz)) {
 				blk_size = sz;	/* change it accordingly */
 			}
@@ -3868,6 +3878,16 @@ scsa2usb_rw_transport(scsa2usb_state_t *scsa2usbp, struct scsi_pkt *pkt)
 
 		/* Figure out the block size */
 		blk_size = scsa2usb_read_cd_blk_size(pkt->pkt_cdbp[1] >> 2);
+		break;
+	case SCMD_READ_G4:
+		lba = SCSA2USB_LBA_16BYTE(pkt);
+		len = SCSA2USB_LEN_16BYTE(pkt);
+		dir = USB_EP_DIR_IN;
+		break;
+	case SCMD_WRITE_G4:
+		lba = SCSA2USB_LBA_16BYTE(pkt);
+		len = SCSA2USB_LEN_16BYTE(pkt);
+		dir = USB_EP_DIR_OUT;
 		break;
 	case SCMD_READ_G5:
 		lba = SCSA2USB_LBA_12BYTE(pkt);
@@ -3884,8 +3904,8 @@ scsa2usb_rw_transport(scsa2usb_state_t *scsa2usbp, struct scsi_pkt *pkt)
 	cmd->cmd_total_xfercount = xfer_count = len * blk_size;
 
 	/* reduce xfer count if necessary */
-	if (blk_size &&
-	    (xfer_count > scsa2usbp->scsa2usb_max_bulk_xfer_size)) {
+	if (blk_size != 0 &&
+	    xfer_count > scsa2usbp->scsa2usb_max_bulk_xfer_size) {
 		/*
 		 * For CD-RW devices reduce the xfer count based
 		 * on the block size used by these devices. The
@@ -3898,13 +3918,13 @@ scsa2usb_rw_transport(scsa2usb_state_t *scsa2usbp, struct scsi_pkt *pkt)
 		 * The len part of the cdb changes as a result of that.
 		 */
 		if (SCSA2USB_VALID_CDRW_BLKSZ(blk_size)) {
-			xfer_count = ((scsa2usbp->scsa2usb_max_bulk_xfer_size/
-			    blk_size) * blk_size);
-			len = xfer_count/blk_size;
+			xfer_count = (scsa2usbp->scsa2usb_max_bulk_xfer_size /
+			    blk_size) * blk_size;
+			len = xfer_count / blk_size;
 			xfer_count = blk_size * len;
 		} else {
 			xfer_count = scsa2usbp->scsa2usb_max_bulk_xfer_size;
-			len = xfer_count/blk_size;
+			len = xfer_count / blk_size;
 		}
 	}
 
@@ -3921,18 +3941,24 @@ scsa2usb_rw_transport(scsa2usb_state_t *scsa2usbp, struct scsi_pkt *pkt)
 	case SCMD_READ_CD:
 		bcopy(pkt->pkt_cdbp, &cmd->cmd_cdb, cmd->cmd_cdblen);
 		scsa2usb_fill_up_ReadCD_cdb_len(cmd, len, CDB_GROUP5);
+		scsa2usb_fill_up_cdb_lba(cmd, lba);
+		break;
+	case SCMD_WRITE_G4:
+	case SCMD_READ_G4:
+		scsa2usb_fill_up_16byte_cdb_len(cmd, len, CDB_GROUP4);
+		scsa2usb_fill_up_g4_cdb_lba(cmd, lba);
 		break;
 	case SCMD_WRITE_G5:
 	case SCMD_READ_G5:
 		scsa2usb_fill_up_12byte_cdb_len(cmd, len, CDB_GROUP5);
+		scsa2usb_fill_up_cdb_lba(cmd, lba);
 		break;
 	default:
 		scsa2usb_fill_up_cdb_len(cmd, len);
 		cmd->cmd_actual_len = CDB_GROUP1;
+		scsa2usb_fill_up_cdb_lba(cmd, lba);
 		break;
 	}
-
-	scsa2usb_fill_up_cdb_lba(cmd, lba);
 
 	USB_DPRINTF_L3(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 	    "bcount=0x%lx lba=0x%x len=0x%lx xfercount=0x%lx total=0x%lx",
@@ -4011,10 +4037,23 @@ scsa2usb_setup_next_xfer(scsa2usb_state_t *scsa2usbp, scsa2usb_cmd_t *cmd)
 		/* calculate lba = current_lba + len_of_prev_cmd */
 		cmd->cmd_lba += (cmd->cmd_cdb[6] << 16) +
 		    (cmd->cmd_cdb[7] << 8) + cmd->cmd_cdb[8];
-		cdb_len = xfer_len/cmd->cmd_blksize;
+		cdb_len = xfer_len / cmd->cmd_blksize;
 		cmd->cmd_cdb[SCSA2USB_READ_CD_LEN_2] = (uchar_t)cdb_len;
 		/* re-adjust xfer count */
 		cmd->cmd_xfercount = cdb_len * cmd->cmd_blksize;
+		scsa2usb_fill_up_cdb_lba(cmd, cmd->cmd_lba);
+		break;
+	case SCMD_WRITE_G4:
+	case SCMD_READ_G4:
+		/* calculate lba = current_lba + len_of_prev_cmd */
+		cmd->cmd_lba += (cmd->cmd_cdb[10] << 24) +
+		    (cmd->cmd_cdb[11] << 16) + (cmd->cmd_cdb[12] << 8) +
+		    cmd->cmd_cdb[13];
+		if (blk_size != 0) {
+			xfer_len /= blk_size;
+		}
+		scsa2usb_fill_up_16byte_cdb_len(cmd, xfer_len, CDB_GROUP5);
+		scsa2usb_fill_up_g4_cdb_lba(cmd, cmd->cmd_lba);
 		break;
 	case SCMD_WRITE_G5:
 	case SCMD_READ_G5:
@@ -4022,10 +4061,11 @@ scsa2usb_setup_next_xfer(scsa2usb_state_t *scsa2usbp, scsa2usb_cmd_t *cmd)
 		cmd->cmd_lba += (cmd->cmd_cdb[6] << 24) +
 		    (cmd->cmd_cdb[7] << 16) + (cmd->cmd_cdb[8] << 8) +
 		    cmd->cmd_cdb[9];
-		if (blk_size) {
+		if (blk_size != 0) {
 			xfer_len /= blk_size;
 		}
 		scsa2usb_fill_up_12byte_cdb_len(cmd, xfer_len, CDB_GROUP5);
+		scsa2usb_fill_up_cdb_lba(cmd, cmd->cmd_lba);
 		break;
 	case SCMD_WRITE_G1:
 	case SCMD_WRITE_LONG:
@@ -4034,21 +4074,22 @@ scsa2usb_setup_next_xfer(scsa2usb_state_t *scsa2usbp, scsa2usb_cmd_t *cmd)
 		if (SCSA2USB_VALID_CDRW_BLKSZ(cmd->cmd_blksize)) {
 			blk_size = cmd->cmd_blksize;
 		}
-		cdb_len = xfer_len/blk_size;
+		cdb_len = xfer_len / blk_size;
 		scsa2usb_fill_up_cdb_len(cmd, cdb_len);
 		/* re-adjust xfer count */
 		cmd->cmd_xfercount = cdb_len * blk_size;
+		scsa2usb_fill_up_cdb_lba(cmd, cmd->cmd_lba);
 		break;
 	default:
-		if (blk_size) {
+		if (blk_size != 0) {
 			xfer_len /= blk_size;
 		}
 		scsa2usb_fill_up_cdb_len(cmd, xfer_len);
-		cmd->cmd_lba += scsa2usbp->scsa2usb_max_bulk_xfer_size/blk_size;
+		cmd->cmd_lba += scsa2usbp->scsa2usb_max_bulk_xfer_size /
+		    blk_size;
+		scsa2usb_fill_up_cdb_lba(cmd, cmd->cmd_lba);
+		break;
 	}
-
-	/* fill in the lba */
-	scsa2usb_fill_up_cdb_lba(cmd, cmd->cmd_lba);
 
 	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 	    "scsa2usb_setup_next_xfer:\n\tlba = 0x%x xfer_len = 0x%x "
@@ -4694,7 +4735,7 @@ scsa2usb_close_usb_pipes(scsa2usb_state_t *scsa2usbp)
  *	fill up command CDBs' LBA part
  */
 static void
-scsa2usb_fill_up_cdb_lba(scsa2usb_cmd_t *cmd, int lba)
+scsa2usb_fill_up_cdb_lba(scsa2usb_cmd_t *cmd, uint64_t lba)
 {
 	/* zero cdb1, lba bits so they won't get copied in the new cdb */
 	cmd->cmd_cdb[SCSA2USB_LUN] &= 0xE0;
@@ -4702,6 +4743,27 @@ scsa2usb_fill_up_cdb_lba(scsa2usb_cmd_t *cmd, int lba)
 	cmd->cmd_cdb[SCSA2USB_LBA_1] = lba >> 16;
 	cmd->cmd_cdb[SCSA2USB_LBA_2] = lba >> 8;
 	cmd->cmd_cdb[SCSA2USB_LBA_3] = (uchar_t)lba;
+	cmd->cmd_lba = lba;
+}
+
+
+/*
+ * scsa2usb_fill_up_g4_cdb_lba:
+ *	fill in the CDB for a Group 4 command (16-byte CDB)
+ */
+static void
+scsa2usb_fill_up_g4_cdb_lba(scsa2usb_cmd_t *cmd, uint64_t lba)
+{
+	/* zero cdb1, lba bits so they won't get copied in the new cdb */
+	cmd->cmd_cdb[SCSA2USB_LUN] &= 0xE0;
+	cmd->cmd_cdb[2] = lba >> 56;
+	cmd->cmd_cdb[3] = lba >> 48;
+	cmd->cmd_cdb[4] = lba >> 40;
+	cmd->cmd_cdb[5] = lba >> 32;
+	cmd->cmd_cdb[6] = lba >> 24;
+	cmd->cmd_cdb[7] = lba >> 16;
+	cmd->cmd_cdb[8] = lba >> 8;
+	cmd->cmd_cdb[9] = lba;
 	cmd->cmd_lba = lba;
 }
 
@@ -4717,6 +4779,21 @@ scsa2usb_fill_up_ReadCD_cdb_len(scsa2usb_cmd_t *cmd, int len, int actual_len)
 	cmd->cmd_cdb[SCSA2USB_READ_CD_LEN_1] = len >> 8;
 	cmd->cmd_cdb[SCSA2USB_READ_CD_LEN_2] = (uchar_t)len;
 	cmd->cmd_actual_len = (uchar_t)actual_len;
+}
+
+
+/*
+ * scsa2usb_fill_up_16byte_cdb_len:
+ *	populate CDB length field for SCMD_WRITE_G4 and SCMD_READ_G4
+ */
+static void
+scsa2usb_fill_up_16byte_cdb_len(scsa2usb_cmd_t *cmd, int len, int actual_len)
+{
+	cmd->cmd_cdb[10] = len >> 24;
+	cmd->cmd_cdb[11] = len >> 16;
+	cmd->cmd_cdb[12] = len >> 8;
+	cmd->cmd_cdb[13] = len;
+	cmd->cmd_actual_len = actual_len;
 }
 
 
