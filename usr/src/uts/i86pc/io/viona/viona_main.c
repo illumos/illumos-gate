@@ -470,7 +470,7 @@ viona_open(dev_t *devp, int flag, int otype, cred_t *credp)
 	}
 
 	minor = id_alloc_nosleep(viona_minors);
-	if (minor == 0) {
+	if (minor == -1) {
 		/* All minors are busy */
 		return (EBUSY);
 	}
