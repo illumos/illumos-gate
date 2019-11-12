@@ -23,6 +23,7 @@
  * Copyright (c) 2011, 2016 by Delphix. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Josef "Jeff" Sipek <jeffpc@josefsipek.net>
+ * Copyright 2020 Joyent, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -30,9 +31,6 @@
  */
 /*
  * Portions Copyright 2009 Advanced Micro Devices, Inc.
- */
-/*
- * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -1186,6 +1184,56 @@
  * Rather than implement this, we recommend that one disables hyper-threading
  * through the use of psradm -aS.
  *
+ * TSX ASYNCHRONOUS ABORT
+ *
+ * TSX Asynchronous Abort (TAA) is another side-channel vulnerability that
+ * behaves like MDS, but leverages Intel's transactional instructions as another
+ * vector. Effectively, when a transaction hits one of these cases (unmapped
+ * page, various cache snoop activity, etc.) then the same data can be exposed
+ * as in the case of MDS. This means that you can attack your twin.
+ *
+ * Intel has described that there are two different ways that we can mitigate
+ * this problem on affected processors:
+ *
+ *   1) We can use the same techniques used to deal with MDS. Flushing the
+ *      microarchitectural buffers and disabling hyperthreading will mitigate
+ *      this in the same way.
+ *
+ *   2) Using microcode to disable TSX.
+ *
+ * Now, most processors that are subject to MDS (as in they don't have MDS_NO in
+ * the IA32_ARCH_CAPABILITIES MSR) will not receive microcode to disable TSX.
+ * That's OK as we're already doing all such mitigations. On the other hand,
+ * processors with MDS_NO are all supposed to receive microcode updates that
+ * enumerate support for disabling TSX. In general, we'd rather use this method
+ * when available as it doesn't require disabling hyperthreading to be
+ * effective. Currently we basically are relying on microcode for processors
+ * that enumerate MDS_NO.
+ *
+ * The microcode features are enumerated as part of the IA32_ARCH_CAPABILITIES.
+ * When bit 7 (IA32_ARCH_CAP_TSX_CTRL) is present, then we are given two
+ * different powers. The first allows us to cause all transactions to
+ * immediately abort. The second gives us a means of disabling TSX completely,
+ * which includes removing it from cpuid. If we have support for this in
+ * microcode during the first cpuid pass, then we'll disable TSX completely such
+ * that user land never has a chance to observe the bit. However, if we are late
+ * loading the microcode, then we must use the functionality to cause
+ * transactions to automatically abort. This is necessary for user land's sake.
+ * Once a program sees a cpuid bit, it must not be taken away.
+ *
+ * We track whether or not we should do this based on what cpuid pass we're in.
+ * Whenever we hit cpuid_scan_security() on the boot CPU and we're still on pass
+ * 1 of the cpuid logic, then we can completely turn off TSX. Notably this
+ * should happen twice. Once in the normal cpuid_pass1() code and then a second
+ * time after we do the initial microcode update.  As a result we need to be
+ * careful in cpuid_apply_tsx() to only use the MSR if we've loaded a suitable
+ * microcode on the current CPU (which happens prior to cpuid_pass_ucode()).
+ *
+ * If TAA has been fixed, then it will be enumerated in IA32_ARCH_CAPABILITIES
+ * as TAA_NO. In such a case, we will still disable TSX: it's proven to be an
+ * unfortunate feature in a number of ways, and taking the opportunity to
+ * finally be able to turn it off is likely to be of benefit in the future.
+ *
  * SUMMARY
  *
  * The following table attempts to summarize the mitigations for various issues
@@ -1199,13 +1247,15 @@
  *  - Spectre v4: Not currently mitigated
  *  - SpectreRSB: SMEP and RSB Stuffing
  *  - L1TF: spec_uarch_flush, SMT exclusion, requires microcode
- *  - MDS: x86_md_clear, requires microcode, disabling hyper threading
+ *  - MDS: x86_md_clear, requires microcode, disabling SMT
+ *  - TAA: x86_md_clear and disabling SMT OR microcode and disabling TSX
  *
  * The following table indicates the x86 feature set bits that indicate that a
  * given problem has been solved or a notable feature is present:
  *
  *  - RDCL_NO: Meltdown, L1TF, MSBDS subset of MDS
  *  - MDS_NO: All forms of MDS
+ *  - TAA_NO: TAA
  */
 
 #include <sys/types.h>
@@ -1261,6 +1311,27 @@ typedef enum {
 uint_t x86_disable_spectrev2 = 0;
 static x86_spectrev2_mitigation_t x86_spectrev2_mitigation =
     X86_SPECTREV2_RETPOLINE;
+
+/*
+ * The mitigation status for TAA:
+ * X86_TAA_NOTHING -- no mitigation available for TAA side-channels
+ * X86_TAA_DISABLED -- mitigation disabled via x86_disable_taa
+ * X86_TAA_MD_CLEAR -- MDS mitigation also suffices for TAA
+ * X86_TAA_TSX_FORCE_ABORT -- transactions are forced to abort
+ * X86_TAA_TSX_DISABLE -- force abort transactions and hide from CPUID
+ * X86_TAA_HW_MITIGATED -- TSX potentially active but H/W not TAA-vulnerable
+ */
+typedef enum {
+	X86_TAA_NOTHING,
+	X86_TAA_DISABLED,
+	X86_TAA_MD_CLEAR,
+	X86_TAA_TSX_FORCE_ABORT,
+	X86_TAA_TSX_DISABLE,
+	X86_TAA_HW_MITIGATED
+} x86_taa_mitigation_t;
+
+uint_t x86_disable_taa = 0;
+static x86_taa_mitigation_t x86_taa_mitigation = X86_TAA_NOTHING;
 
 uint_t pentiumpro_bug4046376;
 
@@ -1363,7 +1434,9 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"mb_clear",
 	"mds_no",
 	"core_thermal",
-	"pkg_thermal"
+	"pkg_thermal",
+	"tsx_ctrl",
+	"taa_no"
 };
 
 boolean_t
@@ -2702,6 +2775,102 @@ cpuid_use_amd_retpoline(struct cpuid_info *cpi)
 }
 #endif	/* !__xpv */
 
+/*
+ * Determine how we should mitigate TAA or if we need to. Regardless of TAA, if
+ * we can disable TSX, we do so.
+ *
+ * This determination is done only on the boot CPU, potentially after loading
+ * updated microcode.
+ */
+static void
+cpuid_update_tsx(cpu_t *cpu, uchar_t *featureset)
+{
+	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
+
+	VERIFY(cpu->cpu_id == 0);
+
+	if (cpi->cpi_vendor != X86_VENDOR_Intel) {
+		x86_taa_mitigation = X86_TAA_HW_MITIGATED;
+		return;
+	}
+
+	if (x86_disable_taa) {
+		x86_taa_mitigation = X86_TAA_DISABLED;
+		return;
+	}
+
+	/*
+	 * If we do not have the ability to disable TSX, then our only
+	 * mitigation options are in hardware (TAA_NO), or by using our existing
+	 * MDS mitigation as described above.  The latter relies upon us having
+	 * configured MDS mitigations correctly! This includes disabling SMT if
+	 * we want to cross-CPU-thread protection.
+	 */
+	if (!is_x86_feature(featureset, X86FSET_TSX_CTRL)) {
+		/*
+		 * It's not clear whether any parts will enumerate TAA_NO
+		 * *without* TSX_CTRL, but let's mark it as such if we see this.
+		 */
+		if (is_x86_feature(featureset, X86FSET_TAA_NO)) {
+			x86_taa_mitigation = X86_TAA_HW_MITIGATED;
+			return;
+		}
+
+		if (is_x86_feature(featureset, X86FSET_MD_CLEAR) &&
+		    !is_x86_feature(featureset, X86FSET_MDS_NO)) {
+			x86_taa_mitigation = X86_TAA_MD_CLEAR;
+		} else {
+			x86_taa_mitigation = X86_TAA_NOTHING;
+		}
+		return;
+	}
+
+	/*
+	 * We have TSX_CTRL, but we can only fully disable TSX if we're early
+	 * enough in boot.
+	 *
+	 * Otherwise, we'll fall back to causing transactions to abort as our
+	 * mitigation. TSX-using code will always take the fallback path.
+	 */
+	if (cpi->cpi_pass < 4) {
+		x86_taa_mitigation = X86_TAA_TSX_DISABLE;
+	} else {
+		x86_taa_mitigation = X86_TAA_TSX_FORCE_ABORT;
+	}
+}
+
+/*
+ * As mentioned, we should only touch the MSR when we've got a suitable
+ * microcode loaded on this CPU.
+ */
+static void
+cpuid_apply_tsx(x86_taa_mitigation_t taa, uchar_t *featureset)
+{
+	uint64_t val;
+
+	switch (taa) {
+	case X86_TAA_TSX_DISABLE:
+		if (!is_x86_feature(featureset, X86FSET_TSX_CTRL))
+			return;
+		val = rdmsr(MSR_IA32_TSX_CTRL);
+		val |= IA32_TSX_CTRL_CPUID_CLEAR | IA32_TSX_CTRL_RTM_DISABLE;
+		wrmsr(MSR_IA32_TSX_CTRL, val);
+		break;
+	case X86_TAA_TSX_FORCE_ABORT:
+		if (!is_x86_feature(featureset, X86FSET_TSX_CTRL))
+			return;
+		val = rdmsr(MSR_IA32_TSX_CTRL);
+		val |= IA32_TSX_CTRL_RTM_DISABLE;
+		wrmsr(MSR_IA32_TSX_CTRL, val);
+		break;
+	case X86_TAA_HW_MITIGATED:
+	case X86_TAA_MD_CLEAR:
+	case X86_TAA_DISABLED:
+	case X86_TAA_NOTHING:
+		break;
+	}
+}
+
 static void
 cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 {
@@ -2791,6 +2960,14 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 					add_x86_feature(featureset,
 					    X86FSET_MDS_NO);
 				}
+				if (reg & IA32_ARCH_CAP_TSX_CTRL) {
+					add_x86_feature(featureset,
+					    X86FSET_TSX_CTRL);
+				}
+				if (reg & IA32_ARCH_CAP_TAA_NO) {
+					add_x86_feature(featureset,
+					    X86FSET_TAA_NO);
+				}
 			}
 			no_trap();
 		}
@@ -2803,16 +2980,25 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 			add_x86_feature(featureset, X86FSET_FLUSH_CMD);
 	}
 
+	/*
+	 * Take care of certain mitigations on the non-boot CPU. The boot CPU
+	 * will have already run this function and determined what we need to
+	 * do. This gives us a hook for per-HW thread mitigations such as
+	 * enhanced IBRS, or disabling TSX.
+	 */
 	if (cpu->cpu_id != 0) {
 		if (x86_spectrev2_mitigation == X86_SPECTREV2_ENHANCED_IBRS) {
 			cpuid_enable_enhanced_ibrs();
 		}
+
+		cpuid_apply_tsx(x86_taa_mitigation, featureset);
 		return;
 	}
 
 	/*
 	 * Go through and initialize various security mechanisms that we should
-	 * only do on a single CPU. This includes Spectre V2, L1TF, and MDS.
+	 * only do on a single CPU. This includes Spectre V2, L1TF, MDS, and
+	 * TAA.
 	 */
 
 	/*
@@ -2862,6 +3048,13 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 	 * need to perform an l1d flush.
 	 */
 	cpuid_update_l1d_flush(cpu, featureset);
+
+	/*
+	 * Determine what our mitigation strategy should be for TAA and then
+	 * also apply TAA mitigations.
+	 */
+	cpuid_update_tsx(cpu, featureset);
+	cpuid_apply_tsx(x86_taa_mitigation, featureset);
 }
 
 /*
