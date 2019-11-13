@@ -970,10 +970,10 @@ soft_aes_decrypt_update(soft_session_t *session_p, CK_BYTE_PTR pEncryptedData,
 		 *
 		 * Some things to note:
 		 *  - The above semantics will cause aes_ctx->ac_remainder to
-		 *  never accumulate more than AES_BLOCK_LEN bytes of ciphertext.
-		 *  Once we reach at least AES_BLOCK_LEN + 1 bytes, we will
-		 *  decrypt the contents of aes_ctx->ac_remainder by one of
-		 *  the last two scenarios described above.
+		 *  never accumulate more than AES_BLOCK_LEN bytes of
+		 *  ciphertext. Once we reach at least AES_BLOCK_LEN + 1 bytes,
+		 *  we will decrypt the contents of aes_ctx->ac_remainder by one
+		 *  of the last two scenarios described above.
 		 *
 		 *  - We must always end up with AES_BLOCK_LEN bytes of data
 		 *  in aes_ctx->ac_remainder when C_DecryptFinal() is called.
@@ -1115,6 +1115,14 @@ soft_aes_decrypt_update(soft_session_t *session_p, CK_BYTE_PTR pEncryptedData,
 	*pulDataLen = out.cd_offset;
 
 	switch (mech) {
+	case CKM_AES_CTR:
+		if (aes_ctx->ac_remainder_len == 0) {
+			break;
+		}
+		rc = ctr_mode_final((ctr_ctx_t *)aes_ctx, &out,
+		    aes_encrypt_block);
+		rv = crypto2pkcs11_error_number(rc);
+		break;
 	case CKM_AES_CBC_PAD:
 		if (buffer_block == NULL) {
 			break;
