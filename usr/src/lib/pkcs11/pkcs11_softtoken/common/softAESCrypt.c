@@ -1115,14 +1115,6 @@ soft_aes_decrypt_update(soft_session_t *session_p, CK_BYTE_PTR pEncryptedData,
 	*pulDataLen = out.cd_offset;
 
 	switch (mech) {
-	case CKM_AES_CTR:
-		if (aes_ctx->ac_remainder_len == 0) {
-			break;
-		}
-		rc = ctr_mode_final((ctr_ctx_t *)aes_ctx, &out,
-		    aes_encrypt_block);
-		rv = crypto2pkcs11_error_number(rc);
-		break;
 	case CKM_AES_CBC_PAD:
 		if (buffer_block == NULL) {
 			break;
