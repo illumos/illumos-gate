@@ -253,7 +253,7 @@ gaw2agaw(int gaw)
 
 /*
  * set_immu_agaw()
- * 	calculate agaw for a IOMMU unit
+ *	calculate agaw for a IOMMU unit
  */
 static int
 set_agaw(immu_t *immu)
@@ -481,7 +481,7 @@ immu_regs_resume(immu_t *immu)
 	immu_regs_intr_enable(immu, immu->immu_regs_intr_msi_addr,
 	    immu->immu_regs_intr_msi_data, immu->immu_regs_intr_uaddr);
 
-	(void) immu_intr_handler(immu);
+	(void) immu_intr_handler((caddr_t)immu, NULL);
 
 	immu_regs_intrmap_enable(immu, immu->immu_intrmap_irta_reg);
 
@@ -638,7 +638,7 @@ immu_regs_wbf_flush(immu_t *immu)
 
 /*
  * immu_regs_cpu_flush()
- * 	flush the cpu cache line after CPU memory writes, so
+ *	flush the cpu cache line after CPU memory writes, so
  *      IOMMU can see the writes
  */
 void

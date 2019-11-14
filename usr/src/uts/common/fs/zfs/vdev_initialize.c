@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2016, 2019 by Delphix. All rights reserved.
  */
 
 #include <sys/spa.h>
@@ -350,7 +350,7 @@ vdev_initialize_calculate_progress(vdev_t *vd)
 		 * metaslab. Load it and walk the free tree for more accurate
 		 * progress estimation.
 		 */
-		VERIFY0(metaslab_load(msp, spa_syncing_txg(vd->vdev_spa)));
+		VERIFY0(metaslab_load(msp));
 
 		for (range_seg_t *rs = avl_first(&msp->ms_allocatable->rt_root);
 		    rs; rs = AVL_NEXT(&msp->ms_allocatable->rt_root, rs)) {
@@ -474,6 +474,7 @@ vdev_initialize_thread(void *arg)
 	for (uint64_t i = 0; !vd->vdev_detached &&
 	    i < vd->vdev_top->vdev_ms_count; i++) {
 		metaslab_t *msp = vd->vdev_top->vdev_ms[i];
+		boolean_t unload_when_done = B_FALSE;
 
 		/*
 		 * If we've expanded the top-level vdev or it's our
@@ -487,14 +488,16 @@ vdev_initialize_thread(void *arg)
 		spa_config_exit(spa, SCL_CONFIG, FTAG);
 		metaslab_disable(msp);
 		mutex_enter(&msp->ms_lock);
-		VERIFY0(metaslab_load(msp, spa_syncing_txg(spa)));
+		if (!msp->ms_loaded && !msp->ms_loading)
+			unload_when_done = B_TRUE;
+		VERIFY0(metaslab_load(msp));
 
 		range_tree_walk(msp->ms_allocatable, vdev_initialize_range_add,
 		    vd);
 		mutex_exit(&msp->ms_lock);
 
 		error = vdev_initialize_ranges(vd, deadbeef);
-		metaslab_enable(msp, B_TRUE);
+		metaslab_enable(msp, B_TRUE, unload_when_done);
 		spa_config_enter(spa, SCL_CONFIG, FTAG, RW_READER);
 
 		range_tree_vacate(vd->vdev_initialize_tree, NULL, NULL);

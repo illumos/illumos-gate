@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  * Copyright (c) 2011, 2018 by Delphix. All rights reserved.
  * Copyright (c) 2014 by Saso Kiselkov. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
@@ -296,6 +296,7 @@
 #include <zfs_fletcher.h>
 #include <sys/aggsum.h>
 #include <sys/cityhash.h>
+#include <sys/param.h>
 
 #ifndef _KERNEL
 /* set with ZFS_DEBUG=watch, to enable watchpoints on frozen buffers */
@@ -1268,6 +1269,20 @@ static inline void arc_hdr_clear_flags(arc_buf_hdr_t *hdr, arc_flags_t flags);
 static boolean_t l2arc_write_eligible(uint64_t, arc_buf_hdr_t *);
 static void l2arc_read_done(zio_t *);
 
+/*
+ * The arc_all_memory function is a ZoL enhancement that lives in their OSL
+ * code. In user-space code, which is used primarily for testing, we return
+ * half of all memory.
+ */
+uint64_t
+arc_all_memory(void)
+{
+#ifdef _KERNEL
+	return (ptob(physmem));
+#else
+	return ((sysconf(_SC_PAGESIZE) * sysconf(_SC_PHYS_PAGES)) / 2);
+#endif
+}
 
 /*
  * We use Cityhash for this. It's fast, and has good hash properties without

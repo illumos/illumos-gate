@@ -494,7 +494,7 @@ done:
  * Enabling is allow the processing thread to send packets to the
  * client while disabling does the opposite.
  */
-void
+int
 mac_soft_ring_intr_enable(void *arg)
 {
 	mac_soft_ring_t *ringp = (mac_soft_ring_t *)arg;
@@ -503,6 +503,7 @@ mac_soft_ring_intr_enable(void *arg)
 	if (ringp->s_ring_first != NULL)
 		mac_soft_ring_worker_wakeup(ringp);
 	mutex_exit(&ringp->s_ring_lock);
+	return (0);
 }
 
 boolean_t

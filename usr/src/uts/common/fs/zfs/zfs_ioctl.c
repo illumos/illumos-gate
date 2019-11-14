@@ -5706,7 +5706,7 @@ zfs_ioc_next_obj(zfs_cmd_t *zc)
 	objset_t *os = NULL;
 	int error;
 
-	error = dmu_objset_hold_flags(zc->zc_name, B_TRUE, FTAG, &os);
+	error = dmu_objset_hold(zc->zc_name, FTAG, &os);
 	if (error != 0)
 		return (error);
 

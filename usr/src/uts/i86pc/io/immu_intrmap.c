@@ -63,7 +63,7 @@ typedef struct intrmap_rte {
 	    (p))
 
 typedef enum {
-	SVT_NO_VERIFY = 0, 	/* no verification */
+	SVT_NO_VERIFY = 0,	/* no verification */
 	SVT_ALL_VERIFY,		/* using sid and sq to verify */
 	SVT_BUS_VERIFY,		/* verify #startbus and #endbus */
 	SVT_RSVD
@@ -224,7 +224,7 @@ bitset_find_multi_free(bitset_t *b, uint_t post, uint_t count)
 		}
 	}
 
-	return (INTRMAP_IDX_FULL);  		/* no free index */
+	return (INTRMAP_IDX_FULL);		/* no free index */
 }
 
 /* alloc one interrupt remapping table entry */
@@ -495,11 +495,12 @@ intrmap_enable(immu_t *immu)
 
 /*
  * immu_intr_handler()
- * 	the fault event handler for a single immu unit
+ *	the fault event handler for a single immu unit
  */
-int
-immu_intr_handler(immu_t *immu)
+uint_t
+immu_intr_handler(caddr_t arg, caddr_t arg1 __unused)
 {
+	immu_t *immu = (immu_t *)arg;
 	uint32_t status;
 	int index, fault_reg_offset;
 	int max_fault_index;
@@ -995,10 +996,10 @@ immu_intr_register(immu_t *immu)
 	    "%s-intr-handler", immu->immu_name);
 
 	(void) add_avintr((void *)NULL, IMMU_INTR_IPL,
-	    (avfunc)(immu_intr_handler), intr_handler_name, irq,
+	    immu_intr_handler, intr_handler_name, irq,
 	    (caddr_t)immu, NULL, NULL, NULL);
 
 	immu_regs_intr_enable(immu, msi_addr, msi_data, uaddr);
 
-	(void) immu_intr_handler(immu);
+	(void) immu_intr_handler((caddr_t)immu, NULL);
 }

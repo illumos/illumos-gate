@@ -3098,25 +3098,25 @@ reference_cb(uintptr_t addr, const void *ignored, void *arg)
 	return (WALK_NEXT);
 }
 
-typedef struct mdb_refcount {
+typedef struct mdb_zfs_refcount {
 	uint64_t rc_count;
-} mdb_refcount_t;
+} mdb_zfs_refcount_t;
 
-typedef struct mdb_refcount_removed {
+typedef struct mdb_zfs_refcount_removed {
 	uint64_t rc_removed_count;
-} mdb_refcount_removed_t;
+} mdb_zfs_refcount_removed_t;
 
-typedef struct mdb_refcount_tracked {
+typedef struct mdb_zfs_refcount_tracked {
 	boolean_t rc_tracked;
-} mdb_refcount_tracked_t;
+} mdb_zfs_refcount_tracked_t;
 
 /* ARGSUSED */
 static int
-refcount(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+zfs_refcount(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	mdb_refcount_t rc;
-	mdb_refcount_removed_t rcr;
-	mdb_refcount_tracked_t rct;
+	mdb_zfs_refcount_t rc;
+	mdb_zfs_refcount_removed_t rcr;
+	mdb_zfs_refcount_tracked_t rct;
 	int off;
 	boolean_t released = B_FALSE;
 
@@ -3128,30 +3128,30 @@ refcount(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
-	if (mdb_ctf_vread(&rc, "refcount_t", "mdb_refcount_t", addr,
+	if (mdb_ctf_vread(&rc, "zfs_refcount_t", "mdb_zfs_refcount_t", addr,
 	    0) == -1)
 		return (DCMD_ERR);
 
-	if (mdb_ctf_vread(&rcr, "refcount_t", "mdb_refcount_removed_t", addr,
-	    MDB_CTF_VREAD_QUIET) == -1) {
-		mdb_printf("refcount_t at %p has %llu holds (untracked)\n",
+	if (mdb_ctf_vread(&rcr, "zfs_refcount_t", "mdb_zfs_refcount_removed_t",
+	    addr, MDB_CTF_VREAD_QUIET) == -1) {
+		mdb_printf("zfs_refcount_t at %p has %llu holds (untracked)\n",
 		    addr, (longlong_t)rc.rc_count);
 		return (DCMD_OK);
 	}
 
-	if (mdb_ctf_vread(&rct, "refcount_t", "mdb_refcount_tracked_t", addr,
-	    MDB_CTF_VREAD_QUIET) == -1) {
+	if (mdb_ctf_vread(&rct, "zfs_refcount_t", "mdb_zfs_refcount_tracked_t",
+	    addr, MDB_CTF_VREAD_QUIET) == -1) {
 		/* If this is an old target, it might be tracked. */
 		rct.rc_tracked = B_TRUE;
 	}
 
-	mdb_printf("refcount_t at %p has %llu current holds, "
+	mdb_printf("zfs_refcount_t at %p has %llu current holds, "
 	    "%llu recently released holds\n",
 	    addr, (longlong_t)rc.rc_count, (longlong_t)rcr.rc_removed_count);
 
 	if (rct.rc_tracked && rc.rc_count > 0)
 		mdb_printf("current holds:\n");
-	off = mdb_ctf_offsetof_by_name("refcount_t", "rc_list");
+	off = mdb_ctf_offsetof_by_name("zfs_refcount_t", "rc_list");
 	if (off == -1)
 		return (DCMD_ERR);
 	mdb_pwalk("list", reference_cb, (void*)B_FALSE, addr + off);
@@ -3159,7 +3159,7 @@ refcount(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (released && rcr.rc_removed_count > 0) {
 		mdb_printf("released holds:\n");
 
-		off = mdb_ctf_offsetof_by_name("refcount_t", "rc_removed");
+		off = mdb_ctf_offsetof_by_name("zfs_refcount_t", "rc_removed");
 		if (off == -1)
 			return (DCMD_ERR);
 		mdb_pwalk("list", reference_cb, (void*)B_TRUE, addr + off);
@@ -3797,12 +3797,12 @@ rrwlock(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf("anonymous references:\n");
-	(void) mdb_call_dcmd("refcount", addr +
+	(void) mdb_call_dcmd("zfs_refcount", addr +
 	    mdb_ctf_offsetof_by_name(ZFS_STRUCT "rrwlock", "rr_anon_rcount"),
 	    DCMD_ADDRSPEC, 0, NULL);
 
 	mdb_printf("linked references:\n");
-	(void) mdb_call_dcmd("refcount", addr +
+	(void) mdb_call_dcmd("zfs_refcount", addr +
 	    mdb_ctf_offsetof_by_name(ZFS_STRUCT "rrwlock", "rr_linked_rcount"),
 	    DCMD_ADDRSPEC, 0, NULL);
 
@@ -4345,9 +4345,9 @@ static const mdb_dcmd_t dcmds[] = {
 	    "given a spa_t, print block type stats from last scrub",
 	    zfs_blkstats },
 	{ "zfs_params", "", "print zfs tunable parameters", zfs_params },
-	{ "refcount", ":[-r]\n"
+	{ "zfs_refcount", ":[-r]\n"
 	    "\t-r display recently removed references",
-	    "print refcount_t holders", refcount },
+	    "print zfs_refcount_t holders", zfs_refcount },
 	{ "zap_leaf", "", "print zap_leaf_phys_t", zap_leaf },
 	{ "zfs_aces", ":[-v]", "print all ACEs from a zfs_acl_t",
 	    zfs_acl_dump },

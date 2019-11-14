@@ -36,6 +36,7 @@
 #include <sys/vdev.h>
 #include <sys/txg.h>
 #include <sys/avl.h>
+#include <sys/multilist.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -194,6 +195,12 @@ struct metaslab_class {
 	uint64_t		mc_space;	/* total space (alloc + free) */
 	uint64_t		mc_dspace;	/* total deflated space */
 	uint64_t		mc_histogram[RANGE_TREE_HISTOGRAM_SIZE];
+
+	/*
+	 * List of all loaded metaslabs in the class, sorted in order of most
+	 * recent use.
+	 */
+	multilist_t		*mc_metaslab_txg_list;
 };
 
 /*
@@ -387,6 +394,7 @@ struct metaslab {
 	range_tree_t	*ms_allocating[TXG_SIZE];
 	range_tree_t	*ms_allocatable;
 	uint64_t	ms_allocated_this_txg;
+	uint64_t	ms_allocating_total;
 
 	/*
 	 * The following range trees are accessed only from syncing context.
@@ -484,7 +492,13 @@ struct metaslab {
 	 * stay cached.
 	 */
 	uint64_t	ms_selected_txg;
-	uint64_t	ms_loaded_txg;	/* track when metaslab was loaded */
+	/*
+	 * ms_load/unload_time can be used for performance monitoring
+	 * (e.g. by dtrace or mdb).
+	 */
+	hrtime_t	ms_load_time;	/* time last loaded */
+	hrtime_t	ms_unload_time;	/* time last unloaded */
+	hrtime_t	ms_selected_time; /* time last allocated from */
 
 	uint64_t	ms_max_size;	/* maximum allocatable size	*/
 
@@ -504,12 +518,17 @@ struct metaslab {
 	 * segment sizes.
 	 */
 	avl_tree_t	ms_allocatable_by_size;
+	avl_tree_t	ms_unflushed_frees_by_size;
 	uint64_t	ms_lbas[MAX_LBAS];
 
 	metaslab_group_t *ms_group;	/* metaslab group		*/
 	avl_node_t	ms_group_node;	/* node in metaslab group tree	*/
 	txg_node_t	ms_txg_node;	/* per-txg dirty metaslab links	*/
 	avl_node_t	ms_spa_txg_node; /* node in spa_metaslabs_by_txg */
+	/*
+	 * Node in metaslab class's selected txg list
+	 */
+	multilist_node_t	ms_class_txg_node;
 
 	/*
 	 * Allocs and frees that are committed to the vdev log spacemap but

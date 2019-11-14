@@ -223,14 +223,13 @@ xen_psm_hrtimeinit(void)
 }
 
 /* xen_psm NMI handler */
-/*ARGSUSED*/
-static void
-xen_psm_nmi_intr(caddr_t arg, struct regs *rp)
+static uint_t
+xen_psm_nmi_intr(caddr_t arg __unused, caddr_t arg1 __unused)
 {
 	xen_psm_num_nmis++;
 
 	if (!lock_try(&xen_psm_nmi_lock))
-		return;
+		return (DDI_INTR_UNCLAIMED);
 
 	if (xen_psm_kmdb_on_nmi && psm_debugger()) {
 		debug_enter("NMI received: entering kmdb\n");
@@ -247,6 +246,7 @@ xen_psm_nmi_intr(caddr_t arg, struct regs *rp)
 	}
 
 	lock_clear(&xen_psm_nmi_lock);
+	return (DDI_INTR_CLAIMED);
 }
 
 static void
@@ -294,7 +294,7 @@ xen_psm_picinit()
 	/* add nmi handler - least priority nmi handler */
 	LOCK_INIT_CLEAR(&xen_psm_nmi_lock);
 
-	if (!psm_add_nmintr(0, (avfunc) xen_psm_nmi_intr,
+	if (!psm_add_nmintr(0, xen_psm_nmi_intr,
 	    "xVM_psm NMI handler", (caddr_t)NULL))
 		cmn_err(CE_WARN, "xVM_psm: Unable to add nmi handler");
 }

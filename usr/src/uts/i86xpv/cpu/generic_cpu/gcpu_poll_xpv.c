@@ -74,7 +74,7 @@ static gcpu_poll_trace_ctl_t gcpu_xpv_poll_trace_ctl;
 #define	GCPU_XPV_MCH_POLL_NO_REARM	NULL
 
 static uint_t
-gcpu_xpv_virq_intr(void)
+gcpu_xpv_virq_intr(caddr_t arg __unused, caddr_t arg1 __unused)
 {
 	int types[] = { XEN_MC_URGENT, XEN_MC_NONURGENT };
 	uint64_t fetch_id;
@@ -194,7 +194,7 @@ gcpu_mca_poll_start(cmi_hdl_t hdl)
 		 */
 		gcpu_xpv_virq_vect = ec_bind_virq_to_irq(VIRQ_MCA, 0);
 		(void) add_avintr(NULL, gcpu_xpv_virq_level,
-		    (avfunc)gcpu_xpv_virq_intr, "MCA", gcpu_xpv_virq_vect,
+		    gcpu_xpv_virq_intr, "MCA", gcpu_xpv_virq_vect,
 		    NULL, NULL, NULL, NULL);
 	}
 }
