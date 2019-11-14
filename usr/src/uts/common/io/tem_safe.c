@@ -2375,7 +2375,7 @@ tem_safe_get_color(text_color_t *fg, text_color_t *bg, term_char_t c)
 	*fg = c.tc_fg_color;
 	*bg = c.tc_bg_color;
 
-	if (c.tc_fg_color < 16) {
+	if (c.tc_fg_color < XLATE_NCOLORS) {
 		if (TEM_ATTR_ISSET(c.tc_char,
 		    TEM_ATTR_BRIGHT_FG | TEM_ATTR_BOLD))
 			*fg = brt_xlate[c.tc_fg_color];
@@ -2383,7 +2383,7 @@ tem_safe_get_color(text_color_t *fg, text_color_t *bg, term_char_t c)
 			*fg = dim_xlate[c.tc_fg_color];
 	}
 
-	if (c.tc_bg_color < 16) {
+	if (c.tc_bg_color < XLATE_NCOLORS) {
 		if (TEM_ATTR_ISSET(c.tc_char, TEM_ATTR_BRIGHT_BG))
 			*bg = brt_xlate[c.tc_bg_color];
 		else

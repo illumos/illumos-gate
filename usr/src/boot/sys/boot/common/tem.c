@@ -2815,23 +2815,22 @@ tem_get_attr(struct tem_vt_state *tem, text_color_t *fg,
 static void
 tem_get_color(text_color_t *fg, text_color_t *bg, term_char_t c)
 {
-	if (c.tc_fg_color < 16) {
+	*fg = c.tc_fg_color;
+	*bg = c.tc_bg_color;
+
+	if (c.tc_fg_color < XLATE_NCOLORS) {
 		if (TEM_CHAR_ATTR(c.tc_char) &
 		    (TEM_ATTR_BRIGHT_FG | TEM_ATTR_BOLD))
 			*fg = brt_xlate[c.tc_fg_color];
 		else
 			*fg = dim_xlate[c.tc_fg_color];
-	} else {
-		*fg = c.tc_fg_color;
 	}
 
-	if (c.tc_bg_color < 16) {
+	if (c.tc_bg_color < XLATE_NCOLORS) {
 		if (TEM_CHAR_ATTR(c.tc_char) & TEM_ATTR_BRIGHT_BG)
 			*bg = brt_xlate[c.tc_bg_color];
 		else
 			*bg = dim_xlate[c.tc_bg_color];
-	} else {
-		*bg = c.tc_bg_color;
 	}
 }
 
