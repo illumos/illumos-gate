@@ -113,6 +113,14 @@ static int max_cached_ncmds = FCT_MAX_CACHED_CMDS;
 static fct_i_local_port_t *fct_iport_list = NULL;
 static kmutex_t fct_global_mutex;
 uint32_t fct_rscn_options = RSCN_OPTION_VERIFY;
+/*
+ * This is to keep fibre channel from hanging if syseventd is
+ * not working correctly and the queue fills. It is a tunable
+ * to allow the user to force event logging to always happen
+ * which is the default.
+ */
+static uint8_t fct_force_log = 0;  /* use DDI_SLEEP on ddi_log_sysevent */
+
 
 int
 _init(void)
@@ -1612,7 +1620,8 @@ fct_local_port_cleanup_done(fct_i_local_port_t *iport)
 
 fct_cmd_t *
 fct_scsi_task_alloc(fct_local_port_t *port, uint16_t rp_handle,
-    uint32_t rportid, uint8_t *lun, uint16_t cdb_length, uint16_t task_ext)
+    uint32_t rportid, uint8_t *lun, uint16_t cdb_length,
+    uint16_t task_ext)
 {
 	fct_cmd_t *cmd;
 	fct_i_cmd_t *icmd;
@@ -2829,8 +2838,8 @@ fct_cmd_fca_aborted(fct_cmd_t *cmd, fct_status_t s, uint32_t ioflags)
 	/* For non FCP Rest of the work is done by the terminator */
 	/* For FCP stuff just call stmf */
 	if (cmd->cmd_type == FCT_CMD_FCP_XCHG) {
-		stmf_task_lport_aborted((scsi_task_t *)cmd->cmd_specific,
-		    s, STMF_IOF_LPORT_DONE);
+		stmf_task_lport_aborted_unlocked(
+		    (scsi_task_t *)cmd->cmd_specific, s, STMF_IOF_LPORT_DONE);
 	}
 }
 
@@ -3432,6 +3441,7 @@ fct_log_local_port_event(fct_local_port_t *port, char *subclass)
 {
 	nvlist_t *attr_list;
 	int port_instance;
+	int rc, sleep = DDI_SLEEP;
 
 	if (!fct_dip)
 		return;
@@ -3452,8 +3462,15 @@ fct_log_local_port_event(fct_local_port_t *port, char *subclass)
 		goto error;
 	}
 
-	(void) ddi_log_sysevent(fct_dip, DDI_VENDOR_SUNW, EC_SUNFC,
-	    subclass, attr_list, NULL, DDI_SLEEP);
+	if (fct_force_log == 0) {
+		sleep = DDI_NOSLEEP;
+	}
+	rc = ddi_log_sysevent(fct_dip, DDI_VENDOR_SUNW, EC_SUNFC,
+	    subclass, attr_list, NULL, sleep);
+	if (rc != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s:event dropped", __func__);
+		goto error;
+	}
 
 	nvlist_free(attr_list);
 	return;
@@ -3471,6 +3488,7 @@ fct_log_remote_port_event(fct_local_port_t *port, char *subclass,
 {
 	nvlist_t *attr_list;
 	int port_instance;
+	int rc, sleep = DDI_SLEEP;
 
 	if (!fct_dip)
 		return;
@@ -3501,8 +3519,15 @@ fct_log_remote_port_event(fct_local_port_t *port, char *subclass,
 		goto error;
 	}
 
-	(void) ddi_log_sysevent(fct_dip, DDI_VENDOR_SUNW, EC_SUNFC,
-	    subclass, attr_list, NULL, DDI_SLEEP);
+	if (fct_force_log == 0) {
+		sleep = DDI_NOSLEEP;
+	}
+	rc = ddi_log_sysevent(fct_dip, DDI_VENDOR_SUNW, EC_SUNFC,
+	    subclass, attr_list, NULL, sleep);
+	if (rc != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: queue full event lost", __func__);
+		goto error;
+	}
 
 	nvlist_free(attr_list);
 	return;

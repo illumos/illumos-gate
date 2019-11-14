@@ -35,13 +35,13 @@ extern "C" {
 #define	SNS_NAA_32	32
 #define	SNS_WWN_16	16
 
-/*
- * Maximum number of bytes needed to store SCSI Name Strings in UTF-8 format,
- * assuming that (per RFC3629) one UTF-8 character can take up to 4 bytes.
- */
-#define	SNS_EUI_U8_LEN_MAX	(SNS_EUI_16 * 4)
-#define	SNS_IQN_U8_LEN_MAX	(SNS_IQN_223 * 4)
-#define	SNS_NAA_U8_LEN_MAX	(SNS_NAA_32 * 4)
+#define	SNS_EUI_LEN_MAX		sizeof (SNS_EUI) + SNS_EUI_16
+#define	SNS_IQN_LEN_MAX		SNS_IQN_223
+#define	SNS_MAC_LEN_MAX		sizeof (SNS_MAC) + SNS_MAC_12
+#define	SNS_NAA_LEN_MAX		sizeof (SNS_NAA) + SNS_NAA_32
+#define	SNS_WWN_LEN_MAX		sizeof (SNS_WWN) + SNS_WWN_16
+
+#define	SNS_LEN_MAX		SNS_IQN_LEN_MAX
 
 #ifdef __cplusplus
 }

@@ -48,8 +48,6 @@ void stmf_view_init();
 void stmf_view_clear_config();
 stmf_status_t stmf_session_create_lun_map(stmf_i_local_port_t *ilport,
 		stmf_i_scsi_session_t *iss);
-stmf_status_t stmf_session_destroy_lun_map(stmf_i_local_port_t *ilport,
-		stmf_i_scsi_session_t *iss);
 stmf_xfer_data_t *stmf_session_prepare_report_lun_data(stmf_lun_map_t *sm);
 void stmf_add_lu_to_active_sessions(stmf_lu_t *lu);
 void stmf_session_lu_unmapall(stmf_lu_t *lu);

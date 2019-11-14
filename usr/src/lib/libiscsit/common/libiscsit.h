@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_LIBISCSIT_H
@@ -40,7 +40,7 @@
 extern "C" {
 #endif
 
-#define	MAX_TARGETS 255 /* maximum targets that may be created */
+#define	MAX_TARGETS	4095 /* maximum targets that may be created */
 #define	MAX_TPGT	256
 #define	CFG_TPGTLIST	"tpgt-list"
 

@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -1246,7 +1246,7 @@ idm_update_state(idm_conn_t *ic, idm_conn_state_t new_state,
 		}
 
 		/* Stop executing active tasks */
-		idm_task_abort(ic, NULL, AT_INTERNAL_SUSPEND);
+		(void) idm_task_abort(ic, NULL, AT_INTERNAL_SUSPEND);
 
 		/* Start logout timer */
 		IDM_SM_TIMER_CHECK(ic);
@@ -1302,7 +1302,7 @@ idm_update_state(idm_conn_t *ic, idm_conn_state_t new_state,
 		}
 
 		/* Abort all tasks */
-		idm_task_abort(ic, NULL, AT_INTERNAL_ABORT);
+		(void) idm_task_abort(ic, NULL, AT_INTERNAL_ABORT);
 
 		/*
 		 * Handle terminal state actions on the global taskq so

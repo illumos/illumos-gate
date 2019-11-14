@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
+ * Copyright 2017 Nexenta Systems, Inc. All rights reserved.
  * iSCSI command interfaces
  */
 
@@ -796,8 +797,8 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 				 */
 				ISCSI_CMD_SET_REASON_STAT(
 				    t_icmdp, CMD_TIMEOUT, STAT_ABORTED);
-				idm_task_abort(icp->conn_ic, t_icmdp->cmd_itp,
-				    AT_TASK_MGMT_ABORT);
+				(void) idm_task_abort(icp->conn_ic,
+				    t_icmdp->cmd_itp, AT_TASK_MGMT_ABORT);
 			} else {
 				cv_broadcast(&t_icmdp->cmd_completion);
 			}
@@ -942,7 +943,7 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 					 */
 					ISCSI_CMD_SET_REASON_STAT(t_icmdp,
 					    CMD_TIMEOUT, STAT_TIMEOUT);
-					idm_task_abort(icp->conn_ic,
+					(void) idm_task_abort(icp->conn_ic,
 					    t_icmdp->cmd_itp,
 					    AT_TASK_MGMT_ABORT);
 				} else {
@@ -1027,7 +1028,7 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 			mutex_exit(&icp->conn_queue_idm_aborting.mutex);
 			ISCSI_CMD_SET_REASON_STAT(icmdp,
 			    CMD_TRAN_ERR, icmdp->cmd_un.scsi.pkt_stat);
-			idm_task_abort(icp->conn_ic, icmdp->cmd_itp,
+			(void) idm_task_abort(icp->conn_ic, icmdp->cmd_itp,
 			    AT_TASK_MGMT_ABORT);
 			break;
 
@@ -1208,7 +1209,7 @@ iscsi_cmd_state_aborting(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 		ISCSI_CMD_SET_REASON_STAT(icmdp,
 		    CMD_TRAN_ERR, icmdp->cmd_un.scsi.pkt_stat);
 
-		idm_task_abort(icmdp->cmd_conn->conn_ic, icmdp->cmd_itp,
+		(void) idm_task_abort(icmdp->cmd_conn->conn_ic, icmdp->cmd_itp,
 		    AT_TASK_MGMT_ABORT);
 		break;
 

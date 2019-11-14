@@ -18,10 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
+
 #ifndef	_STMF_H
 #define	_STMF_H
 
@@ -205,6 +208,11 @@ typedef struct scsi_task {
 #define	TASK_AF_ACCEPT_LU_DBUF		0x08
 
 /*
+ * Indicating a PPPT task
+ */
+#define	TASK_AF_PPPT_TASK		0x10
+
+/*
  * scsi_task_t extension identifiers
  */
 #define	STMF_TASK_EXT_NONE		0
@@ -379,7 +387,8 @@ void stmf_send_status_done(scsi_task_t *task, stmf_status_t s, uint32_t iof);
 void stmf_task_lu_done(scsi_task_t *task);
 void stmf_abort(int abort_cmd, scsi_task_t *task, stmf_status_t s, void *arg);
 void stmf_task_lu_aborted(scsi_task_t *task, stmf_status_t s, uint32_t iof);
-void stmf_task_lport_aborted(scsi_task_t *task, stmf_status_t s, uint32_t iof);
+void stmf_task_lport_aborted_unlocked(scsi_task_t *task, stmf_status_t s,
+    uint32_t iof);
 stmf_status_t stmf_task_poll_lu(scsi_task_t *task, uint32_t timeout);
 stmf_status_t stmf_task_poll_lport(scsi_task_t *task, uint32_t timeout);
 stmf_status_t stmf_ctl(int cmd, void *obj, void *arg);
@@ -416,6 +425,9 @@ boolean_t stmf_scsilib_tptid_compare(struct scsi_transport_id *,
     struct scsi_transport_id *);
 struct stmf_remote_port *stmf_remote_port_alloc(uint16_t);
 void stmf_remote_port_free(struct stmf_remote_port *);
+struct stmf_lu *stmf_check_and_hold_lu(struct scsi_task *task, uint8_t *guid);
+void stmf_release_lu(struct stmf_lu *lu);
+int stmf_is_task_being_aborted(struct scsi_task *task);
 #ifdef	__cplusplus
 }
 #endif

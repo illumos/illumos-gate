@@ -21,12 +21,17 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
+ */
+
+/*
+ * Copyright 2019 Nexenta Systems, Inc.
+ */
+
+/*
  * iSCSI logical unit interfaces
  */
 
 #include "iscsi.h"
-#include <sys/fs/dv_node.h>	/* devfs_clean */
 #include <sys/bootprops.h>
 #include <sys/sysevent/eventdefs.h>
 #include <sys/sysevent/dev.h>
@@ -123,6 +128,11 @@ iscsi_lun_create(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type,
 	ilp->lun_addr	    = addr;
 	ilp->lun_type	    = inq->inq_dtype & DTYPE_MASK;
 	ilp->lun_oid	    = oid_tmp;
+	/*
+	 * Setting refcnt to 1 is the first hold for the LUN structure.
+	 */
+	ilp->lun_refcnt	    = 1;
+	mutex_init(&ilp->lun_mutex, NULL, MUTEX_DRIVER, NULL);
 
 	bcopy(inq->inq_vid, ilp->lun_vid, sizeof (inq->inq_vid));
 	bcopy(inq->inq_pid, ilp->lun_pid, sizeof (inq->inq_pid));
@@ -189,6 +199,7 @@ iscsi_lun_create(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type,
 			kmem_free(ilp->lun_guid, ilp->lun_guid_size);
 			ilp->lun_guid = NULL;
 		}
+		mutex_destroy(&ilp->lun_mutex);
 		kmem_free(ilp, sizeof (iscsi_lun_t));
 	} else {
 		ilp->lun_state &= ISCSI_LUN_STATE_CLEAR;
@@ -215,6 +226,81 @@ iscsi_lun_create(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type,
 	return (rtn);
 }
 
+void
+iscsi_lun_hold(iscsi_lun_t *ilp)
+{
+	mutex_enter(&ilp->lun_mutex);
+	/*
+	 * By design lun_refcnt should never be zero when this routine
+	 * is called. When the LUN is created the refcnt is set to 1.
+	 * If iscsi_lun_rele is called and the refcnt goes to zero the
+	 * structure will be freed so this method shouldn't be called
+	 * afterwards.
+	 */
+	ASSERT(ilp->lun_refcnt > 0);
+	ilp->lun_refcnt++;
+	mutex_exit(&ilp->lun_mutex);
+}
+
+void
+iscsi_lun_rele(iscsi_lun_t *ilp)
+{
+	ASSERT(ilp != NULL);
+
+	mutex_enter(&ilp->lun_mutex);
+	ASSERT(ilp->lun_refcnt > 0);
+	if (--ilp->lun_refcnt == 0) {
+		iscsi_sess_t		*isp;
+
+		isp = ilp->lun_sess;
+		ASSERT(isp != NULL);
+
+		/* ---- release its memory ---- */
+		kmem_free(ilp->lun_addr, (strlen((char *)isp->sess_name) +
+		    ADDR_EXT_SIZE + 1));
+
+		if (ilp->lun_guid != NULL) {
+			kmem_free(ilp->lun_guid, ilp->lun_guid_size);
+		}
+		mutex_destroy(&ilp->lun_mutex);
+		kmem_free(ilp, sizeof (iscsi_lun_t));
+	} else {
+		mutex_exit(&ilp->lun_mutex);
+	}
+}
+
+/*
+ * iscsi_lun_cmd_cancel -- as the name implies, cancel all commands for the lun
+ *
+ * This code is similar to the timeout function with a lot less checking of
+ * state before sending the ABORT event for commands on the pending queue.
+ *
+ * This function is only used by iscsi_lun_destroy().
+ */
+static void
+iscsi_lun_cmd_cancel(iscsi_lun_t *ilp)
+{
+	iscsi_sess_t	*isp;
+	iscsi_cmd_t	*icmdp, *nicmdp;
+
+	isp = ilp->lun_sess;
+	rw_enter(&isp->sess_state_rwlock, RW_READER);
+	mutex_enter(&isp->sess_queue_pending.mutex);
+	for (icmdp = isp->sess_queue_pending.head;
+	    icmdp; icmdp = nicmdp) {
+		nicmdp = icmdp->cmd_next;
+
+		/*
+		 * For commands on the pending queue we can go straight
+		 * to and abort request which will free the command
+		 * and call back to the complete function.
+		 */
+		iscsi_cmd_state_machine(icmdp, ISCSI_CMD_EVENT_E4, isp);
+	}
+	mutex_exit(&isp->sess_queue_pending.mutex);
+	rw_exit(&isp->sess_state_rwlock);
+}
+
 /*
  * iscsi_lun_destroy - offline and remove lun
  *
@@ -239,6 +325,9 @@ iscsi_lun_destroy(iscsi_hba_t *ihp, iscsi_lun_t *ilp)
 	ASSERT(ilp != NULL);
 	isp = ilp->lun_sess;
 	ASSERT(isp != NULL);
+
+	/* flush all outstanding commands first */
+	iscsi_lun_cmd_cancel(ilp);
 
 	/* attempt to offline and free solaris node */
 	status = iscsi_lun_offline(ihp, ilp, B_TRUE);
@@ -269,16 +358,7 @@ iscsi_lun_destroy(iscsi_hba_t *ihp, iscsi_lun_t *ilp)
 			}
 		}
 
-		/* release its memory */
-		kmem_free(ilp->lun_addr, (strlen((char *)isp->sess_name) +
-		    ADDR_EXT_SIZE + 1));
-		ilp->lun_addr = NULL;
-		if (ilp->lun_guid != NULL) {
-			kmem_free(ilp->lun_guid, ilp->lun_guid_size);
-			ilp->lun_guid = NULL;
-		}
-		kmem_free(ilp, sizeof (iscsi_lun_t));
-		ilp = NULL;
+		iscsi_lun_rele(ilp);
 	}
 
 	return (status);
@@ -641,56 +721,18 @@ iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 {
 	iscsi_status_t		status		= ISCSI_STATUS_SUCCESS;
 	int			circ		= 0;
-	dev_info_t		*cdip, *pdip;
-	char			*devname	= NULL;
+	dev_info_t		*cdip;
 	char			*pathname	= NULL;
-	int			rval;
 	boolean_t		offline		= B_FALSE;
 	nvlist_t		*attr_list	= NULL;
 
 	ASSERT(ilp != NULL);
 	ASSERT((ilp->lun_pip != NULL) || (ilp->lun_dip != NULL));
 
-	/*
-	 * Since we carry the logical units parent
-	 * lock across the offline call it will not
-	 * issue devfs_clean() and may fail with a
-	 * devi_ref count > 0.
-	 */
-	if (ilp->lun_pip == NULL) {
+	if (ilp->lun_pip == NULL)
 		cdip = ilp->lun_dip;
-	} else {
+	else
 		cdip = mdi_pi_get_client(ilp->lun_pip);
-	}
-
-	if ((cdip != NULL) &&
-	    (lun_free == B_TRUE) &&
-	    (ilp->lun_state & ISCSI_LUN_STATE_ONLINE)) {
-		/*
-		 * Make sure node is attached otherwise
-		 * it won't have related cache nodes to
-		 * clean up.  i_ddi_devi_attached is
-		 * similiar to i_ddi_node_state(cdip) >=
-		 * DS_ATTACHED. We should clean up only
-		 * when lun_free is set.
-		 */
-		if (i_ddi_devi_attached(cdip)) {
-
-			/* Get parent dip */
-			pdip = ddi_get_parent(cdip);
-
-			/* Get full devname */
-			devname = kmem_alloc(MAXNAMELEN + 1, KM_SLEEP);
-			ndi_devi_enter(pdip, &circ);
-			(void) ddi_deviname(cdip, devname);
-			/* Release lock before devfs_clean() */
-			ndi_devi_exit(pdip, circ);
-
-			/* Clean cache */
-			(void) devfs_clean(pdip, devname + 1, DV_CLEAN_FORCE);
-			kmem_free(devname, MAXNAMELEN + 1);
-		}
-	}
 
 	if (cdip != NULL && ilp->lun_type == DTYPE_DIRECT) {
 		pathname = kmem_zalloc(MAXNAMELEN + 1, KM_SLEEP);
@@ -699,18 +741,9 @@ iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 
 	/* Attempt to offline the logical units */
 	if (ilp->lun_pip != NULL) {
-
 		/* virt/mdi */
 		ndi_devi_enter(scsi_vhci_dip, &circ);
-		if ((lun_free == B_TRUE) &&
-		    (ilp->lun_state & ISCSI_LUN_STATE_ONLINE)) {
-			rval = mdi_pi_offline(ilp->lun_pip,
-			    NDI_DEVI_REMOVE);
-		} else {
-			rval = mdi_pi_offline(ilp->lun_pip, 0);
-		}
-
-		if (rval == MDI_SUCCESS) {
+		if (mdi_pi_offline(ilp->lun_pip, 0) == MDI_SUCCESS) {
 			ilp->lun_state &= ISCSI_LUN_STATE_CLEAR;
 			ilp->lun_state |= ISCSI_LUN_STATE_OFFLINE;
 			if (lun_free == B_TRUE) {
@@ -728,18 +761,14 @@ iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 		ndi_devi_exit(scsi_vhci_dip, circ);
 
 	} else  {
-
 		/* phys/ndi */
+		int flags = NDI_DEVFS_CLEAN;
+
 		ndi_devi_enter(ihp->hba_dip, &circ);
-		if ((lun_free == B_TRUE) &&
-		    (ilp->lun_state & ISCSI_LUN_STATE_ONLINE)) {
-			rval = ndi_devi_offline(
-			    ilp->lun_dip, NDI_DEVI_REMOVE);
-		} else {
-			rval = ndi_devi_offline(
-			    ilp->lun_dip, 0);
-		}
-		if (rval != NDI_SUCCESS) {
+		if (lun_free == B_TRUE &&
+		    (ilp->lun_state & ISCSI_LUN_STATE_ONLINE))
+			flags |= NDI_DEVI_REMOVE;
+		if (ndi_devi_offline(ilp->lun_dip, flags) != NDI_SUCCESS) {
 			status = ISCSI_STATUS_BUSY;
 			if (lun_free == B_FALSE) {
 				ilp->lun_state |= ISCSI_LUN_STATE_INVALID;

@@ -18,11 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2012, Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  */
@@ -124,7 +125,6 @@ void stmf_delete_all_ppds();
 void stmf_trace_clear();
 void stmf_worker_init();
 stmf_status_t stmf_worker_fini();
-void stmf_worker_mgmt();
 void stmf_worker_task(void *arg);
 static void stmf_task_lu_free(scsi_task_t *task, stmf_i_scsi_session_t *iss);
 static stmf_status_t stmf_ic_lu_reg(stmf_ic_reg_dereg_lun_msg_t *msg,
@@ -164,9 +164,14 @@ static void stmf_update_kstat_lu_q(scsi_task_t *, void());
 static void stmf_update_kstat_lport_q(scsi_task_t *, void());
 static void stmf_update_kstat_lu_io(scsi_task_t *, stmf_data_buf_t *);
 static void stmf_update_kstat_lport_io(scsi_task_t *, stmf_data_buf_t *);
+static hrtime_t stmf_update_rport_timestamps(hrtime_t *start_tstamp,
+    hrtime_t *done_tstamp, stmf_i_scsi_task_t *itask);
 
 static int stmf_irport_compare(const void *void_irport1,
     const void *void_irport2);
+static void stmf_create_kstat_rport(stmf_i_remote_port_t *irport);
+static void stmf_destroy_kstat_rport(stmf_i_remote_port_t *irport);
+static int stmf_kstat_rport_update(kstat_t *ksp, int rw);
 static stmf_i_remote_port_t *stmf_irport_create(scsi_devid_desc_t *rport_devid);
 static void stmf_irport_destroy(stmf_i_remote_port_t *irport);
 static stmf_i_remote_port_t *stmf_irport_register(
@@ -179,7 +184,7 @@ extern struct mod_ops mod_driverops;
 
 /* =====[ Tunables ]===== */
 /* Internal tracing */
-volatile int	stmf_trace_on = 1;
+volatile int	stmf_trace_on = 0;
 volatile int	stmf_trace_buf_size = (1 * 1024 * 1024);
 /*
  * The reason default task timeout is 75 is because we want the
@@ -192,14 +197,12 @@ volatile int	stmf_default_task_timeout = 75;
  */
 volatile int	stmf_allow_modunload = 0;
 
-volatile int stmf_max_nworkers = 256;
-volatile int stmf_min_nworkers = 4;
-volatile int stmf_worker_scale_down_delay = 20;
+volatile int stmf_nworkers = 512;
 
 /* === [ Debugging and fault injection ] === */
 #ifdef	DEBUG
-volatile uint32_t stmf_drop_task_counter = 0;
-volatile uint32_t stmf_drop_buf_counter = 0;
+volatile int stmf_drop_task_counter = 0;
+volatile int stmf_drop_buf_counter = 0;
 
 #endif
 
@@ -221,20 +224,13 @@ static enum {
 	STMF_WORKERS_ENABLING,
 	STMF_WORKERS_ENABLED
 } stmf_workers_state = STMF_WORKERS_DISABLED;
-static int stmf_i_max_nworkers;
-static int stmf_i_min_nworkers;
-static int stmf_nworkers_cur;		/* # of workers currently running */
-static int stmf_nworkers_needed;	/* # of workers need to be running */
+static kmutex_t	stmf_worker_sel_mx;
+volatile uint32_t stmf_nworkers_cur = 0; /* # of workers currently running */
 static int stmf_worker_sel_counter = 0;
 static uint32_t stmf_cur_ntasks = 0;
-static clock_t stmf_wm_last = 0;
-/*
- * This is equal to stmf_nworkers_cur while we are increasing # workers and
- * stmf_nworkers_needed while we are decreasing the worker count.
- */
+static clock_t stmf_wm_next = 0;
 static int stmf_nworkers_accepting_cmds;
 static stmf_worker_t *stmf_workers = NULL;
-static clock_t stmf_worker_mgmt_delay = 2;
 static clock_t stmf_worker_scale_down_timer = 0;
 static int stmf_worker_scale_down_qd = 0;
 
@@ -300,6 +296,7 @@ _init(void)
 	trace_buf_size = stmf_trace_buf_size;
 	trace_buf_curndx = 0;
 	mutex_init(&trace_buf_lock, NULL, MUTEX_DRIVER, 0);
+	mutex_init(&stmf_worker_sel_mx, NULL, MUTEX_ADAPTIVE, 0);
 	bzero(&stmf_state, sizeof (stmf_state_t));
 	/* STMF service is off by default */
 	stmf_state.stmf_service_running = 0;
@@ -370,6 +367,7 @@ _fini(void)
 	kmem_free(stmf_trace_buf, stmf_trace_buf_size);
 	mutex_destroy(&trace_buf_lock);
 	mutex_destroy(&stmf_state.stmf_lock);
+	mutex_destroy(&stmf_worker_sel_mx);
 	cv_destroy(&stmf_state.stmf_cv);
 	return (ret);
 }
@@ -1655,10 +1653,13 @@ find_task_from_msgid(uint8_t *lu_id, stmf_ic_msgid_t task_msgid)
 	mutex_enter(&ilu->ilu_task_lock);
 	for (itask = ilu->ilu_tasks; itask != NULL;
 	    itask = itask->itask_lu_next) {
+		mutex_enter(&itask->itask_mutex);
 		if (itask->itask_flags & (ITASK_IN_FREE_LIST |
 		    ITASK_BEING_ABORTED)) {
+			mutex_exit(&itask->itask_mutex);
 			continue;
 		}
+		mutex_exit(&itask->itask_mutex);
 		if (itask->itask_proxy_msg_id == task_msgid) {
 			break;
 		}
@@ -1903,16 +1904,15 @@ stmf_proxy_scsi_cmd(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	 * we can recognize this on return since we won't be completing
 	 * the proxied task in that case.
 	 */
+	mutex_enter(&itask->itask_mutex);
 	if (task->task_mgmt_function) {
 		itask->itask_proxy_msg_id |= MSG_ID_TM_BIT;
 	} else {
-		uint32_t new, old;
-		do {
-			new = old = itask->itask_flags;
-			if (new & ITASK_BEING_ABORTED)
-				return (STMF_FAILURE);
-			new |= ITASK_DEFAULT_HANDLING | ITASK_PROXY_TASK;
-		} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+		if (itask->itask_flags & ITASK_BEING_ABORTED) {
+			mutex_exit(&itask->itask_mutex);
+			return (STMF_FAILURE);
+		}
+		itask->itask_flags |= ITASK_DEFAULT_HANDLING | ITASK_PROXY_TASK;
 	}
 	if (dbuf) {
 		ic_cmd_msg = ic_scsi_cmd_msg_alloc(itask->itask_proxy_msg_id,
@@ -1922,6 +1922,7 @@ stmf_proxy_scsi_cmd(scsi_task_t *task, stmf_data_buf_t *dbuf)
 		ic_cmd_msg = ic_scsi_cmd_msg_alloc(itask->itask_proxy_msg_id,
 		    task, 0, NULL, itask->itask_proxy_msg_id);
 	}
+	mutex_exit(&itask->itask_mutex);
 	if (ic_cmd_msg) {
 		ic_ret = ic_tx_msg(ic_cmd_msg);
 		if (ic_ret == STMF_IC_MSG_SUCCESS) {
@@ -2525,7 +2526,8 @@ stmf_load_ppd_ioctl(stmf_ppioctl_data_t *ppi, uint64_t *ppi_token,
 	}
 
 	/* Free any existing lists and add this one to the ppd */
-	nvlist_free(ppd->ppd_nv);
+	if (ppd->ppd_nv)
+		nvlist_free(ppd->ppd_nv);
 	ppd->ppd_nv = nv;
 
 	/* set the token for writes */
@@ -2597,7 +2599,8 @@ stmf_delete_ppd(stmf_pp_data_t *ppd)
 		return;
 
 	*pppd = ppd->ppd_next;
-	nvlist_free(ppd->ppd_nv);
+	if (ppd->ppd_nv)
+		nvlist_free(ppd->ppd_nv);
 
 	kmem_free(ppd, ppd->ppd_alloc_size);
 }
@@ -2706,6 +2709,8 @@ stmf_delete_all_ppds()
  */
 #define	STMF_KSTAT_LU_SZ	(STMF_GUID_INPUT + 1 + 256)
 #define	STMF_KSTAT_TGT_SZ	(256 * 2 + 16)
+#define	STMF_KSTAT_RPORT_DATAMAX	(sizeof (stmf_kstat_rport_info_t) / \
+					    sizeof (kstat_named_t))
 
 /*
  * This array matches the Protocol Identifier in stmf_ioctl.h
@@ -2780,6 +2785,96 @@ stmf_update_kstat_lport_io(scsi_task_t *task, stmf_data_buf_t *dbuf)
 			mutex_exit(ilp->ilport_kstat_io->ks_lock);
 		}
 	}
+}
+
+static void
+stmf_update_kstat_rport_io(scsi_task_t *task, stmf_data_buf_t *dbuf)
+{
+	stmf_i_scsi_session_t	*iss;
+	stmf_i_remote_port_t	*irport;
+	kstat_io_t		*kip;
+
+	iss = task->task_session->ss_stmf_private;
+	irport = iss->iss_irport;
+	if (irport->irport_kstat_io != NULL) {
+		kip = KSTAT_IO_PTR(irport->irport_kstat_io);
+		mutex_enter(irport->irport_kstat_io->ks_lock);
+		STMF_UPDATE_KSTAT_IO(kip, dbuf);
+		mutex_exit(irport->irport_kstat_io->ks_lock);
+	}
+}
+
+static void
+stmf_update_kstat_rport_estat(scsi_task_t *task)
+{
+	stmf_i_scsi_task_t		*itask;
+	stmf_i_scsi_session_t		*iss;
+	stmf_i_remote_port_t		*irport;
+	stmf_kstat_rport_estat_t	*ks_estat;
+	hrtime_t			lat = 0;
+	uint32_t			n = 0;
+
+	itask = task->task_stmf_private;
+	iss = task->task_session->ss_stmf_private;
+	irport = iss->iss_irport;
+
+	if (irport->irport_kstat_estat == NULL)
+		return;
+
+	ks_estat = (stmf_kstat_rport_estat_t *)KSTAT_NAMED_PTR(
+	    irport->irport_kstat_estat);
+
+	mutex_enter(irport->irport_kstat_estat->ks_lock);
+
+	if (task->task_flags & TF_READ_DATA)
+		n = atomic_dec_32_nv(&irport->irport_nread_tasks);
+	else if (task->task_flags & TF_WRITE_DATA)
+		n = atomic_dec_32_nv(&irport->irport_nwrite_tasks);
+
+	if (itask->itask_read_xfer > 0) {
+		ks_estat->i_nread_tasks.value.ui64++;
+		lat = stmf_update_rport_timestamps(
+		    &irport->irport_rdstart_timestamp,
+		    &irport->irport_rddone_timestamp, itask);
+		if (n == 0)
+			ks_estat->i_rport_read_latency.value.ui64 += lat;
+	} else if ((itask->itask_write_xfer > 0) ||
+	    (task->task_flags & TF_INITIAL_BURST)) {
+		ks_estat->i_nwrite_tasks.value.ui64++;
+		lat = stmf_update_rport_timestamps(
+		    &irport->irport_wrstart_timestamp,
+		    &irport->irport_wrdone_timestamp, itask);
+		if (n == 0)
+			ks_estat->i_rport_write_latency.value.ui64 += lat;
+	}
+
+	if (n == 0) {
+		if (task->task_flags & TF_READ_DATA) {
+			irport->irport_rdstart_timestamp = LLONG_MAX;
+			irport->irport_rddone_timestamp = 0;
+		} else if (task->task_flags & TF_WRITE_DATA) {
+			irport->irport_wrstart_timestamp = LLONG_MAX;
+			irport->irport_wrdone_timestamp = 0;
+		}
+	}
+
+	mutex_exit(irport->irport_kstat_estat->ks_lock);
+}
+
+static hrtime_t
+stmf_update_rport_timestamps(hrtime_t *start_tstamp, hrtime_t *done_tstamp,
+    stmf_i_scsi_task_t *itask)
+{
+	*start_tstamp = MIN(*start_tstamp, itask->itask_start_timestamp);
+	if ((*done_tstamp == 0) &&
+	    (itask->itask_xfer_done_timestamp == 0)) {
+		*done_tstamp = *start_tstamp;
+	} else {
+		*done_tstamp = MAX(*done_tstamp,
+		    itask->itask_xfer_done_timestamp);
+	}
+
+	return (*done_tstamp - *start_tstamp);
 }
 
 static void
@@ -3443,6 +3538,8 @@ stmf_irport_create(scsi_devid_desc_t *rport_devid)
 	    sizeof (scsi_devid_desc_t) + rport_devid->ident_length - 1);
 	irport->irport_refcnt = 1;
 	mutex_init(&irport->irport_mutex, NULL, MUTEX_DEFAULT, NULL);
+	irport->irport_rdstart_timestamp = LLONG_MAX;
+	irport->irport_wrstart_timestamp = LLONG_MAX;
 
 	return (irport);
 }
@@ -3450,10 +3547,130 @@ stmf_irport_create(scsi_devid_desc_t *rport_devid)
 static void
 stmf_irport_destroy(stmf_i_remote_port_t *irport)
 {
+	stmf_destroy_kstat_rport(irport);
 	id_free(stmf_state.stmf_irport_inst_space, irport->irport_instance);
 	mutex_destroy(&irport->irport_mutex);
 	kmem_free(irport, sizeof (*irport) + sizeof (scsi_devid_desc_t) +
 	    irport->irport_id->ident_length - 1);
+}
+
+static void
+stmf_create_kstat_rport(stmf_i_remote_port_t *irport)
+{
+	scsi_devid_desc_t *id = irport->irport_id;
+	char ks_nm[KSTAT_STRLEN];
+	stmf_kstat_rport_info_t *ks_info;
+	stmf_kstat_rport_estat_t *ks_estat;
+	char *ident = NULL;
+
+	ks_info = kmem_zalloc(sizeof (*ks_info), KM_NOSLEEP);
+	if (ks_info == NULL)
+		goto err_out;
+
+	(void) snprintf(ks_nm, KSTAT_STRLEN, "stmf_rport_%"PRIxPTR"",
+	    (uintptr_t)irport);
+	irport->irport_kstat_info = kstat_create(STMF_MODULE_NAME, 0,
+	    ks_nm, "misc", KSTAT_TYPE_NAMED,
+	    STMF_KSTAT_RPORT_DATAMAX - STMF_RPORT_INFO_LIMIT,
+	    KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_VAR_SIZE);
+	if (irport->irport_kstat_info == NULL) {
+		kmem_free(ks_info, sizeof (*ks_info));
+		goto err_out;
+	}
+
+	irport->irport_kstat_info->ks_data = ks_info;
+	irport->irport_kstat_info->ks_private = irport;
+	irport->irport_kstat_info->ks_update = stmf_kstat_rport_update;
+	ident = kmem_alloc(id->ident_length + 1, KM_NOSLEEP);
+	if (ident == NULL) {
+		kstat_delete(irport->irport_kstat_info);
+		irport->irport_kstat_info = NULL;
+		kmem_free(ks_info, sizeof (*ks_info));
+		goto err_out;
+	}
+
+	(void) memcpy(ident, id->ident, id->ident_length);
+	ident[id->ident_length] = '\0';
+	kstat_named_init(&ks_info->i_rport_name, "name", KSTAT_DATA_STRING);
+	kstat_named_init(&ks_info->i_protocol, "protocol",
+	    KSTAT_DATA_STRING);
+
+	kstat_named_setstr(&ks_info->i_rport_name, ident);
+	kstat_named_setstr(&ks_info->i_protocol,
+	    protocol_ident[irport->irport_id->protocol_id]);
+	irport->irport_kstat_info->ks_lock = &irport->irport_mutex;
+	irport->irport_info_dirty = B_TRUE;
+	kstat_install(irport->irport_kstat_info);
+
+	(void) snprintf(ks_nm, KSTAT_STRLEN, "stmf_rport_io_%"PRIxPTR"",
+	    (uintptr_t)irport);
+	irport->irport_kstat_io = kstat_create(STMF_MODULE_NAME, 0, ks_nm,
+	    "io", KSTAT_TYPE_IO, 1, 0);
+	if (irport->irport_kstat_io == NULL)
+		goto err_out;
+
+	irport->irport_kstat_io->ks_lock = &irport->irport_mutex;
+	kstat_install(irport->irport_kstat_io);
+
+	(void) snprintf(ks_nm, KSTAT_STRLEN, "stmf_rport_st_%"PRIxPTR"",
+	    (uintptr_t)irport);
+	irport->irport_kstat_estat = kstat_create(STMF_MODULE_NAME, 0, ks_nm,
+	    "misc", KSTAT_TYPE_NAMED,
+	    sizeof (*ks_estat) / sizeof (kstat_named_t), 0);
+	if (irport->irport_kstat_estat == NULL)
+		goto err_out;
+
+	ks_estat = (stmf_kstat_rport_estat_t *)KSTAT_NAMED_PTR(
+	    irport->irport_kstat_estat);
+	kstat_named_init(&ks_estat->i_rport_read_latency,
+	    "rlatency", KSTAT_DATA_UINT64);
+	kstat_named_init(&ks_estat->i_rport_write_latency,
+	    "wlatency", KSTAT_DATA_UINT64);
+	kstat_named_init(&ks_estat->i_nread_tasks, "rntasks",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ks_estat->i_nwrite_tasks, "wntasks",
+	    KSTAT_DATA_UINT64);
+	irport->irport_kstat_estat->ks_lock = &irport->irport_mutex;
+	kstat_install(irport->irport_kstat_estat);
+
+	return;
+
+err_out:
+	(void) memcpy(ks_nm, id->ident, MAX(KSTAT_STRLEN - 1,
+	    id->ident_length));
+	ks_nm[id->ident_length] = '\0';
+	cmn_err(CE_WARN, "STMF: remote port kstat creation failed: %s", ks_nm);
+}
+
+static void
+stmf_destroy_kstat_rport(stmf_i_remote_port_t *irport)
+{
+	if (irport->irport_kstat_io != NULL) {
+		kstat_delete(irport->irport_kstat_io);
+	}
+	if (irport->irport_kstat_estat != NULL) {
+		kstat_delete(irport->irport_kstat_estat);
+	}
+	if (irport->irport_kstat_info != NULL) {
+		stmf_kstat_rport_info_t *ks_info;
+		kstat_named_t *knp;
+		void *ptr;
+		int i;
+
+		ks_info = (stmf_kstat_rport_info_t *)KSTAT_NAMED_PTR(
+		    irport->irport_kstat_info);
+		kstat_delete(irport->irport_kstat_info);
+		ptr = KSTAT_NAMED_STR_PTR(&ks_info->i_rport_name);
+		kmem_free(ptr, KSTAT_NAMED_STR_BUFLEN(&ks_info->i_rport_name));
+
+		for (i = 0, knp = ks_info->i_rport_uinfo;
+		    i < STMF_RPORT_INFO_LIMIT; i++, knp++) {
+			ptr = KSTAT_NAMED_STR_PTR(knp);
+			if (ptr != NULL)
+			kmem_free(ptr, KSTAT_NAMED_STR_BUFLEN(knp));
+		}
+		kmem_free(ks_info, sizeof (*ks_info));
+	}
 }
 
 static stmf_i_remote_port_t *
@@ -3478,6 +3695,7 @@ stmf_irport_register(scsi_devid_desc_t *rport_devid)
 		return (NULL);
 	}
 
+	stmf_create_kstat_rport(irport);
 	avl_add(&stmf_state.stmf_irportlist, irport);
 	mutex_exit(&stmf_state.stmf_lock);
 
@@ -3601,6 +3819,109 @@ stmf_register_scsi_session(stmf_local_port_t *lport, stmf_scsi_session_t *ss)
 	return (STMF_SUCCESS);
 }
 
+stmf_status_t
+stmf_add_rport_info(stmf_scsi_session_t *ss,
+    const char *prop_name, const char *prop_value)
+{
+	stmf_i_scsi_session_t *iss = ss->ss_stmf_private;
+	stmf_i_remote_port_t *irport = iss->iss_irport;
+	kstat_named_t *knp;
+	char *s;
+	int i;
+
+	s = strdup(prop_value);
+
+	mutex_enter(irport->irport_kstat_info->ks_lock);
+	/* Make sure the caller doesn't try to add already existing property */
+	knp = KSTAT_NAMED_PTR(irport->irport_kstat_info);
+	for (i = 0; i < STMF_KSTAT_RPORT_DATAMAX; i++, knp++) {
+		if (KSTAT_NAMED_STR_PTR(knp) == NULL)
+			break;
+
+		ASSERT(strcmp(knp->name, prop_name) != 0);
+	}
+
+	if (i == STMF_KSTAT_RPORT_DATAMAX) {
+		mutex_exit(irport->irport_kstat_info->ks_lock);
+		kmem_free(s, strlen(s) + 1);
+		return (STMF_FAILURE);
+	}
+
+	irport->irport_info_dirty = B_TRUE;
+	kstat_named_init(knp, prop_name, KSTAT_DATA_STRING);
+	kstat_named_setstr(knp, s);
+	mutex_exit(irport->irport_kstat_info->ks_lock);
+
+	return (STMF_SUCCESS);
+}
+
+void
+stmf_remove_rport_info(stmf_scsi_session_t *ss,
+    const char *prop_name)
+{
+	stmf_i_scsi_session_t *iss = ss->ss_stmf_private;
+	stmf_i_remote_port_t *irport = iss->iss_irport;
+	kstat_named_t *knp;
+	char *s;
+	int i;
+	uint32_t len;
+
+	mutex_enter(irport->irport_kstat_info->ks_lock);
+	knp = KSTAT_NAMED_PTR(irport->irport_kstat_info);
+	for (i = 0; i < STMF_KSTAT_RPORT_DATAMAX; i++, knp++) {
+		if ((knp->name != NULL) && (strcmp(knp->name, prop_name) == 0))
+			break;
+	}
+
+	if (i == STMF_KSTAT_RPORT_DATAMAX) {
+		mutex_exit(irport->irport_kstat_info->ks_lock);
+		return;
+	}
+
+	s = KSTAT_NAMED_STR_PTR(knp);
+	len = KSTAT_NAMED_STR_BUFLEN(knp);
+
+	for (; i < STMF_KSTAT_RPORT_DATAMAX - 1; i++, knp++) {
+		kstat_named_init(knp, knp[1].name, KSTAT_DATA_STRING);
+		kstat_named_setstr(knp, KSTAT_NAMED_STR_PTR(&knp[1]));
+	}
+	kstat_named_init(knp, "", KSTAT_DATA_STRING);
+
+	irport->irport_info_dirty = B_TRUE;
+	mutex_exit(irport->irport_kstat_info->ks_lock);
+	kmem_free(s, len);
+}
+
+static int
+stmf_kstat_rport_update(kstat_t *ksp, int rw)
+{
+	stmf_i_remote_port_t *irport = ksp->ks_private;
+	kstat_named_t *knp;
+	uint_t ndata = 0;
+	size_t dsize = 0;
+	int i;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	if (!irport->irport_info_dirty)
+		return (0);
+
+	knp = KSTAT_NAMED_PTR(ksp);
+	for (i = 0; i < STMF_KSTAT_RPORT_DATAMAX; i++, knp++) {
+		if (KSTAT_NAMED_STR_PTR(knp) == NULL)
+			break;
+		ndata++;
+		dsize += KSTAT_NAMED_STR_BUFLEN(knp);
+	}
+
+	ksp->ks_ndata = ndata;
+	ksp->ks_data_size = sizeof (kstat_named_t) * ndata + dsize;
+	irport->irport_info_dirty = B_FALSE;
+
+	return (0);
+}
+
 void
 stmf_deregister_scsi_session(stmf_local_port_t *lport, stmf_scsi_session_t *ss)
 {
@@ -3610,6 +3931,10 @@ stmf_deregister_scsi_session(stmf_local_port_t *lport, stmf_scsi_session_t *ss)
 	int found = 0;
 	stmf_ic_msg_t *ic_session_dereg;
 	stmf_status_t ic_ret = STMF_FAILURE;
+	stmf_lun_map_t *sm;
+	stmf_i_lu_t *ilu;
+	uint16_t n;
+	stmf_lun_map_ent_t *ent;
 
 	DTRACE_PROBE2(session__offline, stmf_local_port_t *, lport,
 	    stmf_scsi_session_t *, ss);
@@ -3659,14 +3984,45 @@ try_dereg_ss_again:
 	ilport->ilport_nsessions--;
 
 	stmf_irport_deregister(iss->iss_irport);
-	(void) stmf_session_destroy_lun_map(ilport, iss);
+	/*
+	 * to avoid conflict with updating session's map,
+	 * which only grab stmf_lock
+	 */
+	sm = iss->iss_sm;
+	iss->iss_sm = NULL;
+	iss->iss_hg = NULL;
+
 	rw_exit(&ilport->ilport_lock);
-	mutex_exit(&stmf_state.stmf_lock);
+
+	if (sm->lm_nentries) {
+		for (n = 0; n < sm->lm_nentries; n++) {
+			if ((ent = (stmf_lun_map_ent_t *)sm->lm_plus[n])
+			    != NULL) {
+				if (ent->ent_itl_datap) {
+					stmf_do_itl_dereg(ent->ent_lu,
+					    ent->ent_itl_datap,
+					    STMF_ITL_REASON_IT_NEXUS_LOSS);
+				}
+				ilu = (stmf_i_lu_t *)
+				    ent->ent_lu->lu_stmf_private;
+				atomic_dec_32(&ilu->ilu_ref_cnt);
+				kmem_free(sm->lm_plus[n],
+				    sizeof (stmf_lun_map_ent_t));
+			}
+		}
+		kmem_free(sm->lm_plus,
+		    sizeof (stmf_lun_map_ent_t *) * sm->lm_nentries);
+	}
+	kmem_free(sm, sizeof (*sm));
 
 	if (iss->iss_flags & ISS_NULL_TPTID) {
 		stmf_remote_port_free(ss->ss_rport);
 	}
+
+	mutex_exit(&stmf_state.stmf_lock);
 }
+
+
 
 stmf_i_scsi_session_t *
 stmf_session_id_to_issptr(uint64_t session_id, int stay_locked)
@@ -3863,54 +4219,6 @@ dai_scan_done:
 	return (STMF_SUCCESS);
 }
 
-stmf_status_t
-stmf_get_itl_handle(stmf_lu_t *lu, uint8_t *lun, stmf_scsi_session_t *ss,
-    uint64_t session_id, void **itl_handle_retp)
-{
-	stmf_i_scsi_session_t *iss;
-	stmf_lun_map_ent_t *ent;
-	stmf_lun_map_t *lm;
-	stmf_status_t ret;
-	int i;
-	uint16_t n;
-
-	if (ss == NULL) {
-		iss = stmf_session_id_to_issptr(session_id, 1);
-		if (iss == NULL)
-			return (STMF_NOT_FOUND);
-	} else {
-		iss = (stmf_i_scsi_session_t *)ss->ss_stmf_private;
-		rw_enter(iss->iss_lockp, RW_WRITER);
-	}
-
-	ent = NULL;
-	if (lun == NULL) {
-		lm = iss->iss_sm;
-		for (i = 0; i < lm->lm_nentries; i++) {
-			if (lm->lm_plus[i] == NULL)
-				continue;
-			ent = (stmf_lun_map_ent_t *)lm->lm_plus[i];
-			if (ent->ent_lu == lu)
-				break;
-		}
-	} else {
-		n = ((uint16_t)lun[1] | (((uint16_t)(lun[0] & 0x3F)) << 8));
-		ent = (stmf_lun_map_ent_t *)
-		    stmf_get_ent_from_map(iss->iss_sm, n);
-		if (lu && (ent->ent_lu != lu))
-			ent = NULL;
-	}
-	if (ent && ent->ent_itl_datap) {
-		*itl_handle_retp = ent->ent_itl_datap->itl_handle;
-		ret = STMF_SUCCESS;
-	} else {
-		ret = STMF_NOT_FOUND;
-	}
-
-	rw_exit(iss->iss_lockp);
-	return (ret);
-}
-
 stmf_data_buf_t *
 stmf_alloc_dbuf(scsi_task_t *task, uint32_t size, uint32_t *pminsize,
     uint32_t flags)
@@ -4044,13 +4352,29 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 	} else {
 		lu = lun_map_ent->ent_lu;
 	}
+
 	ilu = lu->lu_stmf_private;
 	if (ilu->ilu_flags & ILU_RESET_ACTIVE) {
 		rw_exit(iss->iss_lockp);
 		return (NULL);
 	}
-	ASSERT(lu == dlun0 || (ilu->ilu_state != STMF_STATE_OFFLINING &&
-	    ilu->ilu_state != STMF_STATE_OFFLINE));
+
+	/*
+	 * if the LUN is being offlined or is offline then only command
+	 * that are to query the LUN are allowed.  These are handled in
+	 * stmf via the dlun0 vector.  It is possible that a race condition
+	 * will cause other commands to arrive while the lun is in the
+	 * process of being offlined.  Check for those and just let the
+	 * protocol stack handle the error.
+	 */
+	if ((ilu->ilu_state == STMF_STATE_OFFLINING) ||
+	    (ilu->ilu_state == STMF_STATE_OFFLINE)) {
+		if (lu != dlun0) {
+			rw_exit(iss->iss_lockp);
+			return (NULL);
+		}
+	}
+
 	do {
 		if (ilu->ilu_free_tasks == NULL) {
 			new_task = 1;
@@ -4098,15 +4422,6 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 			return (NULL);
 		}
 		task->task_lu = lu;
-		l = task->task_lun_no;
-		l[0] = lun[0];
-		l[1] = lun[1];
-		l[2] = lun[2];
-		l[3] = lun[3];
-		l[4] = lun[4];
-		l[5] = lun[5];
-		l[6] = lun[6];
-		l[7] = lun[7];
 		task->task_cdb = (uint8_t *)task->task_port_private;
 		if ((ulong_t)(task->task_cdb) & 7ul) {
 			task->task_cdb = (uint8_t *)(((ulong_t)
@@ -4115,7 +4430,25 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 		itask = (stmf_i_scsi_task_t *)task->task_stmf_private;
 		itask->itask_cdb_buf_size = cdb_length;
 		mutex_init(&itask->itask_audit_mutex, NULL, MUTEX_DRIVER, NULL);
+		mutex_init(&itask->itask_mutex, NULL, MUTEX_DRIVER, NULL);
 	}
+
+	/*
+	 * Since a LUN can be mapped as different LUN ids to different initiator
+	 * groups, we need to set LUN id for a new task and reset LUN id for
+	 * a reused task.
+	 */
+	l = task->task_lun_no;
+	l[0] = lun[0];
+	l[1] = lun[1];
+	l[2] = lun[2];
+	l[3] = lun[3];
+	l[4] = lun[4];
+	l[5] = lun[5];
+	l[6] = lun[6];
+	l[7] = lun[7];
+
+	mutex_enter(&itask->itask_mutex);
 	task->task_session = ss;
 	task->task_lport = lport;
 	task->task_cdb_length = cdb_length_in;
@@ -4125,6 +4458,9 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 	itask->itask_lport_read_time = itask->itask_lport_write_time = 0;
 	itask->itask_read_xfer = itask->itask_write_xfer = 0;
 	itask->itask_audit_index = 0;
+	bzero(&itask->itask_audit_records[0],
+	    sizeof (stmf_task_audit_rec_t) * ITASK_TASK_AUDIT_DEPTH);
+	mutex_exit(&itask->itask_mutex);
 
 	if (new_task) {
 		if (lu->lu_task_alloc(task) != STMF_SUCCESS) {
@@ -4165,6 +4501,7 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 	return (task);
 }
 
+/* ARGSUSED */
 static void
 stmf_task_lu_free(scsi_task_t *task, stmf_i_scsi_session_t *iss)
 {
@@ -4173,8 +4510,19 @@ stmf_task_lu_free(scsi_task_t *task, stmf_i_scsi_session_t *iss)
 	stmf_i_lu_t *ilu = (stmf_i_lu_t *)task->task_lu->lu_stmf_private;
 
 	ASSERT(rw_lock_held(iss->iss_lockp));
+	ASSERT((itask->itask_flags & ITASK_IN_FREE_LIST) == 0);
+	ASSERT((itask->itask_flags & ITASK_IN_WORKER_QUEUE) == 0);
+	ASSERT((itask->itask_flags & ITASK_IN_TRANSITION) == 0);
+	ASSERT((itask->itask_flags & ITASK_KNOWN_TO_LU) == 0);
+	ASSERT(mutex_owned(&itask->itask_mutex));
+
 	itask->itask_flags = ITASK_IN_FREE_LIST;
+	itask->itask_ncmds = 0;
 	itask->itask_proxy_msg_id = 0;
+	atomic_dec_32(itask->itask_ilu_task_cntr);
+	itask->itask_worker_next = NULL;
+	mutex_exit(&itask->itask_mutex);
+
 	mutex_enter(&ilu->ilu_task_lock);
 	itask->itask_lu_free_next = ilu->ilu_free_tasks;
 	ilu->ilu_free_tasks = itask;
@@ -4182,7 +4530,6 @@ stmf_task_lu_free(scsi_task_t *task, stmf_i_scsi_session_t *iss)
 	if (ilu->ilu_ntasks == ilu->ilu_ntasks_free)
 		cv_signal(&ilu->ilu_offline_pending_cv);
 	mutex_exit(&ilu->ilu_task_lock);
-	atomic_dec_32(itask->itask_ilu_task_cntr);
 }
 
 void
@@ -4259,7 +4606,40 @@ stmf_check_freetask()
 	}
 }
 
-void
+/*
+ * Since this method is looking to find tasks that are stuck, lost, or senile
+ * it should be more willing to give up scaning during this time period. This
+ * is why mutex_tryenter is now used instead of the standard mutex_enter.
+ * There has been at least one case were the following occurred.
+ *
+ * 1) The iscsit_deferred() method is trying to register a session and
+ *    needs the global lock which is held.
+ * 2) Another thread which holds the global lock is trying to deregister a
+ *    session and needs the session lock.
+ * 3) A third thread is allocating a stmf task that has grabbed the session
+ *    lock and is trying to grab the lun task lock.
+ * 4) There's a timeout thread that has the lun task lock and is trying to grab
+ *    a specific task lock.
+ * 5) The thread that has the task lock is waiting for the ref count to go to
+ *    zero.
+ * 6) There's a task that would drop the count to zero, but it's in the task
+ *    queue waiting to run and is stuck because of #1 is currently block.
+ *
+ * This method is number 4 in the above chain of events. Had this code
+ * originally used mutex_tryenter the chain would have been broken and the
+ * system wouldn't have hung. So, now this method uses mutex_tryenter and
+ * you know why it does so.
+ */
+/* ---- Only one thread calls stmf_do_ilu_timeouts so no lock required ---- */
+typedef struct stmf_bailout_cnt {
+	int	no_ilu_lock;
+	int	no_task_lock;
+	int	tasks_checked;
+} stmf_bailout_cnt_t;
+
+stmf_bailout_cnt_t stmf_bailout;
+
+static void
 stmf_do_ilu_timeouts(stmf_i_lu_t *ilu)
 {
 	clock_t l = ddi_get_lbolt();
@@ -4268,11 +4648,21 @@ stmf_do_ilu_timeouts(stmf_i_lu_t *ilu)
 	scsi_task_t *task;
 	uint32_t to;
 
-	mutex_enter(&ilu->ilu_task_lock);
+	if (mutex_tryenter(&ilu->ilu_task_lock) == 0) {
+		stmf_bailout.no_ilu_lock++;
+		return;
+	}
+
 	for (itask = ilu->ilu_tasks; itask != NULL;
 	    itask = itask->itask_lu_next) {
+		if (mutex_tryenter(&itask->itask_mutex) == 0) {
+			stmf_bailout.no_task_lock++;
+			continue;
+		}
+		stmf_bailout.tasks_checked++;
 		if (itask->itask_flags & (ITASK_IN_FREE_LIST |
 		    ITASK_BEING_ABORTED)) {
+			mutex_exit(&itask->itask_mutex);
 			continue;
 		}
 		task = itask->itask_task;
@@ -4280,8 +4670,12 @@ stmf_do_ilu_timeouts(stmf_i_lu_t *ilu)
 			to = stmf_default_task_timeout;
 		else
 			to = task->task_timeout;
-		if ((itask->itask_start_time + (to * ps)) > l)
+
+		if ((itask->itask_start_time + (to * ps)) > l) {
+			mutex_exit(&itask->itask_mutex);
 			continue;
+		}
+		mutex_exit(&itask->itask_mutex);
 		stmf_abort(STMF_QUEUE_TASK_ABORT, task,
 		    STMF_TIMEOUT, NULL);
 	}
@@ -4336,11 +4730,14 @@ stmf_task_lu_killall(stmf_lu_t *lu, scsi_task_t *tm_task, stmf_status_t s)
 	stmf_i_scsi_task_t *itask;
 
 	mutex_enter(&ilu->ilu_task_lock);
-
 	for (itask = ilu->ilu_tasks; itask != NULL;
 	    itask = itask->itask_lu_next) {
-		if (itask->itask_flags & ITASK_IN_FREE_LIST)
+		mutex_enter(&itask->itask_mutex);
+		if (itask->itask_flags & ITASK_IN_FREE_LIST) {
+			mutex_exit(&itask->itask_mutex);
 			continue;
+		}
+		mutex_exit(&itask->itask_mutex);
 		if (itask->itask_task == tm_task)
 			continue;
 		stmf_abort(STMF_QUEUE_TASK_ABORT, itask->itask_task, s, NULL);
@@ -4396,9 +4793,12 @@ stmf_task_free(scsi_task_t *task)
 	    task->task_stmf_private;
 	stmf_i_scsi_session_t *iss = (stmf_i_scsi_session_t *)
 	    task->task_session->ss_stmf_private;
+	stmf_lu_t *lu = task->task_lu;
 
 	stmf_task_audit(itask, TE_TASK_FREE, CMD_OR_IOF_NA, NULL);
-
+	ASSERT(mutex_owned(&itask->itask_mutex));
+	if ((lu != NULL) && (lu->lu_task_done != NULL))
+		lu->lu_task_done(task);
 	stmf_free_task_bufs(itask, lport);
 	stmf_itl_task_done(itask);
 	DTRACE_PROBE2(stmf__task__end, scsi_task_t *, task,
@@ -4412,7 +4812,14 @@ stmf_task_free(scsi_task_t *task)
 		}
 	}
 
+	/*
+	 * To prevent a deadlock condition must release the itask_mutex,
+	 * grab a reader lock on iss_lockp and then reacquire the itask_mutex.
+	 */
+	mutex_exit(&itask->itask_mutex);
 	rw_enter(iss->iss_lockp, RW_READER);
+	mutex_enter(&itask->itask_mutex);
+
 	lport->lport_task_free(task);
 	if (itask->itask_worker) {
 		atomic_dec_32(&stmf_cur_ntasks);
@@ -4433,9 +4840,9 @@ stmf_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	    task->task_stmf_private;
 	stmf_i_lu_t *ilu = (stmf_i_lu_t *)task->task_lu->lu_stmf_private;
 	int nv;
-	uint32_t old, new;
+	uint32_t new;
 	uint32_t ct;
-	stmf_worker_t *w, *w1;
+	stmf_worker_t *w;
 	uint8_t tm;
 
 	if (task->task_max_nbufs > 4)
@@ -4445,44 +4852,28 @@ stmf_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	ct = atomic_inc_32_nv(&stmf_cur_ntasks);
 
 	/* Select the next worker using round robin */
-	nv = (int)atomic_inc_32_nv((uint32_t *)&stmf_worker_sel_counter);
-	if (nv >= stmf_nworkers_accepting_cmds) {
-		int s = nv;
-		do {
-			nv -= stmf_nworkers_accepting_cmds;
-		} while (nv >= stmf_nworkers_accepting_cmds);
-		if (nv < 0)
-			nv = 0;
-		/* Its ok if this cas fails */
-		(void) atomic_cas_32((uint32_t *)&stmf_worker_sel_counter,
-		    s, nv);
+	mutex_enter(&stmf_worker_sel_mx);
+	stmf_worker_sel_counter++;
+	if (stmf_worker_sel_counter >= stmf_nworkers)
+		stmf_worker_sel_counter = 0;
+	nv = stmf_worker_sel_counter;
+
+	/* if the selected worker is not idle then bump to the next worker */
+	if (stmf_workers[nv].worker_queue_depth > 0) {
+		stmf_worker_sel_counter++;
+		if (stmf_worker_sel_counter >= stmf_nworkers)
+			stmf_worker_sel_counter = 0;
+		nv = stmf_worker_sel_counter;
 	}
+	mutex_exit(&stmf_worker_sel_mx);
+
 	w = &stmf_workers[nv];
 
-	/*
-	 * A worker can be pinned by interrupt. So select the next one
-	 * if it has lower load.
-	 */
-	if ((nv + 1) >= stmf_nworkers_accepting_cmds) {
-		w1 = stmf_workers;
-	} else {
-		w1 = &stmf_workers[nv + 1];
-	}
-	if (w1->worker_queue_depth < w->worker_queue_depth)
-		w = w1;
-
+	mutex_enter(&itask->itask_mutex);
 	mutex_enter(&w->worker_lock);
-	if (((w->worker_flags & STMF_WORKER_STARTED) == 0) ||
-	    (w->worker_flags & STMF_WORKER_TERMINATE)) {
-		/*
-		 * Maybe we are in the middle of a change. Just go to
-		 * the 1st worker.
-		 */
-		mutex_exit(&w->worker_lock);
-		w = stmf_workers;
-		mutex_enter(&w->worker_lock);
-	}
+
 	itask->itask_worker = w;
+
 	/*
 	 * Track max system load inside the worker as we already have the
 	 * worker lock (no point implementing another lock). The service
@@ -4492,39 +4883,33 @@ stmf_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	if (w->worker_max_sys_qdepth_pu < ct)
 		w->worker_max_sys_qdepth_pu = ct;
 
-	do {
-		old = new = itask->itask_flags;
-		new |= ITASK_KNOWN_TO_TGT_PORT | ITASK_IN_WORKER_QUEUE;
-		if (task->task_mgmt_function) {
-			tm = task->task_mgmt_function;
-			if ((tm == TM_TARGET_RESET) ||
-			    (tm == TM_TARGET_COLD_RESET) ||
-			    (tm == TM_TARGET_WARM_RESET)) {
-				new |= ITASK_DEFAULT_HANDLING;
-			}
-		} else if (task->task_cdb[0] == SCMD_REPORT_LUNS) {
+	new = itask->itask_flags;
+	new |= ITASK_KNOWN_TO_TGT_PORT;
+	if (task->task_mgmt_function) {
+		tm = task->task_mgmt_function;
+		if ((tm == TM_TARGET_RESET) ||
+		    (tm == TM_TARGET_COLD_RESET) ||
+		    (tm == TM_TARGET_WARM_RESET)) {
 			new |= ITASK_DEFAULT_HANDLING;
 		}
-		new &= ~ITASK_IN_TRANSITION;
-	} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+	} else if (task->task_cdb[0] == SCMD_REPORT_LUNS) {
+		new |= ITASK_DEFAULT_HANDLING;
+	}
+	new &= ~ITASK_IN_TRANSITION;
+	itask->itask_flags = new;
 
 	stmf_itl_task_start(itask);
 
-	itask->itask_worker_next = NULL;
-	if (w->worker_task_tail) {
-		w->worker_task_tail->itask_worker_next = itask;
-	} else {
-		w->worker_task_head = itask;
-	}
-	w->worker_task_tail = itask;
-	if (++(w->worker_queue_depth) > w->worker_max_qdepth_pu) {
-		w->worker_max_qdepth_pu = w->worker_queue_depth;
-	}
-	/* Measure task waitq time */
-	itask->itask_waitq_enter_timestamp = gethrtime();
-	atomic_inc_32(&w->worker_ref_count);
 	itask->itask_cmd_stack[0] = ITASK_CMD_NEW_TASK;
 	itask->itask_ncmds = 1;
+
+	if ((task->task_flags & TF_INITIAL_BURST) &&
+	    !(curthread->t_flag & T_INTR_THREAD)) {
+		stmf_update_kstat_lu_io(task, dbuf);
+		stmf_update_kstat_lport_io(task, dbuf);
+		stmf_update_kstat_rport_io(task, dbuf);
+	}
+
 	stmf_task_audit(itask, TE_TASK_START, CMD_OR_IOF_NA, dbuf);
 	if (dbuf) {
 		itask->itask_allocated_buf_map = 1;
@@ -4535,13 +4920,10 @@ stmf_post_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 		itask->itask_dbufs[0] = NULL;
 	}
 
-	if ((w->worker_flags & STMF_WORKER_ACTIVE) == 0) {
-		w->worker_signal_timestamp = gethrtime();
-		DTRACE_PROBE2(worker__signal, stmf_worker_t *, w,
-		    scsi_task_t *, task);
-		cv_signal(&w->worker_cv);
-	}
+	STMF_ENQUEUE_ITASK(w, itask);
+
 	mutex_exit(&w->worker_lock);
+	mutex_exit(&itask->itask_mutex);
 
 	/*
 	 * This can only happen if during stmf_task_alloc(), ILU_RESET_ACTIVE
@@ -4597,26 +4979,30 @@ stmf_xfer_data(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t ioflags)
 
 	stmf_task_audit(itask, TE_XFER_START, ioflags, dbuf);
 
+	mutex_enter(&itask->itask_mutex);
 	if (ioflags & STMF_IOF_LU_DONE) {
-		uint32_t new, old;
-		do {
-			new = old = itask->itask_flags;
-			if (new & ITASK_BEING_ABORTED)
-				return (STMF_ABORTED);
-			new &= ~ITASK_KNOWN_TO_LU;
-		} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+		if (itask->itask_flags & ITASK_BEING_ABORTED) {
+			mutex_exit(&itask->itask_mutex);
+			return (STMF_ABORTED);
+		}
+		itask->itask_flags &= ~ITASK_KNOWN_TO_LU;
 	}
-	if (itask->itask_flags & ITASK_BEING_ABORTED)
+	if ((itask->itask_flags & ITASK_BEING_ABORTED) != 0) {
+		mutex_exit(&itask->itask_mutex);
 		return (STMF_ABORTED);
+	}
+	mutex_exit(&itask->itask_mutex);
+
 #ifdef	DEBUG
 	if (!(ioflags & STMF_IOF_STATS_ONLY) && stmf_drop_buf_counter > 0) {
-		if (atomic_dec_32_nv(&stmf_drop_buf_counter) == 1)
+		if (atomic_dec_32_nv((uint32_t *)&stmf_drop_buf_counter) == 1)
 			return (STMF_SUCCESS);
 	}
 #endif
 
 	stmf_update_kstat_lu_io(task, dbuf);
 	stmf_update_kstat_lport_io(task, dbuf);
+	stmf_update_kstat_rport_io(task, dbuf);
 	stmf_lport_xfer_start(itask, dbuf);
 	if (ioflags & STMF_IOF_STATS_ONLY) {
 		stmf_lport_xfer_done(itask, dbuf);
@@ -4646,7 +5032,7 @@ stmf_data_xfer_done(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t iof)
 	    (stmf_i_scsi_task_t *)task->task_stmf_private;
 	stmf_i_local_port_t *ilport;
 	stmf_worker_t *w = itask->itask_worker;
-	uint32_t new, old;
+	uint32_t new;
 	uint8_t update_queue_flags, free_it, queue_it;
 
 	stmf_lport_xfer_done(itask, dbuf);
@@ -4667,74 +5053,67 @@ stmf_data_xfer_done(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t iof)
 		return;
 	}
 
+	mutex_enter(&itask->itask_mutex);
 	mutex_enter(&w->worker_lock);
-	do {
-		new = old = itask->itask_flags;
-		if (old & ITASK_BEING_ABORTED) {
-			mutex_exit(&w->worker_lock);
-			return;
-		}
+	new = itask->itask_flags;
+	if (itask->itask_flags & ITASK_BEING_ABORTED) {
+		mutex_exit(&w->worker_lock);
+		mutex_exit(&itask->itask_mutex);
+		return;
+	}
+	free_it = 0;
+	if (iof & STMF_IOF_LPORT_DONE) {
+		new &= ~ITASK_KNOWN_TO_TGT_PORT;
+		task->task_completion_status = dbuf->db_xfer_status;
+		free_it = 1;
+	}
+	/*
+	 * If the task is known to LU then queue it. But if
+	 * it is already queued (multiple completions) then
+	 * just update the buffer information by grabbing the
+	 * worker lock. If the task is not known to LU,
+	 * completed/aborted, then see if we need to
+	 * free this task.
+	 */
+	if (itask->itask_flags & ITASK_KNOWN_TO_LU) {
 		free_it = 0;
-		if (iof & STMF_IOF_LPORT_DONE) {
-			new &= ~ITASK_KNOWN_TO_TGT_PORT;
-			task->task_completion_status = dbuf->db_xfer_status;
-			free_it = 1;
-		}
-		/*
-		 * If the task is known to LU then queue it. But if
-		 * it is already queued (multiple completions) then
-		 * just update the buffer information by grabbing the
-		 * worker lock. If the task is not known to LU,
-		 * completed/aborted, then see if we need to
-		 * free this task.
-		 */
-		if (old & ITASK_KNOWN_TO_LU) {
-			free_it = 0;
-			update_queue_flags = 1;
-			if (old & ITASK_IN_WORKER_QUEUE) {
-				queue_it = 0;
-			} else {
-				queue_it = 1;
-				new |= ITASK_IN_WORKER_QUEUE;
-			}
-		} else {
-			update_queue_flags = 0;
+		update_queue_flags = 1;
+		if (itask->itask_flags & ITASK_IN_WORKER_QUEUE) {
 			queue_it = 0;
+		} else {
+			queue_it = 1;
 		}
-	} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+	} else {
+		update_queue_flags = 0;
+		queue_it = 0;
+	}
+	itask->itask_flags = new;
 
 	if (update_queue_flags) {
 		uint8_t cmd = (dbuf->db_handle << 5) | ITASK_CMD_DATA_XFER_DONE;
 
+		ASSERT((itask->itask_flags & ITASK_IN_FREE_LIST) == 0);
 		ASSERT(itask->itask_ncmds < ITASK_MAX_NCMDS);
+
 		itask->itask_cmd_stack[itask->itask_ncmds++] = cmd;
 		if (queue_it) {
-			itask->itask_worker_next = NULL;
-			if (w->worker_task_tail) {
-				w->worker_task_tail->itask_worker_next = itask;
-			} else {
-				w->worker_task_head = itask;
-			}
-			w->worker_task_tail = itask;
-			/* Measure task waitq time */
-			itask->itask_waitq_enter_timestamp = gethrtime();
-			if (++(w->worker_queue_depth) >
-			    w->worker_max_qdepth_pu) {
-				w->worker_max_qdepth_pu = w->worker_queue_depth;
-			}
-			if ((w->worker_flags & STMF_WORKER_ACTIVE) == 0)
-				cv_signal(&w->worker_cv);
+			STMF_ENQUEUE_ITASK(w, itask);
 		}
+		mutex_exit(&w->worker_lock);
+		mutex_exit(&itask->itask_mutex);
+		return;
 	}
-	mutex_exit(&w->worker_lock);
 
+	mutex_exit(&w->worker_lock);
 	if (free_it) {
 		if ((itask->itask_flags & (ITASK_KNOWN_TO_LU |
 		    ITASK_KNOWN_TO_TGT_PORT | ITASK_IN_WORKER_QUEUE |
 		    ITASK_BEING_ABORTED)) == 0) {
 			stmf_task_free(task);
+			return;
 		}
 	}
+	mutex_exit(&itask->itask_mutex);
 }
 
 stmf_status_t
@@ -4747,22 +5126,25 @@ stmf_send_scsi_status(scsi_task_t *task, uint32_t ioflags)
 
 	stmf_task_audit(itask, TE_SEND_STATUS, ioflags, NULL);
 
+	mutex_enter(&itask->itask_mutex);
 	if (ioflags & STMF_IOF_LU_DONE) {
-		uint32_t new, old;
-		do {
-			new = old = itask->itask_flags;
-			if (new & ITASK_BEING_ABORTED)
-				return (STMF_ABORTED);
-			new &= ~ITASK_KNOWN_TO_LU;
-		} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+		if (itask->itask_flags & ITASK_BEING_ABORTED) {
+			mutex_exit(&itask->itask_mutex);
+			return (STMF_ABORTED);
+		}
+		itask->itask_flags &= ~ITASK_KNOWN_TO_LU;
 	}
 
 	if (!(itask->itask_flags & ITASK_KNOWN_TO_TGT_PORT)) {
+		mutex_exit(&itask->itask_mutex);
 		return (STMF_SUCCESS);
 	}
 
-	if (itask->itask_flags & ITASK_BEING_ABORTED)
+	if (itask->itask_flags & ITASK_BEING_ABORTED) {
+		mutex_exit(&itask->itask_mutex);
 		return (STMF_ABORTED);
+	}
+	mutex_exit(&itask->itask_mutex);
 
 	if (task->task_additional_flags & TASK_AF_NO_EXPECTED_XFER_LENGTH) {
 		task->task_status_ctrl = 0;
@@ -4790,66 +5172,57 @@ stmf_send_status_done(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 	stmf_i_scsi_task_t *itask =
 	    (stmf_i_scsi_task_t *)task->task_stmf_private;
 	stmf_worker_t *w = itask->itask_worker;
-	uint32_t new, old;
+	uint32_t new;
 	uint8_t free_it, queue_it;
 
 	stmf_task_audit(itask, TE_SEND_STATUS_DONE, iof, NULL);
 
+	mutex_enter(&itask->itask_mutex);
 	mutex_enter(&w->worker_lock);
-	do {
-		new = old = itask->itask_flags;
-		if (old & ITASK_BEING_ABORTED) {
-			mutex_exit(&w->worker_lock);
-			return;
-		}
+	new = itask->itask_flags;
+	if (itask->itask_flags & ITASK_BEING_ABORTED) {
+		mutex_exit(&w->worker_lock);
+		mutex_exit(&itask->itask_mutex);
+		return;
+	}
+	free_it = 0;
+	if (iof & STMF_IOF_LPORT_DONE) {
+		new &= ~ITASK_KNOWN_TO_TGT_PORT;
+		free_it = 1;
+	}
+	/*
+	 * If the task is known to LU then queue it. But if
+	 * it is already queued (multiple completions) then
+	 * just update the buffer information by grabbing the
+	 * worker lock. If the task is not known to LU,
+	 * completed/aborted, then see if we need to
+	 * free this task.
+	 */
+	if (itask->itask_flags & ITASK_KNOWN_TO_LU) {
 		free_it = 0;
-		if (iof & STMF_IOF_LPORT_DONE) {
-			new &= ~ITASK_KNOWN_TO_TGT_PORT;
-			free_it = 1;
+		queue_it = 1;
+		if (itask->itask_flags & ITASK_IN_WORKER_QUEUE) {
+			cmn_err(CE_PANIC, "status completion received"
+			    " when task is already in worker queue "
+			    " task = %p", (void *)task);
 		}
-		/*
-		 * If the task is known to LU then queue it. But if
-		 * it is already queued (multiple completions) then
-		 * just update the buffer information by grabbing the
-		 * worker lock. If the task is not known to LU,
-		 * completed/aborted, then see if we need to
-		 * free this task.
-		 */
-		if (old & ITASK_KNOWN_TO_LU) {
-			free_it = 0;
-			queue_it = 1;
-			if (old & ITASK_IN_WORKER_QUEUE) {
-				cmn_err(CE_PANIC, "status completion received"
-				    " when task is already in worker queue "
-				    " task = %p", (void *)task);
-			}
-			new |= ITASK_IN_WORKER_QUEUE;
-		} else {
-			queue_it = 0;
-		}
-	} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+	} else {
+		queue_it = 0;
+	}
+	itask->itask_flags = new;
 	task->task_completion_status = s;
-
 
 	if (queue_it) {
 		ASSERT(itask->itask_ncmds < ITASK_MAX_NCMDS);
 		itask->itask_cmd_stack[itask->itask_ncmds++] =
 		    ITASK_CMD_STATUS_DONE;
-		itask->itask_worker_next = NULL;
-		if (w->worker_task_tail) {
-			w->worker_task_tail->itask_worker_next = itask;
-		} else {
-			w->worker_task_head = itask;
-		}
-		w->worker_task_tail = itask;
-		/* Measure task waitq time */
-		itask->itask_waitq_enter_timestamp = gethrtime();
-		if (++(w->worker_queue_depth) > w->worker_max_qdepth_pu) {
-			w->worker_max_qdepth_pu = w->worker_queue_depth;
-		}
-		if ((w->worker_flags & STMF_WORKER_ACTIVE) == 0)
-			cv_signal(&w->worker_cv);
+
+		STMF_ENQUEUE_ITASK(w, itask);
+		mutex_exit(&w->worker_lock);
+		mutex_exit(&itask->itask_mutex);
+		return;
 	}
+
 	mutex_exit(&w->worker_lock);
 
 	if (free_it) {
@@ -4857,12 +5230,14 @@ stmf_send_status_done(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 		    ITASK_KNOWN_TO_TGT_PORT | ITASK_IN_WORKER_QUEUE |
 		    ITASK_BEING_ABORTED)) == 0) {
 			stmf_task_free(task);
+			return;
 		} else {
 			cmn_err(CE_PANIC, "LU is done with the task but LPORT "
 			    " is not done, itask %p itask_flags %x",
 			    (void *)itask, itask->itask_flags);
 		}
 	}
+	mutex_exit(&itask->itask_mutex);
 }
 
 void
@@ -4871,33 +5246,32 @@ stmf_task_lu_done(scsi_task_t *task)
 	stmf_i_scsi_task_t *itask =
 	    (stmf_i_scsi_task_t *)task->task_stmf_private;
 	stmf_worker_t *w = itask->itask_worker;
-	uint32_t new, old;
 
+	mutex_enter(&itask->itask_mutex);
 	mutex_enter(&w->worker_lock);
-	do {
-		new = old = itask->itask_flags;
-		if (old & ITASK_BEING_ABORTED) {
-			mutex_exit(&w->worker_lock);
-			return;
-		}
-		if (old & ITASK_IN_WORKER_QUEUE) {
-			cmn_err(CE_PANIC, "task_lu_done received"
-			    " when task is in worker queue "
-			    " task = %p", (void *)task);
-		}
-		new &= ~ITASK_KNOWN_TO_LU;
-	} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+	if (itask->itask_flags & ITASK_BEING_ABORTED) {
+		mutex_exit(&w->worker_lock);
+		mutex_exit(&itask->itask_mutex);
+		return;
+	}
+	if (itask->itask_flags & ITASK_IN_WORKER_QUEUE) {
+		cmn_err(CE_PANIC, "task_lu_done received"
+		    " when task is in worker queue "
+		    " task = %p", (void *)task);
+	}
+	itask->itask_flags &= ~ITASK_KNOWN_TO_LU;
 
 	mutex_exit(&w->worker_lock);
-
 	if ((itask->itask_flags & (ITASK_KNOWN_TO_LU |
 	    ITASK_KNOWN_TO_TGT_PORT | ITASK_IN_WORKER_QUEUE |
 	    ITASK_BEING_ABORTED)) == 0) {
 		stmf_task_free(task);
+		return;
 	} else {
 		cmn_err(CE_PANIC, "stmf_lu_done should be the last stage but "
 		    " the task is still not done, task = %p", (void *)task);
 	}
+	mutex_exit(&itask->itask_mutex);
 }
 
 void
@@ -4906,54 +5280,41 @@ stmf_queue_task_for_abort(scsi_task_t *task, stmf_status_t s)
 	stmf_i_scsi_task_t *itask =
 	    (stmf_i_scsi_task_t *)task->task_stmf_private;
 	stmf_worker_t *w;
-	uint32_t old, new;
 
 	stmf_task_audit(itask, TE_TASK_ABORT, CMD_OR_IOF_NA, NULL);
 
-	do {
-		old = new = itask->itask_flags;
-		if ((old & ITASK_BEING_ABORTED) ||
-		    ((old & (ITASK_KNOWN_TO_TGT_PORT |
-		    ITASK_KNOWN_TO_LU)) == 0)) {
-			return;
-		}
-		new |= ITASK_BEING_ABORTED;
-	} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+	mutex_enter(&itask->itask_mutex);
+	if ((itask->itask_flags & ITASK_BEING_ABORTED) ||
+	    ((itask->itask_flags & (ITASK_KNOWN_TO_TGT_PORT |
+	    ITASK_KNOWN_TO_LU)) == 0)) {
+		mutex_exit(&itask->itask_mutex);
+		return;
+	}
+	itask->itask_flags |= ITASK_BEING_ABORTED;
 	task->task_completion_status = s;
-	itask->itask_start_time = ddi_get_lbolt();
 
 	if (((w = itask->itask_worker) == NULL) ||
 	    (itask->itask_flags & ITASK_IN_TRANSITION)) {
+		mutex_exit(&itask->itask_mutex);
 		return;
 	}
 
 	/* Queue it and get out */
-	mutex_enter(&w->worker_lock);
 	if (itask->itask_flags & ITASK_IN_WORKER_QUEUE) {
-		mutex_exit(&w->worker_lock);
+		mutex_exit(&itask->itask_mutex);
 		return;
 	}
-	atomic_or_32(&itask->itask_flags, ITASK_IN_WORKER_QUEUE);
-	itask->itask_worker_next = NULL;
-	if (w->worker_task_tail) {
-		w->worker_task_tail->itask_worker_next = itask;
-	} else {
-		w->worker_task_head = itask;
-	}
-	w->worker_task_tail = itask;
-	if (++(w->worker_queue_depth) > w->worker_max_qdepth_pu) {
-		w->worker_max_qdepth_pu = w->worker_queue_depth;
-	}
-	if ((w->worker_flags & STMF_WORKER_ACTIVE) == 0)
-		cv_signal(&w->worker_cv);
+	mutex_enter(&w->worker_lock);
+	STMF_ENQUEUE_ITASK(w, itask);
 	mutex_exit(&w->worker_lock);
+	mutex_exit(&itask->itask_mutex);
 }
 
 void
 stmf_abort(int abort_cmd, scsi_task_t *task, stmf_status_t s, void *arg)
 {
 	stmf_i_scsi_task_t *itask = NULL;
-	uint32_t old, new, f, rf;
+	uint32_t f, rf;
 
 	DTRACE_PROBE2(scsi__task__abort, scsi_task_t *, task,
 	    stmf_status_t, s);
@@ -4976,17 +5337,24 @@ stmf_abort(int abort_cmd, scsi_task_t *task, stmf_status_t s, void *arg)
 	default:
 		return;
 	}
+
 	itask = (stmf_i_scsi_task_t *)task->task_stmf_private;
+	mutex_enter(&itask->itask_mutex);
 	f |= ITASK_BEING_ABORTED | rf;
-	do {
-		old = new = itask->itask_flags;
-		if ((old & f) != f) {
-			return;
-		}
-		new &= ~rf;
-	} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+
+	if ((itask->itask_flags & f) != f) {
+		mutex_exit(&itask->itask_mutex);
+		return;
+	}
+	itask->itask_flags &= ~rf;
+	mutex_exit(&itask->itask_mutex);
+
 }
 
+/*
+ * NOTE: stmf_abort_task_offline will release and then reacquire the
+ * itask_mutex. This is required to prevent a lock order violation.
+ */
 void
 stmf_task_lu_aborted(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 {
@@ -4995,7 +5363,7 @@ stmf_task_lu_aborted(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 	unsigned long long	st;
 
 	stmf_task_audit(itask, TE_TASK_LU_ABORTED, iof, NULL);
-
+	ASSERT(mutex_owned(&itask->itask_mutex));
 	st = s;	/* gcc fix */
 	if ((s != STMF_ABORT_SUCCESS) && (s != STMF_NOT_FOUND)) {
 		(void) snprintf(info, sizeof (info),
@@ -5015,16 +5383,19 @@ stmf_task_lu_aborted(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 	stmf_abort_task_offline(task, 1, info);
 }
 
+/*
+ * NOTE: stmf_abort_task_offline will release and then reacquire the
+ * itask_mutex. This is required to prevent a lock order violation.
+ */
 void
 stmf_task_lport_aborted(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 {
 	char			info[STMF_CHANGE_INFO_LEN];
 	stmf_i_scsi_task_t	*itask = TASK_TO_ITASK(task);
 	unsigned long long	st;
-	uint32_t		old, new;
 
+	ASSERT(mutex_owned(&itask->itask_mutex));
 	stmf_task_audit(itask, TE_TASK_LPORT_ABORTED, iof, NULL);
-
 	st = s;
 	if ((s != STMF_ABORT_SUCCESS) && (s != STMF_NOT_FOUND)) {
 		(void) snprintf(info, sizeof (info),
@@ -5038,16 +5409,22 @@ stmf_task_lport_aborted(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 		/*
 		 * LPORT abort successfully
 		 */
-		do {
-			old = new = itask->itask_flags;
-			if (!(old & ITASK_KNOWN_TO_TGT_PORT))
-				return;
-			new &= ~ITASK_KNOWN_TO_TGT_PORT;
-		} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+		atomic_and_32(&itask->itask_flags, ~ITASK_KNOWN_TO_TGT_PORT);
 		return;
 	}
 
 	stmf_abort_task_offline(task, 0, info);
+}
+
+void
+stmf_task_lport_aborted_unlocked(scsi_task_t *task, stmf_status_t s,
+    uint32_t iof)
+{
+	stmf_i_scsi_task_t	*itask = TASK_TO_ITASK(task);
+
+	mutex_enter(&itask->itask_mutex);
+	stmf_task_lport_aborted(task, s, iof);
+	mutex_exit(&itask->itask_mutex);
 }
 
 stmf_status_t
@@ -5058,15 +5435,18 @@ stmf_task_poll_lu(scsi_task_t *task, uint32_t timeout)
 	stmf_worker_t *w = itask->itask_worker;
 	int i;
 
+	mutex_enter(&itask->itask_mutex);
 	ASSERT(itask->itask_flags & ITASK_KNOWN_TO_LU);
 	mutex_enter(&w->worker_lock);
 	if (itask->itask_ncmds >= ITASK_MAX_NCMDS) {
 		mutex_exit(&w->worker_lock);
+		mutex_exit(&itask->itask_mutex);
 		return (STMF_BUSY);
 	}
 	for (i = 0; i < itask->itask_ncmds; i++) {
 		if (itask->itask_cmd_stack[i] == ITASK_CMD_POLL_LU) {
 			mutex_exit(&w->worker_lock);
+			mutex_exit(&itask->itask_mutex);
 			return (STMF_SUCCESS);
 		}
 	}
@@ -5080,21 +5460,10 @@ stmf_task_poll_lu(scsi_task_t *task, uint32_t timeout)
 		itask->itask_poll_timeout = ddi_get_lbolt() + t;
 	}
 	if ((itask->itask_flags & ITASK_IN_WORKER_QUEUE) == 0) {
-		itask->itask_worker_next = NULL;
-		if (w->worker_task_tail) {
-			w->worker_task_tail->itask_worker_next = itask;
-		} else {
-			w->worker_task_head = itask;
-		}
-		w->worker_task_tail = itask;
-		if (++(w->worker_queue_depth) > w->worker_max_qdepth_pu) {
-			w->worker_max_qdepth_pu = w->worker_queue_depth;
-		}
-		atomic_or_32(&itask->itask_flags, ITASK_IN_WORKER_QUEUE);
-		if ((w->worker_flags & STMF_WORKER_ACTIVE) == 0)
-			cv_signal(&w->worker_cv);
+		STMF_ENQUEUE_ITASK(w, itask);
 	}
 	mutex_exit(&w->worker_lock);
+	mutex_exit(&itask->itask_mutex);
 	return (STMF_SUCCESS);
 }
 
@@ -5106,15 +5475,18 @@ stmf_task_poll_lport(scsi_task_t *task, uint32_t timeout)
 	stmf_worker_t *w = itask->itask_worker;
 	int i;
 
+	mutex_enter(&itask->itask_mutex);
 	ASSERT(itask->itask_flags & ITASK_KNOWN_TO_TGT_PORT);
 	mutex_enter(&w->worker_lock);
 	if (itask->itask_ncmds >= ITASK_MAX_NCMDS) {
 		mutex_exit(&w->worker_lock);
+		mutex_exit(&itask->itask_mutex);
 		return (STMF_BUSY);
 	}
 	for (i = 0; i < itask->itask_ncmds; i++) {
 		if (itask->itask_cmd_stack[i] == ITASK_CMD_POLL_LPORT) {
 			mutex_exit(&w->worker_lock);
+			mutex_exit(&itask->itask_mutex);
 			return (STMF_SUCCESS);
 		}
 	}
@@ -5128,20 +5500,10 @@ stmf_task_poll_lport(scsi_task_t *task, uint32_t timeout)
 		itask->itask_poll_timeout = ddi_get_lbolt() + t;
 	}
 	if ((itask->itask_flags & ITASK_IN_WORKER_QUEUE) == 0) {
-		itask->itask_worker_next = NULL;
-		if (w->worker_task_tail) {
-			w->worker_task_tail->itask_worker_next = itask;
-		} else {
-			w->worker_task_head = itask;
-		}
-		w->worker_task_tail = itask;
-		if (++(w->worker_queue_depth) > w->worker_max_qdepth_pu) {
-			w->worker_max_qdepth_pu = w->worker_queue_depth;
-		}
-		if ((w->worker_flags & STMF_WORKER_ACTIVE) == 0)
-			cv_signal(&w->worker_cv);
+		STMF_ENQUEUE_ITASK(w, itask);
 	}
 	mutex_exit(&w->worker_lock);
+	mutex_exit(&itask->itask_mutex);
 	return (STMF_SUCCESS);
 }
 
@@ -5152,22 +5514,22 @@ stmf_do_task_abort(scsi_task_t *task)
 	stmf_lu_t		*lu;
 	stmf_local_port_t	*lport;
 	unsigned long long	 ret;
-	uint32_t		 old, new;
+	uint32_t		 new = 0;
 	uint8_t			 call_lu_abort, call_port_abort;
 	char			 info[STMF_CHANGE_INFO_LEN];
 
 	lu = task->task_lu;
 	lport = task->task_lport;
-	do {
-		old = new = itask->itask_flags;
-		if ((old & (ITASK_KNOWN_TO_LU | ITASK_LU_ABORT_CALLED)) ==
-		    ITASK_KNOWN_TO_LU) {
-			new |= ITASK_LU_ABORT_CALLED;
-			call_lu_abort = 1;
-		} else {
-			call_lu_abort = 0;
-		}
-	} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+	mutex_enter(&itask->itask_mutex);
+	new = itask->itask_flags;
+	if ((itask->itask_flags & (ITASK_KNOWN_TO_LU |
+	    ITASK_LU_ABORT_CALLED)) == ITASK_KNOWN_TO_LU) {
+		new |= ITASK_LU_ABORT_CALLED;
+		call_lu_abort = 1;
+	} else {
+		call_lu_abort = 0;
+	}
+	itask->itask_flags = new;
 
 	if (call_lu_abort) {
 		if ((itask->itask_flags & ITASK_DEFAULT_HANDLING) == 0) {
@@ -5195,16 +5557,22 @@ stmf_do_task_abort(scsi_task_t *task)
 		}
 	}
 
-	do {
-		old = new = itask->itask_flags;
-		if ((old & (ITASK_KNOWN_TO_TGT_PORT |
-		    ITASK_TGT_PORT_ABORT_CALLED)) == ITASK_KNOWN_TO_TGT_PORT) {
-			new |= ITASK_TGT_PORT_ABORT_CALLED;
-			call_port_abort = 1;
-		} else {
-			call_port_abort = 0;
-		}
-	} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+	/*
+	 * NOTE: After the call to either stmf_abort_task_offline() or
+	 * stmf_task_lu_abort() the itask_mutex was dropped and reacquired
+	 * to avoid a deadlock situation with stmf_state.stmf_lock.
+	 */
+
+	new = itask->itask_flags;
+	if ((itask->itask_flags & (ITASK_KNOWN_TO_TGT_PORT |
+	    ITASK_TGT_PORT_ABORT_CALLED)) == ITASK_KNOWN_TO_TGT_PORT) {
+		new |= ITASK_TGT_PORT_ABORT_CALLED;
+		call_port_abort = 1;
+	} else {
+		call_port_abort = 0;
+	}
+	itask->itask_flags = new;
+
 	if (call_port_abort) {
 		ret = lport->lport_abort(lport, STMF_LPORT_ABORT_TASK, task, 0);
 		if ((ret == STMF_ABORT_SUCCESS) || (ret == STMF_NOT_FOUND)) {
@@ -5228,6 +5596,7 @@ stmf_do_task_abort(scsi_task_t *task)
 			stmf_abort_task_offline(itask->itask_task, 0, info);
 		}
 	}
+	mutex_exit(&itask->itask_mutex);
 }
 
 stmf_status_t
@@ -5559,7 +5928,7 @@ stmf_prepare_tpgs_data(uint8_t ilu_alua)
 
 	mutex_enter(&stmf_state.stmf_lock);
 	/* check if any ports are standby and create second group */
-	for (ilport = stmf_state.stmf_ilportlist; ilport;
+	for (ilport = stmf_state.stmf_ilportlist; ilport != NULL;
 	    ilport = ilport->ilport_next) {
 		if (ilport->ilport_standby == 1) {
 			nports_standby++;
@@ -5568,14 +5937,38 @@ stmf_prepare_tpgs_data(uint8_t ilu_alua)
 		}
 	}
 
-	/* The spec only allows for 255 ports to be reported per group */
+	/*
+	 * Section 6.25 REPORT TARGET PORT GROUPS
+	 * The reply can contain many group replies. Each group is limited
+	 * to 255 port identifiers so we'll need to limit the amount of
+	 * data returned. For FC ports there's a physical limitation in
+	 * machines that make reaching 255 ports very, very unlikely. For
+	 * iSCSI on the other hand recent changes mean the port count could
+	 * be as high as 4096 (current limit). Limiting the data returned
+	 * for iSCSI isn't as bad as it sounds. This information is only
+	 * important for ALUA, which isn't supported for iSCSI. iSCSI uses
+	 * virtual IP addresses to deal with node fail over in a cluster.
+	 */
 	nports = min(nports, 255);
 	nports_standby = min(nports_standby, 255);
+
+	/*
+	 * The first 4 bytes of the returned data is the length. The
+	 * size of the Target Port Group header is 8 bytes. So, that's where
+	 * the 12 comes from. Each port entry is 4 bytes in size.
+	 */
 	sz = (nports * 4) + 12;
-	if (nports_standby && ilu_alua) {
+	if (nports_standby != 0 && ilu_alua != 0) {
+		/* --- Only add 8 bytes since it's just the Group header ---- */
 		sz += (nports_standby * 4) + 8;
 	}
-	asz = sz + sizeof (*xd) - 4;
+
+	/*
+	 * The stmf_xfer_data structure contains 4 bytes that will be
+	 * part of the data buffer. So, subtract the 4 bytes from the space
+	 * needed.
+	 */
+	asz = sizeof (*xd) + sz - 4;
 	xd = (stmf_xfer_data_t *)kmem_zalloc(asz, KM_NOSLEEP);
 	if (xd == NULL) {
 		mutex_exit(&stmf_state.stmf_lock);
@@ -5586,8 +5979,11 @@ stmf_prepare_tpgs_data(uint8_t ilu_alua)
 
 	p = xd->buf;
 
+	/* ---- length values never include the field that holds the size --- */
 	*((uint32_t *)p) = BE_32(sz - 4);
 	p += 4;
+
+	/* ---- Now fill out the first Target Group header ---- */
 	p[0] = 0x80;	/* PREF */
 	p[1] = 5;	/* AO_SUP, S_SUP */
 	if (stmf_state.stmf_alua_node == 1) {
@@ -5597,15 +5993,16 @@ stmf_prepare_tpgs_data(uint8_t ilu_alua)
 	}
 	p[7] = nports & 0xff;
 	p += 8;
-	for (ilport = stmf_state.stmf_ilportlist; ilport;
+	for (ilport = stmf_state.stmf_ilportlist; ilport != NULL && nports != 0;
 	    ilport = ilport->ilport_next) {
 		if (ilport->ilport_standby == 1) {
 			continue;
 		}
 		((uint16_t *)p)[1] = BE_16(ilport->ilport_rtpid);
 		p += 4;
+		nports--;
 	}
-	if (nports_standby && ilu_alua) {
+	if (nports_standby != 0 && ilu_alua != 0) {
 		p[0] = 0x02;	/* Non PREF, Standby */
 		p[1] = 5;	/* AO_SUP, S_SUP */
 		if (stmf_state.stmf_alua_node == 1) {
@@ -5615,13 +6012,14 @@ stmf_prepare_tpgs_data(uint8_t ilu_alua)
 		}
 		p[7] = nports_standby & 0xff;
 		p += 8;
-		for (ilport = stmf_state.stmf_ilportlist; ilport;
-		    ilport = ilport->ilport_next) {
+		for (ilport = stmf_state.stmf_ilportlist; ilport != NULL &&
+		    nports_standby != 0; ilport = ilport->ilport_next) {
 			if (ilport->ilport_standby == 0) {
 				continue;
 			}
 			((uint16_t *)p)[1] = BE_16(ilport->ilport_rtpid);
 			p += 4;
+			nports_standby--;
 		}
 	}
 
@@ -5862,7 +6260,9 @@ stmf_scsilib_handle_report_tpgs(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	stmf_xfer_data_t *xd;
 	uint32_t sz, minsz;
 
+	mutex_enter(&itask->itask_mutex);
 	itask->itask_flags |= ITASK_DEFAULT_HANDLING;
+
 	task->task_cmd_xfer_length =
 	    ((((uint32_t)task->task_cdb[6]) << 24) |
 	    (((uint32_t)task->task_cdb[7]) << 16) |
@@ -5874,6 +6274,7 @@ stmf_scsilib_handle_report_tpgs(scsi_task_t *task, stmf_data_buf_t *dbuf)
 		task->task_expected_xfer_length =
 		    task->task_cmd_xfer_length;
 	}
+	mutex_exit(&itask->itask_mutex);
 
 	if (task->task_cmd_xfer_length == 0) {
 		stmf_scsilib_send_status(task, STATUS_GOOD, 0);
@@ -5979,7 +6380,9 @@ stmf_handle_lun_reset(scsi_task_t *task)
 	 * was responsible for setting the ILU_RESET_ACTIVE. In case this
 	 * task itself gets aborted, we will clear ILU_RESET_ACTIVE.
 	 */
+	mutex_enter(&itask->itask_mutex);
 	itask->itask_flags |= ITASK_DEFAULT_HANDLING | ITASK_CAUSING_LU_RESET;
+	mutex_exit(&itask->itask_mutex);
 
 	/* Initiatiate abort on all commands on this LU except this one */
 	stmf_abort(STMF_QUEUE_ABORT_LU, task, STMF_ABORTED, task->task_lu);
@@ -6055,8 +6458,10 @@ stmf_handle_target_reset(scsi_task_t *task)
 	}
 
 	/* ok, start the damage */
+	mutex_enter(&itask->itask_mutex);
 	itask->itask_flags |= ITASK_DEFAULT_HANDLING |
 	    ITASK_CAUSING_TARGET_RESET;
+	mutex_exit(&itask->itask_mutex);
 	for (i = 0; i < lm->lm_nentries; i++) {
 		if (lm->lm_plus[i] == NULL)
 			continue;
@@ -6114,34 +6519,46 @@ void
 stmf_worker_init()
 {
 	uint32_t i;
+	stmf_worker_t *w;
 
 	/* Make local copy of global tunables */
-	stmf_i_max_nworkers = stmf_max_nworkers;
-	stmf_i_min_nworkers = stmf_min_nworkers;
 
+	/*
+	 * Allow workers to be scaled down to a very low number for cases
+	 * where the load is light.  If the number of threads gets below
+	 * 4 assume it is a mistake and force the threads back to a
+	 * reasonable number.  The low limit of 4 is simply legacy and
+	 * may be too low.
+	 */
 	ASSERT(stmf_workers == NULL);
-	if (stmf_i_min_nworkers < 4) {
-		stmf_i_min_nworkers = 4;
+	if (stmf_nworkers < 4) {
+		stmf_nworkers = 64;
 	}
-	if (stmf_i_max_nworkers < stmf_i_min_nworkers) {
-		stmf_i_max_nworkers = stmf_i_min_nworkers;
-	}
+
 	stmf_workers = (stmf_worker_t *)kmem_zalloc(
-	    sizeof (stmf_worker_t) * stmf_i_max_nworkers, KM_SLEEP);
-	for (i = 0; i < stmf_i_max_nworkers; i++) {
+	    sizeof (stmf_worker_t) * stmf_nworkers, KM_SLEEP);
+	for (i = 0; i < stmf_nworkers; i++) {
 		stmf_worker_t *w = &stmf_workers[i];
 		mutex_init(&w->worker_lock, NULL, MUTEX_DRIVER, NULL);
 		cv_init(&w->worker_cv, NULL, CV_DRIVER, NULL);
 	}
-	stmf_worker_mgmt_delay = drv_usectohz(20 * 1000);
 	stmf_workers_state = STMF_WORKERS_ENABLED;
 
-	/* Workers will be started by stmf_worker_mgmt() */
+	/* Check if we are starting */
+	if (stmf_nworkers_cur < stmf_nworkers - 1) {
+		for (i = stmf_nworkers_cur; i < stmf_nworkers; i++) {
+			w = &stmf_workers[i];
+			w->worker_tid = thread_create(NULL, 0, stmf_worker_task,
+			    (void *)&stmf_workers[i], 0, &p0, TS_RUN,
+			    minclsyspri);
+			stmf_nworkers_accepting_cmds++;
+		}
+		return;
+	}
 
 	/* Lets wait for atleast one worker to start */
 	while (stmf_nworkers_cur == 0)
 		delay(drv_usectohz(20 * 1000));
-	stmf_worker_mgmt_delay = drv_usectohz(3 * 1000 * 1000);
 }
 
 stmf_status_t
@@ -6154,7 +6571,6 @@ stmf_worker_fini()
 		return (STMF_SUCCESS);
 	ASSERT(stmf_workers);
 	stmf_workers_state = STMF_WORKERS_DISABLED;
-	stmf_worker_mgmt_delay = drv_usectohz(20 * 1000);
 	cv_signal(&stmf_state.stmf_cv);
 
 	sb = ddi_get_lbolt() + drv_usectohz(10 * 1000 * 1000);
@@ -6166,12 +6582,12 @@ stmf_worker_fini()
 		}
 		delay(drv_usectohz(100 * 1000));
 	}
-	for (i = 0; i < stmf_i_max_nworkers; i++) {
+	for (i = 0; i < stmf_nworkers; i++) {
 		stmf_worker_t *w = &stmf_workers[i];
 		mutex_destroy(&w->worker_lock);
 		cv_destroy(&w->worker_cv);
 	}
-	kmem_free(stmf_workers, sizeof (stmf_worker_t) * stmf_i_max_nworkers);
+	kmem_free(stmf_workers, sizeof (stmf_worker_t) * stmf_nworkers);
 	stmf_workers = NULL;
 
 	return (STMF_SUCCESS);
@@ -6188,7 +6604,6 @@ stmf_worker_task(void *arg)
 	stmf_lu_t *lu;
 	clock_t wait_timer = 0;
 	clock_t wait_ticks, wait_delta = 0;
-	uint32_t old, new;
 	uint8_t curcmd;
 	uint8_t abort_free;
 	uint8_t wait_queue;
@@ -6200,7 +6615,9 @@ stmf_worker_task(void *arg)
 	DTRACE_PROBE1(worker__create, stmf_worker_t, w);
 	mutex_enter(&w->worker_lock);
 	w->worker_flags |= STMF_WORKER_STARTED | STMF_WORKER_ACTIVE;
-stmf_worker_loop:;
+	atomic_inc_32(&stmf_nworkers_cur);
+
+stmf_worker_loop:
 	if ((w->worker_ref_count == 0) &&
 	    (w->worker_flags & STMF_WORKER_TERMINATE)) {
 		w->worker_flags &= ~(STMF_WORKER_STARTED |
@@ -6208,10 +6625,13 @@ stmf_worker_loop:;
 		w->worker_tid = NULL;
 		mutex_exit(&w->worker_lock);
 		DTRACE_PROBE1(worker__destroy, stmf_worker_t, w);
+		atomic_dec_32(&stmf_nworkers_cur);
 		thread_exit();
 	}
+
 	/* CONSTCOND */
 	while (1) {
+		/* worker lock is held at this point */
 		dec_qdepth = 0;
 		if (wait_timer && (ddi_get_lbolt() >= wait_timer)) {
 			wait_timer = 0;
@@ -6229,42 +6649,41 @@ stmf_worker_loop:;
 				    NULL;
 			}
 		}
-		if ((itask = w->worker_task_head) == NULL) {
+
+		STMF_DEQUEUE_ITASK(w, itask);
+		if (itask == NULL)
 			break;
-		}
+
+		ASSERT((itask->itask_flags & ITASK_IN_FREE_LIST) == 0);
 		task = itask->itask_task;
 		DTRACE_PROBE2(worker__active, stmf_worker_t, w,
 		    scsi_task_t *, task);
-		w->worker_task_head = itask->itask_worker_next;
-		if (w->worker_task_head == NULL)
-			w->worker_task_tail = NULL;
-
 		wait_queue = 0;
 		abort_free = 0;
+		mutex_exit(&w->worker_lock);
+		mutex_enter(&itask->itask_mutex);
+		mutex_enter(&w->worker_lock);
+
 		if (itask->itask_ncmds > 0) {
 			curcmd = itask->itask_cmd_stack[itask->itask_ncmds - 1];
 		} else {
 			ASSERT(itask->itask_flags & ITASK_BEING_ABORTED);
 		}
-		do {
-			old = itask->itask_flags;
-			if (old & ITASK_BEING_ABORTED) {
-				itask->itask_ncmds = 1;
-				curcmd = itask->itask_cmd_stack[0] =
-				    ITASK_CMD_ABORT;
-				goto out_itask_flag_loop;
-			} else if ((curcmd & ITASK_CMD_MASK) ==
-			    ITASK_CMD_NEW_TASK) {
-				/*
-				 * set ITASK_KSTAT_IN_RUNQ, this flag
-				 * will not reset until task completed
-				 */
-				new = old | ITASK_KNOWN_TO_LU |
-				    ITASK_KSTAT_IN_RUNQ;
-			} else {
-				goto out_itask_flag_loop;
-			}
-		} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
+		if (itask->itask_flags & ITASK_BEING_ABORTED) {
+			itask->itask_ncmds = 1;
+			curcmd = itask->itask_cmd_stack[0] =
+			    ITASK_CMD_ABORT;
+			goto out_itask_flag_loop;
+		} else if ((curcmd & ITASK_CMD_MASK) == ITASK_CMD_NEW_TASK) {
+			/*
+			 * set ITASK_KSTAT_IN_RUNQ, this flag
+			 * will not reset until task completed
+			 */
+			itask->itask_flags |= ITASK_KNOWN_TO_LU |
+			    ITASK_KSTAT_IN_RUNQ;
+		} else {
+			goto out_itask_flag_loop;
+		}
 
 out_itask_flag_loop:
 
@@ -6323,24 +6742,29 @@ out_itask_flag_loop:
 			lu = task->task_lu;
 		else
 			lu = dlun0;
+
 		dbuf = itask->itask_dbufs[ITASK_CMD_BUF_NDX(curcmd)];
 		mutex_exit(&w->worker_lock);
 		curcmd &= ITASK_CMD_MASK;
 		stmf_task_audit(itask, TE_PROCESS_CMD, curcmd, dbuf);
+		mutex_exit(&itask->itask_mutex);
+
 		switch (curcmd) {
 		case ITASK_CMD_NEW_TASK:
 			iss = (stmf_i_scsi_session_t *)
 			    task->task_session->ss_stmf_private;
 			stmf_itl_lu_new_task(itask);
 			if (iss->iss_flags & ISS_LUN_INVENTORY_CHANGED) {
-				if (stmf_handle_cmd_during_ic(itask))
+				if (stmf_handle_cmd_during_ic(itask)) {
 					break;
+				}
 			}
 #ifdef	DEBUG
 			if (stmf_drop_task_counter > 0) {
-				if (atomic_dec_32_nv(&stmf_drop_task_counter)
-				    == 1)
+				if (atomic_dec_32_nv(
+				    (uint32_t *)&stmf_drop_task_counter) == 1) {
 					break;
+				}
 			}
 #endif
 			DTRACE_PROBE1(scsi__task__start, scsi_task_t *, task);
@@ -6354,6 +6778,7 @@ out_itask_flag_loop:
 			break;
 		case ITASK_CMD_ABORT:
 			if (abort_free) {
+				mutex_enter(&itask->itask_mutex);
 				stmf_task_free(task);
 			} else {
 				stmf_do_task_abort(task);
@@ -6372,6 +6797,7 @@ out_itask_flag_loop:
 		/* case ITASK_CMD_XFER_DATA: */
 			break;
 		}
+
 		mutex_enter(&w->worker_lock);
 		if (dec_qdepth) {
 			w->worker_queue_depth--;
@@ -6397,146 +6823,6 @@ out_itask_flag_loop:
 	DTRACE_PROBE1(worker__wakeup, stmf_worker_t, w);
 	w->worker_flags |= STMF_WORKER_ACTIVE;
 	goto stmf_worker_loop;
-}
-
-void
-stmf_worker_mgmt()
-{
-	int i;
-	int workers_needed;
-	uint32_t qd;
-	clock_t tps, d = 0;
-	uint32_t cur_max_ntasks = 0;
-	stmf_worker_t *w;
-
-	/* Check if we are trying to increase the # of threads */
-	for (i = stmf_nworkers_cur; i < stmf_nworkers_needed; i++) {
-		if (stmf_workers[i].worker_flags & STMF_WORKER_STARTED) {
-			stmf_nworkers_cur++;
-			stmf_nworkers_accepting_cmds++;
-		} else {
-			/* Wait for transition to complete */
-			return;
-		}
-	}
-	/* Check if we are trying to decrease the # of workers */
-	for (i = (stmf_nworkers_cur - 1); i >= stmf_nworkers_needed; i--) {
-		if ((stmf_workers[i].worker_flags & STMF_WORKER_STARTED) == 0) {
-			stmf_nworkers_cur--;
-			/*
-			 * stmf_nworkers_accepting_cmds has already been
-			 * updated by the request to reduce the # of workers.
-			 */
-		} else {
-			/* Wait for transition to complete */
-			return;
-		}
-	}
-	/* Check if we are being asked to quit */
-	if (stmf_workers_state != STMF_WORKERS_ENABLED) {
-		if (stmf_nworkers_cur) {
-			workers_needed = 0;
-			goto worker_mgmt_trigger_change;
-		}
-		return;
-	}
-	/* Check if we are starting */
-	if (stmf_nworkers_cur < stmf_i_min_nworkers) {
-		workers_needed = stmf_i_min_nworkers;
-		goto worker_mgmt_trigger_change;
-	}
-
-	tps = drv_usectohz(1 * 1000 * 1000);
-	if ((stmf_wm_last != 0) &&
-	    ((d = ddi_get_lbolt() - stmf_wm_last) > tps)) {
-		qd = 0;
-		for (i = 0; i < stmf_nworkers_accepting_cmds; i++) {
-			qd += stmf_workers[i].worker_max_qdepth_pu;
-			stmf_workers[i].worker_max_qdepth_pu = 0;
-			if (stmf_workers[i].worker_max_sys_qdepth_pu >
-			    cur_max_ntasks) {
-				cur_max_ntasks =
-				    stmf_workers[i].worker_max_sys_qdepth_pu;
-			}
-			stmf_workers[i].worker_max_sys_qdepth_pu = 0;
-		}
-	}
-	stmf_wm_last = ddi_get_lbolt();
-	if (d <= tps) {
-		/* still ramping up */
-		return;
-	}
-	/* max qdepth cannot be more than max tasks */
-	if (qd > cur_max_ntasks)
-		qd = cur_max_ntasks;
-
-	/* See if we have more workers */
-	if (qd < stmf_nworkers_accepting_cmds) {
-		/*
-		 * Since we dont reduce the worker count right away, monitor
-		 * the highest load during the scale_down_delay.
-		 */
-		if (qd > stmf_worker_scale_down_qd)
-			stmf_worker_scale_down_qd = qd;
-		if (stmf_worker_scale_down_timer == 0) {
-			stmf_worker_scale_down_timer = ddi_get_lbolt() +
-			    drv_usectohz(stmf_worker_scale_down_delay *
-			    1000 * 1000);
-			return;
-		}
-		if (ddi_get_lbolt() < stmf_worker_scale_down_timer) {
-			return;
-		}
-		/* Its time to reduce the workers */
-		if (stmf_worker_scale_down_qd < stmf_i_min_nworkers)
-			stmf_worker_scale_down_qd = stmf_i_min_nworkers;
-		if (stmf_worker_scale_down_qd > stmf_i_max_nworkers)
-			stmf_worker_scale_down_qd = stmf_i_max_nworkers;
-		if (stmf_worker_scale_down_qd == stmf_nworkers_cur)
-			return;
-		workers_needed = stmf_worker_scale_down_qd;
-		stmf_worker_scale_down_qd = 0;
-		goto worker_mgmt_trigger_change;
-	}
-	stmf_worker_scale_down_qd = 0;
-	stmf_worker_scale_down_timer = 0;
-	if (qd > stmf_i_max_nworkers)
-		qd = stmf_i_max_nworkers;
-	if (qd < stmf_i_min_nworkers)
-		qd = stmf_i_min_nworkers;
-	if (qd == stmf_nworkers_cur)
-		return;
-	workers_needed = qd;
-	goto worker_mgmt_trigger_change;
-
-	/* NOTREACHED */
-	return;
-
-worker_mgmt_trigger_change:
-	ASSERT(workers_needed != stmf_nworkers_cur);
-	if (workers_needed > stmf_nworkers_cur) {
-		stmf_nworkers_needed = workers_needed;
-		for (i = stmf_nworkers_cur; i < workers_needed; i++) {
-			w = &stmf_workers[i];
-			w->worker_tid = thread_create(NULL, 0, stmf_worker_task,
-			    (void *)&stmf_workers[i], 0, &p0, TS_RUN,
-			    minclsyspri);
-		}
-		return;
-	}
-	/* At this point we know that we are decreasing the # of workers */
-	stmf_nworkers_accepting_cmds = workers_needed;
-	stmf_nworkers_needed = workers_needed;
-	/* Signal the workers that its time to quit */
-	for (i = (stmf_nworkers_cur - 1); i >= stmf_nworkers_needed; i--) {
-		w = &stmf_workers[i];
-		ASSERT(w && (w->worker_flags & STMF_WORKER_STARTED));
-		mutex_enter(&w->worker_lock);
-		w->worker_flags |= STMF_WORKER_TERMINATE;
-		if ((w->worker_flags & STMF_WORKER_ACTIVE) == 0)
-			cv_signal(&w->worker_cv);
-		mutex_exit(&w->worker_lock);
-	}
 }
 
 /*
@@ -6867,6 +7153,12 @@ stmf_dlun0_ctl(struct stmf_lu *lu, int cmd, void *arg)
 	cmn_err(CE_WARN, "stmf_dlun0_ctl called with cmd %x", cmd);
 }
 
+/* ARGSUSED */
+void
+stmf_dlun0_task_done(struct scsi_task *task)
+{
+}
+
 void
 stmf_dlun_init()
 {
@@ -6881,6 +7173,7 @@ stmf_dlun_init()
 	dlun0->lu_abort = stmf_dlun0_abort;
 	dlun0->lu_task_poll = stmf_dlun0_task_poll;
 	dlun0->lu_ctl = stmf_dlun0_ctl;
+	dlun0->lu_task_done = stmf_dlun0_task_done;
 
 	ilu = (stmf_i_lu_t *)dlun0->lu_stmf_private;
 	ilu->ilu_cur_task_cntr = &ilu->ilu_task_cntr1;
@@ -7144,15 +7437,26 @@ stmf_itl_task_start(stmf_i_scsi_task_t *itask)
 	stmf_itl_data_t	*itl = itask->itask_itl_datap;
 	scsi_task_t	*task = itask->itask_task;
 	stmf_i_lu_t	*ilu;
+	stmf_i_scsi_session_t   *iss =
+	    itask->itask_task->task_session->ss_stmf_private;
+	stmf_i_remote_port_t    *irport = iss->iss_irport;
 
 	if (itl == NULL || task->task_lu == dlun0)
 		return;
 	ilu = (stmf_i_lu_t *)task->task_lu->lu_stmf_private;
 	itask->itask_start_timestamp = gethrtime();
+	itask->itask_xfer_done_timestamp = 0;
 	if (ilu->ilu_kstat_io != NULL) {
 		mutex_enter(ilu->ilu_kstat_io->ks_lock);
 		stmf_update_kstat_lu_q(itask->itask_task, kstat_waitq_enter);
 		mutex_exit(ilu->ilu_kstat_io->ks_lock);
+	}
+
+	if (irport->irport_kstat_estat != NULL) {
+		if (task->task_flags & TF_READ_DATA)
+			atomic_inc_32(&irport->irport_nread_tasks);
+		else if (task->task_flags & TF_WRITE_DATA)
+			atomic_inc_32(&irport->irport_nwrite_tasks);
 	}
 
 	stmf_update_kstat_lport_q(itask->itask_task, kstat_waitq_enter);
@@ -7193,6 +7497,8 @@ stmf_itl_task_done(stmf_i_scsi_task_t *itask)
 	if (ilu->ilu_kstat_io == NULL)
 		return;
 
+	stmf_update_kstat_rport_estat(task);
+
 	mutex_enter(ilu->ilu_kstat_io->ks_lock);
 
 	if (itask->itask_flags & ITASK_KSTAT_IN_RUNQ) {
@@ -7203,6 +7509,23 @@ stmf_itl_task_done(stmf_i_scsi_task_t *itask)
 		stmf_update_kstat_lu_q(task, kstat_waitq_exit);
 		mutex_exit(ilu->ilu_kstat_io->ks_lock);
 		stmf_update_kstat_lport_q(task, kstat_waitq_exit);
+	}
+}
+
+void
+stmf_lu_xfer_done(scsi_task_t *task, boolean_t read, hrtime_t elapsed_time)
+{
+	stmf_i_scsi_task_t *itask = task->task_stmf_private;
+
+	if (task->task_lu == dlun0)
+		return;
+
+	if (read) {
+		atomic_add_64((uint64_t *)&itask->itask_lu_read_time,
+		    elapsed_time);
+	} else {
+		atomic_add_64((uint64_t *)&itask->itask_lu_write_time,
+		    elapsed_time);
 	}
 }
 
@@ -7233,7 +7556,9 @@ stmf_lport_xfer_done(stmf_i_scsi_task_t *itask, stmf_data_buf_t *dbuf)
 	xfer_size = (dbuf->db_xfer_status == STMF_SUCCESS) ?
 	    dbuf->db_data_size : 0;
 
-	elapsed_time = gethrtime() - dbuf->db_xfer_start_timestamp;
+	itask->itask_xfer_done_timestamp = gethrtime();
+	elapsed_time = itask->itask_xfer_done_timestamp -
+	    dbuf->db_xfer_start_timestamp;
 	if (dbuf->db_flags & DB_DIRECTION_TO_RPORT) {
 		atomic_add_64((uint64_t *)&itask->itask_lport_read_time,
 		    elapsed_time);
@@ -7257,7 +7582,8 @@ stmf_svc_init()
 {
 	if (stmf_state.stmf_svc_flags & STMF_SVC_STARTED)
 		return;
-	stmf_state.stmf_svc_tailp = &stmf_state.stmf_svc_active;
+	list_create(&stmf_state.stmf_svc_list, sizeof (stmf_svc_req_t),
+	    offsetof(stmf_svc_req_t, svc_list_entry));
 	stmf_state.stmf_svc_taskq = ddi_taskq_create(0, "STMF_SVC_TASKQ", 1,
 	    TASKQ_DEFAULTPRI, 0);
 	(void) ddi_taskq_dispatch(stmf_state.stmf_svc_taskq,
@@ -7286,6 +7612,7 @@ stmf_svc_fini()
 	if (i == 500)
 		return (STMF_BUSY);
 
+	list_destroy(&stmf_state.stmf_svc_list);
 	ddi_taskq_destroy(stmf_state.stmf_svc_taskq);
 
 	return (STMF_SUCCESS);
@@ -7311,7 +7638,7 @@ stmf_svc(void *arg)
 	stmf_state.stmf_svc_flags |= STMF_SVC_STARTED | STMF_SVC_ACTIVE;
 
 	while (!(stmf_state.stmf_svc_flags & STMF_SVC_TERMINATE)) {
-		if (stmf_state.stmf_svc_active == NULL) {
+		if (list_is_empty(&stmf_state.stmf_svc_list)) {
 			stmf_svc_timeout(&clks);
 			continue;
 		}
@@ -7322,11 +7649,9 @@ stmf_svc(void *arg)
 		 * so it should be safe to access it without holding the
 		 * stmf state lock.
 		 */
-		req = stmf_state.stmf_svc_active;
-		stmf_state.stmf_svc_active = req->svc_next;
-
-		if (stmf_state.stmf_svc_active == NULL)
-			stmf_state.stmf_svc_tailp = &stmf_state.stmf_svc_active;
+		req = list_remove_head(&stmf_state.stmf_svc_list);
+		if (req == NULL)
+			continue;
 
 		switch (req->svc_cmd) {
 		case STMF_CMD_LPORT_ONLINE:
@@ -7398,7 +7723,7 @@ stmf_svc_timeout(struct stmf_svc_clocks *clks)
 			    ddi_get_lbolt() + drv_usectohz(1*1000*1000);
 		}
 
-		if (stmf_state.stmf_svc_active)
+		if (!list_is_empty(&stmf_state.stmf_svc_list))
 			return;
 	}
 
@@ -7423,15 +7748,8 @@ stmf_svc_timeout(struct stmf_svc_clocks *clks)
 			    ddi_get_lbolt() + drv_usectohz(1*1000*1000);
 		}
 
-		if (stmf_state.stmf_svc_active)
+		if (!list_is_empty(&stmf_state.stmf_svc_list))
 			return;
-	}
-
-	/* Check if we need to run worker_mgmt */
-	if (ddi_get_lbolt() > clks->worker_delay) {
-		stmf_worker_mgmt();
-		clks->worker_delay = ddi_get_lbolt() +
-		    stmf_worker_mgmt_delay;
 	}
 
 	/* Check if any active session got its 1st LUN */
@@ -7560,11 +7878,9 @@ stmf_svc_queue(int cmd, void *obj, stmf_state_change_info_t *info)
 		    info->st_additional_info);
 	}
 	req->svc_req_alloc_size = s;
-	req->svc_next = NULL;
 
 	mutex_enter(&stmf_state.stmf_lock);
-	*stmf_state.stmf_svc_tailp = req;
-	stmf_state.stmf_svc_tailp = &req->svc_next;
+	list_insert_tail(&stmf_state.stmf_svc_list, req);
 	if ((stmf_state.stmf_svc_flags & STMF_SVC_ACTIVE) == 0) {
 		cv_signal(&stmf_state.stmf_cv);
 	}
@@ -7574,29 +7890,15 @@ stmf_svc_queue(int cmd, void *obj, stmf_state_change_info_t *info)
 static void
 stmf_svc_kill_obj_requests(void *obj)
 {
-	stmf_svc_req_t *prev_req = NULL;
-	stmf_svc_req_t *next_req;
 	stmf_svc_req_t *req;
 
 	ASSERT(mutex_owned(&stmf_state.stmf_lock));
 
-	for (req = stmf_state.stmf_svc_active; req != NULL; req = next_req) {
-		next_req = req->svc_next;
-
+	for (req = list_head(&stmf_state.stmf_svc_list); req != NULL;
+	    req = list_next(&stmf_state.stmf_svc_list, req)) {
 		if (req->svc_obj == obj) {
-			if (prev_req != NULL)
-				prev_req->svc_next = next_req;
-			else
-				stmf_state.stmf_svc_active = next_req;
-
-			if (next_req == NULL)
-				stmf_state.stmf_svc_tailp = (prev_req != NULL) ?
-				    &prev_req->svc_next :
-				    &stmf_state.stmf_svc_active;
-
+			list_remove(&stmf_state.stmf_svc_list, req);
 			kmem_free(req, req->svc_req_alloc_size);
-		} else {
-			prev_req = req;
 		}
 	}
 }
@@ -7642,6 +7944,14 @@ stmf_trace_clear()
 	mutex_exit(&trace_buf_lock);
 }
 
+/*
+ * NOTE: Due to lock order problems that are not possible to fix this
+ * method drops and reacquires the itask_mutex around the call to stmf_ctl.
+ * Another possible work around would be to use a dispatch queue and have
+ * the call to stmf_ctl run on another thread that's not holding the
+ * itask_mutex. The problem with that approach is that it's difficult to
+ * determine what impact an asynchronous change would have on the system state.
+ */
 static void
 stmf_abort_task_offline(scsi_task_t *task, int offline_lu, char *info)
 {
@@ -7649,10 +7959,14 @@ stmf_abort_task_offline(scsi_task_t *task, int offline_lu, char *info)
 	void				*ctl_private;
 	uint32_t			ctl_cmd;
 	int				msg = 0;
+	stmf_i_scsi_task_t		*itask =
+	    (stmf_i_scsi_task_t *)task->task_stmf_private;
 
 	stmf_trace("FROM STMF", "abort_task_offline called for %s: %s",
 	    offline_lu ? "LU" : "LPORT", info ? info : "no additional info");
 	change_info.st_additional_info = info;
+	ASSERT(mutex_owned(&itask->itask_mutex));
+
 	if (offline_lu) {
 		change_info.st_rflags = STMF_RFLAG_RESET |
 		    STMF_RFLAG_LU_ABORT;
@@ -7680,7 +7994,9 @@ stmf_abort_task_offline(scsi_task_t *task, int offline_lu, char *info)
 		    offline_lu ? "LU" : "LPORT", info ? info :
 		    "<no additional info>");
 	}
+	mutex_exit(&itask->itask_mutex);
 	(void) stmf_ctl(ctl_cmd, ctl_private, &change_info);
+	mutex_enter(&itask->itask_mutex);
 }
 
 static char
@@ -7737,7 +8053,7 @@ stmf_scsilib_tptid_validate(scsi_transport_id_t *tptid, uint32_t total_sz,
 			return (B_FALSE);
 		break;
 
-	case PROTOCOL_iSCSI:
+	case PROTOCOL_iSCSI: /* CSTYLED */
 		{
 		iscsi_transport_id_t	*iscsiid;
 		uint16_t		adn_len, name_len;
@@ -7782,7 +8098,7 @@ stmf_scsilib_tptid_validate(scsi_transport_id_t *tptid, uint32_t total_sz,
 	case PROTOCOL_SAS:
 	case PROTOCOL_ADT:
 	case PROTOCOL_ATAPI:
-	default:
+	default: /* CSTYLED */
 		{
 		stmf_dflt_scsi_tptid_t *dflttpd;
 
@@ -7810,7 +8126,7 @@ stmf_scsilib_tptid_compare(scsi_transport_id_t *tpd1, scsi_transport_id_t *tpd2)
 
 	switch (tpd1->protocol_id) {
 
-	case PROTOCOL_iSCSI:
+	case PROTOCOL_iSCSI: /* CSTYLED */
 		{
 		iscsi_transport_id_t *iscsitpd1, *iscsitpd2;
 		uint16_t len;
@@ -7825,7 +8141,7 @@ stmf_scsilib_tptid_compare(scsi_transport_id_t *tpd1, scsi_transport_id_t *tpd2)
 		}
 		break;
 
-	case PROTOCOL_SRP:
+	case PROTOCOL_SRP: /* CSTYLED */
 		{
 		scsi_srp_transport_id_t *srptpd1, *srptpd2;
 
@@ -7837,7 +8153,7 @@ stmf_scsilib_tptid_compare(scsi_transport_id_t *tpd1, scsi_transport_id_t *tpd2)
 		}
 		break;
 
-	case PROTOCOL_FIBRE_CHANNEL:
+	case PROTOCOL_FIBRE_CHANNEL: /* CSTYLED */
 		{
 		scsi_fc_transport_id_t *fctpd1, *fctpd2;
 
@@ -7855,7 +8171,7 @@ stmf_scsilib_tptid_compare(scsi_transport_id_t *tpd1, scsi_transport_id_t *tpd2)
 	case PROTOCOL_SAS:
 	case PROTOCOL_ADT:
 	case PROTOCOL_ATAPI:
-	default:
+	default: /* CSTYLED */
 		{
 		stmf_dflt_scsi_tptid_t *dflt1, *dflt2;
 		uint16_t len;
@@ -7987,4 +8303,75 @@ stmf_remote_port_free(stmf_remote_port_t *rpt)
 	 *	need to be made here too.
 	 */
 	kmem_free(rpt, sizeof (stmf_remote_port_t) + rpt->rport_tptid_sz);
+}
+
+stmf_lu_t *
+stmf_check_and_hold_lu(scsi_task_t *task, uint8_t *guid)
+{
+	stmf_i_scsi_session_t *iss;
+	stmf_lu_t *lu;
+	stmf_i_lu_t *ilu = NULL;
+	stmf_lun_map_t *sm;
+	stmf_lun_map_ent_t *lme;
+	int i;
+
+	iss = (stmf_i_scsi_session_t *)task->task_session->ss_stmf_private;
+	rw_enter(iss->iss_lockp, RW_READER);
+	sm = iss->iss_sm;
+
+	for (i = 0; i < sm->lm_nentries; i++) {
+		if (sm->lm_plus[i] == NULL)
+			continue;
+		lme = (stmf_lun_map_ent_t *)sm->lm_plus[i];
+		lu = lme->ent_lu;
+		if (bcmp(lu->lu_id->ident, guid, 16) == 0) {
+			break;
+		}
+		lu = NULL;
+	}
+
+	if (!lu) {
+		goto hold_lu_done;
+	}
+
+	ilu = lu->lu_stmf_private;
+	mutex_enter(&ilu->ilu_task_lock);
+	ilu->ilu_additional_ref++;
+	mutex_exit(&ilu->ilu_task_lock);
+
+hold_lu_done:
+	rw_exit(iss->iss_lockp);
+	return (lu);
+}
+
+void
+stmf_release_lu(stmf_lu_t *lu)
+{
+	stmf_i_lu_t *ilu;
+
+	ilu = lu->lu_stmf_private;
+	ASSERT(ilu->ilu_additional_ref != 0);
+	mutex_enter(&ilu->ilu_task_lock);
+	ilu->ilu_additional_ref--;
+	mutex_exit(&ilu->ilu_task_lock);
+}
+
+int
+stmf_is_task_being_aborted(scsi_task_t *task)
+{
+	stmf_i_scsi_task_t *itask;
+
+	itask = (stmf_i_scsi_task_t *)task->task_stmf_private;
+	if (itask->itask_flags & ITASK_BEING_ABORTED)
+		return (1);
+
+	return (0);
+}
+
+volatile boolean_t stmf_pgr_aptpl_always = B_FALSE;
+
+boolean_t
+stmf_is_pgr_aptpl_always()
+{
+	return (stmf_pgr_aptpl_always);
 }

@@ -24,6 +24,7 @@
  */
 /*
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2017, Joyent, Inc.  All rights reserved.
  */
 
@@ -859,6 +860,11 @@ idm_sorecvhdr(idm_conn_t *ic, idm_pdu_t *pdu)
 	/*
 	 * Check actual AHS length against the amount available in the buffer
 	 */
+	if ((IDM_PDU_OPCODE(pdu) != ISCSI_OP_SCSI_CMD) &&
+	    (bhs->hlength != 0)) {
+		/* ---- hlength is only only valid for SCSI Request ---- */
+		return (IDM_STATUS_FAIL);
+	}
 	pdu->isp_hdrlen = sizeof (iscsi_hdr_t) +
 	    (bhs->hlength * sizeof (uint32_t));
 	pdu->isp_datalen = n2h24(bhs->dlength);
@@ -868,7 +874,7 @@ idm_sorecvhdr(idm_conn_t *ic, idm_pdu_t *pdu)
 		    "idm_sorecvhdr: invalid data segment length");
 		return (IDM_STATUS_FAIL);
 	}
-	if (bhs->hlength > IDM_SORX_CACHE_AHSLEN) {
+	if (bhs->hlength > IDM_SORX_WIRE_AHSLEN) {
 		/* Allocate a new header segment and change the callback */
 		new_hdr = kmem_alloc(pdu->isp_hdrlen, KM_SLEEP);
 		bcopy(pdu->isp_hdr, new_hdr, sizeof (iscsi_hdr_t));

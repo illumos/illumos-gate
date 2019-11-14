@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  */
 #ifndef	_LPIF_H
 #define	_LPIF_H
@@ -76,6 +77,7 @@ typedef struct stmf_lu {
 	uint32_t		lu_proxy_reg_arg_len;
 	void			(*lu_dbuf_free)(struct scsi_task *task,
 		struct stmf_data_buf *dbuf);
+	void			(*lu_task_done)(struct scsi_task *task);
 } stmf_lu_t;
 
 /*
@@ -84,6 +86,7 @@ typedef struct stmf_lu {
 #define	STMF_LU_ABORT_TASK		1
 #define	STMF_LU_RESET_STATE		2
 #define	STMF_LU_ITL_HANDLE_REMOVED	3
+#define	STMF_LU_SET_ABORT		4
 
 /*
  * Asymmetric access state
@@ -132,6 +135,9 @@ stmf_status_t stmf_deregister_lu(stmf_lu_t *lup);
 stmf_status_t stmf_set_lu_access(stmf_lu_t *lup, uint8_t access_state);
 stmf_status_t stmf_proxy_scsi_cmd(scsi_task_t *, stmf_data_buf_t *dbuf);
 int stmf_is_standby_port(scsi_task_t *);
+void stmf_lu_xfer_done(struct scsi_task *task, boolean_t read,
+    hrtime_t elapsed_time);
+boolean_t stmf_is_pgr_aptpl_always();
 
 #ifdef	__cplusplus
 }

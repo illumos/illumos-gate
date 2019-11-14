@@ -329,6 +329,7 @@ extern "C" {
  */
 #define	SCMD_GROUP4		0x80
 #define	SCMD_EXTENDED_COPY	0x83
+#define	SCMD_RECV_COPY_RESULTS	0x84
 #define	SCMD_VERIFY_G4		0x8f
 
 /*
@@ -357,6 +358,7 @@ extern "C" {
  */
 #define	SCMD_WRITE_FILE_MARK_G4	0x80
 #define	SCMD_READ_REVERSE_G4	0x81
+#define	SCMD_COMPARE_AND_WRITE	0x89
 #define	SCMD_READ_ATTRIBUTE	0x8c
 #define	SCMD_WRITE_ATTRIBUTE	0x8d
 #define	SCMD_SPACE_G4		0x91

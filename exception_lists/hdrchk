@@ -337,6 +337,7 @@ usr/src/uts/common/io/bnxe/bnxe_binding.h
 usr/src/uts/common/io/bnxe/bnxe_debug.h
 usr/src/uts/common/io/bnxe/bnxe.h
 usr/src/uts/common/io/bnxe/version.h
+usr/src/uts/common/io/comstar/lu/stmf_sbd/stmf_sbd.h
 usr/src/uts/common/io/cxgbe/firmware/*
 usr/src/uts/common/io/cxgbe/common/t4_msg.h
 usr/src/uts/common/io/cxgbe/common/t4_regs.h
