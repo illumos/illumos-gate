@@ -664,8 +664,7 @@ ill_input_short_v4(mblk_t *mp, void *iph_arg, void *nexthop_arg,
 	 * there is a good HW IP header checksum, we clear the need
 	 * look at the IP header checksum.
 	 */
-	if ((DB_CKSUMFLAGS(mp) & HW_LOCAL_MAC) ||
-	    ((DB_CKSUMFLAGS(mp) & HCK_IPV4_HDRCKSUM) &&
+	if (((DB_CKSUMFLAGS(mp) & HCK_IPV4_HDRCKSUM) &&
 	    ILL_HCKSUM_CAPABLE(ill) && dohwcksum)) {
 		/* Header checksum was ok. Clear the flag */
 		DB_CKSUMFLAGS(mp) &= ~HCK_IPV4_HDRCKSUM;
@@ -1003,26 +1002,8 @@ ire_recv_forward_v4(ire_t *ire, mblk_t *mp, void *iph_arg, ip_recv_attr_t *ira)
 		ira->ira_pktlen = ntohs(ipha->ipha_length);
 	}
 
-	/*
-	 * The packet came here via MAC-loopback so we must reinstate
-	 * its hardware IP header checksum request.
-	 *
-	 * IP input clears the HCK_IPV4_HDRCKSUM_OK flag. Since
-	 * HCK_IPV4_HDRCKSUM_OK and HCK_IPV4_HDRCKSUM use the same
-	 * value, we end up clearing the client's request to use
-	 * hardware IP header checksum offload. We check for
-	 * HW_LOCAL_MAC and an IP header checksum value of zero as an
-	 * indicator that this packet requires reinstatement of the
-	 * HCK_IPV4_HDRCKSUM flag. That said, zero is a valid
-	 * checksum, and given hardware that doesn't support IP header
-	 * checksum offload, this could result in the checksum being
-	 * computed twice. This is fine because the checksum value is
-	 * zero, and thus will retain its value on recalculation.
-	 */
-	if (((DB_CKSUMFLAGS(mp) & HW_LOCAL_MAC) != 0) &&
-	    ipha->ipha_hdr_checksum == 0) {
-		DB_CKSUMFLAGS(mp) |= HCK_IPV4_HDRCKSUM;
-	}
+	/* Packet is being forwarded. Turning off hwcksum flag. */
+	DB_CKSUMFLAGS(mp) = 0;
 
 	/*
 	 * Martian Address Filtering [RFC 1812, Section 5.3.7]
@@ -1164,15 +1145,6 @@ ip_forward_xmit_v4(nce_t *nce, ill_t *ill, mblk_t *mp, ipha_t *ipha,
 	sum = (int)ipha->ipha_hdr_checksum + IP_HDR_CSUM_TTL_ADJUST;
 	ipha->ipha_hdr_checksum = (uint16_t)(sum + (sum >> 16));
 
-	/*
-	 * Zero the IP header checksum if this is a mac-loopback
-	 * packet which has requested IP header checksum offload.
-	 */
-	if (((DB_CKSUMFLAGS(mp) & HW_LOCAL_MAC) != 0) &&
-	    (DB_CKSUMFLAGS(mp) & HCK_IPV4_HDRCKSUM) != 0) {
-		ipha->ipha_hdr_checksum = 0;
-	}
-
 	/* Check if there are options to update */
 	if (iraflags & IRAF_IPV4_OPTIONS) {
 		ASSERT(ipha->ipha_version_and_hdr_length !=
@@ -1206,14 +1178,7 @@ ip_forward_xmit_v4(nce_t *nce, ill_t *ill, mblk_t *mp, ipha_t *ipha,
 
 	ixaflags = IXAF_IS_IPV4 | IXAF_NO_DEV_FLOW_CTL;
 
-	/*
-	 * If the packet arrived via MAC-loopback, then it might be an
-	 * LSO packet; in this case the MAC layer will take care to
-	 * segment it. Otherwise, we have a normal packet that is
-	 * being forwarded from a source interface with an MTU larger
-	 * than the desination's; in this case IP must fragment it.
-	 */
-	if (pkt_len > mtu && (DB_CKSUMFLAGS(mp) & HW_LSO) == 0) {
+	if (pkt_len > mtu) {
 		/*
 		 * It needs fragging on its way out.  If we haven't
 		 * verified the header checksum yet we do it now since
@@ -2282,16 +2247,6 @@ ip_input_cksum_v4(iaflags_t iraflags, mblk_t *mp, ipha_t *ipha,
 		return (B_TRUE);
 	}
 
-	hck_flags = DB_CKSUMFLAGS(mp);
-
-	if (hck_flags & HW_LOCAL_MAC) {
-		/*
-		 * The packet is from a same-machine sender in which
-		 * case we assume data integrity.
-		 */
-		return (B_TRUE);
-	}
-
 	/*
 	 * Revert to software checksum calculation if the interface
 	 * isn't capable of checksum offload.
@@ -2303,6 +2258,8 @@ ip_input_cksum_v4(iaflags_t iraflags, mblk_t *mp, ipha_t *ipha,
 	    !dohwcksum) {
 		return (ip_input_sw_cksum_v4(mp, ipha, ira));
 	}
+
+	hck_flags = DB_CKSUMFLAGS(mp);
 
 	/*
 	 * We apply this for all ULP protocols. Does the HW know to

@@ -651,6 +651,8 @@ typedef enum mac_emul {
 } mac_emul_t;
 
 #define	MAC_HWCKSUM_EMULS	(MAC_HWCKSUM_EMUL | MAC_IPCKSUM_EMUL)
+#define	MAC_ALL_EMULS		(MAC_HWCKSUM_EMUL | MAC_IPCKSUM_EMUL | \
+				MAC_LSO_EMUL)
 
 /*
  * Driver interface functions.

@@ -384,10 +384,6 @@ mac_sw_cksum(mblk_t *mp, mac_emul_t emul)
 
 	mac_hcksum_get(mp, &start, &stuff, &end, &value, NULL);
 
-	/*
-	 * We use DB_CKSUMFLAGS (instead of mac_hcksum_get()) because
-	 * we don't want to mask-out the HW_LOCAL_MAC flag.
-	 */
 	flags = DB_CKSUMFLAGS(mp);
 
 	/* Why call this if checksum emulation isn't needed? */
@@ -1307,14 +1303,17 @@ fail:
  * nothing for the caller to free. In any event, the caller shouldn't
  * assume that '*mp_chain' is non-NULL on return.
  *
- * This function was written with two main use cases in mind.
+ * This function was written with three main use cases in mind.
  *
- * 1. A way for MAC clients to emulate hardware offloads when they
- *    can't directly handle LSO packets or packets without fully
- *    calculated checksums.
+ * 1. To emulate hardware offloads when traveling mac-loopback (two
+ *    clients on the same mac). This is wired up in mac_tx_send().
  *
- * 2. A way for MAC to offer hardware offloads when the underlying
- *    hardware can't or won't.
+ * 2. To provide hardware offloads to the client when the underlying
+ *    provider cannot. This is currently wired up in mac_tx() but we
+ *    still only negotiate offloads when the underlying provider
+ *    supports them.
+ *
+ * 3. To emulate real hardware in simnet.
  */
 void
 mac_hw_emul(mblk_t **mp_chain, mblk_t **otail, uint_t *ocount, mac_emul_t emul)
@@ -1569,10 +1568,10 @@ mac_strip_vlan_tag_chain(mblk_t *mp_chain)
  */
 /* ARGSUSED */
 void
-mac_rx_def(void *arg, mac_resource_handle_t resource, mblk_t *mp,
+mac_rx_def(void *arg, mac_resource_handle_t resource, mblk_t *mp_chain,
     boolean_t loopback)
 {
-	freemsgchain(mp);
+	freemsgchain(mp_chain);
 }
 
 /*

@@ -132,11 +132,6 @@ overlay_mux_recv(ksocket_t ks, mblk_t *mpchain, size_t msgsize, int oob,
 		 * packets and check the inside-VXLAN IP packets' checksums,
 		 * or do LSO with VXLAN), we should clear any HW-accelerated-
 		 * performed bits.
-		 *
-		 * We do this, even in cases of HW_LOCAL_MAC, because we
-		 * absolutely have NO context about the inner packet.
-		 * It could've arrived off an external NIC and been forwarded
-		 * to the overlay network, which means no context.
 		 */
 		DB_CKSUMFLAGS(mp) = 0;
 

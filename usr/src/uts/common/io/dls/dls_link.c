@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -30,7 +30,6 @@
 
 #include	<sys/sysmacros.h>
 #include	<sys/strsubr.h>
-#include	<sys/pattr.h>
 #include	<sys/strsun.h>
 #include	<sys/vlan.h>
 #include	<sys/dld_impl.h>
@@ -162,18 +161,6 @@ i_dls_link_subchain(dls_link_t *dlp, mblk_t *mp, const mac_header_info_t *mhip,
 		mac_header_info_t cmhi;
 		uint16_t cvid, cpri;
 		int err;
-
-		/*
-		 * If this message is from a same-machine sender, then
-		 * there may be HW checksum offloads to emulate.
-		 */
-		if (DB_CKSUMFLAGS(mp) & HW_LOCAL_MAC) {
-			mblk_t *tmpnext = mp->b_next;
-
-			mp->b_next = NULL;
-			mac_hw_emul(&mp, NULL, NULL, MAC_HWCKSUM_EMUL);
-			mp->b_next = tmpnext;
-		}
 
 		DLS_PREPARE_PKT(dlp->dl_mh, mp, &cmhi, err);
 		if (err != 0)
@@ -369,22 +356,6 @@ i_dls_link_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 	int				err, rval;
 
 	/*
-	 * The mac_hw_emul() function, by design, doesn't predicate on
-	 * HW_LOCAL_MAC. But since we are in Rx context we know that
-	 * any LSO packet must also be from a same-machine sender. We
-	 * take advantage of that and forgoe writing a manual loop to
-	 * predicate on HW_LOCAL_MAC.
-	 *
-	 * But for checksum emulation we need to predicate on
-	 * HW_LOCAL_MAC to avoid calling mac_hw_emul() on packets that
-	 * don't need it (thanks to the fact that HCK_IPV4_HDRCKSUM
-	 * and HCK_IPV4_HDRCKSUM_OK use the same value). Therefore we
-	 * do the checksum emulation in the second loop and in
-	 * subchain matching.
-	 */
-	mac_hw_emul(&mp, NULL, NULL, MAC_LSO_EMUL);
-
-	/*
 	 * Walk the packet chain.
 	 */
 	for (; mp != NULL; mp = nextp) {
@@ -392,18 +363,6 @@ i_dls_link_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 		 * Wipe the accepted state.
 		 */
 		accepted = B_FALSE;
-
-		/*
-		 * If this message is from a same-machine sender, then
-		 * there may be HW checksum offloads to emulate.
-		 */
-		if (DB_CKSUMFLAGS(mp) & HW_LOCAL_MAC) {
-			mblk_t *tmpnext = mp->b_next;
-
-			mp->b_next = NULL;
-			mac_hw_emul(&mp, NULL, NULL, MAC_HWCKSUM_EMUL);
-			mp->b_next = tmpnext;
-		}
 
 		DLS_PREPARE_PKT(dlp->dl_mh, mp, &mhi, err);
 		if (err != 0) {

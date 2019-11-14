@@ -2322,7 +2322,7 @@ check_again:
 				if (smcip->mci_mip->mi_promisc_list != NULL) {
 					mutex_exit(lock);
 					mac_promisc_dispatch(smcip->mci_mip,
-					    head, NULL);
+					    head, NULL, B_FALSE);
 					mutex_enter(lock);
 				}
 			}
@@ -4346,14 +4346,6 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 			obytes += (mp->b_cont == NULL ? MBLKL(mp) :
 			    msgdsize(mp));
 
-			/*
-			 * Mark all packets as local so that a
-			 * receiver can determine if a packet arrived
-			 * from a local source or from the network.
-			 * This allows some consumers to avoid
-			 * unecessary work like checksum computation.
-			 */
-			DB_CKSUMFLAGS(mp) |= HW_LOCAL_MAC;
 			CHECK_VID_AND_ADD_TAG(mp);
 			mp = mac_provider_tx(mip, ring, mp, src_mcip);
 
@@ -4393,14 +4385,6 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 		pkt_size = (mp->b_cont == NULL ? MBLKL(mp) : msgdsize(mp));
 		obytes += pkt_size;
 		CHECK_VID_AND_ADD_TAG(mp);
-
-		/*
-		 * Mark all packets as local so that a receiver can
-		 * determine if a packet arrived from a local source
-		 * or from the network. This allows some consumers to
-		 * avoid unecessary work like checksum computation.
-		 */
-		DB_CKSUMFLAGS(mp) |= HW_LOCAL_MAC;
 
 		/*
 		 * Find the destination.
@@ -4448,17 +4432,21 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 				 * macro.
 				 */
 				if (mip->mi_promisc_list != NULL) {
-					mac_promisc_dispatch(mip, mp, src_mcip);
+					mac_promisc_dispatch(mip, mp, src_mcip,
+					    B_TRUE);
 				}
 
 				do_switch = ((src_mcip->mci_state_flags &
 				    dst_mcip->mci_state_flags &
 				    MCIS_CLIENT_POLL_CAPABLE) != 0);
 
-				(dst_flow_ent->fe_cb_fn)(
-				    dst_flow_ent->fe_cb_arg1,
-				    dst_flow_ent->fe_cb_arg2,
-				    mp, do_switch);
+				mac_hw_emul(&mp, NULL, NULL, MAC_ALL_EMULS);
+				if (mp != NULL) {
+					(dst_flow_ent->fe_cb_fn)(
+						dst_flow_ent->fe_cb_arg1,
+						dst_flow_ent->fe_cb_arg2,
+						mp, do_switch);
+				}
 
 			}
 			FLOW_REFRELE(dst_flow_ent);

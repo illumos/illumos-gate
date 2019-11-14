@@ -723,7 +723,7 @@ mac_trill_snoop(mac_handle_t mh, mblk_t *mp)
 	mac_impl_t *mip = (mac_impl_t *)mh;
 
 	if (mip->mi_promisc_list != NULL)
-		mac_promisc_dispatch(mip, mp, NULL);
+		mac_promisc_dispatch(mip, mp, NULL, B_FALSE);
 }
 
 /*
@@ -743,7 +743,7 @@ mac_rx_common(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
 	 * this MAC, pass them a copy if appropriate.
 	 */
 	if (mip->mi_promisc_list != NULL)
-		mac_promisc_dispatch(mip, mp_chain, NULL);
+		mac_promisc_dispatch(mip, mp_chain, NULL, B_FALSE);
 
 	if (mr != NULL) {
 		/*
