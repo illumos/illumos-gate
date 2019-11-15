@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_LIBSMB_H
@@ -722,7 +722,9 @@ boolean_t smb_lgrp_itererror(smb_giter_t *);
 int smb_lgrp_iterate(smb_giter_t *, smb_group_t *);
 
 int smb_lookup_sid(const char *, lsa_account_t *);
+int smb_lookup_lsid(const char *, lsa_account_t *);
 int smb_lookup_name(const char *, sid_type_t, lsa_account_t *);
+int smb_lookup_lname(const char *, sid_type_t, lsa_account_t *);
 
 #define	SMB_LGRP_SUCCESS		0
 #define	SMB_LGRP_INVALID_ARG		1

@@ -90,6 +90,7 @@ static	int	aflag = 0;
 static	int	cflag = 0;
 static	int	gflag = 0;
 static	int	sflag = 0;
+static	int	wflag = 0;
 static	int	zflag = 0;
 static	zoneid_t zoneid;
 static	char *match_svc;
@@ -149,6 +150,8 @@ usage(void)
 	(void) fprintf(stderr,
 	    "  -s : print only processes with given service FMRI\n");
 	(void) fprintf(stderr,
+	    "  -w : allow lines to wrap instead of truncating\n");
+	(void) fprintf(stderr,
 	    "  -z : print only processes in given zone\n");
 	exit(2);
 }
@@ -164,7 +167,7 @@ main(int argc, char **argv)
 	ps_t *p;
 
 	/* options */
-	while ((opt = getopt(argc, argv, "acgs:z:")) != EOF) {
+	while ((opt = getopt(argc, argv, "acgs:wz:")) != EOF) {
 		switch (opt) {
 		case 'a':		/* include children of process 0 */
 			aflag = 1;
@@ -179,6 +182,9 @@ main(int argc, char **argv)
 		case 's':
 			sflag = 1;
 			match_svc = parse_svc(optarg, &match_inst);
+			break;
+		case 'w':
+			wflag = 1;
 			break;
 		case 'z':		/* only processes in given zone */
 			zflag = 1;
@@ -196,8 +202,10 @@ main(int argc, char **argv)
 	if (errflg)
 		usage();
 
-	columns = get_termwidth();
-	VERIFY3S(columns, >, 0);
+	if (!wflag) {
+		columns = get_termwidth();
+		VERIFY3S(columns, >, 0);
+	}
 
 	nps = 0;
 	psize = 0;
@@ -334,8 +342,14 @@ printone(ps_t *p, int level)
 
 	if (p->done && !FAKEDPID0(p)) {
 		indent = level * 2;
-		if ((n = columns - PIDWIDTH - indent - 2) < 0)
-			n = 0;
+
+		if (wflag) {
+			n = strlen(p->psargs);
+		} else {
+			if ((n = columns - PIDWIDTH - indent - 2) < 0)
+				n = 0;
+		}
+
 		printlines(p, level);
 		if (p->pid >= 0) {
 			(void) printf("%-*d %.*s\n", PIDWIDTH, (int)p->pid, n,

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  */
 /*
  * SMB Node State Machine
@@ -683,6 +683,11 @@ smb_node_set_delete_on_close(smb_node_t *node, cred_t *cr, uint32_t flags)
 		if (status != 0) {
 			return (status);
 		}
+	}
+
+	/* Dataset roots can't be deleted, so don't set DOC */
+	if ((node->flags & NODE_FLAGS_VFSROOT) != 0) {
+		return (NT_STATUS_CANNOT_DELETE);
 	}
 
 	mutex_enter(&node->n_mutex);

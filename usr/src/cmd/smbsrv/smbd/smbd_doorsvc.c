@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/list.h>
@@ -103,7 +103,9 @@ smbd_doorop_t smbd_doorops[] = {
 	{ SMB_DR_DFS_GET_REFERRALS,	smbd_dop_dfs_get_referrals },
 	{ SMB_DR_SHR_HOSTACCESS,	smbd_dop_shr_hostaccess },
 	{ SMB_DR_SHR_EXEC,		smbd_dop_shr_exec },
-	{ SMB_DR_NOTIFY_DC_CHANGED,	smbd_dop_notify_dc_changed }
+	{ SMB_DR_NOTIFY_DC_CHANGED,	smbd_dop_notify_dc_changed },
+	{ SMB_DR_LOOKUP_LSID,		smbd_dop_lookup_sid },
+	{ SMB_DR_LOOKUP_LNAME,		smbd_dop_lookup_name }
 };
 
 static int smbd_ndoorop = (sizeof (smbd_doorops) / sizeof (smbd_doorops[0]));
@@ -581,6 +583,10 @@ smbd_dop_user_auth_logon(smbd_arg_t *arg)
 	return (SMB_DOP_EMPTYBUF);
 }
 
+/*
+ * SMB_DR_LOOKUP_NAME,
+ * SMB_DR_LOOKUP_LNAME (local-only, for idmap)
+ */
 static int
 smbd_dop_lookup_name(smbd_arg_t *arg)
 {
@@ -604,7 +610,24 @@ smbd_dop_lookup_name(smbd_arg_t *arg)
 		(void) snprintf(buf, MAXNAMELEN, "%s\\%s", acct.a_domain,
 		    acct.a_name);
 
-	acct.a_status = lsa_lookup_name(buf, acct.a_sidtype, &ainfo);
+	switch (arg->hdr.dh_op) {
+	case SMB_DR_LOOKUP_NAME:
+		acct.a_status = lsa_lookup_name(buf, acct.a_sidtype, &ainfo);
+		break;
+
+	case SMB_DR_LOOKUP_LNAME:
+		/*
+		 * Basically for idmap.  Don't call out to AD.
+		 */
+		acct.a_status = lsa_lookup_lname(buf, acct.a_sidtype, &ainfo);
+		break;
+
+	default:
+		assert(!"arg->hdr.dh_op");
+		acct.a_status = NT_STATUS_INTERNAL_ERROR;
+		break;
+	}
+
 	if (acct.a_status == NT_STATUS_SUCCESS) {
 		acct.a_sidtype = ainfo.a_type;
 		smb_sid_tostr(ainfo.a_sid, acct.a_sid);
@@ -626,6 +649,10 @@ smbd_dop_lookup_name(smbd_arg_t *arg)
 	return (SMB_DOP_SUCCESS);
 }
 
+/*
+ * SMB_DR_LOOKUP_SID,
+ * SMB_DR_LOOKUP_LSID (local-only, for idmap)
+ */
 static int
 smbd_dop_lookup_sid(smbd_arg_t *arg)
 {
@@ -641,7 +668,25 @@ smbd_dop_lookup_sid(smbd_arg_t *arg)
 		return (SMB_DOP_DECODE_ERROR);
 
 	sid = smb_sid_fromstr(acct.a_sid);
-	acct.a_status = lsa_lookup_sid(sid, &ainfo);
+
+	switch (arg->hdr.dh_op) {
+	case SMB_DR_LOOKUP_SID:
+		acct.a_status = lsa_lookup_sid(sid, &ainfo);
+		break;
+
+	case SMB_DR_LOOKUP_LSID:
+		/*
+		 * Basically for idmap.  Don't call out to AD.
+		 */
+		acct.a_status = lsa_lookup_lsid(sid, &ainfo);
+		break;
+
+	default:
+		assert(!"arg->hdr.dh_op");
+		acct.a_status = NT_STATUS_INTERNAL_ERROR;
+		break;
+	}
+
 	smb_sid_free(sid);
 
 	if (acct.a_status == NT_STATUS_SUCCESS) {

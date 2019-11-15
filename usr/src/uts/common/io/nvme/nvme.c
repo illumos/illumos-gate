@@ -4794,9 +4794,7 @@ nvme_ufm_fill_slot(ddi_ufm_handle_t *ufmh, void *arg, uint_t imgno,
 	if (slotno == (nvme->n_fwslot->fw_afi - 1))
 		attr |= DDI_UFM_ATTR_ACTIVE;
 
-	if (slotno == 0 && nvme->n_idctl->id_frmw.fw_readonly == 0)
-		attr |= DDI_UFM_ATTR_WRITEABLE;
-	else
+	if (slotno != 0 || nvme->n_idctl->id_frmw.fw_readonly == 0)
 		attr |= DDI_UFM_ATTR_WRITEABLE;
 
 	if (nvme->n_fwslot->fw_frs[slotno][0] == '\0') {

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -37,6 +37,10 @@
 #include <smbsrv/smb_token.h>
 
 #include <lsalib.h>
+
+static uint32_t lsa_lookup_name_int(char *, uint16_t, smb_account_t *,
+    boolean_t);
+static uint32_t lsa_lookup_sid_int(smb_sid_t *, smb_account_t *, boolean_t);
 
 static uint32_t lsa_lookup_name_builtin(char *, char *, smb_account_t *);
 static uint32_t lsa_lookup_name_domain(char *, smb_account_t *);
@@ -75,6 +79,20 @@ static uint32_t lsa_map_status(uint32_t);
 uint32_t
 lsa_lookup_name(char *account, uint16_t type, smb_account_t *info)
 {
+	return (lsa_lookup_name_int(account, type, info, B_TRUE));
+}
+
+/* Variant that avoids the call out to AD. */
+uint32_t
+lsa_lookup_lname(char *account, uint16_t type, smb_account_t *info)
+{
+	return (lsa_lookup_name_int(account, type, info, B_FALSE));
+}
+
+uint32_t
+lsa_lookup_name_int(char *account, uint16_t type, smb_account_t *info,
+    boolean_t try_ad)
+{
 	char nambuf[SMB_USERNAME_MAXLEN];
 	char dombuf[SMB_PI_MAX_DOMAIN];
 	char *name, *domain;
@@ -107,8 +125,10 @@ lsa_lookup_name(char *account, uint16_t type, smb_account_t *info)
 		if (status == NT_STATUS_SUCCESS)
 			return (status);
 
-		if ((domain == NULL) || (status == NT_STATUS_NOT_FOUND))
+		if (try_ad && ((domain == NULL) ||
+		    (status == NT_STATUS_NOT_FOUND))) {
 			status = lsa_lookup_name_domain(account, info);
+		}
 	}
 
 	return ((status == NT_STATUS_SUCCESS) ? status : NT_STATUS_NONE_MAPPED);
@@ -116,6 +136,19 @@ lsa_lookup_name(char *account, uint16_t type, smb_account_t *info)
 
 uint32_t
 lsa_lookup_sid(smb_sid_t *sid, smb_account_t *info)
+{
+	return (lsa_lookup_sid_int(sid, info, B_TRUE));
+}
+
+/* Variant that avoids the call out to AD. */
+uint32_t
+lsa_lookup_lsid(smb_sid_t *sid, smb_account_t *info)
+{
+	return (lsa_lookup_sid_int(sid, info, B_FALSE));
+}
+
+static uint32_t
+lsa_lookup_sid_int(smb_sid_t *sid, smb_account_t *info, boolean_t try_ad)
 {
 	uint32_t status;
 
@@ -125,8 +158,9 @@ lsa_lookup_sid(smb_sid_t *sid, smb_account_t *info)
 	status = lsa_lookup_sid_builtin(sid, info);
 	if (status == NT_STATUS_NOT_FOUND) {
 		status = smb_sam_lookup_sid(sid, info);
-		if (status == NT_STATUS_NOT_FOUND)
+		if (try_ad && status == NT_STATUS_NOT_FOUND) {
 			status = lsa_lookup_sid_domain(sid, info);
+		}
 	}
 
 	return ((status == NT_STATUS_SUCCESS) ? status : NT_STATUS_NONE_MAPPED);

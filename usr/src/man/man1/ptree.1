@@ -4,12 +4,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PTREE 1 "Oct 30, 2019"
+.TH PTREE 1 "Nov 13, 2019"
 .SH NAME
 ptree \- print process trees
 .SH SYNOPSIS
 .nf
-\fB/usr/bin/ptree\fR [\fB-a\fR] [\fB-c\fR] [\fB-g\fR] [\fB-s\fR \fIsvc\fR] [\fB-z\fR \fIzone\fR] [\fIpid\fR | \fIuser\fR]...
+\fB/usr/bin/ptree\fR [\fB-a\fR] [\fB-c\fR] [\fB-g\fR] [\fB-w\fR] [\fB-s\fR \fIsvc\fR] [\fB-z\fR \fIzone\fR] [\fIpid\fR | \fIuser\fR]...
 .fi
 
 .SH DESCRIPTION
@@ -60,6 +60,16 @@ Print only processes with an SMF service FMRI matching the argument. The FMRI
 may be in truncated form (such as 'console-login'). This includes child
 processes even if they are not members of the service contract.
 See \fBprocess\fR(4).
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-w\fR\fR
+.ad
+.RS 11n
+Allow output lines to wrap. Normally output lines are truncated to the current
+width of the terminal window.
 .RE
 
 .sp

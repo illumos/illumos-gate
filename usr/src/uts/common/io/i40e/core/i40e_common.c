@@ -3823,14 +3823,16 @@ static void i40e_parse_discover_capabilities(struct i40e_hw *hw, void *buff,
 	/* count the enabled ports (aka the "not disabled" ports) */
 	hw->num_ports = 0;
 	for (i = 0; i < 4; i++) {
-		u32 port_cfg_reg = I40E_PRTGEN_CNF + (4 * i);
+		enum i40e_status_code status;
+		u32 port_cfg_reg = I40E_PRTGEN_STATUS + (4 * i);
 		u64 port_cfg = 0;
 
 		/* use AQ read to get the physical register offset instead
 		 * of the port relative offset
 		 */
-		i40e_aq_debug_read_register(hw, port_cfg_reg, &port_cfg, NULL);
-		if (!(port_cfg & I40E_PRTGEN_CNF_PORT_DIS_MASK))
+		status = i40e_aq_debug_read_register(hw, port_cfg_reg, &port_cfg, NULL);
+		if ((status == I40E_SUCCESS) &&
+		    (port_cfg & I40E_PRTGEN_STATUS_PORT_VALID_MASK))
 			hw->num_ports++;
 	}
 

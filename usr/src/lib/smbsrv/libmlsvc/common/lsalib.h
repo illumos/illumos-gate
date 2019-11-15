@@ -52,8 +52,6 @@ typedef struct mslsa_sid lsa_sid_t;
 /*
  * lsalib.c
  */
-uint32_t lsa_lookup_name(char *, uint16_t, smb_account_t *);
-uint32_t lsa_lookup_sid(smb_sid_t *, smb_account_t *);
 DWORD lsa_query_primary_domain_info(char *, char *, smb_domain_t *);
 DWORD lsa_query_account_domain_info(char *, char *, smb_domain_t *);
 DWORD lsa_query_dns_domain_info(char *, char *, smb_domain_t *);

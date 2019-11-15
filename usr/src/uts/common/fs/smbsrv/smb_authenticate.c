@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -543,6 +543,12 @@ smb_priv_xlate(smb_token_t *token)
 
 	if (smb_token_query_privilege(token, SE_CHANGE_NOTIFY_LUID))
 		privileges |= SMB_USER_PRIV_CHANGE_NOTIFY;
+
+	if (smb_token_query_privilege(token, SE_READ_FILE_LUID))
+		privileges |= SMB_USER_PRIV_READ_FILE;
+
+	if (smb_token_query_privilege(token, SE_WRITE_FILE_LUID))
+		privileges |= SMB_USER_PRIV_WRITE_FILE;
 
 	return (privileges);
 }

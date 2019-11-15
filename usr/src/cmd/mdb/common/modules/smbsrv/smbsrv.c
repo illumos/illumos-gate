@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -1409,6 +1409,12 @@ user_priv_bits[] = {
 	{ "CHANGE_NOTIFY",
 	    SMB_USER_PRIV_CHANGE_NOTIFY,
 	    SMB_USER_PRIV_CHANGE_NOTIFY },
+	{ "READ_FILE",
+	    SMB_USER_PRIV_READ_FILE,
+	    SMB_USER_PRIV_READ_FILE },
+	{ "WRITE_FILE",
+	    SMB_USER_PRIV_WRITE_FILE,
+	    SMB_USER_PRIV_WRITE_FILE },
 	{ NULL, 0, 0 }
 };
 

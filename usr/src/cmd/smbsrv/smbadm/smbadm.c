@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -178,6 +178,10 @@ static smbadm_prop_handle_t *smbadm_prop_gethandle(char *pname);
 static boolean_t smbadm_chkprop_priv(smbadm_prop_t *prop);
 static int smbadm_setprop_tkowner(char *gname, smbadm_prop_t *prop);
 static int smbadm_getprop_tkowner(char *gname, smbadm_prop_t *prop);
+static int smbadm_setprop_readfile(char *gname, smbadm_prop_t *prop);
+static int smbadm_getprop_readfile(char *gname, smbadm_prop_t *prop);
+static int smbadm_setprop_writefile(char *gname, smbadm_prop_t *prop);
+static int smbadm_getprop_writefile(char *gname, smbadm_prop_t *prop);
 static int smbadm_setprop_backup(char *gname, smbadm_prop_t *prop);
 static int smbadm_getprop_backup(char *gname, smbadm_prop_t *prop);
 static int smbadm_setprop_restore(char *gname, smbadm_prop_t *prop);
@@ -192,6 +196,10 @@ static smbadm_prop_handle_t smbadm_ptable[] = {
 	smbadm_getprop_restore,	smbadm_chkprop_priv	},
 	{"take-ownership", "on|off",	smbadm_setprop_tkowner,
 	smbadm_getprop_tkowner,	smbadm_chkprop_priv	},
+	{"bypass-read", "on|off",	smbadm_setprop_readfile,
+	smbadm_getprop_readfile,	smbadm_chkprop_priv	},
+	{"bypass-write", "on|off",	smbadm_setprop_writefile,
+	smbadm_getprop_writefile,	smbadm_chkprop_priv	},
 	{"description",	"<string>",	smbadm_setprop_desc,
 	smbadm_getprop_desc,	NULL			},
 };
@@ -1804,6 +1812,30 @@ static int
 smbadm_getprop_tkowner(char *gname, smbadm_prop_t *prop)
 {
 	return (smbadm_group_getpriv(gname, SE_TAKE_OWNERSHIP_LUID, prop));
+}
+
+static int
+smbadm_setprop_readfile(char *gname, smbadm_prop_t *prop)
+{
+	return (smbadm_group_setpriv(gname, SE_READ_FILE_LUID, prop));
+}
+
+static int
+smbadm_getprop_readfile(char *gname, smbadm_prop_t *prop)
+{
+	return (smbadm_group_getpriv(gname, SE_READ_FILE_LUID, prop));
+}
+
+static int
+smbadm_setprop_writefile(char *gname, smbadm_prop_t *prop)
+{
+	return (smbadm_group_setpriv(gname, SE_WRITE_FILE_LUID, prop));
+}
+
+static int
+smbadm_getprop_writefile(char *gname, smbadm_prop_t *prop)
+{
+	return (smbadm_group_getpriv(gname, SE_WRITE_FILE_LUID, prop));
 }
 
 static int
