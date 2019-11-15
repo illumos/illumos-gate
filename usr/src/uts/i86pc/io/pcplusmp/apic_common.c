@@ -25,6 +25,7 @@
 /*
  * Copyright 2019, Joyent, Inc.
  * Copyright (c) 2016, 2017 by Delphix. All rights reserved.
+ * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
  */
 
 /*
@@ -1113,6 +1114,18 @@ apic_calibrate_impl()
 	apic_reg_ops->apic_write(APIC_INIT_COUNT, APIC_MAXVAL);
 
 	iflag = intr_clear();
+
+	/*
+	 * Put the PIT in mode 0, "Interrupt On Terminal Count":
+	 */
+	outb(PITCTL_PORT, PIT_C0 | PIT_LOADMODE | PIT_ENDSIGMODE);
+
+	/*
+	 * The PIT counts down and then the counter value wraps around.  Load
+	 * the maximum counter value:
+	 */
+	outb(PITCTR0_PORT, 0xFF);
+	outb(PITCTR0_PORT, 0xFF);
 
 	do {
 		pit_tick_lo = inb(PITCTR0_PORT);
