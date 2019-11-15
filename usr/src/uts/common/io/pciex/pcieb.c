@@ -122,7 +122,7 @@
  * changes to the negotiated link bandwidth. These events are managed by
  * enabling support for the interrupts in the PCI Express Capability Structure.
  * This is all taken care of by the pcie driver through functions like
- * pcie_link_bw_enabled().
+ * pcie_link_bw_enable().
  *
  * The second aspect of link management the pcieb driver enables is the ability
  * to retrain the link and optionally limit the speed. This is enabled through a
