@@ -459,10 +459,6 @@ viona_rx_common(viona_vring_t *ring, mblk_t *mp, boolean_t is_loopback)
 	mblk_t *mpdrop = NULL, **mpdrop_prevp = &mpdrop;
 	const boolean_t do_merge =
 	    ((link->l_features & VIRTIO_NET_F_MRG_RXBUF) != 0);
-	const boolean_t guest_csum =
-	    ((link->l_features & VIRTIO_NET_F_GUEST_CSUM) != 0);
-	const boolean_t guest_tso4 =
-	    ((link->l_features & VIRTIO_NET_F_GUEST_TSO4) != 0);
 
 	size_t nrx = 0, ndrop = 0;
 
