@@ -574,16 +574,18 @@ c_type()
 		 */
 		new_partitiontable(tptr, oldtype);
 	} else if ((index == other_choice) && (cur_label == L_TYPE_EFI)) {
+		uint64_t start_lba = cur_parts->etoc->efi_first_u_lba;
+
 		maxLBA = get_mlba();
 		cur_parts->etoc->efi_last_lba = maxLBA;
-		cur_parts->etoc->efi_last_u_lba = maxLBA - 34;
+		cur_parts->etoc->efi_last_u_lba = maxLBA - start_lba;
 		for (i = 0; i < cur_parts->etoc->efi_nparts; i++) {
 			cur_parts->etoc->efi_parts[i].p_start = 0;
 			cur_parts->etoc->efi_parts[i].p_size = 0;
 			cur_parts->etoc->efi_parts[i].p_tag = V_UNASSIGNED;
 		}
 		cur_parts->etoc->efi_parts[8].p_start =
-		    maxLBA - 34 - (1024 * 16);
+		    maxLBA - start_lba - (1024 * 16);
 		cur_parts->etoc->efi_parts[8].p_size = (1024 * 16);
 		cur_parts->etoc->efi_parts[8].p_tag = V_RESERVED;
 		if (write_label()) {
@@ -1103,7 +1105,7 @@ currently being used for swapping.\n");
 	 * cause the user to sit for quite awhile with no control, but we
 	 * don't have any other good way of keeping their gun from going off.
 	 */
-	clock = time((time_t *)0);
+	clock = time(NULL);
 	fmt_print("Beginning format. The current time is %s\n",
 	    ctime(&clock));
 	enter_critical();
@@ -1126,7 +1128,7 @@ currently being used for swapping.\n");
 				cur_flags |= LABEL_DIRTY;
 		}
 	} else if (cur_disk->label_type == L_TYPE_EFI) {
-		if (start < 34) {
+		if (start < cur_parts->etoc->efi_first_u_lba) {
 			if (cur_disk->disk_flags & DSK_LABEL)
 				cur_flags |= LABEL_DIRTY;
 		}
