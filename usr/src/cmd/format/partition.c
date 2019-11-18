@@ -80,31 +80,31 @@ maxofN(struct dk_gpt *map)
 	int		i;
 
 	for (i = 0; i < map->efi_nparts - 1; i++) {
-	    start[0] = map->efi_parts[i].p_start;
-	    size[0] = map->efi_parts[i].p_size;
-	    sec_no[0] = start[0] + size[0];
+		start[0] = map->efi_parts[i].p_start;
+		size[0] = map->efi_parts[i].p_size;
+		sec_no[0] = start[0] + size[0];
 
-	    start[1] = map->efi_parts[i+1].p_start;
-	    size[1] = map->efi_parts[i+1].p_size;
-	    sec_no[1] = start[1] + size[1];
+		start[1] = map->efi_parts[i + 1].p_start;
+		size[1] = map->efi_parts[i + 1].p_size;
+		sec_no[1] = start[1] + size[1];
 
-	    if (map->efi_parts[i].p_tag == V_BACKUP) {
-		sec_no[0] = 0;
-	    }
-	    if (map->efi_parts[i+1].p_tag == V_BACKUP) {
-		sec_no[1] = 0;
-	    }
-	    if (i == 0) {
-		max = sec_no[1];
-	    }
-	    if (sec_no[0] > max) {
-		max = sec_no[0];
-	    } else {
-		max = max;
-	    }
+		if (map->efi_parts[i].p_tag == V_BACKUP) {
+			sec_no[0] = 0;
+		}
+		if (map->efi_parts[i+1].p_tag == V_BACKUP) {
+			sec_no[1] = 0;
+		}
+		if (i == 0) {
+			max = sec_no[1];
+		}
+		if (sec_no[0] > max) {
+			max = sec_no[0];
+		} else {
+			max = max;
+		}
 	}
 	if (max == 0)
-	    max = map->efi_first_u_lba;
+		max = map->efi_first_u_lba;
 	return (max);
 }
 
@@ -136,66 +136,66 @@ change_partition(int num)
 	}
 
 	if (cur_label == L_TYPE_EFI) {
-	    if (num > cur_parts->etoc->efi_nparts - 1) {
-		err_print("Invalid partition for EFI label\n");
-		return;
-	    }
-	    print_efi_partition(cur_parts->etoc, num, 1);
-	    fmt_print("\n");
+		if (num > cur_parts->etoc->efi_nparts - 1) {
+			err_print("Invalid partition for EFI label\n");
+			return;
+		}
+		print_efi_partition(cur_parts->etoc, num, 1);
+		fmt_print("\n");
 		/*
 		 * Prompt for p_tag and p_flag values for this partition
 		 */
-	    deflt = cur_parts->etoc->efi_parts[num].p_tag;
-	    if (deflt == V_UNASSIGNED) {
-		deflt = V_USR;
-	    }
-	    (void) sprintf(msg, "Enter partition id tag");
-	    ioparam.io_slist = ptag_choices;
-	    tag = input(FIO_SLIST, msg, ':', &ioparam, &deflt, DATA_INPUT);
+		deflt = cur_parts->etoc->efi_parts[num].p_tag;
+		if (deflt == V_UNASSIGNED) {
+			deflt = V_USR;
+		}
+		(void) sprintf(msg, "Enter partition id tag");
+		ioparam.io_slist = ptag_choices;
+		tag = input(FIO_SLIST, msg, ':', &ioparam, &deflt, DATA_INPUT);
 
-	    deflt = cur_parts->etoc->efi_parts[num].p_flag;
-	    (void) sprintf(msg, "Enter partition permission flags");
-	    ioparam.io_slist = pflag_choices;
-	    flag = input(FIO_SLIST, msg, ':', &ioparam, &deflt, DATA_INPUT);
+		deflt = cur_parts->etoc->efi_parts[num].p_flag;
+		(void) sprintf(msg, "Enter partition permission flags");
+		ioparam.io_slist = pflag_choices;
+		flag = input(FIO_SLIST, msg, ':', &ioparam, &deflt, DATA_INPUT);
 
-	    ioparam.io_bounds.lower = cur_parts->etoc->efi_first_u_lba;
-	    ioparam.io_bounds.upper = cur_parts->etoc->efi_last_u_lba;
+		ioparam.io_bounds.lower = cur_parts->etoc->efi_first_u_lba;
+		ioparam.io_bounds.upper = cur_parts->etoc->efi_last_u_lba;
 
-	    efi_deflt.start_sector = maxofN(cur_parts->etoc);
-	    if ((cur_parts->etoc->efi_parts[num].p_start != 0) &&
-		(cur_parts->etoc->efi_parts[num].p_size != 0)) {
-		    efi_deflt.start_sector =
-			cur_parts->etoc->efi_parts[num].p_start;
-	    }
-	    efi_deflt.end_sector = ioparam.io_bounds.upper -
-					efi_deflt.start_sector;
-	    i64 = input(FIO_INT64, "Enter new starting Sector", ':', &ioparam,
-		(int *)&efi_deflt, DATA_INPUT);
+		efi_deflt.start_sector = maxofN(cur_parts->etoc);
+		if ((cur_parts->etoc->efi_parts[num].p_start != 0) &&
+		    (cur_parts->etoc->efi_parts[num].p_size != 0)) {
+			efi_deflt.start_sector =
+			    cur_parts->etoc->efi_parts[num].p_start;
+		}
+		efi_deflt.end_sector = ioparam.io_bounds.upper -
+		    efi_deflt.start_sector;
+		i64 = input(FIO_INT64, "Enter new starting Sector", ':',
+		    &ioparam, (int *)&efi_deflt, DATA_INPUT);
 
-	    ioparam.io_bounds.lower = 0;
-	    ioparam.io_bounds.upper = cur_parts->etoc->efi_last_u_lba;
-	    efi_deflt.end_sector = cur_parts->etoc->efi_parts[num].p_size;
-	    efi_deflt.start_sector = i64;
-	    j64 = input(FIO_EFI, "Enter partition size", ':', &ioparam,
-		(int *)&efi_deflt, DATA_INPUT);
-	    if (j64 == 0) {
-		tag = V_UNASSIGNED;
-		i64 = 0;
-	    } else if ((j64 != 0) && (tag == V_UNASSIGNED)) {
-		tag = V_USR;
-	    }
+		ioparam.io_bounds.lower = 0;
+		ioparam.io_bounds.upper = cur_parts->etoc->efi_last_u_lba;
+		efi_deflt.end_sector = cur_parts->etoc->efi_parts[num].p_size;
+		efi_deflt.start_sector = i64;
+		j64 = input(FIO_EFI, "Enter partition size", ':', &ioparam,
+		    (int *)&efi_deflt, DATA_INPUT);
+		if (j64 == 0) {
+			tag = V_UNASSIGNED;
+			i64 = 0;
+		} else if ((j64 != 0) && (tag == V_UNASSIGNED)) {
+			tag = V_USR;
+		}
 
-	    if (cur_parts->pinfo_name != NULL)
-		make_partition();
+		if (cur_parts->pinfo_name != NULL)
+			make_partition();
 
-	    cur_parts->etoc->efi_parts[num].p_tag = tag;
-	    cur_parts->etoc->efi_parts[num].p_flag = flag;
-	    cur_parts->etoc->efi_parts[num].p_start = i64;
-	    cur_parts->etoc->efi_parts[num].p_size = j64;
-	/*
-	 * We are now done with EFI part, so return now
-	 */
-	    return;
+		cur_parts->etoc->efi_parts[num].p_tag = tag;
+		cur_parts->etoc->efi_parts[num].p_flag = flag;
+		cur_parts->etoc->efi_parts[num].p_start = i64;
+		cur_parts->etoc->efi_parts[num].p_size = j64;
+		/*
+		 * We are now done with EFI part, so return now
+		 */
+		return;
 	}
 	/*
 	 * Print out the given partition so the user knows what they're
@@ -237,9 +237,11 @@ change_partition(int num)
 		if (tag != V_ALTSCTR) {
 			if (cur_parts->pinfo_map[J_PARTITION].dkl_nblk != 0) {
 				cyl_offset =
-				cur_parts->pinfo_map[J_PARTITION].dkl_cylno +
-				((cur_parts->pinfo_map[J_PARTITION].dkl_nblk +
-				(spc()-1)) / spc());
+				    cur_parts->
+				    pinfo_map[J_PARTITION].dkl_cylno +
+				    ((cur_parts->
+				    pinfo_map[J_PARTITION].dkl_nblk +
+				    (spc() - 1)) / spc());
 			}
 		}
 	}
@@ -247,8 +249,7 @@ change_partition(int num)
 
 	ioparam.io_bounds.lower = 0;
 	ioparam.io_bounds.upper = ncyl - 1;
-	deflt = max(cur_parts->pinfo_map[num].dkl_cylno,
-		cyl_offset);
+	deflt = max(cur_parts->pinfo_map[num].dkl_cylno, cyl_offset);
 	i = (uint_t)input(FIO_INT, "Enter new starting cyl", ':', &ioparam,
 	    &deflt, DATA_INPUT);
 
@@ -257,9 +258,8 @@ change_partition(int num)
 
 	/* fill in defaults for the current partition */
 	p_deflt.start_cyl = i;
-	p_deflt.deflt_size =
-		min(cur_parts->pinfo_map[num].dkl_nblk,
-		    ioparam.io_bounds.upper);
+	p_deflt.deflt_size = min(cur_parts->pinfo_map[num].dkl_nblk,
+	    ioparam.io_bounds.upper);
 
 	/* call input, passing p_deflt's address, typecast to (int *) */
 	j = (uint_t)input(FIO_ECYL, "Enter partition size", ':', &ioparam,
@@ -378,18 +378,18 @@ get_partition()
 	 */
 	enter_critical();
 	for (pptr = parts; pptr != NULL; pptr = pptr->pinfo_next) {
-	    if (cur_dtype->dtype_asciilabel) {
-		if (pptr->pinfo_name != NULL && strcmp(pptr->pinfo_name,
-				cur_dtype->dtype_asciilabel) == 0) {
-			/*
-			 * Set current partition and name it.
-			 */
-			cur_disk->disk_parts = cur_parts = pptr;
-			cur_parts->pinfo_name = pptr->pinfo_name;
-			exit_critical();
-			return (0);
+		if (cur_dtype->dtype_asciilabel) {
+			if (pptr->pinfo_name != NULL && strcmp(pptr->pinfo_name,
+			    cur_dtype->dtype_asciilabel) == 0) {
+				/*
+				 * Set current partition and name it.
+				 */
+				cur_disk->disk_parts = cur_parts = pptr;
+				cur_parts->pinfo_name = pptr->pinfo_name;
+				exit_critical();
+				return (0);
+			}
 		}
-	    }
 	}
 	/*
 	 * If we couldn't find a match, take the first one.
@@ -436,18 +436,19 @@ make_partition()
 	 * If there was a current map, copy its values.
 	 */
 	if (cur_label == L_TYPE_EFI) {
-	    struct dk_gpt	*map;
-	    int			nparts;
-	    int			size;
+		struct dk_gpt	*map;
+		int		nparts;
+		int		size;
 
-	    nparts = cur_parts->etoc->efi_nparts;
-	    size = sizeof (struct dk_part) * nparts + sizeof (struct dk_gpt);
-	    map = zalloc(size);
-	    (void) memcpy(map, cur_parts->etoc, size);
-	    pptr->etoc = map;
-	    cur_disk->disk_parts = cur_parts = pptr;
-	    exit_critical();
-	    return;
+		nparts = cur_parts->etoc->efi_nparts;
+		size = sizeof (struct dk_part) * nparts +
+		    sizeof (struct dk_gpt);
+		map = zalloc(size);
+		(void) memcpy(map, cur_parts->etoc, size);
+		pptr->etoc = map;
+		cur_disk->disk_parts = cur_parts = pptr;
+		exit_critical();
+		return;
 	}
 	if (cur_parts != NULL) {
 		for (i = 0; i < NDKMAP; i++) {
