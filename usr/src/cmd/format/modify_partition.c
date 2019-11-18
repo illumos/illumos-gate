@@ -564,7 +564,8 @@ get_user_map_efi(map, float_part)
 
 	reserved = efi_reserved_sectors(map);
 	for (i = 0; i < map->efi_nparts - 1; i++) {
-		if (i == float_part)
+		/* GPT partition 7 is whole disk device, minor node "wd" */
+		if (i == float_part || i == 7)
 			continue;
 
 		ioparam.io_bounds.lower = start_lba;
