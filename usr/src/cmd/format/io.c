@@ -1561,7 +1561,7 @@ or g(gigabytes)\n");
 
 			reserved = efi_reserved_sectors(cur_parts->etoc);
 			return (bounds->upper - reserved -
-			    efi_deflt->start_sector);
+			    efi_deflt->start_sector + 1);
 		}
 
 		/*
