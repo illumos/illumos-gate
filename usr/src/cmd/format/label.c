@@ -55,40 +55,22 @@
 #define	WD_NODE		7
 #endif
 
-#ifdef	__STDC__
-/*
- * Prototypes for ANSI C compilers
- */
 static int	do_geometry_sanity_check(void);
-static int	vtoc_to_label(struct dk_label *label, struct extvtoc *vtoc,
-		struct dk_geom *geom, struct dk_cinfo *cinfo);
+static int	vtoc_to_label(struct dk_label *, struct extvtoc *,
+		struct dk_geom *, struct dk_cinfo *);
 extern int	read_extvtoc(int, struct extvtoc *);
 extern int	write_extvtoc(int, struct extvtoc *);
 static int	vtoc64_to_label(struct efi_info *, struct dk_gpt *);
 
-#else	/* __STDC__ */
-
-/*
- * Prototypes for non-ANSI C compilers
- */
-static int	do_geometry_sanity_check();
-static int	vtoc_to_label();
-extern int	read_extvtoc();
-extern int	write_extvtoc();
-static int	vtoc64_to_label();
-
-#endif	/* __STDC__ */
-
 #ifdef	DEBUG
-static void dump_label(struct dk_label *label);
+static void dump_label(struct dk_label *);
 #endif
 
 /*
  * This routine checks the given label to see if it is valid.
  */
 int
-checklabel(label)
-	register struct dk_label *label;
+checklabel(struct dk_label *label)
 {
 
 	/*
@@ -109,12 +91,10 @@ checklabel(label)
  * the mode it is called in.
  */
 int
-checksum(label, mode)
-	struct	dk_label *label;
-	int	mode;
+checksum(struct	dk_label *label, int mode)
 {
-	register short *sp, sum = 0;
-	register short count = (sizeof (struct dk_label)) / (sizeof (short));
+	short *sp, sum = 0;
+	short count = (sizeof (struct dk_label)) / (sizeof (short));
 
 	/*
 	 * If we are generating a checksum, don't include the checksum
@@ -152,10 +132,9 @@ checksum(label, mode)
  * and truncate it there.
  */
 int
-trim_id(id)
-	char	*id;
+trim_id(char *id)
 {
-	register char *c;
+	char *c;
 
 	/*
 	 * Start at the end of the string.  When we match the word ' cyl',
@@ -167,7 +146,8 @@ trim_id(id)
 			 * Remove any white space.
 			 */
 			for (; (((*(c - 1) == ' ') || (*(c - 1) == '\t')) &&
-				(c >= id)); c--);
+			    (c >= id)); c--)
+				;
 			break;
 		}
 	}
@@ -222,13 +202,15 @@ int
 SMI_vtoc_to_EFI(int fd, struct dk_gpt **new_vtoc)
 {
 	int i;
-	struct dk_gpt	*efi;
+	struct dk_gpt *efi;
+	uint64_t reserved;
 
 	if (efi_alloc_and_init(fd, EFI_NUMPAR, new_vtoc) != 0) {
 		err_print("SMI vtoc to EFI failed\n");
 		return (-1);
 	}
 	efi = *new_vtoc;
+	reserved = efi_reserved_sectors(efi);
 
 	/*
 	 * create a clear EFI partition table:
@@ -239,7 +221,7 @@ SMI_vtoc_to_EFI(int fd, struct dk_gpt **new_vtoc)
 	efi->efi_parts[0].p_tag = V_USR;
 	efi->efi_parts[0].p_start = efi->efi_first_u_lba;
 	efi->efi_parts[0].p_size = efi->efi_last_u_lba - efi->efi_first_u_lba
-	    - EFI_MIN_RESV_SIZE + 1;
+	    - reserved + 1;
 
 	/*
 	 * s1-s6 are unassigned slices
@@ -255,8 +237,8 @@ SMI_vtoc_to_EFI(int fd, struct dk_gpt **new_vtoc)
 	 */
 	efi->efi_parts[efi->efi_nparts - 1].p_tag = V_RESERVED;
 	efi->efi_parts[efi->efi_nparts - 1].p_start =
-	    efi->efi_last_u_lba - EFI_MIN_RESV_SIZE + 1;
-	efi->efi_parts[efi->efi_nparts - 1].p_size = EFI_MIN_RESV_SIZE;
+	    efi->efi_last_u_lba - reserved + 1;
+	efi->efi_parts[efi->efi_nparts - 1].p_size = reserved;
 
 	return (0);
 }
@@ -1001,14 +983,16 @@ is_efi_type(int fd)
 void
 err_check(struct dk_gpt *vtoc)
 {
-	int			resv_part = -1;
-	int			i, j;
-	diskaddr_t		istart, jstart, isize, jsize, endsect;
-	int			overlap = 0;
+	int		resv_part = -1;
+	int		i, j;
+	diskaddr_t	istart, jstart, isize, jsize, endsect;
+	int		overlap = 0;
+	uint_t		reserved;
 
 	/*
 	 * make sure no partitions overlap
 	 */
+	reserved = efi_reserved_sectors(vtoc);
 	for (i = 0; i < vtoc->efi_nparts; i++) {
 		/* It can't be unassigned and have an actual size */
 		if ((vtoc->efi_parts[i].p_tag == V_UNASSIGNED) &&
@@ -1026,10 +1010,10 @@ err_check(struct dk_gpt *vtoc)
 "found duplicate reserved partition at %d\n", i);
 			}
 			resv_part = i;
-			if (vtoc->efi_parts[i].p_size != EFI_MIN_RESV_SIZE)
+			if (vtoc->efi_parts[i].p_size != reserved)
 				(void) fprintf(stderr,
-"Warning: reserved partition size must be %d sectors\n",
-				    EFI_MIN_RESV_SIZE);
+"Warning: reserved partition size must be %u sectors\n",
+				    reserved);
 		}
 		if ((vtoc->efi_parts[i].p_start < vtoc->efi_first_u_lba) ||
 		    (vtoc->efi_parts[i].p_start > vtoc->efi_last_u_lba)) {
@@ -1088,8 +1072,7 @@ err_check(struct dk_gpt *vtoc)
 
 #ifdef	DEBUG
 static void
-dump_label(label)
-	struct dk_label	*label;
+dump_label(struct dk_label *label)
 {
 	int		i;
 
@@ -1141,8 +1124,8 @@ dump_label(label)
 
 #if defined(_SUNOS_VTOC_8)
 		fmt_print("%c:        cyl=%d, blocks=%d", i+'a',
-			label->dkl_map[i].dkl_cylno,
-			label->dkl_map[i].dkl_nblk);
+		    label->dkl_map[i].dkl_cylno,
+		    label->dkl_map[i].dkl_nblk);
 
 #elif defined(_SUNOS_VTOC_16)
 		fmt_print("%c:        start=%u, blocks=%u", i+'a',
@@ -1153,8 +1136,8 @@ dump_label(label)
 #endif				/* defined(_SUNOS_VTOC_8) */
 
 		fmt_print(",  tag=%d,  flag=%d",
-			label->dkl_vtoc.v_part[i].p_tag,
-			label->dkl_vtoc.v_part[i].p_flag);
+		    label->dkl_vtoc.v_part[i].p_tag,
+		    label->dkl_vtoc.v_part[i].p_flag);
 		fmt_print("\n");
 	}
 
