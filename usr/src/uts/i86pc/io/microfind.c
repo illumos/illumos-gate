@@ -91,7 +91,7 @@ microfind_pit_delta(void)
 	 * until we write the low byte and then the high byte to the counter
 	 * port.
 	 */
-	outb(PITCTL_PORT, PIT_LOADMODE);
+	outb(PITCTL_PORT, PIT_C0 | PIT_LOADMODE | PIT_ENDSIGMODE);
 
 	/*
 	 * Load the maximum counter value, 0xffff, into the counter port.

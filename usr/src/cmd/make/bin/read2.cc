@@ -493,13 +493,13 @@ find_target_groups(register Name_vector target_list, register int i, Boolean res
 		  &target_list->next->names[0] : NULL;
 	}
 	/* We have four states here :
-	 *	0:	No target group started and next element is not "+" 
+	 *	0:	No target group started and next element is not "+"
 	 *		This is not interesting.
-	 *	1:	A target group is being built and the next element 
+	 *	1:	A target group is being built and the next element
 	 *		is not "+". This terminates the group.
-	 *	2:	No target group started and the next member is "+" 
+	 *	2:	No target group started and the next member is "+"
 	 *		This is the first target in a group.
-	 *	3:	A target group started and the next member is a "+" 
+	 *	3:	A target group started and the next member is a "+"
 	 *		The group continues.
 	 */
 	switch ((target_group ? 1 : 0) +
@@ -638,7 +638,7 @@ enter_dependencies(register Name target, Chain target_group, register Name_vecto
 			if ((line->body.recursive.directory == directory) &&
 			    (line->body.recursive.target == name)) {
 				line->body.recursive.makefiles = dp;
-				line->body.recursive.has_built = 
+				line->body.recursive.has_built =
 				  (Boolean)
 				    (makefile_type == reading_cpp_file);
 				return;
@@ -648,7 +648,7 @@ enter_dependencies(register Name target, Chain target_group, register Name_vecto
 		line2->body.recursive.directory = directory;
 		line2->body.recursive.target = name;
 		line2->body.recursive.makefiles = dp;
-		line2->body.recursive.has_built = 
+		line2->body.recursive.has_built =
 		    (Boolean) (makefile_type == reading_cpp_file);
 		line2->body.recursive.in_depinfo = false;
 		return;
@@ -1106,9 +1106,9 @@ enter_dyntarget(register Name target)
  *
  *	Global variables used:
  *		all_parallel	Set to indicate that everything runs parallel
- *		svr4 		Set when ".SVR4" target is read
+ *		svr4		Set when ".SVR4" target is read
  *		svr4_name	The Name ".SVR4"
- *		posix 		Set when ".POSIX" target is read
+ *		posix		Set when ".POSIX" target is read
  *		posix_name	The Name ".POSIX"
  *		current_make_version The Name "<current version number>"
  *		default_rule	Set when ".DEFAULT" target is read
@@ -1234,7 +1234,7 @@ special_reader(Name target, register Name_vector depes, Cmd_line command)
 		  break;
 		if(posix)
 		  break;
-			/* it's not necessary to specify KEEP_STATE, if this 
+			/* it's not necessary to specify KEEP_STATE, if this
 			** is given, so set the keep_state.
 			*/
 		keep_state = true;
@@ -1689,7 +1689,7 @@ enter_conditional(register Name target, Name name, Name value, register Boolean 
 	if (target->percent) {
 		target = conditionals;
 	}
-	
+
 	if (name->colon) {
 		sh_transform(&name, &value);
 	}

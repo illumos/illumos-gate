@@ -61,7 +61,7 @@ static int line_started_with_space=0; // Used to diagnose spaces instead of tabs
  */
 static	void		parse_makefile(register Name true_makefile_name, register Source source);
 static	Source		push_macro_value(register Source bp, register wchar_t *buffer, int size, register Source source);
-extern  void 		enter_target_groups_and_dependencies(Name_vector target, Name_vector depes, Cmd_line command, Separator separator, Boolean target_group_seen);
+extern  void		enter_target_groups_and_dependencies(Name_vector target, Name_vector depes, Cmd_line command, Separator separator, Boolean target_group_seen);
 extern	Name		normalize_name(register wchar_t *name_string, register int length);
 
 /*
@@ -111,7 +111,7 @@ read_simple_file(register Name makefile_name, register Boolean chase_path, regis
 	int			previous_line_number = line_number;
 	wchar_t			previous_current_makefile[MAXPATHLEN];
 	Makefile_type		save_makefile_type;
-	Name 			normalized_makefile_name;
+	Name			normalized_makefile_name;
 	register wchar_t        *string_start;
 	register wchar_t        *string_end;
 
@@ -152,7 +152,7 @@ read_simple_file(register Name makefile_name, register Boolean chase_path, regis
 				asprintf(&path, "%s/../../share/", pfx);
 				add_dir_to_path(path, &makefile_path, -1);
 				free(path);
-				    
+
 				add_dir_to_path("/usr/share/lib/make",
 						&makefile_path,
 						-1);
@@ -169,7 +169,7 @@ read_simple_file(register Name makefile_name, register Boolean chase_path, regis
 				string_start=get_wstring(makefile_name->string_mb);
 				for (string_end=string_start+1; *string_end != L'\0'; string_end++);
 				normalized_makefile_name=normalize_name(string_start, string_end - string_start);
-				if ((strcmp(makefile_name->string_mb, normalized_makefile_name->string_mb) == 0) || 
+				if ((strcmp(makefile_name->string_mb, normalized_makefile_name->string_mb) == 0) ||
 					(doname(normalized_makefile_name, true, false) == build_dont_know)) {
 					n = access_vroot(makefile_name->string_mb,
 						 4,
@@ -190,13 +190,13 @@ read_simple_file(register Name makefile_name, register Boolean chase_path, regis
 					}
 				}
 				retmem(string_start);
-				/* 
+				/*
 				 * Commented out: retmem_mb(normalized_makefile_name->string_mb);
 				 * We have to return this memory, but it seems to trigger a bug
 				 * in dmake or in Sun C++ 5.7 compiler (it works ok if this code
 				 * is compiled using Sun C++ 5.6).
 				 */
-				// retmem_mb(normalized_makefile_name->string_mb); 
+				// retmem_mb(normalized_makefile_name->string_mb);
 			}
 			makefile_type = save_makefile_type;
 		}
@@ -204,7 +204,7 @@ read_simple_file(register Name makefile_name, register Boolean chase_path, regis
 		source->previous = NULL;
 		source->already_expanded = false;
 		/* Lock the file for read, but not when -n. */
-		if (lock_makefile && 
+		if (lock_makefile &&
 		    !do_not_exec_rule) {
 
 			 make_state_lockfile = getmem(strlen(make_state->string_mb) + strlen(".lock") + 1);
@@ -504,7 +504,7 @@ parse_makefile(register Name true_makefile_name, register Source source)
 	static wchar_t		include_tab[10];
 	int			tmp_bytes_left_in_string;
 	Boolean			tmp_maybe_include = false;
-	int    			emptycount = 0;
+	int			emptycount = 0;
 	Boolean			first_target;
 
 	String_rec		include_name;
@@ -806,18 +806,18 @@ start_new_line_no_skip:
 
 			/* Strip "./" from the head of the name */
 			if ((name_start[0] == (int) period_char) &&
-	    		   (name_start[1] == (int) slash_char)) {
+			   (name_start[1] == (int) slash_char)) {
 				name_start += 2;
 				name_length -= 2;
 			}
 			/* if include file name is surrounded by double quotes */
 			if ((name_start[0] == (int) doublequote_char) &&
 			    (name_start[name_length - 1] == (int) doublequote_char)) {
-			    	name_start += 1;
-			    	name_length -= 2;
+				name_start += 1;
+				name_length -= 2;
 
-			    	/* if name does not begin with a slash char */
-			    	if (name_start[0] != (int) slash_char) {
+				/* if name does not begin with a slash char */
+				if (name_start[0] != (int) slash_char) {
 					if ((name_start[0] == (int) period_char) &&
 					    (name_start[1] == (int) slash_char)) {
 						name_start += 2;
@@ -837,7 +837,7 @@ start_new_line_no_skip:
 							      name_length);
 
 						name_start = include_name.buffer.start;
-						name_length = include_name.text.p - name_start; 
+						name_length = include_name.text.p - name_start;
 					}
 				}
 			}
@@ -889,7 +889,7 @@ start_new_line_no_skip:
 		}
 	    } else {
 		/* Check if the word include was split across 8K boundary. */
-		
+
 		tmp_bytes_left_in_string = source->string.text.end - source_p;
 		if (tmp_bytes_left_in_string < 8) {
 			tmp_maybe_include = false;
@@ -1299,7 +1299,7 @@ case scan_name_state:
 			/*
 			** following code drops the target separator plus char if it starts
 			** a line.
-			*/ 
+			*/
 			if(first_target && !macro_seen_in_string &&
 					source_p == string_start) {
 				for (; 1; source_p++)
@@ -1485,7 +1485,7 @@ case scan_name_state:
 					separator = equal_seen;
 					on_eoln_state = enter_equal_state;
 					break;
-				} 
+				}
 				if(svr4) {
 				  fatal_reader(gettext("syntax error"));
 				}
@@ -1554,7 +1554,7 @@ case scan_name_state:
 						goto macro_value_start;
 					} else {
                                             if (source->fd >= 0) {
-                                            	line_number++;
+						line_number++;
                                             }
                                         }
 					break;
@@ -1816,7 +1816,7 @@ case scan_name_state:
 
 	/* We read all the command lines for the target/dependency line. */
 	/* Enter the stuff */
-	enter_target_groups_and_dependencies( &target, &depes, command, 
+	enter_target_groups_and_dependencies( &target, &depes, command,
 					     separator, target_group_seen);
 
 	goto start_new_line;
@@ -2056,26 +2056,26 @@ push_macro_value(register Source bp, register wchar_t *buffer, int size, registe
  *					     target_group_seen)
  *
  *	Parameters:
- *		target 		Structure that shows the target(s) on the line
+ *		target		Structure that shows the target(s) on the line
  *				we are currently parsing. This can looks like
  *				target1 .. targetN : dependencies
- *						  	commands
+ *							commands
  *				or
  *				target1 + .. + targetN : dependencies
  *							 commands
  *		depes		Dependencies
- *		command		Points to the command(s) to be executed for 
+ *		command		Points to the command(s) to be executed for
  *				this target.
  *		separator	: or :: or :=
  *		target_group_seen	Set if we have target1 + .. + targetN
- *		
- *		
- * 	After reading the command lines for a target, this routine 
+ *
+ *
+ *	After reading the command lines for a target, this routine
  *	is called to setup the dependencies and the commands for it.
- * 	If the target is a % pattern or part of a target group, then 
- *  	the appropriate routines are called.
+ *	If the target is a % pattern or part of a target group, then
+ *	the appropriate routines are called.
  */
-	
+
 void
 enter_target_groups_and_dependencies(Name_vector target, Name_vector depes, Cmd_line command, Separator separator, Boolean target_group_seen)
 {
@@ -2099,23 +2099,23 @@ enter_target_groups_and_dependencies(Name_vector target, Name_vector depes, Cmd_
 				/* If we saw it in the makefile it must be
 				 * a file */
 				target->names[i]->stat.is_file = true;
-				/* Make sure that we use dependencies 
+				/* Make sure that we use dependencies
 				 * entered for makefiles */
 				target->names[i]->state = build_dont_know;
 
-				/* If the target is special we delegate 
+				/* If the target is special we delegate
 				 * the processing */
-				if (target->names[i]->special_reader 
+				if (target->names[i]->special_reader
 				    != no_special) {
-					special_reader(target->names[i], 
-						       depes, 
+					special_reader(target->names[i],
+						       depes,
 						       command);
-				}	
+				}
 				/* Check if this is a "a%b : x%y" type rule */
 				else if (target->names[i]->percent) {
-					percent_ptr = 
-					  enter_percent(target->names[i], 
-							target->target_group[i], 
+					percent_ptr =
+					  enter_percent(target->names[i],
+							target->target_group[i],
 							depes, command);
 					if (target_group_seen) {
 						target_group_member->percent_member =
@@ -2126,7 +2126,7 @@ enter_target_groups_and_dependencies(Name_vector target, Name_vector depes, Cmd_
 					enter_dependencies
 					  (target->names[i],
 					   target->target_group[i],
-					   depes,	
+					   depes,
 					   command,
 					   separator);
 				} else {
@@ -2134,11 +2134,11 @@ enter_target_groups_and_dependencies(Name_vector target, Name_vector depes, Cmd_
 						target_group_member->percent_member =
 						  NULL;
 					}
-				
+
 					enter_dependencies
 					  (target->names[i],
 					   target->target_group[i],
-					   depes,	
+					   depes,
 					   command,
 					   separator);
 				}
@@ -2146,5 +2146,3 @@ enter_target_groups_and_dependencies(Name_vector target, Name_vector depes, Cmd_
 		}
 	}
 }
-				     
-

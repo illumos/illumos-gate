@@ -31,7 +31,7 @@
 
 /*
  * Included files
- */ 
+ */
 #include <mk/defs.h>
 #include <mksh/misc.h>		/* retmem() */
 #include <vroot/report.h>	/* NSE_DEPINFO */
@@ -73,7 +73,7 @@ report_recursive_init(void)
 	wchar_t		*line;
 	wchar_t		*bigger_line;
 	wchar_t		*colon;
-	wchar_t		*dollar; 
+	wchar_t		*dollar;
 	Recursive_make	rp;
 
 	/*
@@ -85,7 +85,7 @@ report_recursive_init(void)
 	} else {
 		depinfo_already_read = true;
 	}
-					
+
 	search_dir = getenv("NSE_DEP");
 	if (search_dir == NULL) {
 		return;
@@ -138,10 +138,10 @@ report_recursive_init(void)
 			 */
 			rp->oldline = (wchar_t *) wcsdup(line);
 			if ( dollar != NULL ){
-				rp->cond_macrostring = 
+				rp->cond_macrostring =
 				    (wchar_t *) wcsdup(dollar - VER_LEN + 1);
 			}
-			/* 
+			/*
 			 * get target name into recursive struct
 			 */
 			*colon = (int) nul_char;
@@ -174,7 +174,7 @@ report_recursive_dep(Name target, wchar_t *line)
 
 	INIT_STRING_FROM_STACK(string, rec_buf);
 	cond_macros_into_string(target, &string);
-	/* 
+	/*
 	 * find an applicable recursive entry, if there isn't one, create it
 	 */
 	rp = find_recursive_target(target);
@@ -207,7 +207,7 @@ report_recursive_dep(Name target, wchar_t *line)
  *
  *	Parameters:
  *		target		The target we need
- *		top_level_target more info used to determinde the 
+ *		top_level_target more info used to determinde the
  *				 target we need
  *
  *	Static variables used:
@@ -218,7 +218,7 @@ find_recursive_target(Name target)
 {
 	Recursive_make	rp;
 	String_rec	string;
-	wchar_t		rec_buf[STRING_BUFFER_LENGTH]; 
+	wchar_t		rec_buf[STRING_BUFFER_LENGTH];
 
 	INIT_STRING_FROM_STACK(string, rec_buf);
 	cond_macros_into_string(target, &string);
@@ -226,12 +226,12 @@ find_recursive_target(Name target)
 	Wstring tstr(target);
 	wchar_t * wcb = tstr.get_string();
 	for (rp = recursive_list; rp != NULL; rp = rp->next) {
-		/* 
+		/*
 		 * If this entry has already been removed, ignore it.
 		 */
 		if (rp->removed)
 			continue;
-		/* 
+		/*
 		 * If this target, and the target on the list are the same
 		 * and if one of them contains conditional macro info, while
 		 * the other doesn't,  remove this entry from the list of
@@ -247,7 +247,7 @@ find_recursive_target(Name target)
 			    string.buffer.start[VER_LEN] == '\0'){
 				rp->removed = true;
 				continue;
-			} 
+			}
 		}
 		/*
 		 * If this is not a VERS2 entry,  only need to match
@@ -255,8 +255,8 @@ find_recursive_target(Name target)
 		 * are ignored.
 		 */
 		MBSTOWCS(wcs_buffer, DEPINFO_FMT_VERSION);
-		if (IS_WEQUALN(wcs_buffer, string.buffer.start, VER_LEN)) { 
-			if (IS_WEQUAL(rp->cond_macrostring, 
+		if (IS_WEQUALN(wcs_buffer, string.buffer.start, VER_LEN)) {
+			if (IS_WEQUAL(rp->cond_macrostring,
 			    string.buffer.start) &&
 			    IS_WEQUAL(rp->target, wcb)) {
 				return rp;
@@ -277,7 +277,7 @@ find_recursive_target(Name target)
  *
  *	Parameters:
  *		target		The target we want to remove
- *		top_level_target target we want to remove must be built from 
+ *		top_level_target target we want to remove must be built from
  *				 the same top level target
  *
  *	Static variables used:
@@ -291,7 +291,7 @@ remove_recursive_dep(Name target)
 	rp = find_recursive_target(target);
 
 	if ( rp != NULL ) {
-		rp->removed = true;	
+		rp->removed = true;
 		changed = true;
 		if(rp->target) {
 			retmem(rp->target);
@@ -315,7 +315,7 @@ remove_recursive_dep(Name target)
 
 /* gather_recursive_deps()
  *
- *	Create or update list of recursive targets.  
+ *	Create or update list of recursive targets.
  */
 void
 gather_recursive_deps(void)
@@ -333,18 +333,18 @@ gather_recursive_deps(void)
 	for (np = hashtab.begin(), e = hashtab.end(); np != e; np++) {
 		if (np->has_recursive_dependency){
 			has_recursive = false;
-			/* 
+			/*
 			 * start .RECURSIVE line with target:
 			 */
 			INIT_STRING_FROM_STACK(rec, rec_buf);
 			APPEND_NAME(np, &rec, FIND_LENGTH);
 			append_char((int) colon_char, &rec);
 			append_char((int) space_char, &rec);
-			
-			for (lines = get_prop(np->prop,recursive_prop); 
+
+			for (lines = get_prop(np->prop,recursive_prop);
 			    lines != NULL;
 			    lines = get_prop(lines->next, recursive_prop)) {
-				/* 
+				/*
 				 * if entry is already in depinfo
 				 * file or entry was not built, ignore it
 				 */
@@ -354,12 +354,12 @@ gather_recursive_deps(void)
 					continue;
 				has_recursive = true;
 				lines->body.recursive.in_depinfo=true;
-				
-				/* 
+
+				/*
 				* Write the remainder of the
-				* .RECURSIVE line 
+				* .RECURSIVE line
 				*/
-				APPEND_NAME(recursive_name, &rec, 
+				APPEND_NAME(recursive_name, &rec,
 				    FIND_LENGTH);
 				append_char((int) space_char, &rec);
 				APPEND_NAME(lines->body.recursive.directory,
@@ -368,16 +368,16 @@ gather_recursive_deps(void)
 				APPEND_NAME(lines->body.recursive.target,
 					&rec, FIND_LENGTH);
 				append_char((int) space_char, &rec);
-				
+
 				/* Complete list of makefiles used */
-				for (dp = lines->body.recursive.makefiles; 
-				    dp != NULL; 
+				for (dp = lines->body.recursive.makefiles;
+				    dp != NULL;
 				    dp = dp->next) {
 					APPEND_NAME(dp->name, &rec,  FIND_LENGTH);
 					append_char((int) space_char, &rec);
 				}
-			}  
-			/* 
+			}
+			/*
 			 * dump list of conditional targets,
 			 * and report recursive entry, if needed
 			 */

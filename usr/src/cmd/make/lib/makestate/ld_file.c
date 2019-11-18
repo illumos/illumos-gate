@@ -41,28 +41,26 @@
  */
 
 struct Stritem {
-	char *		str;
-	void *		next;
+	char		*str;
+	void		*next;
 };
 
-typedef struct Stritem 	Stritem;
+typedef struct Stritem	Stritem;
 
-static char 		* depend_file = NULL;
-static Stritem		* list = NULL;
+static char		*depend_file = NULL;
+static Stritem		*list = NULL;
 
-
-void mk_state_init()
+void
+mk_state_init(void)
 {
 	depend_file = getenv(SUNPRO_DEPENDENCIES);
 } /* mk_state_init() */
 
-
-
 static void
-prepend_str(Stritem **list, const char * str)
+prepend_str(Stritem **list, const char *str)
 {
-	Stritem * new;
-	char 	* newstr;
+	Stritem *new;
+	char	*newstr;
 
 	if (!(new = calloc(1, sizeof (Stritem)))) {
 		perror("libmakestate.so");
@@ -80,9 +78,8 @@ prepend_str(Stritem **list, const char * str)
 
 } /* prepend_str() */
 
-
 void
-mk_state_collect_dep(const char * file)
+mk_state_collect_dep(const char *file)
 {
 	/*
 	 * SUNPRO_DEPENDENCIES wasn't set, we don't collect .make.state
@@ -95,14 +92,13 @@ mk_state_collect_dep(const char * file)
 
 }  /* mk_state_collect_dep() */
 
-
 void
 mk_state_update_exit()
 {
-	Stritem 	* cur;
-	char		  lockfile[MAXPATHLEN],	* err, * space, * target;
-	FILE		* ofp;
-	extern char 	* file_lock(char *, char *, int);
+	Stritem		*cur;
+	char		  lockfile[MAXPATHLEN],	*err, *space, *target;
+	FILE		*ofp;
+	extern char	*file_lock(char *, char *, int);
 
 	if (!depend_file)
 		return;
@@ -136,18 +132,16 @@ mk_state_update_exit()
 } /* mk_state_update_exit() */
 
 static void
-/* LINTED static unused */
 ld_support_init()
 {
 	mk_state_init();
 
 } /* ld_support_init() */
 
-/* ARGSUSED */
 void
-ld_file(const char * file, const Elf_Kind ekind, int flags, Elf *elf)
+ld_file(const char *file, const Elf_Kind ekind, int flags, Elf *elf)
 {
-	if(! ((flags & LD_SUP_DERIVED) && !(flags & LD_SUP_EXTRACTED)))
+	if (!((flags & LD_SUP_DERIVED) && !(flags & LD_SUP_EXTRACTED)))
 		return;
 
 	mk_state_collect_dep(file);
@@ -158,7 +152,7 @@ void
 ld_atexit(int exit_code)
 {
 	if (exit_code)
-	   return;
+		return;
 
 	mk_state_update_exit();
 
@@ -168,9 +162,9 @@ ld_atexit(int exit_code)
  * Supporting 64-bit objects
  */
 void
-ld_file64(const char * file, const Elf_Kind ekind, int flags, Elf *elf)
+ld_file64(const char *file, const Elf_Kind ekind, int flags, Elf *elf)
 {
-	if(! ((flags & LD_SUP_DERIVED) && !(flags & LD_SUP_EXTRACTED)))
+	if (!((flags & LD_SUP_DERIVED) && !(flags & LD_SUP_EXTRACTED)))
 		return;
 
 	mk_state_collect_dep(file);
@@ -181,7 +175,7 @@ void
 ld_atexit64(int exit_code)
 {
 	if (exit_code)
-	   return;
+		return;
 
 	mk_state_update_exit();
 

@@ -157,7 +157,7 @@ xen_set_version(xen_version_t idx)
 	 * The revision is buried in the extraversion information that is
 	 * maintained by the hypervisor. For our purposes we expect that
 	 * the revision number is:
-	 * 	- the second character in the extraversion information
+	 *	- the second character in the extraversion information
 	 *	- one character long
 	 *	- numeric digit
 	 * If it isn't then we can't extract the revision and we leave it
@@ -637,9 +637,8 @@ xen_suspend_domain(void)
 	cmn_err(CE_NOTE, "domain restore/migrate completed");
 }
 
-/*ARGSUSED*/
-int
-xen_debug_handler(void *arg)
+uint_t
+xen_debug_handler(caddr_t arg __unused, caddr_t arg1 __unused)
 {
 	debug_enter("External debug event received");
 
@@ -712,7 +711,7 @@ retry:
 	 * harmless sysrq to the wrong domain...
 	 */
 	if (key == 'b')
-		(void) xen_debug_handler(NULL);
+		(void) xen_debug_handler(NULL, NULL);
 	else
 		cmn_err(CE_WARN, "Ignored sysrq %c", key);
 	return;
@@ -806,7 +805,7 @@ xen_shutdown(void *arg)
 /*ARGSUSED*/
 static void
 xen_shutdown_handler(struct xenbus_watch *watch, const char **vec,
-	unsigned int len)
+    unsigned int len)
 {
 	char *str;
 	xenbus_transaction_t xbt;

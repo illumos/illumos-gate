@@ -55,8 +55,6 @@ all: $(LIBS)
 
 install: all
 
-lint:
-
 $(POFILE): $(POFILES)
 	$(CAT) $(POFILES) > $@
 

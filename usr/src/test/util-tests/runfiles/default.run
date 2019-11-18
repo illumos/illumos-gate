@@ -14,6 +14,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2019 Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 [DEFAULT]
@@ -59,6 +60,7 @@ timeout = 300
 [/opt/util-tests/tests/grep_test]
 [/opt/util-tests/tests/date_test]
 [/opt/util-tests/tests/chown_test]
+[/opt/util-tests/tests/make_test]
 
 [/opt/util-tests/tests/demangle]
 tests = ['afl-fast', 'gcc-libstdc++', 'llvm-stdcxxabi']

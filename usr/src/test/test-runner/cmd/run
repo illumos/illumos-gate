@@ -14,7 +14,7 @@
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 import ConfigParser
@@ -46,6 +46,8 @@ if os.path.isfile('/usr/bin/sudo'):
 else:
     SUDO = '/opt/local/bin/sudo'
 
+
+retcode = 0
 
 # Custom class to reopen the log file in case it is forcibly closed by a test.
 class WatchedFileHandlerClosed(WatchedFileHandler):
@@ -92,6 +94,8 @@ class Result(object):
 	Report SKIP for return codes 3,4 (NOTINUSE, UNSUPPORTED)
 	as defined in ../stf/include/stf.shlib
         """
+        global retcode
+
         Result.total += 1
         m, s = divmod(time() - self.starttime, 60)
         self.runtime = '%02d:%02d' % (m, s)
@@ -99,6 +103,7 @@ class Result(object):
         if killed:
             self.result = 'KILLED'
             Result.runresults['KILLED'] += 1
+            retcode = 2;
         elif self.returncode is 0:
             self.result = 'PASS'
             Result.runresults['PASS'] += 1
@@ -108,6 +113,7 @@ class Result(object):
         elif self.returncode is not 0:
             self.result = 'FAIL'
             Result.runresults['FAIL'] += 1
+            retcode = 1;
 
 
 class Output(object):
@@ -934,7 +940,7 @@ def main():
     testrun.complete_outputdirs()
     testrun.run(options)
     testrun.summary()
-    exit(0)
+    exit(retcode)
 
 
 if __name__ == '__main__':

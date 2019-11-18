@@ -77,7 +77,18 @@ driver name=ixgbe clone_perms="ixgbe 0666 root sys" perms="* 0666 root sys" \
     alias=pciex8086,15ac \
     alias=pciex8086,15ad \
     alias=pciex8086,15ae \
-    alias=pciex8086,15d1
+    alias=pciex8086,15c2 \
+    alias=pciex8086,15c3 \
+    alias=pciex8086,15c4 \
+    alias=pciex8086,15c6 \
+    alias=pciex8086,15c7 \
+    alias=pciex8086,15c8 \
+    alias=pciex8086,15ca \
+    alias=pciex8086,15cc \
+    alias=pciex8086,15ce \
+    alias=pciex8086,15d1 \
+    alias=pciex8086,15e4 \
+    alias=pciex8086,15e5
 file path=kernel/drv/$(ARCH64)/ixgbe group=sys
 file path=kernel/drv/ixgbe.conf group=sys \
     original_name=SUNWixgbe:kernel/drv/ixgbe.conf preserve=renamenew

@@ -183,7 +183,7 @@ execute_parallel(Property line, Boolean waitflg, Boolean local)
 			rule->command_line =
 			  vpath_translation(rule->command_line);
 		}
-		
+
 		silent_flag = false;
 		ignore = 0;
 
@@ -258,11 +258,11 @@ execute_parallel(Property line, Boolean waitflg, Boolean local)
  *	adjust_pmake_max_jobs (int pmake_max_jobs)
  *
  *	Parameters:
- * 		pmake_max_jobs	- max jobs limit set by user
+ *		pmake_max_jobs	- max jobs limit set by user
  *
  *	External functions used:
  *		sysconf()
- * 		getloadavg()
+ *		getloadavg()
  */
 static int
 adjust_pmake_max_jobs (int pmake_max_jobs)
@@ -1064,12 +1064,12 @@ dependency_conflict(Name target)
 					continue;
 				}
 				for(pending_dp = pending_line->
-				    			body.line.dependencies;
+							body.line.dependencies;
 				    pending_dp != NULL;
 				    pending_dp = pending_dp->next) {
 					if (dp->name == pending_dp->name) {
 						target->checking_subtree
-						  		= false;
+								= false;
 						subtree_conflict = rp->target;
 						subtree_conflict2 = dp->name;
 						return true;
@@ -1244,7 +1244,7 @@ bypass_for_loop_inc_4:
 				retmem_mb(rp->stderr_file);
 				rp->stderr_file = NULL;
 			}
-			
+
 			check_state(rp->temp_file);
 			if (rp->temp_file != NULL) {
 				free_name(rp->temp_file);
@@ -1755,7 +1755,7 @@ is_running(Name target)
 /*
  * This function replaces the makesh binary.
  */
- 
+
 
 static pid_t
 run_rule_commands(char *host, char **commands)
@@ -1820,7 +1820,7 @@ run_rule_commands(char *host, char **commands)
 			               false,
 			               false, /* bugs #4085164 & #4990057 */
 			               /* BOOLEAN(silent_flag && ignore), */
-			               always_exec, 
+			               always_exec,
 			               (Name) NULL);
 			if (result == build_failed) {
 				if (silent_flag) {

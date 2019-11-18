@@ -13,7 +13,7 @@
 
 LIBRARY = libmakestate.a
 VERS = .1
-OBJECTS = 	ld_file.o \
+OBJECTS =	ld_file.o \
 		lock.o
 
 include $(SRC)/lib/Makefile.lib
@@ -25,7 +25,5 @@ MAPFILES = $(SRCDIR)/mapfile-vers
 LDLIBS += -lc
 
 all: $(LIBS)
-
-lint:
 
 include $(SRC)/lib/Makefile.targ

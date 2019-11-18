@@ -24,6 +24,7 @@
  *
  * Copyright 2019, Joyent, Inc.
  * Copyright 2019 RackTop Systems.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -31,7 +32,7 @@
  *
  *	make program main routine plus some helper routines
  */
- 
+
 /*
  * Included files
  */
@@ -104,7 +105,7 @@ static	Boolean		list_all_targets;		/* `-T' */
 static	int		mf_argc;
 static	char		**mf_argv;
 static	Dependency_rec  not_auto_depen_struct;
-static	Dependency 	not_auto_depen = &not_auto_depen_struct;
+static	Dependency	not_auto_depen = &not_auto_depen_struct;
 static	Boolean		pmake_cap_r_specified;		/* `-R' */
 static	Boolean		pmake_machinesfile_specified;	/* `-M' */
 static	Boolean		stop_after_error_ever_seen;	/* `-S' */
@@ -184,11 +185,11 @@ main(int argc, char *argv[])
 	 * which has to be regular chars.
 	 */
 	register char		*cp;
-	char 			make_state_dir[MAXPATHLEN];
+	char			make_state_dir[MAXPATHLEN];
 	Boolean			parallel_flag = false;
 	Boolean			argv_zero_relative = false;
 	char			*prognameptr;
-	char 			*slash_ptr;
+	char			*slash_ptr;
 	mode_t			um;
 	int			i;
 	struct itimerval	value;
@@ -213,7 +214,7 @@ main(int argc, char *argv[])
 #endif
 
 #ifndef TEXT_DOMAIN
-#define	TEXT_DOMAIN	"SYS_TEST"	
+#define	TEXT_DOMAIN	"SYS_TEST"
 #endif
 	textdomain(TEXT_DOMAIN);
 
@@ -255,12 +256,12 @@ main(int argc, char *argv[])
 		argv_zero_relative = true;
 	}
 
-	/* 
-	 * The following flags are reset if we don't have the 
-	 * (.nse_depinfo or .make.state) files locked and only set 
+	/*
+	 * The following flags are reset if we don't have the
+	 * (.nse_depinfo or .make.state) files locked and only set
 	 * AFTER the file has been locked. This ensures that if the user
 	 * interrupts the program while file_lock() is waiting to lock
-	 * the file, the interrupt handler doesn't remove a lock 
+	 * the file, the interrupt handler doesn't remove a lock
 	 * that doesn't belong to us.
 	 */
 	make_state_lockfile = NULL;
@@ -268,13 +269,13 @@ main(int argc, char *argv[])
 
 
 	/*
-	 * look for last slash char in the path to look at the binary 
+	 * look for last slash char in the path to look at the binary
 	 * name. This is to resolve the hard link and invoke make
 	 * in svr4 mode.
 	 */
 
-	/* Sun OS make standart */
-	svr4 = false;  
+	/* Sun OS make standard */
+	svr4 = false;
 	posix = false;
 	if(!strcmp(argv_zero_string, "/usr/xpg4/bin/make")) {
 		svr4 = false;
@@ -465,7 +466,7 @@ main(int argc, char *argv[])
 //
 // If dmake is running with -t option, set dmake_mode_type to serial.
 // This is done because doname() calls touch_command() that runs serially.
-// If we do not do that, maketool will have problems. 
+// If we do not do that, maketool will have problems.
 //
 	if(touch) {
 		dmake_mode_type = serial_mode;
@@ -496,7 +497,7 @@ main(int argc, char *argv[])
 		}
 	}
 
-		
+
 /*
  *	Enable interrupt handler for alarms
  */
@@ -543,16 +544,16 @@ main(int argc, char *argv[])
 	}
 	trace_reader = false;
 
- 	/*
- 	 * Set temp_file_directory to the directory the .make.state
- 	 * file is written to.
- 	 */
- 	if ((slash_ptr = strrchr(make_state->string_mb, (int) slash_char)) == NULL) {
- 		temp_file_directory = strdup(get_current_path());
- 	} else {
- 		*slash_ptr = (int) nul_char;
- 		(void) strcpy(make_state_dir, make_state->string_mb);
- 		*slash_ptr = (int) slash_char;
+	/*
+	 * Set temp_file_directory to the directory the .make.state
+	 * file is written to.
+	 */
+	if ((slash_ptr = strrchr(make_state->string_mb, (int) slash_char)) == NULL) {
+		temp_file_directory = strdup(get_current_path());
+	} else {
+		*slash_ptr = (int) nul_char;
+		(void) strcpy(make_state_dir, make_state->string_mb);
+		*slash_ptr = (int) slash_char;
 		   /* when there is only one slash and it's the first
 		   ** character, make_state_dir should point to '/'.
 		   */
@@ -560,18 +561,18 @@ main(int argc, char *argv[])
 		   make_state_dir[0] = '/';
 		   make_state_dir[1] = '\0';
 		}
- 		if (make_state_dir[0] == (int) slash_char) {
- 			temp_file_directory = strdup(make_state_dir);
- 		} else {
- 			char	tmp_current_path2[MAXPATHLEN];
- 
- 			(void) sprintf(tmp_current_path2,
- 			               "%s/%s",
- 			               get_current_path(),
- 			               make_state_dir);
- 			temp_file_directory = strdup(tmp_current_path2);
- 		}
- 	}
+		if (make_state_dir[0] == (int) slash_char) {
+			temp_file_directory = strdup(make_state_dir);
+		} else {
+			char	tmp_current_path2[MAXPATHLEN];
+
+			(void) sprintf(tmp_current_path2,
+			               "%s/%s",
+			               get_current_path(),
+			               make_state_dir);
+			temp_file_directory = strdup(tmp_current_path2);
+		}
+	}
 
 
 	report_dir_enter_leave(true);
@@ -799,7 +800,7 @@ handle_interrupt(int)
 
 /* BID_1030811 */
 /* azv 16 Oct 95 */
-		current_target->stat.time = file_no_time; 
+		current_target->stat.time = file_no_time;
 
 		if (exists(current_target) != file_doesnt_exist) {
 			(void) fprintf(stderr,
@@ -835,7 +836,7 @@ handle_interrupt(int)
 		    !quest &&
 		    !(rp->target->stat.is_precious || all_precious)) {
 
-			rp->target->stat.time = file_no_time; 
+			rp->target->stat.time = file_no_time;
 			if (exists(rp->target) != file_doesnt_exist) {
 				(void) fprintf(stderr,
 					       "\n*** %s ",
@@ -887,9 +888,8 @@ handle_interrupt(int)
  *
  *	Global variables used:
  */
-/*ARGSUSED*/
 static void
-doalarm(int)
+doalarm(int sig __attribute__((unused)))
 {
 	return;
 }
@@ -971,7 +971,7 @@ read_command_options(register int argc, register char **argv)
 
 		}
 		if (ch == '?') {
-		 	if (optopt == '-') {
+			if (optopt == '-') {
 				/* Bug 5060758: getopt() changed behavior (s10_60),
 				 * and now we have to deal with cases when options
 				 * with double hyphen appear here, from -$(MAKEFLAGS)
@@ -985,16 +985,16 @@ read_command_options(register int argc, register char **argv)
 				      if (tptr) {
 				        if (last_optind_with_double_hyphen != current_optind) {
 				          /* This is first time we are trying to fix "--"
-				           * problem with this option. If we come here second 
+				           * problem with this option. If we come here second
 				           * time, we will go to fatal error.
 				           */
 				          last_optind_with_double_hyphen = current_optind;
-				          
+
 				          /* Eliminate first hyphen character */
 				          for (j=0; argv[i][j] != '\0'; j++) {
 				            argv[i][j] = argv[i][j+1];
 				          }
-				          
+
 				          /* Repeat the processing of this argument */
 				          optind=last_optind;
 				          current_optind=last_current_optind;
@@ -1088,6 +1088,13 @@ read_command_options(register int argc, register char **argv)
 				break;
 			case 2048:
 				argv[i] = (char *)"-C";
+				if (chdir(argv[k]) != 0) {
+					fatal(gettext("failed to change to directory %s: %s"),
+					    argv[k], strerror(errno));
+				}
+				path_reset = true;
+				rebuild_arg0 = true;
+				(void) get_current_path();
 				break;
 			default: /* > 1 of -c, f, g, j, K, M, m, O, o, x seen */
 				fatal(gettext("Illegal command line. More than one option requiring\nan argument given in the same argument group"));
@@ -1193,7 +1200,7 @@ setup_makeflags_argv()
 			 * hyphen characters, and remove all duplicates.
 			 * Usually it happens when the next command is
 			 * used: $(MAKE) -$(MAKEFLAGS)
-			 * 
+			 *
 			 * This was a workaround for BugID 5060758, but
 			 * appears to have survived as a fix in make.
 			 */
@@ -1608,10 +1615,10 @@ int   done=0;
 
 		       (void) sprintf(path, "%s/%s", cwdpath,sccs_dir_path);
 		       if (access(path, F_OK) == 0) {
-		        	sccs_dir_path = path;
+				sccs_dir_path = path;
 				done = 1;
 		        } else {
-		  	       	fatal(gettext("Bogus PROJECTDIR '%s'"), sccs_dir_path);
+				fatal(gettext("Bogus PROJECTDIR '%s'"), sccs_dir_path);
 		        }
 		    }
 		}
@@ -1630,7 +1637,7 @@ make_install_prefix(void)
 	    PATH_MAX - 1)) < 0)
 		fatal("failed to read origin from /proc\n");
 
-	
+
 	origin[ret] = '\0';
 	return strdup(dirname(origin));
 }
@@ -1656,7 +1663,7 @@ add_to_env(const char *var, const char *value, const char *fallback)
 			    var, oldpath, value);
 		} else {
 			asprintf(&newpath, "%s=%s:%s",
-			    var, oldpath, fallback);			
+			    var, oldpath, fallback);
 		}
 	}
 
@@ -1682,7 +1689,7 @@ set_sgs_support()
 {
 	int		len;
 	char		*newpath, *newpath64;
-	char 		*lib32, *lib64;
+	char		*lib32, *lib64;
 	static char	*prev_path, *prev_path64;
 	char		*origin = make_install_prefix();
 	struct stat st;
@@ -1895,7 +1902,7 @@ read_files_and_state(int argc, char **argv)
 
 /*
  *	Set MFLAGS and MAKEFLAGS
- *	
+ *
  *	Before reading makefile we do not know exactly which mode
  *	(posix or not) is used. So prepare two MAKEFLAGS strings
  *	for both posix and solaris modes because they are different.
@@ -1940,7 +1947,7 @@ read_files_and_state(int argc, char **argv)
 		append_char('k', &makeflags_string);
 		append_char('k', &makeflags_string_posix);
 	} else {
-		if (stop_after_error_ever_seen 
+		if (stop_after_error_ever_seen
 		    && continue_after_error_ever_seen) {
 			append_char('k', &makeflags_string_posix);
 			append_char((int) space_char, &makeflags_string_posix);
@@ -2081,15 +2088,15 @@ read_files_and_state(int argc, char **argv)
 		}
 	}
 
-/* 
- *	Add command line macro to POSIX makeflags_string  
+/*
+ *	Add command line macro to POSIX makeflags_string
  */
 	if (makeflags_and_macro.start) {
 		tmp_char = (char) space_char;
 		cp = makeflags_and_macro.start;
 		do {
 			append_char(tmp_char, &makeflags_string_posix);
-		} while ( tmp_char = *cp++ ); 
+		} while ( tmp_char = *cp++ );
 		retmem_mb(makeflags_and_macro.start);
 	}
 
@@ -2373,13 +2380,13 @@ read_files_and_state(int argc, char **argv)
 			*/
 		      memcpy(&state_filename, make_state,sizeof(state_filename));
 		      state_filename.string_mb = state_file_str_mb;
-		/* Just a kludge to avoid two slashes back to back */			
+		/* Just a kludge to avoid two slashes back to back */
 		      if((make_state->hash.length == 1)&&
 			        (make_state->string_mb[0] == '/')) {
 			 make_state->hash.length = 0;
 			 make_state->string_mb[0] = '\0';
 		      }
-	   	      sprintf(state_file_str_mb,"%s%s",
+		      sprintf(state_file_str_mb,"%s%s",
 		       make_state->string_mb,"/.make.state");
 		      make_state = &state_filename;
 			/* adjust the length to reflect the appended string */
@@ -2390,7 +2397,7 @@ read_files_and_state(int argc, char **argv)
 		   char *slashp;
 
 		   if (slashp = strrchr(make_state->string_mb, '/')) {
-		      strncpy(tmp_path, make_state->string_mb, 
+		      strncpy(tmp_path, make_state->string_mb,
 				(slashp - make_state->string_mb));
 			tmp_path[slashp - make_state->string_mb]=0;
 		      if(strlen(tmp_path)) {
@@ -2432,7 +2439,7 @@ enter_argv_values(int argc, char *argv[], ASCII_Dyn_Array *makeflags_and_macro)
 	register int		i;
 	int			length;
 	register Name		name;
-	int			opt_separator = argc; 
+	int			opt_separator = argc;
 	char			tmp_char;
 	wchar_t			*tmp_wcs_buffer;
 	register Name		value;
@@ -2538,18 +2545,17 @@ enter_argv_values(int argc, char *argv[], ASCII_Dyn_Array *makeflags_and_macro)
 				}
 				break;
 			case 2048: /* -C seen */
+				/*
+				 * The chdir() will have been performed
+				 * in read_command_options().
+				 * Just set DMAKE_CDIR here.
+				 */
 				if (argv[i + 1] == NULL) {
-					fatal(gettext("No argument after -C flag"));
-				}
-				if (chdir(argv[i + 1]) != 0) {
-					fatal(gettext("failed to change to directory %s: %s"),
-					    argv[i + 1], strerror(errno));
+					fatal(gettext(
+					    "No argument after -C flag"));
 				}
 				MBSTOWCS(wcs_buffer, "DMAKE_CDIR");
 				name = GETNAME(wcs_buffer, FIND_LENGTH);
-				path_reset = true;
-				rebuild_arg0 = true;
-				(void) get_current_path();
 				break;
 			default: /* Shouldn't reach here */
 				argv[i] = NULL;
@@ -2570,7 +2576,7 @@ enter_argv_values(int argc, char *argv[], ASCII_Dyn_Array *makeflags_and_macro)
 			}
 			argv[i+1] = NULL;
 		} else if ((cp = strchr(argv[i], (int) equal_char)) != NULL) {
-/* 
+/*
  * Combine all macro in dynamic array
  */
 			if(*(cp-1) == (int) plus_char)
@@ -2784,7 +2790,7 @@ static Boolean
 read_makefile(register Name makefile, Boolean complain, Boolean must_exist, Boolean report_file)
 {
 	Boolean			b;
-	
+
 	makefile_type = reading_makefile;
 	recursion_level = 0;
 	reading_dependencies = true;
@@ -2885,11 +2891,11 @@ make_targets(int argc, char **argv, Boolean parallel_flag)
 					if (posix) {
 						if (!commands_done) {
 							(void) printf(gettext("`%s' is updated.\n"),
-						 		      default_target_to_build->string_mb);
+								      default_target_to_build->string_mb);
 						} else {
 							if (no_action_was_taken) {
 								(void) printf(gettext("`%s': no action was taken.\n"),
-						 			      default_target_to_build->string_mb);
+									      default_target_to_build->string_mb);
 							}
 						}
 					} else {
@@ -2906,7 +2912,7 @@ make_targets(int argc, char **argv, Boolean parallel_flag)
 		/* Now wait for all of the targets to finish running */
 		finish_running();
 		//		setjmp(jmpbuffer);
-		
+
 	}
 	for (i = 1; i < argc; i++) {
 		if ((cp = argv[i]) != NULL) {
@@ -2962,11 +2968,11 @@ make_targets(int argc, char **argv, Boolean parallel_flag)
 				if (posix) {
 					if (!commands_done) {
 						(void) printf(gettext("`%s' is updated.\n"),
-					 		      default_target_to_build->string_mb);
+							      default_target_to_build->string_mb);
 					} else {
 						if (no_action_was_taken) {
 							(void) printf(gettext("`%s': no action was taken.\n"),
-					 			      default_target_to_build->string_mb);
+								      default_target_to_build->string_mb);
 						}
 					}
 				} else {
@@ -3025,7 +3031,7 @@ make_targets(int argc, char **argv, Boolean parallel_flag)
 			if (posix) {
 				if (!commands_done) {
 					(void) printf(gettext("`%s' is updated.\n"),
-				 		      default_target_to_build->string_mb);
+						      default_target_to_build->string_mb);
 				} else {
 					if (no_action_was_taken) {
 						(void) printf(gettext("`%s': no action was taken.\n"),
@@ -3093,8 +3099,8 @@ append_or_replace_macro_in_dyn_array(ASCII_Dyn_Array *Ar, char *macro)
 	register char	*cp3;	/* work pointer in array */
 	register char	*name;	/* macro name */
 	register char	*value;	/* macro value */
-	register int 	len_array;
-	register int 	len_macro;
+	register int	len_array;
+	register int	len_macro;
 
 	char * esc_value = NULL;
 	int esc_len;
@@ -3155,13 +3161,13 @@ LOOK_FOR_NAME:
 	while (isspace(*cp3)) {
 		cp3++;
 	}
-	
+
 	cp2 = cp1;  /* remove old macro */
 	if ((*cp3) && (cp3 < Ar->start + Ar->size)) {
 		for (; cp3 < Ar->start + Ar->size; cp3++) {
 			*cp2++ = *cp3;
 		}
-	} 
+	}
 	for (; cp2 < Ar->start + Ar->size; cp2++) {
 		*cp2 = 0;
 	}
@@ -3199,7 +3205,7 @@ APPEND_MACRO:
 	strncat(Ar->start, esc_value, strlen(esc_value));
 	free(esc_value);
 	return;
-ERROR_MACRO:	
+ERROR_MACRO:
 	/* Macro without '=' or with invalid left/right part */
 	return;
 }

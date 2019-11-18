@@ -123,7 +123,7 @@ setvar_envvar(void)
 		    ) {
 			continue;
 		}
-		INIT_STRING_FROM_STACK(value, buffer);		
+		INIT_STRING_FROM_STACK(value, buffer);
 		expand_value(p->value, &value, false);
 		if ((length = wcslen(value.buffer.start)) >= MAXPATHLEN) {
 			mbs = tmp_mbs_buffer = getmem((length + 1) * MB_LEN_MAX);

@@ -70,6 +70,12 @@ static void iscsi_notice_key_values(iscsi_conn_t *icp);
  * +--------------------------------------------------------------------+
  */
 
+void
+iscsi_login_cb(void *arg)
+{
+	(void) iscsi_login_start(arg);
+}
+
 /*
  * iscsi_login_start - connect and perform iscsi protocol login
  */
@@ -235,7 +241,7 @@ login_retry:
 			goto login_start;
 		} else {
 			if (ddi_taskq_dispatch(isp->sess_login_taskq,
-			    (void(*)())iscsi_login_start, itp, DDI_SLEEP) !=
+			    iscsi_login_cb, itp, DDI_SLEEP) !=
 			    DDI_SUCCESS) {
 				iscsi_login_end(icp,
 				    ISCSI_STATUS_LOGIN_TIMED_OUT, itp);
