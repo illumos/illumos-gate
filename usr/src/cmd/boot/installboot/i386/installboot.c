@@ -453,8 +453,8 @@ static bool
 compare_stage1_cb(struct partlist *plist)
 {
 	if (write_vbr) {
-		(void) printf("%s will be written to %s\n", plist->pl_src_name,
-		    plist->pl_devname);
+		(void) printf("%s is newer than one in %s\n",
+		    plist->pl_src_name, plist->pl_devname);
 	}
 	return (write_vbr);
 }
@@ -1993,7 +1993,29 @@ prepare_bblocks(ib_data_t *data)
 	struct partlist *mbr, *stage1, *stage2;
 	uuid_t uuid;
 
+	/*
+	 * Create disk uuid. We only need reasonable amount of uniqueness
+	 * to allow biosdev to identify disk based on mbr differences.
+	 */
+	uuid_generate(uuid);
+
 	mbr = stage1 = stage2 = NULL;
+
+	/* First find stage 2. */
+	STAILQ_FOREACH(pl, data->plist, pl_next) {
+		if (pl->pl_type == IB_BBLK_STAGE2) {
+			stage2 = pl;
+
+			/*
+			 * When stage2 needs update, make sure we also
+			 * update stage1.
+			 */
+			if (pl->pl_cb.compare != NULL &&
+			    pl->pl_cb.compare(pl))
+				write_vbr = true;
+			break;
+		}
+	}
 	/*
 	 * Walk list and pick up BIOS boot blocks. EFI boot programs
 	 * can be set in place.
@@ -2005,10 +2027,10 @@ prepare_bblocks(ib_data_t *data)
 			break;
 		case IB_BBLK_STAGE1:
 			stage1 = pl;
+			if (stage2 != NULL)
+				prepare_stage1(stage1, stage2, uuid);
 			break;
 		case IB_BBLK_STAGE2:
-			stage2 = pl;
-			/* FALLTHROUGH */
 		case IB_BBLK_EFI:
 			prepare_bootblock(data, pl, update_str);
 			break;
@@ -2020,12 +2042,6 @@ prepare_bblocks(ib_data_t *data)
 	/* If stage2 is missing, we are done. */
 	if (stage2 == NULL)
 		return;
-
-	/*
-	 * Create disk uuid. We only need reasonable amount of uniqueness
-	 * to allow biosdev to identify disk based on mbr differences.
-	 */
-	uuid_generate(uuid);
 
 	if (mbr != NULL) {
 		prepare_stage1(mbr, stage2, uuid);
@@ -2040,10 +2056,6 @@ prepare_bblocks(ib_data_t *data)
 			*((uint64_t *)(dest + STAGE1_STAGE2_LBA)) =
 			    stage1->pl_device->stage.start;
 		}
-	}
-
-	if (stage1 != NULL) {
-		prepare_stage1(stage1, stage2, uuid);
 	}
 }
 
