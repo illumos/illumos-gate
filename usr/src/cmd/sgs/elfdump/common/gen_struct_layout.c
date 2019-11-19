@@ -25,6 +25,7 @@
  *
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -568,22 +569,22 @@ gen_utsname(void)
 static void
 gen_prfdinfo(void)
 {
-	START(prfdinfo, prfdinfo_t);
+	START(prfdinfo, prfdinfo_core_t);
 
-	SCALAR_FIELD(prfdinfo_t,	pr_fd,		0);
-	SCALAR_FIELD(prfdinfo_t,	pr_mode,	0);
-	SCALAR_FIELD(prfdinfo_t,	pr_uid,		0);
-	SCALAR_FIELD(prfdinfo_t,	pr_gid,		0);
-	SCALAR_FIELD(prfdinfo_t,	pr_major,	0);
-	SCALAR_FIELD(prfdinfo_t,	pr_minor,	0);
-	SCALAR_FIELD(prfdinfo_t,	pr_rmajor,	0);
-	SCALAR_FIELD(prfdinfo_t,	pr_rminor,	0);
-	SCALAR_FIELD(prfdinfo_t,	pr_ino,		0);
-	SCALAR_FIELD(prfdinfo_t,	pr_offset,	0);
-	SCALAR_FIELD(prfdinfo_t,	pr_size,	0);
-	SCALAR_FIELD(prfdinfo_t,	pr_fileflags,	0);
-	SCALAR_FIELD(prfdinfo_t,	pr_fdflags,	0);
-	ARRAY_FIELD(prfdinfo_t,		pr_path,	0);
+	SCALAR_FIELD(prfdinfo_core_t,	pr_fd,		0);
+	SCALAR_FIELD(prfdinfo_core_t,	pr_mode,	0);
+	SCALAR_FIELD(prfdinfo_core_t,	pr_uid,		0);
+	SCALAR_FIELD(prfdinfo_core_t,	pr_gid,		0);
+	SCALAR_FIELD(prfdinfo_core_t,	pr_major,	0);
+	SCALAR_FIELD(prfdinfo_core_t,	pr_minor,	0);
+	SCALAR_FIELD(prfdinfo_core_t,	pr_rmajor,	0);
+	SCALAR_FIELD(prfdinfo_core_t,	pr_rminor,	0);
+	SCALAR_FIELD(prfdinfo_core_t,	pr_ino,		0);
+	SCALAR_FIELD(prfdinfo_core_t,	pr_offset,	0);
+	SCALAR_FIELD(prfdinfo_core_t,	pr_size,	0);
+	SCALAR_FIELD(prfdinfo_core_t,	pr_fileflags,	0);
+	SCALAR_FIELD(prfdinfo_core_t,	pr_fdflags,	0);
+	ARRAY_FIELD(prfdinfo_core_t,	pr_path,	0);
 
 	END;
 }

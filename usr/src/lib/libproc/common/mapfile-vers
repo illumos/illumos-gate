@@ -24,7 +24,7 @@
 # Copyright 2018 Joyent, Inc.
 # Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright (c) 2019 Carlos Neira <cneirabustos@gmail.com>
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -207,6 +207,10 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	proc_arg_xpsinfo;
 	proc_content2str;
 	proc_dmodelname;
+	proc_fdinfo_free;
+	proc_fdinfo_misc;
+	proc_fdinfowalk;
+	proc_fdwalk;
 	proc_finistdio;
 	proc_fltname;
 	proc_fltset2str;
@@ -214,6 +218,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	proc_free_priv;
 	proc_get_auxv;
 	proc_get_cred;
+	proc_get_fdinfo;
 	proc_get_priv;
 	proc_get_psinfo;
         proc_get_secflags;

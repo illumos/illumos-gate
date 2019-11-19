@@ -24,7 +24,7 @@
  * netstat.c 2.2, last change 9/9/91
  * MROUTING Revision 3.5
  * Copyright 2018, Joyent, Inc.
- * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -988,7 +988,7 @@ process_hash_dump(void)
 }
 
 static int
-process_hash_iter(const psinfo_t *psinfo, const prfdinfo_t *pr,
+process_hash_iter(const psinfo_t *psinfo, const prfdinfo_core_t *pr,
     struct ps_prochandle *Pr)
 {
 	proc_fdinfo_t *ph;
@@ -1089,7 +1089,7 @@ process_hash_iterate(psinfo_t *psinfo)
 	while ((ent = readdir(dirp)) != NULL) {
 		char path[PATH_MAX];
 		struct stat st;
-		prfdinfo_t info;
+		prfdinfo_core_t info;
 		int fd, len;
 
 		if (!isdigit(ent->d_name[0]))

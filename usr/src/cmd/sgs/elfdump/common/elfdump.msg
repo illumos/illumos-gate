@@ -23,6 +23,7 @@
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
 # Copyright 2018 Joyent, Inc.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 @ _START_
@@ -468,7 +469,7 @@
 @ MSG_CNOTE_DESC_PSINFO_T		"desc: (psinfo_t)"
 @ MSG_CNOTE_DESC_PSTATUS_T		"desc: (pstatus_t)"
 @ MSG_CNOTE_DESC_STRUCT_UTSNAME		"desc: (struct utsname)"
-@ MSG_CNOTE_DESC_PRFDINFO_T		"desc: (prfdinfo_t)"
+@ MSG_CNOTE_DESC_PRFDINFO_T		"desc: (prfdinfo_core_t)"
 @ MSG_CNOTE_DESC_PRSECFLAGS_T		"desc: (prsecflags_t)"
 @ MSG_CNOTE_DESC_PRLWPNAME_T		"desc: (prlwpname_t)"
 

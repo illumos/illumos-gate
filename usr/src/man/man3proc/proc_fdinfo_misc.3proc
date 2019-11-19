@@ -1,0 +1,71 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd January 6, 2020
+.Dt PROC_FDINFO_MISC 3PROC
+.Os
+.Sh NAME
+.Nm proc_fdinfo_misc
+.Nd retrieve a miscellaneous information item from a prfdinfo_t structure
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft const void *
+.Fo proc_fdinfo_misc
+.Fa "const prfdinfo_t *info"
+.Fa "uint_t type"
+.Fa "size_t *len"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn proc_fdinfo_misc
+function is a convenient way to retrieve a miscellaneous information item from
+a
+.Vt prfdinfo_t
+structure.
+.Pp
+If a miscellaneous item of type
+.Fa type
+is found, then this function returns a pointer to the data for that item and
+updates
+.Fa len
+with the item's size.
+.Pp
+In the case that there are multiple instances of the requested type in the
+structure, only the first is returned.
+To see all instances, use the
+.Xr proc_fdinfowalk 3PROC
+function.
+.Pp
+The definition of the
+.Vt prfdinfo_t
+structure may be found in the
+.Sx fdinfo
+section of
+.Xr proc 4 .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn proc_fdinfo_misc
+function returns a pointer to the first instance of data with the requested
+type.
+Otherwise,
+.Sy NULL
+is returned to indicate that the item was not found.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc_fdinfowalk 3PROC ,
+.Xr proc 4

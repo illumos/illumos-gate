@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2018 Joyent, Inc.
 .\" Copyright (c) 2019 Carlos Neira <cneirabustos@gmail.com>
-.\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"
 .Dd February 22, 2019
 .Dt LIBPROC 3LIB
@@ -311,7 +311,8 @@ library.
 .It Sy proc_dmodelname Ta Sy proc_finistdio
 .It Sy proc_fltname Ta Sy proc_fltset2str
 .It Sy proc_flushstdio Ta Sy proc_proc_get_auxv
-.It Sy proc_get_cred Ta Sy proc_get_priv
+.It Sy proc_fdinfo_misc Ta Sy proc_get_cred
+.It Sy proc_get_fdinfo Ta Sy proc_get_priv
 .It Sy proc_get_psinfo Ta Sy proc_get_status
 .It Sy proc_get_initstdio Ta Sy proc_lwp_in_set
 .It Sy proc_lwp_range_valid Ta Sy proc_signame
@@ -562,25 +563,39 @@ This indicates that the contents are invalid.
 The
 .Vt prfdinfo_t
 structure is used with the
-.Fn Pfdinfo_iter
-function which describes information about a file descriptor.
+.Fn Pfdinfo_iter ,
+.Fn proc_fdwalk ,
+.Fn proc_fdinfowalk
+and
+.Fn proc_get_fdinfo
+functions and describes information about a file descriptor.
 The structure is defined as follows:
 .Bd -literal
 typedef struct prfdinfo {
-	int		pr_fd;
-	mode_t		pr_mode;
-	uid_t		pr_uid;
-	gid_t		pr_gid;
-	major_t		pr_major;	/* think stat.st_dev */
-	minor_t		pr_minor;
-	major_t		pr_rmajor;	/* think stat.st_rdev */
-	minor_t		pr_rminor;
-	ino64_t		pr_ino;
-	off64_t		pr_offset;
-	off64_t		pr_size;
-	int		pr_fileflags;	/* fcntl(F_GETXFL), etc */
-	int		pr_fdflags;	/* fcntl(F_GETFD), etc. */
-	char		pr_path[MAXPATHLEN];
+    int		pr_fd;		/* file descriptor number */
+    mode_t	pr_mode;	/* (see st_mode in stat(2)) */
+    ino64_t	pr_ino;		/* inode number */
+    off64_t	pr_size;	/* file size */
+    off64_t	pr_offset;	/* current offset */
+    uid_t	pr_uid;		/* owner's user id */
+    gid_t	pr_gid;		/* owner's group id */
+    major_t	pr_major;	/* major number of device */
+    minor_t	pr_minor;	/* minor number of device */
+    major_t	pr_rmajor;	/* major number (if special file) */
+    minor_t	pr_rminor;	/* minor number (if special file) */
+    int		pr_fileflags;	/* (see F_GETXFL in fcntl(2)) */
+    int		pr_fdflags;	/* (see F_GETFD in fcntl(2)) */
+    short	pr_locktype;	/* (see F_GETLK in fcntl(2)) */
+    pid_t	pr_lockpid;	/* process holding file lock */
+    int		pr_locksysid;	/* sysid of locking process */
+    pid_t	pr_peerpid;	/* peer process (socket, door) */
+    int		pr_filler[25];	/* reserved for future use */
+    char	pr_peername[PRFNSZ];	/* peer process name */
+#if    __STDC_VERSION__ >= 199901L
+    uint8_t	pr_misc[];	/* self describing structures */
+else
+    uint8_t	pr_misc[1];	/* self describing structures */
+#endif
 } prfdinfo_t;
 .Ed
 .Pp
@@ -649,6 +664,31 @@ with the arguments
 and
 .Dv F_GETFD
 respectively.
+.Pp
+The
+.Fa pr_locktype ,
+.Fa pr_lockpid ,
+and
+.Fa pr_locksysid
+contain the information that would have been returned by a call to
+.Xr fcntl 2
+with an argument of
+.Dv F_GETLK .
+.Pp
+The
+.Fa pr_peerpid
+and
+.Fa pr_peername
+members contain the process ID and name of any peer endpoint of a
+connection-oriented socket or stream fd.
+This information is the same as that which would be returned by a call to
+.Xr getpeerucred 3C
+.Pp
+The
+.Fa pr_misc
+member contains miscellaneous additional data relating to the file descriptor.
+The format of these data is described in
+.Xr proc 4 .
 .Pp
 .Vt prsyminfo_t
 .Pp
@@ -746,6 +786,54 @@ Both structures are defined in
 .Xr proc 4 .
 For additional information on using this type, see
 .Xr Plwp_iter_all 3PROC .
+.Pp
+.Vt proc_fdinfowalk_f
+.Pp
+The
+.Vt proc_fdinfowalk_f
+is a function pointer type that is used with the
+.Fn proc_fdinfowalk
+function to walk the miscellaneous data items contained within a
+.Vt prfdinfo_t
+structure.
+It is defined as
+.Sy typedef
+.Ft int
+.Fo proc_fdinfowalk_f
+.Fa "uint_t"
+.Fa "const void *"
+.Fa "size_t"
+.Fa "void *"
+.Fc .
+The first argument contains the type of the miscellaneous information being
+presented, the second and third provide a pointer to the associated data and
+the length of that data.
+The final argument is a pointer to an argument that the user specifies.
+For more information on using this, see
+.Xr proc_fdinfowalk 3PROC .
+.Pp
+.Vt proc_fdwalk_f
+.Pp
+The
+.Vt proc_fdwalk_f
+is a function pointer type that is used with the
+.Fn proc_fdwalk
+function.
+It is defined as
+.Sy typedef
+.Ft int
+.Fo proc_fdwalk_f
+.Fa "const prfdinfo_t *"
+.Fa "void *"
+.Fc .
+The first argument contains the file descriptor information.
+The
+.Sy prfdinfo_t
+structure is defined in
+.Xr proc 4 .
+The final argument is a pointer to an argument that the user specifies.
+For more information on using this, see
+.Xr proc_fdwalk 3PROC .
 .Pp
 .Vt proc_walk_f
 .Pp
@@ -1227,6 +1315,7 @@ changes may occur which break both source and binary compatibility.
 .Xr proc_flushstdio 3PROC ,
 .Xr proc_get_auxv 3PROC ,
 .Xr proc_get_cred 3PROC ,
+.Xr proc_get_fdinfo 3PROC ,
 .Xr proc_get_priv 3PROC ,
 .Xr proc_get_psinfo 3PROC ,
 .Xr proc_get_status 3PROC ,
@@ -1245,6 +1334,8 @@ changes may occur which break both source and binary compatibility.
 .Xr proc_sysname 3PROC ,
 .Xr proc_sysset2str 3PROC ,
 .Xr proc_unctrl_psinfo 3PROC ,
+.Xr proc_fdinfowalk 3PROC ,
+.Xr proc_fdwalk 3PROC ,
 .Xr proc_walk 3PROC
 .Pp
 .Xr Pldt 3PROC ,
