@@ -29,6 +29,8 @@
 extern "C" {
 #endif
 
+#include <sys/portif.h>
+
 typedef struct stmf_kstat_itl_info {
 	kstat_named_t		i_rport_name;
 	kstat_named_t		i_rport_alias;
@@ -57,6 +59,21 @@ typedef struct stmf_kstat_tgt_info {
 	kstat_named_t		i_tgt_alias;
 	kstat_named_t		i_protocol;
 } stmf_kstat_tgt_info_t;
+
+#define	STMF_RPORT_INFO_LIMIT 8
+
+typedef struct stmf_kstat_rport_info {
+    kstat_named_t i_rport_name;
+    kstat_named_t i_protocol;
+    kstat_named_t i_rport_uinfo[STMF_RPORT_INFO_LIMIT];
+} stmf_kstat_rport_info_t;
+
+typedef struct stmf_kstat_rport_estat {
+	kstat_named_t i_rport_read_latency;
+	kstat_named_t i_rport_write_latency;
+	kstat_named_t i_nread_tasks;
+	kstat_named_t i_nwrite_tasks;
+} stmf_kstat_rport_estat_t;
 
 #ifdef	__cplusplus
 }

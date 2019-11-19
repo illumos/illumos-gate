@@ -138,6 +138,10 @@ stmf_status_t stmf_register_local_port(stmf_local_port_t *lportp);
 stmf_status_t stmf_deregister_local_port(stmf_local_port_t *lport);
 stmf_status_t stmf_register_scsi_session(stmf_local_port_t *lport,
 				stmf_scsi_session_t *ss);
+stmf_status_t stmf_add_rport_info(stmf_scsi_session_t *ss,
+	const char *prop_name, const char *prop_value);
+void stmf_remove_rport_info(stmf_scsi_session_t *ss,
+	const char *prop_name);
 void stmf_deregister_scsi_session(stmf_local_port_t *lport,
 				stmf_scsi_session_t *ss);
 void stmf_set_port_standby(stmf_local_port_t *lport, uint16_t rtpid);

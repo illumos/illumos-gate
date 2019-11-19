@@ -56,9 +56,6 @@
 #define	ISCSI_MAX_TSIH		0xffff
 #define	ISCSI_UNSPEC_TSIH	0
 
-/* Max targets per system */
-#define	ISCSIT_MAX_TARGETS	1024
-
 #define	ISCSIT_MAX_WINDOW	1024
 #define	ISCSIT_RXPDU_QUEUE_LEN	2048
 
@@ -124,74 +121,63 @@ typedef struct {
 } iscsit_portal_t;
 
 
+#define	TGT_STATE_LIST() \
+	item(TS_UNDEFINED) \
+	item(TS_CREATED) \
+	item(TS_ONLINING) \
+	item(TS_ONLINE) \
+	item(TS_STMF_ONLINE) \
+	item(TS_DELETING_NEED_OFFLINE) \
+	item(TS_OFFLINING) \
+	item(TS_OFFLINE) \
+	item(TS_STMF_OFFLINE) \
+	item(TS_DELETING_STMF_DEREG) \
+	item(TS_DELETING_STMF_DEREG_FAIL) \
+	item(TS_DELETING) \
+	item(TS_MAX_STATE)
+
 /* Target states and events, update iscsit_ts_name table whenever modified */
 typedef enum {
-	TS_UNDEFINED = 0,
-	TS_CREATED,
-	TS_ONLINING,
-	TS_ONLINE,
-	TS_STMF_ONLINE,
-	TS_DELETING_NEED_OFFLINE,
-	TS_OFFLINING,
-	TS_OFFLINE,
-	TS_STMF_OFFLINE,
-	TS_DELETING_STMF_DEREG,
-	TS_DELETING_STMF_DEREG_FAIL,
-	TS_DELETING,
-	TS_MAX_STATE
+#define	item(a)	a,
+	TGT_STATE_LIST()
+#undef	item
 } iscsit_tgt_state_t;
 
 #ifdef ISCSIT_TGT_SM_STRINGS
-static const char *iscsit_ts_name[TS_MAX_STATE+1] = {
-	"TS_UNDEFINED",
-	"TS_CREATED",
-	"TS_ONLINING",
-	"TS_ONLINE",
-	"TS_STMF_ONLINE",
-	"TS_DELETING_NEED_OFFLINE",
-	"TS_OFFLINING",
-	"TS_OFFLINE",
-	"TS_STMF_OFFLINE",
-	"TS_DELETING_STMF_DEREG",
-	"TS_DELETING_STMF_DEREG_FAIL",
-	"TS_DELETING",
-	"TS_MAX_STATE"
+static const char *iscsit_ts_name[TS_MAX_STATE + 1] = {
+#define	item(a) #a,
+	TGT_STATE_LIST()
+#undef	item
 };
 #endif
 
+#define	TGT_EVENT_LIST() \
+	item(TE_UNDEFINED) \
+	item(TE_STMF_ONLINE_REQ) \
+	item(TE_ONLINE_SUCCESS) \
+	item(TE_ONLINE_FAIL) \
+	item(TE_STMF_ONLINE_COMPLETE_ACK) \
+	item(TE_STMF_OFFLINE_REQ) \
+	item(TE_OFFLINE_COMPLETE) \
+	item(TE_STMF_OFFLINE_COMPLETE_ACK) \
+	item(TE_DELETE) \
+	item(TE_STMF_DEREG_SUCCESS) \
+	item(TE_STMF_DEREG_FAIL) \
+	item(TE_STMF_DEREG_RETRY) \
+	item(TE_WAIT_REF_COMPLETE) \
+	item(TE_MAX_EVENT)
+
 typedef enum {
-	TE_UNDEFINED = 0,
-	TE_STMF_ONLINE_REQ,
-	TE_ONLINE_SUCCESS,
-	TE_ONLINE_FAIL,
-	TE_STMF_ONLINE_COMPLETE_ACK,
-	TE_STMF_OFFLINE_REQ,
-	TE_OFFLINE_COMPLETE,
-	TE_STMF_OFFLINE_COMPLETE_ACK,
-	TE_DELETE,
-	TE_STMF_DEREG_SUCCESS,
-	TE_STMF_DEREG_FAIL,
-	TE_STMF_DEREG_RETRY,
-	TE_WAIT_REF_COMPLETE,
-	TE_MAX_EVENT
+#define	item(a) a,
+	TGT_EVENT_LIST()
+#undef	item
 } iscsit_tgt_event_t;
 
 #ifdef ISCSIT_TGT_SM_STRINGS
-static const char *iscsit_te_name[TE_MAX_EVENT+1] = {
-	"TE_UNDEFINED",
-	"TE_STMF_ONLINE_REQ",
-	"TE_ONLINE_SUCCESS",
-	"TE_ONLINE_FAIL",
-	"TE_STMF_ONLINE_COMPLETE_ACK",
-	"TE_STMF_OFFLINE_REQ",
-	"TE_OFFLINE_COMPLETE",
-	"TE_STMF_OFFLINE_COMPLETE_ACK",
-	"TE_DELETE",
-	"TE_STMF_DEREG_SUCCESS",
-	"TE_STMF_DEREG_FAIL",
-	"TE_STMF_DEREG_RETRY",
-	"TE_WAIT_REF_COMPLETE",
-	"TE_MAX_EVENT"
+static const char *iscsit_te_name[TE_MAX_EVENT + 1] = {
+#define	item(a) #a,
+	TGT_EVENT_LIST()
+#undef	item
 };
 #endif
 
@@ -238,7 +224,7 @@ typedef struct conn_auth {
 	uint8_t			ca_ini_chapsecret[iscsitAuthStringMaxLength];
 	int			ca_ini_chapsecretlen;
 
-	/* RADIUS authentication information   	*/
+	/* RADIUS authentication information	*/
 	boolean_t		ca_use_radius;
 	struct sockaddr_storage	ca_radius_server;
 	uint8_t			ca_radius_secret[iscsitAuthStringMaxLength];
@@ -284,67 +270,62 @@ typedef struct conn_auth {
 
 struct iscsit_conn_s;
 
+/* Add new session states above SS_MAX_STATE */
+#define	SESSION_STATE_LIST() \
+	item(SS_UNDEFINED) \
+	item(SS_Q1_FREE) \
+	item(SS_Q2_ACTIVE) \
+	item(SS_Q3_LOGGED_IN) \
+	item(SS_Q4_FAILED) \
+	item(SS_Q5_CONTINUE) \
+	item(SS_Q6_DONE) \
+	item(SS_Q7_ERROR) \
+	item(SS_MAX_STATE)
+
 /* Update iscsit_ss_name table whenever session states are modified */
 typedef enum {
-	SS_UNDEFINED = 0,
-	SS_Q1_FREE,
-	SS_Q2_ACTIVE,
-	SS_Q3_LOGGED_IN,
-	SS_Q4_FAILED,
-	SS_Q5_CONTINUE,
-	SS_Q6_DONE,
-	SS_Q7_ERROR,
-	/* Add new session states above SS_MAX_STATE */
-	SS_MAX_STATE
+#define	item(a) a,
+	SESSION_STATE_LIST()
+#undef	item
 } iscsit_session_state_t;
 
 #ifdef ISCSIT_SESS_SM_STRINGS
 /* An array of state text values, for use in logging state transitions */
-static const char *iscsit_ss_name[SS_MAX_STATE+1] = {
-	"SS_UNDEFINED",
-	"SS_Q1_FREE",
-	"SS_Q2_ACTIVE",
-	"SS_Q3_LOGGED_IN",
-	"SS_Q4_FAILED",
-	"SS_Q5_CONTINUE",
-	"SS_Q6_DONE",
-	"SS_Q7_ERROR",
-	"SS_MAX_STATE"
+static const char *iscsit_ss_name[SS_MAX_STATE + 1] = {
+#define	item(a) #a,
+	SESSION_STATE_LIST()
+#undef	item
 };
 #endif
 
+/* Add new events above SE_MAX_EVENT */
+#define	SESSION_EVENT_LIST() \
+	item(SE_UNDEFINED) \
+	item(SE_CONN_IN_LOGIN)	/* From login state machine */ \
+	item(SE_CONN_LOGGED_IN)	/* FFP enabled client notification */ \
+	item(SE_CONN_FFP_FAIL)	/* FFP disabled client notification */ \
+	item(SE_CONN_FFP_DISABLE) /* FFP disabled client notification */ \
+	item(SE_CONN_FAIL) /* Conn destroy client notification */ \
+	item(SE_SESSION_CLOSE)	/* FFP disabled client notification */ \
+	item(SE_SESSION_REINSTATE) /* From login state machine */ \
+	item(SE_SESSION_TIMEOUT) /* Internal */ \
+	item(SE_SESSION_CONTINUE) /* From login state machine */ \
+	item(SE_SESSION_CONTINUE_FAIL) /* From login state machine? */ \
+	item(SE_MAX_EVENT)
+
 /* Update iscsit_se_name table whenever session events are modified */
 typedef enum {
-	SE_UNDEFINED = 0,
-	SE_CONN_IN_LOGIN,	/* From login state machine */
-	SE_CONN_LOGGED_IN,	/* FFP enabled client notification */
-	SE_CONN_FFP_FAIL,	/* FFP disabled client notification */
-	SE_CONN_FFP_DISABLE,	/* FFP disabled client notification */
-	SE_CONN_FAIL,		/* Conn destroy client notification */
-	SE_SESSION_CLOSE,	/* FFP disabled client notification */
-	SE_SESSION_REINSTATE,	/* From login state machine */
-	SE_SESSION_TIMEOUT,	/* Internal */
-	SE_SESSION_CONTINUE,	/* From login state machine */
-	SE_SESSION_CONTINUE_FAIL, /* From login state machine? */
-	/* Add new events above SE_MAX_EVENT */
-	SE_MAX_EVENT
+#define	item(a) a,
+	SESSION_EVENT_LIST()
+#undef	item
 } iscsit_session_event_t;
 
 #ifdef ISCSIT_SESS_SM_STRINGS
 /* An array of event text values, for use in logging events */
-static const char *iscsit_se_name[SE_MAX_EVENT+1] = {
-	"SE_UNDEFINED",
-	"SE_CONN_IN_LOGIN",
-	"SE_CONN_LOGGED_IN",
-	"SE_CONN_FFP_FAIL",
-	"SE_CONN_FFP_DISABLE",
-	"SE_CONN_FAIL",
-	"SE_SESSION_CLOSE",
-	"SE_SESSION_REINSTATE",
-	"SE_SESSION_TIMEOUT",
-	"SE_SESSION_CONTINUE",
-	"SE_SESSION_CONTINUE_FAIL",
-	"SE_MAX_EVENT"
+static const char *iscsit_se_name[SE_MAX_EVENT + 1] = {
+#define	item(a) #a,
+	SESSION_EVENT_LIST()
+#undef	item
 };
 #endif
 
@@ -389,61 +370,59 @@ typedef struct {
 	iscsit_cbuf_t		*ist_rxpdu_queue;
 } iscsit_sess_t;
 
+/* Add new login states above ILS_MAX_STATE */
+#define	LOGIN_STATE_LIST() \
+	item(ILS_UNDEFINED) \
+	item(ILS_LOGIN_INIT) \
+	item(ILS_LOGIN_WAITING)	/* Waiting for more login PDU's */ \
+	item(ILS_LOGIN_PROCESSING) /* Processing login request */ \
+	item(ILS_LOGIN_RESPONDING) /* Sending login response */ \
+	item(ILS_LOGIN_RESPONDED) /* Sent login response (no trans. to FFP) */ \
+	item(ILS_LOGIN_FFP) /* Sending last login PDU for final response */ \
+	item(ILS_LOGIN_DONE) /* Last login PDU sent (so we can free it) */ \
+	item(ILS_LOGIN_ERROR) /* Login error, login failed */ \
+	item(ILS_MAX_STATE)
+
 /* Update iscsit_ils_name table whenever login states are modified */
 typedef enum {
-	ILS_UNDEFINED = 0,
-	ILS_LOGIN_INIT,
-	ILS_LOGIN_WAITING,	/* Waiting for more login PDU's */
-	ILS_LOGIN_PROCESSING,	/* Processing login request */
-	ILS_LOGIN_RESPONDING,	/* Sending login response */
-	ILS_LOGIN_RESPONDED,	/* Sent login response (no trans. to FFP) */
-	ILS_LOGIN_FFP,		/* Sending last login PDU for final response */
-	ILS_LOGIN_DONE,		/* Last login PDU sent (so we can free it) */
-	ILS_LOGIN_ERROR,	/* Login error, login failed */
-	/* Add new login states above ILS_MAX_STATE */
-	ILS_MAX_STATE
+#define	item(a) a,
+	LOGIN_STATE_LIST()
+#undef	item
 } iscsit_login_state_t;
 
 #ifdef ISCSIT_LOGIN_SM_STRINGS
-/* An array of login state text values, for use in logging login progress */
-static const char *iscsit_ils_name[ILS_MAX_STATE+1] = {
-	"ILS_UNDEFINED",
-	"ILS_LOGIN_INIT",
-	"ILS_LOGIN_WAITING",
-	"ILS_LOGIN_PROCESSING",
-	"ILS_LOGIN_RESPONDING",
-	"ILS_LOGIN_RESPONDED",
-	"ILS_LOGIN_FFP",
-	"ILS_LOGIN_DONE",
-	"ILS_LOGIN_ERROR",
-	"ILS_MAX_STATE"
+/* An array of login state text values, for use in logging login progess */
+static const char *iscsit_ils_name[ILS_MAX_STATE + 1] = {
+#define	item(a) #a,
+	LOGIN_STATE_LIST()
+#undef	item
 };
 #endif
 
+/* Add new login events above ILE_MAX_EVENT */
+#define	LOGIN_EVENT_LIST() \
+	item(ILE_UNDEFINED) \
+	item(ILE_LOGIN_RCV) \
+	item(ILE_LOGIN_RESP_READY) \
+	item(ILE_LOGIN_FFP) \
+	item(ILE_LOGIN_RESP_COMPLETE) \
+	item(ILE_LOGIN_ERROR) \
+	item(ILE_LOGIN_CONN_ERROR) \
+	item(ILE_MAX_EVENT)
+
 /* Update iscsit_ile_name table whenever login events are modified */
 typedef enum {
-	ILE_UNDEFINED = 0,
-	ILE_LOGIN_RCV,
-	ILE_LOGIN_RESP_READY,
-	ILE_LOGIN_FFP,
-	ILE_LOGIN_RESP_COMPLETE,
-	ILE_LOGIN_ERROR,
-	ILE_LOGIN_CONN_ERROR,
-	/* Add new login events above ILE_MAX_EVENT */
-	ILE_MAX_EVENT
+#define	item(a) a,
+	LOGIN_EVENT_LIST()
+#undef	item
 } iscsit_login_event_t;
 
 #ifdef ISCSIT_LOGIN_SM_STRINGS
-/* An array of login event text values, for use in logging login events */
-static const char *iscsit_ile_name[ILE_MAX_EVENT+1] = {
-	"ILE_UNDEFINED",
-	"ILE_LOGIN_RCV",
-	"ILE_LOGIN_RESP_READY",
-	"ILE_LOGIN_FFP",
-	"ILE_LOGIN_RESP_COMPLETE",
-	"ILE_LOGIN_ERROR",
-	"ILE_LOGIN_CONN_ERROR",
-	"ILE_MAX_EVENT"
+/* An array of login event text values, for use in loggin login events */
+static const char *iscsit_ile_name[ILE_MAX_EVENT + 1] = {
+#define	item(a) #a,
+	LOGIN_EVENT_LIST()
+#undef	item
 };
 #endif
 
@@ -466,8 +445,8 @@ typedef struct {
 } iscsit_op_params_t;
 
 typedef struct {
-	iscsit_login_state_t 	icl_login_state;
-	iscsit_login_state_t 	icl_login_last_state;
+	iscsit_login_state_t	icl_login_state;
+	iscsit_login_state_t	icl_login_last_state;
 	sm_audit_buf_t		icl_state_audit;
 	boolean_t		icl_busy;
 	boolean_t		icl_login_complete;
@@ -565,17 +544,22 @@ typedef struct iscsit_isns_cfg {
 	list_t			isns_svrs;
 } iscsit_isns_cfg_t;
 
+#define	SERVICE_ENABLED_LIST() \
+	item(ISE_UNDEFINED) \
+	item(ISE_DETACHED) \
+	item(ISE_DISABLED) \
+	item(ISE_ENABLING) \
+	item(ISE_ENABLED) \
+	item(ISE_BUSY) \
+	item(ISE_DISABLING)
+
 /*
  * State values for the iscsit service
  */
 typedef enum {
-	ISE_UNDEFINED = 0,
-	ISE_DETACHED,
-	ISE_DISABLED,
-	ISE_ENABLING,
-	ISE_ENABLED,
-	ISE_BUSY,
-	ISE_DISABLING
+#define	item(a) a,
+	SERVICE_ENABLED_LIST()
+#undef	item
 } iscsit_service_enabled_t;
 
 
@@ -680,9 +664,6 @@ iscsit_ctl(stmf_local_port_t *lport, int cmd, void *arg);
  */
 idm_status_t
 iscsit_conn_reinstate(iscsit_conn_t *existing_ict, iscsit_conn_t *ict);
-
-void
-iscsit_conn_destroy_done(iscsit_conn_t *ict);
 
 void
 iscsit_conn_set_auth(iscsit_conn_t *ict);

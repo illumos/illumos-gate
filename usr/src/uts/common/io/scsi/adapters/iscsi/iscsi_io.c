@@ -21,7 +21,7 @@
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2011, 2015 Nexenta Systems, Inc. All rights reserved.
  *
  * iSCSI Pseudo HBA Driver
  */
@@ -3511,11 +3511,14 @@ iscsi_timeout_checks(iscsi_sess_t *isp)
 
 	icp = isp->sess_conn_list;
 	while (icp != NULL) {
-		if (icp->conn_timeout == B_TRUE) {
+		mutex_enter(&icp->conn_state_mutex);
+		if ((icp->conn_timeout == B_TRUE) &&
+		    (icp->conn_state_idm_connected == B_TRUE)) {
 			/* timeout on this connect detected */
 			idm_ini_conn_disconnect(icp->conn_ic);
 			icp->conn_timeout = B_FALSE;
 		}
+		mutex_exit(&icp->conn_state_mutex);
 		icp = icp->conn_next;
 	}
 	rw_exit(&isp->sess_conn_list_rwlock);

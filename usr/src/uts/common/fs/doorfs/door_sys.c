@@ -81,7 +81,7 @@ size_t	door_max_arg = 16 * 1024;
  * door_upcall.  Need to guard against a process returning huge amounts
  * of data and getting the kernel stuck in kmem_alloc.
  */
-size_t	door_max_upcall_reply = 1024 * 1024;
+size_t	door_max_upcall_reply = 4 * 1024 * 1024;
 
 /*
  * Maximum number of descriptors allowed to be passed in a single
@@ -2725,7 +2725,7 @@ door_translate_out(void)
  */
 static int
 door_results(kthread_t *caller, caddr_t data_ptr, size_t data_size,
-		door_desc_t *desc_ptr, uint_t desc_num)
+    door_desc_t *desc_ptr, uint_t desc_num)
 {
 	door_client_t	*ct = DOOR_CLIENT(caller->t_door);
 	door_upcall_t	*dup = ct->d_upcall;

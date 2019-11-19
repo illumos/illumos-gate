@@ -46,6 +46,7 @@
 #include <sys/portif.h>
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_text.h>
+#include <sys/idm/idm_so.h>
 
 #define	ISCSIT_LOGIN_SM_STRINGS
 #include "iscsit.h"
@@ -733,7 +734,37 @@ login_sm_new_state(iscsit_conn_t *ict, login_event_ctx_t *ctx,
 	lsm->icl_login_state = new_state;
 	mutex_exit(&lsm->icl_mutex);
 
-	switch (lsm->icl_login_state) {
+	/*
+	 * Tale of caution here. The use of new_state instead of using
+	 * lsm->icl_login_state is deliberate (which had been used originally).
+	 * Since the icl_mutex is dropped under the right circumstances
+	 * the login state changes between setting the state and examining
+	 * the state to proceed. No big surprise since the lock was being
+	 * used in the first place to prevent just that type of change.
+	 *
+	 * There has been a case where network errors occurred while a client
+	 * was attempting to reinstate the connection causing multiple
+	 * login packets to arrive into the state machine. Those multiple
+	 * packets which were processed incorrectly caused the reference
+	 * count on the connection to be one higher than it should be and
+	 * from then on the connection can't close correctly causing a hang.
+	 *
+	 * Upon examination of the core it was found that the connection
+	 * audit data had calls looking like:
+	 *    login_sm_event_dispatch
+	 *    login_sm_processing
+	 *    login_sm_new_state
+	 * That call sequence means the new state was/is ILS_LOGIN_ERROR
+	 * yet the audit trail continues with a call to
+	 *    login_sm_send_next_response
+	 * which could only occur if icl_login_state had changed. Had the
+	 * design of COMSTAR taken this into account the code would
+	 * originally have held the icl_mutex across the processing of the
+	 * state processing. Lock order and calls which sleep prevent that
+	 * from being possible. The next best solution is to use the local
+	 * variable which holds the state.
+	 */
+	switch (new_state) {
 	case ILS_LOGIN_WAITING:
 		/* Do nothing, waiting for more login PDU's */
 		break;
@@ -1749,6 +1780,8 @@ login_sm_session_register(iscsit_conn_t *ict)
 	stmf_scsi_session_t	*ss;
 	iscsi_transport_id_t	*iscsi_tptid;
 	uint16_t		ident_len, adn_len, tptid_sz;
+	char			prop_buf[KSTAT_STRLEN + 1];
+	char			peer_buf[IDM_SA_NTOP_BUFSIZ];
 
 	/*
 	 * Hold target mutex until we have finished registering with STMF
@@ -1809,6 +1842,11 @@ login_sm_session_register(iscsit_conn_t *ict)
 	ss->ss_port_private = ict->ict_sess;
 	ict->ict_sess->ist_stmf_sess = ss;
 	mutex_exit(&ist->ist_tgt->target_mutex);
+	(void) snprintf(prop_buf, sizeof (prop_buf), "peername_%"PRIxPTR"",
+	    (uintptr_t)ict->ict_sess);
+	(void) idm_sa_ntop(&ict->ict_ic->ic_raddr, peer_buf,
+	    sizeof (peer_buf));
+	(void) stmf_add_rport_info(ss, prop_buf, peer_buf);
 
 	return (IDM_STATUS_SUCCESS);
 }
@@ -2727,15 +2765,15 @@ iscsit_fold_name(char *name, size_t *buflen)
 	/* Check for one of the supported name types */
 	if (strncasecmp(name, SNS_EUI ".", strlen(SNS_EUI) + 1) == 0) {
 		sns = SNS_EUI;
-		*buflen = SNS_EUI_U8_LEN_MAX + 1;
+		*buflen = SNS_EUI_LEN_MAX + 1;
 		flag |= U8_TEXTPREP_TOUPPER;
 	} else if (strncasecmp(name, SNS_IQN ".", strlen(SNS_IQN) + 1) == 0) {
 		sns = SNS_IQN;
-		*buflen = SNS_IQN_U8_LEN_MAX + 1;
+		*buflen = SNS_IQN_LEN_MAX + 1;
 		flag |= U8_TEXTPREP_TOLOWER;
 	} else if (strncasecmp(name, SNS_NAA ".", strlen(SNS_NAA) + 1) == 0) {
 		sns = SNS_NAA;
-		*buflen = SNS_NAA_U8_LEN_MAX + 1;
+		*buflen = SNS_NAA_LEN_MAX + 1;
 		flag |= U8_TEXTPREP_TOUPPER;
 	} else {
 		return (NULL);
@@ -2744,7 +2782,7 @@ iscsit_fold_name(char *name, size_t *buflen)
 	ret = kmem_zalloc(*buflen, KM_SLEEP);
 	coff = strlen(sns);
 	inlen = strlen(name) - coff;
-	outlen = *buflen - coff;
+	outlen = *buflen - coff - 1;
 
 	/* Fold the case and normalize string */
 	if (u8_textprep_str(name + coff, &inlen, ret + coff, &outlen, flag,

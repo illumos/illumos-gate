@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013, Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2013, 2015 Nexenta Systems, Inc. All rights reserved.
  */
 #ifndef _PPPT_H
 #define	_PPPT_H
@@ -49,74 +49,63 @@ typedef enum {
 
 #define	PPPT_MODNAME "pppt"
 
+#define	TGT_STATE_LIST() \
+	item(TS_UNDEFINED) \
+	item(TS_CREATED) \
+	item(TS_ONLINING) \
+	item(TS_ONLINE) \
+	item(TS_STMF_ONLINE) \
+	item(TS_DELETING_NEED_OFFLINE) \
+	item(TS_OFFLINING) \
+	item(TS_OFFLINE) \
+	item(TS_STMF_OFFLINE) \
+	item(TS_DELETING_STMF_DEREG) \
+	item(TS_DELETING_STMF_DEREG_FAIL) \
+	item(TS_DELETING) \
+	item(TS_MAX_STATE)
+
 /* Target states and events, update pppt_ts_name table whenever modified */
 typedef enum {
-	TS_UNDEFINED = 0,
-	TS_CREATED,
-	TS_ONLINING,
-	TS_ONLINE,
-	TS_STMF_ONLINE,
-	TS_DELETING_NEED_OFFLINE,
-	TS_OFFLINING,
-	TS_OFFLINE,
-	TS_STMF_OFFLINE,
-	TS_DELETING_STMF_DEREG,
-	TS_DELETING_STMF_DEREG_FAIL,
-	TS_DELETING,
-	TS_MAX_STATE
+#define	item(a) a,
+	TGT_STATE_LIST()
+#undef	item
 } pppt_tgt_state_t;
 
 #ifdef PPPT_TGT_SM_STRINGS
-static const char *pppt_ts_name[TS_MAX_STATE+1] = {
-	"TS_UNDEFINED",
-	"TS_CREATED",
-	"TS_ONLINING",
-	"TS_ONLINE",
-	"TS_STMF_ONLINE",
-	"TS_DELETING_NEED_OFFLINE",
-	"TS_OFFLINING",
-	"TS_OFFLINE",
-	"TS_STMF_OFFLINE",
-	"TS_DELETING_STMF_DEREG",
-	"TS_DELETING_STMF_DEREG_FAIL",
-	"TS_DELETING",
-	"TS_MAX_STATE"
+static const char *pppt_ts_name[TS_MAX_STATE + 1] = {
+#define	item(a) #a,
+	TGT_STATE_LIST()
+#undef	item
 };
 #endif
 
+#define	TGT_EVENT_LIST() \
+	item(TE_UNDEFINED) \
+	item(TE_STMF_ONLINE_REQ) \
+	item(TE_ONLINE_SUCCESS) \
+	item(TE_ONLINE_FAIL) \
+	item(TE_STMF_ONLINE_COMPLETE_ACK) \
+	item(TE_STMF_OFFLINE_REQ) \
+	item(TE_OFFLINE_COMPLETE) \
+	item(TE_STMF_OFFLINE_COMPLETE_ACK) \
+	item(TE_DELETE) \
+	item(TE_STMF_DEREG_SUCCESS) \
+	item(TE_STMF_DEREG_FAIL) \
+	item(TE_STMF_DEREG_RETRY) \
+	item(TE_WAIT_REF_COMPLETE) /* XXX */ \
+	item(TE_MAX_EVENT)
+
 typedef enum {
-	TE_UNDEFINED = 0,
-	TE_STMF_ONLINE_REQ,
-	TE_ONLINE_SUCCESS,
-	TE_ONLINE_FAIL,
-	TE_STMF_ONLINE_COMPLETE_ACK,
-	TE_STMF_OFFLINE_REQ,
-	TE_OFFLINE_COMPLETE,
-	TE_STMF_OFFLINE_COMPLETE_ACK,
-	TE_DELETE,
-	TE_STMF_DEREG_SUCCESS,
-	TE_STMF_DEREG_FAIL,
-	TE_STMF_DEREG_RETRY,
-	TE_WAIT_REF_COMPLETE, /* XXX */
-	TE_MAX_EVENT
+#define	item(a) a,
+	TGT_EVENT_LIST()
+#undef	item
 } pppt_tgt_event_t;
 
 #ifdef PPPT_TGT_SM_STRINGS
-static const char *pppt_te_name[TE_MAX_EVENT+1] = {
-	"TE_UNDEFINED",
-	"TE_STMF_ONLINE_REQ",
-	"TE_ONLINE_SUCCESS",
-	"TE_ONLINE_FAIL",
-	"TE_STMF_ONLINE_COMPLETE_ACK",
-	"TE_STMF_OFFLINE_REQ",
-	"TE_OFFLINE_COMPLETE",
-	"TE_STMF_OFFLINE_COMPLETE_ACK",
-	"TE_DELETE",
-	"TE_STMF_DEREG_SUCCESS",
-	"TE_STMF_DEREG_FAIL",
-	"TE_STMF_DEREG_RETRY",
-	"TE_WAIT_REF_COMPLETE",
-	"TE_MAX_EVENT"
+static const char *pppt_te_name[TE_MAX_EVENT + 1] = {
+#define	item(a) #a,
+	TGT_EVENT_LIST()
+#undef	item
 };
 #endif
 

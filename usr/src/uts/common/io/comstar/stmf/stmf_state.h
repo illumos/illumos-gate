@@ -22,7 +22,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2011, Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016, Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 #ifndef	_STMF_STATE_H
@@ -62,8 +62,7 @@ typedef struct stmf_state {
 	uint32_t		stmf_svc_flags;
 	stmf_i_lu_t		*stmf_svc_ilu_draining;
 	stmf_i_lu_t		*stmf_svc_ilu_timing;
-	struct stmf_svc_req	*stmf_svc_active;
-	struct stmf_svc_req	**stmf_svc_tailp;
+	list_t			stmf_svc_list;
 
 	stmf_id_list_t		stmf_hg_list;
 	stmf_id_list_t		stmf_tg_list;
@@ -86,7 +85,7 @@ typedef struct stmf_state {
  * different types of services) are added to the stmf_svc_thread.
  */
 typedef struct stmf_svc_req {
-	struct stmf_svc_req		*svc_next;
+	list_node_t			svc_list_entry;
 	int				svc_req_alloc_size;
 	int				svc_cmd;
 	void				*svc_obj;

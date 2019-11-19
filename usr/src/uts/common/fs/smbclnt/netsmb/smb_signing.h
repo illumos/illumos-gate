@@ -48,6 +48,8 @@ typedef CK_MECHANISM		smb_sign_mech_t;
 typedef CK_SESSION_HANDLE	smb_sign_ctx_t;
 #endif	/* _KERNEL */
 
+struct smb_mac_ops;
+
 /*
  * SMB signing routines used in smb_signing.c
  */
@@ -65,6 +67,11 @@ int smb2_hmac_getmech(smb_sign_mech_t *);
 int smb2_hmac_init(smb_sign_ctx_t *, smb_sign_mech_t *, uint8_t *, size_t);
 int smb2_hmac_update(smb_sign_ctx_t, uint8_t *, size_t);
 int smb2_hmac_final(smb_sign_ctx_t, uint8_t *);
+
+int smb3_cmac_getmech(smb_sign_mech_t *);
+int smb3_cmac_init(smb_sign_ctx_t *, smb_sign_mech_t *, uint8_t *, size_t);
+int smb3_cmac_update(smb_sign_ctx_t, uint8_t *, size_t);
+int smb3_cmac_final(smb_sign_ctx_t, uint8_t *);
 
 #ifdef __cplusplus
 }

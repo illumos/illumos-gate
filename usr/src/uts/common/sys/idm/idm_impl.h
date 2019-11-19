@@ -22,7 +22,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2014-2015 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_IDM_IMPL_H_
@@ -155,7 +155,7 @@ typedef struct idm_conn_s {
 	void			*ic_handle;
 	idm_refcnt_t		ic_refcnt;
 	idm_svc_t		*ic_svc_binding; /* Target conn. only */
-	idm_sockaddr_t 		ic_ini_dst_addr;
+	idm_sockaddr_t		ic_ini_dst_addr;
 	struct sockaddr_storage	ic_laddr;	/* conn local address */
 	struct sockaddr_storage	ic_raddr;	/* conn remote address */
 
@@ -321,7 +321,7 @@ typedef enum {
 	BP_CHECK_ASSERT
 } idm_bufpat_check_type_t;
 
-#define	BUFPAT_MATCH(bc_bufpat, bc_idb) 		\
+#define	BUFPAT_MATCH(bc_bufpat, bc_idb)			\
 	((bufpat->bufpat_idb == bc_idb) &&		\
 	    (bufpat->bufpat_bufmagic == IDM_BUF_MAGIC))
 
@@ -409,9 +409,19 @@ typedef struct {
 
 #define	OSD_EXT_CDB_AHSLEN	(200 - 15)
 #define	BIDI_AHS_LENGTH		5
+/*
+ * Additional Header Segment (AHS)
+ * AHS is only valid for SCSI Requests and contains SCSI CDB information
+ * which doesn't fit in the standard 16 byte area of the PDU. Commonly
+ * this only holds true for OSD device commands.
+ *
+ * IDM_SORX_CACHE_ASHLEN is the amount of memory which is preallocated in bytes.
+ * When used in the header the AHS length is stored as the number of 4-byte
+ * words; so IDM_SORX_WIRE_ASHLEN is IDM_SORX_CACHE_ASHLEN in words.
+ */
 #define	IDM_SORX_CACHE_AHSLEN \
-	(((OSD_EXT_CDB_AHSLEN + 3) + \
-	    (BIDI_AHS_LENGTH + 3)) / sizeof (uint32_t))
+	((OSD_EXT_CDB_AHSLEN + 3) + (BIDI_AHS_LENGTH + 3))
+#define	IDM_SORX_WIRE_AHSLEN (IDM_SORX_CACHE_AHSLEN / sizeof (uint32_t))
 #define	IDM_SORX_CACHE_HDRLEN	(sizeof (iscsi_hdr_t) + IDM_SORX_CACHE_AHSLEN)
 
 /*

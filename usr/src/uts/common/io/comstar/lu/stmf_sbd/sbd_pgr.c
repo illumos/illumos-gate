@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/atomic.h>
@@ -39,7 +40,7 @@
 
 #define	MAX_PGR_PARAM_LIST_LENGTH	(256 * 1024)
 
-int  sbd_pgr_reservation_conflict(scsi_task_t *);
+int  sbd_pgr_reservation_conflict(scsi_task_t *, struct sbd_lu *sl);
 void sbd_pgr_reset(sbd_lu_t *);
 void sbd_pgr_initialize_it(scsi_task_t *, sbd_it_data_t *);
 void sbd_handle_pgr_in_cmd(scsi_task_t *, stmf_data_buf_t *);
@@ -82,6 +83,7 @@ static void sbd_pgr_do_release(sbd_lu_t *, sbd_it_data_t *, uint8_t);
 static void sbd_pgr_do_reserve(sbd_pgr_t *, sbd_pgr_key_t *, sbd_it_data_t *it,
 	stmf_scsi_session_t *, scsi_cdb_prout_t *);
 
+static boolean_t sbd_pgr_should_save(sbd_lu_t *);
 extern sbd_status_t sbd_write_meta_section(sbd_lu_t *, sm_section_hdr_t *);
 extern sbd_status_t sbd_read_meta_section(sbd_lu_t *, sm_section_hdr_t **,
 	uint16_t);
@@ -195,7 +197,7 @@ extern char sbd_ctoi(char c);
 	/* actions for PERSISTENT RESERVE OUT command */                   \
 	(((cdb[0]) == SCMD_PERSISTENT_RESERVE_OUT) && (                    \
 	    (((cdb[1]) & 0x1F) == PR_OUT_REGISTER_AND_IGNORE_EXISTING_KEY) || \
-	    (((cdb[1]) & 0x1F) == PR_OUT_REGISTER))) 			|| \
+	    (((cdb[1]) & 0x1F) == PR_OUT_REGISTER)))			|| \
 	/* ----------------------- */                                      \
 	/* SBC-3 (rev 17) Table 3  */                                      \
 	/* ----------------------- */                                      \
@@ -280,7 +282,7 @@ sbd_status_t
 sbd_pgr_meta_init(sbd_lu_t *slu)
 {
 	sbd_pgr_info_t	*spi = NULL;
-	uint32_t 	sz;
+	uint32_t	sz;
 	sbd_status_t	ret;
 
 	sz = sizeof (sbd_pgr_info_t);
@@ -293,6 +295,22 @@ sbd_pgr_meta_init(sbd_lu_t *slu)
 	ret = sbd_write_meta_section(slu, (sm_section_hdr_t *)spi);
 	kmem_free(spi, sz);
 	return (ret);
+}
+
+/*
+ * Evaluate common cases where a PERSISTENT RESERVE OUT CDB handler should call
+ * sbd_pgr_meta_write().
+ */
+static boolean_t
+sbd_pgr_should_save(sbd_lu_t *slu)
+{
+	sbd_pgr_t		*pgr = slu->sl_pgr;
+
+	if (stmf_is_pgr_aptpl_always() == B_TRUE ||
+	    (pgr->pgr_flags & (SBD_PGR_APTPL)))
+		return (B_TRUE);
+	else
+		return (B_FALSE);
 }
 
 sbd_status_t
@@ -323,7 +341,12 @@ sbd_pgr_meta_load(sbd_lu_t *slu)
 	}
 
 	pgr->pgr_flags = spi->pgr_flags;
-	if (pgr->pgr_flags & SBD_PGR_APTPL) {
+	/*
+	 * We reload APTPL reservations when:
+	 *  1. Global override is enabled
+	 *  2. APTPL was explicitly asserted in the PERSISTENT RESERVE OUT CDB
+	 */
+	if (stmf_is_pgr_aptpl_always() || (pgr->pgr_flags & SBD_PGR_APTPL)) {
 		pgr->pgr_rsv_type = spi->pgr_rsv_type;
 		pgr->pgr_rsv_scope = spi->pgr_rsv_scope;
 	} else {
@@ -436,7 +459,7 @@ sbd_pgr_meta_write(sbd_lu_t *slu)
 
 	/* Calculate total pgr meta section size needed */
 	sz = sizeof (sbd_pgr_info_t);
-	if (pgr->pgr_flags & SBD_PGR_APTPL) {
+	if ((pgr->pgr_flags & SBD_PGR_APTPL) || stmf_is_pgr_aptpl_always()) {
 		key = pgr->pgr_keylist;
 		while (key != NULL) {
 			sz = ALIGNED_TO_8BYTE_BOUNDARY(sz +
@@ -458,7 +481,7 @@ sbd_pgr_meta_write(sbd_lu_t *slu)
 	spi->pgr_sms_header.sms_id = SMS_ID_PGR_INFO;
 	spi->pgr_sms_header.sms_data_order = SMS_DATA_ORDER;
 
-	if (pgr->pgr_flags & SBD_PGR_APTPL) {
+	if ((pgr->pgr_flags & SBD_PGR_APTPL) || stmf_is_pgr_aptpl_always()) {
 		uint8_t *ptr;
 		key = pgr->pgr_keylist;
 		sz = sizeof (sbd_pgr_info_t);
@@ -484,8 +507,12 @@ sbd_pgr_meta_write(sbd_lu_t *slu)
 			key = key->pgr_key_next;
 		}
 	}
-
+	rw_downgrade(&pgr->pgr_lock);
 	ret = sbd_write_meta_section(slu, (sm_section_hdr_t *)spi);
+	if (!rw_tryupgrade(&pgr->pgr_lock)) {
+		rw_exit(&pgr->pgr_lock);
+		rw_enter(&pgr->pgr_lock, RW_WRITER);
+	}
 	kmem_free(spi, totalsz);
 	if (ret != SBD_SUCCESS) {
 		sbd_pgr_key_t	*tmp_list;
@@ -513,7 +540,7 @@ sbd_pgr_meta_write(sbd_lu_t *slu)
 
 static sbd_pgr_key_t *
 sbd_pgr_key_alloc(scsi_devid_desc_t *lptid, scsi_transport_id_t *rptid,
-					int16_t lpt_len, int16_t rpt_len)
+    int16_t lpt_len, int16_t rpt_len)
 {
 	sbd_pgr_key_t *key;
 
@@ -578,7 +605,8 @@ sbd_pgr_reset(sbd_lu_t *slu)
 	sbd_pgr_t	*pgr  = slu->sl_pgr;
 
 	rw_enter(&pgr->pgr_lock, RW_WRITER);
-	if (!(pgr->pgr_flags & SBD_PGR_APTPL)) {
+	if (!(pgr->pgr_flags & SBD_PGR_APTPL) &&
+	    stmf_is_pgr_aptpl_always() == B_FALSE) {
 		sbd_pgr_keylist_dealloc(slu);
 		pgr->pgr_PRgeneration	= 0;
 		pgr->pgr_rsvholder	= NULL;
@@ -630,7 +658,7 @@ sbd_pgr_remove_key(sbd_lu_t *slu, sbd_pgr_key_t *key)
  */
 static uint32_t
 sbd_pgr_remove_keys(sbd_lu_t *slu, sbd_it_data_t *my_it, sbd_pgr_key_t *my_key,
-				uint64_t svc_key, boolean_t match)
+    uint64_t svc_key, boolean_t match)
 {
 	sbd_pgr_t	*pgr  = slu->sl_pgr;
 	sbd_it_data_t	*it;
@@ -708,7 +736,7 @@ sbd_pgr_set_pgr_check_flag(sbd_lu_t *slu, boolean_t registered)
 
 static boolean_t
 sbd_pgr_key_compare(sbd_pgr_key_t *key, scsi_devid_desc_t *lpt,
-					stmf_remote_port_t *rpt)
+    stmf_remote_port_t *rpt)
 {
 	scsi_devid_desc_t *id;
 
@@ -732,7 +760,7 @@ sbd_pgr_key_compare(sbd_pgr_key_t *key, scsi_devid_desc_t *lpt,
 
 sbd_pgr_key_t *
 sbd_pgr_key_registered(sbd_pgr_t *pgr, scsi_devid_desc_t *lpt,
-					stmf_remote_port_t *rpt)
+    stmf_remote_port_t *rpt)
 {
 	sbd_pgr_key_t *key;
 
@@ -812,9 +840,8 @@ sbd_pgr_initialize_it(scsi_task_t *task, sbd_it_data_t *it)
  * Check for any PGR Reservation conflict. return 0 if access allowed
  */
 int
-sbd_pgr_reservation_conflict(scsi_task_t *task)
+sbd_pgr_reservation_conflict(scsi_task_t *task, sbd_lu_t *slu)
 {
-	sbd_lu_t	*slu = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	sbd_pgr_t	*pgr = slu->sl_pgr;
 	sbd_it_data_t	*it  = (sbd_it_data_t *)task->task_lu_itl_handle;
 
@@ -1129,7 +1156,7 @@ sbd_pgr_in_read_reservation(scsi_task_t *task, stmf_data_buf_t *initial_dbuf)
 
 static void
 sbd_pgr_in_report_capabilities(scsi_task_t *task,
-				stmf_data_buf_t *initial_dbuf)
+    stmf_data_buf_t *initial_dbuf)
 {
 	sbd_lu_t	*slu   = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	sbd_pgr_t	*pgr   =  slu->sl_pgr;
@@ -1167,14 +1194,14 @@ sbd_pgr_in_report_capabilities(scsi_task_t *task,
 
 static void
 sbd_pgr_in_read_full_status(scsi_task_t *task,
-				stmf_data_buf_t *initial_dbuf)
+    stmf_data_buf_t *initial_dbuf)
 {
 	sbd_lu_t	*slu   = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	sbd_pgr_t	*pgr   = slu->sl_pgr;
 	sbd_pgr_key_t	*key;
-	scsi_prin_status_t 	*sts;
+	scsi_prin_status_t	*sts;
 	scsi_prin_full_status_t	*buf;
-	uint32_t 		i, buf_size, cdb_len;
+	uint32_t		i, buf_size, cdb_len;
 	uint8_t			*offset;
 
 	ASSERT(task->task_cdb[0] == SCMD_PERSISTENT_RESERVE_IN);
@@ -1203,7 +1230,7 @@ sbd_pgr_in_read_full_status(scsi_task_t *task,
 		if ((pgr->pgr_flags & SBD_PGR_RSVD_ALL_REGISTRANTS) ||
 		    (pgr->pgr_rsvholder && pgr->pgr_rsvholder == key)) {
 				sts->r_holder	= 1;
-				sts->type 	= pgr->pgr_rsv_type;
+				sts->type	= pgr->pgr_rsv_type;
 				sts->scope	= pgr->pgr_rsv_scope;
 		}
 
@@ -1386,7 +1413,7 @@ sbd_pgr_out_register(scsi_task_t *task, stmf_data_buf_t *dbuf)
 
 sbd_pgr_reg_done:
 
-	if (pgr->pgr_flags & SBD_PGR_APTPL || plist->aptpl) {
+	if (plist->aptpl || (sbd_pgr_should_save(slu) == B_TRUE)) {
 		if (plist->aptpl)
 			PGR_SET_FLAG(pgr->pgr_flags, SBD_PGR_APTPL);
 		else
@@ -1394,7 +1421,7 @@ sbd_pgr_reg_done:
 
 		if (sbd_pgr_meta_write(slu) != SBD_SUCCESS) {
 			stmf_scsilib_send_status(task, STATUS_CHECK,
-			    STMF_SAA_INSUFFICIENT_REG_RESOURCES);
+			    STMF_SAA_INSUFFICIENT_REG_RESRCS);
 			return;
 		}
 	}
@@ -1405,7 +1432,7 @@ sbd_pgr_reg_done:
 
 static sbd_pgr_key_t *
 sbd_pgr_do_register(sbd_lu_t *slu, sbd_it_data_t *it, scsi_devid_desc_t *lpt,
-		stmf_remote_port_t *rpt, uint8_t keyflag, uint64_t svc_key)
+    stmf_remote_port_t *rpt, uint8_t keyflag, uint64_t svc_key)
 {
 	sbd_pgr_t		*pgr = slu->sl_pgr;
 	sbd_pgr_key_t		*key;
@@ -1491,10 +1518,10 @@ sbd_pgr_out_reserve(scsi_task_t *task)
 	/* In case there is no reservation exist */
 	} else {
 		sbd_pgr_do_reserve(pgr, key, it, ses, pr_out);
-		if (pgr->pgr_flags & SBD_PGR_APTPL) {
+		if (sbd_pgr_should_save(slu) == B_TRUE) {
 			if (sbd_pgr_meta_write(slu) != SBD_SUCCESS) {
 				stmf_scsilib_send_status(task, STATUS_CHECK,
-				    STMF_SAA_INSUFFICIENT_REG_RESOURCES);
+				    STMF_SAA_INSUFFICIENT_REG_RESRCS);
 				return;
 			}
 		}
@@ -1505,7 +1532,7 @@ sbd_pgr_out_reserve(scsi_task_t *task)
 
 static void
 sbd_pgr_do_reserve(sbd_pgr_t *pgr, sbd_pgr_key_t *key, sbd_it_data_t *it,
-			stmf_scsi_session_t *ses, scsi_cdb_prout_t *pr_out)
+    stmf_scsi_session_t *ses, scsi_cdb_prout_t *pr_out)
 {
 	scsi_devid_desc_t	*lpt;
 	uint16_t		lpt_len;
@@ -1548,6 +1575,11 @@ sbd_pgr_out_release(scsi_task_t *task)
 
 	ASSERT(key);
 
+	/*
+	 * XXX this does not honor APTPL
+	 * (i.e., changes made to a formerly-persistent reservation are not
+	 *  updated here!!!)
+	 */
 	if (SBD_PGR_RSVD(pgr)) {
 		if (pgr->pgr_flags & SBD_PGR_RSVD_ALL_REGISTRANTS ||
 		    pgr->pgr_rsvholder == key) {
@@ -1559,6 +1591,27 @@ sbd_pgr_out_release(scsi_task_t *task)
 			}
 			sbd_pgr_do_release(slu, it,
 			    SBD_UA_RESERVATIONS_RELEASED);
+
+			/*
+			 * XXX T10 SPC-3 5.6.10.2 says nothing about what to
+			 * do in the event of a failure updating the
+			 * PGR nvram store for a reservation associated with
+			 * an APTPL-enabled (see SPC-3 5.6.4.1) I_T
+			 * registration during a RELEASE service action.
+			 *
+			 * Technically, the CDB completed successfully, as per
+			 * the spec, but at some point we may need to enter
+			 * a recovery mode on the initiator(s) if we power cycle
+			 * the target at the wrong instant...
+			 */
+			if (sbd_pgr_should_save(slu) == B_TRUE) {
+				if (sbd_pgr_meta_write(slu) != SBD_SUCCESS) {
+					stmf_scsilib_send_status(task,
+					    STATUS_CHECK,
+					    STMF_SAA_INSUFFICIENT_REG_RESRCS);
+					return;
+				}
+			}
 		}
 	}
 	stmf_scsilib_send_status(task, STATUS_GOOD, 0);
@@ -1602,10 +1655,10 @@ sbd_pgr_out_clear(scsi_task_t *task)
 	mutex_exit(&slu->sl_lock);
 	sbd_pgr_keylist_dealloc(slu);
 	sbd_pgr_set_ua_conditions(slu, it, SBD_UA_RESERVATIONS_PREEMPTED);
-	if (pgr->pgr_flags & SBD_PGR_APTPL) {
+	if (sbd_pgr_should_save(slu) == B_TRUE) {
 		if (sbd_pgr_meta_write(slu) != SBD_SUCCESS) {
 			stmf_scsilib_send_status(task, STATUS_CHECK,
-			    STMF_SAA_INSUFFICIENT_REG_RESOURCES);
+			    STMF_SAA_INSUFFICIENT_REG_RESRCS);
 			return;
 		}
 	}
@@ -1717,10 +1770,10 @@ sbd_pgr_out_preempt(scsi_task_t *task, stmf_data_buf_t *dbuf)
 		}
 	}
 
-	if (pgr->pgr_flags & SBD_PGR_APTPL) {
+	if (sbd_pgr_should_save(slu) == B_TRUE) {
 		if (sbd_pgr_meta_write(slu) != SBD_SUCCESS) {
 			stmf_scsilib_send_status(task, STATUS_CHECK,
-			    STMF_SAA_INSUFFICIENT_REG_RESOURCES);
+			    STMF_SAA_INSUFFICIENT_REG_RESRCS);
 			return;
 		}
 	}
@@ -1831,8 +1884,8 @@ sbd_pgr_out_register_and_move(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	}
 
 
-	/* Write to disk if currenty aptpl is set or given task is setting it */
-	if (pgr->pgr_flags & SBD_PGR_APTPL || plist->aptpl) {
+	/* Write to disk if aptpl is currently set or this task is setting it */
+	if (plist->aptpl || (sbd_pgr_should_save(slu) == B_TRUE)) {
 		if (plist->aptpl)
 			PGR_SET_FLAG(pgr->pgr_flags, SBD_PGR_APTPL);
 		else
@@ -1840,7 +1893,7 @@ sbd_pgr_out_register_and_move(scsi_task_t *task, stmf_data_buf_t *dbuf)
 
 		if (sbd_pgr_meta_write(slu) != SBD_SUCCESS) {
 			stmf_scsilib_send_status(task, STATUS_CHECK,
-			    STMF_SAA_INSUFFICIENT_REG_RESOURCES);
+			    STMF_SAA_INSUFFICIENT_REG_RESRCS);
 			return;
 		}
 	}
@@ -1850,7 +1903,8 @@ sbd_pgr_out_register_and_move(scsi_task_t *task, stmf_data_buf_t *dbuf)
 }
 
 void
-sbd_pgr_remove_it_handle(sbd_lu_t *sl, sbd_it_data_t *my_it) {
+sbd_pgr_remove_it_handle(sbd_lu_t *sl, sbd_it_data_t *my_it)
+{
 	sbd_it_data_t *it;
 
 	rw_enter(&sl->sl_pgr->pgr_lock, RW_WRITER);

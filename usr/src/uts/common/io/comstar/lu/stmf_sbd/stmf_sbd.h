@@ -34,6 +34,7 @@ extern "C" {
 #endif
 
 typedef	stmf_status_t	sbd_status_t;
+#include "ats_copy_mgr.h"
 extern char sbd_vendor_id[];
 extern char sbd_product_id[];
 extern char sbd_revision[];
@@ -56,6 +57,7 @@ extern krwlock_t sbd_global_prop_lock;
 #define	SBD_FILEIO_FAILURE	(SBD_FAILURE | STMF_FSC(7))
 #define	SBD_IO_PAST_EOF		(SBD_FAILURE | STMF_FSC(8))
 #define	SBD_BUSY		(SBD_FAILURE | STMF_FSC(9))
+#define	SBD_COMPARE_FAILED	(SBD_FAILURE | STMF_FSC(10))
 
 #define	SHARED_META_DATA_SIZE	65536
 #define	SBD_META_OFFSET		4096
@@ -246,6 +248,7 @@ typedef struct sbd_lu {
 	struct sbd_it_data	*sl_it_list;
 	struct sbd_pgr		*sl_pgr;
 	uint64_t	sl_rs_owner_session_id;
+	list_t		sl_ats_io_list;
 } sbd_lu_t;
 
 /*
@@ -303,6 +306,11 @@ sbd_status_t sbd_flush_data_cache(sbd_lu_t *sl, int fsync_done);
 sbd_status_t sbd_wcd_set(int wcd, sbd_lu_t *sl);
 void sbd_wcd_get(int *wcd, sbd_lu_t *sl);
 int sbd_unmap(sbd_lu_t *sl, dkioc_free_list_t *dfl);
+
+void sbd_handle_short_write_transfers(scsi_task_t *, stmf_data_buf_t *,
+    uint32_t);
+void sbd_handle_short_read_transfers(scsi_task_t *, stmf_data_buf_t *,
+    uint8_t *, uint32_t, uint32_t);
 
 #ifdef	__cplusplus
 }

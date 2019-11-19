@@ -21,6 +21,7 @@
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
  *
  * iSCSI Software Initiator
@@ -848,6 +849,7 @@ iscsi_tran_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 		icmdp->cmd_sig			= ISCSI_SIG_CMD;
 		icmdp->cmd_state		= ISCSI_CMD_STATE_FREE;
 		icmdp->cmd_lun			= ilp;
+		iscsi_lun_hold(ilp);
 		icmdp->cmd_type			= ISCSI_CMD_TYPE_SCSI;
 		/* add the report lun addressing type on to the lun */
 		icmdp->cmd_un.scsi.lun		= ilp->lun_addr_type << 14;
@@ -1091,6 +1093,7 @@ iscsi_tran_destroy_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 	ASSERT(icmdp->cmd_sig == ISCSI_SIG_CMD);
 	ASSERT(icmdp->cmd_state == ISCSI_CMD_STATE_FREE);
 
+	iscsi_lun_rele(icmdp->cmd_lun);
 	mutex_destroy(&icmdp->cmd_mutex);
 	cv_destroy(&icmdp->cmd_completion);
 	scsi_hba_pkt_free(ap, pkt);

@@ -191,6 +191,8 @@ struct mode_page {
  */
 
 #define	MODEPAGE_DISCO_RECO	0x02
+#define	MODEPAGE_FORMAT		0x03
+#define	MODEPAGE_GEOMETRY	0x04
 #define	MODEPAGE_CACHING	0x08
 #define	MODEPAGE_PDEVICE	0x09
 #define	MODEPAGE_CTRL_MODE	0x0A

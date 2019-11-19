@@ -215,13 +215,19 @@ smb3_cmac_init(smb_sign_ctx_t *ctxp, smb_crypto_mech_t *mech,
 
 	rv = SUNW_C_KeyToObject(*ctxp, mech->mechanism,
 	    key, key_len, &hkey);
-	if (rv != CKR_OK)
+	if (rv != CKR_OK) {
+		(void) C_CloseSession(*ctxp);
 		return (-1);
+	}
 
 	rv = C_SignInit(*ctxp, mech, hkey);
 	(void) C_DestroyObject(*ctxp, hkey);
+	if (rv != CKR_OK) {
+		(void) C_CloseSession(*ctxp);
+		return (-1);
+	}
 
-	return (rv == CKR_OK ? 0 : -1);
+	return (0);
 }
 
 /*

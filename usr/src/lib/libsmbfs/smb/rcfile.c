@@ -492,8 +492,7 @@ rc_parse(struct rcfile *rcp)
 			if (home_nsmbrc != 0 && (
 			    strcmp(buf, "nbns") == 0 ||
 			    strcmp(buf, "nbns_enable") == 0 ||
-			    strcmp(buf, "nbns_broadcast") == 0 ||
-			    strcmp(buf, "signing") == 0)) {
+			    strcmp(buf, "nbns_broadcast") == 0)) {
 				fprintf(stderr, dgettext(TEXT_DOMAIN,
 				    "option %s may not be set "
 				    "in user .nsmbrc file\n"), buf);
