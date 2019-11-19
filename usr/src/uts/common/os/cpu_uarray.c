@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/cpu_uarray.h>
@@ -45,7 +45,8 @@ cpu_uarray_zalloc(size_t nr_items, int kmflags)
 void
 cpu_uarray_free(cpu_uarray_t *cua)
 {
-	kmem_free(cua, cpu_uarray_size(cua->cu_nr_items));
+	if (cua != NULL)
+		kmem_free(cua, cpu_uarray_size(cua->cu_nr_items));
 }
 
 uint64_t
