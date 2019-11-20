@@ -45,6 +45,8 @@ file path=usr/bin/ctfmerge mode=0555
 # so we need to redeliver isaexec in order to create the
 # proto area correctly.
 file path=usr/lib/isaexec
+# Needed by make_test
+file path=usr/bin/make mode=0555
 
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
