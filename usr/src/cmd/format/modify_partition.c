@@ -559,7 +559,7 @@ get_user_map_efi(map, float_part)
 	u_ioparam_t	ioparam;
 	char		tmpstr[80];
 	uint64_t	i64;
-	uint64_t	start_lba = 34;
+	uint64_t	start_lba = map->efi_first_u_lba;
 
 	for (i = 0; i < map->efi_nparts - 1; i++) {
 		if (i == float_part)

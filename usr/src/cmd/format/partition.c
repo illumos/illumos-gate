@@ -104,7 +104,7 @@ maxofN(struct dk_gpt *map)
 	    }
 	}
 	if (max == 0)
-	    max = 34;
+	    max = map->efi_first_u_lba;
 	return (max);
 }
 
@@ -158,7 +158,7 @@ change_partition(int num)
 	    ioparam.io_slist = pflag_choices;
 	    flag = input(FIO_SLIST, msg, ':', &ioparam, &deflt, DATA_INPUT);
 
-	    ioparam.io_bounds.lower = 34;
+	    ioparam.io_bounds.lower = cur_parts->etoc->efi_first_u_lba;
 	    ioparam.io_bounds.upper = cur_parts->etoc->efi_last_u_lba;
 
 	    efi_deflt.start_sector = maxofN(cur_parts->etoc);

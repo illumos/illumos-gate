@@ -562,7 +562,9 @@ cmd_gpt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
 		return (DCMD_ERR);
 	}
 
-	crc = efi_crc32((unsigned char *)gpet, table_size);
+	crc = efi_crc32((unsigned char *)gpet,
+	    header->efi_gpt_SizeOfPartitionEntry *
+	    header->efi_gpt_NumberOfPartitionEntries);
 
 	mdb_printf("PartitionEntryArrayCRC32: %#x (should be %#x)\n",
 	    header->efi_gpt_PartitionEntryArrayCRC32, crc);
