@@ -12,14 +12,14 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 [DEFAULT]
 pre =
 verbose = False
 quiet = False
-timeout = 60
+timeout = 120
 post =
 outputdir = /var/tmp/test_results
 
