@@ -282,7 +282,7 @@ write_label()
 	if (cur_label == L_TYPE_EFI) {
 		enter_critical();
 		vtoc64 = cur_parts->etoc;
-		err_check(vtoc64);
+		efi_err_check(vtoc64);
 		if (efi_write(cur_file, vtoc64) != 0) {
 			err_print("Warning: error writing EFI.\n");
 			error = -1;
@@ -977,97 +977,6 @@ is_efi_type(int fd)
 		return (1);
 	}
 	return (0);
-}
-
-/* make sure the user specified something reasonable */
-void
-err_check(struct dk_gpt *vtoc)
-{
-	int		resv_part = -1;
-	int		i, j;
-	diskaddr_t	istart, jstart, isize, jsize, endsect;
-	int		overlap = 0;
-	uint_t		reserved;
-
-	/*
-	 * make sure no partitions overlap
-	 */
-	reserved = efi_reserved_sectors(vtoc);
-	for (i = 0; i < vtoc->efi_nparts; i++) {
-		/* It can't be unassigned and have an actual size */
-		if ((vtoc->efi_parts[i].p_tag == V_UNASSIGNED) &&
-		    (vtoc->efi_parts[i].p_size != 0)) {
-			(void) fprintf(stderr,
-"partition %d is \"unassigned\" but has a size of %llu\n", i,
-			    vtoc->efi_parts[i].p_size);
-		}
-		if (vtoc->efi_parts[i].p_tag == V_UNASSIGNED) {
-			continue;
-		}
-		if (vtoc->efi_parts[i].p_tag == V_RESERVED) {
-			if (resv_part != -1) {
-				(void) fprintf(stderr,
-"found duplicate reserved partition at %d\n", i);
-			}
-			resv_part = i;
-			if (vtoc->efi_parts[i].p_size != reserved)
-				(void) fprintf(stderr,
-"Warning: reserved partition size must be %u sectors\n",
-				    reserved);
-		}
-		if ((vtoc->efi_parts[i].p_start < vtoc->efi_first_u_lba) ||
-		    (vtoc->efi_parts[i].p_start > vtoc->efi_last_u_lba)) {
-			(void) fprintf(stderr,
-			    "Partition %d starts at %llu\n",
-			    i,
-			    vtoc->efi_parts[i].p_start);
-			(void) fprintf(stderr,
-			    "It must be between %llu and %llu.\n",
-			    vtoc->efi_first_u_lba,
-			    vtoc->efi_last_u_lba);
-		}
-		if ((vtoc->efi_parts[i].p_start +
-		    vtoc->efi_parts[i].p_size <
-		    vtoc->efi_first_u_lba) ||
-		    (vtoc->efi_parts[i].p_start +
-		    vtoc->efi_parts[i].p_size >
-		    vtoc->efi_last_u_lba + 1)) {
-			(void) fprintf(stderr,
-			    "Partition %d ends at %llu\n",
-			    i,
-			    vtoc->efi_parts[i].p_start +
-			    vtoc->efi_parts[i].p_size);
-			(void) fprintf(stderr,
-			    "It must be between %llu and %llu.\n",
-			    vtoc->efi_first_u_lba,
-			    vtoc->efi_last_u_lba);
-		}
-
-		for (j = 0; j < vtoc->efi_nparts; j++) {
-			isize = vtoc->efi_parts[i].p_size;
-			jsize = vtoc->efi_parts[j].p_size;
-			istart = vtoc->efi_parts[i].p_start;
-			jstart = vtoc->efi_parts[j].p_start;
-			if ((i != j) && (isize != 0) && (jsize != 0)) {
-				endsect = jstart + jsize -1;
-				if ((jstart <= istart) &&
-				    (istart <= endsect)) {
-					if (!overlap) {
-					(void) fprintf(stderr,
-"label error: EFI Labels do not support overlapping partitions\n");
-					}
-					(void) fprintf(stderr,
-"Partition %d overlaps partition %d.\n", i, j);
-					overlap = 1;
-				}
-			}
-		}
-	}
-	/* make sure there is a reserved partition */
-	if (resv_part == -1) {
-		(void) fprintf(stderr,
-		    "no reserved partition found\n");
-	}
 }
 
 #ifdef	DEBUG

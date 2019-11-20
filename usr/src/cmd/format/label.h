@@ -44,7 +44,7 @@ int	get_disk_inquiry_prop(char *, char **, char **, char **);
 int	get_disk_info(int, struct efi_info *, struct disk_info *);
 int	label_to_vtoc(struct extvtoc *, struct dk_label *);
 int	SMI_vtoc_to_EFI(int, struct dk_gpt **);
-void	err_check(struct dk_gpt *);
+void	efi_err_check(struct dk_gpt *);
 extern int	is_efi_type(int);
 
 #ifdef	__cplusplus
