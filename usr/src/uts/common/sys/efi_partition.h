@@ -255,6 +255,7 @@ struct partition64 {
 #define	EFI_NUMPAR	9
 
 #ifndef _KERNEL
+extern	uint_t	efi_reserved_sectors(struct dk_gpt *);
 extern	int	efi_alloc_and_init(int, uint32_t, struct dk_gpt **);
 extern	int	efi_alloc_and_read(int, struct dk_gpt **);
 extern	int	efi_write(int, struct dk_gpt *);
