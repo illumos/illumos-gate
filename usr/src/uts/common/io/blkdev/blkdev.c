@@ -495,17 +495,32 @@ static void
 bd_errstats_setstr(kstat_named_t *k, char *str, size_t len, char *alt)
 {
 	char	*tmp;
+	size_t	km_len;
 
 	if (KSTAT_NAMED_STR_PTR(k) == NULL) {
-		if (len > 0) {
-			tmp = kmem_alloc(len + 1, KM_SLEEP);
-			(void) strlcpy(tmp, str, len + 1);
-		} else {
-			tmp = alt;
-		}
+		if (len > 0)
+			km_len = strnlen(str, len);
+		else if (alt != NULL)
+			km_len = strlen(alt);
+		else
+			return;
+
+		tmp = kmem_alloc(km_len + 1, KM_SLEEP);
+		bcopy(len > 0 ? str : alt, tmp, km_len);
+		tmp[km_len] = '\0';
 
 		kstat_named_setstr(k, tmp);
 	}
+}
+
+static void
+bd_errstats_clrstr(kstat_named_t *k)
+{
+	if (KSTAT_NAMED_STR_PTR(k) == NULL)
+		return;
+
+	kmem_free(KSTAT_NAMED_STR_PTR(k), KSTAT_NAMED_STR_BUFLEN(k));
+	kstat_named_setstr(k, NULL);
 }
 
 static void
@@ -530,6 +545,22 @@ bd_init_errstats(bd_t *bd, bd_drive_t *drive)
 	    drive->d_revision_len, "0001");
 	bd_errstats_setstr(&est->bd_serial, drive->d_serial,
 	    drive->d_serial_len, "0               ");
+
+	mutex_exit(&bd->d_errmutex);
+}
+
+static void
+bd_fini_errstats(bd_t *bd)
+{
+	struct bd_errstats	*est = bd->d_kerr;
+
+	mutex_enter(&bd->d_errmutex);
+
+	bd_errstats_clrstr(&est->bd_model);
+	bd_errstats_clrstr(&est->bd_vid);
+	bd_errstats_clrstr(&est->bd_pid);
+	bd_errstats_clrstr(&est->bd_revision);
+	bd_errstats_clrstr(&est->bd_serial);
 
 	mutex_exit(&bd->d_errmutex);
 }
@@ -773,6 +804,7 @@ bd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 
 	if (bd->d_errstats != NULL) {
+		bd_fini_errstats(bd);
 		kstat_delete(bd->d_errstats);
 		bd->d_errstats = NULL;
 	} else {
