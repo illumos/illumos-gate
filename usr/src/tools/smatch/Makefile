@@ -13,14 +13,14 @@
 
 #
 # The src/ sub-directory is un-modified copy of
-# https://github.com/illumos/smatch/tree/0.5.1-il-6
+# https://github.com/illumos/smatch/tree/$SPARSE_VERSION
 #
 # This Makefile installs just enough for us to be able to run smatch
 # locally.
 #
 
 PROG = smatch
-SPARSE_VERSION = 0.5.1-il-6
+SPARSE_VERSION = 0.6.1-rc1-il-1
 
 include ../Makefile.tools
 
@@ -60,78 +60,168 @@ CPPFLAGS += -I/usr/include
 INS.file = $(RM) $@; $(CP) $< $(@D); $(CHMOD) $(FILEMODE) $@
 INS.dir = mkdir -p $@; $(CHMOD) $(DIRMODE) $@
 
+# fine for us
+OS=linux
+
+LIB_OBJS =
+LIB_OBJS += allocate.o
+LIB_OBJS += builtin.o
+LIB_OBJS += char.o
+LIB_OBJS += compat-$(OS).o
+LIB_OBJS += cse.o
+LIB_OBJS += dissect.o
+LIB_OBJS += dominate.o
+LIB_OBJS += evaluate.o
+LIB_OBJS += expand.o
+LIB_OBJS += expression.o
+LIB_OBJS += flow.o
+LIB_OBJS += flowgraph.o
+LIB_OBJS += inline.o
+LIB_OBJS += ir.o
+LIB_OBJS += lib.o
+LIB_OBJS += linearize.o
+LIB_OBJS += liveness.o
+LIB_OBJS += memops.o
+LIB_OBJS += opcode.o
+LIB_OBJS += optimize.o
+LIB_OBJS += parse.o
+LIB_OBJS += pre-process.o
+LIB_OBJS += ptrlist.o
+LIB_OBJS += ptrmap.o
+LIB_OBJS += scope.o
+LIB_OBJS += show-parse.o
+LIB_OBJS += simplify.o
+LIB_OBJS += sort.o
+LIB_OBJS += ssa.o
+LIB_OBJS += sset.o
+LIB_OBJS += stats.o
+LIB_OBJS += storage.o
+LIB_OBJS += symbol.o
+LIB_OBJS += target.o
+LIB_OBJS += tokenize.o
+LIB_OBJS += unssa.o
+LIB_OBJS += utils.o
+LIB_OBJS += macro_table.o
+LIB_OBJS += token_store.o
+LIB_OBJS += hashtable.o
+
+SMATCH_OBJS =
+SMATCH_OBJS += avl.o
+SMATCH_OBJS += smatch_about_fn_ptr_arg.o
+SMATCH_OBJS += smatch_address.o
+SMATCH_OBJS += smatch_annotate.o
+SMATCH_OBJS += smatch_array_values.o
+SMATCH_OBJS += smatch_assigned_expr.o
+SMATCH_OBJS += smatch_bits.o
+SMATCH_OBJS += smatch_buf_comparison.o
+SMATCH_OBJS += smatch_buf_size.o
+SMATCH_OBJS += smatch_capped.o
+SMATCH_OBJS += smatch_common_functions.o
+SMATCH_OBJS += smatch_comparison.o
+SMATCH_OBJS += smatch_conditions.o
+SMATCH_OBJS += smatch_constraints.o
+SMATCH_OBJS += smatch_constraints_required.o
+SMATCH_OBJS += smatch_container_of.o
+SMATCH_OBJS += smatch_data_source.o
+SMATCH_OBJS += smatch_db.o
+SMATCH_OBJS += smatch_equiv.o
+SMATCH_OBJS += smatch_estate.o
+SMATCH_OBJS += smatch_expressions.o
+SMATCH_OBJS += smatch_expression_stacks.o
+SMATCH_OBJS += smatch_extra.o
+SMATCH_OBJS += smatch_files.o
+SMATCH_OBJS += smatch_flow.o
+SMATCH_OBJS += smatch_fn_arg_link.o
+SMATCH_OBJS += smatch_function_hooks.o
+SMATCH_OBJS += smatch_function_info.o
+SMATCH_OBJS += smatch_function_ptrs.o
+SMATCH_OBJS += smatch_helper.o
+SMATCH_OBJS += smatch_hooks.o
+SMATCH_OBJS += smatch_ignore.o
+SMATCH_OBJS += smatch_imaginary_absolute.o
+SMATCH_OBJS += smatch_implied.o
+SMATCH_OBJS += smatch_impossible.o
+SMATCH_OBJS += smatch_integer_overflow.o
+SMATCH_OBJS += smatch_kernel_user_data.o
+SMATCH_OBJS += smatch_links.o
+SMATCH_OBJS += smatch_math.o
+SMATCH_OBJS += smatch_mem_tracker.o
+SMATCH_OBJS += smatch_modification_hooks.o
+SMATCH_OBJS += smatch_mtag_data.o
+SMATCH_OBJS += smatch_mtag_map.o
+SMATCH_OBJS += smatch_mtag.o
+SMATCH_OBJS += smatch_nul_terminator.o
+SMATCH_OBJS += smatch_param_cleared.o
+SMATCH_OBJS += smatch_param_compare_limit.o
+SMATCH_OBJS += smatch_parameter_names.o
+SMATCH_OBJS += smatch_param_filter.o
+SMATCH_OBJS += smatch_param_limit.o
+SMATCH_OBJS += smatch_param_set.o
+SMATCH_OBJS += smatch_param_to_mtag_data.o
+SMATCH_OBJS += smatch_param_used.o
+SMATCH_OBJS += smatch_parse_call_math.o
+SMATCH_OBJS += smatch_passes_array_size.o
+SMATCH_OBJS += smatch_project.o
+SMATCH_OBJS += smatch_ranges.o
+SMATCH_OBJS += smatch_real_absolute.o
+SMATCH_OBJS += smatch_recurse.o
+SMATCH_OBJS += smatch_returns.o
+SMATCH_OBJS += smatch_return_to_param.o
+SMATCH_OBJS += smatch_scope.o
+SMATCH_OBJS += smatch_slist.o
+SMATCH_OBJS += smatch_start_states.o
+SMATCH_OBJS += smatch_statement_count.o
+SMATCH_OBJS += smatch_states.o
+SMATCH_OBJS += smatch_stored_conditions.o
+SMATCH_OBJS += smatch_string_list.o
+SMATCH_OBJS += smatch_strings.o
+SMATCH_OBJS += smatch_strlen.o
+SMATCH_OBJS += smatch_struct_assignment.o
+SMATCH_OBJS += smatch_sval.o
+SMATCH_OBJS += smatch_tracker.o
+SMATCH_OBJS += smatch_type_links.o
+SMATCH_OBJS += smatch_type.o
+SMATCH_OBJS += smatch_type_val.o
+SMATCH_OBJS += smatch_unknown_value.o
+SMATCH_OBJS += smatch_untracked_param.o
+SMATCH_OBJS += smatch_var_sym.o
+
 SMATCH_CHECK_OBJS:sh=ls src/check_*.c | sed -e 's+\.c+.o+;s+src/++;'
 
-OBJS = smatch.o $(SMATCH_CHECK_OBJS)
-
-OBJS += smatch_flow.o smatch_conditions.o smatch_slist.o smatch_states.o \
-	smatch_helper.o smatch_type.o smatch_hooks.o smatch_function_hooks.o \
-	smatch_modification_hooks.o smatch_extra.o smatch_estate.o smatch_math.o \
-	smatch_sval.o smatch_ranges.o smatch_implied.o smatch_ignore.o smatch_project.o \
-	smatch_var_sym.o smatch_tracker.o smatch_files.o smatch_expression_stacks.o \
-	smatch_equiv.o smatch_buf_size.o smatch_strlen.o smatch_capped.o smatch_db.o \
-	smatch_expressions.o smatch_returns.o smatch_parse_call_math.o \
-	smatch_param_limit.o smatch_param_filter.o \
-	smatch_param_set.o smatch_comparison.o smatch_param_compare_limit.o smatch_local_values.o \
-	smatch_function_ptrs.o smatch_annotate.o smatch_string_list.o \
-	smatch_param_cleared.o smatch_start_states.o \
-	smatch_recurse.o smatch_data_source.o smatch_type_val.o \
-	smatch_common_functions.o smatch_struct_assignment.o \
-	smatch_unknown_value.o smatch_stored_conditions.o avl.o \
-	smatch_function_info.o smatch_links.o smatch_auto_copy.o \
-	smatch_type_links.o smatch_untracked_param.o smatch_impossible.o \
-	smatch_strings.o smatch_param_used.o smatch_container_of.o smatch_address.o \
-	smatch_buf_comparison.o smatch_real_absolute.o smatch_scope.o \
-	smatch_imaginary_absolute.o smatch_parameter_names.o \
-	smatch_return_to_param.o smatch_passes_array_size.o \
-	smatch_constraints.o smatch_constraints_required.o \
-	smatch_fn_arg_link.o smatch_about_fn_ptr_arg.o smatch_mtag.o \
-	smatch_mtag_map.o smatch_mtag_data.o \
-	smatch_param_to_mtag_data.o smatch_mem_tracker.o smatch_array_values.o \
-	smatch_nul_terminator.o smatch_assigned_expr.o smatch_kernel_user_data.o \
-	smatch_statement_count.o smatch_bits.o smatch_integer_overflow.o
-
-OBJS += target.o parse.o tokenize.o pre-process.o symbol.o lib.o scope.o \
-	expression.o show-parse.o evaluate.o expand.o inline.o linearize.o \
-	char.o sort.o allocate.o compat-linux.o ptrlist.o \
-	builtin.o \
-	stats.o \
-	flow.o cse.o simplify.o memops.o liveness.o storage.o unssa.o \
-	dissect.o \
-	macro_table.o token_store.o hashtable.o
+OBJS = smatch.o $(LIB_OBJS) $(SMATCH_OBJS) $(SMATCH_CHECK_OBJS)
 
 SMATCH_DATA = \
 	illumos_kernel.skipped_functions \
 	illumos_user.skipped_functions
 
-SMATCH_DB_DATA = \
-	return_states.schema \
-	call_implies.schema \
-	type_value.schema \
-	param_map.schema \
-	function_type_size.schema \
-	parameter_name.schema \
-	fn_ptr_data_link.schema \
-	constraints.schema \
-	mtag_about.schema \
-	type_info.schema \
-	function_type_info.schema \
-	caller_info.schema \
-	function_type_value.schema \
-	return_implies.schema \
-	type_size.schema \
-	constraints_required.schema \
-	fn_data_link.schema \
-	mtag_alias.schema \
-	common_caller_info.schema \
-	data_info.schema \
-	function_type.schema \
-	db.schema \
-	mtag_data.schema \
-	function_ptr.schema \
-	sink_info.schema \
-	local_values.schema \
-	mtag_map.schema
+SMATCH_DB_DATA =
+SMATCH_DB_DATA += call_implies.schema
+SMATCH_DB_DATA += function_ptr.schema
+SMATCH_DB_DATA += mtag_map.schema
+SMATCH_DB_DATA += caller_info.schema
+SMATCH_DB_DATA += function_type.schema
+SMATCH_DB_DATA += param_map.schema
+SMATCH_DB_DATA += common_caller_info.schema
+SMATCH_DB_DATA += function_type_info.schema
+SMATCH_DB_DATA += parameter_name.schema
+SMATCH_DB_DATA += constraints.schema
+SMATCH_DB_DATA += function_type_size.schema
+SMATCH_DB_DATA += return_implies.schema
+SMATCH_DB_DATA += constraints_required.schema
+SMATCH_DB_DATA += function_type_value.schema
+SMATCH_DB_DATA += return_states.schema
+SMATCH_DB_DATA += data_info.schema
+SMATCH_DB_DATA += local_values.schema
+SMATCH_DB_DATA += sink_info.schema
+SMATCH_DB_DATA += db.schema
+SMATCH_DB_DATA += mtag_about.schema
+SMATCH_DB_DATA += type_info.schema
+SMATCH_DB_DATA += fn_data_link.schema
+SMATCH_DB_DATA += mtag_alias.schema
+SMATCH_DB_DATA += type_size.schema
+SMATCH_DB_DATA += fn_ptr_data_link.schema
+SMATCH_DB_DATA += mtag_data.schema
+SMATCH_DB_DATA += type_value.schema
 
 ROOTONBLDDATAFILES = $(SMATCH_DATA:%=$(SMATCHDATADIR)/smatch_data/%)
 ROOTONBLDDATAFILES += $(SMATCH_DB_DATA:%=$(SMATCHDATADIR)/smatch_data/db/%)

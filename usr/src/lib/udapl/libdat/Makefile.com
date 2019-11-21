@@ -22,6 +22,8 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 Joyent, Inc.
+#
 
 LIBRARY=	libdat.a
 VERS=		.1
@@ -40,18 +42,18 @@ OBJECTS =	\
 
 include ../../../Makefile.lib
 
-LIBS =	$(DYNLIB) $(LINTLIB)
+LIBS =	$(DYNLIB)
 LDLIBS += -lc
 
 SRCDIR =	../common
 
 CPPFLAGS +=     -I../include
 CFLAGS +=	$(CCVERBOSE)
-LINTFLAGS +=	-DDEBUG
-LINTFLAGS64 +=	-DDEBUG
-$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CERRWARN +=	-_gcc=-Wno-type-limits
+
+# false positive
+SMOFF += signed
 
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 
@@ -60,7 +62,5 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 all: $(LIBS)
 
 debug: all
-
-lint: lintcheck
 
 include ../../../Makefile.targ

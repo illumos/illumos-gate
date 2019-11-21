@@ -318,12 +318,12 @@ int main(int argc, char **argv)
 */
 	symlist = sparse_initialize(argc, argv, &filelist);
 
-	FOR_EACH_PTR_NOTAG(filelist, file) {
+	FOR_EACH_PTR(filelist, file) {
 		examine_symbol_list(file, symlist);
 		sparse_keep_tokens(file);
 		examine_symbol_list(file, file_scope->symbols);
 		examine_symbol_list(file, global_scope->symbols);
-	} END_FOR_EACH_PTR_NOTAG(file);
+	} END_FOR_EACH_PTR(file);
 
 
 	xmlSaveFormatFileEnc("-", doc, "UTF-8", 1);

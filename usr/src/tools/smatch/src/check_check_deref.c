@@ -135,8 +135,11 @@ free:
 static void match_condition(struct expression *expr)
 {
 	struct smatch_state *true_state = NULL;
+	char *name;
 
-	if (get_macro_name(expr->pos))
+	name = get_macro_name(expr->pos);
+	if (name &&
+	    (strcmp(name, "likely") != 0 && strcmp(name, "unlikely") != 0))
 		return;
 
 	if (!is_pointer(expr))

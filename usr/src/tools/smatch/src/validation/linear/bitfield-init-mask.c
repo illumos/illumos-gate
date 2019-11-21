@@ -18,7 +18,7 @@ struct bfu bfu_init_20_23(int a)
 
 /*
  * check-name: bitfield initializer mask
- * check-command: test-linearize -fdump-linearize=only -Wno-decl $file
+ * check-command: test-linearize -fdump-ir=linearize -Wno-decl $file
  * check-output-ignore
  *
  * check-output-contains: and\\..*fffff800\$

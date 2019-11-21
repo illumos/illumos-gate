@@ -193,7 +193,6 @@ static const char *current_section;
 static void emit_comment(const char * fmt, ...) FORMAT_ATTR(1);
 static void emit_move(struct storage *src, struct storage *dest,
 		      struct symbol *ctype, const char *comment);
-static int type_is_signed(struct symbol *sym);
 static struct storage *x86_address_gen(struct expression *expr);
 static struct storage *x86_symbol_expr(struct symbol *sym);
 static void x86_symbol(struct symbol *sym);
@@ -452,7 +451,7 @@ static const char *stor_op_name(struct storage *s)
 		strcpy(name, s->reg->name);
 		break;
 	case STOR_VALUE:
-		sprintf(name, "$%Ld", s->value);
+		sprintf(name, "$%lld", s->value);
 		break;
 	case STOR_LABEL:
 		sprintf(name, "%s.L%d", s->flags & STOR_LABEL_VAL ? "$" : "",
@@ -937,7 +936,7 @@ static void emit_scalar(struct expression *expr, unsigned int bit_size)
 
 	assert(type != NULL);
 
-	printf("\t.%s\t%Ld\n", type, ll);
+	printf("\t.%s\t%lld\n", type, ll);
 }
 
 static void emit_global_noinit(const char *name, unsigned long modifiers,
@@ -1163,7 +1162,7 @@ static void emit_move(struct storage *src, struct storage *dest,
 
 	if (ctype) {
 		bits = ctype->bit_size;
-		is_signed = type_is_signed(ctype);
+		is_signed = is_signed_type(ctype);
 	} else {
 		bits = 32;
 		is_signed = 0;
@@ -1355,7 +1354,7 @@ static struct storage *emit_binop(struct expression *expr)
 	if ((expr->op == '/') || (expr->op == '%'))
 		return emit_divide(expr, left, right);
 
-	is_signed = type_is_signed(expr->ctype);
+	is_signed = is_signed_type(expr->ctype);
 
 	switch (expr->op) {
 	case '+':
@@ -1555,7 +1554,7 @@ static struct storage *emit_return_stmt(struct statement *stmt)
 
 static struct storage *emit_conditional_expr(struct expression *expr)
 {
-	struct storage *cond, *true = NULL, *false = NULL;
+	struct storage *cond, *stot = NULL, *stof = NULL;
 	struct storage *new = stack_alloc(expr->ctype->bit_size / 8);
 	int target_false, cond_end;
 
@@ -1564,16 +1563,16 @@ static struct storage *emit_conditional_expr(struct expression *expr)
 	target_false = emit_conditional_test(cond);
 
 	/* handle if-true part of the expression */
-	true = x86_expression(expr->cond_true);
+	stot = x86_expression(expr->cond_true);
 
-	emit_copy(new, true, expr->ctype);
+	emit_copy(new, stot, expr->ctype);
 
 	cond_end = emit_conditional_end(target_false);
 
 	/* handle if-false part of the expression */
-	false = x86_expression(expr->cond_false);
+	stof = x86_expression(expr->cond_false);
 
-	emit_copy(new, false, expr->ctype);
+	emit_copy(new, stof, expr->ctype);
 
 	/* end of conditional; jump target for if-true branch */
 	emit_label(cond_end, "end conditional");
@@ -1584,15 +1583,15 @@ static struct storage *emit_conditional_expr(struct expression *expr)
 static struct storage *emit_select_expr(struct expression *expr)
 {
 	struct storage *cond = x86_expression(expr->conditional);
-	struct storage *true = x86_expression(expr->cond_true);
-	struct storage *false = x86_expression(expr->cond_false);
+	struct storage *stot = x86_expression(expr->cond_true);
+	struct storage *stof = x86_expression(expr->cond_false);
 	struct storage *reg_cond, *reg_true, *reg_false;
 	struct storage *new = stack_alloc(4);
 
 	emit_comment("begin SELECT");
 	reg_cond = get_reg_value(cond, get_regclass(expr->conditional));
-	reg_true = get_reg_value(true, get_regclass(expr));
-	reg_false = get_reg_value(false, get_regclass(expr));
+	reg_true = get_reg_value(stot, get_regclass(expr));
+	reg_false = get_reg_value(stof, get_regclass(expr));
 
 	/*
 	 * Do the actual select: check the conditional for zero,
@@ -2236,7 +2235,7 @@ static struct storage *x86_symbol_expr(struct symbol *sym)
 		return new;
 	}
 	if (sym->ctype.modifiers & MOD_ADDRESSABLE) {
-		printf("\taddi.%d\t\tv%d,vFP,$%lld\n", bits_in_pointer, new->pseudo, sym->value);
+		printf("\taddi.%d\t\tv%d,vFP,$%lld\n", bits_in_pointer, new->pseudo, 0LL);
 		return new;
 	}
 	printf("\taddi.%d\t\tv%d,vFP,$offsetof(%s:%p)\n", bits_in_pointer, new->pseudo, show_ident(sym->ident), sym);
@@ -2262,15 +2261,6 @@ static void x86_symbol_init(struct symbol *sym)
 	}
 
 	priv->addr = new;
-}
-
-static int type_is_signed(struct symbol *sym)
-{
-	if (sym->type == SYM_NODE)
-		sym = sym->ctype.base_type;
-	if (sym->type == SYM_PTR)
-		return 0;
-	return !(sym->ctype.modifiers & MOD_UNSIGNED);
 }
 
 static struct storage *x86_label_expr(struct expression *expr)

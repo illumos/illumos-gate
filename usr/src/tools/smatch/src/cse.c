@@ -14,13 +14,13 @@
 
 #include "parse.h"
 #include "expression.h"
+#include "flowgraph.h"
 #include "linearize.h"
 #include "flow.h"
+#include "cse.h"
 
 #define INSN_HASH_SIZE 256
 static struct instruction_list *insn_hash_table[INSN_HASH_SIZE];
-
-int repeat_phase;
 
 static int phi_compare(pseudo_t phi1, pseudo_t phi2)
 {
@@ -35,16 +35,10 @@ static int phi_compare(pseudo_t phi1, pseudo_t phi2)
 }
 
 
-static void clean_up_one_instruction(struct basic_block *bb, struct instruction *insn)
+void cse_collect(struct instruction *insn)
 {
 	unsigned long hash;
 
-	if (!insn->bb)
-		return;
-	assert(insn->bb == bb);
-	repeat_phase |= simplify_instruction(insn);
-	if (!insn->bb)
-		return;
 	hash = (insn->opcode << 3) + (insn->size >> 3);
 	switch (insn->opcode) {
 	case OP_SEL:
@@ -53,7 +47,7 @@ static void clean_up_one_instruction(struct basic_block *bb, struct instruction 
 
 	/* Binary arithmetic */
 	case OP_ADD: case OP_SUB:
-	case OP_MULU: case OP_MULS:
+	case OP_MUL:
 	case OP_DIVU: case OP_DIVS:
 	case OP_MODU: case OP_MODS:
 	case OP_SHL:
@@ -61,8 +55,7 @@ static void clean_up_one_instruction(struct basic_block *bb, struct instruction 
 	case OP_AND: case OP_OR:
 
 	/* Binary logical */
-	case OP_XOR: case OP_AND_BOOL:
-	case OP_OR_BOOL:
+	case OP_XOR:
 
 	/* Binary comparison */
 	case OP_SET_EQ: case OP_SET_NE:
@@ -70,11 +63,20 @@ static void clean_up_one_instruction(struct basic_block *bb, struct instruction 
 	case OP_SET_LT: case OP_SET_GT:
 	case OP_SET_B:  case OP_SET_A:
 	case OP_SET_BE: case OP_SET_AE:
+
+	/* floating-point arithmetic & comparison */
+	case OP_FPCMP ... OP_FPCMP_END:
+	case OP_FADD:
+	case OP_FSUB:
+	case OP_FMUL:
+	case OP_FDIV:
 		hash += hashval(insn->src2);
 		/* Fall through */
 	
 	/* Unary */
 	case OP_NOT: case OP_NEG:
+	case OP_FNEG:
+	case OP_SYMADDR:
 		hash += hashval(insn->src1);
 		break;
 
@@ -82,21 +84,20 @@ static void clean_up_one_instruction(struct basic_block *bb, struct instruction 
 		hash += hashval(insn->val);
 		break;
 
-	case OP_SYMADDR:
-		hash += hashval(insn->symbol);
+	case OP_SETFVAL:
+		hash += hashval(insn->fvalue);
 		break;
 
-	case OP_CAST:
-	case OP_SCAST:
+	case OP_SEXT: case OP_ZEXT:
+	case OP_TRUNC:
 	case OP_PTRCAST:
-		/*
-		 * This is crap! Many "orig_types" are the
-		 * same as far as casts go, we should generate
-		 * some kind of "type hash" that is identical
-		 * for identical casts
-		 */
-		hash += hashval(insn->orig_type);
+	case OP_UTPTR: case OP_PTRTU:
+		if (!insn->orig_type || insn->orig_type->bit_size < 0)
+			return;
 		hash += hashval(insn->src);
+
+		// Note: see corresponding line in insn_compare()
+		hash += hashval(insn->orig_type->bit_size);
 		break;
 
 	/* Other */
@@ -123,18 +124,6 @@ static void clean_up_one_instruction(struct basic_block *bb, struct instruction 
 	hash += hash >> 16;
 	hash &= INSN_HASH_SIZE-1;
 	add_instruction(insn_hash_table + hash, insn);
-}
-
-static void clean_up_insns(struct entrypoint *ep)
-{
-	struct basic_block *bb;
-
-	FOR_EACH_PTR(ep->bbs, bb) {
-		struct instruction *insn;
-		FOR_EACH_PTR(bb->insns, insn) {
-			clean_up_one_instruction(bb, insn);
-		} END_FOR_EACH_PTR(insn);
-	} END_FOR_EACH_PTR(bb);
 }
 
 /* Compare two (sorted) phi-lists */
@@ -171,6 +160,8 @@ static int insn_compare(const void *_i1, const void *_i2)
 {
 	const struct instruction *i1 = _i1;
 	const struct instruction *i2 = _i2;
+	int size1, size2;
+	int diff;
 
 	if (i1->opcode != i2->opcode)
 		return i1->opcode < i2->opcode ? -1 : 1;
@@ -179,8 +170,7 @@ static int insn_compare(const void *_i1, const void *_i2)
 
 	/* commutative binop */
 	case OP_ADD:
-	case OP_MULU: case OP_MULS:
-	case OP_AND_BOOL: case OP_OR_BOOL:
+	case OP_MUL:
 	case OP_AND: case OP_OR:
 	case OP_XOR:
 	case OP_SET_EQ: case OP_SET_NE:
@@ -205,6 +195,13 @@ static int insn_compare(const void *_i1, const void *_i2)
 	case OP_SET_LT: case OP_SET_GT:
 	case OP_SET_B:  case OP_SET_A:
 	case OP_SET_BE: case OP_SET_AE:
+
+	/* floating-point arithmetic */
+	case OP_FPCMP ... OP_FPCMP_END:
+	case OP_FADD:
+	case OP_FSUB:
+	case OP_FMUL:
+	case OP_FDIV:
 	case_binops:
 		if (i1->src2 != i2->src2)
 			return i1->src2 < i2->src2 ? -1 : 1;
@@ -212,13 +209,10 @@ static int insn_compare(const void *_i1, const void *_i2)
 
 	/* Unary */
 	case OP_NOT: case OP_NEG:
+	case OP_FNEG:
+	case OP_SYMADDR:
 		if (i1->src1 != i2->src1)
 			return i1->src1 < i2->src1 ? -1 : 1;
-		break;
-
-	case OP_SYMADDR:
-		if (i1->symbol != i2->symbol)
-			return i1->symbol < i2->symbol ? -1 : 1;
 		break;
 
 	case OP_SETVAL:
@@ -226,20 +220,32 @@ static int insn_compare(const void *_i1, const void *_i2)
 			return i1->val < i2->val ? -1 : 1;
 		break;
 
+	case OP_SETFVAL:
+		diff = memcmp(&i1->fvalue, &i2->fvalue, sizeof(i1->fvalue));
+		if (diff)
+			return diff;
+		break;
+
 	/* Other */
 	case OP_PHI:
 		return phi_list_compare(i1->phi_list, i2->phi_list);
 
-	case OP_CAST:
-	case OP_SCAST:
+	case OP_SEXT: case OP_ZEXT:
+	case OP_TRUNC:
 	case OP_PTRCAST:
-		/*
-		 * This is crap! See the comments on hashing.
-		 */
-		if (i1->orig_type != i2->orig_type)
-			return i1->orig_type < i2->orig_type ? -1 : 1;
+	case OP_UTPTR: case OP_PTRTU:
 		if (i1->src != i2->src)
 			return i1->src < i2->src ? -1 : 1;
+
+		// Note: if it can be guaranted that identical ->src
+		// implies identical orig_type->bit_size, then this
+		// test and the hashing of the original size in
+		// cse_collect() are not needed.
+		// It must be generaly true but it isn't guaranted (yet).
+		size1 = i1->orig_type->bit_size;
+		size2 = i2->orig_type->bit_size;
+		if (size1 != size2)
+			return size1 < size2 ? -1 : 1;
 		break;
 
 	default:
@@ -262,28 +268,6 @@ static struct instruction * cse_one_instruction(struct instruction *insn, struct
 	kill_instruction(insn);
 	repeat_phase |= REPEAT_CSE;
 	return def;
-}
-
-/*
- * Does "bb1" dominate "bb2"?
- */
-static int bb_dominates(struct entrypoint *ep, struct basic_block *bb1, struct basic_block *bb2, unsigned long generation)
-{
-	struct basic_block *parent;
-
-	/* Nothing dominates the entrypoint.. */
-	if (bb2 == ep->entry->bb)
-		return 0;
-	FOR_EACH_PTR(bb2->parents, parent) {
-		if (parent == bb1)
-			continue;
-		if (parent->generation == generation)
-			continue;
-		parent->generation = generation;
-		if (!bb_dominates(ep, bb1, parent, generation))
-			return 0;
-	} END_FOR_EACH_PTR(parent);
-	return 1;
 }
 
 static struct basic_block *trivial_common_parent(struct basic_block *bb1, struct basic_block *bb2)
@@ -339,10 +323,10 @@ static struct instruction * try_to_cse(struct entrypoint *ep, struct instruction
 		warning(b1->pos, "Whaa? unable to find CSE instructions");
 		return i1;
 	}
-	if (bb_dominates(ep, b1, b2, ++bb_generation))
+	if (domtree_dominates(b1, b2))
 		return cse_one_instruction(i2, i1);
 
-	if (bb_dominates(ep, b2, b1, ++bb_generation))
+	if (domtree_dominates(b2, b1))
 		return cse_one_instruction(i1, i2);
 
 	/* No direct dominance - but we could try to find a common ancestor.. */
@@ -351,21 +335,17 @@ static struct instruction * try_to_cse(struct entrypoint *ep, struct instruction
 		i1 = cse_one_instruction(i2, i1);
 		remove_instruction(&b1->insns, i1, 1);
 		add_instruction_to_end(i1, common);
+	} else {
+		i1 = i2;
 	}
 
 	return i1;
 }
 
-void cleanup_and_cse(struct entrypoint *ep)
+void cse_eliminate(struct entrypoint *ep)
 {
 	int i;
 
-	simplify_memops(ep);
-repeat:
-	repeat_phase = 0;
-	clean_up_insns(ep);
-	if (repeat_phase & REPEAT_CFG_CLEANUP)
-		kill_unreachable_bbs(ep);
 	for (i = 0; i < INSN_HASH_SIZE; i++) {
 		struct instruction_list **list = insn_hash_table + i;
 		if (*list) {
@@ -385,13 +365,7 @@ repeat:
 					last = insn;
 				} END_FOR_EACH_PTR(insn);
 			}
-			free_ptr_list((struct ptr_list **)list);
+			free_ptr_list(list);
 		}
 	}
-
-	if (repeat_phase & REPEAT_SYMBOL_CLEANUP)
-		simplify_memops(ep);
-
-	if (repeat_phase & REPEAT_CSE)
-		goto repeat;
 }

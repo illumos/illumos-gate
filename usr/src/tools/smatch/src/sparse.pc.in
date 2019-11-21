@@ -1,9 +1,0 @@
-prefix=@prefix@
-libdir=@libdir@
-includedir=@includedir@
-
-Name: Sparse
-Description: Semantic parser for C
-Version: @version@
-Libs: -L${libdir} -lsparse
-Cflags: -I${includedir}

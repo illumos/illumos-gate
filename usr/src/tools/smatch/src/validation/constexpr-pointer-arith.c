@@ -17,7 +17,7 @@ static int *o = &*(b + 1);				// OK
 static int *p = &*(d + 1);				// KO
 
 /*
- * check-name: pointer arithmetic constness verification.
+ * check-name: consrexprness pointer arithmetic
  * check-command: sparse -Wconstexpr-not-const $file
  *
  * check-error-start

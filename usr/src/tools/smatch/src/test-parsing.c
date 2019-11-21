@@ -64,7 +64,7 @@ int main(int argc, char **argv)
 	printf("\n\n");
 #endif
 
-	FOR_EACH_PTR_NOTAG(filelist, file) {
+	FOR_EACH_PTR(filelist, file) {
 		list = sparse(file);
 
 		// Simplification
@@ -75,7 +75,7 @@ int main(int argc, char **argv)
 		show_symbol_list(list, "\n\n");
 		printf("\n\n");
 #endif
-	} END_FOR_EACH_PTR_NOTAG(file);
+	} END_FOR_EACH_PTR(file);
 
 #if 0
 	// And show the allocation statistics

@@ -15601,6 +15601,7 @@ f usr/share/man/man3ext/ecb_crypt.3ext 0444 root bin
 f usr/share/man/man3ext/efi_alloc_and_init.3ext 0444 root bin
 s usr/share/man/man3ext/efi_alloc_and_read.3ext=efi_alloc_and_init.3ext
 s usr/share/man/man3ext/efi_free.3ext=efi_alloc_and_init.3ext
+s usr/share/man/man3ext/efi_reserved_sectors.3ext=efi_alloc_and_init.3ext
 s usr/share/man/man3ext/efi_use_whole_disk.3ext=efi_alloc_and_init.3ext
 s usr/share/man/man3ext/efi_write.3ext=efi_alloc_and_init.3ext
 s usr/share/man/man3ext/encrypt.3ext=crypt.3ext

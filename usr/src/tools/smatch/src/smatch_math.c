@@ -31,6 +31,8 @@ static int get_absolute_rl_internal(struct expression *expr, struct range_list *
 static sval_t zero  = {.type = &int_ctype, {.value = 0} };
 static sval_t one   = {.type = &int_ctype, {.value = 1} };
 
+static int fast_math_only;
+
 struct range_list *rl_zero(void)
 {
 	static struct range_list *zero_perm;
@@ -856,7 +858,7 @@ static bool handle_conditional_rl(struct expression *expr, int implied, int *rec
 		return get_rl_sval(expr->cond_false, implied, recurse_cnt, res, res_sval);
 
 	/* this becomes a problem with deeply nested conditional statements */
-	if (low_on_memory())
+	if (fast_math_only || low_on_memory())
 		return false;
 
 	type = get_type(expr);
@@ -947,8 +949,6 @@ struct range_list *var_to_absolute_rl(struct expression *expr)
 		state = get_real_absolute_state(expr);
 		if (state && state->data && !estate_is_whole(state))
 			return clone_rl(estate_rl(state));
-		if (get_local_rl(expr, &rl) && !is_whole_rl(rl))
-			return rl;
 		if (get_mtag_rl(expr, &rl))
 			return rl;
 		if (get_db_type_rl(expr, &rl) && !is_whole_rl(rl))
@@ -1008,8 +1008,6 @@ static bool handle_variable(struct expression *expr, int implied, int *recurse_c
 		if (!state) {
 			if (implied == RL_HARD)
 				return false;
-			if (get_local_rl(expr, res))
-				return true;
 			if (get_mtag_rl(expr, res))
 				return true;
 			if (get_db_type_rl(expr, res))
@@ -1060,8 +1058,6 @@ static bool handle_variable(struct expression *expr, int implied, int *recurse_c
 			return true;
 		}
 
-		if (get_local_rl(expr, res))
-			return true;
 		if (get_mtag_rl(expr, res))
 			return true;
 		if (get_db_type_rl(expr, res))
@@ -1516,6 +1512,16 @@ void clear_math_cache(void)
 	memset(cached_results, 0, sizeof(cached_results));
 }
 
+void set_fast_math_only(void)
+{
+	fast_math_only++;
+}
+
+void clear_fast_math_only(void)
+{
+	fast_math_only--;
+}
+
 /*
  * Don't cache EXPR_VALUE because values are fast already.
  *
@@ -1760,6 +1766,12 @@ int known_condition_true(struct expression *expr)
 	if (!expr)
 		return 0;
 
+	if (__inline_fn && get_param_num(expr) >= 0) {
+		if (get_implied_value(expr, &tmp) && tmp.value)
+			return 1;
+		return 0;
+	}
+
 	if (get_value(expr, &tmp) && tmp.value)
 		return 1;
 
@@ -1768,10 +1780,18 @@ int known_condition_true(struct expression *expr)
 
 int known_condition_false(struct expression *expr)
 {
+	sval_t tmp;
+
 	if (!expr)
 		return 0;
 
-	if (is_zero(expr))
+	if (__inline_fn && get_param_num(expr) >= 0) {
+		if (get_implied_value(expr, &tmp) && tmp.value == 0)
+			return 1;
+		return 0;
+	}
+
+	if (expr_is_zero(expr))
 		return 1;
 
 	return 0;

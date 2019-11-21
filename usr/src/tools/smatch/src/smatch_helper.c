@@ -39,6 +39,19 @@ char *alloc_string(const char *str)
 	return tmp;
 }
 
+char *alloc_string_newline(const char *str)
+{
+	char *tmp;
+	int len;
+
+	if (!str)
+		return NULL;
+	len = strlen(str);
+	tmp = malloc(len + 2);
+	snprintf(tmp, len + 2, "%s\n", str);
+	return tmp;
+}
+
 void free_string(char *str)
 {
 	free(str);
@@ -276,10 +289,13 @@ static void __get_variable_from_expr(struct symbol **sym_ptr, char *buf,
 		return;
 	}
 	case EXPR_VALUE: {
+		sval_t sval = {};
 		char tmp[25];
 
 		*complicated = 1;
-		snprintf(tmp, 25, "%lld", expr->value);
+		if (!get_value(expr, &sval))
+			return;
+		snprintf(tmp, 25, "%s", sval_to_numstr(sval));
 		append(buf, tmp, len);
 		return;
 	}
@@ -589,7 +605,7 @@ int sym_name_is(const char *name, struct expression *expr)
 	return 0;
 }
 
-int is_zero(struct expression *expr)
+int expr_is_zero(struct expression *expr)
 {
 	sval_t sval;
 
@@ -818,24 +834,21 @@ int is_error_return(struct expression *expr)
 	return 0;
 }
 
-int getting_address(void)
+int getting_address(struct expression *expr)
 {
-	struct expression *tmp;
-	int i = 0;
-	int dot_ops = 0;
+	int deref_count = 0;
 
-	FOR_EACH_PTR_REVERSE(big_expression_stack, tmp) {
-		if (!i++)
-			continue;
-		if (tmp->type == EXPR_PREOP && tmp->op == '(')
-			continue;
-		if (tmp->op == '.' && !dot_ops++)
-			continue;
-		if (tmp->op == '&')
-			return 1;
-		return 0;
-	} END_FOR_EACH_PTR_REVERSE(tmp);
-	return 0;
+	while ((expr = expr_get_parent_expr(expr))) {
+		if (expr->type == EXPR_PREOP && expr->op == '*') {
+			/* &foo->bar->baz dereferences "foo->bar" */
+			if (deref_count == 0)
+				deref_count++;
+			return false;
+		}
+		if (expr->type == EXPR_PREOP && expr->op == '&')
+			return true;
+	}
+	return false;
 }
 
 int get_struct_and_member(struct expression *expr, const char **type, const char **member)

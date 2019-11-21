@@ -67,8 +67,9 @@ typedef enum pc_colors {
 	pc_brt_white	= 15
 } pc_colors_t;
 
-extern const uint8_t dim_xlate[];
-extern const uint8_t brt_xlate[];
+#define	XLATE_NCOLORS	8
+extern const uint8_t dim_xlate[XLATE_NCOLORS];
+extern const uint8_t brt_xlate[XLATE_NCOLORS];
 extern const uint8_t solaris_color_to_pc_color[16];
 
 extern uint32_t rgb_color_map(const rgb_t *, uint8_t);

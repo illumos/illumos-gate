@@ -30,7 +30,7 @@ u64 foo(u64 a, u64 b, u64 c, u32 s)
  * check-output-ignore
  *
  * check-output-contains: ret\\..*\\$16
- * check-output-contains: mulu\\.128
+ * check-output-contains: mul\\.128
  * check-output-contains: add\\.128
  *
  * check-error-start

@@ -48,9 +48,9 @@
 
 /* ANSI color to sun color translation. */
 /* BEGIN CSTYLED */
-/*                            Bk  Rd  Gr  Br  Bl  Mg  Cy  Wh */
-const uint8_t dim_xlate[] = {  1,  5,  3,  7,  2,  6,  4,  8 };
-const uint8_t brt_xlate[] = {  9, 13, 11, 15, 10, 14, 12,  0 };
+/*                                         Bk  Rd  Gr  Br  Bl  Mg  Cy  Wh */
+const uint8_t dim_xlate[XLATE_NCOLORS] = {  1,  5,  3,  7,  2,  6,  4,  8 };
+const uint8_t brt_xlate[XLATE_NCOLORS] = {  9, 13, 11, 15, 10, 14, 12,  0 };
 
 const uint8_t solaris_color_to_pc_color[16] = {
 	pc_brt_white,		/*  0 - brt_white	*/

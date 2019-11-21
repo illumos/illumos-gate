@@ -13,5 +13,5 @@ void ind(volatile int *p,int i)	{ int v = i++; if (i && 0) p[v]; }
  *	- bb unreachable.
  *
  * check-output-ignore
- * check-output-pattern-1-times: load\\.
+ * check-output-pattern(1): load\\.
  */

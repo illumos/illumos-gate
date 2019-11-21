@@ -69,16 +69,15 @@ static int match_strnlen(struct expression *call, void *unused, struct range_lis
 static int match_sprintf(struct expression *call, void *_arg, struct range_list **rl)
 {
 	int str_arg = PTR_INT(_arg);
-	int size;
+	int min, max;
 
-	size = get_formatted_string_size(call, str_arg);
-	if (size <= 0) {
+	min = get_formatted_string_min_size(call, str_arg);
+	max = get_formatted_string_size(call, str_arg);
+	if (min < 0 || max < 0) {
 		*rl = alloc_whole_rl(&ulong_ctype);
 	} else {
-		/* FIXME:  This is bogus.  get_formatted_string_size() should be
-		   returning a range_list.  Also it should not add the NUL. */
-		size--;
-		*rl = alloc_rl(ll_to_sval(0), ll_to_sval(size));
+		*rl = alloc_rl(ll_to_sval(min), ll_to_sval(max));
+		*rl = cast_rl(get_type(call), *rl);
 	}
 	return 1;
 }

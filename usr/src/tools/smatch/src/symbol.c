@@ -33,6 +33,7 @@
 #include "symbol.h"
 #include "scope.h"
 #include "expression.h"
+#include "evaluate.h"
 
 #include "target.h"
 
@@ -48,9 +49,9 @@ struct symbol_list *translation_unit_used_list = NULL;
 void access_symbol(struct symbol *sym)
 {
 	if (sym->ctype.modifiers & MOD_INLINE) {
-		if (!(sym->ctype.modifiers & MOD_ACCESSED)) {
+		if (!sym->accessed) {
 			add_symbol(&translation_unit_used_list, sym);
-			sym->ctype.modifiers |= MOD_ACCESSED;
+			sym->accessed = 1;
 		}
 	}
 }
@@ -213,7 +214,7 @@ static struct symbol *examine_base_type(struct symbol *sym)
 	base_type = examine_symbol_type(sym->ctype.base_type);
 	if (!base_type || base_type->type == SYM_PTR)
 		return base_type;
-	sym->ctype.as |= base_type->ctype.as;
+	combine_address_space(sym->pos, &sym->ctype.as, base_type->ctype.as);
 	sym->ctype.modifiers |= base_type->ctype.modifiers & MOD_PTRINHERIT;
 	concat_ptr_list((struct ptr_list *)base_type->ctype.contexts,
 			(struct ptr_list **)&sym->ctype.contexts);
@@ -277,7 +278,7 @@ static struct symbol *examine_bitfield_type(struct symbol *sym)
  */
 void merge_type(struct symbol *sym, struct symbol *base_type)
 {
-	sym->ctype.as |= base_type->ctype.as;
+	combine_address_space(sym->pos, &sym->ctype.as, base_type->ctype.as);
 	sym->ctype.modifiers |= (base_type->ctype.modifiers & ~MOD_STORAGE);
 	concat_ptr_list((struct ptr_list *)base_type->ctype.contexts,
 	                (struct ptr_list **)&sym->ctype.contexts);
@@ -364,6 +365,23 @@ static struct expression *get_symbol_initializer(struct symbol *sym)
 	return NULL;
 }
 
+static unsigned int implicit_array_size(struct symbol *node, unsigned int count)
+{
+	struct symbol *arr_ori = node->ctype.base_type;
+	struct symbol *arr_new = alloc_symbol(node->pos, SYM_ARRAY);
+	struct symbol *elem_type = arr_ori->ctype.base_type;
+	struct expression *size = alloc_const_expression(node->pos, count);
+	unsigned int bit_size = array_element_offset(elem_type->bit_size, count);
+
+	*arr_new = *arr_ori;
+	arr_new->bit_size = bit_size;
+	arr_new->array_size = size;
+	node->array_size = size;
+	node->ctype.base_type = arr_new;
+
+	return bit_size;
+}
+
 static struct symbol * examine_node_type(struct symbol *sym)
 {
 	struct symbol *base_type = examine_base_type(sym);
@@ -393,7 +411,7 @@ static struct symbol * examine_node_type(struct symbol *sym)
 			int count = count_array_initializer(node_type, initializer);
 
 			if (node_type && node_type->bit_size >= 0)
-				bit_size = array_element_offset(node_type->bit_size, count);
+				bit_size = implicit_array_size(sym, count);
 		}
 	}
 	
@@ -479,13 +497,15 @@ struct symbol *examine_symbol_type(struct symbol * sym)
 			sym->ctype.base_type = base;
 			return examine_node_type(sym);
 		}
-		break;
+		sym->type = SYM_NODE;
+		sym->ctype.base_type = &bad_ctype;
+		return sym;
 	}
 	case SYM_PREPROCESSOR:
 		sparse_error(sym->pos, "ctype on preprocessor command? (%s)", show_ident(sym->ident));
 		return NULL;
 	case SYM_UNINITIALIZED:
-//		sparse_error(sym->pos, "ctype on uninitialized symbol %p", sym);
+//		sparse_error(sym->pos, "ctype on uninitialized symbol '%s'", show_typename(sym));
 		return NULL;
 	case SYM_RESTRICT:
 		examine_base_type(sym);
@@ -677,6 +697,14 @@ struct symbol	bool_ctype, void_ctype, type_ctype,
 		string_ctype, ptr_ctype, lazy_ptr_ctype,
 		incomplete_ctype, label_ctype, bad_ctype,
 		null_ctype;
+struct symbol	int_ptr_ctype, uint_ptr_ctype;
+struct symbol	long_ptr_ctype, ulong_ptr_ctype;
+struct symbol	llong_ptr_ctype, ullong_ptr_ctype;
+struct symbol	float32_ctype, float32x_ctype;
+struct symbol	float64_ctype, float64x_ctype;
+struct symbol	float128_ctype;
+struct symbol	const_void_ctype, const_char_ctype;
+struct symbol	const_ptr_ctype, const_string_ctype;
 
 struct symbol	zero_int;
 
@@ -703,6 +731,10 @@ void init_symbols(void)
 #else
 #define CHAR_SIGNEDNESS MOD_SIGNED
 #endif
+// For fix-sized types
+static int bits_in_type32 = 32;
+static int bits_in_type64 = 64;
+static int bits_in_type128 = 128;
 
 #define MOD_ESIGNED (MOD_SIGNED | MOD_EXPLICITLY_SIGNED)
 #define MOD_LL (MOD_LONG | MOD_LONGLONG)
@@ -744,11 +776,28 @@ static const struct ctype_declare {
 	{ &double_ctype,    SYM_BASETYPE, MOD_LONG,		    &bits_in_double,         &max_fp_alignment,  &fp_type },
 	{ &ldouble_ctype,   SYM_BASETYPE, MOD_LONG | MOD_LONGLONG,  &bits_in_longdouble,     &max_fp_alignment,  &fp_type },
 
+	{ &float32_ctype,   SYM_BASETYPE,  0,			    &bits_in_type32,          &max_fp_alignment, &fp_type },
+	{ &float32x_ctype,  SYM_BASETYPE, MOD_LONG,		    &bits_in_double,         &max_fp_alignment,  &fp_type },
+	{ &float64_ctype,   SYM_BASETYPE,  0,			    &bits_in_type64,          &max_fp_alignment, &fp_type },
+	{ &float64x_ctype,  SYM_BASETYPE, MOD_LONG | MOD_LONGLONG,  &bits_in_longdouble,     &max_fp_alignment,  &fp_type },
+	{ &float128_ctype,  SYM_BASETYPE,  0,			    &bits_in_type128,         &max_alignment,    &fp_type },
+
 	{ &string_ctype,    SYM_PTR,	  0,			    &bits_in_pointer,        &pointer_alignment, &char_ctype },
 	{ &ptr_ctype,	    SYM_PTR,	  0,			    &bits_in_pointer,        &pointer_alignment, &void_ctype },
 	{ &null_ctype,	    SYM_PTR,	  0,			    &bits_in_pointer,        &pointer_alignment, &void_ctype },
 	{ &label_ctype,	    SYM_PTR,	  0,			    &bits_in_pointer,        &pointer_alignment, &void_ctype },
 	{ &lazy_ptr_ctype,  SYM_PTR,	  0,			    &bits_in_pointer,        &pointer_alignment, &void_ctype },
+	{ &int_ptr_ctype,   SYM_PTR,	  0,			    &bits_in_pointer,        &pointer_alignment, &int_ctype },
+	{ &uint_ptr_ctype,  SYM_PTR,	  0,			    &bits_in_pointer,        &pointer_alignment, &uint_ctype },
+	{ &long_ptr_ctype,  SYM_PTR,	  0,			    &bits_in_pointer,        &pointer_alignment, &long_ctype },
+	{ &ulong_ptr_ctype, SYM_PTR,	  0,			    &bits_in_pointer,        &pointer_alignment, &ulong_ctype },
+	{ &llong_ptr_ctype, SYM_PTR,	  0,			    &bits_in_pointer,        &pointer_alignment, &llong_ctype },
+	{ &ullong_ptr_ctype,SYM_PTR,	  0,			    &bits_in_pointer,        &pointer_alignment, &ullong_ctype },
+
+	{ &const_void_ctype, SYM_NODE,	  MOD_CONST,		    NULL, NULL, &void_ctype },
+	{ &const_char_ctype, SYM_NODE,	  MOD_CONST,		    &bits_in_char, &max_int_alignment, &char_ctype },
+	{ &const_ptr_ctype, SYM_PTR,	  0,			    &bits_in_pointer,        &pointer_alignment, &const_void_ctype },
+	{ &const_string_ctype,SYM_PTR,	  0,			    &bits_in_pointer,        &pointer_alignment, &const_char_ctype },
 	{ NULL, }
 };
 #undef MOD_LLL
@@ -772,5 +821,11 @@ void init_ctype(void)
 		sym->ctype.alignment = alignment;
 		sym->ctype.base_type = ctype->base_type;
 		sym->ctype.modifiers = ctype->modifiers;
+	}
+
+	// and now some adjustments
+	if (funsigned_char) {
+		char_ctype.ctype.modifiers |= MOD_UNSIGNED;
+		char_ctype.ctype.modifiers &= ~MOD_SIGNED;
 	}
 }

@@ -46,6 +46,6 @@ static void h(void)
  * check-error-start
 noderef.c:24:12: warning: incorrect type in assignment (different modifiers)
 noderef.c:24:12:    expected char *[noderef] *q2
-noderef.c:24:12:    got char [noderef] **<noident>
+noderef.c:24:12:    got char [noderef] **
  * check-error-end
  */

@@ -76,24 +76,15 @@ static void match_access_ok(const char *fn, struct expression *expr, void *data)
 static void split_asm_constraints(struct expression_list *expr_list)
 {
 	struct expression *expr;
-        int state = 0;
 	int i;
 
 	i = 0;
         FOR_EACH_PTR(expr_list, expr) {
-
-                switch (state) {
-                case 0: /* identifier */
-                case 1: /* constraint */
-                        state++;
-                        continue;
-                case 2: /* expression */
-                        state = 0;
-			if (i == 1)
-				match_size(expr);
-			i++;
-                        continue;
-                }
+		i++;
+		if (expr->type != EXPR_ASM_OPERAND)
+			continue;
+		if (i == 1)
+			match_size(expr->expr);
         } END_FOR_EACH_PTR(expr);
 }
 

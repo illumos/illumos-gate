@@ -47,6 +47,8 @@ static void clean_up_symbols(struct symbol_list *list)
 
 		expand_symbol(sym);
 		ep = linearize_symbol(sym);
+		if (!(fdump_ir & PASS_FINAL))
+			continue;
 		if (ep)
 			show_entry(ep);
 	} END_FOR_EACH_PTR(sym);
@@ -58,9 +60,9 @@ int main(int argc, char **argv)
 	char *file;
 
 	clean_up_symbols(sparse_initialize(argc, argv, &filelist));
-	FOR_EACH_PTR_NOTAG(filelist, file) {
+	FOR_EACH_PTR(filelist, file) {
 		clean_up_symbols(sparse(file));
-	} END_FOR_EACH_PTR_NOTAG(file);
+	} END_FOR_EACH_PTR(file);
 
 	report_stats();
 	return 0;

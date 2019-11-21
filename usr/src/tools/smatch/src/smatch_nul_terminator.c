@@ -69,6 +69,24 @@ static void match_nul_assign(struct expression *expr)
 	set_terminated(array, &terminated);
 }
 
+static struct smatch_state *get_terminated_state_var_sym(const char *name, struct symbol *sym)
+{
+	struct sm_state *sm, *tmp;
+
+	sm = get_sm_state(my_id, name, sym);
+	if (!sm)
+		return NULL;
+	if (sm->state == &terminated || sm->state == &unterminated)
+		return sm->state;
+
+	FOR_EACH_PTR(sm->possible, tmp) {
+		if (tmp->state == &unterminated)
+			return &unterminated;
+	} END_FOR_EACH_PTR(tmp);
+
+	return NULL;
+}
+
 static struct smatch_state *get_terminated_state(struct expression *expr)
 {
 	struct sm_state *sm, *tmp;
@@ -238,6 +256,13 @@ static void return_info_terminated(struct expression *expr, int param, char *key
 	set_terminated_var_sym(name, sym, (*value == '1') ? &terminated : &unterminated);
 free:
 	free_string(name);
+}
+
+bool is_nul_terminated_var_sym(const char *name, struct symbol *sym)
+{
+	if (get_terminated_state_var_sym(name, sym) == &terminated)
+		return 1;
+	return 0;
 }
 
 bool is_nul_terminated(struct expression *expr)

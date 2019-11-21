@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -66,11 +66,8 @@ CERRWARN	+= -_gcc=-Wno-unused-variable
 
 # needs work
 SMOFF += all_func_returns
-$(OBJS_DIR)/mac.o := SMOFF += deref_check
 $(OBJS_DIR)/mac_util.o := SMOFF += signed
 
-# false positive
-$(OBJS_DIR)/mac_sched.o := SMOFF += assign_vs_compare
 #
 #	Default build targets.
 #

@@ -10,8 +10,6 @@
  *  - "string to long double" (C99 strtold())
  *	Missing in Solaris and MinGW
  */
-struct stream;
-struct stat;
 
 /*
  * Our "blob" allocator works on chunks that are multiples

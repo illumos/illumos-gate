@@ -8,4 +8,5 @@ void foo(void)
 /*
  * check-name: infinite loop 02
  * check-command: sparse -Wno-decl $file
+ * check-timeout:
  */

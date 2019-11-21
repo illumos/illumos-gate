@@ -5234,7 +5234,7 @@ mac_group_mov_ring(mac_impl_t *mip, mac_group_t *d_group, mac_ring_t *ring)
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
 	ASSERT(d_group != NULL);
-	ASSERT(s_group->mrg_mh == d_group->mrg_mh);
+	ASSERT(s_group == NULL || s_group->mrg_mh == d_group->mrg_mh);
 
 	if (s_group == d_group)
 		return (0);

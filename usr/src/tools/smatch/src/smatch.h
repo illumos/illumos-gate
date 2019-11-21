@@ -107,6 +107,7 @@ struct bit_info {
 
 enum hook_type {
 	EXPR_HOOK,
+	EXPR_HOOK_AFTER,
 	STMT_HOOK,
 	STMT_HOOK_AFTER,
 	SYM_HOOK,
@@ -156,7 +157,7 @@ typedef struct smatch_state *(merge_func_t)(struct smatch_state *s1, struct smat
 typedef struct smatch_state *(unmatched_func_t)(struct sm_state *state);
 void add_merge_hook(int client_id, merge_func_t *func);
 void add_unmatched_state_hook(int client_id, unmatched_func_t *func);
-void add_pre_merge_hook(int client_id, void (*hook)(struct sm_state *sm));
+void add_pre_merge_hook(int client_id, void (*hook)(struct sm_state *cur, struct sm_state *other));
 typedef void (scope_hook)(void *data);
 void add_scope_hook(scope_hook *hook, void *data);
 typedef void (func_hook)(const char *fn, struct expression *expr, void *data);
@@ -205,6 +206,7 @@ extern int final_pass;
 extern struct symbol *cur_func_sym;
 extern int option_debug;
 extern int local_debug;
+bool debug_implied(void);
 extern int option_info;
 extern int option_spammy;
 extern int option_timeout;
@@ -367,6 +369,7 @@ void add_get_state_hook(void (*fn)(int owner, const char *name, struct symbol *s
 /* smatch_helper.c */
 DECLARE_PTR_LIST(int_stack, int);
 char *alloc_string(const char *str);
+char *alloc_string_newline(const char *str);
 void free_string(char *str);
 void append(char *dest, const char *data, int buff_len);
 void remove_parens(char *str);
@@ -401,15 +404,18 @@ int get_absolute_min(struct expression *expr, sval_t *sval);
 int get_absolute_max(struct expression *expr, sval_t *sval);
 int parse_call_math(struct expression *expr, char *math, sval_t *val);
 int parse_call_math_rl(struct expression *call, const char *math, struct range_list **rl);
+const char *get_allocation_math(struct expression *expr);
 char *get_value_in_terms_of_parameter_math(struct expression *expr);
 char *get_value_in_terms_of_parameter_math_var_sym(const char *var, struct symbol *sym);
-int is_zero(struct expression *expr);
+int expr_is_zero(struct expression *expr);
 int known_condition_true(struct expression *expr);
 int known_condition_false(struct expression *expr);
 int implied_condition_true(struct expression *expr);
 int implied_condition_false(struct expression *expr);
 int can_integer_overflow(struct symbol *type, struct expression *expr);
 void clear_math_cache(void);
+void set_fast_math_only(void);
+void clear_fast_math_only(void);
 
 int is_array(struct expression *expr);
 struct expression *get_array_base(struct expression *expr);
@@ -421,7 +427,7 @@ struct expression *strip_expr(struct expression *expr);
 struct expression *strip_expr_set_parent(struct expression *expr);
 void scoped_state(int my_id, const char *name, struct symbol *sym);
 int is_error_return(struct expression *expr);
-int getting_address(void);
+int getting_address(struct expression *expr);
 int get_struct_and_member(struct expression *expr, const char **type, const char **member);
 char *get_member_name(struct expression *expr);
 char *get_fnptr_name(struct expression *expr);
@@ -462,7 +468,7 @@ int is_void_pointer(struct expression *expr);
 int is_char_pointer(struct expression *expr);
 int is_string(struct expression *expr);
 int is_static(struct expression *expr);
-int is_local_variable(struct expression *expr);
+bool is_local_variable(struct expression *expr);
 int types_equiv(struct symbol *one, struct symbol *two);
 int fn_static(void);
 const char *global_static();
@@ -524,6 +530,7 @@ void __split_expr(struct expression *expr);
 void __split_label_stmt(struct statement *stmt);
 void __split_stmt(struct statement *stmt);
 extern int __in_function_def;
+extern int __in_unmatched_hook;
 extern int option_assume_loops;
 extern int option_two_passes;
 extern int option_no_db;
@@ -673,11 +680,6 @@ char *map_long_to_short_name_sym(const char *name, struct symbol *sym, struct sy
 int get_absolute_min_helper(struct expression *expr, sval_t *sval);
 int get_absolute_max_helper(struct expression *expr, sval_t *sval);
 
-/* smatch_local_values.c */
-int get_local_rl(struct expression *expr, struct range_list **rl);
-int get_local_max_helper(struct expression *expr, sval_t *sval);
-int get_local_min_helper(struct expression *expr, sval_t *sval);
-
 /* smatch_type_value.c */
 int get_db_type_rl(struct expression *expr, struct range_list **rl);
 /* smatch_data_val.c */
@@ -686,7 +688,7 @@ int get_mtag_rl(struct expression *expr, struct range_list **rl);
 int get_array_rl(struct expression *expr, struct range_list **rl);
 
 /* smatch_states.c */
-void __swap_cur_stree(struct stree *stree);
+struct stree *__swap_cur_stree(struct stree *stree);
 void __push_fake_cur_stree();
 struct stree *__pop_fake_cur_stree();
 void __free_fake_cur_stree();
@@ -695,6 +697,8 @@ void __pop_fake_cur_stree_fast(void);
 void __merge_stree_into_cur(struct stree *stree);
 
 int unreachable(void);
+void __set_cur_stree_readonly(void);
+void __set_cur_stree_writable(void);
 void __set_sm(struct sm_state *sm);
 void __set_sm_cur_stree(struct sm_state *sm);
 void __set_sm_fake_stree(struct sm_state *sm);
@@ -768,7 +772,6 @@ void __print_cur_stree(void);
 
 /* smatch_hooks.c */
 void __pass_to_client(void *data, enum hook_type type);
-void __pass_to_client_no_data(enum hook_type type);
 void __pass_case_to_client(struct expression *switch_expr,
 			   struct range_list *rl);
 int __has_merge_function(int client_id);
@@ -776,7 +779,7 @@ struct smatch_state *__client_merge_function(int owner,
 					     struct smatch_state *s1,
 					     struct smatch_state *s2);
 struct smatch_state *__client_unmatched_state_function(struct sm_state *sm);
-void call_pre_merge_hook(struct sm_state *sm);
+void call_pre_merge_hook(struct sm_state *cur, struct sm_state *other);
 void __push_scope_hooks(void);
 void __call_scope_hooks(void);
 
@@ -874,6 +877,7 @@ void select_call_implies_hook(int type, void (*callback)(struct expression *call
 void select_return_implies_hook(int type, void (*callback)(struct expression *call, struct expression *arg, char *key, char *value));
 struct range_list *db_return_vals(struct expression *expr);
 struct range_list *db_return_vals_from_str(const char *fn_name);
+struct range_list *db_return_vals_no_args(struct expression *expr);
 char *return_state_to_var_sym(struct expression *expr, int param, const char *key, struct symbol **sym);
 char *get_chunk_from_key(struct expression *arg, char *key, struct symbol **sym, struct var_sym_list **vsl);
 char *get_variable_from_key(struct expression *arg, const char *key, struct symbol **sym);
@@ -1058,6 +1062,8 @@ void __add_return_to_param_mapping(struct expression *assign, const char *return
 char *map_call_to_param_name_sym(struct expression *expr, struct symbol **sym);
 
 /* smatch_comparison.c */
+#define UNKNOWN_COMPARISON 0
+#define IMPOSSIBLE_COMPARISON -1
 struct compare_data {
 	/* The ->left and ->right expression pointers might be NULL (I'm lazy) */
 	struct expression *left;
@@ -1075,7 +1081,7 @@ struct smatch_state *alloc_compare_state(
 		int comparison,
 		struct expression *right,
 		const char *right_var, struct var_sym_list *right_vsl);
-int filter_comparison(int orig, int op);
+int comparison_intersection(int orig, int op);
 int merge_comparisons(int one, int two);
 int combine_comparisons(int left_compare, int right_compare);
 int state_to_comparison(struct smatch_state *state);
@@ -1173,6 +1179,7 @@ int get_formatted_string_min_size(struct expression *call, int arg);
 /* smatch_param_set.c */
 int param_was_set(struct expression *expr);
 int param_was_set_var_sym(const char *name, struct symbol *sym);
+void print_limited_param_set(int return_id, char *return_ranges, struct expression *expr);
 /* smatch_param_filter.c */
 int param_has_filter_data(struct sm_state *sm);
 
@@ -1180,9 +1187,6 @@ int param_has_filter_data(struct sm_state *sm);
 void set_up_link_functions(int id, int linkid);
 struct smatch_state *merge_link_states(struct smatch_state *s1, struct smatch_state *s2);
 void store_link(int link_id, const char *name, struct symbol *sym, const char *link_name, struct symbol *link_sym);
-
-/* smatch_auto_copy.c */
-void set_auto_copy(int owner);
 
 /* check_buf_comparison */
 const char *limit_type_str(unsigned int limit_type);
@@ -1235,13 +1239,14 @@ int get_string_mtag(struct expression *expr, mtag_t *tag);
 int get_toplevel_mtag(struct symbol *sym, mtag_t *tag);
 int create_mtag_alias(mtag_t tag, struct expression *expr, mtag_t *new);
 int expr_to_mtag_offset(struct expression *expr, mtag_t *tag, int *offset);
-void update_mtag_data(struct expression *expr);
+void update_mtag_data(struct expression *expr, struct smatch_state *state);
 int get_mtag_sval(struct expression *expr, sval_t *sval);
 
 /* Trinity fuzzer stuff */
 const char *get_syscall_arg_type(struct symbol *sym);
 
 /* smatch_bit_info.c */
+struct bit_info *rl_to_binfo(struct range_list *rl);
 struct bit_info *get_bit_info(struct expression *expr);
 struct bit_info *get_bit_info_var_sym(const char *name, struct symbol *sym);
 /* smatch_mem_tracker.c */
@@ -1254,6 +1259,7 @@ bool is_nospec(struct expression *expr);
 long get_stmt_cnt(void);
 
 /* smatch_nul_terminator.c */
+bool is_nul_terminated_var_sym(const char *name, struct symbol *sym);
 bool is_nul_terminated(struct expression *expr);
 /* check_kernel.c  */
 bool is_ignored_kernel_data(const char *name);

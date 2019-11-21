@@ -74,6 +74,8 @@ link path=usr/share/man/man3ext/des_setparity.3ext target=ecb_crypt.3ext
 link path=usr/share/man/man3ext/efi_alloc_and_read.3ext \
     target=efi_alloc_and_init.3ext
 link path=usr/share/man/man3ext/efi_free.3ext target=efi_alloc_and_init.3ext
+link path=usr/share/man/man3ext/efi_reserved_sectors.3ext \
+    target=efi_alloc_and_init.3ext
 link path=usr/share/man/man3ext/efi_use_whole_disk.3ext \
     target=efi_alloc_and_init.3ext
 link path=usr/share/man/man3ext/efi_write.3ext target=efi_alloc_and_init.3ext

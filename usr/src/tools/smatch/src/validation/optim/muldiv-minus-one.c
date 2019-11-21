@@ -14,5 +14,5 @@ u32 udivm1(u32 a) { return a / (u32) -1; }
  * check-output-excludes: divs\\.
  * check-output-contains: neg\\.
  * check-output-contains: divu\\.
- * check-output-pattern-3-times: neg\\.
+ * check-output-pattern(3): neg\\.
  */

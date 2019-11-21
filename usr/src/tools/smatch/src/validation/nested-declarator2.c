@@ -27,7 +27,7 @@ static int (-bad2);
 static void [2](*bad3);
 /*
  * check-name: more on handling of ( in direct-declarator
- * check-error-start:
+ * check-error-start
 nested-declarator2.c:17:1: warning: non-ANSI definition of function 'w1'
 nested-declarator2.c:21:21: warning: non-ANSI function declaration of function '<noident>'
 nested-declarator2.c:22:16: warning: variadic functions must have one named argument
@@ -37,5 +37,5 @@ nested-declarator2.c:26:13: error: Expected ) in nested declarator
 nested-declarator2.c:26:13: error: got -
 nested-declarator2.c:27:16: error: Expected ; at the end of type declaration
 nested-declarator2.c:27:16: error: got (
- * check-error-end:
+ * check-error-end
  */

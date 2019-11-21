@@ -18,7 +18,7 @@ static int *f = &a.d.b[1];	// OK
 static int *g = &(&a.d)->b[1];	// OK
 
 /*
- * check-name: address of static object's member constness verification.
+ * check-name: constexpr static object's member address
  * check-command: sparse -Wconstexpr-not-const $file
  *
  * check-error-start

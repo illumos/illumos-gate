@@ -59,7 +59,7 @@ int main(int argc, char **argv)
 	bits_in_bool = 8;
 
 	clean_up_symbols(sparse_initialize(argc, argv, &filelist));
-	FOR_EACH_PTR_NOTAG(filelist, file) {
+	FOR_EACH_PTR(filelist, file) {
 		struct symbol_list *list;
 		const char *basename = strrchr(file, '/');
 		basename = basename ?  basename+1 : file;
@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 		emit_unit_begin(basename);
 		clean_up_symbols(list);
 		emit_unit_end();
-	} END_FOR_EACH_PTR_NOTAG(file);
+	} END_FOR_EACH_PTR(file);
 
 #if 0
 	// And show the allocation statistics

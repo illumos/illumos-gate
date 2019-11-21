@@ -79,21 +79,21 @@ static int good_if_ptr(void *ptr)
  * check-name: conditional-type
  *
  * check-error-start
-conditional-type.c:18:18: error: incorrect type in conditional
+conditional-type.c:18:18: error: incorrect type in conditional (non-scalar type)
 conditional-type.c:18:18:    got void
-conditional-type.c:19:13: error: incorrect type in conditional
+conditional-type.c:19:13: error: incorrect type in conditional (non-scalar type)
 conditional-type.c:19:13:    got struct state s
-conditional-type.c:24:18: error: incorrect type in conditional
+conditional-type.c:24:18: error: incorrect type in conditional (non-scalar type)
 conditional-type.c:24:18:    got void
-conditional-type.c:29:21: error: incorrect type in conditional
+conditional-type.c:29:21: error: incorrect type in conditional (non-scalar type)
 conditional-type.c:29:21:    got void
-conditional-type.c:30:16: error: incorrect type in conditional
+conditional-type.c:30:16: error: incorrect type in conditional (non-scalar type)
 conditional-type.c:30:16:    got struct state s
-conditional-type.c:34:21: error: incorrect type in conditional
+conditional-type.c:34:21: error: incorrect type in conditional (non-scalar type)
 conditional-type.c:34:21:    got void
-conditional-type.c:36:20: error: incorrect type in conditional
+conditional-type.c:36:20: error: incorrect type in conditional (non-scalar type)
 conditional-type.c:36:20:    got void
-conditional-type.c:40:21: error: incorrect type in conditional
+conditional-type.c:40:21: error: incorrect type in conditional (non-scalar type)
 conditional-type.c:40:21:    got void
  * check-error-end
  */

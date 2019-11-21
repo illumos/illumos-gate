@@ -373,7 +373,7 @@ static void store_return_state(struct db_callback_info *db_info, const char *ret
 	db_info->ret_state = state;
 }
 
-static bool fake_a_param_assignment(struct expression *expr, const char *return_str)
+static bool fake_a_param_assignment(struct expression *expr, const char *return_str, struct smatch_state *orig)
 {
 	struct expression *arg, *left, *right, *tmp, *fake_assign;
 	char *p;
@@ -437,6 +437,26 @@ static bool fake_a_param_assignment(struct expression *expr, const char *return_
 	__in_fake_parameter_assign++;
 	__split_expr(fake_assign);
 	__in_fake_parameter_assign--;
+
+	/*
+	 * If the return is "0-65531[$0->nla_len - 4]" the faked expression
+	 * is maybe (-4)-65531 but we know it is in the 0-65531 range so both
+	 * parts have to be considered.  We use _nomod() because it's not really
+	 * another modification, it's just a clarification.
+	 *
+	 */
+	if (estate_rl(orig)) {
+		struct smatch_state *faked;
+		struct range_list *rl;
+
+		faked = get_extra_state(left);
+		if (estate_rl(faked)) {
+			rl = rl_intersection(estate_rl(faked), estate_rl(orig));
+			if (rl)
+				set_extra_expr_nomod(expr, alloc_estate_rl(rl));
+		}
+	}
+
 	return true;
 }
 
@@ -449,9 +469,10 @@ static void set_return_assign_state(struct db_callback_info *db_info)
 		return;
 
 	state = alloc_estate_rl(cast_rl(get_type(expr), clone_rl(estate_rl(db_info->ret_state))));
-	set_extra_expr_mod(expr, state);
+	if (!fake_a_param_assignment(db_info->expr, db_info->ret_str, state))
+		set_extra_expr_mod(expr, state);
+
 	db_info->ret_state = NULL;
-	fake_a_param_assignment(db_info->expr, db_info->ret_str);
 	db_info->ret_str = NULL;
 }
 
@@ -1092,7 +1113,6 @@ static int db_return_states_callback(void *_info, int argc, char **argv, char **
 		__add_return_to_param_mapping(db_info->expr, ret_str);
 	}
 
-
 	FOR_EACH_PTR(db_return_states_list, tmp) {
 		if (tmp->type == type)
 			tmp->callback(db_info->expr, param, key, value);
@@ -1170,12 +1190,14 @@ static void db_return_states_call(struct expression *expr)
 static void match_function_call(struct expression *expr)
 {
 	struct call_back_list *call_backs;
+	struct expression *fn;
 
-	if (expr->fn->type == EXPR_SYMBOL && expr->fn->symbol) {
-		call_backs = search_callback(func_hash, (char *)expr->fn->symbol->ident->name);
+	fn = strip_expr(expr->fn);
+	if (fn->type == EXPR_SYMBOL && fn->symbol) {
+		call_backs = search_callback(func_hash, (char *)fn->symbol->ident->name);
 		if (call_backs)
 			call_call_backs(call_backs, REGULAR_CALL,
-					expr->fn->symbol->ident->name, expr);
+					fn->symbol->ident->name, expr);
 	}
 	db_return_states_call(expr);
 }

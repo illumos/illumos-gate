@@ -135,7 +135,6 @@ extern struct token *external_declaration(struct token *, struct symbol_list **,
 
 extern struct symbol *ctype_integer(int size, int want_unsigned);
 
-extern void copy_statement(struct statement *src, struct statement *dst);
 extern int inline_function(struct expression *expr, struct symbol *sym);
 extern void uninline(struct symbol *sym);
 extern void init_parser(int);

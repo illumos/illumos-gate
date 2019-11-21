@@ -47,9 +47,9 @@ static struct expression *strip_condition(struct expression *expr)
 	if (expr->type == EXPR_COMPARE &&
 	    (expr->op == SPECIAL_EQUAL ||
 	     expr->op == SPECIAL_NOTEQUAL)) {
-		if (is_zero(expr->left))
+		if (expr_is_zero(expr->left))
 			return strip_condition(expr->right);
-		if (is_zero(expr->right))
+		if (expr_is_zero(expr->right))
 			return strip_condition(expr->left);
 	}
 
@@ -130,6 +130,9 @@ static int previous_statement_was_synchronize(void)
 	struct position pos;
 	struct position prev_pos;
 	char *ident;
+
+	if (!__cur_stmt)
+		return 0;
 
 	if (__prev_stmt) {
 		prev_pos = __prev_stmt->pos;

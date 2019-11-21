@@ -55,6 +55,10 @@ You can also build a directory like this:
 
 The kchecker script prints its warnings to stdout.
 
+The above scripts will ensure that any ARCH or CROSS_COMPILE environment
+variables are passed to kernel build system - thus allowing for the use of
+Smatch with kernels that are normally built with cross-compilers.
+
 If you are building something else (which is not the Linux kernel) then use
 something like:
 

@@ -1,7 +1,7 @@
 int def(void);
 void use(int);
 
-static int foo(int a, int b)
+static void foo(int a, int b)
 {
 	int c;
 

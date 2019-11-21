@@ -3355,7 +3355,7 @@ Psymbol_iter_by_lmid(struct ps_prochandle *P, Lmid_t lmid,
     const char *object_name, int which, int mask, proc_sym_f *func, void *cd)
 {
 	return (Psymbol_iter_com(P, lmid, object_name, which, mask,
-	    PRO_NATURAL, (proc_xsym_f *)func, cd));
+	    PRO_NATURAL, (proc_xsym_f *)(uintptr_t)func, cd));
 }
 
 int
@@ -3363,7 +3363,7 @@ Psymbol_iter(struct ps_prochandle *P,
     const char *object_name, int which, int mask, proc_sym_f *func, void *cd)
 {
 	return (Psymbol_iter_com(P, PR_LMID_EVERY, object_name, which, mask,
-	    PRO_NATURAL, (proc_xsym_f *)func, cd));
+	    PRO_NATURAL, (proc_xsym_f *)(uintptr_t)func, cd));
 }
 
 int
@@ -3371,7 +3371,7 @@ Psymbol_iter_by_addr(struct ps_prochandle *P,
     const char *object_name, int which, int mask, proc_sym_f *func, void *cd)
 {
 	return (Psymbol_iter_com(P, PR_LMID_EVERY, object_name, which, mask,
-	    PRO_BYADDR, (proc_xsym_f *)func, cd));
+	    PRO_BYADDR, (proc_xsym_f *)(uintptr_t)func, cd));
 }
 
 int
@@ -3379,7 +3379,7 @@ Psymbol_iter_by_name(struct ps_prochandle *P,
     const char *object_name, int which, int mask, proc_sym_f *func, void *cd)
 {
 	return (Psymbol_iter_com(P, PR_LMID_EVERY, object_name, which, mask,
-	    PRO_BYNAME, (proc_xsym_f *)func, cd));
+	    PRO_BYNAME, (proc_xsym_f *)(uintptr_t)func, cd));
 }
 
 /*

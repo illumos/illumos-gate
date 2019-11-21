@@ -43,6 +43,7 @@ if [ "$PROJ" != "" ] ; then
     ${bin_dir}/fixup_${PROJ}.sh $db_file
 fi
 
+${bin_dir}/copy_function_pointers.pl $db_file
 ${bin_dir}/remove_mixed_up_pointer_params.pl $db_file
 ${bin_dir}/delete_too_common_fn_ptr.sh $db_file
 ${bin_dir}/mark_function_ptrs_searchable.pl $db_file

@@ -66,29 +66,28 @@ static struct smatch_state *unmatched_state(struct sm_state *sm)
 	if (parent_is_gone_var_sym(sm->name, sm->sym))
 		return alloc_estate_empty();
 
-	state = get_state(SMATCH_EXTRA, sm->name, sm->sym);
+	state = __get_state(SMATCH_EXTRA, sm->name, sm->sym);
 	if (state)
 		return state;
 	return alloc_estate_whole(estate_type(sm->state));
 }
 
-static void pre_merge_hook(struct sm_state *sm)
+static void pre_merge_hook(struct sm_state *cur, struct sm_state *other)
 {
-	struct smatch_state *extra, *mine;
+	struct smatch_state *extra;
 	struct range_list *rl;
 
-	if (estate_rl(sm->state))
+	if (estate_rl(other->state))
 		return;
 
-	extra = get_state(SMATCH_EXTRA, sm->name, sm->sym);
+	extra = get_state(SMATCH_EXTRA, cur->name, cur->sym);
 	if (!extra)
 		return;
-	mine = get_state(my_id, sm->name, sm->sym);
 
-	rl = rl_intersection(estate_rl(extra), estate_rl(mine));
-	if (rl_equiv(rl, estate_rl(mine)))
+	rl = rl_intersection(estate_rl(extra), estate_rl(cur->state));
+	if (rl_equiv(rl, estate_rl(cur->state)))
 		return;
-	set_state(my_id, sm->name, sm->sym, alloc_estate_rl(clone_rl(rl)));
+	set_state(my_id, cur->name, cur->sym, alloc_estate_rl(clone_rl(rl)));
 }
 
 static void extra_mod_hook(const char *name, struct symbol *sym, struct expression *expr, struct smatch_state *state)

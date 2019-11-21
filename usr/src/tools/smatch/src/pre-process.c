@@ -49,6 +49,7 @@
 static struct ident_list *macros;	// only needed for -dD
 static int false_nesting = 0;
 static int counter_macro = 0;		// __COUNTER__ expansion
+static int include_level = 0;
 
 #define INCLUDEPATHS 300
 const char *includepath[INCLUDEPATHS+1] = {
@@ -147,49 +148,96 @@ static int token_defined(struct token *token)
 	return 0;
 }
 
-static void replace_with_defined(struct token *token)
+static void replace_with_bool(struct token *token, bool val)
 {
 	static const char *string[] = { "0", "1" };
-	int defined = token_defined(token);
 
 	token_type(token) = TOKEN_NUMBER;
-	token->number = string[defined];
+	token->number = string[val];
+}
+
+static void replace_with_defined(struct token *token)
+{
+	replace_with_bool(token, token_defined(token));
+}
+
+static void replace_with_has_builtin(struct token *token)
+{
+	struct symbol *sym = lookup_symbol(token->ident, NS_SYMBOL);
+	replace_with_bool(token, sym && sym->builtin);
+}
+
+static void replace_with_has_attribute(struct token *token)
+{
+	struct symbol *sym = lookup_symbol(token->ident, NS_KEYWORD);
+	replace_with_bool(token, sym && sym->op && sym->op->attribute);
+}
+
+static void expand_line(struct token *token)
+{
+	replace_with_integer(token, token->pos.line);
+}
+
+static void expand_file(struct token *token)
+{
+	replace_with_string(token, stream_name(token->pos.stream));
+}
+
+static void expand_basefile(struct token *token)
+{
+	replace_with_string(token, base_filename);
+}
+
+static time_t t = 0;
+static void expand_date(struct token *token)
+{
+	static char buffer[12]; /* __DATE__: 3 + ' ' + 2 + ' ' + 4 + '\0' */
+
+	if (!t)
+		time(&t);
+	strftime(buffer, 12, "%b %e %Y", localtime(&t));
+	replace_with_string(token, buffer);
+}
+
+static void expand_time(struct token *token)
+{
+	static char buffer[9]; /* __TIME__: 2 + ':' + 2 + ':' + 2 + '\0' */
+
+	if (!t)
+		time(&t);
+	strftime(buffer, 9, "%T", localtime(&t));
+	replace_with_string(token, buffer);
+}
+
+static void expand_counter(struct token *token)
+{
+	replace_with_integer(token, counter_macro++);
+}
+
+static void expand_include_level(struct token *token)
+{
+	replace_with_integer(token, include_level - 1);
 }
 
 static int expand_one_symbol(struct token **list)
 {
 	struct token *token = *list;
 	struct symbol *sym;
-	static char buffer[12]; /* __DATE__: 3 + ' ' + 2 + ' ' + 4 + '\0' */
-	static time_t t = 0;
 
 	if (token->pos.noexpand)
 		return 1;
 
 	sym = lookup_macro(token->ident);
-	if (sym) {
-		store_macro_pos(token);
+	if (!sym)
+		return 1;
+	store_macro_pos(token);
+	if (sym->expander) {
+		sym->expander(token);
+		return 1;
+	} else {
 		sym->used_in = file_scope;
 		return expand(list, sym);
 	}
-	if (token->ident == &__LINE___ident) {
-		replace_with_integer(token, token->pos.line);
-	} else if (token->ident == &__FILE___ident) {
-		replace_with_string(token, stream_name(token->pos.stream));
-	} else if (token->ident == &__DATE___ident) {
-		if (!t)
-			time(&t);
-		strftime(buffer, 12, "%b %e %Y", localtime(&t));
-		replace_with_string(token, buffer);
-	} else if (token->ident == &__TIME___ident) {
-		if (!t)
-			time(&t);
-		strftime(buffer, 9, "%T", localtime(&t));
-		replace_with_string(token, buffer);
-	} else if (token->ident == &__COUNTER___ident) {
-		replace_with_integer(token, counter_macro++);
-	}
-	return 1;
 }
 
 static inline struct token *scan_next(struct token **where)
@@ -514,13 +562,10 @@ static int merge(struct token *left, struct token *right)
 		left->pos.noexpand = 0;
 		return 1;
 
-	case TOKEN_NUMBER: {
-		char *number = __alloc_bytes(strlen(buffer) + 1);
-		memcpy(number, buffer, strlen(buffer) + 1);
+	case TOKEN_NUMBER:
 		token_type(left) = TOKEN_NUMBER;	/* could be . + num */
-		left->number = number;
+		left->number = xstrdup(buffer);
 		return 1;
-	}
 
 	case TOKEN_SPECIAL:
 		if (buffer[2] && buffer[3])
@@ -851,6 +896,10 @@ static void set_stream_include_path(struct stream *stream)
 	includepath[0] = path;
 }
 
+#ifndef PATH_MAX
+#define PATH_MAX 4096	// for Hurd where it's not defined
+#endif
+
 static int try_include(const char *path, const char *filename, int flen, struct token **where, const char **next_path)
 {
 	int fd;
@@ -867,8 +916,7 @@ static int try_include(const char *path, const char *filename, int flen, struct 
 		return 1;
 	fd = open(fullname, O_RDONLY);
 	if (fd >= 0) {
-		char * streamname = __alloc_bytes(plen + flen);
-		memcpy(streamname, fullname, plen + flen);
+		char *streamname = xmemdup(fullname, plen + flen);
 		*where = tokenize(streamname, fd, *where, next_path);
 		close(fd);
 		return 1;
@@ -912,13 +960,14 @@ const char *find_include(const char *skip, const char *look_for)
 		return NULL;
 
 	if (!getcwd(cwd, sizeof(cwd)))
-		return NULL;
+		goto close;
 
 	while ((entry = readdir(dp))) {
 		lstat(entry->d_name, &statbuf);
 
 		if (strcmp(entry->d_name, look_for) == 0) {
 			snprintf(buf, sizeof(buf), "%s/%s", cwd, entry->d_name);
+			closedir(dp);
 			return buf;
 		}
 
@@ -932,10 +981,13 @@ const char *find_include(const char *skip, const char *look_for)
 			chdir(entry->d_name);
 			ret = find_include("", look_for);
 			chdir("..");
-			if (ret)
+			if (ret) {
+				closedir(dp);
 				return ret;
+			}
 		}
 	}
+close:
 	closedir(dp);
 
 	return NULL;
@@ -982,7 +1034,12 @@ static void use_best_guess_header_file(struct token *token, const char *filename
 	char dir_part[PATH_MAX];
 	const char *file_part;
 	const char *include_name;
+	static int cnt;
 	int len;
+
+	/* Avoid guessing includes recursively. */
+	if (cnt++ > 1000)
+		return;
 
 	if (!filename || filename[0] == '\0')
 		return;
@@ -1420,13 +1477,102 @@ Earg:
 	return NULL;
 }
 
+static int do_define(struct position pos, struct token *token, struct ident *name,
+		     struct token *arglist, struct token *expansion, int attr)
+{
+	struct symbol *sym;
+	int ret = 1;
+
+	expansion = parse_expansion(expansion, arglist, name);
+	if (!expansion)
+		return 1;
+
+	sym = lookup_symbol(name, NS_MACRO | NS_UNDEF);
+	if (sym) {
+		int clean;
+
+		if (attr < sym->attr)
+			goto out;
+
+		clean = (attr == sym->attr && sym->namespace == NS_MACRO);
+
+		if (token_list_different(sym->expansion, expansion) ||
+		    token_list_different(sym->arglist, arglist)) {
+			ret = 0;
+			if ((clean && attr == SYM_ATTR_NORMAL)
+					|| sym->used_in == file_scope) {
+				warning(pos, "preprocessor token %.*s redefined",
+						name->len, name->name);
+				info(sym->pos, "this was the original definition");
+			}
+		} else if (clean)
+			goto out;
+	}
+
+	if (!sym || sym->scope != file_scope) {
+		sym = alloc_symbol(pos, SYM_NODE);
+		bind_symbol(sym, name, NS_MACRO);
+		add_ident(&macros, name);
+		ret = 0;
+	}
+
+	if (!ret) {
+		sym->expansion = expansion;
+		sym->arglist = arglist;
+		if (token) /* Free the "define" token, but not the rest of the line */
+			__free_token(token);
+	}
+
+	sym->namespace = NS_MACRO;
+	sym->used_in = NULL;
+	sym->attr = attr;
+out:
+	return ret;
+}
+
+///
+// predefine a macro with a printf-formatted value
+// @name: the name of the macro
+// @weak: 0/1 for a normal or a weak define
+// @fmt: the printf format followed by it's arguments.
+//
+// The type of the value is automatically infered:
+// TOKEN_NUMBER if it starts by a digit, TOKEN_IDENT otherwise.
+// If @fmt is null or empty, the macro is defined with an empty definition.
+void predefine(const char *name, int weak, const char *fmt, ...)
+{
+	struct ident *ident = built_in_ident(name);
+	struct token *value = &eof_token_entry;
+	int attr = weak ? SYM_ATTR_WEAK : SYM_ATTR_NORMAL;
+
+	if (fmt && fmt[0]) {
+		static char buf[256];
+		va_list ap;
+
+		va_start(ap, fmt);
+		vsnprintf(buf, sizeof(buf), fmt, ap);
+		va_end(ap);
+
+		value = __alloc_token(0);
+		if (isdigit(buf[0])) {
+			token_type(value) = TOKEN_NUMBER;
+			value->number = xstrdup(buf);
+		} else {
+			token_type(value) = TOKEN_IDENT;
+			value->ident = built_in_ident(buf);
+		}
+		value->pos.whitespace = 1;
+		value->next = &eof_token_entry;
+	}
+
+	do_define(value->pos, NULL, ident, NULL, value, attr);
+}
+
 static int do_handle_define(struct stream *stream, struct token **line, struct token *token, int attr)
 {
 	struct token *arglist, *expansion;
 	struct token *left = token->next;
-	struct symbol *sym;
 	struct ident *name;
-	int ret;
 
 	if (token_type(left) != TOKEN_IDENT) {
 		sparse_error(token->pos, "expected identifier to 'define'");
@@ -1449,51 +1595,7 @@ static int do_handle_define(struct stream *stream, struct token **line, struct t
 		}
 	}
 
-	expansion = parse_expansion(expansion, arglist, name);
-	if (!expansion)
-		return 1;
-
-	ret = 1;
-	sym = lookup_symbol(name, NS_MACRO | NS_UNDEF);
-	if (sym) {
-		int clean;
-
-		if (attr < sym->attr)
-			goto out;
-
-		clean = (attr == sym->attr && sym->namespace == NS_MACRO);
-
-		if (token_list_different(sym->expansion, expansion) ||
-		    token_list_different(sym->arglist, arglist)) {
-			ret = 0;
-			if ((clean && attr == SYM_ATTR_NORMAL)
-					|| sym->used_in == file_scope) {
-				warning(left->pos, "preprocessor token %.*s redefined",
-						name->len, name->name);
-				info(sym->pos, "this was the original definition");
-			}
-		} else if (clean)
-			goto out;
-	}
-
-	if (!sym || sym->scope != file_scope) {
-		sym = alloc_symbol(left->pos, SYM_NODE);
-		bind_symbol(sym, name, NS_MACRO);
-		add_ident(&macros, name);
-		ret = 0;
-	}
-
-	if (!ret) {
-		sym->expansion = expansion;
-		sym->arglist = arglist;
-		__free_token(token);	/* Free the "define" token, but not the rest of the line */
-	}
-
-	sym->namespace = NS_MACRO;
-	sym->used_in = NULL;
-	sym->attr = attr;
-out:
-	return ret;
+	return do_define(left->pos, token, name, arglist, expansion, attr);
 }
 
 static int handle_define(struct stream *stream, struct token **line, struct token *token)
@@ -1552,13 +1654,13 @@ static int handle_strong_undef(struct stream *stream, struct token **line, struc
 	return do_handle_undef(stream, line, token, SYM_ATTR_STRONG);
 }
 
-static int preprocessor_if(struct stream *stream, struct token *token, int true)
+static int preprocessor_if(struct stream *stream, struct token *token, int cond)
 {
 	token_type(token) = false_nesting ? TOKEN_SKIP_GROUPS : TOKEN_IF;
 	free_preprocessor_line(token->next);
 	token->next = stream->top_if;
 	stream->top_if = token;
-	if (false_nesting || true != 1)
+	if (false_nesting || cond != 1)
 		false_nesting++;
 	return 0;
 }
@@ -1626,6 +1728,14 @@ static int expression_value(struct token **where)
 				state = 1;
 				beginning = list;
 				break;
+			} else if (p->ident == &__has_builtin_ident) {
+				state = 4;
+				beginning = list;
+				break;
+			} else if (p->ident == &__has_attribute_ident) {
+				state = 6;
+				beginning = list;
+				break;
 			}
 			if (!expand_one_symbol(list))
 				continue;
@@ -1654,6 +1764,38 @@ static int expression_value(struct token **where)
 			state = 0;
 			if (!match_op(p, ')'))
 				sparse_error(p->pos, "missing ')' after \"defined\"");
+			*list = p->next;
+			continue;
+
+		// __has_builtin(x) or __has_attribute(x)
+		case 4: case 6:
+			if (match_op(p, '(')) {
+				state++;
+			} else {
+				sparse_error(p->pos, "missing '(' after \"__has_%s\"",
+					state == 4 ? "builtin" : "attribute");
+				state = 0;
+			}
+			*beginning = p;
+			break;
+		case 5: case 7:
+			if (token_type(p) != TOKEN_IDENT) {
+				sparse_error(p->pos, "identifier expected");
+				state = 0;
+				break;
+			}
+			if (!match_op(p->next, ')'))
+				sparse_error(p->pos, "missing ')' after \"__has_%s\"",
+					state == 5 ? "builtin" : "attribute");
+			if (state == 5)
+				replace_with_has_builtin(p);
+			else
+				replace_with_has_attribute(p);
+			state = 8;
+			*beginning = p;
+			break;
+		case 8:
+			state = 0;
 			*list = p->next;
 			continue;
 		}
@@ -1969,9 +2111,6 @@ static int handle_line(struct stream *stream, struct token **line, struct token 
 	return 1;
 }
 
-/*
- * Ignore "#ident".
- */
 static int handle_ident(struct stream *stream, struct token **line, struct token *token)
 {
 	return 1;
@@ -2021,6 +2160,18 @@ static void init_preprocessor(void)
 		{ "if",		handle_if },
 		{ "elif",	handle_elif },
 	};
+	static struct {
+		const char *name;
+		void (*expander)(struct token *);
+	} dynamic[] = {
+		{ "__LINE__",		expand_line },
+		{ "__FILE__",		expand_file },
+		{ "__BASE_FILE__",	expand_basefile },
+		{ "__DATE__",		expand_date },
+		{ "__TIME__",		expand_time },
+		{ "__COUNTER__",	expand_counter },
+		{ "__INCLUDE_LEVEL__",	expand_include_level },
+	};
 
 	for (i = 0; i < ARRAY_SIZE(normal); i++) {
 		struct symbol *sym;
@@ -2033,6 +2184,11 @@ static void init_preprocessor(void)
 		sym = create_symbol(stream, special[i].name, SYM_PREPROCESSOR, NS_PREPROCESSOR);
 		sym->handler = special[i].handler;
 		sym->normal = 0;
+	}
+	for (i = 0; i < ARRAY_SIZE(dynamic); i++) {
+		struct symbol *sym;
+		sym = create_symbol(stream, dynamic[i].name, SYM_NODE, NS_MACRO);
+		sym->expander = dynamic[i].expander;
 	}
 
 	counter_macro = 0;
@@ -2115,9 +2271,11 @@ static void do_preprocess(struct token **list)
 			if (!stream->dirty)
 				stream->constant = CONSTANT_FILE_YES;
 			*list = next->next;
+			include_level--;
 			continue;
 		case TOKEN_STREAMBEGIN:
 			*list = next->next;
+			include_level++;
 			continue;
 
 		default:
@@ -2179,6 +2337,12 @@ struct token * preprocess(struct token *token)
 	return token;
 }
 
+static int is_VA_ARGS_token(struct token *token)
+{
+	return (token_type(token) == TOKEN_IDENT) &&
+		(token->ident == &__VA_ARGS___ident);
+}
+
 static void dump_macro(struct symbol *sym)
 {
 	int nargs = sym->arglist ? sym->arglist->count.normal : 0;
@@ -2194,27 +2358,34 @@ static void dump_macro(struct symbol *sym)
 		for (; !eof_token(token); token = token->next) {
 			if (token_type(token) == TOKEN_ARG_COUNT)
 				continue;
-			printf("%s%s", sep, show_token(token));
+			if (is_VA_ARGS_token(token))
+				printf("%s...", sep);
+			else
+				printf("%s%s", sep, show_token(token));
 			args[narg++] = token;
-			sep = ", ";
+			sep = ",";
 		}
 		putchar(')');
 	}
-	putchar(' ');
 
 	token = sym->expansion;
-	while (!eof_token(token)) {
+	while (token_type(token) != TOKEN_UNTAINT) {
 		struct token *next = token->next;
+		if (token->pos.whitespace)
+			putchar(' ');
 		switch (token_type(token)) {
-		case TOKEN_UNTAINT:
+		case TOKEN_CONCAT:
+			printf("##");
 			break;
+		case TOKEN_STR_ARGUMENT:
+			printf("#");
+			/* fall-through */
+		case TOKEN_QUOTED_ARGUMENT:
 		case TOKEN_MACRO_ARGUMENT:
 			token = args[token->argnum];
 			/* fall-through */
 		default:
 			printf("%s", show_token(token));
-			if (next->pos.whitespace)
-				putchar(' ');
 		}
 		token = next;
 	}

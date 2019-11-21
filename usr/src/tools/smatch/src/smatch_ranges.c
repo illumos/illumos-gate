@@ -26,7 +26,7 @@ __DO_ALLOCATOR(struct data_range, sizeof(struct data_range), __alignof__(struct 
 			 "permanent ranges", perm_data_range);
 __DECLARE_ALLOCATOR(struct ptr_list, rl_ptrlist);
 
-static bool is_err_ptr(sval_t sval)
+bool is_err_ptr(sval_t sval)
 {
 	if (option_project != PROJ_KERNEL)
 		return false;
@@ -249,6 +249,13 @@ static int str_to_comparison_arg_helper(const char *str,
 	c++;
 
 	param = strtoll(c, (char **)&c, 10);
+	/*
+	 * FIXME: handle parameter math.  [==$1 + 100]
+	 *
+	 */
+	if (*c == ' ')
+		return 0;
+
 	if (*c == ',' || *c == ']')
 		c++; /* skip the ']' character */
 	if (endp)
@@ -342,6 +349,9 @@ void filter_by_comparison(struct range_list **rl, int comparison, struct range_l
 	struct symbol *cast_type;
 	sval_t min, max;
 
+	if (comparison == UNKNOWN_COMPARISON)
+		return;
+
 	cast_type = rl_type(left_orig);
 	if (sval_type_max(rl_type(left_orig)).uvalue < sval_type_max(rl_type(right_orig)).uvalue)
 		cast_type = rl_type(right_orig);
@@ -393,6 +403,10 @@ static struct range_list *filter_by_comparison_call(const char *c, struct expres
 	struct expression *arg;
 	struct range_list *casted_start, *right_orig;
 	int comparison;
+
+	/* For when we have a function that takes a function pointer. */
+	if (!call || call->type != EXPR_CALL)
+		return start_rl;
 
 	if (!str_to_comparison_arg_helper(c, call, &comparison, &arg, endp))
 		return start_rl;
@@ -489,6 +503,21 @@ static const char *jump_to_call_math(const char *value)
 		return NULL;
 
 	return c;
+}
+
+static struct range_list *get_param_return_rl(struct expression *call, const char *call_math)
+{
+	struct expression *arg;
+	int param;
+
+	call_math += 3;
+	param = atoi(call_math);
+
+	arg = get_argument_from_call_expr(call->args, param);
+	if (!arg)
+		return NULL;
+
+	return db_return_vals_no_args(arg);
 }
 
 static void str_to_rl_helper(struct expression *call, struct symbol *type, const char *str, const char **endp, struct range_list **rl)
@@ -592,6 +621,12 @@ static void str_to_dinfo(struct expression *call, struct symbol *type, const cha
 		goto cast;
 
 	call_math = jump_to_call_math(value);
+	if (call_math && call_math[0] == 'r') {
+		math_rl = get_param_return_rl(call, call_math);
+		if (math_rl)
+			rl = rl_intersection(rl, math_rl);
+		goto cast;
+	}
 	if (call_math && parse_call_math_rl(call, call_math, &math_rl)) {
 		rl = rl_intersection(rl, math_rl);
 		goto cast;
@@ -651,7 +686,7 @@ int is_whole_rl(struct range_list *rl)
 {
 	struct data_range *drange;
 
-	if (ptr_list_empty(rl))
+	if (ptr_list_empty((struct ptr_list *)rl))
 		return 0;
 	drange = first_ptr_list((struct ptr_list *)rl);
 	if (sval_is_min(drange->min) && sval_is_max(drange->max))
@@ -682,7 +717,7 @@ int is_whole_rl_non_zero(struct range_list *rl)
 {
 	struct data_range *drange;
 
-	if (ptr_list_empty(rl))
+	if (ptr_list_empty((struct ptr_list *)rl))
 		return 0;
 	drange = first_ptr_list((struct ptr_list *)rl);
 	if (sval_unsigned(drange->min) &&
@@ -704,7 +739,7 @@ sval_t rl_min(struct range_list *rl)
 
 	ret.type = &llong_ctype;
 	ret.value = LLONG_MIN;
-	if (ptr_list_empty(rl))
+	if (ptr_list_empty((struct ptr_list *)rl))
 		return ret;
 	drange = first_ptr_list((struct ptr_list *)rl);
 	return drange->min;
@@ -717,7 +752,7 @@ sval_t rl_max(struct range_list *rl)
 
 	ret.type = &llong_ctype;
 	ret.value = LLONG_MAX;
-	if (ptr_list_empty(rl))
+	if (ptr_list_empty((struct ptr_list *)rl))
 		return ret;
 	drange = last_ptr_list((struct ptr_list *)rl);
 	return drange->max;
@@ -1190,6 +1225,8 @@ int possibly_true(struct expression *left, int comparison, struct expression *ri
 	struct data_range *tmp_left, *tmp_right;
 	struct symbol *type;
 
+	if (comparison == UNKNOWN_COMPARISON)
+		return 1;
 	if (!get_implied_rl(left, &rl_left))
 		return 1;
 	if (!get_implied_rl(right, &rl_right))
@@ -1247,7 +1284,7 @@ int possibly_true_rl(struct range_list *left_ranges, int comparison, struct rang
 	struct data_range *left_tmp, *right_tmp;
 	struct symbol *type;
 
-	if (!left_ranges || !right_ranges)
+	if (!left_ranges || !right_ranges || comparison == UNKNOWN_COMPARISON)
 		return 1;
 
 	type = rl_type(left_ranges);
@@ -1273,7 +1310,7 @@ int possibly_false_rl(struct range_list *left_ranges, int comparison, struct ran
 	struct data_range *left_tmp, *right_tmp;
 	struct symbol *type;
 
-	if (!left_ranges || !right_ranges)
+	if (!left_ranges || !right_ranges || comparison == UNKNOWN_COMPARISON)
 		return 1;
 
 	type = rl_type(left_ranges);
@@ -1847,70 +1884,23 @@ static sval_t sval_lowest_set_bit(sval_t sval)
 	return ret;
 }
 
-static struct range_list *handle_AND_rl_sval(struct range_list *rl, sval_t sval)
-{
-	struct range_list *known_rl;
-	sval_t zero = { 0 };
-	sval_t min;
-
-	zero.type = sval.type;
-	zero.value = 0;
-
-	if (sm_fls64(rl_max(rl).uvalue) < find_first_zero_bit(sval.uvalue) &&
-	    sm_fls64(rl_min(rl).uvalue) < find_first_zero_bit(sval.uvalue))
-		return rl;
-
-	min = sval_lowest_set_bit(sval);
-
-	if (min.value != 0) {
-		sval_t max, mod;
-
-		max = rl_max(rl);
-		mod = sval_binop(max, '%', min);
-		if (mod.value) {
-			max = sval_binop(max, '-', mod);
-			max.value++;
-			if (max.value > 0 && sval_cmp(max, rl_max(rl)) < 0)
-				rl = remove_range(rl, max, rl_max(rl));
-		}
-	}
-
-	known_rl = alloc_rl(min, sval);
-
-	rl = rl_intersection(rl, known_rl);
-	zero = rl_min(rl);
-	zero.value = 0;
-	add_range(&rl, zero, zero);
-
-	return rl;
-}
-
-static struct range_list *fudge_AND_rl(struct range_list *rl)
-{
-	struct range_list *ret;
-	sval_t min;
-
-	min = sval_lowest_set_bit(rl_min(rl));
-	ret = clone_rl(rl);
-	add_range(&ret, min, rl_min(rl));
-
-	return ret;
-}
-
 static struct range_list *handle_AND_rl(struct range_list *left, struct range_list *right)
 {
-	sval_t sval, zero;
+	struct bit_info *one, *two;
 	struct range_list *rl;
+	sval_t min, max, zero;
+	unsigned long long bits;
 
-	if (rl_to_sval(left, &sval))
-		return handle_AND_rl_sval(right, sval);
-	if (rl_to_sval(right, &sval))
-		return handle_AND_rl_sval(left, sval);
+	one = rl_to_binfo(left);
+	two = rl_to_binfo(right);
+	bits = one->possible & two->possible;
 
-	left = fudge_AND_rl(left);
-	right = fudge_AND_rl(right);
+	max = rl_max(left);
+	max.uvalue = bits;
+	min = sval_lowest_set_bit(max);
 
-	rl = rl_intersection(left, right);
+	rl = alloc_rl(min, max);
+
 	zero = rl_min(rl);
 	zero.value = 0;
 	add_range(&rl, zero, zero);
@@ -2148,7 +2138,6 @@ void split_comparison_rl(struct range_list *left_orig, int op, struct range_list
 		break;
 	default:
 		sm_perror(" unhandled comparison %d", op);
-		return;
 	}
 
 	if (left_true_rl) {

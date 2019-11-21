@@ -36,10 +36,27 @@ static void ok_to_use(struct sm_state *sm, struct expression *mod_expr)
 		set_state(my_id, sm->name, sm->sym, &ok);
 }
 
-static void pre_merge_hook(struct sm_state *sm)
+static void pre_merge_hook(struct sm_state *cur, struct sm_state *other)
 {
 	if (is_impossible_path())
-		set_state(my_id, sm->name, sm->sym, &ok);
+		set_state(my_id, cur->name, cur->sym, &ok);
+}
+
+static struct smatch_state *unmatched_state(struct sm_state *sm)
+{
+	struct smatch_state *state;
+	sval_t sval;
+
+	if (sm->state != &freed)
+		return &undefined;
+
+	state = get_state(SMATCH_EXTRA, sm->name, sm->sym);
+	if (!state)
+		return &undefined;
+	if (!estate_get_single_value(state, &sval) || sval.value != 0)
+		return &undefined;
+	/* It makes it easier to consider NULL pointers as freed.  */
+	return &freed;
 }
 
 static int is_freed(struct expression *expr)
@@ -341,6 +358,7 @@ void check_free_strict(int id)
 
 	add_modification_hook_late(my_id, &ok_to_use);
 	add_pre_merge_hook(my_id, &pre_merge_hook);
+	add_unmatched_state_hook(my_id, &unmatched_state);
 
 	select_return_states_hook(PARAM_FREED, &set_param_freed);
 	add_untracked_param_hook(&match_untracked);

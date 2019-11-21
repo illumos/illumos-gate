@@ -7,6 +7,7 @@
 
 #include <assert.h>
 
+#include "liveness.h"
 #include "parse.h"
 #include "expression.h"
 #include "linearize.h"
@@ -53,6 +54,7 @@ static void track_instruction_usage(struct basic_block *bb, struct instruction *
 
 	switch (insn->opcode) {
 	case OP_RET:
+	case OP_COMPUTEDGOTO:
 		USES(src);
 		break;
 
@@ -61,18 +63,16 @@ static void track_instruction_usage(struct basic_block *bb, struct instruction *
 		USES(cond);
 		break;
 
-	case OP_COMPUTEDGOTO:
-		USES(target);
-		break;
-	
 	/* Binary */
 	case OP_BINARY ... OP_BINARY_END:
+	case OP_FPCMP ... OP_FPCMP_END:
 	case OP_BINCMP ... OP_BINCMP_END:
 		USES(src1); USES(src2); DEFINES(target);
 		break;
 
 	/* Uni */
-	case OP_NOT: case OP_NEG:
+	case OP_UNOP ... OP_UNOP_END:
+	case OP_SYMADDR:
 		USES(src1); DEFINES(target);
 		break;
 
@@ -90,11 +90,8 @@ static void track_instruction_usage(struct basic_block *bb, struct instruction *
 		break;
 
 	case OP_SETVAL:
+	case OP_SETFVAL:
 		DEFINES(target);
-		break;
-
-	case OP_SYMADDR:
-		USES(symbol); DEFINES(target);
 		break;
 
 	/* Other */
@@ -109,13 +106,6 @@ static void track_instruction_usage(struct basic_block *bb, struct instruction *
 		 * up and expanded by the OP_PHI
 		 */
 		USES(phi_src);
-		break;
-
-	case OP_CAST:
-	case OP_SCAST:
-	case OP_FPCAST:
-	case OP_PTRCAST:
-		USES(src); DEFINES(target);
 		break;
 
 	case OP_CALL:
@@ -140,31 +130,12 @@ static void track_instruction_usage(struct basic_block *bb, struct instruction *
 		break;
 
 	case OP_BADOP:
-	case OP_INVOKE:
-	case OP_UNWIND:
-	case OP_MALLOC:
-	case OP_FREE:
-	case OP_ALLOCA:
-	case OP_GET_ELEMENT_PTR:
-	case OP_VANEXT:
-	case OP_VAARG:
-	case OP_SNOP:
-	case OP_LNOP:
 	case OP_NOP:
 	case OP_CONTEXT:
 		break;
 	}
 }
 
-int pseudo_in_list(struct pseudo_list *list, pseudo_t pseudo)
-{
-	pseudo_t old;
-	FOR_EACH_PTR(list,old) {
-		if (old == pseudo)
-			return 1;
-	} END_FOR_EACH_PTR(old);   
-	return 0;
-}
 
 static int liveness_changed;
 
@@ -276,7 +247,7 @@ static void merge_pseudo_list(struct pseudo_list *src, struct pseudo_list **dest
 	} END_FOR_EACH_PTR(pseudo);
 }
 
-void track_phi_uses(struct instruction *insn)
+static void track_phi_uses(struct instruction *insn)
 {
 	pseudo_t phi;
 	FOR_EACH_PTR(insn->phi_list, phi) {

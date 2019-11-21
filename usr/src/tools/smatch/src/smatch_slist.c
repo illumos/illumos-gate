@@ -41,8 +41,9 @@ const char *show_sm(struct sm_state *sm)
 	if (!sm)
 		return "<none>";
 
-	pos = snprintf(buf, sizeof(buf), "[%s] '%s' = '%s'",
-		       check_name(sm->owner), sm->name, show_state(sm->state));
+	pos = snprintf(buf, sizeof(buf), "[%s] %s = '%s'%s",
+		       check_name(sm->owner), sm->name, show_state(sm->state),
+		       sm->merged ? " [merged]" : "");
 	if (pos > sizeof(buf))
 		goto truncate;
 
@@ -691,6 +692,8 @@ static void match_states_stree(struct stree **one, struct stree **two)
 	AvlIter one_iter;
 	AvlIter two_iter;
 
+	__set_cur_stree_readonly();
+
 	avl_iter_begin(&one_iter, *one, FORWARD);
 	avl_iter_begin(&two_iter, *two, FORWARD);
 
@@ -699,7 +702,9 @@ static void match_states_stree(struct stree **one, struct stree **two)
 			break;
 		if (cmp_tracker(one_iter.sm, two_iter.sm) < 0) {
 			__set_fake_cur_stree_fast(*two);
+			__in_unmatched_hook++;
 			tmp_state = __client_unmatched_state_function(one_iter.sm);
+			__in_unmatched_hook--;
 			__pop_fake_cur_stree_fast();
 			sm = alloc_state_no_name(one_iter.sm->owner, one_iter.sm->name,
 						  one_iter.sm->sym, tmp_state);
@@ -710,7 +715,9 @@ static void match_states_stree(struct stree **one, struct stree **two)
 			avl_iter_next(&two_iter);
 		} else {
 			__set_fake_cur_stree_fast(*one);
+			__in_unmatched_hook++;
 			tmp_state = __client_unmatched_state_function(two_iter.sm);
+			__in_unmatched_hook--;
 			__pop_fake_cur_stree_fast();
 			sm = alloc_state_no_name(two_iter.sm->owner, two_iter.sm->name,
 						  two_iter.sm->sym, tmp_state);
@@ -718,6 +725,8 @@ static void match_states_stree(struct stree **one, struct stree **two)
 			avl_iter_next(&two_iter);
 		}
 	}
+
+	__set_cur_stree_writable();
 
 	FOR_EACH_PTR(add_to_one, sm) {
 		avl_insert(one, sm);
@@ -733,29 +742,38 @@ static void match_states_stree(struct stree **one, struct stree **two)
 
 static void call_pre_merge_hooks(struct stree **one, struct stree **two)
 {
-	struct sm_state *sm, *other;
+	struct sm_state *sm, *cur;
+	struct stree *new;
 
-	save_all_states();
+	__in_unmatched_hook++;
 
-	__swap_cur_stree(*one);
+	__set_fake_cur_stree_fast(*one);
+	__push_fake_cur_stree();
 	FOR_EACH_SM(*two, sm) {
-		other = get_sm_state(sm->owner, sm->name, sm->sym);
-		if (other == sm)
+		cur = get_sm_state(sm->owner, sm->name, sm->sym);
+		if (cur == sm)
 			continue;
-		call_pre_merge_hook(sm);
+		call_pre_merge_hook(cur, sm);
 	} END_FOR_EACH_SM(sm);
-	*one = clone_stree(__get_cur_stree());
+	new = __pop_fake_cur_stree();
+	overwrite_stree(new, one);
+	free_stree(&new);
+	__pop_fake_cur_stree_fast();
 
-	__swap_cur_stree(*two);
+	__set_fake_cur_stree_fast(*two);
+	__push_fake_cur_stree();
 	FOR_EACH_SM(*one, sm) {
-		other = get_sm_state(sm->owner, sm->name, sm->sym);
-		if (other == sm)
+		cur = get_sm_state(sm->owner, sm->name, sm->sym);
+		if (cur == sm)
 			continue;
-		call_pre_merge_hook(sm);
+		call_pre_merge_hook(cur, sm);
 	} END_FOR_EACH_SM(sm);
-	*two = clone_stree(__get_cur_stree());
+	new = __pop_fake_cur_stree();
+	overwrite_stree(new, two);
+	free_stree(&new);
+	__pop_fake_cur_stree_fast();
 
-	restore_all_states();
+	__in_unmatched_hook--;
 }
 
 static void clone_pool_havers_stree(struct stree **stree)

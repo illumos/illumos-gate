@@ -1,0 +1,177 @@
+///
+// Title
+// -----
+
+///
+// short description
+int a(int param, int arg);
+
+///
+// short description
+// longer description
+int b(int param, int arg);
+
+///
+// short description
+//
+// longer description with empty line
+int c(int param, int arg);
+
+///
+// short description
+// longer description
+// which needs two lines
+int d(int param, int arg);
+
+///
+// short description
+//
+// longer description with empty line
+// which needs two lines
+int e(int param, int arg);
+
+///
+// condensed format
+// @param: desc param
+// @arg: desc arg
+// @return: desc return
+// longer description
+int f(int param, int arg);
+
+///
+// more airy format
+//
+// @param: desc param
+// @arg: desc arg
+// @return: desc return
+//
+// longer description
+int g(int param, int arg);
+
+///
+// short description
+// @return: ``1`` if @param is zero,
+//	``0`` otherwise.
+int h(int param, int arg);
+
+///
+// short description
+// @return:
+//	* ``1`` if @param is zero,
+//	* ``0`` otherwise.
+int i(int param, int arg);
+
+///
+// short description
+int m(int param, int arg)
+{ return 0; }
+
+///
+// short description
+int n(int param,
+	int arg)
+{ return 0; }
+
+///
+// short description
+int o(int param, int arg);
+
+///
+// short description
+int p(int param,
+	int arg);
+
+
+/*
+ * check-name: cdoc
+ * check-command: Documentation/sphinx/cdoc.py < $file
+ *
+ * check-output-start
+   2: Title
+   3: -----
+   4: 
+   4: 
+   5: 
+   7: .. c:function:: int a(int param, int arg)
+   8: 
+   6: 	Short description.
+   7: 
+  12: .. c:function:: int b(int param, int arg)
+  13: 
+  10: 	Short description.
+  11: 
+  11: 	longer description
+  12: 
+  18: .. c:function:: int c(int param, int arg)
+  19: 
+  15: 	Short description.
+  16: 
+  17: 	longer description with empty line
+  18: 
+  24: .. c:function:: int d(int param, int arg)
+  25: 
+  21: 	Short description.
+  22: 
+  22: 	longer description
+  23: 	which needs two lines
+  24: 
+  31: .. c:function:: int e(int param, int arg)
+  32: 
+  27: 	Short description.
+  28: 
+  29: 	longer description with empty line
+  30: 	which needs two lines
+  31: 
+  39: .. c:function:: int f(int param, int arg)
+  40: 
+  34: 	Condensed format.
+  35: 
+  35: 	:param param: desc param
+  36: 	:param arg: desc arg
+  37: 	:return: desc return
+  38: 
+  38: 	longer description
+  39: 
+  49: .. c:function:: int g(int param, int arg)
+  50: 
+  42: 	More airy format.
+  43: 
+  44: 	:param param: desc param
+  45: 	:param arg: desc arg
+  46: 	:return: desc return
+  47: 
+  48: 	longer description
+  49: 
+  55: .. c:function:: int h(int param, int arg)
+  56: 
+  52: 	Short description.
+  53: 
+  53: 	:return: ``1`` if **param** is zero,
+  54: 		``0`` otherwise.
+  54: 
+  62: .. c:function:: int i(int param, int arg)
+  63: 
+  58: 	Short description.
+  59: 
+  59: 	:return: 
+  60: 		* ``1`` if **param** is zero,
+  61: 		* ``0`` otherwise.
+  60: 
+  66: .. c:function:: int m(int param, int arg)
+  67: 
+  65: 	Short description.
+  66: 
+  71: .. c:function:: int n(int param, int arg)
+  72: 
+  70: 	Short description.
+  71: 
+  77: .. c:function:: int o(int param, int arg)
+  78: 
+  76: 	Short description.
+  77: 
+  81: .. c:function:: int p(int param, int arg)
+  82: 
+  80: 	Short description.
+  81: 
+ * check-output-end
+ */

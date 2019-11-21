@@ -93,9 +93,13 @@ const char *show_special(int val)
 
 const char *show_ident(const struct ident *ident)
 {
-	static char buffer[256];
+	static char buff[4][256];
+	static int n;
+	char *buffer;
+
 	if (!ident)
 		return "<noident>";
+	buffer = buff[3 & ++n];
 	sprintf(buffer, "%.*s", ident->len, ident->name);
 	return buffer;
 }
@@ -129,7 +133,7 @@ const char *show_string(const struct string *string)
 	char *ptr;
 	int i;
 
-	if (!string->length)
+	if (!string || !string->length)
 		return "<bad_string>";
 	ptr = buffer;
 	*ptr++ = '"';
@@ -449,6 +453,7 @@ static struct token *mark_eof(stream_t *stream)
 	struct token *end;
 
 	end = alloc_token(stream);
+	eof_token_entry.pos = end->pos;
 	token_type(end) = TOKEN_STREAMEND;
 	end->pos.newline = 1;
 
@@ -488,32 +493,20 @@ enum {
 	Quote = 64,
 };
 
-static const long cclass[257] = {
-	['0' + 1 ... '7' + 1] = Digit | Hex,	/* \<octal> */
-	['8' + 1 ... '9' + 1] = Digit | Hex,
+static const char cclass[257] = {
+	['0' + 1 ... '9' + 1] = Digit | Hex,
 	['A' + 1 ... 'D' + 1] = Letter | Hex,
 	['E' + 1] = Letter | Hex | Exp,	/* E<exp> */
 	['F' + 1] = Letter | Hex,
 	['G' + 1 ... 'O' + 1] = Letter,
 	['P' + 1] = Letter | Exp,	/* P<exp> */
 	['Q' + 1 ... 'Z' + 1] = Letter,
-	['a' + 1 ... 'b' + 1] = Letter | Hex, /* \a, \b */
-	['c' + 1 ... 'd' + 1] = Letter | Hex,
-	['e' + 1] = Letter | Hex | Exp,/* \e, e<exp> */
-	['f' + 1] = Letter | Hex,	/* \f */
-	['g' + 1 ... 'm' + 1] = Letter,
-	['n' + 1] = Letter,	/* \n */
-	['o' + 1] = Letter,
+	['a' + 1 ... 'd' + 1] = Letter | Hex,
+	['e' + 1] = Letter | Hex | Exp,	/* e<exp> */
+	['f' + 1] = Letter | Hex,
+	['g' + 1 ... 'o' + 1] = Letter,
 	['p' + 1] = Letter | Exp,	/* p<exp> */
-	['q' + 1] = Letter,
-	['r' + 1] = Letter,	/* \r */
-	['s' + 1] = Letter,
-	['t' + 1] = Letter,	/* \t */
-	['u' + 1] = Letter,
-	['v' + 1] = Letter,	/* \v */
-	['w' + 1] = Letter,
-	['x' + 1] = Letter,	/* \x<hex> */
-	['y' + 1 ... 'z' + 1] = Letter,
+	['q' + 1 ... 'z' + 1] = Letter,
 	['_' + 1] = Letter,
 	['.' + 1] = Dot | ValidSecond,
 	['=' + 1] = ValidSecond,
@@ -544,8 +537,7 @@ static int get_one_number(int c, int next, stream_t *stream)
 {
 	struct token *token;
 	static char buffer[4095];
-	char *p = buffer, *buf, *buffer_end = buffer + sizeof (buffer);
-	int len;
+	char *p = buffer, *buffer_end = buffer + sizeof (buffer);
 
 	*p++ = c;
 	for (;;) {
@@ -573,13 +565,9 @@ static int get_one_number(int c, int next, stream_t *stream)
 	}
 
 	*p++ = 0;
-	len = p - buffer;
-	buf = __alloc_bytes(len);
-	memcpy(buf, buffer, len);
-
 	token = stream->token;
 	token_type(token) = TOKEN_NUMBER;
-	token->number = buf;
+	token->number = xmemdup(buffer, p - buffer);
 	add_token(stream);
 
 	return next;
@@ -601,9 +589,9 @@ static int eat_string(int next, stream_t *stream, enum token_type type)
 		len++;
 		if (next == '\n') {
 			warning(stream_pos(stream),
-				"Newline in string or character constant");
-			if (delim == '\'') /* assume it's lost ' */
-				break;
+				"missing terminating %c character", delim);
+			/* assume delimiter is lost */
+			break;
 		}
 		if (next == EOF) {
 			warning(stream_pos(stream),

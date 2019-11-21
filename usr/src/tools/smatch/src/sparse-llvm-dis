@@ -1,0 +1,15 @@
+#!/bin/sh
+#
+# For testing sparse-llvm emitted bytecode
+
+set +e
+
+DIS=$("${LLVM_CONFIG:-llvm-config}" --bindir)/llvm-dis
+
+if [ $# -eq 0 ]; then
+	echo "$(basename $0): no input files"
+	exit 1
+fi
+
+DIRNAME=$(dirname $0)
+$DIRNAME/sparse-llvm "$@" | "$DIS" | grep -v '^target '

@@ -167,7 +167,8 @@ static void handle_non_struct_assignments(struct expression *left, struct expres
 	if (type->type != SYM_BASETYPE)
 		return;
 	right = strip_expr(right);
-	if (!right)
+	type = get_type(right);
+	if (!right || !type || type->type == SYM_ARRAY)
 		right = unknown_value_expression(left);
 	assign = assign_expression(left, '=', right);
 	split_fake_expr(assign);
@@ -404,7 +405,7 @@ void __fake_struct_member_assignments(struct expression *expr)
 	if (expr->op != '=')
 		return;
 
-	if (is_zero(expr->right))
+	if (expr_is_zero(expr->right))
 		return;
 
 	left_type = get_type(expr->left);

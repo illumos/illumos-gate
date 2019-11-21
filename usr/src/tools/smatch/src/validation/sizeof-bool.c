@@ -8,6 +8,6 @@ static int a(void)
  * number of bytes
  * check-command: sparse -Wsizeof-bool $file
  * check-error-start
-sizeof-bool.c:3:16: warning: expression using sizeof bool
+sizeof-bool.c:3:16: warning: expression using sizeof _Bool
  * check-error-end
  */

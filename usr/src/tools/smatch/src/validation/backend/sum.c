@@ -19,7 +19,7 @@ int main(int argc, char **argv)
 
 /*
  * check-name: sum from 1 to n
- * check-command: sparsei $file
+ * check-command: sparsei --no-jit $file
  *
  * check-output-start
 15

@@ -160,7 +160,7 @@ nocast.c:34:33:    got unsigned long
 nocast.c:34:33: warning: implicit cast to nocast type
 nocast.c:35:39: warning: incorrect type in initializer (different modifiers)
 nocast.c:35:39:    expected unsigned long *static [toplevel] bad_ptr_from
-nocast.c:35:39:    got unsigned long [nocast] *<noident>
+nocast.c:35:39:    got unsigned long [nocast] *
 nocast.c:35:39: warning: implicit cast from nocast type
 nocast.c:50:16: warning: implicit cast from nocast type
 nocast.c:54:16: warning: implicit cast from nocast type

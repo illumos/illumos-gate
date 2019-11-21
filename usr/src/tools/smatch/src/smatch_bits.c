@@ -54,7 +54,7 @@ static struct smatch_state *alloc_bstate(unsigned long long set, unsigned long l
 	return state;
 }
 
-static struct bit_info *rl_to_binfo(struct range_list *rl)
+struct bit_info *rl_to_binfo(struct range_list *rl)
 {
 	struct bit_info *ret = __alloc_bit_info(0);
 	sval_t sval;

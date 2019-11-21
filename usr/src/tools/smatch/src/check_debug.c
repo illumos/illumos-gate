@@ -22,6 +22,7 @@
 void show_sname_alloc(void);
 void show_data_range_alloc(void);
 void show_ptrlist_alloc(void);
+void show_rl_ptrlist_alloc(void);
 void show_sm_state_alloc(void);
 
 int local_debug;
@@ -204,13 +205,16 @@ static void match_user_rl(const char *fn, struct expression *expr, void *info)
 {
 	struct expression *arg;
 	struct range_list *rl = NULL;
+	bool capped = false;
 	char *name;
 
 	arg = get_argument_from_call_expr(expr->args, 0);
 	name = expr_to_str(arg);
 
 	get_user_rl(arg, &rl);
-	sm_msg("user rl: '%s' = '%s'", name, show_rl(rl));
+	if (rl)
+		capped = user_rl_capped(arg);
+	sm_msg("user rl: '%s' = '%s'%s", name, show_rl(rl), capped ? " (capped)" : "");
 
 	free_string(name);
 }
@@ -687,6 +691,8 @@ static void match_state_count(const char *fn, struct expression *expr, void *inf
 static void match_mem(const char *fn, struct expression *expr, void *info)
 {
 	show_sname_alloc();
+	show_data_range_alloc();
+	show_rl_ptrlist_alloc();
 	show_ptrlist_alloc();
 	sm_msg("%lu pools", get_pool_count());
 	sm_msg("%d strees", unfree_stree);

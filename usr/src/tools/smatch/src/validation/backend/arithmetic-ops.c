@@ -88,6 +88,26 @@ static unsigned int umod(unsigned int x, unsigned int y)
 	return x % y;
 }
 
+static int neg(int x)
+{
+	return -x;
+}
+
+static unsigned int uneg(unsigned int x)
+{
+	return -x;
+}
+
+static float fneg(float x)
+{
+	return -x;
+}
+
+static double dneg(double x)
+{
+	return -x;
+}
+
 /*
  * check-name: Arithmetic operator code generation
  * check-command: sparsec -c $file -o tmp.o

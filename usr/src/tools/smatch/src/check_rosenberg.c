@@ -28,6 +28,7 @@
 
 static int my_whole_id;
 static int my_member_id;
+static int skb_put_id;
 
 STATE(cleared);
 
@@ -122,19 +123,6 @@ static int has_global_scope(struct expression *expr)
 	if (!sym)
 		return FALSE;
 	return toplevel(sym->scope);
-}
-
-static int was_initialized(struct expression *expr)
-{
-	struct symbol *sym;
-	char *name;
-
-	name = expr_to_var_sym(expr, &sym);
-	if (!name)
-		return 0;
-	if (sym->initializer)
-		return 1;
-	return 0;
 }
 
 static void match_clear(const char *fn, struct expression *expr, void *_arg_no)
@@ -258,8 +246,21 @@ static void check_was_initialized(struct expression *data)
 
 	if (has_global_scope(data))
 		return;
-	if (was_initialized(data))
+	if (was_memset(data))
 		return;
+	if (warn_on_holey_struct(data))
+		return;
+	check_members_initialized(data);
+}
+
+static void check_skb_put(struct expression *data)
+{
+	data = strip_expr(data);
+	if (!data)
+		return;
+	if (data->type == EXPR_PREOP && data->op == '&')
+		data = strip_expr(data->unop);
+
 	if (was_memset(data))
 		return;
 	if (warn_on_holey_struct(data))
@@ -291,14 +292,49 @@ static void db_param_cleared(struct expression *expr, int param, char *key, char
 	match_clear(NULL, expr, INT_PTR(param));
 }
 
-static void match_assign(struct expression *expr)
+static struct smatch_state *alloc_expr_state(struct expression *expr)
+{
+	struct smatch_state *state;
+	char *name;
+
+	name = expr_to_str(expr);
+	if (!name)
+		return NULL;
+
+	state = __alloc_smatch_state(0);
+	expr = strip_expr(expr);
+	state->name = alloc_sname(name);
+	free_string(name);
+	state->data = expr;
+	return state;
+}
+
+static void match_skb_put(const char *fn, struct expression *expr, void *unused)
 {
 	struct symbol *type;
+	struct smatch_state *state;
 
 	type = get_type(expr->left);
+	type = get_real_base_type(type);
 	if (!type || type->type != SYM_STRUCT)
 		return;
-	set_state_expr(my_whole_id, expr->left, &cleared);
+	state = alloc_expr_state(expr->left);
+	set_state_expr(skb_put_id, expr->left, state);
+}
+
+static void match_return_skb_put(struct expression *expr)
+{
+	struct sm_state *sm;
+	struct stree *stree;
+
+	if (is_error_return(expr))
+		return;
+
+	stree = __get_cur_stree();
+
+	FOR_EACH_MY_SM(skb_put_id, stree, sm) {
+		check_skb_put(sm->state->data);
+	} END_FOR_EACH_SM(sm);
 }
 
 static void register_clears_argument(void)
@@ -369,7 +405,6 @@ void check_rosenberg(int id)
 	add_function_hook("__builtin_memset", &match_clear, INT_PTR(0));
 	add_function_hook("__builtin_memcpy", &match_clear, INT_PTR(0));
 
-	add_hook(&match_assign, ASSIGNMENT_HOOK);
 	register_clears_argument();
 	select_return_states_hook(PARAM_CLEARED, &db_param_cleared);
 
@@ -384,5 +419,16 @@ void check_rosenberg2(int id)
 	my_member_id = id;
 	set_dynamic_states(my_member_id);
 	add_extra_mod_hook(&extra_mod_hook);
+}
+
+void check_rosenberg3(int id)
+{
+	if (option_project != PROJ_KERNEL)
+		return;
+
+	skb_put_id = id;
+	set_dynamic_states(skb_put_id);
+	add_function_assign_hook("skb_put", &match_skb_put, NULL);
+	add_hook(&match_return_skb_put, RETURN_HOOK);
 }
 

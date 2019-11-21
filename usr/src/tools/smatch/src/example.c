@@ -25,15 +25,12 @@ static const char *opcodes[] = {
 	[OP_BR] = "br",
 	[OP_CBR] = "cbr",
 	[OP_SWITCH] = "switch",
-	[OP_INVOKE] = "invoke",
 	[OP_COMPUTEDGOTO] = "jmp *",
-	[OP_UNWIND] = "unwind",
 	
 	/* Binary */
 	[OP_ADD] = "add",
 	[OP_SUB] = "sub",
-	[OP_MULU] = "mulu",
-	[OP_MULS] = "muls",
+	[OP_MUL] = "mul",
 	[OP_DIVU] = "divu",
 	[OP_DIVS] = "divs",
 	[OP_MODU] = "modu",
@@ -46,8 +43,6 @@ static const char *opcodes[] = {
 	[OP_AND] = "and",
 	[OP_OR] = "or",
 	[OP_XOR] = "xor",
-	[OP_AND_BOOL] = "and-bool",
-	[OP_OR_BOOL] = "or-bool",
 
 	/* Binary comparison */
 	[OP_SET_EQ] = "seteq",
@@ -69,28 +64,27 @@ static const char *opcodes[] = {
 	[OP_SEL] = "select",
 	
 	/* Memory */
-	[OP_MALLOC] = "malloc",
-	[OP_FREE] = "free",
-	[OP_ALLOCA] = "alloca",
 	[OP_LOAD] = "load",
 	[OP_STORE] = "store",
 	[OP_SETVAL] = "set",
-	[OP_GET_ELEMENT_PTR] = "getelem",
 
 	/* Other */
 	[OP_PHI] = "phi",
 	[OP_PHISOURCE] = "phisrc",
 	[OP_COPY] = "copy",
-	[OP_CAST] = "cast",
-	[OP_SCAST] = "scast",
-	[OP_FPCAST] = "fpcast",
+	[OP_SEXT] = "sext",
+	[OP_ZEXT] = "zext",
+	[OP_TRUNC] = "trunc",
+	[OP_FCVTU] = "fcvtu",
+	[OP_FCVTS] = "fcvts",
+	[OP_UCVTF] = "ucvtf",
+	[OP_SCVTF] = "scvtf",
+	[OP_FCVTF] = "fcvtf",
+	[OP_UTPTR] = "utptr",
+	[OP_PTRTU] = "utptr",
 	[OP_PTRCAST] = "ptrcast",
 	[OP_CALL] = "call",
-	[OP_VANEXT] = "va_next",
-	[OP_VAARG] = "va_arg",
 	[OP_SLICE] = "slice",
-	[OP_SNOP] = "snop",
-	[OP_LNOP] = "lnop",
 	[OP_NOP] = "nop",
 	[OP_DEATHNOTE] = "dead",
 	[OP_ASM] = "asm",
@@ -394,7 +388,7 @@ static void flush_reg(struct bb_state *state, struct hardreg *reg)
 		return;
 	reg->dead = 0;
 	reg->used = 1;
-	FOR_EACH_PTR(reg->contains, pseudo) {
+	FOR_EACH_PTR_TAG(reg->contains, pseudo) {
 		if (CURRENT_TAG(pseudo) & TAG_DEAD)
 			continue;
 		if (!(CURRENT_TAG(pseudo) & TAG_DIRTY))
@@ -447,7 +441,7 @@ static void mark_reg_dead(struct bb_state *state, pseudo_t pseudo, struct hardre
 {
 	pseudo_t p;
 
-	FOR_EACH_PTR(reg->contains, p) {
+	FOR_EACH_PTR_TAG(reg->contains, p) {
 		if (p != pseudo)
 			continue;
 		if (CURRENT_TAG(p) & TAG_DEAD)
@@ -532,7 +526,7 @@ static struct hardreg *find_in_reg(struct bb_state *state, pseudo_t pseudo)
 		pseudo_t p;
 
 		reg = hardregs + i;
-		FOR_EACH_PTR(reg->contains, p) {
+		FOR_EACH_PTR_TAG(reg->contains, p) {
 			if (p == pseudo) {
 				last_reg = i;
 				output_comment(state, "found pseudo %s in reg %s (busy=%d)", show_pseudo(pseudo), reg->name, reg->busy);
@@ -872,7 +866,7 @@ static void kill_dead_reg(struct hardreg *reg)
 	if (reg->dead) {
 		pseudo_t p;
 		
-		FOR_EACH_PTR(reg->contains, p) {
+		FOR_EACH_PTR_TAG(reg->contains, p) {
 			if (CURRENT_TAG(p) & TAG_DEAD) {
 				DELETE_CURRENT_PTR(p);
 				reg->dead--;
@@ -912,7 +906,7 @@ static void generate_binop(struct bb_state *state, struct instruction *insn)
 static int is_dead_reg(struct bb_state *state, pseudo_t pseudo, struct hardreg *reg)
 {
 	pseudo_t p;
-	FOR_EACH_PTR(reg->contains, p) {
+	FOR_EACH_PTR_TAG(reg->contains, p) {
 		if (p == pseudo)
 			return CURRENT_TAG(p) & TAG_DEAD;
 	} END_FOR_EACH_PTR(p);
@@ -1007,7 +1001,7 @@ static void kill_pseudo(struct bb_state *state, pseudo_t pseudo)
 		pseudo_t p;
 
 		reg = hardregs + i;
-		FOR_EACH_PTR(reg->contains, p) {
+		FOR_EACH_PTR_TAG(reg->contains, p) {
 			if (p != pseudo)
 				continue;
 			if (CURRENT_TAG(p) & TAG_DEAD)
@@ -1404,9 +1398,8 @@ static void generate_one_insn(struct instruction *insn, struct bb_state *state)
 		generate_copy(state, insn);
 		break;
 
-	case OP_ADD: case OP_MULU: case OP_MULS:
+	case OP_ADD: case OP_MUL:
 	case OP_AND: case OP_OR: case OP_XOR:
-	case OP_AND_BOOL: case OP_OR_BOOL:
 		generate_commutative_binop(state, insn);
 		break;
 
@@ -1420,7 +1413,14 @@ static void generate_one_insn(struct instruction *insn, struct bb_state *state)
 		generate_compare(state, insn);
 		break;
 
-	case OP_CAST: case OP_SCAST: case OP_FPCAST: case OP_PTRCAST:
+	case OP_SEXT: case OP_ZEXT:
+	case OP_TRUNC:
+	case OP_PTRCAST:
+	case OP_UTPTR:
+	case OP_PTRTU:
+	case OP_FCVTU: case OP_FCVTS:
+	case OP_UCVTF: case OP_SCVTF:
+	case OP_FCVTF:
 		generate_cast(state, insn);
 		break;
 
@@ -1544,7 +1544,7 @@ static void fill_output(struct bb_state *state, pseudo_t pseudo, struct storage 
 		struct hardreg *reg = hardregs + i;
 		pseudo_t p;
 
-		FOR_EACH_PTR(reg->contains, p) {
+		FOR_EACH_PTR_TAG(reg->contains, p) {
 			if (p == pseudo) {
 				write_reg_to_storage(state, reg, pseudo, out);
 				return;
@@ -1652,7 +1652,7 @@ static void generate_output_storage(struct bb_state *state)
 			int flushme = 0;
 
 			reg->busy = REG_FIXED;
-			FOR_EACH_PTR(reg->contains, p) {
+			FOR_EACH_PTR_TAG(reg->contains, p) {
 				if (p == entry->pseudo) {
 					flushme = -100;
 					continue;
@@ -1949,9 +1949,9 @@ int main(int argc, char **argv)
 
 	compile(sparse_initialize(argc, argv, &filelist));
 	dbg_dead = 1;
-	FOR_EACH_PTR_NOTAG(filelist, file) {
+	FOR_EACH_PTR(filelist, file) {
 		compile(sparse(file));
-	} END_FOR_EACH_PTR_NOTAG(file);
+	} END_FOR_EACH_PTR(file);
 	return 0;
 }
 

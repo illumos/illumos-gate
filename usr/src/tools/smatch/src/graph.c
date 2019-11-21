@@ -74,17 +74,19 @@ static void graph_ep(struct entrypoint *ep)
 
 		/* List loads and stores */
 		FOR_EACH_PTR(bb->insns, insn) {
+			if (!insn->bb)
+				continue;
 			switch(insn->opcode) {
 			case OP_STORE:
-				if (insn->symbol->type == PSEUDO_SYM) {
-				  printf("%s store(%s)", s, show_ident(insn->symbol->sym->ident));
+				if (insn->src->type == PSEUDO_SYM) {
+				  printf("%s store(%s)", s, show_ident(insn->src->sym->ident));
 				  s = ",";
 				}
 				break;
 
 			case OP_LOAD:
-				if (insn->symbol->type == PSEUDO_SYM) {
-				  printf("%s load(%s)", s, show_ident(insn->symbol->sym->ident));
+				if (insn->src->type == PSEUDO_SYM) {
+				  printf("%s load(%s)", s, show_ident(insn->src->sym->ident));
 				  s = ",";
 				}
 				break;
@@ -130,6 +132,8 @@ static void graph_calls(struct entrypoint *ep, int internal)
 			continue;
 
 		FOR_EACH_PTR(bb->insns, insn) {
+			if (!insn->bb)
+				continue;
 			if (insn->opcode == OP_CALL &&
 			    internal == !(insn->func->sym->ctype.modifiers & MOD_EXTERN)) {
 
@@ -172,7 +176,7 @@ int main(int argc, char **argv)
 
 	/* Linearize all symbols, graph internal basic block
 	 * structures and intra-file calls */
-	FOR_EACH_PTR_NOTAG(filelist, file) {
+	FOR_EACH_PTR(filelist, file) {
 
 		fsyms = sparse(file);
 		concat_symbol_list(fsyms, &all_syms);
@@ -187,15 +191,15 @@ int main(int argc, char **argv)
 				graph_ep(sym->ep);
 				graph_calls(sym->ep, 1);
 			}
-		} END_FOR_EACH_PTR_NOTAG(sym);
+		} END_FOR_EACH_PTR(sym);
 
-	} END_FOR_EACH_PTR_NOTAG(file);
+	} END_FOR_EACH_PTR(file);
 
 	/* Graph inter-file calls */
 	FOR_EACH_PTR(all_syms, sym) {
 		if (sym->ep)
 			graph_calls(sym->ep, 0);
-	} END_FOR_EACH_PTR_NOTAG(sym);
+	} END_FOR_EACH_PTR(sym);
 
 	printf("}\n");
 	return 0;

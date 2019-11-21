@@ -12,7 +12,7 @@ static void output_bb(struct basic_block *bb, unsigned long generation)
 	struct instruction *insn;
 
 	bb->generation = generation;
-	printf(".L%u\n", bb->nr);
+	printf("%s\n", show_label(bb));
 
 	FOR_EACH_PTR(bb->insns, insn) {
 		if (!insn->bb)
@@ -62,6 +62,8 @@ static int compile(struct symbol_list *list)
 		struct entrypoint *ep;
 		expand_symbol(sym);
 		ep = linearize_symbol(sym);
+		if (!(fdump_ir & PASS_FINAL))
+			continue;
 		if (ep)
 			output_fn(ep);
 		else
@@ -78,9 +80,9 @@ int main(int argc, char **argv)
 	char *file;
 
 	compile(sparse_initialize(argc, argv, &filelist));
-	FOR_EACH_PTR_NOTAG(filelist, file) {
+	FOR_EACH_PTR(filelist, file) {
 		compile(sparse(file));
-	} END_FOR_EACH_PTR_NOTAG(file);
+	} END_FOR_EACH_PTR(file);
 
 	report_stats();
 	return 0;

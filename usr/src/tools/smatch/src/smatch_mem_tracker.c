@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2018 Oracle.
+ * Copyright 2019 Joyent, Inc.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,15 +19,18 @@
 #include "smatch.h"
 #include <fcntl.h>
 #include <unistd.h>
+#ifdef __sun
 #include <sys/procfs.h>
+#endif
 
 static int my_id;
-static int my_fd = -2;
 
 static unsigned long max_size;
 
+#ifdef __sun
 unsigned long get_mem_kb(void)
 {
+	static int my_fd = -2;
 	prpsinfo_t pbuf;
 
 	if (my_fd == -2) {
@@ -43,6 +47,24 @@ unsigned long get_mem_kb(void)
 
 	return (pbuf.pr_rssize);
 }
+#else
+unsigned long get_mem_kb(void)
+{
+	FILE *file;
+	char buf[1024] = "0";
+	unsigned long size;
+
+	file = fopen("/proc/self/statm", "r");
+	if (!file)
+	        return 0;
+	fread(buf, 1, sizeof(buf), file);
+	fclose(file);
+
+	size = strtoul(buf, NULL, 10);
+	size = size * sysconf(_SC_PAGESIZE) / 1024;
+	return size;
+}
+#endif
 
 static void match_end_func(struct symbol *sym)
 {

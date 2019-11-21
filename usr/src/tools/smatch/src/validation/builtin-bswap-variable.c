@@ -25,8 +25,8 @@ static u64 swap64v(u32 a)
  *
  * check-output-ignore
  * check-output-contains:call.16 .* __builtin_bswap16
- * check-output-contains:cast.32 .* (64) %arg1
+ * check-output-contains:trunc.32 .* (64) %arg1
  * check-output-contains:call.32 .* __builtin_bswap32
- * check-output-contains:cast.64 .* (32) %arg1
+ * check-output-contains:zext.64 .* (32) %arg1
  * check-output-contains:call.64 .* __builtin_bswap64
  */

@@ -36,10 +36,10 @@ static void ok_to_use(struct sm_state *sm, struct expression *mod_expr)
 		set_state(my_id, sm->name, sm->sym, &ok);
 }
 
-static void pre_merge_hook(struct sm_state *sm)
+static void pre_merge_hook(struct sm_state *cur, struct sm_state *other)
 {
 	if (is_impossible_path())
-		set_state(my_id, sm->name, sm->sym, &ok);
+		set_state(my_id, cur->name, cur->sym, &ok);
 }
 
 static int is_freed(struct expression *expr)

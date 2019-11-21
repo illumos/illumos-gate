@@ -2,6 +2,7 @@ set_bit
 clear_bit
 __clear_bit
 __set_bit
+test_bit
 test_and_set_bit
 find_last_bit
 change_bit

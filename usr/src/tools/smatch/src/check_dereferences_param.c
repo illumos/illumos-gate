@@ -78,8 +78,6 @@ static void match_dereference(struct expression *expr)
 {
 	if (expr->type != EXPR_PREOP)
 		return;
-	if (getting_address())
-		return;
 	check_deref(expr->unop);
 }
 

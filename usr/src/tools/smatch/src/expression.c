@@ -62,7 +62,10 @@ static struct token *comma_expression(struct token *, struct expression **);
 
 struct token *parens_expression(struct token *token, struct expression **expr, const char *where)
 {
+	struct token *p;
+
 	token = expect(token, '(', where);
+	p = token;
 	if (match_op(token, '{')) {
 		struct expression *e = alloc_expression(token->pos, EXPR_STATEMENT);
 		struct statement *stmt = alloc_statement(token->pos, STMT_COMPOUND);
@@ -74,6 +77,9 @@ struct token *parens_expression(struct token *token, struct expression **expr, c
 		token = expect(token, '}', "at end of statement expression");
 	} else
 		token = parse_expression(token, expr);
+
+	if (token == p)
+		sparse_error(token->pos, "an expression is expected before ')'");
 	return expect(token, ')', where);
 }
 

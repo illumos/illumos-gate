@@ -347,7 +347,7 @@ int expr_to_mtag_offset(struct expression *expr, mtag_t *tag, int *offset)
 			if (tmp < 0)
 				return 0;
 			tmp_offset += tmp;
-			expr = expr->deref;
+			expr = strip_expr(expr->deref);
 		}
 		*offset = tmp_offset;
 		if (expr->type == EXPR_PREOP && expr->op == '*') {

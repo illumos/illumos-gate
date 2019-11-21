@@ -5,6 +5,6 @@ static int foo(void) __attribute__((unknown_attribute));
  * check-command: sparse -Wunknown-attribute $file
  *
  * check-error-start
-Wunknown-attribute-yes.c:1:37: warning: attribute 'unknown_attribute': unknown attribute
+Wunknown-attribute-yes.c:1:37: warning: unknown attribute 'unknown_attribute'
  * check-error-end
  */

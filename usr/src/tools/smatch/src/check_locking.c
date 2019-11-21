@@ -456,10 +456,10 @@ static struct smatch_state *unmatched_state(struct sm_state *sm)
 	return &start_state;
 }
 
-static void pre_merge_hook(struct sm_state *sm)
+static void pre_merge_hook(struct sm_state *cur, struct sm_state *other)
 {
 	if (is_impossible_path())
-		set_state(my_id, sm->name, sm->sym, &impossible);
+		set_state(my_id, cur->name, cur->sym, &impossible);
 }
 
 static bool nestable(const char *name)

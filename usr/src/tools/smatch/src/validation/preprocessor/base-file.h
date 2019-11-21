@@ -1,0 +1,2 @@
+__FILE__
+__BASE_FILE__

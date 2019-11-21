@@ -4,7 +4,7 @@ static int *c = (int*)b;	// KO
 
 
 /*
- * check-name: integer literal cast to pointer type constness verification.
+ * check-name: constexprness integer literal cast to pointer type
  * check-command: sparse -Wconstexpr-not-const $file
  *
  * check-error-start

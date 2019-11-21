@@ -240,6 +240,19 @@ read_disk_info(int fd, diskaddr_t *capacity, uint_t *lbsize)
 #define	MAX_PARTS	((4294967295UL - sizeof (struct dk_gpt)) / \
 			    sizeof (struct dk_part))
 
+/*
+ * The EFI reserved partition size is 8 MiB. This calculates the number of
+ * sectors required to store 8 MiB, taking into account the device's sector
+ * size.
+ */
+uint_t
+efi_reserved_sectors(dk_gpt_t *efi)
+{
+	/* roundup to sector size */
+	return ((EFI_MIN_RESV_SIZE * DEV_BSIZE + efi->efi_lbasize - 1) /
+	    efi->efi_lbasize);
+}
+
 int
 efi_alloc_and_init(int fd, uint32_t nparts, struct dk_gpt **vtoc)
 {
@@ -1013,7 +1026,7 @@ efi_use_whole_disk(int fd)
 	 * physically non-zero partition.
 	 */
 	if (pl_start + pl_size - 1 == efi_label->efi_last_u_lba -
-	    EFI_MIN_RESV_SIZE) {
+	    efi_reserved_sectors(efi_label)) {
 		efi_label->efi_parts[phy_last_slice].p_size +=
 		    efi_label->efi_last_lba - efi_label->efi_altern_lba;
 	}
@@ -1270,10 +1283,12 @@ efi_err_check(struct dk_gpt *vtoc)
 	int			i, j;
 	diskaddr_t		istart, jstart, isize, jsize, endsect;
 	int			overlap = 0;
+	uint_t			reserved;
 
 	/*
 	 * make sure no partitions overlap
 	 */
+	reserved = efi_reserved_sectors(vtoc);
 	for (i = 0; i < vtoc->efi_nparts; i++) {
 		/* It can't be unassigned and have an actual size */
 		if ((vtoc->efi_parts[i].p_tag == V_UNASSIGNED) &&
@@ -1292,10 +1307,10 @@ efi_err_check(struct dk_gpt *vtoc)
 				    "%d\n", i);
 			}
 			resv_part = i;
-			if (vtoc->efi_parts[i].p_size != EFI_MIN_RESV_SIZE)
+			if (vtoc->efi_parts[i].p_size != reserved)
 				(void) fprintf(stderr,
 				    "Warning: reserved partition size must "
-				    "be %d sectors\n", EFI_MIN_RESV_SIZE);
+				    "be %u sectors\n", reserved);
 		}
 		if ((vtoc->efi_parts[i].p_start < vtoc->efi_first_u_lba) ||
 		    (vtoc->efi_parts[i].p_start > vtoc->efi_last_u_lba)) {

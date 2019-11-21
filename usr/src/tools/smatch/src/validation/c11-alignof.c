@@ -8,5 +8,5 @@ static int foo(void)
  * check-command: test-linearize -std=c11 $file
  *
  * check-output-ignore
- * check-output-contains: ret\\.32 *\$2
+ * check-output-contains: ret\\.32 *\\$2
  */

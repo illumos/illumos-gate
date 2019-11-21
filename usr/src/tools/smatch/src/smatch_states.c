@@ -44,6 +44,7 @@ struct smatch_state true_state = { .name = "true" };
 struct smatch_state false_state = { .name = "false" };
 
 static struct stree *cur_stree; /* current states */
+static struct stree *fast_overlay;
 
 static struct stree_stack *true_stack; /* states after a t/f branch */
 static struct stree_stack *false_stack;
@@ -78,6 +79,16 @@ int unreachable(void)
 	if (!cur_stree)
 		return 1;
 	return 0;
+}
+
+void __set_cur_stree_readonly(void)
+{
+	read_only++;
+}
+
+void __set_cur_stree_writable(void)
+{
+	read_only--;
 }
 
 struct sm_state *set_state(int owner, const char *name, struct symbol *sym, struct smatch_state *state)
@@ -130,10 +141,12 @@ free:
 	return ret;
 }
 
-void __swap_cur_stree(struct stree *stree)
+struct stree *__swap_cur_stree(struct stree *stree)
 {
-	free_stree(&cur_stree);
+	struct stree *orig = cur_stree;
+
 	cur_stree = stree;
+	return orig;
 }
 
 void __push_fake_cur_stree(void)
@@ -160,15 +173,18 @@ void __free_fake_cur_stree(void)
 
 void __set_fake_cur_stree_fast(struct stree *stree)
 {
-	push_stree(&pre_cond_stack, cur_stree);
-	cur_stree = stree;
-	read_only = 1;
+	if (fast_overlay) {
+		sm_perror("cannot nest fast overlay");
+		return;
+	}
+	fast_overlay = stree;
+	set_fast_math_only();
 }
 
 void __pop_fake_cur_stree_fast(void)
 {
-	cur_stree = pop_stree(&pre_cond_stack);
-	read_only = 0;
+	fast_overlay = NULL;
+	clear_fast_math_only();
 }
 
 void __merge_stree_into_cur(struct stree *stree)
@@ -289,7 +305,12 @@ static void call_get_state_hooks(int owner, const char *name, struct symbol *sym
 
 struct smatch_state *__get_state(int owner, const char *name, struct symbol *sym)
 {
-	return get_state_stree(cur_stree, owner, name, sym);
+	struct sm_state *sm;
+
+	sm = get_sm_state(owner, name, sym);
+	if (!sm)
+		return NULL;
+	return sm->state;
 }
 
 struct smatch_state *get_state(int owner, const char *name, struct symbol *sym)
@@ -343,6 +364,12 @@ free:
 
 struct sm_state *get_sm_state(int owner, const char *name, struct symbol *sym)
 {
+	struct sm_state *ret;
+
+	ret = get_sm_state_stree(fast_overlay, owner, name, sym);
+	if (ret)
+		return ret;
+
 	return get_sm_state_stree(cur_stree, owner, name, sym);
 }
 
@@ -593,39 +620,39 @@ static void check_stree_stack_free(struct stree_stack **stack)
 
 void save_all_states(void)
 {
-	__add_ptr_list(&backup, cur_stree, 0);
+	__add_ptr_list(&backup, cur_stree);
 	cur_stree = NULL;
 
-	__add_ptr_list(&backup, true_stack, 0);
+	__add_ptr_list(&backup, true_stack);
 	true_stack = NULL;
-	__add_ptr_list(&backup, false_stack, 0);
+	__add_ptr_list(&backup, false_stack);
 	false_stack = NULL;
-	__add_ptr_list(&backup, pre_cond_stack, 0);
+	__add_ptr_list(&backup, pre_cond_stack);
 	pre_cond_stack = NULL;
 
-	__add_ptr_list(&backup, cond_true_stack, 0);
+	__add_ptr_list(&backup, cond_true_stack);
 	cond_true_stack = NULL;
-	__add_ptr_list(&backup, cond_false_stack, 0);
+	__add_ptr_list(&backup, cond_false_stack);
 	cond_false_stack = NULL;
 
-	__add_ptr_list(&backup, fake_cur_stree_stack, 0);
+	__add_ptr_list(&backup, fake_cur_stree_stack);
 	fake_cur_stree_stack = NULL;
 
-	__add_ptr_list(&backup, break_stack, 0);
+	__add_ptr_list(&backup, break_stack);
 	break_stack = NULL;
-	__add_ptr_list(&backup, fake_break_stack, 0);
+	__add_ptr_list(&backup, fake_break_stack);
 	fake_break_stack = NULL;
 
-	__add_ptr_list(&backup, switch_stack, 0);
+	__add_ptr_list(&backup, switch_stack);
 	switch_stack = NULL;
-	__add_ptr_list(&backup, remaining_cases, 0);
+	__add_ptr_list(&backup, remaining_cases);
 	remaining_cases = NULL;
-	__add_ptr_list(&backup, default_stack, 0);
+	__add_ptr_list(&backup, default_stack);
 	default_stack = NULL;
-	__add_ptr_list(&backup, continue_stack, 0);
+	__add_ptr_list(&backup, continue_stack);
 	continue_stack = NULL;
 
-	__add_ptr_list(&backup, goto_stack, 0);
+	__add_ptr_list(&backup, goto_stack);
 	goto_stack = NULL;
 }
 
