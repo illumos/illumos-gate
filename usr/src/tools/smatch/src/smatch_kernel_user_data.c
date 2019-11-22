@@ -681,9 +681,14 @@ static void handle_eq_noteq(struct expression *expr)
 static struct range_list *strip_negatives(struct range_list *rl)
 {
 	sval_t min = rl_min(rl);
-	sval_t minus_one = { .type = rl_type(rl), .value = -1 };
-	sval_t over = { .type = rl_type(rl), .value = INT_MAX + 1ULL };
+	sval_t minus_one;
+	sval_t over;
 	sval_t max = sval_type_max(rl_type(rl));
+
+	minus_one.type = rl_type(rl);
+	minus_one.value = -1;
+	over.type = rl_type(rl);
+	over.value = INT_MAX + 1ULL;
 
 	if (!rl)
 		return NULL;

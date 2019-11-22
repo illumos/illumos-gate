@@ -1,4 +1,4 @@
-VERSION=0.6.1-rc1-il-1
+VERSION=0.6.1-rc1-il-2
 
 ########################################################################
 # The following variables can be overwritten from the command line
@@ -9,7 +9,7 @@ CC ?= gcc
 LD = $(CC)
 AR = ar
 
-CFLAGS ?= -O2 -g
+CFLAGS ?= -g
 
 DESTDIR ?=
 PREFIX ?= $(HOME)

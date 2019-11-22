@@ -1,8 +1,6 @@
 /*
- * The below functions cause smatch to fail with "turning off implications after
- * 60 seconds" or similar, generally because they're too large for it to handle.
- *
- * This will disable analysis altogether.
+ * These are specific functions that are generally too complex for smatch to
+ * reasonably handle.
  */
 
 /* libast */

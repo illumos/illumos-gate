@@ -20,7 +20,7 @@
 #
 
 PROG = smatch
-SPARSE_VERSION = 0.6.1-rc1-il-1
+SPARSE_VERSION = 0.6.1-rc1-il-2
 
 include ../Makefile.tools
 
