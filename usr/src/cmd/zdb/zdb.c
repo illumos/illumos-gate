@@ -448,7 +448,8 @@ dump_zap(objset_t *os, uint64_t object, void *data, size_t size)
 			    strcmp(attr.za_name,
 			    DSL_CRYPTO_KEY_HMAC_KEY) == 0 ||
 			    strcmp(attr.za_name, DSL_CRYPTO_KEY_IV) == 0 ||
-			    strcmp(attr.za_name, DSL_CRYPTO_KEY_MAC) == 0) {
+			    strcmp(attr.za_name, DSL_CRYPTO_KEY_MAC) == 0 ||
+			    strcmp(attr.za_name, DMU_POOL_CHECKSUM_SALT) == 0) {
 				uint8_t *u8 = prop;
 
 				for (i = 0; i < attr.za_num_integers; i++) {
