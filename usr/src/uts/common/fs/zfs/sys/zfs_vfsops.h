@@ -75,6 +75,8 @@ struct zfsvfs {
 	boolean_t	z_use_fuids;	/* version allows fuids */
 	boolean_t	z_replay;	/* set during ZIL replay */
 	boolean_t	z_use_sa;	/* version allow system attributes */
+	boolean_t	z_draining;	/* is true when drain is active */
+	boolean_t	z_drain_cancel; /* signal the unlinked drain to stop */
 	uint64_t	z_version;	/* ZPL version */
 	uint64_t	z_shares_dir;	/* hidden shares dir */
 	kmutex_t	z_lock;
@@ -88,6 +90,7 @@ struct zfsvfs {
 	sa_attr_type_t	*z_attr_table;	/* SA attr mapping->id */
 #define	ZFS_OBJ_MTX_SZ	64
 	kmutex_t	z_hold_mtx[ZFS_OBJ_MTX_SZ];	/* znode hold locks */
+	taskqid_t	z_drain_task;	/* task id for the unlink drain task */
 };
 
 /*

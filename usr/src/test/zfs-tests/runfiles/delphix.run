@@ -521,7 +521,7 @@ tests = ['mmp_on_thread', 'mmp_on_uberblocks', 'mmp_on_off', 'mmp_interval',
     'mmp_on_zdb']
 
 [/opt/zfs-tests/tests/functional/mount]
-tests = ['umount_001', 'umountall_001']
+tests = ['umount_001', 'umount_002', 'umountall_001']
 
 [/opt/zfs-tests/tests/functional/mv_files]
 tests = ['mv_files_001_pos', 'mv_files_002_pos']

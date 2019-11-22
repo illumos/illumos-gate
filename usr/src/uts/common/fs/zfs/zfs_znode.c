@@ -100,6 +100,12 @@ krwlock_t zfsvfs_lock;
 
 static kmem_cache_t *znode_cache = NULL;
 
+/*
+ * This is used by the test suite so that it can delay znodes from being
+ * freed in order to inspect the unlinked set.
+ */
+int zfs_unlink_suspend_progress = 0;
+
 /*ARGSUSED*/
 static void
 znode_evict_error(dmu_buf_t *dbuf, void *user_ptr)
@@ -1416,7 +1422,8 @@ zfs_zinactive(znode_t *zp)
 	 */
 	if (zp->z_unlinked) {
 		ASSERT(!zfsvfs->z_issnap);
-		if ((zfsvfs->z_vfs->vfs_flag & VFS_RDONLY) == 0) {
+		if ((zfsvfs->z_vfs->vfs_flag & VFS_RDONLY) == 0 &&
+		    !zfs_unlink_suspend_progress) {
 			mutex_exit(&zp->z_lock);
 			ZFS_OBJ_HOLD_EXIT(zfsvfs, z_id);
 			zfs_rmnode(zp);
