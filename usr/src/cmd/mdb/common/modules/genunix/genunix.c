@@ -4264,9 +4264,11 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "bufctl", ":[-vh] [-a addr] [-c caller] [-e earliest] [-l latest] "
 		"[-t thd]", "print or filter a bufctl", bufctl, bufctl_help },
 	{ "freedby", ":", "given a thread, print its freed buffers", freedby },
-	{ "kmalog", "?[ fail | slab ]",
-	    "display kmem transaction log and stack traces", kmalog },
-	{ "kmastat", NULL, "kernel memory allocator stats", kmastat },
+	{ "kmalog", "?[ fail | slab | zerosized ]",
+	    "display kmem transaction log and stack traces for specified type",
+	    kmalog },
+	{ "kmastat", "[-kmg]", "kernel memory allocator stats",
+	    kmastat },
 	{ "kmausers", "?[-ef] [cache ...]", "current medium and large users "
 		"of the kmem allocator", kmausers, kmausers_help },
 	{ "kmem_cache", "?[-n name]",

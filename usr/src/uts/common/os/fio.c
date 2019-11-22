@@ -1507,8 +1507,8 @@ int
 fgetstartvp(int fd, char *path, vnode_t **startvpp)
 {
 	vnode_t		*startvp;
-	file_t 		*startfp;
-	char 		startchar;
+	file_t		*startfp;
+	char		startchar;
 
 	if (fd == AT_FDCWD && path == NULL)
 		return (EFAULT);
@@ -1554,7 +1554,7 @@ fsetattrat(int fd, char *path, int flags, struct vattr *vap)
 {
 	vnode_t		*startvp;
 	vnode_t		*vp;
-	int 		error;
+	int		error;
 
 	/*
 	 * Since we are never called to set the size of a file, we don't

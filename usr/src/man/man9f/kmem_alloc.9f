@@ -5,11 +5,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KMEM_ALLOC 9F "Oct 22, 2014"
+.TH KMEM_ALLOC 9F "Nov 20, 2019"
 .SH NAME
 kmem_alloc, kmem_zalloc, kmem_free \- allocate kernel memory
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/kmem.h>
@@ -30,11 +29,8 @@ kmem_alloc, kmem_zalloc, kmem_free \- allocate kernel memory
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
 Architecture independent level 1 (DDI/DKI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIsize\fR\fR
@@ -64,8 +60,6 @@ Pointer to allocated memory.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBkmem_alloc()\fR function allocates \fIsize\fR bytes of kernel memory and
 returns a pointer to the allocated memory. The allocated memory is at least
 double-word aligned, so it can hold any C data structure. No greater alignment
@@ -84,28 +78,20 @@ The \fBkmem_free()\fR function frees previously allocated kernel memory. The
 buffer address and size must exactly match the original allocation. Memory
 cannot be returned piecemeal.
 .SH RETURN VALUES
-.sp
-.LP
 If successful, \fBkmem_alloc()\fR and \fBkmem_zalloc()\fR return a pointer to
 the allocated memory. If \fBKM_NOSLEEP\fR is set and memory cannot be allocated
 without sleeping, \fBkmem_alloc()\fR and \fBkmem_zalloc()\fR return \fINULL\fR.
 .SH CONTEXT
-.sp
-.LP
 The \fBkmem_alloc()\fR and \fBkmem_zalloc()\fR functions can be called from
 interrupt context only if the \fBKM_NOSLEEP\fR flag is set. They can be called
 from user context with any valid \fIflag\fR. The \fBkmem_free()\fR function can
 be called from from user, interrupt, or kernel context.
 .SH SEE ALSO
-.sp
-.LP
 \fBcopyout\fR(9F), \fBfreerbuf\fR(9F), \fBgetrbuf\fR(9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-.sp
-.LP
 Memory allocated using \fBkmem_alloc()\fR is not paged. Available memory is
 therefore limited by the total physical memory on the system. It is also
 limited by the available kernel virtual address space, which is often the more
@@ -127,8 +113,6 @@ garbage. This random garbage may include secure kernel data. Therefore,
 uninitialized kernel memory should be handled carefully. For example, never
 \fBcopyout\fR(9F) a potentially uninitialized buffer.
 .SH NOTES
-.sp
-.LP
 \fBkmem_alloc(0\fR, \fIflag\fR\fB)\fR always returns \fINULL\fR, but
 if \fBKM_SLEEP\fR is set, this behavior is considered to be deprecated;
 the system may be configured to explicitly panic in this case in lieu

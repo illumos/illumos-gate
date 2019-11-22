@@ -1061,6 +1061,8 @@ static vmem_t		*kmem_default_arena;
 static vmem_t		*kmem_firewall_va_arena;
 static vmem_t		*kmem_firewall_arena;
 
+static int		kmem_zerosized;		/* # of zero-sized allocs */
+
 /*
  * kmem slab consolidator thresholds (tunables)
  */

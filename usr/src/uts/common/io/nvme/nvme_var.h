@@ -106,6 +106,8 @@ struct nvme_cq {
 	uintptr_t ncq_hdbl;
 	int ncq_phase;
 
+	taskq_t *ncq_cmd_taskq;
+
 	kmutex_t ncq_mutex;
 };
 
@@ -183,7 +185,8 @@ struct nvme {
 	int n_pagesize;
 
 	int n_namespace_count;
-	uint_t n_ioq_count; /* number of I/O command queues */
+	uint_t n_namespaces_attachable;
+	uint_t n_ioq_count;
 	uint_t n_cq_count;
 
 	nvme_identify_ctrl_t *n_idctl;
@@ -207,8 +210,6 @@ struct nvme {
 	int n_fm_cap;
 
 	ksema_t n_abort_sema;
-
-	ddi_taskq_t *n_cmd_taskq;
 
 	/* state for devctl minor node */
 	nvme_minor_state_t n_minor;

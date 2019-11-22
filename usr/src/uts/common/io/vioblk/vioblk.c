@@ -23,6 +23,7 @@
  * Copyright (c) 2015, Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012, Alexey Zaytsev <alexey.zaytsev@gmail.com>
  * Copyright 2019 Joyent Inc.
+ * Copyright 2019 Western Digital Corporation.
  */
 
 /*
@@ -925,7 +926,7 @@ vioblk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * stack based on negotiated features.
 	 */
 	bd_ops_t vioblk_bd_ops = {
-		.o_version =		BD_OPS_VERSION_0,
+		.o_version =		BD_OPS_CURRENT_VERSION,
 		.o_drive_info =		vioblk_bd_driveinfo,
 		.o_media_info =		vioblk_bd_mediainfo,
 		.o_devid_init =		vioblk_bd_devid,
