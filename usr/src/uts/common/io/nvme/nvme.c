@@ -3314,7 +3314,7 @@ nvme_remove_callback(dev_info_t *dip, ddi_eventcookie_t cookie, void *a,
 			 * requested cmd to unqueue.
 			 */
 			u_cmd = nvme_unqueue_cmd(nvme, qp, cmd->nc_sqe.sqe_cid);
-			taskq_dispatch_ent((taskq_t *)cmd->nc_nvme->n_cmd_taskq,
+			taskq_dispatch_ent(qp->nq_cq->ncq_cmd_taskq,
 			    cmd->nc_callback, cmd, TQ_NOSLEEP, &cmd->nc_tqent);
 
 			ASSERT3P(u_cmd, ==, cmd);
