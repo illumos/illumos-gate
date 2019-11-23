@@ -41,4 +41,6 @@ clobber: clean
 clean:
 	-$(RM) $(OBJS)
 
+$(TARGETDIR)/$(PROG): $(TARGETDIR)
+
 include $(SRC)/test/zfs-tests/Makefile.com
