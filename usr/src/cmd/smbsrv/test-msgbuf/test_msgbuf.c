@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -127,7 +127,7 @@ out:
 }
 
 static void
-msg_put_atrunc()
+msg_put_atrunc1()
 {
 	uint8_t wire[] = { 'o', 'n', 'e', 't', };
 	uint8_t temp[32];
@@ -141,17 +141,49 @@ msg_put_atrunc()
 	rc = smb_msgbuf_encode(&mb, "4s", "onetwo");
 	/* Trunc should put exactly 4 */
 	if (rc != 4) {
-		printf("Fail: msg_put_atrunc encode\n");
+		printf("Fail: msg_put_atrunc1 encode\n");
 		goto out;
 	}
 
 	if (memcmp(temp, wire, 4)) {
-		printf("Fail: msg_put_atrunc cmp:\n");
+		printf("Fail: msg_put_atrunc1 cmp:\n");
 		hexdump((uchar_t *)temp, 4);
 		return;
 	}
 
-	printf("Pass: msg_put_atrunc\n");
+	printf("Pass: msg_put_atrunc1\n");
+
+out:
+	smb_msgbuf_term(&mb);
+}
+
+static void
+msg_put_atrunc2()
+{
+	uint8_t wire[] = { 'o', 'n', 'e', 't', 0};
+	uint8_t temp[32];
+	smb_msgbuf_t mb;
+	int mbflags = 0;
+	int rc;
+
+	(void) memset(temp, 0, sizeof (temp));
+	smb_msgbuf_init(&mb, temp, 4, mbflags);
+
+	/* Encode with wire length < strlen */
+	rc = smb_msgbuf_encode(&mb, "s", "onetwo");
+	/* Trunc should return "overflow" */
+	if (rc != -1) {
+		printf("Fail: msg_put_atrunc2 encode rc=%d\n", rc);
+		goto out;
+	}
+
+	if (memcmp(temp, wire, 5)) {
+		printf("Fail: msg_put_atrunc2 cmp:\n");
+		hexdump((uchar_t *)temp, 5);
+		return;
+	}
+
+	printf("Pass: msg_put_atrunc2\n");
 
 out:
 	smb_msgbuf_term(&mb);
@@ -308,7 +340,7 @@ out:
 }
 
 static void
-msg_put_utrunc()
+msg_put_utrunc1()
 {
 	uint16_t wire[] = { 'o', 'n', 'e', 't' };
 	uint8_t temp[32];
@@ -322,17 +354,49 @@ msg_put_utrunc()
 	rc = smb_msgbuf_encode(&mb, "8U", "onetwo");
 	/* Trunc should put exactly 8 */
 	if (rc != 8) {
-		printf("Fail: msg_put_utrunc encode\n");
+		printf("Fail: msg_put_utrunc1 encode\n");
 		goto out;
 	}
 
 	if (memcmp(temp, wire, 8)) {
-		printf("Fail: msg_put_utrunc cmp:\n");
+		printf("Fail: msg_put_utrunc1 cmp:\n");
 		hexdump((uchar_t *)temp, 8);
 		return;
 	}
 
-	printf("Pass: msg_put_utrunc\n");
+	printf("Pass: msg_put_utrunc1\n");
+
+out:
+	smb_msgbuf_term(&mb);
+}
+
+static void
+msg_put_utrunc2()
+{
+	uint16_t wire[] = { 'o', 'n', 'e', 't', 0 };
+	uint8_t temp[32];
+	smb_msgbuf_t mb;
+	int mbflags = 0;
+	int rc;
+
+	(void) memset(temp, 0, sizeof (temp));
+	smb_msgbuf_init(&mb, temp, 8, mbflags);
+
+	/* Encode with wire length < strlen */
+	rc = smb_msgbuf_encode(&mb, "U", "onetwo");
+	/* Trunc should return "overflow" */
+	if (rc != -1) {
+		printf("Fail: msg_put_utrunc2 encode rc=%d\n", rc);
+		goto out;
+	}
+
+	if (memcmp(temp, wire, 10)) {
+		printf("Fail: msg_put_utrunc2 cmp:\n");
+		hexdump((uchar_t *)temp, 10);
+		return;
+	}
+
+	printf("Pass: msg_put_utrunc2\n");
 
 out:
 	smb_msgbuf_term(&mb);
@@ -617,14 +681,16 @@ test_msgbuf()
 	msg_put_a0();
 	msg_put_a1();
 	msg_put_apad();
-	msg_put_atrunc();
+	msg_put_atrunc1();
+	msg_put_atrunc2();
 
 	msg_put_u0();
 	msg_put_u1();
 	msg_put_u3();
 	msg_put_u4();
 	msg_put_upad();
-	msg_put_utrunc();
+	msg_put_utrunc1();
+	msg_put_utrunc2();
 
 	msg_get_a0();
 	msg_get_a1();

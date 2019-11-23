@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -800,7 +800,7 @@ smb_mbc_poke(mbuf_chain_t *mbc, int offset, const char *fmt, ...)
  */
 int
 smb_mbc_copy(mbuf_chain_t *dst_mbc, const mbuf_chain_t *src_mbc,
-	int copy_offset, int copy_len)
+    int copy_offset, int copy_len)
 {
 	mbuf_t	*src_m;
 	int offset, len;
@@ -1109,8 +1109,6 @@ mbc_marshal_put_oem_string(mbuf_chain_t *mbc, char *mbs, int repc)
 	 */
 	if (repc <= 0)
 		repc = oemlen + 1;
-	if (mbc_marshal_make_room(mbc, repc))
-		return (DECODE_NO_MORE_DATA);
 
 	/*
 	 * Convert into a temporary buffer
@@ -1133,6 +1131,10 @@ mbc_marshal_put_oem_string(mbuf_chain_t *mbc, char *mbs, int repc)
 	 */
 	s = oembuf;
 	while (repc > 0) {
+		if (mbc_marshal_make_room(mbc, 1)) {
+			rc = DECODE_NO_MORE_DATA;
+			goto out;
+		}
 		mbc_marshal_store_byte(mbc, *s);
 		if (*s != '\0')
 			s++;
@@ -1158,6 +1160,7 @@ mbc_marshal_put_unicode_string(mbuf_chain_t *mbc, char *mbs, int repc)
 {
 	smb_wchar_t	*wcsbuf = NULL;
 	smb_wchar_t	*wp;
+	smb_wchar_t	wchar;
 	size_t		wcslen, wcsbytes;
 	size_t		rlen;
 	int		rc;
@@ -1183,8 +1186,6 @@ mbc_marshal_put_unicode_string(mbuf_chain_t *mbc, char *mbs, int repc)
 	 */
 	if (repc <= 0)
 		repc = wcsbytes + 2;
-	if (mbc_marshal_make_room(mbc, repc))
-		return (DECODE_NO_MORE_DATA);
 
 	/*
 	 * Convert into a temporary buffer
@@ -1208,18 +1209,27 @@ mbc_marshal_put_unicode_string(mbuf_chain_t *mbc, char *mbs, int repc)
 	 * little-endian order while copying.
 	 */
 	wp = wcsbuf;
-	while (repc > 1) {
-		smb_wchar_t wchar = LE_IN16(wp);
+	while (repc >= sizeof (smb_wchar_t)) {
+		if (mbc_marshal_make_room(mbc, sizeof (smb_wchar_t))) {
+			rc = DECODE_NO_MORE_DATA;
+			goto out;
+		}
+		wchar = LE_IN16(wp);
 		mbc_marshal_store_byte(mbc, wchar);
 		mbc_marshal_store_byte(mbc, wchar >> 8);
 		if (wchar != 0)
 			wp++;
 		repc -= sizeof (smb_wchar_t);
 	}
-	if (repc > 0)
+	if (repc > 0) {
+		if (mbc_marshal_make_room(mbc, 1)) {
+			rc = DECODE_NO_MORE_DATA;
+			goto out;
+		}
 		mbc_marshal_store_byte(mbc, 0);
-
+	}
 	rc = 0;
+
 out:
 	if (wcsbuf != NULL)
 		smb_mem_free(wcsbuf);

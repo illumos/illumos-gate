@@ -1170,6 +1170,7 @@ typedef struct smb_tree {
 	time_t			t_connect_time;
 	volatile uint32_t	t_open_files;
 	smb_cfg_val_t		t_encrypt; /* Share.EncryptData */
+	timestruc_t		t_create_time;
 } smb_tree_t;
 
 #define	SMB_TREE_VFS(tree)	((tree)->t_snode->vp->v_vfsp)
