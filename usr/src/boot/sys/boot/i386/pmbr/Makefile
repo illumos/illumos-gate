@@ -11,6 +11,7 @@
 
 #
 # Copyright 2015 Toomas Soome <tsoome@me.com>
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -28,7 +29,7 @@ SRCS=	$(OBJS:%.o=%.s)
 
 ORG=	0x600
 
-LDFLAGS=-e start -Ttext ${ORG} -N -S --oformat binary
+LDFLAGS=-e start -Ttext ${ORG} -N -S --oformat binary $(GLDTARGET)
 
 all: $(PROG)
 

@@ -2,7 +2,7 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 include ../../Makefile.grub
 include ../Makefile.solaris.defs
@@ -13,10 +13,9 @@ include ../Makefile.solaris.defs
 .exec:
 	$(OBJCOPY) -O binary $< $@
 
-
 INCLUDES	= -I. -I..
 CCASFLAGS	+= -O2 -fno-builtin -nostdinc
-LDFLAGS		+= -nostdlib -N -Ttext 7C00
+LDFLAGS		+= -nostdlib -N -Ttext 7C00 $(GLDTARGET)
 LIBS		=
 
 

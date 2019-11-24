@@ -4,6 +4,7 @@
 # Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 include ../../Makefile.grub
 include ../Makefile.solaris.defs
@@ -43,12 +44,12 @@ STAGE2_CFLAGS	= -Os -fno-builtin -nostdinc \
 $(STAGE2_NETBOOT)STAGE2_CFLAGS	+= $(NETBOOT_CFLAGS)
 #STAGE2_CFLAGS	+= $(HERCULES_CFLAGS)
 
-NBLOADER_LINK	= -nostdlib -N -Ttext 0
-PRE_STAGE2_LINK	= -nostdlib -N -Ttext 8200
-PXELOADER_LINK	= -nostdlib -N -Ttext 7C00
-STAGE1_5_LINK	= -nostdlib -N -Ttext 2000
-START_ELTORITO_LINK = -nostdlib -N -Ttext 7C00
-START_LINK	= -nostdlib -N -Ttext 8000
+NBLOADER_LINK	= -nostdlib -N -Ttext 0 $(GLDTARGET)
+PRE_STAGE2_LINK	= -nostdlib -N -Ttext 8200 $(GLDTARGET)
+PXELOADER_LINK	= -nostdlib -N -Ttext 7C00 $(GLDTARGET)
+STAGE1_5_LINK	= -nostdlib -N -Ttext 2000 $(GLDTARGET)
+START_ELTORITO_LINK = -nostdlib -N -Ttext 7C00 $(GLDTARGET)
+START_LINK	= -nostdlib -N -Ttext 8000 $(GLDTARGET)
 
 LIBDRIVERS	= ../netboot/libdrivers.a
 
@@ -446,13 +447,13 @@ REISERFS_STAGE1_5_OBJS  = reiserfs_stage1_5_exec-bios.o \
 			  reiserfs_stage1_5_exec-fsys_reiserfs.o \
 			  reiserfs_stage1_5_exec-moddiv.o \
 			  reiserfs_stage1_5_exec-stage1_5.o
- 
+
 $(REISERFS_STAGE1_5_EXEC) := LDFLAGS = $(BASE_LDFLAGS) $(STAGE1_5_LINK)
- 
+
 $(REISERFS_STAGE1_5_ASMOBJS) := CCASFLAGS = $(BASE_CCASFLAGS) \
 				$(STAGE1_5_CFLAGS) \
 				-DFSYS_REISERFS=1 -DNO_BLOCK_FILES=1
- 
+
 $(REISERFS_STAGE1_5_OBJS) := CFLAGS = $(BASE_CFLAGS) $(STAGE1_5_CFLAGS)	\
 				-DFSYS_REISERFS=1 -DNO_BLOCK_FILES=1
 
@@ -678,7 +679,7 @@ $(LIBGRUB_OBJS): $$(@:libgrub_a-%.o=%.c)
 #
 # Diskless
 #
-$(DISKLESS_EXEC): $(DISKLESS_ASMOBJS) $(DISKLESS_OBJS) 
+$(DISKLESS_EXEC): $(DISKLESS_ASMOBJS) $(DISKLESS_OBJS)
 	$(RM) $@
 	$(LINK) -o $@ $(DISKLESS_ASMOBJS) $(DISKLESS_OBJS) $(LIBS)
 

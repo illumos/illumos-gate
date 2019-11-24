@@ -2,6 +2,7 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 include $(SRC)/Makefile.master
 
@@ -70,6 +71,7 @@ CPPFLAGS	= $(DEFS) $(INCLUDES) $(WARNFLAGS) \
 		  $(t.ENVCPPFLAGS4:I,%=-nostdinc -isystem %)
 
 CCLD		= $(GNU_ROOT)/bin/gld
+GLDTARGET	= -melf_i386_sol2
 LDFLAGS		= $(BASE_LDFLAGS)
 LINKFLAGS	= -g
 LINK		= $(CCLD) $(LINKFLAGS) $(LDFLAGS)
