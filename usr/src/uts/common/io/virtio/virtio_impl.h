@@ -258,7 +258,7 @@ struct virtio_vq_elem {
 /*
  * This structure is variously known as the "used" ring, or the device-owned
  * portion of the queue structure.  It is used by the device to return
- * completed descriptor chains to the device.
+ * completed descriptor chains to the driver.
  */
 struct virtio_vq_device {
 	uint16_t			vqde_flags;
