@@ -13,6 +13,7 @@
  * Copyright 2013 Nexenta Inc.  All rights reserved.
  * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
  */
 
 /* Based on the NetBSD virtio driver by Minoura Makoto. */
@@ -62,6 +63,7 @@
 #include <sys/ethernet.h>
 #include <sys/vlan.h>
 #include <sys/sysmacros.h>
+#include <sys/smbios.h>
 
 #include <sys/dlpi.h>
 #include <sys/taskq.h>
@@ -178,6 +180,13 @@ static const uchar_t vioif_broadcast[ETHERADDRL] = {
  * Interval for the periodic TX reclaim.
  */
 uint_t vioif_reclaim_ms = 200;
+
+/*
+ * Allow the operator to override the kinds of interrupts we'll use for
+ * vioif.  This value defaults to -1 so that it can be overridden to 0 in
+ * /etc/system.
+ */
+int vioif_allowed_int_types = -1;
 
 /*
  * DMA attribute template for transmit and receive buffers.  The SGL entry
@@ -1576,6 +1585,45 @@ vioif_check_features(vioif_t *vif)
 }
 
 static int
+vioif_select_interrupt_types(void)
+{
+	id_t id;
+	smbios_system_t sys;
+	smbios_info_t info;
+
+	if (vioif_allowed_int_types != -1) {
+		/*
+		 * If this value was tuned via /etc/system or the debugger,
+		 * use the provided value directly.
+		 */
+		return (vioif_allowed_int_types);
+	}
+
+	if ((id = smbios_info_system(ksmbios, &sys)) == SMB_ERR ||
+	    smbios_info_common(ksmbios, id, &info) == SMB_ERR) {
+		/*
+		 * The system may not have valid SMBIOS data, so ignore a
+		 * failure here.
+		 */
+		return (0);
+	}
+
+	if (strcmp(info.smbi_manufacturer, "Google") == 0 &&
+	    strcmp(info.smbi_product, "Google Compute Engine") == 0) {
+		/*
+		 * An undiagnosed issue with the Google Compute Engine (GCE)
+		 * hypervisor exists.  In this environment, no RX interrupts
+		 * are received if MSI-X handlers are installed.  This does not
+		 * appear to be true for the Virtio SCSI driver.  Fixed
+		 * interrupts do appear to work, so we fall back for now:
+		 */
+		return (DDI_INTR_TYPE_FIXED);
+	}
+
+	return (0);
+}
+
+static int
 vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	int ret;
@@ -1605,7 +1653,8 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
-	if (virtio_init_complete(vio, 0) != DDI_SUCCESS) {
+	if (virtio_init_complete(vio, vioif_select_interrupt_types()) !=
+	    DDI_SUCCESS) {
 		dev_err(dip, CE_WARN, "failed to complete Virtio init");
 		goto fail;
 	}
