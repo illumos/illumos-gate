@@ -68,15 +68,15 @@ extern int tsc_gethrtime_enable;
 
 void cbe_hres_tick(void);
 
-int
-cbe_softclock(void)
+uint_t
+cbe_softclock(caddr_t arg1 __unused, caddr_t arg2 __unused)
 {
 	cyclic_softint(CPU, CY_LOCK_LEVEL);
 	return (1);
 }
 
-int
-cbe_low_level(void)
+uint_t
+cbe_low_level(caddr_t arg1 __unused, caddr_t arg2 __unused)
 {
 	cpu_t *cpu = CPU;
 
@@ -90,8 +90,8 @@ cbe_low_level(void)
  * spurious calls, it would not matter if we called cyclic_fire() in both
  * cases.
  */
-int
-cbe_fire(void)
+uint_t
+cbe_fire(caddr_t arg1 __unused, caddr_t arg2 __unused)
 {
 	cpu_t *cpu = CPU;
 	processorid_t me = cpu->cpu_id, i;
@@ -346,21 +346,21 @@ cbe_init(void)
 	cyclic_init(&cbe, cbe_timer_resolution);
 	mutex_exit(&cpu_lock);
 
-	(void) add_avintr(NULL, CBE_HIGH_PIL, (avfunc)cbe_fire,
+	(void) add_avintr(NULL, CBE_HIGH_PIL, cbe_fire,
 	    "cbe_fire_master", cbe_vector, 0, NULL, NULL, NULL);
 
 	if (psm_get_ipivect != NULL) {
-		(void) add_avintr(NULL, CBE_HIGH_PIL, (avfunc)cbe_fire,
+		(void) add_avintr(NULL, CBE_HIGH_PIL, cbe_fire,
 		    "cbe_fire_slave",
 		    (*psm_get_ipivect)(CBE_HIGH_PIL, PSM_INTR_IPI_HI),
 		    0, NULL, NULL, NULL);
 	}
 
 	(void) add_avsoftintr((void *)&cbe_clock_hdl, CBE_LOCK_PIL,
-	    (avfunc)cbe_softclock, "softclock", NULL, NULL);
+	    cbe_softclock, "softclock", NULL, NULL);
 
 	(void) add_avsoftintr((void *)&cbe_low_hdl, CBE_LOW_PIL,
-	    (avfunc)cbe_low_level, "low level", NULL, NULL);
+	    cbe_low_level, "low level", NULL, NULL);
 
 	mutex_enter(&cpu_lock);
 

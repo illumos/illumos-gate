@@ -2328,7 +2328,7 @@ startup_end(void)
 	 */
 	for (i = DDI_IPL_1; i <= DDI_IPL_10; i++) {
 		(void) add_avsoftintr((void *)&softlevel_hdl[i-1], i,
-		    (avfunc)ddi_periodic_softintr, "ddi_periodic",
+		    (avfunc)(uintptr_t)ddi_periodic_softintr, "ddi_periodic",
 		    (caddr_t)(uintptr_t)i, NULL);
 	}
 

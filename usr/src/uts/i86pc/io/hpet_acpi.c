@@ -65,9 +65,8 @@ static int hpet_timer_available(uint32_t allocated_timers, uint32_t n);
 static void hpet_timer_alloc(uint32_t *allocated_timers, uint32_t n);
 static void hpet_timer_set_up(hpet_info_t *hip, uint32_t timer_n,
     uint32_t interrupt);
-static uint_t hpet_isr(char *arg);
-static uint32_t hpet_install_interrupt_handler(uint_t (*func)(char *),
-    int vector);
+static uint_t hpet_isr(caddr_t, caddr_t);
+static uint32_t hpet_install_interrupt_handler(avfunc func, int vector);
 static void hpet_uninstall_interrupt_handler(void);
 static void hpet_expire_all(void);
 static boolean_t hpet_guaranteed_schedule(hrtime_t required_wakeup_time);
@@ -350,8 +349,7 @@ hpet_install_proxy(void)
 static void
 hpet_uninstall_interrupt_handler(void)
 {
-	rem_avintr(NULL, CBE_HIGH_PIL, (avfunc)&hpet_isr,
-	    hpet_info.cstate_timer.intr);
+	rem_avintr(NULL, CBE_HIGH_PIL, &hpet_isr, hpet_info.cstate_timer.intr);
 }
 
 static int
@@ -610,11 +608,11 @@ hpet_enable_timer(hpet_info_t *hip, uint32_t timer_n)
  * apic_init() psm_ops entry point.
  */
 static uint32_t
-hpet_install_interrupt_handler(uint_t (*func)(char *), int vector)
+hpet_install_interrupt_handler(avfunc func, int vector)
 {
 	uint32_t retval;
 
-	retval = add_avintr(NULL, CBE_HIGH_PIL, (avfunc)func, "HPET Timer",
+	retval = add_avintr(NULL, CBE_HIGH_PIL, func, "HPET Timer",
 	    vector, NULL, NULL, NULL, NULL);
 	if (retval == 0) {
 		cmn_err(CE_WARN, "!hpet_acpi: add_avintr() failed");
@@ -1001,9 +999,8 @@ hpet_cst_callback(uint32_t code)
  * This ISR runs on one CPU which pokes other CPUs out of Deep C-state as
  * needed.
  */
-/* ARGSUSED */
 static uint_t
-hpet_isr(char *arg)
+hpet_isr(caddr_t arg __unused, caddr_t arg1 __unused)
 {
 	uint64_t	timer_status;
 	uint64_t	timer_mask;

@@ -440,15 +440,18 @@ mach_cpucontext_free(struct cpu *cp, void *arg, int err)
 /*
  * "Enter monitor."  Called via cross-call from stop_other_cpus().
  */
-void
-mach_cpu_halt(char *msg)
+int
+mach_cpu_halt(xc_arg_t arg1, xc_arg_t arg2 __unused, xc_arg_t arg3 __unused)
 {
+	char *msg = (char *)arg1;
+
 	if (msg)
 		prom_printf("%s\n", msg);
 
 	/*CONSTANTCONDITION*/
 	while (1)
 		;
+	return (0);
 }
 
 void

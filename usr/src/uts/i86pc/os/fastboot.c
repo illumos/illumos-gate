@@ -1293,8 +1293,9 @@ err_out:
 
 /* ARGSUSED */
 static int
-fastboot_xc_func(fastboot_info_t *nk, xc_arg_t unused2, xc_arg_t unused3)
+fastboot_xc_func(xc_arg_t arg1, xc_arg_t arg2 __unused, xc_arg_t arg3 __unused)
 {
+	fastboot_info_t *nk = (fastboot_info_t *)arg1;
 	void (*fastboot_func)(fastboot_info_t *);
 	fastboot_file_t	*fb = &nk->fi_files[FASTBOOT_SWTCH];
 	fastboot_func = (void (*)())(fb->fb_va);
@@ -1372,11 +1373,11 @@ fast_reboot()
 		CPUSET_ZERO(cpuset);
 		CPUSET_ADD(cpuset, bootcpuid);
 		xc_priority((xc_arg_t)&newkernel, 0, 0, CPUSET2BV(cpuset),
-		    (xc_func_t)fastboot_xc_func);
+		    fastboot_xc_func);
 
 		panic_idle();
 	} else
-		(void) fastboot_xc_func(&newkernel, 0, 0);
+		(void) fastboot_xc_func((xc_arg_t)&newkernel, 0, 0);
 }
 
 

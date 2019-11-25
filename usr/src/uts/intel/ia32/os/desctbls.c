@@ -103,7 +103,7 @@ user_desc_t	*gdt0;
 desctbr_t	gdt0_default_r;
 #endif
 
-gate_desc_t	*idt0; 		/* interrupt descriptor table */
+gate_desc_t	*idt0;		/* interrupt descriptor table */
 #if defined(__i386)
 desctbr_t	idt0_default_r;		/* describes idt0 in IDTR format */
 #endif
@@ -147,10 +147,10 @@ void (*(fasttable[]))(void) = {
 	fast_null,			/* T_FNULL routine */
 	fast_null,			/* T_FGETFP routine (initially null) */
 	fast_null,			/* T_FSETFP routine (initially null) */
-	(void (*)())get_hrtime,		/* T_GETHRTIME */
-	(void (*)())gethrvtime,		/* T_GETHRVTIME */
-	(void (*)())get_hrestime,	/* T_GETHRESTIME */
-	(void (*)())getlgrp		/* T_GETLGRP */
+	(void (*)())(uintptr_t)get_hrtime,	/* T_GETHRTIME */
+	(void (*)())(uintptr_t)gethrvtime,	/* T_GETHRVTIME */
+	(void (*)())(uintptr_t)get_hrestime,	/* T_GETHRESTIME */
+	(void (*)())(uintptr_t)getlgrp		/* T_GETLGRP */
 };
 
 /*
@@ -1356,7 +1356,7 @@ void
 brand_interpositioning_enable(void)
 {
 	gate_desc_t	*idt = CPU->cpu_idt;
-	int 		i;
+	int		i;
 
 	ASSERT(curthread->t_preempt != 0 || getpil() >= DISP_LEVEL);
 

@@ -440,7 +440,7 @@ segkmem_badop()
 	panic("segkmem_badop");
 }
 
-#define	SEGKMEM_BADOP(t)	(t(*)())segkmem_badop
+#define	SEGKMEM_BADOP(t)	(t(*)())(uintptr_t)segkmem_badop
 
 /*ARGSUSED*/
 static faultcode_t
@@ -1224,7 +1224,7 @@ static void
 segkmem_free_one_lp(caddr_t addr, size_t size)
 {
 	page_t		*pp, *rootpp = NULL;
-	pgcnt_t 	pgs_left = btopr(size);
+	pgcnt_t		pgs_left = btopr(size);
 
 	ASSERT(size == segkmem_lpsize);
 
@@ -1424,7 +1424,7 @@ segkmem_free_lpi(vmem_t *vmp, void *inaddr, size_t size)
 	pgcnt_t		nlpages = size >> segkmem_lpshift;
 	size_t		lpsize = segkmem_lpsize;
 	caddr_t		addr = inaddr;
-	pgcnt_t 	npages = btopr(size);
+	pgcnt_t		npages = btopr(size);
 	int		i;
 
 	ASSERT(vmp == heap_lp_arena);

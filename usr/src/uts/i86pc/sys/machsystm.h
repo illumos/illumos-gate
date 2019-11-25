@@ -71,7 +71,7 @@ typedef struct mach_cpu_add_arg {
 } mach_cpu_add_arg_t;
 
 extern void mach_cpu_idle(void);
-extern void mach_cpu_halt(char *);
+extern int mach_cpu_halt(xc_arg_t, xc_arg_t, xc_arg_t);
 extern int mach_cpu_start(cpu_t *, void *);
 extern int mach_cpuid_start(processorid_t, void *);
 extern int mach_cpu_stop(cpu_t *, void *);
@@ -107,8 +107,8 @@ struct memconf {
 
 struct system_hardware {
 	int		hd_nodes;		/* number of nodes */
-	int		hd_cpus_per_node; 	/* max cpus in a node */
-	struct memconf 	hd_mem[MAXNODES];
+	int		hd_cpus_per_node;	/* max cpus in a node */
+	struct memconf	hd_mem[MAXNODES];
 						/*
 						 * memory layout for each
 						 * node.

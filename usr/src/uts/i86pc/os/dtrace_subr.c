@@ -134,9 +134,10 @@ dtrace_toxic_ranges(void (*func)(uintptr_t base, uintptr_t limit))
 }
 
 static int
-dtrace_xcall_func(dtrace_xcall_t func, void *arg)
+dtrace_xcall_func(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3 __unused)
 {
-	(*func)(arg);
+	dtrace_xcall_t func = (dtrace_xcall_t)arg1;
+	(*func)((void*)arg2);
 
 	return (0);
 }
@@ -157,7 +158,7 @@ dtrace_xcall(processorid_t cpu, dtrace_xcall_t func, void *arg)
 
 	kpreempt_disable();
 	xc_sync((xc_arg_t)func, (xc_arg_t)arg, 0, CPUSET2BV(set),
-	    (xc_func_t)dtrace_xcall_func);
+	    dtrace_xcall_func);
 	kpreempt_enable();
 }
 

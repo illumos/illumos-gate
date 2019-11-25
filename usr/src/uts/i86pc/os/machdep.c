@@ -409,7 +409,7 @@ stop_other_cpus(void)
 	cpuset_t xcset;
 
 	CPUSET_ALL_BUT(xcset, CPU->cpu_id);
-	xc_priority(0, 0, 0, CPUSET2BV(xcset), (xc_func_t)mach_cpu_halt);
+	xc_priority(0, 0, 0, CPUSET2BV(xcset), mach_cpu_halt);
 	restore_int_flag(s);
 }
 
