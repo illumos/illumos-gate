@@ -17,6 +17,7 @@
 # into the test archive deliverable.
 #
 TEST_IPS_MANIFEST_FILES = \
+    developer-build-make.mf \
     system-bhyve-tests.mf \
     system-dtrace-tests.mf \
     system-file-system-zfs-tests.mf \

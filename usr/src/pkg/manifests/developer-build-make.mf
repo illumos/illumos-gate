@@ -10,6 +10,7 @@
 #
 
 # Copyright 2015, Richard Lowe.
+# Copyright 2019 Joyent, Inc.
 
 set name=pkg.fmri value=pkg:/developer/build/make@$(PKGVERS)
 set name=pkg.description value="Parallel make(1) build tool"
@@ -17,9 +18,18 @@ set name=pkg.summary value="Parallel make(1) build tool"
 set name=info.classification \
     value="org.opensolaris.category.2008:Development/Source Code Management"
 set name=variant.arch value=$(ARCH)
+dir path=usr/ccs
+dir path=usr/ccs/bin
+dir path=usr/ccs/lib
+dir path=usr/lib/$(ARCH64)
+dir path=usr/share
+dir path=usr/share/lib
 dir path=usr/share/lib/make
+dir path=usr/share/man
 dir path=usr/share/man/man1
 dir path=usr/share/man/man1s
+dir path=usr/xpg4
+dir path=usr/xpg4/bin
 file path=usr/bin/make mode=0555
 file path=usr/lib/$(ARCH64)/libmakestate.so.1
 file path=usr/lib/libmakestate.so.1
