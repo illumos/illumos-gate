@@ -328,6 +328,15 @@ typedef struct callb_cpr {
 #define	INGLOBALZONE(z)			(1)
 extern uint32_t zone_get_hostid(void *zonep);
 
+/*
+ * In ZoL the following defines were added to their sys/avl.h header, but
+ * we want to limit these to the ZFS code on illumos.
+ */
+#define	TREE_ISIGN(a)	(((a) > 0) - ((a) < 0))
+#define	TREE_CMP(a, b)	(((a) > (b)) - ((a) < (b)))
+#define	TREE_PCMP(a, b)	\
+	(((uintptr_t)(a) > (uintptr_t)(b)) - ((uintptr_t)(a) < (uintptr_t)(b)))
+
 extern int zfs_secpolicy_snapshot_perms(const char *name, cred_t *cr);
 extern int zfs_secpolicy_rename_perms(const char *from, const char *to,
     cred_t *cr);

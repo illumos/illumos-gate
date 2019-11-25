@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/zfs_context.h>
 #include <sys/avl.h>
 #include <sys/unique.h>
@@ -45,7 +43,7 @@ unique_compare(const void *a, const void *b)
 	const unique_t *una = (const unique_t *)a;
 	const unique_t *unb = (const unique_t *)b;
 
-	return (AVL_CMP(una->un_value, unb->un_value));
+	return (TREE_CMP(una->un_value, unb->un_value));
 }
 
 void

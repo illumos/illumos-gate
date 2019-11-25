@@ -493,7 +493,11 @@ fsavl_compare(const void *arg1, const void *arg2)
 	const fsavl_node_t *fn1 = (const fsavl_node_t *)arg1;
 	const fsavl_node_t *fn2 = (const fsavl_node_t *)arg2;
 
-	return (AVL_CMP(fn1->fn_guid, fn2->fn_guid));
+	if (fn1->fn_guid > fn2->fn_guid)
+		return (+1);
+	if (fn1->fn_guid < fn2->fn_guid)
+		return (-1);
+	return (0);
 }
 
 /*

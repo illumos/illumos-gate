@@ -1335,6 +1335,7 @@ ZFS_COMMON_OBJS +=		\
 	bplist.o		\
 	bpobj.o			\
 	bptree.o		\
+	btree.o			\
 	bqueue.o		\
 	cityhash.o		\
 	dbuf.o			\

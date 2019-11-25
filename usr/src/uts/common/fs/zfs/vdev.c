@@ -215,7 +215,7 @@ vdev_derive_alloc_bias(const char *bias)
 
 /* ARGSUSED */
 void
-vdev_default_xlate(vdev_t *vd, const range_seg_t *in, range_seg_t *res)
+vdev_default_xlate(vdev_t *vd, const range_seg64_t *in, range_seg64_t *res)
 {
 	res->rs_start = in->rs_start;
 	res->rs_end = in->rs_end;
@@ -496,7 +496,8 @@ vdev_alloc_common(spa_t *spa, uint_t id, uint64_t guid, vdev_ops_t *ops)
 
 	rw_init(&vd->vdev_indirect_rwlock, NULL, RW_DEFAULT, NULL);
 	mutex_init(&vd->vdev_obsolete_lock, NULL, MUTEX_DEFAULT, NULL);
-	vd->vdev_obsolete_segments = range_tree_create(NULL, NULL);
+	vd->vdev_obsolete_segments = range_tree_create(NULL, RANGE_SEG64, NULL,
+	    0, 0);
 
 	list_link_init(&vd->vdev_initialize_node);
 	list_link_init(&vd->vdev_leaf_node);
@@ -517,7 +518,8 @@ vdev_alloc_common(spa_t *spa, uint_t id, uint64_t guid, vdev_ops_t *ops)
 	cv_init(&vd->vdev_trim_io_cv, NULL, CV_DEFAULT, NULL);
 
 	for (int t = 0; t < DTL_TYPES; t++) {
-		vd->vdev_dtl[t] = range_tree_create(NULL, NULL);
+		vd->vdev_dtl[t] = range_tree_create(NULL, RANGE_SEG64, NULL, 0,
+		    0);
 	}
 	txg_list_create(&vd->vdev_ms_list, spa,
 	    offsetof(struct metaslab, ms_txg_node));
@@ -2434,14 +2436,11 @@ vdev_dtl_need_resilver(vdev_t *vd, uint64_t offset, size_t psize)
 static uint64_t
 vdev_dtl_min(vdev_t *vd)
 {
-	range_seg_t *rs;
-
 	ASSERT(MUTEX_HELD(&vd->vdev_dtl_lock));
 	ASSERT3U(range_tree_space(vd->vdev_dtl[DTL_MISSING]), !=, 0);
 	ASSERT0(vd->vdev_children);
 
-	rs = avl_first(&vd->vdev_dtl[DTL_MISSING]->rt_root);
-	return (rs->rs_start - 1);
+	return (range_tree_min(vd->vdev_dtl[DTL_MISSING]) - 1);
 }
 
 /*
@@ -2450,14 +2449,11 @@ vdev_dtl_min(vdev_t *vd)
 static uint64_t
 vdev_dtl_max(vdev_t *vd)
 {
-	range_seg_t *rs;
-
 	ASSERT(MUTEX_HELD(&vd->vdev_dtl_lock));
 	ASSERT3U(range_tree_space(vd->vdev_dtl[DTL_MISSING]), !=, 0);
 	ASSERT0(vd->vdev_children);
 
-	rs = avl_last(&vd->vdev_dtl[DTL_MISSING]->rt_root);
-	return (rs->rs_end);
+	return (range_tree_max(vd->vdev_dtl[DTL_MISSING]));
 }
 
 /*
@@ -2768,7 +2764,7 @@ vdev_dtl_sync(vdev_t *vd, uint64_t txg)
 		ASSERT(vd->vdev_dtl_sm != NULL);
 	}
 
-	rtsync = range_tree_create(NULL, NULL);
+	rtsync = range_tree_create(NULL, RANGE_SEG64, NULL, 0, 0);
 
 	mutex_enter(&vd->vdev_dtl_lock);
 	range_tree_walk(rt, range_tree_add, rtsync);
@@ -4475,7 +4471,8 @@ vdev_set_deferred_resilver(spa_t *spa, vdev_t *vd)
  * translation function to do the real conversion.
  */
 void
-vdev_xlate(vdev_t *vd, const range_seg_t *logical_rs, range_seg_t *physical_rs)
+vdev_xlate(vdev_t *vd, const range_seg64_t *logical_rs,
+    range_seg64_t *physical_rs)
 {
 	/*
 	 * Walk up the vdev tree
@@ -4502,7 +4499,7 @@ vdev_xlate(vdev_t *vd, const range_seg_t *logical_rs, range_seg_t *physical_rs)
 	 * range into its physical components by calling the
 	 * vdev specific translate function.
 	 */
-	range_seg_t intermediate = { { { 0, 0 } } };
+	range_seg64_t intermediate = { 0 };
 	pvd->vdev_ops->vdev_op_xlate(vd, physical_rs, &intermediate);
 
 	physical_rs->rs_start = intermediate.rs_start;

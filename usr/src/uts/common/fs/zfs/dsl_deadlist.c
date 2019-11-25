@@ -58,7 +58,7 @@ dsl_deadlist_compare(const void *arg1, const void *arg2)
 	const dsl_deadlist_entry_t *dle1 = (const dsl_deadlist_entry_t *)arg1;
 	const dsl_deadlist_entry_t *dle2 = (const dsl_deadlist_entry_t *)arg2;
 
-	return (AVL_CMP(dle1->dle_mintxg, dle2->dle_mintxg));
+	return (TREE_CMP(dle1->dle_mintxg, dle2->dle_mintxg));
 }
 
 static void
