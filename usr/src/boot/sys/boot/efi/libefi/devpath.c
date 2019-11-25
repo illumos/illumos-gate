@@ -61,6 +61,16 @@ efi_lookup_devpath(EFI_HANDLE handle)
 	return (devpath);
 }
 
+void
+efi_close_devpath(EFI_HANDLE handle)
+{
+	EFI_STATUS status;
+
+	status = BS->CloseProtocol(handle, &DevicePathGUID, IH, NULL);
+	if (EFI_ERROR(status))
+		printf("CloseProtocol error: %lu\n", EFI_ERROR_CODE(status));
+}
+
 CHAR16 *
 efi_devpath_name(EFI_DEVICE_PATH *devpath)
 {
