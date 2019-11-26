@@ -380,7 +380,7 @@ p_name()
  * for all the partitions in the current partition map.
  */
 int
-p_print()
+p_print(void)
 {
 	/*
 	 * check if there exists a partition table for the disk.
@@ -411,13 +411,16 @@ p_print()
 		fmt_print("Total disk cylinders available: %d + %d "
 		    "(reserved cylinders)\n\n", ncyl, acyl);
 	} else if (cur_label == L_TYPE_EFI) {
+		unsigned reserved;
+
+		reserved = efi_reserved_sectors(cur_parts->etoc);
 		fmt_print("Current partition table (%s):\n",
 		    cur_parts->pinfo_name != NULL ?
 		    cur_parts->pinfo_name : "unnamed");
-		fmt_print("Total disk sectors available: %llu + %d "
+		fmt_print("Total disk sectors available: %llu + %u "
 		    "(reserved sectors)\n\n",
-		    cur_parts->etoc->efi_last_u_lba - EFI_MIN_RESV_SIZE -
-		    cur_parts->etoc->efi_first_u_lba + 1, EFI_MIN_RESV_SIZE);
+		    cur_parts->etoc->efi_last_u_lba - reserved -
+		    cur_parts->etoc->efi_first_u_lba + 1, reserved);
 	}
 
 

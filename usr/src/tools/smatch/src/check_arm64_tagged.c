@@ -154,8 +154,13 @@ int rl_range_has_min_value(struct range_list *rl, sval_t sval)
 
 static bool rl_is_tagged(struct range_list *rl)
 {
-	sval_t invalid = { .type = &ullong_ctype, .value = (1ULL << 56) };
-	sval_t invalid_kernel = { .type = &ullong_ctype, .value = (0xff8ULL << 52) };
+	sval_t invalid;
+	sval_t invalid_kernel;
+
+	invalid.type = &ullong_ctype;
+	invalid.value = 1ULL << 56;
+	invalid_kernel.type = &ullong_ctype;
+	invalid_kernel.value = 0xff8ULL << 52;
 
 	/*
 	 * We only care for tagged addresses, thus ignore anything where the

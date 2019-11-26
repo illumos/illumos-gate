@@ -575,7 +575,9 @@ c_type()
 		new_partitiontable(tptr, oldtype);
 	} else if ((index == other_choice) && (cur_label == L_TYPE_EFI)) {
 		uint64_t start_lba = cur_parts->etoc->efi_first_u_lba;
+		uint64_t reserved;
 
+		reserved = efi_reserved_sectors(cur_parts->etoc);
 		maxLBA = get_mlba();
 		cur_parts->etoc->efi_last_lba = maxLBA;
 		cur_parts->etoc->efi_last_u_lba = maxLBA - start_lba;
@@ -585,8 +587,8 @@ c_type()
 			cur_parts->etoc->efi_parts[i].p_tag = V_UNASSIGNED;
 		}
 		cur_parts->etoc->efi_parts[8].p_start =
-		    maxLBA - start_lba - (1024 * 16);
-		cur_parts->etoc->efi_parts[8].p_size = (1024 * 16);
+		    maxLBA - start_lba - reserved;
+		cur_parts->etoc->efi_parts[8].p_size = reserved;
 		cur_parts->etoc->efi_parts[8].p_tag = V_RESERVED;
 		if (write_label()) {
 			err_print("Write label failed\n");

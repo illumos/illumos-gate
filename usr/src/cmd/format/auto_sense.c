@@ -226,7 +226,7 @@ static char		*strcopy(
 				int	n);
 static	int		adjust_disk_geometry(diskaddr_t capacity, uint_t *cyl,
 				uint_t *nsect, uint_t *nhead);
-static void 		compute_chs_values(diskaddr_t total_capacity,
+static void		compute_chs_values(diskaddr_t total_capacity,
 				diskaddr_t usable_capacity, uint_t *pcylp,
 				uint_t *nheadp, uint_t *nsectp);
 #if defined(_SUNOS_VTOC_8)
@@ -254,6 +254,7 @@ auto_efi_sense(int fd, struct efi_info *label)
 	struct ctlr_info *ctlr;
 	struct dk_cinfo dkinfo;
 	struct partition_info *part;
+	uint64_t reserved;
 
 	if (ioctl(fd, DKIOCINFO, &dkinfo) == -1) {
 		if (option_msg && diag_msg) {
@@ -286,6 +287,7 @@ auto_efi_sense(int fd, struct efi_info *label)
 	}
 
 	label->e_parts = vtoc;
+	reserved = efi_reserved_sectors(vtoc);
 
 	/*
 	 * Create a whole hog EFI partition table:
@@ -295,7 +297,7 @@ auto_efi_sense(int fd, struct efi_info *label)
 	vtoc->efi_parts[0].p_tag = V_USR;
 	vtoc->efi_parts[0].p_start = vtoc->efi_first_u_lba;
 	vtoc->efi_parts[0].p_size = vtoc->efi_last_u_lba - vtoc->efi_first_u_lba
-	    - EFI_MIN_RESV_SIZE + 1;
+	    - reserved + 1;
 
 	/*
 	 * S1-S6 are unassigned slices.
@@ -311,8 +313,8 @@ auto_efi_sense(int fd, struct efi_info *label)
 	 */
 	vtoc->efi_parts[vtoc->efi_nparts - 1].p_tag = V_RESERVED;
 	vtoc->efi_parts[vtoc->efi_nparts - 1].p_start =
-	    vtoc->efi_last_u_lba - EFI_MIN_RESV_SIZE + 1;
-	vtoc->efi_parts[vtoc->efi_nparts - 1].p_size = EFI_MIN_RESV_SIZE;
+	    vtoc->efi_last_u_lba - reserved + 1;
+	vtoc->efi_parts[vtoc->efi_nparts - 1].p_size = reserved;
 
 	/*
 	 * Now stick all of it into the disk_type struct
@@ -462,7 +464,7 @@ auto_label_init(struct dk_label *label)
 	efi_gpt_t	*databack = NULL;
 	struct dk_geom	disk_geom;
 	struct dk_minfo	disk_info;
-	efi_gpt_t 	*backsigp;
+	efi_gpt_t	*backsigp;
 	int		fd = cur_file;
 	int		rval = -1;
 	int		efisize = EFI_LABEL_SIZE * 2;
@@ -2190,7 +2192,7 @@ square_box(
 	}
 
 	if (((*dim1) > lim1) || ((*dim2) > lim2) || ((*dim3) > lim3)) {
-		double 	d[4];
+		double	d[4];
 
 		/*
 		 * Second:
@@ -2269,15 +2271,15 @@ compute_chs_values(diskaddr_t total_capacity, diskaddr_t usable_capacity,
 	 * The following table (in order) illustrates some end result
 	 * calculations:
 	 *
-	 * Maximum number of blocks 		nhead	nsect
+	 * Maximum number of blocks		nhead	nsect
 	 *
 	 * 2097152 (1GB)			64	32
 	 * 16777216 (8GB)			128	32
-	 * 1052819775 (502.02GB)		255  	63
+	 * 1052819775 (502.02GB)		255	63
 	 * 2105639550 (0.98TB)			255	126
-	 * 3158459325 (1.47TB)			255  	189
-	 * 4211279100 (1.96TB)			255  	252
-	 * 5264098875 (2.45TB)			255  	315
+	 * 3158459325 (1.47TB)			255	189
+	 * 4211279100 (1.96TB)			255	252
+	 * 5264098875 (2.45TB)			255	315
 	 * ...
 	 */
 

@@ -31,7 +31,7 @@ IDENT(static);
 /* C99 keywords */
 IDENT(restrict); IDENT(__restrict); IDENT(__restrict__);
 IDENT(_Bool);
-IDENT(_Complex);
+IDENT_RESERVED(_Complex);
 IDENT_RESERVED(_Imaginary);
 
 /* C11 keywords */

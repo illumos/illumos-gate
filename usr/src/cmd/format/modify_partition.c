@@ -560,53 +560,53 @@ get_user_map_efi(map, float_part)
 	char		tmpstr[80];
 	uint64_t	i64;
 	uint64_t	start_lba = map->efi_first_u_lba;
+	uint64_t	reserved;
 
+	reserved = efi_reserved_sectors(map);
 	for (i = 0; i < map->efi_nparts - 1; i++) {
 		if (i == float_part)
 			continue;
-		else {
-			ioparam.io_bounds.lower = start_lba;
-			ioparam.io_bounds.upper = map->efi_last_u_lba;
-			efi_deflt.start_sector = ioparam.io_bounds.lower;
-			efi_deflt.end_sector = map->efi_parts[i].p_size;
-			(void) sprintf(tmpstr,
-			    "Enter size of partition %d ", i);
-			i64 = input(FIO_EFI, tmpstr, ':',
-			    &ioparam, (int *)&efi_deflt, DATA_INPUT);
-			if (i64 == 0) {
-			    map->efi_parts[i].p_tag = V_UNASSIGNED;
-			} else if ((i64 != 0) && (map->efi_parts[i].p_tag ==
-				V_UNASSIGNED)) {
-			    map->efi_parts[i].p_tag = V_USR;
-			}
-			if (i64 == 0) {
-			    map->efi_parts[i].p_start = 0;
-			} else {
-			    map->efi_parts[i].p_start = start_lba;
-			}
-			map->efi_parts[i].p_size = i64;
-			start_lba += i64;
+
+		ioparam.io_bounds.lower = start_lba;
+		ioparam.io_bounds.upper = map->efi_last_u_lba;
+		efi_deflt.start_sector = ioparam.io_bounds.lower;
+		efi_deflt.end_sector = map->efi_parts[i].p_size;
+		(void) sprintf(tmpstr, "Enter size of partition %d ", i);
+		i64 = input(FIO_EFI, tmpstr, ':',
+		    &ioparam, (int *)&efi_deflt, DATA_INPUT);
+		if (i64 == 0) {
+			map->efi_parts[i].p_tag = V_UNASSIGNED;
+		} else if ((i64 != 0) && (map->efi_parts[i].p_tag ==
+		    V_UNASSIGNED)) {
+			map->efi_parts[i].p_tag = V_USR;
+		}
+		if (i64 == 0) {
+			map->efi_parts[i].p_start = 0;
+		} else {
+			map->efi_parts[i].p_start = start_lba;
+		}
+		map->efi_parts[i].p_size = i64;
+		start_lba += i64;
+	}
+	map->efi_parts[float_part].p_start = start_lba;
+	map->efi_parts[float_part].p_size = map->efi_last_u_lba -
+		start_lba - reserved;
+	map->efi_parts[float_part].p_tag = V_USR;
+	if (map->efi_parts[float_part].p_size == UINT_MAX64) {
+		map->efi_parts[float_part].p_size = 0;
+		map->efi_parts[float_part].p_start = 0;
+		map->efi_parts[float_part].p_tag = V_UNASSIGNED;
+		fmt_print("Warning: No space left for HOG\n");
+	}
+
+	for (i = 0; i < map->efi_nparts; i++) {
+		if (map->efi_parts[i].p_tag == V_RESERVED) {
+			map->efi_parts[i].p_start = map->efi_last_u_lba -
+			    reserved;
+			map->efi_parts[i].p_size = reserved;
+			break;
 		}
 	}
-		map->efi_parts[float_part].p_start = start_lba;
-		map->efi_parts[float_part].p_size = map->efi_last_u_lba -
-			start_lba - (1024 * 16);
-		map->efi_parts[float_part].p_tag = V_USR;
-		if (map->efi_parts[float_part].p_size == UINT_MAX64) {
-			map->efi_parts[float_part].p_size = 0;
-			map->efi_parts[float_part].p_start = 0;
-			map->efi_parts[float_part].p_tag = V_UNASSIGNED;
-			fmt_print("Warning: No space left for HOG\n");
-		}
-
-		for (i = 0; i < map->efi_nparts; i++) {
-		    if (map->efi_parts[i].p_tag == V_RESERVED) {
-			map->efi_parts[i].p_start = map->efi_last_u_lba -
-			    (1024 * 16);
-			map->efi_parts[i].p_size = (1024 * 16);
-			break;
-		    }
-		}
 }
 
 

@@ -3,6 +3,7 @@ ECDSA_VerifyDigest
 dtrace_disx86
 elf32exec
 elfexec
+emlxs_sli4_process_unsol_rcv
 iscsi_ioctl
 lm_idle_chk
 ld64_sym_validate
