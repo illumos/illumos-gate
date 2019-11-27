@@ -212,7 +212,7 @@ main(int argc, char **argv)
 	ps = NULL;
 
 	/* Currently, this can only fail if the 3rd argument is invalid */
-	VERIFY0(proc_walk(add_proc, NULL, PR_WALK_PROC));
+	VERIFY0(proc_walk(add_proc, NULL, PR_WALK_PROC|PR_WALK_INCLUDE_SYS));
 
 	if (proc0 == NULL)
 		proc0 = fakepid0();

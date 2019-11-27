@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2015 Joyent, Inc.
+.\" Copyright 2019 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd December  2, 2019
 .Dt PROC_WALK 3PROC
 .Os
 .Sh NAME
@@ -77,6 +77,21 @@ included in the
 argument.
 .El
 .Pp
+In addition, the following values may be combined with one of the above
+values of
+.Fa flag
+with a bitwise-inclusive-OR:
+.Bl -tag -width Dv -offset indent
+.It Dv PR_WALK_INCLUDE_SYS
+Include
+.Sy SYS
+.Pq system
+processes.
+Normally
+.Sy SYS
+processes are skipped during the walk of the process tree.
+.El
+.Pp
 The return value of the caller's
 .Fa func
 function determines whether or not iteration will continue.
@@ -107,7 +122,8 @@ and
 functions.
 .Bl -tag -width Er
 .It Er EINVAL
-.Fa flag is not one of
+.Fa flag
+is not one of
 .Dv PR_WALK_PROC
 or
 .Dv PR_WALK_LWP .
