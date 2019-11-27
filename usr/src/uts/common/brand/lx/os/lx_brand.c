@@ -2450,27 +2450,36 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 			 * decision is made after the linker loads and inspects
 			 * elf properties of the target executable being run.)
 			 *
-			 * So for ET_DYN Linux executables, we also don't know
-			 * where the heap should go, so we'll set the brk and
-			 * base to 0.  But in this case the Solaris linker will
-			 * not initialize the heap, so when the Linux linker
-			 * starts running there is no heap allocated.  This
-			 * seems to be ok on Linux 2.4 based systems because the
-			 * Linux linker/libc fall back to using mmap() to
-			 * allocate memory. But on 2.6 systems, running
-			 * applications by specifying them as command line
-			 * arguments to the linker results in segfaults for an
-			 * as yet undetermined reason (which seems to indicatej
-			 * that a more permanent fix for heap initalization in
-			 * these cases may be necessary).
+			 * The Linux linker does not do this, though, and
+			 * doesn't understand the semantics that we give the
+			 * native linker (namely, that the first non-zero arg
+			 * call to brk() will *set* the brkbase but leave
+			 * brksize at 0 -- Linux binaries instead expect that
+			 * this would extend the brk from 0 upto that arg).
+			 *
+			 * So we should never leave here with ex_brkbase == 0
+			 * or else we will get segfaults as Linux binaries
+			 * misinterpret what we return from brk().
+			 *
+			 * It's probably not great, but we'll just set brkbase
+			 * to PAGESIZE. If there's something down there in the
+			 * way then libc/malloc should fall back to mmap() when
+			 * we fail to extend the brk for them.
 			 */
 			if (ehdr.e_type == ET_DYN) {
-				env.ex_bssbase = (caddr_t)0;
-				env.ex_brkbase = (caddr_t)0;
+				env.ex_bssbase = (caddr_t)PAGESIZE;
+				env.ex_brkbase = (caddr_t)PAGESIZE;
 				env.ex_brksize = 0;
 			}
 		}
 	}
+
+	/*
+	 * Never leave this code with a 0 brkbase, or else we expose the
+	 * native linker semantics of initial brk() to Linux binaries which
+	 * will misinterpret them.
+	 */
+	ASSERT3U(env.ex_brkbase, !=, (caddr_t)0);
 
 	env.ex_vp = vp;
 	setexecenv(&env);
