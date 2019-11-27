@@ -45,12 +45,12 @@
 .\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 2013 OmniTI Computer Consulting, Inc. All Rights Reserved.
 .\" Copyright 2016 James S Blachly, MD. All Rights Reserved.
+.\" Copyright 2019 Joyent, Inc.
 .\"
-.TH MMAP 2 "August 29, 2016"
+.TH MMAP 2 "Nov 19, 2019"
 .SH NAME
 mmap \- map pages of memory
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/mman.h>
 
@@ -59,7 +59,6 @@ mmap \- map pages of memory
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBmmap()\fR function establishes a mapping between a process's address
 space and a file or shared memory object. The format of the call is as follows:
 .sp
@@ -71,7 +70,7 @@ space and a file or shared memory object. The format of the call is as follows:
 The \fBmmap()\fR function establishes a mapping between the address space of
 the process at an address \fIpa\fR for \fIlen\fR bytes to the memory object
 represented by the file descriptor \fIfildes\fR at offset \fIoff\fR for
-\fIlen\fR bytes. The value of \fIpa\fR is a function of the  \fIaddr\fR
+\fIlen\fR bytes. The value of \fIpa\fR is a function of the \fIaddr\fR
 argument and values of \fIflags\fR, further described below. A successful
 \fBmmap()\fR call returns \fIpa\fR as its result. The address range starting at
 \fIpa\fR and continuing for \fIlen\fR bytes will be legitimate for the possible
@@ -105,7 +104,7 @@ The \fBmmap()\fR function is supported for regular files and shared memory
 objects. Support for any other type of file is unspecified.
 .sp
 .LP
-The  \fIprot\fR argument determines whether read, write, execute, or some
+The \fIprot\fR argument determines whether read, write, execute, or some
 combination of accesses are permitted to the data being mapped. The \fIprot\fR
 argument should be either \fBPROT_NONE\fR or the bitwise inclusive \fBOR\fR of
 one or more of the other flags in the following table, defined in the header
@@ -165,7 +164,7 @@ descriptor \fIfildes\fR with write permission unless \fBMAP_PRIVATE\fR is
 specified in the \fIflags\fR argument as described below.
 .sp
 .LP
-The  \fIflags\fR argument provides other information about the handling of the
+The \fIflags\fR argument provides other information about the handling of the
 mapped data. The value of \fIflags\fR is the bitwise inclusive \fBOR\fR of
 these options, defined in <\fBsys/mman.h\fR>:
 .sp
@@ -304,7 +303,7 @@ data or stack "segments".
 When \fBMAP_ALIGN\fR is set, the system is informed that the alignment of
 \fIpa\fR must be the same as \fIaddr\fR. The alignment value in \fIaddr\fR must
 be 0 or some power of two multiple of page size as returned by
-\fBsysconf\fR(3C). If addr is 0, the system will choose a suitable  alignment.
+\fBsysconf\fR(3C). If addr is 0, the system will choose a suitable alignment.
 .sp
 .LP
 The \fBMAP_NORESERVE\fR option specifies that no swap space be reserved for a
@@ -312,11 +311,11 @@ mapping. Without this flag, the creation of a writable \fBMAP_PRIVATE\fR
 mapping reserves swap space equal to the size of the mapping; when the mapping
 is written into, the reserved space is employed to hold private copies of the
 data. A write into a \fBMAP_NORESERVE\fR mapping produces results which depend
-on the current availability of swap  space in the system.  If space is
-available, the write succeeds and a  private copy of the written page is
+on the current availability of swap space in the system.  If space is
+available, the write succeeds and a private copy of the written page is
 created; if space is not available, the write fails and a \fBSIGBUS\fR or
 \fBSIGSEGV\fR signal is delivered to the writing process.  \fBMAP_NORESERVE\fR
-mappings are inherited across  \fBfork()\fR; at the time of the \fBfork()\fR,
+mappings are inherited across \fBfork()\fR; at the time of the \fBfork()\fR,
 swap space is reserved in the child for all private pages that currently exist
 in the parent; thereafter the child's mapping behaves as described above.
 .sp
@@ -358,7 +357,7 @@ The \fIoff\fR argument is constrained to be aligned and sized according to the
 value returned by \fBsysconf()\fR when passed \fB_SC_PAGESIZE\fR or
 \fB_SC_PAGE_SIZE\fR. When \fBMAP_FIXED\fR is specified, the \fIaddr\fR argument
 must also meet these constraints. The system performs mapping operations over
-whole pages. Thus, while the  \fIlen\fR argument need not meet a size or
+whole pages. Thus, while the \fIlen\fR argument need not meet a size or
 alignment constraint, the system will include, in any mapping operation, any
 partial page specified by the range [\fIpa, pa + len\fR).
 .sp
@@ -712,7 +711,6 @@ application:
 .RE
 
 .SH RETURN VALUES
-.LP
 Upon successful completion, the \fBmmap()\fR function returns the address at
 which the mapping was placed (\fIpa\fR); otherwise, it returns a value of
 \fBMAP_FAILED\fR and sets \fBerrno\fR to indicate the error. The symbol
@@ -724,7 +722,6 @@ If \fBmmap()\fR fails for reasons other than \fBEBADF\fR, \fBEINVAL\fR or
 \fBENOTSUP\fR, some of the mappings in the address range starting at \fIaddr\fR
 and continuing for \fIlen\fR bytes may have been unmapped.
 .SH ERRORS
-.LP
 The \fBmmap()\fR function will fail if:
 .sp
 .ne 2
@@ -820,7 +817,7 @@ The mapping could not be locked in memory, if required by \fBmlockall\fR(3C),
 because it would require more space than the system is able to supply.
 .sp
 The composite size of \fIlen\fR plus the lengths obtained from all previous
-calls to \fBmmap()\fR exceeds \fBRLIMIT_VMEM\fR (see  \fBgetrlimit\fR(2)).
+calls to \fBmmap()\fR exceeds \fBRLIMIT_VMEM\fR (see \fBgetrlimit\fR(2)).
 .RE
 
 .sp
@@ -872,7 +869,6 @@ locking. See \fBfcntl\fR(2).
 .RE
 
 .SH USAGE
-.LP
 Use of \fBmmap()\fR may reduce the amount of memory available to other memory
 allocation functions.
 .sp
@@ -917,7 +913,7 @@ read(fildes, buf, len)
 
 .sp
 .LP
-The following is a rewrite using  \fBmmap()\fR:
+The following is a rewrite using \fBmmap()\fR:
 .sp
 .in +2
 .nf
@@ -929,7 +925,6 @@ address = mmap((caddr_t) 0, len, (PROT_READ | PROT_WRITE),
 .in -2
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -946,7 +941,6 @@ MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
-.LP
 \fBclose\fR(2), \fBexec\fR(2), \fBfcntl\fR(2), \fBfork\fR(2),
 \fBgetrlimit\fR(2), \fBmemcntl\fR(2), \fBmmapobj\fR(2), \fBmprotect\fR(2),
 \fBmunmap\fR(2), \fBshmat\fR(2), \fBlockf\fR(3C), \fBmlockall\fR(3C),

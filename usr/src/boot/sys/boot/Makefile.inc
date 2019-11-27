@@ -12,6 +12,7 @@
 #
 # Copyright 2017 Toomas Soome <tsoome@me.com>
 # Copyright 2019 Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 # loader.help build needs better awk
@@ -20,6 +21,9 @@ LD=		$(GNU_ROOT)/bin/gld
 OBJCOPY=	$(GNU_ROOT)/bin/gobjcopy
 OBJDUMP=	$(GNU_ROOT)/bin/gobjdump
 GSTRIP=		$(GNU_ROOT)/bin/gstrip
+
+GLDTARGET=	-melf_i386_sol2
+LDFLAGS	+=	$(GLDTARGET)
 
 # Default Console font setup.
 # We want it to be the same as kernel.

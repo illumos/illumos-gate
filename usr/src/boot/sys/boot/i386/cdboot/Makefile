@@ -11,6 +11,7 @@
 
 #
 # Copyright 2015 Toomas Soome <tsoome@me.com>
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include $(SRC)/Makefile.master
@@ -24,10 +25,9 @@ FILEMODE=0444
 SRCS=	${PROG}.S
 OBJS=	$(SRCS:%.S=%.o)
 
-
 ORG=	0x7c00
 
-LDFLAGS=-e start -Ttext $(ORG) -N -S --oformat binary
+LDFLAGS=-e start -Ttext $(ORG) -N -S --oformat binary $(GLDTARGET)
 
 all:	${PROG}
 

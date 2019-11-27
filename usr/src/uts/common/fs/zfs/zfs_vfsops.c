@@ -1201,6 +1201,10 @@ zfsvfs_create_impl(zfsvfs_t **zfvp, zfsvfs_t *zfsvfs, objset_t *os)
 		return (error);
 	}
 
+	zfsvfs->z_drain_task = TASKQID_INVALID;
+	zfsvfs->z_draining = B_FALSE;
+	zfsvfs->z_drain_cancel = B_TRUE;
+
 	*zfvp = zfsvfs;
 	return (0);
 }
@@ -1229,10 +1233,11 @@ zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 		 * allow replays to succeed.
 		 */
 		readonly = zfsvfs->z_vfs->vfs_flag & VFS_RDONLY;
-		if (readonly != 0)
+		if (readonly != 0) {
 			zfsvfs->z_vfs->vfs_flag &= ~VFS_RDONLY;
-		else
+		} else {
 			zfs_unlinked_drain(zfsvfs);
+		}
 
 		/*
 		 * Parse and replay the intent log.
@@ -2039,6 +2044,8 @@ zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
 {
 	znode_t	*zp;
 
+	zfs_unlinked_drain_stop_wait(zfsvfs);
+
 	rrm_enter(&zfsvfs->z_teardown_lock, RW_WRITER, FTAG);
 
 	if (!unmounting) {
@@ -2370,6 +2377,16 @@ zfs_resume_fs(zfsvfs_t *zfsvfs, dsl_dataset_t *ds)
 		(void) zfs_rezget(zp);
 	}
 	mutex_exit(&zfsvfs->z_znodes_lock);
+
+	if (((zfsvfs->z_vfs->vfs_flag & VFS_RDONLY) == 0) &&
+	    !zfsvfs->z_unmounted) {
+		/*
+		 * zfs_suspend_fs() could have interrupted freeing
+		 * of dnodes. We need to restart this freeing so
+		 * that we don't "leak" the space.
+		 */
+		zfs_unlinked_drain(zfsvfs);
+	}
 
 bail:
 	/* release the VOPs */

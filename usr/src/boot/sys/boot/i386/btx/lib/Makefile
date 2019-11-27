@@ -11,6 +11,7 @@
 
 #
 # Copyright 2015 Toomas Soome <tsoome@me.com>
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include $(SRC)/Makefile.master
@@ -23,7 +24,7 @@ PROG=	crt0.o
 SRCS=	btxcsu.S btxsys.s btxv86.s
 OBJS=	btxcsu.o btxsys.o btxv86.o
 
-LDFLAGS =-r
+LDFLAGS = -r $(GLDTARGET)
 
 all install: $(PROG)
 

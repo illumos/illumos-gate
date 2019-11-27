@@ -318,10 +318,7 @@ txml_print_prop(topo_hdl_t *thp, FILE *fp, tnode_t *node, const char *pgname,
 				begin_end_element(fp, Propitem, Value, val[i],
 				    NULL);
 			}
-			for (uint_t i = 0; i < nelem; i++) {
-				topo_hdl_strfree(thp, val[i]);
-			}
-			topo_hdl_free(thp, val, nelem * sizeof (char *));
+			topo_hdl_strfreev(thp, val, nelem);
 
 			end_element(fp, Propval);
 			break;

@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -144,7 +147,7 @@ ipmi_serial_lookup(topo_mod_t *mod, char *ipmi_tag, char *buf)
 	 * The components are:
 	 *
 	 * yyyy: JEDEC ID in hex (2 byte manufacture ID, 2 byte continuation
-	 * 		code).
+	 *	code).
 	 *
 	 * ll:   The memory module's manufacturing location.
 	 *
@@ -233,9 +236,7 @@ get_dimm_serial(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		/* topo errno already set */
 		rv = -1;
 	}
-	for (i = 0; i < nelems; i++)
-		topo_mod_strfree(mod, entity_refs[i]);
-	topo_mod_free(mod, entity_refs, (nelems * sizeof (char *)));
+	topo_mod_strfreev(mod, entity_refs, nelems);
 
 	return (rv);
 }

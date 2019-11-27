@@ -59,7 +59,7 @@ topo_hdl_strfree(topo_hdl_t *thp, char *s)
 void
 topo_hdl_strfreev(topo_hdl_t *thp, char **strarr, uint_t nelem)
 {
-	for (int i = 0; i < nelem; i++)
+	for (uint_t i = 0; i < nelem; i++)
 		topo_hdl_strfree(thp, strarr[i]);
 
 	topo_hdl_free(thp, strarr, (nelem * sizeof (char *)));

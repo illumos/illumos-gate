@@ -11,6 +11,7 @@
 
 #
 # Copyright 2015 Toomas Soome <tsoome@me.com>
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include $(SRC)/Makefile.master
@@ -41,7 +42,7 @@ CPPFLAGS += -I./../../common
 
 ORG=	0x9000
 
-LDFLAGS=-e start -Ttext ${ORG} -N -S --oformat binary
+LDFLAGS=-e start -Ttext ${ORG} -N -S --oformat binary $(GLDTARGET)
 
 all install:	$(PROG)
 

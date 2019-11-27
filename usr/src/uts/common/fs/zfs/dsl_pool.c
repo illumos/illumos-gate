@@ -222,6 +222,9 @@ dsl_pool_open_impl(spa_t *spa, uint64_t txg)
 
 	dp->dp_vnrele_taskq = taskq_create("zfs_vn_rele_taskq", 1, minclsyspri,
 	    1, 4, 0);
+	dp->dp_unlinked_drain_taskq = taskq_create("z_unlinked_drain",
+	    max_ncpus, minclsyspri, max_ncpus, INT_MAX,
+	    TASKQ_PREPOPULATE | TASKQ_DYNAMIC);
 
 	return (dp);
 }
@@ -403,6 +406,7 @@ dsl_pool_close(dsl_pool_t *dp)
 
 	rrw_destroy(&dp->dp_config_rwlock);
 	mutex_destroy(&dp->dp_lock);
+	taskq_destroy(dp->dp_unlinked_drain_taskq);
 	taskq_destroy(dp->dp_vnrele_taskq);
 	if (dp->dp_blkstats != NULL)
 		kmem_free(dp->dp_blkstats, sizeof (zfs_all_blkstats_t));
@@ -1076,6 +1080,12 @@ taskq_t *
 dsl_pool_vnrele_taskq(dsl_pool_t *dp)
 {
 	return (dp->dp_vnrele_taskq);
+}
+
+taskq_t *
+dsl_pool_unlinked_drain_taskq(dsl_pool_t *dp)
+{
+	return (dp->dp_unlinked_drain_taskq);
 }
 
 /*

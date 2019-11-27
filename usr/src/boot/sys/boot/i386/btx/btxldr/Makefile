@@ -11,6 +11,7 @@
 
 #
 # Copyright 2015 Toomas Soome <tsoome@me.com>
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include $(SRC)/Makefile.master
@@ -25,7 +26,7 @@ CPPFLAGS += -DLOADER_ADDRESS=${LOADER_ADDRESS}
 CPPFLAGS += -DBTXLDR_VERBOSE
 CPPFLAGS += -I./../../common
 
-LDFLAGS=-e start -Ttext ${LOADER_ADDRESS} -N -S --oformat binary
+LDFLAGS=-e start -Ttext ${LOADER_ADDRESS} -N -S --oformat binary $(GLDTARGET)
 
 all install:	$(PROG)
 

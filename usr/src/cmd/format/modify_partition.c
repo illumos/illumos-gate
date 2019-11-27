@@ -564,7 +564,8 @@ get_user_map_efi(map, float_part)
 
 	reserved = efi_reserved_sectors(map);
 	for (i = 0; i < map->efi_nparts - 1; i++) {
-		if (i == float_part)
+		/* GPT partition 7 is whole disk device, minor node "wd" */
+		if (i == float_part || i == 7)
 			continue;
 
 		ioparam.io_bounds.lower = start_lba;
@@ -589,10 +590,10 @@ get_user_map_efi(map, float_part)
 		start_lba += i64;
 	}
 	map->efi_parts[float_part].p_start = start_lba;
-	map->efi_parts[float_part].p_size = map->efi_last_u_lba -
+	map->efi_parts[float_part].p_size = map->efi_last_u_lba + 1 -
 		start_lba - reserved;
 	map->efi_parts[float_part].p_tag = V_USR;
-	if (map->efi_parts[float_part].p_size == UINT_MAX64) {
+	if (map->efi_parts[float_part].p_size == 0) {
 		map->efi_parts[float_part].p_size = 0;
 		map->efi_parts[float_part].p_start = 0;
 		map->efi_parts[float_part].p_tag = V_UNASSIGNED;
@@ -602,7 +603,7 @@ get_user_map_efi(map, float_part)
 	for (i = 0; i < map->efi_nparts; i++) {
 		if (map->efi_parts[i].p_tag == V_RESERVED) {
 			map->efi_parts[i].p_start = map->efi_last_u_lba -
-			    reserved;
+			    reserved + 1;
 			map->efi_parts[i].p_size = reserved;
 			break;
 		}
