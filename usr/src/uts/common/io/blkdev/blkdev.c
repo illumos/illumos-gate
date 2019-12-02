@@ -122,9 +122,10 @@
  * There are 4 instance global locks d_ocmutex, d_ksmutex, d_errmutex and
  * d_statemutex. As well a q_iomutex per waitq/runq pair.
  *
- * Currently, there is no lock hierarchy. Nowhere do we ever own more than
- * one lock, any change needs to be documented here with a defined
- * hierarchy.
+ * Lock Hierarchy
+ * --------------
+ * The only two locks which may be held simultaneously are q_iomutex and
+ * d_ksmutex. In all cases q_iomutex must be acquired before d_ksmutex.
  */
 
 #define	BD_MAXPART	64
@@ -1668,6 +1669,10 @@ bd_sched(bd_t *bd, bd_queue_t *bq)
 
 	while ((bq->q_qactive < bq->q_qsize) &&
 	    ((xi = list_remove_head(&bq->q_waitq)) != NULL)) {
+		mutex_enter(&bd->d_ksmutex);
+		kstat_waitq_to_runq(bd->d_kiop);
+		mutex_exit(&bd->d_ksmutex);
+
 		bq->q_qactive++;
 		list_insert_tail(&bq->q_runq, xi);
 
@@ -1679,10 +1684,6 @@ bd_sched(bd_t *bd, bd_queue_t *bq)
 
 		mutex_exit(&bq->q_iomutex);
 
-		mutex_enter(&bd->d_ksmutex);
-		kstat_waitq_to_runq(bd->d_kiop);
-		mutex_exit(&bd->d_ksmutex);
-
 		rv = xi->i_func(bd->d_private, &xi->i_public);
 		if (rv != 0) {
 			bp = xi->i_bp;
@@ -1690,11 +1691,13 @@ bd_sched(bd_t *bd, bd_queue_t *bq)
 			biodone(bp);
 
 			atomic_inc_32(&bd->d_kerr->bd_transerrs.value.ui32);
+
+			mutex_enter(&bq->q_iomutex);
+
 			mutex_enter(&bd->d_ksmutex);
 			kstat_runq_exit(bd->d_kiop);
 			mutex_exit(&bd->d_ksmutex);
 
-			mutex_enter(&bq->q_iomutex);
 			bq->q_qactive--;
 			list_remove(&bq->q_runq, xi);
 			bd_xfer_free(xi);
@@ -1717,12 +1720,14 @@ bd_submit(bd_t *bd, bd_xfer_impl_t *xi)
 	xi->i_qnum = q;
 
 	mutex_enter(&bq->q_iomutex);
+
 	list_insert_tail(&bq->q_waitq, xi);
-	mutex_exit(&bq->q_iomutex);
 
 	mutex_enter(&bd->d_ksmutex);
 	kstat_waitq_enter(bd->d_kiop);
 	mutex_exit(&bd->d_ksmutex);
+
+	mutex_exit(&bq->q_iomutex);
 
 	bd_sched(bd, bq);
 }
@@ -1736,12 +1741,13 @@ bd_runq_exit(bd_xfer_impl_t *xi, int err)
 
 	mutex_enter(&bq->q_iomutex);
 	bq->q_qactive--;
-	list_remove(&bq->q_runq, xi);
-	mutex_exit(&bq->q_iomutex);
 
 	mutex_enter(&bd->d_ksmutex);
 	kstat_runq_exit(bd->d_kiop);
 	mutex_exit(&bd->d_ksmutex);
+
+	list_remove(&bq->q_runq, xi);
+	mutex_exit(&bq->q_iomutex);
 
 	if (err == 0) {
 		if (bp->b_flags & B_READ) {
