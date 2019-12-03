@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2016 by Delphix. All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -114,6 +115,7 @@ SYMBOL_VERSION SUNWprivate {
 	sa_get_protocol_status;
 	sa_init;
 	sa_init_arg;
+	sa_service;
 	sa_find_share;
 	sa_set_protocol_property;
 	sa_fini;

@@ -6999,6 +6999,30 @@ unshare_unmount(int op, int argc, char **argv)
 		}
 
 		/*
+		 * Initialize libshare SA_INIT_SHARE_API_SELECTIVE here
+		 * to avoid unnecessary load/unload of the libshare API
+		 * per shared dataset downstream.
+		 */
+		if (op == OP_SHARE) {
+			get_all_cb_t dslist = { 0 };
+			get_all_datasets(&dslist, B_FALSE);
+
+			if (dslist.cb_used != 0) {
+				sa_init_selective_arg_t sharearg;
+				sharearg.zhandle_arr = dslist.cb_handles;
+				sharearg.zhandle_len = dslist.cb_used;
+				if ((ret = zfs_init_libshare_arg(g_zfs,
+				    SA_INIT_SHARE_API_SELECTIVE, &sharearg)) !=
+				    SA_OK) {
+					(void) fprintf(stderr, gettext(
+					    "Could not initialize libshare, "
+					    "%d"), ret);
+					return (1);
+				}
+			}
+		}
+
+		/*
 		 * Walk the AVL tree in reverse, unmounting each filesystem and
 		 * removing it from the AVL tree in the process.
 		 */

@@ -23,6 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/conf.h>
@@ -3988,8 +3989,7 @@ sbd_lu_reset_state(stmf_lu_t *lu)
 sbd_status_t
 sbd_flush_data_cache(sbd_lu_t *sl, int fsync_done)
 {
-	int r = 0;
-	sbd_status_t ret;
+	sbd_status_t ret = SBD_SUCCESS;
 
 	rw_enter(&sl->sl_access_state_lock, RW_READER);
 	if ((sl->sl_flags & SL_MEDIA_LOADED) == 0) {
@@ -4007,6 +4007,8 @@ sbd_flush_data_cache(sbd_lu_t *sl, int fsync_done)
 over_fsync:
 	if (((sl->sl_data_vtype == VCHR) || (sl->sl_data_vtype == VBLK)) &&
 	    ((sl->sl_flags & SL_NO_DATA_DKIOFLUSH) == 0)) {
+		int r = 0;
+
 		ret = VOP_IOCTL(sl->sl_data_vp, DKIOCFLUSHWRITECACHE, 0,
 		    FKIOCTL, kcred, &r, NULL);
 		if ((ret == ENOTTY) || (ret == ENOTSUP)) {
