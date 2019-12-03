@@ -32,17 +32,26 @@ extern "C" {
  * These are offsets into the device-specific configuration space available
  * through the virtio_dev_*() family of functions.
  */
-#define	VIRTIO_BLK_CONFIG_CAPACITY	0x00	/* 64 R   */
-#define	VIRTIO_BLK_CONFIG_SIZE_MAX	0x08	/* 32 R   */
-#define	VIRTIO_BLK_CONFIG_SEG_MAX	0x0C	/* 32 R   */
-#define	VIRTIO_BLK_CONFIG_GEOMETRY_C	0x10	/* 16 R   */
-#define	VIRTIO_BLK_CONFIG_GEOMETRY_H	0x12	/*  8 R   */
-#define	VIRTIO_BLK_CONFIG_GEOMETRY_S	0x13	/*  8 R   */
-#define	VIRTIO_BLK_CONFIG_BLK_SIZE	0x14	/* 32 R   */
-#define	VIRTIO_BLK_CONFIG_TOPO_PBEXP	0x18	/*  8 R   */
-#define	VIRTIO_BLK_CONFIG_TOPO_ALIGN	0x19	/*  8 R   */
-#define	VIRTIO_BLK_CONFIG_TOPO_MIN_SZ	0x1A	/* 16 R   */
-#define	VIRTIO_BLK_CONFIG_TOPO_OPT_SZ	0x1C	/* 32 R   */
+#define	VIRTIO_BLK_CONFIG_CAPACITY		0x00	/* 64 R   */
+#define	VIRTIO_BLK_CONFIG_SIZE_MAX		0x08	/* 32 R   */
+#define	VIRTIO_BLK_CONFIG_SEG_MAX		0x0C	/* 32 R   */
+#define	VIRTIO_BLK_CONFIG_GEOMETRY_C		0x10	/* 16 R   */
+#define	VIRTIO_BLK_CONFIG_GEOMETRY_H		0x12	/*  8 R   */
+#define	VIRTIO_BLK_CONFIG_GEOMETRY_S		0x13	/*  8 R   */
+#define	VIRTIO_BLK_CONFIG_BLK_SIZE		0x14	/* 32 R   */
+#define	VIRTIO_BLK_CONFIG_TOPO_PBEXP		0x18	/*  8 R   */
+#define	VIRTIO_BLK_CONFIG_TOPO_ALIGN		0x19	/*  8 R   */
+#define	VIRTIO_BLK_CONFIG_TOPO_MIN_SZ		0x1A	/* 16 R   */
+#define	VIRTIO_BLK_CONFIG_TOPO_OPT_SZ		0x1C	/* 32 R   */
+#define	VIRTIO_BLK_CONFIG_WRITEBACK		0x20	/*  8 R	  */
+				/* unused	0x21 */ /*  8 R   */
+#define	VIRTIO_BLK_CONFIG_NUM_QUEUES		0x22	/* 16 R   */
+#define	VIRTIO_BLK_CONFIG_MAX_DISCARD_SECT	0x24	/* 32 R   */
+#define	VIRTIO_BLK_CONFIG_MAX_DISCARD_SEG	0x28	/* 32 R   */
+#define	VIRTIO_BLK_CONFIG_DISCARD_ALIGN		0x2C	/* 32 R   */
+#define	VIRTIO_BLK_CONFIG_MAX_WRITE_ZERO_SECT	0x30	/* 32 R   */
+#define	VIRTIO_BLK_CONFIG_MAX_WRITE_ZERO_SEG	0x34	/* 32 R   */
+#define	VIRTIO_BLK_CONFIG_WRITE_ZERO_UNMAP	0x38	/*  8 R   */
 
 /*
  * VIRTIO BLOCK VIRTQUEUES
@@ -64,6 +73,10 @@ extern "C" {
 #define	VIRTIO_BLK_F_SCSI		(1ULL << 7)
 #define	VIRTIO_BLK_F_FLUSH		(1ULL << 9)
 #define	VIRTIO_BLK_F_TOPOLOGY		(1ULL << 10)
+#define	VIRTIO_BLK_F_CONFIG_WCE		(1ULL << 11)
+#define	VIRTIO_BLK_F_MQ			(1ULL << 12)
+#define	VIRTIO_BLK_F_DISCARD		(1ULL << 13)
+#define	VIRTIO_BLK_F_WRITE_ZEROES	(1ULL << 14)
 
 /*
  * These features are supported by the driver and we will request them from the
@@ -74,7 +87,8 @@ extern "C" {
 					VIRTIO_BLK_F_FLUSH |		\
 					VIRTIO_BLK_F_TOPOLOGY |		\
 					VIRTIO_BLK_F_SEG_MAX |		\
-					VIRTIO_BLK_F_SIZE_MAX)
+					VIRTIO_BLK_F_SIZE_MAX |		\
+					VIRTIO_BLK_F_DISCARD)
 
 /*
  * VIRTIO BLOCK REQUEST HEADER
@@ -102,7 +116,29 @@ struct vioblk_req_hdr {
 #define	VIRTIO_BLK_T_FLUSH		4
 #define	VIRTIO_BLK_T_FLUSH_OUT		5
 #define	VIRTIO_BLK_T_GET_ID		8
+#define	VIRTIO_BLK_T_DISCARD		11
+#define	VIRTIO_BLK_T_WRITE_ZEROES	13
 #define	VIRTIO_BLK_T_BARRIER		0x80000000
+
+/*
+ * VIRTIO BLOCK DISCARD/WRITE ZEROS DATA
+ *
+ * For hosts that support the DISCARD or WRITE ZEROES features, instead of
+ * data, the vioblk_discard_write_zeros struct is used as the 'data' for
+ * the request.
+ */
+struct vioblk_discard_write_zeroes {
+	uint64_t	vdwz_sector;
+	uint32_t	vdwz_num_sectors;
+	uint32_t	vdwz_flags;
+} __packed;
+
+/*
+ * vdwz_flags values
+ */
+
+/* For a WRITE ZEROES request, also unmap the block */
+#define	VIRTIO_BLK_WRITE_ZEROS_UNMAP	(1U << 0)
 
 /*
  * The GET_ID command type does not appear in the specification, but
@@ -199,6 +235,11 @@ typedef struct vioblk {
 	uint_t				vib_pblk_size;
 	uint_t				vib_seg_max;
 	uint_t				vib_seg_size_max;
+
+	boolean_t			vib_can_discard;	/* Write Once */
+	uint_t				vib_max_discard_sectors;	/* WO */
+	uint_t				vib_max_discard_seg;		/* WO */
+	uint_t				vib_discard_sector_align;	/* WO */
 
 	boolean_t			vib_devid_fetched;
 	char				vib_devid[VIRTIO_BLK_ID_BYTES + 1];

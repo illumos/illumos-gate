@@ -23,7 +23,7 @@
 /*
  * Copyright 2013 STEC, Inc.  All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation.
  */
 
@@ -36,20 +36,20 @@
 #include	<sys/uio.h>
 #include	<sys/cred.h>
 #include	<sys/modctl.h>
-#include 	<sys/debug.h>
-#include 	<sys/modctl.h>
-#include 	<sys/list.h>
-#include 	<sys/sysmacros.h>
-#include 	<sys/errno.h>
-#include 	<sys/pcie.h>
-#include 	<sys/pci.h>
+#include	<sys/debug.h>
+#include	<sys/modctl.h>
+#include	<sys/list.h>
+#include	<sys/sysmacros.h>
+#include	<sys/errno.h>
+#include	<sys/pcie.h>
+#include	<sys/pci.h>
 #include	<sys/ddi.h>
 #include	<sys/dditypes.h>
 #include	<sys/sunddi.h>
 #include	<sys/atomic.h>
 #include	<sys/mutex.h>
 #include	<sys/param.h>
-#include 	<sys/devops.h>
+#include	<sys/devops.h>
 #include	<sys/blkdev.h>
 #include	<sys/queue.h>
 #include	<sys/scsi/impl/inquiry.h>
@@ -137,6 +137,7 @@ static bd_ops_t skd_bd_ops = {
 	NULL,			/* sync_cache */
 	skd_bd_read,
 	skd_bd_write,
+	NULL,			/* free_space */
 };
 
 static ddi_device_acc_attr_t	dev_acc_attr = {
@@ -243,11 +244,11 @@ _init(void)
 
 /*
  *
- * Name: 	_info, returns information about loadable module.
+ * Name:	_info, returns information about loadable module.
  *
- * Inputs: 	modinfo, pointer to module information structure.
+ * Inputs:	modinfo, pointer to module information structure.
  *
- * Returns: 	Value returned by mod_info().
+ * Returns:	Value returned by mod_info().
  *
  */
 int
@@ -257,7 +258,7 @@ _info(struct modinfo *modinfop)
 }
 
 /*
- * _fini 	Prepares a module for unloading. It is called when the system
+ * _fini	Prepares a module for unloading. It is called when the system
  *		wants to unload a module. If the module determines that it can
  *		be unloaded, then _fini() returns the value returned by
  *		mod_remove(). Upon successful return from _fini() no other
@@ -265,7 +266,7 @@ _info(struct modinfo *modinfop)
  *
  * Inputs:	None.
  *
- * Returns: 	DDI_SUCCESS or DDI_FAILURE.
+ * Returns:	DDI_SUCCESS or DDI_FAILURE.
  *
  */
 int
@@ -637,9 +638,9 @@ skd_blkdev_preop_sg_list(struct skd_device *skdev,
     struct skd_request_context *skreq, uint32_t *sg_byte_count)
 {
 	bd_xfer_t		*xfer;
-	skd_buf_private_t 	*pbuf;
-	int 			i, bcount = 0;
-	uint_t 			n_sg;
+	skd_buf_private_t	*pbuf;
+	int			i, bcount = 0;
+	uint_t			n_sg;
 
 	*sg_byte_count = 0;
 
@@ -1868,8 +1869,8 @@ skd_isr_completion_posted(struct skd_device *skdev)
 {
 	volatile struct fit_completion_entry_v1 *skcmp = NULL;
 	volatile struct fit_comp_error_info  *skerr;
-	struct skd_fitmsg_context 	*skmsg;
-	struct skd_request_context 	*skreq;
+	struct skd_fitmsg_context	*skmsg;
+	struct skd_request_context	*skreq;
 	skd_buf_private_t		*pbuf;
 	uint16_t req_id;
 	uint32_t req_slot;
@@ -3124,8 +3125,8 @@ skd_cons_skcomp(struct skd_device *skdev)
 {
 	uint64_t	*dma_alloc;
 	struct fit_completion_entry_v1 *skcomp;
-	int 		rc = 0;
-	uint32_t 		nbytes;
+	int		rc = 0;
+	uint32_t		nbytes;
 	dma_mem_t	*mem;
 
 	nbytes = sizeof (*skcomp) * SKD_N_COMPLETION_ENTRY;
@@ -3134,8 +3135,8 @@ skd_cons_skcomp(struct skd_device *skdev)
 	Dcmn_err(CE_NOTE, "cons_skcomp: nbytes=%d,entries=%d", nbytes,
 	    SKD_N_COMPLETION_ENTRY);
 
-	mem 			= &skdev->cq_dma_address;
-	mem->size 		= nbytes;
+	mem			= &skdev->cq_dma_address;
+	mem->size		= nbytes;
 
 	dma_alloc = skd_alloc_dma_mem(skdev, mem, ATYPE_64BIT);
 	skcomp = (struct fit_completion_entry_v1 *)dma_alloc;
@@ -3170,8 +3171,8 @@ static int
 skd_cons_skmsg(struct skd_device *skdev)
 {
 	dma_mem_t	*mem;
-	int 		rc = 0;
-	uint32_t 		i;
+	int		rc = 0;
+	uint32_t		i;
 
 	Dcmn_err(CE_NOTE, "skmsg_table kzalloc, struct %lu, count %u total %lu",
 	    (ulong_t)sizeof (struct skd_fitmsg_context),
@@ -3229,8 +3230,8 @@ skd_cons_skmsg(struct skd_device *skdev)
 static int
 skd_cons_skreq(struct skd_device *skdev)
 {
-	int 	rc = 0;
-	uint32_t 	i;
+	int	rc = 0;
+	uint32_t	i;
 
 	Dcmn_err(CE_NOTE,
 	    "skreq_table kmem_zalloc, struct %lu, count %u total %lu",
@@ -3284,10 +3285,10 @@ err_out:
 static int
 skd_cons_sksb(struct skd_device *skdev)
 {
-	int 				rc = 0;
-	struct skd_special_context 	*skspcl;
+	int				rc = 0;
+	struct skd_special_context	*skspcl;
 	dma_mem_t			*mem;
-	uint32_t 				nbytes;
+	uint32_t				nbytes;
 
 	skspcl = &skdev->internal_skspcl;
 
@@ -3296,8 +3297,8 @@ skd_cons_sksb(struct skd_device *skdev)
 
 	nbytes = SKD_N_INTERNAL_BYTES;
 
-	mem 			= &skspcl->db_dma_address;
-	mem->size 		= nbytes;
+	mem			= &skspcl->db_dma_address;
+	mem->size		= nbytes;
 
 	/* data_buf's DMA pointer is skspcl->db_dma_address */
 	skspcl->data_buf = skd_alloc_dma_mem(skdev, mem, ATYPE_64BIT);
@@ -3310,8 +3311,8 @@ skd_cons_sksb(struct skd_device *skdev)
 
 	nbytes = SKD_N_SPECIAL_FITMSG_BYTES;
 
-	mem 			= &skspcl->mb_dma_address;
-	mem->size 		= nbytes;
+	mem			= &skspcl->mb_dma_address;
+	mem->size		= nbytes;
 
 	/* msg_buf DMA pointer is skspcl->mb_dma_address */
 	skspcl->msg_buf = skd_alloc_dma_mem(skdev, mem, ATYPE_64BIT);
@@ -3362,8 +3363,8 @@ static struct fit_sg_descriptor
 
 	nbytes = sizeof (*sg_list) * n_sg;
 
-	mem 			= ret_dma_addr;
-	mem->size 		= nbytes;
+	mem			= ret_dma_addr;
+	mem->size		= nbytes;
 
 	/* sg_list's DMA pointer is *ret_dma_addr */
 	sg_list = skd_alloc_dma_mem(skdev, mem, ATYPE_32BIT);
@@ -3462,7 +3463,7 @@ skd_free_skcomp(struct skd_device *skdev)
 static void
 skd_free_skmsg(struct skd_device *skdev)
 {
-	uint32_t 		i;
+	uint32_t		i;
 
 	if (NULL == skdev->skmsg_table)
 		return;
@@ -4289,7 +4290,7 @@ skd_disable_intr(skd_device_t *skdev)
 static void
 skd_release_intr(skd_device_t *skdev)
 {
-	int32_t 	i;
+	int32_t	i;
 	int		rval;
 
 
@@ -4352,7 +4353,7 @@ skd_release_intr(skd_device_t *skdev)
  *
  * Inputs:	dip		- DDI device info pointer.
  *		skdev		- device state structure.
- * 		seq		- bit flag representing allocated item.
+ *		seq		- bit flag representing allocated item.
  *		instance	- device instance.
  *
  * Returns:	Nothing.
@@ -4595,7 +4596,7 @@ skd_setup_devid(skd_device_t *skdev, ddi_devid_t *devid)
  * Name:	skd_bd_attach, attach to blkdev driver
  *
  * Inputs:	skdev		- device state structure.
- *        	dip		- device info structure.
+ *		dip		- device info structure.
  *
  * Returns:	DDI_SUCCESS or DDI_FAILURE.
  *
@@ -4659,14 +4660,14 @@ skd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	int			instance;
 	int			nregs;
-	skd_device_t   		*skdev = NULL;
+	skd_device_t		*skdev = NULL;
 	int			inx;
-	uint16_t 		cmd_reg;
+	uint16_t		cmd_reg;
 	int			progress = 0;
 	char			name[MAXPATHLEN];
 	off_t			regsize;
-	char 			pci_str[32];
-	char 			fw_version[8];
+	char			pci_str[32];
+	char			fw_version[8];
 
 	instance = ddi_get_instance(dip);
 
@@ -4955,7 +4956,7 @@ static int
 skd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	skd_buf_private_t *pbuf;
-	skd_device_t   	*skdev;
+	skd_device_t	*skdev;
 	int		instance;
 	timeout_id_t	timer_id = NULL;
 	int		rv1 = DDI_SUCCESS;
@@ -5169,7 +5170,7 @@ skd_bd_mediainfo(void *arg, bd_media_t *media)
 static int
 skd_rw(skd_device_t *skdev, bd_xfer_t *xfer, int dir)
 {
-	skd_buf_private_t 	*pbuf;
+	skd_buf_private_t	*pbuf;
 
 	/*
 	 * The x_flags structure element is not defined in Oracle Solaris
