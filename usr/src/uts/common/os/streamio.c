@@ -3613,29 +3613,39 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		if (stp->sd_flag & STRHUP)
 			return (ENXIO);
 
-		if ((scp = kmem_alloc(sizeof (strcmd_t), KM_NOSLEEP)) == NULL)
-			return (ENOMEM);
+		if (copyflag == U_TO_K) {
+			if ((scp = kmem_alloc(sizeof (strcmd_t),
+			    KM_NOSLEEP)) == NULL) {
+				return (ENOMEM);
+			}
 
-		if (copyin((void *)arg, scp, sizeof (strcmd_t))) {
-			kmem_free(scp, sizeof (strcmd_t));
-			return (EFAULT);
+			if (copyin((void *)arg, scp, sizeof (strcmd_t))) {
+				kmem_free(scp, sizeof (strcmd_t));
+				return (EFAULT);
+			}
+		} else {
+			scp = (strcmd_t *)arg;
 		}
 
 		access = job_control_type(scp->sc_cmd);
 		mutex_enter(&stp->sd_lock);
 		if (access != -1 && (error = i_straccess(stp, access)) != 0) {
 			mutex_exit(&stp->sd_lock);
-			kmem_free(scp, sizeof (strcmd_t));
+			if (copyflag == U_TO_K)
+				kmem_free(scp, sizeof (strcmd_t));
 			return (error);
 		}
 		mutex_exit(&stp->sd_lock);
 
 		*rvalp = 0;
 		if ((error = strdocmd(stp, scp, crp)) == 0) {
-			if (copyout(scp, (void *)arg, sizeof (strcmd_t)))
+			if (copyflag == U_TO_K &&
+			    copyout(scp, (void *)arg, sizeof (strcmd_t))) {
 				error = EFAULT;
+			}
 		}
-		kmem_free(scp, sizeof (strcmd_t));
+		if (copyflag == U_TO_K)
+			kmem_free(scp, sizeof (strcmd_t));
 		return (error);
 
 	case I_NREAD:
