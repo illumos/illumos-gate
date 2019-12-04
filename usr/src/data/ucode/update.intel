@@ -9,7 +9,7 @@
 # source. A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 
-# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2019 Joyent, Inc.
 
 # A simple update script that extracts an Intel microcode download file
@@ -26,7 +26,7 @@ set -o pipefail
 
 ucodetar="$1"
 
-mf=../../pkg/manifests/system-kernel-platform.mf
+mf=../../pkg/manifests/system-microcode-intel.mf
 [[ -f $mf ]] || {
 	echo "Run from usr/src/data/ucode" 2>&1
 	exit 1
@@ -53,6 +53,10 @@ egrep -v "(file|hardlink) path=$fw" $mf.tmp > $mf
 rm -f $mf.tmp
 
 rm -f intel/*
+
+cp $tmp/Intel-Linux-Processor-Microcode-Data*/license intel/THIRDPARTYLICENSE
+echo Intel Processor Microcode Data Files > intel/THIRDPARTYLICENSE.descrip
+
 rm -f Makefile.links
 
 typeset -A seen
@@ -67,7 +71,6 @@ for f in $tmp/out/*; do
 		links[$bf]=${inodes[$inode]}
 	else
 		inodes[$inode]=$bf
-		seen[$bf]=1
 		cp $f intel/$bf
 	fi
 	seen[$bf]=1
@@ -75,14 +78,21 @@ done
 
 for f in intel/*; do
 	bf=$(basename $f)
-	echo "\$(i386_ONLY)file path=$fw/$bf group=sys mode=0444 reboot-needed=true" >> $mf
+	[[ $bf = THIRDPARTYLICENSE* ]] && continue
+	echo "file path=$fw/$bf group=sys mode=0444 reboot-needed=true" >> $mf
 done
 
-echo "INTEL_LINKS = ${!links[@]}" > Makefile.links
-echo >> Makefile.links
+(
+	sed '/^$/q' < ../../prototypes/prototype.Makefile
+	echo 'INTEL_LINKS = \'
+	for i in "${!links[@]}"; do
+		echo "\t$i \\"
+	done | sed '$s/ .*//'
+	echo
+) > Makefile.links
 
 for i in "${!links[@]}"; do
-	echo "\$(i386_ONLY)hardlink path=$fw/$i target=${links[$i]}" >> $mf
+	echo "hardlink path=$fw/$i target=${links[$i]}" >> $mf
 	cat << EOM >> Makefile.links
 \$(ROOTINTELDIR)/$i: \$(ROOTINTELDIR)/${links[$i]}
 	\$(RM) \$@; \$(LN) \$^ \$@
