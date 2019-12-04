@@ -81,6 +81,7 @@ extern int topo_mod_enumerate(topo_mod_t *, tnode_t *, const char *,
     const char *, topo_instance_t, topo_instance_t, void *);
 extern int topo_mod_enummap(topo_mod_t *mod, tnode_t *, const char *,
     const char *);
+extern char *topo_mod_product(topo_mod_t *);
 extern void topo_mod_release(topo_mod_t *, tnode_t *);
 extern void topo_mod_setspecific(topo_mod_t *, void *);
 extern void *topo_mod_getspecific(topo_mod_t *);
