@@ -1397,7 +1397,7 @@ case scan_name_state:
 				/* Start reading that name */
 				goto resume_name_scan;
 			}
-			/* Fall into */
+			/* FALLTHROUGH */
 		case equal_char:
 			if (paren_count + brace_count > 0) {
 				break;
