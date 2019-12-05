@@ -192,8 +192,8 @@ static const fs_operation_trans_def_t vn_ops_table[] = {
 	    fs_rwlock, fs_rwlock,
 
 	VOPNAME_RWUNLOCK, offsetof(struct vnodeops, vop_rwunlock),
-	    (fs_generic_func_p) fs_rwunlock,
-	    (fs_generic_func_p) fs_rwunlock,	/* no errors allowed */
+	    (fs_generic_func_p)(uintptr_t)fs_rwunlock,
+	    (fs_generic_func_p)(intptr_t)fs_rwunlock,	/* no errors allowed */
 
 	VOPNAME_SEEK, offsetof(struct vnodeops, vop_seek),
 	    fs_nosys, fs_nosys,
@@ -243,8 +243,8 @@ static const fs_operation_trans_def_t vn_ops_table[] = {
 	    fs_nosys, fs_nosys,
 
 	VOPNAME_DISPOSE, offsetof(struct vnodeops, vop_dispose),
-	    (fs_generic_func_p) fs_dispose,
-	    (fs_generic_func_p) fs_nodispose,
+	    (fs_generic_func_p)(intptr_t)fs_dispose,
+	    (fs_generic_func_p)(intptr_t)fs_nodispose,
 
 	VOPNAME_SETSECATTR, offsetof(struct vnodeops, vop_setsecattr),
 	    fs_nosys, fs_nosys,
