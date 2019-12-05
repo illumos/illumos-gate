@@ -31,3 +31,6 @@ CCASFLAGS +=	-m32
 CLEANFILES +=	machine x86 $(EFIPROG)
 
 $(OBJS):	machine x86
+
+%.o: ../../../i386/libi386/%.c
+	$(COMPILE.c) $<

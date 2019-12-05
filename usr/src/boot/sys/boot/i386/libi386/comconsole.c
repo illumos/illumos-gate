@@ -23,6 +23,11 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * This code is shared on BIOS and UEFI systems on x86 because
+ * we can access io ports on both platforms and the UEFI Serial IO protocol
+ * is not giving us reliable port order and we see issues with input.
+ */
 #include <sys/cdefs.h>
 
 #include <stand.h>
@@ -495,7 +500,7 @@ comc_rtsdtr_set(struct env_var *ev, int flags, const void *value)
 static uint32_t
 comc_parse_pcidev(const char *string)
 {
-#ifdef NO_PCI
+#ifdef EFI
 	(void) string;
 	return (0);
 #else
@@ -539,7 +544,7 @@ comc_parse_pcidev(const char *string)
 static int
 comc_pcidev_handle(struct console *cp, uint32_t locator)
 {
-#ifdef NO_PCI
+#ifdef EFI
 	(void) cp;
 	(void) locator;
 	return (CMD_ERROR);

@@ -81,7 +81,7 @@ efi_zfs_is_preferred(EFI_HANDLE *h)
 	EFI_DEVICE_PATH *devpath, *dp, *node;
 	HARDDRIVE_DEVICE_PATH *hd;
 	bool ret;
-	extern UINT64 start_sector;	/* from multiboot.S */
+	extern UINT64 start_sector;	/* from mb_header.S */
 
 	/* This check is true for chainloader case. */
 	if (h == img->DeviceHandle)

@@ -9,7 +9,7 @@ SECTIONS
   .hash : { *(.hash) }  /* this MUST come first! */
   . = ALIGN(4096);
   .text		: {
-    multiboot.o(.text)
+    mb_header.o(.text)
     *(.text .stub .text.* .gnu.linkonce.t.*)
     /* .gnu.warning sections are handled specially by elf32.em. */
     *(.gnu.warning)
