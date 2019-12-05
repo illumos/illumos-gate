@@ -1020,6 +1020,13 @@ mdb_dump_aux_partial(void *buf, size_t nbyte, uint64_t offset, void *arg)
 	return (result);
 }
 
+/* Default callback for mdb_dumpptr() is calling mdb_vread(). */
+static ssize_t
+mdb_dumpptr_cb(void *buf, size_t nbytes, uintptr_t addr, void *arg __unused)
+{
+	return (mdb_vread(buf, nbytes, addr));
+}
+
 int
 mdb_dumpptr(uintptr_t addr, size_t len, uint_t flags, mdb_dumpptr_cb_t fp,
     void *arg)
@@ -1027,7 +1034,10 @@ mdb_dumpptr(uintptr_t addr, size_t len, uint_t flags, mdb_dumpptr_cb_t fp,
 	dptrdat_t dat;
 	d64dat_t dat64;
 
-	dat.func = fp;
+	if (fp == NULL)
+		dat.func = mdb_dumpptr_cb;
+	else
+		dat.func = fp;
 	dat.arg = arg;
 	dat64.func = mdb_dump_aux_ptr;
 	dat64.arg = &dat;
