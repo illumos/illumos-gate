@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -833,15 +833,14 @@ segkmem_create(struct seg *seg)
 page_t *
 segkmem_page_create(void *addr, size_t size, int vmflag, void *arg)
 {
-	struct seg kseg;
-	int pgflags;
+	struct seg kseg = { 0 };
+	int pgflags = PG_EXCL;
 	struct vnode *vp = arg;
 
 	if (vp == NULL)
 		vp = &kvp;
 
 	kseg.s_as = &kas;
-	pgflags = PG_EXCL;
 
 	if (segkmem_reloc == 0 || (vmflag & VM_NORELOC))
 		pgflags |= PG_NORELOC;
