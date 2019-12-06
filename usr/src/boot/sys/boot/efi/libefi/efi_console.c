@@ -674,10 +674,11 @@ efi_readkey_ex(EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *coninex)
 					kp->UnicodeChar++;
 				}
 			}
+			if (kp->ScanCode == 0 && kp->UnicodeChar == 0)
+				return (false);
+			keybuf_inschar(kp);
+			return (true);
 		}
-
-		keybuf_inschar(kp);
-		return (true);
 	}
 	return (false);
 }
