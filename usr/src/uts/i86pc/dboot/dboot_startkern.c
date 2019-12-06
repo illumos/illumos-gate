@@ -23,7 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2019 Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 
@@ -1502,7 +1502,7 @@ dboot_add_memlist(uint64_t start, uint64_t end)
 		    mod_end >= CORRUPT_REGION_START) {
 			if (prom_debug) {
 				dboot_printf("disabling RICHMOND-16 workaround "
-				"due to module #%u: "
+				"due to module #%d: "
 				"name %s addr %lx size %lx\n",
 				    i, (char *)(uintptr_t)modules[i].bm_name,
 				    (ulong_t)modules[i].bm_addr,
