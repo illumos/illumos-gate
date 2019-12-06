@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Nexenta by DDN, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -26,6 +26,7 @@
 #include <sys/note.h>
 
 #include <smbsrv/libsmbns.h>
+#include <ads/dsgetdc.h>
 
 #include "smbd.h"
 #include "locate_plugin.h"
@@ -106,6 +107,13 @@ _krb5_override_service_locator(
 	if (dxi.d_dci.dc_name[0] == '\0' ||
 	    dxi.d_dci.dc_addr.a_family == 0)
 		return (KRB5_REALM_CANT_RESOLVE);
+
+	if ((dxi.d_dci.dc_flags & DS_KDC_FLAG) == 0) {
+		smbd_report("_krb5_override_service_locator: "
+		    "Domain Controller is not a KDC: "
+		    "Kerberos auth may be slow");
+		return (rc);
+	}
 
 	switch (family) {
 	case AF_UNSPEC:

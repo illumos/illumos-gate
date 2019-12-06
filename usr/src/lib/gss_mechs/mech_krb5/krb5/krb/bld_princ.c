@@ -4,6 +4,8 @@
  * Copyright 1991 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
+ * Copyright 2020 Nexenta by DDN, Inc. All rights reserved.
+ *
  * Export of this software from the United States of America may
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
@@ -48,13 +50,14 @@ krb5_build_principal_va(krb5_context context, krb5_principal princ, unsigned int
     if (data == 0)
 	return ENOMEM;
     krb5_princ_set_realm_length(context, princ, rlen);
-    tmpdata = malloc(rlen);
+    tmpdata = malloc(rlen + 1);
     if (!tmpdata) {
 	free (data);
 	return ENOMEM;
     }
     krb5_princ_set_realm_data(context, princ, tmpdata);
     memcpy(tmpdata, realm, rlen);
+    tmpdata[rlen] = '\0';
 
     /* process rest of components */
 

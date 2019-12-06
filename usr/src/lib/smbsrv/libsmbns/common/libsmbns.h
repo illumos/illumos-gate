@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 #ifndef	_LIBSMBNS_H
@@ -50,6 +50,7 @@ typedef struct smb_ads_host_info {
 	int port;		/* ldap port */
 	int priority;		/* DNS SRV record priority */
 	int weight;		/* DNS SRV record weight */
+	uint32_t flags;		/* DC flags */
 	smb_inaddr_t ipaddr;	/* network byte order */
 } smb_ads_host_info_t;
 
