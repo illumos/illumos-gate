@@ -3211,6 +3211,7 @@ f usr/include/ikedoor.h 0644 root bin
 f usr/include/ima.h 0644 root bin
 d usr/include/inet 0755 root bin
 f usr/include/inet/arp.h 0644 root bin
+f usr/include/inet/cc.h 0644 root bin
 f usr/include/inet/common.h 0644 root bin
 f usr/include/inet/ip.h 0644 root bin
 f usr/include/inet/ip2mac.h 0644 root bin
