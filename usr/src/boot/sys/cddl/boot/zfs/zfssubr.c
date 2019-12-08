@@ -1643,7 +1643,7 @@ reconstruct:
 		int rv;
 
 		if (data_errors == 0) {
-			rv = raidz_checksum_verify(vd->spa, bp, data, bytes);
+			rv = raidz_checksum_verify(vd->v_spa, bp, data, bytes);
 			if (rv == 0) {
 				/*
 				 * If we read parity information (unnecessarily
@@ -1689,7 +1689,7 @@ reconstruct:
 
 			code = vdev_raidz_reconstruct(rm, tgts, n);
 
-			rv = raidz_checksum_verify(vd->spa, bp, data, bytes);
+			rv = raidz_checksum_verify(vd->v_spa, bp, data, bytes);
 			if (rv == 0) {
 				/*
 				 * If we read more parity disks than were used
@@ -1764,7 +1764,7 @@ reconstruct:
 	if (total_errors > rm->rm_firstdatacol) {
 		error = EIO;
 	} else if (total_errors < rm->rm_firstdatacol &&
-	    (code = vdev_raidz_combrec(vd->spa, rm, bp, data, offset, bytes,
+	    (code = vdev_raidz_combrec(vd->v_spa, rm, bp, data, offset, bytes,
 	    total_errors, data_errors)) != 0) {
 		/*
 		 * If we didn't use all the available parity for the
