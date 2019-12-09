@@ -34,7 +34,7 @@ SRCS=	\
 	framebuffer.c \
 	main.c \
 	memmap.c \
-	multiboot.S \
+	mb_header.S \
 	multiboot2.c \
 	self_reloc.c \
 	smbios.c \
@@ -53,7 +53,7 @@ OBJS=	\
 	framebuffer.o \
 	main.o \
 	memmap.o \
-	multiboot.o \
+	mb_header.o \
 	multiboot2.o \
 	self_reloc.o \
 	smbios.o \
@@ -184,9 +184,6 @@ clean clobber:
 	$(COMPILE.c) $<
 
 %.o:	../../../common/linenoise/%.c
-	$(COMPILE.c) $<
-
-%.o: ../../../i386/libi386/%.c
 	$(COMPILE.c) $<
 
 %.o: $(SRC)/common/font/%.c

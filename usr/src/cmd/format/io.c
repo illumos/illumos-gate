@@ -49,7 +49,6 @@
 
 extern int	data_lineno;
 extern char	*space2str();
-extern long	strtol();
 
 /*
  * This variable is used to determine whether a token is present in the pipe
@@ -62,10 +61,6 @@ static	char	token_present = 0;
  */
 int	last_token_type = 0;
 
-#ifdef	__STDC__
-/*
- * Prototypes for ANSI C compilers
- */
 static int	sup_get_token(char *);
 static void	pushchar(int c);
 static int	checkeof(void);
@@ -79,33 +74,11 @@ static int	sup_inputchar(void);
 static void	sup_pushchar(int c);
 static int	geti64(char *str, uint64_t *iptr, uint64_t *wild);
 
-#else	/* __STDC__ */
-/*
- * Prototypes for non-ANSI C compilers
- */
-
-static int	sup_get_token();
-static void	pushchar(int c);
-static int	checkeof(void);
-static void	flushline(void);
-static int	strcnt(char *s1, char *s2);
-static int	getbn(char *str, diskaddr_t *iptr);
-static void	print_input_choices(int type, u_ioparam_t *param);
-static int	slist_widest_str(slist_t *slist);
-static void	ljust_print(char *str, int width);
-static int	sup_inputchar(void);
-static void	sup_pushchar(int c);
-static int	geti64(char *str, uint64_t *iptr, uint64_t *wild);
-
-#endif	/* __STDC__ */
-
-
 /*
  * This routine pushes the given character back onto the input stream.
  */
 static void
-pushchar(c)
-	int	c;
+pushchar(int c)
 {
 	(void) ungetc(c, stdin);
 }
@@ -114,7 +87,7 @@ pushchar(c)
  * This routine checks the input stream for an eof condition.
  */
 static int
-checkeof()
+checkeof(void)
 {
 	return (feof(stdin));
 }
@@ -124,8 +97,7 @@ checkeof()
  * basically any consecutive non-white characters.
  */
 char *
-gettoken(inbuf)
-	char	*inbuf;
+gettoken(char *inbuf)
 {
 	char	*ptr = inbuf;
 	int	c, quoted = 0;
@@ -196,8 +168,7 @@ retoke:
  * This routine removes the leading and trailing spaces from a token.
  */
 void
-clean_token(cleantoken, token)
-	char	*cleantoken, *token;
+clean_token(char *cleantoken, char *token)
 {
 	char	*ptr;
 
@@ -214,7 +185,7 @@ clean_token(cleantoken, token)
 	 * Strip off trailing white-space.
 	 */
 	for (ptr = cleantoken + strlen(cleantoken) - 1;
-		isspace(*ptr) && (ptr >= cleantoken); ptr--) {
+	    isspace(*ptr) && (ptr >= cleantoken); ptr--) {
 		*ptr = '\0';
 	}
 }
@@ -254,8 +225,7 @@ flushline()
  * between s1 and s2, stopping as soon as a mismatch is found.
  */
 static int
-strcnt(s1, s2)
-	char	*s1, *s2;
+strcnt(char *s1, char *s2)
 {
 	int	i = 0;
 
@@ -271,9 +241,7 @@ strcnt(s1, s2)
  * is present, the wildcard value will be returned.
  */
 int
-geti(str, iptr, wild)
-	char	*str;
-	int	*iptr, *wild;
+geti(char *str, int *iptr, int *wild)
 {
 	char	*str2;
 
@@ -306,9 +274,7 @@ geti(str, iptr, wild)
  * is present, the wildcard value will be returned.
  */
 static int
-geti64(str, iptr, wild)
-	char		*str;
-	uint64_t	*iptr, *wild;
+geti64(char *str, uint64_t *iptr, uint64_t *wild)
 {
 	char	*str2;
 
@@ -345,9 +311,7 @@ geti64(str, iptr, wild)
  * to the highest possible legal value.
  */
 static int
-getbn(str, iptr)
-	char	*str;
-	diskaddr_t	*iptr;
+getbn(char *str, diskaddr_t *iptr)
 {
 	char	*cptr, *hptr, *sptr;
 	int	cyl, head, sect;
@@ -442,13 +406,8 @@ getbn(str, iptr)
  * values and prompt strings.
  */
 uint64_t
-input(type, promptstr, delim, param, deflt, cmdflag)
-	int		type;
-	char		*promptstr;
-	int		delim;
-	u_ioparam_t	*param;
-	int		*deflt;
-	int		cmdflag;
+input(int type, char *promptstr, int delim, u_ioparam_t *param, int *deflt,
+    int cmdflag)
 {
 	int		interactive, help, i, length, index, tied;
 	blkaddr_t	bn;
@@ -586,7 +545,7 @@ reprompt:
 				cylno = bn2c(part_deflt->deflt_size) - 1;
 			} else {
 				cylno = (bn2c(part_deflt->deflt_size) +
-					    part_deflt->start_cyl) - 1;
+				    part_deflt->start_cyl) - 1;
 			}
 
 			fmt_print("[%ub, %uc, %de, %1.2fmb, %1.2fgb]",
@@ -609,11 +568,11 @@ reprompt:
 			    efi_deflt->end_sector,
 			    efi_deflt->start_sector + efi_deflt->end_sector - 1,
 			    (efi_deflt->end_sector * cur_blksz) /
-				(1024 * 1024),
+			    (1024 * 1024),
 			    (efi_deflt->end_sector * cur_blksz) /
-				(1024 * 1024 * 1024),
+			    (1024 * 1024 * 1024),
 			    (efi_deflt->end_sector * cur_blksz) /
-				((uint64_t)1024 * 1024 * 1024 * 1024));
+			    ((uint64_t)1024 * 1024 * 1024 * 1024));
 			break;
 		case FIO_OPINT:
 			/* no default value for optional input type */
@@ -659,9 +618,9 @@ reprompt:
 			 * exit gracefully.
 			 */
 			if ((strlcat(shell_argv, arg, sizeof (shell_argv)) >=
-				sizeof (shell_argv)) ||
+			    sizeof (shell_argv)) ||
 			    (strlcat(shell_argv, " ", sizeof (shell_argv)) >=
-				sizeof (shell_argv))) {
+			    sizeof (shell_argv))) {
 				err_print("Error: Command line too long.\n");
 				fullabort();
 			}
@@ -781,8 +740,8 @@ reprompt:
 	 * If token is a '?' or a 'h', it is a request for help.
 	 */
 	if ((strcmp(cleantoken, "?") == 0) ||
-		(strcmp(cleantoken, "h") == 0) ||
-			(strcmp(cleantoken, "help") == 0)) {
+	    (strcmp(cleantoken, "h") == 0) ||
+	    (strcmp(cleantoken, "help") == 0)) {
 		help = 1;
 	}
 	/*
@@ -813,12 +772,12 @@ reprompt:
 		 * Convert token to a disk block number.
 		 */
 		if (cur_label == L_TYPE_EFI) {
-		    if (geti64(cleantoken, (uint64_t *)&bn64,
-			(uint64_t *)NULL))
-			    break;
+			if (geti64(cleantoken, (uint64_t *)&bn64,
+			    (uint64_t *)NULL))
+				break;
 		} else {
-		    if (getbn(cleantoken, &bn64))
-			break;
+			if (getbn(cleantoken, &bn64))
+				break;
 		}
 		/*
 		 * Check to be sure it is within the legal bounds.
@@ -1066,8 +1025,7 @@ reprompt:
 	 * Return the value associated with the matched string.
 	 */
 	case FIO_SLIST:
-		i = find_value((slist_t *)param->io_slist,
-			cleantoken, &value);
+		i = find_value((slist_t *)param->io_slist, cleantoken, &value);
 		if (i == 1) {
 			return (value);
 		} else {
@@ -1520,14 +1478,14 @@ or g(gigabytes)\n");
 			fmt_print("Expecting up to %llu sectors,",
 			    cur_parts->etoc->efi_last_u_lba);
 			fmt_print("or %llu megabytes,",
-			    (cur_parts->etoc->efi_last_u_lba * cur_blksz)/
-				(1024 * 1024));
+			    (cur_parts->etoc->efi_last_u_lba * cur_blksz) /
+			    (1024 * 1024));
 			fmt_print("or %llu gigabytes\n",
-			    (cur_parts->etoc->efi_last_u_lba * cur_blksz)/
-				(1024 * 1024 * 1024));
+			    (cur_parts->etoc->efi_last_u_lba * cur_blksz) /
+			    (1024 * 1024 * 1024));
 			fmt_print("or %llu terabytes\n",
-			    (cur_parts->etoc->efi_last_u_lba * cur_blksz)/
-				((uint64_t)1024 * 1024 * 1024 * 1024));
+			    (cur_parts->etoc->efi_last_u_lba * cur_blksz) /
+			    ((uint64_t)1024 * 1024 * 1024 * 1024));
 			break;
 		}
 
@@ -1591,12 +1549,12 @@ or g(gigabytes)\n");
 			 * Token is number of blocks
 			 */
 			if (geti64(cleantoken, &blokno, (uint64_t *)NULL)) {
-			    break;
+				break;
 			}
 			if (blokno > bounds->upper) {
-			    err_print(
-"Number of blocks must be less that the total available blocks.\n");
-			    break;
+				err_print("Number of blocks must be less that "
+				    "the total available blocks.\n");
+				break;
 			}
 			return (blokno);
 
@@ -1614,8 +1572,8 @@ or g(gigabytes)\n");
 			 * Some sanity check
 			 */
 			if (blokno < efi_deflt->start_sector) {
-				err_print(
-"End Sector must fall on or after start sector %llu\n",
+				err_print("End Sector must fall on or after "
+				    "start sector %llu\n",
 				    efi_deflt->start_sector);
 				break;
 			}
@@ -1624,8 +1582,8 @@ or g(gigabytes)\n");
 			 * verify that our input is within range
 			 */
 			if (blokno > cur_parts->etoc->efi_last_u_lba) {
-				err_print(
-"End Sector %llu is beyond max Sector %llu\n",
+				err_print("End Sector %llu is beyond max "
+				    "Sector %llu\n",
 				    blokno, cur_parts->etoc->efi_last_u_lba);
 				break;
 			}
@@ -1681,11 +1639,11 @@ or g(gigabytes)\n");
 				break;
 			}
 			return (uint64_t)((float)nmegs * 1024.0 *
-				1024.0 * 1024.0 * 1024.0 / cur_blksz);
+			    1024.0 * 1024.0 * 1024.0 / cur_blksz);
 
 		default:
-			err_print(
-"Please specify units in either b(number of blocks), e(end sector),\n");
+			err_print("Please specify units in either "
+			    "b(number of blocks), e(end sector),\n");
 			err_print(" g(gigabytes), m(megabytes)");
 			err_print(" or t(terabytes)\n");
 			break;
@@ -1721,9 +1679,7 @@ or g(gigabytes)\n");
  * Print input choices
  */
 static void
-print_input_choices(type, param)
-	int		type;
-	u_ioparam_t	*param;
+print_input_choices(int type, u_ioparam_t *param)
 {
 	char		**sp;
 	slist_t		*lp;
@@ -1803,10 +1759,7 @@ common:
  * associated with the matched string in match_value.
  */
 int
-find_value(slist, match_str, match_value)
-	slist_t		*slist;
-	char		*match_str;
-	int		*match_value;
+find_value(slist_t *slist, char *match_str, int *match_value)
 {
 	int		i;
 	int		nmatches;
@@ -1851,9 +1804,7 @@ find_value(slist, match_str, match_value)
  * Return the string associated with that value.
  */
 char *
-find_string(slist, match_value)
-	slist_t		*slist;
-	int		match_value;
+find_string(slist_t *slist, int match_value)
 {
 	for (; slist->str != NULL; slist++) {
 		if (slist->value == match_value) {
@@ -1861,15 +1812,14 @@ find_string(slist, match_value)
 		}
 	}
 
-	return ((char *)NULL);
+	return (NULL);
 }
 
 /*
  * Return the width of the widest string in an slist
  */
 static int
-slist_widest_str(slist)
-	slist_t	*slist;
+slist_widest_str(slist_t *slist)
 {
 	int	i;
 	int	width;
@@ -1887,9 +1837,7 @@ slist_widest_str(slist)
  * Print a string left-justified to a fixed width.
  */
 static void
-ljust_print(str, width)
-	char	*str;
-	int	width;
+ljust_print(char *str, int width)
 {
 	int	i;
 
@@ -2050,9 +1998,7 @@ err_print(char *format, ...)
  * data is not crud, so be rather defensive.
  */
 void
-print_buf(buf, nbytes)
-	char	*buf;
-	int	nbytes;
+print_buf(char *buf, int nbytes)
 {
 	int	c;
 
@@ -2072,13 +2018,12 @@ print_buf(buf, nbytes)
  * booting.
  */
 void
-pr_ctlrline(ctlr)
-	register struct ctlr_info *ctlr;
+pr_ctlrline(struct ctlr_info *ctlr)
 {
 
 	fmt_print("           %s%d at %s 0x%x ",
-		ctlr->ctlr_cname, ctlr->ctlr_num,
-		space2str(ctlr->ctlr_space), ctlr->ctlr_addr);
+	    ctlr->ctlr_cname, ctlr->ctlr_num,
+	    space2str(ctlr->ctlr_space), ctlr->ctlr_addr);
 	if (ctlr->ctlr_vec != 0)
 		fmt_print("vec 0x%x ", ctlr->ctlr_vec);
 	else
@@ -2093,9 +2038,7 @@ pr_ctlrline(ctlr)
  * booting.
  */
 void
-pr_diskline(disk, num)
-	register struct disk_info *disk;
-	int	num;
+pr_diskline(struct disk_info *disk, int	num)
 {
 	struct	ctlr_info *ctlr = disk->disk_ctlr;
 	struct	disk_type *type = disk->disk_type;
@@ -2103,13 +2046,13 @@ pr_diskline(disk, num)
 	fmt_print("    %4d. %s ", num, disk->disk_name);
 	if ((type != NULL) && (disk->label_type == L_TYPE_SOLARIS)) {
 		fmt_print("<%s cyl %u alt %u hd %u sec %u>",
-			type->dtype_asciilabel, type->dtype_ncyl,
-			type->dtype_acyl, type->dtype_nhead,
-			type->dtype_nsect);
+		    type->dtype_asciilabel, type->dtype_ncyl,
+		    type->dtype_acyl, type->dtype_nhead,
+		    type->dtype_nsect);
 	} else if ((type != NULL) && (disk->label_type == L_TYPE_EFI)) {
 		cur_blksz = disk->disk_lbasize;
 		print_efi_string(type->vendor, type->product,
-			type->revision, type->capacity);
+		    type->revision, type->capacity);
 	} else if (disk->disk_flags & DSK_RESERVED) {
 		fmt_print("<drive not available: reserved>");
 	} else if (disk->disk_flags & DSK_UNAVAILABLE) {
@@ -2127,9 +2070,9 @@ pr_diskline(disk, num)
 		fmt_print("          %s\n", disk->devfs_name);
 	} else {
 		fmt_print("          %s%d at %s%d slave %d\n",
-			ctlr->ctlr_dname, disk->disk_dkinfo.dki_unit,
-			ctlr->ctlr_cname, ctlr->ctlr_num,
-			disk->disk_dkinfo.dki_slave);
+		    ctlr->ctlr_dname, disk->disk_dkinfo.dki_unit,
+		    ctlr->ctlr_cname, ctlr->ctlr_num,
+		    disk->disk_dkinfo.dki_slave);
 	}
 
 #ifdef	OLD
@@ -2141,8 +2084,7 @@ pr_diskline(disk, num)
 	}
 	fmt_print("\n");
 	if (type != NULL) {
-		fmt_print(
-"           %s%d: <%s cyl %u alt %u hd %u sec %u>\n",
+		fmt_print("           %s%d: <%s cyl %u alt %u hd %u sec %u>\n",
 		    ctlr->ctlr_dname, disk->disk_dkinfo.dki_unit,
 		    type->dtype_asciilabel, type->dtype_ncyl,
 		    type->dtype_acyl, type->dtype_nhead,
@@ -2175,7 +2117,7 @@ pr_dblock(void (*func)(char *, ...), diskaddr_t bn)
  * track of the current line in the data file via a global variable.
  */
 static int
-sup_inputchar()
+sup_inputchar(void)
 {
 	int	c;
 
@@ -2210,8 +2152,7 @@ sup_inputchar()
  * This routine pushes a character back onto the input pipe for the data file.
  */
 static void
-sup_pushchar(c)
-	int	c;
+sup_pushchar(int c)
 {
 	(void) ungetc(c, data_file);
 }
@@ -2230,16 +2171,14 @@ static  int	pushed_token;
  * last token around, which is useful for error recovery.
  */
 int
-sup_gettoken(buf)
-	char	*buf;
+sup_gettoken(char *buf)
 {
 	last_token_type = sup_get_token(buf);
 	return (last_token_type);
 }
 
 static int
-sup_get_token(buf)
-	char	*buf;
+sup_get_token(char *buf)
 {
 	char	*ptr = buf;
 	int	c, quoted = 0;
@@ -2288,7 +2227,7 @@ sup_get_token(buf)
 		 * a token.
 		 */
 		if (!quoted && (c == '=' || c == ',' || c == ':' ||
-			c == '#' || c == '|' || c == '&' || c == '~'))
+		    c == '#' || c == '|' || c == '&' || c == '~'))
 			break;
 		/*
 		 * Store the character if there's room left.
@@ -2350,9 +2289,7 @@ sup_get_token(buf)
  * Push back a token
  */
 void
-sup_pushtoken(token_buf, token_type)
-	char	*token_buf;
-	int	token_type;
+sup_pushtoken(char *token_buf, int token_type)
 {
 	/*
 	 * We can only push one token back at a time
@@ -2369,9 +2306,7 @@ sup_pushtoken(token_buf, token_type)
  * and EOF.
  */
 void
-get_inputline(line, nbytes)
-	char	*line;
-	int	nbytes;
+get_inputline(char *line, int nbytes)
 {
 	char	*p = line;
 	int	c;
@@ -2481,9 +2416,9 @@ execute_shell(char *s, size_t buff_size)
 	/* reopen file descriptor if one was open before */
 	if (cur_disk != NULL) {
 		if ((cur_file = open_disk(cur_disk->disk_path,
-			O_RDWR | O_NDELAY)) < 0) {
+		    O_RDWR | O_NDELAY)) < 0) {
 			err_print("Error: can't reopen selected disk '%s'. \n",
-				cur_disk->disk_name);
+			    cur_disk->disk_name);
 			fullabort();
 		}
 	}

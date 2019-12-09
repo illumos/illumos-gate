@@ -56,7 +56,7 @@ all: $(PROG)
 
 install: all $(ROOTBOOTPROG)
 
-OBJS= multiboot.o isoboot.o sio.o drv.o cons.o gptldr.o
+OBJS= mb_header.o isoboot.o sio.o drv.o cons.o gptldr.o
 
 CLEANFILES += isoboot
 

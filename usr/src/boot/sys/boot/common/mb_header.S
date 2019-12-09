@@ -13,7 +13,7 @@
  * Copyright 2018 Toomas Soome <tsoome@me.com>
  */
 
-	.file	"multiboot.s"
+	.file	"mb_header.S"
 
 /*
  * Provide fake multiboot header to support versioning and partition

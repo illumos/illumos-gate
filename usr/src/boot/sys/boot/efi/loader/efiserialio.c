@@ -23,6 +23,12 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * We do not use this implementation with x86 till we can fix two issues:
+ * 1. Reliably identify the serial ports in correct order.
+ * 2. Ensure we get properly working reads from serial io.
+ */
+
 #include <sys/cdefs.h>
 
 #include <stand.h>

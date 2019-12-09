@@ -62,7 +62,7 @@ all: $(PROG)
 
 install: all $(ROOTBOOTPROG)
 
-OBJS =	multiboot.o zfsboot.o sio.o cons.o devopen.o \
+OBJS =	mb_header.o zfsboot.o sio.o cons.o devopen.o \
 	part.o disk.o bcache.o zfs_cmd.o
 
 part.o := CPPFLAGS += -I$(ZLIB)
@@ -108,8 +108,8 @@ $(OBJS): machine x86
 %.o:	../../common/%.c
 	$(COMPILE.c) $<
 
-multiboot.o: ../../common/multiboot.S
-	$(COMPILE.S) ../../common/multiboot.S
+%.o: ../../common/%.S
+	$(COMPILE.S) $<
 
 clobber: clean
 

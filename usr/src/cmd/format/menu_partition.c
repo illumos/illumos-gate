@@ -35,25 +35,15 @@
 #include "misc.h"
 #include "param.h"
 
-#ifdef __STDC__
-
 /* Function prototypes for ANSI C Compilers */
 static void	nspaces(int);
 static int	ndigits(uint64_t);
-
-#else	/* __STDC__ */
-
-/* Function prototypes for non-ANSI C Compilers */
-static void	nspaces();
-static int	ndigits();
-
-#endif	/* __STDC__ */
 
 /*
  * This routine implements the 'a' command.  It changes the 'a' partition.
  */
 int
-p_apart()
+p_apart(void)
 {
 
 	change_partition(0);
@@ -64,7 +54,7 @@ p_apart()
  * This routine implements the 'b' command.  It changes the 'b' partition.
  */
 int
-p_bpart()
+p_bpart(void)
 {
 
 	change_partition(1);
@@ -75,7 +65,7 @@ p_bpart()
  * This routine implements the 'c' command.  It changes the 'c' partition.
  */
 int
-p_cpart()
+p_cpart(void)
 {
 
 	change_partition(2);
@@ -86,7 +76,7 @@ p_cpart()
  * This routine implements the 'd' command.  It changes the 'd' partition.
  */
 int
-p_dpart()
+p_dpart(void)
 {
 
 	change_partition(3);
@@ -97,7 +87,7 @@ p_dpart()
  * This routine implements the 'e' command.  It changes the 'e' partition.
  */
 int
-p_epart()
+p_epart(void)
 {
 
 	change_partition(4);
@@ -108,7 +98,7 @@ p_epart()
  * This routine implements the 'f' command.  It changes the 'f' partition.
  */
 int
-p_fpart()
+p_fpart(void)
 {
 
 	change_partition(5);
@@ -119,7 +109,7 @@ p_fpart()
  * This routine implements the 'g' command.  It changes the 'g' partition.
  */
 int
-p_gpart()
+p_gpart(void)
 {
 
 	change_partition(6);
@@ -130,7 +120,7 @@ p_gpart()
  * This routine implements the 'h' command.  It changes the 'h' partition.
  */
 int
-p_hpart()
+p_hpart(void)
 {
 
 	change_partition(7);
@@ -142,7 +132,7 @@ p_hpart()
  * labeled disks. This can be used only in expert mode.
  */
 int
-p_ipart()
+p_ipart(void)
 {
 	change_partition(8);
 	return (0);
@@ -153,7 +143,7 @@ p_ipart()
  * This routine implements the 'j' command.  It changes the 'j' partition.
  */
 int
-p_jpart()
+p_jpart(void)
 {
 
 	change_partition(9);
@@ -162,7 +152,7 @@ p_jpart()
 #endif	/* defined(i386) */
 
 int
-p_expand()
+p_expand(void)
 {
 	uint64_t delta;
 	uint_t nparts;
@@ -193,7 +183,7 @@ p_expand()
  * to make a pre-defined partition map the current map.
  */
 int
-p_select()
+p_select(void)
 {
 	struct partition_info	*pptr, *parts;
 	u_ioparam_t		ioparam;
@@ -254,8 +244,8 @@ p_select()
 	cyl_offset = pptr->pinfo_map[I_PARTITION].dkl_cylno + 1;
 	if (pptr->pinfo_map[J_PARTITION].dkl_nblk != 0) {
 		cyl_offset = pptr->pinfo_map[J_PARTITION].dkl_cylno +
-			((pptr->pinfo_map[J_PARTITION].dkl_nblk +
-				(spc() - 1)) / spc());
+		    ((pptr->pinfo_map[J_PARTITION].dkl_nblk +
+		    (spc() - 1)) / spc());
 	}
 #else	/* !defined(i386) */
 
@@ -281,11 +271,10 @@ p_select()
 		}
 #endif		/* defined(i386) */
 		if (pptr->pinfo_map[i].dkl_cylno < b_cylno ||
-			pptr->pinfo_map[i].dkl_cylno > (ncyl-1)) {
-			err_print(
-"partition %c: starting cylinder %d is out of range\n",
-				(PARTITION_BASE+i),
-				pptr->pinfo_map[i].dkl_cylno);
+		    pptr->pinfo_map[i].dkl_cylno > (ncyl-1)) {
+			err_print("partition %c: starting cylinder %d is out "
+			    "of range\n", (PARTITION_BASE + i),
+			    pptr->pinfo_map[i].dkl_cylno);
 			return (0);
 		}
 		if (pptr->pinfo_map[i].dkl_nblk > ((ncyl -
@@ -336,7 +325,7 @@ p_select()
  * to be created.
  */
 int
-p_name()
+p_name(void)
 {
 	char	*name;
 
@@ -493,25 +482,23 @@ print_efi_partition(struct dk_gpt *map, int partnum, int want_header)
 
 	ncyl2_digits = ndigits(map->efi_last_u_lba);
 	if (want_header) {
-	    fmt_print("Part      ");
-	    fmt_print("Tag    Flag     ");
-	    fmt_print("First Sector");
-	    nspaces(ncyl2_digits);
-	    fmt_print("Size");
-	    nspaces(ncyl2_digits);
-	    fmt_print("Last Sector\n");
+		fmt_print("Part      ");
+		fmt_print("Tag    Flag     ");
+		fmt_print("First Sector");
+		nspaces(ncyl2_digits);
+		fmt_print("Size");
+		nspaces(ncyl2_digits);
+		fmt_print("Last Sector\n");
 	}
 
 	fmt_print("  %d ", partnum);
-	s = find_string(ptag_choices,
-		(int)map->efi_parts[partnum].p_tag);
+	s = find_string(ptag_choices, (int)map->efi_parts[partnum].p_tag);
 	if (s == (char *)NULL)
 		s = "-";
 	nspaces(10 - (int)strlen(s));
 	fmt_print("%s", s);
 
-	s = find_string(pflag_choices,
-		(int)map->efi_parts[partnum].p_flag);
+	s = find_string(pflag_choices, (int)map->efi_parts[partnum].p_flag);
 	if (s == (char *)NULL)
 		s = "-";
 	nspaces(6 - (int)strlen(s));
@@ -521,28 +508,27 @@ print_efi_partition(struct dk_gpt *map, int partnum, int want_header)
 
 	secsize = map->efi_parts[partnum].p_size;
 	if (secsize == 0) {
-	    fmt_print("%16llu", map->efi_parts[partnum].p_start);
-	    nspaces(ncyl2_digits);
-	    fmt_print("  0     ");
+		fmt_print("%16llu", map->efi_parts[partnum].p_start);
+		nspaces(ncyl2_digits);
+		fmt_print("  0     ");
 	} else {
-	    fmt_print("%16llu", map->efi_parts[partnum].p_start);
-	    scaled = bn2mb(secsize);
-	    nspaces(ncyl2_digits - 5);
-	    if (scaled >= (float)1024.0 * 1024) {
-		fmt_print("%8.2fTB", scaled/((float)1024.0 * 1024));
-	    } else if (scaled >= (float)1024.0) {
-		fmt_print("%8.2fGB", scaled/(float)1024.0);
-	    } else {
-		fmt_print("%8.2fMB", scaled);
-	    }
+		fmt_print("%16llu", map->efi_parts[partnum].p_start);
+		scaled = bn2mb(secsize);
+		nspaces(ncyl2_digits - 5);
+		if (scaled >= (float)1024.0 * 1024) {
+			fmt_print("%8.2fTB", scaled/((float)1024.0 * 1024));
+		} else if (scaled >= (float)1024.0) {
+			fmt_print("%8.2fGB", scaled/(float)1024.0);
+		} else {
+			fmt_print("%8.2fMB", scaled);
+		}
 	}
 	nspaces(ncyl2_digits);
-	if ((map->efi_parts[partnum].p_start+secsize - 1) ==
-		UINT_MAX64) {
-	    fmt_print(" 0    \n");
+	if ((map->efi_parts[partnum].p_start + secsize - 1) == UINT_MAX64) {
+		fmt_print(" 0    \n");
 	} else {
-	    fmt_print(" %llu    \n",
-		map->efi_parts[partnum].p_start+secsize - 1);
+		fmt_print(" %llu    \n",
+		    map->efi_parts[partnum].p_start + secsize - 1);
 	}
 }
 
@@ -607,8 +593,7 @@ print_partition(struct partition_info *pinfo, int partnum, int want_header)
 	/*
 	 * Print the partition tag.  If invalid, print -
 	 */
-	s = find_string(ptag_choices,
-		(int)pinfo->vtoc.v_part[partnum].p_tag);
+	s = find_string(ptag_choices, (int)pinfo->vtoc.v_part[partnum].p_tag);
 	if (s == (char *)NULL)
 		s = "-";
 	nspaces(10 - (int)strlen(s));
@@ -617,9 +602,8 @@ print_partition(struct partition_info *pinfo, int partnum, int want_header)
 	/*
 	 * Print the partition flag.  If invalid print -
 	 */
-	s = find_string(pflag_choices,
-		(int)pinfo->vtoc.v_part[partnum].p_flag);
-	if (s == (char *)NULL)
+	s = find_string(pflag_choices, (int)pinfo->vtoc.v_part[partnum].p_flag);
+	if (s == NULL)
 		s = "-";
 	nspaces(6 - (int)strlen(s));
 	fmt_print("%s", s);
@@ -637,7 +621,7 @@ print_partition(struct partition_info *pinfo, int partnum, int want_header)
 		scaled = bn2mb(nblks);
 		if (scaled > (float)1024.0 * 1024.0) {
 			fmt_print("%8.2fTB    ",
-				scaled/((float)1024.0 * 1024.0));
+			    scaled/((float)1024.0 * 1024.0));
 		} else if (scaled > (float)1024.0) {
 			fmt_print("%8.2fGB    ", scaled/(float)1024.0);
 		} else {
@@ -666,8 +650,7 @@ print_partition(struct partition_info *pinfo, int partnum, int want_header)
  * Return true if a disk has a volume name
  */
 int
-chk_volname(disk)
-	struct disk_info	*disk;
+chk_volname(struct disk_info *disk)
 {
 	return (disk->v_volume[0] != 0);
 }
@@ -677,8 +660,7 @@ chk_volname(disk)
  * Print the volume name, if it appears to be set
  */
 void
-print_volname(disk)
-	struct disk_info	*disk;
+print_volname(struct disk_info *disk)
 {
 	int	i;
 	char	*p;
@@ -696,8 +678,7 @@ print_volname(disk)
  * Print a number of spaces
  */
 static void
-nspaces(n)
-	int	n;
+nspaces(int n)
 {
 	while (n-- > 0)
 		fmt_print(" ");
@@ -707,8 +688,7 @@ nspaces(n)
  * Return the number of digits required to print a number
  */
 static int
-ndigits(n)
-	uint64_t	n;
+ndigits(uint64_t n)
 {
 	int	i;
 

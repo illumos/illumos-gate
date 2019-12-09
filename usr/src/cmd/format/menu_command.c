@@ -1709,7 +1709,7 @@ c_label()
 			return (-1);
 		}
 		if (efi_write(cur_file, vtoc64) != 0) {
-			err_check(vtoc64);
+			efi_err_check(vtoc64);
 			err_print("Warning: error writing EFI.\n");
 			return (-1);
 		} else {
