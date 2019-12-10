@@ -71,9 +71,14 @@ usr/src/cmd/bhyve/virtio.[ch]
 usr/src/cmd/bhyve/xmsr.[ch]
 usr/src/cmd/bhyveconsole/bhyveconsole.c
 usr/src/cmd/bhyvectl/bhyvectl.c
+usr/src/cmd/cxgbetool/*
+usr/src/cmd/smbsrv/testoplock/case*.ref
 usr/src/compat/freebsd/*.h
 usr/src/compat/freebsd/*/*.h
 usr/src/compat/freebsd/amd64/machine/*.h
+usr/src/data/hwdata/pci.ids
+usr/src/data/hwdata/usb.ids
+usr/src/data/perfmon/readme.txt
 usr/contrib/freebsd/*/*.h
 usr/contrib/freebsd/*/*/*.h
 usr/contrib/freebsd/lib/libutil/*.c
@@ -101,11 +106,8 @@ usr/src/uts/i86pc/sys/vmm_instruction_emul.h
 usr/src/uts/common/io/qede/*
 usr/src/uts/common/io/i40e/core/*
 usr/src/tools/smatch/src/*
+usr/src/uts/common/io/cxgbe/*
 usr/src/uts/common/io/qede/*
 usr/src/uts/common/io/i40e/core/*
 usr/src/uts/common/io/ixgbe/core/*
-usr/src/data/hwdata/pci.ids
-usr/src/data/hwdata/usb.ids
-usr/src/data/perfmon/readme.txt
-usr/src/cmd/smbsrv/testoplock/case*.ref
 usr/src/test/util-tests/tests/dis/i386/*.out

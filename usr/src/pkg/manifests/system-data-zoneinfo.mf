@@ -21,6 +21,7 @@ set name=pkg.fmri \
 set name=pkg.description value="timezone information"
 set name=pkg.summary value="Timezone Information"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=org.opensolaris.incorp-facet value=true
 set name=variant.arch value=$(ARCH)
 dir path=usr group=sys
 dir path=usr/lib

@@ -43,6 +43,7 @@ extern "C" {
 #define	T4_IOCTL_GET_CIM_IBQ	(T4_IOCTL + 13)
 #define	T4_IOCTL_GET_EDC	(T4_IOCTL + 14)
 #define	T4_IOCTL_LOAD_FW	(T4_IOCTL + 15)
+#define	T4_IOCTL_GET_CUDBG	(T4_IOCTL + 16)
 
 enum {
 	T4_CTXT_EGRESS,
@@ -120,6 +121,13 @@ struct t4_devlog {
 };
 
 struct t4_ldfw {
+	uint32_t len;
+	uint32_t data[0];
+};
+
+struct t4_cudbg_dump {
+	uint8_t wr_flash;
+	uint8_t bitmap[16];
 	uint32_t len;
 	uint32_t data[0];
 };

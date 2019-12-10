@@ -12,7 +12,7 @@
 /*
  * Definitions of T4/T5/T6 work request and CPL5 commands and status codes
  *
- * Copyright (C) 2008-2017 Chelsio Communications.  All rights reserved.
+ * Copyright (C) 2008-2019 Chelsio Communications.  All rights reserved.
  *
  * Written by Dimitris Michailidis (dm@chelsio.com)
  *
@@ -3091,6 +3091,12 @@ struct cpl_rx_mps_pkt {
 #define V_CPL_RX_MPS_PKT_TYPE(x)        ((x) << S_CPL_RX_MPS_PKT_TYPE)
 #define G_CPL_RX_MPS_PKT_TYPE(x)        \
 	(((x) >> S_CPL_RX_MPS_PKT_TYPE) & M_CPL_RX_MPS_PKT_TYPE)
+
+#define S_CPL_RX_MPS_PKT_LENGTH     0
+#define M_CPL_RX_MPS_PKT_LENGTH     0xffff
+#define V_CPL_RX_MPS_PKT_LENGTH(x)  ((x) << S_CPL_RX_MPS_PKT_LENGTH)
+#define G_CPL_RX_MPS_PKT_LENGTH(x)  \
+    (((x) >> S_CPL_RX_MPS_PKT_LENGTH) & M_CPL_RX_MPS_PKT_LENGTH)
 
 /*
  * Values for CPL_RX_MPS_PKT_TYPE, a bit-wise orthogonal field.

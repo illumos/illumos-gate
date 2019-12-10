@@ -12,7 +12,7 @@
 /*
  * This file is part of the Chelsio T4/T5/T6 Ethernet driver.
  *
- * Copyright (C) 2009-2017 Chelsio Communications.  All rights reserved.
+ * Copyright (C) 2009-2019 Chelsio Communications.  All rights reserved.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -32,6 +32,7 @@ enum {
 	EEPROMVSIZE     = 32768, /* Serial EEPROM virtual address space size */
 	EEPROMPFSIZE    = 1024,  /* EEPROM writable area size for PFn, n>0 */
 	RSS_NENTRIES    = 2048,  /* # of entries in RSS mapping table */
+	T6_RSS_NENTRIES = 4096,  /* # of entries in RSS mapping table */
 	TCB_SIZE        = 128,   /* TCB size */
 	NMTUS           = 16,    /* size of MTU table */
 	NCCTRL_WIN      = 32,    /* # of congestion control windows */
@@ -74,6 +75,7 @@ enum {
 	SGE_CTXT_SIZE = 24,       /* size of SGE context */
 	SGE_NTIMERS = 6,          /* # of interrupt holdoff timer values */
 	SGE_NCOUNTERS = 4,        /* # of interrupt packet counter values */
+	SGE_NDBQTIMERS = 8,       /* # of Doorbell Queue Timer values */
 	SGE_MAX_IQ_SIZE = 65520,
 };
 
@@ -289,5 +291,15 @@ enum {
 #define M_SGE_TIMESTAMP 0xfffffffffffffffULL
 #define V_SGE_TIMESTAMP(x) ((__u64)(x) << S_SGE_TIMESTAMP)
 #define G_SGE_TIMESTAMP(x) (((__u64)(x) >> S_SGE_TIMESTAMP) & M_SGE_TIMESTAMP)
+
+#define I2C_DEV_ADDR_A0		0xa0
+#define I2C_DEV_ADDR_A2		0xa2
+#define I2C_PAGE_SIZE		0x100
+#define SFP_DIAG_TYPE_ADDR	0x5c
+#define SFP_DIAG_TYPE_LEN	0x1
+#define SFF_8472_COMP_ADDR	0x5e
+#define SFF_8472_COMP_LEN	0x1
+#define SFF_REV_ADDR		0x1
+#define SFF_REV_LEN		0x1
 
 #endif /* __T4_HW_H */

@@ -12,7 +12,7 @@
 /*
  * This file is part of the Chelsio T4/T5/T6 support code.
  *
- * Copyright (C) 2003-2017 Chelsio Communications.  All rights reserved.
+ * Copyright (C) 2003-2019 Chelsio Communications.  All rights reserved.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -137,6 +137,11 @@
 #define X_FETCHBURSTMIN_32B		1
 #define X_FETCHBURSTMIN_64B		2
 #define X_FETCHBURSTMIN_128B		3
+
+/* T6 and later use a single-bit encoding for FetchBurstMin */
+#define X_FETCHBURSTMIN_SHIFT_T6	6
+#define X_FETCHBURSTMIN_64B_T6		0
+#define X_FETCHBURSTMIN_128B_T6		1
 
 #define X_FETCHBURSTMAX_SHIFT		6
 #define X_FETCHBURSTMAX_64B		0

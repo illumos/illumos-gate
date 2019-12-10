@@ -12,7 +12,7 @@
 /*
  * This file is part of the Chelsio T4/T5/T6 Ethernet driver.
  *
- * Copyright (C) 2003-2017 Chelsio Communications.  All rights reserved.
+ * Copyright (C) 2003-2019 Chelsio Communications.  All rights reserved.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -43,38 +43,6 @@
 #define CHELSIO_T5_FPGA		0xb
 #define CHELSIO_T6		0x6
 #define CHELSIO_T6_FPGA		0xc
-
-/*
- * Translate a PCI Device ID to a base Chelsio Chip Version -- CHELSIO_T4,
- * CHELSIO_T5, etc.  If it weren't for the screwed up numbering of the FPGAs
- * we could do this simply as DeviceID >> 12 (because we know the real
- * encoding oc CHELSIO_Tx identifiers).  However, the FPGAs _do_ have weird
- * Device IDs so we need to do this translation here.  Note that only constant
- * arithmetic and comparisons can be done here since this is being used to
- * initialize static tables, etc.
- *
- * Finally: This will of course need to be expanded as future chips are
- * developed.
- */
-static inline unsigned int
-CHELSIO_PCI_ID_CHIP_VERSION(unsigned int DeviceID)
-{
-	switch (CHELSIO_PCI_ID_VER(DeviceID)) {
-	case CHELSIO_T4:
-	case CHELSIO_T4_FPGA:
-	return CHELSIO_T4;
-
-	case CHELSIO_T5:
-	case CHELSIO_T5_FPGA:
-	return CHELSIO_T5;
-
-	case CHELSIO_T6:
-	case CHELSIO_T6_FPGA:
-	return CHELSIO_T6;
-	}
-
-	return 0;
-}
 
 /*
  * Internally we code the Chelsio T4 Family "Chip Code" as a tuple:
@@ -108,25 +76,9 @@ enum chip_type {
 	T6_LAST_REV	= T6_A0,
 };
 
-static inline int is_t4(enum chip_type chip)
-{
-	return (CHELSIO_CHIP_VERSION(chip) == CHELSIO_T4);
-}
-
-static inline int is_t5(enum chip_type chip)
-{
-
-	return (CHELSIO_CHIP_VERSION(chip) == CHELSIO_T5);
-}
-
-static inline int is_t6(enum chip_type chip)
-{
-	return (CHELSIO_CHIP_VERSION(chip) == CHELSIO_T6);
-}
-
-static inline int is_fpga(enum chip_type chip)
-{
-	 return chip & CHELSIO_CHIP_FPGA;
-}
+int is_t4(enum chip_type chip);
+int is_t5(enum chip_type chip);
+int is_t6(enum chip_type chip);
+int is_fpga(enum chip_type chip);
 
 #endif /* __T4_CHIP_TYPE_H__ */
