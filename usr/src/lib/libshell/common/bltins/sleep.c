@@ -1,22 +1,22 @@
 /***********************************************************************
-*                                                                      *
-*               This software is part of the ast package               *
-*          Copyright (c) 1982-2010 AT&T Intellectual Property          *
-*                      and is licensed under the                       *
-*                  Common Public License, Version 1.0                  *
-*                    by AT&T Intellectual Property                     *
-*                                                                      *
-*                A copy of the License is available at                 *
-*            http://www.opensource.org/licenses/cpl1.0.txt             *
-*         (with md5 checksum 059e8cd6165cb4c31e351f2b69388fd9)         *
-*                                                                      *
-*              Information and Software Systems Research               *
-*                            AT&T Research                             *
-*                           Florham Park NJ                            *
-*                                                                      *
-*                  David Korn <dgk@research.att.com>                   *
-*                                                                      *
-***********************************************************************/
+ *                                                                      *
+ *               This software is part of the ast package               *
+ *          Copyright (c) 1982-2013 AT&T Intellectual Property          *
+ *                      and is licensed under the                       *
+ *                 Eclipse Public License, Version 1.0                  *
+ *                    by AT&T Intellectual Property                     *
+ *                                                                      *
+ *                A copy of the License is available at                 *
+ *          http://www.eclipse.org/org/documents/epl-v10.html           *
+ *         (with md5 checksum b35adb5213ca9657e911e9befb180842)         *
+ *                                                                      *
+ *              Information and Software Systems Research               *
+ *                            AT&T Research                             *
+ *                           Florham Park NJ                            *
+ *                                                                      *
+ *                    David Korn <dgkorn@gmail.com>                     *
+ *                                                                      *
+ ***********************************************************************/
 #pragma prototyped
 /*
  * sleep delay
@@ -156,70 +156,18 @@ unsigned int sleep(unsigned int sec)
 	return(0);
 }
 
-/*
- * delay execution for time <t>
- */
+//
+// Delay execution for time <t>.
+//
+void sh_delay(double t) {
+    Shell_t *shp = sh_getinterp();
+    int n = (int)t;
+    Tv_t ts, tx;
 
-void	sh_delay(double t)
-{
-	register int n = (int)t;
-	Shell_t	*shp = &sh;
-#ifdef _lib_poll
-	struct pollfd fd;
-	if(t<=0)
-		return;
-	else if(n > 30)
-	{
-		sleep(n);
-		t -= n;
-	}
-	if(n=(int)(1000*t))
-	{
-		if(!shp->waitevent || (*shp->waitevent)(-1,(long)n,0)==0)
-			poll(&fd,0,n);
-	}
-#else
-#   if defined(_lib_select) && defined(_mem_tv_usec_timeval)
-	struct timeval timeloc;
-	if(t<=0)
-		return;
-	if(n=(int)(1000*t) && shp->waitevent && (*shp->waitevent)(-1,(long)n,0))
-		return;
-	n = (int)t;
-	timeloc.tv_sec = n;
-	timeloc.tv_usec = 1000000*(t-(double)n);
-	select(0,(fd_set*)0,(fd_set*)0,(fd_set*)0,&timeloc);
-#   else
-#	ifdef _lib_select
-		/* for 9th edition machines */
-		if(t<=0)
-			return;
-		if(n > 30)
-		{
-			sleep(n);
-			t -= n;
-		}
-		if(n=(int)(1000*t))
-		{
-			if(!shp->waitevent || (*shp->waitevent)(-1,(long)n,0)==0)
-				select(0,(fd_set*)0,(fd_set*)0,n);
-		}
-#	else
-		struct tms tt;
-		if(t<=0)
-			return;
-		sleep(n);
-		t -= n;
-		if(t)
-		{
-			clock_t begin = times(&tt);
-			if(begin==0)
-				return;
-			t *= shp->lim.clk_tck;
-			n += (t+.5);
-			while((times(&tt)-begin) < n);
-		}
-#	endif
-#   endif
-#endif /* _lib_poll */
+    ts.tv_sec = n;
+    ts.tv_nsec = 1000000000 * (t - (double)n);
+    while (tvsleep(&ts, &tx) < 0 && errno == EINTR) {
+        if (shp->trapnote & (SH_SIGSET | SH_SIGTRAP)) return;
+        ts = tx;
+    }
 }
