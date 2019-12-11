@@ -25,7 +25,7 @@
 /*
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Argo Technologies SA
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -4759,17 +4759,25 @@ sata_txlt_read_capacity16(sata_pkt_txlate_t *spx)
 		/* logical blocks per physical block exponent */
 		rbuf[13] = l2p_exp;
 
-		/* lowest aligned logical block address = 0 (for now) */
-		/* tpe and tprz as defined in T10/10-079 r0 */
-		if (sdinfo->satadrv_id.ai_addsupported &
-		    SATA_DETERMINISTIC_READ) {
-			if (sdinfo->satadrv_id.ai_addsupported &
-			    SATA_READ_ZERO) {
+		/*
+		 * tpe and tprz as defined in T10/10-079 r0.
+		 * TRIM support is indicated by the relevant bit in the data
+		 * set management word. Read-after-trim behavior is indicated
+		 * by the additional bits in the identify device word. Of the
+		 * three defined possibilities, we only flag read-zero.
+		 */
+		if (sdinfo->satadrv_id.ai_dsm & SATA_DSM_TRIM) {
+			rbuf[14] |= TPE;
+
+			if ((sdinfo->satadrv_id.ai_addsupported &
+			    SATA_DETERMINISTIC_READ) &&
+			    (sdinfo->satadrv_id.ai_addsupported &
+			    SATA_READ_ZERO)) {
 				rbuf[14] |= TPRZ;
-			} else {
-				rbuf[14] |= TPE;
 			}
 		}
+
+		/* lowest aligned logical block address = 0 (for now) */
 		/* rbuf[15] = 0; */
 
 		scsipkt->pkt_state |= STATE_XFERRED_DATA;
