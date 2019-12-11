@@ -4,6 +4,8 @@
  Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
+ Copyright 2019 Joyent, Inc.
+
  CDDL HEADER START
 
  The contents of this file are subject to the terms of the
@@ -50,8 +52,7 @@
 	<!--
 		physical:default and physical:nwam are mutually exclusive.
 		Use a one-way dependency for now since two-way exclude_all
-		does not work; enforcement of single_instance in the future
-		will fix this.
+		does not work.
 	-->
 	<dependency
 		name='physical_nwam'

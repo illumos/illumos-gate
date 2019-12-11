@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2017 RackTop Systems.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
@@ -9743,6 +9743,10 @@ export_svc_general(scf_propertygroup_t *pg, struct entity_elts *selts)
 			scfdie();
 
 		if (strcmp(exp_str, SCF_PROPERTY_SINGLE_INSTANCE) == 0) {
+			/*
+			 * Unimplemented and obsolete, but we still process it
+			 * for compatibility purposes.
+			 */
 			if (prop_check_type(exp_prop, SCF_TYPE_BOOLEAN) == 0 &&
 			    prop_get_val(exp_prop, exp_val) == 0) {
 				uint8_t b;

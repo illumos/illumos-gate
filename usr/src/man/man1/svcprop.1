@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2019 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SVCPROP 1 "April 9, 2016"
+.TH SVCPROP 1 "Dec 11, 2019"
 .SH NAME
 svcprop \- retrieve values of service configuration properties
 .SH SYNOPSIS
-.LP
 .nf
 \fBsvcprop\fR [\fB-fqtv\fR] [\fB-C\fR | \fB-c\fR | \fB-s\fR \fIsnapshot\fR]
      [\fB-z\fR \fIzone\fR] [\fB-p\fR [\fIname\fR/]\fIname\fR]...
@@ -20,7 +20,6 @@ svcprop \- retrieve values of service configuration properties
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBsvcprop\fR utility prints values of properties in the service
 configuration repository. Properties are selected by \fB-p\fR options and the
 operands.
@@ -35,7 +34,6 @@ instance's directly attached properties. See \fBsmf\fR(5) for an explanation of
 property composition. If the \fBrunning\fR snapshot does not exist then the
 instance's directly attached properties are used instead.
 .SS "Output Format"
-.LP
 By default, when a single property is selected, the values for each are printed
 on separate lines. Empty \fBASCII\fR string values are represented by a pair of
 double quotes (\fB""\fR). Bourne shell metacharacters ('\fB;\fR', '\fB&\fR\&',
@@ -62,7 +60,6 @@ due to access controls, an error results.
 .LP
 Error messages are printed to the standard error stream.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -174,7 +171,6 @@ Uses properties from the service or instance in the specified \fIzone\fR.
 This option is only applicable from the global zone, see \fBzones\fR(5).
 
 .SH OPERANDS
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -236,7 +232,6 @@ instances, \fBsvcprop\fR acts on each service or instance.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRDisplaying the Value of a Single Property
 .sp
 .LP
@@ -284,7 +279,6 @@ example% svcprop -p general ntp
 general/package astring SUNWntpr
 general/enabled boolean true
 general/entity_stability astring Unstable
-general/single_instance boolean true
 .fi
 .in -2
 .sp
@@ -367,7 +361,6 @@ svcprop -p $1 $2 | (
 .sp
 
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -397,7 +390,6 @@ Invalid command line options were specified.
 .RE
 
 .SH SEE ALSO
-.LP
 \fBsvcs\fR(1), \fBinetd\fR(1M), \fBsvcadm\fR(1M), \fBsvccfg\fR(1M),
 \fBsvc.startd\fR(1M), \fBservice_bundle\fR(4), \fBattributes\fR(5),
 \fBfnmatch\fR(5), \fBsmf\fR(5), \fBsmf_method\fR(5), \fBsmf_security\fR(5),

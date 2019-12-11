@@ -23,6 +23,7 @@
  */
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 
@@ -3317,9 +3318,12 @@ lxml_get_instance(entity_t *service, xmlNodePtr inst, bundle_type_t bt,
 	return (0);
 }
 
-/* ARGSUSED1 */
+/*
+ * Unimplemented and obsolete, but we still process it for compatibility
+ * purposes.
+ */
 static int
-lxml_get_single_instance(entity_t *entity, xmlNodePtr si)
+lxml_get_single_instance(entity_t *entity, xmlNodePtr si __unused)
 {
 	pgroup_t *pg;
 	property_t *p;
