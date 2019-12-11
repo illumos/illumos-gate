@@ -111,7 +111,7 @@ typedef uchar_t ether_addr_t[ETHERADDRL];
  */
 extern int secpolicy_net_config(const cred_t *, boolean_t);
 
-#include <sys/miiregs.h>		/* by fjlite out of intel 	*/
+#include <sys/miiregs.h>		/* by fjlite out of intel	*/
 
 #include "bge.h"
 #include "bge_hw.h"
@@ -409,7 +409,7 @@ typedef struct buff_ring {
 	uint64_t		rf_next;	/* next slot to refill	*/
 						/* ("producer index")	*/
 
-	sw_rbd_t		*sw_rbds; 	/* software descriptors	*/
+	sw_rbd_t		*sw_rbds;	/* software descriptors	*/
 	void			*spare[4];	/* padding		*/
 } buff_ring_t;					/* 0x100 (256) bytes	*/
 
@@ -558,7 +558,7 @@ typedef struct send_ring {
 	uint64_t		tc_next;	/* next slot to recycle	*/
 						/* ("consumer index")	*/
 
-	sw_sbd_t		*sw_sbds; 	/* software descriptors	*/
+	sw_sbd_t		*sw_sbds;	/* software descriptors	*/
 	uint64_t		mac_resid;	/* special per resource id */
 	uint64_t		pushed_bytes;
 } send_ring_t;					/* 0x100 (256) bytes	*/
@@ -757,7 +757,7 @@ typedef struct bge {
 	ddi_softintr_t		factotum_id;	/* factotum callback	*/
 	ddi_softintr_t		drain_id;	/* reschedule callback	*/
 
-	ddi_intr_handle_t 	*htable;	/* For array of interrupts */
+	ddi_intr_handle_t	*htable;	/* For array of interrupts */
 	int			intr_type;	/* What type of interrupt */
 	int			intr_cnt;	/* # of intrs count returned */
 	uint_t			intr_pri;	/* Interrupt priority	*/
@@ -826,7 +826,7 @@ typedef struct bge {
 	 *	protects the critical cyclic counters etc.
 	 *
 	 * Each send ring contains two locks: <tx_lock> for the send-path
-	 * 	protocol data and <tc_lock> for send-buffer recycling.
+	 *	protocol data and <tc_lock> for send-buffer recycling.
 	 *
 	 * Finally <genlock> is a general lock, protecting most other
 	 *	operational data in the state structure and chip register
@@ -983,7 +983,7 @@ typedef struct bge {
 
 	uint32_t		param_loop_mode;
 	uint32_t		param_msi_cnt;
-	uint32_t 		param_drain_max;
+	uint32_t		param_drain_max;
 	uint64_t		param_link_speed;
 	link_duplex_t		param_link_duplex;
 	uint32_t		eee_lpi_wait;
@@ -1097,7 +1097,7 @@ typedef struct bge {
 #ifdef	DEBUG
 #define	BGE_DEBUGGING		1
 #else
-#define	BGE_DEBUGGING		1
+#define	BGE_DEBUGGING		0
 #endif	/* DEBUG */
 
 
@@ -1119,7 +1119,7 @@ typedef struct bge {
 					{ command; }			\
 					_NOTE(CONSTANTCONDITION)	\
 				} while (0)
-#else 	/* BGE_DEBUGGING */
+#else	/* BGE_DEBUGGING */
 #define	BGE_DDB(command)	do {					\
 					{ _NOTE(EMPTY); }		\
 					_NOTE(CONSTANTCONDITION)	\
