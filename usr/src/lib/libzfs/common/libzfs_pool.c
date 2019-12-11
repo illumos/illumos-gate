@@ -4537,7 +4537,7 @@ zpool_label_disk(libzfs_handle_t *hdl, zpool_handle_t *zhp, const char *name,
 	char path[MAXPATHLEN];
 	struct dk_gpt *vtoc;
 	int fd;
-	size_t resv = EFI_MIN_RESV_SIZE;
+	size_t resv;
 	uint64_t slice_size;
 	diskaddr_t start_block;
 	char errbuf[1024];
@@ -4589,6 +4589,7 @@ zpool_label_disk(libzfs_handle_t *hdl, zpool_handle_t *zhp, const char *name,
 
 		return (zfs_error(hdl, EZFS_NOCAP, errbuf));
 	}
+	resv = efi_reserved_sectors(vtoc);
 
 	/*
 	 * Why we use V_USR: V_BACKUP confuses users, and is considered
@@ -4660,7 +4661,7 @@ zpool_label_disk(libzfs_handle_t *hdl, zpool_handle_t *zhp, const char *name,
 		 * ZFS is on slice 0 and slice 8 is reserved.
 		 */
 		slice_size = vtoc->efi_last_u_lba + 1;
-		slice_size -= EFI_MIN_RESV_SIZE;
+		slice_size -= resv;
 		slice_size -= start_block;
 		if (slice != NULL)
 			*slice = 0;

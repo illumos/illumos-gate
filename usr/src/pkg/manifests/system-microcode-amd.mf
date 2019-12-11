@@ -1,0 +1,74 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2014 Gary Mills
+# Copyright 2019 Peter Tribble.
+# Copyright 2019 Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri \
+    value=pkg:/system/microcode/amd@201203,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+set name=pkg.description value="Microcode for AMD CPUs"
+set name=org.opensolaris.incorp-facet value=true
+set name=variant.arch value=i386
+dir path=platform group=sys
+dir path=platform/i86pc group=sys
+dir path=platform/i86pc/ucode group=sys
+dir path=platform/i86pc/ucode/AuthenticAMD group=sys
+file path=platform/i86pc/ucode/AuthenticAMD/1020-00 group=sys mode=0444 \
+    preserve=true reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/1022-00 group=sys mode=0444 \
+    preserve=true reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/1041-00 group=sys mode=0444 \
+    preserve=true reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/1043-00 group=sys mode=0444 \
+    preserve=true reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/1062-00 group=sys mode=0444 \
+    preserve=true reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/1080-00 group=sys mode=0444 \
+    preserve=true reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/1081-00 group=sys mode=0444 \
+    preserve=true reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/10A0-00 group=sys mode=0444 \
+    preserve=true reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/3010-00 group=sys mode=0444 \
+    preserve=true reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/5010-00 group=sys mode=0444 \
+    preserve=true reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/5020-00 group=sys mode=0444 \
+    preserve=true reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/6012-00 group=sys mode=0444 \
+    preserve=true reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/container group=sys mode=0444 \
+    preserve=true reboot-needed=true
+file path=platform/i86pc/ucode/AuthenticAMD/equivalence-table group=sys \
+    mode=0444 preserve=true reboot-needed=true
+license lic_CDDL license=lic_CDDL

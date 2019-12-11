@@ -20,7 +20,7 @@ ROOTAMDDIR = $(ROOTUCODEPATH)/AuthenticAMD
 ROOTINTELDIR = $(ROOTUCODEPATH)/GenuineIntel
 
 AMD_FILES :sh= (cd amd; print *)
-INTEL_FILES :sh= (cd intel; print *)
+INTEL_FILES :sh= (cd intel; print *-*)
 include $(SRC)/data/ucode/Makefile.links
 
 ROOTAMDFILES = $(AMD_FILES:%=$(ROOTAMDDIR)/%)
