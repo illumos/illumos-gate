@@ -27,10 +27,140 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include "ixgbe_sw.h"
+
+/*
+ * The 82598 controller lacks a high/low register for the various
+ * octet counters, but the common code also lacks a definition for
+ * these older registers. In these cases, the high register address
+ * maps to the appropriate address in the 82598 controller.
+ */
+#define	IXGBE_TOR	IXGBE_TORH
+#define	IXGBE_GOTC	IXGBE_GOTCH
+#define	IXGBE_GORC	IXGBE_GORCH
+
+/*
+ * Read total octets received.
+ */
+static uint64_t
+ixgbe_read_tor_value(const struct ixgbe_hw *hw)
+{
+	uint64_t tor = 0;
+	uint64_t hi = 0, lo = 0;
+
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
+		tor = IXGBE_READ_REG(hw, IXGBE_TOR);
+		break;
+
+	default:
+		lo = IXGBE_READ_REG(hw, IXGBE_TORL);
+		hi = IXGBE_READ_REG(hw, IXGBE_TORH) & 0xF;
+		tor = (hi << 32) + lo;
+		break;
+	}
+
+	return (tor);
+}
+
+/*
+ * Read queue octets received.
+ */
+static uint64_t
+ixgbe_read_qor_value(const struct ixgbe_hw *hw)
+{
+	uint64_t qor = 0;
+	uint64_t hi = 0, lo = 0;
+
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
+		qor = IXGBE_READ_REG(hw, IXGBE_QBRC(0));
+		break;
+
+	default:
+		lo = IXGBE_READ_REG(hw, IXGBE_QBRC_L(0));
+		hi = IXGBE_READ_REG(hw, IXGBE_QBRC_H(0)) & 0xF;
+		qor = (hi << 32) + lo;
+		break;
+	}
+
+	return (qor);
+}
+
+/*
+ * Read queue octets transmitted.
+ */
+static uint64_t
+ixgbe_read_qot_value(const struct ixgbe_hw *hw)
+{
+	uint64_t qot = 0;
+	uint64_t hi = 0, lo = 0;
+
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
+		qot = IXGBE_READ_REG(hw, IXGBE_QBTC(0));
+		break;
+
+	default:
+		lo = IXGBE_READ_REG(hw, IXGBE_QBTC_L(0));
+		hi = IXGBE_READ_REG(hw, IXGBE_QBTC_H(0)) & 0xF;
+		qot = (hi << 32) + lo;
+		break;
+	}
+
+	return (qot);
+}
+
+/*
+ * Read good octets transmitted.
+ */
+static uint64_t
+ixgbe_read_got_value(const struct ixgbe_hw *hw)
+{
+	uint64_t got = 0;
+	uint64_t hi = 0, lo = 0;
+
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
+		got = IXGBE_READ_REG(hw, IXGBE_GOTC);
+		break;
+
+	default:
+		lo = IXGBE_READ_REG(hw, IXGBE_GOTCL);
+		hi = IXGBE_READ_REG(hw, IXGBE_GOTCH) & 0xF;
+		got = (hi << 32) + lo;
+		break;
+	}
+
+	return (got);
+}
+
+/*
+ * Read good octets received.
+ */
+static uint64_t
+ixgbe_read_gor_value(const struct ixgbe_hw *hw)
+{
+	uint64_t gor = 0;
+	uint64_t hi = 0, lo = 0;
+
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
+		gor = IXGBE_READ_REG(hw, IXGBE_GORC);
+		break;
+
+	default:
+		lo = IXGBE_READ_REG(hw, IXGBE_GORCL);
+		hi = IXGBE_READ_REG(hw, IXGBE_GORCH) & 0xF;
+		gor = (hi << 32) + lo;
+		break;
+	}
+
+	return (gor);
+}
 
 /*
  * Update driver private statistics.
@@ -98,56 +228,16 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 	/*
 	 * Hardware calculated statistics.
 	 */
-	ixgbe_ks->gprc.value.ui64 = 0;
-	ixgbe_ks->gptc.value.ui64 = 0;
-	ixgbe_ks->tor.value.ui64 = 0;
-	ixgbe_ks->tot.value.ui64 = 0;
-	for (i = 0; i < 16; i++) {
-		ixgbe_ks->qprc[i].value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_QPRC(i));
-		ixgbe_ks->gprc.value.ui64 += ixgbe_ks->qprc[i].value.ui64;
-		ixgbe_ks->qptc[i].value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_QPTC(i));
-		ixgbe_ks->gptc.value.ui64 += ixgbe_ks->qptc[i].value.ui64;
-		ixgbe_ks->qbrc[i].value.ui64 +=
-		    IXGBE_READ_REG(hw, IXGBE_QBRC(i));
-		ixgbe_ks->tor.value.ui64 += ixgbe_ks->qbrc[i].value.ui64;
-		switch (hw->mac.type) {
-		case ixgbe_mac_82598EB:
-			ixgbe_ks->qbtc[i].value.ui64 +=
-			    IXGBE_READ_REG(hw, IXGBE_QBTC(i));
-			break;
-
-		case ixgbe_mac_82599EB:
-		case ixgbe_mac_X540:
-		case ixgbe_mac_X550:
-		case ixgbe_mac_X550EM_x:
-		case ixgbe_mac_X550EM_a:
-			ixgbe_ks->qbtc[i].value.ui64 +=
-			    IXGBE_READ_REG(hw, IXGBE_QBTC_L(i));
-			ixgbe_ks->qbtc[i].value.ui64 +=
-			    ((uint64_t)((IXGBE_READ_REG(hw,
-			    IXGBE_QBTC_H(i))) & 0xF) << 32);
-			break;
-
-		default:
-			break;
-		}
-		ixgbe_ks->tot.value.ui64 += ixgbe_ks->qbtc[i].value.ui64;
-	}
-	/*
-	 * This is a Workaround:
-	 * Currently h/w GORCH, GOTCH, TORH registers are not
-	 * correctly implemented. We found that the values in
-	 * these registers are same as those in corresponding
-	 * *L registers (i.e. GORCL, GOTCL, and TORL). Here the
-	 * gor and got stat data will not be retrieved through
-	 * GORC{H/L} and GOTC{H/L} registers but be obtained by
-	 * simply assigning tor/tot stat data, so the gor/got
-	 * stat data will not be accurate.
-	 */
-	ixgbe_ks->gor.value.ui64 = ixgbe_ks->tor.value.ui64;
-	ixgbe_ks->got.value.ui64 = ixgbe_ks->tot.value.ui64;
+	ixgbe_ks->gprc.value.ui64 += IXGBE_READ_REG(hw, IXGBE_GPRC);
+	ixgbe_ks->gptc.value.ui64 += IXGBE_READ_REG(hw, IXGBE_GPTC);
+	ixgbe_ks->gor.value.ui64 += ixgbe_read_gor_value(hw);
+	ixgbe_ks->got.value.ui64 += ixgbe_read_got_value(hw);
+	ixgbe_ks->qpr.value.ui64 += IXGBE_READ_REG(hw, IXGBE_QPRC(0));
+	ixgbe_ks->qpt.value.ui64 += IXGBE_READ_REG(hw, IXGBE_QPTC(0));
+	ixgbe_ks->qor.value.ui64 += ixgbe_read_qor_value(hw);
+	ixgbe_ks->qot.value.ui64 += ixgbe_read_qot_value(hw);
+	ixgbe_ks->tor.value.ui64 += ixgbe_read_tor_value(hw);
+	ixgbe_ks->tot.value.ui64 = ixgbe_ks->got.value.ui64;
 
 	ixgbe_ks->prc64.value.ul += IXGBE_READ_REG(hw, IXGBE_PRC64);
 	ixgbe_ks->prc127.value.ul += IXGBE_READ_REG(hw, IXGBE_PRC127);
@@ -282,6 +372,14 @@ ixgbe_init_stats(ixgbe_t *ixgbe)
 	    KSTAT_DATA_UINT64);
 	kstat_named_init(&ixgbe_ks->got, "good_octets_xmitd",
 	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qor, "queue_octets_recvd",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qot, "queue_octets_xmitd",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qpr, "queue_pkts_recvd",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qpt, "queue_pkts_xmitd",
+	    KSTAT_DATA_UINT64);
 	kstat_named_init(&ixgbe_ks->prc64, "pkts_recvd_(  64b)",
 	    KSTAT_DATA_UINT64);
 	kstat_named_init(&ixgbe_ks->prc127, "pkts_recvd_(  65- 127b)",
@@ -305,138 +403,6 @@ ixgbe_init_stats(ixgbe_t *ixgbe)
 	kstat_named_init(&ixgbe_ks->ptc1023, "pkts_xmitd_( 512-1023b)",
 	    KSTAT_DATA_UINT64);
 	kstat_named_init(&ixgbe_ks->ptc1522, "pkts_xmitd_(1024-1522b)",
-	    KSTAT_DATA_UINT64);
-
-	kstat_named_init(&ixgbe_ks->qprc[0], "queue_pkts_recvd [ 0]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qprc[1], "queue_pkts_recvd [ 1]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qprc[2], "queue_pkts_recvd [ 2]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qprc[3], "queue_pkts_recvd [ 3]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qprc[4], "queue_pkts_recvd [ 4]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qprc[5], "queue_pkts_recvd [ 5]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qprc[6], "queue_pkts_recvd [ 6]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qprc[7], "queue_pkts_recvd [ 7]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qprc[8], "queue_pkts_recvd [ 8]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qprc[9], "queue_pkts_recvd [ 9]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qprc[10], "queue_pkts_recvd [10]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qprc[11], "queue_pkts_recvd [11]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qprc[12], "queue_pkts_recvd [12]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qprc[13], "queue_pkts_recvd [13]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qprc[14], "queue_pkts_recvd [14]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qprc[15], "queue_pkts_recvd [15]",
-	    KSTAT_DATA_UINT64);
-
-	kstat_named_init(&ixgbe_ks->qptc[0], "queue_pkts_xmitd [ 0]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qptc[1], "queue_pkts_xmitd [ 1]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qptc[2], "queue_pkts_xmitd [ 2]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qptc[3], "queue_pkts_xmitd [ 3]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qptc[4], "queue_pkts_xmitd [ 4]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qptc[5], "queue_pkts_xmitd [ 5]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qptc[6], "queue_pkts_xmitd [ 6]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qptc[7], "queue_pkts_xmitd [ 7]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qptc[8], "queue_pkts_xmitd [ 8]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qptc[9], "queue_pkts_xmitd [ 9]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qptc[10], "queue_pkts_xmitd [10]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qptc[11], "queue_pkts_xmitd [11]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qptc[12], "queue_pkts_xmitd [12]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qptc[13], "queue_pkts_xmitd [13]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qptc[14], "queue_pkts_xmitd [14]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qptc[15], "queue_pkts_xmitd [15]",
-	    KSTAT_DATA_UINT64);
-
-	kstat_named_init(&ixgbe_ks->qbrc[0], "queue_bytes_recvd [ 0]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbrc[1], "queue_bytes_recvd [ 1]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbrc[2], "queue_bytes_recvd [ 2]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbrc[3], "queue_bytes_recvd [ 3]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbrc[4], "queue_bytes_recvd [ 4]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbrc[5], "queue_bytes_recvd [ 5]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbrc[6], "queue_bytes_recvd [ 6]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbrc[7], "queue_bytes_recvd [ 7]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbrc[8], "queue_bytes_recvd [ 8]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbrc[9], "queue_bytes_recvd [ 9]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbrc[10], "queue_bytes_recvd [10]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbrc[11], "queue_bytes_recvd [11]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbrc[12], "queue_bytes_recvd [12]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbrc[13], "queue_bytes_recvd [13]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbrc[14], "queue_bytes_recvd [14]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbrc[15], "queue_bytes_recvd [15]",
-	    KSTAT_DATA_UINT64);
-
-	kstat_named_init(&ixgbe_ks->qbtc[0], "queue_bytes_xmitd [ 0]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbtc[1], "queue_bytes_xmitd [ 1]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbtc[2], "queue_bytes_xmitd [ 2]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbtc[3], "queue_bytes_xmitd [ 3]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbtc[4], "queue_bytes_xmitd [ 4]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbtc[5], "queue_bytes_xmitd [ 5]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbtc[6], "queue_bytes_xmitd [ 6]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbtc[7], "queue_bytes_xmitd [ 7]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbtc[8], "queue_bytes_xmitd [ 8]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbtc[9], "queue_bytes_xmitd [ 9]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbtc[10], "queue_bytes_xmitd [10]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbtc[11], "queue_bytes_xmitd [11]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbtc[12], "queue_bytes_xmitd [12]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbtc[13], "queue_bytes_xmitd [13]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbtc[14], "queue_bytes_xmitd [14]",
-	    KSTAT_DATA_UINT64);
-	kstat_named_init(&ixgbe_ks->qbtc[15], "queue_bytes_xmitd [15]",
 	    KSTAT_DATA_UINT64);
 
 	kstat_named_init(&ixgbe_ks->mspdc, "mac_short_packet_discard",
@@ -548,10 +514,21 @@ ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case MAC_STAT_NORCVBUF:
-		for (i = 0; i < 8; i++) {
+		/*
+		 * The QPRDC[0] register maps to the same kstat as the
+		 * old RNBC register because they have equivalent
+		 * semantics.
+		 */
+		if (hw->mac.type == ixgbe_mac_82598EB) {
+			for (i = 0; i < 8; i++) {
+				ixgbe_ks->rnbc.value.ui64 +=
+				    IXGBE_READ_REG(hw, IXGBE_RNBC(i));
+			}
+		} else {
 			ixgbe_ks->rnbc.value.ui64 +=
-			    IXGBE_READ_REG(hw, IXGBE_RNBC(i));
+			    IXGBE_READ_REG(hw, IXGBE_QPRDC(0));
 		}
+
 		*val = ixgbe_ks->rnbc.value.ui64;
 		break;
 
@@ -571,43 +548,20 @@ ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case MAC_STAT_RBYTES:
-		ixgbe_ks->tor.value.ui64 = 0;
-		for (i = 0; i < 16; i++) {
-			ixgbe_ks->qbrc[i].value.ui64 +=
-			    IXGBE_READ_REG(hw, IXGBE_QBRC(i));
-			ixgbe_ks->tor.value.ui64 +=
-			    ixgbe_ks->qbrc[i].value.ui64;
-		}
+		ixgbe_ks->tor.value.ui64 += ixgbe_read_tor_value(hw);
 		*val = ixgbe_ks->tor.value.ui64;
 		break;
 
 	case MAC_STAT_OBYTES:
-		ixgbe_ks->tot.value.ui64 = 0;
-		for (i = 0; i < 16; i++) {
-			switch (hw->mac.type) {
-			case ixgbe_mac_82598EB:
-				ixgbe_ks->qbtc[i].value.ui64 +=
-				    IXGBE_READ_REG(hw, IXGBE_QBTC(i));
-				break;
-
-			case ixgbe_mac_82599EB:
-			case ixgbe_mac_X540:
-			case ixgbe_mac_X550:
-			case ixgbe_mac_X550EM_x:
-			case ixgbe_mac_X550EM_a:
-				ixgbe_ks->qbtc[i].value.ui64 +=
-				    IXGBE_READ_REG(hw, IXGBE_QBTC_L(i));
-				ixgbe_ks->qbtc[i].value.ui64 +=
-				    ((uint64_t)((IXGBE_READ_REG(hw,
-				    IXGBE_QBTC_H(i))) & 0xF) << 32);
-				break;
-
-			default:
-				break;
-			}
-			ixgbe_ks->tot.value.ui64 +=
-			    ixgbe_ks->qbtc[i].value.ui64;
-		}
+		/*
+		 * The controller does not provide a Total Octets
+		 * Transmitted statistic. The closest thing we have is
+		 * Good Octets Transmitted. This makes sense, as what
+		 * does it mean to transmit a packet if it didn't
+		 * actually transmit.
+		 */
+		ixgbe_ks->got.value.ui64 += ixgbe_read_got_value(hw);
+		ixgbe_ks->tot.value.ui64 = ixgbe_ks->got.value.ui64;
 		*val = ixgbe_ks->tot.value.ui64;
 		break;
 

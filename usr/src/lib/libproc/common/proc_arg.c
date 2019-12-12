@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -341,14 +342,14 @@ proc_lwp_get_range(char *range, id_t *low, id_t *high)
  * The set can include multiple lwpid ranges separated by commas
  * and has the following syntax:
  *
- * 	lwp_range[,lwp_range]*
+ *	lwp_range[,lwp_range]*
  *
  * where lwp_range is specifed as:
  *
- * 	-n			lwpid <= n
- * 	n-m			n <= lwpid <= m
- * 	n-			lwpid >= n
- * 	n			lwpid == n
+ *	-n			lwpid <= n
+ *	n-m			n <= lwpid <= m
+ *	n-			lwpid >= n
+ *	n			lwpid == n
  */
 int
 proc_lwp_in_set(const char *set, lwpid_t lwpid)
@@ -438,6 +439,11 @@ proc_walk(proc_walk_f *func, void *arg, int flag)
 	id_t pid;
 	int fd, i;
 	int ret = 0;
+	boolean_t walk_sys = B_FALSE;
+
+	if ((flag & PR_WALK_INCLUDE_SYS) != 0)
+		walk_sys = B_TRUE;
+	flag &= ~PR_WALK_INCLUDE_SYS;
 
 	if (flag != PR_WALK_PROC && flag != PR_WALK_LWP) {
 		errno = EINVAL;
@@ -458,7 +464,7 @@ proc_walk(proc_walk_f *func, void *arg, int flag)
 		if (fd < 0)
 			continue;
 		if (read(fd, &psinfo, sizeof (psinfo)) != sizeof (psinfo) ||
-		    (psinfo.pr_flag & SSYS)) {
+		    ((psinfo.pr_flag & SSYS) != 0 && !walk_sys)) {
 			(void) close(fd);
 			continue;
 		}

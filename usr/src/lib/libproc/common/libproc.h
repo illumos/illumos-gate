@@ -25,7 +25,7 @@
  *
  * Portions Copyright 2007 Chad Mynhier
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2019, Carlos Neira <cneirabustos@gmail.com>
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
@@ -464,8 +464,9 @@ extern int Plwp_iter_all(struct ps_prochandle *, proc_lwp_all_f *, void *);
 typedef int proc_walk_f(psinfo_t *, lwpsinfo_t *, void *);
 extern int proc_walk(proc_walk_f *, void *, int);
 
-#define	PR_WALK_PROC	0		/* walk processes only */
-#define	PR_WALK_LWP	1		/* walk all lwps */
+#define	PR_WALK_PROC		0		/* walk processes only */
+#define	PR_WALK_LWP		1		/* walk all lwps */
+#define	PR_WALK_INCLUDE_SYS	0x80000000	/* include SSYS processes */
 
 /*
  * Determine if an lwp is in a set as returned from proc_arg_xgrab().

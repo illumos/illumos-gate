@@ -25,7 +25,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013 OSN Online Service Nuernberg GmbH. All rights reserved.
@@ -2462,8 +2462,7 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 	ixgbe_rx_ring_t *rx_ring;
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	uint32_t reg_val;
-	uint32_t ring_mapping;
-	uint32_t i, index;
+	uint32_t i;
 	uint32_t psrtype_rss_bit;
 
 	/*
@@ -2578,14 +2577,23 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 	}
 
 	/*
-	 * Setup the per-ring statistics mapping.
+	 * The 82598 controller gives us the RNBC (Receive No Buffer
+	 * Count) register to determine the number of frames dropped
+	 * due to no available descriptors on the destination queue.
+	 * However, this register was removed starting with 82599 and
+	 * it was replaced with the RQSMR/QPRDC registers. The nice
+	 * thing about the new registers is that they allow you to map
+	 * groups of queues to specific stat registers. The bad thing
+	 * is there are only 16 slots in the stat registers, so this
+	 * won't work when we have 32 Rx groups. Instead, we map all
+	 * queues to the zero slot of the stat registers, giving us a
+	 * global counter at QPRDC[0] (with the equivalent semantics
+	 * of RNBC). Perhaps future controllers will have more slots
+	 * and we can implement per-group counters.
 	 */
-	ring_mapping = 0;
 	for (i = 0; i < ixgbe->num_rx_rings; i++) {
-		index = ixgbe->rx_rings[i].hw_index;
-		ring_mapping = IXGBE_READ_REG(hw, IXGBE_RQSMR(index >> 2));
-		ring_mapping |= (i & 0xF) << (8 * (index & 0x3));
-		IXGBE_WRITE_REG(hw, IXGBE_RQSMR(index >> 2), ring_mapping);
+		uint32_t index = ixgbe->rx_rings[i].hw_index;
+		IXGBE_WRITE_REG(hw, IXGBE_RQSMR(index >> 2), 0);
 	}
 
 	/*
@@ -2742,7 +2750,6 @@ ixgbe_setup_tx(ixgbe_t *ixgbe)
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	ixgbe_tx_ring_t *tx_ring;
 	uint32_t reg_val;
-	uint32_t ring_mapping;
 	int i;
 
 	for (i = 0; i < ixgbe->num_tx_rings; i++) {
@@ -2751,49 +2758,17 @@ ixgbe_setup_tx(ixgbe_t *ixgbe)
 	}
 
 	/*
-	 * Setup the per-ring statistics mapping.
+	 * Setup the per-ring statistics mapping. We map all Tx queues
+	 * to slot 0 to stay consistent with Rx.
 	 */
-	ring_mapping = 0;
 	for (i = 0; i < ixgbe->num_tx_rings; i++) {
-		ring_mapping |= (i & 0xF) << (8 * (i & 0x3));
-		if ((i & 0x3) == 0x3) {
-			switch (hw->mac.type) {
-			case ixgbe_mac_82598EB:
-				IXGBE_WRITE_REG(hw, IXGBE_TQSMR(i >> 2),
-				    ring_mapping);
-				break;
-
-			case ixgbe_mac_82599EB:
-			case ixgbe_mac_X540:
-			case ixgbe_mac_X550:
-			case ixgbe_mac_X550EM_x:
-			case ixgbe_mac_X550EM_a:
-				IXGBE_WRITE_REG(hw, IXGBE_TQSM(i >> 2),
-				    ring_mapping);
-				break;
-
-			default:
-				break;
-			}
-
-			ring_mapping = 0;
-		}
-	}
-	if (i & 0x3) {
 		switch (hw->mac.type) {
 		case ixgbe_mac_82598EB:
-			IXGBE_WRITE_REG(hw, IXGBE_TQSMR(i >> 2), ring_mapping);
-			break;
-
-		case ixgbe_mac_82599EB:
-		case ixgbe_mac_X540:
-		case ixgbe_mac_X550:
-		case ixgbe_mac_X550EM_x:
-		case ixgbe_mac_X550EM_a:
-			IXGBE_WRITE_REG(hw, IXGBE_TQSM(i >> 2), ring_mapping);
+			IXGBE_WRITE_REG(hw, IXGBE_TQSMR(i >> 2), 0);
 			break;
 
 		default:
+			IXGBE_WRITE_REG(hw, IXGBE_TQSM(i >> 2), 0);
 			break;
 		}
 	}
