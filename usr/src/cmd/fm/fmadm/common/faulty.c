@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -1214,17 +1215,19 @@ print_sup_record(status_record_t *srp, int opt_i, int full)
 		n++;
 	}
 	(void) printf("\n");
-	(void) printf("%s %s", dgettext("FMD", "Host        :"),
-	    srp->host->server);
-	if (srp->host->domain)
-		(void) printf("\t%s %s", dgettext("FMD", "Domain      :"),
-		    srp->host->domain);
-	(void) printf("\n%s %s", dgettext("FMD", "Platform    :"),
-	    srp->host->platform);
-	(void) printf("\t%s %s", dgettext("FMD", "Chassis_id  :"),
-	    srp->host->chassis ? srp->host->chassis : "");
-	(void) printf("\n%s %s\n\n", dgettext("FMD", "Product_sn  :"),
-	    srp->host->product_sn? srp->host->product_sn : "");
+	if (srp->host) {
+		(void) printf("%s %s", dgettext("FMD", "Host        :"),
+		    srp->host->server);
+		if (srp->host->domain)
+			(void) printf("\t%s %s", dgettext("FMD",
+			    "Domain      :"), srp->host->domain);
+		(void) printf("\n%s %s", dgettext("FMD", "Platform    :"),
+		    srp->host->platform);
+		(void) printf("\t%s %s", dgettext("FMD", "Chassis_id  :"),
+		    srp->host->chassis ? srp->host->chassis : "");
+		(void) printf("\n%s %s\n\n", dgettext("FMD", "Product_sn  :"),
+		    srp->host->product_sn ? srp->host->product_sn : "");
+	}
 	if (srp->class)
 		print_name_list(srp->class,
 		    dgettext("FMD", "Fault class :"), 0, srp->class->pct,
