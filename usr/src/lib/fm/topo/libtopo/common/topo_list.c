@@ -23,12 +23,15 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <string.h>
 #include <unistd.h>
 #include <assert.h>
 
+#include <topo_error.h>
 #include <topo_list.h>
 #include <topo_tree.h>
 
@@ -182,4 +185,42 @@ topo_child_next(tnode_t *pnode, tnode_t *node)
 	}
 
 	return (NULL);
+}
+
+int
+topo_list_deepcopy(topo_hdl_t *thp, topo_list_t *dest, topo_list_t *src,
+    size_t elem_sz)
+{
+	void *elem;
+
+	/* if the destination list is not empty - bail out */
+	if (topo_list_next(dest) != NULL)
+		return (topo_hdl_seterrno(thp, ETOPO_UNKNOWN));
+
+	for (elem = topo_list_next(src); elem != NULL;
+	    elem = topo_list_next(elem)) {
+		void *elem_copy;
+
+		if ((elem_copy = topo_hdl_alloc(thp, elem_sz)) == NULL) {
+			goto err;
+		}
+		(void) memcpy(elem_copy, elem, elem_sz);
+		topo_list_append(dest, elem_copy);
+	}
+	return (0);
+
+err:
+	/*
+	 * If we hit an error, cleanup any partially copied list elements
+	 * before we return.
+	 */
+	elem = topo_list_next(dest);
+	while (elem != NULL) {
+		void *tmp = elem;
+
+		elem = topo_list_next(elem);
+		topo_list_delete(dest, tmp);
+		topo_hdl_free(thp, tmp, elem_sz);
+	}
+	return (topo_hdl_seterrno(thp, ETOPO_NOMEM));
 }
