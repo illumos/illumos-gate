@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -935,6 +935,12 @@ create:
 		if ((op->create_disposition == FILE_OPEN) ||
 		    (op->create_disposition == FILE_OVERWRITE)) {
 			status = NT_STATUS_OBJECT_NAME_NOT_FOUND;
+			goto errout;
+		}
+
+		if ((op->desired_access & ACCESS_SYSTEM_SECURITY) != 0 &&
+		    !smb_user_has_security_priv(sr->uid_user, sr->user_cr)) {
+			status = NT_STATUS_ACCESS_DENIED;
 			goto errout;
 		}
 
