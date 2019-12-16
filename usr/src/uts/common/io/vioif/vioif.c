@@ -12,7 +12,7 @@
 /*
  * Copyright 2013 Nexenta Inc.  All rights reserved.
  * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2021 Joyent, Inc.
  * Copyright 2019 Joshua M. Clulow <josh@sysmgr.org>
  */
 
@@ -328,6 +328,32 @@ vioif_rx_free_callback(caddr_t free_arg)
 	mutex_exit(&vif->vif_mutex);
 }
 
+static vioif_ctrlbuf_t *
+vioif_ctrlbuf_alloc(vioif_t *vif)
+{
+	vioif_ctrlbuf_t *cb;
+
+	VERIFY(MUTEX_HELD(&vif->vif_mutex));
+
+	if ((cb = list_remove_head(&vif->vif_ctrlbufs)) != NULL) {
+		vif->vif_nctrlbufs_alloc++;
+	}
+
+	return (cb);
+}
+
+static void
+vioif_ctrlbuf_free(vioif_t *vif, vioif_ctrlbuf_t *cb)
+{
+	VERIFY(MUTEX_HELD(&vif->vif_mutex));
+
+	VERIFY3U(vif->vif_nctrlbufs_alloc, >, 0);
+	vif->vif_nctrlbufs_alloc--;
+
+	virtio_chain_clear(cb->cb_chain);
+	list_insert_head(&vif->vif_ctrlbufs, cb);
+}
+
 static void
 vioif_free_bufs(vioif_t *vif)
 {
@@ -408,6 +434,37 @@ vioif_free_bufs(vioif_t *vif)
 		vif->vif_rxbufs_mem = NULL;
 		vif->vif_rxbufs_capacity = 0;
 	}
+
+	if (vif->vif_has_ctrlq) {
+		VERIFY3U(vif->vif_nctrlbufs_alloc, ==, 0);
+		for (uint_t i = 0; i < vif->vif_ctrlbufs_capacity; i++) {
+			vioif_ctrlbuf_t *cb = &vif->vif_ctrlbufs_mem[i];
+
+			/*
+			 * Ensure that this ctrlbuf is now in the free list
+			 */
+			VERIFY(list_link_active(&cb->cb_link));
+			list_remove(&vif->vif_ctrlbufs, cb);
+
+			if (cb->cb_dma != NULL) {
+				virtio_dma_free(cb->cb_dma);
+				cb->cb_dma = NULL;
+			}
+
+			if (cb->cb_chain != NULL) {
+				virtio_chain_free(cb->cb_chain);
+				cb->cb_chain = NULL;
+			}
+		}
+		VERIFY(list_is_empty(&vif->vif_ctrlbufs));
+		if (vif->vif_ctrlbufs_mem != NULL) {
+			kmem_free(vif->vif_ctrlbufs_mem,
+			    sizeof (vioif_ctrlbuf_t) *
+			    vif->vif_ctrlbufs_capacity);
+			vif->vif_ctrlbufs_mem = NULL;
+			vif->vif_ctrlbufs_capacity = 0;
+		}
+	}
 }
 
 static int
@@ -434,6 +491,16 @@ vioif_alloc_bufs(vioif_t *vif)
 	list_create(&vif->vif_rxbufs, sizeof (vioif_rxbuf_t),
 	    offsetof(vioif_rxbuf_t, rb_link));
 
+	if (vif->vif_has_ctrlq) {
+		vif->vif_ctrlbufs_capacity = MIN(VIRTIO_NET_CTRL_BUFS,
+		    virtio_queue_size(vif->vif_ctrl_vq));
+		vif->vif_ctrlbufs_mem = kmem_zalloc(
+		    sizeof (vioif_ctrlbuf_t) * vif->vif_ctrlbufs_capacity,
+		    KM_SLEEP);
+	}
+	list_create(&vif->vif_ctrlbufs, sizeof (vioif_ctrlbuf_t),
+	    offsetof(vioif_ctrlbuf_t, cb_link));
+
 	/*
 	 * Do not loan more than half of our allocated receive buffers into
 	 * the networking stack.
@@ -449,6 +516,9 @@ vioif_alloc_bufs(vioif_t *vif)
 	}
 	for (uint_t i = 0; i < vif->vif_rxbufs_capacity; i++) {
 		list_insert_tail(&vif->vif_rxbufs, &vif->vif_rxbufs_mem[i]);
+	}
+	for (uint_t i = 0; i < vif->vif_ctrlbufs_capacity; i++) {
+		list_insert_tail(&vif->vif_ctrlbufs, &vif->vif_ctrlbufs_mem[i]);
 	}
 
 	/*
@@ -483,6 +553,26 @@ vioif_alloc_bufs(vioif_t *vif)
 		tb->tb_dmaext = kmem_zalloc(
 		    sizeof (virtio_dma_t *) * tb->tb_dmaext_capacity,
 		    KM_SLEEP);
+	}
+
+	/*
+	 * Control queue buffers are also small (less than a page), so we'll
+	 * also request a single cookie for them.
+	 */
+	for (vioif_ctrlbuf_t *cb = list_head(&vif->vif_ctrlbufs); cb != NULL;
+	    cb = list_next(&vif->vif_ctrlbufs, cb)) {
+		if ((cb->cb_dma = virtio_dma_alloc(vif->vif_virtio,
+		    VIOIF_CTRL_SIZE, &attr,
+		    DDI_DMA_STREAMING | DDI_DMA_RDWR, KM_SLEEP)) == NULL) {
+			goto fail;
+		}
+		VERIFY3U(virtio_dma_ncookies(cb->cb_dma), ==, 1);
+
+		if ((cb->cb_chain = virtio_chain_alloc(vif->vif_ctrl_vq,
+		    KM_SLEEP)) == NULL) {
+			goto fail;
+		}
+		virtio_chain_data_set(cb->cb_chain, cb);
 	}
 
 	/*
@@ -533,6 +623,128 @@ fail:
 }
 
 static int
+vioif_ctrlq_req(vioif_t *vif, uint8_t class, uint8_t cmd, void *data,
+    size_t datalen)
+{
+	vioif_ctrlbuf_t *cb = NULL;
+	virtio_chain_t *vic = NULL;
+	uint8_t *p = NULL;
+	uint64_t pa = 0;
+	uint8_t *ackp = NULL;
+	struct virtio_net_ctrlq_hdr hdr = {
+		.vnch_class = class,
+		.vnch_command = cmd,
+	};
+	const size_t hdrlen = sizeof (hdr);
+	const size_t acklen = 1; /* the ack is always 1 byte */
+	size_t totlen = hdrlen + datalen + acklen;
+	int r = DDI_SUCCESS;
+
+	/*
+	 * We shouldn't be called unless the ctrlq feature has been
+	 * negotiated with the host
+	 */
+	VERIFY(vif->vif_has_ctrlq);
+
+	mutex_enter(&vif->vif_mutex);
+	cb = vioif_ctrlbuf_alloc(vif);
+	if (cb == NULL) {
+		vif->vif_noctrlbuf++;
+		mutex_exit(&vif->vif_mutex);
+		r = DDI_FAILURE;
+		goto done;
+	}
+	mutex_exit(&vif->vif_mutex);
+
+	if (totlen > virtio_dma_size(cb->cb_dma)) {
+		vif->vif_ctrlbuf_toosmall++;
+		r = DDI_FAILURE;
+		goto done;
+	}
+
+	/*
+	 * Clear the entire buffer. Technically not necessary, but useful
+	 * if trying to troubleshoot an issue, and probably not a bad idea
+	 * to not let any old data linger.
+	 */
+	p = virtio_dma_va(cb->cb_dma, 0);
+	bzero(p, virtio_dma_size(cb->cb_dma));
+
+	/*
+	 * We currently do not support VIRTIO_F_ANY_LAYOUT. That means,
+	 * that we must put the header, the data, and the ack in their
+	 * own respective descriptors. Since all the currently supported
+	 * control queue commands take _very_ small amounts of data, we
+	 * use a single DMA buffer for all of it, but use 3 descriptors to
+	 * reference (respectively) the header, the data, and the ack byte
+	 * within that memory to adhere to the virtio spec.
+	 *
+	 * If we add support for control queue features such as custom
+	 * MAC filtering tables, which might require larger amounts of
+	 * memory, we likely will want to add more sophistication here
+	 * and optionally use additional allocated memory to hold that
+	 * data instead of a fixed size buffer.
+	 *
+	 * Copy the header.
+	 */
+	bcopy(&hdr, p, sizeof (hdr));
+	pa = virtio_dma_cookie_pa(cb->cb_dma, 0);
+	if ((r = virtio_chain_append(cb->cb_chain,
+	    pa, hdrlen, VIRTIO_DIR_DEVICE_READS)) != DDI_SUCCESS) {
+		goto done;
+	}
+
+	/*
+	 * Copy the request data
+	 */
+	p = virtio_dma_va(cb->cb_dma, hdrlen);
+	bcopy(data, p, datalen);
+	if ((r = virtio_chain_append(cb->cb_chain,
+	    pa + hdrlen, datalen, VIRTIO_DIR_DEVICE_READS)) != DDI_SUCCESS) {
+		goto done;
+	}
+
+	/*
+	 * We already cleared the buffer, so don't need to copy out a 0 for
+	 * the ack byte. Just add a descriptor for that spot.
+	 */
+	ackp = virtio_dma_va(cb->cb_dma, hdrlen + datalen);
+	if ((r = virtio_chain_append(cb->cb_chain,
+	    pa + hdrlen + datalen, acklen,
+	    VIRTIO_DIR_DEVICE_WRITES)) != DDI_SUCCESS) {
+		goto done;
+	}
+
+	virtio_dma_sync(cb->cb_dma, DDI_DMA_SYNC_FORDEV);
+	virtio_chain_submit(cb->cb_chain, B_TRUE);
+
+	/*
+	 * Spin waiting for response.
+	 */
+	mutex_enter(&vif->vif_mutex);
+	while ((vic = virtio_queue_poll(vif->vif_ctrl_vq)) == NULL) {
+		mutex_exit(&vif->vif_mutex);
+		delay(drv_usectohz(1000));
+		mutex_enter(&vif->vif_mutex);
+	}
+
+	virtio_dma_sync(cb->cb_dma, DDI_DMA_SYNC_FORCPU);
+	VERIFY3P(virtio_chain_data(vic), ==, cb);
+	mutex_exit(&vif->vif_mutex);
+
+	if (*ackp != VIRTIO_NET_CQ_OK) {
+		r = DDI_FAILURE;
+	}
+
+done:
+	mutex_enter(&vif->vif_mutex);
+	vioif_ctrlbuf_free(vif, cb);
+	mutex_exit(&vif->vif_mutex);
+
+	return (r);
+}
+
+static int
 vioif_m_multicst(void *arg, boolean_t add, const uint8_t *mcst_addr)
 {
 	/*
@@ -549,11 +761,15 @@ vioif_m_multicst(void *arg, boolean_t add, const uint8_t *mcst_addr)
 static int
 vioif_m_setpromisc(void *arg, boolean_t on)
 {
-	/*
-	 * Even though we cannot currently enable promiscuous mode, we return
-	 * success here to allow tools like snoop(1M) to continue to function.
-	 */
-	return (0);
+	vioif_t *vif = arg;
+	uint8_t val = on ? 1 : 0;
+
+	if (!vif->vif_has_ctrlq_rx) {
+		return (ENOTSUP);
+	}
+
+	return (vioif_ctrlq_req(vif, VIRTIO_NET_CTRL_RX,
+	    VIRTIO_NET_CTRL_RX_PROMISC, &val, sizeof (val)));
 }
 
 static int
@@ -1655,6 +1871,17 @@ vioif_check_features(vioif_t *vif)
 			vif->vif_tx_tso6 = 1;
 		}
 	}
+
+	if (vioif_has_feature(vif, VIRTIO_NET_F_CTRL_VQ)) {
+		vif->vif_has_ctrlq = 1;
+
+		/*
+		 * The VIRTIO_NET_F_CTRL_VQ feature must be enabled if there's
+		 * any chance of the VIRTIO_NET_F_CTRL_RX being enabled.
+		 */
+		if (vioif_has_feature(vif, VIRTIO_NET_F_CTRL_RX))
+			vif->vif_has_ctrlq_rx = 1;
+	}
 }
 
 static int
@@ -1726,6 +1953,13 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
+	if (vioif_has_feature(vif, VIRTIO_NET_F_CTRL_VQ) &&
+	    (vif->vif_ctrl_vq = virtio_queue_alloc(vio,
+	    VIRTIO_NET_VIRTQ_CONTROL, "ctrlq", NULL, vif,
+	    B_FALSE, VIOIF_MAX_SEGS)) == NULL) {
+		goto fail;
+	}
+
 	if (virtio_init_complete(vio, vioif_select_interrupt_types()) !=
 	    DDI_SUCCESS) {
 		dev_err(dip, CE_WARN, "failed to complete Virtio init");
@@ -1734,6 +1968,8 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	virtio_queue_no_interrupt(vif->vif_rx_vq, B_TRUE);
 	virtio_queue_no_interrupt(vif->vif_tx_vq, B_TRUE);
+	if (vif->vif_ctrl_vq != NULL)
+		virtio_queue_no_interrupt(vif->vif_ctrl_vq, B_TRUE);
 
 	mutex_init(&vif->vif_mutex, NULL, MUTEX_DRIVER, virtio_intr_pri(vio));
 	mutex_enter(&vif->vif_mutex);
