@@ -101,12 +101,26 @@ x_inline(XDR *xdrs, int len)
 	return ((rpc_inline_t *)xdrs->x_private);
 }
 
-static int
-harmless(void)
+static bool_t
+harmless_getlong(XDR *xdr __unused, long *l __unused)
 {
 	/* Always return FALSE/NULL, as the case may be */
-	return (0);
+	return (FALSE);
 }
+
+static bool_t
+harmless_getbytes(XDR *xdr __unused, caddr_t p __unused, int i __unused)
+{
+	return (FALSE);
+}
+
+#if defined(_LP64)
+static bool_t
+harmless_getint32(XDR *xdr __unused, int32_t *p __unused)
+{
+	return (FALSE);
+}
+#endif
 
 static void
 x_destroy(XDR *xdrs)
@@ -126,26 +140,21 @@ xdr_sizeof(xdrproc_t func, void *data)
 	struct xdr_ops ops;
 	bool_t stat;
 	/* to stop ANSI-C compiler from complaining */
-	typedef  bool_t (* dummyfunc1)(XDR *, long *);
-	typedef  bool_t (* dummyfunc2)(XDR *, caddr_t, int);
-#if defined(_LP64)
-	typedef  bool_t (* dummyfunc3)(XDR *, int32_t *);
-#endif
 
 	ops.x_putlong = x_putlong;
-	ops.x_getlong =  (dummyfunc1) harmless;
+	ops.x_getlong =  harmless_getlong;
 	ops.x_putbytes = x_putbytes;
 	ops.x_inline = x_inline;
 	ops.x_getpostn = x_getpostn;
 	ops.x_setpostn = x_setpostn;
 	ops.x_destroy = x_destroy;
 #if defined(_LP64)
-	ops.x_getint32 = (dummyfunc3) harmless;
+	ops.x_getint32 = harmless_getint32;
 	ops.x_putint32 = x_putint32_t;
 #endif
 
 	/* the other harmless ones */
-	ops.x_getbytes = (dummyfunc2) harmless;
+	ops.x_getbytes = harmless_getbytes;
 
 	x.x_op = XDR_ENCODE;
 	x.x_ops = &ops;

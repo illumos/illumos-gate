@@ -755,9 +755,10 @@ se_print(FILE *fp, sysevent_t *ev)
  *			It is created as a seperate thread in each subscriber
  *			process per subscription.
  */
-static void
-subscriber_event_handler(sysevent_handle_t *shp)
+static void *
+subscriber_event_handler(void *arg)
 {
+	sysevent_handle_t *shp = arg;
 	subscriber_priv_t *sub_info;
 	sysevent_queue_t *evqp;
 
@@ -784,7 +785,7 @@ subscriber_event_handler(sysevent_handle_t *shp)
 		}
 		if (!SH_BOUND(shp)) {
 			(void) mutex_unlock(&sub_info->sp_qlock);
-			return;
+			return (NULL);
 		}
 	}
 
@@ -2219,8 +2220,7 @@ sysevent_bind_subscriber_cmn(sysevent_handle_t *shp,
 
 	/* Create an event handler thread */
 	if (xsa == NULL || xsa->xs_thrcreate == NULL) {
-		created = thr_create(NULL, 0,
-		    (void *(*)(void *))subscriber_event_handler,
+		created = thr_create(NULL, 0, subscriber_event_handler,
 		    shp, THR_BOUND, &sub_info->sp_handler_tid) == 0;
 	} else {
 		/*
@@ -2238,8 +2238,7 @@ sysevent_bind_subscriber_cmn(sysevent_handle_t *shp,
 		 * thread start function to stash it.
 		 */
 
-		created = xsa->xs_thrcreate(NULL,
-		    (void *(*)(void *))subscriber_event_handler,
+		created = xsa->xs_thrcreate(NULL, subscriber_event_handler,
 		    shp, xsa->xs_thrcreate_cookie) == 1;
 	}
 

@@ -1,14 +1,13 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2019 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SMF_RESTARTER 5 "May 23, 2008"
+.TH SMF_RESTARTER 5 "Dec 11, 2019"
 .SH NAME
 smf_restarter \- service management facility conventions for restarters
 .SH DESCRIPTION
-.sp
-.LP
 All service instances in the service management facility must be managed by a
 restarter. This manual page describes configuration, functionality, and
 reporting characteristics that are common to all restarters in the framework.
@@ -21,8 +20,6 @@ service instance to determine configuration. The restarter manages a set of
 property groups to communicate the current disposition of a service with
 display tools such as \fBsvcs\fR(1).
 .SS "Service Configuration"
-.sp
-.LP
 The common restarter configuration for all services is captured in the
 \fBgeneral\fR property group. This group includes the following required and
 optional property settings.
@@ -54,12 +51,11 @@ absent, the restarter defaults to \fBsvc.startd\fR(1M).
 .ad
 .RS 19n
 This is an optional property. When set, only one instance of the service is
-allowed to transition to an online or degraded status at any time.
+allowed to transition to an online or degraded status at any time. Note that no
+known implementation honours this setting, and it should be considered obsolete.
 .RE
 
 .SS "Service Reporting"
-.sp
-.LP
 All restarters report status using the \fBrestarter\fR property group, which
 includes the following properties:
 .sp
@@ -106,7 +102,5 @@ executing.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBsvcs\fR(1), \fBsvc.startd\fR(1M), \fBservice_bundle\fR(4), \fBsmf\fR(5),
 \fBsmf_method\fR(5)

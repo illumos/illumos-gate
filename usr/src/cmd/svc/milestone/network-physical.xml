@@ -55,6 +55,11 @@
 		<service_fmri value='svc:/system/filesystem/smartdc' />
 	</dependency>
 
+	<!--
+		physical:default and physical:nwam are mutually exclusive.
+		Use a one-way dependency for now since two-way exclude_all
+		does not work.
+	-->
 	<dependency
 		name='mdata-fetch'
 		grouping='optional_all'

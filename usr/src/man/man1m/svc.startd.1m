@@ -1,14 +1,13 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
-.\" Copyright 2012, Joyent, Inc. All Rights Reserved.
+.\" Copyright 2019 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SVC.STARTD 1M "Aug 23, 2012"
+.TH SVC.STARTD 1M "Dec 11, 2019"
 .SH NAME
 svc.startd \- Service Management Facility master restarter
 .SH SYNOPSIS
-.LP
 .nf
 \fB/lib/svc/bin/svc.startd\fR
 .fi
@@ -19,8 +18,6 @@ svc.startd \- Service Management Facility master restarter
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBsvc.startd\fR is the master restarter daemon for Service Management Facility
 (SMF) and the default restarter for all services. \fBsvc.startd\fR starts,
 stops, and restarts services based on administrative requests, system failures,
@@ -44,8 +41,6 @@ to all restarters.
 Configuration Facility. \fBsvcadm\fR(1M) allows manipulation of service
 instances with respect to the service's restarter.
 .SS "Environment Variables"
-.sp
-.LP
 Environment variables with the "SMF_" prefix are reserved and may be
 overwritten.
 .sp
@@ -59,8 +54,6 @@ default. By default, all other environment variables supplied to
 Duplicate entries are reduced to a single entry. The value used is undefined.
 Environment entries that are not prefixed with "<\fIname\fR>=" are ignored.
 .SS "Restarter Options"
-.sp
-.LP
 \fBsvc.startd\fR is not configured by command line options. Instead,
 configuration is read from the service configuration repository. You can use
 \fBsvccfg\fR(1M) to set all options and properties.
@@ -159,13 +152,9 @@ administrator.
 Configuration errors, such as disabling \fBsvc.startd\fR are logged by
 \fBsyslog\fR, but ignored.
 .SS "SERVICE STATES"
-.sp
-.LP
 Services managed by \fBsvc.startd\fR can appear in any of the states described
 in \fBsmf\fR(5). The state definitions are unmodified by this restarter.
 .SS "SERVICE REPORTING"
-.sp
-.LP
 In addition to any logging done by the managed service, \fBsvc.startd\fR
 provides a common set of service reporting and logging mechanisms.
 .sp
@@ -249,8 +238,6 @@ descriptors to \fB/var/svc/log/\fIservice\fR:\fIinstance\fR.log\fR. The level
 of logging to system global locations like \fB/var/svc/log/svc.startd.log\fR
 and \fBsyslog\fR is controlled by the \fBoptions/logging\fR property.
 .SS "SERVICE DEFINITION"
-.sp
-.LP
 When developing or configuring a service managed by \fBsvc.startd\fR, a common
 set of properties are used to affect the interaction between the service
 instance and the restarter.
@@ -351,8 +338,10 @@ available) for managing the service.
 .ad
 .sp .6
 .RS 4n
-If \fBsingle_instance\fR is set to true, \fBsvc.startd\fR only allows one
-instance of this service to transition to online or degraded at any time.
+This was originally supposed to ensure that only one service instance could be
+in online or degraded state at once; however, it was never implemented, and is
+often incorrectly specified in multi-instance manifests. As such, it should be
+considered obsolete and not specified in new manifests.
 .RE
 
 .sp
@@ -429,8 +418,6 @@ create a \fButmpx\fR entry.
 .RE
 
 .SS "SERVICE FAILURE"
-.sp
-.LP
 \fBsvc.startd\fR assumes that a method has failed if it returns a non-zero exit
 code or if fails to complete before the timeout specified expires. If
 \fB$SMF_EXIT_ERR_CONFIG\fR or \fB$SMF_EXIT_ERR_FATAL\fR is returned,
@@ -495,8 +482,6 @@ transition to maintenance state. However, a wait service which is repeatedly
 exiting with an error that exceeds the default rate (5 failures/second) will be
 throttled back so that the service only restarts once per second.
 .SS "LEGACY SERVICES"
-.sp
-.LP
 \fBsvc.startd\fR continues to provide support for services invoked during the
 startup run level transitions. Each \fB/etc/rc?.d\fR directory is processed
 after all managed services which constitute the equivalent run level milestone
@@ -545,7 +530,6 @@ in the \fBLEGACY-RUN\fR state, cannot be modified, and can not be specified as
 dependencies of other services. The initial start time of the legacy service is
 captured as a convenience for the administrator.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/svc/log\fR\fR
@@ -565,7 +549,6 @@ before \fB/var\fR is mounted read-write.
 .RE
 
 .SH EXAMPLE
-.LP
 \fBExample 1 \fRTurning on Verbose Logging
 .sp
 .LP
@@ -588,8 +571,6 @@ svc:/system/svc/restarter:default> exit
 This request will take effect on the next restart of \fBsvc.startd\fR.
 
 .SH SEE ALSO
-.sp
-.LP
 \fBsvcs\fR(1), \fBsvcprop\fR(1), \fBkernel\fR(1M), \fBinit\fR(1M),
 \fBsvcadm\fR(1M), \fBsvccfg\fR(1M), \fBsvc.configd\fR(1M), \fBsetsid\fR(2),
 \fBsyslog\fR(3C), \fBlibscf\fR(3LIB), \fBscf_value_is_type\fR(3SCF),
