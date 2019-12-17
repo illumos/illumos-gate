@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2011 Hudson River Trading LLC
  * Written by: John H. Baldwin <jhb@FreeBSD.org>
  * All rights reserved.
@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef	_EDD_H_
@@ -106,5 +104,8 @@ struct edd_params_v4 {
 #define	EDD_FLAGS_NO_MEDIA_PRESENT		0x0020
 
 #define	EDD_DEVICE_PATH_KEY	0xbedd
+
+#define	EDD_QUERY_MAGIC		0x55aa
+#define	EDD_INSTALLED		0xaa55
 
 #endif /* !_EDD_H_ */
