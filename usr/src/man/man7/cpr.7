@@ -1,98 +1,114 @@
-'\" te
 .\"  Copyright (c) 2001, Sun Microsystems, Inc.
 .\"  All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CPR 7 "May 13, 2017"
-.SH NAME
-cpr \- Suspend and resume module
-.SH SYNOPSIS
-.LP
-.nf
-\fB/platform/'uname -m'/kernel/misc/cpr\fR
-.fi
-
-.SH DESCRIPTION
-.LP
-The \fBcpr\fR module is a loadable module used to suspend and resume the entire
-system. You may wish to suspend a system to save power or to power off
-temporarily for transport. The \fBcpr\fR module should not be used in place of
+.\"
+.\" Copyright 2020 Joyent, Inc.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd January 12, 2020
+.Dt CPR 7
+.Os
+.Sh NAME
+.Nm cpr
+.Nd Suspend and resume module
+.Sh SYNOPSIS
+.Pa /platform/i86pc/kernel/misc/amd64/cpr
+.Pa /platform/sun4u/kernel/misc/sparcv9/cpr
+.Sh DESCRIPTION
+The
+.Nm
+module is a loadable module used to suspend and resume the entire system.
+You may wish to suspend a system to save power or to power off
+temporarily for transport.
+The
+.Nm
+module should not be used in place of
 a normal shutdown when performing any hardware reconfiguration or replacement.
 In order for the resume operation to succeed, it is important that the hardware
-configuration remain the same. When the system is suspended, the entire system
+configuration remain the same.
+When the system is suspended, the entire system
 state is preserved in non-volatile storage until a resume operation is
 conducted.
-.sp
-.LP
-\fBpmconfig\fR(1M) and \fBpower.conf\fR(4) are used to configure the
-suspend-resume feature.
-.sp
-.LP
+.Pp
+.Xr pmconfig 1M
+and
+.Xr power.conf 4
+are used to configure the suspend-resume feature.
+.Pp
 The speed of suspend and resume operations can range from 15 seconds to
 several minutes, depending on the system speed, memory size, and load.
-.sp
-.LP
-During resume operation, the \fBSIGTHAW\fR signal is sent to all processes to
+.Pp
+During resume operation, the
+.Dv SIGTHAW
+signal is sent to all processes to
 allow them to do any special processing in response to suspend-resume
-operation. Normally applications are not required to do any special processing
+operation.
+Normally applications are not required to do any special processing
 because of suspend-resume, but some specialized processes can use
-\fBSIGTHAW\fR to restore the state prior to suspend. For example, \fBX\fR can
-refresh the screen in response to \fBSIGTHAW\fR.
-.sp
-.LP
-In some cases the \fBcpr\fR module may be unable to perform the suspend
-operation. If a system contains additional devices outside the standard shipped
+.Dv SIGTHAW
+to restore the state prior to suspend.
+For example,
+.Sy X
+can refresh the screen in response to
+.Dv SIGTHAW .
+.Pp
+In some cases the
+.Nm
+module may be unable to perform the suspend operation.
+If a system contains additional devices outside the standard shipped
 configuration, it is possible that device drivers for these additional devices
-might not support suspend-resume operations. In this case, the suspend fails
-and an error message is displayed. These devices must be removed or their
-device drivers unloaded for the suspend operation to succeed. Contact the
+might not support suspend-resume operations.
+In this case, the suspend fails and an error message is displayed.
+These devices must be removed or their
+device drivers unloaded for the suspend operation to succeed.
+Contact the
 device manufacturer to obtain a new version of device driver that supports
 suspend-resume.
-.sp
-.LP
+.Pp
 A suspend may also fail when devices or processes are performing critical or
-time-sensitive operations (such as realtime operations). The system will remain
-in its current running state. Messages reporting the failure will be displayed
-on the console and status returned to the caller. Once the system is
+time-sensitive operations (such as realtime operations).
+The system will remain in its current running state.
+Messages reporting the failure will be displayed
+on the console and status returned to the caller.
+Once the system is
 successfully suspended the resume operation will succeed, barring external
 influences such as a hardware reconfiguration.
-.sp
-.LP
+.Pp
 Some network-based applications may fail across a suspend and resume cycle.
 This largely depends on the underlying network protocol and the applications
-involved.  In general, applications that retry and automatically reestablish
+involved.
+In general, applications that retry and automatically reestablish
 connections will continue to operate transparently on a resume operation;
 those applications that do not will likely fail.
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface stability 	Unstable
-.TE
-
-.SH SEE ALSO
-.LP
-\fBpmconfig\fR(1M),
-\fBuadmin\fR(1M), \fBuadmin\fR(2), \fBpower.conf\fR(4), \fBattributes\fR(5)
-.sp
-.LP
-\fIWriting Device Drivers\fR
-.SH NOTES
-.LP
+.Sh INTERFACE STABILITY
+Unstable
+.Sh SEE ALSO
+.Xr pmconfig 1M ,
+.Xr uadmin 1M ,
+.Xr uadmin 2 ,
+.Xr power.conf 4 ,
+.Xr attributes 5
+.Pp
+.%T Writing Device Drivers
+.Sh NOTES
 Certain device operations such as tape and floppy disk activities are not
-resumable due to the nature of removable media.  These activities are detected
+resumable due to the nature of removable media.
+These activities are detected
 at suspend time, and must be stopped before the suspend operation will
 complete successfully.
-.sp
-.LP
+.Pp
 Suspend-resume is currently supported only on a limited set of hardware
 platforms.
