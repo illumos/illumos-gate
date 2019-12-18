@@ -356,10 +356,14 @@ _
 \fBddi_dma_alloc_handle\fR	illumos DDI
 \fBddi_dma_buf_bind_handle\fR	illumos DDI
 \fBddi_dma_burstsizes\fR	illumos DDI
+\fBddi_dma_cookie_get\fR	illumos DDI
+\fBddi_dma_cookie_next\fR	illumos DDI
+\fBddi_dma_cookie_one\fR	illumos DDI
 \fBddi_dma_free_handle\fR	illumos DDI
 \fBddi_dma_getwin\fR	illumos DDI
 \fBddi_dma_mem_alloc\fR	illumos DDI
 \fBddi_dma_mem_free\fR	illumos DDI
+\fBddi_dma_ncookies\fR	illumos DDI
 \fBddi_dma_nextcookie\fR	illumos DDI
 \fBddi_dma_numwin\fR	illumos DDI
 \fBddi_dma_set_sbus64\fR	illumos DDI

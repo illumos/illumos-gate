@@ -76,6 +76,8 @@ px_dma_allocmp(dev_info_t *dip, dev_info_t *rdip, int (*waitfp)(caddr_t),
 	mp->dmai_flags = 0;
 	mp->dmai_pfnlst = NULL;
 	mp->dmai_winlst = NULL;
+	mp->dmai_ncookies = 0;
+	mp->dmai_curcookie = 0;
 
 	/*
 	 * kmem_alloc debug: the following fields are not zero-ed
@@ -1229,7 +1231,9 @@ px_dma_physwin(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	mp->dmai_rflags &= ~DDI_DMA_REDZONE;
 	mp->dmai_flags |= PX_DMAI_FLAGS_NOSYNC;
 	cookie0_p = (ddi_dma_cookie_t *)(PX_WINLST(mp) + 1);
-	mp->dmai_cookie = PX_WINLST(mp)->win_ncookies > 1 ? cookie0_p + 1 : 0;
+	mp->dmai_cookie = cookie0_p + 1;
+	mp->dmai_curcookie = 1;
+	mp->dmai_ncookies = PX_WINLST(mp)->win_ncookies;
 	mp->dmai_mapping = cookie0_p->dmac_laddress;
 
 	px_dma_freepfn(mp);

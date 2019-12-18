@@ -877,6 +877,8 @@ typedef struct ddi_dma_impl {
 	uint_t		dmai_inuse;	/* active handle? */
 	uint_t		dmai_nwin;
 	uint_t		dmai_winsize;
+	uint_t		dmai_ncookies;
+	uint_t		dmai_curcookie;
 	caddr_t		dmai_nexus_private;
 	void		*dmai_iopte;
 	uint_t		*dmai_sbi;
@@ -901,6 +903,8 @@ typedef struct ddi_dma_impl {
  */
 typedef struct ddi_dma_impl {
 	ddi_dma_cookie_t *dmai_cookie; /* array of DMA cookies */
+	uint_t		dmai_ncookies;
+	uint_t		dmai_curcookie;
 	void		*dmai_private;
 
 	/*

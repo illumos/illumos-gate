@@ -258,6 +258,7 @@ scsi_dmaget_attr(struct scsi_pkt_cache_wrapper *pktw)
 	pktw->pcw_total_xfer += pktp->pkt_dma_len;
 	pktp->pkt_cookies = hp->dmai_cookie - 1;
 	hp->dmai_cookie = cp;
+	hp->dmai_curcookie = num_segs;
 
 	return (1);
 }

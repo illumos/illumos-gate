@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_DMA_BUF_BIND_HANDLE 9F "Jul 27, 1996"
+.TH DDI_DMA_BUF_BIND_HANDLE 9F "Jan 18, 2020"
 .SH NAME
 ddi_dma_buf_bind_handle \- binds a system buffer to a DMA handle
 .SH SYNOPSIS
@@ -20,11 +20,9 @@ ddi_dma_buf_bind_handle \- binds a system buffer to a DMA handle
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhandle\fR\fR
@@ -159,7 +157,8 @@ function is specified.
 \fB\fIcookiep\fR\fR
 .ad
 .RS 12n
-A pointer to the first \fBddi_dma_cookie\fR(9S) structure.
+A pointer to the first  \fBddi_dma_cookie\fR(9S) structure.  This should
+be left as \fBNULL\fR in new callers.
 .RE
 
 .sp
@@ -169,11 +168,12 @@ A pointer to the first \fBddi_dma_cookie\fR(9S) structure.
 .ad
 .RS 12n
 Upon a successful return, \fIccountp\fR points to a value representing the
-number of cookies for this \fBDMA\fR object.
+number of cookies for this \fBDMA\fR object.  This can
+be left as \fBNULL\fR in new callers.  The cookie count can be obtained
+by calling \fBddi_dma_ncookies\fR(9F).
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBddi_dma_buf_bind_handle()\fR allocates \fBDMA\fR resources for a system
 buffer such that a device can perform \fBDMA\fR to or from the buffer.
@@ -181,11 +181,16 @@ buffer such that a device can perform \fBDMA\fR to or from the buffer.
 as expressed by \fBddi_dma_attr\fR(9S) (see \fBddi_dma_alloc_handle\fR(9F)).
 .sp
 .LP
-\fBddi_dma_buf_bind_handle()\fR fills in the first \fBDMA\fR cookie pointed to
-by \fIcookiep\fR with the appropriate address, length, and bus type.
-\fB*\fR\fIccountp\fR is set to the number of \fBDMA\fR cookies representing
-this \fBDMA\fR object. Subsequent \fBDMA\fR cookies must be retrieved by
-calling \fBddi_dma_nextcookie\fR(9F) \fB*\fR\fIcountp\fR-1 times.
+\fBddi_dma_buf_bind_handle()\fR allocates and associates a number of
+\fBDMA\fR cookies with \fIhandle\fR.  To get the total number of
+cookies, callers should use the \fBddi_dma_ncookies\fR(9F) function. To
+get all of the cookies, callers should use the
+\fBddi_dma_cookie_iter\fR(9F) or \fBddi_dma_cookie_get\fR(9F) functions.
+Callers should pass \fBNULL\fR for \fIcookiep\fR and \fIccountp\fR.
+These values are required if using the deprecated
+\fBddi_dma_nextcookie\fR(9F) interface, in which case \fIcookiep\fR is
+filled in with the first \fBddi_dma_cookie\fR(9S) structure.
+
 .sp
 .LP
 When a \fBDMA\fR transfer completes, the driver should free up system \fBDMA\fR
@@ -287,7 +292,6 @@ functions accessible from interrupt context are be available. The callback
 function must take whatever steps necessary to protect its critical resources,
 data structures, queues, etc.
 .SH RETURN VALUES
-.sp
 .LP
 \fBddi_dma_buf_bind_handle()\fR returns:
 .sp
@@ -349,24 +353,22 @@ configuration.
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 \fBddi_dma_buf_bind_handle()\fR can be called from user, kernel, or interrupt
 context, except when \fIcallback\fR is set to \fBDDI_DMA_SLEEP\fR, in which
 case it can be called from user or kernel context only.
 .SH SEE ALSO
-.sp
 .LP
 \fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_alloc_handle\fR(9F),
+\fBddi_dma_cookie_get\fR(9F), \fBddi_dma_cookie_iter\fR(9F),
 \fBddi_dma_free_handle\fR(9F), \fBddi_dma_getwin\fR(9F),
-\fBddi_dma_nextcookie\fR(9F), \fBddi_dma_sync\fR(9F),
+\fBddi_dma_ncookies\fR(9F), \fBddi_dma_sync\fR(9F),
 \fBddi_dma_unbind_handle\fR(9F), \fBbuf\fR(9S), \fBddi_dma_attr\fR(9S),
 \fBddi_dma_cookie\fR(9S)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH NOTES
-.sp
 .LP
 If the driver permits partial mapping with the \fBDDI_DMA_PARTIAL\fR flag, the
 number of cookies in each window may exceed the size of the device's

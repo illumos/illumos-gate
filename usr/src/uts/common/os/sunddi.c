@@ -7074,6 +7074,14 @@ ddi_dma_buf_bind_handle(ddi_dma_handle_t handle, struct buf *bp,
 	dev_info_t *dip, *rdip;
 	struct ddi_dma_req dmareq;
 	int (*funcp)();
+	ddi_dma_cookie_t cookie;
+	uint_t count;
+
+	if (cookiep == NULL)
+		cookiep = &cookie;
+
+	if (ccountp == NULL)
+		ccountp = &count;
 
 	dmareq.dmar_flags = flags;
 	dmareq.dmar_fp = waitfp;
@@ -7130,10 +7138,19 @@ ddi_dma_addr_bind_handle(ddi_dma_handle_t handle, struct as *as,
 	dev_info_t *dip, *rdip;
 	struct ddi_dma_req dmareq;
 	int (*funcp)();
+	ddi_dma_cookie_t cookie;
+	uint_t count;
 
 	if (len == (uint_t)0) {
 		return (DDI_DMA_NOMAPPING);
 	}
+
+	if (cookiep == NULL)
+		cookiep = &cookie;
+
+	if (ccountp == NULL)
+		ccountp = &count;
+
 	dmareq.dmar_flags = flags;
 	dmareq.dmar_fp = waitfp;
 	dmareq.dmar_arg = arg;
@@ -7156,6 +7173,11 @@ ddi_dma_nextcookie(ddi_dma_handle_t handle, ddi_dma_cookie_t *cookiep)
 	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
 	ddi_dma_cookie_t *cp;
 
+	if (hp->dmai_curcookie >= hp->dmai_ncookies) {
+		panic("ddi_dma_nextcookie() called too many times on handle %p",
+		    hp);
+	}
+
 	cp = hp->dmai_cookie;
 	ASSERT(cp);
 
@@ -7164,6 +7186,74 @@ ddi_dma_nextcookie(ddi_dma_handle_t handle, ddi_dma_cookie_t *cookiep)
 	cookiep->dmac_address = cp->dmac_address;
 	cookiep->dmac_size = cp->dmac_size;
 	hp->dmai_cookie++;
+	hp->dmai_curcookie++;
+}
+
+int
+ddi_dma_ncookies(ddi_dma_handle_t handle)
+{
+	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
+
+	return (hp->dmai_ncookies);
+}
+
+const ddi_dma_cookie_t *
+ddi_dma_cookie_iter(ddi_dma_handle_t handle, const ddi_dma_cookie_t *iter)
+{
+	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
+	const ddi_dma_cookie_t *base, *end;
+
+	if (hp->dmai_ncookies == 0) {
+		return (NULL);
+	}
+
+	base = hp->dmai_cookie - hp->dmai_curcookie;
+	end = base + hp->dmai_ncookies;
+	if (iter == NULL) {
+		return (base);
+	}
+
+	if ((uintptr_t)iter < (uintptr_t)base ||
+	    (uintptr_t)iter >= (uintptr_t)end) {
+		return (NULL);
+	}
+
+	iter++;
+	if (iter == end) {
+		return (NULL);
+	}
+
+	return (iter);
+}
+
+const ddi_dma_cookie_t *
+ddi_dma_cookie_get(ddi_dma_handle_t handle, uint_t index)
+{
+	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
+	const ddi_dma_cookie_t *base;
+
+	if (index >= hp->dmai_ncookies) {
+		return (NULL);
+	}
+
+	base = hp->dmai_cookie - hp->dmai_curcookie;
+	return (base + index);
+}
+
+const ddi_dma_cookie_t *
+ddi_dma_cookie_one(ddi_dma_handle_t handle)
+{
+	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
+	const ddi_dma_cookie_t *base;
+
+	if (hp->dmai_ncookies != 1) {
+		panic("ddi_dma_cookie_one() called with improper handle %p",
+		    hp);
+	}
+	ASSERT3P(hp->dmai_cookie, !=, NULL);
+
+	base = hp->dmai_cookie - hp->dmai_curcookie;
+	return (base);
 }
 
 int
@@ -7184,10 +7274,18 @@ ddi_dma_getwin(ddi_dma_handle_t h, uint_t win, off_t *offp,
 {
 	int (*funcp)() = ddi_dma_win;
 	struct bus_ops *bop;
+	ddi_dma_cookie_t cookie;
+	uint_t count;
 
 	bop = DEVI(HD)->devi_ops->devo_bus_ops;
 	if (bop && bop->bus_dma_win)
 		funcp = bop->bus_dma_win;
+
+	if (cookiep == NULL)
+		cookiep = &cookie;
+
+	if (ccountp == NULL)
+		ccountp = &count;
 
 	return ((*funcp)(HD, HD, h, win, offp, lenp, cookiep, ccountp));
 }

@@ -267,6 +267,8 @@ pci_dma_allocmp(dev_info_t *dip, dev_info_t *rdip, int (*waitfp)(caddr_t),
 	mp->dmai_flags = 0;
 	mp->dmai_pfnlst = NULL;
 	mp->dmai_winlst = NULL;
+	mp->dmai_ncookies = 0;
+	mp->dmai_curcookie = 0;
 
 	/*
 	 * kmem_alloc debug: the following fields are not zero-ed
@@ -1410,8 +1412,10 @@ pci_dma_physwin(pci_t *pci_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	}
 	mp->dmai_rflags &= ~DDI_DMA_REDZONE;
 	cookie0_p = (ddi_dma_cookie_t *)(WINLST(mp) + 1);
-	mp->dmai_cookie = WINLST(mp)->win_ncookies > 1 ? cookie0_p + 1 : 0;
+	mp->dmai_cookie = cookie0_p + 1;
 	mp->dmai_mapping = cookie0_p->dmac_laddress;
+	mp->dmai_ncookies = WINLST(mp)->win_ncookies;
+	mp->dmai_curcookie = 1;
 
 	pci_dma_freepfn(mp);
 	return (DDI_DMA_MAPPED);

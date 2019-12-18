@@ -1368,6 +1368,10 @@ ddi_dma_unbind_handle(ddi_dma_handle_t handle);
 
 /*
  * get next DMA cookie
+ *
+ * This function has been deprecated because it is unsafe. Please use
+ * ddi_dma_cookie_iter(), ddi_dma_cookie_get(), or ddi_dma_cookie_one() instead.
+ * For more information on the problems, please see the manual page.
  */
 
 void
@@ -1849,6 +1853,16 @@ extern int ddi_check_dma_handle(ddi_dma_handle_t);
 extern void ddi_dev_report_fault(dev_info_t *, ddi_fault_impact_t,
     ddi_fault_location_t, const char *);
 extern ddi_devstate_t ddi_get_devstate(dev_info_t *);
+
+/*
+ * Replacement DMA cookie functions for ddi_dma_nextcookie().
+ */
+extern int ddi_dma_ncookies(ddi_dma_handle_t);
+extern const ddi_dma_cookie_t *ddi_dma_cookie_iter(ddi_dma_handle_t,
+    const ddi_dma_cookie_t *);
+extern const ddi_dma_cookie_t *ddi_dma_cookie_get(ddi_dma_handle_t, uint_t);
+extern const ddi_dma_cookie_t *ddi_dma_cookie_one(ddi_dma_handle_t);
+
 
 /*
  * Miscellaneous redefines

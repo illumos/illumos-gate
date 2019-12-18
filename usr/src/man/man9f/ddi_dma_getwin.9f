@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_DMA_GETWIN 9F "Nov 15, 1996"
+.TH DDI_DMA_GETWIN 9F "Jan 18, 2020"
 .SH NAME
 ddi_dma_getwin \- activate a new DMA window
 .SH SYNOPSIS
@@ -20,11 +20,9 @@ ddi_dma_getwin \- activate a new DMA window
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIhandle\fR \fR
@@ -69,7 +67,8 @@ current window.
 \fB\fIcookiep\fR \fR
 .ad
 .RS 12n
-A pointer to the first  \fBddi_dma_cookie\fR(9S) structure.
+A pointer to the first \fBddi_dma_cookie\fR(9S) structure.  This should
+be left as \fBNULL\fR in new callers.
 .RE
 
 .sp
@@ -79,11 +78,12 @@ A pointer to the first  \fBddi_dma_cookie\fR(9S) structure.
 .ad
 .RS 12n
 Upon a successful return,  \fIccountp\fR will contain the number of cookies for
-this  \fBDMA\fR window.
+this  \fBDMA\fR window.  This can
+be left as \fBNULL\fR in new callers.  The cookie count can be obtained
+by calling \fBddi_dma_ncookies\fR(9F).
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBddi_dma_getwin()\fR activates a new  \fBDMA\fR window. If a  \fBDMA\fR
 resource allocation request returns \fBDDI_DMA_PARTIAL_MAP\fR indicating that
@@ -97,11 +97,15 @@ window number from the range  \fI[0..N-1]\fR as the parameter \fIwin\fR and
 makes it the current  \fBDMA\fR window.
 .sp
 .LP
-\fBddi_dma_getwin()\fR fills in the first \fBDMA\fR cookie pointed to by
-\fIcookiep\fR with the appropriate address, length, and bus type.
-\fB*\fR\fIccountp\fR is set to the number of \fBDMA\fR cookies representing
-this \fBDMA \fRobject. Subsequent \fBDMA\fR cookies must be retrieved using
-\fBddi_dma_nextcookie\fR(9F).
+\fBddi_dma_getwin()\fR allocates and assosciates a number of
+\fBDMA\fR cookies with \fIhandle\fR.  To get the total number of
+cookies, callers should use the \fBddi_dma_ncookies\fR(9F) function. To
+get all of the cookies, callers should use the
+\fBddi_dma_cookie_iter\fR(9F) or \fBddi_dma_cookie_get\fR(9F) functions.
+Callers should pass \fBNULL\fR for \fIcookiep\fR and \fIccountp\fR.
+These values are required if using the deprecated
+\fBddi_dma_nextcookie\fR(9F) interface, in which case \fIcookiep\fR is
+filled in with the first \fBddi_dma_cookie\fR(9S) structure.
 .sp
 .LP
 \fBddi_dma_getwin()\fR takes care of underlying resource synchronizations
@@ -118,7 +122,6 @@ the interrupt routine returns without invoking another  \fBDMA\fR transfer.
 Otherwise, it calls  \fBddi_dma_getwin()\fR to shift the current window and
 start another \fBDMA\fR transfer.
 .SH RETURN VALUES
-.sp
 .LP
 \fBddi_dma_getwin()\fR returns:
 .sp
@@ -140,14 +143,13 @@ Resources for the specified \fBDMA\fR window are allocated.
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 \fBddi_dma_getwin()\fR can be called from user, kernel, or interrupt context.
 .SH SEE ALSO
-.sp
 .LP
 \fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_alloc_handle\fR(9F),
-\fBddi_dma_buf_bind_handle\fR(9F), \fBddi_dma_nextcookie\fR(9F),
+\fBddi_dma_buf_bind_handle\fR(9F),  \fBddi_dma_cookie_get\fR(9F),
+\fBddi_dma_cookie_iter\fR(9F), \fBddi_dma_ncookies\fR(9F),
 \fBddi_dma_numwin\fR(9F), \fBddi_dma_sync\fR(9F),
 \fBddi_dma_unbind_handle\fR(9F), \fBddi_dma_cookie\fR(9S)
 .sp
