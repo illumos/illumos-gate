@@ -127,8 +127,7 @@ ipcperm(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 #define	MSG_SND_SIZE 0x1
 static int
 msgq_check_for_waiters(list_t *walk_this, int min, int max,
-	int copy_wait, uintptr_t addr, int flag)
-
+    int copy_wait, uintptr_t addr, int flag)
 {
 	int found = 0;
 	int ii;
@@ -686,8 +685,7 @@ msgprint(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    (uintptr_t)message.msg_addr, message.msg_size,
 			    MDB_DUMP_RELATIVE | MDB_DUMP_TRIM |
 			    MDB_DUMP_ASCII | MDB_DUMP_HEADER |
-			    MDB_DUMP_GROUP(4),
-			    (mdb_dumpptr_cb_t)mdb_vread, NULL)) {
+			    MDB_DUMP_GROUP(4), NULL, NULL)) {
 				mdb_dec_indent(CMN_INDENT);
 				return (DCMD_ERR);
 			}

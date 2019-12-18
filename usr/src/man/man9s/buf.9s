@@ -1,228 +1,264 @@
-'\" te
 .\" Copyright (c) 2002 Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BUF 9S "Sep 19, 2002"
-.SH NAME
-buf \- block I/O data transfer structure
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/ddi.h>
-#include <sys/sunddi.h>
-.fi
-
-.SH INTERFACE LEVEL
-.sp
-.LP
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd July 9, 2018
+.Dt BUF 9S
+.Os
+.Sh NAME
+.Nm buf
+.Nd block I/O data transfer structure
+.Sh SYNOPSIS
+.In sys/ddi.h
+.In sys/sunddi.h
+.Sh INTERFACE LEVEL
 Architecture independent level 1 (DDI/DKI)
-.SH DESCRIPTION
-.sp
-.LP
-The \fBbuf\fR structure is the basic data structure for block \fBI/O\fR
-transfers. Each block \fBI/O\fR transfer has an associated buffer header. The
-header contains all the buffer control and status information. For drivers, the
-buffer header pointer is the sole argument to a block driver \fBstrategy\fR(9E)
-routine. Do not depend on the size of the \fBbuf\fR structure when writing a
-driver.
-.sp
-.LP
-A buffer header can be linked in multiple lists simultaneously. Because of
+.Sh DESCRIPTION
+The
+.Vt buf
+structure is the basic data structure for block
+.Sy I/O
+transfers.
+Each block
+.Sy I/O
+transfer has an associated buffer header.
+The header contains all the buffer control and status information.
+For drivers, the buffer header pointer is the sole argument to a block driver
+.Xr strategy 9E
+routine.
+Do not depend on the size of the
+.Vt buf
+structure when writing a driver.
+.Pp
+A buffer header can be linked in multiple lists simultaneously.
+Because of
 this, most of the members in the buffer header cannot be changed by the driver,
 even when the buffer header is in one of the driver's work lists.
-.sp
-.LP
-Buffer headers are also used by the system for unbuffered or physical \fBI/O\fR
-for block drivers. In this case, the buffer describes a portion of user data
+.Pp
+Buffer headers are also used by the system for unbuffered or physical
+.Sy I/O
+for block drivers.
+In this case, the buffer describes a portion of user data
 space that is locked into memory.
-.sp
-.LP
+.Pp
 Block drivers often chain block requests so that overall throughput for the
-device is maximized. The \fBav_forw\fR and the \fBav_back\fR members of the
-\fBbuf\fR structure can serve as link pointers for chaining block requests.
-.SH STRUCTURE MEMBERS
-.sp
-.in +2
-.nf
+device is maximized.
+The
+.Fa av_forw
+and the
+.Fa av_back
+members of the
+.Vt buf
+structure can serve as link pointers for chaining block requests.
+.Sh STRUCTURE MEMBERS
+.Bd -literal -offset 2n
 int           b_flags;           /* Buffer status */
 struct buf    *av_forw;          /* Driver work list link */
 struct buf    *av_back;          /* Driver work list link */
 size_t        b_bcount;          /* # of bytes to transfer */
 union {
-     caddr_t  b_addr;            /* Buffer's virtual address */
+    caddr_t  b_addr;            /* Buffer's virtual address */
 } b_un;
 daddr_t       b_blkno;           /* Block number on device */
-diskaddr_t    b_lblkno;          /* Expanded block number on dev. */
+diskaddr_t    b_lblkno;          /* Expanded block number on dev.  */
 size_t        b_resid;           /* # of bytes not xferred */
 size_t        b_bufsize;         /* size of alloc. buffer */
 int           (*b_iodone)(struct buf *); /* function called */
-	                                        /* by biodone */
+                                         /* by biodone */
 int           b_error;           /* expanded error field */
 void          *b_private;        /* "opaque" driver private area */
 dev_t         b_edev;            /* expanded dev field */
-\fI\fR
-.fi
-.in -2
-
-.sp
-.LP
+.Ed
+.Pp
 The members of the buffer header available to test or set by a driver are as
 follows:
-.sp
-.LP
-\fBb_flags\fR stores the buffer status and indicates to the driver whether to
-read or write to the device. The driver must never clear the \fBb_flags\fR
-member. If this is done, unpredictable results can occur including loss of disk
+.Pp
+.Fa b_flags
+stores the buffer status and indicates to the driver whether to
+read or write to the device.
+The driver must never clear the
+.Fa b_flags
+member.
+If this is done, unpredictable results can occur including loss of disk
 sanity and the possible failure of other kernel processes.
-.sp
-.LP
-All \fBb_flags\fR bit values not otherwise specified above are reserved by the
+.Pp
+All
+.Fa b_flags
+bit values not otherwise specified above are reserved by the
 kernel and may not be used.
-.sp
-.LP
+.Pp
 Valid flags are as follows:
-.sp
-.ne 2
-.na
-\fB\fBB_BUSY\fR \fR
-.ad
-.RS 13n
-Indicates the buffer is in use. The driver must not change this flag unless it
-allocated the buffer with \fBgetrbuf\fR(9F) and no \fBI/O\fR operation is in
-progress.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB_DONE\fR \fR
-.ad
-.RS 13n
-Indicates the data transfer has completed. This flag is read-only.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB_ERROR\fR \fR
-.ad
-.RS 13n
-Indicates an \fBI/O\fR transfer error. It is set in conjunction with the
-\fBb_error\fR field. \fBbioerror\fR(9F) should be used in preference to setting
-the \fBB_ERROR\fR bit.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB_PAGEIO\fR \fR
-.ad
-.RS 13n
-Indicates the buffer is being used in a paged \fBI/O\fR request. See the
-description of the \fBb_un.b_addr\fR field for more information. This flag is
-read-only.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB_PHYS\fR \fR
-.ad
-.RS 13n
-indicates the buffer header is being used for physical (direct) \fBI/O\fR to a
-user data area. See the description of the \fBb_un.b_addr\fR field for more
-information. This flag is read-only.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB_READ\fR \fR
-.ad
-.RS 13n
+.Bl -tag -width "B_PAGEIO"
+.It Dv B_BUSY
+Indicates the buffer is in use.
+The driver must not change this flag unless it allocated the buffer with
+.Xr getrbuf 9F
+and no
+.Sy I/O
+operation is in progress.
+.It Dv B_DONE
+Indicates the data transfer has completed.
+This flag is read-only.
+.It Dv B_ERROR
+Indicates an
+.Sy I/O
+transfer error.
+It is set in conjunction with the
+.Fa b_error
+field.
+.Xr bioerror 9F
+should be used in preference to setting the
+.Dv B_ERROR
+bit.
+.It Dv B_PAGEIO
+Indicates the buffer is being used in a paged
+.Sy I/O
+request.
+See the description of the
+.Fa b_un.b_addr
+field for more information.
+This flag is read-only.
+.It Dv B_PHYS
+indicates the buffer header is being used for physical (direct)
+.Sy I/O
+to a user data area.
+See the description of the
+.Fa b_un.b_addr
+field for more information.
+This flag is read-only.
+.It Dv B_READ
 Indicates that data is to be read from the peripheral device into main memory.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBB_WRITE\fR \fR
-.ad
-.RS 13n
+.It Dv B_WRITE
 Indicates that the data is to be transferred from main memory to the peripheral
-device. \fBB_WRITE\fR is a pseudo flag and cannot be directly tested; it is
-only detected as the NOT form of \fBB_READ\fR.
-.RE
-
-.sp
-.LP
-\fBav_forw\fR and \fBav_back\fR can be used by the driver to link the buffer
-into driver work lists.
-.sp
-.LP
-\fBb_bcount\fR specifies the number of bytes to be transferred in both a paged
-and a non-paged \fBI/O\fR request.
-.sp
-.LP
-\fBb_un.b_addr\fR is the virtual address of the \fBI/O\fR request, unless
-\fBB_PAGEIO\fR is set. The address is a kernel virtual address, unless
-\fBB_PHYS\fR is set, in which case it is a user virtual address. If
-\fBB_PAGEIO\fR is set, \fBb_un.b_addr\fR contains kernel private data. Note
-that either one of \fBB_PHYS\fR and \fBB_PAGEIO\fR, or neither, can be set, but
+device.
+.Dv B_WRITE
+is a pseudo flag and cannot be directly tested; it is
+only detected as the NOT form of
+.Dv B_READ .
+.El
+.Pp
+.Fa av_forw
+and
+.Fa av_back
+can be used by the driver to link the buffer into driver work lists.
+.Pp
+.Fa b_bcount
+specifies the number of bytes to be transferred in both a paged and a non-paged
+.Sy I/O
+request.
+.Pp
+.Fa b_un.b_addr
+is the virtual address of the
+.Sy I/O
+request, unless
+.Dv B_PAGEIO
+is set.
+The address is a kernel virtual address, unless
+.Dv B_PHYS
+is set, in which case it is a user virtual address.
+If
+.Dv B_PAGEIO
+is set,
+.Fa b_un.b_addr
+contains kernel private data.
+Note that either one of
+.Dv B_PHYS
+and
+.Dv B_PAGEIO ,
+or neither, can be set, but
 not both.
-.sp
-.LP
-\fBb_blkno\fR identifies which logical block on the device (the device is
-defined by the device number) is to be accessed. The driver might have to
+.Pp
+.Fa b_blkno
+identifies which logical block on the device (the device is
+defined by the device number) is to be accessed.
+The driver might have to
 convert this logical block number to a physical location such as a cylinder,
-track, and sector of a disk. This is a 32-bit value. The driver should use
-\fBb_blkno\fR or \fBb_lblkno\fR, but not both.
-.sp
-.LP
-\fBb_lblkno\fR identifies which logical block on the device (the device is
-defined by the device number) is to be accessed. The driver might have to
+track, and sector of a disk.
+This is a 32-bit value.
+The driver should use
+.Fa b_blkno
+or
+.Fa b_lblkno ,
+but not both.
+.Pp
+.Fa b_lblkno
+identifies which logical block on the device (the device is
+defined by the device number) is to be accessed.
+The driver might have to
 convert this logical block number to a physical location such as a cylinder,
-track, and sector of a disk. This is a 64-bit value. The driver should use
-\fBb_lblkno\fR or \fBb_blkno\fR, but not both.
-.sp
-.LP
-\fBb_resid\fR should be set to the number of bytes not transferred because of
-an error.
-.sp
-.LP
-\fBb_bufsize\fR contains the size of the allocated buffer.
-.sp
-.LP
-\fBb_iodone\fR identifies a specific \fBbiodone\fR routine to be called by the
-driver when the \fBI/O\fR is complete.
-.sp
-.LP
-\fBb_error\fR can hold an error code that should be passed as a return code
-from the driver. \fBb_error\fR is set in conjunction with the \fBB_ERROR\fR bit
-set in the \fBb_flags\fR member. \fBbioerror\fR(9F) should be used in
-preference to setting the \fBb_error\fR field.
-.sp
-.LP
-\fBb_private\fR is for the private use of the device driver.
-.sp
-.LP
-\fBb_edev\fR contains the major and minor device numbers of the device
+track, and sector of a disk.
+This is a 64-bit value.
+The driver should use
+.Fa b_lblkno
+or
+.Fa b_blkno ,
+but not both.
+.Pp
+.Fa b_resid
+should be set to the number of bytes not transferred because of an error.
+.Pp
+.Fa b_bufsize
+contains the size of the allocated buffer.
+.Pp
+.Fa b_iodone
+identifies a specific
+.Xr biodone 9F
+routine to be called by the driver when the
+.Sy I/O
+is complete.
+.Pp
+.Fa b_error
+can hold an error code that should be passed as a return code
+from the driver.
+.Fa b_error
+is set in conjunction with the
+.Dv B_ERROR
+bit
+set in the
+.Fa b_flags
+member.
+.Xr bioerror 9F
+should be used in
+preference to setting the
+.Fa b_error
+field.
+.Pp
+.Fa b_private
+is for the private use of the device driver.
+.Pp
+.Fa b_edev
+contains the major and minor device numbers of the device
 accessed.
-.SH SEE ALSO
-.sp
-.LP
-\fBstrategy\fR(9E), \fBaphysio\fR(9F), \fBbioclone\fR(9F), \fBbiodone\fR(9F),
-\fBbioerror\fR(9F), \fBbioinit\fR(9F), \fBclrbuf\fR(9F), \fBgetrbuf\fR(9F),
-\fBphysio\fR(9F), \fBiovec\fR(9S), \fBuio\fR(9S)
-.sp
-.LP
-\fIWriting Device Drivers\fR
-.SH WARNINGS
-.sp
-.LP
-Buffers are a shared resource within the kernel. Drivers should read or write
-only the members listed in this section. Drivers that attempt to use
-undocumented members of the \fBbuf\fR structure risk corrupting data in the
-kernel or on the device.
+.Sh SEE ALSO
+.Xr strategy 9E ,
+.Xr aphysio 9F ,
+.Xr bioclone 9F ,
+.Xr biodone 9F ,
+.Xr bioerror 9F ,
+.Xr bioinit 9F ,
+.Xr clrbuf 9F ,
+.Xr getrbuf 9F ,
+.Xr physio 9F ,
+.Xr iovec 9S ,
+.Xr uio 9S
+.Rs
+.%T Writing Device Drivers
+.Re
+.Sh WARNINGS
+Buffers are a shared resource within the kernel.
+Drivers should read or write only the members listed in this section.
+Drivers that attempt to use undocumented members of the
+.Fa buf
+structure risk corrupting data in the kernel or on the device.

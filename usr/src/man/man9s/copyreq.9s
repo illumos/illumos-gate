@@ -1,43 +1,52 @@
-'\" te
 .\" Copyright (c) 2000, Sun Microsystems, Inc., All Rights Reserved.
 .\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH COPYREQ 9S "Oct 6, 2000"
-.SH NAME
-copyreq \- STREAMS data structure for the M_COPYIN and the M_COPYOUT message
-types
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/stream.h>
-.fi
-
-.SH INTERFACE LEVEL
-.sp
-.LP
+.\" Copyright 2018, Joyent, Inc.
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd July 9, 2018
+.Dt COPYREQ 9S
+.Os
+.Sh NAME
+.Nm copyreq
+.Nd STREAMS data structure for the
+.Dv M_COPYIN
+and the
+.Dv M_COPYOUT
+message types
+.Sh SYNOPSIS
+.In sys/stream.h
+.Sh INTERFACE LEVEL
 Architecture independent level 1 (DDI/DKI)
-.SH DESCRIPTION
-.sp
-.LP
-The data structure for the \fBM_COPYIN\fR and the \fBM_COPYOUT\fR message
+.Sh DESCRIPTION
+The data structure for the
+.Dv M_COPYIN
+and the
+.Dv M_COPYOUT
+message
 types.
-.SH STRUCTURE MEMBERS
-.sp
-.in +2
-.nf
+.Sh STRUCTURE MEMBERS
+.Bd -literal -offset 2n
 int      cq_cmd;           /* ioctl command (from ioc_cmd) */
 cred_t   *cq_cr;           /* full credentials */
 uint_t   cq_id;            /* ioctl id (from ioc_id) */
-uint_t   cq_flag;	       /* must be zero */
+uint_t   cq_flag;	   /* must be zero */
 mblk_t   *cq_private;      /* private state information */
 caddr_t  cq_addr;          /* address to copy data to/from */
-size_t   cq_size;          /* number of bytes to copy */	
-.fi
-.in -2
-
-.SH SEE ALSO
-.sp
-.LP
-\fISTREAMS Programming Guide\fR
+size_t   cq_size;          /* number of bytes to copy */
+.Ed
+.Sh SEE ALSO
+.Rs
+.%T STREAMS Programming Guide
+.Re

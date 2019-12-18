@@ -1,90 +1,127 @@
-'\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc., All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CB_OPS 9S "Apr 24, 2008"
-.SH NAME
-cb_ops \- character/block entry points structure
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/conf.h>
-#include <sys/ddi.h>
-#include <sys/sunddi.h>
-.fi
-
-.SH INTERFACE LEVEL
-.sp
-.LP
+.\" Copyright 2018, Joyent, Inc.
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd July 9, 2018
+.Dt CB_OPS 9S
+.Os
+.Sh NAME
+.Nm cb_ops
+.Nd character/block entry points structure
+.Sh SYNOPSIS
+.In sys/conf.h
+.In sys/ddi.h
+.In sys/sunddi.h
+.Sh INTERFACE LEVEL
 Solaris DDI specific (Solaris DDI)
-.SH DESCRIPTION
-.sp
-.LP
-The \fBcb_ops\fR structure contains all entry points for drivers that support
-both character and block entry points. All leaf device drivers that support
-direct user process access to a device should declare a \fBcb_ops\fR structure.
-.sp
-.LP
+.Sh DESCRIPTION
+The
+.Nm
+structure contains all entry points for drivers that support
+both character and block entry points.
+All leaf device drivers that support
+direct user process access to a device should declare a
+.Nm
+structure.
+.Pp
 All drivers that safely allow multiple threads of execution in the driver at
-the same time must set the \fBD_MP\fR flag in the \fBcb_flag\fR field. See
-\fBopen\fR(9E).
-.sp
-.LP
+the same time must set the
+.Dv D_MP
+flag in the
+.Fa cb_flag
+field.
+See
+.Xr open 9E .
+.Pp
 If the driver properly handles 64-bit offsets, it should also set the
-\fBD_64BIT\fR flag in the \fBcb_flag\fR field. This specifies that the driver
-will use the \fBuio_loffset\fR field of the \fBuio\fR(9S) structure.
-.sp
-.LP
-If the driver returns \fBEINTR\fR from \fBopen\fR(9E), it should also set the
-\fBD_OPEN_RETURNS_EINTR\fR flag in the \fBcb_flag\fR field. This lets the
-framework know that it is safe for the driver to return \fBEINTR\fR when
-waiting, to provide exclusion for a last-reference \fBclose\fR(9E) call to
-complete before calling \fBopen\fR(9E).
-.sp
-.LP
-The \fBmt-streams\fR(9F) function describes other flags that can be set in the
-\fBcb_flag\fR field.
-.sp
-.LP
-The \fBcb_rev\fR is the \fBcb_ops\fR structure revision number. This field must
-be set to \fBCB_REV\fR.
-.sp
-.LP
-Non-\fBSTREAMS\fR drivers should set \fBcb_str\fR to \fINULL\fR.
-.sp
-.LP
-The following \fBDDI\fR/\fBDKI\fR or \fBDKI\fR-only or \fBDDI\fR-only functions
-are provided in the character/block driver operations structure.
-.sp
-
-.sp
-.TS
-c c c c
-l l l l .
-block/char	Function	Description	
-_
-b/c	XXopen	\fBDDI\fR/\fBDKI\fR	
-b/c	XXclose	\fBDDI\fR/\fBDKI\fR	
-b	XXstrategy	DDI/DKI	
-b	XXprint	DDI/DKI	
-b	XXdump	DDI(Sun)	
-c	XXread	DDI/DKI	
-c	XXwrite	DDI/DKI	
-c	XXioctl	DDI/DKI	
-c	XXdevmap	DDI(Sun)	
-c	XXmmap	DKI	
-c	XXsegmap	DKI	
-c	XXchpoll	DDI/DKI	
-c	XXprop_op	DDI(Sun)	
-c	XXaread	DDI(Sun)	
-c	XXawrite	DDI(Sun)	
-.TE
-
-.SH STRUCTURE MEMBERS
-.sp
-.in +2
-.nf
+.Dv D_64BIT
+flag in the
+.Fa cb_flag
+field.
+This specifies that the driver
+will use the
+.Fa uio_loffset
+field of the
+.Xr uio 9S
+structure.
+.Pp
+If the driver returns
+.Er EINTR
+from
+.Xr open 9E ,
+it should also set the
+.Dv D_OPEN_RETURNS_EINTR
+flag in the
+.Fa cb_flag
+field.
+This lets the
+framework know that it is safe for the driver to return
+.Er EINTR
+when waiting, to provide exclusion for a last-reference
+.Xr close 9E
+call to complete before calling
+.Xr open 9E .
+.Pp
+The
+.Xr mt-streams 9F
+function describes other flags that can be set in the
+.Fa cb_flag
+field.
+.Pp
+The
+.Fa cb_rev
+is the
+.Vt cb_ops
+structure revision number.
+This field must
+be set to
+.Dv CB_REV .
+.Pp
+.Pf Non- Ns Sy STREAMS
+drivers should set
+.Fa cb_str
+to
+.Sy NULL .
+.Pp
+The following
+.Sy DDI/DKI
+or
+.Sy DKI Ns -only
+or
+.Sy DDI Ns -only
+functions are provided in the character/block driver operations structure.
+.Bl -column "block/char" "Function" "Description"
+.It block/char	Function	Description
+.It b/c	XXopen	DDI/DKI
+.It b/c	XXclose	DDI/DKI
+.It b	XXstrategy	DDI/DKI
+.It b	XXprint	DDI/DKI
+.It b	XXdump	DDI(Sun)
+.It c	XXread	DDI/DKI
+.It c	XXwrite	DDI/DKI
+.It c	XXioctl	DDI/DKI
+.It c	XXdevmap	DDI(Sun)
+.It c	XXmmap	DKI
+.It c	XXsegmap	DKI
+.It c	XXchpoll	DDI/DKI
+.It c	XXprop_op	DDI(Sun)
+.It c	XXaread	DDI(Sun)
+.It c	XXawrite	DDI(Sun)
+.El
+.Sh STRUCTURE MEMBERS
+.Bd -literal -offset 2n
 int  (*cb_open)(dev_t *devp, int flag, int otyp, cred_t *credp);
 int  (*cb_close)(dev_t dev, int flag, int otyp, cred_t *credp);
 int  (*cb_strategy)(struct buf *bp);
@@ -93,37 +130,47 @@ int  (*cb_dump)(dev_t dev, caddr_t addr, daddr_t blkno, int nblk);
 int  (*cb_read)(dev_t dev, struct uio *uiop, cred_t *credp);
 int  (*cb_write)(dev_t dev, struct uio *uiop, cred_t *credp);
 int  (*cb_ioctl)(dev_t dev, int cmd, intptr_t arg, int mode,
-        cred_t *credp, int *rvalp);
+       cred_t *credp, int *rvalp);
 int  (*cb_devmap)(dev_t dev, devmap_cookie_t dhp, offset_t off,
-        size_t len, size_t *maplen, uint_t model);
+       size_t len, size_t *maplen, uint_t model);
 int  (*cb_mmap)(dev_t dev, off_t off, int prot);
 int  (*cb_segmap)(dev_t dev, off_t off, struct as *asp,
-        caddr_t *addrp, off_t len, unsigned int prot,
-        unsigned int maxprot, unsigned int flags, cred_t *credp);
+       caddr_t *addrp, off_t len, unsigned int prot,
+       unsigned int maxprot, unsigned int flags, cred_t *credp);
 int  (*cb_chpoll)(dev_t dev, short events, int anyyet,
-        short *reventsp, struct pollhead **phpp);
+       short *reventsp, struct pollhead **phpp);
 int  (*cb_prop_op)(dev_t dev, dev_info_t *dip,
-        ddi_prop_op_t prop_op, int mod_flags,
-        char *name, caddr_t valuep, int *length);
+       ddi_prop_op_t prop_op, int mod_flags,
+       char *name, caddr_t valuep, int *length);
 struct streamtab *cb_str;   /* streams information */
 int  cb_flag;
 int  cb_rev;
 int  (*cb_aread)(dev_t dev, struct aio_req *aio, cred_t *credp);
 int  (*cb_awrite)(dev_t dev, struct aio_req *aio, cred_t *credp);
-.fi
-.in -2
-
-.SH SEE ALSO
-.sp
-.LP
-\fBaread\fR(9E), \fBawrite\fR(9E), \fBchpoll\fR(9E), \fBclose\fR(9E),
-\fBdump\fR(9E), \fBioctl\fR(9E), \fBmmap\fR(9E), \fBopen\fR(9E),
-\fBprint\fR(9E), \fBprop_op\fR(9E), \fBread\fR(9E), \fBsegmap\fR(9E),
-\fBstrategy\fR(9E), \fBwrite\fR(9E), \fBnochpoll\fR(9F), \fBnodev\fR(9F),
-\fBnulldev\fR(9F), \fBdev_ops\fR(9S), \fBqinit\fR(9S)
-.sp
-.LP
-\fIWriting Device Drivers\fR
-.sp
-.LP
-\fISTREAMS Programming Guide\fR
+.Ed
+.Sh SEE ALSO
+.Xr aread 9E ,
+.Xr awrite 9E ,
+.Xr chpoll 9E ,
+.Xr close 9E ,
+.Xr dump 9E ,
+.Xr ioctl 9E ,
+.Xr mmap 9E ,
+.Xr open 9E ,
+.Xr print 9E ,
+.Xr prop_op 9E ,
+.Xr read 9E ,
+.Xr segmap 9E ,
+.Xr strategy 9E ,
+.Xr write 9E ,
+.Xr nochpoll 9F ,
+.Xr nodev 9F ,
+.Xr nulldev 9F ,
+.Xr dev_ops 9S ,
+.Xr qinit 9S
+.Rs
+.%T Writing Device Drivers
+.Re
+.Rs
+.%T STREAMS Programming Guide
+.Re

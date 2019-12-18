@@ -1,189 +1,130 @@
-'\" te
+.\" Copyright 2018, Joyent Inc.
 .\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\" Copyright (c) 2001, Sun Microsystems, Inc.,  All Rights Reserved.
 .\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INTRO 9S "May 24, 2014"
-.SH NAME
-Intro, intro \- introduction to kernel data structures and properties
-.SH DESCRIPTION
-.sp
-.LP
-Section 9P describes kernel properties used by device drivers. Section 9S
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd July 9, 2018
+.Dt INTRO 9S
+.Os
+.Sh NAME
+.Nm Intro ,
+.Nm intro
+.Nd introduction to kernel data structures and properties
+.Sh DESCRIPTION
+Section 9P describes kernel properties used by device drivers.
+Section 9S
 describes the data structures used by drivers to share information between the
-driver and the kernel. See \fBIntro\fR(9E) for an overview of device driver
+driver and the kernel.
+See
+.Xr Intro 9E
+for an overview of device driver
 interfaces.
-.sp
-.LP
+.Pp
 In Section 9S, reference pages contain the following headings:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBNAME\fR summarizes the purpose of the structure or property.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBSYNOPSIS\fR lists the include file that defines the structure or property.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBINTERFACE\fR \fBLEVEL\fR describes any architecture dependencies.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBDESCRIPTION\fR provides general information about the structure or property.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBSTRUCTURE\fR \fBMEMBERS\fR lists all accessible structure members (for
-Section 9S).
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-\fBSEE\fR \fBALSO\fR gives sources for further information.
-.RE
-.sp
-.LP
-Of the preceding headings, Section 9P reference pages contain the \fBNAME\fR,
-\fBDESCRIPTION\fR, and \fBSEE\fR \fBALSO\fR fields.
-.sp
-.LP
-Every driver MUST include <\fBsys/ddi.h\fR> and <\fBsys/sunddi.h\fR>, in that
-order, and as final entries.
-.sp
-.LP
+.Bl -bullet -offset indent
+.It
+.Sy NAME
+summarizes the purpose of the structure or property.
+.It
+.Sy SYNOPSIS
+lists the include file that defines the structure or property.
+.It
+.Sy "INTERFACE LEVEL"
+describes any architecture dependencies.
+.It
+.Sy DESCRIPTION
+provides general information about the structure or property.
+.It
+.Sy "STRUCTURE MEMBERS"
+lists all accessible structure members (for Section 9S).
+.It
+.Sy "SEE ALSO"
+gives sources for further information.
+.El
+.Pp
+Of the preceding headings, Section 9P reference pages contain the
+.Sy NAME ,
+.Sy DESCRIPTION ,
+and
+.Sy "SEE ALSO"
+fields.
+.Pp
+Every driver MUST include
+.In sys/ddi.h
+and
+.In sys/sunddi.h ,
+in that order, and as final entries.
+.Pp
 The following table summarizes the STREAMS structures described in Section 9S.
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-Structure	Type
-_
-\fBcopyreq\fR	DDI/DKI
-_
-\fBcopyresp\fR	DDI/DKI
-_
-\fBdatab\fR	DDI/DKI
-_
-\fBfmodsw\fR	Solaris DDI
-_
-\fBfree_rtn\fR	DDI/DKI
-_
-\fBiocblk\fR	DDI/DKI
-_
-\fBlinkblk\fR	DDI/DKI
-_
-\fBmodule_info\fR	DDI/DKI
-_
-\fBmsgb\fR	DDI/DKI
-_
-\fBqband\fR	DDI/DKI
-_
-\fBqinit\fR	DDI/DKI
-_
-\fBqueclass\fR	Solaris DDI
-_
-\fBqueue\fR	DDI/DKI
-_
-\fBstreamtab\fR	DDI/DKI
-_
-\fBstroptions\fR	DDI/DKI
-.TE
-
-.sp
-.LP
+.Bl -column "module_info" "Solaris DDI" -offset indent
+.It Structure Ta Type
+.It Vt copyreq Ta DDI/DKI
+.It Vt copyresp Ta DDI/DKI
+.It Vt datab Ta DDI/DKI
+.It Vt fmodsw Ta Solaris DDI
+.It Vt free_rtn Ta DDI/DKI
+.It Vt iocblk Ta DDI/DKI
+.It Vt linkblk Ta DDI/DKI
+.It Vt module_info Ta DDI/DKI
+.It Vt msgb Ta DDI/DKI
+.It Vt qband Ta DDI/DKI
+.It Vt qinit Ta DDI/DKI
+.It Vt queclass Ta Solaris DDI
+.It Vt queue Ta DDI/DKI
+.It Vt streamtab Ta DDI/DKI
+.It Vt stroptions Ta DDI/DKI
+.El
+.Pp
 The following table summarizes structures that are not specific to STREAMS I/O.
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-Structure	Type
-_
-\fBaio_req\fR	Solaris DDI
-_
-\fBbuf\fR	DDI/DKI
-_
-\fBcb_ops\fR	Solaris DDI
-_
-\fBddi_device_acc_attr\fR	Solaris DDI
-_
-\fBddi_dma_attr\fR	Solaris DDI
-_
-\fBddi_dma_cookie\fR	Solaris DDI
-_
-\fBddi_dmae_req\fR	Solaris x86 DDI
-_
-\fBddi_idevice_cookie\fR	Solaris DDI
-_
-\fBddi_mapdev_ctl\fR	Solaris DDI
-_
-\fBdevmap_callback_ctl\fR	Solaris DDI
-_
-\fBdev_ops\fR	Solaris DDI
-_
-\fBiovec\fR	DDI/DKI
-_
-\fBkstat\fR	Solaris DDI
-_
-\fBkstat_intr\fR	Solaris DDI
-_
-\fBkstat_io\fR	Solaris DDI
-_
-\fBkstat_named\fR	Solaris DDI
-_
-\fBmap\fR	DDI/DKI
-_
-\fBmodldrv\fR	Solaris DDI
-_
-\fBmodlinkage\fR	Solaris DDI
-_
-\fBmodlstrmod\fR	Solaris DDI
-_
-\fBscsi_address\fR	Solaris DDI
-_
-\fBscsi_arq_status\fR	Solaris DDI
-_
-\fBscsi_device\fR	Solaris DDI
-_
-\fBscsi_extended_sense\fR	Solaris DDI
-_
-\fBscsi_hba_tran\fR	Solaris DDI
-_
-\fBscsi_inquiry\fR	Solaris DDI
-_
-\fBscsi_pkt\fR	Solaris DDI
-_
-\fBscsi_status\fR	Solaris DDI
-_
-\fBuio\fR	DDI/DKI
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBIntro\fR(9E)
-.SH NOTES
-.sp
-.LP
+.Bl -column "ddi_device_acc_attr" "Solaris x86 DDI" -offset indent
+.It Structure	Type
+.It Vt aio_req Ta Solaris DDI
+.It Vt buf Ta DDI/DKI
+.It Vt cb_ops Ta Solaris DDI
+.It Vt ddi_device_acc_attr Ta Solaris DDI
+.It Vt ddi_dma_attr Ta Solaris DDI
+.It Vt ddi_dma_cookie Ta Solaris DDI
+.It Vt ddi_dmae_req Ta Solaris x86 DDI
+.It Vt ddi_idevice_cookie Ta Solaris DDI
+.It Vt ddi_mapdev_ctl Ta Solaris DDI
+.It Vt devmap_callback_ctl Ta Solaris DDI
+.It Vt dev_ops Ta Solaris DDI
+.It Vt iovec Ta DDI/DKI
+.It Vt kstat Ta Solaris DDI
+.It Vt kstat_intr Ta Solaris DDI
+.It Vt kstat_io Ta Solaris DDI
+.It Vt kstat_named Ta Solaris DDI
+.It Vt map Ta DDI/DKI
+.It Vt modldrv Ta Solaris DDI
+.It Vt modlinkage Ta Solaris DDI
+.It Vt modlstrmod Ta Solaris DDI
+.It Vt scsi_address Ta Solaris DDI
+.It Vt scsi_arq_status Ta Solaris DDI
+.It Vt scsi_device Ta Solaris DDI
+.It Vt scsi_extended_sense Ta Solaris DDI
+.It Vt scsi_hba_tran Ta Solaris DDI
+.It Vt scsi_inquiry Ta Solaris DDI
+.It Vt scsi_pkt Ta Solaris DDI
+.It Vt scsi_status Ta Solaris DDI
+.It Vt uio Ta DDI/DKI
+.El
+.Sh SEE ALSO
+.Xr Intro 9E
+.Sh NOTES
 Do not declare arrays of structures as the size of the structures can change
-between releases. Rely only on the structure members listed in this chapter and
+between releases.
+Rely only on the structure members listed in this chapter and
 not on unlisted members or the position of a member in a structure.

@@ -1891,14 +1891,16 @@ quoteit(char *instr)
 static void
 export_prop(FILE *of, int prop_num, char *prop_id)
 {
-	char *quote_str;
-
 	if (strlen(prop_id) == 0)
 		return;
-	quote_str = quoteit(prop_id);
-	(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
-	    pt_to_str(prop_num), quote_str);
-	free(quote_str);
+	/*
+	 * We're going to explicitly quote all strings on export.
+	 * This should be fine since it seems that no amount of escaping
+	 * will coerce zonecfg to properly parse a double quote as
+	 * part of the string value.
+	 */
+	(void) fprintf(of, "%s %s=\"%s\"\n", cmd_to_str(CMD_SET),
+	    pt_to_str(prop_num), prop_id);
 }
 
 void

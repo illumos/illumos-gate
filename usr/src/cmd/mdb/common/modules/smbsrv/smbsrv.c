@@ -3258,8 +3258,7 @@ smb_mbuf_dump_dcmd(uintptr_t addr, uint_t flags, int argc,
 	    addr, mdata, mh.mh_len);
 
 	dumpptr_flags = MDB_DUMP_RELATIVE | MDB_DUMP_ASCII | MDB_DUMP_HEADER;
-	if (mdb_dumpptr(mdata, len, dumpptr_flags,
-	    (mdb_dumpptr_cb_t)mdb_vread, NULL) < 0)
+	if (mdb_dumpptr(mdata, len, dumpptr_flags, NULL, NULL) < 0)
 		return (DCMD_ERR);
 
 	return (DCMD_OK);
