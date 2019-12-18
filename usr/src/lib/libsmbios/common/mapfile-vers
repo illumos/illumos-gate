@@ -105,6 +105,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_info_extport;
 	smbios_info_powersup;
 	smbios_info_processor;
+	smbios_info_processor_info;
+	smbios_info_processor_riscv;
 	smbios_info_extprocessor;
 	smbios_info_slot;
 	smbios_info_slot_peers;
@@ -150,7 +152,13 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_processor_upgrade_desc;
 	smbios_processor_core_flag_desc;
 	smbios_processor_core_flag_name;
+	smbios_processor_info_type_desc;
 	smbios_psn;
+	smbios_riscv_isa_desc;
+	smbios_riscv_isa_name;
+	smbios_riscv_priv_desc;
+	smbios_riscv_priv_name;
+	smbios_riscv_width_desc;
 	smbios_slot_ch1_desc;
 	smbios_slot_ch1_name;
 	smbios_slot_ch2_desc;

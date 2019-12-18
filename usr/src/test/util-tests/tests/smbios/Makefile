@@ -18,9 +18,12 @@ include $(SRC)/Makefile.master
 ROOTOPTPKG = $(ROOT)/opt/util-tests
 TESTDIR = $(ROOTOPTPKG)/tests/
 
+OBJS =	smbios.o \
+	smbios_test_errors.o \
+	smbios_test_memdevice.o \
+	smbios_test_pinfo.o \
+	smbios_test_slot.o
 PROGS = smbios
-
-LINTS = $(PROGS:%=%.ln)
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
@@ -33,16 +36,15 @@ CFLAGS += -_gcc=-Wall -_gcc=-Wextra -_gcc=-Wno-unknown-pragmas
 
 all: $(PROGS)
 
-install: all $(CMDS) $(OUTFILES)
+install: all $(CMDS)
 
 clobber: clean
-	-$(RM) $(PROGS) $(LINTS)
-
-lint:
+	-$(RM) $(PROGS)
 
 clean:
+	-$(RM) $(OBJS)
 
-$(CMDS): $(TESTDIR) $(PROG)
+$(CMDS): $(TESTDIR) $(PROGS)
 
 $(TESTDIR):
 	$(INS.dir)
@@ -50,6 +52,6 @@ $(TESTDIR):
 $(TESTDIR)/%: %
 	$(INS.file)
 
-%: %.c
-	$(LINK.c) -o $@ $< $(LDLIBS)
+$(PROGS): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
