@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2019 Joyent, Inc.
+ */
+
+/*
  * These functions are used to encode SCSI INQUIRY data into
  * Solaris devid / guid values.
  */
@@ -232,7 +236,7 @@ devid_scsi_encode(
 				(void) strncat(msg, inq_std->inq_revision,
 				    sizeof (inq_std->inq_revision));
 				(void) strcat(msg, "\n");
-				cmn_err(CE_WARN, msg);
+				cmn_err(CE_WARN, "%s", msg);
 				kmem_free(msg,
 				    MSG_NOT_STANDARDS_COMPLIANT_SIZE);
 			}
@@ -301,7 +305,7 @@ static int
 is_page83_data_valid(uchar_t *inq83, size_t inq83_len)
 {
 
-	int 	covered_desc_len	= 0;
+	int	covered_desc_len	= 0;
 	int	dlen			= 0;
 	uchar_t	*dblk			= NULL;
 
@@ -1336,7 +1340,7 @@ scsi_wwnstr_hexcase(char *wwnstr, int upper_case_hex)
  * Function: scsi_wwnstr_skip_ua_prefix
  *
  * Description: This routine removes the leading 'w' in wwnstr,
- * 		if its in unit-address form.
+ *		if its in unit-address form.
  *
  * Arguments: wwnstr - the string wwn to be transformed
  *
