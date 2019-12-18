@@ -39,6 +39,7 @@
  *  - Intel 100 Series PCH
  *  - Intel 200 Series and Z730 PCH
  *  - Intel Sunrise Point-LP (Kaby Lake-U) PCH
+ *  - Intel Cannon Lake (Whiskey Lake-U) PCH
  *  - Intel 300 Series and C240 Chipset
  *
  * The following chipsets use a different format and are not currently
