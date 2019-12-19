@@ -12,3 +12,5 @@ __write_once_size
 atomic_set
 atomic_read
 notifier_to_errno
+ipmi_ssif_lock_cond
+smc_connect_abort

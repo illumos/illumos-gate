@@ -299,6 +299,17 @@ static void __get_variable_from_expr(struct symbol **sym_ptr, char *buf,
 		append(buf, tmp, len);
 		return;
 	}
+	case EXPR_FVALUE: {
+		sval_t sval = {};
+		char tmp[25];
+
+		*complicated = 1;
+		if (!get_value(expr, &sval))
+			return;
+		snprintf(tmp, 25, "%s", sval_to_numstr(sval));
+		append(buf, tmp, len);
+		return;
+	}
 	case EXPR_STRING:
 		append(buf, "\"", len);
 		if (expr->string)
@@ -1064,6 +1075,22 @@ int get_param_num(struct expression *expr)
 	if (!sym)
 		return -1;
 	return get_param_num_from_sym(sym);
+}
+
+struct symbol *get_param_sym_from_num(int num)
+{
+	struct symbol *sym;
+	int i;
+
+	if (!cur_func_sym)
+		return NULL;
+
+	i = 0;
+	FOR_EACH_PTR(cur_func_sym->ctype.base_type->arguments, sym) {
+		if (i++ == num)
+			return sym;
+	} END_FOR_EACH_PTR(sym);
+	return NULL;
 }
 
 int ms_since(struct timeval *start)

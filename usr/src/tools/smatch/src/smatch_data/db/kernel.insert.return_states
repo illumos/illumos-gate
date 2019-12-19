@@ -1,0 +1,12 @@
+# The format to insert is:
+# file (optional), function, "return values" | type, param, "key", "value"
+#
+
+mlx5_cmd_comp_handler, "" | 8021, -2, "*sem", ""
+smc_connect_abort, "1-s32max[==$1]"                | 8021, -2, "smc_client_lgr_pending", ""
+smc_connect_abort, "s32min-(-12),(-10)-(-1)[==$1]" | 8021, -2, "smc_client_lgr_pending", ""
+smc_connect_abort, "1-s32max[==$1]"                | 8021, -2, "smc_server_lgr_pending", ""
+smc_connect_abort, "s32min-(-12),(-10)-(-1)[==$1]" | 8021, -2, "smc_server_lgr_pending", ""
+dlfb_submit_urb, "0" | 8021, 0, "$->urbs.limit_sem", ""
+hfs_find_exit, "" | 8021, 0, "$->tree->tree_lock", ""
+btrfs_tree_unlock, "" | 8021, 0, "$->lock", ""

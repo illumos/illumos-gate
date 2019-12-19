@@ -32,7 +32,7 @@
 #include "smatch_extra.h"
 #include "smatch_slist.h"
 
-static int compare_id;
+int comparison_id;
 static int link_id;
 static int inc_dec_id;
 static int inc_dec_link_id;
@@ -542,6 +542,7 @@ static void pre_merge_hook(struct sm_state *cur, struct sm_state *other)
 	int extra, new;
 	static bool in_recurse;
 
+	// FIXME.  No data is useless
 	if (!data)
 		return;
 
@@ -556,7 +557,8 @@ static void pre_merge_hook(struct sm_state *cur, struct sm_state *other)
 	if (new == data->comparison)
 		return;
 
-	set_state(compare_id, cur->name, NULL,
+	// FIXME: we should always preserve implications
+	set_state(comparison_id, cur->name, NULL,
 		  alloc_compare_state(data->left, data->left_var, data->left_vsl,
 				      new,
 				      data->right, data->right_var, data->right_vsl));
@@ -624,7 +626,7 @@ static void save_start_states(struct statement *stmt)
 				NULL, param->ident->name, left_vsl,
 				SPECIAL_EQUAL,
 				NULL, alloc_sname(orig), right_vsl);
-		set_state(compare_id, state_name, NULL, state);
+		set_state(comparison_id, state_name, NULL, state);
 
 		link = alloc_sname(state_name);
 		links = NULL;
@@ -675,7 +677,7 @@ static void match_inc(struct sm_state *sm, bool preserve)
 	links = sm->state->data;
 
 	FOR_EACH_PTR(links, tmp) {
-		state = get_state(compare_id, tmp, NULL);
+		state = get_state(comparison_id, tmp, NULL);
 		if (!state)
 			continue;
 		data = state->data;
@@ -701,7 +703,7 @@ static void match_inc(struct sm_state *sm, bool preserve)
 					data->left, data->left_var, data->left_vsl,
 					flip ? '<' : '>',
 					data->right, data->right_var, data->right_vsl);
-			set_state(compare_id, tmp, NULL, new);
+			set_state(comparison_id, tmp, NULL, new);
 			break;
 		case '<':
 		case SPECIAL_UNSIGNED_LT:
@@ -709,14 +711,14 @@ static void match_inc(struct sm_state *sm, bool preserve)
 					data->left, data->left_var, data->left_vsl,
 					flip ? SPECIAL_GTE : SPECIAL_LTE,
 					data->right, data->right_var, data->right_vsl);
-			set_state(compare_id, tmp, NULL, new);
+			set_state(comparison_id, tmp, NULL, new);
 			break;
 		default:
 			new = alloc_compare_state(
 					data->left, data->left_var, data->left_vsl,
 					UNKNOWN_COMPARISON,
 					data->right, data->right_var, data->right_vsl);
-			set_state(compare_id, tmp, NULL, new);
+			set_state(comparison_id, tmp, NULL, new);
 		}
 	} END_FOR_EACH_PTR(tmp);
 }
@@ -733,7 +735,7 @@ static void match_dec(struct sm_state *sm, bool preserve)
 		struct compare_data *data;
 		struct smatch_state *new;
 
-		state = get_state(compare_id, tmp, NULL);
+		state = get_state(comparison_id, tmp, NULL);
 		if (!state || !state->data)
 			continue;
 
@@ -752,7 +754,7 @@ static void match_dec(struct sm_state *sm, bool preserve)
 					data->left, data->left_var, data->left_vsl,
 					'<',
 					data->right, data->right_var, data->right_vsl);
-			set_state(compare_id, tmp, NULL, new);
+			set_state(comparison_id, tmp, NULL, new);
 			break;
 			}
 		default:
@@ -760,7 +762,7 @@ static void match_dec(struct sm_state *sm, bool preserve)
 					data->left, data->left_var, data->left_vsl,
 					UNKNOWN_COMPARISON,
 					data->right, data->right_var, data->right_vsl);
-			set_state(compare_id, tmp, NULL, new);
+			set_state(comparison_id, tmp, NULL, new);
 		}
 	} END_FOR_EACH_PTR(tmp);
 }
@@ -775,7 +777,7 @@ static void reset_sm(struct sm_state *sm)
 	FOR_EACH_PTR(links, tmp) {
 		struct smatch_state *old, *new;
 
-		old = get_state(compare_id, tmp, NULL);
+		old = get_state(comparison_id, tmp, NULL);
 		if (!old || !old->data) {
 			new = &undefined;
 		} else {
@@ -786,7 +788,7 @@ static void reset_sm(struct sm_state *sm)
 					UNKNOWN_COMPARISON,
 					data->right, data->right_var, data->right_vsl);
 		}
-		set_state(compare_id, tmp, NULL, new);
+		set_state(comparison_id, tmp, NULL, new);
 	} END_FOR_EACH_PTR(tmp);
 	set_state(link_id, sm->name, sm->sym, &undefined);
 }
@@ -988,7 +990,7 @@ static int get_orig_comparison(struct stree *pre_stree, const char *left, const 
 	}
 
 	snprintf(state_name, sizeof(state_name), "%s vs %s", left, right);
-	state = get_state_stree(pre_stree, compare_id, state_name, NULL);
+	state = get_state_stree(pre_stree, comparison_id, state_name, NULL);
 	if (!state || !state->data)
 		return 0;
 	data = state->data;
@@ -1041,7 +1043,7 @@ static void update_tf_links(struct stree *pre_stree,
 	struct var_sym *vs;
 
 	FOR_EACH_PTR(links, tmp) {
-		state = get_state_stree(pre_stree, compare_id, tmp, NULL);
+		state = get_state_stree(pre_stree, comparison_id, tmp, NULL);
 		if (!state || !state->data)
 			continue;
 		data = state->data;
@@ -1100,7 +1102,7 @@ static void update_tf_links(struct stree *pre_stree,
 			false_state = NULL;
 
 		snprintf(state_name, sizeof(state_name), "%s vs %s", left_var, right_var);
-		set_true_false_states(compare_id, state_name, NULL, true_state, false_state);
+		set_true_false_states(comparison_id, state_name, NULL, true_state, false_state);
 		FOR_EACH_PTR(left_vsl, vs) {
 			save_link_var_sym(vs->var, vs->sym, state_name);
 		} END_FOR_EACH_PTR(vs);
@@ -1199,7 +1201,8 @@ static void handle_for_loops(struct expression *expr, char *state_name, struct s
 			SPECIAL_EQUAL,
 			data->right, data->right_var, data->right_vsl);
 
-	set_true_false_states(compare_id, state_name, NULL, NULL, false_state);
+	// FIXME: This doesn't handle links correct so it doesn't set "param orig"
+	set_true_false_states(comparison_id, state_name, NULL, NULL, false_state);
 }
 
 static int is_plus_one(struct expression *expr)
@@ -1340,7 +1343,7 @@ static void handle_comparison(struct expression *left_expr, int op, struct expre
 	update_tf_data(pre_stree, left_expr, left, left_vsl, right_expr, right, right_vsl, op, false_op);
 	free_stree(&pre_stree);
 
-	set_true_false_states(compare_id, state_name, NULL, true_state, false_state);
+	set_true_false_states(comparison_id, state_name, NULL, true_state, false_state);
 	__compare_param_limit_hook(left_expr, right_expr, state_name, true_state, false_state);
 	save_link(left_expr, state_name);
 	save_link(right_expr, state_name);
@@ -1442,7 +1445,7 @@ static void add_comparison_var_sym(
 			comparison,
 			right_expr, right_name, right_vsl);
 
-	set_state(compare_id, state_name, NULL, state);
+	set_state(comparison_id, state_name, NULL, state);
 
 	FOR_EACH_PTR(left_vsl, vs) {
 		save_link_var_sym(vs->var, vs->sym, state_name);
@@ -1492,7 +1495,7 @@ static void add_comparison(struct expression *left, int comparison, struct expre
 			comparison,
 			right, right_name, right_vsl);
 
-	set_state(compare_id, state_name, NULL, state);
+	set_state(comparison_id, state_name, NULL, state);
 	save_link(left, state_name);
 	save_link(right, state_name);
 
@@ -1609,7 +1612,7 @@ static void copy_comparisons(struct expression *left, struct expression *right)
 	links = state->data;
 
 	FOR_EACH_PTR(links, tmp) {
-		state = get_state(compare_id, tmp, NULL);
+		state = get_state(comparison_id, tmp, NULL);
 		if (!state || !state->data)
 			continue;
 		data = state->data;
@@ -1678,7 +1681,7 @@ int get_comparison_strings(const char *one, const char *two)
 	}
 
 	snprintf(buf, sizeof(buf), "%s vs %s", one, two);
-	state = get_state(compare_id, buf, NULL);
+	state = get_state(comparison_id, buf, NULL);
 	if (state)
 		ret = state_to_comparison(state);
 
@@ -1784,7 +1787,7 @@ int possible_comparison(struct expression *a, int comparison, struct expression 
 	}
 
 	snprintf(buf, sizeof(buf), "%s vs %s", one, two);
-	sm = get_sm_state(compare_id, buf, NULL);
+	sm = get_sm_state(comparison_id, buf, NULL);
 	if (!sm)
 		goto free;
 
@@ -1825,7 +1828,7 @@ struct state_list *get_all_comparisons(struct expression *expr)
 	links = state->data;
 
 	FOR_EACH_PTR(links, tmp) {
-		sm = get_sm_state(compare_id, tmp, NULL);
+		sm = get_sm_state(comparison_id, tmp, NULL);
 		if (!sm)
 			continue;
 		// FIXME have to compare name with vsl
@@ -1849,7 +1852,7 @@ struct state_list *get_all_possible_equal_comparisons(struct expression *expr)
 	links = state->data;
 
 	FOR_EACH_PTR(links, tmp) {
-		sm = get_sm_state(compare_id, tmp, NULL);
+		sm = get_sm_state(comparison_id, tmp, NULL);
 		if (!sm)
 			continue;
 		if (!strchr(sm->state->name, '='))
@@ -1879,7 +1882,7 @@ struct state_list *get_all_possible_not_equal_comparisons(struct expression *exp
 	links = state->data;
 
 	FOR_EACH_PTR(links, link) {
-		sm = get_sm_state(compare_id, link, NULL);
+		sm = get_sm_state(comparison_id, link, NULL);
 		if (!sm)
 			continue;
 		FOR_EACH_PTR(sm->possible, possible) {
@@ -1924,7 +1927,7 @@ static void update_links_from_call(struct expression *left,
 	links = state->data;
 
 	FOR_EACH_PTR(links, tmp) {
-		state = get_state(compare_id, tmp, NULL);
+		state = get_state(comparison_id, tmp, NULL);
 		if (!state || !state->data)
 			continue;
 		data = state->data;
@@ -2173,7 +2176,7 @@ static void match_call_info(struct expression *expr)
 
 			if (strstr(link, " orig"))
 				continue;
-			sm = get_sm_state(compare_id, link, NULL);
+			sm = get_sm_state(comparison_id, link, NULL);
 			if (!sm)
 				continue;
 			data = sm->state->data;
@@ -2228,7 +2231,7 @@ static void struct_member_callback(struct expression *call, int param, char *pri
 
 	links = link_sm->state->data;
 	FOR_EACH_PTR(links, link) {
-		compare_sm = get_sm_state(compare_id, link, NULL);
+		compare_sm = get_sm_state(comparison_id, link, NULL);
 		if (!compare_sm)
 			continue;
 		data = compare_sm->state->data;
@@ -2321,7 +2324,7 @@ static void print_return_comparison(int return_id, char *return_ranges, struct e
 			continue;
 		links = tmp->state->data;
 		FOR_EACH_PTR(links, link) {
-			sm = get_sm_state(compare_id, link, NULL);
+			sm = get_sm_state(comparison_id, link, NULL);
 			if (!sm)
 				continue;
 			data = sm->state->data;
@@ -2539,7 +2542,7 @@ int param_compare_limit_is_impossible(struct expression *expr, int left_param, c
 		goto free;
 
 	snprintf(buf, sizeof(buf), "%s vs %s", left_name, right_name);
-	state = get_state(compare_id, buf, NULL);
+	state = get_state(comparison_id, buf, NULL);
 	if (!state)
 		goto free;
 	state_op = state_to_comparison(state);
@@ -2573,7 +2576,7 @@ int impossibly_high_comparison(struct expression *expr)
 
 	links = link_state->data;
 	FOR_EACH_PTR(links, link) {
-		sm = get_sm_state(compare_id, link, NULL);
+		sm = get_sm_state(comparison_id, link, NULL);
 		if (!sm)
 			continue;
 		data = sm->state->data;
@@ -2595,12 +2598,12 @@ static void free_data(struct symbol *sym)
 
 void register_comparison(int id)
 {
-	compare_id = id;
-	set_dynamic_states(compare_id);
+	comparison_id = id;
+	set_dynamic_states(comparison_id);
 	add_hook(&save_start_states, AFTER_DEF_HOOK);
-	add_unmatched_state_hook(compare_id, unmatched_comparison);
-	add_pre_merge_hook(compare_id, &pre_merge_hook);
-	add_merge_hook(compare_id, &merge_compare_states);
+	add_unmatched_state_hook(comparison_id, unmatched_comparison);
+	add_pre_merge_hook(comparison_id, &pre_merge_hook);
+	add_merge_hook(comparison_id, &merge_compare_states);
 	add_hook(&free_data, AFTER_FUNC_HOOK);
 	add_hook(&match_call_info, FUNCTION_CALL_HOOK);
 	add_split_return_callback(&print_return_comparison);
@@ -2639,9 +2642,60 @@ void register_comparison_inc_dec_links(int id)
 	set_up_link_functions(inc_dec_id, inc_dec_link_id);
 }
 
+static struct sm_state *clone_partial_sm(struct sm_state *sm, int comparison)
+{
+	struct compare_data *data;
+	struct sm_state *clone;
+	struct stree *stree;
+
+	data = sm->state->data;
+
+	clone = clone_sm(sm);
+	clone->state = alloc_compare_state(data->left, data->left_var, data->left_vsl,
+					   comparison,
+					   data->right, data->right_var, data->right_vsl);
+	free_slist(&clone->possible);
+	add_possible_sm(clone, clone);
+
+	stree = clone_stree(sm->pool);
+	overwrite_sm_state_stree(&stree, clone);
+	clone->pool = stree;
+
+	return clone;
+}
+
+static void create_fake_history(struct sm_state *sm, int op,
+			       struct state_list **true_stack,
+			       struct state_list **false_stack)
+{
+	struct sm_state *true_sm, *false_sm;
+	struct compare_data *data;
+	int true_comparison;
+	int false_comparison;
+
+	data = sm->state->data;
+
+	if (is_merged(sm) || sm->left || sm->right)
+		return;
+
+	true_comparison = comparison_intersection(data->comparison, op);
+	false_comparison = comparison_intersection(data->comparison, negate_comparison(op));
+
+	true_sm = clone_partial_sm(sm, true_comparison);
+	false_sm = clone_partial_sm(sm, false_comparison);
+
+	sm->merged = 1;
+	sm->left = true_sm;
+	sm->right = false_sm;
+
+	add_ptr_list(true_stack, true_sm);
+	add_ptr_list(false_stack, false_sm);
+}
+
 static void filter_by_sm(struct sm_state *sm, int op,
 		       struct state_list **true_stack,
-		       struct state_list **false_stack)
+		       struct state_list **false_stack,
+		       bool *useful)
 {
 	struct compare_data *data;
 	int is_true = 0;
@@ -2650,7 +2704,7 @@ static void filter_by_sm(struct sm_state *sm, int op,
 	if (!sm)
 		return;
 	data = sm->state->data;
-	if (!data || data->comparison == UNKNOWN_COMPARISON)
+	if (!data)
 		goto split;
 	if (data->comparison == IMPOSSIBLE_COMPARISON)
 		return;
@@ -2667,6 +2721,11 @@ static void filter_by_sm(struct sm_state *sm, int op,
 	if (data->comparison == comparison_intersection(data->comparison, negate_comparison(op)))
 		is_false = 1;
 
+	if (!is_true && !is_false && !is_merged(sm)) {
+		create_fake_history(sm, op, true_stack, false_stack);
+		return;
+	}
+
 	if (debug_implied()) {
 		sm_msg("%s: %s: op = '%s' negated '%s'. true_intersect = '%s' false_insersect = '%s' sm = '%s'",
 		       __func__,
@@ -2678,13 +2737,14 @@ static void filter_by_sm(struct sm_state *sm, int op,
 		       show_sm(sm));
 	}
 
+	*useful = true;
 	if (is_true)
 		add_ptr_list(true_stack, sm);
 	if (is_false)
 		add_ptr_list(false_stack, sm);
 split:
-	filter_by_sm(sm->left, op, true_stack, false_stack);
-	filter_by_sm(sm->right, op, true_stack, false_stack);
+	filter_by_sm(sm->left, op, true_stack, false_stack, useful);
+	filter_by_sm(sm->right, op, true_stack, false_stack, useful);
 }
 
 struct sm_state *comparison_implication_hook(struct expression *expr,
@@ -2695,6 +2755,7 @@ struct sm_state *comparison_implication_hook(struct expression *expr,
 	char *left, *right;
 	int op;
 	static char buf[256];
+	bool useful = false;
 
 	if (expr->type != EXPR_COMPARE)
 		return NULL;
@@ -2718,14 +2779,14 @@ struct sm_state *comparison_implication_hook(struct expression *expr,
 	}
 
 	snprintf(buf, sizeof(buf), "%s vs %s", left, right);
-	sm = get_sm_state(compare_id, buf, NULL);
+	sm = get_sm_state(comparison_id, buf, NULL);
 	if (!sm)
 		return NULL;
 	if (!sm->merged)
 		return NULL;
 
-	filter_by_sm(sm, op, true_stack, false_stack);
-	if (!*true_stack && !*false_stack)
+	filter_by_sm(sm, op, true_stack, false_stack, &useful);
+	if (!useful)
 		return NULL;
 
 	if (debug_implied())

@@ -34,7 +34,6 @@ int option_no_data = 0;
 int option_spammy = 0;
 int option_info = 0;
 int option_full_path = 0;
-int option_param_mapper = 0;
 int option_call_tree = 0;
 int option_no_db = 0;
 int option_enable = 0;
@@ -142,7 +141,6 @@ static void help(void)
 	printf("--spammy:  print superfluous crap.\n");
 	printf("--info:  print info used to fill smatch_data/.\n");
 	printf("--debug:  print lots of debug output.\n");
-	printf("--param-mapper:  enable param_mapper output.\n");
 	printf("--no-data:  do not use the /smatch_data/ directory.\n");
 	printf("--data=<dir>: overwrite path to default smatch data directory.\n");
 	printf("--full-path:  print the full pathname.\n");
@@ -235,7 +233,6 @@ void parse_args(int *argcp, char ***argvp)
 		OPTION(no_data);
 		OPTION(two_passes);
 		OPTION(full_path);
-		OPTION(param_mapper);
 		OPTION(call_tree);
 		OPTION(file_output);
 		OPTION(time);

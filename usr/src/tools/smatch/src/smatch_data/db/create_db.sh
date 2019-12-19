@@ -52,5 +52,6 @@ ${bin_dir}/mark_function_ptrs_searchable.pl $db_file
 echo "delete from function_ptr where rowid not in (select min(rowid) from function_ptr group by file, function, ptr, searchable);" | sqlite3 $db_file
 
 ${bin_dir}/apply_return_fixes.sh -p=${PROJ} $db_file
+${bin_dir}/insert_manual_states.pl ${PROJ} $db_file
 
 mv $db_file smatch_db.sqlite

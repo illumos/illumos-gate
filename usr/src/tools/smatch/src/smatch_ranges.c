@@ -134,6 +134,9 @@ static int truncates_nicely(struct symbol *type, sval_t min, sval_t max)
 	unsigned long long mask;
 	int bits = type_bits(type);
 
+	if (type_is_fp(min.type) && !type_is_fp(type))
+		return 0;
+
 	if (bits >= type_bits(min.type))
 		return 0;
 
@@ -432,6 +435,13 @@ static sval_t parse_val(int use_max, struct expression *call, struct symbol *typ
 	const char *start = c;
 	sval_t ret;
 
+	if (type == &float_ctype)
+		return sval_type_fval(type, strtof(start, (char **)endp));
+	else if (type == &double_ctype)
+		return sval_type_fval(type, strtod(start, (char **)endp));
+	else if (type == &ldouble_ctype)
+		return sval_type_fval(type, strtold(start, (char **)endp));
+
 	if (!strncmp(start, "max", 3)) {
 		ret = sval_type_max(type);
 		c += 3;
@@ -564,7 +574,7 @@ static void str_to_rl_helper(struct expression *call, struct symbol *type, const
 				break;
 		}
 		if (*c != '-') {
-			sm_msg("debug XXX: trouble parsing %s c = %s", str, c);
+			sm_debug("XXX: trouble parsing %s c = %s", str, c);
 			break;
 		}
 		c++;

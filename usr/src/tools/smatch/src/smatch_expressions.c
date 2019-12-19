@@ -85,6 +85,8 @@ struct expression *preop_expression(struct expression *expr, int op)
 
 struct expression *deref_expression(struct expression *expr)
 {
+	if (expr->type == EXPR_BINOP)
+		expr = preop_expression(expr, '(');
 	return preop_expression(expr, '*');
 }
 
@@ -160,6 +162,17 @@ struct expression *string_expression(char *str)
 	ret->string = string;
 
 	return ret;
+}
+
+struct expression *call_expression(struct expression *fn, struct expression_list *args)
+{
+	struct expression *expr;
+
+	expr = alloc_tmp_expression(fn->pos, EXPR_CALL);
+	expr->fn = fn;
+	expr->args = args;
+
+	return expr;
 }
 
 static struct expression *get_expression_from_base_and_str(struct expression *base, const char *addition)

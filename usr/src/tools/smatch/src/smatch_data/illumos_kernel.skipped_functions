@@ -12,3 +12,4 @@ nostore_generate_key_pair
 sadb_common_add
 segvn_fault_vnodepages
 tcp_input_data
+zfs_setattr

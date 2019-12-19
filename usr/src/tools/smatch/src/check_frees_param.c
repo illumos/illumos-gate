@@ -29,25 +29,10 @@ static int my_id;
 
 STATE(freed);
 STATE(ignore);
-STATE(param);
 
 static void set_ignore(struct sm_state *sm, struct expression *mod_expr)
 {
 	set_state(my_id, sm->name, sm->sym, &ignore);
-}
-
-static void match_function_def(struct symbol *sym)
-{
-	struct symbol *arg;
-	int i;
-
-	i = -1;
-	FOR_EACH_PTR(sym->ctype.base_type->arguments, arg) {
-		i++;
-		if (!arg->ident)
-			continue;
-		set_state(my_id, arg->ident->name, arg, &param);
-	} END_FOR_EACH_PTR(arg);
 }
 
 static void freed_variable(struct expression *expr)
@@ -110,8 +95,6 @@ void check_frees_param(int id)
 		/* The kernel uses check_frees_param_strict.c */
 		return;
 	}
-
-	add_hook(&match_function_def, FUNC_DEF_HOOK);
 
 	add_function_hook("free", &match_free, INT_PTR(0));
 

@@ -77,6 +77,24 @@ static struct symbol *get_binop_type(struct expression *expr)
 	if (!right)
 		return NULL;
 
+	if (type_is_fp(left)) {
+		if (type_is_fp(right)) {
+			if (type_bits(left) > type_bits(right))
+				return left;
+			return right;
+		}
+		return left;
+	}
+
+	if (type_is_fp(right)) {
+		if (type_is_fp(left)) {
+			if (type_bits(right) > type_bits(left))
+				return right;
+			return left;
+		}
+		return right;
+	}
+
 	if (expr->op == '-' &&
 	    (is_ptr_type(left) && is_ptr_type(right)))
 		return ssize_t_ctype;
@@ -143,9 +161,29 @@ static struct symbol *get_symbol_from_deref(struct expression *expr)
 	return get_real_base_type(sym);
 }
 
+static struct symbol *handle__builtin_choose_expr(struct expression *expr)
+{
+	struct expression *const_expr, *expr1, *expr2;
+	sval_t sval;
+
+	const_expr = get_argument_from_call_expr(expr->args, 0);
+	expr1 = get_argument_from_call_expr(expr->args, 1);
+	expr2 = get_argument_from_call_expr(expr->args, 2);
+
+	if (!get_value(const_expr, &sval) || !expr1 || !expr2)
+		return NULL;
+	if (sval.value)
+		return get_type(expr1);
+	else
+		return get_type(expr2);
+}
+
 static struct symbol *get_return_type(struct expression *expr)
 {
 	struct symbol *tmp;
+
+	if (sym_name_is("__builtin_choose_expr", expr->fn))
+		return handle__builtin_choose_expr(expr);
 
 	tmp = get_type(expr->fn);
 	if (!tmp)
@@ -403,9 +441,26 @@ int returns_pointer(struct symbol *sym)
 	return 0;
 }
 
+static sval_t fp_max(struct symbol *type)
+{
+	sval_t ret = { .type = type };
+
+	if (type == &float_ctype)
+		ret.fvalue = FLT_MAX;
+	else if (type == &double_ctype)
+		ret.dvalue = DBL_MAX;
+	else
+		ret.ldvalue = LDBL_MAX;
+
+	return ret;
+}
+
 sval_t sval_type_max(struct symbol *base_type)
 {
 	sval_t ret;
+
+	if (type_is_fp(base_type))
+		return fp_max(base_type);
 
 	if (!base_type || !type_bits(base_type))
 		base_type = &llong_ctype;
@@ -415,9 +470,26 @@ sval_t sval_type_max(struct symbol *base_type)
 	return ret;
 }
 
+static sval_t fp_min(struct symbol *type)
+{
+	sval_t ret = { .type = type };
+
+	if (type == &float_ctype)
+		ret.fvalue = -FLT_MAX;
+	else if (type == &double_ctype)
+		ret.dvalue = -DBL_MAX;
+	else
+		ret.ldvalue = -LDBL_MAX;
+
+	return ret;
+}
+
 sval_t sval_type_min(struct symbol *base_type)
 {
 	sval_t ret;
+
+	if (type_is_fp(base_type))
+		return fp_min(base_type);
 
 	if (!base_type || !type_bits(base_type))
 		base_type = &llong_ctype;
