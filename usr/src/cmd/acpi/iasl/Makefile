@@ -126,6 +126,8 @@ $(LEX_C_FILES) := LEXFILE = $(LY_BASE).l
 $(LEX_C_FILES) := LEXFILE = $(LY_BASE).l
 $(YACC_FILES) := YTABC = $(LY_BASE)parse.c
 
+$(YACC_C_FILES:.c=.o) := CERRWARN += -_gcc=-Wno-char-subscripts
+
 OBJS += $(LEX_C_FILES:.c=.o) $(YACC_C_FILES:.c=.o)
 
 GM4FLAGS = -P
@@ -161,7 +163,5 @@ install: all $(ROOTUSRSBINPROG)
 clean:
 	$(RM) $(OBJS) $(INTERMEDIATES) $(PROG)
 	$(RM) -r AslCompiler.?????? DtParser.?????? PrParser.??????
-
-lint:	lint_SRCS
 
 include ../../Makefile.targ

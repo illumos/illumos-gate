@@ -40,9 +40,9 @@
 #include <sys/fm/fs/zfs.h>
 
 /*
- * Tunable to enable TRIM, which is temporarily disabled by default.
+ * Tunable to disable TRIM in case we're using a problematic SSD.
  */
-uint_t zfs_no_trim = 1;
+uint_t zfs_no_trim = 0;
 
 /*
  * Tunable parameter for debugging or performance analysis. Setting this

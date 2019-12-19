@@ -301,21 +301,23 @@ pctx_set_events(pctx_t *pctx, ...)
 		return (error);
 
 	if (pctx->exec == NULL)
-		pctx->exec = (pctx_sysc_execfn_t *)default_int;
+		pctx->exec = (pctx_sysc_execfn_t *)(uintptr_t)default_int;
 	if (pctx->fork == NULL)
-		pctx->fork = (pctx_sysc_forkfn_t *)default_void;
+		pctx->fork = (pctx_sysc_forkfn_t *)(uintptr_t)default_void;
 	if (pctx->exit == NULL)
-		pctx->exit = (pctx_sysc_exitfn_t *)default_void;
+		pctx->exit = (pctx_sysc_exitfn_t *)(uintptr_t)default_void;
 	if (pctx->lwp_create == NULL)
-		pctx->lwp_create = (pctx_sysc_lwp_createfn_t *)default_int;
+		pctx->lwp_create = (pctx_sysc_lwp_createfn_t *)
+		    (uintptr_t)default_int;
 	if (pctx->init_lwp == NULL)
-		pctx->init_lwp = (pctx_init_lwpfn_t *)default_int;
+		pctx->init_lwp = (pctx_init_lwpfn_t *)(uintptr_t)default_int;
 	if (pctx->fini_lwp == NULL)
-		pctx->fini_lwp = (pctx_fini_lwpfn_t *)default_int;
+		pctx->fini_lwp = (pctx_fini_lwpfn_t *)(uintptr_t)default_int;
 	if (pctx->lwp_exit == NULL)
-		pctx->lwp_exit = (pctx_sysc_lwp_exitfn_t *)default_int;
+		pctx->lwp_exit = (pctx_sysc_lwp_exitfn_t *)
+		    (uintptr_t)default_int;
 
-	if (pctx->fork != (pctx_sysc_forkfn_t *)default_void) {
+	if ((uintptr_t)pctx->fork != (uintptr_t)default_void) {
 		(void) Psysexit(pctx->Pr, SYS_vfork, 1);
 		(void) Psysexit(pctx->Pr, SYS_forksys, 1);
 		if (Psetflags(pctx->Pr, PR_FORK) == -1)
@@ -331,9 +333,9 @@ pctx_set_events(pctx_t *pctx, ...)
 	 * exec causes termination of all but the exec-ing lwp,
 	 * and resets the lwpid to one in the new address space.
 	 */
-	if (pctx->exec != (pctx_sysc_execfn_t *)default_int ||
-	    pctx->fini_lwp != (pctx_fini_lwpfn_t *)default_int ||
-	    pctx->init_lwp != (pctx_init_lwpfn_t *)default_int) {
+	if ((uintptr_t)pctx->exec != (uintptr_t)default_int ||
+	    (uintptr_t)pctx->fini_lwp != (uintptr_t)default_int ||
+	    (uintptr_t)pctx->init_lwp != (uintptr_t)default_int) {
 		(void) Psysexit(pctx->Pr, SYS_execve, 1);
 		(void) Psysentry(pctx->Pr, SYS_execve, 1);
 	} else {
@@ -342,12 +344,12 @@ pctx_set_events(pctx_t *pctx, ...)
 	}
 
 	(void) Psysexit(pctx->Pr, SYS_lwp_create,
-	    pctx->lwp_create != (pctx_sysc_lwp_createfn_t *)default_int ||
-	    pctx->init_lwp != (pctx_init_lwpfn_t *)default_int);
+	    (uintptr_t)pctx->lwp_create != (uintptr_t)default_int ||
+	    (uintptr_t)pctx->init_lwp != (uintptr_t)default_int);
 
 	(void) Psysentry(pctx->Pr, SYS_lwp_exit,
-	    pctx->lwp_exit != (pctx_sysc_lwp_exitfn_t *)default_int ||
-	    pctx->fini_lwp != (pctx_fini_lwpfn_t *)default_int);
+	    (uintptr_t)pctx->lwp_exit != (uintptr_t)default_int ||
+	    (uintptr_t)pctx->fini_lwp != (uintptr_t)default_int);
 
 	return (0);
 }
@@ -407,7 +409,7 @@ pctx_lwpiterate(pctx_t *pctx, int (*action)(pctx_t *, pid_t, id_t, void *))
 	int fd, nlwp;
 	int ret = 0;
 
-	if (action == (int (*)(pctx_t *, pid_t, id_t, void *))default_int)
+	if ((uintptr_t)action == (uintptr_t)default_int)
 		return (0);
 
 	pstatus = Pstatus(pctx->Pr);
@@ -722,8 +724,8 @@ checkstate:
 						running = -1;
 					break;
 				}
-				if (pctx->exec == (pctx_sysc_execfn_t *)
-				    default_int) {
+				if ((uintptr_t)pctx->exec ==
+				    (uintptr_t)default_int) {
 					running = 0;
 					break;
 				}

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _SATA_DEFS_H
@@ -343,6 +344,9 @@ typedef struct sata_id {
 /* Identify (Packet) Device Word 88 */
 #define	SATA_UDMA_SUP_MASK		0x007f	/* UDMA modes supported */
 #define	SATA_UDMA_SEL_MASK	0x7f00	/* UDMA modes selected */
+
+/* Data Set Management: word 169 */
+#define	SATA_DSM_TRIM		0x0001	/* Set when TRIM is supported */
 
 /* Identify Device: command set supported/enabled bits - word 206 */
 

@@ -34,7 +34,7 @@
  */
 
 #if 0
-#ifndef lint 
+#ifndef lint
 static char copyright[] = "@(#) Copyright (c) 1995 Regents of the University of Michigan.\nAll rights reserved.\n";
 #endif
 #endif
@@ -82,7 +82,7 @@ struct nsldapi_ldap_error {
 #else
 __declspec ( thread ) int	nsldapi_gldaperrno;
 __declspec ( thread ) char	*nsldapi_gmatched = NULL;
-__declspec ( thread ) char	*nsldapi_gldaperror = NULL; 
+__declspec ( thread ) char	*nsldapi_gldaperror = NULL;
 #endif /* _WINDOWS */
 
 #ifdef _WINDOWS
@@ -245,18 +245,18 @@ get_ld_error( char **matched, char **errmsg, void *dummy )
 
         le = pthread_getspecific( nsldapi_key );
 	if (le != NULL) {
-        	if ( matched != NULL ) {
-                	*matched = le->le_matched;
-        	}
-        	if ( errmsg != NULL ) {
-                	*errmsg = le->le_errmsg;
-        	}
-        	return( le->le_errno );
+		if ( matched != NULL ) {
+			*matched = le->le_matched;
+		}
+		if ( errmsg != NULL ) {
+			*errmsg = le->le_errmsg;
+		}
+		return( le->le_errno );
 	} else {
-        	if ( matched != NULL )
-                	*matched = NULL;
-        	if ( errmsg != NULL )
-                	*errmsg = NULL;
+		if ( matched != NULL )
+			*matched = NULL;
+		if ( errmsg != NULL )
+			*errmsg = NULL;
 	}
 	return (LDAP_SUCCESS);
 }
@@ -292,7 +292,7 @@ static struct ldap_extra_thread_fns
 #ifdef _WINDOWS
 		0
 #else
-		(void *(*)(void))pthread_self
+		(void *(*)(void))(uintptr_t)pthread_self
 #endif /* _WINDOWS */
 		};
 
@@ -393,8 +393,8 @@ ldap_version( LDAPVersion *ver )
 		ver->sdk_version = (int)(VI_PRODUCTVERSION * 100);
 		ver->protocol_version = LDAP_VERSION_MAX * 100;
 		ver->SSL_version = SSL_VERSION * 100;
-		/* 
-		 * set security to none by default 
+		/*
+		 * set security to none by default
 		 */
 
 		ver->security_level = LDAP_SECURITY_NONE;
@@ -710,7 +710,7 @@ ldap_x_hostlist_next( char **hostp, int *portp,
 		status->lhs_nexthost = NULL;
 	}
 
-	/* 
+	/*
 	 * Look for closing ']' and skip past it before looking for port.
 	 */
 	if ( squarebrackets && NULL != ( q = strchr( *hostp, ']' ))) {

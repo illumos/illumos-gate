@@ -25,6 +25,7 @@
  * Copyright 2016 Joyent, Inc.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -126,6 +127,8 @@ static int pollerr = 0;
 
 static const char *pname;
 static char *username;
+
+extern int __xpg4;	/* 0 if not an xpg4/6-compiled program */
 
 /*
  * When forced_login is true, the user is not prompted
@@ -833,8 +836,16 @@ process_output(int in_fd, int out_fd)
 	cc = read(in_fd, ibuf, ZLOGIN_BUFSIZ);
 	if (cc == -1 && (errno != EINTR || dead))
 		return (-1);
-	if (cc == 0)	/* EOF */
-		return (-1);
+	if (cc == 0) {
+		/*
+		 * A return value of 0 when calling read() on a terminal
+		 * indicates end-of-file pre-XPG4 and no data available
+		 * for XPG4 and above.
+		 */
+		if (__xpg4 == 0)
+			return (-1);
+		return (0);
+	}
 	if (cc == -1)	/* The read was interrupted. */
 		return (0);
 
@@ -854,10 +865,10 @@ process_output(int in_fd, int out_fd)
 /*
  * This is the main I/O loop, and is shared across all zlogin modes.
  * Parameters:
- * 	stdin_fd:  The fd representing 'stdin' for the slave side; input to
+ *	stdin_fd:  The fd representing 'stdin' for the slave side; input to
  *		   the zone will be written here.
  *
- * 	appin_fd:  The fd representing the other end of the 'stdin' pipe (when
+ *	appin_fd:  The fd representing the other end of the 'stdin' pipe (when
  *		   we're running non-interactive); used in process_raw_input
  *		   to ensure we don't fill up the application's stdin pipe.
  *

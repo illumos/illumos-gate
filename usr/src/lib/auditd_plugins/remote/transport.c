@@ -51,10 +51,10 @@
 #include "audit_remote.h"
 
 
-static int 		sockfd = -1;
+static int		sockfd = -1;
 static struct hostent	*current_host;
 static gss_OID		*current_mech_oid;
-static in_port_t 	current_port;
+static in_port_t	current_port;
 static boolean_t	flush_transq;
 
 static char		*ver_str = "01";	/* supported protocol version */
@@ -100,11 +100,11 @@ static boolean_t	transq_enqueue(transq_node_t **, gss_buffer_t,
 static int		transq_retransmit(void);
 
 static boolean_t	init_poll(int);
-static void 		do_reset(int *, struct pollfd *, boolean_t);
-static void 		do_cleanup(int *, struct pollfd *, boolean_t);
+static void		do_reset(int *, struct pollfd *, boolean_t);
+static void		do_cleanup(int *, struct pollfd *, boolean_t);
 
 static void		init_recv_record(void);
-static void		recv_record();
+static void		*recv_record(void *);
 static int		connect_timeout(int, struct sockaddr *, int);
 static int		send_timeout(int, const char *, size_t);
 static int		recv_timeout(int, char *, size_t);
@@ -933,8 +933,7 @@ static void
 init_recv_record()
 {
 	DPRINT((dfile, "Initiating the recv thread\n"));
-	(void) pthread_create(&recv_tid, NULL, (void *(*)(void *))recv_record,
-	    (void *)NULL);
+	(void) pthread_create(&recv_tid, NULL, recv_record, NULL);
 
 }
 
@@ -942,8 +941,8 @@ init_recv_record()
 /*
  * recv_record() - the receiver thread routine
  */
-static void
-recv_record()
+static void *
+recv_record(void *arg __unused)
 {
 	OM_uint32		maj_stat, min_stat;
 	gss_qop_t		qop_state;
@@ -1170,7 +1169,7 @@ recv_record()
 					break;
 				} /* switch (maj_stat) */
 
-			} else { 	/* the failure case */
+			} else {	/* the failure case */
 				report_gss_err(
 				    gettext("signature verification of the "
 				    "received token failed"),
