@@ -38,6 +38,7 @@ driver name=pchtemp \
     alias=pci8086,8ca4,p \
     alias=pci8086,8d24,p \
     alias=pci8086,9d31,p \
+    alias=pci8086,9df9,p \
     alias=pci8086,a131,p \
     alias=pci8086,a1b1,p \
     alias=pci8086,a231,p \
