@@ -179,6 +179,7 @@ sparc_MANFILES=	audiocs.7d	\
 i386_MANFILES=	ahci.7d		\
 		amd8111s.7d	\
 		amdf17nbdf.7d	\
+		amdnbtemp.7d	\
 		amr.7d		\
 		arcmsr.7d	\
 		arn.7d		\
