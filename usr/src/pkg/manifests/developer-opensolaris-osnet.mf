@@ -53,7 +53,6 @@ depend fmri=print/filter/ghostscript@8.64-0.133 type=require
 depend fmri=runtime/perl$(PERL_PKGVERS)@5.10.0-0.133 type=require
 depend fmri=system/header@0.5.11-0.133 type=require
 depend fmri=system/library/dbus@0.5.11-0.133 type=require
-depend fmri=system/library/install@0.5.11-0.133 type=require
 depend fmri=system/library/libdbus-glib@0.5.11-0.133 type=require
 depend fmri=system/library/libdbus@0.5.11-0.133 type=require
 depend fmri=system/library/mozilla-nss/header-nss@0.5.11-0.133 type=require
