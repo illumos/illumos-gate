@@ -656,6 +656,8 @@ exacct_assemble_task_usage(ac_info_t *ac_task, task_t *tk,
 	case EW_INTERVAL:
 		record_type = EXD_GROUP_TASK_INTERVAL;
 		break;
+	default:
+		return (0);
 	}
 
 	/*
@@ -1045,6 +1047,9 @@ exacct_assemble_proc_usage(ac_info_t *ac_proc, proc_usage_t *pu,
 	case EW_PARTIAL:
 		record_type = EXD_GROUP_PROC_PARTIAL;
 		break;
+	default:
+		record_type = EXD_NONE;
+		break;
 	}
 
 	proc_record = exacct_assemble_proc_record(pu, mask, record_type);
@@ -1372,6 +1377,8 @@ exacct_assemble_net_usage(ac_info_t *ac_net, void *ninfo,
 	case EX_NET_FLSTAT_REC:
 		record_type = EXD_GROUP_NET_FLOW_STATS;
 		break;
+	default:
+		return (0);
 	}
 
 	net_desc = exacct_assemble_net_record(ninfo, mask, record_type, what);

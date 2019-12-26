@@ -119,7 +119,7 @@ static void
 waitq_link(waitq_t *wq, kthread_t *t)
 {
 	kthread_t *next_tp;
-	kthread_t *last_tp;
+	kthread_t *last_tp = NULL;
 	kthread_t **tpp;
 	pri_t tpri, next_pri, last_pri = -1;
 
@@ -137,7 +137,7 @@ waitq_link(waitq_t *wq, kthread_t *t)
 	}
 	*tpp = t;
 	t->t_link = next_tp;
-	if (last_pri == tpri) {
+	if (last_tp != NULL && last_pri == tpri) {
 		/* last_tp points to the last thread of this priority */
 		t->t_priback = last_tp;
 		t->t_priforw = last_tp->t_priforw;

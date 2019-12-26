@@ -2385,10 +2385,10 @@ segdev_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 /*
  * segdev pages are not dumped, so we just return
  */
-/*ARGSUSED*/
 static void
-segdev_dump(struct seg *seg)
-{}
+segdev_dump(struct seg *seg __unused)
+{
+}
 
 /*
  * ddi_segmap_setup:	Used by drivers who wish specify mapping attributes
@@ -2405,7 +2405,7 @@ ddi_segmap_setup(dev_t dev, off_t offset, struct as *as, caddr_t *addrp,
 	int (*mapfunc)(dev_t dev, off_t off, int prot);
 	uint_t hat_attr;
 	pfn_t pfn;
-	int	error, i;
+	int error, i;
 
 	TRACE_0(TR_FAC_DEVMAP, TR_DEVMAP_SEGMAP_SETUP,
 	    "ddi_segmap_setup:start");
@@ -2427,25 +2427,25 @@ ddi_segmap_setup(dev_t dev, off_t offset, struct as *as, caddr_t *addrp,
 	if (ddi_device_mapping_check(dev, accattrp, rnumber, &hat_attr) == -1)
 		return (ENXIO);
 
+	if (len == 0)
+		return (ENXIO);
+
 	/*
 	 * Check to ensure that the entire range is
 	 * legal and we are not trying to map in
 	 * more than the device will let us.
 	 */
-	for (i = 0; i < len; i += PAGESIZE) {
-		if (i == 0) {
-			/*
-			 * Save the pfn at offset here. This pfn will be
-			 * used later to get user address.
-			 */
-			if ((pfn = (pfn_t)cdev_mmap(mapfunc, dev, offset,
-			    maxprot)) == PFN_INVALID)
-				return (ENXIO);
-		} else {
-			if (cdev_mmap(mapfunc, dev, offset + i, maxprot) ==
-			    PFN_INVALID)
-				return (ENXIO);
-		}
+	/*
+	 * Save the pfn at offset here. This pfn will be
+	 * used later to get user address.
+	 */
+	pfn = (pfn_t)cdev_mmap(mapfunc, dev, offset, maxprot);
+	if (pfn == PFN_INVALID)
+		return (ENXIO);
+
+	for (i = PAGESIZE; i < len; i += PAGESIZE) {
+		if (cdev_mmap(mapfunc, dev, offset + i, maxprot) == PFN_INVALID)
+			return (ENXIO);
 	}
 
 	as_rangelock(as);
@@ -2727,6 +2727,8 @@ devmap_roundup(devmap_handle_t *dhp, ulong_t offset, size_t len,
 	 * the page size to use. The same calculations can use the
 	 * virtual address to determine the page size.
 	 */
+	pg = 0;
+	poff = 0;
 	base = (ulong_t)ptob(dhp->dh_pfn);
 	for (level = dhp->dh_mmulevel; level >= 0; level--) {
 		pg = page_get_pagesize(level);

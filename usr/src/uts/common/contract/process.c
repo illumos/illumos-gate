@@ -229,7 +229,7 @@ ctmpl_process_set(struct ct_template *tmpl, ct_kparam_t *kparam,
 	ct_param_t *param = &kparam->param;
 	contract_t *ct;
 	int error;
-	uint64_t param_value;
+	uint64_t param_value = 0;
 	char *str_value;
 
 	if ((param->ctpm_id == CTPP_SVC_FMRI) ||

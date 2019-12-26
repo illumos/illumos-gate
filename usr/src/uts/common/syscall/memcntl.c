@@ -109,6 +109,7 @@ memcntl(caddr_t addr, size_t len, int cmd, caddr_t arg, int attr, int mask)
 		attr |= PROT_USER;
 	}
 
+	oszc = 0;
 	switch (cmd) {
 	case MC_SYNC:
 		/*

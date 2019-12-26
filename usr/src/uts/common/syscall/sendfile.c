@@ -702,14 +702,18 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 #endif
 	mblk_t	*dmp = NULL;
 	char	*buf = NULL;
-	size_t  extra;
+	size_t  extra = 0;
 	int maxblk, wroff, tail_len;
 	struct sonode *so;
 	stdata_t *stp;
 	struct nmsghdr msg;
 
+	maxblk = 0;
+	wroff = 0;
 	fflag = fp->f_flag;
 	vp = fp->f_vnode;
+	so = NULL;
+	stp = NULL;
 
 	if (vp->v_type == VSOCK) {
 		so = VTOSO(vp);
@@ -1137,7 +1141,7 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 	int first_vector_error = 0;
 	file_t *fp;
 	struct vnode *vp;
-	struct sonode *so;
+	struct sonode *so = NULL;
 	u_offset_t fileoff;
 	int copy_cnt;
 	const struct sendfilevec *copy_vec;

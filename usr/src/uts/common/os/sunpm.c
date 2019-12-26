@@ -1981,6 +1981,7 @@ pm_free_kept(char *path)
 	size_t length;
 	char **paths;
 
+	paths = NULL;
 	for (dp = pm_dep_head; dp; dp = dp->pdr_next) {
 		if (dp->pdr_kept_count == 0)
 			continue;
@@ -2010,10 +2011,7 @@ pm_free_kept(char *path)
 		}
 		/* Now free the old array and point to the new one */
 		kmem_free(dp->pdr_kept_paths, count * sizeof (char **));
-		if (dp->pdr_kept_count)
-			dp->pdr_kept_paths = paths;
-		else
-			dp->pdr_kept_paths = NULL;
+		dp->pdr_kept_paths = paths;
 	}
 }
 
@@ -3959,6 +3957,7 @@ digit:
 		return (NULL);
 
 hexval:
+	offset = 0;
 	for (np = numbuf; *np; np++) {
 		if (*np >= 'a' && *np <= 'f')
 			offset = 'a' - 10;
@@ -6430,6 +6429,7 @@ pm_process_dep_request(pm_dep_wk_t *work)
 	    (work->pdw_keeper ? work->pdw_keeper : "NULL"),
 	    (work->pdw_kept ? work->pdw_kept : "NULL")))
 
+	ret = 0;
 	switch (work->pdw_type) {
 	case PM_DEP_WK_POWER_ON:
 		/* Bring up the kept devices and put a hold on them */

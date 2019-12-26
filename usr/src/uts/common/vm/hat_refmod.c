@@ -180,6 +180,7 @@ hat_setstat(struct as *as, caddr_t addr, size_t len, uint_t rmbits)
 	 */
 	if (vbits != as->a_vbits) {
 		newbits = (vbits ^ as->a_vbits) & as->a_vbits;
+		nb = 0;
 		while (newbits) {
 			if (ffs(newbits))
 				nb = 1 << (ffs(newbits)-1);

@@ -2368,6 +2368,7 @@ i_ddi_fault_logger(dev_info_t *rdip, struct ddi_fault_event_data *fedp)
 
 	default:
 		bad = 1;
+		still = 0;
 		break;
 	}
 

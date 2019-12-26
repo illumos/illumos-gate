@@ -1354,9 +1354,9 @@ pool_do_bind(pool_t *pool, idtype_t idtype, id_t id, int flags)
 	proc_t **pp, **procs;
 	proc_t *prstart;
 	int procs_count = 0;
-	kproject_t *kpj;
+	kproject_t *kpj = NULL;
 	procset_t set;
-	zone_t *zone;
+	zone_t *zone = NULL;
 	int procs_size;
 	int rv = 0;
 	proc_t *p;

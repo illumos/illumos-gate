@@ -191,6 +191,7 @@ lwp_wait(id_t lwpid, id_t *departed)
 	curthread->t_waitfor = lwpid;
 	p->p_lwpwait++;
 	p->p_lwpdwait += daemon;
+	target_lep = NULL;
 
 	if (lwpid != 0) {
 		if ((ldp = lwp_hash_lookup(p, lwpid)) == NULL)

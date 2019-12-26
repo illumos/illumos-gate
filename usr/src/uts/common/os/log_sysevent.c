@@ -1345,7 +1345,7 @@ log_sysevent_register(char *channel_name, char *udatabuf, se_pubsub_t *udata)
 	char *kchannel, *databuf = NULL;
 	size_t bufsz;
 	se_pubsub_t kdata;
-	sysevent_channel_descriptor_t *chan;
+	sysevent_channel_descriptor_t *chan = NULL;
 
 	if (copyin(udata, &kdata, sizeof (se_pubsub_t)) == -1) {
 		return (EFAULT);

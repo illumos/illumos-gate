@@ -54,8 +54,6 @@ psecdo(proc_t *p, struct psdargs *args)
 		goto out;
 	}
 
-	ASSERT(args->which != PSF_EFFECTIVE);
-
 	if (!psecflags_validate_delta(&p->p_secflags, args->delta)) {
 		ret = EINVAL;
 		goto out;
@@ -74,6 +72,9 @@ psecdo(proc_t *p, struct psdargs *args)
 	case PSF_UPPER:
 		set = &p->p_secflags.psf_upper;
 		break;
+	default:
+		ASSERT(0);
+		goto out;
 	}
 
 	secflags_apply_delta(set, args->delta);

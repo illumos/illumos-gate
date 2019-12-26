@@ -311,6 +311,7 @@ i_ddi_alloc_node(dev_info_t *pdip, char *node_name, pnode_t nodeid,
 	 * auto-assigned nodeids are also auto-freed.
 	 */
 	devi->devi_node_attributes = 0;
+	elem = NULL;
 	switch (nodeid) {
 	case DEVI_SID_HIDDEN_NODEID:
 		devi->devi_node_attributes |= DDI_HIDDEN_NODE;
@@ -2220,6 +2221,7 @@ find_sibling(dev_info_t *head, char *cname, char *caddr, uint_t flag,
 			return (NULL);
 	}
 
+	buf = NULL;
 	/* preallocate buffer of naming node by callback */
 	if (flag & FIND_ADDR_BY_CALLBACK)
 		buf = kmem_alloc(MAXNAMELEN, KM_SLEEP);

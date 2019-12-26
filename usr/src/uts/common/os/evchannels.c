@@ -1655,6 +1655,8 @@ evch_chrdevent_init(evch_chan_t *chp, char *subid)
 	pmqstat = evch_evq_status(chp->ch_queue);
 	if (pmqstat == 0)
 		evch_evq_stop(chp->ch_queue);
+
+	psqstat = 0;
 	if (sdp != NULL) {
 		psqstat = evch_evq_status(sdp->sd_queue);
 		if (psqstat == 0)

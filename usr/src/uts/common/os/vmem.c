@@ -972,6 +972,8 @@ vmem_xalloc(vmem_t *vmp, size_t size, size_t align_arg, size_t phase,
 	    (vmflag & (VM_NOSLEEP | VM_PANIC)) == VM_NOSLEEP)
 		return (NULL);
 
+	addr = 0;
+	xsize = 0;
 	mutex_enter(&vmp->vm_lock);
 	for (;;) {
 		if (vmp->vm_nsegfree < VMEM_MINFREE &&
