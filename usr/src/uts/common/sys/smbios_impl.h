@@ -389,6 +389,13 @@ typedef struct smb_memdevmap {
 	uint64_t smbdmap_extend;	/* extended ending address */
 } smb_memdevmap_t;
 
+typedef struct smb_pointdev {
+	smb_header_t smbpdev_hdr;	/* structure header */
+	uint8_t smbpdev_type;		/* device type */
+	uint8_t smbpdev_iface;		/* device interface */
+	uint8_t smbpdev_nbuttons;	/* number of buttons */
+} smb_pointdev_t;
+
 /*
  * SMBIOS implementation structure for SMB_TYPE_BATTERY.
  */

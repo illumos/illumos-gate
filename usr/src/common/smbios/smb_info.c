@@ -1674,3 +1674,27 @@ smbios_info_processor_riscv(smbios_hdl_t *shp, id_t id,
 
 	return (0);
 }
+
+int
+smbios_info_pointdev(smbios_hdl_t *shp, id_t id, smbios_pointdev_t *pd)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	smb_pointdev_t point;
+
+	if (stp->smbst_hdr->smbh_type != SMB_TYPE_POINTDEV) {
+		return (smb_set_errno(shp, ESMB_TYPE));
+	}
+
+	if (stp->smbst_hdr->smbh_len < sizeof (point)) {
+		return (smb_set_errno(shp, ESMB_SHORT));
+	}
+
+	bzero(pd, sizeof (*pd));
+	smb_info_bcopy(stp->smbst_hdr, &point, sizeof (point));
+
+	pd->smbpd_type = point.smbpdev_type;
+	pd->smbpd_iface = point.smbpdev_iface;
+	pd->smbpd_nbuttons = point.smbpdev_nbuttons;
+
+	return (0);
+}

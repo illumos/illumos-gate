@@ -1467,6 +1467,23 @@ print_processor_info(smbios_hdl_t *shp, id_t id, FILE *fp)
 }
 
 static void
+print_pointdev(smbios_hdl_t *shp, id_t id, FILE *fp)
+{
+	smbios_pointdev_t pd;
+
+	if (smbios_info_pointdev(shp, id, &pd) != 0) {
+		smbios_warn(shp, "failed to read pointer device information");
+		return;
+	}
+
+	desc_printf(smbios_pointdev_type_desc(pd.smbpd_type),
+	    fp, "  Type: %u", pd.smbpd_type);
+	desc_printf(smbios_pointdev_iface_desc(pd.smbpd_iface),
+	    fp, "  Interface: %u", pd.smbpd_iface);
+	oprintf(fp, "  Buttons: %u\n", pd.smbpd_nbuttons);
+}
+
+static void
 print_extprocessor(smbios_hdl_t *shp, id_t id, FILE *fp)
 {
 	int i;
@@ -1660,6 +1677,10 @@ print_struct(smbios_hdl_t *shp, const smbios_struct_t *sp, void *fp)
 	case SMB_TYPE_MEMDEVICEMAP:
 		oprintf(fp, "\n");
 		print_memdevmap(shp, sp->smbstr_id, fp);
+		break;
+	case SMB_TYPE_POINTDEV:
+		oprintf(fp, "\n");
+		print_pointdev(shp, sp->smbstr_id, fp);
 		break;
 	case SMB_TYPE_SECURITY:
 		oprintf(fp, "\n");

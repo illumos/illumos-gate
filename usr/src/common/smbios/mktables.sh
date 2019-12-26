@@ -99,6 +99,8 @@ SMB_MDR_	smbios_memdevice_rank_desc	uint_t
 SMB_MTECH_	smbios_memdevice_memtech_desc	uint_t
 SMB_MOMC_	smbios_memdevice_op_capab_desc	uint_t
 SMB_OBT_	smbios_onboard_type_desc	uint_t
+SMB_PDI_	smbios_pointdev_iface_desc	uint_t
+SMB_PDT_	smbios_pointdev_type_desc	uint_t
 SMB_POC_	smbios_port_conn_desc		uint_t
 SMB_POT_	smbios_port_type_desc		uint_t
 SMB_PRC_	smbios_processor_core_flag_desc	uint_t

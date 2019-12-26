@@ -1347,6 +1347,38 @@ typedef struct smbios_memdevmap {
 } smbios_memdevmap_t;
 
 /*
+ * SMBIOS Builtin Pointing Device (SMB_TYPE_POINTDEV).  See DSP0134 Sectin 7.22
+ * for more information.
+ */
+typedef struct smbios_pointdev {
+	uint16_t smbpd_type;		/* device type */
+	uint16_t smbpd_iface;		/* device information */
+	uint8_t smbpd_nbuttons;		/* number of buttons */
+} smbios_pointdev_t;
+
+#define	SMB_PDT_OTHER		0x01	/* Other */
+#define	SMB_PDT_UNKNOWN		0x02	/* Unknown */
+#define	SMB_PDT_MOUSE		0x03	/* Mouse */
+#define	SMB_PDT_TRBALL		0x04	/* Track Ball */
+#define	SMB_PDT_TRPOINT		0x05	/* Track Point */
+#define	SMB_PDT_GLPOINT		0x06	/* Glide Point */
+#define	SMB_PDT_TOPAD		0x07	/* Touch Pad */
+#define	SMB_PDT_TOSCREEN	0x08	/* Touch Screen */
+#define	SMB_PDT_OPTSENSE	0x09	/* Optical Sensor */
+
+#define	SMB_PDI_OTHER		0x01	/* Other */
+#define	SMB_PDI_UNKNOWN		0x02	/* Unknown */
+#define	SMB_PDI_SERIAL		0x03	/* Serial */
+#define	SMB_PDI_PS2		0x04	/* PS/2 */
+#define	SMB_PDI_INFRARED	0x05	/* Infrared */
+#define	SMB_PDI_HPHIL		0x06	/* HP-HIL */
+#define	SMB_PDI_BUSM		0x07	/* Bus mouse */
+#define	SMB_PDI_ADB		0x08	/* ADB (Apple Desktop Bus) */
+#define	SMB_PDI_BUSM_DB9	0xA0	/* Bus mouse DB-9 */
+#define	SMB_PDI_BUSM_UDIN	0xA1	/* Bus mouse micro-DIN */
+#define	SMB_PDI_BUSM_USB	0xA2	/* USB */
+
+/*
  * SMBIOS Hardware Security Settings.  See DSP0134 Section 7.25 for more
  * information.  Only one such record will be present in the SMBIOS.
  */
@@ -1834,6 +1866,7 @@ extern int smbios_info_processor(smbios_hdl_t *, id_t, smbios_processor_t *);
 extern int smbios_info_extprocessor(smbios_hdl_t *, id_t,
     smbios_processor_ext_t *);
 extern int smbios_info_cache(smbios_hdl_t *, id_t, smbios_cache_t *);
+extern int smbios_info_pointdev(smbios_hdl_t *, id_t, smbios_pointdev_t *);
 extern int smbios_info_port(smbios_hdl_t *, id_t, smbios_port_t *);
 extern int smbios_info_extport(smbios_hdl_t *, id_t, smbios_port_ext_t *);
 extern int smbios_info_slot(smbios_hdl_t *, id_t, smbios_slot_t *);
@@ -1949,6 +1982,9 @@ extern const char *smbios_memdevice_op_capab_name(uint_t);
 extern const char *smbios_memdevice_op_capab_desc(uint_t);
 
 extern const char *smbios_onboard_type_desc(uint_t);
+
+extern const char *smbios_pointdev_iface_desc(uint_t);
+extern const char *smbios_pointdev_type_desc(uint_t);
 
 extern const char *smbios_port_conn_desc(uint_t);
 extern const char *smbios_port_type_desc(uint_t);

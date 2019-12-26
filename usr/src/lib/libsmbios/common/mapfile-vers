@@ -101,6 +101,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_info_memdevmap;
 	smbios_info_obdevs;
 	smbios_info_obdevs_ext;
+	smbios_info_pointdev;
 	smbios_info_port;
 	smbios_info_extport;
 	smbios_info_powersup;
@@ -139,6 +140,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_memdevice_rank_desc;
 	smbios_open;
 	smbios_onboard_type_desc;
+	smbios_pointdev_iface_desc;
+	smbios_pointdev_type_desc;
 	smbios_port_conn_desc;
 	smbios_port_type_desc;
 	smbios_powersup_flag_desc;
