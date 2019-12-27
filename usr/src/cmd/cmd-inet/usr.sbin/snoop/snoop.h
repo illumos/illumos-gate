@@ -264,7 +264,7 @@ extern int interpret_ntp(int, struct ntpdata *, int);
 extern void interpret_netbios_ns(int, uchar_t *, int);
 extern void interpret_netbios_datagram(int, uchar_t *, int);
 extern void interpret_netbios_ses(int, uchar_t *, int);
-extern void interpret_slp(int, void *, int);
+extern int interpret_slp(int, void *, int);
 struct rip;
 extern int interpret_rip(int, struct rip *, int);
 struct rip6;

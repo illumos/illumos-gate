@@ -1059,7 +1059,7 @@ beMapLibbePyErrorToString(int errCode)
 	switch (errCode) {
 	case BE_PY_ERR_APPEND:
 		return ("Unable to append a dictionary to a list "
-		    "of dictinaries.");
+		    "of dictionaries.");
 	case BE_PY_ERR_DICT:
 		return ("Creation of a Python dictionary failed.");
 	case BE_PY_ERR_LIST:
@@ -1080,24 +1080,24 @@ beMapLibbePyErrorToString(int errCode)
 /* Private python initialization structure */
 
 static struct PyMethodDef libbeMethods[] = {
-	{"beCopy", (PyCFunction)beCopy, METH_VARARGS, "Create/Copy a BE."},
-	{"beCreateSnapshot", (PyCFunction)beCreateSnapshot, METH_VARARGS,
+	{"beCopy", beCopy, METH_VARARGS, "Create/Copy a BE."},
+	{"beCreateSnapshot", beCreateSnapshot, METH_VARARGS,
 	    "Create a snapshot."},
-	{"beDestroy", (PyCFunction)beDestroy, METH_VARARGS, "Destroy a BE."},
-	{"beDestroySnapshot", (PyCFunction)beDestroySnapshot, METH_VARARGS,
+	{"beDestroy", beDestroy, METH_VARARGS, "Destroy a BE."},
+	{"beDestroySnapshot", beDestroySnapshot, METH_VARARGS,
 	    "Destroy a snapshot."},
-	{"beMount", (PyCFunction)beMount, METH_VARARGS, "Mount a BE."},
-	{"beUnmount", (PyCFunction)beUnmount, METH_VARARGS, "Unmount a BE."},
-	{"beList", (PyCFunction)beList, METH_VARARGS | METH_KEYWORDS,
+	{"beMount", beMount, METH_VARARGS, "Mount a BE."},
+	{"beUnmount", beUnmount, METH_VARARGS, "Unmount a BE."},
+	{"beList", (PyCFunction)(uintptr_t)beList, METH_VARARGS | METH_KEYWORDS,
 	    "List BE info."},
-	{"beRename", (PyCFunction)beRename, METH_VARARGS, "Rename a BE."},
-	{"beActivate", (PyCFunction)beActivate, METH_VARARGS, "Activate a BE."},
-	{"beRollback", (PyCFunction)beRollback, METH_VARARGS, "Rollback a BE."},
-	{"bePrintErrors", (PyCFunction)bePrintErrors, METH_VARARGS,
+	{"beRename", beRename, METH_VARARGS, "Rename a BE."},
+	{"beActivate", beActivate, METH_VARARGS, "Activate a BE."},
+	{"beRollback", beRollback, METH_VARARGS, "Rollback a BE."},
+	{"bePrintErrors", bePrintErrors, METH_VARARGS,
 	    "Enable/disable error printing."},
-	{"beGetErrDesc", (PyCFunction)beGetErrDesc, METH_VARARGS,
+	{"beGetErrDesc", beGetErrDesc, METH_VARARGS,
 	    "Map Error codes to strings."},
-	{"beVerifyBEName", (PyCFunction)beVerifyBEName, METH_VARARGS,
+	{"beVerifyBEName", beVerifyBEName, METH_VARARGS,
 	    "Verify BE name."},
 	{NULL, NULL, 0, NULL}
 };
