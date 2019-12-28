@@ -427,10 +427,10 @@ sctp_initialize_params(sctp_t *sctp, sctp_init_chunk_t *init,
 /*
  * Copy the peer's original source address into addr. This relies on the
  * following format (see sctp_send_initack() below):
- * 	relative timestamp for the cookie (int64_t) +
- * 	cookie lifetime (uint32_t) +
- * 	local tie-tag (uint32_t) +  peer tie-tag (uint32_t) +
- * 	Peer's original src ...
+ *	relative timestamp for the cookie (int64_t) +
+ *	cookie lifetime (uint32_t) +
+ *	local tie-tag (uint32_t) +  peer tie-tag (uint32_t) +
+ *	Peer's original src ...
  */
 int
 cl_sctp_cookie_paddr(sctp_chunk_hdr_t *ch, in6_addr_t *addr)
@@ -454,7 +454,7 @@ cl_sctp_cookie_paddr(sctp_chunk_hdr_t *ch, in6_addr_t *addr)
 	sizeof (int64_t) +		/* timestamp */			\
 	sizeof (uint32_t) +		/* cookie lifetime */		\
 	sizeof (sctp_init_chunk_t) +	/* INIT ACK */			\
-	sizeof (in6_addr_t) +		/* peer's original source */ 	\
+	sizeof (in6_addr_t) +		/* peer's original source */	\
 	ntohs((initcp)->sch_len) +	/* peer's INIT */		\
 	sizeof (uint32_t) +		/* local tie-tag */		\
 	sizeof (uint32_t) +		/* peer tie-tag */		\
@@ -946,6 +946,8 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp,
 	uint16_t		old_num_str;
 	sctp_stack_t		*sctps = sctp->sctp_sctps;
 
+	sdc = NULL;
+	seglen = 0;
 	iack = (sctp_init_chunk_t *)(iackch + 1);
 
 	cph = NULL;

@@ -163,7 +163,7 @@ int ipsec_weird_null_inbound_policy = 0;
  * Inbound traffic should have matching identities for both SA's.
  */
 
-#define	SA_IDS_MATCH(sa1, sa2) 						\
+#define	SA_IDS_MATCH(sa1, sa2)						\
 	(((sa1) == NULL) || ((sa2) == NULL) ||				\
 	(((sa1)->ipsa_src_cid == (sa2)->ipsa_src_cid) &&		\
 	    (((sa1)->ipsa_dst_cid == (sa2)->ipsa_dst_cid))))
@@ -3178,6 +3178,7 @@ ipsec_act_find(const ipsec_act_t *a, int n, netstack_t *ns)
 	 * TODO: should canonicalize a[] (i.e., zeroize any padding)
 	 * so we can use a non-trivial policy_hash function.
 	 */
+	ap = NULL;
 	for (i = n-1; i >= 0; i--) {
 		hval = policy_hash(IPSEC_ACTION_HASH_SIZE, &a[i], &a[n]);
 
@@ -6282,6 +6283,9 @@ ipsec_fragcache_add(ipsec_fragcache_t *frag, mblk_t *iramp, mblk_t *mp,
 #ifdef FRAGCACHE_DEBUG
 	cmn_err(CE_WARN, "Fragcache: %s\n", inbound ? "INBOUND" : "OUTBOUND");
 #endif
+	v6_proto = 0;
+	fraghdr = NULL;
+
 	/*
 	 * You're on the slow path, so insure that every packet in the
 	 * cache is a single-mblk one.

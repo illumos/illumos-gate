@@ -76,7 +76,7 @@
 	(((ire)->ire_type & IRE_DEFAULT) || \
 	    (((ire)->ire_type & IRE_INTERFACE) && ((ire)->ire_addr == 0)))
 
-#define	IP_SRC_MULTIHOMING(isv6, ipst) 			\
+#define	IP_SRC_MULTIHOMING(isv6, ipst)			\
 	(isv6 ? ipst->ips_ipv6_strict_src_multihoming :	\
 	ipst->ips_ip_strict_src_multihoming)
 
@@ -470,7 +470,7 @@ ire_get_bucket(ire_t *ire)
  * routes to this destination, this routine will utilise the
  * first route it finds to IP address
  * Return values:
- * 	0	- FAILURE
+ *	0	- FAILURE
  *	nonzero	- ifindex
  */
 uint_t
@@ -807,7 +807,7 @@ ire_round_robin(irb_t *irb_ptr, ire_ftable_args_t *margs, uint_t hash,
     ire_t *orig_ire, ip_stack_t *ipst)
 {
 	ire_t		*ire, *maybe_ire = NULL;
-	uint_t		maybe_badcnt;
+	uint_t		maybe_badcnt = 0;
 	uint_t		maxwalk;
 
 	/* Fold in more bits from the hint/hash */

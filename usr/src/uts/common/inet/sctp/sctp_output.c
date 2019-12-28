@@ -990,8 +990,8 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 	mblk_t			*head;
 	mblk_t			*meta = sctp->sctp_xmit_tail;
 	mblk_t			*fill = NULL;
-	uint16_t 		chunklen;
-	uint32_t 		cansend;
+	uint16_t		chunklen;
+	uint32_t		cansend;
 	int32_t			seglen;
 	int32_t			xtralen;
 	int32_t			sacklen;
@@ -1006,6 +1006,8 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 	boolean_t		notsent = B_TRUE;
 	sctp_stack_t		*sctps = sctp->sctp_sctps;
 	uint32_t		tsn;
+
+	lfp = NULL;
 
 	if (sctp->sctp_ftsn == sctp->sctp_lastacked + 1) {
 		sacklen = 0;
@@ -1651,7 +1653,7 @@ sctp_check_adv_ack_pt(sctp_t *sctp, mblk_t *meta, mblk_t *mp)
  * - the chunk is unsent, i.e. new data.
  */
 #define	SCTP_CHUNK_RX_CANBUNDLE(mp, fp)					\
-	(!SCTP_CHUNK_ABANDONED((mp)) && 				\
+	(!SCTP_CHUNK_ABANDONED((mp)) &&					\
 	((SCTP_CHUNK_ISSENT((mp)) && (SCTP_CHUNK_DEST(mp) == (fp) &&	\
 	!SCTP_CHUNK_ISACKED(mp))) ||					\
 	(((mp)->b_flag & (SCTP_CHUNK_FLAG_REXMIT|SCTP_CHUNK_FLAG_SENT)) != \
@@ -1694,7 +1696,7 @@ sctp_rexmit(sctp_t *sctp, sctp_faddr_t *oldfp)
 			 *
 			 *	if the advanced peer ack point includes the next
 			 *	chunk to be retransmited - possibly the Forward
-			 * 	TSN was lost.
+			 *	TSN was lost.
 			 *
 			 *	if we are PRSCTP aware and the next chunk to be
 			 *	retransmitted is now abandoned

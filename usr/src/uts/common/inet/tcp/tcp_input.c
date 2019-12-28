@@ -2469,6 +2469,7 @@ tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		tcp_unfuse(tcp);
 	}
 
+	mss = 0;
 	iphdr = mp->b_rptr;
 	rptr = mp->b_rptr;
 	ASSERT(OK_32PTR(rptr));

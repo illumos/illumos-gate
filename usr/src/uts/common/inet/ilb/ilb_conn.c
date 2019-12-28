@@ -132,6 +132,9 @@ ilb_conn_remove_common(ilb_conn_t *connp, boolean_t c2s)
 	ilb_conn_t **next, **prev;
 	ilb_conn_t **next_prev, **prev_next;
 
+	next_prev = NULL;
+	prev_next = NULL;
+
 	if (c2s) {
 		hash = connp->conn_c2s_hash;
 		ASSERT(MUTEX_HELD(&hash->ilb_conn_hash_lock));
@@ -698,6 +701,7 @@ update_conn_tcp(ilb_conn_t *connp, void *iph, tcpha_t *tcpha, int32_t pkt_len,
 	uint32_t ack, seq;
 	int32_t seg_len;
 
+	ack = 0;
 	if (tcpha->tha_flags & TH_RST)
 		return (B_FALSE);
 
@@ -902,6 +906,11 @@ ilb_check_icmp_conn(ilb_stack_t *ilbs, mblk_t *mp, int l3, void *out_iph,
 	ilb_rule_info_t rule_cache;
 	uint32_t adj_ip_sum;
 	boolean_t full_nat;
+
+	in_iph4 = NULL;
+	in_iph6 = NULL;
+	icmph4 = NULL;
+	icmph6 = NULL;
 
 	if (l3 == IPPROTO_IP) {
 		in6_addr_t in_src, in_dst;

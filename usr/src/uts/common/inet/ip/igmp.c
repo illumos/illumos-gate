@@ -310,15 +310,15 @@ mld_start_timers(unsigned next, ip_stack_t *ipst)
 mblk_t *
 igmp_input(mblk_t *mp, ip_recv_attr_t *ira)
 {
-	igmpa_t 	*igmpa;
+	igmpa_t		*igmpa;
 	ipha_t		*ipha = (ipha_t *)(mp->b_rptr);
 	int		iphlen, igmplen, mblklen;
-	ilm_t 		*ilm;
+	ilm_t		*ilm;
 	uint32_t	src, dst;
-	uint32_t 	group;
+	uint32_t	group;
 	in6_addr_t	v6group;
 	uint_t		next;
-	ipif_t 		*ipif;
+	ipif_t		*ipif;
 	ill_t		*ill = ira->ira_ill;
 	ip_stack_t	*ipst = ill->ill_ipst;
 
@@ -778,7 +778,7 @@ igmp_joingroup(ilm_t *ilm)
 	ASSERT(RW_WRITE_HELD(&ill->ill_mcast_lock));
 
 	if (ilm->ilm_addr == htonl(INADDR_ALLHOSTS_GROUP)) {
-		ilm->ilm_rtx.rtx_timer = INFINITY;
+		ilm->ilm_rtx.rtx_timer = timer = INFINITY;
 		ilm->ilm_state = IGMP_OTHERMEMBER;
 	} else {
 		ip1dbg(("Querier mode %d, sending report, group %x\n",
@@ -857,11 +857,10 @@ mld_joingroup(ilm_t *ilm)
 	ill = ilm->ilm_ill;
 
 	ASSERT(ill->ill_isv6);
-
 	ASSERT(RW_WRITE_HELD(&ill->ill_mcast_lock));
 
 	if (IN6_ARE_ADDR_EQUAL(&ipv6_all_hosts_mcast, &ilm->ilm_v6addr)) {
-		ilm->ilm_rtx.rtx_timer = INFINITY;
+		ilm->ilm_rtx.rtx_timer = timer = INFINITY;
 		ilm->ilm_state = IGMP_OTHERMEMBER;
 	} else {
 		if (ill->ill_mcast_type == MLD_V1_ROUTER) {
@@ -1435,7 +1434,7 @@ igmp_timeout_handler(void *arg)
 uint_t
 mld_timeout_handler_per_ill(ill_t *ill)
 {
-	ilm_t 	*ilm;
+	ilm_t	*ilm;
 	uint_t	next = INFINITY, current;
 	mrec_t	*rp, *rtxrp;
 	rtx_state_t *rtxp;
@@ -1832,7 +1831,7 @@ igmp_sendpkt(ilm_t *ilm, uchar_t type, ipaddr_t addr)
 	ipha_t	*ipha;
 	int	hdrlen = sizeof (ipha_t) + RTRALERT_LEN;
 	size_t	size  = hdrlen + sizeof (igmpa_t);
-	ill_t 	*ill  = ilm->ilm_ill;
+	ill_t	*ill  = ilm->ilm_ill;
 	ip_stack_t *ipst = ill->ill_ipst;
 
 	ASSERT(RW_LOCK_HELD(&ill->ill_mcast_lock));
@@ -1859,15 +1858,15 @@ igmp_sendpkt(ilm_t *ilm, uchar_t type, ipaddr_t addr)
 
 	ipha->ipha_version_and_hdr_length = (IP_VERSION << 4)
 	    | (IP_SIMPLE_HDR_LENGTH_IN_WORDS + RTRALERT_LEN_IN_WORDS);
-	ipha->ipha_type_of_service 	= 0;
+	ipha->ipha_type_of_service	= 0;
 	ipha->ipha_length = htons(size);
 	ipha->ipha_ident = 0;
 	ipha->ipha_fragment_offset_and_flags = 0;
-	ipha->ipha_ttl 		= IGMP_TTL;
-	ipha->ipha_protocol 	= IPPROTO_IGMP;
-	ipha->ipha_hdr_checksum 	= 0;
-	ipha->ipha_dst 		= addr ? addr : igmpa->igmpa_group;
-	ipha->ipha_src 		= INADDR_ANY;
+	ipha->ipha_ttl		= IGMP_TTL;
+	ipha->ipha_protocol	= IPPROTO_IGMP;
+	ipha->ipha_hdr_checksum	= 0;
+	ipha->ipha_dst		= addr ? addr : igmpa->igmpa_group;
+	ipha->ipha_src		= INADDR_ANY;
 
 	ill_mcast_queue(ill, mp);
 
@@ -2448,7 +2447,7 @@ mld_sendpkt(ilm_t *ilm, uchar_t type, const in6_addr_t *v6addr)
 {
 	mblk_t		*mp;
 	mld_hdr_t	*mldh;
-	ip6_t 		*ip6h;
+	ip6_t		*ip6h;
 	ip6_hbh_t	*ip6hbh;
 	struct ip6_opt_router	*ip6router;
 	size_t		size = IPV6_HDR_LEN + sizeof (mld_hdr_t);
