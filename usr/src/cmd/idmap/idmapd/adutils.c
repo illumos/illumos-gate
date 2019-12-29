@@ -130,8 +130,8 @@ static pthread_t	reaperid = 0;
  */
 /*ARGSUSED*/
 static
-void
-adreaper(void *arg)
+void *
+adreaper(void *arg __unused)
 {
 	timespec_t	ts;
 
@@ -146,6 +146,7 @@ adreaper(void *arg)
 		(void) nanosleep(&ts, NULL);
 		adutils_reap_idle_connections();
 	}
+	return (NULL);
 }
 
 /*
@@ -163,8 +164,7 @@ idmap_add_ds(adutils_ad_t *ad, const char *host, int port)
 
 	/* Start reaper if it doesn't exist */
 	if (ret == 0 && reaperid == 0)
-		(void) pthread_create(&reaperid, NULL,
-		    (void *(*)(void *))adreaper, (void *)NULL);
+		(void) pthread_create(&reaperid, NULL, adreaper, NULL);
 	return (ret);
 }
 
@@ -193,8 +193,8 @@ map_adrc2idmaprc(adutils_rc adrc)
 
 idmap_retcode
 idmap_lookup_batch_start(adutils_ad_t *ad, int nqueries,
-	int directory_based_mapping, const char *default_domain,
-	idmap_query_state_t **state)
+    int directory_based_mapping, const char *default_domain,
+    idmap_query_state_t **state)
 {
 	idmap_query_state_t	*new_state;
 	adutils_rc		rc;
@@ -232,7 +232,7 @@ idmap_lookup_batch_start(adutils_ad_t *ad, int nqueries,
  */
 void
 idmap_lookup_batch_set_unixattr(idmap_query_state_t *state,
-		const char *unixuser_attr, const char *unixgroup_attr)
+    const char *unixuser_attr, const char *unixgroup_attr)
 {
 	state->ad_unixuser_attr = unixuser_attr;
 	state->ad_unixgroup_attr = unixgroup_attr;
@@ -385,7 +385,7 @@ idmap_bv_objclass2sidtype(BerValue **bvalues, int *sid_type)
 static
 void
 idmap_extract_object(idmap_query_state_t *state, idmap_q_t *q,
-	LDAPMessage *res, LDAP *ld)
+    LDAPMessage *res, LDAP *ld)
 {
 	BerValue		**bvalues;
 	const char		*attr = NULL;
@@ -503,7 +503,7 @@ out:
 
 void
 idmap_ldap_res_search_cb(LDAP *ld, LDAPMessage **res, int rc, int qid,
-		void *argp)
+    void *argp)
 {
 	idmap_query_state_t	*state = (idmap_query_state_t *)argp;
 	idmap_q_t		*q = &(state->queries[qid]);
@@ -588,12 +588,12 @@ idmap_lookup_batch_end(idmap_query_state_t **state)
 static
 idmap_retcode
 idmap_batch_add1(idmap_query_state_t *state, const char *filter,
-	char *ecanonname, char *edomain, idmap_id_type esidtype,
-	char **dn, char **attr, char **value,
-	char **canonname, char **dname,
-	char **sid, rid_t *rid, idmap_id_type *sid_type, char **unixname,
-	posix_id_t *pid,
-	idmap_retcode *rc)
+    char *ecanonname, char *edomain, idmap_id_type esidtype,
+    char **dn, char **attr, char **value,
+    char **canonname, char **dname,
+    char **sid, rid_t *rid, idmap_id_type *sid_type, char **unixname,
+    posix_id_t *pid,
+    idmap_retcode *rc)
 {
 	adutils_rc	ad_rc;
 	int		qid, i;
@@ -695,11 +695,11 @@ idmap_batch_add1(idmap_query_state_t *state, const char *filter,
 
 idmap_retcode
 idmap_name2sid_batch_add1(idmap_query_state_t *state,
-	const char *name, const char *dname, idmap_id_type esidtype,
-	char **dn, char **attr, char **value,
-	char **canonname, char **sid, rid_t *rid,
-	idmap_id_type *sid_type, char **unixname,
-	posix_id_t *pid, idmap_retcode *rc)
+    const char *name, const char *dname, idmap_id_type esidtype,
+    char **dn, char **attr, char **value,
+    char **canonname, char **sid, rid_t *rid,
+    idmap_id_type *sid_type, char **unixname,
+    posix_id_t *pid, idmap_retcode *rc)
 {
 	idmap_retcode	retcode;
 	char		*filter, *s_name;
@@ -768,10 +768,10 @@ idmap_name2sid_batch_add1(idmap_query_state_t *state,
 
 idmap_retcode
 idmap_sid2name_batch_add1(idmap_query_state_t *state,
-	const char *sid, const rid_t *rid, idmap_id_type esidtype,
-	char **dn, char **attr, char **value,
-	char **name, char **dname, idmap_id_type *sid_type,
-	char **unixname, posix_id_t *pid, idmap_retcode *rc)
+    const char *sid, const rid_t *rid, idmap_id_type esidtype,
+    char **dn, char **attr, char **value,
+    char **name, char **dname, idmap_id_type *sid_type,
+    char **unixname, posix_id_t *pid, idmap_retcode *rc)
 {
 	idmap_retcode	retcode;
 	int		ret;
@@ -809,10 +809,10 @@ idmap_sid2name_batch_add1(idmap_query_state_t *state,
 
 idmap_retcode
 idmap_unixname2sid_batch_add1(idmap_query_state_t *state,
-	const char *unixname, int is_user, int is_wuser,
-	char **dn, char **attr, char **value,
-	char **sid, rid_t *rid, char **name,
-	char **dname, idmap_id_type *sid_type, idmap_retcode *rc)
+    const char *unixname, int is_user, int is_wuser,
+    char **dn, char **attr, char **value,
+    char **sid, rid_t *rid, char **name,
+    char **dname, idmap_id_type *sid_type, idmap_retcode *rc)
 {
 	idmap_retcode	retcode;
 	char		*filter, *s_unixname;
@@ -858,10 +858,10 @@ idmap_unixname2sid_batch_add1(idmap_query_state_t *state,
 
 idmap_retcode
 idmap_pid2sid_batch_add1(idmap_query_state_t *state,
-	posix_id_t pid, int is_user,
-	char **dn, char **attr, char **value,
-	char **sid, rid_t *rid, char **name,
-	char **dname, idmap_id_type *sid_type, idmap_retcode *rc)
+    posix_id_t pid, int is_user,
+    char **dn, char **attr, char **value,
+    char **sid, rid_t *rid, char **name,
+    char **dname, idmap_id_type *sid_type, idmap_retcode *rc)
 {
 	idmap_retcode	retcode;
 	char		*filter;

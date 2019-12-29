@@ -89,11 +89,11 @@ static int			events_pending = 0;
 static int			sendevents = 0;
 
 static void		add_event_to_queue(nvlist_t *event);
-static void		cb_watch_events();
+static void		*cb_watch_events(void *);
 static void		event_handler(sysevent_t *ev);
 static void		print_nvlist(char *prefix, nvlist_t *list);
-static void		walk_devtree();
-static void		walker(void *arg);
+static void		walk_devtree(void);
+static void		*walker(void *arg);
 
 static void(*callback)(nvlist_t *, int) = NULL;
 
@@ -184,9 +184,8 @@ dm_init_event_queue(void (*cb)(nvlist_t *, int), int *errp)
 		    /* installing a cb; we didn't have one before */
 		    thread_t watch_thread;
 
-		    *errp = thr_create(NULL, 0,
-			(void *(*)(void *))cb_watch_events, NULL, THR_DAEMON,
-			&watch_thread);
+		    *errp = thr_create(NULL, 0, cb_watch_events, NULL,
+			THR_DAEMON, &watch_thread);
 		}
 	    }
 
@@ -204,8 +203,7 @@ dm_init_event_queue(void (*cb)(nvlist_t *, int), int *errp)
 
 		callback = cb;
 
-		*errp = thr_create(NULL, 0,
-		    (void *(*)(void *))cb_watch_events, NULL, THR_DAEMON,
+		*errp = thr_create(NULL, 0, cb_watch_events, NULL, THR_DAEMON,
 		    &watch_thread);
 	    }
 	}
@@ -344,8 +342,8 @@ add_event_to_queue(nvlist_t *event)
 	(void) sema_post(&semaphore);
 }
 
-static void
-cb_watch_events()
+static void *
+cb_watch_events(void *arg __unused)
 {
 	nvlist_t	*event;
 	int		error;
@@ -355,7 +353,7 @@ cb_watch_events()
 	    event = dm_get_event(&error);
 	    if (callback == NULL) {
 		/* end the thread */
-		return;
+		return (NULL);
 	    }
 	    callback(event, error);
 	}
@@ -474,7 +472,7 @@ print_nvlist(char *prefix, nvlist_t *list)
  * drive.
  */
 static void
-walk_devtree()
+walk_devtree(void)
 {
 	thread_t	walk_thread;
 
@@ -482,7 +480,7 @@ walk_devtree()
 
 	switch (walker_state) {
 	case WALK_NONE:
-	    if (thr_create(NULL, 0, (void *(*)(void *))walker, NULL,
+	    if (thr_create(NULL, 0, walker, NULL,
 		THR_DAEMON, &walk_thread) == 0) {
 		walker_state = WALK_WAITING;
 	    }
@@ -500,9 +498,8 @@ walk_devtree()
 	mutex_exit(&walker_lock);
 }
 
-/*ARGSUSED*/
-static void
-walker(void *arg)
+static void *
+walker(void *arg __unused)
 {
 	int	walk_again = 0;
 
@@ -515,7 +512,7 @@ walker(void *arg)
 		walker_state = WALK_NONE;
 		(void) cond_broadcast(&walker_cv);
 		mutex_exit(&walker_lock);
-		return;
+		return (NULL);
 	    }
 	    walker_state = WALK_RUNNING;
 	    mutex_exit(&walker_lock);
@@ -527,7 +524,7 @@ walker(void *arg)
 		walker_state = WALK_NONE;
 		(void) cond_broadcast(&walker_cv);
 		mutex_exit(&walker_lock);
-		return;
+		return (NULL);
 	    }
 
 	    if (events_pending) {
@@ -542,4 +539,5 @@ walker(void *arg)
 	    mutex_exit(&walker_lock);
 
 	} while (walk_again);
+	return (NULL);
 }

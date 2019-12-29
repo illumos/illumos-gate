@@ -66,7 +66,7 @@ timeout(void (*func)(void *), void *arg, clock_t delta)
 clock_t
 untimeout(timeout_id_t id_arg)
 {
-	struct itimerspec its;
+	struct itimerspec its, oits;
 	char *id_cp = id_arg;
 	clock_t delta;
 	timer_t tid;
@@ -79,11 +79,12 @@ untimeout(timeout_id_t id_arg)
 	tid = (int)(id_cp - timeout_base);
 
 	bzero(&its, sizeof (its));
-	rc = timer_settime(tid, 0, &its, &its);
+	bzero(&oits, sizeof (oits));
+	rc = timer_settime(tid, 0, &its, &oits);
 	if (rc != 0) {
 		delta = 0;
 	} else {
-		delta = TIMESTRUC_TO_TICK(&its.it_value);
+		delta = TIMESTRUC_TO_TICK(&oits.it_value);
 		if (delta < 0)
 			delta = 0;
 	}

@@ -115,7 +115,7 @@ static int	reset_file = 1; /* 1 to close/open binary log */
 static int	auditing_set = 0;	/* 1 if auditon(A_SETCOND, on... */
 
 static void	my_sleep();
-static void	signal_thread();
+static void	*signal_thread(void *);
 static void	loadauditlist();
 static void	block_signals();
 static int	do_sethost();
@@ -262,8 +262,7 @@ main(int argc, char *argv[])
 	/*
 	 * Set up a separate thread for signal handling.
 	 */
-	if (pthread_create(&tid, NULL, (void *(*)(void *))signal_thread,
-	    NULL)) {
+	if (pthread_create(&tid, NULL, signal_thread, NULL)) {
 		(void) fprintf(stderr, gettext(
 		    "auditd can't create a thread\n"));
 		auditd_exit(1);
@@ -725,8 +724,8 @@ block_signals()
  * The thread is created with all signals blocked.
  */
 
-static void
-signal_thread()
+static void *
+signal_thread(void *arg __unused)
 {
 	sigset_t	set;
 	int		signal_caught;
@@ -766,6 +765,7 @@ signal_thread()
 		}
 		(void) pthread_cond_signal(&(main_thr.thd_cv));
 	}
+	return (NULL);
 }
 
 /*
@@ -819,11 +819,11 @@ fail:
 static void
 conf_to_kernel(void)
 {
-	register au_event_ent_t *evp;
-	register int 		i;
+	au_event_ent_t		*evp;
+	int			i;
 	char			*msg;
-	au_evclass_map_t 	ec;
-	au_stat_t 		as;
+	au_evclass_map_t	ec;
+	au_stat_t		as;
 
 	if (auditon(A_GETSTAT, (caddr_t)&as, 0) != 0) {
 		(void) asprintf(&msg, gettext("Audit module does not appear "

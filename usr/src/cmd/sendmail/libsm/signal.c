@@ -7,8 +7,6 @@
  * the sendmail distribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sm/gen.h>
 SM_RCSID("@(#)$Id: signal.c,v 1.17 2005/06/14 23:07:20 ca Exp $")
 
@@ -54,7 +52,7 @@ sm_signal(sig, handler)
 # ifdef SA_RESTART
 	(void) memset(&n, '\0', sizeof n);
 #  if USE_SA_SIGACTION
-	n.sa_sigaction = (void(*)(int, siginfo_t *, void *)) handler;
+	n.sa_sigaction = (void(*)(int, siginfo_t *, void *))(uintptr_t) handler;
 	n.sa_flags = SA_RESTART|SA_SIGINFO;
 #  else /* USE_SA_SIGACTION */
 	n.sa_handler = handler;

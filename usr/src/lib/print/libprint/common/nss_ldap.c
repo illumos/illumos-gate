@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -173,7 +171,7 @@ static void _freeList(char ***list);
 static NSL_RESULT _modAttrKVP(char *value, char ***kvpList);
 static NSL_RESULT _attrAddKVP(LDAPMod ***attrs, char **kvpList, int kvpExists);
 static int _manageReferralCredentials(LDAP *ld, char **dn, char **credp,
-					int *methodp, int freeit);
+	int *methodp, int freeit, void *);
 
 /*
  * *****************************************************************************
@@ -483,9 +481,8 @@ _connectToLDAP(ns_cred_t *cred, LDAP **ld)
 			 */
 			(void) _manageReferralCredentials(*ld,
 					&(cred->binddn), &(cred->passwd),
-					&tmpMethod, -1);
+					&tmpMethod, -1, NULL);
 			ldap_set_rebind_proc(*ld,
-			    (LDAP_REBINDPROC_CALLBACK *)
 				_manageReferralCredentials, NULL);
 
 			if (lresult != LDAP_SUCCESS)
@@ -2417,8 +2414,7 @@ _attrAddKVP(LDAPMod ***attrs, char **kvpList, int kvpExists)
  * *****************************************************************************
  */
 static int _manageReferralCredentials(LDAP *ld, char **dn, char **credp,
-					int *methodp, int freeit)
-
+    int *methodp, int freeit, void *arg __unused)
 {
 	int result = 0;
 	static char *sDN = NULL;

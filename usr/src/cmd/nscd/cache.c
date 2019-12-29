@@ -85,7 +85,7 @@ static void queue_dump(nsc_db_t *, time_t);
 #endif	/* NSCD_DEBUG */
 
 static int launch_update(nsc_lookup_args_t *);
-static void do_update(nsc_lookup_args_t *);
+static void *do_update(void *);
 static void getxy_keepalive(nsc_ctx_t *, nsc_db_t *, int, int);
 
 static void ctx_info(nsc_ctx_t *);
@@ -107,8 +107,8 @@ static uint_t nsc_db_int_key_gethash(nss_XbyY_key_t *, int);
 static umem_cache_t	*nsc_entry_cache;
 
 static nsc_ctx_t *init_cache_ctx(int);
-static void reaper(nsc_ctx_t *);
-static void revalidate(nsc_ctx_t *);
+static void *reaper(void *);
+static void *revalidate(void *);
 
 static nss_status_t
 dup_packed_buffer(void *src, void *dst)
@@ -1160,8 +1160,7 @@ start_threads(nsc_ctx_t *ctx)
 	 *  kick off the revalidate thread (if necessary)
 	 */
 	if (ctx->revalidate_on != nscd_true) {
-		if (thr_create(NULL, 0, (void *(*)(void *))revalidate,
-		    ctx, 0, NULL) != 0) {
+		if (thr_create(NULL, 0, revalidate, ctx, 0, NULL) != 0) {
 			errnum = errno;
 			_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_ERROR)
 			(me, "thr_create (revalidate thread for %s): %s\n",
@@ -1175,8 +1174,7 @@ start_threads(nsc_ctx_t *ctx)
 	 *  kick off the reaper thread (if necessary)
 	 */
 	if (ctx->reaper_on != nscd_true) {
-		if (thr_create(NULL, 0, (void *(*)(void *))reaper,
-		    ctx, 0, NULL) != 0) {
+		if (thr_create(NULL, 0, reaper, ctx, 0, NULL) != 0) {
 			errnum = errno;
 			_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_ERROR)
 			(me, "thr_create (reaper thread for %s): %s\n",
@@ -1843,9 +1841,11 @@ init_cache_ctx(int i)
 }
 
 
-static void
-revalidate(nsc_ctx_t *ctx)
+static void *
+revalidate(void *arg)
 {
+	nsc_ctx_t *ctx = arg;
+
 	(void) thr_setname(thr_self(), "revalidate");
 
 	for (;;) {
@@ -1871,6 +1871,7 @@ revalidate(nsc_ctx_t *ctx)
 			(void) sleep(slp);
 		}
 	}
+	return (NULL);
 }
 
 
@@ -1976,8 +1977,7 @@ launch_update(nsc_lookup_args_t *in)
 	char	*me = "launch_update";
 	int	errnum;
 
-	errnum = thr_create(NULL, 0, (void *(*)(void*))do_update,
-	    in, 0|THR_DETACHED, NULL);
+	errnum = thr_create(NULL, 0, do_update, in, 0|THR_DETACHED, NULL);
 	if (errnum != 0) {
 		_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_ERROR)
 		(me, "%s: thread creation failure (%d)\n",
@@ -1988,9 +1988,10 @@ launch_update(nsc_lookup_args_t *in)
 }
 
 
-static void
-do_update(nsc_lookup_args_t *in)
+static void *
+do_update(void *arg)
 {
+	nsc_lookup_args_t *in = arg;
 	nss_pheader_t	*phdr = (nss_pheader_t *)in->buffer;
 
 	(void) thr_setname(thr_self(), "do_update");
@@ -2002,6 +2003,7 @@ do_update(nsc_lookup_args_t *in)
 	if (in->buffer)
 		free(in->buffer);
 	free(in);
+	return (NULL);
 }
 
 
@@ -2217,9 +2219,10 @@ lookup_cache(nsc_lookup_args_t *largs, nscd_cfg_cache_t *cfgp,
 	return (NSCD_SUCCESS);
 }
 
-static void
-reaper(nsc_ctx_t *ctx)
+static void *
+reaper(void *arg)
 {
+	nsc_ctx_t	*ctx = arg;
 	uint_t		ttl, extra_sleep, total_sleep, intervals;
 	uint_t		nodes_per_interval, seconds_per_interval;
 	ulong_t		nsc_entries;
@@ -2282,6 +2285,7 @@ reaper(nsc_ctx_t *ctx)
 		if (extra_sleep > 0)
 			(void) sleep(extra_sleep);
 	}
+	return (NULL);
 }
 
 

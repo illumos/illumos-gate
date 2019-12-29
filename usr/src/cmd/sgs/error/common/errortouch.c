@@ -677,6 +677,7 @@ mustwrite(char *base, int n, FILE *preciousfile)
 			return (0);
 		case Q_NO:
 		case Q_no:
+		default:
 			(void) mustwrite(base + nwrote, n - nwrote,
 			    preciousfile);
 			return (1);

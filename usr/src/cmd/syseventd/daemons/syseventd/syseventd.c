@@ -260,8 +260,8 @@ sigusr1(int sig)
 	syseventd_exit(0);
 }
 
-static void
-sigwait_thr()
+static void *
+sigwait_thr(void *arg __unused)
 {
 	int	sig;
 	int	err;
@@ -284,7 +284,7 @@ sigwait_thr()
 			flt_handler(sig);
 		}
 	}
-	/* NOTREACHED */
+	return (NULL);
 }
 
 static void
@@ -465,8 +465,7 @@ main(int argc, char **argv)
 		syseventd_exit(2);
 	}
 	/* Create signal catching thread */
-	if (thr_create(NULL, 0, (void *(*)(void *))sigwait_thr,
-	    NULL, 0, NULL) < 0) {
+	if (thr_create(NULL, 0, sigwait_thr, NULL, 0, NULL) < 0) {
 		syseventd_err_print(INIT_THR_CREATE_ERR, strerror(errno));
 		syseventd_exit(2);
 	}
@@ -665,7 +664,7 @@ drain_eventq(struct sysevent_client *scp, int status)
  *				This thread will process any events on this
  *				client's eventq.
  */
-static void
+static void *
 client_deliver_event_thr(void *arg)
 {
 	int flag, error, i;
@@ -692,7 +691,7 @@ client_deliver_event_thr(void *arg)
 				    "exiting flags: 0X%x\n",
 				    scp->client_num, scp->client_flags);
 				(void) mutex_unlock(&scp->client_lock);
-				return;
+				return (NULL);
 			}
 
 			(void) cond_wait(&scp->client_cv, &scp->client_lock);
@@ -770,7 +769,7 @@ client_deliver_event_thr(void *arg)
 					 */
 					drain_eventq(scp, EINVAL);
 					(void) mutex_unlock(&scp->client_lock);
-					return;
+					return (NULL);
 				}
 
 				/* Event delivery retry requested */
@@ -796,7 +795,7 @@ client_deliver_event_thr(void *arg)
 		/* Return if this was a synchronous delivery */
 		if (!SE_CLIENT_IS_THR_RUNNING(scp)) {
 			(void) mutex_unlock(&scp->client_lock);
-			return;
+			return (NULL);
 		}
 
 	}
@@ -1328,9 +1327,8 @@ load_modules(char *dirname)
 		scp = sysevent_client_tbl[client_id];
 		++concurrency_level;
 		(void) thr_setconcurrency(concurrency_level);
-		if (thr_create(NULL, 0,
-		    (void *(*)(void *))client_deliver_event_thr,
-		    (void *)scp, THR_BOUND, &scp->tid) != 0) {
+		if (thr_create(NULL, 0, client_deliver_event_thr,
+		    scp, THR_BOUND, &scp->tid) != 0) {
 
 			syseventd_err_print(LOAD_MOD_ALLOC_ERR, "insert_client",
 			    strerror(errno));
