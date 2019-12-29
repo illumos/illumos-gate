@@ -24,7 +24,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright (c) 2015 by Delphix. All rights reserved.
- * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_LIBBE_PRIV_H
@@ -175,6 +175,7 @@ boolean_t be_zfs_init(void);
 void be_zfs_fini(void);
 void be_make_root_ds(const char *, const char *, char *, int);
 void be_make_container_ds(const char *, char *, int);
+void be_make_root_container_ds(const char *, char *, int);
 char *be_make_name_from_ds(const char *, char *);
 int be_append_menu(char *, char *, char *, char *, char *);
 int be_remove_menu(char *, char *, char *);
