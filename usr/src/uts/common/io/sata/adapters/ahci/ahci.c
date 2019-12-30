@@ -1432,6 +1432,7 @@ ahci_tran_probe_port(dev_info_t *dip, sata_device_t *sd)
 	uint8_t port;
 	int rval = SATA_SUCCESS, rval_init;
 
+	port_state = 0;
 	ahci_ctlp = ddi_get_soft_state(ahci_statep, ddi_get_instance(dip));
 	port = ahci_ctlp->ahcictl_cport_to_port[cport];
 
@@ -1996,6 +1997,7 @@ ahci_claim_free_slot(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	    ahci_portp->ahciport_pending_tags,
 	    ahci_portp->ahciport_pending_ncq_tags);
 
+	free_slots = 0;
 	/*
 	 * According to the AHCI spec, system software is responsible to
 	 * ensure that queued and non-queued commands are not mixed in
@@ -9837,6 +9839,8 @@ ahci_watchdog_handler(ahci_ctl_t *ahci_ctlp)
 	AHCIDBG(AHCIDBG_ENTRY, ahci_ctlp,
 	    "ahci_watchdog_handler entered", NULL);
 
+	current_slot = 0;
+	current_tags = 0;
 	for (port = 0; port < ahci_ctlp->ahcictl_num_ports; port++) {
 		if (!AHCI_PORT_IMPLEMENTED(ahci_ctlp, port)) {
 			continue;
