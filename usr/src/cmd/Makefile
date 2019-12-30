@@ -249,6 +249,7 @@ COMMON_SUBDIRS=		\
 	logger		\
 	login		\
 	logins		\
+	logname		\
 	look		\
 	ls		\
 	luxadm		\

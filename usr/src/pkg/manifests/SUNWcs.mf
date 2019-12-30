@@ -784,6 +784,7 @@ file path=usr/bin/loadkeys mode=0555
 file path=usr/bin/logger mode=0555
 file path=usr/bin/login mode=4555
 file path=usr/bin/logins mode=0750
+file path=usr/bin/logname mode=0555
 file path=usr/bin/ls mode=0555
 file path=usr/bin/m4 mode=0555
 file path=usr/bin/mach mode=0555
@@ -1446,7 +1447,6 @@ hardlink path=usr/bin/kill target=../../usr/bin/alias
 hardlink path=usr/bin/ksh target=../../usr/lib/isaexec
 hardlink path=usr/bin/ksh93 target=../../usr/lib/isaexec
 hardlink path=usr/bin/ln target=../../usr/bin/cp
-hardlink path=usr/bin/logname target=../../usr/bin/alias
 hardlink path=usr/bin/mac target=../../usr/lib/isaexec
 hardlink path=usr/bin/mv target=../../usr/bin/cp
 hardlink path=usr/bin/newtask target=../../usr/lib/isaexec

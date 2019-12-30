@@ -2654,7 +2654,7 @@ f usr/bin/locale 0555 root bin
 f usr/bin/logger 0555 root bin
 f usr/bin/login 4555 root bin
 f usr/bin/logins 0750 root bin
-h usr/bin/logname=usr/bin/alias
+f usr/bin/logname 0555 root bin
 f usr/bin/look 0755 root bin
 f usr/bin/lorder 0555 root bin
 # We want ls to be the 32bit binary (not a link to isaexec) so we don't blow
