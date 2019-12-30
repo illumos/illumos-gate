@@ -824,6 +824,7 @@ ioat_ring_loop(ioat_channel_ring_t *ring, dcopy_cmd_t cmd)
 	ioat_cmd_private_t *prevpriv;
 	ioat_cmd_private_t *currpriv;
 
+	currpriv = NULL;
 	channel = ring->cr_chan;
 	ASSERT(channel->ic_ver == IOAT_CBv1);
 

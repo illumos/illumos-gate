@@ -272,7 +272,7 @@ gfxp_fb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd, gfxp_fb_softc_ptr_t ptr)
 	case DDI_DETACH:
 		(void) ddi_prop_remove(DDI_DEV_T_ANY, devi,
 		    "primary-controller");
-
+		error = DDI_SUCCESS;
 		switch (softc->fb_type) {
 		case GFXP_BITMAP:
 			error = gfxp_bm_detach(devi, softc);

@@ -3626,7 +3626,7 @@ dtrace_get_operand(dis86_t *x, uint_t mode, uint_t r_m, int wbit, int opindex)
 int
 dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 {
-	const instable_t *dp;	/* decode table being used */
+	const instable_t *dp = NULL;	/* decode table being used */
 #ifdef DIS_TEXT
 	uint_t i;
 #endif
@@ -6406,6 +6406,8 @@ L_VEX_RM:
 
 done:
 #ifdef DIS_MEM
+	if (dp == NULL)
+		return (1);
 	/*
 	 * compute the size of any memory accessed by the instruction
 	 */

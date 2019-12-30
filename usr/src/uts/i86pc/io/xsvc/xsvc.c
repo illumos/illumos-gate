@@ -65,7 +65,7 @@ static int xsvc_detach(dev_info_t *devi, ddi_detach_cmd_t cmd);
 static int xsvc_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
     void **result);
 
-static 	struct cb_ops xsvc_cb_ops = {
+static struct cb_ops xsvc_cb_ops = {
 	xsvc_open,		/* cb_open */
 	xsvc_close,		/* cb_close */
 	nodev,			/* cb_strategy */
@@ -468,7 +468,6 @@ xsvc_ioctl_alloc_memory(xsvc_state_t *state, void *arg, int mode)
 	int err;
 	int i;
 
-
 	/* Copy in the params, then get the size and key */
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
 		err = ddi_copyin(arg, &params32, sizeof (xsvc_mem_req_32),
@@ -525,6 +524,7 @@ xsvc_ioctl_alloc_memory(xsvc_state_t *state, void *arg, int mode)
 		usgl32 = (xsvc_mloc_32 *)(uintptr_t)params32.xsvc_sg_list;
 		mp->xm_dma_attr.dma_attr_align = P2ROUNDUP(
 		    params32.xsvc_mem_align, PAGESIZE);
+		usgl = NULL;
 	} else {
 		mp->xm_dma_attr.dma_attr_addr_lo = params.xsvc_mem_addr_lo;
 		mp->xm_dma_attr.dma_attr_addr_hi = params.xsvc_mem_addr_hi;
@@ -532,6 +532,7 @@ xsvc_ioctl_alloc_memory(xsvc_state_t *state, void *arg, int mode)
 		usgl = (xsvc_mloc *)(uintptr_t)params.xsvc_sg_list;
 		mp->xm_dma_attr.dma_attr_align = P2ROUNDUP(
 		    params.xsvc_mem_align, PAGESIZE);
+		usgl32 = NULL;
 	}
 
 	mp->xm_device_attr = xsvc_device_attr;

@@ -2272,7 +2272,8 @@ cpuid_intel_getids(cpu_t *cpu, void *feature)
 		 * Multi-core (and possibly multi-threaded)
 		 * processors.
 		 */
-		uint_t ncpu_per_core;
+		uint_t ncpu_per_core = 0;
+
 		if (cpi->cpi_ncore_per_chip == 1)
 			ncpu_per_core = cpi->cpi_ncpu_per_chip;
 		else if (cpi->cpi_ncore_per_chip > 1)

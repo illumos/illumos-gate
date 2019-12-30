@@ -1014,7 +1014,7 @@ map_unity_domain(domain_t *domain)
 
 /*
  * create_xlate_arena()
- * 	Create the dvma arena for a domain with translation
+ *	Create the dvma arena for a domain with translation
  *	mapping
  */
 static void
@@ -1158,7 +1158,7 @@ set_domain(
 
 /*
  * device_domain()
- * 	Get domain for a device. The domain may be global in which case it
+ *	Get domain for a device. The domain may be global in which case it
  *	is shared between all IOMMU units. Due to potential AGAW differences
  *      between IOMMU units, such global domains *have to be* UNITY mapping
  *      domains. Alternatively, the domain may be local to a IOMMU unit.
@@ -2570,6 +2570,8 @@ immu_map_dvmaseg(dev_info_t *rdip, ddi_dma_handle_t handle,
 	immu_dcookie_t *dcookies;
 	int pde_set;
 
+	rwmask = 0;
+	page = NULL;
 	domain = IMMU_DEVI(rdip)->imd_domain;
 	immu = domain->dom_immu;
 	immu_flags = dma_to_immu_flags(dmareq);

@@ -318,16 +318,16 @@ static int mnode_maxmrange[MAX_MEM_NODES];
 #define	PAGE_COUNTERS(mnode, rg_szc, idx)			\
 	(page_counters[(rg_szc)][(mnode)].hpm_counters[(idx)])
 
-#define	PAGE_COUNTERS_COUNTERS(mnode, rg_szc) 			\
+#define	PAGE_COUNTERS_COUNTERS(mnode, rg_szc)			\
 	(page_counters[(rg_szc)][(mnode)].hpm_counters)
 
-#define	PAGE_COUNTERS_SHIFT(mnode, rg_szc) 			\
+#define	PAGE_COUNTERS_SHIFT(mnode, rg_szc)			\
 	(page_counters[(rg_szc)][(mnode)].hpm_shift)
 
-#define	PAGE_COUNTERS_ENTRIES(mnode, rg_szc) 			\
+#define	PAGE_COUNTERS_ENTRIES(mnode, rg_szc)			\
 	(page_counters[(rg_szc)][(mnode)].hpm_entries)
 
-#define	PAGE_COUNTERS_BASE(mnode, rg_szc) 			\
+#define	PAGE_COUNTERS_BASE(mnode, rg_szc)			\
 	(page_counters[(rg_szc)][(mnode)].hpm_base)
 
 #define	PAGE_COUNTERS_CURRENT_COLOR_ARRAY(mnode, rg_szc, g)		\
@@ -341,7 +341,7 @@ static int mnode_maxmrange[MAX_MEM_NODES];
 	(((pnum) - PAGE_COUNTERS_BASE((mnode), (rg_szc))) >>	\
 		PAGE_COUNTERS_SHIFT((mnode), (rg_szc)))
 
-#define	IDX_TO_PNUM(mnode, rg_szc, index) 			\
+#define	IDX_TO_PNUM(mnode, rg_szc, index)			\
 	(PAGE_COUNTERS_BASE((mnode), (rg_szc)) +		\
 		((index) << PAGE_COUNTERS_SHIFT((mnode), (rg_szc))))
 
@@ -546,7 +546,7 @@ page_ctrs_sz(void)
 	pfn_t	physbase;
 	pfn_t	physmax;
 	uint_t	ctrs_sz = 0;
-	int 	i;
+	int	i;
 	pgcnt_t colors_per_szc[MMU_PAGE_SIZES];
 
 	/*
@@ -1925,7 +1925,7 @@ static uint_t page_promote_noreloc_err;
  * accounting which needs to be done for a returned page.
  *
  * RFE: For performance pass in pp instead of pfnum so
- * 	we can avoid excessive calls to page_numtopp_nolock().
+ *	we can avoid excessive calls to page_numtopp_nolock().
  *	This would depend on an assumption that all contiguous
  *	pages are in the same memseg so we can just add/dec
  *	our pp.
@@ -1970,7 +1970,7 @@ page_promote(int mnode, pfn_t pfnum, uchar_t new_szc, int flags, int mtype)
 	uint_t		bin;
 	pgcnt_t		tmpnpgs, pages_left;
 	uint_t		noreloc;
-	int 		which_list;
+	int		which_list;
 	ulong_t		index;
 	kmutex_t	*phm;
 
@@ -2270,9 +2270,9 @@ page_t *
 page_freelist_coalesce(int mnode, uchar_t szc, uint_t color, uint_t ceq_mask,
     int mtype, pfn_t pfnhi)
 {
-	int 	r = szc;		/* region size */
+	int	r = szc;		/* region size */
 	int	mrange;
-	uint_t 	full, bin, color_mask, wrap = 0;
+	uint_t	full, bin, color_mask, wrap = 0;
 	pfn_t	pfnum, lo, hi;
 	size_t	len, idx, idx0;
 	pgcnt_t	cands = 0, szcpgcnt = page_get_pagecnt(szc);
@@ -2420,7 +2420,7 @@ page_freelist_coalesce(int mnode, uchar_t szc, uint_t color, uint_t ceq_mask,
 		/*
 		 * RFE: For performance maybe we can do something less
 		 *	brutal than locking the entire freelist. So far
-		 * 	this doesn't seem to be a performance problem?
+		 *	this doesn't seem to be a performance problem?
 		 */
 		page_freelist_lock(mnode);
 		if (PAGE_COUNTERS(mnode, r, idx) == full) {
@@ -2490,8 +2490,8 @@ wrapit:
 void
 page_freelist_coalesce_all(int mnode)
 {
-	int 	r;		/* region size */
-	int 	idx, full;
+	int	r;		/* region size */
+	int	idx, full;
 	size_t	len;
 	int doall = interleaved_mnodes || mnode < 0;
 	int mlo = doall ? 0 : mnode;
@@ -2584,7 +2584,7 @@ page_freelist_split(uchar_t szc, uint_t color, int mnode, int mtype,
     pfn_t pfnlo, pfn_t pfnhi, page_list_walker_t *plw)
 {
 	uchar_t nszc = szc + 1;
-	uint_t 	bin, sbin, bin_prev;
+	uint_t	bin, sbin, bin_prev;
 	page_t	*pp, *firstpp;
 	page_t	*ret_pp = NULL;
 	uint_t  color_mask;
@@ -4147,6 +4147,8 @@ page_get_replacement_page(page_t *orig_like_pp, struct lgrp *lgrp_target,
 	lgrp_mnode_cookie_t	lgrp_cookie;
 	lgrp_t		*lgrp;
 
+	mnode = 0;
+	lgrp = NULL;
 	REPL_STAT_INCR(ngets);
 	like_pp = orig_like_pp;
 	ASSERT(PAGE_EXCL(like_pp));

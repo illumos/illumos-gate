@@ -1142,6 +1142,8 @@ rootnex_map_regspec(ddi_map_req_t *mp, caddr_t *vaddrp)
 		case DDI_STORECACHING_OK_ACC:
 			hat_acc_flags = HAT_STORECACHING_OK;
 			break;
+		default:
+			return (DDI_ME_INVAL);
 		}
 		ap = (ddi_acc_impl_t *)hp->ah_platform_private;
 		ap->ahi_acc_attr |= DDI_ACCATTR_CPU_VADDR;
@@ -2762,7 +2764,7 @@ rootnex_need_bounce_seg(ddi_dma_obj_t *dmar_object, rootnex_sglinfo_t *sglinfo)
 	uint_t pcnt;
 	page_t *pp;
 
-
+	pp = NULL;
 	/* shortcuts */
 	pplist = dmar_object->dmao_obj.virt_obj.v_priv;
 	vaddr = dmar_object->dmao_obj.virt_obj.v_addr;
@@ -2891,7 +2893,7 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 	page_t *pp;
 	uint_t cnt;
 
-
+	pp = NULL;
 	/* shortcuts */
 	pplist = dmar_object->dmao_obj.virt_obj.v_priv;
 	vaddr = dmar_object->dmao_obj.virt_obj.v_addr;
@@ -4226,7 +4228,7 @@ rootnex_copybuf_window_boundary(ddi_dma_impl_t *hp, rootnex_dma_t *dma,
 	uint_t pidx;
 	off_t poff;
 
-
+	pidx = 0;
 	sinfo = &dma->dp_sglinfo;
 
 	/*

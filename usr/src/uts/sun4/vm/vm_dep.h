@@ -473,6 +473,7 @@ typedef	struct {
 	spgcnt_t _cnt = (spgcnt_t)(cnt);				       \
 	int _mn;							       \
 	pgcnt_t _np;							       \
+	rv = 0;								       \
 	if (&plat_mem_node_intersect_range != NULL) {			       \
 		for (_mn = 0; _mn < max_mem_nodes; _mn++) {		       \
 			plat_mem_node_intersect_range((pfn), _cnt, _mn, &_np); \
@@ -527,7 +528,7 @@ extern plcnt_t	plcnt;
  * if allocation from the RELOC pool failed and there is sufficient cage
  * memory, attempt to allocate from the NORELOC pool.
  */
-#define	MTYPE_NEXT(mnode, mtype, flags) { 				\
+#define	MTYPE_NEXT(mnode, mtype, flags) {				\
 	if (!(flags & (PG_NORELOC | PGI_NOCAGE | PGI_RELOCONLY)) &&	\
 	    (kcage_freemem >= kcage_lotsfree)) {			\
 		if (plcnt[mnode][MTYPE_NORELOC].plc_mt_pgmax == 0) {	\

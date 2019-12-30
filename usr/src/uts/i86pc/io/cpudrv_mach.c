@@ -142,6 +142,7 @@ cpudrv_set_topspeed(void *ctx, int plat_level)
 	int instance;
 	int i;
 
+	top_spd = NULL;
 	dip = ctx;
 	instance = ddi_get_instance(dip);
 	cpudsp = ddi_get_soft_state(cpudrv_state, instance);

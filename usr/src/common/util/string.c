@@ -80,6 +80,8 @@ vsnprintf(char *buf, size_t buflen, const char *fmt, va_list aargs)
 	int numwidth;
 	va_list args;
 
+	ul = 0;
+	bs = NULL;
 	/*
 	 * Make a copy so that all our callers don't have to make a copy
 	 */

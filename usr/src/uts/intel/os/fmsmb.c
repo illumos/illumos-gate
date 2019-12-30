@@ -1073,7 +1073,8 @@ bad:
 }
 
 int
-fm_smb_mc_chipinst(uint_t bdf, uint_t *chip_inst) {
+fm_smb_mc_chipinst(uint_t bdf, uint_t *chip_inst)
+{
 
 	int i, j;
 	smbios_hdl_t *shp;
@@ -1101,10 +1102,12 @@ fm_smb_mc_chipinst(uint_t bdf, uint_t *chip_inst) {
 
 	mastypes->type = SUN_OEM_EXT_MEMARRAY;
 	smb_strcnt(shp, mastypes);
+	pstypes = NULL;
+	p_strcnt = 0;
 	for (i = 0; i < mastypes->count; i++) {
 		ext_id = mastypes->ids[i]->id;
 		(void) smbios_info_extmemarray(shp, ext_id, &em);
-		    if (em.smbmae_bdf == bdf) {
+		if (em.smbmae_bdf == bdf) {
 			p_strcnt = smb_cnttypes(shp, SMB_TYPE_PROCESSOR);
 			if (p_strcnt == 0) {
 				smb_free_strcnt(mastypes, ma_strcnt);

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Basic file system reading code for standalone I/O system.
  * Simulates a primitive UNIX I/O system (read(), write(), open(), etc).
@@ -174,7 +172,7 @@ opendir(ino_t inode, fileid_t *filep)
 	filep->fi_blocknum = hdbtodb(inode);
 
 	if (inode != root_ino)
-	    return (0);
+		return (0);
 
 	if (parse_dir(filep, 0, &hsdep) > 0) {
 		struct inode *ip;
@@ -198,6 +196,7 @@ find(char *path, fileid_t *filep)
 	char c;
 	ino_t n;
 
+	n = 0;
 	dprintf("find: %s\n", path);
 	if (path == NULL || *path == '\0')
 		return (0);

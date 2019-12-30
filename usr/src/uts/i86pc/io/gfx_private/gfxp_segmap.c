@@ -75,6 +75,9 @@ gfxp_ddi_segmap_setup(dev_t dev, off_t offset, struct as *as, caddr_t *addrp,
 	if ((flags & MAP_TYPE) != MAP_SHARED)
 		return (EINVAL);
 
+	if (len == 0)
+		return (EINVAL);
+
 	/*
 	 * Check that this region is indeed mappable on this platform.
 	 * Use the mapping function.
@@ -102,20 +105,16 @@ gfxp_ddi_segmap_setup(dev_t dev, off_t offset, struct as *as, caddr_t *addrp,
 	 * legal and we are not trying to map in
 	 * more than the device will let us.
 	 */
-	for (i = 0; i < len; i += PAGESIZE) {
-		if (i == 0) {
-			/*
-			 * Save the pfn at offset here. This pfn will be
-			 * used later to get user address.
-			 */
-			if ((pfn = (pfn_t)cdev_mmap(mapfunc, dev, offset,
-					maxprot)) == PFN_INVALID)
-				return (ENXIO);
-		} else {
-			if (cdev_mmap(mapfunc, dev, offset + i, maxprot) ==
-				PFN_INVALID)
-				return (ENXIO);
-		}
+	/*
+	 * Save the pfn at offset here. This pfn will be
+	 * used later to get user address.
+	 */
+	pfn = (pfn_t)cdev_mmap(mapfunc, dev, offset, maxprot);
+	if (pfn == PFN_INVALID)
+		return (ENXIO);
+	for (i = PAGESIZE; i < len; i += PAGESIZE) {
+		if (cdev_mmap(mapfunc, dev, offset + i, maxprot) == PFN_INVALID)
+			return (ENXIO);
 	}
 
 	as_rangelock(as);

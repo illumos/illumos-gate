@@ -764,9 +764,10 @@ ppm_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	ppm_owned_t	*owned;
 	int		mode;
 	int		ret = DDI_SUCCESS;
-	int 		*res = (int *)result;
+	int		*res = (int *)result;
 	s3a_t s3args;
 
+	domp = NULL;
 #ifdef DEBUG
 	char	*str = "ppm_ctlops";
 	int	mask = ppm_debug & (D_CTLOPS1 | D_CTLOPS2);
@@ -827,6 +828,9 @@ ppm_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			ppmd = ppm_get_dev(rdip, domp);
 		}
 
+		if (domp == NULL)
+			return (DDI_FAILURE);
+
 		PPMD(D_LOCKS, ("ppm_lock_%s: %s, %s\n",
 		    (domp->dflags & PPMD_LOCK_ALL) ? "all" : "one",
 		    ppmd->path, ppm_get_ctlstr(reqp->request_type, D_LOCKS)))
@@ -840,13 +844,16 @@ ppm_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	case PMR_PPM_POWER_LOCK_OWNER:
 		ASSERT(reqp->req.ppm_power_lock_owner_req.who == rdip);
 		ppmd = PPM_GET_PRIVATE(rdip);
-		if (ppmd)
+		if (ppmd) {
 			domp = ppmd->domp;
-		else {
+		} else {
 			domp = ppm_lookup_dev(rdip);
 			ASSERT(domp);
 			ppmd = ppm_get_dev(rdip, domp);
 		}
+
+		if (domp == NULL)
+			return (DDI_FAILURE);
 
 		/*
 		 * In case of LOCK_ALL, effective owner of the power lock
@@ -1399,6 +1406,9 @@ ppm_cpr_callb(void *arg, int code)
 		ppm_cpr_window_flag = B_FALSE;
 		mutex_exit(&ppm_cpr_window_lock);
 
+		break;
+	default:
+		ret = DDI_SUCCESS;
 		break;
 	}
 

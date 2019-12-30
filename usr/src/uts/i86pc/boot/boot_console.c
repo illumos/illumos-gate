@@ -1207,6 +1207,7 @@ bcons_post_bootenvrc(char *inputdev, char *outputdev, char *consoledev)
 	int i;
 	extern int post_fastreboot;
 
+	ttyn = 0;
 	if (post_fastreboot && console == CONS_SCREEN_GRAPHICS)
 		console = CONS_SCREEN_TEXT;
 

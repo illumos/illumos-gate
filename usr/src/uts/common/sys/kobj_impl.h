@@ -164,7 +164,7 @@ extern void kobj_init(void *romvec, void *dvec,
 extern int kobj_notify_add(kobj_notify_list_t *);
 extern int kobj_notify_remove(kobj_notify_list_t *);
 extern int do_relocations(struct module *);
-extern int do_relocate(struct module *, char *, Word, int, int, Addr);
+extern int do_relocate(struct module *, char *, int, int, Addr);
 extern struct bootops *ops;
 extern void exitto(caddr_t);
 extern void kobj_sync_instruction_memory(caddr_t, size_t);

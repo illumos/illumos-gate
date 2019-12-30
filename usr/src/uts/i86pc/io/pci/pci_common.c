@@ -533,6 +533,7 @@ SUPPORTED_TYPES_OUT:
 		 * First check the config space and/or
 		 * MSI capability register(s)
 		 */
+		pci_rval = DDI_FAILURE;
 		if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type))
 			pci_rval = pci_msi_get_cap(rdip, hdlp->ih_type,
 			    &pci_status);
@@ -699,6 +700,7 @@ SUPPORTED_TYPES_OUT:
 		 * First check the config space and/or
 		 * MSI capability register(s)
 		 */
+		pci_rval = DDI_FAILURE;
 		if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type))
 			pci_rval = pci_msi_get_pending(rdip, hdlp->ih_type,
 			    hdlp->ih_inum, &pci_status);
@@ -989,7 +991,7 @@ int
 pci_common_get_reg_prop(dev_info_t *dip, pci_regspec_t *pci_rp)
 {
 	int		i;
-	int 		number;
+	int		number;
 	int		assigned_addr_len;
 	uint_t		phys_hi = pci_rp->pci_phys_hi;
 	pci_regspec_t	*assigned_addr;
@@ -1473,7 +1475,7 @@ pci_common_ctlops_peek(peekpoke_ctlops_t *in_args)
 /*ARGSUSED*/
 int
 pci_common_peekpoke(dev_info_t *dip, dev_info_t *rdip,
-	ddi_ctl_enum_t ctlop, void *arg, void *result)
+    ddi_ctl_enum_t ctlop, void *arg, void *result)
 {
 	if (ctlop == DDI_CTLOPS_PEEK)
 		return (pci_common_ctlops_peek((peekpoke_ctlops_t *)arg));
@@ -1516,7 +1518,7 @@ pci_config_rd8(ddi_acc_impl_t *hdlp, uint8_t *addr)
 
 void
 pci_config_rep_rd8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
-	uint8_t *dev_addr, size_t repcount, uint_t flags)
+    uint8_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint8_t *h, *d;
 
@@ -1552,7 +1554,7 @@ pci_config_rd16(ddi_acc_impl_t *hdlp, uint16_t *addr)
 
 void
 pci_config_rep_rd16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint16_t *h, *d;
 
@@ -1588,7 +1590,7 @@ pci_config_rd32(ddi_acc_impl_t *hdlp, uint32_t *addr)
 
 void
 pci_config_rep_rd32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint32_t *h, *d;
 
@@ -1622,7 +1624,7 @@ pci_config_wr8(ddi_acc_impl_t *hdlp, uint8_t *addr, uint8_t value)
 
 void
 pci_config_rep_wr8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
-	uint8_t *dev_addr, size_t repcount, uint_t flags)
+    uint8_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint8_t *h, *d;
 
@@ -1655,7 +1657,7 @@ pci_config_wr16(ddi_acc_impl_t *hdlp, uint16_t *addr, uint16_t value)
 
 void
 pci_config_rep_wr16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint16_t *h, *d;
 
@@ -1688,7 +1690,7 @@ pci_config_wr32(ddi_acc_impl_t *hdlp, uint32_t *addr, uint32_t value)
 
 void
 pci_config_rep_wr32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	uint32_t *h, *d;
 
@@ -1736,7 +1738,7 @@ pci_config_wr64(ddi_acc_impl_t *hdlp, uint64_t *addr, uint64_t value)
 
 void
 pci_config_rep_rd64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags)
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
 {
 	if (flags == DDI_DEV_AUTOINCR) {
 		for (; repcount; repcount--)
@@ -1749,7 +1751,7 @@ pci_config_rep_rd64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
 
 void
 pci_config_rep_wr64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags)
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
 {
 	if (flags == DDI_DEV_AUTOINCR) {
 		for (; repcount; repcount--)

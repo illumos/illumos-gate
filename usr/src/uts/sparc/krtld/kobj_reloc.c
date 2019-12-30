@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SPARC relocation code.
  */
@@ -146,14 +144,8 @@ sdt_reloc_resolve(struct module *mp, char *symname, uint32_t *instr, long roff)
 }
 
 int
-/* ARGSUSED2 */
-do_relocate(
-	struct module *mp,
-	char *reltbl,
-	Word relshtype,
-	int nreloc,
-	int relocsize,
-	Addr baseaddr)
+do_relocate(struct module *mp, char *reltbl, int nreloc, int relocsize,
+    Addr baseaddr)
 {
 	Word stndx;
 	long off, roff;
@@ -382,8 +374,8 @@ do_relocations(struct module *mp)
 			_kobj_printf(ops, " section=%d\n", shn);
 		}
 #endif
-		if (do_relocate(mp, (char *)rshp->sh_addr, rshp->sh_type,
-		    nreloc, rshp->sh_entsize, shp->sh_addr) < 0) {
+		if (do_relocate(mp, (char *)rshp->sh_addr, nreloc,
+		    rshp->sh_entsize, shp->sh_addr) < 0) {
 			_kobj_printf(ops,
 			    "do_relocations: %s do_relocate failed\n",
 			    mp->filename);

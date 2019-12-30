@@ -397,7 +397,7 @@ tzmon_enumerate_zone(ACPI_HANDLE obj, thermal_zone_t *tzp, int enum_flag)
 	ACPI_STATUS status;
 	ACPI_BUFFER zone_name;
 	int	level;
-	int	instance;
+	int	instance = 0;
 	char	abuf[5];
 
 	/*
