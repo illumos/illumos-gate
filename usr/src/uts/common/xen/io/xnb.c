@@ -665,6 +665,7 @@ xnb_to_peer(xnb_t *xnbp, mblk_t *mp)
 	 * to transfer them.
 	 */
 
+	len = 0;
 	mutex_enter(&xnbp->xnb_rx_lock);
 
 	/*

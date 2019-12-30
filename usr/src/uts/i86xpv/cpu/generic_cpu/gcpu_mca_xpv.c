@@ -82,6 +82,7 @@ gcpu_xpv_proxy_logout(int what, struct mc_info *mi, struct mcinfo_common **micp,
 
 	/* Skip over the MC_TYPE_GLOBAL record */
 	ASSERT(mgi->common.type == MC_TYPE_GLOBAL);
+	mcrp = NULL;
 	mic = x86_mcinfo_next((struct mcinfo_common *)(uintptr_t)mgi);
 	idx++;
 

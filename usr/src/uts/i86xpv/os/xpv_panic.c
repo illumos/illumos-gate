@@ -195,6 +195,7 @@ xpv_va_walk(uintptr_t *vaddr)
 	static pfn_t toplevel_pfn;
 	static uintptr_t lastva;
 
+	pte = 0;
 	/*
 	 * If we do anything other than a simple scan through memory, don't
 	 * trust the mapped page tables.

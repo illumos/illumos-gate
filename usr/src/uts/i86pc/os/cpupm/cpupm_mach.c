@@ -695,12 +695,11 @@ cpupm_plat_domain_id(cpu_t *cp, cpupm_dtype_t type)
 	return (CPUPM_NO_DOMAIN);
 }
 
-/*ARGSUSED*/
 uint_t
 cpupm_plat_state_enumerate(cpu_t *cp, cpupm_dtype_t type,
     cpupm_state_t *states)
 {
-	int	*speeds;
+	int	*speeds = NULL;
 	uint_t	nspeeds, i;
 
 	/*

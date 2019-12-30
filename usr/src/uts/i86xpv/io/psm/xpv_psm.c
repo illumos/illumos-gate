@@ -1111,6 +1111,7 @@ xpv_psm_get_msi_vector(dev_info_t *dip, int type, int entry)
 	uchar_t			vector;
 
 	ASSERT((handle != NULL) && (cap_ptr != 0));
+	vector = 0;
 	if (type == DDI_INTR_TYPE_MSI) {
 		msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSI_CTRL);
 		/*

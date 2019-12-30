@@ -2455,7 +2455,7 @@ x86pte_zero(htable_t *dest, uint_t entry, uint_t count)
 	caddr_t dst_va;
 	size_t size;
 #ifdef __xpv
-	int x;
+	int x = 0;
 	x86pte_t newpte;
 #endif
 
