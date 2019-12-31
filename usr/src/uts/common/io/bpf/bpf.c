@@ -256,6 +256,8 @@ bpf_attachd(struct bpf_d *d, const char *ifname, int dlt)
 	ASSERT(d->bd_mcip == (uintptr_t)NULL);
 	zone = d->bd_zone;
 	zonematch = B_TRUE;
+	error = 0;
+	bpr = NULL;
 again:
 	mh = 0;
 	mcip = 0;
@@ -311,6 +313,10 @@ next:
 		}
 		return (error);
 	}
+
+	/* No providers? */
+	if (bpr == NULL)
+		return (ENOENT);
 
 	d->bd_mac = *bpr;
 	d->bd_mcip = mcip;
