@@ -318,7 +318,7 @@ static struct el ATTRIBUTE_UNUSED entity_list[] = {
 };
 
 #ifdef _KERNEL
-typedef int (*cudbg_print_cb) (dev_info_t *dip, ...);
+typedef int (*cudbg_print_cb) (dev_info_t *dip, int, char *, ...);
 #else
 typedef int (*cudbg_print_cb) (char *, ...);
 #endif

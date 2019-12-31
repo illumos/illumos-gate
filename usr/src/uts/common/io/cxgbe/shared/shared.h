@@ -66,7 +66,7 @@ struct rxbuf_cache_params {
 	size_t			buf_size;
 };
 
-void cxgb_printf(dev_info_t *dip, int level, char *f, ...);
+int cxgb_printf(dev_info_t *dip, int level, char *f, ...);
 kmem_cache_t *rxbuf_cache_create(struct rxbuf_cache_params *p);
 void rxbuf_cache_destroy(kmem_cache_t *cache);
 struct rxbuf *rxbuf_alloc(kmem_cache_t *cache, int kmflags, uint_t ref_cnt);
