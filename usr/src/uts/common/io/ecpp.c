@@ -3052,6 +3052,8 @@ ecpp_isr(caddr_t arg)
 	int		retval = DDI_INTR_UNCLAIMED;
 	hrtime_t	now;
 
+	dsr = 0;
+	dcsr = 0;
 	mutex_enter(&pp->umutex);
 	/*
 	 * interrupt may occur while other thread is holding the lock
