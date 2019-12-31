@@ -267,11 +267,11 @@ ata_disk_init_drive(
 	struct ata_id	*aidp = &ata_drvp->ad_id;
 	struct ctl_obj	*ctlobjp;
 	struct scsi_device	*devp;
-	int 		len;
+	int		len;
 	int		val;
 	int		mode;
 	short		*chs;
-	char 		buf[80];
+	char		buf[80];
 
 	ADBG_TRACE(("ata_disk_init_drive entered\n"));
 
@@ -305,9 +305,9 @@ ata_disk_init_drive(
 
 	/* straighten out the geometry */
 	(void) sprintf(buf, "SUNW-ata-%p-d%d-chs", (void *) ata_ctlp->ac_data,
-		ata_drvp->ad_targ+1);
+	    ata_drvp->ad_targ+1);
 	if (ddi_getlongprop(DDI_DEV_T_ANY, ddi_root_node(), 0,
-			buf, (caddr_t)&chs, &len) == DDI_PROP_SUCCESS) {
+	    buf, (caddr_t)&chs, &len) == DDI_PROP_SUCCESS) {
 		/*
 		 * if the number of sectors and heads in bios matches the
 		 * physical geometry, then so should the number of cylinders
@@ -315,10 +315,10 @@ ata_disk_init_drive(
 		 * causing loss of space.
 		 */
 		if (chs[1] == (ata_drvp->ad_drvrhd - 1) &&
-				chs[2] == ata_drvp->ad_drvrsec)
+		    chs[2] == ata_drvp->ad_drvrsec) {
 			/* Set chs[0] to zero-based number of cylinders. */
 			chs[0] = aidp->ai_fixcyls - 1;
-		else if (!(ata_drvp->ad_drive_bits & ATDH_LBA)) {
+		} else if (!(ata_drvp->ad_drive_bits & ATDH_LBA)) {
 			/*
 			 * if the the sector/heads do not match that of the
 			 * bios and the drive does not support LBA. We go ahead
@@ -326,8 +326,8 @@ ata_disk_init_drive(
 			 * geometry for sector translation.
 			 */
 			cmn_err(CE_WARN, "!Disk 0x%p,%d: BIOS geometry "
-				"different from physical, and no LBA support.",
-				(void *)ata_ctlp->ac_data, ata_drvp->ad_targ);
+			    "different from physical, and no LBA support.",
+			    (void *)ata_ctlp->ac_data, ata_drvp->ad_targ);
 		}
 
 		/*
@@ -351,7 +351,7 @@ ata_disk_init_drive(
 		ata_drvp->ad_flags |= AD_INT13LBA;
 		if (ata_drvp->ad_capacity != 0) {
 			ata_drvp->ad_drvrcyl = ata_drvp->ad_capacity /
-				(ata_drvp->ad_drvrhd * ata_drvp->ad_drvrsec);
+			    (ata_drvp->ad_drvrhd * ata_drvp->ad_drvrsec);
 		} else {
 			/*
 			 * Something's wrong; return something sure to
@@ -410,7 +410,7 @@ ata_disk_init_drive(
 	 */
 	(void) sprintf(buf, "drive%d_block_factor", ata_drvp->ad_targ);
 	val = ddi_prop_get_int(DDI_DEV_T_ANY, ata_ctlp->ac_dip, 0, buf,
-		ata_drvp->ad_block_factor);
+	    ata_drvp->ad_block_factor);
 
 	ata_drvp->ad_block_factor = (short)min(val, ata_drvp->ad_block_factor);
 
@@ -494,7 +494,7 @@ ata_get_capacity(ata_drv_t *ata_drvp, uint64_t *capacity)
 	 * All is well so return 48-bit capacity indicator
 	 */
 	ADBG_INIT(("ATA: using 48-bit mode for capacity %llx blocks\n",
-		(unsigned long long)cap48));
+	    (unsigned long long)cap48));
 
 	*capacity = cap48;
 	return (AD_EXT48);
@@ -549,11 +549,9 @@ ata_fix_large_disk_geometry(
 			 * I give up, there's no way to represent this.
 			 * Limit disk size.
 			 */
-			cmn_err(CE_WARN,
-				"Disk is too large: "
-					"Model %s, Serial# %s "
-					"Approximating...\n",
-				aidp->ai_model, aidp->ai_drvser);
+			cmn_err(CE_WARN, "Disk is too large: "
+			    "Model %s, Serial# %s Approximating...\n",
+			    aidp->ai_model, aidp->ai_drvser);
 			ata_drvp->ad_drvrcyl = USHRT_MAX;
 			break;
 		}
@@ -612,7 +610,7 @@ ata_calculate_28bits_capacity(ata_drv_t *ata_drvp)
 	 */
 
 	return ((uint64_t)(ata_drvp->ad_id.ai_fixcyls *
-		ata_drvp->ad_id.ai_heads * ata_drvp->ad_id.ai_sectors));
+	    ata_drvp->ad_id.ai_heads * ata_drvp->ad_id.ai_sectors));
 }
 
 /*
@@ -678,7 +676,7 @@ ata_disk_setup_parms(
 	ata_drvp->ad_bytes_per_block = ata_drvp->ad_block_factor << SCTRSHFT;
 
 	ADBG_INIT(("set block factor for drive %d to %d\n",
-			ata_drvp->ad_targ, ata_drvp->ad_block_factor));
+	    ata_drvp->ad_targ, ata_drvp->ad_block_factor));
 
 	if (ata_disk_do_standby_timer)
 		ata_disk_set_standby_timer(ata_ctlp, ata_drvp);
@@ -737,7 +735,7 @@ ata_disk_set_standby_timer(
 		parm = 253;
 
 	(void) ata_command(ata_ctlp, ata_drvp, TRUE, FALSE, 5 * 1000000,
-		    ATC_IDLE, 0, parm, 0, 0, 0, 0);
+	    ATC_IDLE, 0, parm, 0, 0, 0, 0);
 }
 
 
@@ -775,12 +773,8 @@ ata_disk_uninit_drive(
 
 /*ARGSUSED*/
 int
-ata_disk_bus_ctl(
-	dev_info_t	*d,
-	dev_info_t	*r,
-	ddi_ctl_enum_t	 o,
-	void		*a,
-	void		*v)
+ata_disk_bus_ctl(dev_info_t *d, dev_info_t *r, ddi_ctl_enum_t o,
+    void *a, void *v)
 {
 	ADBG_TRACE(("ata_disk_bus_ctl entered\n"));
 
@@ -791,10 +785,10 @@ ata_disk_bus_ctl(
 		int	targ;
 
 		targ = ddi_prop_get_int(DDI_DEV_T_ANY, r, DDI_PROP_DONTPASS,
-					"target", 0);
+		    "target", 0);
 		cmn_err(CE_CONT, "?%s%d at %s%d target %d lun %d\n",
-			ddi_driver_name(r), ddi_get_instance(r),
-			ddi_driver_name(d), ddi_get_instance(d), targ, 0);
+		    ddi_driver_name(r), ddi_get_instance(r),
+		    ddi_driver_name(d), ddi_get_instance(d), targ, 0);
 		return (DDI_SUCCESS);
 	}
 	case DDI_CTLOPS_INITCHILD:
@@ -839,16 +833,15 @@ ata_disk_bus_ctl(
 		}
 
 		gtgtp = ghd_target_init(d, cdip, &ata_ctlp->ac_ccc,
-					sizeof (ata_tgt_t), ata_ctlp,
-					ata_drvp->ad_targ,
-					ata_drvp->ad_lun);
+		    sizeof (ata_tgt_t), ata_ctlp,
+		    ata_drvp->ad_targ, ata_drvp->ad_lun);
 
 		/* gt_tgt_private points to ata_tgt_t */
 		ata_tgtp = GTGTP2ATATGTP(gtgtp);
 		ata_tgtp->at_drvp = ata_drvp;
 		ata_tgtp->at_dma_attr = ata_pciide_dma_attr;
 		ata_tgtp->at_dma_attr.dma_attr_maxxfer =
-				ata_ctlp->ac_max_transfer << SCTRSHFT;
+		    ata_ctlp->ac_max_transfer << SCTRSHFT;
 
 		/* gtgtp is the opaque arg to all my entry points */
 		ctlobjp->c_data = gtgtp;
@@ -856,7 +849,7 @@ ata_disk_bus_ctl(
 		/* create device name */
 
 		(void) sprintf(name, "%x,%x", ata_drvp->ad_targ,
-			ata_drvp->ad_lun);
+		    ata_drvp->ad_lun);
 		ddi_set_name_addr(cdip, name);
 		ddi_set_driver_private(cdip, devp);
 
@@ -866,7 +859,7 @@ ata_disk_bus_ctl(
 	case DDI_CTLOPS_UNINITCHILD:
 	{
 		dev_info_t *cdip = (dev_info_t *)a;
-		struct 	scsi_device *devp;
+		struct	scsi_device *devp;
 		struct	ctl_obj *ctlobjp;
 		gtgt_t	*gtgtp;
 
@@ -932,12 +925,17 @@ ata_disk_reset(opaque_t ctl_data, int level)
 
 	/* XXX - Note that this interface is currently not used by dadk */
 
-	if (level == RESET_TARGET) {
+	switch (level) {
+	case RESET_TARGET:
 		rc = ghd_tran_reset_target(&ata_drvp->ad_ctlp->ac_ccc, gtgtp,
-			NULL);
-	} else if (level == RESET_ALL) {
+		    NULL);
+		break;
+	case RESET_ALL:
 		rc = ghd_tran_reset_bus(&ata_drvp->ad_ctlp->ac_ccc, gtgtp,
-					NULL);
+		    NULL);
+		break;
+	default:
+		rc = 0;
 	}
 
 	return (rc ? DDI_SUCCESS : DDI_FAILURE);
@@ -988,23 +986,24 @@ ata_disk_ioctl(opaque_t ctl_data, int cmd, intptr_t arg, int flag)
 		return (0);
 
 	case DCMD_UPDATE_GEOM:
-/* ??? fix this to issue IDENTIFY DEVICE ??? */
-/* might not be necessary since I don't know of any ATA/IDE that */
-/* can change its geometry. On the other hand, ATAPI devices like the  */
-/* LS-120 or PD/CD can change their geometry when new media is inserted */
+	/*
+	 * ??? fix this to issue IDENTIFY DEVICE ???
+	 * might not be necessary since I don't know of any ATA/IDE that
+	 * can change its geometry. On the other hand, ATAPI devices like the
+	 * LS-120 or PD/CD can change their geometry when new media is inserted
+	 */
 		return (0);
 
 	/* copy the model number into the caller's buffer */
 	case DIOCTL_GETMODEL:
 		rc = ata_copy_dk_ioc_string(arg, aidp->ai_model,
-					sizeof (aidp->ai_model), flag);
+		    sizeof (aidp->ai_model), flag);
 		return (rc);
 
 	/* copy the serial number into the caller's buffer */
 	case DIOCTL_GETSERIAL:
 		rc = ata_copy_dk_ioc_string(arg, aidp->ai_drvser,
-					sizeof (aidp->ai_drvser),
-					flag);
+		    sizeof (aidp->ai_drvser), flag);
 		return (rc);
 
 	case DIOCTL_GETWCE:
@@ -1020,8 +1019,8 @@ ata_disk_ioctl(opaque_t ctl_data, int cmd, intptr_t arg, int flag)
 		 * must be updated appropriately.
 		 */
 		wce = (aidp->ai_majorversion == 0xffff) ||
-			((aidp->ai_majorversion & ATAC_MAJVER_4) == 0) ||
-			(aidp->ai_features85 & ATAC_FEATURES85_WCE) != 0;
+		    ((aidp->ai_majorversion & ATAC_MAJVER_4) == 0) ||
+		    (aidp->ai_features85 & ATAC_FEATURES85_WCE) != 0;
 
 		if (ddi_copyout(&wce, (caddr_t)arg, sizeof (wce), flag) != 0)
 			return (EFAULT);
@@ -1030,37 +1029,37 @@ ata_disk_ioctl(opaque_t ctl_data, int cmd, intptr_t arg, int flag)
 
 	case DCMD_GET_STATE:
 		rc = ata_queue_cmd(ata_disk_state, NULL, ata_ctlp, ata_drvp,
-			gtgtp);
+		    gtgtp);
 		break;
 
 	case DCMD_LOCK:
 	case DKIOCLOCK:
 		rc = ata_queue_cmd(ata_disk_lock, NULL, ata_ctlp, ata_drvp,
-			gtgtp);
+		    gtgtp);
 		break;
 
 	case DCMD_UNLOCK:
 	case DKIOCUNLOCK:
 		rc = ata_queue_cmd(ata_disk_unlock, NULL, ata_ctlp, ata_drvp,
-			gtgtp);
+		    gtgtp);
 		break;
 
 	case DCMD_START_MOTOR:
 	case CDROMSTART:
 		rc = ata_queue_cmd(ata_disk_recalibrate, NULL, ata_ctlp,
-			ata_drvp, gtgtp);
+		    ata_drvp, gtgtp);
 		break;
 
 	case DCMD_STOP_MOTOR:
 	case CDROMSTOP:
 		rc = ata_queue_cmd(ata_disk_standby, NULL, ata_ctlp, ata_drvp,
-			gtgtp);
+		    gtgtp);
 		break;
 
 	case DKIOCEJECT:
 	case CDROMEJECT:
 		rc = ata_queue_cmd(ata_disk_eject, NULL, ata_ctlp, ata_drvp,
-			gtgtp);
+		    gtgtp);
 		break;
 
 	case DKIOC_UPDATEFW:
@@ -1231,12 +1230,8 @@ ata_disk_ioctl(opaque_t ctl_data, int cmd, intptr_t arg, int flag)
  */
 
 int
-ata_disk_do_ioctl(
-	int	(*func)(ata_ctl_t *, ata_drv_t *, ata_pkt_t *),
-	void	  *arg,
-	ata_ctl_t *ata_ctlp,
-	gtgt_t	  *gtgtp,
-	cmpkt_t   *pktp)
+ata_disk_do_ioctl(int (*func)(ata_ctl_t *, ata_drv_t *, ata_pkt_t *),
+    void *arg, ata_ctl_t *ata_ctlp, gtgt_t *gtgtp, cmpkt_t *pktp)
 {
 	gcmd_t	  *gcmdp = CPKT2GCMD(pktp);
 	ata_pkt_t *ata_pktp = GCMD2APKT(gcmdp);
@@ -1252,7 +1247,7 @@ ata_disk_do_ioctl(
 	 * ap_start function is called.
 	 */
 	rc = ghd_transport(&ata_ctlp->ac_ccc, gcmdp, gcmdp->cmd_gtgtp,
-		0, TRUE, NULL);
+	    0, TRUE, NULL);
 
 	if (rc != TRAN_ACCEPT) {
 		/* this should never, ever happen */
@@ -1290,8 +1285,8 @@ ata_disk_pktalloc(opaque_t ctl_data, int (*callback)(caddr_t), caddr_t arg)
 	 * DADA cmpkt and the ata_pkt
 	 */
 	if ((gcmdp = ghd_gcmd_alloc(gtgtp,
-				    (sizeof (cmpkt_t) + sizeof (ata_pkt_t)),
-				    (callback == DDI_DMA_SLEEP))) == NULL) {
+	    (sizeof (cmpkt_t) + sizeof (ata_pkt_t)),
+	    (callback == DDI_DMA_SLEEP))) == NULL) {
 		return ((cmpkt_t *)NULL);
 	}
 	ASSERT(gcmdp != NULL);
@@ -1417,7 +1412,7 @@ ata_disk_memsetup(
 	 * Bind the DMA handle to the buf
 	 */
 	if (ghd_dma_buf_bind_attr(&GTGTP2ATAP(gtgtp)->ac_ccc, gcmdp, bp, flags,
-			callback, arg, &GTGTP2ATATGTP(gtgtp)->at_dma_attr)) {
+	    callback, arg, &GTGTP2ATATGTP(gtgtp)->at_dma_attr)) {
 		ata_pktp->ap_v_addr = 0;
 		return (pktp);
 	}
@@ -1539,7 +1534,7 @@ ata_disk_iosetup(opaque_t ctl_data, cmpkt_t *pktp)
 		 * The spec says 0 represents 256 so it should be OK.
 		 */
 		sec_count = min((pktp->cp_bytexfer >> SCTRSHFT),
-				ata_drvp->ad_ctlp->ac_max_transfer);
+		    ata_drvp->ad_ctlp->ac_max_transfer);
 		/*
 		 * Save the current values of ap_v_addr and ap_resid
 		 * in case a retry operation happens. During a retry
@@ -1566,8 +1561,8 @@ ata_disk_iosetup(opaque_t ctl_data, cmpkt_t *pktp)
 	if (gcmdp->cmd_dma_handle != NULL && sec_count != 0) {
 		byte_count = sec_count << SCTRSHFT;
 		if ((ghd_dmaget_attr(&GTGTP2ATAP(gtgtp)->ac_ccc, gcmdp,
-			byte_count, ATA_DMA_NSEGS, &byte_count) == FALSE) ||
-			(byte_count == 0)) {
+		    byte_count, ATA_DMA_NSEGS, &byte_count) == FALSE) ||
+		    (byte_count == 0)) {
 			ADBG_ERROR(("ata_disk_iosetup: byte count zero\n"));
 			return (NULL);
 		}
@@ -1671,7 +1666,7 @@ ata_disk_iosetup(opaque_t ctl_data, cmpkt_t *pktp)
 
 		default:
 			ADBG_WARN(("ata_disk_iosetup: unknown command 0x%x\n",
-					ata_pktp->ap_cdb));
+			    ata_pktp->ap_cdb));
 			pktp = NULL;
 			break;
 		}
@@ -1733,7 +1728,7 @@ ata_disk_transport(opaque_t ctl_data, cmpkt_t *pktp)
 	/* call ghd transport routine */
 
 	rc = ghd_transport(&ata_ctlp->ac_ccc, APKT2GCMD(ata_pktp),
-		gtgtp, pktp->cp_time, polled, NULL);
+	    gtgtp, pktp->cp_time, polled, NULL);
 
 	/* see if pkt was not accepted */
 
@@ -1762,8 +1757,7 @@ ata_disk_load_regs_lba28(ata_pkt_t *ata_pktp, ata_drv_t *ata_drvp)
 
 	lba = ata_pktp->ap_startsec;
 
-	ddi_put8(io_hdl1, ata_ctlp->ac_count,
-		ata_pktp->ap_count);
+	ddi_put8(io_hdl1, ata_ctlp->ac_count, ata_pktp->ap_count);
 	ddi_put8(io_hdl1, ata_ctlp->ac_sect, lba);
 	lba >>= 8;
 	ddi_put8(io_hdl1, ata_ctlp->ac_lcyl, lba);
@@ -1832,8 +1826,7 @@ ata_disk_load_regs_lba48(ata_pkt_t *ata_pktp, ata_drv_t *ata_drvp)
 	ddi_put8(io_hdl1, ata_ctlp->ac_lcyl, lbalow);
 	lbalow >>= 8;
 	ddi_put8(io_hdl1, ata_ctlp->ac_hcyl, lbalow);
-	ddi_put8(io_hdl1,  ata_ctlp->ac_drvhd,
-				ata_drvp->ad_drive_bits);
+	ddi_put8(io_hdl1,  ata_ctlp->ac_drvhd, ata_drvp->ad_drive_bits);
 }
 
 static void
@@ -1853,15 +1846,14 @@ ata_disk_load_regs_chs(ata_pkt_t *ata_pktp, ata_drv_t *ata_drvp)
 	resid = ata_pktp->ap_startsec / drvsectors;
 	head = (resid % drvheads) & 0xf;
 	cyl = resid / drvheads;
-			/* automatically truncate to char */
+	/* automatically truncate to char */
 	ddi_put8(io_hdl1, ata_ctlp->ac_sect,
-			(ata_pktp->ap_startsec % drvsectors) + 1);
+	    (ata_pktp->ap_startsec % drvsectors) + 1);
 	ddi_put8(io_hdl1, ata_ctlp->ac_count, ata_pktp->ap_count);
 	ddi_put8(io_hdl1, ata_ctlp->ac_hcyl, (cyl >> 8));
-		/* lcyl gets truncated to 8 bits */
+	/* lcyl gets truncated to 8 bits */
 	ddi_put8(io_hdl1, ata_ctlp->ac_lcyl, cyl);
-	ddi_put8(io_hdl1,  ata_ctlp->ac_drvhd,
-			ata_drvp->ad_drive_bits | head);
+	ddi_put8(io_hdl1, ata_ctlp->ac_drvhd, ata_drvp->ad_drive_bits | head);
 }
 
 
@@ -1873,10 +1865,8 @@ ata_disk_load_regs_chs(ata_pkt_t *ata_pktp, ata_drv_t *ata_drvp)
 
 /* ARGSUSED */
 static int
-ata_disk_start_common(
-	ata_ctl_t	*ata_ctlp,
-	ata_drv_t	*ata_drvp,
-	ata_pkt_t	*ata_pktp)
+ata_disk_start_common(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp,
+    ata_pkt_t *ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
 	ddi_acc_handle_t io_hdl2 = ata_ctlp->ac_iohandle2;
@@ -1884,11 +1874,11 @@ ata_disk_start_common(
 	ADBG_TRACE(("ata_disk_start_common entered\n"));
 
 	ADBG_TRANSPORT(("ata_disk_start:\tpkt = 0x%p, pkt flags = 0x%x\n",
-		ata_pktp, ata_pktp->ap_flags));
+	    ata_pktp, ata_pktp->ap_flags));
 	ADBG_TRANSPORT(("\tcommand=0x%x, sect=0x%lx\n",
-		ata_pktp->ap_cmd, ata_pktp->ap_startsec));
+	    ata_pktp->ap_cmd, ata_pktp->ap_startsec));
 	ADBG_TRANSPORT(("\tcount=0x%x, drvhd = 0x%x\n",
-		ata_pktp->ap_count, ata_drvp->ad_drive_bits));
+	    ata_pktp->ap_count, ata_drvp->ad_drive_bits));
 
 	/*
 	 * If AC_BSY_WAIT is set, wait for controller to not be busy,
@@ -1904,7 +1894,7 @@ ata_disk_start_common(
 	 */
 	if (ata_ctlp->ac_timing_flags & AC_BSY_WAIT) {
 		if (!ata_wait(io_hdl2,  ata_ctlp->ac_ioaddr2,
-				0, ATS_BSY, 5000000)) {
+		    0, ATS_BSY, 5000000)) {
 			ADBG_ERROR(("ata_disk_start: BUSY\n"));
 			return (FALSE);
 		}
@@ -1917,7 +1907,7 @@ ata_disk_start_common(
 	 * make certain the drive selected
 	 */
 	if (!ata_wait(io_hdl2,  ata_ctlp->ac_ioaddr2,
-			ATS_DRDY, ATS_BSY, 5 * 1000000)) {
+	    ATS_DRDY, ATS_BSY, 5 * 1000000)) {
 		ADBG_ERROR(("ata_disk_start: select failed\n"));
 		return (FALSE);
 	}
@@ -1969,10 +1959,8 @@ ata_disk_start_common(
  */
 
 static int
-ata_disk_start(
-	ata_ctl_t *ata_ctlp,
-	ata_drv_t *ata_drvp,
-	ata_pkt_t *ata_pktp)
+ata_disk_start(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp,
+    ata_pkt_t *ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
 	int		 rc;
@@ -1996,10 +1984,8 @@ ata_disk_start(
 
 
 static int
-ata_disk_start_dma_in(
-	ata_ctl_t *ata_ctlp,
-	ata_drv_t *ata_drvp,
-	ata_pkt_t *ata_pktp)
+ata_disk_start_dma_in(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp,
+    ata_pkt_t *ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
 	int		 rc;
@@ -2014,7 +2000,7 @@ ata_disk_start_dma_in(
 	 * Physical Region Descriptor Table
 	 */
 	ata_pciide_dma_setup(ata_ctlp, ata_pktp->ap_sg_list,
-		ata_pktp->ap_sg_cnt);
+	    ata_pktp->ap_sg_cnt);
 
 	/*
 	 * reset the PCIIDE Controller's interrupt and error status bits
@@ -2037,10 +2023,8 @@ ata_disk_start_dma_in(
 
 
 static int
-ata_disk_start_dma_out(
-	ata_ctl_t *ata_ctlp,
-	ata_drv_t *ata_drvp,
-	ata_pkt_t *ata_pktp)
+ata_disk_start_dma_out(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp,
+    ata_pkt_t *ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
 	int		 rc;
@@ -2055,7 +2039,7 @@ ata_disk_start_dma_out(
 	 * Physical Region Descriptor Table
 	 */
 	ata_pciide_dma_setup(ata_ctlp, ata_pktp->ap_sg_list,
-		ata_pktp->ap_sg_cnt);
+	    ata_pktp->ap_sg_cnt);
 
 	/*
 	 * reset the PCIIDE Controller's interrupt and error status bits
@@ -2119,10 +2103,8 @@ ata_disk_start_pio_in(
  */
 
 static int
-ata_disk_start_pio_out(
-	ata_ctl_t *ata_ctlp,
-	ata_drv_t *ata_drvp,
-	ata_pkt_t *ata_pktp)
+ata_disk_start_pio_out(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp,
+    ata_pkt_t *ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
 	ddi_acc_handle_t io_hdl2 = ata_ctlp->ac_iohandle2;
@@ -2152,10 +2134,10 @@ ata_disk_start_pio_out(
 	 */
 
 	if (!ata_wait3(io_hdl2, ata_ctlp->ac_ioaddr2,
-			ATS_DRQ, ATS_BSY, /* okay */
-			ATS_ERR, ATS_BSY, /* cmd failed */
-			ATS_DF, ATS_BSY, /* drive failed */
-			4000000)) {
+	    ATS_DRQ, ATS_BSY, /* okay */
+	    ATS_ERR, ATS_BSY, /* cmd failed */
+	    ATS_DF, ATS_BSY, /* drive failed */
+	    4000000)) {
 		ADBG_WARN(("ata_disk_start_pio_out: no DRQ\n"));
 		ata_pktp->ap_flags |= AP_ERROR;
 		return (ATA_FSM_RC_INTR);
@@ -2177,10 +2159,7 @@ ata_disk_start_pio_out(
  */
 
 static void
-ata_disk_complete(
-	ata_drv_t *ata_drvp,
-	ata_pkt_t *ata_pktp,
-	int do_callback)
+ata_disk_complete(ata_drv_t *ata_drvp, ata_pkt_t *ata_pktp, int do_callback)
 {
 	struct ata_id   *aidp = &ata_drvp->ad_id;
 	cmpkt_t	*pktp;
@@ -2217,8 +2196,7 @@ ata_disk_complete(
 			ata_pktp->ap_scb = DERR_DWF;
 		else /* any unknown error	*/
 			ata_pktp->ap_scb = DERR_ABORT;
-	} else if (ata_pktp->ap_flags &
-			(AP_ABORT|AP_TIMEOUT|AP_BUS_RESET)) {
+	} else if (ata_pktp->ap_flags & (AP_ABORT|AP_TIMEOUT|AP_BUS_RESET)) {
 
 		pktp->cp_reason = CPS_CHKERR;
 		ata_pktp->ap_scb = DERR_ABORT;
@@ -2248,10 +2226,8 @@ ata_disk_complete(
 
 /* ARGSUSED */
 static int
-ata_disk_intr(
-	ata_ctl_t *ata_ctlp,
-	ata_drv_t *ata_drvp,
-	ata_pkt_t *ata_pktp)
+ata_disk_intr(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp,
+    ata_pkt_t *ata_pktp)
 {
 	uchar_t		 status;
 
@@ -2268,15 +2244,15 @@ ata_disk_intr(
 
 	if (status & (ATS_DF | ATS_ERR)) {
 		ADBG_WARN(("ata_disk_intr: status 0x%x error 0x%x\n", status,
-			ddi_get8(ata_ctlp->ac_iohandle1, ata_ctlp->ac_error)));
+		    ddi_get8(ata_ctlp->ac_iohandle1, ata_ctlp->ac_error)));
 		ata_pktp->ap_flags |= AP_ERROR;
 	}
 
 	if (ata_pktp->ap_flags & AP_ERROR) {
 		ata_pktp->ap_status = ddi_get8(ata_ctlp->ac_iohandle2,
-			ata_ctlp->ac_altstatus);
+		    ata_ctlp->ac_altstatus);
 		ata_pktp->ap_error = ddi_get8(ata_ctlp->ac_iohandle1,
-			ata_ctlp->ac_error);
+		    ata_ctlp->ac_error);
 	}
 
 	/* tell the upper layer this request is complete */
@@ -2292,10 +2268,8 @@ ata_disk_intr(
 
 /* ARGSUSED */
 static int
-ata_disk_intr_pio_in(
-	ata_ctl_t *ata_ctlp,
-	ata_drv_t *ata_drvp,
-	ata_pkt_t *ata_pktp)
+ata_disk_intr_pio_in(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp,
+    ata_pkt_t *ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
 	ddi_acc_handle_t io_hdl2 = ata_ctlp->ac_iohandle2;
@@ -2308,8 +2282,7 @@ ata_disk_intr_pio_in(
 	 * first make certain DRQ is asserted (and no errors)
 	 */
 	(void) ata_wait3(io_hdl2, ata_ctlp->ac_ioaddr2,
-			ATS_DRQ, ATS_BSY, ATS_ERR, ATS_BSY, ATS_DF, ATS_BSY,
-			4000000);
+	    ATS_DRQ, ATS_BSY, ATS_ERR, ATS_BSY, ATS_DF, ATS_BSY, 4000000);
 
 	status = ata_get_status_clear_intr(ata_ctlp, ata_pktp);
 
@@ -2326,7 +2299,7 @@ ata_disk_intr_pio_in(
 	 */
 	if ((status & (ATS_DRQ | ATS_DF | ATS_ERR)) != ATS_DRQ) {
 		ADBG_WARN(("ata_disk_pio_in: status 0x%x error 0x%x\n",
-			status, ddi_get8(io_hdl1, ata_ctlp->ac_error)));
+		    status, ddi_get8(io_hdl1, ata_ctlp->ac_error)));
 		ata_pktp->ap_flags |= AP_ERROR;
 		ata_pktp->ap_status = ddi_get8(io_hdl2, ata_ctlp->ac_altstatus);
 		ata_pktp->ap_error = ddi_get8(io_hdl1, ata_ctlp->ac_error);
@@ -2344,7 +2317,7 @@ ata_disk_intr_pio_in(
 	 */
 	if (ata_pktp->ap_resid == 0) {
 		if (ata_wait(io_hdl2, ata_ctlp->ac_ioaddr2,
-			0, (ATS_DRQ | ATS_BSY), 4000000)) {
+		    0, (ATS_DRQ | ATS_BSY), 4000000)) {
 			/* tell the upper layer this request is complete */
 			return (ATA_FSM_RC_FINI);
 		}
@@ -2380,10 +2353,8 @@ ata_disk_intr_pio_in(
 
 /* ARGSUSED */
 static int
-ata_disk_intr_pio_out(
-	ata_ctl_t *ata_ctlp,
-	ata_drv_t *ata_drvp,
-	ata_pkt_t *ata_pktp)
+ata_disk_intr_pio_out(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp,
+    ata_pkt_t *ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
 	ddi_acc_handle_t io_hdl2 = ata_ctlp->ac_iohandle2;
@@ -2407,7 +2378,7 @@ ata_disk_intr_pio_out(
 
 	if (status & (ATS_DF | ATS_ERR)) {
 		ADBG_WARN(("ata_disk_intr_pio_out: status 0x%x error 0x%x\n",
-		status, ddi_get8(io_hdl1, ata_ctlp->ac_error)));
+		    status, ddi_get8(io_hdl1, ata_ctlp->ac_error)));
 		ata_pktp->ap_flags |= AP_ERROR;
 		ata_pktp->ap_status = ddi_get8(io_hdl2, ata_ctlp->ac_altstatus);
 		ata_pktp->ap_error = ddi_get8(io_hdl1, ata_ctlp->ac_error);
@@ -2441,7 +2412,7 @@ ata_disk_intr_pio_out(
 	 *
 	 */
 	(void) ata_wait3(io_hdl2, ata_ctlp->ac_ioaddr2,
-		ATS_DRQ, ATS_BSY, ATS_ERR, ATS_BSY, ATS_DF, ATS_BSY, 4000000);
+	    ATS_DRQ, ATS_BSY, ATS_ERR, ATS_BSY, ATS_DF, ATS_BSY, 4000000);
 
 	status = ddi_get8(io_hdl2, ata_ctlp->ac_altstatus);
 
@@ -2459,7 +2430,7 @@ ata_disk_intr_pio_out(
 	 */
 	if ((status & (ATS_DRQ | ATS_DF | ATS_ERR)) != ATS_DRQ) {
 		ADBG_WARN(("ata_disk_pio_out: status 0x%x error 0x%x\n",
-			status, ddi_get8(io_hdl1, ata_ctlp->ac_error)));
+		    status, ddi_get8(io_hdl1, ata_ctlp->ac_error)));
 		ata_pktp->ap_flags |= AP_ERROR;
 		ata_pktp->ap_status = ddi_get8(io_hdl2, ata_ctlp->ac_altstatus);
 		ata_pktp->ap_error = ddi_get8(io_hdl1, ata_ctlp->ac_error);
@@ -2488,10 +2459,7 @@ ata_disk_intr_pio_out(
  */
 
 static int
-ata_disk_intr_dma(
-	ata_ctl_t *ata_ctlp,
-	ata_drv_t *ata_drvp,
-	ata_pkt_t *ata_pktp)
+ata_disk_intr_dma(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp, ata_pkt_t *ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
 	ddi_acc_handle_t io_hdl2 = ata_ctlp->ac_iohandle2;
@@ -2509,7 +2477,7 @@ ata_disk_intr_dma(
 	 * wait for the device to clear DRQ
 	 */
 	if (!ata_wait(io_hdl2, ata_ctlp->ac_ioaddr2,
-			0, (ATS_DRQ | ATS_BSY), 4000000)) {
+	    0, (ATS_DRQ | ATS_BSY), 4000000)) {
 		ADBG_WARN(("ata_disk_intr_dma: DRQ stuck\n"));
 		ata_pktp->ap_flags |= AP_ERROR;
 		ata_pktp->ap_status = ddi_get8(io_hdl2, ata_ctlp->ac_altstatus);
@@ -2528,7 +2496,7 @@ ata_disk_intr_dma(
 
 	if (status & (ATS_DF | ATS_ERR)) {
 		ADBG_WARN(("ata_disk_intr_dma: status 0x%x error 0x%x\n",
-			status, ddi_get8(io_hdl1, ata_ctlp->ac_error)));
+		    status, ddi_get8(io_hdl1, ata_ctlp->ac_error)));
 		ata_pktp->ap_flags |= AP_ERROR;
 		ata_pktp->ap_status = ddi_get8(io_hdl2, ata_ctlp->ac_altstatus);
 		ata_pktp->ap_error = ddi_get8(io_hdl1, ata_ctlp->ac_error);
@@ -2559,18 +2527,15 @@ ata_disk_intr_dma(
  */
 
 static void
-ata_disk_pio_xfer_data_in(
-	ata_ctl_t *ata_ctlp,
-	ata_pkt_t *ata_pktp)
+ata_disk_pio_xfer_data_in(ata_ctl_t *ata_ctlp, ata_pkt_t *ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
 	int		 count;
 
-	count = min(ata_pktp->ap_resid,
-			ata_pktp->ap_bytes_per_block);
+	count = min(ata_pktp->ap_resid, ata_pktp->ap_bytes_per_block);
 
 	ADBG_TRANSPORT(("ata_disk_pio_xfer_data_in: 0x%x bytes, addr = 0x%p\n",
-			count, ata_pktp->ap_v_addr));
+	    count, ata_pktp->ap_v_addr));
 
 	/*
 	 * read count bytes
@@ -2579,7 +2544,7 @@ ata_disk_pio_xfer_data_in(
 	ASSERT(count != 0);
 
 	ddi_rep_get16(io_hdl1, (ushort_t *)ata_pktp->ap_v_addr,
-		ata_ctlp->ac_data, (count >> 1), DDI_DEV_NO_AUTOINCR);
+	    ata_ctlp->ac_data, (count >> 1), DDI_DEV_NO_AUTOINCR);
 
 	/* wait for the busy bit to settle */
 	ata_nsecwait(400);
@@ -2600,18 +2565,15 @@ ata_disk_pio_xfer_data_in(
  */
 
 static void
-ata_disk_pio_xfer_data_out(
-	ata_ctl_t *ata_ctlp,
-	ata_pkt_t *ata_pktp)
+ata_disk_pio_xfer_data_out(ata_ctl_t *ata_ctlp, ata_pkt_t *ata_pktp)
 {
 	ddi_acc_handle_t io_hdl1 = ata_ctlp->ac_iohandle1;
 	int		 count;
 
-	count = min(ata_pktp->ap_resid,
-			ata_pktp->ap_bytes_per_block);
+	count = min(ata_pktp->ap_resid, ata_pktp->ap_bytes_per_block);
 
 	ADBG_TRANSPORT(("ata_disk_pio_xfer_data_out: 0x%x bytes, addr = 0x%p\n",
-			count, ata_pktp->ap_v_addr));
+	    count, ata_pktp->ap_v_addr));
 
 	/*
 	 * read or write count bytes
@@ -2620,7 +2582,7 @@ ata_disk_pio_xfer_data_out(
 	ASSERT(count != 0);
 
 	ddi_rep_put16(io_hdl1, (ushort_t *)ata_pktp->ap_v_addr,
-		ata_ctlp->ac_data, (count >> 1), DDI_DEV_NO_AUTOINCR);
+	    ata_ctlp->ac_data, (count >> 1), DDI_DEV_NO_AUTOINCR);
 
 	/* wait for the busy bit to settle */
 	ata_nsecwait(400);
@@ -2646,21 +2608,19 @@ ata_disk_pio_xfer_data_out(
  */
 
 static int
-ata_disk_initialize_device_parameters(
-	ata_ctl_t *ata_ctlp,
-	ata_drv_t *ata_drvp)
+ata_disk_initialize_device_parameters(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp)
 {
 	int		 rc;
 
 	rc = ata_command(ata_ctlp, ata_drvp, FALSE, FALSE,
-			ata_disk_init_dev_parm_wait,
-			ATC_SETPARAM,
-			0, 			/* feature n/a */
-			ata_drvp->ad_phsec,	/* max sector (1-based) */
-			0,			/* sector n/a */
-			(ata_drvp->ad_phhd -1),	/* max head (0-based) */
-			0,			/* cyl_low n/a */
-			0);			/* cyl_hi n/a */
+	    ata_disk_init_dev_parm_wait,
+	    ATC_SETPARAM,
+	    0,			/* feature n/a */
+	    ata_drvp->ad_phsec,	/* max sector (1-based) */
+	    0,			/* sector n/a */
+	    (ata_drvp->ad_phhd -1),	/* max head (0-based) */
+	    0,			/* cyl_low n/a */
+	    0);			/* cyl_hi n/a */
 
 	if (rc)
 		return (TRUE);
@@ -2678,8 +2638,7 @@ ata_disk_initialize_device_parameters(
  */
 
 static void
-ata_disk_fake_inquiry(
-	ata_drv_t *ata_drvp)
+ata_disk_fake_inquiry(ata_drv_t *ata_drvp)
 {
 	struct ata_id *ata_idp = &ata_drvp->ad_id;
 	struct scsi_inquiry *inqp = &ata_drvp->ad_inquiry;
@@ -2694,9 +2653,9 @@ ata_disk_fake_inquiry(
 	inqp->inq_qual = DPQ_POSSIBLE;
 
 	(void) strncpy(inqp->inq_pid, ata_idp->ai_model,
-			sizeof (inqp->inq_pid));
+	    sizeof (inqp->inq_pid));
 	(void) strncpy(inqp->inq_revision, ata_idp->ai_fw,
-			sizeof (inqp->inq_revision));
+	    sizeof (inqp->inq_revision));
 }
 
 #define	LOOP_COUNT	10000
@@ -2709,21 +2668,19 @@ ata_disk_fake_inquiry(
  */
 
 static int
-ata_disk_set_multiple(
-	ata_ctl_t *ata_ctlp,
-	ata_drv_t *ata_drvp)
+ata_disk_set_multiple(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp)
 {
 	int		 rc;
 
 	rc = ata_command(ata_ctlp, ata_drvp, TRUE, FALSE,
-			ata_disk_set_mult_wait,
-			ATC_SETMULT,
-			0, 			/* feature n/a */
-			ata_drvp->ad_block_factor, /* count */
-			0,			/* sector n/a */
-			0, 			/* head n/a */
-			0,			/* cyl_low n/a */
-			0);			/* cyl_hi n/a */
+	    ata_disk_set_mult_wait,
+	    ATC_SETMULT,
+	    0,			/* feature n/a */
+	    ata_drvp->ad_block_factor, /* count */
+	    0,			/* sector n/a */
+	    0,			/* head n/a */
+	    0,			/* cyl_low n/a */
+	    0);			/* cyl_hi n/a */
 
 	if (rc) {
 		return (TRUE);
@@ -2741,19 +2698,15 @@ ata_disk_set_multiple(
  */
 
 int
-ata_disk_id(
-	ddi_acc_handle_t io_hdl1,
-	caddr_t		 ioaddr1,
-	ddi_acc_handle_t io_hdl2,
-	caddr_t		 ioaddr2,
-	struct ata_id	*ata_idp)
+ata_disk_id(ddi_acc_handle_t io_hdl1, caddr_t ioaddr1, ddi_acc_handle_t io_hdl2,
+    caddr_t ioaddr2, struct ata_id *ata_idp)
 {
 	int	rc;
 
 	ADBG_TRACE(("ata_disk_id entered\n"));
 
 	rc = ata_id_common(ATC_ID_DEVICE, TRUE, io_hdl1, ioaddr1, io_hdl2,
-		ioaddr2, ata_idp);
+	    ioaddr2, ata_idp);
 
 	if (!rc)
 		return (FALSE);
@@ -2868,10 +2821,8 @@ ata_last_block_xferred_lba48(ata_ctl_t *ata_ctlp)
  */
 
 static void
-ata_disk_get_resid(
-	ata_ctl_t	*ata_ctlp,
-	ata_drv_t	*ata_drvp,
-	ata_pkt_t	*ata_pktp)
+ata_disk_get_resid(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp,
+    ata_pkt_t *ata_pktp)
 {
 	uint_t		 lba_start;
 	uint_t		 lba_stop;
@@ -2891,7 +2842,7 @@ ata_disk_get_resid(
 	resid_bytes = resid_sectors << SCTRSHFT;
 
 	ADBG_TRACE(("ata_disk_get_resid start 0x%x cnt 0x%x stop 0x%x\n",
-		    lba_start, ata_pktp->ap_count, lba_stop));
+	    lba_start, ata_pktp->ap_count, lba_stop));
 	ata_pktp->ap_resid = resid_bytes;
 }
 
@@ -2910,17 +2861,15 @@ ata_disk_get_resid(
  * will have to do until someone gives me a drive to test this on.
  */
 static int
-ata_disk_state(
-	ata_ctl_t	*ata_ctlp,
-	ata_drv_t	*ata_drvp,
-	ata_pkt_t	*ata_pktp)
+ata_disk_state(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp,
+    ata_pkt_t *ata_pktp)
 {
 	int	*statep = (int *)ata_pktp->ap_v_addr;
 	uchar_t	 err;
 
 	ADBG_TRACE(("ata_disk_state\n"));
 	if (ata_command(ata_ctlp, ata_drvp, TRUE, TRUE, 5 * 1000000,
-		    ATC_DOOR_LOCK, 0, 0, 0, 0, 0, 0)) {
+	    ATC_DOOR_LOCK, 0, 0, 0, 0, 0, 0)) {
 		*statep = DKIO_INSERTED;
 		return (ATA_FSM_RC_FINI);
 	}
@@ -2939,14 +2888,12 @@ ata_disk_state(
  */
 
 static int
-ata_disk_eject(
-	ata_ctl_t	*ata_ctlp,
-	ata_drv_t	*ata_drvp,
-	ata_pkt_t	*ata_pktp)
+ata_disk_eject(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp,
+    ata_pkt_t *ata_pktp)
 {
 	ADBG_TRACE(("ata_disk_eject\n"));
 	if (ata_command(ata_ctlp, ata_drvp, TRUE, TRUE, 5 * 1000000,
-			ATC_EJECT, 0, 0, 0, 0, 0, 0)) {
+	    ATC_EJECT, 0, 0, 0, 0, 0, 0)) {
 		return (ATA_FSM_RC_FINI);
 	}
 	ata_pktp->ap_flags |= AP_ERROR;
@@ -2958,14 +2905,12 @@ ata_disk_eject(
  *
  */
 static int
-ata_disk_lock(
-	ata_ctl_t	*ata_ctlp,
-	ata_drv_t	*ata_drvp,
-	ata_pkt_t	*ata_pktp)
+ata_disk_lock(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp,
+    ata_pkt_t *ata_pktp)
 {
 	ADBG_TRACE(("ata_disk_lock\n"));
 	if (ata_command(ata_ctlp, ata_drvp, TRUE, TRUE, 5 * 1000000,
-			ATC_DOOR_LOCK, 0, 0, 0, 0, 0, 0)) {
+	    ATC_DOOR_LOCK, 0, 0, 0, 0, 0, 0)) {
 		return (ATA_FSM_RC_FINI);
 	}
 	ata_pktp->ap_flags |= AP_ERROR;
@@ -2978,14 +2923,12 @@ ata_disk_lock(
  *
  */
 static int
-ata_disk_unlock(
-	ata_ctl_t	*ata_ctlp,
-	ata_drv_t	*ata_drvp,
-	ata_pkt_t	*ata_pktp)
+ata_disk_unlock(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp,
+    ata_pkt_t *ata_pktp)
 {
 	ADBG_TRACE(("ata_disk_unlock\n"));
 	if (ata_command(ata_ctlp, ata_drvp, TRUE, TRUE, 5 * 1000000,
-			ATC_DOOR_UNLOCK, 0, 0, 0, 0, 0, 0)) {
+	    ATC_DOOR_UNLOCK, 0, 0, 0, 0, 0, 0)) {
 		return (ATA_FSM_RC_FINI);
 	}
 	ata_pktp->ap_flags |= AP_ERROR;
@@ -2997,14 +2940,12 @@ ata_disk_unlock(
  * put the drive into standby mode
  */
 static int
-ata_disk_standby(
-	ata_ctl_t	*ata_ctlp,
-	ata_drv_t	*ata_drvp,
-	ata_pkt_t	*ata_pktp)
+ata_disk_standby(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp,
+    ata_pkt_t *ata_pktp)
 {
 	ADBG_TRACE(("ata_disk_standby\n"));
 	if (ata_command(ata_ctlp, ata_drvp, TRUE, TRUE, 5 * 1000000,
-			ATC_STANDBY_IM, 0, 0, 0, 0, 0, 0)) {
+	    ATC_STANDBY_IM, 0, 0, 0, 0, 0, 0)) {
 		return (ATA_FSM_RC_FINI);
 	}
 	ata_pktp->ap_flags |= AP_ERROR;
@@ -3020,14 +2961,12 @@ ata_disk_standby(
  *
  */
 static int
-ata_disk_recalibrate(
-	ata_ctl_t	*ata_ctlp,
-	ata_drv_t	*ata_drvp,
-	ata_pkt_t	*ata_pktp)
+ata_disk_recalibrate(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp,
+    ata_pkt_t *ata_pktp)
 {
 	ADBG_TRACE(("ata_disk_recalibrate\n"));
 	if (ata_command(ata_ctlp, ata_drvp, TRUE, TRUE, 31 * 1000000,
-			ATC_RECAL, 0, 0, 0, 0, 0, 0)) {
+	    ATC_RECAL, 0, 0, 0, 0, 0, 0)) {
 		return (ATA_FSM_RC_FINI);
 	}
 	ata_pktp->ap_flags |= AP_ERROR;
@@ -3206,8 +3145,8 @@ ata_disk_id_update(
  */
 static int
 ata_disk_update_fw(gtgt_t *gtgtp, ata_ctl_t *ata_ctlp,
-	ata_drv_t *ata_drvp, caddr_t fwfile,
-	uint_t size, uint8_t type, int flag)
+    ata_drv_t *ata_drvp, caddr_t fwfile,
+    uint_t size, uint8_t type, int flag)
 {
 	ata_pkt_t	*ata_pktp;
 	gcmd_t		*gcmdp = NULL;

@@ -95,7 +95,7 @@ int	ghd_ntime_inits = sizeof (ghd_time_inits)
 /*
  * Update state of gcmdp (in one direction, increasing state number, only)
  */
-#define	GCMD_UPDATE_STATE(gcmdp, newstate) 		\
+#define	GCMD_UPDATE_STATE(gcmdp, newstate)		\
 {							\
 	if ((gcmdp)->cmd_state < (newstate)) {		\
 		((gcmdp)->cmd_state = (newstate));	\
@@ -162,7 +162,7 @@ _info(struct modinfo *modinfop)
  * handler when called via the timer callout, and by ghd_timer_poll()
  * while procesing "polled" (FLAG_NOINTR) requests.
  *
- * 	The ccc_activel_mutex is held while a CCB list is being scanned.
+ *	The ccc_activel_mutex is held while a CCB list is being scanned.
  * This prevents the HBA driver's transport or interrupt functions
  * from changing the active CCB list. But we wake up very infrequently
  * and do as little as possible so it shouldn't affect performance.
@@ -205,9 +205,9 @@ ghd_timeout_loop(ccc_t *cccp)
  *	The list of cmd_t's is protected by the ccc_activel_mutex mutex
  *	in the ghd_timeout_loop() routine.
  *
- * 	We also check to see if the waitq is frozen, and if so,
- * 	adjust our timeout to call back sooner if necessary (to
- * 	unfreeze the waitq as soon as possible).
+ *	We also check to see if the waitq is frozen, and if so,
+ *	adjust our timeout to call back sooner if necessary (to
+ *	unfreeze the waitq as soon as possible).
  *
  *
  *	+------------+
@@ -317,7 +317,7 @@ ghd_timer_newstate(ccc_t *cccp, gcmd_t *gcmdp, gtgt_t *gtgtp,
 	gact_t	next_action;
 	cmdstate_t next_state;
 	char	*msgp;
-	long	new_timeout;
+	long	new_timeout = 0;
 	int	(*func)(void *, gcmd_t *, gtgt_t *, gact_t, int);
 	void	*hba_handle;
 	gcmd_t	gsav;
@@ -335,6 +335,7 @@ ghd_timer_newstate(ccc_t *cccp, gcmd_t *gcmdp, gtgt_t *gtgtp,
 	}
 #endif
 
+	bzero(&gsav, sizeof (gsav));
 	func = cccp->ccc_timeout_func;
 	hba_handle = cccp->ccc_hba_handle;
 
@@ -532,7 +533,7 @@ ghd_timer_newstate(ccc_t *cccp, gcmd_t *gcmdp, gtgt_t *gtgtp,
  *
  *	This interrupt is scheduled if a particular HBA instance's
  *	CCB timer list has a timed out CCB, or if the waitq is in a
- * 	frozen state.
+ *	frozen state.
  *
  *	Find the timed out CCB and then call the HBA driver's timeout
  *	function.
