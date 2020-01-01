@@ -3222,7 +3222,9 @@ iwn_wakeup_intr(struct iwn_softc *sc)
 static void
 iwn_fatal_intr(struct iwn_softc *sc)
 {
-	struct iwn_fw_dump dump;
+	struct iwn_fw_dump *dump;
+	uint32_t buf[P2ROUNDUP(sizeof (*dump), sizeof (uint32_t)) /
+	    sizeof (uint32_t)];
 	int i;
 
 	/* Force a complete recalibration on next init. */
@@ -3230,7 +3232,7 @@ iwn_fatal_intr(struct iwn_softc *sc)
 
 	/* Check that the error log address is valid. */
 	if (sc->errptr < IWN_FW_DATA_BASE ||
-	    sc->errptr + sizeof (dump) >
+	    sc->errptr + sizeof (*dump) >
 	    IWN_FW_DATA_BASE + sc->fw_data_maxsz) {
 		dev_err(sc->sc_dip, CE_WARN,
 		    "!bad firmware error log address 0x%08x", sc->errptr);
@@ -3242,31 +3244,30 @@ iwn_fatal_intr(struct iwn_softc *sc)
 		return;
 	}
 	/* Read firmware error log from SRAM. */
-	/*LINTED: E_PTR_BAD_CAST_ALIGN*/
-	iwn_mem_read_region_4(sc, sc->errptr, (uint32_t *)&dump,
-	    sizeof (dump) / sizeof (uint32_t));
+	dump = (struct iwn_fw_dump *)buf;
+	iwn_mem_read_region_4(sc, sc->errptr, buf, ARRAY_SIZE(buf));
 	iwn_nic_unlock(sc);
 
-	if (dump.valid == 0) {
+	if (dump->valid == 0) {
 		dev_err(sc->sc_dip, CE_WARN,
 		    "!firmware error log is empty");
 		return;
 	}
 	dev_err(sc->sc_dip, CE_WARN, "!firmware error log:");
 	dev_err(sc->sc_dip, CE_CONT, "!  error type      = \"%s\" (0x%08X)",
-	    (dump.id < __arraycount(iwn_fw_errmsg)) ?
-		iwn_fw_errmsg[dump.id] : "UNKNOWN",
-	    dump.id);
-	dev_err(sc->sc_dip, CE_CONT, "!  program counter = 0x%08X", dump.pc);
+	    (dump->id < __arraycount(iwn_fw_errmsg)) ?
+		iwn_fw_errmsg[dump->id] : "UNKNOWN",
+	    dump->id);
+	dev_err(sc->sc_dip, CE_CONT, "!  program counter = 0x%08X", dump->pc);
 	dev_err(sc->sc_dip, CE_CONT, "!  source line     = 0x%08X",
-	    dump.src_line);
+	    dump->src_line);
 	dev_err(sc->sc_dip, CE_CONT, "!  error data      = 0x%08X%08X",
-	    dump.error_data[0], dump.error_data[1]);
+	    dump->error_data[0], dump->error_data[1]);
 	dev_err(sc->sc_dip, CE_CONT, "!  branch link     = 0x%08X%08X",
-	    dump.branch_link[0], dump.branch_link[1]);
+	    dump->branch_link[0], dump->branch_link[1]);
 	dev_err(sc->sc_dip, CE_CONT, "!  interrupt link  = 0x%08X%08X",
-	    dump.interrupt_link[0], dump.interrupt_link[1]);
-	dev_err(sc->sc_dip, CE_CONT, "!  time            = %u", dump.time[0]);
+	    dump->interrupt_link[0], dump->interrupt_link[1]);
+	dev_err(sc->sc_dip, CE_CONT, "!  time            = %u", dump->time[0]);
 
 	/* Dump driver status (TX and RX rings) while we're here. */
 	dev_err(sc->sc_dip, CE_WARN, "!driver status:");
