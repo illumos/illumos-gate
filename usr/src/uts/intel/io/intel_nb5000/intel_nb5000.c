@@ -280,6 +280,7 @@ nf_memory_error(const nb_regs_t *rp, void *data)
 			sp->channel = -1;
 			if (nb_mode != NB_MEMORY_MIRROR) {
 				recmema = rp->nb.nf_fbd_regs.recmema;
+				recmemb = rp->nb.nf_fbd_regs.recmemb;
 				sp->rank = (recmema >> 8) & RANK_MASK;
 				sp->bank = (recmema >> 12) & BANK_MASK;
 				sp->cas = (recmemb >> 16) & CAS_MASK;
@@ -2165,6 +2166,8 @@ nb_drain(void *ignored, const void *data, const errorq_elem_t *eqe)
 	char buf[FM_MAX_CLASS];
 	nb_scatchpad_t nb_scatchpad;
 
+	eqep = NULL;
+	scr_eqep = NULL;
 	if (panicstr) {
 		if ((eqep = errorq_reserve(ereport_errorq)) == NULL)
 			return;
