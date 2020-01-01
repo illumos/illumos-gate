@@ -8475,10 +8475,16 @@ nxge_bcm5464_link_led_off(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "==> nxge_bcm5464_link_led_off"));
 
-	if (nxgep->nxge_hw_p->platform_type == P_NEPTUNE_MARAMBA_P1) {
+	switch (nxgep->nxge_hw_p->platform_type) {
+	case P_NEPTUNE_MARAMBA_P1:
 		xcvr_portn = MARAMBA_P1_CLAUSE22_PORT_ADDR_BASE;
-	} else if (nxgep->nxge_hw_p->platform_type == P_NEPTUNE_MARAMBA_P0) {
+		break;
+	case P_NEPTUNE_MARAMBA_P0:
 		xcvr_portn = MARAMBA_P0_CLAUSE22_PORT_ADDR_BASE;
+		break;
+	default:
+		xcvr_portn = 0;
+		break;
 	}
 	/*
 	 * For Altas 4-1G copper, Xcvr port numbers are

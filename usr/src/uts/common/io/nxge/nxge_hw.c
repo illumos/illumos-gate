@@ -187,9 +187,8 @@ nxge_hw_init_niu_common(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_hw_init_niu_common"));
 }
 
-/* ARGSUSED */
 uint_t
-nxge_intr(void *arg1, void *arg2)
+nxge_intr(char *arg1, char *arg2)
 {
 	p_nxge_ldv_t ldvp = (p_nxge_ldv_t)arg1;
 	p_nxge_t nxgep = (p_nxge_t)arg2;

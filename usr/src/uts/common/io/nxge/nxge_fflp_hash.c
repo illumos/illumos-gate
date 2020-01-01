@@ -22,7 +22,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <nxge_fflp_hash.h>
@@ -366,6 +365,7 @@ nxge_compute_h1_table1(uint32_t crcin, uint32_t *flow, uint32_t length)
 	buf = (uint8_t *)flow;
 
 	tmp = crcin;
+	crch1 = 0;
 	for (i = 0; i < length; i++) {
 		crch1 = COMPUTE_H1_BYTE(tmp, buf[i]);
 		tmp = crch1;

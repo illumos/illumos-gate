@@ -906,47 +906,45 @@ static void
 nxge_fill_tcam_entry_udp(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	tcam_entry_t *tcam_ptr)
 {
-	udpip4_spec_t *fspec_key;
-	udpip4_spec_t *fspec_mask;
+#define	fspec_key (flow_spec->uh.udpip4spec)
+#define	fspec_mask (flow_spec->um.udpip4spec)
 
-	fspec_key = (udpip4_spec_t *)&flow_spec->uh.udpip4spec;
-	fspec_mask = (udpip4_spec_t *)&flow_spec->um.udpip4spec;
-	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_key, fspec_key->ip4dst);
-	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_mask, fspec_mask->ip4dst);
-	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_key, fspec_key->ip4src);
-	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_mask, fspec_mask->ip4src);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_key, fspec_key.ip4dst);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_mask, fspec_mask.ip4dst);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_key, fspec_key.ip4src);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_mask, fspec_mask.ip4src);
 	TCAM_IP_PORTS(tcam_ptr->ip4_port_key,
-	    fspec_key->pdst, fspec_key->psrc);
+	    fspec_key.pdst, fspec_key.psrc);
 	TCAM_IP_PORTS(tcam_ptr->ip4_port_mask,
-	    fspec_mask->pdst, fspec_mask->psrc);
+	    fspec_mask.pdst, fspec_mask.psrc);
 	TCAM_IP_CLASS(tcam_ptr->ip4_class_key,
 	    tcam_ptr->ip4_class_mask,
 	    TCAM_CLASS_UDP_IPV4);
 	TCAM_IP_PROTO(tcam_ptr->ip4_proto_key,
 	    tcam_ptr->ip4_proto_mask,
 	    IPPROTO_UDP);
-	tcam_ptr->ip4_tos_key = fspec_key->tos;
-	tcam_ptr->ip4_tos_mask = fspec_mask->tos;
+	tcam_ptr->ip4_tos_key = fspec_key.tos;
+	tcam_ptr->ip4_tos_mask = fspec_mask.tos;
+#undef fspec_key
+#undef fspec_mask
 }
 
 static void
 nxge_fill_tcam_entry_udp_ipv6(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	tcam_entry_t *tcam_ptr)
 {
-	udpip6_spec_t *fspec_key;
-	udpip6_spec_t *fspec_mask;
 	p_nxge_class_pt_cfg_t p_class_cfgp;
+#define	fspec_key (flow_spec->uh.udpip6spec)
+#define	fspec_mask (flow_spec->um.udpip6spec)
 
-	fspec_key = (udpip6_spec_t *)&flow_spec->uh.udpip6spec;
-	fspec_mask = (udpip6_spec_t *)&flow_spec->um.udpip6spec;
 	p_class_cfgp = (p_nxge_class_pt_cfg_t)&nxgep->class_config;
 	if (p_class_cfgp->class_cfg[TCAM_CLASS_UDP_IPV6] &
 	    NXGE_CLASS_TCAM_USE_SRC_ADDR) {
-		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key->ip6src);
-		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask->ip6src);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key.ip6src);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask.ip6src);
 	} else {
-		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key->ip6dst);
-		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask->ip6dst);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key.ip6dst);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask.ip6dst);
 	}
 
 	TCAM_IP_CLASS(tcam_ptr->ip6_class_key,
@@ -954,11 +952,13 @@ nxge_fill_tcam_entry_udp_ipv6(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	TCAM_IP_PROTO(tcam_ptr->ip6_nxt_hdr_key,
 	    tcam_ptr->ip6_nxt_hdr_mask, IPPROTO_UDP);
 	TCAM_IP_PORTS(tcam_ptr->ip6_port_key,
-	    fspec_key->pdst, fspec_key->psrc);
+	    fspec_key.pdst, fspec_key.psrc);
 	TCAM_IP_PORTS(tcam_ptr->ip6_port_mask,
-	    fspec_mask->pdst, fspec_mask->psrc);
-	tcam_ptr->ip6_tos_key = fspec_key->tos;
-	tcam_ptr->ip6_tos_mask = fspec_mask->tos;
+	    fspec_mask.pdst, fspec_mask.psrc);
+	tcam_ptr->ip6_tos_key = fspec_key.tos;
+	tcam_ptr->ip6_tos_mask = fspec_mask.tos;
+#undef fspec_key
+#undef fspec_mask
 }
 
 /* ARGSUSED */
@@ -966,26 +966,25 @@ static void
 nxge_fill_tcam_entry_tcp(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	tcam_entry_t *tcam_ptr)
 {
-	tcpip4_spec_t *fspec_key;
-	tcpip4_spec_t *fspec_mask;
+#define	fspec_key (flow_spec->uh.tcpip4spec)
+#define	fspec_mask (flow_spec->um.tcpip4spec)
 
-	fspec_key = (tcpip4_spec_t *)&flow_spec->uh.tcpip4spec;
-	fspec_mask = (tcpip4_spec_t *)&flow_spec->um.tcpip4spec;
-
-	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_key, fspec_key->ip4dst);
-	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_mask, fspec_mask->ip4dst);
-	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_key, fspec_key->ip4src);
-	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_mask, fspec_mask->ip4src);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_key, fspec_key.ip4dst);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_mask, fspec_mask.ip4dst);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_key, fspec_key.ip4src);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_mask, fspec_mask.ip4src);
 	TCAM_IP_PORTS(tcam_ptr->ip4_port_key,
-	    fspec_key->pdst, fspec_key->psrc);
+	    fspec_key.pdst, fspec_key.psrc);
 	TCAM_IP_PORTS(tcam_ptr->ip4_port_mask,
-	    fspec_mask->pdst, fspec_mask->psrc);
+	    fspec_mask.pdst, fspec_mask.psrc);
 	TCAM_IP_CLASS(tcam_ptr->ip4_class_key,
 	    tcam_ptr->ip4_class_mask, TCAM_CLASS_TCP_IPV4);
 	TCAM_IP_PROTO(tcam_ptr->ip4_proto_key,
 	    tcam_ptr->ip4_proto_mask, IPPROTO_TCP);
-	tcam_ptr->ip4_tos_key = fspec_key->tos;
-	tcam_ptr->ip4_tos_mask = fspec_mask->tos;
+	tcam_ptr->ip4_tos_key = fspec_key.tos;
+	tcam_ptr->ip4_tos_mask = fspec_mask.tos;
+#undef fspec_key
+#undef fspec_mask
 }
 
 /* ARGSUSED */
@@ -993,47 +992,43 @@ static void
 nxge_fill_tcam_entry_sctp(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	tcam_entry_t *tcam_ptr)
 {
-	tcpip4_spec_t *fspec_key;
-	tcpip4_spec_t *fspec_mask;
+#define	fspec_key (flow_spec->uh.tcpip4spec)
+#define	fspec_mask (flow_spec->um.tcpip4spec)
 
-	fspec_key = (tcpip4_spec_t *)&flow_spec->uh.tcpip4spec;
-	fspec_mask = (tcpip4_spec_t *)&flow_spec->um.tcpip4spec;
-
-	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_key, fspec_key->ip4dst);
-	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_mask, fspec_mask->ip4dst);
-	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_key, fspec_key->ip4src);
-	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_mask, fspec_mask->ip4src);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_key, fspec_key.ip4dst);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_mask, fspec_mask.ip4dst);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_key, fspec_key.ip4src);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_mask, fspec_mask.ip4src);
 	TCAM_IP_CLASS(tcam_ptr->ip4_class_key,
 	    tcam_ptr->ip4_class_mask, TCAM_CLASS_SCTP_IPV4);
 	TCAM_IP_PROTO(tcam_ptr->ip4_proto_key,
 	    tcam_ptr->ip4_proto_mask, IPPROTO_SCTP);
 	TCAM_IP_PORTS(tcam_ptr->ip4_port_key,
-	    fspec_key->pdst, fspec_key->psrc);
+	    fspec_key.pdst, fspec_key.psrc);
 	TCAM_IP_PORTS(tcam_ptr->ip4_port_mask,
-	    fspec_mask->pdst, fspec_mask->psrc);
-	tcam_ptr->ip4_tos_key = fspec_key->tos;
-	tcam_ptr->ip4_tos_mask = fspec_mask->tos;
+	    fspec_mask.pdst, fspec_mask.psrc);
+	tcam_ptr->ip4_tos_key = fspec_key.tos;
+	tcam_ptr->ip4_tos_mask = fspec_mask.tos;
+#undef fspec_key
+#undef fspec_mask
 }
 
 static void
 nxge_fill_tcam_entry_tcp_ipv6(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	tcam_entry_t *tcam_ptr)
 {
-	tcpip6_spec_t *fspec_key;
-	tcpip6_spec_t *fspec_mask;
 	p_nxge_class_pt_cfg_t p_class_cfgp;
-
-	fspec_key = (tcpip6_spec_t *)&flow_spec->uh.tcpip6spec;
-	fspec_mask = (tcpip6_spec_t *)&flow_spec->um.tcpip6spec;
+#define	fspec_key (flow_spec->uh.tcpip6spec)
+#define	fspec_mask (flow_spec->um.tcpip6spec)
 
 	p_class_cfgp = (p_nxge_class_pt_cfg_t)&nxgep->class_config;
 	if (p_class_cfgp->class_cfg[TCAM_CLASS_UDP_IPV6] &
 	    NXGE_CLASS_TCAM_USE_SRC_ADDR) {
-		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key->ip6src);
-		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask->ip6src);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key.ip6src);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask.ip6src);
 	} else {
-		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key->ip6dst);
-		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask->ip6dst);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key.ip6dst);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask.ip6dst);
 	}
 
 	TCAM_IP_CLASS(tcam_ptr->ip6_class_key,
@@ -1041,32 +1036,32 @@ nxge_fill_tcam_entry_tcp_ipv6(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	TCAM_IP_PROTO(tcam_ptr->ip6_nxt_hdr_key,
 	    tcam_ptr->ip6_nxt_hdr_mask, IPPROTO_TCP);
 	TCAM_IP_PORTS(tcam_ptr->ip6_port_key,
-	    fspec_key->pdst, fspec_key->psrc);
+	    fspec_key.pdst, fspec_key.psrc);
 	TCAM_IP_PORTS(tcam_ptr->ip6_port_mask,
-	    fspec_mask->pdst, fspec_mask->psrc);
-	tcam_ptr->ip6_tos_key = fspec_key->tos;
-	tcam_ptr->ip6_tos_mask = fspec_mask->tos;
+	    fspec_mask.pdst, fspec_mask.psrc);
+	tcam_ptr->ip6_tos_key = fspec_key.tos;
+	tcam_ptr->ip6_tos_mask = fspec_mask.tos;
+#undef fspec_key
+#undef fspec_mask
 }
 
 static void
 nxge_fill_tcam_entry_sctp_ipv6(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	tcam_entry_t *tcam_ptr)
 {
-	tcpip6_spec_t *fspec_key;
-	tcpip6_spec_t *fspec_mask;
 	p_nxge_class_pt_cfg_t p_class_cfgp;
+#define	fspec_key (flow_spec->uh.tcpip6spec)
+#define	fspec_mask (flow_spec->um.tcpip6spec)
 
-	fspec_key = (tcpip6_spec_t *)&flow_spec->uh.tcpip6spec;
-	fspec_mask = (tcpip6_spec_t *)&flow_spec->um.tcpip6spec;
 	p_class_cfgp = (p_nxge_class_pt_cfg_t)&nxgep->class_config;
 
 	if (p_class_cfgp->class_cfg[TCAM_CLASS_UDP_IPV6] &
 	    NXGE_CLASS_TCAM_USE_SRC_ADDR) {
-		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key->ip6src);
-		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask->ip6src);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key.ip6src);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask.ip6src);
 	} else {
-		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key->ip6dst);
-		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask->ip6dst);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key.ip6dst);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask.ip6dst);
 	}
 
 	TCAM_IP_CLASS(tcam_ptr->ip6_class_key,
@@ -1074,11 +1069,13 @@ nxge_fill_tcam_entry_sctp_ipv6(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	TCAM_IP_PROTO(tcam_ptr->ip6_nxt_hdr_key,
 	    tcam_ptr->ip6_nxt_hdr_mask, IPPROTO_SCTP);
 	TCAM_IP_PORTS(tcam_ptr->ip6_port_key,
-	    fspec_key->pdst, fspec_key->psrc);
+	    fspec_key.pdst, fspec_key.psrc);
 	TCAM_IP_PORTS(tcam_ptr->ip6_port_mask,
-	    fspec_mask->pdst, fspec_mask->psrc);
-	tcam_ptr->ip6_tos_key = fspec_key->tos;
-	tcam_ptr->ip6_tos_mask = fspec_mask->tos;
+	    fspec_mask.pdst, fspec_mask.psrc);
+	tcam_ptr->ip6_tos_key = fspec_key.tos;
+	tcam_ptr->ip6_tos_mask = fspec_mask.tos;
+#undef fspec_key
+#undef fspec_mask
 }
 
 /* ARGSUSED */
@@ -1086,19 +1083,16 @@ static void
 nxge_fill_tcam_entry_ah_esp(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	tcam_entry_t *tcam_ptr)
 {
-	ahip4_spec_t *fspec_key;
-	ahip4_spec_t *fspec_mask;
+#define	fspec_key (flow_spec->uh.ahip4spec)
+#define	fspec_mask (flow_spec->um.ahip4spec)
 
-	fspec_key = (ahip4_spec_t *)&flow_spec->uh.ahip4spec;
-	fspec_mask = (ahip4_spec_t *)&flow_spec->um.ahip4spec;
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_key, fspec_key.ip4dst);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_mask, fspec_mask.ip4dst);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_key, fspec_key.ip4src);
+	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_mask, fspec_mask.ip4src);
 
-	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_key, fspec_key->ip4dst);
-	TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_mask, fspec_mask->ip4dst);
-	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_key, fspec_key->ip4src);
-	TCAM_IPV4_ADDR(tcam_ptr->ip4_src_mask, fspec_mask->ip4src);
-
-	tcam_ptr->ip4_port_key = fspec_key->spi;
-	tcam_ptr->ip4_port_mask = fspec_mask->spi;
+	tcam_ptr->ip4_port_key = fspec_key.spi;
+	tcam_ptr->ip4_port_mask = fspec_mask.spi;
 
 	TCAM_IP_CLASS(tcam_ptr->ip4_class_key,
 	    tcam_ptr->ip4_class_mask,
@@ -1111,29 +1105,28 @@ nxge_fill_tcam_entry_ah_esp(p_nxge_t nxgep, flow_spec_t *flow_spec,
 		TCAM_IP_PROTO(tcam_ptr->ip4_proto_key,
 		    tcam_ptr->ip4_proto_mask, IPPROTO_ESP);
 	}
-	tcam_ptr->ip4_tos_key = fspec_key->tos;
-	tcam_ptr->ip4_tos_mask = fspec_mask->tos;
+	tcam_ptr->ip4_tos_key = fspec_key.tos;
+	tcam_ptr->ip4_tos_mask = fspec_mask.tos;
+#undef fspec_key
+#undef fspec_mask
 }
 
 static void
 nxge_fill_tcam_entry_ah_esp_ipv6(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	tcam_entry_t *tcam_ptr)
 {
-	ahip6_spec_t *fspec_key;
-	ahip6_spec_t *fspec_mask;
 	p_nxge_class_pt_cfg_t p_class_cfgp;
-
-	fspec_key = (ahip6_spec_t *)&flow_spec->uh.ahip6spec;
-	fspec_mask = (ahip6_spec_t *)&flow_spec->um.ahip6spec;
+#define	fspec_key (flow_spec->uh.ahip6spec)
+#define	fspec_mask (flow_spec->um.ahip6spec)
 
 	p_class_cfgp = (p_nxge_class_pt_cfg_t)&nxgep->class_config;
 	if (p_class_cfgp->class_cfg[TCAM_CLASS_AH_ESP_IPV6] &
 	    NXGE_CLASS_TCAM_USE_SRC_ADDR) {
-		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key->ip6src);
-		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask->ip6src);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key.ip6src);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask.ip6src);
 	} else {
-		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key->ip6dst);
-		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask->ip6dst);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_key, fspec_key.ip6dst);
+		TCAM_IPV6_ADDR(tcam_ptr->ip6_ip_addr_mask, fspec_mask.ip6dst);
 	}
 
 	TCAM_IP_CLASS(tcam_ptr->ip6_class_key,
@@ -1146,10 +1139,12 @@ nxge_fill_tcam_entry_ah_esp_ipv6(p_nxge_t nxgep, flow_spec_t *flow_spec,
 		TCAM_IP_PROTO(tcam_ptr->ip6_nxt_hdr_key,
 		    tcam_ptr->ip6_nxt_hdr_mask, IPPROTO_ESP);
 	}
-	tcam_ptr->ip6_port_key = fspec_key->spi;
-	tcam_ptr->ip6_port_mask = fspec_mask->spi;
-	tcam_ptr->ip6_tos_key = fspec_key->tos;
-	tcam_ptr->ip6_tos_mask = fspec_mask->tos;
+	tcam_ptr->ip6_port_key = fspec_key.spi;
+	tcam_ptr->ip6_port_mask = fspec_mask.spi;
+	tcam_ptr->ip6_tos_key = fspec_key.tos;
+	tcam_ptr->ip6_tos_mask = fspec_mask.tos;
+#undef fspec_key
+#undef fspec_mask
 }
 
 /* ARGSUSED */
@@ -1157,30 +1152,29 @@ static void
 nxge_fill_tcam_entry_ip_usr(p_nxge_t nxgep, flow_spec_t *flow_spec,
 	tcam_entry_t *tcam_ptr, tcam_class_t class)
 {
-	ip_user_spec_t *fspec_key;
-	ip_user_spec_t *fspec_mask;
+#define	fspec_key (flow_spec->uh.ip_usr_spec)
+#define	fspec_mask (flow_spec->um.ip_usr_spec)
 
-	fspec_key = (ip_user_spec_t *)&flow_spec->uh.ip_usr_spec;
-	fspec_mask = (ip_user_spec_t *)&flow_spec->um.ip_usr_spec;
+	if (fspec_key.ip_ver == FSPEC_IP4) {
+		TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_key, fspec_key.ip4dst);
+		TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_mask, fspec_mask.ip4dst);
+		TCAM_IPV4_ADDR(tcam_ptr->ip4_src_key, fspec_key.ip4src);
+		TCAM_IPV4_ADDR(tcam_ptr->ip4_src_mask, fspec_mask.ip4src);
 
-	if (fspec_key->ip_ver == FSPEC_IP4) {
-		TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_key, fspec_key->ip4dst);
-		TCAM_IPV4_ADDR(tcam_ptr->ip4_dest_mask, fspec_mask->ip4dst);
-		TCAM_IPV4_ADDR(tcam_ptr->ip4_src_key, fspec_key->ip4src);
-		TCAM_IPV4_ADDR(tcam_ptr->ip4_src_mask, fspec_mask->ip4src);
-
-		tcam_ptr->ip4_port_key = fspec_key->l4_4_bytes;
-		tcam_ptr->ip4_port_mask = fspec_mask->l4_4_bytes;
+		tcam_ptr->ip4_port_key = fspec_key.l4_4_bytes;
+		tcam_ptr->ip4_port_mask = fspec_mask.l4_4_bytes;
 
 		TCAM_IP_CLASS(tcam_ptr->ip4_class_key,
 		    tcam_ptr->ip4_class_mask, class);
 
-		tcam_ptr->ip4_proto_key = fspec_key->proto;
-		tcam_ptr->ip4_proto_mask = fspec_mask->proto;
+		tcam_ptr->ip4_proto_key = fspec_key.proto;
+		tcam_ptr->ip4_proto_mask = fspec_mask.proto;
 
-		tcam_ptr->ip4_tos_key = fspec_key->tos;
-		tcam_ptr->ip4_tos_mask = fspec_mask->tos;
+		tcam_ptr->ip4_tos_key = fspec_key.tos;
+		tcam_ptr->ip4_tos_mask = fspec_mask.tos;
 	}
+#undef fspec_key
+#undef fspec_mask
 }
 
 
@@ -1297,20 +1291,21 @@ nxge_add_tcam_entry(p_nxge_t nxgep, flow_resource_t *flow_res)
 		return (NXGE_ERROR);
 	}
 
+	class = TCAM_CLASS_INVALID;
 	if (flow_spec->flow_type == FSPEC_IP_USR) {
 		int i;
 		int add_usr_cls = 0;
 		int ipv6 = 0;
-		ip_user_spec_t *uspec = &flow_spec->uh.ip_usr_spec;
-		ip_user_spec_t *umask = &flow_spec->um.ip_usr_spec;
 		nxge_usr_l3_cls_t *l3_ucls_p;
+#define	uspec (flow_spec->uh.ip_usr_spec)
+#define	umask (flow_spec->um.ip_usr_spec)
 
 		MUTEX_ENTER(&hw_p->nxge_tcam_lock);
 
 		for (i = 0; i < NXGE_L3_PROG_CLS; i++) {
 			l3_ucls_p = &hw_p->tcam_l3_prog_cls[i];
 			if (l3_ucls_p->valid && l3_ucls_p->tcam_ref_cnt) {
-				if (uspec->proto == l3_ucls_p->pid) {
+				if (uspec.proto == l3_ucls_p->pid) {
 					class = l3_ucls_p->cls;
 					l3_ucls_p->tcam_ref_cnt++;
 					add_usr_cls = 1;
@@ -1334,11 +1329,11 @@ nxge_add_tcam_entry(p_nxge_t nxgep, flow_resource_t *flow_res)
 				default:
 					break;
 				}
-				if (uspec->ip_ver == FSPEC_IP6)
+				if (uspec.ip_ver == FSPEC_IP6)
 					ipv6 = 1;
 				rs = npi_fflp_cfg_ip_usr_cls_set(handle,
-				    (tcam_class_t)class, uspec->tos,
-				    umask->tos, uspec->proto, ipv6);
+				    (tcam_class_t)class, uspec.tos,
+				    umask.tos, uspec.proto, ipv6);
 				if (rs != NPI_SUCCESS)
 					goto fail;
 
@@ -1348,23 +1343,23 @@ nxge_add_tcam_entry(p_nxge_t nxgep, flow_resource_t *flow_res)
 					goto fail;
 
 				l3_ucls_p->cls = class;
-				l3_ucls_p->pid = uspec->proto;
+				l3_ucls_p->pid = uspec.proto;
 				l3_ucls_p->tcam_ref_cnt++;
 				l3_ucls_p->valid = 1;
 				add_usr_cls = 1;
 				break;
 			} else if (l3_ucls_p->tcam_ref_cnt == 0 &&
-			    uspec->proto == l3_ucls_p->pid) {
+			    uspec.proto == l3_ucls_p->pid) {
 				/*
 				 * The class has already been programmed,
 				 * probably for flow hash
 				 */
 				class = l3_ucls_p->cls;
-				if (uspec->ip_ver == FSPEC_IP6)
+				if (uspec.ip_ver == FSPEC_IP6)
 					ipv6 = 1;
 				rs = npi_fflp_cfg_ip_usr_cls_set(handle,
-				    (tcam_class_t)class, uspec->tos,
-				    umask->tos, uspec->proto, ipv6);
+				    (tcam_class_t)class, uspec.tos,
+				    umask.tos, uspec.proto, ipv6);
 				if (rs != NPI_SUCCESS)
 					goto fail;
 
@@ -1373,7 +1368,7 @@ nxge_add_tcam_entry(p_nxge_t nxgep, flow_resource_t *flow_res)
 				if (rs != NPI_SUCCESS)
 					goto fail;
 
-				l3_ucls_p->pid = uspec->proto;
+				l3_ucls_p->pid = uspec.proto;
 				l3_ucls_p->tcam_ref_cnt++;
 				add_usr_cls = 1;
 				break;
@@ -1382,10 +1377,12 @@ nxge_add_tcam_entry(p_nxge_t nxgep, flow_resource_t *flow_res)
 		if (!add_usr_cls) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "nxge_add_tcam_entry: Could not find/insert class"
-			    "for pid %d", uspec->proto));
+			    "for pid %d", uspec.proto));
 			goto fail;
 		}
 		MUTEX_EXIT(&hw_p->nxge_tcam_lock);
+#undef uspec
+#undef umask
 	}
 
 	switch (flow_spec->flow_type) {
@@ -2440,8 +2437,8 @@ nxge_get_tcam_entry(p_nxge_t nxgep, flow_resource_t *fs)
 	tcam_flow_spec_t *tcam_ep;
 	tcam_entry_t	*tp;
 	flow_spec_t	*fspec;
-	tcpip4_spec_t 	*fspec_key;
-	tcpip4_spec_t 	*fspec_mask;
+#define	fspec_key (fspec->uh.tcpip4spec)
+#define	fspec_mask (fspec->um.tcpip4spec)
 
 	index = nxge_tcam_get_index(nxgep, (uint16_t)fs->location);
 	tcam_ep = &nxgep->classifier.tcam_entries[index];
@@ -2467,14 +2464,12 @@ nxge_get_tcam_entry(p_nxge_t nxgep, flow_resource_t *fs)
 	case TCAM_CLASS_UDP_IPV4:
 	case TCAM_CLASS_AH_ESP_IPV4:
 	case TCAM_CLASS_SCTP_IPV4:
-		fspec_key = (tcpip4_spec_t *)&fspec->uh.tcpip4spec;
-		fspec_mask = (tcpip4_spec_t *)&fspec->um.tcpip4spec;
-		FSPEC_IPV4_ADDR(fspec_key->ip4dst, tp->ip4_dest_key);
-		FSPEC_IPV4_ADDR(fspec_mask->ip4dst, tp->ip4_dest_mask);
-		FSPEC_IPV4_ADDR(fspec_key->ip4src, tp->ip4_src_key);
-		FSPEC_IPV4_ADDR(fspec_mask->ip4src, tp->ip4_src_mask);
-		fspec_key->tos = tp->ip4_tos_key;
-		fspec_mask->tos = tp->ip4_tos_mask;
+		FSPEC_IPV4_ADDR(fspec_key.ip4dst, tp->ip4_dest_key);
+		FSPEC_IPV4_ADDR(fspec_mask.ip4dst, tp->ip4_dest_mask);
+		FSPEC_IPV4_ADDR(fspec_key.ip4src, tp->ip4_src_key);
+		FSPEC_IPV4_ADDR(fspec_mask.ip4src, tp->ip4_src_mask);
+		fspec_key.tos = tp->ip4_tos_key;
+		fspec_mask.tos = tp->ip4_tos_mask;
 		break;
 	default:
 		break;
@@ -2484,9 +2479,9 @@ nxge_get_tcam_entry(p_nxge_t nxgep, flow_resource_t *fs)
 	case TCAM_CLASS_TCP_IPV4:
 	case TCAM_CLASS_UDP_IPV4:
 	case TCAM_CLASS_SCTP_IPV4:
-		FSPEC_IP_PORTS(fspec_key->pdst, fspec_key->psrc,
+		FSPEC_IP_PORTS(fspec_key.pdst, fspec_key.psrc,
 		    tp->ip4_port_key);
-		FSPEC_IP_PORTS(fspec_mask->pdst, fspec_mask->psrc,
+		FSPEC_IP_PORTS(fspec_mask.pdst, fspec_mask.psrc,
 		    tp->ip4_port_mask);
 		break;
 	case TCAM_CLASS_AH_ESP_IPV4:
@@ -2512,6 +2507,8 @@ nxge_get_tcam_entry(p_nxge_t nxgep, flow_resource_t *fs)
 	} else {
 		fs->channel_cookie = tp->match_action.bits.ldw.offset;
 	}
+#undef fspec_key
+#undef fspec_mask
 }
 
 void
@@ -2666,6 +2663,7 @@ nxge_add_iptun_class(p_nxge_t nxgep, iptun_cfg_t *iptunp,
 	MUTEX_ENTER(&hw_p->nxge_tcam_lock);
 
 	/* Get an user programmable class ID */
+	class = TCAM_CLASS_INVALID;
 	for (i = 0; i < NXGE_L3_PROG_CLS; i++) {
 		if (hw_p->tcam_l3_prog_cls[i].valid == 0) {
 			/* todo add new usr class reg */
@@ -2855,7 +2853,10 @@ nxge_get_iptun_class(p_nxge_t nxgep, iptun_cfg_t *iptunp, uint8_t cls_id)
 	npi_handle_t handle = nxgep->npi_reg_handle;
 	npi_status_t rs = NPI_SUCCESS;
 	flow_key_cfg_t cfg;
-
+	uint8_t l4b0_val;
+	uint8_t l4b0_mask;
+	uint8_t l4b23_sel;
+	uint16_t l4b23_val;
 
 	/* check to see that this is a valid class ID */
 	if (!nxge_is_iptun_cls_present(nxgep, cls_id, &i))
@@ -2866,8 +2867,15 @@ nxge_get_iptun_class(p_nxge_t nxgep, iptun_cfg_t *iptunp, uint8_t cls_id)
 	pid = nxgep->nxge_hw_p->tcam_l3_prog_cls[i].pid;
 
 	rs = npi_fflp_cfg_ip_usr_cls_get_iptun(handle, (tcam_class_t)cls_id,
-	    &iptunp->l4b0_val, &iptunp->l4b0_mask, &iptunp->l4b23_val,
-	    &iptunp->l4b23_sel);
+	    &l4b0_val, &l4b0_mask, &l4b23_val, &l4b23_sel);
+	if (rs != NPI_SUCCESS)
+		goto fail;
+
+	iptunp->l4b0_val = l4b0_val;
+	iptunp->l4b0_mask = l4b0_mask;
+	iptunp->l4b23_val = l4b23_val;
+	iptunp->l4b23_sel = l4b23_sel;
+
 	if (rs != NPI_SUCCESS)
 		goto fail;
 

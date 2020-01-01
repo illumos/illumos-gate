@@ -41,8 +41,8 @@
  */
 
 /* The following function may be found in nxge_[t|r]xdma.c */
-extern uint_t nxge_tx_intr(void *, void *);
-extern uint_t nxge_rx_intr(void *, void *);
+extern uint_t nxge_tx_intr(char *, char *);
+extern uint_t nxge_rx_intr(char *, char *);
 
 /*
  * Local prototypes
@@ -75,8 +75,7 @@ nxge_intr_add(
 	nxge_intr_t	*interrupts; /* The global interrupt data. */
 	nxge_ldg_t	*group;	/* The logical device group data. */
 	nxge_ldv_t	*ldvp;
-
-	uint_t		*inthandler; /* A parameter to ddi_intr_add_handler */
+	ddi_intr_handler_t *inthandler;
 	int		vector;
 	int		status1, status2;
 
@@ -94,9 +93,11 @@ nxge_intr_add(
 	group = ldvp->ldgp;
 
 	if (group->nldvs == 1) {
-		inthandler = (uint_t *)group->ldvp->ldv_intr_handler;
+		inthandler = group->ldvp->ldv_intr_handler;
 	} else if (group->nldvs > 1) {
-		inthandler = (uint_t *)group->sys_intr_handler;
+		inthandler = group->sys_intr_handler;
+	} else {
+		inthandler = NULL;
 	}
 
 	interrupts = (nxge_intr_t *)&nxge->nxge_intr_type;
@@ -104,7 +105,7 @@ nxge_intr_add(
 	status1 = DDI_SUCCESS;
 
 	if ((status2 = ddi_intr_add_handler(interrupts->htable[vector],
-	    (ddi_intr_handler_t *)inthandler, group->ldvp, nxge))
+	    inthandler, group->ldvp, nxge))
 	    != DDI_SUCCESS) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nxge_intr_add(%cDC %d): "
 		    "ddi_intr_add_handler(%d) returned %s",
@@ -321,7 +322,7 @@ nxge_hio_intr_add(
 	nxge_hio_dc_t	*dc;	/* The relevant DMA channel data structure. */
 	nxge_intr_t	*interrupts; /* The global interrupt data. */
 	nxge_ldg_t	*group;	/* The logical device group data. */
-	uint_t		*inthandler; /* A parameter to ddi_intr_add_handler */
+	ddi_intr_handler_t *inthandler;
 
 	int		vector;	/* A shorthand variable */
 	int		ddi_status; /* The response to ddi_intr_add_handler */
@@ -352,13 +353,15 @@ nxge_hio_intr_add(
 	group = &nxge->ldgvp->ldgp[vector];
 
 	if (group->nldvs == 1) {
-		inthandler = (uint_t *)group->ldvp->ldv_intr_handler;
+		inthandler = group->ldvp->ldv_intr_handler;
 	} else if (group->nldvs > 1) {
-		inthandler = (uint_t *)group->sys_intr_handler;
+		inthandler = group->sys_intr_handler;
+	} else {
+		inthandler = NULL;
 	}
 
 	if ((ddi_status = ddi_intr_add_handler(interrupts->htable[vector],
-	    (ddi_intr_handler_t *)inthandler, group->ldvp, nxge))
+	    inthandler, group->ldvp, nxge))
 	    != DDI_SUCCESS) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
 		    "nxge_hio_intr_add(%cDC %d): "

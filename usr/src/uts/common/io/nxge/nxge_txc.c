@@ -373,10 +373,10 @@ nxge_txc_handle_sys_errors(p_nxge_t nxgep)
 	default:
 		return (NXGE_ERROR);
 	}
-	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-	    " nxge_txc_handle_sys_errors: errored port %d",
-	    err_portn));
 	if (my_err) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    " nxge_txc_handle_sys_errors: errored port %d",
+		    err_portn));
 		status = nxge_txc_handle_port_errors(nxgep, err_status);
 	}
 
