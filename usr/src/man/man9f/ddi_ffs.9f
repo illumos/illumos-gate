@@ -1,9 +1,22 @@
-'\" te
 .\"  Copyright (c) 2006 Sun Microsystems, Inc.  All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.Dd July 14, 2017
+.\" Copyright 2019 Joyent, Inc.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd December 21, 2019
 .Dt DDI_FFS 9F
 .Os
 .Sh NAME
@@ -22,11 +35,11 @@
 .Fa "long mask"
 .Fc
 .Ft int
-.Fo "ddi_ffs"
+.Fo "ddi_ffsll"
 .Fa "long long mask"
 .Fc
 .Ft int
-.Fo "ddi_fls"
+.Fo "ddi_flsll"
 .Fa "long long mask"
 .Fc
 .Sh INTERFACE LEVEL
@@ -94,4 +107,4 @@ the most significant position, depending on the variant of the
 functions used.
 .El
 .Sh SEE ALSO
-\fIWriting Device Drivers\fR
+.%T Writing Device Drivers
