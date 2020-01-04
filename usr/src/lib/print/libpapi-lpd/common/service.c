@@ -27,13 +27,10 @@
 
 /* $Id: service.c 163 2006-05-09 15:07:45Z njacobs $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
-#include <alloca.h>
 #include <uri.h>
 #include <papi_impl.h>
 
@@ -280,20 +277,18 @@ detailed_error(service_t *svc, char *fmt, ...)
 {
 	if ((svc != NULL) && (fmt != NULL)) {
 		va_list ap;
-		size_t size;
-		char *message = alloca(BUFSIZ);
+		char *message;
+		int rv;
 
 		va_start(ap, fmt);
-		/*
-		 * fill in the message.  If the buffer is too small, allocate
-		 * one that is large enough and fill it in.
-		 */
-		if ((size = vsnprintf(message, BUFSIZ, fmt, ap)) >= BUFSIZ)
-			if ((message = alloca(size)) != NULL)
-				vsnprintf(message, size, fmt, ap);
+		rv = vasprintf(&message, fmt, ap);
 		va_end(ap);
 
-		papiAttributeListAddString(&svc->attributes, PAPI_ATTR_APPEND,
-					"detailed-status-message", message);
+		if (rv >= 0) {
+			papiAttributeListAddString(&svc->attributes,
+			    PAPI_ATTR_APPEND, "detailed-status-message",
+			    message);
+			free(message);
+		}
 	}
 }

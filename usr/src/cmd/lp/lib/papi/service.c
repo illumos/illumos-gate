@@ -23,15 +23,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*LINTLIBRARY*/
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
-#include <alloca.h>
 #include <libintl.h>
 #include <papi_impl.h>
 
@@ -284,20 +279,18 @@ detailed_error(service_t *svc, char *fmt, ...)
 {
 	if ((svc != NULL) && (fmt != NULL)) {
 		va_list ap;
-		size_t size;
-		char *message = alloca(BUFSIZ);
+		char *message;
+		int rv;
 
 		va_start(ap, fmt);
-		/*
-		 * fill in the message.  If the buffer is too small, allocate
-		 * one that is large enough and fill it in.
-		 */
-		if ((size = vsnprintf(message, BUFSIZ, fmt, ap)) >= BUFSIZ)
-			if ((message = alloca(size)) != NULL)
-				vsnprintf(message, size, fmt, ap);
+		rv = vasprintf(&message, fmt, ap);
 		va_end(ap);
 
-		papiAttributeListAddString(&svc->attributes, PAPI_ATTR_APPEND,
-					"detailed-status-message", message);
+		if (rv >= 0) {
+			papiAttributeListAddString(&svc->attributes,
+			    PAPI_ATTR_APPEND, "detailed-status-message",
+			    message);
+			free(message);
+		}
 	}
 }
