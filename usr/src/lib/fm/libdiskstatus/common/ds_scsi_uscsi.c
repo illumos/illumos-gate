@@ -1615,12 +1615,13 @@ uscsi_log_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	if (page_size < sizeof (scsi_log_header_t))
 		return (-1);
 
-	log_sense_buf = alloca((uint_t)page_size);
+	log_sense_buf = calloc(1, page_size);
+	if (log_sense_buf == NULL)
+		return (-1);
 
 	/*
 	 * Build and execute the uscsi ioctl
 	 */
-	(void) memset(log_sense_buf, 0, page_size);
 	(void) memset((char *)&ucmd, 0, sizeof (ucmd));
 	(void) memset((char *)&cdb, 0, sizeof (union scsi_cdb));
 	cdb.scc_cmd = SCMD_LOG_SENSE_G1;
@@ -1633,6 +1634,7 @@ uscsi_log_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	status = uscsi_cmd(fd, &ucmd, rqbuf, rqblen);
 	if (status) {
 		dprintf("Log sense page 0x%x failed\n", page_code);
+		free(log_sense_buf);
 		return (-1);
 	}
 
@@ -1651,6 +1653,7 @@ uscsi_log_sense(int fd, int page_code, int page_control, caddr_t page_data,
 		dprintf("\nLog sense page 0x%x: incorrect page code 0x%x\n",
 		    page_code, hdr->lh_code);
 		ddump("Log sense:", log_sense_buf, page_size);
+		free(log_sense_buf);
 		return (-1);
 	}
 
@@ -1672,6 +1675,7 @@ uscsi_log_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	    sizeof (scsi_log_header_t));
 	ddump("data:", (caddr_t)hdr +
 	    sizeof (scsi_log_header_t), len);
+	free(log_sense_buf);
 
 	return (0);
 }
