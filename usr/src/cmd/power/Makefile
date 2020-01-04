@@ -27,14 +27,14 @@
 DAEMON_SRCS =	powerd.c sysstat.c
 DAEMON_OBJS =	$(DAEMON_SRCS:%.c=%.o)
 DAEMON =	powerd
-PMCFG_SRCS = 	conf.c parse.c handlers.c
+PMCFG_SRCS =	conf.c parse.c handlers.c
 PMCFG_OBJS =	$(PMCFG_SRCS:%.c=%.o)
-PMCFG = 	pmconfig
-SUSPEND_SRCS = 	sys-suspend.c pm_pam_conv.c
+PMCFG =		pmconfig
+SUSPEND_SRCS =	sys-suspend.c pm_pam_conv.c
 SUSPEND_OBJS =	$(SUSPEND_SRCS:%.c=%.o)
-SUSPEND = 	sys-suspend
-SRCS = 		$(DAEMON_SRCS) $(PMCFG_SRCS) $(SUSPEND_SRCS)
-OBJS = 		$(SRCS:%.c=%.o)
+SUSPEND =	sys-suspend
+SRCS =		$(DAEMON_SRCS) $(PMCFG_SRCS) $(SUSPEND_SRCS)
+OBJS =		$(SRCS:%.c=%.o)
 PROG =		$(DAEMON) $(PMCFG) $(SUSPEND)
 POWERCONF=	power.conf
 ETCFILES =	$(POWERCONF)
@@ -99,7 +99,7 @@ $(DAEMON_OBJS): $(DAEMON_SRCS)
 	$(PROCESS_COMMENT) $@
 
 $(DAEMON): $(DAEMON_OBJS)
-	$(CC) -o $@ $(DAEMON_OBJS) $(LDFLAGS) $(DAEMON_LDLIBS)
+	$(LINK.c) -o $@ $(DAEMON_OBJS) $(DAEMON_LDLIBS)
 	$(POST_PROCESS)
 
 $(PMCFG_OBJS): pmconfig.h

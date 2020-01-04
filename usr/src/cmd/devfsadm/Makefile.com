@@ -185,7 +185,7 @@ $(DEVFSADM_MOD): $(DEVFSADM_OBJ)
 	$(POST_PROCESS)
 
 SUNW_%.so: %.o $(MAPFILES)
-	$(CC) -o $@ $(GSHARED) $(DYNFLAGS) -h $@ $< $(LDLIBS) -lc
+	$(LINK.c) -o $@ $(GSHARED) $(DYNFLAGS) -h $@ $< $(LDLIBS) -lc
 	$(POST_PROCESS_SO)
 
 %.o: $(COMMON)/%.c
