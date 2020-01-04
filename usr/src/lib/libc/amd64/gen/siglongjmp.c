@@ -24,15 +24,14 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#pragma weak _siglongjmp = siglongjmp
-
 #include "lint.h"
 #include <sys/types.h>
 #include <sys/ucontext.h>
 #include <setjmp.h>
 #include <ucontext.h>
+#include "libc.h"
+
+#pragma weak _siglongjmp = siglongjmp
 
 void
 siglongjmp(sigjmp_buf env, int val)
