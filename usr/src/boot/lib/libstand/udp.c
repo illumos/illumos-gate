@@ -141,7 +141,7 @@ readudp(struct iodesc *d, void **pkt, void **payload, time_t tleft)
 		void *ip;
 		struct ip tip;
 
-		n = ntohs(uh->uh_ulen) + sizeof (*ip);
+		n = ntohs(uh->uh_ulen) + sizeof (struct ip);
 
 		/*
 		 * Check checksum (must save and restore ip header).
