@@ -96,8 +96,10 @@ extern struct lifconf *getmyaddrs(void);
 
 /* ARGSUSED */
 void
-sm_stat_svc(sm_name *namep, sm_stat_res *resp)
+sm_stat_svc(void *arg1, void *arg2)
 {
+	sm_name *namep = arg1;
+	sm_stat_res *resp = arg2;
 
 	if (debug)
 		(void) printf("proc sm_stat: mon_name = %s\n",
@@ -109,8 +111,10 @@ sm_stat_svc(sm_name *namep, sm_stat_res *resp)
 
 /* ARGSUSED */
 void
-sm_mon_svc(mon *monp, sm_stat_res *resp)
+sm_mon_svc(void *arg1, void *arg2)
 {
+	mon *monp = arg1;
+	sm_stat_res *resp = arg2;
 	mon_id *monidp;
 	monidp = &monp->mon_id;
 
@@ -135,8 +139,11 @@ sm_mon_svc(mon *monp, sm_stat_res *resp)
 
 /* ARGSUSED */
 void
-sm_unmon_svc(mon_id *monidp, sm_stat *resp)
+sm_unmon_svc(void *arg1, void *arg2)
 {
+	mon_id *monidp = arg1;
+	sm_stat *resp = arg2;
+
 	rw_rdlock(&thr_rwlock);
 	if (debug) {
 		(void) printf(
@@ -155,8 +162,11 @@ sm_unmon_svc(mon_id *monidp, sm_stat *resp)
 
 /* ARGSUSED */
 void
-sm_unmon_all_svc(my_id *myidp, sm_stat *resp)
+sm_unmon_all_svc(void *arg1, void *arg2)
 {
+	my_id *myidp = arg1;
+	sm_stat *resp = arg2;
+
 	rw_rdlock(&thr_rwlock);
 	if (debug)
 		(void) printf("proc sm_unmon_all: [%s, %d, %d, %d]\n",
@@ -173,8 +183,10 @@ sm_unmon_all_svc(my_id *myidp, sm_stat *resp)
  * Notifies lockd specified by name that state has changed for this server.
  */
 void
-sm_notify_svc(stat_chge *ntfp)
+sm_notify_svc(void *arg, void *arg1 __unused)
 {
+	stat_chge *ntfp = arg;
+
 	rw_rdlock(&thr_rwlock);
 	if (debug)
 		(void) printf("sm_notify: %s state =%d\n",
@@ -185,7 +197,7 @@ sm_notify_svc(stat_chge *ntfp)
 
 /* ARGSUSED */
 void
-sm_simu_crash_svc(void *myidp)
+sm_simu_crash_svc(void *myidp, void *arg __unused)
 {
 	int i;
 	struct mon_entry *monitor_q;
@@ -235,8 +247,10 @@ sm_simu_crash_svc(void *myidp)
 
 /* ARGSUSED */
 void
-nsmaddrproc1_reg(reg1args *regargs, reg1res *regresp)
+nsmaddrproc1_reg(void *arg1, void *arg2)
 {
+	reg1args *regargs = arg1;
+	reg1res *regresp = arg2;
 	nsm_addr_res status;
 	name_addr_entry_t *entry;
 	char *tmp_n_bytes;
@@ -1174,7 +1188,8 @@ in_host_array(char *host)
  * nothing and leaves host_name the way it was previous to the call.
  */
 static void
-add_to_host_array(char *host) {
+add_to_host_array(char *host)
+{
 
 	void *new_block = NULL;
 
@@ -1182,7 +1197,7 @@ add_to_host_array(char *host) {
 	if (addrix >= host_name_count) {
 		host_name_count += HOST_NAME_INCR;
 		new_block = realloc((void *)host_name,
-				    host_name_count*sizeof (char *));
+		    host_name_count * sizeof (char *));
 		if (new_block != NULL)
 			host_name = new_block;
 		else {

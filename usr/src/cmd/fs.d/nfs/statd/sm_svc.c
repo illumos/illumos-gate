@@ -26,7 +26,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -142,41 +142,41 @@ static int nftw_owner(const char *, const struct stat *, int, struct FTW *);
 
 /*
  * statd protocol
- * 	commands:
- * 		SM_STAT
- * 			returns stat_fail to caller
- * 		SM_MON
- * 			adds an entry to the monitor_q and the record_q.
+ *	commands:
+ *		SM_STAT
+ *			returns stat_fail to caller
+ *		SM_MON
+ *			adds an entry to the monitor_q and the record_q.
  *			This message is sent by the server lockd to the server
  *			statd, to indicate that a new client is to be monitored.
  *			It is also sent by the server lockd to the client statd
  *			to indicate that a new server is to be monitored.
- * 		SM_UNMON
- * 			removes an entry from the monitor_q and the record_q
- * 		SM_UNMON_ALL
- * 			removes all entries from a particular host from the
- * 			monitor_q and the record_q.  Our statd has this
- * 			disabled.
- * 		SM_SIMU_CRASH
- * 			simulate a crash.  Removes everything from the
- * 			record_q and the recovery_q, then calls statd_init()
- * 			to restart things.  This message is sent by the server
+ *		SM_UNMON
+ *			removes an entry from the monitor_q and the record_q
+ *		SM_UNMON_ALL
+ *			removes all entries from a particular host from the
+ *			monitor_q and the record_q.  Our statd has this
+ *			disabled.
+ *		SM_SIMU_CRASH
+ *			simulate a crash.  Removes everything from the
+ *			record_q and the recovery_q, then calls statd_init()
+ *			to restart things.  This message is sent by the server
  *			lockd to the server statd to have all clients notified
  *			that they should reclaim locks.
- * 		SM_NOTIFY
+ *		SM_NOTIFY
  *			Sent by statd on server to statd on client during
  *			crash recovery.  The client statd passes the info
  *			to its lockd so it can attempt to reclaim the locks
  *			held on the server.
  *
  * There are three main hash tables used to keep track of things.
- * 	mon_table
- * 		table that keeps track hosts statd must watch.  If one of
- * 		these hosts crashes, then any locks held by that host must
- * 		be released.
- * 	record_table
- * 		used to keep track of all the hostname files stored in
- * 		the directory /var/statmon/sm.  These are client hosts who
+ *	mon_table
+ *		table that keeps track hosts statd must watch.  If one of
+ *		these hosts crashes, then any locks held by that host must
+ *		be released.
+ *	record_table
+ *		used to keep track of all the hostname files stored in
+ *		the directory /var/statmon/sm.  These are client hosts who
  *		are holding or have held a lock at some point.  Needed
  *		to determine if a file needs to be created for host in
  *		/var/statmon/sm.
@@ -210,7 +210,7 @@ sm_prog_1(struct svc_req *rqstp, SVCXPRT *transp)
 	} result;
 
 	bool_t (*xdr_argument)(), (*xdr_result)();
-	char *(*local)();
+	void (*local)(void *, void *);
 
 	/*
 	 * Dispatch according to which protocol is being used:
@@ -227,7 +227,7 @@ sm_prog_1(struct svc_req *rqstp, SVCXPRT *transp)
 		case NSMADDRPROC1_REG:
 			xdr_argument = xdr_reg1args;
 			xdr_result = xdr_reg1res;
-			local = (char *(*)()) nsmaddrproc1_reg;
+			local = nsmaddrproc1_reg;
 			break;
 
 		case NSMADDRPROC1_UNREG: /* Not impl. */
@@ -245,37 +245,37 @@ sm_prog_1(struct svc_req *rqstp, SVCXPRT *transp)
 		case SM_STAT:
 			xdr_argument = xdr_sm_name;
 			xdr_result = xdr_sm_stat_res;
-			local = (char *(*)()) sm_stat_svc;
+			local = sm_stat_svc;
 			break;
 
 		case SM_MON:
 			xdr_argument = xdr_mon;
 			xdr_result = xdr_sm_stat_res;
-			local = (char *(*)()) sm_mon_svc;
+			local = sm_mon_svc;
 			break;
 
 		case SM_UNMON:
 			xdr_argument = xdr_mon_id;
 			xdr_result = xdr_sm_stat;
-			local = (char *(*)()) sm_unmon_svc;
+			local = sm_unmon_svc;
 			break;
 
 		case SM_UNMON_ALL:
 			xdr_argument = xdr_my_id;
 			xdr_result = xdr_sm_stat;
-			local = (char *(*)()) sm_unmon_all_svc;
+			local = sm_unmon_all_svc;
 			break;
 
 		case SM_SIMU_CRASH:
 			xdr_argument = xdr_void;
 			xdr_result = xdr_void;
-			local = (char *(*)()) sm_simu_crash_svc;
+			local = sm_simu_crash_svc;
 			break;
 
 		case SM_NOTIFY:
 			xdr_argument = xdr_stat_chge;
 			xdr_result = xdr_void;
-			local = (char *(*)()) sm_notify_svc;
+			local = sm_notify_svc;
 			break;
 
 		default:

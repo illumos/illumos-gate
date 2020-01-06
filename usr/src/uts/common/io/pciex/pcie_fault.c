@@ -1236,7 +1236,7 @@ const pf_fab_err_tbl_t pcie_pcie_tbl[] = {
 	{PCIE_AER_UCE_MTLP,	pf_panic,
 	    PF_AFFECTED_PARENT, 0},
 
-	{PCIE_AER_UCE_ECRC,	pf_panic,
+	{PCIE_AER_UCE_ECRC,	pf_no_panic,
 	    PF_AFFECTED_SELF, 0},
 
 	{PCIE_AER_UCE_UR,	pf_analyse_ca_ur,
@@ -1277,7 +1277,7 @@ const pf_fab_err_tbl_t pcie_rp_tbl[] = {
 	    PF_AFFECTED_SELF | PF_AFFECTED_AER,
 	    PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN},
 
-	{PCIE_AER_UCE_ECRC,	pf_panic,
+	{PCIE_AER_UCE_ECRC,	pf_no_panic,
 	    PF_AFFECTED_AER, PF_AFFECTED_CHILDREN},
 
 	{PCIE_AER_UCE_UR,	pf_no_panic,
@@ -1318,7 +1318,7 @@ const pf_fab_err_tbl_t pcie_sw_tbl[] = {
 	    PF_AFFECTED_SELF | PF_AFFECTED_AER,
 	    PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN},
 
-	{PCIE_AER_UCE_ECRC,	pf_panic,
+	{PCIE_AER_UCE_ECRC,	pf_no_panic,
 	    PF_AFFECTED_AER, PF_AFFECTED_SELF | PF_AFFECTED_CHILDREN},
 
 	{PCIE_AER_UCE_UR,	pf_analyse_ca_ur,
