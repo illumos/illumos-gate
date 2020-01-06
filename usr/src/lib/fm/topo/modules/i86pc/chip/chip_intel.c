@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <unistd.h>
@@ -51,6 +52,27 @@
 #ifndef MAX
 #define	MAX(a, b)	((a) > (b) ? (a) : (b))
 #endif
+
+/*
+ * These are names that we use for properties. In the v0 scheme we try to pull
+ * these directly from the memory controller (which also causes a lot more
+ * variation). In the v1 scheme we translate to the name that topo wants to use,
+ * regardless of what the parent is called.
+ */
+#define	MC_PROP_ECC	"memory-ecc"
+#define	MC_PROP_POLICY	"memory-policy"
+#define	CHAN_PROP_MODE	"channel-mode"
+#define	DIMM_SIZE	"size"
+#define	DIMM_STRING_SIZE	"dimm-size"
+#define	DIMM_COL	"ncolumn"
+#define	DIMM_ROW	"nrow"
+#define	DIMM_DENSITY	"density"
+#define	DIMM_WIDTH	"width"
+#define	DIMM_RANKS	"ranks"
+#define	DIMM_BANKS	"nbanks"
+#define	DIMM_HDRL	"hdrl-enabled"
+#define	DIMM_HDRL_PARITY	"hdrl-parity"
+#define	DIMM_3DRANK	"3d-subranks"
 
 static const topo_pgroup_info_t dimm_channel_pgroup =
 	{ PGNAME(CHAN), TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
@@ -432,6 +454,310 @@ mc_nb_create(topo_mod_t *mod, uint16_t chip_smbid, tnode_t *pnode,
 	return (0);
 }
 
+static int
+mc_dimm_create_v1(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
+    nvlist_t *dimm_nvl, uint_t id)
+{
+	int err, ret;
+	tnode_t *dimm;
+	nvlist_t *fmri;
+	boolean_t present;
+	uint64_t size, density;
+	uint32_t cols, rows, width, ranks, banks;
+
+	/*
+	 * First, figure out if this DIMM is present. If not, we don't bother
+	 * creating anything.
+	 */
+	if (nvlist_lookup_boolean_value(dimm_nvl,
+	    MCINTEL_NVLIST_V1_DIMM_PRESENT, &present) != 0) {
+		return (-1);
+	} else if (!present) {
+		return (0);
+	}
+
+	fmri = topo_mod_hcfmri(mod, pnode, FM_HC_SCHEME_VERSION, DIMM, id,
+	    NULL, auth, NULL, NULL, NULL);
+	if (fmri == NULL) {
+		whinge(mod, NULL, "mc_dimm_create_v1: topo_mod_hcfmri "
+		    "failed\n");
+		return (-1);
+	}
+
+	if ((dimm = topo_node_bind(mod, pnode, DIMM, id, fmri)) == NULL) {
+		whinge(mod, NULL, "mc_dimm_create_v1: node bind failed for "
+		    "DIMM\n");
+		nvlist_free(fmri);
+		return (-1);
+	}
+
+	if (topo_node_fru_set(dimm, NULL, 0, &err) != 0) {
+		whinge(mod, NULL, "mc_dimm_create_v1: fru set failed: "
+		    "%d\n", err);
+		nvlist_free(fmri);
+		return (topo_mod_seterrno(mod, err));
+	}
+	nvlist_free(fmri);
+
+	if (topo_pgroup_create(dimm, &dimm_pgroup, &err) != 0) {
+		whinge(mod, NULL, "mc_dimm_create_v1: failed to create "
+		    "property group: %d\n", err);
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	ret = 0;
+	if (nvlist_lookup_uint64(dimm_nvl, MCINTEL_NVLIST_V1_DIMM_SIZE,
+	    &size) == 0) {
+		char buf[64];
+		const char *suffix;
+		ret |= topo_prop_set_uint64(dimm, PGNAME(DIMM), DIMM_SIZE,
+		    TOPO_PROP_IMMUTABLE, size, &err);
+
+		/*
+		 * We must manually cons up a dimm-size property which is the
+		 * size of the dimm as a round number with a prefix such as M or
+		 * G. This is used by Intel CPU eversholt rules. Older memory
+		 * controller drivers did this in the driver, but we instead opt
+		 * to do so in user land.
+		 */
+		if (size >= (1ULL << 40)) {
+			size /= (1ULL << 40);
+			suffix = "T";
+		} else if (size >= (1ULL << 30)) {
+			size /= (1ULL << 30);
+			suffix = "G";
+		} else if (size >= (1ULL << 20)) {
+			size /= (1ULL << 20);
+			suffix = "M";
+		} else {
+			suffix = NULL;
+		}
+
+		if (suffix != NULL) {
+			if (snprintf(buf, sizeof (buf), "%"PRIu64"%s", size,
+			    suffix) >= sizeof (buf)) {
+				whinge(mod, NULL, "failed to construct DIMM "
+				    "size due to buffer overflow");
+				return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
+			}
+			ret |= topo_prop_set_string(dimm, PGNAME(DIMM),
+			    DIMM_STRING_SIZE, TOPO_PROP_IMMUTABLE, buf, &err);
+		}
+	}
+
+	if (nvlist_lookup_uint32(dimm_nvl, MCINTEL_NVLIST_V1_DIMM_NCOLS,
+	    &cols) == 0) {
+		ret |= topo_prop_set_uint32(dimm, PGNAME(DIMM), DIMM_COL,
+		    TOPO_PROP_IMMUTABLE, cols, &err);
+	}
+
+	if (nvlist_lookup_uint32(dimm_nvl, MCINTEL_NVLIST_V1_DIMM_NROWS,
+	    &rows) == 0) {
+		ret |= topo_prop_set_uint32(dimm, PGNAME(DIMM), DIMM_ROW,
+		    TOPO_PROP_IMMUTABLE, rows, &err);
+	}
+
+	if (nvlist_lookup_uint64(dimm_nvl, MCINTEL_NVLIST_V1_DIMM_DENSITY,
+	    &density) == 0) {
+		ret |= topo_prop_set_uint64(dimm, PGNAME(DIMM), DIMM_DENSITY,
+		    TOPO_PROP_IMMUTABLE, density, &err);
+	}
+
+	if (nvlist_lookup_uint32(dimm_nvl, MCINTEL_NVLIST_V1_DIMM_WIDTH,
+	    &width) == 0) {
+		ret |= topo_prop_set_uint32(dimm, PGNAME(DIMM), DIMM_WIDTH,
+		    TOPO_PROP_IMMUTABLE, width, &err);
+	}
+
+	if (nvlist_lookup_uint32(dimm_nvl, MCINTEL_NVLIST_V1_DIMM_BANKS,
+	    &banks) == 0) {
+		ret |= topo_prop_set_uint32(dimm, PGNAME(DIMM), DIMM_BANKS,
+		    TOPO_PROP_IMMUTABLE, banks, &err);
+	}
+
+	if (nvlist_lookup_uint32(dimm_nvl, MCINTEL_NVLIST_V1_DIMM_RANKS,
+	    &ranks) == 0) {
+		ret |= topo_prop_set_uint32(dimm, PGNAME(DIMM), DIMM_RANKS,
+		    TOPO_PROP_IMMUTABLE, ranks, &err);
+	}
+
+	return (ret != 0 ? -1 : 0);
+}
+
+static int
+mc_channel_create_v1(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
+    nvlist_t *chan_nvl, uint_t id, const char *cmode)
+{
+	int err;
+	tnode_t *chnode;
+	nvlist_t *fmri;
+	nvlist_t **dimms;
+	uint_t ndimms, i;
+
+	if (mkrsrc(mod, pnode, DRAMCHANNEL, id, auth, &fmri) != 0) {
+		whinge(mod, NULL, "mc_channel_create_v1: mkrsrc failed\n");
+		return (-1);
+	}
+
+	if ((chnode = topo_node_bind(mod, pnode, DRAMCHANNEL, id, fmri)) ==
+	    NULL) {
+		whinge(mod, NULL, "mc_channel_create_v1: node bind failed"
+		    " for dram-channel\n");
+		nvlist_free(fmri);
+		return (-1);
+	}
+
+	nvlist_free(fmri);
+	if (topo_node_fru_set(chnode, NULL, 0, &err) != 0) {
+		whinge(mod, NULL, "mc_channel_create_v1: fru set failed: "
+		    "%d\n", err);
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	if (topo_pgroup_create(chnode, &dimm_channel_pgroup, &err) != 0) {
+		whinge(mod, NULL, "mc_channel_create_v1: failed to create "
+		    "property group: %d\n", err);
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	if (topo_prop_set_string(chnode, PGNAME(CHAN), CHAN_PROP_MODE,
+	    TOPO_PROP_IMMUTABLE, cmode, &err) != 0) {
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	if (nvlist_lookup_nvlist_array(chan_nvl, MCINTEL_NVLIST_V1_CHAN_DIMMS,
+	    &dimms, &ndimms) != 0) {
+		whinge(mod, NULL, "mc_channel_create_v1: No DIMMS provided");
+		return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
+	}
+
+	if (topo_node_range_create(mod, chnode, DIMM, 0, ndimms - 1) < 0) {
+		whinge(mod, NULL, "mc_channel_create_v1: dimm node range "
+		    "create failed\n");
+		return (-1);
+	}
+
+	for (i = 0; i < ndimms; i++) {
+		if (mc_dimm_create_v1(mod, chnode, auth, dimms[i], i) != 0)
+			return (-1);
+	}
+
+	return (0);
+}
+
+static int
+mc_imc_create_v1(topo_mod_t *mod, tnode_t *pnode, const char *name,
+    nvlist_t *auth, nvlist_t *mc_nvl, uint_t id)
+{
+	int err, ret;
+	tnode_t *mcnode;
+	nvlist_t *fmri, **channels;
+	boolean_t ecc;
+	char *page, *cmode;
+	uint_t nchans, i;
+
+	if (mkrsrc(mod, pnode, name, id, auth, &fmri) != 0) {
+		whinge(mod, NULL, "mc_nb_create_v1: mkrsrc failed\n");
+		return (-1);
+	}
+
+	if ((mcnode = topo_node_bind(mod, pnode, name, id, fmri)) == NULL) {
+		whinge(mod, NULL, "mc_nb_create_v1: node bind failed"
+		    " for memory-controller\n");
+		nvlist_free(fmri);
+		return (-1);
+	}
+
+	nvlist_free(fmri);
+	if (topo_node_fru_set(mcnode, NULL, 0, &err) != 0) {
+		whinge(mod, NULL, "mc_nb_create_v1: fru set failed: "
+		    "%d\n", err);
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	if (topo_pgroup_create(mcnode, &mc_pgroup, &err) != 0) {
+		whinge(mod, NULL, "mc_nb_create_v1: failed to create "
+		    "property group: %d\n", err);
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	/*
+	 * Add properties to the controller. Our contract allows for these
+	 * properties to be missing.
+	 */
+	ret = 0;
+	if (nvlist_lookup_boolean_value(mc_nvl, MCINTEL_NVLIST_V1_MC_ECC,
+	    &ecc) == 0) {
+		const char *pval = ecc ? "enabled" : "disabled";
+		ret |= topo_prop_set_string(mcnode, PGNAME(MCT), MC_PROP_ECC,
+		    TOPO_PROP_IMMUTABLE, pval, &err);
+	}
+
+	if (nvlist_lookup_string(mc_nvl, MCINTEL_NVLIST_V1_MC_POLICY,
+	    &page) == 0) {
+		ret |= topo_prop_set_string(mcnode, PGNAME(MCT), MC_PROP_POLICY,
+		    TOPO_PROP_IMMUTABLE, page, &err);
+	}
+
+	if (nvlist_lookup_string(mc_nvl, MCINTEL_NVLIST_V1_MC_CHAN_MODE,
+	    &cmode) != 0) {
+		cmode = NULL;
+	}
+
+	if (ret != 0)
+		return (-1);
+
+	if (nvlist_lookup_nvlist_array(mc_nvl, MCINTEL_NVLIST_V1_MC_CHANNELS,
+	    &channels, &nchans) != 0) {
+		whinge(mod, NULL, "mc_imc_create_v1: missing channels entry");
+		return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
+	}
+
+	if (topo_node_range_create(mod, mcnode, DRAMCHANNEL, 0,
+	    nchans - 1) < 0) {
+		whinge(mod, NULL, "mc_imc_create_v1: channel node range create "
+		    "failed\n");
+		return (-1);
+	}
+
+	for (i = 0; i < nchans; i++) {
+		if (mc_channel_create_v1(mod, mcnode, auth, channels[i], i,
+		    cmode) != 0) {
+			return (-1);
+		}
+	}
+
+	return (0);
+}
+
+static int
+mc_nb_create_v1(topo_mod_t *mod, tnode_t *pnode, const char *name,
+    nvlist_t *auth, nvlist_t *nvl)
+{
+	nvlist_t **mc_nvl;
+	uint_t nmc, i;
+
+	if (nvlist_lookup_nvlist_array(nvl, MCINTEL_NVLIST_V1_MCS,
+	    &mc_nvl, &nmc) != 0) {
+		whinge(mod, NULL, "mc_nb_create_v1: failed to find memory "
+		    "controller information\n");
+		return (-1);
+	}
+
+	if (topo_node_range_create(mod, pnode, name, 0, nmc - 1) < 0) {
+		whinge(mod, NULL,
+		    "mc_nb_create: node range create failed\n");
+		return (-1);
+	}
+
+	for (i = 0; i < nmc; i++) {
+		if (mc_imc_create_v1(mod, pnode, name, auth, mc_nvl[i], i) != 0)
+			return (-1);
+	}
+
+	return (0);
+}
+
 int
 mc_node_create(topo_mod_t *mod, uint16_t chip_smbid, tnode_t *pnode,
     const char *name, nvlist_t *auth)
@@ -461,13 +787,18 @@ mc_node_create(topo_mod_t *mod, uint16_t chip_smbid, tnode_t *pnode,
 		whinge(mod, NULL, "mc nvlist is not versioned\n");
 		nvlist_free(nvl);
 		return (0);
-	} else if (ver != MCINTEL_NVLIST_VERS0) {
+	} else if (ver != MCINTEL_NVLIST_VERS0 &&
+	    ver != MCINTEL_NVLIST_VERS1) {
 		whinge(mod, NULL, "mc nvlist version mismatch\n");
 		nvlist_free(nvl);
 		return (0);
 	}
 
-	rc = mc_nb_create(mod, chip_smbid, pnode, name, auth, nvl);
+	if (ver == MCINTEL_NVLIST_VERS1) {
+		rc = mc_nb_create_v1(mod, pnode, name, auth, nvl);
+	} else {
+		rc = mc_nb_create(mod, chip_smbid, pnode, name, auth, nvl);
+	}
 
 	nvlist_free(nvl);
 	return (rc);

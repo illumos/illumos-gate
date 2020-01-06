@@ -1,0 +1,103 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2019 Joyent, Inc.
+.\"
+.Dd June 25, 2019
+.Dt IMC 7D
+.Os
+.Sh NAME
+.Nm imc
+.Nd Intel memory controller driver
+.Sh SYNOPSIS
+.Pa /dev/mc/mc*
+.Sh DESCRIPTION
+The
+.Nm
+driver interfaces with the memory controller found on certain
+generations of Intel CPUs and provides a means for decoding physical
+addresses to the corresponding memory device.
+The
+.Nm
+driver plugs into the operating systems fault management framework
+providing additional details to the system about the memory topology and
+the ability to decode physical addresses into the corresponding portion
+of the memory hierarchy.
+.Pp
+The
+.Nm
+driver is supported on the following Intel processors:
+.Bl -bullet -offset indent -width Sy
+.It
+Sandy Bridge E5 and E7 Xeon Processors
+.It
+Ivy Bridge E5 and E7 Xeon Processors
+.It
+Haswell E5 and E7 Xeon Processors
+.It
+Broadwell E5 and E7 Xeon Processors
+.It
+Skylake Xeon Scalable Processors
+.It
+Cascade Lake Xeon Scalable Processors
+.It
+Broadwell and Skylake Xeon-D processors
+.El
+.Pp
+Other lines involving the above microarchitectures, such as Xeon E3
+branded processors, are not supported as they do not provide the
+necessary hardware support.
+.Pp
+The
+.Nm
+driver is a pseudo-device driver that amalgamates all of the different
+.Xr imcstub 7D
+instances into a coherent view.
+The
+.Xr imcstub 7D
+driver attaches to all of the different PCI devices that the processor
+exposes.
+.Pp
+One challenge with the
+.Nm
+driver is the Intel Enhanced Machine Check Architecture v2
+.Pq EMCAv2 .
+Many vendors use EMCAv2 to hide memory errors from the operating system.
+Such systems limit the effectiveness of the
+.Nm
+driver and the fault management architecture by hiding correctable and
+uncorrectable DIMM errors from the operating system.
+.Pp
+The
+.Nm
+driver has a few limitations.
+Currently it does not always properly handle lockstep and mirroring
+mode, particularly in variants that are common on Skylake and newer
+systems.
+It also does not properly handle cases where Intel Optane NVDIMMs are in
+use on the memory bus.
+.Sh ARCHITECTURE
+The
+.Nm
+driver is only supported on specific Intel
+.Sy x86
+systems.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /platform/i86pc/kernel/drv/amd64/imc
+64-bit device driver (x86).
+.It Pa /platform/i86pc/kernel/drv/imc.conf
+Driver configuration file.
+.El
+.Sh SEE ALSO
+.Xr fmadm 1M ,
+.Xr fmdump 1M ,
+.Xr imcstub 7D

@@ -377,7 +377,7 @@ file path=usr/lib/fm/eft/storage.eft mode=0444
 #
 # usr/lib/fm/fmd executables:
 #	- fmd is common, as are fminject, fmsim and fmtopo
-#	- ipmitopo is global zone only
+#	- ipmitopo and mcdecode are global zone only
 #
 file path=usr/lib/fm/fmd/fmd mode=0555 variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/fmd/fminject mode=0555 \
@@ -385,6 +385,7 @@ file path=usr/lib/fm/fmd/fminject mode=0555 \
 file path=usr/lib/fm/fmd/fmsim mode=0555 variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/fmd/fmtopo mode=0555 variant.opensolaris.zone=__NODEFAULT
 file path=usr/lib/fm/fmd/ipmitopo mode=0555
+$(i386_ONLY)file path=usr/lib/fm/fmd/mcdecode mode=0555
 #
 # fmd plugins:
 #	- most are hardware-specific and so global zone only

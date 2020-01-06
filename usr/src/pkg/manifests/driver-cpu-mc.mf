@@ -1,0 +1,196 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2019 Joyent, Inc.
+#
+
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/driver/cpu/mc@$(PKGVERS)
+set name=pkg.description value="CPU Memory Controller Drivers"
+set name=pkg.summary value="CPU Memory Controller Drivers"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Hardware
+set name=variant.arch value=i386
+dir path=platform group=sys
+dir path=platform/i86pc group=sys
+dir path=platform/i86pc/$(ARCH64) group=sys
+dir path=platform/i86pc/kernel group=sys
+dir path=platform/i86pc/kernel/drv group=sys
+dir path=platform/i86pc/kernel/drv/$(ARCH64) group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man7d
+driver name=imc
+driver name=imcstub \
+    alias=pci8086,2014,p \
+    alias=pci8086,2016,p \
+    alias=pci8086,2024,p \
+    alias=pci8086,2040,p \
+    alias=pci8086,2044,p \
+    alias=pci8086,2048,p \
+    alias=pci8086,2054,p \
+    alias=pci8086,2055,p \
+    alias=pci8086,2066,p \
+    alias=pci8086,208e,p \
+    alias=pci8086,2f1e,p \
+    alias=pci8086,2f1f,p \
+    alias=pci8086,2f28,p \
+    alias=pci8086,2f60,p \
+    alias=pci8086,2f68,p \
+    alias=pci8086,2f6a,p \
+    alias=pci8086,2f6b,p \
+    alias=pci8086,2f6c,p \
+    alias=pci8086,2f6d,p \
+    alias=pci8086,2f71,p \
+    alias=pci8086,2f79,p \
+    alias=pci8086,2fa0,p \
+    alias=pci8086,2fa8,p \
+    alias=pci8086,2faa,p \
+    alias=pci8086,2fab,p \
+    alias=pci8086,2fac,p \
+    alias=pci8086,2fad,p \
+    alias=pci8086,2ffc,p \
+    alias=pci8086,2ffd,p \
+    alias=pci8086,3c71,p \
+    alias=pci8086,3ca0,p \
+    alias=pci8086,3ca8,p \
+    alias=pci8086,3caa,p \
+    alias=pci8086,3cab,p \
+    alias=pci8086,3cac,p \
+    alias=pci8086,3cad,p \
+    alias=pci8086,3ce0,p \
+    alias=pci8086,3ce3,p \
+    alias=pci8086,3cf4,p \
+    alias=pci8086,3cf5,p \
+    alias=pci8086,3cf6,p \
+    alias=pci8086,6f1e,p \
+    alias=pci8086,6f1f,p \
+    alias=pci8086,6f28,p \
+    alias=pci8086,6f60,p \
+    alias=pci8086,6f68,p \
+    alias=pci8086,6f6a,p \
+    alias=pci8086,6f6b,p \
+    alias=pci8086,6f6c,p \
+    alias=pci8086,6f6d,p \
+    alias=pci8086,6f71,p \
+    alias=pci8086,6f79,p \
+    alias=pci8086,6fa0,p \
+    alias=pci8086,6fa8,p \
+    alias=pci8086,6faa,p \
+    alias=pci8086,6fab,p \
+    alias=pci8086,6fac,p \
+    alias=pci8086,6fad,p \
+    alias=pci8086,6ffc,p \
+    alias=pci8086,6ffd,p \
+    alias=pci8086,e1e,p \
+    alias=pci8086,e1f,p \
+    alias=pci8086,e60,p \
+    alias=pci8086,e68,p \
+    alias=pci8086,e6a,p \
+    alias=pci8086,e6b,p \
+    alias=pci8086,e6c,p \
+    alias=pci8086,e6d,p \
+    alias=pci8086,e71,p \
+    alias=pci8086,e79,p \
+    alias=pci8086,ea0,p \
+    alias=pci8086,ea8,p \
+    alias=pci8086,eaa,p \
+    alias=pci8086,eab,p \
+    alias=pci8086,eac,p \
+    alias=pci8086,ead,p \
+    alias=pci8086,ec8,p \
+    alias=pci8086,ec9,p \
+    alias=pci8086,eca,p \
+    alias=pciex8086,2014 \
+    alias=pciex8086,2016 \
+    alias=pciex8086,2024 \
+    alias=pciex8086,2040 \
+    alias=pciex8086,2044 \
+    alias=pciex8086,2048 \
+    alias=pciex8086,2054 \
+    alias=pciex8086,2055 \
+    alias=pciex8086,2066 \
+    alias=pciex8086,208e \
+    alias=pciex8086,2f1e \
+    alias=pciex8086,2f1f \
+    alias=pciex8086,2f28 \
+    alias=pciex8086,2f60 \
+    alias=pciex8086,2f68 \
+    alias=pciex8086,2f6a \
+    alias=pciex8086,2f6b \
+    alias=pciex8086,2f6c \
+    alias=pciex8086,2f6d \
+    alias=pciex8086,2f71 \
+    alias=pciex8086,2f79 \
+    alias=pciex8086,2fa0 \
+    alias=pciex8086,2fa8 \
+    alias=pciex8086,2faa \
+    alias=pciex8086,2fab \
+    alias=pciex8086,2fac \
+    alias=pciex8086,2fad \
+    alias=pciex8086,2ffc \
+    alias=pciex8086,2ffd \
+    alias=pciex8086,3c71 \
+    alias=pciex8086,3ca0 \
+    alias=pciex8086,3ca8 \
+    alias=pciex8086,3caa \
+    alias=pciex8086,3cab \
+    alias=pciex8086,3cac \
+    alias=pciex8086,3cad \
+    alias=pciex8086,3ce0 \
+    alias=pciex8086,3ce3 \
+    alias=pciex8086,3cf4 \
+    alias=pciex8086,3cf5 \
+    alias=pciex8086,3cf6 \
+    alias=pciex8086,6f1e \
+    alias=pciex8086,6f1f \
+    alias=pciex8086,6f28 \
+    alias=pciex8086,6f60 \
+    alias=pciex8086,6f68 \
+    alias=pciex8086,6f6a \
+    alias=pciex8086,6f6b \
+    alias=pciex8086,6f6c \
+    alias=pciex8086,6f6d \
+    alias=pciex8086,6f71 \
+    alias=pciex8086,6f79 \
+    alias=pciex8086,6fa0 \
+    alias=pciex8086,6fa8 \
+    alias=pciex8086,6faa \
+    alias=pciex8086,6fab \
+    alias=pciex8086,6fac \
+    alias=pciex8086,6fad \
+    alias=pciex8086,6ffc \
+    alias=pciex8086,6ffd \
+    alias=pciex8086,e1e \
+    alias=pciex8086,e1f \
+    alias=pciex8086,e60 \
+    alias=pciex8086,e68 \
+    alias=pciex8086,e6a \
+    alias=pciex8086,e6b \
+    alias=pciex8086,e6c \
+    alias=pciex8086,e6d \
+    alias=pciex8086,e71 \
+    alias=pciex8086,e79 \
+    alias=pciex8086,ea0 \
+    alias=pciex8086,ea8 \
+    alias=pciex8086,eaa \
+    alias=pciex8086,eab \
+    alias=pciex8086,eac \
+    alias=pciex8086,ead \
+    alias=pciex8086,ec8 \
+    alias=pciex8086,ec9 \
+    alias=pciex8086,eca
+file path=platform/i86pc/kernel/drv/$(ARCH64)/imc group=sys
+file path=platform/i86pc/kernel/drv/$(ARCH64)/imcstub group=sys
+file path=platform/i86pc/kernel/drv/imc.conf group=sys
+file path=usr/share/man/man7d/imc.7d
+file path=usr/share/man/man7d/imcstub.7d
+license lic_CDDL license=lic_CDDL

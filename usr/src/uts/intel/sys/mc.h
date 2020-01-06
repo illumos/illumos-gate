@@ -21,11 +21,12 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #ifndef _SYS_MC_H
 #define	_SYS_MC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Public interfaces exposed by the memory controller driver
@@ -63,6 +64,9 @@ typedef struct mc_unum {
 #define	MC_IOC_SNAPSHOT_INFO	(MC_IOC | 1)
 #define	MC_IOC_SNAPSHOT		(MC_IOC | 2)
 #define	MC_IOC_ONLINESPARE_EN	(MC_IOC | 4)
+#define	MC_IOC_DECODE_PA	(MC_IOC | 5)
+#define	MC_IOC_DECODE_SNAPSHOT_INFO	(MC_IOC | 6)
+#define	MC_IOC_DECODE_SNAPSHOT	(MC_IOC | 7)
 
 /*
  * Prior to requesting a copy of the snapshot, consumers are advised to request
@@ -80,6 +84,25 @@ typedef struct mc_snapshot_info {
 	uint32_t mcs_size;	/* snapshot size */
 	uint_t mcs_gen;		/* snapshot generation number */
 } mc_snapshot_info_t;
+
+/*
+ * Data used to simulate encoding or decoding of a physical / DIMM address.
+ */
+typedef struct mc_encode_ioc {
+	uint64_t	mcei_pa;
+	uint64_t	mcei_errdata;
+	uint32_t	mcei_err;
+	uint32_t	mcei_board;
+	uint32_t	mcei_chip;
+	uint32_t	mcei_mc;
+	uint32_t	mcei_chan;
+	uint32_t	mcei_dimm;
+	uint64_t	mcei_rank_addr;
+	uint32_t	mcei_rank;
+	uint32_t	mcei_row;
+	uint32_t	mcei_column;
+	uint32_t	mcei_pad;
+} mc_encode_ioc_t;
 
 #ifdef __cplusplus
 }

@@ -1,0 +1,46 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2019 Joyent, Inc.
+.\"
+.Dd June 25, 2019
+.Dt IMCSTUB 7D
+.Os
+.Sh NAME
+.Nm imcstub
+.Nd Intel memory controller stub driver
+.Sh DESCRIPTION
+The
+.Nm
+driver is a counterpart to the
+.Xr imc 7D
+driver.
+The
+.Nm
+driver is responsible for attaching to all of the logical PCI devices
+that are exposed by Intel CPUs and providing them for use by the
+.Xr imc 7D
+driver.
+For more information on how this is used by the system, please see
+.Xr imc 7D .
+.Sh ARCHITECTURE
+The
+.Nm
+driver is only supported on certain Intel
+.Sy x86
+systems.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /platform/i86pc/kernel/drv/amd64/imcstub
+64-bit device driver (x86).
+.El
+.Sh SEE ALSO
+.Xr imc 7D

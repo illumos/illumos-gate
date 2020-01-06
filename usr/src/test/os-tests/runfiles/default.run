@@ -79,3 +79,6 @@ tests = ['ldt', 'badseg']
 
 [/opt/os-tests/tests/writev.32]
 [/opt/os-tests/tests/writev.64]
+
+[/opt/os-tests/tests/imc_test]
+arch = i86pc
