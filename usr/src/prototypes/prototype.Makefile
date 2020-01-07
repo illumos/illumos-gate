@@ -10,6 +10,6 @@
 #
 
 #
-# Copyright 2019 <contributor>
+# Copyright 2020 <contributor>
 #
 
