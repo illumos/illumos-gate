@@ -14898,9 +14898,11 @@ mptsas_update_hashtab(struct mptsas *mpt)
 		rval = mptsas_get_target_device_info(mpt, page_address,
 		    &dev_handle, &ptgt);
 		if ((rval == DEV_INFO_FAIL_PAGE0) ||
-		    (rval == DEV_INFO_FAIL_ALLOC) ||
-		    (rval == DEV_INFO_FAIL_GUID)) {
+		    (rval == DEV_INFO_FAIL_ALLOC)) {
 			break;
+		}
+		if (rval == DEV_INFO_FAIL_GUID) {
+			continue;
 		}
 
 		mpt->m_dev_handle = dev_handle;
@@ -16601,12 +16603,12 @@ mptsas_phy_to_tgt(mptsas_t *mpt, mptsas_phymask_t phymask, uint8_t phy)
 		rval = mptsas_get_target_device_info(mpt, page_address,
 		    &cur_handle, &ptgt);
 		if ((rval == DEV_INFO_FAIL_PAGE0) ||
-		    (rval == DEV_INFO_FAIL_ALLOC) ||
-		    (rval == DEV_INFO_FAIL_GUID)) {
+		    (rval == DEV_INFO_FAIL_ALLOC)) {
 			break;
 		}
 		if ((rval == DEV_INFO_WRONG_DEVICE_TYPE) ||
-		    (rval == DEV_INFO_PHYS_DISK)) {
+		    (rval == DEV_INFO_PHYS_DISK) ||
+		    (rval == DEV_INFO_FAIL_GUID)) {
 			continue;
 		}
 		mpt->m_dev_handle = cur_handle;
@@ -16671,13 +16673,13 @@ mptsas_wwid_to_ptgt(mptsas_t *mpt, mptsas_phymask_t phymask, uint64_t wwid)
 		rval = mptsas_get_target_device_info(mpt, page_address,
 		    &cur_handle, &tmp_tgt);
 		if ((rval == DEV_INFO_FAIL_PAGE0) ||
-		    (rval == DEV_INFO_FAIL_ALLOC) ||
-		    (rval == DEV_INFO_FAIL_GUID)) {
+		    (rval == DEV_INFO_FAIL_ALLOC)) {
 			tmp_tgt = NULL;
 			break;
 		}
 		if ((rval == DEV_INFO_WRONG_DEVICE_TYPE) ||
-		    (rval == DEV_INFO_PHYS_DISK)) {
+		    (rval == DEV_INFO_PHYS_DISK) ||
+		    (rval == DEV_INFO_FAIL_GUID)) {
 			continue;
 		}
 		mpt->m_dev_handle = cur_handle;
