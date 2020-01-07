@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2002-2015 Apple Inc. All rights reserved.
+ * Copyright (c) 2002-2018 Apple Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -2770,7 +2770,9 @@ mDNSexport const mDNSu8 *getDomainName(const DNSMessage *const msg, const mDNSu8
 
         case 0x80:  debugf("getDomainName: Illegal label length 0x%X in domain name %##s", len, name->c); return(mDNSNULL);
 
-        case 0xC0:  offset = (mDNSu16)((((mDNSu16)(len & 0x3F)) << 8) | *ptr++);
+        case 0xC0:  if (ptr >= end)
+            { debugf("getDomainName: Malformed compression label (overruns packet end)"); return(mDNSNULL); }
+            offset = (mDNSu16)((((mDNSu16)(len & 0x3F)) << 8) | *ptr++);
             if (!nextbyte) nextbyte = ptr;              // Record where we got to before we started following pointers
             ptr = (mDNSu8 *)msg + offset;
             if (ptr < (mDNSu8*)msg || ptr >= end)
@@ -3335,7 +3337,7 @@ mDNSexport mDNSBool SetRData(const DNSMessage *const msg, const mDNSu8 *ptr, con
             AssignDomainName(&name, (domainname *)ptr);
             ptr += DomainNameLength(&name);
         }
-        if (!ptr)
+        if (!ptr || ptr >= end)
         {
             LogInfo("SetRData: Malformed name for TSIG/TKEY type %d", rr->resrec.rrtype);
             goto fail;
@@ -3448,7 +3450,6 @@ mDNSexport const mDNSu8 *GetLargeResourceRecord(mDNS *const m, const DNSMessage 
     rr->TimeRcvd          = m ? m->timenow : 0;
     rr->DelayDelivery     = 0;
     rr->NextRequiredQuery = m ? m->timenow : 0;     // Will be updated to the real value when we call SetNextCacheCheckTimeForRecord()
-    rr->LastUsed          = m ? m->timenow : 0;
     rr->CRActiveQuestion  = mDNSNULL;
     rr->UnansweredQueries = 0;
     rr->LastUnansweredTime= 0;
@@ -3466,16 +3467,15 @@ mDNSexport const mDNSu8 *GetLargeResourceRecord(mDNS *const m, const DNSMessage 
     rr->resrec.rrtype            = (mDNSu16) ((mDNSu16)ptr[0] <<  8 | ptr[1]);
     rr->resrec.rrclass           = (mDNSu16)(((mDNSu16)ptr[2] <<  8 | ptr[3]) & kDNSClass_Mask);
     rr->resrec.rroriginalttl     = (mDNSu32) ((mDNSu32)ptr[4] << 24 | (mDNSu32)ptr[5] << 16 | (mDNSu32)ptr[6] << 8 | ptr[7]);
-    if (rr->resrec.rroriginalttl > 0x70000000UL / mDNSPlatformOneSecond && (mDNSs32)rr->resrec.rroriginalttl != -1)
-        rr->resrec.rroriginalttl = 0x70000000UL / mDNSPlatformOneSecond;
+    if (rr->resrec.rroriginalttl > mDNSMaximumTTLSeconds && (mDNSs32)rr->resrec.rroriginalttl != -1)
+        rr->resrec.rroriginalttl = mDNSMaximumTTLSeconds;
     // Note: We don't have to adjust m->NextCacheCheck here -- this is just getting a record into memory for
     // us to look at. If we decide to copy it into the cache, then we'll update m->NextCacheCheck accordingly.
     pktrdlength           = (mDNSu16)((mDNSu16)ptr[8] <<  8 | ptr[9]);
 
     // If mDNS record has cache-flush bit set, we mark it unique
-    // For uDNS records, all are implicitly deemed unique (a single DNS server is always
-    // authoritative for the entire RRSet), unless this is a truncated response
-    if (ptr[2] & (kDNSClass_UniqueRRSet >> 8) || (!InterfaceID && !(msg->h.flags.b[0] & kDNSFlag0_TC)))
+    // For uDNS records, all are implicitly deemed unique (a single DNS server is always authoritative for the entire RRSet)
+    if (ptr[2] & (kDNSClass_UniqueRRSet >> 8) || !InterfaceID)
         RecordType |= kDNSRecordTypePacketUniqueMask;
     ptr += 10;
     if (ptr + pktrdlength > end) { debugf("GetLargeResourceRecord: RDATA exceeds end of packet"); return(mDNSNULL); }
@@ -3629,25 +3629,6 @@ mDNSexport mDNSBool GetPktLease(mDNS *const m, const DNSMessage *const msg, cons
     return mDNSfalse;
 }
 
-mDNSlocal const mDNSu8 *DumpRecords(mDNS *const m, const DNSMessage *const msg, const mDNSu8 *ptr, const mDNSu8 *const end, int count, char *label)
-{
-    int i;
-    LogInfo("%2d %s", count, label);
-    for (i = 0; i < count && ptr; i++)
-    {
-        // This puts a LargeCacheRecord on the stack instead of using the shared m->rec storage,
-        // but since it's only used for debugging (and probably only on OS X, not on
-        // embedded systems) putting a 9kB object on the stack isn't a big problem.
-        LargeCacheRecord largecr;
-        ptr = GetLargeResourceRecord(m, msg, ptr, end, mDNSInterface_Any, kDNSRecordTypePacketAns, &largecr);
-        if (ptr)
-            LogInfo("%2d TTL%8d %s", i, largecr.r.resrec.rroriginalttl, CRDisplayString(m, &largecr.r));
-    }
-    if (!ptr)
-        LogInfo("DumpRecords: ERROR: Premature end of packet data");
-    return(ptr);
-}
-
 #define DNS_OP_Name(X) (                              \
         (X) == kDNSFlag0_OP_StdQuery ? ""         :       \
         (X) == kDNSFlag0_OP_Iquery   ? "Iquery "  :       \
@@ -3671,52 +3652,198 @@ mDNSlocal const mDNSu8 *DumpRecords(mDNS *const m, const DNSMessage *const msg, 
         (X) == kDNSFlag1_RC_NotAuth  ? "NotAuth"  :      \
         (X) == kDNSFlag1_RC_NotZone  ? "NotZone"  : "??" )
 
-// Note: DumpPacket expects the packet header fields in host byte order, not network byte order
-mDNSexport void DumpPacket(mDNS *const m, mStatus status, mDNSBool sent, char *transport,
-                           const mDNSAddr *srcaddr, mDNSIPPort srcport,
-                           const mDNSAddr *dstaddr, mDNSIPPort dstport, const DNSMessage *const msg, const mDNSu8 *const end)
+mDNSlocal void mDNS_snprintf_add(char **ptr, const char *lim, const char *fmt, ...)
 {
-    mDNSBool IsUpdate = ((msg->h.flags.b[0] & kDNSFlag0_OP_Mask) == kDNSFlag0_OP_Update);
-    const mDNSu8 *ptr = msg->data;
-    int i;
-    DNSQuestion q;
-    char tbuffer[64], sbuffer[64], dbuffer[64] = "";
-    if (!status) tbuffer[mDNS_snprintf(tbuffer, sizeof(tbuffer), sent ? "Sent" : "Received"                        )] = 0;
-    else tbuffer[mDNS_snprintf(tbuffer, sizeof(tbuffer), "ERROR %d %sing", status, sent ? "Send" : "Receive")] = 0;
-    if (sent) sbuffer[mDNS_snprintf(sbuffer, sizeof(sbuffer), "port "        )] = 0;
-    else sbuffer[mDNS_snprintf(sbuffer, sizeof(sbuffer), "%#a:", srcaddr)] = 0;
-    if (dstaddr || !mDNSIPPortIsZero(dstport))
-        dbuffer[mDNS_snprintf(dbuffer, sizeof(dbuffer), " to %#a:%d", dstaddr, mDNSVal16(dstport))] = 0;
+    va_list args;
+    mDNSu32 buflen, n;
+    char *const dst = *ptr;
 
-    LogInfo("-- %s %s DNS %s%s (flags %02X%02X) RCODE: %s (%d) %s%s%s%s%s%sID: %d %d bytes from %s%d%s%s --",
-           tbuffer, transport,
+    buflen = (mDNSu32)(lim - dst);
+    if (buflen > 0)
+    {
+        va_start(args, fmt);
+        n = mDNS_vsnprintf(dst, buflen, fmt, args);
+        va_end(args);
+        *ptr = dst + n;
+    }
+}
+
+#define DNSTypeString(X) (((X) == kDNSType_A) ? "A" : DNSTypeName(X))
+
+#define ReadField16(PTR) ((mDNSu16)((((mDNSu16)((mDNSu8 *)(PTR))[0]) << 8) | ((mDNSu16)((mDNSu8 *)(PTR))[1])))
+#define ReadField32(PTR) \
+    ((mDNSu32)( \
+        (((mDNSu32)((mDNSu8 *)(PTR))[0]) << 24) | \
+        (((mDNSu32)((mDNSu8 *)(PTR))[1]) << 16) | \
+        (((mDNSu32)((mDNSu8 *)(PTR))[2]) <<  8) | \
+         ((mDNSu32)((mDNSu8 *)(PTR))[3])))
+
+mDNSlocal void DNSMessageDump(const DNSMessage *const msg, const mDNSu8 *const end, char *buffer, mDNSu32 buflen)
+{
+    domainname *name;
+    const mDNSu8 *ptr;
+    domainname nameStorage[2];
+    char *dst = buffer;
+    const char *const lim = &buffer[buflen];
+    mDNSu32 i;
+    const mDNSu32 rrcount = msg->h.numAnswers + msg->h.numAuthorities + msg->h.numAdditionals;
+
+    mDNS_snprintf_add(&dst, lim, "DNS %s%s (%lu) (flags %02X%02X) RCODE: %s (%d)%s%s%s%s%s%s ID: %u:",
            DNS_OP_Name(msg->h.flags.b[0] & kDNSFlag0_OP_Mask),
-           msg->h.flags.b[0] & kDNSFlag0_QR_Response ? "Response" : "Query",
+           (msg->h.flags.b[0] & kDNSFlag0_QR_Response) ? "Response" : "Query",
+           (unsigned long)(end - (const mDNSu8 *)msg),
            msg->h.flags.b[0], msg->h.flags.b[1],
            DNS_RC_Name(msg->h.flags.b[1] & kDNSFlag1_RC_Mask),
            msg->h.flags.b[1] & kDNSFlag1_RC_Mask,
-           msg->h.flags.b[0] & kDNSFlag0_AA ? "AA " : "",
-           msg->h.flags.b[0] & kDNSFlag0_TC ? "TC " : "",
-           msg->h.flags.b[0] & kDNSFlag0_RD ? "RD " : "",
-           msg->h.flags.b[1] & kDNSFlag1_RA ? "RA " : "",
-           msg->h.flags.b[1] & kDNSFlag1_AD ? "AD " : "",
-           msg->h.flags.b[1] & kDNSFlag1_CD ? "CD " : "",
-           mDNSVal16(msg->h.id),
-           end - msg->data,
-           sbuffer, mDNSVal16(srcport), dbuffer,
-           (msg->h.flags.b[0] & kDNSFlag0_TC) ? " (truncated)" : ""
-           );
+           (msg->h.flags.b[0] & kDNSFlag0_AA) ? " AA" : "",
+           (msg->h.flags.b[0] & kDNSFlag0_TC) ? " TC" : "",
+           (msg->h.flags.b[0] & kDNSFlag0_RD) ? " RD" : "",
+           (msg->h.flags.b[1] & kDNSFlag1_RA) ? " RA" : "",
+           (msg->h.flags.b[1] & kDNSFlag1_AD) ? " AD" : "",
+           (msg->h.flags.b[1] & kDNSFlag1_CD) ? " CD" : "",
+           mDNSVal16(msg->h.id));
 
-    LogInfo("%2d %s", msg->h.numQuestions, IsUpdate ? "Zone" : "Questions");
-    for (i = 0; i < msg->h.numQuestions && ptr; i++)
+    name = mDNSNULL;
+    ptr  = msg->data;
+    for (i = 0; i < msg->h.numQuestions; i++)
     {
-        ptr = getQuestion(msg, ptr, end, mDNSInterface_Any, &q);
-        if (ptr) LogInfo("%2d %##s %s", i, q.qname.c, DNSTypeName(q.qtype));
+        mDNSu16 qtype, qclass;
+
+        name = &nameStorage[0];
+        ptr = getDomainName(msg, ptr, end, name);
+        if (!ptr) goto exit;
+
+        if ((end - ptr) < 4) goto exit;
+        qtype  = ReadField16(&ptr[0]);
+        qclass = ReadField16(&ptr[2]);
+        ptr += 4;
+
+        mDNS_snprintf_add(&dst, lim, " %##s %s", name->c, DNSTypeString(qtype));
+        if (qclass != kDNSClass_IN) mDNS_snprintf_add(&dst, lim, "/%u", qclass);
+        mDNS_snprintf_add(&dst, lim, "?");
     }
-    ptr = DumpRecords(m, msg, ptr, end, msg->h.numAnswers,     IsUpdate ? "Prerequisites" : "Answers");
-    ptr = DumpRecords(m, msg, ptr, end, msg->h.numAuthorities, IsUpdate ? "Updates"       : "Authorities");
-          DumpRecords(m, msg, ptr, end, msg->h.numAdditionals, "Additionals");
-    LogInfo("--------------");
+
+    mDNS_snprintf_add(&dst, lim, " %u/%u/%u", msg->h.numAnswers, msg->h.numAuthorities, msg->h.numAdditionals);
+    for (i = 0; i < rrcount; i++)
+    {
+        mDNSu16 rrtype, rrclass, rdlength;
+        mDNSu32 ttl;
+        int handled;
+        const mDNSu8 *rdata;
+        const domainname *const previousName = name;
+
+        name = &nameStorage[(name == &nameStorage[0]) ? 1 : 0];
+        ptr = getDomainName(msg, ptr, end, name);
+        if (!ptr) goto exit;
+
+        if ((end - ptr) < 10) goto exit;
+        rrtype   = ReadField16(&ptr[0]);
+        rrclass  = ReadField16(&ptr[2]);
+        ttl      = ReadField32(&ptr[4]);
+        rdlength = ReadField16(&ptr[8]);
+        ptr += 10;
+
+        if ((end - ptr) < rdlength) goto exit;
+        rdata = ptr;
+
+        if (i > 0) mDNS_snprintf_add(&dst, lim, ",");
+        if (!previousName || !SameDomainName(name, previousName)) mDNS_snprintf_add(&dst, lim, " %##s", name);
+
+        mDNS_snprintf_add(&dst, lim, " %s", DNSTypeString(rrtype));
+        if (rrclass != kDNSClass_IN) mDNS_snprintf_add(&dst, lim, "/%u", rrclass);
+        mDNS_snprintf_add(&dst, lim, " ");
+
+        handled = mDNSfalse;
+        switch (rrtype)
+        {
+        case kDNSType_A:
+            if (rdlength == 4)
+            {
+                mDNS_snprintf_add(&dst, lim, "%.4a", rdata);
+                handled = mDNStrue;
+            }
+            break;
+
+        case kDNSType_AAAA:
+            if (rdlength == 16)
+            {
+                mDNS_snprintf_add(&dst, lim, "%.16a", rdata);
+                handled = mDNStrue;
+            }
+            break;
+
+        case kDNSType_CNAME:
+            ptr = getDomainName(msg, rdata, end, name);
+            if (!ptr) goto exit;
+
+            mDNS_snprintf_add(&dst, lim, "%##s", name);
+            handled = mDNStrue;
+            break;
+
+        case kDNSType_SOA:
+        {
+            mDNSu32 serial, refresh, retry, expire, minimum;
+            domainname *const mname = &nameStorage[0];
+            domainname *const rname = &nameStorage[1];
+            name = mDNSNULL;
+
+            ptr = getDomainName(msg, rdata, end, mname);
+             if (!ptr) goto exit;
+
+            ptr = getDomainName(msg, ptr, end, rname);
+            if (!ptr) goto exit;
+
+            if ((end - ptr) < 20) goto exit;
+            serial  = ReadField32(&ptr[0]);
+            refresh = ReadField32(&ptr[4]);
+            retry   = ReadField32(&ptr[8]);
+            expire  = ReadField32(&ptr[12]);
+            minimum = ReadField32(&ptr[16]);
+
+            mDNS_snprintf_add(&dst, lim, "%##s %##s %lu %lu %lu %lu %lu", mname, rname, (unsigned long)serial,
+                (unsigned long)refresh, (unsigned long)retry, (unsigned long)expire, (unsigned long)minimum);
+
+            handled = mDNStrue;
+            break;
+        }
+
+        default:
+            break;
+        }
+        if (!handled) mDNS_snprintf_add(&dst, lim, "RDATA[%u]: %.*H", rdlength, rdlength, rdata);
+        mDNS_snprintf_add(&dst, lim, " (%lu)", (unsigned long)ttl);
+        ptr = rdata + rdlength;
+    }
+
+exit:
+    return;
+}
+
+// Note: DumpPacket expects the packet header fields in host byte order, not network byte order
+mDNSexport void DumpPacket(mStatus status, mDNSBool sent, char *transport,
+                           const mDNSAddr *srcaddr, mDNSIPPort srcport,
+                           const mDNSAddr *dstaddr, mDNSIPPort dstport, const DNSMessage *const msg, const mDNSu8 *const end)
+{
+    char buffer[512];
+    char *dst = buffer;
+    const char *const lim = &buffer[512];
+
+    buffer[0] = '\0';
+    if (!status) mDNS_snprintf_add(&dst, lim, sent ? "Sent" : "Received");
+    else         mDNS_snprintf_add(&dst, lim, "ERROR %d %sing", status, sent ? "Send" : "Receiv");
+
+    mDNS_snprintf_add(&dst, lim, " %s DNS Message %u bytes from ", transport, (unsigned long)(end - (const mDNSu8 *)msg));
+
+    if (sent) mDNS_snprintf_add(&dst, lim, "port %d", mDNSVal16(srcport));
+    else      mDNS_snprintf_add(&dst, lim, "%#a:%d", srcaddr, mDNSVal16(srcport));
+
+    if (dstaddr || !mDNSIPPortIsZero(dstport)) mDNS_snprintf_add(&dst, lim, " to %#a:%d", dstaddr, mDNSVal16(dstport));
+
+    LogInfo("%s", buffer);
+
+    buffer[0] = '\0';
+    DNSMessageDump(msg, end, buffer, (mDNSu32)sizeof(buffer));
+    LogInfo("%s", buffer);
 }
 
 // ***************************************************************************
@@ -3823,7 +3950,7 @@ mDNSexport mStatus mDNSSendDNSMessage(mDNS *const m, DNSMessage *const msg, mDNS
 
     // Dump the packet with the HINFO and TSIG
     if (mDNS_PacketLoggingEnabled && !mDNSOpaque16IsZero(msg->h.id))
-        DumpPacket(m, status, mDNStrue, sock && (sock->flags & kTCPSocketFlags_UseTLS) ? "TLS" : sock ? "TCP" : "UDP", mDNSNULL, src ? src->port : MulticastDNSPort, dst, dstport, msg, end);
+        DumpPacket(status, mDNStrue, sock && (sock->flags & kTCPSocketFlags_UseTLS) ? "TLS" : sock ? "TCP" : "UDP", mDNSNULL, src ? src->port : MulticastDNSPort, dst, dstport, msg, end);
 
     // put the number of additionals back the way it was
     msg->h.numAdditionals = numAdditionals;
@@ -4052,6 +4179,9 @@ static const struct mDNSprintf_format
     unsigned int precision;
 } mDNSprintf_format_default = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
+#define kHexDigitsLowercase "0123456789abcdef"
+#define kHexDigitsUppercase "0123456789ABCDEF";
+
 mDNSexport mDNSu32 mDNS_vsnprintf(char *sbuffer, mDNSu32 buflen, const char *fmt, va_list arg)
 {
     mDNSu32 nwritten = 0;
@@ -4063,6 +4193,7 @@ mDNSexport mDNSu32 mDNS_vsnprintf(char *sbuffer, mDNSu32 buflen, const char *fmt
     for (c = *fmt; c != 0; c = *++fmt)
     {
         unsigned long n;
+        int hexdump = mDNSfalse;
 		if (c != '%')
         {
             *sbuffer++ = (char)c;
@@ -4189,10 +4320,63 @@ decimal:    if (!F.havePrecision)
                                                    a[0], a[1], a[2], a[3]); break;
                         case  6: i = mDNS_snprintf(mDNS_VACB, sizeof(mDNS_VACB), "%02X:%02X:%02X:%02X:%02X:%02X",
                                                    a[0], a[1], a[2], a[3], a[4], a[5]); break;
-                        case 16: i = mDNS_snprintf(mDNS_VACB, sizeof(mDNS_VACB),
-                                                   "%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X:%02X%02X",
-                                                   a[0x0], a[0x1], a[0x2], a[0x3], a[0x4], a[0x5], a[0x6], a[0x7],
-                                                   a[0x8], a[0x9], a[0xA], a[0xB], a[0xC], a[0xD], a[0xE], a[0xF]); break;
+                        case 16: {
+                            // Print IPv6 addresses according to RFC 5952, A Recommendation for IPv6 Address Text
+                            // Representation. See <https://tools.ietf.org/html/rfc5952>.
+
+                            int idx, runLen = 0, runStart = 0, maxRunLen = 0, maxRunStart = 0, maxRunEnd;
+
+                            // Find the leftmost longest run of consecutive zero hextets.
+                            for (idx = 0; idx < 8; ++idx)
+                            {
+                                const unsigned int hextet = (a[idx * 2] << 8) | a[(idx * 2) + 1];
+                                if (hextet == 0)
+                                {
+                                    if (runLen++ == 0) runStart = idx;
+                                    if (runLen > maxRunLen)
+                                    {
+                                        maxRunStart = runStart;
+                                        maxRunLen   = runLen;
+                                    }
+                                }
+                                else
+                                {
+                                    // If the number of remaining hextets is less than or equal to the length of the longest
+                                    // run so far, then we've found the leftmost longest run.
+                                    if ((8 - (idx + 1)) <= maxRunLen) break;
+                                    runLen = 0;
+                                }
+                            }
+
+                            // Compress the leftmost longest run of two or more consecutive zero hextets as "::".
+                            // For each reminaing hextet, suppress zeros leading up to the least-significant nibble, which
+                            // is always written, even if it's zero. Because of this requirement, it's easier to write the
+                            // IPv6 address in reverse. Also, write a colon separator before each hextet except for the
+                            // first one.
+                            s = mDNS_VACB_Lim;
+                            maxRunEnd = (maxRunLen >= 2) ? (maxRunStart + maxRunLen - 1) : -1;
+                            for (idx = 7; idx >= 0; --idx)
+                            {
+                                if (idx == maxRunEnd)
+                                {
+                                    if (idx == 7) *--s = ':';
+                                    idx = maxRunStart;
+                                    *--s = ':';
+                                }
+                                else
+                                {
+                                    unsigned int hextet = (a[idx * 2] << 8) | a[(idx * 2) + 1];
+                                    do {
+                                        *--s = kHexDigitsLowercase[hextet % 16];
+                                        hextet /= 16;
+                                    } while (hextet);
+                                    if (idx > 0) *--s = ':';
+                                }
+                            }
+                            i = (unsigned int)(mDNS_VACB_Lim - s);
+                        }
+                        break;
+
                         default: i = mDNS_snprintf(mDNS_VACB, sizeof(mDNS_VACB), "%s", "<< ERROR: Must specify"
                                                    " address size (i.e. %.4a=IPv4, %.6a=Ethernet, %.16a=IPv6) >>"); break;
                         }
@@ -4203,9 +4387,9 @@ decimal:    if (!F.havePrecision)
             case 'p':  F.havePrecision = F.lSize = 1;
                 F.precision = sizeof(void*) * 2;                // 8 characters on 32-bit; 16 characters on 64-bit
 		/* FALLTHROUGH */
-            case 'X':  digits = "0123456789ABCDEF";
+            case 'X':  digits = kHexDigitsUppercase;
                 goto hexadecimal;
-            case 'x':  digits = "0123456789abcdef";
+            case 'x':  digits = kHexDigitsLowercase;
 hexadecimal: if (F.lSize) n = va_arg(arg, unsigned long);
                 else n = va_arg(arg, unsigned int);
                 if (F.hSize) n = (unsigned short) n;
@@ -4288,6 +4472,12 @@ hexadecimal: if (F.lSize) n = va_arg(arg, unsigned long);
                 { i = F.precision; while (i>0 && (s[i] & 0xC0) == 0x80) i--;}
                 break;
 
+            case 'H': {
+                    s = va_arg(arg, char *);
+                    hexdump = mDNStrue;
+                }
+                break;
+
             case 'n':  s = va_arg(arg, char *);
                 if      (F.hSize) *(short *) s = (short)nwritten;
                 else if (F.lSize) *(long  *) s = (long)nwritten;
@@ -4309,14 +4499,34 @@ hexadecimal: if (F.lSize) n = va_arg(arg, unsigned long);
                     if (++nwritten >= buflen) goto exit;
                 } while (i < --F.fieldWidth);
 
-            // Make sure we don't truncate in the middle of a UTF-8 character.
-            // Note: s[i] is the first eliminated character; i.e. the next character *after* the last character of the
-            // allowed output. If s[i] is a UTF-8 continuation character, then we've cut a unicode character in half,
-            // so back up 'i' until s[i] is no longer a UTF-8 continuation character. (if the input was proprly
-            // formed, s[i] will now be the UTF-8 start character of the multi-byte character we just eliminated).
-            if (i > buflen - nwritten)
-            { i = buflen - nwritten; while (i>0 && (s[i] & 0xC0) == 0x80) i--;}
-            for (j=0; j<i; j++) *sbuffer++ = *s++;          // Write the converted result
+            if (hexdump)
+            {
+                char *dst = sbuffer;
+                const char *const lim = &sbuffer[buflen - nwritten];
+                if (F.havePrecision)
+                {
+                    for (i = 0; (i < F.precision) && (dst < lim); i++)
+                    {
+                        const unsigned int b = (unsigned int) *s++;
+                        if (i > 0)     *dst++ = ' ';
+                        if (dst < lim) *dst++ = kHexDigitsLowercase[(b >> 4) & 0xF];
+                        if (dst < lim) *dst++ = kHexDigitsLowercase[ b       & 0xF];
+                    }
+                }
+                i = (unsigned int)(dst - sbuffer);
+                sbuffer = dst;
+            }
+            else
+            {
+                // Make sure we don't truncate in the middle of a UTF-8 character.
+                // Note: s[i] is the first eliminated character; i.e. the next character *after* the last character of the
+                // allowed output. If s[i] is a UTF-8 continuation character, then we've cut a unicode character in half,
+                // so back up 'i' until s[i] is no longer a UTF-8 continuation character. (if the input was proprly
+                // formed, s[i] will now be the UTF-8 start character of the multi-byte character we just eliminated).
+                if (i > buflen - nwritten)
+                { i = buflen - nwritten; while (i>0 && (s[i] & 0xC0) == 0x80) i--;}
+                for (j=0; j<i; j++) *sbuffer++ = *s++;          // Write the converted result
+            }
             nwritten += i;
             if (nwritten >= buflen) goto exit;
 

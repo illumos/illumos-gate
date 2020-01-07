@@ -433,10 +433,6 @@ mDNSexport void FreeEtcHosts(mDNS *const m, AuthRecord *const rr, mStatus result
 #pragma mark ***** DDNS Config Platform Functions
 #endif
 
-/*
- * Stub to set or get DNS config. Even if it actually does not do anything,
- * it has to make sure the data is zeroed properly.
- */
 mDNSexport mDNSBool mDNSPlatformSetDNSConfig(mDNSBool setservers, mDNSBool setsearch, domainname *const fqdn, DNameListElem **RegDomains,
     DNameListElem **BrowseDomains, mDNSBool ackConfig)
 {
@@ -506,7 +502,7 @@ mDNSexport int ParseDNSServers(mDNS *m, const char *filePath)
             mDNSAddr DNSAddr;
             DNSAddr.type = mDNSAddrType_IPv4;
             DNSAddr.ip.v4.NotAnInteger = ina.s_addr;
-            mDNS_AddDNSServer(m, NULL, mDNSInterface_Any, 0, &DNSAddr, UnicastDNSPort, kScopeNone, 0, mDNSfalse, mDNSfalse, 0, mDNStrue, mDNStrue, mDNSfalse);
+            mDNS_AddDNSServer(m, NULL, mDNSInterface_Any, 0, &DNSAddr, UnicastDNSPort, kScopeNone, 0, mDNSfalse, mDNSfalse, mDNSfalse, 0, mDNStrue, mDNStrue, mDNSfalse);
             numOfServers++;
         }
     }
@@ -667,9 +663,9 @@ mDNSlocal int SetupSocket(struct sockaddr *intfAddr, mDNSIPPort port, int interf
         // Enable inbound packets on IFEF_AWDL interface.
         // Only done for multicast sockets, since we don't expect unicast socket operations
         // on the IFEF_AWDL interface. Operation is a no-op for other interface types.
-        #ifdef SO_RECV_ANYIF
+	#ifdef SO_RECV_ANYIF
         if (setsockopt(*sktPtr, SOL_SOCKET, SO_RECV_ANYIF, &kOn, sizeof(kOn)) < 0) perror("setsockopt - SO_RECV_ANYIF");
-        #endif
+	#endif
     }
 
     // We want to receive destination addresses and interface identifiers.
@@ -771,11 +767,11 @@ mDNSlocal int SetupSocket(struct sockaddr *intfAddr, mDNSIPPort port, int interf
         #warning This platform has no way to get the destination interface information for IPv6 -- will only work for single-homed hosts
     #endif
     #if defined(IPV6_RECVHOPLIMIT)
-       if (err == 0)
-       {
-           err = setsockopt(*sktPtr, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &kOn, sizeof(kOn));
-           if (err < 0) { err = errno; perror("setsockopt - IPV6_RECVHOPLIMIT"); }
-       }
+	if (err == 0)
+	{
+	    err = setsockopt(*sktPtr, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &kOn, sizeof(kOn));
+	    if (err < 0) { err = errno; perror("setsockopt - IPV6_RECVHOPLIMIT"); }
+	}
     #elif defined(IPV6_HOPLIMIT)
         if (err == 0)
         {
@@ -1220,10 +1216,10 @@ mDNSlocal mDNSu32       ProcessRoutingNotification(int sd)
      */
     case RTM_ADD:
     case RTM_DELETE:
-         if (pRSMsg->ifam_type == RTM_IFINFO)
-             result |= 1 << ((struct if_msghdr*) pRSMsg)->ifm_index;
-         else
-             result |= 1 << pRSMsg->ifam_index;
+        if (pRSMsg->ifam_type == RTM_IFINFO)
+            result |= 1 << ((struct if_msghdr*) pRSMsg)->ifm_index;
+        else
+            result |= 1 << pRSMsg->ifam_index;
     break;
     }
 
@@ -1341,7 +1337,8 @@ mDNSexport mStatus mDNSPlatformInit(mDNS *const m)
         // Failure to observe interface changes is non-fatal.
         if (err != mStatus_NoError)
         {
-            fprintf(stderr, "mDNS(%d) WARNING: Unable to detect interface changes (%d).\n", getpid(), err);
+            fprintf(stderr, "mDNS(%d) WARNING: Unable to detect interface changes (%d).\n",
+		(int)getpid(), err);
             err = mStatus_NoError;
         }
     }

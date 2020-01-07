@@ -129,6 +129,8 @@ extern void uDNS_SetupWABQueries(mDNS *const m);
 extern void uDNS_StartWABQueries(mDNS *const m, int queryType);
 extern void uDNS_StopWABQueries(mDNS *const m, int queryType);
 extern domainname      *uDNS_GetNextSearchDomain(mDNSInterfaceID InterfaceID, mDNSs8 *searchIndex, mDNSBool ignoreDotLocal);
+    
+extern void uDNS_RestartQuestionAsTCP(mDNS *m, DNSQuestion *const q, const mDNSAddr *const srcaddr, const mDNSIPPort srcport);
 
 typedef enum
 {

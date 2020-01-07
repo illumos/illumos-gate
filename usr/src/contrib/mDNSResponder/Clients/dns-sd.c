@@ -174,10 +174,6 @@ static const char kFilePathSep = '/';
 #include "../mDNSShared/dnssd_clientstub.c"
 #endif
 
-#if _DNS_SD_LIBDISPATCH
-#include <dispatch/private.h>
-#endif
-
 //*************************************************************************************************************
 // Globals
 
@@ -416,46 +412,36 @@ static unsigned int keytag(unsigned char *key, unsigned int keysize)
     return ac & 0xFFFF;
 }
 
-static void base64Encode(char *buffer, int buflen, void *rdata, unsigned int rdlen)
+// Base 64 encoding according to <https://tools.ietf.org/html/rfc4648#section-4>.
+#define kBase64EncodingTable "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+static void base64Encode(char *buffer, size_t buflen, void *rdata, size_t rdlen)
 {
-#if _DNS_SD_LIBDISPATCH
-    const void *result = NULL;
-    size_t size;
-    dispatch_data_t src_data = NULL, dest_data = NULL, null_str = NULL, data = NULL, map = NULL;
+    const uint8_t *src = (const uint8_t *)rdata;
+    const uint8_t *const end = &src[rdlen];
+    char *dst = buffer;
+    const char *lim;
 
-    src_data = dispatch_data_create(rdata, rdlen, dispatch_get_global_queue(0, 0), ^{});
-    if (!src_data)
-        goto done;
+    if (buflen == 0) return;
+    lim = &buffer[buflen - 1];
+    while ((src < end) && (dst < lim))
+    {
+        uint32_t i;
+        const size_t rem = (size_t)(end - src);
 
-    dest_data = dispatch_data_create_with_transform(src_data, DISPATCH_DATA_FORMAT_TYPE_NONE, DISPATCH_DATA_FORMAT_TYPE_BASE64);
-    if (!dest_data)
-        goto done;
+        // Form a 24-bit input group. If less than 24 bits remain, pad with zero bits.
+        if (     rem >= 3) i = (src[0] << 16) | (src[1] << 8) | src[2]; // 24 bits are equal to 4 6-bit groups.
+        else if (rem == 2) i = (src[0] << 16) | (src[1] << 8);          // 16 bits are treated as 3 6-bit groups + 1 pad
+        else               i =  src[0] << 16;                           //  8 bits are treated as 2 6-bit groups + 2 pads
 
-    null_str = dispatch_data_create("", 1, dispatch_get_global_queue(0, 0), ^{});
-    if (!null_str)
-        goto done;
-
-    data = dispatch_data_create_concat(dest_data, null_str);
-    if (!data)
-        goto done;
-
-    map = dispatch_data_create_map(data, &result, &size);
-    if (!map)
-        goto done;
-
-    snprintf(buffer, buflen, " %s", (char *)result);
-
-done:
-    if (src_data) dispatch_release(src_data);
-    if (dest_data) dispatch_release(dest_data);
-    if (data)     dispatch_release(data);
-    if (null_str) dispatch_release(null_str);
-    if (map)      dispatch_release(map);
-    return;
-#else  //_DNS_SD_LIBDISPATCH
-    snprintf(buffer, buflen, " %s", ".");
-    return;
-#endif //_DNS_SD_LIBDISPATCH
+        // Encode each 6-bit group.
+                       *dst++ =              kBase64EncodingTable[(i >> 18) & 0x3F];
+        if (dst < lim) *dst++ =              kBase64EncodingTable[(i >> 12) & 0x3F];
+        if (dst < lim) *dst++ = (rem >= 2) ? kBase64EncodingTable[(i >>  6) & 0x3F] : '=';
+        if (dst < lim) *dst++ = (rem >= 3) ? kBase64EncodingTable[ i        & 0x3F] : '=';
+        src += (rem > 3) ? 3 : rem;
+    }
+    *dst = '\0';
 }
 
 static DNSServiceProtocol GetProtocol(const char *s)
@@ -924,10 +910,10 @@ static int snprintd(char *p, int max, const unsigned char **rd)
     return(p-buf);
 }
 
-static void ParseDNSSECRecords(uint16_t rrtype, char *rdb, char *p, unsigned const char *rd, uint16_t rdlen)
+static void ParseDNSSECRecords(uint16_t rrtype, char *rdb, size_t rdb_size, unsigned const char *rd, uint16_t rdlen)
 {
-    int rdb_size = 1000;
-    switch (rrtype)
+    char *p = rdb;
+    switch (rrtype) 
     {
         case kDNSServiceType_DS:
         {
@@ -945,7 +931,7 @@ static void ParseDNSSECRecords(uint16_t rrtype, char *rdb, char *p, unsigned con
         case kDNSServiceType_DNSKEY:
         {
             rdataDNSKey *rrkey = (rdataDNSKey *)rd;
-            p += snprintf(p, rdb + rdb_size - p, "%d  %d  %d  %u", swap16(rrkey->flags), rrkey->proto,
+            p += snprintf(p, rdb + rdb_size - p, "%d  %d  %d  %u ", swap16(rrkey->flags), rrkey->proto,
                           rrkey->alg, (unsigned int)keytag((unsigned char *)rrkey, rdlen));
             base64Encode(p, rdb + rdb_size - p, (unsigned char *)(rd + DNSKEY_FIXED_SIZE), rdlen - DNSKEY_FIXED_SIZE);
             break;
@@ -1026,7 +1012,12 @@ static void ParseDNSSECRecords(uint16_t rrtype, char *rdb, char *p, unsigned con
             k = p;
             p += snprintd(p, rdb + rdb_size - p, &q);
             len = p - k + 1;
-
+            
+            if ((&rdb[rdb_size] - p) >= 2)
+            {
+                *p++ = ' ';
+                *p   = '\0';
+            }
             base64Encode(p, rdb + rdb_size - p, (unsigned char *)(rd + len + RRSIG_FIXED_SIZE), rdlen - (len + RRSIG_FIXED_SIZE));
             break;
         }
@@ -1056,9 +1047,9 @@ static void DNSSD_API qr_reply(DNSServiceRef sdref, const DNSServiceFlags flags,
     if (num_printed++ == 0)
     {
         if (operation == 'D')
-            printf("Timestamp     A/R if %-30s%-6s%-7s%-18s Rdata\n", "Name", "Type", "Class", "DNSSECStatus");
+            printf("Timestamp     A/R if %-30s%-6s%-7s%-18s Rdata\n", "Name", "Type", "Class", "DNSSECStatus"); 
         else
-            printf("Timestamp     A/R Flags if %-30s%-6s%-7s Rdata\n", "Name", "Type", "Class");
+            printf("Timestamp     A/R    Flags if %-30s%-6s%-7s Rdata\n", "Name", "Type", "Class");
     }
     printtimestamp();
 
@@ -1115,7 +1106,7 @@ static void DNSSD_API qr_reply(DNSServiceRef sdref, const DNSServiceFlags flags,
                 case kDNSServiceType_DNSKEY:
                 case kDNSServiceType_NSEC:
                 case kDNSServiceType_RRSIG:
-                    ParseDNSSECRecords(rrtype, rdb, p, rd, rdlen);
+                    ParseDNSSECRecords(rrtype, rdb, sizeof(rdb), rd, rdlen);
                     break;
 
                 default:
@@ -1143,7 +1134,7 @@ static void DNSSD_API qr_reply(DNSServiceRef sdref, const DNSServiceFlags flags,
     if (operation == 'D')
         printf("%s%3d %-30s%-6s%-7s%-18s %s", op, ifIndex, fullname, rr_type, rr_class, dnssec_status, rdb);
     else
-        printf("%s%6X%3d %-30s%-7s%-6s %s", op, flags, ifIndex, fullname, rr_type, rr_class, rdb);
+        printf("%s%9X%3d %-30s%-7s%-6s %s", op, flags, ifIndex, fullname, rr_type, rr_class, rdb);
     if (unknowntype)
     {
         while (rd < end)
@@ -1208,7 +1199,7 @@ static void DNSSD_API addrinfo_reply(DNSServiceRef sdref, const DNSServiceFlags 
         if (operation == 'g')
             printf("Timestamp     A/R if %-25s %-44s %-18s\n", "Hostname", "Address", "DNSSECStatus");
         else
-            printf("Timestamp     A/R Flags if %-38s %-44s %s\n", "Hostname", "Address", "TTL");
+            printf("Timestamp     A/R    Flags if %-38s %-44s %s\n", "Hostname", "Address", "TTL");
     }
     printtimestamp();
 
@@ -1248,7 +1239,7 @@ static void DNSSD_API addrinfo_reply(DNSServiceRef sdref, const DNSServiceFlags 
     if (operation == 'g')
         printf("%s%3d %-25s %-44s %-18s", op, interfaceIndex, hostname, addr, dnssec_status);
     else
-        printf("%s%6X%3d %-38s %-44s %d", op, flags, interfaceIndex, hostname, addr, ttl);
+        printf("%s%9X%3d %-38s %-44s %d", op, flags, interfaceIndex, hostname, addr, ttl);
     if (errorCode)
     {
         if (errorCode == kDNSServiceErr_NoSuchRecord)
@@ -1512,12 +1503,6 @@ static int API_string_limit_test()
     printf("Testing for error returns when various strings are > 63 bytes: PASSED\n");
     return 0;
 }
-
-// local prototypes for routines that don't have prototypes in dns_sd.h
-#if APPLE_OSX_mDNSResponder
-DNSServiceErrorType DNSSD_API DNSServiceSetDefaultDomainForUser(DNSServiceFlags flags, const char *domain);
-DNSServiceErrorType DNSSD_API DNSServiceCreateDelegateConnection(DNSServiceRef *sdRef, int32_t pid, uuid_t uuid);
-#endif
 
 static int API_NULL_input_test()
 {
@@ -1915,7 +1900,15 @@ int main(int argc, char **argv)
 	        argv++;
 	        opinterface = kDNSServiceInterfaceIndexBLE;
 	    }
-
+	
+        if (argc > 1 && !strcasecmp(argv[1], "-allowexpired"))
+        {
+            argc--;
+            argv++;
+            flags |= kDNSServiceFlagsAllowExpiredAnswers;
+            printf("Setting kDNSServiceFlagsAllowExpiredAnswers\n");
+        }
+        
 	    if (argc > 1 && !strcasecmp(argv[1], "-includep2p"))
 	    {
 	        argc--;
@@ -2288,7 +2281,11 @@ Fail:
 
 // NOT static -- otherwise the compiler may optimize it out
 // The "@(#) " pattern is a special prefix the "what" command looks for
+#ifndef MDNS_VERSIONSTR_NODTS
+const char VersionString_SCCS[] = "@(#) dns-sd " STRINGIFY(mDNSResponderVersion) " (" __DATE__ " " __TIME__ ")";
+#else
 const char VersionString_SCCS[] = "@(#) dns-sd " STRINGIFY(mDNSResponderVersion);
+#endif
 
 #if _BUILDING_XCODE_PROJECT_
 // If the process crashes, then this string will be magically included in the automatically-generated crash log

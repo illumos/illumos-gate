@@ -69,10 +69,9 @@ mDNSexport void mDNSPlatformSourceAddrForDest(mDNSAddr *const src, const mDNSAdd
     else return;
 
     if ((connect(sock, &addr.s, inner_len)) < 0) {
-	if (errno != ENETUNREACH) {
-	    LogMsg("mDNSPlatformSourceAddrForDest: connect %#a failed errno %d "
-		"(%s)", dst, errno, strerror(errno));
-	}
+	if (errno != ENETUNREACH)
+		LogMsg("mDNSPlatformSourceAddrForDest: connect %#a failed errno %d (%s)", dst, errno,
+		    strerror(errno));
 	goto exit;
     }
 

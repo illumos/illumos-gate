@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2002-2015 Apple Inc. All rights reserved.
+ * Copyright (c) 2002-2018 Apple Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -87,9 +87,9 @@ extern "C" {
     #define MDNS_GNU_VA_ARGS            0
     #define MDNS_HAS_VA_ARG_MACROS      1
 #else
-    #define MDNS_C99_VA_ARGS            0
+    #define MDNS_C99_VA_ARGS            1
     #define MDNS_GNU_VA_ARGS            0
-    #define MDNS_HAS_VA_ARG_MACROS      0
+    #define MDNS_HAS_VA_ARG_MACROS      1
 #endif
 
 #if (MDNS_HAS_VA_ARG_MACROS)
@@ -99,12 +99,14 @@ extern "C" {
         #define LogOperation(... )     do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_OPERATION, __VA_ARGS__);} while (0)
         #define LogSPS(... )           do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_SPS,       __VA_ARGS__);} while (0)
         #define LogInfo(... )          do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_INFO,      __VA_ARGS__);} while (0)
+        #define LogDebug(... )         do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_DEBUG,     __VA_ARGS__);} while (0)
     #elif (MDNS_GNU_VA_ARGS)
         #define debug_noop( ARGS... ) ((void)0)
         #define LogMsg( ARGS... )       LogMsgWithLevel(MDNS_LOG_MSG, ARGS)
         #define LogOperation( ARGS... ) do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_OPERATION, ARGS);} while (0)
         #define LogSPS( ARGS... )       do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_SPS,       ARGS);} while (0)
         #define LogInfo( ARGS... )      do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_INFO,      ARGS);} while (0)
+        #define LogDebug( ARGS... )     do { if (mDNS_LoggingEnabled) LogMsgWithLevel(MDNS_LOG_DEBUG,     ARGS);} while (0)
     #else
         #error Unknown variadic macros
     #endif
@@ -116,10 +118,12 @@ extern "C" {
     #define LogOperation (mDNS_LoggingEnabled == 0) ? ((void)0) : LogOperation_
     #define LogSPS       (mDNS_LoggingEnabled == 0) ? ((void)0) : LogSPS_
     #define LogInfo      (mDNS_LoggingEnabled == 0) ? ((void)0) : LogInfo_
+    #define LogDebug     (mDNS_LoggingEnabled == 0) ? ((void)0) : LogDebug_
 extern void LogMsg_(const char *format, ...)       IS_A_PRINTF_STYLE_FUNCTION(1,2);
 extern void LogOperation_(const char *format, ...) IS_A_PRINTF_STYLE_FUNCTION(1,2);
 extern void LogSPS_(const char *format, ...)       IS_A_PRINTF_STYLE_FUNCTION(1,2);
 extern void LogInfo_(const char *format, ...)      IS_A_PRINTF_STYLE_FUNCTION(1,2);
+extern void LogDebug_(const char *format, ...)     IS_A_PRINTF_STYLE_FUNCTION(1,2);
 #endif
 
 #if MDNS_DEBUGMSGS

@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2003-2015 Apple Inc. All rights reserved.
+ * Copyright (c) 2003-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -66,7 +66,7 @@
  */
 
 #ifndef _DNS_SD_H
-#define _DNS_SD_H 8780101
+#define _DNS_SD_H 8806001
 
 #ifdef  __cplusplus
 extern "C" {
@@ -75,9 +75,11 @@ extern "C" {
 /* Set to 1 if libdispatch is supported
  * Note: May also be set by project and/or Makefile
  */
-#ifndef _DNS_SD_LIBDISPATCH
+#if defined(__APPLE__)
+#define _DNS_SD_LIBDISPATCH 1
+#else
 #define _DNS_SD_LIBDISPATCH 0
-#endif /* ndef _DNS_SD_LIBDISPATCH */
+#endif
 
 /* standard calling convention under Win32 is __stdcall */
 /* Note: When compiling Intel EFI (Extensible Firmware Interface) under MS Visual Studio, the */
@@ -86,6 +88,12 @@ extern "C" {
 #define DNSSD_API __stdcall
 #else
 #define DNSSD_API
+#endif
+
+#if (defined(__GNUC__) && (__GNUC__ >= 4))
+#define DNSSD_EXPORT __attribute__((visibility("default")))
+#else
+#define DNSSD_EXPORT
 #endif
 
 #if defined(_WIN32)
@@ -526,9 +534,23 @@ enum
      * This flag is private and should not be used.
      */
 
-     kDNSServiceFlagsPrivateFour       = 0x40000000
+     kDNSServiceFlagsPrivateFour          = 0x40000000,
     /*
      * This flag is private and should not be used.
+     */
+
+    kDNSServiceFlagsAllowExpiredAnswers   = 0x80000000,
+    /*
+     * When kDNSServiceFlagsAllowExpiredAnswers is passed to DNSServiceQueryRecord or DNSServiceGetAddrInfo,
+     * if there are matching expired records still in the cache, then they are immediately returned to the
+     * client, and in parallel a network query for that name is issued. All returned records from the query will
+     * remain in the cache after expiration.
+     */
+    
+    kDNSServiceFlagsExpiredAnswer         = 0x80000000
+    /*
+     * When kDNSServiceFlagsAllowExpiredAnswers is passed to DNSServiceQueryRecord or DNSServiceGetAddrInfo,
+     * an expired answer will have this flag set.
      */
 
 };
@@ -871,6 +893,7 @@ typedef int32_t DNSServiceErrorType;
  *                  if the daemon (or "system service" on Windows) is not running.
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceGetProperty
 (
     const char *property,  /* Requested property (i.e. kDNSServiceProperty_DaemonVersion) */
@@ -930,6 +953,7 @@ DNSServiceErrorType DNSSD_API DNSServiceGetProperty
  *                  error.
  */
 
+DNSSD_EXPORT
 dnssd_sock_t DNSSD_API DNSServiceRefSockFD(DNSServiceRef sdRef);
 
 
@@ -951,6 +975,7 @@ dnssd_sock_t DNSSD_API DNSServiceRefSockFD(DNSServiceRef sdRef);
  *                  an error code indicating the specific failure that occurred.
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceProcessResult(DNSServiceRef sdRef);
 
 
@@ -978,6 +1003,7 @@ DNSServiceErrorType DNSSD_API DNSServiceProcessResult(DNSServiceRef sdRef);
  *
  */
 
+DNSSD_EXPORT
 void DNSSD_API DNSServiceRefDeallocate(DNSServiceRef sdRef);
 
 
@@ -1062,6 +1088,7 @@ typedef void (DNSSD_API *DNSServiceDomainEnumReply)
  *                  is not initialized).
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceEnumerateDomains
 (
     DNSServiceRef                       *sdRef,
@@ -1252,6 +1279,7 @@ typedef void (DNSSD_API *DNSServiceRegisterReply)
  *                  is not initialized).
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceRegister
 (
     DNSServiceRef                       *sdRef,
@@ -1307,6 +1335,7 @@ DNSServiceErrorType DNSSD_API DNSServiceRegister
  *                  error code indicating the error that occurred (the RecordRef is not initialized).
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceAddRecord
 (
     DNSServiceRef sdRef,
@@ -1348,6 +1377,7 @@ DNSServiceErrorType DNSSD_API DNSServiceAddRecord
  *                  error code indicating the error that occurred.
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceUpdateRecord
 (
     DNSServiceRef sdRef,
@@ -1380,6 +1410,7 @@ DNSServiceErrorType DNSSD_API DNSServiceUpdateRecord
  *                  error code indicating the error that occurred.
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceRemoveRecord
 (
     DNSServiceRef sdRef,
@@ -1485,6 +1516,7 @@ typedef void (DNSSD_API *DNSServiceBrowseReply)
  *                  is not initialized).
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceBrowse
 (
     DNSServiceRef                       *sdRef,
@@ -1613,6 +1645,7 @@ typedef void (DNSSD_API *DNSServiceResolveReply)
  *                  is not initialized).
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceResolve
 (
     DNSServiceRef                       *sdRef,
@@ -1730,6 +1763,7 @@ typedef void (DNSSD_API *DNSServiceQueryRecordReply)
  *                  is not initialized).
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceQueryRecord
 (
     DNSServiceRef                       *sdRef,
@@ -1834,6 +1868,7 @@ typedef void (DNSSD_API *DNSServiceGetAddrInfoReply)
  *                  the error that occurred.
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceGetAddrInfo
 (
     DNSServiceRef                    *sdRef,
@@ -1870,6 +1905,7 @@ DNSServiceErrorType DNSSD_API DNSServiceGetAddrInfo
  *                  case the DNSServiceRef is not initialized).
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceCreateConnection(DNSServiceRef *sdRef);
 
 /* DNSServiceRegisterRecord
@@ -1952,6 +1988,7 @@ typedef void (DNSSD_API *DNSServiceRegisterRecordReply)
  *                  not initialized).
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceRegisterRecord
 (
     DNSServiceRef sdRef,
@@ -2001,6 +2038,7 @@ DNSServiceErrorType DNSSD_API DNSServiceRegisterRecord
  *
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceReconfirmRecord
 (
     DNSServiceFlags flags,
@@ -2184,6 +2222,7 @@ typedef void (DNSSD_API *DNSServiceNATPortMappingReply)
  *                  display) then pass zero for protocol, internalPort, externalPort and ttl.
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceNATPortMappingCreate
 (
     DNSServiceRef                    *sdRef,
@@ -2230,6 +2269,7 @@ DNSServiceErrorType DNSSD_API DNSServiceNATPortMappingCreate
  *
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceConstructFullName
 (
     char                            * const fullName,
@@ -2310,6 +2350,7 @@ typedef union _TXTRecordRef_t { char PrivateData[16]; char *ForceNaturalAlignmen
  *                  the TXTRecordRef.
  */
 
+DNSSD_EXPORT
 void DNSSD_API TXTRecordCreate
 (
     TXTRecordRef     *txtRecord,
@@ -2328,6 +2369,7 @@ void DNSSD_API TXTRecordCreate
  *
  */
 
+DNSSD_EXPORT
 void DNSSD_API TXTRecordDeallocate
 (
     TXTRecordRef     *txtRecord
@@ -2371,6 +2413,7 @@ void DNSSD_API TXTRecordDeallocate
  *                  exceed the available storage.
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API TXTRecordSetValue
 (
     TXTRecordRef     *txtRecord,
@@ -2394,6 +2437,7 @@ DNSServiceErrorType DNSSD_API TXTRecordSetValue
  *                  exist in the TXTRecordRef.
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API TXTRecordRemoveValue
 (
     TXTRecordRef     *txtRecord,
@@ -2413,6 +2457,7 @@ DNSServiceErrorType DNSSD_API TXTRecordRemoveValue
  *                  Returns 0 if the TXTRecordRef is empty.
  */
 
+DNSSD_EXPORT
 uint16_t DNSSD_API TXTRecordGetLength
 (
     const TXTRecordRef *txtRecord
@@ -2430,6 +2475,7 @@ uint16_t DNSSD_API TXTRecordGetLength
  *                  to DNSServiceUpdateRecord().
  */
 
+DNSSD_EXPORT
 const void * DNSSD_API TXTRecordGetBytesPtr
 (
     const TXTRecordRef *txtRecord
@@ -2484,6 +2530,7 @@ const void * DNSSD_API TXTRecordGetBytesPtr
  *                  Otherwise, it returns 0.
  */
 
+DNSSD_EXPORT
 int DNSSD_API TXTRecordContainsKey
 (
     uint16_t txtLen,
@@ -2513,6 +2560,7 @@ int DNSSD_API TXTRecordContainsKey
  *                  For non-empty value, valueLen will be length of value data.
  */
 
+DNSSD_EXPORT
 const void * DNSSD_API TXTRecordGetValuePtr
 (
     uint16_t txtLen,
@@ -2535,6 +2583,7 @@ const void * DNSSD_API TXTRecordGetValuePtr
  *
  */
 
+DNSSD_EXPORT
 uint16_t DNSSD_API TXTRecordGetCount
 (
     uint16_t txtLen,
@@ -2580,6 +2629,7 @@ uint16_t DNSSD_API TXTRecordGetCount
  *                  TXTRecordGetCount()-1.
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API TXTRecordGetItemAtIndex
 (
     uint16_t txtLen,
@@ -2632,6 +2682,7 @@ DNSServiceErrorType DNSSD_API TXTRecordGetItemAtIndex
  *                  queue param is invalid
  */
 
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceSetDispatchQueue
 (
     DNSServiceRef service,
@@ -2646,6 +2697,7 @@ typedef void (DNSSD_API *DNSServiceSleepKeepaliveReply)
     DNSServiceErrorType errorCode,
     void                                *context
 );
+DNSSD_EXPORT
 DNSServiceErrorType DNSSD_API DNSServiceSleepKeepalive
 (
     DNSServiceRef                       *sdRef,
