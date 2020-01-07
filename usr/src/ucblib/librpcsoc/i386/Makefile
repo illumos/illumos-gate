@@ -26,7 +26,7 @@
 include ../Makefile.com
 
 DYNFLAGS += $(DYNFLAGS32)
-BUILD.SO= $(CC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) -L $(ROOT)/usr/ucblib $(LDLIBS)
+BUILD.SO= $(CC) $(CFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) -L $(ROOT)/usr/ucblib $(LDLIBS)
 
 LIBS = $(DYNLIB)
 

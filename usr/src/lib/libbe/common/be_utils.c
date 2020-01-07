@@ -24,7 +24,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright (c) 2015 by Delphix. All rights reserved.
- * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  * Copyright (c) 2018, Joyent, Inc.
  */
 
@@ -513,6 +513,35 @@ be_make_container_ds(const char *zpool,  char *container_ds,
 			    "dataset is not mounted\n"));
 			return;
 		}
+	}
+}
+
+/*
+ * Function:	be_make_root_container_ds
+ * Description:	Generate string for the BE root container dataset given a pool
+ *              name.
+ * Parameters:
+ *		zpool - pointer zpool name.
+ *		container_ds - pointer to buffer in which to return result
+ *		container_ds_size - size of container_ds
+ * Returns:
+ *		None
+ * Scope:
+ *		Semi-private (library wide use only)
+ */
+void
+be_make_root_container_ds(const char *zpool, char *container_ds,
+    int container_ds_size)
+{
+	char *root;
+
+	be_make_container_ds(zpool, container_ds, container_ds_size);
+
+	/* If the container DS ends with /ROOT, remove it.  */
+
+	if ((root = strrchr(container_ds, '/')) != NULL &&
+	    strcmp(root + 1, BE_CONTAINER_DS_NAME) == 0) {
+		*root = '\0';
 	}
 }
 

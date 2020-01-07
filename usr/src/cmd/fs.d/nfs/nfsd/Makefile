@@ -46,7 +46,7 @@ CERRWARN +=	-_gcc=-Wno-extra
 SMATCH=off
 
 $(TYPEPROG):	$(OBJS)
-		$(CC) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
+		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
 
 nfs_tbind.o:	../lib/nfs_tbind.c

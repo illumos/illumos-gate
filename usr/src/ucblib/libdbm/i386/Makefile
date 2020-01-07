@@ -25,7 +25,7 @@
 
 include ../Makefile.com
 
-BUILD.SO= $(CC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) -L $(ROOT)/usr/ucblib $(LDLIBS)
+BUILD.SO= $(CC) $(CFLAGS) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) -L $(ROOT)/usr/ucblib $(LDLIBS)
 
 .KEEP_STATE:
 

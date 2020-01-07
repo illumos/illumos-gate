@@ -25,7 +25,7 @@
 #
 # Copyright (c) 2018, Joyent, Inc.
 
-PROG= 		addbadsec
+PROG=		addbadsec
 OBJECTS=	addbadsec.o ix_altsctr.o
 SRCS=		$(OBJECTS:.o=.c)
 
@@ -43,7 +43,7 @@ SMATCH=off
 all: $(PROG)
 
 $(PROG):        $(OBJECTS)
-	$(CC) -o $@ $(OBJECTS) $(LDFLAGS) $(LDLIBS)
+	$(LINK.c) -o $@ $(OBJECTS) $(LDLIBS)
 	$(POST_PROCESS)
 
 install: all $(ROOTPROG)

@@ -52,7 +52,7 @@ ROOTLIBDIFFH=	$(DIFFH:%=$(ROOTLIB)/%)
 all:	$(PROG)
 
 $(PROG):	$(OBJS)
-	$(CC) -o $(PROG) $(OBJS) $(LDFLAGS) $(LDLIBS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 clean:

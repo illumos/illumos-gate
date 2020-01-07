@@ -54,7 +54,7 @@ all: $(PROG)
 install: all $(ROOTUSRSBINPROG)
 
 $(PROG): $(OBJS)
-	$(CC) -o $(PROG) $(OBJS) $(LDFLAGS) $(LDLIBS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 toktable.o:	$(TABLEDIR)/toktable.c

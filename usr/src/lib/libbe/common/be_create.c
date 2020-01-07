@@ -24,6 +24,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2016 Martin Matuska. All rights reserved.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -611,6 +612,8 @@ be_copy(nvlist_t *be_attrs)
 	uuid_t		parent_uu = { 0 };
 	char		obe_root_ds[MAXPATHLEN];
 	char		nbe_root_ds[MAXPATHLEN];
+	char		obe_root_container[MAXPATHLEN];
+	char		nbe_root_container[MAXPATHLEN];
 	char		ss[MAXPATHLEN];
 	char		*new_mp = NULL;
 	char		*obe_name = NULL;
@@ -1095,8 +1098,14 @@ be_copy(nvlist_t *be_attrs)
 	/*
 	 * Update new BE's vfstab.
 	 */
-	if ((ret = be_update_vfstab(bt.nbe_name, bt.obe_zpool, bt.nbe_zpool,
-	    &fld, new_mp)) != BE_SUCCESS) {
+
+	be_make_root_container_ds(bt.obe_zpool, obe_root_container,
+	    sizeof (obe_root_container));
+	be_make_root_container_ds(bt.nbe_zpool, nbe_root_container,
+	    sizeof (nbe_root_container));
+
+	if ((ret = be_update_vfstab(bt.nbe_name, obe_root_container,
+	    nbe_root_container, &fld, new_mp)) != BE_SUCCESS) {
 		be_print_err(gettext("be_copy: failed to "
 		    "update new BE's vfstab (%s)\n"), bt.nbe_name);
 		goto done;

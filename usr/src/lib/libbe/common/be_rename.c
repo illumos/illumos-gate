@@ -69,6 +69,7 @@ be_rename(nvlist_t *be_attrs)
 	be_fs_list_data_t	fld = { 0 };
 	zfs_handle_t	*zhp = NULL;
 	char		root_ds[MAXPATHLEN];
+	char		be_root_container[MAXPATHLEN];
 	char		*mp = NULL;
 	int		zret = 0, ret = BE_SUCCESS;
 
@@ -205,8 +206,16 @@ be_rename(nvlist_t *be_attrs)
 	}
 
 	/* Update BE's vfstab */
-	if ((ret = be_update_vfstab(bt.nbe_name, bt.obe_zpool, bt.nbe_zpool,
-	    &fld, mp)) != BE_SUCCESS) {
+
+	/*
+	 * Since the new and old BEs reside in the same pool (see above),
+	 * the same variable can be used for the container for both.
+	 */
+	be_make_root_container_ds(bt.obe_zpool, be_root_container,
+	    sizeof (be_root_container));
+
+	if ((ret = be_update_vfstab(bt.nbe_name, be_root_container,
+	    be_root_container, &fld, mp)) != BE_SUCCESS) {
 		be_print_err(gettext("be_rename: "
 		    "failed to update new BE's vfstab (%s)\n"), bt.nbe_name);
 		goto done;

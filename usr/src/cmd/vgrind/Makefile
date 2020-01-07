@@ -28,7 +28,7 @@
 # These are the objects associated with the overall vgrind command.
 #
 VFONTEDPR=	vfontedpr
-RETEST= 	retest
+RETEST=		retest
 MACROS=		tmac.vgrind
 LANGDEFS=	vgrindefs
 KSHPROG=	vgrind
@@ -41,8 +41,8 @@ KSHPROG=	vgrind
 # installed.  We omit it here, so that the NSE doesn't spend cycles
 # on it when acquiring and reconciling.
 #
-PROG= 		$(KSHPROG)
-LIBPROG= 	$(VFONTEDPR) $(LANGDEFS)
+PROG=		$(KSHPROG)
+LIBPROG=	$(VFONTEDPR) $(LANGDEFS)
 TMACPROG=	$(MACROS)
 
 VFONTEDPROBJS=	vfontedpr.o vgrindefs.o regexp.o
@@ -91,8 +91,8 @@ ROOTTMACPROG= $(TMACPROG:%=$(ROOTTMAC)/%)
 #
 # Conditional assignments pertinent to installation.
 #
-$(ROOTLIB)/$(LANGDEFS) 	:= FILEMODE= $(LIBFILEMODE)
-$(ROOTTMACPROG) 	:= FILEMODE= 0644
+$(ROOTLIB)/$(LANGDEFS)	:= FILEMODE= $(LIBFILEMODE)
+$(ROOTTMACPROG)		:= FILEMODE= 0644
 
 #
 # The standard set of rules doesn't know about installing into
@@ -116,14 +116,14 @@ $(POFILE): $(POFILES) $(POFILE_KSH)
 	cat $(POFILES) $(POFILE_KSH) > $@
 
 $(VFONTEDPR): $(VFONTEDPROBJS)
-	$(CC) -o $@ $(VFONTEDPROBJS) $(LDFLAGS) $(LDLIBS)
+	$(LINK.c) -o $@ $(VFONTEDPROBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 $(LANGDEFS):	$(LANGDEFS).src
 	$(CP) $? $@
 
 $(RETEST): $(RETESTOBJS)
-	$(CC) -o $@ $(RETESTOBJS) $(LDFLAGS) $(LDLIBS)
+	$(LINK.c) -o $@ $(RETESTOBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 #
@@ -131,7 +131,7 @@ $(RETEST): $(RETESTOBJS)
 # matching rules see everything they should.  (This is a safety net.)
 #
 # XXX:	ROOTTMAC shouldn't appear as a dependent; it's here as a
-# 	bandaid(TM) until /usr/lib/tmac becomes a symlink to
+#	bandaid(TM) until /usr/lib/tmac becomes a symlink to
 #	/usr/share/lib/tmac.
 #
 install: all $(ROOTTMAC) $(ROOTPROG) $(ROOTLIBPROG) $(ROOTTMACPROG)
