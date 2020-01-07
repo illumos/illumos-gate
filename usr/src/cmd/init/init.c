@@ -23,7 +23,7 @@
  * Copyright (c) 2013 Gary Mills
  *
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -701,8 +701,7 @@ main(int argc, char *argv[])
 		console(B_FALSE,
 		    "\n\n%s Release %s Version %s %d-bit\r\n",
 		    un.sysname, un.release, un.version, bits);
-		console(B_FALSE, "Copyright (c) 2010-2012, "
-		    "Joyent Inc. All rights reserved.\r\n");
+		console(B_FALSE, "Copyright 2010-2020 Joyent, Inc.\r\n");
 	}
 
 	/*
