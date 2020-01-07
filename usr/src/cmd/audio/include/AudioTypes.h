@@ -145,6 +145,7 @@ public:
 	    { val += y; return (*this); }
 	inline Double& operator -= (double y)
 	    { val -= y; return (*this); }
+	Double& operator=(const Double&) = default;
 };
 
 // inline double fabs(double x)

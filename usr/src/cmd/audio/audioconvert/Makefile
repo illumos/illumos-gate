@@ -34,6 +34,7 @@ include	../../Makefile.cmd
 INCLUDES += -I../include -I.
 
 CPPFLAGS += $(INCLUDES)
+CCFLAGS += -_gcc4=-std=gnu++0x
 
 PROGSRCS= convert.cc file.cc main.cc parse.cc
 

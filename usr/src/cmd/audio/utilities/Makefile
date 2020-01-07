@@ -33,6 +33,7 @@ INCLUDES += -I../include
 
 CPPFLAGS += $(INCLUDES)
 
+CCFLAGS += -_gcc4=-std=gnu++0x
 CFLAGS += $(CCVERBOSE)
 CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-unused-variable
