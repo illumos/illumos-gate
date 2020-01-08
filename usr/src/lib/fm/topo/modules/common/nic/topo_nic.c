@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2020 Robert Mustacchi
  */
 
 /*
@@ -23,10 +24,12 @@
 #include <libdevinfo.h>
 #include <libdladm.h>
 #include <libdllink.h>
+#include <libdlstat.h>
 #include <libsff.h>
 #include <unistd.h>
 #include <sys/dld_ioc.h>
 #include <sys/dld.h>
+#include <sys/mac.h>
 
 #include <sys/fm/protocol.h>
 #include <fm/topo_mod.h>
@@ -38,13 +41,199 @@
 
 #include "topo_nic.h"
 
+typedef enum {
+	NIC_PORT_UNKNOWN,
+	NIC_PORT_SFF
+} nic_port_type_t;
+
+static const topo_pgroup_info_t datalink_pgroup = {
+	TOPO_PGROUP_DATALINK,
+	TOPO_STABILITY_PRIVATE,
+	TOPO_STABILITY_PRIVATE,
+	1
+};
+
+typedef struct nic_port_mac {
+	char npm_mac[ETHERADDRSTRL];
+	boolean_t npm_valid;
+	topo_mod_t *npm_mod;
+} nic_port_mac_t;
+
+/*
+ * The first MAC address is always the primary MAC address, so we only worry
+ * about the first. Thus this function always returns B_FALSE, to terminate
+ * iteration.
+ */
+static boolean_t
+nic_port_datalink_mac_cb(void *arg, dladm_macaddr_attr_t *attr)
+{
+	nic_port_mac_t *mac = arg;
+
+	if (attr->ma_addrlen != ETHERADDRL) {
+		topo_mod_dprintf(mac->npm_mod,
+		    "found address with bad length: %u\n", attr->ma_addrlen);
+		return (B_FALSE);
+	}
+
+	(void) snprintf(mac->npm_mac, sizeof (mac->npm_mac),
+	    "%02x:%02x:%02x:%02x:%02x:%02x",
+	    attr->ma_addr[0], attr->ma_addr[1], attr->ma_addr[2],
+	    attr->ma_addr[3], attr->ma_addr[4], attr->ma_addr[5]);
+	mac->npm_valid = B_TRUE;
+	return (B_FALSE);
+}
+
+static int
+nic_port_datalink_props(topo_mod_t *mod, tnode_t *port, dladm_handle_t handle,
+    datalink_id_t linkid)
+{
+	int err;
+	dladm_status_t status;
+	uint64_t ifspeed;
+	link_duplex_t duplex;
+	link_state_t state;
+	const char *duplex_str, *state_str;
+	datalink_class_t dlclass;
+	uint32_t media;
+	char dlname[MAXLINKNAMELEN * 2];
+	char dlerr[DLADM_STRSIZE];
+	nic_port_mac_t mac;
+
+	status = dladm_datalink_id2info(handle, linkid, NULL, &dlclass, &media,
+	    dlname, sizeof (dlname));
+	if (status != DLADM_STATUS_OK) {
+		topo_mod_dprintf(mod, "failed to get link info: %s\n",
+		    dladm_status2str(status, dlerr));
+		return (topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM));
+	}
+
+	if (dlclass != DATALINK_CLASS_PHYS) {
+		return (0);
+	}
+
+	status = dladm_get_single_mac_stat(handle, linkid, "ifspeed",
+	    KSTAT_DATA_UINT64, &ifspeed);
+	if (status != DLADM_STATUS_OK) {
+		topo_mod_dprintf(mod, "failed to get ifspeed: %s\n",
+		    dladm_status2str(status, dlerr));
+		return (topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM));
+	}
+
+	status = dladm_get_single_mac_stat(handle, linkid, "link_duplex",
+	    KSTAT_DATA_UINT32, &duplex);
+	if (status != DLADM_STATUS_OK) {
+		topo_mod_dprintf(mod, "failed to get link_duplex: %s\n",
+		    dladm_status2str(status, dlerr));
+		return (topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM));
+	}
+
+	switch (duplex) {
+	case LINK_DUPLEX_HALF:
+		duplex_str = TOPO_PGROUP_DATALINK_LINK_DUPLEX_HALF;
+		break;
+	case LINK_DUPLEX_FULL:
+		duplex_str = TOPO_PGROUP_DATALINK_LINK_DUPLEX_FULL;
+		break;
+	default:
+		duplex_str = TOPO_PGROUP_DATALINK_LINK_DUPLEX_UNKNOWN;
+		break;
+	}
+
+	status = dladm_get_single_mac_stat(handle, linkid, "link_state",
+	    KSTAT_DATA_UINT32, &state);
+	if (status != DLADM_STATUS_OK) {
+		topo_mod_dprintf(mod, "failed to get link_duplex: %s\n",
+		    dladm_status2str(status, dlerr));
+		return (topo_mod_seterrno(mod, status));
+	}
+
+	switch (state) {
+	case LINK_STATE_UP:
+		state_str = TOPO_PGROUP_DATALINK_LINK_STATUS_UP;
+		break;
+	case LINK_STATE_DOWN:
+		state_str = TOPO_PGROUP_DATALINK_LINK_STATUS_DOWN;
+		break;
+	default:
+		state_str = TOPO_PGROUP_DATALINK_LINK_STATUS_UNKNOWN;
+		break;
+	}
+
+	/*
+	 * Override the duplex if the link is down. Some devices will leave it
+	 * set at half as opposed to unknown.
+	 */
+	if (state == LINK_STATE_DOWN || state == LINK_STATE_UNKNOWN) {
+		duplex_str = TOPO_PGROUP_DATALINK_LINK_DUPLEX_UNKNOWN;
+	}
+
+	mac.npm_mac[0] = '\0';
+	mac.npm_valid = B_FALSE;
+	mac.npm_mod = mod;
+	if (media == DL_ETHER) {
+		(void) dladm_walk_macaddr(handle, linkid, &mac,
+		    nic_port_datalink_mac_cb);
+	}
+
+	if (topo_pgroup_create(port, &datalink_pgroup, &err) != 0) {
+		topo_mod_dprintf(mod, "falied to create property group %s: "
+		    "%s\n", TOPO_PGROUP_DATALINK, topo_strerror(err));
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	if (topo_prop_set_uint64(port, TOPO_PGROUP_DATALINK,
+	    TOPO_PGROUP_DATALINK_LINK_SPEED, TOPO_PROP_IMMUTABLE, ifspeed,
+	    &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set %s property: %s\n",
+		    TOPO_PGROUP_DATALINK_LINK_SPEED, topo_strerror(err));
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	if (topo_prop_set_string(port, TOPO_PGROUP_DATALINK,
+	    TOPO_PGROUP_DATALINK_LINK_DUPLEX, TOPO_PROP_IMMUTABLE, duplex_str,
+	    &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set %s property: %s\n",
+		    TOPO_PGROUP_DATALINK_LINK_DUPLEX, topo_strerror(err));
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	if (topo_prop_set_string(port, TOPO_PGROUP_DATALINK,
+	    TOPO_PGROUP_DATALINK_LINK_STATUS, TOPO_PROP_IMMUTABLE, state_str,
+	    &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set %s property: %s\n",
+		    TOPO_PGROUP_DATALINK_LINK_STATUS, topo_strerror(err));
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	if (topo_prop_set_string(port, TOPO_PGROUP_DATALINK,
+	    TOPO_PGROUP_DATALINK_LINK_NAME, TOPO_PROP_IMMUTABLE, dlname,
+	    &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set %s propery: %s\n",
+		    TOPO_PGROUP_DATALINK_LINK_NAME, topo_strerror(err));
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	if (mac.npm_valid) {
+		if (topo_prop_set_string(port, TOPO_PGROUP_DATALINK,
+		    TOPO_PGROUP_DATALINK_PMAC, TOPO_PROP_IMMUTABLE,
+		    mac.npm_mac, &err) != 0) {
+			topo_mod_dprintf(mod, "failed to set %s propery: %s\n",
+			    TOPO_PGROUP_DATALINK_PMAC, topo_strerror(err));
+			return (topo_mod_seterrno(mod, err));
+		}
+	}
+
+
+	return (0);
+}
+
 /*
  * Create an instance of a transceiver with the specified id. We must create
  * both its port and the transceiver node.
  */
 static int
 nic_create_transceiver(topo_mod_t *mod, tnode_t *pnode, dladm_handle_t handle,
-    datalink_id_t linkid, uint_t tranid)
+    datalink_id_t linkid, uint_t tranid, nic_port_type_t port_type)
 {
 	int ret;
 	tnode_t *port;
@@ -55,8 +244,20 @@ nic_create_transceiver(topo_mod_t *mod, tnode_t *pnode, dladm_handle_t handle,
 	char *vendor = NULL, *part = NULL, *rev = NULL, *serial = NULL;
 	nvlist_t *nvl = NULL;
 
-	if ((ret = port_create_sff(mod, pnode, tranid, &port)) != 0)
+	switch (port_type) {
+	case NIC_PORT_UNKNOWN:
+		ret = port_create_unknown(mod, pnode, tranid, &port);
+		break;
+	case NIC_PORT_SFF:
+		ret = port_create_sff(mod, pnode, tranid, &port);
+		break;
+	}
+
+	if ((ret = nic_port_datalink_props(mod, port, handle, linkid)) != 0)
 		return (ret);
+
+	if (port_type != NIC_PORT_SFF)
+		return (0);
 
 	bzero(&dgt, sizeof (dgt));
 	dgt.dgt_linkid = linkid;
@@ -139,6 +340,7 @@ nic_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	dld_ioc_gettran_t dgt;
 	uint_t ntrans, i;
 	char dname[MAXNAMELEN];
+	nic_port_type_t pt;
 
 	if (strcmp(name, NIC) != 0) {
 		topo_mod_dprintf(mod, "nic_enum: asked to enumerate unknown "
@@ -172,9 +374,13 @@ nic_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	dgt.dgt_tran_id = DLDIOC_GETTRAN_GETNTRAN;
 
 	if (ioctl(dladm_dld_fd(handle), DLDIOC_GETTRAN, &dgt) != 0) {
-		if (errno == ENOTSUP)
-			return (0);
-		return (-1);
+		if (errno != ENOTSUP) {
+			return (-1);
+		}
+		pt = NIC_PORT_UNKNOWN;
+		dgt.dgt_tran_id = 1;
+	} else {
+		pt = NIC_PORT_SFF;
 	}
 
 	ntrans = dgt.dgt_tran_id;
@@ -185,8 +391,10 @@ nic_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		return (-1);
 
 	for (i = 0; i < ntrans; i++) {
-		if (nic_create_transceiver(mod, pnode, handle, linkid, i) != 0)
+		if (nic_create_transceiver(mod, pnode, handle, linkid, i,
+		    pt) != 0) {
 			return (-1);
+		}
 	}
 
 	return (0);

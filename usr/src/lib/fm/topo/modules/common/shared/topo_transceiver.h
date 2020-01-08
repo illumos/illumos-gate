@@ -20,6 +20,8 @@
  * Routines to manage and create ports.
  */
 
+#include <fm/topo_mod.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

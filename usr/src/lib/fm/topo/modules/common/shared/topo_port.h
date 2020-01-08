@@ -20,6 +20,8 @@
  * Routines to manage and create ports.
  */
 
+#include <fm/topo_mod.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -29,6 +31,8 @@ extern int port_range_create(topo_mod_t *, tnode_t *, topo_instance_t,
 extern int port_create_sff(topo_mod_t *, tnode_t *, topo_instance_t,
     tnode_t **);
 extern int port_create_usb(topo_mod_t *, tnode_t *, topo_instance_t,
+    tnode_t **);
+extern int port_create_unknown(topo_mod_t *, tnode_t *, topo_instance_t,
     tnode_t **);
 
 #ifdef __cplusplus
