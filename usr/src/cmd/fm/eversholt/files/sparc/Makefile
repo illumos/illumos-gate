@@ -34,7 +34,8 @@ EFT_COMMON_FILES=		\
 	sca500.eft		\
 	sca1000.eft		\
 	sensor.eft		\
-	storage.eft
+	storage.eft		\
+	nic.eft
 
 include ../../../Makefile.subdirs
 

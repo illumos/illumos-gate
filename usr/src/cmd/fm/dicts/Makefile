@@ -38,7 +38,8 @@ common_DCNAMES = \
 	SCA1000 \
 	SENSOR \
 	STORAGE \
-	TEST
+	TEST \
+	NIC
 
 i386_DCNAMES = \
 	AMD \
