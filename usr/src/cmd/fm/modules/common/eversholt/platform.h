@@ -28,8 +28,6 @@
 #ifndef	_EFT_PLATFORM_H
 #define	_EFT_PLATFORM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libnvpair.h>
 
 #ifdef	__cplusplus
@@ -38,6 +36,7 @@ extern "C" {
 
 #include <config.h>
 #include <fm/fmd_api.h>
+#include <fm/libtopo.h>
 
 nvlist_t *Action_nvl;	/* nvl for problem with action=... prop on it */
 
@@ -45,8 +44,8 @@ void platform_init(void);
 void platform_fini(void);
 void platform_run_poller(const char *poller);
 void platform_set_payloadnvp(nvlist_t *nvlp);
-void platform_units_translate(int, struct config *, nvlist_t **, nvlist_t **,
-    nvlist_t **, char *);
+void platform_unit_translate(int, struct config *, const char *, nvlist_t **,
+    char *);
 
 struct cfgdata *platform_config_snapshot(void);
 void platform_restore_config(fmd_hdl_t *hdl, fmd_case_t *fmcase);

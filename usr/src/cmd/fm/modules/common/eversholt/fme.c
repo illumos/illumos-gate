@@ -38,6 +38,7 @@
 #include <libnvpair.h>
 #include <sys/fm/protocol.h>
 #include <fm/fmd_api.h>
+#include <fm/libtopo.h>
 #include "alloc.h"
 #include "out.h"
 #include "stats.h"
@@ -340,7 +341,7 @@ newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
 	ipathlastcomp(e0ipp);
 	pathstr = ipath2str(NULL, e0ipp);
 	cfgdata = config_snapshot();
-	platform_units_translate(0, cfgdata->cooked, NULL, NULL,
+	platform_unit_translate(0, cfgdata->cooked, TOPO_PROP_RESOURCE,
 	    &detector, pathstr);
 	FREE(pathstr);
 	structconfig_free(cfgdata->cooked);
@@ -392,7 +393,7 @@ newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
 	nvlist_free(detector);
 	pathstr = ipath2str(NULL, e0ipp);
 	cfgdata = config_snapshot();
-	platform_units_translate(0, cfgdata->cooked, NULL, NULL,
+	platform_unit_translate(0, cfgdata->cooked, TOPO_PROP_RESOURCE,
 	    &detector, pathstr);
 	FREE(pathstr);
 	platform_save_config(hdl, fmcase);
@@ -2181,7 +2182,8 @@ void
 get_resources(struct event *sp, struct rsl *rsrcs, struct config *croot)
 {
 	struct node *asrudef, *frudef;
-	nvlist_t *asru, *fru;
+	const struct ipath *asrupath, *frupath;
+	nvlist_t *asru = NULL, *fru = NULL;
 	nvlist_t *rsrc = NULL;
 	char *pathstr;
 
@@ -2193,19 +2195,29 @@ get_resources(struct event *sp, struct rsl *rsrcs, struct config *croot)
 	frudef = eventprop_lookup(sp, L_FRU);
 
 	/*
-	 * Create FMRIs based on those definitions
+	 * Create ipaths based on those definitions
 	 */
-	asru = node2fmri(asrudef);
-	fru = node2fmri(frudef);
-	pathstr = ipath2str(NULL, sp->ipp);
+	asrupath = ipath(asrudef);
+	frupath = ipath(frudef);
 
 	/*
 	 *  Allow for platform translations of the FMRIs
 	 */
-	platform_units_translate(is_defect(sp->t), croot, &asru, &fru, &rsrc,
-	    pathstr);
-
+	pathstr = ipath2str(NULL, sp->ipp);
+	platform_unit_translate(is_defect(sp->t), croot, TOPO_PROP_RESOURCE,
+	    &rsrc, pathstr);
 	FREE(pathstr);
+
+	pathstr = ipath2str(NULL, asrupath);
+	platform_unit_translate(is_defect(sp->t), croot, TOPO_PROP_ASRU,
+	    &asru, pathstr);
+	FREE(pathstr);
+
+	pathstr = ipath2str(NULL, frupath);
+	platform_unit_translate(is_defect(sp->t), croot, TOPO_PROP_FRU,
+	    &fru, pathstr);
+	FREE(pathstr);
+
 	rsrcs->suspect = sp;
 	rsrcs->asru = asru;
 	rsrcs->fru = fru;
@@ -3115,8 +3127,8 @@ fme_undiagnosable(struct fme *f)
 			fmd_case_add_ereport(f->hdl, f->fmcase, ep->ffep);
 
 		pathstr = ipath2str(NULL, ipath(platform_getpath(ep->nvp)));
-		platform_units_translate(0, f->config, NULL, NULL, &detector,
-		    pathstr);
+		platform_unit_translate(0, f->config, TOPO_PROP_RESOURCE,
+		    &detector, pathstr);
 		FREE(pathstr);
 
 		/* add defect */

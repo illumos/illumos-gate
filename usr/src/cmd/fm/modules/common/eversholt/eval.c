@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <fm/libtopo.h>
 #include "alloc.h"
 #include "out.h"
 #include "stable.h"
@@ -507,7 +508,7 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 			valuep->v = 1;
 		return (1);
 	} else if (funcname == L_has_fault) {
-		nvlist_t *asru = NULL, *fru = NULL, *rsrc = NULL;
+		nvlist_t *rsrc = NULL;
 
 		nodep = eval_getname(funcnp, ex, events, np->u.expr.left,
 		    globals, croot, arrowp, try, &duped);
@@ -519,7 +520,8 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 		}
 
 		path = ipath2str(NULL, ipath(nodep));
-		platform_units_translate(0, croot, &asru, &fru, &rsrc, path);
+		platform_unit_translate(0, croot, TOPO_PROP_RESOURCE,
+		    &rsrc, path);
 		outfl(O_ALTFP|O_VERB2|O_NONL, np->file, np->line, "has_fault(");
 		ptree_name_iter(O_ALTFP|O_VERB2|O_NONL, nodep);
 		out(O_ALTFP|O_VERB2|O_NONL, "(%s), \"%s\") ", path,
