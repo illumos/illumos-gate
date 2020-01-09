@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #include "libmail.h"
 #include <sys/types.h>
@@ -41,12 +39,10 @@ typedef void (*SIG_PF) (int);
 #include <unistd.h>
 #include <signal.h>
 
-static SIG_PF catcher(void);
-
-static SIG_PF catcher(void)
+static void
+catcher(int arg __unused)
 {
 	/* do nothing, but allow the write() to break */
-	return (0);
 }
 
 void
@@ -77,7 +73,7 @@ notify(char *user, char *msg, int check_mesg_y, char *etcdir)
 			(void) sprintf(dev, "%s/dev/%s", etcdir, tty);
 
 			/* break out if write() to the tty hangs */
-			old = (SIG_PF)signal(SIGALRM, (SIG_PF)catcher);
+			old = (SIG_PF)signal(SIGALRM, catcher);
 			oldalarm = alarm(300);
 
 			/* check if device is really a tty */

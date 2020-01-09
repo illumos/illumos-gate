@@ -21,7 +21,7 @@
 # Copyright (c) 2015, 2016 by Delphix. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright (c) 2019, Joyent, Inc.
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 from __future__ import print_function
@@ -280,7 +280,7 @@ def jstyle(root, parent, flist, output):
     ret = 0
     output.write("Java style:\n")
     for f in flist(lambda x: x.endswith('.java')):
-        with io.open(f, encoding='utf-8', errors='replace') as fh:
+        with io.open(f, mode='rb') as fh:
             ret |= JStyle.jstyle(fh, output=output, picky=True)
     return ret
 
