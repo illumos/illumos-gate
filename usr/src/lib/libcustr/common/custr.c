@@ -14,7 +14,7 @@
  */
 
 /*
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <stdlib.h>
@@ -83,6 +83,81 @@ custr_reset(custr_t *cus)
 
 	cus->cus_strlen = 0;
 	cus->cus_data[0] = '\0';
+}
+
+int
+custr_remove(custr_t *cus, size_t idx, size_t len)
+{
+	size_t endidx = idx + len;
+
+	/*
+	 * Once gcc4 is dropped as a shadow compiler, we can migrate to
+	 * using builtins for the overflow check.
+	 */
+	if (endidx < idx || endidx < len) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	if (idx >= cus->cus_strlen || endidx > cus->cus_strlen) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	if (len == 0)
+		return (0);
+
+	/* The +1 will include the terminating NUL in the move */
+	(void) memmove(cus->cus_data + idx, cus->cus_data + endidx,
+	    cus->cus_strlen - endidx + 1);
+	cus->cus_strlen -= len;
+
+	/* The result should be NUL */
+	VERIFY0(cus->cus_data[cus->cus_strlen]);
+	return (0);
+}
+
+int
+custr_rremove(custr_t *cus, size_t ridx, size_t len)
+{
+	size_t idx;
+
+	if (ridx >= cus->cus_strlen) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	idx = cus->cus_strlen - ridx - 1;
+	return (custr_remove(cus, idx, len));
+}
+
+int
+custr_trunc(custr_t *cus, size_t idx)
+{
+	if (idx >= cus->cus_strlen) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	cus->cus_data[idx] = '\0';
+	cus->cus_strlen = idx;
+	return (0);
+}
+
+int
+custr_rtrunc(custr_t *cus, size_t ridx)
+{
+	size_t idx;
+
+	if (ridx >= cus->cus_strlen) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	idx = cus->cus_strlen - ridx - 1;
+	cus->cus_data[idx] = '\0';
+	cus->cus_strlen = idx;
+	return (0);
 }
 
 size_t

@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -42,7 +42,11 @@ SYMBOL_VERSION ILLUMOSprivate {
 	custr_cstr;
 	custr_free;
 	custr_len;
+	custr_remove;
 	custr_reset;
+	custr_rremove;
+	custr_rtrunc;
+	custr_trunc;
 	custr_xalloc;
 	custr_xalloc_buf;
     local:

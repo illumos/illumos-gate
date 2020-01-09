@@ -70,3 +70,6 @@ tests = ['afl-fast', 'gcc-libstdc++', 'llvm-stdcxxabi']
 [/opt/util-tests/tests/ctf]
 pre = precheck
 tests = [ 'ctftest' ]
+
+[/opt/util-tests/tests/libcustr]
+tests = ['custr_remove', 'custr_trunc']
