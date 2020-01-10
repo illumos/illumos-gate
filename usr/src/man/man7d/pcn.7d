@@ -24,27 +24,24 @@
 .\" ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 .\" Portions Copyright (c) 2007 by Sun Microsystems, Inc.  All Rights Reserved.
 
-.TH "PCN" "7D" "Sep 16, 2011"
+.TH "PCN" "7D" "Jan 10, 2020"
 .
 .SH "NAME"
 \fBpcn\fR \- PCnet Ethernet device driver
 .SH "SYNOPSIS"
-.LP
 .nf
 \fB/dev/pcn\fR
 .fi
 
 .SH "DESCRIPTION"
-.sp
-.LP
 The \fBpcn\fR driver is a multi\-threaded, loadable, clonable GLDv3\-based
 STREAMS driver supporting the Data Link Provider Interface \fBdlpi\fR(7P) for
-the AMD PCnet family of Ethernet controllers\.
+the AMD PCnet family of Ethernet controllers.
 .SH "APPLICATION PROGRAMMING INTERFACE"
 The \fBpcn\fR driver can be used as either a "style 1" or a "style 2" Data Link
-Service Provider\. Physical points of attachment (PPAs) are interpreted as the
+Service Provider. Physical points of attachment (PPAs) are interpreted as the
 instance number of the \fBpcn\fR controller as assigned by the
-operating environment\.
+operating environment.
 .sp
 .LP
 The values returned by the driver in the \fBDL_INFO_ACK\fR response are:
@@ -52,60 +49,58 @@ The values returned by the driver in the \fBDL_INFO_ACK\fR response are:
 .TP
 .ie t \(bu
 .el o
-Maximum SDU is 1500\.
+Maximum SDU is 1500.
 .RE
 .RS +4
 .TP
 .ie t \(bu
 .el o
-Minimum SDU is 0\.
+Minimum SDU is 0.
 .RE
 .RS +4
 .TP
 .ie t \(bu
 .el o
-The dlsap address length is 8\.
+The dlsap address length is 8.
 .RE
 .RS +4
 .TP
 .ie t \(bu
 .el o
-MAC type is \fBDL_ETHER\fR\.
+MAC type is \fBDL_ETHER\fR.
 .RE
 .RS +4
 .TP
 .ie t \(bu
 .el o
-SAP length is \-2\. The 6\-byte physical address is immediately followed by a
-2\-byte SAP\.
+SAP length is \-2. The 6\-byte physical address is immediately followed by a
+2\-byte SAP.
 .RE
 .RS +4
 .TP
 .ie t \(bu
 .el o
-Service mode is \fBDL_CLDLS\fR\.
+Service mode is \fBDL_CLDLS\fR.
 .RE
 .RS +4
 .TP
 .ie t \(bu
 .el o
 The broadcast address is the 6\-byte Ethernet broadcast address
-(\fBff:ff:ff:ff:ff:ff\fR)\.
+(\fBff:ff:ff:ff:ff:ff\fR).
 .SH "CONFIGURATION"
-.sp
-.LP
 The \fBpcn\fR driver performs auto-negotiation to select the link speed and
-mode\.  Link sped may be 100Mbps full\-duplex, 100Mbps half\-duplex,
+mode.  Link speed may be 100Mbps full\-duplex, 100Mbps half\-duplex,
 10Mbps full\-duplex, or 10Mbps half\-duplex, depending on the hardware
-adapter type\.  See the \fIIEEE802.3\fR standard for more information\.
+adapter type.  See the \fIIEEE802.3\fR standard for more information.
 .sp
 .LP
 The capabilities advertised by the \fBpcn\fR device can be set using
-\fBdladm\fR(1m)\.  The driver supports a number of parameters whose names
-being with \fBen_\fR (see below)\.  Each of these parameters contains a
-boolean value that determines if the devices advertises that mode of
-operations\.  The \fBadv_autoneg_cap\fR parameter controls whether
-auto-negotioation is performed\.  If \fBadv_autoneg_cap\fR is set to 0, the
+\fBdladm\fR(1m).  The driver supports a number of parameters whose names
+begin with \fBen_\fR (see below).  Each of these parameters contains a
+boolean value that determines if the device advertises that mode of
+operations.  The \fBadv_autoneg_cap\fR parameter controls whether
+auto-negotiation is performed.  If \fBadv_autoneg_cap\fR is set to 0, the
 driver forces the mode of operation selected by the first non-zero
 parameter in priority order as shown below:
 .sp
@@ -120,12 +115,10 @@ parameter in priority order as shown below:
 
 .sp
 .LP
-All capabilities default to enabled\.  Note that changing any capability
-parameter causes te link to go down while the link partners renegotiate
-the link speed/duplex using the newly changed capabilities\.
+All capabilities default to enabled.  Note that changing any capability
+parameter causes the link to go down while the link partners renegotiate
+the link speed/duplex using the newly changed capabilities.
 .SH "ATTRIBUTES"
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -142,39 +135,26 @@ Interface Stability	Committed
 .TE
 
 .SH "FILES"
-.sp
 .ne 2
 .na
-\fB\fB/dev/pcn\fR\fR
+\fB/dev/pcn\fR
 .ad
 .sp .6
 .RS 4n
-Special character device\.
+Special character device.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fB/kernel/drv/pcn\fR\fR
-.ad
-.sp 6
-.RS 4n
-32\-bit driver binary\.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/amd64/pcn\fR\fR
+\fB/kernel/drv/amd64/pcn\fR
 .ad
 .sp .6
 .RS 4n
-64\-bit driver binary (x86)\.
+Device driver (x86)
 .RE
 
 .SH "SEE ALSO"
-.sp
-.LP
 \fBattributes\fR(5), \fBstreamio\fR(7I), \fBdlpi\fR(7p)
 .sp
 .LP

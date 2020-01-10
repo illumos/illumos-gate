@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd October 17, 2016
+.Dd January 10, 2020
 .Dt XHCI 7D
 .Os
 .Sh NAME
@@ -23,7 +23,7 @@
 The
 .Nm
 driver supports PCI devices that implement versions 1.0 and 1.1 of the
-Extensible Host Controller Inteface Specification.
+Extensible Host Controller Interface Specification.
 These devices provide support for USB 3.0, USB 2.x, and USB 1.x devices and is
 integrated into the broader illumos USB Architecture (USBA).
 .Pp
@@ -94,12 +94,10 @@ driver is only supported on
 systems at this time.
 .Sh FILES
 .Bl -tag -width Pa
-.It Pa /kernel/drv/xhci
-32-bit device driver (x86).
 .It Pa /kernel/drv/amd64/xhci
-64-bit device driver (x86).
+Device driver (x86)
 .It Pa /kernel/drv/xhci.conf
-Driver configuration file.
+Driver configuration file
 .El
 .Sh SEE ALSO
 .Xr cfgadm 1M ,

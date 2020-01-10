@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2018 Joyent, Inc.
 .\"
-.Dd May 23, 2018
+.Dd Jan 10, 2020
 .Dt I40E 7D
 .Os
 .Sh NAME
@@ -64,7 +64,7 @@ is recommended.
 Each instance is assigned a unique ascending integer identifier.
 A device which has multiple ports may appear to the system as separate
 instances.
-The system does not provide a guarnatee on how these will be presented.
+The system does not provide a guarantee on how these will be presented.
 Using this instance identifier, one can determine the exact character-special
 file to open.
 For example, the first instance enumerated in the system, with id 0, would be
@@ -150,7 +150,7 @@ Maximum:
 .Bd -filled
 The
 .Sy mr_enable
-proeprty determines whether or not support for multiple rings is enabled
+property determines whether or not support for multiple rings is enabled
 for the device.
 The default is always to enable them.
 It is not recommended to to disable them.
@@ -232,7 +232,7 @@ Maximum:
 The
 .Sy tx_hcksum_enable
 property controls whether or not the device enables support for hardware
-checksuming of outgoing packets.
+checksumming of outgoing packets.
 The default is to always enable support for this.
 Turning it off will increase latency and decrease throughput when transmitting
 packets, but should be done if a hardware bug is suspected.
@@ -248,7 +248,7 @@ Maximum:
 The
 .Sy rx_hcksum_enable
 property controls whether or not the device enables support for hardware
-checksuming of incoming packets.
+checksumming of incoming packets.
 The default is to always enable support for this.
 Turning it off will increase latency and decrease throughput when receiving
 packets, but should be done if a hardware bug is suspected.
@@ -260,11 +260,11 @@ Minimum:
 Maximum:
 .Sy INT32_MAX |
 Runtime Property:
-.Sy _rx_dma_treshold
+.Sy _rx_dma_threshold
 .Ed
 .Bd -filled
 The
-.Sy rx_dma_treshold
+.Sy rx_dma_threshold
 indicates the size in bytes of a received frame, including all of its
 headers, at which the driver should not copy the frame but instead bind
 DMA memory.
@@ -300,12 +300,10 @@ systems at this time.
 .Bl -tag -width Pa
 .It Pa /dev/net/i40e*
 Per-instance character device.
-.It Pa /kernel/drv/i40e
-32-bit device driver (x86).
 .It Pa /kernel/drv/amd64/i40e
-64-bit device driver (x86).
+Device driver (x86)
 .It Pa /kernel/drv/i40e.conf
-Driver configuration file.
+Driver configuration file
 .El
 .Sh SEE ALSO
 .Xr dladm 1M ,

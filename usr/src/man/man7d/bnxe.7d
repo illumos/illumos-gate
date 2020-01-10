@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2014 QLogic Corporation. All Rights Reserved
 .\"
-.TH BNXE 7D "Jul 17, 2014"
+.TH BNXE 7D "Jan 10, 2020"
 .SH NAME
 bnxe \- QLogic NetXtreme II 10 Gigabit Ethernet Device Driver
 
@@ -21,7 +21,6 @@ bnxe \- QLogic NetXtreme II 10 Gigabit Ethernet Device Driver
 .ad
 
 .SH DESCRIPTION
-.LP
 The
 .B bnxe
 Ethernet driver is a multi-threaded, loadable,
@@ -96,7 +95,7 @@ for Tx ring stats, and
 "stats"
 for general driver stats and version info.
 .LP
-To get a list of all the individual statistics in these goups run:
+To get a list of all the individual statistics in these groups run:
 .na
 % kstat -m bnxe -i 0 -l
 .ad
@@ -117,16 +116,7 @@ Character special device
 /kernel/drv/bnxe.conf
 .ad
 .RS 16n
-Driver configuration file.
-.RE
-
-.sp
-.ne 2
-.na
-/kernel/drv/bnxe
-.ad
-.RS 16n
-32-bit i386 driver binary.
+Driver configuration file
 .RE
 
 .sp
@@ -135,7 +125,7 @@ Driver configuration file.
 /kernel/drv/amd64/bnxe
 .ad
 .RS 16n
-64-bit i386 driver binary.
+Device driver (x86)
 .RE
 
 .sp
@@ -144,7 +134,7 @@ Driver configuration file.
 /kernel/drv/sparcv9/bnxe
 .ad
 .RS 16n
-SPARC driver binary.
+Device driver (SPARC)
 .RE
 
 .SH SEE ALSO

@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2014 QLogic Corporation. All Rights Reserved
 .\"
-.Dd August 28, 2017
+.Dd January 10, 2020
 .Dt QEDE 7D
 .Os
 .Sh NAME
@@ -89,7 +89,7 @@ for Tx ring stats
 for general driver stats and version info.
 .El
 .Pp
-To get a list of all the individual statistics in these goups run:
+To get a list of all the individual statistics in these groups run:
 .Bd -literal -offset indent
 # kstat -m qede -i 0 -l
 .Ed

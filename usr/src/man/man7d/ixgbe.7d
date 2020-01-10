@@ -5,17 +5,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IXGBE 7D "Apr 10, 2016"
+.TH IXGBE 7D "Jan 10, 2020"
 .SH NAME
 ixgbe \- Intel 10Gb PCI Express NIC Driver
 .SH SYNOPSIS
-.LP
 .nf
 \fB/dev/ixgbe*\fR
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBixgbe\fR 10 Gigabit Ethernet driver is a multi-threaded, loadable,
 clonable, GLD-based STREAMS driver supporting the Data Link Provider Interface,
 \fBdlpi\fR(7P), on Intel 10-Gigabit PCI Express Ethernet controllers.
@@ -55,7 +53,6 @@ Intel Ethernet Controller X550 Family
 The \fBixgbe\fR driver and hardware support auto-negotiation, a protocol
 specified by the \fIIEEE 802.3ae\fR specification.
 .SH APPLICATION PROGRAMMING INTERFACE
-.LP
 The cloning character-special device, \fB/dev/ixgbe\fR, is used to access all
 Intel 10-Gigabit PCI Express Ethernet devices installed within the system.
 .sp
@@ -124,7 +121,6 @@ Once in the DL_ATTACHED state, you must send a DL_BIND_REQ to associate a
 particular SAP with the stream.
 .RE
 .SH CONFIGURATION
-.LP
 By default, the \fBixgbe\fR driver performs auto-negotiation to select the link
 speed and mode. Link speed and mode can only be 10000 Mbps full-duplex for fiber, and only 10000, 1000, or 100 Mbps full-duplex for copper. See the
 \fIIEEE802.3\fR standard for more information.
@@ -140,19 +136,10 @@ Special character device.
 .sp
 .ne 2
 .na
-\fB\fB/kernel/drv/ixgbe\fR\fR
-.ad
-.RS 29n
-32-bit device driver (x86).
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB/kernel/drv/amd64/ixgbe\fR\fR
 .ad
 .RS 29n
-64-bit device driver (x86).
+Device driver (x86)
 .RE
 
 .sp
@@ -161,7 +148,7 @@ Special character device.
 \fB\fB/kernel/drv/sparcv9/ixgbe\fR\fR
 .ad
 .RS 29n
-64-bit device driver (SPARC).
+Device driver (SPARC)
 .RE
 
 .sp
@@ -170,11 +157,10 @@ Special character device.
 \fB\fB/kernel/drv/ixgbe.conf\fR\fR
 .ad
 .RS 29n
-Configuration file.
+Driver configuration file
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -191,7 +177,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.LP
 \fBdladm\fR(1M), \fBnetstat\fR(1M), \fBdriver.conf\fR(4), \fBattributes\fR(5),
 \fBstreamio\fR(7I), \fBdlpi\fR(7P)
 .sp
@@ -205,4 +190,4 @@ Interface Stability	Committed
 \fINetwork Interfaces Programmer's Guide\fR
 .sp
 .LP
-\fIIEEE 802.3ae Specificiation\fR, IEEE - 2002
+\fIIEEE 802.3ae Specification\fR, IEEE - 2002
