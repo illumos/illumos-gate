@@ -804,6 +804,7 @@ public:
 		// constructors
 		iterator() : node(0) {}
 		iterator(entry *node_) : node(node_) {}
+		iterator(const iterator&) = default;
 
 		// dereference operator
 		Name operator->() const { return node->name; }

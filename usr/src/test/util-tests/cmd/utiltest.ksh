@@ -17,6 +17,8 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
+export PATH="${PATH}:/opt/onbld/bin/$(uname -p)"
+export LC_ALL="C"
 export MY_TESTS="/opt/util-tests"
 runner="/opt/test-runner/bin/run"
 

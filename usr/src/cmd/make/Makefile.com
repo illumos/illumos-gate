@@ -14,6 +14,7 @@
 MAKE_INCLUDE= $(SRC)/cmd/make/include
 CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -I$(MAKE_INCLUDE) $(MAKE_DEFS)
+CCFLAGS += -_gcc4=-std=gnu++0x
 
 # So that it's set even for the libraries we build
 TEXT_DOMAIN = SUNW_OST_OSCMD
