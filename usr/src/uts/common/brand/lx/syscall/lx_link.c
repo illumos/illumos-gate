@@ -116,6 +116,7 @@ lx_isdir(int atfd, char *path)
 	if (cstatat_getvp(atfd, path, NO_FOLLOW, &vp, &cr) != 0)
 		return (B_FALSE);
 
+	crfree(cr);
 	is_dir = (vp->v_type == VDIR);
 	VN_RELE(vp);
 
