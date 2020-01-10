@@ -3,24 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DCAM1394 7D "May 19, 2004"
+.TH DCAM1394 7D "Jan 10, 2020"
 .SH NAME
 dcam1394 \- 1394-based digital camera (IIDC) driver
 .SH SYNOPSIS
-.LP
 .nf
 \fB#include <sys/dcam/dcam1394_io.h>\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBdcam1394\fR driver supports devices implementing the \fI1394 Trade
 Association Digital Camera Specification\fR (also referred to as the IIDC
 specification).  Only a subset of the specification is supported.
 .SH READING DATA
-.sp
-.LP
 Isochronous data is read from the driver frame-by-frame and is maintained
 within the driver in a ring buffer.
 .sp
@@ -48,8 +43,6 @@ The size to allocate for the structure is determined by the video mode for
 which the camera is configured. Possible values for the vid_mode field are
 listed under DCAM1394_PARAM_VID_MODE below.
 .SH IOCTL REQUESTS
-.sp
-.LP
 The following ioctl requests are supported:
 .sp
 .ne 2
@@ -116,7 +109,7 @@ Gets a list of parameters associated with a camera. The argument is a pointer
 to a \fBdcam1394_param_list_t\fR structure (described below). The parameter
 list is accessed through macros defined below.
 .sp
-The paramter list only supports Format 1 video formats.
+The parameter list only supports Format 1 video formats.
 .RE
 
 .sp
@@ -130,7 +123,7 @@ Sets a list of parameters associated with a camera. The argument is a pointer
 to a \fBdcam1394_param_list_t structure\fR (described below). The parameter
 list is accessed through macros defined below.
 .sp
-The paramter list only supports Format 1 video formats.
+The parameter list only supports Format 1 video formats.
 .RE
 
 .sp
@@ -177,8 +170,6 @@ Reset frame sequence number.
 .RE
 
 .SH PARAMETER LIST ACCESS
-.sp
-.LP
 The parameter list is initialized and access through macros. The data type for
 the parameter list is \fBdcam1394_param_list_t\fR.
 .sp
@@ -249,8 +240,6 @@ Indicates if a specific parameter is successfully set.
 When no subparam value is required, the value DCAM1394_SUBPARAM_NONE may be
 used.
 .SH PARAMETERS
-.sp
-.LP
 The following parameters may appear in the list:
 .sp
 .ne 2
@@ -896,10 +885,9 @@ DCAM1394_PARAM_BRIGHTNESS.
 .RE
 
 .SH DEVICE SPECIAL FILES
-.sp
 .ne 2
 .na
-\fB\fB/dev/dcam\fIN\fR\fR\fR
+\fB/dev/dcam\fIN\fR\fR
 .ad
 .RS 17n
 Device node for isochronous input from camera.
@@ -908,36 +896,33 @@ Device node for isochronous input from camera.
 .sp
 .ne 2
 .na
-\fB\fB/dev/dcamctl\fIN\fR\fR\fR
+\fB/dev/dcamctl\fIN\fR\fR
 .ad
 .RS 17n
 Device node for camera control.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
-\fB\fBkernel/drv/sparcv9/dcam1394\fR\fR
+\fB/kernel/drv/sparcv9/dcam1394\fR
 .ad
 .sp .6
 .RS 4n
-64-bit ELF kernel module.
+Device driver (SPARC)
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBkernel/drv/dcam1394\fR\fR
+\fB/kernel/drv/amd64/dcam1394\fR
 .ad
 .sp .6
 .RS 4n
-32-bit ELF kernel module.
+Device driver (x86)
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -952,8 +937,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBhci1394\fR(7D)
 .sp
 .LP

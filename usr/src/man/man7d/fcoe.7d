@@ -3,50 +3,37 @@
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
-.TH FCOE 7D "Mar 18, 2009"
+.\" Copyright 2020 Peter Tribble.
+.TH FCOE 7D "Jan 10, 2020"
 .SH NAME
 fcoe \- fibre channel over Ethernet transport driver
 .SH DESCRIPTION
-.sp
-.LP
 The \fBfcoe\fR driver is a pseudo nexus driver which supports the
-transportation of FCoE encapsualted frames. FCoE Ethernet frame will
+transportation of FCoE encapsulated frames. FCoE Ethernet frame will
 encapsulate the raw Fibre Channel frame.
 .sp
 .LP
 The \fBfcoe\fR driver interfaces with FCoE target mode device driver,
 \fBfcoet\fR(7D).
 .SH FILES
-.sp
 .ne 2
 .na
-\fB\fB/kernel/drv/fcoe\fR\fR
+\fB/kernel/drv/amd64/fcoe\fR
 .ad
 .RS 26n
-32-bit ELF kernel module (x86)
+Device driver (x86)
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fB/kernel/drv/amd64/fcoe\fR\fR
+\fB/kernel/drv/sparcv9/fcoe\fR
 .ad
 .RS 26n
-64-bit ELF kernel module (x86)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBkernel/drv/sparcv\fR\fR
-.ad
-.RS 26n
-64-bit ELF kernel module (SPARC)
+Device driver (SPARC)
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attribute:
 .sp
 
@@ -61,8 +48,6 @@ Architecture	SPARC, x86
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBdriver.conf\fR(4), \fBattributes\fR(5), \fBfcoet\fR(7D)
 .sp
 .LP

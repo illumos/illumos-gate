@@ -3,37 +3,29 @@
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\"  Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
-.TH AV1394 7D "Apr 3, 2009"
+.TH AV1394 7D "Jan 10, 2020"
 .SH NAME
 av1394 \- 1394 audio/video driver
 .SH SYNOPSIS
-.LP
 .nf
 \fBunit@GUID\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBav1394\fR driver implements \fBiec61883\fR(7I) interfaces for IEEE 1394
 compliant devices.
 .SS "Asynchronous Transactions"
-.sp
-.LP
 The driver allows applications to act as FCP controllers, but not FCP targets.
 Only \fBIEC61883_FCP_CMD\fR requests can be sent with \fBwrite\fR(2). Only
 \fBIEC61883_FCP_RESP\fR requests can be received with \fBread\fR(2).
 .SS "Isochronous Transactions"
-.sp
-.LP
 When the read/write method of is used for transmit, the driver is capable of
 auto-detecting and transmitting SD-DVCR 525/60 and 625/50 streams. See
 \fBiec61883\fR(7I) for details.
 .SH FILES
-.sp
 .ne 2
 .na
-\fB\fB/dev/av/N/async\fR\fR
+\fB/dev/av/N/async\fR
 .ad
 .RS 29n
 device node for asynchronous data
@@ -42,7 +34,7 @@ device node for asynchronous data
 .sp
 .ne 2
 .na
-\fB\fB/dev/av/N/isoch\fR\fR
+\fB/dev/av/N/isoch\fR
 .ad
 .RS 29n
 device node for isochronous data
@@ -51,33 +43,22 @@ device node for isochronous data
 .sp
 .ne 2
 .na
-\fB\fBkernel/drv/sparcv9/av1394\fR\fR
+\fB/kernel/drv/sparcv9/av1394\fR
 .ad
 .RS 29n
-64-bit ELF kernel module
+Device driver (SPARC)
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBkernel/drv/av1394\fR\fR
+\fB/kernel/drv/amd64/av1394\fR
 .ad
 .RS 29n
-32-bit ELF kernel module
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBkernel/drv/amd64/av1394\fR\fR
-.ad
-.RS 29n
-64-bit ELF kernel module
+Device driver (x86)
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -94,8 +75,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBread\fR(2), \fBwrite\fR(2), \fBattributes\fR(5), \fBhci1394\fR(7D),
 \fBiec61883\fR(7I)
 .sp

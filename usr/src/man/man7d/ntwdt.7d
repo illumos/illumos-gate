@@ -3,18 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NTWDT 7D "Feb 05, 2005"
+.TH NTWDT 7D "Jan 10, 2020"
 .SH NAME
 ntwdt \- Netra\(embased application watchdog timer driver
 .SH SYNOPSIS
-.LP
 .nf
 /dev/ntwdt
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBntwdt\fR driver is a multithreaded, loadable, non-STREAMS pseudo driver
 that provides an application with an interface for controlling a system
 watchdog timer.
@@ -23,13 +20,9 @@ watchdog timer.
 The \fBntwdt\fR driver implements a \fBvirtual watchdog timer\fR that a
 privileged application (Effective UID == 0) controls via IOCTLs.
 .SH CONFIGURATION
-.sp
-.LP
 You configure the \fBntwdt\fR driver by modifying the contents of the
 \fBntwdt.conf\fR file.
 .SH ERRORS
-.sp
-.LP
 An \fBopen()\fR fails if:
 .sp
 .ne 2
@@ -59,7 +52,6 @@ Effective user ID is not zero.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB/dev/ntwdt\fR
@@ -71,24 +63,22 @@ Special character device.
 .sp
 .ne 2
 .na
-\fBkernel/drv/sparcv9/ntwdt\fR
+\fB/kernel/drv/sparcv9/ntwdt\fR
 .ad
 .RS 28n
-SPARC ntwdt driver binary.
+Device driver (SPARC)
 .RE
 
 .sp
 .ne 2
 .na
-\fBkernel/drv/ntwdt.conf\fR
+\fB/kernel/drv/ntwdt.conf\fR
 .ad
 .RS 28n
-Driver configuraton file.
+Driver configuration file
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -103,8 +93,6 @@ Architecture	SPARC
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBdriver.conf\fR(4), \fBattributes\fR(5)
 .sp
 .LP
