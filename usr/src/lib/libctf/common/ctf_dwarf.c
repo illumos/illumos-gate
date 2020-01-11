@@ -1238,7 +1238,7 @@ ctf_dwarf_fixup_sou(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t base, boolean_t add)
 			return (ret);
 
 		if (tag != DW_TAG_member)
-			continue;
+			goto next;
 
 		if ((ret = ctf_dwarf_refdie(cup, memb, DW_AT_type, &tdie)) != 0)
 			return (ret);
@@ -1373,12 +1373,39 @@ ctf_dwarf_create_sou(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp,
 		return (ret);
 
 	/*
-	 * Members are in children. However, gcc also allows empty ones.
+	 * The children of a structure or union are generally members. However,
+	 * some compilers actually insert structs and unions there and not as a
+	 * top-level die. Therefore, to make sure we honor our pass 1 contract
+	 * of having all the base types, but not members, we need to walk this
+	 * for instances of a DW_TAG_union_type.
 	 */
 	if ((ret = ctf_dwarf_child(cup, die, &child)) != 0)
 		return (ret);
-	if (child == NULL)
-		return (0);
+
+	while (child != NULL) {
+		Dwarf_Half tag;
+		Dwarf_Die sib;
+
+		if ((ret = ctf_dwarf_tag(cup, child, &tag)) != 0)
+			return (ret);
+
+		switch (tag) {
+		case DW_TAG_union_type:
+		case DW_TAG_structure_type:
+			ret = ctf_dwarf_convert_type(cup, child, NULL,
+			    CTF_ADD_NONROOT);
+			if (ret != 0) {
+				return (ret);
+			}
+			break;
+		default:
+			break;
+		}
+
+		if ((ret = ctf_dwarf_sib(cup, child, &sib)) != 0)
+			return (ret);
+		child = sib;
+	}
 
 	return (0);
 }
