@@ -59,7 +59,7 @@ no_ctf()
 cat <<EOF >file1.c
 #include <stdio.h>
 struct foo { int a; };
-int main(void) { struct foo foo = { 4 }; printf("%d\n", foo.a); }
+int main(void) { struct foo foo = { 4 }; printf("%d\n", foo.a); return (0); }
 EOF
 
 cat <<EOF >file2.cc

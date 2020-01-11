@@ -18,6 +18,14 @@ result=0
 
 progname=$(basename $0)
 
+#
+# The assembler and compiler may not end up using the same architecture
+# (e.g. 32-bit or 64-bit) by default. So we force this to always be
+# consistent.
+#
+cflags="-m64"
+asflags="--64"
+
 fail()
 {
 	echo "Failed: $*" 2>&1
@@ -62,12 +70,12 @@ has_ctf()
 cat <<EOF >file1.c
 #include <stdio.h>
 struct foo { int a; };
-int main(void) { struct foo foo = { 4 }; printf("%d\n", foo.a); }
+int main(void) { struct foo foo = { 4 }; printf("%d\n", foo.a); return (0); }
 EOF
 
 cat <<EOF >file2.c
 #include <stdio.h>
-char myfunc(int a) { printf("%d\n", a); }
+char myfunc(int a) { printf("%d\n", a); return ('a'); }
 EOF
 
 cat <<EOF >file3.cc
@@ -86,34 +94,34 @@ EOF
 echo "$progname: An empty file should fail conversion due to no DWARF"
 echo >emptyfile.c
 
-$ctf_cc -c -o emptyfile.o emptyfile.c
+$ctf_cc $cflags -c -o emptyfile.o emptyfile.c
 fail_no_debug emptyfile.o
-$ctf_cc -c -o emptyfile.o emptyfile.c
+$ctf_cc $cflags -c -o emptyfile.o emptyfile.c
 $ctf_convert -m emptyfile.o
 
-$ctf_cc $ctf_debugflags -c -o emptyfile.o emptyfile.c
+$ctf_cc $cflags $ctf_debugflags -c -o emptyfile.o emptyfile.c
 fail_no_debug emptyfile.o
-$ctf_cc $ctf_debugflags -c -o emptyfile.o emptyfile.c
+$ctf_cc $cflags $ctf_debugflags -c -o emptyfile.o emptyfile.c
 $ctf_convert -m emptyfile.o
 
 echo "$progname: A file missing DWARF should fail conversion"
 
-$ctf_cc -c -o file1.o file1.c
+$ctf_cc $cflags -c -o file1.o file1.c
 fail_no_debug file1.o
-$ctf_cc -c -o file1.o file1.c
+$ctf_cc $cflags -c -o file1.o file1.c
 $ctf_convert -m file1.o
 
 echo "$progname: A binary with DWARF but 0 debug dies should fail conversion"
 
-$ctf_cc -o mybin file1.c
+$ctf_cc $cflags -o mybin file1.c
 fail_no_debug mybin
-$ctf_cc -o mybin file1.c
+$ctf_cc $cflags -o mybin file1.c
 $ctf_convert -m mybin
 
 echo "$progname: One C file missing DWARF should fail ctfconvert"
 
-$ctf_cc -c -o file1.o file1.c
-$ctf_cc $ctf_debugflags -c -o file2.o file2.c
+$ctf_cc $cflags -c -o file1.o file1.c
+$ctf_cc $cflags $ctf_debugflags -c -o file2.o file2.c
 ld -r -o files.o file2.o file1.o
 fail_no_debug files.o
 ld -r -o files.o file2.o file1.o
@@ -122,18 +130,18 @@ has_ctf files.o
 
 echo "$progname: One .cc file missing DWARF should pass"
 
-$ctf_cc $ctf_debugflags -c -o file1.o file1.c
-$ctf_cc $ctf_debugflags -c -o file2.o file2.c
-$ctf_cxx -c -o file3.o file3.cc
+$ctf_cc $cflags $ctf_debugflags -c -o file1.o file1.c
+$ctf_cc $cflags $ctf_debugflags -c -o file2.o file2.c
+$ctf_cxx $cflags -c -o file3.o file3.cc
 ld -r -o files.o file1.o file2.o file3.o
 $ctf_convert files.o
 has_ctf files.o
 
 echo "$progname: One .s file missing DWARF should pass"
-$ctf_cc $ctf_debugflags -c -o file1.o file1.c
-$ctf_cc $ctf_debugflags -c -o file2.o file2.c
-$ctf_as -o file4.o file4.s
-$ctf_cc -o mybin file1.o file2.o file4.o
+$ctf_cc $cflags $ctf_debugflags -c -o file1.o file1.c
+$ctf_cc $cflags $ctf_debugflags -c -o file2.o file2.c
+$ctf_as $asflags -o file4.o file4.s
+$ctf_cc $cflags -o mybin file1.o file2.o file4.o
 $ctf_convert mybin
 has_ctf mybin
 

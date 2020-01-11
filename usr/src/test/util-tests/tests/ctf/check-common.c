@@ -142,6 +142,12 @@ ctftest_check_numbers(ctf_file_t *fp, const check_number_t *tests)
 		ctf_id_t id;
 		ctf_encoding_t enc;
 
+		if (ctftest_skip(tests[i].cn_skips)) {
+			warnx("skipping check numbers test %s due to known "
+			    "compiler issue", tests[i].cn_tname);
+			continue;
+		}
+
 		id = ctftest_lookup_type(fp, tests[i].cn_tname);
 		if (id == CTF_ERR) {
 			warnx("failed to look up %s", tests[i].cn_tname);
@@ -841,4 +847,24 @@ ctftest_duplicates(ctf_file_t *fp)
 	free(d.ctd_names);
 
 	return (d.ctd_ret);
+}
+
+boolean_t
+ctftest_skip(check_skip_t skip)
+{
+	const char *compiler;
+
+	if (skip == 0) {
+		return (B_FALSE);
+	}
+
+	compiler = getenv("ctf_cc_type");
+	if (compiler == NULL) {
+		return (B_FALSE);
+	}
+
+	if ((skip & SKIP_CLANG) != 0 && strcmp(compiler, "clang") == 0)
+		return (B_TRUE);
+
+	return (B_FALSE);
 }

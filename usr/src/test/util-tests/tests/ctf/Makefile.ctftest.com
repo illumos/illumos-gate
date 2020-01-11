@@ -56,33 +56,33 @@ BINS =		$(CONV32) \
 build: $(BINS)
 
 $(BUILDDIR)/%.32.c.o: %.c
-	$(CC) $(CFLAGS32) $(DEBUGFLAGS) -o $@ -c $<
+	$(CC) $(CFLAGS32) $(TEST_CFLAGS32) $(DEBUGFLAGS) -o $@ -c $<
 
 $(BUILDDIR)/%.64.c.o: %.c
-	$(CC) $(CFLAGS64) $(DEBUGFLAGS) -o $@ -c $<
+	$(CC) $(CFLAGS64) $(TEST_CFLAGS64) $(DEBUGFLAGS) -o $@ -c $<
 
 $(BUILDDIR)/%.32.m.o: %.c
-	$(CC) $(CFLAGS32) $(DEBUGFLAGS) -o $@ -c $<
+	$(CC) $(CFLAGS32) $(TEST_CFLAGS32) $(DEBUGFLAGS) -o $@ -c $<
 	$(CTFCONVERT) $@
 
 $(BUILDDIR)/%.64.m.o: %.c
-	$(CC) $(CFLAGS64) $(DEBUGFLAGS) -o $@ -c $<
+	$(CC) $(CFLAGS64) $(TEST_CFLAGS64) $(DEBUGFLAGS) -o $@ -c $<
 	$(CTFCONVERT) $@
 
 $(CONV32): $(OBJS_C_32)
-	$(CC) $(CFLAGS32) $(DEBUGFLAGS) -o $@ $(OBJS_C_32)
+	$(CC) $(CFLAGS32) $(TEST_CFLAGS32) $(DEBUGFLAGS) -o $@ $(OBJS_C_32)
 	$(CTFCONVERT) $@
 
 $(CONV64): $(OBJS_C_64)
-	$(CC) $(CFLAGS64) $(DEBUGFLAGS) -o $@ $(OBJS_C_64)
+	$(CC) $(CFLAGS64) $(TEST_CFLAGS64) $(DEBUGFLAGS) -o $@ $(OBJS_C_64)
 	$(CTFCONVERT) $@
 
 $(MERGE32): $(OBJS_M_32)
-	$(CC) $(CFLAGS32) $(DEBUGFLAGS) -o $@ $(OBJS_M_32)
+	$(CC) $(CFLAGS32) $(TEST_CFLAGS32) $(DEBUGFLAGS) -o $@ $(OBJS_M_32)
 	$(CTFMERGE) -t -o $@ $(OBJS_M_32)
 
 $(MERGE64): $(OBJS_M_64)
-	$(CC) $(CFLAGS64) $(DEBUGFLAGS) -o $@ $(OBJS_M_64)
+	$(CC) $(CFLAGS64) $(TEST_CFLAGS64) $(DEBUGFLAGS) -o $@ $(OBJS_M_64)
 	$(CTFMERGE) -t -o $@ $(OBJS_M_64)
 
 run-test:

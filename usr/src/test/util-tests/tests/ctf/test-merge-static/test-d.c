@@ -22,3 +22,9 @@ mumble(uint64_t a)
 {
 	return (a);
 }
+
+uint64_t
+d(uint64_t d)
+{
+	return (mumble(d));
+}

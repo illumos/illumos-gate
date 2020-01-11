@@ -238,9 +238,18 @@ struct trigger {
 struct trigger ct;
 
 /*
- * This is an array/union combo that failed conversion previously.
+ * This is an array/union combo that failed conversion previously. Because it is
+ * static, we need to have a dummy function to make sure that clang doesn't
+ * optimize it away. Hopefully even with optimizations, this'll still be kept
+ * even though it's a constant.
  */
 static const union regress {
 	unsigned int i[3];
 	long double e;
 } regress[9];
+
+unsigned int
+get_regress(void)
+{
+	return (regress[0].i[2]);
+}

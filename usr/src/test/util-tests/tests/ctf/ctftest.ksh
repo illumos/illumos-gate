@@ -32,7 +32,7 @@ ctf_root=$(cd $(dirname $0) && echo $PWD)
 ctf_tests=
 ctf_cc="gcc"
 ctf_cxx="g++"
-ctf_as="as"
+ctf_as="gas"
 ctf_convert="ctfconvert"
 ctf_merge="ctfmerge"
 ctf_debugflags="-gdwarf-2 "
@@ -41,6 +41,8 @@ ctf_mach64="-m64"
 ctf_temp="$TMPDIR/ctftest.$$.o"
 ctf_makefile="Makefile.ctftest"
 ctf_nerrs=0
+ctf_cc_type=
+ctf_cc_vers=
 
 usage()
 {
@@ -73,13 +75,44 @@ test_fail()
 	((ctf_nerrs++))
 }
 
+warn()
+{
+	typeset msg="$*"
+	echo "$ctf_arg0: $msg" >&2
+}
+
 fatal()
 {
 	typeset msg="$*"
 	[[ -z "$msg" ]] && msg="failed"
 	echo "$ctf_arg0: $msg" >&2
-	rm -f "$ctf_tmp32" "$ctf_temp64"
+	rm -f "$ctf_temp"
 	exit 1
+}
+
+#
+# Attempt to try and figure out what class and version of compiler we
+# are dealing with so we can try and skip known failures due to existing
+# bugs in the compiler.
+#
+determine_compiler()
+{
+	typeset name=$($ctf_cc --version | awk '{ print $1; exit; }')
+	typeset version
+
+	if [[ "$name" == "gcc" ]]; then
+		version=$($ctf_cc --version | awk '{ print $NF; exit; }')
+	elif [[ "$name" == "clang" ]]; then
+		version=$($ctf_cc --version | awk '{ print $NF; exit; }')
+	else
+		warn "failed to parse compiler name from $ctf_cc, will " \
+		    "not make any assumptions about expected failures"
+		name="unknown"
+		version="unknown"
+	fi
+
+	ctf_cc_type="$name"
+	ctf_cc_version="$version"
 }
 
 announce()
@@ -87,6 +120,7 @@ announce()
 	cat << EOF
 Beginning CTF tests with the following settings:
 cc:		$(which $ctf_cc)
+detected:	$ctf_cc_type $ctf_cc_version
 CC:		$(which $ctf_cxx)
 as:		$(which $ctf_as)
 ctfconvert:	$(which $ctf_convert)
@@ -116,6 +150,7 @@ run_one()
 		return
 	fi
 
+	rm -f "$ctf_temp"
 	echo "TEST PASSED: $source $flags"
 }
 
@@ -259,7 +294,10 @@ done
 ctf_32cflags="$ctf_mach32 $ctf_debugflags"
 ctf_64cflags="$ctf_mach64 $ctf_debugflags"
 
+determine_compiler
+
 export ctf_as ctf_cc ctf_cxx ctf_debugflags ctf_merge ctf_convert
+export ctf_cc_type ctf_cc_version
 
 announce
 

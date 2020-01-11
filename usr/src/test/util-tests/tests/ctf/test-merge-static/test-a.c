@@ -22,3 +22,9 @@ mumble(uint8_t a)
 {
 	return (a);
 }
+
+uint8_t
+a(uint8_t a)
+{
+	return (mumble(a));
+}
