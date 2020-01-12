@@ -29,7 +29,7 @@
 # Copyright 2017 RackTop Systems.
 # Copyright 2019, Joyent, Inc.
 # Copyright 2018 Jason King
-# Copyright 2019 Peter Tribble
+# Copyright 2020 Peter Tribble
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
@@ -200,7 +200,8 @@ usr/include/sys/kmdb.h
 # for customer use, so the files are excluded from packaging.
 #
 lib/libdhcpagent.so
-lib/amd64/libdhcpagent.so
+lib/amd64/libdhcpagent.so		i386
+lib/sparcv9/libdhcpagent.so		sparc
 lib/libdhcputil.so
 lib/amd64/libdhcputil.so		i386
 lib/sparcv9/libdhcputil.so		sparc
@@ -213,7 +214,8 @@ usr/include/dhcpagent_ipc.h
 usr/include/dhcpagent_util.h
 usr/include/dhcpmsg.h
 usr/lib/libdhcpagent.so
-usr/lib/amd64/libdhcpagent.so
+usr/lib/amd64/libdhcpagent.so		i386
+usr/lib/sparcv9/libdhcpagent.so		sparc
 usr/lib/libdhcputil.so
 usr/lib/amd64/libdhcputil.so		i386
 usr/lib/sparcv9/libdhcputil.so		sparc
