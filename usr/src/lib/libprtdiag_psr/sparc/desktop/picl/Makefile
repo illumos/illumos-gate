@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2019 Peter Tribble.
 #
 # lib/libprtdiag_psr/sparc/desktop/picl/Makefile
 
@@ -51,7 +52,6 @@ LINKED_PLATFORMS	+= SUNW,Sun-Blade-2500
 LINKED_PLATFORMS	+= SUNW,A70
 LINKED_PLATFORMS	+= SUNW,Sun-Fire-V445
 LINKED_PLATFORMS	+= SUNW,Sun-Fire-V215
-LINKED_PLATFORMS	+= SUNW,Serverblade1
 LINKED_PLATFORMS	+= SUNW,Sun-Fire-V240
 LINKED_PLATFORMS	+= SUNW,Sun-Fire-V250
 LINKED_PLATFORMS	+= SUNW,Sun-Fire-V440

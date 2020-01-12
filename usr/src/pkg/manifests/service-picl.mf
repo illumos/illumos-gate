@@ -60,11 +60,6 @@ $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T4 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T4/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T4/lib/picl group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T4/lib/picl/plugins group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Serverblade1 group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Serverblade1/lib
-$(sparc_ONLY)dir path=usr/platform/SUNW,Serverblade1/lib/picl group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Serverblade1/lib/picl/plugins \
-    group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-100 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-100/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-100/lib/picl group=sys
@@ -184,18 +179,6 @@ $(sparc_ONLY)file \
     group=sys
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Netra-T4/lib/picl/plugins/piclfrutree.conf \
-    group=sys
-$(sparc_ONLY)file \
-    path=usr/platform/SUNW,Serverblade1/lib/picl/plugins/libpicllom.so.1 \
-    group=sys
-$(sparc_ONLY)file \
-    path=usr/platform/SUNW,Serverblade1/lib/picl/plugins/picldevtree.conf \
-    group=sys
-$(sparc_ONLY)file \
-    path=usr/platform/SUNW,Serverblade1/lib/picl/plugins/piclfrutree.conf \
-    group=sys
-$(sparc_ONLY)file \
-    path=usr/platform/SUNW,Serverblade1/lib/picl/plugins/picllom.conf \
     group=sys
 $(sparc_ONLY)file path=usr/platform/SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)file \
@@ -696,17 +679,6 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Netra-T4/lib/libprtdiag_psr.so.1 \
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Netra-T4/lib/picl/plugins/libfcal_leds.so \
     target=libfcal_leds.so.1
-$(sparc_ONLY)link path=usr/platform/SUNW,Serverblade1/lib/libprtdiag_psr.so.1 \
-    target=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
-$(sparc_ONLY)link \
-    path=usr/platform/SUNW,Serverblade1/lib/picl/plugins/libpicllom.so \
-    target=libpicllom.so.1
-$(sparc_ONLY)link \
-    path=usr/platform/SUNW,Serverblade1/lib/picl/plugins/libpiclmemcfg.so \
-    target=../../../../SUNW,Sun-Blade-100/lib/picl/plugins/libpiclmemcfg.so.1
-$(sparc_ONLY)link \
-    path=usr/platform/SUNW,Serverblade1/lib/picl/plugins/libpiclmemcfg.so.1 \
-    target=../../../../SUNW,Sun-Blade-100/lib/picl/plugins/libpiclmemcfg.so.1
 $(sparc_ONLY)link \
     path=usr/platform/SUNW,Sun-Blade-100/lib/picl/plugins/libpiclenvd.so \
     target=./libpiclenvd.so.1

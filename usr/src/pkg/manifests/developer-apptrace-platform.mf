@@ -40,8 +40,6 @@ dir path=usr/platform/SUNW,Netra-T12 group=sys
 dir path=usr/platform/SUNW,Netra-T12/lib
 dir path=usr/platform/SUNW,Netra-T4 group=sys
 dir path=usr/platform/SUNW,Netra-T4/lib
-dir path=usr/platform/SUNW,Serverblade1 group=sys
-dir path=usr/platform/SUNW,Serverblade1/lib
 dir path=usr/platform/SUNW,Sun-Blade-100 group=sys
 dir path=usr/platform/SUNW,Sun-Blade-100/lib
 dir path=usr/platform/SUNW,Sun-Blade-1000 group=sys

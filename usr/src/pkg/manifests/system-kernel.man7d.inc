@@ -16,7 +16,6 @@
 # Copyright 2019 Joyent, Inc.
 #
 
-file path=usr/share/man/man7d/bscv.7d
 file path=usr/share/man/man7d/console.7d
 file path=usr/share/man/man7d/cpuid.7d
 file path=usr/share/man/man7d/devinfo.7d
@@ -53,8 +52,6 @@ file path=usr/share/man/man7d/vni.7d
 file path=usr/share/man/man7d/wscons.7d
 file path=usr/share/man/man7d/zero.7d
 link path=usr/share/man/man7d/allkmem.7d target=mem.7d
-link path=usr/share/man/man7d/bscbus.7d target=bscv.7d
-link path=usr/share/man/man7d/i2bsc.7d target=bscv.7d
 link path=usr/share/man/man7d/kmem.7d target=mem.7d
 link path=usr/share/man/man7d/lo0.7d target=ipnet.7d
 link path=usr/share/man/man7d/ticots.7d target=ticlts.7d

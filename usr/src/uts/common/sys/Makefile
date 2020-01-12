@@ -27,6 +27,7 @@
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+# Copyright 2019 Peter Tribble.
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -693,12 +694,8 @@ AUDIOHDRS=			\
 AVHDRS=				\
 	iec61883.h
 
-BSCHDRS=			\
-	bscbus.h		\
-	bscv_impl.h		\
-	lom_ebuscodes.h		\
+LOMHDRS=			\
 	lom_io.h		\
-	lom_priv.h		\
 	lombus.h
 
 MDESCHDRS=			\
@@ -1128,7 +1125,7 @@ CHECKHDRS=						\
 	$($(MACH)_HDRS:%.h=%.check)			\
 	$(AUDIOHDRS:%.h=audio/%.check)			\
 	$(AVHDRS:%.h=av/%.check)			\
-	$(BSCHDRS:%.h=%.check)				\
+	$(LOMHDRS:%.h=%.check)				\
 	$(CHKHDRS:%.h=%.check)				\
 	$(CPUDRVHDRS:%.h=%.check)			\
 	$(CRYPTOHDRS:%.h=crypto/%.check)		\

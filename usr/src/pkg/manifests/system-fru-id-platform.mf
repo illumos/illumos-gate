@@ -54,11 +54,6 @@ $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T4/lib/picl group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T4/lib/picl/plugins group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise/sbin
-$(sparc_ONLY)dir path=usr/platform/SUNW,Serverblade1 group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Serverblade1/lib
-$(sparc_ONLY)dir path=usr/platform/SUNW,Serverblade1/lib/picl group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Serverblade1/lib/picl/plugins \
-    group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1000 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1000/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1000/lib/picl group=sys
@@ -145,13 +140,6 @@ $(sparc_ONLY)file path=usr/platform/SUNW,Netra-T12/lib/libfruaccess.so.1 \
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Netra-T4/lib/picl/plugins/libpiclfrudata.conf \
     group=sys
-$(sparc_ONLY)file path=usr/platform/SUNW,Serverblade1/lib/fru_container.conf \
-    group=sys
-$(sparc_ONLY)file path=usr/platform/SUNW,Serverblade1/lib/libfruaccess.so.1 \
-    group=sys
-$(sparc_ONLY)file \
-    path=usr/platform/SUNW,Serverblade1/lib/picl/plugins/libpiclfrudata.conf \
-    group=sys
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Sun-Blade-1000/lib/picl/plugins/libpiclfrudata.conf \
     group=sys
@@ -211,8 +199,6 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Netra-T12/lib/libfruaccess.so \
     target=libfruaccess.so.1
 $(sparc_ONLY)link path=usr/platform/SUNW,SPARC-Enterprise/sbin/fruadm \
     target=../../sun4u/sbin/fruadm
-$(sparc_ONLY)link path=usr/platform/SUNW,Serverblade1/lib/libfruaccess.so \
-    target=libfruaccess.so.1
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V215/sbin/fruadm \
     target=../../sun4u/sbin/fruadm
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-V240/sbin/fruadm \

@@ -132,7 +132,6 @@ PMUBUS_OBJS	+= pmubus.o
 PMUGPIO_OBJS	+= pmugpio.o
 PMC_OBJS	+= pmc.o
 TRAPSTAT_OBJS	+= trapstat.o
-I2BSC_OBJS	+= i2bsc.o
 GPTWOCFG_OBJS	+= gptwocfg.o
 GPTWO_CPU_OBJS	+= gptwo_cpu.o
 
@@ -161,7 +160,6 @@ SHA1_OBJS	+= sha1_asm.o
 TODMOSTEK_OBJS	+= todmostek.o
 TODDS1287_OBJS	+= todds1287.o
 TODDS1337_OBJS	+= todds1337.o
-TODBLADE_OBJS	+= todblade.o
 TODM5819_OBJS	+= todm5819.o
 TODM5819P_RMC_OBJS	+= todm5819p_rmc.o
 TODBQ4802_OBJS	+= todbq4802.o

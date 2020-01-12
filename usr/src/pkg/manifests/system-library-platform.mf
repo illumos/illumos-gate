@@ -59,8 +59,6 @@ $(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise/lib/cfgadm group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise/lib/cfgadm/$(ARCH64) \
     group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise/sbin
-$(sparc_ONLY)dir path=usr/platform/SUNW,Serverblade1 group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Serverblade1/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-100 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-100/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1000 group=sys
@@ -284,12 +282,6 @@ $(sparc_ONLY)link path=usr/platform/SUNW,SPARC-Enterprise/lib/fs \
     target=../../sun4u/lib/fs
 $(sparc_ONLY)link path=usr/platform/SUNW,SPARC-Enterprise/sbin/prtdiag \
     target=../../sun4u/sbin/prtdiag
-$(sparc_ONLY)link path=usr/platform/SUNW,Serverblade1/lib/cfgadm \
-    target=../../sun4u/lib/cfgadm
-$(sparc_ONLY)link path=usr/platform/SUNW,Serverblade1/lib/fs \
-    target=../../sun4u/lib/fs
-$(sparc_ONLY)link path=usr/platform/SUNW,Serverblade1/sbin \
-    target=../sun4u/sbin
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-100/lib/cfgadm \
     target=../../sun4u/lib/cfgadm
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-100/lib/fs \
