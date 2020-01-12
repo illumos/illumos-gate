@@ -1,0 +1,460 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2019 Joyent, Inc.
+.\"
+.Dd December 20, 2019
+.Dt CCID 7D
+.Os
+.Sh NAME
+.Nm ccid
+.Nd chip card interface device USB client class driver
+.Sh SYNOPSIS
+.In sys/usb/clients/ccid/uccid.h
+.Sh INTERFACE LEVEL
+.Sy Volatile
+.Pp
+The interfaces provided by this driver are private at this time and
+subject to change.
+It should not be relied upon.
+.Sh DESCRIPTION
+The
+.Nm
+driver is a USB CCID (chip card interface device) class device driver.
+.Pp
+The driver exposes interfaces that allow consumers to send and receive
+APDUs (application protocol data unit) to a given smart card that is
+plugged into a reader.
+The driver also provides interfaces to obtain status information, the
+ATR (answer to reset), and obtain exclusive access to the device.
+In addition, the system exposes control of CCID devices through
+.Xr cfgadm 1M .
+.Ss Supported Devices
+The CCID specification allows for readers to come in different flavors.
+These different flavors support different communication protocols and
+have different levels of automation for determining the protocol and
+transfers that are required.
+.Pp
+At this time, only the short APDU protocol is supported, which also works with
+readers using the extended APDU protocol.
+TPDU and character level readers are not supported by the driver.
+Readers in this category will still attach; however,
+I/O cannot be performed to them.
+.Pp
+In addition, at this time the driver does not support devices which
+require manually setting the clock and data rates to support an ICC.
+.Ss Device Model
+Each CCID class device provides a number of slots.
+Each slot may have an independent ICC (integrated circuit card or Smart
+Card) inserted into it.
+Each device, or reader, has its own directory under
+.Pa /dev/ccid
+based on its device number.
+Inside of each directory is a character device for each slot.
+A slot exists regardless of whether or not an ICC is inserted into it.
+As long as a CCID device is present in the system, its device nodes will
+be present.
+.Pp
+Slots are enumerated using this pattern:
+.Pa /dev/ccid/ccid%instance/slot%slot .
+.Pp
+For example, all the slots that belong to CCID instance 5 will be
+enumerated under the directory
+.Pa /dev/ccid/ccid5 .
+Slots are numbered starting at zero for each reader and increment from
+there.
+For example, the second physical slot would be numbered as slot one.
+If this were on CCID instance zero, then we would find a character
+device at:
+.Pa /dev/ccid/ccid0/slot1 .
+.Pp
+To enumerate all of the ccid devices present on the system, one could
+read all of the directories under
+.Pa /dev/ccid .
+To enumerate all of the slots on a device, one could read all of the
+device nodes under a particular CCID device, such as:
+.Pa /dev/ccid/ccid0 .
+The number of slots is also obtainable through various ioctls that will
+be discussed later on.
+It's important to note that while slot numbering will always be
+consistent for a given device, the CCID numbering is based on the driver
+instance.
+Therefore, it is possible for a device to change device numbers.
+To deal with this, symlinks based on other properties will be provided
+(for example, the USB serial number).
+.Pp
+All of the CCID devices in the system can also be listed by using the
+.Xr ccidadm 1M
+command.
+.Ss I/O Model
+To send and receive responses to commands, a program must open up the
+corresponding slot's device node.
+In many of the commands that use an ICC, there is a logical notion of
+state associated with the ICC that is mutated by performing commands on
+it.
+For example, a command might be issued that uses a PIN to unlock a slot
+or that selects a particular PIV applet for use.
+Because of this, all I/O to a given device must be performed inside the
+context of a transaction.
+When a program begins a transaction, it is guaranteed that no one else
+may send commands to the ICC.
+When a program is finished, it must explicitly end the transaction,
+which may have the side effect of resetting the ICC.
+If a program with an open transaction crashes or closes the file
+descriptor without taking other actions, then the transaction will be
+automatically closed.
+Without a transaction open, it will still be possible to issue ioctls
+that obtain the status of the slot and the reader.
+.Pp
+While in an active transaction, a program may send commands to a card.
+Sending a command and reading a response are done through the
+traditional
+.Xr read 2
+and
+.Xr write 2
+family of system calls.
+To submit a command, the program would issue a
+.Xr write 2
+family system call that contained the payload to send to the ICC.
+Once submitted, the call would return and the program would be able to
+issue a
+.Xr read 2
+system call to obtain the results.
+Once a command has been submitted, it is illegal to submit another one.
+The next command cannot be submitted until the response has been fully
+consumed.
+Similarly, if a command has not been submitted, one cannot issue a
+.Xr read 2
+system call to obtain results.
+Only a single thread may be blocked waiting to submit a command or
+read a response.
+.Pp
+To facilitate non-blocking operation, the underlying file descriptor may
+be opened with
+.Dv O_NONBLOCK .
+.Pp
+While a transaction is active,
+.Xr poll 2
+may be used to receive status information about the slot.
+The following events are used by
+.Nm :
+.Bl -tag -width POLLRDNORM
+.It Dv POLLOUT
+The device is ready to receive a command using
+.Xr write 2 .
+.It Dv POLLIN, POLLRDNORM
+The device has completed a command the results may be retrieved with
+.Xr read 2 .
+.It Dv POLLHUP
+The card has been removed from the slot.
+.It Dv POLLERR
+An hardware error has occurred, or the CCID reader has been disconnected.
+.El
+.Pp
+If
+.Xr poll 2
+is called while no transaction is active, none of these events will ever occur
+and
+.Xr poll 2
+may block indefinitely if no timeout is given.
+.Pp
+One important note is that readers with multiple slots often still only
+allow I/O a single command to be outstanding across all of the slots in
+the system.
+Because transactions are on a per-slot basis, it is still possible for a
+command submission to block even though one has a transaction open.
+.Pp
+While a transaction is open, various events can occur that cause a fatal
+error on the transaction.
+These include:
+.Bl -bullet -offset indent
+.It
+USB CCID reader removed
+.It
+ICC removed
+.It
+A fatal error while communicating to the device
+.It
+An administrator issued an ioctl to power off or reset the ICC
+.El
+.Pp
+Once such a fatal error has occurred, all new I/O will fail though it
+will still be possible to read any successfully completed commands.
+To clear the error state the program will need to end the transaction
+and begin a new one or close the file descriptor if the device has been
+removed.
+.Ss Opening Devices, Exclusive Access, and Performing I/O
+To perform I/O to a particular card, one must first open the slot of
+interest.
+Opening the slot requires that the process be in the global zone and
+that it have the privilege
+.Sy PRIV_SYS_DEVICES .
+The device node can be opened through the
+.Xr open 2
+or
+.Xr openat 2
+system calls.
+For programs that just want to query the slot status using the
+.Dv UCCID_CMD_STATUS
+command, opening the device node read-only is sufficient.
+All other uses require that the device be opened both for reading and
+writing
+.Po Dv O_RDWR Pc .
+.Pp
+Once the device has been opened, the program may issue ioctls to get
+status information.
+.Pp
+To perform general I/O to the card, a program must be in the context of
+a transaction as discussed in the
+.Sx I/O model
+section.
+To open a transaction, a program must issue the
+.Dv UCCID_CMD_TXN_BEGIN
+command through the
+.Xr ioctl 2
+system call.
+.Pp
+When a program is done, it must issue the
+.Dv UCCID_CMD_TXN_END
+command to release the transaction.
+As part of issuing the command, the program must determine a disposition
+of what it would like done with the card when it has completed.
+These options include leaving the ICC alone and resetting the ICC.
+For many use cases, such as those where a pin is entered or the ICC's
+state is mutated, a reset is the recommended option.
+If the program crashes or closes the file descriptor without issuing a
+transaction end, then the ICC will be reset.
+.Pp
+Please see the ioctl listing in the
+.Sx IOCTLS
+section for more information on the command structure.
+.Pp
+If a multi-threaded application opens a slot once and shares it among multiple
+threads performing I/O to that slot, there can still only be one transaction
+active or waiting on the slot shared by all threads.
+Acquiring another transaction on the same slot minor while another thread is
+already blocked waiting for one will return
+.Dv EINPROGRESS .
+If another transaction is already active,
+.Dv EINVAL
+will be returned.
+Consequently, all threads in a multi-threaded application share the transaction
+state and may issue writes, and read the results.
+The same applies to any other method of sharing an open file descriptor of a slot
+minor, be it by sharing the fd over a socket, a child process inheriting it from
+its parent during
+.Xr fork 2 ,
+even across calls to
+.Xr exec 2 .
+.Ss Device Status and ATR
+Once a slot has been opened, any caller may issue commands to get the
+status of the slot.
+This can also be used to obtain the ATR (answer to reset) of an ICC that
+is present on the slot, if it is known.
+.Pp
+While exclusive access is not required to issue these commands, there is
+no guarantee that they will not have changed between the time that the
+program issued the command and it obtains a transaction.
+.Pp
+To obtain information about the reader, slot, and the ATR, one should
+issue the
+.Dv UCCID_CMD_STATUS
+command.
+Please see the ioctl listing in the
+.Sx IOCTLS
+section for more information.
+.Sh IOCTLS
+This section lists the different commands that may be issued to a CCID
+device through the
+.Xr ioctl 2
+system call.
+.Ss Ic UCCID_CMD_STATUS
+This command is used to obtain the status of the slot.
+It may be used regardless of whether or not the caller has exclusive access.
+.Pp
+The
+.Ic UCCID_CMD_STATUS
+command uses the structure
+.Vt uccid_cmd_status_t ,
+the fields of which have the following meanings:
+.Bl -tag -width Fa
+.It Fa uint32_t ucs_version
+Indicates the current version of the structure.
+Should be set to
+.Dv UCCID_CURRENT_VERSION .
+.It Fa uint32_t ucs_status
+This value is ignored when issuing the command.
+On return, it will be filled in with various flags that describe the
+current status of the slot and the contents returned in the
+.Vt uccid_cmd_status_t .
+The following flags are defined:
+.Bl -tag -width Dv
+.It Dv UCCID_STATUS_F_CARD_PRESENT
+A card has been inserted into the slot of the CCID class device.
+.It Dv UCCID_STATUS_F_CARD_ACTIVE
+The inserted card has been successfully activated.
+This will only be set if the
+.Dv UCCID_STATUS_F_CARD_PRESENT
+flag is also set.
+.It Dv UCCID_STATUS_F_PRODUCT_VALID
+The contents of
+.Fa ucs_product
+are valid.
+.It Dv UCCID_STATUS_F_SERIAL_VALID
+The contents of
+.Fa ucs_serial
+are valid.
+.It Dv UCCID_STATUS_F_PARAMS_VALID
+The parameters returned in
+.Fa ucs_params
+are valid.
+.El
+.It Fa int32_t ucs_instance
+The instance number of the CCID device.
+.It Fa uint32_t ucs_slot
+The slot number currently in use.
+.It Fa uint8_t ucs_atr[UCCID_ATR_MAX]
+The ATR (answer to reset) of the card.
+.It Fa uint8_t ucs_atrlen
+The actual length of the ATR data.
+A length of 0 indicates that there is no ATR data.
+.It Fa int8_t ucs_product[256]
+The product string of the CCID device.
+.It Fa int8_t ucs_serial[256]
+The serial number of the CCID device.
+.It Fa ccid_class_descr_t ucs_class
+The CCID class descriptor of the CCID device.
+.It Fa uccid_prot_t ucs_prot
+The protocol in use by the ICC.
+This can be either
+.Dv UCCID_PROT_T0
+for the TPDU T=0 protocol or
+.Dv UCCID_PROT_T1
+for the TPDU T=1 protocol.
+.It Fa ccid_params_t ucs_params
+The CCID parameters available on the card.
+.El
+.Ss UCCID_CMD_TXN_BEGIN
+This command is used to begin a transaction.
+The command will block until exclusive access is available to the
+caller.
+If the caller does not wish to block, it should set the
+.Dv UCCID_TXN_DONT_BLOCK
+flag.
+.Pp
+The command uses the structure
+.Vt uccid_cmd_txn_begin_t
+with the following members:
+.Bl -tag -width Fa
+.It Fa uint32_t ucs_version
+Indicates the current version of the structure.
+Should be set to
+.Dv UCCID_CURRENT_VERSION .
+.It Fa uint32_t uct_flags
+Flags that impact the behavior of the command.
+The following flags are defined:
+.Bl -tag -width Dv
+.It Dv UCCID_TXN_DONT_BLOCK
+The command should not block for exclusive access.
+If exclusive access is not available, then the command will fail
+immediately.
+.El
+.Pp
+If an unknown flag is specified, an error will be returned.
+.El
+.Ss UCCID_CMD_TXN_END
+The
+.Dv UCCID_CMD_TXN_END
+command is used to end a transaction and relinquish exclusive access
+to the ICC.
+.Pp
+The command uses the structure
+.Vt uccid_cmd_txn_end_t
+with the following members:
+.Bl -tag -width Fa
+.It Fa uint32_t uct_version
+Indicates the current version of the structure.
+Should be set to
+.Dv UCCID_CURRENT_VERSION .
+.It Fa uint32_t uct_flags
+.Bl -tag -width Dv
+.It Dv UCCID_TXN_END_RESET
+The ICC should be reset at the end of the transaction.
+.It Dv UCCID_TXN_END_RELEASE
+The ICC should be released without being reset at the end of the
+transaction.
+.El
+.Pp
+Exactly one of these two flags must be specified.
+It is an error if neither flag or both flags are specified at the same
+time.
+If the device is closed without ending a transaction first, then the ICC
+will be reset.
+.El
+.Ss UCCID_CMD_ICC_MODIFY
+This command can be used to change the state of an ICC, if present.
+.Pp
+The command uses the structure
+.Vt uccid_cmd_icc_modify_t
+with the following members:
+.Bl -tag -width Fa
+.It Fa uint32_t uci_version
+Indicates the current version of the structure.
+Should be set to
+.Dv UCCID_CURRENT_VERSION .
+.It Fa uint32_t uci_action
+The action to be taken on the ICC.
+The following actions are defined:
+.Bl -tag -width Dv
+.It Dv UCCID_ICC_POWER_ON
+Power on the ICC.
+.It Dv UCCID_ICC_POWER_OFF
+Power off the ICC.
+.It Dv UCCID_ICC_WARM_RESET
+Perform a warm reset of the ICC.
+.El
+.El
+.Ss FIONREAD
+This command returns the size in bytes of a command response available
+for reading with
+.Xr read 2 .
+The size is returned in an
+.Vt int
+pointed to by the argument.
+.Sh SYSTEM CALLS
+This section lists the different system calls that may be issued to a
+CCID device.
+.Ss open
+.Ss close
+.Ss write
+.Ss read
+.Ss poll
+.Sh SEE ALSO
+.Xr ccidadm 1M ,
+.Xr cfgadm 1M ,
+.Xr close 2 ,
+.Xr ioctl 2 ,
+.Xr open 2 ,
+.Xr poll 2 ,
+.Xr read 2 ,
+.Xr write 2
+.Rs
+.%T Universal Serial Bus Device Class: Smart Card CCID
+.%O Revision 1.1
+.%D April 22, 2005
+.Re
+.Rs
+.%Q ISO/IEC
+.%B Identification Cards - Integrated Circuits
+.%N Part 3: Cards with contacts — Electrical interface and transmission protocols
+.%O ISO/IEC 7616-3:2006
+.%D 2006
+.Re

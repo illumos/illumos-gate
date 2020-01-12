@@ -1817,6 +1817,8 @@ USB_IA_OBJS += usb_ia.o
 
 SCSA2USB_OBJS += scsa2usb.o usb_ms_bulkonly.o usb_ms_cbi.o
 
+CCID_OBJS += ccid.o atr.o
+
 IPF_OBJS += cfw.o ip_fil_solaris.o fil.o solaris.o ip_state.o ip_frag.o \
 	    ip_nat.o ip_proxy.o ip_auth.o ip_pool.o ip_htable.o ip_lookup.o \
 	    ip_log.o misc.o ip_compat.o ip_nat6.o drand48.o

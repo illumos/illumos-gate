@@ -36,6 +36,7 @@ _MANFILES=	aac.7d		\
 		blkdev.7d	\
 		bnxe.7d		\
 		bscv.7d		\
+		ccid.7d		\
 		chxge.7d	\
 		console.7d	\
 		cpuid.7d	\

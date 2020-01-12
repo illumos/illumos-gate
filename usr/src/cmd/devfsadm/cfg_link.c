@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2019, Joyent, Inc.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -59,6 +60,7 @@ static int	pci_cfg_creat_cb(di_minor_t minor, di_node_t node);
 static int	ib_cfg_creat_cb(di_minor_t minor, di_node_t node);
 static int	sata_cfg_creat_cb(di_minor_t minor, di_node_t node);
 static int	sdcard_cfg_creat_cb(di_minor_t minor, di_node_t node);
+static int	ccid_cfg_creat_cb(di_minor_t minor, di_node_t node);
 
 static di_node_t	pci_cfg_chassis_node(di_node_t, di_prom_handle_t);
 static char	*pci_cfg_slotname(di_node_t, di_prom_handle_t, minor_t);
@@ -120,6 +122,9 @@ static devfsadm_create_t cfg_create_cbt[] = {
 	},
 	{ "attachment-point", DDI_NT_SDCARD_ATTACHMENT_POINT, NULL,
 	    TYPE_EXACT, ILEVEL_0, sdcard_cfg_creat_cb
+	},
+	{ "attachment-point", DDI_NT_CCID_ATTACHMENT_POINT, NULL,
+	    TYPE_EXACT, ILEVEL_0, ccid_cfg_creat_cb
 	}
 };
 
@@ -153,6 +158,9 @@ static devfsadm_remove_t cfg_remove_cbt[] = {
 	{ "attachment-point", SDCARD_CFG_LINK_RE, RM_POST|RM_HOT|RM_ALWAYS,
 	    ILEVEL_0, devfsadm_rm_all
 	},
+	{ "attachment-point", CCID_CFG_LINK_RE, RM_POST|RM_HOT|RM_ALWAYS,
+	    ILEVEL_0, devfsadm_rm_all
+	}
 };
 
 DEVFSADM_REMOVE_INIT_V0(cfg_remove_cbt);
@@ -1245,4 +1253,25 @@ serid_printable(uint64_t *seridp)
 
 	return (1);
 
+}
+
+/*
+ * Create a link for cfgadm that points back to the normal ccid links in
+ * /dev/ccid.
+ */
+static int
+ccid_cfg_creat_cb(di_minor_t minor, di_node_t node)
+{
+	const char *minor_nm;
+	char cfg_path[MAXPATHLEN];
+
+	if ((minor_nm = di_minor_name(minor)) == NULL) {
+		return (DEVFSADM_CONTINUE);
+	}
+
+	(void) snprintf(cfg_path, sizeof (cfg_path), "%s/ccid%d/%s",
+	    CFG_DIRNAME, di_instance(node),  minor_nm);
+
+	(void) devfsadm_mklink(cfg_path, node, minor, 0);
+	return (DEVFSADM_CONTINUE);
 }

@@ -29,6 +29,7 @@ SUBDIRS =       \
 		stress \
 		timer \
 		tmpfs \
+		uccid \
 		$(SUBDIRS_$(MACH))
 
 PROGS = \

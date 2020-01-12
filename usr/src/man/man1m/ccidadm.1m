@@ -1,0 +1,120 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2019 Joyent, Inc.
+.\"
+.Dd December 17, 2019
+.Dt CCIDADM 1M
+.Os
+.Sh NAME
+.Nm ccidadm
+.Nd CCID administration utility
+.Sh SYNOPSIS
+.Nm /usr/lib/ccid/ccidadm
+.Ar list
+.Nm /usr/lib/ccid/ccidadm
+.Ar atr
+.Op Fl pvx
+.Op Ar device
+.Nm /usr/lib/ccid/ccidadm
+.Ar reader
+.Op Ar device
+.Sh DESCRIPTION
+The
+.Nm
+utility can be used to list the CCID controllers and their slots known to the
+.Xr ccid 7D
+driver, query the features and capabilities of a CCID controller, and print
+the ATR of an ICC (integrated circuit card) that is inserted in a slot on an
+CCID controller.
+.Pp
+The information returned by the hardware is printed by
+.Nm
+in a human-readable form were applicable.
+.Sh ARGUMENTS
+.Nm
+expects the following kinds of arguments:
+.Bl -tag -width "device"
+.It Ar command
+Any command
+.Nm
+understands.
+See section
+.Sx COMMANDS .
+.It Ar device
+Specifies a CCID reader or a slot, either as absolute path to the device node
+or in a short-hand form.
+The short-hand form consists of the reader instance, specified by the driver
+name
+.Qq ccid
+followed by the instance number of the reader, and optionally a slot instance
+separated by a
+.Qq / ,
+consisting of the word
+.Qq slot
+followed by the slot number.
+Here's an example for slot 1 on ccid reader 5:
+.Qq ccid5/slot1
+.El
+.Sh COMMANDS
+.Bl -tag -width ""
+.It Xo
+.Nm
+.Cm list
+.Xc
+Lists the CCID controllers and their slots known to the system and prints their
+product name, device node, card state, and the transport protocol in use.
+.It Xo
+.Nm
+.Cm atr
+.Op Fl pvx
+.Op Ar device
+.Xc
+Prints the ATR of an ICC that is inserted in the specified slot.
+If a device is specified it must refer to a certain slot.
+If no device is specified the command will print the ATR of all inserted slots
+in the system.
+A human-readable summary of the ATR data is printed when no flags are given.
+The following options can be used to alter the output of the
+.Cm atr
+command::
+.Bl -tag -width Ds
+.It Fl v
+Verbose output, the individual bytes of the ATR are printed and decoded
+bit-by-bit in a human-readable form.
+Additionally the historic data in the ATR is printed as a hexadecimal dump.
+.It Fl x
+The complete ATR is printed as a hexadecimal dump.
+.El
+.It Xo
+.Nm
+.Cm reader
+.Op Ar device
+.Xc
+Print the capabilities of the specified CCID reader.
+Specifying slot number is not required but can optionally be specified.
+If no device is given, the command will print the capabilities of all attached
+CCID readers.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh INTERFACE STABILITY
+The command line interface of
+.Nm
+is
+.Sy Evolving .
+The output of
+.Nm
+is
+.Sy Not-an-Interface
+and may change any time.
+.Sh SEE ALSO
+.Xr ccid 7D

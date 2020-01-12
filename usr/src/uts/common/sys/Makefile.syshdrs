@@ -23,6 +23,7 @@
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 # Common definitions for open and closed headers.
@@ -149,6 +150,9 @@ usb/clients/mass_storage/%.check:	usb/clients/mass_storage/%.h
 usb/clients/printer/%.check:  usb/clients/printer/%.h
 	$(DOT_H_CHECK)
 
+usb/clients/ccid/%.check:	usb/clients/ccid/%.h
+	$(DOT_H_CHECK)
+
 usb/clients/usbcdc/%.check:	usb/clients/usbcdc/%.h
 	$(DOT_H_CHECK)
 
@@ -231,6 +235,7 @@ ROOTDIRS=			\
 	$(ROOTDIR)/usb/clients/usbcdc  \
 	$(ROOTDIR)/usb/clients/video/usbvc  \
 	$(ROOTDIR)/usb/clients/usbinput/usbwcm \
+	$(ROOTDIR)/usb/clients/ccid \
 	$(ROOTDIR)/usb/clients/ugen  \
 	$(ROOTDIR)/1394         \
 	$(ROOTDIR)/rsm		\
@@ -311,6 +316,7 @@ ROOTUSBPRNHDRS= $(USBPRNHDRS:%=$(ROOTDIR)/usb/clients/printer/%)
 ROOTUSBCDCHDRS= $(USBCDCHDRS:%=$(ROOTDIR)/usb/clients/usbcdc/%)
 ROOTUSBVIDHDRS= $(USBVIDHDRS:%=$(ROOTDIR)/usb/clients/video/usbvc/%)
 ROOTUSBWCMHDRS= $(USBWCMHDRS:%=$(ROOTDIR)/usb/clients/usbinput/usbwcm/%)
+ROOTUSBCCIDHDRS= $(USBCCIDHDRS:%=$(ROOTDIR)/usb/clients/ccid/%)
 ROOTUGENHDRS= $(UGENHDRS:%=$(ROOTDIR)/usb/clients/ugen/%)
 
 ROOT1394HDRS= $(I1394HDRS:%=$(ROOTDIR)/1394/%)

@@ -634,6 +634,7 @@ f kernel/drv/amd64/blkdev 0755 root sys
 f kernel/drv/amd64/bnx 0755 root sys
 f kernel/drv/amd64/bnxe 0755 root sys
 f kernel/drv/amd64/bridge 0755 root sys
+f kernel/drv/amd64/ccid 0755 root sys
 f kernel/drv/amd64/chxge 0755 root sys
 f kernel/drv/amd64/clone 0755 root sys
 f kernel/drv/amd64/cmdk 0755 root sys
@@ -5281,6 +5282,7 @@ s usr/lib/amd64/libpam.so=../../../lib/amd64/libpam.so.1
 f usr/lib/amd64/libpanel.so.1 0755 root bin
 s usr/lib/amd64/libpanel.so=libpanel.so.1
 f usr/lib/amd64/libpcidb.so.1 0755 root bin
+f usr/lib/amd64/libpcsc.so.1 0755 root bin
 f usr/lib/amd64/libpctx.so.1 0755 root bin
 s usr/lib/amd64/libpctx.so=libpctx.so.1
 f usr/lib/amd64/libpicl.so.1 0755 root bin
@@ -5549,8 +5551,12 @@ f usr/lib/brand/shared/common.ksh 0444 root bin
 f usr/lib/brand/shared/query 0755 root bin
 f usr/lib/brand/shared/uninstall.ksh 0444 root bin
 f usr/lib/bridged 0555 root bin
+d usr/lib/ccid 0755 root bin
+f usr/lib/ccid/ccidadm 0555 root bin
 d usr/lib/cfgadm 0755 root bin
 d usr/lib/cfgadm/amd64 0755 root bin
+f usr/lib/cfgadm/amd64/ccid.so.1 0755 root bin
+s usr/lib/cfgadm/amd64/ccid.so=ccid.so.1
 f usr/lib/cfgadm/amd64/fp.so.1 0755 root bin
 s usr/lib/cfgadm/amd64/fp.so=fp.so.1
 f usr/lib/cfgadm/amd64/ib.so.1 0755 root bin
@@ -5565,6 +5571,8 @@ f usr/lib/cfgadm/amd64/shp.so.1 0755 root bin
 s usr/lib/cfgadm/amd64/shp.so=shp.so.1
 f usr/lib/cfgadm/amd64/usb.so.1 0755 root bin
 s usr/lib/cfgadm/amd64/usb.so=usb.so.1
+f usr/lib/cfgadm/ccid.so.1 0755 root bin
+s usr/lib/cfgadm/ccid.so=ccid.so.1
 f usr/lib/cfgadm/fp.so.1 0755 root bin
 s usr/lib/cfgadm/fp.so=fp.so.1
 f usr/lib/cfgadm/ib.so.1 0755 root bin
@@ -6785,6 +6793,7 @@ s usr/lib/libpam.so=../../lib/libpam.so.1
 f usr/lib/libpanel.so.1 0755 root bin
 s usr/lib/libpanel.so=libpanel.so.1
 f usr/lib/libpcidb.so.1 0755 root bin
+f usr/lib/libpcsc.so.1 0755 root bin
 f usr/lib/libpctx.so.1 0755 root bin
 s usr/lib/libpctx.so=libpctx.so.1
 f usr/lib/libpicl.so.1 0755 root bin
@@ -12295,6 +12304,7 @@ f usr/share/man/man1m/bootadm.1m 0444 root bin
 f usr/share/man/man1m/busstat.1m 0444 root bin
 f usr/share/man/man1m/captoinfo.1m 0444 root bin
 f usr/share/man/man1m/catman.1m 0444 root bin
+f usr/share/man/man1m/ccidadm.1m 0444 root bin
 f usr/share/man/man1m/cfgadm.1m 0444 root bin
 f usr/share/man/man1m/cfgadm_fp.1m 0444 root bin
 f usr/share/man/man1m/cfgadm_pci.1m 0444 root bin
@@ -19457,6 +19467,7 @@ f usr/share/man/man7d/bfe.7d 0444 root bin
 f usr/share/man/man7d/bge.7d 0444 root bin
 f usr/share/man/man7d/blkdev.7d 0444 root bin
 f usr/share/man/man7d/bnxe.7d 0444 root bin
+f usr/share/man/man7d/ccid.7d 0444 root bin
 f usr/share/man/man7d/chxge.7d 0444 root bin
 f usr/share/man/man7d/cmdk.7d 0444 root bin
 f usr/share/man/man7d/coretemp.7d 0444 root bin
@@ -19619,6 +19630,7 @@ f usr/share/man/man7i/sockio.7i 0444 root bin
 f usr/share/man/man7i/streamio.7i 0444 root bin
 f usr/share/man/man7i/termio.7i 0444 root bin
 f usr/share/man/man7i/termiox.7i 0444 root bin
+s usr/share/man/man7i/uccid.7i=../man7d/ccid.7d
 f usr/share/man/man7i/uscsi.7i 0444 root bin
 f usr/share/man/man7i/visual_io.7i 0444 root bin
 f usr/share/man/man7i/vt.7i 0444 root bin

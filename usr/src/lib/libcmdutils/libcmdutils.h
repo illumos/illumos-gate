@@ -26,7 +26,7 @@
  * Copyright (c) 2013 RackTop Systems.
  */
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -163,6 +163,7 @@ extern int findnextuid(uid_t, uid_t, uid_t *);
 extern int findnextgid(gid_t, gid_t, gid_t *);
 
 #define	NN_DIVISOR_1000		(1U << 0)
+#define	NN_UNIT_SPACE		(1U << 1)
 
 /* Minimum size for the output of nicenum, including NULL */
 #define	NN_NUMBUF_SZ		(6)

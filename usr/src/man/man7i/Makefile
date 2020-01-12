@@ -16,7 +16,7 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	7i
+MANSECT=	7i
 
 MANFILES=	audio.7i	\
 		cdio.7i		\
@@ -40,6 +40,10 @@ MANFILES=	audio.7i	\
 		uscsi.7i	\
 		visual_io.7i	\
 		vt.7i
+
+MANLINKS=	uccid.7i
+
+uccid.7i	:= LINKSRC = ../man7d/ccid.7d
 
 .KEEP_STATE:
 
