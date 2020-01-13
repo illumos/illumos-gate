@@ -768,7 +768,7 @@ topo_mod_dprintf(topo_mod_t *mod, const char *format, ...)
 	va_end(alist);
 }
 
-static char *
+char *
 topo_mod_product(topo_mod_t *mod)
 {
 	return (topo_mod_strdup(mod, mod->tm_hdl->th_product));

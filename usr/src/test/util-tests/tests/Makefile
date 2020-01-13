@@ -19,7 +19,7 @@
 #
 
 SUBDIRS = date dis dladm iconv libnvpair_json libsff printf xargs grep_xpg4
-SUBDIRS += demangle mergeq workq chown ctf smbios libjedec awk make
+SUBDIRS += demangle mergeq workq chown ctf smbios libjedec awk make sleep
 SUBDIRS += bunyan
 
 include $(SRC)/test/Makefile.com

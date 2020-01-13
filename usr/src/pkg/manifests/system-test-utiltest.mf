@@ -68,6 +68,7 @@ dir path=opt/util-tests/tests/awk/gnu
 dir path=opt/util-tests/tests/awk/syn
 dir path=opt/util-tests/tests/awk/tests
 dir path=opt/util-tests/tests/mergeq
+dir path=opt/util-tests/tests/sleep
 file path=opt/util-tests/README mode=0444
 file path=opt/util-tests/bin/btest mode=0555
 file path=opt/util-tests/bin/print_json mode=0555
@@ -1479,6 +1480,9 @@ file path=opt/util-tests/tests/mergeq/wqt mode=0555
 file path=opt/util-tests/tests/printf_test mode=0555
 file path=opt/util-tests/tests/set-linkprop mode=0555
 file path=opt/util-tests/tests/show-overlay-exit mode=0555
+file path=opt/util-tests/tests/sleep/sleep.awk mode=0444
+file path=opt/util-tests/tests/sleep/sleep.d mode=0444
+file path=opt/util-tests/tests/sleep/sleeptest mode=0555
 file path=opt/util-tests/tests/smbios mode=0555
 file path=opt/util-tests/tests/vnic-mtu mode=0555
 file path=opt/util-tests/tests/xargs_test mode=0555
@@ -1487,5 +1491,6 @@ license usr/src/lib/libdemangle/THIRDPARTYLICENSE \
     license=usr/src/lib/libdemangle/THIRDPARTYLICENSE
 license usr/src/test/util-tests/tests/demangle/THIRDPARTYLICENSE.rust \
     license=usr/src/test/util-tests/tests/demangle/THIRDPARTYLICENSE.rust
+depend fmri=locale/de type=require
 depend fmri=system/library/iconv/utf-8 type=require
 depend fmri=system/test/testrunner type=require

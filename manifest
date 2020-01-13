@@ -2802,7 +2802,7 @@ h usr/bin/setuname=usr/lib/isaexec
 s usr/bin/sh=ksh93
 f usr/bin/shcomp 0555 root bin
 f usr/bin/size 0555 root bin
-h usr/bin/sleep=usr/bin/alias
+f usr/bin/sleep 0555 root bin
 f usr/bin/smbutil 0555 root bin
 f usr/bin/soelim 0555 root bin
 h usr/bin/sort=usr/lib/isaexec

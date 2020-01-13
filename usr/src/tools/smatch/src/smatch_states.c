@@ -1095,6 +1095,15 @@ void __merge_switches(struct expression *switch_expr, struct range_list *case_rl
 	struct stree *implied_stree;
 
 	stree = pop_stree(&switch_stack);
+	if (!stree) {
+		/*
+		 * If the cur_stree was NULL before the start of the switch
+		 * statement then we don't want to unnullify it.
+		 *
+		 */
+		push_stree(&switch_stack, stree);
+		return;
+	}
 	implied_stree = __implied_case_stree(switch_expr, case_rl, &remaining_cases, &stree);
 	merge_stree(&cur_stree, implied_stree);
 	free_stree(&implied_stree);

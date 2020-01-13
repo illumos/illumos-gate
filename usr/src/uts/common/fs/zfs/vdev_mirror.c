@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2012, 2018 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/zfs_context.h>
@@ -781,6 +782,35 @@ vdev_mirror_state_change(vdev_t *vd, int faulted, int degraded)
 	}
 }
 
+static int
+vdev_mirror_dumpio(vdev_t *vd, caddr_t data, size_t size,
+    uint64_t offset, uint64_t origoffset, boolean_t doread, boolean_t isdump)
+{
+	uint64_t numerrors;
+	int err = EIO;
+
+	for (uint64_t c = 0; c < vd->vdev_children; c++) {
+		vdev_t *cvd = vd->vdev_child[c];
+
+		if (cvd->vdev_ops->vdev_op_dumpio == NULL) {
+			err = EINVAL;
+		} else {
+			err = cvd->vdev_ops->vdev_op_dumpio(cvd, data, size,
+			    offset, origoffset, doread, isdump);
+		}
+		if (err != 0) {
+			numerrors++;
+		} else if (doread) {
+			break;
+		}
+	}
+	if (err != 0) {
+		return (SET_ERROR(err));
+	}
+
+	return (0);
+}
+
 vdev_ops_t vdev_mirror_ops = {
 	.vdev_op_open = vdev_mirror_open,
 	.vdev_op_close = vdev_mirror_close,
@@ -793,6 +823,7 @@ vdev_ops_t vdev_mirror_ops = {
 	.vdev_op_rele = NULL,
 	.vdev_op_remap = NULL,
 	.vdev_op_xlate = vdev_default_xlate,
+	.vdev_op_dumpio = vdev_mirror_dumpio,
 	.vdev_op_type = VDEV_TYPE_MIRROR,	/* name of this vdev type */
 	.vdev_op_leaf = B_FALSE			/* not a leaf vdev */
 };
@@ -809,6 +840,7 @@ vdev_ops_t vdev_replacing_ops = {
 	.vdev_op_rele = NULL,
 	.vdev_op_remap = NULL,
 	.vdev_op_xlate = vdev_default_xlate,
+	.vdev_op_dumpio = vdev_mirror_dumpio,
 	.vdev_op_type = VDEV_TYPE_REPLACING,	/* name of this vdev type */
 	.vdev_op_leaf = B_FALSE			/* not a leaf vdev */
 };
@@ -825,6 +857,7 @@ vdev_ops_t vdev_spare_ops = {
 	.vdev_op_rele = NULL,
 	.vdev_op_remap = NULL,
 	.vdev_op_xlate = vdev_default_xlate,
+	.vdev_op_dumpio = vdev_mirror_dumpio,
 	.vdev_op_type = VDEV_TYPE_SPARE,	/* name of this vdev type */
 	.vdev_op_leaf = B_FALSE			/* not a leaf vdev */
 };

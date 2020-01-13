@@ -78,9 +78,7 @@
 #include <sys/refcount.h>
 #include <sys/zfs_znode.h>
 #include <sys/zfs_rlock.h>
-#include <sys/vdev_disk.h>
 #include <sys/vdev_impl.h>
-#include <sys/vdev_raidz.h>
 #include <sys/zvol.h>
 #include <sys/dumphdr.h>
 #include <sys/zil_impl.h>
@@ -1135,53 +1133,15 @@ static int
 zvol_dumpio_vdev(vdev_t *vd, void *addr, uint64_t offset, uint64_t origoffset,
     uint64_t size, boolean_t doread, boolean_t isdump)
 {
-	vdev_disk_t *dvd;
-	int c;
-	int numerrors = 0;
-
-	if (vd->vdev_ops == &vdev_mirror_ops ||
-	    vd->vdev_ops == &vdev_replacing_ops ||
-	    vd->vdev_ops == &vdev_spare_ops) {
-		for (c = 0; c < vd->vdev_children; c++) {
-			int err = zvol_dumpio_vdev(vd->vdev_child[c],
-			    addr, offset, origoffset, size, doread, isdump);
-			if (err != 0) {
-				numerrors++;
-			} else if (doread) {
-				break;
-			}
-		}
-	}
-
-	if (!vd->vdev_ops->vdev_op_leaf && vd->vdev_ops != &vdev_raidz_ops)
-		return (numerrors < vd->vdev_children ? 0 : EIO);
-
 	if (doread && !vdev_readable(vd))
 		return (SET_ERROR(EIO));
-	else if (!doread && !vdev_writeable(vd))
+	if (!doread && !vdev_writeable(vd))
+		return (SET_ERROR(EIO));
+	if (vd->vdev_ops->vdev_op_dumpio == NULL)
 		return (SET_ERROR(EIO));
 
-	if (vd->vdev_ops == &vdev_raidz_ops) {
-		return (vdev_raidz_physio(vd,
-		    addr, size, offset, origoffset, doread, isdump));
-	}
-
-	offset += VDEV_LABEL_START_SIZE;
-
-	if (ddi_in_panic() || isdump) {
-		ASSERT(!doread);
-		if (doread)
-			return (SET_ERROR(EIO));
-		dvd = vd->vdev_tsd;
-		ASSERT3P(dvd, !=, NULL);
-		return (ldi_dump(dvd->vd_lh, addr, lbtodb(offset),
-		    lbtodb(size)));
-	} else {
-		dvd = vd->vdev_tsd;
-		ASSERT3P(dvd, !=, NULL);
-		return (vdev_disk_ldi_physio(dvd->vd_lh, addr, size,
-		    offset, doread ? B_READ : B_WRITE));
-	}
+	return (vd->vdev_ops->vdev_op_dumpio(vd, addr, size,
+	    offset, origoffset, doread, isdump));
 }
 
 static int
@@ -1234,7 +1194,7 @@ zvol_strategy(buf_t *bp)
 	char *addr;
 	objset_t *os;
 	int error = 0;
-	boolean_t doread = bp->b_flags & B_READ;
+	boolean_t doread = !!(bp->b_flags & B_READ);
 	boolean_t is_dumpified;
 	boolean_t sync;
 

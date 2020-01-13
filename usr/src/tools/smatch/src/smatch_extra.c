@@ -194,6 +194,11 @@ static char *get_pointed_at(const char *name, struct symbol *sym, struct symbol 
 {
 	struct expression *assigned;
 
+	/*
+	 * Imagine we have an assignment: "foo = &addr;" then the other name
+	 * of "*foo" is addr.
+	 */
+
 	if (name[0] != '*')
 		return NULL;
 	if (strcmp(name + 1, sym->ident->name) != 0)
@@ -254,9 +259,10 @@ static char *get_long_name_sym(const char *name, struct symbol *sym, struct symb
 
 	/*
 	 * Just prepend the name with a different name/sym and return that.
-	 * For example, if we set "foo->bar = bar;" then we clamp "bar->baz",
-	 * that also clamps "foo->bar->baz".
-	 *
+	 * For example, if we set "foo->bar = bar;" then the other name
+	 * for "bar->baz" is "foo->bar->baz".  Or if we have "foo = bar;" then
+	 * the other name for "bar" is "foo".  A third option is if we have
+	 * "foo = bar;" then another name for "*bar" is "*foo".
 	 */
 
 	FOR_EACH_MY_SM(check_assigned_expr_id, __get_cur_stree(), sm) {
@@ -272,7 +278,17 @@ static char *get_long_name_sym(const char *name, struct symbol *sym, struct symb
 found:
 	if (!use_stack && name[tmp->symbol->ident->len] != '-')
 		return NULL;
-	snprintf(buf, sizeof(buf), "%s%s", sm->name, name + tmp->symbol->ident->len);
+
+	if (name[0] == '*' && strcmp(name + 1, tmp->symbol_name->name) == 0)
+		snprintf(buf, sizeof(buf), "*%s", sm->name);
+	else if (name[tmp->symbol->ident->len] == '-' ||
+		 name[tmp->symbol->ident->len] == '.')
+		snprintf(buf, sizeof(buf), "%s%s", sm->name, name + tmp->symbol->ident->len);
+	else if (strcmp(name, tmp->symbol_name->name) == 0)
+		snprintf(buf, sizeof(buf), "%s", sm->name);
+	else
+		return NULL;
+
 	*new_sym = sm->sym;
 	return alloc_string(buf);
 }
@@ -1084,11 +1100,6 @@ static void match_vanilla_assign(struct expression *left, struct expression *rig
 	    !has_symbol(right, sym)) {
 		set_equiv(left, right);
 		goto free;
-	}
-
-	if (is_pointer(right) && get_address_rl(right, &rl)) {
-		state = alloc_estate_rl(rl);
-		goto done;
 	}
 
 	if (get_implied_value(right, &sval)) {

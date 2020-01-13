@@ -22,16 +22,14 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2019 by Delphix. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2014 Integros [integros.com]
  */
 
 #include <sys/zfs_context.h>
 #include <sys/spa.h>
 #include <sys/vdev_impl.h>
-#include <sys/vdev_disk.h>
 #include <sys/vdev_file.h>
-#include <sys/vdev_raidz.h>
 #include <sys/zio.h>
 #include <sys/zio_checksum.h>
 #include <sys/abd.h>
@@ -1763,7 +1761,7 @@ vdev_raidz_close(vdev_t *vd)
  *
  * However, when writing to the dump device, the behavior is different:
  *
- *     vdev_raidz_physio(data, size: 32 KB, offset: 64 KB)
+ *     vdev_raidz_dumpio(data, size: 32 KB, offset: 64 KB)
  *
  * Unlike the normal RAID-Z case in which the block is allocated based on the
  * I/O size, reads and writes here always use a 128 KB logical I/O size.  If the
@@ -1791,8 +1789,8 @@ vdev_raidz_close(vdev_t *vd)
  *                                                      |
  *                                               32 KB data block
  */
-int
-vdev_raidz_physio(vdev_t *vd, caddr_t data, size_t size,
+static int
+vdev_raidz_dumpio(vdev_t *vd, caddr_t data, size_t size,
     uint64_t offset, uint64_t origoffset, boolean_t doread, boolean_t isdump)
 {
 	vdev_t *tvd = vd->vdev_top;
@@ -1803,8 +1801,6 @@ vdev_raidz_physio(vdev_t *vd, caddr_t data, size_t size,
 
 	uint64_t start, end, colstart, colend;
 	uint64_t coloffset, colsize, colskip;
-
-	int flags = doread ? B_READ : B_WRITE;
 
 #ifdef	_KERNEL
 
@@ -1838,6 +1834,11 @@ vdev_raidz_physio(vdev_t *vd, caddr_t data, size_t size,
 		rc = &rm->rm_col[c];
 		cvd = vd->vdev_child[rc->rc_devidx];
 
+		if (cvd->vdev_ops->vdev_op_dumpio == NULL) {
+			err = EINVAL;
+			break;
+		}
+
 		/*
 		 * Find the start and end of this column in the RAID-Z map,
 		 * keeping in mind that the stated size and offset of the
@@ -1865,10 +1866,10 @@ vdev_raidz_physio(vdev_t *vd, caddr_t data, size_t size,
 		 * VDEV_LABEL_OFFSET().  See zio_vdev_child_io() for another
 		 * example of why this calculation is needed.
 		 */
-		if ((err = vdev_disk_physio(cvd,
+		if ((err = cvd->vdev_ops->vdev_op_dumpio(cvd,
 		    ((char *)abd_to_buf(rc->rc_abd)) + colskip, colsize,
-		    VDEV_LABEL_OFFSET(rc->rc_offset) + colskip,
-		    flags, isdump)) != 0)
+		    VDEV_LABEL_OFFSET(rc->rc_offset) + colskip, 0,
+		    doread, isdump)) != 0)
 			break;
 	}
 
@@ -2697,6 +2698,7 @@ vdev_ops_t vdev_raidz_ops = {
 	.vdev_op_rele = NULL,
 	.vdev_op_remap = NULL,
 	.vdev_op_xlate = vdev_raidz_xlate,
+	.vdev_op_dumpio = vdev_raidz_dumpio,
 	.vdev_op_type = VDEV_TYPE_RAIDZ,	/* name of this vdev type */
 	.vdev_op_leaf = B_FALSE			/* not a leaf vdev */
 };

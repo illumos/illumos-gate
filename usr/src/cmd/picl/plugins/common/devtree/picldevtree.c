@@ -37,7 +37,6 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <alloca.h>
 #include <unistd.h>
 #include <stropts.h>
 #include <syslog.h>
@@ -668,7 +667,7 @@ add_string_list_prop(picl_nodehdl_t nodeh, char *name, char *strlist,
 	if (err != PICL_SUCCESS)
 		return (err);
 
-	proprow = alloca(sizeof (picl_prophdl_t) * nrows);
+	proprow = calloc(nrows, sizeof (picl_prophdl_t));
 	if (proprow == NULL) {
 		(void) ptree_destroy_prop(proph);
 		return (PICL_FAILURE);
@@ -696,10 +695,10 @@ add_string_list_prop(picl_nodehdl_t nodeh, char *name, char *strlist,
 			(void) ptree_destroy_prop(proprow[i]);
 		(void) ptree_delete_prop(proph);
 		(void) ptree_destroy_prop(proph);
-		return (err);
 	}
 
-	return (PICL_SUCCESS);
+	free(proprow);
+	return (err);
 }
 
 /*
@@ -714,6 +713,7 @@ compare_string_propval(picl_nodehdl_t nodeh, const char *pname,
 	int			len;
 	ptree_propinfo_t	pinfo;
 	picl_prophdl_t		proph;
+	int			rv;
 
 	err = ptree_get_prop_by_name(nodeh, pname, &proph);
 	if (err != PICL_SUCCESS)	/* prop doesn't exist */
@@ -725,15 +725,18 @@ compare_string_propval(picl_nodehdl_t nodeh, const char *pname,
 
 	len = strlen(pval) + 1;
 
-	pvalbuf = alloca(len);
+	pvalbuf = malloc(len);
 	if (pvalbuf == NULL)
 		return (0);
 
 	err = ptree_get_propval(proph, pvalbuf, len);
 	if ((err == PICL_SUCCESS) && (strcmp(pvalbuf, pval) == 0))
-		return (1);	/* prop match */
+		rv = 1;	/* prop match */
+	else
+		rv = 0;
 
-	return (0);
+	free(pvalbuf);
+	return (rv);
 }
 
 /*
@@ -846,14 +849,19 @@ process_charstring_data(picl_nodehdl_t nodeh, char *pname, unsigned char *pdata,
 	 * no null terminator
 	 */
 	if (pdata[retval - 1] != '\0') {
-		strdat = alloca(retval + 1);
-		(void) memcpy(strdat, pdata, retval);
-		strdat[retval] = '\0';
-		retval++;
+		strdat = malloc(retval + 1);
+		if (strdat != NULL) {
+			(void) memcpy(strdat, pdata, retval);
+			strdat[retval] = '\0';
+			retval++;
+		}
 	} else {
-		strdat = alloca(retval);
-		(void) memcpy(strdat, pdata, retval);
+		strdat = malloc(retval);
+		if (strdat != NULL)
+			(void) memcpy(strdat, pdata, retval);
 	}
+	if (strdat == NULL)
+		return (PICL_FAILURE);
 
 	/*
 	 * If it's a string list, create a table prop
@@ -862,18 +870,24 @@ process_charstring_data(picl_nodehdl_t nodeh, char *pname, unsigned char *pdata,
 	if (strcount > 1) {
 		err = add_string_list_prop(nodeh, pname,
 		    strdat, strcount);
-		if (err != PICL_SUCCESS)
+		if (err != PICL_SUCCESS) {
+			free(strdat);
 			return (err);
+		}
 	} else {
 		err = ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
 		    PICL_PTYPE_CHARSTRING, PICL_READ,
 		    strlen(strdat) + 1, pname, NULL,
 		    NULL);
-		if (err != PICL_SUCCESS)
+		if (err != PICL_SUCCESS) {
+			free(strdat);
 			return (err);
+		}
 		(void) ptree_create_and_add_prop(nodeh, &propinfo,
 		    strdat, NULL);
 	}
+
+	free(strdat);
 	return (PICL_SUCCESS);
 }
 
@@ -2959,14 +2973,14 @@ get_first_reg_word(picl_nodehdl_t nodeh, uint32_t *regval)
 		return (err);
 	if (pinfo.piclinfo.size < sizeof (uint32_t)) /* too small */
 		return (PICL_FAILURE);
-	regbuf = alloca(pinfo.piclinfo.size);
+	regbuf = malloc(pinfo.piclinfo.size);
 	if (regbuf == NULL)
 		return (PICL_FAILURE);
 	err = ptree_get_propval(regh, regbuf, pinfo.piclinfo.size);
-	if (err != PICL_SUCCESS)
-		return (err);
-	*regval = *regbuf;	/* get first 32-bit value */
-	return (PICL_SUCCESS);
+	if (err == PICL_SUCCESS)
+		*regval = *regbuf;	/* get first 32-bit value */
+	free(regbuf);
+	return (err);
 }
 
 /*
@@ -3324,7 +3338,7 @@ add_unitaddr_prop(picl_nodehdl_t nodeh, unitaddr_map_t *uamap, uint_t addrcells)
 		return (PICL_FAILURE);
 
 	regproplen = pinfo.piclinfo.size;
-	regbuf = alloca(regproplen);
+	regbuf = malloc(regproplen);
 	if (regbuf == NULL)
 		return (PICL_FAILURE);
 
@@ -3333,6 +3347,7 @@ add_unitaddr_prop(picl_nodehdl_t nodeh, unitaddr_map_t *uamap, uint_t addrcells)
 	    (uamap->addrcellcnt && uamap->addrcellcnt != addrcells) ||
 	    (uamap->func)(unitaddr, sizeof (unitaddr), regbuf,
 	    addrcells) != 0) {
+		free(regbuf);
 		return (PICL_FAILURE);
 	}
 
@@ -3342,6 +3357,7 @@ add_unitaddr_prop(picl_nodehdl_t nodeh, unitaddr_map_t *uamap, uint_t addrcells)
 	if (err == PICL_SUCCESS)
 		err = ptree_create_and_add_prop(nodeh, &pinfo, unitaddr, NULL);
 
+	free(regbuf);
 	return (err);
 }
 
@@ -3374,7 +3390,7 @@ get_unitaddr(picl_nodehdl_t parh, picl_nodehdl_t nodeh, char *unitaddr,
 		return (PICL_FAILURE);
 
 	regproplen = pinfo.piclinfo.size;
-	regbuf = alloca(regproplen);
+	regbuf = malloc(regproplen);
 	if (regbuf == NULL)
 		return (PICL_FAILURE);
 
@@ -3382,8 +3398,10 @@ get_unitaddr(picl_nodehdl_t parh, picl_nodehdl_t nodeh, char *unitaddr,
 	if (err != PICL_SUCCESS || uamap->func == NULL ||
 	    (uamap->addrcellcnt && uamap->addrcellcnt != addrcells) ||
 	    (uamap->func)(unitaddr, ualen, regbuf, addrcells) != 0) {
+		free(regbuf);
 		return (PICL_FAILURE);
 	}
+	free(regbuf);
 	return (PICL_SUCCESS);
 }
 
@@ -3465,13 +3483,15 @@ update_memory_size_prop(picl_nodehdl_t plafh)
 	if (err != PICL_SUCCESS)
 		return (err);
 
-	regbuf = alloca(pinfo.piclinfo.size);
+	regbuf = malloc(pinfo.piclinfo.size);
 	if (regbuf == NULL)
 		return (PICL_FAILURE);
 
 	err = ptree_get_propval(proph, regbuf, pinfo.piclinfo.size);
-	if (err != PICL_SUCCESS)
+	if (err != PICL_SUCCESS) {
+		free(regbuf);
 		return (err);
+	}
 
 	mspecs = (memspecs_t *)regbuf;
 	nspecs = pinfo.piclinfo.size / sizeof (memspecs_t);
@@ -3483,6 +3503,7 @@ update_memory_size_prop(picl_nodehdl_t plafh)
 	err = ptree_get_prop_by_name(memh, PICL_PROP_SIZE, &proph);
 	if (err == PICL_SUCCESS) {
 		err = ptree_update_propval(proph, &memsize, sizeof (memsize));
+		free(regbuf);
 		return (err);
 	}
 
@@ -3493,6 +3514,7 @@ update_memory_size_prop(picl_nodehdl_t plafh)
 	    PICL_PTYPE_UNSIGNED_INT, PICL_READ, sizeof (memsize),
 	    PICL_PROP_SIZE, NULL, NULL);
 	err = ptree_create_and_add_prop(memh, &pinfo, &memsize, NULL);
+	free(regbuf);
 	return (err);
 }
 

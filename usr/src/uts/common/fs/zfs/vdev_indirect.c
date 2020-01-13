@@ -15,6 +15,7 @@
 
 /*
  * Copyright (c) 2014, 2019 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/zfs_context.h>
@@ -1830,6 +1831,7 @@ vdev_ops_t vdev_indirect_ops = {
 	.vdev_op_rele = NULL,
 	.vdev_op_remap = vdev_indirect_remap,
 	.vdev_op_xlate = NULL,
+	.vdev_op_dumpio = NULL,
 	.vdev_op_type = VDEV_TYPE_INDIRECT,	/* name of this vdev type */
 	.vdev_op_leaf = B_FALSE			/* leaf vdev */
 };

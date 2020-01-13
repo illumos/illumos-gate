@@ -25,6 +25,7 @@ ${bin_dir}/trace_params.pl $file rds_info_copy 1 >> $tmp
 ${bin_dir}/trace_params.pl $file nla_put 3 >> $tmp
 ${bin_dir}/trace_params.pl $file snd_timer_user_append_to_tqueue 1 >> $tmp
 ${bin_dir}/trace_params.pl $file __send_signal 1 >> $tmp
+${bin_dir}/trace_params.pl $file usb_bulk_msg 2 >> $tmp
 
 cat $tmp | sort -u > $tmp2
 mv $tmp2 $tmp

@@ -68,6 +68,7 @@ SYMBOL_SCOPE {
 	topo_mod_auth			{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_clean_str		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_hc_occupied		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_product		{ TYPE = FUNCTION; FLAGS = extern };
 
 	topo_mod_walk_init		{ TYPE = FUNCTION; FLAGS = extern };
 

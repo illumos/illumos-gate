@@ -831,6 +831,7 @@ file path=usr/bin/setfacl mode=0555
 file path=usr/bin/setpgrp group=sys mode=0555
 file path=usr/bin/settime mode=0555
 file path=usr/bin/shcomp mode=0555
+file path=usr/bin/sleep mode=0555
 file path=usr/bin/strchg group=root mode=0555
 file path=usr/bin/strconf group=root mode=0555
 file path=usr/bin/stty mode=0555
@@ -1474,7 +1475,6 @@ hardlink path=usr/bin/rksh target=../../usr/lib/isaexec
 hardlink path=usr/bin/rksh93 target=../../usr/lib/isaexec
 hardlink path=usr/bin/savecore target=../../usr/lib/isaexec
 hardlink path=usr/bin/setuname target=../../usr/lib/isaexec
-hardlink path=usr/bin/sleep target=../../usr/bin/alias
 hardlink path=usr/bin/sum target=../../usr/bin/alias
 hardlink path=usr/bin/tee target=../../usr/bin/alias
 hardlink path=usr/bin/test target=../../usr/bin/alias

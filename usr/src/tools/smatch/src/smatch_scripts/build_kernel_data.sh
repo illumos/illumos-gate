@@ -36,7 +36,7 @@ if [ ! -e smatch_db.sqlite ] ; then
 fi
 
 BUILD_STATUS=0
-$SCRIPT_DIR/test_kernel.sh --call-tree --info --param-mapper --spammy --data=$DATA_DIR || BUILD_STATUS=$?
+$SCRIPT_DIR/test_kernel.sh --call-tree --info --spammy --data=$DATA_DIR || BUILD_STATUS=$?
 
 for i in $SCRIPT_DIR/gen_* ; do
 	$i smatch_warns.txt -p=kernel

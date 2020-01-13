@@ -29,7 +29,6 @@
 #include <sys/zfs_zone.h>
 #include <sys/spa_impl.h>
 #include <sys/refcount.h>
-#include <sys/vdev_disk.h>
 #include <sys/vdev_impl.h>
 #include <sys/vdev_trim.h>
 #include <sys/abd.h>
@@ -38,6 +37,7 @@
 #include <sys/sunldi.h>
 #include <sys/efi_partition.h>
 #include <sys/fm/fs/zfs.h>
+#include <sys/ddi.h>
 
 /*
  * Tunable to disable TRIM in case we're using a problematic SSD.
@@ -58,6 +58,14 @@ boolean_t zfs_nocacheflush = B_FALSE;
 extern ldi_ident_t zfs_li;
 
 static void vdev_disk_close(vdev_t *);
+
+typedef struct vdev_disk {
+	ddi_devid_t	vd_devid;
+	char		*vd_minor;
+	ldi_handle_t	vd_lh;
+	list_t		vd_ldi_cbs;
+	boolean_t	vd_ldi_offline;
+} vdev_disk_t;
 
 typedef struct vdev_disk_buf {
 	buf_t	vdb_buf;
@@ -775,35 +783,7 @@ vdev_disk_close(vdev_t *vd)
 	vdev_disk_free(vd);
 }
 
-int
-vdev_disk_physio(vdev_t *vd, caddr_t data,
-    size_t size, uint64_t offset, int flags, boolean_t isdump)
-{
-	vdev_disk_t *dvd = vd->vdev_tsd;
-
-	/*
-	 * If the vdev is closed, it's likely in the REMOVED or FAULTED state.
-	 * Nothing to be done here but return failure.
-	 */
-	if (dvd == NULL || (dvd->vd_ldi_offline && dvd->vd_lh == NULL))
-		return (EIO);
-
-	ASSERT(vd->vdev_ops == &vdev_disk_ops);
-
-	/*
-	 * If in the context of an active crash dump, use the ldi_dump(9F)
-	 * call instead of ldi_strategy(9F) as usual.
-	 */
-	if (isdump) {
-		ASSERT3P(dvd, !=, NULL);
-		return (ldi_dump(dvd->vd_lh, data, lbtodb(offset),
-		    lbtodb(size)));
-	}
-
-	return (vdev_disk_ldi_physio(dvd->vd_lh, data, size, offset, flags));
-}
-
-int
+static int
 vdev_disk_ldi_physio(ldi_handle_t vd_lh, caddr_t data,
     size_t size, uint64_t offset, int flags)
 {
@@ -829,6 +809,40 @@ vdev_disk_ldi_physio(ldi_handle_t vd_lh, caddr_t data,
 	freerbuf(bp);
 
 	return (error);
+}
+
+static int
+vdev_disk_dumpio(vdev_t *vd, caddr_t data, size_t size,
+    uint64_t offset, uint64_t origoffset, boolean_t doread, boolean_t isdump)
+{
+	vdev_disk_t *dvd = vd->vdev_tsd;
+	int flags = doread ? B_READ : B_WRITE;
+
+	/*
+	 * If the vdev is closed, it's likely in the REMOVED or FAULTED state.
+	 * Nothing to be done here but return failure.
+	 *
+	 * XXX-mg there is still a race here with off_notify
+	 */
+	if (dvd == NULL || dvd->vd_ldi_offline) {
+		return (EIO);
+	}
+
+	ASSERT(vd->vdev_ops == &vdev_disk_ops);
+
+	offset += VDEV_LABEL_START_SIZE;
+
+	/*
+	 * If in the context of an active crash dump, use the ldi_dump(9F)
+	 * call instead of ldi_strategy(9F) as usual.
+	 */
+	if (isdump) {
+		ASSERT3P(dvd, !=, NULL);
+		return (ldi_dump(dvd->vd_lh, data, lbtodb(offset),
+		    lbtodb(size)));
+	}
+
+	return (vdev_disk_ldi_physio(dvd->vd_lh, data, size, offset, flags));
 }
 
 static int
@@ -1070,6 +1084,7 @@ vdev_ops_t vdev_disk_ops = {
 	.vdev_op_rele = vdev_disk_rele,
 	.vdev_op_remap = NULL,
 	.vdev_op_xlate = vdev_default_xlate,
+	.vdev_op_dumpio = vdev_disk_dumpio,
 	.vdev_op_type = VDEV_TYPE_DISK,		/* name of this vdev type */
 	.vdev_op_leaf = B_TRUE			/* leaf vdev */
 };

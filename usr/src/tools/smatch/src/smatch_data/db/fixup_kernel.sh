@@ -180,6 +180,11 @@ delete from return_states where function = 'ata_dev_next' and type = 103;
 /* The problem is that parsing big function pointers is hard. */
 delete from return_states where function = 'vfs_get_tree' and type = 1024;
 
+/* Locking stuff goes here.  */
+update return_states set parameter = -1, key = '\$' where function = 'ipmi_ssif_lock_cond' and type = 8020 and parameter = 1;
+update return_states set parameter = 1, key = '\$->tree->tree_lock' where function = 'hfs_find_init' and type = 8020 and parameter = 0;
+delete from return_states where function = '__oom_kill_process' and type = 8021;
+
 EOF
 
 # fixme: this is totally broken

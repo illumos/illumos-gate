@@ -99,8 +99,10 @@ mv $MSG_FILE.1 $MSG_FILE
 
 git commit $AMEND -F $MSG_FILE
 
-to_addr=$(./scripts/get_maintainer.pl -f --noroles --norolestats $fullname | head -n 1)
-cc_addr=$(./scripts/get_maintainer.pl -f --noroles --norolestats $fullname | tail -n +2 | \
+git format-patch HEAD^ --stdout >> $MSG_FILE
+
+to_addr=$(./scripts/get_maintainer.pl --noroles --norolestats $MSG_FILE | head -n 1)
+cc_addr=$(./scripts/get_maintainer.pl --noroles --norolestats $MSG_FILE | tail -n +2 | \
     perl -ne 's/\n$/, /; print')
 cc_addr="$cc_addr, kernel-janitors@vger.kernel.org"
 
@@ -118,3 +120,4 @@ echo "Press ENTER to continue"
 read unused
 
 mutt -H $MAIL_FILE
+rm -f $MSG_FILE

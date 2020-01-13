@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -91,6 +92,7 @@ vdev_ops_t vdev_missing_ops = {
 	.vdev_op_rele = NULL,
 	.vdev_op_remap = NULL,
 	.vdev_op_xlate = NULL,
+	.vdev_op_dumpio = NULL,
 	.vdev_op_type = VDEV_TYPE_MISSING,	/* name of this vdev type */
 	.vdev_op_leaf = B_TRUE			/* leaf vdev */
 };
@@ -107,6 +109,7 @@ vdev_ops_t vdev_hole_ops = {
 	.vdev_op_rele = NULL,
 	.vdev_op_remap = NULL,
 	.vdev_op_xlate = NULL,
+	.vdev_op_dumpio = NULL,
 	.vdev_op_type = VDEV_TYPE_HOLE,		/* name of this vdev type */
 	.vdev_op_leaf = B_TRUE			/* leaf vdev */
 };

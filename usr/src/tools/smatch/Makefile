@@ -8,7 +8,7 @@
 # source.  A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 #
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 #
@@ -20,7 +20,7 @@
 #
 
 PROG = smatch
-SPARSE_VERSION = 0.6.1-rc1-il-2
+SPARSE_VERSION = 0.6.1-rc1-il-3
 
 include ../Makefile.tools
 
@@ -31,7 +31,8 @@ sparc_CC = $(GNUC_ROOT)/bin/gcc
 i386_SMATCHFLAGS = -msave-args
 sparc_SMATCHFLAGS =
 
-CFLAGS = -O -m64 $($(MACH)_SMATCHFLAGS) -D__sun -Wall -Wno-unknown-pragmas -std=gnu99 -nodefaultlibs
+CFLAGS = -O -m64 -std=gnu99 -nodefaultlibs -D__sun $($(MACH)_SMATCHFLAGS)
+CFLAGS += -Wall -Wno-unknown-pragmas -Wno-psabi
 
 SMATCHDATADIR = $(ROOTONBLDSHARE)/smatch
 
@@ -185,6 +186,7 @@ SMATCH_OBJS += smatch_type_val.o
 SMATCH_OBJS += smatch_unknown_value.o
 SMATCH_OBJS += smatch_untracked_param.o
 SMATCH_OBJS += smatch_var_sym.o
+SMATCH_OBJS += smatch_parsed_conditions.o
 
 SMATCH_CHECK_OBJS:sh=ls src/check_*.c | sed -e 's+\.c+.o+;s+src/++;'
 

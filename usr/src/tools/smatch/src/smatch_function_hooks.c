@@ -1078,6 +1078,7 @@ static int db_return_states_callback(void *_info, int argc, char **argv, char **
 	value = argv[5];
 
 	if (db_info->prev_return_id != -1 && type == INTERNAL) {
+		call_ranged_return_hooks(db_info);
 		stree = __pop_fake_cur_stree();
 		if (!db_info->cull)
 			merge_fake_stree(&db_info->stree, stree);
@@ -1108,9 +1109,20 @@ static int db_return_states_callback(void *_info, int argc, char **argv, char **
 	ret_range = cast_rl(get_type(db_info->expr), ret_range);
 
 	if (type == INTERNAL) {
+		struct smatch_state *state;
+
 		set_state(-1, "unnull_path", NULL, &true_state);
 		__add_return_comparison(strip_expr(db_info->expr), ret_str);
 		__add_return_to_param_mapping(db_info->expr, ret_str);
+		/*
+		 * We want to store the return values so that we can split the strees
+		 * in smatch_db.c.  This uses set_state() directly because it's not a
+		 * real smatch_extra state.
+		 */
+		snprintf(buf, sizeof(buf), "return %p", db_info->expr);
+		state = alloc_estate_rl(ret_range);
+		set_state(SMATCH_EXTRA, buf, NULL, state);
+		store_return_state(db_info, ret_str, state);
 	}
 
 	FOR_EACH_PTR(db_return_states_list, tmp) {
@@ -1118,13 +1130,6 @@ static int db_return_states_callback(void *_info, int argc, char **argv, char **
 			tmp->callback(db_info->expr, param, key, value);
 	} END_FOR_EACH_PTR(tmp);
 
-	/*
-	 * We want to store the return values so that we can split the strees
-	 * in smatch_db.c.  This uses set_state() directly because it's not a
-	 * real smatch_extra state.
-	 */
-	snprintf(buf, sizeof(buf), "return %p", db_info->expr);
-	set_state(SMATCH_EXTRA, buf, NULL, alloc_estate_rl(ret_range));
 
 	return 0;
 }
@@ -1148,6 +1153,7 @@ static void db_return_states(struct expression *expr)
 	__unnullify_path();
 	sql_select_return_states("return_id, return, type, parameter, key, value",
 			expr, db_return_states_callback, &db_info);
+	call_ranged_return_hooks(&db_info);
 	stree = __pop_fake_cur_stree();
 	if (!db_info.cull)
 		merge_fake_stree(&db_info.stree, stree);

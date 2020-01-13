@@ -119,6 +119,11 @@ int get_member_offset_from_deref(struct expression *expr)
 	struct ident *member;
 	int offset;
 
+	/*
+	 * FIXME: This doesn't handle foo.u.bar correctly.
+	 *
+	 */
+
 	if (expr->type != EXPR_DEREF)  /* hopefully, this doesn't happen */
 		return -1;
 
@@ -202,25 +207,66 @@ static struct range_list *where_allocated_rl(struct symbol *sym)
 	if (!sym)
 		return NULL;
 
+	/* This should just be the mtag if it's not on the stack */
 	return alloc_rl(valid_ptr_min_sval, valid_ptr_max_sval);
+}
+
+static bool handle_fn_address(struct expression *expr, struct range_list **rl)
+{
+	struct symbol *type;
+
+	if (expr->type == EXPR_PREOP && expr->op == '&')
+		expr = strip_expr(expr->unop);
+
+	if (expr->type != EXPR_SYMBOL)
+		return false;
+
+	type = get_type(expr);
+	if (!type || type->type != SYM_FN)
+		return false;
+
+	*rl = alloc_rl(valid_ptr_min_sval, valid_ptr_max_sval);
+	return true;
 }
 
 int get_address_rl(struct expression *expr, struct range_list **rl)
 {
 	struct expression *unop;
 
+	/*
+	 * Ugh...  This function is bad.  It doesn't work where it's supposed to
+	 * and it does more than it really should.  It shouldn't handle string
+	 * literals I think...
+	 *
+	 * There are several complications.  For arrays and functions the "&foo"
+	 * "foo" are equivalent.  But the problem is that we're also passing in
+	 * foo->array[] and foo->fn.
+	 *
+	 * Then, when we have foo->bar.baz.one.two; that needs to be handled
+	 * correctly but right now, it is not.
+	 *
+	 */
+
 	expr = strip_expr(expr);
 	if (!expr)
 		return 0;
 
-	if (expr->type == EXPR_STRING) {
-		*rl = alloc_rl(valid_ptr_min_sval, valid_ptr_max_sval);
+	/*
+	 * For functions &fn and fn are equivalent.  I don't know if this is
+	 * really the right place to handle it, but let's just get it out of the
+	 * way for now.
+	 *
+	 */
+	if (handle_fn_address(expr, rl))
 		return 1;
-	}
 
-	if (expr->type == EXPR_PREOP && expr->op == '&')
+	/*
+	 * For arrays, &foo->array and foo->array are equivalent.
+	 *
+	 */
+	if (expr->type == EXPR_PREOP && expr->op == '&') {
 		expr = strip_expr(expr->unop);
-	else {
+	} else {
 		struct symbol *type;
 
 		type = get_type(expr);

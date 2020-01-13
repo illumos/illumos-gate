@@ -303,6 +303,7 @@ vdev_ops_t vdev_file_ops = {
 	.vdev_op_rele = vdev_file_rele,
 	.vdev_op_remap = NULL,
 	.vdev_op_xlate = vdev_default_xlate,
+	.vdev_op_dumpio = NULL,
 	.vdev_op_type = VDEV_TYPE_FILE,		/* name of this vdev type */
 	.vdev_op_leaf = B_TRUE			/* leaf vdev */
 };
@@ -324,6 +325,7 @@ vdev_ops_t vdev_disk_ops = {
 	.vdev_op_rele = vdev_file_rele,
 	.vdev_op_remap = NULL,
 	.vdev_op_xlate = vdev_default_xlate,
+	.vdev_op_dumpio = NULL,
 	.vdev_op_type = VDEV_TYPE_DISK,		/* name of this vdev type */
 	.vdev_op_leaf = B_TRUE			/* leaf vdev */
 };
