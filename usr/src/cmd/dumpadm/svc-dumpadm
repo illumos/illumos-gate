@@ -21,6 +21,7 @@
 #
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
 
 . /lib/svc/share/smf_include.sh
@@ -100,7 +101,7 @@ fi
 # how to modify the dump settings.
 #
 if [ -x /usr/sbin/dumpadm ]; then
-	/usr/sbin/dumpadm -u || $SMF_EXIT_ERR_CONFIG
+	/usr/sbin/dumpadm -u || exit $SMF_EXIT_ERR_CONFIG
 else
 	echo "WARNING: /usr/sbin/dumpadm is missing or not executable" >& 2
 	exit $SMF_EXIT_ERR_CONFIG
@@ -111,6 +112,11 @@ if [ -r /etc/dumpadm.conf ]; then
 else
 	echo "WARNING: /etc/dumpadm.conf is missing or unreadable" >& 2
 	exit $SMF_EXIT_ERR_CONFIG
+fi
+
+if [[ -f $DUMPADM_SAVDIR/keyfile ]]; then
+	/usr/sbin/dumpadm -k $DUMPADM_SAVDIR/keyfile || \
+	exit $SMT_EXIT_ERR_CONFIG
 fi
 
 #
@@ -147,11 +153,15 @@ if [ "x$DUMPADM_ENABLE" != xno ]; then
 		    mksavedir && /usr/bin/savecore $DUMPADM_SAVDIR &
 		fi
 	else
+		keyarg=""
+		[[ -f "$DUMPADM_SAVDIR/keyfile" ]] && \
+			keyarg="-k $DUMPADM_SAVDIR/keyfile"
+
 		#
 		# The dump device couldn't have been dedicated before we
 		# ran dumpadm, so we must execute savecore again.
 		#
-		mksavedir && /usr/bin/savecore $DUMPADM_SAVDIR &
+		mksavedir && /usr/bin/savecore $keyarg $DUMPADM_SAVDIR &
 	fi
 else
 		#
