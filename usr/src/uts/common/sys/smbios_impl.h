@@ -366,6 +366,9 @@ typedef struct smb_memdevice {
 	uint64_t smbmdev_volsize;	/* volatile memory size */
 	uint64_t smbmdev_cachesize;	/* cache size */
 	uint64_t smbmdev_logicalsize;	/* logical size */
+	/* Added in SMBIOS 3.3 */
+	uint32_t smbmdev_extspeed;	/* Extended device speed */
+	uint32_t smbmdev_extclkspeed;	/* Extended clock speed */
 } smb_memdevice_t;
 
 #define	SMB_MDS_KBYTES		0x8000	/* size in specified in kilobytes */
@@ -385,6 +388,13 @@ typedef struct smb_memdevmap {
 	uint64_t smbdmap_extstart;	/* extended starting address */
 	uint64_t smbdmap_extend;	/* extended ending address */
 } smb_memdevmap_t;
+
+typedef struct smb_pointdev {
+	smb_header_t smbpdev_hdr;	/* structure header */
+	uint8_t smbpdev_type;		/* device type */
+	uint8_t smbpdev_iface;		/* device interface */
+	uint8_t smbpdev_nbuttons;	/* number of buttons */
+} smb_pointdev_t;
 
 /*
  * SMBIOS implementation structure for SMB_TYPE_BATTERY.
@@ -590,6 +600,36 @@ typedef struct smb_obdev_ext {
 	uint8_t smbobe_bus;		/* bus number */
 	uint8_t smbobe_df;		/* device/function number */
 } smb_obdev_ext_t;
+
+/*
+ * SMBIOS implementation structure for SMB_TYPE_PROCESSOR_INFO
+ */
+typedef struct smb_processor_info {
+	smb_header_t smbpai_hdr;	/* structure handle */
+	uint16_t smbpai_proc;		/* processor handle */
+	uint8_t smbpai_len;		/* length of processor specific data */
+	uint8_t smbpai_type;		/* processor type */
+	uint8_t smbpai_data[];		/* processor-specific block */
+} smb_processor_info_t;
+
+typedef struct smb_processor_info_riscv {
+	uint16_t smbpairv_vers;		/* structure revision */
+	uint8_t smbpairv_len;		/* length of structure */
+	uint8_t smbpairv_hartid[16];	/* id of the hart */
+	uint8_t smbpairv_boot;		/* boot hart */
+	uint8_t smbpairv_vendid[16];	/* machine vendor id */
+	uint8_t smbpairv_archid[16];	/* arch vendor id */
+	uint8_t smbpairv_machid[16];	/* machine impl id */
+	uint32_t smbpairv_isa;		/* supported ISA */
+	uint8_t smbpairv_privlvl;		/* supported privilege levels */
+	uint8_t smbpairv_metdi[16];	/* Machine exception trap delegation */
+	uint8_t smbpairv_mitdi[16];	/* Machine interrupt trap delegation */
+	uint8_t smbpairv_xlen;		/* Register width */
+	uint8_t smbpairv_mxlen;		/* Machine register width */
+	uint8_t smbpairv_rsvd;		/* Reserved */
+	uint8_t smbpairv_sxlen;		/* Supervisor register width */
+	uint8_t smbpairv_uxlen;		/* User register width */
+} smb_processor_info_riscv_t;
 
 /*
  * SMBIOS implementation structure for SUN_OEM_EXT_PROCESSOR.

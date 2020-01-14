@@ -3,43 +3,29 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH HCI1394 7D "Aug 30, 2005"
+.TH HCI1394 7D "Jan 10, 2020"
 .SH NAME
 hci1394 \- 1394 OpenHCI host controller driver
 .SH SYNOPSIS
-.LP
 .nf
 \fBfirewire@unit-address\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBhci1394\fR host controller driver is an IEEE 1394 compliant nexus driver
 that supports the \fI1394 Open Host Controller Interface Specification 1.0\fR,
 an industry standard developed by Sun, Apple, Compaq, Intel, Microsoft,
-National Semconductor, and Texas Instruments. The \fBhci1394\fR driver supports
+National Semiconductor, and Texas Instruments. The \fBhci1394\fR driver supports
 asynchronous transfers, isochronous transfers, and bus reset management. The
 \fBhci1394\fR driver also supports the nexus device control interface.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/sparcv9/hci1394\fR\fR
 .ad
 .sp .6
 .RS 4n
-64-bit SPARC ELF kernel module
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/kernel/drv/hci1394\fR\fR
-.ad
-.sp .6
-.RS 4n
-32-bit x86 ELF kernel module
+Device driver (SPARC)
 .RE
 
 .sp
@@ -49,12 +35,10 @@ asynchronous transfers, isochronous transfers, and bus reset management. The
 .ad
 .sp .6
 .RS 4n
-64-bit x86 ELF kernel module
+Device driver (x86)
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -71,8 +55,6 @@ Interface Stability	Unstable
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattributes\fR(5), \fBieee1394\fR(7D)
 .sp
 .LP

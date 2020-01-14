@@ -700,7 +700,7 @@ dt_opt_rate(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
 		char *name;
 		hrtime_t mul;
 	} suffix[] = {
-		{ "ns", 	NANOSEC / NANOSEC },
+		{ "ns",		NANOSEC / NANOSEC },
 		{ "nsec",	NANOSEC / NANOSEC },
 		{ "us",		NANOSEC / MICROSEC },
 		{ "usec",	NANOSEC / MICROSEC },
@@ -915,15 +915,19 @@ dt_options_load(dtrace_hdl_t *dtp)
 	if (hdr.dofh_loadsz < sizeof (dof_hdr_t))
 		return (dt_set_errno(dtp, EINVAL));
 
-	dof = alloca(hdr.dofh_loadsz);
-	bzero(dof, sizeof (dof_hdr_t));
+	dof = calloc(1, hdr.dofh_loadsz);
+	if (dof == NULL)
+		return (dt_set_errno(dtp, errno));
+
 	dof->dofh_loadsz = hdr.dofh_loadsz;
 
 	for (i = 0; i < DTRACEOPT_MAX; i++)
 		dtp->dt_options[i] = DTRACEOPT_UNSET;
 
-	if (dt_ioctl(dtp, DTRACEIOC_DOFGET, dof) == -1)
+	if (dt_ioctl(dtp, DTRACEIOC_DOFGET, dof) == -1) {
+		free(dof);
 		return (dt_set_errno(dtp, errno));
+	}
 
 	for (i = 0; i < dof->dofh_secnum; i++) {
 		sec = (dof_sec_t *)(uintptr_t)((uintptr_t)dof +
@@ -948,6 +952,7 @@ dt_options_load(dtrace_hdl_t *dtp)
 		dtp->dt_options[opt->dofo_option] = opt->dofo_value;
 	}
 
+	free(dof);
 	return (0);
 }
 

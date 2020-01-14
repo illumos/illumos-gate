@@ -196,7 +196,8 @@ inode_cache(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    "ADDR", "INUMBER", "DEVICE", "CHAIN");
 	}
 
-	if (mdb_walk("inode_cache", (mdb_walk_cb_t)inode_cache_cb, &id) == -1) {
+	if (mdb_walk("inode_cache", (mdb_walk_cb_t)(uintptr_t)inode_cache_cb,
+	    &id) == -1) {
 		mdb_warn("can't walk inode cache");
 		return (DCMD_ERR);
 	}

@@ -65,7 +65,7 @@ libkvm_kb_ops(void)
 		.kb_awrite = (ssize_t (*)())kvm_awrite,
 		.kb_pread = (ssize_t (*)())kvm_pread,
 		.kb_pwrite = (ssize_t (*)())kvm_pwrite,
-		.kb_getmregs = (int (*)())mdb_tgt_notsup,
+		.kb_getmregs = (int (*)())(uintptr_t)mdb_tgt_notsup,
 		.kb_vtop = (uint64_t (*)())kvm_physaddr,
 	};
 	return (&ops);

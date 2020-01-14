@@ -108,7 +108,7 @@ const mdb_tgt_ops_t kt_amd64_ops = {
 	kt_setcontext,				/* t_setcontext */
 	kt_activate,				/* t_activate */
 	kt_deactivate,				/* t_deactivate */
-	(void (*)()) mdb_tgt_nop,		/* t_periodic */
+	(void (*)())(uintptr_t) mdb_tgt_nop,	/* t_periodic */
 	kt_destroy,				/* t_destroy */
 	kt_name,				/* t_name */
 	(const char *(*)()) mdb_conf_isa,	/* t_isa */
@@ -136,25 +136,25 @@ const mdb_tgt_ops_t kt_amd64_ops = {
 	kt_addr_to_ctf,				/* t_addr_to_ctf */
 	kt_name_to_ctf,				/* t_name_to_ctf */
 	kt_status,				/* t_status */
-	(int (*)()) mdb_tgt_notsup,		/* t_run */
-	(int (*)()) mdb_tgt_notsup,		/* t_step */
-	(int (*)()) mdb_tgt_notsup,		/* t_step_out */
-	(int (*)()) mdb_tgt_notsup,		/* t_next */
-	(int (*)()) mdb_tgt_notsup,		/* t_cont */
-	(int (*)()) mdb_tgt_notsup,		/* t_signal */
-	(int (*)()) mdb_tgt_null,		/* t_add_vbrkpt */
-	(int (*)()) mdb_tgt_null,		/* t_add_sbrkpt */
-	(int (*)()) mdb_tgt_null,		/* t_add_pwapt */
-	(int (*)()) mdb_tgt_null,		/* t_add_vwapt */
-	(int (*)()) mdb_tgt_null,		/* t_add_iowapt */
-	(int (*)()) mdb_tgt_null,		/* t_add_sysenter */
-	(int (*)()) mdb_tgt_null,		/* t_add_sysexit */
-	(int (*)()) mdb_tgt_null,		/* t_add_signal */
-	(int (*)()) mdb_tgt_null,		/* t_add_fault */
+	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_run */
+	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_step */
+	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_step_out */
+	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_next */
+	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_cont */
+	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_signal */
+	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_vbrkpt */
+	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_sbrkpt */
+	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_pwapt */
+	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_vwapt */
+	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_iowapt */
+	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_sysenter */
+	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_sysexit */
+	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_signal */
+	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_fault */
 	kt_getareg,				/* t_getareg */
 	kt_putareg,				/* t_putareg */
 	mdb_amd64_kvm_stack_iter,		/* t_stack_iter */
-	(int (*)()) mdb_tgt_notsup		/* t_auxv */
+	(int (*)())(uintptr_t) mdb_tgt_notsup	/* t_auxv */
 };
 
 void

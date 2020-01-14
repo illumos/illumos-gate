@@ -4681,7 +4681,7 @@ pt_auxv(mdb_tgt_t *t, const auxv_t **auxvp)
 
 static const mdb_tgt_ops_t proc_ops = {
 	pt_setflags,				/* t_setflags */
-	(int (*)()) mdb_tgt_notsup,		/* t_setcontext */
+	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_setcontext */
 	pt_activate,				/* t_activate */
 	pt_deactivate,				/* t_deactivate */
 	pt_periodic,				/* t_periodic */
@@ -4701,7 +4701,7 @@ static const mdb_tgt_ops_t proc_ops = {
 	pt_fwrite,				/* t_fwrite */
 	(ssize_t (*)()) mdb_tgt_notsup,		/* t_ioread */
 	(ssize_t (*)()) mdb_tgt_notsup,		/* t_iowrite */
-	(int (*)()) mdb_tgt_notsup,		/* t_vtop */
+	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_vtop */
 	pt_lookup_by_name,			/* t_lookup_by_name */
 	pt_lookup_by_addr,			/* t_lookup_by_addr */
 	pt_symbol_iter,				/* t_symbol_iter */
@@ -4720,9 +4720,9 @@ static const mdb_tgt_ops_t proc_ops = {
 	pt_signal,				/* t_signal */
 	pt_add_vbrkpt,				/* t_add_vbrkpt */
 	pt_add_sbrkpt,				/* t_add_sbrkpt */
-	(int (*)()) mdb_tgt_null,		/* t_add_pwapt */
+	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_pwapt */
 	pt_add_vwapt,				/* t_add_vwapt */
-	(int (*)()) mdb_tgt_null,		/* t_add_iowapt */
+	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_iowapt */
 	pt_add_sysenter,			/* t_add_sysenter */
 	pt_add_sysexit,				/* t_add_sysexit */
 	pt_add_signal,				/* t_add_signal */
@@ -4848,8 +4848,8 @@ pt_lwp_setfpregs(mdb_tgt_t *t, void *tap, mdb_tgt_tid_t tid,
 }
 
 static const pt_ptl_ops_t proc_lwp_ops = {
-	(int (*)()) mdb_tgt_nop,
-	(void (*)()) mdb_tgt_nop,
+	(int (*)())(uintptr_t) mdb_tgt_nop,
+	(void (*)())(uintptr_t) mdb_tgt_nop,
 	pt_lwp_tid,
 	pt_lwp_iter,
 	pt_lwp_getregs,

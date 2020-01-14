@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH POLL 7D "April 9, 2016"
+.TH POLL 7D "January 10, 2020"
 .SH NAME
 poll \- driver for fast poll on many file descriptors
 .SH SYNOPSIS
-.LP
 .nf
 \fB#include <sys/devpoll.h>
 int fd = open("/dev/poll", O_RDWR);
@@ -71,7 +70,6 @@ Pointer to \fBpollfd\fR structure.
 .RE
 
 .SH DESCRIPTION
-.LP
 The  \fB/dev/poll\fR driver is a special driver that enables you to monitor
 multiple sets  of polled file descriptors. By using the  \fB/dev/poll\fR
 driver, you can efficiently poll large numbers of file descriptors. Access to
@@ -140,7 +138,7 @@ value \fB0\fR means the ioctl is timed out. In this case, the memory content
 pointed by  \fBdp_fds\fR is not modified. If the call is successful, it returns
 the number of valid \fBpollfd\fR entries in  the array pointed by \fBdp_fds\fR;
 the contents of the rest of the buffer is undefined. For each valid
-\fBpollfd\fR entry, the \fBfd\fR field indicates the file desciptor on which
+\fBpollfd\fR entry, the \fBfd\fR field indicates the file descriptor on which
 the polled \fBevents\fR happened. The  \fBevents\fR field is the user specified
 \fBpoll\fR \fBevents\fR. The \fBrevents\fR field contains the  \fBevents\fR
 occurred. \fB-1\fR is returned if the  call fails.
@@ -155,7 +153,6 @@ currently polled \fBevents\fR. The ioctl returns  \fB0\fR if the file
 descriptor is not in the set. The  \fBpollfd\fR structure pointed by  \fIpfd\fR
 is not modified. The ioctl returns a  \fB-1\fR if the call fails.
 .SH EXAMPLES
-.LP
 The following example shows how  \fB/dev/poll\fR may be used.
 .sp
 .in +2
@@ -335,7 +332,6 @@ special file does not exist.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -351,10 +347,8 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.LP
 \fBopen\fR(2), \fBpoll\fR(2), \fBwrite\fR(2), \fBattributes\fR(5)
 .SH NOTES
-.LP
 The \fB/dev/poll\fR API is particularly beneficial to applications that poll a
 large number of file descriptors repeatedly.  Applications will exhibit the
 best performance gain if the polled file descriptor list rarely change.

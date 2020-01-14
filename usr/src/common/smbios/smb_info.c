@@ -558,13 +558,21 @@ smbios_info_processor(smbios_hdl_t *shp, id_t id, smbios_processor_t *pp)
 	}
 
 	if (smb_libgteq(shp, SMB_VERSION_26)) {
-		pp->smbp_family2 = p.smbpr_family2;
+		if (pp->smbp_family == 0xfe) {
+			pp->smbp_family = p.smbpr_family2;
+		}
 	}
 
 	if (smb_libgteq(shp, SMB_VERSION_30)) {
-		pp->smbp_corecount2 = p.smbpr_corecount2;
-		pp->smbp_coresenabled2 = p.smbpr_coresenabled2;
-		pp->smbp_threadcount2 = p.smbpr_threadcount2;
+		if (pp->smbp_corecount == 0xff) {
+			pp->smbp_corecount = p.smbpr_corecount2;
+		}
+		if (pp->smbp_coresenabled == 0xff) {
+			pp->smbp_coresenabled = p.smbpr_coresenabled2;
+		}
+		if (pp->smbp_threadcount == 0xff) {
+			pp->smbp_threadcount = p.smbpr_threadcount2;
+		}
 	}
 
 	return (0);
@@ -1012,6 +1020,20 @@ smbios_info_memdevice(smbios_hdl_t *shp, id_t id, smbios_memdevice_t *mdp)
 		mdp->smbmd_volatile_size = m.smbmdev_volsize;
 		mdp->smbmd_cache_size = m.smbmdev_cachesize;
 		mdp->smbmd_logical_size = m.smbmdev_logicalsize;
+	}
+
+	if (smb_libgteq(shp, SMB_VERSION_33)) {
+		if (m.smbmdev_speed == 0xffff) {
+			mdp->smbmd_extspeed = m.smbmdev_extspeed;
+		} else {
+			mdp->smbmd_extspeed = m.smbmdev_speed;
+		}
+
+		if (m.smbmdev_clkspeed == 0xffff) {
+			mdp->smbmd_extclkspeed = m.smbmdev_extclkspeed;
+		} else {
+			mdp->smbmd_extclkspeed = m.smbmdev_clkspeed;
+		}
 	}
 
 	return (0);
@@ -1560,6 +1582,119 @@ smbios_info_iprobe(smbios_hdl_t *shp, id_t id, smbios_iprobe_t *iprobe)
 	} else {
 		iprobe->smbip_nominal = SMB_PROBE_UNKNOWN_VALUE;
 	}
+
+	return (0);
+}
+
+int
+smbios_info_processor_info(smbios_hdl_t *shp, id_t id,
+    smbios_processor_info_t *proc)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	smb_processor_info_t pi;
+
+	if (stp == NULL)
+		return (-1); /* errno is set for us */
+
+	if (stp->smbst_hdr->smbh_type != SMB_TYPE_PROCESSOR_INFO)
+		return (smb_set_errno(shp, ESMB_TYPE));
+
+	if (stp->smbst_hdr->smbh_len < sizeof (pi))
+		return (smb_set_errno(shp, ESMB_SHORT));
+
+	bzero(proc, sizeof (*proc));
+	smb_info_bcopy(stp->smbst_hdr, &pi, sizeof (pi));
+
+	if (sizeof (pi) + pi.smbpai_len > stp->smbst_hdr->smbh_len)
+		return (smb_set_errno(shp, ESMB_CORRUPT));
+
+	proc->smbpi_processor = pi.smbpai_proc;
+	proc->smbpi_ptype = pi.smbpai_type;
+
+	return (0);
+}
+
+int
+smbios_info_processor_riscv(smbios_hdl_t *shp, id_t id,
+    smbios_processor_info_riscv_t *riscv)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	const smb_processor_info_t *proc;
+	const smb_processor_info_riscv_t *rv;
+
+	if (stp->smbst_hdr->smbh_type != SMB_TYPE_PROCESSOR_INFO) {
+		return (smb_set_errno(shp, ESMB_TYPE));
+	}
+
+	if (stp->smbst_hdr->smbh_len < sizeof (*proc)) {
+		return (smb_set_errno(shp, ESMB_SHORT));
+	}
+
+	proc = (const smb_processor_info_t *)stp->smbst_hdr;
+	if (sizeof (*proc) + proc->smbpai_len > stp->smbst_hdr->smbh_len) {
+		return (smb_set_errno(shp, ESMB_CORRUPT));
+	}
+
+	switch (proc->smbpai_type) {
+	case SMB_PROCINFO_T_RV32:
+	case SMB_PROCINFO_T_RV64:
+	case SMB_PROCINFO_T_RV128:
+		break;
+	default:
+		return (smb_set_errno(shp, ESMB_TYPE));
+	}
+
+	if (stp->smbst_hdr->smbh_len < sizeof (*proc) + sizeof (*rv)) {
+		return (smb_set_errno(shp, ESMB_SHORT));
+	}
+	rv = (const smb_processor_info_riscv_t *)&proc->smbpai_data[0];
+	if (rv->smbpairv_len != sizeof (*rv)) {
+		return (smb_set_errno(shp, ESMB_CORRUPT));
+	}
+
+	bcopy(rv->smbpairv_hartid, riscv->smbpirv_hartid,
+	    sizeof (riscv->smbpirv_hartid));
+	bcopy(rv->smbpairv_vendid, riscv->smbpirv_vendid,
+	    sizeof (riscv->smbpirv_vendid));
+	bcopy(rv->smbpairv_archid, riscv->smbpirv_archid,
+	    sizeof (riscv->smbpirv_archid));
+	bcopy(rv->smbpairv_machid, riscv->smbpirv_machid,
+	    sizeof (riscv->smbpirv_machid));
+	bcopy(rv->smbpairv_metdi, riscv->smbpirv_metdi,
+	    sizeof (riscv->smbpirv_metdi));
+	bcopy(rv->smbpairv_mitdi, riscv->smbpirv_mitdi,
+	    sizeof (riscv->smbpirv_mitdi));
+	riscv->smbpirv_isa = rv->smbpairv_isa;
+	riscv->smbpirv_privlvl = rv->smbpairv_privlvl;
+	riscv->smbpirv_boothart = rv->smbpairv_boot;
+	riscv->smbpirv_xlen = rv->smbpairv_xlen;
+	riscv->smbpirv_mxlen = rv->smbpairv_mxlen;
+	riscv->smbpirv_sxlen = rv->smbpairv_sxlen;
+	riscv->smbpirv_uxlen = rv->smbpairv_uxlen;
+
+	return (0);
+}
+
+int
+smbios_info_pointdev(smbios_hdl_t *shp, id_t id, smbios_pointdev_t *pd)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	smb_pointdev_t point;
+
+	if (stp->smbst_hdr->smbh_type != SMB_TYPE_POINTDEV) {
+		return (smb_set_errno(shp, ESMB_TYPE));
+	}
+
+	if (stp->smbst_hdr->smbh_len < sizeof (point)) {
+		return (smb_set_errno(shp, ESMB_SHORT));
+	}
+
+	bzero(pd, sizeof (*pd));
+	smb_info_bcopy(stp->smbst_hdr, &point, sizeof (point));
+
+	pd->smbpd_type = point.smbpdev_type;
+	pd->smbpd_iface = point.smbpdev_iface;
+	pd->smbpd_nbuttons = point.smbpdev_nbuttons;
 
 	return (0);
 }

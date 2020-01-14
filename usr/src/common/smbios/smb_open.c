@@ -230,6 +230,7 @@ smbios_bufopen(const smbios_entry_t *ep, const void *buf, size_t len,
 	case SMB_VERSION_30:
 	case SMB_VERSION_31:
 	case SMB_VERSION_32:
+	case SMB_VERSION_33:
 		break;
 	default:
 		return (smb_open_error(shp, errp, ESMB_VERSION));

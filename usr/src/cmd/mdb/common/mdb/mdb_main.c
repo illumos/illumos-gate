@@ -506,8 +506,10 @@ main(int argc, char *argv[], char *envp[])
 	(void) mdb_signal_sethandler(SIGBUS, flt_handler, NULL);
 	(void) mdb_signal_sethandler(SIGSEGV, flt_handler, NULL);
 
-	(void) mdb_signal_sethandler(SIGHUP, (mdb_signal_f *)terminate, NULL);
-	(void) mdb_signal_sethandler(SIGTERM, (mdb_signal_f *)terminate, NULL);
+	(void) mdb_signal_sethandler(SIGHUP,
+	    (mdb_signal_f *)(uintptr_t)terminate, NULL);
+	(void) mdb_signal_sethandler(SIGTERM,
+	    (mdb_signal_f *)(uintptr_t)terminate, NULL);
 
 	for (mdb.m_rdvers = RD_VERSION; mdb.m_rdvers > 0; mdb.m_rdvers--) {
 		if (rd_init(mdb.m_rdvers) == RD_OK)

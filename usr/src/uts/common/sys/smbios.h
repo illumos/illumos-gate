@@ -156,6 +156,7 @@ typedef union {
 #define	SMB_TYPE_OBDEVEXT	41	/* on-board device extended info */
 #define	SMB_TYPE_MCHI		42	/* mgmt controller host interface */
 #define	SMB_TYPE_TPM		43	/* TPM device */
+#define	SMB_TYPE_PROCESSOR_INFO	44	/* Processor Additional Information */
 #define	SMB_TYPE_INACTIVE	126	/* inactive table entry */
 #define	SMB_TYPE_EOT		127	/* end of table */
 
@@ -438,10 +439,6 @@ typedef struct smbios_processor {
 		/* number of threads per processor socket */
 	uint16_t smbp_cflags;
 		/* processor characteristics (SMB_PRC_*) */
-	uint16_t smbp_family2;		/* processor family 2 */
-	uint16_t smbp_corecount2;	/* core count 2 */
-	uint16_t smbp_coresenabled2;	/* cores enabled 2 */
-	uint16_t smbp_threadcount2;	/* thread count 2 */
 } smbios_processor_t;
 
 #define	SMB_PRT_OTHER		0x01	/* other */
@@ -539,6 +536,7 @@ typedef struct smbios_processor {
 #define	SMB_PRC_NX		0x0020	/* execution protection */
 #define	SMB_PRC_VT		0x0040	/* enhanced virtualization */
 #define	SMB_PRC_PM		0x0080	/* power/performance control */
+#define	SMB_PRC_128BIT		0x0100	/* 128-bit capable */
 
 #define	SMB_PRF_OTHER		0x01	/* other */
 #define	SMB_PRF_UNKNOWN		0x02	/* unknown */
@@ -752,6 +750,9 @@ typedef struct smbios_processor {
 #define	SMB_PRF_WINCHIP		0x140	/* WinChip */
 #define	SMB_PRF_DSP		0x15E	/* DSP */
 #define	SMB_PRF_VIDEO		0x1F4	/* Video Processor */
+#define	SMB_PRF_RV32		0x200	/* RISC-V RV32 */
+#define	SMB_PRF_RV64		0x201	/* RISC-V RV64 */
+#define	SMB_PRF_RV128		0x202	/* RISC-V RV128 */
 
 /*
  * SMBIOS Cache Information.  See DSP0134 Section 7.8 for more information.
@@ -985,6 +986,7 @@ typedef struct smbios_slot {
 #define	SMB_SLT_PCIE_M52_WOBSKO	0x22	/* PCI Express Mini 52-pin without bottom-side keep-outs */
 /* END CSTYLED */
 #define	SMB_SLT_PCIE_M76	0x23	/* PCI Express Mini 72-pin */
+#define	SMB_SLT_CXL1		0x30	/* CXL Flexbus 1.0 */
 #define	SMB_SLT_PC98_C20	0xA0	/* PC-98/C20 */
 #define	SMB_SLT_PC98_C24	0xA1	/* PC-98/C24 */
 #define	SMB_SLT_PC98_E		0xA2	/* PC-98/E */
@@ -1008,6 +1010,12 @@ typedef struct smbios_slot {
 #define	SMB_SLT_PCIE3G4		0xB4	/* PCI Exp. Gen 3 x4 */
 #define	SMB_SLT_PCIE3G8		0xB5	/* PCI Exp. Gen 3 x8 */
 #define	SMB_SLT_PCIE3G16	0xB6	/* PCI Exp. Gen 3 x16 */
+#define	SMB_SLT_PCIE4G		0xB8	/* PCI Exp. Gen 4 */
+#define	SMB_SLT_PCIE4G1		0xB9	/* PCI Exp. Gen 4 x1 */
+#define	SMB_SLT_PCIE4G2		0xBA	/* PCI Exp. Gen 4 x2 */
+#define	SMB_SLT_PCIE4G4		0xBB	/* PCI Exp. Gen 4 x4 */
+#define	SMB_SLT_PCIE4G8		0xBC	/* PCI Exp. Gen 4 x8 */
+#define	SMB_SLT_PCIE4G16	0xBD	/* PCI Exp. Gen 4 x16 */
 
 #define	SMB_SLW_OTHER		0x01	/* other */
 #define	SMB_SLW_UNKNOWN		0x02	/* unknown */
@@ -1170,6 +1178,7 @@ typedef struct smbios_memarray {
 #define	SMB_MAL_PC98C24		0xA1	/* PC-98/C24 add-on card */
 #define	SMB_MAL_PC98E		0xA2	/* PC-98/E add-on card */
 #define	SMB_MAL_PC98LB		0xA3	/* PC-98/Local bus add-on card */
+#define	SMB_MAL_CXL1		0xA4	/* CXL Flexbus 1.0 add-on card */
 
 #define	SMB_MAU_OTHER		0x01	/* other */
 #define	SMB_MAU_UNKNOWN		0x02	/* unknown */
@@ -1225,6 +1234,8 @@ typedef struct smbios_memdevice {
 	uint64_t smbmd_volatile_size;	/* volatile size in bytes */
 	uint64_t smbmd_cache_size;	/* cache size in bytes */
 	uint64_t smbmd_logical_size;	/* logical size in bytes */
+	uint64_t smbmd_extspeed;	/* extended device speed */
+	uint64_t smbmd_extclkspeed;	/* extended configured speed */
 } smbios_memdevice_t;
 
 #define	SMB_MDFF_OTHER		0x01	/* other */
@@ -1242,6 +1253,7 @@ typedef struct smbios_memdevice {
 #define	SMB_MDFF_SODIMM		0x0D	/* SODIMM */
 #define	SMB_MDFF_SRIMM		0x0E	/* SRIMM */
 #define	SMB_MDFF_FBDIMM		0x0F	/* FBDIMM */
+#define	SMB_MDFF_DIE		0x10	/* die */
 
 #define	SMB_MDT_OTHER		0x01	/* other */
 #define	SMB_MDT_UNKNOWN		0x02	/* unknown */
@@ -1271,6 +1283,8 @@ typedef struct smbios_memdevice {
 #define	SMB_MDT_LPDDR3		0x1D	/* LPDDR3 */
 #define	SMB_MDT_LPDDR4		0x1E	/* LPDDR4 */
 #define	SMB_MDT_LOGNV		0x1F	/* Logical non-volatile device */
+#define	SMB_MDT_HBM		0x20	/* High Bandwidth Memory */
+#define	SMB_MDT_HBM2		0x21	/* High Bandwidth Memory 2 */
 
 #define	SMB_MDF_OTHER		0x0002	/* other */
 #define	SMB_MDF_UNKNOWN		0x0004	/* unknown */
@@ -1299,7 +1313,7 @@ typedef struct smbios_memdevice {
 #define	SMB_MTECH_NVDIMM_N	0x04	/* NVDIMM-N */
 #define	SMB_MTECH_NVDIMM_F	0x05	/* NVDIMM-F */
 #define	SMB_MTECH_NVDIMM_P	0x06	/* NVDIMM-P */
-#define	SMB_MTECH_INTCPM	0x07	/* Intel persistent memory */
+#define	SMB_MTECH_INTCPM	0x07	/* Intel Optane DC Persistent Memory */
 
 #define	SMB_MOMC_OTHER		0x01	/* other */
 #define	SMB_MOMC_UNKNOWN	0x02	/* unknown */
@@ -1331,6 +1345,38 @@ typedef struct smbios_memdevmap {
 	uint8_t smbmdm_ipos;		/* interleave position */
 	uint8_t smbmdm_idepth;		/* interleave data depth */
 } smbios_memdevmap_t;
+
+/*
+ * SMBIOS Builtin Pointing Device (SMB_TYPE_POINTDEV).  See DSP0134 Sectin 7.22
+ * for more information.
+ */
+typedef struct smbios_pointdev {
+	uint16_t smbpd_type;		/* device type */
+	uint16_t smbpd_iface;		/* device information */
+	uint8_t smbpd_nbuttons;		/* number of buttons */
+} smbios_pointdev_t;
+
+#define	SMB_PDT_OTHER		0x01	/* Other */
+#define	SMB_PDT_UNKNOWN		0x02	/* Unknown */
+#define	SMB_PDT_MOUSE		0x03	/* Mouse */
+#define	SMB_PDT_TRBALL		0x04	/* Track Ball */
+#define	SMB_PDT_TRPOINT		0x05	/* Track Point */
+#define	SMB_PDT_GLPOINT		0x06	/* Glide Point */
+#define	SMB_PDT_TOPAD		0x07	/* Touch Pad */
+#define	SMB_PDT_TOSCREEN	0x08	/* Touch Screen */
+#define	SMB_PDT_OPTSENSE	0x09	/* Optical Sensor */
+
+#define	SMB_PDI_OTHER		0x01	/* Other */
+#define	SMB_PDI_UNKNOWN		0x02	/* Unknown */
+#define	SMB_PDI_SERIAL		0x03	/* Serial */
+#define	SMB_PDI_PS2		0x04	/* PS/2 */
+#define	SMB_PDI_INFRARED	0x05	/* Infrared */
+#define	SMB_PDI_HPHIL		0x06	/* HP-HIL */
+#define	SMB_PDI_BUSM		0x07	/* Bus mouse */
+#define	SMB_PDI_ADB		0x08	/* ADB (Apple Desktop Bus) */
+#define	SMB_PDI_BUSM_DB9	0xA0	/* Bus mouse DB-9 */
+#define	SMB_PDI_BUSM_UDIN	0xA1	/* Bus mouse micro-DIN */
+#define	SMB_PDI_BUSM_USB	0xA2	/* USB */
 
 /*
  * SMBIOS Hardware Security Settings.  See DSP0134 Section 7.25 for more
@@ -1609,6 +1655,90 @@ typedef struct smbios_obdev_ext {
 	uint8_t smboe_df;		/* device/function number */
 } smbios_obdev_ext_t;
 
+/*
+ * SMBIOS Processor Additional Information (Type 44). See sectoin 7.45 for more
+ * information.
+ */
+typedef struct smbios_processor_info {
+	id_t smbpi_processor;		/* processor handle */
+	uint32_t smbpi_ptype;		/* processor type */
+} smbios_processor_info_t;
+
+/* BEGIN CSTYLED */
+#define	SMB_PROCINFO_T_RESERVED	0x00	/* reserved */
+#define	SMB_PROCINFO_T_IA32	0x01	/* IA32 (x86) */
+#define	SMB_PROCINFO_T_AMD64	0x02	/* X64 (x86-64, Intel64, AMD64, EMT64) */
+#define	SMB_PROCINFO_T_IA	0x03	/* Intel Itanium architecture */
+#define	SMB_PROCINFO_T_AARCH32	0x04	/* 32-bit ARM (aarch32) */
+#define	SMB_PROCINFO_T_AARCH64	0x05	/* 64-bit ARM (aarch64) */
+#define	SMB_PROCINFO_T_RV32	0x06	/* 32-bit RISC-V (RV32) */
+#define	SMB_PROCINFO_T_RV64	0x07	/* 64-bit RISC-V (RV64) */
+#define	SMB_PROCINFO_T_RV128	0x08	/* 128-bit RISC-V (RV128) */
+/* END CSTYLED */
+
+typedef struct smbios_processor_info_riscv {
+	uint8_t smbpirv_hartid[16];	/* HART ID */
+	uint8_t smbpirv_vendid[16];	/* Vendor ID */
+	uint8_t smbpirv_archid[16];	/* Architecture ID */
+	uint8_t smbpirv_machid[16];	/* Machine ID */
+	uint8_t smbpirv_metdi[16];	/* Machine exception delegation */
+	uint8_t smbpirv_mitdi[16];	/* Machine interrupt delegation */
+	uint64_t smbpirv_isa;		/* Supported ISA */
+	uint32_t smbpirv_privlvl;	/* Privilege Level */
+	uint8_t smbpirv_boothart;	/* Indicates if boot processor */
+	uint8_t smbpirv_xlen;		/* Default register width */
+	uint8_t smbpirv_mxlen;		/* Machine register width */
+	uint8_t smbpirv_sxlen;		/* Supervisor register width */
+	uint8_t smbpirv_uxlen;		/* User register width */
+} smbios_processor_info_riscv_t;
+
+/*
+ * RISC-V Supported Privilege Levels
+ */
+#define	SMB_RV_PRIV_M	(1 << 0)	/* Machine Mode */
+#define	SMB_RV_PRIV_S	(1 << 2)	/* Supervisor Mode */
+#define	SMB_RV_PRIV_U	(1 << 3)	/* User Mode */
+#define	SMB_RV_PRIV_DBG	(1 << 7)	/* Debug Mode */
+
+/*
+ * Values used to define the various XLEN Values.
+ */
+#define	SMB_RV_WIDTH_UNSUP	0x00	/* Unsupported */
+#define	SMB_RV_WIDTH_32B	0x01	/* 32-bit */
+#define	SMB_RV_WIDTH_64B	0x02	/* 64-bit */
+#define	SMB_RV_WIDTH_128B	0x03	/* 128-bit */
+
+/*
+ * RISC-V ISA extensions
+ */
+/* BEGIN CSTYLED */
+#define	SMB_RV_ISA_A	(1 << 0)	/* Atomic */
+#define	SMB_RV_ISA_B	(1 << 1)	/* Reserved */
+#define	SMB_RV_ISA_C	(1 << 2)	/* Compressed */
+#define	SMB_RV_ISA_D	(1 << 3)	/* Double-precision floating-point */
+#define	SMB_RV_ISA_E	(1 << 4)	/* RV32E base */
+#define	SMB_RV_ISA_F	(1 << 5)	/* Single-precision floating-point */
+#define	SMB_RV_ISA_G	(1 << 6)	/* Additional standard extensions present */
+#define	SMB_RV_ISA_H	(1 << 7)	/* Hypervisor */
+#define	SMB_RV_ISA_I	(1 << 8)	/* Integer base ISA */
+#define	SMB_RV_ISA_J	(1 << 9)	/* Reserved */
+#define	SMB_RV_ISA_K	(1 << 10)	/* Reserved */
+#define	SMB_RV_ISA_L	(1 << 11)	/* Reserved */
+#define	SMB_RV_ISA_M	(1 << 12)	/* Integer Multiply/Divide */
+#define	SMB_RV_ISA_N	(1 << 13)	/* User-level interrupts */
+#define	SMB_RV_ISA_O	(1 << 14)	/* Reserved */
+#define	SMB_RV_ISA_P	(1 << 15)	/* Reserved */
+#define	SMB_RV_ISA_Q	(1 << 16)	/* Quad-precision floating-poit */
+#define	SMB_RV_ISA_R	(1 << 17)	/* Reserved */
+#define	SMB_RV_ISA_S	(1 << 18)	/* Supervisor mode */
+#define	SMB_RV_ISA_T	(1 << 19)	/* Reserved */
+#define	SMB_RV_ISA_U	(1 << 20)	/* User mode */
+#define	SMB_RV_ISA_V	(1 << 21)	/* Reserved */
+#define	SMB_RV_ISA_W	(1 << 22)	/* Reserved */
+#define	SMB_RV_ISA_X	(1 << 23)	/* Non-standard extensions */
+#define	SMB_RV_ISA_Y	(1 << 24)	/* Reserved */
+#define	SMB_RV_ISA_Z	(1 << 25)	/* Reserved */
+/* END CSTYLED */
 
 /*
  * SMBIOS OEM-specific (Type 132) Processor Extended Information.
@@ -1678,7 +1808,8 @@ typedef struct smbios_memdevice_ext {
 #define	SMB_VERSION_30	0x0300		/* SMBIOS encoding for DMTF spec 3.0 */
 #define	SMB_VERSION_31	0x0301		/* SMBIOS encoding for DMTF spec 3.1 */
 #define	SMB_VERSION_32	0x0302		/* SMBIOS encoding for DMTF spec 3.2 */
-#define	SMB_VERSION	SMB_VERSION_32	/* SMBIOS latest version definitions */
+#define	SMB_VERSION_33	0x0303		/* SMBIOS encoding for DMTF spec 3.3 */
+#define	SMB_VERSION	SMB_VERSION_33	/* SMBIOS latest version definitions */
 
 #define	SMB_O_NOCKSUM	0x1		/* do not verify header checksums */
 #define	SMB_O_NOVERS	0x2		/* do not verify header versions */
@@ -1735,6 +1866,7 @@ extern int smbios_info_processor(smbios_hdl_t *, id_t, smbios_processor_t *);
 extern int smbios_info_extprocessor(smbios_hdl_t *, id_t,
     smbios_processor_ext_t *);
 extern int smbios_info_cache(smbios_hdl_t *, id_t, smbios_cache_t *);
+extern int smbios_info_pointdev(smbios_hdl_t *, id_t, smbios_pointdev_t *);
 extern int smbios_info_port(smbios_hdl_t *, id_t, smbios_port_t *);
 extern int smbios_info_extport(smbios_hdl_t *, id_t, smbios_port_ext_t *);
 extern int smbios_info_slot(smbios_hdl_t *, id_t, smbios_slot_t *);
@@ -1764,6 +1896,10 @@ extern id_t smbios_info_boot(smbios_hdl_t *, smbios_boot_t *);
 extern id_t smbios_info_ipmi(smbios_hdl_t *, smbios_ipmi_t *);
 extern int smbios_info_powersup(smbios_hdl_t *, id_t, smbios_powersup_t *);
 extern int smbios_info_pciexrc(smbios_hdl_t *, id_t, smbios_pciexrc_t *);
+extern int smbios_info_processor_info(smbios_hdl_t *, id_t,
+    smbios_processor_info_t *);
+extern int smbios_info_processor_riscv(smbios_hdl_t *, id_t,
+    smbios_processor_info_riscv_t *);
 
 
 extern const char *smbios_psn(smbios_hdl_t *);
@@ -1847,6 +1983,9 @@ extern const char *smbios_memdevice_op_capab_desc(uint_t);
 
 extern const char *smbios_onboard_type_desc(uint_t);
 
+extern const char *smbios_pointdev_iface_desc(uint_t);
+extern const char *smbios_pointdev_type_desc(uint_t);
+
 extern const char *smbios_port_conn_desc(uint_t);
 extern const char *smbios_port_type_desc(uint_t);
 
@@ -1856,6 +1995,13 @@ extern const char *smbios_processor_type_desc(uint_t);
 extern const char *smbios_processor_upgrade_desc(uint_t);
 extern const char *smbios_processor_core_flag_name(uint_t);
 extern const char *smbios_processor_core_flag_desc(uint_t);
+
+extern const char *smbios_processor_info_type_desc(uint_t);
+extern const char *smbios_riscv_isa_desc(uint64_t);
+extern const char *smbios_riscv_isa_name(uint64_t);
+extern const char *smbios_riscv_priv_desc(uint_t);
+extern const char *smbios_riscv_priv_name(uint_t);
+extern const char *smbios_riscv_width_desc(uint_t);
 
 extern const char *smbios_slot_type_desc(uint_t);
 extern const char *smbios_slot_width_desc(uint_t);

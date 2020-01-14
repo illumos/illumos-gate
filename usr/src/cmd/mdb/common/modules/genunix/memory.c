@@ -565,7 +565,7 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	stats.ms_unused_vp = (struct vnode *)(uintptr_t)sym.st_value;
 
 	/* walk all pages, collect statistics */
-	if (mdb_walk("allpages", (mdb_walk_cb_t)memstat_callback,
+	if (mdb_walk("allpages", (mdb_walk_cb_t)(uintptr_t)memstat_callback,
 	    &stats) == -1) {
 		mdb_warn("can't walk memseg");
 		return (DCMD_ERR);

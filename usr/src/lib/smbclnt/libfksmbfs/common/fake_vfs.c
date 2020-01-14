@@ -284,8 +284,9 @@ fs_copyfsops(const fs_operation_def_t *template, vfsops_t *actual,
 			fs_nosys, fs_nosys,
 
 		VFSNAME_FREEVFS, offsetof(vfsops_t, vfs_freevfs),
-			(fs_generic_func_p)fs_freevfs,
-			(fs_generic_func_p)fs_freevfs,	/* Shouldn't fail */
+			(fs_generic_func_p)(uintptr_t)fs_freevfs,
+			(fs_generic_func_p)(uintptr_t)
+			fs_freevfs,	/* Shouldn't fail */
 
 		VFSNAME_VNSTATE, offsetof(vfsops_t, vfs_vnstate),
 			(fs_generic_func_p)fs_nosys,

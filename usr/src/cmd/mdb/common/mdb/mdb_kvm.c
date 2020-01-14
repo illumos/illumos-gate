@@ -1496,7 +1496,7 @@ mdb_kvm_tgt_create(mdb_tgt_t *t, int argc, const char *argv[])
 		goto err;
 	}
 
-	kt->k_dump_print_content = (void (*)())kt_data_stub;
+	kt->k_dump_print_content = (void (*)())(uintptr_t)kt_data_stub;
 	kt->k_dump_find_curproc = kt_data_stub;
 
 	/*

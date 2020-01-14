@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2019, Joyent, Inc.
 .\"
-.Dd March 20, 2019
+.Dd January 10, 2020
 .Dt CORETEMP 7D
 .Os
 .Sh NAME
@@ -28,7 +28,7 @@ Currently, the
 .Nm
 driver supports Intel Core family processors after Penryn
 microarchitecture and Intel Atom processors starting with the Silvermont
-microarchitecure.
+microarchitecture.
 .Pp
 Temperature information is available to the system via the fault
 management architecture

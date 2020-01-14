@@ -27,8 +27,6 @@
 #ifndef _MULTIMEDIA_AUDIOERROR_H
 #define	_MULTIMEDIA_AUDIOERROR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <locale.h>
 #include <errno.h>
 #include <audio_errno.h>	/* to get enum for error codes */
@@ -52,6 +50,7 @@ private:
 public:
 	int		sys;			// system error code
 
+	AudioError(const AudioError&) = default;
 	inline AudioError(audioerror_t val = AUDIO_SUCCESS):	// Constructor
 	    code(val), sys(0)
 	    { if (code == AUDIO_UNIXERROR) sys = errno; }
