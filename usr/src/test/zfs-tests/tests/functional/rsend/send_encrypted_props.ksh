@@ -16,6 +16,7 @@
 
 #
 # Copyright (c) 2018 by Datto Inc. All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
 
 . $STF_SUITE/tests/functional/rsend/rsend.kshlib
@@ -76,7 +77,7 @@ log_must zfs create -o keyformat=passphrase -o keylocation=file://$keyfile \
 
 log_must mkfile 1M /$TESTPOOL/ds/$TESTFILE0
 log_must cp /$TESTPOOL/ds/$TESTFILE0 /$TESTPOOL/crypt/$TESTFILE0
-typeset cksum=$(md5sum /$TESTPOOL/ds/$TESTFILE0 | awk '{  print $1 }')
+typeset cksum=$(digest -a md5 /$TESTPOOL/ds/$TESTFILE0)
 
 log_must zfs snap -r $snap
 log_must zfs snap -r $snap2
@@ -129,7 +130,7 @@ log_must test "$(get_prop 'encryptionroot' $ds)" == "$ds"
 log_must test "$(get_prop 'keyformat' $ds)" == "passphrase"
 log_must test "$(get_prop 'keylocation' $ds)" == "file://$keyfile"
 log_must test "$(get_prop 'mounted' $ds)" == "yes"
-recv_cksum=$(md5sum /$ds/$TESTFILE0 | awk '{ print $1 }')
+recv_cksum=$(digest -a md5 /$ds/$TESTFILE0)
 log_must test "$recv_cksum" == "$cksum"
 log_must zfs destroy -r $ds
 
@@ -145,7 +146,7 @@ log_must test "$(get_prop 'encryptionroot' $ds)" == "$ds"
 log_must test "$(get_prop 'keyformat' $ds)" == "passphrase"
 log_must test "$(get_prop 'keylocation' $ds)" == "file://$keyfile"
 log_must test "$(get_prop 'mounted' $ds)" == "yes"
-recv_cksum=$(md5sum /$ds/$TESTFILE0 | awk '{ print $1 }')
+recv_cksum=$(digest -a md5 /$ds/$TESTFILE0)
 log_must test "$recv_cksum" == "$cksum"
 log_must zfs destroy -r $ds
 
@@ -163,7 +164,7 @@ log_must test "$(get_prop 'encryptionroot' $ds)" == "$ds"
 log_must test "$(get_prop 'keyformat' $ds)" == "passphrase"
 log_must test "$(get_prop 'keylocation' $ds)" == "file://$keyfile"
 log_must test "$(get_prop 'mounted' $ds)" == "yes"
-recv_cksum=$(md5sum /$ds/$TESTFILE0 | awk '{ print $1 }')
+recv_cksum=$(digest -a md5 /$ds/$TESTFILE0)
 log_must test "$recv_cksum" == "$cksum"
 log_must zfs destroy -r $ds
 
@@ -177,7 +178,7 @@ log_must test "$(get_prop 'encryptionroot' $ds)" == "$TESTPOOL/crypt"
 log_must test "$(get_prop 'encryption' $ds)" == "aes-256-ccm"
 log_must test "$(get_prop 'keyformat' $ds)" == "passphrase"
 log_must test "$(get_prop 'mounted' $ds)" == "yes"
-recv_cksum=$(md5sum /$ds/$TESTFILE0 | awk '{ print $1 }')
+recv_cksum=$(digest -a md5 /$ds/$TESTFILE0)
 log_must test "$recv_cksum" == "$cksum"
 log_must zfs destroy -r $ds
 
@@ -191,7 +192,7 @@ log_must test "$(get_prop 'encryptionroot' $ds)" == "$TESTPOOL/crypt"
 log_must test "$(get_prop 'encryption' $ds)" == "aes-256-ccm"
 log_must test "$(get_prop 'keyformat' $ds)" == "passphrase"
 log_must test "$(get_prop 'mounted' $ds)" == "yes"
-recv_cksum=$(md5sum /$ds/$TESTFILE0 | awk '{ print $1 }')
+recv_cksum=$(digest -a md5 /$ds/$TESTFILE0)
 log_must test "$recv_cksum" == "$cksum"
 log_must zfs destroy -r $ds
 
@@ -205,7 +206,7 @@ log_must test "$(get_prop 'encryptionroot' $ds)" == "$TESTPOOL/crypt"
 log_must test "$(get_prop 'encryption' $ds)" == "aes-256-ccm"
 log_must test "$(get_prop 'keyformat' $ds)" == "passphrase"
 log_must test "$(get_prop 'mounted' $ds)" == "yes"
-recv_cksum=$(md5sum /$ds/$TESTFILE0 | awk '{ print $1 }')
+recv_cksum=$(digest -a md5 /$ds/$TESTFILE0)
 log_must test "$recv_cksum" == "$cksum"
 log_must zfs destroy -r $ds
 
