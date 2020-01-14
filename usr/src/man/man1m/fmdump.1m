@@ -4,19 +4,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FMDUMP 1M "Apr 14, 2009"
+.TH FMDUMP 1M "Jan 14, 2020"
 .SH NAME
 fmdump \- fault management log viewer
 .SH SYNOPSIS
-.LP
 .nf
 \fBfmdump\fR [\fB-efmvV\fR] [\fB-c\fR \fIclass\fR] [\fB-R\fR \fIdir\fR] [\fB-t\fR \fItime\fR] [\fB-T\fR \fItime\fR]
-     [\fB-u\fR \fIuid\fR] [\fB-n\fR \fIname\fR[.\fIname\fR]*[=\fIvalue\fR]] [\fIfile\fR]
+     [\fB-u\fR \fIuuid\fR] [\fB-n\fR \fIname\fR[.\fIname\fR]*[=\fIvalue\fR]] [\fIfile\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBfmdump\fR utility can be used to display the contents of any of the log
 files associated with the Fault Manager, \fBfmd\fR(1M). The Fault
 Manager runs in the background on each system. It receives telemetry
@@ -124,8 +121,6 @@ the logical \fBOR\fR of the options. For example, the command:
 selects events whose attributes are \fB(uuid1 OR uuid2\fR) \fBAND\fR (time on
 or after 02Dec03).
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -461,8 +456,6 @@ corresponding errors that were associated with the diagnosis.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -476,7 +469,6 @@ produces appropriate output for the selected log.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRRetrieving Given Class from \fBfmd\fR Log
 .sp
 .LP
@@ -547,8 +539,6 @@ nvlist version: 0
 .sp
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -591,7 +581,6 @@ be displayed, and then continues on and attempts to display other records.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/fm/fmd\fR\fR
@@ -619,8 +608,6 @@ Fault management fault log
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -639,8 +626,6 @@ Interface Stability	See below.
 The command-line options are Evolving. The human-readable error log output is
 Private. The human-readable fault log output is Evolving.
 .SH SEE ALSO
-.sp
-.LP
 \fBsh\fR(1), \fBfmadm\fR(1M), \fBfmd\fR(1M), \fBfmstat\fR(1M),
 \fBsyslogd\fR(1M), \fBlibexacct\fR(3LIB), \fBattributes\fR(5), \fBregex\fR(5)
 .sp
@@ -650,8 +635,6 @@ Private. The human-readable fault log output is Evolving.
 .LP
 http://illumos.org/msg/
 .SH NOTES
-.sp
-.LP
 Fault logs contain references to records stored in error logs that can be
 displayed using \fBfmdump\fR \fB-V\fR to understand the errors that were used
 in the diagnosis of a particular fault. These links are preserved if an error
