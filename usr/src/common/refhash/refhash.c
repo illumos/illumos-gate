@@ -10,15 +10,28 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <sys/refhash.h>
-#include <sys/sysmacros.h>
 #include <sys/types.h>
-#include <sys/kmem.h>
 #include <sys/list.h>
+#include <sys/debug.h>
+
+#ifdef _KERNEL
+#include <sys/sysmacros.h>
 #include <sys/ddi.h>
+#include <sys/kmem.h>
+#define	REFHASH_ALLOC	kmem_alloc
+#define	REFHASH_ZALLOC	kmem_zalloc
+#define	REFHASH_FREE	kmem_free
+#else
+#include <stddef.h>
+#include <umem.h>
+#define	REFHASH_ALLOC	umem_alloc
+#define	REFHASH_ZALLOC	umem_zalloc
+#define	REFHASH_FREE	umem_free
+#endif
 
 #define	RHL_F_DEAD	0x01
 
@@ -43,12 +56,13 @@ refhash_create(uint_t bucket_count, refhash_hash_f hash,
 	refhash_t *hp;
 	uint_t i;
 
-	hp = kmem_alloc(sizeof (refhash_t), km_flags);
+	hp = REFHASH_ALLOC(sizeof (refhash_t), km_flags);
 	if (hp == NULL)
 		return (NULL);
-	hp->rh_buckets = kmem_zalloc(bucket_count * sizeof (list_t), km_flags);
+	hp->rh_buckets = REFHASH_ZALLOC(bucket_count * sizeof (list_t),
+	    km_flags);
 	if (hp->rh_buckets == NULL) {
-		kmem_free(hp, sizeof (refhash_t));
+		REFHASH_FREE(hp, sizeof (refhash_t));
 		return (NULL);
 	}
 	hp->rh_bucket_count = bucket_count;
@@ -75,8 +89,8 @@ refhash_destroy(refhash_t *hp)
 {
 	ASSERT(list_is_empty(&hp->rh_objs));
 
-	kmem_free(hp->rh_buckets, hp->rh_bucket_count * sizeof (list_t));
-	kmem_free(hp, sizeof (refhash_t));
+	REFHASH_FREE(hp->rh_buckets, hp->rh_bucket_count * sizeof (list_t));
+	REFHASH_FREE(hp, sizeof (refhash_t));
 }
 
 void

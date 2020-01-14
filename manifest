@@ -5304,6 +5304,7 @@ f usr/lib/amd64/libraidcfg.so.1 0755 root bin
 s usr/lib/amd64/libraidcfg.so=libraidcfg.so.1
 s usr/lib/amd64/librcm.so.1=../../../lib/amd64/librcm.so.1
 s usr/lib/amd64/librcm.so=../../../lib/amd64/librcm.so.1
+f usr/lib/amd64/librefhash.so.1 0755 root bin
 f usr/lib/amd64/librename.so.1 0755 root bin
 f usr/lib/amd64/libreparse.so.1 0755 root bin
 s usr/lib/amd64/libreparse.so=libreparse.so.1
@@ -6823,6 +6824,7 @@ f usr/lib/libraidcfg.so.1 0755 root bin
 s usr/lib/libraidcfg.so=libraidcfg.so.1
 s usr/lib/librcm.so.1=../../lib/librcm.so.1
 s usr/lib/librcm.so=../../lib/librcm.so.1
+f usr/lib/librefhash.so.1 0755 root bin
 f usr/lib/librename.so.1 0755 root bin
 f usr/lib/libreparse.so.1 0755 root bin
 s usr/lib/libreparse.so=libreparse.so.1

@@ -19,6 +19,10 @@
 #include <sys/types.h>
 #include <sys/list.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define	RHL_F_DEAD	0x01
 
 typedef struct refhash_link {
@@ -57,5 +61,9 @@ extern void refhash_rele(refhash_t *, void *);
 extern void *refhash_first(refhash_t *);
 extern void *refhash_next(refhash_t *, void *);
 extern boolean_t refhash_obj_valid(refhash_t *hp, const void *);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif	/* _SYS_REFHASH_H */
