@@ -65,10 +65,10 @@ fmd_rpc_adm.h: fmd_rpc_adm.x
 
 ../common/fmd_adm.c: fmd_rpc_adm.h
 
-fmd_rpc.c: fmd_rpc_adm.h
+fmd_rpc.c: fmd_rpc_adm.x
 	$(RPCGEN) -CMN -l -o $@ fmd_rpc_adm.x
 
-fmd_xdr.c: fmd_rpc_adm.h
+fmd_xdr.c: fmd_rpc_adm.x
 	$(RPCGEN) -CMN -c -o $@ fmd_rpc_adm.x
 
 pics/%.o: ../$(MACH)/%.c
