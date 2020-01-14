@@ -202,9 +202,15 @@ beCopy(PyObject *self, PyObject *args)
 			    NULL, NULL));
 		}
 		while (PyDict_Next(beNameProperties, &pos, &pkey, &pvalue)) {
+#if PY_MAJOR_VERSION >= 3
 			if (!convertPyArgsToNvlist(&beProps, 2,
-			    PyBytes_AS_STRING(pkey),
-			    PyBytes_AS_STRING(pvalue))) {
+			    PyUnicode_AsUTF8(pkey),
+			    PyUnicode_AsUTF8(pvalue))) {
+#else
+			if (!convertPyArgsToNvlist(&beProps, 2,
+			    PyString_AsString(pkey),
+			    PyString_AsString(pvalue))) {
+#endif
 				nvlist_free(beProps);
 				nvlist_free(beAttrs);
 				return (Py_BuildValue("[iss]", BE_PY_ERR_NVLIST,

@@ -144,7 +144,7 @@ dict2nvl(PyObject *d)
 
 	while (PyDict_Next(d, &pos, &key, &value)) {
 #if PY_MAJOR_VERSION >= 3
-		char *keystr = PyBytes_AsString(key);
+		char *keystr = PyUnicode_AsUTF8(key);
 #else
 		char *keystr = PyString_AsString(key);
 #endif
@@ -161,12 +161,12 @@ dict2nvl(PyObject *d)
 		} else if (value == Py_None) {
 			err = nvlist_add_boolean(nvl, keystr);
 #if PY_MAJOR_VERSION >= 3
-		} else if (PyBytes_Check(value)) {
+		} else if (PyUnicode_Check(value)) {
 #else
 		} else if (PyString_Check(value)) {
 #endif
 #if PY_MAJOR_VERSION >= 3
-			char *valstr = PyBytes_AsString(value);
+			char *valstr = PyUnicode_AsUTF8(value);
 #else
 			char *valstr = PyString_AsString(value);
 #endif
