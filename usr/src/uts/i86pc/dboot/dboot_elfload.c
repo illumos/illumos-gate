@@ -24,6 +24,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2020 Joyent, Inc.
+ */
 
 #include <sys/types.h>
 #include <sys/inttypes.h>
@@ -182,7 +185,7 @@ dboot_elfload64(uintptr_t file_image)
 		/* zero out bss */
 		if (shdr->sh_type == SHT_NOBITS) {
 			if (prom_debug)
-				dboot_printf("zeroing BSS %lu bytes from "
+				dboot_printf("zeroing BSS %ld bytes from "
 				    "physaddr 0x%" PRIx64
 				    " (end=0x%" PRIx64 ")\n",
 				    (ulong_t)shdr->sh_size,
