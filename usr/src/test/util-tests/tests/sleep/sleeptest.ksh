@@ -12,6 +12,7 @@
 
 #
 # Copyright 2019 Robert Mustacchi
+# Copyright 2020 Joyent, Inc.
 #
 
 #
@@ -168,13 +169,12 @@ sleep_err -- -0.3
 
 #
 # Test a locale that uses a ',' character (de_DE.UTF-8 is one) as the
-# decimal point to make sure that sleep correctly is using LC_NUMERIC.
-#
-export LANG=de_DE.UTF-8
+# decimal point to make sure that sleep is correctly using LC_NUMERIC.
+export LC_ALL=de_DE.UTF-8
 sleep_err 21.45
 sleep_one 2,5 2 500000000
 sleep_one 34,0051 34 5100000
 sleep_one 3,6d 311040 0
-export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
 
 exit $sleep_exit
