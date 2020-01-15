@@ -1943,6 +1943,9 @@ file path=opt/zfs-tests/tests/functional/cli_root/zpool_replace/setup \
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_replace/zpool_replace_001_neg \
     mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_replace/zpool_replace_002_neg \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_resilver/cleanup \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_resilver/setup \

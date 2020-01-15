@@ -191,7 +191,7 @@ log_must test "$(get_prop 'encryptionroot' $ds)" == "$TESTPOOL/crypt"
 log_must test "$(get_prop 'encryption' $ds)" == "aes-256-ccm"
 log_must test "$(get_prop 'keyformat' $ds)" == "passphrase"
 log_must test "$(get_prop 'mounted' $ds)" == "yes"
-recv_cksum=$(md5digest /$ds/$TESTFILE0)
+recv_cksum=$(md5sum /$ds/$TESTFILE0 | awk '{ print $1 }')
 log_must test "$recv_cksum" == "$cksum"
 log_must zfs destroy -r $ds
 

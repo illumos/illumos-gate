@@ -27,7 +27,7 @@
  * All rights reserved.
  */
 /*
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
@@ -1871,7 +1871,9 @@ mp_startup_common(boolean_t boot)
 	(void) spl0();
 
 	/*
-	 * Fill out cpu_ucode_info.  Update microcode if necessary.
+	 * Fill out cpu_ucode_info.  Update microcode if necessary. Note that
+	 * this is done after pass1 on the boot CPU, but it needs to be later on
+	 * for the other CPUs.
 	 */
 	ucode_check(cp);
 	cpuid_pass_ucode(cp, new_x86_featureset);

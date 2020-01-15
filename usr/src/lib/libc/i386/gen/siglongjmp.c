@@ -26,17 +26,16 @@
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#pragma weak _siglongjmp = siglongjmp
+/*	  All Rights Reserved	*/
 
 #include "lint.h"
 #include <sys/types.h>
 #include <sys/ucontext.h>
 #include <setjmp.h>
 #include <ucontext.h>
+#include "libc.h"
+
+#pragma weak _siglongjmp = siglongjmp
 
 void
 siglongjmp(sigjmp_buf env, int val)

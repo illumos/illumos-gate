@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _LIBCUSTR_H
@@ -140,6 +140,52 @@ size_t custr_len(custr_t *);
  * memory.
  */
 void custr_reset(custr_t *);
+
+/*
+ * custr_remove(cus, idx, len)
+ *
+ * Remove len bytes from cus, starting at idx.
+ *
+ * Returns 0 on success or -1 on failure.  On failure, errno will be set to:
+ *	EINVAL	Either the idx or len parameter is invalid
+ *
+ */
+int custr_remove(custr_t *, size_t, size_t);
+
+/*
+ * custr_rremove(cus, idx, len)
+ *
+ * Remove len bytes from cus, starting at idx relative to the end of cus.
+ * That is, 0 = last byte of cus, 1 = second to last byte of cus, ...).
+ * The direction of removal is always towards the end of the string.  I.e.
+ * 'custr_rremove(cus, 1, 2)' removes the last two bytes of cus.
+ *
+ * Returns 0 on success or -1 on failure.  On failure, errno will be set to:
+ *	EINVAL	Either the idx or len parameter is invalid
+ *
+ */
+int custr_rremove(custr_t *, size_t, size_t);
+
+/*
+ * custr_trunc(cus, idx)
+ *
+ * Truncate cus starting at idx.
+ *
+ * Returns 0 on success or -1 on failure.  On failure, errno is set to:
+ *	EINVAL	The idx value was invalid.
+ */
+int custr_trunc(custr_t *, size_t);
+
+/*
+ * custr_rtrunc(cus, idx)
+ *
+ * Truncate cus starting at idx relative to the end of cus (similar to how
+ * the idx paramter is treated with custr_rremove()).
+ *
+ * Returns 0 on success or -1 on failure.  On failure, errno is set to:
+ *	EINVAL	The idx value was invalid.
+ */
+int custr_rtrunc(custr_t *, size_t);
 
 /*
  * Retrieve a const pointer to a NUL-terminated string version of the contents

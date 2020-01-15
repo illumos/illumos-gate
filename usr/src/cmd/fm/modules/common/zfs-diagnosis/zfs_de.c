@@ -61,6 +61,7 @@ typedef struct zfs_case_data {
 	char		zc_serd_io[MAX_SERDLEN];
 	char		zc_serd_probe[MAX_SERDLEN];
 	int		zc_has_remove_timer;
+	char		zc_serd_probe[MAX_SERDLEN];
 } zfs_case_data_t;
 
 /*

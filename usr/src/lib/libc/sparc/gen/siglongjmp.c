@@ -25,11 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#pragma weak _siglongjmp = siglongjmp
+/*	  All Rights Reserved	*/
 
 #include "lint.h"
 #include <sys/types.h>
@@ -40,6 +36,8 @@
 #include <setjmp.h>
 #include "sigjmp_struct.h"
 #include "libc.h"
+
+#pragma weak _siglongjmp = siglongjmp
 
 void
 siglongjmp(sigjmp_buf env, int val)

@@ -236,6 +236,8 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 	char *dev_name;
 	zprop_source_t source;
 	int ashift;
+	zfs_retire_data_t *zdp = fmd_hdl_getspecific(hdl);
+	libzfs_handle_t *zhdl = zdp->zrd_hdl;
 
 	config = zpool_get_config(zhp, NULL);
 	if (nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
@@ -259,7 +261,7 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 	(void) nvlist_add_string(replacement, ZPOOL_CONFIG_TYPE,
 	    VDEV_TYPE_ROOT);
 
-	dev_name = zpool_vdev_name(NULL, zhp, vdev, B_FALSE);
+	dev_name = zpool_vdev_name(zhdl, zhp, vdev, B_FALSE);
 
 	/*
 	 * Try to replace each spare, ending when we successfully

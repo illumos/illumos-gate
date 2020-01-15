@@ -50,6 +50,7 @@
 #include <wchar.h>
 #include <wctype.h>
 #include <libnvpair.h>
+#include <setjmp.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -61,6 +62,7 @@ extern long _sysconfig(int);
 extern int kill(pid_t pid, int sig);
 
 extern int primary_link_map;
+extern void _thr_exit(void *) __NORETURN;
 extern int thr_main(void);
 extern int thr_kill(thread_t tid, int sig);
 extern thread_t thr_self(void);
@@ -193,6 +195,11 @@ extern char *getusershell(void);
  * defined in _sigaction.s
  */
 extern int __sigaction(int, const struct sigaction *, struct sigaction *);
+
+/*
+ * defined in siglongjmp.c
+ */
+extern void _siglongjmp(sigjmp_buf, int) __NORETURN;
 
 /*
  * defined in _getsp.s

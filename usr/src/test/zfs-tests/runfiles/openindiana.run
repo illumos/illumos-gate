@@ -364,7 +364,8 @@ tests = ['zpool_remove_001_neg', 'zpool_remove_002_pos',
     'zpool_remove_003_pos']
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_replace]
-tests = ['zpool_replace_001_neg', 'replace-o_ashift', 'replace_prop_ashift']
+tests = ['zpool_replace_001_neg', 'zpool_replace_002_neg', 'replace-o_ashift',
+    'replace_prop_ashift']
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_resilver]
 tests = ['zpool_resilver_bad_args', 'zpool_resilver_restart']

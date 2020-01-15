@@ -27,7 +27,7 @@
  * All rights reserved.
  */
 /*
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright 2012 Jens Elkner <jel+illumos@cs.uni-magdeburg.de>
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  * Copyright 2014 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
@@ -476,6 +476,9 @@ extern "C" {
 #define	IA32_ARCH_CAP_SKIP_L1DFL_VMENTRY	0x0008
 #define	IA32_ARCH_CAP_SSB_NO			0x0010
 #define	IA32_ARCH_CAP_MDS_NO			0x0020
+#define	IA32_ARCH_CAP_IF_PSCHANGE_MC_NO		0x0040
+#define	IA32_ARCH_CAP_TSX_CTRL			0x0080
+#define	IA32_ARCH_CAP_TAA_NO			0x0100
 
 /*
  * Intel Speculation related MSRs
@@ -515,6 +518,13 @@ extern "C" {
 #define	IA32_VMX_EPT_VPID_INVEPT	(1UL << 20)
 #define	IA32_VMX_EPT_VPID_INVEPT_SINGLE	(1UL << 25)
 #define	IA32_VMX_EPT_VPID_INVEPT_ALL	(1UL << 26)
+
+/*
+ * Intel TSX Control MSRs
+ */
+#define	MSR_IA32_TSX_CTRL		0x122
+#define	IA32_TSX_CTRL_RTM_DISABLE	0x01
+#define	IA32_TSX_CTRL_CPUID_CLEAR	0x02
 
 /*
  * Intel Thermal MSRs
@@ -720,6 +730,8 @@ extern "C" {
 #define	X86FSET_MDS_NO		94
 #define	X86FSET_CORE_THERMAL	95
 #define	X86FSET_PKG_THERMAL	96
+#define	X86FSET_TSX_CTRL	97
+#define	X86FSET_TAA_NO		98
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
@@ -1081,7 +1093,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	97
+#define	NUM_X86_FEATURES	99
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);

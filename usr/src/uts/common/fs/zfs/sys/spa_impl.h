@@ -27,6 +27,7 @@
  * Copyright (c) 2017 Datto Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2017, Intel Corporation.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _SYS_SPA_IMPL_H
