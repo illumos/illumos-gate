@@ -26,7 +26,7 @@
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  *
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -2271,18 +2271,22 @@ valid_rsdp(ACPI_TABLE_RSDP *rp)
  * see ACPI 3.0 Spec, 5.2.5.1
  */
 static ACPI_TABLE_RSDP *
-scan_rsdp(paddr_t start, paddr_t end)
+scan_rsdp(paddr_t *paddrp, size_t len)
 {
-	ssize_t len  = end - start;
+	paddr_t paddr = *paddrp;
 	caddr_t ptr;
 
-	ptr = vmap_phys(len, start);
+	ptr = vmap_phys(len, paddr);
+
 	while (len > 0) {
 		if (strncmp(ptr, ACPI_SIG_RSDP, strlen(ACPI_SIG_RSDP)) == 0 &&
-		    valid_rsdp((ACPI_TABLE_RSDP *)ptr))
+		    valid_rsdp((ACPI_TABLE_RSDP *)ptr)) {
+			*paddrp = paddr;
 			return ((ACPI_TABLE_RSDP *)ptr);
+		}
 
 		ptr += ACPI_RSDP_SCAN_STEP;
+		paddr += ACPI_RSDP_SCAN_STEP;
 		len -= ACPI_RSDP_SCAN_STEP;
 	}
 
@@ -2290,43 +2294,67 @@ scan_rsdp(paddr_t start, paddr_t end)
 }
 
 /*
- * Refer to ACPI 3.0 Spec, section 5.2.5.1 to understand this function
+ * Locate the ACPI RSDP.  We search in a particular order:
+ *
+ * - If the bootloader told us the location of the RSDP (via the EFI system
+ *   table), try that first.
+ * - Otherwise, look in the EBDA and BIOS memory as per ACPI 5.2.5.1 (legacy
+ *   case).
+ * - Finally, our bootloader may have a copy of the RSDP in its info: this might
+ *   get freed after boot, so we always prefer to find the original RSDP first.
+ *
+ * Once found, we set acpi-root-tab property (a physical address) for the
+ * benefit of acpica, acpidump etc.
  */
-static ACPI_TABLE_RSDP *
-find_rsdp()
-{
-	ACPI_TABLE_RSDP *rsdp;
-	uint64_t rsdp_val = 0;
-	uint16_t *ebda_seg;
-	paddr_t  ebda_addr;
 
-	/* check for "acpi-root-tab" property */
+static ACPI_TABLE_RSDP *
+find_rsdp(struct xboot_info *xbp)
+{
+	ACPI_TABLE_RSDP *rsdp = NULL;
+	paddr_t paddr = 0;
+
 	if (do_bsys_getproplen(NULL, "acpi-root-tab") == sizeof (uint64_t)) {
-		(void) do_bsys_getprop(NULL, "acpi-root-tab", &rsdp_val);
-		if (rsdp_val != 0) {
-			rsdp = scan_rsdp(rsdp_val, rsdp_val + sizeof (*rsdp));
-			if (rsdp != NULL) {
-				if (kbm_debug) {
-					bop_printf(NULL,
-					    "Using RSDP from bootloader: "
-					    "0x%p\n", (void *)rsdp);
-				}
-				return (rsdp);
-			}
-		}
+		(void) do_bsys_getprop(NULL, "acpi-root-tab", &paddr);
+		rsdp = scan_rsdp(&paddr, sizeof (*rsdp));
 	}
 
-	/*
-	 * Get the EBDA segment and scan the first 1K
-	 */
-	ebda_seg = (uint16_t *)vmap_phys(sizeof (uint16_t),
-	    ACPI_EBDA_PTR_LOCATION);
-	ebda_addr = *ebda_seg << 4;
-	rsdp = scan_rsdp(ebda_addr, ebda_addr + ACPI_EBDA_WINDOW_SIZE);
-	if (rsdp == NULL)
-		/* if EBDA doesn't contain RSDP, look in BIOS memory */
-		rsdp = scan_rsdp(ACPI_HI_RSDP_WINDOW_BASE,
-		    ACPI_HI_RSDP_WINDOW_BASE + ACPI_HI_RSDP_WINDOW_SIZE);
+#ifndef __xpv
+	if (rsdp == NULL && xbp->bi_acpi_rsdp != NULL) {
+		paddr = (uintptr_t)xbp->bi_acpi_rsdp;
+		rsdp = scan_rsdp(&paddr, sizeof (*rsdp));
+	}
+#endif
+
+	if (rsdp == NULL) {
+		uint16_t *ebda_seg = (uint16_t *)vmap_phys(sizeof (uint16_t),
+		    ACPI_EBDA_PTR_LOCATION);
+		paddr = *ebda_seg << 4;
+		rsdp = scan_rsdp(&paddr, ACPI_EBDA_WINDOW_SIZE);
+	}
+
+	if (rsdp == NULL) {
+		paddr = ACPI_HI_RSDP_WINDOW_BASE;
+		rsdp = scan_rsdp(&paddr, ACPI_HI_RSDP_WINDOW_SIZE);
+	}
+
+#ifndef __xpv
+	if (rsdp == NULL && xbp->bi_acpi_rsdp_copy != NULL) {
+		paddr = (uintptr_t)xbp->bi_acpi_rsdp_copy;
+		rsdp = scan_rsdp(&paddr, sizeof (*rsdp));
+	}
+#endif
+
+	if (rsdp == NULL) {
+		bop_printf(NULL, "no RSDP found!\n");
+		return (NULL);
+	}
+
+	if (kbm_debug)
+		bop_printf(NULL, "RSDP found at physical 0x%lx\n", paddr);
+
+	if (do_bsys_getproplen(NULL, "acpi-root-tab") != sizeof (uint64_t))
+		bsetprop64("acpi-root-tab", paddr);
+
 	return (rsdp);
 }
 
@@ -2346,13 +2374,12 @@ map_fw_table(paddr_t table_addr)
 }
 
 static ACPI_TABLE_HEADER *
-find_fw_table(char *signature)
+find_fw_table(ACPI_TABLE_RSDP *rsdp, char *signature)
 {
 	static int revision = 0;
 	static ACPI_TABLE_XSDT *xsdt;
 	static int len;
 	paddr_t xsdt_addr;
-	ACPI_TABLE_RSDP *rsdp;
 	ACPI_TABLE_HEADER *tp;
 	paddr_t table_addr;
 	int	n;
@@ -2370,40 +2397,42 @@ find_fw_table(char *signature)
 	 * revision 1 and use the RSDT.
 	 */
 	if (revision == 0) {
-		if ((rsdp = find_rsdp()) != NULL) {
-			revision = rsdp->Revision;
+		if (rsdp == NULL)
+			return (NULL);
+
+		revision = rsdp->Revision;
+		/*
+		 * ACPI 6.0 states that current revision is 2
+		 * from acpi_table_rsdp definition:
+		 * Must be (0) for ACPI 1.0 or (2) for ACPI 2.0+
+		 */
+		if (revision > 2)
+			revision = 2;
+		switch (revision) {
+		case 2:
 			/*
-			 * ACPI 6.0 states that current revision is 2
-			 * from acpi_table_rsdp definition:
-			 * Must be (0) for ACPI 1.0 or (2) for ACPI 2.0+
+			 * Use the XSDT unless BIOS is buggy and
+			 * claims to be rev 2 but has a null XSDT
+			 * address
 			 */
-			if (revision > 2)
-				revision = 2;
-			switch (revision) {
-			case 2:
-				/*
-				 * Use the XSDT unless BIOS is buggy and
-				 * claims to be rev 2 but has a null XSDT
-				 * address
-				 */
-				xsdt_addr = rsdp->XsdtPhysicalAddress;
-				if (xsdt_addr != 0)
-					break;
-				/* FALLTHROUGH */
-			case 0:
-				/* treat RSDP rev 0 as revision 1 internally */
-				revision = 1;
-				/* FALLTHROUGH */
-			case 1:
-				/* use the RSDT for rev 0/1 */
-				xsdt_addr = rsdp->RsdtPhysicalAddress;
+			xsdt_addr = rsdp->XsdtPhysicalAddress;
+			if (xsdt_addr != 0)
 				break;
-			default:
-				/* unknown revision */
-				revision = 0;
-				break;
-			}
+			/* FALLTHROUGH */
+		case 0:
+			/* treat RSDP rev 0 as revision 1 internally */
+			revision = 1;
+			/* FALLTHROUGH */
+		case 1:
+			/* use the RSDT for rev 0/1 */
+			xsdt_addr = rsdp->RsdtPhysicalAddress;
+			break;
+		default:
+			/* unknown revision */
+			revision = 0;
+			break;
 		}
+
 		if (revision == 0)
 			return (NULL);
 
@@ -2840,6 +2869,7 @@ static void
 build_firmware_properties(struct xboot_info *xbp)
 {
 	ACPI_TABLE_HEADER *tp = NULL;
+	ACPI_TABLE_RSDP *rsdp;
 
 #ifndef __xpv
 	if (xbp->bi_uefi_arch == XBI_UEFI_ARCH_64) {
@@ -2856,36 +2886,33 @@ build_firmware_properties(struct xboot_info *xbp)
 			bop_printf(NULL, "32-bit UEFI detected.\n");
 	}
 
-	if (xbp->bi_acpi_rsdp != NULL) {
-		bsetprop64("acpi-root-tab",
-		    (uint64_t)(uintptr_t)xbp->bi_acpi_rsdp);
-	}
-
 	if (xbp->bi_smbios != NULL) {
 		bsetprop64("smbios-address",
 		    (uint64_t)(uintptr_t)xbp->bi_smbios);
 	}
 
-	if ((tp = find_fw_table(ACPI_SIG_MSCT)) != NULL)
+	rsdp = find_rsdp(xbp);
+
+	if ((tp = find_fw_table(rsdp, ACPI_SIG_MSCT)) != NULL)
 		msct_ptr = process_msct((ACPI_TABLE_MSCT *)tp);
 	else
 		msct_ptr = NULL;
 
-	if ((tp = find_fw_table(ACPI_SIG_MADT)) != NULL)
+	if ((tp = find_fw_table(rsdp, ACPI_SIG_MADT)) != NULL)
 		process_madt((ACPI_TABLE_MADT *)tp);
 
 	if ((srat_ptr = (ACPI_TABLE_SRAT *)
-	    find_fw_table(ACPI_SIG_SRAT)) != NULL)
+	    find_fw_table(rsdp, ACPI_SIG_SRAT)) != NULL)
 		process_srat(srat_ptr);
 
-	if (slit_ptr = (ACPI_TABLE_SLIT *)find_fw_table(ACPI_SIG_SLIT))
+	if (slit_ptr = (ACPI_TABLE_SLIT *)find_fw_table(rsdp, ACPI_SIG_SLIT))
 		process_slit(slit_ptr);
 
-	tp = find_fw_table(ACPI_SIG_MCFG);
+	tp = find_fw_table(rsdp, ACPI_SIG_MCFG);
 #else /* __xpv */
 	enumerate_xen_cpus();
 	if (DOMAIN_IS_INITDOMAIN(xen_info))
-		tp = find_fw_table(ACPI_SIG_MCFG);
+		tp = find_fw_table(rsdp, ACPI_SIG_MCFG);
 #endif /* __xpv */
 	if (tp != NULL)
 		process_mcfg((ACPI_TABLE_MCFG *)tp);

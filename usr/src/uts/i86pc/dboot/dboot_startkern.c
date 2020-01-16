@@ -23,7 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 
@@ -1827,22 +1827,19 @@ dboot_multiboot_get_fwtables(void)
 	}
 
 	/*
-	 * The ACPI RSDP can be found by scanning the BIOS memory areas or
-	 * from the EFI system table. The boot loader may pass in the address
-	 * it found the ACPI tables at.
+	 * The multiboot2 info contains a copy of the RSDP; stash a pointer to
+	 * it (see find_rsdp() in fakebop).
 	 */
 	nacpitagp = (multiboot_tag_new_acpi_t *)
-	    dboot_multiboot2_find_tag(mb2_info,
-	    MULTIBOOT_TAG_TYPE_ACPI_NEW);
+	    dboot_multiboot2_find_tag(mb2_info, MULTIBOOT_TAG_TYPE_ACPI_NEW);
 	oacpitagp = (multiboot_tag_old_acpi_t *)
-	    dboot_multiboot2_find_tag(mb2_info,
-	    MULTIBOOT_TAG_TYPE_ACPI_OLD);
+	    dboot_multiboot2_find_tag(mb2_info, MULTIBOOT_TAG_TYPE_ACPI_OLD);
 
 	if (nacpitagp != NULL) {
-		bi->bi_acpi_rsdp = (native_ptr_t)(uintptr_t)
+		bi->bi_acpi_rsdp_copy = (native_ptr_t)(uintptr_t)
 		    &nacpitagp->mb_rsdp[0];
 	} else if (oacpitagp != NULL) {
-		bi->bi_acpi_rsdp = (native_ptr_t)(uintptr_t)
+		bi->bi_acpi_rsdp_copy = (native_ptr_t)(uintptr_t)
 		    &oacpitagp->mb_rsdp[0];
 	}
 }
@@ -2355,6 +2352,7 @@ startup_kernel(void)
 	if (mb2_info != NULL)
 		DBG(mb2_info->mbi_total_size);
 	DBG(bi->bi_acpi_rsdp);
+	DBG(bi->bi_acpi_rsdp_copy);
 	DBG(bi->bi_smbios);
 	DBG(bi->bi_uefi_arch);
 	DBG(bi->bi_uefi_systab);
