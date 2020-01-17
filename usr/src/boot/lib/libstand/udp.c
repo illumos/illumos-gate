@@ -76,10 +76,10 @@ sendudp(struct iodesc *d, void *pkt, size_t len)
 #endif
 
 	ui = (struct udpiphdr *)pkt - 1;
-	bzero(ui, sizeof(*ui));
+	bzero(ui, sizeof (*ui));
 
 	uh = (struct udphdr *)pkt - 1;
-	len += sizeof(*uh);
+	len += sizeof (*uh);
 
 	uh->uh_sport = d->myport;
 	uh->uh_dport = d->destport;
@@ -99,7 +99,7 @@ sendudp(struct iodesc *d, void *pkt, size_t len)
 		return (-1);
 	if (cc != len)
 		panic("sendudp: bad write (%zd != %zd)", cc, len);
-	return (cc - sizeof(*uh));
+	return (cc - sizeof (*uh));
 }
 
 /*
@@ -120,7 +120,7 @@ readudp(struct iodesc *d, void **pkt, void **payload, time_t tleft)
 	uh = NULL;
 	ptr = NULL;
 	n = readip(d, &ptr, (void **)&uh, tleft, IPPROTO_UDP);
-	if (n == -1 || n < sizeof(*uh) || n != ntohs(uh->uh_ulen)) {
+	if (n == -1 || n < sizeof (*uh) || n != ntohs(uh->uh_ulen)) {
 		free(ptr);
 		return (-1);
 	}
@@ -129,7 +129,7 @@ readudp(struct iodesc *d, void **pkt, void **payload, time_t tleft)
 #ifdef NET_DEBUG
 		if (debug)
 			printf("readudp: bad dport %d != %d\n",
-				d->myport, ntohs(uh->uh_dport));
+			    d->myport, ntohs(uh->uh_dport));
 #endif
 		free(ptr);
 		return (-1);
@@ -138,16 +138,22 @@ readudp(struct iodesc *d, void **pkt, void **payload, time_t tleft)
 #ifndef UDP_NO_CKSUM
 	if (uh->uh_sum) {
 		struct udpiphdr *ui;
-		struct ip *ip;
+		void *ip;
 		struct ip tip;
 
-		n = ntohs(uh->uh_ulen) + sizeof(*ip);
+		n = ntohs(uh->uh_ulen) + sizeof (struct ip);
 
-		/* Check checksum (must save and restore ip header) */
+		/*
+		 * Check checksum (must save and restore ip header).
+		 * Note we do use void *ip here to make gcc to stop
+		 * complaining about possibly unaligned pointer values.
+		 * We do allocate buffer in pxe.c/efinet.c and care is
+		 * taken to get headers aligned properly.
+		 */
 		ip = (struct ip *)uh - 1;
-		tip = *ip;
-		ui = (struct udpiphdr *)ip;
-		bzero(&ui->ui_x1, sizeof(ui->ui_x1));
+		tip = *(struct ip *)ip;
+		ui = ip;
+		bzero(&ui->ui_x1, sizeof (ui->ui_x1));
 		ui->ui_len = uh->uh_ulen;
 		if (in_cksum(ui, n) != 0) {
 #ifdef NET_DEBUG
@@ -157,22 +163,22 @@ readudp(struct iodesc *d, void **pkt, void **payload, time_t tleft)
 			free(ptr);
 			return (-1);
 		}
-		*ip = tip;
+		*(struct ip *)ip = tip;
 	}
 #endif
-	if (ntohs(uh->uh_ulen) < sizeof(*uh)) {
+	if (ntohs(uh->uh_ulen) < sizeof (*uh)) {
 #ifdef NET_DEBUG
 		if (debug)
 			printf("readudp: bad udp len %d < %d\n",
-				ntohs(uh->uh_ulen), (int)sizeof(*uh));
+			    ntohs(uh->uh_ulen), (int)sizeof (*uh));
 #endif
 		free(ptr);
 		return (-1);
 	}
 
-	n = (n > (ntohs(uh->uh_ulen) - sizeof(*uh))) ?
-	    ntohs(uh->uh_ulen) - sizeof(*uh) : n;
+	n = (n > (ntohs(uh->uh_ulen) - sizeof (*uh))) ?
+	    ntohs(uh->uh_ulen) - sizeof (*uh) : n;
 	*pkt = ptr;
-	*payload = (void *)((uintptr_t)uh + sizeof(*uh));
+	*payload = (void *)((uintptr_t)uh + sizeof (*uh));
 	return (n);
 }
