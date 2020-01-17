@@ -35,13 +35,12 @@ include ../hal/Makefile.hal
 
 SRCS= $(OBJS:.o=.c)
 
-LDLIBS +=	-lhal -lsecdb
-NONLINTLDLIBS =	-ldbus-1
+LDLIBS +=	-lhal -lsecdb -ldbus-1
+NATIVE_LIBS +=	libdbus-1.so
 CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-parentheses
 CPPFLAGS +=	-D_REENTRANT -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 $(HAL_DBUS_CPPFLAGS)
-LINTFLAGS += 	-um
 
 # not linted
 SMATCH=off
@@ -53,15 +52,13 @@ $(ROOTBIN)/cdrw := FILEMODE = 04755
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS) $(NONLINTLDLIBS) $(CFLAGS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS) $(CFLAGS)
 	$(POST_PROCESS)
 
 install: all $(ROOTPROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint: lint_SRCS
 
 $(POFILE) : $(SRCS)
 	$(RM) $@

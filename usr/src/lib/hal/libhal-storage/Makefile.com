@@ -32,9 +32,9 @@ LIBPCSRC =	hal-storage.pc
 
 include ../../Makefile.com
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -ldbus-1 -lhal
-$(LINTLIB) := 	SRCS = $(SRCDIR)/$(LINTSRC)
+NATIVE_LIBS +=	libdbus-1.so
 
 SRCDIR =	../common
 
@@ -53,8 +53,6 @@ ROOTMAJLINK64 =	$(ROOTLIBDIR64)/$(LIBRARY:.a=.so)$(VERS_MAJ)
 .KEEP_STATE:
 
 all:		$(LIBS)
-
-lint:		lintcheck
 
 $(ROOTMAJLINK):
 	-$(RM) $@; $(SYMLINK) $(DYNLIB) $@

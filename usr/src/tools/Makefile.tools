@@ -54,7 +54,9 @@ CPPFLAGS=		-D_TS_ERRNO
 ELFSIGN_O=		$(TRUE)
 LDLIBS=
 LDFLAGS=		$(MAPFILE.NES:%=-M%) $(MAPFILE.NED:%=-M%) \
-			    $(MAPFILE.PGA:%=-M%)
+			    $(MAPFILE.PGA:%=-M%) \
+			    $(ZASSERTDEFLIB)=libc.so \
+			    $(BDIRECT)
 
 # Unset CW_LINKER so we run the default.  We don't set LD here to avoid taking
 # the journey through LD_ALTEXEC unnecessarily.

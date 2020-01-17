@@ -45,7 +45,7 @@ POFILE= install.po
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 $(PROG):	$(PROGSRC)
 		$(LINK.c) $(PROGSRC) -o $@ $(LDLIBS)
@@ -56,7 +56,5 @@ install: all $(ROOTPROG)
 	mv $(ROOTBIN)/$(PROG) $(ROOTBIN)/$(PROG2)
 
 clean:
-
-lint:	lint_PROG
 
 include ../Makefile.ucbtarg

@@ -36,7 +36,7 @@ CERRWARN += -_gcc=-Wno-parentheses
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 $(PROG):	$(OBJS)
 		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
@@ -46,7 +46,5 @@ install: all $(ROOTPROG)
 
 clean:
 	-$(RM) $(OBJS)
-
-lint:	lint_PROG
 
 include ../Makefile.ucbtarg

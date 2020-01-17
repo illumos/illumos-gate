@@ -51,6 +51,7 @@ CPPFLAGS	+= -I$(ADJUNCT_PROTO)/usr/include/libxml2 \
 		-I$(KMFDIR)/include -I.
 LDLIBS		+= -L$(ROOT)/usr/lib -lkmf -lcryptoutil
 XMLLIB		= -lxml2
+NATIVE_LIBS +=	libxml2.so
 
 .KEEP_STATE:
 
@@ -82,7 +83,5 @@ $(DTDDIR)/%: %
 
 clean:
 	$(RM) $(OBJS)
-
-lint : lint_SRCS
 
 include ../../Makefile.targ

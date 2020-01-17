@@ -45,7 +45,8 @@ include ../../common/Makefile.util
 CPPFLAGS = -I../../common -I../common
 CFLAGS += $(CCVERBOSE)
 CERRWARN += $(CNOWARN_UNINIT)
-LDFLAGS =
+LDFLAGS = $(ZLAZYLOAD) $(BDIRECT)
+LDFLAGS += $(ZASSERTDEFLIB)=libelf.so $(ZASSERTDEFLIB)=libc.so
 LDLIBS = -lelf
 
 LINTFILES = $(SRCS:%.c=%.ln)
@@ -54,9 +55,6 @@ install all: $(PROG)
 
 clobber clean:
 	$(RM) $(OBJS) $(LINTFILES) $(PROG)
-
-lint: $(LINTFILES)
-	$(LINT) $(LINTFLAGS) $(LINTFILES) $(LDLIBS)
 
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
@@ -69,9 +67,3 @@ $(PROG): $(OBJS)
 %.o: ../common/%.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
-
-%.ln: %.c
-	$(LINT.c) -c $<
-
-%.ln: ../common/%.c
-	$(LINT.c) -c $<

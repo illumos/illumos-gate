@@ -42,6 +42,14 @@ ROOT=		/proto
 # and libraries.
 #
 ADJUNCT_PROTO=
+# HAVE_ADJUNCT_PROTO - ADJUNCT_PROTO is set to a non-default value
+# NO_ADJUNCT_PROTO - ADJUNCT_PROTO is unset
+#
+# This works by replacing any value in ADJUNCT_PROTO with POUND_SIGN, which
+# only happens if it has some value, and then setting HAVE_ADJUNCT_PROTO
+# oppositely.
+NO_ADJUNCT_PROTO=$(ADJUNCT_PROTO:%=$(POUND_SIGN))
+$(NO_ADJUNCT_PROTO)HAVE_ADJUNCT_PROTO=$(POUND_SIGN)
 
 #
 # Adjunct for building things that run on the build machine.
@@ -813,13 +821,19 @@ CCEXTNEEDED64		= -lCrun -lCstd
 $(__GNUC64)CCNEEDED64	= -L$(GCCLIBDIR) -lstdc++ -lgcc_s
 $(__GNUC64)CCEXTNEEDED	= $(CCNEEDED64)
 
-LINK.c=		$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS)
-LINK64.c=	$(CC) $(CFLAGS64) $(CPPFLAGS) $(LDFLAGS)
-NORUNPATH=	-norunpath -nolib
-LINK.cc=	$(CCC) $(CCFLAGS) $(CPPFLAGS) $(NORUNPATH) \
-		$(LDFLAGS) $(CCNEEDED)
-LINK64.cc=	$(CCC) $(CCFLAGS64) $(CPPFLAGS) $(NORUNPATH) \
-		$(LDFLAGS) $(CCNEEDED64)
+# Libraries we expect to use natively on the build machine
+NATIVE_LIBS=
+
+LDCHECKS		= $(ZASSERTDEFLIB) $(ZGUIDANCE) $(ZFATALWARNINGS)
+LDCHECKS		+= $(NATIVE_LIBS:%=$(ZASSERTDEFLIB)=%)
+
+LINK.c=			$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) $(LDCHECKS)
+LINK64.c=		$(CC) $(CFLAGS64) $(CPPFLAGS) $(LDFLAGS) $(LDCHECKS)
+NORUNPATH=		-norunpath -nolib
+LINK.cc=		$(CCC) $(CCFLAGS) $(CPPFLAGS) $(NORUNPATH) \
+			$(LDFLAGS) $(CCNEEDED) $(LDCHECKS)
+LINK64.cc=		$(CCC) $(CCFLAGS64) $(CPPFLAGS) $(NORUNPATH) \
+			$(LDFLAGS) $(CCNEEDED64) $(LDCHECKS)
 
 #
 # lint macros
@@ -982,6 +996,9 @@ ZRECORD=	-zrecord
 ZREDLOCSYM=	-zredlocsym
 ZTEXT=		-ztext
 ZVERBOSE=	-zverbose
+ZASSERTDEFLIB=	-zassert-deflib
+ZGUIDANCE=	-zguidance
+ZFATALWARNINGS=	-zfatal-warnings
 
 GSHARED=	-G
 CCMT=		-mt

@@ -37,8 +37,8 @@ INCS += -I$(ADJUNCT_PROTO)/usr/include/libxml2
 # it during lint, as well as turning off the warnings lint would generate.
 #
 LDLIBS += -lzfs_jni -lnvpair -lzfs
+NATIVE_LIBS += libxml2.so
 all install := LDLIBS += -lxml2
-LINTFLAGS += -xerroff=E_NAME_USED_NOT_DEF2
 
 CPPFLAGS += $(INCS) -D_LARGEFILE64_SOURCE=1 -D_REENTRANT
 $(NOT_RELEASE_BUILD) CPPFLAGS += -DDEBUG
@@ -50,7 +50,5 @@ all: $(PROG)
 install: all $(ROOTCMD)
 
 clean:
-
-lint: lint_PROG
 
 include ../Makefile.targ

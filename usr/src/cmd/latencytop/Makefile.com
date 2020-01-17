@@ -49,6 +49,7 @@ CPPFLAGS += -DEMBED_CONFIGS -I$(ADJUNCT_PROTO)/usr/include/glib-2.0 \
 	-I$(ADJUNCT_PROTO)/usr/lib/glib-2.0/include
 CSTD = $(CSTD_GNU99)
 LDLIBS += -lcurses -ldtrace
+NATIVE_LIBS += libglib-2.0.so
 all install	:= LDLIBS += -lglib-2.0
 
 FILEMODE = 0555

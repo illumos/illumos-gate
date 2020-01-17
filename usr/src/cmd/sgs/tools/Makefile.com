@@ -41,6 +41,8 @@ include		$(SRC)/cmd/Makefile.cmd
 include		$(SRC)/cmd/sgs/Makefile.com
 
 OBJECTS=	piglatin.o
+NATIVECC_CFLAGS = -O
+NATIVE_LDFLAGS = $(LDASSERTS) $(ZASSERTDEFLIB)=libc.so $(BDIRECT)
 
 NATIVE=		$(OBJECTS:%.o=%)
 SRCS=		$(OBJECTS:%.o=../common/%.c)

@@ -30,8 +30,8 @@
 
 PROG=	sendmail
 
-include 	../../Makefile.cmd
-include 	../Makefile.cmd
+include		../../Makefile.cmd
+include		../Makefile.cmd
 
 OBJS= alias.o arpadate.o bf.o collect.o conf.o control.o convtime.o daemon.o \
 	deliver.o domain.o envelope.o err.o headers.o macro.o main.o map.o \
@@ -44,9 +44,10 @@ SRCS=	$(OBJS:%.o=%.c)
 MAPFILES =	$(MAPFILE.INT) $(MAPFILE.NGB)
 LDFLAGS +=	$(MAPFILES:%=-M%)
 
-LDLIBS += 	../libsmutil/libsmutil.a ../libsm/libsm.a -lresolv -lsocket \
+LDLIBS +=	../libsmutil/libsmutil.a ../libsm/libsm.a -lresolv -lsocket \
 		-lnsl ../db/libdb.a -lldap -lsldap -lwrap -lumem \
 		-lssl -lcrypto -lsasl
+NATIVE_LIBS +=	libssl.so libcrypto.so
 
 INCPATH=	-I. -I../include -I../db
 
@@ -55,9 +56,9 @@ SUNENVDEF=	-DSUN_EXTENSIONS -DVENDOR_DEFAULT=VENDOR_SUN \
 		-DSUN_INIT_DOMAIN -DSUN_SIMPLIFIED_LDAP -D_FFR_LOCAL_DAEMON \
 		-D_FFR_MAIL_MACRO
 
-CPPFLAGS = 	$(INCPATH) $(ENVDEF) $(SUNENVDEF) $(DBMDEF) $(CPPFLAGS.sm)
+CPPFLAGS =	$(INCPATH) $(ENVDEF) $(SUNENVDEF) $(DBMDEF) $(CPPFLAGS.sm)
 
-FILEMODE= 	2555
+FILEMODE=	2555
 
 ROOTSYMLINKS=	$(ROOTLIBSMTPSM)/newaliases
 

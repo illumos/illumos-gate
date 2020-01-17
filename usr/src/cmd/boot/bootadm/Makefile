@@ -45,6 +45,7 @@ POFILE= bootadm_cmd.po
 LDLIBS_i386= -lfdisk
 LDLIBS += -lficl-sys -lmd -lcryptoutil -lnvpair -lgen -ladm -lefi
 LDLIBS += -lscf -lz -lbe -lzfs -lofmt $(LDLIBS_$(MACH))
+NATIVE_LIBS += libz.so
 
 # Writing into string literals is incorrect.  We need to match gcc's
 # behavior, which causes us to take SIGSEGV on such a write.

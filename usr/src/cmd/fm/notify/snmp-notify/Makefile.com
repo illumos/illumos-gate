@@ -28,7 +28,6 @@
 
 SRCS += snmp-notify.c
 OBJS = $(SRCS:%.c=%.o)
-LINTFILES = $(SRCS:%.c=%.ln)
 
 PROG = snmp-notify
 ROOTLIBFM = $(ROOT)/usr/lib/fm
@@ -47,13 +46,13 @@ CSTD	= $(CSTD_GNU99)
 CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
 LDLIBS += -L$(ROOT)/usr/lib/fm -lnvpair -lfmevent -lfmd_msg -lfmnotify \
 	-lumem -lnetsnmp -lnetsnmpagent
+NATIVE_LIBS += libnetsnmp.so libnetsnmpagent.so
 LDFLAGS += -R/usr/lib/fm
-LINTFLAGS += -mnu
 
 CERRWARN += -_gcc=-Wno-parentheses
 
 .NO_PARALLEL:
-.PARALLEL: $(OBJS) $(LINTFILES)
+.PARALLEL: $(OBJS)
 
 all: $(PROG)
 
@@ -71,19 +70,10 @@ $(PROG): $(OBJS)
 	$(CTFCONVERT_O)
 
 clean:
-	$(RM) $(OBJS) $(LINTFILES)
+	$(RM) $(OBJS)
 
 clobber: clean
 	$(RM) $(PROG)
-
-%.ln: ../common/%.c
-	$(LINT.c) -c $<
-
-%.ln: %.c
-	$(LINT.c) -c $<
-
-lint: $(LINTFILES)
-	$(LINT) $(LINTFLAGS) $(LINTFILES)
 
 $(ROOTLIBNOTIFY):
 	$(INS.dir)

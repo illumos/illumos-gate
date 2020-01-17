@@ -23,8 +23,6 @@
 # Copyright (c) 1996-1998 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include		../Makefile.tools
 
@@ -32,7 +30,6 @@ all:=           TARGET= all
 install:=       TARGET= install
 clean:=         TARGET= clean
 clobber:=       TARGET= clobber
-lint:=          TARGET= lint
 
 SUBDIRS_sparc	= sparc
 
@@ -45,7 +42,6 @@ all:		$(SUBDIRS)
 install:	$(SUBDIRS)
 clean:		$(SUBDIRS)
 clobber:	$(SUBDIRS)
-lint:		$(SUBDIRS)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

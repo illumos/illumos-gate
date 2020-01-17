@@ -34,6 +34,7 @@ CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-type-limits
 CPPFLAGS += -I../protocmp
 LDLIBS += -lgen
+NATIVE_LIBS += libgen.so
 CLEANFILES += $(OBJS)
 
 # Assume we don't have the install.bin available yet

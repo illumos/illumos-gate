@@ -191,6 +191,8 @@ $(CLNT_PICS) := CPPFLAGS += -I../libnsl/nis/gen
 
 LIBS = $(DYNLIB)
 ZDEFS=
+ZGUIDANCE=
+
 LDLIBS += -lnsl -lldap -lc
 
 # A number of interfaces are interposed by numerous applications, therefore
@@ -207,15 +209,12 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 
 .KEEP_STATE:
 
 all:	$(DERIVED_FILES) $(LIBS)
 
 install: all $(ROOTLIBS) $(ROOTLINKS)
-
-lint: $(DERIVED_FILES) .WAIT lintcheck
 
 objs/%.o pics/%.o profs/%.o: $(YPTOL_DIR)/%.c
 	$(COMPILE.c) -o $@ $<

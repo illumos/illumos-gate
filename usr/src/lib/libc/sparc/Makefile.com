@@ -1364,10 +1364,11 @@ $(ASSYMDEP_OBJS:%=pics/%): assym.h
 assym.h := CFLAGS += $(CCGDEBUG)
 
 GENASSYM_C = $(LIBCDIR)/$(MACH)/genassym.c
+LDFLAGS.native = $(LDASSERTS) $(ZASSERTDEFLIB)=libc.so $(BDIRECT)
 
 genassym: $(GENASSYM_C)
 	$(NATIVECC) $(NATIVE_CFLAGS) -I$(LIBCBASE)/inc -I$(LIBCDIR)/inc \
-		$(CPPFLAGS.native) -o $@ $(GENASSYM_C)
+		$(CPPFLAGS.native) $(LDFLAGS.native) -o $@ $(GENASSYM_C)
 
 OFFSETS = $(LIBCDIR)/$(MACH)/offsets.in
 

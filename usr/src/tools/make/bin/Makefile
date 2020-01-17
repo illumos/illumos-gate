@@ -37,6 +37,7 @@ include ../Makefile.com
 
 LDLIBS += ../lib/mksh/libmksh.a ../lib/vroot/libvroot.a
 LDLIBS += ../lib/bsd/libbsd.a -lc -lnsl -lumem
+NATIVE_LIBS += libnsl.so libumem.so
 
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 

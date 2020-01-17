@@ -37,7 +37,6 @@ all :=          TARGET= all
 clean :=        TARGET= clean
 clobber :=      TARGET= clobber
 install :=      TARGET= install
-lint :=         TARGET= lint
 
 HDRDIR =	inc
 HDRS =		libscf.h libscf_priv.h
@@ -54,8 +53,6 @@ XGETFLAGS +=	-a
 .KEEP_STATE:
 
 all clean clobber install: native $(SUBDIRS)
-
-lint: $(SUBDIRS)
 
 $(POFILE):	pofile_MSGFILES
 

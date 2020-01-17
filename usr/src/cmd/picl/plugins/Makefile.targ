@@ -26,7 +26,6 @@
 #
 # cmd/picl/plugins/Makefile.targ
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 $(ROOT_PLATFORM):
 	$(INS.dir)
@@ -45,4 +44,3 @@ $(USR_LIB_PICLDIR):
 
 $(USR_LIB_PLUGINDIR): $(USR_LIB_PICLDIR)
 	$(INS.dir)
-

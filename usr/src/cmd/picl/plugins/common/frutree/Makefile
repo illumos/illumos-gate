@@ -19,9 +19,6 @@
 #
 # CDDL HEADER END
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -43,7 +40,6 @@ LIBS =		$(DYNLIB)
 
 ROOTLIBDIR =	$(USR_LIB_PLUGINDIR)
 
-CLEANFILES=	$(LINTOUT) $(LINTLIB)
 CLOBBERFILES += $(LIBLINKS)
 
 CPPFLAGS +=	-I../devtree
@@ -54,11 +50,10 @@ LDLIBS +=	-L$(SRC)/cmd/picl/plugins/lib/picld_pluginutil/$(MACH)
 LDLIBS +=	-L../devtree
 LDLIBS +=	-L../memcfg
 LDLIBS +=	-L$(ROOT)/usr/lib/picl/plugins
-LDLIBS +=	-lc -lpicltree -lpicld_pluginutil -lpicldevtree
-LDLIBS +=	-lpiclmemcfg
-$(SPARC_BLD)LDLIBS +=	-R/usr/platform/\$$PLATFORM/lib/picl/plugins \
-			-R/usr/platform/sun4u/lib/picl/plugins
-LDLIBS +=	-R/usr/lib/picl/plugins
+LDLIBS +=	-lc -lpicltree -lpicld_pluginutil
+$(SPARC_BLD)LDLIBS +=	-R/usr/platform/\$$PLATFORM/lib/picl/plugins
+$(SPARC_BLD)LDLIBS +=	-R/usr/platform/sun4u/lib/picl/plugins
+$(SPARC_BLD)LDLIBS +=	-R/usr/lib/picl/plugins
 
 .KEEP_STATE:
 
@@ -68,7 +63,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 POFILE= piclfrutree.po
@@ -90,9 +84,6 @@ $(LIBLINKS):	FRC
 # include library targets
 include $(SRC)/cmd/picl/plugins/Makefile.targ
 include $(SRC)/lib/Makefile.targ
-
-lint :
-	$(LINT.c) $(SRCS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

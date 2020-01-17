@@ -38,12 +38,13 @@ include ../../Makefile.hal
 
 $(HAL_PROGS) :=		LDLIBS += -lc $(ZIGNORE) -lglib-2.0
 
+NATIVE_LIBS += libglib-2.0.so
 CPPFLAGS += $(HAL_DBUS_CPPFLAGS) $(HAL_GLIB_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
 CPPFLAGS += -I$(ROOT)/usr/include/hal
 CPPFLAGS += -I$(ROOT)/usr/include/libpolkit
 CSTD = $(CSTD_GNU99)
 
-ROOTCMDDIR =		$(ROOTLIB_HAL)/sunos 
+ROOTCMDDIR =		$(ROOTLIB_HAL)/sunos
 ROOTCMD =		$(HAL_PROGS:%=$(ROOTCMDDIR)/%) \
 			$(HAL_SCRIPTS:%=$(ROOTCMDDIR)/%)
 

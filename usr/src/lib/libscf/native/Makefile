@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 NOT_NATIVE = $(POUND_SIGN)		# tell Makefile.com we're native
 
@@ -36,6 +34,7 @@ CFLAGS =	$(NATIVE_CFLAGS)
 CPPFLAGS =	$(MY_NATIVE_CPPFLAGS)
 LDFLAGS =
 LDLIBS =	$(MY_NATIVE_LDLIBS)
+NATIVE_LIBS +=	libsmbios.so libnvpair.so libgen.so libc.so
 
 all: libuutil .WAIT $(LIBS)
 

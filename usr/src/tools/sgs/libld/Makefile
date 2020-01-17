@@ -37,6 +37,7 @@ CPPFLAGS = $(NATIVE_CPPFLAGS) -DUSE_LIBLD_MALLOC -I$(SRC)/lib/libc/inc \
 		    -I$(SRC)/uts/common/krtld -I$(SRC)/uts/sparc \
 		    $(VAR_LIBLD_CPPFLAGS)
 LDLIBS +=	-L$(ROOTONBLDLIBMACH) -L../libconv -lconv -llddbg -lelf -lc
+NATIVE_LIBS +=	libc.so
 
 DYNFLAGS +=	$(VERSREF) '-R$$ORIGIN'
 CFLAGS = $(NATIVE_CFLAGS)

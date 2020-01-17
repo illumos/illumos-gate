@@ -88,6 +88,8 @@ $(WHOLIB):=	MAPFILES = ../common/mapfile-vers-who
 $(SYMBINDREP):=	MAPFILES = ../common/mapfile-vers-symbindrep
 $(BINDLIB):=	MAPFILES = ../common/mapfile-vers-bindings
 
+$(ONPROGS):=	LDFLAGS += $(LDLIBS.cmd) $(BDIRECT)
+
 $(ROOTCCSLIB) :=	DIRMODE =	755
 
 CPPFLAGS +=	-D_REENTRANT

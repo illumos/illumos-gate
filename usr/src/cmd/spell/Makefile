@@ -77,14 +77,14 @@ $(ROOTVARADMF) :=	FILEMODE =	0666
 spellin1 hashmk1 := CC = $(NATIVECC)
 spellin1 hashmk1 := POST_PROCESS =
 spellin1 hashmk1 := CPPFLAGS =
-spellin1 hashmk1 := LDFLAGS =
+spellin1 hashmk1 := LDFLAGS = $(BDIRECT)
 
 $(ROOTSPELLD)/% $(ROOTVARADMD)/% : %
 	$(INS.file)
 
 .KEEP_STATE:
 
-all: 	$(PROG) $(TXTS)
+all:	$(PROG) $(TXTS)
 
 spellprog:		$(SPELLPROGOBJ)
 			$(LINK.c) $(SPELLPROGOBJ) -o $@ $(LDLIBS)

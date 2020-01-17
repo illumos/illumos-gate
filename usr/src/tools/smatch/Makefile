@@ -31,7 +31,12 @@ sparc_CC = $(GNUC_ROOT)/bin/gcc
 i386_SMATCHFLAGS = -msave-args
 sparc_SMATCHFLAGS =
 
+# When we use builtins, then ld's -zguidance will complain that libm is
+# unused on x86 because the compiler will replace ceil(3M) with its own copy.
+# However, on SPARC, it doesn't. So for now we disable builtins to make it
+# consistent.
 CFLAGS = -O -m64 -std=gnu99 -nodefaultlibs -D__sun $($(MACH)_SMATCHFLAGS)
+CFLAGS += -fno-builtin
 CFLAGS += -Wall -Wno-unknown-pragmas -Wno-psabi
 
 SMATCHDATADIR = $(ROOTONBLDSHARE)/smatch
@@ -40,7 +45,8 @@ CFLAGS += -DSMATCHDATADIR='"$(SMATCHDATADIR)"'
 CFLAGS += -DGCC_BASE='"/no/such/dir"'
 CFLAGS += -DMULTIARCH_TRIPLET=NULL
 
-LDLIBS += -lsqlite3 -lcrypto -lm -lgcc -lc
+LDCHECKS = -Wl,$(ZASSERTDEFLIB) -Wl,$(ZGUIDANCE) -Wl,$(ZFATALWARNINGS)
+LDLIBS += -Wl,$(ZLAZYLOAD) -Wl,$(ZDIRECT) -lsqlite3 -lcrypto -lgcc -lm -lc
 LDFLAGS = $(MAPFILE.NES:%=-Wl,-M%)
 LDFLAGS += -L$(NATIVE_ADJUNCT)/lib -R$(NATIVE_ADJUNCT)/lib
 

@@ -39,13 +39,7 @@ BERLIB64=	$(BERLIB)
 OPENSSLLIBS=	$(BERLIB) -lcrypto -lcryptoutil -lc
 OPENSSLLIBS64=	$(BERLIB64) -lcrypto -lcryptoutil -lc
 
-LINTSSLLIBS	= $(BERLIB) -lcrypto -lcryptoutil -lc
-LINTSSLLIBS64	= $(BERLIB64) -lcrypto -lcryptoutil -lc
-
-# Because of varying openssl implementations, we need to not have lint
-# complain if we're being liberal in our suppression directives.
-LINTFLAGS	+=	-erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTFLAGS64	+=	-erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
+NATIVE_LIBS +=	libcrypto.so
 
 SRCDIR=		../common
 INCDIR=		../../include
@@ -63,10 +57,7 @@ SMATCH=off
 
 PICS=	$(OBJECTS:%=pics/%)
 
-lint:=	OPENSSLLIBS=	$(LINTSSLLIBS)
-lint:=	OPENSSLLIBS64=	$(LINTSSLLIBS64)
-
-LDLIBS32 	+=	$(OPENSSLLIBS)
+LDLIBS32	+=	$(OPENSSLLIBS)
 
 ROOTLIBDIR=	$(ROOTFS_LIBDIR)/crypto
 ROOTLIBDIR64=	$(ROOTFS_LIBDIR)/crypto/$(MACH64)
@@ -74,9 +65,7 @@ ROOTLIBDIR64=	$(ROOTFS_LIBDIR)/crypto/$(MACH64)
 .KEEP_STATE:
 
 LIBS	=	$(DYNLIB)
-all:	$(DYNLIB) $(LINTLIB)
-
-lint: lintcheck
+all:	$(DYNLIB)
 
 FRC:
 
