@@ -29,4 +29,59 @@ SUBDIRS =       \
 		stress \
 		$(SUBDIRS_$(MACH))
 
-include $(SRC)/test/Makefile.com
+PROGS = \
+	odirectory
+
+CPPFLAGS += -D_REENTRANT
+PROGS32 = $(PROGS:%=%.32)
+PROGS64 = $(PROGS:%=%.64)
+
+ROOTOPTDIR = $(ROOT)/opt/os-tests/tests
+ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTDIR)/%) \
+	$(PROGS64:%=$(ROOTOPTDIR)/%) \
+	$(SCRIPTS:%=$(ROOTOPTDIR)/%)
+
+odirectory.32 :=	LDLIBS += -lsocket
+odirectory.64 :=	LDLIBS64 += -lsocket
+
+include $(SRC)/cmd/Makefile.cmd
+
+all     :=      TARGET = all
+install :=      TARGET = install
+clean   :=      TARGET = clean
+clobber :=      TARGET = clobber
+
+.KEEP_STATE:
+
+install: $(SUBDIRS) $(ROOTOPTPROGS)
+
+all: $(SUBDIRS) $(PROGS32) $(PROGS64)
+
+clean: $(SUBDIRS)
+
+$(ROOTOPTPROGS): $(PROGS32) $(PROGS64) $(ROOTOPTDIR)
+
+$(ROOTOPTDIR):
+	$(INS.dir)
+
+$(ROOTOPTDIR)/%: %
+	$(INS.file)
+
+$(ROOTOPTDIR)/%: %.ksh
+	$(INS.rename)
+
+%.64: %.c
+	$(LINK64.c) -o $@ $< $(LDLIBS64)
+	$(POST_PROCESS)
+
+%.32: %.c
+	$(LINK.c) -o $@ $< $(LDLIBS)
+	$(POST_PROCESS)
+
+clobber: $(SUBDIRS)
+	$(RM) $(PROGS32) $(PROGS64)
+
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:

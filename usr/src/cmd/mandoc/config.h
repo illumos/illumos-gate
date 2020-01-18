@@ -3,12 +3,21 @@
 
 #include <sys/types.h>
 
+/*
+ * The tools build may be on a system without O_DIRECTORY. So we need to
+ * explicitly include sys/fcntl.h and check for O_DIRECTORY and if not present,
+ * use the default of it being zero.
+ */
+#include <sys/fcntl.h>
+#ifndef	O_DIRECTORY
+#define O_DIRECTORY 0
+#endif
+
 #define MAN_CONF_FILE "/etc/man.conf"
 #define MANPATH_BASE "/usr/share/man"
 #define MANPATH_DEFAULT "/usr/share/man:/usr/gnu/share/man"
 #define UTF8_LOCALE "en_US.UTF-8"
 #define EFTYPE EINVAL
-#define O_DIRECTORY 0
 #define HAVE_CMSG_XPG42 0
 #define HAVE_DIRENT_NAMLEN 0
 #define HAVE_ENDIAN 1

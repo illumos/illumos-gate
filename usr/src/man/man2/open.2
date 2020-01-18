@@ -47,7 +47,7 @@
 .\" All Rights Reserved.
 .\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 .\"
-.TH OPEN 2 "Feb 14, 2015"
+.TH OPEN 2 "Jan 20, 2020"
 .SH NAME
 open, openat \- open a file
 .SH SYNOPSIS
@@ -171,6 +171,37 @@ file's permission mask. The "save text image after execution bit" of the mode
 is cleared (see \fBchmod\fR(2)). When bits other than the file permission bits
 are set, the effect is unspecified. The \fImode\fR argument does not affect
 whether the file is open for reading, writing or for both.
+.RE
+
+.sp
+.ne 2
+.na
+.B O_DIRECTORY
+.ad
+.sp .6
+.RS 4n
+Indicates that attempts to open
+.I path
+should fail unless
+.I path
+is a directory.
+If both
+.B O_CREAT
+and
+.B O_DIRECTORY
+are specified then the call will fail if it would result in a file being
+created.
+If a directory already exists at
+.I path
+then it will behave as if the
+.B O_DIRECTORY
+flag had not been present.
+If the
+.B O_EXCL
+and
+.B O_CREAT
+flags are specified, then the call will always fail as they imply a file
+should always be created.
 .RE
 
 .sp
@@ -686,6 +717,14 @@ The maximum allowable number of files is currently open in the system.
 The \fBO_CREAT\fR flag is not set and the named file does not exist; or the
 \fBO_CREAT\fR flag is set and either the path prefix does not exist or the
 \fIpath\fR argument points to an empty string.
+.sp
+The
+.B O_CREAT
+and
+.B O_DIRECTORY
+flags were both set and
+.I path
+did not point to a file.
 .RE
 
 .sp
@@ -747,6 +786,10 @@ A component of the path prefix is not a directory or a relative path was
 supplied to \fBopenat()\fR, the \fBO_XATTR\fR flag was not supplied, and the
 file descriptor does not refer to a directory. The \fBO_SEARCH\fR flag
 was passed and \fIpath\fR does not refer to a directory.
+.sp
+The
+.B O_DIRECTORY
+flag was set and the file was not a directory.
 .RE
 
 .sp
