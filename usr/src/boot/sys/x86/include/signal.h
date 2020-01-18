@@ -45,7 +45,7 @@
 #include <machine/trap.h>	/* codes for SIGILL, SIGFPE */
 #endif
 
-#ifdef __i386__
+#if defined(__i386__) && !defined(__amd64__)
 typedef int sig_atomic_t;
 
 #if __BSD_VISIBLE
