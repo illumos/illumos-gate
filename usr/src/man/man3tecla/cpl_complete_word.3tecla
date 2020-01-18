@@ -24,7 +24,7 @@
 .\" or other dealings in this Software without prior written authorization
 .\" of the copyright holder.
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
-.TH CPL_COMPLETE_WORD 3TECLA "Jun 1, 2004"
+.TH CPL_COMPLETE_WORD 3TECLA "January 18, 2020"
 .SH NAME
 cpl_complete_word, cfc_file_start, cfc_literal_escapes, cfc_set_check_fn,
 cpl_add_completion, cpl_file_completions, cpl_last_error, cpl_list_completions,
@@ -32,7 +32,6 @@ cpl_recall_matches, cpl_record_error, del_CplFileConf, cpl_check_exe,
 del_WordCompletion, new_CplFileConf, new_WordCompletion \- look up possible
 completions for a word
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <stdio.h>
@@ -116,8 +115,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBcpl_complete_word()\fR function is part of the \fBlibtecla\fR(3LIB)
 library. It is usually called behind the scenes by \fBgl_get_line\fR(3TECLA),
 but can also be called separately.
@@ -181,7 +178,7 @@ line string of the start of the word that is being completed. This should equal
 \fIword_end\fR if a zero-length string is being completed. The \fIsuffix\fR
 argument is the string that would have to be appended to the incomplete word to
 complete it. If this needs any quoting (for example, the addition of
-backslashes before special charaters) to be valid within the displayed input
+backslashes before special characters) to be valid within the displayed input
 line, this should be included. A copy of the suffix string is allocated
 internally, so there is no need to maintain your copy of the string after
 \fBcpl_add_completion()\fR returns.
@@ -189,16 +186,16 @@ internally, so there is no need to maintain your copy of the string after
 .LP
 In the array of possible completions that the \fBcpl_complete_word()\fR
 function returns, the suffix recorded by \fBcpl_add_completion()\fR is listed
-along with the concatentation of this suffix with the word that lies between
+along with the concatenation of this suffix with the word that lies between
 \fIword_start\fR and \fIword_end\fR in the input line.
 .sp
 .LP
 The \fItype_suffix\fR argument specifies an optional string to be appended to
 the completion if it is displayed as part of a list of completions by
-\fIcpl_list_completions\fR. The intention is that this indicate to the user the
+\fIcpl_list_completions\fR. The intention is that this indicates to the user the
 type of each completion. For example, the file completion function places a
 directory separator after completions that are directories, to indicate their
-nature to the user. Similary, if the completion were a function, you could
+nature to the user. Similarly, if the completion were a function, you could
 indicate this to the user by setting \fItype_suffix\fR to "()". Note that the
 \fItype_suffix\fR string is not copied, so if the argument is not a literal
 string between speech marks, be sure that the string remains valid for at least
@@ -214,7 +211,7 @@ word is a directory. If the completed word were a function name, you could
 similarly aid the user by arranging for an open parenthesis to be appended.
 .sp
 .LP
-The \fBcpl_complete_word()\fR is normally called behind the scenes by
+The \fBcpl_complete_word()\fR function is normally called behind the scenes by
 \fBgl_get_line\fR(3TECLA), but can also be called separately if you separately
 allocate a \fBWordCompletion\fR object. It performs word completion, as
 described at the beginning of this section. Its first argument is a resource
@@ -277,7 +274,7 @@ If an error occurs during completion, \fBcpl_complete_word()\fR returns
 .sp
 .LP
 The \fBcpl_last_error()\fR function returns a terse description of the error
-which occurred on the last call to \fBcpl_com plete_word()\fR or
+which occurred on the last call to \fBcpl_complete_word()\fR or
 \fBcpl_add_completion()\fR.
 .sp
 .LP
@@ -295,9 +292,7 @@ set by the longest completion. It also appends the \fItype_suffix\fR strings
 that were recorded with each completion, thus indicating their types to the
 user.
 .SS "Builtin Filename completion Callback"
-.sp
-.LP
-By default the \fBgl_get_line()\fR function, passes the
+By default the \fBgl_get_line()\fR function passes the
 \fBCPL_MATCH_FN\fR(\fBcps_file_completions\fR) completion callback function to
 \fBcpl_complete_word()\fR. This function can also be used separately, either by
 sending it to \fBcpl_complete_word()\fR, or by calling it directly from your
@@ -343,7 +338,7 @@ character which removes any special significance of the character which follows
 it, such as a space which should be taken as part of the filename rather than
 delimiting the start of the filename. These backslashes are thus ignored while
 looking for completions, and subsequently added before spaces, tabs and literal
-back slashes in the list of completions. To have unescaped back slashes treated
+backslashes in the list of completions. To have unescaped backslashes treated
 as normal characters, call \fBcfc_literal_escapes()\fR with a non-zero value in
 its \fIliteral\fR argument.
 .sp
@@ -377,23 +372,19 @@ void cfc_set_check_fn(CplFileConf *cfc, CplCheckFn *chk_fn, \e
 .LP
 The \fBcpl_check_exe()\fR function is a provided callback of the above type,
 for use with \fBcpl_file_completions()\fR. It returns non-zero if the filename
-that it is given represents a normal file that the user has execute permission
-to. You could use this to have \fBcpl_file_completions()\fR only list
+that it is given represents a normal file that the user has permission to
+execute. You could use this to have \fBcpl_file_completions()\fR only list
 completions of executable files.
 .sp
 .LP
 When you have finished with a \fBCplFileConf\fR variable, you can pass it to
 the \fBdel_CplFileConf()\fR destructor function to reclaim its memory.
 .SS "Thread Safety"
-.sp
-.LP
 It is safe to use the facilities of this module in multiple threads, provided
 that each thread uses a separately allocated \fBWordCompletion\fR object. In
 other words, if two threads want to do word completion, they should each call
 \fBnew_WordCompletion()\fR to allocate their own completion objects.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -410,7 +401,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBef_expand_file\fR(3TECLA), \fBgl_get_line\fR(3TECLA), \fBlibtecla\fR(3LIB),
 \fBpca_lookup_file\fR(3TECLA), \fBattributes\fR(5)
