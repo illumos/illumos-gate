@@ -875,8 +875,8 @@ access_mask_check(ace_t *acep, int mask_bit, int isowner)
 			set_allow = ACL_WRITE_ATTRS_WRITER_SET_ALLOW;
 			err_allow = ACL_WRITE_ATTRS_WRITER_ERR_ALLOW;
 		} else {
-			if ((acep->a_access_mask & mask_bit) &&
-			    (acep->a_type & ACE_ACCESS_ALLOWED_ACE_TYPE)) {
+			if (((acep->a_access_mask & mask_bit) != 0) &&
+			    (acep->a_type == ACE_ACCESS_ALLOWED_ACE_TYPE)) {
 				return (ENOTSUP);
 			}
 			return (0);
