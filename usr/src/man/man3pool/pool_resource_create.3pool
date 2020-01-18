@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH POOL_RESOURCE_CREATE 3POOL "January 15, 2020"
+.TH POOL_RESOURCE_CREATE 3POOL "January 18, 2020"
 .SH NAME
 pool_resource_create, pool_resource_destroy, pool_resource_info,
 pool_query_resource_components, pool_resource_transfer, pool_resource_xtransfer
@@ -299,7 +299,7 @@ pool_resource_t *resource;
 
 if ((resource = pool_resource_create(conf, "pset",
     "foo")) == NULL) {
-    (void) fprintf(stderr, "Cannot create resource\\B{}n");
+    (void) fprintf(stderr, "Cannot create resource\\n");
     ...
 }
 .fi

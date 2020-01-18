@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH POOL_GET_BINDING 3POOL "Mar 27, 2007"
+.TH POOL_GET_BINDING 3POOL "January 18, 2020"
 .SH NAME
 pool_get_binding, pool_set_binding, pool_get_resource_binding \- set and query
 process to resource pool bindings
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <pool.h>
@@ -28,8 +27,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpool_get_binding()\fR function returns the name of the pool on the
 running system that contains the set of resources to which the given process is
 bound. If no such pool exists on the system or the search returns more than one
@@ -53,7 +50,7 @@ referenced by the pool; generally, this requirement is equivalent to requiring
 superuser privilege.
 .sp
 .LP
-The \fIidtype\fR parameter can be of the following types:
+The \fIidtype\fR parameter can be one of the following types:
 .sp
 .ne 2
 .na
@@ -88,11 +85,9 @@ The \fBpool_get_resource_binding()\fR function returns the name of the resource
 of the supplied type to which the supplied process is bound.
 .sp
 .LP
-The application must explicity free the memory allocated for the return values
+The application must explicitly free the memory allocated for the return values
 for \fBpool_get_binding()\fR and \fBpool_get_resource_binding()\fR.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBpool_get_binding()\fR returns the name of the
 pool to which the process is bound. Otherwise it returns \fINULL\fR and
 \fBpool_error\fR(3POOL) returns the pool-specific error value.
@@ -108,8 +103,6 @@ of the resource of the specified type to which the process is bound. Otherwise
 it returns \fINULL\fR and \fBpool_error()\fR returns the pool-specific error
 value.
 .SH ERRORS
-.sp
-.LP
 The \fBpool_get_binding()\fR function will fail if:
 .sp
 .ne 2
@@ -201,7 +194,6 @@ A system error has occurred. Check the system error code for more details.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRBind the current process to the pool named "target".
 .sp
 .in +2
@@ -217,15 +209,13 @@ id_t pid = getpid();
 \&...
 
 if (pool_set_binding("target", P_PID, pid) == PO_FAIL) \{
-        (void) fprintf(stderr, "pool binding failed (\\%d)\\B{}n",
+        (void) fprintf(stderr, "pool binding failed (%d)\\n",
                  pool_error());
 \}
 .fi
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -244,6 +234,4 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibpool\fR(3LIB), \fBpool_error\fR(3POOL), \fBattributes\fR(5)
