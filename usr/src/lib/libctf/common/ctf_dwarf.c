@@ -29,6 +29,7 @@
 
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2020 Robert Mustacchi
  */
 
 /*
@@ -800,6 +801,40 @@ static const ctf_dwarf_fpmap_t ctf_dwarf_fpmaps[] = {
 	{ EM_NONE }
 };
 
+/*
+ * We want to normalize the type names that are used between compilers in the
+ * case of complex. gcc prefixes things with types like 'long complex' where as
+ * clang only calls them 'complex' in the dwarf even if in the C they are long
+ * complex or similar.
+ */
+static int
+ctf_dwarf_fixup_complex(ctf_cu_t *cup, ctf_encoding_t *enc, char **namep)
+{
+	const char *name;
+	*namep = NULL;
+
+	switch (enc->cte_format) {
+	case CTF_FP_CPLX:
+		name = "complex float";
+		break;
+	case CTF_FP_DCPLX:
+		name = "complex double";
+		break;
+	case CTF_FP_LDCPLX:
+		name = "complex long double";
+		break;
+	default:
+		return (0);
+	}
+
+	*namep = ctf_strdup(name);
+	if (*namep == NULL) {
+		return (ENOMEM);
+	}
+
+	return (0);
+}
+
 static int
 ctf_dwarf_float_base(ctf_cu_t *cup, Dwarf_Signed type, ctf_encoding_t *enc)
 {
@@ -896,7 +931,7 @@ ctf_dwarf_dwarf_base(ctf_cu_t *cup, Dwarf_Die die, int *kindp,
  * back to using the DWARF itself.
  */
 static int
-ctf_dwarf_parse_base(const char *name, int *kindp, ctf_encoding_t *enc,
+ctf_dwarf_parse_int(const char *name, int *kindp, ctf_encoding_t *enc,
     char **newnamep)
 {
 	char buf[256];
@@ -974,7 +1009,7 @@ ctf_dwarf_create_base(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp, int isroot,
     Dwarf_Off off)
 {
 	int ret;
-	char *name, *nname;
+	char *name, *nname = NULL;
 	Dwarf_Unsigned sz;
 	int kind;
 	ctf_encoding_t enc;
@@ -990,15 +1025,25 @@ ctf_dwarf_create_base(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp, int isroot,
 
 	bzero(&enc, sizeof (ctf_encoding_t));
 	enc.cte_bits = sz * 8;
-	if ((ret = ctf_dwarf_parse_base(name, &kind, &enc, &nname)) == 0) {
+	if ((ret = ctf_dwarf_parse_int(name, &kind, &enc, &nname)) == 0) {
 		ctf_free(name, strlen(name) + 1);
 		name = nname;
 	} else {
-		if (ret != EINVAL)
-			return (ret);
+		if (ret != EINVAL) {
+			goto out;
+		}
 		ctf_dprintf("falling back to dwarf for base type %s\n", name);
-		if ((ret = ctf_dwarf_dwarf_base(cup, die, &kind, &enc)) != 0)
-			return (ret);
+		if ((ret = ctf_dwarf_dwarf_base(cup, die, &kind, &enc)) != 0) {
+			goto out;
+		}
+
+		if (kind == CTF_K_FLOAT && (ret = ctf_dwarf_fixup_complex(cup,
+		    &enc, &nname)) != 0) {
+			goto out;
+		} else if (nname != NULL) {
+			ctf_free(name, strlen(name) + 1);
+			name = nname;
+		}
 	}
 
 	id = ctf_add_encoded(cup->cu_ctfp, isroot, name, &enc, kind);
