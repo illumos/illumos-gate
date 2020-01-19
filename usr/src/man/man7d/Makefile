@@ -15,7 +15,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2018 Nexenta Systems, Inc.
-# Copyright 2019 Peter Tribble
+# Copyright 2020 Peter Tribble
 #
 
 include		$(SRC)/Makefile.master
@@ -159,7 +159,6 @@ sparc_MANFILES=	audiocs.7d	\
 		grbeep.7d	\
 		mc-opl.7d	\
 		n2rng.7d	\
-		ncp.7d		\
 		ntwdt.7d	\
 		oplkmdrv.7d	\
 		oplmsu.7d	\
