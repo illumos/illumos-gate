@@ -39,12 +39,12 @@ print_set(fd_set *a, size_t size)
 {
 	for (int i = 0; i < size; i++) {
 		if (FD_ISSET(i, a))
-			putc('1', stdout);
+			(void) putc('1', stdout);
 		else
-			putc('0', stdout);
+			(void) putc('0', stdout);
 	}
 
-	putc('\n', stdout);
+	(void) putc('\n', stdout);
 }
 
 int
@@ -85,8 +85,10 @@ main(int argc, char **argv)
 
 	if ((null = open("/dev/null", O_RDONLY)) == -1)
 		err(1, "couldn't open /dev/null");
-	read(null, &buf, 1);
-	read(null, &buf, 1);
+	if (read(null, &buf, 1) < 0)
+		err(1, "failed to read fd");
+	if (read(null, &buf, 1) < 0)
+		err(1, "failed to read fd");
 
 	if ((zero = open("/dev/zero", O_RDWR)) == -1)
 		err(1, "couldn't open /dev/zero");
@@ -103,11 +105,11 @@ main(int argc, char **argv)
 	}
 
 	if (swrite != NULL)
-		puts("write");
+		(void) puts("write");
 	else if (sread != NULL)
-		puts("read");
+		(void) puts("read");
 	else if (serr != NULL)
-		puts("err");
+		(void) puts("err");
 
 	print_set(&proto, 80);
 

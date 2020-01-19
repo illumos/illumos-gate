@@ -51,10 +51,10 @@ static int
 cthr_test_sleep_thr(void *arg)
 {
 	for (;;) {
-		sleep(1000);
+		(void) sleep(1000);
 	}
 
-	abort();
+	return (0);
 }
 
 static void

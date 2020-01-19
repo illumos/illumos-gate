@@ -42,8 +42,9 @@ static int
 co_thr(void *arg)
 {
 	VERIFY3S(mtx_lock(&co_mtx), ==, thrd_success);
-	while (co_go == B_FALSE)
-		cnd_wait(&co_cnd, &co_mtx);
+	while (co_go == B_FALSE) {
+		(void) cnd_wait(&co_cnd, &co_mtx);
+	}
 	VERIFY3S(mtx_unlock(&co_mtx), ==, thrd_success);
 	call_once(&co_once, co_once_func);
 	return (0);

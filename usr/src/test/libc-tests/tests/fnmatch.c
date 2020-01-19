@@ -208,7 +208,7 @@ flags_to_string(int flags)
 	if (p == result)
 		memcpy(p, "0", 2);
 	else if (flags != 0)
-		sprintf(p, "%d", flags);
+		(void) sprintf(p, "%d", flags);
 	else
 		*p = '\0';
 	return (result);

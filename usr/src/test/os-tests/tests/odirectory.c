@@ -185,6 +185,10 @@ odir_cleanup(void)
 		if (fdetach(odir_doorpath) != 0) {
 			warn("failed to detach door %s", odir_doorpath);
 		}
+
+		if (unlink(odir_doorpath) != 0) {
+			warn("failed to unlink %s", odir_doorpath);
+		}
 	}
 
 	if (odir_did != -1) {

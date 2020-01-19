@@ -372,7 +372,7 @@ mkprog(struct sym_test *st)
 
 	case SYM_FUNC:
 		addprogstr("\ntest_func(");
-		for (int i = 0; st->st_atypes[i] != NULL && i < MAXARG; i++) {
+		for (int i = 0; i < MAXARG && st->st_atypes[i] != NULL; i++) {
 			int didname = 0;
 			if (i > 0) {
 				addprogstr(", ");
@@ -422,7 +422,7 @@ mkprog(struct sym_test *st)
 
 		/* add the function call */
 		addprogfmt("%s(", st->st_name);
-		for (int i = 0; st->st_atypes[i] != NULL && i < MAXARG; i++) {
+		for (int i = 0; i < MAXARG && st->st_atypes[i] != NULL; i++) {
 			if (strcmp(st->st_atypes[i], "") != 0 &&
 			    strcmp(st->st_atypes[i], "void") != 0) {
 				addprogfmt("%sa%d", i > 0 ? ", " : "", i);

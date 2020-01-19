@@ -41,71 +41,71 @@ main(void)
 	char buf[32];
 
 	/* ~0L in octal */
-	char octal0[] = { 'r', 'r', 'r', 'r', '1', '7', '7', '7', '7', '7', '7',
+	char octal0[32] = { 'r', 'r', 'r', 'r', '1', '7', '7', '7', '7', '7',
 	    '7', '7', '7', '7', '7', '7', '7', '7', '7', '7', '7', '7', '7',
-	    '7', '7', '\0', 'r', 'r', 'r', 'r', 'r', 'r' };
+	    '7', '7', '7', '\0', 'r', 'r', 'r', 'r', 'r' };
 
-	char decimal0[] = { 'r', 'r', 'r', 'r', '-', '1', '\0', 'r', 'r', 'r',
+	char decimal0[32] = { 'r', 'r', 'r', 'r', '-', '1', '\0', 'r', 'r', 'r',
 	    'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r',
-	    'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r' };
+	    'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r' };
 
-	char hex0[] = { 'r', 'r', 'r', 'r', 'f', 'f', 'f', 'f', 'f', 'f',
+	char hex0[32] = { 'r', 'r', 'r', 'r', 'f', 'f', 'f', 'f', 'f', 'f',
 	    'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', '\0', 'r', 'r',
-	    'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r' };
+	    'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r' };
 
 	/* 42 in octal */
-	char octal1[] = { 'r', 'r', 'r', 'r', '5', '2', '\0', 'r', 'r', 'r',
+	char octal1[32] = { 'r', 'r', 'r', 'r', '5', '2', '\0', 'r', 'r', 'r',
 	    'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r',
-	    'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r' };
+	    'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r' };
 
 	/* 42 in decimal */
-	char decimal1[] = { 'r', 'r', 'r', 'r', '4', '2', '\0', 'r', 'r', 'r',
+	char decimal1[32] = { 'r', 'r', 'r', 'r', '4', '2', '\0', 'r', 'r', 'r',
 	    'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r',
-	    'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r' };
+	    'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r' };
 
 	/* 42 in hex */
-	char hex1[] = { 'r', 'r', 'r', 'r', '2', 'a', '\0', 'r', 'r', 'r', 'r',
+	char hex1[32] = { 'r', 'r', 'r', 'r', '2', 'a', '\0', 'r', 'r', 'r',
 	    'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r',
 	    'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r', 'r' };
 
 
 	(void) memset(buf, 'r', sizeof (buf));
-	(void) snprintf(buf + 4, sizeof (buf), "%lo", ~0L);
+	(void) snprintf(buf + 4, sizeof (buf) - 4, "%lo", ~0L);
 	if (bcmp(octal0, buf, sizeof (buf)) != 0) {
 		print_diff("~0 in Octal", octal0, buf);
 		ret++;
 	}
 
 	(void) memset(buf, 'r', sizeof (buf));
-	(void) snprintf(buf + 4, sizeof (buf), "%lo", 42L);
+	(void) snprintf(buf + 4, sizeof (buf) - 4, "%lo", 42L);
 	if (bcmp(octal1, buf, sizeof (buf)) != 0) {
 		print_diff("42 in Octal", octal1, buf);
 		ret++;
 	}
 
 	(void) memset(buf, 'r', sizeof (buf));
-	(void) snprintf(buf + 4, sizeof (buf), "%ld", ~0L);
+	(void) snprintf(buf + 4, sizeof (buf) - 4, "%ld", ~0L);
 	if (bcmp(decimal0, buf, sizeof (buf)) != 0) {
 		print_diff("~0 in Decimal", decimal0, buf);
 		ret++;
 	}
 
 	(void) memset(buf, 'r', sizeof (buf));
-	(void) snprintf(buf + 4, sizeof (buf), "%ld", 42L);
+	(void) snprintf(buf + 4, sizeof (buf) - 4, "%ld", 42L);
 	if (bcmp(decimal1, buf, sizeof (buf)) != 0) {
 		print_diff("42 in Decimal", decimal1, buf);
 		ret++;
 	}
 
 	(void) memset(buf, 'r', sizeof (buf));
-	(void) snprintf(buf + 4, sizeof (buf), "%lx", ~0L);
+	(void) snprintf(buf + 4, sizeof (buf) - 4, "%lx", ~0L);
 	if (bcmp(hex0, buf, sizeof (buf)) != 0) {
 		print_diff("~0 in Hex", hex0, buf);
 		ret++;
 	}
 
 	(void) memset(buf, 'r', sizeof (buf));
-	(void) snprintf(buf + 4, sizeof (buf), "%lx", 42L);
+	(void) snprintf(buf + 4, sizeof (buf) - 4, "%lx", 42L);
 	if (bcmp(hex1, buf, sizeof (buf)) != 0) {
 		print_diff("42 in Hex", hex1, buf);
 		ret++;
