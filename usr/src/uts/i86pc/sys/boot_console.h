@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2012 Gary Mills
+ * Copyright 2020 Joyent, Inc.
  *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -68,7 +69,7 @@ extern int bcons_ischar(void);
 extern int bcons_gets(char *, int);
 
 #if !defined(_BOOT)
-extern void bcons_init2(char *, char *, char *);
+extern void bcons_post_bootenvrc(char *, char *, char *);
 extern boolean_t bcons_hypervisor_redirect(void);
 extern void bcons_device_change(int);
 #endif /* !_BOOT */

@@ -20,9 +20,15 @@
  */
 /*
  * Copyright (c) 2012 Gary Mills
+ * Copyright 2020 Joyent, Inc.
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+
+/*
+ * Boot console support.  Most of the file is shared between dboot, and the
+ * early kernel / fakebop.
  */
 
 #include <sys/types.h>
@@ -101,9 +107,10 @@ static int serial_getchar(void);
 static void serial_putchar(int);
 static void serial_adjust_prop(void);
 
+static void defcons_putchar(int);
+
 #if !defined(_BOOT)
-/* Set if the console or mode are expressed in the boot line */
-static int console_set, console_mode_set;
+static boolean_t bootprop_set_tty_mode;
 #endif
 
 #if defined(__xpv)
@@ -410,12 +417,12 @@ serial_adjust_prop(void)
 	(void) strcpy(propname, "ttyX-mode");
 	propname[3] = 'a' + tty_num;
 	propval = get_mode_value(propname);
+#if !defined(_BOOT)
+	if (propval != NULL)
+		bootprop_set_tty_mode = B_TRUE;
+#endif
 	if (propval == NULL)
 		propval = "9600,8,n,1,-";
-#if !defined(_BOOT)
-	else
-		console_mode_set = 1;
-#endif
 
 	/* property is of the form: "9600,8,n,1,-" */
 	p = propval;
@@ -680,15 +687,14 @@ bcons_init_fb(void)
 }
 
 /*
- * Go through the console_devices array trying to match the string
- * we were given.  The string on the command line must end with
- * a comma or white space.
+ * Go through the known console device names trying to match the string we were
+ * given.  The string on the command line must end with a comma or white space.
  *
- * This function does set tty_num as an side effect, this does imply that
- * only one of the main console and the diag-device can be using serial.
+ * For convenience, we provide the caller with an integer index for the CONS_TTY
+ * case.
  */
 static int
-lookup_console_devices(const char *cons_str)
+lookup_console_device(const char *cons_str, int *indexp)
 {
 	int n, cons;
 	size_t len, cons_len;
@@ -707,7 +713,7 @@ lookup_console_devices(const char *cons_str)
 			    (strncmp(cons_str, consolep->name, len) == 0)) {
 				cons = consolep->value;
 				if (cons == CONS_TTY)
-					tty_num = n;
+					*indexp = n;
 				break;
 			}
 		}
@@ -748,7 +754,7 @@ bcons_init(struct xboot_info *xbi)
 	 */
 	cons_str = find_boot_prop("diag-device");
 	if (cons_str != NULL)
-		diag = lookup_console_devices(cons_str);
+		diag = lookup_console_device(cons_str, &tty_num);
 
 	cons_str = find_boot_prop("console");
 	if (cons_str == NULL)
@@ -760,7 +766,7 @@ bcons_init(struct xboot_info *xbi)
 #endif
 
 	if (cons_str != NULL)
-		console = lookup_console_devices(cons_str);
+		console = lookup_console_device(cons_str, &tty_num);
 
 #if defined(__xpv)
 	/*
@@ -773,16 +779,8 @@ bcons_init(struct xboot_info *xbi)
 	}
 #endif /* __xpv */
 
-	/*
-	 * If no console device specified, default to text.
-	 * Remember what was specified for second phase.
-	 */
 	if (console == CONS_INVALID)
 		console = CONS_SCREEN_TEXT;
-#if !defined(_BOOT)
-	else
-		console_set = 1;
-#endif
 
 #if defined(__xpv)
 	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
@@ -866,130 +864,6 @@ bcons_init(struct xboot_info *xbi)
 		break;
 	}
 }
-
-#if !defined(_BOOT)
-/*
- * 2nd part of console initialization.
- * In the kernel (ie. fakebop), this can be used only to switch to
- * using a serial port instead of screen based on the contents
- * of the bootenv.rc file.
- */
-/*ARGSUSED*/
-void
-bcons_init2(char *inputdev, char *outputdev, char *consoledev)
-{
-	int cons = CONS_INVALID;
-	int ttyn;
-	char *devnames[] = { consoledev, outputdev, inputdev, NULL };
-	console_value_t *consolep;
-	int i;
-	extern int post_fastreboot;
-
-	if (post_fastreboot && console == CONS_SCREEN_GRAPHICS)
-		console = CONS_SCREEN_TEXT;
-
-	if (console != CONS_USBSER && console != CONS_SCREEN_GRAPHICS) {
-		if (console_set) {
-			/*
-			 * If the console was set on the command line,
-			 * but the ttyX-mode was not, we only need to
-			 * check bootenv.rc for that setting.
-			 */
-			if ((!console_mode_set) && (console == CONS_TTY))
-				serial_init();
-			return;
-		}
-
-		for (i = 0; devnames[i] != NULL; i++) {
-			int n;
-
-			for (n = 0; console_devices[n].name != NULL; n++) {
-				consolep = &console_devices[n];
-				if (strcmp(devnames[i], consolep->name) == 0) {
-					cons = consolep->value;
-					if (cons == CONS_TTY)
-						ttyn = n;
-				}
-			}
-			if (cons != CONS_INVALID)
-				break;
-		}
-
-#if defined(__xpv)
-		/*
-		 * if the hypervisor is using the currently selected console
-		 * device then default to using the hypervisor as the console
-		 * device.
-		 */
-		if (cons == console_hypervisor_device) {
-			cons = CONS_HYPERVISOR;
-			console_hypervisor_redirect = B_TRUE;
-		}
-#endif /* __xpv */
-
-		if ((cons == CONS_INVALID) || (cons == console)) {
-			/*
-			 * we're sticking with whatever the current setting is
-			 */
-			return;
-		}
-
-		console = cons;
-		if (cons == CONS_TTY) {
-			tty_num = ttyn;
-			serial_init();
-			return;
-		}
-	} else {
-		/*
-		 * USB serial and GRAPHICS console
-		 * we just collect data into a buffer
-		 */
-		extern void *defcons_init(size_t);
-		defcons_buf = defcons_cur = defcons_init(MMU_PAGESIZE);
-	}
-}
-
-#if defined(__xpv)
-boolean_t
-bcons_hypervisor_redirect(void)
-{
-	return (console_hypervisor_redirect);
-}
-
-void
-bcons_device_change(int new_console)
-{
-	if (new_console < CONS_MIN || new_console > CONS_MAX)
-		return;
-
-	/*
-	 * If we are asked to switch the console to the hypervisor, that
-	 * really means to switch the console to whichever device the
-	 * hypervisor is/was using.
-	 */
-	if (new_console == CONS_HYPERVISOR)
-		new_console = console_hypervisor_device;
-
-	console = new_console;
-
-	if (new_console == CONS_TTY) {
-		tty_num = console_hypervisor_tty_num;
-		serial_init();
-	}
-}
-#endif /* __xpv */
-
-static void
-defcons_putchar(int c)
-{
-	if (defcons_buf != NULL &&
-	    defcons_cur + 1 - defcons_buf < MMU_PAGESIZE) {
-		*defcons_cur++ = c;
-		*defcons_cur = 0;
-	}
-}
-#endif	/* _BOOT */
 
 static void
 serial_putchar(int c)
@@ -1273,6 +1147,9 @@ bcons_getchar(void)
 	}
 }
 
+/*
+ * Nothing below is used by dboot.
+ */
 #if !defined(_BOOT)
 
 int
@@ -1313,6 +1190,108 @@ bcons_ischar(void)
 	}
 
 	return (c);
+}
+
+/*
+ * 2nd part of console initialization: we've now processed bootenv.rc; update
+ * console settings as appropriate. This only really processes serial console
+ * modifications.
+ */
+void
+bcons_post_bootenvrc(char *inputdev, char *outputdev, char *consoledev)
+{
+	int cons = CONS_INVALID;
+	int ttyn;
+	char *devnames[] = { consoledev, outputdev, inputdev, NULL };
+	console_value_t *consolep;
+	int i;
+	extern int post_fastreboot;
+
+	if (post_fastreboot && console == CONS_SCREEN_GRAPHICS)
+		console = CONS_SCREEN_TEXT;
+
+	/*
+	 * USB serial and GRAPHICS console: we just collect data into a buffer.
+	 */
+	if (console == CONS_USBSER || console == CONS_SCREEN_GRAPHICS) {
+		extern void *defcons_init(size_t);
+		defcons_buf = defcons_cur = defcons_init(MMU_PAGESIZE);
+		return;
+	}
+
+	for (i = 0; devnames[i] != NULL; i++) {
+		cons = lookup_console_device(devnames[i], &ttyn);
+		if (cons != CONS_INVALID)
+			break;
+	}
+
+	if (cons == CONS_INVALID) {
+		/*
+		 * No console change, but let's see if bootenv.rc had a mode
+		 * setting we should apply.
+		 */
+		if (console == CONS_TTY && !bootprop_set_tty_mode)
+			serial_init();
+		return;
+	}
+
+#if defined(__xpv)
+	/*
+	 * if the hypervisor is using the currently selected console device then
+	 * default to using the hypervisor as the console device.
+	 */
+	if (cons == console_hypervisor_device) {
+		cons = CONS_HYPERVISOR;
+		console_hypervisor_redirect = B_TRUE;
+	}
+#endif /* __xpv */
+
+	console = cons;
+
+	if (console == CONS_TTY) {
+		tty_num = ttyn;
+		serial_init();
+	}
+}
+
+#if defined(__xpv)
+boolean_t
+bcons_hypervisor_redirect(void)
+{
+	return (console_hypervisor_redirect);
+}
+
+void
+bcons_device_change(int new_console)
+{
+	if (new_console < CONS_MIN || new_console > CONS_MAX)
+		return;
+
+	/*
+	 * If we are asked to switch the console to the hypervisor, that
+	 * really means to switch the console to whichever device the
+	 * hypervisor is/was using.
+	 */
+	if (new_console == CONS_HYPERVISOR)
+		new_console = console_hypervisor_device;
+
+	console = new_console;
+
+	if (new_console == CONS_TTY) {
+		tty_num = console_hypervisor_tty_num;
+		serial_init();
+	}
+}
+#endif /* __xpv */
+
+static void
+defcons_putchar(int c)
+{
+	if (defcons_buf != NULL &&
+	    defcons_cur + 1 - defcons_buf < MMU_PAGESIZE) {
+		*defcons_cur++ = c;
+		*defcons_cur = 0;
+	}
 }
 
 #endif /* _BOOT */

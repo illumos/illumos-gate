@@ -25,7 +25,7 @@
 /*
  * Copyright 2011 Bayard G. Bell <buffer.g.overflow@gmail.com>.
  * All rights reserved. Use is subject to license terms.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -423,7 +423,7 @@ kobj_init(
 		 * Now that the ramdisk is mounted, finish boot property
 		 * initialization.
 		 */
-		boot_prop_finish();
+		read_bootenvrc();
 	}
 
 #if !defined(_UNIX_KRTLD)
