@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -124,7 +124,7 @@ cln_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 /* ARGSUSED */
 static int
 cln_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
-	void **result)
+    void **result)
 {
 	int error;
 
@@ -292,7 +292,7 @@ bad_major:
 	/*
 	 * Close the device
 	 */
-	(*rq->q_qinfo->qi_qclose)(rq, flag, crp);
+	(void) (*rq->q_qinfo->qi_qclose)(rq, flag, crp);
 
 #ifdef DEBUG
 	cmn_err(CE_NOTE, "cannot clone major number %d(%s)->%d", emaj,
