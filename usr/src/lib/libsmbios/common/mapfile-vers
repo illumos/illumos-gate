@@ -43,6 +43,7 @@ $mapfile_version 2
 SYMBOL_VERSION SUNWprivate_1.1 {
     global:
 	_smb_debug;
+	smbios_battery_chem_desc;
 	smbios_bboard_flag_desc;
 	smbios_bboard_flag_name;
 	smbios_bboard_type_desc;
@@ -80,6 +81,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_evlog_method_desc;
 	smbios_fdopen;
 	smbios_hwsec_desc;
+	smbios_info_battery;
 	smbios_info_bboard;
 	smbios_info_bios;
 	smbios_info_boot;

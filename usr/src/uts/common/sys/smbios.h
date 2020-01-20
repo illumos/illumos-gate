@@ -1379,6 +1379,34 @@ typedef struct smbios_pointdev {
 #define	SMB_PDI_BUSM_USB	0xA2	/* USB */
 
 /*
+ * SMBIOS Portable Battery.  See DSP0134 Section 7.23 for more information.
+ */
+typedef struct smbios_battery {
+	const char *smbb_date;		/* Manufacture date */
+	const char *smbb_serial;	/* Serial number */
+	uint8_t smbb_chem;		/* Device Chemistry */
+	uint32_t smbb_cap;		/* Design Capacity */
+	uint16_t smbb_volt;		/* Design Voltage */
+	const char *smbb_version;	/* Smart Battery version */
+	uint8_t smbb_err;		/* Maximum error */
+	uint16_t smbb_ssn;		/* SBDS serial number */
+	uint16_t smbb_syear;		/* SBDS manufacture year */
+	uint8_t smbb_smonth;		/* SBDS manufacture month */
+	uint8_t smbb_sday;		/* SBDS manufacture day */
+	const char *smbb_schem;		/* SBDS chemistry */
+	uint32_t smbb_oemdata;		/* OEM data */
+} smbios_battery_t;
+
+#define	SMB_BDC_OTHER		0x01	/* Other */
+#define	SMB_BDC_UNKNOWN		0x02	/* Unknown */
+#define	SMB_BDC_LEADACID	0x03	/* Lead Acid */
+#define	SMB_BDC_NICD		0x04	/* Nickel Cadmium */
+#define	SMB_BDC_NIMH		0x05	/* Nickel Metal hydride */
+#define	SMB_BDC_LIB		0x06	/* Lithium-ion */
+#define	SMB_BDC_ZINCAIR		0x07	/* Zinc air */
+#define	SMB_BDC_LIPO		0x08	/* Lithium Polymer */
+
+/*
  * SMBIOS Hardware Security Settings.  See DSP0134 Section 7.25 for more
  * information.  Only one such record will be present in the SMBIOS.
  */
@@ -1867,6 +1895,7 @@ extern int smbios_info_extprocessor(smbios_hdl_t *, id_t,
     smbios_processor_ext_t *);
 extern int smbios_info_cache(smbios_hdl_t *, id_t, smbios_cache_t *);
 extern int smbios_info_pointdev(smbios_hdl_t *, id_t, smbios_pointdev_t *);
+extern int smbios_info_battery(smbios_hdl_t *, id_t, smbios_battery_t *);
 extern int smbios_info_port(smbios_hdl_t *, id_t, smbios_port_t *);
 extern int smbios_info_extport(smbios_hdl_t *, id_t, smbios_port_ext_t *);
 extern int smbios_info_slot(smbios_hdl_t *, id_t, smbios_slot_t *);
@@ -1912,6 +1941,8 @@ extern const char *smbios_csn(smbios_hdl_t *);
  * functions return the comment string next to the #defines listed above, and
  * the _name functions return the appropriate #define identifier itself.
  */
+extern const char *smbios_battery_chem_desc(uint_t);
+
 extern const char *smbios_bboard_flag_desc(uint_t);
 extern const char *smbios_bboard_flag_name(uint_t);
 extern const char *smbios_bboard_type_desc(uint_t);

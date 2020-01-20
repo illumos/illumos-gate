@@ -198,6 +198,23 @@ static const struct smb_infospec {
 		0,
 		0,
 		0 },
+	{ SMB_TYPE_BATTERY,
+		offsetof(smb_battery_t, smbbat_manufacturer),
+		offsetof(smb_battery_t, smbbat_devname),
+		0,
+		/*
+		 * While the serial number is a part of the device, because of
+		 * the fact that the battery has two different serial numbers,
+		 * we don't include it here.
+		 */
+		0,
+		0,
+		offsetof(smb_battery_t, smbbat_loc),
+		0,
+		0,
+		0,
+		0
+	},
 	{ SMB_TYPE_EOT }
 };
 
@@ -1695,6 +1712,59 @@ smbios_info_pointdev(smbios_hdl_t *shp, id_t id, smbios_pointdev_t *pd)
 	pd->smbpd_type = point.smbpdev_type;
 	pd->smbpd_iface = point.smbpdev_iface;
 	pd->smbpd_nbuttons = point.smbpdev_nbuttons;
+
+	return (0);
+}
+
+int
+smbios_info_battery(smbios_hdl_t *shp, id_t id, smbios_battery_t *bp)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	smb_battery_t bat;
+
+	if (stp->smbst_hdr->smbh_type != SMB_TYPE_BATTERY) {
+		return (smb_set_errno(shp, ESMB_TYPE));
+	}
+
+	if (stp->smbst_hdr->smbh_len < sizeof (bat)) {
+		return (smb_set_errno(shp, ESMB_SHORT));
+	}
+
+	bzero(bp, sizeof (*bp));
+	smb_info_bcopy(stp->smbst_hdr, &bat, sizeof (bat));
+
+	/*
+	 * This may be superseded by the SBDS data.
+	 */
+	if (bat.smbbat_date != 0) {
+		bp->smbb_date = smb_strptr(stp, bat.smbbat_date);
+	} else {
+		bp->smbb_date = NULL;
+	}
+
+	/*
+	 * This may be superseded by the SBDS data.
+	 */
+	if (bat.smbbat_serial != 0) {
+		bp->smbb_serial = smb_strptr(stp, bat.smbbat_serial);
+	} else {
+		bp->smbb_serial = NULL;
+	}
+
+	bp->smbb_chem = bat.smbbat_chem;
+	bp->smbb_cap = bat.smbbat_cap;
+	if (bat.smbbat_mult > 0) {
+		bp->smbb_cap *= bat.smbbat_mult;
+	}
+	bp->smbb_volt = bat.smbbat_volt;
+	bp->smbb_version = smb_strptr(stp, bat.smbbat_version);
+	bp->smbb_err = bat.smbbat_err;
+	bp->smbb_ssn = bat.smbbat_ssn;
+	bp->smbb_syear = 1980 + (bat.smbbat_sdate >> 9);
+	bp->smbb_smonth = (bat.smbbat_sdate >> 5) & 0xf;
+	bp->smbb_sday = bat.smbbat_sdate & 0x1f;
+	bp->smbb_schem = smb_strptr(stp, bat.smbbat_schem);
+	bp->smbb_oemdata = bat.smbbat_oemdata;
 
 	return (0);
 }
