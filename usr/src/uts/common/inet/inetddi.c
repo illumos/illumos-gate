@@ -127,7 +127,7 @@ static struct dev_priv {
 static int
 inet_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
-	int i, ndevs;
+	size_t i, ndevs;
 
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
@@ -139,6 +139,12 @@ inet_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		char *drv = netdev_privs[i].driver;
 		if (drv == NULL || strcmp(drv, ddi_driver_name(devi)) == 0)
 			break;
+	}
+
+	/* smatch has no idea what VERIFY does. */
+	if (i == ndevs) {
+		VERIFY(i < ndevs);
+		return (DDI_FAILURE);
 	}
 
 	return (ddi_create_priv_minor_node(devi, INET_NAME, S_IFCHR,
