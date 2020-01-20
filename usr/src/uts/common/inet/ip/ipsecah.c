@@ -215,7 +215,7 @@ static int
 ah_kstat_update(kstat_t *kp, int rw)
 {
 	ah_kstats_t	*ekp;
-	netstackid_t	stackid = (netstackid_t)(uintptr_t)kp->ks_private;
+	netstackid_t	stackid;
 	netstack_t	*ns;
 	ipsec_stack_t	*ipss;
 
@@ -225,6 +225,7 @@ ah_kstat_update(kstat_t *kp, int rw)
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
+	stackid = (netstackid_t)(uintptr_t)kp->ks_private;
 	ns = netstack_find_by_stackid(stackid);
 	if (ns == NULL)
 		return (-1);

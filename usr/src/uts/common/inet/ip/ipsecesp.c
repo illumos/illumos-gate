@@ -208,7 +208,7 @@ static int
 esp_kstat_update(kstat_t *kp, int rw)
 {
 	esp_kstats_t *ekp;
-	netstackid_t	stackid = (zoneid_t)(uintptr_t)kp->ks_private;
+	netstackid_t	stackid;
 	netstack_t	*ns;
 	ipsec_stack_t	*ipss;
 
@@ -218,6 +218,7 @@ esp_kstat_update(kstat_t *kp, int rw)
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
+	stackid = (zoneid_t)(uintptr_t)kp->ks_private;
 	ns = netstack_find_by_stackid(stackid);
 	if (ns == NULL)
 		return (-1);
