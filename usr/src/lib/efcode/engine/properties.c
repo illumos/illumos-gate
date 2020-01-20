@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -738,7 +736,7 @@ print_property(fcode_env_t *env, prop_t *p, char *prepend)
 	char *name = (p->name ? p->name : "<noname>");
 
 	if (prepend) {
-		sprintf(buf, "%s %s", prepend, name);
+		(void) snprintf(buf, sizeof (buf), "%s %s", prepend, name);
 		name = buf;
 	}
 	print_indented(name);

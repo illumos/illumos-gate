@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -55,14 +53,14 @@ process_signal(int sig, siginfo_t *sip, void *addr)
 	case SIGFPE:
 		forth_abort(saved_envp, "%s: Fault Addr: 0x%08x",
 		    strsignal(sig), sip->si_addr);
-
+		/* FALLTHROUGH */
 	case SIGQUIT:
-		ioctl(fileno(stdin), TCSETA, &saved_termio);
+		(void) ioctl(fileno(stdin), TCSETA, &saved_termio);
 		log_message(MSG_FATAL, "SIGQUIT\n");
 		abort();
 
 	case SIGINT:
-		ioctl(fileno(stdin), TCSETA, &saved_termio);
+		(void) ioctl(fileno(stdin), TCSETA, &saved_termio);
 		break;
 	}
 	forth_abort(saved_envp, strsignal(sig));
@@ -75,17 +73,17 @@ install_handlers(fcode_env_t *env)
 
 	saved_envp = env;
 
-	ioctl(fileno(stdin), TCGETA, &saved_termio);
+	(void) ioctl(fileno(stdin), TCGETA, &saved_termio);
 
-	sigemptyset(&sa.sa_mask);
+	(void) sigemptyset(&sa.sa_mask);
 	sa.sa_flags = SA_SIGINFO|SA_NODEFER;
 	sa.sa_handler = 0;
 	sa.sa_sigaction = process_signal;
 
-	sigaction(SIGINT, &sa, NULL);
-	sigaction(SIGQUIT, &sa, NULL);
-	sigaction(SIGSEGV, &sa, NULL);
-	sigaction(SIGBUS, &sa, NULL);
-	sigaction(SIGUSR1, &sa, NULL);
-	sigaction(SIGFPE, &sa, NULL);
+	(void) sigaction(SIGINT, &sa, NULL);
+	(void) sigaction(SIGQUIT, &sa, NULL);
+	(void) sigaction(SIGSEGV, &sa, NULL);
+	(void) sigaction(SIGBUS, &sa, NULL);
+	(void) sigaction(SIGUSR1, &sa, NULL);
+	(void) sigaction(SIGFPE, &sa, NULL);
 }

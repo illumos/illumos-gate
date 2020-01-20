@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -104,7 +102,7 @@ defer(fcode_env_t *env)
 	PUSH(DS, (fstack_t)&crash_ptr);
 	name = parse_a_string(env, &len);
 	make_common_access(env, name, len, 1,
-		env->instance_mode, &noop, &noop, &set_defer_actions);
+	    env->instance_mode, &noop, &noop, &set_defer_actions);
 }
 
 void
@@ -343,7 +341,7 @@ load_file(fcode_env_t *env)
 	if (fd < 0) {
 		forth_perror(env, "Can't open '%s'", name);
 	}
-	fstat(fd, &buf);
+	(void) fstat(fd, &buf);
 	len = buf.st_size;
 	buffer = MALLOC(len);
 	if (buffer == 0)
@@ -352,7 +350,7 @@ load_file(fcode_env_t *env)
 	if ((n = read(fd, buffer, len)) < 0)
 		forth_perror(env, "read error '%s'", name);
 
-	close(fd);
+	(void) close(fd);
 	PUSH(DS, (fstack_t)buffer);
 	PUSH(DS, (fstack_t)n);
 }
@@ -504,18 +502,18 @@ read_line(fcode_env_t *env)
 	struct termio termio, savetermio;
 
 	if (!isatty(fileno(stdin))) {
-		fgets(buf, sizeof (buf), stdin);
+		(void) fgets(buf, sizeof (buf), stdin);
 		push_string(env, buf, strlen(buf));
 		return;
 	}
 	printf(prompt_string);
 	fflush(stdout);
-	ioctl(fileno(stdin), TCGETA, &termio);
+	(void) ioctl(fileno(stdin), TCGETA, &termio);
 	savetermio = termio;
 	termio.c_lflag &= ~(ICANON|ECHO|ECHOE|IEXTEN);
 	termio.c_cc[VTIME] = 0;
 	termio.c_cc[VMIN] = 1;
-	ioctl(fileno(stdin), TCSETA, &termio);
+	(void) ioctl(fileno(stdin), TCSETA, &termio);
 	my_line = cur_line = num_lines;
 	save_buf[0] = '\0';
 	for (cursor = eol = buf; ; ) {
@@ -627,7 +625,7 @@ read_line(fcode_env_t *env)
 					redraw_line(env, buf, cursor, eol,
 					    save_line, save_line + save_cursor,
 					    save_line + len);
-					strcpy(buf, save_line);
+					(void) strcpy(buf, save_line);
 					eol = buf + len;
 					cursor = buf + save_cursor;
 					continue;
@@ -636,7 +634,7 @@ read_line(fcode_env_t *env)
 			p = history_lines[cur_line];
 			len = strlen(p);
 			redraw_line(env, buf, cursor, eol, p, p, p + len);
-			strcpy(buf, history_lines[cur_line]);
+			(void) strcpy(buf, history_lines[cur_line]);
 			cursor = buf;
 			eol = buf + len;
 			continue;
@@ -753,7 +751,7 @@ read_line(fcode_env_t *env)
 		break;
 	}
 	add_line_to_history(env, buf);
-	ioctl(fileno(stdin), TCSETA, &savetermio);
+	(void) ioctl(fileno(stdin), TCSETA, &savetermio);
 	push_string(env, buf, strlen(buf));
 }
 
@@ -763,7 +761,7 @@ set_prompt(fcode_env_t *env)
 	char *prompt;
 
 	if ((prompt = parse_a_string(env, NULL)) != NULL)
-		strncpy(prompt_string, prompt, sizeof (prompt_string));
+		(void) strncpy(prompt_string, prompt, sizeof (prompt_string));
 }
 
 #pragma init(_init)

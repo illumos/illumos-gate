@@ -588,7 +588,7 @@ locate_package(fcode_env_t *env, char *start)
 		if ((next_p = strchr(p, ':')) != NULL)
 			*next_p++ = '\0';
 		tpath = MALLOC(strlen(p) + strlen(start) + 2);
-		sprintf(tpath, "%s/%s", p, start);
+		(void) sprintf(tpath, "%s/%s", p, start);
 		if ((d = match_package_path(env, tpath)) != NULL) {
 			FREE(fpath);
 			FREE(tpath);
@@ -706,10 +706,10 @@ get_path(fcode_env_t *env, device_t *d)
 	name = get_package_name(env, d);
 	n = strlen(pre_path) + strlen(name) + 1;
 	path = MALLOC(n);
-	strcpy(path, pre_path);
-	strcat(path, name);
+	(void) strcpy(path, pre_path);
+	(void) strcat(path, name);
 	if (d->child && d->parent)
-		strcat(path, "/");
+		(void) strcat(path, "/");
 	FREE(pre_path);
 	return (path);
 }

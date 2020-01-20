@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -78,13 +76,13 @@ convert_phandle(fcode_env_t *env, fstack_t d)
 
 	if (use_os_handle) {
 		my_nodeid_t nh;
-		nh.my_handle = (fc_phandle_t) d;
+		nh.my_handle = (fc_phandle_t)d;
 		t = find_resource(&cdp->nodeids, &nh, match_handle);
 		if (t == NULL) {
 			r = 0;
 		} else {
-			my_nodeid_t *p = (my_nodeid_t *) t->data;
-			r = (device_t *) p->node;
+			my_nodeid_t *p = (my_nodeid_t *)t->data;
+			r = (device_t *)p->node;
 		}
 	} else
 		r = (device_t *)d;
@@ -108,11 +106,11 @@ revert_phandle(fcode_env_t *env, device_t *d)
 		if (t == NULL) {
 			r = 0;
 		} else {
-			my_nodeid_t *p = (my_nodeid_t *) t->data;
-			r = (fstack_t) p->my_handle;
+			my_nodeid_t *p = (my_nodeid_t *)t->data;
+			r = (fstack_t)p->my_handle;
 		}
 	} else
-		r = (fstack_t) d;
+		r = (fstack_t)d;
 	return (r);
 }
 
@@ -135,7 +133,6 @@ allocate_phandle(fcode_env_t *env)
 {
 	private_data_t *pd;
 	common_data_t *cdp;
-	int error;
 	char *service;
 	device_t *current;
 	fc_cell_t hcell;
@@ -160,11 +157,11 @@ allocate_phandle(fcode_env_t *env)
 
 	pd = MALLOC(sizeof (private_data_t));
 	pd->common = cdp;
-	pd->parent = (fc_phandle_t) revert_phandle(env, current->parent);
+	pd->parent = (fc_phandle_t)revert_phandle(env, current->parent);
 	pd->upload = (cdp->init_done == 1);
 	current->private = pd;
 
-	error = fc_run_priv(cdp, service, 0, 1, &hcell);
+	(void) fc_run_priv(cdp, service, 0, 1, &hcell);
 
 	pd->node = fc_cell2phandle(hcell);
 

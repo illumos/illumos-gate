@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <sys/shm.h>
 #include <dlfcn.h>
@@ -57,7 +55,7 @@ static void
 do_dlclose(fcode_env_t *env)
 {
 	void *pl = (void *)POP(DS);
-	dlclose(pl);
+	(void) dlclose(pl);
 }
 
 static void

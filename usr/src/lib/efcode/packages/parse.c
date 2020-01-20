@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -41,7 +39,7 @@ byte_loadfile(fcode_env_t *env)
 	int len;
 
 	load_file(env);
-	len = (int) POP(DS);
+	len = (int)POP(DS);
 	if (len) {
 		void *ptr = (void *) TOS;
 		PUSH(DS, 1);
@@ -60,7 +58,7 @@ define_hook(fcode_env_t *env, char *name, int len, char *fcimage)
 	header(env, name, len, 0);
 	COMPILE_TOKEN(&do_colon);
 	env->state |= 1;
-	PUSH(DS, (fstack_t) fcimage);
+	PUSH(DS, (fstack_t)fcimage);
 	PUSH(DS, strlen(fcimage));
 	compile_string(env);
 	COMPILE_TOKEN(&byteload_ptr);
@@ -131,5 +129,5 @@ make_builtin_hooks(fcode_env_t *env, char *where)
 		}
 	}
 	FREE(buffer);
-	fclose(fd);
+	(void) fclose(fd);
 }
