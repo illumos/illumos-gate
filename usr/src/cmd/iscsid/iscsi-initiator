@@ -22,6 +22,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
 
 #
@@ -170,6 +171,25 @@ mount_iscsi() {
 }
 
 umount_iscsi () {
+	# In case any non-system zpools reside on iscsi drives, export
+	# all of them now so that the system won't hang later in the shutdown
+	# sequence when those zpools need to be unmounted.
+	SYS_POOL=`svcprop -p config/zpool svc:/system/smartdc/init:default \
+	   2>/dev/null`
+	SYS_POOL=${SYS_POOL:-zones}
+
+	zpools=$(zpool list -Ho name)
+	for pool in $zpools; do
+		if [ "$pool" == $SYS_POOL ]; then
+			continue
+		fi
+		zpool export $pool
+		got=$?
+		if [ $got -ne 0 ]; then
+			echo "Exporting zpool $pool failed ($got)"
+		fi
+	done
+
 	#
 	# Generate iscsi mountp list from /etc/vfstab
 	exec < /etc/vfstab
