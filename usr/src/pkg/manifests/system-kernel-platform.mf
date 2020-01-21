@@ -23,7 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2014 Gary Mills
-# Copyright 2019 Peter Tribble.
+# Copyright 2020 Peter Tribble.
 # Copyright 2019 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
@@ -988,7 +988,6 @@ $(sparc_ONLY)file path=usr/share/man/man7d/gpio_87317.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/grbeep.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/mc-opl.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/n2rng.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/ncp.7d
 $(i386_ONLY)file path=usr/share/man/man7d/npe.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/ntwdt.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/oplmsu.7d

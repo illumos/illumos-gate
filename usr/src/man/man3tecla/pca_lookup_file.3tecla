@@ -24,14 +24,13 @@
 .\" or other dealings in this Software without prior written authorization
 .\" of the copyright holder.
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
-.TH PCA_LOOKUP_FILE 3TECLA "Aug 13, 2007"
+.TH PCA_LOOKUP_FILE 3TECLA "January 18, 2020"
 .SH NAME
 pca_lookup_file, del_PathCache, del_PcaPathConf, new_PathCache,
 new_PcaPathConf, pca_last_error, pca_path_completions, pca_scan_path,
 pca_set_check_fn, ppc_file_start, ppc_literal_escapes \- lookup a file in a
 list of directories
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libtecla.h>
@@ -92,8 +91,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBPathCache\fR object is part of the \fBlibtecla\fR(3LIB) library.
 \fBPathCache\fR objects allow an application to search for files in any colon
 separated list of directories, such as the UNIX execution \fBPATH\fR
@@ -105,11 +102,9 @@ filename prefix. By default all files in the list of directories are targets
 for lookup and completion, but a versatile mechanism is provided for only
 selecting specific types of files. The obvious application of this facility is
 to provide Tab-completion and lookup of executable commands in the UNIX
-\fBPATH\fR, so an optional callback which rejects all but executable files, is
+\fBPATH\fR, so an optional callback which rejects all but executable files is
 provided.
 .SS "An Example"
-.sp
-.LP
 Under UNIX, the following example program looks up and displays the full
 pathnames of each of the command names on the command line.
 .sp
@@ -169,15 +164,11 @@ $
 .in -2
 
 .SS "Function Descriptions"
-.sp
-.LP
 To use the facilities of this module, you must first allocate a \fBPathCache\fR
 object by calling the \fBnew_PathCache()\fR constructor function. This function
 creates the resources needed to cache and lookup files in a list of
 directories. It returns \fINULL\fR on error.
 .SS "Populating The Cache"
-.sp
-.LP
 Once you have created a cache, it needs to be populated with files. To do this,
 call the \fBpca_scan_path()\fR function. Whenever this function is called, it
 discards the current contents of the cache, then scans the list of directories
@@ -195,8 +186,6 @@ whenever a file is looked up.
 On success this function return 0. On error it returns 1, and a description of
 the error can be obtained by calling \fBpca_last_error\fR(\fIpc\fR).
 .SS "Looking Up Files"
-.sp
-.LP
 Once the cache has been populated with files, you can look up the full pathname
 of a file, simply by specifying its filename to \fBpca_lookup_file()\fR.
 .sp
@@ -210,8 +199,6 @@ meanings of spaces and tabs within the filename, give the \fIliteral\fR
 argument the value 0. Otherwise, if backslashes should be treated as normal
 characters, pass 1 for the value of the \fIliteral\fR argument.
 .SS "Filename Completion"
-.sp
-.LP
 Looking up the potential completions of a filename-prefix in the filename cache
 is achieved by passing the provided \fBpca_path_completions()\fR callback
 function to the \fBcpl_complete_word\fR(3TECLA) function.
@@ -250,8 +237,6 @@ its literal argument.
 When you have finished with a \fBPcaPathConf\fR variable, you can pass it to
 the \fBdel_PcaPathConf()\fR destructor function to reclaim its memory.
 .SS "Being Selective"
-.sp
-.LP
 If you are only interested in certain types or files, such as, for example,
 executable files, or files whose names end in a particular suffix, you can
 arrange for the file completion and lookup functions to be selective in the
@@ -263,7 +248,7 @@ of the file, plus any application-specific data that you provide. If the
 callback returns 1 the filename will be reported as a match. If it returns 0,
 it will be ignored. Suitable callback functions and their prototypes should be
 declared with the following macro. The \fBCplCheckFn\fR typedef is also
-provided in case you wish to declare pointers to such functions
+provided in case you wish to declare pointers to such functions.
 .sp
 .in +2
 .nf
@@ -302,32 +287,24 @@ instead of calling the callback again, the cached record of whether it was
 accepted or rejected is used. Thus if somebody tries to complete an empty
 string, and hits tab a second time when nothing appears to happen, there will
 only be one long delay, since the second pass will operate entirely from the
-cached dispositions of the files. These cached dipositions are discarded
+cached dispositions of the files. These cached dispositions are discarded
 whenever \fBpca_scan_path()\fR is called, and whenever \fBpca_set_check_fn()\fR
 is called with changed callback function or \fIdata\fR arguments.
 .SS "Error Handling"
-.sp
-.LP
 If \fBpca_scan_path()\fR reports that an error occurred by returning 1, you can
 obtain a terse description of the error by calling
 \fBpca_last_error\fR(\fIpc\fR). This returns an internal string containing an
 error message.
 .SS "Cleaning Up"
-.sp
-.LP
 Once you have finished using a \fBPathCache\fR object, you can reclaim its
 resources by passing it to the \fBdel_PathCache()\fR destructor function. This
 takes a pointer to one of these objects, and always returns \fINULL\fR.
 .SS "Thread Safety"
-.sp
-.LP
 It is safe to use the facilities of this module in multiple threads, provided
 that each thread uses a separately allocated \fBPathCache\fR object. In other
 words, if two threads want to do path searching, they should each call
 \fBnew_PathCache()\fR to allocate their own caches.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -344,7 +321,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBcpl_complete_word\fR(3TECLA), \fBef_expand_file\fR(3TECLA),
 \fBgl_get_line\fR(3TECLA), \fBlibtecla\fR(3LIB), \fBattributes\fR(5)

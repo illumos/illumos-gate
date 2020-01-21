@@ -1311,7 +1311,7 @@ int _is_sun_reg(void *mech)
 			continue;
 		}
 		is_reg = 1;
-		if (r == reg_list_base) {
+		if (prev == NULL) {
 			reg_list_base = reg_list_base->next;
 		} else {
 			prev->next = r->next;

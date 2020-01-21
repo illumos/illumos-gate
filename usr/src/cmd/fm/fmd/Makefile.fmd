@@ -187,11 +187,11 @@ $(DMOD): $(DMOD_OBJS)
 ../common/fmd_rpc_%.h: ../common/fmd_rpc_%.x
 	$(RPCGEN) -CMN -h -o $@ $<
 
-fmd_svc_%.c: ../common/fmd_rpc_%.h
-	$(RPCGEN) -CMN -m -o $@ `echo $< | sed 's/h$$/x/'`
+fmd_svc_%.c: ../common/fmd_rpc_%.x
+	$(RPCGEN) -CMN -m -o $@ $<
 
-fmd_xdr_%.c: ../common/fmd_rpc_%.h
-	$(RPCGEN) -CMN -c -o $@ `echo $< | sed 's/h$$/x/'`
+fmd_xdr_%.c: ../common/fmd_rpc_%.x
+	$(RPCGEN) -CMN -c -o $@ $<
 
 clean:
 	$(RM) $(OBJS) $(DMOD_OBJS) $(LINTFILES) $(DMOD_LINT)

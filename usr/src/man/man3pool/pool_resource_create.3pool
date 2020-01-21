@@ -3,13 +3,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH POOL_RESOURCE_CREATE 3POOL "April 9, 2016"
+.TH POOL_RESOURCE_CREATE 3POOL "January 18, 2020"
 .SH NAME
 pool_resource_create, pool_resource_destroy, pool_resource_info,
 pool_query_resource_components, pool_resource_transfer, pool_resource_xtransfer
 \- resource pool resource manipulation functions
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <pool.h>
@@ -52,7 +51,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBpool_resource_create()\fR function creates and returns a new resource of
 the given \fIname\fR and \fItype\fR in the provided configuration. If there is
 already a resource of the given name, the operation will fail.
@@ -91,7 +89,6 @@ list of \fBpool_component_t\fR.
 The \fIconf\fR argument for each function refers to the target configuration to
 which the operation applies.
 .SH RETURN VALUES
-.LP
 Upon successful completion, \fBpool_resource_create()\fR returns a new
 \fBpool_resource_t\fR with default properties initialized. Otherwise,
 \fINULL\fR is returned and \fBpool_error\fR(3POOL) returns the pool-specific
@@ -108,18 +105,17 @@ describing the given resource (and optionally its components). Otherwise,
 value.
 .sp
 .LP
- Upon successful completion, \fBpool_query_resource_components()\fR returns a
+Upon successful completion, \fBpool_query_resource_components()\fR returns a
 null-terminated array of \fBpool_component_t *\fR that match the provided
 null-terminated property list and are contained in the given resource.
 Otherwise, \fINULL\fR is returned and \fBpool_error()\fR returns the
 pool-specific error value.
 .sp
 .LP
- Upon successful completion, \fBpool_resource_transfer()\fR and
+Upon successful completion, \fBpool_resource_transfer()\fR and
 \fBpool_resource_xtransfer()\fR return 0. Otherwise -1 is returned and
 \fBpool_error()\fR returns the pool-specific error value.
 .SH ERRORS
-.LP
 The \fBpool_resource_create()\fR function will fail if:
 .sp
 .ne 2
@@ -181,7 +177,7 @@ The \fBpool_resource_info()\fR function will fail if:
 .ad
 .RS 20n
 The supplied configuration's status is not \fBPOF_VALID\fR or the \fIflags\fR
-paramter is neither 0 nor 1.
+parameter is neither 0 nor 1.
 .RE
 
 .sp
@@ -288,7 +284,6 @@ A system error has occurred. Check the system error code for more details.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCreate a new resource of type \fBpset\fR named \fBfoo\fR.
 .sp
 .in +2
@@ -304,14 +299,13 @@ pool_resource_t *resource;
 
 if ((resource = pool_resource_create(conf, "pset",
     "foo")) == NULL) {
-    (void) fprintf(stderr, "Cannot create resource\\B{}n");
+    (void) fprintf(stderr, "Cannot create resource\\n");
     ...
 }
 .fi
 .in -2
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -330,5 +324,4 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.LP
 \fBlibpool\fR(3LIB), \fBpool_error\fR(3POOL), \fBattributes\fR(5)

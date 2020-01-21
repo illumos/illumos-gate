@@ -1,0 +1,78 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2019 Robert Mustacchi
+.\"
+.Dd December 24, 2019
+.Dt AMDNBTEMP 7D
+.Os
+.Sh NAME
+.Nm amdnbtemp
+.Nd AMD northbridge temperature sensor driver
+.Sh SYNOPSIS
+.Pa /dev/sensors/temperature/cpu/*
+.Sh DESCRIPTION
+The
+.Nm
+driver provides the system the ability to read the temperature sensor
+found in several AMD processors.
+This includes the K10 microarchitecture, and its derivatives, as well as
+the Bulldozer microarchitecture.
+The following AMD processors are supported:
+.Bl -dash
+.It
+AMD Family 10h Processors
+.Pq K10
+.It
+AMD Family 11h Processors
+.Pq Turion X2 Ultra
+.It
+AMD Family 12h Processors
+.Pq Llano APUs
+.It
+AMD Family 14h Processors
+.Pq Bobcat
+.It
+Family 15h models 0-fh, 10h-1fh, 30-3fh
+.Pq Bulldozer and Piledriver
+.It
+AMD Family 16h Processors
+.Pq Puma and Jaguar
+.El
+.Pp
+Some AMD Family 10h processors that utilize socket F and socket AM2 are
+subject to erratum 319 which indicates that the temperature sensor has
+an inaccurate measurement.
+If such a processor is detected, the system does not attach a
+temperature sensor to the device.
+.Pp
+AMD Family 15h models 60-7fh
+.Pq Steamroller and Excavator
+are not supported at this time.
+.Pp
+For AMD Family 17h
+.Pq Zen
+processors, the
+.Xr amdf17nbdf 7D
+driver provides access to the temperature sensors.
+.Sh SEE ALSO
+.Xr fmadm 1M ,
+.Xr amdf17nbdf 7D
+.Rs
+.%A AMD
+.%B BIOS and Kernel Developer’s Guide (BKDG) for AMD Family 16h Models 00h-0Fh Processors
+.%O 49125
+.Re
+.Rs
+.%A AMD
+.%B Revision Guide for AMD Family 10h Processors
+.%O 41322
+.Re

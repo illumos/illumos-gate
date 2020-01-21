@@ -438,3 +438,8 @@ AMDF17NBDF_OBJS = amdf17nbdf.o
 # Intel Platform Controller Hub Temperature Module
 #
 PCHTEMP_OBJS = pchtemp.o
+
+#
+# AMD Family 10h-16h temperature driver
+#
+AMDNBTEMP_OBJS = amdnbtemp.o

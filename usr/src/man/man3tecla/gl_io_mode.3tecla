@@ -25,13 +25,12 @@
 .\" or other dealings in this Software without prior written authorization
 .\" of the copyright holder.
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
-.TH GL_IO_MODE 3TECLA "Jun 1, 2004"
+.TH GL_IO_MODE 3TECLA "January 18, 2020"
 .SH NAME
 gl_io_mode, gl_raw_io, gl_normal_io, gl_tty_signals, gl_abandon_line,
 gl_handle_signal, gl_pending_io \- use \fBgl_get_line()\fR from an external
 event loop
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libtecla.h>
@@ -71,8 +70,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ltecla\fR [ \fIlibrary\fR\&.\
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBgl_get_line\fR(3TECLA) function supports two different I/O modes. These
 are selected by calling the \fBgl_io_mode()\fR function. The \fImode\fR
 argument of \fBgl_io_mode()\fR specifies the new I/O mode and must be one of
@@ -103,11 +100,9 @@ I/O is used, the entry of each new input line typically requires many calls to
 Newly created GetLine objects start in normal I/O mode, so to switch to
 non-blocking server mode requires an initial call to \fBgl_io_mode()\fR.
 .SS "Server I/O Mode"
-.sp
-.LP
 In non-blocking server I/O mode, the application is required to have an event
 loop that calls \fBgl_get_line()\fR whenever the terminal file descriptor can
-perform the type I/O that \fBgl_get_line()\fR is waiting for. To determine
+perform the type of I/O that \fBgl_get_line()\fR is waiting for. To determine
 which type of I/O \fBgl_get_line()\fR is waiting for, the application calls the
 \fBgl_pending_io()\fR function.  The return value is one of the following two
 enumerated values.
@@ -126,7 +121,7 @@ enumerated values.
 \fB\fBGLP_WRITE\fR\fR
 .ad
 .RS 13n
-\fBgl_get_line()\fR is waiting to read a character from the keyboad.
+\fBgl_get_line()\fR is waiting to read a character from the keyboard.
 .RE
 
 .sp
@@ -162,8 +157,6 @@ calls. If you need to change the prompt of the line that is currently being
 edited, you can call the \fBgl_replace_prompt\fR(3TECLA) function between calls
 to \fBgl_get_line()\fR.
 .SS "Giving Up The Terminal"
-.sp
-.LP
 A complication that is unique to non-blocking server mode is that it requires
 that the terminal be left in raw mode between calls to \fBgl_get_line()\fR. If
 this were not the case, the external event loop would not be able to detect
@@ -199,8 +192,6 @@ call to \fBgl_normal_io()\fR, without an intervening call to \fBgl_raw_io()\fR,
 \fBgl_get_line()\fR will call \fBgl_raw_mode()\fR itself, and the terminal will
 remain in this mode when \fBgl_get_line()\fR returns.
 .SS "Signal Handling"
-.sp
-.LP
 In the previous section it was pointed out that in non-blocking server mode,
 the terminal must be restored to a sane state whenever a signal is received
 that either suspends or terminates the process. In normal I/O mode, this is
@@ -289,8 +280,6 @@ one of these objects, pass its pointer as the \fIgl\fR argument and specify
 Depending on the signal that is being handled, this function does different
 things.
 .SS "Process termination signals"
-.sp
-.LP
 If the signal that was caught is one of those that by default terminates any
 process that receives it, then \fBgl_handle_signal()\fR does the following
 steps.
@@ -325,8 +314,6 @@ Finally it unblocks delivery of this signal, which results in the process
 being terminated.
 .RE
 .SS "Process suspension signals"
-.sp
-.LP
 If the default disposition of the signal is to suspend the process, the same
 steps are executed as for process termination signals, except that when the
 process is later resumed, \fBgl_handle_signal()\fR continues, and does the
@@ -367,8 +354,6 @@ Users would be rightly confused if when their process received a \fBSIGPIPE\fR
 signal, the program responded by sending itself a \fBSIGKILL\fR signal, and the
 shell then printed out the provocative statement, "Killed!".
 .SS "Interrupting The Event Loop"
-.sp
-.LP
 If a signal is caught and handled when the application's event loop is waiting
 in \fBselect()\fR or \fBpoll()\fR, these functions will be aborted with
 \fBerrno\fR set to \fBEINTR\fR. When this happens the event loop should call
@@ -465,7 +450,7 @@ Reinstate the signal handlers that were displaced in step 5.
 .RS +4
 .TP
 11.
-Check wether a signal was caught, by checking the file-scope variable that
+Check whether a signal was caught, by checking the file-scope variable that
 the signal handler records signal numbers in.
 .RE
 .RS +4
@@ -481,8 +466,6 @@ reinstated in step 10.
 Unblock all of the signals that were blocked in step 7.
 .RE
 .SS "Signals Caught By \fBgl_get_line()\fR"
-.sp
-.LP
 Since the application is expected to handle signals in non-blocking server
 mode, \fBgl_get_line()\fR does not attempt to duplicate this when it is being
 called. If one of the signals that it is configured to catch is sent to the
@@ -493,19 +476,15 @@ handle it. If the process is not terminated by this signal, \fBgl_get_line()\fR
 returns \fINULL\fR, and a following call to \fBgl_return_status()\fR returns
 the enumerated value \fBGLR_SIGNAL\fR.
 .SS "Aborting Line Input"
-.sp
-.LP
 Often, rather than letting it terminate the process, applications respond to
 the \fBSIGINT\fR user-interrupt signal by aborting the current input line. This
 can be accomplished in non-blocking server-I/O mode by not calling
 \fBgl_handle_signal()\fR when this signal is caught, but by calling instead the
 \fBgl_abandon_line()\fR function. This function arranges that when
 \fBgl_get_line()\fR is next called, it first flushes any pending output to the
-terminal, discardes the current input line, outputs a new prompt on the next
+terminal, discards the current input line, outputs a new prompt on the next
 line, and finally starts accepting input of a new input line from the user.
 .SS "Signal Safe Functions"
-.sp
-.LP
 Provided that certain rules are followed, the \fBgl_normal_io()\fR,
 \fBgl_raw_io()\fR, \fBgl_handle_signal()\fR, and \fBgl_abandon_line()\fR
 functions can be written to be safely callable from signal handlers. Other
@@ -530,8 +509,6 @@ catch, so be sure that if you call any of the above functions from signal
 handlers, that the signals that these handlers are assigned to are configured
 to be caught by \fBgl_get_line()\fR. See \fBgl_trap_signal\fR(3TECLA).
 .SS "Using Timeouts To Poll"
-.sp
-.LP
 If instead of using \fBselect()\fR or \fBpoll()\fR to wait for I/O your
 application needs only to get out of \fBgl_get_line()\fR periodically to
 briefly do something else before returning to accept input from the user, use
@@ -548,8 +525,6 @@ key for the specified interval, so if the interval is long and the user keeps
 typing, \fBgl_get_line()\fR might not return for a while. There is no guarantee
 that it will return in the time specified.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -566,8 +541,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBcpl_complete_word\fR(3TECLA), \fBef_expand_file\fR(3TECLA),
 \fBgl_get_line\fR(3TECLA), \fBlibtecla\fR(3LIB), \fBpca_lookup_file\fR(3TECLA),
 \fBattributes\fR(5), \fBtecla\fR(5)

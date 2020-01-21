@@ -334,10 +334,16 @@ reset_syscall_args(void)
  * This works for old or new calling sequence.
  */
 int64_t
-nosys()
+nosys(void)
 {
 	tsignal(curthread, SIGSYS);
 	return ((int64_t)set_errno(ENOSYS));
+}
+
+int
+nosys32(void)
+{
+	return (nosys());
 }
 
 /*

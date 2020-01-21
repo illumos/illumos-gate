@@ -793,3 +793,4 @@ LINTFLAGS	+= -D_MACHDEP -I$(UTSBASE)/i86pc
 DRV_KMODS	+= amdf17nbdf
 DRV_KMODS	+= coretemp
 DRV_KMODS	+= pchtemp
+DRV_KMODS	+= amdnbtemp
