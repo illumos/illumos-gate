@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 OmniTI Computer Consulting, Inc  All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -373,10 +375,14 @@ aggr_port_notify_link(aggr_grp_t *grp, aggr_port_t *port)
 	/* link speed changes? */
 	ifspeed = aggr_port_stat(port, MAC_STAT_IFSPEED);
 	if (port->lp_ifspeed != ifspeed) {
+		mutex_enter(&grp->lg_stat_lock);
+
 		if (port->lp_state == AGGR_PORT_STATE_ATTACHED)
 			do_detach |= (ifspeed != grp->lg_ifspeed);
 		else
 			do_attach |= (ifspeed == grp->lg_ifspeed);
+
+		mutex_exit(&grp->lg_stat_lock);
 	}
 	port->lp_ifspeed = ifspeed;
 
@@ -528,8 +534,15 @@ aggr_port_promisc(aggr_port_t *port, boolean_t on)
 
 	if (on) {
 		mac_rx_clear(port->lp_mch);
+
+		/*
+		 * We use the promisc callback because without hardware
+		 * rings, we deliver through flows that will cause duplicate
+		 * delivery of packets when we've flipped into this mode
+		 * to compensate for the lack of hardware MAC matching
+		 */
 		rc = mac_promisc_add(port->lp_mch, MAC_CLIENT_PROMISC_ALL,
-		    aggr_recv_cb, port, &port->lp_mphp,
+		    aggr_recv_promisc_cb, port, &port->lp_mphp,
 		    MAC_PROMISC_FLAGS_NO_TX_LOOP);
 		if (rc != 0) {
 			mac_rx_set(port->lp_mch, aggr_recv_cb, port);
@@ -678,4 +691,48 @@ aggr_port_remmac(aggr_port_t *port, const uint8_t *mac_addr)
 		(void) mac_hwgroup_remmac(port->lp_hwgh, mac_addr);
 	}
 	mac_perim_exit(pmph);
+}
+
+int
+aggr_port_addvlan(aggr_port_t *port, uint16_t vid)
+{
+	mac_perim_handle_t	pmph;
+	int			err;
+
+	ASSERT(MAC_PERIM_HELD(port->lp_grp->lg_mh));
+	mac_perim_enter_by_mh(port->lp_mh, &pmph);
+
+	/*
+	 * Add the VLAN filter to the HW group if the port has a HW
+	 * group. If the port doesn't have a HW group, then it will
+	 * implicitly allow tagged traffic to pass and there is
+	 * nothing to do.
+	 */
+	if (port->lp_hwgh == NULL) {
+		mac_perim_exit(pmph);
+		return (0);
+	}
+
+	err = mac_hwgroup_addvlan(port->lp_hwgh, vid);
+	mac_perim_exit(pmph);
+	return (err);
+}
+
+int
+aggr_port_remvlan(aggr_port_t *port, uint16_t vid)
+{
+	mac_perim_handle_t	pmph;
+	int			err;
+
+	ASSERT(MAC_PERIM_HELD(port->lp_grp->lg_mh));
+	mac_perim_enter_by_mh(port->lp_mh, &pmph);
+
+	if (port->lp_hwgh == NULL) {
+		mac_perim_exit(pmph);
+		return (0);
+	}
+
+	err = mac_hwgroup_remvlan(port->lp_hwgh, vid);
+	mac_perim_exit(pmph);
+	return (err);
 }

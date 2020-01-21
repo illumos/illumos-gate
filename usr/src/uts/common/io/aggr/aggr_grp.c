@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -124,6 +124,8 @@ static int aggr_pseudo_enable_intr(mac_intr_handle_t);
 static int aggr_pseudo_start_ring(mac_ring_driver_t, uint64_t);
 static int aggr_addmac(void *, const uint8_t *);
 static int aggr_remmac(void *, const uint8_t *);
+static int aggr_addvlan(mac_group_driver_t, uint16_t);
+static int aggr_remvlan(mac_group_driver_t, uint16_t);
 static mblk_t *aggr_rx_poll(void *, int);
 static void aggr_fill_ring(void *, mac_ring_type_t, const int,
     const int, mac_ring_info_t *, mac_ring_handle_t);
@@ -324,6 +326,7 @@ aggr_grp_attach_port(aggr_grp_t *grp, aggr_port_t *port)
 		return (B_FALSE);
 	}
 
+	mutex_enter(&grp->lg_stat_lock);
 	if (grp->lg_ifspeed == 0) {
 		/*
 		 * The group inherits the speed of the first link being
@@ -337,8 +340,10 @@ aggr_grp_attach_port(aggr_grp_t *grp, aggr_port_t *port)
 		 * the group link speed, as per 802.3ad. Since it is
 		 * not, the attach is cancelled.
 		 */
+		mutex_exit(&grp->lg_stat_lock);
 		return (B_FALSE);
 	}
+	mutex_exit(&grp->lg_stat_lock);
 
 	grp->lg_nattached_ports++;
 
@@ -347,7 +352,9 @@ aggr_grp_attach_port(aggr_grp_t *grp, aggr_port_t *port)
 	 */
 	if (grp->lg_link_state != LINK_STATE_UP) {
 		grp->lg_link_state = LINK_STATE_UP;
+		mutex_enter(&grp->lg_stat_lock);
 		grp->lg_link_duplex = LINK_DUPLEX_FULL;
+		mutex_exit(&grp->lg_stat_lock);
 		link_state_changed = B_TRUE;
 	}
 
@@ -405,9 +412,11 @@ aggr_grp_detach_port(aggr_grp_t *grp, aggr_port_t *port)
 	grp->lg_nattached_ports--;
 	if (grp->lg_nattached_ports == 0) {
 		/* the last attached MAC port of the group is being detached */
-		grp->lg_ifspeed = 0;
 		grp->lg_link_state = LINK_STATE_DOWN;
+		mutex_enter(&grp->lg_stat_lock);
+		grp->lg_ifspeed = 0;
 		grp->lg_link_duplex = LINK_DUPLEX_UNKNOWN;
+		mutex_exit(&grp->lg_stat_lock);
 		link_state_changed = B_TRUE;
 	}
 
@@ -675,9 +684,13 @@ aggr_rem_pseudo_rx_ring(aggr_pseudo_rx_group_t *rx_grp, mac_ring_handle_t hw_rh)
 }
 
 /*
- * This function is called to create pseudo rings over the hardware rings of
- * the underlying device. Note that there is a 1:1 mapping between the pseudo
- * RX rings of the aggr and the hardware rings of the underlying port.
+ * Create pseudo rings over the HW rings of the port.
+ *
+ * o Create a pseudo ring in rx_grp per HW ring in the port's HW group.
+ *
+ * o Program existing unicast filters on the pseudo group into the HW group.
+ *
+ * o Program existing VLAN filters on the pseudo group into the HW group.
  */
 static int
 aggr_add_pseudo_rx_group(aggr_port_t *port, aggr_pseudo_rx_group_t *rx_grp)
@@ -686,6 +699,7 @@ aggr_add_pseudo_rx_group(aggr_port_t *port, aggr_pseudo_rx_group_t *rx_grp)
 	mac_ring_handle_t	hw_rh[MAX_RINGS_PER_GROUP];
 	aggr_unicst_addr_t	*addr, *a;
 	mac_perim_handle_t	pmph;
+	aggr_vlan_t		*avp;
 	int			hw_rh_cnt, i = 0, j;
 	int			err = 0;
 
@@ -693,63 +707,90 @@ aggr_add_pseudo_rx_group(aggr_port_t *port, aggr_pseudo_rx_group_t *rx_grp)
 	mac_perim_enter_by_mh(port->lp_mh, &pmph);
 
 	/*
-	 * This function must be called after the aggr registers its mac
-	 * and its RX group has been initialized.
+	 * This function must be called after the aggr registers its MAC
+	 * and its Rx group has been initialized.
 	 */
 	ASSERT(rx_grp->arg_gh != NULL);
 
 	/*
-	 * Get the list the the underlying HW rings.
+	 * Get the list of the underlying HW rings.
 	 */
 	hw_rh_cnt = mac_hwrings_get(port->lp_mch,
 	    &port->lp_hwgh, hw_rh, MAC_RING_TYPE_RX);
 
 	if (port->lp_hwgh != NULL) {
 		/*
-		 * Quiesce the HW ring and the mac srs on the ring. Note
+		 * Quiesce the HW ring and the MAC SRS on the ring. Note
 		 * that the HW ring will be restarted when the pseudo ring
 		 * is started. At that time all the packets will be
-		 * directly passed up to the pseudo RX ring and handled
-		 * by mac srs created over the pseudo RX ring.
+		 * directly passed up to the pseudo Rx ring and handled
+		 * by MAC SRS created over the pseudo Rx ring.
 		 */
 		mac_rx_client_quiesce(port->lp_mch);
 		mac_srs_perm_quiesce(port->lp_mch, B_TRUE);
 	}
 
 	/*
-	 * Add all the unicast addresses to the newly added port.
+	 * Add existing VLAN and unicast address filters to the port.
 	 */
+	for (avp = list_head(&rx_grp->arg_vlans); avp != NULL;
+	    avp = list_next(&rx_grp->arg_vlans, avp)) {
+		if ((err = aggr_port_addvlan(port, avp->av_vid)) != 0)
+			goto err;
+	}
+
 	for (addr = rx_grp->arg_macaddr; addr != NULL; addr = addr->aua_next) {
 		if ((err = aggr_port_addmac(port, addr->aua_addr)) != 0)
-			break;
+			goto err;
 	}
 
-	for (i = 0; err == 0 && i < hw_rh_cnt; i++)
+	for (i = 0; i < hw_rh_cnt; i++) {
 		err = aggr_add_pseudo_rx_ring(port, rx_grp, hw_rh[i]);
-
-	if (err != 0) {
-		for (j = 0; j < i; j++)
-			aggr_rem_pseudo_rx_ring(rx_grp, hw_rh[j]);
-
-		for (a = rx_grp->arg_macaddr; a != addr; a = a->aua_next)
-			aggr_port_remmac(port, a->aua_addr);
-
-		if (port->lp_hwgh != NULL) {
-			mac_srs_perm_quiesce(port->lp_mch, B_FALSE);
-			mac_rx_client_restart(port->lp_mch);
-			port->lp_hwgh = NULL;
-		}
-	} else {
-		port->lp_rx_grp_added = B_TRUE;
+		if (err != 0)
+			goto err;
 	}
-done:
+
+	port->lp_rx_grp_added = B_TRUE;
+	mac_perim_exit(pmph);
+	return (0);
+
+err:
+	ASSERT(err != 0);
+
+	for (j = 0; j < i; j++)
+		aggr_rem_pseudo_rx_ring(rx_grp, hw_rh[j]);
+
+	for (a = rx_grp->arg_macaddr; a != addr; a = a->aua_next)
+		aggr_port_remmac(port, a->aua_addr);
+
+	if (avp != NULL)
+		avp = list_prev(&rx_grp->arg_vlans, avp);
+
+	for (; avp != NULL; avp = list_prev(&rx_grp->arg_vlans, avp)) {
+		int err2;
+
+		if ((err2 = aggr_port_remvlan(port, avp->av_vid)) != 0) {
+			cmn_err(CE_WARN, "Failed to remove VLAN %u from port %s"
+			    ": errno %d.", avp->av_vid,
+			    mac_client_name(port->lp_mch), err2);
+		}
+	}
+
+	if (port->lp_hwgh != NULL) {
+		mac_srs_perm_quiesce(port->lp_mch, B_FALSE);
+		mac_rx_client_restart(port->lp_mch);
+		port->lp_hwgh = NULL;
+	}
+
 	mac_perim_exit(pmph);
 	return (err);
 }
 
 /*
- * This function is called by aggr to remove pseudo RX rings over the
- * HW rings of the underlying port.
+ * Destroy the pseudo rings mapping to this port and remove all VLAN
+ * and unicast filters from this port. Even if there are no underlying
+ * HW rings we must still remove the unicast filters to take the port
+ * out of promisc mode.
  */
 static void
 aggr_rem_pseudo_rx_group(aggr_port_t *port, aggr_pseudo_rx_group_t *rx_grp)
@@ -771,15 +812,22 @@ aggr_rem_pseudo_rx_group(aggr_port_t *port, aggr_pseudo_rx_group_t *rx_grp)
 	hw_rh_cnt = mac_hwrings_get(port->lp_mch,
 	    &hwgh, hw_rh, MAC_RING_TYPE_RX);
 
-	/*
-	 * If hw_rh_cnt is 0, it means that the underlying port does not
-	 * support RX rings. Directly return in this case.
-	 */
 	for (i = 0; i < hw_rh_cnt; i++)
 		aggr_rem_pseudo_rx_ring(rx_grp, hw_rh[i]);
 
 	for (addr = rx_grp->arg_macaddr; addr != NULL; addr = addr->aua_next)
 		aggr_port_remmac(port, addr->aua_addr);
+
+	for (aggr_vlan_t *avp = list_head(&rx_grp->arg_vlans); avp != NULL;
+	    avp = list_next(&rx_grp->arg_vlans, avp)) {
+		int err;
+
+		if ((err = aggr_port_remvlan(port, avp->av_vid)) != 0) {
+			cmn_err(CE_WARN, "Failed to remove VLAN %u from port %s"
+			    ": errno %d.", avp->av_vid,
+			    mac_client_name(port->lp_mch), err);
+		}
+	}
 
 	if (port->lp_hwgh != NULL) {
 		port->lp_hwgh = NULL;
@@ -1307,6 +1355,10 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 	bzero(&grp->lg_tx_group, sizeof (aggr_pseudo_tx_group_t));
 	aggr_lacp_init_grp(grp);
 
+	grp->lg_rx_group.arg_untagged = 0;
+	list_create(&(grp->lg_rx_group.arg_vlans), sizeof (aggr_vlan_t),
+	    offsetof(aggr_vlan_t, av_link));
+
 	/* add MAC ports to group */
 	grp->lg_ports = NULL;
 	grp->lg_nports = 0;
@@ -1323,7 +1375,7 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 	grp->lg_key = key;
 
 	for (i = 0; i < nports; i++) {
-		err = aggr_grp_add_port(grp, ports[i].lp_linkid, force, NULL);
+		err = aggr_grp_add_port(grp, ports[i].lp_linkid, force, &port);
 		if (err != 0)
 			goto bail;
 	}
@@ -1545,7 +1597,9 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 			continue;
 		val = aggr_port_stat(port, stat);
 		val -= port->lp_stat[i];
+		mutex_enter(&grp->lg_stat_lock);
 		grp->lg_stat[i] += val;
+		mutex_exit(&grp->lg_stat_lock);
 	}
 	for (i = 0; i < ETHER_NSTAT; i++) {
 		stat = i + MACTYPE_STAT_MIN;
@@ -1553,7 +1607,9 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 			continue;
 		val = aggr_port_stat(port, stat);
 		val -= port->lp_ether_stat[i];
+		mutex_enter(&grp->lg_stat_lock);
 		grp->lg_ether_stat[i] += val;
+		mutex_exit(&grp->lg_stat_lock);
 	}
 
 	grp->lg_nports--;
@@ -1802,6 +1858,8 @@ aggr_grp_delete(datalink_id_t linkid, cred_t *cred)
 	VERIFY(mac_unregister(grp->lg_mh) == 0);
 	grp->lg_mh = NULL;
 
+	list_destroy(&(grp->lg_rx_group.arg_vlans));
+
 	AGGR_GRP_REFRELE(grp);
 	return (0);
 }
@@ -1884,6 +1942,8 @@ aggr_grp_stat(aggr_grp_t *grp, uint_t stat, uint64_t *val)
 	aggr_port_t	*port;
 	uint_t		stat_index;
 
+	ASSERT(MUTEX_HELD(&grp->lg_stat_lock));
+
 	/* We only aggregate counter statistics. */
 	if (IS_MAC_STAT(stat) && !MAC_STAT_ISACOUNTER(stat) ||
 	    IS_MACTYPE_STAT(stat) && !ETHER_STAT_ISACOUNTER(stat)) {
@@ -1952,10 +2012,9 @@ static int
 aggr_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	aggr_grp_t		*grp = arg;
-	mac_perim_handle_t	mph;
 	int			rval = 0;
 
-	mac_perim_enter_by_mh(grp->lg_mh, &mph);
+	mutex_enter(&grp->lg_stat_lock);
 
 	switch (stat) {
 	case MAC_STAT_IFSPEED:
@@ -1975,7 +2034,7 @@ aggr_m_stat(void *arg, uint_t stat, uint64_t *val)
 		rval = aggr_grp_stat(grp, stat, val);
 	}
 
-	mac_perim_exit(mph);
+	mutex_exit(&grp->lg_stat_lock);
 	return (rval);
 }
 
@@ -2207,7 +2266,7 @@ aggr_m_capab_get(void *arg, mac_capab_t cap, void *cap_data)
 }
 
 /*
- * Callback funtion for MAC layer to register groups.
+ * Callback function for MAC layer to register groups.
  */
 static void
 aggr_fill_group(void *arg, mac_ring_type_t rtype, const int index,
@@ -2229,6 +2288,14 @@ aggr_fill_group(void *arg, mac_ring_type_t rtype, const int index,
 		infop->mgi_addmac = aggr_addmac;
 		infop->mgi_remmac = aggr_remmac;
 		infop->mgi_count = rx_group->arg_ring_cnt;
+
+		/*
+		 * Always set the HW VLAN callbacks. They are smart
+		 * enough to know when a port has HW VLAN filters to
+		 * program and when it doesn't.
+		 */
+		infop->mgi_addvlan = aggr_addvlan;
+		infop->mgi_remvlan = aggr_remvlan;
 	} else {
 		tx_group = &grp->lg_tx_group;
 		tx_group->atg_gh = gh;
@@ -2435,6 +2502,186 @@ aggr_remmac(void *arg, const uint8_t *mac_addr)
 	*pprev = addr->aua_next;
 	kmem_free(addr, sizeof (aggr_unicst_addr_t));
 
+	mac_perim_exit(mph);
+	return (err);
+}
+
+/*
+ * Search for VID in the Rx group's list and return a pointer if
+ * found. Otherwise return NULL.
+ */
+static aggr_vlan_t *
+aggr_find_vlan(aggr_pseudo_rx_group_t *rx_group, uint16_t vid)
+{
+	ASSERT(MAC_PERIM_HELD(rx_group->arg_grp->lg_mh));
+	for (aggr_vlan_t *avp = list_head(&rx_group->arg_vlans); avp != NULL;
+	    avp = list_next(&rx_group->arg_vlans, avp)) {
+		if (avp->av_vid == vid)
+			return (avp);
+	}
+
+	return (NULL);
+}
+
+/*
+ * Accept traffic on the specified VID.
+ *
+ * Persist VLAN state in the aggr so that ports added later will
+ * receive the correct filters. In the future it would be nice to
+ * allow aggr to iterate its clients instead of duplicating state.
+ */
+static int
+aggr_addvlan(mac_group_driver_t gdriver, uint16_t vid)
+{
+	aggr_pseudo_rx_group_t  *rx_group = (aggr_pseudo_rx_group_t *)gdriver;
+	aggr_grp_t		*aggr = rx_group->arg_grp;
+	aggr_port_t		*port, *p;
+	mac_perim_handle_t	mph;
+	int			err = 0;
+	aggr_vlan_t		*avp = NULL;
+
+	mac_perim_enter_by_mh(aggr->lg_mh, &mph);
+
+	if (vid == MAC_VLAN_UNTAGGED) {
+		/*
+		 * Aggr is both a MAC provider and MAC client. As a
+		 * MAC provider it is passed MAC_VLAN_UNTAGGED by its
+		 * client. As a client itself, it should pass
+		 * VLAN_ID_NONE to its ports.
+		 */
+		vid = VLAN_ID_NONE;
+		rx_group->arg_untagged++;
+		goto update_ports;
+	}
+
+	avp = aggr_find_vlan(rx_group, vid);
+
+	if (avp != NULL) {
+		avp->av_refs++;
+		mac_perim_exit(mph);
+		return (0);
+	}
+
+	avp = kmem_zalloc(sizeof (aggr_vlan_t), KM_SLEEP);
+	avp->av_vid = vid;
+	avp->av_refs = 1;
+
+update_ports:
+	for (port = aggr->lg_ports; port != NULL; port = port->lp_next)
+		if ((err = aggr_port_addvlan(port, vid)) != 0)
+			break;
+
+	if (err != 0) {
+		/*
+		 * If any of these calls fail then we are in a
+		 * situation where the ports have different HW state.
+		 * There's no reasonable action the MAC client can
+		 * take in this scenario to rectify the situation.
+		 */
+		for (p = aggr->lg_ports; p != port; p = p->lp_next) {
+			int err2;
+
+			if ((err2 = aggr_port_remvlan(p, vid)) != 0) {
+				cmn_err(CE_WARN, "Failed to remove VLAN %u"
+				    " from port %s: errno %d.", vid,
+				    mac_client_name(p->lp_mch), err2);
+			}
+
+		}
+
+		if (vid == VLAN_ID_NONE)
+			rx_group->arg_untagged--;
+
+		if (avp != NULL) {
+			kmem_free(avp, sizeof (aggr_vlan_t));
+			avp = NULL;
+		}
+	}
+
+	if (avp != NULL)
+		list_insert_tail(&rx_group->arg_vlans, avp);
+
+done:
+	mac_perim_exit(mph);
+	return (err);
+}
+
+/*
+ * Stop accepting traffic on this VLAN if it's the last use of this VLAN.
+ */
+static int
+aggr_remvlan(mac_group_driver_t gdriver, uint16_t vid)
+{
+	aggr_pseudo_rx_group_t  *rx_group = (aggr_pseudo_rx_group_t *)gdriver;
+	aggr_grp_t		*aggr = rx_group->arg_grp;
+	aggr_port_t		*port, *p;
+	mac_perim_handle_t	mph;
+	int			err = 0;
+	aggr_vlan_t		*avp = NULL;
+
+	mac_perim_enter_by_mh(aggr->lg_mh, &mph);
+
+	/*
+	 * See the comment in aggr_addvlan().
+	 */
+	if (vid == MAC_VLAN_UNTAGGED) {
+		vid = VLAN_ID_NONE;
+		rx_group->arg_untagged--;
+
+		if (rx_group->arg_untagged > 0)
+			goto done;
+
+		goto update_ports;
+	}
+
+	avp = aggr_find_vlan(rx_group, vid);
+
+	if (avp == NULL) {
+		err = ENOENT;
+		goto done;
+	}
+
+	avp->av_refs--;
+
+	if (avp->av_refs > 0)
+		goto done;
+
+update_ports:
+	for (port = aggr->lg_ports; port != NULL; port = port->lp_next)
+		if ((err = aggr_port_remvlan(port, vid)) != 0)
+			break;
+
+	/*
+	 * See the comment in aggr_addvlan() for justification of the
+	 * use of VERIFY here.
+	 */
+	if (err != 0) {
+		for (p = aggr->lg_ports; p != port; p = p->lp_next) {
+			int err2;
+
+			if ((err2 = aggr_port_addvlan(p, vid)) != 0) {
+				cmn_err(CE_WARN, "Failed to add VLAN %u"
+				    " to port %s: errno %d.", vid,
+				    mac_client_name(p->lp_mch), err2);
+			}
+		}
+
+		if (avp != NULL)
+			avp->av_refs++;
+
+		if (vid == VLAN_ID_NONE)
+			rx_group->arg_untagged++;
+
+		goto done;
+	}
+
+	if (err == 0 && avp != NULL) {
+		VERIFY3U(avp->av_refs, ==, 0);
+		list_remove(&rx_group->arg_vlans, avp);
+		kmem_free(avp, sizeof (aggr_vlan_t));
+	}
+
+done:
 	mac_perim_exit(mph);
 	return (err);
 }

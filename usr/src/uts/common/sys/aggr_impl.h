@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2012 OmniTI Computer Consulting, Inc  All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_SYS_AGGR_IMPL_H
@@ -54,6 +56,15 @@ extern "C" {
  */
 #define	MAC_PSEUDO_RING_INUSE	0x01
 
+/*
+ * VLAN filters placed on the Rx pseudo group.
+ */
+typedef struct aggr_vlan {
+	list_node_t	av_link;
+	uint16_t	av_vid;		/* VLAN ID */
+	uint_t		av_refs;	/* num aggr clients using this VID */
+} aggr_vlan_t;
+
 typedef struct aggr_unicst_addr_s {
 	uint8_t				aua_addr[ETHERADDRL];
 	struct aggr_unicst_addr_s	*aua_next;
@@ -73,6 +84,8 @@ typedef struct aggr_pseudo_rx_group_s {
 	aggr_unicst_addr_t	*arg_macaddr;
 	aggr_pseudo_rx_ring_t	arg_rings[MAX_RINGS_PER_GROUP];
 	uint_t			arg_ring_cnt;
+	uint_t			arg_untagged; /* num clients untagged */
+	list_t			arg_vlans;    /* VLANs on this group */
 } aggr_pseudo_rx_group_t;
 
 typedef struct aggr_pseudo_tx_ring_s {
@@ -186,11 +199,18 @@ typedef struct aggr_grp_s {
 	uint_t		lg_tx_ports_size;	/* size of lg_tx_ports */
 	uint32_t	lg_tx_policy;		/* outbound policy */
 	uint8_t		lg_mac_tx_policy;
-	uint64_t	lg_ifspeed;
 	link_state_t	lg_link_state;
+
+
+	/*
+	 * The lg_stat_lock must be held when accessing these fields.
+	 */
+	kmutex_t	lg_stat_lock;
+	uint64_t	lg_ifspeed;
 	link_duplex_t	lg_link_duplex;
 	uint64_t	lg_stat[MAC_NSTAT];
 	uint64_t	lg_ether_stat[ETHER_NSTAT];
+
 	aggr_lacp_mode_t lg_lacp_mode;		/* off, active, or passive */
 	Agg_t		aggr;			/* 802.3ad data */
 	uint32_t	lg_hcksum_txflags;
@@ -308,6 +328,8 @@ extern boolean_t aggr_port_notify_link(aggr_grp_t *, aggr_port_t *);
 extern void aggr_port_init_callbacks(aggr_port_t *);
 
 extern void aggr_recv_cb(void *, mac_resource_handle_t, mblk_t *, boolean_t);
+extern void aggr_recv_promisc_cb(void *, mac_resource_handle_t, mblk_t *,
+    boolean_t);
 
 extern void aggr_tx_ring_update(void *, uintptr_t);
 extern void aggr_tx_notify_thread(void *);
@@ -337,6 +359,9 @@ extern void aggr_grp_port_wait(aggr_grp_t *);
 
 extern int aggr_port_addmac(aggr_port_t *, const uint8_t *);
 extern void aggr_port_remmac(aggr_port_t *, const uint8_t *);
+
+extern int aggr_port_addvlan(aggr_port_t *, uint16_t);
+extern int aggr_port_remvlan(aggr_port_t *, uint16_t);
 
 extern mblk_t *aggr_ring_tx(void *, mblk_t *);
 extern mblk_t *aggr_find_tx_ring(void *, mblk_t *,

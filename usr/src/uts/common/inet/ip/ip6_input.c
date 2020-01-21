@@ -23,6 +23,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved
  *
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -143,11 +144,9 @@ static void	ip_input_multicast_v6(ire_t *, mblk_t *, ip6_t *,
  * The ill will always be valid if this function is called directly from
  * the driver.
  *
- * If ip_input_v6() is called from GLDv3:
- *
- *   - This must be a non-VLAN IP stream.
- *   - 'mp' is either an untagged or a special priority-tagged packet.
- *   - Any VLAN tag that was in the MAC header has been stripped.
+ * If this chain is part of a VLAN stream, then the VLAN tag is
+ * stripped from the MAC header before being delivered to this
+ * function.
  *
  * If the IP header in packet is not 32-bit aligned, every message in the
  * chain will be aligned before further operations. This is required on SPARC
