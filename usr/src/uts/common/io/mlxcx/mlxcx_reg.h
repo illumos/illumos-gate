@@ -60,6 +60,11 @@
 #define	MLXCX_CMD_HW_OWNED		0x01
 #define	MLXCX_CMD_STATUS(x)		((x) >> 1)
 
+/*
+ * You can't have more commands pending, than bit size of a doorbell
+ */
+#define	MLXCX_CMD_MAX		(sizeof (uint32_t) * NBBY)
+
 #define	MLXCX_UAR_CQ_ARM	0x0020
 #define	MLXCX_UAR_EQ_ARM	0x0040
 #define	MLXCX_UAR_EQ_NOARM	0x0048
@@ -152,6 +157,11 @@ typedef struct {
 	uint24be_t	mled_completion_cqn;
 } mlxcx_evdata_completion_t;
 
+typedef struct {
+	uint32be_t	mled_cmd_completion_vec;
+	uint8_t		mled_cmd_completion_rsvd[24];
+} mlxcx_evdata_cmd_completion_t;
+
 typedef enum {
 	MLXCX_EV_QUEUE_TYPE_QP	= 0x0,
 	MLXCX_EV_QUEUE_TYPE_RQ	= 0x1,
@@ -175,6 +185,7 @@ typedef struct {
 	uint8_t		mleqe_rsvd3[28];
 	union {
 		uint8_t				mleqe_unknown_data[28];
+		mlxcx_evdata_cmd_completion_t	mleqe_cmd_completion;
 		mlxcx_evdata_completion_t	mleqe_completion;
 		mlxcx_evdata_page_request_t	mleqe_page_request;
 		mlxcx_evdata_port_state_t	mleqe_port_state;
@@ -1293,22 +1304,25 @@ typedef struct {
 
 /*
  * This is an artificial limit that we're imposing on our actions.
+ * Large enough to limit the number of manage pages calls we have to
+ * make, but not so large that it will overflow any of the command
+ * mailboxes.
  */
-#define	MLXCX_MANAGE_PAGES_MAX_PAGES	512
+#define	MLXCX_MANAGE_PAGES_MAX_PAGES	4096
 
 typedef struct {
 	mlxcx_cmd_in_t	mlxi_manage_pages_head;
 	uint8_t		mlxi_manage_pages_rsvd[2];
 	uint16be_t	mlxi_manage_pages_func;
 	uint32be_t	mlxi_manage_pages_npages;
-	uint64be_t	mlxi_manage_pages_pas[MLXCX_MANAGE_PAGES_MAX_PAGES];
+	uint64be_t	mlxi_manage_pages_pas[];
 } mlxcx_cmd_manage_pages_in_t;
 
 typedef struct {
 	mlxcx_cmd_out_t	mlxo_manage_pages_head;
 	uint32be_t	mlxo_manage_pages_npages;
 	uint8_t		mlxo_manage_pages_rsvd[4];
-	uint64be_t	mlxo_manage_pages_pas[MLXCX_MANAGE_PAGES_MAX_PAGES];
+	uint64be_t	mlxo_manage_pages_pas[];
 } mlxcx_cmd_manage_pages_out_t;
 
 typedef enum {

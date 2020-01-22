@@ -553,16 +553,22 @@ mlxcx_teardown_rx_group(mlxcx_t *mlxp, mlxcx_ring_group_t *g)
 			mutex_enter(&g->mlg_rx_vlan_ft->mlft_mtx);
 			ASSERT(list_is_empty(&g->mlg_rx_vlans));
 			fg = g->mlg_rx_vlan_def_fg;
-			fe = list_head(&fg->mlfg_entries);
-			if (fe->mlfe_state & MLXCX_FLOW_ENTRY_CREATED) {
-				(void) mlxcx_cmd_delete_flow_table_entry(
-				    mlxp, fe);
+			if (fg != NULL) {
+				fe = list_head(&fg->mlfg_entries);
+				if (fe->mlfe_state & MLXCX_FLOW_ENTRY_CREATED) {
+					(void)
+					    mlxcx_cmd_delete_flow_table_entry(
+					    mlxp, fe);
+				}
 			}
 			fg = g->mlg_rx_vlan_promisc_fg;
-			fe = list_head(&fg->mlfg_entries);
-			if (fe->mlfe_state & MLXCX_FLOW_ENTRY_CREATED) {
-				(void) mlxcx_cmd_delete_flow_table_entry(
-				    mlxp, fe);
+			if (fg != NULL) {
+				fe = list_head(&fg->mlfg_entries);
+				if (fe->mlfe_state & MLXCX_FLOW_ENTRY_CREATED) {
+					(void)
+					    mlxcx_cmd_delete_flow_table_entry(
+					    mlxp, fe);
+				}
 			}
 			mlxcx_teardown_flow_table(mlxp, g->mlg_rx_vlan_ft);
 			list_destroy(&g->mlg_rx_vlans);
@@ -771,7 +777,7 @@ mlxcx_rx_group_setup(mlxcx_t *mlxp, mlxcx_ring_group_t *g)
 		while (eq == NULL) {
 			eq = &mlxp->mlx_eqs[mlxp->mlx_next_eq++];
 			if (mlxp->mlx_next_eq >= mlxp->mlx_intr_count)
-				mlxp->mlx_next_eq = 1;
+				mlxp->mlx_next_eq = mlxp->mlx_intr_cq0;
 			if (eq->mleq_type != MLXCX_EQ_TYPE_ANY &&
 			    eq->mleq_type != MLXCX_EQ_TYPE_RX) {
 				/* Try the next one */
@@ -1344,7 +1350,7 @@ mlxcx_tx_group_setup(mlxcx_t *mlxp, mlxcx_ring_group_t *g)
 		while (eq == NULL) {
 			eq = &mlxp->mlx_eqs[mlxp->mlx_next_eq++];
 			if (mlxp->mlx_next_eq >= mlxp->mlx_intr_count)
-				mlxp->mlx_next_eq = 1;
+				mlxp->mlx_next_eq = mlxp->mlx_intr_cq0;
 			if (eq->mleq_type != MLXCX_EQ_TYPE_ANY &&
 			    eq->mleq_type != MLXCX_EQ_TYPE_TX) {
 				/* Try the next one */
@@ -2375,8 +2381,8 @@ mlxcx_buf_take(mlxcx_t *mlxp, mlxcx_work_queue_t *wq)
 }
 
 size_t
-mlxcx_buf_take_n(mlxcx_t *mlxp, mlxcx_work_queue_t *wq,
-    mlxcx_buffer_t **bp, size_t nbufs)
+mlxcx_buf_take_n(mlxcx_t *mlxp, mlxcx_work_queue_t *wq, mlxcx_buffer_t **bp,
+    size_t nbufs)
 {
 	mlxcx_buffer_t *b;
 	size_t done = 0;

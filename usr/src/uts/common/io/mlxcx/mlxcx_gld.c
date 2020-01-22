@@ -666,12 +666,6 @@ mlxcx_group_add_mac(void *arg, const uint8_t *mac_addr)
 	return (ret);
 }
 
-/*
- * Support for VLAN steering into groups is not yet available in upstream
- * illumos.
- */
-#if defined(MAC_VLAN_UNTAGGED)
-
 static int
 mlxcx_group_add_vlan(mac_group_driver_t gh, uint16_t vid)
 {
@@ -715,8 +709,6 @@ mlxcx_group_remove_vlan(mac_group_driver_t gh, uint16_t vid)
 
 	return (ret);
 }
-
-#endif /* MAC_VLAN_UNTAGGED */
 
 static int
 mlxcx_group_remove_mac(void *arg, const uint8_t *mac_addr)
@@ -1035,10 +1027,8 @@ mlxcx_mac_fill_rx_group(void *arg, mac_ring_type_t rtype, const int index,
 	infop->mgi_stop = NULL;
 	infop->mgi_addmac = mlxcx_group_add_mac;
 	infop->mgi_remmac = mlxcx_group_remove_mac;
-#if defined(MAC_VLAN_UNTAGGED)
 	infop->mgi_addvlan = mlxcx_group_add_vlan;
 	infop->mgi_remvlan = mlxcx_group_remove_vlan;
-#endif /* MAC_VLAN_UNTAGGED */
 
 	infop->mgi_count = g->mlg_nwqs;
 }
