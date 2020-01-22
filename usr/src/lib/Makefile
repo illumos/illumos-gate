@@ -406,7 +406,6 @@ HDRSUBDIRS=				\
 	libdhcputil	\
 	libdisasm	\
 	libdiskmgt	\
-	libdwarf	\
 	libdladm	\
 	libdll		\
 	libdlpi		\

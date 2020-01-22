@@ -83,25 +83,6 @@ ctr_new_keyblock(ctr_ctx_t *ctx,
 	ctx->ctr_offset = 0;
 }
 
-#ifdef __x86
-/*
- * It's not worth bothering to check for pointer alignment on X86 -- always
- * try to do 32-bits at a time when enough data is available.
- */
-#define TRY32(_src, _dst, _key, _keylen, _outlen)	\
-	((_keylen) > 3 && (_outlen) > 3)
-#else
-/*
- * Other platforms (e.g. SPARC) require the pointers to be aligned to
- * do 32-bits at a time.
- */
-#define TRY32(_src, _dst, _key, _keylen, _outlen)	\
-	((_keylen) > 3 && (_outlen) > 3 &&		\
-	IS_P2ALIGNED((_src), sizeof (uint32_t)) &&	\
-	IS_P2ALIGNED((_dst), sizeof (uint32_t)) &&	\
-	IS_P2ALIGNED((_key), sizeof (uint32_t)))
-#endif
-
 /*
  * XOR the input with the keystream and write the result to out.
  * This requires that the amount of data in 'in' is >= outlen
@@ -112,11 +93,11 @@ ctr_new_keyblock(ctr_ctx_t *ctx,
  * between calls.
  */
 static void
-ctr_xor(ctr_ctx_t *ctx, uint8_t *in, uint8_t *out, size_t outlen,
+ctr_xor(ctr_ctx_t *ctx, const uint8_t *in, uint8_t *out, size_t outlen,
     size_t block_size,
     int (*cipher)(const void *ks, const uint8_t *pt, uint8_t *ct))
 {
-	uint8_t *keyp;
+	const uint8_t *keyp;
 	size_t keyamt;
 
 	while (outlen > 0) {
@@ -134,12 +115,29 @@ ctr_xor(ctr_ctx_t *ctx, uint8_t *in, uint8_t *out, size_t outlen,
 		keyamt = block_size - ctx->ctr_offset;
 
 		/*
-		 * Try to process 32-bits at a time when possible.
+		 * xor a byte at a time (while we have data and output
+		 * space) and try to get in, out, and keyp 32-bit aligned.
+		 * If in, out, and keyp all do become 32-bit aligned,
+		 * we switch to xor-ing 32-bits at a time until we run out
+		 * of 32-bit chunks, then switch back to xor-ing a byte at
+		 * a time for any remainder.
 		 */
-		if (TRY32(in, out, keyp, keyamt, outlen)) {
-			uint32_t *in32 = (uint32_t *)in;
+		while (keyamt > 0 && outlen > 0 &&
+		    !IS_P2ALIGNED(in, sizeof (uint32_t)) &&
+		    !IS_P2ALIGNED(out, sizeof (uint32_t)) &&
+		    !IS_P2ALIGNED(keyp, sizeof (uint32_t))) {
+			*out++ = *in++ ^ *keyp++;
+			keyamt--;
+			outlen--;
+		}
+
+		if (keyamt > 3 && outlen > 3 &&
+		    IS_P2ALIGNED(in, sizeof (uint32_t)) &&
+		    IS_P2ALIGNED(out, sizeof (uint32_t)) &&
+		    IS_P2ALIGNED(keyp, sizeof (uint32_t))) {
+			const uint32_t *key32 = (const uint32_t *)keyp;
+			const uint32_t *in32 = (const uint32_t *)in;
 			uint32_t *out32 = (uint32_t *)out;
-			uint32_t *key32 = (uint32_t *)keyp;
 
 			do {
 				*out32++ = *in32++ ^ *key32++;
@@ -147,9 +145,9 @@ ctr_xor(ctr_ctx_t *ctx, uint8_t *in, uint8_t *out, size_t outlen,
 				outlen -= sizeof (uint32_t);
 			} while (keyamt > 3 && outlen > 3);
 
-			in = (uint8_t *)in32;
+			keyp = (const uint8_t *)key32;
+			in = (const uint8_t *)in32;
 			out = (uint8_t *)out32;
-			keyp = (uint8_t *)key32;
 		}
 
 		while (keyamt > 0 && outlen > 0) {
@@ -166,17 +164,17 @@ ctr_xor(ctr_ctx_t *ctx, uint8_t *in, uint8_t *out, size_t outlen,
  * Encrypt and decrypt multiple blocks of data in counter mode.
  */
 int
-ctr_mode_contiguous_blocks(ctr_ctx_t *ctx, char *data, size_t length,
+ctr_mode_contiguous_blocks(ctr_ctx_t *ctx, char *in, size_t in_length,
     crypto_data_t *out, size_t block_size,
     int (*cipher)(const void *ks, const uint8_t *pt, uint8_t *ct))
 {
-	size_t remainder = length;
-	uint8_t *datap = (uint8_t *)data;
+	size_t in_remainder = in_length;
+	uint8_t *inp = (uint8_t *)in;
 	void *iov_or_mp;
 	offset_t offset;
-	uint8_t *out_data_1;
-	uint8_t *out_data_2;
-	size_t out_data_1_len;
+	uint8_t *out_data;
+	uint8_t *out_data_remainder;
+	size_t out_data_len;
 
 	if (block_size > sizeof (ctx->ctr_keystream))
 		return (CRYPTO_ARGUMENTS_BAD);
@@ -184,33 +182,56 @@ ctr_mode_contiguous_blocks(ctr_ctx_t *ctx, char *data, size_t length,
 	if (out == NULL)
 		return (CRYPTO_ARGUMENTS_BAD);
 
+	/* Make sure 'out->cd_offset + in_length' doesn't overflow. */
+	if (out->cd_offset < 0)
+		return (CRYPTO_DATA_LEN_RANGE);
+	if (SIZE_MAX - in_length < (size_t)out->cd_offset)
+		return (CRYPTO_ENCRYPTED_DATA_LEN_RANGE);
+
 	/*
 	 * This check guarantees 'out' contains sufficient space for
 	 * the resulting output.
 	 */
-	if (out->cd_offset + length > out->cd_length)
+	if (out->cd_offset + in_length > out->cd_length)
 		return (CRYPTO_BUFFER_TOO_SMALL);
 
 	crypto_init_ptrs(out, &iov_or_mp, &offset);
 
 	/* Now XOR the output with the keystream */
-	while (remainder > 0) {
-		crypto_get_ptrs(out, &iov_or_mp, &offset, &out_data_1,
-		    &out_data_1_len, &out_data_2, remainder);
+	while (in_remainder > 0) {
+		/*
+		 * If out is a uio_t or an mblk_t, in_remainder might be
+		 * larger than an individual iovec_t or mblk_t in out.
+		 * crypto_get_ptrs uses the value of offset to set the
+		 * the value of out_data to the correct address for writing
+		 * and sets out_data_len to reflect the largest amount of data
+		 * (up to in_remainder) that can be written to out_data. It
+		 * also increments offset by out_data_len. out_data_remainder
+		 * is set to the start of the next segment for writing, however
+		 * it is not used here since the updated value of offset
+		 * will be used in the next loop iteration to locate the
+		 * next mblk_t/iovec_t. Since the sum of the size of all data
+		 * buffers in 'out' (out->cd_length) was checked immediately
+		 * prior to starting the loop, we should always terminate
+		 * the loop.
+		 */
+		crypto_get_ptrs(out, &iov_or_mp, &offset, &out_data,
+		    &out_data_len, &out_data_remainder, in_remainder);
 
 		/*
-		 * crypto_get_ptrs() should guarantee this, but act as a
+		 * crypto_get_ptrs() should guarantee these, but act as a
 		 * safeguard in case the behavior ever changes.
 		 */
-		ASSERT3U(out_data_1_len, <=, remainder);
-		ctr_xor(ctx, datap, out_data_1, out_data_1_len, block_size,
-		    cipher);
+		ASSERT3U(out_data_len, <=, in_remainder);
+		ASSERT3U(out_data_len, >, 0);
 
-		datap += out_data_1_len;
-		remainder -= out_data_1_len;
+		ctr_xor(ctx, inp, out_data, out_data_len, block_size, cipher);
+
+		inp += out_data_len;
+		in_remainder -= out_data_len;
 	}
 
-	out->cd_offset += length;
+	out->cd_offset += in_length;
 
 	return (CRYPTO_SUCCESS);
 }

@@ -1055,7 +1055,7 @@ aes_encrypt_atomic(crypto_provider_handle_t provider,
 			    aes_xor_block);
 			if (ret != CRYPTO_SUCCESS)
 				goto out;
-			ASSERT(aes_ctx.ac_remainder_len == 0);
+			ASSERT3U(aes_ctx.ac_remainder_len, ==, 0);
 			break;
 		case AES_GCM_MECH_INFO_TYPE:
 		case AES_GMAC_MECH_INFO_TYPE:
@@ -1064,9 +1064,22 @@ aes_encrypt_atomic(crypto_provider_handle_t provider,
 			    aes_copy_block, aes_xor_block);
 			if (ret != CRYPTO_SUCCESS)
 				goto out;
-			ASSERT(aes_ctx.ac_remainder_len == 0);
+			ASSERT3U(aes_ctx.ac_remainder_len, ==, 0);
 			break;
 		case AES_CTR_MECH_INFO_TYPE:
+			/*
+			 * Note that this use of the ASSERT3U has a slightly
+			 * different meaning than the other uses in the
+			 * switch statement. The other uses are to ensure
+			 * no unprocessed plaintext remains after encryption
+			 * (and that the input plaintext was an exact multiple
+			 * of AES_BLOCK_LEN).
+			 *
+			 * For CTR mode, it is ensuring that no input
+			 * plaintext was ever segmented and buffered during
+			 * processing (since it's a stream cipher).
+			 */
+			ASSERT3U(aes_ctx.ac_remainder_len, ==, 0);
 			break;
 		case AES_CMAC_MECH_INFO_TYPE:
 			ret = cmac_mode_final((cbc_ctx_t *)&aes_ctx,
@@ -1076,7 +1089,7 @@ aes_encrypt_atomic(crypto_provider_handle_t provider,
 				goto out;
 			break;
 		default:
-			ASSERT(aes_ctx.ac_remainder_len == 0);
+			ASSERT3U(aes_ctx.ac_remainder_len, ==, 0);
 			break;
 		}
 
@@ -1198,7 +1211,7 @@ aes_decrypt_atomic(crypto_provider_handle_t provider,
 			ret = ccm_decrypt_final((ccm_ctx_t *)&aes_ctx,
 			    plaintext, AES_BLOCK_LEN, aes_encrypt_block,
 			    aes_copy_block, aes_xor_block);
-			ASSERT(aes_ctx.ac_remainder_len == 0);
+			ASSERT3U(aes_ctx.ac_remainder_len, ==, 0);
 			if ((ret == CRYPTO_SUCCESS) &&
 			    (ciphertext != plaintext)) {
 				plaintext->cd_length =
@@ -1212,7 +1225,7 @@ aes_decrypt_atomic(crypto_provider_handle_t provider,
 			ret = gcm_decrypt_final((gcm_ctx_t *)&aes_ctx,
 			    plaintext, AES_BLOCK_LEN, aes_encrypt_block,
 			    aes_xor_block);
-			ASSERT(aes_ctx.ac_remainder_len == 0);
+			ASSERT3U(aes_ctx.ac_remainder_len, ==, 0);
 			if ((ret == CRYPTO_SUCCESS) &&
 			    (ciphertext != plaintext)) {
 				plaintext->cd_length =
@@ -1228,7 +1241,7 @@ aes_decrypt_atomic(crypto_provider_handle_t provider,
 			}
 			break;
 		default:
-			ASSERT(aes_ctx.ac_remainder_len == 0);
+			ASSERT3U(aes_ctx.ac_remainder_len, ==, 0);
 			if (ciphertext != plaintext) {
 				plaintext->cd_length =
 				    plaintext->cd_offset - saved_offset;

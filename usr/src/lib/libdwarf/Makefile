@@ -26,9 +26,9 @@ lint :=		TARGET = lint
 
 .KEEP_STATE:
 
-all clean clobber lint install_h: $(SUBDIRS)
+all clean clobber : $(SUBDIRS)
 
-install: install_h $(SUBDIRS)
+install: $(SUBDIRS)
 
 check:		$(CHECKHDRS)
 

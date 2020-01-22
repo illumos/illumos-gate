@@ -814,6 +814,12 @@ soft_aes_encrypt_update(soft_session_t *session_p, CK_BYTE_PTR pData,
 	size_t out_len;
 	int rc;
 
+	/*
+	 * If pData is NULL, we should have zero bytes to process, and
+	 * the aes_encrypt_contiguous_blocks() call will be an effective no-op.
+	 */
+	IMPLY(pData == NULL, ulDataLen == 0);
+
 	/* Check size of the output buffer */
 	switch (mech) {
 	case CKM_AES_CMAC:
