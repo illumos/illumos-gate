@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <grp.h>
@@ -239,7 +240,7 @@ getmembers_DN(char **bufpp, int *lenp, ns_ldap_attr_t *members)
 	char	*buffer;
 	int	buflen;
 	int	i, len;
-	int	nss_result = 0;
+	int	nss_result = 0; /* used by TEST_AND_ADJUST macro */
 	int	firsttime;
 
 	buffer = *bufpp;
@@ -263,9 +264,8 @@ getmembers_DN(char **bufpp, int *lenp, ns_ldap_attr_t *members)
 		if (member_dn[0] == '\0')
 			continue;
 
-		nss_result = __ns_ldap_dn2uid(member_dn,
-		    &member_uid, NULL, &error);
-		if (nss_result != NS_LDAP_SUCCESS) {
+		if (__ns_ldap_dn2uid(member_dn,
+		    &member_uid, NULL, &error) != NS_LDAP_SUCCESS) {
 			(void) __ns_ldap_freeError(&error);
 			error = NULL;
 			continue;

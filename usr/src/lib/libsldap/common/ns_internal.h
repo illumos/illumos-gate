@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 
@@ -67,8 +68,7 @@ extern "C" {
 #define	UIDNUMFILTER_SSD	"(&(%%s)(uidnumber=%s))"
 #define	UIDFILTER		"(&(objectclass=posixAccount)(uid=%s))"
 #define	UIDFILTER_SSD		"(&(%%s)(uid=%s))"
-#define	UIDDNFILTER	"(&(objectclass=posixAccount)(distinguishedName=%s))"
-#define	UIDDNFILTER_SSD		"(&(%%s)(distinguishedName=%s))"
+#define	UIDDNFILTER		"(objectclass=posixAccount)"
 
 #define	HOSTFILTER		"(&(objectclass=ipHost)(cn=%s))"
 #define	HOSTFILTER_SSD		"(&(%%s)(cn=%s))"
@@ -765,6 +765,7 @@ int __s_api_requestServer(const char *request, const char *server,
 
 /* ************ internal sldap-api functions *********** */
 void	__ns_ldap_freeEntry(ns_ldap_entry_t *ep);
+void	__ns_ldap_freeASearchDesc(ns_ldap_search_desc_t *);
 void	__s_api_split_key_value(char *buffer, char **name, char **value);
 int	__s_api_printResult(ns_ldap_result_t *);
 int	__s_api_getSearchScope(int *, ns_ldap_error_t **);
@@ -856,25 +857,16 @@ ns_ldap_error_t *__ns_ldap_print_config(int);
 void		__ns_ldap_default_config();
 int		__ns_ldap_download(const char *, char *, char *,
 				ns_ldap_error_t **);
-int
-__ns_ldap_check_dns_preq(int foreground,
-		int mode_verbose,
-		int mode_quiet,
-		const char *fname,
-		ns_ldap_self_gssapi_config_t config,
-		ns_ldap_error_t **errpp);
-int
-__ns_ldap_check_gssapi_preq(int foreground,
-		int mode_verbose,
-		int mode_quiet,
-		ns_ldap_self_gssapi_config_t config,
-		ns_ldap_error_t **errpp);
-int
-__ns_ldap_check_all_preq(int foreground,
-		int mode_verbose,
-		int mode_quiet,
-		ns_ldap_self_gssapi_config_t config,
-		ns_ldap_error_t **errpp);
+int __ns_ldap_check_dns_preq(int foreground, int mode_verbose, int mode_quiet,
+    const char *fname, ns_ldap_self_gssapi_config_t config,
+    ns_ldap_error_t **errpp);
+
+int __ns_ldap_check_gssapi_preq(int foreground, int mode_verbose,
+    int mode_quiet, ns_ldap_self_gssapi_config_t config,
+    ns_ldap_error_t **errpp);
+
+int __ns_ldap_check_all_preq(int foreground, int mode_verbose, int mode_quiet,
+    ns_ldap_self_gssapi_config_t config, ns_ldap_error_t **errpp);
 
 /* internal un-exposed APIs */
 ns_cred_t	*__ns_ldap_dupAuth(const ns_cred_t *authp);
