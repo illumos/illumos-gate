@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
 # Definitions common to tool source.
 #
@@ -60,6 +61,7 @@ LDFLAGS=		$(MAPFILE.NES:%=-M%) $(MAPFILE.NED:%=-M%) \
 CW_LINKER=
 
 ROOTONBLDPROG=		$(PROG:%=$(ROOTONBLDBIN)/%)
+ROOTONBLDSCRIPTS=	$(SCRIPTS:%=$(ROOTONBLDBIN)/%)
 ROOTONBLDMACHPROG=	$(PROG:%=$(ROOTONBLDBINMACH)/%)
 ROOTONBLDSHFILES=	$(SHFILES:%=$(ROOTONBLDBIN)/%)
 ROOTONBLDMAKEFILES=	$(MAKEFILES:%=$(ROOTONBLDBIN)/%)
