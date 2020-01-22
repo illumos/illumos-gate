@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -82,10 +80,9 @@ debug(int level, char *cp, char *fmt, ...)
 				tmp[i] = cp[i];
 		}
 		tmp[i] = '\0';
-		(void) sprintf(buf, "%s [cp='%s']\n", fmt, tmp);
+		(void) snprintf(buf, sizeof (buf), "%s [cp='%s']\n", fmt, tmp);
 	} else {
-		strcpy(buf, fmt);
-		strcat(buf, "\n");
+		(void) snprintf(buf, sizeof (buf), "%s\n", fmt);
 	}
 
 	va_start(ap, fmt);
@@ -102,7 +99,7 @@ expected(
 	char *where)	/* where we were in the line of input */
 {
 	fprintf(stderr, "%s, input line %d: expecting \"%s\" at \"%s\"\n",
-		who, line_number, what, where);
+	    who, line_number, what, where);
 	exit(1);
 }
 
@@ -117,7 +114,7 @@ get_line(void)
 	if (line_number == debug_line) {
 		fprintf(stderr, "Hit debug line number %d\n", line_number);
 		for (;;)
-			sleep(1);
+			(void) sleep(1);
 	}
 	return (cp);
 }
@@ -239,7 +236,7 @@ parseline(char *cp)
 	if (tagdef) {
 		tagdecl(cp, &tdp, h, w);
 	} else {
-		tdefdecl(cp, h, &tdp);
+		(void) tdefdecl(cp, h, &tdp);
 		tagadd(w, h, tdp);
 	}
 }
@@ -384,10 +381,10 @@ tagdecl(char *cp, struct tdesc **rtdp, int h, char *w)
 
 	switch (*cp++) {
 	case 's':
-		soudef(cp, STRUCT, rtdp);
+		(void) soudef(cp, STRUCT, rtdp);
 		break;
 	case 'u':
-		soudef(cp, UNION, rtdp);
+		(void) soudef(cp, UNION, rtdp);
 		break;
 	case 'e':
 		enumdef(cp, rtdp);
