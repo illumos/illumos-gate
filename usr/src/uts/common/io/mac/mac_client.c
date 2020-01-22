@@ -1436,6 +1436,7 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 	mcip->mci_flent = flent;
 	FLOW_MARK(flent, FE_MC_NO_DATAPATH);
 	flent->fe_mcip = mcip;
+
 	/*
 	 * Place initial creation reference on the flow. This reference
 	 * is released in the corresponding delete action viz.
@@ -2437,7 +2438,17 @@ done_setup:
 	if (flent->fe_rx_ring_group != NULL)
 		mac_rx_group_unmark(flent->fe_rx_ring_group, MR_INCIPIENT);
 	FLOW_UNMARK(flent, FE_INCIPIENT);
-	FLOW_UNMARK(flent, FE_MC_NO_DATAPATH);
+
+	/*
+	 * If this is an aggr port client, don't enable the flow's
+	 * datapath at this stage. Otherwise, bcast traffic could
+	 * arrive while the aggr port is in the process of
+	 * initializing. Instead, the flow's datapath is started later
+	 * when mac_client_set_flow_cb() is called.
+	 */
+	if ((mcip->mci_state_flags & MCIS_IS_AGGR_PORT) == 0)
+		FLOW_UNMARK(flent, FE_MC_NO_DATAPATH);
+
 	mac_tx_client_unblock(mcip);
 	return (0);
 bail:
