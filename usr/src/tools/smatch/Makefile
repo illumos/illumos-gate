@@ -20,7 +20,7 @@
 #
 
 PROG = smatch
-SPARSE_VERSION = 0.6.1-rc1-il-3
+SPARSE_VERSION = 0.6.1-rc1-il-4
 
 include ../Makefile.tools
 
@@ -123,6 +123,7 @@ SMATCH_OBJS += smatch_expression_stacks.o
 SMATCH_OBJS += smatch_extra.o
 SMATCH_OBJS += smatch_files.o
 SMATCH_OBJS += smatch_flow.o
+SMATCH_OBJS += smatch_fresh_alloc.o
 SMATCH_OBJS += smatch_fn_arg_link.o
 SMATCH_OBJS += smatch_function_hooks.o
 SMATCH_OBJS += smatch_function_info.o
