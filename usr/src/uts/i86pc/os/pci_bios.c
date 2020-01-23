@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -70,7 +71,7 @@ pci_bios_get_irq_routing(pci_irq_route_t *routes, int nroutes, int *nneededp)
 	struct bop_regs regs;
 	uchar_t		*hdrp;
 	uchar_t		*bufp;
-	int 		i, n;
+	int		i, n;
 	int		rval = 0;
 
 	if (nneededp)
@@ -155,13 +156,14 @@ pci_get_irq_routing_table(void)
 			cmn_err(CE_CONT,
 			    "pci: unable to get IRQ routing information, "
 			    "required buffer space for %d entries\n", n);
-			kmem_free(routes, n * sizeof (pci_irq_route_t));
 		}
 	}
 
 	if (nroutes > 0) {
 		pci_irq_routes = routes;
 		pci_irq_nroutes = nroutes;
+	} else {
+		kmem_free(routes, n * sizeof (pci_irq_route_t));
 	}
 }
 
