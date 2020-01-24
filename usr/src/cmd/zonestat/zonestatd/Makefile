@@ -35,16 +35,13 @@ ROOTMANIFESTDIR =	$(ROOTSVCSYSTEM)
 SRCS =	zonestatd.c
 
 CPPFLAGS	+= -I$(ADJUNCT_PROTO)/usr/include/libxml2
-LDLIBS 		+= -lkstat -lpool -lexacct -lscf \
+LDLIBS		+= -lkstat -lpool -lexacct -lscf \
 		    -lcontract -lcmdutils -lumem
 
 LINTFLAGS	+= -u
-CERRWARN 	+= -_gcc=-Wno-parentheses
-CERRWARN 	+= -_gcc=-Wno-unused-label
-CERRWARN 	+= $(CNOWARN_UNINIT)
-
-# not linted
-SMATCH=off
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-unused-label
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 OBJS =		$(SRCS:%.c=%.o)
 

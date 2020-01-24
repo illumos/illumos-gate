@@ -2358,7 +2358,7 @@ main(int argc, char *argv[])
 		}
 	}
 
-	if (opt_line_any & (!opt_parseable)) {
+	if (opt_line_any && (!opt_parseable)) {
 		(void) zonestat_error(gettext("-P requires -p"));
 		return (zonestat_usage(B_FALSE));
 	}
