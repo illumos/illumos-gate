@@ -26,6 +26,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_PCONTROL_H
@@ -150,7 +151,7 @@ typedef struct lwp_info {	/* per-lwp information from core file */
 
 typedef struct fd_info {
 	plist_t	fd_list;	/* linked list */
-	prfdinfo_t fd_info;	/* fd info */
+	prfdinfo_t *fd_info;	/* fd info */
 } fd_info_t;
 
 typedef struct core_info {	/* information specific to core files */

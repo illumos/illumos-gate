@@ -14,6 +14,7 @@
  */
 /*
  * Copyright (c) 2013 Joyent, Inc.  All Rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <limits.h>
@@ -27,6 +28,7 @@
 
 #include "libproc.h"
 #include "Pcontrol.h"
+#include "proc_fd.h"
 
 /*
  * Pfdinfo.c - obtain open file information.
@@ -51,10 +53,13 @@ Pfd2info(struct ps_prochandle *P, int fd)
 	}
 
 	for (i = 0; i < P->num_fd; i++, fip = list_next(fip)) {
-		if (fip->fd_info.pr_fd == fd) {
+		if (fip->fd_info == NULL)
+			continue;
+
+		if (fip->fd_info->pr_fd == fd) {
 			return (fip);
 		}
-		if (fip->fd_info.pr_fd < fd) {
+		if (fip->fd_info->pr_fd < fd) {
 			break;
 		}
 	}
@@ -63,10 +68,32 @@ Pfd2info(struct ps_prochandle *P, int fd)
 	if ((fip = calloc(1, sizeof (*fip))) == NULL)
 		return (NULL);
 
-	fip->fd_info.pr_fd = fd;
 	list_link(fip, next ? next : (void *)&(P->fd_head));
 	P->num_fd++;
 	return (fip);
+}
+
+static int
+fdwalk_cb(const prfdinfo_t *info, void *arg)
+{
+	struct ps_prochandle *P = arg;
+	fd_info_t *fip;
+
+	fip = Pfd2info(P, info->pr_fd);
+	if (fip == NULL) {
+		errno = ENOMEM;
+		return (-1);
+	}
+
+	if (fip->fd_info == NULL)
+		fip->fd_info = proc_fdinfo_dup(info);
+
+	if (fip->fd_info == NULL) {
+		errno = ENOMEM;
+		return (-1);
+	}
+
+	return (0);
 }
 
 /*
@@ -81,83 +108,13 @@ load_fdinfo(struct ps_prochandle *P)
 	 * This is an edge case it isn't worth adding additional state to
 	 * to eliminate.
 	 */
-	if (P->num_fd > 0) {
+	if (P->num_fd > 0)
 		return;
-	}
 
-	if (P->state != PS_DEAD && P->state != PS_IDLE) {
-		char dir_name[PATH_MAX];
-		char path[PATH_MAX];
-		struct dirent *ent;
-		DIR	*dirp;
-		int	fd;
+	if (P->state == PS_DEAD || P->state == PS_IDLE)
+		return;
 
-		/*
-		 * Try to get the path information first.
-		 */
-		(void) snprintf(dir_name, sizeof (dir_name),
-		    "%s/%d/path", procfs_path, (int)P->pid);
-		dirp = opendir(dir_name);
-		if (dirp == NULL) {
-			return;
-		}
-		ent = NULL;
-		while ((ent = readdir(dirp)) != NULL) {
-			fd_info_t	*fip;
-			prfdinfo_t	*info;
-			int		len;
-			struct stat64	stat;
-
-			if (!isdigit(ent->d_name[0]))
-				continue;
-
-			fd = atoi(ent->d_name);
-
-			fip = Pfd2info(P, fd);
-			info = &fip->fd_info;
-			info->pr_fd = fd;
-
-			if (pr_fstat64(P, fd, &stat) == 0) {
-				info->pr_mode = stat.st_mode;
-				info->pr_uid = stat.st_uid;
-				info->pr_gid = stat.st_gid;
-				info->pr_major = major(stat.st_dev);
-				info->pr_minor = minor(stat.st_dev);
-				info->pr_rmajor = major(stat.st_rdev);
-				info->pr_rminor = minor(stat.st_rdev);
-				info->pr_size = stat.st_size;
-				info->pr_ino = stat.st_ino;
-			}
-
-			info->pr_fileflags = pr_fcntl(P, fd, F_GETXFL, 0);
-			info->pr_fdflags = pr_fcntl(P, fd, F_GETFD, 0);
-			info->pr_offset = pr_llseek(P, fd, 0, SEEK_CUR);
-
-			/* attempt to determine the path to it */
-			switch (info->pr_mode & S_IFMT) {
-			case S_IFDOOR:
-			case S_IFSOCK:
-				/* not applicable */
-				len = -1;
-				break;
-			default:
-				(void) snprintf(path, sizeof (path),
-				    "%s/%d/path/%d", procfs_path, (int)P->pid,
-				    fd);
-				len = readlink(path, info->pr_path,
-				    sizeof (info->pr_path) - 1);
-				break;
-			}
-
-			if (len < 0) {
-				info->pr_path[0] = 0;
-			} else {
-				info->pr_path[len] = 0;
-			}
-		}
-		(void) closedir(dirp);
-
-	}
+	proc_fdwalk(P->pid, fdwalk_cb, P);
 }
 
 int
@@ -174,7 +131,7 @@ Pfdinfo_iter(struct ps_prochandle *P, proc_fdinfo_f *func, void *cd)
 	for (fip = list_prev(&P->fd_head);
 	    fip != (void *)&P->fd_head && fip != NULL;
 	    fip = list_prev(fip)) {
-		if ((rv = func(cd, &fip->fd_info)) != 0)
+		if ((rv = func(cd, fip->fd_info)) != 0)
 			return (rv);
 	}
 	return (0);

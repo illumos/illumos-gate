@@ -26,6 +26,7 @@
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _SYS_PROCFS_H
@@ -508,7 +509,7 @@ typedef struct prasmap {
 #define	PG_HWMAPPED	0x04		/* page is present and mapped */
 
 /*
- * Open files.  Only in core files (for now).  Note that we'd like to use
+ * Open file information; used in core files.  Note that we'd like to use
  * the stat or stat64 structure, but both of these structures are unfortunately
  * not consistent between 32 and 64 bit modes.  To keep our lives simpler, we
  * just define our own structure with types that are not sensitive to this
@@ -516,7 +517,7 @@ typedef struct prasmap {
  * struct stat (e.g. times, device sizes, etc.) so we don't bother adding those
  * here.
  */
-typedef struct prfdinfo {
+typedef struct prfdinfo_core {
 	int		pr_fd;
 	mode_t		pr_mode;
 
@@ -537,7 +538,96 @@ typedef struct prfdinfo {
 	int		pr_fdflags;	/* fcntl(F_GETFD), etc. */
 
 	char		pr_path[MAXPATHLEN];
+} prfdinfo_core_t;
+
+/*
+ * Open file information; used in /proc/<pid>/fdinfo/nn files.
+ * This differs from prfdinfo_core_t above as it exposes more information
+ * and is variable length, with the last element, pr_misc, pointing to an
+ * array of miscellaneous data items.
+ */
+
+typedef struct prfdinfo {
+	int		pr_fd;		/* file descriptor number */
+	mode_t		pr_mode;	/* (see st_mode in stat(2)) */
+	ino64_t		pr_ino;		/* inode number */
+	off64_t		pr_size;	/* file size */
+	off64_t		pr_offset;	/* current offset of file descriptor */
+	uid_t		pr_uid;		/* owner's user id */
+	gid_t		pr_gid;		/* owner's group id */
+	major_t		pr_major;	/* major number of device */
+	minor_t		pr_minor;	/* minor number of device */
+	major_t		pr_rmajor;	/* major number (if special file) */
+	minor_t		pr_rminor;	/* minor number (if special file) */
+	int		pr_fileflags;	/* (see F_GETXFL in fcntl(2)) */
+	int		pr_fdflags;	/* (see F_GETFD in fcntl(2)) */
+	short		pr_locktype;	/* (see F_GETLK in fcntl(2)) */
+	pid_t		pr_lockpid;	/* process holding file lock */
+					/* (see F_GETLK) */
+	int		pr_locksysid;	/* sysid of locking process */
+					/* (see F_GETLK) */
+	pid_t		pr_peerpid;	/* peer process (socket, door) */
+	int		pr_filler[25];	/* reserved for future use */
+	char		pr_peername[PRFNSZ];	/* peer process name */
+#if	__STDC_VERSION__ >= 199901L
+	uint8_t		pr_misc[];	/* self describing structures */
+#else
+	uint8_t		pr_misc[1];	/* self describing structures */
+#endif
 } prfdinfo_t;
+
+/* pr_misc item size is rounded up to maintain alignment */
+#define	PRFDINFO_ROUNDUP(num) P2ROUNDUP((num), 4)
+
+typedef struct pr_misc_header {
+	uint_t		pr_misc_size;
+	uint_t		pr_misc_type;
+} pr_misc_header_t;
+
+/*
+ * The gaps in this enumeration are present to maintain compatibility with
+ * the values used in Solaris. Any future illumos-specific additions to this
+ * list should use the PR_ILLUMOS_ prefix, be placed after PR_MISC_TYPES_MAX
+ * and start from a number sufficiently large enough to leave space for any
+ * future additions in Solaris.
+ */
+
+enum PR_MISC_TYPES {
+	PR_PATHNAME,
+	PR_SOCKETNAME,
+	PR_PEERSOCKNAME,
+	PR_SOCKOPTS_BOOL_OPTS,
+	PR_SOCKOPT_LINGER,
+	PR_SOCKOPT_SNDBUF,
+	PR_SOCKOPT_RCVBUF,
+	PR_SOCKOPT_IP_NEXTHOP,
+	PR_SOCKOPT_IPV6_NEXTHOP,
+	PR_SOCKOPT_TYPE,
+	PR_SOCKOPT_TCP_CONGESTION = 11,
+	PR_SOCKFILTERS_PRIV = 14,
+	PR_MISC_TYPES_MAX
+};
+
+typedef struct prsockopts_bool_opts {
+	unsigned int prsock_bool_opts;
+} prsockopts_bool_opts_t;
+
+#define	PR_SO_DEBUG		(1 << 0)
+#define	PR_SO_REUSEADDR		(1 << 1)
+#define	PR_SO_REUSEPORT		(1 << 2)
+#define	PR_SO_KEEPALIVE		(1 << 3)
+#define	PR_SO_DONTROUTE		(1 << 4)
+#define	PR_SO_BROADCAST		(1 << 5)
+#define	PR_SO_OOBINLINE		(1 << 7)
+#define	PR_SO_DGRAM_ERRIND	(1 << 8)
+#define	PR_SO_ALLZONES		(1 << 9)
+#define	PR_SO_MAC_EXEMPT	(1 << 10)
+#define	PR_SO_EXCLBIND		(1 << 11)
+#define	PR_SO_PASSIVE_CONNECT	(1 << 12)
+#define	PR_SO_ACCEPTCONN	(1 << 13)
+#define	PR_UDP_NAT_T_ENDPOINT	(1 << 14)
+#define	PR_SO_VRRP		(1 << 15)
+#define	PR_SO_MAC_IMPLICIT	(1 << 16)
 
 /*
  * Representation of LWP name in core files.  In /proc, we use a simple char

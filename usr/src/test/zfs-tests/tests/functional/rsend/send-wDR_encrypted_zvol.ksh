@@ -16,7 +16,7 @@
 
 #
 # Copyright (c) 2018 by Datto Inc. All rights reserved.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 . $STF_SUITE/tests/functional/rsend/rsend.kshlib
@@ -96,8 +96,8 @@ log_must block_device_wait
 
 log_must mount $recvdev $recvmnt
 
-md5_1=$(cat $mntpnt/* | md5sum | awk '{print $1}')
-md5_2=$(cat $recvmnt/* | md5sum | awk '{print $1}')
+md5_1=$(cat $mntpnt/* | digest -a md5)
+md5_2=$(cat $recvmnt/* | digest -a md5)
 [[ "$md5_1" == "$md5_2" ]] || log_fail "md5 mismatch: $md5_1 != $md5_2"
 
 log_pass "zfs can receive raw, recursive, and deduplicated send streams"

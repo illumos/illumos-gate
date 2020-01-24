@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -65,8 +66,7 @@ log_must zpool create $spool $VDEV0
 log_must zfs create $spool/$sfs
 
 typeset -i orig_count=$(zpool history $spool | wc -l)
-typeset orig_md5=$(zpool history $spool | head -2 | md5sum | \
-    awk '{print $1}')
+typeset orig_md5=$(zpool history $spool | head -2 | digest -a md5)
 
 typeset -i i=0
 while ((i < 300)); do
@@ -82,7 +82,7 @@ done
 TMPFILE=/tmp/spool.$$
 zpool history $spool >$TMPFILE
 typeset -i entry_count=$(wc -l $TMPFILE | awk '{print $1}')
-typeset final_md5=$(head -2 $TMPFILE | md5sum | awk '{print $1}')
+typeset final_md5=$(head -2 $TMPFILE | digest -a md5)
 
 grep 'zpool create' $TMPFILE >/dev/null 2>&1 ||
     log_fail "'zpool create' was not found in pool history"

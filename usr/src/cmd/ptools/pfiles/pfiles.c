@@ -25,6 +25,7 @@
  */
 /*
  * Copyright (c) 2017 Joyent, Inc.  All Rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <stdio.h>
@@ -51,28 +52,19 @@
 #include <ucred.h>
 #include <zone.h>
 
-#define	copyflock(dst, src) \
-	(dst).l_type = (src).l_type;		\
-	(dst).l_whence = (src).l_whence;	\
-	(dst).l_start = (src).l_start;		\
-	(dst).l_len = (src).l_len;		\
-	(dst).l_sysid = (src).l_sysid;		\
-	(dst).l_pid = (src).l_pid;
-
 static char *command;
 static volatile int interrupt;
 static int Fflag;
 static boolean_t nflag = B_FALSE;
 
 static	void	intr(int);
-static	void	dofcntl(struct ps_prochandle *, prfdinfo_t *, int, int);
-static	void	dosocket(struct ps_prochandle *, int);
-static	void	dofifo(struct ps_prochandle *, int);
-static	void	dotli(struct ps_prochandle *, int);
+static	void	dofcntl(struct ps_prochandle *, const prfdinfo_t *, int, int);
+static	void	dosocket(struct ps_prochandle *, const prfdinfo_t *);
+static	void	dosocknames(struct ps_prochandle *, const prfdinfo_t *);
+static	void	dofifo(struct ps_prochandle *, const prfdinfo_t *);
 static	void	show_files(struct ps_prochandle *);
 static	void	show_fileflags(int);
-static	void	show_door(struct ps_prochandle *, int);
-static	int	getflock(struct ps_prochandle *, int, struct flock *);
+static	void	show_door(struct ps_prochandle *, const prfdinfo_t *);
 
 int
 main(int argc, char **argv)
@@ -213,11 +205,13 @@ intr(int sig)
 
 /* ------ begin specific code ------ */
 
+
 static int
-show_file(void *data, prfdinfo_t *info)
+show_file(void *data, const prfdinfo_t *info)
 {
 	struct ps_prochandle *Pr = data;
 	char unknown[12];
+	const char *path;
 	char *s;
 	mode_t mode;
 
@@ -265,58 +259,41 @@ show_file(void *data, prfdinfo_t *info)
 		(void) printf(" rdev:%u,%u\n",
 		    (unsigned)info->pr_rmajor, (unsigned)info->pr_rminor);
 
+	path = proc_fdinfo_misc(info, PR_PATHNAME, NULL);
+
 	if (!nflag) {
 		dofcntl(Pr, info,
 		    (mode & (S_IFMT|S_ENFMT|S_IXGRP)) == (S_IFREG|S_ENFMT),
 		    (mode & S_IFMT) == S_IFDOOR);
 
 		if (Pstate(Pr) != PS_DEAD) {
-			char *dev = NULL;
-
-			if ((mode & S_IFMT) == S_IFSOCK)
-				dosocket(Pr, info->pr_fd);
-			else if ((mode & S_IFMT) == S_IFIFO)
-				dofifo(Pr, info->pr_fd);
-
-			if ((mode & S_IFMT) == S_IFCHR) {
+			switch (mode & S_IFMT) {
+			case S_IFSOCK:
+				dosocket(Pr, info);
+				break;
+			case S_IFIFO:
+				dofifo(Pr, info);
+				break;
+			case S_IFCHR:
 				/*
-				 * There's no elegant way to determine
-				 * if a character device supports TLI,
-				 * so we lame out and just check a
-				 * hardcoded list of known TLI devices.
+				 * This may be a TLI endpoint. If so, it will
+				 * have socket names in the fdinfo and this
+				 * will print them.
 				 */
-				int i;
-				const char *tlidevs[] = {
-				    "tcp", "tcp6", "udp", "udp6", NULL
-				};
-
-				/* global zone: /devices paths */
-				dev = strrchr(info->pr_path, ':');
-				/* also check the /dev path for zones */
-				if (dev == NULL)
-					dev = strrchr(info->pr_path, '/');
-				if (dev != NULL) {
-					dev++; /* skip past the `:' or '/' */
-
-					for (i = 0; tlidevs[i] != NULL; i++) {
-						if (strcmp(dev, tlidevs[i]) ==
-						    0) {
-							dotli(Pr, info->pr_fd);
-							break;
-						}
-					}
-				}
+				dosocknames(Pr, info);
+				break;
 			}
 		}
 
-		if (info->pr_path[0] != '\0')
-			(void) printf("      %s\n", info->pr_path);
+		if (path != NULL)
+			(void) printf("      %s\n", path);
 
 		if (info->pr_offset != -1) {
 			(void) printf("      offset:%lld\n",
 			    (long long)info->pr_offset);
 		}
 	}
+
 	return (0);
 }
 
@@ -338,35 +315,13 @@ show_files(struct ps_prochandle *Pr)
 	(void) Pfdinfo_iter(Pr, show_file, Pr);
 }
 
-
-static int
-getflock(struct ps_prochandle *Pr, int fd, struct flock *flock_native)
-{
-	int ret;
-#ifdef _LP64
-	struct flock64_32 flock_target;
-
-	if (Pstatus(Pr)->pr_dmodel == PR_MODEL_ILP32) {
-		copyflock(flock_target, *flock_native);
-		ret = pr_fcntl(Pr, fd, F_GETLK, &flock_target);
-		copyflock(*flock_native, flock_target);
-		return (ret);
-	}
-#endif /* _LP64 */
-	ret = pr_fcntl(Pr, fd, F_GETLK, flock_native);
-	return (ret);
-}
-
 /* examine open file with fcntl() */
 static void
-dofcntl(struct ps_prochandle *Pr, prfdinfo_t *info, int mandatory, int isdoor)
+dofcntl(struct ps_prochandle *Pr, const prfdinfo_t *info, int mandatory,
+    int isdoor)
 {
-	struct flock flock;
 	int fileflags;
 	int fdflags;
-	int fd;
-
-	fd = info->pr_fd;
 
 	fileflags = info->pr_fileflags;
 	fdflags = info->pr_fdflags;
@@ -378,31 +333,27 @@ dofcntl(struct ps_prochandle *Pr, prfdinfo_t *info, int mandatory, int isdoor)
 		if (fdflags != -1 && (fdflags & FD_CLOEXEC))
 			(void) printf(" FD_CLOEXEC");
 		if (isdoor && (Pstate(Pr) != PS_DEAD))
-			show_door(Pr, fd);
+			show_door(Pr, info);
 		(void) fputc('\n', stdout);
 	} else if (isdoor && (Pstate(Pr) != PS_DEAD)) {
 		(void) printf("    ");
-		show_door(Pr, fd);
+		show_door(Pr, info);
 		(void) fputc('\n', stdout);
 	}
 
-	flock.l_type = F_WRLCK;
-	flock.l_whence = 0;
-	flock.l_start = 0;
-	flock.l_len = 0;
-	flock.l_sysid = 0;
-	flock.l_pid = 0;
-	if ((Pstate(Pr) != PS_DEAD) && (getflock(Pr, fd, &flock) != -1)) {
-		if (flock.l_type != F_UNLCK && (flock.l_sysid || flock.l_pid)) {
-			unsigned long sysid = flock.l_sysid;
+	if (Pstate(Pr) != PS_DEAD) {
+		if (info->pr_locktype != F_UNLCK &&
+		    (info->pr_locksysid != -1 || info->pr_lockpid != -1)) {
+			unsigned long sysid = info->pr_locksysid;
 
-			(void) printf("      %s %s lock set by",
+			(void) printf("      %s %s lock set",
 			    mandatory ? "mandatory" : "advisory",
-			    flock.l_type == F_RDLCK? "read" : "write");
+			    info->pr_locktype == F_RDLCK? "read" : "write");
 			if (sysid)
-				(void) printf(" system 0x%lX", sysid);
-			if (flock.l_pid)
-				(void) printf(" process %d", (int)flock.l_pid);
+				(void) printf(" by system 0x%lX", sysid);
+			if (info->pr_lockpid != -1)
+				(void) printf(" by process %d",
+				    (int)info->pr_lockpid);
 			(void) fputc('\n', stdout);
 		}
 	}
@@ -484,11 +435,11 @@ show_peer_process(pid_t ppid)
 
 /* show door info */
 static void
-show_door(struct ps_prochandle *Pr, int fd)
+show_door(struct ps_prochandle *Pr, const prfdinfo_t *info)
 {
 	door_info_t door_info;
 
-	if (pr_door_info(Pr, fd, &door_info) != 0)
+	if (pr_door_info(Pr, info->pr_fd, &door_info) != 0)
 		return;
 
 	(void) printf("  door to");
@@ -500,7 +451,7 @@ show_door(struct ps_prochandle *Pr, int fd)
  * needed for AF_UNIX sockets.
  */
 static void
-show_sockaddr(const char *str, struct sockaddr *sa, socklen_t len)
+show_sockaddr(const char *str, const struct sockaddr *sa, socklen_t len)
 {
 	struct sockaddr_in *so_in = (struct sockaddr_in *)(void *)sa;
 	struct sockaddr_in6 *so_in6 = (struct sockaddr_in6 *)(void *)sa;
@@ -527,11 +478,9 @@ show_sockaddr(const char *str, struct sockaddr *sa, socklen_t len)
 		return;
 	case AF_UNIX:
 		if (len >= sizeof (so_un->sun_family)) {
-			/* Null terminate */
-			len -= sizeof (so_un->sun_family);
-			so_un->sun_path[len] = '\0';
-			(void) printf("\t%s: AF_UNIX %s\n",
-			    str, so_un->sun_path);
+			(void) printf("\t%s: AF_UNIX %.*s\n",
+			    str, len - sizeof (so_un->sun_family),
+			    so_un->sun_path);
 		}
 		return;
 	case AF_IMPLINK:	p = "AF_IMPLINK";	break;
@@ -609,74 +558,74 @@ show_socktype(uint_t type)
 
 #define	BUFSIZE	200
 static void
-show_sockopts(struct ps_prochandle *Pr, int fd)
+show_sockopts(struct ps_prochandle *Pr, const prfdinfo_t *info)
 {
-	int val, vlen;
+	const int *val;
+	size_t vlen;
 	char buf[BUFSIZE];
 	char buf1[32];
 	char ipaddr[INET_ADDRSTRLEN];
 	int i;
-	in_addr_t nexthop_val;
+	const in_addr_t *nexthop_val;
+	const prsockopts_bool_opts_t *opts;
 	struct boolopt {
-		int		level;
 		int		opt;
 		const char	*name;
 	};
 	static struct boolopt boolopts[] = {
-	    { SOL_SOCKET, SO_DEBUG,		"SO_DEBUG,"	},
-	    { SOL_SOCKET, SO_REUSEADDR,		"SO_REUSEADDR,"	},
-	    { SOL_SOCKET, SO_KEEPALIVE,		"SO_KEEPALIVE,"	},
-	    { SOL_SOCKET, SO_DONTROUTE,		"SO_DONTROUTE,"	},
-	    { SOL_SOCKET, SO_BROADCAST,		"SO_BROADCAST,"	},
-	    { SOL_SOCKET, SO_OOBINLINE,		"SO_OOBINLINE,"	},
-	    { SOL_SOCKET, SO_DGRAM_ERRIND,	"SO_DGRAM_ERRIND,"},
-	    { SOL_SOCKET, SO_ALLZONES,		"SO_ALLZONES,"	},
-	    { SOL_SOCKET, SO_MAC_EXEMPT,	"SO_MAC_EXEMPT," },
-	    { SOL_SOCKET, SO_MAC_IMPLICIT,	"SO_MAC_IMPLICIT," },
-	    { SOL_SOCKET, SO_EXCLBIND,		"SO_EXCLBIND," },
-	    { SOL_SOCKET, SO_VRRP,		"SO_VRRP," },
-	    { IPPROTO_UDP, UDP_NAT_T_ENDPOINT,	"UDP_NAT_T_ENDPOINT," },
+	    { PR_SO_DEBUG,		"SO_DEBUG,"	},
+	    { PR_SO_REUSEADDR,		"SO_REUSEADDR,"	},
+	    { PR_SO_KEEPALIVE,		"SO_KEEPALIVE,"	},
+	    { PR_SO_DONTROUTE,		"SO_DONTROUTE,"	},
+	    { PR_SO_BROADCAST,		"SO_BROADCAST,"	},
+	    { PR_SO_OOBINLINE,		"SO_OOBINLINE,"	},
+	    { PR_SO_DGRAM_ERRIND,	"SO_DGRAM_ERRIND,"},
+	    { PR_SO_ALLZONES,		"SO_ALLZONES,"	},
+	    { PR_SO_MAC_EXEMPT,		"SO_MAC_EXEMPT," },
+	    { PR_SO_MAC_IMPLICIT,	"SO_MAC_IMPLICIT," },
+	    { PR_SO_EXCLBIND,		"SO_EXCLBIND," },
+	    { PR_SO_VRRP,		"SO_VRRP," },
+	    { PR_UDP_NAT_T_ENDPOINT,	"UDP_NAT_T_ENDPOINT," },
 	};
-	struct linger l;
+	const struct linger *l;
+
+	opts = proc_fdinfo_misc(info, PR_SOCKOPTS_BOOL_OPTS, NULL);
 
 	buf[0] = '!';		/* sentinel value, never printed */
 	buf[1] = '\0';
 
 	for (i = 0; i < sizeof (boolopts) / sizeof (boolopts[0]); i++) {
-		vlen = sizeof (val);
-		if (pr_getsockopt(Pr, fd, boolopts[i].level, boolopts[i].opt,
-		    &val, &vlen) == 0 && val != 0)
+		if (opts != NULL && opts->prsock_bool_opts & boolopts[i].opt)
 			(void) strlcat(buf, boolopts[i].name, sizeof (buf));
 	}
 
-	vlen = sizeof (l);
-	if (pr_getsockopt(Pr, fd, SOL_SOCKET, SO_LINGER, &l, &vlen) == 0 &&
-	    l.l_onoff != 0) {
+	l = proc_fdinfo_misc(info, PR_SOCKOPT_LINGER, NULL);
+	if (l != NULL && l->l_onoff != 0) {
 		(void) snprintf(buf1, sizeof (buf1), "SO_LINGER(%d),",
-		    l.l_linger);
+		    l->l_linger);
 		(void) strlcat(buf, buf1, sizeof (buf));
 	}
 
-	vlen = sizeof (val);
-	if (pr_getsockopt(Pr, fd, SOL_SOCKET, SO_SNDBUF, &val, &vlen) == 0) {
-		(void) snprintf(buf1, sizeof (buf1), "SO_SNDBUF(%d),", val);
+	val = proc_fdinfo_misc(info, PR_SOCKOPT_SNDBUF, NULL);
+	if (val != NULL) {
+		(void) snprintf(buf1, sizeof (buf1), "SO_SNDBUF(%d),", *val);
 		(void) strlcat(buf, buf1, sizeof (buf));
 	}
-	vlen = sizeof (val);
-	if (pr_getsockopt(Pr, fd, SOL_SOCKET, SO_RCVBUF, &val, &vlen) == 0) {
-		(void) snprintf(buf1, sizeof (buf1), "SO_RCVBUF(%d),", val);
+
+	val = proc_fdinfo_misc(info, PR_SOCKOPT_RCVBUF, NULL);
+	if (val != NULL) {
+		(void) snprintf(buf1, sizeof (buf1), "SO_RCVBUF(%d),", *val);
 		(void) strlcat(buf, buf1, sizeof (buf));
 	}
-	vlen = sizeof (nexthop_val);
-	if (pr_getsockopt(Pr, fd, IPPROTO_IP, IP_NEXTHOP, &nexthop_val,
-	    &vlen) == 0) {
-		if (vlen > 0) {
-			(void) inet_ntop(AF_INET, (void *) &nexthop_val,
-			    ipaddr, sizeof (ipaddr));
-			(void) snprintf(buf1, sizeof (buf1), "IP_NEXTHOP(%s),",
-			    ipaddr);
-			(void) strlcat(buf, buf1, sizeof (buf));
-		}
+
+
+	nexthop_val = proc_fdinfo_misc(info, PR_SOCKOPT_IP_NEXTHOP, &vlen);
+	if (nexthop_val != NULL && vlen > 0) {
+		(void) inet_ntop(AF_INET, (void *) nexthop_val,
+		    ipaddr, sizeof (ipaddr));
+		(void) snprintf(buf1, sizeof (buf1), "IP_NEXTHOP(%s),",
+		    ipaddr);
+		(void) strlcat(buf, buf1, sizeof (buf));
 	}
 
 	buf[strlen(buf) - 1] = '\0'; /* overwrites sentinel if no options */
@@ -686,11 +635,12 @@ show_sockopts(struct ps_prochandle *Pr, int fd)
 
 #define	MAXNALLOC	32
 static void
-show_sockfilters(struct ps_prochandle *Pr, int fd)
+show_sockfilters(struct ps_prochandle *Pr, const prfdinfo_t *info)
 {
 	struct fil_info *fi;
 	int i = 0, nalloc = 2, len = nalloc * sizeof (*fi);
 	boolean_t printhdr = B_TRUE;
+	int fd = info->pr_fd;
 
 	fi = calloc(nalloc, sizeof (*fi));
 	if (fi == NULL) {
@@ -750,68 +700,50 @@ show_sockfilters(struct ps_prochandle *Pr, int fd)
 
 /* print peer credentials for sockets and named pipes */
 static void
-dopeerucred(struct ps_prochandle *Pr, int fd)
+dopeerucred(struct ps_prochandle *Pr, const prfdinfo_t *info)
 {
 	ucred_t *peercred = NULL;	/* allocated by getpeerucred */
 
-	if (pr_getpeerucred(Pr, fd, &peercred) == 0) {
+	if (pr_getpeerucred(Pr, info->pr_fd, &peercred) == 0) {
 		show_ucred("peer", peercred);
 		ucred_free(peercred);
 	}
 }
 
+static void
+dosocknames(struct ps_prochandle *Pr, const prfdinfo_t *info)
+{
+	const struct sockaddr *sa;
+	size_t vlen;
+
+	sa = proc_fdinfo_misc(info, PR_SOCKETNAME, &vlen);
+	if (sa != NULL)
+		show_sockaddr("sockname", sa, vlen);
+
+	sa = proc_fdinfo_misc(info, PR_PEERSOCKNAME, &vlen);
+	if (sa != NULL)
+		show_sockaddr("peername", sa, vlen);
+}
+
 /* the file is a socket */
 static void
-dosocket(struct ps_prochandle *Pr, int fd)
+dosocket(struct ps_prochandle *Pr, const prfdinfo_t *info)
 {
-	/* A buffer large enough for PATH_MAX size AF_UNIX address */
-	long buf[(sizeof (short) + PATH_MAX + sizeof (long) - 1)
-	    / sizeof (long)];
-	struct sockaddr *sa = (struct sockaddr *)buf;
-	socklen_t len;
-	int type, tlen;
+	const int *type;
 
-	tlen = sizeof (type);
-	if (pr_getsockopt(Pr, fd, SOL_SOCKET, SO_TYPE, &type, &tlen) == 0)
-		show_socktype((uint_t)type);
+	type = proc_fdinfo_misc(info, PR_SOCKOPT_TYPE, NULL);
+	if (type != NULL)
+		show_socktype((uint_t)*type);
 
-	show_sockopts(Pr, fd);
-	show_sockfilters(Pr, fd);
-
-	len = sizeof (buf);
-	if (pr_getsockname(Pr, fd, sa, &len) == 0)
-		show_sockaddr("sockname", sa, len);
-
-	len = sizeof (buf);
-	if (pr_getpeername(Pr, fd, sa, &len) == 0)
-		show_sockaddr("peername", sa, len);
-
-	dopeerucred(Pr, fd);
+	show_sockopts(Pr, info);
+	show_sockfilters(Pr, info);
+	dosocknames(Pr, info);
+	dopeerucred(Pr, info);
 }
 
 /* the file is a fifo (aka "named pipe") */
 static void
-dofifo(struct ps_prochandle *Pr, int fd)
+dofifo(struct ps_prochandle *Pr, const prfdinfo_t *info)
 {
-	dopeerucred(Pr, fd);
-}
-
-/* the file is a TLI endpoint */
-static void
-dotli(struct ps_prochandle *Pr, int fd)
-{
-	struct strcmd strcmd;
-
-	strcmd.sc_len = STRCMDBUFSIZE;
-	strcmd.sc_timeout = 5;
-
-	strcmd.sc_cmd = TI_GETMYNAME;
-	if (pr_ioctl(Pr, fd, _I_CMD, &strcmd, sizeof (strcmd)) == 0)
-		show_sockaddr("sockname", (void *)&strcmd.sc_buf,
-		    (size_t)strcmd.sc_len);
-
-	strcmd.sc_cmd = TI_GETPEERNAME;
-	if (pr_ioctl(Pr, fd, _I_CMD, &strcmd, sizeof (strcmd)) == 0)
-		show_sockaddr("peername", (void *)&strcmd.sc_buf,
-		    (size_t)strcmd.sc_len);
+	dopeerucred(Pr, info);
 }

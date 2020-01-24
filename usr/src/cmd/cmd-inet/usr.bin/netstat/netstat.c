@@ -24,7 +24,7 @@
  * netstat.c 2.2, last change 9/9/91
  * MROUTING Revision 3.5
  * Copyright 2018, Joyent, Inc.
- * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -988,9 +988,9 @@ process_hash_dump(void)
 }
 
 static int
-process_hash_iter(const psinfo_t *psinfo, const prfdinfo_t *pr,
-    struct ps_prochandle *Pr)
+process_hash_iterfd(const prfdinfo_t *pr, void *psinfop)
 {
+	psinfo_t *psinfo = psinfop;
 	proc_fdinfo_t *ph;
 
 	/*
@@ -1007,14 +1007,19 @@ process_hash_iter(const psinfo_t *psinfo, const prfdinfo_t *pr,
 		    "tcp", "tcp6", "udp", "udp6", NULL
 		};
 		boolean_t istli = B_FALSE;
+		const char *path;
 		char *dev;
 		int i;
 
+		path = proc_fdinfo_misc(pr, PR_PATHNAME, NULL);
+		if (path == NULL)
+			return (0);
+
 		/* global zone: /devices paths */
-		dev = strrchr(pr->pr_path, ':');
+		dev = strrchr(path, ':');
 		/* also check the /dev path for zones */
 		if (dev == NULL)
-			dev = strrchr(pr->pr_path, '/');
+			dev = strrchr(path, '/');
 		if (dev == NULL)
 			return (0);
 		dev++; /* skip past the `:' or '/' */
@@ -1048,21 +1053,19 @@ process_hash_iter(const psinfo_t *psinfo, const prfdinfo_t *pr,
 	(void) strlcpy(ph->ph_username, get_username(psinfo->pr_uid),
 	    sizeof (ph->ph_username));
 
-	if (S_ISSOCK(pr->pr_mode) && Pr != NULL) {
-		struct sockaddr sa;
-		socklen_t slen;
-		int type, tlen;
+	if (S_ISSOCK(pr->pr_mode)) {
+		const struct sockaddr *sa;
+		const int *type;
 
 		/* Determine the socket type */
-		tlen = sizeof (type);
-		if (pr_getsockopt(Pr, pr->pr_fd, SOL_SOCKET, SO_TYPE, &type,
-		    &tlen) == 0)
-			ph->ph_type = type;
+		type = proc_fdinfo_misc(pr, PR_SOCKOPT_TYPE, NULL);
+		if (type != NULL)
+			ph->ph_type = *type;
 
 		/* Determine the protocol family */
-		slen = sizeof (sa);
-		if (pr_getsockname(Pr, pr->pr_fd, &sa, &slen) == 0)
-			ph->ph_family = sa.sa_family;
+		sa = proc_fdinfo_misc(pr, PR_SOCKETNAME, NULL);
+		if (sa != NULL)
+			ph->ph_family = sa->sa_family;
 	}
 
 	process_hash_insert(ph);
@@ -1070,124 +1073,29 @@ process_hash_iter(const psinfo_t *psinfo, const prfdinfo_t *pr,
 	return (0);
 }
 
-static void
-process_hash_iterate(psinfo_t *psinfo)
+static int
+process_hash_iterproc(psinfo_t *psinfo, lwpsinfo_t *lwp __unused,
+    void *arg __unused)
 {
-	char dir_name[PATH_MAX];
-	struct dirent *ent;
-	struct ps_prochandle *ph = NULL;
-	int err;
+	static pid_t me = -1;
 
-	DIR *dirp;
+	if (me == -1)
+		me = getpid();
 
-	if (snprintf(dir_name, sizeof (dir_name), "/proc/%d/path",
-	    psinfo->pr_pid) >= sizeof (dir_name))
-		return;
-	dirp = opendir(dir_name);
-	if (dirp == NULL)
-		return;
-	while ((ent = readdir(dirp)) != NULL) {
-		char path[PATH_MAX];
-		struct stat st;
-		prfdinfo_t info;
-		int fd, len;
+	if (psinfo->pr_pid == me)
+		return (0);
 
-		if (!isdigit(ent->d_name[0]))
-			continue;
-
-		fd = atoi(ent->d_name);
-
-		if (snprintf(path, sizeof (path), "/proc/%d/fd/%d",
-		    psinfo->pr_pid, fd) >= sizeof (path))
-			continue;
-		if (stat(path, &st) != 0)
-			continue;
-		bzero(&info, sizeof (info));
-		info.pr_fd = fd;
-		info.pr_mode = st.st_mode;
-		info.pr_uid = st.st_uid;
-		info.pr_gid = st.st_gid;
-		info.pr_major = major(st.st_dev);
-		info.pr_minor = minor(st.st_dev);
-		info.pr_rmajor = major(st.st_rdev);
-		info.pr_rminor = minor(st.st_rdev);
-		info.pr_size = st.st_size;
-		info.pr_ino = st.st_ino;
-
-		len = -1;
-		switch (info.pr_mode & S_IFMT) {
-		case S_IFDOOR:
-			break;
-		case S_IFSOCK:
-			/*
-			 * Grab the process so that we can interrogate it
-			 * for further details on the socket.
-			 */
-			if (ph == NULL &&
-			    (ph = Pgrab(psinfo->pr_pid,
-			    PGRAB_RETAIN | PGRAB_NOSTOP, &err)) == NULL) {
-				/* unreadable or SYS process */
-				if (Xflag) {
-					printf("Could not grab %d - %s\n",
-					    psinfo->pr_pid, Pgrab_error(err));
-				}
-			}
-			break;
-		default:
-			/* attempt to determine the path */
-			if (snprintf(path, sizeof (path), "%s/%d",
-			    dir_name, fd) < sizeof (path)) {
-				len = readlink(path, info.pr_path,
-				    sizeof (info.pr_path) - 1);
-			}
-			break;
-		}
-
-		if (len <= 0)
-			len = 0;
-		info.pr_path[len] = '\0';
-
-		if (process_hash_iter(psinfo, &info, ph) != 0)
-			break;
-	}
-	(void) closedir(dirp);
-
-	if (ph != NULL)
-		Prelease(ph, PRELEASE_RETAIN);
+	/*
+	 * We do not use libproc's Pfdinfo_iter() here as it requires
+	 * grabbing the process.
+	 */
+	return (proc_fdwalk(psinfo->pr_pid, process_hash_iterfd, psinfo));
 }
 
 static void
 process_hash_build(void)
 {
-	struct dirent *proce;
-	DIR *proc;
-	int err;
-	pid_t me = getpid();
-
-	if ((proc = opendir("/proc")) == NULL)
-		return;
-
-	while ((proce = readdir(proc)) != NULL) {
-		psinfo_t psinfo;
-		pid_t pid;
-
-		if (!isdigit(proce->d_name[0]))
-			continue;
-
-		pid = proc_arg_psinfo(proce->d_name, PR_ARG_PIDS, &psinfo,
-		    &err);
-		if (pid < 0 || pid == me)
-			continue;
-
-		/*
-		 * We do not use libproc's Pfdinfo_iter() here as it requires
-		 * grabbing the process in read/write mode. Instead, the
-		 * process is grabbed if (and only if) details about an open
-		 * socket need to be retrieved.
-		 */
-		process_hash_iterate(&psinfo);
-	}
-	(void) closedir(proc);
+	(void) proc_walk(process_hash_iterproc, NULL, PR_WALK_PROC);
 
 	if (Xflag)
 		process_hash_dump();

@@ -27,6 +27,7 @@
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -108,7 +109,7 @@ setup_note_header(Phdr *v, proc_t *p)
 	    + (nlwp + nzomb) * roundup(sizeof (lwpsinfo_t), sizeof (Word))
 	    + nlwp * roundup(sizeof (lwpstatus_t), sizeof (Word))
 	    + nlwp * roundup(sizeof (prlwpname_t), sizeof (Word))
-	    + nfd * roundup(sizeof (prfdinfo_t), sizeof (Word));
+	    + nfd * roundup(sizeof (prfdinfo_core_t), sizeof (Word));
 
 	if (curproc->p_agenttp != NULL) {
 		v[0].p_filesz += sizeof (Note) +
@@ -352,7 +353,7 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 		vnode_t *fvp;
 		struct file *fp;
 		vattr_t vattr;
-		prfdinfo_t fdinfo;
+		prfdinfo_core_t fdinfo;
 
 		bzero(&fdinfo, sizeof (fdinfo));
 

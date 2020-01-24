@@ -1,6 +1,7 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2019, Joyent, Inc.
+.\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"
 .\" The contents of this file are subject to the terms of the
 .\" Common Development and Distribution License (the "License").
@@ -17,7 +18,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.Dd January 11, 2019
+.Dd January 6, 2020
 .Dt PROC 4
 .Os
 .Sh NAME
@@ -1416,6 +1417,140 @@ as
 .Pa /proc/ Ns Em pid Ns Pa /cwd .
 An attempt to open any other type of entry fails with
 .Er EACCES .
+.Ss fdinfo
+A directory containing information about each of the process's open files.
+Each entry is a decimal number corresponding to an open file descriptor in the
+process.
+Each file contains a
+.Sy prfdinfo_t
+structure defined as follows:
+.Bd -literal -offset 2
+typedef struct prfdinfo {
+    int     pr_fd;          /* file descriptor number */
+    mode_t  pr_mode;        /* (see st_mode in stat(2)) */
+    uint64_t pr_ino;        /* inode number */
+    uint64_t pr_size;       /* file size */
+    int64_t pr_offset;      /* current offset of file descriptor */
+    uid_t   pr_uid;         /* owner's user id */
+    gid_t   pr_gid;         /* owner's group id */
+    major_t pr_major;       /* major number of device containing file */
+    minor_t pr_minor;       /* minor number of device containing file */
+    major_t pr_rmajor;      /* major number (if special file) */
+    minor_t pr_rminor;      /* minor number (if special file) */
+    int     pr_fileflags;   /* (see F_GETXFL in fcntl(2)) */
+    int     pr_fdflags;     /* (see F_GETFD in fcntl(2)) */
+    short   pr_locktype;    /* (see F_GETLK in fcntl(2)) */
+    pid_t   pr_lockpid;     /* process holding file lock (see F_GETLK) */
+    int     pr_locksysid;   /* sysid of locking process (see F_GETLK) */
+    pid_t   pr_peerpid;     /* peer process (socket, door) */
+    int     pr_filler[25];  /* reserved for future use */
+    char    pr_peername[PRFNSZ]; /* peer process name */
+#if __STDC_VERSION__ >= 199901L
+    char    pr_misc[];      /* self describing structures */
+#else
+    char    pr_misc[1];
+#endif
+} prfdinfo_t;
+.Ed
+.Pp
+The
+.Sy pr_misc
+element points to a list of additional miscellaneous data items, each of which
+has a header of type
+.Sy pr_misc_header_t
+specifying the size and type, and some data which immediately follow
+the header.
+.Bd -literal -offset 2
+typedef struct pr_misc_header {
+    uint_t          pr_misc_size;
+    uint_t          pr_misc_type;
+} pr_misc_header_t;
+.Ed
+.Pp
+The
+.Sy pr_misc_size
+field is the sum of the sizes of the header and the associated data and any
+trailing padding bytes which will be set to zero.
+The end of the list is indicated by a header with a zero size and a type with
+all bits set.
+.Pp
+The following miscellaneous data types can be present:
+.Bl -tag -width "PR_SOCKOPT_TCP_CONGESTION" -offset left
+.It Sy PR_PATHNAME
+The file descriptor's path in the filesystem.
+This is a NUL-terminated sequence of characters.
+.It Sy PR_SOCKETNAME
+A
+.Sy sockaddr
+structure representing the local socket name for this file descriptor, as
+would be returned by calling
+.Fn getsockname
+within the process.
+.It Sy PR_PEERSOCKNAME
+A
+.Sy sockaddr
+structure representing the peer socket name for this file descriptor, as
+would be returned by calling
+.Fn getpeername
+within the process.
+.It Sy PR_SOCKOPTS_BOOL_OPTS
+An unsigned integer which has bits set corresponding to options which are
+set on the underlying socket.
+The following bits may be set:
+.Bl -tag -width "PR_SO_PASSIVE_CONNECT"
+.It Sy PR_SO_DEBUG
+.It Sy PR_SO_REUSEADDR
+.It Sy PR_SO_REUSEPORT
+.It Sy PR_SO_KEEPALIVE
+.It Sy PR_SO_DONTROUTE
+.It Sy PR_SO_BROADCAST
+.It Sy PR_SO_OOBINLINE
+.It Sy PR_SO_DGRAM_ERRIND
+.It Sy PR_SO_ALLZONES
+.It Sy PR_SO_MAC_EXEMPT
+.It Sy PR_SO_EXCLBIND
+.It Sy PR_SO_PASSIVE_CONNECT
+.It Sy PR_SO_ACCEPTCONN
+.It Sy PR_UDP_NAT_T_ENDPOINT
+.It Sy PR_SO_VRRP
+.It Sy PR_SO_MAC_IMPLICIT
+.El
+.It Sy PR_SOCKOPT_LINGER
+A
+.Sy struct linger
+as would be returned by calling
+.Fn getsockopt SO_LINGER
+within the process.
+.It Sy PR_SOCKOPT_SNDBUF
+The data that would be returned by calling
+.Fn getsockopt SO_SNDBUF
+within the process.
+.It Sy PR_SOCKOPT_RCVBUF
+The data that would be returned by calling
+.Fn getsockopt SO_RCVBUF
+within the process.
+.It Sy PR_SOCKOPT_IP_NEXTHOP
+The data that would be returned by calling
+.Fn getsockopt IPPROTO_IP IP_NEXTHOP
+within the process.
+.It Sy PR_SOCKOPT_IPV6_NEXTHOP
+The data that would be returned by calling
+.Fn getsockopt IPPROTO_IPV6 IPV6_NEXTHOP
+within the process.
+.It Sy PR_SOCKOPT_TYPE
+The data that would be returned by calling
+.Fn getsockopt SO_TYPE
+within the process.
+.It Sy PR_SOCKOPT_TCP_CONGESTION
+For TCP sockets, the data that would be returned by calling
+.Fn getsockopt IPPROTO_TCP TCP_CONGESTION
+within the process.
+This is a NUL-terminated character array containing the name of the congestion
+algorithm in use for the socket.
+.It Sy PR_SOCKFILTERS_PRIV
+Private data relating to up to the first 32 socket filters pushed on this
+descriptor.
+.El
 .Ss object
 A directory containing read-only files with names corresponding to the
 .Sy pr_mapname

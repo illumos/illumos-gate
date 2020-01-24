@@ -1,0 +1,99 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd January 6, 2020
+.Dt PROC_GET_FDINFO 3PROC
+.Os
+.Sh NAME
+.Nm proc_get_fdinfo ,
+.Nm proc_fdinfo_free
+.Nd get process file descriptor information
+.Sh LIBRARY
+.Lb libproc
+.Sh SYNOPSIS
+.In libproc.h
+.Ft prfdinfo_t *
+.Fo proc_get_fdinfo
+.Fa "pid_t pid"
+.Fa "int fd"
+.Fc
+.Ft "void"
+.Fo proc_fdinfo_free
+.Fa "prfdinfo_t *info"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn proc_get_fdinfo
+function is a convenient way to read the
+.Pa /proc/pid/fdinfo/fd
+file for the process
+.Fa pid
+and file descriptor
+.Fa fd .
+On success, the return value of the function is a pointer to a properly
+terminated
+.Sy prfdinfo_t
+structure.
+.Pp
+The definition of the
+.Vt prfdinfo_t
+structure may be found in
+.Xr proc 4 .
+.Pp
+The caller must free the returned memory by calling the
+.Fn proc_fdinfo_free
+function.
+.Pp
+The
+.Fn proc_fdinfo_free
+frees all memory associated with the
+.Vt prfdinfo_t
+structure passed as
+.Fa info .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn proc_get_fdinfo
+function returns a pointer to an allocated
+.Vt prfdinfo_t
+structure.
+Otherwise,
+.Dv NULL
+is returned to indicate an error occurred and
+.Vt errno
+is set to indicate the error.
+.Sh ERRORS
+In addition to the errors listed below, the
+.Fn proc_get_fdinfo
+function may fail for the same reasons as the
+.Xr fstat 2 ,
+.Xr malloc 3C ,
+.Xr open 2 ,
+and
+.Xr read 2
+functions.
+The
+.Fn proc_get_fdinfo
+function will fail if:
+.Bl -tag -width Er
+.It Er EIO
+The data read from the file under
+.Pa /proc
+is not properly terminated.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc 4

@@ -27,6 +27,7 @@
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_STRUCT_LAYOUT_H
@@ -507,7 +508,7 @@ typedef struct {
 } sl_utsname_layout_t;
 
 /*
- * Layout description of prdinfo_t, from <sys/procfs.h>.
+ * Layout description of prfdinfo_core_t, from <sys/procfs.h>.
  */
 typedef struct {
 	sl_field_t		sizeof_struct;

@@ -17595,6 +17595,10 @@ s usr/share/man/man3proc/proc_arg_xgrab.3proc=proc_arg_grab.3proc
 s usr/share/man/man3proc/proc_arg_xpsinfo.3proc=proc_arg_psinfo.3proc
 f usr/share/man/man3proc/proc_content2str.3proc 0444 root bin
 s usr/share/man/man3proc/proc_dmodelname.3proc=proc_fltname.3proc
+f usr/share/man/man3proc/proc_fdinfo_misc.3proc 0444 root bin
+f usr/share/man/man3proc/proc_fdinfowalk.3proc 0444 root bin
+f usr/share/man/man3proc/proc_fdwalk.3proc 0444 root bin
+f usr/share/man/man3proc/proc_get_fdinfo.3proc 0444 root bin
 s usr/share/man/man3proc/proc_finistdio.3proc=proc_initstdio.3proc
 f usr/share/man/man3proc/proc_fltname.3proc 0444 root bin
 f usr/share/man/man3proc/proc_fltset2str.3proc 0444 root bin

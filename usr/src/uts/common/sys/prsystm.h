@@ -29,6 +29,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _SYS_PRSYSTM_H
@@ -54,6 +55,7 @@ struct lwpsinfo;
 struct prcred;
 struct prpriv;
 struct prsecflags;
+struct prfdinfo;
 
 struct seg;
 struct regs;
@@ -77,16 +79,14 @@ extern void prgetlwpsinfo(kthread_t *, struct lwpsinfo *);
 extern void prgetprfpregs(klwp_t *, struct prfpregset *);
 extern void prgetprxregs(klwp_t *, caddr_t);
 extern int  prgetprxregsize(proc_t *);
-#if defined(__lint)
-/* Work around lint confusion between old and new prcred definitions */
-extern void prgetcred();
-#else
 extern void prgetcred(proc_t *, struct prcred *);
-#endif
 extern void prgetpriv(proc_t *, struct prpriv *);
 extern size_t prgetprivsize(void);
 extern void prgetsecflags(proc_t *, struct prsecflags *);
 extern uint_t prnsegs(struct as *, int);
+extern u_offset_t prgetfdinfosize(proc_t *, vnode_t *, cred_t *);
+extern int prgetfdinfo(proc_t *, vnode_t *, struct prfdinfo *, cred_t *,
+    list_t *);
 extern void prexit(proc_t *);
 extern void prfree(proc_t *);
 extern void prlwpexit(kthread_t *);

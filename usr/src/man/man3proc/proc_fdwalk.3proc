@@ -1,0 +1,87 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd January 6, 2020
+.Dt PROC_FDWALK 3PROC
+.Os
+.Sh NAME
+.Nm proc_fdwalk
+.Nd walk the open file descriptors for a process
+.Sh SYNOPSIS
+.Lb libproc
+.In libproc.h
+.Ft int
+.Fo proc_fdwalk
+.Fa "pid_t pid"
+.Fa "proc_fdwalk_f *func"
+.Fa "void *arg"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn proc_fdwalk
+function walks all file descriptors currently open in the process with ID
+.Fa pid
+and calls the callback function
+.Fa func
+once for each file descriptor with the user-specified
+.Fa arg .
+The definition of
+.Vt proc_fdwalk_f
+is available in
+.Xr libproc 3LIB .
+.Pp
+.Fa func
+will be called once for each file descriptor and will have its first
+argument filled in with the contents of the corresponding
+.Pa /proc
+.Sy fdinfo
+file for the file descriptor.
+.Pp
+The return value of the caller's
+.Fa func
+function determines whether or not iteration will continue.
+If
+.Fa func
+returns a non-zero value, then iteration will terminate and that
+return value will be returned to the caller.
+To distinguish between system errors and caller errors, it is recommended that
+the function only return positive integers in the event of an error.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn proc_fdwalk
+function returns
+.Sy 0 .
+Otherwise,
+.Sy -1
+is returned and
+.Sy errno
+is updated to reflect the error that occurred.
+.Sh ERRORS
+In addition to the errors listed below, the
+.Fn proc_fdwalk
+function may fail for the same reasons as the
+.Xr opendir 3C ,
+.Xr readdir 3C ,
+and
+.Xr malloc 3C
+functions.
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr malloc 3C ,
+.Xr opendir 3C ,
+.Xr readdir 3C ,
+.Xr libproc 3LIB ,
+.Xr proc 4
