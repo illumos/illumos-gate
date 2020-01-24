@@ -122,6 +122,11 @@ typedef struct fpollinfo {
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 /*
+ * This is a flag that is set on f_flag2, but is never user-visible
+ */
+#define	FEPOLLED	0x8000
+
+/*
  * Fake flags for driver ioctl calls to inform them of the originating
  * process' model.  See <sys/model.h>
  *
