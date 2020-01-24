@@ -2773,10 +2773,14 @@ spdsock_do_updatealg(spd_ext_t *extv[], spd_stack_t *spds)
 bail:
 	/* cleanup */
 	ipsec_alg_free(alg);
-	for (alg_type = 0; alg_type < IPSEC_NALGTYPES; alg_type++)
-		for (algid = 0; algid < IPSEC_MAX_ALGS; algid++)
-		if (spds->spds_algs[alg_type][algid] != NULL)
-			ipsec_alg_free(spds->spds_algs[alg_type][algid]);
+	for (alg_type = 0; alg_type < IPSEC_NALGTYPES; alg_type++) {
+		for (algid = 0; algid < IPSEC_MAX_ALGS; algid++) {
+			if (spds->spds_algs[alg_type][algid] != NULL) {
+				ipsec_alg_free(
+				    spds->spds_algs[alg_type][algid]);
+			}
+		}
+	}
 	return (diag);
 }
 
