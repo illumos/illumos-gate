@@ -25,6 +25,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 
 #
 #	This makefile drives the production of the procfs file system
@@ -82,6 +83,8 @@ CERRWARN	+= $(CNOWARN_UNINIT)
 $(OBJS_DIR)/prsubr.o := SMOFF += all_func_returns
 $(OBJS_DIR)/prcontrol.o := SMOFF += all_func_returns
 $(OBJS_DIR)/prioctl.o := SMOFF += signed
+
+LDFLAGS         += -dy -Nfs/namefs
 
 #
 #	Default build targets.

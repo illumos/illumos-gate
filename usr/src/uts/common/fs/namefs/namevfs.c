@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -179,6 +180,31 @@ namefind(vnode_t *vp, vnode_t *mnt)
 		    (mnt == NULL || np->nm_mountpt == mnt))
 			break;
 	return (np);
+}
+
+/*
+ * For each namenode that has nm_filevp == vp, call the provided function
+ * with the namenode as an argument. This finds all of the namefs entries
+ * which are mounted on vp; note that there can be more than one.
+ */
+int
+nm_walk_mounts(const vnode_t *vp, nm_walk_mounts_f *func, cred_t *cr, void *arg)
+{
+	struct namenode *np;
+	int ret = 0;
+
+	mutex_enter(&ntable_lock);
+
+	for (np = *NM_FILEVP_HASH(vp); np != NULL; np = np->nm_nextp) {
+		if (np->nm_filevp == vp) {
+			if ((ret = func(np, cr, arg)) != 0)
+				break;
+		}
+	}
+
+	mutex_exit(&ntable_lock);
+
+	return (ret);
 }
 
 /*
@@ -480,6 +506,7 @@ nm_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *crp)
 	newvp->v_rdev = filevp->v_rdev;
 	newvp->v_data = (caddr_t)nodep;
 	VFS_HOLD(vfsp);
+	vn_copypath(mvp, newvp);
 	vn_exists(newvp);
 
 	/*
