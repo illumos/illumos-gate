@@ -22,6 +22,7 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Copyright 2013 David Hoeppner.  All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Peter Tribble.
  */
 
 #ifndef _STAT_KSTAT_H
@@ -41,9 +42,6 @@
 
 #ifdef __sparc
 #include <vm/hat_sfmmu.h>
-#include <sys/simmstat.h>
-#include <sys/sysctrl.h>
-#include <sys/fhc.h>
 #endif
 
 #define	KSTAT_DATA_HRTIME	(KSTAT_DATA_STRING + 1)
@@ -85,7 +83,7 @@ typedef union ks_value {
 	nvpair_insert(I, #N, &v, KSTAT_DATA_UINT32);	\
 }
 
-#define	SAVE_INT64(I, S, N)             		\
+#define	SAVE_INT64(I, S, N)				\
 {							\
 	ks_value_t v;					\
 	v.i64 = S->N;					\
@@ -167,7 +165,7 @@ typedef struct ks_instance {
 	char		ks_name[KSTAT_STRLEN];
 	char		ks_module[KSTAT_STRLEN];
 	char		ks_class[KSTAT_STRLEN];
-	int 		ks_instance;
+	int		ks_instance;
 	uchar_t		ks_type;
 	hrtime_t	ks_snaptime;
 	list_t		ks_nvlist;
@@ -214,13 +212,6 @@ static void	save_nfs(kstat_t *, ks_instance_t *);
 #ifdef __sparc
 static void	save_sfmmu_global_stat(kstat_t *, ks_instance_t *);
 static void	save_sfmmu_tsbsize_stat(kstat_t *, ks_instance_t *);
-static void	save_simmstat(kstat_t *, ks_instance_t *);
-/* Helper function for save_temperature() */
-static char	*short_array_to_string(short *, int);
-static void	save_temperature(kstat_t *, ks_instance_t *);
-static void	save_temp_over(kstat_t *, ks_instance_t *);
-static void	save_ps_shadow(kstat_t *, ks_instance_t *);
-static void	save_fault_list(kstat_t *, ks_instance_t *);
 #endif
 
 /* Named kstat readers */
@@ -246,11 +237,6 @@ static struct {
 #ifdef __sparc
 	{save_sfmmu_global_stat,	"unix:sfmmu_global_stat"},
 	{save_sfmmu_tsbsize_stat,	"unix:sfmmu_tsbsize_stat"},
-	{save_simmstat,			"unix:simm-status"},
-	{save_temperature,		"unix:temperature"},
-	{save_temp_over,		"unix:temperature override"},
-	{save_ps_shadow,		"unix:ps_shadow"},
-	{save_fault_list,		"unix:fault_list"},
 #endif
 	{NULL, NULL},
 };
