@@ -17,7 +17,7 @@
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
-# Copyright 2019 Peter Tribble
+# Copyright 2020 Peter Tribble
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
@@ -61,7 +61,6 @@ _MANFILES=	6to4relay.1m		\
 		captoinfo.1m		\
 		catman.1m		\
 		cfgadm.1m		\
-		cfgadm_ac.1m		\
 		cfgadm_cardbus.1m	\
 		cfgadm_fp.1m		\
 		cfgadm_ib.1m		\
@@ -69,7 +68,6 @@ _MANFILES=	6to4relay.1m		\
 		cfgadm_sata.1m		\
 		cfgadm_sbd.1m		\
 		cfgadm_scsi.1m		\
-		cfgadm_sysctrl.1m	\
 		cfgadm_usb.1m		\
 		chat.1m			\
 		check-hostname.1m	\
