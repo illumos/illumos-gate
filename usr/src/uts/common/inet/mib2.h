@@ -1366,6 +1366,49 @@ typedef struct mib2_tcp {
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
 #pragma pack(4)
 #endif
+
+typedef struct tcpConnEntryInfo_s {
+	Counter64	ce_in_data_inorder_bytes;
+	Counter64	ce_in_data_inorder_segs;
+	Counter64	ce_in_data_unorder_bytes;
+	Counter64	ce_in_data_unorder_segs;
+	Counter64	ce_in_zwnd_probes;
+
+	Counter64	ce_out_data_bytes;
+	Counter64	ce_out_data_segs;
+	Counter64	ce_out_retrans_bytes;
+	Counter64	ce_out_retrans_segs;
+	Counter64	ce_out_zwnd_probes;
+	Counter64	ce_rtt_sum;
+
+			/* seq # of next segment to send */
+	Gauge		ce_snxt;
+			/* seq # of of last segment unacknowledged */
+	Gauge		ce_suna;
+			/* current send window size */
+	Gauge		ce_swnd;
+			/* current congestion window size */
+	Gauge		ce_cwnd;
+			/* seq # of next expected segment */
+	Gauge		ce_rnxt;
+			/* seq # of last ack'd segment */
+	Gauge		ce_rack;
+			/* # of unsent bytes in the xmit queue */
+	Gauge		ce_unsent;
+			/* current receive window size */
+	Gauge		ce_rwnd;
+			/* round-trip time smoothed average (us) */
+	Gauge		ce_rtt_sa;
+			/* current rto (retransmit timeout) */
+	Gauge		ce_rto;
+			/* round-trip time count */
+	Gauge		ce_rtt_cnt;
+			/* current max segment size */
+	Gauge		ce_mss;
+			/* actual internal state */
+	int		ce_state;
+} tcpConnEntryInfo_t;
+
 typedef struct mib2_tcpConnEntry {
 		/* state of tcp connection		{ tcpConnEntry 1} RW */
 	int		tcpConnState;
@@ -1377,47 +1420,7 @@ typedef struct mib2_tcpConnEntry {
 	IpAddress	tcpConnRemAddress;
 		/* remote port for this connection	{ tcpConnEntry 5 } */
 	int		tcpConnRemPort;		/* In host byte order */
-	struct tcpConnEntryInfo_s {
-		Counter64	ce_in_data_inorder_bytes;
-		Counter64	ce_in_data_inorder_segs;
-		Counter64	ce_in_data_unorder_bytes;
-		Counter64	ce_in_data_unorder_segs;
-		Counter64	ce_in_zwnd_probes;
-
-		Counter64	ce_out_data_bytes;
-		Counter64	ce_out_data_segs;
-		Counter64	ce_out_retrans_bytes;
-		Counter64	ce_out_retrans_segs;
-		Counter64	ce_out_zwnd_probes;
-		Counter64	ce_rtt_sum;
-
-				/* seq # of next segment to send */
-		Gauge		ce_snxt;
-				/* seq # of of last segment unacknowledged */
-		Gauge		ce_suna;
-				/* current send window size */
-		Gauge		ce_swnd;
-				/* current congestion window size */
-		Gauge		ce_cwnd;
-				/* seq # of next expected segment */
-		Gauge		ce_rnxt;
-				/* seq # of last ack'd segment */
-		Gauge		ce_rack;
-				/* # of unsent bytes in the xmit queue */
-		Gauge		ce_unsent;
-				/* current receive window size */
-		Gauge		ce_rwnd;
-				/* round-trip time smoothed average (us) */
-		Gauge		ce_rtt_sa;
-				/* current rto (retransmit timeout) */
-		Gauge		ce_rto;
-				/* round-trip time count */
-		Gauge		ce_rtt_cnt;
-				/* current max segment size */
-		Gauge		ce_mss;
-				/* actual internal state */
-		int		ce_state;
-	}		tcpConnEntryInfo;
+	tcpConnEntryInfo_t tcpConnEntryInfo;
 
 	/* pid of the processes that created this connection */
 	uint32_t	tcpConnCreationProcess;
@@ -1453,7 +1456,7 @@ typedef struct mib2_tcp6ConnEntry {
 	DeviceIndex	tcp6ConnIfIndex;
 	/* state of tcp6 connection		{ ipv6TcpConnEntry 6 } RW */
 	int		tcp6ConnState;
-	struct tcpConnEntryInfo_s tcp6ConnEntryInfo;
+	tcpConnEntryInfo_t tcp6ConnEntryInfo;
 
 	/* pid of the processes that created this connection */
 	uint32_t	tcp6ConnCreationProcess;
