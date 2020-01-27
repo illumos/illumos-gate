@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd January 6, 2020
+.Dd January 29, 2020
 .Dt PROC_GET_FDINFO 3PROC
 .Os
 .Sh NAME
@@ -76,6 +76,7 @@ In addition to the errors listed below, the
 .Fn proc_get_fdinfo
 function may fail for the same reasons as the
 .Xr fstat 2 ,
+.Xr lseek 2 ,
 .Xr malloc 3C ,
 .Xr open 2 ,
 and
