@@ -26,7 +26,7 @@
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 # Copyright (c) 2017 by Delphix. All rights reserved.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2019 Peter Trible.
 #
@@ -665,10 +665,6 @@ else
 		exit 1
 	fi
 fi
-
-# contents of stdenv.sh inserted after next line:
-# STDENV_START
-# STDENV_END
 
 # Check if we have sufficient data to continue...
 [[ -v CODEMGR_WS ]] || fatal_error "Error: Variable CODEMGR_WS not set."

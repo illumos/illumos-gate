@@ -1,71 +1,47 @@
-'\" te
 .\"  Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IBMF 7 "Sep 9, 2004"
-.SH NAME
-ibmf \- InfiniBand Management Transport Framework
-.SH DESCRIPTION
-.sp
-.LP
+.\" Copyright 2020 Joyent, Inc.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd January 12, 2020
+.Dt IBMF 7
+.Os
+.Sh NAME
+.Nm ibmf
+.Nd InfiniBand Management Transport Framework
+.Sh DESCRIPTION
 The InfiniBand (IB) Management Transport Framework provides the mechanisms for
 IB management modules to communicate with other InfiniBand management modules
-such as the Subnet Administration process.  It also provides helper functions
+such as the Subnet Administration process.
+It also provides helper functions
 such as Subnet Administration Access (SAA) for commonly performed operations.
-.SH FILES
-.sp
-.ne 2
-.na
-\fB/kernel/misc/ibmf\fR
-.ad
-.RS 29n
-32-bit ELF kernel misc module (x86 platform only).
-.RE
-
-.sp
-.ne 2
-.na
-\fB/kernel/misc/amd64/ibmf\fR
-.ad
-.RS 29n
-64-bit ELF kernel misc module (x86 platform only).
-.RE
-
-.sp
-.ne 2
-.na
-\fB/kernel/misc/sparcv9/ibmf\fR
-.ad
-.RS 29n
-64-bit ELF kernel misc module (SPARC platform only).
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Architecture	PCI-based systems
-_
-Interface stability	Consolidation Private
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBibtl\fR(7D)
-.sp
-.LP
-\fIInfiniBand Architecture Specification, Version 1.1\fR
-.sp
-.LP
-\fIwww.infinibandta.org\fR
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /kernel/misc/amd64/ibmf
+Device driver (x86).
+.It Pa /kernel/misc/sparcv9/ibmf
+Device driver (SPARC)
+.El
+.Sh ARCHITECTURE
+PCI-based systems
+.Sh INTERFACE STABILITY
+Private
+.Sh SEE ALSO
+.Xr ibtl 7D
+.Pp
+.%T InfiniBand Architecture Specification, Version 1\&.1
+.Pp
+.%U www.infinibandta.org

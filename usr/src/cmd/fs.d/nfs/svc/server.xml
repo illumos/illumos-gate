@@ -105,7 +105,7 @@
 	    grouping='require_all'
 	    restart_on='error'
 	    type='service'>
-	    	<service_fmri value='svc:/system/filesystem/local' />
+		<service_fmri value='svc:/system/filesystem/local' />
 	</dependency>
 
 	<dependent
@@ -176,7 +176,7 @@
 	   <propval name='server_delegation' type='astring' value='on'/>
 	   <propval name='server_versmax' type='integer' value='4'/>
 	   <propval name='server_versmin' type='integer' value='2'/>
-	   <propval name='servers' type='integer' value='1024'/>
+	   <propval name='servers' type='integer' value='256'/>
 	   <propval name='mountd_listen_backlog' type='integer' value='64'/>
 	   <propval name='mountd_max_threads' type='integer' value='16'/>
 	   <propval name='mountd_port' type='integer' value='0'/>

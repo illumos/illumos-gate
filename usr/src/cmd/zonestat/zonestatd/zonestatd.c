@@ -3872,18 +3872,18 @@ zsd_usage_cache_update(zsd_ctl_t *ctl)
 
 	/* Update the current cache pointer */
 	(void) mutex_lock(&g_usage_cache_lock);
-		old = g_usage_cache;
-		cache->zsuc_ref = 1;
-		cache->zsuc_gen = g_gen_next;
-		usage->zsu_gen = g_gen_next;
-		usage->zsu_size = size;
-		g_usage_cache = cache;
-		if (old != NULL) {
-			old->zsuc_ref--;
-			if (old->zsuc_ref == 0)
-				free(old);
-		}
-		g_gen_next++;
+	old = g_usage_cache;
+	cache->zsuc_ref = 1;
+	cache->zsuc_gen = g_gen_next;
+	usage->zsu_gen = g_gen_next;
+	usage->zsu_size = size;
+	g_usage_cache = cache;
+	if (old != NULL) {
+		old->zsuc_ref--;
+		if (old->zsuc_ref == 0)
+			free(old);
+	}
+	g_gen_next++;
 	/* Wake up any clients that are waiting for this calculation */
 	if (g_usage_cache_kickers > 0) {
 		(void) cond_broadcast(&g_usage_cache_wait);

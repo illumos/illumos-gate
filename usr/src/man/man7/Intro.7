@@ -1,173 +1,209 @@
-'\" te
 .\" Copyright (c) 1999, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH INTRO 7 "Sep 29, 1994"
-.SH NAME
-Intro, intro \- introduction to special files
-.SH DESCRIPTION
-.sp
-.LP
-This section describes various device and network interfaces  available on the
-system.  The types of interfaces described  include character and block
-devices, STREAMS modules, network protocols, file systems, and ioctl requests
+.\" Copyright 2020 Joyent, Inc.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd January  6, 2020
+.Dt INTRO 7
+.Os
+.Sh NAME
+.Nm Intro ,
+.Nm intro
+.Nd introduction to special files
+.Sh DESCRIPTION
+This section describes various device and network interfaces available on the
+sysstem.
+The types of interfaces described include character and block
+devices,
+.Sy STREAMS
+modules, network protocols, file systems, and ioctl requests
 for driver subsystems and classes.
-.sp
-.LP
+.Pp
 This section contains the following major collections:
-.sp
-.ne 2
-.na
-\fB(7D)\fR
-.ad
-.RS 9n
+.Bl -tag -width "xxxxx"
+.It Pq Sy 7D
 The system provides drivers for a variety of hardware devices, such as disk,
-magnetic tapes, serial communication lines, mice, and frame  buffers, as well
+magnetic tapes, serial communication lines, mice, and frame buffers, as well
 as virtual devices such as pseudo-terminals and windows.
-.sp
+.Pp
 This section describes special files that refer to specific hardware
-peripherals and device drivers. STREAMS   device drivers are also described.
+peripherals and device drivers.
+.Sy STREAMS
+device drivers are also described.
 Characteristics of both the hardware device and the corresponding device driver
 are discussed where applicable.
-.sp
-An application accesses a device through that device's special file. This
+.Pp
+An application accesses a device through that device's special file.
+This
 section specifies the device special file to be used to access the device as
 well as application programming interface (API) information relevant to the use
 of the device driver.
-.sp
-All device special files are located under the  \fB/devices\fR directory.  The
-\fB/devices\fR directory hierarchy attempts to mirror the hierarchy of system
-busses, controllers, and devices configured on the system.   Logical device
-names for special files in \fB/devices\fR are located under the  \fB/dev\fR
-directory. Although not every special file under \fB/devices\fR will have a
-corresponding logical entry under  \fB/dev\fR, whenever possible, an
-application should reference a device using  the logical name for the device.
-Logical device names are listed in the  \fBFILES\fR section of the page for the
-device in question.
-.sp
-This section also describes driver configuration where applicable. Many device
-drivers have a driver configuration file of the form
-\fIdriver_name\fR\fB\&.conf\fR associated with them (see
-\fBdriver.conf\fR(4)). The configuration information stored  in the driver
-configuration file is used to configure the driver and the device.  Driver
-configuration files are located in  \fB/kernel/drv\fR and
-\fB/usr/kernel/drv\fR. Driver configuration files for platform dependent
-drivers are  located in \fB/platform/`uname\fR \fB-i`/kernel/drv\fR where
-\fB`uname\fR \fB-i`\fR is the output of the  \fBuname\fR(1) command with the
-\fB-i\fR option.
-.sp
-Some driver configuration files may contain user configurable  properties.
+All device special files are located under the
+.Pa /devices
+directory.
+The
+.Pa /devices
+directory hierarchy attempts to mirror the hierarchy of system
+busses, controllers, and devices configured on the system.
+Logical device names for special files in
+.Pa /devices
+are located under the
+.Pa /dev
+directory.
+Although not every special file under
+.Pa /devices
+will have a corresponding logical entry under
+.Pa /dev ,
+whenever possible, an
+application should reference a device using the logical name for the device.
+Logical device names are listed in the
+.Sy FILES
+section of the page for the device in question.
+.Pp
+This section also describes driver configuration where applicable.
+Many device drivers have a driver configuration file of the form
+.Em driver_name Ns \&.conf
+associated with them (see
+.Xr driver.conf 4 ) .
+The configuration information stored in the driver
+configuration file is used to configure the driver and the device.
+Driver configuration files are located in
+.Pa /kernel/drv
+and
+.Pa /usr/kernel/drv .
+Driver configuration files for platform dependent
+drivers are located in
+.Pa /platform/`uname\ -i`/kernel/drv
+where
+.Pa `uname\ -i`
+is the output of the
+.Xr uname 1
+command with the
+.Fl i
+option.
+.Pp
+Some driver configuration files may contain user configurable properties.
 Changes in a driver's configuration file will not take effect until the system
-is rebooted or the driver has been removed and re-added (see  \fBrem_drv\fR(1M)
-and  \fBadd_drv\fR(1M)).
-.RE
-
-.sp
-.ne 2
-.na
-\fB(7FS)\fR
-.ad
-.RS 9n
-This section describes the  programmatic interface for several file systems
+is rebooted or the driver has been removed and re-added (see
+.Xr rem_drv 1M
+and
+.Xr add_drv 1M ) .
+.It Pq Sy 7FS
+This section describes the programmatic interface for several file systems
 supported by SunOS.
-.RE
-
-.sp
-.ne 2
-.na
-\fB(7I)\fR
-.ad
-.RS 9n
+.It Pq Sy 7I
 This section describes ioctl requests which apply to a class of drivers or
-subsystems. For example, ioctl requests which apply to most tape devices are
-discussed in  \fBmtio\fR(7I). Ioctl requests relevant to only a specific
-device are described on the man page for that device. The page for the device
+subsystems.
+For example, ioctl requests which apply to most tape devices are
+discussed in
+.Xr mtio 7I .
+Ioctl requests relevant to only a specific
+device are described on the man page for that device.
+The page for the device
 in question should still be examined for exceptions to the ioctls listed in
 section 7I.
-.RE
-
-.sp
-.ne 2
-.na
-\fB(7M)\fR
-.ad
-.RS 9n
-This section describes  \fBSTREAMS\fR modules.  Note that  \fBSTREAMS\fR
-drivers are discussed in section 7D. \fBstreamio\fR(7I) contains a list of
-ioctl requests used to manipulate \fBSTREAMS\fR modules and interface with the
-\fBSTREAMS\fR framework.  Ioctl requests specific to a  \fBSTREAMS\fR module
-will be discussed on the man page for that module.
-.RE
-
-.sp
-.ne 2
-.na
-\fB(7P)\fR
-.ad
-.RS 9n
+.It Pq Sy 7M
+This section describes
+.Sy STREAMS
+modules.
+Note that
+.Sy STREAMS
+drivers are discussed in section 7D.
+.Xr streamio 7I
+contains a list of ioctl requests used to manipulate
+.Sy STREAMS
+modules and interface with the
+.Sy STREAMS
+framework.
+.Xr ioctl 2
+requests specific to a
+.Sy STREAMS
+module will be discussed on the man page for that module.
+.It Pq Sy 7P
 This section describes various network protocols available in SunOS.
-.sp
-SunOS supports both socket-based and \fBSTREAMS-based\fR network
-communications. The Internet protocol family, described in \fBinet\fR(7P), is
-the primary protocol family supported by SunOS, although the system can support
-a number of others.  The raw interface provides low-level services, such as
+SunOS supports both socket-based and
+.Sy STREAMS Ns -based
+network communications.
+.Pp
+The Internet protocol family, described in
+.Xr inet 7P ,
+is the primary protocol family supported by SunOS, although the system can
+support a number of others.
+The raw interface provides low-level services, such as
 packet fragmentation and reassembly, routing, addressing, and basic transport
-for socket-based implementations.  Facilities for communicating using an
-Internet-family protocol are generally accessed by specifying the \fBAF_INET\fR
-address family when binding a socket; see \fBsocket\fR(3SOCKET) for details.
-.sp
+for socket-based implementations.
+Facilities for communicating using an
+Internet-family protocol are generally accessed by specifying the
+.Dv AF_INET
+address family when binding a socket; see
+.Xr socket 3SOCKET
+for details.
+.Pp
 Major protocols in the Internet family include:
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.Bl -bullet -offset indent
+.It
 The Internet Protocol (IP) itself, which supports the universal datagram
-format, as described in \fBip\fR(7P). This is the default protocol for
-\fBSOCK_RAW\fR type sockets within the \fBAF_INET\fR domain.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-The Transmission Control Protocol (TCP); see \fBtcp\fR(7P). This is the default
-protocol for \fBSOCK_STREAM\fR type sockets.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-The User Datagram Protocol (UDP); see \fBudp\fR(7P). This is the default
-protocol for \fBSOCK_DGRAM\fR type sockets.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-The Address Resolution Protocol (ARP); see \fBarp\fR(7P).
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-The Internet Control Message Protocol (ICMP); see \fBicmp\fR(7P).
-.RE
-.RE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBadd_drv\fR(1M), \fBrem_drv\fR(1M), \fBIntro\fR(3), \fBioctl\fR(2),
-\fBsocket\fR(3SOCKET), \fBdriver.conf\fR(4), \fBarp\fR(7P), \fBicmp\fR(7P),
-\fBinet\fR(7P), \fBip\fR(7P), \fBmtio\fR(7I), \fBst\fR(7D), \fBstreamio\fR(7I),
-\fBtcp\fR(7P), \fBudp\fR(7P)
-.sp
-.LP
-\fISystem Administration Guide: IP Services\fR
-.sp
-.LP
-\fISTREAMS Programming Guide\fR
-.sp
-.LP
-\fIWriting Device Drivers\fR
+format, as described in
+.Xr ip 7P .
+This is the default protocol for
+.Dv SOCK_RAW
+type sockets within the
+.Dv AF_INET
+domain.
+.It
+The Transmission Control Protocol (TCP); see
+.Xr tcp 7P .
+This is the default protocol for
+.Dv SOCK_STREAM
+type sockets.
+.It
+The User Datagram Protocol (UDP); see
+.Xr udp 7P .
+This is the default
+protocol for
+.Dv SOCK_DGRAM
+type sockets.
+.It
+The Address Resolution Protocol (ARP); see
+.Xr arp 7P .
+.It
+The Internet Control Message Protocol (ICMP); see
+.Xr icmp 7P .
+.El
+.El
+.Sh SEE ALSO
+.Xr add_drv 1M ,
+.Xr rem_drv 1M ,
+.Xr ioctl 2 ,
+.Xr Intro 3 ,
+.Xr socket 3SOCKET ,
+.Xr driver.conf 4 ,
+.Xr st 7D ,
+.Xr mtio 7I ,
+.Xr streamio 7I ,
+.Xr arp 7P ,
+.Xr icmp 7P ,
+.Xr inet 7P ,
+.Xr ip 7P ,
+.Xr tcp 7P ,
+.Xr udp 7P
+.Pp
+.%T System Administration Guide: IP Services
+.Pp
+.%T STREAMS Programming Guide
+.Pp
+.%T Writing Device Drivers

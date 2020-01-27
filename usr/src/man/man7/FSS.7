@@ -1,165 +1,190 @@
-'\" te
 .\" Copyright (c) 2001, Sun Microsystems, Inc. All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FSS 7 "May 13, 2017"
-.SH NAME
-FSS \- Fair share scheduler
-.SH DESCRIPTION
-.LP
+.\" Copyright 2019 Joyent, Inc.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.Dd December 17, 2019
+.Dt FSS 7
+.Os
+.Sh NAME
+.Nm FSS
+.Nd Fair share scheduler
+.Sh DESCRIPTION
 The fair share scheduler (FSS) guarantees application performance by explicitly
-allocating shares of CPU resources to projects. A share indicates a project's
-entitlement to available CPU resources. Because shares are meaningful only in
+allocating shares of CPU resources to projects.
+A share indicates a project's
+entitlement to available CPU resources.
+Because shares are meaningful only in
 comparison with other project's shares, the absolute quantity of shares is not
-important. Any number that is in proportion with the desired CPU entitlement
+important.
+Any number that is in proportion with the desired CPU entitlement
 can be used.
-.sp
-.LP
+.Pp
 The goals of the FSS scheduler differ from the traditional time-sharing
-scheduling class (TS). In addition to scheduling individual LWPs, the FSS
+scheduling class (TS).
+In addition to scheduling individual LWPs, the FSS
 scheduler schedules projects against each other, making it impossible for any
 project to acquire more CPU cycles simply by running more processes
 concurrently.
-.sp
-.LP
+.Pp
 A project's entitlement is individually calculated by FSS independently for
-each processor set if the project contains processes bound to them. If a
+each processor set if the project contains processes bound to them.
+If a
 project is running on more than one processor set, it can have different
-entitlements on every set. A project's entitlement is defined as a ratio
+entitlements on every set.
+A project's entitlement is defined as a ratio
 between the number of shares given to a project and the sum of shares of all
-active projects running on the same processor set. An active project is one
-that has at least one running or runnable process. Entitlements are recomputed
+active projects running on the same processor set.
+An active project is one
+that has at least one running or runnable process.
+Entitlements are recomputed
 whenever any project becomes active or inactive, or whenever the number of
 shares is changed.
-.sp
-.LP
+.Pp
 Processor sets represent virtual machines in the FSS scheduling class and
-processes are scheduled independently in each processor set. That is, processes
+processes are scheduled independently in each processor set.
+That is, processes
 compete with each other only if they are running on the same processor set.
 When a processor set is destroyed, all processes that were bound to it are
-moved to the default processor set, which always exists. Empty processor sets
+moved to the default processor set, which always exists.
+Empty processor sets
 (that is, sets without processors in them) have no impact on the FSS scheduler
 behavior.
-.sp
-.LP
+.Pp
 If a processor set contains a mix of TS/IA and FSS processes, the fairness of
 the FSS scheduling class can be compromised because these classes use the same
-range of priorities. Fairness is most significantly affected if processes
+range of priorities.
+Fairness is most significantly affected if processes
 running in the TS scheduling class are CPU-intensive and are bound to
-processors within the processor set. As a result, you should avoid having
-processes from TS/IA and FSS classes share the same processor set. RT and FSS
+processors within the processor set.
+As a result, you should avoid having
+processes from TS/IA and FSS classes share the same processor set.
+RT and FSS
 processes use disjoint priority ranges and therefore can share processor sets.
-.sp
-.LP
-As projects execute, their CPU usage is accumulated over time. The FSS
+.Pp
+As projects execute, their CPU usage is accumulated over time.
+The FSS
 scheduler periodically decays CPU usages of every project by multiplying it
 with a decay factor, ensuring that more recent CPU usage has greater weight
-when taken into account for scheduling. The FSS scheduler continually adjusts
+when taken into account for scheduling.
+The FSS scheduler continually adjusts
 priorities of all processes to make each project's relative CPU usage converge
 with its entitlement.
-.sp
-.LP
+.Pp
 While FSS is designed to fairly allocate cycles over a long-term time period,
 it is possible that projects will not receive their allocated shares worth of
-CPU cycles due to uneven demand. This makes one-shot, instantaneous analysis of
+CPU cycles due to uneven demand.
+This makes one-shot, instantaneous analysis of
 FSS performance data unreliable.
-.sp
-.LP
-Note that share is not the same as utilization. A project may be allocated 50%
-of the system, although on the average, it uses just 20%. Shares serve to cap a
+.Pp
+Note that share is not the same as utilization.
+A project may be allocated 50%
+of the system, although on the average, it uses just 20%.
+Shares serve to cap a
 project's CPU usage only when there is competition from other projects running
-on the same processor set. When there is no competition, utilization may be
-larger than entitlement based on shares. Allocating a small share to a busy
+on the same processor set.
+When there is no competition, utilization may be
+larger than entitlement based on shares.
+Allocating a small share to a busy
 project slows it down but does not prevent it from completing its work if the
 system is not saturated.
-.sp
-.LP
+.Pp
 The configuration of CPU shares is managed by the name server as a property of
-the \fBproject\fR(4) database. In the following example, an entry in the
-\fB/etc/project\fR file sets the number of shares for project \fBx-files\fR to
-10:
-.sp
-.in +2
-.nf
+the
+.Xr project 4
+database.
+In the following example, an entry in the
+.Pa /etc/project
+file sets the number of shares for project
+.Sy x-files
+to 10:
+.Bd -literal -offset 2n
 x-files:100::::project.cpu-shares=(privileged,10,none)
-.fi
-.in -2
-
-.sp
-.LP
-Projects with undefined number of shares are given one share each. This means
-that such projects are treated with equal importance. Projects with 0 shares
+.Ed
+.Pp
+Projects with undefined number of shares are given one share each.
+This means
+that such projects are treated with equal importance.
+Projects with 0 shares
 only run when there are no projects with non-zero shares competing for the same
-processor set. The maximum number of shares that can be assigned to one project
+processor set.
+The maximum number of shares that can be assigned to one project
 is 65535.
-.sp
-.LP
-You can use the \fBprctl\fR(1) command to determine the current share
+.Pp
+You can use the
+.Xr prctl 1
+command to determine the current share
 assignment for a given project:
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 $ prctl -n project.cpu-shares -i project x-files
-.fi
-.in -2
-
-.sp
-.LP
+.Ed
+.Pp
 or to change the amount of shares if you have root privileges:
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 # prctl -r -n project.cpu-shares -v 5 -i project x-files
-.fi
-.in -2
-
-.sp
-.LP
-See the \fBprctl\fR(1) man page for additional information on how to modify and
+.Ed
+.Pp
+See the
+.Xr prctl 1
+man page for additional information on how to modify and
 examine resource controls associated with active processes, tasks, or projects
-on the system. See \fBresource_controls\fR(5) for a description of the resource
+on the system.
+See
+.Xr resource_controls 5
+for a description of the resource
 controls supported in the current release of the Solaris operating system.
-.sp
-.LP
-By default, project \fBsystem\fR (project ID 0) includes all system daemons
-started by initialization scripts and has an "unlimited" amount of shares. That
+.Pp
+By default, project
+.Sy system
+(project ID 0) includes all system daemons
+started by initialization scripts and has an
+.Dq unlimited
+amount of shares.
+That
 is, it is always scheduled first no matter how many shares are given to other
 projects.
-.sp
-.LP
+.Pp
 The following command sets FSS as the default scheduler for the system:
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 # dispadmin -d FSS
-.fi
-.in -2
-
-.sp
-.LP
-This change will take effect on the next reboot. Alternatively, you can move
+.Ed
+.Pp
+This change will take effect on the next reboot.
+Alternatively, you can move
 processes from the time-share scheduling class (as well as the special case of
 init) into the FSS class without changing your default scheduling class and
-rebooting by becoming \fBroot\fR, and then using the \fBpriocntl\fR(1) command,
-as shown in the following example:
-.sp
-.in +2
-.nf
+rebooting by becoming
+.Sy root ,
+and then using the
+.Xr priocntl 1
+command, as shown in the following example:
+.Bd -literal -offset 2n
 # priocntl -s -c FSS -i class TS
 # priocntl -s -c FSS -i pid 1
-.fi
-.in -2
-
-.SH CONFIGURING SCHEDULER WITH DISPADMIN
-.LP
-You can use the \fBdispadmin\fR(1M) command to examine and tune the FSS
-scheduler's time quantum value. Time quantum is the amount of time that a
-thread is allowed to run before it must relinquish the processor. The following
+.Ed
+.Sh CONFIGURING SCHEDULER WITH DISPADMIN
+You can use the
+.Xr dispadmin 1M
+command to examine and tune the FSS
+scheduler's time quantum value.
+Time quantum is the amount of time that a
+thread is allowed to run before it must relinquish the processor.
+The following
 example dumps the current time quantum for the fair share scheduler:
-.sp
-.in +2
-.nf
+.Bd -literal -offset 2n
 $ dispadmin -g -c FSS
 	#
 	# Fair Share Scheduler Configuration
@@ -169,32 +194,38 @@ $ dispadmin -g -c FSS
 	# Time Quantum
 	#
 	QUANTUM=110
-.fi
-.in -2
-
-.sp
-.LP
+.Ed
+.Pp
 The value of the QUANTUM represents some fraction of a second with the
-fractional value determined by the reciprocal value of RES. With the default
-value of RES = 1000, the reciprocal of 1000 is .001, or milliseconds. Thus, by
+fractional value determined by the reciprocal value of RES.
+With the default
+value of RES = 1000, the reciprocal of 1000 is \&.001, or milliseconds.
+Thus, by
 default, the QUANTUM value represents the time quantum in milliseconds.
-.sp
-.LP
-If you change the RES value using \fBdispadmin\fR with the \fB-r\fR option, you
-also change the QUANTUM value. For example, instead of quantum of 110 with RES
-of 1000, a quantum of 11 with a RES of 100 results. The fractional unit is
-different while the amount of time is the same.
-.sp
-.LP
-You can use the \fB-s\fR option to change the time quantum value. Note that
-such changes are not preserved across reboot. Please refer to the
-\fBdispadmin\fR(1M) man page for additional information.
-
-.SH SEE ALSO
-.LP
-\fBprctl\fR(1), \fBpriocntl\fR(1), \fBdispadmin\fR(1M), \fBpsrset\fR(1M),
-\fBpriocntl\fR(2), \fBproject\fR(4), \fBresource_controls\fR(5)
-.sp
-.LP
-\fISystem Administration Guide:  Virtualization Using the Solaris Operating
-System\fR
+.Pp
+If you change the RES value using
+.Xr dispadmin 1M
+with the
+.Fl r
+option, you also change the QUANTUM value.
+For example, instead of quantum of 110 with RES
+of 1000, a quantum of 11 with a RES of 100 results.
+The fractional unit is different while the amount of time is the same.
+.Pp
+You can use the
+.Fl s
+option to change the time quantum value.
+Note that such changes are not preserved across reboot.
+Please refer to the
+.Xr dispadmin 1M
+man page for additional information.
+.Sh SEE ALSO
+.Xr prctl 1 ,
+.Xr priocntl 1 ,
+.Xr dispadmin 1M ,
+.Xr psrset 1M ,
+.Xr priocntl 2 ,
+.Xr project 4 ,
+.Xr resource_controls 5
+.Pp
+.%T System Administration Guide: Virtualization Using the Solaris Operating System
