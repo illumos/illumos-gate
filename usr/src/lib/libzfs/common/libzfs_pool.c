@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, 2020 by Delphix. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>
  * Copyright (c) 2017 Datto Inc.
@@ -1290,6 +1290,16 @@ zpool_create(libzfs_handle_t *hdl, const char *pool, nvlist_t *nvroot,
 			 */
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "one or more vdevs refer to the same device"));
+			return (zfs_error(hdl, EZFS_BADDEV, msg));
+
+		case EDOM:
+			/*
+			 * This happens if the asize/ashift required by a disk
+			 * vdev is less than ASHIFT_MIN or greater than
+			 * ASHIFT_MAX.
+			 */
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "one or more vdevs require an invalid ashift"));
 			return (zfs_error(hdl, EZFS_BADDEV, msg));
 
 		case ERANGE:
