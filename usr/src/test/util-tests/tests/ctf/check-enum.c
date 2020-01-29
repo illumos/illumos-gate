@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -101,6 +101,14 @@ static check_enum_test_t enums[] = {
 	{ NULL }
 };
 
+static check_size_test_t size_enums[] = {
+	{ "enum char_enum", 1 },
+	{ "enum short_enum", 2 },
+	{ "enum int_enum", 4 },
+	{ "enum ll_enum", 8 },
+	{ NULL }
+};
+
 int
 main(int argc, char *argv[])
 {
@@ -135,6 +143,14 @@ main(int argc, char *argv[])
 				ret = EXIT_FAILURE;
 			}
 		}
+
+		for (d = 0; size_enums[d].cst_name != NULL; d++) {
+			if (!ctftest_check_size(size_enums[d].cst_name,
+			    fp, size_enums[d].cst_size)) {
+				ret = EXIT_FAILURE;
+			}
+		}
+
 		ctf_close(fp);
 	}
 

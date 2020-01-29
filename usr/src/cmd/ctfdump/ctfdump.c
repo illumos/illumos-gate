@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -613,7 +613,16 @@ ctfdump_types_cb(ctf_id_t id, boolean_t root, void *arg)
 		}
 		break;
 	case CTF_K_ENUM:
-		ctfdump_printf(CTFDUMP_TYPES, "%s\n", name);
+		size = ctf_type_size(g_fp, id);
+
+		/* Only the oddest enums are worth reporting on size. */
+		if (size != CTF_ERR && size != sizeof (int)) {
+			ctfdump_printf(CTFDUMP_TYPES, "%s (%zd bytes)\n",
+			    name, size);
+		} else {
+			ctfdump_printf(CTFDUMP_TYPES, "%s\n", name);
+		}
+
 		count = 0;
 		if (ctf_enum_iter(g_fp, id, ctfdump_enum_cb, &count) != 0)
 			ctfdump_fatal("failed to iterate enumerators of %s: "
@@ -805,7 +814,14 @@ ctfsrc_type(ctf_id_t id, const char *name)
 			    "%s\n", name, ctf_errmsg(ctf_errno(g_fp)));
 		}
 
-		printf("};\n\n");
+		size = ctf_type_size(g_fp, id);
+
+		/* Only the oddest enums are worth reporting on size. */
+		if (size != CTF_ERR && size != sizeof (int)) {
+			printf("} /* 0x%x bytes */;\n\n", size);
+		} else {
+			printf("};\n\n");
+		}
 		break;
 	case CTF_K_TYPEDEF:
 		/*

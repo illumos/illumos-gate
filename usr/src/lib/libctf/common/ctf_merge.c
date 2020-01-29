@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -340,15 +340,18 @@ ctf_merge_add_enum(ctf_merge_types_t *cmp, ctf_id_t id)
 	const char *name;
 	ctf_id_t enumid;
 	ctf_merge_enum_t cme;
+	size_t size;
 
 	tp = LCTF_INDEX_TO_TYPEPTR(cmp->cm_src, id);
-	name = ctf_strraw(cmp->cm_src, tp->ctt_name);
 	if (CTF_INFO_ISROOT(tp->ctt_info) != 0)
 		flags = CTF_ADD_ROOT;
 	else
 		flags = CTF_ADD_NONROOT;
 
-	enumid = ctf_add_enum(cmp->cm_out, flags, name);
+	name = ctf_strraw(cmp->cm_src, tp->ctt_name);
+	size = ctf_get_ctt_size(cmp->cm_src, tp, NULL, NULL);
+
+	enumid = ctf_add_enum(cmp->cm_out, flags, name, size);
 	if (enumid == CTF_ERR)
 		return (enumid);
 

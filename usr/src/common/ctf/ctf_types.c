@@ -25,7 +25,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <ctf_impl.h>
@@ -52,6 +52,18 @@ ctf_get_ctt_size(const ctf_file_t *fp, const ctf_type_t *tp, ssize_t *sizep,
 		*incrementp = increment;
 
 	return (size);
+}
+
+void
+ctf_set_ctt_size(ctf_type_t *tp, ssize_t size)
+{
+	if (size > CTF_MAX_SIZE) {
+		tp->ctt_size = CTF_LSIZE_SENT;
+		tp->ctt_lsizehi = CTF_SIZE_TO_LSIZE_HI(size);
+		tp->ctt_lsizelo = CTF_SIZE_TO_LSIZE_LO(size);
+	} else {
+		tp->ctt_size = (ushort_t)size;
+	}
 }
 
 /*
@@ -481,7 +493,7 @@ ctf_type_size(ctf_file_t *fp, ctf_id_t type)
 		return (0);
 
 	case CTF_K_ENUM:
-		return (fp->ctf_dmodel->ctd_int);
+		return (ctf_get_ctt_size(fp, tp, NULL, NULL));
 
 	case CTF_K_ARRAY:
 		/*
@@ -578,8 +590,6 @@ ctf_type_align(ctf_file_t *fp, ctf_id_t type)
 	}
 
 	case CTF_K_ENUM:
-		return (fp->ctf_dmodel->ctd_int);
-
 	default:
 		return (ctf_get_ctt_size(fp, tp, NULL, NULL));
 	}

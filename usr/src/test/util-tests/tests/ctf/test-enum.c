@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <stdint.h>
@@ -72,3 +72,33 @@ typedef enum chrono {
 enum ff6 ff6;
 ff10_t ff10;
 chrono_t trigger;
+
+/*
+ * Normally enums are integer-sized, but a packed enum is a counter-example, as
+ * is something like trace_alloc_type_t which can't fit in an int.
+ */
+
+enum char_enum {
+	CE1,
+	CE2
+} __attribute__((packed)) ce;
+
+enum short_enum {
+	SE1,
+	SE2,
+	SE3 = 255,
+	SE4 = 256,
+	SE5 = 257
+} __attribute__((packed)) se;
+
+enum int_enum {
+	IE1,
+	IE2,
+	IE3 = 256,
+	IE4 = 257
+} ie;
+
+enum ll_enum {
+	LLE1 = -1ULL,
+	LLE2 = -2ULL,
+} lle;

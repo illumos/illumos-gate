@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
- * Copyright (c) 2015 Joyent, Inc. All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <strings.h>
@@ -694,7 +694,7 @@ dt_decl_enum(char *name)
 	if (name != NULL && (type = ctf_lookup_by_name(ctfp, n)) != CTF_ERR) {
 		if (ctf_enum_iter(ctfp, type, dt_decl_hasmembers, NULL))
 			xyerror(D_DECL_TYPERED, "type redeclared: %s\n", n);
-	} else if ((type = ctf_add_enum(ctfp, flag, name)) == CTF_ERR) {
+	} else if ((type = ctf_add_enum(ctfp, flag, name, 0)) == CTF_ERR) {
 		xyerror(D_UNKNOWN, "failed to define %s: %s\n",
 		    n, ctf_errmsg(ctf_errno(ctfp)));
 	}

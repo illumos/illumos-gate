@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -736,6 +736,25 @@ ctftest_check_fptr(const char *type, ctf_file_t *fp, const char *rtype,
 
 	free(args);
 	return (ret);
+}
+
+boolean_t
+ctftest_check_size(const char *type, ctf_file_t *fp, size_t size)
+{
+	ctf_id_t base;
+
+	if ((base = ctftest_lookup_type(fp, type)) == CTF_ERR) {
+		warnx("Failed to look up type %s", type);
+		return (B_FALSE);
+	}
+
+	if (size != ctf_type_size(fp, base)) {
+		warnx("%s has bad size, expected %lu, found %lu",
+		    type, size, ctf_type_size(fp, base));
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
 }
 
 typedef struct ctftest_duplicates {
