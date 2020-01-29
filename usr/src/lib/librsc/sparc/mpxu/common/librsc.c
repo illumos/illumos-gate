@@ -108,9 +108,9 @@ static const int rr_table_cnt = sizeof (rr_table) / sizeof (rr_table[0]);
 
 static req_resp_table_t rr_bp_table[] = {
 
-	{ BP_OBP_BOOTINIT,	NULL,	sizeof (bp_msg_t),
+	{ BP_OBP_BOOTINIT,	0,	sizeof (bp_msg_t),
 	    RR_BOOT_INIT_TIMEOUT },
-	{ BP_OBP_RESET,		NULL,	sizeof (bp_msg_t),
+	{ BP_OBP_RESET,		0,	sizeof (bp_msg_t),
 	    RR_BOOT_RESET_TIMEOUT }
 };
 
