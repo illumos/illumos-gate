@@ -61,7 +61,7 @@ setup_top_frame(void *stk, size_t stksize, ulwp_t *ulwp)
 
 int
 setup_context(ucontext_t *ucp, void *(*func)(ulwp_t *),
-	ulwp_t *ulwp, caddr_t stk, size_t stksize)
+    ulwp_t *ulwp, caddr_t stk, size_t stksize)
 {
 	uintptr_t stack;
 
@@ -72,7 +72,8 @@ setup_context(ucontext_t *ucp, void *(*func)(ulwp_t *),
 	 * Clear the top stack frame.
 	 * If this fails, pass the problem up to the application.
 	 */
-	if ((stack = (uintptr_t)setup_top_frame(stk, stksize, ulwp)) == NULL)
+	stack = (uintptr_t)setup_top_frame(stk, stksize, ulwp);
+	if (stack == (uintptr_t)NULL)
 		return (ENOMEM);
 
 	/* fill in registers of interest */
