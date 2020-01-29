@@ -48,8 +48,6 @@ CPPFLAGS += -I../../lib/libzpool/common
 CPPFLAGS += -I../../lib/libscf/inc
 CPPFLAGS += -I../../uts/common/fs/zfs
 
-CERRWARN += -_gcc=-Wno-unused-label
-
 LDLIBS += -lbsm -lscf -lzfs -lgen
 LDLIBS_i386 +=	-lbe
 LDLIBS +=	$(LDLIBS_$(MACH))

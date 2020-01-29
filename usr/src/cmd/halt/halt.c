@@ -719,7 +719,6 @@ validate_zfs_pool(char *arg, char *mountpoint)
 		rc = -1;
 	}
 
-validate_zfs_err_out:
 	if (zhp != NULL)
 		zfs_close(zhp);
 
