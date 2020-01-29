@@ -1401,6 +1401,8 @@ typedef struct tcpConnEntryInfo_s {
 			/* round-trip time smoothed average (us) */
 	Gauge		ce_rtt_sa;
 			/* current rto (retransmit timeout) */
+	Gauge		ce_rtt_sd;
+			/* current rto (retransmit timeout) */
 	Gauge		ce_rto;
 			/* round-trip time count */
 	Gauge		ce_rtt_cnt;
