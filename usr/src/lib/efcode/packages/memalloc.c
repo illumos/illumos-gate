@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -55,7 +53,7 @@ claim(fcode_env_t *env)
 	    fc_int2cell(align), fc_size2cell(size), fc_ptr2cell(hint), &vaddr);
 	if (error)
 		throw_from_fclib(env, 1, "client-services/claim failed\n");
-	vaddr = mapping_to_mcookie(vaddr, size, NULL, NULL);
+	vaddr = mapping_to_mcookie(vaddr, size, 0, 0);
 	PUSH(DS, (fstack_t)vaddr);
 }
 
