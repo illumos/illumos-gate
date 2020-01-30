@@ -595,14 +595,14 @@ zsattach(dev_info_t *dev, ddi_attach_cmd_t cmd)
 			(void) strcpy(name, "a");
 			if (ddi_create_minor_node(dev, name, S_IFCHR,
 			    ddi_get_instance(dev) * 2,
-			    obp_type, NULL) == DDI_FAILURE) {
+			    obp_type, 0) == DDI_FAILURE) {
 				ddi_remove_minor_node(dev, NULL);
 				return (DDI_FAILURE);
 			}
 			(void) strcpy(name, "b");
 			if (ddi_create_minor_node(dev, name, S_IFCHR,
 			    (ddi_get_instance(dev) * 2) + 1,
-			    obp_type, NULL) == DDI_FAILURE) {
+			    obp_type, 0) == DDI_FAILURE) {
 				ddi_remove_minor_node(dev, NULL);
 				return (DDI_FAILURE);
 			}
@@ -614,28 +614,28 @@ zsattach(dev_info_t *dev, ddi_attach_cmd_t cmd)
 		(void) sprintf(name, "%c", (ddi_get_instance(dev) + 'a'));
 		if (ddi_create_minor_node(dev, name, S_IFCHR,
 		    ddi_get_instance(dev) * 2,
-		    serial_line, NULL) == DDI_FAILURE) {
+		    serial_line, 0) == DDI_FAILURE) {
 			ddi_remove_minor_node(dev, NULL);
 			return (DDI_FAILURE);
 		}
 		(void) sprintf(name, "%c", (ddi_get_instance(dev) + 'b'));
 		if (ddi_create_minor_node(dev, name, S_IFCHR,
 		    (ddi_get_instance(dev) * 2) + 1,
-		    serial_line, NULL) == DDI_FAILURE) {
+		    serial_line, 0) == DDI_FAILURE) {
 			ddi_remove_minor_node(dev, NULL);
 			return (DDI_FAILURE);
 		}
 		(void) sprintf(name, "%c,cu", (ddi_get_instance(dev) + 'a'));
 		if (ddi_create_minor_node(dev, name, S_IFCHR,
 		    (ddi_get_instance(dev) * 2) | OUTLINE,
-		    dial_out, NULL) == DDI_FAILURE) {
+		    dial_out, 0) == DDI_FAILURE) {
 			ddi_remove_minor_node(dev, NULL);
 			return (DDI_FAILURE);
 		}
 		(void) sprintf(name, "%c,cu", (ddi_get_instance(dev) + 'b'));
 		if (ddi_create_minor_node(dev, name, S_IFCHR,
 		    ((ddi_get_instance(dev)  * 2) + 1) | OUTLINE,
-		    dial_out, NULL) == DDI_FAILURE) {
+		    dial_out, 0) == DDI_FAILURE) {
 			ddi_remove_minor_node(dev, NULL);
 			return (DDI_FAILURE);
 		}
@@ -871,7 +871,7 @@ zsintr(caddr_t intarg)
 		for (zs = &zscom[0]; zs <= zslast; zs++) {
 			if (zs->zs_flags & ZS_NEEDSOFT) {
 				zs->zs_flags &= ~ZS_NEEDSOFT;
-				(*zs->zs_ops->zsop_softint)(zs);
+				(void) (*zs->zs_ops->zsop_softint)(zs);
 				if (zs->intrstats) {
 					KIOIP->intrs[KSTAT_INTR_SOFT]++;
 				}
