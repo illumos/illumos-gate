@@ -168,7 +168,7 @@ typedef struct vd_driver_type {
  * The list can be extended by adding a "driver-type-list" entry in vds.conf
  * with the following syntax:
  *
- * 	driver-type-list="<driver>:<type>", ... ,"<driver>:<type>";
+ *	driver-type-list="<driver>:<type>", ... ,"<driver>:<type>";
  *
  * Where:
  *	<driver> is the name of a driver (limited to 64 characters)
@@ -178,7 +178,7 @@ typedef struct vd_driver_type {
  *
  * For example, the following line in vds.conf:
  *
- * 	driver-type-list="foo:disk","bar:volume";
+ *	driver-type-list="foo:disk","bar:volume";
  *
  * defines that "foo" is a disk driver, and driver "bar" is a volume driver.
  *
@@ -256,7 +256,7 @@ vd_driver_type_t vds_driver_types[] = {
 static mdeg_prop_spec_t	vds_prop_template[] = {
 	{ MDET_PROP_STR,	"name",		VDS_NAME },
 	{ MDET_PROP_VAL,	"cfg-handle",	NULL },
-	{ MDET_LIST_END,	NULL, 		NULL }
+	{ MDET_LIST_END,	NULL,		NULL }
 };
 
 #define	VDS_SET_MDEG_PROP_INST(specp, val) (specp)[1].ps_val = (val);
@@ -290,7 +290,7 @@ typedef struct vd_option {
 
 vd_option_t vd_bdev_options[] = {
 	{ "ro",		VD_OPT_RDONLY },
-	{ "slice", 	VD_OPT_SLICE },
+	{ "slice",	VD_OPT_SLICE },
 	{ "excl",	VD_OPT_EXCLUSIVE }
 };
 
@@ -407,7 +407,7 @@ typedef struct vds {
 	mdeg_node_spec_t *ispecp;	/* mdeg node specification */
 	mdeg_handle_t	mdeg;		/* handle for MDEG operations  */
 	vd_driver_type_t *driver_types;	/* extra driver types (from vds.conf) */
-	int 		num_drivers;	/* num of extra driver types */
+	int		num_drivers;	/* num of extra driver types */
 } vds_t;
 
 /*
@@ -595,7 +595,7 @@ static int	vd_awflush = VD_AWFLUSH_IMMEDIATE | VD_AWFLUSH_GROUP;
  * the service domain to panic. In both cases, the reset of the service domain
  * should trigger a reset SCSI buses and hopefully clear any SCSI-2 reservation.
  */
-static int 	vd_reset_access_failure = 0;
+static int	vd_reset_access_failure = 0;
 
 /*
  * Tunable for backward compatibility. When this variable is set to B_TRUE,
@@ -694,8 +694,8 @@ extern int is_pseudo_device(dev_info_t *);
  *	vd_get_readable_size
  *
  * Description:
- * 	Convert a given size in bytes to a human readable format in
- * 	kilobytes, megabytes, gigabytes or terabytes.
+ *	Convert a given size in bytes to a human readable format in
+ *	kilobytes, megabytes, gigabytes or terabytes.
  *
  * Parameters:
  *	full_size	- the size to convert in bytes.
@@ -729,7 +729,7 @@ vd_get_readable_size(size_t full_size, size_t *size, char *unit)
  *	vd_dskimg_io_params
  *
  * Description:
- * 	Convert virtual disk I/O parameters (slice, block, length) to
+ *	Convert virtual disk I/O parameters (slice, block, length) to
  *	(offset, length) relative to the disk image and according to
  *	the virtual disk partitioning.
  *
@@ -848,7 +848,7 @@ vd_dskimg_io_params(vd_t *vd, int slice, size_t *blkp, size_t *lenp)
  *	vd_dskimg_rw
  *
  * Description:
- * 	Read or write to a disk image. It handles the case where the disk
+ *	Read or write to a disk image. It handles the case where the disk
  *	image is a file or a volume exported as a full disk or a file
  *	exported as single-slice disk. Read or write to volumes exported as
  *	single slice disks are done by directly using the ldi interface.
@@ -891,7 +891,7 @@ vd_dskimg_rw(vd_t *vd, int slice, int operation, caddr_t data, size_t offset,
 		    ((operation == VD_OP_BREAD)? B_READ : B_WRITE);
 		buf.b_bcount	= len;
 		buf.b_lblkno	= offset;
-		buf.b_edev 	= vd->dev[0];
+		buf.b_edev	= vd->dev[0];
 		buf.b_un.b_addr = data;
 
 		/*
@@ -986,9 +986,9 @@ vd_build_default_label(size_t disk_size, size_t bsize, struct dk_label *label)
 	 *
 	 * Other parameters are computed from these values:
 	 *
-	 * 	pcyl = disk_size / (nhead * nsect * 512)
-	 * 	acyl = (pcyl > 2)? 2 : 0
-	 * 	ncyl = pcyl - acyl
+	 *	pcyl = disk_size / (nhead * nsect * 512)
+	 *	acyl = (pcyl > 2)? 2 : 0
+	 *	ncyl = pcyl - acyl
 	 *
 	 * The maximum number of cylinder is 65535 so this allows to define a
 	 * geometry for a disk size up to 65535 * 96 * 768 * 512 = 2.24 TB
@@ -1358,7 +1358,7 @@ vd_dskimg_write_devid(vd_t *vd, ddi_devid_t devid)
  *	vd_do_scsi_rdwr
  *
  * Description:
- * 	Read or write to a SCSI disk using an absolute disk offset.
+ *	Read or write to a SCSI disk using an absolute disk offset.
  *
  * Parameters:
  *	vd		- disk on which the operation is performed.
@@ -1482,7 +1482,7 @@ vd_do_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t blk, size_t len)
  *	vd_scsi_rdwr
  *
  * Description:
- * 	Wrapper function to read or write to a SCSI disk using an absolute
+ *	Wrapper function to read or write to a SCSI disk using an absolute
  *	disk offset. It checks the blocksize of the underlying device and,
  *	if necessary, adjusts the buffers accordingly before calling
  *	vd_do_scsi_rdwr() to do the actual read or write.
@@ -1562,7 +1562,7 @@ vd_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t vblk, size_t vlen)
 	 *          ^                       ^
 	 *          |<--------------------->|
 	 *          |         plen
-	 *         pblk 
+	 *	   pblk
 	 */
 	/* END CSTYLED */
 	pblk = (vblk * vd->vdisk_bsize) / vd->backend_bsize;
@@ -1897,7 +1897,7 @@ vd_flush_write(vd_t *vd)
 		status = VOP_FSYNC(vd->file_vnode, FSYNC, kcred, NULL);
 	} else {
 		status = ldi_ioctl(vd->ldi_handle[0], DKIOCFLUSHWRITECACHE,
-		    NULL, vd->open_flags | FKIOCTL, kcred, &rval);
+		    (intptr_t)NULL, vd->open_flags | FKIOCTL, kcred, &rval);
 	}
 
 	return (status);
@@ -1973,7 +1973,7 @@ vd_start_bio(vd_task_t *task)
 	vd_dring_payload_t	*request	= task->request;
 	struct buf		*buf		= &task->buf;
 	uint8_t			mtype;
-	int 			slice;
+	int			slice;
 	char			*bufaddr = 0;
 	size_t			buflen;
 	size_t			offset, length, nbytes;
@@ -2116,7 +2116,7 @@ vd_start_bio(vd_task_t *task)
 	buf->b_bcount	= length;
 	buf->b_lblkno	= offset;
 	buf->b_bufsize	= buflen;
-	buf->b_edev 	= vd->dev[slice];
+	buf->b_edev	= vd->dev[slice];
 	buf->b_un.b_addr = bufaddr;
 	buf->b_iodone	= vd_biodone;
 
@@ -2526,7 +2526,7 @@ vd_complete_bio(vd_task_t *task)
  *	message to the client.
  *
  * Parameters:
- *	arg 	- opaque pointer to structure containing task to be completed
+ *	arg	- opaque pointer to structure containing task to be completed
  *
  * Return Values
  *	None
@@ -2569,7 +2569,7 @@ vd_notify(vd_task_t *task)
  *	the vDisk client
  *
  * Parameters:
- *	task 		- structure containing the request sent from client
+ *	task		- structure containing the request sent from client
  *
  * Return Values
  *	None
@@ -2624,7 +2624,7 @@ vd_complete_notify(vd_task_t *task)
  *	message to the client that the request is completed.
  *
  * Parameters:
- *	arg 	- opaque pointer to structure containing task to be completed
+ *	arg	- opaque pointer to structure containing task to be completed
  *
  * Return Values
  *	None
@@ -3578,7 +3578,7 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
  *	is passed in as a field in the task pointer.
  *
  * Parameters:
- *	arg 	- opaque pointer to structure containing task to be completed
+ *	arg	- opaque pointer to structure containing task to be completed
  *
  * Return Values
  *	None
@@ -3688,7 +3688,8 @@ vd_ioctl(vd_task_t *task)
 			break;
 		}
 	}
-	ASSERT(i < nioctls);	/* because "operation" already validated */
+
+	VERIFY(i < nioctls); /* because "operation" already validated */
 
 	if (!(vd->open_flags & FWRITE) && ioctl[i].write) {
 		PR0("%s fails because backend is opened read-only",
@@ -3890,7 +3891,7 @@ vd_get_access(vd_task_t *task)
 	}
 
 	request->status = ldi_ioctl(vd->ldi_handle[request->slice], MHIOCSTATUS,
-	    NULL, (vd->open_flags | FKIOCTL), kcred, &rval);
+	    (intptr_t)NULL, (vd->open_flags | FKIOCTL), kcred, &rval);
 
 	if (request->status != 0)
 		return (0);
@@ -3935,8 +3936,8 @@ vd_set_access(vd_task_t *task)
 	if (flags == VD_ACCESS_SET_CLEAR) {
 		PR0("Performing VD_OP_SET_ACCESS (CLEAR)");
 		request->status = ldi_ioctl(vd->ldi_handle[request->slice],
-		    MHIOCRELEASE, NULL, (vd->open_flags | FKIOCTL), kcred,
-		    &rval);
+		    MHIOCRELEASE, (intptr_t)NULL, (vd->open_flags | FKIOCTL),
+		    kcred, &rval);
 		if (request->status == 0)
 			vd->ownership = B_FALSE;
 		return (0);
@@ -3962,7 +3963,8 @@ vd_set_access(vd_task_t *task)
 		 */
 		PR0("Performing VD_OP_SET_ACCESS (EXCLUSIVE|PREEMPT|PRESERVE)");
 		request->status = ldi_ioctl(vd->ldi_handle[request->slice],
-		    MHIOCTKOWN, NULL, (vd->open_flags | FKIOCTL), kcred, &rval);
+		    MHIOCTKOWN, (intptr_t)NULL, (vd->open_flags | FKIOCTL),
+		    kcred, &rval);
 		break;
 
 	case VD_ACCESS_SET_PRESERVE:
@@ -3977,12 +3979,13 @@ vd_set_access(vd_task_t *task)
 		 */
 		PR0("Performing VD_OP_SET_ACCESS (EXCLUSIVE|PRESERVE)");
 		request->status = ldi_ioctl(vd->ldi_handle[request->slice],
-		    MHIOCQRESERVE, NULL, (vd->open_flags | FKIOCTL), kcred,
-		    &rval);
+		    MHIOCQRESERVE, (intptr_t)NULL, (vd->open_flags | FKIOCTL),
+		    kcred, &rval);
 		if (request->status != 0)
 			break;
 		request->status = ldi_ioctl(vd->ldi_handle[request->slice],
-		    MHIOCTKOWN, NULL, (vd->open_flags | FKIOCTL), kcred, &rval);
+		    MHIOCTKOWN, (intptr_t)NULL, (vd->open_flags | FKIOCTL),
+		    kcred, &rval);
 		break;
 
 	case VD_ACCESS_SET_PREEMPT:
@@ -3994,8 +3997,8 @@ vd_set_access(vd_task_t *task)
 		 */
 		PR0("Performing VD_OP_SET_ACCESS (EXCLUSIVE|PREEMPT)");
 		request->status = ldi_ioctl(vd->ldi_handle[request->slice],
-		    MHIOCQRESERVE, NULL, (vd->open_flags | FKIOCTL), kcred,
-		    &rval);
+		    MHIOCQRESERVE, (intptr_t)NULL, (vd->open_flags | FKIOCTL),
+		    kcred, &rval);
 		if (request->status == 0)
 			break;
 
@@ -4004,16 +4007,16 @@ vd_set_access(vd_task_t *task)
 
 		/* try again even if the reset has failed */
 		request->status = ldi_ioctl(vd->ldi_handle[request->slice],
-		    MHIOCQRESERVE, NULL, (vd->open_flags | FKIOCTL), kcred,
-		    &rval);
+		    MHIOCQRESERVE, (intptr_t)NULL, (vd->open_flags | FKIOCTL),
+		    kcred, &rval);
 		break;
 
 	case 0:
 		/* Flag EXCLUSIVE only. Just issue a SCSI reservation */
 		PR0("Performing VD_OP_SET_ACCESS (EXCLUSIVE)");
 		request->status = ldi_ioctl(vd->ldi_handle[request->slice],
-		    MHIOCQRESERVE, NULL, (vd->open_flags | FKIOCTL), kcred,
-		    &rval);
+		    MHIOCQRESERVE, (intptr_t)NULL, (vd->open_flags | FKIOCTL),
+		    kcred, &rval);
 		break;
 	}
 
@@ -4034,7 +4037,7 @@ vd_reset_access(vd_t *vd)
 		return;
 
 	PR0("Releasing disk ownership");
-	status = ldi_ioctl(vd->ldi_handle[0], MHIOCRELEASE, NULL,
+	status = ldi_ioctl(vd->ldi_handle[0], MHIOCRELEASE, (intptr_t)NULL,
 	    (vd->open_flags | FKIOCTL), kcred, &rval);
 
 	/*
@@ -4059,7 +4062,7 @@ vd_reset_access(vd_t *vd)
 		PR0("Fail to reset disk, error %d", status);
 
 	/* whatever the result of the reset is, we try the release again */
-	status = ldi_ioctl(vd->ldi_handle[0], MHIOCRELEASE, NULL,
+	status = ldi_ioctl(vd->ldi_handle[0], MHIOCRELEASE, (intptr_t)NULL,
 	    (vd->open_flags | FKIOCTL), kcred, &rval);
 
 	if (status == 0 || status == EACCES) {
@@ -4081,7 +4084,7 @@ vd_reset_access(vd_t *vd)
 	if (vd_reset_access_failure == A_REBOOT) {
 		cmn_err(CE_WARN, VD_RESET_ACCESS_FAILURE_MSG
 		    ", rebooting the system", vd->device_path);
-		(void) uadmin(A_SHUTDOWN, AD_BOOT, NULL);
+		(void) uadmin(A_SHUTDOWN, AD_BOOT, (uintptr_t)NULL);
 	} else if (vd_reset_access_failure == A_DUMP) {
 		panic(VD_RESET_ACCESS_FAILURE_MSG, vd->device_path);
 	}
@@ -4122,7 +4125,7 @@ static const size_t	vds_noperations =
  * Process a task specifying a client I/O request
  *
  * Parameters:
- *	task 		- structure containing the request sent from client
+ *	task		- structure containing the request sent from client
  *
  * Return Value
  *	0	- success
@@ -4196,7 +4199,7 @@ vd_do_process_task(vd_task_t *task)
  *	by the completion handler.
  *
  * Parameters:
- *	task 		- structure containing the request sent from client
+ *	task		- structure containing the request sent from client
  *
  * Return Value
  *	0		- successful synchronous request.
@@ -5415,7 +5418,7 @@ vds_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		kmem_free(vds->ispecp->specp, sizeof (vds_prop_template));
 		kmem_free(vds->ispecp, sizeof (mdeg_node_spec_t));
 		vds->ispecp = NULL;
-		vds->mdeg = NULL;
+		vds->mdeg = 0;
 	}
 
 	vds_driver_types_free(vds);
@@ -5884,7 +5887,7 @@ vd_setup_partition_efi(vd_t *vd)
 static int
 vd_setup_backend_vnode(vd_t *vd)
 {
-	int 		rval, status;
+	int		rval, status;
 	dev_t		dev;
 	char		*file_path = vd->device_path;
 	ldi_handle_t	lhandle;
@@ -6059,7 +6062,7 @@ vd_setup_disk_image(vd_t *vd)
 	 */
 	PR1("creating devid for %s", backend_path);
 
-	if (ddi_devid_init(vd->vds->dip, DEVID_FAB, NULL, 0,
+	if (ddi_devid_init(vd->vds->dip, DEVID_FAB, 0, 0,
 	    &vd->dskimg_devid) != DDI_SUCCESS) {
 		PR0("fail to create devid for %s", backend_path);
 		vd->dskimg_devid = NULL;
@@ -6088,7 +6091,7 @@ vd_setup_disk_image(vd_t *vd)
  *	Open a device using its device path (supplied by ldm(1m))
  *
  * Parameters:
- *	vd 	- pointer to structure containing the vDisk info
+ *	vd	- pointer to structure containing the vDisk info
  *	flags	- open flags
  *
  * Return Value
@@ -6491,7 +6494,7 @@ vd_backend_check_size(vd_t *vd)
  *	a disk device or a volume device.
  *
  * Parameters:
- *	vd 	- pointer to structure containing the vDisk info
+ *	vd	- pointer to structure containing the vDisk info
  *	dtype	- return the driver type of the device
  *
  * Return Value
@@ -6565,7 +6568,7 @@ vd_setup_vd(vd_t *vd)
 {
 	int		status, drv_type, pseudo;
 	dev_info_t	*dip;
-	vnode_t 	*vnp;
+	vnode_t		*vnp;
 	char		*path = vd->device_path;
 	char		tq_name[TASKQ_NAMELEN];
 
@@ -7066,7 +7069,7 @@ vds_get_ldc_id(md_t *md, mde_cookie_t vd_node, uint64_t *ldc_id)
  *	vds_get_options
  *
  * Description:
- * 	Parse the options of a vds node. Options are defined as an array
+ *	Parse the options of a vds node. Options are defined as an array
  *	of strings in the vds-block-device-opts property of the vds node
  *	in the machine description. Options are returned as a bitmask. The
  *	mapping between the bitmask options and the options strings from the
