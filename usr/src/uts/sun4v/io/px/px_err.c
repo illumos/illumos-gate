@@ -151,7 +151,7 @@ px_err_fill_pfd(dev_info_t *dip, pf_data_t *pfd_p, px_rc_err_t *epkt) {
 	case BLOCK_MMU:
 		/* Only PIO Fault Addresses are valid, this is DMA */
 		s_status = PCI_STAT_S_TARG_AB;
-		fault_addr = NULL;
+		fault_addr = 0;
 
 		if (epkt->rc_descr.H) {
 			fault_bdf = (pcie_req_id_t)(epkt->hdr[0] >> 16);
@@ -836,7 +836,7 @@ px_mmu_handle_lookup(dev_info_t *dip, ddi_fm_error_t *derr, px_rc_err_t *epkt)
 	pcie_req_id_t bdf = PCIE_INVALID_BDF;
 
 	if (epkt->rc_descr.H) {
-		bdf = (uint32_t)((epkt->hdr[0] >> 16) && 0xFFFF);
+		bdf = (uint32_t)((epkt->hdr[0] >> 16) & 0xFFFF);
 	}
 
 	return (pf_hdl_lookup(dip, derr->fme_ena, PF_ADDR_DMA, addr,

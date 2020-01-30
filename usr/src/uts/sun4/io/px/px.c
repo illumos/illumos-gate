@@ -44,8 +44,6 @@
 #include <sys/pcie_pwr.h>
 #include <sys/pci_cfgacc.h>
 
-/*LINTLIBRARY*/
-
 /*
  * function prototypes for dev ops routines:
  */
@@ -226,7 +224,7 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	px_t		*px_p;	/* per bus state pointer */
 	int		instance = DIP_TO_INST(dip);
 	int		ret = DDI_SUCCESS;
-	devhandle_t	dev_hdl = NULL;
+	devhandle_t	dev_hdl = 0;
 	pcie_hp_regops_t regops;
 	pcie_bus_t	*bus_p;
 
@@ -521,7 +519,7 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		mutex_exit(&px_p->px_mutex);
 		mutex_destroy(&px_p->px_mutex);
 
-		px_p->px_dev_hdl = NULL;
+		px_p->px_dev_hdl = 0;
 		ddi_soft_state_free(px_state_p, instance);
 
 		return (DDI_SUCCESS);
@@ -688,7 +686,7 @@ px_pwr_teardown(dev_info_t *dip)
 	px_t *px_p = INST_TO_STATE(instance);
 	ddi_intr_handle_impl_t	hdl;
 
-	if (!PCIE_PMINFO(dip) || !PCIE_NEXUS_PMINFO(dip))
+	if (PCIE_PMINFO(dip) == NULL || PCIE_NEXUS_PMINFO(dip) == NULL)
 		return;
 
 	/* Initialize handle */
@@ -848,7 +846,8 @@ px_dma_setup(dev_info_t *dip, dev_info_t *rdip, ddi_dma_req_t *dmareq,
 	    ddi_driver_name(rdip), ddi_get_instance(rdip),
 	    handlep ? "alloc" : "advisory");
 
-	if (!(mp = px_dma_lmts2hdl(dip, rdip, mmu_p, dmareq)))
+	mp = px_dma_lmts2hdl(dip, rdip, mmu_p, dmareq);
+	if (mp == NULL)
 		return (DDI_DMA_NORESOURCES);
 	if (mp == (ddi_dma_impl_t *)DDI_DMA_NOMAPPING)
 		return (DDI_DMA_NOMAPPING);
@@ -858,14 +857,14 @@ px_dma_setup(dev_info_t *dip, dev_info_t *rdip, ddi_dma_req_t *dmareq,
 		goto freehandle;
 
 	switch (PX_DMA_TYPE(mp)) {
-	case PX_DMAI_FLAGS_DVMA:	/* LINTED E_EQUALITY_NOT_ASSIGNMENT */
-		if ((ret = px_dvma_win(px_p, dmareq, mp)) || !handlep)
+	case PX_DMAI_FLAGS_DVMA:
+		ret = px_dvma_win(px_p, dmareq, mp);
+		if (ret != 0 || handlep == NULL)
 			goto freehandle;
 		if (!PX_DMA_CANCACHE(mp)) {	/* try fast track */
 			if (PX_DMA_CANFAST(mp)) {
 				if (!px_dvma_map_fast(mmu_p, mp))
 					break;
-			/* LINTED E_NOP_ELSE_STMT */
 			} else {
 				PX_DVMA_FASTTRAK_PROF(mp);
 			}
@@ -873,8 +872,9 @@ px_dma_setup(dev_info_t *dip, dev_info_t *rdip, ddi_dma_req_t *dmareq,
 		if (ret = px_dvma_map(mp, dmareq, mmu_p))
 			goto freehandle;
 		break;
-	case PX_DMAI_FLAGS_PTP:	/* LINTED E_EQUALITY_NOT_ASSIGNMENT */
-		if ((ret = px_dma_physwin(px_p, dmareq, mp)) || !handlep)
+	case PX_DMAI_FLAGS_PTP:
+		ret = px_dma_physwin(px_p, dmareq, mp);
+		if (ret == 0 || handlep == NULL)
 			goto freehandle;
 		break;
 	case PX_DMAI_FLAGS_BYPASS:
@@ -915,7 +915,8 @@ px_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attrp,
 	if (attrp->dma_attr_version != DMA_ATTR_V0)
 		return (DDI_DMA_BADATTR);
 
-	if (!(mp = px_dma_allocmp(dip, rdip, waitfp, arg)))
+	mp = px_dma_allocmp(dip, rdip, waitfp, arg);
+	if (mp == NULL)
 		return (DDI_DMA_NORESOURCES);
 
 	/*
@@ -989,7 +990,7 @@ px_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 		if (!PX_DMA_CANCACHE(mp)) {	/* try fast track */
 			if (PX_DMA_CANFAST(mp)) {
 				if (!px_dvma_map_fast(mmu_p, mp))
-					goto mapped; /*LINTED E_NOP_ELSE_STMT*/
+					goto mapped;
 			} else {
 				PX_DVMA_FASTTRAK_PROF(mp);
 			}

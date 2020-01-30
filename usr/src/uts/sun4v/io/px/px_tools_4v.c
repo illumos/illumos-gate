@@ -184,7 +184,7 @@ pxtool_phys_access(px_t *px_p, uintptr_t dev_addr,
 		from_addr = dev_addr;
 	}
 
-	rval = hv_hpriv((void *)pfunc, from_addr, to_addr, NULL);
+	rval = hv_hpriv((void *)pfunc, from_addr, to_addr, 0);
 	switch (rval) {
 	case H_ENOACCESS:	/* Returned by non-debug hypervisor. */
 		rval = ENOTSUP;

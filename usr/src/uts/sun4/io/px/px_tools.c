@@ -488,7 +488,7 @@ pxtool_get_phys_addr(px_t *px_p, int space, uint64_t offset)
 	    "space:0x%d, offset:0x%" PRIx64 "\n", space, offset);
 
 	if (rval != DDI_SUCCESS)
-		return (NULL);
+		return ((uintptr_t)NULL);
 
 	/* Bustype here returns the high order address bits. */
 	xlated_regspec.regspec_bustype &= px_get_rng_parent_hi_mask(px_p);

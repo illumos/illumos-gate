@@ -570,14 +570,14 @@ px_err_bit_desc_t px_err_lpug_tbl[] = {
 
 /* LPU Registers Addresses */
 #define	LR4(pre) \
-	NULL, \
+	0, \
 	LPU_ ## pre ## _INTERRUPT_MASK, \
 	LPU_ ## pre ## _INTERRUPT_AND_STATUS, \
 	LPU_ ## pre ## _INTERRUPT_AND_STATUS
 
 /* LPU Registers Addresses with Irregularities */
 #define	LR4_FIXME(pre) \
-	NULL, \
+	0, \
 	LPU_ ## pre ## _INTERRUPT_MASK, \
 	LPU_ ## pre ## _LAYER_INTERRUPT_AND_STATUS, \
 	LPU_ ## pre ## _LAYER_INTERRUPT_AND_STATUS
@@ -737,7 +737,7 @@ px_err_reg_enable(px_err_id_t reg_id, caddr_t csr_base)
 	uint64_t 		log_mask = *reg_desc_p->log_mask_p;
 
 	/* Enable logs if it exists */
-	if (reg_desc_p->log_addr != NULL)
+	if (reg_desc_p->log_addr != 0)
 		CSR_XS(csr_base, reg_desc_p->log_addr, log_mask);
 
 	/*
@@ -758,7 +758,7 @@ px_err_reg_enable(px_err_id_t reg_id, caddr_t csr_base)
 	    CSR_XR(csr_base, reg_desc_p->status_addr));
 	DBG(DBG_ATTACH, NULL, "%s Clear: 0x%llx\n", reg_desc_p->msg,
 	    CSR_XR(csr_base, reg_desc_p->clear_addr));
-	if (reg_desc_p->log_addr != NULL) {
+	if (reg_desc_p->log_addr != 0) {
 		DBG(DBG_ATTACH, NULL, "%s Log: 0x%llx\n", reg_desc_p->msg,
 		    CSR_XR(csr_base, reg_desc_p->log_addr));
 	}
@@ -770,7 +770,7 @@ px_err_reg_disable(px_err_id_t reg_id, caddr_t csr_base)
 	const px_err_reg_desc_t	*reg_desc_p = &px_err_reg_tbl[reg_id];
 	uint64_t		val = (reg_id >= PX_ERR_LPU_LINK) ? -1 : 0;
 
-	if (reg_desc_p->log_addr != NULL)
+	if (reg_desc_p->log_addr != 0)
 		CSR_XS(csr_base, reg_desc_p->log_addr, val);
 	CSR_XS(csr_base, reg_desc_p->enable_addr, val);
 }
@@ -1722,7 +1722,7 @@ PX_ERPT_SEND_DEC(mmu_tfar_tfsr)
 		s_status = PCI_STAT_S_TARG_AB;
 
 		/* Only PIO Fault Addresses are valid, this is DMA */
-		(void) px_rp_en_q(px_p, fault_bdf, NULL, s_status);
+		(void) px_rp_en_q(px_p, fault_bdf, 0, s_status);
 	}
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
@@ -1793,8 +1793,7 @@ px_err_mmu_rbne_handle(dev_info_t *rpdip, caddr_t csr_base,
 		goto done;
 
 	bdf = (pcie_req_id_t)CSR_FR(csr_base, MMU_TRANSLATION_FAULT_STATUS, ID);
-	(void) pf_hdl_lookup(rpdip, derr->fme_ena, PF_ADDR_DMA, NULL,
-	    bdf);
+	(void) pf_hdl_lookup(rpdip, derr->fme_ena, PF_ADDR_DMA, 0, bdf);
 
 done:
 	return (px_err_no_panic_handle(rpdip, csr_base, derr, err_reg_descr,
@@ -1824,8 +1823,7 @@ px_err_mmu_tfa_handle(dev_info_t *rpdip, caddr_t csr_base,
 		goto done;
 
 	bdf = (pcie_req_id_t)CSR_FR(csr_base, MMU_TRANSLATION_FAULT_STATUS, ID);
-	(void) pf_hdl_lookup(rpdip, derr->fme_ena, PF_ADDR_DMA, NULL,
-	    bdf);
+	(void) pf_hdl_lookup(rpdip, derr->fme_ena, PF_ADDR_DMA, 0, bdf);
 
 done:
 	return (px_err_no_panic_handle(rpdip, csr_base, derr, err_reg_descr,
