@@ -3715,8 +3715,9 @@ remove_node(struct fem_list *sp, void **baseops, void *opset, void *datap)
 	int	i;
 	struct fem_node	*fn;
 
+	fn = NULL;
 	for (i = sp->feml_tos; i > 0; i--) {
-		fn = sp->feml_nodes+i;
+		fn = sp->feml_nodes + i;
 		if (fn->fn_op.anon == opset &&
 		    (fn->fn_available == datap || datap == NULL)) {
 			break;

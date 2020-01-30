@@ -1172,6 +1172,7 @@ pci_fm_ereport_post(dev_info_t *dip, const char *error_class, uint64_t ena,
 	errorq_elem_t *eqep;
 	va_list ap;
 
+	eqep = NULL;
 	if (panicstr) {
 		eqep = errorq_reserve(ereport_errorq);
 		if (eqep == NULL)

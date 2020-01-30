@@ -1099,7 +1099,7 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	mntopts_t	mnt_mntopts;
 	int		error = 0;
 	int		copyout_error = 0;
-	int		ovflags;
+	int		ovflags = 0;
 	char		*opts = uap->optptr;
 	char		*inargs = opts;
 	int		optlen = uap->optlen;
@@ -1489,8 +1489,6 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	 */
 	if (!remount) {
 		if (error = vfs_lock(vfsp)) {
-			vfsp->vfs_flag = ovflags;
-
 			lofi_remove(vfsp);
 
 			if (splice)

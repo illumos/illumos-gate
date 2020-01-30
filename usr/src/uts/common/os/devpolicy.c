@@ -417,12 +417,12 @@ devpolicy_load(int nitems, size_t sz, devplcysys_t *uitmp)
 	int lastlen;
 	int lastwild;
 
-#ifdef lint
-	/* Lint can't figure out that the "i == 1" test protects all */
+	/* gcc 9 can't figure out that the "i == 1" test protects all */
 	lastlen = 0;
 	lastwild = 0;
 	lastmajor = 0;
-#endif
+	newpolicy = NULL;
+
 	/*
 	 * The application must agree with the kernel on the size of each
 	 * item; it must not exceed the maximum number and must be

@@ -829,8 +829,6 @@ dirfindvp(vnode_t *vrootp, vnode_t *dvp, vnode_t *tvp, cred_t *cr, char *dbuf,
 	 */
 	bzero(&pnp, sizeof (pnp));
 
-	eof = 0;
-
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_segflg = UIO_SYSSPACE;
@@ -840,6 +838,9 @@ dirfindvp(vnode_t *vrootp, vnode_t *dvp, vnode_t *tvp, cred_t *cr, char *dbuf,
 
 	if ((error = VOP_ACCESS(dvp, VREAD, 0, cr, NULL)) != 0)
 		return (error);
+
+	dp = NULL;
+	eof = 0;
 
 	while (!eof) {
 		uio.uio_resid = dlen;

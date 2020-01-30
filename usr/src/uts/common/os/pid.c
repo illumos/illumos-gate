@@ -179,7 +179,8 @@ pid_allocate(proc_t *prp, pid_t pid, int flags)
 	pidp = kmem_zalloc(sizeof (struct pid), KM_SLEEP);
 
 	mutex_enter(&pidlinklock);
-	if ((flags & PID_ALLOC_PROC) && (pep = procentfree) == NULL) {
+	pep = procentfree;
+	if ((flags & PID_ALLOC_PROC) && pep == NULL) {
 		/*
 		 * ran out of /proc directory entries
 		 */

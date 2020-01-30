@@ -1006,7 +1006,7 @@ int
 pci_post_suspend(dev_info_t *dip)
 {
 	pci_pm_context_t *p;
-	uint16_t	pmcap, pmcsr, pcicmd;
+	uint16_t pmcap, pmcsr, pcicmd;
 	uint_t length;
 	int ret;
 	int fromprop = 1;	/* source of memory *p */
@@ -1023,6 +1023,7 @@ pci_post_suspend(dev_info_t *dip)
 		return (DDI_FAILURE);
 	}
 
+	pmcsr = 0;
 	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    SAVED_PM_CONTEXT, (uchar_t **)&p, &length) != DDI_PROP_SUCCESS) {

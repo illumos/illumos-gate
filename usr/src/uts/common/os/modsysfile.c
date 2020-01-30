@@ -3154,12 +3154,14 @@ process_rtc_config_file(void)
 static void
 append(struct hwc_spec *spec, struct par_list *par)
 {
-	struct hwc_spec *hwc, *last;
+	struct hwc_spec *hwc, *last = NULL;
 
 	ASSERT(par->par_specs);
 	for (hwc = par->par_specs; hwc; hwc = hwc->hwc_next)
 		last = hwc;
-	last->hwc_next = spec;
+
+	if (last != NULL)
+		last->hwc_next = spec;
 }
 
 /*

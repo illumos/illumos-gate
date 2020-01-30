@@ -2574,7 +2574,7 @@ segvn_softunlock(struct seg *seg, caddr_t addr, size_t len, enum seg_rw rw)
 	caddr_t adr;
 	struct vnode *vp;
 	u_offset_t offset;
-	ulong_t anon_index;
+	ulong_t anon_index = 0;
 	struct anon_map *amp;
 	struct anon *ap = NULL;
 
@@ -2725,7 +2725,7 @@ segvn_faultpage(
 	int cow;
 	int claim;
 	int steal = 0;
-	ulong_t anon_index;
+	ulong_t anon_index = 0;
 	struct anon *ap, *oldap;
 	struct anon_map *amp;
 	int hat_flag = (type == F_SOFTLOCK) ? HAT_LOAD_LOCK : HAT_LOAD;
@@ -3890,6 +3890,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 	}
 
 	if (svd->pageprot) {
+		prot = PROT_NONE;
 		switch (rw) {
 		case S_READ:
 			protchk = PROT_READ;
@@ -3906,6 +3907,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			break;
 		}
 	} else {
+		protchk = PROT_NONE;
 		prot = svd->prot;
 		/* caller has already done segment level protection check. */
 	}
@@ -3921,6 +3923,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 
 	VM_STAT_COND_ADD(amp != NULL, segvnvmstats.fltvnpages[3]);
 
+	ierr = 0;
 	for (;;) {
 		adjszc_chk = 0;
 		for (; a < lpgeaddr; a += pgsz, off += pgsz, aindx += pages) {
@@ -4681,6 +4684,7 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 	}
 
 	if (svd->pageprot) {
+		prot = PROT_NONE;
 		switch (rw) {
 		case S_READ:
 			protchk = PROT_READ;
@@ -4698,12 +4702,14 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 		}
 		VM_STAT_ADD(segvnvmstats.fltanpages[2]);
 	} else {
+		protchk = PROT_NONE;
 		prot = svd->prot;
 		/* caller has already done segment level protection check. */
 	}
 
 	ppa = kmem_cache_alloc(segvn_szc_cache[ppaszc], KM_SLEEP);
 	ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
+	ierr = 0;
 	for (;;) {
 		adjszc_chk = 0;
 		for (; a < lpgeaddr; a += pgsz, aindx += pages) {
@@ -4932,12 +4938,12 @@ segvn_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t len,
 	u_offset_t off;
 	caddr_t a;
 	struct vpage *vpage;
-	uint_t vpprot, prot;
+	uint_t vpprot, prot = 0;
 	int err;
 	page_t *pl[PVN_GETPAGE_NUM + 1];
 	size_t plsz, pl_alloc_sz;
 	size_t page;
-	ulong_t anon_index;
+	ulong_t anon_index = 0;
 	struct anon_map *amp;
 	int dogetpage = 0;
 	caddr_t	lpgaddr, lpgeaddr;
@@ -5235,8 +5241,8 @@ slow:
 	 */
 
 	if ((page != 0) && fltadvice && svd->tr_state != SEGVN_TR_ON) {
-		struct vpage *vpp;
-		ulong_t fanon_index;
+		struct vpage *vpp = NULL;
+		ulong_t fanon_index = 0;
 		size_t fpage;
 		u_offset_t pgoff, fpgoff;
 		struct vnode *fvp;
@@ -5674,10 +5680,10 @@ static int
 segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 {
 	struct segvn_data *svd = (struct segvn_data *)seg->s_data;
-	struct vpage *cvp, *svp, *evp;
+	struct vpage *cvp, *svp = NULL, *evp = NULL;
 	struct vnode *vp;
 	size_t pgsz;
-	pgcnt_t pgcnt;
+	pgcnt_t pgcnt = 0;
 	anon_sync_obj_t cookie;
 	int unload_done = 0;
 
@@ -7256,9 +7262,9 @@ segvn_sync(struct seg *seg, caddr_t addr, size_t len, int attr, uint_t flags)
 	int bflags;
 	int err = 0;
 	int segtype;
-	int pageprot;
+	int pageprot = 0;
 	int prot;
-	ulong_t anon_index;
+	ulong_t anon_index = 0;
 	struct anon_map *amp;
 	struct anon *ap;
 	anon_sync_obj_t cookie;
@@ -7642,10 +7648,10 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 	u_offset_t offset;
 	u_offset_t off;
 	int segtype;
-	int pageprot;
+	int pageprot = 0;
 	int claim;
 	struct vnode *vp;
-	ulong_t anon_index;
+	ulong_t anon_index = 0;
 	struct anon_map *amp;
 	struct anon *ap;
 	struct vattr va;
@@ -8332,7 +8338,7 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 	} else {
 		caddr_t			eaddr;
 		struct seg		*new_seg;
-		struct segvn_data	*new_svd;
+		struct segvn_data	*new_svd = NULL;
 		u_offset_t		off;
 		caddr_t			oldeaddr;
 
@@ -8705,7 +8711,7 @@ segvn_dump(struct seg *seg)
 	struct segvn_data *svd;
 	page_t *pp;
 	struct anon_map *amp;
-	ulong_t	anon_index;
+	ulong_t	anon_index = 0;
 	struct vnode *vp;
 	u_offset_t off, offset;
 	pfn_t pfn;
@@ -8832,7 +8838,7 @@ segvn_pagelock(struct seg *seg, caddr_t addr, size_t len, struct page ***ppp,
 	seg_preclaim_cbfunc_t preclaim_callback;
 	size_t pgsz;
 	int use_pcache;
-	size_t wlen;
+	size_t wlen = 0;
 	uint_t pflags = 0;
 	int sftlck_sbase = 0;
 	int sftlck_send = 0;
@@ -9593,7 +9599,7 @@ segvn_getmemid(struct seg *seg, caddr_t addr, memid_t *memidp)
 {
 	struct segvn_data *svd = (struct segvn_data *)seg->s_data;
 	struct anon 	*ap = NULL;
-	ulong_t		anon_index;
+	ulong_t		anon_index = 0;
 	struct anon_map	*amp;
 	anon_sync_obj_t cookie;
 

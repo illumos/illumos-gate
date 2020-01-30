@@ -1704,7 +1704,7 @@ taskq_d_thread(taskq_ent_t *tqe)
 	kmutex_t	*lock = &bucket->tqbucket_lock;
 	kcondvar_t	*cv = &tqe->tqent_cv;
 	callb_cpr_t	cprinfo;
-	clock_t		w;
+	clock_t		w = 0;
 
 	CALLB_CPR_INIT(&cprinfo, lock, callb_generic_cpr, tq->tq_name);
 

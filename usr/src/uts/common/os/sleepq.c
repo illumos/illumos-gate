@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/thread.h>
@@ -141,6 +139,7 @@ sleepq_insert(sleepq_t *spq, kthread_t *t)
 
 	tpri = CMP_PRIO(t);
 	tpp = &spq->sq_first;
+	last_tp = NULL;
 	while ((next_tp = *tpp) != NULL) {
 		next_pri = CMP_PRIO(next_tp);
 		if (tpri > next_pri)
@@ -151,7 +150,7 @@ sleepq_insert(sleepq_t *spq, kthread_t *t)
 	}
 	*tpp = t;
 	t->t_link = next_tp;
-	if (last_pri == tpri) {
+	if (last_tp != NULL && last_pri == tpri) {
 		/* last_tp points to the last thread of this priority */
 		t->t_priback = last_tp;
 		t->t_priforw = last_tp->t_priforw;

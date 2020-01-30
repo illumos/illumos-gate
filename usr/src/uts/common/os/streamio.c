@@ -6588,7 +6588,7 @@ strgetmsg(
 	mblk_t *savemp = NULL;
 	mblk_t *savemptail = NULL;
 	uint_t old_sd_flag;
-	int flg;
+	int flg = MSG_BAND;
 	int more = 0;
 	int error = 0;
 	char first = 1;
@@ -7154,7 +7154,7 @@ kstrgetmsg(
 	mblk_t *savemptail = NULL;
 	int flags;
 	uint_t old_sd_flag;
-	int flg;
+	int flg = MSG_BAND;
 	int more = 0;
 	int error = 0;
 	char first = 1;

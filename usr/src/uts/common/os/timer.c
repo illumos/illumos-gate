@@ -422,7 +422,7 @@ timer_signal(sigqueue_t *sigq)
 static void
 timer_fire(itimer_t *it)
 {
-	proc_t *p;
+	proc_t *p = NULL;
 	int proc_lock_held;
 
 	if (it->it_flags & IT_SIGNAL) {

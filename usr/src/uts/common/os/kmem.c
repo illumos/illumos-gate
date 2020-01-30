@@ -3874,6 +3874,7 @@ kmem_cache_create(
 		size_t chunks, bestfit, waste, slabsize;
 		size_t minwaste = LONG_MAX;
 
+		bestfit = 0;
 		for (chunks = 1; chunks <= KMEM_VOID_FRACTION; chunks++) {
 			slabsize = P2ROUNDUP(chunksize * chunks,
 			    vmp->vm_quantum);

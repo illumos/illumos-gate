@@ -169,6 +169,7 @@ cfork(int isvfork, int isfork1, int flags)
 	lwpent_t *lep;
 	lwpent_t *clep;
 
+	clone = NULL;
 	/*
 	 * Allow only these two flags.
 	 */

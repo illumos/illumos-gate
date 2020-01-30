@@ -1439,7 +1439,7 @@ as_map_segvn_segs(struct as *as, caddr_t addr, size_t size, uint_t szcvec,
 	uint_t szc, nszc, save_szcvec;
 	int error;
 	caddr_t a, eaddr;
-	size_t pgsz;
+	size_t pgsz = 0;
 	const boolean_t do_off = (vn_a->vp != NULL || vn_a->amp != NULL);
 
 	ASSERT(AS_WRITE_HELD(as));
@@ -1643,7 +1643,7 @@ as_map_ansegs(struct as *as, caddr_t addr, size_t size,
     segcreate_func_t crfp, struct segvn_crargs *vn_a, boolean_t *segcreated)
 {
 	uint_t szcvec;
-	uchar_t type;
+	uchar_t type = 0;
 
 	ASSERT(vn_a->type == MAP_SHARED || vn_a->type == MAP_PRIVATE);
 	if (vn_a->type == MAP_SHARED) {
@@ -2295,6 +2295,9 @@ as_ctl(struct as *as, caddr_t addr, size_t size, int func, int attr,
 	ulong_t *mlock_map;	/* pointer to bitmap used */
 				/* to represent the locked */
 				/* pages. */
+
+	mlock_size = 0;
+	mlock_map = NULL;
 retry:
 	if (error == IE_RETRY)
 		AS_LOCK_ENTER(as, RW_WRITER);

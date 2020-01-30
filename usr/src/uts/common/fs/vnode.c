@@ -2099,13 +2099,13 @@ vn_vfslocks_rele(vn_vfslocks_entry_t *vepent)
 	if ((int32_t)vepent->ve_refcnt < 0)
 		cmn_err(CE_PANIC, "vn_vfslocks_rele: refcount negative");
 
+	pvep = NULL;
 	if (vepent->ve_refcnt == 0) {
 		for (vep = bp->vb_list; vep != NULL; vep = vep->ve_next) {
 			if (vep->ve_vpvfs == vepent->ve_vpvfs) {
-				if (bp->vb_list == vep)
+				if (pvep == NULL)
 					bp->vb_list = vep->ve_next;
 				else {
-					/* LINTED */
 					pvep->ve_next = vep->ve_next;
 				}
 				mutex_exit(&bp->vb_lock);

@@ -399,6 +399,7 @@ segkp_get_internal(
 	int kmflag = (flags & KPD_NOWAIT) ? KM_NOSLEEP : KM_SLEEP;
 	caddr_t s_base = (segkp_fromheap) ? kvseg.s_base : seg->s_base;
 
+	segkpindex = 0;
 	if (len & PAGEOFFSET) {
 		panic("segkp_get: len is not page-aligned");
 		/*NOTREACHED*/
@@ -647,6 +648,7 @@ segkp_release_internal(struct seg *seg, struct segkp_data *kpd, size_t len)
 	struct anon	*ap;
 	pgcnt_t		segkpindex;
 
+	segkpindex = 0;
 	ASSERT(kpd != NULL);
 	ASSERT((kpd->kp_flags & KPD_HASAMP) == 0 || kpd->kp_cookie == -1);
 	np = btop(len);

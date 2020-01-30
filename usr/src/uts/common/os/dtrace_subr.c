@@ -186,6 +186,7 @@ dtrace_vtime_enable(void)
 {
 	dtrace_vtime_state_t state, nstate;
 
+	nstate = DTRACE_VTIME_INACTIVE;
 	do {
 		state = dtrace_vtime_active;
 
@@ -213,6 +214,7 @@ dtrace_vtime_disable(void)
 {
 	dtrace_vtime_state_t state, nstate;
 
+	nstate = DTRACE_VTIME_INACTIVE;
 	do {
 		state = dtrace_vtime_active;
 
@@ -240,6 +242,7 @@ dtrace_vtime_enable_tnf(void)
 {
 	dtrace_vtime_state_t state, nstate;
 
+	nstate = DTRACE_VTIME_INACTIVE;
 	do {
 		state = dtrace_vtime_active;
 
@@ -267,6 +270,7 @@ dtrace_vtime_disable_tnf(void)
 {
 	dtrace_vtime_state_t state, nstate;
 
+	nstate = DTRACE_VTIME_INACTIVE;
 	do {
 		state = dtrace_vtime_active;
 

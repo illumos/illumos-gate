@@ -1222,7 +1222,7 @@ ddi_prop_search_common(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 {
 	ddi_prop_t	*propp;
 	int		i;
-	caddr_t		buffer;
+	caddr_t		buffer = NULL;
 	caddr_t		prealloc = NULL;
 	int		plength = 0;
 	dev_info_t	*pdip;
@@ -1370,7 +1370,8 @@ ddi_prop_search_common(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 			/*
 			 * Do the copy.
 			 */
-			bcopy(propp->prop_val, buffer, propp->prop_len);
+			if (buffer != NULL)
+				bcopy(propp->prop_val, buffer, propp->prop_len);
 			mutex_exit(&(DEVI(dip)->devi_lock));
 			return (DDI_PROP_SUCCESS);
 		}
@@ -4302,7 +4303,7 @@ impl_ddi_bus_prop_op(dev_t dev, dev_info_t *dip, dev_info_t *ch_dip,
     char *name, caddr_t valuep, int *lengthp)
 {
 	int	len;
-	caddr_t buffer;
+	caddr_t buffer = NULL;
 
 	/*
 	 * If requested dev is DDI_DEV_T_NONE or DDI_DEV_T_ANY, then

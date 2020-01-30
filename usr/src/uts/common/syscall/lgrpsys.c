@@ -747,6 +747,7 @@ lgrp_affinity_set(lgrp_affinity_args_t *ap)
 	if (idtype != P_LWPID && idtype != P_PID)
 		return (set_errno(EINVAL));
 
+	retval = EINVAL;
 	/*
 	 * Set given LWP's or process' affinity for specified lgroup
 	 */

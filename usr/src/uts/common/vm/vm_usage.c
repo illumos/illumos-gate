@@ -1151,6 +1151,8 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 	pgcnt_t swresv = 0;
 	pgcnt_t panon = 0;
 
+	s_start = 0;
+	p_end = 0;
 	/* Can zero-length segments exist?  Not sure, so paranoia. */
 	if (seg->s_size <= 0)
 		return;

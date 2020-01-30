@@ -566,6 +566,7 @@ segspt_create(struct seg **segpp, void *argsp)
 	if ((sptd = kmem_zalloc(sizeof (*sptd), KM_NOSLEEP)) == NULL)
 		goto out1;
 
+	ppa = NULL;
 	if ((sptcargs->flags & SHM_PAGEABLE) == 0) {
 		if ((ppa = kmem_zalloc(((sizeof (page_t *)) * npages),
 		    KM_NOSLEEP)) == NULL)
@@ -806,6 +807,9 @@ segspt_free_pages(struct seg *seg, caddr_t addr, size_t len)
 
 	ASSERT(amp != NULL);
 
+	proj = NULL;
+	rootpp = NULL;
+	sp = NULL;
 	if ((sptd->spt_flags & SHM_PAGEABLE) == 0) {
 		sp = amp->a_sp;
 		proj = sp->shm_perm.ipc_proj;

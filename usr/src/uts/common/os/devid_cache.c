@@ -1079,6 +1079,8 @@ e_devid_cache_path_to_devid(char *path, char *ua,
 
 	*devidp = NULL;
 
+	pathlen = 0;
+	ualen = 0;
 	if (ua) {
 		pathlen = strlen(path);
 		ualen = strlen(ua);

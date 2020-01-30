@@ -31,8 +31,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/isa_defs.h>
 #include <sys/types.h>
@@ -136,6 +134,7 @@ cacl(int cmd, int nentries, void *aclbufp, vnode_t *vp, int *rv)
 	ASSERT(vp);
 
 	bzero(&vsecattr, sizeof (vsecattr_t));
+	dfaclbsize = 0;
 
 	switch (cmd) {
 

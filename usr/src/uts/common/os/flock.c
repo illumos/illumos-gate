@@ -1362,6 +1362,8 @@ flk_wait_execute_request(lock_descriptor_t *request)
 
 	flk_insert_sleeping_lock(request);
 
+	index = 0;	/* quiesce compiler warning. */
+	fg = NULL;
 	if (IS_LOCKMGR(request)) {
 		index = HASH_INDEX(request->l_vnode);
 		fg = flk_get_globals();

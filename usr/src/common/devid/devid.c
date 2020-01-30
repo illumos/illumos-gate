@@ -324,6 +324,7 @@ devid_str_decode_id(char *devidstr, ddi_devid_t *devidp,
 	int		slen, devid_len, ascii, i, n, c, pre_alloc = FALSE;
 	unsigned short	id_len, type;		/* for hibyte/lobyte */
 
+	devid_len = 0;
 	if (devidp != NULL)
 		*devidp = NULL;
 	if (minor_namep != NULL)
