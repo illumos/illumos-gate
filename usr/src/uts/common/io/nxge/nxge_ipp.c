@@ -766,7 +766,7 @@ nxge_ipp_eccue_valid_check(p_nxge_t nxgep, boolean_t *valid)
 			}
 		}
 
-		if (valid) {
+		if (*valid) {
 			/*
 			 * Further check to see if the ECCUE is valid. The
 			 * error is real if the LSB of d4 is 1, which

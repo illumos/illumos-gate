@@ -42,7 +42,6 @@ UTSBASE	= ../..
 MODULE		= nxge
 NXGE_OBJECTS =	$(NXGE_OBJS) $(NXGE_NPI_OBJS) $(NXGE_HCALL_OBJS)
 OBJECTS		=  $(NXGE_OBJECTS:%=$(OBJS_DIR)/%)
-LINTS		= $(NXGE_OBJECTS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/nxge
 
@@ -62,7 +61,6 @@ CLEANFILES	+= $(MODSTUBS_O)
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
@@ -76,9 +74,6 @@ CFLAGS	+= -dalign
 INC_PATH	+= -I$(UTSBASE)/common/io/nxge/npi
 INC_PATH	+= -I$(UTSBASE)/common/sys/nxge
 INC_PATH	+= -I$(UTSBASE)/sun4v
-#
-#
-# lint pass one enforcement
 #
 CFLAGS += -DSOLARIS
 # NEMO
@@ -102,21 +97,13 @@ CFLAGS += -DSOLARIS
 #CFLAGS += -DNIU_HV_WORKAROUND
 CFLAGS += -DNIU_LP_WORKAROUND
 
-LINTFLAGS += -DSOLARIS
-LINTFLAGS += -DNXGE_FM
-LINTFLAGS += -DNIU_LP_WORKAROUND
-#
-# STREAMS, DDI API limitations and other ON header file definitions such as ethernet.h
-# force us to turn off these lint checks.
-#
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-type-limits
+
+$(OBJS_DIR)/nxge_hw.o := SMOFF += deref_check
 
 #
 #	Driver depends on mac & IP
@@ -135,12 +122,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

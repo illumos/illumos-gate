@@ -2847,9 +2847,7 @@ nxge_set_hw_vlan_class_config(p_nxge_t nxgep)
 			vmap = (nxge_param_map_t *)&vlan_cfg_val[i];
 			if ((vmap->param_id) &&
 			    (vmap->param_id < NXGE_MAX_VLANS) &&
-			    (vmap->map_to <
-			    p_cfgp->max_rdc_grpids) &&
-			    (vmap->map_to >= (uint8_t)0)) {
+			    (vmap->map_to < p_cfgp->max_rdc_grpids)) {
 				NXGE_DEBUG_MSG((nxgep, CFG2_CTL,
 				    " nxge_vlan_config mapping"
 				    " id %d grp %d",
@@ -2909,9 +2907,7 @@ nxge_set_hw_mac_class_config(p_nxge_t nxgep)
 		for (i = 0; i < mac_cnt; i++) {
 			mac_map = (nxge_param_map_t *)&mac_cfg_val[i];
 			if ((mac_map->param_id < p_cfgp->max_macs) &&
-			    (mac_map->map_to <
-			    p_cfgp->max_rdc_grpids) &&
-			    (mac_map->map_to >= (uint8_t)0)) {
+			    (mac_map->map_to < p_cfgp->max_rdc_grpids)) {
 				NXGE_DEBUG_MSG((nxgep, CFG2_CTL,
 				    " nxge_mac_config mapping"
 				    " id %d grp %d",

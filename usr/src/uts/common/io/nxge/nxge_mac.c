@@ -1540,7 +1540,7 @@ nxge_n2_serdes_init(p_nxge_t nxgep)
 			if ((status = nxge_mdio_write(nxgep, portn,
 			    ESR_N2_DEV_ADDR,
 			    ESR_N2_TEST_CFG_REG, test_cfg.value)) != NXGE_OK)
-			goto fail;
+				goto fail;
 		}
 
 		/* Initialize PLL for 10G */
@@ -2002,7 +2002,7 @@ nxge_n2_kt_serdes_init(p_nxge_t nxgep)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "nxge_n2_kt_serdes_init: "
 			    "Serdes/signal for port<%d> not ready", portn));
-				goto done;
+			goto done;
 		}
 	} else if (portn == 1) {
 		/* Wait for serdes to be ready */
@@ -2031,7 +2031,7 @@ nxge_n2_kt_serdes_init(p_nxge_t nxgep)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "nxge_n2_kt_serdes_init: "
 			    "Serdes/signal for port<%d> not ready", portn));
-				goto done;
+			goto done;
 		}
 	}
 done:
@@ -2519,7 +2519,7 @@ nxge_1G_serdes_init(p_nxge_t nxgep)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "nxge_neptune_1G_serdes_init: "
 			    "Serdes/signal for port<%d> not ready", portn));
-				goto done;
+			goto done;
 		}
 	} else if (portn == 1) {
 		if ((val & ESR_SIG_P1_BITS_MASK_1G) !=
@@ -2533,7 +2533,7 @@ nxge_1G_serdes_init(p_nxge_t nxgep)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "nxge_neptune_1G_serdes_init: "
 			    "Serdes/signal for port<%d> not ready", portn));
-				goto done;
+			goto done;
 
 		}
 	}
@@ -4639,11 +4639,11 @@ nxge_rx_mac_reset(p_nxge_t nxgep)
 	if (nxgep->mac.porttype == PORT_TYPE_XMAC) {
 		if ((rs = npi_xmac_reset(handle, portn, XRX_MAC_RESET_ALL))
 		    != NPI_SUCCESS)
-		goto fail;
+			goto fail;
 	} else {
 		if ((rs = npi_bmac_reset(handle, portn, RX_MAC_RESET))
 		    != NPI_SUCCESS)
-		goto fail;
+			goto fail;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_rx_mac_reset: port<%d>",
@@ -7124,7 +7124,7 @@ nxge_mac_intr(void *arg1, void *arg2)
 				NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 				    NXGE_FM_EREPORT_RXMAC_LENGTH_ERRCNT_EXP);
 			}
-			if (status & ICFG_BMAC_RX_VIOL_ERR_CNT_EXP)
+			if (status & ICFG_BMAC_RX_VIOL_ERR_CNT_EXP) {
 				statsp->bmac_stats.rx_viol_err_cnt +=
 				    BMAC_CD_VIO_CNT_MASK;
 				NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
@@ -7155,6 +7155,7 @@ nxge_mac_intr(void *arg1, void *arg2)
 					statsp->bmac_stats.tx_nopause_state++;
 			}
 		}
+	}
 
 	if (ldgp->nldvs == 1) {
 		(void) npi_intr_ldg_mgmt_set(handle, ldgp->ldg,
@@ -7515,7 +7516,7 @@ nxge_hswap_phy_present(p_nxge_t nxgep, uint8_t portn)
 	if (nxge_is_phy_present(nxgep, GOA_CLAUSE45_PORT_ADDR_BASE + portn,
 	    BCM8706_DEV_ID, BCM_PHY_ID_MASK)) {
 		nxgep->xcvr_addr = GOA_CLAUSE45_PORT_ADDR_BASE + portn;
-			goto found_phy;
+		goto found_phy;
 	}
 
 	/*
