@@ -647,7 +647,7 @@ pci_intr_dist_cpuid(ib_t *ib_p, ib_ino_info_t *ino_p)
 void
 pci_cb_teardown(pci_t *pci_p)
 {
-	cb_t 	*cb_p = pci_p->pci_cb_p;
+	cb_t	*cb_p = pci_p->pci_cb_p;
 	uint32_t mondo;
 
 	if (!pci_buserr_interrupt)
@@ -704,7 +704,7 @@ cb_ino_to_clr_pa(cb_t *cb_p, ib_ino_t ino)
  */
 int
 cb_remove_xintr(pci_t *pci_p, dev_info_t *dip, dev_info_t *rdip, ib_ino_t ino,
-ib_mondo_t mondo)
+    ib_mondo_t mondo)
 {
 	return (DDI_FAILURE);
 }
@@ -1555,8 +1555,8 @@ pci_cb_clear_error(cb_t *cb_p, cb_errstate_t *cb_err_p)
 static cb_fm_err_t safari_err_tbl[] = {
 	SAFARI_BAD_CMD,		SCHIZO_CB_ELOG_BAD_CMD,		CB_FATAL,
 	SAFARI_SSM_DIS,		SCHIZO_CB_ELOG_SSM_DIS,		CB_FATAL,
-	SAFARI_BAD_CMD_PCIA, 	SCHIZO_CB_ELOG_BAD_CMD_PCIA,	CB_FATAL,
-	SAFARI_BAD_CMD_PCIB, 	SCHIZO_CB_ELOG_BAD_CMD_PCIB,	CB_FATAL,
+	SAFARI_BAD_CMD_PCIA,	SCHIZO_CB_ELOG_BAD_CMD_PCIA,	CB_FATAL,
+	SAFARI_BAD_CMD_PCIB,	SCHIZO_CB_ELOG_BAD_CMD_PCIB,	CB_FATAL,
 	SAFARI_PAR_ERR_INT_PCIB, XMITS_CB_ELOG_PAR_ERR_INT_PCIB, CB_FATAL,
 	SAFARI_PAR_ERR_INT_PCIA, XMITS_CB_ELOG_PAR_ERR_INT_PCIA, CB_FATAL,
 	SAFARI_PAR_ERR_INT_SAF,	XMITS_CB_ELOG_PAR_ERR_INT_SAF,	CB_FATAL,
@@ -1576,7 +1576,7 @@ static cb_fm_err_t safari_err_tbl[] = {
 	SAFARI_CPU0_PAR_BIDI,	SCHIZO_CB_ELOG_CPU0_PAR_BIDI,	CB_FATAL,
 	SAFARI_CPU1_PAR_SINGLE,	SCHIZO_CB_ELOG_CPU1_PAR_SINGLE,	CB_FATAL,
 	SAFARI_CPU1_PAR_BIDI,	SCHIZO_CB_ELOG_CPU1_PAR_BIDI,	CB_FATAL,
-	NULL,			NULL,				NULL,
+	NULL,			0,				0,
 };
 
 /*
@@ -1584,7 +1584,7 @@ static cb_fm_err_t safari_err_tbl[] = {
  */
 static int
 safari_err_handler(dev_info_t *dip, uint64_t fme_ena,
-		cb_errstate_t *cb_err_p)
+    cb_errstate_t *cb_err_p)
 {
 	int	i;
 	int	fatal = 0;
@@ -1665,7 +1665,7 @@ static cb_fm_err_t jbus_err_tbl[] = {
 	JBUS_TO_EXP_ERR,	TOMATILLO_CB_ELOG_TO_EXP_ERR,	CB_NONFATAL,
 	JBUS_TO_ERR,		SCHIZO_CB_ELOG_TO_ERR,		CB_NONFATAL,
 	JBUS_BUS_ERR,		SCHIZO_CB_ELOG_BUS_ERR,		CB_NONFATAL,
-	NULL,			NULL,				NULL,
+	NULL,			0,				0,
 };
 
 /*
@@ -1791,39 +1791,39 @@ static ecc_fm_err_t ecc_err_tbl[] = {
 	ACC_HANDLE,
 
 	PCI_ECC_SEC_PIO_UE, COMMON_ECC_AFSR_E_PIO,  CBNINTR_UE,
-	PBM_SECONDARY, NULL, NULL, ACC_HANDLE,
+	PBM_SECONDARY, 0, 0, ACC_HANDLE,
 
 	PCI_ECC_PIO_CE, COMMON_ECC_AFSR_E_PIO,  CBNINTR_CE,
-	PBM_PRIMARY, NULL, NULL, ACC_HANDLE,
+	PBM_PRIMARY, 0, 0, ACC_HANDLE,
 
 	PCI_ECC_SEC_PIO_CE, COMMON_ECC_AFSR_E_PIO,  CBNINTR_CE,
-	PBM_SECONDARY, NULL, NULL, ACC_HANDLE,
+	PBM_SECONDARY, 0, 0, ACC_HANDLE,
 
 	PCI_ECC_DRD_UE, COMMON_ECC_AFSR_E_DRD, CBNINTR_UE,
-	PBM_PRIMARY, NULL, NULL, DMA_HANDLE,
+	PBM_PRIMARY, 0, 0, DMA_HANDLE,
 
 	PCI_ECC_SEC_DRD_UE, COMMON_ECC_AFSR_E_DRD, CBNINTR_UE,
-	PBM_SECONDARY, NULL, NULL, DMA_HANDLE,
+	PBM_SECONDARY, 0, 0, DMA_HANDLE,
 
 	PCI_ECC_DRD_CE, COMMON_ECC_AFSR_E_DRD, CBNINTR_CE,
-	PBM_PRIMARY, NULL, NULL, DMA_HANDLE,
+	PBM_PRIMARY, 0, 0, DMA_HANDLE,
 
 	PCI_ECC_SEC_DRD_CE, COMMON_ECC_AFSR_E_DRD, CBNINTR_CE,
-	PBM_SECONDARY, NULL, NULL, DMA_HANDLE,
+	PBM_SECONDARY, 0, 0, DMA_HANDLE,
 
 	PCI_ECC_DWR_UE, COMMON_ECC_AFSR_E_DWR, CBNINTR_UE,
-	PBM_PRIMARY, NULL, NULL, DMA_HANDLE,
+	PBM_PRIMARY, 0, 0, DMA_HANDLE,
 
 	PCI_ECC_SEC_DWR_UE, COMMON_ECC_AFSR_E_DWR, CBNINTR_UE,
-	PBM_SECONDARY, NULL, NULL, DMA_HANDLE,
+	PBM_SECONDARY, 0, 0, DMA_HANDLE,
 
 	PCI_ECC_DWR_CE, COMMON_ECC_AFSR_E_DWR, CBNINTR_CE,
-	PBM_PRIMARY, NULL, NULL, DMA_HANDLE,
+	PBM_PRIMARY, 0, 0, DMA_HANDLE,
 
 	PCI_ECC_SEC_DWR_CE, COMMON_ECC_AFSR_E_DWR, CBNINTR_CE,
-	PBM_SECONDARY, NULL, NULL, DMA_HANDLE,
+	PBM_SECONDARY, 0, 0, DMA_HANDLE,
 
-	NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, 0, 0, 0, 0, 0,
 };
 
 /*
@@ -1919,8 +1919,8 @@ pcix_err_tbl_t pcix_split_errs_tbl[] = {
  * Tables for the PCI-X error status messages
  */
 pcix_err_msg_rec_t pcix_stat_errs[] = {
-	{XMITS_PCIX_STAT_SC_DSCRD,	"pcix", "discard"  	},
-	{XMITS_PCIX_STAT_SC_TTO,	"xmits.pbmx", "tato" 	},
+	{XMITS_PCIX_STAT_SC_DSCRD,	"pcix", "discard"	},
+	{XMITS_PCIX_STAT_SC_TTO,	"xmits.pbmx", "tato"	},
 	{XMITS_PCIX_STAT_SMMU,		"xmits.pbmx", "stmmu"	},
 	{XMITS_PCIX_STAT_SDSTAT,	"xmits.pbmx", "stdst"	},
 	{XMITS_PCIX_STAT_CMMU,		"xmits.pbmx", "cnmmu"	},
@@ -1942,7 +1942,7 @@ pcix_err_tbl_t pcix_stat_errs_tbl =
  */
 static int
 pcix_lookup_err_msgs(dev_info_t *dip, uint64_t ena, pcix_err_tbl_t t,
-		pbm_errstate_t *pbm_err_p)
+    pbm_errstate_t *pbm_err_p)
 {
 	uint32_t err_bits  = pbm_err_p->pbm_err & XMITS_PCIX_MSG_INDEX_MASK;
 	int nerr = 0;
@@ -2093,8 +2093,8 @@ static pbm_fm_err_t pbm_err_tbl[] = {
 	PCI_SEC_SCH_BUS_UNUSABLE_ERR, SCHIZO_PCI_AFSR_E_UNUSABLE, PBM_SECONDARY,
 	FM_LOG_PBM,	NULL,
 
-	NULL,			NULL,			NULL,
-	NULL,		NULL,
+	NULL,			0,			0,
+	0,		NULL,
 };
 
 
@@ -2283,16 +2283,16 @@ pci_check_error(pci_t *pci_p)
 
 static pbm_fm_err_t pci_pbm_err_tbl[] = {
 	PCI_PBM_RETRY,			SCHIZO_PCI_CTRL_PCI_RTRY_ERR,
-	NULL,	PBM_NONFATAL,	PCI_PBM_TARG_RETRY,
+	0,	PBM_NONFATAL,	PCI_PBM_TARG_RETRY,
 
 	PCI_PBM_TTO,			SCHIZO_PCI_CTRL_PCI_TTO_ERR,
-	NULL,	PBM_NONFATAL,	PCI_PBM_TARG_TTO,
+	0,	PBM_NONFATAL,	PCI_PBM_TARG_TTO,
 
 	PCI_SCH_BUS_UNUSABLE_ERR,	SCHIZO_PCI_CTRL_BUS_UNUSABLE,
-	NULL,	PBM_NONFATAL,	NULL,
+	0,	PBM_NONFATAL,	NULL,
 
-	NULL,				NULL,
-	NULL,	NULL,		NULL
+	NULL,				0,
+	0,	0,		NULL
 };
 
 /*
@@ -2303,7 +2303,7 @@ static pbm_fm_err_t pci_pbm_err_tbl[] = {
  */
 int
 pci_pbm_err_handler(dev_info_t *dip, ddi_fm_error_t *derr,
-		const void *impl_data, int caller)
+    const void *impl_data, int caller)
 {
 	int fatal = 0;
 	int nonfatal = 0;
@@ -2731,15 +2731,15 @@ pci_format_addr(dev_info_t *dip, uint64_t *afar, uint64_t afsr)
 }
 
 static ecc_format_t ecc_format_tbl[] = {
-	SCH_REG_UPA,		NULL,				NULL,
+	SCH_REG_UPA,		0,				0,
 	SCH_REG_PCIA_REG,	SCHIZO_PCI_AFSR_CONF_SPACE,	PCI_SIDEA,
 	SCH_REG_PCIA_MEM,	SCHIZO_PCI_AFSR_MEM_SPACE,	PCI_SIDEA,
 	SCH_REG_PCIA_CFGIO,	SCHIZO_PCI_AFSR_IO_SPACE,	PCI_SIDEA,
 	SCH_REG_PCIB_REG,	SCHIZO_PCI_AFSR_CONF_SPACE,	PCI_SIDEB,
 	SCH_REG_PCIB_MEM,	SCHIZO_PCI_AFSR_MEM_SPACE,	PCI_SIDEB,
 	SCH_REG_PCIB_CFGIO,	SCHIZO_PCI_AFSR_IO_SPACE,	PCI_SIDEB,
-	SCH_REG_SAFARI_REGS,	NULL,				NULL,
-	NULL,			NULL,				NULL,
+	SCH_REG_SAFARI_REGS,	0,				0,
+	0,			0,				0,
 };
 
 /*
@@ -2773,7 +2773,7 @@ pci_format_ecc_addr(dev_info_t *dip, uint64_t *afar, ecc_region_t region)
 
 	schizo_base = pa - PBM_CTRL_OFFSET;
 
-	for (i = 0; ecc_format_tbl[i].ecc_region != NULL; i++) {
+	for (i = 0; ecc_format_tbl[i].ecc_region != 0; i++) {
 		if (region == ecc_format_tbl[i].ecc_region) {
 			flag = ecc_format_tbl[i].ecc_space;
 			if (ecc_format_tbl[i].ecc_side != pci_side)
@@ -3083,11 +3083,11 @@ schizo_saf_events[] = {
 	{"saf_bus_cycles", 0x1},	{"saf_pause_asserted_cycles", 0x2},
 	{"saf_frn_coherent_cmds", 0x3},	{"saf_frn_coherent_hits", 0x4},
 	{"saf_my_coherent_cmds", 0x5},	{"saf_my_coherent_hits", 0x6},
-	{"saf_frn_io_cmds", 0x7}, 	{"saf_frn_io_hits", 0x8},
-	{"merge_buffer", 0x9}, 		{"interrupts", 0xa},
-	{"csr_pios", 0xc}, 		{"upa_pios", 0xd},
-	{"pcia_pios", 0xe}, 		{"pcib_pios", 0xf},
-	{"saf_pause_seen_cycles", 0x11}, 	{"dvma_reads", 0x12},
+	{"saf_frn_io_cmds", 0x7},	{"saf_frn_io_hits", 0x8},
+	{"merge_buffer", 0x9},		{"interrupts", 0xa},
+	{"csr_pios", 0xc},		{"upa_pios", 0xd},
+	{"pcia_pios", 0xe},		{"pcib_pios", 0xf},
+	{"saf_pause_seen_cycles", 0x11}, {"dvma_reads", 0x12},
 	{"dvma_writes", 0x13},		{"saf_orq_full_cycles", 0x14},
 	{"saf_data_in_cycles", 0x15},	{"saf_data_out_cycles", 0x16},
 	{"clear_pic", 0x1f}
@@ -3099,7 +3099,7 @@ schizo_saf_events[] = {
  */
 pci_kev_mask_t
 schizo_pci_events[] = {
-	{"dvma_stream_rd", 0x0}, 	{"dvma_stream_wr", 0x1},
+	{"dvma_stream_rd", 0x0},	{"dvma_stream_wr", 0x1},
 	{"dvma_const_rd", 0x2},		{"dvma_const_wr", 0x3},
 	{"dvma_stream_buf_mis", 0x4},	{"dvma_cycles", 0x5},
 	{"dvma_wd_xfr", 0x6},		{"pio_cycles", 0x7},
@@ -3577,7 +3577,7 @@ pci_reloc_getkey(void)
 
 static void
 tm_vmem_free(ddi_dma_impl_t *mp, iommu_t *iommu_p, dvma_addr_t dvma_pg,
-	int npages)
+    int npages)
 {
 	uint32_t dur_max, dur_base;
 	dvma_unbind_req_t *req_p, *req_max_p;
