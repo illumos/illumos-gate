@@ -306,7 +306,7 @@ ssc050_set(struct ssc050_unit *unitp, int reg, uchar_t byte)
 
 static int
 ssc050_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-		int *rvalp)
+    int *rvalp)
 {
 	_NOTE(ARGUNUSED(credp, rvalp))
 
@@ -317,14 +317,14 @@ ssc050_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	i2c_reg_t		ioctl_reg;
 	int port = MINOR_TO_PORT(getminor(dev));
 	int instance = MINOR_TO_INST(getminor(dev));
-	uchar_t 		reg, val8;
-	uchar_t 		control;
+	uchar_t			reg, val8;
+	uchar_t			control;
 	uchar_t			fan_count;
 	int			divisor;
 	int32_t			fan_speed;
 	uint8_t			inverted_mask;
 
-	if (arg == NULL) {
+	if (arg == (intptr_t)NULL) {
 		D2CMN_ERR((CE_WARN, "SSC050: ioctl: arg passed in to ioctl "
 		    "= NULL"));
 		return (EINVAL);
@@ -498,10 +498,10 @@ ssc050_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 				    val8));
 				err = ssc050_set(unitp, reg,
 				    val8 | SSC050_DATADIRECTION_BIT);
-					if (err != I2C_SUCCESS) {
-						break;
-					}
-					delay(10);
+				if (err != I2C_SUCCESS) {
+					break;
+				}
+				delay(10);
 			}
 		}
 
@@ -647,7 +647,7 @@ ssc050_do_attach(dev_info_t *dip)
 		    PORT_TO_MINOR(I2C_PORT(i));
 
 		if (ddi_create_minor_node(dip, name, S_IFCHR, minor_number,
-		"ddi_i2c:ioexp", NULL) == DDI_FAILURE) {
+		"ddi_i2c:ioexp", 0) == DDI_FAILURE) {
 			cmn_err(CE_WARN, "%s: failed to create node for %s",
 			    unitp->name, name);
 			ddi_soft_state_free(ssc050soft_statep, instance);
@@ -684,7 +684,7 @@ ssc050_do_detach(dev_info_t *dip)
 
 int
 ssc050_get_port_bit(dev_info_t *dip, int port, int bit, uchar_t *rval,
-			int flags)
+    int flags)
 {
 	struct ssc050_unit	*unitp;
 	int			instance;
