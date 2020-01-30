@@ -46,10 +46,10 @@
 /*
  * ADM1031 is an Intelligent Temperature Monitor and Dual PWM Fan Controller.
  * The functions supported by the driver are:
- * 	Reading sensed temperatures.
- * 	Setting temperature limits which control fan speeds.
- * 	Reading fan speeds.
- * 	Setting fan outputs.
+ *	Reading sensed temperatures.
+ *	Setting temperature limits which control fan speeds.
+ *	Reading fan speeds.
+ *	Setting fan outputs.
  *	Reading internal registers.
  *	Setting internal registers.
  */
@@ -210,9 +210,9 @@ _info(struct modinfo *modinfop)
 static int
 adm1031_resume(dev_info_t *dip)
 {
-	int 		instance = ddi_get_instance(dip);
+	int		instance = ddi_get_instance(dip);
 	adm1031_unit_t	*admp;
-	int 		err = DDI_SUCCESS;
+	int		err = DDI_SUCCESS;
 
 	admp = (adm1031_unit_t *)
 	    ddi_get_soft_state(adm1031_soft_statep, instance);
@@ -272,8 +272,8 @@ done:
 static void
 adm1031_detach(dev_info_t *dip)
 {
-	adm1031_unit_t 	*admp;
-	int 		instance = ddi_get_instance(dip);
+	adm1031_unit_t	*admp;
+	int		instance = ddi_get_instance(dip);
 
 	admp = ddi_get_soft_state(adm1031_soft_statep, instance);
 
@@ -317,10 +317,10 @@ adm1031_intr(caddr_t arg)
 static int
 adm1031_attach(dev_info_t *dip)
 {
-	adm1031_unit_t 		*admp;
-	int 			instance = ddi_get_instance(dip);
-	minor_t 		minor;
-	int 			i;
+	adm1031_unit_t		*admp;
+	int			instance = ddi_get_instance(dip);
+	minor_t			minor;
+	int			i;
 	char			*minor_name;
 	int			err = 0;
 
@@ -351,7 +351,7 @@ adm1031_attach(dev_info_t *dip)
 		    ADM1031_FCNINST_TO_MINOR(i);
 
 		if (ddi_create_minor_node(dip, minor_name, S_IFCHR, minor,
-		    ADM1031_NODE_TYPE, NULL) == DDI_FAILURE) {
+		    ADM1031_NODE_TYPE, 0) == DDI_FAILURE) {
 			cmn_err(CE_WARN, "%s:%d ddi_create_minor_node failed",
 			    admp->adm1031_name, instance);
 			adm1031_detach(dip);
@@ -370,7 +370,7 @@ adm1031_attach(dev_info_t *dip)
 		    ADM1031_FCNINST_TO_MINOR(i);
 
 		if (ddi_create_minor_node(dip, minor_name, S_IFCHR, minor,
-		    ADM1031_NODE_TYPE, NULL) == DDI_FAILURE) {
+		    ADM1031_NODE_TYPE, 0) == DDI_FAILURE) {
 			cmn_err(CE_WARN, "%s:%d ddi_create_minor_node failed",
 			    admp->adm1031_name, instance);
 			adm1031_detach(dip);
@@ -386,7 +386,7 @@ adm1031_attach(dev_info_t *dip)
 	    ADM1031_FCNINST_TO_MINOR(0);
 
 	if (ddi_create_minor_node(dip, "control", S_IFCHR, minor,
-	    ADM1031_NODE_TYPE, NULL) == DDI_FAILURE) {
+	    ADM1031_NODE_TYPE, 0) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s:%d ddi_create_minor_node failed",
 		    admp->adm1031_name, instance);
 		adm1031_detach(dip);
@@ -459,8 +459,8 @@ adm1031_s_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 static int
 adm1031_suspend(dev_info_t *dip)
 {
-	adm1031_unit_t 	*admp;
-	int 		instance = ddi_get_instance(dip);
+	adm1031_unit_t	*admp;
+	int		instance = ddi_get_instance(dip);
 	int		err = DDI_SUCCESS;
 
 	admp = ddi_get_soft_state(adm1031_soft_statep, instance);
@@ -586,7 +586,7 @@ static int
 adm1031_close(dev_t dev, int flags, int otyp, cred_t *credp)
 {
 	int		instance;
-	adm1031_unit_t 	*admp;
+	adm1031_unit_t	*admp;
 
 	_NOTE(ARGUNUSED(flags, otyp, credp))
 
@@ -874,7 +874,7 @@ done:
  * Step 3):
  *	User reads the contents of the array (which actually contains the values
  *	of the devices' status registers) to determine the exact nature of the
- * 	event.
+ *	event.
  */
 static int
 adm1031_i_ioctl(dev_t dev, int cmd, intptr_t arg, int mode)
@@ -1060,12 +1060,11 @@ err:
 
 static int
 adm1031_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-	int *rvalp)
+    int *rvalp)
 {
 	_NOTE(ARGUNUSED(credp, rvalp))
 
 	if (cmd == ADM1031_INTERRUPT_WAIT) {
-
 		return (adm1031_i_ioctl(dev, cmd, arg, mode));
 	} else {
 		return (adm1031_s_ioctl(dev, cmd, arg, mode));
