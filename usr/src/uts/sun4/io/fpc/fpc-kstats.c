@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
@@ -281,7 +279,7 @@ fpc_dev_kstat(fire_perfcnt_t reg_group, uint8_t num_inst)
 		(void) strncpy(dev_name, "tlu", sizeof (dev_name));
 		num_events = sizeof (fire_tlu_events) / sizeof (fi_kev_mask_t);
 		num_events2 = sizeof (fire_tlu2_events) /
-					sizeof (fi_kev_mask_t);
+		    sizeof (fi_kev_mask_t);
 		fire_events = fire_tlu_events;
 		fire_events2 = fire_tlu2_events;
 		num_cntrs = NUM_TLU_COUNTERS;
@@ -297,8 +295,7 @@ fpc_dev_kstat(fire_perfcnt_t reg_group, uint8_t num_inst)
 	}
 
 	for (i = 0; i < num_inst; i++) {
-		ksinfop = (fi_ksinfo_t *)kmem_zalloc(sizeof (fi_ksinfo_t),
-						KM_SLEEP);
+		ksinfop = kmem_zalloc(sizeof (fi_ksinfo_t), KM_SLEEP);
 
 		ksinfop->pic_num_events = num_events;
 		ksinfop->pic_reg_group = reg_group;
@@ -361,7 +358,7 @@ fpc_dev_kstat(fire_perfcnt_t reg_group, uint8_t num_inst)
 
 		/* create counter kstats */
 		ksinfop->cntr_ksp = fpc_create_cntr_kstat(dev_name, i,
-				fpc_cntr_kstat_update, ksinfop, num_cntrs);
+		    fpc_cntr_kstat_update, ksinfop, num_cntrs);
 		if (ksinfop->cntr_ksp == NULL)
 			goto err;
 
@@ -384,7 +381,7 @@ fpc_create_name_kstat(char *name, fi_ksinfo_t *pp, fi_kev_mask_t *ev,
 
 	for (i = base; i < (base + num_cntrs); i++) {
 		pp->pic_name_ksp[i] = fpc_create_picN_kstat(name, i,
-			pp->pic_sel_shift[i], pp->pic_num_events, ev);
+		    pp->pic_sel_shift[i], pp->pic_num_events, ev);
 
 		if (pp->pic_name_ksp[i] == NULL)
 			return (FAILURE);
@@ -408,7 +405,7 @@ fpc_create_picN_kstat(char *mod_name, int pic, int pic_sel_shift, int num_ev,
 
 	(void) snprintf(pic_name, sizeof (pic_name), "pic%d", pic);
 	if ((picN_ksp = kstat_create(mod_name, 0, pic_name,
-	    "bus", KSTAT_TYPE_NAMED, num_ev, NULL)) == NULL) {
+	    "bus", KSTAT_TYPE_NAMED, num_ev, 0)) == NULL) {
 		cmn_err(CE_WARN, "%s %s : kstat create failed",
 		    mod_name, pic_name);
 		return (NULL);
@@ -423,7 +420,7 @@ fpc_create_picN_kstat(char *mod_name, int pic, int pic_sel_shift, int num_ev,
 	 */
 	for (event = 0; event < num_ev - 1; event++) {
 		pic_named_data[event].value.ui64 =
-			(ev_array[event].pcr_mask << pic_sel_shift);
+		    (ev_array[event].pcr_mask << pic_sel_shift);
 
 		kstat_named_init(&pic_named_data[event],
 		    ev_array[event].event_name, KSTAT_DATA_UINT64);
@@ -433,7 +430,7 @@ fpc_create_picN_kstat(char *mod_name, int pic, int pic_sel_shift, int num_ev,
 	 * add the clear_pic entry
 	 */
 	pic_named_data[event].value.ui64 =
-			(uint64_t)~(ev_array[event].pcr_mask << pic_sel_shift);
+	    (uint64_t)~(ev_array[event].pcr_mask << pic_sel_shift);
 
 	kstat_named_init(&pic_named_data[event], ev_array[event].event_name,
 	    KSTAT_DATA_UINT64);
@@ -471,7 +468,7 @@ fpc_create_cntr_kstat(char *name, int instance, int (*update)(kstat_t *, int),
 	if ((counters_ksp = kstat_create(name, instance, "counters", "bus",
 	    KSTAT_TYPE_NAMED, num_pics + 1, KSTAT_FLAG_WRITABLE)) == NULL) {
 		cmn_err(CE_WARN, "kstat_create for %s%d failed",
-						name, instance);
+		    name, instance);
 		return (NULL);
 	}
 
