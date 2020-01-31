@@ -312,7 +312,7 @@ adm1026_do_attach(dev_info_t *dip)
 
 	D2CMN_ERR((CE_WARN, "adm1026_do_attach: ddi_create_minor_node"));
 	if (ddi_create_minor_node(dip, "adm1026", S_IFCHR, instance,
-	"ddi_i2c:led_control", NULL) == DDI_FAILURE) {
+	"ddi_i2c:led_control", 0) == DDI_FAILURE) {
 		cmn_err(CE_WARN,
 		    "adm1026_do_attach: ddi_create_minor_node failed");
 		ddi_soft_state_free(adm1026soft_statep, instance);
@@ -438,7 +438,7 @@ adm1026_put8(adm1026_unit_t *unitp, uint8_t reg, uint8_t val)
  */
 static int
 adm1026_send8(adm1026_unit_t *unitp, uint8_t reg, uint8_t reg_val,
-			uint8_t reg_mask)
+    uint8_t reg_mask)
 {
 	uint8_t val = 0;
 	int err;
@@ -593,7 +593,7 @@ adm1026_get_config(adm1026_unit_t *unitp, int cmd, uint32_t mask, uint32_t *val)
 
 static int
 adm1026_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-		int *rvalp)
+    int *rvalp)
 {
 	_NOTE(ARGUNUSED(credp, rvalp))
 

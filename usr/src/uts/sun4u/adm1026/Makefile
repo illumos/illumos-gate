@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	This makefile drives the production of the adm1026 driver kernel module
 #
 #	sun4u implementation architecture dependent
@@ -37,9 +35,8 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= adm1026 
+MODULE		= adm1026
 OBJECTS		= $(ADM1026_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(ADM1026_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 
 #
@@ -47,24 +44,15 @@ ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 #
 include $(UTSBASE)/sun4u/Makefile.sun4u
 
-#
-# lint pass one enforcement
-#
-CFLAGS += $(CCVERBOSE)
 LDFLAGS += -dy -N misc/i2c_svc
-
-# compile time debug flag
-
 
 #
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 .KEEP_STATE:
-
 
 all:		$(ALL_DEPS)
 
@@ -73,12 +61,6 @@ def:		$(DEF_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
