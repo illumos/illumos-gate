@@ -52,7 +52,7 @@ int (*rmc_req_now)(rmc_comm_msg_t *, uint8_t) = NULL;
 void
 startup_platform(void)
 {
-	mutex_init(&mi2cv_mutex, NULL, NULL, NULL);
+	mutex_init(&mi2cv_mutex, NULL, MUTEX_ADAPTIVE, NULL);
 }
 
 int
