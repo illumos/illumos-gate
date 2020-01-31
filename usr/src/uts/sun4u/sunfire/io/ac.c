@@ -905,8 +905,8 @@ ac_add_picN_kstats(dev_info_t *dip)
 	};
 
 	struct kstat_named *ac_pic_named_data;
-	int  		event, pic;
-	char 		pic_name[30];
+	int		event, pic;
+	char		pic_name[30];
 	int		instance = ddi_get_instance(dip);
 	int		pic_shift = 0;
 
@@ -918,7 +918,7 @@ ac_add_picN_kstats(dev_info_t *dip)
 		(void) sprintf(pic_name, "pic%d", pic);	/* pic0, pic1 ... */
 		if ((ac_picN_ksp[pic] = kstat_create("ac",
 		    instance, pic_name, "bus", KSTAT_TYPE_NAMED,
-		    AC_NUM_EVENTS + 1, NULL)) == NULL) {
+		    AC_NUM_EVENTS + 1, 0)) == NULL) {
 
 				cmn_err(CE_WARN, "ac %s: kstat_create failed",
 				    pic_name);

@@ -245,7 +245,7 @@ short clk_danger_temp = 68;	/* Clock Board Danger Temperature */
 short dft_warn_temp = 60;	/* default warning temp value */
 short dft_danger_temp = 68;	/* default danger temp value */
 
-short cpu_warn_temp_4x = 60; 	/* CPU/Memory warning temp for 400 MHZ */
+short cpu_warn_temp_4x = 60;	/* CPU/Memory warning temp for 400 MHZ */
 short cpu_danger_temp_4x = 68;	/* CPU/Memory danger temp for 400 MHZ */
 
 /*
@@ -398,7 +398,7 @@ static struct cb_ops fhc_cb_ops = {
 	nulldev,		/* dump */
 	nulldev,		/* read */
 	nulldev,		/* write */
-	nulldev, 		/* ioctl */
+	nulldev,		/* ioctl */
 	nodev,			/* devmap */
 	nodev,			/* mmap */
 	nodev,			/* segmap */
@@ -1321,7 +1321,7 @@ done:
  */
 static void
 fhc_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
-	ddi_intr_handle_impl_t *hdlp)
+    ddi_intr_handle_impl_t *hdlp)
 {
 	volatile uint_t *mondo_vec_reg;
 	volatile uint_t tmpreg;
@@ -1490,7 +1490,7 @@ fhc_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
  */
 static int
 fhc_ctlops(dev_info_t *dip, dev_info_t *rdip,
-	ddi_ctl_enum_t op, void *arg, void *result)
+    ddi_ctl_enum_t op, void *arg, void *result)
 {
 
 	switch (op) {
@@ -1529,7 +1529,6 @@ fhc_ctlops(dev_info_t *dip, dev_info_t *rdip,
 /* ARGSUSED */
 static void
 fhc_xlate_intrs(ddi_intr_handle_impl_t *hdlp, uint32_t ign)
-
 {
 	uint32_t mondo;
 
@@ -2384,8 +2383,8 @@ cpu_on_board(int board)
 	int upa_a = board << 1;
 	int upa_b = (board << 1) + 1;
 
-	if ((cpunodes[upa_a].nodeid != NULL) ||
-	    (cpunodes[upa_b].nodeid != NULL)) {
+	if ((cpunodes[upa_a].nodeid != 0) ||
+	    (cpunodes[upa_b].nodeid != 0)) {
 		return (1);
 	} else {
 		return (0);
@@ -3385,7 +3384,7 @@ fhc_cpu_poweron(struct cpu *cp)
 static void
 os_completes_shutdown(void)
 {
-	pfn_t 			pfn;
+	pfn_t			pfn;
 	tte_t			tte;
 	volatile uint_t		*src;
 	volatile uint_t		*dst;

@@ -576,7 +576,7 @@ sysctrl_resume(sysc_cfga_pkt_t *pkt)
 		 */
 		if (sysc_watchdog_suspended) {
 			mutex_enter(&tod_lock);
-			tod_ops.tod_set_watchdog_timer(
+			(void) tod_ops.tod_set_watchdog_timer(
 			    watchdog_timeout_seconds);
 			mutex_exit(&tod_lock);
 		}
@@ -731,7 +731,7 @@ sysctrl_suspend(sysc_cfga_pkt_t *pkt)
 	 */
 	if (watchdog_activated) {
 		mutex_enter(&tod_lock);
-		tod_ops.tod_clear_watchdog_timer();
+		(void) tod_ops.tod_clear_watchdog_timer();
 		mutex_exit(&tod_lock);
 		sysc_watchdog_suspended = 1;
 	} else {
