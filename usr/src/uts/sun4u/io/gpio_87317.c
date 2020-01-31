@@ -213,7 +213,7 @@ gpio_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		instance = ddi_get_instance(dip);
 		DBG(dip, "attach: instance is %d", instance, 0, 0, 0, 0);
 		if (ddi_soft_state_zalloc(statep, instance) != DDI_SUCCESS)
-		goto attach_failed;
+			goto attach_failed;
 		softc = getsoftc(instance);
 		softc->gp_dip = dip;
 		softc->gp_state = 0;
@@ -226,7 +226,7 @@ gpio_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		dev_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 		if (ddi_regs_map_setup(dip, 0, (caddr_t *)&softc->gp_regs, 0, 0,
 		    &dev_attr, &softc->gp_handle) != DDI_SUCCESS)
-		goto attach_failed;
+			goto attach_failed;
 		DBG(dip, "attach: regs=0x%p", (uintptr_t)softc->gp_regs,
 		    0, 0, 0, 0);
 		DBG(dip, "attach: port 1 data is %x",
@@ -254,10 +254,10 @@ gpio_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    (uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[7]),
 		    0, 0, 0, 0);
 
-	    /* Create device minor nodes. */
+		/* Create device minor nodes. */
 
 		if (ddi_create_minor_node(dip, "gpio", S_IFCHR,
-		    instance, NULL, NULL) == DDI_FAILURE) {
+		    instance, NULL, 0) == DDI_FAILURE) {
 			ddi_regs_map_free(&softc->gp_handle);
 			goto attach_failed;
 		}
@@ -267,7 +267,7 @@ gpio_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	case DDI_RESUME:
 
-	    /* Nothing to do for a resume. */
+		/* Nothing to do for a resume. */
 
 		return (DDI_SUCCESS);
 
@@ -340,7 +340,7 @@ gpio_close(dev_t dev, int flag, int otyp, cred_t *credp)
 /* ARGSUSED */
 static int
 gpio_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-	int *rvalp)
+    int *rvalp)
 {
 	int instance = getminor(dev);
 	struct gpio_softc *softc = getsoftc(instance);
@@ -423,7 +423,7 @@ gpio_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 #ifdef DEBUG
 void
 gpio_debug(dev_info_t *dip, char *format, uint_t arg1, uint_t arg2, uint_t arg3,
-	uint_t arg4, uint_t arg5)
+    uint_t arg4, uint_t arg5)
 {
 	if (gpio_debug_flag == 0) {
 		return;
