@@ -275,17 +275,17 @@ pic16f819_close(dev_t dev, int flags, int otyp, cred_t *credp)
 
 static int
 pic16f819_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
-		cred_t *credp, int *rvalp)
+    cred_t *credp, int *rvalp)
 {
 	_NOTE(ARGUNUSED(credp, rvalp))
 
-	struct pic16f819_unit 	*unitp;
-	int 		instance;
-	int 			err = 0;
+	struct pic16f819_unit	*unitp;
+	int		instance;
+	int			err = 0;
 	i2c_reg_t		ioctl_reg;
-	uchar_t 		val8;
+	uchar_t			val8;
 
-	if (arg == NULL) {
+	if (arg == (intptr_t)NULL) {
 		D2CMN_ERR((CE_WARN, "PIC16F819: ioctl: arg passed in to ioctl "
 		    "= NULL\n"));
 		err = EINVAL;
@@ -389,7 +389,7 @@ pic16f819_do_attach(dev_info_t *dip)
 	    "%s%d", ddi_node_name(dip), instance);
 
 	if (ddi_create_minor_node(dip, "fan_1", S_IFCHR, instance,
-	    "ddi_i2c:pic",	NULL) == DDI_FAILURE) {
+	    "ddi_i2c:pic", 0) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s ddi_create_minor_node failed for "
 		    "%s\n", unitp->pic16f819_name, "pic16f819");
 		ddi_soft_state_free(pic16f819soft_statep, instance);
