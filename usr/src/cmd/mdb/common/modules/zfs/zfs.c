@@ -22,7 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2011, 2018 by Delphix. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -2869,61 +2869,57 @@ typedef struct mdb_multilist {
 	uintptr_t ml_sublists;
 } mdb_multilist_t;
 
-typedef struct multilist_walk_data {
-	uint64_t mwd_idx;
-	mdb_multilist_t mwd_ml;
-} multilist_walk_data_t;
-
-/* ARGSUSED */
-static int
-multilist_print_cb(uintptr_t addr, const void *unknown, void *arg)
-{
-	mdb_printf("%#lr\n", addr);
-	return (WALK_NEXT);
-}
-
 static int
 multilist_walk_step(mdb_walk_state_t *wsp)
 {
-	multilist_walk_data_t *mwd = wsp->walk_data;
-
-	if (mwd->mwd_idx >= mwd->mwd_ml.ml_num_sublists)
-		return (WALK_DONE);
-
-	wsp->walk_addr = mwd->mwd_ml.ml_sublists +
-	    mdb_ctf_sizeof_by_name("multilist_sublist_t") * mwd->mwd_idx +
-	    mdb_ctf_offsetof_by_name("multilist_sublist_t", "mls_list");
-
-	mdb_pwalk("list", multilist_print_cb, (void*)NULL, wsp->walk_addr);
-	mwd->mwd_idx++;
-
-	return (WALK_NEXT);
+	return (wsp->walk_callback(wsp->walk_addr, wsp->walk_layer,
+	    wsp->walk_cbdata));
 }
 
 static int
 multilist_walk_init(mdb_walk_state_t *wsp)
 {
-	multilist_walk_data_t *mwd;
+	mdb_multilist_t ml;
+	ssize_t sublist_sz;
+	int list_offset;
+	size_t i;
 
 	if (wsp->walk_addr == 0) {
 		mdb_warn("must supply address of multilist_t\n");
 		return (WALK_ERR);
 	}
 
-	mwd = mdb_zalloc(sizeof (multilist_walk_data_t), UM_SLEEP | UM_GC);
-	if (mdb_ctf_vread(&mwd->mwd_ml, "multilist_t", "mdb_multilist_t",
+	if (mdb_ctf_vread(&ml, "multilist_t", "mdb_multilist_t",
 	    wsp->walk_addr, 0) == -1) {
 		return (WALK_ERR);
 	}
 
-	if (mwd->mwd_ml.ml_num_sublists == 0 ||
-	    mwd->mwd_ml.ml_sublists == 0) {
+	if (ml.ml_num_sublists == 0 || ml.ml_sublists == 0) {
 		mdb_warn("invalid or uninitialized multilist at %#lx\n",
 		    wsp->walk_addr);
 		return (WALK_ERR);
 	}
 
-	wsp->walk_data = mwd;
+	/* mdb_ctf_sizeof_by_name() will print an error for us */
+	sublist_sz = mdb_ctf_sizeof_by_name("multilist_sublist_t");
+	if (sublist_sz == -1)
+		return (WALK_ERR);
+
+	/* mdb_ctf_offsetof_by_name will print an error for us */
+	list_offset = mdb_ctf_offsetof_by_name("multilist_sublist_t",
+	    "mls_list");
+	if (list_offset == -1)
+		return (WALK_ERR);
+
+	for (i = 0; i < ml.ml_num_sublists; i++) {
+		wsp->walk_addr = ml.ml_sublists + i * sublist_sz + list_offset;
+
+		if (mdb_layered_walk("list", wsp) == -1) {
+			mdb_warn("can't walk multilist sublist");
+			return (WALK_ERR);
+		}
+	}
+
 	return (WALK_NEXT);
 }
 
