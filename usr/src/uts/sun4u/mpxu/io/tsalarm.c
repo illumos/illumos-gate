@@ -211,7 +211,7 @@ tsalarm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * the device's softc, is used to direct peculiar behavior.
 		 */
 		if (ddi_create_minor_node(dip, "lom", S_IFCHR, 0,
-		    DDI_PSEUDO, NULL) == DDI_FAILURE)
+		    DDI_PSEUDO, 0) == DDI_FAILURE)
 			goto attach_failed;
 
 		ddi_report_dev(dip);
@@ -288,7 +288,7 @@ tsalarm_close(dev_t dev, int flag, int otyp, cred_t *credp)
 /* ARGSUSED */
 static int
 tsalarm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
-		cred_t *credp, int *rvalp)
+    cred_t *credp, int *rvalp)
 {
 	int		inst = getminor(dev);
 	struct tsalarm_softc *softc;
