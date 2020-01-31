@@ -90,16 +90,16 @@ typedef struct vnet_hio_kstats {
 	kstat_named_t	oerrors;
 
 	/* required by kstat for MIB II objects(RFC 1213) */
-	kstat_named_t	rbytes; 	/* MIB - ifInOctets */
+	kstat_named_t	rbytes;		/* MIB - ifInOctets */
 	kstat_named_t	rbytes64;
-	kstat_named_t	obytes; 	/* MIB - ifOutOctets */
+	kstat_named_t	obytes;		/* MIB - ifOutOctets */
 	kstat_named_t	obytes64;
-	kstat_named_t	multircv; 	/* MIB - ifInNUcastPkts */
-	kstat_named_t	multixmt; 	/* MIB - ifOutNUcastPkts */
+	kstat_named_t	multircv;	/* MIB - ifInNUcastPkts */
+	kstat_named_t	multixmt;	/* MIB - ifOutNUcastPkts */
 	kstat_named_t	brdcstrcv;	/* MIB - ifInNUcastPkts */
 	kstat_named_t	brdcstxmt;	/* MIB - ifOutNUcastPkts */
-	kstat_named_t	norcvbuf; 	/* MIB - ifInDiscards */
-	kstat_named_t	noxmtbuf; 	/* MIB - ifOutDiscards */
+	kstat_named_t	norcvbuf;	/* MIB - ifInDiscards */
+	kstat_named_t	noxmtbuf;	/* MIB - ifOutDiscards */
 } vnet_hio_kstats_t;
 
 typedef struct vnet_tx_ring_stats {
@@ -348,10 +348,10 @@ enum	{ DBG_LEVEL1 = 0x01, DBG_LEVEL2 = 0x02, DBG_WARN = 0x04,
 
 #else
 
-#define	DBG1(...)	if (0)	do { } while (0)
-#define	DBG2(...)	if (0)	do { } while (0)
-#define	DWARN(...)	if (0)	do { } while (0)
-#define	DERR(...)	if (0)	do { } while (0)
+#define	DBG1(...)
+#define	DBG2(...)
+#define	DWARN(...)
+#define	DERR(...)
 
 #endif
 
