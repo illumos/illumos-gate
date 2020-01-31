@@ -1418,7 +1418,8 @@ cpu_log_fast_ecc_error(caddr_t tpc, int priv, int tl, uint64_t ceen,
 	 */
 	if ((t_afsr_errs & (C_AFSR_UCU | C_AFSR_L3_UCU)) &&
 	    aflt->flt_panic == 0 && aflt->flt_priv != 0 &&
-	    curthread->t_ontrap == NULL && curthread->t_lofault == NULL) {
+	    curthread->t_ontrap == NULL &&
+	    curthread->t_lofault == (uintptr_t)NULL) {
 		get_cpu_error_state(&cpu_error_regs);
 		if (IS_PANTHER(cpunodes[CPU->cpu_id].implementation)) {
 			aflt->flt_panic |=
@@ -4549,7 +4550,7 @@ cpu_error_to_resource_type(struct async_flt *aflt)
  */
 static void
 cpu_payload_add_aflt(struct async_flt *aflt, nvlist_t *payload,
-	nvlist_t *resource, int *afar_status, int *synd_status)
+    nvlist_t *resource, int *afar_status, int *synd_status)
 {
 	ch_async_flt_t *ch_flt = (ch_async_flt_t *)aflt;
 	*synd_status = AFLT_STAT_INVALID;
@@ -5351,7 +5352,7 @@ afsr_to_synd_status(uint_t cpuid, uint64_t afsr, uint64_t afsr_bit)
 void
 sticksync_slave(void)
 {
-	int 		i;
+	int		i;
 	int		tries = 0;
 	int64_t		tskew;
 	int64_t		av_tskew;
@@ -5494,7 +5495,7 @@ cpu_uninit_private(struct cpu *cp)
 	ASSERT(chprp);
 	cpu_uninit_ecache_scrub_dr(cp);
 	CPU_PRIVATE(cp) = NULL;
-	ch_err_tl1_paddrs[cp->cpu_id] = NULL;
+	ch_err_tl1_paddrs[cp->cpu_id] = 0;
 	kmem_cache_free(ch_private_cache, chprp);
 	cmp_delete_cpu(cp->cpu_id);
 
@@ -6175,8 +6176,8 @@ cpu_check_ce_errors(void *arg)
  *
  * flag == SCRUBBER_CEEN_CHECK
  *		called from memscrubber, just check/scrub, no reset
- *		paddr 	physical addr. for start of scrub pages
- *		vaddr 	virtual addr. for scrub area
+ *		paddr	physical addr. for start of scrub pages
+ *		vaddr	virtual addr. for scrub area
  *		psz	page size of area to be scrubbed
  *
  * flag == TIMEOUT_CEEN_CHECK
@@ -6316,9 +6317,9 @@ cpu_ce_delayed_ec_logout(uint64_t afar)
 void
 cpu_ce_detected(ch_cpu_errors_t *cpu_error_regs, int flag)
 {
-	ch_async_flt_t 	ch_flt;
+	ch_async_flt_t ch_flt;
 	struct async_flt *aflt;
-	char 		pr_reason[MAX_REASON_STRING];
+	char pr_reason[MAX_REASON_STRING];
 
 	bzero(&ch_flt, sizeof (ch_async_flt_t));
 	ch_flt.flt_trapped_ce = flag;
@@ -6356,8 +6357,8 @@ cpu_log_and_clear_ce(ch_async_flt_t *ch_flt)
 	struct async_flt *aflt;
 	uint64_t afsr, afsr_errs;
 	ch_cpu_logout_t *clop;
-	char 		pr_reason[MAX_REASON_STRING];
-	on_trap_data_t	*otp = curthread->t_ontrap;
+	char pr_reason[MAX_REASON_STRING];
+	on_trap_data_t *otp = curthread->t_ontrap;
 
 	aflt = (struct async_flt *)ch_flt;
 	afsr = aflt->flt_stat;
@@ -7017,7 +7018,7 @@ fpras_failure(int op, int how)
 	 * ie, don't panic for copyin, copyout, kcopy and bcopy called
 	 * under on_fault and do panic for unprotected bcopy and hwblkpagecopy.
 	 */
-	aflt->flt_panic = (curthread->t_lofault == NULL);
+	aflt->flt_panic = (curthread->t_lofault == (uintptr_t)NULL);
 
 	/*
 	 * XOR the source instruction block with the copied instruction
