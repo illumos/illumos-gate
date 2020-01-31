@@ -220,7 +220,7 @@ pic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		(void) sprintf(name, "env-monitor%d", inst);
 		minor = PIC_INST_TO_MINOR(inst) | PIC_UNIT_TO_MINOR(0);
 		if (ddi_create_minor_node(dip, name, S_IFCHR, minor,
-		    DDI_PSEUDO, NULL) == DDI_FAILURE) {
+		    DDI_PSEUDO, 0) == DDI_FAILURE) {
 			cmn_err(CE_WARN,
 			    "ddi_create_minor_node() failed for inst %d\n",
 			    inst);
@@ -261,7 +261,7 @@ pic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			minor_name = pic_nodes[i].minor_name;
 			minor = PIC_INST_TO_MINOR(inst) | PIC_UNIT_TO_MINOR(i);
 			if (ddi_create_minor_node(dip, minor_name, S_IFCHR,
-			    minor, PICDEV_NODE_TYPE, NULL) == DDI_FAILURE) {
+			    minor, PICDEV_NODE_TYPE, 0) == DDI_FAILURE) {
 				cmn_err(CE_WARN,
 				    "%s:%d ddi_create_minor_node failed",
 				    ddi_driver_name(dip), inst);
