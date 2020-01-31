@@ -151,14 +151,14 @@
  * Globals.  (The complete mapping can be found in the UltraSPARC I&II User's
  * Manual.)
  *
- * Note that the sets of globals are per trap _type_, not per trap _level_.  
+ * Note that the sets of globals are per trap _type_, not per trap _level_.
  * Thus, when executing a TL>0 trap handler, one may not have registers
  * available (for example, both trap-instruction traps and spill traps execute
  * on the alternate globals; if a trap-instruction trap induces a window spill,
  * the window spill handler has no available globals).  For trapstat, this is
  * problematic:  a register is required to transfer control from one arbitrary
  * location (in the interposing trap table) to another (in the actual trap
- * table).  
+ * table).
  *
  * We solve this problem by exploiting the trap table's location at the bottom
  * of valid kernel memory (i.e. at KERNELBASE).  We locate the interposing trap
@@ -173,7 +173,7 @@
  *  Actual trap table:
  *
  *       +--------------------------------+- 2ff
- *       |                                |   .   
+ *       |                                |   .
  *       |   Non-trap instruction, TL>0   |   .   <-----------------------+
  *       |                                |   .   <-----------------------|-+
  *       |- - - - - - - - - - - - - - - - +- 200  <-----------------------|-|-+
@@ -323,11 +323,11 @@
  *
  * To accurately determine the amount of time spent executing the TLB miss
  * handler, one must get a timestamp on trap entry and trap exit, subtract the
- * latter from the former, and add the result to an accumulating count.  
+ * latter from the former, and add the result to an accumulating count.
  * Consider flow of control during normal TLB miss processing (where "ldx
  * [%g2], %g2" is an arbitrary TLB-missing instruction):
- * 
- * + - - - - - - - -+              
+ *
+ * + - - - - - - - -+
  * :                :
  * : ldx [%g2], %g2 :<-------------------------------------------------------+
  * :                :              Return from trap:                         |
@@ -357,10 +357,10 @@
  * As the above diagram indicates, interposing on the trap table allows one
  * only to determine a timestamp on trap _entry_:  when the TLB miss handler
  * has completed filling the TLB, a "retry" will be issued, and control will
- * transfer immediately back to the missing %pc.  
+ * transfer immediately back to the missing %pc.
  *
  * To obtain a timestamp on trap exit, we must then somehow interpose between
- * the "retry" and the subsequent control transfer to the TLB-missing 
+ * the "retry" and the subsequent control transfer to the TLB-missing
  * instruction.  To do this, we _push_ a trap level.  The basic idea is to
  * spoof a TLB miss by raising TL, setting the %tpc to be within text
  * controlled by trapstat (the "TLB return entry") and branching to the
@@ -371,7 +371,7 @@
  * Here is the above TLB miss flow control diagram modified to reflect
  * trapstat's operation:
  *
- * + - - - - - - - -+              
+ * + - - - - - - - -+
  * :                :
  * : ldx [%g2], %g2 :<-------------------------------------------------------+
  * :                :             Return from trap:                          |
@@ -928,8 +928,8 @@ trapstat_enable()
 			cpu_t *cp = CPU;
 
 			cp->cpu_m.cpu_tstat_flags |= TSTAT_TLB_STATS;
-			(void) hv_set_ctx0(NULL, NULL);
-			(void) hv_set_ctxnon0(NULL, NULL);
+			(void) hv_set_ctx0(0, 0);
+			(void) hv_set_ctxnon0(0, 0);
 		}
 	}
 #endif
@@ -1114,7 +1114,7 @@ trapstat_tlbretent(tstat_percpu_t *tcpu, tstat_tlbretent_t *ret,
 	static const uint32_t retent[TSTAT_TLBRET_NINSTR] = {
 #ifndef sun4v
 	    0x87410000,		/* rd    %tick, %g3			*/
-	    0x03000000, 	/* sethi %hi(stat), %g1			*/
+	    0x03000000,		/* sethi %hi(stat), %g1			*/
 	    0x82106000,		/* or    %g1, %lo(stat), %g1		*/
 	    0x89297001,		/* sllx  %g5, 1, %g4			*/
 	    0x8931303e,		/* srlx  %g4, 62, %g4			*/
@@ -1129,19 +1129,19 @@ trapstat_tlbretent(tstat_percpu_t *tcpu, tstat_tlbretent_t *ret,
 	    0xc4586000,		/* ldx   [%g1 + tmiss_count], %g2	*/
 	    0x8400a001,		/* add   %g2, 1, %g2			*/
 	    0xc4706000,		/* stx   %g2, [%g1 + tmiss_count]	*/
-	    0x0d000000, 	/* sethi %hi(tdata_tmptick), %g6	*/
-	    0xc459a000, 	/* ldx   [%g6 + %lo(tdata_tmptick)], %g2 */
+	    0x0d000000,		/* sethi %hi(tdata_tmptick), %g6	*/
+	    0xc459a000,		/* ldx   [%g6 + %lo(tdata_tmptick)], %g2 */
 	    0x8620c002,		/* sub   %g3, %g2, %g3			*/
 	    0xc4586000,		/* ldx   [%g1 + tmiss_time], %g2	*/
 	    0x84008003,		/* add   %g2, %g3, %g2			*/
 	    0xc4706000,		/* stx   %g2, [%g1 + tmiss_time]	*/
 	    0x83f00000		/* retry				*/
 #else /* sun4v */
-	    0x82102008,		/* mov   SCRATCHPAD_CPUID, %g1 		*/
+	    0x82102008,		/* mov   SCRATCHPAD_CPUID, %g1		*/
 	    0xced84400,		/* ldxa  [%g1]ASI_SCRATCHPAD, %g7	*/
 	    0x8f29f000,		/* sllx  %g7, TSTAT_DATA_SHIFT, %g7	*/
 	    0x87410000,		/* rd    %tick, %g3			*/
-	    0x03000000, 	/* sethi %hi(stat), %g1			*/
+	    0x03000000,		/* sethi %hi(stat), %g1			*/
 	    0x82004007,		/* add   %g1, %g7, %g1			*/
 	    0x82106000,		/* or    %g1, %lo(stat), %g1		*/
 	    0x8929703d,		/* sllx  %g5, 61, %g4			*/
@@ -1151,9 +1151,9 @@ trapstat_tlbretent(tstat_percpu_t *tcpu, tstat_tlbretent_t *ret,
 	    0xc4586000,		/* ldx   [%g1 + tmiss_count], %g2	*/
 	    0x8400a001,		/* add   %g2, 1, %g2			*/
 	    0xc4706000,		/* stx   %g2, [%g1 + tmiss_count]	*/
-	    0x0d000000, 	/* sethi %hi(tdata_tmptick), %g6	*/
+	    0x0d000000,		/* sethi %hi(tdata_tmptick), %g6	*/
 	    0x8c018007,		/* add   %g6, %g7, %g6			*/
-	    0xc459a000, 	/* ldx   [%g6 + %lo(tdata_tmptick)], %g2 */
+	    0xc459a000,		/* ldx   [%g6 + %lo(tdata_tmptick)], %g2 */
 	    0x8620c002,		/* sub   %g3, %g2, %g3			*/
 	    0xc4586000,		/* ldx   [%g1 + tmiss_time], %g2	*/
 	    0x84008003,		/* add   %g2, %g3, %g2			*/
@@ -1291,7 +1291,7 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	 */
 	static const uint32_t tlbent[] = {
 #ifndef sun4v
-	    0x03000000, 		/* sethi %hi(stat), %g1		*/
+	    0x03000000,			/* sethi %hi(stat), %g1		*/
 	    0xc4586000,			/* ldx   [%g1 + %lo(stat)], %g2	*/
 	    0x8400a001,			/* add   %g2, 1, %g2		*/
 	    0xc4706000,			/* stx   %g2, [%g1 + %lo(stat)]	*/
@@ -1309,14 +1309,14 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	    0xc2d80000,			/* ldxa  [%g0]ASI_MMU, %g1	*/
 	    0x83307030,			/* srlx  %g1, CTXSHIFT, %g1	*/
 	    0x02c04004,			/* brz,pn %g1, .+0x10		*/
-	    0x03000000, 		/* sethi %hi(new_tpc), %g1	*/
+	    0x03000000,			/* sethi %hi(new_tpc), %g1	*/
 	    0x82106000,			/* or    %g1, %lo(new_tpc), %g1	*/
 	    0x30800002,			/* ba,a  .+0x8			*/
 	    0x82106000,			/* or    %g1, %lo(new_tpc), %g1	*/
 	    0x81904000,			/* wrpr  %g1, %g0, %tpc		*/
 	    0x82006004,			/* add   %g1, 4, %g1		*/
 	    0x83904000,			/* wrpr  %g1, %g0, %tnpc	*/
-	    0x03000000, 		/* sethi %hi(tmptick), %g1	*/
+	    0x03000000,			/* sethi %hi(tmptick), %g1	*/
 	    0x85410000,			/* rd    %tick, %g2		*/
 	    0xc4706000,			/* stx   %g2, [%g1 + %lo(tmptick)] */
 	    0x30800000,			/* ba,a  addr			*/
@@ -1325,7 +1325,7 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	    0x82102008,			/* mov SCRATCHPAD_CPUID, %g1	*/
 	    0xc8d84400,			/* ldxa [%g1]ASI_SCRATCHPAD, %g4 */
 	    0x89293000,			/* sllx %g4, TSTAT_DATA_SHIFT, %g4 */
-	    0x03000000, 		/* sethi %hi(stat), %g1		*/
+	    0x03000000,			/* sethi %hi(stat), %g1		*/
 	    0x82004004,			/* add %g1, %g4, %g1		*/
 	    0xc4586000,			/* ldx   [%g1 + %lo(stat)], %g2	*/
 	    0x8400a001,			/* add   %g2, 1, %g2		*/
@@ -1347,14 +1347,14 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	    0xc2d80400,			/* ldxa  [%g0]ASI_SCRATCHPAD, %g1 */
 	    0xc2586000,			/* ldx  [%g1 + MMFSA_?_CTX], %g1 */
 	    0x02c04004,			/* brz,pn %g1, .+0x10		*/
-	    0x03000000, 		/* sethi %hi(new_tpc), %g1	*/
+	    0x03000000,			/* sethi %hi(new_tpc), %g1	*/
 	    0x82106000,			/* or    %g1, %lo(new_tpc), %g1	*/
 	    0x30800002,			/* ba,a  .+0x8			*/
 	    0x82106000,			/* or    %g1, %lo(new_tpc), %g1	*/
 	    0x81904000,			/* wrpr  %g1, %g0, %tpc		*/
 	    0x82006004,			/* add   %g1, 4, %g1		*/
 	    0x83904000,			/* wrpr  %g1, %g0, %tnpc	*/
-	    0x03000000, 		/* sethi %hi(tmptick), %g1	*/
+	    0x03000000,			/* sethi %hi(tmptick), %g1	*/
 	    0x82004004,			/* add %g1, %g4, %g1		*/
 	    0x85410000,			/* rd    %tick, %g2		*/
 	    0xc4706000,			/* stx   %g2, [%g1 + %lo(tmptick)] */
@@ -1505,7 +1505,7 @@ trapstat_make_traptab(tstat_percpu_t *tcpu)
 	 * back before branching to the actual trap table entry.
 	 */
 	static const uint32_t enabled[TSTAT_ENT_NINSTR] = {
-	    0x03000000, 		/* sethi %hi(stat), %g1		*/
+	    0x03000000,			/* sethi %hi(stat), %g1		*/
 	    0xc4586000,			/* ldx   [%g1 + %lo(stat)], %g2	*/
 	    0x8400a001,			/* add   %g2, 1, %g2		*/
 	    0xc4706000,			/* stx   %g2, [%g1 + %lo(stat)]	*/
@@ -1617,9 +1617,9 @@ trapstat_make_traptab(tstat_percpu_t *tcpu)
 	 * the interposing trap table.
 	 */
 	static const uint32_t enabled[TSTAT_ENT_NINSTR] = {
-	    0x03000000, 		/* sethi %hi(stat), %g1		*/
+	    0x03000000,			/* sethi %hi(stat), %g1		*/
 	    0x82106000,			/* or   %g1, %lo[stat), %g1	*/
-	    0x05000000, 		/* sethi %hi(addr), %g2		*/
+	    0x05000000,			/* sethi %hi(addr), %g2		*/
 	    0x8410a000,			/* or   %g2, %lo(addr), %g2	*/
 	    0x86102008,			/* mov	ASI_SCRATCHPAD_CPUID, %g3 */
 	    0xc6d8c400,			/* ldxa [%g3]ASI_SCRATCHPAD, %g3 */
@@ -1628,7 +1628,7 @@ trapstat_make_traptab(tstat_percpu_t *tcpu)
 	};
 
 	static const uint32_t enabled_cont[TSTAT_ENT_NINSTR] = {
-	    0xc8584003, 		/* ldx [%g1 + %g3], %g4		*/
+	    0xc8584003,			/* ldx [%g1 + %g3], %g4		*/
 	    0x88012001,			/* add %g4, 1, %g4		*/
 	    0x81c08000,			/* jmp %g2			*/
 	    0xc8704003,			/* stx %g4, [%g1 + %g3]		*/
