@@ -1140,10 +1140,6 @@ nl7c_data(struct sonode *so, uio_t *uio)
 
 	alloc = kmem_alloc(sz, KM_SLEEP);
 	URI_RD_ADD(uri, rdp, sz, -1);
-	if (rdp == NULL) {
-		error = ENOMEM;
-		goto fail;
-	}
 
 	if (uri->hash != URI_TEMP && uri->count > nca_max_cache_size) {
 		uri_delete(uri);
@@ -1376,10 +1372,6 @@ nl7c_sendfilev(struct sonode *so, u_offset_t *fileoff, sendfilevec_t *sfvp,
 			fp = NULL;
 		}
 		URI_RD_ADD(uri, rdp, cnt, -1);
-		if (rdp == NULL) {
-			error = ENOMEM;
-			goto fail;
-		}
 		data = alloc;
 		alloc = NULL;
 		rdp->data.kmem = data;
@@ -1405,10 +1397,6 @@ nl7c_sendfilev(struct sonode *so, u_offset_t *fileoff, sendfilevec_t *sfvp,
 			if (len > cnt) {
 				/* More file data so add it */
 				URI_RD_ADD(uri, rdp, len - cnt, off);
-				if (rdp == NULL) {
-					error = ENOMEM;
-					goto fail;
-				}
 				rdp->data.vnode = vp;
 
 				/* Send vnode data out the connection */

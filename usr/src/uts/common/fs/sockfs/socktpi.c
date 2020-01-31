@@ -4811,8 +4811,8 @@ sodgram_direct(struct sonode *so, struct sockaddr *name,
 		if (auditing)
 			audit_sock(T_UNITDATA_REQ, strvp2wq(SOTOV(so)), mp, 0);
 
-		udp_wput(udp_wq, mp);
-		return (0);
+		/* Always returns 0... */
+		return (udp_wput(udp_wq, mp));
 	}
 
 	ASSERT(mpdata == NULL);
@@ -4874,8 +4874,8 @@ sostream_direct(struct sonode *so, struct uio *uiop, mblk_t *mp, cred_t *cr)
 			}
 			mp = newmp;
 		}
-		tcp_wput(tcp_wq, mp);
-		return (0);
+		/* Always returns 0... */
+		return (tcp_wput(tcp_wq, mp));
 	}
 
 	/* Fallback to strwrite() to do proper error handling */
@@ -4925,7 +4925,7 @@ sostream_direct(struct sonode *so, struct uio *uiop, mblk_t *mp, cred_t *cr)
 			}
 			mp = newmp;
 		}
-		tcp_wput(tcp_wq, mp);
+		(void) tcp_wput(tcp_wq, mp);	/* Always returns 0 anyway. */
 
 		wflag |= NOINTR;
 
