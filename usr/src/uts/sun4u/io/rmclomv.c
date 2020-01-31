@@ -399,7 +399,7 @@ rmclomv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			return (DDI_FAILURE);
 
 		err = ddi_create_minor_node(dip, "rmclomv", S_IFCHR,
-		    instance, DDI_PSEUDO, NULL);
+		    instance, DDI_PSEUDO, 0);
 		if (err != DDI_SUCCESS)
 			return (DDI_FAILURE);
 
@@ -1621,7 +1621,7 @@ refresh_name_cache(int force_fail)
 
 	if (retval == 0) {
 		retval = rmclomv_do_cmd(DP_GET_SYSINFO, DP_GET_SYSINFO_R,
-		    sizeof (sysinfo), NULL, (intptr_t)&sysinfo);
+		    sizeof (sysinfo), (intptr_t)NULL, (intptr_t)&sysinfo);
 	}
 	if (retval == 0) {
 		fru_cmd.handle = DP_NULL_HANDLE;
@@ -2896,7 +2896,7 @@ rmclomv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 	case ENVMONIOCCHASSISSERIALNUM:
 		retval = rmclomv_do_cmd(DP_GET_SDP_VERSION,
 		    DP_GET_SDP_VERSION_R, sizeof (rmc_sdpver_r),
-		    NULL, (intptr_t)&rmc_sdpver_r);
+		    (intptr_t)NULL, (intptr_t)&rmc_sdpver_r);
 
 		if (retval != 0) {
 			cmn_err(CE_WARN, "DP_GET_SDP_VERSION failed, ret=%d\n",
@@ -2908,7 +2908,7 @@ rmclomv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 		}
 		retval = rmclomv_do_cmd(DP_GET_CHASSIS_SERIALNUM,
 		    DP_GET_CHASSIS_SERIALNUM_R, sizeof (rmc_serialnum_r),
-		    NULL, (intptr_t)&rmc_serialnum_r);
+		    (intptr_t)NULL, (intptr_t)&rmc_serialnum_r);
 
 		if (retval != 0) {
 			break;
@@ -2940,7 +2940,7 @@ rmclomv_checkrmc(caddr_t arg)
 	int			err;
 	int			retries;
 	int			state;
-	dp_get_sysinfo_r_t 	sysinfo;
+	dp_get_sysinfo_r_t	sysinfo;
 
 	CALLB_CPR_INIT(&cprinfo, &rmclomv_checkrmc_lock, callb_generic_cpr,
 	    "rmclomv_checkrmc");
@@ -3005,7 +3005,7 @@ rmclomv_checkrmc(caddr_t arg)
 		mutex_exit(&rmclomv_checkrmc_lock);
 
 		err = rmclomv_do_cmd(DP_GET_SYSINFO, DP_GET_SYSINFO_R,
-		    sizeof (sysinfo), NULL, (intptr_t)&sysinfo);
+		    sizeof (sysinfo), (intptr_t)NULL, (intptr_t)&sysinfo);
 		if (err == 0) {
 			mutex_enter(&rmclomv_state_lock);
 			state = rmclomv_rmc_state;
@@ -3393,7 +3393,7 @@ plat_timesync(void *arg)
 	if (arg != NULL) {
 		/* Request the time from the RMC clock. */
 		retval = rmclomv_do_cmd(DP_GET_DATE_TIME, DP_GET_DATE_TIME_R,
-		    DATE_TIME_MSG_SIZE, NULL, (intptr_t)&buffer);
+		    DATE_TIME_MSG_SIZE, (intptr_t)NULL, (intptr_t)&buffer);
 
 		/*
 		 * If we were able to get the time lets set the local clock.
