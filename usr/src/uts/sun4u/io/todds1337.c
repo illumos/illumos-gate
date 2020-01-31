@@ -67,8 +67,8 @@ static uint_t		todds1337_set_watchdog_timer(uint_t);
 static uint_t		todds1337_clear_watchdog_timer(void);
 static void		todds1337_set_power_alarm(timestruc_t);
 static void		todds1337_clear_power_alarm(void);
-static int		todds1337_setup_prom();
-static void		todds1337_rele_prom();
+static int		todds1337_setup_prom(void);
+static void		todds1337_rele_prom(void);
 static int		todds1337_prom_getdate(struct rtc_t *rtc);
 static int		todds1337_prom_setdate(struct rtc_t *rtc);
 
@@ -90,7 +90,7 @@ static ihandle_t todds1337_ihandle = 0;
 #define	I2C_CYCLIC_TIMEOUT	1000000000
 uint_t i2c_cyclic_timeout = I2C_CYCLIC_TIMEOUT;
 static int sync_clock_once = 1;
-static 	struct	rtc_t	 soft_rtc;
+static struct	rtc_t	 soft_rtc;
 
 /*
  * cp_ops structure
@@ -898,7 +898,7 @@ todds1337_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
  * execute the get-time method
  */
 static int
-todds1337_setup_prom()
+todds1337_setup_prom(void)
 {
 	pnode_t todnode;
 	char tod1337_devpath[MAXNAMELEN];
@@ -920,7 +920,7 @@ todds1337_setup_prom()
 	/*
 	 * Now open the node and store it's ihandle
 	 */
-	if ((todds1337_ihandle = prom_open(tod1337_devpath)) == NULL) {
+	if ((todds1337_ihandle = prom_open(tod1337_devpath)) == 0) {
 		cmn_err(CE_WARN, "prom_open failed");
 		return (DDI_FAILURE);
 	}
@@ -932,7 +932,7 @@ todds1337_setup_prom()
  * Closes the prom interface
  */
 static void
-todds1337_rele_prom()
+todds1337_rele_prom(void)
 {
 	(void) prom_close(todds1337_ihandle);
 }
@@ -958,7 +958,7 @@ todds1337_prom_getdate(struct rtc_t *rtc)
 	(void) p1275_cif_handler(&ci);
 	promif_postprom();
 
-	year 		= p1275_cell2int(ci[6]);
+	year		= p1275_cell2int(ci[6]);
 	rtc->rtc_mon	= p1275_cell2int(ci[7]);
 	rtc->rtc_dom	= p1275_cell2int(ci[8]);
 	rtc->rtc_dow	= 0;
