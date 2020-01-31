@@ -360,13 +360,13 @@ rmc_comm_send_req_resp(struct rmc_comm_state *rcs, rmc_comm_msg_t *request,
 	if (response != NULL) {
 		exp_resp->msg_type = response->msg_type;
 		exp_resp->msg_buf = (uint8_t *)response->msg_buf;
-		exp_resp->msg_msglen = (uint16_t)response->msg_bytes;
-		exp_resp->msg_bufsiz = (uint16_t)response->msg_len;
+		exp_resp->msg_msglen = response->msg_bytes;
+		exp_resp->msg_bufsiz = response->msg_len;
 	} else {
 		exp_resp->msg_type = DP_NULL_MSG;
-		exp_resp->msg_buf = (uint8_t)NULL;
-		exp_resp->msg_bufsiz = (uint16_t)0;
-		exp_resp->msg_msglen = (uint16_t)0;
+		exp_resp->msg_buf = NULL;
+		exp_resp->msg_bufsiz = 0;
+		exp_resp->msg_msglen = 0;
 	}
 
 	/*
@@ -374,7 +374,7 @@ rmc_comm_send_req_resp(struct rmc_comm_state *rcs, rmc_comm_msg_t *request,
 	 */
 	req.msg_type = request->msg_type;
 	req.msg_buf = (uint8_t *)request->msg_buf;
-	req.msg_msglen = (uint16_t)request->msg_len;
+	req.msg_msglen = request->msg_len;
 
 	/*
 	 * send the message and wait for the reply or ACKnowledgment
@@ -636,7 +636,7 @@ int
 rmc_comm_reg_intr(uint8_t msg_type, rmc_comm_intrfunc_t intr_handler,
     rmc_comm_msg_t *msgbuf, uint_t *state, kmutex_t *lock)
 {
-	struct rmc_comm_state 	*rcs;
+	struct rmc_comm_state	*rcs;
 	dp_msg_intr_t		*msgintr;
 	int			 err = RCNOERR;
 
