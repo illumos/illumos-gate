@@ -222,10 +222,10 @@ ics951601_close(dev_t dev, int flags, int otyp, cred_t *credp)
 	_NOTE(ARGUNUSED(flags, credp))
 
 	int		instance;
-	ics951601_unit_t 	*icsp;
+	ics951601_unit_t	*icsp;
 
 	/*
-	 * 	Make sure the close is for the right file type
+	 *	Make sure the close is for the right file type
 	 */
 	if (otyp != OTYP_CHR) {
 		return (EINVAL);
@@ -247,8 +247,8 @@ ics951601_close(dev_t dev, int flags, int otyp, cred_t *credp)
 static int
 ics951601_attach(dev_info_t *dip)
 {
-	ics951601_unit_t 	*icsp;
-	int 			instance = ddi_get_instance(dip);
+	ics951601_unit_t	*icsp;
+	int			instance = ddi_get_instance(dip);
 
 	if (ddi_soft_state_zalloc(ics951601_soft_statep, instance) != 0) {
 		cmn_err(CE_WARN, "%s%d failed to zalloc softstate",
@@ -270,7 +270,7 @@ ics951601_attach(dev_info_t *dip)
 
 
 	if (ddi_create_minor_node(dip, icsp->ics951601_name, S_IFCHR,
-	    instance, ICS951601_NODE_TYPE, NULL) == DDI_FAILURE) {
+	    instance, ICS951601_NODE_TYPE, 0) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s ddi_create_minor_node failed",
 		    icsp->ics951601_name);
 		goto ATTACH_ERR;
@@ -333,7 +333,7 @@ static void
 ics951601_detach(dev_info_t *dip)
 {
 	ics951601_unit_t *icsp;
-	int 		instance;
+	int		instance;
 
 	instance = ddi_get_instance(dip);
 	icsp = ddi_get_soft_state(ics951601_soft_statep, instance);
@@ -374,7 +374,7 @@ ics951601_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 static int
 ics951601_suspend(dev_info_t *dip)
 {
-	ics951601_unit_t 	*icsp;
+	ics951601_unit_t	*icsp;
 	int		instance = ddi_get_instance(dip);
 
 	icsp = ddi_get_soft_state(ics951601_soft_statep, instance);
@@ -413,9 +413,9 @@ ics951601_suspend(dev_info_t *dip)
 static int
 ics951601_resume(dev_info_t *dip)
 {
-	int 		instance = ddi_get_instance(dip);
+	int		instance = ddi_get_instance(dip);
 	ics951601_unit_t	*icsp;
-	int 		err = DDI_SUCCESS;
+	int		err = DDI_SUCCESS;
 
 	icsp = (ics951601_unit_t *)
 	    ddi_get_soft_state(ics951601_soft_statep, instance);
@@ -479,7 +479,7 @@ ics951601_s_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 static int
 ics951601_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-	int *rvalp)
+    int *rvalp)
 {
 	_NOTE(ARGUNUSED(credp, rvalp))
 
