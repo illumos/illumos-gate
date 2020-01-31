@@ -217,18 +217,18 @@ lm75_close(dev_t dev, int flags, int otyp, cred_t *credp)
 }
 
 static int
-lm75_get16(intptr_t arg, int reg, struct lm75_unit *unitp, int mode) {
+lm75_get16(intptr_t arg, int reg, struct lm75_unit *unitp, int mode)
+{
 	i2c_transfer_t		*i2c_tran_pointer;
 	int err = DDI_SUCCESS;
 	int16_t			temp16;
 	int8_t			holder;
 
 	(void) i2c_transfer_alloc(unitp->lm75_hdl, &i2c_tran_pointer,
-				1, 2, I2C_SLEEP);
+	    1, 2, I2C_SLEEP);
 	if (i2c_tran_pointer == NULL) {
 		D2CMN_ERR((CE_WARN, "%s: Failed in I2C_GET_TEMPERATURE "
-				"i2c_tran_pointer not allocated\n",
-				unitp->lm75_name));
+		    "i2c_tran_pointer not allocated\n", unitp->lm75_name));
 		return (ENOMEM);
 	}
 
@@ -238,15 +238,14 @@ lm75_get16(intptr_t arg, int reg, struct lm75_unit *unitp, int mode) {
 	err = i2c_transfer(unitp->lm75_hdl, i2c_tran_pointer);
 	if (err) {
 		D2CMN_ERR((CE_WARN, "%s: Failed in I2C_GET_TEMPERATURE "
-				"i2c_transfer routine\n",
-				unitp->lm75_name));
+		    "i2c_transfer routine\n", unitp->lm75_name));
 		i2c_transfer_free(unitp->lm75_hdl, i2c_tran_pointer);
 		return (err);
 	}
 
 	D1CMN_ERR((CE_NOTE, "%s: rbuf[0] =  %x rbuf[1] = %x\n",
-		unitp->lm75_name, i2c_tran_pointer->i2c_rbuf[0],
-		i2c_tran_pointer->i2c_rbuf[0]));
+	    unitp->lm75_name, i2c_tran_pointer->i2c_rbuf[0],
+	    i2c_tran_pointer->i2c_rbuf[0]));
 	temp16 = i2c_tran_pointer->i2c_rbuf[0];
 	temp16 = (temp16 << 1);
 	temp16 = (temp16 | ((i2c_tran_pointer->i2c_rbuf[1] & 0x80) >> 7));
@@ -261,10 +260,9 @@ lm75_get16(intptr_t arg, int reg, struct lm75_unit *unitp, int mode) {
 		temp16 = temp16 / 2;
 	}
 	if (ddi_copyout((caddr_t)&temp16, (caddr_t)arg,
-			sizeof (int16_t), mode) != DDI_SUCCESS) {
+	    sizeof (int16_t), mode) != DDI_SUCCESS) {
 		D2CMN_ERR((CE_WARN, "%s: Failed in I2C_GET_TEMPERATURE "
-				"ddi_copyout routine\n",
-				unitp->lm75_name));
+		    "ddi_copyout routine\n", unitp->lm75_name));
 		err = EFAULT;
 	}
 	i2c_transfer_free(unitp->lm75_hdl, i2c_tran_pointer);
@@ -272,25 +270,24 @@ lm75_get16(intptr_t arg, int reg, struct lm75_unit *unitp, int mode) {
 }
 
 static int
-lm75_set16(intptr_t arg, int reg, struct lm75_unit *unitp, int mode) {
+lm75_set16(intptr_t arg, int reg, struct lm75_unit *unitp, int mode)
+{
 	i2c_transfer_t		*i2c_tran_pointer;
 	int err = DDI_SUCCESS;
 	int16_t			temp16;
 
 	if (ddi_copyin((caddr_t)arg, (caddr_t)&temp16,
-			sizeof (int16_t), mode) != DDI_SUCCESS) {
+	    sizeof (int16_t), mode) != DDI_SUCCESS) {
 		D2CMN_ERR((CE_WARN, "%s: Failed in LM74_SET_HYST "
-				"ddi_copyin routine\n",
-				unitp->lm75_name));
+		    "ddi_copyin routine\n", unitp->lm75_name));
 		return (EFAULT);
 	}
 
 	(void) i2c_transfer_alloc(unitp->lm75_hdl, &i2c_tran_pointer,
-				3, 0, I2C_SLEEP);
+	    3, 0, I2C_SLEEP);
 	if (i2c_tran_pointer == NULL) {
 		D2CMN_ERR((CE_WARN, "%s: Failed in LM75_SET_HYST "
-				"i2c_tran_pointer not allocated\n",
-				unitp->lm75_name));
+		    "i2c_tran_pointer not allocated\n", unitp->lm75_name));
 		return (ENOMEM);
 	}
 
@@ -316,7 +313,7 @@ lm75_set16(intptr_t arg, int reg, struct lm75_unit *unitp, int mode) {
 
 static int
 lm75_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-		int *rvalp)
+    int *rvalp)
 {
 	_NOTE(ARGUNUSED(credp, rvalp))
 
@@ -326,7 +323,7 @@ lm75_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	i2c_transfer_t		*i2c_tran_pointer;
 	uchar_t			passin_byte;
 
-	if (arg == NULL) {
+	if (arg == (intptr_t)NULL) {
 		D2CMN_ERR((CE_WARN, "LM75: ioctl: arg passed in to ioctl "
 		    "= NULL\n"));
 		err = EINVAL;
@@ -484,7 +481,7 @@ lm75_do_attach(dev_info_t *dip)
 	    "%s%d", ddi_node_name(dip), instance);
 
 	if (ddi_create_minor_node(dip, "lm75", S_IFCHR, instance,
-	    "ddi_i2c:temperature_sensor", NULL) == DDI_FAILURE) {
+	    "ddi_i2c:temperature_sensor", 0) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s ddi_create_minor_node failed for "
 		    "%s\n", unitp->lm75_name, "lm75");
 		ddi_soft_state_free(lm75soft_statep, instance);
