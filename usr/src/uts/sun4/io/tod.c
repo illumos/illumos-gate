@@ -192,7 +192,7 @@ tod_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		(void) sprintf(name, "tod%d", inst);
 		if (ddi_create_minor_node(dip, name, S_IFCHR, inst,
-		    DDI_PSEUDO, NULL) == DDI_FAILURE)
+		    DDI_PSEUDO, 0) == DDI_FAILURE)
 			goto attach_failed;
 
 		/*
