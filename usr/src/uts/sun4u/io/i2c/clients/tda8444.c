@@ -225,7 +225,7 @@ tda8444_do_attach(dev_info_t *dip)
 		minor = TDA8444_CHANNEL_TO_MINOR(i) |
 		    TDA8444_DEVINST_TO_MINOR(instance);
 		if (ddi_create_minor_node(dip, name, S_IFCHR, minor,
-		    TDA8444_NODE_TYPE, NULL) == DDI_FAILURE) {
+		    TDA8444_NODE_TYPE, 0) == DDI_FAILURE) {
 			cmn_err(CE_WARN, "%s ddi_create_minor_node failed",
 			    unitp->tda8444_name);
 			ddi_soft_state_free(tda8444_soft_statep, instance);
