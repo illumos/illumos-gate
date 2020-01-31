@@ -172,15 +172,15 @@ static struct bus_ops sbbc_bus_ops = {
 	0,
 	0,
 	0,
-	NULL, 			/* (*bus_map_fault)() */
+	NULL,			/* (*bus_map_fault)() */
 	ddi_no_dma_map,
 	ddi_no_dma_allochdl,
-	ddi_no_dma_freehdl, 	/* (*bus_dma_freehdl)() */
-	ddi_no_dma_bindhdl, 	/* (*bus_dma_bindhdl)() */
-	ddi_no_dma_unbindhdl, 	/* (*bus_dma_unbindhdl)() */
-	ddi_no_dma_flush, 	/* (*bus_dma_flush)() */
-	ddi_no_dma_win, 	/* (*bus_dma_win)() */
-	ddi_no_dma_mctl, 	/* (*bus_dma_ctl)() */
+	ddi_no_dma_freehdl,	/* (*bus_dma_freehdl)() */
+	ddi_no_dma_bindhdl,	/* (*bus_dma_bindhdl)() */
+	ddi_no_dma_unbindhdl,	/* (*bus_dma_unbindhdl)() */
+	ddi_no_dma_flush,	/* (*bus_dma_flush)() */
+	ddi_no_dma_win,		/* (*bus_dma_win)() */
+	ddi_no_dma_mctl,	/* (*bus_dma_ctl)() */
 	sbbc_ctlops,
 	ddi_bus_prop_op,
 	0,			/* (*bus_get_eventcookie)();	*/
@@ -425,7 +425,7 @@ sbbc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	(void) sprintf(name, "sbbc%d", instance);
 
 	if (ddi_create_minor_node(dip, name, S_IFCHR, instance, NULL,
-	    NULL) == DDI_FAILURE) {
+	    0) == DDI_FAILURE) {
 		ddi_remove_minor_node(dip, NULL);
 		goto failed;
 	}
@@ -510,7 +510,7 @@ sbbc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
  */
 static int
 sbbc_busmap(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
-	    off_t off, off_t len, caddr_t *addrp)
+    off_t off, off_t len, caddr_t *addrp)
 {
 	struct sbbcsoft *sbbcsoftp;
 	sbbc_child_regspec_t *child_rp, *child_regs;
@@ -690,7 +690,7 @@ sbbc_add_intr_impl(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	childintr->status = SBBC_INTR_STATE_DISABLE;
 
 	for (i = 0; i < MAX_SBBC_DEVICES; i++) {
-		if (sbbcsoftp->child_intr[i] == 0) {
+		if (sbbcsoftp->child_intr[i] == NULL) {
 			sbbcsoftp->child_intr[i] = childintr;
 			break;
 		}
@@ -705,7 +705,8 @@ sbbc_add_intr_impl(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		cmn_err(CE_WARN, "sbbc%d: failed to add intr for %s",
 		    instance, ddi_get_name(rdip));
 		kmem_free(childintr, sizeof (struct sbbc_child_intr));
-		sbbcsoftp->child_intr[i] = NULL;
+		if (i < MAX_SBBC_DEVICES)
+			sbbcsoftp->child_intr[i] = NULL;
 	}
 
 	/*
@@ -817,7 +818,7 @@ sbbc_update_intr_state(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
  */
 static int
 sbbc_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t op,
-	    void *arg, void *result)
+    void *arg, void *result)
 {
 	sbbc_child_regspec_t *child_rp;
 	int i, n;
@@ -1121,7 +1122,7 @@ sbbc_close(dev_t dev, int flag, int otype, cred_t *credp)
 /*ARGSUSED2*/
 static int
 sbbc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-		int *rvalp)
+    int *rvalp)
 {
 	struct sbbcsoft *sbbcsoftp;
 
@@ -1144,7 +1145,7 @@ sbbc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			return (EINVAL);
 		}
 
-		if (arg == NULL) {
+		if (arg == (intptr_t)NULL) {
 			return (ENXIO);
 		}
 
@@ -1184,7 +1185,7 @@ sbbc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			return (EINVAL);
 		}
 
-		if (arg == NULL) {
+		if (arg == (intptr_t)NULL) {
 			return (ENXIO);
 		}
 
@@ -1372,7 +1373,8 @@ sbbc_intr_wrapper(caddr_t arg)
  * used to crash the system.
  */
 static int
-sbbc_offset_valid(uint32_t offset) {
+sbbc_offset_valid(uint32_t offset)
+{
 	/*
 	 * Check for proper alignment first.
 	 */
@@ -1415,7 +1417,7 @@ sbbc_offset_valid(uint32_t offset) {
 #ifdef DEBUG
 void
 sbbc_dbg(uint32_t flag, dev_info_t *dip, char *fmt,
-	uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5)
+    uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5)
 {
 	char *s = NULL;
 
