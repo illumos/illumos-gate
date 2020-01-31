@@ -196,7 +196,7 @@ _info(struct modinfo *modinfop)
 /*ARGSUSED*/
 static int
 xcalwd_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd,
-	void *arg, void **resultp)
+    void *arg, void **resultp)
 {
 	int	retval;
 	dev_t	dev = (dev_t)arg;
@@ -255,7 +255,7 @@ xcalwd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 
 		if (ddi_create_minor_node(dip, MINOR_DEVICE_NAME,
-		    S_IFCHR, instance, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+		    S_IFCHR, instance, DDI_PSEUDO, 0) == DDI_FAILURE) {
 			cmn_err(CE_WARN, "create minor node failed\n");
 			return (DDI_FAILURE);
 		}
@@ -396,7 +396,7 @@ xcalwd_close(dev_t dev, int flag, int otyp, cred_t *credp)
 /*ARGSUSED*/
 static int
 xcalwd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
-			cred_t *cred_p, int *rvalp)
+    cred_t *cred_p, int *rvalp)
 {
 	int		instance;
 	xcalwd_state_t	*tsp;
