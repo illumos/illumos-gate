@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sunddi.h>
@@ -51,7 +49,7 @@ int (*p2get_mem_unum)(int, uint64_t, char *, int, int *);
 void
 startup_platform(void)
 {
-	mutex_init(&lneck_pcf8584_mutex, NULL, NULL, NULL);
+	mutex_init(&lneck_pcf8584_mutex, NULL, MUTEX_ADAPTIVE, NULL);
 }
 
 int
@@ -149,7 +147,7 @@ plat_get_mem_unum(int synd_code, uint64_t flt_addr, int flt_bus_id,
 {
 	if (flt_in_memory && (p2get_mem_unum != NULL))
 		return (p2get_mem_unum(synd_code, P2ALIGN(flt_addr, 8),
-			buf, buflen, lenp));
+		    buf, buflen, lenp));
 	else
 		return (ENOTSUP);
 }

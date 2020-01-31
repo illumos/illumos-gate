@@ -229,18 +229,18 @@ pcf8574_close(dev_t dev, int flags, int otyp, cred_t *credp)
 }
 
 static int
-pcf8574_get(struct pcf8574_unit *unitp, uchar_t *byte) {
+pcf8574_get(struct pcf8574_unit *unitp, uchar_t *byte)
+{
 	i2c_transfer_t		*i2c_tran_pointer;
 	int			err = I2C_SUCCESS;
 
 	D1CMN_ERR((CE_WARN, "Entered the pcf8574_get routine\n"));
 
 	(void) i2c_transfer_alloc(unitp->pcf8574_hdl, &i2c_tran_pointer,
-					0, 1, I2C_SLEEP);
+	    0, 1, I2C_SLEEP);
 	if (i2c_tran_pointer == NULL) {
 		D2CMN_ERR((CE_WARN, "%s: Failed in pcf8574_get "
-				"i2c_tran_pointer not allocated\n",
-				unitp->pcf8574_name));
+		    "i2c_tran_pointer not allocated\n", unitp->pcf8574_name));
 		return (ENOMEM);
 	}
 
@@ -249,13 +249,13 @@ pcf8574_get(struct pcf8574_unit *unitp, uchar_t *byte) {
 	err = i2c_transfer(unitp->pcf8574_hdl, i2c_tran_pointer);
 	if (err) {
 		D2CMN_ERR((CE_WARN, "%s: Failed in the i2c_transfer routine\n",
-				unitp->pcf8574_name));
+		    unitp->pcf8574_name));
 		i2c_transfer_free(unitp->pcf8574_hdl, i2c_tran_pointer);
 		return (err);
 	}
 
 	D1CMN_ERR((CE_WARN, "Back from a transfer value is %x\n",
-		i2c_tran_pointer->i2c_rbuf[0]));
+	    i2c_tran_pointer->i2c_rbuf[0]));
 	*byte = i2c_tran_pointer->i2c_rbuf[0];
 
 	i2c_transfer_free(unitp->pcf8574_hdl, i2c_tran_pointer);
@@ -263,16 +263,17 @@ pcf8574_get(struct pcf8574_unit *unitp, uchar_t *byte) {
 }
 
 static int
-pcf8574_set(struct pcf8574_unit *unitp, uchar_t byte) {
+pcf8574_set(struct pcf8574_unit *unitp, uchar_t byte)
+{
 	i2c_transfer_t		*i2c_tran_pointer;
 	int			err = I2C_SUCCESS;
 
 	(void) i2c_transfer_alloc(unitp->pcf8574_hdl, &i2c_tran_pointer,
-				1, 0, I2C_SLEEP);
+	    1, 0, I2C_SLEEP);
 	if (i2c_tran_pointer == NULL) {
 		D2CMN_ERR((CE_WARN, "%s: Failed in pcf8574_set "
-				"i2c_tran_pointer not allocated\n",
-				unitp->pcf8574_name));
+		    "i2c_tran_pointer not allocated\n",
+		    unitp->pcf8574_name));
 		return (ENOMEM);
 	}
 
@@ -280,13 +281,12 @@ pcf8574_set(struct pcf8574_unit *unitp, uchar_t byte) {
 	i2c_tran_pointer->i2c_wbuf[0] = byte;
 
 	D1CMN_ERR((CE_NOTE, "%s: contains %x\n", unitp->pcf8574_name,
-			i2c_tran_pointer->i2c_wbuf[0]));
+	    i2c_tran_pointer->i2c_wbuf[0]));
 
 	err = i2c_transfer(unitp->pcf8574_hdl, i2c_tran_pointer);
 	if (err) {
 		D2CMN_ERR((CE_WARN, "%s: Failed in the pcf8574_set"
-				" i2c_transfer routine\n",
-				unitp->pcf8574_name));
+		    " i2c_transfer routine\n", unitp->pcf8574_name));
 		i2c_transfer_free(unitp->pcf8574_hdl, i2c_tran_pointer);
 		return (err);
 	}
@@ -296,7 +296,7 @@ pcf8574_set(struct pcf8574_unit *unitp, uchar_t byte) {
 
 static int
 pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
-		cred_t *credp, int *rvalp)
+    cred_t *credp, int *rvalp)
 {
 	_NOTE(ARGUNUSED(credp, rvalp))
 	struct pcf8574_unit	*unitp;
@@ -306,7 +306,7 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	i2c_port_t		ioctl_port;
 	uchar_t			byte;
 
-	if (arg == NULL) {
+	if (arg == (intptr_t)NULL) {
 		D2CMN_ERR((CE_WARN, "PCF8574: ioctl: arg passed in to ioctl "
 		    "= NULL\n"));
 		err = EINVAL;
@@ -523,7 +523,7 @@ pcf8574_do_attach(dev_info_t *dip)
 
 
 	if (ddi_create_minor_node(dip, "pcf8574", S_IFCHR, instance,
-	    "ddi_i2c:ioexp", NULL) == DDI_FAILURE) {
+	    "ddi_i2c:ioexp", 0) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s ddi_create_minor_node failed for "
 		    "%s\n", unitp->pcf8574_name, "pcf8574");
 		ddi_soft_state_free(pcf8574soft_statep, instance);
