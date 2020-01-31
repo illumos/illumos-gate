@@ -191,10 +191,10 @@ max1617_do_attach(dev_info_t *dip)
 	    MAX1617_FCN_TO_MINOR(MAX1617_CPU_TEMP);
 
 	if (ddi_create_minor_node(dip, minor_name, S_IFCHR,
-	    minor_number, MAX1617_NODE_TYPE, NULL) == DDI_FAILURE) {
+	    minor_number, MAX1617_NODE_TYPE, 0) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s ddi_create_minor_node failed for minor "
 		    " name '%s'", unitp->max1617_name, minor_name);
-			ddi_soft_state_free(max1617_soft_statep, instance);
+		ddi_soft_state_free(max1617_soft_statep, instance);
 
 		return (DDI_FAILURE);
 	}
@@ -204,7 +204,7 @@ max1617_do_attach(dev_info_t *dip)
 	    MAX1617_FCN_TO_MINOR(MAX1617_AMB_TEMP);
 
 	if (ddi_create_minor_node(dip, minor_name, S_IFCHR,
-	    minor_number, MAX1617_NODE_TYPE, NULL) == DDI_FAILURE) {
+	    minor_number, MAX1617_NODE_TYPE, 0) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s ddi_create_minor_node failed for %s",
 		    unitp->max1617_name, minor_name);
 		ddi_remove_minor_node(dip, NULL);
@@ -525,10 +525,8 @@ max1617_close(dev_t dev, int flags, int otyp, cred_t *credp)
 }
 
 int
-set_temp_limit(struct max1617_unit *unitp,
-		uchar_t device_reg,
-		caddr_t arg,
-		int mode)
+set_temp_limit(struct max1617_unit *unitp, uchar_t device_reg, caddr_t arg,
+    int mode)
 {
 	int err = 0;
 	i2c_transfer_t *i2ctp;
@@ -558,10 +556,7 @@ set_temp_limit(struct max1617_unit *unitp,
 }
 
 int
-get_temp_limit(struct max1617_unit *unitp,
-		uchar_t reg,
-		caddr_t arg,
-		int mode)
+get_temp_limit(struct max1617_unit *unitp, uchar_t reg, caddr_t arg, int mode)
 {
 	int err = 0;
 	i2c_transfer_t *i2ctp;
@@ -591,7 +586,7 @@ get_temp_limit(struct max1617_unit *unitp,
 
 static int
 max1617_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
-		cred_t *credp, int *rvalp)
+    cred_t *credp, int *rvalp)
 {
 	_NOTE(ARGUNUSED(credp, rvalp))
 	struct max1617_unit *unitp;

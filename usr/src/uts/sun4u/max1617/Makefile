@@ -35,18 +35,12 @@ UTSBASE	= ../..
 #
 MODULE		= max1617
 OBJECTS		= $(MAX1617_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(MAX1617_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 
 #
 #	Include common rules.
 #
 include $(UTSBASE)/sun4u/Makefile.sun4u
-
-# 
-# lint pass one enforcement 
-# 
-CFLAGS		+= $(CCVERBOSE)
 
 CERRWARN	+= -_gcc=-Wno-unused-label
 
@@ -56,7 +50,6 @@ LDFLAGS += -dy -N misc/i2c_svc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 .KEEP_STATE:
@@ -68,12 +61,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
