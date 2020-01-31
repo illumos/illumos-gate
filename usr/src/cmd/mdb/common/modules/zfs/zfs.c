@@ -1006,13 +1006,17 @@ abuf_find_cb(uintptr_t addr, const void *unknown, void *arg)
 	return (WALK_NEXT);
 }
 
+typedef struct mdb_arc_state {
+	uintptr_t	arcs_list[ARC_BUFC_NUMTYPES];
+} mdb_arc_state_t;
+
 /* ARGSUSED */
 static int
 abuf_find(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	abuf_find_data_t data;
 	GElf_Sym sym;
-	int i;
+	int i, j;
 	const char *syms[] = {
 		"ARC_mru",
 		"ARC_mru_ghost",
@@ -1042,14 +1046,30 @@ abuf_find(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	for (i = 0; i < sizeof (syms) / sizeof (syms[0]); i++) {
+		mdb_arc_state_t mas;
+
 		if (mdb_lookup_by_obj(ZFS_OBJ_NAME, syms[i], &sym)) {
 			mdb_warn("can't find symbol %s", syms[i]);
 			return (DCMD_ERR);
 		}
 
-		if (mdb_pwalk("list", abuf_find_cb, &data, sym.st_value) != 0) {
-			mdb_warn("can't walk %s", syms[i]);
+		if (mdb_ctf_vread(&mas, "arc_state_t", "mdb_arc_state_t",
+		    sym.st_value, 0) != 0) {
+			mdb_warn("can't read arcs_list of %s", syms[i]);
 			return (DCMD_ERR);
+		}
+
+		for (j = 0; j < ARC_BUFC_NUMTYPES; j++) {
+			uintptr_t addr = mas.arcs_list[j];
+
+			if (addr == 0)
+				continue;
+
+			if (mdb_pwalk("multilist", abuf_find_cb, &data,
+			    addr) != 0) {
+				mdb_warn("can't walk %s", syms[i]);
+				return (DCMD_ERR);
+			}
 		}
 	}
 
