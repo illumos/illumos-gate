@@ -37,7 +37,6 @@ COM1_DIR = $(COMMONBASE)/bignum
 #
 MODULE		= bignum
 OBJECTS		= $(BIGNUM_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(BIGNUM_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 
 #
@@ -49,7 +48,6 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -57,12 +55,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 LDFLAGS += -dy -Nmisc/kcf
 
-#
-# lint pass one enforcement
-#
-CFLAGS		+= $(CCVERBOSE) -I$(CRYPTODIR) -I$(COM1_DIR)
+CFLAGS		+= -I$(CRYPTODIR) -I$(COM1_DIR)
 CFLAGS		+= -DUMUL64
-LINTFLAGS	+= -I$(CRYPTODIR) -I$(COM1_DIR)
 CERRWARN	+= -_gcc=-Wno-unused-function
 
 #
@@ -77,12 +71,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
