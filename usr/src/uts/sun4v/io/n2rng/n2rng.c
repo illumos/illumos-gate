@@ -944,7 +944,7 @@ n2rng_check_ctl_access(n2rng_t *n2rng)
 		 * Attempt to read control registers with invalid ID and data
 		 * just to see if we get an access error
 		 */
-		rv = hv_rng_ctl_read_v2(NULL, N2RNG_INVALID_ID,
+		rv = hv_rng_ctl_read_v2(0, N2RNG_INVALID_ID,
 		    &unused_64, &unused_64, &unused_64, &unused_64);
 	} else {
 		rv = hv_rng_get_diag_control();

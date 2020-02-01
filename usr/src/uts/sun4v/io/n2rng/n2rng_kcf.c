@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/stream.h>
@@ -72,7 +70,7 @@ static crypto_random_number_ops_t n2rng_rng_ops = {
 static crypto_provider_management_ops_t n2rng_extinfo_op = {
 	ext_info,	/* ext_info */
 	NULL,		/* init_token */
-	NULL, 		/* init_pin */
+	NULL,		/* init_pin */
 	NULL,		/* set_pin */
 };
 
@@ -207,7 +205,7 @@ n2rng_register_provider(n2rng_t *n2rng)
 		} else {
 			cmn_err(CE_WARN,
 			    "crypto_register_provider() failed (%d)", ret);
-			n2rng->n_prov = NULL;
+			n2rng->n_prov = 0;
 			return (DDI_FAILURE);
 		}
 	}
@@ -236,7 +234,7 @@ n2rng_unregister_provider(n2rng_t *n2rng)
 			return (DDI_FAILURE);
 		}
 	}
-	n2rng->n_prov = NULL;
+	n2rng->n_prov = 0;
 	n2rng_clrregistered(n2rng);
 	return (DDI_SUCCESS);
 }
@@ -408,8 +406,8 @@ n2rng_provider_status(crypto_provider_handle_t provider, uint_t *status)
 /*ARGSUSED*/
 static int
 n2rng_random_number(crypto_provider_handle_t provider,
-	crypto_session_id_t sess, unsigned char *buf, size_t buflen,
-	crypto_req_handle_t cfreq)
+    crypto_session_id_t sess, unsigned char *buf, size_t buflen,
+    crypto_req_handle_t cfreq)
 {
 	n2rng_t		*n2rng = (n2rng_t *)provider;
 	int		rv;
