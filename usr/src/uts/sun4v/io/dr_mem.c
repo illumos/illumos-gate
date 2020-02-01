@@ -611,7 +611,7 @@ dr_mem_res_array_init(dr_mem_hdr_t *req, drctl_rsrc_t *rsrc, int nrsrc)
 		 * on the memory allocated for the message buffer
 		 * itself.
 		 */
-		if (rsrc[idx].offset != NULL) {
+		if (rsrc[idx].offset != 0) {
 			err_str = (char *)rsrc + rsrc[idx].offset;
 			err_len = strlen(err_str) + 1;
 
@@ -768,7 +768,7 @@ dr_mem_list_query(dr_mem_hdr_t *req, dr_mem_hdr_t **resp, int *resp_len)
 	/* allocate a response message, should be freed by caller */
 	nml = 0;
 	rlen = sizeof (dr_mem_hdr_t);
-	if (req_mblks->addr == NULL && req_mblks->size == 0) {
+	if (req_mblks->addr == 0 && req_mblks->size == 0) {
 		/*
 		 * Request is for domain's full view of it's memory.
 		 * place a copy in phys_copy then release the memlist lock.
@@ -926,8 +926,8 @@ dr_mem_unconfigure(dr_mem_blk_t *mbp, int *status)
 	if (!MBLK_IS_VALID(mbp)) {
 		DR_DBG_MEM("invalid mblk 0x%lx.0x%lx\n",
 		    mbp->addr, mbp->size);
-			*status = DR_MEM_STAT_CONFIGURED;
-			rv = DR_MEM_RES_EINVAL;
+		*status = DR_MEM_STAT_CONFIGURED;
+		rv = DR_MEM_RES_EINVAL;
 	} else if (rv = mem_del(btop(mbp->addr), btop(mbp->size))) {
 		*status = DR_MEM_STAT_CONFIGURED;
 	} else {
