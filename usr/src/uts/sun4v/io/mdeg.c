@@ -67,7 +67,7 @@ typedef struct mdeg_clnt {
  *	held when modifying any client information.
  */
 static struct mdeg {
-	taskq_t 	*taskq;		/* for internal processing */
+	taskq_t		*taskq;		/* for internal processing */
 	boolean_t	enabled;	/* enable/disable taskq processing */
 	kmutex_t	lock;		/* synchronize MD updates */
 	md_t		*md_prev;	/* previous MD */
@@ -94,8 +94,8 @@ static void mdeg_dump_table(void);
 #else /* DEBUG */
 
 #define	MDEG_DBG		_NOTE(CONSTCOND) if (0) printf
-#define	MDEG_DUMP_CLNT
-#define	MDEG_DUMP_TABLE()
+#define	MDEG_DUMP_CLNT(...)
+#define	MDEG_DUMP_TABLE(...)
 
 #endif /* DEBUG */
 
@@ -334,7 +334,7 @@ mdeg_notify_client_reg(mdeg_clnt_t *clnt)
 	 */
 	if (clnt->pspec == NULL) {
 		/* call the client callback */
-		(*clnt->cb)(clnt->cb_arg, NULL);
+		(void) (*clnt->cb)(clnt->cb_arg, NULL);
 		goto done;
 	}
 
@@ -387,7 +387,7 @@ mdeg_notify_client_reg(mdeg_clnt_t *clnt)
 	mdeg_res->added.nelem = nnodes;
 
 	/* call the client callback */
-	(*clnt->cb)(clnt->cb_arg, mdeg_res);
+	(void) (*clnt->cb)(clnt->cb_arg, mdeg_res);
 
 done:
 	mutex_exit(&mdeg.lock);
@@ -602,7 +602,7 @@ mdeg_notify_client(void *arg)
 	 */
 	if (clnt->pspec == NULL) {
 		/* call the client callback */
-		(*clnt->cb)(clnt->cb_arg, NULL);
+		(void) (*clnt->cb)(clnt->cb_arg, NULL);
 
 		MDEG_DBG("MDEG client callback done\n");
 		goto cleanup;
@@ -634,7 +634,7 @@ mdeg_notify_client(void *arg)
 	mdeg_get_diff_results(mdd, &mdeg_res);
 
 	/* call the client callback */
-	(*clnt->cb)(clnt->cb_arg, &mdeg_res);
+	(void) (*clnt->cb)(clnt->cb_arg, &mdeg_res);
 
 	MDEG_DBG("MDEG client callback done\n");
 
@@ -658,13 +658,13 @@ mdeg_find_start_node(md_t *md, mdeg_node_spec_t *nspec)
 	nname = md_find_name(md, nspec->namep);
 	aname = md_find_name(md, "fwd");
 
-	nnodes = md_scan_dag(md, NULL, nname, aname, NULL);
+	nnodes = md_scan_dag(md, 0, nname, aname, NULL);
 	if (nnodes == 0)
 		return (MDE_INVAL_ELEM_COOKIE);
 
 	nodesp = kmem_alloc(sizeof (mde_cookie_t) * nnodes, KM_SLEEP);
 
-	(void) md_scan_dag(md, NULL, nname, aname, nodesp);
+	(void) md_scan_dag(md, 0, nname, aname, nodesp);
 
 	for (idx = 0; idx < nnodes; idx++) {
 
