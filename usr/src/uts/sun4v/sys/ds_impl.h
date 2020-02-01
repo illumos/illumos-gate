@@ -196,7 +196,7 @@ typedef struct ds_port {
 	uint32_t	ver_idx;	/* index of version during handshake */
 	ds_ldc_t	ldc;		/* LDC for this port */
 	ds_domain_hdl_t	domain_hdl;	/* LDOMs domain hdl assoc. with port */
-	char 		*domain_name;	/* LDOMs domain name assoc. with port */
+	char		*domain_name;	/* LDOMs domain name assoc. with port */
 } ds_port_t;
 
 #define	IS_DS_PORT(port)	1	/* VBSC code compatability */
@@ -404,7 +404,7 @@ typedef struct ds_log_entry {
 #define	DS_LOG_POOL_END		(ds_log_entry_pool + DS_LOG_NPOOL)
 
 #define	DS_IS_POOL_ENTRY(ep)	(((ep) >= ds_log_entry_pool) && \
-				((ep) <= &(ds_log_entry_pool[DS_LOG_NPOOL])))
+				((ep) < &(ds_log_entry_pool[DS_LOG_NPOOL])))
 
 /* VBSC code compatability related defines */
 
@@ -554,8 +554,8 @@ void ds_dump_msg(void *buf, size_t len);
 #define	DS_DUMP_MSG(flags, buf, len)
 #define	DS_DUMP_LDC_MSG(buf, len)
 
-#define	DS_BADHDL1			NULL
-#define	DS_BADHDL2			NULL
+#define	DS_BADHDL1			(ds_svc_hdl_t)0
+#define	DS_BADHDL2			(ds_svc_hdl_t)0
 
 #endif /* DEBUG */
 
