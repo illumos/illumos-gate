@@ -31,8 +31,6 @@
  * Definitions which deal with things other than registers.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -65,8 +63,8 @@ extern int n2piupc_debug;
 #define	N2PIUPC_DBG1 if (n2piupc_debug >= 1) printf
 #define	N2PIUPC_DBG2 if (n2piupc_debug >= 2) printf
 #else
-#define	N2PIUPC_DBG1 0 &&
-#define	N2PIUPC_DBG2 0 &&
+#define	N2PIUPC_DBG1(...)
+#define	N2PIUPC_DBG2(...)
 #endif	/* DEBUG */
 
 

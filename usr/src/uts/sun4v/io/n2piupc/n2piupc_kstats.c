@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/kstat.h>
 #include "n2piupc_acc.h"
@@ -68,7 +66,7 @@ n2piupc_kstat_init()
 
 		/* Create basic pic event-type pair. */
 		grp_p->name_kstats_pp = kmem_zalloc((grp_p->num_counters *
-			sizeof (kstat_t)), KM_SLEEP);
+		    sizeof (kstat_t)), KM_SLEEP);
 		if (n2piupc_create_name_kstat(grp_p) != DDI_SUCCESS) {
 			n2piupc_kstat_fini();
 			N2PIUPC_DBG1("n2piupc: init: failure exit\n");
@@ -183,7 +181,7 @@ n2piupc_create_picN_kstat(char *mod_name, int pic, uint64_t ev_offset,
 	(void) snprintf(pic_name, PIC_STR_LEN, "pic%1d", pic);
 
 	if ((picN_ksp = kstat_create(mod_name, 0, pic_name,
-	    "bus", KSTAT_TYPE_NAMED, num_ev, NULL)) == NULL) {
+	    "bus", KSTAT_TYPE_NAMED, num_ev, 0)) == NULL) {
 		cmn_err(CE_WARN, "%s %s : kstat create failed",
 		    mod_name, pic_name);
 		return (NULL);
