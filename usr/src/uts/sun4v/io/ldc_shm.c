@@ -191,10 +191,10 @@ i_ldc_init_mapin(ldc_soft_state_t *ldcssp, uint64_t major, uint64_t minor)
 int
 ldc_mem_alloc_handle(ldc_handle_t handle, ldc_mem_handle_t *mhandle)
 {
-	ldc_chan_t 	*ldcp;
+	ldc_chan_t	*ldcp;
 	ldc_mhdl_t	*mhdl;
 
-	if (handle == NULL) {
+	if (handle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_alloc_handle: invalid channel handle\n");
 		return (EINVAL);
@@ -250,10 +250,10 @@ ldc_mem_alloc_handle(ldc_handle_t handle, ldc_mem_handle_t *mhandle)
 int
 ldc_mem_free_handle(ldc_mem_handle_t mhandle)
 {
-	ldc_mhdl_t 	*mhdl, *phdl;
-	ldc_chan_t 	*ldcp;
+	ldc_mhdl_t	*mhdl, *phdl;
+	ldc_chan_t	*ldcp;
 
-	if (mhandle == NULL) {
+	if (mhandle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_free_handle: invalid memory handle\n");
 		return (EINVAL);
@@ -346,7 +346,7 @@ i_ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
     uint8_t mtype, uint8_t perm, ldc_mem_cookie_t *cookie, uint32_t *ccount)
 {
 	ldc_mhdl_t	*mhdl;
-	ldc_chan_t 	*ldcp;
+	ldc_chan_t	*ldcp;
 	ldc_mtbl_t	*mtbl;
 	ldc_memseg_t	*memseg;
 	ldc_mte_t	tmp_mte;
@@ -357,9 +357,9 @@ i_ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 	uint64_t	pg_shift, pg_size, pg_size_code, pg_mask;
 	pgcnt_t		npages;
 	caddr_t		v_align, addr;
-	int 		i, rv;
+	int		i, rv;
 
-	if (mhandle == NULL) {
+	if (mhandle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_bind_handle: invalid memory handle\n");
 		return (EINVAL);
@@ -400,7 +400,7 @@ i_ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 		mtbl = kmem_zalloc(sizeof (ldc_mtbl_t), KM_SLEEP);
 		mtbl->num_entries = mtbl->num_avail = ldc_maptable_entries;
 		mtbl->size = ldc_maptable_entries * sizeof (ldc_mte_slot_t);
-		mtbl->next_entry = NULL;
+		mtbl->next_entry = 0;
 		mtbl->contigmem = B_TRUE;
 
 		/* Allocate the table itself */
@@ -671,10 +671,10 @@ int
 ldc_mem_nextcookie(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie)
 {
 	ldc_mhdl_t	*mhdl;
-	ldc_chan_t 	*ldcp;
+	ldc_chan_t	*ldcp;
 	ldc_memseg_t	*memseg;
 
-	if (mhandle == NULL) {
+	if (mhandle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_nextcookie: invalid memory handle\n");
 		return (EINVAL);
@@ -727,14 +727,14 @@ int
 ldc_mem_unbind_handle(ldc_mem_handle_t mhandle)
 {
 	ldc_mhdl_t	*mhdl;
-	ldc_chan_t 	*ldcp;
+	ldc_chan_t	*ldcp;
 	ldc_mtbl_t	*mtbl;
 	ldc_memseg_t	*memseg;
 	uint64_t	cookie_addr;
 	uint64_t	pg_shift, pg_size_code;
 	int		i, rv, retries;
 
-	if (mhandle == NULL) {
+	if (mhandle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_unbind_handle: invalid memory handle\n");
 		return (EINVAL);
@@ -827,7 +827,7 @@ ldc_mem_info(ldc_mem_handle_t mhandle, ldc_mem_info_t *minfo)
 {
 	ldc_mhdl_t	*mhdl;
 
-	if (mhandle == NULL) {
+	if (mhandle == 0) {
 		DWARN(DBG_ALL_LDCS, "ldc_mem_info: invalid memory handle\n");
 		return (EINVAL);
 	}
@@ -862,20 +862,20 @@ int
 ldc_mem_copy(ldc_handle_t handle, caddr_t vaddr, uint64_t off, size_t *size,
     ldc_mem_cookie_t *cookies, uint32_t ccount, uint8_t direction)
 {
-	ldc_chan_t 	*ldcp;
+	ldc_chan_t	*ldcp;
 	uint64_t	local_voff, local_valign;
 	uint64_t	cookie_addr, cookie_size;
 	uint64_t	pg_shift, pg_size, pg_size_code;
-	uint64_t 	export_caddr, export_poff, export_psize, export_size;
+	uint64_t	export_caddr, export_poff, export_psize, export_size;
 	uint64_t	local_ra, local_poff, local_psize;
 	uint64_t	copy_size, copied_len = 0, total_bal = 0, idx = 0;
 	pgcnt_t		npages;
 	size_t		len = *size;
-	int 		i, rv = 0;
+	int		i, rv = 0;
 
 	uint64_t	chid;
 
-	if (handle == NULL) {
+	if (handle == 0) {
 		DWARN(DBG_ALL_LDCS, "ldc_mem_copy: invalid channel handle\n");
 		return (EINVAL);
 	}
@@ -984,7 +984,7 @@ ldc_mem_copy(ldc_handle_t handle, caddr_t vaddr, uint64_t off, size_t *size,
 		    copy_size, &copied_len);
 
 		if (rv != 0) {
-			int 		error = EIO;
+			int		error = EIO;
 			uint64_t	rx_hd, rx_tl;
 
 			DWARN(chid,
@@ -1088,17 +1088,17 @@ int
 ldc_mem_rdwr_cookie(ldc_handle_t handle, caddr_t vaddr, size_t *size,
     caddr_t paddr, uint8_t direction)
 {
-	ldc_chan_t 	*ldcp;
+	ldc_chan_t	*ldcp;
 	uint64_t	local_voff, local_valign;
 	uint64_t	pg_shift, pg_size, pg_size_code;
-	uint64_t 	target_pa, target_poff, target_psize, target_size;
+	uint64_t	target_pa, target_poff, target_psize, target_size;
 	uint64_t	local_ra, local_poff, local_psize;
 	uint64_t	copy_size, copied_len = 0;
 	pgcnt_t		npages;
 	size_t		len = *size;
-	int 		rv = 0;
+	int		rv = 0;
 
-	if (handle == NULL) {
+	if (handle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_rdwr_cookie: invalid channel handle\n");
 		return (EINVAL);
@@ -1259,7 +1259,7 @@ i_ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie,
 {
 
 	int		i, j, idx, rv, retries;
-	ldc_chan_t 	*ldcp;
+	ldc_chan_t	*ldcp;
 	ldc_mhdl_t	*mhdl;
 	ldc_memseg_t	*memseg;
 	caddr_t		tmpaddr;
@@ -1269,7 +1269,7 @@ i_ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie,
 	uint64_t	cookie_addr, cookie_off, cookie_size;
 	tte_t		ldc_tte;
 
-	if (mhandle == NULL) {
+	if (mhandle == 0) {
 		DWARN(DBG_ALL_LDCS, "ldc_mem_map: invalid memory handle\n");
 		return (EINVAL);
 	}
@@ -1519,7 +1519,7 @@ ldc_mem_unmap(ldc_mem_handle_t mhandle)
 {
 	int		i, rv;
 	ldc_mhdl_t	*mhdl = (ldc_mhdl_t *)mhandle;
-	ldc_chan_t 	*ldcp;
+	ldc_chan_t	*ldcp;
 	ldc_memseg_t	*memseg;
 
 	if (mhdl == 0 || mhdl->status != LDC_MAPPED) {
@@ -1586,14 +1586,14 @@ static int
 i_ldc_mem_acquire_release(ldc_mem_handle_t mhandle, uint8_t direction,
     uint64_t offset, size_t size)
 {
-	int 		err;
+	int		err;
 	ldc_mhdl_t	*mhdl;
 	ldc_chan_t	*ldcp;
 	ldc_memseg_t	*memseg;
 	caddr_t		local_vaddr;
 	size_t		copy_size;
 
-	if (mhandle == NULL) {
+	if (mhandle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "i_ldc_mem_acquire_release: invalid memory handle\n");
 		return (EINVAL);
@@ -1691,7 +1691,7 @@ ldc_mem_dring_create(uint32_t len, uint32_t dsize, ldc_dring_handle_t *dhandle)
 	D1(DBG_ALL_LDCS, "ldc_mem_dring_create: len=0x%x, size=0x%x\n",
 	    len, dsize);
 
-	if (dhandle == NULL) {
+	if (dhandle == 0) {
 		DWARN(DBG_ALL_LDCS, "ldc_mem_dring_create: invalid dhandle\n");
 		return (EINVAL);
 	}
@@ -1754,7 +1754,7 @@ ldc_mem_dring_destroy(ldc_dring_handle_t dhandle)
 
 	D1(DBG_ALL_LDCS, "ldc_mem_dring_destroy: entered\n");
 
-	if (dhandle == NULL) {
+	if (dhandle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_dring_destroy: invalid desc ring handle\n");
 		return (EINVAL);
@@ -1822,19 +1822,19 @@ ldc_mem_dring_bind(ldc_handle_t handle, ldc_dring_handle_t dhandle,
     uint8_t mtype, uint8_t perm, ldc_mem_cookie_t *cookie, uint32_t *ccount)
 {
 	int		err;
-	ldc_chan_t 	*ldcp;
+	ldc_chan_t	*ldcp;
 	ldc_dring_t	*dringp;
 	ldc_mem_handle_t mhandle;
 
 	/* check to see if channel is initalized */
-	if (handle == NULL) {
+	if (handle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_dring_bind: invalid channel handle\n");
 		return (EINVAL);
 	}
 	ldcp = (ldc_chan_t *)handle;
 
-	if (dhandle == NULL) {
+	if (dhandle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_dring_bind: invalid desc ring handle\n");
 		return (EINVAL);
@@ -1885,7 +1885,7 @@ ldc_mem_dring_bind(ldc_handle_t handle, ldc_dring_handle_t dhandle,
 
 	/* create an memory handle */
 	err = ldc_mem_alloc_handle(handle, &mhandle);
-	if (err || mhandle == NULL) {
+	if (err || mhandle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_dring_bind: (0x%llx) error allocating mhandle\n",
 		    ldcp->id);
@@ -1914,7 +1914,7 @@ ldc_mem_dring_bind(ldc_handle_t handle, ldc_dring_handle_t dhandle,
 		(void) ldc_mem_free_handle(mhandle);
 
 		dringp->ldcp = NULL;
-		dringp->mhdl = NULL;
+		dringp->mhdl = 0;
 		*ccount = 0;
 
 		mutex_exit(&dringp->lock);
@@ -1941,10 +1941,10 @@ int
 ldc_mem_dring_nextcookie(ldc_dring_handle_t dhandle, ldc_mem_cookie_t *cookie)
 {
 	int		rv = 0;
-	ldc_dring_t 	*dringp;
+	ldc_dring_t	*dringp;
 	ldc_chan_t	*ldcp;
 
-	if (dhandle == NULL) {
+	if (dhandle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_dring_nextcookie: invalid desc ring handle\n");
 		return (EINVAL);
@@ -1982,11 +1982,11 @@ ldc_mem_dring_nextcookie(ldc_dring_handle_t dhandle, ldc_mem_cookie_t *cookie)
 int
 ldc_mem_dring_unbind(ldc_dring_handle_t dhandle)
 {
-	ldc_dring_t 	*dringp;
+	ldc_dring_t	*dringp;
 	ldc_dring_t	*tmp_dringp;
 	ldc_chan_t	*ldcp;
 
-	if (dhandle == NULL) {
+	if (dhandle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_dring_unbind: invalid desc ring handle\n");
 		return (EINVAL);
@@ -2035,7 +2035,7 @@ ldc_mem_dring_unbind(ldc_dring_handle_t dhandle)
 	(void) ldc_mem_free_handle((ldc_mem_handle_t)dringp->mhdl);
 
 	dringp->ldcp = NULL;
-	dringp->mhdl = NULL;
+	dringp->mhdl = 0;
 	dringp->status = LDC_UNBOUND;
 
 	mutex_exit(&dringp->lock);
@@ -2124,7 +2124,7 @@ ldc_mem_dring_info(ldc_dring_handle_t dhandle, ldc_mem_info_t *minfo)
 	ldc_dring_t	*dringp;
 	int		rv;
 
-	if (dhandle == NULL) {
+	if (dhandle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_dring_info: invalid desc ring handle\n");
 		return (EINVAL);
@@ -2143,7 +2143,7 @@ ldc_mem_dring_info(ldc_dring_handle_t dhandle, ldc_mem_info_t *minfo)
 		}
 	} else {
 		minfo->vaddr = dringp->base;
-		minfo->raddr = NULL;
+		minfo->raddr = 0;
 		minfo->status = dringp->status;
 	}
 
@@ -2164,19 +2164,19 @@ ldc_mem_dring_map(ldc_handle_t handle, ldc_mem_cookie_t *cookie,
     ldc_dring_handle_t *dhandle)
 {
 	int		err;
-	ldc_chan_t 	*ldcp = (ldc_chan_t *)handle;
+	ldc_chan_t	*ldcp = (ldc_chan_t *)handle;
 	ldc_mem_handle_t mhandle;
 	ldc_dring_t	*dringp;
 	size_t		dring_size;
 
-	if (dhandle == NULL) {
+	if (dhandle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_dring_map: invalid dhandle\n");
 		return (EINVAL);
 	}
 
 	/* check to see if channel is initalized */
-	if (handle == NULL) {
+	if (handle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_dring_map: invalid channel handle\n");
 		return (EINVAL);
@@ -2234,7 +2234,7 @@ ldc_mem_dring_map(ldc_handle_t handle, ldc_mem_cookie_t *cookie,
 
 	/* create an memory handle */
 	err = ldc_mem_alloc_handle(handle, &mhandle);
-	if (err || mhandle == NULL) {
+	if (err || mhandle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_dring_map: cannot alloc hdl err=%d\n",
 		    err);
@@ -2278,11 +2278,11 @@ ldc_mem_dring_map(ldc_handle_t handle, ldc_mem_cookie_t *cookie,
 int
 ldc_mem_dring_unmap(ldc_dring_handle_t dhandle)
 {
-	ldc_dring_t 	*dringp;
+	ldc_dring_t	*dringp;
 	ldc_dring_t	*tmp_dringp;
 	ldc_chan_t	*ldcp;
 
-	if (dhandle == NULL) {
+	if (dhandle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_dring_unmap: invalid desc ring handle\n");
 		return (EINVAL);
@@ -2356,14 +2356,14 @@ static int
 i_ldc_dring_acquire_release(ldc_dring_handle_t dhandle,
     uint8_t direction, uint64_t start, uint64_t end)
 {
-	int 			err;
+	int			err;
 	ldc_dring_t		*dringp;
 	ldc_chan_t		*ldcp;
 	ldc_mhdl_t		*mhdl;
 	uint64_t		soff;
 	size_t			copy_size;
 
-	if (dhandle == NULL) {
+	if (dhandle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "i_ldc_dring_acquire_release: invalid desc ring handle\n");
 		return (EINVAL);
