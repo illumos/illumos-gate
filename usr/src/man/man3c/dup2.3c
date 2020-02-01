@@ -5,7 +5,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DUP2 3C "Apr 19, 2013"
+.TH DUP2 3C "Feb 04, 2020"
 .SH NAME
 dup2, dup3 \- duplicate an open file descriptor
 .SH SYNOPSIS
@@ -18,11 +18,10 @@ dup2, dup3 \- duplicate an open file descriptor
 
 .LP
 .nf
-\fBint\fR \fBdup3\fR(\fBint\fR \fIfildes\fR, \fBint\fR \fIfildes2\fR, \dBint\fR \fIflags\fR);
+\fBint\fR \fBdup3\fR(\fBint\fR \fIfildes\fR, \fBint\fR \fIfildes2\fR, \fBint\fR \fIflags\fR);
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdup2()\fR function causes the file descriptor \fIfildes2\fR to refer to
 the same file as \fIfildes\fR. The \fIfildes\fR argument is a file descriptor
@@ -45,13 +44,11 @@ is \fBO_CLOEXEC\fR, then \fIfiledes2\fR will have the \fBFD_CLOEXEC\fR flag
 set causing the file descriptor to be closed during any future call of
 \fBexec\fR(2).
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion a non-negative integer representing the file
 descriptor is returned. Otherwise, \fB\(mi1\fR is returned and \fBerrno\fR is
 set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBdup2()\fR and \fBdup3()\fR functions will fail if:
 .sp
@@ -105,7 +102,6 @@ Additionally, the \fBdup3()\fR function will fail if:
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -123,7 +119,6 @@ MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBclose\fR(2), \fBcreat\fR(2), \fBexec\fR(2), \fBfcntl\fR(2),
 \fBgetrlimit\fR(2), \fBopen\fR(2), \fBpipe\fR(2), \fBattributes\fR(5),
