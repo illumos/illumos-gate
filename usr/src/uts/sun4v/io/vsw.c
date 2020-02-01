@@ -747,7 +747,7 @@ static int
 vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	vsw_t			**vswpp, *vswp;
-	int 			instance;
+	int			instance;
 
 	instance = ddi_get_instance(dip);
 	vswp = ddi_get_soft_state(vsw_state, instance);
@@ -1435,8 +1435,8 @@ mdeg_reg_fail:
 	kmem_free(pspecp, templatesz);
 	kmem_free(inst_specp, sizeof (mdeg_node_spec_t));
 
-	vswp->mdeg_hdl = NULL;
-	vswp->mdeg_port_hdl = NULL;
+	vswp->mdeg_hdl = 0;
+	vswp->mdeg_port_hdl = 0;
 
 	return (1);
 }
@@ -1446,10 +1446,10 @@ vsw_mdeg_unregister(vsw_t *vswp)
 {
 	D1(vswp, "vsw_mdeg_unregister: enter");
 
-	if (vswp->mdeg_hdl != NULL)
+	if (vswp->mdeg_hdl != 0)
 		(void) mdeg_unregister(vswp->mdeg_hdl);
 
-	if (vswp->mdeg_port_hdl != NULL)
+	if (vswp->mdeg_port_hdl != 0)
 		(void) mdeg_unregister(vswp->mdeg_port_hdl);
 
 	if (vswp->inst_spec != NULL) {
@@ -1812,8 +1812,8 @@ vsw_get_initial_md_properties(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
  */
 static void
 vsw_vlan_read_ids(void *arg, int type, md_t *mdp, mde_cookie_t node,
-	uint16_t *pvidp, vsw_vlanid_t **vidspp, uint16_t *nvidsp,
-	uint16_t *default_idp)
+    uint16_t *pvidp, vsw_vlanid_t **vidspp, uint16_t *nvidsp,
+    uint16_t *default_idp)
 {
 	vsw_t		*vswp;
 	vsw_port_t	*portp;
@@ -2054,7 +2054,7 @@ vsw_mtu_update(vsw_t *vswp, uint32_t mtu)
 
 static void
 vsw_linkprop_read(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
-	boolean_t *pls)
+    boolean_t *pls)
 {
 	int		rv;
 	uint64_t	val;
@@ -2134,7 +2134,7 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 	uint_t		ddi_instance;
 	uint8_t		new_smode;
 	int		i;
-	uint64_t 	macaddr = 0;
+	uint64_t	macaddr = 0;
 	enum		{MD_init = 0x1,
 				MD_physname = 0x2,
 				MD_macaddr = 0x4,
@@ -2449,7 +2449,7 @@ fail_update:
  */
 static int
 vsw_port_read_props(vsw_port_t *portp, vsw_t *vswp,
-	md_t *mdp, mde_cookie_t *node)
+    md_t *mdp, mde_cookie_t *node)
 {
 	uint64_t		ldc_id;
 	uint8_t			*addrp;
@@ -2597,7 +2597,7 @@ vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node)
 
 static int
 vsw_port_update(vsw_t *vswp, md_t *curr_mdp, mde_cookie_t curr_mdex,
-	md_t *prev_mdp, mde_cookie_t prev_mdex)
+    md_t *prev_mdp, mde_cookie_t prev_mdex)
 {
 	uint64_t	cport_num;
 	uint64_t	pport_num;

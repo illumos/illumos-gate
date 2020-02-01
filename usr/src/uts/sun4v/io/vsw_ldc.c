@@ -279,7 +279,7 @@ extern uint32_t vsw_nrbufs_factor;
  * 1.3			VLAN and HybridIO support.
  * 1.4			Jumbo Frame support.
  * 1.5			Link State Notification support with optional support
- * 			for Physical Link information.
+ *			for Physical Link information.
  * 1.6			Support for RxDringData mode.
  */
 static	ver_sup_t	vsw_versions[] = { {1, 6} };
@@ -471,7 +471,7 @@ vsw_port_detach(vsw_t *vswp, int p_instance)
 void
 vsw_detach_ports(vsw_t *vswp)
 {
-	vsw_port_list_t 	*plist = &vswp->plist;
+	vsw_port_list_t		*plist = &vswp->plist;
 	vsw_port_t		*port = NULL;
 
 	D1(vswp, "%s: enter", __func__);
@@ -562,11 +562,11 @@ vsw_port_delete(vsw_port_t *port)
 static int
 vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 {
-	vsw_t 		*vswp = port->p_vswp;
-	vsw_ldc_t 	*ldcp = NULL;
-	ldc_attr_t 	attr;
+	vsw_t		*vswp = port->p_vswp;
+	vsw_ldc_t	*ldcp = NULL;
+	ldc_attr_t	attr;
 	ldc_status_t	istatus;
-	int 		status = DDI_FAILURE;
+	int		status = DDI_FAILURE;
 	char		kname[MAXNAMELEN];
 	enum		{ PROG_init = 0x0,
 			    PROG_callback = 0x1,
@@ -719,8 +719,8 @@ ldc_attach_fail:
 static void
 vsw_ldc_detach(vsw_ldc_t *ldcp)
 {
-	int 		rv;
-	vsw_t 		*vswp = ldcp->ldc_port->p_vswp;
+	int		rv;
+	vsw_t		*vswp = ldcp->ldc_port->p_vswp;
 	int		retries = 0;
 
 	D2(vswp, "%s: detaching channel %lld", __func__, ldcp->ldc_id);
@@ -773,7 +773,7 @@ vsw_ldc_detach(vsw_ldc_t *ldcp)
 	(void) ldc_fini(ldcp->ldc_handle);
 
 	ldcp->ldc_status = LDC_INIT;
-	ldcp->ldc_handle = NULL;
+	ldcp->ldc_handle = 0;
 	ldcp->ldc_vswp = NULL;
 
 	mutex_destroy(&ldcp->msg_thr_lock);
@@ -800,7 +800,7 @@ vsw_ldc_detach(vsw_ldc_t *ldcp)
 static int
 vsw_ldc_init(vsw_ldc_t *ldcp)
 {
-	vsw_t 		*vswp = ldcp->ldc_vswp;
+	vsw_t		*vswp = ldcp->ldc_vswp;
 	ldc_status_t	istatus = 0;
 	int		rv;
 
@@ -1238,7 +1238,7 @@ static uint_t
 vsw_ldc_cb(uint64_t event, caddr_t arg)
 {
 	vsw_ldc_t	*ldcp = (vsw_ldc_t  *)arg;
-	vsw_t 		*vswp = ldcp->ldc_vswp;
+	vsw_t		*vswp = ldcp->ldc_vswp;
 
 	D1(vswp, "%s: enter: ldcid (%lld)\n", __func__, ldcp->ldc_id);
 
@@ -1246,7 +1246,7 @@ vsw_ldc_cb(uint64_t event, caddr_t arg)
 	ldcp->ldc_stats.callbacks++;
 
 	mutex_enter(&ldcp->status_lock);
-	if ((ldcp->ldc_status == LDC_INIT) || (ldcp->ldc_handle == NULL)) {
+	if ((ldcp->ldc_status == LDC_INIT) || (ldcp->ldc_handle == 0)) {
 		mutex_exit(&ldcp->status_lock);
 		mutex_exit(&ldcp->ldc_cblock);
 		return (LDC_SUCCESS);
@@ -2075,11 +2075,11 @@ void
 vsw_process_pkt(void *arg)
 {
 	vsw_ldc_t	*ldcp = (vsw_ldc_t  *)arg;
-	vsw_t 		*vswp = ldcp->ldc_vswp;
+	vsw_t		*vswp = ldcp->ldc_vswp;
 	size_t		msglen;
 	vio_msg_tag_t	*tagp;
 	uint64_t	*ldcmsg;
-	int 		rv = 0;
+	int		rv = 0;
 
 
 	D1(vswp, "%s enter: ldcid (%lld)\n", __func__, ldcp->ldc_id);
@@ -2145,7 +2145,7 @@ vsw_process_pkt(void *arg)
  */
 static void
 vsw_dispatch_ctrl_task(vsw_ldc_t *ldcp, void *cpkt, vio_msg_tag_t *tagp,
-	int msglen)
+    int msglen)
 {
 	vsw_ctrl_task_t		*ctaskp = NULL;
 	vsw_port_t		*port = ldcp->ldc_port;
@@ -2221,7 +2221,7 @@ vsw_process_ctrl_pkt(void *arg)
 {
 	vsw_ctrl_task_t	*ctaskp = (vsw_ctrl_task_t *)arg;
 	vsw_ldc_t	*ldcp = ctaskp->ldcp;
-	vsw_t 		*vswp = ldcp->ldc_vswp;
+	vsw_t		*vswp = ldcp->ldc_vswp;
 	vio_msg_tag_t	tag;
 	uint16_t	env;
 
@@ -2305,7 +2305,7 @@ void
 vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 {
 	vio_ver_msg_t	*ver_pkt;
-	vsw_t 		*vswp = ldcp->ldc_vswp;
+	vsw_t		*vswp = ldcp->ldc_vswp;
 
 	D1(vswp, "%s(%lld): enter", __func__, ldcp->ldc_id);
 
@@ -3362,7 +3362,7 @@ vsw_process_physlink_msg(vsw_ldc_t *ldcp, void *pkt)
 
 static void
 vsw_process_data_pkt(vsw_ldc_t *ldcp, void *dpkt, vio_msg_tag_t *tagp,
-	uint32_t msglen)
+    uint32_t msglen)
 {
 	uint16_t	env = tagp->vio_subtype_env;
 	vsw_t		*vswp = ldcp->ldc_vswp;
@@ -3747,7 +3747,7 @@ vsw_portsend(vsw_port_t *port, mblk_t *mp)
 {
 	mblk_t		*mpt;
 	int		count;
-	vsw_ldc_t 	*ldcp = port->ldcp;
+	vsw_ldc_t	*ldcp = port->ldcp;
 	int		status = 0;
 
 	count = vsw_vlan_frame_untag(port, VSW_VNETPORT, &mp, &mpt);
@@ -3763,7 +3763,7 @@ vsw_portsend(vsw_port_t *port, mblk_t *mp)
  * priority frames is also counted and returned.
  *
  * Params:
- * 	vswp:	pointer to the instance of vsw
+ *	vswp:	pointer to the instance of vsw
  *	np:	head of packet chain to be broken
  *	npt:	tail of packet chain to be broken
  *
@@ -3775,7 +3775,7 @@ vsw_portsend(vsw_port_t *port, mblk_t *mp)
  */
 static uint32_t
 vsw_get_pri_packets(vsw_t *vswp, mblk_t **np, mblk_t **npt,
-	mblk_t **hp, mblk_t **hpt)
+    mblk_t **hp, mblk_t **hpt)
 {
 	mblk_t			*tmp = NULL;
 	mblk_t			*smp = NULL;
@@ -3840,7 +3840,7 @@ vsw_get_pri_packets(vsw_t *vswp, mblk_t **np, mblk_t **npt,
 static int
 vsw_ldctx_pri(void *arg, mblk_t *mp, mblk_t *mpt, uint32_t count)
 {
-	vsw_ldc_t 		*ldcp = (vsw_ldc_t *)arg;
+	vsw_ldc_t		*ldcp = (vsw_ldc_t *)arg;
 	mblk_t			*tmp;
 	mblk_t			*smp;
 	mblk_t			*hmp;	/* high prio pkts head */
@@ -3884,7 +3884,7 @@ vsw_ldctx_pri(void *arg, mblk_t *mp, mblk_t *mpt, uint32_t count)
 static int
 vsw_ldctx(void *arg, mblk_t *mp, mblk_t *mpt, uint32_t count)
 {
-	vsw_ldc_t 	*ldcp = (vsw_ldc_t *)arg;
+	vsw_ldc_t	*ldcp = (vsw_ldc_t *)arg;
 	mblk_t		*tmp = NULL;
 
 	ASSERT(count != 0);
@@ -3952,7 +3952,7 @@ vsw_ldcsend_pkt(vsw_ldc_t *ldcp, mblk_t *mp)
 	vgen_stats_t		*statsp = &ldcp->ldc_stats;
 
 	if ((!(ldcp->lane_out.lstate & VSW_LANE_ACTIVE)) ||
-	    (ldcp->ldc_status != LDC_UP) || (ldcp->ldc_handle == NULL)) {
+	    (ldcp->ldc_status != LDC_UP) || (ldcp->ldc_handle == 0)) {
 		(void) atomic_inc_32(&statsp->tx_pri_fail);
 		DWARN(vswp, "%s(%lld) status(%d) lstate(0x%llx), dropping "
 		    "packet\n", __func__, ldcp->ldc_id, ldcp->ldc_status,
@@ -4121,7 +4121,7 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	ASSERT(mp != NULL);
 
 	if ((!(ldcp->lane_out.lstate & VSW_LANE_ACTIVE)) ||
-	    (ldcp->ldc_status != LDC_UP) || (ldcp->ldc_handle == NULL)) {
+	    (ldcp->ldc_status != LDC_UP) || (ldcp->ldc_handle == 0)) {
 		DERR(vswp, "%s(%lld) status(%d) state (0x%llx), dropping pkt",
 		    __func__, ldcp->ldc_id, ldcp->ldc_status,
 		    ldcp->lane_out.lstate);
@@ -4566,7 +4566,7 @@ vsw_map_dring_cmn(vsw_ldc_t *ldcp, vio_dring_reg_msg_t *dring_pkt)
 
 	return (dp);
 fail:
-	if (dp->dring_handle != NULL) {
+	if (dp->dring_handle != 0) {
 		(void) ldc_mem_dring_unmap(dp->dring_handle);
 	}
 	kmem_free(dp, sizeof (*dp));
@@ -4836,9 +4836,9 @@ display_state(void)
 {
 	vsw_t		*vswp;
 	vsw_port_list_t	*plist;
-	vsw_port_t 	*port;
-	vsw_ldc_t 	*ldcp;
-	extern vsw_t 	*vsw_head;
+	vsw_port_t	*port;
+	vsw_ldc_t	*ldcp;
+	extern vsw_t	*vsw_head;
 
 	cmn_err(CE_NOTE, "***** system state *****");
 
