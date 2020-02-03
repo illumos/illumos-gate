@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -53,8 +54,6 @@ function cleanup
 	[[ -f $PREV_VFSTAB_FILE ]] && \
 	    log_must mv $PREV_VFSTAB_FILE $VFSTAB_FILE
 	[[ -f $PREV_VFSTAB_FILE ]] && rm -f $PREV_VFSTAB_FILE
-
-	log_must swapadd $VFSTAB_FILE
 
         if is_swap_inuse $voldev ; then
 		log_must swap -d $voldev

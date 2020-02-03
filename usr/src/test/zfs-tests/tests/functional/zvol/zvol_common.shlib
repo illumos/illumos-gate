@@ -26,6 +26,7 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -133,6 +134,7 @@ function is_swap_inuse
 		return 1
 	fi
 
-	swap -l | grep -w $device > /dev/null 2>&1
+	swap -l | awk 'NR > 1 { print $1 }' | \
+	    grep "^$device\$" > /dev/null 2>&1
 	return $?
 }
