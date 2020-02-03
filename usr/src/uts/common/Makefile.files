@@ -25,7 +25,7 @@
 # Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 # Copyright 2016 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
@@ -1411,6 +1411,7 @@ ZFS_COMMON_OBJS +=		\
 	zap_micro.o		\
 	zcp.o			\
 	zcp_get.o		\
+	zcp_set.o		\
 	zcp_global.o		\
 	zcp_iter.o		\
 	zcp_synctask.o		\
