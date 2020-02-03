@@ -183,6 +183,7 @@ extern "C" {
 #define	TOPO_PROP_PORT_TYPE	"type"
 #define	TOPO_PROP_PORT_TYPE_SFF	"sff"
 #define	TOPO_PROP_PORT_TYPE_USB	"usb"
+#define	TOPO_PROP_PORT_TYPE_UNKNOWN	"unknown"
 
 #define	TOPO_PGROUP_TRANSCEIVER	"transceiver"
 #define	TOPO_PROP_TRANSCEIVER_TYPE	"type"
@@ -289,6 +290,19 @@ extern "C" {
 #define	TOPO_PROP_UFM_SLOT_VERSION	"ufm-slot-version"
 #define	TOPO_PROP_UFM_SLOT_MODE		"ufm-slot-mode"
 #define	TOPO_PROP_UFM_SLOT_ACTIVE	"ufm-slot-active"
+
+#define	TOPO_PGROUP_DATALINK		"datalink"
+#define	TOPO_PGROUP_DATALINK_PMAC	"primary-mac-address"
+#define	TOPO_PGROUP_DATALINK_LINK_SPEED		"link-speed"
+#define	TOPO_PGROUP_DATALINK_LINK_STATUS	"link-status"
+#define	TOPO_PGROUP_DATALINK_LINK_STATUS_UP	"up"
+#define	TOPO_PGROUP_DATALINK_LINK_STATUS_DOWN	"down"
+#define	TOPO_PGROUP_DATALINK_LINK_STATUS_UNKNOWN	"unknown"
+#define	TOPO_PGROUP_DATALINK_LINK_DUPLEX	"link-duplex"
+#define	TOPO_PGROUP_DATALINK_LINK_DUPLEX_FULL	"full"
+#define	TOPO_PGROUP_DATALINK_LINK_DUPLEX_HALF	"half"
+#define	TOPO_PGROUP_DATALINK_LINK_DUPLEX_UNKNOWN	"unknown"
+#define	TOPO_PGROUP_DATALINK_LINK_NAME		"link-name"
 
 #ifdef	__cplusplus
 }

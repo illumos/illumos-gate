@@ -646,6 +646,19 @@ validate_disk(char *arg, char *mountpoint)
 	if (rc != 0)
 		return (rc);
 
+	/*
+	 * Check for the usual case: 64-bit kernel
+	 */
+	(void) snprintf(kernpath, MAXPATHLEN,
+	    "%s/platform/i86pc/kernel/amd64/unix", mountpoint);
+	if (stat64(kernpath, &statbuf) == 0)
+		return (0);
+
+	/*
+	 * We no longer build 32-bit kernel but in a case we are trying to boot
+	 * some ancient filesystem with 32-bit only kernel we should be able to
+	 * proceed too
+	 */
 	(void) snprintf(kernpath, MAXPATHLEN, "%s/platform/i86pc/kernel/unix",
 	    mountpoint);
 
@@ -1151,7 +1164,7 @@ parse_fastboot_args(char *bootargs_buf, size_t buf_size,
 	} else if (mplen != 0) {
 		/*
 		 * No unix argument, but mountpoint is not empty, use
-		 * /platform/i86pc/$ISADIR/kernel/unix as default.
+		 * /platform/i86pc/kernel/$ISADIR/unix as default.
 		 */
 		char isa[20];
 
