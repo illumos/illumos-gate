@@ -18,8 +18,9 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2016 Nexenta Systems, Inc.
+.\" Copyright 2020 Joyent, Inc.
 .\"
-.Dd March 12, 2016
+.Dd February 4, 2020
 .Dt NFSD 1M
 .Os
 .Sh NAME
@@ -178,7 +179,8 @@ Daemon failed to start.
 .Xr sharetab 4 ,
 .Xr system 4 ,
 .Xr attributes 5 ,
-.Xr smf 5
+.Xr smf 5 ,
+.Xr zones 5
 .Sh NOTES
 Manually starting and restarting
 .Nm
@@ -193,7 +195,9 @@ unless its
 .Sy application Ns / Ns Sy auto_enable
 property is set to
 .Sy false .
-See the , and
+See
+.Xr smf 5
+and
 .Xr svcadm 1M
 for more information.
 .Pp
@@ -222,3 +226,10 @@ Instead,
 .Nm
 can be restarted by other signals, such as
 .Sy SIGINT .
+.Pp
+NFS service, which includes
+.Nm ,
+can run inside a non-global zone.
+See the discussion under ZONES in
+.Xr nfs 4
+for more information.

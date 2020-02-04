@@ -3,19 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SHAREFS 7FS "Oct 31, 2007"
+.\"
+.\" Copyright 2020 Joyent, Inc.
+.TH SHAREFS 7FS "February 4, 2020"
 .SH NAME
 sharefs \- Kernel sharetab filesystem
 .SH DESCRIPTION
+The \fBsharefs\fR filesystem describes the state of all shares currently
+loaded by the kernel, and shared by the invoking zone. It is mounted during
+boot time as a read-only file at \fB/etc/dfs/sharetab\fR.
 .sp
 .LP
-The \fBsharefs\fR filesystem describes the state of all shares currently loaded
-by the kernel. It is mounted during boot time as a read-only file at
-\fB/etc/dfs/sharetab\fR.
-.sp
-.LP
-Filesystem contents are dynamic and  reflect  the current set of shares in the
-system. File contents are described in \fBsharetab\fR(4).
+Filesystem contents are dynamic and reflect the current set of shares in the
+zone. File contents are described in \fBsharetab\fR(4).
 .sp
 .LP
 File contents can be modified as a result of \fBshare\fR(1M),
@@ -25,7 +25,6 @@ File contents can be modified as a result of \fBshare\fR(1M),
 .LP
 The module may not be unloaded dynamically by the kernel.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/dfs/sharetab\fR\fR
@@ -35,7 +34,5 @@ System record of shared file systems.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBshare\fR(1M), \fBsharectl\fR(1M), \fBsharemgr\fR(1M), \fBzfs\fR(1M),
-\fBsharetab\fR(4)
+\fBsharetab\fR(4), \fBzones\fR(5)

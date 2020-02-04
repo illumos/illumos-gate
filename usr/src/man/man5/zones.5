@@ -3,12 +3,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" Copyright 2020 Joyent, Inc.
 .TH ZONES 5 "Jan 29, 2009"
 .SH NAME
 zones \- Solaris application containers
 .SH DESCRIPTION
-.sp
-.LP
 The zones facility in Solaris provides an isolated environment for running
 applications. Processes running in a zone are prevented from monitoring or
 interfering with other activity in the system. Access to other processes,
@@ -118,8 +118,6 @@ cannot be destroyed. Such cases require operator intervention.
 .RE
 
 .SS "Process Access Restrictions"
-.sp
-.LP
 Processes running inside a zone (aside from the global zone) have restricted
 access to other processes. Only processes in the same zone are visible through
 \fB/proc\fR (see \fBproc\fR(4) or through system call interfaces that take
@@ -127,8 +125,6 @@ process IDs such as \fBkill\fR(2) and \fBpriocntl\fR(2). Attempts to access
 processes that exist in other zones (including the global zone) fail with the
 same error code that would be issued if the specified process did not exist.
 .SS "Privilege Restrictions"
-.sp
-.LP
 Processes running within a non-global zone are restricted to a subset of
 privileges, in order to prevent one zone from being able to perform operations
 that might affect other zones. The set of privileges limits the capabilities of
@@ -137,8 +133,6 @@ list of privileges available within a zone can be displayed using the
 \fBppriv\fR(1) utility. For more information about privileges, see
 \fBprivileges\fR(5).
 .SS "Device Restrictions"
-.sp
-.LP
 The set of devices available within a zone is restricted, to prevent a process
 in one zone from interfering with processes in other zones. For example, a
 process in a zone should not be able to modify kernel memory using
@@ -153,8 +147,6 @@ that can run in a non-global zone. For example, the \fBeeprom\fR(1M),
 \fBprtdiag\fR(1M), and \fBprtconf\fR(1M) utilities do not work in a zone since
 they rely on devices that are not normally available.
 .SS "Brands"
-.sp
-.LP
 A zone may be assigned a brand when it is initially created. A branded zone is
 one whose software does not match that software found in the global zone. The
 software may include Solaris software configured or laid out differently, or it
@@ -162,8 +154,6 @@ may include non-Solaris software. The particular collection of software is
 called a "brand" (see \fBbrands\fR(5)). Once installed, a zone's brand may not
 be changed unless the zone is first uninstalled.
 .SS "File Systems"
-.sp
-.LP
 Each zone has its own section of the file system hierarchy, rooted at a
 directory known as the zone root. Processes inside the zone can access only
 files within that part of the hierarchy, that is, files that are located
@@ -182,9 +172,15 @@ in multiple zones, while preserving the security guarantees supplied by zones.
 NFS and autofs mounts established within a zone are local to that zone; they
 cannot be accessed from other zones, including the global zone. The mounts are
 removed when the zone is halted or rebooted.
-.SS "Networking"
 .sp
 .LP
+A zone can share filesystems using \fBnfs\fR(4) or \fBsmb\fR(4)
+subject to the restrictions earlier in this section, plus the additional
+restriction that file sharing can only be done from filesystems a zone
+completely controls. Some \fBbrands\fR(5) do not have the zone root set to a
+filesystem boundary.  \fBsharefs\fR(7FS) can instantiate per-zone subject to
+the brand restrictions.
+.SS "Networking"
 A zone has its own port number space for \fBTCP\fR, \fBUDP\fR, and \fBSCTP\fR
 applications and typically one or more separate \fBIP\fR addresses (but some
 configurations of Trusted Extensions share IP address(es) between zones).
@@ -230,8 +226,6 @@ The full \fBIP\fR-level functionality in the form of \fBDHCP\fR client,
 \fBIPsec\fR and \fBIP\fR Filter, is available in exclusive-\fBIP\fR zones and
 not in shared-\fBIP\fR zones.
 .SS "Host Identifiers"
-.sp
-.LP
 A zone is capable of emulating a 32-bit host identifier, which can be
 configured via \fBzonecfg\fR(1M), for the purpose of system consolidation. If a
 zone emulates a host identifier, then commands such as \fBhostid\fR(1) and
@@ -240,10 +234,9 @@ zone emulates a host identifier, then commands such as \fBhostid\fR(1) and
 display or return the zone's emulated host identifier rather than the host
 machine's identifier.
 .SH SEE ALSO
-.sp
-.LP
 \fBhostid\fR(1), \fBzlogin\fR(1), \fBzonename\fR(1), \fBin.rlogind\fR(1M),
 \fBsshd\fR(1M), \fBsysdef\fR(1M), \fBzoneadm\fR(1M), \fBzonecfg\fR(1M),
 \fBkill\fR(2), \fBpriocntl\fR(2), \fBsysinfo\fR(2), \fBgethostid\fR(3C),
-\fBgetzoneid\fR(3C), \fBucred_get\fR(3C), \fBproc\fR(4), \fBattributes\fR(5),
-\fBbrands\fR(5), \fBprivileges\fR(5), \fBcrgetzoneid\fR(9F)
+\fBgetzoneid\fR(3C), \fBucred_get\fR(3C), \fBnfs\fR(4), \fBproc\fR(4),
+\fBsmb\fR(4), \fBattributes\fR(5), \fBbrands\fR(5), \fBprivileges\fR(5),
+\fBsharefs\fR(7FS), \fBcrgetzoneid\fR(9F)
