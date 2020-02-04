@@ -22,6 +22,10 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2020 Joyent Inc.
+ */
+
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -70,7 +74,7 @@ static void subUsage(uint_t, subcommand_t *);
 static void subUsageObject(uint_t, subcommand_t *, object_t *);
 static int getObject(char *, object_t **);
 static int getObjectRules(uint_t, objectRules_t **);
-static char *getLongOption(int);
+static const char *getLongOption(int);
 static optionProp_t *getOptions(uint_t, uint_t);
 static char *getOptionArgDesc(int);
 
@@ -207,7 +211,7 @@ getOptions(uint_t object, uint_t subcommand)
  *  on success, long option name
  *  on failure, NULL
  */
-static char *
+static const char *
 getLongOption(int shortOption)
 {
 	struct option *op;
@@ -317,7 +321,7 @@ subUsageObject(uint_t usageType, subcommand_t *subcommand, object_t *objp)
 	opCmd_t *opCmd = NULL;
 	optionProp_t *options;
 	char *optionArgDesc;
-	char *longOpt;
+	const char *longOpt;
 
 
 	if (getObjectRules(objp->value, &objRules) != 0) {

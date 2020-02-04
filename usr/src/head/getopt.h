@@ -27,6 +27,10 @@
  */
 
 /*
+ * Copyright 2020 Joyent Inc.
+ */
+
+/*
  * GNU-like getopt_long(), getopt_long_only().
  * Solaris-specific getopt_clip().
  */
@@ -49,11 +53,13 @@ extern "C" {
 #define	optional_argument	2
 
 struct option {
-	char *name;	/* name of long option */
-	int has_arg;	/* whether option takes an argument */
-	int *flag;	/* if not NULL, set *flag to val when option found */
-	int val;	/* if flag is not NULL, value to set *flag to. */
-			/* if flag is NULL, return value */
+	const char *name;	/* name of long option */
+	int has_arg;		/* whether option takes an argument */
+	int *flag;		/* if not NULL, set *flag to val when option */
+				/* found */
+	int val;		/* if flag is not NULL, value to set *flag */
+				/* to. */
+				/* if flag is NULL, return value */
 };
 
 /*
