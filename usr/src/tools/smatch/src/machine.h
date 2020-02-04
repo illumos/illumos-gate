@@ -62,7 +62,7 @@ enum machine {
 #define	MACH_NATIVE	MACH_RISCV64
 #elif defined(__riscv) && (__riscv_xlen == 32)
 #define	MACH_NATIVE	MACH_RISCV32
-#elif defined(__sparc_v9__)
+#elif defined(__sparc_v9__) || defined(__sparcv9)
 #define	MACH_NATIVE	MACH_SPARC64
 #elif defined(__sparc__) || defined(__sparc)
 #define	MACH_NATIVE	MACH_SPARC32

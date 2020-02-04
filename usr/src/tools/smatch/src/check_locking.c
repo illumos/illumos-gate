@@ -1021,10 +1021,13 @@ static void check_lock(char *name, struct symbol *sym)
 		if (parent_is_gone_var_sym(sm->name, sm->sym))
 			goto swap_stree;
 
-		if (sm->state != &locked && sm->state != &unlocked)
+		if (sm->state != &locked &&
+		    sm->state != &unlocked &&
+		    sm->state != &restore)
 			goto swap_stree;
 
-		if (sm->state == &unlocked && is_EINTR(estate_rl(return_sm->state)))
+		if ((sm->state == &unlocked || sm->state == &restore) &&
+		    is_EINTR(estate_rl(return_sm->state)))
 			goto swap_stree;
 
 		bucket = success_fail_positive(estate_rl(return_sm->state));
@@ -1032,7 +1035,7 @@ static void check_lock(char *name, struct symbol *sym)
 			add_range(&locked_lines, line, line);
 			locked_buckets[bucket] = true;
 		}
-		if (sm->state == &unlocked) {
+		if (sm->state == &unlocked || sm->state == &restore) {
 			add_range(&unlocked_lines, line, line);
 			unlocked_buckets[bucket] = true;
 		}

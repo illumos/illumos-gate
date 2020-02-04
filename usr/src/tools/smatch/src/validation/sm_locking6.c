@@ -31,15 +31,11 @@ void func (void)
  * check-command: smatch -p=kernel sm_locking6.c
  *
  * check-output-start
-sm_locking6.c:27 func() warn: inconsistent returns 'irqsave:flags'.
-  Locked on:   line 26
-  Unlocked on: line 21
-               line 24
-               line 27
-sm_locking6.c:27 func() warn: inconsistent returns 'spin_lock:lock'.
-  Locked on:   line 26
-  Unlocked on: line 21
-               line 24
-               line 27
+sm_locking6.c:27 func() warn: inconsistent returns 'flags'.
+  Locked on  : 26
+  Unlocked on: 21,24,27
+sm_locking6.c:27 func() warn: inconsistent returns 'lock'.
+  Locked on  : 26
+  Unlocked on: 21,24,27
  * check-output-end
  */

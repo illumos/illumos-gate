@@ -28,9 +28,8 @@ void func (void)
  * check-command: smatch --project=kernel sm_locking4.c
  *
  * check-output-start
-sm_locking4.c:23 func() warn: inconsistent returns 'spin_lock:mylock'.
-  Locked on:   line 22
-               line 23
-  Unlocked on: line 16
+sm_locking4.c:23 func() warn: inconsistent returns 'mylock'.
+  Locked on  : 22-23
+  Unlocked on: 16
  * check-output-end
  */

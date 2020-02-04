@@ -134,6 +134,7 @@ enum phase {
 
 extern void add_pre_buffer(const char *fmt, ...) FORMAT_ATTR(1);
 extern void predefine(const char *name, int weak, const char *fmt, ...) FORMAT_ATTR(3);
+extern void predefine_nostd(const char *name);
 
 extern int preprocess_only;
 
@@ -205,6 +206,20 @@ extern int arch_m64;
 extern int arch_msize_long;
 extern int arch_big_endian;
 extern int arch_mach;
+
+enum standard {
+	STANDARD_NONE,
+	STANDARD_GNU,
+	STANDARD_C89,
+	STANDARD_GNU89 = STANDARD_C89 | STANDARD_GNU,
+	STANDARD_C94,
+	STANDARD_GNU94 = STANDARD_C94 | STANDARD_GNU,
+	STANDARD_C99,
+	STANDARD_GNU99 = STANDARD_C99 | STANDARD_GNU,
+	STANDARD_C11,
+	STANDARD_GNU11 = STANDARD_C11 | STANDARD_GNU,
+};
+extern enum standard standard;
 
 extern void dump_macro_definitions(void);
 extern struct symbol_list *sparse_initialize(int argc, char **argv, struct string_list **files);

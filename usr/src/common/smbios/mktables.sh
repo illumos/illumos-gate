@@ -62,6 +62,7 @@ SMB_SLCH2_	smbios_slot_ch2_name		uint_t
 desc_funcs='
 SMB_BBFL_	smbios_bboard_flag_desc		uint_t
 SMB_BBT_	smbios_bboard_type_desc		uint_t
+SMB_BDC_	smbios_battery_chem_desc	uint_t
 SMB_BIOSFL_	smbios_bios_flag_desc		uint64_t
 SMB_BIOSXB1_	smbios_bios_xb1_desc		uint_t
 SMB_BIOSXB2_	smbios_bios_xb2_desc		uint_t

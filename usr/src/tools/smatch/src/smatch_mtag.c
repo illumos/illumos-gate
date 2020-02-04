@@ -50,7 +50,7 @@
 
 static int my_id;
 
-static mtag_t str_to_tag(const char *str)
+mtag_t str_to_mtag(const char *str)
 {
 	unsigned char c[MD5_DIGEST_LENGTH];
 	unsigned long long *tag = (unsigned long long *)&c;
@@ -132,7 +132,7 @@ struct smatch_state *swap_mtag_return(struct expression *expr, struct smatch_sta
 
 	snprintf(buf, sizeof(buf), "%s %s %s %s", get_filename(), get_function(),
 		 left_name, right_name);
-	tag = str_to_tag(buf);
+	tag = str_to_mtag(buf);
 	tag_sval.type = estate_type(state);
 	tag_sval.uvalue = tag;
 
@@ -156,8 +156,8 @@ int get_string_mtag(struct expression *expr, mtag_t *tag)
 		return 0;
 
 	/* I was worried about collisions so I added a xor */
-	xor = str_to_tag("__smatch string");
-	*tag = str_to_tag(expr->string->data);
+	xor = str_to_mtag("__smatch string");
+	*tag = str_to_mtag(expr->string->data);
 	*tag = *tag ^ xor;
 
 	return 1;
@@ -177,7 +177,7 @@ int get_toplevel_mtag(struct symbol *sym, mtag_t *tag)
 	snprintf(buf, sizeof(buf), "%s %s",
 		 (sym->ctype.modifiers & MOD_STATIC) ? get_filename() : "extern",
 		 sym->ident->name);
-	*tag = str_to_tag(buf);
+	*tag = str_to_mtag(buf);
 	return 1;
 }
 
@@ -196,7 +196,7 @@ bool get_symbol_mtag(struct symbol *sym, mtag_t *tag)
 
 	snprintf(buf, sizeof(buf), "%s %s %s",
 		 get_filename(), get_function(), sym->ident->name);
-	*tag = str_to_tag(buf);
+	*tag = str_to_mtag(buf);
 	return true;
 }
 
@@ -258,7 +258,7 @@ struct range_list *swap_mtag_seed(struct expression *expr, struct range_list *rl
 	name = expr_to_str(expr);
 	snprintf(buf, sizeof(buf), "%s %s %s", get_filename(), get_function(), name);
 	free_string(name);
-	tag = str_to_tag(buf);
+	tag = str_to_mtag(buf);
 	sval.value = tag;
 	return alloc_rl(sval, sval);
 }
@@ -284,7 +284,7 @@ int create_mtag_alias(mtag_t tag, struct expression *expr, mtag_t *new)
 	snprintf(buf, sizeof(buf), "%lld %d %s", tag, lines_from_start, str);
 	free_string(str);
 
-	*new = str_to_tag(buf);
+	*new = str_to_mtag(buf);
 	sql_insert_mtag_alias(tag, *new);
 
 	return 1;

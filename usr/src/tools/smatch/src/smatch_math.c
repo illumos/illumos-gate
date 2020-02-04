@@ -1606,6 +1606,26 @@ int get_implied_value(struct expression *expr, sval_t *sval)
 	return 1;
 }
 
+int get_implied_value_fast(struct expression *expr, sval_t *sval)
+{
+	struct range_list *rl;
+	static int recurse;
+	int ret = 0;
+
+	if (recurse)
+		return 0;
+
+	recurse = 1;
+	set_fast_math_only();
+	if (get_rl_helper(expr, RL_IMPLIED, &rl) &&
+	    rl_to_sval(rl, sval))
+		ret = 1;
+	clear_fast_math_only();
+	recurse = 0;
+
+	return ret;
+}
+
 int get_implied_min(struct expression *expr, sval_t *sval)
 {
 	struct range_list *rl;

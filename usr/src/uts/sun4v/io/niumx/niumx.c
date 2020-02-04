@@ -665,6 +665,8 @@ niumx_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attrp,
 	mp->dmai_rdip = rdip;
 	mp->dmai_pfnlst = NULL;
 	mp->dmai_cookie = NULL;
+	mp->dmai_ncookies = 0;
+	mp->dmai_curcookie = 0;
 	mp->dmai_fault = 0;
 	mp->dmai_fault_check = NULL;
 	mp->dmai_fault_notify = NULL;
@@ -775,6 +777,8 @@ niumx_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 		}
 	mp->dmai_cookie->dmac_laddress = mp->dmai_mapping;
 	mp->dmai_cookie->dmac_size = mp->dmai_size;
+	mp->dmai_ncookies = 1;
+	mp->dmai_curcookie = 0;
 	*ccountp = 1;
 	*cookiep = *mp->dmai_cookie;
 	DBG(NIUMX_DBG_DMA_BINDH, dip, "cookie %" PRIx64 "+%x, count=%d\n",
@@ -801,6 +805,7 @@ niumx_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 	if (mp->dmai_cookie) {
 		kmem_free(mp->dmai_cookie, sizeof (ddi_dma_cookie_t));
 		mp->dmai_cookie = NULL;
+		mp->dmai_ncookies = mp->dmai_curcookie = 0;
 	}
 
 	return (DDI_SUCCESS);

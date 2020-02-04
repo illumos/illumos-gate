@@ -104,6 +104,12 @@ struct constraint {
 };
 DECLARE_PTR_LIST(constraint_list, struct constraint);
 
+struct alloc_info {
+	const char *fn;
+	int size_param, nr;
+};
+extern struct alloc_info *alloc_funcs;
+
 struct bit_info {
 	unsigned long long set;
 	unsigned long long possible;
@@ -398,6 +404,7 @@ int sym_name_is(const char *name, struct expression *expr);
 int get_const_value(struct expression *expr, sval_t *sval);
 int get_value(struct expression *expr, sval_t *val);
 int get_implied_value(struct expression *expr, sval_t *val);
+int get_implied_value_fast(struct expression *expr, sval_t *sval);
 int get_implied_min(struct expression *expr, sval_t *sval);
 int get_implied_max(struct expression *expr, sval_t *val);
 int get_hard_max(struct expression *expr, sval_t *sval);
@@ -839,6 +846,7 @@ enum info_type {
 	NOSPEC_WB	= 1036,
 	STMT_CNT	= 1037,
 	TERMINATED	= 1038,
+	FRESH_ALLOC	= 1044,
 
 	/* put random temporary stuff in the 7000-7999 range for testing */
 	USER_DATA	= 8017,
@@ -1249,6 +1257,7 @@ int get_offset_from_container_of(struct expression *expr);
 char *get_container_name(struct expression *container, struct expression *expr);
 
 /* smatch_mtag.c */
+mtag_t str_to_mtag(const char *str);
 int get_string_mtag(struct expression *expr, mtag_t *tag);
 int get_toplevel_mtag(struct symbol *sym, mtag_t *tag);
 int create_mtag_alias(mtag_t tag, struct expression *expr, mtag_t *new);
@@ -1278,6 +1287,8 @@ bool is_nul_terminated(struct expression *expr);
 /* check_kernel.c  */
 bool is_ignored_kernel_data(const char *name);
 
+bool is_fresh_alloc_var_sym(const char *var, struct symbol *sym);
+bool is_fresh_alloc(struct expression *expr);
 static inline bool type_is_ptr(struct symbol *type)
 {
 	return type &&

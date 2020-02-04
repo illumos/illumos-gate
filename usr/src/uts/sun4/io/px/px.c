@@ -999,6 +999,8 @@ px_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 mapped:
 		*ccountp = 1;
 		MAKE_DMA_COOKIE(cookiep, mp->dmai_mapping, mp->dmai_size);
+		mp->dmai_ncookies = 1;
+		mp->dmai_curcookie = 1;
 		break;
 	case PX_DMAI_FLAGS_BYPASS:
 	case PX_DMAI_FLAGS_PTP:
@@ -1007,6 +1009,10 @@ mapped:
 		*ccountp = PX_WINLST(mp)->win_ncookies;
 		*cookiep =
 		    *(ddi_dma_cookie_t *)(PX_WINLST(mp) + 1); /* wholeobj */
+		/*
+		 * mp->dmai_ncookies and mp->dmai_curcookie are set by
+		 * px_dma_physwin().
+		 */
 		break;
 	default:
 		cmn_err(CE_PANIC, "%s%d: px_dma_bindhdl(%p): bad dma type",
@@ -1078,6 +1084,8 @@ px_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 		ddi_run_callback(&px_kmem_clid);
 	}
 	mp->dmai_flags &= PX_DMAI_FLAGS_PRESERVE;
+	mp->dmai_ncookies = 0;
+	mp->dmai_curcookie = 0;
 
 	return (DDI_SUCCESS);
 }
@@ -1120,6 +1128,8 @@ px_dma_win(dev_info_t *dip, dev_info_t *rdip,
 			    mp->dmai_size);
 		if (ccountp)
 			*ccountp = 1;
+		mp->dmai_ncookies = 1;
+		mp->dmai_curcookie = 1;
 		break;
 	case PX_DMAI_FLAGS_PTP:
 	case PX_DMAI_FLAGS_BYPASS: {
@@ -1137,6 +1147,8 @@ px_dma_win(dev_info_t *dip, dev_info_t *rdip,
 		win_p->win_curseg = 0;
 		if (ccountp)
 			*ccountp = win_p->win_ncookies;
+		mp->dmai_ncookies = win_p->win_ncookies;
+		mp->dmai_curcookie = 1;
 		}
 		break;
 	default:

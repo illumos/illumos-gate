@@ -1487,6 +1487,54 @@ print_processor_info(smbios_hdl_t *shp, id_t id, FILE *fp)
 }
 
 static void
+print_battery(smbios_hdl_t *shp, id_t id, FILE *fp)
+{
+	smbios_battery_t bat;
+
+	if (smbios_info_battery(shp, id, &bat) != 0) {
+		smbios_warn(shp, "failed to read battery information");
+		return;
+	}
+
+	if (bat.smbb_date != NULL) {
+		oprintf(fp, "  Manufacture Date: %s\n", bat.smbb_date);
+	}
+
+	if (bat.smbb_serial != NULL) {
+		oprintf(fp, "  Serial Number: %s\n", bat.smbb_serial);
+	}
+
+	if (bat.smbb_chem != SMB_BDC_UNKNOWN) {
+		desc_printf(smbios_battery_chem_desc(bat.smbb_chem),
+		    fp, "  Battery Chemistry: 0x%x", bat.smbb_chem);
+	}
+
+	if (bat.smbb_cap != 0) {
+		oprintf(fp, "  Design Capacity: %u mWh\n", bat.smbb_cap);
+	} else {
+		oprintf(fp, "  Design Capacity: unknown\n");
+	}
+
+	if (bat.smbb_volt != 0) {
+		oprintf(fp, "  Design Voltage: %u mV\n", bat.smbb_volt);
+	} else {
+		oprintf(fp, "  Design Voltage: unknown\n");
+	}
+
+	oprintf(fp, "  SBDS Version Number: %s\n", bat.smbb_version);
+	if (bat.smbb_err != UINT8_MAX) {
+		oprintf(fp, "  Maximum Error: %u\n", bat.smbb_err);
+	} else {
+		oprintf(fp, "  Maximum Error: unknown\n", bat.smbb_err);
+	}
+	oprintf(fp, "  SBDS Serial Number: %04x\n", bat.smbb_ssn);
+	oprintf(fp, "  SBDS Manufacture Date: %u-%02u-%02u\n", bat.smbb_syear,
+	    bat.smbb_smonth, bat.smbb_sday);
+	oprintf(fp, "  SBDS Device Chemistry: %s\n", bat.smbb_schem);
+	oprintf(fp, "  OEM-specific Information: 0x%08x\n", bat.smbb_oemdata);
+}
+
+static void
 print_pointdev(smbios_hdl_t *shp, id_t id, FILE *fp)
 {
 	smbios_pointdev_t pd;
@@ -1697,6 +1745,10 @@ print_struct(smbios_hdl_t *shp, const smbios_struct_t *sp, void *fp)
 	case SMB_TYPE_MEMDEVICEMAP:
 		oprintf(fp, "\n");
 		print_memdevmap(shp, sp->smbstr_id, fp);
+		break;
+	case SMB_TYPE_BATTERY:
+		oprintf(fp, "\n");
+		print_battery(shp, sp->smbstr_id, fp);
 		break;
 	case SMB_TYPE_POINTDEV:
 		oprintf(fp, "\n");

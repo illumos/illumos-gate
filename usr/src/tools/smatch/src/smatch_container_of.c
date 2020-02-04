@@ -215,17 +215,17 @@ static char *get_stored_container_name(struct expression *container,
 	return NULL;
 }
 
-char *get_container_name(struct expression *container, struct expression *expr)
+static char *get_container_name_helper(struct expression *container, struct expression *expr)
 {
 	struct symbol *container_sym, *sym;
-	struct expression *tmp;
 	static char buf[64];
 	char *ret, *shared;
 	bool star;
-	int cnt;
 
 	expr = strip_expr(expr);
 	container = strip_expr(container);
+	if (!expr || !container)
+		return NULL;
 
 	ret = get_stored_container_name(container, expr);
 	if (ret)
@@ -233,24 +233,10 @@ char *get_container_name(struct expression *container, struct expression *expr)
 
 	sym = expr_to_sym(expr);
 	container_sym = expr_to_sym(container);
-	if (sym && sym == container_sym)
-		goto found;
-
-	cnt = 0;
-	while ((tmp = get_assigned_expr(container))) {
-		container = strip_expr(tmp);
-		if (cnt++ > 3)
-			break;
-	}
-
-	cnt = 0;
-	while ((tmp = get_assigned_expr(expr))) {
-		expr = strip_expr(tmp);
-		if (cnt++ > 3)
-			break;
-	}
-
-found:
+	if (!sym || !container_sym)
+		return NULL;
+	if (sym != container_sym)
+		return NULL;
 
 	if (container->type == EXPR_DEREF)
 		star = true;
@@ -262,13 +248,6 @@ found:
 	if (expr->type == EXPR_PREOP && expr->op == '&')
 		expr = strip_expr(expr->unop);
 
-	sym = expr_to_sym(expr);
-	if (!sym)
-		return NULL;
-	container_sym = expr_to_sym(container);
-	if (!container_sym || sym != container_sym)
-		return NULL;
-
 	shared = get_shared_str(expr, container);
 	if (!shared)
 		return NULL;
@@ -278,6 +257,30 @@ found:
 		snprintf(buf, sizeof(buf), "%s", shared);
 
 	return buf;
+}
+
+char *get_container_name(struct expression *container, struct expression *expr)
+{
+	char *ret;
+
+	ret = get_container_name_helper(container, expr);
+	if (ret)
+		return ret;
+
+	ret = get_container_name_helper(get_assigned_expr(container), expr);
+	if (ret)
+		return ret;
+
+	ret = get_container_name_helper(container, get_assigned_expr(expr));
+	if (ret)
+		return ret;
+
+	ret = get_container_name_helper(get_assigned_expr(container),
+					get_assigned_expr(expr));
+	if (ret)
+		return ret;
+
+	return NULL;
 }
 
 static bool is_fn_ptr(struct expression *expr)

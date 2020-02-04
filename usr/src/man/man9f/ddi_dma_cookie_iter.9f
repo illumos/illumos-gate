@@ -1,0 +1,282 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2019 Robert Mustacchi
+.\"
+.Dd December 9, 2019
+.Dt DDI_DMA_COOKIE_ITER 9F
+.Os
+.Sh NAME
+.Nm ddi_dma_cookie_get ,
+.Nm ddi_dma_cookie_iter ,
+.Nm ddi_dma_cookie_one ,
+.Nm ddi_dma_ncookies ,
+.Nm ddi_dma_nextcookie
+.Nd retrieve DMA cookies
+.Sh SYNOPSIS
+.In sys/ddi.h
+.In sys/sunddi.h
+.Ft "const ddi_dma_cookie_t *"
+.Fo ddi_dma_cookie_iter
+.Fa "ddi_dma_handle_t handle"
+.Fa "const ddi_dma_cookie_t *cookiep"
+.Fc
+.Ft "const ddi_dma_cookie_t *"
+.Fo ddi_dma_cookie_get
+.Fa "ddi_dma_handle_t handle"
+.Fa "uint_t index"
+.Fc
+.Ft "const ddi_dma_cookie_t *"
+.Fo ddi_dma_cookie_one
+.Fa "ddi_dma_handle_t handle"
+.Fc
+.Ft "uint_t"
+.Fo ddi_dma_ncookies
+.Fa "ddi_dma_handle_t handle"
+.Fc
+.Ft void
+.Fo ddi_dma_nextcookie
+.Fa "ddi_dma_handle_t handle"
+.Fa "ddi_dma_cookie_t *cookiep"
+.Fc
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa handle
+The DMA handle obtained by a call to
+.Xr ddi_dma_alloc_handle 9F .
+.It Fa cookie
+A pointer to a
+.Xr ddi_dma_cookie 9S
+structure.
+.It Fa index
+An unsigned integer that represents the index of a cookie to obtain.
+The first entry is at index zero.
+.El
+.Sh DESCRIPTION
+The
+.Fn ddi_dma_cookie_iter ,
+.Fn ddi_dma_cookie_get ,
+and
+.Fn ddi_dma_cookie_one
+functions obtain information about DMA cookies.
+When a DMA request, represented by the DMA handle
+.Fa handle ,
+has been bound to a series of addresses with the
+.Xr ddi_dma_addr_bind_handle 9F
+or
+.Xr ddi_dma_buf_bind_handle 9F
+functions, the resulting addresses are stored in one or more
+.Xr ddi_dma_cookie 9S
+structures.
+the three different functions provide different ways to obtain cookies
+and are safe alternatives to the unsafe
+.Fn ddi_dma_nextcookie
+function.
+To see how to use these functions, please see the
+.Sx EXAMPLES
+section.
+.Pp
+The
+.Fn ddi_dma_cookie_iter
+function provides a way to iterate over all the cookies that are
+associated with the DMA handle
+.Fa handle .
+To get the first handle, pass
+.Dv NULL
+in
+.Fa cookiep .
+Do not use the DMA cookie returned from either of the
+.Xr ddi_dma_addr_bind_handle 9F
+or
+.Xr ddi_dma_buf_bind_handle 9F
+functions.
+To get subsequent cookies, pass the returned cookie as the argument
+.Fa cookiep .
+When the function returns
+.Dv NULL
+then that indicates that the last handle has been iterated over.
+.Pp
+The
+.Fn ddi_dma_cookie_get
+function returns a specific cookie.
+The
+.Fa index
+indicates which of the cookies should be returned.
+The first cookie is at index
+.Sy 0 .
+If an invalid index is specified, the function returns
+.Dv NULL .
+.Pp
+The
+.Ft ddi_dma_cookie_one
+function is a convenience function for DMA requests that have a single
+cookie.
+This function always returns the single cookie assosciated with the DMA
+handle
+.Fa handle .
+If this function is used when there is a DMA request with multiple
+cookies, then it will panic the system.
+It can never return
+.Dv NULL .
+.Pp
+The
+.Fn ddi_dma_ncookies
+function returns the number of DMA cookies that are associated with the
+DMA handle
+.Fa handle .
+If there are no DMA resources bound to the handle, then this will return
+.Sy 0 .
+.Pp
+The
+.Fn ddi_dma_nextcookie
+function was the historical function that was associated with obtaining
+DMA cookies.
+It should not be used due to several flaws.
+The
+.Fn ddi_dma_nextcookie
+function mutates the underlying DMA handle meaning that a driver cannot
+obtain a cookie a second time and thus a device driver using this
+interface must either manually keep storage of the cookie around wasting
+space or rebind the handle, wasting time.
+In addition, there is no way for the function to indicate that a driver
+has consumed all of its cookies.
+If for some reason a device driver calls the
+.Fn ddi_dma_nextcookie
+function more times than there are cookies, the results are undefined.
+In short, this function should not be used for any purpose.
+Use the
+.Fn ddi_dma_cookie_iter ,
+.Fn ddi_dma_cookie_get ,
+or
+.Fn ddi_dma_cookie_one
+functions instead.
+.Sh CONTEXT
+The
+.Fn ddi_dma_cookie_iter ,
+.Fn ddi_dma_cookie_get ,
+.Fn ddi_dma_cookie_one ,
+.Fn ddi_dma_ncookies ,
+and
+.Fn ddi_dma_nextcookie
+functions may be called from
+.Sy user ,
+.Sy kernel ,
+or
+.Sy interrupt
+context.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn ddi_dma_cookie_iter ,
+.Fn ddi_dma_cookie_get ,
+.Fn ddi_dma_cookie_one
+functions will return the requested DMA cookie.
+If there are no more cookies, or
+.Fa coookiep
+is invalid, the
+.Fn ddi_dma_cookie_iter
+function will return
+.Dv NULL .
+If
+.Fa index
+does not correspond to a valid cookie, the
+.Fn ddi_dma_cookie_get
+function will return
+.Dv NULL .
+If there is not exactly one DMA cookie, or another issue occurs, then the
+.Fn ddi_dma_cookie_one
+function will panic the system.
+.Pp
+Upon successful completion, the
+.Fn ddi_dma_ncookies
+function returns the number of cookies associated with
+.Fa handle .
+If there are none, then
+.Sy 0
+is returned.
+.Pp
+The
+.Fn ddi_dma_nextcookie
+function always updates
+.Fa cookiep
+regardless of whether it is valid or not.
+.Sh EXAMPLES
+.Sy Example 1
+Using the
+.Fn ddi_dma_cookie_iter
+function to obtain all DMA cookies.
+.Bd -literal
+/*
+ * This example assumes that either ddi_dma_addr_bind_handle() or
+ * ddi_dma_buf_bind_handle() has already been successfully called.
+ */
+void
+program_dma(ddi_dma_handle_t handle)
+{
+	const ddi_dma_cookie_t *c;
+
+	for (cookie = ddi_dma_cookie_iter(handle, NULL); c != NULL;
+	    c = ddi_dma_cookie_iter(handle, c)) {
+		/*
+		 * Use the dmac_laddress and dmac_size members to
+		 * properly program the device or descriptor rings.
+		 */
+	}
+}
+.Ed
+.Pp
+.Sy Example 2
+Using the
+.Fn ddi_dma_cookie_get
+function.
+.Bd -literal
+/*
+ * This example assumes that either ddi_dma_mem_alloc() has already
+ * been successfully called.
+ */
+int
+bind_dma(ddi_dma_handle_t handle, void *addr, size_t len)
+{
+	int ret;
+	uint_t i, ncookies;
+	ddi_dma_cookie_t first;
+
+	ret = ddi_dma_addr_bind_handle(handle, NULL, addr, len,
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, NULL, NULL, &first,
+	    &ncookies);
+	if (ret != DDI_DMA_MAPPED) {
+		return (ret);
+	}
+
+	/*
+	 * A driver doesn't need to store ncookies. It can get it again
+	 * by simply calling ddi_dma_ncookies() and using the result in
+	 * place of ncookies from ddi_dma_addr_bind_handle().
+	 */
+	for (i = 0; i < ncookies; i++) {
+		const ddi_dma_cookie_t *cookie;
+
+		cookie = ddi_dma_coookie_get(handle, i);
+		/*
+		 * Use the dmac_laddress and dmac_size members to
+		 * properly program the device or descriptor rings.
+		 */
+	}
+}
+.Ed
+.Sh SEE ALSO
+.Xr ddi_dma_addr_bind_handle 9F ,
+.Xr ddi_dma_alloc_handle 9F ,
+.Xr ddi_dma_buf_bind_handle 9F ,
+.Xr ddi_dma_unbind_handle 9F ,
+.Xr ddi_dma_cookie 9S
+.Rs
+.%T Writing Device Drivers
+.Re

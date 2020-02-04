@@ -1568,6 +1568,14 @@ void predefine(const char *name, int weak, const char *fmt, ...)
 	do_define(value->pos, NULL, ident, NULL, value, attr);
 }
 
+///
+// like predefine() but only if one of the non-standard dialect is chosen
+void predefine_nostd(const char *name)
+{
+	if ((standard & STANDARD_GNU) || (standard == STANDARD_NONE))
+		predefine(name, 1, "1");
+}
+
 static int do_handle_define(struct stream *stream, struct token **line, struct token *token, int attr)
 {
 	struct token *arglist, *expansion;

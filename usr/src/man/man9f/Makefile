@@ -154,11 +154,11 @@ MANFILES=	ASSERT.9f				\
 		ddi_dma_alloc_handle.9f			\
 		ddi_dma_buf_bind_handle.9f		\
 		ddi_dma_burstsizes.9f			\
+		ddi_dma_cookie_iter.9f			\
 		ddi_dma_free_handle.9f			\
 		ddi_dma_getwin.9f			\
 		ddi_dma_mem_alloc.9f			\
 		ddi_dma_mem_free.9f			\
-		ddi_dma_nextcookie.9f			\
 		ddi_dma_numwin.9f			\
 		ddi_dma_set_sbus64.9f			\
 		ddi_dma_sync.9f				\
@@ -748,6 +748,10 @@ MANLINKS=	AVL_NEXT.9f					\
 		ddi_devid_unregister.9f				\
 		ddi_devid_valid.9f				\
 		ddi_devmap_segmap.9f				\
+		ddi_dma_cookie_get.9f				\
+		ddi_dma_cookie_one.9f				\
+		ddi_dma_ncookies.9f				\
+		ddi_dma_nextcookie.9f				\
 		ddi_dmae_1stparty.9f				\
 		ddi_dmae_alloc.9f				\
 		ddi_dmae_disable.9f				\
@@ -1558,6 +1562,11 @@ ddi_devid_str_encode.9f			:= LINKSRC = ddi_devid_compare.9f
 ddi_devid_str_free.9f			:= LINKSRC = ddi_devid_compare.9f
 ddi_devid_unregister.9f			:= LINKSRC = ddi_devid_compare.9f
 ddi_devid_valid.9f			:= LINKSRC = ddi_devid_compare.9f
+
+ddi_dma_cookie_get.9f			:= LINKSRC = ddi_dma_cookie_iter.9f
+ddi_dma_cookie_one.9f			:= LINKSRC = ddi_dma_cookie_iter.9f
+ddi_dma_ncookies.9f			:= LINKSRC = ddi_dma_cookie_iter.9f
+ddi_dma_nextcookie.9f			:= LINKSRC = ddi_dma_cookie_iter.9f
 
 ddi_dmae_1stparty.9f			:= LINKSRC = ddi_dmae.9f
 ddi_dmae_alloc.9f			:= LINKSRC = ddi_dmae.9f

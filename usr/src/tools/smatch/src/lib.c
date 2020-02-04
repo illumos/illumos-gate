@@ -318,13 +318,7 @@ int funsigned_char = UNSIGNED_CHAR;
 
 int preprocess_only;
 
-static enum { STANDARD_C89,
-              STANDARD_C94,
-              STANDARD_C99,
-              STANDARD_C11,
-              STANDARD_GNU11,
-              STANDARD_GNU89,
-              STANDARD_GNU99, } standard = STANDARD_GNU89;
+enum standard standard = STANDARD_GNU89;
 
 int arch_m64 = ARCH_M64_DEFAULT;
 int arch_msize_long = 0;
@@ -1313,6 +1307,8 @@ static void predefined_macros(void)
 	if (optimize_size)
 		predefine("__OPTIMIZE_SIZE__", 0, "1");
 
+	predefine("__PRAGMA_REDEFINE_EXTNAME", 1, "1");
+
 	// Temporary hacks
 	predefine("__extension__", 0, NULL);
 	predefine("__pragma__", 0, NULL);
@@ -1326,7 +1322,6 @@ static void predefined_macros(void)
 		break;
 	case ARCH_LP64:
 		predefine("__LP64__", 1, "1");
-		predefine("__LP64", 1, "1");
 		predefine("_LP64", 1, "1");
 		break;
 	case ARCH_LLP64:
@@ -1389,32 +1384,38 @@ static void predefined_macros(void)
 	case MACH_SPARC32:
 		predefine("__sparc__", 1, "1");
 		predefine("__sparc", 1, "1");
+		predefine_nostd("sparc");
 		break;
 	case MACH_X86_64:
 		if (arch_m64 != ARCH_LP32) {
 			predefine("__x86_64__", 1, "1");
 			predefine("__x86_64", 1, "1");
+			predefine("__amd64__", 1, "1");
+			predefine("__amd64", 1, "1");
 			break;
 		}
 		/* fall-through */
 	case MACH_I386:
 		predefine("__i386__", 1, "1");
 		predefine("__i386", 1, "1");
-		predefine("i386", 1, "1");
+		predefine_nostd("i386");
 		break;
 	}
 
-	predefine("__PRAGMA_REDEFINE_EXTNAME", 1, "1");
-
-#ifdef	__sun
+#if defined(__unix__)
 	predefine("__unix__", 1, "1");
 	predefine("__unix", 1, "1");
-	predefine("unix", 1, "1");
+	predefine_nostd("unix");
+#endif
+
+
+#if defined(__sun__) || defined(__sun)
 	predefine("__sun__", 1, "1");
 	predefine("__sun", 1, "1");
-	predefine("sun", 1, "1");
+	predefine_nostd("sun");
 	predefine("__svr4__", 1, "1");
 #endif
+
 }
 
 static void create_builtin_stream(void)

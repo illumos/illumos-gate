@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_DMAE 9F "May 24, 2014"
+.TH DDI_DMAE 9F "Jan 18, 2020"
 .SH NAME
 ddi_dmae, ddi_dmae_alloc, ddi_dmae_release, ddi_dmae_prog, ddi_dmae_disable,
 ddi_dmae_enable, ddi_dmae_stop, ddi_dmae_getcnt, ddi_dmae_1stparty,
@@ -58,11 +58,9 @@ ddi_dmae_getattr \- system DMA engine functions
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris DDI specific (Solaris DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -157,7 +155,6 @@ A pointer to a \fBDMA \fR attribute structure. See \fBddi_dma_attr\fR(9S).
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 There are three possible ways that a device can perform \fBDMA\fR engine
 functions:
@@ -201,7 +198,6 @@ configuration is necessary to enable this mode.
 .RE
 
 .SS "\fBddi_dmae_alloc()\fR"
-.sp
 .LP
 The \fBddi_dmae_alloc()\fR function is used to acquire a \fBDMA\fR channel of
 the system \fBDMA\fR engine. \fBddi_dmae_alloc()\fR allows only one device at a
@@ -228,7 +224,6 @@ the value \fBDDI_DMA_CALLBACK_DONE\fR. If it tries to allocate the channel but
 fails to do so, it must return the value \fBDDI_DMA_CALLBACK_RUNOUT\fR. In this
 case, the callback function is put back on a list to be called again later.
 .SS "\fBddi_dmae_prog()\fR"
-.sp
 .LP
 The \fBddi_dmae_prog()\fR function programs the \fBDMA\fR channel for a
 \fBDMA\fR transfer. The \fBddi_dmae_req\fR structure contains all the
@@ -250,30 +245,25 @@ resources using \fBDMA\fR setup functions such as \fBddi_dma_mem_alloc\fR(9F).
 contains the address and count. Then this cookie is passed to
 \fBddi_dmae_prog()\fR.
 .SS "\fBddi_dmae_disable()\fR"
-.sp
 .LP
 The \fBddi_dmae_disable()\fR function disables the \fBDMA\fR channel so that it
 no longer responds to a device's  \fBDMA\fR service requests.
 .SS "\fBddi_dmae_enable()\fR"
-.sp
 .LP
 The \fBddi_dmae_enable()\fR function enables the \fBDMA\fR channel for
 operation. This may be used to re-enable the channel after a call to
 \fBddi_dmae_disable()\fR. The channel is automatically enabled after successful
 programming by \fBddi_dmae_prog()\fR.
 .SS "\fBddi_dmae_stop()\fR"
-.sp
 .LP
 The \fBddi_dmae_stop()\fR function disables the channel and terminates any
 active operation.
 .SS "\fBddi_dmae_getcnt()\fR"
-.sp
 .LP
 The \fBddi_dmae_getcnt()\fR function examines the count register of the
 \fBDMA\fR channel and sets \fI*countp\fR to the number of bytes remaining to be
 transferred.  The channel is assumed to be stopped.
 .SS "\fBddi_dmae_1stparty()\fR"
-.sp
 .LP
 In the case of \fBISA\fR buses, \fBddi_dmae_1stparty()\fR configures a channel
 in the system's \fBDMA\fR engine to operate in a ``slave'' (``cascade'') mode.
@@ -285,7 +275,6 @@ first be allocated using \fBddi_dmae_alloc()\fR and then configured using
 I/O, including the necessary \fBDMA\fR address and count values obtained from
 the \fBddi_dma_cookie\fR(9S).
 .SS "\fBddi_dmae_getattr()\fR"
-.sp
 .LP
 The \fBddi_dmae_getattr()\fR function fills in the \fBDMA\fR attribute
 structure, pointed to by \fIattrp\fR, with the \fBDMA\fR attributes of the
@@ -295,9 +284,8 @@ mastering or use first-party \fBDMA\fR must create and initialize their own
 The \fBDMA\fR attribute structure must be passed to the \fBDMA\fR resource
 allocation functions to provide the information necessary to break the
 \fBDMA\fR request into \fBDMA\fR windows and \fBDMA\fR cookies. See
-\fBddi_dma_nextcookie\fR(9F) and \fBddi_dma_getwin\fR(9F).
+\fBddi_dma_cookie_iter\fR(9F) and \fBddi_dma_getwin\fR(9F).
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDDI_SUCCESS\fR\fR
@@ -326,14 +314,12 @@ available and the value of \fIdmae_waitfp\fR is not \fBDDI_DMA_SLEEP\fR.
 .RE
 
 .SH CONTEXT
-.sp
 .LP
 If \fBddi_dmae_alloc()\fR is called from interrupt context, then its
 \fIdmae_waitfp\fR argument and the callback function must not have the value
 \fBDDI_DMA_SLEEP\fR. Otherwise, all these routines can be called from user,
 interrupt, or kernel context.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -349,10 +335,9 @@ Architecture	x86
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBisa\fR(4), \fBattributes\fR(5), \fBddi_dma_buf_setup\fR(9F),
-\fBddi_dma_getwin\fR(9F), \fBddi_dma_nextcookie\fR(9F),
+\fBddi_dma_cookie_iter\fR(9F), \fBddi_dma_getwin\fR(9F),
 \fBddi_dma_mem_alloc\fR(9F), \fBddi_dma_addr_bind_handle\fR(9F), \fBddi_dma_attr\fR(9S),
 \fBddi_dma_cookie\fR(9S),
 \fBddi_dmae_req\fR(9S)

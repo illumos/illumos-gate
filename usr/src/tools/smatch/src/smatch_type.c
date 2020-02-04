@@ -789,7 +789,7 @@ static int type_str_helper(char *buf, int size, struct symbol *type)
 	int n;
 
 	if (!type)
-		return snprintf(buf, size, "<unknown>");
+		return snprintf(buf, size, "<null type>");
 
 	if (type->type == SYM_BASETYPE) {
 		return snprintf(buf, size, "%s", base_type_str(type));

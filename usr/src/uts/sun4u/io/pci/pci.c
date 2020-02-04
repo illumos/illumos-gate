@@ -731,6 +731,8 @@ pci_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 mapped:
 		*ccountp = 1;
 		MAKE_DMA_COOKIE(cookiep, mp->dmai_mapping, mp->dmai_size);
+		mp->dmai_ncookies = 1;
+		mp->dmai_curcookie = 1;
 		break;
 	case DMAI_FLAGS_BYPASS:
 	case DMAI_FLAGS_PEER_TO_PEER:
@@ -738,6 +740,10 @@ mapped:
 			goto map_err;
 		*ccountp = WINLST(mp)->win_ncookies;
 		*cookiep = *(ddi_dma_cookie_t *)(WINLST(mp) + 1); /* wholeobj */
+		/*
+		 * mp->dmai_ncookies and mp->dmai_curcookie are set by
+		 * pci_dma_physwin().
+		 */
 		break;
 	default:
 		panic("%s%d: pci_dma_bindhdl(%p): bad dma type",
@@ -809,6 +815,8 @@ pci_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 	SYNC_BUF_PA(mp) = 0;
 
 	mp->dmai_error.err_cf = NULL;
+	mp->dmai_ncookies = 0;
+	mp->dmai_curcookie = 0;
 
 	return (DDI_SUCCESS);
 }
@@ -845,6 +853,8 @@ pci_dma_win(dev_info_t *dip, dev_info_t *rdip,
 			    mp->dmai_size);
 		if (ccountp)
 			*ccountp = 1;
+		mp->dmai_ncookies = 1;
+		mp->dmai_curcookie = 1;
 		break;
 	case DMAI_FLAGS_PEER_TO_PEER:
 	case DMAI_FLAGS_BYPASS: {
@@ -863,6 +873,8 @@ pci_dma_win(dev_info_t *dip, dev_info_t *rdip,
 		win_p->win_curseg = 0;
 		if (ccountp)
 			*ccountp = win_p->win_ncookies;
+		mp->dmai_ncookies = win_p->win_ncookies;
+		mp->dmai_curcookie = 1;
 		}
 		break;
 	default:

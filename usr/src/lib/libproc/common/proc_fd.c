@@ -155,7 +155,8 @@ proc_get_fdinfo(pid_t pid, int fd)
 			break;
 		}
 
-		if ((l = read(ifd, info, st.st_size)) == -1) {
+		if (lseek(ifd, 0, SEEK_SET) != 0 ||
+		    (l = read(ifd, info, st.st_size)) == -1) {
 			err = errno;
 			break;
 		}
@@ -163,6 +164,9 @@ proc_get_fdinfo(pid_t pid, int fd)
 		/* Walk the data to check that is properly terminated. */
 
 		off = offsetof(prfdinfo_t, pr_misc);
+
+		if (l < off + sizeof (pr_misc_header_t))
+			continue;
 
 		while (off <= l - sizeof (pr_misc_header_t)) {
 			pr_misc_header_t *misc;
