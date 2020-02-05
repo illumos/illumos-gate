@@ -49,6 +49,7 @@
 
 #include <libzfs.h>
 #include <libzfs_core.h>
+#include <libzutil.h>
 
 #include "zfs_namecheck.h"
 #include "zfs_prop.h"

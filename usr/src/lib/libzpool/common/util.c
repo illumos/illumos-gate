@@ -34,7 +34,9 @@
 #include <sys/spa.h>
 #include <sys/fs/zfs.h>
 #include <sys/refcount.h>
+#include <sys/zfs_ioctl.h>
 #include <dlfcn.h>
+#include <libzutil.h>
 
 extern void nicenum(uint64_t num, char *buf, size_t);
 
@@ -197,3 +199,56 @@ set_global_var(char *arg)
 
 	return (0);
 }
+
+static nvlist_t *
+refresh_config(void *unused, nvlist_t *tryconfig)
+{
+	return (spa_tryimport(tryconfig));
+}
+
+static int
+pool_active(void *unused, const char *name, uint64_t guid,
+    boolean_t *isactive)
+{
+	zfs_cmd_t *zcp;
+	nvlist_t *innvl;
+	char *packed = NULL;
+	size_t size = 0;
+	int fd, ret;
+
+	/*
+	 * Use ZFS_IOC_POOL_SYNC to confirm if a pool is active
+	 */
+
+	fd = open("/dev/zfs", O_RDWR);
+	if (fd < 0)
+		return (-1);
+
+	zcp = umem_zalloc(sizeof (zfs_cmd_t), UMEM_NOFAIL);
+
+	innvl = fnvlist_alloc();
+	fnvlist_add_boolean_value(innvl, "force", B_FALSE);
+
+	(void) strlcpy(zcp->zc_name, name, sizeof (zcp->zc_name));
+	packed = fnvlist_pack(innvl, &size);
+	zcp->zc_nvlist_src = (uint64_t)(uintptr_t)packed;
+	zcp->zc_nvlist_src_size = size;
+
+	ret = ioctl(fd, ZFS_IOC_POOL_SYNC, zcp);
+
+	fnvlist_pack_free(packed, size);
+	free((void *)(uintptr_t)zcp->zc_nvlist_dst);
+	nvlist_free(innvl);
+	umem_free(zcp, sizeof (zfs_cmd_t));
+
+	(void) close(fd);
+
+	*isactive = (ret == 0);
+
+	return (0);
+}
+
+const pool_config_ops_t libzpool_config_ops = {
+	.pco_refresh_config = refresh_config,
+	.pco_pool_active = pool_active,
+};

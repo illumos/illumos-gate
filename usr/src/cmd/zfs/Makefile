@@ -24,7 +24,7 @@
 # Copyright 2010 Nexenta Systems, Inc. All rights reserved.
 # Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 # Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 PROG=		zfs
@@ -41,12 +41,13 @@ LINKPROGS=	mount umount
 ROOTETCFSTYPE=  $(ROOTETC)/fs/$(FSTYPE)
 USRLIBFSTYPE=	$(ROOTLIB)/fs/$(FSTYPE)
 
-LDLIBS += -lzfs_core -lzfs -luutil -lumem -lnvpair -lsec -lidmap
+LDLIBS += -lzfs_core -lzfs -luutil -lumem -lnvpair -lsec -lidmap -lzutil
 # cmdutils has list(9F) functions used by the project code.
 LDLIBS += -lcmdutils
 
 INCS += -I../../common/zfs
 INCS += -I$(SRC)/uts/common/fs/zfs
+INCS += -I../../lib/libzutil/common
 
 CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all

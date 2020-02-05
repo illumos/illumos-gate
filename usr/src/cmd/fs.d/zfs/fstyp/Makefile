@@ -22,12 +22,12 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2020 Joyent, Inc.
 #
 
 FSTYP_VERS=1
 FSTYPE=		zfs
-LIBPROG=	fstyp.so.${FSTYP_VERS} 
+LIBPROG=	fstyp.so.${FSTYP_VERS}
 
 include ../../../../lib/Makefile.lib
 include ../../Makefile.fstype
@@ -36,16 +36,17 @@ include ../../Makefile.fstype
 MAPFILES =
 
 CFLAGS +=	$(C_PICFLAGS)
+CFLAGS += -I../../../../lib/libzutil/common
 DYNLIB=		$(LIBPROG)
 
-LDLIBS += -lnvpair -lzfs -lc
+LDLIBS += -lnvpair -lc -lzutil
 
 LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN -erroff=E_NAME_DEF_NOT_USED2
 LINTFLAGS64 += -erroff=E_BAD_PTR_CAST_ALIGN -erroff=E_NAME_DEF_NOT_USED2
 
 SRCS=	${LIBPROG:%.so.$(FSTYP_VERS)=%.c}
 
-CPPFLAGS += 	-DFSTYP_VERS=${FSTYP_VERS} -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
+CPPFLAGS += -DFSTYP_VERS=${FSTYP_VERS} -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 #
 # Override PMAP dependency
@@ -76,7 +77,7 @@ lint: lint_SRCS
 cstyle:
 	$(CSTYLE) $(SRCS)
 
-clean:     
+clean:
 	${RM} $(LIBPROG)
 
 clobber: clean
