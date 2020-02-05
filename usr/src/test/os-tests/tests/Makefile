@@ -33,18 +33,23 @@ SUBDIRS =       \
 		$(SUBDIRS_$(MACH))
 
 PROGS = \
+	odirectory \
 	OS-6097
 
+CPPFLAGS += -D_REENTRANT
 PROGS32 = $(PROGS:%=%.32)
 PROGS64 = $(PROGS:%=%.64)
-
-OS-6097.32 :=	LDLIBS += -ldlpi
-OS-6097.64 :=	LDLIBS64 += -ldlpi
 
 ROOTOPTDIR = $(ROOT)/opt/os-tests/tests
 ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTDIR)/%) \
 	$(PROGS64:%=$(ROOTOPTDIR)/%) \
 	$(SCRIPTS:%=$(ROOTOPTDIR)/%)
+
+odirectory.32 :=	LDLIBS += -lsocket
+odirectory.64 :=	LDLIBS64 += -lsocket
+
+OS-6097.32 :=	LDLIBS += -ldlpi
+OS-6097.64 :=	LDLIBS64 += -ldlpi
 
 include $(SRC)/cmd/Makefile.cmd
 
@@ -52,7 +57,6 @@ all     :=      TARGET = all
 install :=      TARGET = install
 clean   :=      TARGET = clean
 clobber :=      TARGET = clobber
-lint    :=      TARGET = lint
 
 .KEEP_STATE:
 
@@ -60,7 +64,7 @@ install: $(SUBDIRS) $(ROOTOPTPROGS)
 
 all: $(SUBDIRS) $(PROGS32) $(PROGS64)
 
-clean lint: $(SUBDIRS)
+clean: $(SUBDIRS)
 
 $(ROOTOPTPROGS): $(PROGS32) $(PROGS64) $(ROOTOPTDIR)
 

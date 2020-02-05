@@ -192,9 +192,9 @@ walkcontext(const ucontext_t *uptr, int (*operate_func)(uintptr_t, int, void *),
 	ucontext_t *oldctx = uptr->uc_link;
 
 	int	fd;
-	int 	sig;
+	int	sig;
 #if defined(__sparc)
-	int 	signo = 0;
+	int	signo = 0;
 #endif
 
 	struct frame *savefp;
@@ -227,7 +227,7 @@ walkcontext(const ucontext_t *uptr, int (*operate_func)(uintptr_t, int, void *),
 	 */
 #if defined(__sparc)
 
-	uintptr_t special_pc = NULL;
+	uintptr_t special_pc = (uintptr_t)NULL;
 	int special_size = 0;
 
 	extern void thr_sighndlrinfo(void (**func)(), int *funcsize);
@@ -415,8 +415,8 @@ callback(uintptr_t pc, int signo, void *arg)
 int
 backtrace(void **buffer, int count)
 {
-	backtrace_t 	bt;
-	ucontext_t 	u;
+	backtrace_t	bt;
+	ucontext_t	u;
 
 	bt.bt_buffer = buffer;
 	bt.bt_maxcount = count;

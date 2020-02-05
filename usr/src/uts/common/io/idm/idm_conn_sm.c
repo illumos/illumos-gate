@@ -23,6 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <sys/cpuvar.h>
@@ -341,6 +342,7 @@ idm_conn_event_handler(void *event_ctx_opaque)
 			 */
 			IDM_SM_LOG(CE_NOTE, "*** drop PDU %p", (void *) pdu);
 			idm_pdu_complete(pdu, IDM_STATUS_FAIL);
+			event_ctx->iec_info = (uintptr_t)NULL;
 			break;
 		default:
 			ASSERT(0);
@@ -419,6 +421,10 @@ idm_conn_event_handler(void *event_ctx_opaque)
 					idm_pdu_tx_forward(ic, pdu);
 				}
 			}
+			break;
+		case CA_DROP:
+			/* Already completed above. */
+			ASSERT3P(event_ctx->iec_info, ==, NULL);
 			break;
 		default:
 			ASSERT(0);

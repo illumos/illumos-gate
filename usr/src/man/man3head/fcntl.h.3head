@@ -43,7 +43,7 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH FCNTL.H 3HEAD "April 9, 2016"
+.TH FCNTL.H 3HEAD "January 20, 2020"
 .SH NAME
 fcntl.h, fcntl \- file control options
 .SH SYNOPSIS
@@ -374,6 +374,15 @@ Create file if it does not exist.
 .sp
 .ne 2
 .na
+.B O_DIRECTORY
+.ad
+.RS 12n
+Fail unless the path is a directory.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBO_EXCL\fR\fR
 .ad
 .RS 12n
@@ -421,6 +430,15 @@ File status flags used for \fBfcntl()\fR, \fBopen()\fR, and \fBopen()\fR:
 .ad
 .RS 14n
 Set append mode.
+.RE
+
+.sp
+.ne 2
+.na
+.B O_CLOEXEC
+.ad
+.RS 12n
+The file should be closed on any calls to \fBexec\fR(2).
 .RE
 
 .sp

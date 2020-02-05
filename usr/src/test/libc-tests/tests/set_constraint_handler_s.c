@@ -33,11 +33,11 @@ main(void)
 	assert(set_constraint_handler_s(abort_handler_s) == NULL);
 
 	/* abort handler */
-	set_constraint_handler_s(abort_handler_s);
+	(void) set_constraint_handler_s(abort_handler_s);
 	assert(set_constraint_handler_s(ignore_handler_s) == abort_handler_s);
 
 	/* ignore handler */
-	set_constraint_handler_s(ignore_handler_s);
+	(void) set_constraint_handler_s(ignore_handler_s);
 	assert(set_constraint_handler_s(abort_handler_s) == ignore_handler_s);
 
 	return (0);

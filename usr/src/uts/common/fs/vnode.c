@@ -972,6 +972,7 @@ vn_openat(
 	int estale_retry = 0;
 	struct shrlock shr;
 	struct shr_locowner shr_own;
+	boolean_t create;
 
 	mode = 0;
 	accessflags = 0;
@@ -991,8 +992,31 @@ vn_openat(
 	if (filemode & FAPPEND)
 		accessflags |= V_APPEND;
 
+	/*
+	 * We need to handle the case of FCREAT | FDIRECTORY and the case of
+	 * FEXCL. If all three are specified, then we always fail because we
+	 * cannot create a directory through this interface and FEXCL says we
+	 * need to fail the request if we can't create it. If, however, only
+	 * FCREAT | FDIRECTORY are specified, then we can treat this as the case
+	 * of opening a file that already exists. If it exists, we can do
+	 * something and if not, we fail. Effectively FCREAT | FDIRECTORY is
+	 * treated as FDIRECTORY.
+	 */
+	if ((filemode & (FCREAT | FDIRECTORY | FEXCL)) ==
+	    (FCREAT | FDIRECTORY | FEXCL)) {
+		return (EINVAL);
+	}
+
+	if ((filemode & (FCREAT | FDIRECTORY)) == (FCREAT | FDIRECTORY)) {
+		create = B_FALSE;
+	} else if ((filemode & FCREAT) != 0) {
+		create = B_TRUE;
+	} else {
+		create = B_FALSE;
+	}
+
 top:
-	if (filemode & FCREAT) {
+	if (create) {
 		enum vcexcl excl;
 
 		/*
@@ -1089,11 +1113,13 @@ top:
 		 */
 		if (error = VOP_ACCESS(vp, mode, accessflags, CRED(), NULL))
 			goto out;
+
 		/*
-		 * Require FSEARCH to return a directory.
-		 * Require FEXEC to return a regular file.
+		 * Require FSEARCH and FDIRECTORY to return a directory. Require
+		 * FEXEC to return a regular file.
 		 */
-		if ((filemode & FSEARCH) && vp->v_type != VDIR) {
+		if ((filemode & (FSEARCH|FDIRECTORY)) != 0 &&
+		    vp->v_type != VDIR) {
 			error = ENOTDIR;
 			goto out;
 		}

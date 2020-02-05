@@ -19,7 +19,7 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.Dd February 19, 2018
+.Dd February 3, 2020
 .Dt CHECK_RTIME 1ONBLD
 .Os
 .Sh NAME
@@ -192,7 +192,7 @@ the symbol sorting sections, and for direct bindings.
 These checks are carried out for the following reasons:
 .Bl -bullet
 .It
-A concatenated relocation section 
+A concatenated relocation section
 .Pq Em .SUNW_reloc
 provides optimal symbol table access at runtime, and thus reduces the overhead
 of relocating the shared object.
@@ -389,11 +389,11 @@ Dependencies are printed as:
 .Dl foo: NEEDED=bar.so.1
 .It
 Dependencies may be marked as forbidden
-.Pq see Sx EXCEPTION FILE FORMAT 
+.Pq see Sx EXCEPTION FILE FORMAT
 this allows the build to warn should people use them accidentally.
 Forbidden dependencies are printed as:
 .Pp
-.Dl foo: NEEDED=bar.so.1	<forbidden dependency, missing -nodefaultlibs?>
+.Dl foo: NEEDED=bar.so.1  <forbidden dependency, missing -nodefaultlibs?>
 .El
 .Pp
 .Nm check_rtime
@@ -546,7 +546,7 @@ regular expression:
 Since whitespace is used as a separator, the regular
 expression cannot itself contain whitespace.
 Use of the
-.Ql \\s
+.Ql \es
 character class to represent whitespace within the regular expression is
 recommended.
 .Pp
@@ -595,13 +595,13 @@ exceptions will not suffice.
 Objects that are allowed to contain debugging information (stabs).
 .It TEXTREL
 Objects for which we allow relocations to the text segment.
-.It BUNDEF_OBJ
+.It UNREF_OBJ
 Objects that are allowed to be unreferenced.
 .It UNDEF_REF
 Objects that are allowed undefined references.
 .It UNUSED_DEPS
 Objects that are allowed to have unused dependencies.
-.It BUNUSED_OBJ
+.It UNUSED_OBJ
 Objects that are always allowed to be unused dependencies.
 .It UNUSED_RPATH
 Objects that are allowed to have unused runpath directories.

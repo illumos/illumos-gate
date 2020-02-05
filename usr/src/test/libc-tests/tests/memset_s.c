@@ -46,33 +46,33 @@ main(void)
 	char b[3];
 
 	/* null ptr */
-	set_constraint_handler_s(ignore_handler_s);
+	(void) set_constraint_handler_s(ignore_handler_s);
 	assert(memset_s(0, 1, 1, 1) != 0);
 
 	/* smax > rmax */
-	set_constraint_handler_s(ignore_handler_s);
+	(void) set_constraint_handler_s(ignore_handler_s);
 	assert(memset_s(&b, RSIZE_MAX + 1, 1, 1) != 0);
 
 	/* smax < 0 */
-	set_constraint_handler_s(ignore_handler_s);
+	(void) set_constraint_handler_s(ignore_handler_s);
 	assert(memset_s(&a, -1, 1, 1) != 0);
 
 	/* normal */
-	set_constraint_handler_s(ignore_handler_s);
+	(void) set_constraint_handler_s(ignore_handler_s);
 	a = 3;
 	assert(memset_s(&a, 1, 5, 1) == 0);
 	assert(a == 5);
 
 	/* n > rmax */
-	set_constraint_handler_s(ignore_handler_s);
+	(void) set_constraint_handler_s(ignore_handler_s);
 	assert(memset_s(&a, 1, 1, RSIZE_MAX + 1) != 0);
 
 	/* n < 0 */
-	set_constraint_handler_s(ignore_handler_s);
+	(void) set_constraint_handler_s(ignore_handler_s);
 	assert(memset_s(&a, 1, 1, -1) != 0);
 
 	/* n < smax */
-	set_constraint_handler_s(ignore_handler_s);
+	(void) set_constraint_handler_s(ignore_handler_s);
 	b[0] = 1; b[1] = 2; b[2] = 3;
 	assert(memset_s(&b[0], 3, 9, 1) == 0);
 	assert(b[0] == 9);
@@ -80,7 +80,7 @@ main(void)
 	assert(b[2] == 3);
 
 	/* n > smax, handler */
-	set_constraint_handler_s(h);
+	(void) set_constraint_handler_s(h);
 	e = 0;
 	m = NULL;
 	b[0] = 1; b[1] = 2; b[2] = 3;
@@ -92,7 +92,7 @@ main(void)
 	assert(b[2] == 3);
 
 	/* smax > rmax, handler */
-	set_constraint_handler_s(h);
+	(void) set_constraint_handler_s(h);
 	e = 0;
 	m = NULL;
 	assert(memset_s(&a, RSIZE_MAX + 1, 1, 1) != 0);
@@ -100,7 +100,7 @@ main(void)
 	assert(strcmp(m, "memset_s: smax > RSIZE_MAX") == 0);
 
 	/* smax < 0, handler */
-	set_constraint_handler_s(h);
+	(void) set_constraint_handler_s(h);
 	e = 0;
 	m = NULL;
 	assert(memset_s(&a, -1, 1, 1) != 0);
@@ -108,7 +108,7 @@ main(void)
 	assert(strcmp(m, "memset_s: smax > RSIZE_MAX") == 0);
 
 	/* n > rmax, handler */
-	set_constraint_handler_s(h);
+	(void) set_constraint_handler_s(h);
 	e = 0;
 	m = NULL;
 	assert(memset_s(&a, 1, 1, RSIZE_MAX + 1) != 0);
@@ -116,7 +116,7 @@ main(void)
 	assert(strcmp(m, "memset_s: n > RSIZE_MAX") == 0);
 
 	/* n < 0, handler */
-	set_constraint_handler_s(h);
+	(void) set_constraint_handler_s(h);
 	e = 0;
 	m = NULL;
 	assert(memset_s(&a, 1, 1, -1) != 0);

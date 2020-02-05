@@ -58,9 +58,6 @@ SCRIPTS = \
 
 CPPFLAGS += -D_REENTRANT
 
-# needs work
-SMOFF += all_func_returns,snprintf_overflow,unreachable
-
 PROGS32 = $(PROGS:%=%.32)
 PROGS64 = \
 	$(PROGS:%=%.64) \
