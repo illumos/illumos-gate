@@ -21,15 +21,14 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 Peter Tribble.
  *
  * Littleneck Platform specific functions.
  *
- * 	called when :
+ *	called when :
  *      machine_type ==  MTYPE_LITTLENECK
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -81,7 +80,7 @@ void	display_io_cards(struct io_card *list);
 void	display_diaginfo(int flag, Prom_node *root, Sys_tree *tree,
 				struct system_kstat_data *kstats);
 void	display_ffb(Board_node *board, int table);
-void	display_memoryconf(Sys_tree *tree, struct grp_info *grps);
+void	display_memoryconf(Sys_tree *tree);
 
 /* local functions */
 static	int disp_envc_status(void);
@@ -231,9 +230,8 @@ display_cpus(Board_node *board)
 	}
 }
 
-/*ARGSUSED0*/
 void
-display_memoryconf(Sys_tree *tree, struct grp_info *grps)
+display_memoryconf(Sys_tree *tree)
 {
 	Board_node	*bnode = tree->bd_list;
 

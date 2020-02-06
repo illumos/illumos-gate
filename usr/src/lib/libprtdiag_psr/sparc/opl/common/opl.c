@@ -21,10 +21,11 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 Peter Tribble.
  *
  * Opl Platform specific functions.
  *
- * 	called when :
+ *	called when :
  *	machine_type == MTYPE_OPL
  */
 
@@ -85,12 +86,12 @@ void	display_ffb(Board_node *, int);
 void	display_sbus(Board_node *board);
 void	display_cpu_devices(Sys_tree *tree);
 void	display_cpus(Board_node *board);
-void	display_memoryconf(Sys_tree *tree, struct grp_info *grps);
+void	display_memoryconf(Sys_tree *tree);
 void	display_io_cards(struct io_card *list);
 void	display_io_devices(Sys_tree *tree);
 void	display_diaginfo(int flag, Prom_node *root, Sys_tree *tree,
     struct system_kstat_data *kstats);
-Prop 	*find_prop(Prom_node *pnode, char *name);
+Prop	*find_prop(Prom_node *pnode, char *name);
 int	do_piclinfo(int);
 int	get_proc_mode(void);
 
@@ -500,9 +501,8 @@ get_opl_mem_regs(Board_node *bnode)
 /*
  * Display memory information.
  */
-/*ARGSUSED*/
 void
-display_memoryconf(Sys_tree *tree, struct grp_info *grps)
+display_memoryconf(Sys_tree *tree)
 {
 	Board_node	*bnode = tree->bd_list;
 	uint64_t	total_mem = 0, total_sys_mem = 0;

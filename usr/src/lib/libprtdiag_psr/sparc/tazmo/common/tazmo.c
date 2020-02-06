@@ -22,6 +22,7 @@
 /*
  * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 Peter Tribble.
  *
  * Tazmo Platform specific functions.
  *
@@ -67,7 +68,7 @@ extern	int	print_flag;
  * at runtime (workgroup server systems only)
  */
 int	error_check(Sys_tree *tree, struct system_kstat_data *kstats);
-void	display_memoryconf(Sys_tree *tree, struct grp_info *grps);
+void	display_memoryconf(Sys_tree *tree);
 int	disp_fail_parts(Sys_tree *tree);
 void	display_hp_fail_fault(Sys_tree *tree, struct system_kstat_data *kstats);
 void	display_diaginfo(int flag, Prom_node *root, Sys_tree *tree,
@@ -78,7 +79,7 @@ void	display_io_cards(struct io_card *list);
 void	display_ffb(Board_node *, int);
 void	read_platform_kstats(Sys_tree *tree,
 		struct system_kstat_data *sys_kstat,
-		struct bd_kstat_data *bdp, struct envctrl_kstat_data *ep);
+		struct envctrl_kstat_data *ep);
 
 /* local functions */
 static	int disp_envctrl_status(Sys_tree *, struct system_kstat_data *);
@@ -132,7 +133,7 @@ dev_next_node_sibling(Prom_node *root, char *name)
  * DIMM sizes, DIMM socket names.
  */
 void
-display_memoryconf(Sys_tree *tree, struct grp_info *grps)
+display_memoryconf(Sys_tree *tree)
 {
 	Board_node *bnode;
 	Prom_node *memory;
@@ -147,9 +148,6 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
 	Prop *status_prop;
 	char interleave[8];
 	int total_size = 0;
-#ifdef lint
-	grps = grps;
-#endif
 
 	log_printf("\n", 0);
 	log_printf("=========================", 0);
@@ -755,11 +753,11 @@ display_ffb(Board_node *board, int table)
 
 /*
  * This module does the reading and interpreting of tazmo system
- * kstats. These kstats are created by the environ driver:
+ * kstats. These kstats are created by the envctrl driver:
  */
 void
 read_platform_kstats(Sys_tree *tree, struct system_kstat_data *sys_kstat,
-    struct bd_kstat_data *bdp, struct envctrl_kstat_data *ep)
+    struct envctrl_kstat_data *ep)
 {
 	kstat_ctl_t		*kc;
 	kstat_t			*ksp;
@@ -767,10 +765,6 @@ read_platform_kstats(Sys_tree *tree, struct system_kstat_data *sys_kstat,
 	if ((kc = kstat_open()) == NULL) {
 		return;
 	}
-#ifdef lint
-	tree = tree;
-	bdp = bdp;
-#endif
 
 	ep = &sys_kstat->env_data;
 

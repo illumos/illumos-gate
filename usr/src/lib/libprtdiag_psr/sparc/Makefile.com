@@ -21,7 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2019 Peter Tribble.
+# Copyright 2020 Peter Tribble.
 #
 
 LIBRARY= libprtdiag_psr.a
@@ -34,7 +34,7 @@ VERS= .1
 #
 PSR_MACH= sun4u
 #
-# PLATFORM_OBJECTS is defined in ./desktop ./wgs ./sunfire Makefiles
+# PLATFORM_OBJECTS is defined in ./desktop ./wgs Makefiles
 #
 OBJECTS= $(PLATFORM_OBJECTS)
 
@@ -56,9 +56,8 @@ CERRWARN +=	-_gcc=-Wno-unused-value
 CERRWARN +=	-_gcc=-Wno-unused-function
 CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-address
-IFLAGS +=	-I $(UTSBASE)/sun4u 
-IFLAGS +=	-I $(UTSCLOSED)/sun4u 
-IFLAGS +=	-I $(UTSCLOSED)/sun4u/sunfire -I $(UTSBASE)/sun4u/sunfire
+IFLAGS +=	-I $(UTSBASE)/sun4u
+IFLAGS +=	-I $(UTSCLOSED)/sun4u
 CPPFLAGS =	$(IFLAGS) $(CPPFLAGS.master)
 LDLIBS +=	-L $(ROOT)/usr/platform/$(PSR_MACH)/lib -lprtdiag -lc
 DYNFLAGS +=	-R /usr/platform/$(PSR_MACH)/lib

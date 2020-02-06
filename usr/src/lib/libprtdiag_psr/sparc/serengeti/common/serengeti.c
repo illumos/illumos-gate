@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 Peter Tribble.
  *
  * Serengeti Platform specific functions.
  *
@@ -136,7 +137,7 @@ void	display_diaginfo(int flag, Prom_node *root, Sys_tree *tree,
 void	display_hp_fail_fault(Sys_tree *tree, struct system_kstat_data *kstats);
 void	get_failed_parts(void);
 int	display_failed_parts(Sys_tree *tree);
-void	display_memoryconf(Sys_tree *tree, struct grp_info *grps);
+void	display_memoryconf(Sys_tree *tree);
 void	print_us3_memory_line(int portid, int bank_id, uint64_t bank_size,
 	    char *bank_status, uint64_t dimm_size, uint32_t intlv, int seg_id);
 
@@ -1766,9 +1767,8 @@ display_failed_parts(Sys_tree *tree)
  * This routine displays the memory configuration for all boards in the
  * system.
  */
-/*ARGSUSED0*/
 void
-display_memoryconf(Sys_tree *tree, struct grp_info *grps)
+display_memoryconf(Sys_tree *tree)
 {
 	Board_node	*bnode = tree->bd_list;
 

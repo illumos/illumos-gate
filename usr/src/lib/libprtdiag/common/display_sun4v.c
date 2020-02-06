@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020 Peter Tribble.
  */
 
 #include <stdio.h>
@@ -119,7 +120,6 @@ sun4v_display(Sys_tree *tree, Prom_node *root, int log,
 {
 	void *value;		/* used for opaque PROM data */
 	struct mem_total memory_total;	/* Total memory in system */
-	struct grp_info grps;	/* Info on all groups in system */
 	char machine[MAXSTRLEN];
 	int	exit_code = 0;
 
@@ -155,7 +155,7 @@ sun4v_display(Sys_tree *tree, Prom_node *root, int log,
 		}
 
 		/* Display the Memory Size */
-		display_memorysize(tree, NULL, &grps, &memory_total);
+		display_memorysize(tree, NULL, &memory_total);
 
 		/* Display the CPU devices */
 		sun4v_display_cpu_devices(plafh);
