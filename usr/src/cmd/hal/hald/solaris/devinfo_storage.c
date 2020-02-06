@@ -1522,19 +1522,17 @@ devinfo_storage_mnttab_event (HalDevice *hal_volume)
 
 		/* cleanup if was mounted by us */
 		if (hal_util_is_mounted_by_hald (mount_point)) {
-			char *cleanup_stdin;
 			char *extra_env[2];
 
 			HAL_INFO (("Cleaning up '%s'", mount_point));
 
 			extra_env[0] = g_strdup_printf ("HALD_CLEANUP=%s", mount_point);
 			extra_env[1] = NULL;
-			cleanup_stdin = "\n";
 
 			hald_runner_run_method (d, 
 						"hal-storage-cleanup-mountpoint", 
 						extra_env, 
-						cleanup_stdin, TRUE,
+						"", TRUE,
 						0,
 						devinfo_storage_cleanup_mountpoint_cb,
 						g_strdup (mount_point), NULL);
@@ -1577,7 +1575,6 @@ static void
 devinfo_volume_force_unmount (HalDevice *d, void *end_token)
 {
 	const char *mount_point;
-	char *unmount_stdin;
 	char *extra_env[2];
 	extra_env[0] = "HAL_METHOD_INVOKED_BY_UID=0";
 	extra_env[1] = NULL;
@@ -1591,12 +1588,10 @@ devinfo_volume_force_unmount (HalDevice *d, void *end_token)
 
 	HAL_INFO (("devinfo_volume_force_unmount for udi='%s'", hal_device_get_udi (d)));
 		
-	unmount_stdin = "\n";
-		
 	hald_runner_run_method (d, 
 				"hal-storage-unmount", 
 				extra_env, 
-				unmount_stdin, TRUE,
+				"", TRUE,
 				0,
 				devinfo_volume_force_unmount_cb,
 				end_token, NULL);
