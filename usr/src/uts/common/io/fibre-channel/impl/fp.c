@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2020 RackTop Systems, Inc.
  *
  * NOT a DDI compliant Sun Fibre Channel port driver(fp)
  *
@@ -7894,6 +7895,9 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 			break;
 		case FC_STATE_16GBIT_SPEED:
 			val->PortSpeed = FC_HBA_PORTSPEED_16GBIT;
+			break;
+		case FC_STATE_32GBIT_SPEED:
+			val->PortSpeed = FC_HBA_PORTSPEED_32GBIT;
 			break;
 		default:
 			val->PortSpeed = FC_HBA_PORTSPEED_UNKNOWN;

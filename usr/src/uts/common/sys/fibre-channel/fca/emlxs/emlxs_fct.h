@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #ifndef _EMLXS_FCT_H
@@ -62,6 +63,10 @@ extern "C" {
 #ifndef PORT_SPEED_16G
 #define	PORT_SPEED_16G		0x20
 #endif /* PORT_SPEED_16G */
+
+#ifndef PORT_SPEED_32G
+#define	PORT_SPEED_32G		0x40
+#endif /* PORT_SPEED_32G */
 
 /*
  * Number of ports that do not require a valid cmd handle

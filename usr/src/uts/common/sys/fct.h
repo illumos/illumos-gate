@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 #ifndef	_FCT_H
 #define	_FCT_H
@@ -337,6 +338,7 @@ typedef struct fct_port_stat {
 #define	PORT_SPEED_8G			8
 #define	PORT_SPEED_10G			16
 #define	PORT_SPEED_16G			32
+#define	PORT_SPEED_32G			64
 
 /*
  * Abort commands

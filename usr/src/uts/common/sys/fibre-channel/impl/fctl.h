@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #ifndef	_FCTL_H
@@ -67,6 +68,7 @@ extern "C" {
 #define	FC_STATE_10GBIT_SPEED		0x0600	/* 10 Gbit/sec */
 #define	FC_STATE_8GBIT_SPEED		0x0700	/* 8 Gbit/sec */
 #define	FC_STATE_16GBIT_SPEED		0x0800	/* 16 Gbit/sec */
+#define	FC_STATE_32GBIT_SPEED		0x0900	/* 32 Gbit/sec */
 #define	FC_STATE_FULL_SPEED		FC_STATE_1GBIT_SPEED
 #define	FC_STATE_DOUBLE_SPEED		FC_STATE_2GBIT_SPEED
 
@@ -230,6 +232,7 @@ typedef struct fca_hba_fru_details {
 #define	FC_HBA_PORTSPEED_4GBIT		8    /* 4 GBit/sec */
 #define	FC_HBA_PORTSPEED_8GBIT		16   /* 8 GBit/sec */
 #define	FC_HBA_PORTSPEED_16GBIT		32   /* 16 GBit/sec */
+#define	FC_HBA_PORTSPEED_32GBIT		64   /* 32 GBit/sec */
 #define	FC_HBA_PORTSPEED_NOT_NEGOTIATED	(1<<15)	  /* Speed not established */
 
 #define	FCHBA_MANUFACTURER_LEN		64

@@ -35,11 +35,11 @@ extern "C" {
 
 
 #define	EMLXS_VERSION		"2.80.8.0"
-#define	EMLXS_DATE_MINUTE	"45"	/* 00-59 */
-#define	EMLXS_DATE_HOUR		"15"	/* 00-23 */
-#define	EMLXS_DATE_DAY		"17"	/* 00-31 */
-#define	EMLXS_DATE_MONTH	"09"	/* 01-12 */
-#define	EMLXS_DATE_YEAR		"2012"	/* YYYY  */
+#define	EMLXS_DATE_MINUTE	"16"	/* 00-59 */
+#define	EMLXS_DATE_HOUR		"28"	/* 00-23 */
+#define	EMLXS_DATE_DAY		"28"	/* 00-31 */
+#define	EMLXS_DATE_MONTH	"02"	/* 01-12 */
+#define	EMLXS_DATE_YEAR		"2020"	/* YYYY  */
 
 #define	EMLXS_REVISION		EMLXS_DATE_YEAR "." EMLXS_DATE_MONTH "." \
 				    EMLXS_DATE_DAY "." EMLXS_DATE_HOUR "." \

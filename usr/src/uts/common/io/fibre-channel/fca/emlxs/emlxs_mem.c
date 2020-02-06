@@ -22,6 +22,8 @@
 /*
  * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #include <emlxs.h>
@@ -159,6 +161,42 @@ emlxs_mem_alloc_buffer(emlxs_hba_t *hba)
 			seg->fc_hi_water = MEM_CTBUF_COUNT;
 			seg->fc_lo_water = MEM_CTBUF_COUNT;
 			seg->fc_step = 1;
+			break;
+
+		case MEM_SGL1K:
+			(void) strlcpy(seg->fc_label, "1K SGL Pool",
+			    sizeof (seg->fc_label));
+			seg->fc_memtag	= MEM_SGL1K;
+			seg->fc_memsize	= 0x400;
+			seg->fc_memflag	= FC_MBUF_DMA | FC_MBUF_SNGLSG;
+			seg->fc_memalign = 32;
+			seg->fc_hi_water = 0x5000;
+			seg->fc_lo_water = 0;
+			seg->fc_step = 0x100;
+			break;
+
+		case MEM_SGL2K:
+			(void) strlcpy(seg->fc_label, "2K SGL Pool",
+			    sizeof (seg->fc_label));
+			seg->fc_memtag	= MEM_SGL2K;
+			seg->fc_memsize	= 0x800;
+			seg->fc_memflag	= FC_MBUF_DMA | FC_MBUF_SNGLSG;
+			seg->fc_memalign = 32;
+			seg->fc_hi_water = 0x5000;
+			seg->fc_lo_water = 0;
+			seg->fc_step = 0x100;
+			break;
+
+		case MEM_SGL4K:
+			(void) strlcpy(seg->fc_label, "4K SGL Pool",
+			    sizeof (seg->fc_label));
+			seg->fc_memtag	= MEM_SGL4K;
+			seg->fc_memsize	= 0x1000;
+			seg->fc_memflag	= FC_MBUF_DMA | FC_MBUF_SNGLSG;
+			seg->fc_memalign = 32;
+			seg->fc_hi_water = 0x5000;
+			seg->fc_lo_water = 0;
+			seg->fc_step = 0x100;
 			break;
 
 #ifdef SFCT_SUPPORT
@@ -708,7 +746,7 @@ emlxs_mem_pool_create(emlxs_hba_t *hba, MEMSEG *seg)
 	seg->fc_total_memsize = 0;
 	seg->fc_low = 0;
 
-	(void) emlxs_mem_pool_alloc(hba, seg,  seg->fc_lo_water);
+	(void) emlxs_mem_pool_alloc(hba, seg, seg->fc_lo_water);
 
 	seg->fc_memflag |= (FC_MEMSEG_PUT_ENABLED|FC_MEMSEG_GET_ENABLED);
 
@@ -1038,7 +1076,7 @@ emlxs_mem_buf_alloc(emlxs_hba_t *hba, uint32_t size)
 
 	bzero(buf_info, sizeof (MBUF_INFO));
 	buf_info->size = size;
-	buf_info->flags = FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
+	buf_info->flags = FC_MBUF_DMA | FC_MBUF_SNGLSG;
 	buf_info->align = 32;
 
 	(void) emlxs_mem_alloc(hba, buf_info);
@@ -1053,7 +1091,7 @@ emlxs_mem_buf_alloc(emlxs_hba_t *hba, uint32_t size)
 		buf_info->virt = (void *)mp;
 		emlxs_mem_free(hba, buf_info);
 
-		return (0);
+		return (NULL);
 	}
 	bp = (uint8_t *)buf_info->virt;
 	bzero(bp, buf_info->size);

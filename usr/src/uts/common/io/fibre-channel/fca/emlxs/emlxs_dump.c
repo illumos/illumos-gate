@@ -47,7 +47,8 @@ emlxs_menlo_set_mode(
 	menlo_rsp_t *rsp_buf = NULL;
 	uint32_t rval = 0;
 
-	if (hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
+	if (hba->model_info.vendor_id != PCI_VENDOR_ID_EMULEX ||
+	    hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
 		return (DFC_INVALID_ADAPTER);
 	}
 
@@ -110,7 +111,8 @@ emlxs_menlo_reset(
 	menlo_rsp_t *rsp_buf = NULL;
 	uint32_t rval = 0;
 
-	if (hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
+	if (hba->model_info.vendor_id != PCI_VENDOR_ID_EMULEX ||
+	    hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
 		return (DFC_INVALID_ADAPTER);
 	}
 
@@ -171,7 +173,8 @@ emlxs_menlo_get_cfg(
 	menlo_cmd_t *cmd_buf = NULL;
 	uint32_t rval = 0;
 
-	if (hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
+	if (hba->model_info.vendor_id != PCI_VENDOR_ID_EMULEX ||
+	    hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
 		return (DFC_INVALID_ADAPTER);
 	}
 
@@ -229,7 +232,8 @@ emlxs_menlo_get_logcfg(
 	menlo_cmd_t *cmd_buf = NULL;
 	uint32_t rval = 0;
 
-	if (hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
+	if (hba->model_info.vendor_id != PCI_VENDOR_ID_EMULEX ||
+	    hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
 		return (DFC_INVALID_ADAPTER);
 	}
 
@@ -285,7 +289,8 @@ emlxs_menlo_get_log(
 	menlo_cmd_t *cmd_buf = NULL;
 	uint32_t rval = 0;
 
-	if (hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
+	if (hba->model_info.vendor_id != PCI_VENDOR_ID_EMULEX ||
+	    hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
 		return (DFC_INVALID_ADAPTER);
 	}
 
@@ -340,7 +345,8 @@ emlxs_menlo_get_paniclog(
 	menlo_cmd_t *cmd_buf = NULL;
 	uint32_t rval = 0;
 
-	if (hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
+	if (hba->model_info.vendor_id != PCI_VENDOR_ID_EMULEX ||
+	    hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
 		return (DFC_INVALID_ADAPTER);
 	}
 
@@ -2222,7 +2228,8 @@ emlxs_dump_file_create(
 	if (fpCeeFile) {
 		*fpCeeFile = NULL;
 
-		if ((hba->model_info.device_id == PCI_DEVICE_ID_HORNET) ||
+		if ((hba->model_info.vendor_id == PCI_VENDOR_ID_EMULEX &&
+		    hba->model_info.device_id == PCI_DEVICE_ID_HORNET) ||
 		    (hba->model_info.chip == EMLXS_BE2_CHIP) ||
 		    (hba->model_info.chip == EMLXS_BE3_CHIP)) {
 			if ((*fpCeeFile =
@@ -2277,7 +2284,8 @@ emlxs_dump_file_terminate(
 	}
 
 	if (fpCeeFile) {
-		if (hba->model_info.device_id == PCI_DEVICE_ID_HORNET) {
+		if (hba->model_info.vendor_id == PCI_VENDOR_ID_EMULEX &&
+		    hba->model_info.device_id == PCI_DEVICE_ID_HORNET) {
 			(void) emlxs_fprintf(fpCeeFile, "Dump File End\n");
 		}
 
@@ -3262,7 +3270,8 @@ emlxs_dump_menlo_log(
 	uint32_t PanicLogEntryCount;
 	uint32_t PanicLogEntrySize;
 
-	if (hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
+	if (hba->model_info.vendor_id != PCI_VENDOR_ID_EMULEX ||
+	    hba->model_info.device_id != PCI_DEVICE_ID_HORNET) {
 		return (DFC_INVALID_ADAPTER);
 	}
 

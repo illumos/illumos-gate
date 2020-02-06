@@ -36,6 +36,10 @@
  *******************************************************************************
  */
 
+/*
+ * Copyright 2020 RackTop Systems, Inc.
+ */
+
 #ifndef _EMLXS_HBAAPI_H
 #define _EMLXS_HBAAPI_H
 
@@ -239,6 +243,7 @@ typedef HBA_UINT32 HBA_PORTSPEED;
 #define HBA_PORTSPEED_4GBIT		8   /* 4 GBit/sec */
 #define HBA_PORTSPEED_8GBIT		16  /* 8 GBit/sec */
 #define HBA_PORTSPEED_16GBIT		32  /* 16 GBit/sec */
+#define HBA_PORTSPEED_32GBIT		64  /* 32 GBit/sec */
 #define HBA_PORTSPEED_NOT_NEGOTIATED	(1<<15)   /* Speed not established */
 
 

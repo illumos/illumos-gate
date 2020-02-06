@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004-2011 Emulex. All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #ifndef _EMLXS_HW_H
@@ -794,6 +795,10 @@ typedef SliCtRequest_t SLI_CT_REQUEST;
 #define	CQ_DB_POP_SHIFT 16		/* shift for entries popped */
 #define	CQ_DB_POP_MASK  0x1FFF0000	/* Mask for number of entries popped */
 #define	CQ_DB_REARM	0x20000000	/* Bit 29, rearm */
+#define	CQ_ID_LO_BITS	10		/* num of id bits that are "low" */
+#define	CQ_DB_ID_LO_MASK	((1 << CQ_ID_LO_BITS) - 1)
+#define	CQ_DB_ID_HI_SHIFT	11
+#define	CQ_DB_ID_HI_MASK	(0x1F << CQ_DB_ID_HI_SHIFT)
 
 /* Defines for EQ doorbell */
 #define	EQ_DB_CLEAR	0x00000200	/* Bit 9, designates clear EQ ISR */
@@ -801,11 +806,21 @@ typedef SliCtRequest_t SLI_CT_REQUEST;
 #define	EQ_DB_POP_SHIFT 16		/* shift for entries popped */
 #define	EQ_DB_POP_MASK  0x1FFF0000	/* Mask for number of entries popped */
 #define	EQ_DB_REARM	0x20000000	/* Bit 29, rearm */
+#define	EQ_ID_LO_BITS	9		/* num of id bits that are "low" */
+#define	EQ_DB_ID_LO_MASK	((1 << EQ_ID_LO_BITS) - 1)
+#define	EQ_DB_ID_HI_SHIFT	11
+#define	EQ_DB_ID_HI_MASK	(0x1F << EQ_DB_ID_HI_SHIFT)
+
+/* Defines for WQ doorbell */
+#define	WQ_DB_POST_SHIFT	24
+#define	WQ_DB_POST_MASK		(0xFF << WQ_DB_POST_SHIFT)
+#define	WQ_DB_IDX_SHIFT		16
+#define	WQ_DB_IDX_MASK		(0xFF << WQ_DB_IDX_SHIFT)
 
 /* bootstrap mailbox doorbell defines */
 #define	BMBX_READY	0x00000001	/* Mask for Port Ready bit */
 #define	BMBX_ADDR_HI	0x00000002	/* Mask for Addr Hi bit */
-#define	BMBX_ADDR	0xFFFFFFFA	/* Mask for Addr bits */
+#define	BMBX_ADDR	0xFFFFFFFC	/* Mask for Addr bits */
 
 /* Sizeof bootstrap mailbox */
 #define	EMLXS_BOOTSTRAP_MB_SIZE	256
