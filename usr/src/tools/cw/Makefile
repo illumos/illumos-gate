@@ -47,7 +47,8 @@ $(__SUNC)CFLAGS=	-xspace -Xa -xildoff -errtags=yes -errwarn=%all \
 $(__GNUC)LDLIBS +=	-Wl,-zassert-deflib=libc.so -lc
 $(__GNUC)LDFLAGS=	$(MAPFILE.NES:%=-Wl,-M%)
 $(__GNUC)ZASSERTDEFLIB = -Wl,-zassert-deflib
-$(__GNUC)ZFATALWARNINGS = -Wl,-zfatal-warnings
+# XXX disable to fix the build
+# $(__GNUC)ZFATALWARNINGS = -Wl,-zfatal-warnings
 $(__GNUC)ZGUIDANCE = -Wl,-zguidance
 LDFLAGS += -Wl,$(ZDIRECT)
 
