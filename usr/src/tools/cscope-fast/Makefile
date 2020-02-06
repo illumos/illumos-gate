@@ -28,7 +28,7 @@
 
 PROG= cscope-fast
 
-OBJS= 	main.o dir.o crossref.o scanner.o lookup.o command.o display.o \
+OBJS=	main.o dir.o crossref.o scanner.o lookup.o command.o display.o \
 	find.o edit.o exec.o help.o history.o input.o menu.o alloc.o \
 	cgrep.o compath.o invlib.o logdir.o \
 	mouse.o mygetenv.o mygetwd.o mypopen.o \
@@ -56,6 +56,7 @@ SMATCH=off
 
 CFLAGS +=	$(CCVERBOSE)
 LDLIBS +=	-lcurses -ll
+NATIVE_LIBS +=	libcurses.so libl.so
 
 .KEEP_STATE:
 

@@ -19,9 +19,6 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -39,18 +36,17 @@ i86_MSGSUBDIRS=
 
 SUBDIRS=	$(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
 
-MSGSUBDIRS=	$(COMMON_SUBDIRS) $($(MACH)_MSGSUBDIRS) 
+MSGSUBDIRS=	$(COMMON_SUBDIRS) $($(MACH)_MSGSUBDIRS)
 
 all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 .KEEP_STATE:
 
-all clean clobber lint : $(SUBDIRS)
+all clean clobber: $(SUBDIRS)
 
 _msg:	$(MSGSUBDIRS)
 

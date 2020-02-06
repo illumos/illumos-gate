@@ -31,6 +31,9 @@ include		$(SRC)/Makefile.master
 $(__GNUC)FILES=	$(MACH)_gcc_map.noexeglobs
 $(__SUNC)FILES= $(MACH)_cc_map.noexeglobs
 
+NATIVE_LIBS	+= libc.so
+LDFLAGS		+= $(BDIRECT)
+
 $(__GNUC)$(BUILD64)FILES += $(MACH64)_gcc_map.noexeglobs
 $(__SUNC)$(BUILD64)FILES += $(MACH64)_cc_map.noexeglobs
 
@@ -43,8 +46,6 @@ TEMPLATE1=	map.noexeglobs.1.template
 TEMPLATE2=	map.noexeglobs.2.template
 
 all install:	$(FILES)
-
-lint:
 
 clean:
 		$(RM) $(SYMS1) $(SYMS2) $(MAIN1) $(MAIN2)

@@ -19,9 +19,6 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -30,21 +27,16 @@ PROG= whoami
 
 include ../Makefile.ucbcmd
 
-CFLAGS += $(CCVERBOSE)
- 
 XGETFLAGS += -a -x rmdir.xcl
-
 
 FILEMODE=	755
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTPROG)
 
 clean:
-
-lint:	lint_PROG
 
 include ../Makefile.ucbtarg

@@ -45,7 +45,7 @@ XGETFLAGS += -a -x shutdown.xcl
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 $(PROG):	$(PROGOBJS)
 		$(LINK.c) $(PROGOBJS) -o $@ $(LDLIBS)
@@ -55,7 +55,5 @@ install: all $(ROOTPROG)
 
 clean:
 	$(RM) $(PROGOBJS)
-
-lint:	lint_PROG
 
 include ../Makefile.ucbtarg

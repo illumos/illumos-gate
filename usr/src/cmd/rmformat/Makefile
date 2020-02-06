@@ -40,7 +40,6 @@ CERRWARN += $(CNOWARN_UNINIT)
 # not linted
 SMATCH=off
 
-LINTFLAGS += -u
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 
 $(ROOTBIN)/rmformat := FILEMODE = 04555
@@ -57,8 +56,6 @@ install: all $(ROOTPROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint: lint_SRCS
 
 $(POFILE) : $(SRCS)
 	$(RM) $@

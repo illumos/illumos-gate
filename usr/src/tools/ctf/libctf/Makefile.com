@@ -26,6 +26,7 @@ CPPFLAGS +=	-I$(SRC)/lib/libctf/common/ \
 		-DCTF_OLD_VERSIONS \
 		-DCTF_TOOLS_BUILD
 LDLIBS += -lc -lelf -L$(ROOTONBLDLIBMACH) -ldwarf -lavl
+NATIVE_LIBS += libelf.so libavl.so libc.so
 DYNFLAGS += '-R$$ORIGIN/../../lib/$(MACH)'
 
 .KEEP_STATE:

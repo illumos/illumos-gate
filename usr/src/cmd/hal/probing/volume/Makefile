@@ -33,6 +33,7 @@ include ../../Makefile.hal
 ROOTCMDDIR =	$(ROOTLIB_HAL)
 
 LDLIBS +=	-lc -ldbus-1 -lhal -lfstyp -lnvpair -ladm -lefi
+NATIVE_LIBS +=	libdbus-1.so
 
 CPPFLAGS +=	-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)

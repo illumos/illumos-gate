@@ -53,12 +53,11 @@ include $(SRC)/lib/Makefile.rootfs
 SRCDIR=	../common
 INCDIR=	../../include
 
-LIBS=	$(DYNLIB) $(LINTLIB)
-
-$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
+LIBS=	$(DYNLIB)
 
 LDLIBS	+=	$(BERDERLIB) $(CRYPTOUTILLIB) -lmd -lpkcs11 -lnsl -lsocket -lc
 LDLIBS	+=	-lcustr
+NATIVE_LIBS +=	libxml2.so
 
 # DYNLIB libraries do not have lint libs and are not linted
 $(DYNLIB) :=    LDLIBS += -lxml2
@@ -78,7 +77,5 @@ SMATCH=off
 .KEEP_STATE:
 
 all:    $(LIBS)
-
-lint:	lintcheck
 
 include $(SRC)/lib/Makefile.targ

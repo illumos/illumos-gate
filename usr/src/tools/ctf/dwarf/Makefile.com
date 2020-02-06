@@ -83,6 +83,7 @@ SMATCH=off
 
 DYNFLAGS += '-R$$ORIGIN/../../lib/$(MACH)'
 LDLIBS = -lelf -lc
+NATIVE_LIBS += libelf.so libc.so
 
 .KEEP_STATE:
 .PARALLEL:

@@ -31,11 +31,12 @@ OBJECTS=	$(LIB_OBJS) $(XML_OBJS)
 
 include ../../Makefile.lib
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lsocket -luuid -lnvpair -lsysevent -lsec -lbrand \
 		-lpool -lscf -lproc -luutil -lbsm -lsecdb
 # DYNLIB libraries do not have lint libs and are not linted
 $(DYNLIB) :=	LDLIBS += -lxml2
+NATIVE_LIBS +=	libxml2.so
 
 SRCDIR =	../common
 
@@ -47,15 +48,12 @@ SRCS = \
 CPPFLAGS +=	-I$(ADJUNCT_PROTO)/usr/include/libxml2 -I$(SRCDIR) -D_REENTRANT
 CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-parentheses
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 CPPFLAGS +=	-I$(XMLDIR)
 
 .KEEP_STATE:
 
 all:	$(LIBS)
-
-lint:	lintcheck
 
 pics/%.o: $(XMLDIR)/%.c
 	$(COMPILE.c) -o $@ $<

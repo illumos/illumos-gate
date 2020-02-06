@@ -34,6 +34,7 @@ CFLAGS =	$(NATIVE_CFLAGS)
 CPPFLAGS =	-I. $(MY_NATIVE_CPPFLAGS)
 LDFLAGS =
 LDLIBS =	$(MY_NATIVE_LDLIBS)
+NATIVE_LIBS +=	libc.so
 
 #
 # We must use the build's avl headers, to match the common avl.c

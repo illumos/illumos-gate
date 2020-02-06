@@ -51,6 +51,7 @@ LLDFLAGS64 =	$(VAR_ELFEDIT_LLDFLAGS64)
 LDFLAGS +=	$(VERSREF) -M$(MAPFILE) $(LLDFLAGS)
 LDLIBS +=	$(ELFLIBDIR) -lelf $(LDDBGLIBDIR) -llddbg \
 		    $(CONVLIBDIR) -lconv -ltecla
+NATIVE_LIBS +=	libtecla.so
 
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	$(CNOWARN_UNINIT)

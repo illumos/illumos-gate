@@ -1282,6 +1282,17 @@ $(ASSYMDEP_OBJS:%=pics/%): assym.h
 assym.h := CFLAGS64 += $(CCGDEBUG)
 
 GENASSYM_C = $(LIBCDIR)/$(MACH)/genassym.c
+LDFLAGS.native = $(LDASSERTS) $(ZASSERTDEFLIB)=libc.so $(BDIRECT)
+
+genassym: $(GENASSYM_C)
+	$(NATIVECC) $(NATIVE_CFLAGS) -I$(LIBCBASE)/inc -I$(LIBCDIR)/inc \
+		$(CPPFLAGS.native) $(LDFLAGS.native) -o $@ $(GENASSYM_C)
+
+OFFSETS = $(LIBCDIR)/$(MACH)/offsets.in
+
+assym.h: $(OFFSETS) genassym
+	$(OFFSETS_CREATE) <$(OFFSETS) >$@
+	./genassym >>$@
 
 # derived C source and related explicit dependencies
 $(LIBCDIR)/port/gen/new_list.c: $(LIBCDIR)/port/gen/errlist $(LIBCDIR)/port/gen/errlist.awk

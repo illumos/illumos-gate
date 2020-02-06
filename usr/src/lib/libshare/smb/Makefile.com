@@ -43,10 +43,10 @@ ROOTLIBDIR =	$(ROOT)/usr/lib/fs/smb
 ROOTLIBDIR64 =	$(ROOT)/usr/lib/fs/smb/$(MACH64)
 
 LIBSRCS = $(LIBOBJS:%.o=$(SRCDIR)/%.c)
-lintcheck := SRCS = $(LIBSRCS)
 
 LIBS =		$(DYNLIB)
 LDLIBS +=	-lshare -lscf -luuid -ldlpi -lnsl -lnvpair -lxml2 -lumem -lc
+NATIVE_LIBS +=	libxml2.so
 
 CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-char-subscripts
@@ -64,8 +64,6 @@ $(ENABLE_SMB_PRINTING) CPPFLAGS += -DHAVE_CUPS
 all: $(LIBS)
 
 install: all
-
-lint: lintcheck
 
 pics/smb_door_client.o:       $(SMBBASE_DIR)/smb_door_client.c
 	$(COMPILE.c) -o $@ $(SMBBASE_DIR)/smb_door_client.c

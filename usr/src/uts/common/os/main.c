@@ -527,6 +527,14 @@ main(void)
 	audit_init();
 
 	/*
+	 * Start the periodic hash rescale for all vmem arenas before we load
+	 * protocol modules and drivers via strplumb() below.  Some drivers
+	 * might rely on heavy vmem operations that could hurt performance
+	 * without the rescale.
+	 */
+	vmem_update(NULL);
+
+	/*
 	 * Plumb the protocol modules and drivers only if we are not
 	 * networked booted, in this case we already did it in rootconf().
 	 */
@@ -613,7 +621,6 @@ main(void)
 	 * Any per cpu initialization is done here.
 	 */
 	kmem_mp_init();
-	vmem_update(NULL);
 
 	clock_tick_init_post();
 

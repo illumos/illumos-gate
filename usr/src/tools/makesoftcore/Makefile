@@ -26,6 +26,7 @@ CPPFLAGS +=	-I../../uts/common
 OBJS=		makesoftcore.o lz4.o
 SRCS=		makesoftcore.c $(LZ4)/lz4.c
 LDLIBS=		-lumem
+NATIVE_LIBS +=	libumem.so
 
 # not linted
 SMOFF += all_func_returns
@@ -40,7 +41,7 @@ clean:
 		$(RM) $(PROG) $(OBJS)
 
 $(PROG):	$(OBJS)
-		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
 
 %.o:		$(SOFTCORE)/%.c

@@ -31,6 +31,7 @@ include		$(SRC)/tools/Makefile.tools
 include		$(CMDDIR)/Makefile.common
 
 MAPFILES=	$(CMDDIR)/$(MAPFILE.INT)
+NATIVE_LIBS +=	libcurses.so
 
 .KEEP_STATE:
 

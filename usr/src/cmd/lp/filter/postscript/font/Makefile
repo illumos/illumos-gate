@@ -19,9 +19,6 @@
 #
 # CDDL HEADER END
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 1989-2002 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -48,6 +45,7 @@ POFILE =	lp_filter_postscript_font.po
 
 NATIVEDIR =		native
 NATIVEPROG =		$(NATIVEDIR)/$(PROG)
+NATIVE_LIBS +=		libc.so
 $(NATIVEPROG) :=	CC=$(NATIVECC)
 $(NATIVEPROG) :=	LDLIBS=
 $(NATIVEPROG) :=	CPPFLAGS.master=

@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 
-SUBDIR =	sunos	
+SUBDIR =	sunos
 
 HAL_PROG =	hal-device hal-find-by-capability hal-find-by-property \
 		hal-get-property hal-set-property lshal
@@ -59,6 +59,7 @@ CLEANFILES += $(STORAGE_SHAREDOBJS) $(STORAGE_OBJS) hal-storage-zpool.o
 include ../../Makefile.cmd
 include ../Makefile.hal
 
+NATIVE_LIBS +=		libdbus-1.so libdbus-glib-1.so libglib-2.0.so
 $(HAL_PROG) :=		LDLIBS += -lc -ldbus-1 -lhal
 
 lshal :=		LDLIBS += -ldbus-glib-1 -lglib-2.0

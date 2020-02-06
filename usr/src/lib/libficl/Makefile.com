@@ -26,8 +26,7 @@ OBJECTS= dictionary.o system.o fileaccess.o float.o double.o prefix.o search.o \
 
 include $(SRC)/lib/Makefile.lib
 
-LIBS=	$(DYNLIB) $(LINTLIB)
-
+LIBS=	$(DYNLIB)
 FICLDIR=	$(SRC)/common/ficl
 LZ4=		$(SRC)/common/lz4
 CSTD=	$(CSTD_GNU99)
@@ -43,6 +42,7 @@ CFLAGS64 += $(C_BIGPICFLAGS64)
 pics/vm.o := CERRWARN += -_gcc=-Wno-clobbered
 
 LDLIBS +=	-luuid -lz -lc -lm -lumem
+NATIVE_LIBS +=	libz.so
 
 HEADERS= $(FICLDIR)/ficl.h $(FICLDIR)/ficltokens.h ../ficllocal.h \
 	$(FICLDIR)/ficlplatform/unix.h $(PNGLITE)/pnglite.h
@@ -70,8 +70,6 @@ pics/%.o:	$(LZ4)/%.c $(HEADERS)
 pics/%.o:	$(PNGLITE)/%.c $(HEADERS)
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
-
-$(LINTLIB) := SRCS=	../$(LINTSRC)
 
 all: $(LIBS)
 

@@ -26,6 +26,7 @@ if PY3:
 else:
     import ConfigParser as configparser
 
+import io
 import os
 import logging
 import platform
@@ -67,7 +68,7 @@ class WatchedFileHandlerClosed(WatchedFileHandler):
     giving up, default 5.
     """
 
-    def __init__(self, filename, mode='a', encoding=None, delay=0, max_tries=5):
+    def __init__(self, filename, mode='a', encoding='utf-8', delay=0, max_tries=5):
         self.max_tries = max_tries
         self.tries = 0
         WatchedFileHandler.__init__(self, filename, mode, encoding, delay)
@@ -154,7 +155,7 @@ class Output(object):
         for easy sorting/merging later.
         """
         fd = self.fileno()
-        buf = os.read(fd, 4096).decode()
+        buf = os.read(fd, 4096).decode('utf-8')
         if not buf:
             return None
         if '\n' not in buf:
@@ -346,15 +347,24 @@ class Cmd(object):
             logger.debug('%s %s' % (dt.strftime("%H:%M:%S.%f ")[:11], line))
 
         if len(self.result.stdout):
-            with open(os.path.join(self.outputdir, 'stdout'), 'w') as out:
+            with io.open(os.path.join(self.outputdir, 'stdout'),
+                                   encoding='utf-8',
+                                   errors='surrogateescape',
+                                   mode='w') as out:
                 for _, line in self.result.stdout:
                     out.write('%s\n' % line)
         if len(self.result.stderr):
-            with open(os.path.join(self.outputdir, 'stderr'), 'w') as err:
+            with io.open(os.path.join(self.outputdir, 'stderr'),
+                                   encoding='utf-8',
+                                   errors='surrogateescape',
+                                   mode='w') as err:
                 for _, line in self.result.stderr:
                     err.write('%s\n' % line)
         if len(self.result.stdout) and len(self.result.stderr):
-            with open(os.path.join(self.outputdir, 'merged'), 'w') as merged:
+            with io.open(os.path.join(self.outputdir, 'merged'),
+                                   encoding='utf-8',
+                                   errors='surrogateescape',
+                                   mode='w') as merged:
                 for _, line in lines:
                     merged.write('%s\n' % line)
 

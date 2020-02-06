@@ -40,8 +40,9 @@ MYCPPFLAGS = -I../../../../lib/libfsmgt/common \
 		-I../..
 CPPFLAGS += $(MYCPPFLAGS)
 LDLIBS += -lshare -lscf -lsecdb -lumem
+NATIVE_LIBS += libxml2.so
+
 all install := LDLIBS += -lxml2
-LINTFLAGS	+= -u
 
 CERRWARN	+= $(CNOWARN_UNINIT)
 
@@ -63,8 +64,6 @@ $(PROG): $(OBJS)
 install: all
 
 $(SHAREMGRNO64)install: $(ROOTUSRSBINPROG)
-
-lint:	lint_SRCS
 
 clean:
 	$(RM) $(OBJS)

@@ -53,7 +53,8 @@ MV =		mv
 .PARALLEL:	$(OBJS)
 
 CPPFLAGS=	-I../common -I. $(CPPFLAGS.master)
-LDLIBS +=	-lrtld_db -lelf -ll -ly
+LDLIBS +=	$(BDIRECT) $(ZLAZYLOAD) -lrtld_db -lelf -ll -ly
+NATIVE_LIBS +=	libelf.so liby.so libl.so
 
 CLEANFILES +=	$(BLTSRC) $(BLTHDR) simp libsub.so.1
 

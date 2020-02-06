@@ -61,7 +61,7 @@ include ../../Makefile.lib
 # libzfs must be installed in the root filesystem for mount(1M)
 include ../../Makefile.rootfs
 
-LIBS=	$(DYNLIB) $(LINTLIB)
+LIBS=	$(DYNLIB)
 
 SRCDIR =	../common
 
@@ -81,27 +81,15 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 # not linted
 SMATCH=off
 
-# There's no lint library for zlib, so only include this when building
-$(DYNLIB) := LDLIBS +=	-lz
-
-LINTFLAGS +=	-erroff=E_STATIC_UNUSED
-LINTFLAGS64 +=	-erroff=E_STATIC_UNUSED
+LDLIBS +=	-lz
+NATIVE_LIBS += libz.so
 
 SRCS=	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
 	$(OBJS_SHARED:%.o=$(SRC)/common/zfs/%.c)
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
-
-# lint complains about unused inline functions, even though
-# they are "inline", not "static inline", with "extern inline"
-# implementations and usage in libzpool.
-LINTFLAGS += -erroff=E_STATIC_UNUSED
-LINTFLAGS64 += -erroff=E_STATIC_UNUSED
 
 .KEEP_STATE:
 
 all: $(LIBS)
-
-lint: lintcheck
 
 pics/%.o: ../../../common/zfs/%.c
 	$(COMPILE.c) -o $@ $<

@@ -44,9 +44,12 @@ $(__GNUC)CFLAGS=	-O -D__sun -Wall -Wno-unknown-pragmas -Werror \
 $(__SUNC)CFLAGS=	-xspace -Xa -xildoff -errtags=yes -errwarn=%all \
 			-xc99=%all -W0,-xglobalstatic -v
 
-
-$(__GNUC)LDLIBS +=	-lc
+$(__GNUC)LDLIBS +=	-Wl,-zassert-deflib=libc.so -lc
 $(__GNUC)LDFLAGS=	$(MAPFILE.NES:%=-Wl,-M%)
+$(__GNUC)ZASSERTDEFLIB = -Wl,-zassert-deflib
+$(__GNUC)ZFATALWARNINGS = -Wl,-zfatal-warnings
+$(__GNUC)ZGUIDANCE = -Wl,-zguidance
+LDFLAGS += -Wl,$(ZDIRECT)
 
 $(ROOTONBLDMAN1ONBLDFILES) := FILEMODE=      644
 CSTD=	$(CSTD_GNU99)

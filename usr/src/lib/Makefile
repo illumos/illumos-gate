@@ -592,13 +592,14 @@ dbusdeps:	libsecdb libtsol libinetutil libscf libuutil libgen libsmbios
 # The following dependencies don't need to be listed below as they are built
 # before everything else:
 # libc libm libmd libmp libnsl libnvpair libsocket
+../cmd/sendmail/libmilter:	libsocket libnsl
 abi:		libctf libmapmalloc libproc
 auditd_plugins: libbsm libsecdb libgss libmtmalloc
 brand:		libzonecfg libmapmalloc libipadm libcustr libproc librpcsvc
 cfgadm_plugins:	libdevice libdevinfo libhotplug librcm hbaapi libkstat libscf
 fm:		libexacct libipmi libzfs scsi libdevinfo libdevid libcfgadm \
 		libcontract libsysevent ../cmd/sgs/libelf libdladm libsff \
-		libpcidb
+		libpcidb libdiskmgt
 $(SPARC_BLD)fm:	libpri
 gss_mechs/mech_dh: libgss
 gss_mechs/mech_dummy: libgss
@@ -606,18 +607,21 @@ gss_mechs/mech_krb5: libgss libresolv2 pkcs11 libkstat
 gss_mechs/mech_spnego: gss_mechs/mech_krb5
 hal:		dbusdeps
 krb5:		gss_mechs/mech_krb5 libtecla libldap5
+libads:		libnsl
 libadt_jni:	libbsm
 libadutils:	libldap5 libresolv2
 libbe:		libzfs libinstzones libuuid libgen libdevinfo libefi libficl
 libbsm:		libinetutil libscf libsecdb libtsol
 libbunyan:	libnvpair
 libcfgadm:	libdevinfo
+libcontract:	libnvpair
 libcmd:		libsum libast
-libcmdutils:	libavl
+libcmdutils:	libavl libnvpair
 libcpc:		libpctx
 libcrypt:	libgen
 libctf:		libdwarf
 libdemangle:	libcustr
+libdevice:	libnvpair
 libdevid:	libdevinfo
 libdevinfo:	libsec libgen
 libdhcpagent:	libdhcputil libuuid libdlpi libcontract
@@ -631,6 +635,7 @@ libdlpi:	libinetutil libdladm
 libds:		libsysevent
 libdtrace:	libproc libgen libctf libmapmalloc
 libdtrace_jni:	libuutil libdtrace
+libdwarf:	../cmd/sgs/libelf
 libefi:		libuuid libsmbios
 libelfsign:	libcryptoutil libkmf ../cmd/sgs/libelf
 libeti:		libcurses
@@ -645,11 +650,14 @@ $(INTEL_BLD)libgrubmgmt: libfdisk
 libidmap:	libavl libuutil
 libidspace:	libumem
 libinetsvc:	libscf
+libinetutil:	libsocket
 libinstzones:	libzonecfg libcontract
 libipadm:	libinetutil libdlpi libdhcpagent libdladm libsecdb libdhcputil
+libipmi:	libm libnvpair libsocket libnsl
 libipmp:	libinetutil
 libipsecutil:	libtecla libtsol libkmf
 libiscsit:	libstmf libuuid
+libhotplug:	libnvpair
 libkmf:		libcryptoutil pkcs11 libcustr
 libkvm:		../cmd/sgs/libelf
 libldap5:	libsasl
@@ -667,15 +675,17 @@ libppt:		libpcidb libdevinfo libcmdutils
 libproc:	../cmd/sgs/librtld_db ../cmd/sgs/libelf libctf
 $(INTEL_BLD)libproc: libsaveargs
 libproject:	libpool libproc libsecdb
-libprtdiag:	libkstat
+libprtdiag:	libkstat libdevinfo
 libprtdiag_psr:	libprtdiag
 libraidcfg:	libdevinfo
+librcm:		libnvpair
 librefhash:	libumem
 librestart:	libuutil libscf libpool libproject libsecdb libsysevent
 libsasl:	libgss pkcs11
 libsaveargs:	libdisasm
-libscf:		libuutil libgen libsmbios
+libscf:		libuutil libgen libnsl libnvpair libsmbios
 libsec:		libavl libidmap
+libsecdb:	libnsl
 libsff:		libnvpair
 libshare:	libscf libzfs libuuid libfsmgt libsecdb libumem libsmbfs
 libshell:	libast libcmd libdll libsecdb
@@ -705,6 +715,7 @@ libvscan:	libscf libsecdb
 libzdoor:	libc libzonecfg libcontract
 libzfs:		libdevid libgen libuutil libadm libavl libefi libidmap \
 		libumem libtsol libzfs_core libcryptoutil pkcs11 libmd libcmdutils
+libzfs_core:	libnvpair
 libzfs_jni:	libdiskmgt libzfs
 libzonecfg:	libuuid libsysevent libsec libbrand libpool libscf libproc \
 		libuutil libbsm libsecdb

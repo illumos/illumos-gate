@@ -19,9 +19,6 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
 
@@ -33,12 +30,10 @@ FILEMODE=	755
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTPROG)
 
 clean:
-
-lint:	lint_PROG
 
 include ../Makefile.ucbtarg

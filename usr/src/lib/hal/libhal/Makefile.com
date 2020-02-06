@@ -35,9 +35,9 @@ LIBPCSRC =	hal.pc
 
 include ../../Makefile.com
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -ldbus-1
-$(LINTLIB) := 	SRCS = $(SRCDIR)/$(LINTSRC)
+NATIVE_LIBS +=	libdbus-1.so
 
 SRCDIR =	../common
 

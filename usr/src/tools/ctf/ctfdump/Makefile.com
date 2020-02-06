@@ -19,10 +19,12 @@ CSTD = $(CSTD_GNU99)
 C99LMODE = -Xc99=%all
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -lctf
+NATIVE_LIBS += libctf.so libc.so
 
 LDFLAGS = \
 	-L$(ROOTONBLDLIBMACH) \
 	'-R$$ORIGIN/../../lib/$(MACH)' \
+	$(BDIRECT)
 
 CPPFLAGS += -include ../../common/ctf_headers.h
 

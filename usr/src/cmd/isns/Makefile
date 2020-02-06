@@ -35,10 +35,9 @@ clean := TARGET= clean
 clobber := TARGET= clobber
 install := TARGET= install
 install_h := TARGET= install_h
-lint := TARGET= lint
 _msg := TARGET= _msg
 
-all clean clobber install install_h lint: $(SUBDIRS)
+all clean clobber install install_h: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

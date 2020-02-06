@@ -21,8 +21,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # cmd/geniconvtbl/Makefile
 
 
@@ -37,7 +35,6 @@ all	:= TARGET = all
 install	:= TARGET = install
 clean	:= TARGET = clean
 clobber	:= TARGET = clobber
-lint	:= TARGET = lint
 _msg	:= TARGET = catalog
 
 .KEEP_STATE:
@@ -46,7 +43,7 @@ _msg	:= TARGET = catalog
 
 all clean clobber install:	$(SUBDIRS) .WAIT $(SAMPLES)
 
-_msg lint:	$(SUBDIRS)
+_msg:	$(SUBDIRS)
 
 $(SUBDIRS) $(SAMPLES):	FRC
 		@cd $@; pwd; $(MAKE) $(TARGET)

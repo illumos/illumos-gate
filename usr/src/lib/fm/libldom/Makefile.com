@@ -35,7 +35,7 @@ include ../../Makefile.lib
 SRCS = $(LIBSRCS:%.c=../sparc/%.c)
 SRCDIR = ../sparc
 
-LIBS = $(DYNLIB) $(LINTLIB)
+LIBS = $(DYNLIB)
 
 CPPFLAGS += -I. -I$(SRC)/uts/sun4v -I$(ROOT)/usr/platform/sun4v/include \
 	-I$(ADJUNCT_PROTO)/usr/include/libxml2
@@ -44,23 +44,14 @@ CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
 CERRWARN += -_gcc=-Wno-parentheses
 
-$(DYNLIB) := LDLIBS += $(MACH_LDLIBS)
-$(DYNLIB) := LDLIBS += -lfmd_agent -lnvpair -lscf -lmdesc -lc -lxml2 -lsocket \
-	-lumem
-
-LINTFLAGS = -msux
-LINTFLAGS64 = -msux -m64
-
-$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
-$(LINTLIB) := LINTFLAGS = -nsvx -I$(ROOT)/usr/platform/sun4v/include
-$(LINTLIB) := LINTFLAGS64 = -nsvx -m64 \
-	-I$(ROOT)/usr/platform/sun4v/include
+LDLIBS += $(MACH_LDLIBS)
+LDLIBS += -lfmd_agent -lnvpair -lscf -lmdesc -lc -lxml2
+LDLIBS += -lsocket -lumem
+NATIVE_LIBS += libxml2.so
 
 .KEEP_STATE:
 
 all: $(LIBS)
-
-lint: $(LINTLIB) lintcheck
 
 pics/%.o: ../$(MACH)/%.c
 	$(COMPILE.c) -o $@ $<

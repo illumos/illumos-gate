@@ -43,9 +43,6 @@ CLOBBERFILES +=	$(LIBPCSRC)
 #
 all:
 
-# no lint for 3rd party code
-lint:
-
 $(ROOTLIBPCDIR):
 	$(INS.dir)
 
