@@ -46,8 +46,7 @@ LDFLAGS +=	$(MAPFILES:%=-M%)
 
 LDLIBS +=	../libsmutil/libsmutil.a ../libsm/libsm.a -lresolv -lsocket \
 		-lnsl ../db/libdb.a -lldap -lsldap -lwrap -lumem \
-		-lssl -lcrypto -lsasl
-NATIVE_LIBS +=	libssl.so libcrypto.so
+		-lsunw_ssl -lsunw_crypto -lsasl
 
 INCPATH=	-I. -I../include -I../db
 
