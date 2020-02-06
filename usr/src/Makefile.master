@@ -1013,7 +1013,9 @@ ZTEXT=		-ztext
 ZVERBOSE=	-zverbose
 ZASSERTDEFLIB=	-zassert-deflib
 ZGUIDANCE=	-zguidance
-ZFATALWARNINGS=	-zfatal-warnings
+# XXX temporarily disable this to get the SmartOS build working
+# ZFATALWARNINGS=	-zfatal-warnings
+ZFATALWARNINGS=
 
 GSHARED=	-G
 CCMT=		-mt
