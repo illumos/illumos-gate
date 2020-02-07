@@ -612,7 +612,7 @@ libadt_jni:	libbsm
 libadutils:	libldap5 libresolv2
 libbe:		libzfs libinstzones libuuid libgen libdevinfo libefi libficl
 libbsm:		libinetutil libscf libsecdb libtsol
-libbunyan:	libnvpair
+libbunyan:	libumem
 libcfgadm:	libdevinfo
 libcontract:	libnvpair
 libcmd:		libsum libast
@@ -633,7 +633,7 @@ libdladm:	libdevinfo libinetutil libscf librcm libexacct libkstat \
 libdll:		libast
 libdlpi:	libinetutil libdladm
 libds:		libsysevent
-libdtrace:	libproc libgen libctf libmapmalloc
+libdtrace:	libproc libgen libctf libmapmalloc libzonecfg ../cmd/sgs/libelf
 libdtrace_jni:	libuutil libdtrace
 libdwarf:	../cmd/sgs/libelf
 libefi:		libuuid libsmbios

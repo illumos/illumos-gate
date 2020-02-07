@@ -191,6 +191,10 @@ $(SUBDIRS) head ucbhead pkg: FRC
 sgs: rootdirs .WAIT sysheaders userheaders .WAIT \
 	libheaders ucbheaders cmdheaders
 
+# To prevent 'ld: warning: dynamic library found on default search path', make
+# sure we've finished building all of the libraries before doing cmd and test.
+test cmd: lib
+
 #
 # Top-level setup target to setup the development environment that includes
 # headers, tools and generated mapfiles.  For open-only builds (i.e.: source
