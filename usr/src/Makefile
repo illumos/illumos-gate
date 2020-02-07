@@ -50,6 +50,9 @@ $(SPARC_BLD)psm: stand
 
 SUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
 
+FIRST_SUBDIRS= data uts lib
+SECOND_SUBDIRS= cmd ucblib ucbcmd psm man test $($(MACH)_SUBDIRS)
+
 HDRSUBDIRS=	uts head lib cmd ucbhead
 
 # UCB headers are bug-for-bug compatible and not checkable against the header
@@ -124,7 +127,7 @@ stage-licenses: install2
 
 install1: mapfiles closedbins sgs
 
-install2: install1 .WAIT $(SUBDIRS)
+install2: install1 .WAIT $(FIRST_SUBDIRS) .WAIT $(SECOND_SUBDIRS)
 
 _msg: _msgdirs rootdirs FRC
 	@for m in $(MSGSUBDIRS); do \
@@ -190,10 +193,6 @@ $(SUBDIRS) head ucbhead pkg: FRC
 # userheaders, hence the .WAIT before libheaders.
 sgs: rootdirs .WAIT sysheaders userheaders .WAIT \
 	libheaders ucbheaders cmdheaders
-
-# To prevent 'ld: warning: dynamic library found on default search path', make
-# sure we've finished building all of the libraries before doing cmd and test.
-test cmd: lib
 
 #
 # Top-level setup target to setup the development environment that includes
