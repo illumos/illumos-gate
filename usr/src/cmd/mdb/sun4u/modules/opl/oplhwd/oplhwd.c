@@ -23,7 +23,6 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mdb_modapi.h>
 #include <sys/types.h>
@@ -151,7 +150,7 @@ dumpmemhwd(hwd_memory_t *memp, int v, int mv)
 				mdb_printf("\tDIMM %d\tstatus\t0x%x (%s)\n",
 				    i, memp->mem_dimms[i].dimm_status,
 				    hwd_stat_decode(
-					    memp->mem_dimms[i].dimm_status));
+				    memp->mem_dimms[i].dimm_status));
 			continue;
 		}
 		mdb_printf("\tDIMM %d\tstatus\t0x%x (%s)\tcapacity\t0x%llx\n",
@@ -241,16 +240,16 @@ dumpchiphwd(hwd_cpu_chip_t *chipp, int ch, int v, int mv)
 			mdb_printf("\tsharing\t%x\n",
 			    corep->core_l2_cache_sharing);
 			mdb_printf("\t\tITLB entries\t0x%x\tDTLB entries "
-				"0x%x\n", corep->core_num_itlb_entries,
+			    "0x%x\n", corep->core_num_itlb_entries,
 			    corep->core_num_dtlb_entries);
 		}
 
 		for (cp = 0; cp < HWD_CPUS_PER_CORE; cp++) {
 			cpup = &corep->core_cpus[cp];
 			mdb_printf("\t\tCPU %d:\tstatus\t0x%x (%s)\tcpuid"
-				" = 0x%x\n", cp, cpup->cpu_status,
-				hwd_stat_decode(cpup->cpu_status),
-				cpup->cpu_cpuid);
+			    " = 0x%x\n", cp, cpup->cpu_status,
+			    hwd_stat_decode(cpup->cpu_status),
+			    cpup->cpu_cpuid);
 			if (v & DUMP_COMP_NAME)
 				mdb_printf("\t\t\tcomponent name:%s\n",
 				    cpup->cpu_component_name);
@@ -320,10 +319,10 @@ dumpahwd(int bd, int v)
 
 
 	if (mdb_vread(&boardcfg, sizeof (opl_board_cfg_t),
-		tmptr + (bd * sizeof (opl_board_cfg_t))) == -1) {
+	    tmptr + (bd * sizeof (opl_board_cfg_t))) == -1) {
 		mdb_warn("failed to read opl_board_cfg at %p",
-			(tmptr + (bd * sizeof (opl_board_cfg_t))));
-			return;
+		    (tmptr + (bd * sizeof (opl_board_cfg_t))));
+		return;
 	}
 
 	if (boardcfg.cfg_hwd == NULL) {
@@ -335,9 +334,9 @@ dumpahwd(int bd, int v)
 
 	/* We always need the header, for offsets */
 	if (mdb_vread(&hwd_hdr, sizeof (hwd_header_t),
-			(uintptr_t)boardcfg.cfg_hwd) == -1) {
+	    (uintptr_t)boardcfg.cfg_hwd) == -1) {
 		mdb_warn("failed to read hwd_header_t at %p\n",
-				boardcfg.cfg_hwd);
+		    boardcfg.cfg_hwd);
 		return;
 	}
 
@@ -370,7 +369,7 @@ dumpahwd(int bd, int v)
 		if (mdb_vread(&hwd_sb_status, sizeof (hwd_sb_status_t),
 		    (uintptr_t)statusp) == -1) {
 			mdb_warn("failed to read hwd_sb_status_t at %p\n",
-					statusp);
+			    statusp);
 			return;
 		}
 		mdb_printf("\nSTATUS:\tBoard\tStatus\n");
@@ -388,7 +387,7 @@ dumpahwd(int bd, int v)
 		if (mdb_vread(&hwd_dinfo, sizeof (hwd_domain_info_t),
 		    (uintptr_t)dinfop) == -1) {
 			mdb_warn("failed to read hwd_domain_info_t at %p\n",
-				dinfop);
+			    dinfop);
 			return;
 		}
 		mdb_printf("\nDomain info:\tReset reason\t0x%x",
@@ -445,7 +444,7 @@ dumpahwd(int bd, int v)
 		cmup = &hwd_sb.sb_cmu.cmu_ch;
 
 		mdb_printf("\nCMU CH: status\t0x%x (%s)\tportid=0x%x"
-				" LSB = 0x%x\n",
+		    " LSB = 0x%x\n",
 		    cmup->chan_status, hwd_stat_decode(cmup->chan_status),
 		    cmup->chan_portid, ((cmup->chan_portid) >> 4));
 
@@ -504,16 +503,16 @@ dumpahwd(int bd, int v)
 
 			scp = &hwd_sb.sb_cmu.cmu_scs[sc];
 
-			if (DONT_BOTHER(scp->sc_status, mv))
-			    mdb_printf("\nSC %d:\tstatus\t0x%x (%s)\n",
-				sc, scp->sc_status,
-				hwd_stat_decode(scp->sc_status));
-			else {
-			    mdb_printf("\nSC %d:\tstatus\t0x%x (%s)\t",
-				sc, scp->sc_status,
-				hwd_stat_decode(scp->sc_status));
-			    mdb_printf("register addr\t0x%llx\n",
-				scp->sc_register_address);
+			if (DONT_BOTHER(scp->sc_status, mv)) {
+				mdb_printf("\nSC %d:\tstatus\t0x%x (%s)\n",
+				    sc, scp->sc_status,
+				    hwd_stat_decode(scp->sc_status));
+			} else {
+				mdb_printf("\nSC %d:\tstatus\t0x%x (%s)\t",
+				    sc, scp->sc_status,
+				    hwd_stat_decode(scp->sc_status));
+				mdb_printf("register addr\t0x%llx\n",
+				    scp->sc_register_address);
 			}
 		}
 
@@ -607,7 +606,7 @@ oplhwd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (bdi < 0) {
 		/* get active boards */
 		for (bdi = 0; bdi < OPL_MAX_BOARDS; bdi++)
-		dumpahwd(bdi, v_mode);
+			dumpahwd(bdi, v_mode);
 	} else {
 		dumpahwd(bdi, v_mode);
 	}
@@ -621,22 +620,22 @@ static void
 oplhwd_help(void)
 {
 	mdb_printf("oplhwd will dump HWD only for a particular board"
-		" on which,");
+	    " on which,");
 	mdb_printf("an earlier DR operation has been executed.\n");
 	mdb_printf("-b NUM \tlist oplhwd entry for a board\n"
-		"-s \t\tlist oplhwd entry with SB status\n"
-		"-d \t\tlist oplhwd entry with Domain info.\n"
-		"-i \t\tlist oplhwd entry with SB info.\n"
-		"-h \t\tlist oplhwd entry with Chips details\n"
-		"-o \t\tlist oplhwd entry with Core details\n"
-		"-m \t\tlist oplhwd entry with Memory info.\n"
-		"-k \t\tlist oplhwd entry with Memory Bank info.\n"
-		"-r \t\tlist oplhwd entry with SC info.\n"
-		"-c \t\tlist oplhwd entry with CMU channels\n"
-		"-p \t\tlist oplhwd entry with PCI channels\n"
-		"-a \t\tlist oplhwd entry with all possible info.\n"
-		"-C \t\tlist oplhwd entry with component names\n"
-		"-v \t\tlist oplhwd entry in verbose mode\n");
+	    "-s \t\tlist oplhwd entry with SB status\n"
+	    "-d \t\tlist oplhwd entry with Domain info.\n"
+	    "-i \t\tlist oplhwd entry with SB info.\n"
+	    "-h \t\tlist oplhwd entry with Chips details\n"
+	    "-o \t\tlist oplhwd entry with Core details\n"
+	    "-m \t\tlist oplhwd entry with Memory info.\n"
+	    "-k \t\tlist oplhwd entry with Memory Bank info.\n"
+	    "-r \t\tlist oplhwd entry with SC info.\n"
+	    "-c \t\tlist oplhwd entry with CMU channels\n"
+	    "-p \t\tlist oplhwd entry with PCI channels\n"
+	    "-a \t\tlist oplhwd entry with all possible info.\n"
+	    "-C \t\tlist oplhwd entry with component names\n"
+	    "-v \t\tlist oplhwd entry in verbose mode\n");
 }
 
 /*

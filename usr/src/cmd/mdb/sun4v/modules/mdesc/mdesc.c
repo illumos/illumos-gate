@@ -68,7 +68,7 @@ mdhdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		else
 			mdb_printf("%p\n", mdp);
 
-	} while ((mdp = (uintptr_t)md.next) != NULL);
+	} while ((mdp = (uintptr_t)md.next) != (uintptr_t)NULL);
 
 	return (DCMD_OK);
 }

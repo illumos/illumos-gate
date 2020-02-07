@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This module provides debugging tools for the LDoms vDisk drivers
  * (vds and vdc).
@@ -41,7 +39,7 @@ int
 vd_dring_entry_walk_init(mdb_walk_state_t *wsp)
 {
 	/* Must have a start addr.  */
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == (uintptr_t)NULL) {
 		mdb_warn("Descriptor Ring base address required\n");
 
 		return (WALK_ERR);

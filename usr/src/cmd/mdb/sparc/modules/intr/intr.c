@@ -64,7 +64,7 @@ static int detailed = 0; /* Print detailed view */
 static int
 intr_walk_init(mdb_walk_state_t *wsp)
 {
-	wsp->walk_addr = NULL;
+	wsp->walk_addr = (uintptr_t)NULL;
 
 	return (WALK_NEXT);
 }
