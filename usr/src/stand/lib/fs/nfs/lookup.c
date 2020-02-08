@@ -287,7 +287,7 @@ next:
 		if (error)
 			goto bad;
 
-		stpn_get(pathp, &linkpath);
+		(void) stpn_get(pathp, &linkpath);
 
 		if (stpn_pathleft(&linkpath) == 0)
 			(void) stpn_set(&linkpath, ".");

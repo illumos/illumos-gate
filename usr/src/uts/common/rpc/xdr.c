@@ -80,7 +80,7 @@ xdr_free(xdrproc_t proc, char *objp)
 	XDR x;
 
 	x.x_op = XDR_FREE;
-	(*proc)(&x, objp);
+	(void) (*proc)(&x, objp);
 }
 
 /*

@@ -32,8 +32,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Adapted for use by the boot program.
  *
@@ -93,13 +91,11 @@ authunix_create(char *machname, uid_t uid, gid_t gid, int len, gid_t *aup_gids)
 	auth = (AUTH *) bkmem_alloc(sizeof (*auth));
 	if (auth == NULL) {
 		prom_panic("authunix_create: Cannot allocate memory.");
-		return (NULL);
 	}
 
 	au = (struct audata *)bkmem_alloc(sizeof (*au));
 	if (au == NULL) {
 		prom_panic("authunix_create: Cannot allocate memory.");
-		return (NULL);
 	}
 
 	/* setup authenticator. */
@@ -127,17 +123,11 @@ authunix_create(char *machname, uid_t uid, gid_t gid, int len, gid_t *aup_gids)
 	xdrmem_create(&xdrs, mymem, MAX_AUTH_BYTES, XDR_ENCODE);
 	if (!xdr_authunix_parms(&xdrs, &aup)) {
 		prom_panic("authunix_create:  xdr_authunix_parms failed");
-		bkmem_free(auth->ah_private, sizeof (struct audata));
-		bkmem_free((caddr_t)auth, sizeof (*auth));
-		return ((AUTH *)0);
 	}
 	au->au_origcred.oa_length = len = XDR_GETPOS(&xdrs);
 	au->au_origcred.oa_flavor = (uint_t)AUTH_UNIX;
 	if ((au->au_origcred.oa_base = bkmem_alloc((uint_t)len)) == NULL) {
 		prom_panic("authunix_create: memory alloc failed");
-		bkmem_free(auth->ah_private, sizeof (struct audata));
-		bkmem_free((caddr_t)auth, sizeof (*auth));
-		return ((AUTH *)0);
 	}
 	(void) bcopy(mymem, au->au_origcred.oa_base, (uint_t)len);
 
@@ -222,7 +212,7 @@ authunix_refresh(AUTH *auth, struct rpc_msg *msg, cred_t *cr)
 	/* update the time and serialize in place */
 	aup.aup_time = (prom_gettime() / 1000);
 	xdrs.x_op = XDR_ENCODE;
-	XDR_SETPOS(&xdrs, 0);
+	(void) XDR_SETPOS(&xdrs, 0);
 	stat = xdr_authunix_parms(&xdrs, &aup);
 	if (!stat)
 		goto done;

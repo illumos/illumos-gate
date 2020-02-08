@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if 1
 #undef DEBUG
 #endif
@@ -682,7 +680,6 @@ prtree(kmem_info.free_root, "kmem_free");
 			 * as "ptr == neigh_block"
 			 */
 			prom_panic("kmem_free: block already free as neighbor");
-			return;
 		} /* else */
 		neighbor = *np;
 	} /* while */

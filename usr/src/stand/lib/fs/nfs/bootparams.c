@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains routines responsible for getting the system's
  * name and boot params. Most of it comes from the SVR4 diskless boot
@@ -166,7 +164,7 @@ whoami(void)
 	if (namelen > 0) {
 		if (boothowto & RB_VERBOSE)
 			printf("hostname: %s\n", bp.client_name);
-		sethostname(bp.client_name, namelen);
+		(void) sethostname(bp.client_name, namelen);
 	} else {
 		dprintf("whoami: no host name\n");
 		retval = FALSE;

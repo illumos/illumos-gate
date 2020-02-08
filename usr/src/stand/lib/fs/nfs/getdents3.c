@@ -26,8 +26,6 @@
  *  Stuff relating to NFSv3 directory reading ...
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <rpc/types.h>
 #include <rpc/auth.h>
 #include <rpc/xdr.h>
@@ -171,7 +169,8 @@ nfs3getdents(struct nfs_file *nfp, struct dirent *dep, unsigned size)
 				return (cnt);
 			size -= n;
 
-			(void) strcpy(dep->d_name, ep->name);
+			(void) strlcpy(dep->d_name, ep->name,
+			    strlen(ep->name) + 1);
 			dep->d_ino = ep->fileid;
 			dep->d_off = (off_t)ep->cookie;
 			dep->d_reclen = (ushort_t)n;

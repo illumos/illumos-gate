@@ -25,8 +25,6 @@
  * Simple nfs V4 ops
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <rpc/types.h>
 #include <rpc/auth.h>
 #include <sys/t_lock.h>
@@ -118,7 +116,8 @@ nfs4read(struct nfs_file *filep, char *buf, size_t size)
 			    timeout);
 
 			if (status == RPC_TIMEDOUT) {
-	dprintf("NFS read(%d) timed out. Retrying...\n", readargs.r_count);
+				dprintf("NFS read(%d) timed out. Retrying...\n",
+				    readargs.r_count);
 				if (errno == ETIMEDOUT)
 					framing_errs++;
 
