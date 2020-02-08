@@ -24,21 +24,6 @@
 #
 
 set name=pkg.fmri value=pkg:/system/compatibility/sunos4@$(PKGVERS)
-set name=pkg.description \
-    value="utilities to provide a binary-compatible execution environment for SunOS 4.x applications"
-set name=pkg.summary value="SunOS 4.x Binary Compatibility"
-set name=info.classification value=org.opensolaris.category.2008:System/Core
+set name=pkg.obsolete value=true
+set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=sparc
-dir path=usr group=sys
-dir path=usr/4lib
-file path=usr/4lib/libc.so.1.9
-file path=usr/4lib/libc.so.2.9
-file path=usr/4lib/sbcp mode=0755
-legacy pkg=SUNWbcp \
-    desc="utilities to provide a binary-compatible execution environment for SunOS 4.x applications" \
-    name="SunOS 4.x Binary Compatibility"
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL
-license usr/src/lib/libbc/THIRDPARTYLICENSE \
-    license=usr/src/lib/libbc/THIRDPARTYLICENSE
-link path=usr/4lib/libdl.so.1.0 target=../../lib/libdl.so.1
