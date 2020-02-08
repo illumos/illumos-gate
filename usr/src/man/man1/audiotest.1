@@ -1,30 +1,28 @@
 '\" te
 .\"  Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2020 Peter Tribble.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIOTEST 1 "May 13, 2017"
+.TH AUDIOTEST 1 "Feb 8, 2020"
 .SH NAME
 audiotest \- test audio device
 .SH SYNOPSIS
-.LP
 .nf
-\fBaudiotest\fR [\fB-24571\fR] [\fIdev\fR] ...
+\fBaudiotest\fR [\fB-2457\fR] [\fB-l\fR] [\fB-r\fR \fIrate\fR] [\fIdev\fR] ...
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBaudiotest\fR utility runs a test for the named audio device (or all
 audio devices found on the system if none is given). The test includes playing
 an audio sample over each channel and measuring the rate of playback for clock
 drift.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
 .na
-\fB\fB-1\fR\fR
+\fB-l\fR
 .ad
 .RS 6n
 Loop mode. The test is run in an infinite loop.
@@ -33,7 +31,16 @@ Loop mode. The test is run in an infinite loop.
 .sp
 .ne 2
 .na
-\fB\fB-2\fR\fR
+\fB-r\fR \fIrate\fR
+.ad
+.RS 6n
+Sample rate. By default 48000Hz is used.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-2\fR
 .ad
 .RS 6n
 Stereo (2-channel) mode. This is the default mode. Playback assumes 2 channels
@@ -43,7 +50,7 @@ are present.
 .sp
 .ne 2
 .na
-\fB\fB-4\fR\fR
+\fB-4\fR
 .ad
 .RS 6n
 Quadraphonic mode (4-channel surround). The test assumes that four surround
@@ -53,7 +60,7 @@ channels are present.
 .sp
 .ne 2
 .na
-\fB\fB-5\fR\fR
+\fB-5\fR
 .ad
 .RS 6n
 Surround sound mode (5.1). The test checks the left, right, surround left,
@@ -64,7 +71,7 @@ tested.
 .sp
 .ne 2
 .na
-\fB\fB-7\fR\fR
+\fB-7\fR
 .ad
 .RS 6n
 Surround sound mode (7.1). The test checks the left, right, surround left,
@@ -72,38 +79,23 @@ surround right, back surround left, back surround right, and center channels.
 The low frequency effects channel is not tested.
 .RE
 
+.sp
+.LP
+If multiple modes are specified, the last one specified is used.
+
 .SH OPERANDS
 .ne 2
 .na
-\fB\fIdev\fR\fR
+\fIdev\fR
 .ad
 .RS 7n
-The path the device to test, for example, \fB/dev/dsp0\fR.
+The path to the device to test, for example, \fB/dev/dsp0\fR.
 .RE
 
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Architecture	SPARC, x86
-_
-Interface Stability	Committed
-.TE
-
 .SH SEE ALSO
-.LP
 \fBaudioconvert\fR(1), \fBaudiorecord\fR(1),
-\fBattributes\fR(5), \fBaudio\fR(7I)
+\fBaudio\fR(7I)
 .SH BUGS
-.LP
 \fBaudiotest\fR has no way to detect the number of actual audio channels
 supported by the physical device.
 .sp
