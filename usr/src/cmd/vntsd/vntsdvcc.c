@@ -22,7 +22,6 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Configuration and setup interface to vcc driver.
@@ -206,7 +205,7 @@ vntsd_delete_cons(vntsd_t *vntsdp)
 
 				(void) mutex_lock(&groupp->vntsd->lock);
 				(void) vntsd_que_rm(&groupp->vntsd->grouppq,
-						    groupp);
+				    groupp);
 				(void) mutex_unlock(&groupp->vntsd->lock);
 
 				/* clean up the group */
@@ -459,7 +458,7 @@ alloc_cons_with_group(vntsd_t *vntsdp, vcc_console_t *consp,
 	/* intialize console */
 	if (alloc_cons(groupp, consp) == NULL) {
 		/* no memory */
-		if (new_groupp != NULL) {
+		if (*new_groupp != NULL) {
 			/* clean up new group */
 			free_group(groupp);
 		}
@@ -488,8 +487,7 @@ create_listen_thread(vntsd_group_t *groupp)
 	D1(stderr, "t@%d create_listen:%lld\n", thr_self(), groupp->tcp_port);
 
 	if ((rv = thr_create(NULL, 0, (thr_func_t)vntsd_listen_thread,
-			    (void *)groupp, THR_DETACHED, &groupp->listen_tid))
-	    != 0) {
+	    (void *)groupp, THR_DETACHED, &groupp->listen_tid)) != 0) {
 		(void) (void) snprintf(err_msg, sizeof (err_msg),
 		    "Can not create listen thread for"
 		    "group %s tcp %llx\n", groupp->group_name,

@@ -18,7 +18,6 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
@@ -284,5 +283,5 @@ vntsd_read(vntsd_client_t *clientp)
 	}
 
 	/*NOTREACHED*/
-	return (NULL);
+	return (0);
 }

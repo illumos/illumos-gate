@@ -22,7 +22,6 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * write thread - read from vcc console and  write to tcp client. There are one
@@ -198,7 +197,7 @@ write_one_client(vntsd_client_t *clientp, write_buf_t *write_buf)
 		(void) mutex_lock(&clientp->lock);
 		clientp->status |= VNTSD_CLIENT_IO_ERR;
 		assert(clientp->cons);
-		(void) thr_kill(clientp->cons_tid, NULL);
+		(void) thr_kill(clientp->cons_tid, 0);
 		(void) mutex_unlock(&clientp->lock);
 	}
 	return (B_FALSE);

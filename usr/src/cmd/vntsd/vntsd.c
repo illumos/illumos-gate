@@ -358,7 +358,7 @@ main(int argc, char ** argv)
 		    "descriptor limit.");
 	(void) enable_extended_FILE_stdio(-1, -1);
 
-	vntsdp = calloc(sizeof (vntsd_t), 1);
+	vntsdp = calloc(1, sizeof (vntsd_t));
 	if (vntsdp == NULL) {
 		vntsd_log(VNTSD_ERR_NO_MEM, "main:vntsdp");
 		exit(1);
