@@ -8,7 +8,6 @@
 acltotext, aclfromtext \- convert internal representation to or from external
 representation
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lsec\fR [ \fIlibrary\fR... ]
 #include <sys/acl.h>
@@ -22,12 +21,10 @@ representation
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBacltotext()\fR function converts an internal \fBACL\fR representation
 pointed to by \fIaclbufp\fR into an external \fBACL\fR representation. The
 space for the external text string is obtained using \fBmalloc\fR(3C). The
-caller is responsible for freeing the space upon completion..
+caller is responsible for freeing the space upon completion.
 .sp
 .LP
 The \fBaclfromtext()\fR function converts an external \fBACL\fR representation
@@ -206,8 +203,6 @@ no access
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, the \fBacltotext()\fR function returns a pointer to
 a text string. Otherwise, it returns \fBNULL\fR.
 .sp
@@ -215,8 +210,6 @@ a text string. Otherwise, it returns \fBNULL\fR.
 Upon successful completion, the \fBaclfromtext()\fR function returns a pointer
 to a list of \fBACL\fR entries. Otherwise, it returns \fBNULL\fR.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -233,6 +226,4 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBacl\fR(2), \fBmalloc\fR(3C), \fBattributes\fR(5)

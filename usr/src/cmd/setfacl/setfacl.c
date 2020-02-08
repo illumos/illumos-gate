@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2020 Peter Tribble.
  */
 
 /*
@@ -41,6 +42,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>
+#include <ctype.h>
 
 #define	ADD	1
 #define	MODIFY	2
@@ -70,7 +72,7 @@ main(int argc, char *argv[])
 	int		errflag = 0;
 	int		aclcnt;			/* used by -m -d */
 	aclent_t	*aclp;			/* used by -m -d */
-	char		*aclfilep;		/* acl file argument */
+	char		*aclfilep = NULL;		/* acl file argument */
 	char		*d_entryp = NULL;	/* ptr to del entry list */
 	char		*m_entryp = NULL;	/* ptr to mod entry list */
 	char		*s_entryp = NULL;	/* ptr to set entry list */
@@ -198,8 +200,8 @@ get_acl_info(char *filep, aclent_t **aclpp)
 			(void) fprintf(stderr,
 			    gettext("File system doesn't support aclent_t "
 			    "style ACL's.\n"
-			    "See acl(5) for more information on"
-			    " ACL styles support by Solaris.\n"));
+			    "See acl(5) for more information on "
+			    "POSIX-draft ACL support.\n"));
 			return (-1);
 		}
 		(void) fprintf(stderr,
@@ -237,10 +239,8 @@ get_acl_info(char *filep, aclent_t **aclpp)
  */
 static int
 mod_entries(aclent_t *aclp, int cnt, char *modp, char *delp,
-	char *fnamep, int rfg)
+    char *fnamep, int rfg)
 {
-	int	rc;		/* return code */
-
 	/* modify and add: from -m option */
 	if (parse_entry_list(&aclp, &cnt, modp, MODIFY) == -1)
 		return (-1);
@@ -342,7 +342,6 @@ set_file_entries(char *acl_fnamep, char *fnamep, int rflag)
 static int
 set_online_entries(char *setp, char *fnamep, int rflag)
 {
-	char		*commap;
 	aclent_t	*aclp;
 	int		aclcnt = 0;
 
@@ -414,17 +413,6 @@ convert_to_aclent_t(char *entryp, int *cntp, aclent_t **aclpp, int mode)
 	if (entryp == NULL)
 		return (0);
 
-	if (*cntp > 1)
-		new_aclp = (aclent_t *)realloc(*aclpp,
-		    sizeof (aclent_t) * (*cntp));
-	else
-		new_aclp = (aclent_t *) malloc(sizeof (aclent_t) * (*cntp));
-	if (new_aclp == NULL) {
-		fprintf(stderr,
-		    gettext("Insufficient memory for acl %d\n"), *cntp);
-		return (-1);
-	}
-
 	tmpacl.a_id = 0;	/* id field needs to be initialized */
 	if (entryp[0] == 'u')
 		tmpacl.a_id = getuid();	/* id field for user */
@@ -441,6 +429,17 @@ convert_to_aclent_t(char *entryp, int *cntp, aclent_t **aclpp, int mode)
 	    (tmpacl.a_type == DEF_USER_OBJ) ||
 	    (tmpacl.a_type == DEF_GROUP_OBJ) ||
 	    (tmpacl.a_type == DEF_OTHER_OBJ));
+
+	if (*cntp > 1)
+		new_aclp = (aclent_t *)realloc(*aclpp,
+		    sizeof (aclent_t) * (*cntp));
+	else
+		new_aclp = (aclent_t *) malloc(sizeof (aclent_t) * (*cntp));
+	if (new_aclp == NULL) {
+		fprintf(stderr,
+		    gettext("Insufficient memory for acl %d\n"), *cntp);
+		return (-1);
+	}
 
 	cur_cnt = *cntp - 1;
 	switch (mode) {
@@ -520,7 +519,7 @@ convert_to_aclent_t(char *entryp, int *cntp, aclent_t **aclpp, int mode)
 		if (centry != NULL && gentry != NULL && trivial == B_TRUE)
 			centry->a_perm = gentry->a_perm;
 	}
-	*aclpp = new_aclp; 	/* return new acl entries */
+	*aclpp = new_aclp;	/* return new acl entries */
 	return (0);
 }
 

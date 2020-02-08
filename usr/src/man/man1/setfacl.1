@@ -1,13 +1,13 @@
 '\" te
 .\"  Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (c) 2020 Peter Tribble.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SETFACL 1 "Dec 19, 2006"
+.TH SETFACL 1 "Feb 8, 2020"
 .SH NAME
 setfacl \- modify the Access Control List (ACL) for a file or files
 .SH SYNOPSIS
-.LP
 .nf
 \fBsetfacl\fR [\fB-r\fR] \fB-s\fR \fIacl_entries\fR \fIfile\fR
 .fi
@@ -23,12 +23,16 @@ setfacl \- modify the Access Control List (ACL) for a file or files
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 For each file specified, \fBsetfacl\fR either replaces its entire \fBACL\fR,
 including the default \fBACL\fR on a directory, or it adds, modifies, or
 deletes one or more \fBACL\fR entries, including default entries on
 directories.
+.sp
+.LP
+The \fBsetfacl\fR utility can only manipulate POSIX-draft \fBACL\fRs.  See
+\fBacl\fR(5) for a description of the difference between the older POSIX-draft
+\fBACL\fRs and the newer NFSv4 \fBACL\fRs.  The \fBchmod\fR(1) utility can
+be used to manipulate \fBACL\fRs on all types of file system.
 .sp
 .LP
 When the \fBsetfacl\fR command is used, it can result in changes to the file
@@ -63,8 +67,6 @@ supports POSIX-draft ACLS (or \fBaclent_t\fR style ACLs). Use the \fBchmod\fR
 command to set ACLs on files in a ZFS file system, which supports NFSv4-style
 ACLS (or \fBace_t\fR style ACLs).
 .SS "\fIacl_entries\fR Syntax"
-.sp
-.LP
 For the \fB-m\fR and \fB-s\fR options, \fIacl_entries\fR are one or more
 comma-separated \fBACL\fR entries.
 .sp
@@ -114,12 +116,12 @@ c c
 l l .
 \fBACL\fR Entry	Description
 _
-u[ser]::\fIperms\fR 	File owner permissions.
-g[roup]::\fIperms\fR 	File group owner permissions.
-o[ther]:\fIperms\fR 	T{
+u[ser]::\fIperms\fR	File owner permissions.
+g[roup]::\fIperms\fR	File group owner permissions.
+o[ther]:\fIperms\fR	T{
 Permissions for users other than the file owner or members of file group owner.
 T}
-m[ask]:\fIperms\fR 	T{
+m[ask]:\fIperms\fR	T{
 The \fBACL\fR mask. The mask entry indicates the maximum permissions allowed for users (other than the owner) and for groups. The mask is a quick way to change permissions on all the users and groups.
 T}
 u[ser]:\fIuid:perms\fR	T{
@@ -128,12 +130,12 @@ T}
 g[roup]:\fIgid:perms\fR	T{
 Permissions for a specific group. For \fIgid\fR, you can specify either a group name or a numeric GID.
 T}
-d[efault]:u[ser]::\fIperms\fR 	Default file owner permissions.
-d[efault]:g[roup]::\fIperms\fR 	Default file group owner permissions.
-d[efault]:o[ther]:\fIperms\fR 	T{
+d[efault]:u[ser]::\fIperms\fR	Default file owner permissions.
+d[efault]:g[roup]::\fIperms\fR	Default file group owner permissions.
+d[efault]:o[ther]:\fIperms\fR	T{
 Default permissions for users other than the file owner or members of the file group owner.
 T}
-d[efault]:m[ask]:\fIperms\fR 	Default \fBACL\fR mask.
+d[efault]:m[ask]:\fIperms\fR	Default \fBACL\fR mask.
 d[efault]:u[ser]:\fIuid\fR:\fIperms\fR	T{
 Default permissions for a specific user. For \fIuid\fR, you can specify either a user name or a numeric UID.
 T}
@@ -148,8 +150,6 @@ For the \fB-d\fR option, \fIacl_entries\fR are one or more comma-separated
 \fBACL\fR entries without permissions. Notice that the entries for file owner,
 file group owner, \fBACL\fR mask, and others can not be deleted.
 .SH OPTIONS
-.sp
-.LP
 The options have the following meaning:
 .sp
 .ne 2
@@ -293,7 +293,6 @@ group\fR entries with the same \fIgid\fR.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRAdding read permission only
 .sp
 .LP
@@ -353,7 +352,6 @@ The following example sets the same \fBACL\fR on file \fBabc\fR as the file
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/passwd\fR\fR
@@ -372,7 +370,6 @@ group file
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBchmod\fR(1), \fBgetfacl\fR(1), \fBumask\fR(1), \fBaclcheck\fR(3SEC),
-\fBaclsort\fR(3SEC), \fBgroup\fR(4), \fBpasswd\fR(4), \fBattributes\fR(5)
+\fBaclsort\fR(3SEC), \fBgroup\fR(4), \fBpasswd\fR(4), \fBacl\fR(5),
+\fBattributes\fR(5)

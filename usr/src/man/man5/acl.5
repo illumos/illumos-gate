@@ -1,17 +1,17 @@
 '\" te
+.\" Copyright (c) 2020 Peter Tribble.
 .\" Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ACL 5 "Nov 24, 2014"
+.TH ACL 5 "Feb 8, 2020"
 .SH NAME
 acl \- Access Control Lists
 .SH DESCRIPTION
-.LP
 Access control lists (ACLs) are discretionary access control mechanisms that
 grant and deny access to files and directories. Two different ACL models are
-supported in the Solaris release: POSIX-draft ACLs and NFSv4 ACLs.
+supported in this release: POSIX-draft ACLs and NFSv4 ACLs.
 .sp
 .LP
 The older, POSIX-draft model is supported by the UFS file system. This model is
@@ -23,10 +23,9 @@ The other model is based on the standards of the NFSv4 working group and is an
 approved standard from the Internet Engineering Task Force (IETF). The ZFS file
 system uses the NFSv4 model, and provides richer semantics and finer grained
 permission capabilities than the POSIX-draft model.
-.SS "\fBPOSIX\fR-draft \fBACL\fRs"
-.LP
+.SS "POSIX-draft ACLs"
 POSIX-draft ACLs provide an alternative security mechanism to basic UNIX file
-permissions in the Solaris release. Their purpose is to further restrict access
+permissions. Their purpose is to further restrict access
 to files and directories or to extend permissions to a particular user. ACLs
 can be used to change the permissions for the standard owner, group and other
 class bits of a file's mode. ACLs can give additional users and groups access
@@ -104,9 +103,8 @@ user:joe:rw-
 .in -2
 .sp
 
-.SS "\fBNFS\fRv4 \fBACL\fRs"
-.LP
-NFSv4 ACL model is based loosely on the Windows NT ACL model. NFSv4 ACLs
+.SS "NFSv4 ACLs"
+The NFSv4 ACL model is based loosely on the Windows NT ACL model. NFSv4 ACLs
 provide a much richer ACL model than POSIX-draft ACLs.
 .sp
 .LP
@@ -151,7 +149,7 @@ subdirectories of the directory.
 .ie t \(bu
 .el o
 NFSv4 ACLs provide a mechanism for hooking into a system's audit trail.
-Currently, Solaris does not support this mechanism.
+Currently, illumos does not support this mechanism.
 .RE
 .RS +4
 .TP
@@ -540,10 +538,9 @@ user:fred:rwR:f------:allow
 .in -2
 .sp
 
-.SS "Shell-level Solaris \fBAPI\fR"
-.LP
-The Solaris command interface supports the manipulation of ACLs. The following
-Solaris utilities accommodate both ACL models:
+.SS "Shell-level API"
+Several utilities support the manipulation of ACLs. The following
+utilities accommodate both ACL models:
 .sp
 .ne 2
 .na
@@ -656,12 +653,11 @@ When a file with an ACL is unpacked, the unpacked file retains the ACL
 information.
 .RE
 
-.SS "Application-level \fBAPI\fR"
-.LP
+.SS "Application-level API"
 The primary interfaces required to access file system ACLs at the programmatic
 level are the \fBacl_get()\fR and \fBacl_set()\fR functions. These functions
-support both POSIX draft ACLs and NFSv4 ACLs.
-.SS "Retrieving a file's \fBACL\fR"
+support both POSIX-draft ACLs and NFSv4 ACLs.
+.SS "Retrieving a file's ACL"
 .in +2
 .nf
 int acl_get(const char *path, int flag, acl_t **aclp);
@@ -671,23 +667,23 @@ int facl_get(int fd, int flag, acl_t **aclp);
 
 .sp
 .LP
-The \fBacl_get\fR(3SEC) and \fBfacl_get\fR(3SEC) functions retrieves an ACL on
+The \fBacl_get\fR(3SEC) and \fBfacl_get\fR(3SEC) functions retrieve an ACL on
 a file whose name is given by path or referenced by the open file descriptor
 fd. The flag argument specifies whether a trivial ACL should be retrieved. When
-the flag argument equals \fBACL_NO_TRIVIAL\fR then only ACLs that are not
+the flag argument equals \fBACL_NO_TRIVIAL\fR only ACLs that are not
 trivial are retrieved. The ACL is returned in the \fBaclp\fR argument.
-.SS "Freeing \fBACL\fR structure"
+.SS "Freeing ACL structure"
 .in +2
 .nf
-void acl_free(acl_t *aclp)s;
+void acl_free(acl_t *aclp);
 .fi
 .in -2
 
 .sp
 .LP
 The \fBacl_free()\fR function frees up memory allocated for the argument
-\fBaclp;\fR.
-.SS "Setting an \fBACL\fR on a file"
+\fBaclp\fR.
+.SS "Setting an ACL on a file"
 .in +2
 .nf
 int acl_set(const char *path, acl_t *aclp);
@@ -700,10 +696,10 @@ int facl_set(int fd, acl_t *aclp);
 The \fBacl_set\fR(3SEC) and \fBfacl_get\fR(3SEC) functions are used for setting
 an ACL on a file whose name is given by path or referenced by the open file
 descriptor \fBfd\fR. The \fBaclp\fR argument specifies the ACL to set. The
-\fBacl_set\fR(3SEC) translates an POSIX-draft ACL into a NFSv4 ACL when the
-target file systems supports NFSv4 ACLs. No translation is performed when
+\fBacl_set\fR(3SEC) function translates a POSIX-draft ACL into a NFSv4 ACL when
+the target file system supports NFSv4 ACLs. No translation is performed when
 trying to set an NFSv4 ACL on a POSIX-draft ACL supported file system.
-.SS "Determining an \fBACL\fR's trivialness"
+.SS "Determining an ACL's trivialness"
 .in +2
 .nf
 int acl_trivial(const char *path);
@@ -714,7 +710,7 @@ int acl_trivial(const char *path);
 .LP
 The \fBacl_trivial()\fR function is used to determine whether a file has a
 trivial ACL.
-.SS "Removing all \fBACL\fRs from a file"
+.SS "Removing all ACLs from a file"
 .in +2
 .nf
 int acl_strip(const char *path, uid_t uid, gid_t gid, mode_t mode);
@@ -727,7 +723,7 @@ The \fBacl_strip()\fR function removes all ACLs from a file and replaces them
 with a trivial ACL based off of the passed in argument mode. After replacing
 the ACL the owner and group of the file are set to the values specified in the
 uid and gid parameters.
-.SS "Converting \fBACL\fRs to/from external representation"
+.SS "Converting ACLs to/from external representation"
 .in +2
 .nf
 int acl_fromtext(const char *path, acl_t **aclp);
@@ -742,11 +738,10 @@ to by aclp into an external representation. See \fBDESCRIPTION\fR for details
 about external representation.
 .sp
 .LP
-The \fBacl_fromtext()\fR functions converts and external representation into an
+The \fBacl_fromtext()\fR function converts an external representation into an
 internal representation. See \fBDESCRIPTION\fR for details about external
 representation.
 .SH EXAMPLES
-.LP
 The following examples demonstrate how the API can be used to perform basic
 operations on ACLs.
 .LP
@@ -831,7 +826,6 @@ error = acl_strip("file", 10, 100, 0644);
 .in -2
 
 .SH SEE ALSO
-.LP
 \fBchgrp\fR(1), \fBchmod\fR(1), \fBchown\fR(1), \fBcp\fR(1), \fBcpio\fR(1),
 \fBfind\fR(1), \fBls\fR(1), \fBmv\fR(1), \fBtar\fR(1), \fBsetfacl\fR(1),
 \fBchmod\fR(2), \fBacl\fR(2), \fBstat\fR(2), \fBacl_get\fR(3SEC),

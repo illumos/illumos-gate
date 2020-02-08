@@ -21,13 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 Peter Tribble.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifndef lint
-static char sccsid[] = "%Z%%M%	%I%	%E% SMI";
-#endif
 
 /*
  * getfacl [-ad] file ...
@@ -73,7 +68,7 @@ main(int argc, char *argv[])
 	int		errflag = 0;
 	int		savecnt;
 	int		aclcnt;
-	int		mask;
+	int		mask = 0;
 	aclent_t	*aclp;
 	aclent_t	*tp;
 	char		*permp;
@@ -116,7 +111,7 @@ main(int argc, char *argv[])
 				    gettext("File system doesn't support "
 				    "aclent_t style ACL's.\n"
 				    "See acl(5) for more information on "
-				    "Solaris ACL support.\n"));
+				    "POSIX-draft ACL support.\n"));
 				exit(2);
 			}
 			perror(filep);

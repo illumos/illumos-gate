@@ -8,7 +8,6 @@
 acl_totext, acl_fromtext \- convert internal representation  to or from
 external representation
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lsec\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <sys/acl.h>
@@ -22,8 +21,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lsec\fR [ \fIlibrary\fR\&.\|.
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBacl_totext()\fR function converts an internal ACL representation pointed
 to by \fIaclp\fR into an external ACL representation. The memory for the
 external text string is obtained using \fBmalloc\fR(3C). The caller is
@@ -50,7 +47,7 @@ detailed in \fBls\fR(1) for the \fB-V\fR option.
 .ad
 .RS 19n
 Append the \fBuid\fR or \fBgid\fR for additional user or group entries.  This
-flag is used to construt ACL entries in a manner that is suitable for archive
+flag is used to construct ACL entries in a manner that is suitable for archive
 utilities such as \fBtar\fR(1). When the ACL is translated from the external
 format to internal representation using \fBacl_fromtext()\fR, the appended ID
 will be used to populate the \fBuid\fR or \fBgid\fR field of the ACL entry when
@@ -611,8 +608,6 @@ The mask specified in field three should be denied.
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, the \fBacl_totext()\fR function returns a pointer
 to a text string. Otherwise, it returns \fINULL\fR.
 .sp
@@ -701,7 +696,6 @@ Unknown data was found in the ACL.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRExamples of permissions when \fBACL_COMPACT_FMT\fR is not
 specified.
 .sp
@@ -740,8 +734,6 @@ owner@:----------c---:------allow,user:tom:r-------------:f-i---:deny
 .sp
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -758,7 +750,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBls\fR(1), \fBtar\fR(1), \fBacl\fR(2), \fBmalloc\fR(3C),
 \fBaclfromtext\fR(3SEC), \fBacl\fR(5), \fBattributes\fR(5)

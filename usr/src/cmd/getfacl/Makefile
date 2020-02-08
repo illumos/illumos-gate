@@ -23,22 +23,19 @@
 # Copyright (c) 1993,2001 by Sun Microsystems, Inc.
 # All rights reserved.
 #
+# Copyright 2020 Peter Tribble.
+#
 
 PROG= getfacl
 
 include ../Makefile.cmd
 
-CERRWARN += -_gcc=-Wno-unused-variable
-CERRWARN += $(CNOWARN_UNINIT)
-
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTPROG)
 
 clean:
-
-lint:	lint_PROG
 
 include ../Makefile.targ

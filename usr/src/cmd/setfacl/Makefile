@@ -23,17 +23,11 @@
 # Copyright (c) 1993 by Sun Microsystems, Inc.
 #
 # Copyright (c) 2018, Joyent, Inc.
-
+# Copyright 2020 Peter Tribble.
+#
 PROG= setfacl
 
 include ../Makefile.cmd
-
-CERRWARN += -_gcc=-Wno-unused-variable
-CERRWARN += -_gcc=-Wno-implicit-function-declaration
-CERRWARN += $(CNOWARN_UNINIT)
-
-# not linted
-SMATCH=off
 
 LDLIBS += -lsec
 
@@ -44,7 +38,5 @@ all: $(PROG)
 install: all $(ROOTPROG)
 
 clean:
-
-lint:	lint_PROG
 
 include ../Makefile.targ
