@@ -103,6 +103,7 @@ lint := SVCCFG_EXTRA_LIBS = -lscf -ll -luutil -lumem -lmd5 -lnvpair
 
 LDLIBS += $(SVCCFG_EXTRA_LIBS)
 
+$(NATIVE_BUILD)NATIVE_LIBS += libl.so libumem.so libmd5.so libnvpair.so libc.so
 $(NATIVE_BUILD)CC =	$(NATIVECC)
 $(NATIVE_BUILD)LD =	$(NATIVELD)
 $(NATIVE_BUILD)CFLAGS =	$(NATIVE_CFLAGS)
