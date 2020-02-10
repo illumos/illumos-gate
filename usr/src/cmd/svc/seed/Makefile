@@ -115,6 +115,8 @@ SEEDFILEMODE = 0444		# seeds are not intended for editing, but may
 CONFIGD = ../configd/svc.configd-native
 SVCCFG = ../svccfg/svccfg-native
 
+NATIVE_LIBS += libc.so libumem.so
+
 .KEEP_STATE:
 
 all: global.db nonglobal.db miniroot.db

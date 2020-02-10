@@ -78,5 +78,5 @@ $(TESTDIR)/%: %
 	$(POST_PROCESS_O)
 
 %: %.o
-	$(LINK.c) -o $@ $< $(EXTRA_OBJS)
+	$(LINK.c) -o $@ $< $(EXTRA_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
