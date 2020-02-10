@@ -24,10 +24,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2018 Nexenta Systems, Inc.
+ */
+
 #ifndef _SHAREFS_SHAREFS_H
 #define	_SHAREFS_SHAREFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This header provides service for the sharefs module.
@@ -67,24 +69,27 @@ typedef struct sharefs_vfs {
 
 #define	SHAREFS_NAME_MAX	MAXNAMELEN
 
-/*
- * The lock ordering whenever sharefs_lock and sharetab_lock both
- * need to be held is: sharefs_lock and then sharetab_lock.
- */
-extern krwlock_t	sharefs_lock;	/* lock for the vnode ops */
-extern sharetab_t	*sharefs_sharetab;	/* The sharetab. */
+typedef struct sharetab_globals {
+	/*
+	 * The lock ordering whenever sharefs_lock and sharetab_lock both
+	 * need to be held is: sharefs_lock and then sharetab_lock.
+	 */
+	krwlock_t	sharefs_lock;	/* lock for the vnode ops */
+	sharetab_t	*sharefs_sharetab;	/* The sharetab. */
 
-extern uint_t		sharetab_count;	/* How many shares? */
-extern krwlock_t	sharetab_lock;	/* lock for the cached sharetab */
-extern size_t		sharetab_size;	/* How big is the sharetab file? */
+	uint_t		sharetab_count;	/* How many shares? */
+	krwlock_t	sharetab_lock;	/* lock for the cached sharetab */
+	size_t		sharetab_size;	/* How big is the sharetab file? */
 
-extern timestruc_t	sharetab_mtime;	/* Last mod to sharetab */
-extern timestruc_t	sharetab_snap_time;	/* Last snap */
-extern uint_t		sharetab_generation;	/* Which copy is it? */
+	timestruc_t	sharetab_mtime;	/* Last mod to sharetab */
+	timestruc_t	sharetab_snap_time;	/* Last snap */
+	uint_t		sharetab_generation;	/* Which copy is it? */
+} sharetab_globals_t;
 
 #define	SHAREFS_INO_FILE	0x80
 
 extern vnode_t *sharefs_create_root_file(vfs_t *);
+extern sharetab_globals_t *sharetab_get_globals(zone_t *zone);
 
 /*
  * Sharetab file

@@ -18,12 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.
  */
 
 #include <sys/systm.h>
@@ -133,6 +135,11 @@ rfs4_attr_init()
 	struct statvfs64 sb;
 
 	rfs4_init_compound_state(&cs);
+	/*
+	 * This is global state checking, called once. We might be in
+	 * non-global-zone context here (say a modload happens from a zone
+	 * process) so in this case, we want the global-zone root vnode.
+	 */
 	cs.vp = rootvp;
 	cs.fh.nfs_fh4_val = NULL;
 	cs.cr = kcred;
@@ -1301,22 +1308,29 @@ rfs4_get_mntdfileid(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg)
 	vp = sarg->cs->vp;
 	sarg->mntdfid_set = FALSE;
 
-	/* VROOT object, must untraverse */
-	if (vp->v_flag & VROOT) {
+	/*
+	 * VROOT object or zone's root, must untraverse.
+	 *
+	 * NOTE: Not doing reality checks on curzone vs. compound
+	 * state vnode because it will mismatch once at initialization
+	 * if a non-global-zone triggers the module load, BUT in that case
+	 * the vp is literally "/" which has VROOT set.
+	 */
+	if ((vp->v_flag & VROOT) || VN_IS_CURZONEROOT(vp)) {
 
 		/* extra hold for vp since untraverse might rele */
 		VN_HOLD(vp);
-		stubvp = untraverse(vp);
+		stubvp = untraverse(vp, ZONE_ROOTVP());
 
 		/*
-		 * If vp/stubvp are same, we must be at system
+		 * If vp/stubvp are same, we must be at system-or-zone
 		 * root because untraverse returned same vp
 		 * for a VROOT object.  sarg->vap was setup
 		 * before we got here, so there's no need to do
 		 * another getattr -- just use the one in sarg.
 		 */
 		if (VN_CMP(vp, stubvp)) {
-			ASSERT(VN_CMP(vp, rootdir));
+			ASSERT(VN_IS_CURZONEROOT(vp));
 			vap = sarg->vap;
 		} else {
 			va.va_mask = AT_NODEID;
@@ -1375,10 +1389,10 @@ rfs4_fattr4_mounted_on_fileid(nfs4_attr_cmd_t cmd,
 		break;		/* this attr is supported */
 	case NFS4ATTR_GETIT:
 	case NFS4ATTR_VERIT:
-		if (! sarg->mntdfid_set)
+		if (!sarg->mntdfid_set)
 			error = rfs4_get_mntdfileid(cmd, sarg);
 
-		if (! error && sarg->mntdfid_set) {
+		if (!error && sarg->mntdfid_set) {
 			if (cmd == NFS4ATTR_GETIT)
 				na->mounted_on_fileid = sarg->mounted_on_fileid;
 			else
@@ -1595,6 +1609,10 @@ rfs4_fattr4_fs_locations(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		break;  /* this attr is supported */
 
 	case NFS4ATTR_GETIT:
+	{
+		kstat_named_t *stat =
+		    sarg->cs->exi->exi_ne->ne_globals->svstat[NFS_V4];
+
 		fsl = fetch_referral(sarg->cs->vp, sarg->cs->cr);
 		if (fsl == NULL)
 			(void) memset(&(na->fs_locations), 0,
@@ -1603,9 +1621,9 @@ rfs4_fattr4_fs_locations(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 			na->fs_locations = *fsl;
 			kmem_free(fsl, sizeof (fs_locations4));
 		}
-		global_svstat_ptr[4][NFS_REFERRALS].value.ui64++;
+		stat[NFS_REFERRALS].value.ui64++;
 		break;
-
+	}
 	case NFS4ATTR_FREEIT:
 		if (sarg->op == NFS4ATTR_SETIT || sarg->op == NFS4ATTR_VERIT)
 			error = EINVAL;

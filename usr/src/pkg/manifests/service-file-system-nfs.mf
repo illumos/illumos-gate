@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/file-system/nfs@$(PKGVERS)
@@ -48,6 +48,7 @@ dir path=usr/lib/fs group=sys
 dir path=usr/lib/fs/nfs group=sys
 dir path=usr/lib/fs/nfs/$(ARCH64) group=sys
 dir path=usr/lib/nfs group=sys
+dir path=usr/lib/nfs/dtrace group=bin
 dir path=usr/lib/reparse group=bin
 dir path=usr/lib/reparse/$(ARCH64) group=sys
 dir path=usr/sbin
@@ -65,6 +66,8 @@ file path=lib/svc/manifest/network/nfs/server.xml group=sys mode=0444
 file path=lib/svc/method/nfs-server mode=0555
 file path=usr/lib/fs/nfs/$(ARCH64)/libshare_nfs.so.1
 file path=usr/lib/fs/nfs/libshare_nfs.so.1
+file path=usr/lib/nfs/dtrace/nfs-time.d mode=0555
+file path=usr/lib/nfs/dtrace/nfs-trace.d mode=0555
 file path=usr/lib/nfs/mountd mode=0555
 file path=usr/lib/nfs/nfsd mode=0555
 file path=usr/lib/nfs/nfslogd mode=0555

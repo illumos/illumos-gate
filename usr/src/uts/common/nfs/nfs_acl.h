@@ -379,8 +379,6 @@ extern void nfs_acl_free(vsecattr_t *);
 
 #ifdef _KERNEL
 /* server and client data structures */
-extern kstat_named_t	*aclproccnt_v2_ptr;
-extern kstat_named_t	*aclproccnt_v3_ptr;
 
 extern char		*aclnames_v2[];
 extern uchar_t		acl_call_type_v2[];

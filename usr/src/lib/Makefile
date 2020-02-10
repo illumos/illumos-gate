@@ -22,7 +22,7 @@
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2019, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 # Copyright (c) 2013 Gary Mills
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2015 Gary Mills
@@ -258,6 +258,7 @@ SUBDIRS +=				\
 	libzoneinfo	\
 	libzonestat	\
 	libzpool	\
+	libzutil	\
 	madv		\
 	mpapi		\
 	mpss		\
@@ -713,14 +714,15 @@ libvolmgt:	libadm
 libvrrpadm:	libdladm libscf
 libvscan:	libscf libsecdb
 libzdoor:	libc libzonecfg libcontract
-libzfs:		libdevid libgen libuutil libadm libavl libefi libidmap \
-		libumem libtsol libzfs_core libcryptoutil pkcs11 libmd libcmdutils
+libzfs:		libdevid libgen libuutil libavl libefi libidmap \
+		libumem libtsol libzfs_core libcryptoutil pkcs11 libmd libzutil
 libzfs_core:	libnvpair
-libzfs_jni:	libdiskmgt libzfs
+libzfs_jni:	libdiskmgt libzfs libzutil
 libzonecfg:	libuuid libsysevent libsec libbrand libpool libscf libproc \
 		libuutil libbsm libsecdb
 libzonestat:	libcmdutils libumem
-libzpool:	libavl libumem libcmdutils libsysevent libfakekernel libzfs
+libzpool:	libavl libumem libcmdutils libsysevent libfakekernel libzutil
+libzutil:	libadm libavl libdevid libefi
 madv:		libgen
 mpapi:		libpthread libdevinfo libsysevent
 mpss:		libgen

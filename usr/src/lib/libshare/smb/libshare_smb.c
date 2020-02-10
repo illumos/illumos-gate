@@ -391,9 +391,7 @@ smb_enable_share(sa_share_t share)
 	smb_share_t si;
 	sa_resource_t resource;
 	boolean_t iszfs;
-	boolean_t privileged;
 	int err = SA_OK;
-	priv_set_t *priv_effective;
 	boolean_t online;
 
 	/*
@@ -404,11 +402,6 @@ smb_enable_share(sa_share_t share)
 		    "SMB: service not supported with Trusted Extensions\n"));
 		return (SA_NOT_SUPPORTED);
 	}
-
-	priv_effective = priv_allocset();
-	(void) getppriv(PRIV_EFFECTIVE, priv_effective);
-	privileged = (priv_isfullset(priv_effective) == B_TRUE);
-	priv_freeset(priv_effective);
 
 	/* get the path since it is important in several places */
 	path = sa_get_share_attr(share, "path");
@@ -424,29 +417,7 @@ smb_enable_share(sa_share_t share)
 
 	iszfs = sa_path_is_zfs(path);
 
-	if (iszfs) {
-
-		if (privileged == B_FALSE && !online) {
-
-			if (!online) {
-				(void) printf(dgettext(TEXT_DOMAIN,
-				    "SMB: Cannot share remove "
-				    "file system: %s\n"), path);
-				(void) printf(dgettext(TEXT_DOMAIN,
-				    "SMB: Service needs to be enabled "
-				    "by a privileged user\n"));
-				err = SA_NO_PERMISSION;
-				errno = EPERM;
-			}
-			if (err) {
-				sa_free_attr_string(path);
-				return (err);
-			}
-
-		}
-	}
-
-	if (privileged == B_TRUE && !online) {
+	if (!online) {
 		err = smb_enable_service();
 		if (err != SA_OK) {
 			(void) printf(dgettext(TEXT_DOMAIN,

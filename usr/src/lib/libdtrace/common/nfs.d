@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ */
 
 #pragma	D depends_on library ip.d
 #pragma	D depends_on library net.d
@@ -35,6 +38,8 @@ typedef struct nfsv4opinfo {
 	uint64_t noi_xid;	/* unique transation ID */
 	cred_t *noi_cred;	/* credentials for operation */
 	string noi_curpath;	/* current file handle path (if any) */
+	string noi_shrpath;     /* current share path */
+	zoneid_t noi_zoneid;	/* zone identifier */
 } nfsv4opinfo_t;
 
 typedef struct nfsv4cbinfo {
@@ -101,12 +106,17 @@ translator nfsv4opinfo_t < struct compound_state *P > {
 	noi_xid = P->req->rq_xprt->xp_xid;
 	noi_cred = P->basecr;
 	noi_curpath = (P->vp == NULL) ? "<unknown>" : P->vp->v_path;
+	noi_shrpath = (P->exi == NULL || P->exi->exi_export.ex_path == NULL) ?
+	    "<unknown>" : P->exi->exi_export.ex_path;
+	noi_zoneid = (P->exi == NULL) ? -1 : P->exi->exi_zoneid;
 };
 
 typedef struct nfsv3opinfo {
 	uint64_t noi_xid;	/* unique transation ID */
 	cred_t *noi_cred;	/* credentials for operation */
 	string noi_curpath;	/* current file handle path (if any) */
+	string noi_shrpath;     /* current share path */
+	zoneid_t noi_zoneid;	/* zone identifier */
 } nfsv3opinfo_t;
 
 typedef struct nfsv3oparg nfsv3oparg_t;
@@ -117,4 +127,9 @@ translator nfsv3opinfo_t < nfsv3oparg_t *P > {
 	noi_cred = (cred_t *)arg1;
 	noi_curpath = (arg2 == 0 || ((vnode_t *)arg2)->v_path == NULL) ?
 	    "<unknown>" : ((vnode_t *)arg2)->v_path;
+	noi_shrpath =
+	    (arg3 == 0 || ((exportinfo_t *)arg3)->exi_export.ex_path == NULL) ?
+	    "<unknown>" : ((exportinfo_t *)arg3)->exi_export.ex_path;
+	noi_zoneid =
+	    (arg3 == 0) ? -1 : ((exportinfo_t *)arg3)->exi_zoneid;
 };

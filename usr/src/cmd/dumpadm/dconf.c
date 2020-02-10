@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -39,6 +39,7 @@
 #include <errno.h>
 #include <libdiskmgt.h>
 #include <libzfs.h>
+#include <libzutil.h>
 #include <uuid/uuid.h>
 
 #include "dconf.h"

@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2020 Peter tribble.
+#
 
 PROG = kstat
 OBJS = kstat.o
@@ -37,7 +39,6 @@ CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-parentheses
 
 CPPFLAGS_sparc += -I$(SRC)/uts/sfmmu
-CPPFLAGS_sparc += -I$(SRC)/uts/sun4u/sunfire
 CPPFLAGS += $(CPPFLAGS_$(MACH))
 
 FILEMODE= 0555

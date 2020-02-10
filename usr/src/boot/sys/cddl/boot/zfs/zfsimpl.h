@@ -1339,8 +1339,7 @@ typedef struct dsl_dataset_phys {
 #define	ZAP_HASHBITS		28
 #define	MZAP_ENT_LEN		64
 #define	MZAP_NAME_LEN		(MZAP_ENT_LEN - 8 - 4 - 2)
-#define	MZAP_MAX_BLKSHIFT	SPA_MAXBLOCKSHIFT
-#define	MZAP_MAX_BLKSZ		(1 << MZAP_MAX_BLKSHIFT)
+#define	MZAP_MAX_BLKSZ		SPA_OLD_MAXBLOCKSIZE
 
 typedef struct mzap_ent_phys {
 	uint64_t mze_value;
@@ -1352,7 +1351,8 @@ typedef struct mzap_ent_phys {
 typedef struct mzap_phys {
 	uint64_t mz_block_type;	/* ZBT_MICRO */
 	uint64_t mz_salt;
-	uint64_t mz_pad[6];
+	uint64_t mz_normflags;
+	uint64_t mz_pad[5];
 	mzap_ent_phys_t mz_chunk[1];
 	/* actually variable size depending on block size */
 } mzap_phys_t;
@@ -1409,6 +1409,8 @@ typedef struct zap_phys {
 	uint64_t zap_num_leafs;		/* number of leafs */
 	uint64_t zap_num_entries;	/* number of entries */
 	uint64_t zap_salt;		/* salt to stir into hash function */
+	uint64_t zap_normflags;		/* flags for u8_textprep_str() */
+	uint64_t zap_flags;		/* zap_flags_t */
 	/*
 	 * This structure is followed by padding, and then the embedded
 	 * pointer table.  The embedded pointer table takes up second
@@ -1419,9 +1421,12 @@ typedef struct zap_phys {
 
 typedef struct zap_table_phys zap_table_phys_t;
 
+struct spa;
 typedef struct fat_zap {
 	int zap_block_shift;			/* block size shift */
 	zap_phys_t *zap_phys;
+	const struct spa *zap_spa;
+	const dnode_phys_t *zap_dnode;
 } fat_zap_t;
 
 #define	ZAP_LEAF_MAGIC 0x2AB1EAF

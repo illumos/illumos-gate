@@ -24,6 +24,7 @@
  * Copyright (c) 2013 David Hoeppner. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2020 Peter Tribble.
  */
 
 /*
@@ -518,7 +519,7 @@ static kstat_raw_reader_t
 lookup_raw_kstat_fn(char *module, char *name)
 {
 	char		key[KSTAT_STRLEN * 2];
-	register char 	*f, *t;
+	register char	*f, *t;
 	int		n = 0;
 
 	for (f = module, t = key; *f != '\0'; f++, t++) {
@@ -1321,171 +1322,6 @@ save_sfmmu_tsbsize_stat(kstat_t *kp, ks_instance_t *ksi)
 	SAVE_INT32(ksi, sfmmut, sf_tsbsz_1m);
 	SAVE_INT32(ksi, sfmmut, sf_tsbsz_2m);
 	SAVE_INT32(ksi, sfmmut, sf_tsbsz_4m);
-}
-#endif
-
-#ifdef __sparc
-static void
-save_simmstat(kstat_t *kp, ks_instance_t *ksi)
-{
-	uchar_t	*simmstat;
-	char	*simm_buf;
-	char	*list = NULL;
-	int	i;
-
-	assert(kp->ks_data_size == sizeof (uchar_t) * SIMM_COUNT);
-
-	for (i = 0, simmstat = (uchar_t *)(kp->ks_data); i < SIMM_COUNT - 1;
-	    i++, simmstat++) {
-		if (list == NULL) {
-			(void) asprintf(&simm_buf, "%d,", *simmstat);
-		} else {
-			(void) asprintf(&simm_buf, "%s%d,", list, *simmstat);
-			free(list);
-		}
-		list = simm_buf;
-	}
-
-	(void) asprintf(&simm_buf, "%s%d", list, *simmstat);
-	SAVE_STRING_X(ksi, "status", simm_buf);
-	free(list);
-	free(simm_buf);
-}
-#endif
-
-#ifdef __sparc
-/*
- * Helper function for save_temperature().
- */
-static char *
-short_array_to_string(short *shortp, int len)
-{
-	char	*list = NULL;
-	char	*list_buf;
-
-	for (; len > 1; len--, shortp++) {
-		if (list == NULL) {
-			(void) asprintf(&list_buf, "%hd,", *shortp);
-		} else {
-			(void) asprintf(&list_buf, "%s%hd,", list, *shortp);
-			free(list);
-		}
-		list = list_buf;
-	}
-
-	(void) asprintf(&list_buf, "%s%hd", list, *shortp);
-	free(list);
-	return (list_buf);
-}
-
-static void
-save_temperature(kstat_t *kp, ks_instance_t *ksi)
-{
-	struct temp_stats *temps = (struct temp_stats *)(kp->ks_data);
-	char	*buf;
-
-	assert(kp->ks_data_size == sizeof (struct temp_stats));
-
-	SAVE_UINT32(ksi, temps, index);
-
-	buf = short_array_to_string(temps->l1, L1_SZ);
-	SAVE_STRING_X(ksi, "l1", buf);
-	free(buf);
-
-	buf = short_array_to_string(temps->l2, L2_SZ);
-	SAVE_STRING_X(ksi, "l2", buf);
-	free(buf);
-
-	buf = short_array_to_string(temps->l3, L3_SZ);
-	SAVE_STRING_X(ksi, "l3", buf);
-	free(buf);
-
-	buf = short_array_to_string(temps->l4, L4_SZ);
-	SAVE_STRING_X(ksi, "l4", buf);
-	free(buf);
-
-	buf = short_array_to_string(temps->l5, L5_SZ);
-	SAVE_STRING_X(ksi, "l5", buf);
-	free(buf);
-
-	SAVE_INT32(ksi, temps, max);
-	SAVE_INT32(ksi, temps, min);
-	SAVE_INT32(ksi, temps, state);
-	SAVE_INT32(ksi, temps, temp_cnt);
-	SAVE_INT32(ksi, temps, shutdown_cnt);
-	SAVE_INT32(ksi, temps, version);
-	SAVE_INT32(ksi, temps, trend);
-	SAVE_INT32(ksi, temps, override);
-}
-#endif
-
-#ifdef __sparc
-static void
-save_temp_over(kstat_t *kp, ks_instance_t *ksi)
-{
-	short	*sh = (short *)(kp->ks_data);
-	char	*value;
-
-	assert(kp->ks_data_size == sizeof (short));
-
-	(void) asprintf(&value, "%hu", *sh);
-	SAVE_STRING_X(ksi, "override", value);
-	free(value);
-}
-#endif
-
-#ifdef __sparc
-static void
-save_ps_shadow(kstat_t *kp, ks_instance_t *ksi)
-{
-	uchar_t	*uchar = (uchar_t *)(kp->ks_data);
-
-	assert(kp->ks_data_size == SYS_PS_COUNT);
-
-	SAVE_CHAR_X(ksi, "core_0", *uchar++);
-	SAVE_CHAR_X(ksi, "core_1", *uchar++);
-	SAVE_CHAR_X(ksi, "core_2", *uchar++);
-	SAVE_CHAR_X(ksi, "core_3", *uchar++);
-	SAVE_CHAR_X(ksi, "core_4", *uchar++);
-	SAVE_CHAR_X(ksi, "core_5", *uchar++);
-	SAVE_CHAR_X(ksi, "core_6", *uchar++);
-	SAVE_CHAR_X(ksi, "core_7", *uchar++);
-	SAVE_CHAR_X(ksi, "pps_0", *uchar++);
-	SAVE_CHAR_X(ksi, "clk_33", *uchar++);
-	SAVE_CHAR_X(ksi, "clk_50", *uchar++);
-	SAVE_CHAR_X(ksi, "v5_p", *uchar++);
-	SAVE_CHAR_X(ksi, "v12_p", *uchar++);
-	SAVE_CHAR_X(ksi, "v5_aux", *uchar++);
-	SAVE_CHAR_X(ksi, "v5_p_pch", *uchar++);
-	SAVE_CHAR_X(ksi, "v12_p_pch", *uchar++);
-	SAVE_CHAR_X(ksi, "v3_pch", *uchar++);
-	SAVE_CHAR_X(ksi, "v5_pch", *uchar++);
-	SAVE_CHAR_X(ksi, "p_fan", *uchar++);
-}
-#endif
-
-#ifdef __sparc
-static void
-save_fault_list(kstat_t *kp, ks_instance_t *ksi)
-{
-	struct ft_list *fault;
-	char	name[KSTAT_STRLEN + 7];
-	int	i;
-
-	for (i = 1, fault = (struct ft_list *)(kp->ks_data);
-	    i <= 999999 && i <= kp->ks_data_size / sizeof (struct ft_list);
-	    i++, fault++) {
-		(void) snprintf(name, sizeof (name), "unit_%d", i);
-		SAVE_INT32_X(ksi, name, fault->unit);
-		(void) snprintf(name, sizeof (name), "type_%d", i);
-		SAVE_INT32_X(ksi, name, fault->type);
-		(void) snprintf(name, sizeof (name), "fclass_%d", i);
-		SAVE_INT32_X(ksi, name, fault->fclass);
-		(void) snprintf(name, sizeof (name), "create_time_%d", i);
-		SAVE_HRTIME_X(ksi, name, fault->create_time);
-		(void) snprintf(name, sizeof (name), "msg_%d", i);
-		SAVE_STRING_X(ksi, name, fault->msg);
-	}
 }
 #endif
 

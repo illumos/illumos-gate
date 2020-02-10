@@ -59,6 +59,7 @@
 #include <sys/debug.h>
 
 #include <libzfs.h>
+#include <libzutil.h>
 
 #include "zpool_util.h"
 #include "zfs_comutil.h"
@@ -914,7 +915,7 @@ zpool_do_labelclear(int argc, char **argv)
 		return (1);
 	}
 
-	if (zpool_read_label(fd, &config) != 0) {
+	if (zpool_read_label(fd, &config, NULL) != 0) {
 		(void) fprintf(stderr,
 		    gettext("failed to read label from %s\n"), vdev);
 		return (1);
@@ -2535,6 +2536,40 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 	return (ret);
 }
 
+typedef struct target_exists_args {
+	const char	*poolname;
+	uint64_t	poolguid;
+} target_exists_args_t;
+
+static int
+name_or_guid_exists(zpool_handle_t *zhp, void *data)
+{
+	target_exists_args_t *args = data;
+	nvlist_t *config = zpool_get_config(zhp, NULL);
+	int found = 0;
+
+	if (config == NULL)
+		return (0);
+
+	if (args->poolname != NULL) {
+		char *pool_name;
+
+		verify(nvlist_lookup_string(config, ZPOOL_CONFIG_POOL_NAME,
+		    &pool_name) == 0);
+		if (strcmp(pool_name, args->poolname) == 0)
+			found = 1;
+	} else {
+		uint64_t pool_guid;
+
+		verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID,
+		    &pool_guid) == 0);
+		if (pool_guid == args->poolguid)
+			found = 1;
+	}
+	zpool_close(zhp);
+
+	return (found);
+}
 /*
  * zpool checkpoint <pool>
  *       checkpoint --discard <pool>
@@ -2687,6 +2722,7 @@ zpool_do_import(int argc, char **argv)
 	boolean_t dryrun = B_FALSE;
 	boolean_t do_rewind = B_FALSE;
 	boolean_t xtreme_rewind = B_FALSE;
+	boolean_t pool_exists = B_FALSE;
 	uint64_t pool_state, txg = -1ULL;
 	char *cachefile = NULL;
 	importargs_t idata = { 0 };
@@ -2895,9 +2931,9 @@ zpool_do_import(int argc, char **argv)
 		/*
 		 * User specified a name or guid.  Ensure it's unique.
 		 */
-		idata.unique = B_TRUE;
+		target_exists_args_t search = {searchname, searchguid};
+		pool_exists = zpool_iter(g_zfs, name_or_guid_exists, &search);
 	}
-
 
 	idata.path = searchdirs;
 	idata.paths = nsearch;
@@ -2906,9 +2942,9 @@ zpool_do_import(int argc, char **argv)
 	idata.cachefile = cachefile;
 	idata.policy = policy;
 
-	pools = zpool_search_import(g_zfs, &idata);
+	pools = zpool_search_import(g_zfs, &idata, &libzfs_config_ops);
 
-	if (pools != NULL && idata.exists &&
+	if (pools != NULL && pool_exists &&
 	    (argc == 1 || strcmp(argv[0], argv[1]) == 0)) {
 		(void) fprintf(stderr, gettext("cannot import '%s': "
 		    "a pool with that name already exists\n"),
@@ -2917,7 +2953,7 @@ zpool_do_import(int argc, char **argv)
 		    "[-t] <pool | id> <newpool>' to give it a new temporary "
 		    "or permanent name\n"));
 		err = 1;
-	} else if (pools == NULL && idata.exists) {
+	} else if (pools == NULL && pool_exists) {
 		(void) fprintf(stderr, gettext("cannot import '%s': "
 		    "a pool with that name is already created/imported,\n"),
 		    argv[0]);
@@ -3389,7 +3425,7 @@ get_interval_count(int *argcp, char **argv, unsigned long *iv,
 	/*
 	 * Determine if the last argument is an integer or a pool name
 	 */
-	if (argc > 0 && isdigit(argv[argc - 1][0])) {
+	if (argc > 0 && zfs_isnumber(argv[argc - 1])) {
 		char *end;
 
 		errno = 0;
@@ -3419,7 +3455,7 @@ get_interval_count(int *argcp, char **argv, unsigned long *iv,
 	 * If the last argument is also an integer, then we have both a count
 	 * and an interval.
 	 */
-	if (argc > 0 && isdigit(argv[argc - 1][0])) {
+	if (argc > 0 && zfs_isnumber(argv[argc - 1])) {
 		char *end;
 
 		errno = 0;

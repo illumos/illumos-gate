@@ -18,9 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+
+/*
+ * Copyright 2018 Nexenta Systems, Inc.
  */
 
 #include <sys/param.h>
@@ -45,32 +50,65 @@
 #endif
 #define	nextdp(dp)	((struct dirent64 *)((char *)(dp) + (dp)->d_reclen))
 
-kmutex_t	nfscmd_lock;
-door_handle_t   nfscmd_dh;
+typedef struct nfscmd_globals {
+	kmutex_t	nfscmd_lock;
+	door_handle_t   nfscmd_dh;
+} nfscmd_globals_t;
+
+static zone_key_t nfscmd_zone_key;
 
 static struct charset_cache *nfscmd_charmap(exportinfo_t *exi,
     struct sockaddr *sp);
-
+static void *nfscmd_zone_init(zoneid_t);
+static void nfscmd_zone_fini(zoneid_t, void *);
 
 void
 nfscmd_args(uint_t did)
 {
-	mutex_enter(&nfscmd_lock);
-	if (nfscmd_dh)
-		door_ki_rele(nfscmd_dh);
-	nfscmd_dh = door_ki_lookup(did);
-	mutex_exit(&nfscmd_lock);
+	nfscmd_globals_t *ncg = zone_getspecific(nfscmd_zone_key, curzone);
+
+	mutex_enter(&ncg->nfscmd_lock);
+	if (ncg->nfscmd_dh != NULL)
+		door_ki_rele(ncg->nfscmd_dh);
+	ncg->nfscmd_dh = door_ki_lookup(did);
+	mutex_exit(&ncg->nfscmd_lock);
 }
 
 void
 nfscmd_init(void)
 {
-	mutex_init(&nfscmd_lock, NULL, MUTEX_DEFAULT, NULL);
+	zone_key_create(&nfscmd_zone_key, nfscmd_zone_init,
+	    NULL, nfscmd_zone_fini);
 }
 
 void
 nfscmd_fini(void)
 {
+	(void) zone_key_delete(nfscmd_zone_key);
+}
+
+/*ARGSUSED*/
+static void *
+nfscmd_zone_init(zoneid_t zoneid)
+{
+	nfscmd_globals_t *ncg;
+
+	ncg = kmem_zalloc(sizeof (*ncg), KM_SLEEP);
+	mutex_init(&ncg->nfscmd_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	return (ncg);
+}
+
+/*ARGSUSED*/
+static void
+nfscmd_zone_fini(zoneid_t zoneid, void *data)
+{
+	nfscmd_globals_t *ncg = data;
+
+	mutex_destroy(&ncg->nfscmd_lock);
+	if (ncg->nfscmd_dh)
+		door_ki_rele(ncg->nfscmd_dh);
+	kmem_free(ncg, sizeof (*ncg));
 }
 
 /*
@@ -88,13 +126,14 @@ nfscmd_send(nfscmd_arg_t *arg, nfscmd_res_t *res)
 	door_info_t	di;
 	int		ntries = 0;
 	int		last = 0;
+	nfscmd_globals_t *ncg = zone_getspecific(nfscmd_zone_key, curzone);
 
 retry:
-	mutex_enter(&nfscmd_lock);
-	dh = nfscmd_dh;
+	mutex_enter(&ncg->nfscmd_lock);
+	dh = ncg->nfscmd_dh;
 	if (dh != NULL)
 		door_ki_hold(dh);
-	mutex_exit(&nfscmd_lock);
+	mutex_exit(&ncg->nfscmd_lock);
 
 	if (dh == NULL) {
 		/*
@@ -141,10 +180,10 @@ retry:
 				 * chance to restart mountd(1m)
 				 * and establish a new door handle.
 				 */
-				mutex_enter(&nfscmd_lock);
-				if (dh == nfscmd_dh)
-					nfscmd_dh = NULL;
-				mutex_exit(&nfscmd_lock);
+				mutex_enter(&ncg->nfscmd_lock);
+				if (dh == ncg->nfscmd_dh)
+					ncg->nfscmd_dh = NULL;
+				mutex_exit(&ncg->nfscmd_lock);
 				door_ki_rele(dh);
 				delay(hz);
 				goto retry;

@@ -668,7 +668,7 @@ static int (*pr_read_function[PR_NFILES])() = {
 
 /* ARGSUSED */
 static int
-pr_read_inval(prnode_t *pnp, uio_t *uiop)
+pr_read_inval(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	/*
 	 * No read() on any /proc directory, use getdents(2) instead.
@@ -801,7 +801,7 @@ pr_read_as(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_status(prnode_t *pnp, uio_t *uiop)
+pr_read_status(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	pstatus_t *sp;
 	int error;
@@ -823,7 +823,7 @@ pr_read_status(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_lstatus(prnode_t *pnp, uio_t *uiop)
+pr_read_lstatus(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	proc_t *p;
 	kthread_t *t;
@@ -869,7 +869,7 @@ pr_read_lstatus(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_psinfo(prnode_t *pnp, uio_t *uiop)
+pr_read_psinfo(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	psinfo_t psinfo;
 	proc_t *p;
@@ -896,7 +896,7 @@ pr_read_psinfo(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_fdinfo(prnode_t *pnp, uio_t *uiop)
+pr_read_fdinfo(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	prfdinfo_t *fdinfo;
 	list_t data;
@@ -904,7 +904,7 @@ pr_read_fdinfo(prnode_t *pnp, uio_t *uiop)
 	vnode_t *vp;
 	uint_t fd;
 	file_t *fp;
-	cred_t *cred;
+	cred_t *file_cred;
 	short ufp_flag;
 	int error = 0;
 
@@ -959,8 +959,8 @@ pr_read_fdinfo(prnode_t *pnp, uio_t *uiop)
 	if ((fdinfo->pr_fileflags & (FSEARCH | FEXEC)) == 0)
 		fdinfo->pr_fileflags += FOPEN;
 	fdinfo->pr_offset = fp->f_offset;
-	cred = fp->f_cred;
-	crhold(cred);
+	file_cred = fp->f_cred;
+	crhold(file_cred);
 	/*
 	 * Information from the vnode (rather than the file_t) is retrieved
 	 * later, in prgetfdinfo() - for example sock_getfasync()
@@ -969,9 +969,9 @@ pr_read_fdinfo(prnode_t *pnp, uio_t *uiop)
 
 	prunlock(pnp);
 
-	error = prgetfdinfo(p, vp, fdinfo, cred, &data);
+	error = prgetfdinfo(p, vp, fdinfo, cr, file_cred, &data);
 
-	crfree(cred);
+	crfree(file_cred);
 
 	VN_RELE(vp);
 
@@ -985,7 +985,7 @@ out:
 }
 
 static int
-pr_read_lpsinfo(prnode_t *pnp, uio_t *uiop)
+pr_read_lpsinfo(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	proc_t *p;
 	kthread_t *t;
@@ -1099,28 +1099,28 @@ readmap_common:
 }
 
 static int
-pr_read_map(prnode_t *pnp, uio_t *uiop)
+pr_read_map(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	ASSERT(pnp->pr_type == PR_MAP);
 	return (pr_read_map_common(pnp, uiop, pnp->pr_type));
 }
 
 static int
-pr_read_rmap(prnode_t *pnp, uio_t *uiop)
+pr_read_rmap(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	ASSERT(pnp->pr_type == PR_RMAP);
 	return (pr_read_map_common(pnp, uiop, pnp->pr_type));
 }
 
 static int
-pr_read_xmap(prnode_t *pnp, uio_t *uiop)
+pr_read_xmap(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	ASSERT(pnp->pr_type == PR_XMAP);
 	return (pr_read_map_common(pnp, uiop, pnp->pr_type));
 }
 
 static int
-pr_read_cred(prnode_t *pnp, uio_t *uiop)
+pr_read_cred(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	proc_t *p;
 	prcred_t *pcrp;
@@ -1155,7 +1155,7 @@ out:
 }
 
 static int
-pr_read_priv(prnode_t *pnp, uio_t *uiop)
+pr_read_priv(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	proc_t *p;
 	size_t psize = prgetprivsize();
@@ -1179,7 +1179,7 @@ out:
 }
 
 static int
-pr_read_sigact(prnode_t *pnp, uio_t *uiop)
+pr_read_sigact(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	int nsig = PROC_IS_BRANDED(curproc)? BROP(curproc)->b_nsig : NSIG;
 	proc_t *p;
@@ -1218,7 +1218,7 @@ out:
 }
 
 static int
-pr_read_auxv(prnode_t *pnp, uio_t *uiop)
+pr_read_auxv(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	auxv_t auxv[__KERN_NAUXV_IMPL];
 	proc_t *p;
@@ -1253,7 +1253,7 @@ pr_read_auxv(prnode_t *pnp, uio_t *uiop)
  *	For now let's just have a ldt of size 0 for 64-bit processes.
  */
 static int
-pr_read_ldt(prnode_t *pnp, uio_t *uiop)
+pr_read_ldt(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	proc_t *p;
 	struct ssd *ssd;
@@ -1289,7 +1289,7 @@ pr_read_ldt(prnode_t *pnp, uio_t *uiop)
 #endif	/* __x86 */
 
 static int
-pr_read_usage(prnode_t *pnp, uio_t *uiop)
+pr_read_usage(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	prhusage_t *pup;
 	prusage_t *upup;
@@ -1378,7 +1378,7 @@ out:
 }
 
 static int
-pr_read_lusage(prnode_t *pnp, uio_t *uiop)
+pr_read_lusage(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	int nlwp;
 	prhusage_t *pup;
@@ -1489,7 +1489,7 @@ pr_read_lusage(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_pagedata(prnode_t *pnp, uio_t *uiop)
+pr_read_pagedata(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	proc_t *p;
 	int error;
@@ -1514,7 +1514,7 @@ pr_read_pagedata(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_opagedata(prnode_t *pnp, uio_t *uiop)
+pr_read_opagedata(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	proc_t *p;
 	struct as *as;
@@ -1541,7 +1541,7 @@ pr_read_opagedata(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_watch(prnode_t *pnp, uio_t *uiop)
+pr_read_watch(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	proc_t *p;
 	int error;
@@ -1587,7 +1587,7 @@ pr_read_watch(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_lwpstatus(prnode_t *pnp, uio_t *uiop)
+pr_read_lwpstatus(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	lwpstatus_t *sp;
 	int error;
@@ -1618,7 +1618,7 @@ out:
 }
 
 static int
-pr_read_lwpsinfo(prnode_t *pnp, uio_t *uiop)
+pr_read_lwpsinfo(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	lwpsinfo_t lwpsinfo;
 	proc_t *p;
@@ -1665,7 +1665,7 @@ pr_read_lwpsinfo(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_lwpusage(prnode_t *pnp, uio_t *uiop)
+pr_read_lwpusage(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	prhusage_t *pup;
 	prusage_t *upup;
@@ -1716,7 +1716,7 @@ out:
 }
 
 static int
-pr_read_lwpname(prnode_t *pnp, uio_t *uiop)
+pr_read_lwpname(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	char lwpname[THREAD_NAME_MAX];
 	kthread_t *t;
@@ -1744,7 +1744,7 @@ pr_read_lwpname(prnode_t *pnp, uio_t *uiop)
 
 /* ARGSUSED */
 static int
-pr_read_xregs(prnode_t *pnp, uio_t *uiop)
+pr_read_xregs(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 #if defined(__sparc)
 	proc_t *p;
@@ -1785,7 +1785,7 @@ out:
 }
 
 static int
-pr_read_spymaster(prnode_t *pnp, uio_t *uiop)
+pr_read_spymaster(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	psinfo_t psinfo;
 	int error;
@@ -1815,7 +1815,7 @@ pr_read_spymaster(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_secflags(prnode_t *pnp, uio_t *uiop)
+pr_read_secflags(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	prsecflags_t ret;
 	int error;
@@ -1836,7 +1836,7 @@ pr_read_secflags(prnode_t *pnp, uio_t *uiop)
 #if defined(__sparc)
 
 static int
-pr_read_gwindows(prnode_t *pnp, uio_t *uiop)
+pr_read_gwindows(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	proc_t *p;
 	kthread_t *t;
@@ -1880,7 +1880,7 @@ out:
 
 /* ARGSUSED */
 static int
-pr_read_asrs(prnode_t *pnp, uio_t *uiop)
+pr_read_asrs(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	int error;
 
@@ -1917,7 +1917,7 @@ pr_read_asrs(prnode_t *pnp, uio_t *uiop)
 #endif	/* __sparc */
 
 static int
-pr_read_piddir(prnode_t *pnp, uio_t *uiop)
+pr_read_piddir(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	ASSERT(pnp->pr_type == PR_PIDDIR);
 	ASSERT(pnp->pr_pidfile != NULL);
@@ -1930,7 +1930,7 @@ pr_read_piddir(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_pidfile(prnode_t *pnp, uio_t *uiop)
+pr_read_pidfile(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	int error;
 
@@ -2040,7 +2040,7 @@ static int (*pr_read_function_32[PR_NFILES])() = {
 };
 
 static int
-pr_read_status_32(prnode_t *pnp, uio_t *uiop)
+pr_read_status_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	pstatus32_t *sp;
 	proc_t *p;
@@ -2074,7 +2074,7 @@ pr_read_status_32(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_lstatus_32(prnode_t *pnp, uio_t *uiop)
+pr_read_lstatus_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	proc_t *p;
 	kthread_t *t;
@@ -2128,7 +2128,7 @@ pr_read_lstatus_32(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_psinfo_32(prnode_t *pnp, uio_t *uiop)
+pr_read_psinfo_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	psinfo32_t psinfo;
 	proc_t *p;
@@ -2155,7 +2155,7 @@ pr_read_psinfo_32(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_lpsinfo_32(prnode_t *pnp, uio_t *uiop)
+pr_read_lpsinfo_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	proc_t *p;
 	kthread_t *t;
@@ -2271,28 +2271,28 @@ readmap32_common:
 }
 
 static int
-pr_read_map_32(prnode_t *pnp, uio_t *uiop)
+pr_read_map_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	ASSERT(pnp->pr_type == PR_MAP);
 	return (pr_read_map_common_32(pnp, uiop, pnp->pr_type));
 }
 
 static int
-pr_read_rmap_32(prnode_t *pnp, uio_t *uiop)
+pr_read_rmap_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	ASSERT(pnp->pr_type == PR_RMAP);
 	return (pr_read_map_common_32(pnp, uiop, pnp->pr_type));
 }
 
 static int
-pr_read_xmap_32(prnode_t *pnp, uio_t *uiop)
+pr_read_xmap_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	ASSERT(pnp->pr_type == PR_XMAP);
 	return (pr_read_map_common_32(pnp, uiop, pnp->pr_type));
 }
 
 static int
-pr_read_sigact_32(prnode_t *pnp, uio_t *uiop)
+pr_read_sigact_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	int nsig = PROC_IS_BRANDED(curproc)? BROP(curproc)->b_nsig : NSIG;
 	proc_t *p;
@@ -2336,7 +2336,7 @@ out:
 }
 
 static int
-pr_read_auxv_32(prnode_t *pnp, uio_t *uiop)
+pr_read_auxv_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	auxv32_t auxv[__KERN_NAUXV_IMPL];
 	proc_t *p;
@@ -2371,7 +2371,7 @@ pr_read_auxv_32(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_usage_32(prnode_t *pnp, uio_t *uiop)
+pr_read_usage_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	prhusage_t *pup;
 	prusage32_t *upup;
@@ -2460,7 +2460,7 @@ out:
 }
 
 static int
-pr_read_lusage_32(prnode_t *pnp, uio_t *uiop)
+pr_read_lusage_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	int nlwp;
 	prhusage_t *pup;
@@ -2572,7 +2572,7 @@ pr_read_lusage_32(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_pagedata_32(prnode_t *pnp, uio_t *uiop)
+pr_read_pagedata_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	proc_t *p;
 	int error;
@@ -2602,7 +2602,7 @@ pr_read_pagedata_32(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_opagedata_32(prnode_t *pnp, uio_t *uiop)
+pr_read_opagedata_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	proc_t *p;
 	struct as *as;
@@ -2635,7 +2635,7 @@ pr_read_opagedata_32(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_watch_32(prnode_t *pnp, uio_t *uiop)
+pr_read_watch_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	proc_t *p;
 	int error;
@@ -2685,7 +2685,7 @@ pr_read_watch_32(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_lwpstatus_32(prnode_t *pnp, uio_t *uiop)
+pr_read_lwpstatus_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	lwpstatus32_t *sp;
 	proc_t *p;
@@ -2728,7 +2728,7 @@ out:
 }
 
 static int
-pr_read_lwpsinfo_32(prnode_t *pnp, uio_t *uiop)
+pr_read_lwpsinfo_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	lwpsinfo32_t lwpsinfo;
 	proc_t *p;
@@ -2773,7 +2773,7 @@ pr_read_lwpsinfo_32(prnode_t *pnp, uio_t *uiop)
 }
 
 static int
-pr_read_lwpusage_32(prnode_t *pnp, uio_t *uiop)
+pr_read_lwpusage_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	prhusage_t *pup;
 	prusage32_t *upup;
@@ -2824,7 +2824,7 @@ out:
 }
 
 static int
-pr_read_spymaster_32(prnode_t *pnp, uio_t *uiop)
+pr_read_spymaster_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	psinfo32_t psinfo;
 	int error;
@@ -2855,7 +2855,7 @@ pr_read_spymaster_32(prnode_t *pnp, uio_t *uiop)
 
 #if defined(__sparc)
 static int
-pr_read_gwindows_32(prnode_t *pnp, uio_t *uiop)
+pr_read_gwindows_32(prnode_t *pnp, uio_t *uiop, cred_t *cr)
 {
 	proc_t *p;
 	kthread_t *t;
@@ -2921,11 +2921,11 @@ prread(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr, caller_context_t *ct)
 	 * data.  An ILP32 process will see ILP32 data.
 	 */
 	if (curproc->p_model == DATAMODEL_LP64)
-		return (pr_read_function[pnp->pr_type](pnp, uiop));
+		return (pr_read_function[pnp->pr_type](pnp, uiop, cr));
 	else
-		return (pr_read_function_32[pnp->pr_type](pnp, uiop));
+		return (pr_read_function_32[pnp->pr_type](pnp, uiop, cr));
 #else
-	return (pr_read_function[pnp->pr_type](pnp, uiop));
+	return (pr_read_function[pnp->pr_type](pnp, uiop, cr));
 #endif
 }
 

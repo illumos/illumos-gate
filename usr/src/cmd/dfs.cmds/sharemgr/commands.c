@@ -22,7 +22,11 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+
+/*
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2019, Joyent, Inc.
  */
 
@@ -2167,7 +2171,6 @@ static void
 show_group(sa_group_t group, int verbose, int properties, char *proto,
     char *subgroup)
 {
-	sa_share_t share;
 	char *groupname;
 	char *zfs = NULL;
 	int iszfs = 0;
@@ -2175,6 +2178,8 @@ show_group(sa_group_t group, int verbose, int properties, char *proto,
 
 	groupname = sa_get_group_attr(group, "name");
 	if (groupname != NULL) {
+		sa_share_t share;
+
 		if (proto != NULL && !has_protocol(group, proto)) {
 			sa_free_attr_string(groupname);
 			return;
@@ -2191,7 +2196,7 @@ show_group(sa_group_t group, int verbose, int properties, char *proto,
 			iszfs = 1;
 			sa_free_attr_string(zfs);
 		}
-		share = sa_get_share(group, NULL);
+
 		if (subgroup == NULL)
 			(void) printf("%s", groupname);
 		else

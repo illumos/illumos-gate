@@ -1379,6 +1379,8 @@ f lib/amd64/libzfs.so.1 0755 root bin
 s lib/amd64/libzfs.so=libzfs.so.1
 s lib/amd64/libzfs_core.so.1=../../usr/lib/amd64/libzfs_core.so.1
 s lib/amd64/libzfs_core.so=../../usr/lib/amd64/libzfs_core.so
+f lib/amd64/libzutil.so.1 0755 root bin
+s lib/amd64/libzutil.so=libzutil.so.1
 f lib/amd64/nss_compat.so.1 0755 root bin
 f lib/amd64/nss_dns.so.1 0755 root bin
 f lib/amd64/nss_files.so.1 0755 root bin
@@ -1584,6 +1586,8 @@ f lib/libzfs.so.1 0755 root bin
 s lib/libzfs.so=libzfs.so.1
 s lib/libzfs_core.so.1=../usr/lib/libzfs_core.so
 s lib/libzfs_core.so=../usr/lib/libzfs_core.so
+f lib/libzutil.so.1 0755 root bin
+s lib/libzutil.so=libzutil.so.1
 d lib/mpxio 0755 root bin
 f lib/mpxio/stmsboot_util 0555 root bin
 f lib/nss_compat.so.1 0755 root bin
@@ -5430,6 +5434,8 @@ f usr/lib/amd64/libzonecfg.so.1 0755 root bin
 s usr/lib/amd64/libzonecfg.so=libzonecfg.so.1
 f usr/lib/amd64/libzpool.so.1 0755 root bin
 s usr/lib/amd64/libzpool.so=libzpool.so.1
+s usr/lib/amd64/libzutil.so.1=../../../lib/amd64/libzutil.so.1
+s usr/lib/amd64/libzutil.so=../../../lib/amd64/libzutil.so.1
 f usr/lib/amd64/lx_brand.so.1 0755 root sys
 f usr/lib/amd64/madv.so.1 0755 root bin
 f usr/lib/amd64/mpss.so.1 0755 root bin
@@ -6957,6 +6963,8 @@ f usr/lib/libzoneinfo.so.1 0755 root bin
 s usr/lib/libzoneinfo.so=libzoneinfo.so.1
 f usr/lib/libzpool.so.1 0755 root bin
 s usr/lib/libzpool.so=libzpool.so.1
+s usr/lib/libzutil.so.1=../../lib/libzutil.so.1
+s usr/lib/libzutil.so=../../lib/libzutil.so.1
 d usr/lib/link_audit 0755 root bin
 s usr/lib/link_audit/32=.
 s usr/lib/link_audit/64=amd64
@@ -10127,6 +10135,9 @@ f usr/lib/netsvc/yp/ypxfr_2perday 0555 root sys
 f usr/lib/netsvc/yp/ypxfrd 0555 root sys
 f usr/lib/newsyslog 0555 root sys
 d usr/lib/nfs 0755 root sys
+d usr/lib/nfs/dtrace 0755 root sys
+f usr/lib/nfs/dtrace/nfs-time.d 0555 root bin
+f usr/lib/nfs/dtrace/nfs-trace.d 0555 root bin
 f usr/lib/nfs/libmapid.so.1 0755 root bin
 s usr/lib/nfs/libmapid.so=libmapid.so.1
 f usr/lib/nfs/lockd 0555 root bin

@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 PROG = dumpadm
@@ -36,12 +36,13 @@ ROOTETCFILES= $(ETCFILES:%=$(ROOTETC)/%)
 include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
+CFLAGS += -I../../lib/libzutil/common
 
 FILEMODE = 0555
 
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 
-LDLIBS +=	-ldiskmgt -lzfs -luuid
+LDLIBS +=	-ldiskmgt -lzfs -luuid -lzutil
 
 .KEEP_STATE:
 

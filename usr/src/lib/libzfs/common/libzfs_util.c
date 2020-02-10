@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
  * Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>
  * Copyright (c) 2017 Datto Inc.
@@ -31,6 +31,7 @@
  * Internal utility routines for the ZFS library.
  */
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <libintl.h>
@@ -38,8 +39,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
-#include <unistd.h>
-#include <ctype.h>
 #include <math.h>
 #include <sys/filio.h>
 #include <sys/mnttab.h>
@@ -54,6 +53,7 @@
 #include "zfs_prop.h"
 #include "zfs_comutil.h"
 #include "zfeature_common.h"
+#include <libzutil.h>
 
 int
 libzfs_errno(libzfs_handle_t *hdl)
@@ -631,15 +631,6 @@ zfs_strdup(libzfs_handle_t *hdl, const char *str)
 		(void) no_memory(hdl);
 
 	return (ret);
-}
-
-/*
- * Convert a number to an appropriately human-readable output.
- */
-void
-zfs_nicenum(uint64_t num, char *buf, size_t buflen)
-{
-	nicenum(num, buf, buflen);
 }
 
 void
@@ -1661,21 +1652,4 @@ zfs_get_hole_count(const char *path, uint64_t *count, uint64_t *bs)
 		return (errno);
 	}
 	return (0);
-}
-
-ulong_t
-get_system_hostid(void)
-{
-	char *env;
-
-	/*
-	 * Allow the hostid to be subverted for testing.
-	 */
-	env = getenv("ZFS_HOSTID");
-	if (env) {
-		ulong_t hostid = strtoull(env, NULL, 16);
-		return (hostid & 0xFFFFFFFF);
-	}
-
-	return (gethostid());
 }

@@ -86,7 +86,7 @@ extern void prgetsecflags(proc_t *, struct prsecflags *);
 extern uint_t prnsegs(struct as *, int);
 extern u_offset_t prgetfdinfosize(proc_t *, vnode_t *, cred_t *);
 extern int prgetfdinfo(proc_t *, vnode_t *, struct prfdinfo *, cred_t *,
-    list_t *);
+    cred_t *, list_t *);
 extern void prexit(proc_t *);
 extern void prfree(proc_t *);
 extern void prlwpexit(kthread_t *);

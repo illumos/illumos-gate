@@ -21,10 +21,12 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include "libzfs_jni_util.h"
 #include "libzfs_jni_pool.h"
+#include <libzutil.h>
 #include <strings.h>
 
 /*
@@ -753,7 +755,8 @@ create_MirrorVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
 }
 
 static char *
-find_field(const zjni_field_mapping_t *mapping, int value) {
+find_field(const zjni_field_mapping_t *mapping, int value)
+{
 	int i;
 	for (i = 0; mapping[i].name != NULL; i++) {
 		if (value == mapping[i].value) {
@@ -1046,7 +1049,8 @@ zjni_get_VirtualDevices_from_vdev(JNIEnv *env, zpool_handle_t *zhp,
 }
 
 int
-zjni_create_add_ImportablePool(nvlist_t *config, void *data) {
+zjni_create_add_ImportablePool(nvlist_t *config, void *data)
+{
 
 	JNIEnv *env = ((zjni_ArrayCallbackData_t *)data)->env;
 	zjni_Collection_t *list = ((zjni_ArrayCallbackData_t *)data)->list;
@@ -1154,7 +1158,14 @@ zjni_pool_status_to_obj(JNIEnv *env, zpool_status_t status)
 int
 zjni_ipool_iter(int argc, char **argv, zjni_ipool_iter_f func, void *data)
 {
-	nvlist_t *pools = zpool_find_import(g_zfs, argc, argv);
+	nvlist_t *pools;
+	importargs_t iarg = { 0 };
+
+	iarg.paths = argc;
+	iarg.path = argv;
+	iarg.can_be_active = B_TRUE;
+
+	pools = zpool_search_import(g_zfs, &iarg, &libzfs_config_ops);
 
 	if (pools != NULL) {
 		nvpair_t *elem = NULL;
@@ -1173,21 +1184,25 @@ zjni_ipool_iter(int argc, char **argv, zjni_ipool_iter_f func, void *data)
 }
 
 char *
-zjni_vdev_state_to_str(vdev_state_t state) {
+zjni_vdev_state_to_str(vdev_state_t state)
+{
 	return (find_field(vdev_state_map, state));
 }
 
 char *
-zjni_vdev_aux_to_str(vdev_aux_t aux) {
+zjni_vdev_aux_to_str(vdev_aux_t aux)
+{
 	return (find_field(vdev_aux_map, aux));
 }
 
 char *
-zjni_pool_state_to_str(pool_state_t state) {
+zjni_pool_state_to_str(pool_state_t state)
+{
 	return (find_field(pool_state_map, state));
 }
 
 char *
-zjni_pool_status_to_str(zpool_status_t status) {
+zjni_pool_status_to_str(zpool_status_t status)
+{
 	return (find_field(zpool_status_map, status));
 }

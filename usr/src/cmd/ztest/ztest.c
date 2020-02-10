@@ -128,7 +128,7 @@
 #include <math.h>
 #include <sys/fs/zfs.h>
 #include <libnvpair.h>
-#include <libzfs.h>
+#include <libzutil.h>
 #include <libcmdutils.h>
 
 static int ztest_fd_data = -1;
@@ -6811,7 +6811,6 @@ make_random_props()
 static void
 ztest_import(ztest_shared_t *zs)
 {
-	libzfs_handle_t *hdl;
 	importargs_t args = { 0 };
 	spa_t *spa;
 	nvlist_t *cfg = NULL;
@@ -6825,14 +6824,14 @@ ztest_import(ztest_shared_t *zs)
 	rw_init(&ztest_name_lock, NULL, USYNC_THREAD, NULL);
 
 	kernel_init(FREAD | FWRITE);
-	hdl = libzfs_init();
 
 	searchdirs[0] = ztest_opts.zo_dir;
 	args.paths = nsearch;
 	args.path = searchdirs;
 	args.can_be_active = B_FALSE;
 
-	error = zpool_tryimport(hdl, name, &cfg, &args);
+	error = zpool_find_config(NULL, name, &cfg, &args,
+	    &libzpool_config_ops);
 	if (error)
 		(void) fatal(0, "No pools found\n");
 
@@ -6842,7 +6841,6 @@ ztest_import(ztest_shared_t *zs)
 	    1ULL << spa->spa_root_vdev->vdev_child[0]->vdev_ms_shift;
 	spa_close(spa, FTAG);
 
-	libzfs_fini(hdl);
 	kernel_fini();
 
 	if (!ztest_opts.zo_mmp_test) {

@@ -22,7 +22,7 @@
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>.
 # Copyright (c) 2015 by Delphix. All rights reserved.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 PROG= zpool
@@ -40,9 +40,10 @@ STAT_COMMON_OBJS = timestamp.o
 STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
 SRCS += $(STAT_COMMON_SRCS)
 
-LDLIBS += -lzfs -lnvpair -ldevid -lefi -ldiskmgt -luutil -lumem
+LDLIBS += -lzfs -lnvpair -ldevid -lefi -ldiskmgt -luutil -lumem -lzutil
 
 INCS += -I../../common/zfs -I../../uts/common/fs/zfs -I$(STATCOMMONDIR)
+INCS += -I../../lib/libzutil/common
 
 CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all

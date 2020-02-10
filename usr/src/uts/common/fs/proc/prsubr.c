@@ -2549,24 +2549,16 @@ static size_t
 prfdinfopath(proc_t *p, vnode_t *vp, list_t *data, cred_t *cred)
 {
 	char *pathname;
-	vnode_t *vrootp;
 	size_t pathlen;
 	size_t sz = 0;
 
 	pathlen = MAXPATHLEN + 1;
 	pathname = kmem_alloc(pathlen, KM_SLEEP);
 
-	mutex_enter(&p->p_lock);
-	if ((vrootp = PTOU(p)->u_rdir) == NULL)
-		vrootp = rootdir;
-	VN_HOLD(vrootp);
-	mutex_exit(&p->p_lock);
-
-	if (vnodetopath(vrootp, vp, pathname, pathlen, cred) == 0) {
+	if (vnodetopath(NULL, vp, pathname, pathlen, cred) == 0) {
 		sz += prfdinfomisc(data, PR_PATHNAME,
 		    pathname, strlen(pathname) + 1);
 	}
-	VN_RELE(vrootp);
 
 	kmem_free(pathname, pathlen);
 	return (sz);
@@ -2825,7 +2817,7 @@ prgetfdinfosize(proc_t *p, vnode_t *vp, cred_t *cred)
 
 int
 prgetfdinfo(proc_t *p, vnode_t *vp, prfdinfo_t *fdinfo, cred_t *cred,
-    list_t *data)
+    cred_t *file_cred, list_t *data)
 {
 	vattr_t vattr;
 	int error;
@@ -2852,9 +2844,20 @@ prgetfdinfo(proc_t *p, vnode_t *vp, prfdinfo_t *fdinfo, cred_t *cred,
 	    VOP_SEEK(vp, 0, (offset_t *)&fdinfo->pr_offset, NULL) != 0)
 		fdinfo->pr_offset = -1;
 
-	/* Attributes */
+	/*
+	 * Attributes
+	 *
+	 * We have two cred_t structures available here.
+	 * 'cred' is the caller's credential, and 'file_cred' is the credential
+	 * for the file being inspected.
+	 *
+	 * When looking up the file attributes, file_cred is used in order
+	 * that the correct ownership is set for doors and FIFOs. Since the
+	 * caller has permission to read the fdinfo file in proc, this does
+	 * not expose any additional information.
+	 */
 	vattr.va_mask = AT_STAT;
-	if (VOP_GETATTR(vp, &vattr, 0, cred, NULL) == 0) {
+	if (VOP_GETATTR(vp, &vattr, 0, file_cred, NULL) == 0) {
 		fdinfo->pr_major = getmajor(vattr.va_fsid);
 		fdinfo->pr_minor = getminor(vattr.va_fsid);
 		fdinfo->pr_rmajor = getmajor(vattr.va_rdev);

@@ -23,6 +23,7 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014 Racktop Systems.
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 Peter Tribble.
  */
 
 /*
@@ -85,9 +86,6 @@
 /* Ultra-specific kstat includes */
 #ifdef __sparc
 #include <vm/hat_sfmmu.h>	/* from /usr/platform/sun4u/include */
-#include <sys/simmstat.h>	/* from /usr/platform/sun4u/include */
-#include <sys/sysctrl.h>	/* from /usr/platform/sun4u/include */
-#include <sys/fhc.h>		/* from /usr/include */
 #endif
 
 /*
@@ -548,169 +546,6 @@ save_sfmmu_tsbsize_stat(HV *self, kstat_t *kp, int strip_str)
 #endif
 
 /*
- * Definition in /usr/platform/sun4u/include/sys/simmstat.h
- */
-
-#ifdef __sparc
-static void
-save_simmstat(HV *self, kstat_t *kp, int strip_str)
-{
-	uchar_t	*simmstatp;
-	SV	*list;
-	int	i;
-
-	/* PERL_ASSERT(kp->ks_ndata == 1); */
-	PERL_ASSERT(kp->ks_data_size == sizeof (uchar_t) * SIMM_COUNT);
-
-	list = newSVpv("", 0);
-	for (i = 0, simmstatp = (uchar_t *)(kp->ks_data);
-	i < SIMM_COUNT - 1; i++, simmstatp++) {
-		sv_catpvf(list, "%d,", *simmstatp);
-	}
-	sv_catpvf(list, "%d", *simmstatp);
-	hv_store(self, "status", 6, list, 0);
-}
-#endif
-
-/*
- * Used by save_temperature to make CSV lists from arrays of
- * short temperature values
- */
-
-#ifdef __sparc
-static SV *
-short_array_to_SV(short *shortp, int len)
-{
-	SV  *list;
-
-	list = newSVpv("", 0);
-	for (; len > 1; len--, shortp++) {
-		sv_catpvf(list, "%d,", *shortp);
-	}
-	sv_catpvf(list, "%d", *shortp);
-	return (list);
-}
-
-/*
- * Definition in /usr/platform/sun4u/include/sys/fhc.h
- */
-
-static void
-save_temperature(HV *self, kstat_t *kp, int strip_str)
-{
-	struct temp_stats *tempsp;
-
-	/* PERL_ASSERT(kp->ks_ndata == 1); */
-	PERL_ASSERT(kp->ks_data_size == sizeof (struct temp_stats));
-	tempsp = (struct temp_stats *)(kp->ks_data);
-
-	SAVE_UINT32(self, tempsp, index);
-	hv_store(self, "l1", 2, short_array_to_SV(tempsp->l1, L1_SZ), 0);
-	hv_store(self, "l2", 2, short_array_to_SV(tempsp->l2, L2_SZ), 0);
-	hv_store(self, "l3", 2, short_array_to_SV(tempsp->l3, L3_SZ), 0);
-	hv_store(self, "l4", 2, short_array_to_SV(tempsp->l4, L4_SZ), 0);
-	hv_store(self, "l5", 2, short_array_to_SV(tempsp->l5, L5_SZ), 0);
-	SAVE_INT32(self, tempsp, max);
-	SAVE_INT32(self, tempsp, min);
-	SAVE_INT32(self, tempsp, state);
-	SAVE_INT32(self, tempsp, temp_cnt);
-	SAVE_INT32(self, tempsp, shutdown_cnt);
-	SAVE_INT32(self, tempsp, version);
-	SAVE_INT32(self, tempsp, trend);
-	SAVE_INT32(self, tempsp, override);
-}
-#endif
-
-/*
- * Not actually defined anywhere - just a short.  Yuck.
- */
-
-#ifdef __sparc
-static void
-save_temp_over(HV *self, kstat_t *kp, int strip_str)
-{
-	short *shortp;
-
-	/* PERL_ASSERT(kp->ks_ndata == 1); */
-	PERL_ASSERT(kp->ks_data_size == sizeof (short));
-
-	shortp = (short *)(kp->ks_data);
-	hv_store(self, "override", 8, newSViv(*shortp), 0);
-}
-#endif
-
-/*
- * Defined in /usr/platform/sun4u/include/sys/sysctrl.h
- * (Well, sort of.  Actually there's no structure, just a list of #defines
- * enumerating *some* of the array indexes.)
- */
-
-#ifdef __sparc
-static void
-save_ps_shadow(HV *self, kstat_t *kp, int strip_str)
-{
-	uchar_t *ucharp;
-
-	/* PERL_ASSERT(kp->ks_ndata == 1); */
-	PERL_ASSERT(kp->ks_data_size == SYS_PS_COUNT);
-
-	ucharp = (uchar_t *)(kp->ks_data);
-	hv_store(self, "core_0", 6, newSViv(*ucharp++), 0);
-	hv_store(self, "core_1", 6, newSViv(*ucharp++), 0);
-	hv_store(self, "core_2", 6, newSViv(*ucharp++), 0);
-	hv_store(self, "core_3", 6, newSViv(*ucharp++), 0);
-	hv_store(self, "core_4", 6, newSViv(*ucharp++), 0);
-	hv_store(self, "core_5", 6, newSViv(*ucharp++), 0);
-	hv_store(self, "core_6", 6, newSViv(*ucharp++), 0);
-	hv_store(self, "core_7", 6, newSViv(*ucharp++), 0);
-	hv_store(self, "pps_0", 5, newSViv(*ucharp++), 0);
-	hv_store(self, "clk_33", 6, newSViv(*ucharp++), 0);
-	hv_store(self, "clk_50", 6, newSViv(*ucharp++), 0);
-	hv_store(self, "v5_p", 4, newSViv(*ucharp++), 0);
-	hv_store(self, "v12_p", 5, newSViv(*ucharp++), 0);
-	hv_store(self, "v5_aux", 6, newSViv(*ucharp++), 0);
-	hv_store(self, "v5_p_pch", 8, newSViv(*ucharp++), 0);
-	hv_store(self, "v12_p_pch", 9, newSViv(*ucharp++), 0);
-	hv_store(self, "v3_pch", 6, newSViv(*ucharp++), 0);
-	hv_store(self, "v5_pch", 6, newSViv(*ucharp++), 0);
-	hv_store(self, "p_fan", 5, newSViv(*ucharp++), 0);
-}
-#endif
-
-/*
- * Definition in /usr/platform/sun4u/include/sys/fhc.h
- */
-
-#ifdef __sparc
-static void
-save_fault_list(HV *self, kstat_t *kp, int strip_str)
-{
-	struct ft_list	*faultp;
-	int		i;
-	char		name[KSTAT_STRLEN + 7];	/* room for 999999 faults */
-
-	/* PERL_ASSERT(kp->ks_ndata == 1); */
-	/* PERL_ASSERT(kp->ks_data_size == sizeof (struct ft_list)); */
-
-	for (i = 1, faultp = (struct ft_list *)(kp->ks_data);
-	    i <= 999999 && i <= kp->ks_data_size / sizeof (struct ft_list);
-	    i++, faultp++) {
-		(void) snprintf(name, sizeof (name), "unit_%d", i);
-		hv_store(self, name, strlen(name), newSViv(faultp->unit), 0);
-		(void) snprintf(name, sizeof (name), "type_%d", i);
-		hv_store(self, name, strlen(name), newSViv(faultp->type), 0);
-		(void) snprintf(name, sizeof (name), "fclass_%d", i);
-		hv_store(self, name, strlen(name), newSViv(faultp->fclass), 0);
-		(void) snprintf(name, sizeof (name), "create_time_%d", i);
-		hv_store(self, name, strlen(name),
-		    NEW_UV(faultp->create_time), 0);
-		(void) snprintf(name, sizeof (name), "msg_%d", i);
-		hv_store(self, name, strlen(name), newSVpv(faultp->msg, 0), 0);
-	}
-}
-#endif
-
-/*
  * We need to be able to find the function corresponding to a particular raw
  * kstat.  To do this we ignore the instance and glue the module and name
  * together to form a composite key.  We can then use the data in the kstat
@@ -721,7 +556,7 @@ save_fault_list(HV *self, kstat_t *kp, int strip_str)
  * Note that some kstats include the instance number as part of the module
  * and/or name.  This could be construed as a bug.  However, to work around this
  * we omit any digits from the module and name as we build the table in
- * build_raw_kstat_loopup(), and we remove any digits from the module and name
+ * build_raw_kstat_lookup(), and we remove any digits from the module and name
  * when we look up the functions in lookup_raw_kstat_fn()
  */
 
@@ -747,11 +582,6 @@ build_raw_kstat_lookup()
 	    "unix:sfmmu_global_stat");
 	SAVE_FNP(raw_kstat_lookup, save_sfmmu_tsbsize_stat,
 	    "unix:sfmmu_tsbsize_stat");
-	SAVE_FNP(raw_kstat_lookup, save_simmstat, "unix:simm-status");
-	SAVE_FNP(raw_kstat_lookup, save_temperature, "unix:temperature");
-	SAVE_FNP(raw_kstat_lookup, save_temp_over, "unix:temperature override");
-	SAVE_FNP(raw_kstat_lookup, save_ps_shadow, "unix:ps_shadow");
-	SAVE_FNP(raw_kstat_lookup, save_fault_list, "unix:fault_list");
 #endif
 }
 

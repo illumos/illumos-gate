@@ -30,6 +30,7 @@
 # Copyright 2017 RackTop Systems.
 # Copyright 2019 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 Joyent, Inc.
 #
 
 #
@@ -926,6 +927,8 @@ $(ROOT)/usr/lib/libzfs.so.1:=		REALPATH=../../lib/libzfs.so.1
 $(ROOT)/usr/lib/libzfs.so:=		REALPATH=../../lib/libzfs.so.1
 $(ROOT)/usr/lib/libzfs_core.so.1:=	REALPATH=../../lib/libzfs_core.so.1
 $(ROOT)/usr/lib/libzfs_core.so:=	REALPATH=../../lib/libzfs_core.so.1
+$(ROOT)/usr/lib/libzutil.so.1:=		REALPATH=../../lib/libzutil.so.1
+$(ROOT)/usr/lib/libzutil.so:=		REALPATH=../../lib/libzutil.so.1
 $(ROOT)/usr/lib/nss_compat.so.1:=	REALPATH=../../lib/nss_compat.so.1
 $(ROOT)/usr/lib/nss_dns.so.1:=		REALPATH=../../lib/nss_dns.so.1
 $(ROOT)/usr/lib/nss_files.so.1:=	REALPATH=../../lib/nss_files.so.1
@@ -1194,6 +1197,10 @@ $(ROOT)/usr/lib/$(MACH64)/libzfs_core.so:= \
 	REALPATH=../../../lib/$(MACH64)/libzfs_core.so.1
 $(ROOT)/usr/lib/$(MACH64)/libzfs_core.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libzfs_core.so.1
+$(ROOT)/usr/lib/$(MACH64)/libzutil.so:= \
+	REALPATH=../../../lib/$(MACH64)/libzutil.so.1
+$(ROOT)/usr/lib/$(MACH64)/libzutil.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libzutil.so.1
 $(ROOT)/usr/lib/$(MACH64)/libfakekernel.so:= \
 	REALPATH=../../../lib/$(MACH64)/libfakekernel.so.1
 $(ROOT)/usr/lib/$(MACH64)/libfakekernel.so.1:= \
@@ -1357,6 +1364,8 @@ SYM.USRLIB= \
 	/usr/lib/libzfs.so.1 \
 	/usr/lib/libzfs_core.so \
 	/usr/lib/libzfs_core.so.1 \
+	/usr/lib/libzutil.so \
+	/usr/lib/libzutil.so.1 \
 	/usr/lib/nss_compat.so.1 \
 	/usr/lib/nss_dns.so.1 \
 	/usr/lib/nss_files.so.1 \
@@ -1506,6 +1515,8 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libzfs.so.1 \
 	/usr/lib/$(MACH64)/libzfs_core.so \
 	/usr/lib/$(MACH64)/libzfs_core.so.1 \
+	/usr/lib/$(MACH64)/libzutil.so \
+	/usr/lib/$(MACH64)/libzutil.so.1 \
 	/usr/lib/$(MACH64)/nss_compat.so.1 \
 	/usr/lib/$(MACH64)/nss_dns.so.1 \
 	/usr/lib/$(MACH64)/nss_files.so.1 \

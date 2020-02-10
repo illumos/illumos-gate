@@ -93,6 +93,7 @@ lm_zone_init(zoneid_t zoneid)
 
 	g->lockd_pid = 0;
 	g->run_status = NLM_ST_DOWN;
+	g->nlm_zoneid = zoneid;
 
 	nlm_globals_register(g);
 	return (g);
@@ -104,6 +105,8 @@ lm_zone_fini(zoneid_t zoneid, void *data)
 {
 	struct nlm_globals *g = data;
 
+	nlm_globals_unregister(g);
+
 	ASSERT(avl_is_empty(&g->nlm_hosts_tree));
 	avl_destroy(&g->nlm_hosts_tree);
 	mod_hash_destroy_idhash(g->nlm_hosts_hash);
@@ -114,7 +117,6 @@ lm_zone_fini(zoneid_t zoneid, void *data)
 	cv_destroy(&g->nlm_gc_finish_cv);
 	mutex_destroy(&g->clean_lock);
 
-	nlm_globals_unregister(g);
 	kmem_free(g, sizeof (*g));
 }
 

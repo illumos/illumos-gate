@@ -21,7 +21,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2016 by Delphix. All rights reserved.
-# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -152,7 +152,7 @@ SYMBOL_VERSION SUNWprivate {
 	sa_proto_delete_section;
 	sa_needs_refresh;
 	sa_get_zfs_handle;
-	sa_zfs_process_share;
+	sa_get_zfs_share;
 	sa_update_sharetab_ts;
 	sa_zfs_setprop;
     local:

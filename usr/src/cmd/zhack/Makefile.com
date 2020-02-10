@@ -27,6 +27,7 @@
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2017 RackTop Systems.
+# Copyright 2020 Joyent, Inc.
 #
 
 PROG= zhack
@@ -40,8 +41,9 @@ INCS +=	-I../../../lib/libzpool/common
 INCS +=	-I../../../uts/common/fs/zfs
 INCS +=	-I../../../uts/common/fs/zfs/lua
 INCS +=	-I../../../common/zfs
+INCS += -I../../../lib/libzutil/common
 
-LDLIBS += -lzpool -lumem -lnvpair -lzfs
+LDLIBS += -lzpool -lumem -lnvpair -lzutil
 
 CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all

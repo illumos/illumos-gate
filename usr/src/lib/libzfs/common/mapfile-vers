@@ -24,7 +24,7 @@
 # Copyright (c) 2012, Joyent, Inc. All rights reserved.
 # Copyright (c) 2011, 2017 by Delphix. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 #
@@ -51,8 +51,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	fletcher_4_byteswap;
 	fletcher_4_incremental_native;
 	fletcher_4_incremental_byteswap;
-	get_system_hostid;
 	libzfs_add_handle;
+	libzfs_config_ops;
 	libzfs_errno;
 	libzfs_error_action;
 	libzfs_error_description;
@@ -113,7 +113,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zfs_mount;
 	zfs_name_to_prop;
 	zfs_name_valid;
-	zfs_nicenum;
 	zfs_nicestrtonum;
 	zfs_open;
 	zfs_path_to_zhandle;
@@ -198,14 +197,11 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_destroy;
 	zpool_disable_datasets;
 	zpool_discard_checkpoint;
-	zpool_dump_ddt;
 	zpool_enable_datasets;
 	zpool_expand_proplist;
 	zpool_explain_recover;
 	zpool_export;
 	zpool_export_force;
-	zpool_find_import;
-	zpool_find_import_cached;
 	zpool_find_vdev;
 	zpool_find_vdev_by_physpath;
 	zpool_fru_set;
@@ -220,7 +216,6 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_get_prop_int;
 	zpool_get_state;
 	zpool_get_status;
-	zpool_history_unpack;
 	zpool_import;
 	zpool_import_props;
 	zpool_import_status;
@@ -245,18 +240,15 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_prop_to_name;
 	zpool_prop_unsupported;
 	zpool_prop_values;
-	zpool_read_label;
 	zpool_refresh_stats;
 	zpool_reguid;
 	zpool_reopen;
 	zpool_scan;
-	zpool_search_import;
 	zpool_set_prop;
 	zpool_skip_pool;
 	zpool_state_to_name;
 	zpool_sync_one;
 	zpool_trim;
-	zpool_tryimport;
 	zpool_unmount_datasets;
 	zpool_upgrade;
 	zpool_vdev_attach;

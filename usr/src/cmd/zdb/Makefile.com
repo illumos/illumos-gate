@@ -23,7 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 # Copyright 2017 RackTop Systems.
 #
 
@@ -37,8 +37,9 @@ include ../../Makefile.ctf
 INCS += -I../../../lib/libzpool/common
 INCS +=	-I../../../uts/common/fs/zfs
 INCS +=	-I../../../common/zfs
+INCS += -I../../../lib/libzutil/common
 
-LDLIBS += -lzpool -lumem -lnvpair -lzfs -lavl -lcmdutils -lfakekernel
+LDLIBS += -lzpool -lumem -lnvpair -lzutil -lavl -lfakekernel
 
 CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all

@@ -385,6 +385,7 @@ typedef struct zinject_record {
 #define	ZINJECT_NULL		0x1
 #define	ZINJECT_FLUSH_ARC	0x2
 #define	ZINJECT_UNLOAD_SPA	0x4
+#define	ZINJECT_CALC_RANGE	0x8
 
 #define	ZI_NO_DVA		(-1)
 

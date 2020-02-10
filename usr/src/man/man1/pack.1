@@ -44,11 +44,10 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Copyright (c) 1996, Sun Microsystems, Inc. All Rights Reserved
 .\"
-.TH PACK 1 "Mar 13, 2008"
+.TH PACK 1 "Feb 5, 2020"
 .SH NAME
 pack, pcat, unpack \- compress and expand files
 .SH SYNOPSIS
-.LP
 .nf
 \fBpack\fR [\fB-f/\fR] [\fB-\fR] \fIfile\fR...
 .fi
@@ -65,8 +64,6 @@ pack, pcat, unpack \- compress and expand files
 
 .SH DESCRIPTION
 .SS "pack"
-.sp
-.LP
 The \fBpack\fR command attempts to store the specified files in a compressed
 form. Wherever possible (and useful), each input file \fBfile\fR is replaced by
 a packed file \fBfile\fR\fB\&.z\fR with the same access modes, access and
@@ -155,10 +152,8 @@ an I/O error occurred during processing.
 .sp
 .LP
 The last segment of the file name must be short enough to allow space for the
-appended \fB\&.z\fRextension. Directories cannot be compressed.
+appended \fB\&.z\fR extension. Directories cannot be compressed.
 .SS "pcat"
-.sp
-.LP
 The \fBpcat\fR command does for packed files what \fBcat\fR(1) does for
 ordinary files, except that \fBpcat\fR cannot be used as a filter. The
 specified files are unpacked and written to the standard output.
@@ -179,8 +174,6 @@ the file cannot be opened;
 the file does not appear to be the output of \fBpack\fR.
 .RE
 .SS "unpack"
-.sp
-.LP
 The \fBunpack\fR command expands files created by \fBpack\fR. For each
 \fBfile\fR specified in the command, a search is made for a file called
 \fBfile\fR\fB\&.z\fR (or just \fBfile\fR, if \fBfile\fR ends in \fB\&.z\fR). If
@@ -206,8 +199,6 @@ a file with the unpacked name already exists;
 the unpacked file cannot be created.
 .RE
 .SH OPTIONS
-.sp
-.LP
 The following options are supported by \fBpack\fR:
 .sp
 .ne 2
@@ -237,8 +228,6 @@ message is written to \fBstderr\fR, and the final exit status is
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -264,13 +253,10 @@ place of \fBfile\fR causes the internal flag to be set and reset.
 .RE
 
 .SH USAGE
-.sp
-.LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBpack\fR,
 \fBpcat\fR, and \fBunpack\fR when encountering files greater than or equal to 2
-Gbyte ( 2^31 bytes).
+Gbyte (2^31 bytes).
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRViewing a Packed File
 .sp
 .LP
@@ -289,7 +275,7 @@ or just:
 \fBexample%\fR \fBpcat\fR \fBfile\fR
 
 .LP
-\fBExample 2 \fRMaking and Unpacked Copy:
+\fBExample 2 \fRMaking an Unpacked Copy:
 .sp
 .LP
 To make an unpacked copy, say \fBnnn\fR, of a packed file named \fBfile.z\fR
@@ -300,14 +286,10 @@ To make an unpacked copy, say \fBnnn\fR, of a packed file named \fBfile.z\fR
 \fBexample%\fR \fBpcat\fR \fBfile\fR \fB>nnn\fR
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBpack\fR, \fBpcat\fR, and \fBunpack\fR:
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -330,8 +312,6 @@ returned.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -346,7 +326,5 @@ CSI	Enabled
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBcat\fR(1), \fBcompress\fR(1), \fBzcat\fR(1), \fBfgetattr\fR(3C),
 \fBfsetattr\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5), \fBlargefile\fR(5)

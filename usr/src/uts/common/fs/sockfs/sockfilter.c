@@ -85,13 +85,13 @@
  *           sof_module_list -> sof_module_t -> ... -> sof_module_t
  */
 
-static list_t 	sof_entry_list;		/* list of configured filters */
+static list_t	sof_entry_list;		/* list of configured filters */
 
 static list_t	sof_module_list;	/* list of loaded filter modules */
 static kmutex_t	sof_module_lock;	/* protect the module list */
 
 static sof_kstat_t	sof_stat;
-static kstat_t 		*sof_stat_ksp;
+static kstat_t		*sof_stat_ksp;
 
 #ifdef DEBUG
 static int socket_filter_debug = 0;
@@ -117,15 +117,15 @@ kmutex_t	sof_close_deferred_lock;
 static void	sof_close_deferred(void *);
 
 static void		sof_module_rele(sof_module_t *);
-static sof_module_t 	*sof_module_hold_by_name(const char *, const char *);
+static sof_module_t	*sof_module_hold_by_name(const char *, const char *);
 
 static int		sof_entry_load_module(sof_entry_t *);
-static void 		sof_entry_hold(sof_entry_t *);
-static void 		sof_entry_rele(sof_entry_t *);
-static int 		sof_entry_kstat_create(sof_entry_t *);
-static void 		sof_entry_kstat_destroy(sof_entry_t *);
+static void		sof_entry_hold(sof_entry_t *);
+static void		sof_entry_rele(sof_entry_t *);
+static int		sof_entry_kstat_create(sof_entry_t *);
+static void		sof_entry_kstat_destroy(sof_entry_t *);
 
-static sof_instance_t 	*sof_instance_create(sof_entry_t *, struct sonode *);
+static sof_instance_t	*sof_instance_create(sof_entry_t *, struct sonode *);
 static void		sof_instance_destroy(sof_instance_t *);
 
 static int
@@ -1093,9 +1093,10 @@ sof_entry_proc_sockparams(sof_entry_t *ent, struct sockparams *sp)
 			    fil != NULL;
 			    fil = list_next(&sp->sp_auto_filters, fil)) {
 				if (strncmp(ent->sofe_hintarg,
-				    fil->spf_filter->sofe_name,
-				    SOF_MAXNAMELEN) == 0)
-				break;
+				    fil->spf_filter->sofe_name, SOF_MAXNAMELEN)
+				    == 0) {
+					break;
+				}
 			}
 
 			if (fil != NULL) {

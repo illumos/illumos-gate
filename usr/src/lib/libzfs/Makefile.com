@@ -22,7 +22,7 @@
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright (c) 2011, 2017 by Delphix. All rights reserved.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 LIBRARY= libzfs.a
@@ -69,12 +69,13 @@ INCS += -I$(SRCDIR)
 INCS += -I../../../uts/common/fs/zfs
 INCS += -I../../../common/zfs
 INCS += -I../../libc/inc
+INCS += -I../../libzutil/common
 
 CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
 LDLIBS +=	-lc -lm -ldevid -lgen -lnvpair -luutil -lavl -lefi \
-	-ladm -lidmap -ltsol -lcryptoutil -lpkcs11 -lmd -lumem -lzfs_core \
-	-lcmdutils -ldevinfo
+	-lidmap -ltsol -lcryptoutil -lpkcs11 -lmd -lumem -lzfs_core \
+	-ldevinfo -lzutil
 CPPFLAGS +=	$(INCS) -D_LARGEFILE64_SOURCE=1 -D_REENTRANT
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 

@@ -34,6 +34,7 @@
 #include <strings.h>
 
 #include <libzfs.h>
+#include <libzutil.h>
 
 #include "zpool_util.h"
 

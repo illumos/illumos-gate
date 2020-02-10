@@ -68,6 +68,7 @@
 #include <libzfs_core.h>
 #include <zfs_prop.h>
 #include <zfs_deleg.h>
+#include <libzutil.h>
 #include <libuutil.h>
 #include <aclutils.h>
 #include <directory.h>
