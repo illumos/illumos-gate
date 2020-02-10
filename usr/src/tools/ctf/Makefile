@@ -23,7 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 include ../Makefile.tools
@@ -36,7 +36,6 @@ all	:= TARGET= all
 install	:= TARGET= install
 clean	:= TARGET= clean
 clobber	:= TARGET= clobber
-lint	:= TARGET= lint
 
 .KEEP_STATE:
 
@@ -45,9 +44,29 @@ ctfdiff: libctf
 ctfdump: libctf
 ctfconvert: libctf
 
-all clean clobber install lint: dwarf .WAIT $(SUBDIRS)
+all clean clobber install: dwarf .WAIT $(SUBDIRS)
 
 dwarf $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
+
+#
+# This is a somewhat arbitrary list.
+#
+CTFTOOLS_FILES = \
+	bin/i386/ctfconvert \
+	bin/i386/ctfdiff \
+	bin/i386/ctfdump \
+	bin/i386/ctfstabs \
+	bin/i386/ctfstrip \
+	lib/i386/libctf.so \
+	lib/i386/libctf.so.1 \
+	lib/i386/libdwarf.so \
+	lib/i386/libdwarf.so.1 \
+	lib/i386/libelf.so \
+	lib/i386/libelf.so.1
+
+# CTFTOOLS_TARBALL should be set in the environment
+ctftools: install
+	cd $(ROOTONBLD) && $(TAR) cvzf $(CTFTOOLS_TARBALL) $(CTFTOOLS_FILES)
 
 FRC:
