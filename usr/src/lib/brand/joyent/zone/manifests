@@ -116,6 +116,7 @@ network/nfs/mapid.xml					disabled
 network/nfs/nlockmgr.xml				disabled
 network/nfs/rquota.xml					disabled
 network/nfs/status.xml					disabled
+network/nfs/server.xml					disabled
 network/nis/client.xml					disabled
 network/rexec.xml					disabled
 network/routing/legacy-routing.xml			enabled

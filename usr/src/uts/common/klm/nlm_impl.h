@@ -460,6 +460,7 @@ struct nlm_globals {
 	int				cn_idle_tmo;		/* (z) */
 	int				grace_period;		/* (z) */
 	int				retrans_tmo;		/* (z) */
+	boolean_t			nlm_v4_only;		/* (z) */
 	zoneid_t			nlm_zoneid;		/* (c) */
 	kmutex_t			clean_lock;		/* (c) */
 	TAILQ_ENTRY(nlm_globals)	nlm_link;		/* (g) */

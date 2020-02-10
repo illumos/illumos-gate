@@ -53,6 +53,7 @@
 #include <sys/nvpair.h>
 #include <sys/list.h>
 #include <sys/loadavg.h>
+#include <sys/vnode.h>
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus
@@ -949,7 +950,7 @@ struct zsd_entry {
  * NOTE:  Using the VN_ prefix, even though it's defined here in zone.h.
  * NOTE2: See above warning about ZONE_ROOTVP().
  */
-#define	VN_IS_CURZONEROOT(vp)   (VN_CMP(vp, ZONE_ROOTVP()))
+#define	VN_IS_CURZONEROOT(vp)	(VN_CMP(vp, ZONE_ROOTVP()))
 
 /*
  * Zone-safe version of thread_create() to be used when the caller wants to

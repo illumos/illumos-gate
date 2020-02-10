@@ -20,7 +20,6 @@
  */
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T		*/
@@ -174,13 +173,6 @@ main(int ac, char *av[])
 	    can_do_mlp ? PRIV_NET_BINDMLP : NULL, NULL) == -1) {
 		(void) fprintf(stderr, "%s should be run with"
 		    " sufficient privileges\n", av[0]);
-		exit(1);
-	}
-
-	/* Nfsd cannot run in a non-global zone. */
-	if (getzoneid() != GLOBAL_ZONEID) {
-		(void) fprintf(stderr, "%s: can only run in the global zone\n",
-		    av[0]);
 		exit(1);
 	}
 

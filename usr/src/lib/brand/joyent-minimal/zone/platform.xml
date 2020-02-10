@@ -51,6 +51,7 @@
 	    opt="nodevices" type="lofs" />
 	<global_mount special="%R/ccs" directory="/usr/ccs"
 	    opt="nodevices" type="lofs" />
+	<mount special="sharefs" directory="/etc/dfs/sharetab" type="sharefs" />
 
 	<!-- Local filesystems to mount when booting the zone -->
 	<mount special="/proc" directory="/proc" type="proc" />
