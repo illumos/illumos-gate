@@ -14,7 +14,6 @@
 #
 # Copyright (c) 2017, Intel Corporation.
 # Copyright (c) 2018 by Delphix. All rights reserved.
-# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/tests/functional/alloc_class/alloc_class.kshlib
@@ -36,8 +35,7 @@ log_must zpool create $TESTPOOL raidz $ZPOOL_DISKS \
    special mirror $CLASS_DISK0 $CLASS_DISK1
 log_must zpool replace $TESTPOOL $CLASS_DISK1 $CLASS_DISK2
 log_must sleep 10
-log_must zpool status $TESTPOOL | nawk -v dev=$CLASS_DISK2 \
-    'BEGIN {res=1} {if ($1 == dev) res=0} END {exit res}'
+log_must zpool iostat -H $TESTPOOL $CLASS_DISK2
 log_must zpool destroy -f $TESTPOOL
 
 log_pass $claim

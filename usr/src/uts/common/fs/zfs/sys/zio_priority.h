@@ -14,6 +14,7 @@
  */
 /*
  * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 #ifndef	_ZIO_PRIORITY_H
 #define	_ZIO_PRIORITY_H
@@ -22,6 +23,10 @@
 extern "C" {
 #endif
 
+/*
+ * NOTE: If ZIO_PRIORITY_NUM_QUEUEABLE changes, update ZIO_PRIORITY_N_QUEUEABLE
+ * in uts/common/sys/fs/zfs.h to match.
+ */
 typedef enum zio_priority {
 	ZIO_PRIORITY_SYNC_READ,
 	ZIO_PRIORITY_SYNC_WRITE,	/* ZIL */
@@ -32,7 +37,6 @@ typedef enum zio_priority {
 	ZIO_PRIORITY_INITIALIZING,	/* initializing I/O */
 	ZIO_PRIORITY_TRIM,		/* trim I/O (discard) */
 	ZIO_PRIORITY_NUM_QUEUEABLE,
-
 	ZIO_PRIORITY_NOW		/* non-queued i/os (e.g. free) */
 } zio_priority_t;
 

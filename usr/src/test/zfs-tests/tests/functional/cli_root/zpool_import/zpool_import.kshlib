@@ -343,6 +343,14 @@ function get_last_txg_synced
 {
 	typeset pool=$1
 
+	if is_linux; then
+		txg=$(tail "/proc/spl/kstat/zfs/$pool/txgs" |
+		    awk '$3=="C" {print $1}' | tail -1)
+		[[ "$txg" ]] || txg=0
+		echo $txg
+		return 0
+	fi
+
 	typeset spas
 	spas=$(mdb -k -e "::spa")
 	[[ $? -ne 0 ]] && return 1

@@ -1,4 +1,4 @@
-#!/usr/bin/ksh -p
+#!/bin/ksh -p
 #
 # CDDL HEADER START
 #
@@ -18,19 +18,17 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-#
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-
-#
-# Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2016, 2017 by Intel Corporation. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
+. $STF_SUITE/tests/functional/fault/fault.cfg
 
-DISK=${DISKS%% *}
+verify_runnable "global"
 
-default_raidz_setup $DISKS
+zed_setup resilver_finish-start-scrub.sh
+zed_start
+
+log_pass

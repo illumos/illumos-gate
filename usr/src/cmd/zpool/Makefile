@@ -40,7 +40,8 @@ STAT_COMMON_OBJS = timestamp.o
 STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
 SRCS += $(STAT_COMMON_SRCS)
 
-LDLIBS += -lzfs -lnvpair -ldevid -lefi -ldiskmgt -luutil -lumem -lzutil
+LDLIBS += -lzfs -lnvpair -ldevid -lefi -ldiskmgt -luutil -lumem -lzutil \
+	-lm -lzpool
 
 INCS += -I../../common/zfs -I../../uts/common/fs/zfs -I$(STATCOMMONDIR)
 INCS += -I../../lib/libzutil/common

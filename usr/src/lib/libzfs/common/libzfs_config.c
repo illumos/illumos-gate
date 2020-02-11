@@ -312,21 +312,9 @@ zpool_refresh_stats(zpool_handle_t *zhp, boolean_t *missing)
 	zhp->zpool_config_size = zc.zc_nvlist_dst_size;
 
 	if (zhp->zpool_config != NULL) {
-		uint64_t oldtxg, newtxg;
-
-		verify(nvlist_lookup_uint64(zhp->zpool_config,
-		    ZPOOL_CONFIG_POOL_TXG, &oldtxg) == 0);
-		verify(nvlist_lookup_uint64(config,
-		    ZPOOL_CONFIG_POOL_TXG, &newtxg) == 0);
-
 		nvlist_free(zhp->zpool_old_config);
 
-		if (oldtxg != newtxg) {
-			nvlist_free(zhp->zpool_config);
-			zhp->zpool_old_config = NULL;
-		} else {
-			zhp->zpool_old_config = zhp->zpool_config;
-		}
+		zhp->zpool_old_config = zhp->zpool_config;
 	}
 
 	zhp->zpool_config = config;

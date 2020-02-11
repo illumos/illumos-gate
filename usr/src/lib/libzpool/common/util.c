@@ -23,6 +23,7 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2017 RackTop Systems.
  * Copyright (c) 2017, Intel Corporation.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <assert.h>
@@ -48,13 +49,15 @@ static void
 show_vdev_stats(const char *desc, const char *ctype, nvlist_t *nv, int indent)
 {
 	vdev_stat_t *vs;
-	vdev_stat_t v0 = { 0 };
+	vdev_stat_t *v0 = { 0 };
 	uint64_t sec;
 	uint64_t is_log = 0;
 	nvlist_t **child;
 	uint_t c, children;
 	char used[6], avail[6];
 	char rops[6], wops[6], rbytes[6], wbytes[6], rerr[6], werr[6], cerr[6];
+
+	v0 = umem_zalloc(sizeof (*v0), UMEM_NOFAIL);
 
 	if (indent == 0 && desc != NULL) {
 		(void) printf("                           "
@@ -72,7 +75,7 @@ show_vdev_stats(const char *desc, const char *ctype, nvlist_t *nv, int indent)
 		    &bias);
 		if (nvlist_lookup_uint64_array(nv, ZPOOL_CONFIG_VDEV_STATS,
 		    (uint64_t **)&vs, &c) != 0)
-			vs = &v0;
+			vs = v0;
 
 		if (bias != NULL) {
 			(void) snprintf(bias_suffix, sizeof (bias_suffix),
@@ -105,6 +108,7 @@ show_vdev_stats(const char *desc, const char *ctype, nvlist_t *nv, int indent)
 		    vs->vs_space ? 6 : 0, vs->vs_space ? avail : "",
 		    rops, wops, rbytes, wbytes, rerr, werr, cerr);
 	}
+	umem_free(v0, sizeof (*v0));
 
 	if (nvlist_lookup_nvlist_array(nv, ctype, &child, &children) != 0)
 		return;

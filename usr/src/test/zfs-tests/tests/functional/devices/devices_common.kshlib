@@ -26,6 +26,7 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
 
 . $STF_SUITE/tests/functional/devices/devices.cfg
@@ -41,6 +42,10 @@ function create_dev_file
 {
 	typeset filetype=$1
 	typeset filename=$2
+
+	# On illumos we need access to the root zpool to get the major/minor
+	# numbers here.
+	export __ZFS_POOL_EXCLUDE=""
 
 	case $filetype in
 		b)
