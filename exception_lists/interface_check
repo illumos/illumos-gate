@@ -58,7 +58,7 @@ PLUGIN		^usr/lib/mdb
 PLUGIN		^usr/lib/pci
 PLUGIN		^usr/lib/picl/plugins
 PLUGIN		^usr/lib/python2.[467]
-PLUGIN		^usr/lib/python3.[567]
+PLUGIN		^usr/lib/python3.[5678]
 PLUGIN		^usr/lib/rcm/modules
 PLUGIN		^usr/lib/scsi/plugins
 PLUGIN		^usr/lib/sysevent/modules
