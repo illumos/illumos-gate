@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2015 Tycho Nightingale <tycho.nightingale@pluribusnetworks.com>
  * Copyright (c) 2015 Leon Dang
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -803,7 +803,7 @@ rfb_handle(struct rfb_softc *rc, int cfd)
 		 * The client then sends the resulting 16-bytes response.
 		 */
 #ifndef NO_OPENSSL
-		strncpy(keystr, rc->password, PASSWD_LENGTH);
+		strncpy((char *)keystr, rc->password, PASSWD_LENGTH);
 
 		/* VNC clients encrypts the challenge with all the bit fields
 		 * in each byte of the password mirrored.
@@ -838,7 +838,8 @@ rfb_handle(struct rfb_softc *rc, int cfd)
 				&ks, DES_ENCRYPT);
 
 		if (memcmp(crypt_expected, buf, AUTH_LENGTH) != 0) {
-			message = "Auth Failed: Invalid Password.";
+			message =
+			    (unsigned char *)"Auth Failed: Invalid Password.";
 			sres = htonl(1);
 		} else
 			sres = 0;

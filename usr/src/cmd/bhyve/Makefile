@@ -11,7 +11,7 @@
 
 #
 # Copyright 2014 Pluribus Networks Inc.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 PROG =		bhyve
@@ -115,9 +115,6 @@ CPPFLAGS =	-I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
 		-I$(SRC)/lib/libdladm/common \
 		-DWITHOUT_CAPSICUM
 
-# Disable the crypto code until it is wired up
-CPPFLAGS +=	-DNO_OPENSSL
-
 pci_nvme.o := CERRWARN += -_gcc=-Wno-pointer-sign
 
 SMOFF += all_func_returns,leaks,no_if_block
@@ -125,9 +122,17 @@ SMOFF += all_func_returns,leaks,no_if_block
 # Force c99 for everything
 CSTD=		$(CSTD_GNU99)
 C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all
 
-$(PROG) := LDLIBS += -lsocket -lnsl -ldlpi -ldladm -lmd -luuid -lvmmapi -lz
+$(PROG) := LDLIBS +=	\
+	-lsocket	\
+	-lnsl		\
+	-ldlpi		\
+	-ldladm		\
+	-lmd		\
+	-lsunw_crypto	\
+	-luuid		\
+	-lvmmapi	\
+	-lz
 $(ZHYVE_PROG) := LDLIBS += -lnvpair
 $(MEVENT_TEST_PROG) := LDLIBS += -lsocket
 
@@ -149,8 +154,6 @@ clean: $(SUBDIRS)
 
 clobber: clean $(SUBDIRS)
 	$(RM) $(CLOBBERFILES)
-
-lint:	lint_SRCS $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

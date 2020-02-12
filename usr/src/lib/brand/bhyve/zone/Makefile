@@ -8,7 +8,7 @@
 # source.  A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 include $(SRC)/cmd/Makefile.cmd
@@ -22,7 +22,7 @@ PROG2 =		bhhwcompat
 PROGS +=	$(PROG1) $(PROG2)
 CLEANFILES +=	$(PROG1) $(PROG2)
 
-$(PROG1) :=	LDLIBS += -lnvpair
+$(PROG1) :=	LDLIBS += -lnvpair -lcustr
 $(PROG2) :=	CPPFLAGS = -I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
 	$(CPPFLAGS.master) -I$(SRC)/uts/i86pc \
 	-I$(COMPAT)/freebsd/amd64 -I$(CONTRIB)/freebsd/amd64
@@ -41,7 +41,5 @@ install: $(PROGS) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
 
 clean:
 	$(RM) $(CLEANFILES)
-
-lint:
 
 include $(SRC)/cmd/Makefile.targ
