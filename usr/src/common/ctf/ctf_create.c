@@ -25,7 +25,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <sys/sysmacros.h>
@@ -33,6 +33,14 @@
 #include <sys/mman.h>
 #include <ctf_impl.h>
 #include <sys/debug.h>
+
+/*
+ * SSIZE_MAX is not available in the kernel, so we define it here rather than
+ * accidentally inject into headers where it's not wanted.
+ */
+#ifndef SSIZE_MAX
+#define	SSIZE_MAX (LONG_MAX)
+#endif
 
 /*
  * This static string is used as the template for initially populating a
@@ -1246,13 +1254,21 @@ ctf_add_union(ctf_file_t *fp, uint_t flag, const char *name)
 	return (type);
 }
 
+/*
+ * If size is 0, we use the standard integer size. This is almost always the
+ * case, except for packed enums.
+ */
 ctf_id_t
-ctf_add_enum(ctf_file_t *fp, uint_t flag, const char *name)
+ctf_add_enum(ctf_file_t *fp, uint_t flag, const char *name, size_t size)
 {
 	ctf_hash_t *hp = &fp->ctf_enums;
 	ctf_helem_t *hep = NULL;
 	ctf_dtdef_t *dtd = NULL;
 	ctf_id_t type = CTF_ERR;
+
+	/* Check we could return something valid in ctf_type_size. */
+	if (size > SSIZE_MAX)
+		return (ctf_set_errno(fp, EINVAL));
 
 	if (name != NULL)
 		hep = ctf_hash_lookup(hp, fp, name, strlen(name));
@@ -1272,7 +1288,9 @@ ctf_add_enum(ctf_file_t *fp, uint_t flag, const char *name)
 
 	VERIFY(type != CTF_ERR);
 	dtd->dtd_data.ctt_info = CTF_TYPE_INFO(CTF_K_ENUM, flag, 0);
-	dtd->dtd_data.ctt_size = fp->ctf_dmodel->ctd_int;
+
+	ctf_set_ctt_size(&dtd->dtd_data, size == 0 ?
+	    fp->ctf_dmodel->ctd_int : size);
 
 	/*
 	 * Always dirty in case we modified a forward.
@@ -1551,12 +1569,7 @@ ctf_add_member(ctf_file_t *fp, ctf_id_t souid, const char *name, ctf_id_t type,
 		ssize = MAX(ssize, msize);
 	}
 
-	if (ssize > CTF_MAX_SIZE) {
-		dtd->dtd_data.ctt_size = CTF_LSIZE_SENT;
-		dtd->dtd_data.ctt_lsizehi = CTF_SIZE_TO_LSIZE_HI(ssize);
-		dtd->dtd_data.ctt_lsizelo = CTF_SIZE_TO_LSIZE_LO(ssize);
-	} else
-		dtd->dtd_data.ctt_size = (ushort_t)ssize;
+	ctf_set_ctt_size(&dtd->dtd_data, ssize);
 
 	dtd->dtd_data.ctt_info = CTF_TYPE_INFO(kind, root, vlen + 1);
 	ctf_list_append(&dtd->dtd_u.dtu_members, dmd);
@@ -1693,7 +1706,6 @@ ctf_add_type(ctf_file_t *dst_fp, ctf_file_t *src_fp, ctf_id_t src_type)
 
 	ctf_dtdef_t *dtd;
 	ctf_funcinfo_t ctc;
-	ssize_t size;
 
 	ctf_hash_t *hp;
 	ctf_helem_t *hep;
@@ -1888,12 +1900,8 @@ ctf_add_type(ctf_file_t *dst_fp, ctf_file_t *src_fp, ctf_id_t src_type)
 		if (ctf_member_iter(src_fp, src_type, membadd, &dst) != 0)
 			errs++; /* increment errs and fail at bottom of case */
 
-		if ((size = ctf_type_size(src_fp, src_type)) > CTF_MAX_SIZE) {
-			dtd->dtd_data.ctt_size = CTF_LSIZE_SENT;
-			dtd->dtd_data.ctt_lsizehi = CTF_SIZE_TO_LSIZE_HI(size);
-			dtd->dtd_data.ctt_lsizelo = CTF_SIZE_TO_LSIZE_LO(size);
-		} else
-			dtd->dtd_data.ctt_size = (ushort_t)size;
+		ctf_set_ctt_size(&dtd->dtd_data,
+		    ctf_type_size(src_fp, src_type));
 
 		dtd->dtd_data.ctt_info = CTF_TYPE_INFO(kind, flag, vlen);
 
@@ -1928,7 +1936,12 @@ ctf_add_type(ctf_file_t *dst_fp, ctf_file_t *src_fp, ctf_id_t src_type)
 			    ctf_enum_iter(dst_fp, dst_type, enumcmp, &src))
 				return (ctf_set_errno(dst_fp, ECTF_CONFLICT));
 		} else {
-			dst_type = ctf_add_enum(dst_fp, flag, name);
+			ssize_t size = ctf_type_size(src_fp, src_type);
+
+			if (size == CTF_ERR)
+				return (CTF_ERR); /* errno is set for us */
+
+			dst_type = ctf_add_enum(dst_fp, flag, name, size);
 			if ((dst.ctb_type = dst_type) == CTF_ERR ||
 			    ctf_enum_iter(src_fp, src_type, enumadd, &dst))
 				return (CTF_ERR); /* errno is set for us */
@@ -2165,13 +2178,7 @@ ctf_set_size(ctf_file_t *fp, ctf_id_t id, const ulong_t newsz)
 	if (newsz < oldsz)
 		return (ctf_set_errno(fp, EINVAL));
 
-	if (newsz > CTF_MAX_SIZE) {
-		dtd->dtd_data.ctt_size = CTF_LSIZE_SENT;
-		dtd->dtd_data.ctt_lsizehi = CTF_SIZE_TO_LSIZE_HI(newsz);
-		dtd->dtd_data.ctt_lsizelo = CTF_SIZE_TO_LSIZE_LO(newsz);
-	} else {
-		dtd->dtd_data.ctt_size = (ushort_t)newsz;
-	}
+	ctf_set_ctt_size(&dtd->dtd_data, newsz);
 
 	fp->ctf_flags |= LCTF_DIRTY;
 	return (0);

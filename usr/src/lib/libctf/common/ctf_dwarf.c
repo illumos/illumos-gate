@@ -28,7 +28,7 @@
  */
 
 /*
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -1213,7 +1213,6 @@ ctf_dwarf_fixup_sou(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t base, boolean_t add)
 	int ret, kind;
 	Dwarf_Die child, memb;
 	Dwarf_Unsigned size;
-	ulong_t nsz;
 
 	kind = ctf_type_kind(cup->cu_ctfp, base);
 	VERIFY(kind != CTF_ERR);
@@ -1306,8 +1305,7 @@ next:
 	/* Finally set the size of the structure to the actual byte size */
 	if ((ret = ctf_dwarf_unsigned(cup, die, DW_AT_byte_size, &size)) != 0)
 		return (ret);
-	nsz = size;
-	if ((ctf_set_size(cup->cu_ctfp, base, nsz)) == CTF_ERR) {
+	if ((ctf_set_size(cup->cu_ctfp, base, size)) == CTF_ERR) {
 		int e = ctf_errno(cup->cu_ctfp);
 		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 		    "failed to set type size for %d to 0x%x: %s", base,
@@ -1614,20 +1612,53 @@ ctf_dwarf_create_reference(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp,
 	return (ctf_dwmap_add(cup, *idp, die, B_FALSE));
 }
 
+/*
+ * Get the size of the type of a particular die. Note that this is a simple
+ * version that doesn't attempt to traverse further than expecting a single
+ * sized type reference (so no qualifiers etc.). Nor does it attempt to do as
+ * much as ctf_type_size() - which we cannot use here as that doesn't look up
+ * dynamic types, and we don't yet want to do a ctf_update().
+ */
+static int
+ctf_dwarf_get_type_size(ctf_cu_t *cup, Dwarf_Die die, size_t *sizep)
+{
+	const ctf_type_t *t;
+	Dwarf_Die tdie;
+	ctf_id_t tid;
+	int ret;
+
+	if ((ret = ctf_dwarf_refdie(cup, die, DW_AT_type, &tdie)) != 0)
+		return (ret);
+
+	if ((ret = ctf_dwarf_convert_type(cup, tdie, &tid,
+	    CTF_ADD_NONROOT)) != 0)
+		return (ret);
+
+	if ((t = ctf_dyn_lookup_by_id(cup->cu_ctfp, tid)) == NULL)
+		return (ENOENT);
+
+	*sizep = ctf_get_ctt_size(cup->cu_ctfp, t, NULL, NULL);
+	return (0);
+}
+
 static int
 ctf_dwarf_create_enum(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp, int isroot)
 {
-	int ret;
-	ctf_id_t id;
+	size_t size = 0;
 	Dwarf_Die child;
+	ctf_id_t id;
 	char *name;
+	int ret;
 
 	if ((ret = ctf_dwarf_string(cup, die, DW_AT_name, &name)) != 0 &&
 	    ret != ENOENT)
 		return (ret);
 	if (ret == ENOENT)
 		name = NULL;
-	id = ctf_add_enum(cup->cu_ctfp, isroot, name);
+
+	(void) ctf_dwarf_get_type_size(cup, die, &size);
+
+	id = ctf_add_enum(cup->cu_ctfp, isroot, name, size);
 	ctf_dprintf("added enum %s (%d)\n", name, id);
 	if (name != NULL)
 		ctf_free(name, strlen(name) + 1);

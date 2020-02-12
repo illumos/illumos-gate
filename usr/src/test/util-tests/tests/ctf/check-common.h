@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef _CHECK_COMMON_H
@@ -87,6 +87,11 @@ typedef struct check_function_test {
 	const char **cft_args;
 } check_function_test_t;
 
+typedef struct check_size_test {
+	const char *cst_name;
+	size_t cst_size;
+} check_size_test_t;
+
 /*
  * Looks up each type and verifies that it matches the expected type.
  */
@@ -128,6 +133,11 @@ extern boolean_t ctftest_check_function(const char *, ctf_file_t *,
     const char *, uint_t, uint_t, const char **);
 extern boolean_t ctftest_check_fptr(const char *, ctf_file_t *,
     const char *, uint_t, uint_t, const char **);
+
+/*
+ * Check size of types.
+ */
+extern boolean_t ctftest_check_size(const char *, ctf_file_t *, size_t);
 
 /*
  * Determine whether or not we have a duplicate type or not based on its name.
