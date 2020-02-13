@@ -3742,6 +3742,8 @@ good:
 #endif
 
 	kmem_free(namlen, args->dircount);
+	if (ndata != data)
+		kmem_free(data, args->dircount);
 
 	resp->status = NFS3_OK;
 	vattr_to_post_op_attr(vap, &resp->resok.dir_attributes);
