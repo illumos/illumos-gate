@@ -40,7 +40,6 @@
 
 #ifdef _KERNEL
 #include <nfs/nfs4_kprot.h>
-#include <nfs/nfs4_drc.h>
 #include <sys/nvpair.h>
 #else
 #include <rpcsvc/nfs4_prot.h>
@@ -807,7 +806,7 @@ typedef struct nfs4_srv {
 	 */
 	rfs4_dss_path_t	*dss_pathlist;
 	/* Duplicate request cache */
-	rfs4_drc_t	*nfs4_drc;
+	struct rfs4_drc	*nfs4_drc;
 	/* nfsv4 server start time */
 	time_t rfs4_start_time;
 	/* Used to serialize lookups of clientids */
