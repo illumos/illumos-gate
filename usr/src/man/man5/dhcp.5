@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DHCP 5 "Aug 15, 2014"
+.TH DHCP 5 "Feb 13, 2020"
 .SH NAME
 dhcp \- Dynamic Host Configuration Protocol
 .SH DESCRIPTION
-.LP
 Dynamic Host Configuration Protocol (\fBDHCP\fR) enables host systems in a
 \fBTCP/IP\fR network to be configured automatically for the network as they
 boot. \fBDHCP\fR uses a client/server mechanism: servers store configuration
@@ -19,7 +18,6 @@ network services available to the client.
 This manual page provides a brief summary of the \fBDHCP\fR
 implementation.
 .SS "DHCP Client"
-.LP
 The DHCP client is implemented as background daemon,
 \fBdhcpagent\fR(1M).
 .LP
@@ -40,13 +38,11 @@ changing the tunables in the \fB/etc/default/dhcpagent\fR file. The daemon is
 controlled by the \fBifconfig\fR(1M) utility. Check the status of the daemon
 using the \fBnetstat\fR(1M) and \fBifconfig\fR(1M) commands.
 .SH SEE ALSO
-.LP
 \fBdhcpinfo\fR(1), \fBdhcpagent\fR(1M),
 \fBifconfig\fR(1M),
 \fBin.ndpd\fR(1M), \fBnetstat\fR(1M),
 \fBsyslog\fR(3C),
-\fBdhcp_network\fR(4), \fBdhcptab\fR(4), \fBdhcpsvc.conf\fR(4),
-\fBdhcp_inittab\fR(4), \fBndpd.conf\fR(4), \fBdhcp_modules\fR(5)
+\fBdhcp_inittab\fR(4), \fBndpd.conf\fR(4)
 .LP
 Alexander, S., and R. Droms. \fIRFC 2132, DHCP Options and BOOTP Vendor
 Extensions\fR. Silicon Graphics, Inc. Bucknell University. March 1997.

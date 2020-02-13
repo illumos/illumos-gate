@@ -4,17 +4,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DHCPAGENT 1M "Jun 30, 2017"
+.TH DHCPAGENT 1M "Feb 13, 2020"
 .SH NAME
 dhcpagent \- Dynamic Host Configuration Protocol (DHCP) client daemon
 .SH SYNOPSIS
-.LP
 .nf
 \fBdhcpagent\fR [\fB-a\fR] [ \fB-d\fR \fIn\fR] [\fB-f\fR] [\fB-v\fR]
 .fi
 
 .SH DESCRIPTION
-.LP
 \fBdhcpagent\fR implements the client half of the Dynamic Host Configuration
 Protocol \fB(DHCP)\fR for machines running illumos software.
 .sp
@@ -141,7 +139,6 @@ If the name does not start with a stock symbol and a comma, it is automatically
 prefixed with \fBSUNW\fR.
 .RE
 .SS "Messages"
-.LP
 The \fBdhcpagent\fR daemon writes information and error messages in five
 categories:
 .sp
@@ -211,7 +208,6 @@ to the system logger \fBsyslog\fR(3C) at the appropriate matching priority and
 with a facility identifier \fBLOG_DAEMON\fR. When \fBdhcpagent\fR is run with
 the \fB-f\fR option, all messages are directed to standard error.
 .SS "DHCP Events and User-Defined Actions"
-.LP
 If an executable (binary or script) is placed at \fB/etc/dhcp/eventhook\fR, the
 \fBdhcpagent\fR daemon will automatically run that program when any of the
 following events occur:
@@ -351,7 +347,6 @@ is terminated by a \fBSIGKILL\fR signal.
 .LP
 See EXAMPLES for an example event program.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -426,7 +421,6 @@ Provide verbose output useful for debugging site configuration problems.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRExample Event Program
 .sp
 .LP
@@ -454,7 +448,7 @@ case $2 in
      ;;
 "EXTEND")
     echo "Lease extended for " \e
-         `sbin/dhcpinfo -i $1 LeaseTim`" seconds"
+         `/sbin/dhcpinfo -i $1 LeaseTim`" seconds"
      ;;
 "EXTEND6")
     echo "New lease information obtained on $i"
@@ -823,7 +817,6 @@ Location of a DHCP event program.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -838,7 +831,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.LP
 \fBdhcpinfo\fR(1), \fBifconfig\fR(1M), \fBinit\fR(1M), \fBin.mpathd\fR(1M),
 \fBin.ndpd\fR(1M), \fBipadm\fR(1M), \fBnwamcfg\fR(1M), \fBsyslog\fR(3C),
 \fBnodename\fR(4), \fBresolv.conf\fR(4), \fBattributes\fR(5), \fBdhcp\fR(5)
@@ -863,7 +855,6 @@ Microsystems. February 2006.
 Droms, R. \fIRFC 3315, Dynamic Host Configuration Protocol for IPv6
 (DHCPv6)\fR. Cisco Systems. July 2003.
 .SH NOTES
-.LP
 The \fBdhcpagent\fR daemon can be used on IPv4 logical interfaces, just as with
 physical interfaces. When used on a logical interface, the daemon automatically
 constructs a Client ID value based on the DUID and IAID values, according to
