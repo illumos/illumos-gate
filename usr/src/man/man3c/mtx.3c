@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd "Jan 11, 2015"
+.Dd "February 14, 2020"
 .Dt MTX 3C
 .Os
 .Sh NAME
@@ -69,15 +69,15 @@ The following types of mutexes are valid and may be specified by the
 .Fa type
 argument:
 .Bl -tag -width Dv
-.It Sy mtx_plain
+.It Dv mtx_plain
 A simple, intra-process mutex.
-.It Sy mtx_timed
+.It Dv mtx_timed
 A simple, intra-process mutex, which allows timed locking operations.
-.It Sy mtx_plain | mtx_recursive
+.It Dv mtx_plain | mtx_recursive
 An intra-process mutex that may be acquired recursively by the same
 thread.
 It must be unlocked an equal number of times that it is locked.
-.It Sy mtx_timed | mtx_recursive
+.It Dv mtx_timed | mtx_recursive
 An intra-process mutex that supports timed locking operations and may be
 acquired recursively by the same thread.
 It must be unlocked an equal number of times that it is locked.
@@ -112,16 +112,16 @@ When they finally return, then they will have obtained the mutex
 .Fa mtx .
 .Pp
 Unless a lock of type
-.Sy mtx_recursive
+.Dv mtx_recursive
 was created, a thread calling
 .Fn mtx_lock
 when it already holds
 .Fa mtx
 will cause the thread to deadlock.
-Othewrise, the lock will be successfully taken again.
+Otherwise, the lock will be successfully taken again.
 However, a thread must call
 .Fn mtx_unlock
-for each time that it has acquried
+for each time that it has acquired
 .Fa mtx .
 .Pp
 The
@@ -135,7 +135,7 @@ if
 is locked, then it will not block and wait for
 .Fa mtx
 and instead return
-.Sy thrd_busy
+.Dv thrd_busy
 to indicate that the lock is currently held.
 .Pp
 The
@@ -149,7 +149,7 @@ The timeout in
 .Fa ts
 is treated as an absolute time in UTC to block until, measured based on
 the
-.Sy CLOCK_REALTIME
+.Dv CLOCK_REALTIME
 clock.
 .Pp
 The
@@ -164,44 +164,46 @@ It is an error to call
 on a mutex which the calling thread does not currently own.
 .Sh RETURN VALUES
 Upon successful completion, the function
-.Fn mtx_init returns
-.Sy thrd_success.
+.Fn mtx_init
+returns
+.Dv thrd_success .
 If there was insufficient memory to create the thread,
 it instead returns
-.Sy thrd_nomem .
+.Dv thrd_nomem .
 If any other error occurred, it returns
-.Sy thrd_error .
+.Dv thrd_error .
 .Pp
 The functions
 .Fn mtx_lock ,
 and
 .Fn mtx_unlock
 return
-.Sy thrd_success .
+.Dv thrd_success .
 If they were unable to successfully complete the operation, they instead
 return
-.Sy thrd_error .
+.Dv thrd_error .
 .Pp
 Upon successful completion, the
 .Fn mtx_timedlock
 function returns
-.Sy thrd_success .
+.Dv thrd_success .
 If the timeout is reached and the calling thread is unable to obtain the
 mutex, then
-.Sy thrd_timedout
-is returned .
+.Dv thrd_timedout
+is returned.
 If any other error occurs, then
-.Sy thrd_error is returned.
+.Dv thrd_error
+is returned.
 .Pp
 Upon successful completion, the
 .Fn mtx_trylock
 function returns
-.Sy thrd_success .
+.Dv thrd_success .
 If the thread was unable to obtain the mutex because another thread owns
 it, then it returns
-.Sy thrd_busy .
+.Dv thrd_busy .
 Otherwise, an error will have occurred and
-.Sy thrd_error
+.Dv thrd_error
 is returned.
 .Sh INTERFACE STABILITY
 .Sy Standard
