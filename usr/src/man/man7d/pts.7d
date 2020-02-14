@@ -1,14 +1,13 @@
 '\" te
+.\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"  Copyright 1992 Sun Microsystems
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PTS 7D "Aug 21, 1992"
+.TH PTS 7D "Feb 29, 2020"
 .SH NAME
 pts \- STREAMS pseudo-tty slave driver
 .SH DESCRIPTION
-.sp
-.LP
 The pseudo-tty subsystem simulates a terminal connection, where the master side
 represents the terminal and the slave represents the user process's special
 device end point. In order to use the pseudo-tty subsystem, a node for the
@@ -26,9 +25,10 @@ Only one open is allowed on a master device. Multiple opens are allowed on the
 slave device. After both the master and slave have been opened, the user has
 two file descriptors which are end points of a full duplex connection composed
 of two streams automatically connected at the master and slave drivers. The
-user may then push modules onto either side of the stream pair. The user needs
-to push the \fBptem\fR(7M) and \fBldterm\fR(7M) modules onto the slave side of
-the pseudo-terminal subsystem to get terminal semantics.
+user may then push modules onto either side of the stream pair. Unless compiled
+in XPG4v2 mode (see below), the consumer needs to push the \fBptem\fR(7M) and
+\fBldterm\fR(7M) modules onto the slave side of the pseudo-terminal subsystem
+to get terminal semantics.
 .sp
 .LP
 The master and slave drivers pass all messages to their adjacent queues. Only
@@ -48,14 +48,23 @@ device is not closed, the pseudo-tty subsystem will be available to another
 user to open the slave device. Since 0-length messages are used to indicate
 that the process on the slave side has closed and should be interpreted that
 way by the process on the master side, applications on the slave side should
-not write 0-length messages. If that occurs, the write returns 0, and the
-0-length message is discarded by the  \fBptem\fR module.
+not write 0-length messages. Unless the application is compiled in XPG4v2 mode
+(see below) then any 0-length messages written on the slave side will be
+discarded by the \fBptem\fR module.
 .sp
 .LP
 The standard STREAMS system calls can access the pseudo-tty devices. The slave
 devices support the \fBO_NDELAY\fR and \fBO_NONBLOCK\fR flags.
-.SH EXAMPLES
+.SH XPG4v2 MODE
+XPG4v2 requires that open of a slave pseudo terminal device provides the
+process with an interface that is identical to the terminal interface (without
+having to explicitly push any modules to achieve this). It also requires that
+0-length messages written on the slave side will be propagated to the master.
 .sp
+Experience has shown, however, that most software does not expect slave pty
+devices to operate in this manner and therefore this XPG4v2-compliant
+behaviour is only enabled in XPG4v2/SUS (see \fBstandards\fR(5)) mode.
+.SH EXAMPLES
 .in +2
 .nf
 int    fdm fds;
@@ -73,7 +82,6 @@ ioctl(fds, I_PUSH, "ldterm");     /* push ldterm*/
 .in -2
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/ptmx\fR\fR
@@ -92,10 +100,8 @@ slave devices (M = 0 -> N-1)
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBgrantpt\fR(3C), \fBptsname\fR(3C), \fBunlockpt\fR(3C), \fBldterm\fR(7M),
-\fBptm\fR(7D), \fBptem\fR(7M)
+\fBptm\fR(7D), \fBptem\fR(7M), \fBstandards\fR(5)
 .sp
 .LP
 \fISTREAMS Programming Guide\fR

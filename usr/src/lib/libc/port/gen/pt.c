@@ -24,10 +24,12 @@
  * Use is subject to license terms.
  */
 
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved	*/
 
 #pragma weak _ptsname = ptsname
 #pragma weak _grantpt = grantpt
@@ -131,6 +133,45 @@ unlockpt(int fd)
 		return (-1);
 
 	return (0);
+}
+
+/*
+ * XPG4v2 requires that open of a slave pseudo terminal device
+ * provides the process with an interface that is identical to
+ * the terminal interface.
+ *
+ * To satisfy this, in strict XPG4v2 mode, this routine also sends
+ * a message down the stream that sets a flag in the kernel module
+ * so that additional actions are performed when opening an
+ * associated slave PTY device. When this happens, modules are
+ * automatically pushed onto the stream to provide terminal
+ * semantics and those modules are then informed that they should
+ * behave in strict XPG4v2 mode which modifies their behaviour. In
+ * particular, in strict XPG4v2 mode, empty blocks will be sent up
+ * the master side of the stream rather than being suppressed.
+ *
+ * Most applications do not expect this behaviour so it is only
+ * enabled for programs compiled in strict XPG4v2 mode (see
+ * stdlib.h).
+ */
+int
+__unlockpt_xpg4(int fd)
+{
+	int ret;
+
+	if ((ret = unlockpt(fd)) == 0) {
+		struct strioctl istr;
+
+		istr.ic_cmd = PTSSTTY;
+		istr.ic_len = 0;
+		istr.ic_timout = 0;
+		istr.ic_dp = NULL;
+
+		if (ioctl(fd, I_STR, &istr) < 0)
+			ret = -1;
+	}
+
+	return (ret);
 }
 
 int

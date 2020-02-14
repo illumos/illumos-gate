@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Editor
@@ -41,7 +41,7 @@
 #include	<errno.h>
 #include	<paths.h>
 
-static const 	char	*msgtab[] =
+static const	char	*msgtab[] =
 {
 	"write or open on pipe failed",			/*  0 */
 	"warning: expecting `w'",			/*  1 */
@@ -161,7 +161,6 @@ static const 	char	*msgtab[] =
 
 extern  char	*optarg;	/* Value of argument */
 extern  int	optind;		/* Indicator of argument */
-extern	int __xpg4;	/* defined in xpg4.c; 0 if not xpg4-compiled program */
 
 struct  Fspec   {
 	char    Ftabs[22];
@@ -253,15 +252,15 @@ static int	fflg, shflg;
 static char	prompt[16] = "*";
 static int	rflg;
 static int	readflg;
-static int 	eflg;
-static int 	qflg = 0;
-static int 	ncflg;
-static int 	listn;
-static int 	listf;
-static int 	pflag;
-static int 	flag28 = 0; /* Prevents write after a partial read */
-static int 	save28 = 0; /* Flag whether buffer empty at start of read */
-static long 	savtime;
+static int	eflg;
+static int	qflg = 0;
+static int	ncflg;
+static int	listn;
+static int	listf;
+static int	pflag;
+static int	flag28 = 0; /* Prevents write after a partial read */
+static int	save28 = 0; /* Flag whether buffer empty at start of read */
+static long	savtime;
 static char	*name = "SHELL";
 static char	*rshell = "/usr/lib/rsh";
 static char	*val;
@@ -466,7 +465,7 @@ main(int argc, char **argv)
 			;
 		globp = "e";
 		fflg++;
-	} else 	/* editing with no file so set savtime to 0 */
+	} else	/* editing with no file so set savtime to 0 */
 		savtime = 0;
 	eflg++;
 	if ((tfname = tempnam("", "ea")) == NULL) {
@@ -3061,8 +3060,8 @@ static char stdtabs[] = {
 'f', 0, 1, 7, 11, 15, 19, 23, 0,		/* FORTRAN */
 'p', 0, 1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61, 0,
 						/* PL/I */
-'s', 0, 1, 10, 55, 0,    			/* SNOBOL */
-'u', 0, 1, 12, 20, 44, 0, 			/* UNIVAC ASM */
+'s', 0, 1, 10, 55, 0,				/* SNOBOL */
+'u', 0, 1, 12, 20, 44, 0,			/* UNIVAC ASM */
 0 };
 
 

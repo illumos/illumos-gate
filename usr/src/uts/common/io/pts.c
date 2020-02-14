@@ -25,7 +25,9 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
-
+/*
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ */
 
 /*
  * Pseudo Terminal Slave Driver.
@@ -106,6 +108,7 @@
 #include <sys/sysmacros.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
+#include <sys/strsubr.h>
 #include <sys/stat.h>
 #include <sys/errno.h>
 #include <sys/debug.h>
@@ -337,7 +340,6 @@ ptsopen(
 	DDBGP("ptsopen: p = %p\n", (uintptr_t)ptsp);
 	DDBG("ptsopen: state = %x\n", ptsp->pt_state);
 
-
 	ASSERT(ptsp->pt_minor == dminor);
 
 	if ((ptsp->pt_state & PTLOCK) || !(ptsp->pt_state & PTMOPEN)) {
@@ -347,7 +349,7 @@ ptsopen(
 	}
 
 	/*
-	 * if already, open simply return...
+	 * if already open, simply return...
 	 */
 	if (ptsp->pt_state & PTSOPEN) {
 		ASSERT(rqp->q_ptr == ptsp);
@@ -386,6 +388,9 @@ ptsopen(
 	mutex_exit(&ptsp->pt_lock);
 	mutex_exit(&ptms_lock);
 
+	if (ptsp->pt_state & PTSTTY)
+		STREAM(rqp)->sd_flag |= STRXPG4TTY;
+
 	qprocson(rqp);
 
 	/*
@@ -415,8 +420,6 @@ ptsopen(
 
 	return (0);
 }
-
-
 
 /*
  * Find the address to private data identifying the slave's write
