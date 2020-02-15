@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd June 02, 2016
+.Dd February 15, 2020
 .Dt MC_SETPROP 9E
 .Os
 .Sh NAME
@@ -113,7 +113,7 @@ and return
 Otherwise, a positive error should be returned to indicate failure.
 .Sh EXAMPLES
 The following examples shows how a device driver might structure its
-.Fn mc_setporp
+.Fn mc_setprop
 entry point.
 .Bd -literal
 #include <sys/mac_provider.h>
@@ -129,7 +129,7 @@ entry point.
  */
 
 static int
-exmple_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
+example_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_valsize, const void *pr_val)
 {
 	uint32_t new_mtu;

@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd Dec 20, 2016
+.Dd February 15, 2020
 .Dt USBA_HCDI_HUB_UPDATE 9E
 .Os
 .Sh NAME
@@ -75,7 +75,7 @@ If this function fails, the enumeration of this device will fail, the
 hub driver will not attach to this USB device, and all devices plugged
 into this hub will not be detected by the system.
 .Sh CONTEXT
-This functin is called from kernel context only.
+This function is called from kernel context only.
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn usba_hcdi_hub_update

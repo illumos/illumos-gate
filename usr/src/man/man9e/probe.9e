@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PROBE 9E "Nov 18, 1992"
+.TH PROBE 9E "February 15, 2020"
 .SH NAME
 probe \- determine if a non-self-identifying device is present
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -16,29 +15,24 @@ probe \- determine if a non-self-identifying device is present
 
 
 
-\fBstatic intprefix\fR\fBprobe\fR(\fBdev_info_t *\fR\fIdip\fR);
+\fBstatic int prefix\fR\fBprobe\fR(\fBdev_info_t *\fR\fIdip\fR);
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
 Solaris DDI specific (Solaris DDI). This entry point is required for
 non-self-identifying devices.  You must write it for such devices. For
-self-identifying devices,  \fBnulldev\fR(9F) should be specified in the
+self-identifying devices, \fBnulldev\fR(9F) should be specified in the
 \fBdev_ops\fR(9S) structure if a probe routine is not necessary.
 .SH ARGUMENTS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR \fR
 .ad
 .RS 8n
-Pointer to the device's  \fBdev_info\fR structure.
+Pointer to the device's \fBdev_info\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBprobe()\fR determines whether the device corresponding to \fIdip\fR actually
 exists and is a valid device for this driver. \fBprobe()\fR is called after
 \fBidentify\fR(9E) and before \fBattach\fR(9E) for a given \fIdip\fR. For
@@ -64,10 +58,9 @@ done in \fBattach\fR(9E).
 For a self-identifying device, this entry point is not necessary. However, if a
 device exists in both self-identifying and non-self-identifying forms, a
 \fBprobe()\fR routine can be provided to simplify the driver.
-\fBddi_dev_is_sid\fR(9F) can then be used to determine whether  \fBprobe()\fR
+\fBddi_dev_is_sid\fR(9F) can then be used to determine whether \fBprobe()\fR
 needs to do any work. See \fBddi_dev_is_sid\fR(9F) for an example.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDDI_PROBE_SUCCESS\fR \fR
@@ -104,8 +97,6 @@ If the instance is not present now, but may be present in the future.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattach\fR(9E), \fBidentify\fR(9E), \fBddi_dev_is_sid\fR(9F),
 \fBddi_map_regs\fR(9F), \fBddi_peek\fR(9F), \fBddi_poke\fR(9F),
 \fBnulldev\fR(9F), \fBdev_ops\fR(9S)

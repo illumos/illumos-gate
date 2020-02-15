@@ -44,12 +44,11 @@
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH COND_INIT 3C "Jun 5, 2007"
+.TH COND_INIT 3C "February 15, 2020"
 .SH NAME
 cond_init, cond_wait, cond_timedwait, cond_reltimedwait, cond_signal,
 cond_broadcast, cond_destroy \- condition variables
 .SH SYNOPSIS
-.LP
 .nf
 cc -mt [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
 #include <thread.h>
@@ -92,8 +91,6 @@ cc -mt [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
 
 .SH DESCRIPTION
 .SS "Initialize"
-.sp
-.LP
 Condition variables and mutexes should be global. Condition variables that are
 allocated in writable memory can synchronize threads among processes if they
 are shared by the cooperating processes (see \fBmmap\fR(2)) and are initialized
@@ -119,7 +116,7 @@ initialization.
 .LP
 The \fBcond_init()\fR function initializes the condition variable pointed to by
 \fIcvp\fR. A condition variable can have several different types of behavior,
-specified by \fItype\fR. No current type uses  \fIarg\fR although a future type
+specified by \fItype\fR. No current type uses \fIarg\fR although a future type
 may specify additional behavior parameters with \fIarg\fR. The \fItype\fR
 argument c take one of the following values:
 .sp
@@ -128,7 +125,7 @@ argument c take one of the following values:
 \fB\fBUSYNC_THREAD\fR\fR
 .ad
 .RS 17n
-The condition variable can synchronize  threads only in this process. This is
+The condition variable can synchronize threads only in this process. This is
 the default.
 .RE
 
@@ -199,8 +196,6 @@ cond_init(&cvp, USYNC_PROCESS, NULL); /* initialize cv with
 .in -2
 
 .SS "Condition Wait"
-.sp
-.LP
 The condition wait interface allows a thread to wait for a condition and
 atomically release the associated mutex that it needs to hold to check the
 condition. The thread waits for another thread to make the condition true and
@@ -211,7 +206,7 @@ The \fBcond_wait()\fR function atomically releases the mutex pointed to by
 \fImp\fR and causes the calling thread to block on the condition variable
 pointed to by \fIcvp\fR. The blocked thread may be awakened by
 \fBcond_signal()\fR, \fBcond_broadcast()\fR, or when interrupted by delivery of
-a  \fBUNIX\fR signal or a \fBfork()\fR.
+a \fBUNIX\fR signal or a \fBfork()\fR.
 .sp
 .LP
 The \fBcond_wait()\fR, \fBcond_timedwait()\fR, and \fBcond_reltimedwait()\fR
@@ -222,8 +217,6 @@ attribute and has been left irrecoverable by the mutex's last owner. The
 functions return the appropriate error value if they fail to internally
 reacquire the mutex.
 .SS "Condition Signaling"
-.sp
-.LP
 A condition signal allows a thread to unblock a single thread waiting on the
 condition variable, whereas a condition broadcast allows a thread to unblock
 all threads waiting on the condition variable.
@@ -248,8 +241,6 @@ associated with the condition variable during their waits. If, however,
 predictable scheduling behavior is required, then that mutex should be locked
 by the thread prior to calling \fBcond_signal()\fR or \fBcond_broadcast()\fR.
 .SS "Destroy"
-.sp
-.LP
 The condition destroy functions destroy any state, but not the space,
 associated with the condition variable.
 .sp
@@ -258,13 +249,9 @@ The \fBcond_destroy()\fR function destroys any state associated with the
 condition variable pointed to by \fIcvp\fR. The space for storing the condition
 variable is not freed.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, these functions return \fB0\fR. Otherwise, a
 non-zero value is returned to indicate the error.
 .SH ERRORS
-.sp
-.LP
 The \fBcond_timedwait()\fR and \fBcond_reltimedwait()\fR functions will fail
 if:
 .sp
@@ -313,7 +300,7 @@ mutex has not been acquired.
 \fB\fBEOWNERDEAD\fR\fR
 .ad
 .RS 19n
-The last owner of the mutex died while  holding the mutex, possibly leaving the
+The last owner of the mutex died while holding the mutex, possibly leaving the
 state it was protecting inconsistent. The mutex is now owned by the caller.
 .RE
 
@@ -342,11 +329,10 @@ to 1,000,000,000.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUse \fBcond_wait()\fR in a loop to test some condition.
 .sp
 .LP
-The \fBcond_wait()\fR functin is normally used in a loop testing some
+The \fBcond_wait()\fR function is normally used in a loop testing some
 condition, as follows:
 
 .sp
@@ -413,8 +399,6 @@ while (cond == FALSE) {
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -429,14 +413,10 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBfork\fR(2), \fBmmap\fR(2), \fBsetitimer\fR(2), \fBshmop\fR(2),
 \fBmutex_init\fR(3C), \fBsignal\fR(3C), \fBattributes\fR(5),
 \fBcondition\fR(5), \fBmutex\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
-.LP
 If more than one thread is blocked on a condition variable, the order in which
 threads are unblocked is determined by the scheduling policy. When each thread,
 unblocked as a result of a \fBcond_signal()\fR or \fBcond_broadcast()\fR,
