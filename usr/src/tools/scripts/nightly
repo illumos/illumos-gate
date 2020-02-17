@@ -191,7 +191,7 @@ function build {
 
 	echo "\n==== Build errors ($LABEL) ====\n" >> $mail_msg_file
 	egrep ":" $SRC/${INSTALLOG}.out |
-	    egrep -e "(^${MAKE}:|[ 	]error[: 	\n])" | \
+	    egrep -e "(^${MAKE}:|[ 	]error[: 	\n]|ld: guidance:)" | \
 	    egrep -v "Ignoring unknown host" | \
 	    egrep -v "cc .* -o error " | \
 	    egrep -v "warning" | tee $TMPDIR/build_errs${SUFFIX} \
