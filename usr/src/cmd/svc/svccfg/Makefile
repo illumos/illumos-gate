@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 MYPROG =	svccfg
@@ -92,7 +92,11 @@ CLOBBERFILES += svccfg_lex.c svccfg_grammar.c svccfg_grammar.h \
 
 SVCCFG_EXTRA_LIBS = -lxml2 -lscf -ll -luutil -lumem -lmd5 -lnvpair
 $(NOT_NATIVE)SVCCFG_EXTRA_LIBS += -ltecla
-NATIVE_LIBS += libxml2.so
+#
+# If no adjunct, then we'll already find /usr/lib via LDLIBS below.
+#
+$(NO_ADJUNCT_PROTO)NATIVE_LIBS += libxml2.so libl.so libumem.so \
+    libmd5.so libnvpair.so libc.so
 
 LIBSCF		= $(SRC)/lib/libscf
 LIBTECLA	= $(SRC)/lib/libtecla		# just for the header
