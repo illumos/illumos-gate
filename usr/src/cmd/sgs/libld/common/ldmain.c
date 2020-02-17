@@ -24,6 +24,8 @@
  *	  All Rights Reserved
  *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -480,8 +482,18 @@ ld_main(int argc, char **argv, Half mach)
 	dbg_cleanup();
 
 	/* If any ERR_GUIDANCE messages were issued, add a summary */
-	if (ofl->ofl_guideflags & FLG_OFG_ISSUED)
+	if (ofl->ofl_guideflags & FLG_OFG_ISSUED) {
 		ld_eprintf(ofl, ERR_GUIDANCE, MSG_INTL(MSG_GUIDE_SUMMARY));
+		ofl->ofl_guideflags &= ~FLG_OFG_ISSUED;
+	}
+
+	/*
+	 * One final check for any new warnings we found that should fail the
+	 * link edit.
+	 */
+	if ((ofl->ofl_flags & (FLG_OF_WARN | FLG_OF_FATWARN)) ==
+	    (FLG_OF_WARN | FLG_OF_FATWARN))
+		return (ld_exit(ofl));
 
 	/*
 	 * For performance reasons we don't actually free up the memory we've
