@@ -3,7 +3,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 
 ROUTEDPROG=	in.routed
 ROUTEDOBJS=	common.o if.o input.o main.o output.o parms.o radix.o \
@@ -43,7 +43,7 @@ CERRWARN +=	$(CNOWARN_UNINIT)
 # not linted
 SMATCH=off
 
-LDLIBS +=	-lxnet -lmd -lsocket
+LDLIBS +=	-lxnet -lmd
 CLEAN_FILES +=	$(ROUTEDOBJS) $(RTQUERYOBJS)
 CLOBBERFILES +=	$(ROUTEDPROG) $(RTQUERYPROG)
 #

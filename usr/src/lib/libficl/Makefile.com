@@ -12,7 +12,7 @@
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 
 LIBRARY=libficl-sys.a
 MAJOR = 4
@@ -41,7 +41,7 @@ CFLAGS64 += $(C_BIGPICFLAGS64)
 # for time being, till gcc 4.4.4 will be replaced.
 pics/vm.o := CERRWARN += -_gcc=-Wno-clobbered
 
-LDLIBS +=	-luuid -lz -lc -lm -lumem
+LDLIBS +=	-lumem -luuid -lz -lc -lm
 NATIVE_LIBS +=	libz.so
 
 HEADERS= $(FICLDIR)/ficl.h $(FICLDIR)/ficltokens.h ../ficllocal.h \

@@ -23,7 +23,7 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 
 include		../Makefile.cmd
 
@@ -58,8 +58,7 @@ CLEANFILES =	proctab.c y.tab.h y.tab.c awk.h awk.g.c		\
 		temp
 
 YFLAGS =	-d
-XLDLIBS5CC +=	-lm
-LDLIBS +=	-lm
+LDLIBS += -lm
 CPPFLAGS =      -I. $(CPPFLAGS.master)
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
 

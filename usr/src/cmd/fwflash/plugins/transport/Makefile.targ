@@ -21,7 +21,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/fwflash/plugins/transport
+# Copyright 2020 Joyent, Inc.
 #
 include $(SRC)/lib/Makefile.lib
 
@@ -48,7 +48,7 @@ CLEANFILES=	$(PLUGINS) $(POFILES) $(POFILE) $(LINTFILE) $(SLINKS)
 LIBS= $(DYNLIB)
 CFLAGS += $(C_PICFLAGS) 
 ROOTLIBDIR= $(ROOTUSRLIBFWFLASHIDF)
-LDLIBS		+= -ldevinfo -lc
+LDLIBS		+= -ldevinfo
 MAPFILES= ../common/mapfile-vers
 FILEMODE= 0755
 
@@ -65,8 +65,10 @@ $(SD_LIB):=     SONAME = $(SD_LIB)
 $(HERMON_LIB):=	MAPFILES += ../common/mapfile-vers-hermon
 $(SD_LIB):=	MAPFILES += ../common/mapfile-vers-plus
 
-$(SES_LIB):=	LDLIBS += -L$(ROOT)/usr/lib/scsi -lscsi -lses -lnvpair
-$(SD_LIB):=	LDLIBS += -L$(ROOT)/usr/lib/scsi -lscsi -lumem
+$(HERMON_LIB):=	LDLIBS += -lc
+$(TAVOR_LIB):=	LDLIBS += -lc
+$(SES_LIB):=	LDLIBS += -L$(ROOT)/usr/lib/scsi -lscsi -lses -lnvpair -lc
+$(SD_LIB):=	LDLIBS += -L$(ROOT)/usr/lib/scsi -lscsi -lumem -lc
 
 $(SES_LIB):=	DYNFLAGS += -R/usr/lib/scsi 
 $(SD_LIB):=	DYNFLAGS += -R/usr/lib/scsi 

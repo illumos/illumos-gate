@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 
 
 FSTYPE	  =	nfs
@@ -33,7 +33,7 @@ ATTMK	  =	$(TYPEPROG)
 include		../../Makefile.fstype
 
 LDLIBS   +=	-L$(ROOT)/usr/lib/nfs -R/usr/lib/nfs
-LDLIBS   +=	-lnsl -lmapid -ldtrace -lidmap
+$(TYPEPROG) := LDLIBS += -lnsl -lmapid -ldtrace -lidmap
 COMMON    =	nfs_resolve.o
 SRCS	  =	nfsmapid.c ../lib/nfs_resolve.c nfsmapid_server.c
 DSRC	  =	nfsmapid_dt.d

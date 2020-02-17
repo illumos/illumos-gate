@@ -22,7 +22,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 # Copyright 2019 Peter Tribble.
 #
 
@@ -137,7 +137,7 @@ SUNW_bridge_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm -lnvpair
 SUNW_mpxio_rcm.so := LDLIBS_MODULES += -ldevinfo
 LDLIBS_MODULES += -L$(ROOT)/lib -lrcm -lc
 
-LDLIBS += -lgen -lelf -lrcm -lnvpair -ldevinfo -lnsl -lsocket
+LDLIBS += -lrcm -lnvpair
 
 SRCS = $(RCM_SRC) $(COMMON_MOD_SRC)
 

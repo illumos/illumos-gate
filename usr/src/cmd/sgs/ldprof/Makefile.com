@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
@@ -49,6 +49,8 @@ CPPFLAGS=	-I. -I../common -I../../include \
 CFLAGS +=	$(C_PICFLAGS)
 
 SMOFF += indenting
+
+ZGUIDANCE =	-zguidance=nounused
 
 LDLIBS +=	$(ZRECORD) -lmapmalloc -lc $(DLLIB)
 

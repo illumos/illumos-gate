@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2020 Joyent, Inc.
 #
 
 LIBRARY=	audit_remote.a
@@ -33,7 +34,7 @@ LIBBSM=		$(SRC)/lib/libbsm/common
 include		$(SRC)/lib/Makefile.lib
 
 LIBS=		$(DYNLIB)
-LDLIBS		+= -lbsm -lsecdb -lc -lnsl -lsocket -lgss -lmtmalloc
+LDLIBS		+= -lmtmalloc -lbsm -lsecdb -lc -lnsl -lsocket -lgss
 
 CFLAGS		+= $(CCVERBOSE)
 CPPFLAGS	+= -D_REENTRANT -I$(LIBBSM)

@@ -23,7 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 
 TESTPROG = kwarndtest 
 
@@ -67,9 +67,10 @@ CPPFLAGS += -I../../lib/gss_mechs/mech_krb5/include \
 
 ktkt_warnd :=	MAPFILES =	$(MAPFILE.INT) $(MAPFILE.NGB)
 ktkt_warnd :=	LDFLAGS +=	$(KRUNPATH) $(MAPFILES:%=-M%)
+ktkt_warnd :=	LDLIBS +=	-lnsl
 
 LDFLAGS +=	$(KRUNPATH)
-LDLIBS +=	$(KMECHLIB) -lnsl
+LDLIBS +=	$(KMECHLIB)
 
 .KEEP_STATE:
 
