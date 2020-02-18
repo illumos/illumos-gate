@@ -27,18 +27,16 @@
 
 PROG= zpool
 OBJS= zpool_main.o zpool_vdev.o zpool_iter.o zpool_util.o
-SRCS= $(OBJS:%.o=%.c)
 POFILES=$(OBJS:%.o=%.po)
 POFILE= zpool.po
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
 include ../Makefile.ctf
 
 STATCOMMONDIR = $(SRC)/cmd/stat/common
 
 STAT_COMMON_OBJS = timestamp.o
-STAT_COMMON_SRCS = $(STAT_COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
-SRCS += $(STAT_COMMON_SRCS)
 
 LDLIBS += -lzfs -lnvpair -ldevid -lefi -ldiskmgt -luutil -lumem -lzutil \
 	-lm -lzpool
@@ -47,14 +45,9 @@ INCS += -I../../common/zfs -I../../uts/common/fs/zfs -I$(STATCOMMONDIR)
 INCS += -I../../lib/libzutil/common
 
 CSTD=	$(CSTD_GNU99)
-C99LMODE=	-Xc99=%all
 
-CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS)
+CPPFLAGS += $(INCS)
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
-
-# lint complains about unused _umem_* functions
-LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
-LINTFLAGS64 += -xerroff=E_NAME_DEF_NOT_USED2
 
 ROOTUSRSBINLINKS = $(PROG:%=$(ROOTUSRSBIN)/%)
 
@@ -78,8 +71,6 @@ $(POFILE): $(POFILES)
 
 clean:
 	$(RM) $(OBJS) $(STAT_COMMON_OBJS)
-
-lint:	lint_SRCS
 
 # Links from /usr/sbin to /sbin
 $(ROOTUSRSBINLINKS):
