@@ -430,7 +430,7 @@ user =
 
 [/opt/zfs-tests/tests/functional/cli_user/zpool_iostat]
 tests = ['zpool_iostat_001_neg', 'zpool_iostat_002_pos',
-    'zpool_iostat_003_neg']
+    'zpool_iostat_003_neg', 'zpool_iostat_004_pos']
 user =
 
 [/opt/zfs-tests/tests/functional/cli_user/zpool_list]
@@ -461,6 +461,9 @@ tests = ['exec_001_pos', 'exec_002_neg']
 
 [/opt/zfs-tests/tests/functional/features/async_destroy]
 tests = ['async_destroy_001_pos']
+
+[/opt/zfs-tests/tests/functional/fault]
+tests = ['zpool_status_-s']
 
 [/opt/zfs-tests/tests/functional/grow_pool]
 tests = ['grow_pool_001_pos']

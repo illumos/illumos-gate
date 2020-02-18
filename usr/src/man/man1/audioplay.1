@@ -3,17 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIOPLAY 1 "May 13, 2017"
+.TH AUDIOPLAY 1 "Feb 8, 2020"
 .SH NAME
 audioplay \- play audio files
 .SH SYNOPSIS
-.LP
 .nf
 \fBaudioplay\fR [\fB-iV\fR] [\fB-v\fR \fIvol\fR] [\fB-d\fR \fIdev\fR] [\fIfile\fR]...
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBaudioplay\fR utility copies the named audio files (or the standard input
 if no filenames are present) to the audio device. If no input file is specified
 and standard input is a tty, the program exits with an error message.
@@ -31,7 +29,6 @@ ignored. This allows, for instance, data sampled at 8012 Hz to be played on an
 audio device that only supports 8000 Hz. If the \fB-V\fR option is present,
 such deviations are flagged with warning messages.
 .SH OPTIONS
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -84,7 +81,7 @@ the audio device or when sample rate deviations are detected.
 .sp
 .ne 2
 .na
-\fB\fB\(mi\e?\fR\fR
+\fB\fB-?\fR\fR
 .ad
 .RS 11n
 \fIHelp\fR: Prints a command line usage message.
@@ -105,9 +102,8 @@ variable is consulted (see below).
 .RE
 
 .SH USAGE
-.LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBaudioplay\fR
-when encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
+when encountering files greater than or equal to 2 Gbyte (2^31 bytes).
 .SH ENVIRONMENT VARIABLES
 .ne 2
 .na
@@ -130,29 +126,10 @@ specified explicitly in the search path. If the \fBAUDIOPATH\fR variable is not
 set, only the current directory is searched.
 .RE
 
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Architecture	SPARC, x86
-_
-Interface Stability	Committed
-.TE
-
 .SH SEE ALSO
-.LP
 \fBaudioconvert\fR(1), \fBaudiorecord\fR(1),
-\fBattributes\fR(5), \fBlargefile\fR(5), \fBaudio\fR(7I)
+\fBlargefile\fR(5), \fBaudio\fR(7I)
 .SH BUGS
-.LP
 \fBaudioplay\fR currently supports a limited set of audio format conversions.
 If the audio file is not in a format supported by the audio device, it must
 first be converted. For example, to convert to voice format on the fly, use the

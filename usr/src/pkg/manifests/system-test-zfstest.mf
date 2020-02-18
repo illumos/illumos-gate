@@ -112,6 +112,7 @@ dir path=opt/zfs-tests/tests/functional/ctime
 dir path=opt/zfs-tests/tests/functional/delegate
 dir path=opt/zfs-tests/tests/functional/devices
 dir path=opt/zfs-tests/tests/functional/exec
+dir path=opt/zfs-tests/tests/functional/fault
 dir path=opt/zfs-tests/tests/functional/features
 dir path=opt/zfs-tests/tests/functional/features/async_destroy
 dir path=opt/zfs-tests/tests/functional/grow_pool
@@ -209,6 +210,7 @@ file path=opt/zfs-tests/include/default.cfg mode=0444
 file path=opt/zfs-tests/include/libtest.shlib mode=0444
 file path=opt/zfs-tests/include/math.shlib mode=0444
 file path=opt/zfs-tests/include/properties.shlib mode=0444
+file path=opt/zfs-tests/include/zpool_script.shlib mode=0444
 file path=opt/zfs-tests/runfiles/delphix.run mode=0444
 file path=opt/zfs-tests/runfiles/longevity.run mode=0444
 file path=opt/zfs-tests/runfiles/omnios.run mode=0444
@@ -2377,6 +2379,9 @@ file \
 file \
     path=opt/zfs-tests/tests/functional/cli_user/zpool_iostat/zpool_iostat_003_neg \
     mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_user/zpool_iostat/zpool_iostat_004_pos \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_user/zpool_list/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_user/zpool_list/setup mode=0555
 file \
@@ -2445,6 +2450,10 @@ file path=opt/zfs-tests/tests/functional/exec/exec_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/exec/exec_002_neg mode=0555
 file path=opt/zfs-tests/tests/functional/exec/mmap_exec mode=0555
 file path=opt/zfs-tests/tests/functional/exec/setup mode=0555
+file path=opt/zfs-tests/tests/functional/fault/cleanup mode=0555
+file path=opt/zfs-tests/tests/functional/fault/fault.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/fault/setup mode=0555
+file path=opt/zfs-tests/tests/functional/fault/zpool_status_-s mode=0555
 file \
     path=opt/zfs-tests/tests/functional/features/async_destroy/async_destroy_001_pos \
     mode=0555

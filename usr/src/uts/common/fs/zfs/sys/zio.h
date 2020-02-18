@@ -472,6 +472,9 @@ struct zio {
 	hrtime_t	io_queued_timestamp;
 	hrtime_t	io_target_timestamp;
 	hrtime_t	io_dispatched;	/* time I/O was dispatched to disk */
+	hrtime_t	io_delta;	/* vdev queue service delta */
+	hrtime_t	io_delay;	/* Device access time (disk or */
+					/* file). */
 	avl_node_t	io_queue_node;
 	avl_node_t	io_offset_node;
 	avl_node_t	io_alloc_node;
@@ -657,7 +660,7 @@ extern void zfs_ereport_send_interim_checksum(zio_cksum_report_t *report);
 extern void zfs_ereport_free_checksum(zio_cksum_report_t *report);
 
 /* If we have the good data in hand, this function can be used */
-extern void zfs_ereport_post_checksum(spa_t *spa, vdev_t *vd,
+extern int zfs_ereport_post_checksum(spa_t *spa, vdev_t *vd,
     const zbookmark_phys_t *zb, struct zio *zio, uint64_t offset,
     uint64_t length, const abd_t *good_data, const abd_t *bad_data,
     struct zio_bad_cksum *info);

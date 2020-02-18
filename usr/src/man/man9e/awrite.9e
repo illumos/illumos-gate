@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AWRITE 9E "Mar 28, 1997"
+.TH AWRITE 9E "February 15, 2020"
 .SH NAME
 awrite \- asynchronous write to a device
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/uio.h>
 #include <sys/aio_req.h>
@@ -16,17 +15,14 @@ awrite \- asynchronous write to a device
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
-\fBintprefix\fR\fBawrite\fR(\fBdev_t\fR \fIdev\fR, \fBstruct aio_req *\fR\fIaio_reqp\fR,
+\fBint prefix\fR\fBawrite\fR(\fBdev_t\fR \fIdev\fR, \fBstruct aio_req *\fR\fIaio_reqp\fR,
      \fBcred_t *\fR\fIcred_p\fR);
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
 Solaris \fBDDI \fRspecific (Solaris DDI). This entry point is optional. Drivers
-that do not support an  \fBawrite()\fR entry point should use  \fBnodev\fR(9F)
+that do not support an \fBawrite()\fR entry point should use \fBnodev\fR(9F)
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdev\fR\fR
@@ -41,7 +37,7 @@ Device number.
 \fB\fIaio_reqp\fR\fR
 .ad
 .RS 12n
-Pointer to the  \fBaio_req\fR(9S) structure that describes where the data is
+Pointer to the \fBaio_req\fR(9S) structure that describes where the data is
 stored.
 .RE
 
@@ -51,18 +47,16 @@ stored.
 \fB\fIcred_p\fR\fR
 .ad
 .RS 12n
-Pointer to the  credential structure.
+Pointer to the credential structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The driver's \fBawrite()\fR routine is called to perform an asynchronous write.
-\fBgetminor\fR(9F) can be used to  access the minor number component of the
-\fIdev\fR argument. \fBawrite()\fR may use the  credential structure pointed to
-by  \fIcred_p\fR to check for superuser access by calling  \fBdrv_priv\fR(9F).
-The  \fBawrite()\fR routine may also examine the  \fBuio\fR(9S) structure
-through the  \fBaio_req\fR structure pointer,  \fBaio_reqp\fR. \fBawrite()\fR
+\fBgetminor\fR(9F) can be used to access the minor number component of the
+\fIdev\fR argument. \fBawrite()\fR may use the credential structure pointed to
+by \fIcred_p\fR to check for superuser access by calling \fBdrv_priv\fR(9F).
+The \fBawrite()\fR routine may also examine the \fBuio\fR(9S) structure
+through the \fBaio_req\fR structure pointer, \fBaio_reqp\fR. \fBawrite()\fR
 must call \fBaphysio\fR(9F) with the \fBaio_req\fR pointer and a pointer to the
 driver's \fBstrategy\fR(9E) routine.
 .sp
@@ -71,20 +65,15 @@ No fields of the \fBuio\fR(9S) structure pointed to by \fBaio_req\fR, other
 than \fBuio_offset\fR or \fBuio_loffset\fR, may be modified for non-seekable
 devices.
 .SH RETURN VALUES
-.sp
-.LP
-The  \fBawrite()\fR routine should return   \fB0\fR for success, or the
+The \fBawrite()\fR routine should return  \fB0\fR for success, or the
 appropriate error number.
 .SH CONTEXT
-.sp
-.LP
 This function is called from user context only.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing the \fBawrite()\fR routine:
 .sp
 .LP
-The following is an example of an  \fBawrite()\fR routine:
+The following is an example of an \fBawrite()\fR routine:
 
 .sp
 .in +2
@@ -107,8 +96,6 @@ xxawrite(dev_t dev, struct aio_req *aio, cred_t *cred_p)
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBwrite\fR(2), \fBaiowrite\fR(3C), \fBaread\fR(9E), \fBread\fR(9E),
 \fBstrategy\fR(9E), \fBwrite\fR(9E), \fBanocancel\fR(9F), \fBaphysio\fR(9F),
 \fBddi_get_soft_state\fR(9F), \fBdrv_priv\fR(9F), \fBgetminor\fR(9F),
@@ -118,7 +105,5 @@ xxawrite(dev_t dev, struct aio_req *aio, cred_t *cred_p)
 .LP
 \fIWriting Device Drivers\fR
 .SH BUGS
-.sp
-.LP
 There is no way other than calling \fBaphysio\fR(9F) to accomplish an
 asynchronous write.

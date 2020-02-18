@@ -19,54 +19,13 @@
 . $STF_SUITE/tests/functional/cli_root/zpool_trim/zpool_trim.kshlib
 
 #
-# Get the actual on disk disk for the provided file.
+# Get the actual size on disk for the provided file.
 #
 function get_size_mb
 {
 	typeset rval=$(du -s "$1" | awk '{print $1}')
 	rval=$((rval * 2048))
 	echo -n "$rval"
-}
-
-#
-# Use mdb to get the approximate number of trim IOs issued for the pool.
-# This really is just used to ensure that trim IO has occured and is a
-# temporary solution until illumos supports zpool iostat histograms.
-#
-function get_illumos_trim_io
-{
-	typeset pool="${1-:$TESTPOOL}"
-	typeset spa
-	typeset vdevs
-	typeset total_trim
-	typeset v
-	typeset trimmed
-	typeset b
-
-	# Get vdevs for the pool
-	spa=$(mdb -ke '::spa' | awk -v pool=$pool '{if ($3 == pool) print $1}')
-	vdevs=$(mdb -ke "$spa::spa -v" | awk '{
-		if ($4 == "DESCRIPTION") {st=1; next}
-		if (st == 1) print $1
-	}')
-
-	# Get trim counts for each vdev
-	total_trim=0
-	for v in $vdevs
-	do
-		b=$(mdb -ke "$v::print vdev_t vdev_trim_bytes_done" | \
-		    awk '{print $3}')
-		trimmed=$(mdb -e "$b=E")
-		trimmed=$((trimmed / 4096))
-		total_trim=$((total_trim + trimmed))
-
-		b=$(mdb -ke "$v::print vdev_t vdev_autotrim_bytes_done" | \
-		    awk '{print $3}')
-		trimmed=$(mdb -e "$b=E")
-		trimmed=$((trimmed / 4096))
-		total_trim=$((total_trim + trimmed))
-	done
-	echo -n "$total_trim"
 }
 
 #
@@ -106,11 +65,7 @@ function verify_trim_io
 	typeset min_trim_ios=${3:-100}
 	typeset ios
 
-	if is_linux; then
-		ios=$(get_trim_io $pool $type)
-	else
-		ios=$(get_illumos_trim_io $pool $type)
-	fi
+	ios=$(get_trim_io $pool $type)
 
 	if [[ $ios -ge $min_trim_ios ]]; then
 		log_note "Issued $ios $type trim IOs for pool $pool"

@@ -839,6 +839,7 @@ vdev_queue_io_done(zio_t *zio)
 
 	vdev_queue_pending_remove(vq, zio);
 
+	zio->io_delta = gethrtime() - zio->io_timestamp;
 	vq->vq_io_complete_ts = gethrtime();
 
 	while ((nio = vdev_queue_io_to_issue(vq)) != NULL) {

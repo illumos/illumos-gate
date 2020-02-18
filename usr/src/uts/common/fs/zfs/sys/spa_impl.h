@@ -400,6 +400,14 @@ struct spa {
 		int spa_queued;
 	} spa_queue_stats[ZIO_PRIORITY_NUM_QUEUEABLE];
 
+	/*
+	 * The following two members diverge from OpenZFS. Upstream import
+	 * status is built around the Linux /proc fs. On illumos we use a kstat
+	 * to track import status. spa_imp_kstat_lock protects spa_imp_kstat.
+	 */
+	kmutex_t	spa_imp_kstat_lock;
+	struct kstat	*spa_imp_kstat;		/* kstat for import status */
+
 	/* arc_memory_throttle() parameters during low memory condition */
 	uint64_t	spa_lowmem_page_load;	/* memory load during txg */
 	uint64_t	spa_lowmem_last_txg;	/* txg window start */

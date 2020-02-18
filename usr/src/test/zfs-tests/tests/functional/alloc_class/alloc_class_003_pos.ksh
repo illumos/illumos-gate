@@ -14,7 +14,6 @@
 #
 # Copyright (c) 2017, Intel Corporation.
 # Copyright (c) 2018 by Delphix. All rights reserved.
-# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/tests/functional/alloc_class/alloc_class.kshlib
@@ -39,17 +38,17 @@ do
 	if [ "$type" = "mirror" ]; then
 		log_must zpool add $TESTPOOL special mirror \
 		    $CLASS_DISK0 $CLASS_DISK1 $CLASS_DISK2
-		log_must zpool clear $TESTPOOL $CLASS_DISK0
-		log_must zpool clear $TESTPOOL $CLASS_DISK1
-		log_must zpool clear $TESTPOOL $CLASS_DISK2
+		log_must zpool iostat -H $TESTPOOL $CLASS_DISK0
+		log_must zpool iostat -H $TESTPOOL $CLASS_DISK1
+		log_must zpool iostat -H $TESTPOOL $CLASS_DISK2
 	elif [ "$type" = "raidz" ]; then
 		log_must zpool add $TESTPOOL special mirror \
 		    $CLASS_DISK0 $CLASS_DISK1
-		log_must zpool clear $TESTPOOL $CLASS_DISK0
-		log_must zpool clear $TESTPOOL $CLASS_DISK1
+		log_must zpool iostat -H $TESTPOOL $CLASS_DISK0
+		log_must zpool iostat -H $TESTPOOL $CLASS_DISK1
 	else
 		log_must zpool add $TESTPOOL special $CLASS_DISK0
-		log_must zpool clear $TESTPOOL $CLASS_DISK0
+		log_must zpool iostat -H $TESTPOOL $CLASS_DISK0
 	fi
 
 	log_must zpool destroy -f $TESTPOOL

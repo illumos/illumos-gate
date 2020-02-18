@@ -11,8 +11,9 @@
 .\"
 .\"
 .\" Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright 2020 Peter Tribble.
 .\"
-.TH AUDIOCTL 1 "Mar 18, 2011"
+.TH AUDIOCTL 1 "Feb 8, 2020"
 .SH NAME
 audioctl - audio device control command line interface
 .SH SYNOPSIS
@@ -27,22 +28,27 @@ audioctl - audio device control command line interface
 
 .LP
 .nf
-\fBaudioctl\fR \fBshow-control\fR [\fB-v\fR] [\fB-d\fR \fIdevice\fB] [\fIcontrol\fR ...]
+\fBaudioctl\fR \fBshow-control\fR [\fB-v\fR] [\fB-d\fR \fIdevice\fR] [\fIcontrol\fR ...]
 .fi
 
 .LP
 .nf
-\fBaudioctl\fR \fBset-control\fR [\fB-v\fR] [\fB-d\fR \fIdevice\fB] \fIcontrol\fR \fIvalue\fR
+\fBaudioctl\fR \fBset-control\fR [\fB-v\fR] [\fB-d\fR \fIdevice\fR] \fIcontrol\fR \fIvalue\fR
 .fi
 
 .LP
 .nf
-\fBaudioctl\fR \fBsave-controls\fR [\fB-d\fR \fIdevice\fB] [\fB-f\fR] \fIfile\fR
+\fBaudioctl\fR \fBsave-controls\fR [\fB-d\fR \fIdevice\fR] [\fB-f\fR] \fIfile\fR
 .fi
 
 .LP
 .nf
-\fBaudioctl\fR \fBload-controls\fR [\fB-d\fR \fIdevice\fB] \fIfile\fR
+\fBaudioctl\fR \fBload-controls\fR [\fB-d\fR \fIdevice\fR] \fIfile\fR
+.fi
+
+.LP
+.nf
+\fBaudioctl\fR \fBhelp\fR
 .fi
 
 .SH DESCRIPTION
@@ -64,7 +70,7 @@ List all the audio devices on the system.
 .sp
 .ne 2
 .na
-\fBshow-device\fR [\fB-v\fR] [\fB-d\fR \fIdevice\fR] [\fBcontrol\fR ... ]
+\fBshow-device\fR [\fB-v\fR] [\fB-d\fR \fIdevice\fR]
 .ad
 .sp .6
 .RS 4n
@@ -76,7 +82,7 @@ will be displayed.
 .sp
 .ne 2
 .na
-\fBshow-control\fR [\fB-v\fR] [\fB-d\fR \fIdevice\fR]
+\fBshow-control\fR [\fB-v\fR] [\fB-d\fR \fIdevice\fR] [\fBcontrol\fR ... ]
 .ad
 .sp .6
 .RS 4n
@@ -89,7 +95,7 @@ the \fB-v\fR option is specified, then more detail will be displayed.
 .sp
 .ne 2
 .na
-\fBset-control\fR [\fB-v\fR] [\fB-d\fR \fIdevice\fB] \fIcontrol\fR \fIvalue\fR
+\fBset-control\fR [\fB-v\fR] [\fB-d\fR \fIdevice\fR] \fIcontrol\fR \fIvalue\fR
 .ad
 .sp .6
 .RS 4n
@@ -101,7 +107,7 @@ option is specified, then more verbose output be displayed.
 .sp
 .ne 2
 .na
-\fBsave-controls\fR [\fB-f\fR] [\fB-d\fR \fIdevice\fB] \fIfile\fR
+\fBsave-controls\fR [\fB-f\fR] [\fB-d\fR \fIdevice\fR] \fIfile\fR
 .ad
 .sp .6
 .RS 4n
@@ -113,13 +119,23 @@ or modify an existing file unless \fB-f\fR (force) is specified.
 .sp
 .ne 2
 .na
-\fBload-controls\fR [\fB-d\fR \fIdevice\fB] \fIfile\fR
+\fBload-controls\fR [\fB-d\fR \fIdevice\fR] \fIfile\fR
 .ad
 .sp .6
 .RS 4n
 Load previously saved control settings from a \fIfile\fR
 into a \fIdevice\fR (or all audio devices if not
 specified).
+.RE
+
+.sp
+.ne 2
+.na
+\fBhelp\fR
+.ad
+.sp .6
+.RS 4n
+Display the usage message.
 .RE
 
 .SH ENVIRONMENT VARIABLES
@@ -133,21 +149,7 @@ is not specified on the command line.  If this variable is not set,
 \fB/dev/audio\fR is used.
 .RE
 
-
 .SH ATTRIBUTES
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	See below.
-.TE
-.LP
 The \fBaudioctl\fR command and its subcommands are Committed.  The
 names of controls, their values, and device names are Uncommitted.
 The display output is intended for human consumption, and is Not An
@@ -156,4 +158,4 @@ Interface.  The format of the state files used by the
 Private.
 .SH SEE ALSO
 \fBaudioplay\fR(1), \fBaudiorecord\fR(1), \fBdsp\fR(7I),
-\fBmixer\fR(7I), \fBattributes\fR(5)
+\fBmixer\fR(7I)

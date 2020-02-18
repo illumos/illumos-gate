@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd Nov 26, 2017
+.Dd February 15, 2020
 .Dt USBA_HCDI_PIPE_OPEN 9E
 .Os
 .Sh NAME
@@ -125,7 +125,7 @@ closed.
 .Ss Pipe close specifics
 When a pipe is closed, the driver must clean up all of the resources
 that it allocated when opening the pipe.
-For non-periodic transfers, the host controller driver may assueme that there
+For non-periodic transfers, the host controller driver may assume that there
 are no outstanding transfers that need to be cleaned up.
 However, the same is not true for periodic pipes.
 .Pp

@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2017, Joyent, Inc.
 .\"
-.Dd Nov 26, 2017
+.Dd February 15, 2020
 .Dt MAC_CAPAB_TRANSCEIVER 9E
 .Os
 .Sh NAME
@@ -156,7 +156,7 @@ then the value of the capability structure is the following structure:
 .Bd -literal -offset indent
 typedef struct mac_capab_transceiver {
 	uint_t	mct_flags;
-	uint_t	mct_ntransceiveres;
+	uint_t	mct_ntransceivers;
 	int	(*mct_info)(void *driver, uint_t id,
 		    mac_transceiver_info_t *infop),
 	int	(*mct_read)(void *driver, uint_t id, uint_t page,
@@ -185,7 +185,7 @@ member to
 .It Sy mct_ntransceivers
 The value of
 .Sy mct_ntransceivers
-indicates that the number of transceivers present in the device.
+indicates the number of transceivers present in the device.
 For most devices, it is expected that this value will be set to one.
 However, some devices do support multiple transceivers and PHYs that
 show up behind a single logical MAC.
@@ -231,7 +231,7 @@ the functions described in the section
 After successfully calling all of the functions, the driver should
 return
 .Sy 0 .
-Othewrise, it should return the appropriate error number.
+Otherwise, it should return the appropriate error number.
 For a full list of error numbers, see
 .Xr Intro 2 .
 Common values are:

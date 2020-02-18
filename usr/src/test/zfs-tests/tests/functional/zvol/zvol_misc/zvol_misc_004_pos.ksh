@@ -28,6 +28,7 @@
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -54,7 +55,8 @@ function cleanup
 		safe_dumpadm $savedumpdev
 	fi
 
-	swap -l | grep -w $voldev > /dev/null 2>&1
+	swap -l | awk 'NR > 1 { print $1 }' | \
+	    grep "^$voldev\$" > /dev/null 2>&1
         if (( $? == 0 ));  then
 		log_must swap -d $voldev
 	fi

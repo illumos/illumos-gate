@@ -1,10 +1,10 @@
+#!/bin/ksh -p
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -18,25 +18,19 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+
 #
+# Copyright (c) 2016, 2017 by Intel Corporation. All rights reserved.
 #
-# Copyright (c) 1993 by Sun Microsystems, Inc.
-#
-# Copyright (c) 2018, Joyent, Inc.
-# Copyright 2020 Peter Tribble.
-#
-PROG= setfacl
 
-include ../Makefile.cmd
+. $STF_SUITE/include/libtest.shlib
+. $STF_SUITE/tests/functional/fault/fault.cfg
 
-LDLIBS += -lsec
+verify_runnable "global"
 
-.KEEP_STATE:
+cleanup_devices $DISKS
 
-all: $(PROG)
+zed_stop
+zed_cleanup resilver_finish-start-scrub.sh
 
-install: all $(ROOTPROG)
-
-clean:
-
-include ../Makefile.targ
+log_pass

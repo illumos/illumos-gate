@@ -1,25 +1,30 @@
 '\" te
 .\" \&.Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright (c) 2020 Peter Tribble.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETFACL 1 "Nov 5, 1994"
+.TH GETFACL 1 "Feb 8, 2020"
 .SH NAME
 getfacl \- display discretionary file information
 .SH SYNOPSIS
-.LP
 .nf
 \fBgetfacl\fR [\fB-ad\fR] \fIfile\fR...
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 For each argument that is a regular file, special file, or named pipe, the
 \fBgetfacl\fR utility displays the owner, the group, and the Access Control
 List (\fBACL\fR). For each directory argument, \fBgetfacl\fR displays the
 owner, the group, and the \fBACL\fR and/or the default \fBACL\fR. Only
 directories contain default \fBACL\fRs.
+.sp
+.LP
+The \fBgetfacl\fR utility will fail if executed on a file system that supports
+NFSv4 \fBACL\fRs.  See \fBacl\fR(5) for a description of the difference
+between the older POSIX-draft \fBACL\fRs and the newer NFSv4 \fBACL\fRs.  The
+\fBls\fR(1) utility, when used with the \fB-v\fR or \fB-V\fR options, will
+display \fBACL\fRs on all types of file system.
 .sp
 .LP
 The \fBgetfacl\fR utility may be executed on a file system that does not
@@ -30,8 +35,6 @@ With no options specified, \fBgetfacl\fR displays the filename, the file owner,
 the file group owner, and both the \fBACL\fR and the default \fBACL\fR, if it
 exists.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -54,8 +57,6 @@ Displays the filename, the file owner, the file group owner, and the default
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -67,26 +68,24 @@ The path name of a regular file, special file, or named pipe.
 .RE
 
 .SH OUTPUT
-.sp
-.LP
 The format for \fBACL\fR output is as follows:
 .sp
 .in +2
 .nf
-# file: filename	
-# owner: uid	
-# group: gid	
-user::perm	
-user:uid:perm	
-group::perm	
-group:gid:perm	
-mask:perm	
-other:perm	
-default:user::perm	
-default:user:uid:perm	
-default:group::perm	
-default:group:gid:perm	
-default:mask:perm	
+# file: filename
+# owner: uid
+# group: gid
+user::perm
+user:uid:perm
+group::perm
+group:gid:perm
+mask:perm
+other:perm
+default:user::perm
+default:user:uid:perm
+default:group::perm
+default:group:gid:perm
+default:mask:perm
 default:other:perm
 .fi
 .in -2
@@ -115,7 +114,7 @@ permissions that are granted to the specified users.
 .LP
 The \fBgroup\fR entry without a group \fBID\fR indicates the permissions that
 are granted to the file group owner. One or more additional group entries
-indicate the permissions that  are granted to the specified groups.
+indicate the permissions that are granted to the specified groups.
 .sp
 .LP
 The \fBmask\fR entry indicates the \fBACL\fR mask permissions. These are the
@@ -143,18 +142,17 @@ character \fB\(mi\fR\&. The \fBperm\fR is displayed in the following order:
 holder character appears.
 .sp
 .LP
-If  you use the \fBchmod\fR(1) command to change the file group owner
+If you use the \fBchmod\fR(1) command to change the file group owner
 permissions on a file with \fBACL\fR entries, both the file group owner
 permissions and the \fBACL\fR mask are changed to the new permissions. Be aware
 that the new \fBACL\fR mask permissions may change the effective permissions
 for additional users and groups who have \fBACL\fR entries on the file.
 .sp
 .LP
-In order to indicate that the \fBACL\fR mask  restricts an \fBACL\fR entry,
+In order to indicate that the \fBACL\fR mask restricts an \fBACL\fR entry,
 \fBgetfacl\fR displays an additional tab character, pound sign (\fB#\fR), and
 the actual permissions granted, following the entry.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRDisplaying file information
 .sp
 .LP
@@ -258,7 +256,6 @@ default:other::\|\(mi\|\(mi\|\(mi
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/passwd\fR\fR
@@ -277,8 +274,6 @@ group file
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -293,13 +288,10 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBchmod\fR(1), \fBls\fR(1), \fBsetfacl\fR(1), \fBacl\fR(2),
-\fBaclsort\fR(3SEC), \fBgroup\fR(4), \fBpasswd\fR(4), \fBattributes\fR(5)
+\fBaclsort\fR(3SEC), \fBgroup\fR(4), \fBpasswd\fR(4), \fBacl\fR(5),
+\fBattributes\fR(5)
 .SH NOTES
-.sp
-.LP
 The output from \fBgetfacl\fR is in the correct format for input to the
 \fBsetfacl\fR \fB-f\fR command. If the output from \fBgetfacl\fR is redirected
 to a file, the file may be used as input to \fBsetfacl\fR. In this way, a user

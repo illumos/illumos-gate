@@ -334,7 +334,7 @@ main(int argc, char *argv[])
 			(void) unlink(infile);
 
 		if (err == ECTF_CONVBKERR || err == ECTF_CONVNODEBUG) {
-			ctfconvert_fatal("%s", buf);
+			ctfconvert_fatal("%s\n", buf);
 		} else {
 			ctfconvert_fatal("CTF conversion failed: %s\n",
 			    ctf_errmsg(err));

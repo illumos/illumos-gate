@@ -1,14 +1,14 @@
 '\" te
 .\"  Copyright (c) 1992-1996 Competitive Automation, Inc.
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (c) 2020 Peter Tribble
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DHCPINFO 1 "May 15, 2009"
+.TH DHCPINFO 1 "Feb 13, 2020"
 .SH NAME
 dhcpinfo \- display values of parameters received through DHCP
 .SH SYNOPSIS
-.LP
 .nf
 \fBdhcpinfo\fR [\fB-c\fR] [\fB-i\fR \fIinterface\fR] [\fB-n\fR \fIlimit\fR] [\fB-v 4|6\fR] \fIcode\fR
 .fi
@@ -19,14 +19,11 @@ dhcpinfo \- display values of parameters received through DHCP
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBdhcpinfo\fR utility prints the \fBDHCP\fR-supplied value(s) of the
 parameter requested on the command line. The parameter can be identified either
 by its numeric code in the \fBDHCP\fR specification, or by its mnemonic
 identifier, as listed in \fBdhcp_inittab\fR(4). This command is intended to be
-used in command substitutions in the shell scripts invoked by \fBinit\fR(1M) at
-system boot. It first contacts the \fBDHCP\fR client daemon at system boot or
+used in command substitutions in the shell scripts invoked at system boot or
 in event scripts as described in \fBdhcpagent\fR(1M). It first contacts the
 DHCP client daemon \fBdhcpagent\fR(1M) to verify that \fBDHCP\fR has
 successfully completed on the requested interface. If \fBDHCP\fR has
@@ -41,8 +38,6 @@ Extensions\fR for more details on DHCPv4 parameters, and RFC 3315, Dynamic Host
 Configuration Protocol for IPv6 (DHCPv6), for more details on DHCPv6
 parameters.
 .SS "Output Format"
-.sp
-.LP
 The output from \fBdhcpinfo\fR consists of one or more lines of \fBASCII\fR
 text; the format of the output depends upon the requested parameter. The number
 of values returned per line and the total number of lines output for a given
@@ -81,8 +76,6 @@ T}	\fBDOMAIN\fR
 .TE
 
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -130,16 +123,14 @@ Limits the list of values displayed to \fIlimit\fR lines.
 .sp
 .ne 2
 .na
-\fB\fB-v\fR\fB4 | 6\fR\fR
+\fB\fB-v 4|6\fR\fR
 .ad
 .RS 16n
-Specifies the DHCP version to query. Use \fB-v4\fRfor DHCPv4 and \fB-v6\fR for
-DHCPv6.
+Specifies the DHCP version to query. Use \fB-v 4\fR for DHCPv4 and \fB-v 6\fR
+for DHCPv6.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -163,8 +154,6 @@ Mnemonic symbol for the requested \fBDHCP\fR parameter, as listed in
 .RE
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -214,8 +203,6 @@ System error (should never occur).
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -230,9 +217,7 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
-\fBdhcpagent\fR(1M), \fBifconfig\fR(1M), \fBinit\fR(1M), \fBdhcp_inittab\fR(4),
+\fBdhcpagent\fR(1M), \fBifconfig\fR(1M), \fBdhcp_inittab\fR(4),
 \fBattributes\fR(5)
 .sp
 .LP

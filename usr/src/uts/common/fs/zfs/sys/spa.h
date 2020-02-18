@@ -900,6 +900,12 @@ typedef struct spa_iostats {
 	kstat_named_t	autotrim_bytes_failed;
 } spa_iostats_t;
 
+extern int spa_import_progress_set_state(spa_t *, spa_load_state_t);
+extern int spa_import_progress_set_max_txg(spa_t *, uint64_t);
+extern int spa_import_progress_set_mmp_check(spa_t *, uint64_t);
+extern void spa_import_progress_add(spa_t *);
+extern void spa_import_progress_remove(spa_t *);
+
 /* Pool configuration locks */
 extern int spa_config_tryenter(spa_t *spa, int locks, void *tag, krw_t rw);
 extern void spa_config_enter(spa_t *spa, int locks, void *tag, krw_t rw);
@@ -1053,9 +1059,11 @@ extern void spa_history_log_internal_dd(dsl_dir_t *dd, const char *operation,
 /* error handling */
 struct zbookmark_phys;
 extern void spa_log_error(spa_t *spa, const struct zbookmark_phys *zb);
-extern void zfs_ereport_post(const char *class, spa_t *spa, vdev_t *vd,
+extern int zfs_ereport_post(const char *class, spa_t *spa, vdev_t *vd,
     const struct zbookmark_phys *zb, struct zio *zio, uint64_t stateoroffset,
     uint64_t length);
+extern boolean_t zfs_ereport_is_valid(const char *class, spa_t *spa, vdev_t *vd,
+    zio_t *zio);
 extern void zfs_post_remove(spa_t *spa, vdev_t *vd);
 extern void zfs_post_state_change(spa_t *spa, vdev_t *vd);
 extern void zfs_post_autoreplace(spa_t *spa, vdev_t *vd);

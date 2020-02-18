@@ -1428,6 +1428,7 @@ spa_unload(spa_t *spa)
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 	ASSERT(spa_state(spa) != POOL_STATE_UNINITIALIZED);
 
+	spa_import_progress_remove(spa);
 	spa_load_note(spa, "UNLOADING");
 
 	/*
@@ -2389,6 +2390,7 @@ spa_load(spa_t *spa, spa_load_state_t state, spa_import_type_t type)
 	int error;
 
 	spa->spa_load_state = state;
+	(void) spa_import_progress_set_state(spa, spa_load_state(spa));
 
 	gethrestime(&spa->spa_loaded_ts);
 	error = spa_load_impl(spa, type, &ereport);
@@ -2410,6 +2412,8 @@ spa_load(spa_t *spa, spa_load_state_t state, spa_import_type_t type)
 	}
 	spa->spa_load_state = error ? SPA_LOAD_ERROR : SPA_LOAD_NONE;
 	spa->spa_ena = 0;
+
+	(void) spa_import_progress_set_state(spa, spa_load_state(spa));
 
 	return (error);
 }
@@ -2634,6 +2638,9 @@ spa_activity_check(spa_t *spa, uberblock_t *ub, nvlist_t *config)
 	import_expire = gethrtime() + import_delay;
 
 	while (gethrtime() < import_expire) {
+		(void) spa_import_progress_set_mmp_check(spa,
+		    NSEC2SEC(import_expire - gethrtime()));
+
 		vdev_uberblock_load(rvd, ub, &mmp_label);
 
 		if (txg != ub->ub_txg || timestamp != ub->ub_timestamp ||
@@ -3000,6 +3007,10 @@ spa_ld_select_uberblock(spa_t *spa, spa_import_type_t type)
 		return (spa_vdev_err(rvd, VDEV_AUX_CORRUPT_DATA, ENXIO));
 	}
 
+	if (spa->spa_load_max_txg != UINT64_MAX) {
+		(void) spa_import_progress_set_max_txg(spa,
+		    (u_longlong_t)spa->spa_load_max_txg);
+	}
 	spa_load_note(spa, "using uberblock with txg=%llu",
 	    (u_longlong_t)ub->ub_txg);
 
@@ -3935,6 +3946,8 @@ spa_ld_mos_init(spa_t *spa, spa_import_type_t type)
 	if (error != 0)
 		return (error);
 
+	spa_import_progress_add(spa);
+
 	/*
 	 * Now that we have the vdev tree, try to open each vdev. This involves
 	 * opening the underlying physical device, retrieving its geometry and
@@ -4365,6 +4378,7 @@ spa_load_impl(spa_t *spa, spa_import_type_t type, char **ereport)
 		spa_config_exit(spa, SCL_CONFIG, FTAG);
 	}
 
+	spa_import_progress_remove(spa);
 	spa_load_note(spa, "LOADED");
 
 	return (0);
@@ -4425,6 +4439,7 @@ spa_load_best(spa_t *spa, spa_load_state_t state, uint64_t max_request,
 		 * from previous txgs when spa_load fails.
 		 */
 		ASSERT(spa->spa_import_flags & ZFS_IMPORT_CHECKPOINT);
+		spa_import_progress_remove(spa);
 		return (load_error);
 	}
 
@@ -4436,6 +4451,7 @@ spa_load_best(spa_t *spa, spa_load_state_t state, uint64_t max_request,
 
 	if (rewind_flags & ZPOOL_NEVER_REWIND) {
 		nvlist_free(config);
+		spa_import_progress_remove(spa);
 		return (load_error);
 	}
 
@@ -4478,6 +4494,7 @@ spa_load_best(spa_t *spa, spa_load_state_t state, uint64_t max_request,
 
 	if (state == SPA_LOAD_RECOVER) {
 		ASSERT3P(loadinfo, ==, NULL);
+		spa_import_progress_remove(spa);
 		return (rewind_error);
 	} else {
 		/* Store the rewind info as part of the initial load info */
@@ -4488,6 +4505,7 @@ spa_load_best(spa_t *spa, spa_load_state_t state, uint64_t max_request,
 		fnvlist_free(spa->spa_load_info);
 		spa->spa_load_info = loadinfo;
 
+		spa_import_progress_remove(spa);
 		return (load_error);
 	}
 }
@@ -4757,6 +4775,8 @@ spa_add_l2cache(spa_t *spa, nvlist_t *config)
 			    ZPOOL_CONFIG_VDEV_STATS, (uint64_t **)&vs, &vsc)
 			    == 0);
 			vdev_get_stats(vd, vs);
+			vdev_config_generate_stats(vd, l2cache[i]);
+
 		}
 	}
 }

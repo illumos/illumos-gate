@@ -29,6 +29,7 @@
 
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2020 Robert Mustacchi
  */
 
 /*
@@ -800,6 +801,40 @@ static const ctf_dwarf_fpmap_t ctf_dwarf_fpmaps[] = {
 	{ EM_NONE }
 };
 
+/*
+ * We want to normalize the type names that are used between compilers in the
+ * case of complex. gcc prefixes things with types like 'long complex' where as
+ * clang only calls them 'complex' in the dwarf even if in the C they are long
+ * complex or similar.
+ */
+static int
+ctf_dwarf_fixup_complex(ctf_cu_t *cup, ctf_encoding_t *enc, char **namep)
+{
+	const char *name;
+	*namep = NULL;
+
+	switch (enc->cte_format) {
+	case CTF_FP_CPLX:
+		name = "complex float";
+		break;
+	case CTF_FP_DCPLX:
+		name = "complex double";
+		break;
+	case CTF_FP_LDCPLX:
+		name = "complex long double";
+		break;
+	default:
+		return (0);
+	}
+
+	*namep = ctf_strdup(name);
+	if (*namep == NULL) {
+		return (ENOMEM);
+	}
+
+	return (0);
+}
+
 static int
 ctf_dwarf_float_base(ctf_cu_t *cup, Dwarf_Signed type, ctf_encoding_t *enc)
 {
@@ -896,7 +931,7 @@ ctf_dwarf_dwarf_base(ctf_cu_t *cup, Dwarf_Die die, int *kindp,
  * back to using the DWARF itself.
  */
 static int
-ctf_dwarf_parse_base(const char *name, int *kindp, ctf_encoding_t *enc,
+ctf_dwarf_parse_int(const char *name, int *kindp, ctf_encoding_t *enc,
     char **newnamep)
 {
 	char buf[256];
@@ -974,7 +1009,7 @@ ctf_dwarf_create_base(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp, int isroot,
     Dwarf_Off off)
 {
 	int ret;
-	char *name, *nname;
+	char *name, *nname = NULL;
 	Dwarf_Unsigned sz;
 	int kind;
 	ctf_encoding_t enc;
@@ -990,15 +1025,25 @@ ctf_dwarf_create_base(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp, int isroot,
 
 	bzero(&enc, sizeof (ctf_encoding_t));
 	enc.cte_bits = sz * 8;
-	if ((ret = ctf_dwarf_parse_base(name, &kind, &enc, &nname)) == 0) {
+	if ((ret = ctf_dwarf_parse_int(name, &kind, &enc, &nname)) == 0) {
 		ctf_free(name, strlen(name) + 1);
 		name = nname;
 	} else {
-		if (ret != EINVAL)
-			return (ret);
+		if (ret != EINVAL) {
+			goto out;
+		}
 		ctf_dprintf("falling back to dwarf for base type %s\n", name);
-		if ((ret = ctf_dwarf_dwarf_base(cup, die, &kind, &enc)) != 0)
-			return (ret);
+		if ((ret = ctf_dwarf_dwarf_base(cup, die, &kind, &enc)) != 0) {
+			goto out;
+		}
+
+		if (kind == CTF_K_FLOAT && (ret = ctf_dwarf_fixup_complex(cup,
+		    &enc, &nname)) != 0) {
+			goto out;
+		} else if (nname != NULL) {
+			ctf_free(name, strlen(name) + 1);
+			name = nname;
+		}
 	}
 
 	id = ctf_add_encoded(cup->cu_ctfp, isroot, name, &enc, kind);
@@ -1238,7 +1283,7 @@ ctf_dwarf_fixup_sou(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t base, boolean_t add)
 			return (ret);
 
 		if (tag != DW_TAG_member)
-			continue;
+			goto next;
 
 		if ((ret = ctf_dwarf_refdie(cup, memb, DW_AT_type, &tdie)) != 0)
 			return (ret);
@@ -1373,12 +1418,39 @@ ctf_dwarf_create_sou(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp,
 		return (ret);
 
 	/*
-	 * Members are in children. However, gcc also allows empty ones.
+	 * The children of a structure or union are generally members. However,
+	 * some compilers actually insert structs and unions there and not as a
+	 * top-level die. Therefore, to make sure we honor our pass 1 contract
+	 * of having all the base types, but not members, we need to walk this
+	 * for instances of a DW_TAG_union_type.
 	 */
 	if ((ret = ctf_dwarf_child(cup, die, &child)) != 0)
 		return (ret);
-	if (child == NULL)
-		return (0);
+
+	while (child != NULL) {
+		Dwarf_Half tag;
+		Dwarf_Die sib;
+
+		if ((ret = ctf_dwarf_tag(cup, child, &tag)) != 0)
+			return (ret);
+
+		switch (tag) {
+		case DW_TAG_union_type:
+		case DW_TAG_structure_type:
+			ret = ctf_dwarf_convert_type(cup, child, NULL,
+			    CTF_ADD_NONROOT);
+			if (ret != 0) {
+				return (ret);
+			}
+			break;
+		default:
+			break;
+		}
+
+		if ((ret = ctf_dwarf_sib(cup, child, &sib)) != 0)
+			return (ret);
+		child = sib;
+	}
 
 	return (0);
 }

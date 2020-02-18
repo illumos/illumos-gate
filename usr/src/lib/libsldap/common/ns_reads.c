@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -3595,6 +3596,133 @@ __ns_ldap_list_batch_end(ns_ldap_list_batch_t *batch)
 	return (rc);
 }
 
+typedef struct lookup_data {
+	const char *lkd_dn;
+	const char *lkd_service;
+	const char *lkd_filter;
+	const ns_cred_t *lkd_cred;
+	ns_conn_user_t *lkd_user;
+} lookup_data_t;
+
+/*
+ * This creates a service search descriptor that can be used to
+ * retrieve a specific DN by using the DN as the basedn with a search
+ * scope of 'base'. We don't use any service SSDs in this instance since
+ * they are intended to search specific locations/subtrees and filter the
+ * results, while here we are wanting to retrieve a specific entry.
+ */
+static int
+lookup_create_ssd(lookup_data_t *dn_data, ns_ldap_search_desc_t **descpp)
+{
+	ns_ldap_search_desc_t *dptr;
+
+	*descpp = NULL;
+
+	dptr = calloc(1, sizeof (ns_ldap_search_desc_t));
+	if (dptr == NULL)
+		return (NS_LDAP_MEMORY);
+
+	dptr->basedn = strdup(dn_data->lkd_dn);
+	dptr->scope = NS_LDAP_SCOPE_BASE;
+	dptr->filter = strdup(dn_data->lkd_filter);
+
+	if (dptr->basedn == NULL || dptr->filter == NULL) {
+		__ns_ldap_freeASearchDesc(dptr);
+		return (NS_LDAP_MEMORY);
+	}
+
+	*descpp = dptr;
+	return (NS_LDAP_SUCCESS);
+}
+
+static int
+lookup_dn(lookup_data_t *dn_data, const char **attrs,
+    ns_ldap_result_t **resultp, ns_ldap_error_t **errorp)
+{
+	ns_ldap_cookie_t	*cookie;
+	int			rc = 0;
+	int			flags = 0;
+
+	*errorp = NULL;
+	*resultp = NULL;
+
+	if (dn_data == NULL || dn_data->lkd_dn == NULL ||
+	    dn_data->lkd_dn[0] == '\0' || dn_data->lkd_filter == NULL)
+		return (NS_LDAP_INVALID_PARAM);
+
+	cookie = init_search_state_machine();
+	if (cookie == NULL)
+		return (NS_LDAP_MEMORY);
+
+	rc = __s_api_toFollowReferrals(flags, &cookie->followRef, errorp);
+	if (rc != NS_LDAP_SUCCESS)
+		goto out;
+
+	/* 1 for SSD, 1 for terminating NULL */
+	cookie->sdlist = calloc(2, sizeof (ns_ldap_search_desc_t *));
+	if (cookie->sdlist == NULL) {
+		rc = NS_LDAP_MEMORY;
+		goto out;
+	}
+
+	rc = lookup_create_ssd(dn_data, &cookie->sdlist[0]);
+	if (rc != NS_LDAP_SUCCESS)
+		goto out;
+
+	if (dn_data->lkd_service != NULL) {
+		/*
+		 * If a service was specified, set that on the cookie so
+		 * that search_state_machine() will properly map
+		 * attributes and objectclasses.
+		 */
+		cookie->service = strdup(dn_data->lkd_service);
+		if (cookie->service == NULL) {
+			rc = NS_LDAP_MEMORY;
+			goto out;
+		}
+	}
+
+	cookie->i_attr = attrs;
+	cookie->i_auth = dn_data->lkd_cred;
+	cookie->i_flags = 0;
+	cookie->i_filter = strdup(dn_data->lkd_filter);
+	if (cookie->i_filter == NULL) {
+		rc = NS_LDAP_MEMORY;
+		goto out;
+	}
+
+	/*
+	 * Actually perform the search. The return value is only used when
+	 * iterating through multiple results. Since we are searching with
+	 * a scope of base, we will always get at most one result entry,
+	 * we ignore the return value and look at err_rc to determine if
+	 * there were any errors.
+	 */
+	(void) search_state_machine(cookie, INIT, 0);
+	rc = cookie->err_rc;
+
+	if (rc != NS_LDAP_SUCCESS) {
+		ns_conn_user_t *user = dn_data->lkd_user;
+
+		if (user != NULL && user->ns_error != NULL) {
+			*errorp = user->ns_error;
+			user->ns_error = NULL;
+		} else {
+			*errorp = cookie->errorp;
+			cookie->errorp = NULL;
+		}
+	} else if (cookie->result != NULL) {
+		*resultp = cookie->result;
+		cookie->result = NULL;
+	} else {
+		rc = NS_LDAP_NOTFOUND;
+	}
+
+out:
+	delete_search_cookie(cookie);
+	return (rc);
+}
+
 /*
  * find_domainname performs one or more LDAP searches to
  * find the value of the nisdomain attribute associated with
@@ -3605,93 +3733,35 @@ static int
 find_domainname(const char *dn, char **domainname, const ns_cred_t *cred,
     ns_ldap_error_t **errorp, ns_conn_user_t *conn_user)
 {
-
-	ns_ldap_cookie_t	*cookie;
-	ns_ldap_search_desc_t	**sdlist;
-	ns_ldap_search_desc_t	*dptr;
-	int			rc;
+	lookup_data_t		ldata;
+	ns_ldap_result_t	*result;
 	char			**value;
-	int			flags = 0;
+	int			rc;
 
 	*domainname = NULL;
 	*errorp = NULL;
 
-	/* Initialize State machine cookie */
-	cookie = init_search_state_machine();
-	if (cookie == NULL) {
-		return (NS_LDAP_MEMORY);
-	}
-	cookie->conn_user = conn_user;
+	ldata.lkd_dn = dn;
+	ldata.lkd_service = NULL;
+	ldata.lkd_filter = _NIS_FILTER;
+	ldata.lkd_cred = cred;
+	ldata.lkd_user = conn_user;
 
-	/* see if need to follow referrals */
-	rc = __s_api_toFollowReferrals(flags,
-	    &cookie->followRef, errorp);
-	if (rc != NS_LDAP_SUCCESS) {
-		delete_search_cookie(cookie);
+	rc = lookup_dn(&ldata, nis_domain_attrs, &result, errorp);
+	if (rc != NS_LDAP_SUCCESS)
 		return (rc);
-	}
 
-	/* Create default service Desc */
-	sdlist = (ns_ldap_search_desc_t **)calloc(2,
-	    sizeof (ns_ldap_search_desc_t *));
-	if (sdlist == NULL) {
-		delete_search_cookie(cookie);
-		cookie = NULL;
-		return (NS_LDAP_MEMORY);
-	}
-	dptr = (ns_ldap_search_desc_t *)
-	    calloc(1, sizeof (ns_ldap_search_desc_t));
-	if (dptr == NULL) {
-		free(sdlist);
-		delete_search_cookie(cookie);
-		cookie = NULL;
-		return (NS_LDAP_MEMORY);
-	}
-	sdlist[0] = dptr;
+	value = __ns_ldap_getAttr(result->entry, _NIS_DOMAIN);
 
-	/* search base is dn */
-	dptr->basedn = strdup(dn);
-
-	/* search scope is base */
-	dptr->scope = NS_LDAP_SCOPE_BASE;
-
-	/* search filter is "nisdomain=*" */
-	dptr->filter = strdup(_NIS_FILTER);
-
-	cookie->sdlist = sdlist;
-	cookie->i_filter = strdup(dptr->filter);
-	cookie->i_attr = nis_domain_attrs;
-	cookie->i_auth = cred;
-	cookie->i_flags = 0;
-
-	/* Process search */
-	rc = search_state_machine(cookie, INIT, 0);
-
-	/* Copy domain name if found */
-	rc = cookie->err_rc;
-	if (rc != NS_LDAP_SUCCESS) {
-		if (conn_user != NULL && conn_user->ns_error != NULL) {
-			*errorp = conn_user->ns_error;
-			conn_user->ns_error = NULL;
-		} else {
-			*errorp = cookie->errorp;
-		}
-	}
-	if (cookie->result == NULL)
+	if (value != NULL && value[0] != NULL) {
+		*domainname = strdup(value[0]);
+		if (*domainname == NULL)
+			rc = NS_LDAP_MEMORY;
+	} else {
 		rc = NS_LDAP_NOTFOUND;
-	if (rc == NS_LDAP_SUCCESS) {
-		value = __ns_ldap_getAttr(cookie->result->entry,
-		    _NIS_DOMAIN);
-		if (value[0])
-			*domainname = strdup(value[0]);
-		else
-			rc = NS_LDAP_NOTFOUND;
 	}
-	if (cookie->result != NULL)
-		(void) __ns_ldap_freeResult(&cookie->result);
-	cookie->errorp = NULL;
-	delete_search_cookie(cookie);
-	cookie = NULL;
+
+	(void) __ns_ldap_freeResult(&result);
 	return (rc);
 }
 
@@ -4239,73 +4309,51 @@ static const char *dn2uid_attrs[] = {
 };
 
 int
-__ns_ldap_dn2uid(const char *dn, char **userID, const ns_cred_t *cred,
+__ns_ldap_dn2uid(const char *dn, char **userIDp, const ns_cred_t *cred,
     ns_ldap_error_t **errorp)
 {
-	ns_ldap_result_t	*result = NULL;
-	char		*filter, *userdata;
-	char		errstr[MAXERROR];
-	char		**value;
-	int		rc = 0;
-	size_t		len;
+	lookup_data_t		ldata;
+	ns_ldap_result_t	*result;
+	char			**value;
+	int			rc;
 
 	*errorp = NULL;
-	*userID = NULL;
+	*userIDp = NULL;
 	if ((dn == NULL) || (dn[0] == '\0'))
 		return (NS_LDAP_INVALID_PARAM);
 
-	len = strlen(UIDDNFILTER) + strlen(dn) + 1;
-	filter = malloc(len);
-	if (filter == NULL) {
-		return (NS_LDAP_MEMORY);
-	}
-	(void) snprintf(filter, len, UIDDNFILTER, dn);
-
-	len = strlen(UIDDNFILTER_SSD) + strlen(dn) + 1;
-	userdata = malloc(len);
-	if (userdata == NULL) {
-		free(filter);
-		return (NS_LDAP_MEMORY);
-	}
-	(void) snprintf(userdata, len, UIDDNFILTER_SSD, dn);
+	/*
+	 * Many LDAP servers do not support using the dn in a search
+	 * filter. As a result, we unfortunately cannot  use __ns_ldap_list()
+	 * to lookup the DN. Instead we perform a search with the baseDN
+	 * being the DN we are looking for with a scope of 'base' to
+	 * return the entry, as this should be supported by all LDAP servers.
+	 */
+	ldata.lkd_dn = dn;
 
 	/*
-	 * Unlike uid2dn, we DO want attribute mapping, so that
-	 * "uid" is mapped to/from samAccountName, for example.
+	 * Since we are looking up a user account by its DN, use the attribute
+	 * and objectclass mappings (if present) for the passwd service.
 	 */
-	rc = __ns_ldap_list("passwd", filter,
-	    __s_api_merge_SSD_filter,
-	    dn2uid_attrs, cred, 0,
-	    &result, errorp, NULL,
-	    userdata);
-	free(filter);
-	filter = NULL;
-	free(userdata);
-	userdata = NULL;
-	if (rc != NS_LDAP_SUCCESS)
-		goto out;
+	ldata.lkd_service = "passwd";
+	ldata.lkd_filter = UIDDNFILTER;
+	ldata.lkd_cred = cred;
+	ldata.lkd_user = NULL;
 
-	if (result->entries_count > 1) {
-		(void) sprintf(errstr,
-		    gettext("Too many entries are returned for %s"), dn);
-		MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, strdup(errstr),
-		    NS_LDAP_MEMORY);
-		rc = NS_LDAP_INTERNAL;
-		goto out;
-	}
+	rc = lookup_dn(&ldata, dn2uid_attrs, &result, errorp);
+	if (rc != NS_LDAP_SUCCESS)
+		return (rc);
 
 	value = __ns_ldap_getAttr(result->entry, _P_UID);
-	if (value == NULL || value[0] == NULL) {
+	if (value != NULL && value[0] != NULL) {
+		*userIDp = strdup(value[0]);
+		if (*userIDp == NULL)
+			rc = NS_LDAP_MEMORY;
+	} else {
 		rc = NS_LDAP_NOTFOUND;
-		goto out;
 	}
 
-	*userID = strdup(value[0]);
-	rc = NS_LDAP_SUCCESS;
-
-out:
 	(void) __ns_ldap_freeResult(&result);
-	result = NULL;
 	return (rc);
 }
 

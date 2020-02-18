@@ -4,12 +4,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GLD 9F "Aug 28, 2003"
+.TH GLD 9F "February 15, 2020"
 .SH NAME
 gld, gld_mac_alloc, gld_mac_free, gld_register, gld_unregister, gld_recv,
 gld_sched, gld_intr \- Generic LAN Driver service routines
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/gld.h>
 
@@ -52,11 +51,8 @@ gld_sched, gld_intr \- Generic LAN Driver service routines
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
 Solaris architecture specific (Solaris DDI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fImacinfo\fR \fR
@@ -102,8 +98,6 @@ Media link state.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBgld_mac_alloc\fR(\|) allocates a new \fBgld_mac_info\fR(9S) structure and
 returns a pointer to it. Some of the GLD-private elements of the structure may
 be initialized before \fBgld_mac_alloc\fR(\|) returns; all other elements are
@@ -264,10 +258,8 @@ The status of the media link is unknown.
 .sp
 .LP
 If a driver calls \fBgld_linkstate()\fR, it must also set the GLD_CAP_LINKSTATE
-bit  in the  gldm_capabilties field of the \fBgld_mac_info\fR(9S) structure.
+bit in the gldm_capabilities field of the \fBgld_mac_info\fR(9S) structure.
 .SH RETURN VALUES
-.sp
-.LP
 \fBgld_mac_alloc\fR(\|) returns a pointer to a new \fBgld_mac_info\fR(9S)
 structure.
 .sp
@@ -295,8 +287,6 @@ on failure.
 .LP
 \fBgld_intr\fR(\|) returns a value appropriate for an interrupt handler.
 .SH SEE ALSO
-.sp
-.LP
 \fBgld\fR(7D), \fBgld\fR(9E), \fBgld_mac_info\fR(9S), \fBgld_stats\fR(9S),
 \fBdlpi\fR(7P), \fBattach\fR(9E), \fBddi_add_intr\fR(9F)
 .sp

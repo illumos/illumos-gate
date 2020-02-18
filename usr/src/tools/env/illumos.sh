@@ -118,6 +118,11 @@ export ENABLE_SMB_PRINTING=
 #export BUILDPY2='#'
 #export BUILDPY3='#'
 
+# To disable building this workspace's tools in $SRC/tools with either Python2
+# or Python3 (but not both!), uncomment either of these lines:
+#export BUILDPY2TOOLS='#'
+#export BUILDPY3TOOLS='#'
+
 # Set console color scheme either by build type:
 #
 #export RELEASE_CONSOLE_COLOR="-DDEFAULT_ANSI_FOREGROUND=ANSI_COLOR_BLACK \

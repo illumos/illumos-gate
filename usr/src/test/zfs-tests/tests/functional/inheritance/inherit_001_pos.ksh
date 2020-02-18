@@ -26,6 +26,7 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -201,8 +202,13 @@ function get_mntpt_val #dataset src index
 
 			mnt_val=`get_prop mountpoint $dset`
 
-			mod_prop_val=${mnt_val##*/}
-			new_path="/"$mod_prop_val$new_path
+			if [[ $dset == $src ]]; then
+				new_path=$mnt_val$new_path
+			else
+				mod_prop_val=${mnt_val##*/}
+				new_path="/"$mod_prop_val$new_path
+			fi
+
 			dataset=$dset
 		done
 

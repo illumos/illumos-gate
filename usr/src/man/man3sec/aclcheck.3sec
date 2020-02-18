@@ -7,7 +7,6 @@
 .SH NAME
 aclcheck \- check the validity of an ACL
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lsec\fR [ \fIlibrary\fR... ]
 #include <sys/acl.h>
@@ -16,8 +15,6 @@ aclcheck \- check the validity of an ACL
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBaclcheck()\fR function checks the validity of an \fBACL\fR pointed to by
 \fIaclbufp.\fR The \fInentries\fR argument is the number of entries contained
 in the buffer. The \fIwhich\fR parameter returns the index of the first entry
@@ -115,13 +112,11 @@ exactly one \fBDEF_CLASS_OBJ\fR (default \fBACL\fR mask) entry.
 .ie t \(bu
 .el o
 If any of the above rules are violated, then the function fails with
-\fBerrno\fR set to  \fBEINVAL\fR.
+\fBerrno\fR set to \fBEINVAL\fR.
 .RE
 .SH RETURN VALUES
-.sp
-.LP
-If the \fBACL\fR is valid, \fBalcheck()\fR will return \fB0\fR. Otherwise
-\fBerrno\fR is set to \fBEINVAL\fR and return code is set to one of the
+If the \fBACL\fR is valid, \fBaclcheck()\fR will return \fB0\fR. Otherwise
+\fBerrno\fR is set to \fBEINVAL\fR and \fBaclcheck()\fR will return one of the
 following:
 .sp
 .ne 2
@@ -199,8 +194,6 @@ The system cannot allocate any memory. The \fBwhich\fR parameter returns
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -217,6 +210,4 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBacl\fR(2), \fBaclsort\fR(3SEC), \fBattributes\fR(5)

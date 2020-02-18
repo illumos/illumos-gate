@@ -62,9 +62,6 @@ SMATCH_ =
 SMATCH_on =
 SMATCH_off = -_smatch=off
 
-# smatch does not define __amd64 and __amd64__
-SMATCH_amd64=	-_smatch=-D__amd64 -_smatch=-D__amd64__
-
 # SMATCH_ARGS will bring in set of -Wno-* options.
 #CFLAGS +=	$(SMATCH_ARGS:%=-_smatch=%)
 CFLAGS +=	$(SMOFF:%=-_smatch=--disable=%)

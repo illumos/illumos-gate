@@ -24,8 +24,8 @@
 .\" Copyright (c) 2012, 2017 by Delphix. All rights reserved.
 .\" Copyright 2017 Nexenta Systems, Inc.
 .\" Copyright (c) 2017 Datto Inc.
-.\" Copyright (c) 2017 George Melikov. All Rights Reserved.
-.\" Copyright 2019 Joyent, Inc.
+.\" Copyright (c) 2018 George Melikov. All Rights Reserved.
+.\" Copyright 2020 Joyent, Inc.
 .\" Copyright (c) 2012 Cyril Plisko. All Rights Reserved.
 .\"
 .Dd August 30, 2019
@@ -117,10 +117,10 @@
 .Op Ar device Ns ...
 .Nm
 .Cm iostat
-.Op Fl v
+.Op Oo Fl lq Oc | Ns Fl rw
 .Op Fl T Sy u Ns | Ns Sy d
-.Op Fl gLP
-.Oo Ar pool Oc Ns ...
+.Op Fl ghHLnpPvy
+.Oo Oo Ar pool Ns ... Oc Ns | Ns Oo Ar pool vdev Ns ... Oc Ns | Ns Oo Ar vdev Ns ... Oc Oc
 .Op Ar interval Op Ar count
 .Nm
 .Cm labelclear
@@ -185,7 +185,7 @@
 .Ar pool newpool
 .Nm
 .Cm status
-.Op Fl DigLPtvx
+.Op Fl DigLpPstvx
 .Op Fl T Sy u Ns | Ns Sy d
 .Oo Ar pool Oc Ns ...
 .Op Ar interval Op Ar count
@@ -1607,25 +1607,48 @@ with no flags on the relevant target devices.
 .It Xo
 .Nm
 .Cm iostat
+.Op Oo Fl lq Oc | Ns Fl rw
 .Op Fl T Sy u Ns | Ns Sy d
-.Op Fl gLPv
-.Oo Ar pool Oc Ns ...
+.Op Fl ghHLnpPvy
+.Oo Oo Ar pool Ns ... Oc Ns | Ns Oo Ar pool vdev Ns ... Oc Ns | Ns Oo Ar vdev Ns ... Oc Oc
 .Op Ar interval Op Ar count
 .Xc
-Displays I/O statistics for the given pools.
+Displays I/O statistics for the given pools/vdevs.
+Physical I/Os may be observed via
+.Xr iostat 1 .
+If writes are located nearby, they may be merged into a single larger operation.
+Additional I/O may be generated depending on the level of vdev redundancy.
+To filter output, you may pass in a list of pools, a pool and list of vdevs
+in that pool, or a list of any vdevs from any pool.
+If no items are specified, statistics for every pool in the system are shown.
 When given an
 .Ar interval ,
 the statistics are printed every
 .Ar interval
 seconds until ^C is pressed.
-If no
-.Ar pool Ns s
-are specified, statistics for every pool in the system is shown.
+If
+.Fl n
+flag is specified the headers are displayed only once, otherwise they are
+displayed periodically.
 If
 .Ar count
 is specified, the command exits after
 .Ar count
 reports are printed.
+The first report printed is always the statistics since boot regardless of
+whether
+.Ar interval
+and
+.Ar count
+are passed.
+Also note that the units of
+.Sy K ,
+.Sy M ,
+.Sy G ...
+that are printed in the report are in base 1024.
+To get the raw values, use the
+.Fl p
+flag.
 .Bl -tag -width Ds
 .It Fl T Sy u Ns | Ns Sy d
 Display a time stamp.
@@ -1645,20 +1668,99 @@ Display vdev initialization status.
 Display vdev GUIDs instead of the normal device names.
 These GUIDs can be used in place of device names for the zpool
 detach/offline/remove/replace commands.
+.It Fl H
+Scripted mode.
+Do not display headers, and separate fields by a single tab instead of
+arbitrary space.
 .It Fl L
 Display real paths for vdevs resolving all symbolic links.
 This can be used to look up the current block device name regardless of the
-.Pa /dev/disk/
+.Pa /dev/dsk/
 path used to open it.
+.It Fl n
+Print headers only once when passed.
+.It Fl p
+Display numbers in parsable (exact) values.
+Time values are in nanoseconds.
 .It Fl P
 Display full paths for vdevs instead of only the last component of
 the path.
 This can be used in conjunction with the
 .Fl L
 flag.
+.It Fl r
+Print request size histograms for the leaf vdev's IO
+This includes histograms of individual IOs (ind) and aggregate IOs (agg).
+These stats can be useful for observing how well IO aggregation is working.
+Note that TRIM IOs may exceed 16M, but will be counted as 16M.
 .It Fl v
 Verbose statistics Reports usage statistics for individual vdevs within the
 pool, in addition to the pool-wide statistics.
+.It Fl y
+Omit statistics since boot.
+Normally the first line of output reports the statistics since boot.
+This option suppresses that first line of output.
+.Ar interval
+.It Fl w
+Display latency histograms:
+.Pp
+.Ar total_wait :
+Total IO time (queuing + disk IO time).
+.Ar disk_wait :
+Disk IO time (time reading/writing the disk).
+.Ar syncq_wait :
+Amount of time IO spent in synchronous priority queues.
+Does not include disk time.
+.Ar asyncq_wait :
+Amount of time IO spent in asynchronous priority queues.
+Does not include disk time.
+.Ar scrub :
+Amount of time IO spent in scrub queue.
+Does not include disk time.
+.It Fl l
+Include average latency statistics:
+.Pp
+.Ar total_wait :
+Average total IO time (queuing + disk IO time).
+.Ar disk_wait :
+Average disk IO time (time reading/writing the disk).
+.Ar syncq_wait :
+Average amount of time IO spent in synchronous priority queues.
+Does not include disk time.
+.Ar asyncq_wait :
+Average amount of time IO spent in asynchronous priority queues.
+Does not include disk time.
+.Ar scrub :
+Average queuing time in scrub queue.
+Does not include disk time.
+.Ar trim :
+Average queuing time in trim queue.
+Does not include disk time.
+.It Fl q
+Include active queue statistics.
+Each priority queue has both pending (
+.Ar pend )
+and active (
+.Ar activ )
+IOs.
+Pending IOs are waiting to be issued to the disk, and active IOs have been
+issued to disk and are waiting for completion.
+These stats are broken out by priority queue:
+.Pp
+.Ar syncq_read/write :
+Current number of entries in synchronous priority
+queues.
+.Ar asyncq_read/write :
+Current number of entries in asynchronous priority queues.
+.Ar scrubq_read :
+Current number of entries in scrub queue.
+.Ar trimq_write :
+Current number of entries in trim queue.
+.Pp
+All queue statistics are instantaneous measurements of the number of
+entries in the queues.
+If you specify an interval, the measurements will be sampled from the end of
+the interval.
 .El
 .It Xo
 .Nm
@@ -1732,12 +1834,12 @@ flag.
 .It Fl T Sy u Ns | Ns Sy d
 Display a time stamp.
 Specify
-.Fl u
+.Sy u
 for a printed representation of the internal representation of time.
 See
 .Xr time 2 .
 Specify
-.Fl d
+.Sy d
 for standard date format.
 See
 .Xr date 1 .
@@ -2022,7 +2124,7 @@ and automatically import it.
 .It Xo
 .Nm
 .Cm status
-.Op Fl DigLPtvx
+.Op Fl DigLpPstvx
 .Op Fl T Sy u Ns | Ns Sy d
 .Oo Ar pool Oc Ns ...
 .Op Ar interval Op Ar count
@@ -2055,23 +2157,33 @@ Display real paths for vdevs resolving all symbolic links.
 This can be used to look up the current block device name regardless of the
 .Pa /dev/disk/
 path used to open it.
+.It Fl p
+Display numbers in parsable (exact) values.
 .It Fl P
 Display full paths for vdevs instead of only the last component of
 the path.
 This can be used in conjunction with the
 .Fl L
 flag.
+.It Fl s
+Display the number of leaf VDEV slow IOs.
+This is the number of IOs that didn't complete in
+.Sy zio_slow_io_ms
+milliseconds (default 30 seconds).
+This does not necessarily mean the IOs failed to complete, just took an
+unreasonably long amount of time.
+This may indicate a problem with the underlying storage.
 .It Fl t
 Display vdev TRIM status.
 .It Fl T Sy u Ns | Ns Sy d
 Display a time stamp.
 Specify
-.Fl u
+.Sy u
 for a printed representation of the internal representation of time.
 See
 .Xr time 2 .
 Specify
-.Fl d
+.Sy d
 for standard date format.
 See
 .Xr date 1 .

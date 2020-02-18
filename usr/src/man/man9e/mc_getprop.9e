@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd November 15, 2016
+.Dd February 15, 2020
 .Dt MC_GETPROP 9E
 .Os
 .Sh NAME
@@ -145,7 +145,7 @@ example_m_getprop_private(example_t *ep, const char *pr_name, uint_t pr_valsize,
 	ASSERT(MUTEX_HELD(&ep->ep_lock));
 	if (strcmp(pr_name, example_priv_props[0] == 0) {
 		val = ep->ep_rx_itr;
-	} else if (strcmp(pr_name, exampe_priv_props[1] == 0) {
+	} else if (strcmp(pr_name, example_priv_props[1] == 0) {
 		val = ep->ep_tx_itr;
 	} else {
 		return (ENOTSUP);

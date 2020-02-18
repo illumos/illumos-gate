@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2017, Joyent, Inc.
 .\"
-.Dd September 22, 2017
+.Dd February 15, 2020
 .Dt MAC_REGISTER 9F
 .Os
 .Sh NAME
@@ -170,7 +170,7 @@ static char *example_priv_props[] = {
 };
 
 static mac_callbacks_t example_m_callbacks = {
-	.mc_callbacsk = MC_GETCAPAB | MC_SETPROP | MC_GETPROP | MC_PROPINFO |
+	.mc_callbacks = MC_GETCAPAB | MC_SETPROP | MC_GETPROP | MC_PROPINFO |
 	    MC_IOCTL,
 	.mc_start = example_m_start,
 	.mc_stop = example_m_stop,
@@ -203,7 +203,7 @@ example_register_mac(example_t *ep)
 	mac->m_min_sdu = 0;
 	mac->m_max_sdu = ep->ep_sdu;
 	mac->m_margin = VLAN_TAGSZ;
-	mac->m_priv_props = exmple_priv_props;
+	mac->m_priv_props = example_priv_props;
 
 	status = mac_register(mac, &ep->ep_mac_hdl);
 	mac_free(mac);

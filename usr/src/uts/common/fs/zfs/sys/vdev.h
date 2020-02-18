@@ -99,6 +99,7 @@ extern void vdev_deadman(vdev_t *vd);
 extern void vdev_xlate(vdev_t *vd, const range_seg64_t *logical_rs,
     range_seg64_t *physical_rs);
 
+extern void vdev_get_stats_ex(vdev_t *vd, vdev_stat_t *vs, vdev_stat_ex_t *vsx);
 extern void vdev_get_stats(vdev_t *vd, vdev_stat_t *vs);
 extern void vdev_clear_stats(vdev_t *vd);
 extern void vdev_stat_update(zio_t *zio, uint64_t psize);
@@ -173,6 +174,7 @@ extern uint64_t vdev_label_offset(uint64_t psize, int l, uint64_t offset);
 extern int vdev_label_number(uint64_t psise, uint64_t offset);
 extern nvlist_t *vdev_label_read_config(vdev_t *vd, uint64_t txg);
 extern void vdev_uberblock_load(vdev_t *, struct uberblock *, nvlist_t **);
+extern void vdev_config_generate_stats(vdev_t *vd, nvlist_t *nv);
 extern void vdev_label_write(zio_t *zio, vdev_t *vd, int l, abd_t *buf, uint64_t
     offset, uint64_t size, zio_done_func_t *done, void *private, int flags);
 
