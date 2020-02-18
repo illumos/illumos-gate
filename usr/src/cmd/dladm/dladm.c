@@ -9936,7 +9936,7 @@ do_create_overlay(int argc, char *argv[], const char *use)
 	if (encap == NULL)
 		die("missing required encapsulation plugin");
 
-	if (encap == NULL)
+	if (search == NULL)
 		die("missing required search plugin");
 
 	if (optind != (argc - 1))
