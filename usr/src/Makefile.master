@@ -27,9 +27,8 @@
 # Copyright 2015 Gary Mills
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 Toomas Soome <tsoome@me.com>
-# Copyright 2017 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2019, Joyent, Inc.
 # Copyright 2019 RackTop Systems.
 #
 
@@ -1013,9 +1012,7 @@ ZTEXT=		-ztext
 ZVERBOSE=	-zverbose
 ZASSERTDEFLIB=	-zassert-deflib
 ZGUIDANCE=	-zguidance
-# XXX temporarily disable this to get the SmartOS build working
-# ZFATALWARNINGS=	-zfatal-warnings
-ZFATALWARNINGS=
+ZFATALWARNINGS=	-zfatal-warnings
 
 GSHARED=	-G
 CCMT=		-mt

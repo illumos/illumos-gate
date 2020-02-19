@@ -23,15 +23,13 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2020 Joyent, Inc.
 #
 
 COBJS64 =	lx_librtld_db64.o
 
 include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
-
-DYNFLAGS +=	-Mmapfile-vers
 
 CLOBBERFILES = $(ROOTLIBDIR64)/$(DYNLIB)
 

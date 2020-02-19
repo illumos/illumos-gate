@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 LIBRARY=	libsmartsshd.a
@@ -33,7 +33,7 @@ SRCS =	$(OBJECTS:%.o=$(SRCDIR)/%.c)
 
 CPPFLAGS +=	-I$(SRCDIR) -D_REENTRANT -D_FILE_OFFSET_BITS=64
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -ldoor -lmd5
+LDLIBS +=	-lc -lmd5
 
 $(LINTLIB) :=	SRCS=	$(SRCDIR)/$(LINTSRC)
 

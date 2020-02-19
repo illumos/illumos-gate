@@ -22,6 +22,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2020 Joyent, Inc.
+#
 
 include ../../Makefile.cmd
 include ../../Makefile.cmd.64
@@ -62,7 +64,7 @@ LINTSRCS = rcapd_main.c \
 $(NOT_RELEASE_BUILD)CPPFLAGS	+= -DDEBUG
 CPPFLAGS			+= -DDEBUG_MSG
 CPPFLAGS			+= -I$(COMMON_DIR)
-LDLIBS			+= -lkstat -lproc -lproject -lzonecfg -lumem -lscf
+LDLIBS			+= -lkstat -lproc -lproject -lumem -lscf
 LDLIBS			+= $(EXTRA_LDLIBS)
 
 LINTFLAGS64		+= -u

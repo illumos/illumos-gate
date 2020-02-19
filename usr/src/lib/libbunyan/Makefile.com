@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2014 Joyent, Inc. All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
 
 LIBRARY =	libbunyan.a
@@ -21,7 +21,7 @@ USDT_PROVIDERS =	bunyan_provider.d
 include ../../Makefile.lib
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -lumem -lnvpair -lnsl
+LDLIBS +=	-lc -lumem -lnvpair
 CPPFLAGS +=	-I../common -I. -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 SRCDIR =	../common

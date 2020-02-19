@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2015 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 LIBRARY =	libvarpd_direct.a
@@ -21,7 +21,7 @@ include ../../../Makefile.lib
 include ../../Makefile.plugin
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lc -lumem -lnvpair -lnsl
+LDLIBS +=	-lc -lumem -lnvpair
 CPPFLAGS +=	-I../common
 
 C99MODE=	-xc99=%all

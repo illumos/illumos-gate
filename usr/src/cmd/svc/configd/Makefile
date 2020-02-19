@@ -81,7 +81,7 @@ ROOTSCRIPTFILE	= $(ROOTCMDDIR)/$(SCRIPTFILE)
 # Native variant (used in ../seed). We only need to set NATIVE_LIBS if
 # $(ADJUNCT_PROTO) is pointing outside of /usr/lib.
 #
-$(NO_ADJUNCT_PROTO)NATIVE_LIBS += libumem.so libc.so
+$(NATIVE_BUILD)NATIVE_LIBS += libumem.so libc.so
 $(NATIVE_BUILD)CC =	$(NATIVECC)
 $(NATIVE_BUILD)LD =	$(NATIVELD)
 $(NATIVE_BUILD)CFLAGS =	$(NATIVE_CFLAGS)

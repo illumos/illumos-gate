@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 LIBRARY = libdladm.a
@@ -38,7 +38,7 @@ include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-ldevinfo -lc -linetutil -lsocket -lscf -lrcm -lnvpair \
-		-lexacct -lnsl -lkstat -lpool -lvarpd
+		-lexacct -lkstat -lpool -lvarpd
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)

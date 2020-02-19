@@ -22,7 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 
 PROG	= cw
 
@@ -47,8 +47,7 @@ $(__SUNC)CFLAGS=	-xspace -Xa -xildoff -errtags=yes -errwarn=%all \
 $(__GNUC)LDLIBS +=	-Wl,-zassert-deflib=libc.so -lc
 $(__GNUC)LDFLAGS=	$(MAPFILE.NES:%=-Wl,-M%)
 $(__GNUC)ZASSERTDEFLIB = -Wl,-zassert-deflib
-# XXX disable to fix the build
-# $(__GNUC)ZFATALWARNINGS = -Wl,-zfatal-warnings
+$(__GNUC)ZFATALWARNINGS = -Wl,-zfatal-warnings
 $(__GNUC)ZGUIDANCE = -Wl,-zguidance
 LDFLAGS += -Wl,$(ZDIRECT)
 

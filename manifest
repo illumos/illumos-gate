@@ -1264,6 +1264,8 @@ f lib/amd64/libdevid.so.1 0755 root bin
 s lib/amd64/libdevid.so=libdevid.so.1
 f lib/amd64/libdevinfo.so.1 0755 root bin
 s lib/amd64/libdevinfo.so=libdevinfo.so.1
+f lib/amd64/libdhcpagent.so.1 0755 root bin
+s lib/amd64/libdhcpagent.so=libdhcpagent.so.1
 f lib/amd64/libdl.so.1 0755 root bin
 s lib/amd64/libdl.so=libdl.so.1
 f lib/amd64/libdladm.so.1 0755 root bin

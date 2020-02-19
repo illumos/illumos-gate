@@ -23,7 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 
 LIBRARY =	lx_librtld_db.a
 VERS	=	.1
@@ -49,7 +49,8 @@ UTSBASE	=	$(SRC)/uts
 #	brand plugin library can use to access a target process are the
 #	proc_service(3PROC) apis.
 #
-DYNFLAGS +=	$(VERSREF) -M../common/mapfile-vers
+MAPFILES = $(BRAND_SHARED)/librtld_db/common/mapfile-vers
+DYNFLAGS +=	$(VERSREF)
 LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lrtld_db
 CFLAGS +=	$(CCVERBOSE)
@@ -65,18 +66,16 @@ ROOTLIBDIR =	$(ROOT)/usr/lib/brand/lx
 ROOTLIBDIR64 =	$(ROOT)/usr/lib/brand/lx/$(MACH64)
 
 #
-# The top level Makefiles define define TEXT_DOMAIN.  But librtld_db.so.1
-# isn't internationalized and this library won't be either.  The only
-# messages that this library can generate are messages used for debugging
-# the operation of the library itself.
+# The top level Makefiles define TEXT_DOMAIN.  But librtld_db.so.1 isn't
+# internationalized and this library won't be either.  The only messages that
+# this library can generate are messages used for debugging the operation of the
+# library itself.
 #
 DTEXTDOM =
 
 .KEEP_STATE:
 
 all: $(LIBS)
-
-lint: lintcheck
 
 pics/%64.o:	../common/%.c
 		$(COMPILE.c) -D_ELF64 $(PICFLAGS) -o $@ $<

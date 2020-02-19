@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 PROG=		ipf ipfs ipmon ipnat ippool ipfstat
@@ -56,7 +56,7 @@ SRCS=		$(OBJSL:%.o=../%.c)
 include ../../../Makefile.cmd
 include ../../Makefile.ipf
 
-LDLIBS		+= $(LIBBPF) -luuid
+LDLIBS		+= $(LIBBPF)
 LDFLAGS		+= $(MAPFILE.NGB:%=-M%)
 
 CPPFLAGS	+= -I. -DIPFILTER_LOOKUP -DIPFILTER_LOG
@@ -64,12 +64,12 @@ CPPFLAGS	+= -I. -DIPFILTER_LOOKUP -DIPFILTER_LOG
 ipfstat.o	:=	CPPFLAGS += -DSTATETOP
 ipfstat		:=	LDLIBS += -lcurses
 
-ipf		:=	LDLIBS += -lsocket -lnsl
-ipftest		:=	LDLIBS += -lsocket -lnsl -lmd
-ipfstat		:=	LDLIBS += -lsocket -lnsl -lkvm -lelf
-ipmon		:=	LDLIBS += -lsocket -lnsl
-ipnat		:=	LDLIBS += -lsocket -lnsl -lkvm -lelf
-ippool		:=	LDLIBS += -lsocket -lnsl -lkvm -lelf
+ipf		:=	LDLIBS += -lsocket -lnsl -luuid
+ipftest		:=	LDLIBS += -lsocket -lnsl -lmd -luuid
+ipfstat		:=	LDLIBS += -lsocket -lnsl -lkvm -lelf -luuid
+ipmon		:=	LDLIBS += -lsocket -lnsl -luuid
+ipnat		:=	LDLIBS += -lsocket -lnsl -lkvm -lelf -luuid
+ippool		:=	LDLIBS += -lsocket -lnsl -lkvm -lelf -luuid
 
 CLEANFILES	+= $(OBJS)
 CLOBBERFILES	+= $(IPFPROG)
@@ -243,17 +243,15 @@ ippool_l.o: ../ippool_l.c $(COMMONIPF)/netinet/ip_pool.h ../ippool_l.h
 CLEANFILES += ../ippool_l.c ../ippool_l.h
 
 ipftest:	$(IPFTEST_OBJS) $(LIBIPF) $(MAPFILE.NGB)
-	$(LINK.c) $(ZIGNORE) -o ipftest $(IPFTEST_OBJS) $(LDLIBS)  
+	$(LINK.c) $(ZIGNORE) -o ipftest $(IPFTEST_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 clean:
 	-$(RM) $(CLEANFILES)
 
-lint: 	lint_SRCS
-
 #
 # NOTE: all rules must use relative paths otherwise absolute paths will be
-#       embedded into the binaries making them false positives and 
+#       embedded into the binaries making them false positives and
 #       reported by wsdiff
 #
 

@@ -20,7 +20,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2018 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 PROG= zoneadmd
@@ -35,7 +35,7 @@ OBJS= zoneadmd.o zcons.o zfd.o vplat.o log.o
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
 	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm -ltsnet -ltsol \
-	-linetutil -lproc -lscf -lppt
+	-linetutil -lscf -lppt
 
 CSTD= $(CSTD_GNU99)
 

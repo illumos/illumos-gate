@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2015 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 LIBRARY =	libvarpd_svp.a
@@ -34,7 +34,7 @@ LIBS =		$(DYNLIB)
 # functions and better to use that then compile list.o yet again
 # ourselves... probably.
 #
-LDLIBS +=	-lc -lumem -lnvpair -lsocket -lnsl -lavl \
+LDLIBS +=	-lc -lumem -lnvpair -lsocket -lavl \
 		-lcmdutils -lidspace -lbunyan
 CPPFLAGS +=	-I../common
 

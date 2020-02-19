@@ -53,7 +53,7 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
-SNMPLIBS = -lnetsnmp -lnetsnmpagent
+SNMPLIBS = -lnetsnmp -lnetsnmpagent -lnetsnmphelpers
 NATIVE_LIBS += libnetsnmp.so libnetsnmpagent.so
 
 LDLIBS += $(MACH_LDLIBS)

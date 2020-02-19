@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 include $(SRC)/cmd/Makefile.cmd
@@ -28,13 +28,6 @@ SRCS = $(PROGS:%=%.c) $(UTILS:%.o=%.c)
 PROGS32 = $(PROGS:%=%.32)
 PROGS64 = $(PROGS:%=%.64)
 
-runtests.32 :=	LDLIBS += -lgen
-runtests.64 :=	LDLIBS64 += -lgen
-
-LINTS = $(PROGS:%=%.ln)
-LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
-LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
-
 ROOTOPTDIR = $(ROOT)/opt/os-tests/tests/file-locking
 ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTDIR)/%) \
 	$(PROGS64:%=$(ROOTOPTDIR)/%)
@@ -43,15 +36,12 @@ all     :=      TARGET = all
 install :=      TARGET = install
 clean   :=      TARGET = clean
 clobber :=      TARGET = clobber
-lint    :=      TARGET = lint
 
 .KEEP_STATE:
 
 install: $(ROOTOPTPROGS)
 
 all: $(PROGS32) $(PROGS64)
-
-lint: $(LINTS)
 
 clean:
 	-rm $(PROGS32) $(PROGS64)
@@ -66,9 +56,6 @@ $(ROOTOPTDIR)/%: %
 
 $(ROOTOPTDIR)/%: %.ksh
 	$(INS.rename)
-
-%.ln: %.c
-	$(LINT.c) $< $(UTILS) $(LDLIBS)
 
 %.64.o: %.c
 	$(COMPILE64.c) $< -o $@
