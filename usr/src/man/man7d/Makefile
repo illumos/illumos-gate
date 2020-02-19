@@ -35,7 +35,6 @@ _MANFILES=	aac.7d		\
 		bge.7d		\
 		blkdev.7d	\
 		bnxe.7d		\
-		bscv.7d		\
 		ccid.7d		\
 		chxge.7d	\
 		console.7d	\
@@ -244,10 +243,8 @@ i386_MANFILES=	ahci.7d		\
 
 _MANLINKS=	1394.7d		\
 		allkmem.7d	\
-		bscbus.7d	\
 		fdc.7d		\
 		firewire.7d	\
-		i2bsc.7d	\
 		kmem.7d		\
 		lo0.7d		\
 		ticots.7d	\
@@ -259,9 +256,6 @@ sparc_MANLINKS=	drmach.7d
 
 MANFILES =	$(_MANFILES) $($(MACH)_MANFILES)
 MANLINKS =	$(_MANLINKS) $($(MACH)_MANLINKS)
-
-bscbus.7d	:= LINKSRC = bscv.7d
-i2bsc.7d	:= LINKSRC = bscv.7d
 
 drmach.7d	:= LINKSRC = dr.7d
 

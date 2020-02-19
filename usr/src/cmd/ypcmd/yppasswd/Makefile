@@ -21,7 +21,7 @@
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 
 NETYPPROG =	rpc.yppasswdd
 DEFAULTFILES =	yppasswdd.dfl
@@ -44,6 +44,8 @@ ROOTDIRS =	$(NETSVC) $(NETYP)
 LDLIBS +=	-lnsl -lnisdb -lc
 MAPFILES =	$(MAPFILE.INT) $(MAPFILE.NGB)
 LDFLAGS +=	$(MAPFILES:%=-M%)
+
+ZGUIDANCE =	-zguidance=nounused
 
 # Pick up includes from library
 CPPFLAGS += -I$(SRC)/lib/libnisdb/yptol
@@ -102,8 +104,6 @@ $(NETYP)/%: %
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_SRCS
 
 check: $(CHKMANIFEST)
 

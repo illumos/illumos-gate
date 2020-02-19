@@ -31,11 +31,11 @@ include $(SRC)/Makefile.master
 
 SUBDIRS= lib .WAIT envmon .WAIT \
 	frudata grover excalibur psvc littleneck daktari \
-	cherrystone lw2plus lw8 taco enchilada chicago blade mpxu ents \
+	cherrystone lw2plus lw8 taco enchilada chicago mpxu ents \
 	chalupa silverstone sebring schumacher seattle boston .WAIT
 
 MSGSUBDIRS=	lib frudata grover excalibur psvc littleneck daktari \
-	cherrystone lw2plus lw8 taco enchilada chicago blade envmon mpxu ents \
+	cherrystone lw2plus lw8 taco enchilada chicago envmon mpxu ents \
 	silverstone sebring
 
 all :=		TARGET= all

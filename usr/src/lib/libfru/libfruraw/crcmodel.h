@@ -27,11 +27,7 @@
 #ifndef	_CRCMODEL_H
 #define	_CRCMODEL_H
 
-#ifdef SOLARIS_UNIX
 #include <sys/types.h>
-#else
-typedef long uint32_t;
-#endif
 
 #ifdef __cplusplus
 extern "C" {

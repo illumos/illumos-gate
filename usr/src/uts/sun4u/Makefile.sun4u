@@ -174,7 +174,6 @@ IMPLEMENTATIONS		+= daktari
 IMPLEMENTATIONS		+= cherrystone
 IMPLEMENTATIONS		+= fjlite
 IMPLEMENTATIONS		+= schumacher
-IMPLEMENTATIONS		+= blade
 IMPLEMENTATIONS		+= boston
 IMPLEMENTATIONS		+= seattle
 IMPLEMENTATIONS		+= chicago
@@ -389,7 +388,6 @@ DRV_KMODS	+= rmcadm
 DRV_KMODS	+= rmclomv
 DRV_KMODS	+= sf
 DRV_KMODS	+= nxge
-DRV_KMODS	+= i2bsc
 DRV_KMODS	+= mem_cache
 
 #
@@ -457,7 +455,7 @@ CPU_KMODS	+= cheetah cheetahplus jalapeno serrano spitfire hummingbird
 #	sun4u 'TOD' Modules (/platform/.../kernel/tod):
 #
 TOD_KMODS	+= todds1287 todds1337 todmostek
-TOD_KMODS	+= todm5819 todblade todbq4802 todsg todopl
+TOD_KMODS	+= todm5819 todbq4802 todsg todopl
 TOD_KMODS	+= todm5819p_rmc
 
 #

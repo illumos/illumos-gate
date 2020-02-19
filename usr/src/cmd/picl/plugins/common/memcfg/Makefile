@@ -23,7 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/picl/plugins/common/memcfg/Makefile
+# Copyright 2020 Joyent, Inc.
 #
 LIBRARY=	libpiclmemcfg.a
 VERS=		.1
@@ -46,13 +46,7 @@ CLEANFILES=	$(LINTOUT) $(LINTLIB)
 CPPFLAGS +=	-I$(SRC)/uts/sun4u/sys -I$(SRC)/cmd/picl/plugins/common/memcfg
 CFLAGS +=	$(CCVERBOSE) $(C_PICFLAGS)
 
-LDLIBS +=	-L$(SRC)/lib/libpicltree/$(MACH)
-LDLIBS +=	-L../devtree
-LDLIBS +=	-L$(ROOT)/usr/lib/picl/plugins
-LDLIBS +=	-lc -lpicltree -lpicldevtree -lnvpair
-$(SPARC_BLD)LDLIBS +=	-R/usr/platform/\$$PLATFORM/lib/picl/plugins \
-			-R/usr/platform/sun4u/lib/picl/plugins
-LDLIBS +=	-R/usr/lib/picl/plugins
+LDLIBS +=	-lc -lpicltree -lnvpair
 
 CLOBBERFILES += $(LIBLINKS)
 

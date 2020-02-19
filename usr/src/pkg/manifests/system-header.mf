@@ -132,7 +132,6 @@ $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-CP3010/include
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T12 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Netra-T4 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,SPARC-Enterprise group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Serverblade1 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-100 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1000 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1500 group=sys
@@ -1967,8 +1966,6 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Netra-T12/include \
 $(sparc_ONLY)link path=usr/platform/SUNW,Netra-T4/include \
     target=../sun4u/include
 $(sparc_ONLY)link path=usr/platform/SUNW,SPARC-Enterprise/include \
-    target=../sun4u/include
-$(sparc_ONLY)link path=usr/platform/SUNW,Serverblade1/include \
     target=../sun4u/include
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-100/include \
     target=../sun4u/include

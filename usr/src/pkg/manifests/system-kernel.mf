@@ -127,10 +127,6 @@ driver name=arp perms="arp 0666 root sys"
 driver name=bl perms="* 0666 root sys"
 driver name=bridge clone_perms="bridge 0666 root sys" \
     policy="read_priv_set=net_rawaccess write_priv_set=net_rawaccess"
-$(sparc_ONLY)driver name=bscbus alias=SUNW,bscbus
-$(i386_ONLY)driver name=bscbus alias=SVI0101
-$(sparc_ONLY)driver name=bscv alias=SUNW,bscv perms="* 0644 root sys"
-$(i386_ONLY)driver name=bscv
 driver name=clone
 driver name=cn perms="* 0620 root tty"
 driver name=conskbd perms="kbd 0666 root sys"
@@ -339,8 +335,6 @@ file path=kernel/drv/$(ARCH64)/aggr group=sys
 file path=kernel/drv/$(ARCH64)/arp group=sys
 file path=kernel/drv/$(ARCH64)/bl group=sys
 file path=kernel/drv/$(ARCH64)/bridge group=sys
-$(i386_ONLY)file path=kernel/drv/$(ARCH64)/bscbus group=sys
-$(i386_ONLY)file path=kernel/drv/$(ARCH64)/bscv group=sys
 file path=kernel/drv/$(ARCH64)/clone group=sys
 file path=kernel/drv/$(ARCH64)/cn group=sys
 file path=kernel/drv/$(ARCH64)/conskbd group=sys
@@ -422,8 +416,6 @@ file path=kernel/drv/aggr.conf group=sys
 file path=kernel/drv/arp.conf group=sys
 file path=kernel/drv/bl.conf group=sys
 file path=kernel/drv/bridge.conf group=sys
-$(i386_ONLY)file path=kernel/drv/bscbus.conf group=sys
-$(i386_ONLY)file path=kernel/drv/bscv.conf group=sys
 file path=kernel/drv/clone.conf group=sys
 file path=kernel/drv/cn.conf group=sys
 file path=kernel/drv/conskbd.conf group=sys
@@ -627,8 +619,6 @@ file path=usr/kernel/drv/$(ARCH64)/signalfd group=sys
 file path=usr/kernel/drv/signalfd.conf group=sys
 $(sparc_ONLY)file path=usr/share/man/man1m/monitor.1m
 $(sparc_ONLY)file path=usr/share/man/man1m/obpsym.1m
-# On SPARC driver/bscv is Serverblade1 specific, and in system/kernel/platform
-# We keep the manual page generic
 $(sparc_ONLY)file path=usr/share/man/man7d/dad.7d
 $(i386_ONLY)file path=usr/share/man/man7d/smbios.7d
 # Sadly vuid mouse support is in different packages on different platforms

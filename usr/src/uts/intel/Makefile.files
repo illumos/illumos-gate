@@ -23,6 +23,7 @@
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2019 Joyent, Inc.
 # Copyright 2018 Nexenta Systems, Inc.
+# Copyright 2019 Peter Tribble.
 #
 
 #
@@ -153,8 +154,6 @@ ARCMSR_OBJS += arcmsr.o
 ATA_OBJS += $(GHD_OBJS) ata_blacklist.o ata_common.o ata_disk.o \
 	ata_dma.o atapi.o atapi_fsm.o ata_debug.o \
 	sil3xxx.o
-BSCBUS_OBJS += bscbus.o
-BSCV_OBJS += bscv.o
 CMDK_OBJS += cmdk.o
 CMLB_OBJS += cmlb.o
 CPUNEX_OBJS += cpunex.o

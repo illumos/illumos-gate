@@ -53,6 +53,8 @@ CLEANFILES += ../common/smb_tables.c
 CPPFLAGS += -I../common -I$(COMMON_SRCDIR)
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -ldevinfo -lc
+CFLAGS += $(C_BIGPICFLAGS)
+CFLAGS64 += $(C_BIGPICFLAGS64)
 
 $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 

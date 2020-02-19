@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 DEFAULTFILES =	cron.dfl
@@ -135,16 +135,14 @@ $(ROOTXPG6BIN)/crontab :=	FILEMODE = 04555
 $(ROOTXPG4BIN)/crontab :=	FILEMODE = 04555
 $(ROOTUSRSBIN)/cron :=		FILEMODE = 0555
 
-LDLIBS +=	-lbsm
-
-at :=		LDLIBS += -lproject -lsecdb
-at.xpg4 :=	LDLIBS += -lproject -lsecdb
-atq :=		LDLIBS += -lsecdb
-atrm :=		LDLIBS += -lsecdb
-cron :=		LDLIBS += -lpam -lproject -lcontract -lzoneinfo -lcustr
-crontab :=	LDLIBS += -lsecdb -lpam -lzoneinfo -lcustr
-crontab.xpg6 :=	LDLIBS += -lsecdb -lpam -lzoneinfo -lcustr
-crontab.xpg4 :=	LDLIBS += -lsecdb -lpam -lzoneinfo -lcustr
+at :=		LDLIBS += -lbsm -lproject -lsecdb
+at.xpg4 :=	LDLIBS += -lbsm -lproject -lsecdb
+atq :=		LDLIBS += -lbsm -lsecdb
+atrm :=		LDLIBS += -lbsm -lsecdb
+cron :=		LDLIBS += -lbsm -lpam -lproject -lcontract -lzoneinfo -lcustr
+crontab :=	LDLIBS += -lbsm -lsecdb -lpam -lzoneinfo -lcustr
+crontab.xpg6 :=	LDLIBS += -lbsm -lsecdb -lpam -lzoneinfo -lcustr
+crontab.xpg4 :=	LDLIBS += -lbsm -lsecdb -lpam -lzoneinfo -lcustr
 parsetest :=	LDLIBS += -lcustr
 
 $(XPG4) :=	CFLAGS += -DXPG4

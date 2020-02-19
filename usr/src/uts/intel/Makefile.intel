@@ -26,6 +26,7 @@
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2019 RackTop Systems
+# Copyright 2019 Peter Tribble.
 #
 
 #
@@ -255,8 +256,6 @@ DRV_KMODS	+= bge
 DRV_KMODS	+= bofi
 DRV_KMODS	+= bpf
 DRV_KMODS	+= bridge
-DRV_KMODS	+= bscbus
-DRV_KMODS	+= bscv
 DRV_KMODS	+= chxge
 DRV_KMODS	+= cxgbe
 DRV_KMODS	+= ntxn

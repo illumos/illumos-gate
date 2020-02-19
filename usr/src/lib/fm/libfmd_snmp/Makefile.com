@@ -22,6 +22,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2020 Joyent, Inc.
+#
 
 LIBRARY = libfmd_snmp.a
 VERS = .1
@@ -51,8 +53,8 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
-SNMPLIBS = -lnetsnmp -lnetsnmphelpers -lnetsnmpagent
-NATIVE_LIBS += libnetsnmp.so libnetsnmphelpers.so libnetsnmpagent.so
+SNMPLIBS = -lnetsnmp -lnetsnmpagent
+NATIVE_LIBS += libnetsnmp.so libnetsnmpagent.so
 
 LDLIBS += $(MACH_LDLIBS)
 LDLIBS += -lfmd_adm -luutil -lnvpair -ltopo
