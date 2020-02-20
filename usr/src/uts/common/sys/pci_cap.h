@@ -46,7 +46,7 @@ int pci_htcap_locate(ddi_acc_handle_t h, uint16_t reg_mask, uint16_t reg_val,
 /* Extract the lower 8 bits Extended CFG SPACE */
 #define	PCI_CAP_ID_MASK		0xff
 
-#define	PCI_CAP_XCFG_SPC(i) 	((i) ? (i) | PCI_CAP_XCFG_FLAG : 0)
+#define	PCI_CAP_XCFG_SPC(i)	((i) ? (i) | PCI_CAP_XCFG_FLAG : 0)
 
 #ifdef DEBUG
 #define	PCI_CAP_DBG		if (pci_cap_debug) printf
@@ -64,7 +64,7 @@ int pci_htcap_locate(ddi_acc_handle_t h, uint16_t reg_mask, uint16_t reg_val,
  */
 
 typedef enum {
-	PCI_CAP_CFGSZ_8 	= 0,
+	PCI_CAP_CFGSZ_8		= 0,
 	PCI_CAP_CFGSZ_16	= 1,
 	PCI_CAP_CFGSZ_32	= 2
 } pci_cap_config_size_t;
