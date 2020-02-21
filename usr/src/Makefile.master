@@ -28,7 +28,7 @@
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2019, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 # Copyright 2019 RackTop Systems.
 #
 
@@ -813,12 +813,16 @@ COMPILE.java=	$(JAVAC) $(JAVAFLAGS) -classpath $(CLASSPATH)
 #
 CCNEEDED		= -lC
 CCEXTNEEDED		= -lCrun -lCstd
+NATIVECCNEEDED		= -lC
 $(__GNUC)CCNEEDED	= -L$(GCCLIBDIR) -lstdc++ -lgcc_s
 $(__GNUC)CCEXTNEEDED	= $(CCNEEDED)
+$(__GNUC)NATIVECCNEEDED	= -R$(GCCLIBDIR) -L$(GCCLIBDIR) -lstdc++ -lgcc_s
 
 CCNEEDED64		= -lCrun
 CCEXTNEEDED64		= -lCrun -lCstd
+NATIVECCNEEDED64	= -lCrun
 $(__GNUC64)CCNEEDED64	= -L$(GCCLIBDIR) -lstdc++ -lgcc_s
+$(__GNUC64)NATIVECCNEEDED64 = -R$(GCCLIBDIR) -L$(GCCLIBDIR) -lstdc++ -lgcc_s
 $(__GNUC64)CCEXTNEEDED	= $(CCNEEDED64)
 
 # Libraries we expect to use natively on the build machine

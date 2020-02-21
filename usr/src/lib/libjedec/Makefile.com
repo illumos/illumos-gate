@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2018 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 LIBRARY =	libjedec.a
@@ -27,7 +27,5 @@ SRCDIR =	../common
 .KEEP_STATE:
 
 all:	$(LIBS)
-
-lint:	lintcheck
 
 include ../../Makefile.targ
