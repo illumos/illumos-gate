@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/digraph-topology.dtd.1">
+
+<!--
+  Copyright 2020 Joyent, Inc.
+
+-->
+
+<topo-digraph fmri-scheme='hc' nodename='test-nodename' os-version='test-os-version' product-id='test-product-id' timestamp='2019-12-20T01:51:26Z'>
+<vertices>
+<vertex name='node' instance='0x0' fmri='hc:///node=0'>
+
+  <nvpair name='property-groups' type='nvlist-array'>
+    <!-- DTD violation: bad element -->
+    <badelement>
+      <nvpair name='property-group-name' type='string' value='protocol' />
+      <nvpair name='property-values' type='nvlist-array'>
+        <nvlist>
+          <nvpair name='property-name' type='string' value='resource' />
+          <nvpair name='property-type' type='uint32' value='9' />
+          <nvpair name='property-value' type='nvlist'>
+            <nvlist>
+              <nvpair name='scheme' type='string' value='hc' />
+              <nvpair name='version' type='uint8' value='0' />
+              <nvpair name='hc-list' type='nvlist-array'>
+                <nvlist>
+                  <nvpair name='hc-name' type='string' value='node' />
+                  <nvpair name='hc-id' type='string' value='0' />
+                </nvlist>
+              </nvpair>
+            </nvlist>
+          </nvpair> <!-- property-value -->
+        </nvlist>
+      </nvpair> <!-- property-values -->
+    </nvlist>
+
+  </nvpair> <!-- property-groups -->
+
+</vertex>
+
+</vertices>
+</topo-digraph>

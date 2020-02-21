@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 #ifndef _TOPO_METHOD_H
 #define	_TOPO_METHOD_H
@@ -77,6 +77,9 @@ extern int topo_prop_method_version_register(tnode_t *, const char *,
 #define	TOPO_METH_PROP_SET		"topo_prop_set"
 #define	TOPO_METH_FACILITY		"topo_facility"
 #define	TOPO_METH_OCCUPIED		"topo_occupied"
+#define	TOPO_METH_PATH_STR2NVL		"topo_path_str2nvl"
+#define	TOPO_METH_PATH_NVL2STR		"topo_path_nvl2str"
+
 
 #define	TOPO_METH_FMRI_VERSION			0
 #define	TOPO_METH_FRU_COMPUTE_VERSION		0

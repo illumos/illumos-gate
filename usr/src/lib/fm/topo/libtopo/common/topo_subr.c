@@ -23,7 +23,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <alloca.h>
@@ -37,6 +37,7 @@
 #include <sys/utsname.h>
 
 #include <topo_error.h>
+#include <topo_digraph.h>
 #include <topo_subr.h>
 
 void
@@ -220,11 +221,17 @@ tnode_t *
 topo_hdl_root(topo_hdl_t *thp, const char *scheme)
 {
 	ttree_t *tp;
+	topo_digraph_t *tdg;
 
 	for (tp = topo_list_next(&thp->th_trees); tp != NULL;
 	    tp = topo_list_next(tp)) {
 		if (strcmp(scheme, tp->tt_scheme) == 0)
 			return (tp->tt_root);
+	}
+	for (tdg = topo_list_next(&thp->th_digraphs); tdg != NULL;
+	    tdg = topo_list_next(tdg)) {
+		if (strcmp(scheme, tdg->tdg_scheme) == 0)
+			return (tdg->tdg_rootnode);
 	}
 
 	return (NULL);

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -219,6 +219,7 @@ void
 topo_close(topo_hdl_t *thp)
 {
 	ttree_t *tp;
+	topo_digraph_t *tdg;
 
 	topo_hdl_lock(thp);
 	if (thp->th_platform != NULL)
@@ -249,6 +250,14 @@ topo_close(topo_hdl_t *thp)
 	while ((tp = topo_list_next(&thp->th_trees)) != NULL) {
 		topo_list_delete(&thp->th_trees, tp);
 		topo_tree_destroy(tp);
+	}
+
+	/*
+	 * Clean-up digraphs
+	 */
+	while ((tdg = topo_list_next(&thp->th_digraphs)) != NULL) {
+		topo_list_delete(&thp->th_digraphs, tdg);
+		topo_digraph_destroy(tdg);
 	}
 
 	/*
@@ -426,6 +435,7 @@ topo_snap_destroy(topo_hdl_t *thp)
 {
 	int i;
 	ttree_t *tp;
+	topo_digraph_t *tdg;
 	topo_walk_t *twp;
 	tnode_t *root;
 	topo_nodehash_t *nhp;
@@ -465,6 +475,29 @@ topo_snap_destroy(topo_hdl_t *thp)
 
 	}
 
+	for (tdg = topo_list_next(&thp->th_digraphs); tdg != NULL;
+	    tdg = topo_list_next(tdg)) {
+
+		topo_vertex_t *vtx;
+
+		if (tdg->tdg_nvertices == 0)
+			continue;
+		/*
+		 * We maintain an adjacency list in the topo_digraph_t
+		 * structure, so we can just walk the list to destroy all the
+		 * vertices.
+		 */
+		mod = tdg->tdg_mod;
+		vtx = topo_list_next(&tdg->tdg_vertices);
+		while (vtx != NULL) {
+			topo_vertex_t *tmp = vtx;
+
+			vtx = topo_list_next(vtx);
+			topo_vertex_destroy(mod, tmp);
+		}
+		tdg->tdg_nvertices = 0;
+	}
+
 	/*
 	 * Clean-up our cached devinfo and prom tree handles.
 	 */
@@ -476,7 +509,6 @@ topo_snap_destroy(topo_hdl_t *thp)
 		di_prom_fini(thp->th_pi);
 		thp->th_pi = DI_PROM_HANDLE_NIL;
 	}
-
 
 	if (thp->th_uuid != NULL) {
 		topo_hdl_free(thp, thp->th_uuid, TOPO_UUID_SIZE);

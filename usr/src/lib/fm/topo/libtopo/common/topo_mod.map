@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 # CDDL HEADER START
 #
@@ -25,6 +25,9 @@
 $mapfile_version 2
 
 SYMBOL_SCOPE {
+	topo_digraph_destroy		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_digraph_new		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_edge_new			{ TYPE = FUNCTION; FLAGS = extern };
 	topo_node_range_create		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_node_range_destroy		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_node_bind			{ TYPE = FUNCTION; FLAGS = extern };
@@ -101,4 +104,7 @@ SYMBOL_SCOPE {
 	topo_prop_inherit		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_pgroup_create		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_pgroup_hcset		{ TYPE = FUNCTION; FLAGS = extern };
+
+	topo_vertex_destroy		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_vertex_new			{ TYPE = FUNCTION; FLAGS = extern };
 };

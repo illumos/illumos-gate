@@ -104,16 +104,18 @@ xmlattr_to_int(topo_mod_t *mp,
 	xmlChar *str;
 	xmlChar *estr;
 
-	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "xmlattr_to_int(propname=%s)\n",
-	    propname);
-	if ((str = xmlGetProp(n, (xmlChar *)propname)) == NULL)
+	if ((str = xmlGetProp(n, (xmlChar *)propname)) == NULL) {
+		topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
+		    "%s: failed to lookup %s attribute", __func__, propname);
 		return (topo_mod_seterrno(mp, ETOPO_PRSR_NOATTR));
-
+	}
 	errno = 0;
 	*value = strtoull((char *)str, (char **)&estr, 0);
 	if (errno != 0 || *estr != '\0') {
 		/* no conversion was done */
 		xmlFree(str);
+		topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
+		    "%s: failed to convert %s attribute", __func__, propname);
 		return (topo_mod_seterrno(mp, ETOPO_PRSR_BADNUM));
 	}
 	xmlFree(str);

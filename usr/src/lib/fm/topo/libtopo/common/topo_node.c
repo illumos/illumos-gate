@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2019, Joyent, Inc. All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -196,6 +196,14 @@ topo_node_destroy(tnode_t *node)
 	}
 
 	/*
+	 * Nodes in a directed graph structure have no children, so the node
+	 * name is still intact. We must free it now.
+	 */
+	if (node->tn_vtx != NULL) {
+		topo_mod_strfree(mod, node->tn_name);
+	}
+
+	/*
 	 * Destroy all property data structures, free the node and release
 	 * the module that created it
 	 */
@@ -257,6 +265,12 @@ topo_node_parent(tnode_t *node)
 	return (node->tn_parent);
 }
 
+topo_vertex_t *
+topo_node_vertex(tnode_t *node)
+{
+	return (node->tn_vtx);
+}
+
 int
 topo_node_flags(tnode_t *node)
 {
@@ -315,7 +329,7 @@ topo_node_range_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 			    EMOD_NODE_DUP));
 	}
 
-	if (min < 0 || max < min)
+	if (max < min)
 		return (node_create_seterror(mod, pnode, NULL,
 		    EMOD_NODE_RANGE));
 
@@ -766,9 +780,7 @@ topo_node_unbind(tnode_t *node)
 	topo_node_unlock(node);
 
 	topo_dprintf(node->tn_hdl, TOPO_DBG_MODSVC,
-	    "node unbound %s=%d/%s=%d refs = %d\n",
-	    topo_node_name(node->tn_parent),
-	    topo_node_instance(node->tn_parent), node->tn_name,
+	    "node unbound %s=%d refs = %d\n", node->tn_name,
 	    node->tn_instance, node->tn_refs);
 
 	topo_node_rele(node);

@@ -1138,7 +1138,7 @@ hc_fmri_create_meth(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	int ret;
 	nvlist_t *args, *pfmri = NULL;
 	nvlist_t *auth;
-	uint32_t inst;
+	uint64_t inst;
 	char *name, *serial, *rev, *part;
 
 	if (version > TOPO_METH_FMRI_VERSION)
@@ -1147,7 +1147,7 @@ hc_fmri_create_meth(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	/* First the must-have fields */
 	if (nvlist_lookup_string(in, TOPO_METH_FMRI_ARG_NAME, &name) != 0)
 		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
-	if (nvlist_lookup_uint32(in, TOPO_METH_FMRI_ARG_INST, &inst) != 0)
+	if (nvlist_lookup_uint64(in, TOPO_METH_FMRI_ARG_INST, &inst) != 0)
 		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
 
 	/*

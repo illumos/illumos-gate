@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <pthread.h>
@@ -42,17 +43,18 @@
 #include <zfs.h>
 
 static const struct topo_builtin _topo_builtins[] = {
-	{ "cpu", CPU_VERSION, cpu_init, cpu_fini },
-	{ "dev", DEV_VERSION, dev_init, dev_fini },
-	{ "fmd", FMD_VERSION, fmd_init, fmd_fini },
-	{ "mem", MEM_VERSION, mem_init, mem_fini },
-	{ "pkg", PKG_VERSION, pkg_init, pkg_fini },
-	{ "svc", SVC_VERSION, svc_init, svc_fini },
-	{ "sw", SW_VERSION, sw_init, sw_fini },
-	{ "zfs", ZFS_VERSION, zfs_init, zfs_fini },
-	{ "mod", MOD_VERSION, mod_init, mod_fini },
-	{ "hc", HC_VERSION, hc_init, hc_fini },		/* hc must go last */
-	{ NULL, 0, NULL, NULL }
+	{ "cpu", CPU_VERSION, cpu_init, cpu_fini, TOPO_BLTIN_TYPE_TREE },
+	{ "dev", DEV_VERSION, dev_init, dev_fini, TOPO_BLTIN_TYPE_TREE },
+	{ "fmd", FMD_VERSION, fmd_init, fmd_fini, TOPO_BLTIN_TYPE_TREE },
+	{ "mem", MEM_VERSION, mem_init, mem_fini, TOPO_BLTIN_TYPE_TREE },
+	{ "pkg", PKG_VERSION, pkg_init, pkg_fini, TOPO_BLTIN_TYPE_TREE },
+	{ "svc", SVC_VERSION, svc_init, svc_fini, TOPO_BLTIN_TYPE_TREE },
+	{ "sw", SW_VERSION, sw_init, sw_fini, TOPO_BLTIN_TYPE_TREE },
+	{ "zfs", ZFS_VERSION, zfs_init, zfs_fini, TOPO_BLTIN_TYPE_TREE },
+	{ "mod", MOD_VERSION, mod_init, mod_fini, TOPO_BLTIN_TYPE_TREE },
+	/* hc must go last */
+	{ "hc", HC_VERSION, hc_init, hc_fini, TOPO_BLTIN_TYPE_TREE },
+	{ NULL, 0, NULL, NULL, 0 }
 };
 
 static int
@@ -105,6 +107,7 @@ topo_builtin_create(topo_hdl_t *thp, const char *rootdir)
 	topo_mod_t *mod;
 	ttree_t *tp;
 	tnode_t *rnode;
+	topo_digraph_t *tdg;
 
 	/*
 	 * Create a scheme-specific topo tree for all builtins
@@ -118,35 +121,49 @@ topo_builtin_create(topo_hdl_t *thp, const char *rootdir)
 		    &topo_bltin_ops, bp->bltin_version)) == NULL) {
 			topo_dprintf(thp, TOPO_DBG_ERR,
 			    "unable to create scheme "
-			    "tree for %s:%s\n", bp->bltin_name,
+			    "topology for %s:%s\n", bp->bltin_name,
 			    topo_hdl_errmsg(thp));
 			return (-1);
 		}
-		if ((tp = topo_tree_create(thp, mod, bp->bltin_name))
-		    == NULL) {
-			topo_dprintf(thp, TOPO_DBG_ERR,
-			    "unable to create scheme "
-			    "tree for %s:%s\n", bp->bltin_name,
-			    topo_hdl_errmsg(thp));
-			return (-1);
-		}
-		topo_list_append(&thp->th_trees, tp);
+		switch (bp->bltin_type) {
+		case TOPO_BLTIN_TYPE_TREE:
+			if ((tp = topo_tree_create(thp, mod, bp->bltin_name))
+			    == NULL) {
+				topo_dprintf(thp, TOPO_DBG_ERR, "unable to "
+				    "create scheme tree for %s:%s\n",
+				    bp->bltin_name, topo_hdl_errmsg(thp));
+				return (-1);
+			}
+			topo_list_append(&thp->th_trees, tp);
 
-		/*
-		 * Call the enumerator on the root of the tree, with the
-		 * scheme name as the name to enumerate.  This will
-		 * establish methods on the root node.
-		 */
-		rnode = tp->tt_root;
-		if (topo_mod_enumerate(mod, rnode, mod->tm_name, rnode->tn_name,
-		    rnode->tn_instance, rnode->tn_instance, NULL) < 0) {
+			rnode = tp->tt_root;
+			break;
+		case TOPO_BLTIN_TYPE_DIGRAPH:
+			if ((tdg = topo_digraph_new(thp, mod, bp->bltin_name))
+			    == NULL) {
+				topo_dprintf(thp, TOPO_DBG_ERR, "unable to "
+				    "create scheme digraph for %s:%s\n",
+				    bp->bltin_name, topo_hdl_errmsg(thp));
+				return (-1);
+			}
+			topo_list_append(&thp->th_digraphs, tdg);
+
+			rnode = tdg->tdg_rootnode;
+			break;
+		default:
+			topo_dprintf(thp, TOPO_DBG_ERR, "unexpected topology "
+			    "type: %u", bp->bltin_type);
+			return (-1);
+		}
+		if (topo_mod_enumerate(mod, rnode, mod->tm_name,
+		    rnode->tn_name, rnode->tn_instance, rnode->tn_instance,
+		    NULL) < 0) {
 			/*
-			 * If we see a failure, note it in the handle and
-			 * drive on
+			 * If we see a failure, note it in the handle and drive
+			 * on
 			 */
 			(void) topo_hdl_seterrno(thp, ETOPO_ENUM_PARTIAL);
 		}
-
 	}
 
 	return (0);

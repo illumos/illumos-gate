@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ This file and its contents are supplied under the terms of the
+ Common Development and Distribution License ("CDDL"), version 1.0.
+ You may only use this file in accordance with the terms of version
+ 1.0 of the CDDL.
+
+ A full copy of the text of the CDDL should have accompanied this
+ source.  A copy of the CDDL is also available via the Internet at
+ http://www.illumos.org/license/CDDL.
+
+ Copyright 2020 Joyent, Inc.
+-->
+
+<!--
+ DTD for Directed Graph based topologies
+-->
+
+<!ELEMENT topo-digraph (vertices) >
+
+<!ATTLIST topo-digraph
+	scheme		CDATA #REQUIRED
+>
+
+<!ELEMENT vertices>
+
+<!ATTLIST vertices
+        nelem           CDATA #REQUIRED
+>
+
+<!ELEMENT vertex (nvpair*, outgoing-edges?) >
+
+<!ELEMENT nvlist (nvpair*) >
+
+<!ELEMENT nvpair (nvlist?) >
+
+<!ATTLIST nvpair
+	name		CDATA #REQUIRED
+	type		( int8 | uint8 | int16 | uint16 | int32 | uint32 |
+			  int64 | uint64 | string | nvlist | int32-array |
+			  uint32-array | int64-array | uint64-array |
+			  string-array | nvlist-array | "")
+	value		CDATA ""
+>
+
+<!ELEMENT outgoing-edges (edge*) >
+
+<!ELEMENT edge (edge*) >
+
+<!ATTLIST edge
+        fmri		CDATA #REQUIRED
+>

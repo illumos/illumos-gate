@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef _TOPO_TREE_H
@@ -73,6 +73,7 @@ struct topo_node {
 	topo_list_t tn_methods;		/* Registered method list */
 	void *tn_priv;			/* Private enumerator data */
 	int tn_refs;			/* node reference count */
+	topo_vertex_t *tn_vtx;		/* NULL for tree topologies */
 };
 
 #define	TOPO_NODE_INIT		0x0001
@@ -118,6 +119,7 @@ struct topo_hdl {
 	di_prom_handle_t th_pi;		/* handle to root of prom tree */
 	topo_modhash_t *th_modhash;	/* Module hash */
 	topo_list_t th_trees;		/* Scheme-specific topo tree list */
+	topo_list_t th_digraphs;	/* Scheme-specific topo digraph list */
 	topo_alloc_t *th_alloc;		/* allocators */
 	int th_errno;			/* errno */
 	int th_debug;			/* Debug mask */
