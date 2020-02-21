@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Public utilities and convenience calls (from the API spec):
  *	SLPFindScopes (queries for all known scopes)
@@ -253,11 +251,12 @@ static SLPError SAAdvert_for_scopes(SLPHandle hSLP, void **stree) {
 
 	err = slp_packSrvRqst("service:service-agent", predicate, hp);
 
-	if (err == SLP_OK)
+	if (err == SLP_OK) {
 		err = slp_ua_common(hSLP, "",
-				    (SLPGenericAppCB *)saadvert_callback,
-				    stree,
-				    (SLPMsgReplyCB *)unpackSAAdvert_scope);
+		    (SLPGenericAppCB *)(uintptr_t)saadvert_callback,
+		    stree,
+		    (SLPMsgReplyCB *)unpackSAAdvert_scope);
+	}
 
 	if (type_hint) {
 		free(predicate);

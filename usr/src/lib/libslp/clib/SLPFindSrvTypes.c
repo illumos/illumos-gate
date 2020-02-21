@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <syslog.h>
 #include <slp-internal.h>
 
@@ -60,8 +58,8 @@ SLPError SLPFindSrvTypes(SLPHandle hSLP, const char *pcNamingAuthority,
 
 	if (err == SLP_OK)
 		err = slp_ua_common(hSLP, pcScopeList,
-				    (SLPGenericAppCB *) callback, pvUser,
-				    (SLPMsgReplyCB *) UnpackSrvTypesReply);
+		    (SLPGenericAppCB *)(uintptr_t)callback, pvUser,
+		    (SLPMsgReplyCB *) UnpackSrvTypesReply);
 
 	if (err != SLP_OK)
 		slp_end_call(hSLP);

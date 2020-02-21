@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <syslog.h>
@@ -43,13 +41,13 @@ struct thr_call_args {
 	slp_target_list_t *targets;
 };
 
-static SLPError consumer(void *);
-static void slp_call(void *);
+static void *consumer(void *);
+static void *slp_call(void *);
 static SLPError check_message_fit(slp_handle_impl_t *, slp_target_list_t *);
 
 SLPError slp_ua_common(SLPHandle hSLP, const char *scopes,
-			SLPGenericAppCB cb, void *cookie,
-			SLPMsgReplyCB msg_cb) {
+    SLPGenericAppCB cb, void *cookie, SLPMsgReplyCB msg_cb)
+{
 	slp_handle_impl_t *hp;
 	slp_target_list_t *targets;
 	struct thr_call_args *args;
@@ -88,10 +86,9 @@ SLPError slp_ua_common(SLPHandle hSLP, const char *scopes,
 	hp->q = q;
 
 	/* kick off the producer thread */
-	if ((terr = thr_create(
-		NULL, 0, (void *(*)(void *)) slp_call, args, 0, &tid)) != 0) {
+	if ((terr = thr_create(NULL, 0, slp_call, args, 0, &tid)) != 0) {
 		slp_err(LOG_CRIT, 0, "ua_common", "could not start thread: %s",
-			strerror(terr));
+		    strerror(terr));
 		err = SLP_INTERNAL_SYSTEM_ERROR;
 		goto error;
 	}
@@ -99,12 +96,11 @@ SLPError slp_ua_common(SLPHandle hSLP, const char *scopes,
 
 	if (hp->async) {
 		/* kick off the consumer thread */
-		if ((terr = thr_create(
-			NULL, 0, (void *(*)(void *))consumer,
-			args, 0, NULL)) != 0) {
+		if ((terr = thr_create(NULL, 0, consumer,
+		    args, 0, NULL)) != 0) {
 			slp_err(LOG_CRIT, 0, "ua_common",
-				"could not start thread: %s",
-				strerror(terr));
+			    "could not start thread: %s",
+			    strerror(terr));
 			err = SLP_INTERNAL_SYSTEM_ERROR;
 			/* cleanup producer thread, if necessary */
 			hp->cancel = 1;
@@ -115,13 +111,15 @@ SLPError slp_ua_common(SLPHandle hSLP, const char *scopes,
 		return (SLP_OK);
 	}
 	/* else	sync */
-	return (consumer(args));
+	return ((SLPError)consumer(args));
 error:
 	free(args);
 	return (err);
 }
 
-static SLPError consumer(void *ap) {
+static void *
+consumer(void *ap)
+{
 	slp_handle_impl_t *hp;
 	char *reply;
 	void *collator;
@@ -138,19 +136,19 @@ static SLPError consumer(void *ap) {
 		reply = slp_dequeue(hp->q);
 		/* reply == NULL if no more available or SLPClosed */
 		cont = args->msg_cb(hp, reply, args->cb, args->cookie,
-				    &collator, &numResults);
+		    &collator, &numResults);
 
 		if (reply) {
-		    free(reply);
+			free(reply);
 		} else {
-		    break;
+			break;
 		}
 
 		if (!cont) {
-		    /* cb doesn't want any more; invoke last call */
-		    args->msg_cb(hp, NULL, args->cb, args->cookie,
-				    &collator, &numResults);
-		    break;
+			/* cb doesn't want any more; invoke last call */
+			args->msg_cb(hp, NULL, args->cb, args->cookie,
+			    &collator, &numResults);
+			break;
 		}
 	}
 	/* cleanup */
@@ -164,13 +162,15 @@ static SLPError consumer(void *ap) {
 
 	free(args);
 	slp_end_call(hp);
-	return (SLP_OK);
+	return ((void *)SLP_OK);
 }
 
 /*
  * This is the producer thread
  */
-static void slp_call(void *ap) {
+static void *
+slp_call(void *ap)
+{
 	struct thr_call_args *args = (struct thr_call_args *)ap;
 	slp_target_t *t;
 	const char *uc_scopes, *mc_scopes;
@@ -193,16 +193,14 @@ static void slp_call(void *ap) {
 		if (len > mtu)
 			use_tcp = SLP_TRUE;
 
-		for (
-			t = slp_next_uc_target(args->targets);
-			t;
-			t = slp_next_uc_target(args->targets)) {
+		for (t = slp_next_uc_target(args->targets); t != NULL;
+		    t = slp_next_uc_target(args->targets)) {
 			if (args->hp->cancel)
 				break;
 
 			if (use_tcp)
 				slp_uc_tcp_send(args->hp, t, uc_scopes,
-						SLP_FALSE, 0);
+				    SLP_FALSE, 0);
 			else
 				slp_uc_udp_send(args->hp, t, uc_scopes);
 		}

@@ -118,7 +118,7 @@ static SLPError enqueue_reg(slp_handle_impl_t *, struct reg_msg *,
 			    void *, SLPRegReport *);
 static SLPError reg_impl(slp_handle_impl_t *, struct reg_msg *,
 				void *, SLPRegReport *);
-static void reg_thread();
+static void *reg_thread(void *);
 static SLPError start_reg_thr();
 static SLPError reg_common(slp_handle_impl_t *, struct reg_msg *,
 				void *, SLPRegReport *);
@@ -563,7 +563,7 @@ static SLPError start_reg_thr() {
 
 	/* start the reg thread */
 	if ((terr = thr_create(
-		0, 0, (void *(*)(void *)) reg_thread,
+		0, 0, reg_thread,
 		NULL, 0, NULL)) != 0) {
 		slp_err(LOG_CRIT, 0, "start_reg_thr",
 			"could not start thread: %s",
@@ -586,7 +586,9 @@ start_done:
  * To conserve resources,
  * if there are no more registrations to refresh, it will exit.
  */
-static void reg_thread() {
+static void *
+reg_thread(void *arg __unused)
+{
 	timestruc_t timeout;
 	timeout.tv_nsec = 0;
 
@@ -596,7 +598,7 @@ static void reg_thread() {
 
 		/* get the next message from the queue */
 		timeout.tv_sec =
-			next_wake_time ? next_wake_time : time(NULL) + 5;
+		    next_wake_time ? next_wake_time : time(NULL) + 5;
 		rmsg = slp_dequeue_timed(reg_q, &timeout, &etimed);
 		if (!rmsg && etimed == SLP_TRUE) {
 			/* timed out */

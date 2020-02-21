@@ -83,7 +83,7 @@ struct bc_ifs {
  * Private utility routines
  */
 static SLPError start_tcp_thr();
-static void tcp_thread();
+static void *tcp_thread(void *);
 static SLPError make_header(slp_handle_impl_t *, char *, const char *);
 static void udp_make_msghdr(struct sockaddr_in *, struct iovec *, int,
 			    struct msghdr *);
@@ -401,7 +401,9 @@ void slp_mc_send(slp_handle_impl_t *hp, const char *scopes) {
 /*
  * Starts the tcp_thread and allocates any necessary resources.
  */
-static SLPError start_tcp_thr() {
+static SLPError
+start_tcp_thr(void)
+{
 	SLPError err;
 	int terr;
 
@@ -419,12 +421,11 @@ static SLPError start_tcp_thr() {
 	}
 
 	/* start the tcp thread */
-	if ((terr = thr_create(0, 0, (void *(*)(void *)) tcp_thread,
-				NULL, 0, NULL)) != 0) {
-	    slp_err(LOG_CRIT, 0, "start_tcp_thr",
+	if ((terr = thr_create(0, 0, tcp_thread, NULL, 0, NULL)) != 0) {
+		slp_err(LOG_CRIT, 0, "start_tcp_thr",
 		    "could not start thread: %s", strerror(terr));
-	    (void) mutex_unlock(&start_lock);
-	    return (SLP_INTERNAL_SYSTEM_ERROR);
+		(void) mutex_unlock(&start_lock);
+		return (SLP_INTERNAL_SYSTEM_ERROR);
 	}
 
 	tcp_thr_running = SLP_TRUE;
@@ -452,7 +453,9 @@ static void end_tcp_thr() {
  * on 'tcp_q' for new messages. If no message appear after 30 seconds,
  * this thread cleans up resources and shuts itself down.
  */
-static void tcp_thread() {
+static void *
+tcp_thread(void *arg __unused)
+{
 	struct tcp_rqst *rqst;
 	char *reply, header[SLP_DEFAULT_SENDMTU];
 	timestruc_t to[1];
@@ -497,9 +500,8 @@ static void tcp_thread() {
 			slp_set_xid(header, xid);
 
 	/* walk targets list until we either succeed or run out of targets */
-		for (ctarg = targets;
-			ctarg && !hp->cancel;
-			ctarg = slp_next_failover(ctarg)) {
+		for (ctarg = targets; ctarg && !hp->cancel;
+		    ctarg = slp_next_failover(ctarg)) {
 
 			sin = (struct sockaddr_in *)slp_get_target_sin(ctarg);
 
@@ -507,18 +509,18 @@ static void tcp_thread() {
 			if ((tcp_sockfd = socket(AF_INET, SOCK_STREAM, 0))
 			    < 0) {
 				slp_err(LOG_CRIT, 0, "tcp_thread",
-					"could not create socket: %s",
-					strerror(errno));
+				    "could not create socket: %s",
+				    strerror(errno));
 				ctarg = NULL;
 				break;
 			}
 
 			/* connect to target */
 			if (connect(tcp_sockfd, (struct sockaddr *)sin,
-				    sizeof (*sin)) < 0) {
+			    sizeof (*sin)) < 0) {
 				slp_err(LOG_INFO, 0, "tcp_thread",
-					"could not connect, error = %s",
-					strerror(errno));
+				    "could not connect, error = %s",
+				    strerror(errno));
 				goto failed;
 			}
 
@@ -526,8 +528,8 @@ static void tcp_thread() {
 			if (writev(tcp_sockfd, hp->msg.iov, hp->msg.iovlen)
 			    == -1) {
 				slp_err(LOG_INFO, 0, "tcp_thread",
-					"could not send, error = %s",
-					strerror(errno));
+				    "could not send, error = %s",
+				    strerror(errno));
 				goto failed;
 			}
 
@@ -563,6 +565,7 @@ transaction_complete:
 		if (free_target)
 			slp_free_target(targets);
 	}
+	return (NULL);
 }
 
 /*
