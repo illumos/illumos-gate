@@ -272,8 +272,7 @@ db_abort_merge_dict()
 	if (dbstat != DB_SUCCESS)
 		return (dbstat);
 	dbstat = FreeDictionary->db_shutdown();
-	if (dbstat != DB_SUCCESS)
-		return (dbstat);
+	return (dbstat);
 }
 
 

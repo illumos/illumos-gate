@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2002-2003 Apple Computer, Inc. All rights reserved.
+ * Copyright (c) 2002-2018 Apple Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -110,6 +110,13 @@ extern mDNSu32 mDNSRandom(mDNSu32 max);     // Returns pseudo-random result from
 #define mDNSIsUpperCase(X) ((X) >= 'A' && (X) <= 'Z')
 #define mDNSIsLowerCase(X) ((X) >= 'a' && (X) <= 'z')
 #define mDNSIsLetter(X)    (mDNSIsUpperCase(X) || mDNSIsLowerCase(X))
+    
+// We believe we have adequate safeguards to protect against cache poisoning.
+// In the event that someone does find a workable cache poisoning attack, we want to limit the lifetime of the poisoned entry.
+// We set the maximum allowable TTL to one hour.
+// With the 25% correction factor to avoid the DNS Zeno's paradox bug, that gives us an actual maximum lifetime of 75 minutes.
+
+#define mDNSMaximumTTLSeconds (mDNSu32)3600
 
 #define mDNSValidHostChar(X, notfirst, notlast) (mDNSIsLetter(X) || mDNSIsDigit(X) || ((notfirst) && (notlast) && (X) == '-') )
 
@@ -260,7 +267,7 @@ extern const mDNSu8 *LocateAdditionals(const DNSMessage *const msg, const mDNSu8
 extern const mDNSu8 *LocateOptRR(const DNSMessage *const msg, const mDNSu8 *const end, int minsize);
 extern const rdataOPT *GetLLQOptData(mDNS *const m, const DNSMessage *const msg, const mDNSu8 *const end);
 extern mDNSBool GetPktLease(mDNS *const m, const DNSMessage *const msg, const mDNSu8 *const end, mDNSu32 *const lease);
-extern void DumpPacket(mDNS *const m, mStatus status, mDNSBool sent, char *transport,
+extern void DumpPacket(mStatus status, mDNSBool sent, char *transport,
                        const mDNSAddr *srcaddr, mDNSIPPort srcport,
                        const mDNSAddr *dstaddr, mDNSIPPort dstport, const DNSMessage *const msg, const mDNSu8 *const end);
 extern mDNSBool RRAssertsNonexistence(const ResourceRecord *const rr, mDNSu16 type);

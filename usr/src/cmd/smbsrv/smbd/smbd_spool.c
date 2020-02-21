@@ -203,7 +203,7 @@ smbd_spool_copyfile(smb_inaddr_t *ipaddr, char *username, char *path,
 	char		new_jobname[SMBD_PJOBLEN];
 	smbd_printjob_t	pjob;
 	char		clientname[INET6_ADDRSTRLEN];
-	struct stat 	sbuf;
+	struct stat	sbuf;
 	int		rc = 1;
 
 	if (stat(path, &sbuf)) {
@@ -424,7 +424,7 @@ smbd_load_printers(void)
 
 	(void) pthread_attr_init(&attr);
 	(void) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-	rc = pthread_create(&tid, &attr, smbd_share_printers, &tid);
+	rc = pthread_create(&tid, &attr, smbd_share_printers, NULL);
 	(void) pthread_attr_destroy(&attr);
 
 	if (rc != 0)
@@ -435,9 +435,8 @@ smbd_load_printers(void)
 /*
  * All print shares use the path from print$.
  */
-/*ARGSUSED*/
 static void *
-smbd_share_printers(void *arg)
+smbd_share_printers(void *arg __unused)
 {
 	cups_dest_t	*dests;
 	cups_dest_t	*dest;
@@ -558,4 +557,4 @@ smbd_spool_stop(void)
 {
 }
 
-#endif 	/* HAVE_CUPS */
+#endif	/* HAVE_CUPS */

@@ -78,8 +78,7 @@ SCRIPTFILE	= restore_repository
 ROOTSCRIPTFILE	= $(ROOTCMDDIR)/$(SCRIPTFILE)
 
 #
-# Native variant (used in ../seed). We only need to set NATIVE_LIBS if
-# $(ADJUNCT_PROTO) is pointing outside of /usr/lib.
+# Native variant (used in ../seed).
 #
 $(NATIVE_BUILD)NATIVE_LIBS += libumem.so libc.so
 $(NATIVE_BUILD)CC =	$(NATIVECC)

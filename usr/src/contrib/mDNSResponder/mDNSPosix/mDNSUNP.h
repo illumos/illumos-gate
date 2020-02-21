@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2002-2004 Apple Computer, Inc. All rights reserved.
+ * Copyright (c) 2002-2018 Apple Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,8 +62,8 @@ typedef unsigned int socklen_t;
 #define GET_SA_LEN(X) (((struct sockaddr*)&(X))->sa_family == AF_INET ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr))
 #endif
 
-#define IFI_NAME    16          /* same as IFNAMSIZ in <net/if.h> */
-#define IFI_HADDR    8          /* allow for 64-bit EUI-64 in future */
+#define IFI_NAME    IFNAMSIZ    /* same as IFNAMSIZ in <net/if.h> */
+#define IFI_HADDR   8           /* allow for 64-bit EUI-64 in future */
 
 // Renamed from my_in_pktinfo because in_pktinfo is used by Linux.
 
@@ -98,7 +98,7 @@ struct ifi_info {
 
 #if defined(AF_INET6) && HAVE_IPV6 && HAVE_LINUX
 #define PROC_IFINET6_PATH "/proc/net/if_inet6"
-extern struct ifi_info  *get_ifi_info_linuxv6(int family, int doaliases);
+extern struct ifi_info  *get_ifi_info_linuxv6(int doaliases);
 #endif
 
 #if defined(AF_INET6) && HAVE_IPV6

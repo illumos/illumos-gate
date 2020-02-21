@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2003-2015 Apple Inc. All rights reserved.
+ * Copyright (c) 2003-2018 Apple Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,6 +77,7 @@ void LogMsg_(const char *format, ...)       LOG_HELPER_BODY(MDNS_LOG_MSG)
 void LogOperation_(const char *format, ...) LOG_HELPER_BODY(MDNS_LOG_OPERATION)
 void LogSPS_(const char *format, ...)       LOG_HELPER_BODY(MDNS_LOG_SPS)
 void LogInfo_(const char *format, ...)      LOG_HELPER_BODY(MDNS_LOG_INFO)
+void LogDebug_(const char *format, ...)     LOG_HELPER_BODY(MDNS_LOG_DEBUG)
 #endif
 
 #if MDNS_DEBUGMSGS

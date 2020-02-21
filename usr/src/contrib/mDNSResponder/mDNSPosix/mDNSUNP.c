@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2002-2004 Apple Computer, Inc. All rights reserved.
+ * Copyright (c) 2002-2018 Apple Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -84,40 +84,56 @@ void plen_to_mask(int plen, char *addr) {
 }
 
 /* Gets IPv6 interface information from the /proc filesystem in linux*/
-struct ifi_info *get_ifi_info_linuxv6(int family, int doaliases)
+struct ifi_info *get_ifi_info_linuxv6(int doaliases)
 {
     struct ifi_info *ifi, *ifihead, **ifipnext, *ifipold, **ifiptr;
     FILE *fp = NULL;
-    char addr[8][5];
-    int flags, myflags, index, plen, scope;
-    char ifname[9], lastname[IFNAMSIZ];
-    char addr6[32+7+1]; /* don't forget the seven ':' */
+    int i, nitems, flags, index, plen, scope;
     struct addrinfo hints, *res0;
     int err;
     int sockfd = -1;
     struct ifreq ifr;
+    char ifnameFmt[16], addrStr[32 + 7 + 1], ifname[IFNAMSIZ], lastname[IFNAMSIZ];
 
     res0=NULL;
     ifihead = NULL;
     ifipnext = &ifihead;
-    lastname[0] = 0;
 
     if ((fp = fopen(PROC_IFINET6_PATH, "r")) != NULL) {
         sockfd = socket(AF_INET6, SOCK_DGRAM, 0);
         if (sockfd < 0) {
             goto gotError;
         }
-        while (fscanf(fp,
-                      "%4s%4s%4s%4s%4s%4s%4s%4s %02x %02x %02x %02x %8s\n",
-                      addr[0],addr[1],addr[2],addr[3],
-                      addr[4],addr[5],addr[6],addr[7],
-                      &index, &plen, &scope, &flags, ifname) != EOF) {
 
-            myflags = 0;
-            if (strncmp(lastname, ifname, IFNAMSIZ) == 0) {
+        // Parse /proc/net/if_inet6 according to <https://www.tldp.org/HOWTO/Linux+IPv6-HOWTO/ch11s04.html>.
+
+        // Create a string specifier with a width of IFNAMSIZ - 1 ("%<IFNAMSIZ - 1>s") to scan the interface name. The
+        // reason why we don't just use the string-ified macro expansion of IFNAMSIZ for the width is because the width
+        // needs to be a decimal string and there's no guarantee that IFNAMSIZ will be defined as a decimal integer. For
+        // example, it could be defined in hexadecimal or as an arithmetic expression.
+
+        snprintf(ifnameFmt, sizeof(ifnameFmt), "%%%ds", IFNAMSIZ - 1);
+
+        // Write the seven IPv6 address string colons and NUL terminator, i.e., "xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx".
+        // The remaining 32 IPv6 address characters come from /proc/net/if_inet6.
+
+        for (i = 4; i < 39; i += 5) addrStr[i] = ':';
+        addrStr[39] = '\0';
+
+        lastname[0] = '\0';
+        for (;;) {
+            nitems = fscanf(fp, " %4c%4c%4c%4c%4c%4c%4c%4c %x %x %x %x",
+                &addrStr[0],  &addrStr[5],  &addrStr[10], &addrStr[15],
+                &addrStr[20], &addrStr[25], &addrStr[30], &addrStr[35],
+                &index, &plen, &scope, &flags);
+            if (nitems != 12) break;
+
+            nitems = fscanf(fp, ifnameFmt, ifname);
+            if (nitems != 1) break;
+
+            if (strcmp(lastname, ifname) == 0) {
                 if (doaliases == 0)
                     continue;   /* already processed this interface */
-                myflags = IFI_ALIAS;
             }
             memcpy(lastname, ifname, IFNAMSIZ);
             ifi = (struct ifi_info*)calloc(1, sizeof(struct ifi_info));
@@ -130,15 +146,11 @@ struct ifi_info *get_ifi_info_linuxv6(int family, int doaliases)
             *ifipnext = ifi;            /* prev points to this new one */
             ifipnext = &ifi->ifi_next;  /* pointer to next one goes here */
 
-            sprintf(addr6, "%s:%s:%s:%s:%s:%s:%s:%s",
-                    addr[0],addr[1],addr[2],addr[3],
-                    addr[4],addr[5],addr[6],addr[7]);
-
             /* Add address of the interface */
             memset(&hints, 0, sizeof(hints));
             hints.ai_family = AF_INET6;
             hints.ai_flags = AI_NUMERICHOST;
-            err = getaddrinfo(addr6, NULL, &hints, &res0);
+            err = getaddrinfo(addrStr, NULL, &hints, &res0);
             if (err) {
                 goto gotError;
             }
@@ -156,9 +168,9 @@ struct ifi_info *get_ifi_info_linuxv6(int family, int doaliases)
                 goto gotError;
             }
 
-            ((struct sockaddr_in6 *)ifi->ifi_netmask)->sin6_family=family;
+            ((struct sockaddr_in6 *)ifi->ifi_netmask)->sin6_family=AF_INET6;
             ((struct sockaddr_in6 *)ifi->ifi_netmask)->sin6_scope_id=scope;
-            inet_pton(family, ipv6addr, &((struct sockaddr_in6 *)ifi->ifi_netmask)->sin6_addr);
+            inet_pton(AF_INET6, ipv6addr, &((struct sockaddr_in6 *)ifi->ifi_netmask)->sin6_addr);
 
             /* Add interface name */
             memcpy(ifi->ifi_name, ifname, IFI_NAME);
@@ -222,8 +234,7 @@ done:
  * Unlike plen_to_mask returns netmask in binary form and not
  * in text form.
  */
-static void plen_to_netmask(int prefix, unsigned char *addr)
-{
+static void plen_to_netmask(int prefix, unsigned char *addr) {
     for (; prefix > 8; prefix -= 8)
         *addr++ = 0xff;
     for (; prefix > 0; prefix--)
@@ -543,7 +554,7 @@ struct ifi_info *get_ifi_info(int family, int doaliases)
 #endif
 
 #if defined(AF_INET6) && HAVE_IPV6 && HAVE_LINUX
-    if (family == AF_INET6) return get_ifi_info_linuxv6(family, doaliases);
+    if (family == AF_INET6) return get_ifi_info_linuxv6(doaliases);
 #elif HAVE_SOLARIS
     return get_ifi_info_solaris(family);
 #endif
@@ -839,7 +850,7 @@ recvfrom_flags(int fd, void *ptr, size_t nbytes, int *flagsp,
 
     *ttl = 255;         // If kernel fails to provide TTL data then assume the TTL was 255 as it should be
 
-    msg.msg_control = control_un.control;
+    msg.msg_control = (void *) control_un.control;
     msg.msg_controllen = sizeof(control_un.control);
     msg.msg_flags = 0;
 #else

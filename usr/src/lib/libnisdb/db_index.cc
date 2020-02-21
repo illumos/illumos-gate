@@ -26,8 +26,6 @@
  *  Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <malloc.h>
 #include "db_headers.h"
@@ -339,6 +337,7 @@ db_index::dump(char *file)
 	else
 		ret = status;
 	WRITEUNLOCK(this, ret, "wu db_index::dump");
+	return (ret);
 }
 
 /*

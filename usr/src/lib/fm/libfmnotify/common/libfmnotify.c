@@ -447,8 +447,10 @@ nd_join_strarray(nd_hdl_t *nhdl, char **arr, uint_t arrsz, char **buf)
 	}
 
 	(void) snprintf(jbuf, len, "%s", arr[0]);
-	for (i = 1; i < arrsz; i++)
-		(void) snprintf(jbuf, len, "%s,%s", jbuf, arr[i]);
+	for (i = 1; i < arrsz; i++) {
+		(void) strlcat(jbuf, ",", len);
+		(void) strlcat(jbuf, arr[i], len);
+	}
 
 	*buf = jbuf;
 	return (0);

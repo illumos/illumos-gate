@@ -132,8 +132,8 @@ mDNSlocal void ToggleLogPacket(void)
     mDNS_PacketLoggingEnabled = !mDNS_PacketLoggingEnabled;
 }
 
-mDNSlocal void DumpStateLog()
 // Dump a little log of what we've been up to.
+mDNSlocal void DumpStateLog()
 {
 	LogMsg("---- BEGIN STATE LOG ----");
     udsserver_info();

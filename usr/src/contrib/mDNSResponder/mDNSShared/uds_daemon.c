@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2003-2015 Apple Inc. All rights reserved.
+ * Copyright (c) 2003-2018 Apple Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,9 @@
 // fully qualified. This can be overridden to apply search domains for queries (that are
 // not fully qualified) with any number of labels e.g., moon, moon.cs, moon.cs.be, etc.
 mDNSBool AlwaysAppendSearchDomains = mDNSfalse;
+
+//  Control enabling ioptimistic DNS
+mDNSBool EnableAllowExpired = mDNStrue;
 
 // Apple-specific functionality, not required for other platforms
 #if APPLE_OSX_mDNSResponder
@@ -325,8 +328,8 @@ mDNSlocal void abort_request(request_state *req)
     // Now, if this request_state is not subordinate to some other primary, close file descriptor and discard replies
     if (!req->primary)
     {
-        if (req->errsd != req->sd) LogOperation("%3d: Removing FD and closing errsd %d", req->sd, req->errsd);
-        else LogOperation("%3d: Removing FD", req->sd);
+        if (req->errsd != req->sd) LogDebug("%3d: Removing FD and closing errsd %d", req->sd, req->errsd);
+        else LogDebug("%3d: Removing FD", req->sd);
         udsSupportRemoveFDFromEventLoop(req->sd, req->platform_data);       // Note: This also closes file descriptor req->sd for us
         if (req->errsd != req->sd) { dnssd_close(req->errsd); req->errsd = req->sd; }
 
@@ -1079,7 +1082,7 @@ mDNSlocal void connection_termination(request_state *request)
 mDNSlocal void handle_cancel_request(request_state *request)
 {
     request_state **req = &all_requests;
-    LogOperation("%3d: Cancel %08X %08X", request->sd, request->hdr.client_context.u32[1], request->hdr.client_context.u32[0]);
+    LogDebug("%3d: Cancel %08X %08X", request->sd, request->hdr.client_context.u32[1], request->hdr.client_context.u32[0]);
     while (*req)
     {
         if ((*req)->primary == request &&
@@ -1691,7 +1694,7 @@ mDNSlocal mStatus register_service_instance(request_state *request, const domain
                                   &request->u.servicereg.name, &request->u.servicereg.type, domain,
                                   request->u.servicereg.host.c[0] ? &request->u.servicereg.host : NULL,
                                   request->u.servicereg.port,
-                                  request->u.servicereg.txtdata, request->u.servicereg.txtlen,
+                                  mDNSNULL, request->u.servicereg.txtdata, request->u.servicereg.txtlen,
                                   instance->subtypes, request->u.servicereg.num_subtypes,
                                   interfaceID, regservice_callback, instance, request->flags);
 
@@ -2168,7 +2171,7 @@ mDNSlocal mStatus add_domain_to_browser(request_state *info, const domainname *d
         {
             domainname tmp;
             ConstructServiceName(&tmp, NULL, &info->u.browser.regtype, &b->domain);
-            LogInfo("add_domain_to_browser: calling external_start_browsing_for_service()");
+            LogDebug("add_domain_to_browser: calling external_start_browsing_for_service()");
             external_start_browsing_for_service(info->u.browser.interface_id, &tmp, kDNSType_PTR, info->flags);
         }
     }
@@ -3164,7 +3167,7 @@ mDNSlocal mDNSBool RetryQuestionWithSearchDomains(DNSQuestion *question, request
     }
     else
     {
-        LogInfo("%3d: RetryQuestionWithSearchDomains: Not appending search domains - SuppressQuery %d, SearchListIndex %d, AppendSearchDomains %d", req->sd, AddRecord, question->SearchListIndex, question->AppendSearchDomains);
+        LogDebug("%3d: RetryQuestionWithSearchDomains: Not appending search domains - SuppressQuery %d, SearchListIndex %d, AppendSearchDomains %d", req->sd, AddRecord, question->SearchListIndex, question->AppendSearchDomains);
     }
     return mDNSfalse;
 }
@@ -3180,10 +3183,11 @@ mDNSlocal void queryrecord_result_reply(mDNS *const m, request_state *req, DNSQu
 
     ConvertDomainNameToCString(answer->name, name);
 
-    LogOperation("%3d: %s(%##s, %s) RESULT %s interface %d: %s", req->sd,
+    LogOperation("%3d: %s(%##s, %s) RESULT %s interface %d: (%s)%s", req->sd,
                  req->hdr.op == query_request ? "DNSServiceQueryRecord" : "DNSServiceGetAddrInfo",
                  question->qname.c, DNSTypeName(question->qtype), AddRecord ? "ADD" : "RMV",
-                 mDNSPlatformInterfaceIndexfromInterfaceID(m, answer->InterfaceID, mDNSfalse), RRDisplayString(m, answer));
+                 mDNSPlatformInterfaceIndexfromInterfaceID(m, answer->InterfaceID, mDNSfalse),
+                 MortalityDisplayString(answer->mortality), RRDisplayString(m, answer));
 
     len = sizeof(DNSServiceFlags);  // calculate reply data length
     len += sizeof(mDNSu32);     // interface index
@@ -3197,6 +3201,8 @@ mDNSlocal void queryrecord_result_reply(mDNS *const m, request_state *req, DNSQu
 
     if (AddRecord)
         flags |= kDNSServiceFlagsAdd;
+    if (answer->mortality == Mortality_Ghost)
+        flags |= kDNSServiceFlagsExpiredAnswer;
     if (question->ValidationStatus != 0)
     {
         error =   kDNSServiceErr_NoError;
@@ -3454,7 +3460,7 @@ mDNSlocal void queryrecord_result_callback(mDNS *const m, DNSQuestion *question,
     // the "core" needs to temporarily turn off SuppressQuery to answer this query.
     if (AddRecord == QC_suppressed)
     {
-        LogInfo("queryrecord_result_callback: Suppressed question %##s (%s)", question->qname.c, DNSTypeName(question->qtype));
+        LogDebug("queryrecord_result_callback: Suppressed question %##s (%s)", question->qname.c, DNSTypeName(question->qtype));
         queryrecord_result_reply(m, req, question, answer, AddRecord, kDNSServiceErr_NoSuchRecord);
         return;
     }
@@ -3519,7 +3525,7 @@ mDNSlocal void queryrecord_result_callback(mDNS *const m, DNSQuestion *question,
             // appended .local, we need to see if we need to send an additional query. This should
             // normally happen just once because after we append .local, we ignore all negative
             // responses for .local above.
-            LogInfo("queryrecord_result_callback: Retrying question %##s (%s) after appending search domains", question->qname.c, DNSTypeName(question->qtype));
+            LogDebug("queryrecord_result_callback: Retrying question %##s (%s) after appending search domains", question->qname.c, DNSTypeName(question->qtype));
             if (RetryQuestionWithSearchDomains(question, req, AddRecord))
             {
                 // Note: We need to call SendAdditionalQuery every time after appending a search domain as .local could
@@ -3648,34 +3654,35 @@ mDNSlocal mStatus handle_queryrecord_request(request_state *request)
     request->interfaceIndex = interfaceIndex;
     mDNSPlatformMemZero(&request->u.queryrecord, sizeof(request->u.queryrecord));
 
-    q->InterfaceID      = InterfaceID;
-    q->flags            = flags;
-    q->Target           = zeroAddr;
+    q->InterfaceID         = InterfaceID;
+    q->flags               = flags;
+    q->Target              = zeroAddr;
     if (!MakeDomainNameFromDNSNameString(&q->qname, name)) return(mStatus_BadParamErr);
 #if 0
     if (!AuthorizedDomain(request, &q->qname, AutoBrowseDomains)) return (mStatus_NoError);
 #endif
-    q->qtype            = rrtype;
-    q->qclass           = rrclass;
-    q->LongLived        = (flags & kDNSServiceFlagsLongLivedQuery     ) != 0;
-    q->ExpectUnique     = mDNSfalse;
-    q->ForceMCast       = (flags & kDNSServiceFlagsForceMulticast     ) != 0;
-    q->ReturnIntermed   = (flags & kDNSServiceFlagsReturnIntermediates) != 0;
-    q->SuppressUnusable = (flags & kDNSServiceFlagsSuppressUnusable   ) != 0;
-    q->TimeoutQuestion  = (flags & kDNSServiceFlagsTimeout            ) != 0;
-    q->WakeOnResolve    = 0;
+    q->qtype               = rrtype;
+    q->qclass              = rrclass;
+    q->LongLived           = (flags & kDNSServiceFlagsLongLivedQuery     ) != 0;
+    q->ExpectUnique        = mDNSfalse;
+    q->ForceMCast          = (flags & kDNSServiceFlagsForceMulticast     ) != 0;
+    q->ReturnIntermed      = (flags & kDNSServiceFlagsReturnIntermediates) != 0;
+    q->SuppressUnusable    = (flags & kDNSServiceFlagsSuppressUnusable   ) != 0;
+    q->TimeoutQuestion     = (flags & kDNSServiceFlagsTimeout            ) != 0;
+    q->allowExpired        = (EnableAllowExpired && (flags & kDNSServiceFlagsAllowExpiredAnswers) != 0) ? AllowExpired_AllowExpiredAnswers : AllowExpired_None;
+    q->WakeOnResolve       = 0;
     q->UseBackgroundTrafficClass = (flags & kDNSServiceFlagsBackgroundTrafficClass) != 0;
     if ((flags & kDNSServiceFlagsValidate) != 0)
         q->ValidationRequired = DNSSEC_VALIDATION_SECURE;
     else if ((flags & kDNSServiceFlagsValidateOptional) != 0)
         q->ValidationRequired = DNSSEC_VALIDATION_SECURE_OPTIONAL;
     q->ValidatingResponse = 0;
-    q->ProxyQuestion    = 0;
+    q->ProxyQuestion      = 0;
     q->AnonInfo = mDNSNULL;
-    q->QuestionCallback = queryrecord_result_callback;
-    q->QuestionContext  = request;
-    q->SearchListIndex  = 0;
-    q->StopTime         = 0;
+    q->QuestionCallback   = queryrecord_result_callback;
+    q->QuestionContext    = request;
+    q->SearchListIndex    = 0;
+    q->StopTime           = 0;
 
     q->DNSSECAuthInfo = mDNSNULL;
     q->DAIFreeCallback = mDNSNULL;
@@ -3739,7 +3746,7 @@ mDNSlocal mStatus handle_queryrecord_request(request_state *request)
         LogMcastQ(q, request, q_start);
         if (callExternalHelpers(q->InterfaceID, &q->qname, q->flags))
         {
-            LogInfo("handle_queryrecord_request: calling external_start_browsing_for_service()");
+            LogDebug("handle_queryrecord_request: calling external_start_browsing_for_service()");
             external_start_browsing_for_service(q->InterfaceID, &q->qname, q->qtype, q->flags);
         }
     }
@@ -4260,7 +4267,7 @@ mDNSlocal void addrinfo_termination_callback(request_state *request)
 
         if (callExternalHelpers(request->u.addrinfo.interface_id, &request->u.addrinfo.q4.qname, request->flags))
         {
-            LogInfo("addrinfo_termination_callback: calling external_stop_browsing_for_service() for kDNSServiceType_A record");
+            LogInfo("addrinfo_termination_callback: calling external_stop_browsing_for_service() for A record");
             external_stop_browsing_for_service(request->u.addrinfo.interface_id, &request->u.addrinfo.q4.qname, kDNSServiceType_A, request->flags);
         }
     }
@@ -4295,7 +4302,7 @@ mDNSlocal void addrinfo_termination_callback(request_state *request)
 
         if (callExternalHelpers(request->u.addrinfo.interface_id, &request->u.addrinfo.q6.qname, request->flags))
         {
-            LogInfo("addrinfo_termination_callback: calling external_stop_browsing_for_service() for kDNSServiceType_AAAA record");
+            LogInfo("addrinfo_termination_callback: calling external_stop_browsing_for_service() for AAAA record");
             external_stop_browsing_for_service(request->u.addrinfo.interface_id, &request->u.addrinfo.q6.qname, kDNSServiceType_AAAA, request->flags);
         }
     }
@@ -4425,19 +4432,20 @@ mDNSlocal mStatus handle_addrinfo_request(request_state *request)
         request->u.addrinfo.protocol = (kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6);
     }
 
-    request->u.addrinfo.q4.InterfaceID      = request->u.addrinfo.q6.InterfaceID      = request->u.addrinfo.interface_id;
-    request->u.addrinfo.q4.ServiceID        = request->u.addrinfo.q6.ServiceID        = serviceIndex;
-    request->u.addrinfo.q4.flags            = request->u.addrinfo.q6.flags            = flags;
-    request->u.addrinfo.q4.Target           = request->u.addrinfo.q6.Target           = zeroAddr;
-    request->u.addrinfo.q4.qname            = request->u.addrinfo.q6.qname            = d;
-    request->u.addrinfo.q4.qclass           = request->u.addrinfo.q6.qclass           = kDNSServiceClass_IN;
-    request->u.addrinfo.q4.LongLived        = request->u.addrinfo.q6.LongLived        = (flags & kDNSServiceFlagsLongLivedQuery     ) != 0;
-    request->u.addrinfo.q4.ExpectUnique     = request->u.addrinfo.q6.ExpectUnique     = mDNSfalse;
-    request->u.addrinfo.q4.ForceMCast       = request->u.addrinfo.q6.ForceMCast       = (flags & kDNSServiceFlagsForceMulticast     ) != 0;
-    request->u.addrinfo.q4.ReturnIntermed   = request->u.addrinfo.q6.ReturnIntermed   = (flags & kDNSServiceFlagsReturnIntermediates) != 0;
-    request->u.addrinfo.q4.SuppressUnusable = request->u.addrinfo.q6.SuppressUnusable = (flags & kDNSServiceFlagsSuppressUnusable   ) != 0;
-    request->u.addrinfo.q4.TimeoutQuestion  = request->u.addrinfo.q6.TimeoutQuestion  = (flags & kDNSServiceFlagsTimeout            ) != 0;
-    request->u.addrinfo.q4.WakeOnResolve    = request->u.addrinfo.q6.WakeOnResolve    = 0;
+    request->u.addrinfo.q4.InterfaceID         = request->u.addrinfo.q6.InterfaceID         = request->u.addrinfo.interface_id;
+    request->u.addrinfo.q4.ServiceID           = request->u.addrinfo.q6.ServiceID           = serviceIndex;
+    request->u.addrinfo.q4.flags               = request->u.addrinfo.q6.flags               = flags;
+    request->u.addrinfo.q4.Target              = request->u.addrinfo.q6.Target              = zeroAddr;
+    request->u.addrinfo.q4.qname               = request->u.addrinfo.q6.qname               = d;
+    request->u.addrinfo.q4.qclass              = request->u.addrinfo.q6.qclass              = kDNSServiceClass_IN;
+    request->u.addrinfo.q4.LongLived           = request->u.addrinfo.q6.LongLived           = (flags & kDNSServiceFlagsLongLivedQuery     ) != 0;
+    request->u.addrinfo.q4.ExpectUnique        = request->u.addrinfo.q6.ExpectUnique        = mDNSfalse;
+    request->u.addrinfo.q4.ForceMCast          = request->u.addrinfo.q6.ForceMCast          = (flags & kDNSServiceFlagsForceMulticast     ) != 0;
+    request->u.addrinfo.q4.ReturnIntermed      = request->u.addrinfo.q6.ReturnIntermed      = (flags & kDNSServiceFlagsReturnIntermediates) != 0;
+    request->u.addrinfo.q4.SuppressUnusable    = request->u.addrinfo.q6.SuppressUnusable    = (flags & kDNSServiceFlagsSuppressUnusable   ) != 0;
+    request->u.addrinfo.q4.TimeoutQuestion     = request->u.addrinfo.q6.TimeoutQuestion     = (flags & kDNSServiceFlagsTimeout            ) != 0;
+    request->u.addrinfo.q4.allowExpired        = request->u.addrinfo.q6.allowExpired        = (EnableAllowExpired && (flags & kDNSServiceFlagsAllowExpiredAnswers) != 0) ? AllowExpired_AllowExpiredAnswers : AllowExpired_None;
+    request->u.addrinfo.q4.WakeOnResolve       = request->u.addrinfo.q6.WakeOnResolve    = 0;
     request->u.addrinfo.q4.UseBackgroundTrafficClass = request->u.addrinfo.q6.UseBackgroundTrafficClass  = (flags & kDNSServiceFlagsBackgroundTrafficClass) != 0;
     if ((flags & kDNSServiceFlagsValidate) != 0)
         request->u.addrinfo.q4.ValidationRequired = request->u.addrinfo.q6.ValidationRequired = DNSSEC_VALIDATION_SECURE;
@@ -4499,7 +4507,7 @@ mDNSlocal mStatus handle_addrinfo_request(request_state *request)
             LogMcastQ(&request->u.addrinfo.q6, request, q_start);
             if (callExternalHelpers(InterfaceID, &d, flags))
             {
-                LogInfo("handle_addrinfo_request: calling external_start_browsing_for_service() for kDNSServiceType_AAAA record");
+                LogDebug("handle_addrinfo_request: calling external_start_browsing_for_service() for AAAA record");
                 external_start_browsing_for_service(InterfaceID, &d, kDNSServiceType_AAAA, flags);
             }
         }
@@ -4541,7 +4549,7 @@ mDNSlocal mStatus handle_addrinfo_request(request_state *request)
 
                 if (callExternalHelpers(InterfaceID, &d, flags))
                 {
-                    LogInfo("addrinfo_termination_callback: calling external_stop_browsing_for_service() for kDNSServiceType_AAAA record");
+                    LogInfo("addrinfo_termination_callback: calling external_stop_browsing_for_service() for AAAA record");
                     external_stop_browsing_for_service(InterfaceID, &d, kDNSServiceType_AAAA, flags);
                 }
             }
@@ -4555,7 +4563,7 @@ mDNSlocal mStatus handle_addrinfo_request(request_state *request)
             LogMcastQ(&request->u.addrinfo.q4, request, q_start);
             if (callExternalHelpers(InterfaceID, &d, flags))
             {
-                LogInfo("handle_addrinfo_request: calling external_start_browsing_for_service() for kDNSServiceType_A record");
+                LogDebug("handle_addrinfo_request: calling external_start_browsing_for_service() for A record");
                 external_start_browsing_for_service(InterfaceID, &d, kDNSServiceType_A, flags);
             }
         }
@@ -4755,7 +4763,7 @@ mDNSlocal void read_msg(request_state *req)
 #if !defined(USE_TCP_LOOPBACK)
 got_errfd:
 #endif
-            LogOperation("%3d: Result code socket %d created %08X %08X", req->sd, req->errsd, req->hdr.client_context.u32[1], req->hdr.client_context.u32[0]);
+            LogDebug("%3d: Result code socket %d created %08X %08X", req->sd, req->errsd, req->hdr.client_context.u32[1], req->hdr.client_context.u32[0]);
 #if defined(_WIN32)
             if (ioctlsocket(req->errsd, FIONBIO, &opt) != 0)
 #else
@@ -4954,8 +4962,8 @@ mDNSlocal void request_callback(int fd, short filter, void *info)
             send_all(req->errsd, (const char *)&err_netorder, sizeof(err_netorder));
             if (req->errsd != req->sd)
             {
-                LogOperation("%3d: Result code socket %d closed  %08X %08X (%d)",
-                             req->sd, req->errsd, req->hdr.client_context.u32[1], req->hdr.client_context.u32[0], err);
+                LogDebug("%3d: Result code socket %d closed  %08X %08X (%d)",
+                         req->sd, req->errsd, req->hdr.client_context.u32[1], req->hdr.client_context.u32[0], err);
                 dnssd_close(req->errsd);
                 req->errsd = req->sd;
                 // Also need to reset the parent's errsd, if this is a subordinate operation
@@ -5026,7 +5034,7 @@ mDNSlocal void connect_callback(int fd, short filter, void *info)
 
         debugf("LOCAL_PEERCRED %d %u %u %d", xucredlen, x.cr_version, x.cr_uid, x.cr_ngroups);
 #endif // APPLE_OSX_mDNSResponder
-        LogOperation("%3d: connect_callback: Adding FD for uid %u", request->sd, request->uid);
+        LogDebug("%3d: connect_callback: Adding FD for uid %u", request->sd, request->uid);
         udsSupportAddFDToEventLoop(sd, request_callback, request, &request->platform_data);
     }
 }
@@ -5087,7 +5095,7 @@ mDNSexport int udsserver_init(dnssd_sock_t skts[], mDNSu32 count)
         FILE *fp = fopen(PID_FILE, "w");
         if (fp != NULL)
         {
-            fprintf(fp, "%d\n", getpid());
+            fprintf(fp, "%d\n", (int)getpid());
             fclose(fp);
         }
     }
@@ -6256,10 +6264,10 @@ struct CompileTimeAssertionChecks_uds_daemon
     // Check our structures are reasonable sizes. Including overly-large buffers, or embedding
     // other overly-large structures instead of having a pointer to them, can inadvertently
     // cause structure sizes (and therefore memory usage) to balloon unreasonably.
-    char sizecheck_request_state          [(sizeof(request_state)           <= 2954) ? 1 : -1];
+    char sizecheck_request_state          [(sizeof(request_state)           <= 3696) ? 1 : -1];
     char sizecheck_registered_record_entry[(sizeof(registered_record_entry) <=   60) ? 1 : -1];
     char sizecheck_service_instance       [(sizeof(service_instance)        <= 6552) ? 1 : -1];
-    char sizecheck_browser_t              [(sizeof(browser_t)               <= 1202) ? 1 : -1];
+    char sizecheck_browser_t              [(sizeof(browser_t)               <= 1432) ? 1 : -1];
     char sizecheck_reply_hdr              [(sizeof(reply_hdr)               <=   12) ? 1 : -1];
     char sizecheck_reply_state            [(sizeof(reply_state)             <=   64) ? 1 : -1];
 };

@@ -1,6 +1,6 @@
 /* -*- Mode: C; tab-width: 4 -*-
  *
- * Copyright (c) 2004-2011 Apple Inc. All rights reserved.
+ * Copyright (c) 2004-2018 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -30,10 +30,6 @@
 #include <string.h>
 
 #include "dns_sd.h"
-
-#if MDNS_BUILDINGSHAREDLIBRARY || MDNS_BUILDINGSTUBLIBRARY
-#pragma export on
-#endif
 
 #if defined(_WIN32)
 // disable warning "conversion from <data> to uint16_t"
@@ -361,10 +357,18 @@ DNSServiceErrorType DNSSD_API TXTRecordGetItemAtIndex
 #define STRINGIFY_ARGUMENT_WITHOUT_EXPANSION(s) # s
 #define STRINGIFY(s) STRINGIFY_ARGUMENT_WITHOUT_EXPANSION(s)
 
+// The "used" variable attribute prevents a non-exported variable from being stripped, even if its visibility is hidden,
+// e.g., when compiling with -fvisibility=hidden.
+#if defined(__GNUC__)
+#define DNSSD_USED __attribute__((used))
+#else
+#define DNSSD_USED
+#endif
+
 // NOT static -- otherwise the compiler may optimize it out
 // The "@(#) " pattern is a special prefix the "what" command looks for
 #ifndef MDNS_VERSIONSTR_NODTS
-const char VersionString_SCCS_libdnssd[] = "@(#) libdns_sd " STRINGIFY(mDNSResponderVersion) " (" __DATE__ " " __TIME__ ")";
+const char VersionString_SCCS_libdnssd[] DNSSD_USED = "@(#) libdns_sd " STRINGIFY(mDNSResponderVersion) " (" __DATE__ " " __TIME__ ")";
 #else
 const char VersionString_SCCS_libdnssd[] = "@(#) libdns_sd " STRINGIFY(mDNSResponderVersion);
 #endif
