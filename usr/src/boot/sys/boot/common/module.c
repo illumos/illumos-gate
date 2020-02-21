@@ -671,7 +671,8 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 			    "error reading '%s': %s", name, strerror(errno));
 			free(name);
 			close(fd);
-			if (archsw.arch_free_loadaddr != NULL) {
+			if (archsw.arch_free_loadaddr != NULL &&
+			    st.st_size != 0) {
 				archsw.arch_free_loadaddr(loadaddr,
 				    (uint64_t)
 				    (roundup2(st.st_size, PAGE_SIZE) >> 12));
@@ -684,7 +685,7 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 	/* Looks OK so far; create & populate control structure */
 	fp = file_alloc();
 	if (fp == NULL) {
-		if (archsw.arch_free_loadaddr != NULL)
+		if (archsw.arch_free_loadaddr != NULL && st.st_size != 0)
 			archsw.arch_free_loadaddr(loadaddr,
 			    (uint64_t)(roundup2(st.st_size, PAGE_SIZE) >> 12));
 		snprintf(command_errbuf, sizeof (command_errbuf),
@@ -1151,7 +1152,8 @@ file_discard(struct preloaded_file *fp)
 	if (fp == NULL)
 		return;
 
-	if (archsw.arch_free_loadaddr != NULL && fp->f_addr) {
+	if (archsw.arch_free_loadaddr != NULL && fp->f_addr &&
+	    fp->f_size != 0) {
 		archsw.arch_free_loadaddr(fp->f_addr,
 		    (uint64_t)(roundup2(fp->f_size, PAGE_SIZE) >> 12));
 	}
