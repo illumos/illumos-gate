@@ -1220,12 +1220,7 @@ dsl_crypto_key_sync(dsl_crypto_key_t *dck, dmu_tx_t *tx)
 	    tx);
 }
 
-typedef struct spa_keystore_change_key_args {
-	const char *skcka_dsname;
-	dsl_crypto_params_t *skcka_cp;
-} spa_keystore_change_key_args_t;
-
-static int
+int
 spa_keystore_change_key_check(void *arg, dmu_tx_t *tx)
 {
 	int ret;
@@ -1469,7 +1464,7 @@ spa_keystore_change_key_sync_impl(uint64_t rddobj, uint64_t ddobj,
 	dsl_dir_rele(dd, FTAG);
 }
 
-static void
+void
 spa_keystore_change_key_sync(void *arg, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds;

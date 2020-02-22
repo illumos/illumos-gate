@@ -25,6 +25,7 @@
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright 2017 RackTop Systems.
  * Copyright (c) 2017 Datto Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -1021,6 +1022,7 @@ lzc_channel_program_impl(const char *pool, const char *program, boolean_t sync,
 {
 	int error;
 	nvlist_t *args;
+	nvlist_t *hidden_args = NULL;
 
 	args = fnvlist_alloc();
 	fnvlist_add_string(args, ZCP_ARG_PROGRAM, program);
@@ -1028,6 +1030,22 @@ lzc_channel_program_impl(const char *pool, const char *program, boolean_t sync,
 	fnvlist_add_boolean_value(args, ZCP_ARG_SYNC, sync);
 	fnvlist_add_uint64(args, ZCP_ARG_INSTRLIMIT, instrlimit);
 	fnvlist_add_uint64(args, ZCP_ARG_MEMLIMIT, memlimit);
+
+	/*
+	 * If any hidden arguments are passed, we pull them out of 'args'
+	 * and into a separate nvlist so spa_history_nvl() doesn't log
+	 * their values.
+	 */
+	if (nvlist_lookup_nvlist(argnvl, ZPOOL_HIDDEN_ARGS,
+	    &hidden_args) == 0) {
+		nvlist_t *argcopy = fnvlist_dup(argnvl);
+
+		fnvlist_add_nvlist(args, ZPOOL_HIDDEN_ARGS, hidden_args);
+		fnvlist_remove(argcopy, ZPOOL_HIDDEN_ARGS);
+		fnvlist_add_nvlist(args, ZCP_ARG_ARGLIST, argcopy);
+		nvlist_free(argcopy);
+	}
+
 	error = lzc_ioctl(ZFS_IOC_CHANNEL_PROGRAM, pool, args, outnvl);
 	fnvlist_free(args);
 

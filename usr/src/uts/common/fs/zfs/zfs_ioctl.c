@@ -3767,6 +3767,7 @@ zfs_ioc_channel_program(const char *poolname, nvlist_t *innvl,
 	uint64_t instrlimit, memlimit;
 	boolean_t sync_flag;
 	nvpair_t *nvarg = NULL;
+	nvlist_t *hidden_args = NULL;
 
 	if (0 != nvlist_lookup_string(innvl, ZCP_ARG_PROGRAM, &program)) {
 		return (EINVAL);
@@ -3782,6 +3783,16 @@ zfs_ioc_channel_program(const char *poolname, nvlist_t *innvl,
 	}
 	if (0 != nvlist_lookup_nvpair(innvl, ZCP_ARG_ARGLIST, &nvarg)) {
 		return (EINVAL);
+	}
+
+	/* hidden args are optional */
+	if (nvlist_lookup_nvlist(innvl, ZPOOL_HIDDEN_ARGS, &hidden_args) == 0) {
+		nvlist_t *argnvl = fnvpair_value_nvlist(nvarg);
+		int ret;
+
+		ret = nvlist_add_nvlist(argnvl, ZPOOL_HIDDEN_ARGS, hidden_args);
+		if (ret != 0)
+			return (ret);
 	}
 
 	if (instrlimit == 0 || instrlimit > zfs_lua_max_instrlimit)
