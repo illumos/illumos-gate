@@ -228,7 +228,7 @@ canonicalize_filename (gchar *filename)
 static char *
 resolve_symlink (const char *file)
 {
-	GError *error;
+	GError *error = NULL;
 	char *dir;
 	char *link;
 	char *f;
