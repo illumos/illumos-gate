@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
 
 LIBRARY =	libidspace.a
@@ -23,17 +23,13 @@ include ../../Makefile.lib
 
 SRCDIR =	../common
 SRCS =		../../../common/idspace/id_space.c
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 
-LDLIBS += 	-lc -lumem
-
-$(LINTLIB) := 	SRCS = $(SRCDIR)/$(LINTSRC)
+LDLIBS += 	-lumem
 
 .KEEP_STATE:
 
 all: $(LIBS)
-
-lint: lintcheck
 
 include ../../Makefile.targ
 

@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2020 Joyent, Inc.
 #
 
 LIBRARY= kldap.a
@@ -65,14 +66,11 @@ CERRWARN +=	-_gcc=-Wno-unused-function
 
 DYNFLAGS +=	$(KERBRUNPATH)
 # setting -L $(ROOT)/usr/lib/gss because libkdb_ldap needs mech_krb5
-LDLIBS +=	-L $(ROOT)/usr/lib/gss -L $(ROOTLIBDIR) -lkdb_ldap \
-		-lc
+LDLIBS +=	-L $(ROOT)/usr/lib/gss -L $(ROOTLIBDIR) -lkdb_ldap
 
 .KEEP_STATE:
 
 all:	$(LIBS)
-
-lint:	lintcheck
 
 # include library targets
 include $(SRC)/lib/krb5/Makefile.targ
