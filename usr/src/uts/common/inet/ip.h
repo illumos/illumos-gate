@@ -1730,8 +1730,6 @@ typedef struct ill_s {
 	 * Capabilities related fields.
 	 */
 	uint_t  ill_dlpi_capab_state;	/* State of capability query, IDCS_* */
-	kcondvar_t ill_dlpi_capab_cv;	/* CV for broadcasting state changes */
-	kmutex_t ill_dlpi_capab_lock;	/* Lock for accessing above Cond Var */
 	uint_t	ill_capab_pending_cnt;
 	uint64_t ill_capabilities;	/* Enabled capabilities, ILL_CAPAB_* */
 	ill_hcksum_capab_t *ill_hcksum_capab; /* H/W cksumming capabilities */

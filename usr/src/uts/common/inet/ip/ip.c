@@ -4124,8 +4124,6 @@ ip_modclose(ill_t *ill)
 	rw_destroy(&ill->ill_mcast_lock);
 	mutex_destroy(&ill->ill_mcast_serializer);
 	list_destroy(&ill->ill_nce);
-	cv_destroy(&ill->ill_dlpi_capab_cv);
-	mutex_destroy(&ill->ill_dlpi_capab_lock);
 
 	/*
 	 * Now we are done with the module close pieces that
