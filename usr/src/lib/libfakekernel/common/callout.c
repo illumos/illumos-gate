@@ -46,7 +46,7 @@ timeout(void (*func)(void *), void *arg, clock_t delta)
 	bzero(&sev, sizeof (sev));
 	sev.sigev_notify = SIGEV_THREAD;
 	sev.sigev_value.sival_ptr = arg;
-	sev.sigev_notify_function = (sigev_notify_func_t)func;
+	sev.sigev_notify_function = (sigev_notify_func_t)(uintptr_t)func;
 	err = timer_create(CLOCK_REALTIME, &sev, &tid);
 	if (err != 0)
 		return (NULL);

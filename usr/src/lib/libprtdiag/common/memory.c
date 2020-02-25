@@ -22,9 +22,8 @@
 /*
  * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
  * All rights reserved.
+ * Copyright (c) 2020 Peter Tribble.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,7 +85,7 @@ static memory_seg_t *match_seg(uint64_t);
 /*ARGSUSED0*/
 void
 display_memorysize(Sys_tree *tree, struct system_kstat_data *kstats,
-	struct grp_info *grps, struct mem_total *memory_total)
+	struct mem_total *memory_total)
 {
 	log_printf(dgettext(TEXT_DOMAIN, "Memory size: "), 0);
 
@@ -110,7 +109,7 @@ display_memorysize(Sys_tree *tree, struct system_kstat_data *kstats,
 
 /*ARGSUSED0*/
 void
-display_memoryconf(Sys_tree *tree, struct grp_info *grps)
+display_memoryconf(Sys_tree *tree)
 {
 	/*
 	 * This function is intentionally blank

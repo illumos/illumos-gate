@@ -77,16 +77,16 @@ dapli_evd_event_alloc(
  * to create the default async evd.
  *
  * Input:
- * 	ia_ptr
+ *	ia_ptr
  *	cno_ptr
  *	qlen
  *	evd_flags
  *
  * Output:
- * 	evd_ptr_ptr
+ *	evd_ptr_ptr
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 
@@ -136,6 +136,13 @@ dapls_evd_internal_create(
 		goto bail;
 	}
 
+#if 0
+	/*
+	 * Current implementation of dapls_ib_setup_async_callback() does
+	 * nothing and returns DAT_SUCCESS. However, it is declared to expect
+	 * function pointers with different signatures. We do leave the code
+	 * block out till dapls_ib_setup_async_callback() is implemented.
+	 */
 	dat_status = dapls_ib_setup_async_callback(
 	    ia_ptr,
 	    DAPL_ASYNC_CQ_COMPLETION,
@@ -145,6 +152,7 @@ dapls_evd_internal_create(
 	if (dat_status != DAT_SUCCESS) {
 		goto bail;
 	}
+#endif
 	/*
 	 * cq_notify is not required since when evd_wait is called
 	 * time we go and poll cq anyways.
@@ -181,13 +189,13 @@ bail:
  * alloc and initialize an EVD struct
  *
  * Input:
- * 	ia
+ *	ia
  *
  * Output:
- * 	evd_ptr
+ *	evd_ptr
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 DAPL_EVD *
@@ -250,14 +258,14 @@ bail:
  * alloc events into an EVD.
  *
  * Input:
- * 	evd_ptr
+ *	evd_ptr
  *	qlen
  *
  * Output:
- * 	NONE
+ *	NONE
  *
  * Returns:
- * 	DAT_SUCCESS
+ *	DAT_SUCCESS
  *	ERROR
  *
  */
@@ -328,13 +336,13 @@ bail:
  * error.
  *
  * Input:
- * 	evd_ptr
+ *	evd_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	status
+ *	status
  *
  */
 DAT_RETURN
@@ -413,8 +421,7 @@ bail:
 
 #ifdef	DAPL_DBG	/* For debugging.  */
 void
-dapli_evd_eh_print_cqe(
-    IN 	ib_work_completion_t	cqe)
+dapli_evd_eh_print_cqe(IN ib_work_completion_t cqe)
 {
 	static char *optable[] = {
 		"",
@@ -481,7 +488,7 @@ dapli_evd_eh_print_cqe(
  * that the lock is held.
  *
  * Input:
- * 	evd_ptr
+ *	evd_ptr
  *
  * Output:
  *	event
@@ -518,8 +525,8 @@ dapli_evd_get_event(
  * entry to this function.
  *
  * Input:
- * 	evd_ptr
- * 	event
+ *	evd_ptr
+ *	event
  *
  * Output:
  *	none
@@ -532,7 +539,7 @@ dapli_evd_post_event(
     IN	const DAT_EVENT	*event_ptr)
 {
 	DAT_RETURN	dat_status;
-	DAPL_CNO 	*cno_to_trigger = NULL;
+	DAPL_CNO	*cno_to_trigger = NULL;
 
 	dapl_dbg_log(DAPL_DBG_TYPE_EVD,
 	    "dapli_evd_post_event: Called with event # %x\n",
@@ -606,8 +613,8 @@ dapli_evd_post_event(
  * entry to this function.
  *
  * Input:
- * 	evd_ptr
- * 	event
+ *	evd_ptr
+ *	event
  *
  * Output:
  *	none
@@ -643,8 +650,8 @@ dapli_evd_post_event_nosignal(
  * format an overflow event for posting
  *
  * Input:
- * 	evd_ptr
- * 	event_ptr
+ *	evd_ptr
+ *	event_ptr
  *
  * Output:
  *	none
@@ -671,8 +678,8 @@ dapli_evd_format_overflow_event(
  * post an overflow event
  *
  * Input:
- * 	async_evd_ptr
- * 	evd_ptr
+ *	async_evd_ptr
+ *	evd_ptr
  *
  * Output:
  *	none
@@ -711,7 +718,7 @@ dapli_evd_get_and_init_event(
     IN DAPL_EVD				*evd_ptr,
     IN DAT_EVENT_NUMBER			event_number)
 {
-	DAT_EVENT 		*event_ptr;
+	DAT_EVENT		*event_ptr;
 
 	event_ptr = dapli_evd_get_event(evd_ptr);
 	if (NULL == event_ptr) {
@@ -734,7 +741,7 @@ dapls_evd_post_cr_arrival_event(
     DAT_CONN_QUAL			conn_qual,
     DAT_CR_HANDLE			cr_handle)
 {
-	DAT_EVENT 		*event_ptr;
+	DAT_EVENT		*event_ptr;
 	event_ptr = dapli_evd_get_and_init_event(evd_ptr, event_number);
 	/*
 	 * Note event lock may be held on successful return
@@ -765,7 +772,7 @@ dapls_evd_post_connection_event(
     IN DAT_COUNT			private_data_size,
     IN DAT_PVOID			private_data)
 {
-	DAT_EVENT 		*event_ptr;
+	DAT_EVENT		*event_ptr;
 	event_ptr = dapli_evd_get_and_init_event(evd_ptr, event_number);
 	/*
 	 * Note event lock may be held on successful return
@@ -793,7 +800,7 @@ dapls_evd_post_async_error_event(
     IN DAT_EVENT_NUMBER			event_number,
     IN DAT_IA_HANDLE			ia_handle)
 {
-	DAT_EVENT 		*event_ptr;
+	DAT_EVENT		*event_ptr;
 	event_ptr = dapli_evd_get_and_init_event(evd_ptr, event_number);
 	/*
 	 * Note event lock may be held on successful return
@@ -818,7 +825,7 @@ dapls_evd_post_software_event(
     IN DAT_EVENT_NUMBER			event_number,
     IN DAT_PVOID			pointer)
 {
-	DAT_EVENT 		*event_ptr;
+	DAT_EVENT		*event_ptr;
 	event_ptr = dapli_evd_get_and_init_event(evd_ptr, event_number);
 	/*
 	 * Note event lock may be held on successful return
@@ -911,13 +918,13 @@ dapls_evd_post_premature_events(IN DAPL_EP *ep_ptr)
  *
  * Input:
  *	evd_ptr
- * 	cqe_ptr
+ *	cqe_ptr
  *
  * Output:
- * 	event_ptr
+ *	event_ptr
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 static DAT_BOOLEAN
@@ -1206,10 +1213,10 @@ dapli_evd_cqe_to_event(
  *	evd_ptr
  *
  * Output:
- * 	nevents
+ *	nevents
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -1296,16 +1303,14 @@ dapls_evd_copy_cq(
  *	timeout
  *
  * Output:
- * 	return status
+ *	return status
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 DAT_RETURN
-dapls_evd_copy_events(
-    DAPL_EVD 	*evd_ptr,
-    DAT_TIMEOUT timeout)
+dapls_evd_copy_events(DAPL_EVD *evd_ptr, DAT_TIMEOUT timeout)
 {
 	dapl_ib_event_t	evp_arr[NUM_EVENTS_PER_POLL];
 	dapl_ib_event_t	*evpp_start;
@@ -1584,16 +1589,14 @@ dapls_evd_copy_events(
  *	evd_ptr
  *
  * Output:
- * 	event
+ *	event
  *
  * Returns:
- * 	Status of operation
+ *	Status of operation
  *
  */
 DAT_RETURN
-dapls_evd_cq_poll_to_event(
-    IN DAPL_EVD 	*evd_ptr,
-    OUT DAT_EVENT	*event)
+dapls_evd_cq_poll_to_event(IN DAPL_EVD *evd_ptr, OUT DAT_EVENT *event)
 {
 	DAT_RETURN		dat_status;
 	ib_work_completion_t	cur_cqe;

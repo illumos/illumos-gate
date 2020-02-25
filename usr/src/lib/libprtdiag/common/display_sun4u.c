@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020 Peter Tribble.
  */
 
 #include <stdio.h>
@@ -62,7 +63,6 @@ display(Sys_tree *tree,
 	int exit_code = 0;	/* init to all OK */
 	void *value;		/* used for opaque PROM data */
 	struct mem_total memory_total;	/* Total memory in system */
-	struct grp_info grps;	/* Info on all groups in system */
 
 	sys_clk = -1;  /* System clock freq. (in MHz) */
 
@@ -96,7 +96,7 @@ display(Sys_tree *tree,
 		}
 
 		/* Display the Memory Size */
-		display_memorysize(tree, kstats, &grps, &memory_total);
+		display_memorysize(tree, kstats, &memory_total);
 
 		/* Display platform specific configuration info */
 		display_platform_specific_header();
@@ -105,7 +105,7 @@ display(Sys_tree *tree,
 		display_cpu_devices(tree);
 
 		/* Display the Memory configuration */
-		display_memoryconf(tree, &grps);
+		display_memoryconf(tree);
 
 		/* Display all the IO cards. */
 		(void) display_io_devices(tree);

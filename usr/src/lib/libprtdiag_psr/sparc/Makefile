@@ -21,11 +21,11 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2019 Peter Tribble.
+# Copyright 2020 Peter Tribble.
 #
 # lib/libprtdiag_psr/sparc/Makefile
 
-PRTDIAG_PLATFORMS=	desktop tazmo javelin sunfire serengeti \
+PRTDIAG_PLATFORMS=	desktop tazmo javelin serengeti \
 			littleneck daktari cherrystone \
 			lw8 ontario schumacher opl montoya monza
 

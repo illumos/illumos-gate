@@ -174,6 +174,10 @@ efi_loadaddr(uint_t type, void *data, vm_offset_t addr)
 		size = st.st_size;
 	}
 
+	/* AllocatePages can not allocate 0 pages. */
+	if (size == 0)
+		return (addr);
+
 	pages = EFI_SIZE_TO_PAGES(size);
 	/* 4GB upper limit */
 	paddr = UINT32_MAX;

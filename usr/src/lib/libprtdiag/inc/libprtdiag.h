@@ -21,12 +21,11 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 Peter Tribble.
  */
 
 #ifndef	_SYS_LIBPRTDIAG_H
 #define	_SYS_LIBPRTDIAG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -132,15 +131,15 @@ void	decode_qlc_card_model_prop(Prom_node *card_node, struct io_card *card);
  */
 void	read_platform_kstats(Sys_tree *tree,
 	    struct system_kstat_data *sys_kstat,
-	    struct bd_kstat_data *bdp, struct envctrl_kstat_data *ep);
+	    struct envctrl_kstat_data *ep);
 void	read_sun4u_kstats(Sys_tree *, struct system_kstat_data *);
 
 /*
  * memory functions
  */
 void	display_memorysize(Sys_tree *tree, struct system_kstat_data *kstats,
-	    struct grp_info *grps, struct mem_total *memory_total);
-void	display_memoryconf(Sys_tree *tree, struct grp_info *grps);
+	    struct mem_total *memory_total);
+void	display_memoryconf(Sys_tree *tree);
 
 /*
  * prom functions

@@ -22,6 +22,7 @@
 /*
  * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 Peter Tribble.
  *
  * Javelin Platform specific functions.
  *
@@ -67,7 +68,7 @@ extern	int	print_flag;
  * at runtime (workgroup server systems only)
  */
 int	error_check(Sys_tree *tree, struct system_kstat_data *kstats);
-void	display_memoryconf(Sys_tree *tree, struct grp_info *grps);
+void	display_memoryconf(Sys_tree *tree);
 int	disp_fail_parts(Sys_tree *tree);
 void	display_hp_fail_fault(Sys_tree *tree, struct system_kstat_data *kstats);
 void	display_diaginfo(int flag, Prom_node *root, Sys_tree *tree,
@@ -78,7 +79,7 @@ void	display_io_cards(struct io_card *list);
 void	display_ffb(Board_node *, int);
 void	read_platform_kstats(Sys_tree *tree,
 		struct system_kstat_data *sys_kstat,
-		struct bd_kstat_data *bdp, struct envctrl_kstat_data *ep);
+	        struct envctrl_kstat_data *ep);
 
 /* local functions */
 static	int disp_envc_status(struct system_kstat_data *);
@@ -129,7 +130,7 @@ dev_next_node_sibling(Prom_node *root, char *name)
  * DIMM sizes, DIMM socket names.
  */
 void
-display_memoryconf(Sys_tree *tree, struct grp_info *grps)
+display_memoryconf(Sys_tree *tree)
 {
 	Board_node *bnode;
 	Prom_node *memory;
@@ -144,9 +145,6 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
 	Prop *status_prop;
 	char interleave[8];
 	int total_size = 0;
-#ifdef lint
-	grps = grps;
-#endif
 
 	log_printf("\n", 0);
 	log_printf("=========================", 0);
@@ -752,11 +750,11 @@ display_ffb(Board_node *board, int table)
 
 /*
  * This module does the reading and interpreting of javelin system
- * kstats. These kstats are created by the environ drivers.
+ * kstats. These kstats are created by the envctrl drivers.
  */
 void
 read_platform_kstats(Sys_tree *tree, struct system_kstat_data *sys_kstat,
-    struct bd_kstat_data *bdp, struct envctrl_kstat_data *ep)
+    struct envctrl_kstat_data *ep)
 {
 	kstat_ctl_t		*kc;
 	struct envctrltwo_kstat_data *ecp;
@@ -765,11 +763,6 @@ read_platform_kstats(Sys_tree *tree, struct system_kstat_data *sys_kstat,
 	if ((kc = kstat_open()) == NULL) {
 		return;
 	}
-#ifdef lint
-	tree = tree;
-	bdp = bdp;
-	ep = ep;
-#endif
 
 	/* read the envctrltwo kstats */
 	ecp = &sys_kstat->envc_data;

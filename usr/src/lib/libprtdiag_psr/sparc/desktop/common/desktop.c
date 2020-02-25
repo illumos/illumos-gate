@@ -22,6 +22,7 @@
 /*
  * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 Peter Tribble.
  *
  * Desktop Platform specific functions.
  *
@@ -30,8 +31,6 @@
  *	machine_type == MTYPE_DEFAULT
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -89,15 +88,11 @@ extern	int	print_flag;
  * at runtime (desktop systems only)
  */
 int	error_check(Sys_tree *tree, struct system_kstat_data *kstats);
-void 	display_memoryconf(Sys_tree *tree, struct grp_info *grps);
 int	disp_fail_parts(Sys_tree *tree);
 void	display_hp_fail_fault(Sys_tree *tree, struct system_kstat_data *kstats);
 void	display_diaginfo(int flag, Prom_node *root, Sys_tree *tree,
 		struct system_kstat_data *kstats);
 void	display_pci(Board_node *bnode);
-void	read_platform_kstats(Sys_tree *tree,
-		struct system_kstat_data *sys_kstat,
-		struct bd_kstat_data *bdp, struct envctrl_kstat_data *ep);
 void	display_sbus(Board_node *);
 
 
@@ -130,22 +125,13 @@ error_check(Sys_tree *tree, struct system_kstat_data *kstats)
 }
 
 
-void
-display_memoryconf(Sys_tree *tree, struct grp_info *grps)
-{
-#ifdef lint
-	tree = tree;
-	grps = grps;
-#endif
-}
-
 /*
  * disp_fail_parts
  *
  * Display the failed parts in the system. This function looks for
  * the status property in all PROM nodes. On systems where
- * the PROM does not supports passing diagnostic information
- * thruogh the device tree, this routine will be silent.
+ * the PROM does not support passing diagnostic information
+ * through the device tree, this routine will be silent.
  */
 int
 disp_fail_parts(Sys_tree *tree)
@@ -317,20 +303,6 @@ display_pci(Board_node *bnode)
 		return;
 	}
 }
-
-void
-read_platform_kstats(Sys_tree *tree, struct system_kstat_data *sys_kstat,
-	struct bd_kstat_data *bdp, struct envctrl_kstat_data *ep)
-
-{
-#ifdef	lint
-	tree = tree;
-	sys_kstat = sys_kstat;
-	bdp = bdp;
-	ep = ep;
-#endif
-}
-
 
 /*
  * local functions
