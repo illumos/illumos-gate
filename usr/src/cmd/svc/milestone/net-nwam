@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Milan Jurik. All rights reserved.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 . /lib/svc/share/smf_include.sh
@@ -165,7 +166,7 @@ create_legacy_loc () {
 	# Copy /etc/nsswitch.conf file
 	copy_to_legacy_loc /etc/nsswitch.conf
 	NAMESERVICES_CONFIG_FILE="$VOL_LEGACY_PATH/nsswitch.conf"
-	
+
 	# Gather DNS info from resolv.conf if present.
 	if [ -f /etc/resolv.conf ]; then
 		NAMESERVICES="dns,"
@@ -215,12 +216,12 @@ create_legacy_loc () {
 
 	# Now, write nwamcfg commands for nameservices
 	write_loc_prop "nameservices" $NAMESERVICES $CREATE_LOC_LEGACY_FILE
- 	write_loc_prop "nameservices-config-file" $NAMESERVICES_CONFIG_FILE \
- 	    $CREATE_LOC_LEGACY_FILE
+	write_loc_prop "nameservices-config-file" $NAMESERVICES_CONFIG_FILE \
+	    $CREATE_LOC_LEGACY_FILE
 	write_loc_prop "dns-nameservice-configsrc" $DNS_NAMESERVICE_CONFIGSRC \
 	    $CREATE_LOC_LEGACY_FILE
 	write_loc_prop "dns-nameservice-domain" $DNS_NAMESERVICE_DOMAIN \
- 	    $CREATE_LOC_LEGACY_FILE
+	    $CREATE_LOC_LEGACY_FILE
 	write_loc_prop "dns-nameservice-servers" $DNS_NAMESERVICE_SERVERS \
 	    $CREATE_LOC_LEGACY_FILE
 	write_loc_prop "dns-nameservice-search" $DNS_NAMESERVICE_SEARCH \
@@ -238,7 +239,7 @@ create_legacy_loc () {
 	# Retrieve NFSv4 domain from SMF.
 	if service_is_enabled $NFS_MAPID_FMRI; then
 		NFS_DOMAIN=`get_smf_prop NFS_MAPID_FMRI \
-		    nfs-props/nfsmapid_domain`    
+		    nfs-props/nfsmapid_domain`
 		write_loc_prop "nfsv4-domain" \
 		    $NFS_DOMAIN $CREATE_LOC_LEGACY_FILE
 	fi
@@ -313,7 +314,7 @@ create_legacy_loc () {
 	if [ -n "$IPNAT_CONFIG_FILE" -a -f "$IPNAT_CONFIG_FILE" ]; then
 		write_loc_prop "ipnat-config-file" $IPNAT_CONFIG_FILE \
 		    $CREATE_LOC_LEGACY_FILE
-	fi   
+	fi
 	if [ -n "$IPPOOL_CONFIG_FILE" -a -f "$IPPOOL_CONFIG_FILE" ]; then
 		write_loc_prop "ippool-config-file" $IPPOOL_CONFIG_FILE \
 		    $CREATE_LOC_LEGACY_FILE
@@ -504,7 +505,7 @@ case "$1" in
 	# The real daemon is not started in a shared stack zone. But we need to
 	# create a dummy background process to preserve contract lifetime.
 	smf_configure_ip
-	if [ $? = "1" ] ; then 
+	if [ $? = "1" ] ; then
 		$RM -f $VOL_NWAM_PATH/nwam_blocked
 		$MKFIFO $VOL_NWAM_PATH/nwam_blocked
 		($CAT <$VOL_NWAM_PATH/nwam_blocked >/dev/null) &
@@ -565,6 +566,7 @@ case "$1" in
 		/sbin/dladm up-part
 		/sbin/dladm up-aggr
 		/sbin/flowadm init-flow
+		/sbin/dladm up-overlay
 	fi
 
 	#
@@ -588,7 +590,7 @@ case "$1" in
 'stop')
 	# We need to make the dummy process we created above stop.
 	smf_configure_ip
-	if [ $? = "1" ] ; then 
+	if [ $? = "1" ] ; then
 		echo "stop" > $VOL_NWAM_PATH/nwam_blocked
 		exit $SMF_EXIT_OK
 	fi
@@ -604,7 +606,7 @@ case "$1" in
 		exit $SMF_EXIT_OK
 	fi
 	revert_to_legacy_loc
-	# remove the location property group 
+	# remove the location property group
 	$SVCCFG -s $NET_LOC_FMRI delpg location
 	;;
 
@@ -614,7 +616,7 @@ case "$1" in
 	# network/physical:nwam will be disabled.
 	# There are various other parts of the system (nscd, nfs) that
 	# depend on continuing to have a working network.  For this
-	# reason we don't change the network configuration immediately.	
+	# reason we don't change the network configuration immediately.
 	#
 	# Disable network/physical temporarily and make sure that will
 	# be enabled on reboot.
@@ -622,7 +624,7 @@ case "$1" in
 	$SVCCFG -s $NET_PHYS_FMRI setprop general/enabled=true
 
 	# If nwam is online then make sure that it's temporarily enabled.
-	nwam_online=`$SVCPROP -t -p restarter/state $NET_NWAM_FMRI`	
+	nwam_online=`$SVCPROP -t -p restarter/state $NET_NWAM_FMRI`
 	if [ $? -eq 0 ]; then
 		set -- $nwam_online
 		[ $3 = "online" ] && $SVCADM enable -st $NET_NWAM_FMRI

@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _LIBDLADM_IMPL_H
@@ -73,6 +73,14 @@ extern void		dladm_free_args(dladm_arg_list_t *);
 /*
  * Link attributes persisted by dlmgmtd.
  */
+
+/*
+ * Set for overlays only
+ */
+#define	FENCAP		"encap"		/* string */
+#define	FSEARCH		"search"	/* string */
+#define	FVNETID		"vnetid"	/* uint64_t */
+
 /*
  * Set for VLANs only
  */
@@ -120,7 +128,8 @@ extern void		dladm_free_args(dladm_arg_list_t *);
 /*
  * List of all the above attributes.
  */
-#define	DLADM_ATTR_NAMES	FVLANID, FLINKOVER, \
+#define	DLADM_ATTR_NAMES	FENCAP, FSEARCH, FVNETID, \
+				FVLANID, FLINKOVER, \
 				FKEY, FNPORTS, FPORTS, FPOLICY, \
 				FFIXMACADDR, FFORCE, FLACPMODE, FLACPTIMER, \
 				FMADDRTYPE, FMADDRLEN, FMADDRSLOT, \

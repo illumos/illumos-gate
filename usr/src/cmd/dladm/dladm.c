@@ -233,7 +233,7 @@ static cmdfunc_t do_add_bridge, do_remove_bridge, do_show_bridge;
 static cmdfunc_t do_create_iptun, do_modify_iptun, do_delete_iptun;
 static cmdfunc_t do_show_iptun, do_up_iptun, do_down_iptun;
 static cmdfunc_t do_create_overlay, do_delete_overlay, do_modify_overlay;
-static cmdfunc_t do_show_overlay;
+static cmdfunc_t do_show_overlay, do_up_overlay;
 
 static void	do_up_vnic_common(int, char **, const char *, boolean_t);
 
@@ -424,13 +424,14 @@ static cmd_t	cmds[] = {
 	    "    create-overlay   [-t] -e <encap> -s <search> -v <vnetid>\n"
 	    "\t\t     [ -p <prop>=<value>[,...]] <overlay>"	},
 	{ "delete-overlay",	do_delete_overlay,
-	    "    delete-overlay   <overlay>"			},
+	    "    delete-overlay   [-t] <overlay>"			},
 	{ "modify-overlay",	do_modify_overlay,
 	    "    modify-overlay   -d mac | -f | -s mac=ip:port "
 	    "<overlay>"						},
 	{ "show-overlay",	do_show_overlay,
 	    "    show-overlay     [-f | -t] [[-p] -o <field>,...] "
 	    "[<overlay>]\n"						},
+	{ "up-overlay",		do_up_overlay,		NULL		},
 	{ "show-usage",		do_show_usage,
 	    "    show-usage       [-a] [-d | -F <format>] "
 	    "[-s <DD/MM/YYYY,HH:MM:SS>]\n"
@@ -9886,13 +9887,6 @@ do_create_overlay(int argc, char *argv[], const char *use)
 		}
 	}
 
-	/*
-	 * Overlays do not currently support persistence.
-	 * This will be addressed by https://www.illumos.org/issues/14434
-	 */
-	if ((flags & DLADM_OPT_PERSIST) != 0)
-		die("overlays do not (yet) support persistence, use -t");
-
 	if (havevid == B_FALSE)
 		die("missing required virtual network id");
 
@@ -9935,18 +9929,33 @@ do_delete_overlay(int argc, char *argv[], const char *use)
 {
 	datalink_id_t	linkid = DATALINK_ALL_LINKID;
 	dladm_status_t	status;
+	uint32_t flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
+	int option;
 
-	if (argc != 2) {
-		usage();
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":t", lopts,
+	    NULL)) != -1) {
+		switch (option) {
+		case 't':
+			flags &= ~DLADM_OPT_PERSIST;
+			break;
+		default:
+			die_opterr(optopt, option, use);
+		}
 	}
 
-	status = dladm_name2info(handle, argv[1], &linkid, NULL, NULL, NULL);
-	if (status != DLADM_STATUS_OK)
-		die_dlerr(status, "failed to delete %s", argv[1]);
+	/* get overlay name (required last argument) */
+	if (optind != (argc - 1))
+		usage();
 
-	status = dladm_overlay_delete(handle, linkid);
+	status = dladm_name2info(handle, argv[optind], &linkid,
+	    NULL, NULL, NULL);
 	if (status != DLADM_STATUS_OK)
-		die_dlerr(status, "failed to delete %s", argv[1]);
+		die_dlerr(status, "failed to delete %s", argv[optind]);
+
+	status = dladm_overlay_delete(handle, linkid, flags);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "failed to delete %s", argv[optind]);
 }
 
 typedef struct showoverlay_state {
@@ -10543,4 +10552,36 @@ do_modify_overlay(int argc, char *argv[], const char *use)
 			    "target cache %s", optarg, argv[optind]);
 	}
 
+}
+
+static void
+do_up_overlay(int argc, char *argv[], const char *use)
+{
+	datalink_id_t	linkid = DATALINK_ALL_LINKID;
+	dladm_status_t	status;
+
+	/*
+	 * get the id or the name of the overlay (optional last argument)
+	 */
+	if (argc == 2) {
+		status = dladm_name2info(handle, argv[1], &linkid, NULL, NULL,
+		    NULL);
+		if (status != DLADM_STATUS_OK)
+			goto done;
+	} else if (argc > 2) {
+		usage();
+	}
+
+	status = dladm_overlay_up(handle, linkid, &errlist);
+
+done:
+	if (status != DLADM_STATUS_OK) {
+		if (argc == 2) {
+			die_dlerrlist(status, &errlist,
+			    "could not bring up overlay '%s'", argv[1]);
+		} else {
+			die_dlerrlist(status, &errlist,
+			    "could not bring overlays up");
+		}
+	}
 }

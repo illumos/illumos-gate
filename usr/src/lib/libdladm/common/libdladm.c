@@ -1337,6 +1337,12 @@ dladm_errlist_reset(dladm_errlist_t *erl)
 	dladm_errlist_init(erl);
 }
 
+uint_t
+dladm_errlist_count(dladm_errlist_t *erl)
+{
+	return (erl->el_count);
+}
+
 dladm_status_t
 dladm_errlist_append(dladm_errlist_t *erl, const char *fmt, ...)
 {

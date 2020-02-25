@@ -27,6 +27,7 @@
 # Copyright 2012 Milan Jurik. All rights reserved.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 #
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 
 . /lib/svc/share/smf_include.sh
 . /lib/svc/share/net_include.sh
@@ -38,7 +39,6 @@
 # In the global zone and exclusive-IP zones we proceed.
 #
 smf_configure_ip || exit $SMF_EXIT_OK
-
 
 # Make sure that the libraries essential to this stage of booting can be found.
 LD_LIBRARY_PATH=/lib; export LD_LIBRARY_PATH
@@ -98,6 +98,15 @@ if smf_is_globalzone; then
 	# Create flows via flowadm.
 	#
 	/sbin/flowadm init-flow
+	#
+	# Bring up overlays
+	# Note that there may be VNICs configured over these overlays but
+	# these cannot be brought up until the network interface on which
+	# varpd will listen is enabled, and that doesn't happen until
+	# near the end of this script. Therefore VNIC initialisation is
+	# repeated below if overlays are present.
+	#
+	/sbin/dladm up-overlay
 fi
 
 #
@@ -146,6 +155,45 @@ is_iptun ()
 		fi
 	fi
 	return 1
+}
+
+bringup_ipif()
+{
+	for showif_output in `\
+	    /sbin/ipadm show-if -p -o ifname,state,current`; do
+		intf=`echo $showif_output | /usr/bin/cut -f1 -d:`
+		state=`echo $showif_output | /usr/bin/cut -f2 -d:`
+		current=`echo $showif_output | /usr/bin/cut -f3 -d:`
+		if  [[ "$state" != "disabled" && $current != *Z* ]]; then
+			#
+			# skip if not a persistent interface, or if it should
+			# get IP configuration from the global zone ('Z' flag
+			# is set)
+			#
+			continue;
+		elif is_iptun $intf; then
+			# skip IP tunnel interfaces plumbed by net-iptun
+			continue;
+		elif [ -f /etc/hostname.$intf ] || \
+		    [ -f /etc/hostname6.$intf ]; then
+			if [[ $current != *Z* ]]; then
+				echo "found /etc/hostname.$intf "\
+				    "or /etc/hostname6.$intf, "\
+				    "ignoring ipadm configuration" > /dev/msglog
+				continue;
+			else
+				echo "Ignoring /etc/hostname*.$intf" \
+				    > /dev/msglog
+				{
+					/sbin/ifconfig $intf unplumb
+					/sbin/ifconfig $intf inet6 unplumb
+				} > /dev/null 2>&1
+			fi
+		fi
+
+		# Enable the interface managed by ipadm
+		/sbin/ipadm enable-if -t $intf
+	done
 }
 
 #
@@ -313,7 +361,7 @@ fi
 #
 if /usr/bin/grep -q _family /etc/ipadm/ipadm.conf; then
 	oldifs=$(/usr/bin/sed -En \
-	    's/^_ifname=([a-z0-9]+);_family=[0-9]+;$/\1/p' \
+	    's/^_ifname=([a-z0-9_]+);_family=[0-9]+;$/\1/p' \
 	    /etc/ipadm/ipadm.conf | /usr/bin/sort -u)
 	/usr/bin/sed -i '/_family/d' /etc/ipadm/ipadm.conf
 	for oldif in $oldifs; do
@@ -329,35 +377,7 @@ fi
 # we are in a non-global zone and Layer-3 protection of IP addresses is
 # enforced on the interface by the global zone.
 #
-for showif_output in `/sbin/ipadm show-if -p -o ifname,state,current`; do
-	intf=`echo $showif_output | /usr/bin/cut -f1 -d:`
-	state=`echo $showif_output | /usr/bin/cut -f2 -d:`
-	current=`echo $showif_output | /usr/bin/cut -f3 -d:`
-	if  [[ "$state" != "disabled" && $current != *Z* ]]; then
-		#
-		# skip if not a persistent interface, or if it should get IP
-		# configuration from the global zone ('Z' flag is set)
-		#
-		continue;
-	elif is_iptun $intf; then
-		# skip IP tunnel interfaces plumbed by net-iptun
-		continue;
-	elif [ -f /etc/hostname.$intf ] || [ -f /etc/hostname6.$intf ]; then
-		if [[ $current != *Z* ]]; then
-			echo "found /etc/hostname.$intf "\
-			    "or /etc/hostname6.$intf, "\
-			    "ignoring ipadm configuration" > /dev/msglog
-			continue;
-		else
-			echo "Ignoring /etc/hostname*.$intf" > /dev/msglog
-			/sbin/ifconfig $intf unplumb > /dev/null 2>&1
-			/sbin/ifconfig $intf inet6 unplumb > /dev/null 2>&1
-		fi
-	fi
-
-	# Enable the interface managed by ipadm
-	/sbin/ipadm enable-if -t $intf
-done
+bringup_ipif
 
 #
 # Process the /etc/hostname[6].* files for IPMP interfaces.  Processing these
@@ -438,6 +458,19 @@ if [ "$interface_names" != '/etc/dhcp.*[0-9]' ]; then
 	IFS="$ORIGIFS"
 	unset ORIGIFS
 	[ -n "$i4d_fail" ] && warn_failed_ifs "configure IPv4 DHCP" "$i4d_fail"
+fi
+
+# There is a chicken-and-egg problem with bringing up overlay VNICs at boot
+# time. When the first VNIC is added to an overlay, it creates a kernel socket
+# to listen for incoming encapsulated frames. Therefore, VNICs cannot be added
+# until after IP interfaces have been brought up. Overlay VNICs may themselves
+# have IP interfaces over them and so it is necessary to attempt to bring up
+# any remaining IP interfaces once the overlay VNICs are in place.
+if smf_is_globalzone && dladm show-link -p -o class | egrep -s 'overlay'; then
+	echo "Bringing up any remaining VNICs on overlays"
+	/sbin/dladm up-vnic
+	echo "Bringing up any remaining IP interfaces on overlay VNICs"
+	bringup_ipif
 fi
 
 # In order to avoid bringing up the interfaces that have

@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2015 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _LIBDLOVERLAY_H
@@ -27,6 +28,15 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef struct dladm_overlay_attr {
+	datalink_id_t		oa_linkid;
+	char			oa_name[MAXLINKNAMELEN];
+	char			oa_encap[OVERLAY_PROP_SIZEMAX];
+	char			oa_search[OVERLAY_PROP_SIZEMAX];
+	uint64_t		oa_vid;
+	uint32_t		oa_flags;
+} dladm_overlay_attr_t;
 
 #define	DLADM_OVERLAY_F_DROP	0x0001
 #define	DLADM_OVERLAY_F_DEFAULT	0xf000
@@ -47,7 +57,10 @@ typedef struct dladm_overlay_status {
 extern dladm_status_t dladm_overlay_create(dladm_handle_t, const char *,
     const char *, const char *, uint64_t, dladm_arg_list_t *, dladm_errlist_t *,
     uint32_t);
-extern dladm_status_t dladm_overlay_delete(dladm_handle_t, datalink_id_t);
+extern dladm_status_t dladm_overlay_delete(dladm_handle_t, datalink_id_t,
+    uint32_t);
+extern dladm_status_t dladm_overlay_up(dladm_handle_t, datalink_id_t,
+    dladm_errlist_t *);
 
 typedef void (*dladm_overlay_status_f)(dladm_handle_t, datalink_id_t,
     dladm_overlay_status_t *, void *);

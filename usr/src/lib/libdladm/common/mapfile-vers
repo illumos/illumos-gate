@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015 Joyent, Inc.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -281,6 +282,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	dladm_overlay_prop_info;
 	dladm_overlay_get_prop;
 	dladm_overlay_walk_prop;
+	dladm_overlay_up;
 
 	dladm_overlay_cache_set;
 	dladm_overlay_cache_get;
