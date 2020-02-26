@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ENXS platform-specific functions
  */
@@ -151,7 +149,7 @@ rscp_init(void)
 	/*
 	 * 'erase' the rx buffer
 	 */
-	(void) memset(rsc_rx_buffer, 0, sizeof (RSC_MAX_RX_BUFFER));
+	(void) memset(rsc_rx_buffer, 0, sizeof (rsc_rx_buffer));
 	rsc_rx_resp_len = 0;
 	rsc_rx_error = 0;
 	rsc_rx_resp_type = DP_NULL_MSG;

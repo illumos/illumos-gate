@@ -22,6 +22,7 @@
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 Andrew Stormont.  All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 
@@ -1027,9 +1028,12 @@ execute(const char *name, const struct stat *statb, int type, struct FTW *state)
 			 * /usr/bin/find  will not pattern match a leading
 			 * '.' in a filename, unless '.' is explicitly
 			 * specified.
+			 *
+			 * The legacy behavior makes no sense for PATH.
 			 */
 #ifndef XPG4
-			fnmflags |= FNM_PERIOD;
+			if (np->action == NAME || np->action == INAME)
+				fnmflags |= FNM_PERIOD;
 #endif
 
 			val = !fnmatch(np->first.cp,

@@ -56,6 +56,7 @@ dir path=opt/util-tests/tests/files/make_a/a
 dir path=opt/util-tests/tests/files/make_a/b
 dir path=opt/util-tests/tests/files/make_a/c
 dir path=opt/util-tests/tests/files/make_l
+dir path=opt/util-tests/tests/find
 dir path=opt/util-tests/tests/libcustr
 dir path=opt/util-tests/tests/libnvpair_json
 dir path=opt/util-tests/tests/libsff
@@ -1432,6 +1433,7 @@ file path=opt/util-tests/tests/files/test5 mode=0444
 file path=opt/util-tests/tests/files/test6 mode=0444
 file path=opt/util-tests/tests/files/test7 mode=0444
 file path=opt/util-tests/tests/files/testnl mode=0444
+file path=opt/util-tests/tests/find/findtest mode=0555
 file path=opt/util-tests/tests/grep_test mode=0555
 file path=opt/util-tests/tests/iconv_test mode=0555
 file path=opt/util-tests/tests/libcustr/custr_remove mode=0555
