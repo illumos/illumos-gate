@@ -44,6 +44,14 @@
 		<service_fmri value='svc:/system/filesystem/usr' />
 	</dependency>
 
+	<dependency
+		name='kbmd'
+		grouping='optional_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/kbmd:default' />
+	</dependency>
+
 	<!--
 	  Start method timeout is infinite to handle potentially unbounded
 	  fsck times.

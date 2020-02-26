@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 set -o xtrace
@@ -70,6 +70,24 @@ function mount_zfs
     echo ${output} 1>&2
 }
 
+function unlock_pool
+{
+    local pool=$1
+
+    # If the key is already loaded, don't bother trying again
+    local keystatus="$(zfs get -Hpo value keystatus $pool)"
+    if [[ "$keystatus" == "available" ]]; then
+        return
+    fi
+
+    kbmadm unlock $pool && return
+
+    echo "Failed to unlock $pool; recovery may be required" | \
+        tee -a /dev/console >&2
+
+    exit $SMF_EXIT_ERR_FATAL
+}
+
 /bin/bootparams | grep "^noimport=true" >/dev/null
 if [ $? -ne 0 ]; then
     # If the zpool doesn't exist, then there's nothing to mount.
@@ -87,11 +105,17 @@ if [ $? -ne 0 ]; then
 
     for pool in $pools; do
         zpool import -f $pool
-	# Due to early, failed attempts to support the filesystem_limits
-	# feature we now need to ensure the dependent feature is enabled.
-	zpool set feature@extensible_dataset=enabled $pool
+
+        is_encr="$(zfs get -Hpo value encryption $pool)"
+
+        [[ "$is_encr" != "off" ]] && unlock_pool $pool
+
+        # Due to early, failed attempts to support the filesystem_limits
+        # feature we now need to ensure the dependent feature is enabled.
+        zpool set feature@extensible_dataset=enabled $pool
         if [[ -f /$pool/.system_pool ]]; then
             SYS_ZPOOL=$pool
+            [[ "$is_encr" != "off" ]] && kbmadm set-syspool $pool
         fi
     done
 
