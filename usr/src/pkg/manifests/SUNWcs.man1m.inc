@@ -110,6 +110,7 @@ file path=usr/share/man/man1m/groupmod.1m
 file path=usr/share/man/man1m/growfs.1m
 file path=usr/share/man/man1m/halt.1m
 file path=usr/share/man/man1m/hostconfig.1m
+file path=usr/share/man/man1m/hotplug.1m
 file path=usr/share/man/man1m/id.1m
 file path=usr/share/man/man1m/idmap.1m
 file path=usr/share/man/man1m/idmapd.1m
