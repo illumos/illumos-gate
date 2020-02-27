@@ -27,8 +27,6 @@
 #ifndef	_FMD_SERD_H
 #define	_FMD_SERD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -75,14 +73,14 @@ extern fmd_serd_eng_t *fmd_serd_eng_lookup(fmd_serd_hash_t *, const char *);
 extern void fmd_serd_eng_delete(fmd_serd_hash_t *, const char *);
 
 extern int fmd_serd_eng_contains(fmd_serd_eng_t *, fmd_event_t *);
-extern int fmd_serd_eng_record(fmd_serd_eng_t *, fmd_event_t *);
+extern int fmd_serd_eng_record(void *, fmd_event_t *);
 extern int fmd_serd_eng_fired(fmd_serd_eng_t *);
 extern int fmd_serd_eng_empty(fmd_serd_eng_t *);
 
 extern void fmd_serd_eng_reset(fmd_serd_eng_t *);
-extern void fmd_serd_eng_gc(fmd_serd_eng_t *);
-extern void fmd_serd_eng_commit(fmd_serd_eng_t *);
-extern void fmd_serd_eng_clrdirty(fmd_serd_eng_t *);
+extern void fmd_serd_eng_gc(fmd_serd_eng_t *, void *);
+extern void fmd_serd_eng_commit(fmd_serd_eng_t *, void*);
+extern void fmd_serd_eng_clrdirty(fmd_serd_eng_t *, void*);
 
 #ifdef	__cplusplus
 }

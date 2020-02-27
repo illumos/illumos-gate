@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/fm/protocol.h>
 #include <sys/types.h>
 #include <sys/systeminfo.h>
@@ -75,11 +73,17 @@ static fmd_scheme_t *sch_list;		/* list of cached schemes */
 static char *g_root;			/* fmd root dir */
 static struct topo_hdl *g_thp;
 
-static long
-fmd_scheme_notsup(void)
+static ssize_t
+fmd_scheme_notsup(nvlist_t *nv __unused, char *arg1 __unused,
+    size_t arg2 __unused)
 {
 	errno = ENOTSUP;
 	return (-1);
+}
+
+static void
+fmd_scheme_vnop(void)
+{
 }
 
 static int
@@ -93,9 +97,9 @@ fmd_scheme_nop(void)
  * the module, then this operation is implemented using the default function.
  */
 static const fmd_scheme_ops_t _fmd_scheme_default_ops = {
-	(int (*)())fmd_scheme_nop,		/* sop_init */
-	(void (*)())fmd_scheme_nop,		/* sop_fini */
-	(ssize_t (*)())fmd_scheme_notsup,	/* sop_nvl2str */
+	.sop_init = fmd_scheme_nop,		/* sop_init */
+	.sop_fini = fmd_scheme_vnop,		/* sop_fini */
+	.sop_nvl2str = fmd_scheme_notsup	/* sop_nvl2str */
 };
 
 /*

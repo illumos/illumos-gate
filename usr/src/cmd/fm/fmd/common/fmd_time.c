@@ -186,7 +186,7 @@ fmd_time_tod2hrt(hrtime_t hrt_base, const fmd_timeval_t *tod_base,
  * period between 'hrt' and 't0', therefore to check which one came first, we
  * test their subtraction against the highest bit of mask, if the bit is not
  * set, then 't0' is earlier.  This is equivalent to
- * 	((hrt - t0) & mask) < ((mask + 1) / 2)
+ *	((hrt - t0) & mask) < ((mask + 1) / 2)
  */
 hrtime_t
 fmd_time_ena2hrt(hrtime_t hrt, uint64_t ena)
@@ -366,6 +366,11 @@ fmd_native_cancel(pthread_t tid)
 	(void) pthread_kill(tid, SIGALRM);
 }
 
+static void
+fmd_time_vnop(void)
+{
+}
+
 static void *
 fmd_time_nop(void)
 {
@@ -374,10 +379,10 @@ fmd_time_nop(void)
 
 const fmd_timeops_t fmd_timeops_native = {
 	(void *(*)())fmd_time_nop,	/* fto_init */
-	(void (*)())fmd_time_nop,	/* fto_fini */
+	(void (*)())fmd_time_vnop,	/* fto_fini */
 	gettimeofday,			/* fto_gettimeofday */
 	gethrtime,			/* fto_gethrtime */
-	(void (*)())fmd_time_nop,	/* fto_addhrtime */
+	(void (*)())fmd_time_vnop,	/* fto_addhrtime */
 	fmd_native_wait,		/* fto_waithrtime */
 	fmd_native_cancel,		/* fto_waitcancel */
 };

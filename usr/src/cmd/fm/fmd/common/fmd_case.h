@@ -130,8 +130,8 @@ extern void fmd_case_rele(fmd_case_t *);
 extern void fmd_case_rele_locked(fmd_case_t *);
 extern void fmd_case_update(fmd_case_t *);
 
-extern int fmd_case_insert_principal(fmd_case_t *, fmd_event_t *);
-extern int fmd_case_insert_event(fmd_case_t *, fmd_event_t *);
+extern int fmd_case_insert_principal(void *, fmd_event_t *);
+extern int fmd_case_insert_event(void *, fmd_event_t *);
 
 extern void fmd_case_insert_suspect(fmd_case_t *, nvlist_t *);
 extern void fmd_case_recreate_suspect(fmd_case_t *, nvlist_t *);
