@@ -23,7 +23,7 @@
  */
 
 /*
- * Copyright 2019 OmniOS Community Edition (OmniOSce) Association
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association
  */
 
 #ifndef _LIBDLADM_H
@@ -178,7 +178,8 @@ typedef enum {
 	DLADM_STATUS_NO_IB_HW_RESOURCE,
 	DLADM_STATUS_INVALID_PKEY_TBL_SIZE,
 	DLADM_STATUS_PORT_NOPROTO,
-	DLADM_STATUS_INVALID_MTU
+	DLADM_STATUS_INVALID_MTU,
+	DLADM_STATUS_PERSIST_ON_TEMP
 } dladm_status_t;
 
 typedef enum {
