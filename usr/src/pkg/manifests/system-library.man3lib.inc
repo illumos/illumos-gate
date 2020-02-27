@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
 
 file path=usr/share/man/man3lib/libadm.3lib
@@ -43,6 +44,7 @@ file path=usr/share/man/man3lib/libkstat.3lib
 file path=usr/share/man/man3lib/libkvm.3lib
 file path=usr/share/man/man3lib/libl.3lib
 file path=usr/share/man/man3lib/liblgrp.3lib
+file path=usr/share/man/man3lib/libm.3lib
 file path=usr/share/man/man3lib/libmail.3lib
 file path=usr/share/man/man3lib/libmalloc.3lib
 file path=usr/share/man/man3lib/libmapmalloc.3lib
@@ -51,6 +53,7 @@ file path=usr/share/man/man3lib/libmd5.3lib
 file path=usr/share/man/man3lib/libmenu.3lib
 file path=usr/share/man/man3lib/libmp.3lib
 file path=usr/share/man/man3lib/libmtmalloc.3lib
+file path=usr/share/man/man3lib/libmvec.3lib
 file path=usr/share/man/man3lib/libnls.3lib
 file path=usr/share/man/man3lib/libnsl.3lib
 file path=usr/share/man/man3lib/libnvpair.3lib
