@@ -28,7 +28,7 @@ gettimeofday(struct timeval *tv, void *tz)
 
 	/*
 	 * Perform a NULL check before attempting to store the result directly.
-	 * The old fasttrop logic would perform this same check, but after the
+	 * The old fasttrap logic would perform this same check, but after the
 	 * call into hrestime().
 	 */
 	if (tv == NULL) {
