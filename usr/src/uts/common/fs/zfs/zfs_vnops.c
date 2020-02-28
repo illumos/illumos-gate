@@ -23,7 +23,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2017 by Delphix. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright 2017 Nexenta Systems, Inc.
  */
 
@@ -374,6 +374,46 @@ zfs_ioctl(vnode_t *vp, int com, intptr_t data, int flag, cred_t *cred,
 	case _FIOGDIO:
 	case _FIOSDIO:
 	{
+		return (0);
+	}
+
+	case _FIODIRECTIO:
+	{
+		/*
+		 * ZFS inherently provides the basic semantics for directio.
+		 * This is the summary from the ZFS on Linux support for
+		 * O_DIRECT, which is the common form of directio, and required
+		 * no changes to ZFS.
+		 *
+		 * 1. Minimize cache effects of the I/O.
+		 *
+		 *    By design the ARC is already scan-resistant, which helps
+		 *    mitigate the need for special O_DIRECT handling.
+		 *
+		 * 2. O_DIRECT _MAY_ impose restrictions on IO alignment and
+		 *    length.
+		 *
+		 *    No additional alignment or length restrictions are
+		 *    imposed by ZFS.
+		 *
+		 * 3. O_DIRECT _MAY_ perform unbuffered IO operations directly
+		 *    between user memory and block device.
+		 *
+		 *    No unbuffered IO operations are currently supported. In
+		 *    order to support features such as compression, encryption,
+		 *    and checksumming a copy must be made to transform the
+		 *    data.
+		 *
+		 * 4. O_DIRECT _MAY_ imply O_DSYNC (XFS).
+		 *
+		 *    O_DIRECT does not imply O_DSYNC for ZFS.
+		 *
+		 * 5. O_DIRECT _MAY_ disable file locking that serializes IO
+		 *    operations.
+		 *
+		 *    All I/O in ZFS is locked for correctness and this locking
+		 *    is not disabled by O_DIRECT.
+		 */
 		return (0);
 	}
 
