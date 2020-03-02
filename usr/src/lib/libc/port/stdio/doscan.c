@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #include "lint.h"
 #include <sys/types.h>
@@ -402,7 +400,7 @@ charswitch:	/* target of a goto 8-( */
 			if (size == 'l') {
 				int	c, len, i;
 				int	negflg = 0;
-				unsigned char 	*p;
+				unsigned char	*p;
 
 				p = (unsigned char *)(fmt - 1);
 				len = 0;
@@ -830,10 +828,10 @@ readchar(FILE *iop, int *chcount)
 	int	inchar;
 	char	buf[1];
 
-	if ((iop->_flag & _IOWRT) || (iop->_cnt != 0))
+	if ((iop->_flag & _IOWRT) || (iop->_cnt != 0)) {
 		inchar = locgetc((*chcount));
-	else {
-		if (read(FILENO(iop), buf, 1) != 1)
+	} else {
+		if (_xread(iop, buf, 1) != 1)
 			return (EOF);
 		inchar = (int)buf[0];
 		(*chcount) += 1;

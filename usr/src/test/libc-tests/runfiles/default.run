@@ -62,6 +62,23 @@ outputdir = /var/tmp/test_results
 [/opt/libc-tests/tests/select/select.sh]
 timeout = 600
 
+[/opt/libc-tests/tests/stdio/fileno.32]
+[/opt/libc-tests/tests/stdio/fileno.64]
+[/opt/libc-tests/tests/stdio/fmemopentest.32]
+[/opt/libc-tests/tests/stdio/fmemopentest.64]
+[/opt/libc-tests/tests/stdio/ftell_ungetc.32]
+[/opt/libc-tests/tests/stdio/ftell_ungetc.64]
+[/opt/libc-tests/tests/stdio/memstream.32]
+[/opt/libc-tests/tests/stdio/memstream.64]
+[/opt/libc-tests/tests/stdio/memstream_reopen.32]
+[/opt/libc-tests/tests/stdio/memstream_reopen.64]
+[/opt/libc-tests/tests/stdio/open_memstreamtest.32]
+[/opt/libc-tests/tests/stdio/open_memstreamtest.64]
+[/opt/libc-tests/tests/stdio/orientation_test.32]
+[/opt/libc-tests/tests/stdio/orientation_test.64]
+[/opt/libc-tests/tests/stdio/test_mbrtowc.32]
+[/opt/libc-tests/tests/stdio/test_mbrtowc.64]
+
 [/opt/libc-tests/tests/aligned_alloc.32]
 [/opt/libc-tests/tests/aligned_alloc.64]
 [/opt/libc-tests/tests/c11_threads.32]

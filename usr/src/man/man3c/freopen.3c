@@ -43,11 +43,10 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved.
 .\"
-.TH FREOPEN 3C "Jul 24, 2002"
+.TH FREOPEN 3C "March 25, 2020"
 .SH NAME
 freopen \- open a stream
 .SH SYNOPSIS
-.LP
 .nf
 #include <stdio.h>
 
@@ -55,7 +54,6 @@ freopen \- open a stream
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBfreopen()\fR function first attempts to flush the stream and close any
 file descriptor associated with \fIstream\fR. Failure to flush or close the
 file successfully is ignored. The error and end-of-file indicators for the
@@ -71,9 +69,10 @@ pointed to by \fIfilename\fR and associates the stream pointed to by
 If \fIfilename\fR is a null pointer and the application conforms to SUSv3 (see
 \fBstandards\fR(5)), the \fBfreopen()\fR function attempts to change the mode
 of the stream to that specified by \fImode\fR, as though the name of the file
-currently associated with the \fIstream\fR had been used.  The following
-changes of mode are permitted, depending upon the access mode of the file
-descriptor underlying the stream:
+currently associated with the \fIstream\fR had been used. This behavior
+is not supported by streams that are backed by memory, such as
+\fRfmemopen\fB(3C). The following changes of mode are permitted, depending upon
+the access mode of the file descriptor underlying the stream:
 .RS +4
 .TP
 .ie t \(bu
@@ -113,12 +112,10 @@ The largest value that can be represented correctly in an object of type
 \fBoff_t\fR will be established as the offset maximum in the open file
 description.
 .SH RETURN VALUES
-.LP
 Upon successful completion, \fBfreopen()\fR returns the value of \fIstream\fR.
 Otherwise, a null pointer is returned and \fBerrno\fR is set to indicate the
 error.
 .SH ERRORS
-.LP
 The \fBfreopen()\fR function will fail if:
 .sp
 .ne 2
@@ -321,7 +318,6 @@ The file is a pure procedure (shared text) file that is being executed and
 .RE
 
 .SH USAGE
-.LP
 The \fBfreopen()\fR function is typically used to attach the preopened
 \fIstreams\fR associated with \fBstdin\fR, \fBstdout\fR and \fBstderr\fR to
 other files. By default \fBstderr\fR is unbuffered, but the use of
@@ -331,7 +327,6 @@ other files. By default \fBstderr\fR is unbuffered, but the use of
 The \fBfreopen()\fR function has a transitional interface for 64-bit file
 offsets.  See \fBlf64\fR(5).
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -348,6 +343,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.LP
 \fBfclose\fR(3C), \fBfdopen\fR(3C), \fBfopen\fR(3C), \fBstdio\fR(3C),
 \fBattributes\fR(5), \fBlf64\fR(5), \fBstandards\fR(5)

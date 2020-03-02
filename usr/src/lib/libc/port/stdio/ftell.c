@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 /*
  * Return file offset.
@@ -49,41 +47,63 @@
 #include <sys/types.h>
 #include "stdiom.h"
 
-long
-ftell(FILE *iop)
+off64_t
+ftell_common(FILE *iop)
 {
 	ptrdiff_t adjust;
 	off64_t	tres;
 	rmutex_t *lk;
 
 	FLOCKFILE(lk, iop);
+
+	/*
+	 * If we're dealing with a memory stream, we need to flush the internal
+	 * state before we try and determine the location. This is especially
+	 * important for open_wmemstream() as it will have buffered bytes, but
+	 * we need to convert that to wide characters before we proceed. If we
+	 * have no file descriptor, then the units that the backing store are in
+	 * can be arbitrary.
+	 */
+	if (_get_fd(iop) == -1) {
+		(void) _fflush_u(iop);
+	}
+
 	if (iop->_cnt < 0)
 		iop->_cnt = 0;
-	if (iop->_flag & _IOREAD)
+	if (iop->_flag & _IOREAD) {
 		adjust = (ptrdiff_t)-iop->_cnt;
-	else if (iop->_flag & (_IOWRT | _IORW)) {
+	} else if (iop->_flag & (_IOWRT | _IORW)) {
 		adjust = 0;
 		if (((iop->_flag & (_IOWRT | _IONBF)) == _IOWRT) &&
-		    (iop->_base != 0))
+		    (iop->_base != 0)) {
 			adjust = iop->_ptr - iop->_base;
-		else if ((iop->_flag & _IORW) && (iop->_base != 0))
+		} else if ((iop->_flag & _IORW) && (iop->_base != 0)) {
 			adjust = (ptrdiff_t)-iop->_cnt;
+		}
 	} else {
 		errno = EBADF;	/* file descriptor refers to no open file */
 		FUNLOCKFILE(lk);
 		return (EOF);
 	}
 
-	tres = lseek64(FILENO(iop), 0, SEEK_CUR);
+	tres = _xseek64(iop, 0, SEEK_CUR);
 	if (tres >= 0)
 		tres += adjust;
 
+	FUNLOCKFILE(lk);
+	return ((long)tres);
+}
+
+long
+ftell(FILE *iop)
+{
+	off64_t	tres;
+
+	tres = ftell_common(iop);
 	if (tres > LONG_MAX) {
 		errno = EOVERFLOW;
-		FUNLOCKFILE(lk);
 		return (EOF);
 	}
 
-	FUNLOCKFILE(lk);
 	return ((long)tres);
 }

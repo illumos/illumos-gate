@@ -1,0 +1,327 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2020 Robert Mustacchi
+#
+     _      _ _
+ ___| |_ __| (_) ___
+/ __| __/ _` | |/ _ \
+\__ \ || (_| | | (_) |
+|___/\__\__,_|_|\___/
+
+Notes on the design of stdio.
+
+------------
+File Streams
+------------
+
+At the heart of the stdio is the 'FILE *'. The 'FILE *' represents a
+stream that can be read, written, and seeked. The streams traditionally
+refer to a file descriptor, when created by fopen(3C), or may refer to
+memory, when created by open_memstream(3C) or fmopen(3C). This document
+focuses on the implementation of streams. Other misc. functions in stdio
+are not discussed.
+
+------------
+Organization
+------------
+
+Most functions exist in a file with the same name. When adding new
+files to stdio the file name should match the primary function name.
+There are a few exceptions. Almost all of the logic related to both
+flushing and knowledge of how to handle the 32-bit ABI issues (described
+in the next section) can be found in flush.c.
+
+-----------------------------
+struct __FILE_TAG and the ABI
+-----------------------------
+
+The definition of the 'FILE *' is a pointer to a 'struct __FILE_TAG'.
+The 'struct __FILE_TAG' structure has a long history that dates back to
+historical UNIX. For better or for worse, we have inherited some of the
+design decisions of the past, it's important to understand what those
+are as they have profound impact on the stdio design and serve as a good
+cautionary tale for future ABI decisions.
+
+In the original UNIX designs, the 'struct __FILE_TAG' was exposed as a
+non-opaque structure. This was also true on other platforms. This had a
+couple of challenges:
+
+* It meant the size of the 'struct __FILE_TAG' was part of the ABI
+* Consumers would access the members directly. You can find examples of
+  this in our public headers where things like getc() are inlined in
+  terms of the implementation. Various 3rd-party software that has
+  existed for quite some time knows the offset of members and directly
+  manipulates them. This is still true as of 2020.
+* The 'struct __FILE_TAG' only used an unsigned char (uint8_t) for the
+  file descriptor in the 32-bit version. Other systems used a short, so
+  they were in better shape. This was changed in the 64-bit version to
+  use an int.
+* The main C stdio symbols 'stdin', 'stdout', and 'stderr', were (and
+  still are) exposed as an array. This means that while the 64-bit
+  structure is opaque, its size is actually part of the ABI.
+
+All of these issues have been dealt with in different ways in the
+system. The first thing that is a little confusing is where to find the
+definitions of the actual implementation. The 32-bit 'struct __FILE_BUF'
+is split into two different pieces, the part that is public and a
+secondary, private part.
+
+The public definition of the 'struct __FILE_TAG' for 32-bit code and the
+opaque definition for 64-bit code may be found in
+'usr/src/head/stdio_impl.h.'. The actual definition of the 64-bit
+structure and the 32-bit additions are all found in
+'usr/src/lib/libc/inc/file64.h.'
+
+In file64.h, one will find the 'struct xFILEdata' (extended FILE * data).
+This represents all of the data that has been added to stdio that is
+missing from the public structure. Whenever a 'FILE *' is allocated,
+32-bit code always ensures that there is a corresponding 'struct
+xFILEdata' that exists. Currently, we still have plenty of padding left
+in the 64-bit version of the structure for at least 3 pointers.
+
+To add a member to the structure, one has to add data to the structures
+in 'lib/libc/inc/file64.h'. If for some reason, all the padding would be
+used up, then you must stop. The size of the 64-bit structure _cannot_
+be extended, as noted earlier it is part of the ABI. If we hit this
+case, then one must introduce the struct xFILEdata for the lp64
+environment.
+
+--------------------------
+Allocating FILE Structures
+--------------------------
+
+libc defines a number of 'FILE *' structures by default. These can all
+be found in 'data.c'. The first _NFILE (20 or 60 depending on the
+platform) are defined statically. In the 32-bit case, the corresponding
+'struct _xFILEdata' is allocated along with it.
+
+To determine if a structure is free or not in the array, the `_flag`
+member is consulted. If the flag has been set to zero, then the STREAM
+is considered free and can be allocated. All of the allocated (whether
+used or not) 'FILE *' structures are present on a linked list which is
+found in 'flush.c' rooted at the symbol '__first_link'. This list is
+always scanned to try and reuse an existing 'FILE *' structure before
+allocating a new one. If all of the existing ones are in use, then one
+will be allocated.
+
+An important thing to understand is that once allocated, a 'FILE *' will
+never be freed by libc. It will always exist on the global list of
+structures to be reused.
+
+---------
+Buffering
+---------
+
+Every stream in stdio starts out as buffered. Buffering can be changed
+by calling either setbuf(3C) or setvbuf(3C). This buffer is stored in
+the `_base` member of the 'struct __FILE_TAG'. The amount of valid data
+in the buffer is maintained in the '_cnt' member of the structure. By
+default, there is no associated buffer with a stream. When the stream is
+first used, the buffer will be assigned by a call to _findbuf() in
+_findbuf.c.
+
+There are pre-allocated buffers that exist. There are two specifically
+for stdin and stdout (stderr is unbuffered). These include space for
+both the buffer and the pushback buffer. The pushback buffer is used so
+someone can call fungetc(3C) regardless of whether a buffering mode is
+enabled or not. Characters that we 'unget' are placed on the pushback
+buffer.
+
+For other buffering modes, we'll try and allocate an appropriate sized
+buffer. The buffer size defaults to BUFSIZ, but if the stream is backed
+by a file descriptor, we'll use fstat() to determine the appropriate
+size to use and match the file system block size. If we cannot allocate
+that, we'll fall back to trying to allocate a pushback buffer.
+
+libc defines static data for _NFILE worth of pushback buffers which are
+indexed based on the underlying file descriptor. This and the stdin and
+stdout buffers are all found in 'data.c' in  _smbuf, _sibuf, and _sobuf
+respectively.
+
+------------------------------
+Reading, Writing, and Flushing
+------------------------------
+
+By default, reads and writes on a stream, whether backed by a
+file-descriptor or not, go through the buffer described in the previous
+section. If a read or write can be satisfied by the buffer, then no
+underlying I/O will occur, unless buffering has been disabled.
+
+The various function entry points that read such as fread(3C) or
+fgetc(3C) will not call read() directly but will instead try to fill the
+buffer, which will cause a read if required. This is centralized in
+_filbuf(). When a read is required from the underlying file, it will
+call _xread() in flush.c. For more on _xread() see the operations vector
+section further along.
+
+Unlike reads, writes are much less centralized and each of the main
+writing entry points has reimplemented the path of writing to the buffer
+and flushing it. It would be good in the future to consolidate them. In
+general, data will be written directly to the stdio buffer. When that
+buffer needs to be flushed either the _flsbuf() or _xflsbuf() functions
+will be called to actually flush out the buffer.
+
+When data needs to be flushed from a buffer to its underlying file
+descriptor (or other backing store), all of the write family functions
+ultimately call _xwrite().
+
+Flushes can occur in a few different ways:
+
+1. A write has filled up the buffer.
+2. A new line ('\n') is written and new-line buffering is used.
+3. fflush(3C) or a similar function has been called.
+4. A read occurs on a buffer that has unflushed writes.
+5. The stream is being closed.
+
+Most of these methods are fairly similar; however, the fflush(3C) case
+is a little different. fflush() may be asked to flush all of the streams
+when it is passed a NULL stream. Even when that happens it will still
+utilize the same underlying mechanism via _xflsbuf() or _flsbuf().
+
+-----------
+Orientation
+-----------
+
+Streams handle both wide characters and narrow characters. There is an
+internal multi-byte conversion state buffer that is included with every
+stream. A stream may exist in one of three modes:
+
+1. It may have an explicit narrow orientation
+2. It may have an explicit wide orientation
+3. It may have no orientation
+
+When most streams are created, they have no orientation. The orientation
+can then be explicitly set by calling fwide(3C). Some streams are also
+created with an explicit orientation, for example, open_wmemstream(3C)
+always sets the stream to be wide.
+
+The C standard dictates that certain operations will actually cause a
+stream with no orientation to have an explicit orientation set. Calling
+a narrow or wide related character function, such as 'fgetc(3C)' or
+'fgetwc(3C)' respectively will then cause the orientation to be set if
+it has not been. Once an orientation for a stream has been set, it
+cannot be changed until the stream has been closed or it is reset by
+calling freopen(3C).
+
+There are a few functions that don't change this today. One example is
+ungetc(3C). Often this isn't indicative of whether it should or
+shouldn't change the orientation, but is a side effect of the history of
+the stdio implementation.
+
+-------------------------------------
+Operations Vectors and Memory Streams
+-------------------------------------
+
+Traditionally, stdio streams were always backed by a file descriptor of
+some kind and therefore always called out into functions like read(2),
+write(2), lseek(2), and close(2) directly. A series of new functions
+were introduced in POSIX 2008 that add support for streams backed by
+memory in the form of fmemopen(3C), open_memstream(3C), and
+open_wmemstream(3C).
+
+To deal with this and other possible designs, an operations vector was
+added to the stream represented by the 'stdio_ops_t' structure. This is
+stored in the '_ops' member of the 'struct __FILE_BUF'. For a normal
+stream backed by a file descriptor, this member will be NULL.
+
+In places where a normal system call would have been made there is now a
+call to a corresponding function such as _xread(), _xwrite(), xseek(),
+_xseek64(), and _xclose(). If an operations vector is defined, it will
+call into the corresponding operation vector. If not, it will perform
+the traditional system call. This design choice consolidates all of the
+work required to implement non-file descriptor backed streams.
+
+When creating a non-file backed stream there are several expectations in
+the system:
+
+* The stream code should obtain a stream normally through a call to
+  _findiop().
+* If one needs to translate the normal fopen(3C) arguments, they should
+  use the _stdio_flags() function. This will also construct the
+  appropriate internal stdio flags for the stream.
+* The stream code must call _xassoc() to set the file operations vector
+  before return a 'FILE *' out of libc.
+* All of the operations vectors must be implemented.
+* If the stream is seekable, it must explicitly use the SET_SEEKABLE()
+  macro before return the stream.
+* If the stream is supposed to have a default orientation, it must set
+  it by calling _setorientation(). Not all streams have a default
+  orientation.
+* In the stream's close entry point it should call _xunassoc().
+
+--------------------------
+Extended File and fileno()
+--------------------------
+
+The 32-bit libc has historically been limited to 255 open streams
+because of the use of an unsigned char. This problem does not impact the
+64-bit libc. To deal with this, libc uses a series of techniques which
+are summarized for users in extendedFILE(5). The usage of extendedFILE
+can also be enabled by passing the special 'F' character to fopen(3C).
+
+The '_magic' member in the 32-bit 'struct __FILE_TAG' contains what used
+to be the file descriptor. When extended file is not in use, the
+_magic member still does contain the file descriptor. However, when
+extendedFILE is enabled, then the _magic member contains a sentinel
+value and the actual value is stored in the 'struct xFILEdata' _magic
+member.
+
+The act of getting the correct file descriptor has been centralized in a
+function called _get_fd(). This function knows how to handle the special
+32-bit case and the normal case. It also centralizes the logic of
+checking for a non-file backed stream. There are many cases in libc
+where we want to know the file descriptor to perform some operation;
+however, non-file backed streams do not have a corresponding file
+descriptor. When such a stream is detected, we will explicitly return
+-1. This ensures that a bad file descriptor will be used if someone
+mistakenly calls a system call. Functions like _fileno() call this
+directly.
+
+-------
+Testing
+-------
+
+There is a burgeoning test suite for stdio in
+usr/src/test/libc-tests/tests/stdio. If working in stdio (or libc more
+generally) it is recommended that you run this test suite and add new
+tests to it where appropriate. For most new functionality it is
+encouraged that you both import test suites that may already exist and
+that you also write your own test suites to properly cover a number of
+error and corner cases.
+
+Tests should also be written against libumem(3LIB), and umem debugging
+should be explicitly enabled in the program. Enabling umem debugging can
+catch a number of common memory usage errors. It also makes it easier to
+test for memory leaks by taking a core file and used the mdb
+'::findleaks' dcmd. A good starting point is to place the following in
+the program:
+
+const char *
+_umem_debug_init(void)
+{
+	return ("default,verbose");
+}
+
+const char *
+_umem_logging_init(void)
+{
+	return ("fail,contents");
+}
+
+For the definition of these flags, see umem_debug(3MALLOC).
+
+In addition, by leveraging umem debugging it becomes very easy to
+simulate malloc failure when required. This can be enabled by calling
+umem_setmtbf(1), which ensures that any subsequent memory requests
+through malloc(), including those made indirectly by libc, will fail. To
+restore the behavior after a test, one can simply call umem_setmtbf(0).

@@ -24,6 +24,7 @@ SUBDIRS = \
 	random \
 	regex \
 	select \
+	stdio \
 	strerror \
 	symbols \
 	threads \

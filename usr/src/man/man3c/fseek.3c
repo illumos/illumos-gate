@@ -44,11 +44,10 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH FSEEK 3C "May 13, 2017"
+.TH FSEEK 3C "March 25, 2020"
 .SH NAME
 fseek, fseeko \- reposition a file-position indicator in a stream
 .SH SYNOPSIS
-.LP
 .nf
 #include <stdio.h>
 
@@ -61,7 +60,6 @@ fseek, fseeko \- reposition a file-position indicator in a stream
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBfseek()\fR function sets the file-position indicator for the stream
 pointed to by \fIstream\fR. The \fBfseeko()\fR function is identical to
 \fBfseek()\fR except for the type of \fIoffset\fR.
@@ -101,7 +99,8 @@ Set position to \fBEOF\fR plus \fIoffset\fR.
 .LP
 If the stream is to be used with wide character input/output functions,
 \fIoffset\fR must either be 0 or a value returned by an earlier call to
-\fBftell\fR(3C) on the same stream and \fIwhence\fR must be \fBSEEK_SET\fR.
+\fBftell\fR(3C) on the same stream and \fIwhence\fR must be \fBSEEK_SET\fR. This
+constraint does not hold for streams created by \fBopen_wmemstream\fR(3C).
 .sp
 .LP
 A successful call to \fBfseek()\fR clears the end-of-file indicator for the
@@ -129,12 +128,32 @@ If the stream is writable and buffered data had not been written to the
 underlying file, \fBfseek()\fR will cause the unwritten data to be written to
 the file and mark the \fBst_ctime\fR and \fBst_mtime\fR fields of the file for
 update.
+.SS \fBopen_wmemstream\fR(3C)
+When using a stream based on
+.B open_wmemstream\fR(3C),
+the
+.B fseek()
+and
+.B fseeko()
+functions no longer operate in terms of bytes. Instead, like the stream itself,
+the values used in
+.I offset
+are measured in units of wide characters, the underlying data unit of the
+stream. The values returned by
+.B ftell(3C)
+or
+.B ftello(3C)
+are also in these same units, allowing them to be used in the same way. These
+streams do not have the constraints of other wide character streams and may the
+full range of values in
+.I whence
+and
+.I offset,
+the same as would be done for a normal byte-oriented stream.
 .SH RETURN VALUES
-.LP
 The \fBfseek()\fR and \fBfseeko()\fR functions return \fB0\fR on success;
 otherwise, they returned \fB\(mi1\fR and set \fBerrno\fR to indicate the error.
 .SH ERRORS
-.LP
 The \fBfseek()\fR and \fBfseeko()\fR functions will fail if, either the
 \fIstream\fR is unbuffered or the \fIstream\fR's buffer needed to be flushed,
 and the call to \fBfseek()\fR or \fBfseeko()\fR causes an underlying
@@ -269,7 +288,6 @@ correctly in an object of type \fBoff_t\fR.
 .RE
 
 .SH USAGE
-.LP
 Although on the UNIX system an offset returned by \fBftell()\fR or
 \fBftello()\fR (see \fBftell\fR(3C)) is measured in bytes, and it is
 permissible to seek to positions relative to that offset, portability to
@@ -281,7 +299,6 @@ necessarily measured in bytes.
 The \fBfseeko()\fR function has a transitional interface for 64-bit file
 offsets.  See \fBlf64\fR(5).
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -298,7 +315,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.LP
 \fBgetrlimit\fR(2), \fBulimit\fR(2), \fBftell\fR(3C),
 \fBrewind\fR(3C), \fBungetc\fR(3C), \fBungetwc\fR(3C), \fBattributes\fR(5),
 \fBlf64\fR(5), \fBstandards\fR(5)

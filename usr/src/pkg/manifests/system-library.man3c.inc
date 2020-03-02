@@ -136,6 +136,7 @@ file path=usr/share/man/man3c/fgetwc.3c
 file path=usr/share/man/man3c/floating_to_decimal.3c
 file path=usr/share/man/man3c/flock.3c
 file path=usr/share/man/man3c/flockfile.3c
+file path=usr/share/man/man3c/fmemopen.3c
 file path=usr/share/man/man3c/fmtmsg.3c
 file path=usr/share/man/man3c/fnmatch.3c
 file path=usr/share/man/man3c/fopen.3c
@@ -264,6 +265,7 @@ file path=usr/share/man/man3c/ndbm.3c
 file path=usr/share/man/man3c/newlocale.3c
 file path=usr/share/man/man3c/nl_langinfo.3c
 file path=usr/share/man/man3c/offsetof.3c
+file path=usr/share/man/man3c/open_memstream.3c
 file path=usr/share/man/man3c/opendir.3c
 file path=usr/share/man/man3c/perror.3c
 file path=usr/share/man/man3c/pfmt.3c
@@ -1054,6 +1056,7 @@ link path=usr/share/man/man3c/nrand48.3c target=drand48.3c
 link path=usr/share/man/man3c/ntohl.3c target=byteorder.3c
 link path=usr/share/man/man3c/ntohll.3c target=byteorder.3c
 link path=usr/share/man/man3c/ntohs.3c target=byteorder.3c
+link path=usr/share/man/man3c/open_wmemstream.3c target=open_memstream.3c
 link path=usr/share/man/man3c/openlog.3c target=syslog.3c
 link path=usr/share/man/man3c/pclose.3c target=popen.3c
 link path=usr/share/man/man3c/port_dissociate.3c target=port_associate.3c

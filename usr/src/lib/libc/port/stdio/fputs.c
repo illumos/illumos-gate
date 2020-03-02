@@ -25,10 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+/*	  All Rights Reserved	*/
 
 /*
  * Ptr args aren't checked for NULL because the program would be a
@@ -112,15 +109,13 @@ fputs(const char *ptr, FILE *iop)
 					return (EOF);
 			}
 		}
-	}
-	else
-	{
+	} else {
 		/* write out to an unbuffered file */
 		ssize_t num_wrote;
 		ssize_t count = (ssize_t)ptrlen;
-		int fd = GET_FD(iop);
 
-		while ((num_wrote = write(fd, ptr, (size_t)count)) != count) {
+		while ((num_wrote = _xwrite(iop, ptr, (size_t)count)) !=
+		    count) {
 			if (num_wrote <= 0) {
 				if (!cancel_active())
 					iop->_flag |= _IOERR;

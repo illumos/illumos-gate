@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #include "lint.h"
 #include "file64.h"
@@ -47,7 +45,7 @@ setvbuf(FILE *iop, char *abuf, int type, size_t size)
 	Uchar *temp;
 	int	sflag = iop->_flag & _IOMYBUF;
 	rmutex_t *lk;
-	int fd = GET_FD(iop);
+	int fd = _get_fd(iop);
 
 	FLOCKFILE(lk, iop);
 	iop->_flag &= ~(_IOMYBUF | _IONBF | _IOLBF);
@@ -55,17 +53,14 @@ setvbuf(FILE *iop, char *abuf, int type, size_t size)
 	/* note that the flags are the same as the possible values for type */
 	case _IONBF:
 		iop->_flag |= _IONBF;	 /* file is unbuffered */
-#ifndef _STDIO_ALLOCATE
-		if (fd < 2) {
+		if (fd == 0 || fd == 1) {
 			/* use special buffer for std{in,out} */
 			buf = (fd == 0) ? _sibuf : _sobuf;
 			size = BUFSIZ;
-		} else /* needed for ifdef */
-#endif
-		if (fd < _NFILE) {
+		} else if (fd >= 2 && fd < _NFILE) {
 			buf = _smbuf[fd];
 			size = _SMBFSZ - PUSHBACK;
-		} else
+		} else {
 			if ((buf = malloc(_SMBFSZ * sizeof (Uchar))) != NULL) {
 				iop->_flag |= _IOMYBUF;
 				size = _SMBFSZ - PUSHBACK;
@@ -73,6 +68,7 @@ setvbuf(FILE *iop, char *abuf, int type, size_t size)
 				FUNLOCKFILE(lk);
 				return (EOF);
 			}
+		}
 		break;
 	case _IOLBF:
 	case _IOFBF:

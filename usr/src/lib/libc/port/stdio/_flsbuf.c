@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #pragma weak __flsbuf = _flsbuf
 
@@ -41,17 +39,18 @@
 #include <sys/types.h>
 #include "stdiom.h"
 
+/*
+ * flush (write) buffer, save ch,
+ * return EOF on failure
+ */
 int
-_flsbuf(int ch, FILE *iop)	/* flush (write) buffer, save ch, */
-				/* return EOF on failure */
+_flsbuf(int ch, FILE *iop)
 {
 	Uchar uch;
 
-	do	/* only loop if need to use _wrtchk() on non-_IOFBF */
-	{
+	do {	/* only loop if need to use _wrtchk() on non-_IOFBF */
 		switch (iop->_flag & (_IOFBF | _IOLBF | _IONBF |
-				_IOWRT | _IOEOF))
-		{
+		    _IOWRT | _IOEOF)) {
 		case _IOFBF | _IOWRT:	/* okay to do full-buffered case */
 			if (iop->_base != 0 && iop->_ptr > iop->_base)
 				goto flush_putc;	/* skip _wrtchk() */
@@ -71,7 +70,7 @@ _flsbuf(int ch, FILE *iop)	/* flush (write) buffer, save ch, */
 		case _IONBF | _IOWRT:	/* okay to do no-buffered case */
 			iop->_cnt = 0;
 			uch = (unsigned char)ch;
-			if (write(GET_FD(iop), (char *)&uch, 1) != 1) {
+			if (_xwrite(iop, (char *)&uch, 1) != 1) {
 				if (!cancel_active())
 					iop->_flag |= _IOERR;
 				return (EOF);

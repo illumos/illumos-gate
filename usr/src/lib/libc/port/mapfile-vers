@@ -78,6 +78,13 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.32 {
+    protected:
+	fmemopen;
+	open_memstream;
+	open_wmemstream;
+} ILLUMOS_0.31;
+
 SYMBOL_VERSION ILLUMOS_0.31 {
     protected:
 	__unlockpt_xpg4;

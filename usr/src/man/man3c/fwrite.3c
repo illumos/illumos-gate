@@ -44,11 +44,10 @@
 .\" Copyright (c) 1997, The Open Group. All Rights Reserved.
 .\" Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH FWRITE 3C "Jul 24, 2002"
+.TH FWRITE 3C "March 25, 2020"
 .SH NAME
 fwrite \- binary output
 .SH SYNOPSIS
-.LP
 .nf
 #include <stdio.h>
 
@@ -56,8 +55,6 @@ fwrite \- binary output
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBfwrite()\fR function writes, from the array pointed to by \fIptr\fR, up
 to \fInitems\fR elements whose size is specified by \fIsize\fR, to the stream
 pointed to by \fIstream\fR. For each object, \fIsize\fR calls are made to the
@@ -72,28 +69,26 @@ The \fBst_ctime\fR and \fBst_mtime\fR fields of the file will be marked for
 update between the successful execution of \fBfwrite()\fR and the next
 successful completion of a call to \fBfflush\fR(3C) or \fBfclose\fR(3C) on the
 same stream or a call to \fBexit\fR(2) or \fBabort\fR(3C).
-.SH RETURN VALUES
 .sp
 .LP
+When using the \fBfwrite()\fR function on a stream that was created with
+\fBopen_wmemstream\fR(3C), there are additional constraints on the
+binary data that can be written due to the nature of the stream. Please
+see \fBopen_wmemstream\fR(3C) for additional information.
+.SH RETURN VALUES
 The \fBfwrite()\fR function returns the number of elements successfully
 written, which might be less than \fInitems\fR if a write error is encountered.
 If \fIsize\fR or \fInitems\fR is 0, \fBfwrite()\fR returns 0 and the state of
 the stream remains unchanged. Otherwise, if a write error occurs, the error
 indicator for the stream is set and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
-.LP
 Refer to \fBfputc\fR(3C).
 .SH USAGE
-.sp
-.LP
 Because of possible differences in element length and byte ordering, files
 written using \fBfwrite()\fR are application-dependent, and possibly cannot be
 read using \fBfread\fR(3C) by a different application or by the same
 application on a different processor.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -110,8 +105,7 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBwrite\fR(2), \fBfclose\fR(3C), \fBferror\fR(3C), \fBfopen\fR(3C),
-\fBfread\fR(3C), \fBgetc\fR(3C), \fBgets\fR(3C), \fBprintf\fR(3C),
-\fBputc\fR(3C), \fBputs\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+\fBfread\fR(3C), \fBgetc\fR(3C), \fBgets\fR(3C), \fBopen_wmemstream\fR(3C),
+\fBprintf\fR(3C), \fBputc\fR(3C), \fBputs\fR(3C), \fBattributes\fR(5),
+\fBstandards\fR(5)

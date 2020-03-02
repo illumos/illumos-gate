@@ -25,10 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+/*	  All Rights Reserved	*/
 
 #pragma weak __filbuf = _filbuf
 
@@ -62,24 +59,24 @@ _filbuf(FILE *iop)
 	unsigned char	flag;
 #endif
 
-	if (!(iop->_flag & _IOREAD))	/* check, correct permissions */
-	{
-		if (iop->_flag & _IORW)
-			iop->_flag |= _IOREAD; /* change direction */
+	if (!(iop->_flag & _IOREAD)) {	/* check, correct permissions */
+		if (iop->_flag & _IORW) {
+			iop->_flag |= _IOREAD;  /* change direction */
 						/* to read - fseek */
-		else {
+		} else {
 			errno = EBADF;
 			return (EOF);
 		}
 	}
 
 	if (iop->_base == 0) {
-		if ((endbuf = _findbuf(iop)) == 0) /* get buffer and */
-						/* end_of_buffer */
+		/* Get the buffer and end of buffer */
+		if ((endbuf = _findbuf(iop)) == 0) {
 			return (EOF);
-	}
-	else
+		}
+	} else {
 		endbuf = _bufend(iop);
+	}
 
 	/*
 	 * Flush all line-buffered streams before we
@@ -109,6 +106,7 @@ _filbuf(FILE *iop)
 			return (EOF);
 		}
 	}
+
 	/*
 	 * Fill buffer or read 1 byte for unbuffered, handling any errors.
 	 */
@@ -117,7 +115,7 @@ _filbuf(FILE *iop)
 		nbyte = 1;
 	else
 		nbyte = endbuf - iop->_base;
-	if ((res = read(GET_FD(iop), (char *)iop->_base, nbyte)) > 0) {
+	if ((res = _xread(iop, (char *)iop->_base, nbyte)) > 0) {
 		iop->_cnt = res - 1;
 		return (*iop->_ptr++);
 	}

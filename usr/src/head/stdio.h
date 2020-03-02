@@ -362,6 +362,15 @@ extern int	fseeko64(FILE *, off64_t, int);
 extern off64_t	ftello64(FILE *);
 #endif
 
+/*
+ * XPG7 symbols
+ */
+#if !defined(_STRICT_SYMBOLS) || defined(_XPG7)
+extern FILE	*fmemopen(void *_RESTRICT_KYWD, size_t,
+		    const char *_RESTRICT_KYWD);
+extern FILE	*open_memstream(char **, size_t *);
+#endif	/* !_STRICT_SYMBOLS || _XPG7 */
+
 #if defined(__EXTENSIONS__) || defined(_REENTRANT) || \
 	    (_POSIX_C_SOURCE - 0 >= 199506L)
 #define	getchar_unlocked()	getc_unlocked(stdin)

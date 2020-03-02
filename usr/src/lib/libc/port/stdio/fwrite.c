@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #include "lint.h"
 #include "file64.h"
@@ -108,9 +106,9 @@ _fwrite_unlocked(const void *ptr, size_t size, size_t count, FILE *iop)
 			bytes = iop->_ptr - iop->_base;
 			data = (char *)iop->_base;
 
-			while ((n = write(fileno(iop), data, (size_t)bytes))
-			    != bytes) {
-				if (n == -1) {
+			while ((n = _xwrite(iop, data, (size_t)bytes)) !=
+			    bytes) {
+				if (n <= 0) {
 					if (!cancel_active())
 						iop->_flag |= _IOERR;
 					return (0);
@@ -126,8 +124,8 @@ _fwrite_unlocked(const void *ptr, size_t size, size_t count, FILE *iop)
 		 * written is in bytes until the return.
 		 * Then it is divided by size to produce items.
 		 */
-		while ((n = write(fileno(iop), dptr, s)) != s) {
-			if (n == -1) {
+		while ((n = _xwrite(iop, dptr, s)) != s) {
+			if (n <= 0) {
 				if (!cancel_active())
 					iop->_flag |= _IOERR;
 				return (written / size);

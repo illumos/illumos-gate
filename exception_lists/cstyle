@@ -697,6 +697,9 @@ usr/src/test/os-tests/tests/sockfs/conn.c
 usr/src/test/os-tests/tests/sockfs/dgram.c
 usr/src/test/os-tests/tests/sockfs/drop_priv.c
 usr/src/test/os-tests/tests/sockfs/sockpair.c
+usr/src/test/libc-tests/tests/stdio/fmemopentest.c
+usr/src/test/libc-tests/tests/stdio/open_memstreamtest.c
+usr/src/test/libc-tests/tests/stdio/orientation_test.c
 usr/src/tools/btxld/btx.h
 usr/src/tools/btxld/btxld.c
 usr/src/tools/btxld/elfh.c

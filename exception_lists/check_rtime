@@ -62,6 +62,12 @@ SKIP		^usr/platform/.*/libpsvcpolicy_psr\.so\.1
 SKIP		^usr/platform/.*/libpsvcpolicy\.so\.1
 SKIP		^usr/lib/sysevent/modules/picl_slm.so$
 
+#
+# The stdio tests all link against libumem to interpose on libc's
+# malloc; however, they do not actually reference the object.
+#
+SKIP		^opt/libc-tests/tests/stdio/
+
 # Objects that are allowed to have executable data segments
 EXEC_DATA	^MACH(lib)/ld\.so\.1$
 EXEC_DATA	^lib/libc\.so\.1$	# 6524709, 32-bit, needed for x86 only

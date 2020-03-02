@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #include "lint.h"
 #include "file64.h"
@@ -55,7 +53,7 @@ void
 _rewind_unlocked(FILE *iop)
 {
 	(void) _fflush_u(iop);
-	(void) lseek64(FILENO(iop), 0, SEEK_SET);
+	(void) _xseek64(iop, 0, SEEK_SET);
 	iop->_cnt = 0;
 	iop->_ptr = iop->_base;
 	iop->_flag &= ~(_IOERR | _IOEOF);
