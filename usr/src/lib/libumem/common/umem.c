@@ -395,8 +395,8 @@
  * umem_t that looks like:
  *
  * typedef struct {
- * 	size_t	tm_size;
- * 	void	*tm_roots[NTMEMBASE];  (Currently 16)
+ *	size_t	tm_size;
+ *	void	*tm_roots[NTMEMBASE];  (Currently 16)
  * } tmem_t;
  *
  * Each of the roots is treated as the head of a linked list. Each entry in the
@@ -560,10 +560,10 @@
  *
  *	o. _tmem_get_base(void)
  *
- * 	Returns the offset from the ulwp_t (curthread) to the tmem_t structure.
- * 	This is a constant for all threads and is effectively a way to to do
- * 	::offsetof ulwp_t ul_tmem without having to know the specifics of the
- * 	structure outside of libc.
+ *	Returns the offset from the ulwp_t (curthread) to the tmem_t structure.
+ *	This is a constant for all threads and is effectively a way to to do
+ *	::offsetof ulwp_t ul_tmem without having to know the specifics of the
+ *	structure outside of libc.
  *
  *	o. _tmem_get_nentries(void)
  *
@@ -3559,4 +3559,10 @@ fail:
 	(void) cond_broadcast(&umem_init_cv);
 	(void) mutex_unlock(&umem_init_lock);
 	return (0);
+}
+
+void
+umem_setmtbf(uint32_t mtbf)
+{
+	umem_mtbf = mtbf;
 }

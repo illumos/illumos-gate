@@ -49,6 +49,10 @@ LOAD_SEGMENT umem {
 };
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.1 {
+    global:
+	umem_setmtbf;
+} SUNW_1.1;
 
 SYMBOL_VERSION SUNW_1.1 {
     global:

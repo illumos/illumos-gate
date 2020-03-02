@@ -16,15 +16,16 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3malloc
+MANSECT=	3malloc
 
-MANFILES= 	bsdmalloc.3malloc		\
+MANFILES=	bsdmalloc.3malloc		\
 		malloc.3malloc			\
 		mapmalloc.3malloc		\
 		mtmalloc.3malloc		\
 		umem_alloc.3malloc		\
 		umem_cache_create.3malloc	\
 		umem_debug.3malloc		\
+		umem_setmtbf.3malloc		\
 		watchmalloc.3malloc
 
 MANLINKS=	calloc.3malloc			\

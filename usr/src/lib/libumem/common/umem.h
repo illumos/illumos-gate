@@ -27,8 +27,6 @@
 #ifndef _UMEM_H
 #define	_UMEM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/vmem.h>
 #include <stdlib.h>
@@ -78,6 +76,8 @@ extern void *umem_cache_alloc(umem_cache_t *, int);
 extern void umem_cache_free(umem_cache_t *, void *);
 
 extern void umem_reap(void);
+
+extern void umem_setmtbf(uint32_t);
 
 #ifdef	__cplusplus
 }
