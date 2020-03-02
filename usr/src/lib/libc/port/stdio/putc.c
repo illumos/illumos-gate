@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #pragma weak _putc_unlocked = putc_unlocked
 
@@ -51,22 +49,24 @@ putc(int ch, FILE *iop)
 	int ret;
 
 	FLOCKFILE(lk, iop);
-
-	_SET_ORIENTATION_BYTE(iop);
-
-	if (--iop->_cnt < 0)
-		ret = __flsbuf((unsigned char) ch, iop);
-	else {
-		(*iop->_ptr++) = (unsigned char)ch;
-		ret = (unsigned char)ch;
-	}
+	ret = putc_unlocked(ch, iop);
 	FUNLOCKFILE(lk);
 	return (ret);
 }
 
-
 int
 putc_unlocked(int ch, FILE *iop)
+{
+	_SET_ORIENTATION_BYTE(iop);
+
+	if (--iop->_cnt < 0)
+		return (__flsbuf((unsigned char) ch, iop));
+	else
+		return (*iop->_ptr++ = (unsigned char)ch);
+}
+
+int
+_putc_internal(int ch, FILE *iop)
 {
 	if (--iop->_cnt < 0)
 		return (__flsbuf((unsigned char) ch, iop));

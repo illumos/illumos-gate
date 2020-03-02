@@ -362,24 +362,11 @@ extern int	fseeko64(FILE *, off64_t, int);
 extern off64_t	ftello64(FILE *);
 #endif
 
-#if !defined(__lint)
-
 #if defined(__EXTENSIONS__) || defined(_REENTRANT) || \
 	    (_POSIX_C_SOURCE - 0 >= 199506L)
-#ifndef	_LP64
-#define	getc_unlocked(p)	(--(p)->_cnt < 0 \
-					? __filbuf(p) \
-					: (int)*(p)->_ptr++)
-#define	putc_unlocked(x, p)	(--(p)->_cnt < 0 \
-					? __flsbuf((x), (p)) \
-					: (int)(*(p)->_ptr++ = \
-					(unsigned char) (x)))
-#endif	/* _LP64 */
 #define	getchar_unlocked()	getc_unlocked(stdin)
 #define	putchar_unlocked(x)	putc_unlocked((x), stdout)
 #endif	/* defined(__EXTENSIONS__) || defined(_REENTRANT).. */
-
-#endif	/* !defined(__lint) */
 
 #ifdef	__cplusplus
 }

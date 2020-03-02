@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * stdiom.h - shared guts of stdio
@@ -33,8 +33,6 @@
 
 #ifndef	_STDIOM_H
 #define	_STDIOM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9 */
 
 #include <thread.h>
 #include <synch.h>
@@ -152,7 +150,7 @@ extern int	__flsbuf(int, FILE *);
  */
 #define	_realbufend(iop)	((iop)->_end)
 #else
-extern Uchar 	*_realbufend(FILE *iop);
+extern Uchar	*_realbufend(FILE *iop);
 extern rmutex_t	*_reallock(FILE *iop);
 #endif	/*	_LP64	*/
 
@@ -206,7 +204,7 @@ extern int _fileno(FILE *iop);
 /*
  * Internal routines from _findbuf.c
  */
-extern Uchar 	*_findbuf(FILE *iop);
+extern Uchar	*_findbuf(FILE *iop);
 
 /*
  * Internal routine used by fopen.c
@@ -221,12 +219,12 @@ extern size_t _fwrite_unlocked(const void *, size_t, size_t, FILE *);
 /*
  * Internal routine from getc.c
  */
-int _getc_unlocked(FILE *);
+int _getc_internal(FILE *);
 
 /*
  * Internal routine from put.c
  */
-int _putc_unlocked(int, FILE *);
+int _putc_internal(int, FILE *);
 
 /*
  * Internal routine from ungetc.c

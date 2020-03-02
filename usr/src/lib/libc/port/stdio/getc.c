@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 #pragma weak _getc_unlocked = getc_unlocked
 
@@ -51,10 +49,7 @@ getc(FILE *iop)
 	int c;
 
 	FLOCKFILE(lk, iop);
-
-	_SET_ORIENTATION_BYTE(iop);
-
-	c = (--iop->_cnt < 0) ? __filbuf(iop) : *iop->_ptr++;
+	c = getc_unlocked(iop);
 	FUNLOCKFILE(lk);
 	return (c);
 }
@@ -62,6 +57,13 @@ getc(FILE *iop)
 
 int
 getc_unlocked(FILE *iop)
+{
+	_SET_ORIENTATION_BYTE(iop);
+	return ((--iop->_cnt < 0) ? __filbuf(iop) : *iop->_ptr++);
+}
+
+int
+_getc_internal(FILE *iop)
 {
 	return ((--iop->_cnt < 0) ? __filbuf(iop) : *iop->_ptr++);
 }

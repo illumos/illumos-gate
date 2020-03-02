@@ -27,8 +27,6 @@
 #ifndef	_MTLIB_H
 #define	_MTLIB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <thread.h>
 
 #ifdef	__cplusplus
@@ -66,9 +64,9 @@ extern	void	assert_no_libc_locks_held(void);
 #define	_FWRITE _fwrite_unlocked
 #define	FILENO(s) _fileno(s)
 #define	FERROR(s) ferror(s)
-#define	GETC(s) _getc_unlocked(s)
+#define	GETC(s) _getc_internal(s)
 #define	UNGETC(c, s) _ungetc_unlocked(c, s)
-#define	PUTC(c, s) _putc_unlocked(c, s)
+#define	PUTC(c, s) _putc_internal(c, s)
 #define	GETWC(s) getwc(s)
 #define	PUTWC(c, s) putwc(c, s)
 
