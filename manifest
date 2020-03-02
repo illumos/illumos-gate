@@ -12652,6 +12652,7 @@ f usr/share/man/man1m/trapstat.1m 0444 root bin
 f usr/share/man/man1m/ttyadm.1m 0444 root bin
 f usr/share/man/man1m/ttymon.1m 0444 root bin
 f usr/share/man/man1m/tunefs.1m 0444 root bin
+f usr/share/man/man1m/tzreload.1m 0444 root bin
 f usr/share/man/man1m/tzselect.1m 0444 root bin
 f usr/share/man/man1m/uadmin.1m 0444 root bin
 f usr/share/man/man1m/ucodeadm.1m 0444 root bin

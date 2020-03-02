@@ -15,9 +15,10 @@
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
 # Copyright (c) 2016 by Delphix. All rights reserved.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
+$(i386_ONLY) file path=usr/share/man/man1m/rdmsr.1m variant.opensolaris.zone=global
 file path=usr/share/man/man1m/6to4relay.1m
 file path=usr/share/man/man1m/Intro.1m
 file path=usr/share/man/man1m/acctadm.1m
@@ -57,7 +58,6 @@ file path=usr/share/man/man1m/dd.1m
 file path=usr/share/man/man1m/devattr.1m
 file path=usr/share/man/man1m/devfree.1m
 file path=usr/share/man/man1m/devfsadm.1m
-link path=usr/share/man/man1m/audlinks.1m target=devfsadm.1m
 file path=usr/share/man/man1m/devinfo.1m
 file path=usr/share/man/man1m/devlinks.1m
 file path=usr/share/man/man1m/devnm.1m
@@ -203,7 +203,6 @@ file path=usr/share/man/man1m/quotaon.1m
 file path=usr/share/man/man1m/raidctl.1m
 file path=usr/share/man/man1m/ramdiskadm.1m
 file path=usr/share/man/man1m/rctladm.1m
-$(i386_ONLY) file path=usr/share/man/man1m/rdmsr.1m variant.opensolaris.zone=global
 file path=usr/share/man/man1m/reboot.1m
 file path=usr/share/man/man1m/rem_drv.1m
 file path=usr/share/man/man1m/repquota.1m
@@ -260,6 +259,7 @@ file path=usr/share/man/man1m/trapstat.1m
 file path=usr/share/man/man1m/ttyadm.1m
 file path=usr/share/man/man1m/ttymon.1m
 file path=usr/share/man/man1m/tunefs.1m
+file path=usr/share/man/man1m/tzreload.1m
 file path=usr/share/man/man1m/tzselect.1m
 file path=usr/share/man/man1m/uadmin.1m
 file path=usr/share/man/man1m/ucodeadm.1m
@@ -280,6 +280,7 @@ file path=usr/share/man/man1m/whodo.1m
 file path=usr/share/man/man1m/wracct.1m
 file path=usr/share/man/man1m/zdump.1m
 file path=usr/share/man/man1m/zic.1m
+link path=usr/share/man/man1m/audlinks.1m target=devfsadm.1m
 link path=usr/share/man/man1m/dcopy.1m target=clri.1m
 link path=usr/share/man/man1m/devfsadmd.1m target=devfsadm.1m
 link path=usr/share/man/man1m/grpck.1m target=pwck.1m

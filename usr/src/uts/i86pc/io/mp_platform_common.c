@@ -24,6 +24,7 @@
  * Copyright 2017 Joyent, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -79,7 +80,7 @@
 /*
  *	Local Function Prototypes
  */
-static int apic_handle_defconf();
+static int apic_handle_defconf(void);
 static int apic_parse_mpct(caddr_t mpct, int bypass);
 static struct apic_mpfps_hdr *apic_find_fps_sig(caddr_t fptr, int size);
 static int apic_checksum(caddr_t bptr, int len);
@@ -182,7 +183,7 @@ int	apic_num_rebind = 0;
  * Maximum number of APIC CPUs in the system, -1 indicates that dynamic
  * allocation of CPU ids is disabled.
  */
-int 	apic_max_nproc = -1;
+int	apic_max_nproc = -1;
 int	apic_nproc = 0;
 size_t	apic_cpus_size = 0;
 int	apic_defconf = 0;
@@ -589,10 +590,22 @@ apic_free_apic_cpus(void)
 	}
 }
 
+static uint32_t
+acpi_get_apic_lid(void)
+{
+	uint32_t	id;
+
+	id = apic_reg_ops->apic_read(APIC_LID_REG);
+	if (apic_mode != LOCAL_X2APIC)
+		id >>= APIC_ID_BIT_OFFSET;
+
+	return (id);
+}
+
 static int
 acpi_probe(char *modname)
 {
-	int			i, intmax, index;
+	int			i, intmax;
 	uint32_t		id, ver;
 	int			acpi_verboseflags = 0;
 	int			madt_seen, madt_size;
@@ -640,9 +653,9 @@ acpi_probe(char *modname)
 		return (PSM_FAILURE);
 	}
 
-	id = apic_reg_ops->apic_read(APIC_LID_REG);
-	local_ids[0] = (uchar_t)(id >> 24);
-	apic_nproc = index = 1;
+	local_ids[0] = acpi_get_apic_lid();
+
+	apic_nproc = 1;
 	apic_io_max = 0;
 
 	ap = (ACPI_SUBTABLE_HEADER *) (acpi_mapic_dtp + 1);
@@ -657,25 +670,19 @@ acpi_probe(char *modname)
 				if (mpa->Id == 255) {
 					cmn_err(CE_WARN, "!%s: encountered "
 					    "invalid entry in MADT: CPU %d "
-					    "has Local APIC Id equal to 255 ",
+					    "has Local APIC Id equal to 255",
 					    psm_name, mpa->ProcessorId);
 				}
 				if (mpa->Id == local_ids[0]) {
-					ASSERT(index == 1);
 					proc_ids[0] = mpa->ProcessorId;
 				} else if (apic_nproc < NCPU && use_mp &&
 				    apic_nproc < boot_ncpus) {
-					local_ids[index] = mpa->Id;
-					proc_ids[index] = mpa->ProcessorId;
-					index++;
+					local_ids[apic_nproc] = mpa->Id;
+					proc_ids[apic_nproc] = mpa->ProcessorId;
 					apic_nproc++;
 				} else if (apic_nproc == NCPU && !warned) {
 					cmn_err(CE_WARN, "%s: CPU limit "
-					    "exceeded"
-#if !defined(__amd64)
-					    " for 32-bit mode"
-#endif
-					    "; Solaris will use %d CPUs.",
+					    "exceeded; will use %d CPUs.",
 					    psm_name,  NCPU);
 					warned = 1;
 				}
@@ -716,7 +723,7 @@ acpi_probe(char *modname)
 				acpi_nmi_sp = mns;
 			acpi_nmi_scnt++;
 
-			cmn_err(CE_NOTE, "!apic: nmi source: %d 0x%x\n",
+			cmn_err(CE_NOTE, "!apic: nmi source: %d 0x%x",
 			    mns->GlobalIrq, mns->IntiFlags);
 			break;
 
@@ -727,7 +734,7 @@ acpi_probe(char *modname)
 				acpi_nmi_cp = mlan;
 			acpi_nmi_ccnt++;
 
-			cmn_err(CE_NOTE, "!apic: local nmi: %d 0x%x %d\n",
+			cmn_err(CE_NOTE, "!apic: local nmi: %d 0x%x %d",
 			    mlan->ProcessorId, mlan->IntiFlags,
 			    mlan->Lint);
 			break;
@@ -735,7 +742,7 @@ acpi_probe(char *modname)
 		case ACPI_MADT_TYPE_LOCAL_APIC_OVERRIDE:
 			/* UNIMPLEMENTED */
 			mao = (ACPI_MADT_LOCAL_APIC_OVERRIDE *) ap;
-			cmn_err(CE_NOTE, "!apic: address override: %lx\n",
+			cmn_err(CE_NOTE, "!apic: address override: %lx",
 			    (long)mao->Address);
 			break;
 
@@ -743,7 +750,7 @@ acpi_probe(char *modname)
 			/* UNIMPLEMENTED */
 			misa = (ACPI_MADT_IO_SAPIC *) ap;
 
-			cmn_err(CE_NOTE, "!apic: io sapic: %d %d %lx\n",
+			cmn_err(CE_NOTE, "!apic: io sapic: %d %d %lx",
 			    misa->Id, misa->GlobalIrqBase,
 			    (long)misa->Address);
 			break;
@@ -753,7 +760,7 @@ acpi_probe(char *modname)
 			mis = (ACPI_MADT_INTERRUPT_SOURCE *) ap;
 
 			cmn_err(CE_NOTE,
-			    "!apic: irq source: %d %d %d 0x%x %d %d\n",
+			    "!apic: irq source: %d %d %d 0x%x %d %d",
 			    mis->Id, mis->Eid, mis->GlobalIrq,
 			    mis->IntiFlags, mis->Type,
 			    mis->IoSapicVector);
@@ -764,21 +771,16 @@ acpi_probe(char *modname)
 
 			if (mpx2a->LapicFlags & ACPI_MADT_ENABLED) {
 				if (mpx2a->LocalApicId == local_ids[0]) {
-					ASSERT(index == 1);
 					proc_ids[0] = mpx2a->Uid;
 				} else if (apic_nproc < NCPU && use_mp &&
 				    apic_nproc < boot_ncpus) {
-					local_ids[index] = mpx2a->LocalApicId;
-					proc_ids[index] = mpx2a->Uid;
-					index++;
+					local_ids[apic_nproc] =
+					    mpx2a->LocalApicId;
+					proc_ids[apic_nproc] = mpx2a->Uid;
 					apic_nproc++;
 				} else if (apic_nproc == NCPU && !warned) {
 					cmn_err(CE_WARN, "%s: CPU limit "
-					    "exceeded"
-#if !defined(__amd64)
-					    " for 32-bit mode"
-#endif
-					    "; Solaris will use %d CPUs.",
+					    "exceeded; will use %d CPUs.",
 					    psm_name,  NCPU);
 					warned = 1;
 				}
@@ -792,9 +794,9 @@ acpi_probe(char *modname)
 			if (mx2alan->Uid >> 8)
 				acpi_nmi_ccnt++;
 
-#ifdef	DEBUG
+#ifdef DEBUG
 			cmn_err(CE_NOTE,
-			    "!apic: local x2apic nmi: %d 0x%x %d\n",
+			    "!apic: local x2apic nmi: %d 0x%x %d",
 			    mx2alan->Uid, mx2alan->IntiFlags, mx2alan->Lint);
 #endif
 
@@ -848,19 +850,19 @@ acpi_probe(char *modname)
 	 * The state for each apic CPU info structure will be assigned according
 	 * to the following rules:
 	 * Rule 1:
-	 * 	Slot index range: [0, min(apic_nproc, boot_ncpus))
+	 *	Slot index range: [0, min(apic_nproc, boot_ncpus))
 	 *	State flags: 0
 	 *	Note: cpu exists and will be configured/enabled at boot time
 	 * Rule 2:
-	 * 	Slot index range: [boot_ncpus, apic_nproc)
+	 *	Slot index range: [boot_ncpus, apic_nproc)
 	 *	State flags: APIC_CPU_FREE | APIC_CPU_DIRTY
 	 *	Note: cpu exists but won't be configured/enabled at boot time
 	 * Rule 3:
-	 * 	Slot index range: [apic_nproc, boot_ncpus)
+	 *	Slot index range: [apic_nproc, boot_ncpus)
 	 *	State flags: APIC_CPU_FREE
 	 *	Note: cpu doesn't exist at boot time
 	 * Rule 4:
-	 * 	Slot index range: [max(apic_nproc, boot_ncpus), max_ncpus)
+	 *	Slot index range: [max(apic_nproc, boot_ncpus), max_ncpus)
 	 *	State flags: APIC_CPU_FREE
 	 *	Note: cpu doesn't exist at boot time
 	 */
@@ -1014,10 +1016,8 @@ cleanup:
  * Fill all details as MP table does not give any more info
  */
 static int
-apic_handle_defconf()
+apic_handle_defconf(void)
 {
-	uint_t	lid;
-
 	/* Failed to probe ACPI MADT tables, disable CPU DR. */
 	apic_max_nproc = -1;
 	apic_free_apic_cpus();
@@ -1035,8 +1035,7 @@ apic_handle_defconf()
 	CPUSET_ONLY(apic_cpumask, 0);
 	CPUSET_ADD(apic_cpumask, 1);
 	apic_nproc = 2;
-	lid = apic_reg_ops->apic_read(APIC_LID_REG);
-	apic_cpus[0].aci_local_id = (uchar_t)(lid >> APIC_ID_BIT_OFFSET);
+	apic_cpus[0].aci_local_id = acpi_get_apic_lid();
 	/*
 	 * According to the PC+MP spec 1.1, the local ids
 	 * for the default configuration has to be 0 or 1
@@ -1081,10 +1080,9 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 	struct	apic_io_entry	*ioapicp;
 	struct	apic_io_intr	*intrp;
 	int			ioapic_ix;
-	uint_t	lid;
-	uint32_t	id;
-	uchar_t hid;
-	int	warned = 0;
+	uint32_t		lid, id;
+	uchar_t			hid;
+	int			warned = 0;
 
 	/*LINTED: pointer cast may result in improper alignment */
 	procp = (struct apic_procent *)(mpct + sizeof (struct apic_mp_cnf_hdr));
@@ -1103,11 +1101,7 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 					apic_nproc++;
 				} else if (apic_nproc == NCPU && !warned) {
 					cmn_err(CE_WARN, "%s: CPU limit "
-					    "exceeded"
-#if !defined(__amd64)
-					    " for 32-bit mode"
-#endif
-					    "; Solaris will use %d CPUs.",
+					    "exceeded; will use %d CPUs.",
 					    psm_name,  NCPU);
 					warned = 1;
 				}
@@ -1137,10 +1131,9 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 		if (!bypass_cpus_and_ioapics &&
 		    procp->proc_cpuflags & CPUFLAGS_EN) {
 			if (procp->proc_cpuflags & CPUFLAGS_BP) { /* Boot CPU */
-				lid = apic_reg_ops->apic_read(APIC_LID_REG);
+				lid = acpi_get_apic_lid();
 				apic_cpus[0].aci_local_id = procp->proc_apicid;
-				if (apic_cpus[0].aci_local_id !=
-				    (uchar_t)(lid >> APIC_ID_BIT_OFFSET)) {
+				if (apic_cpus[0].aci_local_id != lid) {
 					return (PSM_FAILURE);
 				}
 				apic_cpus[0].aci_local_ver =
@@ -1624,7 +1617,8 @@ apic_allocate_irq(int irq)
 
 			if (freeirq == -1) {
 				/* This shouldn't happen, but just in case */
-				cmn_err(CE_WARN, "%s: NO available IRQ", psm_name);
+				cmn_err(CE_WARN, "%s: NO available IRQ",
+				    psm_name);
 				return (-1);
 			}
 		}
