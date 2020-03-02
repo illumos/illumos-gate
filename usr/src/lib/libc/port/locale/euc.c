@@ -46,22 +46,23 @@
 
 static size_t	_EUC_mbrtowc_impl(wchar_t *_RESTRICT_KYWD,
     const char *_RESTRICT_KYWD,
-    size_t, mbstate_t *_RESTRICT_KYWD, uint8_t, uint8_t, uint8_t, uint8_t);
+    size_t, mbstate_t *_RESTRICT_KYWD, uint8_t, uint8_t, uint8_t, uint8_t,
+    boolean_t);
 static size_t	_EUC_wcrtomb_impl(char *_RESTRICT_KYWD, wchar_t,
     mbstate_t *_RESTRICT_KYWD, uint8_t, uint8_t, uint8_t, uint8_t);
 
 static size_t	_EUC_CN_mbrtowc(wchar_t *_RESTRICT_KYWD,
 		    const char *_RESTRICT_KYWD,
-		    size_t, mbstate_t *_RESTRICT_KYWD);
+		    size_t, mbstate_t *_RESTRICT_KYWD, boolean_t);
 static size_t	_EUC_JP_mbrtowc(wchar_t *_RESTRICT_KYWD,
 		    const char *_RESTRICT_KYWD,
-		    size_t, mbstate_t *_RESTRICT_KYWD);
+		    size_t, mbstate_t *_RESTRICT_KYWD, boolean_t);
 static size_t	_EUC_KR_mbrtowc(wchar_t *_RESTRICT_KYWD,
 		    const char *_RESTRICT_KYWD,
-		    size_t, mbstate_t *_RESTRICT_KYWD);
+		    size_t, mbstate_t *_RESTRICT_KYWD, boolean_t);
 static size_t	_EUC_TW_mbrtowc(wchar_t *_RESTRICT_KYWD,
 		    const char *_RESTRICT_KYWD,
-		    size_t, mbstate_t *_RESTRICT_KYWD);
+		    size_t, mbstate_t *_RESTRICT_KYWD, boolean_t);
 
 static size_t	_EUC_CN_wcrtomb(char *_RESTRICT_KYWD, wchar_t,
 		    mbstate_t *_RESTRICT_KYWD);
@@ -131,9 +132,9 @@ _EUC_CN_init(struct lc_ctype *lct)
 
 static size_t
 _EUC_CN_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
-    size_t n, mbstate_t *_RESTRICT_KYWD ps)
+    size_t n, mbstate_t *_RESTRICT_KYWD ps, boolean_t zero)
 {
-	return (_EUC_mbrtowc_impl(pwc, s, n, ps, SS2, 4, 0, 0));
+	return (_EUC_mbrtowc_impl(pwc, s, n, ps, SS2, 4, 0, 0, zero));
 }
 
 static size_t
@@ -176,9 +177,9 @@ _EUC_KR_init(struct lc_ctype *lct)
 
 static size_t
 _EUC_KR_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
-    size_t n, mbstate_t *_RESTRICT_KYWD ps)
+    size_t n, mbstate_t *_RESTRICT_KYWD ps, boolean_t zero)
 {
-	return (_EUC_mbrtowc_impl(pwc, s, n, ps, 0, 0, 0, 0));
+	return (_EUC_mbrtowc_impl(pwc, s, n, ps, 0, 0, 0, 0, zero));
 }
 
 static size_t
@@ -221,9 +222,9 @@ _EUC_JP_init(struct lc_ctype *lct)
 
 static size_t
 _EUC_JP_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
-    size_t n, mbstate_t *_RESTRICT_KYWD ps)
+    size_t n, mbstate_t *_RESTRICT_KYWD ps, boolean_t zero)
 {
-	return (_EUC_mbrtowc_impl(pwc, s, n, ps, SS2, 2, SS3, 3));
+	return (_EUC_mbrtowc_impl(pwc, s, n, ps, SS2, 2, SS3, 3, zero));
 }
 
 static size_t
@@ -266,9 +267,9 @@ _EUC_TW_init(struct lc_ctype *lct)
 
 static size_t
 _EUC_TW_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
-    size_t n, mbstate_t *_RESTRICT_KYWD ps)
+    size_t n, mbstate_t *_RESTRICT_KYWD ps, boolean_t zero)
 {
-	return (_EUC_mbrtowc_impl(pwc, s, n, ps, SS2, 4, 0, 0));
+	return (_EUC_mbrtowc_impl(pwc, s, n, ps, SS2, 4, 0, 0, zero));
 }
 
 static size_t
@@ -300,7 +301,8 @@ _EUC_TW_wcsnrtombs(char *_RESTRICT_KYWD dst, const wchar_t **_RESTRICT_KYWD src,
 static size_t
 _EUC_mbrtowc_impl(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
     size_t n, mbstate_t *_RESTRICT_KYWD ps,
-    uint8_t cs2, uint8_t cs2width, uint8_t cs3, uint8_t cs3width)
+    uint8_t cs2, uint8_t cs2width, uint8_t cs3, uint8_t cs3width,
+    boolean_t zero)
 {
 	_EucState *es;
 	int i, want;
@@ -329,7 +331,11 @@ _EUC_mbrtowc_impl(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
 		if (((ch = (unsigned char)*s) & 0x80) == 0) {
 			if (pwc != NULL)
 				*pwc = ch;
-			return (ch != '\0' ? 1 : 0);
+			if (zero || ch != '\0') {
+				return (1);
+			} else {
+				return (0);
+			}
 		}
 
 		if (ch >= 0xa1) {
@@ -367,7 +373,11 @@ _EUC_mbrtowc_impl(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
 	if (pwc != NULL)
 		*pwc = wc;
 	es->want = 0;
-	return (wc == L'\0' ? 0 : want);
+	if (zero || wc != L'\0') {
+		return (want);
+	} else {
+		return (0);
+	}
 }
 
 static size_t

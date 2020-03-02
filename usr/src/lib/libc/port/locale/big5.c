@@ -44,7 +44,7 @@
 
 static size_t	_BIG5_mbrtowc(wchar_t *_RESTRICT_KYWD,
 		    const char *_RESTRICT_KYWD,
-		    size_t, mbstate_t *RESTRICT_KYWD);
+		    size_t, mbstate_t *RESTRICT_KYWD, boolean_t);
 static int	_BIG5_mbsinit(const mbstate_t *);
 static size_t	_BIG5_wcrtomb(char *_RESTRICT_KYWD, wchar_t,
 		    mbstate_t *_RESTRICT_KYWD);
@@ -88,7 +88,7 @@ _big5_check(uint_t c)
 
 static size_t
 _BIG5_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
-    size_t n, mbstate_t *_RESTRICT_KYWD ps)
+    size_t n, mbstate_t *_RESTRICT_KYWD ps, boolean_t zero)
 {
 	_BIG5State *bs;
 	wchar_t wc;
@@ -143,7 +143,11 @@ _BIG5_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
 	} else {
 		if (pwc != NULL)
 			*pwc = wc;
-		return (wc == L'\0' ? 0 : 1);
+		if (zero || wc != L'\0') {
+			return (1);
+		} else {
+			return (0);
+		}
 	}
 }
 

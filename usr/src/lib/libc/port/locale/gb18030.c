@@ -44,7 +44,7 @@
 
 static size_t	_GB18030_mbrtowc(wchar_t *_RESTRICT_KYWD,
 		    const char *_RESTRICT_KYWD,
-		    size_t, mbstate_t *_RESTRICT_KYWD);
+		    size_t, mbstate_t *_RESTRICT_KYWD, boolean_t);
 static int	_GB18030_mbsinit(const mbstate_t *);
 static size_t	_GB18030_wcrtomb(char *_RESTRICT_KYWD, wchar_t,
 		    mbstate_t *_RESTRICT_KYWD);
@@ -83,7 +83,7 @@ _GB18030_mbsinit(const mbstate_t *ps)
 
 static size_t
 _GB18030_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
-    size_t n, mbstate_t *_RESTRICT_KYWD ps)
+    size_t n, mbstate_t *_RESTRICT_KYWD ps, boolean_t zero)
 {
 	_GB18030State *gs;
 	wchar_t wch;
@@ -159,7 +159,11 @@ _GB18030_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
 	if (pwc != NULL)
 		*pwc = wch;
 	gs->count = 0;
-	return (wch == L'\0' ? 0 : len - ocount);
+	if (zero || wch != L'\0') {
+		return (len - ocount);
+	} else {
+		return (0);
+	}
 ilseq:
 	errno = EILSEQ;
 	return ((size_t)-1);

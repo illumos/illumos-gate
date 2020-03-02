@@ -37,7 +37,7 @@
 
 static size_t	_UTF8_mbrtowc(wchar_t *_RESTRICT_KYWD,
 		    const char *_RESTRICT_KYWD,
-		    size_t, mbstate_t *_RESTRICT_KYWD);
+		    size_t, mbstate_t *_RESTRICT_KYWD, boolean_t);
 static int	_UTF8_mbsinit(const mbstate_t *);
 static size_t	_UTF8_mbsnrtowcs(wchar_t *_RESTRICT_KYWD,
 		    const char **_RESTRICT_KYWD, size_t, size_t,
@@ -75,7 +75,7 @@ _UTF8_mbsinit(const mbstate_t *ps)
 
 static size_t
 _UTF8_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
-    size_t n, mbstate_t *_RESTRICT_KYWD ps)
+    size_t n, mbstate_t *_RESTRICT_KYWD ps, boolean_t zero)
 {
 	_UTF8State *us;
 	int ch, i, mask, want;
@@ -116,7 +116,11 @@ _UTF8_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
 			/* Fast path for plain ASCII characters. */
 			if (pwc != NULL)
 				*pwc = ch;
-			return (ch != '\0' ? 1 : 0);
+			if (zero || ch != '\0') {
+				return (1);
+			} else {
+				return (0);
+			}
 		}
 		if ((ch & 0xe0) == 0xc0) {
 			mask = 0x1f;
@@ -192,7 +196,11 @@ _UTF8_mbrtowc(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
 	if (pwc != NULL)
 		*pwc = wch;
 	us->want = 0;
-	return (wch == L'\0' ? 0 : want);
+	if (zero || wch != L'\0') {
+		return (want);
+	} else {
+		return (0);
+	}
 }
 
 static size_t
@@ -221,18 +229,19 @@ _UTF8_mbsnrtowcs(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
 			return ((size_t)-1);
 		}
 		for (;;) {
-			if (nms > 0 && (signed char)*s > 0)
+			if (nms > 0 && (signed char)*s > 0) {
 				/*
 				 * Fast path for plain ASCII characters
 				 * excluding NUL.
 				 */
 				nb = 1;
-			else if ((nb = _UTF8_mbrtowc(&wc, s, nms, ps)) ==
-			    (size_t)-1)
+			} else if ((nb = _UTF8_mbrtowc(&wc, s, nms, ps,
+			    B_FALSE)) == (size_t)-1) {
 				/* Invalid sequence - mbrtowc() sets errno. */
 				return ((size_t)-1);
-			else if (nb == 0 || nb == (size_t)-2)
+			} else if (nb == 0 || nb == (size_t)-2) {
 				return (nchr);
+			}
 			s += nb;
 			nms -= nb;
 			nchr++;
@@ -257,7 +266,7 @@ _UTF8_mbsnrtowcs(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
 			 */
 			*dst = (wchar_t)*s;
 			nb = 1;
-		} else if ((nb = _UTF8_mbrtowc(dst, s, nms, ps)) ==
+		} else if ((nb = _UTF8_mbrtowc(dst, s, nms, ps, B_FALSE)) ==
 		    (size_t)-1) {
 			*src = s;
 			return ((size_t)-1);

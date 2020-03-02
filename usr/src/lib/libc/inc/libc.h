@@ -333,6 +333,14 @@ extern void __throw_constraint_handler_s(const char *_RESTRICT_KYWD, int);
  */
 extern void common_panic(const char *, const char *);
 
+/*
+ * defined in mbrtowc.c.
+ */
+extern size_t mbrtowc_nz_l(wchar_t *_RESTRICT_KYWD, const char *_RESTRICT_KYWD,
+    size_t, mbstate_t *_RESTRICT_KYWD, locale_t);
+extern size_t mbrtowc_nz(wchar_t *_RESTRICT_KYWD, const char *_RESTRICT_KYWD,
+    size_t, mbstate_t *_RESTRICT_KYWD);
+
 #ifdef	__cplusplus
 }
 #endif
