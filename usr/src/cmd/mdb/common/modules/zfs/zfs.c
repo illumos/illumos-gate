@@ -4066,6 +4066,8 @@ typedef struct arc_compression_stats_data {
 	uint64_t *all_bufs;	/* histogram of buffer counts in all states  */
 	int arc_cflags;		/* arc compression flags, specified by user */
 	int hist_nbuckets;	/* number of buckets in each histogram */
+
+	ulong_t l1hdr_off;	/* offset of b_l1hdr in arc_buf_hdr_t */
 } arc_compression_stats_data_t;
 
 int
@@ -4101,13 +4103,51 @@ static int
 arc_compression_stats_cb(uintptr_t addr, const void *unknown, void *arg)
 {
 	arc_compression_stats_data_t *data = arg;
+	arc_flags_t flags;
 	mdb_arc_buf_hdr_t hdr;
 	int cbucket, ubucket, bufcnt;
 
-	if (mdb_ctf_vread(&hdr, "arc_buf_hdr_t", "mdb_arc_buf_hdr_t",
-	    addr, 0) == -1) {
+	/*
+	 * mdb_ctf_vread() uses the sizeof the target type (e.g.
+	 * sizeof (arc_buf_hdr_t) in the target) to read in the entire contents
+	 * of the target type into a buffer and then copy the values of the
+	 * desired members from the mdb typename (e.g. mdb_arc_buf_hdr_t) from
+	 * this buffer. Unfortunately, the way arc_buf_hdr_t is used by zfs,
+	 * the actual size allocated by the kernel for arc_buf_hdr_t is often
+	 * smaller than `sizeof (arc_buf_hdr_t)` (see the definitions of
+	 * l1arc_buf_hdr_t and arc_buf_hdr_t in
+	 * usr/src/uts/common/fs/zfs/arc.c). Attempting to read the entire
+	 * contents of arc_buf_hdr_t from the target (as mdb_ctf_vread() does)
+	 * can cause an error if the allocated size is indeed smaller--it's
+	 * possible that the 'missing' trailing members of arc_buf_hdr_t
+	 * (l1arc_buf_hdr_t and/or arc_buf_hdr_crypt_t) may fall into unmapped
+	 * memory.
+	 *
+	 * We use the GETMEMB macro instead which performs an mdb_vread()
+	 * but only reads enough of the target to retrieve the desired struct
+	 * member instead of the entire struct.
+	 */
+	if (GETMEMB(addr, "arc_buf_hdr", b_flags, flags) == -1)
 		return (WALK_ERR);
-	}
+
+	/*
+	 * We only count headers that have data loaded in the kernel.
+	 * This means an L1 header must be present as well as the data
+	 * that corresponds to the L1 header. If there's no L1 header,
+	 * we can skip the arc_buf_hdr_t completely. If it's present, we
+	 * must look at the ARC state (b_l1hdr.b_state) to determine if
+	 * the data is present.
+	 */
+	if ((flags & ARC_FLAG_HAS_L1HDR) == 0)
+		return (WALK_NEXT);
+
+	if (GETMEMB(addr, "arc_buf_hdr", b_psize, hdr.b_psize) == -1 ||
+	    GETMEMB(addr, "arc_buf_hdr", b_lsize, hdr.b_lsize) == -1 ||
+	    GETMEMB(addr + data->l1hdr_off, "l1arc_buf_hdr", b_bufcnt,
+	    hdr.b_l1hdr.b_bufcnt) == -1 ||
+	    GETMEMB(addr + data->l1hdr_off, "l1arc_buf_hdr", b_state,
+	    hdr.b_l1hdr.b_state) == -1)
+		return (WALK_ERR);
 
 	/*
 	 * Headers in the ghost states, or the l2c_only state don't have
@@ -4212,6 +4252,7 @@ arc_compression_stats(uintptr_t addr, uint_t flags, int argc,
 	unsigned int hist_size;
 	char range[32];
 	int rc = DCMD_OK;
+	int off;
 
 	if (mdb_getopts(argc, argv,
 	    'v', MDB_OPT_SETBITS, ARC_CFLAG_VERBOSE, &data.arc_cflags,
@@ -4263,6 +4304,14 @@ arc_compression_stats(uintptr_t addr, uint_t flags, int argc,
 	data.all_c_hist = mdb_zalloc(hist_size, UM_SLEEP);
 	data.all_u_hist = mdb_zalloc(hist_size, UM_SLEEP);
 	data.all_bufs = mdb_zalloc(hist_size, UM_SLEEP);
+
+	if ((off = mdb_ctf_offsetof_by_name(ZFS_STRUCT "arc_buf_hdr",
+	    "b_l1hdr")) == -1) {
+		mdb_warn("could not get offset of b_l1hdr from arc_buf_hdr_t");
+		rc = DCMD_ERR;
+		goto out;
+	}
+	data.l1hdr_off = off;
 
 	if (mdb_walk("arc_buf_hdr_t_full", arc_compression_stats_cb,
 	    &data) != 0) {
