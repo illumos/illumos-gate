@@ -1,0 +1,330 @@
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright (c) 2010, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2020 Joyent, Inc.
+.\"
+.Dd March 2, 2020
+.Dt HOTPLUG 1M
+.Os
+.Sh NAME
+.Nm hotplug
+.Nd configure hotplug connectors and ports
+.Sh SYNOPSIS
+.Nm
+.Fl \&?
+.Nm
+.Cm list
+.Op Fl lv
+.Op Ar path
+.Op Ar connection
+.Nm
+.Cm online
+.Ar path
+.Ar port
+.Nm
+.Cm offline
+.Op Fl fq
+.Ar path
+.Ar port
+.Nm
+.Cm enable
+.Ar path
+.Ar connector
+.Nm
+.Cm disable
+.Op Fl fq
+.Ar path
+.Ar connector
+.Nm
+.Cm poweron
+.Ar path
+.Ar connector
+.Nm
+.Cm poweroff
+.Op Fl fq
+.Ar path
+.Ar connector
+.Nm
+.Cm set
+.Fl o Ar options
+.Ar path
+.Ar connector
+.Nm
+.Cm get
+.Fl o Ar options
+.Ar path
+.Ar connector
+.Sh DESCRIPTION
+The
+.Nm
+command is used to manage hotplug connections.
+A connection can be a connector or port.
+A hotplug connector is a representation of a physical point in the system where
+components can be inserted or removed.
+A hotplug port is a representation of a logical point in the system device tree
+where the connection of a device to the system is managed.
+.Pp
+The
+.Nm
+command only supports hotplug operations on hotplug connectors for PCI Express
+buses and PCI buses that implement the Standard PCI Hotplug feature.
+Hotplug ports on PCI Express and PCI buses in systems with PCI Express fabrics
+are also supported.
+Additional buses may be supported in the future.
+.Pp
+The
+.Nm
+command operates on the following kinds of objects:
+.Bl -tag -width "connection"
+.It Cm path
+Hotplug connectors and ports are integrated into the system device tree.
+The names of connectors and ports are unique relative only to their bus
+controller.
+A device path is required to uniquely reference a connector or port.
+.It Cm connector
+If a hardware component supports being physically inserted or removed, then a
+hotplug connector represents the location where this action may occur.
+When a connector exists, it has a hierarchy of ports and device nodes that
+depend upon it.
+.It Cm port
+All device nodes can be virtually hotplugged, even if their hardware does not
+support physical hotplugging.
+A hotplug port exists between a device node and its parent node in the system
+device tree.
+It represents the location where the device node and its dependents can be
+managed.
+.It Cm connection
+A hotplug connection is a generic term to refer to either a hotplug connector or
+a hotplug port.
+.El
+.Pp
+Hotplug connectors and ports are managed according to a state model.
+The
+.Nm
+command can list information about the hotplug connections in a system, or it
+can initiate change of state operations on specific hotplug connections.
+.Pp
+Hotplug connectors can be in the following states:
+.Bl -tag -width "present"
+.It Cm empty
+A component is not physically inserted in the connector.
+.It Cm present
+A component is physically inserted in the connector, but the component is
+powered off.
+The component is not in use.
+.It Cm powered
+A component is physically inserted in the connector, and the component is
+powered on.
+The component is disabled and is not in use.
+.It Cm enabled
+A component is physically inserted in the connector.
+The component is powered on and has been probed and tested.
+The component is enabled and devices that represent its functions can be used.
+.El
+.Pp
+Hotplug ports can be in the following states:
+.Bl -tag -width "port-present"
+.It Cm port-empty
+No device exists for the hotplug port.
+.It Cm port-present
+A device exists for the hotplug port, but the device has not been probed and it
+has no attached device driver.
+The device is not in use.
+.It Cm offline
+A device exists for the hotplug port, and the device has been probed.
+A device driver is not attached, and the device is not in use.
+.It Cm online
+A device exists for the hotplug port, and its device driver is fully attached.
+The device is in use.
+.It Cm maintenance
+A device exists for the hotplug port, and its device driver is fully attached.
+The device is in use, but not fully operational.
+A maintenance or fault management operation is affecting the device.
+.El
+.Pp
+The
+.Nm
+command can also access bus private properties for each hotplug connector.
+The current values of bus private properties can be displayed.
+New values for each bus private property can be set directly.
+.Sh EXIT STATUS
+.Bl -diag
+.It 0
+Successful completion.
+.It 1
+Invalid command line options were specified.
+.It 2
+The specified path or connection does not exist.
+.It 3
+A fatal error occurred.
+One or more error messages are displayed on standard error.
+.It 4
+The hotplug service is not available.
+.El
+.Sh EXAMPLES
+.Bl -tag -width 0n
+.It Sy Example 1 No Showing All Hotplug Connections
+The following command shows all hotplug connections:
+.Bd -literal
+# hotplug list -v
+pci@0,0
+        <pci.2,1> (ONLINE)
+         pci108e,534a@2,1
+                 [pci30] (EMPTY)
+        <pci.e,0> (ONLINE)
+         pci10de,5d@e
+                 <pci.b,0> (ONLINE)
+                 display@b
+                 [NEM0] (ENABLED)
+                 <pci.a,0> (ONLINE)
+                 pci108e,534a@a,0
+                         { Network interface nge0 }
+                         { nge0: hosts IP addresses: 10.0.0.1 }
+                 <pci.a,1> (MAINTENANCE)
+                 pci108e,534a@a,1
+                 [NEM1] (EMPTY)
+         <pci.c,0> (OFFLINE)
+                pci108e,534a@4
+.Ed
+.Pp
+To show the full paths of hotplug connections and devices, enter the following
+command:
+.Bd -literal
+# hotplug list -l
+/pci@0,0 <pci.2,1> (ONLINE)
+/pci@0,0/pci108e,534a@2,1 [pci30] (EMPTY)
+/pci@0,0 pci.e,0> (ONLINE)
+/pci@0,0/pci10de,5d@e <pci.b,0> (ONLINE)
+/pci@0,0/pci10de,5d@e/display@b
+/pci@0,0/pci10de,5d@e [NEM0] (ENABLED)
+/pci@0,0/pci10de,5d@e <pci.a,0> (ONLINE)
+/pci@0,0/pci10de,5d@e/pci108e,534a@a,0
+/pci@0,0/pci10de,5d@e <pci.a,1> (MAINTENANCE)
+/pci@0,0/pci10de,5d@e/pci108e,534a@a,0
+/pci@0,0/pci10de,5d@e [NEM1] (EMPTY)
+/pci@0,0 pci.c,0> (OFFLINE)
+/pci@0,0/pci108e,534a@4
+.Ed
+.It Sy Example 2 No Reporting Failure During State Change Operation
+If a change of state operation fails, an explanation is displayed to describe
+the failure.
+An attempt to offline a hotplug port with dependent devices that are currently
+in use by the system might fail as follows:
+.Bd -literal
+# hotplug offline /pci@0,0/pci10de,5d@e pci.a,0
+ERROR: devices or resources are busy.
+pci108e,534a@a,0:
+    { Network interface nge0 }
+    { nge0: hosts IP addresses: 10.0.0.1 }
+    { Plumbed IP Address }
+.Ed
+.It Sy Example 3 No Displaying Bus-Specific Properties and Values
+The following command displays all supported bus-specific properties and their
+possible values:
+.Bd -literal
+# hotplug get -o help /pci@0,0 pci.2,1
+power_led=<on|off|blink>
+fault_led=<on|off|blink>
+active_led=<on|off|blink>
+attn_led=<on|off|blink>
+card_type=<type description>
+board_type=<type description>
+.Ed
+.It Sy Example 4 Displaying Bus-Specific Options
+The following command displays the card type and the current state of the Power
+LED of a PCI hotplug connector:
+.Bd -literal
+# hotplug get -o card_type,power_led /pci@0,0 pci.2,1
+card_type=fibre
+power_led=on
+.Ed
+.It Sy Example 5 No Setting a Bus-Specific Property
+The following command turns on the attention LED of a PCI hotplug connector:
+.Bd -literal
+# hotplug set -o attn_led=on /pci@0,0 pci.2,1
+.Ed
+.El
+.Sh DIAGNOSTICS
+The following error message is displayed on systems that do not have any
+supported I/O buses:
+.Bd -literal
+ERROR: there are no connections to display.
+(See hotplug(1m) for more information.)
+.Ed
+.Pp
+If this error message is seen, note that the system might still have other I/O
+devices that support hotplugging, through the
+.Xr cfgadm 1M
+command instead of
+.Nm .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr cfgadm 1M ,
+.Xr hotplugd 1M ,
+.Xr getsubopt 3C ,
+.Xr rcmscript 4 ,
+.Xr attributes 5
+.Sh NOTES
+The
+.Nm
+service
+.Po FMRI
+.Pa svc:/system/hotplug
+.Pc
+must be enabled as a prerequisite for using the
+.Nm
+command.
+See
+.Xr hotplugd 1M .
+.Pp
+The authorization
+.Pa solaris.hotplug.modify
+must be granted in order to perform change-of-state operations.
+Alternatively, the rights profile
+.Qq Hotplug Management
+can be granted, which includes that authorization.
+.Pp
+Verbose usage information is gathered from the RCM framework.
+Its format and content is subject to change.
+.Pp
+The following bus specific properties are supported in PCI bus controllers:
+.Bl -tag -width Ds
+.It Cm power_led No \&| Cm fault_led No \&| Cm attn_led No \&| Cm active_led
+States of a specific LED of a slot.
+The value could be
+.Cm on , off ,
+or
+.Cm blink .
+.Pp
+They can all be used with
+.Cm get
+subcommand, but only property
+.Cm attn_led
+can be used with
+.Cm set
+subcommand.
+.It Cm card_type No \&| Cm board_type
+Type of a card or board of a slot.
+.Pp
+They can all be used with
+.Cm get
+subcommand, but neither can be used with
+.Cm set
+subcommand.
+.El

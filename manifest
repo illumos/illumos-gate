@@ -12414,6 +12414,7 @@ f usr/share/man/man1m/gsscred.1m 0444 root bin
 f usr/share/man/man1m/gssd.1m 0444 root bin
 f usr/share/man/man1m/halt.1m 0444 root bin
 f usr/share/man/man1m/hostconfig.1m 0444 root bin
+f usr/share/man/man1m/hotplug.1m 0444 root bin
 f usr/share/man/man1m/id.1m 0444 root bin
 f usr/share/man/man1m/idmap.1m 0444 root bin
 f usr/share/man/man1m/idmapd.1m 0444 root bin
