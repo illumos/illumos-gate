@@ -27,6 +27,10 @@
  * Copyright 2017 Joyent, Inc.
  */
 
+/*
+ * Copyright 2020 Peter Tribble.
+ */
+
 #include <stdio.h>
 #include <ctype.h>
 #include <locale.h>
@@ -417,7 +421,7 @@ typedef struct  history_fields_buf_s {
 	char	h_rbytes[10];
 	char	h_opackets[9];
 	char	h_obytes[10];
-	char	h_bandwidth[14];
+	char	h_bandwidth[15];
 } history_fields_buf_t;
 
 static ofmt_field_t history_fields[] = {
@@ -433,7 +437,7 @@ static ofmt_field_t history_fields[] = {
 	offsetof(history_fields_buf_t, h_opackets), print_default_cb},
 { "OBYTES",	11,
 	offsetof(history_fields_buf_t, h_obytes), print_default_cb},
-{ "BANDWIDTH",	15,
+{ "BANDWIDTH",	16,
 	offsetof(history_fields_buf_t, h_bandwidth), print_default_cb},
 { NULL,		0, 0, NULL}};
 
@@ -446,7 +450,7 @@ typedef struct  history_l_fields_buf_s {
 	char	hl_etime[13];
 	char	hl_rbytes[8];
 	char	hl_obytes[8];
-	char	hl_bandwidth[14];
+	char	hl_bandwidth[15];
 } history_l_fields_buf_t;
 
 static ofmt_field_t history_l_fields[] = {
@@ -461,7 +465,7 @@ static ofmt_field_t history_l_fields[] = {
 	offsetof(history_l_fields_buf_t, hl_rbytes), print_default_cb},
 { "OBYTES",	9,
 	offsetof(history_l_fields_buf_t, hl_obytes), print_default_cb},
-{ "BANDWIDTH",	15,
+{ "BANDWIDTH",	16,
 	offsetof(history_l_fields_buf_t, hl_bandwidth), print_default_cb},
 { NULL,		0, 0, NULL}}
 ;
@@ -569,7 +573,7 @@ show_history_time(dladm_usage_t *history, void *arg)
 {
 	show_history_state_t	*state = arg;
 	char			buf[DLADM_STRSIZE];
-	history_l_fields_buf_t 	ubuf;
+	history_l_fields_buf_t	ubuf;
 	time_t			time;
 	double			bw;
 	dladm_status_t		status;
@@ -754,7 +758,7 @@ do_show_history(int argc, char *argv[], const char *use)
 		die("show-link -h requires a file");
 
 	if (optind == (argc-1)) {
-		uint32_t 	flags;
+		uint32_t	flags;
 
 		resource = argv[optind];
 		if (!state.hs_showall &&
@@ -1500,7 +1504,7 @@ static int
 show_queried_stats(dladm_handle_t dh, datalink_id_t linkid, void *arg)
 {
 	show_state_t		*state = arg;
-	int 			i;
+	int			i;
 	dladm_stat_chain_t	*diff_stat;
 	char			linkname[DLPI_LINKNAME_MAX];
 	char			zonename[DLADM_PROP_VAL_MAX + 1];
@@ -1654,7 +1658,7 @@ do_show(int argc, char *argv[], const char *use)
 	ofmt_handle_t		ofmt;
 	ofmt_status_t		oferr;
 	uint_t			ofmtflags = OFMT_RIGHTJUST;
-	ofmt_field_t 		*oftemplate;
+	ofmt_field_t		*oftemplate;
 
 	bzero(&state, sizeof (state));
 	opterr = 0;
@@ -1855,7 +1859,7 @@ do_show_phys(int argc, char *argv[], const char *use)
 	ofmt_handle_t		ofmt;
 	ofmt_status_t		oferr;
 	uint_t			ofmtflags = OFMT_RIGHTJUST;
-	ofmt_field_t 		*oftemplate;
+	ofmt_field_t		*oftemplate;
 
 	bzero(&state, sizeof (state));
 	opterr = 0;
@@ -2037,7 +2041,7 @@ do_show_link(int argc, char *argv[], const char *use)
 	ofmt_handle_t		ofmt;
 	ofmt_status_t		oferr;
 	uint_t			ofmtflags = OFMT_RIGHTJUST;
-	ofmt_field_t 		*oftemplate;
+	ofmt_field_t		*oftemplate;
 
 	bzero(&state, sizeof (state));
 	opterr = 0;
@@ -2242,7 +2246,7 @@ do_show_aggr(int argc, char *argv[], const char *use)
 	ofmt_handle_t		ofmt;
 	ofmt_status_t		oferr;
 	uint_t			ofmtflags = OFMT_RIGHTJUST;
-	ofmt_field_t 		*oftemplate;
+	ofmt_field_t		*oftemplate;
 
 	bzero(&state, sizeof (state));
 	opterr = 0;

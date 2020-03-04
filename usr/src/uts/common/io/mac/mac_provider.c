@@ -735,7 +735,7 @@ mac_rx_common(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
 {
 	mac_impl_t		*mip = (mac_impl_t *)mh;
 	mac_ring_t		*mr = (mac_ring_t *)mrh;
-	mac_soft_ring_set_t 	*mac_srs;
+	mac_soft_ring_set_t	*mac_srs;
 	mblk_t			*bp = mp_chain;
 
 	/*

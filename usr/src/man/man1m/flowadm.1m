@@ -1,10 +1,11 @@
 '\" te
+.\" Copyright 2020 Peter Tribble
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright (c) 2011, Joyent, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FLOWADM 1M "April 9, 2016"
+.TH FLOWADM 1M "February 26, 2020"
 .SH NAME
 flowadm \- administer bandwidth resource control and priority for protocols,
 services, containers, and virtual machines
@@ -30,14 +31,7 @@ services, containers, and virtual machines
      [\fB-p\fR \fIprop\fR[,...]] [\fIflow\fR]
 .fi
 
-.LP
-.nf
-\fBflowadm show-usage\fR [\fB-a\fR] [\fB-d\fR | {\fB-p\fR \fIplotfile\fR \fB-F\fR \fIformat\fR}] [\fB-s\fR \fItime\fR]
-     [\fB-e\fR \fItime\fR] \fB-f\fR \fIfilename\fR [\fIflow\fR]
-.fi
-
 .SH DESCRIPTION
-.LP
 The \fBflowadm\fR command is used to create, modify, remove, and show
 networking bandwidth and associated resources for a type of traffic on a
 particular link.
@@ -62,7 +56,7 @@ Inbound and outbound packet are matched to flows in a very fast and scalable
 way, so that limits can be enforced with minimal performance impact.
 .sp
 .LP
-The \fBflowadm\fR command can be used to identify a flow without imposing any
+The \fBflowadm\fR command can be used to define a flow without imposing any
 bandwidth resource control. This would result in the traffic type getting its
 own resources and queues so that it is isolated from rest of the networking
 traffic for more observable and deterministic behavior.
@@ -71,172 +65,11 @@ traffic for more observable and deterministic behavior.
 \fBflowadm\fR is implemented as a set of subcommands with corresponding
 options. Options are described in the context of each subcommand.
 .SH SUBCOMMANDS
-.LP
 The following subcommands are supported:
 .sp
 .ne 2
 .na
 \fB\fBflowadm show-flow\fR [\fB-pP\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]] [\fB-o\fR \fIfield\fR[,...]] [\fB-l\fR \fIlink\fR] [\fB-z\fR \fIzonename\fR] [\fIflow\fR]\fR
-.ad
-.sp .6
-.RS 4n
-Show flow configuration information (the default) or statistics, either for all
-flows, all flows on a link, or for the specified \fIflow\fR.
-.sp
-.ne 2
-.na
-\fB\fB-o\fR \fIfield\fR[,...]\fR
-.ad
-.sp .6
-.RS 4n
-A case-insensitive, comma-separated list of output fields to display. The field
-name must be one of the fields listed below, or a special value \fBall\fR, to
-display all fields. For each flow found, the following fields can be displayed:
-.sp
-.ne 2
-.na
-\fB\fBflow\fR\fR
-.ad
-.sp .6
-.RS 4n
-The name of the flow.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBlink\fR\fR
-.ad
-.sp .6
-.RS 4n
-The name of the link the flow is on.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBipaddr\fR\fR
-.ad
-.sp .6
-.RS 4n
-IP address of the flow. This can be either local or remote depending on how the
-flow was defined.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBtransport\fR\fR
-.ad
-.sp .6
-.RS 4n
-The name of the layer for protocol to be used.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBport\fR\fR
-.ad
-.sp .6
-.RS 4n
-Local port of service for flow.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBdsfield\fR\fR
-.ad
-.sp .6
-.RS 4n
-Differentiated services value for flow and mask used with \fBDSFIELD\fR value
-to state the bits of interest in the differentiated services field of the IP
-header.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-p\fR, \fB--parsable\fR\fR
-.ad
-.sp .6
-.RS 4n
-Display using a stable machine-parsable format.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-P\fR, \fB--persistent\fR\fR
-.ad
-.sp .6
-.RS 4n
-Display persistent flow property information.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-S\fR, \fB--continuous\fR\fR
-.ad
-.sp .6
-.RS 4n
-Continuously display network utilization by flow in a manner similar to the way
-that \fBprstat\fR(1M) displays CPU utilization by process.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-s\fR, \fB--statistics\fR\fR
-.ad
-.sp .6
-.RS 4n
-Displays flow statistics.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-i\fR \fIinterval\fR, \fB--interval\fR=\fIinterval\fR\fR
-.ad
-.sp .6
-.RS 4n
-Used with the \fB-s\fR option to specify an interval, in seconds, at which
-statistics should be displayed. If this option is not specified, statistics are
-displayed once.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-l\fR \fIlink\fR, \fB--link\fR=\fIlink\fR | \fIflow\fR\fR
-.ad
-.sp .6
-.RS 4n
-Display information for all flows on the named link or information for the
-named flow.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-z\fR \fIzonename\fR
-.ad
-.sp .6
-.RS 4n
-Operate on a link that has been delegated to the specified zone.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBflowadm add-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fB-l\fR \fIlink\fR \fB-a\fR \fIattr\fR=\fIvalue\fR[,...] \fB-p\fR \fIprop\fR=\fIvalue\fR[,...] \fIflow\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -274,16 +107,6 @@ persistent creation.
 .sp
 .ne 2
 .na
-\fB\fB-z\fR \fIzonename\fR
-.ad
-.sp .6
-.RS 4n
-Operate on a link that has been delegated to the specified zone.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fB-l\fR \fIlink\fR, \fB--link\fR=\fIlink\fR\fR
 .ad
 .sp .6
@@ -298,7 +121,8 @@ Specify the link to which the flow will be added.
 .ad
 .sp .6
 .RS 4n
-A comma-separated list of attributes to be set to the specified values.
+A mandatory comma-separated list of attributes to be set to the specified
+values.
 .RE
 
 .sp
@@ -308,7 +132,8 @@ A comma-separated list of attributes to be set to the specified values.
 .ad
 .sp .6
 .RS 4n
-A comma-separated list of properties to be set to the specified values.
+An optional comma-separated list of properties to be set to the specified
+values. Flow properties are documented in the "Flow Properties" section, below.
 .RE
 
 .RE
@@ -316,7 +141,8 @@ A comma-separated list of properties to be set to the specified values.
 .sp
 .ne 2
 .na
-\fB\fBflowadm remove-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fB-l\fR {\fIlink\fR | \fIflow\fR}\fR
+\fB\fBflowadm remove-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] \fB-l\fR
+{\fIlink\fR | \fIflow\fR}\fR
 .ad
 .sp .6
 .RS 4n
@@ -346,6 +172,165 @@ persistent removal.
 .sp
 .ne 2
 .na
+\fB\fB-l\fR \fIlink\fR | \fIflow\fR, \fB--link\fR=\fIlink\fR | \fIflow\fR\fR
+.ad
+.sp .6
+.RS 4n
+If a link is specified, remove all flows from that link. If a single flow is
+specified, remove only that flow.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBflowadm show-flow\fR [\fB-pP\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]]
+[\fB-o\fR \fIfield\fR[,...]] [\fB-l\fR \fIlink\fR] [\fIflow\fR]\fR
+.ad
+.sp .6
+.RS 4n
+Show flow configuration information, either for all
+flows, all flows on a link, or for the specified \fIflow\fR.
+.sp
+.ne 2
+.na
+\fB\fB-o\fR \fIfield\fR[,...]\fR
+.ad
+.sp .6
+.RS 4n
+A case-insensitive, comma-separated list of output fields to display. The field
+name must be one of the fields listed below, or a special value \fBall\fR, to
+display all fields. For each flow found, the following fields can be displayed:
+.sp
+.ne 2
+.na
+\fB\fBflow\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display information for all flows on the named link or information for the
+named flow.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-z\fR \fIzonename\fR
+.ad
+.sp .6
+.RS 4n
+Operate on a link that has been delegated to the specified zone.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBflowadm add-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fB-l\fR \fIlink\fR \fB-a\fR \fIattr\fR=\fIvalue\fR[,...] \fB-p\fR \fIprop\fR=\fIvalue\fR[,...] \fIflow\fR\fR
+.ad
+.sp .6
+.RS 4n
+The name of the link the flow is on.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBipaddr\fR\fR
+.ad
+.sp .6
+.RS 4n
+IP address of the flow. This can be either local or remote depending on how the
+flow was defined.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBproto\fR\fR
+.ad
+.sp .6
+.RS 4n
+The name of the layer for protocol to be used.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-z\fR \fIzonename\fR
+.ad
+.sp .6
+.RS 4n
+Operate on a link that has been delegated to the specified zone.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-l\fR \fIlink\fR, \fB--link\fR=\fIlink\fR\fR
+.ad
+.sp .6
+.RS 4n
+Local port of service for flow.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrport\fR\fR
+.ad
+.sp .6
+.RS 4n
+Remote port of service for flow.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdsfld\fR\fR
+.ad
+.sp .6
+.RS 4n
+Differentiated services value for flow and mask used with \fBDSFIELD\fR value
+to state the bits of interest in the differentiated services field of the IP
+header.
+.RE
+
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBflowadm remove-flow\fR [\fB-t\fR] [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzonename\fR] \fB-l\fR {\fIlink\fR | \fIflow\fR}\fR
+.ad
+.sp .6
+.RS 4n
+Remove an existing flow identified by its link or name.
+.sp
+.ne 2
+.na
+\fB\fB-t\fR, \fB--temporary\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display using a stable machine-parsable format.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-P\fR, \fB--persistent\fR\fR
+.ad
+.sp .6
+.RS 4n
+Display persistent flow property information.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-z\fR \fIzonename\fR
 .ad
 .sp .6
@@ -360,8 +345,8 @@ Operate on a link that has been delegated to the specified zone.
 .ad
 .sp .6
 .RS 4n
-If a link is specified, remove all flows from that link. If a single flow is
-specified, remove only that flow.
+Display information for all flows on the named link or information for the
+named flow.
 .RE
 
 .RE
@@ -375,7 +360,7 @@ specified, remove only that flow.
 .sp .6
 .RS 4n
 Set values of one or more properties on the flow specified by name. The
-complete list of properties can be retrieved using the \fBshow-flow\fR
+complete list of properties can be retrieved using the \fBshow-flowprop\fR
 subcommand.
 .sp
 .ne 2
@@ -561,100 +546,7 @@ A comma-separated list of properties to show.
 
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fBflowadm show-usage\fR [\fB-a\fR] [\fB-d\fR | {\fB-p\fR \fIplotfile\fR
-\fB-F\fR \fIformat\fR}] [\fB-s\fR \fItime\fR] [\fB-e\fR \fItime\fR]
-[\fIflow\fR]\fR
-.ad
-.sp .6
-.RS 4n
-Show the historical network flow usage from a stored extended accounting file.
-Configuration and enabling of network accounting through \fBacctadm\fR(1M) is
-required. The default output will be the summary of flow usage for the entire
-period of time in which extended accounting was enabled.
-.sp
-.ne 2
-.na
-\fB\fB-a\fR\fR
-.ad
-.sp .6
-.RS 4n
-Display all historical network usage for the specified period of time during
-which extended accounting is enabled. This includes the usage information for
-the flows that have already been deleted.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-d\fR\fR
-.ad
-.sp .6
-.RS 4n
-Display the dates for which there is logging information. The date is in the
-format \fIDD\fR/\fIMM\fR/\fIYYYY\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-F\fR \fIformat\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specifies the format of \fIplotfile\fR that is specified by the \fB-p\fR
-option. As of this release, \fBgnuplot\fR is the only supported format.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-p\fR \fIplotfile\fR\fR
-.ad
-.sp .6
-.RS 4n
-When specified with \fB-s\fR or \fB-e\fR (or both), outputs flow usage data to
-a file of the format specified by the \fB-F\fR option, which is required.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-s\fR \fItime\fR, \fB-e\fR \fItime\fR\fR
-.ad
-.sp .6
-.RS 4n
-Start and stop times for data display. Time is in the format
-\fIYYYY\fR.\fIMM\fR.\fIDD\fR,\fIhh\fR:\fImm\fR:\fIss\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-f\fR \fIfilename\fR\fR
-.ad
-.sp .6
-.RS 4n
-Read extended accounting records of network flow usage from \fIfilename\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIflow\fR\fR
-.ad
-.sp .6
-.RS 4n
-If specified, display the network flow usage only from the named flow.
-Otherwise, display network usage from all flows.
-.RE
-
-.RE
-
 .SS "Flow Attributes"
-.LP
 The flow operand that identify a flow in a \fBflowadm\fR command is a
 comma-separated list of one or more keyword, value pairs from the list below.
 .sp
@@ -683,7 +575,7 @@ address is \fB/32\fR and for IPv6 is \fB/128\fR.
 .sp .6
 .RS 4n
 Identifies a network flow by the remote IP address. The syntax is the same as
-\fBlocal_ip\fR attributes
+the \fBlocal_ip\fR attribute.
 .RE
 
 .sp
@@ -710,6 +602,16 @@ Identifies a service specified by the local port.
 .sp
 .ne 2
 .na
+\fB\fBremote_port\fR\fR
+.ad
+.sp .6
+.RS 4n
+Identifies a service specified by the remote port.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBdsfield\fR[\fB:\fR\fIdsfield_mask\fR]\fR
 .ad
 .sp .6
@@ -726,7 +628,7 @@ is used. Both the \fBdsfield\fR value and mask must be in hexadecimal.
 
 .sp
 .LP
-The following five types of combinations of attributes are supported:
+The following six types of combinations of attributes are supported:
 .sp
 .in +2
 .nf
@@ -734,6 +636,7 @@ local_ip[/\fIprefixlen\fR]=\fIaddress\fR
 remote_ip[/\fIprefixlen\fR]=\fIaddress\fR
 transport={tcp|udp|sctp|icmp|icmpv6}
 transport={tcp|udp|sctp},local_port=\fIport\fR
+transport={tcp|udp|sctp},remote_port=\fIport\fR
 dsfield=\fIval\fR[:\fIdsfield_mask\fR]
 .fi
 .in -2
@@ -741,13 +644,11 @@ dsfield=\fIval\fR[:\fIdsfield_mask\fR]
 
 .sp
 .LP
-On a given link, the combinations above are mutually exclusive. An attempt to
-create flows of different combinations will fail.
+On a given link, the types of combinations above are mutually exclusive. An
+attempt to create flows of different types on a given link will fail.
 .SS "Restrictions"
-.LP
 There are individual flow restrictions and flow restrictions per zone.
 .SS "Individual Flow Restrictions"
-.LP
 Restrictions on individual flows do not require knowledge of other flows that
 have been added to the link.
 .sp
@@ -793,12 +694,10 @@ flow16\fR
 .sp
 
 .SS "Flow Restrictions Per Zone"
-.LP
 Within a zone, no two flows can have the same name. After adding a flow with
 the link specified, the link will not be required for display, modification, or
 deletion of the flow.
 .SS "Flow Properties"
-.LP
 The following flow properties are supported. Note that the ability to set a
 given property to a given value depends on the driver and hardware.
 .sp
@@ -826,7 +725,6 @@ tokens \fBhigh\fR, \fBmedium\fR, or \fBlow\fR. The default is \fBmedium\fR.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCreating a Policy Around a Mission-Critical Port
 .sp
 .LP
@@ -840,8 +738,8 @@ delete the policy.
 .nf
 # \fBflowadm add-flow -l bge0 -a transport=TCP,local_port=443 https-1\fR
 # \fBflowadm show-flow -l bge0\fR
-FLOW         LINK         IP ADDR                PROTO  PORT    DSFLD
-https1       bge0         --                     tcp    443     --
+FLOW         LINK       IPADDR                   PROTO  LPORT   RPORT   DSFLD
+https1       bge0       --                       tcp    443     --      --
 .fi
 .in -2
 .sp
@@ -859,13 +757,13 @@ priority.
 .nf
 # \fBflowadm set-flowprop -p maxbw=500M,priority=high https-1\fR
 # \fBflowadm show-flow https-1\fR
-FLOW         LINK         IP ADDR                PROTO  PORT    DSFLD
-https1       bge0         --                     tcp    443     --
+FLOW        LINK        IPADDR                   PROTO  LPORT   RPORT   DSFLD
+https-1     bge0        --                       tcp    443     --      --
 
 # \fBflowadm show-flowprop https-1\fR
-FLOW        PROPERTY    VALUE     DEFAULT      POSSIBLE
-https-1     maxbw       500       --           --
-https-1     priority    HIGH      --          LOW,NORMAL,HIGH
+FLOW         PROPERTY        VALUE          DEFAULT        POSSIBLE
+https-1      maxbw             500          --             --
+https-1      priority        high           --             low,medium,high
 .fi
 .in -2
 .sp
@@ -888,33 +786,7 @@ priority=low limit-udp-1\fR
 .sp
 
 .LP
-\fBExample 4 \fRShowing Flow Usage
-.sp
-.LP
-Flow usage statistics can be stored using the extended accounting facility,
-\fBacctadm\fR(1M).
-
-.sp
-.in +2
-.nf
-# \fBacctadm -e extended -f /var/log/net.log net\fR
-
-# \fBacctadm net\fR
-Network accounting: active
-Network accounting file: /var/log/net.log
-Tracked Network resources: extended
-Untracked Network resources: none
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-The historical data that was saved can be retrieved in summary form using the
-\fBshow-usage\fR subcommand of \fBflowadm\fR.
-
-.LP
-\fBExample 5 \fRSetting Policy, Making Use of \fBdsfield\fR Attribute
+\fBExample 4 \fRSetting Policy, Making Use of \fBdsfield\fR Attribute
 .sp
 .LP
 The following command sets a policy for EF PHB (DSCP value of 101110 from RFC
@@ -927,71 +799,6 @@ for this flow will be \fB0x2e\fR (101110) with the \fBdsfield_mask\fR being
 .nf
 # \fBflowadm add-flow -l bge0 -a dsfield=0x2e:0xfc \e
 -p maxbw=500M,priority=high efphb-flow\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Display summary information:
-
-.sp
-.in +2
-.nf
-# \fBflowadm show-usage -f /var/log/net.log\fR
-FLOW      DURATION  IPACKETS RBYTES      OPACKETS OBYTES     BANDWIDTH
-flowtcp   100       1031     546908      0        0          43.76 Kbps
-flowudp   0         0        0           0        0           0.00 Mbps
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Display dates for which logging information is available:
-
-.sp
-.in +2
-.nf
-# \fBflowadm show-usage -d -f /var/log/net.log\fR
-02/19/2008
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Display logging information for \fBflowtcp\fR starting at 02/19/2008, 10:38:46
-and ending at 02/19/2008, 10:40:06:
-
-.sp
-.in +2
-.nf
-# \fBflowadm show-usage -s 02/19/2008,10:39:06 -e 02/19/2008,10:40:06 \e
--f /var/log/net.log flowtcp\fR
-FLOW      TIME       IPACKETS RBYTES      OPACKETS OBYTES     BANDWIDTH
-flowtcp   10:39:06   1        1546         4       6539       3.23 Kbps
-flowtcp   10:39:26   2        3586         5       9922       5.40 Kbps
-flowtcp   10:39:46   1        240          1       216       182.40 bps
-flowtcp   10:40:06   0        0            0       0           0.00 bps
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Output the same information as above as a plotfile:
-
-.sp
-.in +2
-.nf
-# \fBflowadm show-usage -s 02/19/2008,10:39:06 -e 02/19/2008,10:40:06 \e
--p /home/plot/myplot -F gnuplot -f /var/log/net.log flowtcp\fR
-# \fBTime tcp-flow\fR
-10:39:06 3.23
-10:39:26 5.40
-10:39:46 0.18
-10:40:06 0.00
 .fi
 .in -2
 .sp
@@ -1017,7 +824,6 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -1032,6 +838,10 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.LP
-\fBacctadm\fR(1M), \fBdladm\fR(1M), \fBifconfig\fR(1M), \fBprstat\fR(1M),
-\fBroute\fR(1M), \fBattributes\fR(5), \fBdlpi\fR(7P)
+\fBdladm\fR(1M), \fBflowstat\fR(1M), \fBifconfig\fR(1M),
+\fBroute\fR(1M), \fBattributes\fR(5)
+
+.SH NOTES
+The display of statistics by the \fBshow-flow\fR subcommand, and the
+\fBshow-usage\fR subcommand, have been removed. This functionality can
+now be accessed using the \fBflowstat\fR(1M) utility.

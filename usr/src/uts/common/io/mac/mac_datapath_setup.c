@@ -2892,8 +2892,8 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 	mac_group_t		*default_rgroup;
 	mac_group_t		*default_tgroup;
 	int			err;
-	uint8_t 		*mac_addr;
 	uint16_t		vid;
+	uint8_t			*mac_addr;
 	mac_group_state_t	next_state;
 	mac_client_impl_t	*group_only_mcip;
 	mac_resource_props_t	*mrp = MCIP_RESOURCE_PROPS(mcip);

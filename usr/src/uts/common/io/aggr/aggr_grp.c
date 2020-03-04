@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -1442,8 +1442,7 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 
 	grp->lg_rx_group_count = 1;
 
-	for (i = 0, port = grp->lg_ports; port != NULL;
-	     i++, port = port->lp_next) {
+	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
 		uint_t num_rgroups;
 
 		mac_perim_enter_by_mh(port->lp_mh, &mph);

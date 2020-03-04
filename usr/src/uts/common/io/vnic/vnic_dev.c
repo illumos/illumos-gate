@@ -1060,7 +1060,7 @@ static int
 vnic_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_valsize, const void *pr_val)
 {
-	int 		err = 0;
+	int		err = 0;
 	vnic_t		*vn = m_driver;
 
 	switch (pr_num) {
@@ -1158,7 +1158,7 @@ vnic_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_valsize, void *pr_val)
 {
 	vnic_t		*vn = arg;
-	int 		ret = 0;
+	int		ret = 0;
 	boolean_t	out;
 
 	switch (pr_num) {

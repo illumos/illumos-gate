@@ -25,7 +25,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013 OSN Online Service Nuernberg GmbH. All rights reserved.
@@ -6546,8 +6546,10 @@ ixgbe_remvlan(mac_group_driver_t gdriver, uint16_t vid)
 	}
 
 	vlp = ixgbe_find_vlan(rx_group, vid);
-	if (vlp == NULL)
+	if (vlp == NULL) {
+		mutex_exit(&ixgbe->gen_lock);
 		return (ENOENT);
+	}
 
 	/*
 	 * See the comment in ixgbe_addvlan() about is_def_grp and
@@ -6601,8 +6603,10 @@ ixgbe_remvlan(mac_group_driver_t gdriver, uint16_t vid)
 			/* This shouldn't fail, but if it does return EIO. */
 			ret = ixgbe_set_vfta(hw, vid, rx_group->index, B_TRUE,
 			    B_TRUE);
-			if (ret != IXGBE_SUCCESS)
+			if (ret != IXGBE_SUCCESS) {
+				mutex_exit(&ixgbe->gen_lock);
 				return (EIO);
+			}
 		}
 	}
 

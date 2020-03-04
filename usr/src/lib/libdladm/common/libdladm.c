@@ -27,6 +27,10 @@
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
+/*
+ * Copyright 2020 Peter Tribble.
+ */
+
 #include <unistd.h>
 #include <errno.h>
 #include <ctype.h>
@@ -70,23 +74,23 @@ static media_type_t media_type_table[] =  {
 	{ DL_HDLC,	"HDLC" },
 	{ DL_CHAR,	"SyncCharacter" },
 	{ DL_CTCA,	"CTCA" },
-	{ DL_FDDI, 	"FDDI" },
-	{ DL_FC, 	"FiberChannel" },
-	{ DL_ATM, 	"ATM" },
-	{ DL_IPATM, 	"ATM(ClassicIP)" },
-	{ DL_X25, 	"X.25" },
-	{ DL_IPX25, 	"X.25(ClassicIP)" },
-	{ DL_ISDN, 	"ISDN" },
-	{ DL_HIPPI, 	"HIPPI" },
-	{ DL_100VG, 	"100BaseVGEthernet" },
-	{ DL_100VGTPR, 	"100BaseVGTokenRing" },
-	{ DL_ETH_CSMA, 	"IEEE802.3" },
-	{ DL_100BT, 	"100BaseT" },
-	{ DL_FRAME, 	"FrameRelay" },
-	{ DL_MPFRAME, 	"MPFrameRelay" },
-	{ DL_ASYNC, 	"AsyncCharacter" },
-	{ DL_IPNET, 	"IPNET" },
-	{ DL_OTHER, 	"Other" }
+	{ DL_FDDI,	"FDDI" },
+	{ DL_FC,	"FiberChannel" },
+	{ DL_ATM,	"ATM" },
+	{ DL_IPATM,	"ATM(ClassicIP)" },
+	{ DL_X25,	"X.25" },
+	{ DL_IPX25,	"X.25(ClassicIP)" },
+	{ DL_ISDN,	"ISDN" },
+	{ DL_HIPPI,	"HIPPI" },
+	{ DL_100VG,	"100BaseVGEthernet" },
+	{ DL_100VGTPR,	"100BaseVGTokenRing" },
+	{ DL_ETH_CSMA,	"IEEE802.3" },
+	{ DL_100BT,	"100BaseT" },
+	{ DL_FRAME,	"FrameRelay" },
+	{ DL_MPFRAME,	"MPFrameRelay" },
+	{ DL_ASYNC,	"AsyncCharacter" },
+	{ DL_IPNET,	"IPNET" },
+	{ DL_OTHER,	"Other" }
 };
 #define	MEDIATYPECOUNT	(sizeof (media_type_table) / sizeof (media_type_t))
 
@@ -594,11 +598,7 @@ dladm_bw2str(int64_t bw, char *buf)
 	kbps = (bw%1000000)/1000;
 	mbps = bw/1000000;
 	if (kbps != 0) {
-		if (mbps == 0)
-			(void) snprintf(buf, DLADM_STRSIZE, "0.%03u", kbps);
-		else
-			(void) snprintf(buf, DLADM_STRSIZE, "%5u.%03u", mbps,
-			    kbps);
+		(void) snprintf(buf, DLADM_STRSIZE, "%5u.%03u", mbps, kbps);
 	} else {
 		(void) snprintf(buf, DLADM_STRSIZE, "%5u", mbps);
 	}

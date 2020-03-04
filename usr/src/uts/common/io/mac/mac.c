@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  */
 
@@ -1648,7 +1648,8 @@ mac_hwrings_idx_get(mac_handle_t mh, uint_t idx, mac_group_handle_t *hwgh,
 
 	if (rtype == MAC_RING_TYPE_RX) {
 		grp = mip->mi_rx_groups;
-	} else if (rtype == MAC_RING_TYPE_TX) {
+	} else {
+		ASSERT(rtype == MAC_RING_TYPE_TX);
 		grp = mip->mi_tx_groups;
 	}
 
@@ -1752,7 +1753,7 @@ mac_client_clear_flow_cb(mac_client_handle_t mch)
 	flow_entry_t		*flent = mcip->mci_flent;
 
 	mutex_enter(&flent->fe_lock);
-	flent->fe_cb_fn = (flow_fn_t)mac_rx_def;
+	flent->fe_cb_fn = (flow_fn_t)mac_pkt_drop;
 	flent->fe_cb_arg1 = NULL;
 	flent->fe_cb_arg2 = NULL;
 	flent->fe_flags |= FE_MC_NO_DATAPATH;
@@ -5536,6 +5537,11 @@ mac_add_macaddr_vlan(mac_impl_t *mip, mac_group_t *group, uint8_t *addr,
 		return (0);
 	}
 
+	/*
+	 * We failed to set promisc mode and we are about to free 'map'.
+	 */
+	map->ma_nusers = 0;
+
 bail:
 	if (hw_vlan) {
 		int err2 = mac_group_remvlan(group, vid);
@@ -5591,6 +5597,8 @@ mac_remove_macaddr_vlan(mac_address_t *map, uint16_t vid)
 	if (map->ma_nusers > 0)
 		return (0);
 
+	VERIFY3S(map->ma_nusers, ==, 0);
+
 	/*
 	 * The MAC address is no longer used by any MAC client, so
 	 * remove it from its associated group. Turn off promiscuous
@@ -5615,7 +5623,16 @@ mac_remove_macaddr_vlan(mac_address_t *map, uint16_t vid)
 			 * If we fail to remove the MAC address HW
 			 * filter but then also fail to re-add the
 			 * VLAN HW filter then we are in a busted
-			 * state and should just crash.
+			 * state. We do our best by logging a warning
+			 * and returning the original 'err' that got
+			 * us here. At this point, traffic for this
+			 * address + VLAN combination will be dropped
+			 * until the user reboots the system. In the
+			 * future, it would be nice to have a system
+			 * that can compare the state of expected
+			 * classification according to mac to the
+			 * actual state of the provider, and report
+			 * and fix any inconsistencies.
 			 */
 			if (MAC_GROUP_HW_VLAN(group)) {
 				int err2;
@@ -5629,6 +5646,7 @@ mac_remove_macaddr_vlan(mac_address_t *map, uint16_t vid)
 				}
 			}
 
+			map->ma_nusers = 1;
 			return (err);
 		}
 
@@ -5642,8 +5660,10 @@ mac_remove_macaddr_vlan(mac_address_t *map, uint16_t vid)
 		    map->ma_type, __FILE__, __LINE__);
 	}
 
-	if (err != 0)
+	if (err != 0) {
+		map->ma_nusers = 1;
 		return (err);
+	}
 
 	/*
 	 * We created MAC address for the primary one at registration, so we

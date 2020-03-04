@@ -230,7 +230,7 @@ extern	int	mac_tx_percpu_cnt;
 	&(mcip)->mci_flent->fe_resource_props)
 
 #define	MCIP_EFFECTIVE_PROPS(mcip)		\
-	(mcip->mci_flent == NULL ? NULL : 	\
+	(mcip->mci_flent == NULL ? NULL :	\
 	&(mcip)->mci_flent->fe_effective_props)
 
 #define	MCIP_RESOURCE_PROPS_MASK(mcip)		\

@@ -1133,9 +1133,9 @@ vnet_mac_register(vnet_t *vnetp)
 static int
 vnet_read_mac_address(vnet_t *vnetp)
 {
-	uchar_t 	*macaddr;
-	uint32_t 	size;
-	int 		rv;
+	uchar_t		*macaddr;
+	uint32_t	size;
+	int		rv;
 
 	rv = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, vnetp->dip,
 	    DDI_PROP_DONTPASS, macaddr_propname, &macaddr, &size);
@@ -2318,7 +2318,7 @@ vnet_get_ring(void *arg, mac_ring_type_t rtype, const int g_index,
  */
 static void
 vnet_get_group(void *arg, mac_ring_type_t type, const int index,
-	mac_group_info_t *infop, mac_group_handle_t handle)
+    mac_group_info_t *infop, mac_group_handle_t handle)
 {
 	vnet_t	*vnetp = (vnet_t *)arg;
 
@@ -2631,7 +2631,7 @@ vnet_rx_poll(void *arg, int bytes_to_pickup)
 /* ARGSUSED */
 void
 vnet_hio_rx_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
-	boolean_t loopback)
+    boolean_t loopback)
 {
 	vnet_t			*vnetp = (vnet_t *)arg;
 	vnet_pseudo_rx_ring_t	*ringp = (vnet_pseudo_rx_ring_t *)mrh;

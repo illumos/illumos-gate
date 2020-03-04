@@ -350,7 +350,7 @@ get_usage(zpool_help_t idx)
 	case HELP_IOSTAT:
 		return (gettext("\tiostat "
 		    "[[-lq]|[-rw]] [-T d | u] [-ghHLpPvy]\n"
-		    "\t    [pool] ..."
+		    "\t    [[pool] ...]|[pool vdev ...]|[vdev ...]]"
 		    " [[-n] interval [count]]\n"));
 	case HELP_LABELCLEAR:
 		return (gettext("\tlabelclear [-f] <vdev>\n"));
@@ -4987,6 +4987,7 @@ zpool_do_iostat(int argc, char **argv)
 			    cb.cb_vdev_names_count)) &&
 			    !cb.cb_scripted) {
 				print_iostat_separator(&cb);
+				printf("\n");
 			}
 		}
 

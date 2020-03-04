@@ -31,6 +31,10 @@
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
+/*
+ * Copyright 2020 Peter Tribble.
+ */
+
 #include <stdio.h>
 #include <locale.h>
 #include <stdarg.h>
@@ -139,7 +143,7 @@ typedef struct  history_fields_buf_s {
 	char	history_rbytes[10];
 	char	history_opackets[9];
 	char	history_obytes[10];
-	char	history_bandwidth[14];
+	char	history_bandwidth[15];
 } history_fields_buf_t;
 
 static ofmt_field_t history_fields[] = {
@@ -156,7 +160,7 @@ static ofmt_field_t history_fields[] = {
 	offsetof(history_fields_buf_t, history_opackets), print_default_cb},
 { "OBYTES",	11,
 	offsetof(history_fields_buf_t, history_obytes), print_default_cb},
-{ "BANDWIDTH",	15,
+{ "BANDWIDTH",	16,
 	offsetof(history_fields_buf_t, history_bandwidth), print_default_cb},
 NULL_OFMT}
 ;
@@ -167,7 +171,7 @@ typedef struct  history_l_fields_buf_s {
 	char	history_l_etime[13];
 	char	history_l_rbytes[8];
 	char	history_l_obytes[8];
-	char	history_l_bandwidth[14];
+	char	history_l_bandwidth[15];
 } history_l_fields_buf_t;
 
 static ofmt_field_t history_l_fields[] = {
@@ -182,7 +186,7 @@ static ofmt_field_t history_l_fields[] = {
 	offsetof(history_l_fields_buf_t, history_l_rbytes), print_default_cb},
 { "OBYTES",	9,
 	offsetof(history_l_fields_buf_t, history_l_obytes), print_default_cb},
-{ "BANDWIDTH",	15,
+{ "BANDWIDTH",	16,
 	offsetof(history_l_fields_buf_t, history_l_bandwidth),
 	    print_default_cb},
 NULL_OFMT}
@@ -544,7 +548,7 @@ dump_all_flow_stats(dladm_flow_attr_t *attrp, void *arg, datalink_id_t linkid,
 int
 main(int argc, char *argv[])
 {
-	dladm_status_t 		status;
+	dladm_status_t		status;
 	int			option;
 	boolean_t		r_arg = B_FALSE;
 	boolean_t		t_arg = B_FALSE;
@@ -790,7 +794,7 @@ show_history_time(dladm_usage_t *history, void *arg)
 {
 	show_history_state_t	*state = (show_history_state_t *)arg;
 	char			buf[DLADM_STRSIZE];
-	history_l_fields_buf_t 	ubuf;
+	history_l_fields_buf_t	ubuf;
 	time_t			time;
 	double			bw;
 	dladm_flow_attr_t	attr;
