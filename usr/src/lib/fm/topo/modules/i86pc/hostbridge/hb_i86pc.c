@@ -93,6 +93,18 @@ pci_hostbridges_find(topo_mod_t *mod, tnode_t *ptn)
 
 	pnode = di_drv_first_node(PCI, devtree);
 	while (pnode != DI_NODE_NIL) {
+		/*
+		 * We've seen cases where certain phantom PCI hostbridges have
+		 * appeared on systems. If we encounter a host bridge without a
+		 * bus address assigned to it, then we should skip processing it
+		 * here as that indicates that it generally doesn't have any
+		 * devices under it and we'll otherwise blow up in devinfo.
+		 */
+		if (di_bus_addr(pnode) == NULL) {
+			pnode = di_drv_next_node(pnode);
+			continue;
+		}
+
 		if (hb_process(mod, ptn, hbcnt, pnode) < 0) {
 			if (hbcnt == 0)
 				topo_node_range_destroy(ptn, HOSTBRIDGE);
