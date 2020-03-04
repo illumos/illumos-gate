@@ -1,0 +1,11 @@
+    libdis_test:      c4 e3 75 44 d0 23  vpclmulqdq $0x23,%ymm0,%ymm1,%ymm2
+    libdis_test+0x6:  c4 e3 65 44 a0 45  vpclmulqdq $0x42,0x12345(%eax),%ymm3,%ymm4
+                      23 01 00 42 
+    libdis_test+0x10: c4 e3 65 44 a4 8b  vpclmulqdq $-0x17,0x678(%ebx,%ecx,4),%ymm3,%ymm4	<0xe9>
+                      78 06 00 00 e9 
+    libdis_test+0x1b: 62 f3 75 48 44 d0  vpclmulqdq $0x23,%zmm0,%zmm1,%zmm2
+                      23 
+    libdis_test+0x22: 62 f3 65 48 44 a0  vpclmulqdq $0x42,0x12345(%eax),%zmm3,%zmm4
+                      45 23 01 00 42 
+    libdis_test+0x2d: 62 f3 65 48 44 a4  vpclmulqdq $-0x17,0x678(%ebx,%ecx,4),%zmm3,%zmm4	<0xe9>
+                      8b 78 06 00 00 e9 
