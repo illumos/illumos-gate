@@ -53,7 +53,7 @@ typedef struct grc3state {
 	int32_t *historyptr;
 	int32_t dummy_pad1;
 
-	int32_t history[GRC3_MAXHISTORY * 2];
+	int32_t history[GRC3_MAXHISTORY * 2 + 1];
 
 	uint32_t outsz;
 } grc3state_t;
