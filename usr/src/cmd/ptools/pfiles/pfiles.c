@@ -205,13 +205,19 @@ intr(int sig)
 
 /* ------ begin specific code ------ */
 
+static int
+show_paths(uint_t type, const void *data, size_t len, void *arg __unused)
+{
+	if (type == PR_PATHNAME)
+		(void) printf("      %.*s\n", len, data);
+	return (0);
+}
 
 static int
 show_file(void *data, const prfdinfo_t *info)
 {
 	struct ps_prochandle *Pr = data;
 	char unknown[12];
-	const char *path;
 	char *s;
 	mode_t mode;
 
@@ -259,8 +265,6 @@ show_file(void *data, const prfdinfo_t *info)
 		(void) printf(" rdev:%u,%u\n",
 		    (unsigned)info->pr_rmajor, (unsigned)info->pr_rminor);
 
-	path = proc_fdinfo_misc(info, PR_PATHNAME, NULL);
-
 	if (!nflag) {
 		dofcntl(Pr, info,
 		    (mode & (S_IFMT|S_ENFMT|S_IXGRP)) == (S_IFREG|S_ENFMT),
@@ -285,8 +289,7 @@ show_file(void *data, const prfdinfo_t *info)
 			}
 		}
 
-		if (path != NULL)
-			(void) printf("      %s\n", path);
+		(void) proc_fdinfowalk(info, show_paths, NULL);
 
 		if (info->pr_offset != -1) {
 			(void) printf("      offset:%lld\n",

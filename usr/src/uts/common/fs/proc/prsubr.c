@@ -75,6 +75,7 @@
 #include <sys/autoconf.h>
 #include <sys/dtrace.h>
 #include <sys/timod.h>
+#include <sys/fs/namenode.h>
 #include <netinet/udp.h>
 #include <netinet/tcp.h>
 #include <inet/cc.h>
@@ -2552,7 +2553,11 @@ prfdinfopath(proc_t *p, vnode_t *vp, list_t *data, cred_t *cred)
 	size_t pathlen;
 	size_t sz = 0;
 
-	pathlen = MAXPATHLEN + 1;
+	/*
+	 * The global zone's path to a file in a non-global zone can exceed
+	 * MAXPATHLEN.
+	 */
+	pathlen = MAXPATHLEN * 2 + 1;
 	pathname = kmem_alloc(pathlen, KM_SLEEP);
 
 	if (vnodetopath(NULL, vp, pathname, pathlen, cred) == 0) {
@@ -2561,6 +2566,7 @@ prfdinfopath(proc_t *p, vnode_t *vp, list_t *data, cred_t *cred)
 	}
 
 	kmem_free(pathname, pathlen);
+
 	return (sz);
 }
 
@@ -2789,6 +2795,22 @@ prfdinfosockopt(vnode_t *vp, list_t *data, cred_t *cred)
 	return (sz);
 }
 
+typedef struct prfdinfo_nm_path_cbdata {
+	proc_t		*nmp_p;
+	u_offset_t	nmp_sz;
+	list_t		*nmp_data;
+} prfdinfo_nm_path_cbdata_t;
+
+static int
+prfdinfo_nm_path(const struct namenode *np, cred_t *cred, void *arg)
+{
+	prfdinfo_nm_path_cbdata_t *cb = arg;
+
+	cb->nmp_sz += prfdinfopath(cb->nmp_p, np->nm_vnode, cb->nmp_data, cred);
+
+	return (0);
+}
+
 u_offset_t
 prgetfdinfosize(proc_t *p, vnode_t *vp, cred_t *cred)
 {
@@ -2801,8 +2823,23 @@ prgetfdinfosize(proc_t *p, vnode_t *vp, cred_t *cred)
 	sz = offsetof(prfdinfo_t, pr_misc) + sizeof (pr_misc_header_t);
 
 	/* Pathname */
-	if (vp->v_type != VSOCK && vp->v_type != VDOOR)
+	switch (vp->v_type) {
+	case VDOOR: {
+		prfdinfo_nm_path_cbdata_t cb = {
+			.nmp_p		= p,
+			.nmp_data	= NULL,
+			.nmp_sz		= 0
+		};
+
+		(void) nm_walk_mounts(vp, prfdinfo_nm_path, cred, &cb);
+		sz += cb.nmp_sz;
+		break;
+	}
+	case VSOCK:
+		break;
+	default:
 		sz += prfdinfopath(p, vp, NULL, cred);
+	}
 
 	/* Socket options */
 	if (vp->v_type == VSOCK)
@@ -2946,14 +2983,31 @@ prgetfdinfo(proc_t *p, vnode_t *vp, prfdinfo_t *fdinfo, cred_t *cred,
 		}
 	}
 
-	/*
-	 * Don't attempt to determine the vnode path for a socket or a door
-	 * as it will cause a linear scan of the dnlc table given there is no
-	 * v_path associated with the vnode.
-	 */
-	if (vp->v_type != VSOCK && vp->v_type != VDOOR)
-		(void) prfdinfopath(p, vp, data, cred);
+	/* pathname */
 
+	switch (vp->v_type) {
+	case VDOOR: {
+		prfdinfo_nm_path_cbdata_t cb = {
+			.nmp_p		= p,
+			.nmp_data	= data,
+			.nmp_sz		= 0
+		};
+
+		(void) nm_walk_mounts(vp, prfdinfo_nm_path, cred, &cb);
+		break;
+	}
+	case VSOCK:
+		/*
+		 * Don't attempt to determine the path for a socket as the
+		 * vnode has no associated v_path. It will cause a linear scan
+		 * of the dnlc table and result in no path being found.
+		 */
+		break;
+	default:
+		(void) prfdinfopath(p, vp, data, cred);
+	}
+
+	/* socket options */
 	if (vp->v_type == VSOCK)
 		(void) prfdinfosockopt(vp, data, cred);
 
