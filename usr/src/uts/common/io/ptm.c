@@ -24,7 +24,9 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
-
+/*
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ */
 
 /*
  * Pseudo Terminal Master Driver.
@@ -531,6 +533,13 @@ ptmwput(queue_t *qp, mblk_t *mp)
 			/*FALLTHROUGH*/
 		case ISPTM:
 			DBG(("ack the UNLKPT/ISPTM\n"));
+			miocack(qp, mp, 0, 0);
+			break;
+		case PTSSTTY:
+			mutex_enter(&ptmp->pt_lock);
+			ptmp->pt_state |= PTSTTY;
+			mutex_exit(&ptmp->pt_lock);
+			DBG(("ack PTSSTTY\n"));
 			miocack(qp, mp, 0, 0);
 			break;
 		case ZONEPT:

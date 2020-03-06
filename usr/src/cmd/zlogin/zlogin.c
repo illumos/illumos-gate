@@ -24,7 +24,7 @@
  * Copyright (c) 2014 Gary Mills
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2020 Joyent, Inc.
- * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -126,8 +126,6 @@ static int pollerr = 0;
 
 static const char *pname;
 static char *username;
-
-extern int __xpg4;	/* 0 if not an xpg4/6-compiled program */
 
 /*
  * When forced_login is true, the user is not prompted
@@ -835,16 +833,8 @@ process_output(int in_fd, int out_fd)
 	cc = read(in_fd, ibuf, ZLOGIN_BUFSIZ);
 	if (cc == -1 && (errno != EINTR || dead))
 		return (-1);
-	if (cc == 0) {
-		/*
-		 * A return value of 0 when calling read() on a terminal
-		 * indicates end-of-file pre-XPG4 and no data available
-		 * for XPG4 and above.
-		 */
-		if (__xpg4 == 0)
-			return (-1);
-		return (0);
-	}
+	if (cc == 0)
+		return (-1);	/* EOF */
 	if (cc == -1)	/* The read was interrupted. */
 		return (0);
 

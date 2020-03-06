@@ -22,7 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -4087,7 +4087,8 @@ ldterm_dosig(queue_t *q, int sig, uchar_t c, int mtype, int mode)
 
 	if (c != '\0') {
 		if ((tp->t_echomp = allocb(4, BPRI_HI)) != NULL) {
-			if (ldterm_echo(c, WR(q), 4, tp) > 0)
+			if (ldterm_echo(c, WR(q), 4, tp) > 0 ||
+			    (tp->t_state & TS_ISPTSTTY))
 				putnext(WR(q), tp->t_echomp);
 			else
 				freemsg(tp->t_echomp);
