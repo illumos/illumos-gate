@@ -21,12 +21,12 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef	_MDB_IO_H
 #define	_MDB_IO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -148,6 +148,8 @@ extern const char *mdb_iob_name(mdb_iob_t *);
 extern size_t mdb_iob_lineno(mdb_iob_t *);
 extern size_t mdb_iob_gettabstop(mdb_iob_t *);
 extern size_t mdb_iob_getmargin(mdb_iob_t *);
+
+extern void mdb_iob_set_autowrap(mdb_iob_t *);
 
 extern void mdb_iob_stack_create(mdb_iob_stack_t *);
 extern void mdb_iob_stack_destroy(mdb_iob_stack_t *);
