@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Nexenta by DDN, Inc. All rights reserved.
  */
 
 #include <sys/sid.h>
@@ -147,10 +147,9 @@ smb_fsop_create_with_sd(smb_request_t *sr, cred_t *cr,
 	is_dir = ((fs_sd->sd_flags & SMB_FSSD_FLAGS_DIR) != 0);
 
 	if (smb_tree_has_feature(sr->tid_tree, SMB_TREE_ACLONCREATE)) {
-		if (fs_sd->sd_secinfo & SMB_ACL_SECINFO) {
-			dacl = fs_sd->sd_zdacl;
-			sacl = fs_sd->sd_zsacl;
-			ASSERT(dacl || sacl);
+		dacl = fs_sd->sd_zdacl;
+		sacl = fs_sd->sd_zsacl;
+		if (dacl != NULL || sacl != NULL) {
 			if (dacl && sacl) {
 				acl = smb_fsacl_merge(dacl, sacl);
 			} else if (dacl) {
@@ -466,15 +465,20 @@ smb_fsop_create_file(smb_request_t *sr, cred_t *cr,
 	if (op->sd) {
 		/*
 		 * SD sent by client in Windows format. Needs to be
-		 * converted to FS format. No inheritance.
+		 * converted to FS format. Inherit DACL/SACL if they're not
+		 * specified.
 		 */
 		secinfo = smb_sd_get_secinfo(op->sd);
+
 		smb_fssd_init(&fs_sd, secinfo, 0);
 
 		status = smb_sd_tofs(op->sd, &fs_sd);
 		if (status == NT_STATUS_SUCCESS) {
-			rc = smb_fsop_create_with_sd(sr, cr, dnode,
-			    name, attr, ret_snode, &fs_sd);
+			rc = smb_fsop_sdinherit(sr, dnode, &fs_sd);
+			if (rc == 0)
+				rc = smb_fsop_create_with_sd(sr, cr, dnode,
+				    name, attr, ret_snode, &fs_sd);
+
 		} else {
 			rc = EINVAL;
 		}
@@ -485,7 +489,7 @@ smb_fsop_create_file(smb_request_t *sr, cred_t *cr,
 		 * Server applies Windows inheritance rules,
 		 * see smb_fsop_sdinherit() comments as to why.
 		 */
-		smb_fssd_init(&fs_sd, SMB_ACL_SECINFO, 0);
+		smb_fssd_init(&fs_sd, 0, 0);
 		rc = smb_fsop_sdinherit(sr, dnode, &fs_sd);
 		if (rc == 0) {
 			rc = smb_fsop_create_with_sd(sr, cr, dnode,
@@ -607,15 +611,19 @@ smb_fsop_mkdir(
 	if (op->sd) {
 		/*
 		 * SD sent by client in Windows format. Needs to be
-		 * converted to FS format. No inheritance.
+		 * converted to FS format. Inherit DACL/SACL if they're not
+		 * specified.
 		 */
 		secinfo = smb_sd_get_secinfo(op->sd);
+
 		smb_fssd_init(&fs_sd, secinfo, SMB_FSSD_FLAGS_DIR);
 
 		status = smb_sd_tofs(op->sd, &fs_sd);
 		if (status == NT_STATUS_SUCCESS) {
-			rc = smb_fsop_create_with_sd(sr, cr, dnode,
-			    name, attr, ret_snode, &fs_sd);
+			rc = smb_fsop_sdinherit(sr, dnode, &fs_sd);
+			if (rc == 0)
+				rc = smb_fsop_create_with_sd(sr, cr, dnode,
+				    name, attr, ret_snode, &fs_sd);
 		}
 		else
 			rc = EINVAL;
@@ -626,7 +634,7 @@ smb_fsop_mkdir(
 		 * Server applies Windows inheritance rules,
 		 * see smb_fsop_sdinherit() comments as to why.
 		 */
-		smb_fssd_init(&fs_sd, SMB_ACL_SECINFO, SMB_FSSD_FLAGS_DIR);
+		smb_fssd_init(&fs_sd, 0, SMB_FSSD_FLAGS_DIR);
 		rc = smb_fsop_sdinherit(sr, dnode, &fs_sd);
 		if (rc == 0) {
 			rc = smb_fsop_create_with_sd(sr, cr, dnode,
@@ -2391,6 +2399,8 @@ smb_fsop_sdmerge(smb_request_t *sr, smb_node_t *snode, smb_fssd_t *fs_sd)
  * owner has been specified. Callers should translate this to
  * STATUS_INVALID_OWNER which is not the normal mapping for EPERM
  * in upper layers, so EPERM is mapped to EBADE.
+ *
+ * If 'overwrite' is non-zero, then the existing ACL is ignored.
  */
 int
 smb_fsop_sdwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
@@ -2456,14 +2466,13 @@ smb_fsop_sdwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	}
 
 	if (fs_sd->sd_secinfo & SMB_ACL_SECINFO) {
-		if (overwrite == 0) {
+		if (overwrite == 0)
 			error = smb_fsop_sdmerge(sr, snode, fs_sd);
-			if (error)
-				return (error);
-		}
 
-		error = smb_fsop_aclwrite(sr, cr, snode, fs_sd);
-		if (error) {
+		if (error == 0)
+			error = smb_fsop_aclwrite(sr, cr, snode, fs_sd);
+
+		if (error != 0) {
 			/*
 			 * Revert uid/gid changes if required.
 			 */
@@ -2511,39 +2520,46 @@ smb_fsop_sdinherit(smb_request_t *sr, smb_node_t *dnode, smb_fssd_t *fs_sd)
 	acl_t *sacl = NULL;
 	int is_dir;
 	int error;
+	uint32_t secinfo;
+	smb_fssd_t pfs_sd;
 
 	ASSERT(fs_sd);
 
-	if (sr->tid_tree->t_acltype != ACE_T) {
-		/*
-		 * No forced inheritance for non-ZFS filesystems.
-		 */
-		fs_sd->sd_secinfo = 0;
-		return (0);
-	}
+	secinfo = fs_sd->sd_secinfo;
 
+	/* Anything to do? */
+	if ((secinfo & SMB_ACL_SECINFO) == SMB_ACL_SECINFO)
+		return (0);
+
+	/*
+	 * No forced inheritance for non-ZFS filesystems.
+	 */
+	if (sr->tid_tree->t_acltype != ACE_T)
+		return (0);
+
+	smb_fssd_init(&pfs_sd, SMB_ACL_SECINFO, fs_sd->sd_flags);
 
 	/* Fetch parent directory's ACL */
-	error = smb_fsop_sdread(sr, zone_kcred(), dnode, fs_sd);
+	error = smb_fsop_sdread(sr, zone_kcred(), dnode, &pfs_sd);
 	if (error) {
 		return (error);
 	}
 
 	is_dir = (fs_sd->sd_flags & SMB_FSSD_FLAGS_DIR);
-	dacl = smb_fsacl_inherit(fs_sd->sd_zdacl, is_dir, SMB_DACL_SECINFO,
-	    sr->user_cr);
-	sacl = smb_fsacl_inherit(fs_sd->sd_zsacl, is_dir, SMB_SACL_SECINFO,
-	    sr->user_cr);
+	if ((secinfo & SMB_DACL_SECINFO) == 0) {
+		dacl = smb_fsacl_inherit(pfs_sd.sd_zdacl, is_dir,
+		    SMB_DACL_SECINFO, sr->user_cr);
+		fs_sd->sd_zdacl = dacl;
+	}
 
-	if (sacl == NULL)
-		fs_sd->sd_secinfo &= ~SMB_SACL_SECINFO;
+	if ((secinfo & SMB_SACL_SECINFO) == 0) {
+		sacl = smb_fsacl_inherit(pfs_sd.sd_zsacl, is_dir,
+		    SMB_SACL_SECINFO, sr->user_cr);
+		fs_sd->sd_zsacl = sacl;
+	}
 
-	smb_fsacl_free(fs_sd->sd_zdacl);
-	smb_fsacl_free(fs_sd->sd_zsacl);
-
-	fs_sd->sd_zdacl = dacl;
-	fs_sd->sd_zsacl = sacl;
-
+	smb_fsacl_free(pfs_sd.sd_zdacl);
+	smb_fsacl_free(pfs_sd.sd_zsacl);
 	return (0);
 }
 #endif	/* _KERNEL */
