@@ -687,7 +687,7 @@ ire_match_args_v6(ire_t *ire, const in6_addr_t *addr, const in6_addr_t *mask,
     const in6_addr_t *gateway, int type, const ill_t *ill, zoneid_t zoneid,
     const ts_label_t *tsl, int match_flags)
 {
-	in6_addr_t gw_addr_v6;
+	in6_addr_t gw_addr_v6 = { 0 };
 	ill_t *ire_ill = NULL, *dst_ill;
 	ip_stack_t *ipst = ire->ire_ipst;
 

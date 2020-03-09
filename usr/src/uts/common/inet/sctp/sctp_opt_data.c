@@ -1057,7 +1057,10 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 	/* In all cases, the size of the option must be bigger than int */
 	if (inlen >= sizeof (int32_t)) {
 		onoff = ONOFF(*i1);
+	} else {
+		return (EINVAL);
 	}
+
 	retval = 0;
 
 	RUN_SCTP(sctp);

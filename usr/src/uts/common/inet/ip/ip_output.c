@@ -1100,7 +1100,7 @@ ire_send_local_v4(ire_t *ire, mblk_t *mp, void *iph_arg,
 	    int, 1);
 
 	if (HOOKS4_INTERESTED_LOOPBACK_OUT(ipst)) {
-		int error;
+		int error = 0;
 
 		DTRACE_PROBE4(ip4__loopback__out__start, ill_t *, NULL,
 		    ill_t *, ill, ipha_t *, ipha, mblk_t *, mp);
@@ -1156,7 +1156,7 @@ ire_send_local_v4(ire_t *ire, mblk_t *mp, void *iph_arg,
 	}
 
 	if (HOOKS4_INTERESTED_LOOPBACK_IN(ipst)) {
-		int error;
+		int error = 0;
 
 		DTRACE_PROBE4(ip4__loopback__in__start, ill_t *, ill,
 		    ill_t *, NULL, ipha_t *, ipha, mblk_t *, mp);

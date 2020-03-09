@@ -1509,9 +1509,9 @@ ill_capability_id_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *outers)
 
 	id_ic = (dl_capab_id_t *)(outers + 1);
 
+	inners = &id_ic->id_subcap;
 	if (outers->dl_length < sizeof (*id_ic) ||
-	    (inners = &id_ic->id_subcap,
-	    inners->dl_length > (outers->dl_length - sizeof (*inners)))) {
+	    inners->dl_length > (outers->dl_length - sizeof (*inners))) {
 		cmn_err(CE_WARN, "ill_capability_id_ack: malformed "
 		    "encapsulated capab type %d too long for mblk",
 		    inners->dl_cap);
@@ -4025,6 +4025,7 @@ ill_get_next_ifindex(uint_t index, boolean_t isv6, ip_stack_t *ipst)
 	phyint_t *phyi_initial;
 	uint_t   ifindex;
 
+	phyi_initial = NULL;
 	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 
 	if (index == 0) {

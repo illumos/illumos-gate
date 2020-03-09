@@ -804,6 +804,8 @@ sctp_unlink_faddr(sctp_t *sctp, sctp_faddr_t *fp)
 {
 	sctp_faddr_t *fpp;
 
+	fpp = NULL;
+
 	if (!sctp->sctp_faddrs) {
 		return;
 	}

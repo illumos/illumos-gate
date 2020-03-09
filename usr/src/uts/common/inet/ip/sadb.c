@@ -113,8 +113,8 @@ extern uint64_t ipsacq_maxpackets;
 		if (((sa)->ipsa_ ## exp) == 0)				\
 			(sa)->ipsa_ ## exp = tmp;			\
 		else							\
-			(sa)->ipsa_ ## exp = 				\
-			    MIN((sa)->ipsa_ ## exp, tmp); 		\
+			(sa)->ipsa_ ## exp =				\
+			    MIN((sa)->ipsa_ ## exp, tmp);		\
 	}								\
 }
 
@@ -154,8 +154,6 @@ sadb_sa_refrele(void *target)
 static time_t
 sadb_add_time(time_t base, uint64_t delta)
 {
-	time_t sum;
-
 	/*
 	 * Clip delta to the maximum possible time_t value to
 	 * prevent "overwrapping" back into a shorter-than-desired
@@ -163,18 +161,12 @@ sadb_add_time(time_t base, uint64_t delta)
 	 */
 	if (delta > TIME_MAX)
 		delta = TIME_MAX;
-	/*
-	 * This sum may still overflow.
-	 */
-	sum = base + delta;
 
-	/*
-	 * .. so if the result is less than the base, we overflowed.
-	 */
-	if (sum < base)
-		sum = TIME_MAX;
-
-	return (sum);
+	if (base > 0) {
+		if (TIME_MAX - base < delta)
+			return (TIME_MAX);	/* Overflow */
+	}
+	return (base + delta);
 }
 
 /*
@@ -1695,8 +1687,7 @@ sadb_pfkey_echo(queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 		mp->b_cont = mp1;
 		break;
 	default:
-		if (mp != NULL)
-			freemsg(mp);
+		freemsg(mp);
 		return;
 	}
 
@@ -2941,7 +2932,7 @@ sadb_common_add(queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 	boolean_t isupdate = (newbie != NULL);
 	uint32_t *src_addr_ptr, *dst_addr_ptr, *isrc_addr_ptr, *idst_addr_ptr;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
-	ip_stack_t 	*ipst = ns->netstack_ip;
+	ip_stack_t	*ipst = ns->netstack_ip;
 	ipsec_alginfo_t *alg;
 	int		rcode;
 	boolean_t	async = B_FALSE;
@@ -4386,8 +4377,8 @@ sadb_update_lifetimes(ipsa_t *assoc, sadb_lifetime_t *hard,
 			if (assoc->ipsa_idletime != 0) {
 				assoc->ipsa_idletime = min(assoc->ipsa_idletime,
 				    assoc->ipsa_idleuselt);
-			assoc->ipsa_idleexpiretime =
-			    current + assoc->ipsa_idletime;
+				assoc->ipsa_idleexpiretime =
+				    current + assoc->ipsa_idletime;
 			} else {
 				assoc->ipsa_idleexpiretime =
 				    current + assoc->ipsa_idleuselt;
@@ -5450,7 +5441,7 @@ sadb_acquire(mblk_t *datamp, ip_xmit_attr_t *ixa, boolean_t need_ah,
 	uint32_t seq;
 	uint64_t unique_id = 0;
 	boolean_t tunnel_mode = (ixa->ixa_flags & IXAF_IPSEC_TUNNEL) != 0;
-	ts_label_t 	*tsl;
+	ts_label_t	*tsl;
 	netstack_t	*ns = ixa->ixa_ipst->ips_netstack;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
@@ -6102,7 +6093,8 @@ sadb_label_from_sens(sadb_sens_t *sens, uint64_t *bitmap)
 		return (NULL);
 
 	bsllow(&sl);
-	LCLASS_SET((_bslabel_impl_t *)&sl, sens->sadb_sens_sens_level);
+	LCLASS_SET((_bslabel_impl_t *)&sl,
+	    (uint16_t)sens->sadb_sens_sens_level);
 	bcopy(bitmap, &((_bslabel_impl_t *)&sl)->compartments,
 	    bitmap_len);
 
@@ -6629,7 +6621,7 @@ ipsec_find_listen_conn(uint16_t *pptr, ipsec_selector_t *sel, ip_stack_t *ipst)
 static void
 ipsec_tcp_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp, ip_stack_t *ipst)
 {
-	connf_t 	*connfp;
+	connf_t		*connfp;
 	conn_t		*connp;
 	uint32_t	ports;
 	uint16_t	*pptr = (uint16_t *)&ports;

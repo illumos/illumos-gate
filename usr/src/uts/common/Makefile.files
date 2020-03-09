@@ -2318,3 +2318,9 @@ BNX_OBJS += \
 	bnx_lm_main.o \
 	bnx_lm_recv.o \
 	bnx_lm_send.o
+
+#
+# mlxcx(7D)
+#
+MLXCX_OBJS +=	mlxcx.o mlxcx_dma.o mlxcx_cmd.o mlxcx_intr.o mlxcx_gld.o \
+		mlxcx_ring.o

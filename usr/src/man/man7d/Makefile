@@ -216,6 +216,7 @@ i386_MANFILES=	ahci.7d		\
 		iwi.7d		\
 		iwn.7d		\
 		mega_sas.7d	\
+		mlxcx.7d	\
 		npe.7d		\
 		ntxn.7d		\
 		nv_sata.7d	\

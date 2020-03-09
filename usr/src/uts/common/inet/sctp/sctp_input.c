@@ -831,7 +831,7 @@ sctp_try_partial_delivery(sctp_t *sctp, mblk_t *hmp, sctp_reass_t *srp,
 	 * there is a break in the sequence. We want
 	 * to chop the reassembly list as follows (the
 	 * numbers are TSNs):
-	 *   10 -> 11 -> 	(end of chunks)
+	 *   10 -> 11 ->	(end of chunks)
 	 *   10 -> 11 -> | 13   (break in sequence)
 	 */
 	prev = mp;
@@ -943,6 +943,7 @@ sctp_data_frag(sctp_t *sctp, mblk_t *dmp, sctp_data_hdr_t **dc, int *error,
 	uint32_t	tsn;
 	uint16_t	fraglen = 0;
 
+	reassq_curr = NULL;
 	*error = 0;
 
 	/*

@@ -767,7 +767,7 @@ platform_config_snapshot(void)
 }
 
 static const char *
-cfgstrprop_lookup(struct config *croot, char *path, char *pname)
+cfgstrprop_lookup(struct config *croot, char *path, const char *pname)
 {
 	struct config *cresource;
 	const char *fmristr;
@@ -790,43 +790,45 @@ cfgstrprop_lookup(struct config *croot, char *path, char *pname)
 }
 
 /*
- * Get resource FMRI from libtopo
+ * Get FMRI for a particular unit from libtopo. The unit is specified by the
+ * "path" argument (a stringified ipath). "prop" argument should be one
+ * of the constants TOPO_PROP_RESOURCE, TOPO_PROP_ASRU, TOPO_PROP_FRU, etc.
  */
 /*ARGSUSED*/
 void
-platform_units_translate(int isdefect, struct config *croot,
-    nvlist_t **dfltasru, nvlist_t **dfltfru, nvlist_t **dfltrsrc, char *path)
+platform_unit_translate(int isdefect, struct config *croot, const char *prop,
+    nvlist_t **fmrip, char *path)
 {
 	const char *fmristr;
 	char *serial;
-	nvlist_t *rsrc;
+	nvlist_t *fmri;
 	int err;
 
-	fmristr = cfgstrprop_lookup(croot, path, TOPO_PROP_RESOURCE);
+	fmristr = cfgstrprop_lookup(croot, path, prop);
 	if (fmristr == NULL) {
-		out(O_ALTFP, "Cannot rewrite resource for %s.", path);
+		out(O_ALTFP, "Cannot rewrite unit FMRI for %s.", path);
 		return;
 	}
-	if (topo_fmri_str2nvl(Eft_topo_hdl, fmristr, &rsrc, &err) < 0) {
+	if (topo_fmri_str2nvl(Eft_topo_hdl, fmristr, &fmri, &err) < 0) {
 		out(O_ALTFP, "Can not convert config info: %s",
 		    topo_strerror(err));
-		out(O_ALTFP, "Cannot rewrite resource for %s.", path);
+		out(O_ALTFP, "Cannot rewrite unit FMRI for %s.", path);
 		return;
 	}
 
 	/*
-	 * If we don't have a serial number in the resource then check if it
+	 * If we don't have a serial number in the unit then check if it
 	 * is available as a separate property and if so then add it.
 	 */
-	if (nvlist_lookup_string(rsrc, FM_FMRI_HC_SERIAL_ID, &serial) != 0) {
+	if (nvlist_lookup_string(fmri, FM_FMRI_HC_SERIAL_ID, &serial) != 0) {
 		serial = (char *)cfgstrprop_lookup(croot, path,
 		    FM_FMRI_HC_SERIAL_ID);
 		if (serial != NULL)
-			(void) nvlist_add_string(rsrc, FM_FMRI_HC_SERIAL_ID,
+			(void) nvlist_add_string(fmri, FM_FMRI_HC_SERIAL_ID,
 			    serial);
 	}
 
-	*dfltrsrc = rsrc;
+	*fmrip = fmri;
 }
 
 /*

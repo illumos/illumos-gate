@@ -692,7 +692,7 @@ tsol_get_pkt_label(mblk_t *mp, int version, ip_recv_attr_t *ira)
 	const void	*src;
 	const ip6_t	*ip6h;
 	cred_t		*credp;
-	int 		proto;
+	int		proto;
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
 
@@ -1477,6 +1477,9 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp, const ip_recv_attr_t *ira)
 	 */
 
 	af = (ire->ire_ipversion == IPV4_VERSION) ? AF_INET : AF_INET6;
+	ipha = NULL;
+	ip6h = NULL;
+	gw_rhtp = NULL;
 
 	if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION) {
 		ASSERT(ire->ire_ipversion == IPV4_VERSION);

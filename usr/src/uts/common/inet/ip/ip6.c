@@ -2766,7 +2766,7 @@ ip_process_options_v6(mblk_t *mp, ip6_t *ip6h,
     uint8_t *optptr, uint_t optlen, uint8_t hdr_type, ip_recv_attr_t *ira)
 {
 	uint8_t opt_type;
-	uint_t optused;
+	uint_t optused = 0;
 	int ret = 0;
 	const char *errtype;
 	ill_t		*ill = ira->ira_ill;

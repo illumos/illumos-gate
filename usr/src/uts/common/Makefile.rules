@@ -956,6 +956,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/mii/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/mlxcx/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/mr_sas/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)

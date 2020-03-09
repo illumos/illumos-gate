@@ -1679,6 +1679,8 @@ ilb_check(ilb_stack_t *ilbs, ill_t *ill, mblk_t *mp, in6_addr_t *src,
 	uint16_t		nat_src_idx;
 	boolean_t		busy;
 
+	ret = 0;
+
 	/*
 	 * We don't really need to switch here since both protocols's
 	 * ports are at the same offset.  Just prepare for future protocol

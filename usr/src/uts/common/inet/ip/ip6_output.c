@@ -1023,7 +1023,7 @@ ire_send_wire_v6(ire_t *ire, mblk_t *mp, void *iph_arg,
 	 */
 	if (pktlen > ixa->ixa_fragsize ||
 	    (ixaflags & (IXAF_IPSEC_SECURE|IXAF_IPV6_ADD_FRAGHDR))) {
-		uint32_t ident;
+		uint32_t ident = 0;
 
 		if (ixaflags & IXAF_IPSEC_SECURE)
 			pktlen += ipsec_out_extra_length(ixa);

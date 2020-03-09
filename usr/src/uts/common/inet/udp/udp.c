@@ -4984,6 +4984,8 @@ udp_do_bind(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 	mlp_type_t	addrtype, mlptype;
 	udp_stack_t	*us = udp->udp_us;
 
+	sin = NULL;
+	sin6 = NULL;
 	switch (len) {
 	case sizeof (sin_t):	/* Complete IPv4 address */
 		sin = (sin_t *)sa;
@@ -5697,6 +5699,10 @@ udp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 
 	udp = connp->conn_udp;
 	us = udp->udp_us;
+	sin = NULL;
+	sin6 = NULL;
+	v4dst = INADDR_ANY;
+	flowinfo = 0;
 
 	/*
 	 * Address has been verified by the caller

@@ -47,7 +47,7 @@
 
 typedef struct sctp_asconf_s {
 	mblk_t		*head;
-	uint32_t 	cid;
+	uint32_t	cid;
 } sctp_asconf_t;
 
 /*
@@ -636,6 +636,12 @@ sctp_input_asconf_ack(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 
 	ASSERT(ch->sch_id == CHUNK_ASCONF_ACK);
 
+	ainfo = NULL;
+	alist = NULL;
+	dlist = NULL;
+	aptr = NULL;
+	dptr = NULL;
+
 	snp = (uint32_t *)(ch + 1);
 	rlen = ntohs(ch->sch_len) - sizeof (*ch) - sizeof (*snp);
 	if (rlen < 0) {
@@ -915,9 +921,9 @@ sctp_wput_asconf(sctp_t *sctp, sctp_faddr_t *fp)
 {
 #define	SCTP_SET_SENT_FLAG(mp)	((mp)->b_flag = SCTP_CHUNK_FLAG_SENT)
 
-	mblk_t 			*mp;
+	mblk_t			*mp;
 	mblk_t			*ipmp;
-	uint32_t 		*snp;
+	uint32_t		*snp;
 	sctp_parm_hdr_t		*ph;
 	boolean_t		isv4;
 	sctp_stack_t		*sctps = sctp->sctp_sctps;
@@ -1467,6 +1473,7 @@ sctp_add_ip(sctp_t *sctp, const void *addrs, uint32_t cnt)
 	 * If deleting:
 	 *   o Must be part of the association
 	 */
+	sin6 = NULL;
 	for (i = 0; i < cnt; i++) {
 		switch (connp->conn_family) {
 		case AF_INET:

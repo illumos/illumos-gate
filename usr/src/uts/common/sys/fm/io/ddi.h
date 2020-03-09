@@ -66,6 +66,17 @@ extern "C" {
 #define	DVR_STACK_DEPTH		"dvr-stack-depth"
 #define	DVR_ERR_SPECIFIC	"dvr-error-specific"
 
+/* Generic NIC driver ereports. */
+#define	DDI_FM_NIC		"nic"
+#define	DDI_FM_TXR_ERROR	"txr-err"
+
+/* Valid values of the "error" field in txr-err ereports */
+#define	DDI_FM_TXR_ERROR_WHITELIST	"whitelist"
+#define	DDI_FM_TXR_ERROR_NOTSUPP	"notsupp"
+#define	DDI_FM_TXR_ERROR_OVERTEMP	"overtemp"
+#define	DDI_FM_TXR_ERROR_HWFAIL		"hwfail"
+#define	DDI_FM_TXR_ERROR_UNKNOWN	"unknown"
+
 #ifdef	__cplusplus
 }
 #endif

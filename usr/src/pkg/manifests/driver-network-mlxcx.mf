@@ -1,0 +1,54 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2020 the University of Queensland
+# Author: Alex Wilson <alex@uq.edu.au>
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/driver/network/mlxcx@$(PKGVERS)
+set name=pkg.description value="Mellanox ConnectX-4/5/6 Ethernet Driver"
+set name=pkg.summary value="Mellanox ConnectX-4/5/6 Ethernet Driver"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Drivers/Storage
+set name=variant.arch value=i386
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man7d
+driver name=mlxcx \
+    alias=pciex15b3,1013 \
+    alias=pciex15b3,1014 \
+    alias=pciex15b3,1015 \
+    alias=pciex15b3,1016 \
+    alias=pciex15b3,1017 \
+    alias=pciex15b3,1018 \
+    alias=pciex15b3,1019 \
+    alias=pciex15b3,101a \
+    alias=pciex15b3,101b \
+    alias=pciex15b3,101c \
+    alias=pciex15b3,101d \
+    alias=pciex15b3,101e \
+    alias=pciex15b3,101f
+file path=kernel/drv/$(ARCH64)/mlxcx group=sys
+file path=kernel/drv/mlxcx.conf group=sys
+file path=usr/share/man/man7d/mlxcx.7d
+legacy pkg=SUNWmrsas desc="Mellanox ConnectX-4/5/6 Ethernet Driver" \
+    name="Mellanox ConnectX-4/5/6 Ethernet Driver"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL

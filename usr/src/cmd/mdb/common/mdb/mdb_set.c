@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -275,7 +275,7 @@ print_properties(void)
 	 * we enable it for the duration of the command.
 	 */
 	oflags = mdb.m_flags;
-	mdb.m_flags |= MDB_FL_AUTOWRAP;
+	mdb_iob_set_autowrap(mdb.m_out);
 
 	mdb_printf("follow_exec_mode=");
 	switch (mdb.m_execmode) {

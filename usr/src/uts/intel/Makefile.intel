@@ -318,6 +318,7 @@ DRV_KMODS	+= log
 DRV_KMODS	+= logindmux
 DRV_KMODS	+= mega_sas
 DRV_KMODS	+= mc-amd
+DRV_KMODS	+= mlxcx
 DRV_KMODS	+= mm
 DRV_KMODS	+= mouse8042
 DRV_KMODS	+= mpt_sas

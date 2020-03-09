@@ -1,0 +1,340 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 the University of Queensland
+.\"
+.Dd January 17, 2020
+.Dt MLXCX 7D
+.Os
+.Sh NAME
+.Nm mlxcx
+.Nd Mellanox ConnectX-4/5/6 Ethernet controller driver
+.Sh SYNOPSIS
+.Pa /dev/net/mlxcx*
+.Sh DESCRIPTION
+The
+.Sy mlxcx
+driver is a GLDv3 NIC driver for the ConnectX-4, ConnectX-4 Lx, ConnectX-5 and
+ConnectX-6 families of ethernet controllers from Mellanox.
+It supports the Data Link Provider Interface,
+.Xr dlpi 7P .
+.Pp
+This driver supports:
+.Bl -dash -offset indent
+.It
+Jumbo frames up to 9000 bytes.
+.It
+Checksum offload for TCP, UDP, IPv4 and IPv6.
+.It
+Group support with VLAN and MAC steering to avoid software classification
+when using VNICs.
+.It
+Promiscuous access via
+.Xr snoop 1M and
+.Xr dlpi 7P
+.It
+LED control
+.It
+Transceiver information
+.El
+.Pp
+At this time, the driver does not support Large Send Offload (LSO), energy
+efficient Ethernet (EEE), or the use of flow control through hardware pause
+frames.
+.Sh CONFIGURATION
+The
+.Sy mlxcx.conf
+file contains user configurable parameters, including the ability to set the
+number of rings and groups advertised to MAC, the sizes of rings and groups,
+and the maximum number of MAC address filters available.
+.Sh PROPERTIES
+The driver supports the following device properties which may be tuned through
+its driver.conf file,
+.Pa /kernel/drv/mlxcx.conf .
+These properties cannot be changed after the driver has been attached.
+.Pp
+These properties are not considered stable at this time, and may change.
+.Bl -hang -width Ds
+.It Sy eq_size_shift
+.Bd -filled -compact
+Minimum:
+.Sy 2 |
+Maximum:
+.Sy device dependent (up to 255)
+.Ed
+.Bd -filled
+The
+.Sy eq_size_shift
+property determines the number of entries on Event Queues for the device.
+The number of entries is calculated as
+.Dv (1 << eq_size_shift) ,
+so a value of 9 would mean 512 entries are created on each Event Queue.
+The default value is
+.Sy 9 .
+.Ed
+.It Sy cq_size_shift
+.Bd -filled -compact
+Minimum:
+.Sy 2 |
+Maximum:
+.Sy device dependent (up to 255)
+.Ed
+.Bd -filled
+The
+.Sy cq_size_shift
+property determines the number of entries on Completion Queues for the device.
+The number of entries is calculated as
+.Li (1 << cq_size_shift) ,
+so a value of 9 would mean 512 entries are created on each Event Queue.
+The default value is
+.Sy 10 .
+This should be kept very close to the value set for
+.Sy rq_size_shift
+and
+.Sy sq_size_shift .
+.Ed
+.It Sy rq_size_shift
+.Bd -filled -compact
+Minimum:
+.Sy 2 |
+Maximum:
+.Sy device dependent (up to 255)
+.Ed
+.Bd -filled
+The
+.Sy rq_size_shift
+property determines the number of descriptors on Receive Queues for the device.
+The number of descriptors is calculated as
+.Dv (1 << rq_size_shift) ,
+so a value of 9 would mean 512 descriptors are created on each Receive Queue.
+This sets the number of packets on RX rings advertised to MAC.
+The default value is
+.Sy 10 .
+.Ed
+.It Sy sq_size_shift
+.Bd -filled -compact
+Minimum:
+.Sy 2 |
+Maximum:
+.Sy device dependent (up to 255)
+.Ed
+.Bd -filled
+The
+.Sy sq_size_shift
+property determines the number of descriptors on Send Queues for the device.
+The number of descriptors is calculated as
+.Dv (1 << sq_size_shift) ,
+so a value of 9 would mean 512 descriptors are created on each Send Queue.
+This sets the number of packets on RX rings advertised to MAC.
+The default value is
+.Sy 11 .
+Note that large packets often occupy more than one descriptor slot on the SQ,
+so it is sometimes a good idea to increase this if using a large MTU.
+.Ed
+.It Sy tx_ngroups
+.Bd -filled -compact
+Minimum:
+.Sy 1 |
+Maximum:
+.Sy device dependent
+.Ed
+.Bd -filled
+The
+.Sy tx_ngroups
+property determines the number of TX groups advertised to MAC.
+The default value is
+.Sy 1 .
+.Ed
+.It Sy tx_nrings_per_group
+.Bd -filled -compact
+Minimum:
+.Sy 1 |
+Maximum:
+.Sy device dependent
+.Ed
+.Bd -filled
+The
+.Sy tx_nrings_per_group
+property determines the number of rings in each TX group advertised to MAC.
+The default value is
+.Sy 64 .
+.Ed
+.It Sy rx_ngroups_large
+.Bd -filled -compact
+Minimum:
+.Sy 1 |
+Maximum:
+.Sy device dependent
+.Ed
+.Bd -filled
+The
+.Sy rx_ngroups_large
+property determines the number of "large" RX groups advertised to MAC.
+The size of "large" RX groups is set by the
+.Sy rx_nrings_per_large_group
+property.
+The default value is
+.Sy 2 .
+.Ed
+.It Sy rx_nrings_per_large_group
+.Bd -filled -compact
+Minimum:
+.Sy 1 |
+Maximum:
+.Sy device dependent
+.Ed
+.Bd -filled
+The
+.Sy rx_nrings_per_large_group
+property determines the number of rings in each "large" RX group advertised to
+MAC.
+The number of such groups is determined by the
+.Sy rx_ngroups_large
+property.
+The default value is
+.Sy 16 .
+.Ed
+.It Sy rx_ngroups_small
+.Bd -filled -compact
+Minimum:
+.Sy 1 |
+Maximum:
+.Sy device dependent
+.Ed
+.Bd -filled
+The
+.Sy rx_ngroups_small
+property determines the number of "small" RX groups advertised to MAC.
+The size of "small" RX groups is set by the
+.Sy rx_nrings_per_small_group
+property.
+It is recommended to use many small groups when using a large number of
+VNICs on top of the NIC (e.g. on a system with many zones).
+The default value is
+.Sy 256 .
+.Ed
+.It Sy rx_nrings_per_small_group
+.Bd -filled -compact
+Minimum:
+.Sy 1 |
+Maximum:
+.Sy device dependent
+.Ed
+.Bd -filled
+The
+.Sy rx_nrings_per_small_group
+property determines the number of rings in each "small" RX group advertised to
+MAC.
+The number of such groups is determined by the
+.Sy rx_ngroups_small
+property.
+The default value is
+.Sy 4 .
+.Ed
+.It Sy ftbl_root_size_shift
+.Bd -filled -compact
+Minimum:
+.Sy 4 |
+Maximum:
+.Sy device dependent
+.Ed
+.Bd -filled
+The
+.Sy ftbl_root_size_shift
+property determines the number of flow table entries on the root flow table,
+and therefore how many MAC addresses can be filtered into groups across the
+entire NIC.
+The number of flow entries is calculated as
+.Dv (1 << ftbl_root_size_shift) ,
+so a value of 9 would mean 512 entries are created in the root flow table.
+The default value is
+.Sy 12 .
+.Ed
+.It Sy cqemod_period_usec
+.Bd -filled -compact
+Minimum:
+.Sy 1 |
+Maximum:
+.Sy 65535
+.Ed
+.Bd -filled
+The
+.Sy cqemod_period_usec
+property determines the maximum delay after a completion event has occurred
+before an event queue entry (and thus an interrupt) is generated.
+The delay is measured in microseconds.
+The default value is
+.Sy 50 .
+.Ed
+.It Sy cqemod_count
+.Bd -filled -compact
+Minimum:
+.Sy 1 |
+Maximum:
+.Sy 65535
+.Ed
+.Bd -filled
+The
+.Sy cqemod_count
+property determines the maximum number of completion events that can have
+occurred before an event queue entry (and thus an interrupt) is generated.
+The default value is
+.Sy 80% of the CQ size .
+.Ed
+.It Sy intrmod_period_usec
+.Bd -filled -compact
+Minimum:
+.Sy 1 |
+Maximum:
+.Sy 65535
+.Ed
+.Bd -filled
+The
+.Sy intrmod_period_usec
+property determines the maximum delay after an event queue entry has been
+generated before an interrupt is raised.
+The delay is measured in microseconds.
+The default value is
+.Sy 10 .
+.Ed
+.It Sy tx_bind_threshold
+.Bd -filled -compact
+Minimum:
+.Sy 1 |
+Maximum:
+.Sy 65535
+.Ed
+.Bd -filled
+The
+.Sy tx_bind_threshold
+property determines the minimum number of bytes in a packet before the driver
+uses
+.Xr ddi_dma_addr_bind_handle 9F
+to bind the packet memory for DMA, rather than copying the memory as it does
+for small packets.
+DMA binds are expensive and involve taking locks in the PCI nexus driver, so it
+is seldom worth using them for small packets.
+The default value is
+.Sy 2048 .
+.Ed
+.El
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /kernel/drv/amd64/mlxcx
+Device driver (x86)
+.It Pa /kernel/drv/mlxcx.conf
+Driver configuration file containing user-configurable options
+.El
+.Sh SEE ALSO
+.Xr dladm 1M ,
+.Xr snoop 1M ,
+.Xr driver.conf 4 ,
+.Xr dlpi 7P

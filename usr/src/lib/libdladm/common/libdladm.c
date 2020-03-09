@@ -456,6 +456,9 @@ dladm_status2str(dladm_status_t status, char *buf)
 	case DLADM_STATUS_BAD_ENCAP:
 		s = "invalid encapsulation protocol";
 		break;
+	case DLADM_STATUS_PERSIST_ON_TEMP:
+		s = "can't create persistent object on top of temporary object";
+		break;
 	default:
 		s = "<unknown error>";
 		break;

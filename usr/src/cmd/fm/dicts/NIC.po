@@ -1,0 +1,98 @@
+#
+# Copyright 2020 the University of Queensland
+# Use is subject to license terms.
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# code: NIC-8000-0Q
+# keys: fault.io.nic.transceiver.notsupp
+#
+msgid "NIC-8000-0Q.type"
+msgstr "Fault"
+msgid "NIC-8000-0Q.severity"
+msgstr "Critical"
+msgid "NIC-8000-0Q.description"
+msgstr "NIC transceiver module %<fault-list[0].resource.hc-specific.txr_index> (SFP/SFP+/QSFP+ etc.) in %<fault-list[0].resource.hc-specific.link-name> is of a type that is not supported. This may be due to an incompatible link type or speed. In some NICs, this may also be caused by enforcement of a vendor or part whitelist.\n\n  NIC data link: %<fault-list[0].resource.hc-specific.link-name> (%<fault-list[0].resource.hc-specific.primary-mac-address>)\n  Module vendor: %<fault-list[0].resource.hc-specific.vendor>\n  Module part: %<fault-list[0].resource.part>\n  Module serial: %<fault-list[0].resource.serial>\n\n  Refer to %s for more information."
+msgid "NIC-8000-0Q.response"
+msgstr "The transceiver module has been disabled, and the network data link associated with it (%<fault-list[0].resource.hc-specific.link-name>) has been marked as down.\n"
+msgid "NIC-8000-0Q.impact"
+msgstr "No network traffic will pass through the data link or network interfaces associated with this transceiver slot.\n"
+msgid "NIC-8000-0Q.action"
+msgstr "Replace the transceiver module with one of a supported type.\n"
+
+#
+# code: NIC-8000-1C
+# keys: fault.io.nic.transceiver.whitelist
+#
+msgid "NIC-8000-1C.type"
+msgstr "Fault"
+msgid "NIC-8000-1C.severity"
+msgstr "Critical"
+msgid "NIC-8000-1C.description"
+msgstr "NIC transceiver module %<fault-list[0].resource.hc-specific.txr_index> (SFP/SFP+/QSFP+ etc.) in %<fault-list[0].resource.hc-specific.link-name> is of a type that is not allowed to be used with this NIC (due to a hardware-enforced vendor or part whitelist).\n\n  NIC data link: %<fault-list[0].resource.hc-specific.link-name> (%<fault-list[0].resource.hc-specific.primary-mac-address>)\n  Module vendor: %<fault-list[0].resource.hc-specific.vendor>\n  Module part: %<fault-list[0].resource.part>\n  Module serial: %<fault-list[0].resource.serial>\n\n  Refer to %s for more information."
+msgid "NIC-8000-1C.response"
+msgstr "The transceiver module has been disabled, and the network data link associated with it (%<fault-list[0].resource.hc-specific.link-name>) has been marked as down.\n"
+msgid "NIC-8000-1C.impact"
+msgstr "No network traffic will pass through the data link or network\ninterfaces associated with this transceiver slot.\n"
+msgid "NIC-8000-1C.action"
+msgstr "Replace the transceiver module with one of a supported type.\n"
+
+#
+# code: NIC-8000-2R
+# keys: fault.io.nic.transceiver.overtemp
+#
+msgid "NIC-8000-2R.type"
+msgstr "Fault"
+msgid "NIC-8000-2R.severity"
+msgstr "Critical"
+msgid "NIC-8000-2R.description"
+msgstr "NIC transceiver module %<fault-list[0].resource.hc-specific.txr_index> (SFP/SFP+/QSFP+ etc.) in %<fault-list[0].resource.hc-specific.link-name> has overheated.\n\n  NIC data link: %<fault-list[0].resource.hc-specific.link-name> (%<fault-list[0].resource.hc-specific.primary-mac-address>)\n  Module vendor: %<fault-list[0].resource.hc-specific.vendor>\n  Module part: %<fault-list[0].resource.part>\n  Module serial: %<fault-list[0].resource.serial>\n\n  Refer to %s for more information."
+msgid "NIC-8000-2R.response"
+msgstr "The transceiver module has been disabled, and the network data link associated with it (%<fault-list[0].resource.hc-specific.link-name>) has been marked as down.\n"
+msgid "NIC-8000-2R.impact"
+msgstr "No network traffic will pass through the data link or network interfaces associated with this transceiver slot.\n"
+msgid "NIC-8000-2R.action"
+msgstr "Remove the transceiver module and check for adequate ventilation\nand cooling. Re-inserting the module after it has cooled will restore service.\n"
+
+#
+# code: NIC-8000-34
+# keys: fault.io.nic.transceiver.hwfail
+#
+msgid "NIC-8000-34.type"
+msgstr "Fault"
+msgid "NIC-8000-34.severity"
+msgstr "Critical"
+msgid "NIC-8000-34.description"
+msgstr "NIC transceiver module %<fault-list[0].resource.hc-specific.txr_index> (SFP/SFP+/QSFP+ etc.) in %<fault-list[0].resource.hc-specific.link-name> has experienced a hardware failure.\n\n  NIC data link: %<fault-list[0].resource.hc-specific.link-name> (%<fault-list[0].resource.hc-specific.primary-mac-address>)\n  Module vendor: %<fault-list[0].resource.hc-specific.vendor>\n  Module part: %<fault-list[0].resource.part>\n  Module serial: %<fault-list[0].resource.serial>\n\n  Refer to %s for more information."
+msgid "NIC-8000-34.response"
+msgstr "The transceiver module has been disabled, and the network data link associated with it (%<fault-list[0].resource.hc-specific.link-name>) has been marked as down.\n"
+msgid "NIC-8000-34.impact"
+msgstr "No network traffic will pass through the data link or network\ninterfaces associated with this transceiver slot.\n"
+msgid "NIC-8000-34.action"
+msgstr "Remove and check the transceiver module, and consider replacing it.\n"
+
+#
+# code: NIC-8000-4X
+# keys: fault.io.nic.transceiver.unknown
+#
+msgid "NIC-8000-4X.type"
+msgstr "Fault"
+msgid "NIC-8000-4X.severity"
+msgstr "Critical"
+msgid "NIC-8000-4X.description"
+msgstr "The slot for NIC transceiver module %<fault-list[0].resource.hc-specific.txr_index> (SFP/SFP+/QSFP+ etc.) in %<fault-list[0].resource.hc-specific.link-name> is occupied, but hardware did not find a valid transceiver in it.\n  Refer to %s for more information."
+msgid "NIC-8000-4X.response"
+msgstr "The transceiver module slot has been disabled, and the network data link associated with it (%<fault-list[0].resource.hc-specific.link-name>) has been marked as down.\n"
+msgid "NIC-8000-4X.impact"
+msgstr "No network traffic will pass through the data link or network\ninterfaces associated with this transceiver slot.\n"
+msgid "NIC-8000-4X.action"
+msgstr "Remove and check the transceiver module. It may be faulty,\ninserted incorrectly, or not of the correct type for the slot.\nIf problems persist, consider replacing the module.\n"

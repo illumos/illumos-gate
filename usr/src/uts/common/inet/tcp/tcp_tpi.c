@@ -154,6 +154,10 @@ tcp_conprim_opt_process(tcp_t *tcp, mblk_t *mp, int *do_disconnectp,
 		opt_offset = tcresp->OPT_offset;
 		opt_lenp = (t_scalar_t *)&tcresp->OPT_length;
 		break;
+	default:
+		opt_lenp = 0;
+		opt_offset = 0;
+		break;
 	}
 
 	*t_errorp = 0;

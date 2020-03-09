@@ -613,6 +613,7 @@ ipcl_conn_create(uint32_t type, int sleep, netstack_t *ns)
 		break;
 
 	default:
+		conn_cache = NULL;
 		connp = NULL;
 		ASSERT(0);
 	}

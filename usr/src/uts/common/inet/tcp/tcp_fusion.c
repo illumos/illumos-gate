@@ -160,7 +160,7 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcpha_t *tcpha)
 
 	if (!tcp->tcp_unfusable && !peer_tcp->tcp_unfusable &&
 	    tcp->tcp_xmit_head == NULL && peer_tcp->tcp_xmit_head == NULL) {
-		mblk_t *mp;
+		mblk_t *mp = NULL;
 		queue_t *peer_rq = peer_connp->conn_rq;
 
 		ASSERT(!TCP_IS_DETACHED(peer_tcp));

@@ -1,0 +1,127 @@
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ */
+/*
+ * Copyright 2020, the University of Queensland
+ */
+
+#pragma dictionary "NIC"
+
+/*
+ * Rules for the generic NIC (non-driver-specific) fault events.
+ */
+
+/*
+ * Transceiver events are emitted by drivers under ereport.io.nic.txr-err.
+ *
+ * These are emitted with detector = the PCI/PCIex function of the NIC.
+ * They must always have a string property "error", set to one of the
+ * generic transceiver fault type names (notsupp, whitelist, overtemp etc).
+ *
+ * As well as "error", they must have both the "port_index" and "txr_index"
+ * properties set in the event payload (both integer types).
+ *
+ * It is expected that drivers will call ddi_fm_service_impact() immediately
+ * after noticing a transceiver error, with an argument of DDI_SERVICE_LOST or
+ * DDI_SERVICE_DEGRADED (depending on the specific error -- at time of writing
+ * all the supported events expect DDI_SERVICE_LOST).
+ */
+
+asru pcifn;
+fru  pcifn/port/transceiver;
+
+asru pciexfn;
+fru  pciexfn/port/transceiver;
+
+#define	EV_DECL_TXR_FAULT(TYPE)		\
+	event fault.io.nic.transceiver.TYPE@pcifn/port/transceiver \
+	    FRU=pcifn/port/transceiver, ASRU=pcifn; \
+	event fault.io.nic.transceiver.TYPE@pciexfn/port/transceiver \
+	    FRU=pciexfn/port/transceiver, ASRU=pciexfn;
+
+EV_DECL_TXR_FAULT(notsupp)
+EV_DECL_TXR_FAULT(whitelist)
+EV_DECL_TXR_FAULT(overtemp)
+EV_DECL_TXR_FAULT(hwfail)
+EV_DECL_TXR_FAULT(unknown)
+
+event ereport.io.nic.txr-err@pcifn;
+event ereport.io.service.lost@pcifn;
+
+event ereport.io.nic.txr-err@pciexfn;
+event ereport.io.service.lost@pciexfn;
+
+#define	EV_PROP_TXR_FAULT(TYPE)		\
+	prop fault.io.nic.transceiver.TYPE@pcifn/port[pn]/transceiver[tn] (2) -> \
+	    ereport.io.nic.txr-err@pcifn { \
+	      payloadprop("txr_index") == tn && \
+	      payloadprop("port_index") == pn && \
+	      payloadprop("error") == "TYPE" && \
+	      setpayloadprop("txr_index", tn) && \
+	      setpayloadprop("link-name", confprop(pcifn/port[pn], "link-name")) && \
+	      setpayloadprop("primary-mac-address", confprop(pcifn/port[pn], "primary-mac-address")) && \
+	      (!confprop_defined(pcifn/port[pn]/transceiver[tn], "vendor") || \
+	       setpayloadprop("vendor", confprop(pcifn/port[pn]/transceiver[tn], "vendor"))) \
+	    }, \
+	    ereport.io.service.lost@pcifn { within(1s) }; \
+	prop fault.io.nic.transceiver.TYPE@pciexfn/port[pn]/transceiver[tn] (2) -> \
+	    ereport.io.nic.txr-err@pciexfn { \
+	      payloadprop("txr_index") == tn && \
+	      payloadprop("port_index") == pn && \
+	      payloadprop("error") == "TYPE" && \
+	      setpayloadprop("txr_index", tn) && \
+	      setpayloadprop("link-name", confprop(pciexfn/port[pn], "link-name")) && \
+	      setpayloadprop("primary-mac-address", confprop(pciexfn/port[pn], "primary-mac-address")) && \
+	      (!confprop_defined(pciexfn/port[pn]/transceiver[tn], "vendor") || \
+	       setpayloadprop("vendor", confprop(pciexfn/port[pn]/transceiver[tn], "vendor"))) \
+	    }, \
+	    ereport.io.service.lost@pciexfn { within(1s) };
+
+EV_PROP_TXR_FAULT(notsupp)
+EV_PROP_TXR_FAULT(whitelist)
+EV_PROP_TXR_FAULT(overtemp)
+EV_PROP_TXR_FAULT(hwfail)
+EV_PROP_TXR_FAULT(unknown)
+
+/*
+ * Allow drivers (e.g. i40e) which can't tell the difference between the events
+ * notsupp/unknown/whitelist to generate a single ereport covering all 3.
+ *
+ * If transceiver information is available in topo, we will turn it into
+ * a "notsupp" fault. If it isn't, we'll turn it into an "unknown" fault
+ * instead. The text in "notsupp" explicitly notes that certain drivers might
+ * have difficulty telling the difference between it and "whitelist".
+ *
+ * If you want this for a pcifn driver rather than pciexfn, you'll have to
+ * make another copy.
+ */
+prop fault.io.nic.transceiver.notsupp@pciexfn/port[pn]/transceiver[tn] (2) ->
+    ereport.io.nic.txr-err@pciexfn {
+      payloadprop("txr_index") == tn &&
+      payloadprop("port_index") == pn &&
+      payloadprop("error") == "notsupp/unknown" &&
+      confprop_defined(pciexfn/port[pn]/transceiver[tn], "vendor") &&
+      setpayloadprop("txr_index", tn) &&
+      setpayloadprop("link-name", confprop(pciexfn/port[pn], "link-name")) &&
+      setpayloadprop("primary-mac-address", confprop(pciexfn/port[pn], "primary-mac-address")) &&
+      setpayloadprop("vendor", confprop(pciexfn/port[pn]/transceiver[tn], "vendor"))
+    },
+    ereport.io.service.lost@pciexfn { within(1s) };
+prop fault.io.nic.transceiver.unknown@pciexfn/port[pn]/transceiver[tn] (2) ->
+    ereport.io.nic.txr-err@pciexfn {
+      payloadprop("txr_index") == tn &&
+      payloadprop("port_index") == pn &&
+      payloadprop("error") == "notsupp/unknown" &&
+      !confprop_defined(pciexfn/port[pn]/transceiver[tn], "vendor") &&
+      setpayloadprop("txr_index", tn) &&
+      setpayloadprop("link-name", confprop(pciexfn/port[pn], "link-name")) &&
+      setpayloadprop("primary-mac-address", confprop(pciexfn/port[pn], "primary-mac-address"))
+    },
+    ereport.io.service.lost@pciexfn { within(1s) };

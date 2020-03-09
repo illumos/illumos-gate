@@ -21,7 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
@@ -739,7 +739,7 @@ mdb_fmt_print(mdb_tgt_t *t, mdb_tgt_as_t as,
 		 * Unless a format has explicitly opted out, we force autowrap
 		 * for the duration of mdb_fmt_print().
 		 */
-		mdb.m_flags |= MDB_FL_AUTOWRAP;
+		mdb_iob_set_autowrap(mdb.m_out);
 	}
 
 	switch (FMT_TYPE(fp->f_type)) {

@@ -1209,6 +1209,7 @@ conn_opt_set_ip(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 		return (EINVAL);
 	}
 
+	ifindex = UINT_MAX;
 	switch (name) {
 	case IP_TTL:
 		/* Don't allow zero */
@@ -1529,6 +1530,7 @@ conn_opt_set_ipv6(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 	if (connp->conn_family != AF_INET6)
 		return (EINVAL);
 
+	ifindex = UINT_MAX;
 	switch (name) {
 	case IPV6_MULTICAST_IF:
 		/*

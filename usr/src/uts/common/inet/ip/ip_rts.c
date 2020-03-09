@@ -114,7 +114,7 @@ rts_queue_input(mblk_t *mp, conn_t *o_connp, sa_family_t af, uint_t flags,
     ip_stack_t *ipst)
 {
 	mblk_t	*mp1;
-	conn_t 	*connp, *next_connp;
+	conn_t	*connp, *next_connp;
 
 	/*
 	 * Since we don't have an ill_t here, RTSQ_DEFAULT must already be
@@ -190,7 +190,7 @@ ip_rts_rtmsg(int type, ire_t *ire, int error, ip_stack_t *ipst)
 	mblk_t		*mp;
 	rt_msghdr_t	*rtm;
 	int		rtm_addrs = (RTA_DST | RTA_NETMASK | RTA_GATEWAY);
-	sa_family_t	af;
+	sa_family_t	af = { 0 };
 	in6_addr_t	gw_addr_v6;
 
 	if (ire == NULL)
@@ -199,6 +199,7 @@ ip_rts_rtmsg(int type, ire_t *ire, int error, ip_stack_t *ipst)
 	    ire->ire_ipversion == IPV6_VERSION);
 
 	ASSERT(!(ire->ire_type & IRE_IF_CLONE));
+	mp = NULL;
 
 	if (ire->ire_flags & RTF_SETSRC)
 		rtm_addrs |= RTA_SRC;
@@ -306,10 +307,14 @@ ip_rts_request_common(mblk_t *mp, conn_t *connp, cred_t *ioc_cr)
 	ts_label_t	*tsl = NULL;
 	zoneid_t	zoneid;
 	ip_stack_t	*ipst;
-	ill_t   	*ill = NULL;
+	ill_t		*ill = NULL;
 
 	zoneid = connp->conn_zoneid;
 	ipst = connp->conn_netstack->netstack_ip;
+	net_mask = 0;
+	src_addr = 0;
+	dst_addr = 0;
+	gw_addr = 0;
 
 	if (mp->b_cont != NULL && !pullupmsg(mp, -1)) {
 		freemsg(mp);
@@ -1239,6 +1244,9 @@ rts_rtmget(mblk_t *mp, ire_t *ire, ire_t *ifire, const in6_addr_t *setsrc,
 	ipaddr_t	v4setsrc;
 
 	rtm = (rt_msghdr_t *)mp->b_rptr;
+	ifaddr = 0;
+	brdaddr = 0;
+	rtm_flags = 0;
 
 	/*
 	 * Find the ill used to send packets. This will be NULL in case
@@ -1406,7 +1414,7 @@ rts_setmetrics(ire_t *ire, uint_t which, rt_metrics_t *metrics)
 	ill_t		*ill;
 	ifrt_t		*ifrt;
 	mblk_t		*mp;
-	in6_addr_t	gw_addr_v6;
+	in6_addr_t	gw_addr_v6 = { 0 };
 
 	/* Need to add back some metrics to the IRE? */
 	/*
@@ -1422,6 +1430,7 @@ rts_setmetrics(ire_t *ire, uint_t which, rt_metrics_t *metrics)
 	 * <net/route.h> says: rmx_rtt and rmx_rttvar are stored as
 	 * microseconds.
 	 */
+	rtt = 0;
 	if (which & RTV_RTT)
 		rtt = metrics->rmx_rtt / 1000;
 	if (which & RTV_RTTVAR)

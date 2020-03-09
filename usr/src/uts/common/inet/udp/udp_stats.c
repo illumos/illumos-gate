@@ -93,7 +93,12 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl, boolean_t legacy_req)
 	 */
 	mp2ctl = copymsg(mpctl);
 
-	mp_conn_ctl = mp_attr_ctl = mp6_conn_ctl = NULL;
+	mp6_info_ctl = NULL;
+	mp6_attr_ctl = NULL;
+	mp6_conn_ctl = NULL;
+	mp_info_ctl = NULL;
+	mp_attr_ctl = NULL;
+	mp_conn_ctl = NULL;
 	if (mpctl == NULL ||
 	    (mpdata = mpctl->b_cont) == NULL ||
 	    (mp_conn_ctl = copymsg(mpctl)) == NULL ||

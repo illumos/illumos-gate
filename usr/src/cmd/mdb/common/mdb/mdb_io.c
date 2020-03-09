@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc. All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -1777,6 +1777,27 @@ mdb_iob_snprintf(char *buf, size_t nbytes, const char *format, ...)
 	return (nbytes);
 }
 
+/*
+ * Return how many bytes we can copy into our buffer, limited by either cols or
+ * bufsiz depending on whether AUTOWRAP is on.  Note that typically,
+ * mdb_iob_set_autowrap() will have already checked for an existing
+ * "->iob_nbytes > ->iob_cols" situation, but we double check here anyway.
+ */
+static size_t
+iob_bufleft(mdb_iob_t *iob)
+{
+	if (IOB_AUTOWRAP(iob)) {
+		if (iob->iob_cols < iob->iob_nbytes) {
+			mdb_iob_nl(iob);
+			ASSERT(iob->iob_cols >= iob->iob_nbytes);
+		}
+		return (iob->iob_cols - iob->iob_nbytes);
+	}
+
+	ASSERT(iob->iob_bufsiz >= iob->iob_nbytes);
+	return (iob->iob_bufsiz - iob->iob_nbytes);
+}
+
 void
 mdb_iob_nputs(mdb_iob_t *iob, const char *s, size_t nbytes)
 {
@@ -1810,20 +1831,11 @@ mdb_iob_nputs(mdb_iob_t *iob, const char *s, size_t nbytes)
 	}
 
 	/*
-	 * For a given string component, we determine how many bytes (n) we can
-	 * copy into our buffer (limited by either cols or bufsiz depending
-	 * on whether AUTOWRAP is on), copy a chunk into the buffer, and
+	 * For a given string component, we copy a chunk into the buffer, and
 	 * flush the buffer if we reach the end of a line.
 	 */
 	while (nleft != 0) {
-		if (IOB_AUTOWRAP(iob)) {
-			ASSERT(iob->iob_cols >= iob->iob_nbytes);
-			n = iob->iob_cols - iob->iob_nbytes;
-		} else {
-			ASSERT(iob->iob_bufsiz >= iob->iob_nbytes);
-			n = iob->iob_bufsiz - iob->iob_nbytes;
-		}
-
+		n = iob_bufleft(iob);
 		m = MIN(nleft, n); /* copy at most n bytes in this pass */
 
 		bcopy(q, iob->iob_bufp, m);
@@ -1884,14 +1896,7 @@ mdb_iob_fill(mdb_iob_t *iob, int c, size_t nfill)
 	ASSERT(iob->iob_flags & MDB_IOB_WRONLY);
 
 	while (nfill != 0) {
-		if (IOB_AUTOWRAP(iob)) {
-			ASSERT(iob->iob_cols >= iob->iob_nbytes);
-			n = iob->iob_cols - iob->iob_nbytes;
-		} else {
-			ASSERT(iob->iob_bufsiz >= iob->iob_nbytes);
-			n = iob->iob_bufsiz - iob->iob_nbytes;
-		}
-
+		n = iob_bufleft(iob);
 		m = MIN(nfill, n); /* fill at most n bytes in this pass */
 
 		for (i = 0; i < m; i++)
@@ -2169,6 +2174,26 @@ mdb_iob_stack_size(mdb_iob_stack_t *stk)
 }
 
 /*
+ * This only enables autowrap for iobs that are already autowrap themselves such
+ * as mdb.m_out typically.
+ *
+ * Note that we might be the middle of the iob buffer at this point, and
+ * specifically, iob->iob_nbytes could be more than iob->iob_cols.  As that's
+ * not a valid situation, we may need to do an autowrap *now*.
+ *
+ * In theory, we would need to do this across all MDB_IOB_AUTOWRAP iob's;
+ * instead, we have a failsafe in iob_bufleft().
+ */
+void
+mdb_iob_set_autowrap(mdb_iob_t *iob)
+{
+	mdb.m_flags |= MDB_FL_AUTOWRAP;
+	if (IOB_WRAPNOW(iob, 0))
+		mdb_iob_nl(iob);
+	ASSERT(iob->iob_cols >= iob->iob_nbytes);
+}
+
+/*
  * Stub functions for i/o backend implementors: these stubs either act as
  * pass-through no-ops or return ENOTSUP as appropriate.
  */
@@ -2267,14 +2292,14 @@ no_io_resume(mdb_io_t *io)
 /*
  * Iterate over the varargs. The first item indicates the mode:
  * MDB_TBL_PRNT
- * 	pull out the next vararg as a const char * and pass it and the
- * 	remaining varargs to iob_doprnt; if we want to print the column,
- * 	direct the output to mdb.m_out otherwise direct it to mdb.m_null
+ *	pull out the next vararg as a const char * and pass it and the
+ *	remaining varargs to iob_doprnt; if we want to print the column,
+ *	direct the output to mdb.m_out otherwise direct it to mdb.m_null
  *
  * MDB_TBL_FUNC
- * 	pull out the next vararg as type mdb_table_print_f and the
- * 	following one as a void * argument to the function; call the
- * 	function with the given argument if we want to print the column
+ *	pull out the next vararg as type mdb_table_print_f and the
+ *	following one as a void * argument to the function; call the
+ *	function with the given argument if we want to print the column
  *
  * The second item indicates the flag; if the flag is set in the flags
  * argument, then the column is printed. A flag value of 0 indicates

@@ -1909,6 +1909,7 @@ ipmp_phyint_join_grp(phyint_t *phyi, ipmp_grp_t *grp)
 
 	ASSERT(IAM_WRITER_IPSQ(ipsq));
 	ASSERT(phyi->phyint_illv4 != NULL || phyi->phyint_illv6 != NULL);
+	ill = NULL;
 
 	/*
 	 * Send routing socket messages indicating that the phyint's ills

@@ -25,7 +25,7 @@
 
 /*
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright (c) 2014 Nexenta Systems, Inc. All rights reserved.
  */
 
@@ -931,6 +931,30 @@ print_bitfield(ulong_t off, printarg_t *pap, ctf_encoding_t *ep)
 }
 
 /*
+ * We want to print an escaped char as e.g. '\0'. We don't use mdb_fmt_print()
+ * as it won't get auto-wrap right here (although even now, we don't include any
+ * trailing comma).
+ */
+static int
+print_char_val(mdb_tgt_addr_t addr, printarg_t *pap)
+{
+	char cval;
+	char *s;
+
+	if (mdb_tgt_aread(pap->pa_tgt, pap->pa_as, &cval, 1, addr) != 1)
+		return (1);
+
+	if (mdb.m_flags & MDB_FL_ADB)
+		s = strchr2adb(&cval, 1);
+	else
+		s = strchr2esc(&cval, 1);
+
+	mdb_printf("'%s'", s);
+	strfree(s);
+	return (0);
+}
+
+/*
  * Print out a character or integer value.  We use some simple heuristics,
  * described below, to determine the appropriate radix to use for output.
  */
@@ -971,14 +995,8 @@ print_int_val(const char *type, ctf_encoding_t *ep, ulong_t off,
 	if (size > 8 || (ep->cte_bits % NBBY) != 0 || (size & (size - 1)) != 0)
 		return (print_bitfield(off, pap, ep));
 
-	if (IS_CHAR(*ep)) {
-		mdb_printf("'");
-		if (mdb_fmt_print(pap->pa_tgt, pap->pa_as,
-		    addr, 1, 'C') == addr)
-			return (1);
-		mdb_printf("'");
-		return (0);
-	}
+	if (IS_CHAR(*ep))
+		return (print_char_val(addr, pap));
 
 	if (mdb_tgt_aread(pap->pa_tgt, pap->pa_as, &u.i8, size, addr) != size) {
 		mdb_warn("failed to read %lu bytes at %llx",

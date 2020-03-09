@@ -1787,7 +1787,7 @@ tcp_send(tcp_t *tcp, const int mss, const int total_hdr_len,
     uint32_t *snxt, int *tail_unsent, mblk_t **xmit_tail, mblk_t *local_time)
 {
 	int		num_lso_seg = 1;
-	uint_t		lso_usable;
+	uint_t		lso_usable = 0;
 	boolean_t	do_lso_send = B_FALSE;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	conn_t		*connp = tcp->tcp_connp;

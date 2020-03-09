@@ -2943,6 +2943,8 @@ nce_update(ncec_t *ncec, uint16_t new_state, uchar_t *new_ll_addr)
 		ASSERT(ncec->ncec_lladdr != NULL || new_state == ND_INITIAL ||
 		    new_state == ND_INCOMPLETE);
 	}
+
+	tid = 0;
 	if (need_stop_timer || (ncec->ncec_flags & NCE_F_STATIC)) {
 		tid = ncec->ncec_timeout_id;
 		ncec->ncec_timeout_id = 0;
@@ -4433,6 +4435,7 @@ nce_resolve_src(ncec_t *ncec, in6_addr_t *src)
 
 	ASSERT(src != NULL);
 	ASSERT(IN6_IS_ADDR_UNSPECIFIED(src));
+	src4 = 0;
 	src6 = *src;
 	if (is_myaddr) {
 		src6 = ncec->ncec_addr;
@@ -4641,6 +4644,7 @@ nce_add_common(ill_t *ill, uchar_t *hw_addr, uint_t hw_addr_len,
 		ndp = ill->ill_ipst->ips_ndp4;
 
 	*retnce = NULL;
+	state = 0;
 
 	ASSERT(MUTEX_HELD(&ndp->ndp_g_lock));
 

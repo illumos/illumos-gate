@@ -291,6 +291,7 @@ tcp_ioctl_abort_bucket(tcp_ioc_abort_conn_t *acp, int index, int *count,
 
 startover:
 	nmatch = 0;
+	last = NULL;
 
 	mutex_enter(&connfp->connf_lock);
 	for (tconnp = connfp->connf_head; tconnp != NULL;

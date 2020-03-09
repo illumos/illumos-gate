@@ -704,6 +704,7 @@ f kernel/drv/amd64/log 0755 root sys
 f kernel/drv/amd64/lsimega 0755 root sys
 f kernel/drv/amd64/marvell88sx 0755 root sys
 f kernel/drv/amd64/mega_sas 0755 root sys
+f kernel/drv/amd64/mlxcx 0755 root sys
 f kernel/drv/amd64/mm 0755 root sys
 f kernel/drv/amd64/mpt 0755 root sys
 f kernel/drv/amd64/mpt_sas 0755 root sys
@@ -872,6 +873,7 @@ f kernel/drv/lofi.conf 0644 root sys
 f kernel/drv/log.conf 0644 root sys
 f kernel/drv/lsimega.conf 0644 root sys
 f kernel/drv/mega_sas.conf 0644 root sys
+f kernel/drv/mlxcx.conf 0644 root sys
 f kernel/drv/mm.conf 0644 root sys
 f kernel/drv/mpt.conf 0644 root sys
 f kernel/drv/mpt_sas.conf 0644 root sys
@@ -5732,6 +5734,7 @@ f usr/lib/fm/dict/FMD.dict 0444 root bin
 f usr/lib/fm/dict/FMNOTIFY.dict 0444 root bin
 f usr/lib/fm/dict/GMCA.dict 0444 root bin
 f usr/lib/fm/dict/INTEL.dict 0444 root bin
+f usr/lib/fm/dict/NIC.dict 0444 root bin
 f usr/lib/fm/dict/NXGE.dict 0444 root bin
 f usr/lib/fm/dict/PCI.dict 0444 root bin
 f usr/lib/fm/dict/PCIEX.dict 0444 root bin
@@ -5747,6 +5750,7 @@ d usr/lib/fm/eft 0755 root bin
 f usr/lib/fm/eft/disk.eft 0444 root bin
 f usr/lib/fm/eft/neptune_xaui.eft 0444 root bin
 f usr/lib/fm/eft/neptune_xfp.eft 0444 root bin
+f usr/lib/fm/eft/nic.eft 0444 root bin
 f usr/lib/fm/eft/pci.eft 0444 root bin
 f usr/lib/fm/eft/pciex.eft 0444 root bin
 f usr/lib/fm/eft/pciexrc.eft 0444 root bin
@@ -7002,6 +7006,8 @@ f usr/lib/locale/C/LC_MESSAGES/GMCA.mo 0444 root bin
 f usr/lib/locale/C/LC_MESSAGES/GMCA.po 0644 root bin
 f usr/lib/locale/C/LC_MESSAGES/INTEL.mo 0444 root bin
 f usr/lib/locale/C/LC_MESSAGES/INTEL.po 0644 root bin
+f usr/lib/locale/C/LC_MESSAGES/NIC.mo 0444 root bin
+f usr/lib/locale/C/LC_MESSAGES/NIC.po 0644 root bin
 f usr/lib/locale/C/LC_MESSAGES/NXGE.mo 0444 root bin
 f usr/lib/locale/C/LC_MESSAGES/NXGE.po 0644 root bin
 f usr/lib/locale/C/LC_MESSAGES/PCI.mo 0444 root bin
@@ -19537,6 +19543,7 @@ f usr/share/man/man7d/lofi.7d 0444 root bin
 f usr/share/man/man7d/log.7d 0444 root bin
 f usr/share/man/man7d/mega_sas.7d 0444 root bin
 f usr/share/man/man7d/mem.7d 0444 root bin
+f usr/share/man/man7d/mlxcx.7d 0444 root bin
 f usr/share/man/man7d/mpt_sas.7d 0444 root bin
 f usr/share/man/man7d/mr_sas.7d 0444 root bin
 f usr/share/man/man7d/msglog.7d 0444 root bin

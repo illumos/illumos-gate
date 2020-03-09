@@ -324,7 +324,7 @@ tcp_bind_select_lport(tcp_t *tcp, in_port_t *requested_port_ptr,
     boolean_t bind_to_req_port_only, cred_t *cr)
 {
 	in_port_t	mlp_port;
-	mlp_type_t 	addrtype, mlptype;
+	mlp_type_t	addrtype, mlptype;
 	boolean_t	user_specified;
 	in_port_t	allocated_port;
 	in_port_t	requested_port = *requested_port_ptr;
@@ -333,6 +333,7 @@ tcp_bind_select_lport(tcp_t *tcp, in_port_t *requested_port_ptr,
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	in6_addr_t	v6addr = connp->conn_laddr_v6;
 
+	zone = NULL;
 	/*
 	 * XXX It's up to the caller to specify bind_to_req_port_only or not.
 	 */
@@ -697,7 +698,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 		if (connp->conn_anon_priv_bind) {
 			/*
 			 * loopmax =
-			 * 	(IPPORT_RESERVED-1) - tcp_min_anonpriv_port + 1
+			 *	(IPPORT_RESERVED-1) - tcp_min_anonpriv_port + 1
 			 */
 			loopmax = IPPORT_RESERVED -
 			    tcps->tcps_min_anonpriv_port;

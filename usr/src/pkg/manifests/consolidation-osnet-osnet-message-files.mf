@@ -282,6 +282,7 @@ file path=usr/lib/locale/C/LC_MESSAGES/FMD.po
 file path=usr/lib/locale/C/LC_MESSAGES/FMNOTIFY.po
 file path=usr/lib/locale/C/LC_MESSAGES/GMCA.po
 file path=usr/lib/locale/C/LC_MESSAGES/INTEL.po
+file path=usr/lib/locale/C/LC_MESSAGES/NIC.po
 file path=usr/lib/locale/C/LC_MESSAGES/NXGE.po
 file path=usr/lib/locale/C/LC_MESSAGES/PCI.po
 file path=usr/lib/locale/C/LC_MESSAGES/PCIEX.po

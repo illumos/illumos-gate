@@ -739,6 +739,11 @@ rawip_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	}
 
 	ASSERT(sa != NULL && len != 0);
+	sin = NULL;
+	sin6 = NULL;
+	dstport = 0;
+	flowinfo = 0;
+	v4dst = INADDR_ANY;
 
 	/*
 	 * Determine packet type based on type of address passed in
@@ -3592,6 +3597,7 @@ icmp_output_ancillary(conn_t *connp, sin_t *sin, sin6_t *sin6, mblk_t *mp,
 		}
 	} else {
 		/* Connected case */
+		dstport = connp->conn_fport;
 		v6dst = connp->conn_faddr_v6;
 		flowinfo = connp->conn_flowinfo;
 	}
