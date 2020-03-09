@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2020, the University of Queensland
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -25,6 +26,11 @@
 #include <sys/mac_provider.h>
 
 #include <mlxcx.h>
+
+/*
+ * CTASSERT(s) to cover bad values which would induce bugs.
+ */
+CTASSERT(MLXCX_CQ_LWM_GAP >= MLXCX_CQ_HWM_GAP);
 
 void
 mlxcx_intr_teardown(mlxcx_t *mlxp)
@@ -187,6 +193,31 @@ mlxcx_cq_next(mlxcx_completion_queue_t *mlcq)
 	ddi_fm_dma_err_clear(mlcq->mlcq_dma.mxdb_dma_handle, DDI_FME_VERSION);
 
 	return (NULL);
+}
+
+void
+mlxcx_update_cqci(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq)
+{
+	ddi_fm_error_t err;
+	uint_t try = 0;
+
+	mlcq->mlcq_doorbell->mlcqd_update_ci = to_be24(mlcq->mlcq_cc);
+
+retry:
+	MLXCX_DMA_SYNC(mlcq->mlcq_doorbell_dma, DDI_DMA_SYNC_FORDEV);
+	ddi_fm_dma_err_get(mlcq->mlcq_doorbell_dma.mxdb_dma_handle, &err,
+	    DDI_FME_VERSION);
+	if (err.fme_status != DDI_FM_OK) {
+		if (try++ < mlxcx_doorbell_tries) {
+			ddi_fm_dma_err_clear(
+			    mlcq->mlcq_doorbell_dma.mxdb_dma_handle,
+			    DDI_FME_VERSION);
+			goto retry;
+		} else {
+			ddi_fm_service_impact(mlxp->mlx_dip, DDI_SERVICE_LOST);
+			return;
+		}
+	}
 }
 
 void
@@ -538,14 +569,15 @@ mlxcx_intr_0(caddr_t arg, caddr_t arg2)
 	if (!(mleq->mleq_state & MLXCX_EQ_ALLOC) ||
 	    !(mleq->mleq_state & MLXCX_EQ_CREATED) ||
 	    (mleq->mleq_state & MLXCX_EQ_DESTROYED)) {
-		mlxcx_warn(mlxp, "int0 on bad eq state");
+		mlxcx_warn(mlxp, "int %d on bad eq state",
+		    mleq->mleq_intr_index);
 		mutex_exit(&mleq->mleq_mtx);
 		return (DDI_INTR_UNCLAIMED);
 	}
 
 	ent = mlxcx_eq_next(mleq);
 	if (ent == NULL) {
-		mlxcx_warn(mlxp, "spurious int 0?");
+		mlxcx_warn(mlxp, "spurious int %d", mleq->mleq_intr_index);
 		mutex_exit(&mleq->mleq_mtx);
 		return (DDI_INTR_UNCLAIMED);
 	}
@@ -574,8 +606,8 @@ mlxcx_intr_0(caddr_t arg, caddr_t arg2)
 			mlxcx_report_module_error(mlxp, &ent->mleqe_port_mod);
 			break;
 		default:
-			mlxcx_warn(mlxp, "unhandled event 0x%x on int0",
-			    ent->mleqe_event_type);
+			mlxcx_warn(mlxp, "unhandled event 0x%x on int %d",
+			    ent->mleqe_event_type, mleq->mleq_intr_index);
 		}
 	}
 
@@ -591,46 +623,56 @@ mlxcx_intr_0(caddr_t arg, caddr_t arg2)
 	return (DDI_INTR_CLAIMED);
 }
 
-mblk_t *
-mlxcx_rx_poll(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq, size_t bytelim)
+static boolean_t
+mlxcx_process_cq(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq, mblk_t **mpp,
+    size_t bytelim)
 {
-	mlxcx_buffer_t *buf;
-	mblk_t *mp, *cmp, *nmp;
+	mlxcx_work_queue_t *wq = mlcq->mlcq_wq;
 	mlxcx_completionq_ent_t *cent;
+	mblk_t *mp, *cmp, *nmp;
+	mlxcx_buffer_t *buf;
+	boolean_t found, added;
 	size_t bytes = 0;
-	boolean_t found;
+	uint_t rx_frames = 0;
+	uint_t comp_cnt = 0;
+	int64_t wqebbs, bufcnt;
 
-	ASSERT(mutex_owned(&mlcq->mlcq_mtx));
-
-	ASSERT(mlcq->mlcq_wq != NULL);
-	ASSERT3U(mlcq->mlcq_wq->mlwq_type, ==, MLXCX_WQ_TYPE_RECVQ);
+	*mpp = NULL;
 
 	if (!(mlcq->mlcq_state & MLXCX_CQ_ALLOC) ||
 	    !(mlcq->mlcq_state & MLXCX_CQ_CREATED) ||
 	    (mlcq->mlcq_state & MLXCX_CQ_DESTROYED) ||
 	    (mlcq->mlcq_state & MLXCX_CQ_TEARDOWN)) {
-		return (NULL);
+		return (B_FALSE);
 	}
-
-	ASSERT(mlcq->mlcq_state & MLXCX_CQ_POLLING);
 
 	nmp = cmp = mp = NULL;
 
-	cent = mlxcx_cq_next(mlcq);
-	for (; cent != NULL; cent = mlxcx_cq_next(mlcq)) {
+	wqebbs = 0;
+	bufcnt = 0;
+	for (cent = mlxcx_cq_next(mlcq); cent != NULL;
+	    cent = mlxcx_cq_next(mlcq)) {
 		/*
 		 * Teardown and ring stop can atomic_or this flag
 		 * into our state if they want us to stop early.
 		 */
 		if (mlcq->mlcq_state & MLXCX_CQ_TEARDOWN)
-			break;
+			return (B_FALSE);
 
+		comp_cnt++;
 		if (cent->mlcqe_opcode == MLXCX_CQE_OP_REQ &&
 		    cent->mlcqe_send_wqe_opcode == MLXCX_WQE_OP_NOP) {
 			/* NOP */
+			atomic_dec_64(&wq->mlwq_wqebb_used);
 			goto nextcq;
 		}
 
+lookagain:
+		/*
+		 * Generally the buffer we're looking for will be
+		 * at the front of the list, so this loop won't
+		 * need to look far.
+		 */
 		buf = list_head(&mlcq->mlcq_buffers);
 		found = B_FALSE;
 		while (buf != NULL) {
@@ -641,35 +683,117 @@ mlxcx_rx_poll(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq, size_t bytelim)
 			}
 			buf = list_next(&mlcq->mlcq_buffers, buf);
 		}
+
 		if (!found) {
+			/*
+			 * If there's any buffers waiting on the
+			 * buffers_b list, then merge those into
+			 * the main list and have another look.
+			 *
+			 * The wq enqueue routines push new buffers
+			 * into buffers_b so that they can avoid
+			 * taking the mlcq_mtx and blocking us for
+			 * every single packet.
+			 */
+			added = B_FALSE;
+			mutex_enter(&mlcq->mlcq_bufbmtx);
+			if (!list_is_empty(&mlcq->mlcq_buffers_b)) {
+				list_move_tail(&mlcq->mlcq_buffers,
+				    &mlcq->mlcq_buffers_b);
+				added = B_TRUE;
+			}
+			mutex_exit(&mlcq->mlcq_bufbmtx);
+			if (added)
+				goto lookagain;
+
 			buf = list_head(&mlcq->mlcq_buffers);
 			mlxcx_warn(mlxp, "got completion on CQ %x but "
 			    "no buffer matching wqe found: %x (first "
 			    "buffer counter = %x)", mlcq->mlcq_num,
 			    from_be16(cent->mlcqe_wqe_counter),
-			    buf == NULL ? UINT32_MAX : buf->mlb_wqe_index);
+			    buf == NULL ? UINT32_MAX :
+			    buf->mlb_wqe_index);
 			mlxcx_fm_ereport(mlxp, DDI_FM_DEVICE_INVAL_STATE);
 			goto nextcq;
 		}
-		list_remove(&mlcq->mlcq_buffers, buf);
-		atomic_dec_64(&mlcq->mlcq_bufcnt);
 
-		nmp = mlxcx_rx_completion(mlxp, mlcq, cent, buf);
-		if (nmp != NULL) {
+		/*
+		 * The buf is likely to be freed below, count this now.
+		 */
+		wqebbs += buf->mlb_wqebbs;
+
+		list_remove(&mlcq->mlcq_buffers, buf);
+		bufcnt++;
+
+		switch (mlcq->mlcq_wq->mlwq_type) {
+		case MLXCX_WQ_TYPE_SENDQ:
+			mlxcx_tx_completion(mlxp, mlcq, cent, buf);
+			break;
+		case MLXCX_WQ_TYPE_RECVQ:
+			nmp = mlxcx_rx_completion(mlxp, mlcq, cent, buf);
 			bytes += from_be32(cent->mlcqe_byte_cnt);
-			if (cmp != NULL) {
-				cmp->b_next = nmp;
-				cmp = nmp;
-			} else {
-				mp = cmp = nmp;
+			if (nmp != NULL) {
+				if (cmp != NULL) {
+					cmp->b_next = nmp;
+					cmp = nmp;
+				} else {
+					mp = cmp = nmp;
+				}
+
+				rx_frames++;
 			}
+			break;
+		}
+
+		/*
+		 * Update the consumer index with what has been processed,
+		 * followed by driver counters. It is important to tell the
+		 * hardware first, otherwise when we throw more packets at
+		 * it, it may get an overflow error.
+		 * We do this whenever we've processed enough to bridge the
+		 * high->low water mark.
+		 */
+		if (bufcnt > (MLXCX_CQ_LWM_GAP - MLXCX_CQ_HWM_GAP)) {
+			mlxcx_update_cqci(mlxp, mlcq);
+			/*
+			 * Both these variables are incremented using
+			 * atomics as they are modified in other code paths
+			 * (Eg during tx) which hold different locks.
+			 */
+			atomic_add_64(&mlcq->mlcq_bufcnt, -bufcnt);
+			atomic_add_64(&wq->mlwq_wqebb_used, -wqebbs);
+			wqebbs = 0;
+			bufcnt = 0;
+			comp_cnt = 0;
 		}
 nextcq:
-		mlcq->mlcq_doorbell->mlcqd_update_ci = to_be24(mlcq->mlcq_cc);
-
-		if (bytelim != 0 && bytes > bytelim)
+		if (rx_frames > mlxp->mlx_props.mldp_rx_per_cq ||
+		    (bytelim != 0 && bytes > bytelim))
 			break;
 	}
+
+	if (comp_cnt > 0) {
+		mlxcx_update_cqci(mlxp, mlcq);
+		atomic_add_64(&mlcq->mlcq_bufcnt, -bufcnt);
+		atomic_add_64(&wq->mlwq_wqebb_used, -wqebbs);
+	}
+
+	*mpp = mp;
+	return (B_TRUE);
+}
+
+
+mblk_t *
+mlxcx_rx_poll(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq, size_t bytelim)
+{
+	mblk_t *mp = NULL;
+
+	ASSERT(mutex_owned(&mlcq->mlcq_mtx));
+
+	ASSERT(mlcq->mlcq_wq != NULL);
+	ASSERT3U(mlcq->mlcq_wq->mlwq_type, ==, MLXCX_WQ_TYPE_RECVQ);
+
+	(void) mlxcx_process_cq(mlxp, mlcq, &mp, bytelim);
 
 	return (mp);
 }
@@ -680,11 +804,10 @@ mlxcx_intr_n(caddr_t arg, caddr_t arg2)
 	mlxcx_t *mlxp = (mlxcx_t *)arg;
 	mlxcx_event_queue_t *mleq = (mlxcx_event_queue_t *)arg2;
 	mlxcx_eventq_ent_t *ent;
-	mlxcx_completionq_ent_t *cent;
 	mlxcx_completion_queue_t *mlcq, probe;
-	mlxcx_buffer_t *buf;
-	mblk_t *mp, *cmp, *nmp;
-	boolean_t found, tellmac = B_FALSE, added;
+	mlxcx_work_queue_t *mlwq;
+	mblk_t *mp = NULL;
+	boolean_t tellmac = B_FALSE;
 
 	mutex_enter(&mleq->mleq_mtx);
 
@@ -729,10 +852,12 @@ mlxcx_intr_n(caddr_t arg, caddr_t arg2)
 		if (mlcq == NULL)
 			continue;
 
+		mlwq = mlcq->mlcq_wq;
+
 		/*
 		 * The polling function might have the mutex and stop us from
-		 * getting the lock here, so we increment the event counter
-		 * atomically from outside.
+		 * getting the lock in mlxcx_process_cq(), so we increment
+		 * the event counter atomically from outside.
 		 *
 		 * This way at the end of polling when we go back to interrupts
 		 * from this CQ, the event counter is still correct.
@@ -746,145 +871,57 @@ mlxcx_intr_n(caddr_t arg, caddr_t arg2)
 
 		if (mutex_tryenter(&mlcq->mlcq_mtx) == 0) {
 			/*
-			 * If we failed to take the mutex because the polling
-			 * function has it, just move on. We don't want to
-			 * block other CQs behind this one.
+			 * If we failed to take the mutex because the
+			 * polling function has it, just move on.
+			 * We don't want to block other CQs behind
+			 * this one.
 			 */
 			if (mlcq->mlcq_state & MLXCX_CQ_POLLING)
-				continue;
+				goto update_eq;
+
 			/* Otherwise we will wait. */
 			mutex_enter(&mlcq->mlcq_mtx);
 		}
 
-		if (!(mlcq->mlcq_state & MLXCX_CQ_ALLOC) ||
-		    !(mlcq->mlcq_state & MLXCX_CQ_CREATED) ||
-		    (mlcq->mlcq_state & MLXCX_CQ_DESTROYED) ||
-		    (mlcq->mlcq_state & MLXCX_CQ_TEARDOWN) ||
-		    (mlcq->mlcq_state & MLXCX_CQ_POLLING)) {
-			mutex_exit(&mlcq->mlcq_mtx);
-			continue;
-		}
-
-		nmp = cmp = mp = NULL;
-		tellmac = B_FALSE;
-
-		cent = mlxcx_cq_next(mlcq);
-		for (; cent != NULL; cent = mlxcx_cq_next(mlcq)) {
+		if ((mlcq->mlcq_state & MLXCX_CQ_POLLING) == 0 &&
+		    mlxcx_process_cq(mlxp, mlcq, &mp, 0)) {
 			/*
-			 * Teardown and ring stop can atomic_or this flag
-			 * into our state if they want us to stop early.
+			 * The ring is not in polling mode and we processed
+			 * some completion queue entries.
 			 */
-			if (mlcq->mlcq_state & MLXCX_CQ_TEARDOWN)
-				break;
-			if (mlcq->mlcq_state & MLXCX_CQ_POLLING)
-				break;
-
-			if (cent->mlcqe_opcode == MLXCX_CQE_OP_REQ &&
-			    cent->mlcqe_send_wqe_opcode == MLXCX_WQE_OP_NOP) {
-				/* NOP */
-				goto nextcq;
-			}
-
-lookagain:
-			/*
-			 * Generally the buffer we're looking for will be
-			 * at the front of the list, so this loop won't
-			 * need to look far.
-			 */
-			buf = list_head(&mlcq->mlcq_buffers);
-			found = B_FALSE;
-			while (buf != NULL) {
-				if ((buf->mlb_wqe_index & UINT16_MAX) ==
-				    from_be16(cent->mlcqe_wqe_counter)) {
-					found = B_TRUE;
-					break;
-				}
-				buf = list_next(&mlcq->mlcq_buffers, buf);
-			}
-			if (!found) {
-				/*
-				 * If there's any buffers waiting on the
-				 * buffers_b list, then merge those into
-				 * the main list and have another look.
-				 *
-				 * The wq enqueue routines push new buffers
-				 * into buffers_b so that they can avoid
-				 * taking the mlcq_mtx and blocking us for
-				 * every single packet.
-				 */
-				added = B_FALSE;
-				mutex_enter(&mlcq->mlcq_bufbmtx);
-				if (!list_is_empty(&mlcq->mlcq_buffers_b)) {
-					list_move_tail(&mlcq->mlcq_buffers,
-					    &mlcq->mlcq_buffers_b);
-					added = B_TRUE;
-				}
-				mutex_exit(&mlcq->mlcq_bufbmtx);
-				if (added)
-					goto lookagain;
-			}
-			if (!found) {
-				buf = list_head(&mlcq->mlcq_buffers);
-				mlxcx_warn(mlxp, "got completion on CQ %x but "
-				    "no buffer matching wqe found: %x (first "
-				    "buffer counter = %x)", mlcq->mlcq_num,
-				    from_be16(cent->mlcqe_wqe_counter),
-				    buf == NULL ? UINT32_MAX :
-				    buf->mlb_wqe_index);
-				mlxcx_fm_ereport(mlxp,
-				    DDI_FM_DEVICE_INVAL_STATE);
-				goto nextcq;
-			}
-			list_remove(&mlcq->mlcq_buffers, buf);
-			atomic_dec_64(&mlcq->mlcq_bufcnt);
-
-			switch (mlcq->mlcq_wq->mlwq_type) {
-			case MLXCX_WQ_TYPE_SENDQ:
-				mlxcx_tx_completion(mlxp, mlcq, cent, buf);
-				break;
-			case MLXCX_WQ_TYPE_RECVQ:
-				nmp = mlxcx_rx_completion(mlxp, mlcq, cent,
-				    buf);
-				if (nmp != NULL) {
-					if (cmp != NULL) {
-						cmp->b_next = nmp;
-						cmp = nmp;
-					} else {
-						mp = cmp = nmp;
-					}
-				}
-				break;
-			}
-
-nextcq:
-			/*
-			 * Update the "doorbell" consumer counter for the queue
-			 * every time. Unlike a UAR write, this is relatively
-			 * cheap and doesn't require us to go out on the bus
-			 * straight away (since it's our memory).
-			 */
-			mlcq->mlcq_doorbell->mlcqd_update_ci =
-			    to_be24(mlcq->mlcq_cc);
-
-			if ((mlcq->mlcq_state & MLXCX_CQ_BLOCKED_MAC) &&
+			if ((mlcq->mlcq_state & MLXCX_CQ_BLOCKED_MAC) != 0 &&
 			    mlcq->mlcq_bufcnt < mlcq->mlcq_buflwm) {
-				mlcq->mlcq_state &= ~MLXCX_CQ_BLOCKED_MAC;
+				atomic_and_uint(&mlcq->mlcq_state,
+				    ~MLXCX_CQ_BLOCKED_MAC);
 				tellmac = B_TRUE;
 			}
+
+			if ((mlwq->mlwq_state & MLXCX_WQ_BLOCKED_MAC) != 0 &&
+			    mlwq->mlwq_wqebb_used < mlwq->mlwq_buflwm) {
+				atomic_and_uint(&mlwq->mlwq_state,
+				    ~MLXCX_WQ_BLOCKED_MAC);
+				tellmac = B_TRUE;
+			}
+
+			mlxcx_arm_cq(mlxp, mlcq);
+
+			mutex_exit(&mlcq->mlcq_mtx);
+
+			if (tellmac) {
+				mac_tx_ring_update(mlxp->mlx_mac_hdl,
+				    mlcq->mlcq_mac_hdl);
+				tellmac = B_FALSE;
+			}
+
+			if (mp != NULL) {
+				mac_rx_ring(mlxp->mlx_mac_hdl,
+				    mlcq->mlcq_mac_hdl, mp, mlcq->mlcq_mac_gen);
+			}
+		} else {
+			mutex_exit(&mlcq->mlcq_mtx);
 		}
 
-		mlxcx_arm_cq(mlxp, mlcq);
-		mutex_exit(&mlcq->mlcq_mtx);
-
-		if (tellmac) {
-			mac_tx_ring_update(mlxp->mlx_mac_hdl,
-			    mlcq->mlcq_mac_hdl);
-		}
-		if (mp != NULL) {
-			mac_rx_ring(mlxp->mlx_mac_hdl, mlcq->mlcq_mac_hdl,
-			    mp, mlcq->mlcq_mac_gen);
-		}
-
+update_eq:
 		/*
 		 * Updating the consumer counter for an EQ requires a write
 		 * to the UAR, which is possibly expensive.

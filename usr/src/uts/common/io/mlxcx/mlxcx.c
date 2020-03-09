@@ -12,6 +12,7 @@
 /*
  * Copyright 2020, The University of Queensland
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -453,6 +454,61 @@ uint_t mlxcx_doorbell_tries = MLXCX_DOORBELL_TRIES_DFLT;
 uint_t mlxcx_stuck_intr_count = MLXCX_STUCK_INTR_COUNT_DFLT;
 
 static void
+mlxcx_load_prop_defaults(mlxcx_t *mlxp)
+{
+	mlxcx_drv_props_t *p = &mlxp->mlx_props;
+	mlxcx_port_t *port = &mlxp->mlx_ports[0];
+
+	VERIFY((mlxp->mlx_attach & MLXCX_ATTACH_PORTS) != 0);
+	VERIFY((mlxp->mlx_attach & (MLXCX_ATTACH_CQS | MLXCX_ATTACH_WQS)) == 0);
+
+	/*
+	 * Currently we have different queue size defaults for two
+	 * categories of queues. One set for devices which support a
+	 * maximum speed of 10Gb/s, and another for those above that.
+	 */
+	if ((port->mlp_max_proto & (MLXCX_PROTO_25G | MLXCX_PROTO_40G |
+	    MLXCX_PROTO_50G | MLXCX_PROTO_100G)) != 0) {
+		p->mldp_cq_size_shift_default = MLXCX_CQ_SIZE_SHIFT_25G;
+		p->mldp_rq_size_shift_default = MLXCX_RQ_SIZE_SHIFT_25G;
+		p->mldp_sq_size_shift_default = MLXCX_SQ_SIZE_SHIFT_25G;
+	} else if ((port->mlp_max_proto & (MLXCX_PROTO_100M | MLXCX_PROTO_1G |
+	    MLXCX_PROTO_10G)) != 0) {
+		p->mldp_cq_size_shift_default = MLXCX_CQ_SIZE_SHIFT_DFLT;
+		p->mldp_rq_size_shift_default = MLXCX_RQ_SIZE_SHIFT_DFLT;
+		p->mldp_sq_size_shift_default = MLXCX_SQ_SIZE_SHIFT_DFLT;
+	} else {
+		mlxcx_warn(mlxp, "Encountered a port with a speed we don't "
+		    "recognize. Proto: 0x%x", port->mlp_max_proto);
+		p->mldp_cq_size_shift_default = MLXCX_CQ_SIZE_SHIFT_DFLT;
+		p->mldp_rq_size_shift_default = MLXCX_RQ_SIZE_SHIFT_DFLT;
+		p->mldp_sq_size_shift_default = MLXCX_SQ_SIZE_SHIFT_DFLT;
+	}
+}
+
+/*
+ * Properties which may have different defaults based on hardware
+ * characteristics.
+ */
+static void
+mlxcx_load_model_props(mlxcx_t *mlxp)
+{
+	mlxcx_drv_props_t *p = &mlxp->mlx_props;
+
+	mlxcx_load_prop_defaults(mlxp);
+
+	p->mldp_cq_size_shift = ddi_getprop(DDI_DEV_T_ANY, mlxp->mlx_dip,
+	    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS, "cq_size_shift",
+	    p->mldp_cq_size_shift_default);
+	p->mldp_sq_size_shift = ddi_getprop(DDI_DEV_T_ANY, mlxp->mlx_dip,
+	    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS, "sq_size_shift",
+	    p->mldp_sq_size_shift_default);
+	p->mldp_rq_size_shift = ddi_getprop(DDI_DEV_T_ANY, mlxp->mlx_dip,
+	    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS, "rq_size_shift",
+	    p->mldp_rq_size_shift_default);
+}
+
+static void
 mlxcx_load_props(mlxcx_t *mlxp)
 {
 	mlxcx_drv_props_t *p = &mlxp->mlx_props;
@@ -460,16 +516,6 @@ mlxcx_load_props(mlxcx_t *mlxp)
 	p->mldp_eq_size_shift = ddi_getprop(DDI_DEV_T_ANY, mlxp->mlx_dip,
 	    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS, "eq_size_shift",
 	    MLXCX_EQ_SIZE_SHIFT_DFLT);
-	p->mldp_cq_size_shift = ddi_getprop(DDI_DEV_T_ANY, mlxp->mlx_dip,
-	    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS, "cq_size_shift",
-	    MLXCX_CQ_SIZE_SHIFT_DFLT);
-	p->mldp_sq_size_shift = ddi_getprop(DDI_DEV_T_ANY, mlxp->mlx_dip,
-	    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS, "sq_size_shift",
-	    MLXCX_SQ_SIZE_SHIFT_DFLT);
-	p->mldp_rq_size_shift = ddi_getprop(DDI_DEV_T_ANY, mlxp->mlx_dip,
-	    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS, "rq_size_shift",
-	    MLXCX_RQ_SIZE_SHIFT_DFLT);
-
 	p->mldp_cqemod_period_usec = ddi_getprop(DDI_DEV_T_ANY, mlxp->mlx_dip,
 	    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS, "cqemod_period_usec",
 	    MLXCX_CQEMOD_PERIOD_USEC_DFLT);
@@ -521,6 +567,19 @@ mlxcx_load_props(mlxcx_t *mlxp)
 	p->mldp_wq_check_interval_sec = ddi_getprop(DDI_DEV_T_ANY,
 	    mlxp->mlx_dip, DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS,
 	    "wq_check_interval_sec", MLXCX_WQ_CHECK_INTERVAL_SEC_DFLT);
+
+	p->mldp_rx_per_cq = ddi_getprop(DDI_DEV_T_ANY, mlxp->mlx_dip,
+	    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS, "rx_limit_per_completion",
+	    MLXCX_RX_PER_CQ_DEFAULT);
+
+	if (p->mldp_rx_per_cq < MLXCX_RX_PER_CQ_MIN ||
+	    p->mldp_rx_per_cq > MLXCX_RX_PER_CQ_MAX) {
+		mlxcx_warn(mlxp, "!rx_limit_per_completion = %u is "
+		    "out of range. Defaulting to: %d. Valid values are from "
+		    "%d to %d", p->mldp_rx_per_cq, MLXCX_RX_PER_CQ_DEFAULT,
+		    MLXCX_RX_PER_CQ_MIN, MLXCX_RX_PER_CQ_MAX);
+		p->mldp_rx_per_cq = MLXCX_RX_PER_CQ_DEFAULT;
+	}
 }
 
 void
@@ -2594,6 +2653,8 @@ mlxcx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto err;
 	}
 	mlxp->mlx_attach |= MLXCX_ATTACH_PORTS;
+
+	mlxcx_load_model_props(mlxp);
 
 	/*
 	 * Set up, enable and arm the rest of the interrupt EQs which will
