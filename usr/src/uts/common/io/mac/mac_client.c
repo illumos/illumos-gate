@@ -23,6 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2017 RackTop Systems.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -1287,7 +1288,7 @@ mac_addr_random(mac_client_handle_t mch, uint_t prefix_len,
 		    prefix_len, addr_len - prefix_len);
 	}
 
-	*diag = 0;
+	*diag = MAC_DIAG_NONE;
 	return (0);
 }
 
@@ -2550,6 +2551,8 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 	 * argument, only the primary MAC client.
 	 */
 	ASSERT(!((mip->mi_state_flags & MIS_IS_VNIC) && (vid != VLAN_ID_NONE)));
+
+	*diag = MAC_DIAG_NONE;
 
 	/*
 	 * Can't unicast add if the client asked only for minimal datapath

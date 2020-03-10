@@ -16373,6 +16373,7 @@ f usr/share/man/man3lib/libkstat.3lib 0444 root bin
 f usr/share/man/man3lib/libkvm.3lib 0444 root bin
 f usr/share/man/man3lib/libl.3lib 0444 root bin
 f usr/share/man/man3lib/liblgrp.3lib 0444 root bin
+f usr/share/man/man3lib/libm.3lib 0444 root bin
 f usr/share/man/man3lib/libmail.3lib 0444 root bin
 f usr/share/man/man3lib/libmalloc.3lib 0444 root bin
 f usr/share/man/man3lib/libmapmalloc.3lib 0444 root bin
@@ -16382,6 +16383,7 @@ f usr/share/man/man3lib/libmenu.3lib 0444 root bin
 f usr/share/man/man3lib/libmp.3lib 0444 root bin
 s usr/share/man/man3lib/libmpapi.3lib=libMPAPI.3lib
 f usr/share/man/man3lib/libmtmalloc.3lib 0444 root bin
+f usr/share/man/man3lib/libmvec.3lib 0444 root bin
 f usr/share/man/man3lib/libnls.3lib 0444 root bin
 f usr/share/man/man3lib/libnsl.3lib 0444 root bin
 f usr/share/man/man3lib/libnvpair.3lib 0444 root bin

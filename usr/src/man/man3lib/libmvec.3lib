@@ -1,0 +1,91 @@
+'\" te
+.\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2020 Joyent, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH libmvec 3LIB "Feb 27, 2020"
+.SH NAME
+libmvec \- vector math library
+.SH SYNOPSIS
+.nf
+cc [ \fIflag\fR... ] \fIfile\fR... \fB-lmvec\fR [ \fIlibrary\fR... ]
+.fi
+
+.SH DESCRIPTION
+This library contains function to evaluate common mathematical functions for
+several arguments at once. The argument values are specified by one or more
+vectors (arrays) of data, and the corresponding result values are stored in
+another vector.
+.SH INTERFACES
+The shared object \fBlibmvec.so.1\fR provides the public interfaces defined
+below. See \fBIntro\fR(3) for additional information on shared object
+interfaces.
+.sp
+
+.sp
+.TS
+tab(	);
+lw(2.75i) lw(2.75i)
+lw(2.75i) lw(2.75i)
+.
+\fBvatan_\fR	\fBvatanf_\fR
+\fBvatan2_\fR	\fBvatan2f_\fR
+\fBvc_abs_\fR	\fBvc_exp_\fR
+\fBvc_log_\fR	\fBvc_pow_\fR
+\fBvcos_\fR	\fBvcosf_\fR
+\fBvcospi_\fR	\fBvcospif_\fR
+\fBvexp_\fR	\fBvexpf_\fR
+\fBvhypot_\fR	\fBvhypotf_\fR
+\fBvlog_\fR	\fBvlogf_\fR
+\fBvpow_\fR	\fBvpowf_\fR
+\fBvrhypot_\fR	\fBvrhypotf_\fR
+\fBvrsqrt_\fR	\fBvrsqrtf_\fR
+\fBvsin_\fR	\fBvsinf_\fR
+\fBvsincos_\fR	\fBvsincosf_\fR
+\fBvsincospi_\fR	\fBvsincospif_\fR
+\fBvsinpi_\fR	\fBvsinpif_\fR
+\fBvsqrt_\fR	\fBvsqrtf_\fR
+\fBvz_abs_\fR	\fBvz_exp_\fR
+\fBvz_log_\fR	\fBvz_pow_\fR
+.TE
+
+.SH FILES
+.ne 2
+.mk
+.na
+\fB\fB/lib/libmvec.so.1\fR\fR
+.ad
+.RS 24n
+.rt
+shared object
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/lib/64/libmvec.so.1\fR\fR
+.ad
+.RS 24n
+.rt
+64-bit shared object
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab(	) box;
+cw(2.75i) |cw(2.75i)
+lw(2.75i) |lw(2.75i)
+.
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+MT-Level	MT-Safe
+.TE
+
+.SH SEE ALSO
+\fBIntro\fR(3), \fBcomplex.h\fR(3HEAD), \fBlibm\fR(3LIB), \fBattributes\fR(5)

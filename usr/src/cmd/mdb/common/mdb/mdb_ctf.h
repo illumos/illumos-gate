@@ -35,6 +35,7 @@
 
 #ifdef _MDB
 #include <sys/machelf.h>
+#include <mdb/mdb_modapi.h>
 #endif
 
 /*
@@ -159,6 +160,8 @@ extern int mdb_ctf_synthetics_init(void);			/* Internal */
 extern void mdb_ctf_synthetics_fini(void);			/* Internal */
 extern int mdb_ctf_synthetics_from_file(const char *);		/* Internal */
 extern int mdb_ctf_synthetics_to_file(const char *);		/* Internal */
+extern int cmd_typelist(uintptr_t, uint_t, int,			/* Internal */
+    const mdb_arg_t *);
 
 #endif
 

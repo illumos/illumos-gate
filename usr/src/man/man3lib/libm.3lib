@@ -1,0 +1,672 @@
+'\" te
+.\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2020 Joyent, Inc.
+.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.TH libm 3LIB "Feb 27, 2020"
+.SH NAME
+libm \- C math library
+.SH SYNOPSIS
+.nf
+c99 [ \fIflag\fR... ] \fIfile\fR... \fB-lm\fR [ \fIlibrary\fR... ]
+.fi
+
+.SH DESCRIPTION
+Functions in this library provide common elementary mathematical functions and
+floating point environment routines defined by System V, ANSI C, POSIX, and so
+on. See \fBstandards\fR(5). Additional functions in this library provide
+extended support for handling floating point exceptions.
+.SH INTERFACES
+The shared object \fBlibm.so.2\fR provides the public interfaces defined below.
+See \fBIntro\fR(3) for additional information on shared object interfaces.
+.sp
+
+.sp
+.TS
+tab(	);
+lw(2.75i) lw(2.75i)
+lw(2.75i) lw(2.75i)
+.
+\fBacos\fR	\fBacosf\fR
+\fBacosh\fR	\fBacoshf\fR
+\fBacoshl\fR	\fBacosl\fR
+\fBasin\fR	\fBasinf\fR
+\fBasinh\fR	\fBasinhf\fR
+\fBasinhl\fR	\fBasinl\fR
+\fBatan\fR	\fBatan2\fR
+\fBatan2f\fR	\fBatan2l\fR
+\fBatanf\fR	\fBatanh\fR
+\fBatanhf\fR	\fBatanhl\fR
+\fBatanl\fR	\fBcabs\fR
+\fBcabsf\fR	\fBcabsl\fR
+\fBcacos\fR	\fBcacosf\fR
+\fBcacosh\fR	\fBcacoshf\fR
+\fBcacoshl\fR	\fBcacosl\fR
+\fBcarg\fR	\fBcargf\fR
+\fBcargl\fR	\fBcasin\fR
+\fBcasinf\fR	\fBcasinh\fR
+\fBcasinhf\fR	\fBcasinhl\fR
+\fBcasinl\fR	\fBcatan\fR
+\fBcatanf\fR	\fBcatanh\fR
+\fBcatanhf\fR	\fBcatanhl\fR
+\fBcatanl\fR	\fBcbrt\fR
+\fBcbrtf\fR	\fBcbrtl\fR
+\fBccos\fR	\fBccosf\fR
+\fBccosh\fR	\fBccoshf\fR
+\fBccoshl\fR	\fBccosl\fR
+\fBceil\fR	\fBceilf\fR
+\fBceill\fR	\fBcexp\fR
+\fBcexpf\fR	\fBcexpl\fR
+\fBcimag\fR	\fBcimagf\fR
+\fBcimagl\fR	\fBclog\fR
+\fBclogf\fR	\fBclogl\fR
+\fBconj\fR	\fBconjf\fR
+\fBconjl\fR	\fBcopysign\fR
+\fBcopysignf\fR	\fBcopysignl\fR
+\fBcos\fR	\fBcosf\fR
+\fBcosh\fR	\fBcoshf\fR
+\fBcoshl\fR	\fBcosl\fR
+\fBcpow\fR	\fBcpowf\fR
+\fBcpowl\fR	\fBcproj\fR
+\fBcprojf\fR	\fBcprojl\fR
+\fBcreal\fR	\fBcrealf\fR
+\fBcreall\fR	\fBcsin\fR
+\fBcsinf\fR	\fBcsinh\fR
+\fBcsinhf\fR	\fBcsinhl\fR
+\fBcsinl\fR	\fBcsqrt\fR
+\fBcsqrtf\fR	\fBcsqrtl\fR
+\fBctan\fR	\fBctanf\fR
+\fBctanh\fR	\fBctanhf\fR
+\fBctanhl\fR	\fBctanl\fR
+\fBerf\fR	\fBerfc\fR
+\fBerfcf\fR	\fBerfcl\fR
+\fBerff\fR	\fBerfl\fR
+\fBexp\fR	\fBexp2\fR
+\fBexp2f\fR	\fBexp2l\fR
+\fBexpf\fR	\fBexpl\fR
+\fBexpm1\fR	\fBexpm1f\fR
+\fBexpm1l\fR	\fBfabs\fR
+\fBfabsf\fR	\fBfabsl\fR
+\fBfdim\fR	\fBfdimf\fR
+\fBfdiml\fR	\fBfeclearexcept\fR
+\fBfegetenv\fR	\fBfegetexceptflag\fR
+\fBfegetround\fR	\fBfeholdexcept\fR
+\fBferaiseexcept\fR	\fBfesetenv\fR
+\fBfesetexceptflag\fR	\fBfesetround\fR
+\fBfetestexcept\fR	\fBfeupdateenv\fR
+\fBfex_get_handling\fR	\fBfex_get_log\fR
+\fBfex_get_log_depth\fR	\fBfex_getexcepthandler\fR
+\fBfex_log_entry\fR	\fBfex_merge_flags\fR
+\fBfex_set_handling\fR	\fBfex_set_log\fR
+\fBfex_set_log_depth\fR	\fBfex_setexcepthandler\fR
+\fBfloor\fR	\fBfloorf\fR
+\fBfloorl\fR	\fBfma\fR
+\fBfmaf\fR	\fBfmal\fR
+\fBfmax\fR	\fBfmaxf\fR
+\fBfmaxl\fR	\fBfmin\fR
+\fBfminf\fR	\fBfminl\fR
+\fBfmod\fR	\fBfmodf\fR
+\fBfmodl\fR	\fBfrexp\fR
+\fBfrexpf\fR	\fBfrexpl\fR
+\fBgamma\fR	\fBgamma_r\fR
+\fBgammaf\fR	\fBgammaf_r\fR
+\fBgammal\fR	\fBgammal_r\fR
+\fBhypot\fR	\fBhypotf\fR
+\fBhypotl\fR	\fBilogb\fR
+\fBilogbf\fR	\fBilogbl\fR
+\fBisnan\fR	\fBj0\fR
+\fBj0f\fR	\fBj0l\fR
+\fBj1\fR	\fBj1f\fR
+\fBj1l\fR	\fBjn\fR
+\fBjnf\fR	\fBjnl\fR
+\fBldexp\fR	\fBldexpf\fR
+\fBldexpl\fR	\fBlgamma\fR
+\fBlgamma_r\fR	\fBlgammaf\fR
+\fBlgammaf_r\fR	\fBlgammal\fR
+\fBlgammal_r\fR	\fBllrint\fR
+\fBllrintf\fR	\fBllrintl\fR
+\fBllround\fR	\fBllroundf\fR
+\fBllroundl\fR	\fBlog\fR
+\fBlog10\fR	\fBlog10f\fR
+\fBlog10l\fR	\fBlog1p\fR
+\fBlog1pf\fR	\fBlog1pl\fR
+\fBlog2\fR	\fBlog2f\fR
+\fBlog2l\fR	\fBlogb\fR
+\fBlogbf\fR	\fBlogbl\fR
+\fBlogf\fR	\fBlogl\fR
+\fBlrint\fR	\fBlrintf\fR
+\fBlrintl\fR	\fBlround\fR
+\fBlroundf\fR	\fBlroundl\fR
+\fBmatherr\fR	\fBmodf\fR
+\fBmodff\fR	\fBmodfl\fR
+\fBnan\fR	\fBnanf\fR
+\fBnanl\fR	\fBnearbyint\fR
+\fBnearbyintf\fR	\fBnearbyintl\fR
+\fBnextafter\fR	\fBnextafterf\fR
+\fBnextafterl\fR	\fBnexttoward\fR
+\fBnexttowardf\fR	\fBnexttowardl\fR
+\fBpow\fR	\fBpowf\fR
+\fBpowl\fR	\fBremainder\fR
+\fBremainderf\fR	\fBremainderl\fR
+\fBremquo\fR	\fBremquof\fR
+\fBremquol\fR	\fBrint\fR
+\fBrintf\fR	\fBrintl\fR
+\fBround\fR	\fBroundf\fR
+\fBroundl\fR	\fBscalb\fR
+\fBscalbf\fR	\fBscalbl\fR
+\fBscalbln\fR	\fBscalblnf\fR
+\fBscalblnl\fR	\fBscalbn\fR
+\fBscalbnf\fR	\fBscalbnl\fR
+\fBsigngam\fR	\fBsigngamf\fR
+\fBsigngaml\fR	\fBsignificand\fR
+\fBsignificandf\fR	\fBsignificandl\fR
+\fBsin\fR	\fBsincos\fR
+\fBsincosf\fR	\fBsincosl\fR
+\fBsinf\fR	\fBsinh\fR
+\fBsinhf\fR	\fBsinhl\fR
+\fBsinl\fR	\fBsqrt\fR
+\fBsqrtf\fR	\fBsqrtl\fR
+\fBtan\fR	\fBtanf\fR
+\fBtanh\fR	\fBtanhf\fR
+\fBtanhl\fR	\fBtanl\fR
+\fBtgamma\fR	\fBtgammaf\fR
+\fBtgammal\fR	\fBtrunc\fR
+\fBtruncf\fR	\fBtruncl\fR
+\fBy0\fR	\fBy0f\fR
+\fBy0l\fR	\fBy1\fR
+\fBy1f\fR	\fBy1l\fR
+\fByn\fR	\fBynf\fR
+\fBynl\fR	\fB\fR
+.TE
+
+.sp
+.LP
+The following interfaces are unique to the x86 and amd64 versions of this library:
+.sp
+
+.sp
+.TS
+tab(	);
+lw(2.75i) lw(2.75i)
+.
+\fBfegetprec\fR	\fBfesetprec\fR
+.TE
+
+.SH ACCURACY
+ISO/IEC 9899:1999, also known as C99, specifies the functions listed in the
+following tables and states that the accuracy of these functions is
+"implementation-defined". The information below characterizes the accuracy
+of these functions as implemented in \fBlibm.so.2\fR. For each function,
+the tables provide an upper bound on the largest error possible for any
+argument and the largest error actually observed among a large sample of
+arguments. Errors are expressed in "units in the last place", or ulps, relative
+to the exact function value for each argument (regarding the argument as
+exact). Ulps depend on the precision of the floating point format: if \fIy\fR
+is the exact function value, \fIx\fR and \fIx\fR' are adjacent floating point
+numbers such that \fIx\fR < \fIy\fR < \fIx\fR', and \fIx\fR'' is the computed
+function value, then provided \fIx\fR, \fIx\fR', and \fIx\fR'' all lie in the
+same binade, the error in \fIx\fR'' is |\fIy\fR - \fIx\fR''| / |\fIx\fR -
+\fIx\fR'| ulps. In particular, when the error is less than one ulp, the computed
+value is one of the two floating point numbers adjacent to the exact value.
+.sp
+.LP
+The bounds and observed errors listed below apply only in the default floating
+point modes. Specifically, on SPARC, these bounds assume the rounding direction
+is round-to-nearest and non-standard mode is disabled. On x86, the bounds assume
+the rounding direction is round-to-nearest and the rounding precision is
+round-to-64-bits. Moreover, on x86, floating point function values are returned
+in a floating point register in extended double precision format, but the bounds
+below assume that the result value is then stored to memory in the format
+corresponding to the function's type. On amd64, the bounds assume the rounding
+direction in both the x87 floating point control word and the MXCSR is
+round-to-nearest, the rounding precision in the x87 control word is
+round-to-64-bits, and the FTZ and DAZ modes are disabled.
+.sp
+.LP
+The error bounds listed below are believed to be correct, but smaller bounds
+might be proved later. The observed errors are the largest ones currently known,
+but larger errors might be discovered later. Numbers in the notes column refer
+to the notes following the tables.
+.SS "Real Functions"
+.SS "Single precision real functions (SPARC, x86, and amd64)"
+
+.TS
+tab(	);
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+.
+	error bound	largest error
+function	 (ulps)	observed (ulps)	notes
+\fBacosf\fR	1.0	< 1
+\fBacoshf\fR	1.0	< 1
+\fBasinf\fR	1.0	< 1
+\fBasinhf\fR	1.0	< 1
+\fBatanf\fR	1.0	< 1
+\fBatan2f\fR	1.0	< 1
+\fBatanhf\fR	1.0	< 1
+\fBcbrtf\fR	1.0	< 1
+\fBcosf\fR	1.0	< 1
+\fBcoshf\fR	1.0	< 1
+\fBerff\fR	1.0	< 1
+\fBerfcf\fR	1.0	< 1
+\fBexpf\fR	1.0	< 1
+\fBexp2f\fR	1.0	< 1
+\fBexpm1f\fR	1.0	< 1
+\fBhypotf\fR	1.0	< 1
+\fBlgammaf\fR	1.0	< 1
+\fBlogf\fR	1.0	< 1
+\fBlog10f\fR	1.0	< 1
+\fBlog1pf\fR	1.0	< 1
+\fBlog2f\fR	1.0	< 1
+\fBpowf\fR	1.0	< 1
+\fBsinf\fR	1.0	< 1
+\fBsinhf\fR	1.0	< 1
+\fBsqrtf\fR	0.5	0.500	[1]
+\fBtanf\fR	1.0	< 1
+\fBtanhf\fR	1.0	< 1
+\fBtgammaf\fR	1.0	< 1
+.TE
+
+.SS "Double precision real functions (SPARC and amd64)"
+
+.TS
+tab(	);
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+.
+	error bound	largest error
+function	 (ulps)	observed (ulps)	notes
+\fBacos\fR	1.0	< 1
+\fBacosh\fR	4.0	1.878
+\fBasin\fR	1.0	< 1
+\fBasinh\fR	7.0	1.653
+\fBatan\fR	1.0	<1
+\fBatan2\fR	2.5	1.475
+\fBatanh\fR	4.0	1.960
+\fBcbrt\fR	1.0	< 1
+\fBcos\fR	1.0	< 1
+\fBcosh\fR	3.0	1.168
+\fBerf\fR	4.0	0.959
+\fBerfc\fR	6.0	2.816
+\fBexp\fR	1.0	< 1
+\fBexp2\fR	2.0	1.050
+\fBexpm1\fR	1.0	< 1
+\fBhypot\fR	1.0	< 1
+\fBlgamma\fR	61.5	5.629	[2]
+\fBlog\fR	1.0	< 1
+\fBlog10\fR	3.5	1.592
+\fBlog1p\fR	1.0	< 1
+\fBlog2\fR	1.0	< 1
+\fBpow\fR	1.0	< 1
+\fBsin\fR	1.0	< 1
+\fBsinh\fR	4.0	2.078
+\fBsqrt\fR	0.5	0.500	[1]
+\fBtan\fR	1.0	< 1
+\fBtanh\fR	3.5	2.136
+\fBtgamma\fR	1.0	< 1
+.TE
+
+.SS "Double precision real functions (x86)"
+
+.TS
+tab(	);
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+.
+	error bound	largest error
+function	 (ulps)	observed (ulps)	notes
+\fBacos\fR	1.0	< 1
+\fBacosh\fR	4.0	1.694
+\fBasin\fR	1.0	< 1
+\fBasinh\fR	7.0	1.493
+\fBatan\fR	1.0	< 1
+\fBatan2\fR	1.0	< 1
+\fBatanh\fR	4.0	1.445
+\fBcbrt\fR	1.0	< 1
+\fBcos\fR	1.0	< 1
+\fBcosh\fR	3.0	1.001
+\fBerf\fR	4.0	0.932
+\fBerfc\fR	6.0	2.728
+\fBexp\fR	1.0	< 1
+\fBexp2\fR	1.0	< 1
+\fBexpm1\fR	1.0	< 1
+\fBhypot\fR	1.0	< 1
+\fBlgamma\fR	61.5	2.654	[2]
+\fBlog\fR	1.0	< 1
+\fBlog10\fR	1.0	< 1
+\fBlog1p\fR	1.0	< 1
+\fBlog2\fR	1.0	< 1
+\fBpow\fR	1.0	< 1
+\fBsin\fR	1.0	< 1
+\fBsinh\fR	4.0	1.458
+\fBsqrt\fR	0.5003	0.500	[1]
+\fBtan\fR	1.0	< 1
+\fBtanh\fR	3.5	1.592
+\fBtgamma\fR	1.0	< 1
+.TE
+
+.SS "Quadruple precision real functions (SPARC)"
+
+.TS
+tab(	);
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+.
+	error bound	largest error
+function	 (ulps)	observed (ulps)	notes
+\fBacosl\fR	3.5	1.771
+\fBacoshl\fR	8.0	1.275
+\fBasinl\fR	4.0	2.007
+\fBasinhl\fR	9.0	1.823
+\fBatanl\fR	1.0	< 1
+\fBatan2l\fR	2.5	1.102
+\fBatanhl\fR	4.0	1.970
+\fBcbrtl\fR	1.0	< 1
+\fBcosl\fR	1.0	< 1
+\fBcoshl\fR	3.5	0.985
+\fBerfl\fR	2.0	0.779
+\fBerfcl\fR	68.5	13.923
+\fBexpl\fR	1.0	< 1
+\fBexp2l\fR	2.0	0.714
+\fBexpm1l\fR	2.0	1.020
+\fBhypotl\fR	1.0	< 1
+\fBlgammal\fR	18.5	2.916	[2]
+\fBlogl\fR	1.0	< 1
+\fBlog10l\fR	3.5	1.156
+\fBlog1pl\fR	2.0	1.216
+\fBlog2l\fR	3.5	1.675
+\fBpowl\fR	1.0	< 1
+\fBsinl\fR	1.0	< 1
+\fBsinhl\fR	4.5	1.589
+\fBsqrtl\fR	0.5	0.500	[1]
+\fBtanl\fR	4.5	2.380
+\fBtanhl\fR	4.5	1.692
+\fBtgammal\fR	1.0	< 1
+.TE
+
+.SS "Extended precision real functions (x86 and amd64)"
+
+.TS
+tab(	);
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+.
+	error bound	largest error
+function	 (ulps)	observed (ulps)	notes
+\fBacosl\fR	3.0	1.868
+\fBacoshl\fR	8.0	2.352
+\fBasinl\fR	3.0	1.716
+\fBasinhl\fR	9.0	2.346
+\fBatanl\fR	1.0	< 1
+\fBatan2l\fR	1.0	< 1
+\fBatanhl\fR	4.0	2.438
+\fBcbrtl\fR	1.0	< 1
+\fBcosl\fR	1.0	< 1
+\fBcoshl\fR	3.5	1.288
+\fBerfl\fR	1.0	< 1
+\fBerfcl\fR	78.5	13.407
+\fBexpl\fR	3.5	1.291
+\fBexp2l\fR	1.5	0.807
+\fBexpm1l\fR	4.0	1.936
+\fBhypotl\fR	3.5	2.087
+\fBlgammal\fR	22.5	4.197	[2]
+\fBlogl\fR	2.0	0.881
+\fBlog10l\fR	2.0	1.284
+\fBlog1pl\fR	5.0	2.370
+\fBlog2l\fR	1.0	< 1
+\fBpowl\fR	32770.0	4478.132
+\fBsinl\fR	1.0	< 1
+\fBsinhl\fR	4.5	2.356
+\fBsqrtl\fR	0.5	0.500	[1]
+\fBtanl\fR	4.5	2.366
+\fBtanhl\fR	4.5	2.417
+\fBtgammal\fR	1.0	< 1
+.TE
+
+.SS "Notes:"
+.ne 2
+.mk
+.na
+\fB[1]\fR
+.ad
+.RS 7n
+.rt
+On SPARC and amd64, \fBsqrtf\fR, \fBsqrt\fR, and \fBsqrtl\fR are correctly
+rounded in accordance with IEEE 754. On x86, \fBsqrtl\fR is correctly rounded,
+\fBsqrtf\fR is correctly rounded provided the result is narrowed to single
+precision as discussed above, but \fBsqrt\fR might not be correctly rounded due
+to "double rounding": when the intermediate value computed to extended precision
+lies exactly halfway between two representable numbers in double precision, the
+result of rounding the intermediate value to double precision is determined by
+the round-ties-to-even rule. If this rule causes the second rounding to round in
+the same direction as the first, the net rounding error can exceed 0.5 ulps.
+(The error is bounded instead by 0.5*(1 + 2^-11) ulps.)
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB[2]\fR
+.ad
+.RS 7n
+.rt
+Error bounds for lgamma and lgammal apply only for positive arguments.
+.RE
+
+.SS "Complex functions"
+The real-valued complex functions \fBcabsf\fR, \fBcabs\fR, \fBcabsl\fR,
+\fBcargf\fR, \fBcarg\fR, and \fBcargl\fR are equivalent to the real functions
+\fBhypotf\fR, \fBhypot\fR, \fBhypotl\fR, \fBatan2f\fR, \fBatan2\fR, and
+\fBatan2l\fR, respectively. The error bounds and observed errors given above for
+the latter functions also apply to the former.
+.sp
+.LP
+The complex functions listed below are complex-valued. For each function, the
+error bound shown applies separately to both the real and imaginary parts of the
+result. (For example, both the real and imaginary parts of \fBcacosf\fR(\fIz\fR)
+are accurate to within 1 ulp regardless of their magnitudes.) Similarly, the
+largest observed error shown is the largest error found in either the real or
+the imaginary part of the result.
+.SS "Single precision complex functions (SPARC and amd64)"
+
+.TS
+tab(	);
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+.
+	error bound	largest error
+function	 (ulps)	observed (ulps)	notes
+\fBcacosf\fR, \fBcacoshf\fR	1	< 1	[1]
+\fBcasinf\fR, \fBcasinhf\fR	1	< 1
+\fBcatanf\fR, \fBcatanhf\fR	6	< 1
+\fBccosf\fR, \fBccoshf\fR	10	2.012
+\fBcexpf\fR	3	2.239
+\fBclogf\fR	3	< 1
+\fBcpowf\fR	\(em	< 1	[2]
+\fBcsinf\fR, \fBcsinhf\fR	10	2.009
+\fBcsqrtf\fR	4	< 1
+\fBctanf\fR, \fBctanhf\fR	13	6.987
+.TE
+
+.SS "Single precision complex functions (x86)"
+
+.TS
+tab(	);
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+.
+	error bound	largest error
+function	 (ulps)	observed (ulps)	notes
+\fBcacosf\fR, \fBcacoshf\fR	1	< 1	[1]
+\fBcasinf\fR, \fBcasinhf\fR	1	< 1
+\fBcatanf\fR, \fBcatanhf\fR	6	< 1
+\fBccosf\fR, \fBccoshf\fR	10	1.984
+\fBcexpf\fR	3	1.984
+\fBclogf\fR	3	< 1
+\fBcpowf\fR	\(em	< 1	[2]
+\fBcsinf\fR, \fBcsinhf\fR	10	1.973
+\fBcsqrtf\fR	4	< 1
+\fBctanf\fR, \fBctanhf\fR	13	4.657
+.TE
+
+.SS "Double precision complex functions (SPARC and amd64)"
+
+.TS
+tab(	);
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+.
+	error bound	largest error
+function	 (ulps)	observed (ulps)	notes
+\fBcacos\fR, \fBcacosh\fR	9	3.831	[1]
+\fBcasin\fR, \fBcasinh\fR	9	3.732
+\fBcatan\fR, \fBcatanh\fR	6	4.179
+\fBccos\fR, \fBccosh\fR	10	3.832
+\fBcexp\fR	3	2.255
+\fBclog\fR	3	2.870
+\fBcpow\fR	-	-	[2]
+\fBcsin\fR, \fBcsinh\fR	10	3.722
+\fBcsqrt\fR	4	3.204
+\fBctan\fR, \fBctanh\fR	13	7.143
+.TE
+
+.SS "Double precision complex functions (x86)"
+
+.TS
+tab(	);
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+.
+	error bound	largest error
+function	 (ulps)	observed (ulps)	notes
+\fBcacos\fR, \fBcacosh\fR	9	3.624	[1]
+\fBcasin\fR, \fBcasinh\fR	9	3.624
+\fBcatan\fR, \fBcatanh\fR	6	2.500
+\fBccos\fR, \fBccosh\fR	10	2.929
+\fBcexp\fR	3	2.147
+\fBclog\fR	3	1.927
+\fBcpow\fR	-	-	[2]
+\fBcsin\fR, \fBcsinh\fR	10	2.918
+\fBcsqrt\fR	4	1.914
+\fBctan\fR, \fBctanh\fR	13	4.630
+.TE
+
+.SS "Quadruple precision complex functions (SPARC)"
+
+.TS
+tab(	);
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+.
+	error bound	largest error
+function	 (ulps)	observed (ulps)	notes
+\fBcacosl\fR, \fBcacoshl\fR	9	3	[1]
+\fBcasinl\fR, \fBcasinhl\fR	9	3
+\fBcatanl\fR, \fBcatanhl\fR	6	3
+\fBccosl\fR, \fBccoshl\fR	10	3
+\fBcexpl\fR	3	2
+\fBclogl\fR	3	2
+\fBcpowl\fR	-	-	[2]
+\fBcsinl\fR, \fBcsinhl\fR	10	3
+\fBcsqrtl\fR	4	3
+\fBctanl\fR, \fBctanhl\fR	13	5
+.TE
+
+.SS "Extended precision complex functions (x86 and amd64)"
+
+.TS
+tab(	);
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+cw(1.38i) cw(1.38i) cw(1.38i) cw(1.38i)
+.
+	error bound	largest error
+function	 (ulps)	observed (ulps)	notes
+\fBcacosl\fR, \fBcacoshl\fR	9	2	[1]
+\fBcasinl\fR, \fBcasinhl\fR	9	2
+\fBcatanl\fR, \fBcatanhl\fR	6	2
+\fBccosl\fR, \fBccoshl\fR	10	3
+\fBcexpl\fR	3	2.699
+\fBclogl\fR	3	1
+\fBcpowl\fR	-	-	[2]
+\fBcsinl\fR, \fBcsinhl\fR	10	3
+\fBcsqrtl\fR	4	1.452
+\fBctanl\fR, \fBctanhl\fR	13	5
+.TE
+
+.SS "Notes:"
+.ne 2
+.mk
+.na
+\fB[1]\fR
+.ad
+.RS 7n
+.rt
+The complex hyperbolic trigonometric functions are equivalent by symmetries to
+their circular trigonometric counterparts. Because the implementations of these
+functions exploit these symmetries, corresponding functions have the same error
+bounds and observed errors.
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB[2]\fR
+.ad
+.RS 7n
+.rt
+For large arguments, the results computed by \fBcpowf\fR, \fBcpow\fR, and
+\fBcpowl\fR can have unbounded relative error. It might be possible to give
+error bounds for specific domains, but no such bounds are currently available.
+The observed errors shown are for the domain {(\fIz\fR,\fIw\fR) :
+\fBmax\fR(|\fBRe\fR \fIz\fR|, |\fBIm\fR \fIz\fR|, |\fBRe\fR \fIw\fR|, |\fBIm\fR
+\fIw\fR|) <= 1}.
+.RE
+
+.SH FILES
+.ne 2
+.mk
+.na
+\fB\fB/lib/libm.so.2\fR\fR
+.ad
+.RS 21n
+.rt
+shared object
+.RE
+
+.sp
+.ne 2
+.mk
+.na
+\fB\fB/lib/64/libm.so.2\fR\fR
+.ad
+.RS 21n
+.rt
+64-bit shared object
+.RE
+
+.SH ATTRIBUTES
+See \fBattributes\fR(5) for descriptions of the following attributes:
+.sp
+
+.sp
+.TS
+tab(	) box;
+cw(2.75i) |cw(2.75i)
+lw(2.75i) |lw(2.75i)
+.
+ATTRIBUTE TYPE	ATTRIBUTE VALUE
+_
+MT-Level	Safe with exceptions
+.TE
+
+.sp
+.LP
+As described on the \fBlgamma\fR(3M) manual page, \fBgamma()\fR and
+\fBlgamma()\fR and their \fBfloat\fR and \fBlong double\fR counterparts are
+Unsafe. All other functions in \fBlibm.so.2\fR are MT-Safe.
+.SH SEE ALSO
+\fBIntro\fR(3), \fBlgamma\fR(3M), \fBmath.h\fR(3HEAD), \fBattributes\fR(5),
+\fBstandards\fR(5)
