@@ -23,7 +23,7 @@
 #define	MAXPHYS		(56 * 1024)
 #endif
 #define	MAXHOSTNAMELEN	256
-#define	SPECNAMELEN	63
+#define	SPECNAMELEN	255
 
 #ifdef	_KERNEL
 #include <sys/time.h>

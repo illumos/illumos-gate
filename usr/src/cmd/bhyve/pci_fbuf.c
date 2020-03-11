@@ -229,15 +229,13 @@ pci_fbuf_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 static int
 pci_fbuf_parse_opts(struct pci_fbuf_softc *sc, char *opts)
 {
-	char	*uopts, *xopts, *config;
+	char	*uopts, *uoptsbak, *xopts, *config;
 	char	*tmpstr;
 	int	ret;
 
 	ret = 0;
-	uopts = strdup(opts);
-	for (xopts = strtok(uopts, ",");
-	     xopts != NULL;
-	     xopts = strtok(NULL, ",")) {
+	uoptsbak = uopts = strdup(opts);
+	while ((xopts = strsep(&uopts, ",")) != NULL) {
 		if (strcmp(xopts, "wait") == 0) {
 			sc->rfb_wait = 1;
 			continue;
@@ -264,7 +262,7 @@ pci_fbuf_parse_opts(struct pci_fbuf_softc *sc, char *opts)
 			if (config) {
 				if (tmpstr[0] == '[')
 					tmpstr++;
-				sc->rfb_host = tmpstr;
+				sc->rfb_host = strdup(tmpstr);
 				if (config[0] == ':')
 					config++;
 				else {
@@ -280,12 +278,12 @@ pci_fbuf_parse_opts(struct pci_fbuf_softc *sc, char *opts)
 					sc->rfb_port = atoi(tmpstr);
 				else {
 					sc->rfb_port = atoi(config);
-					sc->rfb_host = tmpstr;
+					sc->rfb_host = strdup(tmpstr);
 				}
 			}
 #ifndef __FreeBSD__
 		} else if (!strcmp(xopts, "unix")) {
-			sc->rfb_unix = config;
+			sc->rfb_unix = strdup(config);
 #endif
 	        } else if (!strcmp(xopts, "vga")) {
 			if (!strcmp(config, "off")) {
@@ -318,7 +316,7 @@ pci_fbuf_parse_opts(struct pci_fbuf_softc *sc, char *opts)
 			} else if (sc->memregs.height == 0)
 				sc->memregs.height = 1080;
 		} else if (!strcmp(xopts, "password")) {
-			sc->rfb_password = config;
+			sc->rfb_password = strdup(config);
 		} else {
 			pci_fbuf_usage(xopts);
 			ret = -1;
@@ -327,6 +325,7 @@ pci_fbuf_parse_opts(struct pci_fbuf_softc *sc, char *opts)
 	}
 
 done:
+	free(uoptsbak);
 	return (ret);
 }
 

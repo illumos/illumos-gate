@@ -339,7 +339,7 @@ vlapic_get_lvtptr(struct vlapic *vlapic, uint32_t offset)
 		return (&lapic->lvt_cmci);
 	case APIC_OFFSET_TIMER_LVT ... APIC_OFFSET_ERROR_LVT:
 		i = (offset - APIC_OFFSET_TIMER_LVT) >> 2;
-		return ((&lapic->lvt_timer) + i);;
+		return ((&lapic->lvt_timer) + i);
 	default:
 		panic("vlapic_get_lvt: invalid LVT\n");
 	}
@@ -854,7 +854,8 @@ vlapic_calcdest(struct vm *vm, cpuset_t *dmask, uint32_t dest, bool phys,
 		 */
 		CPU_ZERO(dmask);
 		vcpuid = vm_apicid2vcpuid(vm, dest);
-		if (vcpuid < vm_get_maxcpus(vm))
+		amask = vm_active_cpus(vm);
+		if (vcpuid < vm_get_maxcpus(vm) && CPU_ISSET(vcpuid, &amask))
 			CPU_SET(vcpuid, dmask);
 	} else {
 		/*

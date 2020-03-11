@@ -703,7 +703,7 @@ fail:
 static int
 add_vmname(int *argc, char **argv)
 {
-	char buf[32];				/* VM_MAX_NAMELEN */
+	char buf[229];				/* VM_MAX_NAMELEN */
 	char *val = getenv("_ZONECFG_did");
 
 	if (val == NULL || val[0] == '\0') {

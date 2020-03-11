@@ -309,7 +309,8 @@ pci_vtscsi_reset(void *vsc)
 	/* initialize config structure */
 	sc->vss_config = (struct pci_vtscsi_config){
 		.num_queues = VTSCSI_REQUESTQ,
-		.seg_max = VTSCSI_MAXSEG,
+		/* Leave room for the request and the response. */
+		.seg_max = VTSCSI_MAXSEG - 2,
 		.max_sectors = 2,
 		.cmd_per_lun = 1,
 		.event_info_size = sizeof(struct pci_vtscsi_event),
@@ -464,7 +465,7 @@ pci_vtscsi_request_handle(struct pci_vtscsi_queue *q, struct iovec *iov_in,
 	int data_niov_in, data_niov_out;
 	void *ext_data_ptr = NULL;
 	uint32_t ext_data_len = 0, ext_sg_entries = 0;
-	int err;
+	int err, nxferred;
 
 	seek_iov(iov_in, niov_in, data_iov_in, &data_niov_in,
 	    VTSCSI_IN_HEADER_LEN(sc));
@@ -543,10 +544,11 @@ pci_vtscsi_request_handle(struct pci_vtscsi_queue *q, struct iovec *iov_in,
 	}
 
 	buf_to_iov(cmd_wr, VTSCSI_OUT_HEADER_LEN(sc), iov_out, niov_out, 0);
+	nxferred = VTSCSI_OUT_HEADER_LEN(sc) + io->scsiio.ext_data_filled;
 	free(cmd_rd);
 	free(cmd_wr);
 	ctl_scsi_free_io(io);
-	return (VTSCSI_OUT_HEADER_LEN(sc) + io->scsiio.ext_data_filled);
+	return (nxferred);
 }
 
 static void
@@ -581,7 +583,7 @@ static void
 pci_vtscsi_eventq_notify(void *vsc, struct vqueue_info *vq)
 {
 
-	vq->vq_used->vu_flags |= VRING_USED_F_NO_NOTIFY;
+	vq_kick_disable(vq);
 }
 
 static void

@@ -100,17 +100,12 @@ vmm_get_host_gdtrbase(void)
 #endif
 }
 
-#ifdef	__FreeBSD__
-struct pcpu;
-extern struct pcpu __pcpu[];
-#endif
-
 static __inline uint64_t
 vmm_get_host_gsbase(void)
 {
 
 #ifdef	__FreeBSD__
-	return ((uint64_t)&__pcpu[curcpu]);
+	return ((uint64_t)get_pcpu());
 #else
 	return (rdmsr(MSR_GSBASE));
 #endif
