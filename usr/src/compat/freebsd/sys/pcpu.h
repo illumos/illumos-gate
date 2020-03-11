@@ -16,6 +16,8 @@
 #ifndef _COMPAT_FREEBSD_SYS_PCPU_H_
 #define	_COMPAT_FREEBSD_SYS_PCPU_H_
 
-#define	curcpu	(CPU->cpu_id)
+#define	curcpu		(CPU->cpu_id)
+
+#define	get_pcpu()	CPU
 
 #endif	/* _COMPAT_FREEBSD_SYS_PCPU_H_ */

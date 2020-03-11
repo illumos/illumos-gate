@@ -982,35 +982,19 @@ vm_segmap_space(struct vmspace *vms, off_t off, struct as *as, caddr_t *addrp,
 }
 
 void
-vm_page_lock(vm_page_t vmp)
+vm_page_unwire(vm_page_t vmp, uint8_t nqueue __unused)
 {
 	ASSERT(!MUTEX_HELD(&vmp->vmp_lock));
-
 	mutex_enter(&vmp->vmp_lock);
-}
 
-void
-vm_page_unlock(vm_page_t vmp)
-{
-	boolean_t purge = (vmp->vmp_pfn == PFN_INVALID);
-
-	ASSERT(MUTEX_HELD(&vmp->vmp_lock));
-
-	mutex_exit(&vmp->vmp_lock);
-
-	if (purge) {
-		mutex_destroy(&vmp->vmp_lock);
-		kmem_free(vmp, sizeof (*vmp));
-	}
-}
-
-void
-vm_page_unhold(vm_page_t vmp)
-{
-	ASSERT(MUTEX_HELD(&vmp->vmp_lock));
 	VERIFY(vmp->vmp_pfn != PFN_INVALID);
 
 	vm_object_deallocate(vmp->vmp_obj_held);
 	vmp->vmp_obj_held = NULL;
 	vmp->vmp_pfn = PFN_INVALID;
+
+	mutex_exit(&vmp->vmp_lock);
+
+	mutex_destroy(&vmp->vmp_lock);
+	kmem_free(vmp, sizeof (*vmp));
 }

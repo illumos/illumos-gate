@@ -375,8 +375,11 @@ out:
 	if (fd != -1)
 		close(fd);
 
-	if (error != 0 && s != -1)
-		close(s);
+	if (error != 0) {
+		if (s != -1)
+			close(s);
+		free(sock);
+	}
 
 	return (error);
 }
@@ -630,7 +633,7 @@ pci_vtcon_notify_rx(void *vsc, struct vqueue_info *vq)
 
 	if (!port->vsp_rx_ready) {
 		port->vsp_rx_ready = 1;
-		vq->vq_used->vu_flags |= VRING_USED_F_NO_NOTIFY;
+		vq_kick_disable(vq);
 	}
 }
 

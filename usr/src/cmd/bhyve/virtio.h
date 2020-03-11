@@ -32,6 +32,7 @@
 #define	_VIRTIO_H_
 
 #include <pthread_np.h>
+#include <machine/atomic.h>
 
 /*
  * These are derived from several virtio specifications.
@@ -461,6 +462,26 @@ vq_interrupt(struct virtio_softc *vs, struct vqueue_info *vq)
 		VS_UNLOCK(vs);
 #endif
 	}
+}
+
+static inline void
+vq_kick_enable(struct vqueue_info *vq)
+{
+
+	vq->vq_used->vu_flags &= ~VRING_USED_F_NO_NOTIFY;
+	/*
+	 * Full memory barrier to make sure the store to vu_flags
+	 * happens before the load from va_idx, which results from
+	 * a subsequent call to vq_has_descs().
+	 */
+	atomic_thread_fence_seq_cst();
+}
+
+static inline void
+vq_kick_disable(struct vqueue_info *vq)
+{
+
+	vq->vq_used->vu_flags |= VRING_USED_F_NO_NOTIFY;
 }
 
 struct iovec;

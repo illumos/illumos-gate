@@ -278,8 +278,10 @@ rfb_recv_set_encodings_msg(struct rfb_softc *rc, int cfd)
 			rc->enc_raw_ok = true;
 			break;
 		case RFB_ENCODING_ZLIB:
-			rc->enc_zlib_ok = true;
-			deflateInit(&rc->zstream, Z_BEST_SPEED);
+			if (!rc->enc_zlib_ok) {
+				deflateInit(&rc->zstream, Z_BEST_SPEED);
+				rc->enc_zlib_ok = true;
+			}
 			break;
 		case RFB_ENCODING_RESIZE:
 			rc->enc_resize_ok = true;
@@ -978,7 +980,7 @@ rfb_init(char *hostname, int port, int wait, char *password)
 	int e;
 	char servname[6];
 	struct rfb_softc *rc;
-	struct addrinfo *ai;
+	struct addrinfo *ai = NULL;
 	struct addrinfo hints;
 	int on = 1;
 #ifndef WITHOUT_CAPSICUM
@@ -993,6 +995,7 @@ rfb_init(char *hostname, int port, int wait, char *password)
 	                     sizeof(uint32_t));
 	rc->crc_width = RFB_MAX_WIDTH;
 	rc->crc_height = RFB_MAX_HEIGHT;
+	rc->sfd = -1;
 
 	rc->password = password;
 
@@ -1012,28 +1015,25 @@ rfb_init(char *hostname, int port, int wait, char *password)
 
 	if ((e = getaddrinfo(hostname, servname, &hints, &ai)) != 0) {
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(e));
-		return(-1);
+		goto error;
 	}
 
 	rc->sfd = socket(ai->ai_family, ai->ai_socktype, 0);
 	if (rc->sfd < 0) {
 		perror("socket");
-		freeaddrinfo(ai);
-		return (-1);
+		goto error;
 	}
 
 	setsockopt(rc->sfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
 
 	if (bind(rc->sfd, ai->ai_addr, ai->ai_addrlen) < 0) {
 		perror("bind");
-		freeaddrinfo(ai);
-		return (-1);
+		goto error;
 	}
 
 	if (listen(rc->sfd, 1) < 0) {
 		perror("listen");
-		freeaddrinfo(ai);
-		return (-1);
+		goto error;
 	}
 
 #ifndef WITHOUT_CAPSICUM
@@ -1062,6 +1062,16 @@ rfb_init(char *hostname, int port, int wait, char *password)
 
 	freeaddrinfo(ai);
 	return (0);
+
+ error:
+	if (ai != NULL)
+		freeaddrinfo(ai);
+	if (rc->sfd != -1)
+		close(rc->sfd);
+	free(rc->crc);
+	free(rc->crc_tmp);
+	free(rc);
+	return (-1);
 }
 
 #ifndef __FreeBSD__

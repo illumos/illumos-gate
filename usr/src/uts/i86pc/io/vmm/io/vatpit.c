@@ -3,6 +3,7 @@
  * Copyright (c) 2014 Tycho Nightingale <tycho.nightingale@pluribusnetworks.com>
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
+ * Copyright (c) 2018 Joyent, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -180,20 +181,20 @@ static void
 pit_timer_start_cntr0(struct vatpit *vatpit)
 {
 	struct channel *c;
+	struct bintime now, delta;
+	sbintime_t precision;
 
 	c = &vatpit->channel[0];
 	if (c->initial != 0) {
-		sbintime_t precision;
-		struct bintime now, delta;
-
 		delta.sec = 0;
 		delta.frac = vatpit->freq_bt.frac * c->initial;
 		bintime_add(&c->callout_bt, &delta);
 		precision = bttosbt(delta) >> tc_precexp;
 
 		/*
-		 * Reset 'callout_bt' if the time that the callout was supposed
-		 * to fire is more than 'c->initial' ticks in the past.
+		 * Reset 'callout_bt' if the time that the callout
+		 * was supposed to fire is more than 'c->initial'
+		 * ticks in the past.
 		 */
 		binuptime(&now);
 		if (bintime_cmp(&c->callout_bt, &now, <)) {
