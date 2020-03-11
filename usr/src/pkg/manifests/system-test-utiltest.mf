@@ -68,6 +68,11 @@ dir path=opt/util-tests/tests/awk/examples/out
 dir path=opt/util-tests/tests/awk/gnu
 dir path=opt/util-tests/tests/awk/syn
 dir path=opt/util-tests/tests/awk/tests
+dir path=opt/util-tests/tests/mdb
+dir path=opt/util-tests/tests/mdb/exit-e
+dir path=opt/util-tests/tests/mdb/format
+dir path=opt/util-tests/tests/mdb/options
+dir path=opt/util-tests/tests/mdb/typedef
 dir path=opt/util-tests/tests/mergeq
 dir path=opt/util-tests/tests/sleep
 file path=opt/util-tests/README mode=0444
@@ -1479,6 +1484,95 @@ file path=opt/util-tests/tests/libsff/libsff_strings mode=0555
 file path=opt/util-tests/tests/libsff/libsff_wave mode=0555
 file path=opt/util-tests/tests/libsff/libsff_wave.out mode=0444
 file path=opt/util-tests/tests/make_test mode=0555
+file path=opt/util-tests/tests/mdb/exit-e/err.cmdbadopt.ksh mode=0444
+file path=opt/util-tests/tests/mdb/exit-e/err.enocmd.ksh mode=0444
+file path=opt/util-tests/tests/mdb/exit-e/err.nowrite.ksh mode=0444
+file path=opt/util-tests/tests/mdb/exit-e/err.unmapped.ksh mode=0444
+file path=opt/util-tests/tests/mdb/exit-e/tst.output.ksh mode=0444
+file path=opt/util-tests/tests/mdb/exit-e/tst.output.ksh.out mode=0444
+file path=opt/util-tests/tests/mdb/exit-e/tst.simple.ksh mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-cap-E.mdb mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-cap-E.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-cap-G.mdb mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-cap-G.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-cap-J.mdb mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-cap-J.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-cap-P.mdb mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-cap-P.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-cap-R.mdb mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-cap-R.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-e.mdb mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-e.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-g.mdb mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-g.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-j.mdb mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-j.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-p.mdb mode=0444
+file path=opt/util-tests/tests/mdb/format/tst.format-p.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/mdbtest mode=0555
+file path=opt/util-tests/tests/mdb/options/tst.autowrap.mdb mode=0444
+file path=opt/util-tests/tests/mdb/options/tst.autowrap.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badid-leadnum.ksh mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badid-leadschar.ksh mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badmodel.ksh mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-extrabraces.ksh \
+    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-neglenarr.ksh \
+    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-noarrayclose.ksh \
+    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-noarraylen.ksh \
+    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-noarrayopen.ksh \
+    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-nobraces.ksh \
+    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-noclosebrace.ksh \
+    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-nomembers.ksh \
+    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-nomemname.ksh \
+    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-nomemsemi.ksh \
+    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-noopenbrace.ksh \
+    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-noquotes.ksh \
+    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-repmemname.ksh \
+    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-vlaonly.ksh mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badstruct-zerolenarr.ksh \
+    mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.badunion-hasvla.ksh mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.extraargs.ksh mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.noargs.ksh mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.nokeyword.ksh mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.nomodel.ksh mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.noname.ksh mode=0444
+file path=opt/util-tests/tests/mdb/typedef/err.typeexists.ksh mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.anonstruct.mdb mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.anonstruct.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.anonunion.mdb mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.anonunion.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.cleanupstruct.ksh mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.deftypes32.mdb mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.deftypes32.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.deftypes64.mdb mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.deftypes64.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.dellist.mdb mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.emptylist.mdb mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.libctype.ksh mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.libctype.ksh.out mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.models.ksh mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.struct.mdb mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.struct.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.structselfref.mdb mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.structselfref.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.structvla.mdb mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.structvla.mdb.out mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.union.mdb mode=0444
+file path=opt/util-tests/tests/mdb/typedef/tst.union.mdb.out mode=0444
 file path=opt/util-tests/tests/mergeq/mqt mode=0555
 file path=opt/util-tests/tests/mergeq/wqt mode=0555
 file path=opt/util-tests/tests/printf_test mode=0555

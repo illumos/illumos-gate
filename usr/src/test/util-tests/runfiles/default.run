@@ -13,7 +13,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
@@ -78,3 +78,7 @@ tests = [ 'ctftest' ]
 
 [/opt/util-tests/tests/libcustr]
 tests = ['custr_remove', 'custr_trunc']
+
+[/opt/util-tests/tests/find/findtest]
+
+[/opt/util-tests/tests/mdb/mdbtest]

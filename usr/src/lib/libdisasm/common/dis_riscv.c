@@ -313,7 +313,7 @@ typedef void (*dis_riscv_func_t)(dis_handle_t *, uint32_t,
     struct dis_riscv_instr *, char *, size_t);
 
 typedef struct dis_riscv_instr {
-	const char 		*drv_name;
+	const char		*drv_name;
 	dis_riscv_itype_t	drv_type;
 	dis_riscv_func_t	drv_print;
 	uint_t			drv_opcode;
@@ -959,7 +959,7 @@ dis_riscv_fp_rm(dis_handle_t *dhp, uint32_t instr,
 #define	DIS_RISCV_FP_R_RS2_IFP_NR(str, op, f3, rs2, f7)		\
 	{ str, DIS_RISCV_I_FP_R_RS2_TYPE, dis_riscv_fp_rs2_ifp_nr, op, f3, \
 	    f7, rs2 }
-#define	DIS_RISCV_FP_RI(str, op, f3, f7) 			\
+#define	DIS_RISCV_FP_RI(str, op, f3, f7)			\
 	{ str, DIS_RISCV_I_R_TYPE, dis_riscv_fp_r_fpi, op, f3, f7 }
 
 /*
@@ -1300,7 +1300,7 @@ typedef struct dis_riscv_c_instr {
 	const char		*drv_c_name;
 	dis_riscv_ctype_t	drv_c_type;
 	dis_riscv_c_func_t	drv_c_print;
-	dis_riscv_c_class_t 	drv_c_class;
+	dis_riscv_c_class_t	drv_c_class;
 	uint_t			drv_c_opcode;
 	uint_t			drv_c_funct;
 	uint_t			drv_c_mask;
@@ -1680,7 +1680,7 @@ dis_riscv_c_int(dis_handle_t *dhp, uint32_t instr,
 
 #define	DIS_RISCV_CFUNCT3(name, class, op, funct, print)		\
 	{ name, DIS_RISCV_C_FUNCT3, print, class, op, funct, 0, 0 }
-#define	DIS_RISCV_CMATCH(name, class, op, funct, mask, match, print) 	\
+#define	DIS_RISCV_CMATCH(name, class, op, funct, mask, match, print)	\
 	{ name, DIS_RISCV_C_MATCH, print, class, op, funct, mask, match }
 
 static dis_riscv_c_instr_t dis_riscv_2byte[] = {
@@ -1972,7 +1972,6 @@ dis_riscv_max_instrlen(dis_handle_t *dhp)
 static int
 dis_riscv_instrlen(dis_handle_t *dhp, uint64_t addr)
 {
-	int ret;
 	uint16_t parcel;
 
 	dhp->dh_addr = addr;
@@ -1980,15 +1979,7 @@ dis_riscv_instrlen(dis_handle_t *dhp, uint64_t addr)
 	if (dis_riscv_read_parcel(dhp, &parcel) != 0)
 		return (-1);
 
-	/*
-	 * Get length based on this parcel. Check for required alignment. 2-byte
-	 * alignment was already taken care of when we read the parcel.
-	 */
-	ret = dis_riscv_decode_len(parcel);
-	if (ret >= 4 && (addr % 4) != 0)
-		return (-1);
-
-	return (ret);
+	return (dis_riscv_decode_len(parcel));
 }
 
 dis_arch_t dis_arch_riscv = {

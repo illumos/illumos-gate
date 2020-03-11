@@ -23,6 +23,7 @@
 #
 # Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2020 Joyent, Inc.
 #
 #
 # open-tree exception list
@@ -239,4 +240,3 @@
 # ld tests which are not currently delivered
 #
 ./usr/src/cmd/sgs/test
-./usr/src/cmd/mdb/test

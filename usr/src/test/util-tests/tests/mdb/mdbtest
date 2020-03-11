@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2012 (c), Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 #
@@ -40,7 +40,6 @@ function usage
 Usage: $mt_arg0  [ -o dir ] [ -k ] [ -m executable ] [ -a | test ... ]
 
 	-o dir		Sets 'dir' as the output directory
-	-a		Runs all tests, ignores tests passed in
 	-k		Keep output from all tests, not just failures
 	-m 		mdb binary to test
 USAGE
@@ -180,11 +179,8 @@ EOF
 	fi
 }
 
-while getopts ":ahko:m:" c $@; do
+while getopts ":hko:m:" c $@; do
 	case "$c" in
-	a)
-		mt_all="y"
-		;;
 	k)
 		mt_keep="y"
 		;;
@@ -208,7 +204,7 @@ done
 
 shift $((OPTIND-1))
 
-[[ -z "$mt_all" && $# == 0 ]] && usage "no tests to run"
+[[ $# == 0 ]] && mt_all="y"
 
 [[ -x "$mt_mdb" ]] || fatal "unable to execute mdb binary: $mt_mdb"
 
