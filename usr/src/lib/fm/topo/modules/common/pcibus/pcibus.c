@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <sys/fm/protocol.h>
@@ -630,11 +630,12 @@ static void
 declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
     int board, int bridge, int rc, int devno, int fnno, int depth)
 {
-	int dcnt = 0, rcnt;
-	char *propstr;
+	int dcnt = 0, rcnt, err;
+	char *propstr, *label = NULL, *pdev = NULL;
 	tnode_t *fn;
 	uint_t class, subclass;
 	uint_t vid, did;
+	uint_t pdev_sz;
 	did_t *dp = NULL;
 
 	if (*dev == NULL) {
@@ -773,6 +774,84 @@ declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
 				pci_receptacle_instantiate(mod, fn, din);
 		}
 	}
+
+	/*
+	 * If this is an NVMe device and if the FRU label indicates it's not an
+	 * onboard device then invoke the disk enumerator to enumerate the NVMe
+	 * controller and associated namespaces.
+	 *
+	 * We skip NVMe devices that appear to be onboard as those are likely
+	 * M.2 or U.2 devices and so should be enumerated via a
+	 * platform-specific XML map so that they can be associated with the
+	 * correct physical bay/slot.  This code is intended to pick up NVMe
+	 * devices that are part of PCIe add-in cards.
+	 */
+	if (topo_node_label(fn, &label, &err) != 0) {
+		topo_mod_dprintf(mod, "%s: failed to lookup FRU label on %s=%d",
+		    __func__, topo_node_name(fn), topo_node_instance(fn));
+		goto out;
+	}
+
+	if (class == PCI_CLASS_MASS && subclass == PCI_MASS_NVME &&
+	    strcmp(label, "MB") != 0) {
+		char *driver = di_driver_name(din);
+		char *slash;
+		topo_pgroup_info_t pgi;
+
+		if (topo_prop_get_string(fn, TOPO_PGROUP_IO, TOPO_IO_DEV,
+		    &pdev, &err) != 0) {
+			topo_mod_dprintf(mod, "%s: failed to lookup %s on "
+			    "%s=%d", __func__, TOPO_IO_DEV, topo_node_name(fn),
+			    topo_node_instance(fn));
+			goto out;
+		}
+
+		/*
+		 * Add the binding properties that are required by the disk
+		 * enumerator to discover the accociated NVMe controller.
+		 */
+		pdev_sz = strlen(pdev) + 1;
+		if ((slash = strrchr(pdev, '/')) == NULL) {
+			topo_mod_dprintf(mod, "%s: malformed dev path\n",
+			    __func__);
+			(void) topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
+			goto out;
+		}
+		*slash = '\0';
+
+		pgi.tpi_name = TOPO_PGROUP_BINDING;
+		pgi.tpi_namestab = TOPO_STABILITY_PRIVATE;
+		pgi.tpi_datastab = TOPO_STABILITY_PRIVATE;
+		pgi.tpi_version = TOPO_VERSION;
+		if (topo_pgroup_create(fn, &pgi, &err) != 0 ||
+		    topo_prop_set_string(fn, TOPO_PGROUP_BINDING,
+		    TOPO_BINDING_DRIVER, TOPO_PROP_IMMUTABLE, driver,
+		    &err) != 0 ||
+		    topo_prop_set_string(fn, TOPO_PGROUP_BINDING,
+		    TOPO_BINDING_PARENT_DEV, TOPO_PROP_IMMUTABLE, pdev,
+		    &err) != 0) {
+			topo_mod_dprintf(mod, "%s: failed to set binding "
+			    "props", __func__);
+			(void) topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
+			goto out;
+		}
+
+		/*
+		 * Load and invoke the disk enumerator module.
+		 */
+		if (topo_mod_load(mod, DISK, TOPO_VERSION) == NULL) {
+			topo_mod_dprintf(mod, "pcibus enum could not load "
+			    "disk enum\n");
+			(void) topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
+			goto out;
+		}
+		(void) topo_mod_enumerate(mod, fn, DISK, NVME, 0, 0, NULL);
+	}
+out:
+	if (pdev != NULL) {
+		topo_mod_free(mod, pdev, pdev_sz);
+	}
+	topo_mod_strfree(mod, label);
 }
 
 int

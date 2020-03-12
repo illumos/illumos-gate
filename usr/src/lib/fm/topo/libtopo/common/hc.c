@@ -22,7 +22,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -179,6 +179,7 @@ static const hcc_t hc_canon[] = {
 	{ MOTHERBOARD, TOPO_STABILITY_PRIVATE },
 	{ NIU, TOPO_STABILITY_PRIVATE },
 	{ NIUFN, TOPO_STABILITY_PRIVATE },
+	{ NVME, TOPO_STABILITY_PRIVATE },
 	{ PCI_BUS, TOPO_STABILITY_PRIVATE },
 	{ PCI_DEVICE, TOPO_STABILITY_PRIVATE },
 	{ PCI_FUNCTION, TOPO_STABILITY_PRIVATE },

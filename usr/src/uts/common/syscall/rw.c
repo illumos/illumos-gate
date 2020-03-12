@@ -1087,7 +1087,7 @@ preadv(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 		}
 	}
 
-	if ((bcount = count) < 0) {
+	if ((bcount = (ssize_t)count) < 0) {
 		if (aiovlen != 0)
 			kmem_free(aiov, aiovlen);
 		return (set_errno(EINVAL));
@@ -1288,7 +1288,7 @@ pwritev(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 		}
 	}
 
-	if ((bcount = count) < 0) {
+	if ((bcount = (ssize_t)count) < 0) {
 		if (aiovlen != 0)
 			kmem_free(aiov, aiovlen);
 		return (set_errno(EINVAL));

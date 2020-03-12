@@ -80,6 +80,7 @@
 #include <sys/zone.h>
 #include <sys/limits.h>
 #include <sys/ptms.h>
+#include <sys/limits.h>
 #include <c2/audit.h>
 
 /*

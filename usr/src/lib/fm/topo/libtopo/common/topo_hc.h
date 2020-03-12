@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef _TOPO_HC_H
@@ -68,6 +68,7 @@ extern "C" {
 #define	MOTHERBOARD	"motherboard"
 #define	NIU		"niu"
 #define	NIUFN		"niufn"
+#define	NVME		"nvme"
 #define	PCI_BUS		"pcibus"
 #define	PCI_DEVICE	"pcidev"
 #define	PCI_FUNCTION    "pcifn"
@@ -138,6 +139,7 @@ extern "C" {
 #define	TOPO_BINDING_ENCLOSURE	"enclosure"
 #define	TOPO_BINDING_SLOT	"slot"
 #define	TOPO_BINDING_PORT	"port"
+#define	TOPO_BINDING_PARENT_DEV	"parent-device"
 
 #define	TOPO_PGROUP_STORAGE	"storage"
 #define	TOPO_STORAGE_INITIATOR_PORT	"initiator-port"
@@ -303,6 +305,9 @@ extern "C" {
 #define	TOPO_PGROUP_DATALINK_LINK_DUPLEX_HALF	"half"
 #define	TOPO_PGROUP_DATALINK_LINK_DUPLEX_UNKNOWN	"unknown"
 #define	TOPO_PGROUP_DATALINK_LINK_NAME		"link-name"
+
+#define	TOPO_PGROUP_NVME		"nvme-properties"
+#define	TOPO_PROP_NVME_VER		"nvme-version"
 
 #ifdef	__cplusplus
 }

@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright 2015 Joyent, Inc.  All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -646,8 +647,6 @@ struct stroptions {
  * Structure for rw (read/write) procedure calls. A pointer
  * to a struiod_t is passed as a parameter to the rwnext() call.
  */
-#define	DEF_IOV_MAX	16
-
 struct struiod {
 	mblk_t		*d_mp;		/* pointer to mblk (chain) */
 	uio_t		d_uio;		/* uio info */

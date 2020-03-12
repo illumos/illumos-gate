@@ -10625,6 +10625,9 @@ f usr/platform/i86pc/lib/fm/topo/maps/SSG-6049P-E1CR36L-chassis-hc-topology.xml 
 f usr/platform/i86pc/lib/fm/topo/maps/SSG-6049P-E1CR36L-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/SSG-6049P-E1CR36L-slot-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/SSG-6049P-E1CR36L-usb.usbtopo 0444 root sys
+f usr/platform/i86pc/lib/fm/topo/maps/SYS-2028U-E1CNRT+-chassis-hc-topology.xml 0444 root sys
+f usr/platform/i86pc/lib/fm/topo/maps/SYS-2028U-E1CNRT+-hc-topology.xml 0444 root sys
+f usr/platform/i86pc/lib/fm/topo/maps/SYS-2028U-E1CNRT+-usb.usbtopo 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/chassis-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/chip-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/fan-hc-topology.xml 0444 root sys

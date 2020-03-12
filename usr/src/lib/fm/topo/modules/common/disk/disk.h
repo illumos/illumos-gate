@@ -23,12 +23,13 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef _DISK_H
 #define	_DISK_H
 
+#include <sys/fm/protocol.h>
 #include <fm/topo_mod.h>
 #include <libdevinfo.h>
 
@@ -42,6 +43,18 @@ extern "C" {
 /* Max. number of devices for thumper */
 #define	DEVID_MAX		48
 
+/*
+ * Given a /devices path for a whole disk, appending this extension gives the
+ * path to a raw device that can be opened.
+ */
+#if defined(__i386) || defined(__amd64)
+#define	PHYS_EXTN	":q,raw"
+#elif defined(__sparc) || defined(__sparcv9)
+#define	PHYS_EXTN	":c,raw"
+#else
+#error	Unknown architecture
+#endif
+
 /* Properties added to the "storage" pgroup: */
 #define	TOPO_PGROUP_STORAGE		"storage"
 #define	TOPO_STORAGE_LOGICAL_DISK_NAME	"logical-disk"
@@ -52,21 +65,26 @@ extern "C" {
 #define	TOPO_STORAGE_CAPACITY		"capacity-in-bytes"
 #define	TOPO_STORAGE_RPM		"speed-in-rpm"
 
-/*
- * Properties for binding group: The binding group required in platform
- * specific xml that describes 'bay' nodes containing internal disks.
- */
-#define	TOPO_PGROUP_BINDING		"binding"
-#define	TOPO_BINDING_OCCUPANT		"occupant-path"
-#define	TOPO_BINDING_DRIVER		"driver"
+static const topo_pgroup_info_t io_pgroup = {
+	TOPO_PGROUP_IO,
+	TOPO_STABILITY_PRIVATE,
+	TOPO_STABILITY_PRIVATE,
+	1
+};
 
-/*
- * The binding group required in platform specific xml that describes 'bay'
- * nodes containing disks attached to an HBA using the 'mpt_sas' driver.
- */
-#define	TOPO_BINDING_DEVCTL		"devctl"
-#define	TOPO_BINDING_ENCLOSURE		"enclosure"
-#define	TOPO_BINDING_SLOT		"slot"
+static const topo_pgroup_info_t disk_auth_pgroup = {
+	FM_FMRI_AUTHORITY,
+	TOPO_STABILITY_PRIVATE,
+	TOPO_STABILITY_PRIVATE,
+	1
+};
+
+static const topo_pgroup_info_t storage_pgroup = {
+	TOPO_PGROUP_STORAGE,
+	TOPO_STABILITY_PRIVATE,
+	TOPO_STABILITY_PRIVATE,
+	1
+};
 
 /*
  * device node information.

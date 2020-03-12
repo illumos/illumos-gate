@@ -436,7 +436,7 @@ struct msghdr32 {
 					/* with left over data */
 #define	MSG_XPG4_2	0x8000		/* Private: XPG4.2 flag */
 
-/* Obsolete but kept for compilation compatability. Use IOV_MAX. */
+/* Obsolete but kept for compilation compatibility. Use IOV_MAX. */
 #define	MSG_MAXIOVLEN	16
 
 #ifdef _KERNEL
