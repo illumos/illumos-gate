@@ -12292,6 +12292,7 @@ f usr/share/man/man1/ypwhich.1 0444 root bin
 s usr/share/man/man1/zcat.1=compress.1
 f usr/share/man/man1/zlogin.1 0444 root bin
 f usr/share/man/man1/zonename.1 0444 root bin
+f usr/share/man/man1/zonestat.1 0444 root bin
 d usr/share/man/man1b 0755 root bin
 f usr/share/man/man1b/df.1b 0444 root bin
 f usr/share/man/man1b/ps.1b 0444 root bin
@@ -12697,6 +12698,7 @@ f usr/share/man/man1m/zic.1m 0444 root bin
 f usr/share/man/man1m/zoneadm.1m 0444 root bin
 f usr/share/man/man1m/zoneadmd.1m 0444 root bin
 f usr/share/man/man1m/zonecfg.1m 0444 root bin
+f usr/share/man/man1m/zonestatd.1m 0444 root bin
 f usr/share/man/man1m/zpool.1m 0444 root bin
 f usr/share/man/man1m/zstreamdump.1m 0444 root bin
 f usr/share/man/man1m/ztest.1m 0444 root bin
@@ -17618,6 +17620,7 @@ s usr/share/man/man3proc/proc_arg_xgrab.3proc=proc_arg_grab.3proc
 s usr/share/man/man3proc/proc_arg_xpsinfo.3proc=proc_arg_psinfo.3proc
 f usr/share/man/man3proc/proc_content2str.3proc 0444 root bin
 s usr/share/man/man3proc/proc_dmodelname.3proc=proc_fltname.3proc
+f usr/share/man/man3proc/proc_fdinfo_free.3proc 0444 root bin
 f usr/share/man/man3proc/proc_fdinfo_misc.3proc 0444 root bin
 f usr/share/man/man3proc/proc_fdinfowalk.3proc 0444 root bin
 f usr/share/man/man3proc/proc_fdwalk.3proc 0444 root bin
