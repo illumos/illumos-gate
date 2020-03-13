@@ -1,0 +1,212 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 Robert Mustacchi
+.\"
+.Dd March 14, 2020
+.Dt E1000G 7D
+.Os
+.Sh NAME
+.Nm e1000g
+.Nd Intel 1 Gigabit Client Ethernet Controller
+.Sh SYNOPSIS
+.Pa /dev/net/e1000g*
+.Sh DESCRIPTION
+The
+.Nm
+driver is a GLDv3 NIC driver for Intel 1 Gigabit Ethernet devices which
+are often found as discrete PCI and PCI expresss add-on-cards and built
+into many Intel chipsets and platforms.
+.Pp
+On most models, the device driver supports transmit and receive
+checksumming, 9000 byte jumbo frames, large send offload
+.Pq LSO ,
+LED control and Ethernet Pause frames.
+.Pp
+For each device supported by the
+.Nm
+driver, a character special-file will be created for each instance.
+The first instance would have id 0 and would be named
+.Sy e1000g0
+and found in the file system at
+.Pa /dev/net/e1000g0 .
+This device node supports the Data Link Provider Interface
+.Pq DLPI
+which is documented in
+.Xr dlpi 7P .
+.Xr libdlpi 3LIB
+provides a more usable interface on top of that.
+.Pp
+For administrative control, the device can be manipulated through the
+.Xr dladm 1M
+utility.
+.Pp
+The following Ethernet controllers are supported by this driver:
+.Bl -bullet
+.It
+82542 Gigabit Ethernet Controller
+.It
+82543GC Gigabit Ethernet Controller
+.It
+82544EI Gigabit Ethernet Controller
+.It
+82544GC Gigabit Ethernet Controller
+.It
+82540EM Gigabit Ethernet Controller
+.It
+82540EP Gigabit Ethernet Controller
+.It
+8254EM Gigabit Ethernet Controller
+.It
+82545GM Gigabit Ethernet Controller
+.It
+82546GB Gigabit Ethernet Adapter
+.It
+82541EI Gigabit Ethernet Controller
+.It
+82541ER Gigabit Ethernet Controller
+.It
+82541GI Gigabit Ethernet Controller
+.It
+82547EI Gigabit Ethernet Controller
+.It
+82547GI Gigabit Ethernet Controller
+.It
+82571EB Gigabit Ethernet Controller
+.It
+82571GB Gigabit Ethernet Controller
+.It
+82571PT Gigabit PT Quad Port Server ExpressModule
+.It
+82572EI Gigabit Ethernet Controller
+.It
+82573E Gigabit Ethernet Controller
+.It
+82573V Gigabit Ethernet Controller
+.It
+82573L Gigabit Ethernet Controller
+.It
+82574L Gigabit Ethernet Controller
+.It
+82583V Gigabit Ethernet Controller
+.It
+80003ES2LAN Gigabit Ethernet Controller
+.It
+82566MM Gigabit Network Connection
+.It
+82566DM Gigabit Network Connection v1-2
+.It
+82566DC Gigabit Network Connection v1-2
+.It
+82562V 10/100 Network Connection v1-2
+.It
+82562GT 10/100 Network Connection v1-2
+.It
+82562G 10/100 Network Connection v1-2
+.It
+82566MC Gigabit Network Connection
+.It
+82567LM v1-v4 Gigabit Network Connection
+.It
+82567LF v1-v3 Gigabit Network Connection
+.It
+82567V v1-v4 Gigabit Network Connection
+.It
+82577LM Gigabit Network Connection
+.It
+82577LC Gigabit Network Connection
+.It
+82578DM Gigabit Ethernet PHY
+.It
+82578DC Gigabit Ethernet PHY
+.It
+82579LM Gigabit Network Connection
+.It
+82579V Gigabit Network Connection
+.It
+Ethernet Connection I217-LM
+.It
+Ethernet Connection I217-V
+.It
+Ethernet Connection I218-LM v1-3
+.It
+Ethernet Connection I218-V v1-3
+.It
+Ethernet Connection I219-LM v1-15
+.It
+Ethernet Connection I219-V v1-14
+.El
+.Pp
+The following specific devices are supported by this driver:
+.Bl -bullet
+.It
+Gigabit CT2 Desktop Adapter
+.It
+PRO/1000 Gigabit Server Adapter
+.It
+PRO/1000 CT Desktop, Mobile, and Network Connection
+.It
+PRO/1000 F Server Adapter
+.It
+PRO/1000 GT Desktop, Server, and Quad Port Server Adapter
+.It
+PRO/1000 MB Server and Dual Port Server Connection
+.It
+PRO/1000 MF Server and Dual Port Server Adapter
+.It
+PRO/1000 MT Desktop, Mobile, Network, Server, Dual Port Server, and Quad
+Port Server Adapter
+.It
+PRO/1000 P Dual Port Server Adapter
+.It
+PRO/1000 PB Dual Port Server Connection
+.It
+PRO/1000 PF Server, Dual Port Server and Quad Port Server Adapter
+.It
+PRO/1000 PL Network Connection
+.It
+PRO/1000 PT Desktop, Server, Dual Port Server, Quad Port Server, and Quad Port LP Server
+Adapter
+.It
+PRO/1000 T Desktop and Server Adapter
+.It
+PRO/1000 XF Server Adapter
+.It
+PRO/1000 XT Server and Desktop Adapter
+.El
+.Pp
+The
+.Xr igb 7D
+driver supports many other Intel Gigabit parts.
+.Sh CONFIGURATION
+The
+.Pa e1000g.conf
+file contains some user configurable parameters, the format of which
+is documented in
+.Xr driver.conf 4 .
+Generally, the use of
+.Xr dladm 1M
+is recommended over editing the configuration file.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /kernel/drv/amd64/e1000g
+Device driver (x86)
+.It Pa /kernel/drv/sparcv9/e1000g
+Device driver (SPARC)
+.It Pa /kernel/drv/e1000g.conf
+Driver configuration file
+.El
+.Sh SEE ALSO
+.Xr dladm 1M ,
+.Xr libdlpi 3LIB ,
+.Xr driver.conf 4 ,
+.Xr igb 7D ,
+.Xr dlpi 7P
