@@ -11,13 +11,14 @@
  * implied warranties, including, without limitation, the implied
  * warranties of merchantability and fitness for a particular
  * purpose.
- *
- * $FreeBSD$
  */
 
-		.set SIO_PRT,SIOPRT		# Base port
 		.set SIO_FMT,SIOFMT		# 8N1
 
+/* int sio_port */
+sio_port:	.long SIOPRT			# Base port
+
+		.globl sio_port
 		.globl sio_init
 		.globl sio_flush
 		.globl sio_putc
@@ -27,13 +28,15 @@
 /* int sio_init(int div) */
 
 sio_init:	pushl %eax
-		movw $SIO_PRT+0x3,%dx		# Data format reg
+		movl (sio_port),%edx
+		addl $0x3,%edx			# Data format reg
 		movb $SIO_FMT|0x80,%al		# Set format
 		outb %al,(%dx)			#  and DLAB
 		subb $0x3,%dl			# Divisor latch reg
 		popl %eax
 		outw %ax,(%dx)			#  BPS
-		movw $SIO_PRT+0x3,%dx		# Data format reg
+		movl (sio_port),%edx
+		addl $0x3,%edx			# Data format reg
 		movb $SIO_FMT,%al		# Clear
 		outb %al,(%dx)			#  DLAB
 		incl %edx			# Modem control reg
@@ -55,7 +58,8 @@ sio_flush.2:	ret				# To caller
 /* void sio_putc(int c) */
 
 sio_putc:	pushl %eax
-		movw $SIO_PRT+0x5,%dx		# Line status reg
+		movl (sio_port),%edx
+		addl $0x5,%edx			# Line status reg
 		xor %ecx,%ecx			# Timeout
 		movb $0x40,%ch			#  counter
 sio_putc.1:	inb (%dx),%al			# Transmitter
@@ -77,7 +81,8 @@ sio_getc.1:	subb $0x5,%dl			# Receiver buffer reg
 
 /* int sio_ischar(void) */
 
-sio_ischar:	movw $SIO_PRT+0x5,%dx		# Line status register
+sio_ischar:	movl (sio_port),%edx
+		addl $0x5,%edx			# Line status register
 		xorl %eax,%eax			# Zero
 		inb (%dx),%al			# Received data
 		andb $0x1,%al			#  ready?

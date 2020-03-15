@@ -115,6 +115,9 @@ main(void)
 	}
 	setheap(heap_bottom, heap_top);
 
+	/* detect ACPI for future reference */
+	biosacpi_detect();
+
 	/*
 	 * XXX Chicken-and-egg problem; we want to have console output early,
 	 * but some console attributes may depend on reading from eg. the boot
@@ -181,9 +184,6 @@ main(void)
 		initial_bootinfo->bi_basemem = bios_basemem / 1024;
 		initial_bootinfo->bi_extmem = bios_extmem / 1024;
 	}
-
-	/* detect ACPI for future reference */
-	biosacpi_detect();
 
 	/* detect SMBIOS for future reference */
 	smbios_detect(NULL);

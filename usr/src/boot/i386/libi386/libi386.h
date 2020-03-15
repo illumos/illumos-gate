@@ -130,6 +130,7 @@ uint32_t biospci_locator(int8_t bus, uint8_t device, uint8_t function);
 int biospci_write_config(uint32_t locator, int offset, int width, uint32_t val);
 
 void	biosacpi_detect(void);
+int	comc_getspeed(int);
 
 int	i386_autoload(void);
 vm_offset_t i386_loadaddr(u_int type, void *data, vm_offset_t addr);
