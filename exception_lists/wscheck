@@ -105,6 +105,7 @@ usr/src/uts/i86pc/sys/vmm_dev.h
 usr/src/uts/i86pc/sys/vmm_instruction_emul.h
 usr/src/uts/common/io/qede/*
 usr/src/uts/common/io/i40e/core/*
+usr/src/test/util-tests/tests/dis/i386/*.out
 usr/src/tools/smatch/src/*
 usr/src/uts/common/io/cxgbe/*
 usr/src/uts/common/io/qede/*

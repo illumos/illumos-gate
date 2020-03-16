@@ -1382,6 +1382,7 @@ htable_create(
 	if (level < 0 || level > TOP_LEVEL(hat))
 		panic("htable_create(): level %d out of range\n", level);
 
+	ht = NULL;
 	/*
 	 * Create the page tables in top down order.
 	 */

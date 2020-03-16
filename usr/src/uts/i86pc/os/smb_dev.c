@@ -148,7 +148,7 @@ smbios_open(const char *file, int version, int flags, int *errp)
 	} else if (smb3 != NULL) {
 		ep_type = SMBIOS_ENTRY_POINT_30;
 		p = smb3;
-	} else if (smb2 != NULL) {
+	} else {
 		ep_type = SMBIOS_ENTRY_POINT_21;
 		p = smb2;
 	}

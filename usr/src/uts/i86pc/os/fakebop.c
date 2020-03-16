@@ -2411,6 +2411,7 @@ find_fw_table(ACPI_TABLE_RSDP *rsdp, char *signature)
 	 * use the XSDT.  If the XSDT address is 0, though, fall back to
 	 * revision 1 and use the RSDT.
 	 */
+	xsdt_addr = 0;
 	if (revision == 0) {
 		if (rsdp == NULL)
 			return (NULL);

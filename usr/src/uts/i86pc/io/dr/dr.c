@@ -1570,6 +1570,7 @@ dr_dev_make_list(dr_handle_t *hp, sbd_comp_type_t type, int present_only,
 		nunits = MAX_IO_UNITS_PER_BOARD;
 		break;
 	default:
+		nunits = 0;
 		/* catch this in debug kernels */
 		ASSERT(0);
 		break;

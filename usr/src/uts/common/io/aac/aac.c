@@ -2297,6 +2297,10 @@ aac_check_firmware(struct aac_softstate *softs)
 	uint32_t max_sectors;
 	uint32_t status;
 
+	max_fibs = 0;
+	max_sectors = 0;
+	sg_tablesize = 0;
+
 	/* Get supported options */
 	if ((aac_sync_mbcommand(softs, AAC_MONKER_GETINFO, 0, 0, 0, 0,
 	    &status)) != AACOK) {
@@ -5136,7 +5140,7 @@ aac_cmd_dma_alloc(struct aac_softstate *softs, struct aac_cmd *acp,
 {
 	int kf = (cb == SLEEP_FUNC) ? KM_SLEEP : KM_NOSLEEP;
 	uint_t oldcookiec;
-	int bioerr;
+	int bioerr = 0;
 	int rval;
 
 	oldcookiec = acp->left_cookien;
@@ -7413,7 +7417,7 @@ aac_tran_bus_config(dev_info_t *parent, uint_t flags, ddi_bus_config_op_t op,
 {
 	struct aac_softstate *softs;
 	int circ = 0;
-	int rval;
+	int rval = NDI_FAILURE;
 
 	if ((softs = ddi_get_soft_state(aac_softstatep,
 	    ddi_get_instance(parent))) == NULL)
@@ -7423,7 +7427,7 @@ aac_tran_bus_config(dev_info_t *parent, uint_t flags, ddi_bus_config_op_t op,
 	mutex_enter(&softs->io_lock);
 	if (softs->state & AAC_STATE_QUIESCED) {
 		AACDB_PRINT(softs, CE_NOTE,
-		    "bus_config abroted because bus is quiesced");
+		    "bus_config aborted because bus is quiesced");
 		mutex_exit(&softs->io_lock);
 		return (NDI_FAILURE);
 	}

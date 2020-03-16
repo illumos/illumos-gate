@@ -1,0 +1,13 @@
+    libdis_test:      c4 43 25 44 e2 23  vpclmulqdq $0x23,%ymm10,%ymm11,%ymm12
+    libdis_test+0x6:  67 c4 63 15 44 b0  addr32 vpclmulqdq $0x42,0x12345(%rax),%ymm13,%ymm14
+                      45 23 01 00 42 
+    libdis_test+0x11: 67 62 e3 05 28 44  addr32 vpclmulqdq $-0x17,0x678(%rbx,%rcx,4),%ymm15,%ymm16	<0xe9>
+                      84 8b 78 06 00 00 
+                      e9 
+    libdis_test+0x1e: 62 53 25 48 44 d4  vpclmulqdq $0x23,%zmm12,%zmm11,%zmm10
+                      23 
+    libdis_test+0x25: 67 62 73 3d 48 44  addr32 vpclmulqdq $0x42,0x12345(%rax),%zmm8,%zmm8
+                      80 45 23 01 00 42 
+    libdis_test+0x31: 67 62 f3 45 48 44  addr32 vpclmulqdq $-0x17,0x678(%rbx,%rcx,4),%zmm7,%zmm6	<0xe9>
+                      b4 8b 78 06 00 00 
+                      e9 

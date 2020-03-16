@@ -548,6 +548,7 @@ add_deventry_info(ivhd_t *ivhdp, ivhd_deventry_t *deventry,
 		last = acpi_ivhdp;
 		break;
 	case DEVENTRY_RANGE_END:
+		idx = 0;
 		cmn_err(CE_PANIC, "%s: Unexpected Range End Deventry",
 		    amd_iommu_modname);
 		/*NOTREACHED*/
@@ -589,9 +590,10 @@ add_deventry_info(ivhd_t *ivhdp, ivhd_deventry_t *deventry,
 		idx = AMD_IOMMU_ACPI_INFO_HASH_SZ;
 		break;
 	default:
+		idx = 0;
 		cmn_err(CE_PANIC, "%s: Unsupported deventry type",
 		    amd_iommu_modname);
-		/* FALLTHROUGH */
+		/*NOTREACHED*/
 	}
 
 	acpi_ivhdp->ach_Lint1Pass = deventry->idev_Lint1Pass;
@@ -717,6 +719,7 @@ set_ivmd_info(ivmd_t *ivmdp, amd_iommu_acpi_ivmd_t **hash)
 		idx = AMD_IOMMU_ACPI_INFO_HASH_SZ;
 		break;
 	default:
+		idx = 0;
 		cmn_err(CE_PANIC, "Unknown AMD IOMMU ACPI IVMD deviceid type: "
 		    "%x", ivmdp->ivmd_type);
 		/*NOTREACHED*/

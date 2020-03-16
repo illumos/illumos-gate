@@ -1347,7 +1347,7 @@ lgrp_plat_root_hand(void)
 /*
  * Update CPU to node mapping for given CPU and proximity domain.
  * Return values:
- * 	- zero for success
+ *	- zero for success
  *	- positive numbers for warnings
  *	- negative numbers for errors
  */
@@ -1693,6 +1693,7 @@ lgrp_plat_latency_adjust(memnode_phys_addr_map_t *memnode_info,
 	const lgrp_config_flag_t	cflag = LGRP_CONFIG_LAT_CHANGE_ALL;
 	int				lat_corrected[MAX_NODES][MAX_NODES];
 
+	t = 0;
 	/*
 	 * Nothing to do when this is an UMA machine or don't have args needed
 	 */
@@ -3492,7 +3493,7 @@ opt_get_numa_config(uint_t *node_cnt, int *mem_intrlv,
 	uint_t				node_info[MAX_NODES];
 	uint_t				off_hi;
 	uint_t				off_lo;
-	uint64_t			nb_cfg_reg;
+	uint64_t nb_cfg_reg;
 
 	/*
 	 * Read configuration registers from PCI configuration space to
@@ -3527,6 +3528,7 @@ opt_get_numa_config(uint_t *node_cnt, int *mem_intrlv,
 	 * For Greyhound, PCI Extended Configuration Space must be enabled to
 	 * read high DRAM address map base and limit registers
 	 */
+	nb_cfg_reg = 0;
 	if (opt_family == AMD_FAMILY_GREYHOUND) {
 		nb_cfg_reg = rdmsr(MSR_AMD_NB_CFG);
 		if ((nb_cfg_reg & AMD_GH_NB_CFG_EN_ECS) == 0)

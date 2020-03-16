@@ -278,12 +278,11 @@ pcitool_get_intr(dev_info_t *dip, void *arg, int mode)
 	pcitool_intr_get_t partial_iget;
 	pcitool_intr_get_t *iget = &partial_iget;
 	size_t	iget_kmem_alloc_size = 0;
-	uint8_t num_devs_ret;
+	uint8_t num_devs_ret = 0;
 	int copyout_rval;
 	int rval = SUCCESS;
 	int circ;
 	int i;
-
 	ddi_intr_handle_impl_t info_hdl;
 	apic_get_intr_t intr_info;
 	apic_get_type_t type_info;
@@ -640,6 +639,9 @@ pcitool_cfg_access(pcitool_reg_t *prg, boolean_t write_flag,
 		case 8:
 			local_data = VAL64(&req);
 			break;
+		default:
+			prg->status = PCITOOL_INVALID_ADDRESS;
+			return (ENOTSUP);
 		}
 		if (big_endian) {
 			prg->data =

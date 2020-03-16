@@ -22,7 +22,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <sys/dtrace.h>
@@ -61,8 +61,8 @@ INTFUNC(mutex_type_spin(&`cpu_lock))
 INTFUNC(rw_read_held(&`vfssw_lock))
 INTFUNC(rw_write_held(&`vfssw_lock))
 INTFUNC(rw_iswriter(&`vfssw_lock))
-INTFUNC(copyin(NULL, 1))
-STRFUNC(copyinstr(NULL, 1))
+INTFUNC(copyin((uintptr_t)NULL, 1))
+STRFUNC(copyinstr((uintptr_t)NULL, 1))
 INTFUNC(speculation())
 INTFUNC(progenyof($pid))
 INTFUNC(strlen("fooey"))

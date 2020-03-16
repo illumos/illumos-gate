@@ -27,8 +27,6 @@
  * Copyright (c) 2017 Joyent, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * x86 relocation code.
  */
@@ -174,9 +172,8 @@ smap_reloc_resolve(struct module *mp, char *symname, uint8_t *instr)
 }
 
 int
-/* ARGSUSED2 */
-do_relocate(struct module *mp, char *reltbl, Word relshtype, int nreloc,
-	int relocsize, Addr baseaddr)
+do_relocate(struct module *mp, char *reltbl, int nreloc, int relocsize,
+    Addr baseaddr)
 {
 	unsigned long stndx;
 	unsigned long off;	/* can't be register for tnf_reloc_resolve() */
@@ -184,7 +181,7 @@ do_relocate(struct module *mp, char *reltbl, Word relshtype, int nreloc,
 	register unsigned int rtype;
 	unsigned long value;
 	Elf64_Sxword addend;
-	Sym *symref;
+	Sym *symref = NULL;
 	int err = 0;
 	tnf_probe_control_t *probelist = NULL;
 	tnf_tag_data_t *taglist = NULL;
@@ -385,8 +382,8 @@ do_relocations(struct module *mp)
 		}
 #endif
 
-		if (do_relocate(mp, (char *)rshp->sh_addr, rshp->sh_type,
-		    nreloc, rshp->sh_entsize, shp->sh_addr) < 0) {
+		if (do_relocate(mp, (char *)rshp->sh_addr, nreloc,
+		    rshp->sh_entsize, shp->sh_addr) < 0) {
 			_kobj_printf(ops,
 			    "do_relocations: %s do_relocate failed\n",
 			    mp->filename);

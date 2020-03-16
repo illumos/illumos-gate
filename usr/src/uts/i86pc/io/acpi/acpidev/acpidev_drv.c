@@ -1092,6 +1092,7 @@ acpidev_filter_device(acpidev_walk_info_t *infop, ACPI_HANDLE hdl,
 {
 	acpidev_filter_result_t res;
 
+	res = ACPIDEV_FILTER_FAILED;
 	/* Evaluate filtering rules. */
 	for (; entries > 0; entries--, afrp++) {
 		if (afrp->adf_filter_func != NULL) {

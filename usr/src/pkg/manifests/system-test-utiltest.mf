@@ -1184,6 +1184,8 @@ file path=opt/util-tests/tests/dis/i386/32.avx512.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.avx512.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.avx512_vnni.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.avx512_vnni.s mode=0444
+file path=opt/util-tests/tests/dis/i386/32.avx512_vpclmulqdq.out mode=0444
+file path=opt/util-tests/tests/dis/i386/32.avx512_vpclmulqdq.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.bmi1.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.bmi1.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.bmi2.out mode=0444
@@ -1200,6 +1202,8 @@ file path=opt/util-tests/tests/dis/i386/32.fma-sd.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.fma-sd.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.fma-ss.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.fma-ss.s mode=0444
+file path=opt/util-tests/tests/dis/i386/32.gfni.out mode=0444
+file path=opt/util-tests/tests/dis/i386/32.gfni.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.lzcnt.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.lzcnt.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.movbe.out mode=0444
@@ -1220,6 +1224,8 @@ file path=opt/util-tests/tests/dis/i386/32.sse-4.2.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.sse-4.2.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.ssse3.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.ssse3.s mode=0444
+file path=opt/util-tests/tests/dis/i386/32.vaes.out mode=0444
+file path=opt/util-tests/tests/dis/i386/32.vaes.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.xsave.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.xsave.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.adx.out mode=0444
@@ -1236,6 +1242,8 @@ file path=opt/util-tests/tests/dis/i386/64.avx512.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.avx512.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.avx512_vnni.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.avx512_vnni.s mode=0444
+file path=opt/util-tests/tests/dis/i386/64.avx512_vpclmulqdq.out mode=0444
+file path=opt/util-tests/tests/dis/i386/64.avx512_vpclmulqdq.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.bmi1.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.bmi1.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.bmi2.out mode=0444
@@ -1256,6 +1264,8 @@ file path=opt/util-tests/tests/dis/i386/64.fma-ss.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.fma-ss.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.fsbase.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.fsbase.s mode=0444
+file path=opt/util-tests/tests/dis/i386/64.gfni.out mode=0444
+file path=opt/util-tests/tests/dis/i386/64.gfni.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.lzcnt.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.lzcnt.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.movbe.out mode=0444
@@ -1278,6 +1288,8 @@ file path=opt/util-tests/tests/dis/i386/64.sse-4.2.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.sse-4.2.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.ssse3.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.ssse3.s mode=0444
+file path=opt/util-tests/tests/dis/i386/64.vaes.out mode=0444
+file path=opt/util-tests/tests/dis/i386/64.vaes.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.vmx.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.vmx.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.xsave.out mode=0444
@@ -1300,6 +1312,8 @@ file path=opt/util-tests/tests/dis/i386/tst.tsc.out mode=0444
 file path=opt/util-tests/tests/dis/i386/tst.tsc.s mode=0444
 file path=opt/util-tests/tests/dis/i386/tst.vmx.out mode=0444
 file path=opt/util-tests/tests/dis/i386/tst.vmx.s mode=0444
+file path=opt/util-tests/tests/dis/i386/tst.wbnovind.out mode=0444
+file path=opt/util-tests/tests/dis/i386/tst.wbnovind.s mode=0444
 file path=opt/util-tests/tests/dis/risc-v-c/32.ldsr.out mode=0444
 file path=opt/util-tests/tests/dis/risc-v-c/32.ldsr.s mode=0444
 file path=opt/util-tests/tests/dis/risc-v-c/64.int.out mode=0444

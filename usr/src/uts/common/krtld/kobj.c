@@ -1176,7 +1176,6 @@ bind_primary(val_t *bootaux, int lmid)
 		if (mp->flags & KOBJ_EXEC) {
 			Dyn *dyn;
 			Word relasz = 0, relaent = 0;
-			Word shtype;
 			char *rela = NULL;
 
 			for (dyn = (Dyn *)bootaux[BA_DYNAMIC].ba_ptr;
@@ -1191,11 +1190,9 @@ bind_primary(val_t *bootaux, int lmid)
 					relaent = dyn->d_un.d_val;
 					break;
 				case DT_RELA:
-					shtype = SHT_RELA;
 					rela = (char *)dyn->d_un.d_ptr;
 					break;
 				case DT_REL:
-					shtype = SHT_REL;
 					rela = (char *)dyn->d_un.d_ptr;
 					break;
 				}
@@ -1212,8 +1209,8 @@ bind_primary(val_t *bootaux, int lmid)
 				_kobj_printf(ops, "krtld: relocating: file=%s "
 				    "KOBJ_EXEC\n", mp->filename);
 #endif
-			if (do_relocate(mp, rela, shtype, relasz/relaent,
-			    relaent, (Addr)mp->text) < 0)
+			if (do_relocate(mp, rela, relasz/relaent, relaent,
+			    (Addr)mp->text) < 0)
 				return (-1);
 		} else {
 			if (do_relocations(mp) < 0)
@@ -2103,6 +2100,7 @@ kobj_load_primary_module(struct modctl *modp)
 	if (kobj_load_module(modp, 0) != 0)
 		return (-1);
 
+	dep = NULL;
 	mp = modp->mod_mp;
 	mp->flags |= KOBJ_PRIM;
 
@@ -2118,7 +2116,8 @@ kobj_load_primary_module(struct modctl *modp)
 		return (-1);
 	}
 
-	add_dependent(mp, dep->mod_mp);
+	if (dep != NULL)
+		add_dependent(mp, dep->mod_mp);
 
 	/*
 	 * Relocate it.  This module may not be part of a link map, so we

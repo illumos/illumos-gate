@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Robert Mustacchi
  */
 
 /*
@@ -246,7 +247,8 @@ enum {
 	ADX,		/* ADX instructions, support REX.w, mod_rm->mod_reg */
 	EVEX_RX,	/* EVEX  mod_reg                      -> mod_rm */
 	EVEX_MX,	/* EVEX  mod_rm                       -> mod_reg */
-	EVEX_RMrX	/* EVEX  EVEX.vvvv, mod_rm            -> mod_reg */
+	EVEX_RMrX,	/* EVEX  EVEX.vvvv, mod_rm            -> mod_reg */
+	EVEX_RMRX	/* EVEX  EVEX.vvvv, mod_rm, imm8      -> mod_reg */
 };
 
 /*
@@ -343,7 +345,6 @@ enum {
 #define	TSZ(name, amode, sz)	{TERM, amode, name, 1, 0, 0, 0, 0}
 #define	TSaZ(name, amode, sz)	{TERM, amode, name, 1, 0, 0, 0, 0, 0, AVS2}
 #define	TSq(name, amode)	{TERM, amode, name, 0, 0, 0, 0, 0, 0, AVS5Q}
-#define	TSd(name, amode)	{TERM, amode, name, 0, 0, 0, 0, 0, 0, AVS5D}
 #define	TSZx(name, amode, sz)	{TERM, amode, name, 1, 1, 0, 0, 0}
 #define	TSZy(name, amode, sz)	{TERM, amode, name, 1, 0, 1, 0, 0}
 #define	INVALID			{TERM, UNKNOWN, "", 0, 0, 0, 0, 0}
@@ -366,7 +367,6 @@ enum {
 #define	TSZ(name, amode, sz)	{TERM, amode, sz, 0, 0, 0, 0}
 #define	TSaZ(name, amode, sz)	{TERM, amode, sz, 0, 0, 0, 0, 0, AVS2}
 #define	TSq(name, amode)	{TERM, amode, 0, 0, 0, 0, 0, 0, AVS5Q}
-#define	TSd(name, amode)	{TERM, amode, 0, 0, 0, 0, 0, 0, AVS5D}
 #define	TSZx(name, amode, sz)	{TERM, amode, sz, 1, 0, 0, 0}
 #define	TSZy(name, amode, sz)	{TERM, amode, sz, 0, 1, 0, 0}
 #define	INVALID			{TERM, UNKNOWN, 0, 0, 0, 0, 0}
@@ -1461,22 +1461,22 @@ const instable_t dis_opAVXF30F[256] = {
 };
 
 /*
- * Table for instructions with an EVEX prefix.
+ * Table for instructions with an EVEX prefix followed by 0F.
  */
-const instable_t dis_opAVX62[256] = {
+const instable_t dis_opEVEX0F[256] = {
 /*  [00]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [04]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [08]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [0C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
-/*  [10]  */	TSd("vmovup",EVEX_MX),	TSd("vmovup",EVEX_RX),	INVALID,		INVALID,
+/*  [10]  */	TNS("vmovups",EVEX_MX),	TNS("vmovups",EVEX_RX),	INVALID,		INVALID,
 /*  [14]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [18]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [1C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
 /*  [20]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [24]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [28]  */	TSd("vmovap",EVEX_MX),	TSd("vmovap",EVEX_RX),	INVALID,		INVALID,
+/*  [28]  */	TNS("vmovaps",EVEX_MX),	TNS("vmovaps",EVEX_RX),	INVALID,		INVALID,
 /*  [2C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
 /*  [30]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -1489,20 +1489,105 @@ const instable_t dis_opAVX62[256] = {
 /*  [48]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [4C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
-/*  [50]  */	TNSZ("vpdpbusd",EVEX_RMrX,16),TNSZ("vpdpbusds",EVEX_RMrX,16),TNSZ("vpdpwssd",EVEX_RMrX,16),TNSZ("vpdpwssds",EVEX_RMrX,16),
-/*  [54]  */	TSd("vandp",EVEX_RMrX), TSd("vandnp",EVEX_RMrX), TSd("vorp",EVEX_RMrX),		TSd("vxorp",EVEX_RMrX),
+/*  [50]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [54]  */	TNS("vandps",EVEX_RMrX),TNS("vandnps",EVEX_RMrX),TNS("vorps",EVEX_RMrX),TNS("vxorps",EVEX_RMrX),
 /*  [58]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [5C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
 /*  [60]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [64]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [68]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [6C]  */	INVALID,		INVALID,		INVALID,		TNS("vmovdq",EVEX_MX),
+/*  [6C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
 /*  [70]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [74]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [78]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [7C]  */	INVALID,		INVALID,		INVALID,		TNS("vmovdq",EVEX_RX),
+/*  [7C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [80]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [84]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [88]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [0C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [90]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [94]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [98]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [9C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [A0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [A4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [A8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [AC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [B0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [B4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [B8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [BC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [C0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [C4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [C8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [CC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [D0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [D4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [D8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [DC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [E0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [E4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [E8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [EC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [F0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [F4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [F8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [FC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+};
+
+/*
+ * Decode tables for EVEX 66 0F
+ */
+const instable_t dis_opEVEX660F[256] = {
+/*  [00]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [04]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [08]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [0C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [10]  */	TNS("vmovupd",EVEX_MX),	TNS("vmovupd",EVEX_RX),	INVALID,		INVALID,
+/*  [14]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [18]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [1C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [20]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [24]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [28]  */	TNS("vmovapd",EVEX_MX),	TNS("vmovapd",EVEX_RX),	INVALID,		INVALID,
+/*  [2C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [30]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [34]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [38]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [3C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [40]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [44]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [48]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [4C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [50]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [54]  */	TNS("vandpd",EVEX_RMrX),TNS("vandnpd",EVEX_RMrX),TNS("vorpd",EVEX_RMrX),TNS("vxorpd",EVEX_RMrX),
+/*  [58]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [5C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [60]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [64]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [68]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [6C]  */	INVALID,		INVALID,		INVALID,		TNS("vmovdqa",EVEX_MX),
+
+/*  [70]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [74]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [78]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [7C]  */	INVALID,		INVALID,		INVALID,		TNS("vmovdqa",EVEX_RX),
 
 /*  [80]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [84]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -1545,6 +1630,334 @@ const instable_t dis_opAVX62[256] = {
 /*  [FC]  */	INVALID,		INVALID,		INVALID,		INVALID,
 };
 
+const instable_t dis_opEVEX660F38[256] = {
+/*  [00]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [04]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [08]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [0C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [10]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [14]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [18]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [1C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [20]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [24]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [28]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [2C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [30]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [34]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [38]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [3C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [40]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [44]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [48]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [4C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [50]  */	TNSZ("vpdpbusd",EVEX_RMrX,16),TNSZ("vpdpbusds",EVEX_RMrX,16),TNSZ("vpdpwssd",EVEX_RMrX,16),TNSZ("vpdpwssds",EVEX_RMrX,16),
+/*  [54]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [58]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [5C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [60]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [64]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [68]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [6C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [70]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [74]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [78]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [7C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [80]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [84]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [88]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [8C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [90]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [94]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [98]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [9C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [A0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [A4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [A8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [AC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [B0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [B4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [B8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [BC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [C0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [C4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [C8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [CC]  */	INVALID,		INVALID,		INVALID,		TNS("vgf2p8mulb",EVEX_RMrX),
+
+/*  [D0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [D4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [D8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [DC]  */	TNSZ("vaesenc",EVEX_RMrX,16),TNSZ("vaesenclast",EVEX_RMrX,16),TNSZ("vaesdec",EVEX_RMrX,16),TNSZ("vaesdeclast",EVEX_RMrX,16),
+
+/*  [E0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [E4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [E8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [EC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [F0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [F4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [F8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [FC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+};
+
+const instable_t dis_opEVEX660F3A[256] = {
+/*  [00]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [04]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [08]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [0C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [10]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [14]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [18]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [1C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [20]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [24]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [28]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [2C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [30]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [34]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [38]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [3C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [40]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [44]  */	TNSZ("vpclmulqdq",EVEX_RMRX,16),INVALID,		INVALID,		INVALID,
+/*  [48]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [4C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [50]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [54]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [58]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [5C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [60]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [64]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [68]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [6C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [70]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [74]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [78]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [7C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [80]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [84]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [88]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [8C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [90]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [94]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [98]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [9C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [A0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [A4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [A8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [AC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [B0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [B4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [B8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [BC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [C0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [C4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [C8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [CC]  */	INVALID,		INVALID,		TNS("vgf2p8affineqb",EVEX_RMRX),TNS("vgf2p8affineinvqb",EVEX_RMRX),
+
+/*  [D0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [D4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [D8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [DC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [E0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [E4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [E8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [EC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [F0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [F4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [F8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [FC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+};
+
+
+const instable_t dis_opEVEXF20F[256] = {
+/*  [00]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [04]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [08]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [0C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [10]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [14]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [18]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [1C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [20]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [24]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [28]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [2C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [30]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [34]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [38]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [3C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [40]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [44]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [48]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [4C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [50]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [54]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [58]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [5C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [60]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [64]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [68]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [6C]  */	INVALID,		INVALID,		INVALID,		TNS("vmovdqu",EVEX_MX),
+
+/*  [70]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [74]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [78]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [7C]  */	INVALID,		INVALID,		INVALID,		TNS("vmovdqu",EVEX_RX),
+
+/*  [80]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [84]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [88]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [0C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [90]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [94]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [98]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [9C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [A0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [A4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [A8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [AC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [B0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [B4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [B8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [BC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [C0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [C4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [C8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [CC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [D0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [D4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [D8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [DC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [E0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [E4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [E8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [EC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [F0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [F4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [F8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [FC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+};
+
+const instable_t dis_opEVEXF30F[256] = {
+/*  [00]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [04]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [08]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [0C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [10]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [14]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [18]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [1C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [20]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [24]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [28]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [2C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [30]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [34]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [38]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [3C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [40]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [44]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [48]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [4C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [50]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [54]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [58]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [5C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [60]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [64]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [68]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [6C]  */	INVALID,		INVALID,		INVALID,		TNS("vmovdqu",EVEX_MX),
+
+/*  [70]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [74]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [78]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [7C]  */	INVALID,		INVALID,		INVALID,		TNS("vmovdqu",EVEX_RX),
+
+/*  [80]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [84]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [88]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [0C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [90]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [94]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [98]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [9C]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [A0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [A4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [A8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [AC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [B0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [B4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [B8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [BC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [C0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [C4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [C8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [CC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [D0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [D4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [D8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [DC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [E0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [E4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [E8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [EC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+
+/*  [F0]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [F4]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [F8]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [FC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+};
 /*
  * The following two tables are used to encode crc32 and movbe
  * since they share the same opcodes.
@@ -1632,7 +2045,7 @@ const instable_t dis_op0F38[256] = {
 /*  [C0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [C4]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [C8]  */	TNSZ("sha1nexte",XMM,16),TNSZ("sha1msg1",XMM,16),TNSZ("sha1msg2",XMM,16),TNSZ("sha256rnds2",XMM,16),
-/*  [CC]  */	TNSZ("sha256msg1",XMM,16),TNSZ("sha256msg2",XMM,16),INVALID,		INVALID,
+/*  [CC]  */	TNSZ("sha256msg1",XMM,16),TNSZ("sha256msg2",XMM,16),INVALID,		TNS("gf2p8mulb",XMM_66r),
 
 /*  [D0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [D4]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -1713,7 +2126,7 @@ const instable_t dis_opAVX660F38[256] = {
 /*  [C0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [C4]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [C8]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [CC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [CC]  */	INVALID,		INVALID,		INVALID,		TNS("vgf2p8mulb",VEX_RMrX),
 
 /*  [D0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [D4]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -1794,7 +2207,7 @@ const instable_t dis_op0F3A[256] = {
 /*  [C0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [C4]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [C8]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [CC]  */	TNSZ("sha1rnds4",XMMP,16),INVALID,		INVALID,		INVALID,
+/*  [CC]  */	TNSZ("sha1rnds4",XMMP,16),INVALID,		TNS("gf2p8affineqb",XMMP_66r),TNS("gf2p8affineinvqb",XMMP_66r),
 
 /*  [D0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [D4]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -1876,7 +2289,7 @@ const instable_t dis_opAVX660F3A[256] = {
 /*  [C0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [C4]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [C8]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [CC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [CC]  */	INVALID,		INVALID,		TNS("vgf2p8affineqb",VEX_RMRX),TNS("vgf2p8affineinvqb",VEX_RMRX),
 
 /*  [D0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [D4]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -2669,44 +3082,35 @@ dtrace_evex_mnem_adjust(dis86_t *x, const instable_t *dp, uint_t vex_W,
     uint_t evex_byte2)
 {
 #ifdef DIS_TEXT
-	/* No adjustments needed for VNNI instructions. */
-	if (dp == &dis_opAVX62[0x50] || dp == &dis_opAVX62[0x51] ||
-	    dp == &dis_opAVX62[0x52] || dp == &dis_opAVX62[0x53]) {
-		return;
+	if (dp == &dis_opEVEX660F[0x7f] ||		/* vmovdqa */
+	    dp == &dis_opEVEX660F[0x6f]) {
+		(void) strlcat(x->d86_mnem, vex_W != 0 ? "64" : "32",
+		    OPLEN);
 	}
 
-	if (dp == &dis_opAVX62[0x7f] ||		/* vmovdq */
-	    dp == &dis_opAVX62[0x6f]) {
-		/* Aligned or Unaligned? */
-		if ((evex_byte2 & 0x3) == 0x01) {
-			(void) strlcat(x->d86_mnem, "a", OPLEN);
-			(void) strlcat(x->d86_mnem, vex_W != 0 ? "64" : "32",
-			    OPLEN);
-		} else {
-			(void) strlcat(x->d86_mnem, "u", OPLEN);
-			switch (evex_byte2 & 0x81) {
-			case 0x0:
-				(void) strlcat(x->d86_mnem, "32", OPLEN);
-				break;
-			case 0x1:
-				(void) strlcat(x->d86_mnem, "8", OPLEN);
-				break;
-			case 0x80:
-				(void) strlcat(x->d86_mnem, "64", OPLEN);
-				break;
-			case 0x81:
-				(void) strlcat(x->d86_mnem, "16", OPLEN);
-				break;
-			}
+	if (dp == &dis_opEVEXF20F[0x7f] ||		/* vmovdqu */
+	    dp == &dis_opEVEXF20F[0x6f] ||
+	    dp == &dis_opEVEXF30F[0x7f] ||
+	    dp == &dis_opEVEXF30F[0x6f]) {
+		switch (evex_byte2 & 0x81) {
+		case 0x0:
+			(void) strlcat(x->d86_mnem, "32", OPLEN);
+			break;
+		case 0x1:
+			(void) strlcat(x->d86_mnem, "8", OPLEN);
+			break;
+		case 0x80:
+			(void) strlcat(x->d86_mnem, "64", OPLEN);
+			break;
+		case 0x81:
+			(void) strlcat(x->d86_mnem, "16", OPLEN);
+			break;
 		}
-	} else {
-		if (dp->it_avxsuf == AVS5Q) {
-			(void) strlcat(x->d86_mnem, vex_W != 0 ?  "q" : "d",
-			    OPLEN);
-		} else {
-			(void) strlcat(x->d86_mnem, vex_W != 0 ?  "d" : "s",
-			    OPLEN);
-		}
+	}
+
+	if (dp->it_avxsuf == AVS5Q) {
+		(void) strlcat(x->d86_mnem, vex_W != 0 ?  "q" : "d",
+		    OPLEN);
 	}
 #endif
 }
@@ -3032,10 +3436,12 @@ dtrace_get_operand(dis86_t *x, uint_t mode, uint_t r_m, int wbit, int opindex)
 	}
 
 	/*
-	 * 32 and 64 bit addressing modes are more complex since they
-	 * can involve an SIB (scaled index and base) byte to decode.
+	 * 32 and 64 bit addressing modes are more complex since they can
+	 * involve an SIB (scaled index and base) byte to decode. When using VEX
+	 * and EVEX encodings, the r_m indicator for a SIB may be offset by 8
+	 * and 24 (8 + 16) respectively.
 	 */
-	if (r_m == ESP_REGNO || r_m == ESP_REGNO + 8) {
+	if (r_m == ESP_REGNO || r_m == ESP_REGNO + 8 || r_m == ESP_REGNO + 24) {
 		have_SIB = 1;
 		dtrace_get_SIB(x, &ss, &index, &base);
 		if (x->d86_error)
@@ -3220,7 +3626,7 @@ dtrace_get_operand(dis86_t *x, uint_t mode, uint_t r_m, int wbit, int opindex)
 int
 dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 {
-	const instable_t *dp;	/* decode table being used */
+	const instable_t *dp = NULL;	/* decode table being used */
 #ifdef DIS_TEXT
 	uint_t i;
 #endif
@@ -3296,6 +3702,7 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 	uint_t vex_L = 0;
 	uint_t evex_L = 0;
 	uint_t evex_modrm = 0;
+	uint_t evex_prefix = 0;
 	dis_gather_regs_t *vreg;
 
 #ifdef	DIS_TEXT
@@ -3430,6 +3837,8 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 	 * EVEX prefix and the 2nd byte must have bits 2 & 3 set to 0.
 	 */
 	if (opcode1 == 0x6 && opcode2 == 0x2) {
+		evex_prefix = 0x62;
+
 		/*
 		 * An EVEX prefix is 4 bytes long, get the next 3 bytes.
 		 */
@@ -3486,10 +3895,60 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 		vex_W = (opcode6 & VEX_W) >> 3;
 		vex_p = opcode7 & VEX_p;
 
+		/*
+		 * Store the corresponding prefix information for later use when
+		 * calculating the SIB.
+		 */
+		if ((evex_byte1 & VEX_R) == 0)
+			x->d86_rex_prefix |= REX_R;
+		if ((evex_byte1 & VEX_X) == 0)
+			x->d86_rex_prefix |= REX_X;
+		if ((evex_byte1 & VEX_B) == 0)
+			x->d86_rex_prefix |= REX_B;
+
 		/* Currently only 3 valid values for evex L'L: 00, 01, 10 */
 		evex_L = (opcode8 & EVEX_L) >> 1;
 
-		dp = (instable_t *)&dis_opAVX62[(opcode1 << 4) | opcode2];
+		switch (vex_p) {
+		case VEX_p_66:
+			switch (vex_m) {
+			case VEX_m_0F:
+				dp = &dis_opEVEX660F[(opcode1 << 4) | opcode2];
+				break;
+			case VEX_m_0F38:
+				dp = &dis_opEVEX660F38[(opcode1 << 4) |
+				    opcode2];
+				break;
+			case VEX_m_0F3A:
+				dp = &dis_opEVEX660F3A[(opcode1 << 4) |
+				    opcode2];
+				break;
+			default:
+				goto error;
+			}
+			break;
+		case VEX_p_F3:
+			switch (vex_m) {
+			case VEX_m_0F:
+				dp = &dis_opEVEXF30F[(opcode1 << 4) | opcode2];
+				break;
+			default:
+				goto error;
+			}
+			break;
+		case VEX_p_F2:
+			switch (vex_m) {
+			case VEX_m_0F:
+				dp = &dis_opEVEXF20F[(opcode1 << 4) | opcode2];
+				break;
+			default:
+				goto error;
+			}
+			break;
+		default:
+			dp = &dis_opEVEX0F[(opcode1 << 4) | opcode2];
+			break;
+		}
 	}
 not_avx512:
 
@@ -4171,7 +4630,7 @@ not_avx512:
 	/*
 	 * In vex mode the rex_prefix has no meaning
 	 */
-	if (!vex_prefix)
+	if (!vex_prefix && evex_prefix == 0)
 		x->d86_rex_prefix = rex_prefix;
 	x->d86_opnd_size = opnd_size;
 	x->d86_addr_size = addr_size;
@@ -5909,6 +6368,29 @@ L_VEX_RM:
 		dtrace_evex_adjust_disp8_n(x, 0, evex_L, evex_modrm);
 		dtrace_evex_adjust_z_opmask(x, 2, evex_byte3);
 		break;
+	case EVEX_RMRX:
+		/* ModR/M.reg := op(EVEX.vvvv, ModR/M.r_m, imm8) */
+		x->d86_numopnds = 4;
+
+		dtrace_evex_mnem_adjust(x, dp, vex_W, evex_byte2);
+		dtrace_get_modrm(x, &mode, &reg, &r_m);
+		evex_modrm = x->d86_bytes[x->d86_len - 1] & 0xff;
+		dtrace_evex_adjust_reg(evex_byte1, &reg);
+		dtrace_evex_adjust_rm(evex_byte1, &r_m);
+		dtrace_evex_adjust_reg_name(evex_L, &wbit);
+		dtrace_get_operand(x, REG_ONLY, reg, wbit, 3);
+		/*
+		 * EVEX.vvvv is the same as VEX.vvvv (ones complement of the
+		 * register specifier). The EVEX prefix handling uses the vex_v
+		 * variable for these bits.
+		 */
+		dtrace_get_operand(x, REG_ONLY, (0xF - vex_v), wbit, 2);
+		dtrace_get_operand(x, mode, r_m, wbit, 1);
+		dtrace_evex_adjust_disp8_n(x, 0, evex_L, evex_modrm);
+		dtrace_evex_adjust_z_opmask(x, 3, evex_byte3);
+
+		dtrace_imm_opnd(x, wbit, 1, 0);
+		break;
 	/* an invalid op code */
 	case AM:
 	case DM:
@@ -5924,6 +6406,8 @@ L_VEX_RM:
 
 done:
 #ifdef DIS_MEM
+	if (dp == NULL)
+		return (1);
 	/*
 	 * compute the size of any memory accessed by the instruction
 	 */
@@ -6179,7 +6663,6 @@ dtrace_disx86_str(dis86_t *dis, uint_t mode, uint64_t pc, char *buf,
 				save_mask = mask;
 			}
 			(void) strlcat(buf, op->d86_opnd, buflen);
-
 			break;
 
 		case MODE_IPREL:

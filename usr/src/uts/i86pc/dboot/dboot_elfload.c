@@ -84,6 +84,7 @@ dboot_elfload64(uintptr_t file_image)
 	paddr_t dst;
 	paddr_t next_addr;
 
+	next_addr = 0;
 	elf_file = (caddr_t)file_image;
 
 	allphdrs = NULL;

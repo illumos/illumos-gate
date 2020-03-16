@@ -1302,6 +1302,7 @@ amd_iommu_destroy_pgtables(amd_iommu_t *iommu, dev_info_t *rdip,
 	int instance = ddi_get_instance(iommu->aiomt_dip);
 	const char *f = "amd_iommu_destroy_pgtables";
 
+	tear_level = -1;
 	if (amd_iommu_debug & AMD_IOMMU_DEBUG_PAGE_TABLES) {
 		cmn_err(CE_NOTE, "%s: %s%d: idx = %u, domainid = %d, "
 		    "deviceid = %u, va = %p, path = %s",
@@ -1347,7 +1348,6 @@ amd_iommu_destroy_pgtables(amd_iommu_t *iommu, dev_info_t *rdip,
 		}
 	}
 
-	tear_level = -1;
 	invalidate_pde = 0;
 	invalidate_pte = 0;
 	for (++level; level <= AMD_IOMMU_PGTABLE_MAXLEVEL; level++) {
@@ -1401,7 +1401,7 @@ invalidate:
 	}
 
 passthru:
-	if (tear_level ==  AMD_IOMMU_PGTABLE_MAXLEVEL) {
+	if (tear_level == AMD_IOMMU_PGTABLE_MAXLEVEL) {
 		error = amd_iommu_clear_devtbl_entry(iommu, rdip, domainid,
 		    deviceid, dp, domain_freed, path);
 	} else {

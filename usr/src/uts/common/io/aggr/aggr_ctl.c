@@ -46,6 +46,11 @@ aggr_ioc_modify(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 	aggr_lacp_mode_t lacp_mode;
 	aggr_lacp_timer_t lacp_timer;
 
+	policy = 0;
+	mac_fixed = B_FALSE;
+	lacp_mode = AGGR_LACP_OFF;
+	lacp_timer = AGGR_LACP_TIMER_LONG;
+
 	modify_mask_arg = modify_arg->lu_modify_mask;
 
 	if (modify_mask_arg & LAIOC_MODIFY_POLICY) {
@@ -234,6 +239,9 @@ aggr_ioc_add_remove(laioc_add_rem_t *add_rem_arg, intptr_t arg, int cmd,
 		break;
 	case LAIOC_REMOVE:
 		rc = aggr_grp_rem_ports(add_rem_arg->la_linkid, nports, ports);
+		break;
+	default:
+		rc = 0;
 		break;
 	}
 

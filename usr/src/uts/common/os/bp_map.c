@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/systm.h>
@@ -94,6 +92,7 @@ bp_mapin_common(struct buf *bp, int flag)
 	pgcnt_t		npages;
 	int		color;
 
+	as = NULL;
 	/* return if already mapped in, no pageio/physio, or physio to kas */
 	if ((bp->b_flags & B_REMAPPED) ||
 	    !(bp->b_flags & (B_PAGEIO | B_PHYS)) ||
@@ -283,8 +282,8 @@ bp_copy_common(bp_copydir_t dir, struct buf *bp, void *driverbuf,
 	page_t *pp;
 	pfn_t pfn;
 
-
 	ASSERT((offset + size) <= bp->b_bcount);
+	as = NULL;
 
 	/* if the buf_t already has a KVA, just do a bcopy */
 	if (!(bp->b_flags & (B_PHYS | B_PAGEIO))) {

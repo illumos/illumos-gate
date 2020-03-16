@@ -145,7 +145,7 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 	void		*mapva;
 	void		*metabase = (void *)base;
 	pgcnt_t		nkpmpgs = 0;
-	offset_t	kpm_pages_off;
+	offset_t	kpm_pages_off = 0;
 
 	cmn_err(CE_CONT,
 	    "?kphysm_add_memory_dynamic: adding %ldK at 0x%" PRIx64 "\n",
@@ -411,7 +411,7 @@ mapalloc:
 	 *
 	 * If a memseg is reused, invalidate memseg pointers in
 	 * all cpu vm caches.  We need to do this this since the check
-	 * 	pp >= seg->pages && pp < seg->epages
+	 *	pp >= seg->pages && pp < seg->epages
 	 * used in various places is not atomic and so the first compare
 	 * can happen before reuse and the second compare after reuse.
 	 * The invalidation ensures that a memseg is not deferenced while
@@ -2643,7 +2643,7 @@ kphysm_del_cleanup(struct mem_handle *mhp)
 {
 	struct memdelspan	*mdsp;
 	struct memseg		*seg;
-	struct memseg   	**segpp;
+	struct memseg		**segpp;
 	struct memseg		*seglist;
 	pfn_t			p_end;
 	uint64_t		avmem;

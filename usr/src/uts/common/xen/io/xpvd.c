@@ -377,9 +377,11 @@ got_xs_prop:
 		break;
 	}
 
-	if ((rv == DDI_PROP_SUCCESS) && (prop_len > 0)) {
-		bcopy(prop_str, buff, prop_len);
-		*lengthp = prop_len;
+	if (rv == DDI_PROP_SUCCESS) {
+		if (prop_op != PROP_LEN) {
+			bcopy(prop_str, buff, prop_len);
+			*lengthp = prop_len;
+		}
 	}
 	kmem_free(prop_str, len);
 	return (rv);
@@ -874,7 +876,7 @@ i_xpvd_parse_devname(char *name, xendev_devclass_t *devclassp,
 	int len = strlen(name) + 1;
 	char *device_name = i_ddi_strdup(name, KM_SLEEP);
 	char *cname = NULL, *caddr = NULL;
-	boolean_t ret;
+	boolean_t ret = B_FALSE;
 
 	i_ddi_parse_name(device_name, &cname, &caddr, NULL);
 

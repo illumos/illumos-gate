@@ -854,6 +854,8 @@ gcpu_ereport_post(const gcpu_logout_t *gcl, int bankidx,
 	} else {
 		ereport = fm_nvlist_create(NULL);
 		nva = NULL;
+		eqep = NULL;
+		scr_eqep = NULL;
 	}
 
 	if (ereport == NULL)
@@ -1808,6 +1810,7 @@ gcpu_mca_logout(cmi_hdl_t hdl, struct regs *rp, uint64_t bankmask,
 
 	if (ismc) {
 		gcl = mca->gcpu_mca_logout[GCPU_MCA_LOGOUT_EXCEPTION];
+		pgcl = NULL;
 	} else {
 		int pidx = mca->gcpu_mca_nextpoll_idx;
 		int ppidx = (pidx == GCPU_MCA_LOGOUT_POLLER_1) ?

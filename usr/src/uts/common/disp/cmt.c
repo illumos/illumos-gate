@@ -1355,7 +1355,7 @@ cmt_pad_disable(pghw_type_t type)
 /* ARGSUSED */
 static void
 cmt_ev_thread_swtch(pg_t *pg, cpu_t *cp, hrtime_t now, kthread_t *old,
-		    kthread_t *new)
+    kthread_t *new)
 {
 	pg_cmt_t	*cmt_pg = (pg_cmt_t *)pg;
 
@@ -1749,6 +1749,8 @@ pg_cmt_lineage_validate(pg_cmt_t **lineage, int *sz, cpu_pg_t *pgdata)
 	lgrp_handle_t	lgrp;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
+	pg = NULL;
+	pg_next = NULL;
 
 revalidate:
 	size = *sz;

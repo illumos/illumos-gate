@@ -350,6 +350,9 @@ pg_plat_hw_rank(pghw_type_t hw1, pghw_type_t hw2)
 		PGHW_NUM_COMPONENTS
 	};
 
+	rank1 = 0;
+	rank2 = 0;
+
 	for (i = 0; hw_hier[i] != PGHW_NUM_COMPONENTS; i++) {
 		if (hw_hier[i] == hw1)
 			rank1 = i;

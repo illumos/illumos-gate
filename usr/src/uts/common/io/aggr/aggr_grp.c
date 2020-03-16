@@ -753,6 +753,8 @@ aggr_add_pseudo_rx_group(aggr_port_t *port, aggr_pseudo_rx_group_t *rx_grp)
 	ASSERT3U(g_idx, <, MAX_GROUPS_PER_PORT);
 	mac_perim_enter_by_mh(port->lp_mh, &pmph);
 
+	i = 0;
+	addr = NULL;
 	/*
 	 * This function must be called after the aggr registers its
 	 * MAC and its Rx groups have been initialized.

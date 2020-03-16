@@ -1,0 +1,24 @@
+    libdis_test:      c4 e2 71 dc d0     vaesenc %xmm0,%xmm1,%xmm2
+    libdis_test+0x5:  c4 e2 71 dc 10     vaesenc (%eax),%xmm1,%xmm2
+    libdis_test+0xa:  c4 e2 5d dc eb     vaesenc %ymm3,%ymm4,%ymm5
+    libdis_test+0xf:  c4 e2 5d dc 2b     vaesenc (%ebx),%ymm4,%ymm5
+    libdis_test+0x14: 62 f2 45 48 dc c6  vaesenc %zmm6,%zmm7,%zmm0
+    libdis_test+0x1a: 62 f2 45 48 dc 01  vaesenc (%ecx),%zmm7,%zmm0
+    libdis_test+0x20: c4 e2 71 dd d0     vaesenclast %xmm0,%xmm1,%xmm2
+    libdis_test+0x25: c4 e2 71 dd 10     vaesenclast (%eax),%xmm1,%xmm2
+    libdis_test+0x2a: c4 e2 5d dd eb     vaesenclast %ymm3,%ymm4,%ymm5
+    libdis_test+0x2f: c4 e2 5d dd 2b     vaesenclast (%ebx),%ymm4,%ymm5
+    libdis_test+0x34: 62 f2 45 48 dd c6  vaesenclast %zmm6,%zmm7,%zmm0
+    libdis_test+0x3a: 62 f2 45 48 dd 01  vaesenclast (%ecx),%zmm7,%zmm0
+    libdis_test+0x40: c4 e2 71 de d0     vaesdec %xmm0,%xmm1,%xmm2
+    libdis_test+0x45: c4 e2 71 de 10     vaesdec (%eax),%xmm1,%xmm2
+    libdis_test+0x4a: c4 e2 5d de eb     vaesdec %ymm3,%ymm4,%ymm5
+    libdis_test+0x4f: c4 e2 5d de 2b     vaesdec (%ebx),%ymm4,%ymm5
+    libdis_test+0x54: 62 f2 45 48 de c6  vaesdec %zmm6,%zmm7,%zmm0
+    libdis_test+0x5a: 62 f2 45 48 de 01  vaesdec (%ecx),%zmm7,%zmm0
+    libdis_test+0x60: c4 e2 71 df d0     vaesdeclast %xmm0,%xmm1,%xmm2
+    libdis_test+0x65: c4 e2 71 df 10     vaesdeclast (%eax),%xmm1,%xmm2
+    libdis_test+0x6a: c4 e2 5d df eb     vaesdeclast %ymm3,%ymm4,%ymm5
+    libdis_test+0x6f: c4 e2 5d df 2b     vaesdeclast (%ebx),%ymm4,%ymm5
+    libdis_test+0x74: 62 f2 45 48 df c6  vaesdeclast %zmm6,%zmm7,%zmm0
+    libdis_test+0x7a: 62 f2 45 48 df 01  vaesdeclast (%ecx),%zmm7,%zmm0
