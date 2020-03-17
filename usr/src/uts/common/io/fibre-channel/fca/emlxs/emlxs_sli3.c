@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #include <emlxs.h>
@@ -309,7 +310,8 @@ reset:
 
 	/* Check for PEGASUS (This is a special case) */
 	/* We need to check for dual channel adapter */
-	if (hba->model_info.device_id == PCI_DEVICE_ID_PEGASUS) {
+	if (hba->model_info.vendor_id == PCI_VENDOR_ID_EMULEX &&
+	    hba->model_info.device_id == PCI_DEVICE_ID_PEGASUS) {
 		/* Try to determine if this is a DC adapter */
 		if (emlxs_get_max_sram(hba, &MaxRbusSize, &MaxIbusSize) == 0) {
 			if (MaxRbusSize == REDUCED_SRAM_CFG) {
@@ -684,9 +686,10 @@ reset:
 	if (hba->model_info.flags & EMLXS_NOT_SUPPORTED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg,
 		    "Unsupported adapter found.  "
-		    "Id:%d  Device id:0x%x  SSDID:0x%x  Model:%s",
-		    hba->model_info.id, hba->model_info.device_id,
-		    hba->model_info.ssdid, hba->model_info.model);
+		    "Id:%d  Vendor id:0x%x  Device id:0x%x  SSDID:0x%x  "
+		    "Model:%s", hba->model_info.id, hba->model_info.vendor_id,
+		    hba->model_info.device_id, hba->model_info.ssdid,
+		    hba->model_info.model);
 
 		rval = EIO;
 		goto failed;
@@ -1795,7 +1798,7 @@ emlxs_sli3_map_hdw(emlxs_hba_t *hba)
 		bzero(buf_info, sizeof (MBUF_INFO));
 		buf_info->size = SLI_SLIM2_SIZE;
 		buf_info->flags =
-		    FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
+		    FC_MBUF_DMA | FC_MBUF_SNGLSG;
 		buf_info->align = ddi_ptob(dip, 1L);
 
 		(void) emlxs_mem_alloc(hba, buf_info);

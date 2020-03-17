@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #define	DEF_ICFG	1
@@ -1647,6 +1648,10 @@ emlxs_fca_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 			(void) strlcpy(linkspeed, "16Gb", sizeof (linkspeed));
 			port_info->pi_port_state |= FC_STATE_16GBIT_SPEED;
 			break;
+		case LA_32GHZ_LINK:
+			(void) strlcpy(linkspeed, "32Gb", sizeof (linkspeed));
+			port_info->pi_port_state |= FC_STATE_32GBIT_SPEED;
+			break;
 		default:
 			(void) snprintf(linkspeed, sizeof (linkspeed),
 			    "unknown(0x%x)", hba->linkspeed);
@@ -1794,7 +1799,7 @@ emlxs_fca_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	    (sizeof (port_info->pi_attrs.driver_name)-1));
 
 	port_info->pi_attrs.vendor_specific_id =
-	    ((hba->model_info.device_id << 16) | PCI_VENDOR_ID_EMULEX);
+	    (hba->model_info.device_id << 16) | hba->model_info.vendor_id;
 
 	port_info->pi_attrs.supported_cos = LE_SWAP32(FC_NS_CLASS3);
 
@@ -1803,7 +1808,7 @@ emlxs_fca_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 #if (EMLXS_MODREV >= EMLXS_MODREV3)
 	port_info->pi_rnid_params.params.num_attached = 0;
 
-	if (hba->model_info.chip == EMLXS_LANCER_CHIP) {
+	if ((hba->model_info.chip & EMLXS_LANCER_CHIPS) != 0) {
 		uint8_t		byte;
 		uint8_t		*wwpn;
 		uint32_t	i;
@@ -1924,6 +1929,10 @@ emlxs_fca_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	    "%x", vpd->biuRev);
 
 	/* Set the hba speed limit */
+	if (vpd->link_speed & LMT_32GB_CAPABLE) {
+		port_info->pi_attrs.supported_speed |=
+		    FC_HBA_PORTSPEED_32GBIT;
+	}
 	if (vpd->link_speed & LMT_16GB_CAPABLE) {
 		port_info->pi_attrs.supported_speed |=
 		    FC_HBA_PORTSPEED_16GBIT;
@@ -4324,6 +4333,9 @@ emlxs_fca_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 				break;
 			case LA_16GHZ_LINK:
 				*link_state |= FC_STATE_16GBIT_SPEED;
+				break;
+			case LA_32GHZ_LINK:
+				*link_state |= FC_STATE_32GBIT_SPEED;
 				break;
 			case LA_1GHZ_LINK:
 			default:
@@ -6844,9 +6856,9 @@ emlxs_drv_banner(emlxs_hba_t *hba)
 	    emlxs_revision);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_msg,
-	    "%s Dev_id:%x Sub_id:%x Id:%d", hba->model_info.model,
-	    hba->model_info.device_id, hba->model_info.ssdid,
-	    hba->model_info.id);
+	    "%s Ven_id:%x Dev_id:%x Sub_id:%x Id:%d", hba->model_info.model,
+	    hba->model_info.vendor_id, hba->model_info.device_id,
+	    hba->model_info.ssdid, hba->model_info.id);
 
 #ifdef EMLXS_I386
 
@@ -7172,9 +7184,10 @@ emlxs_hba_attach(dev_info_t *dip)
 
 	if (rval == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_failed_msg,
-		    "Unable to get adapter info. Id:%d  Device id:0x%x "
-		    "Model:%s", hba->model_info.id,
-		    hba->model_info.device_id, hba->model_info.model);
+		    "Unable to get adapter info. Id:%d  Vendor id:0x%x  "
+		    "Device id:0x%x  Model:%s", hba->model_info.id,
+		    hba->model_info.vendor_id, hba->model_info.device_id,
+		    hba->model_info.model);
 		goto failed;
 	}
 #define	FILTER_ORACLE_BRANDED
@@ -7189,9 +7202,9 @@ emlxs_hba_attach(dev_info_t *dip)
 	/* Check if adapter is not supported */
 	if (hba->model_info.flags & EMLXS_NOT_SUPPORTED) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_failed_msg,
-		    "Unsupported adapter found. Id:%d  Device id:0x%x "
-		    "SSDID:0x%x  Model:%s", hba->model_info.id,
-		    hba->model_info.device_id,
+		    "Unsupported adapter found. Id:%d  Vendor id:0x%x  "
+		    "Device id:0x%x  SSDID:0x%x  Model:%s", hba->model_info.id,
+		    hba->model_info.vendor_id, hba->model_info.device_id,
 		    hba->model_info.ssdid, hba->model_info.model);
 		goto failed;
 	}
@@ -7804,6 +7817,18 @@ emlxs_check_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 				}
 				break;
 
+			case 32:
+				if (!(vpd->link_speed & LMT_32GB_CAPABLE)) {
+					new_value = 0;
+
+					EMLXS_MSGF(EMLXS_CONTEXT,
+					    &emlxs_init_msg,
+					    "link-speed: 32Gb not supported "
+					    "by adapter. Switching to auto "
+					    "detect.");
+				}
+				break;
+
 			default:
 				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_msg,
 				    "link-speed: Invalid value=%d provided. "
@@ -8191,10 +8216,6 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 		dma_attr.dma_attr_sgllen = 1;
 	}
 
-	if (buf_info->flags & FC_MBUF_DMA32) {
-		dma_attr.dma_attr_addr_hi = (uint64_t)0xffffffff;
-	}
-
 	if (buf_info->flags & FC_MBUF_PHYSONLY) {
 
 		if (buf_info->virt == NULL) {
@@ -8282,7 +8303,7 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 		EMLXS_MPDATA_SYNC((ddi_dma_handle_t)buf_info->dma_handle,
 		    (off_t)0, (size_t)buf_info->size, DDI_DMA_SYNC_FORDEV);
 
-	} else if (buf_info->flags & (FC_MBUF_DMA|FC_MBUF_DMA32)) {
+	} else if (buf_info->flags & FC_MBUF_DMA) {
 
 		dma_attr.dma_attr_align = buf_info->align;
 
@@ -8427,7 +8448,7 @@ emlxs_mem_free(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 			buf_info->dma_handle = NULL;
 		}
 
-	} else if (buf_info->flags & (FC_MBUF_DMA|FC_MBUF_DMA32)) {
+	} else if (buf_info->flags & FC_MBUF_DMA) {
 
 		if (buf_info->dma_handle) {
 			(void) ddi_dma_unbind_handle(buf_info->dma_handle);

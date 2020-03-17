@@ -2170,9 +2170,8 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 	 * figure out where we might find this. Originally, GNU used the
 	 * .gnu_debuglink solely, but then they added a .note.gnu.build-id. The
 	 * build-id is some size, usually 16 or 20 bytes, often a SHA1 sum of
-	 * the old, but not present file. All that you have to do to compare
-	 * things is see if the sections are less, in theory saving you from
-	 * doing lots of expensive I/O.
+	 * parts of the original file. This is maintained across all versions of
+	 * the subsequent file.
 	 *
 	 * For the .note.gnu.build-id, we're going to check a few things before
 	 * using it, first that the name is 4 bytes, and is GNU and that the

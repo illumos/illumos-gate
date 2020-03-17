@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _EMLXS_FCF_H
@@ -100,7 +101,8 @@ typedef struct XRIobj
 
 	uint16_t	sge_count;
 	uint16_t	iotag;
-	MBUF_INFO	SGList;
+	MATCHMAP	*SGList;
+	uint32_t	SGSeg;
 	struct RPIobj	*rpip;
 	struct RPIobj	*reserved_rpip;
 	emlxs_buf_t	*sbp;

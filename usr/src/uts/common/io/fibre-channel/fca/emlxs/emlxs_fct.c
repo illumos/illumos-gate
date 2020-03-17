@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #include <emlxs.h>
@@ -1371,7 +1372,8 @@ emlxs_fct_populate_hba_details(fct_local_port_t *fct_port,
 	emlxs_hba_t *hba = HBA;
 	emlxs_vpd_t *vpd = &VPD;
 
-	(void) strncpy(port_attrs->manufacturer, "Emulex",
+	(void) strncpy(port_attrs->manufacturer,
+	    hba->model_info.manufacturer,
 	    (sizeof (port_attrs->manufacturer)-1));
 	(void) strncpy(port_attrs->serial_number, vpd->serial_num,
 	    (sizeof (port_attrs->serial_number)-1));
@@ -1395,12 +1397,15 @@ emlxs_fct_populate_hba_details(fct_local_port_t *fct_port,
 	    vpd->fw_label);
 	(void) strncpy(port_attrs->driver_name, DRIVER_NAME,
 	    (sizeof (port_attrs->driver_name)-1));
-	port_attrs->vendor_specific_id =
-	    ((hba->model_info.device_id << 16) | PCI_VENDOR_ID_EMULEX);
+	port_attrs->vendor_specific_id = (hba->model_info.device_id << 16) |
+	    hba->model_info.vendor_id;
 	port_attrs->supported_cos = LE_SWAP32(FC_NS_CLASS3);
 
 	port_attrs->max_frame_size = FF_FRAME_SIZE;
 
+	if (vpd->link_speed & LMT_32GB_CAPABLE) {
+		port_attrs->supported_speed |= PORT_SPEED_32G;
+	}
 	if (vpd->link_speed & LMT_16GB_CAPABLE) {
 		port_attrs->supported_speed |= PORT_SPEED_16G;
 	}
@@ -2005,6 +2010,9 @@ emlxs_fct_get_link_info(fct_local_port_t *fct_port, fct_link_info_t *link)
 		break;
 	case LA_16GHZ_LINK:
 		link->port_speed = PORT_SPEED_16G;
+		break;
+	case LA_32GHZ_LINK:
+		link->port_speed = PORT_SPEED_32G;
 		break;
 	default:
 		link->port_speed = PORT_SPEED_UNKNOWN;

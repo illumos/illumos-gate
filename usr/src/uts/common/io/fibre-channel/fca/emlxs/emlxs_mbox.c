@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #include <emlxs.h>
@@ -991,7 +992,7 @@ emlxs_mb_mq_create_ext(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	case 1:
 	default:
 		mb4->un.varSLIConfig.be.payload_length =
-		    sizeof (IOCTL_COMMON_MQ_CREATE) + IOCTL_HEADER_SZ;
+		    sizeof (IOCTL_COMMON_MQ_CREATE_EXT_V1) + IOCTL_HEADER_SZ;
 		mb4->un.varSLIConfig.be.un_hdr.hdr_req.subsystem =
 		    IOCTL_SUBSYSTEM_COMMON;
 		mb4->un.varSLIConfig.be.un_hdr.hdr_req.opcode =
@@ -1591,7 +1592,8 @@ emlxs_read_la_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 	if ((la.attType == AT_LINK_UP) && (hba->state < FC_LINK_UP)) {
 
 #ifdef MENLO_SUPPORT
-		if ((hba->model_info.device_id == PCI_DEVICE_ID_HORNET) &&
+		if (hba->model_info.vendor_id == PCI_VENDOR_ID_EMULEX &&
+		    hba->model_info.device_id == PCI_DEVICE_ID_HORNET &&
 		    (hba->flag & (FC_ILB_MODE | FC_ELB_MODE))) {
 			la.topology = TOPOLOGY_LOOP;
 			la.granted_AL_PA = 0;
@@ -1661,8 +1663,8 @@ emlxs_read_la_mbcmpl(emlxs_hba_t *hba, MAILBOXQ *mbq)
 		}
 #ifdef MENLO_SUPPORT
 		/* Check if Menlo maintenance mode is enabled */
-		if (hba->model_info.device_id ==
-		    PCI_DEVICE_ID_HORNET) {
+		if (hba->model_info.vendor_id == PCI_VENDOR_ID_EMULEX &&
+		    hba->model_info.device_id == PCI_DEVICE_ID_HORNET) {
 			if (la.mm == 1) {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_link_atten_msg,
@@ -2140,39 +2142,38 @@ emlxs_mb_init_link(emlxs_hba_t *hba, MAILBOXQ *mbq, uint32_t topology,
 		break;
 
 	case 1:
-		if (!(vpd->link_speed & LMT_1GB_CAPABLE)) {
-			linkspeed = 0;
-		}
+		linkspeed = (vpd->link_speed & LMT_1GB_CAPABLE) == 0 ? 0 :
+		    LINK_SPEED_1G;
 		break;
 
 	case 2:
-		if (!(vpd->link_speed & LMT_2GB_CAPABLE)) {
-			linkspeed = 0;
-		}
+		linkspeed = (vpd->link_speed & LMT_2GB_CAPABLE) == 0 ? 0 :
+		    LINK_SPEED_2G;
 		break;
 
 	case 4:
-		if (!(vpd->link_speed & LMT_4GB_CAPABLE)) {
-			linkspeed = 0;
-		}
+		linkspeed = (vpd->link_speed & LMT_4GB_CAPABLE) == 0 ? 0 :
+		    LINK_SPEED_4G;
 		break;
 
 	case 8:
-		if (!(vpd->link_speed & LMT_8GB_CAPABLE)) {
-			linkspeed = 0;
-		}
+		linkspeed = (vpd->link_speed & LMT_8GB_CAPABLE) == 0 ? 0 :
+		    LINK_SPEED_8G;
 		break;
 
 	case 10:
-		if (!(vpd->link_speed & LMT_10GB_CAPABLE)) {
-			linkspeed = 0;
-		}
+		linkspeed = (vpd->link_speed & LMT_10GB_CAPABLE) == 0 ? 0 :
+		    LINK_SPEED_10G;
 		break;
 
 	case 16:
-		if (!(vpd->link_speed & LMT_16GB_CAPABLE)) {
-			linkspeed = 0;
-		}
+		linkspeed = (vpd->link_speed & LMT_16GB_CAPABLE) == 0 ? 0 :
+		    LINK_SPEED_16G;
+		break;
+
+	case 32:
+		linkspeed = (vpd->link_speed & LMT_32GB_CAPABLE) == 0 ? 0 :
+		    LINK_SPEED_32G;
 		break;
 
 	default:

@@ -22,11 +22,11 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2017, Joyent, Inc.
+ * Copyright 2020, Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
@@ -1087,7 +1087,7 @@ preadv(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 		}
 	}
 
-	if ((bcount = (ssize_t)count) < 0) {
+	if ((bcount = count) < 0) {
 		if (aiovlen != 0)
 			kmem_free(aiov, aiovlen);
 		return (set_errno(EINVAL));
@@ -1105,7 +1105,7 @@ preadv(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 	rwflag = 0;
 
 	/*
-	 * Behaviour is same as read(2). Please see comments in read(2).
+	 * Behaviour is same as read(2). Please see comments in read above.
 	 */
 	if (vp->v_type == VREG) {
 		if (bcount == 0)
@@ -1288,7 +1288,7 @@ pwritev(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 		}
 	}
 
-	if ((bcount = (ssize_t)count) < 0) {
+	if ((bcount = count) < 0) {
 		if (aiovlen != 0)
 			kmem_free(aiov, aiovlen);
 		return (set_errno(EINVAL));
@@ -1306,8 +1306,8 @@ pwritev(int fdes, struct iovec *iovp, int iovcnt, off_t offset,
 	rwflag = 1;
 
 	/*
-	 * The kernel's write(2) code checks the rctl & OFFSET_MAX and returns
-	 * EFBIG when fileoff exceeds either limit. We do the same.
+	 * The kernel's write(2) code checks OFFSET_MAX and the rctl, and
+	 * returns EFBIG when fileoff exceeds either limit. We do the same.
 	 */
 	if (vp->v_type == VREG) {
 		if (bcount == 0)

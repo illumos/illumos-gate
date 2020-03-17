@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #include <emlxs.h>
@@ -1553,6 +1554,10 @@ emlxs_port_online(emlxs_port_t *vport)
 	case LA_16GHZ_LINK:
 		(void) strlcpy(linkspeed, "16Gb", sizeof (linkspeed));
 		state |= FC_STATE_16GBIT_SPEED;
+		break;
+	case LA_32GHZ_LINK:
+		(void) strlcpy(linkspeed, "32Gb", sizeof (linkspeed));
+		state |= FC_STATE_32GBIT_SPEED;
 		break;
 	default:
 		(void) snprintf(linkspeed, sizeof (linkspeed), "unknown(0x%x)",

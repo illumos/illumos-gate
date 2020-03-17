@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 
@@ -137,6 +138,10 @@ printPortSpeed(HBA_PORTSPEED portSpeed) {
 	}
 	if ((portSpeed & HBA_PORTSPEED_16GBIT) == HBA_PORTSPEED_16GBIT) {
 		fprintf(stdout, "16Gb ");
+		foundSpeed = 1;
+	}
+	if ((portSpeed & HBA_PORTSPEED_32GBIT) == HBA_PORTSPEED_32GBIT) {
+		fprintf(stdout, "32Gb ");
 		foundSpeed = 1;
 	}
 	if ((portSpeed & HBA_PORTSPEED_NOT_NEGOTIATED)

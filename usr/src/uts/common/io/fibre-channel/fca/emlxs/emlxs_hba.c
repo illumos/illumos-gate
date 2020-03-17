@@ -22,6 +22,8 @@
 /*
  * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #define	EMLXS_FW_TABLE_DEF
@@ -990,6 +992,11 @@ emlxs_process_link_speed(emlxs_hba_t *hba)
 		hi = 16;
 	}
 
+	if (vpd->link_speed & LMT_32GB_CAPABLE) {
+		(void) strlcat(cfg->help, ", 32=32Gb", EMLXS_CFG_HELP_SIZE);
+		hi = 32;
+	}
+
 	(void) strlcat(cfg->help, "]", EMLXS_CFG_HELP_SIZE);
 	cfg->hi = hi;
 
@@ -1938,6 +1945,7 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 	uint32_t pci_id;
 	uint32_t cache_line;
 	uint32_t channels;
+	uint16_t vendor_id;
 	uint16_t device_id;
 	uint16_t ssdid;
 	uint32_t i;
@@ -1950,6 +1958,7 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 			bcopy(&emlxs_sbus_model[0], &hba->model_info,
 			    sizeof (emlxs_model_t));
 
+			hba->model_info.vendor_id = 0;
 			hba->model_info.device_id = 0;
 
 			return (0);
@@ -1959,11 +1968,13 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 		pci_id =
 		    ddi_get32(hba->pci_acc_handle,
 		    (uint32_t *)(hba->pci_addr + PCI_VENDOR_ID_REGISTER));
+		vendor_id = (uint16_t)pci_id;
 		device_id = (uint16_t)(pci_id >> 16);
 
 		/* Find matching adapter model */
 		for (i = 1; i < EMLXS_SBUS_MODEL_COUNT; i++) {
-			if (emlxs_sbus_model[i].device_id == device_id) {
+			if (emlxs_sbus_model[i].vendor_id == vendor_id &&
+			    emlxs_sbus_model[i].device_id == device_id) {
 				bcopy(&emlxs_sbus_model[i], &hba->model_info,
 				    sizeof (emlxs_model_t));
 				found = 1;
@@ -1976,6 +1987,7 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 			bcopy(&emlxs_sbus_model[0], &hba->model_info,
 			    sizeof (emlxs_model_t));
 
+			hba->model_info.vendor_id = vendor_id;
 			hba->model_info.device_id = device_id;
 
 			return (0);
@@ -1986,12 +1998,17 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 			bcopy(&emlxs_pci_model[0], &hba->model_info,
 			    sizeof (emlxs_model_t));
 
+			hba->model_info.vendor_id = 0;
 			hba->model_info.device_id = 0;
 
 			return (0);
 		}
 
-		/* Read the PCI device id */
+		/* Read the PCI vendor and device id */
+		vendor_id =
+		    ddi_get16(hba->pci_acc_handle,
+		    (uint16_t *)(hba->pci_addr + PCI_VENDOR_ID_REGISTER));
+
 		device_id =
 		    ddi_get16(hba->pci_acc_handle,
 		    (uint16_t *)(hba->pci_addr + PCI_DEVICE_ID_REGISTER));
@@ -2010,6 +2027,10 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 		    ddi_get32(hba->pci_acc_handle,
 		    (uint32_t *)(hba->pci_addr + PCI_CACHE_LINE_REGISTER));
 
+		EMLXS_MSGF(EMLXS_CONTEXT,
+		    &emlxs_init_debug_msg, "Device IDs: %x/%x/%x/%x",
+		    vendor_id, device_id, ssdid, cache_line);
+
 		/* Check for the multifunction bit being set */
 		if ((cache_line & 0x00ff0000) == 0x00800000) {
 			channels = EMLXS_MULTI_CHANNEL;
@@ -2021,11 +2042,11 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 		if (device_id != ssdid) {
 			/*
 			 * Find matching adapter model using
-			 * device_id, ssdid, and channels
+			 * vendor_id, device_id, ssdid, and channels
 			 */
 			for (i = 1; i < emlxs_pci_model_count; i++) {
-				if (emlxs_pci_model[i].device_id ==
-				    device_id &&
+				if (emlxs_pci_model[i].vendor_id == vendor_id &&
+				    emlxs_pci_model[i].device_id == device_id &&
 				    emlxs_pci_model[i].ssdid == ssdid &&
 				    emlxs_pci_model[i].channels ==
 				    channels) {
@@ -2042,10 +2063,11 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 		if (!found) {
 			/*
 			 * Find matching adapter model using
-			 * device_id and channels
+			 * vendor_id, device_id and channels
 			 */
 			for (i = 1; i < emlxs_pci_model_count; i++) {
-				if (emlxs_pci_model[i].device_id == device_id &&
+				if (emlxs_pci_model[i].vendor_id == vendor_id &&
+				    emlxs_pci_model[i].device_id == device_id &&
 				    emlxs_pci_model[i].channels == channels) {
 					bcopy(&emlxs_pci_model[i],
 					    &hba->model_info,
@@ -2060,10 +2082,11 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 		if (!found) {
 			/*
 			 * Find matching adapter model using
-			 * device_id only
+			 * vendor_id and device_id only
 			 */
 			for (i = 1; i < emlxs_pci_model_count; i++) {
-				if (emlxs_pci_model[i].device_id == device_id) {
+				if (emlxs_pci_model[i].vendor_id == vendor_id &&
+				    emlxs_pci_model[i].device_id == device_id) {
 					bcopy(&emlxs_pci_model[i],
 					    &hba->model_info,
 					    sizeof (emlxs_model_t));
@@ -2078,6 +2101,7 @@ emlxs_init_adapter_info(emlxs_hba_t *hba)
 			bcopy(&emlxs_pci_model[0], &hba->model_info,
 			    sizeof (emlxs_model_t));
 
+			hba->model_info.vendor_id = vendor_id;
 			hba->model_info.device_id = device_id;
 			hba->model_info.ssdid = ssdid;
 

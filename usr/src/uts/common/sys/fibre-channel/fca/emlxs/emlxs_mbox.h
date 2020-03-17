@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #ifndef _EMLXS_MBOX_H
@@ -585,9 +586,15 @@ typedef struct
 #define	FLAGS_PREABORT_RETURN		0x4000	/* Bit 14 */
 
 	uint32_t	link_speed;	/* NEW_FEATURE */
-#define	LINK_SPEED_AUTO			0	/* Auto selection */
-#define	LINK_SPEED_1G			1	/* 1 Gigabaud */
-#define	LINK_SPEED_2G			2	/* 2 Gigabaud */
+#define	LINK_SPEED_AUTO			0x0	/* Auto selection */
+#define	LINK_SPEED_1G			0x1	/* 1 Gigabaud */
+#define	LINK_SPEED_2G			0x2	/* 2 Gigabaud */
+#define	LINK_SPEED_4G			0x4	/* 4 Gigabaud */
+#define	LINK_SPEED_8G			0x8	/* 8 Gigabaud */
+#define	LINK_SPEED_10G			0x10	/* 10 Gigabaud */
+#define	LINK_SPEED_16G			0x11	/* 16 Gigabaud */
+#define	LINK_SPEED_32G			0x14	/* 32 Gigabaud */
+
 } INIT_LINK_VAR;
 
 
@@ -758,6 +765,7 @@ typedef struct
 #define	LMT_8GB_CAPABLE		0x0080
 #define	LMT_10GB_CAPABLE	0x0100
 #define	LMT_16GB_CAPABLE	0x0200
+#define	LMT_32GB_CAPABLE	0x0400
 /* E2E supported on adapters >= 8GB */
 #define	LMT_E2E_CAPABLE		(LMT_8GB_CAPABLE|LMT_10GB_CAPABLE)
 
@@ -1572,6 +1580,7 @@ typedef struct
 #define	LA_8GHZ_LINK   0x20	/* lnkSpeed */
 #define	LA_10GHZ_LINK  0x40	/* lnkSpeed */
 #define	LA_16GHZ_LINK  0x80	/* lnkSpeed */
+#define	LA_32GHZ_LINK  0x90	/* lnkSpeed */
 } READ_LA_VAR;
 
 

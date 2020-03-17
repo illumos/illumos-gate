@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004-2012 Emulex. All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #define	DEF_EVENT_STRUCT  /* Needed for emlxs_events.h in emlxs_event.h */
@@ -591,6 +592,8 @@ emlxs_log_link_event(emlxs_port_t *port)
 			*linkspeed = HBA_PORTSPEED_10GBIT;
 		} else if (hba->linkspeed == LA_16GHZ_LINK) {
 			*linkspeed = HBA_PORTSPEED_16GBIT;
+		} else if (hba->linkspeed == LA_32GHZ_LINK) {
+			*linkspeed = HBA_PORTSPEED_32GBIT;
 		} else {
 			*linkspeed = HBA_PORTSPEED_1GBIT;
 		}

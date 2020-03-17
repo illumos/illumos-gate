@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #include <sys/conf.h>
@@ -490,6 +491,8 @@ fct_get_adapter_port_attr(fct_i_local_port_t *ilport, uint8_t *pwwn,
 		port_attr->PortSupportedSpeed |= FC_HBA_PORTSPEED_10GBIT;
 	if (attr->supported_speed & PORT_SPEED_16G)
 		port_attr->PortSupportedSpeed |= FC_HBA_PORTSPEED_16GBIT;
+	if (attr->supported_speed & PORT_SPEED_32G)
+		port_attr->PortSupportedSpeed |= FC_HBA_PORTSPEED_32GBIT;
 	switch (iport->iport_link_info.port_speed) {
 		case PORT_SPEED_1G:
 			port_attr->PortSpeed = FC_HBA_PORTSPEED_1GBIT;
@@ -508,6 +511,9 @@ fct_get_adapter_port_attr(fct_i_local_port_t *ilport, uint8_t *pwwn,
 			break;
 		case PORT_SPEED_16G:
 			port_attr->PortSpeed = FC_HBA_PORTSPEED_16GBIT;
+			break;
+		case PORT_SPEED_32G:
+			port_attr->PortSpeed = FC_HBA_PORTSPEED_32GBIT;
 			break;
 		default:
 			port_attr->PortSpeed = FC_HBA_PORTSPEED_UNKNOWN;

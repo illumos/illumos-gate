@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/driver/network/emlxs@$(PKGVERS)
@@ -58,6 +59,7 @@ driver name=emlxs class=fibre-channel perms="* 0666 root sys" \
     alias=pci10df,fd00 \
     alias=pci10df,fe00 \
     alias=pciex10df,e200 \
+    alias=pciex10df,e300 \
     alias=pciex10df,f100 \
     alias=pciex10df,f111 \
     alias=pciex10df,f112 \
@@ -65,6 +67,10 @@ driver name=emlxs class=fibre-channel perms="* 0666 root sys" \
     alias=pciex10df,fc40 \
     alias=pciex10df,fe00 \
     alias=pciex10df,fe05 \
+    alias=pciex117c,63 \
+    alias=pciex117c,64 \
+    alias=pciex117c,65 \
+    alias=pciex117c,94 \
     alias=pciex19a2,704 \
     alias=pciex19a2,714
 driver name=oce perms="* 0666 root sys" \
