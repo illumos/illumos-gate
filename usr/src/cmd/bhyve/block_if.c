@@ -29,7 +29,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -475,6 +475,10 @@ blockif_open(const char *optstr, const char *ident)
 	off_t size, psectsz, psectoff;
 	int extra, fd, i, sectsz;
 	int nocache, sync, ro, candelete, geom, ssopt, pssopt;
+#ifdef __FreeBSD__
+	int nodelete;
+#endif
+
 #ifndef WITHOUT_CAPSICUM
 	cap_rights_t rights;
 	cap_ioctl_t cmds[] = { DIOCGFLUSH, DIOCGDELETE };
@@ -487,6 +491,9 @@ blockif_open(const char *optstr, const char *ident)
 	nocache = 0;
 	sync = 0;
 	ro = 0;
+#ifdef __FreeBSD__
+	nodelete = 0;
+#endif
 
 	/*
 	 * The first element in the optstring is always a pathname.
@@ -499,6 +506,10 @@ blockif_open(const char *optstr, const char *ident)
 			continue;
 		else if (!strcmp(cp, "nocache"))
 			nocache = 1;
+#ifdef __FreeBSD__
+		else if (!strcmp(cp, "nodelete"))
+			nodelete = 1;
+#endif
 		else if (!strcmp(cp, "sync") || !strcmp(cp, "direct"))
 			sync = 1;
 		else if (!strcmp(cp, "ro"))
@@ -566,7 +577,7 @@ blockif_open(const char *optstr, const char *ident)
 			ioctl(fd, DIOCGSTRIPEOFFSET, &psectoff);
 		strlcpy(arg.name, "GEOM::candelete", sizeof(arg.name));
 		arg.len = sizeof(arg.value.i);
-		if (ioctl(fd, DIOCGATTR, &arg) == 0)
+		if (nodelete == 0 && ioctl(fd, DIOCGATTR, &arg) == 0)
 			candelete = arg.value.i;
 		if (ioctl(fd, DIOCGPROVIDERNAME, name) == 0)
 			geom = 1;
