@@ -8,7 +8,7 @@
 # source.  A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 # Copyright 2016 RackTop Systems.
 #
 
@@ -19,7 +19,7 @@ include ../../Makefile.ctf
 
 OBJS= apmain.o apdump.o apfiles.o getopt.o tbprint.o tbxfroot.o osillumostbl.o \
 	utascii.o utbuffer.o utdebug.o utexcep.o utmath.o utnonansi.o \
-	utxferror.o utglobal.o utprint.o osunixdir.o osl.o osunixxf.o \
+	utxferror.o utglobal.o osunixdir.o osl.o osunixxf.o \
 	uthex.o utstrsuppt.o utstrtoul64.o
 SRCS = $(OBJS:.o=.c)
 
@@ -27,8 +27,7 @@ VPATH = ../common:$(SRC)/common/acpica/utilities:$(SRC)/common/acpica/tables
 
 CERRWARN += -_gcc=-Wno-unused-function
 
-# not linted
-SMATCH=off
+SMOFF = all_func_returns
 
 CPPFLAGS += -I$(SRC)/uts/intel/sys/acpi -DACPI_DUMP_APP
 

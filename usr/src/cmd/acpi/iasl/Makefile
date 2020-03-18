@@ -8,7 +8,7 @@
 # source.  A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 # Adapted from acpica/generate/unix/iasl/Makefile, which lacked a copyright
@@ -63,7 +63,7 @@ OBJS +=	tbdata.o tbfadt.o tbinstal.o tbprint.o tbutils.o tbxface.o
 OBJS += utaddress.o utalloc.o utascii.o utbuffer.o utcache.o utcopy.o \
 	utdebug.o utdecode.o utdelete.o uterror.o utexcep.o utglobal.o uthex.o \
 	utinit.o utlock.o utmath.o utmisc.o utmutex.o utnonansi.o utobject.o \
-	utownerid.o utpredef.o utprint.o utresdecode.o utresrc.o utstate.o \
+	utownerid.o utpredef.o utresdecode.o utresrc.o utstate.o \
 	utstring.o utstrsuppt.o utstrtoul64.o utuuid.o utxface.o utxferror.o
 
 SRCS = $(OBJS:.o=.c)
@@ -101,9 +101,7 @@ INTERMEDIATES = \
 	dtparser.y.h \
 	prparser.y.h
 
-CERRWARN += -_gcc=-Wno-unused-function
-
-# not linted
+# too much noise
 SMATCH=off
 
 CPPFLAGS += -I$(SRC)/uts/intel/sys/acpi -DACPI_ASL_COMPILER -I.
