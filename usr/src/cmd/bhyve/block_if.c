@@ -29,7 +29,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -364,9 +364,40 @@ blockif_proc(struct blockif_ctxt *bc, struct blockif_elem *be, uint8_t *buf)
 			else
 				br->br_resid = 0;
 		}
-#endif
 		else
 			 err = EOPNOTSUPP;
+#else
+		else if (bc->bc_ischr) {
+			dkioc_free_list_t dfl = {
+				.dfl_num_exts = 1,
+				.dfl_offset = 0,
+				.dfl_flags = 0,
+				.dfl_exts = {
+					{
+						.dfle_start = br->br_offset,
+						.dfle_length = br->br_resid
+					}
+				}
+			};
+
+			if (ioctl(bc->bc_fd, DKIOCFREE, &dfl))
+				err = errno;
+			else
+				br->br_resid = 0;
+		} else {
+			struct flock fl = {
+				.l_whence = 0,
+				.l_type = F_WRLCK,
+				.l_start = br->br_offset,
+				.l_len = br->br_resid
+			};
+
+			if (fcntl(bc->bc_fd, F_FREESP, &fl))
+				err = errno;
+			else
+				br->br_resid = 0;
+		}
+#endif
 		break;
 	default:
 		err = EINVAL;
@@ -475,6 +506,8 @@ blockif_open(const char *optstr, const char *ident)
 	off_t size, psectsz, psectoff;
 	int extra, fd, i, sectsz;
 	int nocache, sync, ro, candelete, geom, ssopt, pssopt;
+	int nodelete;
+
 #ifndef WITHOUT_CAPSICUM
 	cap_rights_t rights;
 	cap_ioctl_t cmds[] = { DIOCGFLUSH, DIOCGDELETE };
@@ -487,6 +520,7 @@ blockif_open(const char *optstr, const char *ident)
 	nocache = 0;
 	sync = 0;
 	ro = 0;
+	nodelete = 0;
 
 	/*
 	 * The first element in the optstring is always a pathname.
@@ -499,6 +533,8 @@ blockif_open(const char *optstr, const char *ident)
 			continue;
 		else if (!strcmp(cp, "nocache"))
 			nocache = 1;
+		else if (!strcmp(cp, "nodelete"))
+			nodelete = 1;
 		else if (!strcmp(cp, "sync") || !strcmp(cp, "direct"))
 			sync = 1;
 		else if (!strcmp(cp, "ro"))
@@ -566,7 +602,7 @@ blockif_open(const char *optstr, const char *ident)
 			ioctl(fd, DIOCGSTRIPEOFFSET, &psectoff);
 		strlcpy(arg.name, "GEOM::candelete", sizeof(arg.name));
 		arg.len = sizeof(arg.value.i);
-		if (ioctl(fd, DIOCGATTR, &arg) == 0)
+		if (nodelete == 0 && ioctl(fd, DIOCGATTR, &arg) == 0)
 			candelete = arg.value.i;
 		if (ioctl(fd, DIOCGPROVIDERNAME, name) == 0)
 			geom = 1;
@@ -619,6 +655,10 @@ blockif_open(const char *optstr, const char *ident)
 				}
 			}
 		}
+
+		if (nodelete == 0 && ioctl(fd, DKIOC_CANFREE, &candelete))
+			candelete = 0;
+
 	} else {
 		int flags;
 
@@ -628,6 +668,19 @@ blockif_open(const char *optstr, const char *ident)
 				wce = WCE_FCNTL;
 			}
 		}
+
+		/*
+		 * We don't have a way to discover if a file supports the
+		 * FREESP fcntl cmd (other than trying it).  However,
+		 * zfs, ufs, tmpfs, and udfs all support the FREESP fcntl cmd.
+		 * Nfsv4 and nfsv4 also forward the FREESP request
+		 * to the server, so we always enable it for file based
+		 * volumes. Anyone trying to run volumes on an unsupported
+		 * configuration is on their own, and should be prepared
+		 * for the requests to fail.
+		 */
+		if (nodelete == 0)
+			candelete = 1;
 	}
 #endif
 
