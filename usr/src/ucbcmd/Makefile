@@ -63,20 +63,15 @@ COMMON_SUBDIRS=		\
 	whereis		\
 	whoami
 
-sparc_SUBDIRS= sbcp
-
-SUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
+SUBDIRS= $(COMMON_SUBDIRS)
 
 # commands messaged
 MSGSUBDIRS = biff install.d mkstr rusage shutdown
-
-BWOSDIRS=
 
 all:=		TARGET= all
 install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
-lint:=		TARGET= lint
 _msg:=          TARGET= _msg
 
 # Since pre-5.0 system users were told to put /usr/5bin in their path to
@@ -165,11 +160,7 @@ install: $(SUBDIRS) .WAIT rootlinks
 #
 _msg:   $(MSGSUBDIRS)
 
-
-
-bwos: $(BWOSDIRS) .WAIT $(SUBDIRS)
-
-$(BWOSDIRS) $(SUBDIRS): FRC
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 rootlinks: $(S5LINK) $(DICTLINK) $(ROOTBINLINKS) $(OTHERLINKS)

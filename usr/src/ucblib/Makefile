@@ -19,21 +19,15 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 1989-1997,2002 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ucblib/Makefile
 #
 
-# libbc is special.  It depends on libucb and must be built after libucb.
 SUBDIRS= libucb librpcsoc libdbm libtermcap
 # libcurses needs libtermcap and libucb
 SUBDIRS2= libcurses
-sparc_SUBDIR= ../lib/libbc 
-BWOSDIRS=
 
 all:=		TARGET= all
 install:=	TARGET= install
@@ -45,13 +39,11 @@ lint:=		TARGET= lint
 
 .PARALLEL:	$(SUBDIRS)
 
-all install clean clobber: $(SUBDIRS) .WAIT $(SUBDIRS2) .WAIT $($(MACH)_SUBDIR)
-
-bwos: $(BWOSDIRS) .WAIT $(SUBDIRS) .WAIT $(SUBDIRS2) .WAIT $($(MACH)_SUBDIR)
+all install clean clobber: $(SUBDIRS) .WAIT $(SUBDIRS2)
 
 install_h:
 
-$(BWOSDIRS) $(SUBDIRS) $(SUBDIRS2) $($(MACH)_SUBDIR) : FRC
+$(SUBDIRS) $(SUBDIRS2): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
