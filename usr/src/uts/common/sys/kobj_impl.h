@@ -21,6 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -184,8 +186,9 @@ extern void mach_modpath(char *, const char *);
 
 extern void kobj_setup_standalone_vectors(void);
 extern void kobj_restore_vectors(void);
-extern void (*_kobj_printf)(void *, const char *fmt, ...);
-extern void (*_vkobj_printf)(void *, const char *fmt, va_list);
+extern void (*_kobj_printf)(void *, const char *fmt, ...) __KPRINTFLIKE(2);
+extern void (*_vkobj_printf)(void *, const char *fmt, va_list)
+    __KVPRINTFLIKE(2);
 extern void (*kobj_bcopy)(const void *, void *, size_t);
 extern void (*kobj_bzero)(void *, size_t);
 extern size_t (*kobj_strlcat)(char *, const char *, size_t);
