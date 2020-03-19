@@ -769,6 +769,7 @@ ptable_open(void *dev, uint64_t sectors, uint16_t sectorsize, diskread_t *dread)
 	int has_ext;
 #endif
 	table = NULL;
+	dp = NULL;
 	buf = malloc(sectorsize);
 	if (buf == NULL)
 		return (NULL);
@@ -829,7 +830,11 @@ ptable_open(void *dev, uint64_t sectors, uint16_t sectorsize, diskread_t *dread)
 		goto out;
 	}
 	/* Check that we have PMBR. Also do some validation. */
-	dp = (struct dos_partition *)(buf + DOSPARTOFF);
+	dp = malloc(NDOSPART * sizeof (struct dos_partition));
+	if (dp == NULL)
+		goto out;
+	bcopy(buf + DOSPARTOFF, dp, NDOSPART * sizeof (struct dos_partition));
+
 	/*
 	 * macOS can create PMBR partition in a hybrid MBR; that is, an MBR
 	 * partition which has a DOSTYP_PMBR entry defined to start at sector 1.
@@ -891,6 +896,7 @@ ptable_open(void *dev, uint64_t sectors, uint16_t sectorsize, diskread_t *dread)
 #endif /* LOADER_MBR_SUPPORT */
 #endif /* LOADER_MBR_SUPPORT || LOADER_GPT_SUPPORT */
 out:
+	free(dp);
 	free(buf);
 	return (table);
 }
