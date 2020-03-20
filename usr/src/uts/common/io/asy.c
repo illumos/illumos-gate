@@ -322,7 +322,7 @@ static int asyattach(dev_info_t *, ddi_attach_cmd_t);
 static int asydetach(dev_info_t *, ddi_detach_cmd_t);
 static int asyquiesce(dev_info_t *);
 
-static 	struct cb_ops cb_asy_ops = {
+static struct cb_ops cb_asy_ops = {
 	nodev,			/* cb_open */
 	nodev,			/* cb_close */
 	nodev,			/* cb_strategy */
@@ -1548,8 +1548,8 @@ asyopen(queue_t *rq, dev_t *dev, int flag, int sflag, cred_t *cr)
 	struct asyncline *async;
 	int		mcr;
 	int		unit;
-	int 		len;
-	struct termios 	*termiosp;
+	int		len;
+	struct termios	*termiosp;
 
 	unit = UNIT(*dev);
 	DEBUGCONT1(ASY_DEBUG_CLOSE, "asy%dopen\n", unit);
@@ -1990,7 +1990,7 @@ asy_waiteot(struct asycom *asy)
 static void
 asy_reset_fifo(struct asycom *asy, uchar_t flush)
 {
-	uchar_t lcr;
+	uchar_t lcr = 0;
 
 	/* On a 16750, we have to set DLAB in order to set FIFOEXTRA. */
 

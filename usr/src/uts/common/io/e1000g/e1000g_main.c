@@ -712,6 +712,7 @@ e1000g_regs_map(struct e1000g *Adapter)
 		break;
 	case e1000_pch_spt:
 	case e1000_pch_cnp:
+	case e1000_pch_tgp:
 		/*
 		 * On the SPT, the device flash is actually in BAR0, not a
 		 * separate BAR. Therefore we end up setting the
@@ -911,6 +912,7 @@ e1000g_setup_max_mtu(struct e1000g *Adapter)
 	case e1000_pch_lpt:
 	case e1000_pch_spt:
 	case e1000_pch_cnp:
+	case e1000_pch_tgp:
 		Adapter->max_mtu = MAXIMUM_MTU_9K;
 		break;
 	/* types with a special limit */
@@ -1489,6 +1491,8 @@ e1000g_init(struct e1000g *Adapter)
 	} else if (hw->mac.type == e1000_pch_spt) {
 		pba = E1000_PBA_26K;
 	} else if (hw->mac.type == e1000_pch_cnp) {
+		pba = E1000_PBA_26K;
+	} else if (hw->mac.type == e1000_pch_tgp) {
 		pba = E1000_PBA_26K;
 	} else {
 		/*
