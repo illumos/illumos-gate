@@ -104,7 +104,7 @@ if [ $? -ne 0 ]; then
     fi
 
     for pool in $pools; do
-        zpool import -f $pool
+        zpool import -f $pool || continue
 
         is_encr="$(zfs get -Hpo value encryption $pool)"
 
