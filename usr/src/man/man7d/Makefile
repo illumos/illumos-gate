@@ -44,6 +44,7 @@ _MANFILES=	aac.7d		\
 		devinfo.7d	\
 		dmfe.7d		\
 		dtrace.7d	\
+		e1000g.7d	\
 		ehci.7d		\
 		fasttrap.7d	\
 		fbt.7d		\

@@ -19514,6 +19514,7 @@ f usr/share/man/man7d/devinfo.7d 0444 root bin
 f usr/share/man/man7d/dmfe.7d 0444 root bin
 f usr/share/man/man7d/dnet.7d 0444 root bin
 f usr/share/man/man7d/dtrace.7d 0444 root bin
+f usr/share/man/man7d/e1000g.7d 0444 root bin
 f usr/share/man/man7d/ehci.7d 0444 root bin
 f usr/share/man/man7d/fasttrap.7d 0444 root bin
 f usr/share/man/man7d/fbt.7d 0444 root bin
