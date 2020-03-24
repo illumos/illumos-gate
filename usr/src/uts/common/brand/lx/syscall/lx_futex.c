@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -405,6 +405,17 @@ futex_wait(memid_t *memid, caddr_t addr,
 	}
 	if (curval != val) {
 		err = set_errno(EWOULDBLOCK);
+		goto out;
+	}
+
+	/*
+	 * We can't have hrtime and a timeout of 0. See below about
+	 * CLOCK_REALTIME.
+	 * On Linux this is is an invalid state anyway, so we'll short cut
+	 * this early to avoid a panic from passing a null pointer to ts2hrt().
+	 */
+	if (hrtime && timeout == NULL) {
+		err = set_errno(EINVAL);
 		goto out;
 	}
 
