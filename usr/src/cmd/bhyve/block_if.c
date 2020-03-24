@@ -372,8 +372,12 @@ blockif_proc(struct blockif_ctxt *bc, struct blockif_elem *be, uint8_t *buf)
 				.dfl_num_exts = 1,
 				.dfl_offset = 0,
 				.dfl_flags = 0,
-				.dfl_exts[0].dfle_start = br->br_offset,
-				.dfl_exts[0].dfle_length = br->br_resid
+				.dfl_exts = {
+					{
+						.dfle_start = br->br_offset,
+						.dfle_length = br->br_resid
+					}
+				}
 			};
 
 			if (ioctl(bc->bc_fd, DKIOCFREE, &dfl))
