@@ -1039,6 +1039,7 @@ xen_vbdroot_props(char *s)
 	short minor;
 	long addr = 0;
 
+	mi = '\0';
 	pnp = vbdpath + strlen(vbdpath);
 	prop_p = s + strlen(lnamefix);
 	while ((*prop_p != '\0') && (*prop_p != 's') && (*prop_p != 'p'))

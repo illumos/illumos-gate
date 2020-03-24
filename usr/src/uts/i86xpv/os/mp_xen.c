@@ -846,6 +846,7 @@ vcpu_config_report(processorid_t id, uint_t newstate, int error)
 	size_t len;
 	char *ps;
 
+	ps = NULL;
 	switch (newstate) {
 	case P_ONLINE:
 		ps = PS_ONLINE;

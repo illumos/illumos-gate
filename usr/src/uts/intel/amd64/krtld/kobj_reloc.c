@@ -22,6 +22,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2020 Joyent, Inc.
  */
 /*
  * Copyright (c) 2017 Joyent, Inc.
@@ -212,7 +214,7 @@ do_relocate(struct module *mp, char *reltbl, int nreloc, int relocsize,
 		if ((rtype > R_AMD64_NUM) || IS_TLS_INS(rtype)) {
 			_kobj_printf(ops, "krtld: invalid relocation type %d",
 			    rtype);
-			_kobj_printf(ops, " at 0x%llx:", off);
+			_kobj_printf(ops, " at 0x%lx:", off);
 			_kobj_printf(ops, " file=%s\n", mp->filename);
 			err = 1;
 			continue;
@@ -233,8 +235,8 @@ do_relocate(struct module *mp, char *reltbl, int nreloc, int relocsize,
 			    (mp->symtbl+(stndx * mp->symhdr->sh_entsize));
 			_kobj_printf(ops, "krtld:\t%s",
 			    conv_reloc_amd64_type(rtype));
-			_kobj_printf(ops, "\t0x%8llx", off);
-			_kobj_printf(ops, " 0x%8llx", addend);
+			_kobj_printf(ops, "\t0x%8lx", off);
+			_kobj_printf(ops, " %8lld", (longlong_t)addend);
 			_kobj_printf(ops, "  %s\n",
 			    (const char *)mp->strings + symp->st_name);
 		}
@@ -313,8 +315,8 @@ do_relocate(struct module *mp, char *reltbl, int nreloc, int relocsize,
 
 #ifdef	KOBJ_DEBUG
 		if (kobj_debug & D_RELOCATIONS) {
-			_kobj_printf(ops, "krtld:\t\t\t\t0x%8llx", off);
-			_kobj_printf(ops, " 0x%8llx\n", value);
+			_kobj_printf(ops, "krtld:\t\t\t\t0x%8lx", off);
+			_kobj_printf(ops, " 0x%8lx\n", value);
 		}
 #endif
 

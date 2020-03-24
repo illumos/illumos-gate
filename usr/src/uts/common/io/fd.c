@@ -810,6 +810,7 @@ fdgetlabel(struct fcu_obj *fjp, int unit)
 	nexttype = fdp->d_deffdtype;
 	try_this = 1;		/* always try the current characteristics */
 
+	rval = ENXIO;
 	for (tries = nfdtypes; tries; tries--) {
 		if (try_this) {
 			fjp->fj_flags &= ~FUNIT_CHAROK;

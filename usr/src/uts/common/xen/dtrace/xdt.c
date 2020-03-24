@@ -702,6 +702,7 @@ xdt_process_rec(uint_t cpuid, struct t_rec *rec)
 	ASSERT(rec != NULL);
 	ASSERT(xdt_ncpus == xpv_nr_phys_cpus());
 
+	eid = 0;
 	if (cpuid >= xdt_ncpus) {
 		tbuf.stat_spurious_cpu++;
 		goto done;
@@ -973,7 +974,7 @@ switchdone:
 		 *
 		 * data[0] = eip
 		 * data[1] = trapnr | (error_code_valid << 15)
-		 * 	| (error_code << 16);
+		 *	| (error_code << 16);
 		 */
 		XDT_PROBE4(XDT_PV_TRAP, data[0], data[1] & 0x7fff,
 		    (data[1] >> 15) & 1, data[1] >> 16);
@@ -985,7 +986,7 @@ switchdone:
 		 * data[0] = rip(0:31)
 		 * data[1] = rip(32:63)
 		 * data[2] = trapnr | (error_code_valid << 15)
-		 * 	| (error_code << 16);
+		 *	| (error_code << 16);
 		 */
 		rip64 = (((uint64_t)data[1]) << 32) | data[2];
 		XDT_PROBE4(XDT_PV_TRAP, rip64, data[2] & 0x7fff,

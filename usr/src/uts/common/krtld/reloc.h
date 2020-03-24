@@ -21,6 +21,8 @@
 
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef	_RELOC_DOT_H
@@ -274,7 +276,7 @@ extern const char	*conv_reloc_SPARC_type(Word);
 	_kobj_printf(ops, MSG_REL_PREGEN, CONV_RELOC_TYPE((rtype))); \
 	_kobj_printf(ops, MSG_REL_FILE, (file)); \
 	_kobj_printf(ops, MSG_REL_SYM, ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
-	_kobj_printf(ops, MSG_REL_NOFIT, EC_XWORD((uvalue)))
+	_kobj_printf(ops, MSG_REL_NOFIT, (u_longlong_t)EC_XWORD((uvalue)))
 
 
 #else	/* !_KERNEL */

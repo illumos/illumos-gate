@@ -305,8 +305,8 @@ int use_iflush;				/* iflush after relocations */
  * through this function pointer cannot handle more that one conversion
  * specification in the format string.
  */
-void (*_kobj_printf)(void *, const char *, ...);	/* printf routine */
-void (*_vkobj_printf)(void *, const char *, va_list);	/* vprintf routine */
+void (*_kobj_printf)(void *, const char *, ...) __KPRINTFLIKE(2);
+void (*_vkobj_printf)(void *, const char *, va_list) __KVPRINTFLIKE(2);
 
 /*
  * Standalone function pointers for use within krtld.
@@ -511,7 +511,7 @@ kobj_init(
 #ifdef	KOBJ_DEBUG
 	if (kobj_debug & D_DEBUG)
 		_kobj_printf(ops,
-		    "krtld: transferring control to: 0x%p\n", entry);
+		    "krtld: transferring control to: 0x%lx\n", entry);
 #endif
 
 	/*
@@ -532,7 +532,7 @@ kobj_init(
 #ifdef	KOBJ_DEBUG
 	if (kobj_debug & D_DEBUG)
 		_kobj_printf(ops,
-		    "krtld: really transferring control to: 0x%p\n", entry);
+		    "krtld: really transferring control to: 0x%lx\n", entry);
 #endif
 
 	/* restore printf/bcopy/bzero vectors before returning */
@@ -857,9 +857,9 @@ load_exec(val_t *bootaux, char *filename)
 	if (kobj_debug & D_LOADING) {
 		_kobj_printf(ops, "krtld: file=%s\n", mp->filename);
 		_kobj_printf(ops, "\ttext: 0x%p", mp->text);
-		_kobj_printf(ops, " size: 0x%x\n", mp->text_size);
+		_kobj_printf(ops, " size: 0x%lx\n", mp->text_size);
 		_kobj_printf(ops, "\tdata: 0x%p", mp->data);
-		_kobj_printf(ops, " dsize: 0x%x\n", mp->data_size);
+		_kobj_printf(ops, " dsize: 0x%lx\n", mp->data_size);
 	}
 #endif /* KOBJ_DEBUG */
 
@@ -968,9 +968,9 @@ load_linker(val_t *bootaux)
 	if (kobj_debug & D_LOADING) {
 		_kobj_printf(ops, "krtld: file=%s\n", mp->filename);
 		_kobj_printf(ops, "\ttext:0x%p", mp->text);
-		_kobj_printf(ops, " size: 0x%x\n", mp->text_size);
+		_kobj_printf(ops, " size: 0x%lx\n", mp->text_size);
 		_kobj_printf(ops, "\tdata:0x%p", mp->data);
-		_kobj_printf(ops, " dsize: 0x%x\n", mp->data_size);
+		_kobj_printf(ops, " dsize: 0x%lx\n", mp->data_size);
 	}
 #endif /* KOBJ_DEBUG */
 
@@ -2010,9 +2010,9 @@ kobj_load_module(struct modctl *modp, int use_path)
 	if (kobj_debug & D_LOADING) {
 		_kobj_printf(ops, "krtld: file=%s\n", mp->filename);
 		_kobj_printf(ops, "\ttext:0x%p", mp->text);
-		_kobj_printf(ops, " size: 0x%x\n", mp->text_size);
+		_kobj_printf(ops, " size: 0x%lx\n", mp->text_size);
 		_kobj_printf(ops, "\tdata:0x%p", mp->data);
-		_kobj_printf(ops, " dsize: 0x%x\n", mp->data_size);
+		_kobj_printf(ops, " dsize: 0x%lx\n", mp->data_size);
 	}
 #endif /* KOBJ_DEBUG */
 
@@ -2724,8 +2724,8 @@ crypto_es_hash(struct module *mp, char *hash, char *shstrtab)
 		if (kobj_debug & D_DEBUG)
 			_kobj_printf(ops,
 			    "krtld: crypto_es_hash: updating hash with"
-			    " %s data size=%d\n", shstrtab + shp->sh_name,
-			    shp->sh_size);
+			    " %s data size=%lx\n", shstrtab + shp->sh_name,
+			    (size_t)shp->sh_size);
 #endif
 		ASSERT(shp->sh_addr != 0);
 		SHA1Update(&ctx, (const uint8_t *)shp->sh_addr, shp->sh_size);
@@ -2878,7 +2878,7 @@ do_dependents(struct modctl *modp, char *modname, size_t modnamelen)
 
 			_kobj_printf(ops, "%s: dependency ", modp->mod_modname);
 			_kobj_printf(ops, "'%s' too long ", dep);
-			_kobj_printf(ops, "(max %d chars)\n", modnamelen);
+			_kobj_printf(ops, "(max %d chars)\n", (int)modnamelen);
 
 			kobj_free(dep, p - d + 1);
 
@@ -3840,7 +3840,7 @@ kobj_read_file(struct _buf *file, char *buf, uint_t size, uint_t off)
 	if (_moddebug & MODDEBUG_ERRMSG) {
 		_kobj_printf(ops, "kobj_read_file: size=%x,", size);
 		_kobj_printf(ops, " offset=%x at", off);
-		_kobj_printf(ops, " buf=%x\n", buf);
+		_kobj_printf(ops, " buf=%lx\n", (uintptr_t)buf);
 	}
 
 	/*
@@ -3883,7 +3883,7 @@ kobj_read_file(struct _buf *file, char *buf, uint_t size, uint_t off)
 
 		if (dlen != size) {
 			_kobj_printf(ops, "kobj_read_file: z_uncompress "
-			    "failed to uncompress (size returned 0x%x , "
+			    "failed to uncompress (size returned 0x%lx , "
 			    "expected size: 0x%x)\n", dlen, size);
 			return (-1);
 		}

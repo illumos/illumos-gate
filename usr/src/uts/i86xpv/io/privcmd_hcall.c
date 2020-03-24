@@ -1067,6 +1067,7 @@ privcmd_HYPERVISOR_mmuext_op(struct mmuext_op *op, int count, uint_t *scount,
 	struct mmuext_op *kop, single_kop;
 	import_export_t op_ie, scnt_ie;
 
+	kop = NULL;
 	op_ie = scnt_ie = null_ie;
 	error = 0;
 

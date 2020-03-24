@@ -2791,6 +2791,7 @@ page_swap_with_hypervisor(struct vnode *vp, u_offset_t off, caddr_t vaddr,
 	page_t *pp, *expp, *pp_first, **pplist = NULL;
 	mfn_t *mfnlist = NULL;
 
+	extra = 0;
 	contig = flags & PG_PHYSCONTIG;
 	if (minctg == 1)
 		contig = 0;
