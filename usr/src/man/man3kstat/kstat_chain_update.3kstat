@@ -7,7 +7,6 @@
 .SH NAME
 kstat_chain_update \- update the kstat header chain
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lkstat\fR [ \fIlibrary\fR\&.\|.\|.]
 #include <kstat.h>
@@ -18,8 +17,6 @@ kstat_chain_update \- update the kstat header chain
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBkstat_chain_update()\fR function brings the user's kstat header chain in
 sync with that of the kernel. The kstat chain is a linked list of kstat headers
 (\fBkstat_t\fR's) pointed to by \fIkc\fR->\fBkc_chain\fR, which is initialized
@@ -27,7 +24,7 @@ by \fBkstat_open\fR(3KSTAT). This chain constitutes a list of all kstats
 currently in the system.
 .sp
 .LP
-During normal operation, the kernel creates new kstats and delete old ones as
+During normal operation, the kernel creates new kstats and deletes old ones as
 various device instances are added and removed, thereby causing the user's copy
 of the kstat chain to become out of date. The \fBkstat_chain_update()\fR
 function detects this condition by comparing the kernel's current kstat chain
@@ -37,15 +34,18 @@ user's KCID, \fIkc\fR->\fBkc_chain_id\fR. If the KCIDs match,
 kstat headers from the user's kstat chain, adds any new ones, and sets
 \fIkc\fR->\fBkc_chain_id\fR to the new KCID. All other kstat headers in the
 user's kstat chain are unmodified.
-.SH RETURN VALUES
 .sp
 .LP
+Because of the deletion process, any \fBkstat_t\fR structures retrieved by the
+\fBkstat_lookup\fR(3KSTAT) function or data pointers obtained through the
+\fBkstat_data_lookup\fR(3KSTAT) function are invalidated by a call to
+\fRkstat_chain_update\fB(). New lookup calls must be made to obtain fresh
+structures after each chain update.
+.SH RETURN VALUES
 Upon successful completion, \fBkstat_chain_update()\fR returns the new KCID if
 the kstat chain has changed and 0 if it has not changed. Otherwise, it returns
 \(mi1 and sets \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
-.LP
 The \fBkstat_chain_update()\fR function will fail if:
 .sp
 .ne 2
@@ -84,7 +84,6 @@ The data for the given kstat was too large to be stored in the structure.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/kstat\fR\fR
@@ -94,8 +93,6 @@ kernel statistics driver
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -112,7 +109,5 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBkstat\fR(3KSTAT), \fBkstat_lookup\fR(3KSTAT), \fBkstat_open\fR(3KSTAT),
 \fBkstat_read\fR(3KSTAT), \fBattributes\fR(5)
