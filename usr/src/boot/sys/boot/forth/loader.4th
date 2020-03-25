@@ -43,7 +43,7 @@ include /boot/forth/support.4th
 include /boot/forth/color.4th
 include /boot/forth/delay.4th
 include /boot/forth/check-password.4th
-s" efi-version" getenv? [if]
+efi? [if]
 	include /boot/forth/efi.4th
 [then]
 
@@ -124,7 +124,7 @@ only forth also support-functions also builtins definitions
         swap -
         to len				( addr len )
         to blen				( addr )
-        baddr addr len move 		( addr )
+        baddr addr len move		( addr )
         to baddr			\ baddr points now to first option
       then
     then
@@ -280,7 +280,7 @@ builtin: boot-conf
 
 only forth definitions also support-functions
 
-\ 
+\
 \ in case the boot-args is set, parse it and extract following options:
 \ -a to boot_ask=YES
 \ -s to boot_single=YES
@@ -289,11 +289,11 @@ only forth definitions also support-functions
 \ -d to boot_drop_into_kmdb=YES
 \ -r to boot_reconfigure=YES
 \ -B acpi-user-options=X to acpi-user-options=X
-\ 
+\
 \ This is needed so that the menu can manage these options. Unfortunately, this
 \ also means that boot-args will override previously set options, but we have no
 \ way to control the processing order here. boot-args will be rebuilt at boot.
-\ 
+\
 \ NOTE: The best way to address the order is to *not* set any above options
 \ in boot-args.
 
@@ -382,7 +382,7 @@ only forth definitions also support-functions
 	    1+ swap 1- swap
 	  repeat
 				( addr len len' addr' len" addr" )
-	  >r >r 		( addr len len' addr' R: addr" len" )
+	  >r >r			( addr len len' addr' R: addr" len" )
 	  over r@ -		( addr len len' addr' proplen R: addr" len" )
 	  dup 5 +		( addr len len' addr' proplen proplen+5 )
 	  allocate abort" out of memory"

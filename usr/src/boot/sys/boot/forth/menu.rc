@@ -70,11 +70,6 @@ set mainmenu_reboot
 \
 set mainmenu_options=5
 
-\ illumos does not have multiple kernels
-\ set mainmenu_kernel=5
-\ set mainmenu_command[5]="cycle_kernel"
-\ set mainmenu_keycode[5]=107
-
 set mainmenu_caption[5]="Configure Boot [O]ptions..."
 set mainmenu_command[5]="2 goto_menu"
 set mainmenu_keycode[5]=111
@@ -153,22 +148,25 @@ set optionsmenu_keycode[6]=114
 set optionsansi_caption[6]="^[1mR^[meconfigure........... ^[34;1mOff^[m"
 set optionstoggled_ansi[6]="^[1mR^[meconfigure........... ^[32;7mOn^[m"
 
-set optionsmenu_init[7]="init_kmdb"
-set optionsmenu_caption[7]="Load [k]mdb........... Off"
-set optionstoggled_text[7]="Load [k]mdb........... On"
-set optionsmenu_command[7]="toggle_kmdb"
+set optionsmenu_kmdb=7
+set optionsmenu_command[7]="cycle_kmdb"
 set optionsmenu_keycode[7]=107
-set optionsansi_caption[7]="Load ^[1mk^[mmdb............. ^[34;1mOff^[m"
-set optionstoggled_ansi[7]="Load ^[1mk^[mmdb............. ^[32;7mOn^[m"
 
-set optionsmenu_init[8]="init_drop_into_kmdb"
-set optionsmenu_caption[8]="[D]rop into kmdb...... Off"
-set optionstoggled_text[8]="[D]rop into kmdb...... On"
-set optionsmenu_command[8]="toggle_drop_into_kmdb"
-set optionsmenu_keycode[8]=100
-set optionsansi_caption[8]="^[1mD^[mrop into kmdb........ ^[34;1mOff^[m"
-set optionstoggled_ansi[8]="^[1mD^[mrop into kmdb........ ^[32;7mOn^[m"
-
+\
+\ In EFI mode the framebuffer cannot be disabled. Although "framebuffer off"
+\ does switch to a simple text protocol, it doesn't affect the kernel which
+\ still ends up with a framebuffer console. This option is therefore only
+\ exposed in a non-EFI environment.
+\
+efi? invert [if]
+  set optionsmenu_init[8]="init_framebuffer"
+  set optionsmenu_caption[8]="[G]raphical Console... Off"
+  set optionstoggled_text[8]="[G]raphical Console... On"
+  set optionsmenu_command[8]="toggle_framebuffer"
+  set optionsmenu_keycode[8]=103
+  set optionsansi_caption[8]="^[1mG^[mraphical Console..... ^[34;1mOff^[m"
+  set optionstoggled_ansi[8]="^[1mG^[mraphical Console..... ^[32;7mOn^[m"
+[then]
 
 \
 \ BOOT ENVIRONMENT MENU
