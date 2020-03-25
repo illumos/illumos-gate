@@ -1472,24 +1472,26 @@ lxpr_read_meminfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    "        total:     used:    free:  shared: buffers:  cached:\n"
 	    "Mem:  %8lu %8lu %8lu %8u %8u %8u\n"
 	    "Swap: %8lu %8lu %8lu\n"
-	    "MemTotal:  %8lu kB\n"
-	    "MemFree:   %8lu kB\n"
-	    "MemShared: %8u kB\n"
-	    "Buffers:   %8u kB\n"
-	    "Cached:    %8u kB\n"
-	    "SwapCached:%8u kB\n"
-	    "Active:    %8u kB\n"
-	    "Inactive:  %8u kB\n"
-	    "HighTotal: %8u kB\n"
-	    "HighFree:  %8u kB\n"
-	    "LowTotal:  %8u kB\n"
-	    "LowFree:   %8u kB\n"
-	    "SwapTotal: %8lu kB\n"
-	    "SwapFree:  %8lu kB\n",
+	    "MemTotal:     %8lu kB\n"
+	    "MemFree:      %8lu kB\n"
+	    "MemAvailable: %8lu kB\n"
+	    "MemShared:    %8u kB\n"
+	    "Buffers:      %8u kB\n"
+	    "Cached:       %8u kB\n"
+	    "SwapCached:   %8u kB\n"
+	    "Active:       %8u kB\n"
+	    "Inactive:     %8u kB\n"
+	    "HighTotal:    %8u kB\n"
+	    "HighFree:     %8u kB\n"
+	    "LowTotal:     %8u kB\n"
+	    "LowFree:      %8u kB\n"
+	    "SwapTotal:    %8lu kB\n"
+	    "SwapFree:     %8lu kB\n",
 	    total_mem, total_mem - free_mem, free_mem, 0, 0, 0,
 	    total_swap, used_swap, total_swap - used_swap,
 	    btok(total_mem),				/* MemTotal */
 	    btok(free_mem),				/* MemFree */
+	    btok(free_mem),				/* MemAvailable */
 	    0,						/* MemShared */
 	    0,						/* Buffers */
 	    0,						/* Cached */
