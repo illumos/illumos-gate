@@ -109,6 +109,16 @@ extern "C" {
 #define	DEVICE_ID_5906			0x1712
 #define	DEVICE_ID_5906M			0x1713
 #define	DEVICE_ID_57780			0x1692
+#define	DEVICE_ID_57761			0x16b0
+#define	DEVICE_ID_57762			0x1682
+#define	DEVICE_ID_57765			0x16b4
+#define	DEVICE_ID_57766			0x1686
+#define	DEVICE_ID_57781			0x16b1
+#define	DEVICE_ID_57782			0x16b7
+#define	DEVICE_ID_57785			0x16b5
+#define	DEVICE_ID_57786			0x16b3
+#define	DEVICE_ID_57791			0x16b2
+#define	DEVICE_ID_57795			0x16b6
 
 #define	REVISION_ID_5700_B0		0x10
 #define	REVISION_ID_5700_B2		0x12
@@ -227,6 +237,23 @@ extern "C" {
 		(bgep->chipid.device == DEVICE_ID_5906M))
 
 /*
+ * Even though the hardware register calls this the 57785 family, all of the
+ * BSDs call this the 57765 series, so we call it that way to make it more
+ * similar.
+ */
+#define	DEVICE_57765_SERIES_CHIPSETS(bgep) \
+		((bgep->chipid.device == DEVICE_ID_57761) || \
+		(bgep->chipid.device == DEVICE_ID_57762) || \
+		(bgep->chipid.device == DEVICE_ID_57765) || \
+		(bgep->chipid.device == DEVICE_ID_57766) || \
+		(bgep->chipid.device == DEVICE_ID_57781) || \
+		(bgep->chipid.device == DEVICE_ID_57782) || \
+		(bgep->chipid.device == DEVICE_ID_57785) || \
+		(bgep->chipid.device == DEVICE_ID_57786) || \
+		(bgep->chipid.device == DEVICE_ID_57791) || \
+		(bgep->chipid.device == DEVICE_ID_57795))
+
+/*
  * Second section:
  *	Offsets of important registers & definitions for bits therein
  */
@@ -334,12 +361,12 @@ extern "C" {
 #define	MHCR_CHIP_ASIC_REV_5704		(0x2 << 28)
 #define	MHCR_CHIP_ASIC_REV_5705		(0x3 << 28)
 #define	MHCR_CHIP_ASIC_REV_5721_5751	(0x4 << 28)
-#define	MHCR_CHIP_ASIC_REV_5714 	(0x5 << 28)
+#define	MHCR_CHIP_ASIC_REV_5714		(0x5 << 28)
 #define	MHCR_CHIP_ASIC_REV_5752		(0x6 << 28)
 #define	MHCR_CHIP_ASIC_REV_5754		(0xb << 28)
 #define	MHCR_CHIP_ASIC_REV_5787		((uint32_t)0xb << 28)
 #define	MHCR_CHIP_ASIC_REV_5755		((uint32_t)0xa << 28)
-#define	MHCR_CHIP_ASIC_REV_5715 	((uint32_t)0x9 << 28)
+#define	MHCR_CHIP_ASIC_REV_5715		((uint32_t)0x9 << 28)
 #define	MHCR_CHIP_ASIC_REV_5906		((uint32_t)0xc << 28)
 /* (0xf << 28) touches all 5717 and 5725 series as well (OK) */
 #define	MHCR_CHIP_ASIC_REV_5723		((uint32_t)0xf << 28)
@@ -348,6 +375,7 @@ extern "C" {
 #define	CHIP_ASIC_REV_5761		0x5761
 #define	CHIP_ASIC_REV_5785		0x5785
 #define	CHIP_ASIC_REV_57780		0x57780
+#define	CHIP_ASIC_REV_57785		0x57785
 
 #define	CHIP_ASIC_REV_5717		0x5717
 #define	CHIP_ASIC_REV_5719		0x5719
@@ -356,6 +384,7 @@ extern "C" {
 
 #define	CHIP_ASIC_REV_PROD_ID_REG	0x000000bc
 #define	CHIP_ASIC_REV_PROD_ID_GEN2_REG	0x000000f4
+#define	CHIP_ASIC_REV_PROD_ID_GEN15_REG	0x000000fc
 
 #define	CHIP_ASIC_REV_5717_B0		0x05717100
 #define	CHIP_ASIC_REV_5717_C0		0x05717200
@@ -365,6 +394,11 @@ extern "C" {
 #define	CHIP_ASIC_REV_5720_A0		0x05720000
 #define	CHIP_ASIC_REV_5725_A0		0x05762000
 #define	CHIP_ASIC_REV_5727_B0		0x05762100
+
+/*
+ * Match any Metal Layer Revision.
+ */
+#define	CHIP_ASIC_REV_57765_AX		0x577850
 
 /*
  * PCI DMA read/write Control Register, in PCI config space
@@ -504,7 +538,7 @@ extern "C" {
 #define	PCI_CONF_DEV_CTRL_5717		0xb4
 #define	READ_REQ_SIZE_MASK		0x7000
 #define	READ_REQ_SIZE_MAX		0x5000
-#define	READ_REQ_SIZE_2K 		0x4000
+#define	READ_REQ_SIZE_2K		0x4000
 #define	DEV_CTRL_NO_SNOOP		0x0800
 #define	DEV_CTRL_RELAXED		0x0010
 
@@ -1144,15 +1178,17 @@ extern "C" {
 #define	JUMBO_RCV_BD_REPLENISH_DEFAULT	0x00000020	/* 32	*/
 
 /*
- * CPMU registers (5717/18/19/20 only)
+ * CPMU registers (5717/18/19/20/57765 only)
  */
 #define	CPMU_CLCK_ORIDE_REG		0x3624
 #define	CPMU_CLCK_ORIDE_MAC_ORIDE_EN	0x80000000
 #define	CPMU_STATUS_REG			0x362c
 #define	CPMU_STATUS_FUNC_NUM		0x20000000
 #define	CPMU_STATUS_FUNC_NUM_SHIFT	29
-#define	CPMU_STATUS_FUNC_NUM_5719 	0xc0000000
+#define	CPMU_STATUS_FUNC_NUM_5719	0xc0000000
 #define	CPMU_STATUS_FUNC_NUM_5719_SHIFT	30
+#define	CPMU_PADRNG_CTL_REG		0x3668
+#define	CPMU_PADRNG_CTL_RDIV2		0x00040000
 
 /*
  * EEE registers (5718/19/20 only)
@@ -1444,6 +1480,12 @@ extern "C" {
 #define	MLCR_DEFAULT_5717		(MLCR_AUTO_SEEPROM_ACCESS)
 
 /*
+ * MLCR_AUTO_SEEPROM_ACCESS is marked reserved in the 57765 family, so we don't
+ * try to enable it like on the 5717.
+ */
+#define	MLCR_DEFAULT_57765		0
+
+/*
  * Serial EEPROM Data/Address Registers (auto-access mode)
  */
 #define	SERIAL_EEPROM_DATA_REG		0x683c
@@ -1544,7 +1586,7 @@ extern "C" {
 
 /*
  * NVM access register
- * Applicable to BCM5721,BCM5751,BCM5752,BCM5714
+ * Applicable to BCM5721,BCM5751,BCM5752,BCM5714,BCM57725
  * and BCM5715 only.
  */
 #define	NVM_ACCESS_REG			0x7024
@@ -1731,7 +1773,7 @@ extern "C" {
 
 /*
  * Third section:
- * 	Hardware-defined data structures
+ *	Hardware-defined data structures
  *
  * Note that the chip is naturally BIG-endian, so, for a big-endian
  * host, the structures defined below match those described in the PRM.

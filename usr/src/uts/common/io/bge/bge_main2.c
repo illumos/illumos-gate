@@ -83,8 +83,8 @@ static ddi_dma_attr_t dma_attr = {
 	0x00000001,			/* dma_attr_minxfer	*/
 	0x000000000000FFFFull,		/* dma_attr_maxxfer	*/
 	0x00000000FFFFFFFFull,		/* dma_attr_seg		*/
-	1,				/* dma_attr_sgllen 	*/
-	0x00000001,			/* dma_attr_granular 	*/
+	1,				/* dma_attr_sgllen	*/
+	0x00000001,			/* dma_attr_granular	*/
 	DDI_DMA_FLAGERR			/* dma_attr_flags */
 };
 
@@ -2691,7 +2691,8 @@ bge_alloc_bufs(bge_t *bgep)
 	 * Enable PCI relaxed ordering only for RX/TX data buffers
 	 */
 	if (!(DEVICE_5717_SERIES_CHIPSETS(bgep) ||
-	    DEVICE_5725_SERIES_CHIPSETS(bgep))) {
+	    DEVICE_5725_SERIES_CHIPSETS(bgep) ||
+	    DEVICE_57765_SERIES_CHIPSETS(bgep))) {
 		if (bge_relaxed_ordering)
 			dma_attr.dma_attr_flags |= DDI_DMA_RELAXED_ORDERING;
 	}
@@ -2727,7 +2728,8 @@ bge_alloc_bufs(bge_t *bgep)
 	           txbuffsize));
 
 	if (!(DEVICE_5717_SERIES_CHIPSETS(bgep) ||
-	    DEVICE_5725_SERIES_CHIPSETS(bgep))) {
+	    DEVICE_5725_SERIES_CHIPSETS(bgep) ||
+	    DEVICE_57765_SERIES_CHIPSETS(bgep))) {
 		/* no relaxed ordering for descriptors rings? */
 		dma_attr.dma_attr_flags &= ~DDI_DMA_RELAXED_ORDERING;
 	}
@@ -3767,7 +3769,8 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * byte-swapped value to it. So we just write zero first for simplicity.
 	 */
 	if (DEVICE_5717_SERIES_CHIPSETS(bgep) ||
-	    DEVICE_5725_SERIES_CHIPSETS(bgep))
+	    DEVICE_5725_SERIES_CHIPSETS(bgep) ||
+	    DEVICE_57765_SERIES_CHIPSETS(bgep))
 		pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MHCR, 0);
 #else
 	mhcrValue = MHCR_ENABLE_INDIRECT_ACCESS |
