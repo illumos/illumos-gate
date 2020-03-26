@@ -2761,7 +2761,7 @@ function wait_freeing #pool
 	typeset pool=${1:-$TESTPOOL}
 	while true; do
 		[[ "0" == "$(zpool list -Ho freeing $pool)" ]] && break
-		log_must $SLEEP 1
+		log_must sleep 1
 	done
 }
 
