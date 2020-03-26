@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2020, the University of Queensland
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -1056,6 +1057,61 @@ mlxcx_mac_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
 		mac_prop_info_set_default_uint8(prh, 1);
 		break;
+	case MAC_PROP_ADV_100GFDX_CAP:
+	case MAC_PROP_EN_100GFDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh,
+		    (port->mlp_oper_proto &
+		    (MLXCX_PROTO_100GBASE_CR4 | MLXCX_PROTO_100GBASE_SR4 |
+		    MLXCX_PROTO_100GBASE_KR4)) != 0);
+		break;
+	case MAC_PROP_ADV_50GFDX_CAP:
+	case MAC_PROP_EN_50GFDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh,
+		    (port->mlp_oper_proto &
+		    (MLXCX_PROTO_50GBASE_CR2 | MLXCX_PROTO_50GBASE_KR2 |
+		    MLXCX_PROTO_50GBASE_SR2)) != 0);
+		break;
+	case MAC_PROP_ADV_40GFDX_CAP:
+	case MAC_PROP_EN_40GFDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh,
+		    (port->mlp_oper_proto &
+		    (MLXCX_PROTO_40GBASE_SR4 | MLXCX_PROTO_40GBASE_LR4_ER4 |
+		    MLXCX_PROTO_40GBASE_CR4 | MLXCX_PROTO_40GBASE_KR4))
+		    != 0);
+		break;
+	case MAC_PROP_ADV_25GFDX_CAP:
+	case MAC_PROP_EN_25GFDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh,
+		    (port->mlp_oper_proto &
+		    (MLXCX_PROTO_25GBASE_CR | MLXCX_PROTO_25GBASE_KR |
+		    MLXCX_PROTO_25GBASE_SR)) != 0);
+		break;
+	case MAC_PROP_ADV_10GFDX_CAP:
+	case MAC_PROP_EN_10GFDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh,
+		    (port->mlp_oper_proto &
+		    (MLXCX_PROTO_10GBASE_CX4 | MLXCX_PROTO_10GBASE_KX4 |
+		    MLXCX_PROTO_10GBASE_KR | MLXCX_PROTO_10GBASE_CR |
+		    MLXCX_PROTO_10GBASE_SR | MLXCX_PROTO_10GBASE_ER_LR)) != 0);
+		break;
+	case MAC_PROP_ADV_1000FDX_CAP:
+	case MAC_PROP_EN_1000FDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh,
+		    (port->mlp_oper_proto & (MLXCX_PROTO_1000BASE_KX |
+		    MLXCX_PROTO_SGMII)) != 0);
+		break;
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_EN_100FDX_CAP:
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_uint8(prh,
+		    (port->mlp_oper_proto & MLXCX_PROTO_SGMII_100BASE) != 0);
+		break;
 	default:
 		break;
 	}
@@ -1188,6 +1244,75 @@ mlxcx_mac_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 		}
 		*(uint32_t *)pr_val = port->mlp_mtu - MLXCX_MTU_OFFSET;
+		break;
+	case MAC_PROP_ADV_100GFDX_CAP:
+	case MAC_PROP_EN_100GFDX_CAP:
+		if (pr_valsize < sizeof (uint8_t)) {
+			ret = EOVERFLOW;
+			break;
+		}
+		*(uint8_t *)pr_val = (port->mlp_max_proto &
+		    (MLXCX_PROTO_100GBASE_CR4 | MLXCX_PROTO_100GBASE_SR4 |
+		    MLXCX_PROTO_100GBASE_KR4)) != 0;
+		break;
+	case MAC_PROP_ADV_50GFDX_CAP:
+	case MAC_PROP_EN_50GFDX_CAP:
+		if (pr_valsize < sizeof (uint8_t)) {
+			ret = EOVERFLOW;
+			break;
+		}
+		*(uint8_t *)pr_val = (port->mlp_max_proto &
+		    (MLXCX_PROTO_50GBASE_CR2 | MLXCX_PROTO_50GBASE_KR2 |
+		    MLXCX_PROTO_50GBASE_SR2)) != 0;
+		break;
+	case MAC_PROP_ADV_40GFDX_CAP:
+	case MAC_PROP_EN_40GFDX_CAP:
+		if (pr_valsize < sizeof (uint8_t)) {
+			ret = EOVERFLOW;
+			break;
+		}
+		*(uint8_t *)pr_val = (port->mlp_max_proto &
+		    (MLXCX_PROTO_40GBASE_SR4 | MLXCX_PROTO_40GBASE_LR4_ER4 |
+		    MLXCX_PROTO_40GBASE_CR4 | MLXCX_PROTO_40GBASE_KR4)) != 0;
+		break;
+	case MAC_PROP_ADV_25GFDX_CAP:
+	case MAC_PROP_EN_25GFDX_CAP:
+		if (pr_valsize < sizeof (uint8_t)) {
+			ret = EOVERFLOW;
+			break;
+		}
+		*(uint8_t *)pr_val = (port->mlp_max_proto &
+		    (MLXCX_PROTO_25GBASE_CR | MLXCX_PROTO_25GBASE_KR |
+		    MLXCX_PROTO_25GBASE_SR)) != 0;
+		break;
+	case MAC_PROP_ADV_10GFDX_CAP:
+	case MAC_PROP_EN_10GFDX_CAP:
+		if (pr_valsize < sizeof (uint8_t)) {
+			ret = EOVERFLOW;
+			break;
+		}
+		*(uint8_t *)pr_val = (port->mlp_max_proto &
+		    (MLXCX_PROTO_10GBASE_CX4 | MLXCX_PROTO_10GBASE_KX4 |
+		    MLXCX_PROTO_10GBASE_KR | MLXCX_PROTO_10GBASE_CR |
+		    MLXCX_PROTO_10GBASE_SR | MLXCX_PROTO_10GBASE_ER_LR)) != 0;
+		break;
+	case MAC_PROP_ADV_1000FDX_CAP:
+	case MAC_PROP_EN_1000FDX_CAP:
+		if (pr_valsize < sizeof (uint8_t)) {
+			ret = EOVERFLOW;
+			break;
+		}
+		*(uint8_t *)pr_val = (port->mlp_max_proto &
+		    (MLXCX_PROTO_1000BASE_KX | MLXCX_PROTO_SGMII)) != 0;
+		break;
+	case MAC_PROP_ADV_100FDX_CAP:
+	case MAC_PROP_EN_100FDX_CAP:
+		if (pr_valsize < sizeof (uint8_t)) {
+			ret = EOVERFLOW;
+			break;
+		}
+		*(uint8_t *)pr_val = (port->mlp_max_proto &
+		    MLXCX_PROTO_SGMII_100BASE) != 0;
 		break;
 	default:
 		ret = ENOTSUP;
