@@ -29,4 +29,4 @@ include ../../../Makefile.lib.64
 $(ROOTLIBDIR64):
 	$(INS.dir)
 
-install: all $(ROOTLIBDIR64) $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+install: all $(ROOTLIBDIR64) $(ROOTLIBS64) $(ROOTLINKS64)

@@ -218,10 +218,6 @@ INCS += -I$(SRC)/uts/common
 INCS += -I$(SRC)/common/smbsrv
 INCS += -I$(SRC)/common
 
-LINTCHECKFLAGS += -erroff=E_INCONS_ARG_DECL2
-LINTCHECKFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2
-LINTCHECKFLAGS += -erroff=E_INCONS_VAL_TYPE_USED2
-
 LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS +=	-lfakekernel -lidmap -lcmdutils
 LDLIBS +=	-lavl -lnvpair -lnsl -lpkcs11 -lreparse -lc

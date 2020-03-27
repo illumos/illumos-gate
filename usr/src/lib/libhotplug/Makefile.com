@@ -29,12 +29,11 @@ OBJECTS=	libhotplug.o
 
 include ../../Makefile.lib
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lnvpair
 
 SRCDIR =	../common
 CPPFLAGS +=	-I$(SRCDIR) -D_REENTRANT
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 
@@ -42,6 +41,5 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include ../../Makefile.targ

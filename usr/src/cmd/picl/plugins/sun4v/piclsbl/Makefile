@@ -22,9 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/picl/plugins/sun4v/piclsbl/Makefile
 
 LIBRARY=	libpiclsbl.a
 VERS=		.1
@@ -39,15 +36,9 @@ include $(SRC)/cmd/picl/plugins/Makefile.com
 
 SRCS=		$(OBJECTS:%.o=%.c)
 
-LINT_SRC=	$(LINTLIB:%.ln=%)	
-
 $(OBJS_DIR)/%.o:		$(SRC)/sun4v/piclsbl/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
-$(LINTS_DIR)/%.ln:              $(SRC)/sun4v/piclsbl/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 
 LIBS =		$(DYNLIB)
 
@@ -56,8 +47,6 @@ DYNFLAGS_PLAT =		/usr/platform/\$$PLATFORM/lib/picl/plugins
 DYNFLAGS_SUN4V =	/usr/platform/sun4v/lib/picl/plugins
 DYNFLAGS_COM =		/usr/lib/picl/plugins
 ROOTLIBDIR =		$(ROOT_PLAT_PLUGINDIR)
-
-CLEANFILES=	$(LINTOUT) $(LINTLIB)
 
 CPPFLAGS +=	-I$(SRC)/sun4v/piclsbl
 CPPFLAGS +=	-I$(SRC)/uts/common/sys
@@ -70,8 +59,6 @@ LDLIBS +=	-L$(ROOT)/usr/lib/picl/plugins
 DYNFLAGS +=	-R$(DYNFLAGS_COM)
 
 LDLIBS +=	-lc -lpicltree -lumem -lnvpair
-
-LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN -v
 
 .KEEP_STATE:
 
@@ -90,6 +77,5 @@ include $(SRC)/cmd/picl/plugins/Makefile.targ
 include $(SRC)/lib/Makefile.targ
 
 lint :
-	$(LINT.c) $(SRCS)
 
 FRC:

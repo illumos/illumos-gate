@@ -44,9 +44,3 @@ CPPFLAGS += -I$(SUN4DIR) -I$(UTILDIR) -I$(HBDIR)
 %.o: $(UTILDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
-%.ln: $(SUN4DIR)/%.c
-	$(LINT.c) -c $<
-
-%.ln: $(UTILDIR)/%.c
-	$(LINT.c) -c $<

@@ -31,9 +31,8 @@ OBJECTS= libvscan.o
 
 include ../../Makefile.lib
 
-LIBS=	$(DYNLIB) $(LINTLIB)
+LIBS=	$(DYNLIB)
 SRCDIR =	../common
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 # Reset the Makefile.lib macro ROOTLIBDIR to refer to usr/lib/vscan
 ROOTLIBDIR = $(ROOT)/usr/lib/vscan
@@ -47,6 +46,5 @@ SMOFF += signed
 .KEEP_STATE:
 
 all: $(LIBS)
-lint: lintcheck
 
 include ../../Makefile.targ

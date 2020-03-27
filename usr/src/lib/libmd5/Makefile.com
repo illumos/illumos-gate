@@ -28,5 +28,4 @@ VERS =		.1
 
 include		$(SRC)/lib/Makefile.rootfs
 
-LIBS +=		$(LINTLIB)
-DYNFLAGS += 	-F libmd.so.1
+DYNFLAGS +=	-F libmd.so.1

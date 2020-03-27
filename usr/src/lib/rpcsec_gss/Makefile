@@ -23,8 +23,6 @@
 # Copyright (c) 1995,1997, by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 include ../../Makefile.master
 
 SUBDIRS= $(MACH) $(BUILD64) $(MACH64)
@@ -47,10 +45,9 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 _msg :=         TARGET= _msg
 
-LIBRARY= 	rpcsec.a
+LIBRARY=	rpcsec.a
 TEXT_DOMAIN=	SUNW_OST_NETRPC
 XGETFLAGS=	-a
 POFILE=		$(LIBRARY:.a=.po)

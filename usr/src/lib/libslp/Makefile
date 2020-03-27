@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include $(SRC)/Makefile.master
 
@@ -54,12 +52,11 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 .PARALLEL: $(SUBDIRS)
 
-all lint install: install_h .WAIT $(SUBDIRS)
+all install: install_h .WAIT $(SUBDIRS)
 
 clean clobber: $(SUBDIRS)
 

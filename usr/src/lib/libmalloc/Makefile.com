@@ -22,24 +22,19 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	libmalloc.a
 VERS=		.1
 
-OBJECTS= 	malloc.o
+OBJECTS=	malloc.o
 
 # include library definitions
 include ../../Makefile.lib
 
 SRCDIR =	../common
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 
-LINTSRC=	$(LINTLIB:%.ln=%)
-LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
-LINTFLAGS64 +=	-erroff=E_BAD_PTR_CAST_ALIGN
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I../../common/inc -D_REENTRANT
@@ -48,7 +43,6 @@ LDLIBS +=	-lc
 
 .KEEP_STATE:
 
-lint: lintcheck
 
 # include library targets
 include ../../Makefile.targ
@@ -56,7 +50,3 @@ include ../../Makefile.targ
 pics/%.o: ../common/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
-
-# install rule for lint library target
-$(ROOTLINTDIR)/%:	../common/%
-	$(INS.file)

@@ -34,11 +34,7 @@ include ../../Makefile.lib
 
 SRCDIR =	../common
 
-LIBS =		$(DYNLIB) $(LINTLIB)
-
-$(LINTLIB):= SRCS=../common/llib-lkvm
-
-LINTSRC=	$(LINTLIB:%.ln=%)
+LIBS =		$(DYNLIB)
 
 CFLAGS	+=	$(CCVERBOSE)
 DYNFLAGS32 +=	-Wl,-f,/usr/platform/\$$PLATFORM/lib/$(DYNLIBPSR)
@@ -55,7 +51,6 @@ CLOBBERFILES += test test.o
 
 .KEEP_STATE:
 
-lint: lintcheck
 
 test: ../common/test.c
 	$(COMPILE.c) ../common/test.c
@@ -67,7 +62,3 @@ include ../../Makefile.targ
 objs/%.o pics/%.o: ../common/%.c ../kvm.h
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
-
-# install rule for lint library target
-$(ROOTLINTDIR)/%:	../common/%
-	$(INS.file)

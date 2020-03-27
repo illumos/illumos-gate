@@ -34,7 +34,6 @@ clobber :=	TARGET = clobber
 debug :=	TARGET = debug
 delete :=	TARGET = delete
 install :=	TARGET = install
-lint :=		TARGET = lint
 
 #
 # Definitions for header files
@@ -69,7 +68,7 @@ $(XMLDIR)/%: %
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 $(POFILE):	pofile_MSGFILES
 

@@ -23,10 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/picl/plugins/sun4u/psvc/psvcpolicy/Makefile
-#
+
 LIBRARY=	libpsvcpolicy.a
 VERS=		.1
 
@@ -46,12 +43,10 @@ PLATFORM = sun4u
 
 USR_PLAT_PSVCPOL = $(LIBS:%=$(USR_PSM_LIB_DIR)/%)
 
-CLEANFILES=	$(LINTOUT) $(LINTLIB)
-
 CPPFLAGS +=	-I$(SRC)/uts/sun4u
 CPPFLAGS +=	-I$(SRC)/cmd/picl/plugins/sun4u/psvc/psvcobj
 
-ZDEFS =		
+ZDEFS =
 CFLAGS +=	$(CCVERBOSE)
 LDLIBS +=	$(ZNODEFS)
 LDLIBS +=	-L$(SRC)/lib/libpicl/$(MACH) -L$(SRC)/lib/libpicltree/$(MACH)
@@ -61,8 +56,6 @@ LDLIBS +=	-lc -lpsvcobj -lpsvcplugin -lpicltree
 
 DYNFLAGS +=	-Wl,-f/usr/platform/\$$PLATFORM/lib/$(DYNLIBPSR)
 DYNFLAGS +=	-R/usr/platform/\$$PLATFORM/lib/picl/plugins:/usr/platform/sun4u/lib/picl/plugins:/usr/lib/picl/plugins:/usr/platform/sun4u/lib
-
-LINTFLAGS +=
 
 .KEEP_STATE:
 
@@ -74,7 +67,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 all: $(LIBS) $(LIBLINKS)
@@ -102,7 +94,6 @@ $(USR_PSM_LIB_DIR)/%: % $(USR_PSM_LIB_DIR)
 	$(SYMLINK) ./libpsvcpolicy.so$(VERS) $(USR_PSM_LIB_DIR)/libpsvcpolicy.so
 
 lint :
-	$(LINT.c) $(SRCS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

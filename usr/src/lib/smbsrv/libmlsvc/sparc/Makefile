@@ -30,4 +30,4 @@ $(__GNUC)sparc_C_PICFLAGS =	$(sparc_C_BIGPICFLAGS)
 
 DYNFLAGS +=	-R/usr/lib/smbsrv
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBS) $(ROOTLINKS)

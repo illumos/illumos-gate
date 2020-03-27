@@ -39,8 +39,6 @@ install		:= FILEMODE = 0444
 CONF=           picldevtree.conf
 ROOTCONF=       $(CONF:%=$(ROOTLIBDIR)/%)
 
-ROOTLINTDIR =   $(ROOTLIBDIR)
-
 .KEEP_STATE:
 
 SUBDIRS=
@@ -49,9 +47,8 @@ all	:=	TARGET= all
 install :=	TARGET= install
 clean	:=	TARGET= clean
 clobber	:=	TARGET= clobber
-lint	:=	TARGET= lint
 
-all: 
+all:
 
 install:	$(ROOTLIBDIR) $(ROOTCONF)
 

@@ -32,4 +32,4 @@ include ../Makefile.com
 #
 LDLIBS +=	-lfdisk
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBS) $(ROOTLINKS)

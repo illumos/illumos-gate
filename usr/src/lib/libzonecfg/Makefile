@@ -32,7 +32,6 @@ all :=		TARGET = all
 clean :=	TARGET = clean
 clobber :=	TARGET = clobber
 install :=	TARGET = install
-lint :=		TARGET = lint
 
 #
 # Definitions for message catalog
@@ -54,7 +53,7 @@ $(DTDDIR)/%: %
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 $(POFILE):	pofile_MSGFILES
 

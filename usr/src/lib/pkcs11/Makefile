@@ -24,7 +24,7 @@
 
 include ../Makefile.lib
 
-HDRS =     	cryptoki.h pkcs11.h pkcs11f.h pkcs11t.h
+HDRS =		cryptoki.h pkcs11.h pkcs11f.h pkcs11t.h
 HDRDIR =	include
 ROOTHDRDIR =	$(ROOT)/usr/include/security
 
@@ -39,15 +39,14 @@ SUBDIRS = \
 	pkcs11_softtoken \
 	pkcs11_tpm
 
-all 	:=	TARGET= all
-clean 	:=	TARGET= clean
+all	:=	TARGET= all
+clean	:=	TARGET= clean
 clobber	:=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 install_h: $(ROOTHDRS)
 

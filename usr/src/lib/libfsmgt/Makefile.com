@@ -42,11 +42,10 @@ ROOTHDRS= $(HDRS:%=$(ROOTDIRS)/%)
 
 CHECKHDRS= $(HDRS:%.h=%.check)
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lnsl -lkstat
 
 SRCDIR =	../common
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I$(SRC)/lib/libfsmgt/common \
@@ -66,7 +65,6 @@ CLOBBERFILES	+= $(SRCDIR)/sharetab.c
 
 all: $(LIBS)
 
-lint: lintcheck
 
 $(SRCDIR)/sharetab.c: $(NFSLIB_DIR)/sharetab.c
 	rm -f $(SRCDIR)/sharetab.c

@@ -33,7 +33,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 test :=		TARGET= test
 
 SCRFILES = screen/keycaps \
@@ -48,7 +47,7 @@ SCRFILES = screen/keycaps \
 	screen/term.h
 
 # definitions for install_h target
-HDRS= 		curses.h term.h unctrl.h
+HDRS=		curses.h term.h unctrl.h
 HDRDIR=		screen
 
 LIBRARY=	libcurses.a
@@ -71,7 +70,7 @@ all: $(SCRFILES) .WAIT $(SUBDIRS)
 
 install: all .WAIT $(SUBDIRS)
 
-clean clobber lint test: $(SUBDIRS)
+clean clobber test: $(SUBDIRS)
 
 install_h: $(ROOTHDRS)
 

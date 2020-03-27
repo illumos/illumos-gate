@@ -27,4 +27,4 @@ include ../../../Makefile.lib.64
 
 DYNFLAGS += -R/usr/lib/fm/$(MACH64)
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+install: all $(ROOTLIBS64) $(ROOTLINKS64)

@@ -19,8 +19,6 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -30,20 +28,19 @@ include ../../Makefile.lib
 SUBDIRS =	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
-MSGFILES = 	libshare_smbfs.c
+MSGFILES =	libshare_smbfs.c
 POFILE  =	libshare_smbfs.po
 
 all	:=	TARGET= all
 clean	:=	TARGET= clean
 clobber	:=	TARGET= clobber
 install	:=	TARGET= install
-lint	:=	TARGET= lint
 
 .KEEP_STATE:
 
-all clean clobber install lint:	$(SUBDIRS)
+all clean clobber install:	$(SUBDIRS)
 
-$(POFILE): 	$(MSGFILES)
+$(POFILE):	$(MSGFILES)
 	$(BUILDPO.msgfiles)
 
 _msg:	$(MSGDOMAINPOFILE)

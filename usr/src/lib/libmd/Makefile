@@ -37,13 +37,12 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 
 .KEEP_STATE:
 
 .PARALLEL:	$(SUBDIRS)
 
-all clean clobber install lint: \
+all clean clobber install: \
 		$(CAPDIR) .WAIT $(SUBDIRS)
 
 install_h:	$(ROOTHDRS)

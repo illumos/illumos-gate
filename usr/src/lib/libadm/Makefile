@@ -22,23 +22,20 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include		../Makefile.lib
 
 SUBDIRS= $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64) 
+$(BUILD64)SUBDIRS += $(MACH64)
 
 all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

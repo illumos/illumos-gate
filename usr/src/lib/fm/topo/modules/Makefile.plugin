@@ -55,9 +55,6 @@ arch_ROOTCONF = $(ROOT)/usr/platform/$(ARCH)/lib/fm/topo/plugins/$(CONF)
 plat_ROOTCONF = $(PLATFORMS:%=$(ROOT)/usr/platform/%/lib/fm/topo/plugins/$(CONF))
 ROOTCONF = $($(CLASS)_ROOTCONF)
 
-LINTFLAGS = -msux
-LINTFILES = $(MODULESRCS:%.c=%.ln) $(SHAREDSRCS:%.c=%.ln)
-
 CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-parentheses
 
@@ -77,7 +74,7 @@ DYNFLAGS += -R/usr/lib/fm
 all: $(PROG)
 
 .NO_PARALLEL:
-.PARALLEL: $(OBJS) $(LINTFILES)
+.PARALLEL: $(OBJS)
 
 $(PROG): $(OBJS) $(APIMAP)
 	$(LINK.c) $(DYNFLAGS) $(OBJS) -o $@ $(LDLIBS)
@@ -97,22 +94,10 @@ $(PROG): $(OBJS) $(APIMAP)
 	$(CTFCONVERT_O)
 
 clean:
-	$(RM) $(OBJS) $(LINTFILES) $(CLEANFILES)
+	$(RM) $(OBJS) $(CLEANFILES)
 
 clobber: clean
 	$(RM) $(PROG) $(CLOBBERFILES)
-
-%.ln: ../../common/$(MODULE)/%.c
-	$(LINT.c) -c $<
-
-%.ln: ../../common/$(SHAREDMODULE)/%.c
-	$(LINT.c) -c $<
-
-%.ln: %.c
-	$(LINT.c) -c $<
-
-lint: $(LINTFILES)
-	$(LINT) $(LINTFLAGS) $(LINTFILES) $(LDLIBS)
 
 check:	$(CHECKHDRS)
 

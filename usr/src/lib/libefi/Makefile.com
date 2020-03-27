@@ -36,12 +36,10 @@ include ../../Makefile.rootfs
 
 SRCDIR =	../common
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-luuid -lsmbios -lc
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 CFLAGS +=	$(CCVERBOSE)
 
-LINTFLAGS64 +=	-errchk=longptr64
 
 SMOFF += kmalloc_wrong_size
 
@@ -49,6 +47,5 @@ SMOFF += kmalloc_wrong_size
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include ../../Makefile.targ

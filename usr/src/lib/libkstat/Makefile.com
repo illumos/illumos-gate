@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= libkstat.a
 VERS= .1
@@ -38,9 +36,7 @@ include ../../Makefile.rootfs
 
 SRCDIR =	../common
 
-LIBS =		$(DYNLIB) $(LINTLIB)
-
-LINTSRC=	$(LINTLIB:%.ln=%)
+LIBS =		$(DYNLIB)
 
 CPPFLAGS +=	-I..
 CFLAGS +=	$(CCVERBOSE)
@@ -48,7 +44,6 @@ LDLIBS +=	-lc
 
 .KEEP_STATE:
 
-lint: lintcheck
 
 # include library targets
 include ../../Makefile.targ
@@ -58,7 +53,3 @@ pics/%.o: ../common/%.c
 	$(POST_PROCESS_O)
 
 pics/kstat.o: ../kstat.h
-
-# install rule for lint library target
-$(ROOTLINTDIR)/%:	../common/%
-	$(INS.file)

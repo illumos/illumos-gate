@@ -47,6 +47,5 @@ CERRWARN +=	$(CNOWARN_UNINIT)
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include ../../Makefile.targ

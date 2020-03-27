@@ -49,8 +49,7 @@ include	../../Makefile.lib
 #
 LIBNAME=	passwdutil
 
-LIBS=		$(DYNLIB) $(LINTLIB)
-$(LINTLIB) :=	SRCS= $(SRCDIR)/$(LINTSRC)
+LIBS=		$(DYNLIB)
 LDLIBS		+= -lsldap -lnsl -lc
 
 CPPFLAGS	+= -DENABLE_SUNOS_AGING -D_REENTRANT \
@@ -64,12 +63,9 @@ CERRWARN	+= -_gcc=-Wno-unused-label
 # not linted
 SMATCH=off
 
-lint	:=	SRCS= $(OBJ:%.o=$(SRCDIR)/%.c)
-
 .KEEP_STATE:
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include ../../Makefile.targ

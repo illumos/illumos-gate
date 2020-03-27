@@ -42,16 +42,13 @@ LIBS=		$(DYNLIB)
 
 ROOTLIBDIR      = $(ROOT_PLATFORM)/lib
 
-CONF = 		fru_container.conf
+CONF =		fru_container.conf
 ROOTCONF=       $(CONF:%=$(ROOTLIBDIR)/%)
 $(ROOTCONF)	:= FILEMODE = 0644
 
-
-CLEANFILES=	$(LINTOUT) $(LINTLIB)
 CLOBBERFILES += $(LIBLINKS)
 CSTYLE    = cstyle -p -P
 HDRCHK    = hdrchk
-
 
 CPPFLAGS +=	-I$(SRC)/lib/libfru/include
 CPPFLAGS +=	-I$(SRC)/lib/libfruutils/
@@ -71,7 +68,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 LN = ln -s
@@ -107,7 +103,6 @@ include $(SRC)/cmd/picl/plugins/Makefile.targ
 include $(SRC)/lib/Makefile.targ
 
 lint :
-	$(LINT.c) -m $(SRCS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

@@ -20,12 +20,8 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 2001 by Sun Microsystems, Inc.
 # All rights reserved.
-#
-# cmd/picl/plugins/sun4u/cherrystone/conf/Makefile
 #
 
 OBJECTS=
@@ -44,15 +40,11 @@ install	:= FILEMODE = 0444
 CONF=		platsvcd.conf psvcobj.conf
 ROOTCONF=	$(CONF:%=$(USR_PSM_LIB_DIR)/%)
 
-SRCS=		
+SRCS=
 
 LIBS =		$(DYNLIB)
 
-CLEANFILES=	$(LINTOUT) $(LINTLIB)
-
 ZDEFS	=
-
-LINTFLAGS +=
 
 .KEEP_STATE:
 
@@ -62,7 +54,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 
 all:
 

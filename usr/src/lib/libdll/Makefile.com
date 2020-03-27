@@ -50,13 +50,11 @@ MAPFILES=       ../mapfile-vers
 # Set common AST build flags (e.g. C99/XPG6, needed to support the math stuff)
 include ../../../Makefile.ast
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 
 LDLIBS += \
 	-last \
 	-lc
-
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 SRCDIR =	../common
 
@@ -93,13 +91,5 @@ SMOFF += all_func_returns,strcpy_overflow
 .KEEP_STATE:
 
 all: $(LIBS)
-
-#
-# libdll is not lint-clean yet; fake up a target.  (You can use
-# "make lintcheck" to actually run lint; please send all lint fixes
-# upstream (to AT&T) so the next update will pull them into ON.)
-#
-lint:
-	@ print "usr/src/lib/libdll is not lint-clean: skipping"
 
 include ../../Makefile.targ

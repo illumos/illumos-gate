@@ -45,11 +45,6 @@ $(TYPES:%=all.%):
 all.library.targ: $(LIBS)
 all.standalone.targ: $(STANDLIBRARY)
 
-lint: $(TYPES:%=lint.%)
-
-$(TYPES:%=lint.%):
-	@$(MAKE) lintcheck CURTYPE=$(@:lint.%=%)
-
 $(STANDLIBRARY): $(OBJS) $(LINKTEST_OBJ)
 	$(LD) $(BREDUCE) $(ZDEFS) $(LDFLAGS) -o $@.linktest $(OBJS) $(LINKTEST_OBJ)
 	rm $@.linktest
@@ -80,7 +75,3 @@ objs/%.o pics/%.o: $(ISASRCDIR)/%.s
 objs/%.o pics/%.o: ../common/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
-
-# install rule for lint library target
-$(ROOTLINTDIR)/%: ../common/%
-	$(INS.file)

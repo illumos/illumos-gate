@@ -37,7 +37,6 @@ all:=           TARGET= all
 install:=       TARGET= install
 clean:=         TARGET= clean
 clobber:=       TARGET= clobber
-lint:=          TARGET= lint
 
 ROOTETC= $(ROOT)/etc
 ETCFLASHD=      $(ROOTETC)/flash

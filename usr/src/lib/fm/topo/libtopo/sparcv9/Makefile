@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../Makefile.com
 include ../../../../Makefile.lib.64
@@ -33,4 +31,4 @@ LDLIBS += -L$(ROOTLIBDIR64)
 
 LDLIBS += -lzfs
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+install: all $(ROOTLIBS64) $(ROOTLINKS64)

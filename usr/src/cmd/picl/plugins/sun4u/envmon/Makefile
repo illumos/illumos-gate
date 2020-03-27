@@ -44,17 +44,10 @@ LIBS =		$(DYNLIB)
 
 ROOTLIBDIR	= $(ROOT_PLAT_PLUGINDIR)
 
-LINTSRC =	$(LINTLIB:%.ln=%)
-ROOTLINTDIR =	$(ROOTLIBDIR)
-ROOTLINT =	$(LINTSRC:%=$(ROOTLINTDIR)/%)
-
-CLEANFILES=	$(LINTOUT) $(LINTLIB)
-
 CPPFLAGS +=	-I$(SRC)/uts/sun4u/ -I$(SRC)/uts/common/
 CPPFLAGS +=	-I$(SRC)/cmd/picl/plugins/lib/picld_pluginutil
 CPPFLAGS +=	-D_REENTRANT
 CFLAGS +=	$(CCVERBOSE)
-LINTFLAGS =	-uxmn -I.. -I$(SRC)/lib/libpicl -I$(SRC)/lib/libpicltree
 DYNFLAGS +=	-R/usr/platform/sun4u/lib/picl/plugins:/usr/lib/picl/plugins
 LDLIBS +=	-L$(SRC)/cmd/picl/plugins/lib/picld_pluginutil/$(MACH)
 LDLIBS +=	-L$(SRC)/lib/libpicltree/$(MACH)
@@ -62,7 +55,7 @@ LDLIBS +=	-L$(SRC)/cmd/picl/plugins/common/piclevent
 LDLIBS +=	-L$(SRC)/cmd/picl/plugins/common/memcfg
 LDLIBS +=	-L$(SRC)/cmd/picl/plugins/common/devtree
 LDLIBS +=	-lnvpair -ldevinfo -lc
-LDLIBS +=	-lpicltree -lpicld_pluginutil -lpiclevent -lpicldevtree 
+LDLIBS +=	-lpicltree -lpicld_pluginutil -lpiclevent -lpicldevtree
 
 .KEEP_STATE:
 
@@ -72,7 +65,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 POFILE =	piclenvmon_sun4u.po
@@ -100,11 +92,7 @@ $(LIBLINKS):	FRC
 include $(SRC)/lib/Makefile.targ
 include	$(SRC)/cmd/picl/plugins/Makefile.targ
 
-$(ROOTLINTDIR)/%: ../%
-	$(INS.file)
-
 lint:
-	$(LINT.c) $(SRCS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../Makefile.lib
 
@@ -37,12 +35,11 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 test :=		TARGET= test
 
 .KEEP_STATE:
 
-all install clean clobber lint test: $(SUBDIRS)
+all install clean clobber test: $(SUBDIRS)
 
 install_h: $(ROOTHDRS)
 

@@ -31,7 +31,7 @@ TSTOBJECTS =    diagcode_test.o
 include ../../../Makefile.lib
 include ../../Makefile.lib
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc
 
 CLOBBERFILES += test $(TSTOBJECTS)
@@ -40,17 +40,11 @@ SRCDIR =	../common
 
 CFLAGS +=	$(CCVERBOSE)
 
-$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
-$(LINTLIB) := LINTFLAGS = -nsvx
-$(LINTLIB) := LINTFLAGS64 = -nsvx -m64
-
 .KEEP_STATE:
 
 all:
 
 install:
-
-lint: lintcheck
 
 test: $(TSTOBJECTS) $(PICS)
 	$(LINK.c) -o $@ $(TSTOBJECTS) $(PICS) $(LDLIBS)

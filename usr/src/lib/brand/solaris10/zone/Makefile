@@ -48,7 +48,6 @@ $(POFILE): $(POFILES)
 
 install: $(PROGS) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES) $(ETCUSER)
 
-lint:
 
 clean:
 	-$(RM) $(PROGS) $(POFILES) $(POFILE)

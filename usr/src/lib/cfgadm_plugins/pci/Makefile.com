@@ -59,7 +59,6 @@ SMATCH=off
 
 all: $(LIBS)
 
-lint:   lintcheck
 
 # Create target directories
 $(USR_LIB_DIR):

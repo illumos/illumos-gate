@@ -30,7 +30,6 @@ install :=	TARGET= install
 
 all clean clobber install: $(SUBDIRS)
 
-lint:
 
 install_h: $(ROOTHDRS)
 

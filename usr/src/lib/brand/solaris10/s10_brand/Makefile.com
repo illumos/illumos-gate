@@ -80,12 +80,9 @@ CPPFLAGS +=	-D_REENTRANT -U_ASM \
 CFLAGS +=	$(CCVERBOSE)
 # Needed to handle zfs include files
 CSTD=	$(CSTD_GNU99)
-C99LMODE=	-Xc99=%all
 DYNFLAGS +=	$(DYNFLAGS_$(CLASS))
 DYNFLAGS +=	$(BLOCAL) $(ZNOVERSION) -Wl,-e_start
 LDLIBS +=	-lmapmalloc -lc
-LINTFLAGS +=	-erroff=E_STATIC_UNUSED
-LINTFLAGS64 +=	-erroff=E_STATIC_UNUSED
 
 CERRWARN +=	$(CNOWARN_UNINIT)
 

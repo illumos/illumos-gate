@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 
-include $(SRC)/lib/Makefile.lib 
+include $(SRC)/lib/Makefile.lib
 
 HDRS =		libilb.h
 HDRDIR =	common
@@ -33,15 +33,14 @@ $(BUILD64)SUBDIRS += $(MACH64)
 POFILE =       libilb.po
 MSGFILES =     common/ilb_subr.c
 
-all := 		TARGET = all
+all :=		TARGET = all
 clean :=	TARGET = clean
 clobber :=	TARGET = clobber
 install	:=	TARGET = install
-lint :=		TARGET = lint
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 install_h:	$(ROOTHDRS)
 
@@ -57,5 +56,5 @@ $(SUBDIRS): FRC
 
 FRC:
 
-include $(SRC)/Makefile.msg.targ 
+include $(SRC)/Makefile.msg.targ
 include $(SRC)/lib/Makefile.targ

@@ -23,9 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# usr/src/lib/pam_modules/authtok_get/Makefile.com
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 LIBRARY=	pam_authtok_get.a
 VERS=		.1
@@ -37,6 +34,5 @@ LDLIBS		+= -lpam -lc
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include		../../../Makefile.targ

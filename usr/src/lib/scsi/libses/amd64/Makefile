@@ -23,7 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../Makefile.com
 include ../../../Makefile.lib
@@ -31,6 +30,6 @@ include ../../../Makefile.lib.64
 include ../Makefile.defs
 include ../Makefile.defs.64
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+install: all $(ROOTLIBS64) $(ROOTLINKS64)
 
 include ../Makefile.targ

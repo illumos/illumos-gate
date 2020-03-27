@@ -38,22 +38,21 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 
 POFILE =	libbe.po
 MSGFILES =	`$(GREP) -l gettext $(HDRDIR)/*.[ch]`
 
 .KEEP_STATE:
 
-all install lint: install_h $(SUBDIRS)
+all install: install_h $(SUBDIRS)
 
 clean clobber: $(SUBDIRS)
 
-$(POFILE): 	pofile_MSGFILES
+$(POFILE):	pofile_MSGFILES
 
-install_h: 	$(ROOTHDRS)
+install_h:	$(ROOTHDRS)
 
-check: 		$(CHECKHDRS)
+check:		$(CHECKHDRS)
 
 _msg: $(MSGDOMAINPOFILE)
 

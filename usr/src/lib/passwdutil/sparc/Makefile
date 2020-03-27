@@ -23,11 +23,7 @@
 # Copyright (c) 2001 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# usr/src/lib/passwdutil/sparc/Makefile
-#
 
 include	../Makefile.com
 
-install:	all $(ROOTLIBS) $(ROOTLINT)
+install:	all $(ROOTLIBS)

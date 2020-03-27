@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = libcontract.a
 VERS = .1
@@ -40,10 +38,9 @@ OBJECTS = \
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
-LIBS =		$(DYNLIB) $(LINTLIB)
-SRCDIR = 	../common
+LIBS =		$(DYNLIB)
+SRCDIR =	../common
 
-$(LINTLIB) :=	SRCS = $(SRCDIR)/llib-lcontract
 LDLIBS +=	-lnvpair -lc
 
 CPPFLAGS +=	-I$(SRCDIR) -D_REENTRANT
@@ -53,6 +50,5 @@ CFLAGS +=	$(CCVERBOSE)
 
 all: $(LIBS)
 
-lint: $(LINTLIB) lintcheck
 
 include ../../Makefile.targ

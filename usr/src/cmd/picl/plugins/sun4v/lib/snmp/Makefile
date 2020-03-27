@@ -26,10 +26,6 @@
 # Copyright 2019 Peter Tribble.
 #
 
-#
-# cmd/picl/plugins/sun4v/lib/snmp/Makefile
-#
-
 LIBRARY=	libpiclsnmp.a
 VERS=		.1
 OBJECTS=	snmplib.o pdu.o asn1.o
@@ -48,7 +44,6 @@ LIBS=		$(DYNLIB)
 
 ROOTLIBDIR      = $(ROOT_PLATFORM)/lib
 
-CLEANFILES=	$(LINTOUT) $(LINTLIB)
 CLOBBERFILES += $(LIBLINKS)
 
 CPPFLAGS +=	-I. -I../../include -I$(SRC)/uts/sun4v
@@ -73,7 +68,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 
 all:  $(DYNLIB) $(LIBLINKS)
 
@@ -87,7 +81,6 @@ include $(SRC)/cmd/picl/plugins/Makefile.targ
 include $(SRC)/lib/Makefile.targ
 
 lint :
-	$(LINT.c) -m $(SRCS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

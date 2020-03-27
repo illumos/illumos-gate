@@ -28,15 +28,15 @@ LIBRARY= pkcs11_kernel.a
 VERS= .1
 
 CORE_OBJECTS= \
-	kernelGeneral.o 	\
-	kernelSlottable.o 	\
-	kernelSlotToken.o 	\
-	kernelObject.o 		\
-	kernelDigest.o	 	\
-	kernelSign.o 		\
-	kernelVerify.o 		\
-	kernelDualCrypt.o 	\
-	kernelKeys.o 		\
+	kernelGeneral.o		\
+	kernelSlottable.o	\
+	kernelSlotToken.o	\
+	kernelObject.o		\
+	kernelDigest.o		\
+	kernelSign.o		\
+	kernelVerify.o		\
+	kernelDualCrypt.o	\
+	kernelKeys.o		\
 	kernelRand.o		\
 	kernelSession.o		\
 	kernelSessionUtil.o	\
@@ -99,15 +99,6 @@ ROOTLIBDIR64=   $(ROOT)/usr/lib/security/$(MACH64)
 
 all:    $(LIBS)
 
-# we don't need to lint ST_OBJECTS since they are linted elsewhere.
-lintcheck := SRCS = $(CORESRCS)
-lintother := OSRCS = ../common/kernelSoftCommon.c
-lintother := CPPFLAGS = -I$(ST_DIR) $(CPPFLAGS.master)
-
-lintother: $$(OSRCS)
-	$(LINT.c) $(LINTCHECKFLAGS) $(OSRCS) $(LDLIBS)
-
-lint: lintcheck lintother
 
 pics/%.o:	$(ST_DIR)/%.c
 	$(COMPILE.c) -o $@ $< -I$(ST_DIR)

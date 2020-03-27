@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = libsctp.a
 VERS    = .1
@@ -32,8 +30,7 @@ OBJECTS = sctp.o
 include ../../Makefile.lib
 
 SRCDIR =	../common
-LIBS =		$(DYNLIB) $(LINTLIB)
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lsocket -lc
 
 CFLAGS +=	$(CCVERBOSE)
@@ -42,6 +39,5 @@ CFLAGS +=	$(CCVERBOSE)
 
 all:		$(LIBS)
 
-lint:		$(LINTLIB) lintcheck
 
 include ../../Makefile.targ

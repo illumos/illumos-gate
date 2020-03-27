@@ -51,8 +51,6 @@ OTHERINFOS	+= $(INCDIR2)/fru_PS0_data.info
 OTHERINFOS	+= $(INCDIR2)/fru_PS1_data.info
 OTHERINFOS	+= $(INCDIR2)/fru_SC_data.info
 
-ROOTLINTDIR =   $(ROOTLIBDIR)
-
 .KEEP_STATE:
 
 SUBDIRS=
@@ -61,9 +59,8 @@ all	:=	TARGET= all
 install :=	TARGET= install
 clean	:=	TARGET= clean
 clobber	:=	TARGET= clobber
-lint	:=	TARGET= lint
 
-all:	$(CONFS) 
+all:	$(CONFS)
 
 install:	$(ROOTLIBDIR) $(ROOTCONF)
 
@@ -80,9 +77,6 @@ $(CONFS): $(MAININFO) $(OTHERINFOS)
 # include library targets
 include $(SRC)/lib/Makefile.targ
 include	$(SRC)/cmd/picl/plugins/Makefile.targ
-
-$(ROOTLINTDIR)/%: ../%
-	$(INS.file)
 
 lint:
 

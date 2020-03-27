@@ -39,11 +39,9 @@ OBJECTS=  \
 # include library definitions
 include ../../../Makefile.lib
 
-LIBS =          $(DYNLIB) $(LINTLIB)
+LIBS =          $(DYNLIB)
 
 SRCDIR=		../common
-
-$(LINTLIB) :=	SRCS=$(SRCDIR)/$(LINTSRC)
 
 CPPFLAGS +=	-I../inc
 CFLAGS +=       $(CCVERBOSE)
@@ -55,7 +53,6 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 
 all: $(LIBS)
 
-lint: lintcheck
 
 # include library targets
 include ../../../Makefile.targ

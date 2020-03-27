@@ -106,7 +106,7 @@ DLIBSRCS += \
 include ../../Makefile.lib
 
 SRCS = $(LIBSRCS:%.c=../common/%.c) $(LIBISASRCS:%.c=../$(MACH)/%.c)
-LIBS = $(DYNLIB) $(LINTLIB)
+LIBS = $(DYNLIB)
 
 SRCDIR = ../common
 
@@ -144,8 +144,6 @@ LIBDAUDITLIBS = $(LDLIBS.lib) -lmapmalloc -lc -lproc
 
 yydebug := YYCFLAGS += -DYYDEBUG
 
-$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
-
 LFLAGS = -t -v
 YFLAGS = -d -v
 
@@ -166,10 +164,6 @@ $(ROOTDLIBDIR64)/%.so := FILEMODE=555
 
 all: $(LIBS) $(DRTIOBJ) $(LIBDAUDIT)
 
-lint: lintdlink lintcheck
-
-lintdlink: $(DLINKSRCS:%.c=../common/%.c)
-	$(LINT.c) $(DLINKSRCS:%.c=../common/%.c) $(DRTILDLIBS)
 
 dt_lex.c: $(SRCDIR)/dt_lex.l dt_grammar.h
 	$(LEX) $(LFLAGS) $(SRCDIR)/dt_lex.l > $@

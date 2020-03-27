@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	libpicl.a
 VERS=		.1
@@ -31,9 +29,8 @@ OBJECTS=	picl.o
 
 include $(SRC)/lib/Makefile.lib
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CPPFLAGS +=	-I.. -D_REENTRANT
 CFLAGS +=	$(CCVERBOSE)
@@ -45,7 +42,6 @@ POFILE =	picl.po
 
 all: $(LIBS)
 
-lint:	lintcheck
 
 %.po:	../%.c
 	$(CP) $< $<.i

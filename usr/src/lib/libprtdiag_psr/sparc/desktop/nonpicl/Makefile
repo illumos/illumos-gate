@@ -37,21 +37,19 @@ include $(SRC)/lib/libprtdiag_psr/sparc/Makefile.com
 SRCS=	$(OBJECTS:%.o=../common/%.c)
 
 IFLAGS += -I$(USR_PLAT_DIR)/sun4u/include -I ../../../../libprtdiag/inc
-LINTFLAGS += $(IFLAGS)
 
 #
-# desktop platform library should install into
-# SUNW,Ultra-2. All other desktop platforms can
-# link to /usr/platform/SUNW,Ultra-2/lib/libprtdiag_psr.so
+# desktop platform library should install into SUNW,Ultra-2. All other desktop
+# platforms can link to /usr/platform/SUNW,Ultra-2/lib/libprtdiag_psr.so
 #
 PLATFORM=SUNW,Ultra-2
 
 #
-# For all other sun4u platforms NOT delivered by ON (ie. delivered 
-# by SME or external hardware vendors) we add a default library in
-# /usr/platform/sun4u/lib so that prtdiag will default to using 
-# the desktop library for any of these platforms. (this will be a
-# link to ../../SUNW,Ultra-2/lib
+# For all other sun4u platforms NOT delivered by ON (ie. delivered by SME or
+# external hardware vendors) we add a default library in
+# /usr/platform/sun4u/lib so that prtdiag will default to using the desktop
+# library for any of these platforms. (this will be a link to
+# ../../SUNW,Ultra-2/lib
 #
 DEF_PLATFORM=sun4u
 USR_DEF_PSM_LIB_DIR=$(USR_PLAT_DIR)/$(DEF_PLATFORM)/lib

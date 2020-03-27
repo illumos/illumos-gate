@@ -34,7 +34,6 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 
 # definitions for install_h target
 HDRS=		smhbaapi.h
@@ -42,7 +41,7 @@ HDRDIR=		common
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS) 
+all clean clobber install: $(SUBDIRS)
 
 # install rule for install_h target
 

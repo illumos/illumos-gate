@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 all:		$(LIBS)
 
@@ -47,8 +45,6 @@ objs/%.o pics/%.o: ../common/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
-lint:
-		$(LINT.c) $(SRCS) $(LDLIBS) > $(LINTOUT) 2>&1
 
 # Leaf target makefiles establish exactly what they will install.  Use of
 # ROOTLIBS will install both the default archive library and DYNLIB1,

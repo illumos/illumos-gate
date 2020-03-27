@@ -38,20 +38,15 @@
  * workaround exists for lint's pass2, which requires definitions for all
  * symbols in order to properly perform cross-checks.
  *
- * Thus, this header file was created to address two problems:
+ * Thus, this header file was created to address the problems:
  *
- *	1. The "extern" problem.  All files beneath stand/lib should #include
- *	   this file rather than "extern" the symbol. Additionally, existing
- *	   externs should be removed as convenient.
+ *	- The "extern" problem.  All files beneath stand/lib should #include
+ *	  this file rather than "extern" the symbol. Additionally, existing
+ *	  externs should be removed as convenient.
  *
- *	   Of course, eventually some brave soul needs to venture over to the
- *	   slums of psm/stand and add all the proper header files, at which
- *	   point this file can be disposed of.
- *
- *	2. The lint pass2 problem.  Specifically, this file is used to build
- *	   llib-lfakeboot.ln, which is then used to properly lint the
- *	   binaries under stand/lib.  See stand/lib/llib-lfakeboot for more
- *	   details.
+ *	  Of course, eventually some brave soul needs to venture over to the
+ *	  slums of psm/stand and add all the proper header files, at which
+ *	  point this file can be disposed of.
  *
  * Note that the set of symbols shared between stand/lib and psm/stand is
  * itself a moving target.  As such, this file should be updated as needed

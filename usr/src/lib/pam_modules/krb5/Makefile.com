@@ -37,7 +37,7 @@ PRIV_OBJ=	krb5_authenticate.o \
 
 OBJECTS=	$(PRIV_OBJ)
 
-include 	../../Makefile.pam_modules
+include		../../Makefile.pam_modules
 include $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
 
 CPPFLAGS +=	-I../../../gss_mechs/mech_krb5/include \
@@ -57,15 +57,9 @@ SMATCH=off
 # called after dlclose()
 DYNFLAGS +=	$(ZNODELETE)
 
-CLOBBERFILES += $(LINTLIB) $(LINTOUT) $(POFILE)
-
-#
-# Don't lint derived files
-#
-lint    :=      SRCS= $(PRIV_OBJ:%.o=$(SRCDIR)/%.c)
+CLOBBERFILES += $(POFILE)
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include	$(SRC)/lib/Makefile.targ

@@ -30,12 +30,10 @@ OBJECTS=	avl.o
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 SRCS =		$(COMDIR)/avl.c
 
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
-
-COMDIR = 	$(SRC)/common/avl
+COMDIR =	$(SRC)/common/avl
 
 LDLIBS +=	-lc
 CFLAGS +=	$(CCVERBOSE)
@@ -43,8 +41,6 @@ CFLAGS +=	$(CCVERBOSE)
 .KEEP_STATE:
 
 all : $(LIBS)
-
-lint : lintcheck
 
 pics/%.o:	 $(COMDIR)/%.c
 	$(COMPILE.c) -o $@ $<

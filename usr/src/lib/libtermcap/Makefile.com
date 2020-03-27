@@ -18,6 +18,5 @@ include ../../Makefile.rootfs
 
 LIBRARY =	libtermcap.a
 VERS =		.1
-LIBS +=		$(LINTLIB)
 
 DYNFLAGS +=	$(ZLOADFLTR)

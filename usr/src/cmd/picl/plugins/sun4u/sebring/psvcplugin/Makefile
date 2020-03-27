@@ -62,9 +62,6 @@ $(LIBLINKS):	FRC
 include $(SRC)/lib/Makefile.targ
 include $(SRC)/cmd/picl/plugins/Makefile.targ
 
-$(ROOTLINTDIR)/%: ../%
-	$(INS.file)
-
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 

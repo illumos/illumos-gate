@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include	../Makefile.lib
 
@@ -31,11 +29,10 @@ SUBDIRS =	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
 # conditional assignments
-all :=      	TARGET= all
+all :=		TARGET= all
 install :=      TARGET= install
 clean :=        TARGET= clean
 clobber :=      TARGET= clobber
-lint :=         TARGET= lint
 test :=         TARGET= test
 
 # definitions for install_h target
@@ -46,7 +43,7 @@ CHECKHDRS=      $(HDRS:%.h=%.check)
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all install clean clobber: $(SUBDIRS)
 
 $(ROOTHDRDIR)/%: %
 	$(INS.file)

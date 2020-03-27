@@ -40,12 +40,6 @@ LDLIBS += -lumem -lmdesc -lldom
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-%.ln: $(PRIDIR)/%.c
-	$(LINT.c) -c $<
-
 %.o: $(PIDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
-%.ln: $(PIDIR)/%.c
-	$(LINT.c) -c $<

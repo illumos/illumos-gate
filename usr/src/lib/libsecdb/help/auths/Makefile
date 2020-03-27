@@ -204,4 +204,4 @@ $(DIRS):
 $(MSGDIR)/%: %
 	$(INS.file)
 
-clean clobber lint:
+clean clobber:

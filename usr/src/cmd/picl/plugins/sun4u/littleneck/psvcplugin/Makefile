@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	libpsvcplugin_psr.a
 VERS=		.1
@@ -45,8 +43,6 @@ ROOT_PLATFORM = $(USR_PLAT_DIR)/SUNW,Sun-Fire-280R
 
 ROOTLIBDIR =	$(ROOT_PLAT_PLUGINDIR)
 
-CLEANFILES=	$(LINTOUT) $(LINTLIB)
-
 CPPFLAGS +=	-I$(SRC)/uts/sun4u
 CPPFLAGS +=	-I$(SRC)/cmd/picl/plugins/sun4u/psvc/psvcobj
 CPPFLAGS +=	-D_REENTRANT
@@ -59,8 +55,6 @@ DYNFLAGS +=	-R/usr/platform/\$$PLATFORM/lib/picl/plugins:/usr/platform/sun4u/lib
 
 LDLIBS +=	-lc -lpicltree -lpicl -lpsvcobj -lpsvcplugin
 
-LINTFLAGS +=
-
 .KEEP_STATE:
 
 SUBDIRS=
@@ -72,7 +66,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 all: $(LIBS) $(LIBLINKS)
@@ -94,7 +87,6 @@ include $(SRC)/cmd/picl/plugins/Makefile.targ
 include $(SRC)/lib/Makefile.targ
 
 lint :
-	$(LINT.c) $(SRCS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

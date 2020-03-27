@@ -20,27 +20,22 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1997, by Sun Microsystems, Inc.
 # All rights reserved.
 #
-# lib/gss_mechs/mech_dh/Makefile
-#
 
-SUBDIRS= backend .WAIT dh192 dh640 dh1024 
+SUBDIRS= backend .WAIT dh192 dh640 dh1024
 MSGSUBDIRS = backend
 
 all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 .KEEP_STATE:
 
-all clean clobber lint: $(SUBDIRS)
+all clean clobber: $(SUBDIRS)
 
 install: $(SUBDIRS)
 

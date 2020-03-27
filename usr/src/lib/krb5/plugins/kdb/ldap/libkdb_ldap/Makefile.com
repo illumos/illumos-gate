@@ -45,7 +45,7 @@ LIBKLDAP_OBJS= \
 	ldap_service_stash.o \
 	ldap_services.o \
 	ldap_tkt_policy.o \
-	princ_xdr.o 
+	princ_xdr.o
 
 OBJECTS= $(LIBKLDAP_OBJS)
 
@@ -64,7 +64,7 @@ POFILES = generic.po
 #override liblink
 INS.liblink=	-$(RM) $@; $(SYMLINK) $(LIBLINKS)$(VERS) $@
 
-CPPFLAGS += 	-DHAVE_CONFIG_H \
+CPPFLAGS +=	-DHAVE_CONFIG_H \
 		-I$(SRC)/lib/krb5 \
 		-I$(SRC)/lib/krb5/kdb \
 		-I$(SRC)/lib/gss_mechs/mech_krb5/include \
@@ -88,7 +88,6 @@ LDLIBS +=	-L $(ROOTLIBDIR) -lkadm5srv -lc -lnsl -lldap
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 # include library targets
 include $(SRC)/lib/krb5/Makefile.targ

@@ -164,7 +164,7 @@ include ../../Makefile.lib
 # install this library in the root filesystem
 include ../../Makefile.rootfs
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 
 SRCDIR=		../common
 
@@ -208,19 +208,14 @@ CERRWARN +=	-_gcc=-Wno-clobbered
 SMATCH=off
 
 LIBMP =		-lmp
-lint :=		LIBMP =
 LDLIBS +=	$(LIBMP) -lmd -lc
 DYNFLAGS +=	$(ZNODELETE)
 
-$(LINTLIB):=	SRCS=$(SRCDIR)/$(LINTSRC)
-LINTFLAGS +=	-m -DPORTMAP
-LINTFLAGS64 +=	-m -DPORTMAP
 
 .KEEP_STATE:
 
 all: $(LIBS)
 
-# Don't lint WRAPPERS as they are explicitly unclean
 SRCS=	$(DES:%.o=../des/%.c)			\
 	$(DIAL:%.o=../dial/%.c)			\
 	$(IPSEC:%.o=../ipsec/%.c)		\
@@ -234,8 +229,6 @@ SRCS=	$(DES:%.o=../des/%.c)			\
 	$(NIS_GEN:%.o=../nis/gen/%.c)		\
 	$(COMMON:%.o=../common/%.c)
 
-lint:
-	@$(LINT.c) $(SRCS) $(LDLIBS)
 
 # include library targets
 include ../../Makefile.targ

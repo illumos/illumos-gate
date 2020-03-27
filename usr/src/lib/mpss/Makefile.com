@@ -36,7 +36,7 @@ MAPFILES =
 
 LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lgen
-CFLAGS +=	$(CCVERBOSE) 
+CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT
 DYNFLAGS +=	$(BLOCAL) $(ZNOVERSION)
 
@@ -47,6 +47,5 @@ CERRWARN +=	$(CNOWARN_UNINIT)
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include ../../Makefile.targ

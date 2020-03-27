@@ -83,16 +83,12 @@ SRCS=		$(XCURSES:%.o=../src/libc/xcurses/%.c) \
 		$(MKS:%.o=../src/libc/mks/%.c) \
 		$(WIDE:%.o=../src/libc/wide/%.c)
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 
 # definitions for install target
 ROOTLIBDIR=	$(ROOT)/usr/xpg4/lib
 ROOTLIBDIR64=	$(ROOT)/usr/xpg4/lib/$(MACH64)
 ROOTLIBS=	$(LIBS:%=$(ROOTLIBDIR)/%)
-
-$(LINTLIB):= SRCS=../src/libc/llib-lcurses
-
-LINTSRC=	$(LINTLIB:%.ln=%)
 
 LDLIBS += -lc
 
@@ -113,7 +109,6 @@ CLOBBERFILES=	libcurses.so libcurses.so$(VERS)
 
 all: $(LIBS)
 
-lint: lintcheck
 
 #
 # Include library targets
@@ -131,11 +126,3 @@ objs/%.o pics/%.o:	../src/libc/mks/%.c
 objs/%.o pics/%.o:	../src/libc/wide/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
-
-# install rule for lint library target
-$(ROOTLINTDIR)/%: ../src/libc/%
-	$(INS.file)
-
-# install rule for 64 bit lint library target
-$(ROOTLINTDIR64)/%: ../src/libc/%
-	$(INS.file)

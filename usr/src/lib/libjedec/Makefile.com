@@ -19,7 +19,7 @@ OBJECTS =	libjedec.o
 
 include ../../Makefile.lib
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 CPPFLAGS +=	-I../common
 
 SRCDIR =	../common

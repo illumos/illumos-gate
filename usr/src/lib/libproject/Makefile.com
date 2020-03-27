@@ -36,15 +36,7 @@ include ../../Makefile.lib
 
 SRCDIR =	../common
 
-LIBS =		$(DYNLIB) $(LINTLIB)
-
-LINTOUT =	lint.out
-
-LINTSRC =	$(LINTLIB:%.ln=%)
-ROOTLINTDIR =	$(ROOTLIBDIR)
-ROOTLINT =	$(LINTSRC:%=$(ROOTLINTDIR)/%)
-
-CLEANFILES +=	$(LINTOUT) $(LINTLIB)
+LIBS =		$(DYNLIB)
 
 CPPFLAGS +=	-D_REENTRANT
 CFLAGS +=	$(CCVERBOSE)
@@ -52,13 +44,11 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	$(CNOWARN_UNINIT)
 LDLIBS +=	-lc -lsecdb -lproc -lpool
 
-$(LINTLIB) :=	SRCS = ../common/llib-lproject
 
 .KEEP_STATE:
 
 all: $(LIBS)
 
-lint:	lintcheck
 
 # include library targets
 include ../../Makefile.targ
@@ -66,7 +56,3 @@ include ../../Makefile.targ
 pics/%.o: ../common/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
-
-# install rule for lint library target
-$(ROOTLINTDIR)/%: ../common/%
-	$(INS.file)

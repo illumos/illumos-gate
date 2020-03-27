@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include	$(SRC)/lib/krb5/Makefile.lib
 
@@ -35,12 +33,11 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 .KEEP_STATE:
 
-all clean clobber lint: $(SUBDIRS)
+all clean clobber: $(SUBDIRS)
 
 # no messages in this current dir but there are in libkdb_ldap
 _msg: libkdb_ldap

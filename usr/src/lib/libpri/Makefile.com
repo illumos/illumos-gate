@@ -31,7 +31,7 @@ OBJECTS = $(LIBSRCS:%.c=%.o)
 
 include ../../Makefile.lib
 
-LIBS = $(DYNLIB) $(LINTLIB)
+LIBS = $(DYNLIB)
 
 SRCDIR = ../common
 SRCS = $(LIBSRCS:%.c=$(SRCDIR)/%.c)
@@ -42,19 +42,13 @@ CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
 LDLIBS += -lc
 
-LINTFLAGS = -msux
-LINTFLAGS64 = -msux -m64
 
-$(LINTLIB) := SRCS = $(LINTSRC:%=$(SRCDIR)/%)
-$(LINTLIB) := LINTFLAGS = -nsvx -I$(ROOT)/usr/platform/sun4v/include
-$(LINTLIB) := LINTFLAGS64 = -nsvx -m64 \
 	-I$(ROOT)/usr/platform/sun4v/include
 
 .KEEP_STATE:
 
 all: $(LIBS)
 
-lint: $(LINTLIB) lintcheck
 
 pics/%.o: $(SRCDIR)/%.c
 	$(COMPILE.c) -o $@ $<

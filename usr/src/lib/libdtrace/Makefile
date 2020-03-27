@@ -28,19 +28,18 @@ include ../Makefile.lib
 HDRS = dtrace.h
 HDRDIR = common
 
-SUBDIRS = $(MACH) 
+SUBDIRS = $(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
 all := TARGET = all
 clean := TARGET = clean
 clobber := TARGET = clobber
 install := TARGET = install
-lint := TARGET = lint
 yydebug := TARGET = yydebug
 
 .KEEP_STATE:
 
-all clean clobber lint yydebug: $(SUBDIRS)
+all clean clobber yydebug: $(SUBDIRS)
 
 install: install_h $(SUBDIRS)
 

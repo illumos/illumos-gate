@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	pam_smbfs_login.a
 VERS=		.1
@@ -35,11 +33,8 @@ include		../../Makefile.pam_modules
 LDLIBS		+= -lpam -lc -lsmbfs
 CFLAGS		+= -I../../../libsmbfs
 CFLAGS64	+= -I../../../libsmbfs
-LINTFLAGS	+= -I$(SRC)/lib/libsmbfs
-LINTFLAGS64	+= -I$(SRC)/lib/libsmbfs
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include	$(SRC)/lib/Makefile.targ

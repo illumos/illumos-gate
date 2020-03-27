@@ -20,4 +20,4 @@ include ../../../Makefile.lib.64
 
 sparcv9_C_PICFLAGS= $(sparcv9_C_BIGPICFLAGS)
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+install: all $(ROOTLIBS64) $(ROOTLINKS64)

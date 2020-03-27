@@ -23,26 +23,22 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libprtdiag_psr/Makefile
 
 include		$(SRC)/Makefile.master
 
-SUBDIRS=	$(MACH) 
+SUBDIRS=	$(MACH)
 
 all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 delete :=	TARGET= delete
 install :=	TARGET= install
-lint :=		TARGET= lint
 package :=	TARGET= package
 _msg :=		TARGET= _msg
 
 .KEEP_STATE:
 
-all clean clobber delete install lint package _msg: $(SUBDIRS)
+all clean clobber delete install package _msg: $(SUBDIRS)
 
 $(MACH) $(MACH64):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

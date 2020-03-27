@@ -11,10 +11,10 @@
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
 # are met:
-# 	- Redistributions of source code must retain the above copyright
+#	- Redistributions of source code must retain the above copyright
 #	  notice, this list of conditions and the following disclaimer.
 #
-# 	- Redistributions in binary form must reproduce the above copyright
+#	- Redistributions in binary form must reproduce the above copyright
 #	  notice, this list of conditions and the following disclaimer in
 #	  the documentation and/or other materials provided with the
 #	  distribution.
@@ -47,8 +47,7 @@ INCS += -I$(SRCDIR)
 INCS += -I$(SRC)/cmd/ndmpd/include
 
 CSTD=	$(CSTD_GNU99)
-C99LMODE=	-Xc99=%all
-LIBS=	$(DYNLIB) $(LINTLIB)
+LIBS=	$(DYNLIB)
 LDLIBS +=	-lc -lscf
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 
@@ -56,12 +55,10 @@ CERRWARN +=	-_gcc=-Wno-char-subscripts
 CERRWARN +=	$(CNOWARN_UNINIT)
 
 SRCS=	$(OBJECTS:%.o=$(SRCDIR)/%.c)
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include ../../Makefile.targ

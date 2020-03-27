@@ -39,12 +39,11 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 install_h:=	TARGET = install_h
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all install clean clobber: $(SUBDIRS)
 
 install_h: $(ROOTHDRS)
 

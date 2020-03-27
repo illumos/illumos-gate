@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -92,11 +90,9 @@ manifests:
 install:	all message_files manifests $(JARDESTDIR) $(INSJARS)
 
 # empty targets for top-level building compatability
-
-install_h lint:
+install_h:
 
 # jstyle check -- more for developer's convenience since the checks are
 # not automated in the build.
-
 check:
 	$(JSTYLE) -p $(PKGPATH)/*.java

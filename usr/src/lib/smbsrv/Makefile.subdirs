@@ -22,7 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 .KEEP_STATE:
 
@@ -32,9 +31,8 @@ clean := TARGET = clean
 clobber := TARGET = clobber
 install := TARGET = install
 install_h := TARGET = install_h
-lint := TARGET = lint
 
-all check clean clobber install install_h lint: $(SUBDIRS)
+all check clean clobber install install_h: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; VERSION='$(VERSION)' $(MAKE) $(TARGET)

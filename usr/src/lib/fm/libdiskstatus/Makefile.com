@@ -36,7 +36,7 @@ OBJECTS=	libdiskstatus.o \
 include ../../../Makefile.lib
 include ../../Makefile.lib
 
-LIBS=		$(DYNLIB) $(LINTLIB)
+LIBS=		$(DYNLIB)
 
 SRCDIR=		../common
 
@@ -47,13 +47,9 @@ CPPFLAGS +=	$(INCS)
 # not linted
 SMATCH=off
 
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
-
 .KEEP_STATE:
 
 all: $(LIBS)
-
-lint: lintcheck
 
 include ../../../Makefile.targ
 include ../../Makefile.targ

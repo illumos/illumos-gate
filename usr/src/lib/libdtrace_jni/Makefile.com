@@ -56,8 +56,6 @@ SMOFF += all_func_returns
 
 LDLIBS += -lc -luutil -ldtrace -lproc
 
-LINTLIB =
-
 LFLAGS = -t -v
 
 ROOTDLIBDIR = $(ROOT)/usr/lib/dtrace_jni
@@ -69,7 +67,6 @@ ROOTDLIBS = $(DLIBSRCS:%=$(ROOTDLIBDIR)/%)
 
 all: $(DYNLIB)
 
-lint: lintcheck
 
 %.o: ../common/%.c
 	$(COMPILE.c) -o $@ $<

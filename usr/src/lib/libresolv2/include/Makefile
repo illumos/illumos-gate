@@ -36,7 +36,7 @@ install :=	TARGET= install
 
 .KEEP_STATE:
 
-all lint: $(HDRS)
+all: $(HDRS)
 
 install: all
 

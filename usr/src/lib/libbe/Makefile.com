@@ -43,7 +43,7 @@ OBJECTS=	\
 
 include ../../Makefile.lib
 
-LIBS=		$(DYNLIB) $(LINTLIB)
+LIBS=		$(DYNLIB)
 
 SRCDIR=		../common
 
@@ -57,12 +57,9 @@ CPPFLAGS +=	$(INCS)
 
 CLOBBERFILES += $(LIBRARY)
 
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
-
 .KEEP_STATE:
 
 all: $(LIBS) $(LIBRARY)
 
-lint: lintcheck
 
 include ../../Makefile.targ

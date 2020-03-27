@@ -40,7 +40,6 @@ s10_python_wrapper.sh:	s10_python_wrapper.sh.in
 
 all: $(PROGS)
 
-lint:
 
 install: all $(ROOTPROGS)
 

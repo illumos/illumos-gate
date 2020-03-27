@@ -30,4 +30,4 @@ include ../Makefile.com
 
 BUILD.SO= $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(LDLIBS)
 
-install: all $(ROOTLIBDIR) .WAIT $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBDIR) .WAIT $(ROOTLIBS) $(ROOTLINKS)

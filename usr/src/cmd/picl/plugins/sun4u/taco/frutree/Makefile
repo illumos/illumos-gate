@@ -39,8 +39,6 @@ ROOTCONF=       $(CONF:%=$(ROOTLIBDIR)/%)
 $(ROOTCONF)	:= FILEMODE = 0644
 INFOS=          piclfrutree.info system-board.info
 
-ROOTLINTDIR =   $(ROOTLIBDIR)
-
 .KEEP_STATE:
 
 SUBDIRS=
@@ -49,9 +47,8 @@ all	:=	TARGET= all
 install :=	TARGET= install
 clean	:=	TARGET= clean
 clobber	:=	TARGET= clobber
-lint	:=	TARGET= lint
 
-all:	$(CONF) 
+all:	$(CONF)
 
 install:	$(ROOTLIBDIR) $(ROOTCONF)
 
@@ -62,9 +59,6 @@ $(CONF): $(INFOS)
 # include library targets
 include $(SRC)/lib/Makefile.targ
 include	$(SRC)/cmd/picl/plugins/Makefile.targ
-
-$(ROOTLINTDIR)/%: ../%
-	$(INS.file)
 
 lint:
 

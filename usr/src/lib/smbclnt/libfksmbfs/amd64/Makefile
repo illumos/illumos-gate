@@ -20,4 +20,4 @@ include ../../../Makefile.lib.64
 
 DYNFLAGS +=	-R/usr/lib/smbfs/$(MACH64)
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+install: all $(ROOTLIBS64) $(ROOTLINKS64)

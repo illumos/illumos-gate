@@ -35,7 +35,6 @@ clean :=	TARGET = clean
 clobber :=	TARGET = clobber
 delete :=	TARGET = delete
 install :=	TARGET = install
-lint :=		TARGET = lint
 _msg :=		TARGET = _msg
 package :=	TARGET = package
 
@@ -50,7 +49,7 @@ GREP=	grep
 
 .KEEP_STATE:
 
-all debug clean clobber delete install lint package: $(SUBDIRS)
+all debug clean clobber delete install package: $(SUBDIRS)
 
 install_h: $(ROOTHDRS)
 

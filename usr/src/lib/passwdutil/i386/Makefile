@@ -23,11 +23,7 @@
 # Copyright (c) 2001 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/passwdutil/i386/Makefile
-#
 
 include	../Makefile.com
 
-install: all $(ROOTLIBS) $(ROOTLINT)
+install: all $(ROOTLIBS)

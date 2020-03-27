@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 ASFLAGS += $(AS_PICFLAGS) -P -D_ASM
 
@@ -35,7 +33,6 @@ include ../Makefile.com
 SRCS += $(SRC)/common/dis/i386/dis_tables.c
 CPPFLAGS += -I$(SRC)/common/dis/i386
 
-LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN
 
 CLEANFILES += regs.sed regs.d
 
@@ -50,5 +47,5 @@ pics/%.o: $(SRC)/common/dis/i386/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-install yydebug: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT) \
+install yydebug: all $(ROOTLIBS) $(ROOTLINKS) \
 	$(ROOTDLIBS) $(ROOTDOBJS)

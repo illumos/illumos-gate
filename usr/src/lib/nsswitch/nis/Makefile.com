@@ -54,8 +54,6 @@ include		../../Makefile.com
 # install this library in the root filesystem
 include ../../../Makefile.rootfs
 
-LINTFLAGS +=	-erroff=E_GLOBAL_COULD_BE_STATIC2
-LINTFLAGS64 +=	-erroff=E_GLOBAL_COULD_BE_STATIC2
 
 LDLIBS +=	-lnsl
 DYNLIB1 =	nss_nis.so$(VERS)

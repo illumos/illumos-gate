@@ -40,7 +40,6 @@ SRCS =		$(OBJECTS:%.o=$(SRCDIR)/%.c)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I../../../include -I$(INCDIR)
-LINTFLAGS64 +=	-errchk=longptr64
 
 PICS =		$(OBJECTS:%=pics/%)
 
@@ -53,9 +52,8 @@ ROOTLIBDIR64 =	$(ROOTFS_LIBDIR)/crypto/$(MACH64)
 
 LIBS =		$(DYNLIB)
 
-all:		$(LIBS) $(LINTLIB)
+all:		$(LIBS)
 
-lint:		lintcheck
 
 FRC:
 

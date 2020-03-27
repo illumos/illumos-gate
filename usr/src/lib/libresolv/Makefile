@@ -74,7 +74,6 @@ all: $(LIBS)
 
 install: all $(ROOTDYNLIBS)
 
-lint: lintcheck
 
 # include library targets
 include ../Makefile.targ

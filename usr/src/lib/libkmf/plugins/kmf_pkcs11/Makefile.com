@@ -50,7 +50,6 @@ SRCS =  \
 CFLAGS		+=	$(CCVERBOSE)
 CPPFLAGS	+=	-D_REENTRANT $(KMFINC) -I$(INCDIR) \
 			-I$(ADJUNCT_PROTO)/usr/include/libxml2 -I$(BIGNUMDIR)
-LINTFLAGS64	+=	-errchk=longptr64
 
 CERRWARN	+=	-_gcc=-Wno-unused-label
 
@@ -68,9 +67,8 @@ ROOTLIBDIR64=	$(ROOTFS_LIBDIR)/crypto/$(MACH64)
 
 LIBS	=	$(DYNLIB)
 
-all:	$(LIBS) $(LINTLIB)
+all:	$(LIBS)
 
-lint: lintcheck
 
 FRC:
 

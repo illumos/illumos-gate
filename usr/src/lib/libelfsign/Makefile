@@ -23,9 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/libelfsign/Makefile
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 include $(SRC)/lib/Makefile.lib
 
@@ -43,7 +40,6 @@ all:=		TARGET= all
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
 install:=	TARGET= install
-lint:=		TARGET= lint
 
 .KEEP_STATE:
 

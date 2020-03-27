@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 MACH_LDLIBS = -L$(ROOT)/usr/lib/fm
 
@@ -31,4 +29,4 @@ include ../Makefile.com
 
 DYNFLAGS += -R/usr/lib/fm
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBS) $(ROOTLINKS)

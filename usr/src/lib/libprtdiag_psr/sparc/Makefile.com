@@ -67,7 +67,6 @@ INS.slink6=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/libprtdiag_psr.so.1 $@
 
 all: $(LIBS)
 
-lint:	lintcheck
 
 # include library targets
 include $(SRC)/lib/Makefile.targ

@@ -21,9 +21,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/nsswitch/mdns/Makefile
 
 include     ../../../Makefile.master
 
@@ -33,11 +30,10 @@ all:=		TARGET= all
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
 install:=	TARGET= install
-lint:=		TARGET= lint
 
 .KEEP_STATE:
 
-all clean clobber install lint debugmod: $(FILES_SUBDIRS)
+all clean clobber install debugmod: $(FILES_SUBDIRS)
 
 $(MACH) $(MACH64): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

@@ -55,11 +55,10 @@ all :=          TARGET= all
 clean :=        TARGET= clean
 clobber :=      TARGET= clobber
 install :=      TARGET= install
-lint :=         TARGET= lint
 
 .KEEP_STATE:
 
-all clean lint:    $(SUBDIRS)
+all clean:    $(SUBDIRS)
 
 install: install_dir all .WAIT $(SUBDIRS)
 

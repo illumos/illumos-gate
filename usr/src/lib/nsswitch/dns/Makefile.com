@@ -42,7 +42,6 @@ include ../../../Makefile.rootfs
 # if no libresolv was provided by the application.
 CPPFLAGS +=	-DNSS_DNS_LIBRESOLV=\"libresolv.so.2\"
 
-LINTFLAGS +=	-erroff=E_GLOBAL_COULD_BE_STATIC2
 
 LDLIBS +=	-lnsl -lsocket
 DYNLIB1 =	nss_dns.so$(VERS)

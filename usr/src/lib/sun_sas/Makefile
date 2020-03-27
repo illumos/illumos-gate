@@ -33,14 +33,13 @@ clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
 install_h :=	TARGET= install_h
-lint :=		TARGET= lint
 
 HDRDIR=		common
 
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS) 
+all clean clobber install: $(SUBDIRS)
 
 install_h: $(ROOTHDRS)
 

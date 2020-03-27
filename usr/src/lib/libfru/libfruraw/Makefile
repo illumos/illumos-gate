@@ -29,11 +29,10 @@ include	$(SRC)/lib/Makefile.lib
 SUBDIRS = .WAIT $(MACH) $(BUILD64) $(MACH64)
 
 # conditional assignments
-all :=      	TARGET= all
+all :=		TARGET= all
 install :=      TARGET= install
 clean :=        TARGET= clean
 clobber :=      TARGET= clobber
-lint :=         TARGET= lint
 _msg :=         TARGET= _msg
 
 sparc_HDRS=
@@ -46,7 +45,7 @@ CHECKHDRS=      $(HDRS:%.h=%.check)
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all install clean clobber: $(SUBDIRS)
 
 _msg:	$(MACH) $(MACH64)
 

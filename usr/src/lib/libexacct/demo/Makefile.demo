@@ -23,34 +23,25 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG =		exdump
 CC =		cc
-LINT =		lint
 LDLIBS =	-lexacct -lproject -lsocket -lnsl
 
 CFLAGS =	$(CCVERBOSE)
-LINTFLAGS =	
 
 SRCS =		$(PROG:%=%.c)
 OBJS =		$(PROG:%=%.o)
-LINTFILES=	$(PROG:%=%.ln)
 
 all:	$(PROG)
 
 %.o:	%.c
 	$(CC) $(CFLAGS) -c $<
 
-%.ln:	%.c
-	$(LINT) $(LINTFLAGS) -c $<
-
 clean:
 	rm -f $(OBJS) $(PROG)
 
 clobber:
-	rm -f $(OBJS) $(LINTFILES) $(PROG)
+	rm -f $(OBJS) $(PROG)
 
-lint:	$(LINTFILES)
-	$(LINT) $(LINTFLAGS) $(LINTFILES) $(LDLIBS)
+lint:

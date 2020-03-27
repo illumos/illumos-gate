@@ -19,7 +19,7 @@ OBJECTS =	libsff.o
 
 include ../../Makefile.lib
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lnvpair
 CPPFLAGS +=	-I../common
 
@@ -29,6 +29,5 @@ SRCDIR =	../common
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include ../../Makefile.targ

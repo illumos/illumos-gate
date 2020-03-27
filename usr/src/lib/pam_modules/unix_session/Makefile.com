@@ -23,10 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# usr/src/lib/pam_modules/unix_session/Makefile.com
-#
 
 LIBRARY=	pam_unix_session.a
 VERS=		.1
@@ -40,6 +36,5 @@ CPPFLAGS	+= -D_FILE_OFFSET_BITS=64
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include	$(SRC)/lib/Makefile.targ

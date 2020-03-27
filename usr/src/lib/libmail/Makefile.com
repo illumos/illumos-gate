@@ -22,16 +22,14 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= libmail.a
 VERS= .1
 
-OBJECTS= 	abspath.o  casncmp.o   copystream.o delempty.o \
+OBJECTS=	abspath.o  casncmp.o   copystream.o delempty.o \
 		getdomain.o maillock.o notifyu.o    popenvp.o \
 		s_string.o  setup_exec.o strmove.o  skipspace.o \
-		substr.o   systemvp.o  trimnl.o     xgetenv.o
+		substr.o   systemvp.o  trimnl.o	    xgetenv.o
 
 include ../../Makefile.lib
 
@@ -39,11 +37,7 @@ SRCDIR =	../common
 
 MAPFILES +=	$(MAPFILE32)
 
-LIBS =		$(DYNLIB) $(LINTLIB)
-
-$(LINTLIB):= SRCS = ../common/llib-lmail
-
-LINTSRC=	$(LINTLIB:%.ln=%)
+LIBS =		$(DYNLIB)
 
 CPPFLAGS =	-I../inc -I../../common/inc $(CPPFLAGS.master)
 CFLAGS +=	$(CCVERBOSE)
@@ -53,7 +47,6 @@ LDLIBS +=	-lc
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include ../../Makefile.targ
 
@@ -62,11 +55,3 @@ pics/%.o: ../common/%.c
 	$(POST_PROCESS_O)
 
 pics/%.o: ../inc/%.h
-
-# install rule for lint library target
-$(ROOTLINTDIR)/%: ../common/%
-	$(INS.file)
-
-# install rule for 64 bit lint library target
-$(ROOTLINTDIR64)/%: ../common/%
-	$(INS.file)

@@ -73,7 +73,6 @@ LDLIBS +=	-lc -lelf
 
 CPPFLAGS +=	-I$(SRC)/lib/libtnfprobe -D_REENTRANT -I$(SRC)/cmd/sgs/include
 
-LINTFLAGS +=	-y
 
 CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-empty-body
@@ -92,8 +91,6 @@ all: $(LIBS)
 
 install_h: $(ROOTHDRDIR) $(ROOTHDRS)
 
-lint:
-	$(LINT.c) $(SRCS)
 
 check: $(CHECKHDRS)
 

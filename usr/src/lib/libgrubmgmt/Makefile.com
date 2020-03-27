@@ -33,13 +33,12 @@ OBJECTS +=	libgrub_menu.o libgrub_bargs.o libgrub_errno.o
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 
 SRCDIR = ../common
 
 INCS += -I$(SRCDIR)
 
-$(LINTLIB) :=	SRCS =	$(SRCDIR)/$(LINTSRC)
 #
 # Libraries added to the next line must be present in miniroot
 #
@@ -51,6 +50,5 @@ CFLAGS +=	$(CCVERBOSE)
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include ../../Makefile.targ

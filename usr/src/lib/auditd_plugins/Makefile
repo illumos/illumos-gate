@@ -36,7 +36,6 @@ clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 delete :=	TARGET= delete
 install :=	TARGET= install
-lint :=		TARGET= lint
 package :=	TARGET= package
 _msg :=		TARGET= _msg
 
@@ -68,7 +67,6 @@ catalog: $(SUBDIRS)
 
 check: $(CHECKHDRS)
 
-lint: $(SUBDIRS)
 
 $(ROOTDIRS):
 	$(INS.dir)

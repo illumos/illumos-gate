@@ -81,16 +81,16 @@ clean:
 clobber: clean
 	$(RM) $(CLOBBERFILES)
 
-check: $(CHECKHDRS)
+check: $(CHECKHDRS)  $(TOPOFILE:%=%.chk)
 
 install_h _msg:
-
-lint: $(TOPOFILE:%=%.chk)
 
 %.xml.chk: %.xml
 	@echo xmllint $<
 	@xmllint --dropdtd $< | \
 	xmllint --noout --dtdvalid  $(DTDSRC) -
+
+%.usbtopo.chk: %.usbtopo
 
 $($(CLASS)_ROOTTOPOROOT)/%: %
 	$(INS.file)

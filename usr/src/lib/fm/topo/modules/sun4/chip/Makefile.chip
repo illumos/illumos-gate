@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-
 MODULE = chip
 CLASS = arch
 SUN4DIR = ../../sun4/$(MODULE)
@@ -38,6 +36,3 @@ CPPFLAGS += $(INCDIRS:%=-I%)
 %.o: $(SUN4DIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
-%.ln: $(SUN4DIR)/%.c
-	$(LINT.c) -c $<

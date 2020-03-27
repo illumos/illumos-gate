@@ -23,10 +23,6 @@
 # Copyright (c) 1999 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libsecdb/help/Makefile
-#
 
 SUBDIRS = auths profiles
 
@@ -34,12 +30,11 @@ all:=		TARGET= all
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
 install:=	TARGET= install
-lint:=		TARGET= lint
 _msg:=		TARGET= _msg
 
 .KEEP_STATE:
 
-all clean clobber install lint _msg: $(SUBDIRS)
+all clean clobber install _msg: $(SUBDIRS)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

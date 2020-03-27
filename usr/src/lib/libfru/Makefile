@@ -39,18 +39,17 @@ SUBDIRS = $(SUBDIRS_$(MACH))
 
 
 # conditional assignments
-all :=      	TARGET= all
+all :=		TARGET= all
 install :=      TARGET= install
 clean :=        TARGET= clean
 clobber :=      TARGET= clobber
-lint :=         TARGET= lint
 _msg :=         TARGET= _msg
 
 POFILE=		libfru.po
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all install clean clobber: $(SUBDIRS)
 
 _msg:	$(MSGDOMAIN) $(POFILE)
 	$(RM) $(MSGDOMAIN)/$(POFILE)

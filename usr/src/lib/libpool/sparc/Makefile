@@ -23,16 +23,11 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libpool/sparc/Makefile
-#
 
 include ../Makefile.com
 
 #
 # Turn off bad ptr-cast lint warnings, since we do them all the time
 #
-LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBS) $(ROOTLINKS)

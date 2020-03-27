@@ -35,7 +35,6 @@ all:=           TARGET= all
 install:=       TARGET= install
 clean:=         TARGET= clean
 clobber:=       TARGET= clobber
-lint:=          TARGET= lint
 
 ROOTETC=	$(ROOT)/etc
 ETCFLASHD=	$(ROOTETC)/flash
@@ -61,7 +60,6 @@ install: all .WAIT $(DIRS) .WAIT $(ETCFLASHPREPROG)
 
 cstyle:
 
-lint:
 
 $(FLASHPREPROG): $(FLASHPRESRC)
 	$(CP) $@.ksh $@

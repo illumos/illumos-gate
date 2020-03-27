@@ -111,11 +111,6 @@ CLEANFILES +=	$(ISRCHDR) $(ISRCXDR)
 # Explicitly state the dependancy on iprop.h
 $(LIBS): $(ISRCHDR)
 
-# We turn off ptr-cast warnings, since we're doing mmapping in kdb_log
-LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
-
-lint:	lintcheck
-
 # include library targets
 include ../../Makefile.targ
 

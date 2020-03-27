@@ -23,10 +23,6 @@
 # Copyright (c) 2000 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libfruutils/Makefile
-#
 
 # include library definitions
 include $(SRC)/lib/Makefile.lib
@@ -38,14 +34,13 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 POFILE=		libfruutils.po
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all install clean clobber: $(SUBDIRS)
 
 _msg:	$(MSGDOMAIN) $(POFILE)
 	$(RM) $(MSGDOMAIN)/$(POFILE)

@@ -22,19 +22,8 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include		$(SRC)/lib/Makefile.lib
 
 ROOTLIBDIR=	$(ROOT)/usr/lib/krb5
 ROOTLIBDIR64=	$(ROOT)/usr/lib/krb5/$(MACH64)
-ROOTLINTDIR=	$(ROOT)/usr/lib/krb5
-
-# definitions for lint
-LINTFLAGS=	-u -I..
-LINTFLAGS64=	-u -I..
-LINTSRC=	$(LINTLIB:%.ln=%)
-ROOTLINT=	$(LINTSRC:%=$(ROOTLINTDIR)/%)
-
-CLEANFILES +=	$(LINTOUT) $(LINTLIB)

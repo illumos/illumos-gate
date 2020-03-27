@@ -41,7 +41,6 @@ LDLIBS += -lpicl
 
 IFLAGS += -I$(USR_PLAT_DIR)/sun4u/include -I ../../../../libprtdiag/inc
 IFLAGS += -I$(SRC)/cmd/picl/plugins/inc
-LINTFLAGS += $(IFLAGS)
 
 PLATFORM=	SUNW,Netra-T12
 
@@ -51,7 +50,7 @@ $(USR_PLAT_DIR)/$(PLATFORM)/lib/libprtdiag_psr.so.1 := FILEMODE= 0755
 
 PLATLIBS=	$(PLATFORM:%=$(USR_PLAT_DIR)/%/lib/)
 
-install:	all $(PLATLIBS) $(USR_PSM_LIBS) 
+install:	all $(PLATLIBS) $(USR_PSM_LIBS)
 
 #
 # install rules for SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1

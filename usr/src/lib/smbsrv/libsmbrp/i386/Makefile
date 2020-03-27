@@ -28,4 +28,4 @@ include ../Makefile.com
 $(ROOTLIBDIR):
 	$(INS.dir)
 
-install: all $(ROOTLIBDIR) $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBDIR) $(ROOTLIBS) $(ROOTLINKS)

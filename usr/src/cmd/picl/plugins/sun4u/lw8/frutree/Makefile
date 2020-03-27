@@ -50,13 +50,6 @@ LIBS =		$(DYNLIB)
 
 ROOTLIBDIR	= $(ROOT_PLAT_PLUGINDIR)
 
-LINTSRC =	$(LINTLIB:%.ln=%)
-ROOTLINTDIR =	$(ROOTLIBDIR)
-ROOTLINT =	$(LINTSRC:%=$(ROOTLINTDIR)/%)
-
-CLEANFILES =	$(LINTOUT) $(LINTLIB)
-
-
 CPPFLAGS +=	-D_SGFRU
 CFLAGS +=	$(CCVERBOSE)
 DYNFLAGS +=	-R/usr/platform/\$$PLATFORM/lib/picl/plugins:/usr/platform/sun4u/lib/picl/plugins:/usr/lib/picl/plugins
@@ -77,7 +70,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 all: $(LIBS) $(LIBLINKS)
@@ -98,11 +90,7 @@ $(LIBLINKS):	FRC
 include $(SRC)/lib/Makefile.targ
 include	$(SRC)/cmd/picl/plugins/Makefile.targ
 
-$(ROOTLINTDIR)/%: ../%
-	$(INS.file)
-
 lint:
-	$(LINT.c) $(SRCS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

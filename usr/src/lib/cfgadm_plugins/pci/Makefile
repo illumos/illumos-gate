@@ -34,7 +34,6 @@ clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 delete :=	TARGET= delete
 install :=	TARGET= install
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 package :=	TARGET= package
 
@@ -48,9 +47,10 @@ GREP=	grep
 
 .KEEP_STATE:
 
-all clean delete install lint package: $(SUBDIRS)
+all clean delete install package: $(SUBDIRS)
 clobber: $(SUBDIRS)
 	$(RM) $(POFILE) $(POFILES)
+
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

@@ -38,6 +38,5 @@ CFLAGS +=	$(CCVERBOSE)
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include ../../Makefile.targ

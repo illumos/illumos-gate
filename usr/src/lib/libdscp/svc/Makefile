@@ -22,10 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/libdscp/svc/Makefile.com
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 MANIFEST=	dscp.xml
 SVCMETHOD=	svc-dscp
@@ -48,7 +44,7 @@ $(ROOTOPTIONSDIR):
 $(ROOTOPTIONSDIR)/%: %
 	$(INS.file)
 
-all clean clobber lint:
+all clean clobber:
 
 install: $(ROOTMANIFEST) $(ROOTSVCMETHOD) $(ROOTOPTIONS)
 

@@ -34,7 +34,6 @@ clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 delete :=	TARGET= delete
 install :=	TARGET= install
-lint :=		TARGET= lint
 package :=	TARGET= package
 
 .KEEP_STATE:
@@ -45,20 +44,20 @@ COMMONDIR = common
 # Macros for libbsm header files. These define user-level only interfaces.
 #
 GENHDRS = audit_uevents.h
-HDRS = libbsm.h devices.h devalloc.h adt.h adt_event.h audit_private.h 
+HDRS = libbsm.h devices.h devalloc.h adt.h adt_event.h audit_private.h
 GENSRCS =	$(COMMONDIR)/adt_xlate.c $(COMMONDIR)/adt_event.h
 COMMONHDRS =	$(HDRS:%=$(COMMONDIR)/%)
-ROOTHDRDIR = 	$(ROOT)/usr/include/bsm
-ROOTCHDRS = 	$(HDRS:%=$(ROOTHDRDIR)/%)
-ROOTHDRS = 	$(GENHDRS:%=$(ROOTHDRDIR)/%)
+ROOTHDRDIR =	$(ROOT)/usr/include/bsm
+ROOTCHDRS =	$(HDRS:%=$(ROOTHDRDIR)/%)
+ROOTHDRS =	$(GENHDRS:%=$(ROOTHDRDIR)/%)
 
 CHECKCHDRS =	$(COMMONHDRS:%.h=%.check)
 CHECKHDRS =	$(GENHDRS:%.h=%.check)
 
-$(ROOTHDRS) := 	FILEMODE = 0644
+$(ROOTHDRS) :=	FILEMODE = 0644
 $(ROOTCHDRS) :=	FILEMODE = 0644
 
-all install lint package: $(GENSRCS) $(SUBDIRS)
+all install package: $(GENSRCS) $(SUBDIRS)
 clean clobber delete: $(SUBDIRS)
 
 #
@@ -67,8 +66,8 @@ clean clobber delete: $(SUBDIRS)
 # from here.
 #
 
-ROOTETCSECURITY = 	$(ROOT)/etc/security
-$(ROOTETCSECURITY) := 	DIRMODE = 0755
+ROOTETCSECURITY =	$(ROOT)/etc/security
+$(ROOTETCSECURITY) :=	DIRMODE = 0755
 
 ESFILES =		audit_class audit_event
 ESSRC =			$(ESFILES:%=%.txt)
@@ -176,7 +175,7 @@ $(ROOTDTDDIR)/% $(ROOTXSLDIR)/%: %
 $(AUDITDIRS):
 	$(INS.dir)
 
-$(ARSYMLNK): 
+$(ARSYMLNK):
 	$(RM) $@
 	$(SYMLINK) ../../../../var/audit $@
 

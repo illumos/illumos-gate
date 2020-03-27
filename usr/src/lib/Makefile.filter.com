@@ -44,14 +44,12 @@
 #
 #   include	   $(SRC)/lib/Makefile.rootfs		(1)
 #
-#   LIBS +=	   $(LINTLIB)				(2)
-#   DYNFLAGS +=	   -F filtee				(3)
-#   MAPFILEDIR =   .					(4)
+#   DYNFLAGS +=	   -F filtee				(2)
+#   MAPFILEDIR =   .					(3)
 #
 # 1.  Use Makefile.rootfs when destination is /lib (rather than /usr/lib).
-# 2.  Add LINTLIB when a lint library is produced.
-# 3.  Customize DYNFLAGS to indicate filtee name.
-# 4.  Change MAPFILEDIR if mapfiles are not under ../common.
+# 2.  Customize DYNFLAGS to indicate filtee name.
+# 3.  Change MAPFILEDIR if mapfiles are not under ../common.
 #
 # The typical use of Makefile.filter.com and Makefile.filter.targ is through
 # inclusion from a standard filters machine specific Makefiles:
@@ -69,10 +67,10 @@
 #   include	   $(SRC)/lib/Makefile.filter.targ
 #
 # 1.  Use Makefile.lib.64 for 64-bit builds.
-# 2.  Customize DYNFLAGS for $MACH if necessary.  
+# 2.  Customize DYNFLAGS for $MACH if necessary.
 #
 
-include	   	$(SRC)/lib/Makefile.lib
+include		$(SRC)/lib/Makefile.lib
 
 # Define common flags, that override or append to Makefile.lib rules.
 

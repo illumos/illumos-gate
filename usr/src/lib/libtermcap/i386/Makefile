@@ -16,6 +16,6 @@
 include		$(SRC)/lib/Makefile.filter.com
 include		../Makefile.com
 
-install:	$(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install:	$(ROOTLIBS) $(ROOTLINKS)
 
 include		$(SRC)/lib/Makefile.filter.targ

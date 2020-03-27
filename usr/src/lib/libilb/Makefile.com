@@ -28,17 +28,16 @@ VERS =		.1
 LIB_OBJS =	ilb_sg.o ilb_comm.o ilb_subr.o ilb_rules.o
 LIB_OBJS +=	ilb_hc.o ilb_nat.o
 
-OBJECTS = 	$(LIB_OBJS)
+OBJECTS =	$(LIB_OBJS)
 
 include ../../Makefile.lib
 
 LIB_SRCS=	$(LIB_OBJS:%.o=$(SRCDIR)/%.c)
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 INCS +=		-I../common -I$(SRC)/uts/common
 LDLIBS +=	-lc
 
 SRCDIR =	../common
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CSTD =	$(CSTD_GNU99)
 
@@ -50,7 +49,5 @@ LDLIBS +=	-lsocket
 
 all: $(LIBS)
 
-lint: $(LIB_SRCS)
-	$(LINT.c) $(LINTCHECKFLAGS) $(LIB_SRCS) $(LDLIBS)
 
 include ../../Makefile.targ

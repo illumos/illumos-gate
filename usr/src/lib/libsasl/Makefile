@@ -38,7 +38,6 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 
 LIBRARY=        libsasl.a
 POFILE=         $(LIBRARY:.a=.po)
@@ -53,7 +52,7 @@ MSGFILES=	lib/canonusr.c lib/checkpw.c lib/client.c lib/common.c \
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 all install: THIRDPARTYLICENSE
 

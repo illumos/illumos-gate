@@ -32,8 +32,7 @@ include		../../Makefile.rootfs
 
 TEXT_DOMAIN=	SUNW_OST_SYSOSPAM
 
-LIBS=		$(DYNLIB) $(LINTLIB)
-$(LINTLIB) :=	SRCS= $(SRCDIR)/$(LINTSRC)
+LIBS=		$(DYNLIB)
 LDLIBS +=	-lc
 
 CFLAGS +=	$(CCVERBOSE)
@@ -45,6 +44,5 @@ CERRWARN +=	$(CNOWARN_UNINIT)
 
 all:		$(LIBS)
 
-lint:		lintcheck
 
 include		../../Makefile.targ

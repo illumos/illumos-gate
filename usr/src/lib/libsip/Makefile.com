@@ -35,8 +35,7 @@ OBJECTS = sip_headers.o sip_msg.o sip_gids.o \
 include ../../Makefile.lib
 
 SRCDIR =	../common
-LIBS =		$(DYNLIB) $(LINTLIB)
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lmd5 -lc
 
 CFLAGS +=	$(CCVERBOSE)
@@ -49,6 +48,5 @@ SMATCH=off
 
 all:		$(LIBS)
 
-lint:		lintcheck
 
 include ../../Makefile.targ

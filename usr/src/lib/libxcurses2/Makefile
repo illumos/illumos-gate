@@ -33,7 +33,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 
 # capability NAMES generated source
 NAMES= \
@@ -60,7 +59,7 @@ CLOBBERFILES=	$(GENERATED)
 
 .KEEP_STATE:
 
-LIBS=		$(DYNLIB) $(LINTLIB)
+LIBS=		$(DYNLIB)
 
 all: $(GENERATED) .WAIT $(SUBDIRS)
 
@@ -68,8 +67,6 @@ install: all .WAIT $(SUBDIRS)
 
 clean clobber: $(SUBDIRS)
 	$(RM) $(GENERATED)
-
-lint: $(SUBDIRS)
 
 # still need to implement cstyle check of term.h
 # do this when we go through and make this library cstyle clean.

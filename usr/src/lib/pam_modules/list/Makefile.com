@@ -22,12 +22,10 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	pam_list.a
 VERS=		.1
-OBJECTS= 	list.o
+OBJECTS=	list.o
 
 include		../../Makefile.pam_modules
 
@@ -35,6 +33,5 @@ LDLIBS +=	-lpam -lc
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include $(SRC)/lib/Makefile.targ

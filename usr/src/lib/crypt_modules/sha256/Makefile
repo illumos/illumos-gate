@@ -21,8 +21,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include $(SRC)/lib/Makefile.lib
 
@@ -34,12 +32,11 @@ clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 delete :=	TARGET= delete
 install :=	TARGET= install
-lint :=		TARGET= lint
 test :=		TARGET= test
 
 .KEEP_STATE:
 
-all clean clobber delete install lint test: $(SUBDIRS)
+all clean clobber delete install test: $(SUBDIRS)
 
 _msg:
 

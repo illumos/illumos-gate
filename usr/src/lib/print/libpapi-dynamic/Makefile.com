@@ -37,7 +37,6 @@ ROOTLIBDIR=	$(ROOT)/usr/lib
 
 LIBS =			$(DYNLIB)
 
-$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 MAPFILES =	$(SRCDIR)/mapfile
 
@@ -55,6 +54,5 @@ SMOFF += all_func_returns
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include ../../../Makefile.targ

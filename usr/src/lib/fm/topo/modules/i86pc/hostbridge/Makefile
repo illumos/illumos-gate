@@ -45,10 +45,3 @@ CPPFLAGS += -I$(UTILDIR) -I$(HBDIR)
 %.o: $(HBDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
-%.ln: $(UTILDIR)/%.c
-	$(LINT.c) -c $<
-
-%.ln: $(HBDIR)/%.c
-	$(LINT.c) -c $<
-

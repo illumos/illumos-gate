@@ -25,7 +25,7 @@
 include ../Makefile.com
 include ../../Makefile.lib.64
 
-LIBS = $(DYNLIB) $(LINTLIB)
+LIBS = $(DYNLIB)
 
 all: $(LIBS)
 

@@ -37,6 +37,5 @@ install: $(ROOTXMLDOCS) $(ROOTTEMPLATES)
 
 clean:
 
-lint:
 
 include $(SRC)/cmd/Makefile.targ

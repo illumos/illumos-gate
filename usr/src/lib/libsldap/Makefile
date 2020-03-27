@@ -33,7 +33,6 @@ clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 delete :=	TARGET= delete
 install :=	TARGET= install
-lint :=		TARGET= lint
 catalog :=	TARGET= catalog
 _msg :=		TARGET= _msg
 package :=	TARGET= package
@@ -46,7 +45,7 @@ POFILES=	generic.po
 
 .KEEP_STATE:
 
-all clean delete install lint catalog package: $(SUBDIRS)
+all clean delete install catalog package: $(SUBDIRS)
 clobber: $(SUBDIRS)
 	$(RM) $(POFILE) $(POFILES)
 

@@ -23,11 +23,9 @@
 # Copyright (c) 1997-2001 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../Makefile.com
 
 all: $(LIBS)
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBS) $(ROOTLINKS)

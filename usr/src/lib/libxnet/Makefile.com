@@ -23,11 +23,10 @@
 # Use is subject to license terms.
 #
 
-LIBRARY = 	libxnet.a
+LIBRARY =	libxnet.a
 VERS =		.1
 
 include		$(SRC)/lib/Makefile.rootfs
 
-LIBS +=		$(LINTLIB)
 DYNFLAGS +=     $(ZLOADFLTR)
 CPPFLAGS +=	-D__EXTENSIONS__

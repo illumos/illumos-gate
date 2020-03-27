@@ -44,7 +44,6 @@ ROOTLIBDIR=	$(ROOT)/usr/lib
 
 LIBS =			$(DYNLIB)
 
-$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-DSOLARIS_PRIVATE_POST_0_9
@@ -66,6 +65,5 @@ LDLIBS +=	-lipp-core -lpapi -lc -lsocket -lnsl
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include ../../../Makefile.targ

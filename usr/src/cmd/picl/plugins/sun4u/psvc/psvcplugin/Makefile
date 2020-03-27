@@ -58,8 +58,6 @@ USR_PLAT_PLUGINS_DYNLIBS = $(PLAT_PLUGINS_DIRS:%=%/$(DYNLIB))
 USR_PLAT_PLUGINS_LIBLINKS = $(PLAT_PLUGINS_DIRS:%=%/$(LIBLINKS))
 LNECK_DYNLIB_DIR = ../../../../SUNW,Sun-Fire-280R/lib/picl/plugins
 
-CLEANFILES=	$(LINTOUT) $(LINTLIB)
-
 CPPFLAGS +=	-I$(SRC)/uts/sun4u
 CPPFLAGS +=	-I$(SRC)/cmd/picl/plugins/sun4u/psvc/psvcobj
 
@@ -71,7 +69,6 @@ LDLIBS +=	-R/usr/platform/sun4u/lib
 LDLIBS +=	-lc -lpicltree -lpicl -lpsvcobj
 
 DYNFLAGS +=	-Wl,-f/usr/platform/\$$PLATFORM/lib/$(DYNLIBPSR)
-LINTFLAGS +=
 
 .KEEP_STATE:
 
@@ -83,7 +80,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 all: $(LIBS) $(LIBLINKS)
@@ -131,7 +127,6 @@ $(USR_PLAT_PLUGINS_LIBLINKS): $(PLAT_PLUGINS_DIRS)
 	$(SYMLINK) $(LNECK_DYNLIB_DIR)/$(DYNLIB) $@
 
 lint :
-	$(LINT.c) $(SRCS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

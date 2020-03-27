@@ -51,8 +51,6 @@ CPPFLAGS	+=	-D_REENTRANT $(KMFINC) $(NSSINC)  \
 
 PICS=	$(OBJECTS:%=pics/%)
 
-LINTFLAGS	+=	-erroff=E_STATIC_UNUSED
-LINTFLAGS64	+=	-erroff=E_STATIC_UNUSED
 
 CERRWARN	+=	-_gcc=-Wno-unused-label
 CERRWARN	+=	-_gcc=-Wno-unused-value
@@ -60,9 +58,6 @@ CERRWARN	+=	$(CNOWARN_UNINIT)
 
 # not linted
 SMATCH=off
-
-lint:=	NSSLIBS =	$(BERLIB)
-lint:=	NSSLIBS64 =	$(BERLIB64)
 
 LDLIBS32	+=	$(NSSLIBS)
 
@@ -73,9 +68,8 @@ ROOTLIBDIR64=	$(ROOTFS_LIBDIR)/crypto/$(MACH64)
 
 .KEEP_STATE:
 
-all:	$(LIBS) $(LINTLIB)
+all:	$(LIBS)
 
-lint: lintcheck
 
 FRC:
 

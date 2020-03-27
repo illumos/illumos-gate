@@ -33,16 +33,12 @@ include ../../Makefile.lib
 
 SRCDIR =	../common
 SRCS =		../common/mtmalloc.c
-LINTSRC =        $(LINTLIB:%.ln=%)
 
-LIBS 		 = $(DYNLIB) $(LINTLIB)
-LDLIBS 		+= -lc
-CFLAGS 		+= $(CCVERBOSE) $(C_PICFLAGS)
+LIBS		 = $(DYNLIB)
+LDLIBS		+= -lc
+CFLAGS		+= $(CCVERBOSE) $(C_PICFLAGS)
 CPPFLAGS	+= -I../common -I../../common/inc -D_REENTRANT
-DYNFLAGS 	+= $(ZINTERPOSE)
-
-$(LINTLIB) lint :=	LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN
-$(LINTLIB) lint :=	LINTFLAGS64 += -erroff=E_BAD_PTR_CAST_ALIGN
+DYNFLAGS	+= $(ZINTERPOSE)
 
 CERRWARN	+= $(CNOWARN_UNINIT)
 
@@ -50,7 +46,6 @@ CERRWARN	+= $(CNOWARN_UNINIT)
 
 all: $(LIBS)
 
-lint:	lintcheck
 
 # include library targets
 include ../../Makefile.targ

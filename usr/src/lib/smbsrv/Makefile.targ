@@ -39,5 +39,3 @@ pics/%.o:	$(SRC)/common/smbsrv/%.c
 .KEEP_STATE:
 
 all: $(LIBS)
-
-lint: lintcheck

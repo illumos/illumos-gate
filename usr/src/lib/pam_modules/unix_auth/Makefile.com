@@ -22,10 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# usr/src/lib/pam_modules/unix_auth/Makefile.com
-#
 
 LIBRARY=	pam_unix_auth.a
 VERS=		.1
@@ -37,6 +33,5 @@ LDLIBS		+= -lpam -lsecdb -lc
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include	$(SRC)/lib/Makefile.targ

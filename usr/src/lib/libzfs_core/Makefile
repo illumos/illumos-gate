@@ -38,14 +38,13 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 
 MSGFILES =	`$(GREP) -l gettext $(HDRDIR)/*.[ch]`
 POFILE =	libzfs_core.po
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 $(POFILE):	pofile_MSGFILES
 

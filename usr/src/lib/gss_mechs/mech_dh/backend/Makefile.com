@@ -27,7 +27,7 @@
 #
 # This make file will build mech_dh.so.1. This shared object
 # contains all the functionality needed to support Diffie-Hellman GSS-API
-# mechanism. 
+# mechanism.
 #
 
 LIBRARY= mech_dh.a
@@ -54,8 +54,8 @@ CERRWARN +=	$(CNOWARN_UNINIT)
 # needs work
 SMATCH=off
 
-$(PICS) := 	CFLAGS += $(XFFLAG)
-$(PICS) := 	CCFLAGS += $(XFFLAG)
+$(PICS) :=	CFLAGS += $(XFFLAG)
+$(PICS) :=	CCFLAGS += $(XFFLAG)
 $(PICS) :=	CFLAGS64 += $(XFFLAG)
 $(PICS) :=	CCFLAGS64 += $(XFFLAG)
 
@@ -66,7 +66,7 @@ LIBNAME = $(LIBRARY:%.a=%)
 
 MAPFILES =	../mapfile-vers
 
-LDLIBS +=  -lgss -lnsl -lc 
+LDLIBS +=  -lgss -lnsl -lc
 
 RPCGEN += -C
 SED = sed
@@ -78,17 +78,6 @@ SRCS=	$(CSRCS)
 
 ROOTLIBDIR = $(ROOT)/usr/lib/gss
 ROOTLIBDIR64 = $(ROOT)/usr/lib/$(MACH64)/gss
-
-#LINTFLAGS += -dirout=lint -errfmt=simple
-#LINTFLAGS64 += -dirout=lint -errfmt=simple -errchk all
-LINTOUT =	lint.out
-LINTSRC =	$(LINTLIB:%.ln=%)
-ROOTLINTDIR =	$(ROOTLIBDIR)
-#ROOTLINT = 	$(LINTSRC:%=$(ROOTLINTDIR)/%)
-
-CLEANFILES += $(LINTOUT) $(LINTLIB)
-
-lint: lintcheck
 
 $(ROOTLIBDIR):
 	$(INS.dir)

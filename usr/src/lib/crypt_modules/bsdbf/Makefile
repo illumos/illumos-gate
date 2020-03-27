@@ -33,12 +33,11 @@ clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 delete :=	TARGET= delete
 install :=	TARGET= install
-lint :=		TARGET= lint
 package :=	TARGET= package
 
 .KEEP_STATE:
 
-all clean clobber delete install lint package: $(SUBDIRS)
+all clean clobber delete install package: $(SUBDIRS)
 
 _msg:
 

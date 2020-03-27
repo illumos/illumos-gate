@@ -71,7 +71,6 @@ SMOFF += no_if_block
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 # include library targets
 include ../../Makefile.targ

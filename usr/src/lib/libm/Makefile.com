@@ -390,7 +390,7 @@ ROBJS		= \
 # LSARC/2003/658 adds isnanf/isnanl
 #
 
-SOBJS_sparc 	= \
+SOBJS_sparc	= \
 		copysign.o \
 		exp.o \
 		fabs.o \
@@ -496,20 +496,11 @@ complexOBJS	= \
 OBJECTS		= $(COBJS) $(ROBJS) $(QOBJS) $(SOBJS) $(m9xOBJS) $(complexOBJS)
 
 include		$(SRC)/lib/Makefile.lib
-include 	$(LIBMDIR)/Makefile.libm.com
+include		$(LIBMDIR)/Makefile.libm.com
 include		$(SRC)/lib/Makefile.rootfs
 
 SRCDIR		= ../common/
-LIBS		= $(DYNLIB) $(LINTLIB)
-
-LINTERROFF	= -erroff=E_FUNC_SET_NOT_USED
-LINTERROFF	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
-LINTERROFF	+= -erroff=E_FUNC_RET_MAYBE_IGNORED2
-LINTERROFF	+= -erroff=E_IMPL_CONV_RETURN
-LINTERROFF	+= -erroff=E_NAME_MULTIPLY_DEF2
-LINTFLAGS	+= $(LINTERROFF)
-LINTFLAGS64	+= $(LINTERROFF)
-LINTFLAGS64	+= -errchk=longptr64
+LIBS		= $(DYNLIB)
 
 CFLAGS		+= $(C_BIGPICFLAGS)
 CFLAGS64	+= $(C_BIGPICFLAGS)
@@ -928,7 +919,7 @@ SRCS_C_sparc = \
 	../common/C/sincos.c \
 	../common/C/tan.c
 
-SRCS_i386_i386 	= \
+SRCS_i386_i386	= \
 	../common/C/__libx_errno.c
 
 SRCS_sparc_sparc = \
@@ -1023,5 +1014,4 @@ SRCS	= \
 
 all:	$(LIBS)
 
-lint:	lintcheck
 

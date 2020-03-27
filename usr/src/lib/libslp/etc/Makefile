@@ -40,7 +40,7 @@ CLOBBERFILES = $(ROOTETCINETCONF)
 
 .KEEP_STATE:
 
-all lint clean _msg:
+all clean _msg:
 
 install:	$(DIRS) $(ROOTETCINETCONF)
 

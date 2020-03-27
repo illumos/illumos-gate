@@ -91,9 +91,7 @@ MAPFILES=       ../mapfile-vers
 # Set common AST build flags (e.g. C99/XPG6, needed to support the math stuff)
 include ../../../Makefile.ast
 
-LIBS =		$(DYNLIB) $(LINTLIB)
-
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
+LIBS =		$(DYNLIB)
 
 LDLIBS += \
 	-lsum \
@@ -148,14 +146,6 @@ pics/vmstate.o	:= CERRWARN += -erroff=E_NO_IMPLICIT_DECL_ALLOWED
 
 .KEEP_STATE:
 
-all: $(LIBS) 
-
-#
-# libcmd is not lint-clean yet; fake up a target.  (You can use
-# "make lintcheck" to actually run lint; please send all lint fixes
-# upstream (to AT&T) so the next update will pull them into ON.)
-#
-lint:
-	@ print "usr/src/lib/libcmd is not lint-clean: skipping"
+all: $(LIBS)
 
 include ../../Makefile.targ

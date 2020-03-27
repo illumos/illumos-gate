@@ -25,7 +25,7 @@
 # Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY = libinetutil.a
-VERS = 	  .1
+VERS =	  .1
 OBJECTS = octet.o inetutil.o ifspec.o ifaddrlist.o ifaddrlistx.o eh.o tq.o
 
 include ../../Makefile.lib
@@ -33,15 +33,14 @@ include ../../Makefile.lib
 # install this library in the root filesystem
 include ../../Makefile.rootfs
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 
 SRCDIR =	../common
 COMDIR =	$(SRC)/common/net/dhcp
-SRCS = 		$(COMDIR)/octet.c $(SRCDIR)/inetutil.c \
+SRCS =		$(COMDIR)/octet.c $(SRCDIR)/inetutil.c \
 		$(SRCDIR)/ifspec.c $(SRCDIR)/eh.c $(SRCDIR)/tq.c \
 		$(SRCDIR)/ifaddrlist.c $(SRCDIR)/ifaddrlistx.c
 
-$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 LDLIBS +=	-lsocket -lc
 
 CFLAGS +=	$(CCVERBOSE)
@@ -55,7 +54,6 @@ SMOFF += index_overflow
 
 all: $(LIBS)
 
-lint: lintcheck
 
 pics/%.o: $(COMDIR)/%.c
 	$(COMPILE.c) -o $@ $<

@@ -89,6 +89,5 @@ SMATCH =	off
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include ../../Makefile.targ

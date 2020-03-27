@@ -44,7 +44,6 @@ $(EXTRALINKS):	$(ROOTLINKS)
 
 LIBS =			$(DYNLIB)
 
-$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
@@ -65,7 +64,6 @@ CLOBBERFILES += $(PROG)
 
 all:	$(LIBS) $(PROG)
 
-lint:	lintcheck
 
 include ../../../Makefile.targ
 

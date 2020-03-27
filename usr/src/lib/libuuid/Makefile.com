@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY =	libuuid.a
 VERS =		.1
@@ -34,11 +32,10 @@ include ../../Makefile.lib
 # install this library in the root filesystem
 include ../../Makefile.rootfs
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lsocket -lnsl -lc -ldlpi
 
 SRCDIR =	../common
-$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
 
@@ -46,6 +43,5 @@ CFLAGS +=	$(CCVERBOSE)
 
 all:
 
-lint: lintcheck
 
 include ../../Makefile.targ

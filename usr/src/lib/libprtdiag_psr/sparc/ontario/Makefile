@@ -34,7 +34,7 @@ include ../Makefile.com
 #
 # links in /usr/platform
 #
-LINKED_PLATFORMS	= SUNW,Sun-Blade-T6300 
+LINKED_PLATFORMS	= SUNW,Sun-Blade-T6300
 
 LINKED_DIRS		= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%)
 LINKED_LIB_DIRS		= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib)
@@ -50,7 +50,6 @@ IFLAGS +=  -I ../../../libprtdiag/inc
 IFLAGS += -I$(SRC)/cmd/picl/plugins/inc
 LDLIBS += -lpicl
 
-LINTFLAGS += $(IFLAGS)
 
 PLATFORM=SUNW,Sun-Fire-T200
 

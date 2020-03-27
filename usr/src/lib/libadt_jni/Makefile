@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include		../Makefile.lib
 
@@ -41,13 +39,12 @@ all	:=	TARGET= all
 clean	:=	TARGET= clean
 clobber	:=	TARGET= clobber
 install :=	TARGET= install
-lint	:=	TARGET= lint
 
 .KEEP_STATE:
 
 CLEANFILES += $(GENSRCS)
 
-all install lint: $(GENSRCS) com/sun .WAIT $(SUBDIRS)
+all install: $(GENSRCS) com/sun .WAIT $(SUBDIRS)
 
 com/sun $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

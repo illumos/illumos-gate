@@ -67,7 +67,6 @@ ERRSRC=		$(ROOT)/usr/platform/$(PLATFORM)/include/sys/sbd_ioctl.h
 
 all: $(LIBS)
 
-lint:   lintcheck
 
 # Create target directories
 $(USR_PSM_DIR):
@@ -101,6 +100,6 @@ pics/%.o: ../common/%.c
 	$(GENERRDIR)/sbdgenerr < $(ERRSRC) > ../common/ap_err.c
 
 sbdgenerr: $(GENERRDIR)/sbdgenerr.pl
-	$(RM) $(GENERRDIR)/sbdgenerr 
+	$(RM) $(GENERRDIR)/sbdgenerr
 	cat $(GENERRDIR)/sbdgenerr.pl > $(GENERRDIR)/sbdgenerr
 	$(CHMOD) +x $(GENERRDIR)/sbdgenerr

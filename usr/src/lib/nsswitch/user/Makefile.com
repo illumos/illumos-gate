@@ -22,9 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/nsswitch/user/Makefile.com
 
 LIBRARY =	libnss_user.a
 VERS =		.1
@@ -39,8 +36,6 @@ include		../../Makefile.com
 include ../../../Makefile.rootfs
 
 CPPFLAGS +=	-I../../../common/inc
-LINTFLAGS +=	-erroff=E_GLOBAL_COULD_BE_STATIC2 -erroff=E_FUNC_SET_NOT_USED
-LINTFLAGS64 +=	-erroff=E_GLOBAL_COULD_BE_STATIC2 -erroff=E_FUNC_SET_NOT_USED
 
 DYNLIB1 =	nss_user.so$(VERS)
 

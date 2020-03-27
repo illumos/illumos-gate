@@ -33,8 +33,7 @@ include $(SRC)/lib/Makefile.rootfs
 
 SRCDIR =	../common
 
-LIBS =		$(DYNLIB) $(LINTLIB)
-$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
+LIBS =		$(DYNLIB)
 
 LDLIBS +=	-lmd -lelf -lkmf -lcryptoutil -lc
 
@@ -45,6 +44,5 @@ CPPFLAGS +=	-D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS
 
 all:		$(LIBS)
 
-lint:		lintcheck
 
 include $(SRC)/lib/Makefile.targ

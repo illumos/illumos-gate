@@ -237,11 +237,9 @@ install:	all $(JARDESTDIR) $(INSJARS) $(DOCDESTDIR) \
 	$(DOCIMAGESDESTDIR)/JavaDTraceAPI.gif
 
 # empty targets for top-level building compatability
-
-install_h lint:
+install_h:
 
 # create API javadoc
-
 doc:
 		-@mkdir -p $(DOCAPI)
 		cd $(APIJAVASRC); umask 022; \

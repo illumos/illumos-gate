@@ -45,6 +45,5 @@ install: $(ROOTSHARED)
 
 clean:
 
-lint:
 
 include $(SRC)/cmd/Makefile.targ

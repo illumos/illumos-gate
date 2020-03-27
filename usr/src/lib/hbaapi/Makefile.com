@@ -35,7 +35,7 @@ include ../../Makefile.lib
 
 HETCFILES=	$(CONFIGFILE:%=$(ROOTETC)/%)
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 SRCDIR=		../common
 
 INCS +=		-I$(SRCDIR)
@@ -51,17 +51,11 @@ SMATCH=off
 
 LDLIBS +=	-lc
 
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
-
 $(ROOTETC)/%:	../common/%
 	$(INS.file)
 
 .KEEP_STATE:
 
 all:	$(LIBS) $(HETCFILES)
-
-lint:
-	@echo "This section is not required to be lint clean"
-	@echo "C++ code"
 
 include ../../Makefile.targ

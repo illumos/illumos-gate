@@ -23,13 +23,9 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-
 .KEEP_STATE:
 
 all : $(LIBS)
-
-lint : lintcheck
 
 ../common/ses_errno.c: ../common/mkerrno.sh ../common/libses.h
 	sh ../common/mkerrno.sh < $(ROOTSCSIHDRDIR)/libses.h > $@

@@ -22,8 +22,6 @@
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
 #
-# lib/libsmedia/plugins/Makefile
-
 
 SUBDIRS = \
 	blkdev \
@@ -35,17 +33,13 @@ all             :=      TARGET= all
 install         :=      TARGET= install
 clean           :=      TARGET= clean
 clobber         :=      TARGET= clobber
-lint            :=      TARGET= lint
-modlintlib      :=      TARGET= modlintlib
-clean.lint      :=      TARGET= clean.lint
 check           :=      TARGET= check
 install_h       :=      TARGET= install_h
-catalog       	:=      TARGET= catalog
+catalog		:=	TARGET= catalog
 
-all install install_h clean clobber lint catalog : $(SUBDIRS)
+all install install_h clean clobber catalog: $(SUBDIRS)
 
 $(SUBDIRS) : FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
-FRC : 
-
+FRC :

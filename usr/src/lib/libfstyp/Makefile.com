@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY =	libfstyp.a
 VERS =		.1
@@ -33,20 +31,17 @@ include ../../Makefile.lib
 
 SRCDIR =	../common
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc
 INCS +=		-I$(SRCDIR)
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_POSIX_PTHREAD_SEMANTICS -D_LARGEFILE64_SOURCE
 CPPFLAGS +=	$(INCS)
 
-LINTFLAGS64 +=	-errchk=longptr64
 
 .KEEP_STATE:
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include ../../Makefile.targ

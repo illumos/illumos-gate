@@ -38,31 +38,16 @@ LIBS =		$(DYNLIB)
 # There should be a mapfile here
 MAPFILES =
 
-LINTFLAGS =	-uxn
-LINTFLAGS64 =	$(LINTFLAGS) -m64
-LINTOUT=	lint.out
-LINTSRC =       $(LINTLIB:%.ln=%)
-ROOTLINTDIR =   $(ROOTLIBDIR)
-ROOTLINT =      $(LINTSRC:%=$(ROOTLINTDIR)/%)
-
-CLEANFILES=	$(LINTOUT)
-
 CPPFLAGS +=	-I.. -D_REENTRANT
 CFLAGS +=	$(CCVERBOSE)
 
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	$(CNOWARN_UNINIT)
 
-$(LINTLIB) :=	LINTFLAGS = -nvx
-$(LINTLIB) :=	LINTFLAGS64 = -nvx -m64
-
 .KEEP_STATE:
 
 all : $(LIBS)
 	$(CHMOD) 755 $(DYNLIB)
-
-lint :
-	$(LINT.c) $(SRCS)
 
 # include library targets
 include $(SRC)/lib/Makefile.targ
@@ -70,6 +55,3 @@ include $(SRC)/lib/Makefile.targ
 pics/%.o:	../%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
-
-$(ROOTLINTDIR)/%: ../%
-	$(INS.file)

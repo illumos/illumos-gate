@@ -23,10 +23,8 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 LIBRARY=	crypt_bsdbf.a
-VERS= 		.1
+VERS=		.1
 
 OBJECTS=	bsdbf.o \
 		bcrypt.o \
@@ -35,11 +33,9 @@ OBJECTS=	bsdbf.o \
 
 include		../../Makefile.crypt_modules
 
-LDLIBS 		+= -lc
+LDLIBS		+= -lc
 CPPFLAGS	+= -I..
 
 all: $(LIBS)
-
-lint: lintcheck
 
 include $(SRC)/lib/Makefile.targ

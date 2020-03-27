@@ -25,4 +25,4 @@
 
 include ../Makefile.com
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBS) $(ROOTLINKS)

@@ -26,5 +26,4 @@
 LIBRARY =	libsched.a
 VERS =		.1
 
-LIBS +=		$(LINTLIB)
 DYNFLAGS +=	-F libc.so.1

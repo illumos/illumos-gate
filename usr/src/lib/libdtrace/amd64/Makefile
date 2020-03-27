@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 ASFLAGS += $(AS_PICFLAGS) -P -D_ASM
 
@@ -36,11 +34,10 @@ SRCS += $(SRC)/common/dis/i386/dis_tables.c
 CPPFLAGS += -I$(SRC)/common/dis/i386
 CPPFLAGS += -D_ELF64
 
-LINTFLAGS64 += -erroff=E_BAD_PTR_CAST_ALIGN
 
 pics/%.o: $(SRC)/common/dis/i386/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-install yydebug: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64) \
+install yydebug: all $(ROOTLIBS64) $(ROOTLINKS64) \
 	$(ROOTDLIBS) $(ROOTDOBJS64)

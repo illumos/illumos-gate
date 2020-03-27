@@ -29,8 +29,6 @@ VERS = .1
 
 include $(SRC)/lib/Makefile.rootfs
 
-LIBS +=		$(LINTLIB)
-
 #
 # Identify that this library is an interposer. This identification
 # ensures that runtime symbol lookup resolves to this library

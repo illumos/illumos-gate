@@ -45,6 +45,5 @@ LDLIBS +=	-lpam -lc
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include		../../../Makefile.targ

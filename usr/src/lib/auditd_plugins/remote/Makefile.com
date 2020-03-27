@@ -46,6 +46,5 @@ ROOTLIBDIR=	$(ROOT)/usr/lib/security
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include		../../../Makefile.targ

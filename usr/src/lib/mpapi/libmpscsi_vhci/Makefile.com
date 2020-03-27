@@ -57,7 +57,7 @@ OBJECTS=	Initialize.o MP_AssignLogicalUnitToTPG.o \
 include ../../../Makefile.lib
 include ../../../Makefile.rootfs
 
-SRCDIR = 	../common
+SRCDIR =	../common
 
 LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -ldevinfo -lsysevent -lnvpair
@@ -73,6 +73,5 @@ SMATCH=off
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include ../../../Makefile.targ
