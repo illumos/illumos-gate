@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 /*
  * Return file offset.
@@ -60,30 +58,7 @@
 off64_t
 ftello64(FILE *iop)
 {
-	ptrdiff_t adjust;
-	off64_t	tres;
-	rmutex_t *lk;
-
-	FLOCKFILE(lk, iop);
-	if (iop->_cnt < 0)
-		iop->_cnt = 0;
-	if (iop->_flag & _IOREAD)
-		adjust = (ptrdiff_t)-iop->_cnt;
-	else if (iop->_flag & (_IOWRT | _IORW)) {
-		adjust = 0;
-		if (((iop->_flag & (_IOWRT | _IONBF)) == _IOWRT) &&
-		    (iop->_base != 0))
-			adjust = iop->_ptr - iop->_base;
-	} else {
-		errno = EBADF;	/* file descriptor refers to no open file */
-		FUNLOCKFILE(lk);
-		return ((off64_t)EOF);
-	}
-	tres = lseek64(FILENO(iop), 0, SEEK_CUR);
-	if (tres >= 0)
-		tres += (off64_t)adjust;
-	FUNLOCKFILE(lk);
-	return (tres);
+	return (ftell_common(iop));
 }
 
 #endif	/* _LP64 */

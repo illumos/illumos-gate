@@ -1,0 +1,222 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 Robert Mustacchi
+.\"
+.Dd March 25, 2020
+.Dt FMEMOPEN 3C
+.Os
+.Sh NAME
+.Nm fmemopen
+.Nd open a memory stream
+.Sh SYNOPSIS
+.In stdio.h
+.Ft "FILE *"
+.Fo fmemopen
+.Fa "void *restrict buf"
+.Fa "size_t size"
+.Fa "const char *restrict mode"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn fmemopen
+function provides a means of associating a file stream with a
+corresponding memory buffer of a fixed size.
+The resulting stream can then be used just like any other stream, and
+when done should be released by calling the
+.Xr fclose 3C
+function.
+.Pp
+The stream can either dynamically allocate memory or it can use an
+existing memory buffer.
+If
+.Fa buf
+is
+.Dv NULL ,
+then a buffer
+.Fa size
+bytes long will be allocated for the stream and initialized to zero.
+This buffer will be allocated as though a call to
+.Xr malloc 3C
+and will be freed when
+.Xr fclose 3C
+is called.
+When using this mode, the stream must be created for update
+.Po
+indicated by a
+.Sq +
+character in the
+.Fa mode
+argument
+.Pc .
+Otherwise, it is assumed that
+.Fa buf
+is at least
+.Fa size
+bytes long.
+.Pp
+The
+.Fa mode
+argument determines whether the stream is opened for read, write, or
+append.
+The
+.Fa mode
+argument accepts all the same values as
+.Xr fopen 3C .
+.Pp
+The resulting stream behaves in a similar way to a stream backed by a
+file.
+The stream can be read and written to.
+The stream is seekeable and can either be byte or wide-character
+oriented.
+A NUL byte has no special meaning when reading.
+.Pp
+The stream logically tracks three different values:
+.Bl -enum -offset indent
+.It
+The current position in the stream.
+.It
+The current size of the stream.
+.It
+The maximum size of the stream.
+.El
+.Pp
+The current position is where reads or writes take place.
+When the stream is opened for read or write
+.Pq r, r+, w, w+
+then the initial position is set to zero.
+If the stream is opened for update
+.Pq a, a+
+then the initial position is set to the first NUL byte in the buffer.
+.Pp
+The current size of the stream represents the length of the stream.
+Like a file, this starts at a specific size and then can grow over time.
+Unlike a file, where the maximum size is determined by the file system,
+the maximum size here is determined at the creation of the stream.
+.Pp
+This size is used when using
+.Dv SEEK_END
+as an argument to functions like
+.Xr fseek 3C .
+Reads cannot advance beyond the current size of the stream and
+attempting to read beyond it is considered hitting the end-of-file.
+Writes beyond the end of the current size will cause the current size to
+increase, though it cannot increase beyond the maximum size.
+.Pp
+The initial size of the stream varies.
+It is set depending on the mode and works as follows:
+.Bl -tag -width Sy -offset indent
+.It Sy r, r+
+The size is set to the
+.Fa size
+argument.
+.It Sy w, w+
+The initial size is set to zero.
+.It Sy a, a+
+The initial size is set according to the following rules:
+.Bl -enum
+.It
+If
+.Fa buf
+is a
+.Dv NULL
+pointer, the current size is set to zero.
+.It
+If a NUL byte is found in the first
+.Fa size
+bytes of
+.Fa buf ,
+then the current size is set to the first NUL byte.
+.It
+The position is set to the
+.Fa size
+argument
+.Pq the maximum size
+if no NUL byte was found in
+.Fa buf .
+.El
+.El
+.Pp
+The maximum size of the stream is determined by the
+.Fa size
+argument.
+Writes beyond this size are dropped.
+Attempts to seek beyond the maximum size will result in an error.
+.Pp
+If the stream was open for writing or update, when the stream is flushed
+or closed, a NUL byte will be written to terminate the stream based on
+the current position and size of the stream.
+If the stream was open for update, if the stream is flushed or closed
+and the last write changed the current buffer size, a NUL byte will be
+written if there is still space for it within the buffer.
+.Pp
+By default, all streams are buffered.
+This means that writes beyond the size of the memory buffer could fail,
+but not be seen until the stream is flushed or closed.
+To detect errors right away, one can explicitly disable buffering with
+the
+.Xr setvbuf 3C
+function or perform explicit buffer flushes with the
+.Xr fflush 3C
+function.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn fmemopen
+function returns a pointer to a stream.
+Otherwise,
+.Dv NULL
+is returned and
+.Dv errno
+is set to indicate the error.
+.Sh ERRORS
+The
+.Fn fmemopen
+function will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+The value of
+.Fa mode
+is invalid.
+.Pp
+The
+.Fa size
+argument was zero.
+.Pp
+The
+.Fa buf
+argument is
+.Dv NULL
+and the
+.Fa mode
+argument does not contain a
+.Sq +
+character.
+.It Er EMFILE
+.Brq FOPEN_MAX
+streams are currently open in the calling process.
+.Pp
+.Brq STREAM_MAX
+streams are currently open in the calling process.
+.It Er ENOMEM
+The system was unable to allocate memory for the stream or its backing
+buffer.
+.El
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr fclose 3C ,
+.Xr fflush 3C ,
+.Xr fopen 3C ,
+.Xr fseek 3C ,
+.Xr malloc 3C ,
+.Xr open_memstream 3C

@@ -1,73 +1,104 @@
-'\" te
-.\"  Copyright 1989 AT&T  Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FERROR 3C "Feb 17, 2005"
-.SH NAME
-ferror, feof, clearerr, fileno \- stream status inquiries
-.SH SYNOPSIS
-.LP
-.nf
-#include <stdio.h>
-
-\fBint\fR \fBferror\fR(\fBFILE *\fR\fIstream\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBfeof\fR(\fBFILE *\fR\fIstream\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBclearerr\fR(\fBFILE *\fR\fIstream\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBfileno\fR(\fBFILE *\fR\fIstream\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBferror()\fR function returns a non-zero value when an error has
-previously occurred reading from or writing to the named \fIstream\fR (see
-\fBIntro\fR(3)). It returns \fB0\fR otherwise.
-.sp
-.LP
-The \fBfeof()\fR function returns a non-zero value when \fBEOF\fR has
-previously been detected reading the named input \fIstream\fR. It returns
-\fB0\fR otherwise.
-.sp
-.LP
-The \fBclearerr()\fR function resets the error indicator and \fBEOF\fR
-indicator to 0 on the named \fIstream\fR.
-.sp
-.LP
-The \fBfileno()\fR function returns the integer file descriptor associated with
-the named \fIstream\fR; see \fBopen\fR(2).
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-_
-MT-Level	MT-Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBopen\fR(2), \fBIntro\fR(3), \fBfopen\fR(3C), \fBstdio\fR(3C),
-\fBattributes\fR(5), \fBstandards\fR(5)
+.\"
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2020 Robert Mustacchi
+.\"
+.Dd "March 25, 2020"
+.Dt FERROR 3C
+.Os
+.Sh NAME
+.Nm ferror ,
+.Nm feof ,
+.Nm clearerr ,
+.Nm fileno
+.Nd stream status inquiries
+.Sh SYNOPSIS
+.In stdio.h
+.Ft int
+.Fo ferror
+.Fa "FILE *stream"
+.Fc
+.Ft int
+.Fo feof
+.Fa "FILE *stream"
+.Fc
+.Ft void
+.Fo clearerr
+.Fa "FILE *stream"
+.Fc
+.Ft int
+.Fo fileno
+.Fa "FILE *stream"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn ferror
+function returns a non-zero value when an error has
+previously occurred reading from or writing to the named
+.Fa stream
+.Po
+see
+.Xr Intro 3
+.Pc .
+It returns
+.Sy 0
+otherwise.
+.Pp
+The
+.Fn feof
+function returns a non-zero value when
+.Sy EOF
+has previously been detected reading the named input
+.Fa stream .
+It returns
+.Sy 0
+otherwise.
+.Pp
+The
+.Fn clearerr
+function resets the error indicator and
+.Sy EOF
+indicator to 0 on the named
+.Fa stream .
+.Pp
+The
+.Fn fileno
+function returns the integer file descriptor associated with
+the named
+.Fa stream ;
+see
+.Xr open 2 .
+Streams that are not associated with a file descriptor such as those
+that were created through the
+.Xr fmemopen 3C
+or
+.Xr open_memstream 3C
+functions will return
+.Sy -1 .
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr Intro 2 ,
+.Xr open 2 ,
+.Xr fmemopen 3C ,
+.Xr fopen 3C ,
+.Xr open_memstream 3C ,
+.Xr stdio 3C

@@ -7,14 +7,12 @@
 .SH NAME
 umem_debug \- debugging features of the umem library
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lumem\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <\fBumem.h\fR>
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBlibumem\fR library provides debugging features that detect memory leaks,
 buffer overruns, multiple frees, use of uninitialized data, use of freed data,
 and many other common programming errors. The activation of the run-time
@@ -24,6 +22,13 @@ debugging features is controlled by environment variables.
 When the library detects an error, it writes a description of the error to an
 internal buffer that is readable with the \fB::umem_status\fR \fBmdb\fR(1)
 \fIdcmd\fR and then calls \fBabort\fR(3C).
+.sp
+.LP
+When using the debugging features of the library, a program may opt into
+changing the failure rate of memory allocation. This is often useful for
+test code that would like to force memory allocation failures in a
+controlled fashion. See the \fBumem_setmtbf\fR(3MALLOC) function for
+more information.
 .SH ENVIRONMENT VARIABLES
 .ne 2
 .na
@@ -166,7 +171,6 @@ cannot be allocated.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -183,9 +187,9 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.LP
 \fBmdb\fR(1), \fBabort\fR(3C), \fBsignal\fR(3C),
-\fBumem_cache_create\fR(3MALLOC), \fBattributes\fR(5)
+\fBumem_cache_create\fR(3MALLOC), \fBumem_setmtbf\fR(3MALLOC),
+\fBattributes\fR(5)
 .sp
 .LP
 \fIModular Debugger Guide\fR:
@@ -193,12 +197,10 @@ MT-Level	MT-Safe
 .LP
 https://illumos.org/books/mdb/
 .SH WARNINGS
-.LP
 When \fBlibumem\fR aborts the process using \fBabort\fR(3C), any existing
 signal handler for \fBSIGABRT\fR is called. If the signal handler performs
 allocations, undefined behavior can result.
 .SH NOTES
-.LP
 Some of the debugging features work only for allocations smaller than 16
 kilobytes in size. Allocations larger than 16 kilobytes could have reduced
 support.

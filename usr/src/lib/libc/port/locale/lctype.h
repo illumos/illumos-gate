@@ -17,6 +17,7 @@
 #define	_LCTYPE_H_
 
 #include <wchar.h>
+#include <sys/types.h>
 
 /* private LC_CTYPE related structures */
 
@@ -24,7 +25,8 @@
 struct lc_ctype {
 
 	size_t (*lc_mbrtowc)(wchar_t *_RESTRICT_KYWD,
-	    const char *_RESTRICT_KYWD, size_t, mbstate_t *_RESTRICT_KYWD);
+	    const char *_RESTRICT_KYWD, size_t, mbstate_t *_RESTRICT_KYWD,
+	    boolean_t);
 
 	int (*lc_mbsinit)(const mbstate_t *);
 
@@ -51,7 +53,7 @@ struct lc_ctype {
  * Default implementation (C locale, i.e. ASCII).
  */
 size_t	__mbrtowc_ascii(wchar_t *_RESTRICT_KYWD,
-    const char *_RESTRICT_KYWD, size_t, mbstate_t *_RESTRICT_KYWD);
+    const char *_RESTRICT_KYWD, size_t, mbstate_t *_RESTRICT_KYWD, boolean_t);
 int	__mbsinit_ascii(const mbstate_t *);
 size_t	__mbsnrtowcs_ascii(wchar_t *_RESTRICT_KYWD dst,
     const char **_RESTRICT_KYWD src, size_t nms, size_t len,

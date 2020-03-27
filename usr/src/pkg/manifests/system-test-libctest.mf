@@ -32,6 +32,7 @@ dir path=opt/libc-tests/tests/random
 dir path=opt/libc-tests/tests/regex
 dir path=opt/libc-tests/tests/regex/data
 dir path=opt/libc-tests/tests/select
+dir path=opt/libc-tests/tests/stdio
 dir path=opt/libc-tests/tests/symbols
 dir path=usr group=sys
 dir path=usr/lib
@@ -157,6 +158,22 @@ file path=opt/libc-tests/tests/select/select.sh mode=0555
 file path=opt/libc-tests/tests/select/select_test mode=0555
 file path=opt/libc-tests/tests/set_constraint_handler_s.32 mode=0555
 file path=opt/libc-tests/tests/set_constraint_handler_s.64 mode=0555
+file path=opt/libc-tests/tests/stdio/fileno.32 mode=0555
+file path=opt/libc-tests/tests/stdio/fileno.64 mode=0555
+file path=opt/libc-tests/tests/stdio/fmemopentest.32 mode=0555
+file path=opt/libc-tests/tests/stdio/fmemopentest.64 mode=0555
+file path=opt/libc-tests/tests/stdio/ftell_ungetc.32 mode=0555
+file path=opt/libc-tests/tests/stdio/ftell_ungetc.64 mode=0555
+file path=opt/libc-tests/tests/stdio/memstream.32 mode=0555
+file path=opt/libc-tests/tests/stdio/memstream.64 mode=0555
+file path=opt/libc-tests/tests/stdio/memstream_reopen.32 mode=0555
+file path=opt/libc-tests/tests/stdio/memstream_reopen.64 mode=0555
+file path=opt/libc-tests/tests/stdio/open_memstreamtest.32 mode=0555
+file path=opt/libc-tests/tests/stdio/open_memstreamtest.64 mode=0555
+file path=opt/libc-tests/tests/stdio/orientation_test.32 mode=0555
+file path=opt/libc-tests/tests/stdio/orientation_test.64 mode=0555
+file path=opt/libc-tests/tests/stdio/test_mbrtowc.32 mode=0555
+file path=opt/libc-tests/tests/stdio/test_mbrtowc.64 mode=0555
 file path=opt/libc-tests/tests/strcoll-strxfrm-6907.32 mode=0555
 file path=opt/libc-tests/tests/strcoll-strxfrm-6907.64 mode=0555
 file path=opt/libc-tests/tests/strerror mode=0555

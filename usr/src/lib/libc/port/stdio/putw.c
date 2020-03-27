@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 /*
  * The intent here is to provide a means to make the order of
@@ -54,7 +52,7 @@ putw(int w, FILE *stream)
 	rmutex_t *lk;
 
 	FLOCKFILE(lk, stream);
-	while (--i >= 0 && PUTC(*s++, stream) != EOF)
+	while (--i >= 0 && putc_unlocked(*s++, stream) != EOF)
 		;
 	ret = stream->_flag & _IOERR;
 	FUNLOCKFILE(lk);

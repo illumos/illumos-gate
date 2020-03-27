@@ -140,6 +140,7 @@ MANFILES=	__fbufsize.3c					\
 		floating_to_decimal.3c				\
 		flock.3c					\
 		flockfile.3c					\
+		fmemopen.3c					\
 		fmtmsg.3c					\
 		fnmatch.3c					\
 		fopen.3c					\
@@ -271,6 +272,7 @@ MANFILES=	__fbufsize.3c					\
 		newlocale.3c					\
 		nl_langinfo.3c					\
 		offsetof.3c					\
+		open_memstream.3c				\
 		opendir.3c					\
 		perror.3c					\
 		pfmt.3c						\
@@ -1054,6 +1056,7 @@ MANLINKS=	FD_CLR.3c				\
 		ntohl.3c				\
 		ntohll.3c				\
 		ntohs.3c				\
+		open_wmemstream.3c			\
 		openlog.3c				\
 		pclose.3c				\
 		port_dissociate.3c			\
@@ -2080,6 +2083,8 @@ duplocale.3c				:= LINKSRC = newlocale.3c
 freelocale.3c				:= LINKSRC = newlocale.3c
 
 nl_langinfo_l.3c			:= LINKSRC = nl_langinfo.3c
+
+open_wmemstream.3c			:= LINKSRC = open_memstream.3c
 
 fdopendir.3c				:= LINKSRC = opendir.3c
 

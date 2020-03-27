@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -37,7 +37,9 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2020 Robert Mustacchi
+ */
 
 #include "lint.h"
 #include "file64.h"
@@ -84,6 +86,17 @@ _freopen_null(const char *type, FILE *iop)
 	mbstate_t	*mb;
 
 	if (iop == NULL || iop->_flag == 0) {
+		errno = EBADF;
+		return (NULL);
+	}
+
+	/*
+	 * If this is not a file-based stream (as in we have no file
+	 * descriptor), then we need to close this, but still actually return an
+	 * error.
+	 */
+	if (_get_fd(iop) == -1) {
+		(void) close_fd(iop);
 		errno = EBADF;
 		return (NULL);
 	}
@@ -140,7 +153,7 @@ _freopen_null(const char *type, FILE *iop)
 	}
 
 #ifdef	_LP64
-	iop->_flag &= ~0377;	/* clear lower 8-bits */
+	iop->_flag &= ~_DEF_FLAG_MASK;	/* clear lower 8-bits */
 	if (mode == 'r') {
 		iop->_flag |= _IOREAD;
 		nflag = oflag & ~O_APPEND;

@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2020 Robert Mustacchi
+ */
+
+/*
  * This is the header where the internal to libc definition of the FILE
  * structure is defined. The exrernal defintion defines the FILE structure
  * as an array of longs. This prevents customers from writing code that
@@ -41,8 +45,6 @@
 #ifndef	_FILE64_H
 #define	_FILE64_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <synch.h>
 #include <stdio_tag.h>
 #include <wchar_impl.h>
@@ -58,8 +60,25 @@ typedef __mbstate_t	mbstate_t;
 
 #define	rmutex_t	mutex_t
 
+typedef ssize_t (*fread_t)(__FILE *, char *, size_t);
+typedef ssize_t (*fwrite_t)(__FILE *, const char *, size_t);
+typedef off_t (*fseek_t)(__FILE *, off_t, int);
+typedef int (*fclose_t)(__FILE *);
+
+typedef struct {
+	fread_t	std_read;
+	fwrite_t std_write;
+	fseek_t std_seek;
+	fclose_t std_close;
+	void *std_data;
+} stdio_ops_t;
+
 #ifdef	_LP64
 
+/*
+ * This structure cannot grow beyond its current size of 128 bytes. See the file
+ * lib/libc/port/stdio/README.design for more information.
+ */
 struct __FILE_TAG {
 	unsigned char	*_ptr;	/* next character from/to here in buffer */
 	unsigned char	*_base;	/* the buffer */
@@ -69,7 +88,8 @@ struct __FILE_TAG {
 	unsigned int	_flag;	/* the state of the stream */
 	rmutex_t	_lock;	/* lock for this structure */
 	mbstate_t	_state;	/* mbstate_t */
-	char		__fill[32];	/* filler to bring size to 128 bytes */
+	stdio_ops_t	*_ops;	/* Alternate impl ops */
+	char		__fill[24];	/* filler to bring size to 128 bytes */
 };
 
 #else
@@ -83,6 +103,7 @@ struct xFILEdata {
 	rmutex_t	_lock;	/* lock for this structure */
 	mbstate_t	_state;	/* mbstate_t */
 	int		_altfd;	/* alternate fd if > 255 */
+	stdio_ops_t	*_ops;	/* Alternate impl ops */
 };
 
 #define	XFILEINITIALIZER	{ 0, NULL, RECURSIVEMUTEX, DEFAULTMBSTATE }

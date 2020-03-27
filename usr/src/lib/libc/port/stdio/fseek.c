@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 /*
  * Seek for standard library.  Coordinates with buffering.
@@ -76,7 +74,7 @@ fseek(FILE *iop, long offset, int ptrname)
 	if (iop->_flag & _IORW) {
 		iop->_flag &= ~(_IOREAD | _IOWRT);
 	}
-	p = lseek(FILENO(iop), (off_t)offset, ptrname);
+	p = _xseek(iop, (off_t)offset, ptrname);
 	FUNLOCKFILE(lk);
 	return ((p == (off_t)-1) ? -1: 0);
 }

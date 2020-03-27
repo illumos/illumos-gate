@@ -25,7 +25,11 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
+
+/*
+ * Copyright 2020 Robert Mustacchi
+ */
 
 /*
  * stdiom.h - shared guts of stdio
@@ -33,8 +37,6 @@
 
 #ifndef	_STDIOM_H
 #define	_STDIOM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.9 */
 
 #include <thread.h>
 #include <synch.h>
@@ -48,11 +50,18 @@
 /*
  * The following flags, and the macros that manipulate them, operate upon
  * the FILE structure used by stdio. If new flags are required, they should
- * be created in this file. The values of the flags must be differnt from
+ * be created in this file. The values of the flags must be different from
  * the currently used values. New macros should be created to use the flags
  * so that the compilation mode dependencies can be isolated here.
  */
 
+/*
+ * The 32-bit version of the stdio FILE has 8 bits for its flags (see
+ * lib/libc/port/stdio/README.design). These 8 bits are used to determine if the
+ * FILE structure is allocated. We define '_DEF_FLAG_MASK' as a means to
+ * indicate this.
+ */
+#define	_DEF_FLAG_MASK	0377
 #ifdef _LP64
 #define	_BYTE_MODE_FLAG	0400
 #define	_WC_MODE_FLAG	01000
@@ -152,7 +161,7 @@ extern int	__flsbuf(int, FILE *);
  */
 #define	_realbufend(iop)	((iop)->_end)
 #else
-extern Uchar 	*_realbufend(FILE *iop);
+extern Uchar	*_realbufend(FILE *iop);
 extern rmutex_t	*_reallock(FILE *iop);
 #endif	/*	_LP64	*/
 
@@ -171,7 +180,7 @@ extern void	close_pid(void);
 /*
  * Internal routines from flush.c
  */
-extern int _file_get(FILE *);
+extern int _get_fd(FILE *);
 extern int _file_set(FILE *, int, const char *);
 
 /*
@@ -180,11 +189,8 @@ extern int _file_set(FILE *, int, const char *);
  * since 64-bit Solaris is not affected by this.
  */
 #ifdef  _LP64
-#define	GET_FD(iop)		((iop)->_file)
 #define	SET_FILE(iop, fd)	((iop)->_file = (fd))
 #else
-#define	GET_FD(iop)		\
-		(((iop)->__extendedfd) ? _file_get(iop) : (iop)->_magic)
 #define	SET_FILE(iop, fd)	(iop)->_magic = (fd); (iop)->__extendedfd = 0
 #endif
 
@@ -206,7 +212,7 @@ extern int _fileno(FILE *iop);
 /*
  * Internal routines from _findbuf.c
  */
-extern Uchar 	*_findbuf(FILE *iop);
+extern Uchar	*_findbuf(FILE *iop);
 
 /*
  * Internal routine used by fopen.c
@@ -221,12 +227,12 @@ extern size_t _fwrite_unlocked(const void *, size_t, size_t, FILE *);
 /*
  * Internal routine from getc.c
  */
-int _getc_unlocked(FILE *);
+int _getc_internal(FILE *);
 
 /*
  * Internal routine from put.c
  */
-int _putc_unlocked(int, FILE *);
+int _putc_internal(int, FILE *);
 
 /*
  * Internal routine from ungetc.c
@@ -259,5 +265,37 @@ int _ungetc_unlocked(int, FILE *);
 extern struct xFILEdata	_xftab[];
 
 #endif	/*	_LP64	*/
+
+/*
+ * A set of stdio routines to allow us to have alternate read, write, lseek, and
+ * close implementations.
+ */
+extern ssize_t	_xread(FILE *iop, void *buf, size_t nbytes);
+extern ssize_t	_xwrite(FILE *iop, const void *buf, size_t nbytes);
+extern off_t	_xseek(FILE *iop, off_t off, int whence);
+extern off64_t	_xseek64(FILE *iop, off64_t off, int whence);
+extern int	_xclose(FILE *iop);
+extern void	*_xdata(FILE *iop);
+extern int	_xassoc(FILE *iop, fread_t readf, fwrite_t writef,
+    fseek_t seekf, fclose_t closef, void *data);
+extern void	_xunassoc(FILE *iop);
+
+/*
+ * Internal functions from _stdio_flags.c.
+ */
+extern int	_stdio_flags(const char *type, int *oflags, int *fflags);
+
+/*
+ * Internal functions from open_memstream.c.
+ */
+extern boolean_t	memstream_seek(size_t base, off_t off, size_t max,
+    size_t *nposp);
+extern int	memstream_newsize(size_t pos, size_t alloc, size_t nbytes,
+    size_t *nallocp);
+
+/*
+ * Internal function from ftell.o.
+ */
+extern off64_t	ftell_common(FILE *iop);
 
 #endif	/* _STDIOM_H */

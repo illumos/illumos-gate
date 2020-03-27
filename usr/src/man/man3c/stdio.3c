@@ -3,11 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STDIO 3C "May 18, 2005"
+.\" Copyright 2020 Robert Mustacchi
+.TH STDIO 3C "March 25, 2020"
 .SH NAME
 stdio, stdin, stdout, stderr \- standard buffered input/output package
 .SH SYNOPSIS
-.LP
 .nf
 #include <stdio.h>
 .fi
@@ -28,8 +28,6 @@ stdio, stdin, stdout, stderr \- standard buffered input/output package
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The standard I/O functions described in section 3C of this manual constitute an
 efficient, user-level \fBI/O\fR buffering scheme. The in-line macros
 \fBgetc()\fR and \fBputc()\fR handle characters quickly. The macros
@@ -45,6 +43,8 @@ A file with associated buffering is called a \fIstream\fR (see \fBIntro\fR(3))
 and is declared to be a pointer to a defined type \fBFILE\fR. The
 \fBfopen\fR(3C) function creates certain descriptive data for a stream and
 returns a pointer to designate the stream in all further transactions.
+Streams to memory may also be created through the \fBfmemopen\fR(3C),
+\fBopen_memstream\fR(3C), and \fBopen_wmemstream\fR(3C) functions.
 Normally, there are three open streams with constant pointers declared in the
 \fB<stdio.h>\fR header and associated with the standard open files:
 .sp
@@ -113,7 +113,10 @@ a buffer intended to hold a file's pathname.
 The integer constant \fBFOPEN_MAX\fR specifies the minimum number of files that
 the implementation guarantees can be open simultaneously. Note that no more
 than 255 files may be opened using \fBfopen()\fR, and only file descriptors 0
-through 255 can be used in a stream.
+through 255 can be used in a stream. This restriction only holds for the 32-bit
+compilation environment. The 64-bit environment may use more streams and the use
+of more than 255 may be enabled in a 32-bit environment through the use of
+\fBextendedFILE\fR(5).
 .sp
 .LP
 The functions and constants mentioned in the entries of section 3S of this
@@ -140,8 +143,6 @@ The \fBsetbuf()\fR or \fBsetvbuf()\fR functions (both described on the
 \fBsetbuf\fR(3C) manual page) may be used to change the stream's buffering
 strategy.
 .SS "Interactions of Other FILE-Type C Functions"
-.sp
-.LP
 A single open file description can be accessed both through streams and through
 file descriptors.  Either a file descriptor or a stream will be called a
 \fIhandle\fR on the open file description to which it refers; an open file
@@ -290,8 +291,6 @@ are followed, it is implementation defined whether, and under what conditions,
 all input is seen exactly once.
 .RE
 .SS "Use of stdio in Multithreaded Applications"
-.sp
-.LP
 All the \fBstdio\fR functions are safe unless they have the \fB_unlocked\fR
 suffix.  Each \fBFILE\fR pointer has its own lock to guarantee that only one
 thread can access it. In the case that output needs to be synchronized, the
@@ -329,18 +328,15 @@ funlockfile(iop);
 .in -2
 
 .SH RETURN VALUES
-.sp
-.LP
 Invalid stream pointers usually cause grave disorder, possibly including
 program termination. Individual function descriptions describe the possible
 error conditions.
 .SH SEE ALSO
-.sp
-.LP
 \fBclose\fR(2), \fBlseek\fR(2), \fBopen\fR(2), \fBpipe\fR(2), \fBread\fR(2),
 \fBwrite\fR(2), \fBctermid\fR(3C), \fBcuserid\fR(3C), \fBfclose\fR(3C),
-\fBferror\fR(3C), \fBfopen\fR(3C), \fBfread\fR(3C), \fBfseek\fR(3C),
-\fBflockfile\fR(3C), \fBgetc\fR(3C), \fBgets\fR(3C), \fBpopen\fR(3C),
+\fBferror\fR(3C), \fBfmemopen\fR(3C), \fBfopen\fR(3C), \fBfread\fR(3C),
+\fBfseek\fR(3C), \fBflockfile\fR(3C), \fBgetc\fR(3C), \fBgets\fR(3C),
+\fBopen_memstream(3C)\fR, \fBopen_wmemstream(3C(\fR, \fBpopen\fR(3C),
 \fBprintf\fR(3C), \fBputc\fR(3C), \fBputs\fR(3C), \fBscanf\fR(3C),
 \fBsetbuf\fR(3C), \fBsystem\fR(3C), \fBtmpfile\fR(3C), \fBtmpnam\fR(3C),
 \fBungetc\fR(3C)

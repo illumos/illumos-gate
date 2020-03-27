@@ -43,11 +43,10 @@
 .\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.
 .\" Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH FFLUSH 3C "Nov 1, 2003"
+.TH FFLUSH 3C "March 25, 2020"
 .SH NAME
 fflush \- flush a stream
 .SH SYNOPSIS
-.LP
 .nf
 #include <stdio.h>
 
@@ -55,8 +54,6 @@ fflush \- flush a stream
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 If \fIstream\fR points to an output stream or an update stream in which the
 most recent operation was not input, \fBfflush()\fR causes any unwritten data
 for that stream to be written to the file, and the \fBst_ctime\fR and
@@ -78,13 +75,9 @@ on all streams for which the behavior is defined above.
 An input stream, seekable or non-seekable, can be flushed by explicitly calling
 \fBfflush()\fR with a non-null argument specifying that stream.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBfflush()\fR returns \fB0\fR. Otherwise, it
 returns \fBEOF\fR and sets \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
-.LP
 The \fBfflush()\fR function will fail if:
 .sp
 .ne 2
@@ -135,6 +128,8 @@ The \fBfflush()\fR function was interrupted by a signal.
 The process is a member of a background process group attempting to write to
 its controlling terminal, \fBTOSTOP\fR is set, the process is neither ignoring
 nor blocking \fBSIGTTOU\fR, and the process group of the process is orphaned.
+\fIstream\fR was created by \fBopen_wmemstream\fR(3C) and a wide-character or
+byte sequence buffered is invalid in the current locale.
 .RE
 
 .sp
@@ -171,8 +166,6 @@ limits of the device.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -189,6 +182,4 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBgetrlimit\fR(2), \fBulimit\fR(2), \fBattributes\fR(5), \fBstandards\fR(5)

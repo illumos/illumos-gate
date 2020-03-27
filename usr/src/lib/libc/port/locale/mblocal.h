@@ -48,7 +48,7 @@ void	_BIG5_init(struct lc_ctype *);
 void	_MSKanji_init(struct lc_ctype *);
 
 typedef size_t (*mbrtowc_pfn_t)(wchar_t *_RESTRICT_KYWD,
-    const char *_RESTRICT_KYWD, size_t, mbstate_t *_RESTRICT_KYWD);
+    const char *_RESTRICT_KYWD, size_t, mbstate_t *_RESTRICT_KYWD, boolean_t);
 typedef size_t (*wcrtomb_pfn_t)(char *_RESTRICT_KYWD, wchar_t,
     mbstate_t *_RESTRICT_KYWD);
 size_t __mbsnrtowcs_std(wchar_t *_RESTRICT_KYWD, const char **_RESTRICT_KYWD,

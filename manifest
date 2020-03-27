@@ -13379,6 +13379,7 @@ f usr/share/man/man3c/flockfile.3c 0444 root bin
 s usr/share/man/man3c/fls.3c=ffs.3c
 s usr/share/man/man3c/flsl.3c=ffs.3c
 s usr/share/man/man3c/flsll.3c=ffs.3c
+f path=usr/share/man/man3c/fmemopen.3c 0444 root bin
 f usr/share/man/man3c/fmtmsg.3c 0444 root bin
 f usr/share/man/man3c/fnmatch.3c 0444 root bin
 f usr/share/man/man3c/fopen.3c 0444 root bin
@@ -13750,6 +13751,8 @@ s usr/share/man/man3c/ntohs.3c=byteorder.3c
 f usr/share/man/man3c/offsetof.3c 0444 root bin
 f usr/share/man/man3c/opendir.3c 0444 root bin
 s usr/share/man/man3c/openlog.3c=syslog.3c
+f usr/share/man/man3c/open_memstream.3c 0444 root bin
+s usr/share/man/man3c/open_wmemstream.3c=open_memstream.3c
 s usr/share/man/man3c/pclose.3c=popen.3c
 f usr/share/man/man3c/perror.3c 0444 root bin
 f usr/share/man/man3c/pfmt.3c 0444 root bin
@@ -16767,6 +16770,7 @@ s usr/share/man/man3malloc/umem_cache_free.3malloc=umem_cache_create.3malloc
 f usr/share/man/man3malloc/umem_debug.3malloc 0444 root bin
 s usr/share/man/man3malloc/umem_free.3malloc=umem_alloc.3malloc
 s usr/share/man/man3malloc/umem_nofail_callback.3malloc=umem_alloc.3malloc
+f usr/share/man/man3malloc/umem_setmtbf.3malloc 0444 root bin
 s usr/share/man/man3malloc/umem_zalloc.3malloc=umem_alloc.3malloc
 s usr/share/man/man3malloc/valloc.3malloc=malloc.3malloc
 f usr/share/man/man3malloc/watchmalloc.3malloc 0444 root bin

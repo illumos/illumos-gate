@@ -21,6 +21,7 @@ file path=usr/share/man/man3malloc/mtmalloc.3malloc
 file path=usr/share/man/man3malloc/umem_alloc.3malloc
 file path=usr/share/man/man3malloc/umem_cache_create.3malloc
 file path=usr/share/man/man3malloc/umem_debug.3malloc
+file path=usr/share/man/man3malloc/umem_setmtbf.3malloc
 file path=usr/share/man/man3malloc/watchmalloc.3malloc
 link path=usr/share/man/man3malloc/calloc.3malloc target=malloc.3malloc
 link path=usr/share/man/man3malloc/free.3malloc target=malloc.3malloc

@@ -73,7 +73,7 @@ __mbsinit_ascii(const mbstate_t *unused)
 
 size_t
 __mbrtowc_ascii(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
-    size_t n, mbstate_t *_RESTRICT_KYWD unused)
+    size_t n, mbstate_t *_RESTRICT_KYWD unused, boolean_t zero)
 {
 	_NOTE(ARGUNUSED(unused));
 
@@ -85,7 +85,11 @@ __mbrtowc_ascii(wchar_t *_RESTRICT_KYWD pwc, const char *_RESTRICT_KYWD s,
 		return ((size_t)-2);
 	if (pwc != NULL)
 		*pwc = (unsigned char)*s;
-	return (*s == '\0' ? 0 : 1);
+	if (zero || *s != '\0') {
+		return (1);
+	} else {
+		return (0);
+	}
 }
 
 size_t

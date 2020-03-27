@@ -1,0 +1,195 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 Robert Mustacchi
+.\"
+.Dd March 25, 2020
+.Dt OPEN_MEMSTREAM 3C
+.Os
+.Sh NAME
+.Nm open_memstream ,
+.Nm open_wmemstream
+.Nd open a memory stream
+.Sh SYNOPSIS
+.In stdio.h
+.Ft "FILE *"
+.Fo open_memstream
+.Fa "char **bufp"
+.Fa "size_t *sizep"
+.Fc
+.In wchar.h
+.Ft "FILE *"
+.Fo open_wmemstream
+.Fa "wchar_t **bufp"
+.Fa "size_t *sizep"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn open_memstream
+and
+.Fn open_wmemstream
+functions create an I/O stream that is backed by a dynamic memory buffer
+which will grow as needed.
+The stream is seekable and writable.
+The stream is not readable.
+The stream is byte-oriented in the case of the
+.Fn open_memstream
+function or it is wide-oriented in the case of the
+.Fn open_wmemstream
+function.
+.Pp
+Memory for the stream is dynamically allocated and reallocated as though
+a call to
+.Xr malloc 3C .
+As the stream is written to, flushed, or closed, the underlying buffer
+will be grown automatically as required.
+After the stream is flushed or closed, the
+.Fa bufp
+argument will be filled in with a pointer to the current buffer.
+The
+.Fa sizep
+argument will be filled in with the smaller of the current buffer length
+and the current position in bytes
+.Pq Fn open_memstream
+or wide characters
+.Pq Fn open_wmemstream ,
+excluding a NUL character.
+Note, because the current position is taken into account, the actual
+size of the buffer may be larger than is found in
+.Fa sizep ;
+however data should not be accessed beyond the indicated size.
+The values stored in the
+.Fa bufp
+and
+.Fa sizep
+arguments are only valid until the next write operation on the stream
+or a call to
+.Xr fclose 3C .
+.Pp
+The stream maintains both the current position and the current length of
+the stream.
+Both the initial position and length of the buffer are set to zero.
+Whenever a write at the current position exceeds the current length of the
+buffer, the current length is increased and a NUL character,
+.Sq \e0
+.Pq Fn open_memstream
+or NUL wide character,
+.Sq L\e0
+.Pq Fn open_wmemstream
+will be added to the buffer.
+If the stream is seeked beyond the current length and a subsequent write
+occurs, intervening characters will be filled with the corresponding NUL
+character for the stream.
+.Pp
+To release the stream, the caller must call the
+.Xr fclose 3C
+function.
+The corresponding dynamically allocated memory will be disassociated
+from the stream and will become owned by the caller.
+The caller must eventually release the memory buffer pointed to in the
+.Fa bufp
+argument with a call to
+.Xr free 3C .
+.Ss Fn open_wmemstream , Xr fseek 3C , Xr fsetops 3C, and Xr ftell 3C
+The specification for the
+.Fn open_wmemstream
+function causes the
+.Xr fseek 3C
+and
+.Xr ftell 3C
+families of functions to operate differently.
+Traditionally, these functions always return units in bytes, regardless
+of whether the underlying stream is byte- or wide-oriented.
+However, when used against a stream created by the
+.Fn open_wmemstream
+function these now count in terms of units of wide characters.
+While this is different from the traditional behavior, this does mean
+that the units will be the same as tracked in
+.Fa sizep .
+.Ss Fn open_wmemstream and byte-oriented functions
+Unlike other streams, streams created by
+.Fn open_wmemstream
+are not only wide-oriented, but operate in terms of the
+.Vt wchar_t
+data type.
+When normal bytes are written to the stream, an implicit multi-byte
+conversion state is maintained.
+Writing byte sequences that don't correspond to valid byte sequences in
+the locale can cause I/O errors to occur when using write functions such
+as
+.Xr fputc 3C
+or
+.Xr fwrite 3C ,
+or when buffered data is flushed through functions like
+.Xr fflush 3C
+or
+.Xr fclose 3C .
+.Pp
+The same problem can occur when explicitly using wide characters, for
+example,
+.Xr fputwc 3C ,
+if the
+wide character represents a code point that is not valid in the current
+locale.
+To avoid these errors when flushing or closing, one can disable
+buffering by passing
+.Dv _IONBF
+as the buffering type with
+.Xr setvbuf 3C .
+.Pp
+It is not recommended to change the locale of such a stream while
+writing a byte sequence that represents valid wide characters.
+The behavior of using byte-oriented functions is not standardized and
+not all systems will behave the same way.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn open_memstream
+and
+.Fn open_wmemstream
+functions returns a pointer to a stream.
+Otherwise,
+.Dv NULL
+is returned and
+.Dv errno
+is set to indicate the error.
+.Sh ERRORS
+The
+.Fn fmemopen
+function will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+Either of the
+.Fa bufp
+or
+.Fa sizep
+arguments are
+.Dv NULL .
+.It Er EMFILE
+.Brq FOPEN_MAX
+streams are currently open in the calling process.
+.Pp
+.Brq STREAM_MAX
+streams are currently open in the calling process.
+.It Er ENOMEM
+The system was unable to allocate memory for the stream or its backing
+memory buffer.
+.El
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr fclose 3C ,
+.Xr fflush 3C ,
+.Xr fmemopen 3C ,
+.Xr free 3C ,
+.Xr malloc 3C ,
+.Xr setvbuf 3C

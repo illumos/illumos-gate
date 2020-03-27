@@ -43,11 +43,10 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2002, Sun Microsystems, Inc. All Rights Reserved.
 .\"
-.TH FTELL 3C "Jul 24, 2002"
+.TH FTELL 3C "March 25, 2020"
 .SH NAME
 ftell, ftello \- return a file offset in a stream
 .SH SYNOPSIS
-.LP
 .nf
 #include <stdio.h>
 
@@ -60,21 +59,28 @@ ftell, ftello \- return a file offset in a stream
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBftell()\fR function obtains the current value of the file-position
 indicator for the stream pointed to by \fIstream\fR. The \fBftello()\fR
 function is identical to \fBftell()\fR except for the return type.
+.PP
+Normally the value returned is measured in bytes. However, when
+.I stream
+has been created with
+.B open_wmemstream(3C)
+then the offset of the stream is measured in wide characters. This behavior is
+consistent with how
+.B fseek(3C)
+and
+.B fseeko(3C)
+treat the offset into the stream.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, the \fBftell()\fR and \fBftello()\fR functions
 return the current value of the file-position indicator for the stream measured
-in bytes from the beginning of the file. Otherwise, they return \fB\(mi1\fR and
-sets \fBerrno\fR to indicate the error.
+in bytes from the beginning of the file, or wide characters for streams created
+by
+.B open_wmemstream(3C).
+Otherwise, they return \fB\(mi1\fR and sets \fBerrno\fR to indicate the error.
 .SH ERRORS
-.sp
-.LP
 The \fBftell()\fR and \fBftello()\fR functions will fail if:
 .sp
 .ne 2
@@ -122,13 +128,9 @@ The current file offset cannot be represented correctly in an object of type
 .RE
 
 .SH USAGE
-.sp
-.LP
 The \fBftello()\fR function has a transitional interface for 64-bit file
 offsets.  See \fBlf64\fR(5).
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -145,7 +147,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
-\fBlseek\fR(2), \fBfopen\fR(3C), \fBfseek\fR(3C), \fBattributes\fR(5), ,
-\fBstandards\fR(5), \fBlf64\fR(5)
+\fBlseek\fR(2), \fBfopen\fR(3C), \fBfseek\fR(3C), \fBopen_wmemstream\fR(3C),
+\fBattributes\fR(5), \fBstandards\fR(5), \fBlf64\fR(5)

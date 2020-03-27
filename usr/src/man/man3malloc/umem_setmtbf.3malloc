@@ -1,0 +1,74 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 Robert Mustacchi
+.\"
+.Dd February 23, 2020
+.Dt UMEM_SETMTBF 3MALLOC
+.Os
+.Sh NAME
+.Nm umem_setmtbf
+.Nd set umem failure threshold
+.Sh SYNOPSIS
+.Lb libumem
+.In umem.h
+.Ft void
+.Fo umem_setmtbf
+.Fa "uint_t thresh"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn umem_setmtbf
+function can be used to modify the run-time behavior of the
+.Xr libumem 3LIB
+library to set a threshold to cause injected memory allocation failures.
+.Pp
+By default, no failures are injected.
+When a non-zero value is passed in
+.Fa thresh
+then error injection is enabled, if the umem debugging features
+described in
+.Xr umem_debug 3MALLOC
+are enabled through the
+.Ev UMEM_DEBUG
+environment variable.
+If a process has not enabled the debugging functionality of
+.Xr libumem 3LIB
+then no errors will be injected, no matter what
+.Fa thresh
+is set to.
+.Pp
+Passing the value
+.Sy 0
+disables error injection.
+To cause every allocation to fail, pass the value
+.Sy 1 .
+The larger the value passed, the more time that will pass between error
+injections.
+Currently, an error is injected if the current time in nanoseconds since
+boot modulus the mtbf is zero.
+Concretely:
+.Bd -literal -offset indent
+if (gethrtime() % thresh) == 0) {
+	<inject error>
+}
+.Ed
+.Pp
+This mechanism is not guaranteed over time; however, the meanings of a
+threshold of zero, one, and the general tendency of larger numbers to
+indicate less errors is.
+.Sh MT-LEVEL
+.Sy Unsafe
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh SEE ALSO
+.Xr libumem 3LIB ,
+.Xr umem_debug 3MALLOC

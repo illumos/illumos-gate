@@ -66,7 +66,7 @@ _fgetwc_unlocked_l(FILE *fp, locale_t loc)
 	}
 	do {
 		char	x = (char)c;
-		nconv = lct->lc_mbrtowc(&wc, &x, 1, statep);
+		nconv = lct->lc_mbrtowc(&wc, &x, 1, statep, B_FALSE);
 		if (nconv == (size_t)-1) {
 			break;
 		} else if (nconv == (size_t)-2) {

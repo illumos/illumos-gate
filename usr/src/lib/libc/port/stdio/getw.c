@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	  All Rights Reserved	*/
 
 /*
  * The intent here is to provide a means to make the order of
@@ -57,7 +55,7 @@ getw(FILE *stream)
 
 	FLOCKFILE(lk, stream);
 	while (--i >= 0 && !(stream->_flag & (_IOERR | _IOEOF)))
-		*s++ = GETC(stream);
+		*s++ = getc_unlocked(stream);
 	ret = ((stream->_flag & (_IOERR | _IOEOF)) ? EOF : w);
 	FUNLOCKFILE(lk);
 	return (ret);

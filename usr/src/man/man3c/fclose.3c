@@ -44,11 +44,10 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH FCLOSE 3C "Nov 1, 2003"
+.TH FCLOSE 3C "March 25, 2020"
 .SH NAME
 fclose \- close a stream
 .SH SYNOPSIS
-.LP
 .nf
 #include <stdio.h>
 
@@ -56,7 +55,6 @@ fclose \- close a stream
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBfclose()\fR function causes the stream pointed to by \fIstream\fR to be
 flushed and the associated file to be closed. Any unwritten buffered data for
 the stream is written to the file; any unread buffered data is discarded. The
@@ -78,11 +76,9 @@ behavior.
 The \fBfclose()\fR function is performed automatically for all open files upon
 calling \fBexit\fR(2).
 .SH RETURN VALUES
-.LP
 Upon successful completion, \fBfclose()\fR returns \fB0\fR. Otherwise, it
 returns \fBEOF\fR and sets \fBerrno\fR to indicate the error.
 .SH ERRORS
-.LP
 The \fBfclose()\fR function will fail if:
 .sp
 .ne 2
@@ -133,6 +129,8 @@ The \fBfclose()\fR function was interrupted by a signal.
 The process is a member of a background process group attempting to write to
 its controlling terminal, \fBTOSTOP\fR is set, the process is neither ignoring
 nor blocking \fBSIGTTOU\fR and the process group of the process is orphaned.
+\fIstream\fR was created by \fBopen_wmemstream\fR(3C) and a wide-character or
+byte sequence buffered is invalid in the current locale.
 .RE
 
 .sp
@@ -169,7 +167,6 @@ limits of the device.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -186,7 +183,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.LP
 \fBclose\fR(2), \fBexit\fR(2), \fBgetrlimit\fR(2), \fBulimit\fR(2),
 \fBfcloseall\fR(3C), \fBfopen\fR(3C), \fBstdio\fR(3C),
 \fBattributes\fR(5), \fBstandards\fR(5)

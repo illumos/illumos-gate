@@ -68,11 +68,13 @@ __mbsnrtowcs_std(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
 
 	if (dst == NULL) {
 		for (;;) {
-			if ((nb = pmbrtowc(&wc, s, nms, ps)) == (size_t)-1)
+			if ((nb = pmbrtowc(&wc, s, nms, ps, B_FALSE)) ==
+			    (size_t)-1) {
 				/* Invalid sequence - mbrtowc() sets errno. */
 				return ((size_t)-1);
-			else if (nb == 0 || nb == (size_t)-2)
+			} else if (nb == 0 || nb == (size_t)-2) {
 				return (nchr);
+			}
 			s += nb;
 			nms -= nb;
 			nchr++;
@@ -81,7 +83,7 @@ __mbsnrtowcs_std(wchar_t *_RESTRICT_KYWD dst, const char **_RESTRICT_KYWD src,
 	}
 
 	while (len-- > 0) {
-		if ((nb = pmbrtowc(dst, s, nms, ps)) == (size_t)-1) {
+		if ((nb = pmbrtowc(dst, s, nms, ps, B_FALSE)) == (size_t)-1) {
 			*src = s;
 			return ((size_t)-1);
 		} else if (nb == (size_t)-2) {

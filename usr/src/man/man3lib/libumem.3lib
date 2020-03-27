@@ -3,19 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBUMEM 3LIB "May 22, 2003"
+.TH LIBUMEM 3LIB "February 23, 2020"
 .SH NAME
 libumem \- object-caching memory allocation library
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR... ] \fIfile\fR... \fB-lumem\fR [ \fIlibrary\fR... ]
 #include <\fBumem.h\fR>
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 Functions in this library provide fast, scalable object-caching memory
 allocation with multithreaded application support. In addition to the standard
 \fBmalloc\fR(3C) family of functions and the more flexible
@@ -28,8 +25,6 @@ detection of memory leaks, buffer overruns, multiple frees, use of
 uninitialized data, use of freed data, and many other common programming
 errors. See \fBumem_debug\fR(3MALLOC).
 .SH INTERFACES
-.sp
-.LP
 The shared object \fBlibumem.so.1\fR provides the public interfaces defined
 below. See \fBIntro\fR(3) for additional information on shared object
 interfaces.
@@ -45,11 +40,11 @@ l l .
 \fBumem_cache_alloc\fR	\fBumem_cache_create\fR
 \fBumem_cache_destroy\fR	\fBumem_cache_free\fR
 \fBumem_free\fR	\fBumem_nofail_callback\fR
-\fBumem_zalloc\fR	\fBvalloc\fR
+\fBumem_setmtbf\fR	\fBumem_zalloc\fR
+\fBvalloc\fR
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/libumem.so.1\fR\fR
@@ -68,8 +63,6 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -86,8 +79,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBIntro\fR(3), \fBmalloc\fR(3C), \fBumem_alloc\fR(3MALLOC),
 \fBumem_cache_create\fR(3MALLOC), \fBumem_debug\fR(3MALLOC),
-\fBattributes\fR(5)
+\fBumem_setmtbf\fR(3MALLOC), \fBattributes\fR(5)

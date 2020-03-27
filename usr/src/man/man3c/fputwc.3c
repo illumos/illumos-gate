@@ -43,11 +43,10 @@
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH FPUTWC 3C "Nov 1, 2003"
+.TH FPUTWC 3C "March 25, 2020"
 .SH NAME
 fputwc, putwc, putwchar \- put wide-character code on a stream
 .SH SYNOPSIS
-.LP
 .nf
 #include <stdio.h>
 #include <wchar.h>
@@ -68,8 +67,6 @@ fputwc, putwc, putwchar \- put wide-character code on a stream
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBfputwc()\fR function writes the character corresponding to the
 wide-character code \fIwc\fR to the output stream pointed to by \fIstream\fR,
 at the position indicated by the associated file-position indicator for the
@@ -94,14 +91,10 @@ The call \fBputwchar(\fR\fIwc\fR\fB)\fR is equivalent to
 \fBputwc(\fR\fIwc,\fR\fB stdout)\fR\fI\&.\fR The \fBputwchar()\fR routine is
 implemented as a macro.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBfputwc()\fR, \fBputwc()\fR, and \fBputwchar()\fR
 return \fIwc\fR. Otherwise, they return \fBWEOF\fR, the error indicator for the
 stream is set, and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
-.LP
 The \fBfputwc()\fR, \fBputwc()\fR, and \fBputwchar()\fR functions will fail if
 either the stream is unbuffered or data in the \fIstream\fR's buffer needs to
 be written, and:
@@ -156,7 +149,9 @@ was transferred.
 A physical I/O error has occurred, or the process is a member of a background
 process group attempting to write to its controlling terminal, \fBTOSTOP\fR is
 set, the process is neither ignoring nor blocking \fBSIGTTOU\fR, and the
-process group of the process is orphaned.
+process group of the process is orphaned. \fIstream\fR was created by
+\fBopen_wmemstream\fR(3C) and a wide-character or byte sequence buffered is
+invalid in the current locale.
 .RE
 
 .sp
@@ -211,8 +206,6 @@ The wide-character code \fIwc\fR does not correspond to a valid character.
 .RE
 
 .SH USAGE
-.sp
-.LP
 Functions exist for the \fBputwc()\fR and \fBputwchar()\fR macros. To get the
 function form, the macro name must be undefined (for example, \fB#undef
 putc\fR).
@@ -223,8 +216,6 @@ more than once. In particular, \fBputwc(\fR\fIwc\fR\fB, \fR\fI*f++\fR\fB)\fR
 does not work sensibly.  The \fBfputwc()\fR function should be used instead
 when evaluating the \fIstream\fR argument has side effects.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -241,8 +232,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBexit\fR(2), \fBulimit\fR(2), \fBabort\fR(3C), \fBfclose\fR(3C),
 \fBferror\fR(3C), \fBfflush\fR(3C), \fBfopen\fR(3C), \fBsetbuf\fR(3C),
 \fBattributes\fR(5), \fBstandards\fR(5)
