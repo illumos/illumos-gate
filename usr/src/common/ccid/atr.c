@@ -20,7 +20,6 @@
 
 #include "atr.h"
 #include <sys/debug.h>
-#include <sys/limits.h>
 #include <sys/sysmacros.h>
 
 #ifdef	_KERNEL

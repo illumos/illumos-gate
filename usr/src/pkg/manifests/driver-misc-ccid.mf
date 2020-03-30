@@ -1,0 +1,57 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2019, Joyent Inc.
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+set name=pkg.fmri value=pkg:/driver/misc/ccid@$(PKGVERS)
+set name=pkg.description \
+    value="Driver for USB Chip Card Interface Devices (CCID)"
+set name=pkg.summary value="CCID driver"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Hardware
+set name=variant.arch value=i386
+dir path=kernel group=sys variant.opensolaris.zone=global
+dir path=kernel/drv group=sys variant.opensolaris.zone=global
+dir path=kernel/drv/$(ARCH64) group=sys variant.opensolaris.zone=global
+dir path=usr group=sys
+dir path=usr/include
+dir path=usr/include/sys
+dir path=usr/include/sys/usb
+dir path=usr/include/sys/usb/clients
+dir path=usr/include/sys/usb/clients/ccid
+dir path=usr/lib/cfgadm variant.opensolaris.zone=global
+dir path=usr/lib/cfgadm/$(ARCH64) variant.opensolaris.zone=global
+dir path=usr/sbin variant.opensolaris.zone=global
+dir path=usr/share
+dir path=usr/share/man
+dir path=usr/share/man/man1m variant.opensolaris.zone=global
+dir path=usr/share/man/man7d
+driver name=ccid alias=usbif,classb class=misc perms="* 0600 root sys"
+file path=kernel/drv/$(ARCH64)/ccid group=sys variant.opensolaris.zone=global
+file path=usr/include/sys/usb/clients/ccid/ccid.h
+file path=usr/include/sys/usb/clients/ccid/uccid.h
+file path=usr/lib/cfgadm/$(ARCH64)/ccid.so.1 variant.opensolaris.zone=global
+file path=usr/lib/cfgadm/ccid.so.1 variant.opensolaris.zone=global
+file path=usr/sbin/ccidadm mode=0555 variant.opensolaris.zone=global
+file path=usr/share/man/man1m/ccidadm.1m variant.opensolaris.zone=global
+file path=usr/share/man/man7d/ccid.7d
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/cfgadm/$(ARCH64)/ccid.so target=./ccid.so.1 \
+    variant.opensolaris.zone=global
+link path=usr/lib/cfgadm/ccid.so target=./ccid.so.1 \
+    variant.opensolaris.zone=global

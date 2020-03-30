@@ -56,7 +56,7 @@ extern "C" {
 typedef struct uccid_cmd_txn_begin {
 	uint32_t	uct_version;
 	uint32_t	uct_flags;
-} __packed uccid_cmd_txn_begin_t;
+} uccid_cmd_txn_begin_t;
 
 /*
  * Relinquish exclusive access. Takes a uccid_cmd_txn_end_t. The callers should
@@ -72,7 +72,7 @@ typedef struct uccid_cmd_txn_begin {
 typedef struct uccid_cmd_txn_end {
 	uint32_t	uct_version;
 	uint32_t	uct_flags;
-} __packed uccid_cmd_txn_end_t;
+} uccid_cmd_txn_end_t;
 
 /*
  * Obtain the status of the slot. Returns a filled-in uccid_cmd_status_t.
@@ -109,7 +109,7 @@ typedef struct uccid_cmd_status {
 	ccid_class_descr_t	ucs_class;
 	uccid_prot_t	ucs_prot;
 	ccid_params_t	ucs_params;
-} __packed uccid_cmd_status_t;
+} uccid_cmd_status_t;
 
 /*
  * Modify the state of the ICC, if present.
@@ -123,7 +123,7 @@ typedef struct uccid_cmd_status {
 typedef struct uccid_cmd_icc_modify {
 	uint32_t uci_version;
 	uint32_t uci_action;
-} __packed uccid_cmd_icc_modify_t;
+} uccid_cmd_icc_modify_t;
 
 #ifdef __cplusplus
 }

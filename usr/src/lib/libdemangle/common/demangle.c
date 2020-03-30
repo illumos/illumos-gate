@@ -21,6 +21,7 @@
 #include <pthread.h>
 #include <sys/ctype.h>
 #include <sys/debug.h>
+#include <sys/sysmacros.h>
 #include <stdarg.h>
 #include "demangle-sys.h"
 #include "demangle_int.h"
@@ -31,19 +32,40 @@ static pthread_once_t debug_once = PTHREAD_ONCE_INIT;
 volatile boolean_t demangle_debug;
 FILE *debugf = stderr;
 
+static struct {
+	const char	*str;
+	sysdem_lang_t	lang;
+} lang_tbl[] = {
+	{ "auto", SYSDEM_LANG_AUTO },
+	{ "c++", SYSDEM_LANG_CPP },
+	{ "rust", SYSDEM_LANG_RUST },
+};
+
 static const char *
 langstr(sysdem_lang_t lang)
 {
-	switch (lang) {
-	case SYSDEM_LANG_AUTO:
-		return ("auto");
-	case SYSDEM_LANG_CPP:
-		return ("c++");
-	case SYSDEM_LANG_RUST:
-		return ("rust");
-	default:
-		return ("invalid");
+	size_t i;
+
+	for (i = 0; i < ARRAY_SIZE(lang_tbl); i++) {
+		if (lang == lang_tbl[i].lang)
+			return (lang_tbl[i].str);
 	}
+	return ("invalid");
+}
+
+boolean_t
+sysdem_parse_lang(const char *str, sysdem_lang_t *langp)
+{
+	size_t i;
+
+	for (i = 0; i < ARRAY_SIZE(lang_tbl); i++) {
+		if (strcmp(str, lang_tbl[i].str) == 0) {
+			*langp = lang_tbl[i].lang;
+			return (B_TRUE);
+		}
+	}
+
+	return (B_FALSE);
 }
 
 static sysdem_lang_t

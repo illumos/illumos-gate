@@ -73,6 +73,8 @@
 #define	DIMM_HDRL	"hdrl-enabled"
 #define	DIMM_HDRL_PARITY	"hdrl-parity"
 #define	DIMM_3DRANK	"3d-subranks"
+#define	RANK_STATUS	"dimm-rank-status"
+#define	RANK_SIZE	"dimm-rank-size"
 
 static const topo_pgroup_info_t dimm_channel_pgroup =
 	{ PGNAME(CHAN), TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
@@ -156,7 +158,7 @@ mc_add_ranks(topo_mod_t *mod, tnode_t *dnode, nvlist_t *auth, int dimm,
 		(void) topo_node_fru_set(rnode, NULL, 0, &err);
 
 		if (topo_method_register(mod, rnode, rank_methods) < 0)
-			whinge(mod, &err, "rank_create: "
+			whinge(mod, &err, "mc_add_ranks: "
 			    "topo_method_register failed");
 
 		if (! is_xpv() && topo_method_register(mod, rnode,
@@ -455,6 +457,102 @@ mc_nb_create(topo_mod_t *mod, uint16_t chip_smbid, tnode_t *pnode,
 }
 
 static int
+mc_rank_create_v1(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
+    nvlist_t *dimm_nvl, uint64_t rsize, uint32_t id)
+{
+	nvlist_t *fmri;
+	tnode_t *rank;
+	int err;
+	boolean_t *disabled;
+	uint_t ndisabled;
+	const char *status;
+
+	fmri = topo_mod_hcfmri(mod, pnode, FM_HC_SCHEME_VERSION, RANK, id,
+	    NULL, auth, NULL, NULL, NULL);
+	if (fmri == NULL) {
+		whinge(mod, NULL, "mc_rank_create_v1: topo_mod_hcfmri "
+		    "failed\n");
+		return (-1);
+	}
+
+	if ((rank = topo_node_bind(mod, pnode, RANK, id, fmri)) == NULL) {
+		whinge(mod, NULL, "mc_rank_create_v1: node bind failed for "
+		    "DIMM\n");
+		nvlist_free(fmri);
+		return (-1);
+	}
+
+	if (topo_method_register(mod, rank, rank_methods) < 0) {
+		whinge(mod, NULL, "mc_rank_create_v1: topo_method_register "
+		    "failed for rank_methods: %d", topo_mod_errno(mod));
+	}
+
+	if (!is_xpv() && topo_method_register(mod, rank,
+	    ntv_page_retire_methods) != 0) {
+		whinge(mod, NULL, "mc_rank_create_v1: topo_method_register "
+		    "failed for page retire: %d", topo_mod_errno(mod));
+	}
+
+	if (topo_node_asru_set(rank, fmri, TOPO_ASRU_COMPUTE, &err) != 0) {
+		whinge(mod, NULL, "mc_rank_create_v1: failed to set asru: %d",
+		    err);
+		nvlist_free(fmri);
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	if (topo_node_fru_set(rank, NULL, 0, &err) != 0) {
+		whinge(mod, NULL, "mc_rank_create_v1: fru set failed: "
+		    "%d\n", err);
+		nvlist_free(fmri);
+		return (topo_mod_seterrno(mod, err));
+	}
+	nvlist_free(fmri);
+
+	if (topo_pgroup_create(rank, &rank_pgroup, &err) != 0) {
+		whinge(mod, NULL, "mc_rank_create_v1: failed to create "
+		    "property group: %d\n", err);
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	/*
+	 * The traditional northbridge driver broke down each rank into the
+	 * interleave targets that led to it. At this time, the imc driver (the
+	 * only v1 provider) does not supply that information and therefore we
+	 * cannot set that. Instead we just set basic properties on this, the
+	 * size of the rank and whether or not it is disabled.
+	 */
+	if (rsize != 0 && topo_prop_set_uint64(rank, PGNAME(RANK), RANK_SIZE,
+	    TOPO_PROP_IMMUTABLE, rsize, &err) != 0) {
+		whinge(mod, NULL, "mc_rank_create_v1: failed to set %s "
+		    "property: %d", RANK_SIZE, err);
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	if (nvlist_lookup_boolean_array(dimm_nvl, MCINTEL_NVLIST_V1_DIMM_RDIS,
+	    &disabled, &ndisabled) != 0) {
+		whinge(mod, NULL, "mc_rank_create_v1: Couldn't find disabled "
+		    "ranks array");
+		return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
+	}
+
+	if (id >= ndisabled) {
+		whinge(mod, NULL, "mc_rank_create_v1: Found rank %u with id "
+		    "larger than supported by hardware", id);
+		return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
+	}
+
+	status = disabled[id] ? "disabled" : "enabled";
+	if (topo_prop_set_string(rank, PGNAME(RANK), RANK_STATUS,
+	    TOPO_PROP_IMMUTABLE, status, &err) != 0) {
+		whinge(mod, NULL, "mc_rank_create_v1: failed to set %s "
+		    "property: %d", RANK_STATUS, err);
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	return (0);
+}
+
+static int
 mc_dimm_create_v1(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
     nvlist_t *dimm_nvl, uint_t id)
 {
@@ -462,8 +560,8 @@ mc_dimm_create_v1(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
 	tnode_t *dimm;
 	nvlist_t *fmri;
 	boolean_t present;
-	uint64_t size, density;
-	uint32_t cols, rows, width, ranks, banks;
+	uint64_t size, density, rsize;
+	uint32_t cols, rows, width, ranks, banks, i;
 
 	/*
 	 * First, figure out if this DIMM is present. If not, we don't bother
@@ -510,8 +608,10 @@ mc_dimm_create_v1(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
 	    &size) == 0) {
 		char buf[64];
 		const char *suffix;
+		uint64_t tsize;
 		ret |= topo_prop_set_uint64(dimm, PGNAME(DIMM), DIMM_SIZE,
 		    TOPO_PROP_IMMUTABLE, size, &err);
+		tsize = size;
 
 		/*
 		 * We must manually cons up a dimm-size property which is the
@@ -520,68 +620,115 @@ mc_dimm_create_v1(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
 		 * controller drivers did this in the driver, but we instead opt
 		 * to do so in user land.
 		 */
-		if (size >= (1ULL << 40)) {
-			size /= (1ULL << 40);
+		if (tsize >= (1ULL << 40)) {
+			tsize /= (1ULL << 40);
 			suffix = "T";
-		} else if (size >= (1ULL << 30)) {
-			size /= (1ULL << 30);
+		} else if (tsize >= (1ULL << 30)) {
+			tsize /= (1ULL << 30);
 			suffix = "G";
-		} else if (size >= (1ULL << 20)) {
-			size /= (1ULL << 20);
+		} else if (tsize >= (1ULL << 20)) {
+			tsize /= (1ULL << 20);
 			suffix = "M";
 		} else {
 			suffix = NULL;
 		}
 
 		if (suffix != NULL) {
-			if (snprintf(buf, sizeof (buf), "%"PRIu64"%s", size,
+			if (snprintf(buf, sizeof (buf), "%"PRIu64"%s", tsize,
 			    suffix) >= sizeof (buf)) {
 				whinge(mod, NULL, "failed to construct DIMM "
 				    "size due to buffer overflow");
 				return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
 			}
-			ret |= topo_prop_set_string(dimm, PGNAME(DIMM),
+			ret = topo_prop_set_string(dimm, PGNAME(DIMM),
 			    DIMM_STRING_SIZE, TOPO_PROP_IMMUTABLE, buf, &err);
+			if (ret != 0) {
+				return (topo_mod_seterrno(mod, err));
+			}
 		}
+	} else {
+		size = 0;
 	}
 
 	if (nvlist_lookup_uint32(dimm_nvl, MCINTEL_NVLIST_V1_DIMM_NCOLS,
 	    &cols) == 0) {
-		ret |= topo_prop_set_uint32(dimm, PGNAME(DIMM), DIMM_COL,
+		ret = topo_prop_set_uint32(dimm, PGNAME(DIMM), DIMM_COL,
 		    TOPO_PROP_IMMUTABLE, cols, &err);
+		if (ret != 0) {
+			return (topo_mod_seterrno(mod, err));
+		}
 	}
 
 	if (nvlist_lookup_uint32(dimm_nvl, MCINTEL_NVLIST_V1_DIMM_NROWS,
 	    &rows) == 0) {
-		ret |= topo_prop_set_uint32(dimm, PGNAME(DIMM), DIMM_ROW,
+		ret = topo_prop_set_uint32(dimm, PGNAME(DIMM), DIMM_ROW,
 		    TOPO_PROP_IMMUTABLE, rows, &err);
+		if (ret != 0) {
+			return (topo_mod_seterrno(mod, err));
+		}
 	}
 
 	if (nvlist_lookup_uint64(dimm_nvl, MCINTEL_NVLIST_V1_DIMM_DENSITY,
 	    &density) == 0) {
-		ret |= topo_prop_set_uint64(dimm, PGNAME(DIMM), DIMM_DENSITY,
+		ret = topo_prop_set_uint64(dimm, PGNAME(DIMM), DIMM_DENSITY,
 		    TOPO_PROP_IMMUTABLE, density, &err);
+		if (ret != 0) {
+			return (topo_mod_seterrno(mod, err));
+		}
 	}
 
 	if (nvlist_lookup_uint32(dimm_nvl, MCINTEL_NVLIST_V1_DIMM_WIDTH,
 	    &width) == 0) {
-		ret |= topo_prop_set_uint32(dimm, PGNAME(DIMM), DIMM_WIDTH,
+		ret = topo_prop_set_uint32(dimm, PGNAME(DIMM), DIMM_WIDTH,
 		    TOPO_PROP_IMMUTABLE, width, &err);
+		if (ret != 0) {
+			return (topo_mod_seterrno(mod, err));
+		}
 	}
 
 	if (nvlist_lookup_uint32(dimm_nvl, MCINTEL_NVLIST_V1_DIMM_BANKS,
 	    &banks) == 0) {
-		ret |= topo_prop_set_uint32(dimm, PGNAME(DIMM), DIMM_BANKS,
+		ret = topo_prop_set_uint32(dimm, PGNAME(DIMM), DIMM_BANKS,
 		    TOPO_PROP_IMMUTABLE, banks, &err);
+		if (ret != 0) {
+			return (topo_mod_seterrno(mod, err));
+		}
+	} else {
+		banks = 0;
 	}
 
 	if (nvlist_lookup_uint32(dimm_nvl, MCINTEL_NVLIST_V1_DIMM_RANKS,
 	    &ranks) == 0) {
-		ret |= topo_prop_set_uint32(dimm, PGNAME(DIMM), DIMM_RANKS,
+		ret = topo_prop_set_uint32(dimm, PGNAME(DIMM), DIMM_RANKS,
 		    TOPO_PROP_IMMUTABLE, ranks, &err);
+		if (ret != 0) {
+			return (topo_mod_seterrno(mod, err));
+		}
 	}
 
-	return (ret != 0 ? -1 : 0);
+	if (ret != 0) {
+		return (-1);
+	}
+
+	if (topo_node_range_create(mod, dimm, RANK, 0, ranks - 1) < 0) {
+		whinge(mod, NULL, "mc_dimm_create_v1: rank node range "
+		    "create failed\n");
+		return (-1);
+	}
+
+	rsize = 0;
+	if (size != 0 && banks != 0) {
+		rsize = size / banks;
+	}
+
+	for (i = 0; i < ranks; i++) {
+		if (mc_rank_create_v1(mod, dimm, auth, dimm_nvl, rsize, i) !=
+		    0) {
+			return (-1);
+		}
+	}
+
+	return (0);
 }
 
 static int
@@ -657,12 +804,12 @@ mc_imc_create_v1(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	uint_t nchans, i;
 
 	if (mkrsrc(mod, pnode, name, id, auth, &fmri) != 0) {
-		whinge(mod, NULL, "mc_nb_create_v1: mkrsrc failed\n");
+		whinge(mod, NULL, "mc_imc_create_v1: mkrsrc failed\n");
 		return (-1);
 	}
 
 	if ((mcnode = topo_node_bind(mod, pnode, name, id, fmri)) == NULL) {
-		whinge(mod, NULL, "mc_nb_create_v1: node bind failed"
+		whinge(mod, NULL, "mc_imc_create_v1: node bind failed"
 		    " for memory-controller\n");
 		nvlist_free(fmri);
 		return (-1);
@@ -670,13 +817,13 @@ mc_imc_create_v1(topo_mod_t *mod, tnode_t *pnode, const char *name,
 
 	nvlist_free(fmri);
 	if (topo_node_fru_set(mcnode, NULL, 0, &err) != 0) {
-		whinge(mod, NULL, "mc_nb_create_v1: fru set failed: "
+		whinge(mod, NULL, "mc_imc_create_v1: fru set failed: "
 		    "%d\n", err);
 		return (topo_mod_seterrno(mod, err));
 	}
 
 	if (topo_pgroup_create(mcnode, &mc_pgroup, &err) != 0) {
-		whinge(mod, NULL, "mc_nb_create_v1: failed to create "
+		whinge(mod, NULL, "mc_imc_create_v1: failed to create "
 		    "property group: %d\n", err);
 		return (topo_mod_seterrno(mod, err));
 	}
@@ -689,23 +836,26 @@ mc_imc_create_v1(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	if (nvlist_lookup_boolean_value(mc_nvl, MCINTEL_NVLIST_V1_MC_ECC,
 	    &ecc) == 0) {
 		const char *pval = ecc ? "enabled" : "disabled";
-		ret |= topo_prop_set_string(mcnode, PGNAME(MCT), MC_PROP_ECC,
+		ret = topo_prop_set_string(mcnode, PGNAME(MCT), MC_PROP_ECC,
 		    TOPO_PROP_IMMUTABLE, pval, &err);
+		if (ret != 0) {
+			return (topo_mod_seterrno(mod, err));
+		}
 	}
 
 	if (nvlist_lookup_string(mc_nvl, MCINTEL_NVLIST_V1_MC_POLICY,
 	    &page) == 0) {
-		ret |= topo_prop_set_string(mcnode, PGNAME(MCT), MC_PROP_POLICY,
+		ret = topo_prop_set_string(mcnode, PGNAME(MCT), MC_PROP_POLICY,
 		    TOPO_PROP_IMMUTABLE, page, &err);
+		if (ret != 0) {
+			return (topo_mod_seterrno(mod, err));
+		}
 	}
 
 	if (nvlist_lookup_string(mc_nvl, MCINTEL_NVLIST_V1_MC_CHAN_MODE,
 	    &cmode) != 0) {
 		cmode = NULL;
 	}
-
-	if (ret != 0)
-		return (-1);
 
 	if (nvlist_lookup_nvlist_array(mc_nvl, MCINTEL_NVLIST_V1_MC_CHANNELS,
 	    &channels, &nchans) != 0) {
@@ -746,7 +896,7 @@ mc_nb_create_v1(topo_mod_t *mod, tnode_t *pnode, const char *name,
 
 	if (topo_node_range_create(mod, pnode, name, 0, nmc - 1) < 0) {
 		whinge(mod, NULL,
-		    "mc_nb_create: node range create failed\n");
+		    "mc_nb_create_v1: node range create failed\n");
 		return (-1);
 	}
 

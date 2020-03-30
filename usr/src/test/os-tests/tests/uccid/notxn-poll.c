@@ -14,8 +14,8 @@
  */
 
 /*
- * Verify that trying to poll without a transaction / excl access works but
- * returns no events.
+ * Verify that trying to poll without a transaction / excl access fails
+ * with EACCES.
  */
 
 #include <err.h>
@@ -50,8 +50,8 @@ main(int argc, char *argv[])
 	pfds[0].revents = 0;
 
 	ret = poll(pfds, 1, 0);
-	VERIFY3S(ret, ==, 0);
-	VERIFY3S(pfds[0].revents, ==, 0);
+	VERIFY3S(ret, ==, -1);
+	VERIFY3S(errno, ==, EACCES);
 
 	return (0);
 }

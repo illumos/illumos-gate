@@ -45,13 +45,11 @@ nicenum_scale(uint64_t n, size_t units, char *buf, size_t buflen,
 	uint64_t divisor = 1;
 	int index = 0;
 	int rc = 0;
-	int spclen = 0;
-	char *spc = "";
+	const char *spc = "";
 	char u;
 
 	if (flags & NN_UNIT_SPACE) {
 		spc = " ";
-		spclen = 1;
 	}
 
 	if (units == 0)
@@ -92,7 +90,7 @@ nicenum_scale(uint64_t n, size_t units, char *buf, size_t buflen,
 	u = " KMGTPE"[index];
 
 	if (index == 0) {
-		rc = snprintf(buf, buflen, "%llu", n);
+		rc = snprintf(buf, buflen, "%llu%s", n, spc);
 	} else if (n % divisor == 0) {
 		/*
 		 * If this is an even multiple of the base, always display
@@ -102,7 +100,7 @@ nicenum_scale(uint64_t n, size_t units, char *buf, size_t buflen,
 	} else {
 		/*
 		 * We want to choose a precision that reflects the best choice
-		 * for fitting in 5 characters.  This can get rather tricky
+		 * for fitting in the buffer.  This can get rather tricky
 		 * when we have numbers that are very close to an order of
 		 * magnitude.  For example, when displaying 10239 (which is
 		 * really 9.999K), we want only a single place of precision
@@ -113,7 +111,7 @@ nicenum_scale(uint64_t n, size_t units, char *buf, size_t buflen,
 		int i;
 		for (i = 2; i >= 0; i--) {
 			if ((rc = snprintf(buf, buflen, "%.*f%s%c", i,
-			    (double)n / divisor, spc, u)) <= 5 + spclen)
+			    (double)n / divisor, spc, u)) <= (buflen - 1))
 				break;
 		}
 	}

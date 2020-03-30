@@ -138,7 +138,10 @@
  * Readers provide four different modes for us to be able to transmit data to
  * and from the card. These are:
  *
- * 1. Character Mode 2. TPDU Mode 3. Short APDU Mode 4. Extended APDU Mode
+ *   1. Character Mode
+ *   2. TPDU Mode
+ *   3. Short APDU Mode
+ *   4. Extended APDU Mode
  *
  * Readers either support mode 1, mode 2, mode 3, or mode 3 and 4. All readers
  * that support extended APDUs support short APDUs. At this time, we do not
@@ -916,8 +919,8 @@ ccid_slot_excl_req(ccid_slot_t *slot, ccid_minor_t *cmp, boolean_t nosleep)
 	list_insert_tail(&slot->cs_excl_waiters, cmp);
 	while (slot->cs_excl_minor != NULL ||
 	    (slot->cs_flags & CCID_SLOT_F_NOEXCL_MASK) != 0) {
-		if (cv_wait_sig(&cmp->cm_excl_cv, &slot->cs_ccid->ccid_mutex)
-		    == 0) {
+		if (cv_wait_sig(&cmp->cm_excl_cv, &slot->cs_ccid->ccid_mutex) ==
+		    0) {
 			/*
 			 * Remove ourselves from the list and try to signal the
 			 * next thread.
@@ -1043,13 +1046,14 @@ static uint8_t
 ccid_command_resp_param2(ccid_command_t *cc)
 {
 	const ccid_header_t *cch;
+	uint8_t val;
 
 	VERIFY3P(cc, !=, NULL);
 	VERIFY3P(cc->cc_response, !=, NULL);
 
 	cch = (ccid_header_t *)cc->cc_response->b_rptr;
-
-	return (cch->ch_param2);
+	bcopy(&cch->ch_param2, &val, sizeof (val));
+	return (val);
 }
 
 /*
@@ -1073,7 +1077,7 @@ ccid_command_complete(ccid_command_t *cc)
 		ccid_slot_t *slot;
 
 		slot = &ccid->ccid_slots[cc->cc_slot];
-		ASSERT(slot->cs_icc.icc_complete != NULL);
+		ASSERT3P(slot->cs_icc.icc_complete, !=, NULL);
 		slot->cs_icc.icc_complete(ccid, slot, cc);
 	} else {
 		list_insert_tail(&ccid->ccid_complete_queue, cc);
@@ -1169,8 +1173,6 @@ ccid_reply_bulk_cb(usb_pipe_handle_t ph, usb_bulk_req_t *ubrp)
 		return;
 	}
 
-	slot = &ccid->ccid_slots[cc->cc_slot];
-
 	if (mlen >= sizeof (ccid_header_t)) {
 		bcopy(ubrp->bulk_data->b_rptr, &cch, sizeof (cch));
 		header_valid = B_TRUE;
@@ -1208,6 +1210,8 @@ ccid_reply_bulk_cb(usb_pipe_handle_t ph, usb_bulk_req_t *ubrp)
 		usb_free_bulk_req(ubrp);
 		return;
 	}
+
+	slot = &ccid->ccid_slots[cc->cc_slot];
 
 	/*
 	 * If the sequence or slot number don't match the head of the list or
@@ -1949,14 +1953,18 @@ ccid_hw_error(ccid_t *ccid, ccid_intr_hwerr_t *hwerr)
 	ccid_slot_t *slot;
 
 	/* Make sure the slot number is within range. */
-	if (hwerr->cih_slot >= ccid->ccid_nslots)
+	if (hwerr->cih_slot >= ccid->ccid_nslots) {
+		ccid->ccid_stats.cst_intr_inval++;
 		return;
+	}
 
 	slot = &ccid->ccid_slots[hwerr->cih_slot];
 
 	/* The only error condition defined by the spec is overcurrent. */
-	if (hwerr->cih_code != CCID_INTR_HWERR_OVERCURRENT)
+	if (hwerr->cih_code != CCID_INTR_HWERR_OVERCURRENT) {
+		ccid->ccid_stats.cst_intr_inval++;
 		return;
+	}
 
 	/*
 	 * The worker thread will take care of this situation.
@@ -2263,10 +2271,7 @@ ccid_slot_power_on(ccid_t *ccid, ccid_slot_t *slot, ccid_class_voltage_t volts,
 	VERIFY(MUTEX_HELD(&ccid->ccid_mutex));
 
 	mutex_exit(&ccid->ccid_mutex);
-	if ((ret = ccid_command_power_on(ccid, slot, volts, atr))
-	    != 0) {
-		freemsg(*atr);
-
+	if ((ret = ccid_command_power_on(ccid, slot, volts, atr)) != 0) {
 		/*
 		 * If we got ENXIO, then we know that there is no ICC
 		 * present. This could happen for a number of reasons.
@@ -2370,8 +2375,8 @@ ccid_slot_inserted(ccid_t *ccid, ccid_slot_t *slot)
 	 * the moment we do.
 	 */
 	if ((ccid->ccid_class.ccd_dwFeatures &
-	    (CCID_CLASS_F_AUTO_ICC_ACTIVATE | CCID_CLASS_F_AUTO_ICC_VOLTAGE))
-	    == 0) {
+	    (CCID_CLASS_F_AUTO_ICC_ACTIVATE | CCID_CLASS_F_AUTO_ICC_VOLTAGE)) ==
+	    0) {
 		/* Skip auto-voltage */
 		cvolt++;
 	}
@@ -2380,13 +2385,15 @@ ccid_slot_inserted(ccid_t *ccid, ccid_slot_t *slot)
 		int ret;
 
 		if (volts[cvolt] != CCID_CLASS_VOLT_AUTO &&
-		    (ccid->ccid_class.ccd_bVoltageSupport & volts[cvolt])
-		    == 0) {
+		    (ccid->ccid_class.ccd_bVoltageSupport & volts[cvolt]) ==
+		    0) {
 			continue;
 		}
 
-		if ((ret = ccid_slot_power_on(ccid, slot, volts[cvolt], &atr))
-		    != 0) {
+		ret = ccid_slot_power_on(ccid, slot, volts[cvolt], &atr);
+		if (ret != 0) {
+			freemsg(atr);
+			atr = NULL;
 			continue;
 		}
 
@@ -2531,8 +2538,8 @@ ccid_worker(void *arg)
 				ccid_slot_removed(ccid, slot, B_TRUE);
 			} else {
 				(void) ccid_slot_inserted(ccid, slot);
-				if ((slot->cs_flags & CCID_SLOT_F_ACTIVE)
-				    != 0) {
+				if ((slot->cs_flags & CCID_SLOT_F_ACTIVE) !=
+				    0) {
 					ccid_slot_excl_maybe_signal(slot);
 				}
 			}
@@ -3718,8 +3725,8 @@ ccid_read(dev_t dev, struct uio *uiop, cred_t *credp)
 	 * a lot of the surrounding logic and fits with the current consumer
 	 * model.
 	 */
-	if ((slot->cs_io.ci_flags & (CCID_IO_F_IN_PROGRESS | CCID_IO_F_DONE))
-	    == 0) {
+	if ((slot->cs_io.ci_flags & (CCID_IO_F_IN_PROGRESS | CCID_IO_F_DONE)) ==
+	    0) {
 		mutex_exit(&ccid->ccid_mutex);
 		return (ENODATA);
 	}
@@ -3791,8 +3798,8 @@ ccid_read(dev_t dev, struct uio *uiop, cred_t *credp)
 		if (mlen > uiop->uio_resid) {
 			ret = EOVERFLOW;
 		} else {
-			if ((ret = ccid_read_copyout(uiop, slot->cs_io.ci_data))
-			    == 0) {
+			ret = ccid_read_copyout(uiop, slot->cs_io.ci_data);
+			if (ret == 0) {
 				done = B_TRUE;
 			}
 		}
@@ -3935,7 +3942,7 @@ ccid_ioctl_status(ccid_slot_t *slot, intptr_t arg, int mode)
 	if (ddi_copyin((void *)arg, &ucs, sizeof (ucs), mode & FKIOCTL) != 0)
 		return (EFAULT);
 
-	if (ucs.ucs_version != UCCID_CURRENT_VERSION)
+	if (ucs.ucs_version != UCCID_VERSION_ONE)
 		return (EINVAL);
 
 	ucs.ucs_status = 0;
@@ -3943,6 +3950,11 @@ ccid_ioctl_status(ccid_slot_t *slot, intptr_t arg, int mode)
 	ucs.ucs_slot = slot->cs_slotno;
 
 	mutex_enter(&slot->cs_ccid->ccid_mutex);
+	if ((slot->cs_ccid->ccid_flags & CCID_F_DISCONNECTED) != 0) {
+		mutex_exit(&slot->cs_ccid->ccid_mutex);
+		return (ENODEV);
+	}
+
 	if ((slot->cs_flags & CCID_SLOT_F_PRESENT) != 0)
 		ucs.ucs_status |= UCCID_STATUS_F_CARD_PRESENT;
 	if ((slot->cs_flags & CCID_SLOT_F_ACTIVE) != 0)
@@ -3998,7 +4010,7 @@ ccid_ioctl_txn_begin(ccid_slot_t *slot, ccid_minor_t *cmp, intptr_t arg,
 	if (ddi_copyin((void *)arg, &uct, sizeof (uct), mode & FKIOCTL) != 0)
 		return (EFAULT);
 
-	if (uct.uct_version != UCCID_CURRENT_VERSION)
+	if (uct.uct_version != UCCID_VERSION_ONE)
 		return (EINVAL);
 
 	if ((uct.uct_flags & ~UCCID_TXN_DONT_BLOCK) != 0)
@@ -4006,9 +4018,14 @@ ccid_ioctl_txn_begin(ccid_slot_t *slot, ccid_minor_t *cmp, intptr_t arg,
 	nowait = (uct.uct_flags & UCCID_TXN_DONT_BLOCK) != 0;
 
 	mutex_enter(&slot->cs_ccid->ccid_mutex);
+	if ((slot->cs_ccid->ccid_flags & CCID_F_DISCONNECTED) != 0) {
+		mutex_exit(&slot->cs_ccid->ccid_mutex);
+		return (ENODEV);
+	}
+
 	if ((cmp->cm_flags & CCID_MINOR_F_WRITABLE) == 0) {
 		mutex_exit(&slot->cs_ccid->ccid_mutex);
-		return (EACCES);
+		return (EBADF);
 	}
 
 	ret = ccid_slot_excl_req(slot, cmp, nowait);
@@ -4026,11 +4043,16 @@ ccid_ioctl_txn_end(ccid_slot_t *slot, ccid_minor_t *cmp, intptr_t arg, int mode)
 		return (EFAULT);
 	}
 
-	if (uct.uct_version != UCCID_CURRENT_VERSION) {
+	if (uct.uct_version != UCCID_VERSION_ONE) {
 		return (EINVAL);
 	}
 
 	mutex_enter(&slot->cs_ccid->ccid_mutex);
+	if ((slot->cs_ccid->ccid_flags & CCID_F_DISCONNECTED) != 0) {
+		mutex_exit(&slot->cs_ccid->ccid_mutex);
+		return (ENODEV);
+	}
+
 	if (slot->cs_excl_minor != cmp) {
 		mutex_exit(&slot->cs_ccid->ccid_mutex);
 		return (EINVAL);
@@ -4065,10 +4087,19 @@ ccid_ioctl_fionread(ccid_slot_t *slot, ccid_minor_t *cmp, intptr_t arg,
 	int data;
 
 	mutex_enter(&slot->cs_ccid->ccid_mutex);
-	if ((cmp->cm_flags & (CCID_MINOR_F_WRITABLE | CCID_MINOR_F_HAS_EXCL)) ==
-	    (CCID_MINOR_F_WRITABLE | CCID_MINOR_F_HAS_EXCL)) {
+	if ((slot->cs_ccid->ccid_flags & CCID_F_DISCONNECTED) != 0) {
+		mutex_exit(&slot->cs_ccid->ccid_mutex);
+		return (ENODEV);
+	}
+
+	if ((cmp->cm_flags & CCID_MINOR_F_HAS_EXCL) == 0) {
 		mutex_exit(&slot->cs_ccid->ccid_mutex);
 		return (EACCES);
+	}
+
+	if ((cmp->cm_flags & CCID_MINOR_F_WRITABLE) == 0) {
+		mutex_exit(&slot->cs_ccid->ccid_mutex);
+		return (EBADF);
 	}
 
 	if ((slot->cs_io.ci_flags & CCID_IO_F_DONE) != 0) {
@@ -4090,8 +4121,8 @@ ccid_ioctl_fionread(ccid_slot_t *slot, ccid_minor_t *cmp, intptr_t arg,
 		data = MIN(s, INT_MAX);
 	}
 
-	if (ddi_copyout(&data, (void *)arg, sizeof (data), mode & FKIOCTL)
-	    != 0) {
+	if (ddi_copyout(&data, (void *)arg, sizeof (data), mode & FKIOCTL) !=
+	    0) {
 		mutex_exit(&slot->cs_ccid->ccid_mutex);
 		return (EFAULT);
 	}
@@ -4112,7 +4143,7 @@ ccid_ioctl_icc_modify(ccid_slot_t *slot, ccid_minor_t *cmp, intptr_t arg,
 		return (EFAULT);
 	}
 
-	if (uci.uci_version != UCCID_CURRENT_VERSION) {
+	if (uci.uci_version != UCCID_VERSION_ONE) {
 		return (EINVAL);
 	}
 
@@ -4127,10 +4158,14 @@ ccid_ioctl_icc_modify(ccid_slot_t *slot, ccid_minor_t *cmp, intptr_t arg,
 
 	ccid = slot->cs_ccid;
 	mutex_enter(&ccid->ccid_mutex);
-	if ((cmp->cm_flags & (CCID_MINOR_F_WRITABLE | CCID_MINOR_F_HAS_EXCL)) !=
-	    (CCID_MINOR_F_WRITABLE | CCID_MINOR_F_HAS_EXCL)) {
-		mutex_exit(&ccid->ccid_mutex);
-		return (EACCES);
+	if ((slot->cs_ccid->ccid_flags & CCID_F_DISCONNECTED) != 0) {
+		mutex_exit(&slot->cs_ccid->ccid_mutex);
+		return (ENODEV);
+	}
+
+	if ((cmp->cm_flags & CCID_MINOR_F_WRITABLE) == 0) {
+		mutex_exit(&slot->cs_ccid->ccid_mutex);
+		return (EBADF);
 	}
 
 	switch (uci.uci_action) {
@@ -4167,13 +4202,6 @@ ccid_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	cmp = idx->cmi_data.cmi_user;
 	slot = cmp->cm_slot;
-
-	mutex_enter(&slot->cs_ccid->ccid_mutex);
-	if ((slot->cs_ccid->ccid_flags & CCID_F_DISCONNECTED) != 0) {
-		mutex_exit(&slot->cs_ccid->ccid_mutex);
-		return (ENODEV);
-	}
-	mutex_exit(&slot->cs_ccid->ccid_mutex);
 
 	switch (cmd) {
 	case UCCID_CMD_TXN_BEGIN:
@@ -4218,22 +4246,25 @@ ccid_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
 		return (ENODEV);
 	}
 
-	if ((cmp->cm_flags & CCID_MINOR_F_HAS_EXCL) != 0) {
-		/*
-		 * If the CCID_IO_F_DONE flag is set, then we're always
-		 * readable. However, flags are insufficient to be writeable.
-		 */
-		if ((slot->cs_io.ci_flags & CCID_IO_F_DONE) != 0) {
-			ready |= POLLIN | POLLRDNORM;
-		} else if ((slot->cs_flags & CCID_SLOT_F_ACTIVE) != 0 &&
-		    (slot->cs_io.ci_flags & CCID_IO_F_POLLOUT_FLAGS) == 0 &&
-		    slot->cs_icc.icc_tx != NULL) {
-			ready |= POLLOUT;
-		}
+	if (!(cmp->cm_flags & CCID_MINOR_F_HAS_EXCL) != 0) {
+		mutex_exit(&ccid->ccid_mutex);
+		return (EACCES);
+	}
 
-		if ((slot->cs_flags & CCID_SLOT_F_PRESENT) == 0) {
-			ready |= POLLHUP;
-		}
+	/*
+	 * If the CCID_IO_F_DONE flag is set, then we're always
+	 * readable. However, flags are insufficient to be writeable.
+	 */
+	if ((slot->cs_io.ci_flags & CCID_IO_F_DONE) != 0) {
+		ready |= POLLIN | POLLRDNORM;
+	} else if ((slot->cs_flags & CCID_SLOT_F_ACTIVE) != 0 &&
+	    (slot->cs_io.ci_flags & CCID_IO_F_POLLOUT_FLAGS) == 0 &&
+	    slot->cs_icc.icc_tx != NULL) {
+		ready |= POLLOUT;
+	}
+
+	if ((slot->cs_flags & CCID_SLOT_F_PRESENT) == 0) {
+		ready |= POLLHUP;
 	}
 
 	*reventsp = ready & events;

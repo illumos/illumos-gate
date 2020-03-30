@@ -119,6 +119,7 @@ COMMON_SUBDIRS=		\
 	date		\
 	dc		\
 	dd		\
+	demangle	\
 	deroff		\
 	devfsadm	\
 	syseventd	\

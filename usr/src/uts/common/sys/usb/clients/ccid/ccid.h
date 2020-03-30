@@ -175,23 +175,23 @@ typedef union ccid_params {
 typedef enum ccid_intr_code {
 	CCID_INTR_CODE_SLOT_CHANGE	= 0x50,
 	CCID_INTR_CODE_HW_ERROR		= 0x51
-} __packed ccid_intr_code_t;
+} ccid_intr_code_t;
 
 typedef enum ccid_intr_hwerr_code {
 	CCID_INTR_HWERR_OVERCURRENT	= 0x01
-} __packed ccid_intr_hwerr_code_t;
+} ccid_intr_hwerr_code_t;
 
 typedef struct ccid_intr_slot {
 	uint8_t	cis_type;
 	uint8_t	cis_state[];
-} __packed ccid_intr_slot_t;
+} ccid_intr_slot_t;
 
 typedef struct ccid_intr_hwerr {
 	uint8_t	cih_type;
 	uint8_t	cih_slot;
 	uint8_t	cih_seq;
 	uint8_t	cih_code;
-} __packed ccid_intr_hwerr_t;
+} ccid_intr_hwerr_t;
 
 /*
  * Message request codes. These codes are based on CCID r1.1.0 Table 6.1-1
@@ -214,7 +214,7 @@ typedef enum ccid_request_code {
 	CCID_REQEUST_ABORT		= 0x72,	/* PC_to_RDR_Abort */
 	CCID_REQUEST_DATA_CLOCK		= 0x73	/* PC_to_RDR_SetDataRateAnd */
 						/* ClockFrequency */
-} __packed ccid_request_code_t;
+} ccid_request_code_t;
 
 /*
  * Message request codes. These codes are based on CCID r1.1.0 Table 6.2-1
@@ -228,7 +228,7 @@ typedef enum ccid_response_code {
 	CCID_RESPONSE_ESCAPE		= 0x83,	/* RDR_to_PC_Escape */
 	CCID_RESPONSE_DATA_CLOCK	= 0x84	/* RDR_to_PC_DataRateAnd */
 						/* ClockFrequency */
-} __packed ccid_response_code_t;
+} ccid_response_code_t;
 
 /*
  * This represents the CCID command header that is used for every request and
@@ -265,13 +265,13 @@ typedef enum {
 	CCID_REPLY_ICC_ACTIVE = 0,
 	CCID_REPLY_ICC_INACTIVE,
 	CCID_REPLY_ICC_MISSING
-} __packed ccid_reply_icc_status_t;
+} ccid_reply_icc_status_t;
 
 typedef enum {
 	CCID_REPLY_STATUS_COMPLETE = 0,
 	CCID_REPLY_STATUS_FAILED,
 	CCID_REPLY_STATUS_MORE_TIME
-} __packed ccid_reply_command_status_t;
+} ccid_reply_command_status_t;
 
 /*
  * Errors that are defined based when commands fail. These are based on CCID
@@ -294,7 +294,7 @@ typedef enum ccid_command_err {
 	CCID_ERR_PIN_CANCELLED			= 0xef,
 	CCID_ERR_CMD_SLOT_BUSY			= 0xe0,
 	CCID_ERR_CMD_NOT_SUPPORTED		= 0x00
-} __packed ccid_command_err_t;
+} ccid_command_err_t;
 
 /*
  * Maximum size of an APDU (application data unit) payload. There are both short

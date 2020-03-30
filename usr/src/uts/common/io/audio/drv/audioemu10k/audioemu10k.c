@@ -827,6 +827,11 @@ emu10k_reset_rec(emu10k_portc_t *portc)
 	case 65536:
 		sz = 31;
 		break;
+	default:
+		/*
+		 * Can't really reach here, but this keeps the compiler quiet.
+		 */
+		return;
 	}
 	emu10k_write_reg(devc, ADCBA, 0, portc->buf_paddr);
 	emu10k_write_reg(devc, ADCBS, 0, sz);

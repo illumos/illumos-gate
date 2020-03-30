@@ -376,10 +376,9 @@ cfga_list_ext(const char *ap, struct cfga_list_data **ap_list, int *nlist,
 	}
 
 	/*
-	 * XXX We should probably have a way to indicate that there's an error
-	 * when the ICC is basically foobar'd. We should also allow the status
-	 * ioctl to know that the slot is resetting or something else is going
-	 * on I guess.
+	 * We should probably have a way to indicate that there's an error when
+	 * the ICC is basically foobar'd. We should also allow the status ioctl
+	 * to know that the slot is resetting or something else is going on.
 	 */
 	if ((ucs.ucs_class.ccd_dwFeatures &
 	    (CCID_CLASS_F_SHORT_APDU_XCHG | CCID_CLASS_F_EXT_APDU_XCHG)) == 0) {

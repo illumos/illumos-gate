@@ -316,8 +316,8 @@ usb_process(di_minor_t minor, di_node_t node)
 		return (DEVFSADM_CONTINUE);
 	}
 
-	if (strcmp(di_minor_nodetype(minor), DDI_NT_CCID_ATTACHMENT_POINT)
-	    == 0) {
+	if (strcmp(di_minor_nodetype(minor), DDI_NT_CCID_ATTACHMENT_POINT) ==
+	    0) {
 		ccid_create_link(p_path, minor_nm, node, minor);
 		free(l_path);
 		free(p_path);

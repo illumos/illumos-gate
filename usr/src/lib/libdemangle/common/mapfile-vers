@@ -11,6 +11,7 @@
 
 #
 # Copyright 2017 Jason King
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -30,6 +31,7 @@ $mapfile_version 2
 
 SYMBOL_VERSION ILLUMOSprivate {
     global:
+	sysdem_parse_lang;
 	sysdemangle;
     local:
         *;

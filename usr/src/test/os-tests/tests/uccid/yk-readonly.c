@@ -54,31 +54,47 @@ main(int argc, char *argv[])
 	bzero(&begin, sizeof (begin));
 	begin.uct_version = UCCID_CURRENT_VERSION;
 	if (ioctl(fd, UCCID_CMD_TXN_BEGIN, &begin) == 0) {
-		err(EXIT_FAILURE, "didn't fail to issue begin ioctl");
+		errx(EXIT_FAILURE, "didn't fail to issue begin ioctl");
 	}
 
 	if ((ret = write(fd, yk_req, sizeof (yk_req))) != -1) {
-		err(EXIT_FAILURE, "didn't fail to write data");
+		errx(EXIT_FAILURE, "didn't fail to write data");
+	}
+
+	if (errno != EBADF) {
+		err(EXIT_FAILURE, "wrong errno for failed write, "
+		    "expected EBADF");
 	}
 
 	if ((ret = read(fd, buf, sizeof (buf))) != -1) {
-		err(EXIT_FAILURE, "didn't fail to read data");
+		errx(EXIT_FAILURE, "didn't fail to read data");
 	}
 
+	if (errno != EACCES) {
+		err(EXIT_FAILURE, "wrong errno for failed read, "
+		    "expected EACCES");
+	}
+
+	/* get card status */
 	bzero(&ucs, sizeof (ucs));
 	ucs.ucs_version = UCCID_CURRENT_VERSION;
 	if ((ret = ioctl(fd, UCCID_CMD_STATUS, &ucs)) != 0) {
 		err(EXIT_FAILURE, "failed to get status");
 	}
 
-	/* try power off the card outside of a transaction */
+
+	/* try to power off the card while opened read-only */
 	bzero(&uci, sizeof (uci));
 	uci.uci_version = UCCID_CURRENT_VERSION;
 	uci.uci_action = UCCID_ICC_POWER_OFF;
 	if ((ret = ioctl(fd, UCCID_CMD_ICC_MODIFY, &uci)) == 0) {
-		err(EXIT_FAILURE, "didn't fail to power off ICC");
+		errx(EXIT_FAILURE, "didn't fail to power off ICC");
 	}
 
+	if (errno != EBADF) {
+		err(EXIT_FAILURE, "wrong errno for failed write, "
+		    "expected EBADF");
+	}
 
 	return (0);
 }

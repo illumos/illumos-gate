@@ -53,14 +53,36 @@ main(int argc, char *argv[])
 		err(EXIT_FAILURE, "failed to open %s", argv[1]);
 	}
 
-	/* try power off the card outside of a transaction */
+	/* power off the card outside of a transaction */
 	bzero(&uci, sizeof (uci));
 	uci.uci_version = UCCID_CURRENT_VERSION;
 	uci.uci_action = UCCID_ICC_POWER_OFF;
 	ret = ioctl(fd, UCCID_CMD_ICC_MODIFY, &uci);
-	VERIFY3S(ret, ==, -1);
-	VERIFY3S(errno, ==, EACCES);
+	VERIFY3S(ret, ==, 0);
 
+	/* make sure the card is inactive now */
+	bzero(&ucs, sizeof (ucs));
+	ucs.ucs_version = UCCID_CURRENT_VERSION;
+	ret = ioctl(fd, UCCID_CMD_STATUS, &ucs);
+	VERIFY3S(ret, ==, 0);
+	VERIFY3U(ucs.ucs_status & UCCID_STATUS_F_CARD_ACTIVE, ==, 0);
+
+	/* power on the card outside of a transaction */
+	bzero(&uci, sizeof (uci));
+	uci.uci_version = UCCID_CURRENT_VERSION;
+	uci.uci_action = UCCID_ICC_POWER_ON;
+	ret = ioctl(fd, UCCID_CMD_ICC_MODIFY, &uci);
+	VERIFY3S(ret, ==, 0);
+
+	/* make sure the card is active again */
+	bzero(&ucs, sizeof (ucs));
+	ucs.ucs_version = UCCID_CURRENT_VERSION;
+	ret = ioctl(fd, UCCID_CMD_STATUS, &ucs);
+	VERIFY3S(ret, ==, 0);
+	VERIFY3U(ucs.ucs_status & UCCID_STATUS_F_CARD_ACTIVE, !=, 0);
+
+
+	/* enter transaction */
 	bzero(&begin, sizeof (begin));
 	begin.uct_version = UCCID_CURRENT_VERSION;
 	if (ioctl(fd, UCCID_CMD_TXN_BEGIN, &begin) != 0) {

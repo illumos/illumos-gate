@@ -110,7 +110,7 @@ When a program is finished, it must explicitly end the transaction,
 which may have the side effect of resetting the ICC.
 If a program with an open transaction crashes or closes the file
 descriptor without taking other actions, then the transaction will be
-automatically closed.
+automatically closed and the ICC will be reset.
 Without a transaction open, it will still be possible to issue ioctls
 that obtain the status of the slot and the reader.
 .Pp
@@ -158,13 +158,6 @@ The card has been removed from the slot.
 .It Dv POLLERR
 An hardware error has occurred, or the CCID reader has been disconnected.
 .El
-.Pp
-If
-.Xr poll 2
-is called while no transaction is active, none of these events will ever occur
-and
-.Xr poll 2
-may block indefinitely if no timeout is given.
 .Pp
 One important note is that readers with multiple slots often still only
 allow I/O a single command to be outstanding across all of the slots in
@@ -214,7 +207,7 @@ status information.
 .Pp
 To perform general I/O to the card, a program must be in the context of
 a transaction as discussed in the
-.Sx I/O model
+.Sx I/O Model
 section.
 To open a transaction, a program must issue the
 .Dv UCCID_CMD_TXN_BEGIN
@@ -288,7 +281,7 @@ the fields of which have the following meanings:
 .Bl -tag -width Fa
 .It Fa uint32_t ucs_version
 Indicates the current version of the structure.
-Should be set to
+This should be set to
 .Dv UCCID_CURRENT_VERSION .
 .It Fa uint32_t ucs_status
 This value is ignored when issuing the command.
@@ -342,7 +335,7 @@ for the TPDU T=1 protocol.
 .It Fa ccid_params_t ucs_params
 The CCID parameters available on the card.
 .El
-.Ss UCCID_CMD_TXN_BEGIN
+.Ss Ic UCCID_CMD_TXN_BEGIN
 This command is used to begin a transaction.
 The command will block until exclusive access is available to the
 caller.
@@ -356,7 +349,7 @@ with the following members:
 .Bl -tag -width Fa
 .It Fa uint32_t ucs_version
 Indicates the current version of the structure.
-Should be set to
+This should be set to
 .Dv UCCID_CURRENT_VERSION .
 .It Fa uint32_t uct_flags
 Flags that impact the behavior of the command.
@@ -370,7 +363,7 @@ immediately.
 .Pp
 If an unknown flag is specified, an error will be returned.
 .El
-.Ss UCCID_CMD_TXN_END
+.Ss Ic UCCID_CMD_TXN_END
 The
 .Dv UCCID_CMD_TXN_END
 command is used to end a transaction and relinquish exclusive access
@@ -382,7 +375,7 @@ with the following members:
 .Bl -tag -width Fa
 .It Fa uint32_t uct_version
 Indicates the current version of the structure.
-Should be set to
+This should be set to
 .Dv UCCID_CURRENT_VERSION .
 .It Fa uint32_t uct_flags
 .Bl -tag -width Dv
@@ -399,7 +392,7 @@ time.
 If the device is closed without ending a transaction first, then the ICC
 will be reset.
 .El
-.Ss UCCID_CMD_ICC_MODIFY
+.Ss Ic UCCID_CMD_ICC_MODIFY
 This command can be used to change the state of an ICC, if present.
 .Pp
 The command uses the structure
@@ -408,7 +401,7 @@ with the following members:
 .Bl -tag -width Fa
 .It Fa uint32_t uci_version
 Indicates the current version of the structure.
-Should be set to
+This should be set to
 .Dv UCCID_CURRENT_VERSION .
 .It Fa uint32_t uci_action
 The action to be taken on the ICC.
@@ -422,7 +415,7 @@ Power off the ICC.
 Perform a warm reset of the ICC.
 .El
 .El
-.Ss FIONREAD
+.Ss Ic FIONREAD
 This command returns the size in bytes of a command response available
 for reading with
 .Xr read 2 .
@@ -432,11 +425,116 @@ pointed to by the argument.
 .Sh SYSTEM CALLS
 This section lists the different system calls that may be issued to a
 CCID device.
-.Ss open
-.Ss close
-.Ss write
-.Ss read
-.Ss poll
+.Ss Xr open 2
+.Nm
+slot device nodes can be opened using
+.Xr open 2 .
+Non-blocking operation can be selected by using the
+.Dv O_NONBLOCK
+flag when opening the device node.
+A device node opened for read-only operations will not allow creating
+transactions or doing I/O, but it will allow the ICC/reader status to
+be queried.
+.Ss Xr close 2
+When no longer needed by a program, a device node can be closed with
+.Xr close 2 .
+If a transaction is still active when a device node is closed, the transaction
+will be ended automatically and the ICC will be reset.
+Any unread data is discarded.
+.Ss Xr ioctl 2
+The
+.Xr ioctl 2
+system call can be used to start or end a transaction, query the reply size for
+.Xr read 2 ,
+query the ICC and CCID reader status, or change the state of an ICC in a reader.
+See section
+.Sx IOCTLS
+for details.
+.Ss Xr write 2
+Within an active transaction the
+.Xr write 2
+system call can be used to transfer an APDU (application protocol data unit) to
+an ICC, one single complete APDU at a time.
+Partial writes or writing more than one APDU at a time are not supported.
+The data returned by the ICC must be consumed by a subsequent
+.Xr read 2
+call before
+.Xr write 2
+can be called again within the same transaction.
+.Pp
+The following errors for
+.Xr write 2
+have specific meaning in
+.Nm :
+.Bl -tag -width Dv
+.It Dv E2BIG
+The number of bytes to write is larger than the maximum APDU length supported by
+.Nm ,
+currently defined as 261 bytes.
+.It Dv EACCES
+The device is opened read-only, or no transaction is active.
+.It Dv EBUSY
+There is unread data from a previous call to
+.Xr write 2 .
+.It Dv ENOTSUP
+The reader and/or ICC is unsupported for I/O.
+.It Dv ENXIO
+The ICC is inactive and can't be used for I/O.
+.It Dv ENODEV
+The CCID reader has been disconnected.
+.El
+.Ss Xr read 2
+Within an active transaction the
+.Xr read 2
+system call is used to read the reply from an ICC following sending an APDU with
+.Xr write 2 .
+The whole reply needs to be read with a single call to
+.Xr read 2 .
+The size of the reply can be queried before reading by issuing the
+.Dv FIONREAD
+ioctl.
+See section
+.Sx IOCTLS
+for details.
+.Pp
+The following errors for
+.Xr read 2
+have specific meaning in
+.Nm :
+.Bl -tag -width Dv
+.It Dv EACCES
+No transaction is active.
+.It Dv EBUSY
+Another thread is already blocked in
+.Xr read 2
+waiting for data.
+.It Dv EOVERFLOW
+The buffer size is too small to fit the reply.
+.It Dv ENODATA
+No
+.Xr write 2
+was issued before and consequently there is no reply to be read.
+.It Dv ENODEV
+The CCID reader has been disconnected.
+.El
+.Ss Xr poll 2
+Within an active transaction the
+.Xr poll 2
+system call is used to wait for status changes on a device node.
+See section
+.Sx I/O model
+for details.
+.Pp
+The following errors for
+.Xr poll 2
+have specific meaning in
+.Nm :
+.Bl -tag -width Dv
+.It Dv EACCES
+No transaction is active.
+.It Dv ENODEV
+The CCID reader has been disconnected.
+.El
 .Sh SEE ALSO
 .Xr ccidadm 1M ,
 .Xr cfgadm 1M ,

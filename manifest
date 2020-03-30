@@ -2534,6 +2534,7 @@ f usr/bin/date 0555 root bin
 f usr/bin/dc 0555 root bin
 f usr/bin/dd 0555 root bin
 h usr/bin/decrypt=usr/lib/isaexec
+f usr/bin/demangle 0555 root bin
 f usr/bin/deroff 0555 root bin
 f usr/bin/devattr 0555 root bin
 f usr/bin/devfree 0555 root bin
@@ -4788,6 +4789,9 @@ d usr/include/sys/usb 0755 root bin
 d usr/include/sys/usb/clients 0755 root bin
 d usr/include/sys/usb/clients/audio 0755 root bin
 f usr/include/sys/usb/clients/audio/usb_audio.h 0644 root bin
+d usr/include/sys/usb/clients/ccid 0755 root bin
+f usr/include/sys/usb/clients/ccid/ccid.h 0644 root bin
+f usr/include/sys/usb/clients/ccid/uccid.h 0644 root bin
 d usr/include/sys/usb/clients/hid 0755 root bin
 f usr/include/sys/usb/clients/hid/hid.h 0644 root bin
 d usr/include/sys/usb/clients/mass_storage 0755 root bin
@@ -4932,6 +4936,8 @@ f usr/include/wchar.h 0644 root bin
 f usr/include/wchar_impl.h 0644 root bin
 f usr/include/wctype.h 0644 root bin
 f usr/include/widec.h 0644 root bin
+f usr/include/winscard.h 0644 root bin
+f usr/include/wintypes.h 0644 root bin
 f usr/include/wordexp.h 0644 root bin
 f usr/include/xlocale.h 0644 root bin
 f usr/include/xti.h 0644 root bin
@@ -5292,6 +5298,7 @@ f usr/lib/amd64/libpanel.so.1 0755 root bin
 s usr/lib/amd64/libpanel.so=libpanel.so.1
 f usr/lib/amd64/libpcidb.so.1 0755 root bin
 f usr/lib/amd64/libpcsc.so.1 0755 root bin
+s usr/lib/amd64/libpcsc.so=libpcsc.so.1
 f usr/lib/amd64/libpctx.so.1 0755 root bin
 s usr/lib/amd64/libpctx.so=libpctx.so.1
 f usr/lib/amd64/libpicl.so.1 0755 root bin
@@ -6808,6 +6815,7 @@ f usr/lib/libpanel.so.1 0755 root bin
 s usr/lib/libpanel.so=libpanel.so.1
 f usr/lib/libpcidb.so.1 0755 root bin
 f usr/lib/libpcsc.so.1 0755 root bin
+s usr/lib/libpcsc.so=libpcsc.so.1
 f usr/lib/libpctx.so.1 0755 root bin
 s usr/lib/libpctx.so=libpctx.so.1
 f usr/lib/libpicl.so.1 0755 root bin
@@ -11949,6 +11957,7 @@ f usr/share/man/man1/date.1 0444 root bin
 f usr/share/man/man1/dc.1 0444 root bin
 f usr/share/man/man1/deallocate.1 0444 root bin
 s usr/share/man/man1/decrypt.1=encrypt.1
+f usr/share/man/man1/demangle.1 0444 root bin
 f usr/share/man/man1/deroff.1 0444 root bin
 f usr/share/man/man1/dhcpinfo.1 0444 root bin
 f usr/share/man/man1/diff.1 0444 root bin

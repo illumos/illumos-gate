@@ -220,7 +220,7 @@ static boolean_t
 ccidadm_list_slot_usable_str(uccid_cmd_status_t *ucs, char *buf,
     uint_t buflen)
 {
-	char *un = "";
+	const char *un = "";
 	ccid_class_features_t feat;
 	uint_t prot = CCID_CLASS_F_SHORT_APDU_XCHG | CCID_CLASS_F_EXT_APDU_XCHG;
 	uint_t param = CCID_CLASS_F_AUTO_PARAM_NEG | CCID_CLASS_F_AUTO_PPS;

@@ -1,0 +1,119 @@
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" Copyright 2020 Joyent, Inc.
+.\"
+.Dd March  3, 2020
+.Dt DEMANGLE 1
+.Os
+.Sh NAME
+.Nm demangle
+.Nd demangle symbols
+.Sh SYNOPSIS
+.Nm
+.Oo
+.Fl l
+.Ar lang
+.Oc
+.Op Ar symbol Ns ...
+.Sh DESCRIPTION
+The
+.Nm
+utility attempts to detect mangled symbols and transform them back into a
+more human friendly version of the symbol.
+.Pp
+Some languages allow the same identifier to refer to multiple things
+(functions, variables, etc\&.) where some additional context such as
+parameter types, return types, etc\&. are used to disambiguate between the
+symbols sharing the same name.
+When compiling such languages into an executable form, most binary formats
+do not allow for duplicate symbol names or provide a way to disambiguate
+between duplicate names.
+.Pp
+To solve this problem, many languages will use the additional context from
+the source code to transform the symbol name into a unique name.
+This process is called name mangling.
+While the resulting name is predictable, the mangled names are often difficult
+for humans to interpret.
+.Pp
+The
+.Nm
+utility can be invoked in one of two ways.
+In the first method,
+.Ar symbol
+is demangled and the result is written to standard out, one line per input
+.Ar symbol .
+If any input
+.Ar symbol
+cannot be demangled, the original value of
+.Ar symbol
+is output unchanged.
+In the second method,
+.Nm
+reads standard in, and whenever it encounters a potential symbol, it will
+attempt to replace the symbol in stdandard out with the demangled version.
+If the symbol cannot be demangled, it is output unchanged.
+.Pp
+For either method, if an error other than attempting to demangle an non-mangled
+symbol (e.g. out of memory), that error will be written to standard error.
+.Sh OPTIONS
+.Bl -tag -width Fl
+.It Fl l Ar lang
+Treat all potential symbols as symbols from
+.Ar lang .
+By default,
+.Nm
+will attempt to detect the language and demangle symbols for all supported
+languages.
+Current supported values of
+.Ar lang
+are:
+.Bl -tag -width rust -offset indent
+.It c++
+The C++ mangling format defined by the Itanium ABI.
+While the mangling format was originally defined for the Itanium processor, g++
+and clang use this format for all their supported platforms (including x86 and
+SPARC).
+.It rust
+The legacy rust mangling format.
+.It auto
+Attempt to detect the language automatically (default).
+.El
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh EXAMPLES
+.Sy Example 1
+Demangle symbols given as command line arguments.
+.Bd -literal
+% demangle '_ZGVN9__gnu_cxx16bitmap_allocatorIwE13_S_mem_blocksE'
+guard variable for __gnu_cxx::bitmap_allocator<wchar_t>::_S_mem_blocks
+%
+.Ed
+.Pp
+.Sy Example 2
+Demangle symbols from the output of another command.
+.Bd -literal
+% grep slice rust.c | head -1
+    T("__ZN4core5slice89_$LT$impl$u20$core..iter..traits..IntoIterator$u20$for$u20$$RF$$u27$a$u20$$u5b$T$u5d$$GT$9into_iter17h450e234d27262170E",
+% grep slice rust.c | head -1 | demangle
+    T("core::slice::<impl core::iter::traits::IntoIterator for &'a [T]>::into_iter::h450e234d27262170",
+%
+.Ed
+.Sh INTERFACE STABILITY
+The command line options are
+.Sy Uncommitted .
+The output format is
+.Sy Not-an-Interface .
