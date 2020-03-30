@@ -5571,7 +5571,6 @@ f usr/lib/brand/shared/query 0755 root bin
 f usr/lib/brand/shared/uninstall.ksh 0444 root bin
 f usr/lib/bridged 0555 root bin
 d usr/lib/ccid 0755 root bin
-f usr/lib/ccid/ccidadm 0555 root bin
 d usr/lib/cfgadm 0755 root bin
 d usr/lib/cfgadm/amd64 0755 root bin
 f usr/lib/cfgadm/amd64/ccid.so.1 0755 root bin
@@ -10756,6 +10755,7 @@ s usr/sbin/automount=../lib/fs/autofs/automount
 s usr/sbin/autopush=../../sbin/autopush
 f usr/sbin/bhyve 0555 root sys
 f usr/sbin/bhyvectl 0555 root sys
+f usr/sbin/ccid/ccidadm 0555 root bin
 f usr/sbin/cfgadm 0555 root bin
 f usr/sbin/check-hostname 0555 root mail
 f usr/sbin/check-permissions 0555 root mail
