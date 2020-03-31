@@ -470,6 +470,8 @@ typedef struct lxpr_rlimtab {
 	char	*rlim_rctl;	/* rctl source */
 } lxpr_rlimtab_t;
 
+#define RLIM_MAXFD	"Max open files"
+
 static lxpr_rlimtab_t lxpr_rlimtab[] = {
 	{ "Max cpu time",	"seconds",	"process.max-cpu-time" },
 	{ "Max file size",	"bytes",	"process.max-file-size" },
@@ -478,7 +480,7 @@ static lxpr_rlimtab_t lxpr_rlimtab[] = {
 	{ "Max core file size",	"bytes",	"process.max-core-size" },
 	{ "Max resident set",	"bytes",	"zone.max-physical-memory" },
 	{ "Max processes",	"processes",	"zone.max-lwps" },
-	{ "Max open files",	"files",	"process.max-file-descriptor" },
+	{ RLIM_MAXFD,		"files",	"process.max-file-descriptor" },
 	{ "Max locked memory",	"bytes",	"zone.max-locked-memory" },
 	{ "Max address space",	"bytes",	"process.max-address-space" },
 	{ "Max file locks",	"locks",	NULL },
@@ -1730,6 +1732,14 @@ lxpr_read_pid_limits(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 				break;
 			}
 		}
+		/*
+		 * If "Max open files" is still set to RLIM_INFINITY, make it
+		 * match the max value so that we do not output "unlimited".
+		 */
+		if (strcmp(lxpr_rlimtab[i].rlim_name, RLIM_MAXFD) == 0 &&
+		    cur[i] == RLIM_INFINITY)
+		    cur[i] = max[i];
+
 	}
 	lxpr_unlock(p);
 
