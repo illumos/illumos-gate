@@ -25,6 +25,7 @@
 #include <sys/sysmacros.h>
 #include <sys/atomic.h>
 #include <sys/cpuvar.h>
+#include <sys/sdt.h>
 
 #include <sys/pattr.h>
 #include <sys/dlpi.h>
@@ -1567,8 +1568,8 @@ mlxcx_sq_add_buffer(mlxcx_t *mlxp, mlxcx_work_queue_t *mlwq,
 		    inlinelen);
 	}
 
-	ent0->mlsqe_control.mlcs_ds =
-	    offsetof(mlxcx_sendq_ent_t, mlsqe_data) / 16;
+	ent0->mlsqe_control.mlcs_ds = offsetof(mlxcx_sendq_ent_t, mlsqe_data) /
+	    MLXCX_WQE_OCTOWORD;
 
 	if (chkflags & HCK_IPV4_HDRCKSUM) {
 		ASSERT(mlxp->mlx_caps->mlc_checksum);
@@ -1653,7 +1654,20 @@ mlxcx_sq_add_buffer(mlxcx_t *mlxp, mlxcx_work_queue_t *mlwq,
 	/*
 	 * Make sure the workqueue entry is flushed out before updating
 	 * the doorbell.
+	 * If the ring has wrapped, we need to flush the front and back.
 	 */
+	if ((first + ents) > mlwq->mlwq_nents) {
+		uint_t sync_cnt = mlwq->mlwq_nents - first;
+
+		VERIFY0(ddi_dma_sync(mlwq->mlwq_dma.mxdb_dma_handle,
+		    (uintptr_t)ent0 - (uintptr_t)mlwq->mlwq_send_ent,
+		    sync_cnt * sizeof (mlxcx_sendq_ent_t),
+		    DDI_DMA_SYNC_FORDEV));
+
+		ent0 = &mlwq->mlwq_send_ent[0];
+		ents -= sync_cnt;
+	}
+
 	VERIFY0(ddi_dma_sync(mlwq->mlwq_dma.mxdb_dma_handle,
 	    (uintptr_t)ent0 - (uintptr_t)mlwq->mlwq_send_ent,
 	    ents * sizeof (mlxcx_sendq_ent_t), DDI_DMA_SYNC_FORDEV));
@@ -2205,58 +2219,64 @@ copyb:
 	return (b);
 }
 
-mlxcx_buffer_t *
+static mlxcx_buffer_t *
+mlxcx_bind_or_copy_mblk(mlxcx_t *mlxp, mlxcx_work_queue_t *wq,
+    mblk_t *mp, size_t off)
+{
+	mlxcx_buffer_t *b;
+	uint8_t *rptr;
+	size_t sz;
+	boolean_t ret;
+
+	rptr = mp->b_rptr;
+	sz = MBLKL(mp);
+
+#ifdef DEBUG
+	if (off > 0) {
+		ASSERT3U(off, <, sz);
+	}
+#endif
+
+	rptr += off;
+	sz -= off;
+
+	if (sz < mlxp->mlx_props.mldp_tx_bind_threshold) {
+		b = mlxcx_copy_data(mlxp, wq, rptr, sz);
+	} else {
+		b = mlxcx_buf_take_foreign(mlxp, wq);
+		if (b == NULL)
+			return (NULL);
+
+		ret = mlxcx_dma_bind_mblk(mlxp, &b->mlb_dma, mp, off,
+		    B_FALSE);
+
+		if (!ret) {
+			mlxcx_buf_return(mlxp, b);
+
+			b = mlxcx_copy_data(mlxp, wq, rptr, sz);
+		}
+	}
+
+	return (b);
+}
+
+uint_t
 mlxcx_buf_bind_or_copy(mlxcx_t *mlxp, mlxcx_work_queue_t *wq,
-    mblk_t *mpb, size_t off)
+    mblk_t *mpb, size_t off, mlxcx_buffer_t **bp)
 {
 	mlxcx_buffer_t *b, *b0 = NULL;
 	boolean_t first = B_TRUE;
 	mblk_t *mp;
-	uint8_t *rptr;
-	size_t sz;
+	size_t offset = off;
 	size_t ncookies = 0;
-	boolean_t ret;
+	uint_t count = 0;
 
-	for (mp = mpb; mp != NULL; mp = mp->b_cont) {
-		rptr = mp->b_rptr;
-		sz = MBLKL(mp);
+	for (mp = mpb; mp != NULL && ncookies <= MLXCX_SQE_MAX_PTRS;
+	    mp = mp->b_cont) {
+		b = mlxcx_bind_or_copy_mblk(mlxp, wq, mp, offset);
+		if (b == NULL)
+			goto failed;
 
-		if (off > 0)
-			ASSERT3U(off, <, sz);
-		rptr += off;
-		sz -= off;
-
-		if (sz < mlxp->mlx_props.mldp_tx_bind_threshold) {
-			b = mlxcx_copy_data(mlxp, wq, rptr, sz);
-			if (b == NULL)
-				goto failed;
-		} else {
-			b = mlxcx_buf_take_foreign(mlxp, wq);
-			if (b == NULL)
-				goto failed;
-
-			ret = mlxcx_dma_bind_mblk(mlxp, &b->mlb_dma, mp, off,
-			    B_FALSE);
-
-			if (!ret) {
-				mlxcx_buf_return(mlxp, b);
-
-				b = mlxcx_copy_data(mlxp, wq, rptr, sz);
-				if (b == NULL)
-					goto failed;
-			}
-		}
-
-		/*
-		 * We might overestimate here when we've copied data, since
-		 * the buffer might be longer than what we copied into it. This
-		 * is safe since it's always wrong in the conservative
-		 * direction (and we will blow up later when we actually
-		 * generate the WQE anyway).
-		 *
-		 * If the assert below ever blows, we'll have to come and fix
-		 * this up so we can transmit these packets.
-		 */
 		ncookies += b->mlb_dma.mxdb_ncookies;
 
 		if (first)
@@ -2267,23 +2287,55 @@ mlxcx_buf_bind_or_copy(mlxcx_t *mlxp, mlxcx_work_queue_t *wq,
 
 		b->mlb_tx_mp = mp;
 		b->mlb_tx_head = b0;
-		b->mlb_used = sz;
+		b->mlb_used = MBLKL(mp) - offset;
 
 		if (!first)
 			list_insert_tail(&b0->mlb_tx_chain, b);
 		first = B_FALSE;
-		off = 0;
+		offset = 0;
+
+		count++;
 	}
 
-	ASSERT3U(ncookies, <=, MLXCX_SQE_MAX_PTRS);
+	/*
+	 * The chain of mblks has resulted in too many cookies for
+	 * a single message. This is unusual, so take the hit to tidy
+	 * up, do a pullup to a single mblk and allocate the requisite
+	 * buf.
+	 */
+	if (ncookies > MLXCX_SQE_MAX_PTRS) {
+		DTRACE_PROBE4(pullup, mlxcx_t *, mlxp, mlxcx_work_queue_t *, wq,
+		    mblk_t *, mpb, size_t, ncookies);
 
-	return (b0);
+		if (b0 != NULL)
+			mlxcx_buf_return_chain(mlxp, b0, B_TRUE);
+
+		if ((mp = msgpullup(mpb, -1)) == NULL)
+			return (0);
+
+		b0 = mlxcx_bind_or_copy_mblk(mlxp, wq, mp, off);
+		if (b0 == NULL) {
+			freemsg(mp);
+			return (0);
+		}
+		freemsg(mpb);
+
+		b0->mlb_tx_mp = mp;
+		b0->mlb_tx_head = b0;
+		b0->mlb_used = MBLKL(mp) - off;
+
+		count = 1;
+	}
+
+	*bp = b0;
+
+	return (count);
 
 failed:
 	if (b0 != NULL)
 		mlxcx_buf_return_chain(mlxp, b0, B_TRUE);
 
-	return (NULL);
+	return (0);
 }
 
 mlxcx_buffer_t *

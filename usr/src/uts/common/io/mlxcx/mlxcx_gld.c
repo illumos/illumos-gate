@@ -395,6 +395,7 @@ mlxcx_mac_ring_tx(void *arg, mblk_t *mp)
 	uint32_t chkflags = 0;
 	boolean_t ok;
 	size_t take = 0;
+	uint_t bcount;
 
 	VERIFY(mp->b_next == NULL);
 
@@ -430,8 +431,8 @@ mlxcx_mac_ring_tx(void *arg, mblk_t *mp)
 		}
 	}
 
-	b = mlxcx_buf_bind_or_copy(mlxp, sq, kmp, take);
-	if (b == NULL) {
+	bcount = mlxcx_buf_bind_or_copy(mlxp, sq, kmp, take, &b);
+	if (bcount == 0) {
 		atomic_or_uint(&sq->mlwq_state, MLXCX_WQ_BLOCKED_MAC);
 		return (mp);
 	}
@@ -457,10 +458,12 @@ mlxcx_mac_ring_tx(void *arg, mblk_t *mp)
 	}
 
 	/*
-	 * Similar logic here: bufcnt is only manipulated atomically, and
-	 * bufhwm is set at startup.
+	 * If the completion queue buffer count is already at or above
+	 * the high water mark, or the addition of this new chain will
+	 * exceed the CQ ring size, then indicate we are blocked.
 	 */
-	if (cq->mlcq_bufcnt >= cq->mlcq_bufhwm) {
+	if (cq->mlcq_bufcnt >= cq->mlcq_bufhwm ||
+	    (cq->mlcq_bufcnt + bcount) > cq->mlcq_nents) {
 		atomic_or_uint(&cq->mlcq_state, MLXCX_CQ_BLOCKED_MAC);
 		goto blocked;
 	}
