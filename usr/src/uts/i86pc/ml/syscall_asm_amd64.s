@@ -1300,6 +1300,66 @@ _full_syscall_postsys32:
 	SET_SIZE(brand_sys_sysenter)
 
 /*
+ * System call via an int80.  This entry point is only used by the Linux
+ * application environment.  Unlike the other entry points, there is no
+ * default action to take if no callback is registered for this process.
+ */
+
+	ENTRY_NP(brand_sys_int80)
+	SWAPGS				/* kernel gsbase */
+	XPV_TRAP_POP
+	call	smap_enable
+
+	/*
+	 * We first attempt to call the "b_int80" handler from the "struct
+	 * brand_mach_ops" for this brand.  If no handler function is installed
+	 * for this brand, the BRAND_CALLBACK() macro returns here and we
+	 * check the lwp for a "lwp_brand_syscall" handler.
+	 */
+	BRAND_CALLBACK(BRAND_CB_INT80, BRAND_URET_FROM_INTR_STACK())
+
+	/*
+	 * Check to see if this lwp provides "lwp_brand_syscall".  If so, we
+	 * will route this int80 through the regular system call handling path.
+	 */
+	movq	%r15, %gs:CPU_RTMP_R15
+	movq	%gs:CPU_THREAD, %r15
+	movq	T_LWP(%r15), %r15
+	movq	LWP_BRAND_SYSCALL(%r15), %r15
+	testq	%r15, %r15
+	movq	%gs:CPU_RTMP_R15, %r15
+	jnz	nopop_syscall_int
+
+	/*
+	 * The brand provided neither a "b_int80", nor a "lwp_brand_syscall"
+	 * function, and has thus opted out of handling this trap.
+	 */
+	SWAPGS				/* user gsbase */
+	jmp	nopop_int80
+
+	ENTRY_NP(sys_int80)
+	/*
+	 * We hit an int80, but this process isn't of a brand with an int80
+	 * handler.  Bad process!  Make it look as if the INT failed.
+	 * Modify %rip to point before the INT, push the expected error
+	 * code and fake a GP fault. Note on 64-bit hypervisor we need
+	 * to undo the XPV_TRAP_POP and push rcx and r11 back on the stack
+	 * because gptrap will pop them again with its own XPV_TRAP_POP.
+	 */
+	XPV_TRAP_POP
+	call	smap_enable
+nopop_int80:
+	subq	$2, (%rsp)	/* int insn 2-bytes */
+	pushq	$_CONST(_MUL(T_INT80, GATE_DESC_SIZE) + 2)
+#if defined(__xpv)
+	push	%r11
+	push	%rcx
+#endif
+	jmp	gptrap			/ GP fault
+	SET_SIZE(sys_int80)
+	SET_SIZE(brand_sys_int80)
+
+/*
  * This is the destination of the "int $T_SYSCALLINT" interrupt gate, used by
  * the generic i386 libc to do system calls. We do a small amount of setup
  * before jumping into the existing sys_syscall32 path.
