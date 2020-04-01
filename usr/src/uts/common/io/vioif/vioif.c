@@ -1019,7 +1019,7 @@ vioif_send(vioif_t *vif, mblk_t *mp)
 	for (nmp = mp; nmp; nmp = nmp->b_cont)
 		msg_size += MBLKL(nmp);
 
-	if (vif->vif_tx_tso4) {
+	if (vif->vif_tx_tso4 || vif->vif_tx_tso6) {
 		mac_lso_get(mp, &lso_mss, &lso_flags);
 		lso_required = (lso_flags & HW_LSO) != 0;
 	}
@@ -1105,9 +1105,10 @@ vioif_send(vioif_t *vif, mblk_t *mp)
 			goto fail;
 		}
 
-		if (meo.meoi_l3proto == ETHERTYPE_IP) {
+		if (meo.meoi_l3proto == ETHERTYPE_IP && vif->vif_tx_tso4) {
 			vnh->vnh_gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
-		} else if (meo.meoi_l3proto == ETHERTYPE_IPV6) {
+		} else if (meo.meoi_l3proto == ETHERTYPE_IPV6 &&
+		    vif->vif_tx_tso6) {
 			vnh->vnh_gso_type = VIRTIO_NET_HDR_GSO_TCPV6;
 		} else {
 			goto fail;
@@ -1515,8 +1516,9 @@ vioif_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		}
 
 		mac_capab_lso_t *lso = cap_data;
-		lso->lso_flags = LSO_TX_BASIC_TCP_IPV4;
+		lso->lso_flags = LSO_TX_BASIC_TCP_IPV4 | LSO_TX_BASIC_TCP_IPV6;
 		lso->lso_basic_tcp_ipv4.lso_max = VIOIF_RX_DATA_SIZE;
+		lso->lso_basic_tcp_ipv6.lso_max = VIOIF_RX_DATA_SIZE;
 
 		return (B_TRUE);
 	}
@@ -1618,6 +1620,7 @@ vioif_check_features(vioif_t *vif)
 
 	vif->vif_tx_csum = 0;
 	vif->vif_tx_tso4 = 0;
+	vif->vif_tx_tso6 = 0;
 
 	if (vioif_has_feature(vif, VIRTIO_NET_F_CSUM)) {
 		/*
@@ -1631,6 +1634,7 @@ vioif_check_features(vioif_t *vif)
 		 */
 		boolean_t gso = vioif_has_feature(vif, VIRTIO_NET_F_GSO);
 		boolean_t tso4 = vioif_has_feature(vif, VIRTIO_NET_F_HOST_TSO4);
+		boolean_t tso6 = vioif_has_feature(vif, VIRTIO_NET_F_HOST_TSO6);
 		boolean_t ecn = vioif_has_feature(vif, VIRTIO_NET_F_HOST_ECN);
 
 		/*
@@ -1640,8 +1644,15 @@ vioif_check_features(vioif_t *vif)
 		 * we require the device to support the combination of
 		 * segmentation offload and ECN support.
 		 */
-		if (gso || (tso4 && ecn)) {
+		if (gso) {
 			vif->vif_tx_tso4 = 1;
+			vif->vif_tx_tso6 = 1;
+		}
+		if (tso4 && ecn) {
+			vif->vif_tx_tso4 = 1;
+		}
+		if (tso6 && ecn) {
+			vif->vif_tx_tso6 = 1;
 		}
 	}
 }

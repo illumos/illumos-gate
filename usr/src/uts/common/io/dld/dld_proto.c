@@ -1479,13 +1479,23 @@ dld_capab_lso(dld_str_t *dsp, void *data, uint_t flags)
 		 * accordingly.
 		 */
 		if (mac_capab_get(dsp->ds_mh, MAC_CAPAB_LSO, &mac_lso)) {
-			lso->lso_max = mac_lso.lso_basic_tcp_ipv4.lso_max;
+			lso->lso_max_tcpv4 = mac_lso.lso_basic_tcp_ipv4.lso_max;
+			lso->lso_max_tcpv6 = mac_lso.lso_basic_tcp_ipv6.lso_max;
 			lso->lso_flags = 0;
 			/* translate the flag for mac clients */
 			if ((mac_lso.lso_flags & LSO_TX_BASIC_TCP_IPV4) != 0)
 				lso->lso_flags |= DLD_LSO_BASIC_TCP_IPV4;
-			dsp->ds_lso = B_TRUE;
-			dsp->ds_lso_max = lso->lso_max;
+			if ((mac_lso.lso_flags & LSO_TX_BASIC_TCP_IPV6) != 0)
+				lso->lso_flags |= DLD_LSO_BASIC_TCP_IPV6;
+			dsp->ds_lso = lso->lso_flags != 0;
+			/*
+			 * DLS uses this to try and make sure that a raw ioctl
+			 * doesn't send too much data, but doesn't currently
+			 * check the actual SAP that is sending this (or that
+			 * it's TCP). So for now, just use the max value here.
+			 */
+			dsp->ds_lso_max = MAX(lso->lso_max_tcpv4,
+			    lso->lso_max_tcpv6);
 		} else {
 			dsp->ds_lso = B_FALSE;
 			dsp->ds_lso_max = 0;
@@ -1515,17 +1525,25 @@ dld_capab(dld_str_t *dsp, uint_t type, void *data, uint_t flags)
 	 * completes. So we limit the check to DLD_ENABLE case.
 	 */
 	if ((flags == DLD_ENABLE && type != DLD_CAPAB_PERIM) &&
-	    (dsp->ds_sap != ETHERTYPE_IP ||
+	    (!(dsp->ds_sap == ETHERTYPE_IP || dsp->ds_sap == ETHERTYPE_IPV6) ||
 	    !check_mod_above(dsp->ds_rq, "ip"))) {
 		return (ENOTSUP);
 	}
 
 	switch (type) {
 	case DLD_CAPAB_DIRECT:
+		if (dsp->ds_sap == ETHERTYPE_IPV6) {
+			err = ENOTSUP;
+			break;
+		}
 		err = dld_capab_direct(dsp, data, flags);
 		break;
 
 	case DLD_CAPAB_POLL:
+		if (dsp->ds_sap == ETHERTYPE_IPV6) {
+			err = ENOTSUP;
+			break;
+		}
 		err =  dld_capab_poll(dsp, data, flags);
 		break;
 
@@ -1600,7 +1618,8 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	/*
 	 * Direct capability negotiation interface between IP and DLD
 	 */
-	if (dsp->ds_sap == ETHERTYPE_IP && check_mod_above(dsp->ds_rq, "ip")) {
+	if ((dsp->ds_sap == ETHERTYPE_IP || dsp->ds_sap == ETHERTYPE_IPV6) &&
+	    check_mod_above(dsp->ds_rq, "ip")) {
 		dld_capable = B_TRUE;
 		subsize += sizeof (dl_capability_sub_t) +
 		    sizeof (dl_capab_dld_t);

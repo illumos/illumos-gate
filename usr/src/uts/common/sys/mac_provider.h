@@ -119,10 +119,15 @@ typedef struct lso_basic_tcp_ipv4_s {
 	t_uscalar_t	lso_max;		/* maximum payload */
 } lso_basic_tcp_ipv4_t;
 
+typedef struct lso_basic_tcp_ipv6_s {
+	t_uscalar_t	lso_max;		/* maximum payload */
+} lso_basic_tcp_ipv6_t;
+
 /*
  * Currently supported flags for LSO.
  */
-#define	LSO_TX_BASIC_TCP_IPV4	0x01		/* TCP LSO capability */
+#define	LSO_TX_BASIC_TCP_IPV4	0x01		/* TCPv4 LSO capability */
+#define	LSO_TX_BASIC_TCP_IPV6	0x02		/* TCPv6 LSO capability */
 
 /*
  * Future LSO capabilities can be added at the end of the mac_capab_lso_t.
@@ -135,6 +140,7 @@ typedef struct lso_basic_tcp_ipv4_s {
 typedef	struct mac_capab_lso_s {
 	t_uscalar_t		lso_flags;
 	lso_basic_tcp_ipv4_t	lso_basic_tcp_ipv4;
+	lso_basic_tcp_ipv6_t	lso_basic_tcp_ipv6;
 	/* Add future lso capabilities here */
 } mac_capab_lso_t;
 

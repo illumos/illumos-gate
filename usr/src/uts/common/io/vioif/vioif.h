@@ -164,6 +164,7 @@ extern "C" {
 #define	VIRTIO_NET_WANTED_FEATURES	(VIRTIO_NET_F_CSUM |		\
 					VIRTIO_NET_F_GSO |		\
 					VIRTIO_NET_F_HOST_TSO4 |	\
+					VIRTIO_NET_F_HOST_TSO6 |	\
 					VIRTIO_NET_F_HOST_ECN |		\
 					VIRTIO_NET_F_MAC |		\
 					VIRTIO_NET_F_MTU)
@@ -356,6 +357,7 @@ struct vioif {
 	 */
 	unsigned int			vif_tx_csum:1;
 	unsigned int			vif_tx_tso4:1;
+	unsigned int			vif_tx_tso6:1;
 
 	/*
 	 * For debugging, it is useful to know whether the MAC address we
