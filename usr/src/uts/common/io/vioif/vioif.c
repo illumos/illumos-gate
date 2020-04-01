@@ -74,6 +74,7 @@
 #include <sys/random.h>
 #include <sys/containerof.h>
 #include <sys/stream.h>
+#include <inet/tcp.h>
 
 #include <sys/mac.h>
 #include <sys/mac_provider.h>
@@ -1084,8 +1085,69 @@ vioif_send(vioif_t *vif, mblk_t *mp)
 	 * Setup LSO fields if required.
 	 */
 	if (lso_required) {
-		vnh->vnh_gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
+		mac_ether_offload_flags_t needed;
+		mac_ether_offload_info_t meo;
+		uint32_t cksum;
+		size_t len;
+		mblk_t *pullmp = NULL;
+		tcpha_t *tcpha;
+
+		if (mac_ether_offload_info(mp, &meo) != 0) {
+			goto fail;
+		}
+
+		needed = MEOI_L2INFO_SET | MEOI_L3INFO_SET | MEOI_L4INFO_SET;
+		if ((meo.meoi_flags & needed) != needed) {
+			goto fail;
+		}
+
+		if (meo.meoi_l4proto != IPPROTO_TCP) {
+			goto fail;
+		}
+
+		if (meo.meoi_l3proto == ETHERTYPE_IP) {
+			vnh->vnh_gso_type = VIRTIO_NET_HDR_GSO_TCPV4;
+		} else if (meo.meoi_l3proto == ETHERTYPE_IPV6) {
+			vnh->vnh_gso_type = VIRTIO_NET_HDR_GSO_TCPV6;
+		} else {
+			goto fail;
+		}
+
+		/*
+		 * The TCP stack does not include the length in the TCP
+		 * pseudo-header when it is performing LSO since hardware
+		 * generally asks for it to be removed (as it'll change).
+		 * Unfortunately, for virtio, we actually need it. This means we
+		 * need to go through and calculate the actual length and fix
+		 * things up. Because the virtio spec cares about the ECN flag
+		 * and indicating that, at least this means we'll have that
+		 * available as well.
+		 */
+		if (MBLKL(mp) < vnh->vnh_hdr_len) {
+			pullmp = msgpullup(mp, vnh->vnh_hdr_len);
+			if (pullmp == NULL)
+				goto fail;
+			tcpha = (tcpha_t *)(pullmp->b_rptr + meo.meoi_l2hlen +
+			    meo.meoi_l3hlen);
+		} else {
+			tcpha = (tcpha_t *)(mp->b_rptr + meo.meoi_l2hlen +
+			    meo.meoi_l3hlen);
+		}
+
+		len = meo.meoi_len - meo.meoi_l2hlen - meo.meoi_l3hlen;
+		cksum = ntohs(tcpha->tha_sum) + len;
+		cksum = (cksum >> 16) + (cksum & 0xffff);
+		cksum = (cksum >> 16) + (cksum & 0xffff);
+		tcpha->tha_sum = htons(cksum);
+
+		if (tcpha->tha_flags & TH_CWR) {
+			vnh->vnh_gso_type |= VIRTIO_NET_HDR_GSO_ECN;
+		}
 		vnh->vnh_gso_size = (uint16_t)lso_mss;
+		vnh->vnh_hdr_len = meo.meoi_l2hlen + meo.meoi_l3hlen +
+		    meo.meoi_l4hlen;
+
+		freemsg(pullmp);
 	}
 
 	/*

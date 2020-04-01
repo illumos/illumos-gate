@@ -32,6 +32,7 @@ $mapfile_version 2
 SYMBOL_SCOPE {
     global:
 	mac_alloc				{ FLAGS = EXTERN };
+	mac_ether_offload_info			{ FLAGS = EXTERN };
 	mac_fini_ops				{ FLAGS = EXTERN };
 	mac_free				{ FLAGS = EXTERN };
 	mac_hcksum_get				{ FLAGS = EXTERN };

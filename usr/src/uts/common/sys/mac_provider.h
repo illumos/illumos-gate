@@ -645,6 +645,31 @@ extern void			mac_transceiver_info_set_usable(
 				    mac_transceiver_info_t *,
 				    boolean_t);
 
+/*
+ * This represents a provisional set of currently illumos-private APIs to get
+ * information about a mblk_t chain's type. This is an evolving interface.
+ */
+typedef enum mac_ether_offload_flags {
+	MEOI_L2INFO_SET		= 1 << 0,
+	MEOI_VLAN_TAGGED	= 1 << 1,
+	MEOI_L3INFO_SET		= 1 << 2,
+	MEOI_L4INFO_SET		= 1 << 3
+} mac_ether_offload_flags_t;
+
+typedef struct mac_ether_offload_info {
+	mac_ether_offload_flags_t	meoi_flags;	/* What's valid? */
+	size_t		meoi_len;	/* Total message length */
+	uint8_t		meoi_l2hlen;	/* How long is the Ethernet header? */
+	uint16_t	meoi_l3proto;	/* What's the Ethertype */
+	uint8_t		meoi_l3hlen;	/* How long is the header? */
+	uint8_t		meoi_l4proto;	/* What is the payload type? */
+	uint8_t		meoi_l4hlen;	/* How long is the L4 header */
+} mac_ether_offload_info_t;
+
+extern int			mac_ether_offload_info(mblk_t *,
+				    mac_ether_offload_info_t *);
+
+
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus
