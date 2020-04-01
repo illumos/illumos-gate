@@ -110,14 +110,6 @@
 #include <sys/machbrand.h>
 #include <sys/param.h>
 
-#if defined(__lint)
-
-#include <sys/types.h>
-#include <sys/thread.h>
-#include <sys/systm.h>
-
-#else	/* __lint */
-
 #include <sys/segments.h>
 #include <sys/pcb.h>
 #include <sys/trap.h>
@@ -820,4 +812,3 @@ tr_intr_ret_end:
 kpti_tramp_end:
 	nop
 
-#endif	/* __lint */

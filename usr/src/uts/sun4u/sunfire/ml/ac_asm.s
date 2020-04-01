@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/asm_linkage.h>
@@ -39,20 +37,10 @@
 #include <sys/mmu.h>
 #include <sys/spitregs.h>
 
-#if defined(lint)
-
-#else	/* lint */
 #include "assym.h"
-#endif	/* lint */
 
 #define	TT_HSM	0x99
 
-#if defined(lint)
-/* ARGSUSED */
-void
-ac_blkcopy(caddr_t src, caddr_t dst, u_int linecount, u_int linesize)
-{}
-#else /* !lint */
 !
 ! Move a single cache line of data.  Survive UE and CE on the read
 !
@@ -117,4 +105,3 @@ ac_blkcopy(caddr_t src, caddr_t dst, u_int linecount, u_int linesize)
 	ret
 	 restore
 	SET_SIZE(ac_blkcopy)
-#endif /* lint */

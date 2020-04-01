@@ -23,18 +23,12 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SFMMU primitives.  These primitives should only be used by sfmmu
  * routines.
  */
 
-#if defined(lint)
-#include <sys/types.h>
-#else	/* lint */
 #include "assym.h"
-#endif	/* lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/machtrap.h>
@@ -55,47 +49,6 @@
 /*
  * sfmmu related subroutines
  */
-
-#if defined (lint)
-
-/*
- * sfmmu related subroutines
- */
-/* ARGSUSED */
-void
-sfmmu_raise_tsb_exception(uint64_t sfmmup, uint64_t rctx)
-{}
-
-/* ARGSUSED */
-void
-sfmmu_itlb_ld_kva(caddr_t vaddr, tte_t *tte)
-{}
-
-/* ARGSUSED */
-void
-sfmmu_dtlb_ld_kva(caddr_t vaddr, tte_t *tte)
-{}
-
-int
-sfmmu_getctx_pri()
-{ return(0); }
-
-int
-sfmmu_getctx_sec()
-{ return(0); }
-
-/* ARGSUSED */
-void
-sfmmu_setctx_sec(uint_t ctx)
-{}
-
-/* ARGSUSED */
-void
-sfmmu_load_mmustate(sfmmu_t *sfmmup)
-{
-}
-
-#else	/* lint */
 
 /*
  * Invalidate either the context of a specific victim or any process
@@ -609,26 +562,17 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
           nop
         SET_SIZE(sfmmu_load_mmustate)
 
-#endif /* lint */
-
-#if defined (lint)
 /*
- * Invalidate all of the entries within the tsb, by setting the inv bit
+ * Invalidate all of the entries within the TSB, by setting the inv bit
  * in the tte_tag field of each tsbe.
  *
- * We take advantage of the fact TSBs are page aligned and a multiple of
- * PAGESIZE to use block stores.
+ * We take advantage of the fact that the TSBs are page aligned and a
+ * multiple of PAGESIZE to use ASI_BLK_INIT_xxx ASI.
  *
  * See TSB_LOCK_ENTRY and the miss handlers for how this works in practice
  * (in short, we set all bits in the upper word of the tag, and we give the
  * invalid bit precedence over other tag bits in both places).
  */
-/* ARGSUSED */
-void
-sfmmu_inv_tsb_fast(caddr_t tsb_base, uint_t tsb_bytes)
-{}
-
-#else /* lint */
 
 #define	VIS_BLOCKSIZE	64
 
@@ -707,10 +651,6 @@ sfmmu_inv_tsb_fast(caddr_t tsb_base, uint_t tsb_bytes)
 	  restore
 	SET_SIZE(sfmmu_inv_tsb_fast)
 
-#endif /* lint */
-
-#if defined(lint)
-
 /*
  * Prefetch "struct tsbe" while walking TSBs.
  * prefetch 7 cache lines ahead of where we are at now.
@@ -721,27 +661,14 @@ sfmmu_inv_tsb_fast(caddr_t tsb_base, uint_t tsb_bytes)
  * The 448 comes from (7 * 64) which is how far ahead of our current
  * address, we want to prefetch.
  */
-/*ARGSUSED*/
-void
-prefetch_tsbe_read(struct tsbe *tsbep)
-{}
-
-/* Prefetch the tsbe that we are about to write */
-/*ARGSUSED*/
-void
-prefetch_tsbe_write(struct tsbe *tsbep)
-{}
-
-#else /* lint */
-
 	ENTRY(prefetch_tsbe_read)
 	retl
 	  prefetch	[%o0+448], #n_reads
 	SET_SIZE(prefetch_tsbe_read)
 
+/* Prefetch the tsbe that we are about to write */
 	ENTRY(prefetch_tsbe_write)
 	retl
 	  prefetch	[%o0], #n_writes
 	SET_SIZE(prefetch_tsbe_write)
-#endif /* lint */
 

@@ -22,12 +22,12 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
+ * Copyright 2020 Joyent, Inc.
+ *
  * Assembly code support for Cheetah/Cheetah+ modules
  */
 
-#if !defined(lint)
 #include "assym.h"
-#endif	/* !lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/mmu.h>
@@ -50,8 +50,6 @@
 #ifdef TRAPTRACE
 #include <sys/traptrace.h>
 #endif /* TRAPTRACE */
-
-#if !defined(lint)
 
 /* BEGIN CSTYLED */
 
@@ -169,20 +167,9 @@
 
 /* END CSTYLED */
 
-#endif	/* !lint */
-
 /*
  * Cheetah MMU and Cache operations.
  */
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-vtag_flushpage(caddr_t vaddr, uint64_t sfmmup)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(vtag_flushpage)
 	/*
@@ -252,16 +239,6 @@ vtag_flushpage(caddr_t vaddr, uint64_t sfmmup)
 	wrpr	%g0, %o5, %pstate		/* enable interrupts */
 	SET_SIZE(vtag_flushpage)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-void
-vtag_flushall(void)
-{}
-
-#else	/* lint */
-
 	ENTRY_NP2(vtag_flushall, demap_all)
 	/*
 	 * flush the tlb
@@ -276,17 +253,6 @@ vtag_flushall(void)
 	SET_SIZE(demap_all)
 	SET_SIZE(vtag_flushall)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-vtag_flushpage_tl1(uint64_t vaddr, uint64_t sfmmup)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(vtag_flushpage_tl1)
 	/*
@@ -332,17 +298,6 @@ vtag_flushpage_tl1(uint64_t vaddr, uint64_t sfmmup)
 	retry
 	SET_SIZE(vtag_flushpage_tl1)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-vtag_flush_pgcnt_tl1(uint64_t vaddr, uint64_t sfmmup_pgcnt)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(vtag_flush_pgcnt_tl1)
 	/*
@@ -422,17 +377,6 @@ vtag_flush_pgcnt_tl1(uint64_t vaddr, uint64_t sfmmup_pgcnt)
 	retry
 	SET_SIZE(vtag_flush_pgcnt_tl1)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-vtag_flushall_tl1(uint64_t dummy1, uint64_t dummy2)
-{}
-
-#else	/* lint */
-
 	ENTRY_NP(vtag_flushall_tl1)
 	/*
 	 * x-trap to flush tlb
@@ -443,17 +387,6 @@ vtag_flushall_tl1(uint64_t dummy1, uint64_t dummy2)
 	retry
 	SET_SIZE(vtag_flushall_tl1)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-vac_flushpage(pfn_t pfnum, int vcolor)
-{}
-
-#else	/* lint */
 
 /*
  * vac_flushpage(pfnum, color)
@@ -479,17 +412,6 @@ dflush_type:
 	  nop
 	SET_SIZE(vac_flushpage)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-vac_flushpage_tl1(uint64_t pfnum, uint64_t vcolor)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(vac_flushpage_tl1)
 	/*
@@ -501,17 +423,6 @@ vac_flushpage_tl1(uint64_t pfnum, uint64_t vcolor)
 	retry
 	SET_SIZE(vac_flushpage_tl1)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-vac_flushcolor(int vcolor, pfn_t pfnum)
-{}
-
-#else	/* lint */
 
 	ENTRY(vac_flushcolor)
 	/*
@@ -525,17 +436,6 @@ vac_flushcolor(int vcolor, pfn_t pfnum)
 	  nop
 	SET_SIZE(vac_flushcolor)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-vac_flushcolor_tl1(uint64_t vcolor, uint64_t pfnum)
-{}
-
-#else	/* lint */
 
 	ENTRY(vac_flushcolor_tl1)
 	/*
@@ -547,18 +447,6 @@ vac_flushcolor_tl1(uint64_t vcolor, uint64_t pfnum)
 	DCACHE_FLUSHCOLOR(%g1, 3, %g2, %g3, %g4)
 	retry
 	SET_SIZE(vac_flushcolor_tl1)
-
-#endif	/* lint */
-
-#if defined(lint)
- 
-int
-idsr_busy(void)
-{
-	return (0);
-}
-
-#else	/* lint */
 
 /*
  * Determine whether or not the IDSR is busy.
@@ -575,22 +463,6 @@ idsr_busy(void)
 	retl
 	nop
 	SET_SIZE(idsr_busy)
-
-#endif	/* lint */
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-init_mondo(xcfunc_t *func, uint64_t arg1, uint64_t arg2)
-{}
-
-/* ARGSUSED */
-void
-init_mondo_nocheck(xcfunc_t *func, uint64_t arg1, uint64_t arg2)
-{}
-
-#else	/* lint */
 
 	.global _dispatch_status_busy
 _dispatch_status_busy:
@@ -645,19 +517,8 @@ _dispatch_status_busy:
 	SET_SIZE(init_mondo_nocheck)
 	SET_SIZE(init_mondo)
 
-#endif	/* lint */
-
 
 #if !(defined(JALAPENO) || defined(SERRANO))
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-shipit(int upaid, int bn)
-{ return; }
-
-#else	/* lint */
 
 /*
  * Ship mondo to aid using busy/nack pair bn
@@ -673,19 +534,8 @@ shipit(int upaid, int bn)
 	nop
 	SET_SIZE(shipit)
 
-#endif	/* lint */
-
 #endif	/* !(JALAPENO || SERRANO) */
 
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-flush_instr_mem(caddr_t vaddr, size_t len)
-{}
-
-#else	/* lint */
 
 /*
  * flush_instr_mem:
@@ -705,19 +555,8 @@ flush_instr_mem(caddr_t vaddr, size_t len)
 	nop
 	SET_SIZE(flush_instr_mem)
 
-#endif	/* lint */
-
 
 #if defined(CPU_IMP_ECACHE_ASSOC)
-
-#if defined(lint)
-
-/* ARGSUSED */
-uint64_t
-get_ecache_ctrl(void)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(get_ecache_ctrl)
 	GET_CPU_IMPL(%o0)
@@ -738,8 +577,6 @@ get_ecache_ctrl(void)
 	  nop
 	SET_SIZE(get_ecache_ctrl)
 
-#endif	/* lint */
-
 #endif	/* CPU_IMP_ECACHE_ASSOC */
 
 
@@ -751,14 +588,6 @@ get_ecache_ctrl(void)
  *	%o1 - ecache size
  *	%o2 - ecache linesize
  */
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-flush_ecache(uint64_t physaddr, size_t ecache_size, size_t ecache_linesize)
-{}
-
-#else /* !lint */
 
 	ENTRY(flush_ecache)
 
@@ -777,18 +606,8 @@ flush_ecache(uint64_t physaddr, size_t ecache_size, size_t ecache_linesize)
 	nop
 	SET_SIZE(flush_ecache)
 
-#endif /* lint */
-
 #endif	/* !(JALAPENO || SERRANO) */
 
-
-#if defined(lint)
-
-void
-flush_dcache(void)
-{}
-
-#else	/* lint */
 
 	ENTRY(flush_dcache)
 	ASM_LD(%o0, dcache_size)
@@ -798,16 +617,6 @@ flush_dcache(void)
 	nop
 	SET_SIZE(flush_dcache)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-void
-flush_icache(void)
-{}
-
-#else	/* lint */
 
 	ENTRY(flush_icache)
 	GET_CPU_PRIVATE_PTR(%g0, %o0, %o2, flush_icache_1);
@@ -823,19 +632,6 @@ flush_icache_1:
 	nop
 	SET_SIZE(flush_icache)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-kdi_flush_idcache(int dcache_size, int dcache_lsize, int icache_size, 
-    int icache_lsize)
-{
-}
-
-#else	/* lint */
-
 	ENTRY(kdi_flush_idcache)
 	CH_DCACHE_FLUSHALL(%o0, %o1, %g1)
 	CH_ICACHE_FLUSHALL(%o2, %o3, %g1, %g2)
@@ -844,35 +640,14 @@ kdi_flush_idcache(int dcache_size, int dcache_lsize, int icache_size,
 	nop
 	SET_SIZE(kdi_flush_idcache)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-void
-flush_pcache(void)
-{}
-
-#else	/* lint */
-
 	ENTRY(flush_pcache)
 	PCACHE_FLUSHALL(%o0, %o1, %o2)
 	retl
 	nop
 	SET_SIZE(flush_pcache)
 
-#endif	/* lint */
-
 
 #if defined(CPU_IMP_L1_CACHE_PARITY)
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-get_dcache_dtag(uint32_t dcache_idx, uint64_t *data)
-{}
-
-#else	/* lint */
 
 /*
  * Get dcache data and tag.  The Dcache data is a pointer to a ch_dc_data_t
@@ -951,17 +726,6 @@ get_dcache_dtag(uint32_t dcache_idx, uint64_t *data)
 	  wrpr	%g0, %o5, %pstate	
 	SET_SIZE(get_dcache_dtag)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-get_icache_dtag(uint32_t ecache_idx, uint64_t *data)
-{}
-
-#else	/* lint */
 
 /*
  * Get icache data and tag.  The data argument is a pointer to a ch_ic_data_t
@@ -1004,17 +768,6 @@ get_icache_dtag(uint32_t ecache_idx, uint64_t *data)
 	  wrpr	%g0, %o5, %pstate	
 	SET_SIZE(get_icache_dtag)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-get_pcache_dtag(uint32_t pcache_idx, uint64_t *data)
-{}
-
-#else	/* lint */
-
 /*
  * Get pcache data and tags.
  * inputs:
@@ -1050,18 +803,7 @@ get_pcache_dtag(uint32_t pcache_idx, uint64_t *data)
 	  wrpr	%g0, %o5, %pstate	
 	SET_SIZE(get_pcache_dtag)
 
-#endif	/* lint */
-
 #endif	/* CPU_IMP_L1_CACHE_PARITY */
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-set_dcu(uint64_t dcu)
-{}
-
-#else	/* lint */
 
 /*
  * re-enable the i$, d$, w$, and p$ according to bootup cache state.
@@ -1075,18 +817,6 @@ set_dcu(uint64_t dcu)
 	nop
 	SET_SIZE(set_dcu)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-uint64_t
-get_dcu(void)
-{
-	return ((uint64_t)0);
-}
-
-#else	/* lint */
 
 /*
  * Return DCU register.
@@ -1096,8 +826,6 @@ get_dcu(void)
 	retl
 	nop
 	SET_SIZE(get_dcu)
-
-#endif	/* lint */
 
 /*
  * Cheetah/Cheetah+ level 15 interrupt handler trap table entry.
@@ -1109,28 +837,11 @@ get_dcu(void)
  * NB: Must be 8 instructions or less to fit in trap table and code must
  *     be relocatable.
  */
-#if defined(lint)
-
-void
-ch_pil15_interrupt_instr(void)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(ch_pil15_interrupt_instr)
 	ASM_JMP(%g1, ch_pil15_interrupt)
 	SET_SIZE(ch_pil15_interrupt_instr)
 
-#endif
-
-
-#if defined(lint)
-
-void
-ch_pil15_interrupt(void)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(ch_pil15_interrupt)
 
@@ -1185,7 +896,6 @@ ch_pil15_interrupt(void)
 	  mov	PIL_15, %g4
 
 	SET_SIZE(ch_pil15_interrupt)
-#endif
 
 
 /*
@@ -1278,14 +988,6 @@ ch_pil15_interrupt(void)
  *     be relocatable.
  */
 
-#if defined(lint)
-
-void
-fecc_err_instr(void)
-{}
-
-#else	/* lint */
-
 	ENTRY_NP(fecc_err_instr)
 	membar	#Sync			! Cheetah requires membar #Sync
 
@@ -1300,18 +1002,8 @@ fecc_err_instr(void)
 	ASM_JMP(%g4, fast_ecc_err)
 	SET_SIZE(fecc_err_instr)
 
-#endif	/* lint */
-
 
 #if !(defined(JALAPENO) || defined(SERRANO))
-
-#if defined(lint)
-
-void
-fast_ecc_err(void)
-{}
-
-#else	/* lint */
 
 	.section ".text"
 	.align	64
@@ -1452,8 +1144,6 @@ fast_ecc_err_5:
 
 	SET_SIZE(fast_ecc_err)
 
-#endif	/* lint */
-
 #endif	/* !(JALAPENO || SERRANO) */
 
 
@@ -1511,19 +1201,9 @@ fast_ecc_err_5:
  *     be relocatable.
  */
 
-#if defined(lint)
-
-void
-fecc_err_tl1_instr(void)
-{}
-
-#else	/* lint */
-
 	ENTRY_NP(fecc_err_tl1_instr)
 	CH_ERR_TL1_TRAPENTRY(SWTRAP_0);
 	SET_SIZE(fecc_err_tl1_instr)
-
-#endif	/* lint */
 
 /*
  * Software trap 0 at TL>0.
@@ -1537,28 +1217,11 @@ fecc_err_tl1_instr(void)
  * NB: Must be 8 instructions or less to fit in trap table and code must
  *     be relocatable.
  */
-#if defined(lint)
-
-void
-fecc_err_tl1_cont_instr(void)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(fecc_err_tl1_cont_instr)
 	CH_ERR_TL1_SWTRAPENTRY(fast_ecc_tl1_err)
 	SET_SIZE(fecc_err_tl1_cont_instr)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-void
-ce_err(void)
-{}
-
-#else	/* lint */
 
 /*
  * The ce_err function handles disrupting trap type 0x63 at TL=0.
@@ -1738,21 +1401,11 @@ ce_err_1:
 	  movl	%icc, PIL_14, %g4
 	SET_SIZE(ce_err)
 
-#endif	/* lint */
-
-
-#if defined(lint)
 
 /*
  * This trap cannot happen at TL>0 which means this routine will never
  * actually be called and so we treat this like a BAD TRAP panic.
  */
-void
-ce_err_tl1(void)
-{}
-
-#else	/* lint */
-
 	.align	64
 	ENTRY_NP(ce_err_tl1)
 
@@ -1761,17 +1414,7 @@ ce_err_tl1(void)
 
 	SET_SIZE(ce_err_tl1)
 
-#endif	/* lint */
-
 	
-#if defined(lint)
-
-void
-async_err(void)
-{}
-
-#else	/* lint */
-
 /*
  * The async_err function handles deferred trap types 0xA 
  * (instruction_access_error) and 0x32 (data_access_error) at TL>=0.
@@ -1969,8 +1612,6 @@ async_err_resetskip:
 	  mov	PIL_15, %g4		! run at pil 15
 	SET_SIZE(async_err)
 
-#endif	/* lint */
-
 #if defined(CPU_IMP_L1_CACHE_PARITY)
 
 /*
@@ -1981,13 +1622,6 @@ async_err_resetskip:
  * NB: Must be 8 instructions or less to fit in trap table and code must
  *     be relocatable.
  */
-#if defined(lint)
-
-void
-dcache_parity_instr(void)
-{}
-
-#else	/* lint */
 	ENTRY_NP(dcache_parity_instr)
 	membar	#Sync			! Cheetah+ requires membar #Sync
 	set	cpu_parity_error, %g1
@@ -1997,8 +1631,6 @@ dcache_parity_instr(void)
 	jmp	%g7 + %lo(sys_trap)
 	  mov	PIL_15, %g4		! run at pil 15
 	SET_SIZE(dcache_parity_instr)
-
-#endif	/* lint */
 
 
 /*
@@ -2010,18 +1642,9 @@ dcache_parity_instr(void)
  * NB: Must be 8 instructions or less to fit in trap table and code must
  *     be relocatable.
  */
-#if defined(lint)
-
-void
-dcache_parity_tl1_instr(void)
-{}
-
-#else	/* lint */
 	ENTRY_NP(dcache_parity_tl1_instr)
 	CH_ERR_TL1_TRAPENTRY(SWTRAP_1);
 	SET_SIZE(dcache_parity_tl1_instr)
-
-#endif	/* lint */
 
 
 /*
@@ -2036,31 +1659,15 @@ dcache_parity_tl1_instr(void)
  * NB: Must be 8 instructions or less to fit in trap table and code must
  *     be relocatable.
  */
-#if defined(lint)
-
-void
-dcache_parity_tl1_cont_instr(void)
-{}
-
-#else	/* lint */
 	ENTRY_NP(dcache_parity_tl1_cont_instr)
 	CH_ERR_TL1_SWTRAPENTRY(dcache_parity_tl1_err);
 	SET_SIZE(dcache_parity_tl1_cont_instr)
-
-#endif	/* lint */
 
 /*
  * D$ parity error at TL>0 handler
  * We get here via trap 71 at TL>0->Software trap 1 at TL>0.  We enter
  * this routine with %g1 and %g2 already saved in %tpc, %tnpc and %tstate.
  */
-#if defined(lint)
-
-void
-dcache_parity_tl1_err(void)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(dcache_parity_tl1_err)
 
@@ -2152,8 +1759,6 @@ dpe_tl1_skip_tt:
 	CH_ERR_TL1_EXIT;
 	SET_SIZE(dcache_parity_tl1_err)
 
-#endif	/* lint */
-
 /*
  * I$ parity error trap (trap 72) at TL=0.
  * tt0_iperr is replaced by icache_parity_instr in cpu_init_trap of
@@ -2162,13 +1767,6 @@ dpe_tl1_skip_tt:
  * NB: Must be 8 instructions or less to fit in trap table and code must
  *     be relocatable.
  */
-#if defined(lint)
-
-void
-icache_parity_instr(void)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(icache_parity_instr)
 	membar	#Sync			! Cheetah+ requires membar #Sync
@@ -2180,8 +1778,6 @@ icache_parity_instr(void)
 	  mov	PIL_15, %g4		! run at pil 15
 	SET_SIZE(icache_parity_instr)
 
-#endif	/* lint */
-
 /*
  * I$ parity error trap (trap 72) at TL>0.
  * tt1_iperr is replaced by icache_parity_tl1_instr in cpu_init_trap of
@@ -2191,18 +1787,9 @@ icache_parity_instr(void)
  * NB: Must be 8 instructions or less to fit in trap table and code must
  *     be relocatable.
  */
-#if defined(lint)
-
-void
-icache_parity_tl1_instr(void)
-{}
-
-#else	/* lint */
 	ENTRY_NP(icache_parity_tl1_instr)
 	CH_ERR_TL1_TRAPENTRY(SWTRAP_2);
 	SET_SIZE(icache_parity_tl1_instr)
-
-#endif	/* lint */
 
 /*
  * Software trap 2 at TL>0.
@@ -2216,18 +1803,9 @@ icache_parity_tl1_instr(void)
  * NB: Must be 8 instructions or less to fit in trap table and code must
  *     be relocatable.
  */
-#if defined(lint)
-
-void
-icache_parity_tl1_cont_instr(void)
-{}
-
-#else	/* lint */
 	ENTRY_NP(icache_parity_tl1_cont_instr)
 	CH_ERR_TL1_SWTRAPENTRY(icache_parity_tl1_err);
 	SET_SIZE(icache_parity_tl1_cont_instr)
-
-#endif	/* lint */
 
 
 /*
@@ -2235,13 +1813,6 @@ icache_parity_tl1_cont_instr(void)
  * We get here via trap 72 at TL>0->Software trap 2 at TL>0.  We enter
  * this routine with %g1 and %g2 already saved in %tpc, %tnpc and %tstate.
  */
-#if defined(lint)
-
-void
-icache_parity_tl1_err(void)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(icache_parity_tl1_err)
 
@@ -2318,8 +1889,6 @@ ipe_tl1_skip_tt:
 
 	SET_SIZE(icache_parity_tl1_err)
 
-#endif	/* lint */
-
 #endif	/* CPU_IMP_L1_CACHE_PARITY */
 
 
@@ -2332,15 +1901,6 @@ ipe_tl1_skip_tt:
  * Note: These two routines are required by the Estar "cpr" loadable module.
  */
 
-#if defined(lint)
-
-/* ARGSUSED */
-void
-itlb_rd_entry(uint_t entry, tte_t *tte, uint64_t *va_tag)
-{}
-
-#else	/* lint */
-
 	ENTRY_NP(itlb_rd_entry)
 	sllx	%o0, 3, %o0
 	ldxa	[%o0]ASI_ITLB_ACCESS, %g1
@@ -2352,17 +1912,6 @@ itlb_rd_entry(uint_t entry, tte_t *tte, uint64_t *va_tag)
 	  stx	%o5, [%o2]
 	SET_SIZE(itlb_rd_entry)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-dtlb_rd_entry(uint_t entry, tte_t *tte, uint64_t *va_tag)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(dtlb_rd_entry)
 	sllx	%o0, 3, %o0
@@ -2374,18 +1923,9 @@ dtlb_rd_entry(uint_t entry, tte_t *tte, uint64_t *va_tag)
 	retl
 	  stx	%o5, [%o2]
 	SET_SIZE(dtlb_rd_entry)
-#endif	/* lint */
 
 
 #if !(defined(JALAPENO) || defined(SERRANO))
-
-#if defined(lint)
-
-uint64_t
-get_safari_config(void)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(get_safari_config)
 	ldxa	[%g0]ASI_SAFARI_CONFIG, %o0
@@ -2393,17 +1933,6 @@ get_safari_config(void)
 	nop
 	SET_SIZE(get_safari_config)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-set_safari_config(uint64_t safari_config)
-{}
-
-#else	/* lint */
 
 	ENTRY(set_safari_config)
 	stxa	%o0, [%g0]ASI_SAFARI_CONFIG
@@ -2412,18 +1941,9 @@ set_safari_config(uint64_t safari_config)
 	nop
 	SET_SIZE(set_safari_config)
 
-#endif	/* lint */
-
 #endif	/* !(JALAPENO || SERRANO) */
 
 
-#if defined(lint)
-
-void
-cpu_cleartickpnt(void)
-{}
-
-#else	/* lint */
 	/*
 	 * Clear the NPT (non-privileged trap) bit in the %tick/%stick
 	 * registers. In an effort to make the change in the
@@ -2463,26 +1983,16 @@ cpu_cleartickpnt(void)
 	
 	SET_SIZE(cpu_clearticknpt)
 
-#endif	/* lint */
-
 
 #if defined(CPU_IMP_L1_CACHE_PARITY)
 
-#if defined(lint)
 /*
  * correct_dcache_parity(size_t size, size_t linesize)
  *
  * Correct D$ data parity by zeroing the data and initializing microtag
  * for all indexes and all ways of the D$.
- * 
+ *
  */
-/* ARGSUSED */
-void
-correct_dcache_parity(size_t size, size_t linesize)
-{}
-
-#else	/* lint */
-
 	ENTRY(correct_dcache_parity)
 	/*
 	 * Register Usage:
@@ -2544,22 +2054,8 @@ correct_dcache_parity(size_t size, size_t linesize)
 	  nop
 	SET_SIZE(correct_dcache_parity)
 
-#endif	/* lint */
-
 #endif	/* CPU_IMP_L1_CACHE_PARITY */
 
-
-#if defined(lint)
-/*
- *  Get timestamp (stick).
- */
-/* ARGSUSED */
-void
-stick_timestamp(int64_t *ts)
-{
-}
-
-#else	/* lint */
 
 	ENTRY_NP(stick_timestamp)
 	rd	STICK, %g1	! read stick reg
@@ -2570,21 +2066,7 @@ stick_timestamp(int64_t *ts)
 	stx     %g1, [%o0]	! store the timestamp
 	SET_SIZE(stick_timestamp)
 
-#endif	/* lint */
 
-
-#if defined(lint)
-/*
- * Set STICK adjusted by skew.
- */
-/* ARGSUSED */	
-void
-stick_adj(int64_t skew)
-{
-}
-
-#else	/* lint */
-		
 	ENTRY_NP(stick_adj)
 	rdpr	%pstate, %g1		! save processor state
 	andn	%g1, PSTATE_IE, %g3
@@ -2602,21 +2084,6 @@ stick_adj(int64_t skew)
 	wrpr	%g1, %pstate		! restore processor state
 	SET_SIZE(stick_adj)
 
-#endif	/* lint */
-
-#if defined(lint)
-/*
- * Debugger-specific stick retrieval
- */
-/*ARGSUSED*/
-int
-kdi_get_stick(uint64_t *stickp)
-{
-	return (0);
-}
-
-#else	/* lint */
-
 	ENTRY_NP(kdi_get_stick)
 	rd	STICK, %g1
 	stx	%g1, [%o0]
@@ -2624,9 +2091,6 @@ kdi_get_stick(uint64_t *stickp)
 	mov	%g0, %o0
 	SET_SIZE(kdi_get_stick)
 
-#endif	/* lint */
-
-#if defined(lint)
 /*
  * Invalidate the specified line from the D$.
  *
@@ -2659,12 +2123,6 @@ kdi_get_stick(uint64_t *stickp)
  * Setting the DC_valid bit to zero for the specified DC_way and
  * DC_addr index into the D$ results in an invalidation of a D$ line.
  */
-/*ARGSUSED*/
-void
-dcache_inval_line(int index)
-{
-}
-#else	/* lint */
 	ENTRY(dcache_inval_line)
 	sll	%o0, 5, %o0		! shift index into DC_way and DC_addr
 	stxa	%g0, [%o0]ASI_DC_TAG	! zero the DC_valid and DC_tag bits
@@ -2672,9 +2130,7 @@ dcache_inval_line(int index)
 	retl
 	nop
 	SET_SIZE(dcache_inval_line)
-#endif	/* lint */
 
-#if defined(lint)
 /*
  * Invalidate the entire I$
  *
@@ -2722,12 +2178,6 @@ dcache_inval_line(int index)
  * Setting the Valid bit to zero for the specified IC_way and
  * IC_addr index into the I$ results in an invalidation of an I$ line.
  */
-/*ARGSUSED*/
-void
-icache_inval_all(void)
-{
-}
-#else	/* lint */
 	ENTRY(icache_inval_all)
 	rdpr	%pstate, %o5
 	andn	%o5, PSTATE_IE, %o3
@@ -2746,17 +2196,8 @@ icache_inval_all_1:
 	retl
 	wrpr	%g0, %o5, %pstate	! restore earlier pstate
 	SET_SIZE(icache_inval_all)
-#endif	/* lint */
 
 
-#if defined(lint)
-/* ARGSUSED */
-void
-cache_scrubreq_tl1(uint64_t inum, uint64_t index)
-{
-}
-
-#else	/* lint */
 /*
  * cache_scrubreq_tl1 is the crosstrap handler called on offlined cpus via a 
  * crosstrap.  It atomically increments the outstanding request counter and,
@@ -2794,17 +2235,6 @@ cache_scrubreq_tl1(uint64_t inum, uint64_t index)
 	retry
 	SET_SIZE(cache_scrubreq_tl1)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-get_cpu_error_state(ch_cpu_errors_t *cpu_error_regs)
-{}
-
-#else	/* lint */
 
 /*
  * Get the error state for the processor.
@@ -2853,9 +2283,6 @@ get_cpu_error_state(ch_cpu_errors_t *cpu_error_regs)
 	retl
 	stx	%o1, [%o0 + CH_CPU_ERRORS_AFAR]
 	SET_SIZE(get_cpu_error_state)
-#endif	/* lint */
-
-#if defined(lint)
 
 /*
  * Check a page of memory for errors.
@@ -2867,13 +2294,6 @@ get_cpu_error_state(ch_cpu_errors_t *cpu_error_regs)
  * Used to determine if a page contains
  * CEs when CEEN is disabled.
  */
-/*ARGSUSED*/
-void
-cpu_check_block(caddr_t va, uint_t psz)
-{}
-
-#else	/* lint */
-
 	ENTRY(cpu_check_block)
 	!
 	! get a new window with room for the error regs
@@ -2912,22 +2332,12 @@ cpu_check_block(caddr_t va, uint_t psz)
 
 	SET_SIZE(cpu_check_block)
 
-#endif	/* lint */
-
-#if defined(lint)
-
 /*
  * Perform a cpu logout called from C.  This is used where we did not trap
  * for the error but still want to gather "what we can".  Caller must make
  * sure cpu private area exists and that the indicated logout area is free
  * for use, and that we are unable to migrate cpus.
  */
-/*ARGSUSED*/
-void
-cpu_delayed_logout(uint64_t afar, ch_cpu_logout_t *clop)
-{ }
-
-#else
 	ENTRY(cpu_delayed_logout)
 	rdpr	%pstate, %o2
 	andn	%o2, PSTATE_IE, %o2
@@ -2945,17 +2355,6 @@ cpu_delayed_logout(uint64_t afar, ch_cpu_logout_t *clop)
 	retl
 	  nop
 	SET_SIZE(cpu_delayed_logout)
-
-#endif	/* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-int
-dtrace_blksuword32(uintptr_t addr, uint32_t *data, int tryagain)
-{ return (0); }
-
-#else
 
 	ENTRY(dtrace_blksuword32)
 	save	%sp, -SA(MINFRAME + 4), %sp
@@ -3021,19 +2420,9 @@ dtrace_blksuword32(uintptr_t addr, uint32_t *data, int tryagain)
 
 	SET_SIZE(dtrace_blksuword32)
 
-#endif /* lint */
-
 #ifdef	CHEETAHPLUS_ERRATUM_25
 
-#if	defined(lint)
-/*
- * Claim a chunk of physical address space.
- */
-/*ARGSUSED*/
-void
-claimlines(uint64_t pa, size_t sz, int stride)
-{}
-#else	/* lint */
+	/* Claim a chunk of physical address space. */
 	ENTRY(claimlines)
 1:
 	subcc	%o1, %o2, %o1
@@ -3044,19 +2433,12 @@ claimlines(uint64_t pa, size_t sz, int stride)
 	retl
 	nop
 	SET_SIZE(claimlines)
-#endif	/* lint */
 
-#if	defined(lint)
-/*
- * CPU feature initialization,
- * turn BPE off,
- * get device id.
- */
-/*ARGSUSED*/
-void
-cpu_feature_init(void)
-{}
-#else	/* lint */
+	/*
+	 * CPU feature initialization,
+	 * turn BPE off,
+	 * get device id.
+	 */
 	ENTRY(cpu_feature_init)
 	save	%sp, -SA(MINFRAME), %sp
 	sethi	%hi(cheetah_bpe_off), %o0
@@ -3089,18 +2471,11 @@ cpu_feature_init(void)
 	ret
 	  restore
 	SET_SIZE(cpu_feature_init)
-#endif	/* lint */
 
-#if	defined(lint)
 /*
  * Copy a tsb entry atomically, from src to dest.
  * src must be 128 bit aligned.
  */
-/*ARGSUSED*/
-void
-copy_tsb_entry(uintptr_t src, uintptr_t dest)
-{}
-#else	/* lint */
 	ENTRY(copy_tsb_entry)
 	ldda	[%o0]ASI_NQUAD_LD, %o2		! %o2 = tag, %o3 = data
 	stx	%o2, [%o1]
@@ -3108,20 +2483,10 @@ copy_tsb_entry(uintptr_t src, uintptr_t dest)
 	retl
 	nop
 	SET_SIZE(copy_tsb_entry)
-#endif	/* lint */
 
 #endif	/* CHEETAHPLUS_ERRATUM_25 */
 
 #ifdef	CHEETAHPLUS_ERRATUM_34
-
-#if	defined(lint)
-
-/*ARGSUSED*/
-void
-itlb_erratum34_fixup(void)
-{}
-
-#else	/* lint */
 
 	!
 	! In Cheetah+ erratum 34, under certain conditions an ITLB locked
@@ -3187,17 +2552,6 @@ itlb_erratum34_fixup(void)
 	  wrpr	%g0, %o3, %pstate		! Enable interrupts
 	SET_SIZE(itlb_erratum34_fixup)
 
-#endif	/* lint */
-
-#if	defined(lint)
-
-/*ARGSUSED*/
-void
-dtlb_erratum34_fixup(void)
-{}
-
-#else	/* lint */
-
 	!
 	! In Cheetah+ erratum 34, under certain conditions a DTLB locked
 	! index 0 TTE will erroneously be displaced when a new TTE is
@@ -3255,8 +2609,6 @@ dtlb_erratum34_fixup(void)
 	retl
 	  wrpr	%g0, %o3, %pstate		! Enable interrupts
 	SET_SIZE(dtlb_erratum34_fixup)
-
-#endif	/* lint */
 
 #endif	/* CHEETAHPLUS_ERRATUM_34 */
 

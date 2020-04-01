@@ -37,87 +37,17 @@
 /*
  * Hypervisor "system calls"
  *
- * i386
- *	%eax == call number
- *	args in registers (%ebx, %ecx, %edx, %esi, %edi)
- *
  * amd64
  *	%rax == call number
  *	args in registers (%rdi, %rsi, %rdx, %r10, %r8, %r9)
  *
- * Note that for amd64 we use %r10 instead of %rcx for passing 4th argument
- * as in C calling convention since the "syscall" instruction clobbers %rcx.
+ * Note that we use %r10 instead of %rcx for passing 4th argument as in
+ * C calling convention since the "syscall" instruction clobbers %rcx.
  *
  * (These calls can be done more efficiently as gcc-style inlines, but
  * for simplicity and help with initial debugging, we use these primitives
  * to build the hypervisor calls up from C wrappers.)
  */
-
-#if defined(__lint)
-
-/*ARGSUSED*/
-long
-__hypercall0(int callnum)
-{ return (0); }
-
-/*ARGSUSED*/
-long
-__hypercall1(int callnum, ulong_t a1)
-{ return (0); }
-
-/*ARGSUSED*/
-long
-__hypercall2(int callnum, ulong_t a1, ulong_t a2)
-{ return (0); }
-
-/*ARGSUSED*/
-long
-__hypercall3(int callnum, ulong_t a1, ulong_t a2, ulong_t a3)
-{ return (0); }
-
-/*ARGSUSED*/
-long
-__hypercall4(int callnum, ulong_t a1, ulong_t a2, ulong_t a3, ulong_t a4)
-{ return (0); }
-
-/*ARGSUSED*/
-long
-__hypercall5(int callnum,
-    ulong_t a1, ulong_t a2, ulong_t a3, ulong_t a4, ulong_t a5)
-{ return (0); }
-
-/*ARGSUSED*/
-int
-__hypercall0_int(int callnum)
-{ return (0); }
-
-/*ARGSUSED*/
-int
-__hypercall1_int(int callnum, ulong_t a1)
-{ return (0); }
-
-/*ARGSUSED*/
-int
-__hypercall2_int(int callnum, ulong_t a1, ulong_t a2)
-{ return (0); }
-
-/*ARGSUSED*/
-int
-__hypercall3_int(int callnum, ulong_t a1, ulong_t a2, ulong_t a3)
-{ return (0); }
-
-/*ARGSUSED*/
-int
-__hypercall4_int(int callnum, ulong_t a1, ulong_t a2, ulong_t a3, ulong_t a4)
-{ return (0); }
-
-/*ARGSUSED*/
-int
-__hypercall5_int(int callnum,
-    ulong_t a1, ulong_t a2, ulong_t a3, ulong_t a4, ulong_t a5)
-{ return (0); }
-
-#else	/* __lint */
 
 /*
  * XXPV grr - assembler can't deal with an instruction in a quoted string
@@ -164,29 +94,16 @@ hypercall_shared_info_page:
 hypercall_page:
 	.skip	HYPERCALL_PAGESIZE
 	.size	hypercall_page, HYPERCALL_PAGESIZE
-#if defined(__amd64)
 #define	TRAP_INSTR			\
 	shll	$5, %eax;		\
 	addq	$hypercall_page, %rax;	\
 	INDIRECT_JMP_REG(rax);
-#else
-#define	TRAP_INSTR			\
-	shll	$5, %eax;		\
-	addl	$hypercall_page, %eax;	\
-	call	*%eax
-#endif
 
 #else /* !_xpv */
 
-#if defined(__amd64)
 #define	TRAP_INSTR	syscall
-#elif defined(__i386)
-#define	TRAP_INSTR	int $0x82
-#endif
 #endif /* !__xpv */
 
-
-#if defined(__amd64)
 
 	ENTRY_NP(__hypercall0)
 	ALTENTRY(__hypercall0_int)
@@ -245,81 +162,3 @@ hypercall_page:
 	ret
 	SET_SIZE(__hypercall5)
 
-#elif defined(__i386)
-
-	ENTRY_NP(__hypercall0)
-	ALTENTRY(__hypercall0_int)
-	movl	4(%esp), %eax
-	TRAP_INSTR
-	ret
-	SET_SIZE(__hypercall0)
-
-	ENTRY_NP(__hypercall1)
-	ALTENTRY(__hypercall1_int)
-	pushl	%ebx
-	movl	8(%esp), %eax
-	movl	12(%esp), %ebx
-	TRAP_INSTR
-	popl	%ebx
-	ret
-	SET_SIZE(__hypercall1)
-
-	ENTRY_NP(__hypercall2)
-	ALTENTRY(__hypercall2_int)
-	pushl	%ebx
-	movl	8(%esp), %eax
-	movl	12(%esp), %ebx
-	movl	16(%esp), %ecx
-	TRAP_INSTR
-	popl	%ebx
-	ret
-	SET_SIZE(__hypercall2)
-
-	ENTRY_NP(__hypercall3)
-	ALTENTRY(__hypercall3_int)
-	pushl	%ebx
-	movl	8(%esp), %eax
-	movl	12(%esp), %ebx
-	movl	16(%esp), %ecx
-	movl	20(%esp), %edx
-	TRAP_INSTR
-	popl	%ebx
-	ret
-	SET_SIZE(__hypercall3)
-
-	ENTRY_NP(__hypercall4)
-	ALTENTRY(__hypercall4_int)
-	pushl	%ebx
-	pushl	%esi
-	movl	12(%esp), %eax
-	movl	16(%esp), %ebx
-	movl	20(%esp), %ecx
-	movl	24(%esp), %edx
-	movl	28(%esp), %esi
-	TRAP_INSTR
-	popl	%esi
-	popl	%ebx
-	ret
-	SET_SIZE(__hypercall4)
-
-	ENTRY_NP(__hypercall5)
-	ALTENTRY(__hypercall5_int)
-	pushl	%ebx
-	pushl	%esi
-	pushl	%edi
-	movl	16(%esp), %eax
-	movl	20(%esp), %ebx
-	movl	24(%esp), %ecx
-	movl	28(%esp), %edx
-	movl	32(%esp), %esi
-	movl	36(%esp), %edi
-	TRAP_INSTR
-	popl	%edi
-	popl	%esi
-	popl	%ebx
-	ret
-	SET_SIZE(__hypercall5)
-
-#endif	/* __i386 */
-
-#endif	/* lint */

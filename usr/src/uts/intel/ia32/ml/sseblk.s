@@ -23,25 +23,21 @@
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include <sys/asm_linkage.h>
 #include <sys/regset.h>
 #include <sys/privregs.h>
 
-#if defined(__lint)
-#include <sys/types.h>
-#include <sys/archsystm.h>
-#else
 #include "assym.h"
-#endif
 
 /*
  * Do block operations using Streaming SIMD extensions
  */
 
 #if defined(DEBUG)
-#if defined(__amd64)
 #define	ASSERT_KPREEMPT_DISABLED(t, r32, msg)	\
 	movq	%gs:CPU_THREAD, t;		\
 	movsbl	T_PREEMPT(t), r32;		\
@@ -53,18 +49,6 @@
 	xorl	%eax, %eax;			\
 	call	panic;				\
 5:
-#elif defined(__i386)
-#define	ASSERT_KPREEMPT_DISABLED(t, r32, msg)	\
-	movl	%gs:CPU_THREAD, t;		\
-	movsbl	T_PREEMPT(t), r32;		\
-	testl	r32, r32;			\
-	jne	5f;				\
-	pushl	%ebp;				\
-	movl	%esp, %ebp;			\
-	pushl	$msg;				\
-	call	panic;				\
-5:
-#endif	/* __i386 */
 #else	/* DEBUG */
 #define	ASSERT_KPREEMPT_DISABLED(t, r32, msg)
 #endif	/* DEBUG */
@@ -75,23 +59,6 @@
 
 #if (1 << BLOCKSHIFT) != BLOCKSIZE || BLOCKMASK != (BLOCKSIZE - 1)
 #error	"mucked up constants"
-#endif
-
-#if defined(__lint)
-
-/*ARGSUSED*/
-void
-hwblkclr(void *addr, size_t size)
-{}
-
-#else	/* __lint */
-
-#if defined(__amd64)
-#define	ADD	addq
-#define	SUB	subq
-#else
-#define	ADD	addl
-#define	SUB	subl
 #endif
 
 #define	SAVE_XMM0(r)				\
@@ -106,8 +73,8 @@ hwblkclr(void *addr, size_t size)
 	movntdq	%xmm0, 0x10(dst);		\
 	movntdq	%xmm0, 0x20(dst);		\
 	movntdq	%xmm0, 0x30(dst);		\
-	ADD	$BLOCKSIZE, dst;		\
-	SUB	$1, cnt
+	addq	$BLOCKSIZE, dst;		\
+	subq	$1, cnt
 
 #define	ZERO_LOOP_FINI_XMM(dst)			\
 	mfence
@@ -115,8 +82,6 @@ hwblkclr(void *addr, size_t size)
 #define	RSTOR_XMM0(r)				\
 	movdqa	0x0(r), %xmm0;			\
 	RSTOR_XMM_EPILOG(r, 1)
-
-#if defined(__amd64)
 
 	/*
 	 * %rdi		dst
@@ -158,65 +123,6 @@ hwblkclr(void *addr, size_t size)
 	jmp	bzero
 	SET_SIZE(hwblkclr)
 
-#elif defined(__i386)
-
-	/*
-	 * %eax		dst
-	 * %ecx		size in bytes, loop count
-	 * %ebx		saved %cr0 (#if DEBUG then t->t_preempt)
-	 * %edi		pointer to %xmm register save area
-	 */
-	ENTRY(hwblkclr)
-	movl	4(%esp), %eax
-	movl	8(%esp), %ecx
-	testl	$BLOCKMASK, %eax	/* address must be BLOCKSIZE aligned */
-	jne	.dobzero
-	cmpl	$BLOCKSIZE, %ecx	/* size must be at least BLOCKSIZE */
-	jl	.dobzero
-	testl	$BLOCKMASK, %ecx 	/* .. and be a multiple of BLOCKSIZE */
-	jne	.dobzero
-	shrl	$BLOCKSHIFT, %ecx
-	movl	0xc(%esp), %edx
-	pushl	%ebx
-
-	pushl	%esi
-	ASSERT_KPREEMPT_DISABLED(%esi, %ebx, .not_disabled)
-	popl	%esi
-	movl	%cr0, %ebx
-	clts
-	testl	$CR0_TS, %ebx
-	jnz	1f
-
-	pushl	%edi
-	SAVE_XMM0(%edi)
-1:	ZERO_LOOP_INIT_XMM(%eax)
-9:	ZERO_LOOP_BODY_XMM(%eax, %ecx)
-	jnz	9b
-	ZERO_LOOP_FINI_XMM(%eax)
-
-	testl	$CR0_TS, %ebx
-	jnz	2f
-	RSTOR_XMM0(%edi)
-	popl	%edi
-2:	movl	%ebx, %cr0
-	popl	%ebx
-	ret
-.dobzero:
-	jmp	bzero
-	SET_SIZE(hwblkclr)
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
-
-#if defined(__lint)
-
-/*ARGSUSED*/
-void
-hwblkpagecopy(const void *src, void *dst)
-{}
-
-#else	/* __lint */
 
 #define	PREFETCH_START(src)			\
 	prefetchnta	0x0(src);		\
@@ -244,7 +150,7 @@ hwblkpagecopy(const void *src, void *dst)
 	movdqa	0x50(src), %xmm5;		\
 	movdqa	0x60(src), %xmm6;		\
 	movdqa	0x70(src), %xmm7;		\
-	ADD	$0x80, src
+	addq	$0x80, src
 
 #define	COPY_LOOP_BODY_XMM(src, dst, cnt)	\
 	prefetchnta	0x80(src);		\
@@ -265,10 +171,10 @@ hwblkpagecopy(const void *src, void *dst)
 	movntdq	%xmm7, 0x70(dst);		\
 	movdqa	0x40(src), %xmm4;		\
 	movdqa	0x50(src), %xmm5;		\
-	ADD	$0x80, dst;			\
+	addq	$0x80, dst;			\
 	movdqa	0x60(src), %xmm6;		\
 	movdqa	0x70(src), %xmm7;		\
-	ADD	$0x80, src;			\
+	addq	$0x80, src;			\
 	subl	$1, cnt
 
 #define	COPY_LOOP_FINI_XMM(dst)			\
@@ -291,8 +197,6 @@ hwblkpagecopy(const void *src, void *dst)
 	movdqa	0x60(r), %xmm6;			\
 	movdqa	0x70(r), %xmm7;			\
 	RSTOR_XMM_EPILOG(r, 8)
-
-#if defined(__amd64)
 
 	/*
 	 * %rdi		src
@@ -330,70 +234,6 @@ hwblkpagecopy(const void *src, void *dst)
 	ret
 	SET_SIZE(hwblkpagecopy)
 
-#elif defined(__i386)
-
-	/*
-	 * %eax		src
-	 * %edx		dst
-	 * %ecx		loop count
-	 * %ebx		saved %cr0 (#if DEBUG then t->t_prempt)
-	 * %edi		pointer to %xmm register save area
-	 * %esi		#if DEBUG temporary thread pointer
-	 */
-	ENTRY(hwblkpagecopy)
-	movl	4(%esp), %eax
-	movl	8(%esp), %edx
-	PREFETCH_START(%eax)
-	pushl	%ebx
-	/*
-	 * PAGESIZE is 4096, each loop moves 128 bytes, but the initial
-	 * load and final store save us one loop count
-	 */
-	movl	$_CONST(32 - 1), %ecx
-	pushl	%esi
-	ASSERT_KPREEMPT_DISABLED(%esi, %ebx, .not_disabled)
-	popl	%esi
-	movl	%cr0, %ebx
-	clts
-	testl	$CR0_TS, %ebx
-	jnz	3f
-	pushl	%edi
-	SAVE_XMMS(%edi)
-3:	COPY_LOOP_INIT_XMM(%eax)
-4:	COPY_LOOP_BODY_XMM(%eax, %edx, %ecx)
-	jnz	4b
-	COPY_LOOP_FINI_XMM(%edx)
-	testl	$CR0_TS, %ebx
-	jnz	5f
-	RSTOR_XMMS(%edi)
-	popl	%edi
-5:	movl	%ebx, %cr0
-	popl	%ebx
-	mfence
-	ret
-	SET_SIZE(hwblkpagecopy)
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
-#if defined(__lint)
-
-/*
- * Version of hwblkclr which doesn't use XMM registers.
- * Note that it requires aligned dst and len.
- *
- * XXPV This needs to be performance tuned at some point.
- *	Is 4 the best number of iterations to unroll?
- */
-/*ARGSUSED*/
-void
-block_zero_no_xmm(void *dst, int len)
-{}
-
-#else	/* __lint */
-
-#if defined(__amd64)
-
 	ENTRY(block_zero_no_xmm)
 	pushq	%rbp
 	movq	%rsp, %rbp
@@ -412,49 +252,6 @@ block_zero_no_xmm(void *dst, int len)
 	ret
 	SET_SIZE(block_zero_no_xmm)
 
-#elif defined(__i386)
-
-	ENTRY(block_zero_no_xmm)
-	pushl	%ebp
-	movl	%esp, %ebp
-	xorl	%eax, %eax
-	movl	8(%ebp), %edx
-	movl	12(%ebp), %ecx
-	addl	%ecx, %edx
-	negl	%ecx
-1:
-	movnti	%eax, (%edx, %ecx)
-	movnti	%eax, 4(%edx, %ecx)
-	movnti	%eax, 8(%edx, %ecx)
-	movnti	%eax, 12(%edx, %ecx)
-	addl	$16, %ecx
-	jnz	1b
-	mfence
-	leave
-	ret
-	SET_SIZE(block_zero_no_xmm)
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
-
-#if defined(__lint)
-
-/*
- * Version of page copy which doesn't use XMM registers.
- *
- * XXPV	This needs to be performance tuned at some point.
- *	Is 4 the right number of iterations to unroll?
- *	Is the load/store order optimal? Should it use prefetch?
- */
-/*ARGSUSED*/
-void
-page_copy_no_xmm(void *dst, void *src)
-{}
-
-#else	/* __lint */
-
-#if defined(__amd64)
 
 	ENTRY(page_copy_no_xmm)
 	movq	$MMU_STD_PAGESIZE, %rcx
@@ -476,36 +273,7 @@ page_copy_no_xmm(void *dst, void *src)
 	ret
 	SET_SIZE(page_copy_no_xmm)
 
-#elif defined(__i386)
-
-	ENTRY(page_copy_no_xmm)
-	pushl	%esi
-	movl	$MMU_STD_PAGESIZE, %ecx
-	movl	8(%esp), %edx
-	movl	12(%esp), %esi
-	addl	%ecx, %edx
-	addl	%ecx, %esi
-	negl	%ecx
-1:
-	movl	(%esi, %ecx), %eax
-	movnti	%eax, (%edx, %ecx)
-	movl	4(%esi, %ecx), %eax
-	movnti	%eax, 4(%edx, %ecx)
-	movl	8(%esi, %ecx), %eax
-	movnti	%eax, 8(%edx, %ecx)
-	movl	12(%esi, %ecx), %eax
-	movnti	%eax, 12(%edx, %ecx)
-	addl	$16, %ecx
-	jnz	1b
-	mfence
-	popl	%esi
-	ret
-	SET_SIZE(page_copy_no_xmm)
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
-#if defined(DEBUG) && !defined(__lint)
+#if defined(DEBUG)
 	.text
 .not_disabled:
 	.string	"sseblk: preemption not disabled!"

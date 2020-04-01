@@ -31,14 +31,6 @@
 #include <sys/psw.h>
 #include <sys/machbrand.h>
 
-#if defined(__lint)
-
-#include <sys/types.h>
-#include <sys/thread.h>
-#include <sys/systm.h>
-
-#else	/* __lint */
-
 #include <sys/segments.h>
 #include <sys/pcb.h>
 #include <sys/trap.h>
@@ -53,8 +45,6 @@
 #endif
 
 #include "assym.h"
-
-#endif	/* __lint */
 
 /*
  * We implement five flavours of system call entry points
@@ -286,8 +276,6 @@
 
 #if defined(DEBUG)
 
-#if !defined(__lint)
-
 __lwptoregs_msg:
 	.string	"syscall_asm_amd64.s:%d lwptoregs(%p) [%p] != rp [%p]"
 
@@ -298,9 +286,7 @@ __no_rupdate_msg:
 	.string	"syscall_asm_amd64.s:%d lwp %p, pcb_rupdate != 0"
 
 __bad_ts_msg:
-	.string "sysscall_asm_amd64.s:%d CR0.TS set on user return"
-
-#endif	/* !__lint */
+	.string "syscall_asm_amd64.s:%d CR0.TS set on user return"
 
 #define	ASSERT_LWPTOREGS(lwp, rp)			\
 	movq	LWP_REGS(lwp), %r11;			\
@@ -432,21 +418,6 @@ __bad_ts_msg:
 #else
 #define	XPV_SYSCALL_PROD /* nothing */
 #endif
-
-#if defined(__lint)
-
-/*ARGSUSED*/
-void
-sys_syscall()
-{}
-
-void
-_allsyscalls()
-{}
-
-size_t _allsyscalls_size;
-
-#else	/* __lint */
 
 	ENTRY_NP2(brand_sys_syscall,_allsyscalls)
 	SWAPGS				/* kernel gsbase */
@@ -799,17 +770,6 @@ _syscall_post_call:
 	SET_SIZE(sys_syscall)
 	SET_SIZE(brand_sys_syscall)
 
-#endif	/* __lint */
-
-#if defined(__lint)
-
-/*ARGSUSED*/
-void
-sys_syscall32()
-{}
-
-#else	/* __lint */
-
 	ENTRY_NP(brand_sys_syscall32)
 	SWAPGS				/* kernel gsbase */
 	XPV_TRAP_POP
@@ -1069,8 +1029,6 @@ _full_syscall_postsys32:
 	SET_SIZE(sys_syscall32)
 	SET_SIZE(brand_sys_syscall32)
 
-#endif	/* __lint */
-
 /*
  * System call handler via the sysenter instruction
  * Used only for 32-bit system calls on the 64-bit kernel.
@@ -1111,13 +1069,6 @@ _full_syscall_postsys32:
  * one mentioned above.  To avoid this situation, we simply add a jump over the
  * instruction at sys_sysenter to make it impossible to single-step to it.
  */
-#if defined(__lint)
-
-void
-sys_sysenter()
-{}
-
-#else	/* __lint */
 
 	ENTRY_NP(brand_sys_sysenter)
 	SWAPGS				/* kernel gsbase */
@@ -1348,89 +1299,11 @@ sys_sysenter()
 	SET_SIZE(_sys_sysenter_post_swapgs)
 	SET_SIZE(brand_sys_sysenter)
 
-#endif	/* __lint */
-
-#if defined(__lint)
-/*
- * System call via an int80.  This entry point is only used by the Linux
- * application environment.  Unlike the other entry points, there is no
- * default action to take if no callback is registered for this process.
- */
-void
-sys_int80()
-{}
-
-#else	/* __lint */
-
-	ENTRY_NP(brand_sys_int80)
-	SWAPGS				/* kernel gsbase */
-	XPV_TRAP_POP
-	call	smap_enable
-
-	/*
-	 * We first attempt to call the "b_int80" handler from the "struct
-	 * brand_mach_ops" for this brand.  If no handler function is installed
-	 * for this brand, the BRAND_CALLBACK() macro returns here and we
-	 * check the lwp for a "lwp_brand_syscall" handler.
-	 */
-	BRAND_CALLBACK(BRAND_CB_INT80, BRAND_URET_FROM_INTR_STACK())
-
-	/*
-	 * Check to see if this lwp provides "lwp_brand_syscall".  If so, we
-	 * will route this int80 through the regular system call handling path.
-	 */
-	movq	%r15, %gs:CPU_RTMP_R15
-	movq	%gs:CPU_THREAD, %r15
-	movq	T_LWP(%r15), %r15
-	movq	LWP_BRAND_SYSCALL(%r15), %r15
-	testq	%r15, %r15
-	movq	%gs:CPU_RTMP_R15, %r15
-	jnz	nopop_syscall_int
-
-	/*
-	 * The brand provided neither a "b_int80", nor a "lwp_brand_syscall"
-	 * function, and has thus opted out of handling this trap.
-	 */
-	SWAPGS				/* user gsbase */
-	jmp	nopop_int80
-
-	ENTRY_NP(sys_int80)
-	/*
-	 * We hit an int80, but this process isn't of a brand with an int80
-	 * handler.  Bad process!  Make it look as if the INT failed.
-	 * Modify %rip to point before the INT, push the expected error
-	 * code and fake a GP fault. Note on 64-bit hypervisor we need
-	 * to undo the XPV_TRAP_POP and push rcx and r11 back on the stack
-	 * because gptrap will pop them again with its own XPV_TRAP_POP.
-	 */
-	XPV_TRAP_POP
-	call	smap_enable
-nopop_int80:
-	subq	$2, (%rsp)	/* int insn 2-bytes */
-	pushq	$_CONST(_MUL(T_INT80, GATE_DESC_SIZE) + 2)
-#if defined(__xpv)
-	push	%r11
-	push	%rcx
-#endif
-	jmp	gptrap			/ GP fault
-	SET_SIZE(sys_int80)
-	SET_SIZE(brand_sys_int80)
-#endif	/* __lint */
-
-
 /*
  * This is the destination of the "int $T_SYSCALLINT" interrupt gate, used by
  * the generic i386 libc to do system calls. We do a small amount of setup
  * before jumping into the existing sys_syscall32 path.
  */
-#if defined(__lint)
-
-/*ARGSUSED*/
-void
-sys_syscall_int()
-{}
-
-#else	/* __lint */
 
 	ENTRY_NP(brand_sys_syscall_int)
 	SWAPGS				/* kernel gsbase */
@@ -1474,8 +1347,6 @@ nopop_syscall_int:
 	SET_SIZE(sys_syscall_int)
 	SET_SIZE(brand_sys_syscall_int)
 
-#endif	/* __lint */
-
 /*
  * Legacy 32-bit applications and old libc implementations do lcalls;
  * we should never get here because the LDT entry containing the syscall
@@ -1489,15 +1360,6 @@ nopop_syscall_int:
  * this problem, and end up depending explicitly on the first
  * instruction of this handler being either swapgs or cli.
  */
-
-#if defined(__lint)
-
-/*ARGSUSED*/
-void
-sys_lcall32()
-{}
-
-#else	/* __lint */
 
 	ENTRY_NP(sys_lcall32)
 	SWAPGS				/* kernel gsbase */
@@ -1523,25 +1385,9 @@ _allsyscalls_size:
 	.NWORD	. - _allsyscalls
 	SET_SIZE(_allsyscalls_size)
 
-#endif	/* __lint */
-
 /*
  * These are the thread context handlers for lwps using sysenter/sysexit.
  */
-
-#if defined(__lint)
-
-/*ARGSUSED*/
-void
-sep_save(void *ksp)
-{}
-
-/*ARGSUSED*/
-void
-sep_restore(void *ksp)
-{}
-
-#else	/* __lint */
 
 	/*
 	 * setting this value to zero as we switch away causes the
@@ -1569,4 +1415,3 @@ sep_restore(void *ksp)
 	ret
 	SET_SIZE(sep_restore)
 
-#endif	/* __lint */

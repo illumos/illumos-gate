@@ -26,12 +26,6 @@
  */
 
 
-#if defined(__lint)
-
-int fb_swtch_silence_lint = 0;
-
-#else
-
 #include <sys/asm_linkage.h>
 #include <sys/segments.h>
 #include <sys/controlregs.h>
@@ -96,7 +90,6 @@ _start:
 	/* Disable interrupts */
 	cli
 
-#if defined(__amd64)
 	/* Switch to a low memory stack */
 	movq	$_start, %rsp
 	addq	$FASTBOOT_STACK_OFFSET, %rsp
@@ -112,23 +105,6 @@ _start:
 	rep
 	  smovb
 
-#elif defined(__i386)
-	movl	0x4(%esp), %esi	/* address of fastboot info struct */
-
-	/* Switch to a low memory stack */
-	movl	$_start, %esp
-	addl	$FASTBOOT_STACK_OFFSET, %esp
-
-	/* Copy struct to stack */
-	movl	%esp, %edi	/* destination on the new stack */
-	movl	$FI_VALID, %ecx	/* size to copy */
-	rep
-	  smovb
-
-#endif
-
-#if defined(__amd64)
-
 	xorl	%eax, %eax
 	xorl	%edx, %edx
 
@@ -141,11 +117,9 @@ _start:
 	movl	$MSR_AMD_KGSBASE, %ecx
 	wrmsr
 
-#endif
 	/*
 	 * zero out all the registers to make sure they're 16 bit clean
 	 */
-#if defined(__amd64)
 	xorq	%r8, %r8
 	xorq	%r9, %r9
 	xorq	%r10, %r10
@@ -154,25 +128,21 @@ _start:
 	xorq	%r13, %r13
 	xorq	%r14, %r14
 	xorq	%r15, %r15
-#endif
 	xorl	%eax, %eax
 	xorl	%ebx, %ebx
 	xorl	%ecx, %ecx
 	xorl	%edx, %edx
 	xorl	%ebp, %ebp
 
-#if defined(__amd64)
 	/*
 	 * Load our own GDT
 	 */
 	lgdt	gdt_info
-#endif
 	/*
 	 * Load our own IDT
 	 */
 	lidt	idt_info
 
-#if defined(__amd64)
 	/*
 	 * Invalidate all TLB entries.
 	 * Load temporary pagetables to copy kernel and boot-archive
@@ -229,13 +199,10 @@ _start:
 	 * - turning off PCID in cr4
 	 * - disabling LME (long mode enable) in EFER (extended feature reg)
 	 */
-#endif
 	DISABLE_PAGING		/* clobbers %eax */
 
-#if defined(__amd64)
 	ljmp	$B32CODE_SEL, $1f
 1:
-#endif
 
 	/*
 	 * Clear PGE, PAE and PSE flags as dboot expects them to be
@@ -245,67 +212,10 @@ _start:
 	andl	$_BITNOT(CR4_PGE | CR4_PAE | CR4_PSE), %eax
 	movl	%eax, %cr4
 
-#if defined(__amd64)
 	movl	$MSR_AMD_EFER, %ecx	/* Extended Feature Enable */
 	rdmsr
 	btcl	$8, %eax		/* bit 8 Long Mode Enable bit */
 	wrmsr
-
-#elif defined(__i386)
-	/*
-	 * If fi_has_pae is set, re-enable paging with PAE.
-	 */
-	leal	FI_FILES(%esp), %ebx	/* offset to the files */
-	movl	FI_HAS_PAE(%esp), %edi	/* need to enable paging or not */
-	cmpl	$0, %edi
-	je	paging_on		/* no need to enable paging */
-
-	movl	FI_LAST_TABLE_PA(%esp), %esi	/* page table PA */
-
-	/*
-	 * Turn on PAE
-	 */
-	movl	%cr4, %eax
-	orl	$CR4_PAE, %eax
-	movl	%eax, %cr4
-
-	/*
-	 * Load top pagetable base address into cr3
-	 */
-	movl	FI_PAGETABLE_PA(%esp), %eax
-	movl	%eax, %cr3
-
-	movl	%cr0, %eax
-	orl	$_CONST(CR0_PG | CR0_WP | CR0_AM), %eax
-	andl	$_BITNOT(CR0_NW | CR0_CD), %eax
-	movl	%eax, %cr0
-	jmp	paging_on
-paging_on:
-
-	/* copy unix to final destination */
-	leal	_MUL(FASTBOOT_UNIX, FI_FILES_INCR)(%ebx), %edx
-	call	map_copy
-
-	/* copy boot archive to final destination */
-	leal	_MUL(FASTBOOT_BOOTARCHIVE, FI_FILES_INCR)(%ebx), %edx
-	call	map_copy
-
-	/* Disable paging one more time */
-	DISABLE_PAGING
-
-	/* Copy sections if there are any */ 
-	leal	_MUL(FASTBOOT_UNIX, FI_FILES_INCR)(%ebx), %edx
-	movl	FB_SECTCNT(%edx), %eax
-	cmpl	$0, %eax
-	je	1f
-	call	copy_sections
-1:
-
-	/* Whatever flags we turn on we need to turn off */
-	movl	%cr4, %eax
-	andl	$_BITNOT(CR4_PAE), %eax
-	movl	%eax, %cr4
-#endif	/* __i386 */
 
 dboot_jump:
 	/* Jump to dboot */
@@ -313,8 +223,6 @@ dboot_jump:
 	movl	FI_NEW_MBI_PA(%esp), %ebx
 	movl	$MB_BOOTLOADER_MAGIC, %eax
 	jmp	*%edi
-
-#if defined(__amd64)
 
 	.code64
 	ENTRY_NP(copy_sections)
@@ -361,89 +269,6 @@ dboot_jump:
 	ret
 	SET_SIZE(map_copy)	
 
-#elif defined(__i386)
-
-	ENTRY_NP(copy_sections)
-	/*
-	 * On entry
-	 *	%edx points to the fboot_file_t
-	 *	%eax contains the number of sections
-	 */
-	pushl	%ebp
-	pushl	%ebx
-	pushl	%esi
-	pushl	%edi
-
-	movl	%eax, %ebp
-
-	COPY_SECT(%edx, %ebx, %ebp)
-
-	popl	%edi
-	popl	%esi
-	popl	%ebx
-	popl	%ebp
-	ret
-	SET_SIZE(copy_sections)	
-
-	ENTRY_NP(map_copy)
-	/*
-	 * On entry
-	 *	%edx points to the fboot_file_t
-	 *	%edi has FB_HAS_PAE(%esp)
-	 *	%esi has FI_LAST_TABLE_PA(%esp)
-	 */
-	pushl	%eax
-	pushl	%ebx
-	pushl	%ecx
-	pushl	%edx
-	pushl	%ebp
-	pushl	%esi
-	pushl	%edi
-	movl	%esi, %ebp	/* Save page table PA in %ebp */
-
-	movl	FB_PTE_LIST_PA(%edx), %eax	/* PA list of the source */
-	movl	FB_DEST_PA(%edx), %ebx		/* PA of the destination */
-
-loop:
-	movl	(%eax), %esi			/* Are we done? */
-	cmpl	$FASTBOOT_TERMINATE, %esi
-	je	done
-
-	cmpl	$1, (%esp)			/* Is paging on? */
-	jne	no_paging			/* Nope */
-
-	movl	%ebp, %edi			/* Page table PA */
-	movl	%esi, (%edi)			/* Program low 32-bit */
-	movl	4(%eax), %esi			/* high bits of the table */
-	movl	%esi, 4(%edi)			/* Program high 32-bit */
-	movl	%cr3, %esi			/* Reload cr3 */
-	movl	%esi, %cr3
-	movl	FB_VA(%edx), %esi		/* Load from VA */
-	jmp	do_copy
-no_paging:
-	andl	$_BITNOT(MMU_PAGEOFFSET), %esi	/* clear lower 12-bit */
-do_copy:
-	movl	%ebx, %edi
-	movl	$PAGESIZE, %ecx
-	shrl	$2, %ecx	/* 4-byte at a time */
-	rep
-	  smovl
-	addl	$8, %eax /* We built the PTEs as 8-byte entries */
-	addl	$PAGESIZE, %ebx
-	jmp	loop
-done:
-	popl	%edi
-	popl	%esi
-	popl	%ebp
-	popl	%edx
-	popl	%ecx
-	popl	%ebx
-	popl	%eax
-	ret
-	SET_SIZE(map_copy)	
-#endif	/* __i386 */
-
-
 idt_info:
 	.value	0x3ff
 	.quad	0
@@ -452,4 +277,3 @@ idt_info:
  * We need to trampoline thru a gdt we have in low memory.
  */
 #include "../boot/boot_gdt.s"
-#endif /* __lint */

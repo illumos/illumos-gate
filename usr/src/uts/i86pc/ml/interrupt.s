@@ -36,14 +36,6 @@
 #include <sys/psw.h>
 #include <sys/x86_archext.h>
 
-#if defined(__lint)
-
-#include <sys/types.h>
-#include <sys/thread.h>
-#include <sys/systm.h>
-
-#else   /* __lint */
-
 #include <sys/segments.h>
 #include <sys/pcb.h>
 #include <sys/trap.h>
@@ -52,18 +44,6 @@
 #include <sys/clock.h>
 #include <sys/panic.h>
 #include "assym.h"
-
-#endif	/* lint */
-
-#if defined(__lint)
-
-void
-_interrupt(void)
-{}
-
-#else	/* __lint */
-
-#if defined(__amd64)
 
 	/*
 	 * Common register usage:
@@ -109,38 +89,6 @@ _interrupt(void)
 	SET_SIZE(cmnint)
 	SET_SIZE(_interrupt)
 
-#elif defined(__i386)
-
-	ENTRY_NP2(cmnint, _interrupt)
-
-	INTR_PUSH
-	INTGATE_INIT_KERNEL_FLAGS
-
-	/*
-	 * At the end of TRACE_PTR %esi points to the current TRAPTRACE entry
-	 */
-	TRACE_PTR(%esi, %eax, %eax, %edx, $TT_INTERRUPT)
-						/* Uses labels 8 and 9 */
-	TRACE_REGS(%esi, %esp, %eax, %ebx)	/* Uses label 9 */
-	TRACE_STAMP(%esi)		/* Clobbers %eax, %edx, uses 9 */
-
-	movl	%esp, %ebp
-
-	TRACE_STACK(%esi)
-
-	pushl	%esi			/* pass traptrace record pointer */
-	pushl	%ebp			/* pass struct regs pointer */
-	call	*do_interrupt_common	/* interrupt service routine */
-	addl	$8, %esp		/* pop args off of stack */
-
-	jmp	_sys_rtt_ints_disabled
-	/*NOTREACHED*/
-
-	SET_SIZE(cmnint)
-	SET_SIZE(_interrupt)
-
-#endif	/* __i386 */
-
 /*
  * Declare a uintptr_t which has the size of _interrupt to enable stack
  * traceback code to know when a regs structure is on the stack.
@@ -151,33 +99,20 @@ _interrupt_size:
 	.NWORD	. - _interrupt
 	.type	_interrupt_size, @object
 
-#endif	/* __lint */
-
-#if defined(__lint)
-
-void
-fakesoftint(void)
-{}
-
-#else	/* __lint */
-
-	/
-	/ If we're here, we're being called from splx() to fake a soft
-	/ interrupt (note that interrupts are still disabled from splx()).
-	/ We execute this code when a soft interrupt is posted at
-	/ level higher than the CPU's current spl; when spl is lowered in
-	/ splx(), it will see the softint and jump here.  We'll do exactly
-	/ what a trap would do:  push our flags, %cs, %eip, error code
-	/ and trap number (T_SOFTINT).  The cmnint() code will see T_SOFTINT
-	/ and branch to the dosoftint() code.
-	/
-#if defined(__amd64)
-
 	/*
-	 * In 64-bit mode, iretq -always- pops all five regs
-	 * Imitate the 16-byte auto-align of the stack, and the
-	 * zero-ed out %ss value.
+	 * If we're here, we're being called from splx() to fake a soft
+	 * interrupt (note that interrupts are still disabled from
+	 * splx()).  We execute this code when a soft interrupt is
+	 * posted at level higher than the CPU's current spl; when spl
+	 * is lowered in splx(), it will see the softint and jump here.
+	 * We'll do exactly what a trap would do:  push our flags, %cs,
+	 * %rip, error code and trap number (T_SOFTINT).  The cmnint()
+	 * code will see T_SOFTINT and branch to the dosoftint() code.
+	 *
+	 * iretq -always- pops all five regs. Imitate the 16-byte
+	 * auto-align of the stack, and the zero-ed out %ss value.
 	 */
+
 	ENTRY_NP(fakesoftint)
 	movq	%rsp, %r11
 	andq	$-16, %rsp
@@ -200,24 +135,3 @@ fakesoftint(void)
 	SET_SIZE(fakesoftint_return)
 	SET_SIZE(fakesoftint)
 
-#elif defined(__i386)
-
-	ENTRY_NP(fakesoftint)
-	pushfl
-#if defined(__xpv)
-	popl	%eax
-	EVENT_MASK_TO_IE(%edx, %eax)
-	pushl	%eax
-#endif
-	pushl	%cs
-	pushl	$fakesoftint_return
-	pushl	$0
-	pushl	$T_SOFTINT
-	jmp	cmnint
-	ALTENTRY(fakesoftint_return)
-	ret
-	SET_SIZE(fakesoftint_return)
-	SET_SIZE(fakesoftint)
-
-#endif	/* __i386 */
-#endif	/* __lint */

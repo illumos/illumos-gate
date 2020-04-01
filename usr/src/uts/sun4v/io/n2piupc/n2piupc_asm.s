@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Assembly language support for the n2piupc N2 PIU performance counter driver.
  */
@@ -35,20 +33,6 @@
 #include "n2piupc_acc.h"
 
 /*LINTLIBRARY*/
-
-#if defined(lint)
-
-/*ARGSUSED*/	
-int
-n2piupc_get_perfreg(cntr_handle_t handle, int regid, uint64_t *data)
-{ return (0); }
-
-/*ARGSUSED*/	
-int
-n2piupc_set_perfreg(cntr_handle_t handle, int regid, uint64_t data)
-{ return (0); }
-
-#else /* lint */
 
 	ENTRY(n2piupc_get_perfreg)
 	mov	N2PIU_GET_PERFREG, %o5
@@ -66,4 +50,3 @@ n2piupc_set_perfreg(cntr_handle_t handle, int regid, uint64_t data)
 	nop
 	SET_SIZE(n2piupc_set_perfreg)
 
-#endif

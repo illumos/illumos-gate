@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Assembly language support for sun4v px driver
  */
@@ -37,22 +35,6 @@
 #include "fpc-impl-4v.h"
 
 /*LINTLIBRARY*/
-
-#if defined(lint)
-
-#include "fpc-impl-4v.h"
-
-/*ARGSUSED*/	
-int
-fpc_get_fire_perfreg(devhandle_t dev_hdl, int regid, uint64_t *data)
-{ return (0); }
-
-/*ARGSUSED*/	
-int
-fpc_set_fire_perfreg(devhandle_t dev_hdl, int regid, uint64_t data)
-{ return (0); }
-
-#else /* lint */
 
 	/*
 	 * fpc_get_fire_perfreg(devhandle_t dev_hdl, int regid, uint64_t *data)
@@ -77,4 +59,3 @@ fpc_set_fire_perfreg(devhandle_t dev_hdl, int regid, uint64_t data)
 	SET_SIZE(fpc_set_fire_perfreg)
 
 
-#endif

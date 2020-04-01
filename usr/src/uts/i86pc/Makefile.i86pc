@@ -26,6 +26,7 @@
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 # Copyright 2019 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2019 Joyent, Inc.
 #
 #
 #	This makefile contains the common definitions for the i86pc unix
@@ -99,15 +100,6 @@ DEF_BUILDS		= $(DEF_BUILDS64)
 ALL_BUILDS		= $(ALL_BUILDS64)
 
 #
-#	x86 or amd64 inline templates
-#
-INLINES_32		= $(UTSBASE)/intel/ia32/ml/ia32.il \
-			  $(UTSBASE)/$(PLATFORM)/ml/ia32.il
-INLINES_64		= $(UTSBASE)/intel/amd64/ml/amd64.il \
-			  $(UTSBASE)/$(PLATFORM)/ml/amd64.il
-INLINES			+= $(INLINES_$(CLASS))
-
-#
 #	kernel-specific optimizations; override default in Makefile.master
 #
 
@@ -121,7 +113,7 @@ COPTIMIZE		= $(COPTFLAG_$(CLASS))
 
 CFLAGS			= $(CFLAGS_XARCH)
 CFLAGS			+= $(COPTIMIZE)
-CFLAGS			+= $(INLINES) -D_ASM_INLINES
+CFLAGS			+= -D_ASM_INLINES
 CFLAGS			+= $(CCMODE)
 CFLAGS			+= $(SPACEFLAG)
 CFLAGS			+= $(CCUNBOUND)
@@ -147,9 +139,7 @@ UNIX_MAPFILE	 = $(UTSBASE)/$(PLATFORM)/conf/Mapfile
 MODSTUBS	 = $(UTSBASE)/intel/ia32/ml/modstubs.s
 GENASSYM_SRC	 = $(UTSBASE)/$(PLATFORM)/ml/genassym.c
 OFFSETS_SRC	 = $(UTSBASE)/$(PLATFORM)/ml/offsets.in
-PLATFORM_OFFSETS_32	= $(UTSBASE)/$(PLATFORM)/ml/mach_offsets.in
-PLATFORM_OFFSETS_64	= $(UTSBASE)/intel/amd64/ml/mach_offsets.in
-PLATFORM_OFFSETS_SRC	= $(PLATFORM_OFFSETS_$(CLASS))
+PLATFORM_OFFSETS_SRC	= $(UTSBASE)/intel/amd64/ml/mach_offsets.in
 KDI_OFFSETS_SRC	 = $(UTSBASE)/intel/kdi/kdi_offsets.in
 
 #
@@ -186,7 +176,6 @@ DEBUG_COND_DBG64	=
 IF_DEBUG_OBJ		= $(DEBUG_COND_$(BUILD_TYPE))$(OBJS_DIR)/
 
 $(IF_DEBUG_OBJ)trap.o		:= DEBUG_DEFS += -DTRAPDEBUG -DTRAPTRACE
-$(IF_DEBUG_OBJ)syscall_asm.o	:= DEBUG_DEFS += -DSYSCALLTRACE -DTRAPTRACE
 $(IF_DEBUG_OBJ)syscall_asm_amd64.o := DEBUG_DEFS += -DSYSCALLTRACE -DTRAPTRACE
 $(IF_DEBUG_OBJ)fast_trap_asm.o	:= DEBUG_DEFS += -DTRAPTRACE
 $(IF_DEBUG_OBJ)interrupt.o	:= DEBUG_DEFS += -DTRAPTRACE

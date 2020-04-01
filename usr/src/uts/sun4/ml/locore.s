@@ -24,31 +24,13 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#if defined(lint)
-#include <sys/types.h>
-#include <sys/t_lock.h>
-#include <sys/promif.h>
-#include <sys/prom_isa.h>
-#endif	/* lint */
-
 #include <sys/asm_linkage.h>
 #include <sys/privregs.h>
 #include <sys/scb.h>
 #include <sys/machparam.h>
 #include <sys/machthread.h>
 
-#if defined(lint)
-
-#include <sys/thread.h>
-#include <sys/time.h>
-
-#else	/* lint */
-
 #include "assym.h"
-
-#endif	/* lint */
 
 /*
  * void
@@ -59,14 +41,6 @@
  *	The CPU_ADDR macro figures out the cpuid by reading hardware registers.
  */
 
-#if defined(lint)
-
-void
-reestablish_curthread(void)
-{}
-
-#else	/* lint */
-
 	ENTRY_NP(reestablish_curthread)
 
 	CPU_ADDR(%o0, %o1)
@@ -75,26 +49,15 @@ reestablish_curthread(void)
 	SET_SIZE(reestablish_curthread)
 
 
-#endif	/* lint */
-
 /*
  * Return the current THREAD pointer.
  * This is also available as an inline function.
  */
-#if defined(lint)
-
-kthread_id_t
-threadp(void)
-{ return ((kthread_id_t)0); }
-
-#else	/* lint */
 
 	ENTRY_NP(threadp)
 	retl
 	mov	THREAD_REG, %o0
 	SET_SIZE(threadp)
-
-#endif	/* lint */
 
 
 /*
@@ -108,18 +71,6 @@ threadp(void)
  * called with %tba pointing to the boot firmware's trap table.  All of
  * the prom's window handlers are mixed mode handlers.
  */
-
-#if defined(lint)
-
-int
-callback_handler(cell_t *arg_array)
-{
-	extern int vx_handler(cell_t *arg_array);
-
-	return (vx_handler(arg_array));
-}
-
-#else	/* lint */
 
 	ENTRY_NP(callback_handler)
 	!
@@ -153,6 +104,4 @@ callback_handler(cell_t *arg_array)
 	ret					! return result in %o0
 	restore					! back to a 64 bit stack
 	SET_SIZE(callback_handler)
-
-#endif	/* lint */
 

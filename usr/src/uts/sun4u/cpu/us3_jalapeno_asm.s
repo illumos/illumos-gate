@@ -26,11 +26,7 @@
  * Assembly code support for the jalapeno module
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#if !defined(lint)
 #include "assym.h"
-#endif	/* lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/mmu.h>
@@ -53,8 +49,6 @@
 #ifdef TRAPTRACE
 #include <sys/traptrace.h>
 #endif /* TRAPTRACE */
-
-#if !defined(lint)
 
 /* BEGIN CSTYLED */
 
@@ -324,17 +318,6 @@
 
 /* END CSTYLED */
 
-#endif	/* !lint */
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-shipit(int upaid, int bn)
-{ return; }
-
-#else	/* lint */
-
 /*
  * Ship mondo to aid using implicit busy/nack pair (bn ignored)
  */
@@ -347,8 +330,6 @@ shipit(int upaid, int bn)
 	nop
 	SET_SIZE(shipit)
 
-#endif	/* lint */
-
 
 /*
  * flush_ecache:
@@ -356,14 +337,6 @@ shipit(int upaid, int bn)
  *	%o1 - ecache size
  *	%o2 - ecache linesize
  */
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-flush_ecache(uint64_t physaddr, size_t ecache_size, size_t ecache_linesize)
-{}
-
-#else /* !lint */
 
 	ENTRY(flush_ecache)
 #if defined(JALAPENO) && defined(JALAPENO_ERRATA_85)
@@ -387,16 +360,6 @@ flush_ecache_2:
 	nop
 	SET_SIZE(flush_ecache)
 
-#endif /* lint */
-
-
-#if defined(lint)
-
-void
-fast_ecc_err(void)
-{}
-
-#else	/* lint */
 
 	.section ".text"
 	.align	64
@@ -528,8 +491,6 @@ fast_ecc_err_4:
 
 	SET_SIZE(fast_ecc_err)
 
-#endif	/* lint */
-
 
 /*
  * Fast ECC error at TL>0 handler
@@ -539,13 +500,6 @@ fast_ecc_err_4:
  * comment block "Cheetah/Cheetah+ Fast ECC at TL>0 trap strategy" in
  * us3_common_asm.s
  */
-#if defined(lint)
-
-void
-fast_ecc_tl1_err(void)
-{}
-
-#else	/* lint */
 
 	.section ".text"
 	.align	64
@@ -770,30 +724,6 @@ skip_traptrace:
 
 	SET_SIZE(fast_ecc_tl1_err)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-
-uint64_t
-get_jbus_config(void)
-{ return (0); }
-
-/* ARGSUSED */
-void
-set_jbus_config(uint64_t jbus_config)
-{}
-
-/* ARGSUSED */
-void
-set_mcu_ctl_reg1(uint64_t mcu_ctl)
-{}
-
-uint64_t
-get_mcu_ctl_reg1(void)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(get_jbus_config)
 	ldxa	[%g0]ASI_JBUS_CONFIG, %o0
@@ -823,10 +753,7 @@ get_mcu_ctl_reg1(void)
 	nop
 	SET_SIZE(set_mcu_ctl_reg1)
 
-#endif	/* lint */
 
-
-#if defined(lint)
 /*
  * scrubphys - Pass in the aligned physical memory address
  * that you want to scrub, along with the ecache set size.
@@ -849,12 +776,6 @@ get_mcu_ctl_reg1(void)
  * will stay E, if the store doesn't happen. So the first displacement flush
  * should ensure that the CAS will miss in the E$.  Arrgh.
  */
-/* ARGSUSED */
-void
-scrubphys(uint64_t paddr, int ecache_set_size)
-{}
-
-#else	/* lint */
 	ENTRY(scrubphys)
 	rdpr	%pstate, %o4
 	andn	%o4, PSTATE_IE | PSTATE_AM, %o5
@@ -882,10 +803,6 @@ scrubphys_2:
 	membar	#Sync			! move the data out of the load buffer
 	SET_SIZE(scrubphys)
 
-#endif	/* lint */
-
-
-#if defined(lint)
 /*
  * clearphys - Pass in the physical memory address of the checkblock
  * that you want to push out, cleared with a recognizable pattern,
@@ -896,13 +813,6 @@ scrubphys_2:
  * in an entire ecache subblock's worth of data, and write it back out.
  * Then we overwrite the 16 bytes of bad data with the pattern.
  */
-/* ARGSUSED */
-void
-clearphys(uint64_t paddr, int ecache_set_size, int ecache_linesize)
-{
-}
-
-#else	/* lint */
 	ENTRY(clearphys)
 	/* turn off IE, AM bits */
 	rdpr	%pstate, %o4
@@ -962,10 +872,7 @@ clearphys_2:
 	  wrpr	%g0, %o4, %pstate
 	SET_SIZE(clearphys)
 
-#endif	/* lint */
-	
 
-#if defined(lint)
 /*
  * Jalapeno Ecache displacement flush the specified line from the E$
  *
@@ -973,12 +880,6 @@ clearphys_2:
  *	%o0 - 64 bit physical address for flushing
  *	%o1 - Ecache set size
  */
-/*ARGSUSED*/
-void
-ecache_flush_line(uint64_t flushaddr, int ec_set_size)
-{
-}
-#else	/* lint */
 	ENTRY(ecache_flush_line)
 
 #if defined(JALAPENO) && defined(JALAPENO_ERRATA_85)
@@ -998,7 +899,6 @@ ecache_flush_line_2:
 	retl
 	  nop
 	SET_SIZE(ecache_flush_line)
-#endif	/* lint */
 
 
 /*
@@ -1006,12 +906,6 @@ ecache_flush_line_2:
  * Called only from Fire systems.
  * CPU's internal "invalidate FIFOs" are flushed.
  */
-
-#if defined(lint)
-void
-jbus_stst_order()
-{}
-#else	/* lint */
 
 #define	VIS_BLOCKSIZE	64
 
@@ -1035,21 +929,11 @@ sync_buf:
 	membar  #Sync
 	SET_SIZE(jbus_stst_order)
 
-#endif	/* lint */
-
-#if defined(lint)
 /*
  * This routine will not be called in Jalapeno systems.
  */
-void
-flush_ipb(void)
-{ return; }
-
-#else	/* lint */
-
 	ENTRY(flush_ipb)
 	retl
 	nop
 	SET_SIZE(flush_ipb)
 
-#endif	/* lint */

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Hypervisor calls called by niu leaf driver.
 */
@@ -42,35 +40,6 @@
 #define N2NIU_VRRX_SET_INO	0x150
 #define N2NIU_VRTX_SET_INO	0x151
 
-
-#if defined(lint) || defined(__lint)
-
-/*ARGSUSED*/
-uint64_t
-vdds_hv_niu_vr_getinfo(uint32_t cookie, uint64_t *real_start, uint64_t *size)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-vdds_hv_niu_vr_get_rxmap(uint32_t cookie, uint64_t *dma_map)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-vdds_hv_niu_vr_get_txmap(uint32_t cookie, uint64_t *dma_map)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-vdds_hv_niu_vrtx_set_ino(uint32_t cookie, uint64_t vch_idx, uint32_t ino)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-vdds_hv_niu_vrrx_set_ino(uint32_t cookie, uint64_t vch_idx, uint32_t ino)
-{ return (0); }
-
-#else	/* lint || __lint */
 
 	/*
 	 * vdds_hv_niu_vr_getinfo(uint32_t cookie, uint64_t &real_start,
@@ -128,4 +97,3 @@ vdds_hv_niu_vrrx_set_ino(uint32_t cookie, uint64_t vch_idx, uint32_t ino)
 	nop
 	SET_SIZE(vdds_hv_niu_vrtx_set_ino)
 
-#endif	/* lint || __lint */

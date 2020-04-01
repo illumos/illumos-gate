@@ -23,12 +23,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(lint)
-#include <sys/types.h>
-#include <sys/cpuvar.h>
-#else	/*lint */
 #include "assym.h"
-#endif	/* lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/privregs.h>
@@ -41,15 +36,6 @@
 #include <sys/traptrace.h>
 #endif /* TRAPTRACE */
 
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-self_xcall(struct cpu *cpu, uint64_t arg1, uint64_t arg2, xcfunc_t *func)
-{}
-
-#else
 
 /*
  * Entered by the software trap (TT=ST_SELFXCALL, TL>0) thru send_self_xcall().
@@ -104,18 +90,7 @@ self_xcall(struct cpu *cpu, uint64_t arg1, uint64_t arg2, xcfunc_t *func)
 	/* Not Reached */
 	SET_SIZE(self_xcall)
 
-#endif	/* lint */
-
 #ifdef  TRAPTRACE
-#if defined(lint)
-
-/* ARGSUSED */
-void
-xc_trace(u_int traptype, cpuset_t *cpu_set, xcfunc_t *func,
-	uint64_t arg1, uint64_t arg2)
-{}
-
-#else	/* lint */
 	ENTRY(xc_trace)
 	rdpr	%pstate, %g1
 	andn	%g1, PSTATE_IE | PSTATE_AM, %g2
@@ -188,22 +163,8 @@ xc_trace(u_int traptype, cpuset_t *cpu_set, xcfunc_t *func,
 	wrpr	%g0, %g1, %pstate			/* enable interrupts */
 	SET_SIZE(xc_trace)
 
-#endif	/* lint */
 #endif	/* TRAPTRACE */
 
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-init_mondo(xcfunc_t *func, uint64_t arg1, uint64_t arg2)
-{}
-
-/*ARGSUSED*/
-int
-shipit(int n, uint64_t cpuid)
-{ return(0); }
-
-#else	/* lint */
 /*
  * Setup interrupt dispatch data registers
  * Entry:
@@ -241,16 +202,6 @@ shipit(int n, uint64_t cpuid)
 	membar	#Sync
 	SET_SIZE(shipit)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-uint64_t
-get_cpuaddr(uint64_t reg, uint64_t scr)
-{ return (0);}
-
-#else	/* lint */
 /*
  * Get cpu structure
  * Entry:
@@ -263,15 +214,6 @@ get_cpuaddr(uint64_t reg, uint64_t scr)
 	nop
 	SET_SIZE(get_cpuaddr)
 
-#endif	/* lint */
-
-#if defined(lint)
-/* ARGSUSED */
-void
-xt_sync_tl1(uint64_t *cpu_sync_addr)
-{}
-
-#else /* lint */
 /*
  * This is to ensure that previously called xtrap handlers have executed on
  * sun4v. We zero out the byte corresponding to its cpuid in the
@@ -286,4 +228,3 @@ xt_sync_tl1(uint64_t *cpu_sync_addr)
 	retry
 	SET_SIZE(xt_sync_tl1)
 
-#endif  /* lint */

@@ -22,34 +22,21 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2020 Joyent, Inc.
  */
 
 
-#if defined(__lint)
-#pragma pack(1)
-struct {
-	uint16_t limit_low;
-	uint16_t base_low;
-	uint8_t base_middle;
-	uint8_t attr;
-	uint8_t attr_and_limit;
-	uint8_t base_high;
-} global_descriptor_table[8];
-struct {
-	uint16_t limit;	/* sizeof (global_descriptor_table) - 1 */
-	void     *base;	/* &global_descriptor_table */
-} gdt_info;
-#pragma pack()
-
-#else	/* __lint */
+/*
+ * The boot GDT must remain in sync with the entries in intel/sys/segments.h; in
+ * particular kmdb uses B64CODE_SEL or B32CODE_SEL in perpetuity for its IDT
+ * entries (they're copied to the kernel's GDT in init_idt()).
+ *
+ * The GDT is effectively an array of user_desc_t entries.
+ */
 
 	.align 16
 	.data
-	/*
-	 * This must remain in sync with the entries in intel/sys/gdt.h; in
-	 * particular kmdb uses B64CODE_SEL or B32CODE_SEL in perpetuity for
-	 * its IDT entries (they're copied to the kernel's GDT in init_idt()).
-	 */
 
 global_descriptor_table:
 	.long   0
@@ -129,6 +116,10 @@ fake_cpu_gdt_base_24_31:
 /	.long	0
 /	.long	0
 
+
+/*
+ * This is a desctbr_t.
+ */
 gdt_info:
 	.value	gdt_info - global_descriptor_table - 1
 	.long	global_descriptor_table
@@ -143,4 +134,3 @@ fake_cpu_ptr:
 	.4byte 0
 	.skip 0x6c0, 0
 
-#endif	/* __lint */

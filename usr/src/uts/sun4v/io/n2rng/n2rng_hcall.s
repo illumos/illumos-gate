@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Hypervisor calls called by ncp driver.
  */
@@ -32,54 +30,6 @@
 #include <sys/asm_linkage.h>
 #include <sys/hypervisor_api.h>
 #include <sys/n2rng.h>
-
-#if defined(lint) || defined(__lint)
-
-/*ARGSUSED*/
-uint64_t
-hv_rng_get_diag_control()
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-hv_rng_ctl_read(uint64_t ctlregsptr_ra, uint64_t *rstate, uint64_t *tdelta)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-hv_rng_ctl_read_v2(uint64_t ctlregsptr_ra, uint64_t rngid, uint64_t *rstate,
-		uint64_t *tdelta, uint64_t *wdelta, uint64_t *wstate)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-hv_rng_ctl_write(uint64_t ctlregsptr_ra, uint64_t nstate, uint64_t wtimeout,
-		uint64_t *tdelta)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-hv_rng_ctl_write_v2(uint64_t ctlregsptr_ra, uint64_t nstate, uint64_t wtimeout,
-		uint64_t rngid)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-hv_rng_data_read_diag(uint64_t buffer_ra, uint64_t sz, uint64_t *tdelta)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-hv_rng_data_read_diag_v2(uint64_t buffer_ra, uint64_t sz, uint64_t rngid,
-		uint64_t *tdelta)
-{ return (0); }
-
-/*ARGSUSED*/
-uint64_t
-hv_rng_data_read(uint64_t buffer_ra, uint64_t *tdelta)
-{ return (0); }
-
-#else	/* lint || __lint */
 
 	/*
 	 * hv_rng_get_diag_control()
@@ -183,4 +133,3 @@ hv_rng_data_read(uint64_t buffer_ra, uint64_t *tdelta)
 	stx	%o1, [%o4]
 	SET_SIZE(hv_rng_data_read)
 
-#endif	/* lint || __lint */

@@ -26,24 +26,11 @@
  * All Rights Reserved, Copyright (c) FUJITSU LIMITED 2006
  */
 
-#if defined(lint)
-#include <sys/types.h>
-#else
 #include <sys/asm_linkage.h>
-#endif	/* lint */
 
-#if defined(lint)
-
-/* ARGSUSED */
-void
-mc_prefetch(caddr_t va)
-{ return; }
-
-#else
 	/* issue a strong prefetch to cause MI error */
 	ENTRY(mc_prefetch)
 	prefetch	[%o0],0x16
 	retl
 	nop
 	SET_SIZE(mc_prefetch)
-#endif

@@ -24,12 +24,6 @@
  * Use is subject to license terms.
  */
 
-#if defined(__lint)
-
-int silence_lint_warnings = 0;
-
-#else /* __lint */
-
 #include <sys/multiboot.h>
 #include <sys/multiboot2.h>
 #include <sys/asm_linkage.h>
@@ -372,4 +366,3 @@ longmode:
 	.skip 4096
 	.long	0
 
-#endif /* __lint */

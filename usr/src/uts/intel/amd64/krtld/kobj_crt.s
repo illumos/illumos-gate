@@ -37,15 +37,6 @@
  *	There is NO RETURN from exitto().
  */
 
-#if defined(lint)
-
-/* ARGSUSED */
-void
-exitto(caddr_t entrypoint)
-{}
-
-#else	/* lint */
-
 
 	ENTRY(exitto)
 
@@ -66,6 +57,4 @@ exitto(caddr_t entrypoint)
 	INDIRECT_CALL_REG(r11)
 
 	SET_SIZE(exitto)
-
-#endif
 

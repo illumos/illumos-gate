@@ -34,20 +34,6 @@
 
 /*LINTLIBRARY*/
 
-#if defined(lint)
-
-/*ARGSUSED*/	
-int
-rfiospc_get_perfreg(cntr_handle_t handle, int regid, uint64_t *data)
-{ return (0); }
-
-/*ARGSUSED*/	
-int
-rfiospc_set_perfreg(cntr_handle_t handle, int regid, uint64_t data)
-{ return (0); }
-
-#else /* lint */
-
 	ENTRY(rfiospc_get_perfreg)
 	mov	RFIOS_GET_PERFREG, %o5
 	ta	FAST_TRAP
@@ -64,4 +50,3 @@ rfiospc_set_perfreg(cntr_handle_t handle, int regid, uint64_t data)
 	nop
 	SET_SIZE(rfiospc_set_perfreg)
 
-#endif

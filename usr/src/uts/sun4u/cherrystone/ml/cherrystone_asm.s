@@ -24,13 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#if defined(lint)
-#include <sys/types.h>
-#else
 #include "assym.h"
-#endif /* lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/param.h>
@@ -54,24 +48,6 @@
  * If its found that either of these files will not change it might
  * be a good idea to move this up to sun4u/ml.
  */
-
-#if defined(lint)
-
-/* ARGSUSED */
-uint64_t
-lddmcdecode(uint64_t physaddr)
-{
-	return (0x0ull);
-}
-
-/* ARGSUSED */
-uint64_t
-lddsafaddr(uint64_t physaddr)
-{
-	return (0x0ull);
-}
-
-#else /* !lint */
 
 !
 ! Load the safari address for a specific cpu
@@ -121,4 +97,3 @@ lddsafaddr(uint64_t physaddr)
 	wrpr	%g0, %o4, %pstate	! restore earlier pstate register value
 	SET_SIZE(lddmcdecode)
 
-#endif /* lint */

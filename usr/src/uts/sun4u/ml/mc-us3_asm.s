@@ -26,28 +26,10 @@
  * Assembly code support for Memory Control driver
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#if !defined(lint)
 #include "assym.h"
 #include <sys/mc-us3.h>
-#endif	/* lint */
 
 #include <sys/asm_linkage.h>
-
-#if defined(lint)
-
-/*
- * routine to get value of Memory Control Registers
- */
-/* ARGSUSED */
-uint64_t
-get_mcr(int offset)
-{
-	return ((uint64_t)0);
-}
-
-#else	/* lint */
 
  	! This routine is to get content of Memory Control Registers
  	ENTRY(get_mcr)
@@ -59,4 +41,3 @@ get_mcr(int offset)
  	  nop
  	SET_SIZE(get_mcr)
  
-#endif /* lint */

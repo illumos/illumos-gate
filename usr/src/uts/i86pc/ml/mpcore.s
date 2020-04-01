@@ -34,10 +34,8 @@
 #include <sys/privregs.h>
 #include <sys/x86_archext.h>
 
-#if !defined(__lint)
 #include <sys/segments.h>
 #include "assym.h"
-#endif
 
 /*
  *	Our assumptions:
@@ -59,24 +57,6 @@
  *		- Put CPU into halted state with interrupts disabled
  *
  */
-
-#if defined(__lint)
-
-void
-real_mode_start_cpu(void)
-{}
-
-void
-real_mode_stop_cpu_stage1(void)
-{}
-
-void
-real_mode_stop_cpu_stage2(void)
-{}
-
-#else	/* __lint */
-
-#if defined(__amd64)
 
 	ENTRY_NP(real_mode_start_cpu)
 
@@ -118,28 +98,7 @@ pestart:
 	/*
 	 * 16-bit protected mode is now active, so prepare to turn on long
 	 * mode.
-	 *
-	 * Note that we currently assume that if we're attempting to run a
-	 * kernel compiled with (__amd64) #defined, the target CPU has long
-	 * mode support.
 	 */
-
-#if 0
-	/*
-	 * If there's a chance this might not be true, the following test should
-	 * be done, with the no_long_mode branch then doing something
-	 * appropriate:
-	 */
-
-	movl		$0x80000000, %eax	/* get largest extended CPUID */
-	cpuid
-	cmpl		$0x80000000, %eax	/* check if > 0x80000000 */
-	jbe		no_long_mode		/* nope, no long mode */
-	movl		$0x80000001, %eax
-	cpuid					/* get extended feature flags */
-	btl		$29, %edx		/* check for long mode */
-	jnc		no_long_mode		/* long mode not supported */
-#endif
 
 	/*
 	 * Add any initial cr4 bits
@@ -335,200 +294,6 @@ kernel_cs_code:
 
 	SET_SIZE(real_mode_start_cpu)
 
-#elif defined(__i386)
-
-	ENTRY_NP(real_mode_start_cpu)
-
-#if !defined(__GNUC_AS__)
-
-	cli
-	D16 movw	%cs, %eax
-	movw		%eax, %ds	/* load cs into ds */
-	movw		%eax, %ss	/* and into ss */
-
-	/*
-	 * Helps in debugging by giving us the fault address.
-	 *
-	 * Remember to patch a hlt (0xf4) at cmntrap to get a good stack.
-	 */
-	D16 movl	$0xffc, %esp
-
-	D16 A16 lgdt	%cs:GDTROFF
-	D16 A16 lidt	%cs:IDTROFF
-	D16 A16 movl	%cs:CR4OFF, %eax	/* set up CR4, if desired */
-	D16 andl	%eax, %eax
-	D16 A16 je	no_cr4
-
-	D16 movl	%eax, %ecx
-	D16 movl	%cr4, %eax
-	D16 orl		%ecx, %eax
-	D16 movl	%eax, %cr4
-no_cr4:
-	D16 A16 movl	%cs:CR3OFF, %eax
-	A16 movl	%eax, %cr3
-	movl		%cr0, %eax
-
-	/*
-	 * Enable protected-mode, paging, write protect, and alignment mask
-	 */
-	D16 orl		$[CR0_PG|CR0_PE|CR0_WP|CR0_AM], %eax
-	movl		%eax, %cr0
-	jmp		pestart
-
-pestart:
-	D16 pushl	$KCS_SEL
-	D16 pushl	$kernel_cs_code
-	D16 lret
-	.globl real_mode_start_cpu_end
-real_mode_start_cpu_end:
-	nop
-
-	.globl	kernel_cs_code
-kernel_cs_code:
-	/*
-	 * At this point we are with kernel's cs and proper eip.
-	 *
-	 * We will be executing not from the copy in real mode platter,
-	 * but from the original code where boot loaded us.
-	 *
-	 * By this time GDT and IDT are loaded as is cr3.
-	 */
-	movw	$KFS_SEL,%eax
-	movw	%eax,%fs
-	movw	$KGS_SEL,%eax
-	movw	%eax,%gs
-	movw	$KDS_SEL,%eax
-	movw	%eax,%ds
-	movw	%eax,%es
-	movl	%gs:CPU_TSS,%esi
-	movw	%eax,%ss
-	movl	TSS_ESP0(%esi),%esp
-	movw	$KTSS_SEL,%ax
-	ltr	%ax
-	xorw	%ax, %ax		/* clear LDTR */
-	lldt	%ax
-	movl	%cr0,%edx
-	andl    $-1![CR0_TS|CR0_EM],%edx  /* clear emulate math chip bit */
-	orl     $[CR0_MP|CR0_NE],%edx
-	movl    %edx,%cr0		  /* set machine status word */
-
-	/*
-	 * Before going any further, enable usage of page table NX bit if
-	 * that's how our page tables are set up.
-	 */
-	bt	$X86FSET_NX, x86_featureset
-	jnc	1f
-	movl	%cr4, %ecx
-	andl	$CR4_PAE, %ecx
-	jz	1f
-	movl	$MSR_AMD_EFER, %ecx
-	rdmsr
-	orl	$AMD_EFER_NXE, %eax
-	wrmsr
-1:
-	movl	%gs:CPU_THREAD, %eax	/* get thread ptr */
-	call	*T_PC(%eax)		/* call mp_startup */
-	/* not reached */
-	int	$20			/* whoops, returned somehow! */
-
-#else
-
-	cli
-	mov		%cs, %ax
-	mov		%eax, %ds	/* load cs into ds */
-	mov		%eax, %ss	/* and into ss */
-
-	/*
-	 * Helps in debugging by giving us the fault address.
-	 *
-	 * Remember to patch a hlt (0xf4) at cmntrap to get a good stack.
-	 */
-	D16 mov		$0xffc, %esp
-
-	D16 A16 lgdtl	%cs:GDTROFF
-	D16 A16 lidtl	%cs:IDTROFF
-	D16 A16 mov	%cs:CR4OFF, %eax	/* set up CR4, if desired */
-	D16 and		%eax, %eax
-	D16 A16 je	no_cr4
-
-	D16 mov		%eax, %ecx
-	D16 mov		%cr4, %eax
-	D16 or		%ecx, %eax
-	D16 mov		%eax, %cr4
-no_cr4:
-	D16 A16 mov	%cs:CR3OFF, %eax
-	A16 mov		%eax, %cr3
-	mov		%cr0, %eax
-
-	/*
-	 * Enable protected-mode, paging, write protect, and alignment mask
-	 */
-	D16 or		$(CR0_PG|CR0_PE|CR0_WP|CR0_AM), %eax
-	mov		%eax, %cr0
-	jmp		pestart
-
-pestart:
-	D16 pushl	$KCS_SEL
-	D16 pushl	$kernel_cs_code
-	D16 lret
-	.globl real_mode_start_cpu_end
-real_mode_start_cpu_end:
-	nop
-	.globl	kernel_cs_code
-kernel_cs_code:
-	/*
-	 * At this point we are with kernel's cs and proper eip.
-	 *
-	 * We will be executing not from the copy in real mode platter,
-	 * but from the original code where boot loaded us.
-	 *
-	 * By this time GDT and IDT are loaded as is cr3.
-	 */
-	mov	$KFS_SEL, %ax
-	mov	%eax, %fs
-	mov	$KGS_SEL, %ax
-	mov	%eax, %gs
-	mov	$KDS_SEL, %ax
-	mov	%eax, %ds
-	mov	%eax, %es
-	mov	%gs:CPU_TSS, %esi
-	mov	%eax, %ss
-	mov	TSS_ESP0(%esi), %esp
-	mov	$(KTSS_SEL), %ax
-	ltr	%ax
-	xorw	%ax, %ax		/* clear LDTR */
-	lldt	%ax
-	mov	%cr0, %edx
-	and	$~(CR0_TS|CR0_EM), %edx	/* clear emulate math chip bit */
-	or	$(CR0_MP|CR0_NE), %edx
-	mov	%edx, %cr0		/* set machine status word */
-
-	/*
-	 * Before going any farther, enable usage of page table NX bit if
-	 * that's how our page tables are set up.  (PCIDE is enabled later on).
-	 */
-	bt	$X86FSET_NX, x86_featureset
-	jnc	1f
-	movl	%cr4, %ecx
-	andl	$CR4_PAE, %ecx
-	jz	1f
-	movl	$MSR_AMD_EFER, %ecx
-	rdmsr
-	orl	$AMD_EFER_NXE, %eax
-	wrmsr
-1:
-	mov	%gs:CPU_THREAD, %eax	/* get thread ptr */
-	call	*T_PC(%eax)		/* call mp_startup */
-	/* not reached */
-	int	$20			/* whoops, returned somehow! */
-#endif
-
-	SET_SIZE(real_mode_start_cpu)
-
-#endif	/* __amd64 */
-
-#if defined(__amd64)
-
 	ENTRY_NP(real_mode_stop_cpu_stage1)
 
 #if !defined(__GNUC_AS__)
@@ -580,52 +345,6 @@ real_mode_stop_cpu_stage1_end:
 
 	SET_SIZE(real_mode_stop_cpu_stage1)
 
-#elif defined(__i386)
-
-	ENTRY_NP(real_mode_stop_cpu_stage1)
-
-#if !defined(__GNUC_AS__)
-
-	cli
-	D16 movw	%cs, %eax
-	movw		%eax, %ds	/* load cs into ds */
-	movw		%eax, %ss	/* and into ss */
-
-	/*
-	 * Jump to the stage 2 code in the rm_platter_va->rm_cpu_halt_code
-	 */
-	movw		$CPUHALTCODEOFF, %ax
-	.byte		0xff, 0xe0	/* jmp *%ax */
-
-#else	/* __GNUC_AS__ */
-
-	cli
-	mov		%cs, %ax
-	mov		%eax, %ds	/* load cs into ds */
-	mov		%eax, %ss	/* and into ss */
-
-	/*
-	 * Jump to the stage 2 code in the rm_platter_va->rm_cpu_halt_code
-	 */
-	movw		$CPUHALTCODEOFF, %ax
-	/*
-	 * The following indirect call is executed as part of starting up a CPU.
-	 * As such nothing else should be running on it or executing in the
-	 * system such that it is a viable Spectre v2 branch target injection
-	 * location. At least, in theory.
-	 */
-	jmp		*%ax
-
-#endif	/* !__GNUC_AS__ */
-
-	.globl real_mode_stop_cpu_stage1_end
-real_mode_stop_cpu_stage1_end:
-	nop
-
-	SET_SIZE(real_mode_stop_cpu_stage1)
-
-#endif	/* __amd64 */
-
 	ENTRY_NP(real_mode_stop_cpu_stage2)
 
 	movw		$0xdead, %ax
@@ -645,4 +364,3 @@ real_mode_stop_cpu_stage2_end:
 
 	SET_SIZE(real_mode_stop_cpu_stage2)
 
-#endif	/* __lint */

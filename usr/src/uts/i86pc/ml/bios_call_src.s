@@ -24,13 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#if defined(__lint)
-
-int silence_lint = 0;
-
-#else
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include <sys/segments.h>
 #include <sys/controlregs.h>
@@ -44,42 +40,8 @@ int silence_lint = 0;
  */
 #define DATASZ	.byte 0x66;
 
-#if defined(__amd64)
-#define	MOVCR(x, y)	movq  x,%rax; movq  %rax, y
-#define LOAD_XAX(sym)	leaq	sym, %rax
-#elif defined(__i386)
-#define	MOVCR(x, y)	movl  x,%eax; movl  %eax, y
-#define LOAD_XAX(sym)	leal	sym, %eax
-#endif
-
 	.globl	_start
 _start:
-
-#if defined(__i386)
-
-	/*
-	 * Save caller registers
-	 */
-	movl	%ebp, save_ebp
-	movl	%esp, save_esp
-	movl	%ebx, save_ebx
-	movl	%esi, save_esi
-	movl	%edi, save_edi
-
-	/* get registers argument into esi */
-	movl	8(%esp), %esi
-
-	/* put interrupt number in %bl */
-	movl	4(%esp), %ebx
-
-	/* Switch to a low memory stack */
-	movl	$_start, %esp
-
-	/* allocate space for args on stack */
-	subl	$18, %esp
-	movl	%esp, %edi
-
-#elif defined(__amd64)
 
 	/*
 	 * Save caller registers
@@ -103,8 +65,6 @@ _start:
 	subq	$18, %rsp
 	movq	%rsp, %rdi
 
-#endif
-
 	/* copy args from high memory to stack in low memory */
 	cld
 	movl	$18, %ecx
@@ -123,11 +83,13 @@ _start:
 	movw	%es, save_es
 	movw	%fs, save_fs
 	movw	%gs, save_gs
-	MOVCR(	%cr4, save_cr4)
-	MOVCR(	%cr3, save_cr3)
-	MOVCR(	%cr0, save_cr0)
+	movq	%cr4, %rax
+	movq	%rax, save_cr4
+	movq	%cr3, %rax
+	movq	%rax, save_cr3
+	movq	%cr0, %rax
+	movq	%rax, save_cr0
 
-#if defined(__amd64)
 	/*
 	 * save/clear the extension parts of the fs/gs base registers and cr8
 	 */
@@ -157,18 +119,17 @@ _start:
 
 	movq	%cr8, %rax
 	movq	%rax, save_cr8
-#endif
 
 	/*
 	 * set offsets in 16 bit ljmp instructions below
 	 */
-	LOAD_XAX(enter_real)
+	leaq	enter_real, %rax
 	movw	%ax, enter_real_ljmp
 
-	LOAD_XAX(enter_protected)
+	leaq	enter_protected, %rax
 	movw	%ax, enter_protected_ljmp
 
-	LOAD_XAX(gdt_info)
+	leaq	gdt_info, %rax
 	movw	%ax, gdt_info_load
 
 	/*
@@ -181,7 +142,6 @@ _start:
 	/*
 	 * zero out all the registers to make sure they're 16 bit clean
 	 */
-#if defined(__amd64)
 	xorq	%r8, %r8
 	xorq	%r9, %r9
 	xorq	%r10, %r10
@@ -190,7 +150,6 @@ _start:
 	xorq	%r13, %r13
 	xorq	%r14, %r14
 	xorq	%r15, %r15
-#endif
 	xorl	%eax, %eax
 	xorl	%ebx, %ebx
 	xorl	%ecx, %ecx
@@ -205,9 +164,8 @@ _start:
 	lgdt	gdt_info
 	lidt	idt_info
 
-#if defined(__amd64)
 	/*
-	 * Shut down 64 bit mode. First get into compatiblity mode.
+	 * Shut down 64 bit mode. First get into compatibility mode.
 	 */
 	movq	%rsp, %rax
 	pushq	$B32DATA_SEL
@@ -238,7 +196,6 @@ _start:
 	rdmsr
 	btcl	$8, %eax		/* bit 8 Long Mode Enable bit */
 	wrmsr
-#endif
 
 	/*
 	 * ok.. now enter 16 bit mode, so we can shut down protected mode
@@ -351,7 +308,6 @@ enter_protected:
 	movl	save_cr3, %eax
 	movl	%eax, %cr3
 
-#if defined(__amd64)
 	/*
 	 * re-enable long mode
 	 */
@@ -359,7 +315,6 @@ enter_protected:
 	rdmsr
 	btsl	$8, %eax
 	wrmsr
-#endif
 
 	movl	save_cr0, %eax
 	movl	%eax, %cr0
@@ -367,7 +322,6 @@ enter_protected:
 enter_paging:
 
 
-#if defined(__amd64)
 	/*
 	 * transition back to 64 bit mode
 	 */
@@ -376,7 +330,6 @@ enter_paging:
 	lret
 longmode:
 	.code64
-#endif
 	/*
 	 * restore caller frame pointer and segment registers
 	 */
@@ -388,15 +341,9 @@ longmode:
 	 * in its corresponding GDT selector. The busy bit is the 2nd bit in
 	 * the 5th byte of the selector.
 	 */
-#if defined(__i386)
-	movzwl	save_tr, %eax
-	addl	save_gdt+2, %eax
-	btcl	$1, 5(%eax)
-#elif defined(__amd64)
 	movzwq	save_tr, %rax
 	addq	save_gdt+2, %rax
 	btcl	$1, 5(%rax)
-#endif
 	ltr	save_tr
 	movw	save_ds, %ds
 	movw	save_ss, %ss
@@ -404,18 +351,11 @@ longmode:
 	movw	save_fs, %fs
 	movw	save_gs, %gs
 
-#if defined(__i386)
-	pushl	save_cs
-	pushl	$.newcs
-	lret
-#elif defined(__amd64)
 	pushq	save_cs
 	pushq	$.newcs
 	lretq
-#endif
 .newcs:
 
-#if defined(__amd64)
 	/*
 	 * restore the hidden kernel segment base register values
 	 */
@@ -439,29 +379,10 @@ longmode:
 	je	1f
 	movq	%rax, %cr8
 1:
-#endif
 
 	/*
 	 * copy results to caller's location, then restore remaining registers
 	 */
-#if defined(__i386)
-	movl    save_esp, %edi
-	movl	8(%edi), %edi
-	movl	%esp, %esi
-	movl	$18, %ecx
-	rep
-	movsb
-	movw	18(%esp), %ax
-	andl	$0xffff, %eax
-	movl    save_ebx, %ebx
-	movl    save_esi, %esi
-	movl    save_edi, %edi
-	movl    save_esp, %esp
-	movl    save_ebp, %ebp
-	movl    save_esp, %esp
-	ret
-
-#elif defined(__amd64)
 	movq    save_rsi, %rdi
 	movq	%rsp, %rsi
 	movq	$18, %rcx
@@ -477,8 +398,6 @@ longmode:
 	movq    save_rbp, %rbp
 	movq    save_rsp, %rsp
 	ret
-
-#endif
 
 
 /*
@@ -497,7 +416,6 @@ save_esp:
 	.long	0
 
 	.align 8
-#if defined(__amd64)
 save_rsi:
 	.quad	0
 save_rbx:
@@ -522,7 +440,6 @@ save_fsbase:
 	.quad	0
 save_cr8:
 	.quad	0
-#endif	/* __amd64 */
 
 save_idt:
 	.quad	0
@@ -562,4 +479,3 @@ idt_info:
  * We need to trampoline thru a gdt we have in low memory.
  */
 #include "../boot/boot_gdt.s"
-#endif /* __lint */

@@ -23,11 +23,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(lint)
-#include <sys/types.h>
-#else	/* lint */
 #include "assym.h"
-#endif	/* lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/machthread.h>
@@ -39,15 +35,11 @@
 #include <sys/clock.h>
 #include <vm/hat_sfmmu.h>	
 
-#if !defined(lint)
 	.weak	cpu_feature_init
 	.type	cpu_feature_init, #function
-#endif	/* lint */
 
-#if !defined(lint)
 	.weak	cpu_early_feature_init
 	.type	cpu_early_feature_init, #function
-#endif	/* lint */
 
 /*
  * Processor initialization
@@ -56,15 +48,6 @@
  * When the prom jumps to this location we are still executing with the
  * prom's trap table.  It expects the cpuid as its first parameter.
  */
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-cpu_startup(int cpuid)
-{}
-
-#else	/* lint */
 
 	! allocate a temporary stack to run on while we figure who and
 	! what we are.
@@ -154,4 +137,3 @@ tmpstk:
 	restore				! WILL cause underflow
 	SET_SIZE(cpu_startup)
 
-#endif	/* lint */

@@ -23,12 +23,7 @@
  * Use is subject to license terms.
  */
 
-#if defined(lint)
-#include <sys/types.h>
-#include <sys/thread.h>
-#else	/* lint */
 #include "assym.h"
-#endif	/* lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/machthread.h>
@@ -41,14 +36,6 @@
 #include <sys/traptrace.h>
 #endif /* TRAPTRACE */
 
-
-#if defined(lint)
-
-void
-vec_interrupt(void)
-{}
-
-#else	/* lint */
 
 vec_uiii_irdr_tab:
         .byte   UIII_IRDR_0, UIII_IRDR_1, UIII_IRDR_2, UIII_IRDR_3
@@ -272,16 +259,6 @@ vec_interrupt_resume:
 	retry
 	SET_SIZE(dmv_vector)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-void
-vec_intr_spurious(void)
-{}
-
-#else	/* lint */
-
 	DGDEF(vec_spurious_cnt)
 	.word	0
 
@@ -340,4 +317,3 @@ vec_intr_spurious(void)
 
 _not_ready:	.asciz	"Interrupt Vector Receive Register not READY"
 
-#endif	/* lint */

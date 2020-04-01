@@ -26,12 +26,7 @@
  * General machine architecture & implementation specific
  * assembly language routines.
  */
-#if defined(lint)
-#include <sys/types.h>
-#include <sys/t_lock.h>
-#else	/* lint */
 #include "assym.h"
-#endif	/* lint */
 
 #define CPU_MODULE /* need it for NSEC_SHIFT used by NATIVE_TIME_TO_NSEC() */
 
@@ -44,14 +39,6 @@
 #include <sys/clock.h>
 #include <sys/fpras.h>
 #include <sys/soft_state.h>
-
-#if defined(lint)
-
-uint64_t
-ultra_gettick(void)
-{ return (0); }
-
-#else	/* lint */
 
 /*
  * This isn't the routine you're looking for.
@@ -67,46 +54,19 @@ ultra_gettick(void)
 	nop
 	SET_SIZE(ultra_gettick)
 
-#endif	/* lint */
-
-#if defined(lint)
-/* ARGSUSED */
-void
-set_mmfsa_scratchpad(caddr_t vaddr)
-{ }
-
-#else	/* lint */
-
 	ENTRY(set_mmfsa_scratchpad)
 	stxa	%o0, [%g0]ASI_SCRATCHPAD 
 	retl
 	nop
 	SET_SIZE(set_mmfsa_scratchpad)
-#endif	/* lint */
-
-#if defined(lint)
-caddr_t
-get_mmfsa_scratchpad()
-{  return (0); }
-
-#else	/* lint */
 
 	ENTRY(get_mmfsa_scratchpad)
 	ldxa	[%g0]ASI_SCRATCHPAD, %o0 
 	retl
 	nop
 	SET_SIZE(get_mmfsa_scratchpad)
-#endif	/* lint */
 
 
-
-#if defined(lint)
-/* ARGSUSED */
-void
-cpu_intrq_unregister_powerdown(uint64_t doneflag_va)
-{}
-
-#else	/* lint */
 
 /*
  * Called from a x-trap at tl1 must use %g1 as arg
@@ -169,16 +129,7 @@ cpu_intrq_unregister_powerdown(uint64_t doneflag_va)
 	ba,a	0b
 
 	SET_SIZE(cpu_intrq_unregister_powerdown)
-#endif	/* lint */
 
-
-#if defined(lint)
-/* ARGSUSED */
-int
-getprocessorid(void)
-{ return (0); }
-
-#else	/* lint */
 
 /*
  * Get the processor ID.
@@ -191,17 +142,6 @@ getprocessorid(void)
 	nop
 	SET_SIZE(getprocessorid)
 
-#endif	/* lint */
-
-#if defined(lint) || defined(__lint)
-
-/* ARGSUSED */
-hrtime_t
-tick2ns(hrtime_t tick, uint_t cpuid)
-{ return 0; }
-
-#else	/* lint */
-
 	ENTRY_NP(tick2ns)
 	!
 	! Use nsec_scale for sun4v which is based on %stick
@@ -211,49 +151,15 @@ tick2ns(hrtime_t tick, uint_t cpuid)
 	nop
 	SET_SIZE(tick2ns)
 
-#endif  /* lint */
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-set_cmp_error_steering(void)
-{}
-
-#else	/* lint */
-
 	ENTRY(set_cmp_error_steering)
 	retl
 	nop
 	SET_SIZE(set_cmp_error_steering)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/* ARGSUSED */
-uint64_t
-ultra_getver(void)
-{
-	return (0); 
-}
-
-#else /* lint */
-
 	ENTRY(ultra_getver)
 	retl
 	mov	-1, %o0		! XXXQ no version available
 	SET_SIZE(ultra_getver)
-
-#endif /* lint */
-
-#if defined(lint)
-
-int
-fpras_chkfn_type1(void)
-{ return 0; }
-
-#else	/* lint */
 
 	/*
 	 * Check instructions using just the AX pipelines, designed by
@@ -414,11 +320,7 @@ fpras_chkfn_type1(void)
 	retl				! 15
 	  mov	FPRAS_BADTRAP, %o0	! 16, how detected
 	SET_SIZE(fpras_chkfn_type1)
-#endif	/* lint */
 
-#if defined(lint)
-char	soft_state_message_strings[SOLARIS_SOFT_STATE_MSG_CNT][SSM_SIZE];
-#else	/* lint */
 	.seg	".data"
 	.global soft_state_message_strings
 
@@ -442,4 +344,3 @@ soft_state_message_strings:
 	.nword	0
 
 	.seg	".text"
-#endif	/* lint */

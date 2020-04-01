@@ -29,15 +29,6 @@
 #include <sys/regset.h>
 #include <sys/psw.h>
 
-#if defined(__lint)
-
-#include <sys/types.h>
-#include <sys/thread.h>
-#include <sys/systm.h>
-#include <sys/lgrp.h>
-
-#else   /* __lint */
-
 #include <sys/pcb.h>
 #include <sys/trap.h>
 #include <sys/ftrace.h>
@@ -48,41 +39,6 @@
 
 #include "assym.h"
 
-#endif	/* __lint */
-
-
-#if defined(__lint)
-
-hrtime_t
-get_hrtime(void)
-{ return (0); }
-
-hrtime_t
-get_hrestime(void)
-{
-	hrtime_t ts;
-
-	gethrestime((timespec_t *)&ts);
-	return (ts);
-}
-
-hrtime_t
-gethrvtime(void)
-{
-	klwp_t *lwp = ttolwp(curthread);
-	struct mstate *ms = &lwp->lwp_mstate;
-
-	return (gethrtime() - ms->ms_state_start + ms->ms_acct[LMS_USER]);
-}
-
-uint64_t
-getlgrp(void)
-{
-	return (((uint64_t)(curthread->t_lpl->lpl_lgrpid) << 32) |
-			curthread->t_cpu->cpu_id);
-}
-
-#else	/* __lint */
 
 /*
  * XX64: We are assuming that libc continues to expect the 64-bit value being
@@ -95,8 +51,6 @@ getlgrp(void)
  * assumptions are not true.
  */
 
-#if defined(__amd64)
-
 	.globl	gethrtimef
 	ENTRY_NP(get_hrtime)
 	FAST_INTR_PUSH
@@ -107,20 +61,6 @@ getlgrp(void)
 	FAST_INTR_POP
 	FAST_INTR_RETURN
 	SET_SIZE(get_hrtime)
-
-#elif defined(__i386)
-
-	.globl	gethrtimef
-	ENTRY_NP(get_hrtime)
-	FAST_INTR_PUSH
-	call	*gethrtimef
-	FAST_INTR_POP
-	FAST_INTR_RETURN
-	SET_SIZE(get_hrtime)
-
-#endif	/* __i386 */
-
-#if defined(__amd64)
 
 	.globl	gethrestimef
 	ENTRY_NP(get_hrestime)
@@ -136,25 +76,13 @@ getlgrp(void)
 	FAST_INTR_RETURN
 	SET_SIZE(get_hrestime)
 
-#elif defined(__i386)
-
-	.globl	gethrestimef
-	ENTRY_NP(get_hrestime)
-	FAST_INTR_PUSH
-	subl	$TIMESPEC_SIZE, %esp
-	pushl	%esp
-	call	*gethrestimef
-	movl	_CONST(4 + 0)(%esp), %eax
-	movl	_CONST(4 + CLONGSIZE)(%esp), %edx
-	addl	$_CONST(4 + TIMESPEC_SIZE), %esp
-	FAST_INTR_POP
-	FAST_INTR_RETURN
-	SET_SIZE(get_hrestime)
-
-#endif	/* __i386 */
-
-#if defined(__amd64)
-
+	/*
+	 * In C this is
+	 *
+	 * klwp_t *lwp = ttolwp(curthread);
+	 * struct mstate *ms = &lwp->lwp_mstate;
+	 * return (gethrtime() - ms->ms_state_start + ms->ms_acct[LMS_USER]);
+	 */
 	ENTRY_NP(gethrvtime)
 	FAST_INTR_PUSH
 	call	gethrtime_unscaled		/* get time since boot */
@@ -173,34 +101,12 @@ getlgrp(void)
 	FAST_INTR_RETURN
 	SET_SIZE(gethrvtime)
 
-#elif defined(__i386)
-
-	ENTRY_NP(gethrvtime)
-	FAST_INTR_PUSH
-	call	gethrtime_unscaled		/* get time since boot */
-	movl	%gs:CPU_LWP, %ecx		/* current lwp */
-	subl	LWP_MS_STATE_START(%ecx), %eax	/* - ms->ms_state_start */
-	sbbl	LWP_MS_STATE_START+4(%ecx), %edx
-	addl	LWP_ACCT_USER(%ecx), %eax	/* add ms->ms_acct[LMS_USER] */
-	adcl	LWP_ACCT_USER+4(%ecx), %edx
-	subl	$0x8, %esp
-	leal	(%esp), %ecx
-	movl	%eax, (%ecx)
-	movl	%edx, 4(%ecx)
-	pushl	%ecx
-	call	scalehrtime
-	popl	%ecx
-	movl	(%ecx), %eax
-	movl	4(%ecx), %edx
-	addl	$0x8, %esp
-	FAST_INTR_POP
-	FAST_INTR_RETURN
-	SET_SIZE(gethrvtime)
-
-#endif	/* __i386 */
-
-#if defined(__amd64)
-
+	/*
+	 * In C this is:
+	 *
+	 * return (((uint64_t)(curthread->t_lpl->lpl_lgrpid) << 32) |
+	 *     curthread->t_cpu->cpu_id);
+	 */
 	ENTRY_NP(getlgrp)
 	FAST_INTR_PUSH
 	movq	%gs:CPU_THREAD, %rcx
@@ -211,18 +117,3 @@ getlgrp(void)
 	FAST_INTR_RETURN
 	SET_SIZE(getlgrp)
 
-#elif defined(__i386)
-
-	ENTRY_NP(getlgrp)
-	FAST_INTR_PUSH
-	movl	%gs:CPU_THREAD, %ecx
-	movl	T_LPL(%ecx), %ecx
-	movl	LPL_LGRPID(%ecx), %edx
-	movl	%gs:CPU_ID, %eax
-	FAST_INTR_POP
-	FAST_INTR_RETURN
-	SET_SIZE(getlgrp)
-
-#endif	/* __i386 */
-
-#endif	/* __lint */

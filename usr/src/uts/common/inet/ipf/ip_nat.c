@@ -4747,6 +4747,8 @@ ipf_stack_t *ifs;
 	ipnat_t *np;
 	SPL_INT(s);
 
+	sum1 = 0;
+	sum2 = 0;
 	if (ifs->ifs_fr_running <= 0)
 		return;
 

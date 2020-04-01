@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/asm_linkage.h>
@@ -36,9 +34,7 @@
 #include <sys/fsr.h>
 #include <sys/privregs.h>
 
-#if !defined(lint)
 #include "assym.h"
-#endif	/* lint */
 
 #define	FP_USED 1
 #define	LOFAULT_SET 2
@@ -59,20 +55,6 @@
  *
  * uzero is used by the kernel to zero a block in user address space.
  */
-
-#if defined(lint)
-
-/* ARGSUSED */
-int
-kzero(void *addr, size_t count)
-{ return(0); }
-
-/* ARGSUSED */
-void
-uzero(void *addr, size_t count)
-{}
-
-#else	/* lint */
 
 	ENTRY(uzero)
 	!
@@ -154,20 +136,9 @@ uzero(void *addr, size_t count)
 	SET_SIZE(kzero)
 	SET_SIZE(uzero)
 
-#endif	/* lint */
-
 /*
  * Zero a block of storage.
  */
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-bzero(void *addr, size_t count)
-{}
-
-#else	/* lint */
 
 	ENTRY(bzero)
 	wr	%g0, ASI_P, %asi
@@ -474,4 +445,3 @@ bzero(void *addr, size_t count)
 	clr	%o0			! return (0)
 
 	SET_SIZE(bzero)
-#endif	/* lint */

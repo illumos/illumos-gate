@@ -33,26 +33,6 @@
 #if defined(sun4v)
 #include <sys/hypervisor_api.h>
 
-#if defined(lint) || defined(__lint)
-
-/*ARGSUSED*/
-uint64_t
-hcall_tpm_get(uint64_t locality, uint64_t offset, uint64_t size,
-    uint64_t *value)
-{
-	return (0);
-}
-
-/*ARGSUSED*/
-uint64_t
-hcall_tpm_put(uint64_t locality, uint64_t offset, uint64_t size,
-    uint64_t value)
-{
-	return (0);
-}
-
-#else  /* lint || __lint */
-
 /*
  * hcall_tpm_get(uint64_t locality, uint64_t offset, uint64_t size,
  *     uint64_t *value)
@@ -77,7 +57,5 @@ hcall_tpm_put(uint64_t locality, uint64_t offset, uint64_t size,
 	retl
 	nop
 	SET_SIZE(hcall_tpm_put)
-
-#endif /* lint || __lint */
 
 #endif /* defined(sun4v) */

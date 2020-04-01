@@ -23,11 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#if !defined(lint)
 #include "assym.h"
-#endif	/* lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/mmu.h>
@@ -47,8 +43,6 @@
 #ifdef TRAPTRACE
 #include <sys/traptrace.h>
 #endif /* TRAPTRACE */
-
-#ifndef	lint
 
 /* BEGIN CSTYLED */
 #define	DCACHE_FLUSHPAGE(arg1, arg2, tmp1, tmp2, tmp3)			\
@@ -347,101 +341,9 @@ lbl/**/1:                                                       ;\
 
 /* END CSTYLED */
 
-#endif	/* !lint */
-
 /*
  * Spitfire MMU and Cache operations.
  */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-vtag_flushpage(caddr_t vaddr, uint64_t sfmmup)
-{}
-
-/*ARGSUSED*/
-void
-vtag_flushall(void)
-{}
-	
-/*ARGSUSED*/
-void
-vtag_flushall_uctxs(void)
-{}
-		
-/*ARGSUSED*/
-void
-vtag_flushpage_tl1(uint64_t vaddr, uint64_t sfmmup)
-{}
-
-/*ARGSUSED*/
-void
-vtag_flush_pgcnt_tl1(uint64_t vaddr, uint64_t sfmmup_pgcnt)
-{}
-
-/*ARGSUSED*/
-void
-vtag_flushall_tl1(uint64_t dummy1, uint64_t dummy2)
-{}
-
-/*ARGSUSED*/
-void
-vac_flushpage(pfn_t pfnum, int vcolor)
-{}
-
-/*ARGSUSED*/
-void
-vac_flushpage_tl1(uint64_t pfnum, uint64_t vcolor)
-{}
-
-/*ARGSUSED*/
-void
-init_mondo(xcfunc_t *func, uint64_t arg1, uint64_t arg2)
-{}
-
-/*ARGSUSED*/
-void
-init_mondo_nocheck(xcfunc_t *func, uint64_t arg1, uint64_t arg2)
-{}
-
-/*ARGSUSED*/
-void
-flush_instr_mem(caddr_t vaddr, size_t len)
-{}
-
-/*ARGSUSED*/
-void
-flush_ecache(uint64_t physaddr, size_t size, size_t linesize)
-{}
-
-/*ARGSUSED*/
-void
-get_ecache_dtag(uint32_t ecache_idx, uint64_t *ecache_data,
-		uint64_t *ecache_tag, uint64_t *oafsr, uint64_t *acc_afsr)
-{}
-
-/* ARGSUSED */
-uint64_t
-get_ecache_tag(uint32_t id, uint64_t *nafsr, uint64_t *acc_afsr)
-{
-	return ((uint64_t)0);
-}
-
-/* ARGSUSED */
-uint64_t
-check_ecache_line(uint32_t id, uint64_t *acc_afsr)
-{
-	return ((uint64_t)0);
-}
-
-/*ARGSUSED*/
-void
-kdi_flush_idcache(int dcache_size, int dcache_lsize,
-    int icache_size, int icache_lsize)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(vtag_flushpage)
 	/*
@@ -956,9 +858,7 @@ _dispatch_status_busy:
 	ret
 	  restore
 	SET_SIZE(get_ecache_dtag)
-#endif /* lint */
 
-#if defined(lint)
 /*
  * The ce_err function handles trap type 0x63 (corrected_ECC_error) at tl=0.
  * Steps: 1. GET AFSR  2. Get AFAR <40:4> 3. Get datapath error status
@@ -967,53 +867,6 @@ _dispatch_status_busy:
  * %g2: [ 52:43 UDB lower | 42:33 UDB upper | 32:0 afsr ] - arg #3/arg #1
  * %g3: [ 40:4 afar ] - sys_trap->have_win: arg #4/arg #2
  */
-void
-ce_err(void)
-{}
-
-void
-ce_err_tl1(void)
-{}
-
-
-/*
- * The async_err function handles trap types 0x0A (instruction_access_error)
- * and 0x32 (data_access_error) at TL = 0 and TL > 0.  When we branch here,
- * %g5 will have the trap type (with 0x200 set if we're at TL > 0).
- *
- * Steps: 1. Get AFSR 2. Get AFAR <40:4> 3. If not UE error skip UDP registers.
- *	  4. Else get and clear datapath error bit(s) 4. Clear AFSR error bits
- *	  6. package data in %g2 and %g3 7. disable all cpu errors, because
- *	  trap is likely to be fatal 8. call cpu_async_error vis sys_trap
- *
- * %g3: [ 63:53 tt | 52:43 UDB_L | 42:33 UDB_U | 32:0 afsr ] - arg #3/arg #1
- * %g2: [ 40:4 afar ] - sys_trap->have_win: arg #4/arg #2
- */
-void
-async_err(void)
-{}
-
-/*
- * The clr_datapath function clears any error bits set in the UDB regs.
- */
-void
-clr_datapath(void)
-{}
-
-/*
- * The get_udb_errors() function gets the current value of the
- * Datapath Error Registers.
- */
-/*ARGSUSED*/
-void
-get_udb_errors(uint64_t *udbh, uint64_t *udbl)
-{
-	*udbh = 0;
-	*udbl = 0;
-}
-
-#else 	/* lint */
-
 	ENTRY_NP(ce_err)
 	ldxa	[%g0]ASI_AFSR, %g3	! save afsr in g3
 
@@ -1108,11 +961,23 @@ get_udb_errors(uint64_t *udbh, uint64_t *udbl)
 	SET_SIZE(ce_trap_tl1)
 #endif
 
-	!
-	! async_err is the assembly glue code to get us from the actual trap
-	! into the CPU module's C error handler.  Note that we also branch
-	! here from ce_err() above.
-	!
+/*
+ * The async_err function handles trap types 0x0A (instruction_access_error)
+ * and 0x32 (data_access_error) at TL = 0 and TL > 0.  When we branch here,
+ * %g5 will have the trap type (with 0x200 set if we're at TL > 0).
+ *
+ * Steps: 1. Get AFSR 2. Get AFAR <40:4> 3. If not UE error skip UDP registers.
+ *	  4. Else get and clear datapath error bit(s) 4. Clear AFSR error bits
+ *	  6. package data in %g2 and %g3 7. disable all cpu errors, because
+ *	  trap is likely to be fatal 8. call cpu_async_error vis sys_trap
+ *
+ * %g3: [ 63:53 tt | 52:43 UDB_L | 42:33 UDB_U | 32:0 afsr ] - arg #3/arg #1
+ * %g2: [ 40:4 afar ] - sys_trap->have_win: arg #4/arg #2
+ *
+ * async_err is the assembly glue code to get us from the actual trap
+ * into the CPU module's C error handler.  Note that we also branch
+ * here from ce_err() above.
+ */
 	ENTRY_NP(async_err)
 	stxa	%g0, [%g0]ASI_ESTATE_ERR ! disable ecc and other cpu errors
 	membar	#Sync			! membar sync required
@@ -1186,6 +1051,9 @@ dis_err_panic1_resetskip:
 	  sub	%g0, 1, %g4
 	SET_SIZE(dis_err_panic1)
 
+/*
+ * The clr_datapath function clears any error bits set in the UDB regs.
+ */
 	ENTRY(clr_datapath)
 	set	P_DER_H, %o4			! put P_DER_H in o4
 	ldxa	[%o4]ASI_SDB_INTR_R, %o5	! read sdb upper half into o3
@@ -1209,6 +1077,10 @@ dis_err_panic1_resetskip:
 	  nop
 	SET_SIZE(clr_datapath)
 
+/*
+ * The get_udb_errors() function gets the current value of the
+ * Datapath Error Registers.
+ */
 	ENTRY(get_udb_errors)
 	set	P_DER_H, %o3
 	ldxa	[%o3]ASI_SDB_INTR_R, %o2
@@ -1219,9 +1091,6 @@ dis_err_panic1_resetskip:
 	  stx	%o2, [%o1]
 	SET_SIZE(get_udb_errors)
 
-#endif /* lint */
-
-#if defined(lint)
 /*
  * The itlb_rd_entry and dtlb_rd_entry functions return the tag portion of the
  * tte, the virtual address, and the ctxnum of the specified tlb entry.  They
@@ -1230,16 +1099,6 @@ dis_err_panic1_resetskip:
  *
  * Note: These two routines are required by the Estar "cpr" loadable module.
  */
-/*ARGSUSED*/
-void
-itlb_rd_entry(uint_t entry, tte_t *tte, uint64_t *va_tag)
-{}
-
-/*ARGSUSED*/
-void
-dtlb_rd_entry(uint_t entry, tte_t *tte, uint64_t *va_tag)
-{}
-#else 	/* lint */
 /*
  * NB - In Spitfire cpus, when reading a tte from the hardware, we
  * need to clear [42-41] because the general definitions in pte.h
@@ -1286,25 +1145,6 @@ dtlb_rd_entry(uint_t entry, tte_t *tte, uint64_t *va_tag)
 	retl
 	  stx	%o5, [%o2]
 	SET_SIZE(dtlb_rd_entry)
-#endif /* lint */
-
-#if defined(lint)
-
-/*
- * routines to get and set the LSU register
- */
-uint64_t
-get_lsu(void)
-{
-	return ((uint64_t)0);
-}
-
-/*ARGSUSED*/
-void
-set_lsu(uint64_t lsu)
-{}
-
-#else /* lint */
 
 	ENTRY(set_lsu)
 	stxa	%o0, [%g0]ASI_LSU		! store to LSU
@@ -1317,9 +1157,6 @@ set_lsu(uint64_t lsu)
 	ldxa	[%g0]ASI_LSU, %o0		! load LSU
 	SET_SIZE(get_lsu)
 
-#endif /* lint */
-
-#ifndef lint
 	/*
 	 * Clear the NPT (non-privileged trap) bit in the %tick
 	 * registers. In an effort to make the change in the
@@ -1458,30 +1295,12 @@ set_lsu(uint64_t lsu)
 	retl
 	wrpr	%g0, %o5, %pstate
 	SET_SIZE(check_ecache_line)
-#endif /* lint */
 
-#if defined(lint)
-uint64_t
-read_and_clear_afsr()
-{
-	return ((uint64_t)0);
-}
-#else	/* lint */
 	ENTRY(read_and_clear_afsr)
 	ldxa	[%g0]ASI_AFSR, %o0
 	retl
 	  stxa	%o0, [%g0]ASI_AFSR		! clear AFSR
 	SET_SIZE(read_and_clear_afsr)
-#endif	/* lint */
-
-#if defined(lint)
-/* ARGSUSED */
-void
-scrubphys(uint64_t paddr, int ecache_size)
-{
-}
-
-#else	/* lint */
 
 /*
  * scrubphys - Pass in the aligned physical memory address that you want
@@ -1609,10 +1428,6 @@ scrubphys(uint64_t paddr, int ecache_size)
 	membar	#Sync			! move the data out of the load buffer
 	SET_SIZE(scrubphys)
 
-#endif	/* lint */
-
-#if defined(lint)
-
 /*
  * clearphys - Pass in the aligned physical memory address that you want
  * to push out, as a 64 byte block of zeros, from the ecache zero-filled.
@@ -1621,14 +1436,6 @@ scrubphys(uint64_t paddr, int ecache_size)
  * This routine clears and restores the error enable flag.
  * TBD - Hummingbird may need similar protection
  */
-/* ARGSUSED */
-void
-clearphys(uint64_t paddr, int ecache_size, int ecache_linesize)
-{
-}
-
-#else	/* lint */
-
 	ENTRY(clearphys)
 	or	%o2, %g0, %o3	! ecache linesize
 	or	%o1, %g0, %o2	! ecache size
@@ -1759,16 +1566,6 @@ clearphys(uint64_t paddr, int ecache_size, int ecache_linesize)
 	wrpr	%g0, %o4, %pstate	! restore earlier pstate register value
 	SET_SIZE(clearphys)
 
-#endif	/* lint */
-
-#if defined(lint)
-/* ARGSUSED */
-void
-flushecacheline(uint64_t paddr, int ecache_size)
-{
-}
-
-#else	/* lint */
 /*
  * flushecacheline - This is a simpler version of scrubphys
  * which simply does a displacement flush of the line in
@@ -1882,16 +1679,6 @@ flushecacheline(uint64_t paddr, int ecache_size)
         wrpr    %g0, %o4, %pstate       
         SET_SIZE(flushecacheline)
 
-#endif	/* lint */
-
-#if defined(lint)
-/* ARGSUSED */
-void
-ecache_scrubreq_tl1(uint64_t inum, uint64_t dummy)
-{
-}
-
-#else	/* lint */
 /*
  * ecache_scrubreq_tl1 is the crosstrap handler called at ecache_calls_a_sec Hz
  * from the clock CPU.  It atomically increments the outstanding request
@@ -1927,15 +1714,6 @@ ecache_scrubreq_tl1(uint64_t inum, uint64_t dummy)
 1:
 	retry
 	SET_SIZE(ecache_scrubreq_tl1)
-
-#endif	/* lint */
-
-#if defined(lint)
-/*ARGSUSED*/
-void
-write_ec_tag_parity(uint32_t id)
-{}
-#else /* lint */
 
 	/*
          * write_ec_tag_parity(), which zero's the ecache tag,
@@ -1975,15 +1753,6 @@ write_ec_tag_parity(uint32_t id)
         retl
         wrpr    %g0, %o5, %pstate
         SET_SIZE(write_ec_tag_parity)
-
-#endif /* lint */
-
-#if defined(lint)
-/*ARGSUSED*/
-void
-write_hb_ec_tag_parity(uint32_t id)
-{}
-#else /* lint */
 
 	/*
          * write_hb_ec_tag_parity(), which zero's the ecache tag,
@@ -2029,18 +1798,7 @@ write_hb_ec_tag_parity(uint32_t id)
         wrpr    %g0, %o5, %pstate
         SET_SIZE(write_hb_ec_tag_parity)
 
-#endif /* lint */
-
 #define	VIS_BLOCKSIZE		64
-
-#if defined(lint)
-
-/*ARGSUSED*/
-int
-dtrace_blksuword32(uintptr_t addr, uint32_t *data, int tryagain)
-{ return (0); }
-
-#else
 
 	ENTRY(dtrace_blksuword32)
 	save	%sp, -SA(MINFRAME + 4), %sp
@@ -2106,4 +1864,3 @@ dtrace_blksuword32(uintptr_t addr, uint32_t *data, int tryagain)
 
 	SET_SIZE(dtrace_blksuword32)
 
-#endif /* lint */

@@ -23,13 +23,6 @@
  * Use is subject to license terms.
  */
 
-#if defined(lint)
-#include <sys/types.h>
-#include <sys/t_lock.h>
-#include <sys/promif.h>
-#include <sys/prom_isa.h>
-#endif	/* lint */
-
 #include <sys/asm_linkage.h>
 #include <sys/intreg.h>
 #include <sys/ivintr.h>
@@ -45,13 +38,6 @@
 #include <sys/privregs.h>
 #include <sys/hypervisor_api.h>
 #include <sys/clock.h>
-
-#if defined(lint)
-
-#include <sys/thread.h>
-#include <sys/time.h>
-
-#else	/* lint */
 
 #include "assym.h"
 
@@ -181,16 +167,6 @@ availmem:
 	.align	8
 _local_p1275cis:
 	.nword	0
-
-#endif	/* lint */
-
-#if defined(lint)
-
-void
-_start(void)
-{}
-
-#else /* lint */
 
 	.seg	".data"
 
@@ -364,8 +340,6 @@ afsrbuf:
 	.asciz	"main returned"
 	.align	4
 
-#endif	/* lint */
-
 
 /*
  * Generic system trap handler.
@@ -401,14 +375,6 @@ afsrbuf:
  *	func(struct regs *rp, uint32_t arg1 [%g2.l],
  *	    uint32_t arg2 [%g3.l], uint32_t arg3 [%g3.h], uint32_t [%g2.h])
  */
-
-#if defined(lint)
-
-void
-sys_trap(void)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(sys_trap)
 #ifdef DEBUG
@@ -1047,10 +1013,6 @@ common_rtt:
 	SET_SIZE(priv_rtt)
 	SET_SIZE(ktl0)
 
-#endif	/* lint */
-
-#ifndef lint
-
 #ifdef DEBUG
 	.seg	".data"
 	.align	4
@@ -1071,27 +1033,18 @@ sys_trap_wrong_pil:
 	mov	%o3, %o2
 	SET_SIZE(bad_g4)
 #endif /* DEBUG */
-#endif /* lint */
 
 /*
  * sys_tl1_panic can be called by traps at tl1 which
  * really want to panic, but need the rearrangement of
  * the args as provided by this wrapper routine.
  */
-#if defined(lint)
-
-void
-sys_tl1_panic(void)
-{}
-
-#else	/* lint */
 	ENTRY_NP(sys_tl1_panic)
 	mov	%o1, %o0
 	mov	%o2, %o1
 	call	panic
 	mov	%o3, %o2
 	SET_SIZE(sys_tl1_panic)
-#endif /* lint */
 
 
 /*
@@ -1101,28 +1054,10 @@ sys_tl1_panic(void)
  * This is used for context switching.
  */
 
-#if defined(lint)
-
-void
-flush_windows(void)
-{}
-
-#else	/* lint */
-
 	ENTRY_NP(flush_windows)
 	retl
 	flushw
 	SET_SIZE(flush_windows)
-
-#endif	/* lint */
-
-#if defined(lint)
-
-void
-debug_flush_windows(void)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(debug_flush_windows)
 	set	nwindows, %g1
@@ -1145,19 +1080,9 @@ debug_flush_windows(void)
 
 	SET_SIZE(debug_flush_windows)
 
-#endif	/* lint */
-
 /*
  * flush user windows to memory.
  */
-
-#if defined(lint)
-
-void
-flush_user_windows(void)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(flush_user_windows)
 	rdpr	%otherwin, %g1
@@ -1177,22 +1102,12 @@ flush_user_windows(void)
 	nop
 	SET_SIZE(flush_user_windows)
 
-#endif	/* lint */
-
 /*
  * Throw out any user windows in the register file.
  * Used by setregs (exec) to clean out old user.
  * Used by sigcleanup to remove extraneous windows when returning from a
  * signal.
  */
-
-#if defined(lint)
-
-void
-trash_user_windows(void)
-{}
-
-#else	/* lint */
 
 	ENTRY_NP(trash_user_windows)
 	rdpr	%otherwin, %g1
@@ -1219,42 +1134,15 @@ trash_user_windows(void)
 	SET_SIZE(trash_user_windows)
 
 
-#endif	/* lint */
-
 /*
  * Setup g7 via the CPU data structure.
  */
-#if defined(lint)
-
-struct scb *
-set_tbr(struct scb *s)
-{ return (s); }
-
-#else	/* lint */
 
 	ENTRY_NP(set_tbr)
 	retl
 	ta	72		! no tbr, stop simulation
 	SET_SIZE(set_tbr)
 
-#endif	/* lint */
-
-
-#if defined(lint)
-/*
- * These need to be defined somewhere to lint and there is no "hicore.s"...
- */
-char etext[1], end[1];
-#endif	/* lint*/
-
-#if defined (lint)
-
-/* ARGSUSED */
-void
-ptl1_panic(u_int reason)
-{}
-
-#else /* lint */
 
 #define	PTL1_SAVE_WINDOW(RP)						\
 	stxa	%l0, [RP + RW64_LOCAL + (0 * RW64_LOCAL_INCR)] %asi;	\
@@ -1497,25 +1385,16 @@ ptl1_panic_tl0:					! ----<-----+	TL:0
 	  mov	%l1, %o0
 	/*NOTREACHED*/
 	SET_SIZE(ptl1_panic)
-#endif /* lint */
 
 #ifdef	PTL1_PANIC_DEBUG
-#if defined (lint)
+
 /*
  * ptl1_recurse() calls itself a number of times to either set up a known
- * stack or to cause a kernel stack overflow. It decrements the arguments 
+ * stack or to cause a kernel stack overflow. It decrements the arguments
  * on each recursion.
  * It's called by #ifdef PTL1_PANIC_DEBUG code in startup.c to set the
  * registers to a known state to facilitate debugging.
  */
-
-/* ARGSUSED */
-void 
-ptl1_recurse(int count_threshold, int trap_threshold)
-{}
-
-#else /* lint */
-
 	ENTRY_NP(ptl1_recurse)
 	save    %sp, -SA(MINFRAME), %sp
 
@@ -1580,16 +1459,6 @@ ptl1_recurse_trap:
 	  nop 					! NOTREACHED 
         SET_SIZE(ptl1_recurse)
 
-#endif /* lint */
-
-#if defined (lint)
-
-/* ARGSUSED */
-void
-ptl1_panic_xt(int arg1, int arg2)
-{}
-
-#else /* lint */
 	/*
 	 * Asm function to handle a cross trap to call ptl1_panic()
 	 */
@@ -1598,19 +1467,9 @@ ptl1_panic_xt(int arg1, int arg2)
 	  mov	PTL1_BAD_DEBUG, %g1
         SET_SIZE(ptl1_panic_xt)
 
-#endif /* lint */
-
 #endif	/* PTL1_PANIC_DEBUG */
 
 #ifdef	TRAPTRACE
-#if	defined (lint)
-
-void
-trace_ptr_panic(void)
-{
-}
-
-#else	/* lint */
 
 	ENTRY_NP(trace_ptr_panic)
 	!
@@ -1633,22 +1492,12 @@ trace_ptr_panic(void)
 	mov	PTL1_BAD_TRACE_PTR, %g1
 	SET_SIZE(trace_ptr_panic)
 
-#endif	/* lint */
 #endif	/* TRAPTRACE */
 
 /*
  * The interface for a 32-bit client program that takes over the TBA
  * calling the 64-bit romvec OBP.
  */
-
-#if defined(lint)
-
-/* ARGSUSED */
-int
-client_handler(void *cif_handler, void *arg_array)
-{ return 0; }
-
-#else	/* lint */
 
 	ENTRY(client_handler)
 	save	%sp, -SA64(MINFRAME64), %sp	! 32 bit frame, 64 bit sized
@@ -1672,17 +1521,6 @@ client_handler(void *cif_handler, void *arg_array)
 	restore	%o0, %g0, %o0			! delay; result in %o0
 	SET_SIZE(client_handler)
 
-#endif	/* lint */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-panic_bad_hcall(uint64_t err, uint64_t hcall)
-{}
-
-#else   /* lint */
-
 	.seg	".text"
 bad_hcall_error:
 	.asciz	"hypervisor call 0x%x returned an unexpected error %d"
@@ -1703,4 +1541,3 @@ bad_hcall_error:
 	mov	%o3, %o7
 	SET_SIZE(panic_bad_hcall)
 
-#endif  /* lint */

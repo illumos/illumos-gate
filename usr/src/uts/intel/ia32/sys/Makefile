@@ -19,21 +19,17 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# uts/intel/ia32/sys/Makefile
+# Copyright 2020 Joyent, Inc.
 #
 # include global definitions
 include ../../../../Makefile.master
 
 HDRS=  \
 	asm_linkage.h	\
-	kdi_regs.h	\
 	machtypes.h	\
-	privmregs.h	\
 	privregs.h	\
 	psw.h		\
 	pte.h		\

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/asm_linkage.h>
@@ -36,9 +34,7 @@
 #include <sys/fsr.h>
 #include <sys/privregs.h>
 
-#if !defined(lint)
 #include "assym.h"
-#endif	/* lint */
 
 
 /*
@@ -482,15 +478,6 @@
 
 
 
-#if defined(lint)
-
-/* ARGSUSED */
-int
-kcopy(const void *from, void *to, size_t count)
-{ return(0); }
-
-#else	/* lint */
-
 	.seg	".text"
 	.align	4
 
@@ -617,7 +604,6 @@ fp_panic_msg:
 	call	panic
 	  nop
 	SET_SIZE(kcopy)
-#endif	/* lint */
 
 
 /*
@@ -627,14 +613,6 @@ fp_panic_msg:
  * Copy a page of memory.
  * Assumes double word alignment and a count >= 256.
  */
-#if defined(lint)
-
-/* ARGSUSED */
-void
-bcopy(const void *from, void *to, size_t count)
-{}
-
-#else	/* lint */
 
 	ENTRY(bcopy)
 
@@ -1870,20 +1848,9 @@ blkdone:
 	andn	%i2, %o0, %i3		! return size of aligned bytes
 	SET_SIZE(bcopy)
 
-#endif	/* lint */
-
 /*
  * Block copy with possibly overlapped operands.
  */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-ovbcopy(const void *from, void *to, size_t count)
-{}
-
-#else	/* lint */
 
 	ENTRY(ovbcopy)
 	tst	%o2			! check count
@@ -1927,8 +1894,6 @@ ovbcopy(const void *from, void *to, size_t count)
 	nop
 	SET_SIZE(ovbcopy)
 
-#endif	/* lint */
-
 /*
  * hwblkpagecopy()
  *
@@ -1936,12 +1901,6 @@ ovbcopy(const void *from, void *to, size_t count)
  * has already disabled kernel preemption and has checked
  * use_hw_bcopy.
  */
-#ifdef lint
-/*ARGSUSED*/
-void
-hwblkpagecopy(const void *src, void *dst)
-{ }
-#else /* lint */
 	ENTRY(hwblkpagecopy)
 	! get another window w/space for three aligned blocks of saved fpregs
 	save	%sp, -SA(MINFRAME + 4*64), %sp
@@ -2019,7 +1978,6 @@ hwblkpagecopy(const void *src, void *dst)
 	ret
 	restore	%g0, 0, %o0
 	SET_SIZE(hwblkpagecopy)
-#endif	/* lint */
 
 
 /*
@@ -2130,15 +2088,6 @@ hwblkpagecopy(const void *src, void *dst)
 /*
  * Copy kernel data to user space (copyout/xcopyout/xcopyout_little).
  */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-int
-copyout(const void *kaddr, void *uaddr, size_t count)
-{ return (0); }
-
-#else	/* lint */
 
 /*
  * We save the arguments in the following registers in case of a fault:
@@ -3392,17 +3341,6 @@ copyout_blkdone:
 	mov	-1, %o0
 	SET_SIZE(copyout)
 
-#endif	/* lint */
-
-
-#ifdef	lint
-
-/*ARGSUSED*/
-int
-xcopyout(const void *kaddr, void *uaddr, size_t count)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(xcopyout)
 	sethi	%hi(.xcopyout_err), REAL_LOFAULT
@@ -3419,17 +3357,6 @@ xcopyout(const void *kaddr, void *uaddr, size_t count)
 	retl
 	mov	%g1, %o0
 	SET_SIZE(xcopyout)
-
-#endif	/* lint */
-	
-#ifdef	lint
-
-/*ARGSUSED*/
-int
-xcopyout_little(const void *kaddr, void *uaddr, size_t count)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(xcopyout_little)
 	sethi	%hi(.little_err), %o4
@@ -3458,20 +3385,9 @@ xcopyout_little(const void *kaddr, void *uaddr, size_t count)
 	mov	%g0, %o0		! return (0)
 	SET_SIZE(xcopyout_little)
 
-#endif	/* lint */
-
 /*
  * Copy user data to kernel space (copyin/xcopyin/xcopyin_little)
  */
-
-#if defined(lint)
-
-/*ARGSUSED*/
-int
-copyin(const void *uaddr, void *kaddr, size_t count)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(copyin)
 	sethi	%hi(.copyin_err), REAL_LOFAULT
@@ -4630,17 +4546,6 @@ copyin_blkdone:
 	mov	-1, %o0
 	SET_SIZE(copyin)
 
-#endif	/* lint */
-
-#ifdef	lint
-
-/*ARGSUSED*/
-int
-xcopyin(const void *uaddr, void *kaddr, size_t count)
-{ return (0); }
-
-#else	/* lint */
-
 	ENTRY(xcopyin)
 	sethi	%hi(.xcopyin_err), REAL_LOFAULT
 	b	.do_copyin
@@ -4656,17 +4561,6 @@ xcopyin(const void *uaddr, void *kaddr, size_t count)
 	retl
 	mov	%g1, %o0
 	SET_SIZE(xcopyin)
-
-#endif	/* lint */
-
-#ifdef	lint
-
-/*ARGSUSED*/
-int
-xcopyin_little(const void *uaddr, void *kaddr, size_t count)
-{ return (0); }
-
-#else	/* lint */
 
 	ENTRY(xcopyin_little)
 	sethi	%hi(.little_err), %o4
@@ -4701,21 +4595,11 @@ xcopyin_little(const void *uaddr, void *kaddr, size_t count)
 	mov	%g1, %o0
 	SET_SIZE(xcopyin_little)
 
-#endif	/* lint */
-
 
 /*
  * Copy a block of storage - must not overlap (from + len <= to).
  * No fault handler installed (to be called under on_fault())
  */
-#if defined(lint)
-
-/* ARGSUSED */
-void
-copyin_noerr(const void *ufrom, void *kto, size_t count)
-{}
-
-#else	/* lint */
 
 	ENTRY(copyin_noerr)
 	sethi	%hi(.copyio_noerr), REAL_LOFAULT
@@ -4726,41 +4610,16 @@ copyin_noerr(const void *ufrom, void *kto, size_t count)
 	  nop
 	SET_SIZE(copyin_noerr)
 
-#endif /* lint */
-
 /*
  * Copy a block of storage - must not overlap (from + len <= to).
  * No fault handler installed (to be called under on_fault())
  */
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-copyout_noerr(const void *kfrom, void *uto, size_t count)
-{}
-
-#else	/* lint */
 
 	ENTRY(copyout_noerr)
 	sethi	%hi(.copyio_noerr), REAL_LOFAULT
 	b	.do_copyout
 	  or	REAL_LOFAULT, %lo(.copyio_noerr), REAL_LOFAULT
 	SET_SIZE(copyout_noerr)
-
-#endif /* lint */
-
-#if defined(lint)
-
-int use_hw_bcopy = 1;
-int use_hw_copyio = 1;
-int use_hw_bzero = 1;
-uint_t hw_copy_limit_1 = 0;
-uint_t hw_copy_limit_2 = 0;
-uint_t hw_copy_limit_4 = 0;
-uint_t hw_copy_limit_8 = 0;
-
-#else /* !lint */
 
 	.align	4
 	DGDEF(use_hw_bcopy)
@@ -4780,7 +4639,6 @@ uint_t hw_copy_limit_8 = 0;
 
 	.align	64
 	.section ".text"
-#endif /* !lint */
 
 
 /*
@@ -4791,14 +4649,6 @@ uint_t hw_copy_limit_8 = 0;
  * Caller is responsible for ensuring use_hw_bzero is true and that
  * kpreempt_disable() has been called.
  */
-#ifdef lint
-/*ARGSUSED*/
-int
-hwblkclr(void *addr, size_t len)
-{ 
-	return(0);
-}
-#else /* lint */
 	! %i0 - start address
 	! %i1 - length of region (multiple of 64)
 	! %l0 - saved fprs
@@ -4898,15 +4748,6 @@ hwblkclr(void *addr, size_t len)
 	ret
 	restore	%g0, 0, %o0		! return (bzero or not)
 	SET_SIZE(hwblkclr)
-#endif	/* lint */
-
-#ifdef	lint
-/* Copy 32 bytes of data from src to dst using physical addresses */
-/*ARGSUSED*/
-void
-hw_pa_bcopy32(uint64_t src, uint64_t dst)
-{}
-#else	/*!lint */
 
 	/*
 	 * Copy 32 bytes of data from src (%o0) to dst (%o1)
@@ -4936,4 +4777,3 @@ hw_pa_bcopy32(uint64_t src, uint64_t dst)
 	retl
 	  wrpr    %g0, %g1, %pstate
 	SET_SIZE(hw_pa_bcopy32)
-#endif /* lint */

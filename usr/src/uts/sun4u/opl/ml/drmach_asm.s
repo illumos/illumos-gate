@@ -30,12 +30,8 @@
  * only by DR for the copy-rename sequence.
  */
 
-#if defined(lint)
-#include <sys/types.h>
-#else
 #include "assym.h"
 #include "drmach_offsets.h"
-#endif /* lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/param.h>
@@ -50,8 +46,6 @@
 #include <sys/cheetahregs.h>
 #include <sys/drmach.h>
 #include <sys/sbd_ioctl.h>
-
-#if !defined(lint)
 
 /*
  * turn off speculative mode to prevent unwanted memory access
@@ -68,15 +62,8 @@
 	or	tmp1, tmp2, tmp1					;\
 	stxa	tmp1, [%g0]ASI_MCNTL					;\
 	membar #Sync
-#endif
 
 
-#if defined(lint)
-/*ARGSUSED*/
-void
-drmach_fmem_loop_script(caddr_t critical, int size, caddr_t stat)
-{ return; }
-#else /* lint */
 	.align  8
 	ENTRY_NP(drmach_fmem_loop_script)
 	/* turn off speculative mode */
@@ -158,14 +145,7 @@ drmach_fmem_loop_script(caddr_t critical, int size, caddr_t stat)
 	ba	2b
 .word	 0x81b01060
 	SET_SIZE(drmach_fmem_loop_script)
-#endif /* lint */
 
-#if defined(lint)
-/*ARGSUSED*/
-void
-drmach_flush_icache(void)
-{ return; }
-#else /* lint */
 	.align  8
 	ENTRY_NP(drmach_flush_icache)
 	stxa	%g0, [%g0]ASI_ALL_FLUSH_L1I
@@ -173,14 +153,7 @@ drmach_flush_icache(void)
 	retl
 	 nop
 	SET_SIZE(drmach_flush_icache)
-#endif
 
-#if defined(lint)
-/*ARGSUSED*/
-int
-drmach_fmem_exec_script(caddr_t critical, int size)
-{ return (0); }
-#else /* lint */
 .align 32
 	ENTRY_NP(drmach_fmem_exec_script)
 	/* turn off speculative mode */
@@ -455,28 +428,10 @@ drmach_fmem_exec_script(caddr_t critical, int size)
 	ba,a	1b
 	 nop
 	SET_SIZE(drmach_fmem_exec_script)
-#endif /* lint */
 
-#if defined(lint)
-/*ARGSUSED*/
-void
-drmach_fmem_exec_script_end(caddr_t critical, int size)
-{ return; }
-#else /* lint */
 	ENTRY_NP(drmach_fmem_exec_script_end)
 	nop
 	SET_SIZE(drmach_fmem_exec_script_end)
-#endif /* lint */
-
-#if defined(lint)
-uint64_t
-patch_inst(uint64_t *x, uint64_t y)
-{
-	*x = y;
-	return (0);
-}
-
-#else   /* lint */
 
 	ENTRY_NP(patch_inst)
 	ldx	[%o0], %o2
@@ -488,42 +443,18 @@ patch_inst(uint64_t *x, uint64_t y)
 	 mov	%o2, %o0
 	SET_SIZE(patch_inst)
 
-#endif /* lint */
-
-#if defined(lint)
-void
-drmach_sys_trap()
-{
-}
-#else   /* lint */
 	ENTRY_NP(drmach_sys_trap)
 	mov	-1, %g4
 	set	sys_trap, %g5
 	jmp	%g5
 	 nop
 	SET_SIZE(drmach_sys_trap)
-#endif /* lint */
 
-#if defined(lint)
-uint64_t
-drmach_get_stick()
-{
-	return (0);
-}
-#else   /* lint */
 	ENTRY_NP(drmach_get_stick)
 	retl
 	rd	STICK, %o0
 	SET_SIZE(drmach_get_stick)
-#endif /* lint */
 
-#if defined(lint)
-/*ARGSUSED*/
-void
-drmach_flush(drmach_copy_rename_critical_t *x, uint_t y)
-{}
-
-#else /* lint */
 	ENTRY_NP(drmach_flush)
 	mov	%o0, %o2
 0:
@@ -534,4 +465,3 @@ drmach_flush(drmach_copy_rename_critical_t *x, uint_t y)
 	retl
 	 nop
 	SET_SIZE(drmach_flush)
-#endif /* lint */

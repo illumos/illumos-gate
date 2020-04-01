@@ -30,31 +30,6 @@
 
 #include <sys/asm_linkage.h>
 
-#if defined(lint) || defined(__lint)
-
-#include <sys/cpc_ultra.h>
-
-/*ARGSUSED*/
-void
-ultra_setpcr(uint64_t pcr)
-{}
-
-/*ARGSUSED*/
-uint64_t
-ultra_getpcr(void)
-{ return (0); }
-
-/*ARGSUSED*/
-void
-ultra_setpic(uint64_t pic)
-{}
-
-uint64_t
-ultra_getpic(void)
-{ return (0); }
-
-#else	/* lint || __lint */
-
 	ENTRY(ultra_setpcr)
 	retl
 	wr	%o0, %pcr
@@ -85,4 +60,3 @@ ultra_getpic(void)
 	rd	%pic, %o0
 	SET_SIZE(ultra_getpic)
 
-#endif	/* lint || __lint */

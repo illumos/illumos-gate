@@ -31,10 +31,6 @@
  * the IDT stubs that drop into here (mainly via kdi_cmnint).
  */
 
-#if defined(__lint)
-#include <sys/types.h>
-#else
-
 #include <sys/segments.h>
 #include <sys/asm_linkage.h>
 #include <sys/controlregs.h>
@@ -716,4 +712,3 @@ kdi_pass_invaltrap:
 	SETDREG(kdi_setdr6, %dr6)
 	SETDREG(kdi_setdr7, %dr7)
 
-#endif /* !__lint */

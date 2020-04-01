@@ -23,19 +23,11 @@
  * Copyright (c) 2007 by Sun Microsystems, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * General machine architecture & implementation specific
  * assembly language routines.
  */
-#if defined(lint)
-#include <sys/types.h>
-#include <sys/machsystm.h>
-#include <sys/t_lock.h>
-#else   /* lint */
 #include "assym.h"
-#endif  /* lint */
 
 #include <sys/asm_linkage.h>
 #include <sys/eeprom.h>
@@ -46,15 +38,6 @@
 #include <sys/iocache.h>
 #include <sys/privregs.h>
 #include <sys/archsystm.h>
-
-#if defined(lint)
-
-/*ARGSUSED*/
-void
-memscrub_read(caddr_t vaddr, u_int blks)
-{}
-
-#else	/* lint */
 
 	!
 	! void	memscrub_read(caddr_t src, u_int blks)
@@ -88,4 +71,3 @@ memscrub_read(caddr_t vaddr, u_int blks)
 	wr	%o2, 0, %fprs			! restore fprs (disabled)
 	SET_SIZE(memscrub_read)
 
-#endif	/* lint */

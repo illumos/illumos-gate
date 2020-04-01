@@ -51,8 +51,6 @@
 #include <sys/traptrace.h>
 #include <sys/machparam.h>
 
-#if !defined(__lint)
-
 #include "assym.h"
 
 /*
@@ -67,7 +65,7 @@
  * it get saved as is running native.
  */
 
-#if defined(__xpv) && defined(__amd64)
+#if defined(__xpv)
 
 #define	NPTRAP_NOERR(trapno)	\
 	pushq	$0;		\
@@ -85,7 +83,7 @@
 	XPV_TRAP_POP;		\
 	pushq	$trapno
 
-#else /* __xpv && __amd64 */
+#else /* __xpv */
 
 #define	TRAP_NOERR(trapno)	\
 	push	$0;		\
@@ -100,11 +98,11 @@
 #define	TRAP_ERR(trapno)	\
 	push	$trapno
 
-#endif	/* __xpv && __amd64 */
+#endif	/* __xpv */
 
 	/*
 	 * These are the stacks used on cpu0 for taking double faults,
-	 * NMIs and MCEs (the latter two only on amd64 where we have IST).
+	 * NMIs and MCEs.
 	 *
 	 * We define them here instead of in a C file so that we can page-align
 	 * them (gcc won't do that in a .c file).
@@ -134,7 +132,6 @@
 	ENTRY_NP(dbgtrap)
 	TRAP_NOERR(T_SGLSTP)	/* $1 */
 
-#if defined(__amd64)
 #if !defined(__xpv)		/* no sysenter support yet */
 	/*
 	 * If we get here as a result of single-stepping a sysenter
@@ -193,29 +190,9 @@
 	movq	%rax, %db6
 #endif
 
-#elif defined(__i386)
-
-	INTR_PUSH
-#if defined(__xpv)
-	pushl	$6
-	call	kdi_dreg_get
-	addl	$4, %esp
-	movl	%eax, %esi		/* %dr6 -> %esi */
-	pushl	$0
-	pushl	$6
-	call	kdi_dreg_set		/* 0 -> %dr6 */
-	addl	$8, %esp
-#else
-	movl	%db6, %esi
-	xorl	%eax, %eax
-	movl	%eax, %db6
-#endif
-#endif	/* __i386 */
-
 	jmp	cmntrap_pushed
 	SET_SIZE(dbgtrap)
 
-#if defined(__amd64)
 #if !defined(__xpv)
 
 /*
@@ -277,10 +254,7 @@
 #define	SET_CPU_GSBASE	/* noop on the hypervisor */
 
 #endif	/* __xpv */
-#endif	/* __amd64 */
 
-
-#if defined(__amd64)
 
 	/*
 	 * #NMI
@@ -314,43 +288,10 @@
 	/*NOTREACHED*/
 	SET_SIZE(nmiint)
 
-#elif defined(__i386)
-
-	/*
-	 * #NMI
-	 */
-	ENTRY_NP(nmiint)
-	TRAP_NOERR(T_NMIFLT)	/* $2 */
-
-	/*
-	 * Save all registers and setup segment registers
-	 * with kernel selectors.
-	 */
-	INTR_PUSH
-	INTGATE_INIT_KERNEL_FLAGS
-
-	TRACE_PTR(%edi, %ebx, %ebx, %ecx, $TT_TRAP)
-	TRACE_REGS(%edi, %esp, %ebx, %ecx)
-	TRACE_STAMP(%edi)
-
-	movl	%esp, %ebp
-
-	pushl	%ebp
-	call	av_dispatch_nmivect
-	addl	$4, %esp
-
-	INTR_POP_USER
-	IRET
-	SET_SIZE(nmiint)
-
-#endif	/* __i386 */
-
 	/*
 	 * #BP
 	 */
 	ENTRY_NP(brktrap)
-
-#if defined(__amd64)
 	XPV_TRAP_POP
 	cmpw	$KCS_SEL, 8(%rsp)
 	jne	bp_user
@@ -368,7 +309,6 @@
 	jmp	ud_kernel
 
 bp_user:
-#endif /* __amd64 */
 
 	NPTRAP_NOERR(T_BPTFLT)	/* $3 */
 	jmp	dtrace_trap
@@ -390,8 +330,6 @@ bp_user:
 	TRAP_NOERR(T_BOUNDFLT)	/* $5 */
 	jmp	cmntrap
 	SET_SIZE(boundstrap)
-
-#if defined(__amd64)
 
 	ENTRY_NP(invoptrap)
 
@@ -454,12 +392,12 @@ ud_push:
 
 ud_leave:
 	/*
-	 * We must emulate a "leave", which is the same as a "movq %rbp, %rsp"
-	 * followed by a "popq %rbp".  This is quite a bit simpler on amd64
-	 * than it is on i386 -- we can exploit the fact that the %rsp is
-	 * explicitly saved to effect the pop without having to reshuffle
-	 * the other data pushed for the trap.
+	 * We must emulate a "leave", which is the same as a "movq %rbp,
+	 * %rsp" followed by a "popq %rbp".  We can exploit the fact
+	 * that the %rsp is explicitly saved to effect the pop without
+	 * having to reshuffle the other data pushed for the trap.
 	 */
+
 	INTR_POP
 	pushq	%rax			/* push temp */
 	movq	8(%rsp), %rax		/* load calling RIP */
@@ -515,126 +453,6 @@ ud_user:
 	jmp	cmntrap
 	SET_SIZE(invoptrap)
 
-#elif defined(__i386)
-
-	/*
-	 * #UD
-	 */
-	ENTRY_NP(invoptrap)
-	/*
-	 * If we are taking an invalid opcode trap while in the kernel, this
-	 * is likely an FBT probe point.
-	 */
-	pushl   %gs
-	cmpw	$KGS_SEL, (%esp)
-	jne	8f
-
-	addl	$4, %esp
-#if defined(__xpv)
-	movb	$0, 6(%esp)		/* clear saved upcall_mask from %cs */
-#endif	/* __xpv */
-	pusha
-	pushl	%eax			/* push %eax -- may be return value */
-	pushl	%esp			/* push stack pointer */
-	addl	$48, (%esp)		/* adjust to incoming args */
-	pushl	40(%esp)		/* push calling EIP */
-	call	dtrace_invop
-	ALTENTRY(dtrace_invop_callsite)
-	addl	$12, %esp
-	cmpl	$DTRACE_INVOP_PUSHL_EBP, %eax
-	je	1f
-	cmpl	$DTRACE_INVOP_POPL_EBP, %eax
-	je	2f
-	cmpl	$DTRACE_INVOP_LEAVE, %eax
-	je	3f
-	cmpl	$DTRACE_INVOP_NOP, %eax
-	je	4f
-	jmp	7f
-1:
-	/*
-	 * We must emulate a "pushl %ebp".  To do this, we pull the stack
-	 * down 4 bytes, and then store the base pointer.
-	 */
-	popa
-	subl	$4, %esp		/* make room for %ebp */
-	pushl	%eax			/* push temp */
-	movl	8(%esp), %eax		/* load calling EIP */
-	incl	%eax			/* increment over LOCK prefix */
-	movl	%eax, 4(%esp)		/* store calling EIP */
-	movl	12(%esp), %eax		/* load calling CS */
-	movl	%eax, 8(%esp)		/* store calling CS */
-	movl	16(%esp), %eax		/* load calling EFLAGS */
-	movl	%eax, 12(%esp)		/* store calling EFLAGS */
-	movl	%ebp, 16(%esp)		/* push %ebp */
-	popl	%eax			/* pop off temp */
-	jmp	_emul_done
-2:
-	/*
-	 * We must emulate a "popl %ebp".  To do this, we do the opposite of
-	 * the above:  we remove the %ebp from the stack, and squeeze up the
-	 * saved state from the trap.
-	 */
-	popa
-	pushl	%eax			/* push temp */
-	movl	16(%esp), %ebp		/* pop %ebp */
-	movl	12(%esp), %eax		/* load calling EFLAGS */
-	movl	%eax, 16(%esp)		/* store calling EFLAGS */
-	movl	8(%esp), %eax		/* load calling CS */
-	movl	%eax, 12(%esp)		/* store calling CS */
-	movl	4(%esp), %eax		/* load calling EIP */
-	incl	%eax			/* increment over LOCK prefix */
-	movl	%eax, 8(%esp)		/* store calling EIP */
-	popl	%eax			/* pop off temp */
-	addl	$4, %esp		/* adjust stack pointer */
-	jmp	_emul_done
-3:
-	/*
-	 * We must emulate a "leave", which is the same as a "movl %ebp, %esp"
-	 * followed by a "popl %ebp".  This looks similar to the above, but
-	 * requires two temporaries:  one for the new base pointer, and one
-	 * for the staging register.
-	 */
-	popa
-	pushl	%eax			/* push temp */
-	pushl	%ebx			/* push temp */
-	movl	%ebp, %ebx		/* set temp to old %ebp */
-	movl	(%ebx), %ebp		/* pop %ebp */
-	movl	16(%esp), %eax		/* load calling EFLAGS */
-	movl	%eax, (%ebx)		/* store calling EFLAGS */
-	movl	12(%esp), %eax		/* load calling CS */
-	movl	%eax, -4(%ebx)		/* store calling CS */
-	movl	8(%esp), %eax		/* load calling EIP */
-	incl	%eax			/* increment over LOCK prefix */
-	movl	%eax, -8(%ebx)		/* store calling EIP */
-	movl	%ebx, -4(%esp)		/* temporarily store new %esp */
-	popl	%ebx			/* pop off temp */
-	popl	%eax			/* pop off temp */
-	movl	-12(%esp), %esp		/* set stack pointer */
-	subl	$8, %esp		/* adjust for three pushes, one pop */
-	jmp	_emul_done
-4:
-	/*
-	 * We must emulate a "nop".  This is obviously not hard:  we need only
-	 * advance the %eip by one.
-	 */
-	popa
-	incl	(%esp)
-_emul_done:
-	IRET				/* return from interrupt */
-7:
-	popa
-	pushl	$0
-	pushl	$T_ILLINST	/* $6 */
-	jmp	cmntrap
-8:
-	addl	$4, %esp
-	pushl	$0
-	pushl	$T_ILLINST	/* $6 */
-	jmp	cmntrap
-	SET_SIZE(invoptrap)
-
-#endif	/* __i386 */
-
 	/*
 	 * #NM
 	 */
@@ -646,7 +464,6 @@ _emul_done:
 	SET_SIZE(ndptrap)
 
 #if !defined(__xpv)
-#if defined(__amd64)
 
 	/*
 	 * #DF
@@ -699,129 +516,6 @@ _emul_done:
 
 	SET_SIZE(syserrtrap)
 
-#elif defined(__i386)
-
-	/*
-	 * #DF
-	 */
-	ENTRY_NP(syserrtrap)
-	cli				/* disable interrupts */
-
-	/*
-	 * We share this handler with kmdb (if kmdb is loaded).  As such, we
-	 * may have reached this point after encountering a #df in kmdb.  If
-	 * that happens, we'll still be on kmdb's IDT.  We need to switch back
-	 * to this CPU's IDT before proceeding.  Furthermore, if we did arrive
-	 * here from kmdb, kmdb is probably in a very sickly state, and
-	 * shouldn't be entered from the panic flow.  We'll suppress that
-	 * entry by setting nopanicdebug.
-	 */
-
-	subl	$DESCTBR_SIZE, %esp
-	movl	%gs:CPU_IDT, %eax
-	sidt	(%esp)
-	cmpl	DTR_BASE(%esp), %eax
-	je	1f
-
-	movl	%eax, DTR_BASE(%esp)
-	movw	$_MUL(NIDT, GATE_DESC_SIZE), DTR_LIMIT(%esp)
-	lidt	(%esp)
-
-	movl	$1, nopanicdebug
-
-1:	addl	$DESCTBR_SIZE, %esp
-
-	/*
-	 * Check the CPL in the TSS to see what mode
-	 * (user or kernel) we took the fault in.  At this
-	 * point we are running in the context of the double
-	 * fault task (dftss) but the CPU's task points to
-	 * the previous task (ktss) where the process context
-	 * has been saved as the result of the task switch.
-	 */
-	movl	%gs:CPU_TSS, %eax	/* get the TSS */
-	movl	TSS_SS(%eax), %ebx	/* save the fault SS */
-	movl	TSS_ESP(%eax), %edx	/* save the fault ESP */
-	testw	$CPL_MASK, TSS_CS(%eax)	/* user mode ? */
-	jz	make_frame
-	movw	TSS_SS0(%eax), %ss	/* get on the kernel stack */
-	movl	TSS_ESP0(%eax), %esp
-
-	/*
-	 * Clear the NT flag to avoid a task switch when the process
-	 * finally pops the EFL off the stack via an iret.  Clear
-	 * the TF flag since that is what the processor does for
-	 * a normal exception. Clear the IE flag so that interrupts
-	 * remain disabled.
-	 */
-	movl	TSS_EFL(%eax), %ecx
-	andl	$_BITNOT(PS_NT|PS_T|PS_IE), %ecx
-	pushl	%ecx
-	popfl				/* restore the EFL */
-	movw	TSS_LDT(%eax), %cx	/* restore the LDT */
-	lldt	%cx
-
-	/*
-	 * Restore process segment selectors.
-	 */
-	movw	TSS_DS(%eax), %ds
-	movw	TSS_ES(%eax), %es
-	movw	TSS_FS(%eax), %fs
-	movw	TSS_GS(%eax), %gs
-
-	/*
-	 * Restore task segment selectors.
-	 */
-	movl	$KDS_SEL, TSS_DS(%eax)
-	movl	$KDS_SEL, TSS_ES(%eax)
-	movl	$KDS_SEL, TSS_SS(%eax)
-	movl	$KFS_SEL, TSS_FS(%eax)
-	movl	$KGS_SEL, TSS_GS(%eax)
-
-	/*
-	 * Clear the TS bit, the busy bits in both task
-	 * descriptors, and switch tasks.
-	 */
-	clts
-	leal	gdt0, %ecx
-	movl	DFTSS_SEL+4(%ecx), %esi
-	andl	$_BITNOT(0x200), %esi
-	movl	%esi, DFTSS_SEL+4(%ecx)
-	movl	KTSS_SEL+4(%ecx), %esi
-	andl	$_BITNOT(0x200), %esi
-	movl	%esi, KTSS_SEL+4(%ecx)
-	movw	$KTSS_SEL, %cx
-	ltr	%cx
-
-	/*
-	 * Restore part of the process registers.
-	 */
-	movl	TSS_EBP(%eax), %ebp
-	movl	TSS_ECX(%eax), %ecx
-	movl	TSS_ESI(%eax), %esi
-	movl	TSS_EDI(%eax), %edi
-
-make_frame:
-	/*
-	 * Make a trap frame.  Leave the error code (0) on
-	 * the stack since the first word on a trap stack is
-	 * unused anyway.
-	 */
-	pushl	%ebx			/ fault SS
-	pushl	%edx			/ fault ESP
-	pushl	TSS_EFL(%eax)		/ fault EFL
-	pushl	TSS_CS(%eax)		/ fault CS
-	pushl	TSS_EIP(%eax)		/ fault EIP
-	pushl	$0			/ error code
-	pushl	$T_DBLFLT		/ trap number 8
-	movl	TSS_EBX(%eax), %ebx	/ restore EBX
-	movl	TSS_EDX(%eax), %edx	/ restore EDX
-	movl	TSS_EAX(%eax), %eax	/ restore EAX
-	sti				/ enable interrupts
-	jmp	cmntrap
-	SET_SIZE(syserrtrap)
-
-#endif	/* __i386 */
 #endif	/* !__xpv */
 
 	/*
@@ -837,9 +531,7 @@ make_frame:
 	 */
 	ENTRY_NP(segnptrap)
 	TRAP_ERR(T_SEGFLT)	/* $11 already have error code on stack */
-#if defined(__amd64)
 	SET_CPU_GSBASE
-#endif
 	jmp	cmntrap
 	SET_SIZE(segnptrap)
 
@@ -848,9 +540,7 @@ make_frame:
 	 */
 	ENTRY_NP(stktrap)
 	TRAP_ERR(T_STKFLT)	/* $12 already have error code on stack */
-#if defined(__amd64)
 	SET_CPU_GSBASE
-#endif
 	jmp	cmntrap
 	SET_SIZE(stktrap)
 
@@ -859,9 +549,7 @@ make_frame:
 	 */
 	ENTRY_NP(gptrap)
 	TRAP_ERR(T_GPFLT)	/* $13 already have error code on stack */
-#if defined(__amd64)
 	SET_CPU_GSBASE
-#endif
 	jmp	cmntrap
 	SET_SIZE(gptrap)
 
@@ -873,64 +561,16 @@ make_frame:
 	INTR_PUSH
 #if defined(__xpv)
 
-#if defined(__amd64)
 	movq	%gs:CPU_VCPU_INFO, %r15
 	movq	VCPU_INFO_ARCH_CR2(%r15), %r15	/* vcpu[].arch.cr2 */
-#elif defined(__i386)
-	movl	%gs:CPU_VCPU_INFO, %esi
-	movl	VCPU_INFO_ARCH_CR2(%esi), %esi	/* vcpu[].arch.cr2 */
-#endif	/* __i386 */
 
 #else	/* __xpv */
 
-#if defined(__amd64)
 	movq	%cr2, %r15
-#elif defined(__i386)
-	movl	%cr2, %esi
-#endif	/* __i386 */
 
 #endif	/* __xpv */
 	jmp	cmntrap_pushed
 	SET_SIZE(pftrap)
-
-#if !defined(__amd64)
-
-	.globl	idt0_default_r
-
-	/*
-	 * #PF pentium bug workaround
-	 */
-	ENTRY_NP(pentium_pftrap)
-	pushl	%eax
-	movl	%cr2, %eax
-	andl	$MMU_STD_PAGEMASK, %eax
-
-	cmpl	%eax, %cs:idt0_default_r+2	/* fixme */
-
-	je	check_for_user_address
-user_mode:
-	popl	%eax
-	pushl	$T_PGFLT	/* $14 */
-	jmp	cmntrap
-check_for_user_address:
-	/*
-	 * Before we assume that we have an unmapped trap on our hands,
-	 * check to see if this is a fault from user mode.  If it is,
-	 * we'll kick back into the page fault handler.
-	 */
-	movl	4(%esp), %eax	/* error code */
-	andl	$PF_ERR_USER, %eax
-	jnz	user_mode
-
-	/*
-	 * We now know that this is the invalid opcode trap.
-	 */
-	popl	%eax
-	addl	$4, %esp	/* pop error code */
-	jmp	invoptrap
-	SET_SIZE(pentium_pftrap)
-
-#endif	/* !__amd64 */
 
 	ENTRY_NP(resvtrap)
 	TRAP_NOERR(T_RESVTRAP)	/* (reserved)  */
@@ -958,8 +598,6 @@ check_for_user_address:
 	 */
 	.globl	cmi_mca_trap	/* see uts/i86pc/os/cmi.c */
 
-#if defined(__amd64)
-
 	ENTRY_NP(mcetrap)
 	TRAP_NOERR(T_MCE)	/* $18 */
 
@@ -980,30 +618,6 @@ check_for_user_address:
 	jmp	_sys_rtt
 	SET_SIZE(mcetrap)
 
-#else
-
-	ENTRY_NP(mcetrap)
-	TRAP_NOERR(T_MCE)	/* $18 */
-
-	INTR_PUSH
-	INTGATE_INIT_KERNEL_FLAGS
-
-	TRACE_PTR(%edi, %ebx, %ebx, %ecx, $TT_TRAP)
-	TRACE_REGS(%edi, %esp, %ebx, %ecx)
-	TRACE_STAMP(%edi)
-
-	movl	%esp, %ebp
-
-	movl	%esp, %ecx
-	pushl	%ecx		/* arg0 = struct regs *rp */
-	call	cmi_mca_trap	/* cmi_mca_trap(rp) */
-	addl	$4, %esp	/* pop arg0 */
-
-	jmp	_sys_rtt
-	SET_SIZE(mcetrap)
-
-#endif
-
 	/*
 	 * #XF
 	 */
@@ -1018,8 +632,6 @@ check_for_user_address:
 	SET_SIZE(invaltrap)
 
 	.globl	fasttable
-
-#if defined(__amd64)
 
 	ENTRY_NP(fasttrap)
 	cmpl	$T_LASTFAST, %eax
@@ -1051,35 +663,10 @@ check_for_user_address:
 	jmp	gptrap
 	SET_SIZE(fasttrap)
 
-#elif defined(__i386)
-
-	ENTRY_NP(fasttrap)
-	cmpl	$T_LASTFAST, %eax
-	ja	1f
-	jmp	*%cs:fasttable(, %eax, CLONGSIZE)
-1:
-	/*
-	 * Fast syscall number was illegal.  Make it look
-	 * as if the INT failed.  Modify %eip to point before the
-	 * INT, push the expected error code and fake a GP fault.
-	 *
-	 * XXX Why make the error code be offset into idt + 1?
-	 * Instead we should push a real (soft?) error code
-	 * on the stack and #gp handler could know about fasttraps?
-	 */
-	subl	$2, (%esp)	/* XXX int insn 2-bytes */
-	pushl	$_CONST(_MUL(T_FASTTRAP, GATE_DESC_SIZE) + 2)
-	jmp	gptrap
-	SET_SIZE(fasttrap)
-
-#endif	/* __i386 */
-
 	ENTRY_NP(dtrace_ret)
 	TRAP_NOERR(T_DTRACE_RET)
 	jmp	dtrace_trap
 	SET_SIZE(dtrace_ret)
-
-#if defined(__amd64)
 
 	/*
 	 * RFLAGS 24 bytes up the stack from %rsp.
@@ -1092,15 +679,6 @@ check_for_user_address:
 	jmp	tr_iret_auto
 	/*NOTREACHED*/
 	SET_SIZE(fast_null)
-
-#elif defined(__i386)
-
-	ENTRY_NP(fast_null)
-	orw	$PS_C, 8(%esp)	/* set carry bit in user flags */
-	IRET
-	SET_SIZE(fast_null)
-
-#endif	/* __i386 */
 
 	/*
 	 * Interrupts start at 32
@@ -1337,4 +915,3 @@ check_for_user_address:
 	MKIVCT(254)
 	MKIVCT(255)
 
-#endif	/* __lint */

@@ -21,16 +21,11 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2019 Joyent, Inc.
+ *
+ * Copyright 2020 Joyent, Inc.
  */
 
-#if defined(lint)
-#include <sys/types.h>
-#include <sys/thread.h>
-#include <sys/cpuvar.h>
-#else	/* lint */
 #include "assym.h"
-#endif	/* lint */
 
 #include <sys/t_lock.h>
 #include <sys/mutex.h>
@@ -57,47 +52,14 @@
  * Store 0xFF at the specified location, and return its previous content.
  */
 
-#if defined(lint)
-uint8_t
-ldstub(uint8_t *cp)
-{
-	uint8_t	rv;
-	rv = *cp;
-	*cp = 0xFF;
-	return rv;
-}
-#else	/* lint */
-
 	ENTRY(ldstub)
 	retl
 	ldstub	[%o0], %o0
 	SET_SIZE(ldstub)
 
-#endif	/* lint */
-
 /************************************************************************
  *		MEMORY BARRIERS -- see atomic.h for full descriptions.
  */
-
-#if defined(lint)
-
-void
-membar_enter(void)
-{}
-
-void
-membar_exit(void)
-{}
-
-void
-membar_producer(void)
-{}
-
-void
-membar_consumer(void)
-{}
-
-#else	/* lint */
 
 #ifdef SF_ERRATA_51
 	.align 32
@@ -130,69 +92,18 @@ membar_consumer(void)
 	membar	#LoadLoad
 	SET_SIZE(membar_consumer)
 
-#endif	/* lint */
-
 /************************************************************************
  *		MINIMUM LOCKS
  */
 
-#if defined(lint)
-
 /*
  * lock_try(lp), ulock_try(lp)
- *	- returns non-zero on success.
- *	- doesn't block interrupts so don't use this to spin on a lock.
- *	- uses "0xFF is busy, anything else is free" model.
+ * - returns non-zero on success.
+ * - doesn't block interrupts so don't use this to spin on a lock.
+ * - uses "0xFF is busy, anything else is free" model.
  *
- *      ulock_try() is for a lock in the user address space.
- *      For all V7/V8 sparc systems they are same since the kernel and
- *      user are mapped in a user' context.
- *      For V9 platforms the lock_try and ulock_try are different impl.
+ * ulock_try() is for a lock in the user address space.
  */
-
-int
-lock_try(lock_t *lp)
-{
-	return (0xFF ^ ldstub(lp));
-}
-
-int
-lock_spin_try(lock_t *lp)
-{
-	return (0xFF ^ ldstub(lp));
-}
-
-void
-lock_set(lock_t *lp)
-{
-	extern void lock_set_spin(lock_t *);
-
-	if (!lock_try(lp))
-		lock_set_spin(lp);
-	membar_enter();
-}
-
-void
-lock_clear(lock_t *lp)
-{
-	membar_exit();
-	*lp = 0;
-}
-
-int
-ulock_try(lock_t *lp)
-{
-	return (0xFF ^ ldstub(lp));
-}
-
-void
-ulock_clear(lock_t *lp)
-{
-	membar_exit();
-	*lp = 0;
-}
-
-#else	/* lint */
 
 	.align	32
 	ENTRY(lock_try)
@@ -254,34 +165,11 @@ ulock_clear(lock_t *lp)
 	  stba	%g0, [%o0]ASI_USER	! clear lock
 	SET_SIZE(ulock_clear)
 
-#endif	/* lint */
-
 
 /*
  * lock_set_spl(lp, new_pil, *old_pil_addr)
  *	Sets pil to new_pil, grabs lp, stores old pil in *old_pil_addr.
  */
-
-#if defined(lint)
-
-/* ARGSUSED */
-void
-lock_set_spl(lock_t *lp, int new_pil, u_short *old_pil_addr)
-{
-	extern int splr(int);
-	extern void lock_set_spl_spin(lock_t *, int, u_short *, int);
-	int old_pil;
-
-	old_pil = splr(new_pil);
-	if (!lock_try(lp)) {
-		lock_set_spl_spin(lp, new_pil, old_pil_addr, old_pil);
-	} else {
-		*old_pil_addr = (u_short)old_pil;
-		membar_enter();
-	}
-}
-
-#else	/* lint */
 
 	ENTRY(lock_set_spl)
 	rdpr	%pil, %o3			! %o3 = current pil
@@ -301,24 +189,9 @@ lock_set_spl(lock_t *lp, int new_pil, u_short *old_pil_addr)
 	nop					! delay: do nothing
 	SET_SIZE(lock_set_spl)
 
-#endif	/* lint */
-
 /*
  * lock_clear_splx(lp, s)
  */
-
-#if defined(lint)
-
-void
-lock_clear_splx(lock_t *lp, int s)
-{
-	extern void splx(int);
-
-	lock_clear(lp);
-	splx(s);
-}
-
-#else	/* lint */
 
 	ENTRY(lock_clear_splx)
 	ldn	[THREAD_REG + T_CPU], %o2	! get CPU pointer
@@ -331,8 +204,6 @@ lock_clear_splx(lock_t *lp, int s)
 	retl
 	wrpr	%g0, %o2, %pil
 	SET_SIZE(lock_clear_splx)
-
-#endif	/* lint */
 
 /*
  * mutex_enter() and mutex_exit().
@@ -358,29 +229,6 @@ lock_clear_splx(lock_t *lp, int s)
  * patch this code in unless we're gathering ADAPTIVE_HOLD lockstats.
  */
 
-#if defined (lint)
-
-/* ARGSUSED */
-void
-mutex_enter(kmutex_t *lp)
-{}
-
-/* ARGSUSED */
-int
-mutex_tryenter(kmutex_t *lp)
-{ return (0); }
-
-/* ARGSUSED */
-void
-mutex_exit(kmutex_t *lp)
-{}
-
-/* ARGSUSED */
-void *
-mutex_owner_running(mutex_impl_t *lp)
-{ return (NULL); }
-
-#else
 	.align	32
 	ENTRY(mutex_enter)
 	mov	THREAD_REG, %o1
@@ -472,8 +320,6 @@ mutex_owner_running_critical_start:	! If interrupted restart here
 	mov	%o2, %o0		! owner running, return cpu
 	SET_SIZE(mutex_owner_running)
 
-#endif	/* lint */
-
 /*
  * rw_enter() and rw_exit().
  *
@@ -482,19 +328,6 @@ mutex_owner_running_critical_start:	! If interrupted restart here
  * and rw_exit (no waiters or not the last reader).  If anything complicated
  * is going on we punt to rw_enter_sleep() and rw_exit_wakeup(), respectively.
  */
-#if defined(lint)
-
-/* ARGSUSED */
-void
-rw_enter(krwlock_t *lp, krw_t rw)
-{}
-
-/* ARGSUSED */
-void
-rw_exit(krwlock_t *lp)
-{}
-
-#else
 
 	.align	16
 	ENTRY(rw_enter)
@@ -574,16 +407,6 @@ rw_exit(krwlock_t *lp)
 	retl
 	nop
 	SET_SIZE(rw_exit)
-
-#endif
-
-#if defined(lint)
-
-void
-lockstat_hot_patch(void)
-{}
-
-#else
 
 #define	RETL			0x81c3e008
 #define	NOP			0x01000000
@@ -672,8 +495,6 @@ lockstat_hot_patch(void)
 	restore
 	SET_SIZE(lockstat_hot_patch)
 
-#endif	/* lint */
-
 /*
  * asm_mutex_spin_enter(mutex_t *)
  *
@@ -687,7 +508,6 @@ lockstat_hot_patch(void)
  *		%l7 - address of call (returns to %l7+8)
  * Uses:	%l6, %l5
  */
-#ifndef lint
 	.align 16
 	ENTRY_NP(asm_mutex_spin_enter)
 	ldstub	[%l6 + M_SPINLOCK], %l5	! try to set lock, get value in %l5
@@ -717,7 +537,6 @@ lockstat_hot_patch(void)
 	b	4b
 	ldub	[%l6 + M_SPINLOCK], %l5	! delay - reload lock
 	SET_SIZE(asm_mutex_spin_enter)
-#endif /* lint */
 
 /*
  * asm_mutex_spin_exit(mutex_t *)
@@ -730,13 +549,11 @@ lockstat_hot_patch(void)
  *		%l7 - address of call (returns to %l7+8)
  * Uses:	none
  */
-#ifndef lint
 	ENTRY_NP(asm_mutex_spin_exit)
 	membar	#LoadStore|#StoreStore
 	jmp	%l7 + 8			! return
 	clrb	[%l6 + M_SPINLOCK]	! delay - clear lock
 	SET_SIZE(asm_mutex_spin_exit)
-#endif /* lint */
 
 /*
  * thread_onproc()
@@ -745,16 +562,6 @@ lockstat_hot_patch(void)
  * Since the new lock isn't held, the store ordering is important.
  * If not done in assembler, the compiler could reorder the stores.
  */
-#if defined(lint)
-
-void
-thread_onproc(kthread_id_t t, cpu_t *cp)
-{
-	t->t_state = TS_ONPROC;
-	t->t_lockp = &cp->cpu_thread_lock;
-}
-
-#else	/* lint */
 
 	ENTRY(thread_onproc)
 	set	TS_ONPROC, %o2		! TS_ONPROC state
@@ -764,54 +571,29 @@ thread_onproc(kthread_id_t t, cpu_t *cp)
 	stn	%o3, [%o0 + T_LOCKP]	! delay - store new lock pointer
 	SET_SIZE(thread_onproc)
 
-#endif	/* lint */
-
 /* delay function used in some mutex code - just do 3 nop cas ops */
-#if defined(lint)
-
-/* ARGSUSED */
-void
-cas_delay(void *addr)
-{}
-#else	/* lint */
 	ENTRY(cas_delay)
 	casx [%o0], %g0, %g0
 	casx [%o0], %g0, %g0
 	retl
 	casx [%o0], %g0, %g0
 	SET_SIZE(cas_delay)
-#endif	/* lint */
-
-#if defined(lint)
 
 /*
  * alternative delay function for some niagara processors.   The rd
  * instruction uses less resources than casx on those cpus.
  */
-/* ARGSUSED */
-void
-rdccr_delay(void)
-{}
-#else	/* lint */
 	ENTRY(rdccr_delay)
 	rd	%ccr, %g0
 	rd	%ccr, %g0
 	retl
 	rd	%ccr, %g0
 	SET_SIZE(rdccr_delay)
-#endif	/* lint */
 
 /*
  * mutex_delay_default(void)
  * Spins for approx a few hundred processor cycles and returns to caller.
  */
-#if defined(lint)
-
-void
-mutex_delay_default(void)
-{}
-
-#else	/* lint */
 
 	ENTRY(mutex_delay_default)
 	mov	72,%o0
@@ -821,4 +603,3 @@ mutex_delay_default(void)
 	nop
 	SET_SIZE(mutex_delay_default)
 
-#endif  /* lint */
