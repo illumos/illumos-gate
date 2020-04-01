@@ -424,11 +424,18 @@ typedef enum {
 	MLXCX_BUFFER_ON_CHAIN,
 } mlxcx_buffer_state_t;
 
+typedef enum {
+	MLXCX_SHARD_READY,
+	MLXCX_SHARD_DRAINING,
+} mlxcx_shard_state_t;
+
 typedef struct mlxcx_buf_shard {
+	mlxcx_shard_state_t	mlbs_state;
 	list_node_t		mlbs_entry;
 	kmutex_t		mlbs_mtx;
 	list_t			mlbs_busy;
 	list_t			mlbs_free;
+	list_t			mlbs_loaned;
 	kcondvar_t		mlbs_free_nonempty;
 } mlxcx_buf_shard_t;
 
@@ -1171,6 +1178,8 @@ extern boolean_t mlxcx_buf_loan(mlxcx_t *, mlxcx_buffer_t *);
 extern void mlxcx_buf_return(mlxcx_t *, mlxcx_buffer_t *);
 extern void mlxcx_buf_return_chain(mlxcx_t *, mlxcx_buffer_t *, boolean_t);
 extern void mlxcx_buf_destroy(mlxcx_t *, mlxcx_buffer_t *);
+extern void mlxcx_shard_ready(mlxcx_buf_shard_t *);
+extern void mlxcx_shard_draining(mlxcx_buf_shard_t *);
 
 extern uint_t mlxcx_buf_bind_or_copy(mlxcx_t *, mlxcx_work_queue_t *,
     mblk_t *, size_t, mlxcx_buffer_t **);
