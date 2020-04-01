@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 #
@@ -50,6 +50,7 @@ dt_nodefault=
 dt_tests=
 dt_tnum=0
 dt_tfail=0
+dt_txfail=0
 dt_tsuc=0
 dt_origwd=
 dt_root=
@@ -141,10 +142,25 @@ handle_failure()
 	mv $dir $faildir
 	cp $source $faildir/
 	cp $out $faildir/
-	printf "%s " "failed "
+
+	#
+	# Our pkgsrc gas is too old (2.26.1) to assemble these.
+	#
+	xfails=("32.vaes.s" "32.gfni.s" "32.avx512_vpclmulqdq.s"
+	    "64.vaes.s" "64.gfni.s" "64.avx512_vpclmulqdq.s")
+	testname=$(basename $source)
+	printf '%s\n' ${xfails[@]} | grep "^$testname$" >/dev/null
+
+	if [[ $? -eq 0 ]]; then
+		printf "%s " "expected fail "
+		((dt_txfail++))
+	else
+		printf "%s " "failed "
+		((dt_tfail++))
+	fi
+
 	[[ -n $reason ]] && printf "%s " $reason
 	printf "%s\n" "$faildir"
-	((dt_tfail++))
 }
 
 #
@@ -271,6 +287,7 @@ libdis Results
 
 Tests passed: $dt_tsuc
 Tests failed: $dt_tfail
+Tests expected to fail: $dt_txfail
 Tests ran:    $dt_tnum
 EOF
 }
