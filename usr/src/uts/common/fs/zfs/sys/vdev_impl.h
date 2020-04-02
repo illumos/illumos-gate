@@ -24,6 +24,7 @@
  * Copyright (c) 2011, 2019 by Delphix. All rights reserved.
  * Copyright (c) 2017, Intel Corporation.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joshua M. Clulow <josh@sysmgr.org>
  */
 
 #ifndef _SYS_VDEV_IMPL_H
@@ -555,6 +556,14 @@ typedef struct vdev_buf {
 	buf_t	vb_buf;		/* buffer that describes the io */
 	zio_t	*vb_io;		/* pointer back to the original zio_t */
 } vdev_buf_t;
+
+/*
+ * Support routines used during boot from a ZFS pool
+ */
+extern int vdev_disk_read_rootlabel(const char *, const char *, nvlist_t **);
+extern void vdev_disk_preroot_init(void);
+extern void vdev_disk_preroot_fini(void);
+extern const char *vdev_disk_preroot_lookup(uint64_t, uint64_t);
 
 #ifdef	__cplusplus
 }

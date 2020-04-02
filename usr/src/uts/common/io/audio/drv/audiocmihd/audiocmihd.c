@@ -118,7 +118,7 @@ static audio_engine_ops_t cmediahd_engine_ops = {
 	cmediahd_channels,
 	cmediahd_rate,
 	cmediahd_sync,
-	NULL, 	/* qlen */
+	NULL,	/* qlen */
 	cmediahd_chinfo,
 	NULL	/* playahead */
 };
@@ -322,7 +322,7 @@ cs4398_init(void *arg, int codec)
 	i2c_write(devc, codec, CS4398_MODE_CTRL, 0x00);
 	i2c_write(devc, codec, 3, 0x09);
 	i2c_write(devc, codec, 4, 0x82);	/* PCM Automute */
-	i2c_write(devc, codec, 5, 0x80); 	/* Vol A+B to -64dB */
+	i2c_write(devc, codec, 5, 0x80);	/* Vol A+B to -64dB */
 	i2c_write(devc, codec, 6, 0x80);
 	i2c_write(devc, codec, 7, 0xf0);	/* soft ramping on */
 
@@ -369,7 +369,6 @@ cs4362a_init(void *arg, int codec)
 static void
 cmediahd_generic_set_play_volume(cmediahd_devc_t *devc, int codec_id,
     int left, int right)
-
 {
 	spi_write(devc, codec_id, AK4396_LchATTCtl | 0x20, mix_scale(left, 8));
 	spi_write(devc, codec_id, AK4396_RchATTCtl | 0x20, mix_scale(right, 8));
@@ -706,6 +705,9 @@ cmediahd_reset_port(cmediahd_portc_t *portc)
 			break;
 		case 8:
 			channels = 3;
+			break;
+		default:
+			channels = 0x0;
 			break;
 		}
 		OUTB(devc, (INB(devc, MULTICH_MODE) & ~0x3) | channels,

@@ -25,6 +25,7 @@
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joshua M. Clulow <josh@sysmgr.org>
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -64,10 +65,12 @@
 #include <sys/zfs_ctldir.h>
 #include <sys/zfs_fuid.h>
 #include <sys/bootconf.h>
+#include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/dnlc.h>
 #include <sys/dmu_objset.h>
 #include <sys/spa_boot.h>
+#include <sys/vdev_impl.h>
 #include "zfs_comutil.h"
 
 int zfsfstype;
@@ -1711,6 +1714,36 @@ zfs_mount_label_policy(vfs_t *vfsp, char *osname)
 	return (retv);
 }
 
+/*
+ * Load a string-valued boot property and attempt to convert it to a 64-bit
+ * unsigned integer.  If the value is not present, or the conversion fails,
+ * return the provided default value.
+ */
+static uint64_t
+spa_get_bootprop_uint64(const char *name, uint64_t defval)
+{
+	char *propval;
+	u_longlong_t r;
+	int e;
+
+	if ((propval = spa_get_bootprop(name)) == NULL) {
+		/*
+		 * The property does not exist.
+		 */
+		return (defval);
+	}
+
+	e = ddi_strtoull(propval, NULL, 10, &r);
+
+	spa_free_bootprop(propval);
+
+	/*
+	 * If the conversion succeeded, return the value.  If there was any
+	 * kind of failure, just return the default value.
+	 */
+	return (e == 0 ? r : defval);
+}
+
 static int
 zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 {
@@ -1721,6 +1754,8 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 	vnode_t *vp = NULL;
 	char *zfs_bootfs;
 	char *zfs_devid;
+	uint64_t zfs_bootpool;
+	uint64_t zfs_bootvdev;
 
 	ASSERT(vfsp);
 
@@ -1732,6 +1767,7 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 	if (why == ROOT_INIT) {
 		if (zfsrootdone++)
 			return (SET_ERROR(EBUSY));
+
 		/*
 		 * the process of doing a spa_load will require the
 		 * clock to be set before we could (for example) do
@@ -1746,23 +1782,47 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 			return (SET_ERROR(EINVAL));
 		}
 		zfs_devid = spa_get_bootprop("diskdevid");
-		error = spa_import_rootpool(rootfs.bo_name, zfs_devid);
-		if (zfs_devid)
-			spa_free_bootprop(zfs_devid);
-		if (error) {
+
+		/*
+		 * The boot loader may also provide us with the GUID for both
+		 * the pool and the nominated boot vdev.  A GUID value of 0 is
+		 * explicitly invalid (see "spa_change_guid()"), so we use this
+		 * as a sentinel value when no GUID is present.
+		 */
+		zfs_bootpool = spa_get_bootprop_uint64("zfs-bootpool", 0);
+		zfs_bootvdev = spa_get_bootprop_uint64("zfs-bootvdev", 0);
+
+		/*
+		 * Initialise the early boot device rescan mechanism.  A scan
+		 * will not actually be performed unless we need to do so in
+		 * order to find the correct /devices path for a relocated
+		 * device.
+		 */
+		vdev_disk_preroot_init();
+
+		error = spa_import_rootpool(rootfs.bo_name, zfs_devid,
+		    zfs_bootpool, zfs_bootvdev);
+
+		spa_free_bootprop(zfs_devid);
+
+		if (error != 0) {
 			spa_free_bootprop(zfs_bootfs);
+			vdev_disk_preroot_fini();
 			cmn_err(CE_NOTE, "spa_import_rootpool: error %d",
 			    error);
 			return (error);
 		}
+
 		if (error = zfs_parse_bootfs(zfs_bootfs, rootfs.bo_name)) {
 			spa_free_bootprop(zfs_bootfs);
+			vdev_disk_preroot_fini();
 			cmn_err(CE_NOTE, "zfs_parse_bootfs: error %d",
 			    error);
 			return (error);
 		}
 
 		spa_free_bootprop(zfs_bootfs);
+		vdev_disk_preroot_fini();
 
 		if (error = vfs_lock(vfsp))
 			return (error);

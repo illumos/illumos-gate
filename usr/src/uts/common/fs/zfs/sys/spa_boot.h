@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2020 Joshua M. Clulow <josh@sysmgr.org>
  */
 
 #ifndef _SYS_SPA_BOOT_H
@@ -36,8 +37,8 @@
 extern "C" {
 #endif
 
-extern char *spa_get_bootprop(char *prop);
-extern void spa_free_bootprop(char *prop);
+extern char *spa_get_bootprop(const char *propname);
+extern void spa_free_bootprop(char *propval);
 
 extern void spa_arch_init(void);
 

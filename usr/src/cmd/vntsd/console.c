@@ -22,7 +22,6 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Listen thread creates a console thread whenever there is a tcp client
@@ -95,8 +94,7 @@ write_connect_msg(vntsd_client_t *clientp, char *group_name,
 	}
 
 	if ((rv = vntsd_write_line(clientp,
-			    gettext("Press ~? for control options .."))) !=
-	    VNTSD_SUCCESS) {
+	    gettext("Press ~? for control options .."))) != VNTSD_SUCCESS) {
 		return (rv);
 	}
 
@@ -112,7 +110,7 @@ create_write_thread(vntsd_cons_t *consp)
 	/* create write thread for the console */
 	(void) mutex_lock(&consp->lock);
 	if (thr_create(NULL, 0, (thr_func_t)vntsd_write_thread,
-		    (void *)consp, NULL, &consp->wr_tid)) {
+	    (void *)consp, 0, &consp->wr_tid)) {
 
 		DERR(stderr, "t@%d create_rd_wr_thread@%d: "
 		    "create write thread failed\n",
@@ -156,7 +154,7 @@ list_all_domains(vntsd_group_t *groupp, vntsd_client_t *clientp)
 	(void) mutex_lock(&groupp->lock);
 
 	if (vntsd_que_find(groupp->conspq, (compare_func_t)display_domain_name,
-		    &(clientp->sockfd)) != NULL) {
+	    &(clientp->sockfd)) != NULL) {
 		rv = VNTSD_ERR_WRITE_CLIENT;
 	}
 
@@ -172,8 +170,8 @@ display_help(vntsd_client_t *clientp)
 	int	rv = VNTSD_SUCCESS;
 	char	*bufp;
 
-	if ((rv = vntsd_write_client(clientp, vntsd_eol, VNTSD_EOL_LEN))
-		!= VNTSD_SUCCESS) {
+	rv = vntsd_write_client(clientp, vntsd_eol, VNTSD_EOL_LEN);
+	if (rv != VNTSD_SUCCESS) {
 		return (rv);
 	}
 
@@ -208,7 +206,7 @@ display_help(vntsd_client_t *clientp)
 	 */
 
 	bufp = gettext("c{id}, n{name} -- connect to a console of domain {id}"
-		" or domain {name}");
+	    " or domain {name}");
 
 	if ((rv = vntsd_write_line(clientp, bufp)) != VNTSD_SUCCESS) {
 		return (rv);
@@ -234,7 +232,7 @@ name_to_cons_no(vntsd_group_t *groupp, char *name)
 	vntsd_cons_t *consp;
 
 	consp = (vntsd_cons_t *)vntsd_que_find(groupp->conspq,
-		    (compare_func_t)cons_by_name, name);
+	    (compare_func_t)cons_by_name, name);
 
 	if (consp == NULL) {
 		return (-1);
@@ -280,7 +278,7 @@ select_cons(vntsd_group_t *groupp, vntsd_cons_t **consp,
 		case 'c':
 			/* c{id} or c {id} */
 			if (isspace(buf[i])) {
-			    continue;
+				continue;
 			}
 
 			if (!isdigit(buf[i])) {
@@ -293,7 +291,7 @@ select_cons(vntsd_group_t *groupp, vntsd_cons_t **consp,
 		case 'n':
 			/* n{name) or n {name} */
 			if (isspace(buf[i])) {
-			    continue;
+				continue;
 			}
 
 			buf[n-1] = 0;
@@ -318,7 +316,7 @@ select_cons(vntsd_group_t *groupp, vntsd_cons_t **consp,
 	(void) mutex_lock(&groupp->lock);
 
 	*consp = (vntsd_cons_t *)vntsd_que_find(groupp->conspq,
-		    (compare_func_t)vntsd_cons_by_consno, &cons_no);
+	    (compare_func_t)vntsd_cons_by_consno, &cons_no);
 
 	if (*consp == NULL) {
 		/* during console selection, the console has been  deleted */
@@ -487,13 +485,13 @@ read_cmd(vntsd_client_t *clientp, char *prompt, char *cmd)
 	clientp->status |= VNTSD_CLIENT_DISABLE_DAEMON_CMD;
 	(void) mutex_unlock(&clientp->lock);
 
-	if ((rv = vntsd_write_client(clientp, vntsd_eol, VNTSD_EOL_LEN))
-	    != VNTSD_SUCCESS) {
+	rv = vntsd_write_client(clientp, vntsd_eol, VNTSD_EOL_LEN);
+	if (rv != VNTSD_SUCCESS) {
 		return (rv);
 	}
 
-	if ((rv = vntsd_write_client(clientp, prompt, strlen(prompt)))
-		!= VNTSD_SUCCESS) {
+	rv = vntsd_write_client(clientp, prompt, strlen(prompt));
+	if (rv != VNTSD_SUCCESS) {
 		return (rv);
 	}
 
@@ -778,11 +776,11 @@ vntsd_console_thread(vntsd_thr_arg_t *argp)
 	}
 
 	if (snprintf(prompt, sizeof (prompt),
-		    "%s-vnts-%s: h, l, c{id}, n{name}, q:",
+	    "%s-vnts-%s: h, l, c{id}, n{name}, q:",
 	    buf, groupp->group_name) >= sizeof (prompt)) {
 		/* long prompt doesn't fit, use short one */
 		(void) snprintf(prompt, sizeof (prompt),
-				"vnts: h, l, c{id}, n{name}, q:");
+		    "vnts: h, l, c{id}, n{name}, q:");
 	}
 
 

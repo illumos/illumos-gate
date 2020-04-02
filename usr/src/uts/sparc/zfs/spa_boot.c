@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2020 Joshua M. Clulow <josh@sysmgr.org>
  */
 
 #include <sys/zio.h>
@@ -35,7 +36,7 @@
 extern int zfs_deadman_enabled;
 
 char *
-spa_get_bootprop(char *propname)
+spa_get_bootprop(const char *propname)
 {
 	int proplen;
 	char *value;
@@ -54,9 +55,13 @@ spa_get_bootprop(char *propname)
 }
 
 void
-spa_free_bootprop(char *propname)
+spa_free_bootprop(char *propval)
 {
-	kmem_free(propname, strlen(propname) + 1);
+	if (propval == NULL) {
+		return;
+	}
+
+	kmem_free(propval, strlen(propval) + 1);
 }
 
 void
