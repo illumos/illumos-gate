@@ -24,6 +24,7 @@
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2020 Joshua M. Clulow <josh@sysmgr.org>
  */
 
 #include <sys/note.h>
@@ -62,6 +63,7 @@
 #include <sys/varargs.h>
 #include <sys/modhash.h>
 #include <sys/instance.h>
+#include <sys/sysevent/eventdefs.h>
 
 #if defined(__amd64) && !defined(__xpv)
 #include <sys/iommulib.h>
@@ -1486,12 +1488,12 @@ postattach_node(dev_info_t *dip)
 	/*
 	 * Plumbing during postattach may fail because of the
 	 * underlying device is not ready. This will fail ndi_devi_config()
-	 * in dv_filldir() and a warning message is issued. The message
-	 * from here will explain what happened
+	 * in dv_filldir().
 	 */
 	if (rval != DACF_SUCCESS) {
-		cmn_err(CE_WARN, "Postattach failed for %s%d\n",
-		    ddi_driver_name(dip), ddi_get_instance(dip));
+		NDI_CONFIG_DEBUG((CE_CONT, "postattach_node: %s%d (%p) "
+		    "postattach failed\n", ddi_driver_name(dip),
+		    ddi_get_instance(dip), (void *)dip));
 		return (DDI_FAILURE);
 	}
 
@@ -3560,7 +3562,6 @@ walk_devs(dev_info_t *dip, int (*f)(dev_info_t *, void *), void *arg,
  *	They include, but not limited to, _init(9e), _fini(9e), probe(9e),
  *	attach(9e), and detach(9e).
  */
-
 void
 ddi_walk_devs(dev_info_t *dip, int (*f)(dev_info_t *, void *), void *arg)
 {
@@ -3580,7 +3581,6 @@ ddi_walk_devs(dev_info_t *dip, int (*f)(dev_info_t *, void *), void *arg)
  *
  * N.B. The same restrictions from ddi_walk_devs() apply.
  */
-
 void
 e_ddi_walk_driver(char *drv, int (*f)(dev_info_t *, void *), void *arg)
 {
@@ -3607,6 +3607,91 @@ e_ddi_walk_driver(char *drv, int (*f)(dev_info_t *, void *), void *arg)
 		dip = ddi_get_next(dip);
 	}
 	UNLOCK_DEV_OPS(&dnp->dn_lock);
+}
+
+struct preroot_walk_block_devices_arg {
+	int (*prwb_func)(const char *, void *);
+	void *prwb_arg;
+};
+
+static int
+preroot_walk_block_devices_walker(dev_info_t *dip, void *arg)
+{
+	struct preroot_walk_block_devices_arg *prwb = arg;
+
+	if (i_ddi_devi_class(dip) == NULL ||
+	    strcmp(i_ddi_devi_class(dip), ESC_DISK) != 0) {
+		/*
+		 * We do not think that this is a disk.
+		 */
+		return (DDI_WALK_CONTINUE);
+	}
+
+	for (struct ddi_minor_data *md = DEVI(dip)->devi_minor; md != NULL;
+	    md = md->next) {
+		if (md->ddm_spec_type != S_IFBLK) {
+			/*
+			 * We don't want the raw version of any block device.
+			 */
+			continue;
+		}
+
+		/*
+		 * The node type taxonomy is hierarchical, with each level
+		 * separated by colons.  Nodes of interest are either of the
+		 * BLOCK type, or are prefixed with that type.
+		 */
+		if (strcmp(md->ddm_node_type, DDI_NT_BLOCK) != 0 &&
+		    strncmp(md->ddm_node_type, DDI_NT_BLOCK ":",
+		    strlen(DDI_NT_BLOCK ":")) != 0) {
+			/*
+			 * This minor node does not represent a block device.
+			 */
+			continue;
+		}
+
+		char buf[MAXPATHLEN];
+		int r;
+		if ((r = prwb->prwb_func(ddi_pathname_minor(md, buf),
+		    prwb->prwb_arg)) == PREROOT_WALK_BLOCK_DEVICES_CANCEL) {
+			/*
+			 * The consumer does not need any more minor nodes.
+			 */
+			return (DDI_WALK_TERMINATE);
+		}
+		VERIFY3S(r, ==, PREROOT_WALK_BLOCK_DEVICES_NEXT);
+	}
+
+	return (DDI_WALK_CONTINUE);
+}
+
+/*
+ * Private routine for ZFS when it needs to attach and scan all of the block
+ * device minors in the system while looking for vdev labels.
+ *
+ * The callback function accepts a physical device path and the context
+ * argument (arg) passed to this function; it should return
+ * PREROOT_WALK_BLOCK_DEVICES_NEXT when more devices are required and
+ * PREROOT_WALK_BLOCK_DEVICES_CANCEL to stop the walk.
+ */
+void
+preroot_walk_block_devices(int (*callback)(const char *, void *), void *arg)
+{
+	/*
+	 * First, force everything which can attach to do so.  The device class
+	 * is not derived until at least one minor mode is created, so we
+	 * cannot walk the device tree looking for a device class of ESC_DISK
+	 * until everything is attached.
+	 */
+	(void) ndi_devi_config(ddi_root_node(), NDI_CONFIG | NDI_DEVI_PERSIST |
+	    NDI_NO_EVENT | NDI_DRV_CONF_REPROBE);
+
+	struct preroot_walk_block_devices_arg prwb;
+	prwb.prwb_func = callback;
+	prwb.prwb_arg = arg;
+
+	ddi_walk_devs(ddi_root_node(), preroot_walk_block_devices_walker,
+	    &prwb);
 }
 
 /*
@@ -3823,8 +3908,8 @@ ddi_is_pci_dip(dev_info_t *dip)
  * to ioc's bus_config entry point.
  */
 int
-resolve_pathname(char *pathname,
-	dev_info_t **dipp, dev_t *devtp, int *spectypep)
+resolve_pathname(char *pathname, dev_info_t **dipp, dev_t *devtp,
+    int *spectypep)
 {
 	int			error;
 	dev_info_t		*parent, *child;
@@ -9055,7 +9140,7 @@ out:
 char *
 ddi_curr_redirect(char *curr)
 {
-	char 	*alias;
+	char *alias;
 	int i;
 
 	if (ddi_aliases_present == B_FALSE)

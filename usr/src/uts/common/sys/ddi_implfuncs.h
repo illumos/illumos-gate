@@ -25,6 +25,7 @@
  */
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2020 Joshua M. Clulow <josh@sysmgr.org>
  */
 
 #ifndef _SYS_DDI_IMPLFUNCS_H
@@ -236,6 +237,16 @@ extern void i_ddi_decr_locked_memory(proc_t *, rctl_qty_t);
  * Direct I/O support functions
  */
 extern void translate_devid(dev_info_t *dip);
+
+/*
+ * Support routine for file systems that need to scan block devices searching
+ * for a label as part of mounting the root file system.
+ */
+extern void preroot_walk_block_devices(int (*)(const char *, void *), void *);
+
+#define	PREROOT_WALK_BLOCK_DEVICES_NEXT		1
+#define	PREROOT_WALK_BLOCK_DEVICES_CANCEL	2
+
 
 #endif	/* _KERNEL */
 
