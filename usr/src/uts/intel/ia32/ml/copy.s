@@ -1902,30 +1902,6 @@ _flt_/**/NAME:					\
 	.string "copyout_noerr: argument not in kernel address space"
 #endif
 
-/*
- * These functions are used for SMAP, supervisor mode access protection. They
- * are hotpatched to become real instructions when the system starts up which is
- * done in mlsetup() as a part of enabling the other CR4 related features.
- *
- * Generally speaking, smap_disable() is a stac instruction and smap_enable is a
- * clac instruction. It's safe to call these any number of times, and in fact,
- * out of paranoia, the kernel will likely call it at several points.
- */
-
-	ENTRY(smap_disable)
-	nop
-	nop
-	nop
-	ret
-	SET_SIZE(smap_disable)
-
-	ENTRY(smap_enable)
-	nop
-	nop
-	nop
-	ret
-	SET_SIZE(smap_enable)
-
 .data
 .align	4
 .globl	_smap_enable_patch_count
