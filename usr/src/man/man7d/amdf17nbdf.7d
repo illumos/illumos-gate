@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2019, Joyent, Inc.
 .\"
-.Dd March 20, 2019
+.Dd November 16, 2019
 .Dt AMDF17NBDF 7D
 .Os
 .Sh NAME
@@ -24,7 +24,7 @@ The
 .Nm
 driver provides the system access to the Northbridge and Data Fabric
 devices on AMD Family 17h
-.Pq Zen
+.Pq Zen, Zen+, and Zen 2
 processors allowing the operating system to communicate with the system
 management unit
 .Pq SMU .
