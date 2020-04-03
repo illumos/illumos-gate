@@ -209,6 +209,7 @@ extern "C" {
 #define	CPUID_AMD_EBX_IBRS_ALL		0x000010000 /* AMD: Enhanced IBRS */
 #define	CPUID_AMD_EBX_STIBP_ALL		0x000020000 /* AMD: STIBP ALL */
 #define	CPUID_AMD_EBX_PREFER_IBRS	0x000040000 /* AMD: Don't retpoline */
+#define	CPUID_AMD_EBX_PPIN		0x000800000 /* AMD: PPIN Support */
 #define	CPUID_AMD_EBX_SSBD		0x001000000 /* AMD: SSBD */
 #define	CPUID_AMD_EBX_VIRT_SSBD		0x002000000 /* AMD: VIRT SSBD */
 #define	CPUID_AMD_EBX_SSB_NO		0x004000000 /* AMD: SSB Fixed */
@@ -443,13 +444,21 @@ extern "C" {
 #define	MSR_PRP4_LBSTK_TO_15	0x6cf
 
 /*
- * General Xeon based MSRs
+ * PPIN definitions for Intel and AMD. Unfortunately, Intel and AMD use
+ * different MSRS for this and different MSRS to control whether or not it
+ * should be readable.
  */
-#define	MSR_PPIN_CTL		0x04e
-#define	MSR_PPIN		0x04f
+#define	MSR_PPIN_CTL_INTC	0x04e
+#define	MSR_PPIN_INTC		0x04f
 #define	MSR_PLATFORM_INFO	0x0ce
-
 #define	MSR_PLATFORM_INFO_PPIN	(1 << 23)
+
+#define	MSR_PPIN_CTL_AMD	0xC00102F0
+#define	MSR_PPIN_AMD		0xC00102F1
+
+/*
+ * These values are currently the same between Intel and AMD.
+ */
 #define	MSR_PPIN_CTL_MASK	0x03
 #define	MSR_PPIN_CTL_LOCKED	0x01
 #define	MSR_PPIN_CTL_ENABLED	0x02
@@ -695,6 +704,7 @@ extern "C" {
 #define	X86FSET_PKG_THERMAL	96
 #define	X86FSET_TSX_CTRL	97
 #define	X86FSET_TAA_NO		98
+#define	X86FSET_PPIN		99
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
@@ -1072,7 +1082,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	99
+#define	NUM_X86_FEATURES	100
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);
