@@ -33,7 +33,7 @@
 /*
  * Copyright 2012 Jens Elkner <jel+illumos@cs.uni-magdeburg.de>
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
- * Copyright 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -82,10 +82,13 @@
  *		11 for family 0x16, models 00 - 0f
  *		12 for family 0x16, models 30 - 3f
  *		13 for family 0x17, models 00 - 0f
+ *		14 for family 0x17, models 10 - 1f
+ *		15 for family 0x17, models 30 - 3f
+ *		16 for family 0x17, models 70 - 7f
  * Second index by (model & 0x3) for family 0fh,
  * CPUID pkg bits (Fn8000_0001_EBX[31:28]) for later families.
  */
-static uint32_t amd_skts[14][8] = {
+static uint32_t amd_skts[17][8] = {
 	/*
 	 * Family 0xf revisions B through E
 	 */
@@ -280,7 +283,7 @@ static uint32_t amd_skts[14][8] = {
 	},
 
 	/*
-	 * Family 0x17 models 00-0f
+	 * Family 0x17 models 00-0f	(Zen 1 - Naples, Ryzen)
 	 */
 #define	A_SKTS_13			13
 	{
@@ -294,6 +297,50 @@ static uint32_t amd_skts[14][8] = {
 		X86_SOCKET_SP3R2	/* 0b111 */
 	},
 
+	/*
+	 * Family 0x17 models 10-1f	(Zen 1 - APU: Raven Ridge)
+	 */
+#define	A_SKTS_14			14
+	{
+		X86_SOCKET_FP5,		/* 0b000 */
+		X86_SOCKET_UNKNOWN,	/* 0b001 */
+		X86_SOCKET_AM4,		/* 0b010 */
+		X86_SOCKET_UNKNOWN,	/* 0b011 */
+		X86_SOCKET_UNKNOWN,	/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
+	},
+
+	/*
+	 * Family 0x17 models 30-3f	(Zen 2 - Rome)
+	 */
+#define	A_SKTS_15			15
+	{
+		X86_SOCKET_UNKNOWN,	/* 0b000 */
+		X86_SOCKET_UNKNOWN,	/* 0b001 */
+		X86_SOCKET_UNKNOWN,	/* 0b010 */
+		X86_SOCKET_UNKNOWN,	/* 0b011 */
+		X86_SOCKET_SP3,		/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_SP3R2	/* 0b111 */
+	},
+
+	/*
+	 * Family 0x17 models 70-7f	(Zen 2 - Matisse)
+	 */
+#define	A_SKTS_16			16
+	{
+		X86_SOCKET_UNKNOWN,	/* 0b000 */
+		X86_SOCKET_UNKNOWN,	/* 0b001 */
+		X86_SOCKET_AM4,		/* 0b010 */
+		X86_SOCKET_UNKNOWN,	/* 0b011 */
+		X86_SOCKET_UNKNOWN,	/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
+	},
 };
 
 struct amd_sktmap_s {
@@ -332,6 +379,7 @@ static struct amd_sktmap_s amd_sktmap[X86_NUM_SOCKETS_AMD + 1] = {
 	{ X86_SOCKET_FT3B,	"FT3b" },
 	{ X86_SOCKET_SP3,	"SP3" },
 	{ X86_SOCKET_SP3R2,	"SP3r2" },
+	{ X86_SOCKET_FP5,	"FP5" },
 	{ X86_SOCKET_UNKNOWN,	"Unknown" }
 };
 
@@ -487,6 +535,18 @@ static const struct amd_rev_mapent {
 	    A_SKTS_13 },
 	{ 0x17, 0x01, 0x01, 0x1, 0x1, X86_CHIPREV_AMD_17_PiR_B2, "PiR-B2",
 	    A_SKTS_13 },
+
+	{ 0x17, 0x11, 0x11, 0x0, 0x0, X86_CHIPREV_AMD_17_RV_B0, "RV-B0",
+	    A_SKTS_14 },
+	{ 0x17, 0x11, 0x11, 0x1, 0x1, X86_CHIPREV_AMD_17_RV_B1, "RV-B1",
+	    A_SKTS_14 },
+	{ 0x17, 0x18, 0x18, 0x1, 0x1, X86_CHIPREV_AMD_17_PCO_B1, "PCO-B1",
+	    A_SKTS_14 },
+
+	{ 0x17, 0x30, 0x30, 0x0, 0x0, X86_CHIPREV_AMD_17_SSP_A0, "SSP-A0",
+	    A_SKTS_15 },
+	{ 0x17, 0x31, 0x31, 0x0, 0x0, X86_CHIPREV_AMD_17_SSP_B0, "SSP-B0",
+	    A_SKTS_15 },
 };
 
 static void
