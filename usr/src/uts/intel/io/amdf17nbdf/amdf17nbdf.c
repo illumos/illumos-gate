@@ -75,9 +75,9 @@
  * value in the corresponding data fabric's AMDF17_DF_CFG_ADDR_CTL.
  *
  * This means that we can map a northbridge to a data fabric device and a data
- * fabric device to a die. Because these are 1:1 mappings, there is a transitive
- * relationship and therefore we know which northbridge is associated with which
- * processor die. This is summarized in the following image:
+ * fabric device to a die. Because these are generally 1:1 mappings, there is a
+ * transitive relationship and therefore we know which northbridge is associated
+ * with which processor die. This is summarized in the following image:
  *
  *  +-------+      +----------------------------+         +--------------+
  *  | Die 0 | ---> | Data Fabric PCI BDF 0/18/0 |-------> | Northbridge  |
@@ -92,6 +92,17 @@
  * reflect the actual values by hardware; however, the bus/device/function (BDF)
  * of the data fabric accurately models hardware. All of the BDF values are in
  * hex.
+ *
+ * Starting with the Rome generation of processors (Family 17h Model 30-3Fh),
+ * AMD has multiple northbridges that exist on a given die. All of these
+ * northbridges share the same data fabric and system management network port.
+ * From our perspective this means that some of the northbridge devices will be
+ * redundant and that we will no longer have a 1:1 mapping between the
+ * northbridge and the data fabric devices. Every data fabric will have a
+ * northbridge, but not every northbridge will have a data fabric device mapped.
+ * Because we're always trying to map from a die to a northbridge and not the
+ * reverse, the fact that there are extra northbridge devices hanging around
+ * that we don't know about shouldn't be a problem.
  *
  * -------------------------------
  * Attach and Detach Complications
@@ -246,6 +257,20 @@ static const amdf17nbdf_table_t amdf17nbdf_dev_map[] = {
 	/* Family 17h Ryzen, Epyc Models 00h-0fh (Zen uarch) */
 	{ 0x1450, AMD_NBDF_TYPE_NORTHBRIDGE },
 	{ 0x1460, AMD_NBDF_TYPE_DATA_FABRIC },
+	/* Family 17h Raven Ridge Models 10h-1fh (Zen uarch) */
+	{ 0x15d0, AMD_NBDF_TYPE_NORTHBRIDGE },
+	{ 0x15e8, AMD_NBDF_TYPE_DATA_FABRIC },
+	/* Family 17h Epyc Models 30h-3fh (Zen 2 uarch) */
+	{ 0x1480, AMD_NBDF_TYPE_NORTHBRIDGE },
+	{ 0x1490, AMD_NBDF_TYPE_DATA_FABRIC },
+	/*
+	 * Family 17h Ryzen Models 70-7fh (Zen 2 uarch)
+	 *
+	 * While this family has its own PCI ID for the data fabric device, it
+	 * shares the same northbridge ID as the Zen 2 EPYC models 30-3f --
+	 * 0x1480.
+	 */
+	{ 0x1440, AMD_NBDF_TYPE_DATA_FABRIC },
 	{ PCI_EINVAL16 }
 };
 
