@@ -697,6 +697,7 @@ ixgbe_get_context(mblk_t *mp, ixgbe_tx_context_t *ctx)
 	uint32_t start;
 	uint32_t hckflags;
 	uint32_t lsoflags;
+	uint32_t lsocksum;
 	uint32_t mss;
 	uint32_t len;
 	uint32_t size;
@@ -721,19 +722,6 @@ ixgbe_get_context(mblk_t *mp, ixgbe_tx_context_t *ctx)
 	mac_lso_get(mp, &mss, &lsoflags);
 	ctx->mss = mss;
 	ctx->lso_flag = (lsoflags == HW_LSO);
-
-	/*
-	 * LSO relies on tx h/w checksum, so here will drop the package
-	 * if h/w checksum flag is not declared.
-	 */
-	if (ctx->lso_flag) {
-		if (!((ctx->hcksum_flags & HCK_PARTIALCKSUM) &&
-		    (ctx->hcksum_flags & HCK_IPV4_HDRCKSUM))) {
-			IXGBE_DEBUGLOG_0(NULL, "ixgbe_tx: h/w "
-			    "checksum flags are not specified when doing LSO");
-			return (-1);
-		}
-	}
 
 	etype = 0;
 	mac_hdr_len = 0;
@@ -779,6 +767,8 @@ ixgbe_get_context(mblk_t *mp, ixgbe_tx_context_t *ctx)
 	 * Here we don't assume the IP(V6) header is fully included in
 	 * one mblk fragment.
 	 */
+	lsocksum = HCK_PARTIALCKSUM;
+	ctx->l3_proto = etype;
 	switch (etype) {
 	case ETHERTYPE_IP:
 		if (ctx->lso_flag) {
@@ -810,6 +800,7 @@ ixgbe_get_context(mblk_t *mp, ixgbe_tx_context_t *ctx)
 			 * (ip_source_addr, ip_destination_addr, l4_proto)
 			 * Currently the tcp/ip stack has done it.
 			 */
+			lsocksum |= HCK_IPV4_HDRCKSUM;
 		}
 
 		offset = offsetof(ipha_t, ipha_protocol) + mac_hdr_len;
@@ -824,6 +815,21 @@ ixgbe_get_context(mblk_t *mp, ixgbe_tx_context_t *ctx)
 		l4_proto = *(uint8_t *)pos;
 		break;
 	case ETHERTYPE_IPV6:
+		/*
+		 * We need to zero out the length in the header.
+		 */
+		if (ctx->lso_flag) {
+			offset = offsetof(ip6_t, ip6_plen) + mac_hdr_len;
+			while (size <= offset) {
+				mp = mp->b_cont;
+				ASSERT(mp != NULL);
+				len = MBLKL(mp);
+				size += len;
+			}
+			pos = mp->b_rptr + offset + len - size;
+			*((uint16_t *)(uintptr_t)(pos)) = 0;
+		}
+
 		offset = offsetof(ip6_t, ip6_nxt) + mac_hdr_len;
 		while (size <= offset) {
 			mp = mp->b_cont;
@@ -842,6 +848,18 @@ ixgbe_get_context(mblk_t *mp, ixgbe_tx_context_t *ctx)
 	}
 
 	if (ctx->lso_flag) {
+		/*
+		 * LSO relies on tx h/w checksum, so here will drop the packet
+		 * if h/w checksum flag is not declared.
+		 */
+		if ((ctx->hcksum_flags & lsocksum) != lsocksum) {
+			IXGBE_DEBUGLOG_2(NULL, "ixgbe_tx: h/w checksum flags "
+			    "are not set for LSO, found 0x%x, needed bits 0x%x",
+			    ctx->hcksum_flags, lsocksum);
+			return (-1);
+		}
+
+
 		offset = mac_hdr_len + start;
 		while (size <= offset) {
 			mp = mp->b_cont;
@@ -898,6 +916,7 @@ ixgbe_check_context(ixgbe_tx_ring_t *tx_ring, ixgbe_tx_context_t *ctx)
 
 	if ((ctx->hcksum_flags != last->hcksum_flags) ||
 	    (ctx->l4_proto != last->l4_proto) ||
+	    (ctx->l3_proto != last->l3_proto) ||
 	    (ctx->mac_hdr_len != last->mac_hdr_len) ||
 	    (ctx->ip_hdr_len != last->ip_hdr_len) ||
 	    (ctx->lso_flag != last->lso_flag) ||
@@ -928,11 +947,19 @@ ixgbe_fill_context(struct ixgbe_adv_tx_context_desc *ctx_tbd,
 
 	ctx_tbd->type_tucmd_mlhl =
 	    IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_CTXT;
+	/*
+	 * When we have a TX context set up, we enforce that the ethertype is
+	 * either IPv4 or IPv6 in ixgbe_get_tx_context().
+	 */
+	if (ctx->lso_flag || ctx->hcksum_flags & HCK_IPV4_HDRCKSUM) {
+		if (ctx->l3_proto == ETHERTYPE_IP) {
+			ctx_tbd->type_tucmd_mlhl |= IXGBE_ADVTXD_TUCMD_IPV4;
+		} else {
+			ctx_tbd->type_tucmd_mlhl |= IXGBE_ADVTXD_TUCMD_IPV6;
+		}
+	}
 
-	if (ctx->hcksum_flags & HCK_IPV4_HDRCKSUM)
-		ctx_tbd->type_tucmd_mlhl |= IXGBE_ADVTXD_TUCMD_IPV4;
-
-	if (ctx->hcksum_flags & HCK_PARTIALCKSUM) {
+	if (ctx->lso_flag || ctx->hcksum_flags & HCK_PARTIALCKSUM) {
 		switch (ctx->l4_proto) {
 		case IPPROTO_TCP:
 			ctx_tbd->type_tucmd_mlhl |= IXGBE_ADVTXD_TUCMD_L4T_TCP;

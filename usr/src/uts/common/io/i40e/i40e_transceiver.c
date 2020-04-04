@@ -1782,7 +1782,8 @@ i40e_tx_context(i40e_t *i40e, i40e_trqpair_t *itrq, mblk_t *mp,
 		 * LSO requires that checksum offloads are enabled.  If for
 		 * some reason they're not we bail out with an error.
 		 */
-		if ((chkflags & HCK_IPV4_HDRCKSUM) == 0 ||
+		if ((meo->meoi_l3proto == ETHERTYPE_IP &&
+		    (chkflags & HCK_IPV4_HDRCKSUM) == 0) ||
 		    (chkflags & HCK_PARTIALCKSUM) == 0) {
 			txs->itxs_lso_nohck.value.ui64++;
 			return (-1);
