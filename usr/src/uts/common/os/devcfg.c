@@ -397,6 +397,9 @@ sid:		devi->devi_node_attributes |= DDI_PERSISTENT;
 	devi->devi_ct_count = -1;	/* counter not in use if -1 */
 	list_create(&(devi->devi_ct), sizeof (cont_device_t),
 	    offsetof(cont_device_t, cond_next));
+	list_create(&devi->devi_unbind_cbs, sizeof (ddi_unbind_callback_t),
+	    offsetof(ddi_unbind_callback_t, ddiub_next));
+	mutex_init(&devi->devi_unbind_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	i_ddi_set_node_state((dev_info_t *)devi, DS_PROTO);
 	da_log_enter((dev_info_t *)devi);
@@ -492,6 +495,9 @@ i_ddi_free_node(dev_info_t *dip)
 	/* free event data */
 	if (devi->devi_ev_path)
 		kmem_free(devi->devi_ev_path, MAXPATHLEN);
+
+	mutex_destroy(&devi->devi_unbind_lock);
+	list_destroy(&devi->devi_unbind_cbs);
 
 	kmem_cache_free(ddi_node_cache, devi);
 }
@@ -830,6 +836,7 @@ bind_node(dev_info_t *dip)
 static int
 unbind_node(dev_info_t *dip)
 {
+	ddi_unbind_callback_t *cb;
 	ASSERT(DEVI(dip)->devi_node_state == DS_BOUND);
 	ASSERT(DEVI(dip)->devi_major != DDI_MAJOR_T_NONE);
 
@@ -844,6 +851,11 @@ unbind_node(dev_info_t *dip)
 
 	DEVI(dip)->devi_major = DDI_MAJOR_T_NONE;
 	DEVI(dip)->devi_binding_name = DEVI(dip)->devi_node_name;
+
+	while ((cb = list_remove_head(&DEVI(dip)->devi_unbind_cbs)) != NULL) {
+		cb->ddiub_cb(cb->ddiub_arg, dip);
+	}
+
 	return (DDI_SUCCESS);
 }
 
@@ -9280,4 +9292,14 @@ ddi_mem_update(uint64_t addr, uint64_t size)
 	/*LINTED*/
 	;
 #endif
+}
+
+void
+e_ddi_register_unbind_callback(dev_info_t *dip, ddi_unbind_callback_t *cb)
+{
+	struct dev_info *devi = DEVI(dip);
+
+	mutex_enter(&devi->devi_unbind_lock);
+	list_insert_tail(&devi->devi_unbind_cbs, cb);
+	mutex_exit(&devi->devi_unbind_lock);
 }

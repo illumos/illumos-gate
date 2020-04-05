@@ -27,8 +27,6 @@
 #ifndef _PCIBUS_H
 #define	_PCIBUS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/pci.h>
 #include <fm/topo_mod.h>
 #include <libdevinfo.h>
@@ -81,6 +79,7 @@ extern int pci_children_instantiate(topo_mod_t *, tnode_t *, di_node_t,
     int, int, int, int, int);
 
 extern int platform_pci_label(topo_mod_t *, tnode_t *, nvlist_t *, nvlist_t **);
+extern int pci_create_dev_sensors(topo_mod_t *, tnode_t *);
 
 #ifdef __cplusplus
 }

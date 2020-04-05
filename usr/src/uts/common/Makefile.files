@@ -217,6 +217,7 @@ GENUNIX_OBJS +=	\
 		kiconv.o	\
 		klpd.o		\
 		kmem.o		\
+		ksensor.o	\
 		ksyms_snapshot.o	\
 		l_strplumb.o	\
 		labelsys.o	\
@@ -742,6 +743,9 @@ SOL_UVERBS_OBJS +=	sol_uverbs.o sol_uverbs_comp.o sol_uverbs_event.o \
 SOL_UMAD_OBJS += sol_umad.o
 
 KSTAT_OBJS +=	kstat.o
+
+KSENSOR_OBJS +=	ksensor_drv.o
+KSENSOR_TEST_OBJS += ksensor_test.o
 
 KSYMS_OBJS +=	ksyms.o
 

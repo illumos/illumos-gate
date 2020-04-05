@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*
@@ -33,8 +34,8 @@
 static int
 sensor_link(di_minor_t minor, di_node_t node)
 {
-	const char *t, *minor_name, *dir_path = NULL;
-	char *type, *c;
+	const char *t, *dir_path = NULL;
+	char *type, *name, *c;
 	char buf[PATH_MAX];
 	size_t len;
 
@@ -42,27 +43,40 @@ sensor_link(di_minor_t minor, di_node_t node)
 		return (DEVFSADM_CONTINUE);
 	}
 
-	if ((minor_name = di_minor_name(minor)) == NULL) {
-		return (DEVFSADM_CONTINUE);
-	}
-
 	if ((type = strdup(t)) == NULL) {
 		return (DEVFSADM_TERMINATE);
 	}
 
-	while ((c = strchr(type, ':')) != NULL) {
+	c = type;
+	while ((c = strchr(c, ':')) != NULL) {
 		if (dir_path == NULL) {
 			dir_path = c + 1;
 		}
 		*c = '/';
 	}
 
+	if ((t = di_minor_name(minor)) == NULL) {
+		free(type);
+		return (DEVFSADM_CONTINUE);
+	}
+
+	if ((name = strdup(t)) == NULL) {
+		free(type);
+		return (DEVFSADM_TERMINATE);
+	}
+
+	c = name;
+	while ((c = strchr(c, ':')) != NULL) {
+		*c = '/';
+	}
+
+
 	if (dir_path == NULL || *dir_path == '\0') {
 		len = snprintf(buf, sizeof (buf), "%s/%s", SENSORS_BASE,
-		    minor_name);
+		    name);
 	} else {
 		len = snprintf(buf, sizeof (buf), "%s/%s/%s", SENSORS_BASE,
-		    dir_path, minor_name);
+		    dir_path, name);
 	}
 
 	if (len < sizeof (buf)) {
@@ -70,6 +84,7 @@ sensor_link(di_minor_t minor, di_node_t node)
 	}
 
 	free(type);
+	free(name);
 	return (DEVFSADM_CONTINUE);
 }
 

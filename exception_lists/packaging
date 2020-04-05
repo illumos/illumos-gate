@@ -861,12 +861,6 @@ usr/bin/ctfconvert
 usr/bin/ctfmerge
 
 #
-# SPARC doesn't currently use this today, though it may in the future.
-#
-usr/include/sys/sensors.h	sparc
-usr/lib/devfsadm/linkmod/SUNW_sensor_link.so	sparc
-
-#
 # libjedec is private
 #
 usr/include/libjedec.h

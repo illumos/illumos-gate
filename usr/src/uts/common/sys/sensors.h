@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #ifndef _SYS_SENSORS_H
@@ -71,8 +72,42 @@ typedef struct sensor_ioctl_kind {
 typedef struct sensor_ioctl_temperature {
 	uint32_t	sit_unit;
 	int32_t		sit_gran;
+	uint32_t	sit_prec;
+	uint32_t	sit_pad;
 	int64_t		sit_temp;
 } sensor_ioctl_temperature_t;
+
+#ifdef	_KERNEL
+typedef int (*ksensor_kind_f)(void *, sensor_ioctl_kind_t *);
+typedef int (*ksensor_temp_f)(void *, sensor_ioctl_temperature_t *);
+
+typedef struct {
+	ksensor_kind_f	kso_kind;
+	ksensor_temp_f	kso_temp;
+} ksensor_ops_t;
+
+extern int ksensor_kind_temperature(void *, sensor_ioctl_kind_t *);
+
+/*
+ * Create a sensor where the class and name is supplied.
+ */
+extern int ksensor_create(dev_info_t *, const ksensor_ops_t *, void *,
+    const char *, const char *, id_t *);
+
+/*
+ * Create a temperature sensor for a PCI device. If this is not a device-wide
+ * (e.g. per-function) sensor, this should not be used.
+ */
+extern int ksensor_create_temp_pcidev(dev_info_t *, const ksensor_ops_t *,
+    void *, const char *, id_t *);
+
+/*
+ * Remove a named or all sensors from this driver.
+ */
+#define	KSENSOR_ALL_IDS	INT_MIN
+extern int ksensor_remove(dev_info_t *, id_t);
+
+#endif
 
 #ifdef __cplusplus
 }

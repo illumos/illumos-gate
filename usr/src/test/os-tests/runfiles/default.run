@@ -100,3 +100,14 @@ tests = ['atrparse']
 [/opt/os-tests/tests/libtopo]
 user = root
 tests = ['digraph-test']
+
+#
+# Only the ksensor functional tests are included in the run file.
+# The stress test is designed to be run separately.
+#
+[/opt/os-tests/tests/ksensor]
+user = root
+pre = ksensor_init
+tests = [ 'ksensor_basic.32','ksensor_basic.64', 'ksensor_err.32',
+    'ksensor_err.64' ]
+post = ksensor_fini

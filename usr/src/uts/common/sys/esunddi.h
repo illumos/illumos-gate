@@ -22,6 +22,7 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #ifndef	_SYS_ESUNDDI_H
@@ -46,15 +47,15 @@ extern "C" {
 
 int
 e_ddi_prop_create(dev_t dev, dev_info_t *dip, int flag,
-	char *name, caddr_t value, int length);
+    char *name, caddr_t value, int length);
 
 int
 e_ddi_prop_modify(dev_t dev, dev_info_t *dip, int flag,
-	char *name, caddr_t value, int length);
+    char *name, caddr_t value, int length);
 
 int
 e_ddi_prop_update_int(dev_t match_dev, dev_info_t *dip,
-	char *name, int data);
+    char *name, int data);
 
 int
 e_ddi_prop_update_int64(dev_t match_dev, dev_info_t *dip,
@@ -70,7 +71,7 @@ e_ddi_prop_update_int64_array(dev_t match_dev, dev_info_t *dip,
 
 int
 e_ddi_prop_update_string(dev_t match_dev, dev_info_t *dip,
-	char *name, char *data);
+    char *name, char *data);
 
 int
 e_ddi_prop_update_string_array(dev_t match_dev, dev_info_t *dip,
@@ -94,18 +95,18 @@ e_ddi_getprop(dev_t dev, vtype_t type, char *name, int flags, int defaultval);
 
 int64_t
 e_ddi_getprop_int64(dev_t dev, vtype_t type, char *name,
-	int flags, int64_t defvalue);
+    int flags, int64_t defvalue);
 
 int
 e_ddi_getproplen(dev_t dev, vtype_t type, char *name, int flags, int *lengthp);
 
 int
 e_ddi_getlongprop(dev_t dev, vtype_t type, char *name, int flags,
-	caddr_t valuep, int *lengthp);
+    caddr_t valuep, int *lengthp);
 
 int
 e_ddi_getlongprop_buf(dev_t dev, vtype_t type, char *name, int flags,
-	caddr_t valuep, int *lengthp);
+    caddr_t valuep, int *lengthp);
 
 int
 e_ddi_parental_suspend_resume(dev_info_t *dip);
@@ -159,9 +160,8 @@ extern int (*pm_platform_power)(power_req_t *);
  */
 int
 umem_lockmemory(caddr_t addr, size_t size, int flags,
-		ddi_umem_cookie_t *cookie,
-		struct umem_callback_ops *ops_vector,
-		proc_t *procp);
+    ddi_umem_cookie_t *cookie, struct umem_callback_ops *ops_vector,
+    proc_t *procp);
 
 #define	DDI_UMEMLOCK_LONGTERM	0x04
 
@@ -249,15 +249,20 @@ extern int e_ddi_branch_referenced(dev_info_t *rdip,
  * Obsolete interfaces, no longer used, to be removed.
  * Retained only for driver compatibility.
  */
-void
-e_ddi_enter_driver_list(struct devnames *, int *);	/* obsolete */
+void e_ddi_enter_driver_list(struct devnames *, int *);		/* obsolete */
 
-int
-e_ddi_tryenter_driver_list(struct devnames *, int *);	/* obsolete */
+int e_ddi_tryenter_driver_list(struct devnames *, int *);	/* obsolete */
 
-void
-e_ddi_exit_driver_list(struct devnames *, int);		/* obsolete */
+void e_ddi_exit_driver_list(struct devnames *, int);		/* obsolete */
 
+typedef struct ddi_unbind_callback {
+	list_node_t ddiub_next;
+	void (*ddiub_cb)(void *, dev_info_t *);
+	void *ddiub_arg;
+} ddi_unbind_callback_t;
+
+extern void e_ddi_register_unbind_callback(dev_info_t *,
+    ddi_unbind_callback_t *);
 
 #endif	/* _KERNEL */
 

@@ -913,6 +913,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/kbtrans/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ksensor/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ksocket/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
