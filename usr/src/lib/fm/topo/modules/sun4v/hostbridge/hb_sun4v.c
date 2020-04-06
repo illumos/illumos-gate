@@ -291,7 +291,7 @@ platform_hb_enum(topo_mod_t *mod, tnode_t *parent, const char *name,
 	int nrcs, nrcnode = 0;
 	busorrc_t *rcs;
 
-	if (imin < 0 || imax < 0 || imin > imax) {
+	if (imin > imax) {
 		topo_mod_dprintf(mod, "Invalid hb range(%d,%d)\n", imin, imax);
 		return (-1);
 	}
