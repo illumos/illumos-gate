@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 #
@@ -43,6 +43,14 @@ SYMBOL_VERSION SUNWprivate {
     global:
 	topo_close;
 	topo_debug_set;
+	topo_digraph_deserialize;
+	topo_digraph_destroy;
+	topo_digraph_get;
+	topo_digraph_new;
+	topo_digraph_paths;
+	topo_digraph_serialize;
+	topo_edge_iter;
+	topo_edge_new;
 	topo_fmri_asru;
 	topo_fmri_compare;
 	topo_fmri_contains;
@@ -160,7 +168,9 @@ SYMBOL_VERSION SUNWprivate {
 	topo_node_resource;
 	topo_node_setspecific;
 	topo_node_unbind;
+	topo_node_vertex;
 	topo_open;
+	topo_path_destroy;
 	topo_pgroup_create;
 	topo_pgroup_destroy;
 	topo_pgroup_info;
@@ -208,6 +218,10 @@ SYMBOL_VERSION SUNWprivate {
 	topo_snap_hold;
 	topo_snap_release;
 	topo_strerror;
+	topo_vertex_destroy;
+	topo_vertex_iter;
+	topo_vertex_node;
+	topo_vertex_new;
 	topo_walk_fini;
 	topo_walk_init;
 	topo_walk_step;

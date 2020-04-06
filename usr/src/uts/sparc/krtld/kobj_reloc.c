@@ -207,7 +207,7 @@ do_relocate(struct module *mp, char *reltbl, int nreloc, int relocsize,
 		if ((rtype > R_SPARC_NUM) || IS_TLS_INS(rtype)) {
 			_kobj_printf(ops, "krtld: invalid relocation type %d",
 			    rtype);
-			_kobj_printf(ops, " at 0x%llx:", off);
+			_kobj_printf(ops, " at 0x%llx:", (u_longlong_t)off);
 			_kobj_printf(ops, " file=%s\n", mp->filename);
 			err = 1;
 			continue;
@@ -223,8 +223,8 @@ do_relocate(struct module *mp, char *reltbl, int nreloc, int relocsize,
 			    (mp->symtbl+(stndx * mp->symhdr->sh_entsize));
 			_kobj_printf(ops, "krtld:\t%s",
 			    conv_reloc_SPARC_type(rtype));
-			_kobj_printf(ops, "\t0x%8llx", off);
-			_kobj_printf(ops, " 0x%8llx", addend);
+			_kobj_printf(ops, "\t0x%8llx", (u_longlong_t)off);
+			_kobj_printf(ops, " 0x%8llx", (u_longlong_t)addend);
 			_kobj_printf(ops, "  %s\n",
 			    (const char *)mp->strings + symp->st_name);
 		}
@@ -309,8 +309,9 @@ do_relocate(struct module *mp, char *reltbl, int nreloc, int relocsize,
 
 #ifdef	KOBJ_DEBUG
 		if (kobj_debug & D_RELOCATIONS) {
-			_kobj_printf(ops, "krtld:\t\t\t\t0x%8llx", off);
-			_kobj_printf(ops, " 0x%8llx\n", value);
+			_kobj_printf(ops, "krtld:\t\t\t\t0x%8llx",
+			    (u_longlong_t)off);
+			_kobj_printf(ops, " 0x%8llx\n", (u_longlong_t)value);
 		}
 #endif
 		if (do_reloc_krtld(rtype, (unsigned char *)off, (Xword *)&value,
@@ -353,7 +354,7 @@ do_relocations(struct module *mp)
 		}
 		if (rshp->sh_info >= mp->hdr.e_shnum) {
 			_kobj_printf(ops, "do_relocations: %s ", mp->filename);
-			_kobj_printf(ops, " sh_info out of range %lld\n", shn);
+			_kobj_printf(ops, " sh_info out of range %d\n", shn);
 			goto bad;
 		}
 		nreloc = rshp->sh_size / rshp->sh_entsize;

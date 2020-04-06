@@ -3204,7 +3204,9 @@ f usr/include/hbaapi.h 0644 root bin
 d usr/include/ia32 0755 root bin
 d usr/include/ia32/sys 0755 root bin
 f usr/include/ia32/sys/asm_linkage.h 0644 root bin
+f usr/include/ia32/sys/kdi_regs.h 0644 root bin
 f usr/include/ia32/sys/machtypes.h 0644 root bin
+f usr/include/ia32/sys/privmregs.h 0644 root bin
 f usr/include/ia32/sys/privregs.h 0644 root bin
 f usr/include/ia32/sys/psw.h 0644 root bin
 f usr/include/ia32/sys/pte.h 0644 root bin
@@ -11244,6 +11246,7 @@ d usr/share/lib/xml 0755 root sys
 d usr/share/lib/xml/dtd 0755 root sys
 f usr/share/lib/xml/dtd/adt_record.dtd.1 0444 root bin
 f usr/share/lib/xml/dtd/brand.dtd.1 0644 root bin
+f usr/share/lib/xml/dtd/digraph-topology.dtd.1 0644 root bin
 f usr/share/lib/xml/dtd/kmfpolicy.dtd 0444 root bin
 f usr/share/lib/xml/dtd/rm_pool.dtd.1 0444 root bin
 f usr/share/lib/xml/dtd/service_bundle.dtd.1 0444 root sys

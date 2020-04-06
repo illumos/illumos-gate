@@ -911,8 +911,10 @@ file path=usr/sbin/fmadm mode=0555 variant.opensolaris.zone=__NODEFAULT
 file path=usr/sbin/fmdump mode=0555 variant.opensolaris.zone=__NODEFAULT
 file path=usr/sbin/fmstat mode=0555 variant.opensolaris.zone=__NODEFAULT
 #
-# Topo DTD is also common
+# Topo DTDs are also common
 #
+file path=usr/share/lib/xml/dtd/digraph-topology.dtd.1 \
+    variant.opensolaris.zone=__NODEFAULT
 file path=usr/share/lib/xml/dtd/topology.dtd.1 \
     variant.opensolaris.zone=__NODEFAULT
 file path=usr/share/man/man1m/fmadm.1m

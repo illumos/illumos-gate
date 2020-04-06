@@ -23,7 +23,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef _TOPO_MOD_H
@@ -296,6 +296,7 @@ typedef enum topo_mod_errno {
     EMOD_NONCANON,		/* non-canonical component name requested */
     EMOD_MOD_NOENT,		/* module lookup failed */
     EMOD_UKNOWN_ENUM,		/* unknown enumeration error */
+    EMOD_DIGRAPH_MAXSZ,		/* max digraph size exceeded */
     EMOD_END			/* end of mod errno list (to ease auto-merge) */
 } topo_mod_errno_t;
 
@@ -307,6 +308,19 @@ extern int topo_mod_seterrno(topo_mod_t *, int);
 extern int topo_mod_file_search(topo_mod_t *, const char *file, int oflags);
 
 extern topo_method_f topo_mod_hc_occupied;
+
+/*
+ * Directed Graph topology interfaces
+ */
+extern topo_digraph_t *topo_digraph_new(topo_hdl_t *, topo_mod_t *,
+    const char *);
+extern void topo_digraph_destroy(topo_digraph_t *);
+
+extern topo_vertex_t *topo_vertex_new(topo_mod_t *, const char *,
+    topo_instance_t);
+extern void topo_vertex_destroy(topo_mod_t *mod, topo_vertex_t *vtx);
+
+extern int topo_edge_new(topo_mod_t *, topo_vertex_t *, topo_vertex_t *);
 
 #ifdef	__cplusplus
 }

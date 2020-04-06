@@ -42,7 +42,7 @@ extern "C" {
 typedef struct topo_hdl topo_hdl_t;
 typedef struct topo_node tnode_t;
 typedef struct topo_walk topo_walk_t;
-typedef int32_t topo_instance_t;
+typedef uint64_t topo_instance_t;
 typedef uint32_t topo_version_t;
 
 typedef struct topo_list {
@@ -54,6 +54,21 @@ typedef struct topo_faclist {
 	topo_list_t	tf_list;
 	tnode_t		*tf_node;
 } topo_faclist_t;
+
+typedef struct topo_digraph topo_digraph_t;
+typedef struct topo_vertex topo_vertex_t;
+typedef struct topo_edge topo_edge_t;
+
+typedef struct topo_path {
+	const char	*tsp_fmristr;
+	nvlist_t	*tsp_fmri;
+	topo_list_t	tsp_components;
+} topo_path_t;
+
+typedef struct topo_path_component {
+	topo_list_t	tspc_link;
+	topo_vertex_t	*tspc_vertex;
+} topo_path_component_t;
 
 /*
  * The following functions, error codes and data structures are private
@@ -397,6 +412,23 @@ extern int topo_hdl_nvdup(topo_hdl_t *, nvlist_t *, nvlist_t **);
 extern char *topo_hdl_strdup(topo_hdl_t *, const char *);
 extern char *topo_hdl_strsplit(topo_hdl_t *, const char *, const char *,
     char **);
+
+/*
+ * Interfaces for interacting with directed graph topologies
+ */
+extern topo_digraph_t *topo_digraph_get(topo_hdl_t *, const char *);
+extern int topo_vertex_iter(topo_hdl_t *, topo_digraph_t *,
+    int (*)(topo_hdl_t *, topo_vertex_t *, boolean_t, void *), void *);
+extern tnode_t *topo_vertex_node(topo_vertex_t *);
+extern int topo_edge_iter(topo_hdl_t *, topo_vertex_t *,
+    int (*)(topo_hdl_t *, topo_edge_t *, boolean_t, void *), void *);
+extern int topo_digraph_paths(topo_hdl_t *, topo_digraph_t *,
+    topo_vertex_t *, topo_vertex_t *, topo_path_t ***, uint_t *);
+extern void topo_path_destroy(topo_hdl_t *, topo_path_t *);
+extern int topo_digraph_serialize(topo_hdl_t *, topo_digraph_t *, FILE *);
+extern topo_digraph_t *topo_digraph_deserialize(topo_hdl_t *, const char *,
+    size_t);
+extern topo_vertex_t *topo_node_vertex(tnode_t *);
 
 /*
  * Interfaces for converting sensor/indicator types, units, states, etc to

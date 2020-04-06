@@ -10,13 +10,14 @@
 #
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
-# Copyright (c) 2019, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 usr/src/boot/*
 # Not actually a manual page
 usr/src/cmd/hal/fdi/fdi.dtd.1
 usr/src/cmd/isns/isnsd/xml_def/isnsdata.dtd.1
 usr/src/cmd/svc/dtd/service_bundle.dtd.1
+usr/src/lib/fm/topo/maps/common/digraph-topology.dtd.1
 usr/src/lib/fm/topo/maps/common/topology.dtd.1
 usr/src/lib/libbrand/dtd/brand.dtd.1
 usr/src/lib/libbrand/dtd/zone_platform.dtd.1

@@ -112,3 +112,7 @@ arch = i86pc
 [/opt/os-tests/tests/uccid]
 arch = i86pc
 tests = ['atrparse']
+
+[/opt/os-tests/tests/libtopo]
+user = root
+tests = ['digraph-test']

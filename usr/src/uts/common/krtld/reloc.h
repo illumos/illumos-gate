@@ -256,7 +256,7 @@ extern const char	*conv_reloc_SPARC_type(Word);
 	_kobj_printf(ops, MSG_REL_PREGEN, CONV_RELOC_TYPE((rtype))); \
 	_kobj_printf(ops, MSG_REL_FILE, (file)); \
 	_kobj_printf(ops, MSG_REL_SYM, ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
-	_kobj_printf(ops, MSG_REL_NONALIGN, EC_OFF((off)))
+	_kobj_printf(ops, MSG_REL_NONALIGN, (u_longlong_t)EC_OFF((off)))
 
 #define	REL_ERR_UNNOBITS(lml, file, sym, rtype, nbits) \
 	_kobj_printf(ops, MSG_REL_PREGEN, CONV_RELOC_TYPE((rtype))); \
@@ -268,9 +268,9 @@ extern const char	*conv_reloc_SPARC_type(Word);
 	_kobj_printf(ops, MSG_REL_PREGEN, CONV_RELOC_TYPE((rtype))); \
 	_kobj_printf(ops, MSG_REL_FILE, (file)); \
 	_kobj_printf(ops, MSG_REL_SYM, ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
-	_kobj_printf(ops, MSG_REL_VALUE, EC_XWORD((uvalue))); \
+	_kobj_printf(ops, MSG_REL_VALUE, (u_longlong_t)EC_XWORD((uvalue))); \
 	_kobj_printf(ops, MSG_REL_LOSEBITS, (int)(nbits)); \
-	_kobj_printf(ops, MSG_REL_OFFSET, EC_NATPTR((off)))
+	_kobj_printf(ops, MSG_REL_OFFSET, (u_longlong_t)EC_NATPTR((off)))
 
 #define	REL_ERR_NOFIT(lml, file, sym, rtype, uvalue) \
 	_kobj_printf(ops, MSG_REL_PREGEN, CONV_RELOC_TYPE((rtype))); \

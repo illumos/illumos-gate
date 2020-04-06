@@ -23,11 +23,12 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2020 Joyent, Inc.
+ */
 
 #ifndef	_TOPO_BUILTIN_H
 #define	_TOPO_BUILTIN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -35,7 +36,10 @@ extern "C" {
 
 #include <topo_tree.h>
 #include <topo_module.h>
+#include <topo_digraph.h>
 
+#define	TOPO_BLTIN_TYPE_TREE		1
+#define	TOPO_BLTIN_TYPE_DIGRAPH		2
 /*
  * topo_builtin.h
  *
@@ -50,6 +54,7 @@ typedef struct topo_builtin {
 	topo_version_t bltin_version;
 	int (*bltin_init)(topo_mod_t *, topo_version_t version);
 	void (*bltin_fini)(topo_mod_t *);
+	uint_t bltin_type;
 } topo_builtin_t;
 
 extern int topo_builtin_create(topo_hdl_t *, const char *);
