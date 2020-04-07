@@ -2101,8 +2101,8 @@ iwh_mac_access_exit(iwh_sc_t *sc)
  * static uint32_t
  * iwh_mem_read(iwh_sc_t *sc, uint32_t addr)
  * {
- * 	IWH_WRITE(sc, HBUS_TARG_MEM_RADDR, addr);
- * 	return (IWH_READ(sc, HBUS_TARG_MEM_RDAT));
+ *	IWH_WRITE(sc, HBUS_TARG_MEM_RADDR, addr);
+ *	return (IWH_READ(sc, HBUS_TARG_MEM_RDAT));
  * }
  */
 
@@ -3085,9 +3085,10 @@ iwh_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	struct ieee80211_qosframe *qwh = NULL;
 	int tid = WME_TID_INVALID;
 
-	if (NULL == ic) {
+	if (ic == NULL) {
 		return (IWH_FAIL);
 	}
+	rate = 0;
 	sc = (iwh_sc_t *)ic;
 
 	if (sc->sc_flags & IWH_F_SUSPEND) {

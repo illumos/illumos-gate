@@ -505,6 +505,10 @@ load_dev_disabled(dev_t dev, caddr_t arg, int mode, int *rval)
 	uint32_t rv;
 	int error = 0;
 
+	entries = NULL;
+	count = 0;
+	instance = 0;
+	rv = CRYPTO_SUCCESS;
 	if (copyin(arg, &dev_disabled, sizeof (dev_disabled)) != 0) {
 		error =  EFAULT;
 		goto out2;
@@ -580,6 +584,9 @@ load_soft_disabled(dev_t dev, caddr_t arg, int mode, int *rval)
 	uint32_t rv;
 	int error = 0;
 
+	entries = NULL;
+	count = 0;
+	rv = CRYPTO_SUCCESS;
 	if (copyin(arg, &soft_disabled, sizeof (soft_disabled)) != 0) {
 		error = EFAULT;
 		goto out2;
@@ -660,6 +667,9 @@ load_soft_config(dev_t dev, caddr_t arg, int mode, int *rval)
 	uint32_t rv;
 	int error = 0;
 
+	entries = NULL;
+	count = 0;
+	rv = CRYPTO_SUCCESS;
 	if (copyin(arg, &soft_config, sizeof (soft_config)) != 0) {
 		error = EFAULT;
 		goto out2;
@@ -736,6 +746,7 @@ unload_soft_module(dev_t dev, caddr_t arg, int mode, int *rval)
 	uint32_t rv;
 	int error = 0;
 
+	rv = CRYPTO_SUCCESS;
 	if (copyin(arg, &unload_soft_module,
 	    sizeof (unload_soft_module)) != 0) {
 		error = EFAULT;

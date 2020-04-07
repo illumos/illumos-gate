@@ -438,7 +438,7 @@ dnet_probe(dev_info_t *devinfo)
 static int
 dnet_hack(dev_info_t *devinfo)
 {
-	uchar_t 	vendor_info[SROM_SIZE];
+	uchar_t		vendor_info[SROM_SIZE];
 	uint32_t	csr;
 	uint16_t	deviceid;
 	ddi_acc_handle_t handle;
@@ -505,12 +505,12 @@ static int
 dnet_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 {
 	uint16_t revid;
-	struct dnetinstance 	*dnetp;		/* Our private device info */
+	struct dnetinstance	*dnetp;		/* Our private device info */
 	mac_register_t		*macp;
-	uchar_t 		vendor_info[SROM_SIZE];
+	uchar_t			vendor_info[SROM_SIZE];
 	uint32_t		csr;
 	uint16_t		deviceid;
-	ddi_acc_handle_t 	handle;
+	ddi_acc_handle_t	handle;
 	int			secondary;
 
 #define	DNET_PCI_RNUMBER	1
@@ -1003,7 +1003,7 @@ static int
 dnet_set_addr(struct dnetinstance *dnetp)
 {
 	struct tx_desc_type *desc;
-	int 		current_desc;
+	int		current_desc;
 	uint32_t	val;
 
 	ASSERT(MUTEX_HELD(&dnetp->intrlock));
@@ -1032,13 +1032,13 @@ dnet_set_addr(struct dnetinstance *dnetp)
 
 	desc->buffer1			= dnetp->setup_buf_paddr;
 	desc->buffer2			= 0;
-	desc->desc1.buffer_size1 	= SETUPBUF_SIZE;
-	desc->desc1.buffer_size2 	= 0;
+	desc->desc1.buffer_size1	= SETUPBUF_SIZE;
+	desc->desc1.buffer_size2	= 0;
 	desc->desc1.setup_packet	= 1;
 	desc->desc1.first_desc		= 0;
-	desc->desc1.last_desc 		= 0;
-	desc->desc1.filter_type0 	= 1;
-	desc->desc1.filter_type1 	= 1;
+	desc->desc1.last_desc		= 0;
+	desc->desc1.filter_type0	= 1;
+	desc->desc1.filter_type1	= 1;
 	desc->desc1.int_on_comp		= 1;
 
 	desc->desc0.own = 1;
@@ -1128,12 +1128,12 @@ static uint32_t
 hashindex(const uint8_t *address)
 {
 	uint32_t	crc = (uint32_t)HASH_CRC;
-	uint32_t const 	POLY = HASH_POLY;
+	uint32_t const	POLY = HASH_POLY;
 	uint32_t	msb;
-	int32_t 	byteslength;
-	uint8_t 	currentbyte;
-	uint32_t 	index;
-	int32_t 	bit;
+	int32_t		byteslength;
+	uint8_t		currentbyte;
+	uint32_t	index;
+	int32_t		bit;
 	int32_t		shift;
 
 	for (byteslength = 0; byteslength < ETHERADDRL; byteslength++) {
@@ -1331,6 +1331,7 @@ dnet_send(struct dnetinstance *dnetp, mblk_t *mp)
 	mblk_t		*bp;
 
 	ASSERT(MUTEX_HELD(&dnetp->txlock));
+	end_index = 0;
 
 	/* reclaim any xmit descriptors completed */
 	dnet_reclaim_Tx_desc(dnetp);
@@ -1583,7 +1584,7 @@ dnet_getp(struct dnetinstance *dnetp)
 {
 	int packet_length, index;
 	mblk_t	*mp;
-	caddr_t 	virtual_address;
+	caddr_t	virtual_address;
 	struct	rx_desc_type *desc = dnetp->rx_desc;
 	int marker = dnetp->rx_current_desc;
 	int misses;
@@ -1699,7 +1700,7 @@ dnet_getp(struct dnetinstance *dnetp)
 
 		/*
 		 * If no packet errors then do:
-		 * 	1. Allocate a new receive buffer so that we can
+		 *	1. Allocate a new receive buffer so that we can
 		 *	   use the current buffer as streams buffer to
 		 *	   avoid bcopy.
 		 *	2. If we got a new receive buffer then allocate
@@ -2009,7 +2010,7 @@ set_opr(struct dnetinstance *dnetp)
 {
 	uint32_t fd, mb1, sf;
 
-	int 		opnmode_len;
+	int		opnmode_len;
 	uint32_t val;
 	media_block_t *block = dnetp->selected_media_block;
 
@@ -2859,7 +2860,7 @@ static void
 dnet_read21140srom(ddi_acc_handle_t io_handle, caddr_t io_reg, uchar_t *addr,
     int maxlen)
 {
-	uint32_t 	i, j;
+	uint32_t	i, j;
 	uint32_t	dout;
 	uint16_t	word;
 	uint8_t		rom_addr;
@@ -2993,7 +2994,7 @@ get_alternative_srom_image(dev_info_t *devinfo, uchar_t *vi, int len)
 	 */
 	pci_regspec_t	*assignp;
 	int		assign_len;
-	int 		devnum;
+	int		devnum;
 	int		primary_devnum;
 
 	primary_devnum = ddi_getprop(DDI_DEV_T_ANY, devinfo, 0,
@@ -3020,10 +3021,10 @@ get_alternative_srom_image(dev_info_t *devinfo, uchar_t *vi, int len)
 static void
 set_alternative_srom_image(dev_info_t *devinfo, uchar_t *vi, int len)
 {
-	int 		proplen;
+	int		proplen;
 	pci_regspec_t	*assignp;
 	int		assign_len;
-	int 		devnum;
+	int		devnum;
 
 	if (ddi_getproplen(DDI_DEV_T_ANY, devinfo, DDI_PROP_DONTPASS,
 	    "DNET_SROM", &proplen) == DDI_PROP_SUCCESS ||
@@ -3520,7 +3521,7 @@ enable_interrupts(struct dnetinstance *dnetp)
  * calls dnet_intr for each of them.
  * Known cards that suffer from this problem are:
  *	All Cogent multiport cards;
- * 	Znyx 314;
+ *	Znyx 314;
  *	Znyx 315.
  *
  * XXX NEEDSWORK -- see comments above get_alternative_srom_image(). This
@@ -4093,7 +4094,7 @@ dnet_parse_srom(struct dnetinstance *dnetp, SROM_FORMAT *sr, uchar_t *vi)
 /* Section 4.2, 4.3, 4.4, 4.5 */
 static void
 parse_controller_leaf(struct dnetinstance *dnetp, LEAF_FORMAT *leaf,
-	uchar_t *vi)
+    uchar_t *vi)
 {
 	int i;
 

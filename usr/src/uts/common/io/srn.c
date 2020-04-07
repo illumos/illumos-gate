@@ -519,6 +519,7 @@ void
 srn_notify(int type, int event)
 {
 	int clone, count;
+
 	PMD(PMD_SX, ("srn_notify entered with type %d, event 0x%x\n",
 	    type, event));
 	ASSERT(mutex_owned(&srn_clone_lock));
@@ -538,8 +539,8 @@ srn_notify(int type, int event)
 		count = srn_autosx_count;
 		break;
 	default:
-		ASSERT(0);
-		break;
+		PMD(PMD_SX, ("unsupported type\n"))
+		return;
 	}
 	ASSERT(count > 0);
 	PMD(PMD_SX, ("count %d\n", count))
