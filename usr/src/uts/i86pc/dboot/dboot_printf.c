@@ -203,6 +203,10 @@ unsigned_num:
 			dboot_putnum(x, B_FALSE, base);
 			break;
 
+		case 'z':
+			size = sizeof (size_t);
+			goto again;
+
 		default:
 			dboot_puts("dboot_printf(): unknown % escape\n");
 		}

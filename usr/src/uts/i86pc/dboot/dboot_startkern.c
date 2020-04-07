@@ -75,6 +75,10 @@ extern int have_cpuid(void);
 
 #define	SHA1_ASCII_LENGTH	(SHA1_DIGEST_LENGTH * 2)
 
+#define	ULL(v) ((u_longlong_t)(v))
+
+static void *page_alloc(void);
+
 /*
  * This file contains code that runs to transition us from either a multiboot
  * compliant loader (32 bit non-paging) or a XPV domain loader to
@@ -105,7 +109,10 @@ x86pte_t pte_bits = PT_VALID | PT_REF | PT_WRITABLE | PT_MOD | PT_NOCONSIST;
  * virtual address.
  */
 paddr_t ktext_phys;
-uint32_t ksize = 2 * FOUR_MEG;	/* kernel nucleus is 8Meg */
+/*
+ * Nucleus size is 8Mb, including text, data, and BSS.
+ */
+uint32_t ksize = 2 * FOUR_MEG;
 
 static uint64_t target_kernel_text;	/* value to use for KERNEL_TEXT */
 
@@ -115,9 +122,16 @@ static uint64_t target_kernel_text;	/* value to use for KERNEL_TEXT */
 char stack_space[STACK_SIZE];
 
 /*
- * Used to track physical memory allocation
+ * The highest address we build page tables for.
  */
-static paddr_t next_avail_addr = 0;
+static paddr_t boot_map_end;
+
+/*
+ * The dboot allocator. This is a small area we use for allocating the
+ * kernel nucleus and pages for the identity page tables we build here.
+ */
+static paddr_t alloc_addr;
+static paddr_t alloc_end;
 
 #if defined(__xpv)
 /*
@@ -127,7 +141,6 @@ static paddr_t next_avail_addr = 0;
  * to derive a pfn from a pointer, you subtract mfn_base.
  */
 
-static paddr_t scratch_end = 0;	/* we can't write all of mem here */
 static paddr_t mfn_base;		/* addr corresponding to mfn_list[0] */
 start_info_t *xen_info;
 
@@ -233,6 +246,12 @@ uint_t map_debug = 0;
 
 static char noname[2] = "-";
 
+static boolean_t
+ranges_intersect(uint64_t s1, uint64_t e1, uint64_t s2, uint64_t e2)
+{
+	return (s1 < e2 && e1 >= s2);
+}
+
 /*
  * Either hypervisor-specific or grub-specific code builds the initial
  * memlists. This code does the sort/merge/link for final use.
@@ -288,8 +307,16 @@ sort_physinstall(void)
 	if (prom_debug) {
 		dboot_printf("\nFinal memlists:\n");
 		for (i = 0; i < memlists_used; ++i) {
-			dboot_printf("\t%d: addr=%" PRIx64 " size=%"
-			    PRIx64 "\n", i, memlists[i].addr, memlists[i].size);
+			dboot_printf("\t%d: 0x%llx-0x%llx size=0x%llx\n",
+			    i, ULL(memlists[i].addr), ULL(memlists[i].addr +
+			    memlists[i].size), ULL(memlists[i].size));
+		}
+
+		dboot_printf("\nBoot modules:\n");
+		for (i = 0; i < bi->bi_module_cnt; i++) {
+			dboot_printf("\t%d: 0x%llx-0x%llx size=0x%llx\n",
+			    i, ULL(modules[i].bm_addr), ULL(modules[i].bm_addr +
+			    modules[i].bm_size), ULL(modules[i].bm_size));
 		}
 	}
 
@@ -341,6 +368,8 @@ dboot_halt(void)
 	while (--i)
 		(void) HYPERVISOR_yield();
 	(void) HYPERVISOR_shutdown(SHUTDOWN_poweroff);
+	for (;;)
+		;
 }
 
 /*
@@ -427,7 +456,7 @@ set_pteval(paddr_t table, uint_t index, uint_t level, x86pte_t pteval)
 paddr_t
 make_ptable(x86pte_t *pteval, uint_t level)
 {
-	paddr_t new_table = (paddr_t)(uintptr_t)mem_alloc(MMU_PAGESIZE);
+	paddr_t new_table = (paddr_t)(uintptr_t)page_alloc();
 
 	if (level == top_level && level == 2)
 		*pteval = pa_to_ma((uintptr_t)new_table) | PT_VALID;
@@ -659,18 +688,6 @@ exclude_from_pci(uint64_t start, uint64_t end)
 	}
 }
 
-/*
- * During memory allocation, find the highest address not used yet.
- */
-static void
-check_higher(paddr_t a)
-{
-	if (a < next_avail_addr)
-		return;
-	next_avail_addr = RNDUP(a + 1, MMU_PAGESIZE);
-	DBG(next_avail_addr);
-}
-
 static int
 dboot_loader_mmap_entries(void)
 {
@@ -687,7 +704,6 @@ dboot_loader_mmap_entries(void)
 
 			DBG(mb_info->mmap_addr);
 			DBG(mb_info->mmap_length);
-			check_higher(mb_info->mmap_addr + mb_info->mmap_length);
 
 			for (mmap_addr = mb_info->mmap_addr;
 			    mmap_addr < mb_info->mmap_addr +
@@ -895,17 +911,13 @@ build_pcimemlists(void)
 }
 
 #if defined(__xpv)
-/*
- * Initialize memory allocator stuff from hypervisor-supplied start info.
- */
 static void
-init_mem_alloc(void)
+init_dboot_alloc(void)
 {
 	int	local;	/* variables needed to find start region */
-	paddr_t	scratch_start;
 	xen_memory_map_t map;
 
-	DBG_MSG("Entered init_mem_alloc()\n");
+	DBG_MSG("Entered init_dboot_alloc()\n");
 
 	/*
 	 * Free memory follows the stack. There's at least 512KB of scratch
@@ -914,17 +926,17 @@ init_mem_alloc(void)
 	 * allocated last and will be outside the addressible range.  We'll
 	 * switch to new page tables before we unpack the kernel
 	 */
-	scratch_start = RNDUP((paddr_t)(uintptr_t)&local, MMU_PAGESIZE);
-	DBG(scratch_start);
-	scratch_end = RNDUP((paddr_t)scratch_start + 512 * 1024, TWO_MEG);
-	DBG(scratch_end);
+	alloc_addr = RNDUP((paddr_t)(uintptr_t)&local, MMU_PAGESIZE);
+	DBG(alloc_addr);
+	alloc_end = RNDUP((paddr_t)alloc_addr + 512 * 1024, TWO_MEG);
+	DBG(alloc_end);
 
 	/*
 	 * For paranoia, leave some space between hypervisor data and ours.
 	 * Use 500 instead of 512.
 	 */
-	next_avail_addr = scratch_end - 500 * 1024;
-	DBG(next_avail_addr);
+	alloc_addr = alloc_end - 500 * 1024;
+	DBG(alloc_addr);
 
 	/*
 	 * The domain builder gives us at most 1 module
@@ -1272,7 +1284,6 @@ process_module(int midx)
 	char *cmdline = dboot_multiboot_modcmdline(midx);
 	char *p, *q;
 
-	check_higher(mod_end);
 	if (prom_debug) {
 		dboot_printf("\tmodule #%d: '%s' at 0x%lx, end 0x%lx\n",
 		    midx, cmdline, (ulong_t)mod_start, (ulong_t)mod_end);
@@ -1436,7 +1447,6 @@ static void
 dboot_process_modules(void)
 {
 	int i, modcount;
-	extern char _end[];
 
 	DBG_MSG("\nFinding Modules\n");
 	modcount = dboot_multiboot_modcount();
@@ -1444,11 +1454,11 @@ dboot_process_modules(void)
 		dboot_panic("Too many modules (%d) -- the maximum is %d.",
 		    modcount, MAX_BOOT_MODULES);
 	}
+
 	/*
 	 * search the modules to find the last used address
 	 * we'll build the module list while we're walking through here
 	 */
-	check_higher((paddr_t)(uintptr_t)&_end);
 	for (i = 0; i < modcount; ++i) {
 		process_module(i);
 		modules_used++;
@@ -1498,8 +1508,8 @@ dboot_add_memlist(uint64_t start, uint64_t end)
 		native_ptr_t mod_start = modules[i].bm_addr;
 		native_ptr_t mod_end = modules[i].bm_addr + modules[i].bm_size;
 
-		if (mod_start < CORRUPT_REGION_END &&
-		    mod_end >= CORRUPT_REGION_START) {
+		if (ranges_intersect(mod_start, mod_end, CORRUPT_REGION_START,
+		    CORRUPT_REGION_END)) {
 			if (prom_debug) {
 				dboot_printf("disabling RICHMOND-16 workaround "
 				"due to module #%d: "
@@ -1662,21 +1672,17 @@ dboot_multiboot1_highest_addr(void)
 	return (addr);
 }
 
-static void
+static uint64_t
 dboot_multiboot_highest_addr(void)
 {
 	paddr_t addr;
 
 	switch (multiboot_version) {
 	case 1:
-		addr = dboot_multiboot1_highest_addr();
-		if (addr != (paddr_t)(uintptr_t)NULL)
-			check_higher(addr);
+		return (dboot_multiboot1_highest_addr());
 		break;
 	case 2:
-		addr = dboot_multiboot2_highest_addr(mb2_info);
-		if (addr != (paddr_t)(uintptr_t)NULL)
-			check_higher(addr);
+		return (dboot_multiboot2_highest_addr(mb2_info));
 		break;
 	default:
 		dboot_panic("Unknown multiboot version: %d\n",
@@ -1686,15 +1692,97 @@ dboot_multiboot_highest_addr(void)
 }
 
 /*
- * Walk the boot loader provided information and find the highest free address.
+ * Set up our simple physical memory allocator.  This is used to allocate both
+ * the kernel nucleus (ksize) and our page table pages.
+ *
+ * We need to find a contiguous region in the memlists that is below 4Gb (as
+ * we're 32-bit and need to use the addresses), and isn't otherwise in use by
+ * dboot, multiboot allocations, or boot modules. The memlist is sorted and
+ * merged by this point.
+ *
+ * Historically, this code always did the allocations past the end of the
+ * highest used address, even if there was space below.  For reasons unclear, if
+ * we don't do this, then we get massive corruption during early kernel boot.
+ *
+ * Note that find_kalloc_start() starts its search at the end of this
+ * allocation.
+ *
+ * This all falls apart horribly on some EFI systems booting under iPXE, where
+ * we end up with boot module allocation such that there is no room between the
+ * highest used address and our 4Gb limit. To that end, we have an iPXE hack
+ * that limits the maximum address used by its allocations in an attempt to give
+ * us room.
  */
 static void
-init_mem_alloc(void)
+init_dboot_alloc(void)
 {
-	DBG_MSG("Entered init_mem_alloc()\n");
+	extern char _end[];
+
+	DBG_MSG("Entered init_dboot_alloc()\n");
+
 	dboot_process_modules();
 	dboot_process_mmap();
-	dboot_multiboot_highest_addr();
+
+	size_t align = FOUR_MEG;
+
+	/*
+	 * We need enough alloc space for the nucleus memory...
+	 */
+	size_t size = RNDUP(ksize, align);
+
+	/*
+	 * And enough page table pages to cover potentially 4Gb. Each leaf PT
+	 * covers 2Mb, so we need a maximum of 2048 pages for those. Next level
+	 * up each covers 1Gb, and so on, so we'll just add a little slop (which
+	 * gets aligned up anyway).
+	 */
+	size += RNDUP(MMU_PAGESIZE * (2048 + 256), align);
+
+	uint64_t start = MAX(dboot_multiboot_highest_addr(),
+	    (paddr_t)(uintptr_t)&_end);
+	start = RNDUP(start, align);
+
+	/*
+	 * As mentioned above, only start our search after all the boot modules.
+	 */
+	for (uint_t i = 0; i < bi->bi_module_cnt; i++) {
+		native_ptr_t mod_end = modules[i].bm_addr + modules[i].bm_size;
+
+		start = MAX(start, RNDUP(mod_end, MMU_PAGESIZE));
+	}
+
+	uint64_t end = start + size;
+
+	DBG(start);
+	DBG(end);
+
+	for (uint_t i = 0; i < memlists_used; i++) {
+		uint64_t ml_start = memlists[i].addr;
+		uint64_t ml_end = memlists[i].addr + memlists[i].size;
+
+		/*
+		 * If we're past our starting point for search, begin at this
+		 * memlist.
+		 */
+		if (start < ml_start) {
+			start = RNDUP(ml_start, align);
+			end = start + size;
+		}
+
+		if (end >= (uint64_t)UINT32_MAX) {
+			dboot_panic("couldn't find alloc space below 4Gb");
+		}
+
+		if (end < ml_end) {
+			alloc_addr = start;
+			alloc_end = end;
+			DBG(alloc_addr);
+			DBG(alloc_end);
+			return;
+		}
+	}
+
+	dboot_panic("couldn't find alloc space in memlists");
 }
 
 static int
@@ -1938,77 +2026,89 @@ print_efi64(EFI_SYSTEM_TABLE64 *efi)
 #endif /* !__xpv */
 
 /*
- * Simple memory allocator, allocates aligned physical memory.
- * Note that startup_kernel() only allocates memory, never frees.
- * Memory usage just grows in an upward direction.
+ * Simple memory allocator for aligned physical memory from the area provided by
+ * init_dboot_alloc().  This is a simple bump allocator, and it's never directly
+ * freed by dboot.
  */
 static void *
-do_mem_alloc(uint32_t size, uint32_t align)
+dboot_alloc(uint32_t size, uint32_t align)
 {
-	uint_t i;
-	uint64_t best;
-	uint64_t start;
-	uint64_t end;
+	uint32_t start = RNDUP(alloc_addr, align);
 
-	/*
-	 * make sure size is a multiple of pagesize
-	 */
 	size = RNDUP(size, MMU_PAGESIZE);
-	next_avail_addr = RNDUP(next_avail_addr, align);
 
-	/*
-	 * XXPV fixme joe
-	 *
-	 * a really large bootarchive that causes you to run out of memory
-	 * may cause this to blow up
-	 */
-	/* LINTED E_UNEXPECTED_UINT_PROMOTION */
-	best = (uint64_t)-size;
-	for (i = 0; i < memlists_used; ++i) {
-		start = memlists[i].addr;
-#if defined(__xpv)
-		start += mfn_base;
-#endif
-		end = start + memlists[i].size;
-
-		/*
-		 * did we find the desired address?
-		 */
-		if (start <= next_avail_addr && next_avail_addr + size <= end) {
-			best = next_avail_addr;
-			goto done;
-		}
-
-		/*
-		 * if not is this address the best so far?
-		 */
-		if (start > next_avail_addr && start < best &&
-		    RNDUP(start, align) + size <= end)
-			best = RNDUP(start, align);
+	if (start + size > alloc_end) {
+		dboot_panic("%s: couldn't allocate 0x%x bytes aligned 0x%x "
+		    "alloc_addr = 0x%llx, alloc_end = 0x%llx", __func__,
+		    size, align, (u_longlong_t)alloc_addr,
+		    (u_longlong_t)alloc_end);
 	}
 
-	/*
-	 * We didn't find exactly the address we wanted, due to going off the
-	 * end of a memory region. Return the best found memory address.
-	 */
-done:
-	next_avail_addr = best + size;
-#if defined(__xpv)
-	if (next_avail_addr > scratch_end)
-		dboot_panic("Out of mem next_avail: 0x%lx, scratch_end: "
-		    "0x%lx", (ulong_t)next_avail_addr,
-		    (ulong_t)scratch_end);
-#endif
-	(void) memset((void *)(uintptr_t)best, 0, size);
-	return ((void *)(uintptr_t)best);
+	alloc_addr = start + size;
+
+	if (map_debug) {
+		dboot_printf("%s(0x%x, 0x%x) = 0x%x\n", __func__, size,
+		    align, start);
+	}
+
+	(void) memset((void *)(uintptr_t)start, 0, size);
+	return ((void *)(uintptr_t)start);
 }
 
-void *
-mem_alloc(uint32_t size)
+static void *
+page_alloc(void)
 {
-	return (do_mem_alloc(size, MMU_PAGESIZE));
+	return (dboot_alloc(MMU_PAGESIZE, MMU_PAGESIZE));
 }
 
+/*
+ * This is where we tell the kernel to start physical allocations from, beyond
+ * the end of our allocation area and all boot modules. It might be beyond 4Gb,
+ * so we can't touch that area ourselves.
+ *
+ * We might set kalloc_start to the end of a memlist; if so make sure we skip it
+ * along to the next one.
+ *
+ * This is making the massive assumption that there is a suitably large area for
+ * kernel allocations past the end of the last boot module and the dboot
+ * allocated region. Worse, we don't have a simple way to assert that is so.
+ */
+static paddr_t
+find_kalloc_start(void)
+{
+	paddr_t kalloc_start = alloc_end;
+	uint_t i;
+
+	for (i = 0; i < bi->bi_module_cnt; i++) {
+		native_ptr_t mod_end = modules[i].bm_addr + modules[i].bm_size;
+
+		kalloc_start = MAX(kalloc_start, RNDUP(mod_end, MMU_PAGESIZE));
+	}
+
+	boot_map_end = kalloc_start;
+	DBG(boot_map_end);
+
+	for (i = 0; i < memlists_used; i++) {
+		uint64_t ml_start = memlists[i].addr;
+		uint64_t ml_end = memlists[i].addr + memlists[i].size;
+
+		if (kalloc_start >= ml_end)
+			continue;
+
+		if (kalloc_start < ml_start)
+			kalloc_start = ml_start;
+		break;
+	}
+
+	if (i == memlists_used) {
+		dboot_panic("fell off the end of memlists finding a "
+		    "kalloc_start value > 0x%llx", (u_longlong_t)kalloc_start);
+	}
+
+	DBG(kalloc_start);
+
+	return (kalloc_start);
+}
 
 /*
  * Build page tables to map all of memory used so far as well as the kernel.
@@ -2031,7 +2131,7 @@ build_page_tables(void)
 #if defined(__xpv)
 	top_page_table = (paddr_t)(uintptr_t)xen_info->pt_base;
 #else /* __xpv */
-	top_page_table = (paddr_t)(uintptr_t)mem_alloc(MMU_PAGESIZE);
+	top_page_table = (paddr_t)(uintptr_t)page_alloc();
 #endif /* __xpv */
 	DBG((uintptr_t)top_page_table);
 
@@ -2057,7 +2157,7 @@ build_page_tables(void)
 	/*
 	 * The kernel will need a 1 page window to work with page tables
 	 */
-	bi->bi_pt_window = (native_ptr_t)(uintptr_t)mem_alloc(MMU_PAGESIZE);
+	bi->bi_pt_window = (native_ptr_t)(uintptr_t)page_alloc();
 	DBG(bi->bi_pt_window);
 	bi->bi_pte_to_pt_window =
 	    (native_ptr_t)(uintptr_t)find_pte(bi->bi_pt_window, NULL, 0, 0);
@@ -2098,6 +2198,10 @@ build_page_tables(void)
 
 #if !defined(__xpv)
 
+	/*
+	 * Map every valid memlist address up until boot_map_end: this will
+	 * cover at least our alloc region and all boot modules.
+	 */
 	for (i = 0; i < memlists_used; ++i) {
 		start = memlists[i].addr;
 		end = start + memlists[i].size;
@@ -2105,11 +2209,11 @@ build_page_tables(void)
 		if (map_debug)
 			dboot_printf("1:1 map pa=%" PRIx64 "..%" PRIx64 "\n",
 			    start, end);
-		while (start < end && start < next_avail_addr) {
+		while (start < end && start < boot_map_end) {
 			map_pa_at_va(start, start, 0);
 			start += MMU_PAGESIZE;
 		}
-		if (start >= next_avail_addr)
+		if (start >= boot_map_end)
 			break;
 	}
 
@@ -2533,7 +2637,7 @@ startup_kernel(void)
 	/*
 	 * initialize the simple memory allocator
 	 */
-	init_mem_alloc();
+	init_dboot_alloc();
 
 #if !defined(__xpv) && !defined(_BOOT_TARGET_amd64)
 	/*
@@ -2587,7 +2691,7 @@ startup_kernel(void)
 	 * For grub, copy kernel bits from the ELF64 file to final place.
 	 */
 	DBG_MSG("\nAllocating nucleus pages.\n");
-	ktext_phys = (uintptr_t)do_mem_alloc(ksize, FOUR_MEG);
+	ktext_phys = (uintptr_t)dboot_alloc(ksize, FOUR_MEG);
 
 	if (ktext_phys == 0)
 		dboot_panic("failed to allocate aligned kernel memory");
@@ -2597,6 +2701,8 @@ startup_kernel(void)
 #endif
 
 	DBG(ktext_phys);
+
+	paddr_t kalloc_start = find_kalloc_start();
 
 	/*
 	 * Allocate page tables.
@@ -2615,18 +2721,18 @@ startup_kernel(void)
 
 #if defined(__xpv)
 
-	bi->bi_next_paddr = next_avail_addr - mfn_base;
+	bi->bi_next_paddr = kalloc_start - mfn_base;
 	DBG(bi->bi_next_paddr);
-	bi->bi_next_vaddr = (native_ptr_t)(uintptr_t)next_avail_addr;
+	bi->bi_next_vaddr = (native_ptr_t)kalloc_start;
 	DBG(bi->bi_next_vaddr);
 
 	/*
 	 * unmap unused pages in start area to make them available for DMA
 	 */
-	while (next_avail_addr < scratch_end) {
-		(void) HYPERVISOR_update_va_mapping(next_avail_addr,
+	while (alloc_addr < alloc_end) {
+		(void) HYPERVISOR_update_va_mapping(alloc_addr,
 		    0, UVMF_INVLPG | UVMF_LOCAL);
-		next_avail_addr += MMU_PAGESIZE;
+		alloc_addr += MMU_PAGESIZE;
 	}
 
 	bi->bi_xen_start_info = (native_ptr_t)(uintptr_t)xen_info;
@@ -2636,9 +2742,9 @@ startup_kernel(void)
 
 #else /* __xpv */
 
-	bi->bi_next_paddr = next_avail_addr;
+	bi->bi_next_paddr = kalloc_start;
 	DBG(bi->bi_next_paddr);
-	bi->bi_next_vaddr = (native_ptr_t)(uintptr_t)next_avail_addr;
+	bi->bi_next_vaddr = (native_ptr_t)kalloc_start;
 	DBG(bi->bi_next_vaddr);
 	bi->bi_mb_version = multiboot_version;
 

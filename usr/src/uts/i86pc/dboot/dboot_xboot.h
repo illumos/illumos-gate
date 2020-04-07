@@ -22,12 +22,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef	_DBOOT_XBOOT_H
 #define	_DBOOT_XBOOT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mach_mmu.h>
 
@@ -54,16 +54,14 @@ extern uint_t prom_debug;
 
 #define	DBG_MSG(s)	do { if (prom_debug)	\
 	dboot_printf(s);			\
-	_NOTE(CONSTANTCONDITION)		\
 	} while (0)
 
-#define	DBG(x)	do { if (prom_debug) {					\
-	dboot_printf("%s is 0x%" PRIx64 "\n", #x, (uint64_t)(x));	\
-	_NOTE(CONSTANTCONDITION)					\
+#define	DBG(x)	do { if (prom_debug) {			\
+	dboot_printf("%s: %s is 0x%" PRIx64 "\n",	\
+	    __func__, #x, (uint64_t)(x));		\
 	} } while (0)
 
-extern void dboot_halt(void);
-extern void *mem_alloc(uint32_t size);
+extern void dboot_halt(void) __NORETURN;
 
 #define	RNDUP(x, y)	((x) + ((y) - 1ul) & ~((y) - 1ul))
 
