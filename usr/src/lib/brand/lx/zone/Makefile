@@ -21,13 +21,14 @@
 
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 # Copyright 2017 ASS-Einrichtungssysteme GmbH, Inc.  All rights reserved.
 #
 
 PROGS =	lx_boot lx_install lx_uninstall prestate poststate statechange
 PROGS += lx_boot_zone_redhat lx_boot_zone_ubuntu lx_boot_zone_debian
 PROGS += lx_boot_zone_busybox lx_boot_zone_suse lx_boot_zone_docker
+PROGS += lx_boot_zone_void
 XMLDOCS =	config.xml platform.xml
 TEMPLATES =	SUNWlx.xml SUNWlx26.xml
 
