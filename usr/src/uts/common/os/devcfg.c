@@ -255,7 +255,7 @@ i_ddi_node_cache_init()
  * The allocated node has a reference count of 0.
  */
 dev_info_t *
-i_ddi_alloc_node(dev_info_t *pdip, char *node_name, pnode_t nodeid,
+i_ddi_alloc_node(dev_info_t *pdip, const char *node_name, pnode_t nodeid,
     int instance, ddi_prop_t *sys_prop, int flag)
 {
 	struct dev_info *devi;
@@ -2046,7 +2046,7 @@ ndi_devi_tryenter(dev_info_t *dip, int *circular)
  * not allowed to sleep.
  */
 int
-ndi_devi_alloc(dev_info_t *parent, char *node_name, pnode_t nodeid,
+ndi_devi_alloc(dev_info_t *parent, const char *node_name, pnode_t nodeid,
     dev_info_t **ret_dip)
 {
 	ASSERT(node_name != NULL);
@@ -2066,7 +2066,7 @@ ndi_devi_alloc(dev_info_t *parent, char *node_name, pnode_t nodeid,
  * This routine may sleep and should not be called at interrupt time
  */
 void
-ndi_devi_alloc_sleep(dev_info_t *parent, char *node_name, pnode_t nodeid,
+ndi_devi_alloc_sleep(dev_info_t *parent, const char *node_name, pnode_t nodeid,
     dev_info_t **ret_dip)
 {
 	ASSERT(node_name != NULL);
@@ -2536,7 +2536,7 @@ i_ddi_get_exported_classes(dev_info_t *dip, char ***classes)
  * Helper functions, returns NULL if no memory.
  */
 char *
-i_ddi_strdup(char *str, uint_t flag)
+i_ddi_strdup(const char *str, uint_t flag)
 {
 	char *copy;
 

@@ -274,7 +274,7 @@ extern int exclude_level(int);
 
 extern major_t path_to_major(char *);
 extern void i_ddi_node_cache_init(void);
-extern dev_info_t *i_ddi_alloc_node(dev_info_t *, char *, pnode_t, int,
+extern dev_info_t *i_ddi_alloc_node(dev_info_t *, const char *, pnode_t, int,
     ddi_prop_t *, int);
 extern void i_ddi_forceattach_drivers(void);
 extern int i_ddi_io_initialized(void);
