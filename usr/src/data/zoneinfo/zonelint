@@ -1,0 +1,72 @@
+#!/bin/ksh
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source. A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+
+f=zone_sun.tab
+proto=$ROOT/usr/share/lib/zoneinfo
+
+if [[ ! -f "$f" ]]; then
+	echo "Run from inside usr/src/data/zoneinfo"
+	exit 1
+fi
+
+if [[ ! -d "$proto" ]]; then
+	echo "No zoneinfo in $proto - run 'dmake install'"
+	exit 1
+fi
+
+# First check that all of the referenced zone files exist in the proto
+# area.
+
+nawk -F'\t' '
+	/^#/ { next }
+	{
+		print $3
+		if ($4 != "-")
+			print $4
+	}
+' $f | while read zone; do
+	if [ ! -f $proto/$zone ]; then
+		echo "Missing: $zone"
+	fi
+done
+
+# Check that lines have between 3 and 5 fields
+
+nawk -F'\t' '
+	/^#/ { next }
+	NF < 3 || NF > 5 { print NF, $0 }
+' $f | while read line; do
+	echo "Fields: $line"
+done
+
+# Check that field 5 does not point to a zone file. This could indicate a
+# field in the wrong position.
+
+nawk -F'\t' '
+	/^#/ { next }
+	NF > 4 { print $5 }
+' $f | while read zone; do
+	if [ -f "$proto/$zone" ]; then
+		echo "Check: $zone"
+	fi
+done
+
+# Check that the file is properly sorted
+
+of=`mktemp`
+nf=`mktemp`
+nawk '/^#/ { next } { print $1 }' $f > $of
+sort < $of > $nf
+cmp -s $of $nf || echo "Bad sorting"
+rm -f $of $nf
+
