@@ -1537,13 +1537,23 @@ dld_capab_lso(dld_str_t *dsp, void *data, uint_t flags)
 		 * accordingly.
 		 */
 		if (mac_capab_get(dsp->ds_mh, MAC_CAPAB_LSO, &mac_lso)) {
-			lso->lso_max = mac_lso.lso_basic_tcp_ipv4.lso_max;
+			lso->lso_max_tcpv4 = mac_lso.lso_basic_tcp_ipv4.lso_max;
+			lso->lso_max_tcpv6 = mac_lso.lso_basic_tcp_ipv6.lso_max;
 			lso->lso_flags = 0;
 			/* translate the flag for mac clients */
 			if ((mac_lso.lso_flags & LSO_TX_BASIC_TCP_IPV4) != 0)
 				lso->lso_flags |= DLD_LSO_BASIC_TCP_IPV4;
-			dsp->ds_lso = B_TRUE;
-			dsp->ds_lso_max = lso->lso_max;
+			if ((mac_lso.lso_flags & LSO_TX_BASIC_TCP_IPV6) != 0)
+				lso->lso_flags |= DLD_LSO_BASIC_TCP_IPV6;
+			dsp->ds_lso = lso->lso_flags != 0;
+			/*
+			 * DLS uses this to try and make sure that a raw ioctl
+			 * doesn't send too much data, but doesn't currently
+			 * check the actual SAP that is sending this (or that
+			 * it's TCP). So for now, just use the max value here.
+			 */
+			dsp->ds_lso_max = MAX(lso->lso_max_tcpv4,
+			    lso->lso_max_tcpv6);
 		} else {
 			dsp->ds_lso = B_FALSE;
 			dsp->ds_lso_max = 0;
@@ -1581,10 +1591,18 @@ dld_capab(dld_str_t *dsp, uint_t type, void *data, uint_t flags)
 
 	switch (type) {
 	case DLD_CAPAB_DIRECT:
+		if (dsp->ds_sap == ETHERTYPE_IPV6) {
+			err = ENOTSUP;
+			break;
+		}
 		err = dld_capab_direct(dsp, data, flags);
 		break;
 
 	case DLD_CAPAB_POLL:
+		if (dsp->ds_sap == ETHERTYPE_IPV6) {
+			err = ENOTSUP;
+			break;
+		}
 		err =  dld_capab_poll(dsp, data, flags);
 		break;
 

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ctype.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -230,7 +228,7 @@ typedef struct CMN_MSG_T cmn_msg_t;
 struct CMN_MSG_T {
 	char		buf[CMN_MSG_SIZE];
 	int		level;
-	int 		len;
+	int		len;
 	cmn_msg_t	*prev;
 	cmn_msg_t	*next;
 };
@@ -243,7 +241,7 @@ struct CMN_FMT_T {
 	char	format; /* format type */
 };
 
-static cmn_msg_t 	*root = NULL;
+static cmn_msg_t	*root = NULL;
 static int		cmn_msg_level = 0;
 
 /*
@@ -271,7 +269,7 @@ static int		cmn_msg_level = 0;
  * For valid formatting, caller's supplied cmn_fmt_t elements are
  * filled in:
  *	fwidth:
- * 		> 0 - returned value is the field width
+ *		> 0 - returned value is the field width
  *		< 0 - returned value is negation of field width for
  *			64 bit data formats
  *	cwidth:
@@ -296,7 +294,7 @@ validfmt(char *fmt, cmn_fmt_t *cfstr)
 	cwidth = &cfstr->cwidth;
 	format = &cfstr->format;
 	*fwidth = *cwidth = 0;
-	*format = NULL;
+	*format = '\0';
 	dig1 = dig2 = NULL;
 
 	/* check for left justification character */
@@ -361,7 +359,7 @@ validfmt(char *fmt, cmn_fmt_t *cfstr)
 		(*fwidth)++;
 		break;
 	case 'p':
-		isll = 1; 		/* uses 64 bit format */
+		isll = 1;		/* uses 64 bit format */
 		*format = *fmt;
 		(*fwidth)++;
 		break;
@@ -392,7 +390,7 @@ validfmt(char *fmt, cmn_fmt_t *cfstr)
 
 static void
 fmt_args(fcode_env_t *env, int cw, int fw, char format, long *arg,
-	long long *llarg)
+    long long *llarg)
 {
 	char	*cbuf;
 	char	snf[3];
@@ -423,8 +421,8 @@ fmt_args(fcode_env_t *env, int cw, int fw, char format, long *arg,
 			return;
 		default:
 			log_message(MSG_ERROR,
-				"fmt_args:invalid format type! (%s)\n",
-					&format);
+			    "fmt_args:invalid format type! (%s)\n",
+			    &format);
 			return;
 		}
 
@@ -436,9 +434,9 @@ fmt_args(fcode_env_t *env, int cw, int fw, char format, long *arg,
 
 			if (snprintf(cbuf, cbsize, snf, *arg) < 0)
 				log_message(MSG_ERROR,
-					"fmt_args: snprintf output error\n");
-			while ((cbuf[ndigits] != NULL) &&
-				(ndigits < cbsize))
+				    "fmt_args: snprintf output error\n");
+			while ((cbuf[ndigits] != '\0') &&
+			    (ndigits < cbsize))
 				ndigits++;
 
 			/* if truncation is necessary, do it */
@@ -449,8 +447,7 @@ fmt_args(fcode_env_t *env, int cw, int fw, char format, long *arg,
 					str = (char *)*arg;
 					str[cw] = 0;
 				} else
-					*arg = strtol(cbuf,
-						(char **)NULL, cnv);
+					*arg = strtol(cbuf, (char **)NULL, cnv);
 			}
 			free(cbuf);
 		}
@@ -470,7 +467,7 @@ fmt_args(fcode_env_t *env, int cw, int fw, char format, long *arg,
 				cnv = 16;
 				if (snprintf(cbuf, cbsize, "%p", *llarg) < 0)
 					log_message(MSG_ERROR,
-						"fmt_args: snprintf error\n");
+					    "fmt_args: snprintf error\n");
 				break;
 			case 'x':
 				cnv = 16;
@@ -481,17 +478,17 @@ fmt_args(fcode_env_t *env, int cw, int fw, char format, long *arg,
 			case 'd':
 				if (snprintf(cbuf, cbsize, "%ld", *llarg) < 0)
 					log_message(MSG_ERROR,
-						"fmt_args: snprintf error\n");
+					    "fmt_args: snprintf error\n");
 				break;
 			default:
 				log_message(MSG_ERROR,
 				    "invalid long format type! (l%s)\n",
-						&format);
+				    &format);
 				free(cbuf);
 				return;
 			}
-			while ((cbuf[ndigits] != NULL) &&
-				(ndigits < cbsize)) {
+			while ((cbuf[ndigits] != '\0') &&
+			    (ndigits < cbsize)) {
 				ndigits++;
 			}
 			/* if truncation is necessary, do it */
@@ -561,8 +558,8 @@ fmt_str(fcode_env_t *env, char *fmt, char *fmtbuf, int bsize)
 			tbuf[bytes] = 0;
 
 			log_message(MSG_ERROR,
-				"fmt_str: invalid format type! (%s)\n",
-				tbuf+bytes-3);
+			    "fmt_str: invalid format type! (%s)\n",
+			    tbuf+bytes-3);
 
 			strncpy(fmtbuf, tbuf, bsize);
 			return;
@@ -589,8 +586,8 @@ fmt_str(fcode_env_t *env, char *fmt, char *fmtbuf, int bsize)
 
 		/* if more input buffer to process, recurse */
 		if ((l - abs(fw)) != 0) {
-		    fmt_str(env, pct+abs(fw), (tbuf + strlen(tbuf)),
-				CMN_MSG_SIZE - strlen(tbuf));
+			fmt_str(env, pct+abs(fw), (tbuf + strlen(tbuf)),
+			    CMN_MSG_SIZE - strlen(tbuf));
 		}
 
 		/* call to extract args for snprintf() calls below */
@@ -611,7 +608,7 @@ fmt_str(fcode_env_t *env, char *fmt, char *fmtbuf, int bsize)
 			default:
 				log_message(MSG_ERROR,
 				    "fmt_str: invalid format (%s)\n",
-					fmptr);
+				    fmptr);
 				return;
 			}
 
@@ -642,7 +639,7 @@ fc_cmn_append(fcode_env_t *env)
 
 	if (root == NULL) {
 		log_message(MSG_ERROR,
-			"fc_cmn_append: no message context for append\n");
+		    "fc_cmn_append: no message context for append\n");
 		return;
 	}
 
@@ -651,11 +648,11 @@ fc_cmn_append(fcode_env_t *env)
 
 	if ((root->len + len) < CMN_MSG_SIZE) {
 		fmt_str(env, str, root->buf+root->len, CMN_MSG_SIZE -
-			root->len);
+		    root->len);
 		root->len += len;
 	} else
 		log_message(MSG_ERROR,
-			"fc_cmn_append: append exceeds max msg size\n");
+		    "fc_cmn_append: append exceeds max msg size\n");
 }
 
 /*

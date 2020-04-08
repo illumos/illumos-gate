@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -116,7 +114,7 @@ delete_mapping(fstack_t mcookie)
 		}
 	}
 	log_message(MSG_WARN, "Warning: delete_mapping: invalid"
-		" mcookie: %llx\n", (uint64_t)mcookie);
+	    " mcookie: %llx\n", (uint64_t)mcookie);
 }
 
 int
@@ -209,7 +207,7 @@ add_map(fcode_env_t *env)
 
 	size = POP(DS);
 	addr = POP(DS);
-	addr = mapping_to_mcookie(addr, size, NULL, NULL);
+	addr = mapping_to_mcookie(addr, size, 0, 0);
 	PUSH(DS, addr);
 }
 

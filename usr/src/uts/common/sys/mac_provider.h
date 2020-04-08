@@ -120,10 +120,15 @@ typedef struct lso_basic_tcp_ipv4_s {
 	t_uscalar_t	lso_max;		/* maximum payload */
 } lso_basic_tcp_ipv4_t;
 
+typedef struct lso_basic_tcp_ipv6_s {
+	t_uscalar_t	lso_max;		/* maximum payload */
+} lso_basic_tcp_ipv6_t;
+
 /*
  * Currently supported flags for LSO.
  */
-#define	LSO_TX_BASIC_TCP_IPV4	0x01		/* TCP LSO capability */
+#define	LSO_TX_BASIC_TCP_IPV4	0x01		/* TCPv4 LSO capability */
+#define	LSO_TX_BASIC_TCP_IPV6	0x02		/* TCPv6 LSO capability */
 
 /*
  * Future LSO capabilities can be added at the end of the mac_capab_lso_t.
@@ -136,6 +141,7 @@ typedef struct lso_basic_tcp_ipv4_s {
 typedef	struct mac_capab_lso_s {
 	t_uscalar_t		lso_flags;
 	lso_basic_tcp_ipv4_t	lso_basic_tcp_ipv4;
+	lso_basic_tcp_ipv6_t	lso_basic_tcp_ipv6;
 	/* Add future lso capabilities here */
 } mac_capab_lso_t;
 
@@ -646,6 +652,31 @@ extern void			mac_transceiver_info_set_present(
 extern void			mac_transceiver_info_set_usable(
 				    mac_transceiver_info_t *,
 				    boolean_t);
+
+/*
+ * This represents a provisional set of currently illumos-private APIs to get
+ * information about a mblk_t chain's type. This is an evolving interface.
+ */
+typedef enum mac_ether_offload_flags {
+	MEOI_L2INFO_SET		= 1 << 0,
+	MEOI_VLAN_TAGGED	= 1 << 1,
+	MEOI_L3INFO_SET		= 1 << 2,
+	MEOI_L4INFO_SET		= 1 << 3
+} mac_ether_offload_flags_t;
+
+typedef struct mac_ether_offload_info {
+	mac_ether_offload_flags_t	meoi_flags;	/* What's valid? */
+	size_t		meoi_len;	/* Total message length */
+	uint8_t		meoi_l2hlen;	/* How long is the Ethernet header? */
+	uint16_t	meoi_l3proto;	/* What's the Ethertype */
+	uint8_t		meoi_l3hlen;	/* How long is the header? */
+	uint8_t		meoi_l4proto;	/* What is the payload type? */
+	uint8_t		meoi_l4hlen;	/* How long is the L4 header */
+} mac_ether_offload_info_t;
+
+extern int			mac_ether_offload_info(mblk_t *,
+				    mac_ether_offload_info_t *);
+
 
 #endif	/* _KERNEL */
 

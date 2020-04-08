@@ -673,7 +673,8 @@ ip_verify_lso(ill_t *ill, ip_xmit_attr_t *ixa)
 		/*
 		 * Capability has changed, refresh the copy in ixa.
 		 */
-		if (lsoc->ill_lso_max != new_lsoc->ill_lso_max) {
+		if (lsoc->ill_lso_max_tcpv4 != new_lsoc->ill_lso_max_tcpv4 ||
+		    lsoc->ill_lso_max_tcpv6 != new_lsoc->ill_lso_max_tcpv6) {
 			*lsoc = *new_lsoc;
 
 			return (B_FALSE);

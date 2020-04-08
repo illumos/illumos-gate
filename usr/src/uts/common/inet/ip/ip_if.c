@@ -2112,7 +2112,7 @@ ill_capability_lso_enable(ill_t *ill)
 	dld_capab_lso_t	lso;
 	int rc;
 
-	ASSERT(!ill->ill_isv6 && IAM_WRITER_ILL(ill));
+	ASSERT(IAM_WRITER_ILL(ill));
 
 	if (ill->ill_lso_capab == NULL) {
 		ill->ill_lso_capab = kmem_zalloc(sizeof (ill_lso_capab_t),
@@ -2129,7 +2129,8 @@ ill_capability_lso_enable(ill_t *ill)
 	if ((rc = idc->idc_capab_df(idc->idc_capab_dh, DLD_CAPAB_LSO, &lso,
 	    DLD_ENABLE)) == 0) {
 		ill->ill_lso_capab->ill_lso_flags = lso.lso_flags;
-		ill->ill_lso_capab->ill_lso_max = lso.lso_max;
+		ill->ill_lso_capab->ill_lso_max_tcpv4 = lso.lso_max_tcpv4;
+		ill->ill_lso_capab->ill_lso_max_tcpv6 = lso.lso_max_tcpv6;
 		ill->ill_capabilities |= ILL_CAPAB_LSO;
 		ip1dbg(("ill_capability_lso_enable: interface %s "
 		    "has enabled LSO\n ", ill->ill_name));
@@ -2194,11 +2195,10 @@ ill_capability_dld_enable(ill_t *ill)
 	if (!ill->ill_isv6) {
 		ill_capability_direct_enable(ill);
 		ill_capability_poll_enable(ill);
-		ill_capability_lso_enable(ill);
 	}
 
 	ill_capability_ipcheck_enable(ill);
-
+	ill_capability_lso_enable(ill);
 	ill->ill_capabilities |= ILL_CAPAB_DLD;
 	ill_mac_perim_exit(ill, mph);
 }

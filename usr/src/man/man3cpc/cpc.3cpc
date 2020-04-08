@@ -3,7 +3,7 @@
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright (c) 2019, Joyent, Inc.
-.Dd March 25, 2019
+.Dd March 27, 2020
 .Dt CPC 3CPC
 .Os
 .Sh NAME
@@ -131,8 +131,11 @@ The following manual pages provide more detailed information on the
 events available for the specific AMD processor models.
 The covered processor families are listed in hexadecimal.
 .Bl -tag -width Xr
-.It Xr amd_f17h_events 3CPC
-AMD Family 17h processors, including models 00-2fh.
+.It Xr amd_f17h_zen1_events 3CPC
+AMD Family 17h Zen 1 processors, including models 00-2fh.
+Include Ryzen, ThreadRipper, and EPYC branded processors.
+.It Xr amd_f17h_zen2_events 3CPC
+AMD Family 17h Zen 2 processors, including models 30-7fh.
 Include Ryzen, ThreadRipper, and EPYC branded processors.
 .El
 .Ss Using Attributes

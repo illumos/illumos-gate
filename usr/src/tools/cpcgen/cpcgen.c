@@ -332,11 +332,11 @@ static const char *cpcgen_manual_amd_header = ""
 ".Os\n"
 ".Sh NAME\n"
 ".Nm amd_%s_events\n"
-".Nd AMD family %s processor performance monitoring events\n"
+".Nd AMD Family %s processor performance monitoring events\n"
 ".Sh DESCRIPTION\n"
-"This manual page describes events specfic to AMD family %s processors.\n"
+"This manual page describes events specfic to AMD Family %s processors.\n"
 "For more information, please consult the appropriate AMD BIOS and Kernel\n"
-"Developer's guide or Open-Source Register Reference manual.\n"
+"Developer's guide or Open-Source Register Reference.\n"
 ".Pp\n"
 "Each of the events listed below includes the AMD mnemonic which matches\n"
 "the name found in the AMD manual and a brief summary of the event.\n"
@@ -630,7 +630,7 @@ cpcgen_determine_vendor(const char *datadir)
  * Read in all the data files that exist for AMD.
  *
  * Our family names for AMD systems are based on the family and type so a given
- * name will look like f17h_core.json.
+ * name will look like f17h_<core>_core.json.
  */
 static void
 cpcgen_read_amd(const char *datadir, const char *platform)
@@ -660,16 +660,26 @@ cpcgen_read_amd(const char *datadir, const char *platform)
 			continue;
 		}
 
+		/*
+		 * Chop off the .json. Next, make sure we have both _ present.
+		 */
 		if (*(c + slen) != '\0') {
 			free(name);
 			continue;
 		}
-
 		*c = '\0';
+
 		c = strchr(name, '_');
 		if (c == NULL) {
-			free(name);
-			continue;
+			errx(EXIT_FAILURE, "unexpected AMD JSON file name: %s",
+			    d->d_name);
+		}
+
+		c++;
+		c = strchr(c, '_');
+		if (c == NULL) {
+			errx(EXIT_FAILURE, "unexpected AMD JSON file name: %s",
+			    d->d_name);
 		}
 		*c = '\0';
 		c++;
@@ -1408,11 +1418,16 @@ static boolean_t
 cpcgen_manual_amd_file_before(FILE *f, cpc_map_t *map)
 {
 	size_t i;
-	char *upper;
-	const char *family;
+	char *upper, *desc, *c;
 
 	if ((upper = strdup(map->cmap_name)) == NULL) {
 		warn("failed to duplicate manual name for %s", map->cmap_name);
+		return (B_FALSE);
+	}
+
+	if ((desc = strdup(map->cmap_name)) == NULL) {
+		warn("failed to duplicate manual name for %s", map->cmap_name);
+		free(upper);
 		return (B_FALSE);
 	}
 
@@ -1420,17 +1435,25 @@ cpcgen_manual_amd_file_before(FILE *f, cpc_map_t *map)
 		upper[i] = toupper(upper[i]);
 	}
 
-	family = map->cmap_name + 1;
+	desc++;
+	c = strchr(desc, '_');
+	if (c != NULL) {
+		*c = ' ';
+		c++;
+		*c = toupper(*c);
+	}
 
 	if (fprintf(f, cpcgen_manual_amd_header, map->cmap_path, upper,
-	    family, family, family) == -1) {
+	    map->cmap_name, desc, desc) == -1) {
 		warn("failed to write out manual header for %s",
 		    map->cmap_name);
 		free(upper);
+		free(desc);
 		return (B_FALSE);
 	}
 
 	free(upper);
+	free(desc);
 	return (B_TRUE);
 }
 

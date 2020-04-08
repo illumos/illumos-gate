@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -129,7 +127,7 @@ os_get_prop(fcode_env_t *env, int inherit, device_t *dev)
 	name = pop_a_string(env, &len);
 
 	node = pd->node;
-	if (node == NULL) {
+	if (node == 0) {
 		log_message(MSG_ERROR, "os_get_prop: NULL node: %s\n",
 		    get_path(env, dev));
 		PUSH(DS, TRUE);

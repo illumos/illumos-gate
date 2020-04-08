@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -40,7 +38,7 @@ mem_map_in(fcode_env_t *env, fstack_t hi, fstack_t lo, fstack_t len)
 {
 	private_data_t *pdp = DEVICE_PRIVATE(env);
 	fc_cell_t virt;
-	fstack_t mcookie = NULL;
+	fstack_t mcookie = 0;
 	char *service = "map-in";
 	int error;
 	int offset = 0;
@@ -60,9 +58,9 @@ mem_map_in(fcode_env_t *env, fstack_t hi, fstack_t lo, fstack_t len)
 	if (error)
 		throw_from_fclib(env, 1, "gp2:%s: failed\n", service);
 
-	mcookie = mapping_to_mcookie(virt, len, NULL, NULL);
+	mcookie = mapping_to_mcookie(virt, len, 0, 0);
 
-	if (mcookie == NULL)
+	if (mcookie == 0)
 		throw_from_fclib(env, 1, "gp2:%s: mapping_to_mcookie failed\n",
 		    service);
 
@@ -294,7 +292,7 @@ do_device_id(fcode_env_t *env)
 
 	/* Try to read the wci_id register */
 	rc = fc_run_priv(pdp->common, "rx@", 1, 1, virtaddr + 0xe0,
-		    &wci_id_reg);
+	    &wci_id_reg);
 
 	mem_map_out(env, addr, 0x100);
 

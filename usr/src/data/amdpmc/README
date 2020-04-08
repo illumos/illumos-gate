@@ -7,5 +7,9 @@ that are used to implement the kernel performance monitoring interfaces.
 For more information, see the cpcgen tool. This data is derived from the
 following documents:
 
-FAMILY	DOCUMENT
-17h	OSRR for AMD Family 17h processors, Models 00h-2Fh (56255 Rev 3.03 - July, 2018)
+FAMILY	CORE	DOCUMENT
+17h	Zen 1	OSRR for AMD Family 17h processors, Models 00h-2Fh (56255 Rev 3.03 - July, 2018)
+17h	Zen 2	Preliminary Processor Programming Reference (PPR) for AMD Family 17h
+			Model 31h, Revision B0 Processors (55803 Rev 0.54 - Sep 12, 2019)
+		Processor Programming Reference (PPR) for AMD Family 17h
+			Model 71h, Revision B0 Processors (56176 Rev 3.06 - Jul 17, 2019)

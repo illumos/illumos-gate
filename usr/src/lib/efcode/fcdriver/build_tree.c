@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -47,7 +45,7 @@ fc_nodeop(common_data_t *cdp, fc_phandle_t node, char *svc)
 
 	error = fc_run_priv(cdp, svc, 1, 1, fc_phandle2cell(node), &hcell);
 	if (error)
-		return (NULL);
+		return (0);
 	return (fc_cell2phandle(hcell));
 }
 
@@ -85,7 +83,7 @@ get_prom_nodeid(fcode_env_t *env, device_t *d)
 	name = get_package_name(env, d);
 	debug_msg(DEBUG_UPLOAD, "Node %s: %p (%p)\n", name, d, pd);
 	if (d->parent) {
-		private_data_t *ppd = (private_data_t *) d->parent->private;
+		private_data_t *ppd = (private_data_t *)d->parent->private;
 		fc_phandle_t thisnode;
 
 		if (os_get_prop_common(cdp, ppd->node, "name",
@@ -94,7 +92,7 @@ get_prom_nodeid(fcode_env_t *env, device_t *d)
 		debug_msg(DEBUG_UPLOAD, "Parent: %p (%p) %s = %p\n", d->parent,
 		    ppd, namebuf, ppd->node);
 		for (thisnode = fc_nodeop(cdp, ppd->node, FC_CHILD_FCODE);
-		    thisnode != NULL;
+		    thisnode != 0;
 		    thisnode = fc_nodeop(cdp, thisnode, FC_PEER_FCODE)) {
 			int status;
 

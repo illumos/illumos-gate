@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -1471,14 +1471,6 @@ hotinline_smap(hotinline_desc_t *hid)
 {
 	if (is_x86_feature(x86_featureset, X86FSET_SMAP) == B_FALSE)
 		return;
-
-/*
- * We should never hit this since SMAP feature detection is behind
- * an AMD64 header guard.
- */
-#if defined(__i386)
-	panic("illumos only suppports SMAP on the AMD64 architecture.");
-#endif
 
 	if (strcmp(hid->hid_symname, "smap_enable") == 0) {
 		bcopy(clac_instr, (void *)hid->hid_instr_offset,

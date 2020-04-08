@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -81,7 +79,7 @@ fc_get_request(common_data_t *cdp)
 		return (0);
 	}
 
-	if ((cdp->attach = fc_get_ap(cdp)) == NULL)
+	if ((cdp->attach = fc_get_ap(cdp)) == 0)
 		return (0);
 
 	return (1);
@@ -355,7 +353,7 @@ get_efdaemon_request(fcode_env_t *env)
 		exit(1);
 	}
 
-	if ((cdp->attach = fc_get_ap(cdp)) == NULL)
+	if ((cdp->attach = fc_get_ap(cdp)) == 0)
 		exit(1);
 
 	get_my_args(env);

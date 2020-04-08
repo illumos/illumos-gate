@@ -446,7 +446,8 @@ typedef struct dld_capab_poll_s {
 
 typedef struct dld_capab_lso_s {
 	uint_t  lso_flags;	/* capability flags */
-	uint_t  lso_max;	/* maximum payload */
+	uint_t  lso_max_tcpv4;	/* maximum TCPv4 payload */
+	uint_t  lso_max_tcpv6;	/* maximum TCPv6 payload */
 } dld_capab_lso_t;
 
 int	dld_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
