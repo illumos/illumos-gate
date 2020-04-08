@@ -81,7 +81,6 @@ SUBDIRS +=				\
 	gss_mechs/mech_dummy	\
 	gss_mechs/mech_krb5	\
 	gss_mechs/mech_spnego	\
-	hal		\
 	hbaapi		\
 	iconv_modules	\
 	krb5		\
@@ -254,7 +253,6 @@ SUBDIRS +=				\
 	pam_modules	\
 	passwdutil	\
 	pkcs11		\
-	policykit	\
 	print		\
 	pylibbe		\
 	pysolaris	\
@@ -366,7 +364,6 @@ HDRSUBDIRS=				\
 	../cmd/sendmail/libmilter	\
 	auditd_plugins	\
 	fm		\
-	hal		\
 	hbaapi		\
 	libads		\
 	libast		\
@@ -486,7 +483,6 @@ HDRSUBDIRS=				\
 	mpapi		\
 	passwdutil	\
 	pkcs11		\
-	policykit	\
 	scsi		\
 	smbsrv		\
 	smhba		\
@@ -579,7 +575,6 @@ gss_mechs/mech_dh: libgss
 gss_mechs/mech_dummy: libgss
 gss_mechs/mech_krb5: libgss libresolv2 pkcs11 libkstat
 gss_mechs/mech_spnego: gss_mechs/mech_krb5
-hal:		dbusdeps
 krb5:		gss_mechs/mech_krb5 libtecla libldap5
 libadt_jni:	libbsm
 libadutils:	libldap5 libresolv2
@@ -683,7 +678,6 @@ nsswitch:	libadutils libidmap libdns_sd libscf libldap5 libsldap
 pam_modules:	libproject passwdutil smbsrv libtsnet libpam libbsm libsecdb
 passwdutil:	libsldap
 pkcs11:		libcryptoutil libgen libuuid
-policykit:	dbusdeps
 print:		libldap5 libmd5 libsendfile
 pylibbe:	libbe libzfs
 pysolaris:	libsec libidmap

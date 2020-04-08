@@ -2,12 +2,16 @@
 #define MANDOC_CONFIG_H
 
 #include <sys/types.h>
+#include <fcntl.h> /* XXX so that O_DIRECTORY is already defined */
 
 #define MAN_CONF_FILE "/etc/man.conf"
 #define MANPATH_BASE "/usr/share/man"
 #define MANPATH_DEFAULT "/usr/share/man:/usr/gnu/share/man"
 #define UTF8_LOCALE "en_US.UTF-8"
 #define EFTYPE EINVAL
+#ifdef O_DIRECTORY
+#undef O_DIRECTORY
+#endif
 #define O_DIRECTORY 0
 #define HAVE_CMSG_XPG42 0
 #define HAVE_DIRENT_NAMLEN 0
