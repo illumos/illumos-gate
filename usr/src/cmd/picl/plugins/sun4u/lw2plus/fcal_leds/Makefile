@@ -65,8 +65,7 @@ LDLIBS +=	-L$(SRC)/cmd/picl/plugins/common/devtree
 LDLIBS +=	-L$(SRC)/cmd/picl/plugins/common/piclevent
 LDLIBS +=	-L$(SRC)/cmd/picl/plugins/common/frutree
 LDLIBS +=	-L$(SRC)/cmd/picl/plugins/common/memcfg
-LDLIBS +=	-lpicltree -lpicldevtree -lpiclfrutree -lnvpair
-LDLIBS +=	-ldevinfo -lc
+LDLIBS +=	-lpicltree -ldevinfo -lc
 
 .KEEP_STATE:
 

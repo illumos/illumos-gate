@@ -67,7 +67,7 @@ LDLIBS +=	-L$(SRC)/lib/libpicl/$(MACH) -L$(SRC)/lib/libpicltree/$(MACH)
 LDLIBS +=	-L$(ROOT)/usr/lib/picl/plugins -L$(ROOT)/usr/lib/sparcv9
 DYNFLAGS +=	-R$(DYNFLAGS_COM)
 
-LDLIBS +=	-lc -lpicltree -ldevinfo -lpicldevtree -lcfgadm -lnvpair
+LDLIBS +=	-lc -lpicltree -ldevinfo -lcfgadm -lnvpair
 
 .KEEP_STATE:
 

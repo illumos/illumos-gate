@@ -57,7 +57,7 @@ LDLIBS +=	-L$(SRC)/cmd/picl/plugins/sun4u/psvc/psvcplugin
 DYNFLAGS +=	-R$(DYNFLAGS_PLAT):$(DYNFLAGS_SUN4U):$(DYNFLAGS_COM)
 
 LDLIBS +=	-lpicltree -lpsvcobj -lpsvcplugin
-LDLIBS +=	-lc -ldevice -lcfgadm
+LDLIBS +=	-lc -ldevice
 
 .KEEP_STATE:
 
