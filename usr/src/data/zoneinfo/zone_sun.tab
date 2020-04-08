@@ -189,11 +189,11 @@ DZ	+3647+00303	Africa/Algiers	-
 EC	-0210-07950	America/Guayaquil	-	Ecuador (mainland)
 EC	-0054-08936	Pacific/Galapagos	-	Galapagos Islands
 EE	+5925+02445	Europe/Tallinn	-
-EG	+3003+03115	Africa/Cairo	Egypt
+EG	+3003+03115	Africa/Cairo	-	Egypt
 EH	+2709-01312	Africa/El_Aaiun	-
 ER	+1520+03853	Africa/Asmara	-
-ES	+4024-00341	Europe/Madrid	Spain (mainland)
-ES	+3553-00519	Africa/Ceuta	Ceuta, Melilla
+ES	+4024-00341	Europe/Madrid	-	Spain (mainland)
+ES	+3553-00519	Africa/Ceuta	-	Ceuta, Melilla
 ES	+2806-01524	Atlantic/Canary	-	Canary Islands
 ET	+0902+03842	Africa/Addis_Ababa	-
 FI	+6010+02458	Europe/Helsinki	-
@@ -205,7 +205,7 @@ FM	+0519+16259	Pacific/Kosrae	-	Kosrae
 FO	+6201-00646	Atlantic/Faroe	-
 FR	+4852+00220	Europe/Paris	-
 GA	+0023+00927	Africa/Libreville	-
-GB	+513030-0000731	Europe/London	GB
+GB	+513030-0000731	Europe/London	-	GB
 GD	+1203-06145	America/Grenada	-
 GE	+4143+04449	Asia/Tbilisi	-
 GF	+0456-05220	America/Cayenne	-
@@ -214,8 +214,8 @@ GH	+0533-00013	Africa/Accra	-
 GI	+3608-00521	Europe/Gibraltar	-
 GL	+6411-05144	America/Godthab	-	Greenland (most areas)
 GL	+7646-01840	America/Danmarkshavn	-	National Park (east coast)
-GL	+7029-02158	America/Scoresbysund	Scoresbysund/Ittoqqortoormiit
-GL	+7634-06847	America/Thule	Thule/Pituffik
+GL	+7029-02158	America/Scoresbysund	-	Scoresbysund/Ittoqqortoormiit
+GL	+7634-06847	America/Thule	-	Thule/Pituffik
 GM	+1328-01639	Africa/Banjul	-
 GN	+0931-01343	Africa/Conakry	-
 GP	+1614-06132	America/Guadeloupe	-
@@ -226,7 +226,7 @@ GT	+1438-09031	America/Guatemala	-
 GU	+1328+14445	Pacific/Guam	-
 GW	+1151-01535	Africa/Bissau	-
 GY	+0648-05810	America/Guyana	-
-HK	+2217+11409	Asia/Hong_Kong	Hongkong
+HK	+2217+11409	Asia/Hong_Kong	-	Hongkong
 HN	+1406-08713	America/Tegucigalpa	-
 HR	+4548+01558	Europe/Zagreb	-
 HT	+1832-07220	America/Port-au-Prince	-
@@ -235,8 +235,8 @@ ID	-0610+10648	Asia/Jakarta	-	Java, Sumatra
 ID	-0002+10920	Asia/Pontianak	-	Borneo (west, central)
 ID	-0507+11924	Asia/Makassar	-	Borneo (east, south); Sulawesi/Celebes, Bali, Nusa Tengarra; Timor (west)
 ID	-0232+14042	Asia/Jayapura	-	New Guinea (West Papua / Irian Jaya); Malukus/Moluccas
-IE	+5320-00615	Europe/Dublin	Eire
-IL	+314650+0351326	Asia/Jerusalem	Israel
+IE	+5320-00615	Europe/Dublin	-	Eire
+IL	+314650+0351326	Asia/Jerusalem	-	Israel
 IM	+5409-00428	Europe/Isle_of_Man	-
 IN	+2232+08822	Asia/Kolkata	-
 IO	-0720+07225	Indian/Chagos	-
@@ -247,7 +247,7 @@ IT	+4154+01229	Europe/Rome	-
 JE	+491101-0020624	Europe/Jersey	-
 JM	+175805-0764736	America/Jamaica	-
 JO	+3157+03556	Asia/Amman	-
-JP	+353916+1394441	Asia/Tokyo	Japan
+JP	+353916+1394441	Asia/Tokyo	-	Japan
 KE	-0117+03649	Africa/Nairobi	-
 KG	+4254+07436	Asia/Bishkek	-
 KH	+1133+10455	Asia/Phnom_Penh	-
@@ -257,13 +257,13 @@ KI	+0152-15720	Pacific/Kiritimati	-	Line Islands
 KM	-1141+04316	Indian/Comoro	-
 KN	+1718-06243	America/St_Kitts	-
 KP	+3901+12545	Asia/Pyongyang	-
-KR	+3733+12658	Asia/Seoul	ROK
+KR	+3733+12658	Asia/Seoul	-	ROK
 KW	+2920+04759	Asia/Kuwait	-
 KY	+1918-08123	America/Cayman	-
 KZ	+4315+07657	Asia/Almaty	-	Kazakhstan (most areas)
-KZ	+4448+06528	Asia/Qyzylorda	Qyzylorda/Kyzylorda/Kzyl-Orda
+KZ	+4448+06528	Asia/Qyzylorda	-	Qyzylorda/Kyzylorda/Kzyl-Orda
 KZ	+5312+06337	Asia/Qostanay	-	Qostanay/Kostanay/Kustanay
-KZ	+5017+05710	Asia/Aqtobe	Aqtobe/Aktobe
+KZ	+5017+05710	Asia/Aqtobe	-	Aqtobe/Aktobe
 KZ	+4431+05016	Asia/Aqtau	-	Mangghystau/Mankistau
 KZ	+4707+05156	Asia/Atyrau	-	Atyrau/Atirau/Gur'yev
 KZ	+5113+05121	Asia/Oral	-	West Kazakhstan
@@ -277,7 +277,7 @@ LS	-2928+02730	Africa/Maseru	-
 LT	+5441+02519	Europe/Vilnius	-
 LU	+4936+00609	Europe/Luxembourg	-
 LV	+5657+02406	Europe/Riga	-
-LY	+3254+01311	Africa/Tripoli	Libya
+LY	+3254+01311	Africa/Tripoli	-	Libya
 MA	+3339-00735	Africa/Casablanca	-
 MC	+4342+00723	Europe/Monaco	-
 MD	+4700+02850	Europe/Chisinau	-
@@ -292,7 +292,7 @@ MM	+1647+09610	Asia/Yangon	-
 MN	+4755+10653	Asia/Ulaanbaatar	-	Mongolia (most areas)
 MN	+4801+09139	Asia/Hovd	-	Bayan-Olgiy, Govi-Altai, Hovd, Uvs, Zavkhan
 MN	+4804+11430	Asia/Choibalsan	-	Dornod, Sukhbaatar
-MO	+221150+1133230	Asia/Macau	Asia/Macao
+MO	+221150+1133230	Asia/Macau	-	Asia/Macao
 MP	+1512+14545	Pacific/Saipan	-
 MQ	+1436-06105	America/Martinique	-
 MR	+1806-01557	Africa/Nouakchott	-
@@ -338,7 +338,7 @@ PG	-0930+14710	Pacific/Port_Moresby	-	Papua New Guinea (most areas)
 PG	-0613+15534	Pacific/Bougainville	-	Bougainville
 PH	+1435+12100	Asia/Manila	-
 PK	+2452+06703	Asia/Karachi	-
-PL	+5215+02100	Europe/Warsaw	Poland
+PL	+5215+02100	Europe/Warsaw	-	Poland
 PM	+4703-05620	America/Miquelon	-
 PN	-2504-13005	Pacific/Pitcairn	-
 PR	+182806-0660622	America/Puerto_Rico	-
@@ -358,7 +358,7 @@ RU	+554521+0373704	Europe/Moscow	-	MSK+00 - Moscow area
 RU	+5836+04939	Europe/Kirov	-	MSK+00 - Kirov
 RU	+4621+04803	Europe/Astrakhan	-	MSK+01 - Astrakhan
 RU	+4844+04425	Europe/Volgograd	-	MSK+01 - Volgograd
-RU	+5134+04602	Europe/Saratov  -	MSK+01 - Saratov
+RU	+5134+04602	Europe/Saratov	-	MSK+01 - Saratov
 RU	+5420+04824	Europe/Ulyanovsk	-	MSK+01 - Ulyanovsk
 RU	+5312+05009	Europe/Samara	-	MSK+01 - Samara, Udmurtia
 RU	+5651+06036	Asia/Yekaterinburg	-	MSK+02 - Urals
@@ -385,7 +385,7 @@ SB	-0932+16012	Pacific/Guadalcanal	-
 SC	-0440+05528	Indian/Mahe	-
 SD	+1536+03232	Africa/Khartoum	-
 SE	+5920+01803	Europe/Stockholm	-
-SG	+0117+10351	Asia/Singapore	Singapore
+SG	+0117+10351	Asia/Singapore	-	Singapore
 SH	-1555-00542	Atlantic/St_Helena	-
 SI	+4603+01431	Europe/Ljubljana	-
 SJ	+7800+01600	Arctic/Longyearbyen	-
@@ -412,7 +412,7 @@ TL	-0833+12535	Asia/Dili	-
 TM	+3757+05823	Asia/Ashgabat	-
 TN	+3648+01011	Africa/Tunis	-
 TO	-2110-17510	Pacific/Tongatapu	-
-TR	+4101+02858	Europe/Istanbul	Turkey
+TR	+4101+02858	Europe/Istanbul	-	Turkey
 TT	+1039-06131	America/Port_of_Spain	-
 TV	-0831+17913	Pacific/Funafuti	-
 TW	+2503+12130	Asia/Taipei	-
@@ -456,7 +456,7 @@ US	+550737-1313435	America/Metlakatla	-	Alaska - Annette Island
 US	+593249-1394338	America/Yakutat	-	Alaska - Yakutat
 US	+643004-1652423	America/Nome	-	Alaska (west)
 US	+515248-1763929	America/Adak	US/Aleutian	-	Aleutian Islands
-US	+211825-1575130	Pacific/Honolulu	US/Hawaii	Hawaii
+US	+211825-1575130	Pacific/Honolulu	-	US/Hawaii	Hawaii
 UY	-345433-0561245	America/Montevideo	-
 UZ	+3940+06648	Asia/Samarkand	-	Uzbekistan (west)
 UZ	+4120+06918	Asia/Tashkent	-	Uzbekistan (east)
