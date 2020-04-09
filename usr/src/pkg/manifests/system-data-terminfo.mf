@@ -2755,3 +2755,4 @@ license lic_CDDL license=lic_CDDL
 license usr/src/data/terminfo/THIRDPARTYLICENSE \
     license=usr/src/data/terminfo/THIRDPARTYLICENSE
 link path=usr/lib/tabset target=../share/lib/tabset
+link path=usr/share/terminfo target=../share/lib/terminfo
