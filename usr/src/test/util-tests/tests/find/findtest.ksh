@@ -25,8 +25,12 @@ unalias -a
 
 find_prog=/usr/bin/find
 find_prog_xpg4=/usr/xpg4/bin/find
-find_dir="$(mktemp -d -p /tmp/)"
 find_exit=0
+
+# make sure we don't end in 1 or 2, which breaks the tests
+find_dir=/tmp/findtest.$$.dir
+
+mkdir $find_dir
 
 testfind()
 {
