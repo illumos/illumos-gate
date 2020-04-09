@@ -499,6 +499,7 @@ i386_SUBDIRS=		\
 	rdmsr		\
 	rtc		\
 	ucodeadm	\
+	usmn		\
 	xhci		\
 	xvm
 

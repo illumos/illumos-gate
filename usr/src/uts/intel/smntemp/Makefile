@@ -10,21 +10,21 @@
 #
 
 #
-# Copyright 2019, Joyent, Inc.
+# Copyright 2020 Oxide Computer company
 #
 
 UTSBASE = ../..
 
-MODULE		= amdf17nbdf
-OBJECTS		= $(AMDF17NBDF_OBJS:%=$(OBJS_DIR)/%)
+MODULE		= smntemp
+OBJECTS		= $(SMNTEMP_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/intel/io/amdf17nb
 
 include $(UTSBASE)/intel/Makefile.intel
 
-ALL_TARGET	= $(BINARY) $(CONFMOD)
-LINT_TARGET	= $(MODULE).lint
+ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+CPPFLAGS	+= -I$(UTSBASE)/intel/io/amdzen
+LDFLAGS		+= -dy -Ndrv/amdzen
 
 .KEEP_STATE:
 
@@ -35,12 +35,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

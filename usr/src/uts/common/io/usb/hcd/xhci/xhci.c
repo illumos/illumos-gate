@@ -1911,7 +1911,7 @@ xhci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		xhci_t *xhcip = ddi_get_soft_state(xhci_soft_state,
 		    getminor(dev) & ~HUBD_IS_ROOT_HUB);
 
-		if (secpolicy_xhci(credp) != 0 ||
+		if (secpolicy_hwmanip(credp) != 0 ||
 		    crgetzoneid(credp) != GLOBAL_ZONEID)
 			return (EPERM);
 

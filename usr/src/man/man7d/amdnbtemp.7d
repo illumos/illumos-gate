@@ -61,11 +61,11 @@ are not supported at this time.
 For AMD Family 17h
 .Pq Zen
 processors, the
-.Xr amdf17nbdf 7D
+.Xr smntemp 7D
 driver provides access to the temperature sensors.
 .Sh SEE ALSO
 .Xr fmadm 1M ,
-.Xr amdf17nbdf 7D
+.Xr smntemp 7D
 .Rs
 .%A AMD
 .%B BIOS and Kernel Developer’s Guide (BKDG) for AMD Family 16h Models 00h-0Fh Processors
