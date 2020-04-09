@@ -42,7 +42,6 @@ ROOTMODULE      = $(ROOT_PSM_CPU_DIR)/$(MODULE)
 #
 include ../cpu/Makefile.cpu
 
-CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= $(CNOWARN_UNINIT)
 
 #

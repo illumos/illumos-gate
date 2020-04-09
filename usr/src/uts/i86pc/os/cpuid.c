@@ -1436,7 +1436,8 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"core_thermal",
 	"pkg_thermal",
 	"tsx_ctrl",
-	"taa_no"
+	"taa_no",
+	"ppin"
 };
 
 boolean_t
@@ -3228,6 +3229,60 @@ cpuid_pass1_thermal(cpu_t *cpu, uchar_t *featureset)
 	}
 }
 
+/*
+ * PPIN is the protected processor inventory number. On AMD this is an actual
+ * feature bit. However, on Intel systems we need to read the platform
+ * information MSR if we're on a specific model.
+ */
+#if !defined(__xpv)
+static void
+cpuid_pass1_ppin(cpu_t *cpu, uchar_t *featureset)
+{
+	on_trap_data_t otd;
+	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
+
+	switch (cpi->cpi_vendor) {
+	case X86_VENDOR_AMD:
+		/*
+		 * This leaf will have already been gathered in the topology
+		 * functions.
+		 */
+		if (cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_8) {
+			if (cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_PPIN) {
+				add_x86_feature(featureset, X86FSET_PPIN);
+			}
+		}
+		break;
+	case X86_VENDOR_Intel:
+		if (cpi->cpi_family != 6)
+			break;
+		switch (cpi->cpi_model) {
+		case INTC_MODEL_IVYBRIDGE_XEON:
+		case INTC_MODEL_HASWELL_XEON:
+		case INTC_MODEL_BROADWELL_XEON:
+		case INTC_MODEL_BROADWELL_XEON_D:
+		case INTC_MODEL_SKYLAKE_XEON:
+			if (!on_trap(&otd, OT_DATA_ACCESS)) {
+				uint64_t value;
+
+				value = rdmsr(MSR_PLATFORM_INFO);
+				if ((value & MSR_PLATFORM_INFO_PPIN) != 0) {
+					add_x86_feature(featureset,
+					    X86FSET_PPIN);
+				}
+			}
+			no_trap();
+			break;
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+}
+#endif	/* ! __xpv */
+
 void
 cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 {
@@ -4065,8 +4120,15 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		}
 	}
 
+	/*
+	 * cpuid_pass1_ppin assumes that cpuid_pass1_topology has already been
+	 * run and thus gathered some of its dependent leaves.
+	 */
 	cpuid_pass1_topology(cpu, featureset);
 	cpuid_pass1_thermal(cpu, featureset);
+#if !defined(__xpv)
+	cpuid_pass1_ppin(cpu, featureset);
+#endif
 
 	/*
 	 * Synthesize chip "revision" and socket type

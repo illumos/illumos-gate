@@ -64,64 +64,67 @@ static const char *gcpu_id_override[GCPU_MAX_CHIPID] = { NULL };
 #endif
 
 #ifndef	__xpv
+
 /*
- * This should probably be delegated to a CPU specific module. However, as those
- * haven't been developed as actively for recent CPUs, we should revisit this
- * when we do have it and move this out of gcpu.
+ * The purpose of this is to construct a unique identifier for a given processor
+ * that can be used by things like FMA to determine when a FRU has been
+ * replaced. It is supported on Intel Xeon Platforms since Ivy Bridge and AMD
+ * 17h processors since Rome. See cpuid_pass1_ppin() for how we determine if a
+ * CPU is supported.
  *
- * This method is only supported on Intel Xeon platforms. It relies on a
- * combination of the PPIN and the cpuid signature. Both are required to form
- * the synthetic ID. This ID is preceded with iv0-INTC to represent that this is
- * an Intel synthetic ID. The iv0 is the illumos version zero of the ID for
- * Intel. If we have a new scheme for a new generation of processors, then that
- * should rev the version field, otherwise for a given processor, this synthetic
- * ID should not change. For more information on PPIN and these MSRS, see the
- * relevant processor external design specification.
+ * The protected processor inventory number (PPIN) can be used to create a
+ * unique identifier when combined with the processor's cpuid signature. We
+ * create a versioned, synthetic ID using the following scheme for the
+ * identifier: iv0-<vendor>-<signature>-<PPIN>. The iv0 is the illumos version
+ * zero of the ID. If we have a new scheme for a new generation of processors,
+ * then that should rev the version field, otherwise for a given processor, this
+ * synthetic ID should not change.
+ *
+ * We use the string "INTC" for Intel and "AMD" for AMD. None of these or the
+ * formatting of the values can change without changing the version string.
  */
 static char *
-gcpu_init_ident_intc(cmi_hdl_t hdl)
+gcpu_init_ident_ppin(cmi_hdl_t hdl)
 {
-	uint64_t msr;
+	uint_t ppin_ctl_msr, ppin_msr;
+	uint64_t value;
+	const char *vendor;
 
 	/*
 	 * This list should be extended as new Intel Xeon family processors come
 	 * out.
 	 */
-	switch (cmi_hdl_model(hdl)) {
-	case INTC_MODEL_IVYBRIDGE_XEON:
-	case INTC_MODEL_HASWELL_XEON:
-	case INTC_MODEL_BROADWELL_XEON:
-	case INTC_MODEL_BROADWELL_XEON_D:
-	case INTC_MODEL_SKYLAKE_XEON:
+	switch (cmi_hdl_vendor(hdl)) {
+	case X86_VENDOR_Intel:
+		ppin_ctl_msr = MSR_PPIN_CTL_INTC;
+		ppin_msr = MSR_PPIN_INTC;
+		vendor = "INTC";
+		break;
+	case X86_VENDOR_AMD:
+		ppin_ctl_msr = MSR_PPIN_CTL_AMD;
+		ppin_msr = MSR_PPIN_AMD;
+		vendor = "AMD";
 		break;
 	default:
 		return (NULL);
 	}
 
-	if (cmi_hdl_rdmsr(hdl, MSR_PLATFORM_INFO, &msr) != CMI_SUCCESS) {
+	if (cmi_hdl_rdmsr(hdl, ppin_ctl_msr, &value) != CMI_SUCCESS) {
 		return (NULL);
 	}
 
-	if ((msr & MSR_PLATFORM_INFO_PPIN) == 0) {
-		return (NULL);
-	}
-
-	if (cmi_hdl_rdmsr(hdl, MSR_PPIN_CTL, &msr) != CMI_SUCCESS) {
-		return (NULL);
-	}
-
-	if ((msr & MSR_PPIN_CTL_ENABLED) == 0) {
-		if ((msr & MSR_PPIN_CTL_LOCKED) != 0) {
+	if ((value & MSR_PPIN_CTL_ENABLED) == 0) {
+		if ((value & MSR_PPIN_CTL_LOCKED) != 0) {
 			return (NULL);
 		}
 
-		if (cmi_hdl_wrmsr(hdl, MSR_PPIN_CTL, MSR_PPIN_CTL_ENABLED) !=
+		if (cmi_hdl_wrmsr(hdl, ppin_ctl_msr, MSR_PPIN_CTL_ENABLED) !=
 		    CMI_SUCCESS) {
 			return (NULL);
 		}
 	}
 
-	if (cmi_hdl_rdmsr(hdl, MSR_PPIN, &msr) != CMI_SUCCESS) {
+	if (cmi_hdl_rdmsr(hdl, ppin_msr, &value) != CMI_SUCCESS) {
 		return (NULL);
 	}
 
@@ -130,9 +133,10 @@ gcpu_init_ident_intc(cmi_hdl_t hdl)
 	 * failure of this part, as we will have gotten everything that we need.
 	 * It is possible that it locked open, for example.
 	 */
-	(void) cmi_hdl_wrmsr(hdl, MSR_PPIN_CTL, MSR_PPIN_CTL_LOCKED);
+	(void) cmi_hdl_wrmsr(hdl, ppin_ctl_msr, MSR_PPIN_CTL_LOCKED);
 
-	return (kmem_asprintf("iv0-INTC-%x-%llx", cmi_hdl_chipsig(hdl), msr));
+	return (kmem_asprintf("iv0-%s-%x-%llx", vendor, cmi_hdl_chipsig(hdl),
+	    value));
 }
 #endif	/* __xpv */
 
@@ -159,11 +163,8 @@ gcpu_init_ident(cmi_hdl_t hdl, struct gcpu_chipshared *sp)
 #endif
 
 #ifndef __xpv
-	switch (cmi_hdl_vendor(hdl)) {
-	case X86_VENDOR_Intel:
-		sp->gcpus_ident = gcpu_init_ident_intc(hdl);
-	default:
-		break;
+	if (is_x86_feature(x86_featureset, X86FSET_PPIN)) {
+		sp->gcpus_ident = gcpu_init_ident_ppin(hdl);
 	}
 #endif	/* __xpv */
 }
