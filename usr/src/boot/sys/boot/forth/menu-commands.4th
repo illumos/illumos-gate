@@ -23,8 +23,8 @@
 \ SUCH DAMAGE.
 \
 \ Copyright 2015 Toomas Soome <tsoome@me.com>
-\ Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 \ Copyright 2019 Joyent, Inc.
+\ Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 
 marker task-menu-commands.4th
 
@@ -34,16 +34,10 @@ only forth definitions
 
 variable osconsole_state
 variable acpi_state
-variable kernel_state
-variable root_state
 variable kmdb_state
-variable drop_into_kmdb_state
-0 kmdb_state !
-0 drop_into_kmdb_state !
 0 osconsole_state !
 0 acpi_state !
-0 kernel_state !
-0 root_state !
+0 kmdb_state !
 
 also menu-namespace also menu-command-helpers
 
@@ -223,101 +217,6 @@ create chaincmd 1030 chars allot
 ;
 
 \
-\ kmdb
-\
-
-: kmdb_enabled? ( -- flag )
-	s" boot_kmdb" getenv -1 <> dup if
-		swap drop ( c-addr flag -- flag )
-	then
-;
-
-: kmdb_enable ( -- )
-	s" set boot_kmdb=YES" evaluate
-;
-
-: kmdb_disable ( -- )
-	s" boot_kmdb" unsetenv
-	s" boot_drop_into_kmdb" unsetenv
-;
-
-: init_kmdb ( N -- N )
-	dup kmdb_state !		\ store entry number for kmdb+drop_into_kmdb
-	kmdb_enabled? if
-		toggle_menuitem ( n -- n )
-	then
-;
-
-: toggle_kmdb ( N -- N TRUE )
-	toggle_menuitem
-	dup toggle_stateN @ 0= if ( kmdb is not set )
-		drop_into_kmdb_state @ if ( drop_into_kmdb is set? )
-			drop_into_kmdb_state @ toggle_stateN @ if ( drop_into_kmdb is enabled? )
-				drop_into_kmdb_state @ toggle_menuitem drop
-			then
-		then
-	then
-	menu-redraw
-
-	\ Now we're going to make the change effective
-
-	dup toggle_stateN @ 0= if
-		kmdb_disable
-	else
-		kmdb_enable
-	then
-
-	TRUE \ loop menu again
-;
-
-\
-\ drop into kmdb
-\
-
-: drop_into_kmdb_disable ( -- )
-	s" boot_drop_into_kmdb" unsetenv
-;
-
-: drop_into_kmdb_enabled? ( -- flag )
-	\ -d is only allowed with -k
-	s" boot_drop_into_kmdb" getenv -1 <> kmdb_enabled? and dup if
-		swap drop ( c-addr flag -- flag )
-	else
-		drop_into_kmdb_disable		\ make sure env is not set
-	then
-;
-
-: drop_into_kmdb_enable ( -- )
-	kmdb_enable
-	s" set boot_drop_into_kmdb=YES" evaluate
-;
-
-: init_drop_into_kmdb ( N -- N )
-	dup drop_into_kmdb_state !		\ store entry number for kmdb
-	kmdb_enabled? drop_into_kmdb_enabled? and if
-		toggle_menuitem ( n -- n )
-	then
-;
-
-: toggle_drop_into_kmdb ( N -- N TRUE )
-	toggle_menuitem
-	kmdb_enabled? 0= if
-		kmdb_state @ toggle_menuitem drop
-	then
-	menu-redraw
-
-	\ Now we're going to make the change effective
-
-	dup toggle_stateN @ 0= if
-		drop_into_kmdb_disable
-	else
-		drop_into_kmdb_enable
-	then
-
-	TRUE \ loop menu again
-;
-
-\
 \ Reconfiguration boot
 \
 
@@ -352,6 +251,33 @@ create chaincmd 1030 chars allot
 	else
 		reconfigure_enable
 	then
+
+	TRUE \ loop menu again
+;
+
+\
+\ Framebuffer
+\
+
+: init_framebuffer ( N -- N )
+	framebuffer? if
+		toggle_menuitem ( n -- n )
+	then
+;
+
+: toggle_framebuffer ( N -- N TRUE )
+	toggle_menuitem
+
+	dup toggle_stateN @ 0= if
+		s" off"
+	else
+		s" on"
+	then 1 framebuffer
+
+	draw-beastie
+	draw-brand
+	menu-init		\ needed to reset menu position
+	menu-redraw
 
 	TRUE \ loop menu again
 ;
@@ -420,7 +346,7 @@ create chaincmd 1030 chars allot
 ;
 
 \
-\ Cyclestate (used by osconsole/acpi/kernel/root below)
+\ Cyclestate (used by osconsole/acpi/kmdb below)
 \
 
 : init_cyclestate ( N K -- N )
@@ -535,53 +461,70 @@ create chaincmd 1030 chars allot
 ;
 
 \
-\ Kernel
+\ kmdb
 \
 
-: init_kernel ( N -- N )
-	kernel_state @  ( n -- n k )
-	init_cyclestate ( n k -- n )
+: kmdb_disable
+	s" boot_kmdb" unsetenv
+	s" boot_drop_into_kmdb" unsetenv
 ;
 
-: activate_kernel ( N -- N )
+: init_kmdb ( N -- N )
+	\ Retrieve the contents of "nmi" or default to "panic"
+	( N -- N c-addr/u )
+	s" nmi" getenv dup -1 <> if else drop s" panic" then
+	\ Store the string in "nmi_initial" if not already set
+	\ (to support re-entering the menu from the loader prompt)
+	s" nmi_initial" getenv? if else
+		2dup s" nmi_initial" setenv
+	then
+	( N caddr/u -- N flag )
+	s" kmdb" compare if false else true then
+
+	s" boot_kmdb" getenv -1 <> if
+		drop
+		s" boot_drop_into_kmdb" getenv -1 <> if
+			drop
+			if 4 else 3 then
+		else
+			if 2 else 1 then
+		then
+	else
+		drop	\ drop flag
+		0
+	then
+	kmdb_state !
+;
+
+: activate_kmdb ( N -- N )
 	dup cycle_stateN @	( n -- n n2 )
-	dup kernel_state !	( n n2 -- n n2 )  \ copy for re-initialization
-	48 +			( n n2 -- n n2' ) \ kernel_state to ASCII num
+	dup kmdb_state !	( n n2 -- n n2 )
 
-	s" set kernel=${kernel_prefix}${kernel[N]}${kernel_suffix}"
-	36 +c!		( n n2 c-addr/u -- n c-addr/u ) \ 'N' to ASCII num
-	evaluate	( n c-addr/u -- n ) \ sets $kernel to full kernel-path
+	\ Reset "nmi" to its initial value
+	s" nmi_initial" getenv s" nmi" setenv
+
+	case 4 of		\ drop + nmi=kmdb
+		s" set boot_kmdb=YES" evaluate
+		s" set boot_drop_into_kmdb=YES" evaluate
+		s" set nmi=kmdb" evaluate
+	endof 3 of		\ drop
+		s" set boot_kmdb=YES" evaluate
+		s" set boot_drop_into_kmdb=YES" evaluate
+	endof 2 of		\ load + nmi=kmdb
+		s" set boot_kmdb=YES" evaluate
+		s" boot_drop_into_kmdb" unsetenv
+		s" set nmi=kmdb" evaluate
+	endof 1 of		\ load
+		s" set boot_kmdb=YES" evaluate
+		s" boot_drop_into_kmdb" unsetenv
+	endof
+		kmdb_disable
+	endcase
 ;
 
-: cycle_kernel ( N -- N TRUE )
+: cycle_kmdb ( N -- N TRUE )
 	cycle_menuitem	\ cycle cycle_stateN to next value
-	activate_kernel \ apply current cycle_stateN
-	menu-redraw	\ redraw menu
-	TRUE		\ loop menu again
-;
-
-\
-\ Root
-\
-
-: init_root ( N -- N )
-	root_state @    ( n -- n k )
-	init_cyclestate ( n k -- n )
-;
-
-: activate_root ( N -- N )
-	dup cycle_stateN @	( n -- n n2 )
-	dup root_state !	( n n2 -- n n2 )  \ copy for re-initialization
-	48 +			( n n2 -- n n2' ) \ root_state to ASCII num
-
-	s" set root=${root_prefix}${root[N]}${root_suffix}"
-	30 +c!		( n n2 c-addr/u -- n c-addr/u ) \ 'N' to ASCII num
-	evaluate	( n c-addr/u -- n ) \ sets $root to full kernel-path
-;
-
-: cycle_root ( N -- N TRUE )
-	cycle_menuitem	\ cycle cycle_stateN to next value
-	activate_root	\ apply current cycle_stateN
+	activate_kmdb	\ apply current cycle_stateN
 	menu-redraw	\ redraw menu
 	TRUE		\ loop menu again
 ;
@@ -608,7 +551,7 @@ create chaincmd 1030 chars allot
 	s" boot_ask" unsetenv
 	singleuser_disable
 	verbose_disable
-	kmdb_disable		\ disables drop_into_kmdb as well
+	kmdb_disable		\ disables drop_into_kmdb as well
 	reconfigure_disable
 ;
 

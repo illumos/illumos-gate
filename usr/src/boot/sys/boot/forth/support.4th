@@ -247,6 +247,11 @@ create last_module_option sizeof module.next allot 0 last_module_option !
 	s" screen-height" getenv?
 ;
 
+\ Test if booted in an EFI environment
+: efi? ( -- flag )
+	s" efi-version" getenv?
+;
+
 \ determine if a word appears in a string, case-insensitive
 : contains? ( addr1 len1 addr2 len2 -- 0 | -1 )
 	2 pick 0= if 2drop 2drop true exit then

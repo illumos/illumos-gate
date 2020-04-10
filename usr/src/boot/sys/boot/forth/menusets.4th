@@ -1,5 +1,5 @@
 \ Copyright (c) 2012 Devin Teske <dteske@FreeBSD.org>
-\ Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+\ Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 \ All rights reserved.
 \
 \ Redistribution and use in source and binary forms, with or without
@@ -537,8 +537,8 @@ only forth definitions also menusets-infrastructure
 	s" set var=osconsole" evaluate
 	menuset-loadmenuvar
 
-	\ ... menu_kernel ...
-	s" set var=kernel" evaluate
+	\ ... menu_kmdb ...
+	s" set var=kmdb" evaluate
 	menuset-loadmenuvar
 
 	\ ... menu_options ...
@@ -622,8 +622,8 @@ only forth definitions also menusets-infrastructure
 
 		s" set var=acpi"        evaluate menuset-unloadmenuvar
 		s" set var=osconsole"   evaluate menuset-unloadmenuvar
+		s" set var=kmdb"        evaluate menuset-unloadmenuvar
 		s" set var=init"        evaluate menuset-unloadmenuvar
-		s" set var=kernel"      evaluate menuset-unloadmenuvar
 		s" set var=options"     evaluate menuset-unloadmenuvar
 		s" set var=optionstext" evaluate menuset-unloadmenuvar
 		s" set var=reboot"      evaluate menuset-unloadmenuvar
