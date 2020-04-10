@@ -533,6 +533,19 @@ sprunlock(proc_t *p)
 	mutex_exit(&p->p_lock);
 }
 
+/*
+ * Undo effects of sprlock but without dropping p->p_lock
+ */
+void
+sprunprlock(proc_t *p)
+{
+	ASSERT(p->p_proc_flag & P_PR_LOCK);
+	ASSERT(MUTEX_HELD(&p->p_lock));
+
+	cv_signal(&pr_pid_cv[p->p_slot]);
+	p->p_proc_flag &= ~P_PR_LOCK;
+}
+
 void
 pid_init(void)
 {
