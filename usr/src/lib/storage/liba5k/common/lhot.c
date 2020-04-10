@@ -318,7 +318,7 @@ Box_list	*boxlist;
 	if (((ptr = strstr(boxname, ",")) != NULL) &&
 	    ((*(ptr + 1) == 'f') || (*(ptr + 1) == 'r') ||
 	    (*(ptr + 1) == 's'))) {
-		*ptr = NULL;
+		*ptr = '\0';
 	} else {
 		return (0);
 	}
@@ -332,7 +332,7 @@ Box_list	*boxlist;
 		return (L_NO_ENCL_LIST_FOUND);
 	}
 
-	*ses_path = NULL;
+	*ses_path = '\0';
 
 	/*
 	 * The following method is safer to get an ses path
@@ -397,13 +397,12 @@ Box_list	*boxlist;
  */
 int
 l_encl_status_page_funcs(int func, char *code, int todo, char *ses_path,
-					struct l_state_struct  *l_state,
-				int f_flag, int slot, int verbose_flag)
+    struct l_state_struct  *l_state, int f_flag, int slot, int verbose_flag)
 {
-uchar_t	*page_buf;
-int 	fd, front_index, rear_index, offset, err;
-unsigned short	page_len;
-struct	device_element *elem;
+	uchar_t	*page_buf;
+	int	fd, front_index, rear_index, offset, err;
+	unsigned short	page_len;
+	struct	device_element *elem;
 
 	if ((ses_path == NULL) || (l_state == NULL)) {
 		return (L_INVALID_PATH_FORMAT);
@@ -885,7 +884,7 @@ Path_struct *p_pathstruct;
 	free(p_pathstruct);
 	switch (enc_type) {
 	case DAK_ENC_TYPE:
-	    if (f_flag != NULL) {
+	    if (f_flag != 0) {
 		(void) sprintf(drive_name, MSGSTR(8502,
 			"Drive in \"%s\" slot %d"), box_name, slot);
 	    } else {
@@ -895,7 +894,7 @@ Path_struct *p_pathstruct;
 	    }
 	    break;
 	default:
-	    if (f_flag != NULL) {
+	    if (f_flag != 0) {
 		(void) sprintf(drive_name, MSGSTR(8500,
 		    "Drive in \"%s\" front slot %d"), box_name, slot);
 	    } else {

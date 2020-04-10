@@ -64,7 +64,7 @@
 #include	<a5k.h>
 
 
-/*	Defines 	*/
+/*	Defines		*/
 #define	PLNDEF		"SUNW,pln"	/* check if box name starts with 'c' */
 #define	DOWNLOAD_RETRIES	60*5	/* 5 minutes */
 #define	IBFIRMWARE_FILE		"/usr/lib/locale/C/LC_MESSAGES/ibfirmware"
@@ -519,17 +519,16 @@ int	i, rear_flag = 0;
  */
 int
 l_led(struct path_struct *path_struct, int led_action,
-	struct device_element *status,
-	int verbose)
+    struct device_element *status, int verbose)
 {
-gfc_map_t		map;
-char			ses_path[MAXPATHLEN];
-uchar_t			*page_buf;
-int 			err, write, fd, front_index, rear_index, offset;
-unsigned short		page_len;
-struct	device_element 	*elem;
-L_state			*l_state;
-int			enc_type;
+	gfc_map_t		map;
+	char			ses_path[MAXPATHLEN];
+	uchar_t			*page_buf;
+	int			err, write, fd, front_index, rear_index, offset;
+	unsigned short		page_len;
+	struct	device_element	*elem;
+	L_state			*l_state;
+	int			enc_type;
 
 	if ((path_struct == NULL) || (status == NULL)) {
 		return (L_INVALID_PATH_FORMAT);
@@ -1184,14 +1183,15 @@ pwr_up_dwn:
  */
 static int
 pwr_up_down(char *path_phys, L_state *l_state, int front, int slot,
-		int power_off_flag, int verbose)
+    int power_off_flag, int verbose)
 {
-L_inquiry		inq;
-int			fd, status, err;
-uchar_t			*page_buf;
-int 			front_index, rear_index, front_offset, rear_offset;
-unsigned short		page_len;
-struct	device_element	*front_elem, *rear_elem;
+	L_inquiry		inq;
+	int			fd, status, err;
+	uchar_t			*page_buf;
+	int			front_index, rear_index, front_offset;
+	int			rear_offset;
+	unsigned short		page_len;
+	struct	device_element	*front_elem, *rear_elem;
 
 	(void) memset(&inq, 0, sizeof (inq));
 	if ((fd = g_object_open(path_phys, O_NDELAY | O_RDONLY)) == -1) {
@@ -1561,7 +1561,7 @@ int		al_pa;
 
 			/* Get the port WWN from the IB, page 1 */
 			if ((status = l_get_envsen_page(fd, (uchar_t *)&page1,
-				sizeof (page1), 1, 0)) != NULL) {
+			    sizeof (page1), 1, 0)) != 0) {
 				(void) close(fd);
 				g_destroy_data(result);
 				(void) g_destroy_data(dev_name);
@@ -1606,7 +1606,7 @@ int		al_pa;
 				(char *)inq.inq_box_name,
 				sizeof (inq.inq_box_name));
 			/* make sure null terminated */
-			l2->b_name[sizeof (l2->b_name) - 1] = NULL;
+			l2->b_name[sizeof (l2->b_name) - 1] = '\0';
 
 			/*
 			 * Now get the port WWN for the port
@@ -1807,7 +1807,7 @@ load_flds_if_enc_disk(char *phys_path, struct path_struct **path_struct)
 	L_state		*l_state = NULL;
 
 	if ((path_struct == NULL) || (*path_struct == NULL) ||
-				(phys_path == NULL) || (*phys_path == NULL)) {
+	    (phys_path == NULL) || (*phys_path == '\0')) {
 		return (L_INVALID_PATH_FORMAT);
 	}
 
@@ -2073,7 +2073,7 @@ WWN_list	*wwn_list, *wwn_list_ptr;
 	if (((char_ptr = strstr(tmp_name, ",")) != NULL) &&
 		((*(char_ptr + 1) == 'f') || (*(char_ptr + 1) == 'r') ||
 		    (*(char_ptr + 1) == 's'))) {
-		*char_ptr = NULL; /* make just box name */
+		*char_ptr = '\0'; /* make just box name */
 		found_comma = 1;
 	}
 	/* Find path to IB */
@@ -2398,7 +2398,7 @@ ushort_t	num_pages;
 
 	/* Get page 0 */
 	if ((rval = l_get_envsen_page(fd, local_buf_ptr,
-		size, page_code, verbose)) != NULL) {
+		size, page_code, verbose)) != 0) {
 		(void) close(fd);
 		return (rval);
 	}
@@ -2447,7 +2447,7 @@ ushort_t	num_pages;
 		page_code = *page_list_ptr;
 
 		if ((rval = l_get_envsen_page(fd, local_buf_ptr,
-			size, page_code, verbose)) != NULL) {
+			size, page_code, verbose)) != 0) {
 			(void) close(fd);
 			return (rval);
 		}
@@ -2500,7 +2500,7 @@ struct		stat sbuf;
 	}
 
 	/* Initialize */
-	*path_a = *path_b = NULL;
+	*path_a = *path_b = '\0';
 	l_disk_state->g_disk_state.num_blocks = 0;
 
 	/* Get paths. */
@@ -2699,7 +2699,7 @@ Read_reserv	read_reserv_buf;
 		MSGSTR(9048, "  Checking for Persistent "
 			"Reservations:"));
 		if (l_disk_state->g_disk_state.persistent_reserv_flag) {
-		    if (l_disk_state->g_disk_state.persistent_active != NULL) {
+		    if (l_disk_state->g_disk_state.persistent_active != 0) {
 			(void) fprintf(stdout, MSGSTR(39, "Active"));
 		    } else {
 			(void) fprintf(stdout, MSGSTR(9049, "Registered"));
@@ -3717,7 +3717,6 @@ hrtime_t	start_time, end_time;
 						if ((strcmp(seslist->dev_path,
 							path) != 0) &&
 							!port_a_flag) {
-							*path = NULL;
 							(void) strcpy(path,
 							seslist->dev_path);
 							if (err =
@@ -3742,7 +3741,6 @@ hrtime_t	start_time, end_time;
 						}
 						if ((strcmp(seslist->dev_path,
 						path) != 0) && port_a_flag) {
-							*path = NULL;
 							(void) strcpy(path,
 							seslist->dev_path);
 							if (err =
@@ -4310,7 +4308,7 @@ int	status, sz;
 static int
 dak_download_code_cmd(int fd, uchar_t *buf_ptr, int buf_len)
 {
-	int 	status = 0;
+	int	status = 0;
 	int	sz = 0;
 	int	offs = 0;
 
@@ -4334,10 +4332,10 @@ dak_download_code_cmd(int fd, uchar_t *buf_ptr, int buf_len)
  * Downloads the new prom image to IB.
  *
  * INPUTS:
- * 	path		- physical path of Photon SES card
- * 	file		- input file for new code (may be NULL)
- * 	ps		- whether the "save" bit should be set
- * 	verbose		- to be verbose or not
+ *	path		- physical path of Photon SES card
+ *	file		- input file for new code (may be NULL)
+ *	ps		- whether the "save" bit should be set
+ *	verbose		- to be verbose or not
  *
  * RETURNS:
  *	0	 O.K.
@@ -4954,11 +4952,11 @@ l_element_msg_string(uchar_t code, char *es)
  */
 int
 l_get_allses(char *path, struct box_list_struct *box_list,
-			struct dlist **ses_list, int verbose)
+    struct dlist **ses_list, int verbose)
 {
-struct box_list_struct 	*box_list_ptr;
-char			node_wwn_s[WWN_S_LEN];
-struct dlist		*dlt, *dl;
+	struct box_list_struct	*box_list_ptr;
+	char			node_wwn_s[WWN_S_LEN];
+	struct dlist		*dlt, *dl;
 
 	if ((path == NULL) || (box_list == NULL) || (ses_list == NULL)) {
 		return (L_INVALID_PATH_FORMAT);
@@ -5044,7 +5042,7 @@ l_get_enc_type(L_inquiry inq)
 	}
 	/*
 	 *  ADD OTHERS here if ever needed/wanted, and add to def's
-	 * 	as noted above
+	 *	as noted above
 	 */
 	return (UNDEF_ENC_TYPE);
 }
