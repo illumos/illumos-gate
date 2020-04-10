@@ -100,7 +100,7 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 	devtree_freeze();
 
 	if (invoke_cb)
-		(void) callb_execute_class(CB_CL_MDBOOT, NULL);
+		(void) callb_execute_class(CB_CL_MDBOOT, 0);
 
 	/*
 	 * Clear any unresolved UEs from memory.
@@ -252,7 +252,7 @@ panic_stopcpus(cpu_t *cp, kthread_t *t, int spl)
 
 	(void) splzs();
 	CPUSET_ALL_BUT(cps, cp->cpu_id);
-	xt_some(cps, (xcfunc_t *)idle_stop_xcall, (uint64_t)&panic_idle, NULL);
+	xt_some(cps, (xcfunc_t *)idle_stop_xcall, (uint64_t)&panic_idle, 0);
 
 	for (i = 0; i < NCPU; i++) {
 		if (i != cp->cpu_id && CPU_XCALL_READY(i)) {

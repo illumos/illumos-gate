@@ -279,7 +279,7 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 	devtree_freeze();
 
 	if (invoke_cb)
-		(void) callb_execute_class(CB_CL_MDBOOT, NULL);
+		(void) callb_execute_class(CB_CL_MDBOOT, 0);
 
 	/*
 	 * Clear any unresolved UEs from memory.
@@ -380,7 +380,7 @@ panic_stopcpus(cpu_t *cp, kthread_t *t, int spl)
 
 	(void) splzs();
 	CPUSET_ALL_BUT(cps, cp->cpu_id);
-	xt_some(cps, (xcfunc_t *)idle_stop_xcall, (uint64_t)&panic_idle, NULL);
+	xt_some(cps, (xcfunc_t *)idle_stop_xcall, (uint64_t)&panic_idle, 0);
 
 	for (i = 0; i < NCPU; i++) {
 		if (i != cp->cpu_id && CPU_XCALL_READY(i)) {
@@ -589,8 +589,8 @@ ptl1_panic_handler(ptl1_state_t *pstate)
 		"CPU ECC error loop",		/* PTL1_BAD_ECC */
 		"unexpected error from hypervisor call", /* PTL1_BAD_HCALL */
 		"unexpected global level(%gl)", /* PTL1_BAD_GL */
-		"Watchdog Reset", 		/* PTL1_BAD_WATCHDOG */
-		"unexpected RED mode trap", 	/* PTL1_BAD_RED */
+		"Watchdog Reset",		/* PTL1_BAD_WATCHDOG */
+		"unexpected RED mode trap",	/* PTL1_BAD_RED */
 		"return value EINVAL from hcall: "\
 		    "UNMAP_PERM_ADDR",	/* PTL1_BAD_HCALL_UNMAP_PERM_EINVAL */
 		"return value ENOMAP from hcall: "\

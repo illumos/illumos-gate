@@ -20,7 +20,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
@@ -121,7 +121,7 @@ setfpregs(klwp_t *lwp, fpregset_t *fp)
 		/*
 		 * Load up a user's floating point context.
 		 */
-		if (fp->fpu_qcnt > MAXFPQ) 	/* plug security holes */
+		if (fp->fpu_qcnt > MAXFPQ)	/* plug security holes */
 			fp->fpu_qcnt = MAXFPQ;
 		fp->fpu_q_entrysize = sizeof (struct _fq);
 
@@ -819,7 +819,7 @@ setregs(uarg_t *args)
 	rp->r_y = 0;
 	curthread->t_post_sys = 1;
 	lwp->lwp_eosys = JUSTRETURN;
-	lwp->lwp_pcb.pcb_trap0addr = NULL;	/* no trap 0 handler */
+	lwp->lwp_pcb.pcb_trap0addr = 0;	/* no trap 0 handler */
 	/*
 	 * Clear the fixalignment flag
 	 */
@@ -1425,7 +1425,7 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 		gwp = NULL;
 		sp += gwin_size;
 	} else {
-		suword32_noerr(&fp->uc.uc_mcontext.gwins, (uint32_t)NULL);
+		suword32_noerr(&fp->uc.uc_mcontext.gwins, 0);
 	}
 
 	if (fpq_size != 0) {
@@ -1455,8 +1455,7 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 		mpcb->mpcb_flags |= FP_TRAPPED;
 
 	} else {
-		suword32_noerr(&fp->uc.uc_mcontext.fpregs.fpu_q,
-		    (uint32_t)NULL);
+		suword32_noerr(&fp->uc.uc_mcontext.fpregs.fpu_q, 0);
 		suword8_noerr(&fp->uc.uc_mcontext.fpregs.fpu_qcnt, 0);
 	}
 
@@ -1724,7 +1723,7 @@ fpuregset_nto32(const fpregset_t *src, fpregset32_t *dest, struct fq32 *dfq)
 	bzero(dest, sizeof (*dest));
 	for (i = 0; i < 32; i++)
 		dest->fpu_fr.fpu_regs[i] = src->fpu_fr.fpu_regs[i];
-	dest->fpu_q = NULL;
+	dest->fpu_q = 0;
 	dest->fpu_fsr = (uint32_t)src->fpu_fsr;
 	dest->fpu_qcnt = src->fpu_qcnt;
 	dest->fpu_q_entrysize = sizeof (struct fpq32);

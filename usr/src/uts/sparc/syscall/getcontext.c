@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -87,7 +87,7 @@ savecontext(ucontext_t *ucp, const k_sigset_t *mask)
 	 * been disabled for this LWP. If stack bounds checking is disabled
 	 * or the copyin() fails, we fall back to the legacy behavior.
 	 */
-	if (lwp->lwp_ustack == NULL ||
+	if (lwp->lwp_ustack == (uintptr_t)NULL ||
 	    copyin((void *)lwp->lwp_ustack, &ucp->uc_stack,
 	    sizeof (ucp->uc_stack)) != 0 ||
 	    ucp->uc_stack.ss_size == 0) {
@@ -384,7 +384,7 @@ savecontext32(ucontext32_t *ucp, const k_sigset_t *mask, struct fq32 *dfq)
 	 * been disabled for this LWP. If stack bounds checking is disabled
 	 * or the copyin() fails, we fall back to the legacy behavior.
 	 */
-	if (lwp->lwp_ustack == NULL ||
+	if (lwp->lwp_ustack == (uintptr_t)NULL ||
 	    copyin((void *)lwp->lwp_ustack, &ucp->uc_stack,
 	    sizeof (ucp->uc_stack)) != 0 ||
 	    ucp->uc_stack.ss_size == 0) {
@@ -410,7 +410,7 @@ savecontext32(ucontext32_t *ucp, const k_sigset_t *mask, struct fq32 *dfq)
 
 	if (ucp->uc_mcontext.fpregs.fpu_en == 0)
 		ucp->uc_flags &= ~UC_FPU;
-	ucp->uc_mcontext.gwins = (caddr32_t)NULL;
+	ucp->uc_mcontext.gwins = (caddr32_t)(uintptr_t)NULL;
 
 	/*
 	 * Save signal mask (the 32- and 64-bit sigset_t structures are
@@ -464,7 +464,7 @@ getsetcontext32(int flag, void *arg)
 		 * a later setcontext(2).
 		 */
 		uc.uc_mcontext.fpregs.fpu_qcnt = 0;
-		uc.uc_mcontext.fpregs.fpu_q = (caddr32_t)NULL;
+		uc.uc_mcontext.fpregs.fpu_q = (caddr32_t)(uintptr_t)NULL;
 
 		if (copyout(&uc, arg, sizeof (ucontext32_t)))
 			return (set_errno(EFAULT));
