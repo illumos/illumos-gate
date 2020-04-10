@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stddef.h>
 #include <locale.h>
 #include <ctype.h>
@@ -611,7 +609,10 @@ sim_open(char *a, int b, int c)
 }
 
 static int
-sim_close(int a) { return (0); }
+sim_close(int a)
+{
+	return (0);
+}
 
 static int
 sim_ioctl(int fd, int cmd, void *a)
@@ -750,7 +751,7 @@ dlist_find(int board, char **dlist, int *disabled)
 
 static int
 dlist_update(int board, int disable, char *dlist, struct cfga_msg *msgp,
-	int verbose)
+    int verbose)
 {
 	int i, j, n;
 	int err;
@@ -941,7 +942,7 @@ cfga_change_state(
 			cfga_err(NULL, errstring, ERR_TRANS, 0);
 		else if (disabled && !(force || (options && !disable)))
 			cfga_err(NULL, errstring, CMD_CONNECT,
-				ERR_DISABLED, DIAG_FORCE, 0);
+			    ERR_DISABLED, DIAG_FORCE, 0);
 		else if (!(*confp->confirm)(confp->appdata_ptr,
 		    cfga_str(ASK_CONNECT))) {
 			(void) close(fd);
@@ -949,7 +950,7 @@ cfga_change_state(
 		} else if (ioctl(fd, SYSC_CFGA_CMD_CONNECT, sc) == -1)
 			cfga_err(sc, errstring, CMD_CONNECT, 0);
 		else if (options && (opterr = dlist_update(idx, disable,
-			dlist, msgp, verbose))) {
+		    dlist, msgp, verbose))) {
 			err = disable ? OPT_DISABLE : OPT_ENABLE;
 			cfga_err(NULL, errstring, err, opterr, 0);
 		} else
@@ -982,7 +983,7 @@ cfga_change_state(
 		if (rs == SYSC_CFGA_RSTATE_DISCONNECTED)
 			if (disabled && !(force || (options && !disable))) {
 				cfga_err(NULL, errstring, CMD_CONFIGURE,
-					ERR_DISABLED, DIAG_FORCE, 0);
+				    ERR_DISABLED, DIAG_FORCE, 0);
 				(void) close(fd);
 				return (CFGA_ERROR);
 			} else if (!(*confp->confirm)(confp->appdata_ptr,
@@ -1000,7 +1001,7 @@ cfga_change_state(
 			if (ioctl(fd, SYSC_CFGA_CMD_CONFIGURE, sc) == -1)
 				cfga_err(sc, errstring, CMD_CONFIGURE, 0);
 			else if (options && (opterr = dlist_update(idx,
-				disable, dlist, msgp, verbose))) {
+			    disable, dlist, msgp, verbose))) {
 				err = disable ? OPT_DISABLE : OPT_ENABLE;
 				cfga_err(NULL, errstring, err, opterr, 0);
 			} else
@@ -1015,7 +1016,7 @@ cfga_change_state(
 		else if (ioctl(fd, SYSC_CFGA_CMD_UNCONFIGURE, sc) == -1)
 			cfga_err(sc, errstring, CMD_UNCONFIGURE, 0);
 		else if (options && (opterr = dlist_update(idx, disable,
-			dlist, msgp, verbose))) {
+		    dlist, msgp, verbose))) {
 			err = disable ? OPT_DISABLE : OPT_ENABLE;
 			cfga_err(NULL, errstring, err, opterr, 0);
 		} else
@@ -1124,14 +1125,14 @@ cfga_private_func(
 	if ((idx = ap_idx(ap_id)) == -1)
 		cfga_err(NULL, errstring, ERR_AP_INVAL, ap_id, 0);
 	else if (((fd = open(ap_id, O_RDWR, 0)) == -1) ||
-		(ioctl(fd, cmd, sc) == -1))
+	    (ioctl(fd, cmd, sc) == -1))
 		cfga_err(NULL, errstring, err, 0);
 	else
 		rc = CFGA_OK;
 
 	if (options) {
 		opterr = (dlist_find(idx, &dlist, &disabled) ||
-			dlist_update(idx, disable, dlist, msgp, verbose));
+		    dlist_update(idx, disable, dlist, msgp, verbose));
 		if (opterr) {
 			err = disable ? OPT_DISABLE : OPT_ENABLE;
 			if (verbose)
@@ -1274,7 +1275,7 @@ info_set(sysc_cfga_stat_t *sc, cfga_info_t info, int disabled)
 	struct cpu_info *cpu;
 	union bd_un *bd = &sc->bd;
 
-	*info = NULL;
+	*info = '\0';
 
 	switch (sc->type) {
 	case CPU_BOARD:
@@ -1282,11 +1283,11 @@ info_set(sysc_cfga_stat_t *sc, cfga_info_t info, int disabled)
 			if (cpu->cpu_speed > 1) {
 				info += sprintf(info, "cpu %d: ", i);
 				info += sprintf(info, "%3d MHz ",
-						cpu->cpu_speed);
+				    cpu->cpu_speed);
 				if (cpu->cache_size)
 					info += sprintf(info, "%0.1fM ",
-						(float)cpu->cache_size /
-						(float)(1024 * 1024));
+					    (float)cpu->cache_size /
+					    (float)(1024 * 1024));
 			}
 		}
 		break;
@@ -1312,7 +1313,7 @@ info_set(sysc_cfga_stat_t *sc, cfga_info_t info, int disabled)
 		for (i = 0; i < 2; i++)
 			if (bd->dsk.disk_pres[i])
 				info += sprintf(info, "target: %2d ",
-						bd->dsk.disk_id[i]);
+				    bd->dsk.disk_id[i]);
 			else
 				info += sprintf(info, "no disk   ");
 		break;
@@ -1338,8 +1339,8 @@ sysc_cvt(sysc_cfga_stat_t *sc, cfga_stat_data_t *cs, int disabled)
 	cs->ap_busy = (cfga_busy_t)sc->in_transition;
 	cs->ap_status_time = sc->last_change;
 	info_set(sc, cs->ap_info, disabled);
-	cs->ap_log_id[0] = NULL;
-	cs->ap_phys_id[0] = NULL;
+	cs->ap_log_id[0] = '\0';
+	cs->ap_phys_id[0] = '\0';
 }
 
 /*ARGSUSED*/
@@ -1426,8 +1427,8 @@ cfga_stat(
 		rc = CFGA_OK;
 
 		if (options && options[0] && ((opterr != 0) ||
-			((opterr = dlist_update(idx, disable, dlist, NULL, 0))
-			!= 0))) {
+		    ((opterr = dlist_update(idx, disable, dlist, NULL, 0))
+		    != 0))) {
 				err = disable ? OPT_DISABLE : OPT_ENABLE;
 				cfga_err(NULL, errstring, err, opterr, 0);
 		}
