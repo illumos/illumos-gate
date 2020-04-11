@@ -218,14 +218,14 @@ static int		 drmach_node_ddi_get_prop(drmach_node_t *np,
 static int		 drmach_node_ddi_get_proplen(drmach_node_t *np,
 				char *name, int *len);
 
-static int 		drmach_get_portid(drmach_node_t *);
+static int		drmach_get_portid(drmach_node_t *);
 static	sbd_error_t	*drmach_i_status(drmachid_t, drmach_status_t *);
 static int		opl_check_dr_status();
 static void		drmach_io_dispose(drmachid_t);
 static sbd_error_t	*drmach_io_release(drmachid_t);
 static sbd_error_t	*drmach_io_status(drmachid_t, drmach_status_t *);
-static int 		drmach_init(void);
-static void 		drmach_fini(void);
+static int		drmach_init(void);
+static void		drmach_fini(void);
 static void		drmach_swap_pa(drmach_mem_t *, drmach_mem_t *);
 static drmach_board_t	*drmach_get_board_by_bnum(int);
 
@@ -457,7 +457,7 @@ struct drmach_hotcpu {
 	drmach_board_t *bp;
 	int	bnum;
 	int	core_id;
-	int 	rv;
+	int	rv;
 	int	option;
 };
 
@@ -652,7 +652,7 @@ drmach_setup_core_info(drmach_board_t *obj)
 
 typedef struct {
 	drmach_node_walk_args_t	*nwargs;
-	int 			(*cb)(drmach_node_walk_args_t *args);
+	int			(*cb)(drmach_node_walk_args_t *args);
 	int			err;
 } drmach_node_ddi_walk_args_t;
 
@@ -686,7 +686,7 @@ drmach_node_ddi_walk_cb(dev_info_t *dip, void *arg)
 
 static int
 drmach_node_ddi_walk(drmach_node_t *np, void *data,
-		int (*cb)(drmach_node_walk_args_t *args))
+    int (*cb)(drmach_node_walk_args_t *args))
 {
 	drmach_node_walk_args_t		args;
 	drmach_node_ddi_walk_args_t	nargs;
@@ -735,7 +735,7 @@ drmach_node_ddi_get_parent(drmach_node_t *np, drmach_node_t *pp)
 static pnode_t
 drmach_node_ddi_get_dnode(drmach_node_t *np)
 {
-	return ((pnode_t)NULL);
+	return (0);
 }
 
 static drmach_node_t *
@@ -769,7 +769,7 @@ drmach_node_ddi_get_dip(drmach_node_t *np)
 
 static int
 drmach_node_walk(drmach_node_t *np, void *param,
-		int (*cb)(drmach_node_walk_args_t *args))
+    int (*cb)(drmach_node_walk_args_t *args))
 {
 	return (np->walk(np, param, cb));
 }
@@ -977,7 +977,7 @@ drmach_configure(drmachid_t id, int flags)
 
 static sbd_error_t *
 drmach_device_new(drmach_node_t *node,
-	drmach_board_t *bp, int portid, drmachid_t *idp)
+    drmach_board_t *bp, int portid, drmachid_t *idp)
 {
 	int		 i;
 	int		 rv;
@@ -1541,7 +1541,7 @@ drmach_get_portid(drmach_node_t *np)
 static int
 drmach_name2type_idx(char *name)
 {
-	int 	index, ntypes;
+	int	index, ntypes;
 
 	if (name == NULL)
 		return (-1);
@@ -1656,7 +1656,7 @@ drmach_board_find_devices_cb(drmach_node_walk_args_t *args)
 
 sbd_error_t *
 drmach_board_find_devices(drmachid_t id, void *a,
-	sbd_error_t *(*found)(void *a, const char *, int, drmachid_t))
+    sbd_error_t *(*found)(void *a, const char *, int, drmachid_t))
 {
 	drmach_board_t		*bp = (drmach_board_t *)id;
 	sbd_error_t		*err;
@@ -2782,7 +2782,7 @@ drmach_cpu_poweron(struct cpu *cp)
 int
 drmach_cpu_poweroff(struct cpu *cp)
 {
-	int 		rv = 0;
+	int		rv = 0;
 	processorid_t	cpuid = cp->cpu_id;
 
 	DRMACH_PR("drmach_cpu_poweroff: stopping cpuid %d\n", cp->cpu_id);
@@ -2957,7 +2957,7 @@ opl_check_dr_status()
 
 static struct memlist *
 drmach_memlist_add_span(drmach_copy_rename_program_t *p,
-	struct memlist *mlist, uint64_t base, uint64_t len)
+    struct memlist *mlist, uint64_t base, uint64_t len)
 {
 	struct memlist	*ml, *tl, *nl;
 
@@ -3072,7 +3072,7 @@ static int	fmem_timeout = 17;
 /*
  *	The empirical data on some OPL system shows that
  *	we can copy 250 MB per second.  We set it to
- * 	80 MB to be conservative.  In normal case,
+ *	80 MB to be conservative.  In normal case,
  *	this timeout does not affect anything.
  */
 
@@ -3113,7 +3113,7 @@ static int drmach_copy_rename_timeout = 500;
 
 static int
 drmach_copy_rename_prog__relocatable(drmach_copy_rename_program_t *prog,
-	int cpuid)
+    int cpuid)
 {
 	struct memlist		*ml;
 	register int		rtn;
@@ -3412,7 +3412,7 @@ drmach_unlock_critical(caddr_t va)
 
 sbd_error_t *
 drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
-	struct memlist *c_ml, drmachid_t *pgm_id)
+    struct memlist *c_ml, drmachid_t *pgm_id)
 {
 	drmach_mem_t	*s_mem;
 	drmach_mem_t	*t_mem;
@@ -3690,7 +3690,7 @@ drmach_copy_rename_init(drmachid_t t_id, drmachid_t s_id,
 
 	/*
 	 * max_elms -	max number of memlist structures that
-	 * 		may be allocated for the CPU memory list.
+	 *		may be allocated for the CPU memory list.
 	 *		If there are too many memory span (because
 	 *		of fragmentation) than number of memlist
 	 *		available, we should return error.
@@ -4042,7 +4042,7 @@ drmach_copy_rename(drmachid_t id)
 	prog->critical->scf_reg_base = (*prog->data->scf_get_base_addr)();
 
 	if (prog->critical->scf_reg_base == (uint64_t)-1 ||
-	    prog->critical->scf_reg_base == NULL) {
+	    prog->critical->scf_reg_base == 0) {
 		prog->data->fmem_status.error = EOPL_FMEM_SCF_ERR;
 		drmach_unlock_critical((caddr_t)prog);
 		return;

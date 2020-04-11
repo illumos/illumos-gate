@@ -241,7 +241,7 @@ okm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	okmsp->km_clean |= OKM_CLEAN_NODE;
 	if (ddi_create_minor_node(dip, OKM_NODENAME, S_IFCHR,
-	    instance, NULL, NULL) == DDI_FAILURE) {
+	    instance, NULL, 0) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "Device node creation failed");
 		okm_cleanup(okmsp);
 		return (DDI_FAILURE);

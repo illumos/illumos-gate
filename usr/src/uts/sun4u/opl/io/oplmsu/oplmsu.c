@@ -660,7 +660,7 @@ oplmsu_close(queue_t *urq, int flag, cred_t *cred_p)
 		cmn_err(CE_WARN, "oplmsu: close: node_flag = 0x%lx", node_flag);
 	}
 
-	ctrl->minor = NULL;
+	ctrl->minor = 0;
 	ctrl->queue = NULL;
 	wbuf_id = ctrl->wbuf_id;
 	wtout_id = ctrl->wtout_id;

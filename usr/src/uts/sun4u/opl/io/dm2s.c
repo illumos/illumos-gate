@@ -177,8 +177,8 @@ struct streamtab dm2s_streamtab = {
 	NULL
 };
 
-DDI_DEFINE_STREAM_OPS(dm2s_ops, nulldev, nulldev, dm2s_attach,		\
-	dm2s_detach, nodev, dm2s_info, D_NEW | D_MP | D_MTPERMOD,	\
+DDI_DEFINE_STREAM_OPS(dm2s_ops, nulldev, nulldev, dm2s_attach,
+	dm2s_detach, nodev, dm2s_info, D_NEW | D_MP | D_MTPERMOD,
 	&dm2s_streamtab, ddi_quiesce_not_supported);
 
 
@@ -296,7 +296,7 @@ dm2s_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	(void) sprintf(name, "%s%d", DM2S_MODNAME, instance);
 	if (ddi_create_minor_node(dip, name, S_IFCHR, instance,
-	    DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    DDI_PSEUDO, 0) == DDI_FAILURE) {
 		ddi_remove_minor_node(dip, NULL);
 		cmn_err(CE_WARN, "Device node creation failed.");
 		goto error;

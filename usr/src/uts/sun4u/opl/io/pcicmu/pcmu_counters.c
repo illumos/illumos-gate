@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/async.h>
 #include <sys/sunddi.h>
@@ -56,7 +54,7 @@ pcmu_create_name_kstat(char *name, pcmu_ksinfo_t *pp, pcmu_kev_mask_t *ev)
 
 	for (i = 0; i < NUM_OF_PICS; i++) {
 		pp->pic_name_ksp[i] = pcmu_create_picN_kstat(name,
-			i, pp->pic_shift[i], pp->pic_no_evs, ev);
+		    i, pp->pic_shift[i], pp->pic_no_evs, ev);
 
 		if (pp->pic_name_ksp[i] == NULL) {
 			cmn_err(CE_WARN, "pci: unable to create name kstat");
@@ -85,7 +83,7 @@ pcmu_delete_name_kstat(pcmu_ksinfo_t *pp)
  */
 static kstat_t *
 pcmu_create_picN_kstat(char *mod_name, int pic, int pic_shift,
-	int num_ev, pcmu_kev_mask_t *ev_array)
+    int num_ev, pcmu_kev_mask_t *ev_array)
 {
 	struct kstat_named *pic_named_data;
 	int	inst = 0;
@@ -95,9 +93,9 @@ pcmu_create_picN_kstat(char *mod_name, int pic, int pic_shift,
 
 	(void) sprintf(pic_name, "pic%d", pic);
 	if ((picN_ksp = kstat_create(mod_name, inst, pic_name,
-		"bus", KSTAT_TYPE_NAMED, num_ev, NULL)) == NULL) {
+	    "bus", KSTAT_TYPE_NAMED, num_ev, 0)) == NULL) {
 		cmn_err(CE_WARN, "%s %s : kstat create failed",
-			mod_name, pic_name);
+		    mod_name, pic_name);
 
 		/*
 		 * It is up to the calling function to delete any kstats
@@ -158,7 +156,7 @@ kstat_t *pcmu_create_cntr_kstat(pcmu_t *pcmu_p, char *name,
 	    "counters", "bus", KSTAT_TYPE_NAMED, num_pics + 1,
 	    KSTAT_FLAG_WRITABLE)) == NULL) {
 		cmn_err(CE_WARN, "%s%d counters kstat_create failed",
-			drv_name, drv_instance);
+		    drv_name, drv_instance);
 		return (NULL);
 	}
 
