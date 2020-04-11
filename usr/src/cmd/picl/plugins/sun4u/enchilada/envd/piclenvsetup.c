@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains code for setting up environmental related nodes
  * and properties in the PICL tree.
@@ -88,22 +86,22 @@ typedef struct {
  */
 static sensor_node_t sensor_nodes[] = {
 	{"/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,58",
-	SENSOR_CPU0_DIE, NULL, NULL, NULL, NULL},
+	SENSOR_CPU0_DIE, NULL, 0, 0, 0},
 
 	{"/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,58",
-	SENSOR_CPU1_DIE, NULL, NULL, NULL, NULL},
+	SENSOR_CPU1_DIE, NULL, 0, 0, 0},
 
 	{"/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,58",
-	SENSOR_INT_AMB_0, NULL, NULL, NULL, NULL},
+	SENSOR_INT_AMB_0, NULL, 0, 0, 0},
 
 	{"/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c",
-	SENSOR_SYS_OUT, NULL, NULL, NULL, NULL},
+	SENSOR_SYS_OUT, NULL, 0, 0, 0},
 
 	{"/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c",
-	SENSOR_SYS_IN, NULL, NULL, NULL, NULL},
+	SENSOR_SYS_IN, NULL, 0, 0, 0},
 
 	{"/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c",
-	SENSOR_INT_AMB_1, NULL, NULL, NULL, NULL},
+	SENSOR_INT_AMB_1, NULL, 0, 0, 0},
 
 };
 #define	N_SENSOR_NODES	(sizeof (sensor_nodes)/sizeof (sensor_nodes[0]))
@@ -115,7 +113,7 @@ static sensor_node_t sensor_nodes[] = {
 typedef struct {
 	char		*parent_path;	/* parent node path */
 	char		*fan_name;	/* fan name */
-	env_fan_t 	*fanp;		/* fan information */
+	env_fan_t	*fanp;		/* fan information */
 	char		*speed_unit;	/* speed unit string */
 	picl_nodehdl_t	nodeh;		/* "fan" node handle */
 	picl_prophdl_t	proph;		/* "Speed" property handle */
@@ -127,19 +125,19 @@ typedef struct {
  */
 static fan_node_t fan_nodes[] =  {
 	{"/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,58",
-	ENV_CPU0_FAN, NULL, PROP_FAN_SPEED_UNIT_VALUE, NULL, NULL},
+	ENV_CPU0_FAN, NULL, PROP_FAN_SPEED_UNIT_VALUE, 0, 0},
 
 	{"/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,58",
-	ENV_CPU1_FAN, NULL, PROP_FAN_SPEED_UNIT_VALUE, NULL, NULL},
+	ENV_CPU1_FAN, NULL, PROP_FAN_SPEED_UNIT_VALUE, 0, 0},
 
 	{"/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c",
-	ENV_SYSTEM_OUT_FAN, NULL, PROP_FAN_SPEED_UNIT_VALUE, NULL, NULL},
+	ENV_SYSTEM_OUT_FAN, NULL, PROP_FAN_SPEED_UNIT_VALUE, 0, 0},
 
 	{"/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c",
-	ENV_SYSTEM_INTAKE_FAN, NULL, PROP_FAN_SPEED_UNIT_VALUE, NULL, NULL},
+	ENV_SYSTEM_INTAKE_FAN, NULL, PROP_FAN_SPEED_UNIT_VALUE, 0, 0},
 
 	{"/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,52",
-	ENV_DIMM_FAN, NULL, PROP_FAN_SPEED_UNIT_VALUE, NULL, NULL},
+	ENV_DIMM_FAN, NULL, PROP_FAN_SPEED_UNIT_VALUE, 0, 0},
 
 };
 #define	N_FAN_NODES	(sizeof (fan_nodes)/sizeof (fan_nodes[0]))
@@ -150,7 +148,7 @@ static fan_node_t fan_nodes[] =  {
 typedef struct {
 	char		*parent_path;	/* parent node path */
 	char		*disk_name;	/* disk name */
-	env_disk_t 	*diskp;		/* disk information */
+	env_disk_t	*diskp;		/* disk information */
 	picl_nodehdl_t	nodeh;		/* "disk" node handle */
 	picl_prophdl_t	proph;		/* "Temperature" property handle */
 } disk_node_t;
@@ -159,8 +157,8 @@ typedef struct {
  * Disk node array
  */
 static disk_node_t disk_nodes[] =  {
-	{DISK0_NODE_PATH, ENV_DISK0, NULL, NULL, NULL},
-	{DISK1_NODE_PATH, ENV_DISK1, NULL, NULL, NULL},
+	{DISK0_NODE_PATH, ENV_DISK0, NULL, 0, 0},
+	{DISK1_NODE_PATH, ENV_DISK1, NULL, 0, 0},
 };
 #define	N_DISK_NODES	(sizeof (disk_nodes)/sizeof (disk_nodes[0]))
 
@@ -178,7 +176,7 @@ static void delete_fan_nodes_and_props(void);
 static int
 get_current_temp(ptree_rarg_t *parg, void *buf)
 {
-	tempr_t 	temp;
+	tempr_t		temp;
 	picl_prophdl_t	proph;
 	sensor_node_t	*snodep;
 	int		i;
@@ -207,7 +205,7 @@ get_current_temp(ptree_rarg_t *parg, void *buf)
 static int
 get_disk_temp(ptree_rarg_t *parg, void *buf)
 {
-	tempr_t 	temp;
+	tempr_t		temp;
 	picl_prophdl_t	proph;
 	disk_node_t	*dnodep;
 	int		i;
@@ -497,12 +495,12 @@ delete_sensor_nodes_and_props(void)
 
 	for (i = 0; i < N_SENSOR_NODES; ++i) {
 		snodep = &sensor_nodes[i];
-		if (snodep->nodeh != NULL) {
+		if (snodep->nodeh != 0) {
 			/* delete node and all properties under it */
 			(void) ptree_delete_node(snodep->nodeh);
 			(void) ptree_destroy_node(snodep->nodeh);
-			snodep->nodeh = NULL;
-			snodep->proph = NULL;
+			snodep->nodeh = 0;
+			snodep->proph = 0;
 		}
 	}
 }
@@ -529,11 +527,12 @@ add_disk_nodes_and_props()
 		 */
 		err = ptree_get_node_by_path(dnodep->parent_path, &nodeh);
 		if (err != PICL_SUCCESS) {
-		    if (env_debug)
-			envd_log(LOG_ERR, "failed to get node for path %s\n",
-				dnodep->parent_path);
-		    err = PICL_SUCCESS;
-		    continue;
+			if (env_debug)
+				envd_log(LOG_ERR,
+				    "failed to get node for path %s\n",
+				    dnodep->parent_path);
+			err = PICL_SUCCESS;
+			continue;
 		}
 		diskp = dnodep->diskp;
 		if (diskp->present == B_FALSE)
@@ -584,24 +583,24 @@ add_disk_nodes_and_props()
 		 */
 
 		(void) add_regular_prop(cnodeh, PICL_PROP_LOW_SHUTDOWN,
-			PICL_PTYPE_INT, PICL_READ,
-			sizeof (diskp->low_shutdown),
-			(void *)&(diskp->low_shutdown), &proph);
+		    PICL_PTYPE_INT, PICL_READ,
+		    sizeof (diskp->low_shutdown),
+		    (void *)&(diskp->low_shutdown), &proph);
 
 		(void) add_regular_prop(cnodeh, PICL_PROP_LOW_WARNING,
-			PICL_PTYPE_INT, PICL_READ,
-			sizeof (diskp->low_warning),
-			(void *)&(diskp->low_warning), &proph);
+		    PICL_PTYPE_INT, PICL_READ,
+		    sizeof (diskp->low_warning),
+		    (void *)&(diskp->low_warning), &proph);
 
 		(void) add_regular_prop(cnodeh, PICL_PROP_HIGH_WARNING,
-			PICL_PTYPE_INT, PICL_READ,
-			sizeof (diskp->high_warning),
-			(void *)&(diskp->high_warning), &proph);
+		    PICL_PTYPE_INT, PICL_READ,
+		    sizeof (diskp->high_warning),
+		    (void *)&(diskp->high_warning), &proph);
 
 		(void) add_regular_prop(cnodeh, PICL_PROP_HIGH_SHUTDOWN,
-			PICL_PTYPE_INT, PICL_READ,
-			sizeof (diskp->high_shutdown),
-			(void *)&(diskp->high_shutdown), &proph);
+		    PICL_PTYPE_INT, PICL_READ,
+		    sizeof (diskp->high_shutdown),
+		    (void *)&(diskp->high_shutdown), &proph);
 
 	}
 	if (err != PICL_SUCCESS) {
@@ -633,11 +632,11 @@ delete_disk_nodes_and_props(void)
 
 	for (i = 0; i < N_DISK_NODES; ++i) {
 		dnodep = &disk_nodes[i];
-		if (dnodep->nodeh != NULL) {
+		if (dnodep->nodeh != 0) {
 			(void) ptree_delete_node(dnodep->nodeh);
 			(void) ptree_destroy_node(dnodep->nodeh);
-			dnodep->nodeh = NULL;
-			dnodep->proph = NULL;
+			dnodep->nodeh = 0;
+			dnodep->proph = 0;
 		}
 	}
 }
@@ -716,14 +715,14 @@ add_fan_nodes_and_props()
 			 * We do not permit setting of DIMM FAN speeds.
 			 */
 			err = add_volatile_prop(cnodeh, pname, PICL_PTYPE_INT,
-				PICL_READ, sizeof (fanspeed_t),
-				get_current_speed,
-				NULL, &proph);
+			    PICL_READ, sizeof (fanspeed_t),
+			    get_current_speed,
+			    NULL, &proph);
 		} else {
 			err = add_volatile_prop(cnodeh, pname, PICL_PTYPE_INT,
-				PICL_READ|PICL_WRITE, sizeof (fanspeed_t),
-				get_current_speed,
-				set_current_speed, &proph);
+			    PICL_READ|PICL_WRITE, sizeof (fanspeed_t),
+			    get_current_speed,
+			    set_current_speed, &proph);
 		}
 
 		if (err != PICL_SUCCESS)
@@ -772,10 +771,10 @@ delete_fan_nodes_and_props(void)
 
 	for (i = 0; i < N_FAN_NODES; ++i) {
 		fnodep = &fan_nodes[i];
-		if (fnodep->nodeh != NULL) {
+		if (fnodep->nodeh != 0) {
 			(void) ptree_delete_node(fnodep->nodeh);
 			(void) ptree_destroy_node(fnodep->nodeh);
-			fnodep->nodeh = NULL;
+			fnodep->nodeh = 0;
 		}
 	}
 }
@@ -943,9 +942,9 @@ env_picl_setup(void)
 	for (i = 0; i < N_SENSOR_NODES; ++i) {
 		snodep = &sensor_nodes[i];
 		snodep->sensorp = sensor_lookup(snodep->sensor_name);
-		snodep->nodeh = NULL;
-		snodep->proph = NULL;
-		snodep->target_proph = NULL;
+		snodep->nodeh = 0;
+		snodep->proph = 0;
+		snodep->target_proph = 0;
 	}
 
 	/*
@@ -954,8 +953,8 @@ env_picl_setup(void)
 	for (i = 0; i < N_FAN_NODES; ++i) {
 		fnodep = &fan_nodes[i];
 		fnodep->fanp = fan_lookup(fnodep->fan_name);
-		fnodep->nodeh = NULL;
-		fnodep->proph = NULL;
+		fnodep->nodeh = 0;
+		fnodep->proph = 0;
 	}
 
 	/*
@@ -964,8 +963,8 @@ env_picl_setup(void)
 	for (i = 0; i < N_DISK_NODES; ++i) {
 		dnodep = &disk_nodes[i];
 		dnodep->diskp = disk_lookup(dnodep->disk_name);
-		dnodep->nodeh = NULL;
-		dnodep->proph = NULL;
+		dnodep->nodeh = 0;
+		dnodep->proph = 0;
 	}
 
 	/*

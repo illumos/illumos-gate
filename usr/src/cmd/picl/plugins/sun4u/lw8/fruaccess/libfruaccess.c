@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -78,7 +76,7 @@ int		fru_append_packet(segment_hdl_t segment, packet_t *packet,
 		    segment_hdl_t *newsegment, door_cred_t *cred);
 int		fru_delete_packet(packet_hdl_t packet,
 		    segment_hdl_t *newsegment, door_cred_t *cred);
-int 		fru_is_data_available(picl_nodehdl_t fru);
+int		fru_is_data_available(picl_nodehdl_t fru);
 
 #define	PICL_PROP_SC_HANDLE	"SC_handle"
 #define	PICL_PROP_DATA_AVAIL	"FRUDataAvailable"
@@ -114,19 +112,19 @@ fru_open_container(picl_nodehdl_t fruh)
 	container_hdl_t container_hdl;
 
 	if (fru_open_dev() == -1) {
-		return (NULL);
+		return (0);
 	}
 
-	err = ptree_get_propval_by_name(fruh, PICL_PROP_DATA_AVAIL, NULL, NULL);
+	err = ptree_get_propval_by_name(fruh, PICL_PROP_DATA_AVAIL, NULL, 0);
 	if (err != PICL_SUCCESS) {
 		syslog(LOG_ERR, GETPV, PICL_PROP_DATA_AVAIL, err);
-		return (NULL);
+		return (0);
 	}
 	err = ptree_get_propval_by_name(fruh, PICL_PROP_SC_HANDLE,
 	    &container_hdl, sizeof (container_hdl_t));
 	if (err != PICL_SUCCESS) {
 		syslog(LOG_ERR, GETPV, PICL_PROP_SC_HANDLE, err);
-		return (NULL);
+		return (0);
 	}
 	return (container_hdl);
 }

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This plugin-in creates the FRU Hierarchy for the
  * SUNW,Netra-T12 platform and manages the environmental sensors
@@ -126,7 +124,7 @@ static picld_plugin_reg_t  my_reg_info = {
 #define	PICL_PROPVAL_DISABLED		"disabled"
 #define	PICL_PROPVAL_UNKNOWN		"unknown"
 #define	PICL_PROPVAL_SELF_REGULATING	"self-regulating"
-#define	PICL_PROPVAL_PER_CENT 		"%"
+#define	PICL_PROPVAL_PER_CENT		"%"
 #define	PICL_PROP_BANK_STATUS		"bank-status"
 
 /*
@@ -297,7 +295,7 @@ static char *hpu_condition_table[] = {"unknown", "okay", "failing",
  * variables set up in init
  */
 static picl_nodehdl_t	frutreeh;
-static picl_nodehdl_t	sch = NULL;
+static picl_nodehdl_t	sch = 0;
 static int init_complete;
 static int pcix_io = 0;
 
@@ -746,7 +744,7 @@ add_fru_node(picl_nodehdl_t parh, sgfrunode_t *sgfrunode,
 	 * if sgfrunode already there, then just carry on own the tree
 	 */
 	childh = find_child_by_name(parh, nodename);
-	if (childh != NULL) {
+	if (childh != 0) {
 		/*
 		 * for frus other than dimms and ecaches, update environmental
 		 * sensors and board status if necessary
@@ -807,7 +805,7 @@ add_fru_node(picl_nodehdl_t parh, sgfrunode_t *sgfrunode,
 	 * a dr event - ie post-initialisation
 	 */
 	if (init_complete)
-		post_frudr_event(PICL_FRU_ADDED, parh, NULL);
+		post_frudr_event(PICL_FRU_ADDED, parh, 0);
 
 	/*
 	 * Create empty Devices table - we'll add lines to it as we go along
@@ -941,7 +939,7 @@ add_location_node(picl_nodehdl_t parh, sgfrunode_t *sgfrunode,
 	 * if node already there, then just carry on down the tree
 	 */
 	childh = find_child_by_name(parh, labelp);
-	if (childh != NULL) {
+	if (childh != 0) {
 		*childp = childh;
 		return (PICL_SUCCESS);
 	}
@@ -1330,7 +1328,7 @@ add_intermediate_nodes(picl_nodehdl_t *nodep, char *labelp,
 	 * created)
 	 */
 	intermediate = find_child_by_name(*nodep, labelp);
-	if (intermediate == NULL) {
+	if (intermediate == 0) {
 		intermediate = *nodep;
 		err = add_intermediate_location(&intermediate, labelp,
 		    slot_name);
@@ -1344,7 +1342,7 @@ add_intermediate_nodes(picl_nodehdl_t *nodep, char *labelp,
 	 * created)
 	 */
 	intermediate2 = find_child_by_name(intermediate, labelp);
-	if (intermediate2 == NULL) {
+	if (intermediate2 == 0) {
 		/*
 		 * need to create intermediate fru node node
 		 */
@@ -1436,19 +1434,19 @@ find_child_by_name(picl_nodehdl_t parh, char *name)
 	err = ptree_get_propval_by_name(parh, PICL_PROP_CHILD,
 	    &nodeh, sizeof (picl_nodehdl_t));
 	if (err != PICL_SUCCESS)
-		return (NULL);
+		return (0);
 	for (;;) {
 		err = ptree_get_propval_by_name(nodeh, PICL_PROP_NAME, nodename,
 		    sizeof (nodename));
 		if (err != PICL_SUCCESS)
-			return (NULL);
+			return (0);
 		if (strcmp(name, nodename) == 0) {
 			return (nodeh);
 		}
 		err = ptree_get_propval_by_name(nodeh, PICL_PROP_PEER,
 		    &nodeh, sizeof (picl_nodehdl_t));
 		if (err != PICL_SUCCESS)
-			return (NULL);
+			return (0);
 	}
 }
 
@@ -1457,7 +1455,7 @@ create_dimm_references(picl_nodehdl_t parh, int dimm_id,
     picl_nodehdl_t nodeh, picl_prophdl_t tblhdl)
 {
 	int err;
-	picl_nodehdl_t memctlhdl = NULL;
+	picl_nodehdl_t memctlhdl = 0;
 	picl_nodehdl_t memgrphdl;
 	picl_nodehdl_t memhdl;
 	char name[MAXPATHLEN];
@@ -1662,8 +1660,8 @@ create_cpu_references(char *pname, picl_nodehdl_t nodeh, picl_prophdl_t tblhdl)
 			err = ptree_get_prop_by_name(cpuhdl1,
 			    PICL_REFPROP_FRU_PARENT, &prophdl);
 			if (err != PICL_SUCCESS) {
-			    err = add_prop_ref(cpuhdl1, nodeh,
-				PICL_REFPROP_FRU_PARENT);
+				err = add_prop_ref(cpuhdl1, nodeh,
+				    PICL_REFPROP_FRU_PARENT);
 			if (err != PICL_SUCCESS)
 				return (err);
 			err = create_table_entry(tblhdl, cpuhdl1,
@@ -2024,19 +2022,19 @@ frudr_completion_handler(char *ename, void *earg, size_t size)
 		 * now frudata has been notified that the node is to be
 		 * removed, we can actually remove it
 		 */
-		fruh = NULL;
+		fruh = 0;
 		(void) nvlist_lookup_uint64(earg,
 		    PICLEVENTARG_FRUHANDLE, &fruh);
-		if (fruh != NULL) {
+		if (fruh != 0) {
 			(void) remove_subtree(fruh);
 
 			/*
 			 * Now repopulate the frutree with current data.
 			 */
-			parh = NULL;
+			parh = 0;
 			(void) nvlist_lookup_uint64(earg,
 			    PICLEVENTARG_PARENTHANDLE, &parh);
-			if (parh != NULL) {
+			if (parh != 0) {
 				frudr_add_subtree(parh);
 			}
 		}
@@ -2058,7 +2056,7 @@ post_frudr_event(char *ename, picl_nodehdl_t parenth, picl_nodehdl_t fruh)
 	ev_name = strdup(ename);
 	if (ev_name == NULL)
 		return;
-	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME_TYPE, NULL)) {
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME_TYPE, 0)) {
 		free(ev_name);
 		return;
 	}
@@ -2164,7 +2162,7 @@ frudr_evhandler(const char *ename, const void *earg, size_t size, void *cookie)
 	if (strcmp(ename, PICLEVENT_DR_AP_STATE_CHANGE) != 0)
 		return;
 
-	if (nvlist_unpack((char *)earg, size, &nvlp, NULL))
+	if (nvlist_unpack((char *)earg, size, &nvlp, 0))
 		return;
 
 	if (nvlist_lookup_string(nvlp, PICLEVENTARG_DATA_TYPE, &dtype)) {
@@ -2366,7 +2364,7 @@ frumemcfg_evhandler(const char *ename, const void *earg, size_t size,
 	/*
 	 * find corresponding frutree dimm nodes
 	 */
-	if (nvlist_unpack((char *)earg, size, &nvlp, NULL))
+	if (nvlist_unpack((char *)earg, size, &nvlp, 0))
 		return;
 	if (nvlist_lookup_uint64(nvlp, PICLEVENTARG_NODEHANDLE, &nodeh)) {
 		nvlist_free(nvlp);
@@ -2574,8 +2572,8 @@ next_bank:
  */
 static int
 add_sensor_node(picl_nodehdl_t fruhdl, picl_nodehdl_t lochdl, char *nodename,
-	char *class, char *prop_class, picl_prophdl_t tblhdl,
-	picl_nodehdl_t *sensorhdlp)
+    char *class, char *prop_class, picl_prophdl_t tblhdl,
+    picl_nodehdl_t *sensorhdlp)
 {
 	int err;
 
@@ -2597,7 +2595,7 @@ add_sensor_node(picl_nodehdl_t fruhdl, picl_nodehdl_t lochdl, char *nodename,
 	if (err != PICL_SUCCESS)
 		return (err);
 
-	if (fruhdl != NULL) {
+	if (fruhdl != 0) {
 		err = add_prop_ref(*sensorhdlp, fruhdl,
 		    PICL_REFPROP_FRU_PARENT);
 	} else {
@@ -3226,7 +3224,7 @@ add_env_nodes(picl_nodehdl_t nodeh, char *nodename, picl_prophdl_t tblhdl)
 		 * check if sensor node has already been created
 		 */
 		sprintf_buf3(buf, "%s_%s", nodename, id);
-		if (find_child_by_name(sch, buf) != NULL)
+		if (find_child_by_name(sch, buf) != 0)
 			continue;
 
 		if (env->sd_id.id.sensor_type == SG_SENSOR_TYPE_COOLING) {
@@ -3267,7 +3265,7 @@ add_env_nodes(picl_nodehdl_t nodeh, char *nodename, picl_prophdl_t tblhdl)
 			childh = nodeh;
 			tblhdl2 = tblhdl;
 		}
-		err = add_sensor_node(childh, NULL, buf,
+		err = add_sensor_node(childh, 0, buf,
 		    hpu_sensor_class_table[env->sd_id.id.sensor_type],
 		    hpu_sensor_prop_table[env->sd_id.id.sensor_type],
 		    tblhdl2, &sensorhdl);
@@ -3627,10 +3625,10 @@ add_led_nodes(picl_nodehdl_t nodeh, char *name, int position,
 		if (position != lom_get_led.position)
 			continue;
 		if (position == LOM_LED_POSITION_LOCATION) {
-			err = add_sensor_node(NULL, nodeh, buf, PICL_CLASS_LED,
+			err = add_sensor_node(0, nodeh, buf, PICL_CLASS_LED,
 			    PICL_PROP_STATE, tblhdl, &sensorhdl);
 		} else {
-			err = add_sensor_node(nodeh, NULL, buf, PICL_CLASS_LED,
+			err = add_sensor_node(nodeh, 0, buf, PICL_CLASS_LED,
 			    PICL_PROP_STATE, tblhdl, &sensorhdl);
 		}
 		if (err != PICL_SUCCESS) {
@@ -3863,7 +3861,7 @@ update_disk_node(struct lw8_disk *diskp)
 	diskndh = find_child_by_name(slotndh, fruname);
 	err = ptree_get_node_by_path(diskp->d_plat_path, &devhdl);
 	if (err == PICL_SUCCESS) {
-		if (diskndh != NULL)
+		if (diskndh != 0)
 			return;
 		err = ptree_create_and_add_node(slotndh, fruname,
 		    PICL_CLASS_FRU, &diskndh);
@@ -3881,7 +3879,7 @@ update_disk_node(struct lw8_disk *diskp)
 		if (err != PICL_SUCCESS)
 			return;
 	} else {
-		if (diskndh == NULL)
+		if (diskndh == 0)
 			return;
 		err = ptree_delete_node(diskndh);
 		if (err != PICL_SUCCESS)

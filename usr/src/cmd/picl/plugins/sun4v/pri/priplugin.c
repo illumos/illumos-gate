@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <pri.h>
 #include "priplugin.h"
 
@@ -126,14 +124,14 @@ priplugin_init(void)
 	(void) mutex_init(&rebuild_lock, USYNC_THREAD, NULL);
 	(void) cond_init(&rebuild_cv, USYNC_THREAD, NULL);
 
-	if ((status = thr_create(NULL, NULL, pri_worker_thread, NULL, THR_BOUND,
+	if ((status = thr_create(NULL, 0, pri_worker_thread, NULL, THR_BOUND,
 	    &pri_worker_thread_id)) < 0) {
 		pri_debug(LOG_NOTICE, "priplugin: can't create worker thread: "
 		    "%d\n", status);
 		all_thr_exit = B_TRUE;
 		(void) mutex_destroy(&rebuild_lock);
 		(void) cond_destroy(&rebuild_cv);
-	} else if ((status = thr_create(NULL, NULL, pri_reader_thread, NULL,
+	} else if ((status = thr_create(NULL, 0, pri_reader_thread, NULL,
 	    THR_BOUND, &pri_reader_thread_id)) < 0) {
 		pri_debug(LOG_NOTICE, "priplugin: can't create reader thread: "
 		    "%d\n", status);

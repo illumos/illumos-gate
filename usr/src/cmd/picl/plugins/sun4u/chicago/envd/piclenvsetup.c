@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains code for setting up environmental related nodes
  * and properties in the PICL tree.
@@ -83,23 +81,23 @@ typedef struct {
  */
 static sensor_node_t sensor_nodes[] = {
 	{"/platform/ebus@1f,464000/env-monitor@3,0", SENSOR_CPU0,
-	NULL, NULL, NULL, NULL},
+	NULL, 0, 0, 0},
 	{"/platform/ebus@1f,464000/env-monitor@3,0", SENSOR_CPU1,
-	NULL, NULL, NULL, NULL},
+	NULL, 0, 0, 0},
 	{"/platform/ebus@1f,464000/env-monitor@3,0", SENSOR_MB,
-	NULL, NULL, NULL, NULL},
+	NULL, 0, 0, 0},
 	{"/platform/ebus@1f,464000/env-monitor@3,0", SENSOR_ADT7462,
-	NULL, NULL, NULL, NULL},
+	NULL, 0, 0, 0},
 	{"/platform/ebus@1f,464000/env-monitor@3,0", SENSOR_LM95221,
-	NULL, NULL, NULL, NULL},
+	NULL, 0, 0, 0},
 	{"/platform/ebus@1f,464000/env-monitor@3,0", SENSOR_FIRE,
-	NULL, NULL, NULL, NULL},
+	NULL, 0, 0, 0},
 	{"/platform/ebus@1f,464000/env-monitor@3,0", SENSOR_LSI1064,
-	NULL, NULL, NULL, NULL},
+	NULL, 0, 0, 0},
 	{"/platform/ebus@1f,464000/env-monitor@3,0", SENSOR_FRONT_PANEL,
-	NULL, NULL, NULL, NULL},
+	NULL, 0, 0, 0},
 	{"/platform/ebus@1f,464000/env-monitor@3,0", SENSOR_PSU,
-	NULL, NULL, NULL, NULL}
+	NULL, 0, 0, 0}
 };
 #define	N_SENSOR_NODES	(sizeof (sensor_nodes)/sizeof (sensor_nodes[0]))
 
@@ -109,7 +107,7 @@ static sensor_node_t sensor_nodes[] = {
 typedef struct {
 	char		*parent_path;	/* parent node path */
 	char		*fan_name;	/* fan name */
-	env_fan_t 	*fanp;		/* fan information */
+	env_fan_t	*fanp;		/* fan information */
 	char		*speed_unit;	/* speed unit string */
 	picl_nodehdl_t	nodeh;		/* "fan" node handle */
 	picl_prophdl_t	proph;		/* "Speed" property handle */
@@ -120,15 +118,15 @@ typedef struct {
  */
 static fan_node_t fan_nodes[] =  {
 	{"/platform/ebus@1f,464000/env-monitor@3,0", ENV_SYSTEM_FAN0,
-	NULL, PROP_FAN_SPEED_UNIT_VALUE, NULL, NULL},
+	NULL, PROP_FAN_SPEED_UNIT_VALUE, 0, 0},
 	{"/platform/ebus@1f,464000/env-monitor@3,0", ENV_SYSTEM_FAN1,
-	NULL, PROP_FAN_SPEED_UNIT_VALUE, NULL, NULL},
+	NULL, PROP_FAN_SPEED_UNIT_VALUE, 0, 0},
 	{"/platform/ebus@1f,464000/env-monitor@3,0", ENV_SYSTEM_FAN2,
-	NULL, PROP_FAN_SPEED_UNIT_VALUE, NULL, NULL},
+	NULL, PROP_FAN_SPEED_UNIT_VALUE, 0, 0},
 	{"/platform/ebus@1f,464000/env-monitor@3,0", ENV_SYSTEM_FAN3,
-	NULL, PROP_FAN_SPEED_UNIT_VALUE, NULL, NULL},
+	NULL, PROP_FAN_SPEED_UNIT_VALUE, 0, 0},
 	{"/platform/ebus@1f,464000/env-monitor@3,0", ENV_SYSTEM_FAN4,
-	NULL, PROP_FAN_SPEED_UNIT_VALUE, NULL, NULL}
+	NULL, PROP_FAN_SPEED_UNIT_VALUE, 0, 0}
 };
 #define	N_FAN_NODES	(sizeof (fan_nodes)/sizeof (fan_nodes[0]))
 
@@ -138,7 +136,7 @@ static fan_node_t fan_nodes[] =  {
 typedef struct {
 	char		*parent_path;	/* parent node path */
 	char		*disk_name;	/* disk name */
-	env_disk_t 	*diskp;		/* disk information */
+	env_disk_t	*diskp;		/* disk information */
 	picl_nodehdl_t	nodeh;		/* "disk" node handle */
 	picl_prophdl_t	proph;		/* "Temperature" property handle */
 } disk_node_t;
@@ -147,10 +145,10 @@ typedef struct {
  * Disk node array
  */
 static disk_node_t disk_nodes[] =  {
-	{DISK0_NODE_PATH, ENV_DISK0, NULL, NULL, NULL},
-	{DISK1_NODE_PATH, ENV_DISK1, NULL, NULL, NULL},
-	{DISK2_NODE_PATH, ENV_DISK2, NULL, NULL, NULL},
-	{DISK3_NODE_PATH, ENV_DISK3, NULL, NULL, NULL}
+	{DISK0_NODE_PATH, ENV_DISK0, NULL, 0, 0},
+	{DISK1_NODE_PATH, ENV_DISK1, NULL, 0, 0},
+	{DISK2_NODE_PATH, ENV_DISK2, NULL, 0, 0},
+	{DISK3_NODE_PATH, ENV_DISK3, NULL, 0, 0}
 };
 #define	N_DISK_NODES	(sizeof (disk_nodes)/sizeof (disk_nodes[0]))
 
@@ -168,7 +166,7 @@ static void delete_fan_nodes_and_props(void);
 static int
 get_current_temp(ptree_rarg_t *parg, void *buf)
 {
-	tempr_t 	temp;
+	tempr_t		temp;
 	picl_prophdl_t	proph;
 	sensor_node_t	*snodep;
 	int		i;
@@ -197,7 +195,7 @@ get_current_temp(ptree_rarg_t *parg, void *buf)
 static int
 get_disk_temp(ptree_rarg_t *parg, void *buf)
 {
-	tempr_t 	temp;
+	tempr_t		temp;
 	picl_prophdl_t	proph;
 	disk_node_t	*dnodep;
 	int		i;
@@ -492,12 +490,12 @@ delete_sensor_nodes_and_props(void)
 
 	for (i = 0; i < N_SENSOR_NODES; i++) {
 		snodep = &sensor_nodes[i];
-		if (snodep->nodeh != NULL) {
+		if (snodep->nodeh != 0) {
 			/* delete node and all properties under it */
 			(void) ptree_delete_node(snodep->nodeh);
 			(void) ptree_destroy_node(snodep->nodeh);
-			snodep->nodeh = NULL;
-			snodep->proph = NULL;
+			snodep->nodeh = 0;
+			snodep->proph = 0;
 		}
 	}
 }
@@ -634,11 +632,11 @@ delete_disk_nodes_and_props(void)
 
 	for (i = 0; i < N_DISK_NODES; i++) {
 		dnodep = &disk_nodes[i];
-		if (dnodep->nodeh != NULL) {
+		if (dnodep->nodeh != 0) {
 			(void) ptree_delete_node(dnodep->nodeh);
 			(void) ptree_destroy_node(dnodep->nodeh);
-			dnodep->nodeh = NULL;
-			dnodep->proph = NULL;
+			dnodep->nodeh = 0;
+			dnodep->proph = 0;
 		}
 	}
 }
@@ -772,10 +770,10 @@ delete_fan_nodes_and_props(void)
 
 	for (i = 0; i < N_FAN_NODES; i++) {
 		fnodep = &fan_nodes[i];
-		if (fnodep->nodeh != NULL) {
+		if (fnodep->nodeh != 0) {
 			(void) ptree_delete_node(fnodep->nodeh);
 			(void) ptree_destroy_node(fnodep->nodeh);
-			fnodep->nodeh = NULL;
+			fnodep->nodeh = 0;
 		}
 	}
 }
@@ -947,9 +945,9 @@ env_picl_setup(void)
 	for (i = 0; i < N_SENSOR_NODES; i++) {
 		snodep = &sensor_nodes[i];
 		snodep->sensorp = sensor_lookup(snodep->sensor_name);
-		snodep->nodeh = NULL;
-		snodep->proph = NULL;
-		snodep->target_proph = NULL;
+		snodep->nodeh = 0;
+		snodep->proph = 0;
+		snodep->target_proph = 0;
 	}
 
 	/*
@@ -958,8 +956,8 @@ env_picl_setup(void)
 	for (i = 0; i < N_FAN_NODES; i++) {
 		fnodep = &fan_nodes[i];
 		fnodep->fanp = fan_lookup(fnodep->fan_name);
-		fnodep->nodeh = NULL;
-		fnodep->proph = NULL;
+		fnodep->nodeh = 0;
+		fnodep->proph = 0;
 	}
 
 	/*
@@ -968,8 +966,8 @@ env_picl_setup(void)
 	for (i = 0; i < N_DISK_NODES; i++) {
 		dnodep = &disk_nodes[i];
 		dnodep->diskp = disk_lookup(dnodep->disk_name);
-		dnodep->nodeh = NULL;
-		dnodep->proph = NULL;
+		dnodep->nodeh = 0;
+		dnodep->proph = 0;
 	}
 
 	/*
