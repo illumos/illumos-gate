@@ -1514,7 +1514,7 @@ cmlb_create_minor_nodes(struct cmlb_lun *cl)
 		if (cl->cl_alter_behavior & CMLB_CREATE_P0_MINOR_NODE) {
 			if (cmlb_create_minor(CMLB_DEVINFO(cl), "q", S_IFBLK,
 			    (instance << CMLBUNIT_FORCE_P0_SHIFT) | P0_RAW_DISK,
-			    cl->cl_node_type, NULL, internal) == DDI_FAILURE) {
+			    cl->cl_node_type, 0, internal) == DDI_FAILURE) {
 				ddi_remove_minor_node(CMLB_DEVINFO(cl), NULL);
 				return (ENXIO);
 			}
@@ -1522,7 +1522,7 @@ cmlb_create_minor_nodes(struct cmlb_lun *cl)
 			if (cmlb_create_minor(CMLB_DEVINFO(cl), "q,raw",
 			    S_IFCHR,
 			    (instance << CMLBUNIT_FORCE_P0_SHIFT) | P0_RAW_DISK,
-			    cl->cl_node_type, NULL, internal) == DDI_FAILURE) {
+			    cl->cl_node_type, 0, internal) == DDI_FAILURE) {
 				ddi_remove_minor_node(CMLB_DEVINFO(cl), NULL);
 				return (ENXIO);
 			}
