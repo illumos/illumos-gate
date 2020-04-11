@@ -97,19 +97,19 @@ static struct bus_ops niumx_bus_ops = {
 	0,
 	niumx_ctlops,
 	ddi_bus_prop_op,
-	0,				/* (*bus_get_eventcookie)();    */
+	0,				/* (*bus_get_eventcookie)();	*/
 	0,				/* (*bus_add_eventcall)();	*/
-	0,				/* (*bus_remove_eventcall)();   */
+	0,				/* (*bus_remove_eventcall)();	*/
 	0,				/* (*bus_post_event)();		*/
 	0,				/* (*bus_intr_ctl)();		*/
-	0,				/* (*bus_config)(); 		*/
-	0,				/* (*bus_unconfig)(); 		*/
-	niumx_fm_init_child,		/* (*bus_fm_init)(); 		*/
-	0,				/* (*bus_fm_fini)(); 		*/
+	0,				/* (*bus_config)();		*/
+	0,				/* (*bus_unconfig)();		*/
+	niumx_fm_init_child,		/* (*bus_fm_init)();		*/
+	0,				/* (*bus_fm_fini)();		*/
 	0,				/* (*bus_enter)()		*/
 	0,				/* (*bus_exit)()		*/
 	0,				/* (*bus_power)()		*/
-	niumx_intr_ops			/* (*bus_intr_op)(); 		*/
+	niumx_intr_ops			/* (*bus_intr_op)();		*/
 };
 
 extern  struct cb_ops niumx_cb_ops;
@@ -199,7 +199,7 @@ void
 niumx_intr_dist(void *arg)
 {
 	niumx_devstate_t	*niumxds_p = (niumx_devstate_t *)arg;
-	kmutex_t 	*lock_p = &niumxds_p->niumx_mutex;
+	kmutex_t	*lock_p = &niumxds_p->niumx_mutex;
 	int		i;
 	niumx_ih_t	*ih_p = niumxds_p->niumx_ihtable;
 
@@ -367,13 +367,13 @@ niumx_fm_init_child(dev_info_t *dip, dev_info_t *cdip, int cap,
 /*ARGSUSED*/
 int
 niumx_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
-	off_t offset, off_t len, caddr_t *vaddrp)
+    off_t offset, off_t len, caddr_t *vaddrp)
 {
 	struct regspec p_regspec;
 	ddi_map_req_t p_mapreq;
-	niu_regspec_t	*reg_p;
-	int 	i, rn = mp->map_obj.rnumber, reglen, rnglen, rngnum, ret;
-	niumx_ranges_t	*rng_p;
+	niu_regspec_t *reg_p;
+	int i, rn = mp->map_obj.rnumber, reglen, rnglen, rngnum, ret;
+	niumx_ranges_t *rng_p;
 
 	uint32_t	reg_begin, rng_begin;
 
@@ -453,7 +453,7 @@ err:
  */
 int
 niumx_ctlops(dev_info_t *dip, dev_info_t *rdip,
-	ddi_ctl_enum_t ctlop, void *arg, void *result)
+    ddi_ctl_enum_t ctlop, void *arg, void *result)
 {
 	niu_regspec_t *reg_p;
 	int	reglen, totreg;
@@ -644,7 +644,7 @@ niumx_removechild(dev_info_t *dip)
 /*ARGSUSED*/
 int
 niumx_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attrp,
-	int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *handlep)
+    int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *handlep)
 {
 	ddi_dma_impl_t *mp;
 	int sleep = (waitfp == DDI_DMA_SLEEP) ? KM_SLEEP : KM_NOSLEEP;
@@ -671,7 +671,7 @@ niumx_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attrp,
 	mp->dmai_fault_check = NULL;
 	mp->dmai_fault_notify = NULL;
 
-	mp->dmai_attr = *attrp; 	/* set requestors attr info */
+	mp->dmai_attr = *attrp;		/* set requestors attr info */
 
 	DBG(NIUMX_DBG_DMA_ALLOCH, dip, "mp=%p\n", mp);
 
@@ -714,16 +714,16 @@ niumx_dma_freehdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
  *	dma handle members affected (set on exit):
  *	mp->dmai_object		- dmareq->dmar_object
  *	mp->dmai_rflags		- dmareq->dmar_flags
- *	mp->dmai_pfn0   	- 1st page pfn (if va/size pair and not shadow)
- *	mp->dmai_roffset 	- initialized to starting page offset
+ *	mp->dmai_pfn0		- 1st page pfn (if va/size pair and not shadow)
+ *	mp->dmai_roffset	- initialized to starting page offset
  *	mp->dmai_size		- # of total pages of entire object
  *	mp->dmai_cookie		- new cookie alloc'd
  */
 /*ARGSUSED*/
 int
 niumx_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
-	ddi_dma_handle_t handle, ddi_dma_req_t *dmareq,
-	ddi_dma_cookie_t *cookiep, uint_t *ccountp)
+    ddi_dma_handle_t handle, ddi_dma_req_t *dmareq,
+    ddi_dma_cookie_t *cookiep, uint_t *ccountp)
 {
 	int (*waitfp)(caddr_t) = dmareq->dmar_fp;
 	ddi_dma_impl_t *mp = (ddi_dma_impl_t *)handle;
@@ -921,7 +921,7 @@ niumx_set_intr(dev_info_t *dip, dev_info_t *rdip,
 	int		ret = DDI_SUCCESS;
 	uint64_t	hvret;
 	niumx_devstate_t	*niumxds_p;	/* devstate pointer */
-	int 		instance = ddi_get_instance(dip);
+	int		instance = ddi_get_instance(dip);
 
 	niumxds_p = (niumx_devstate_t *)ddi_get_soft_state(niumx_state,
 	    instance);
@@ -1142,7 +1142,7 @@ niumx_rem_intr(dev_info_t *dip, dev_info_t *rdip,
 	niumx_ih_t	*ih_p;
 	int		ret = DDI_SUCCESS, state;
 	hrtime_t	start;
-	niusysino_t 	sysino;
+	niusysino_t	sysino;
 	niumx_devstate_t	*niumxds_p;	/* devstate pointer */
 	int		instance = ddi_get_instance(dip);
 
@@ -1175,7 +1175,8 @@ niumx_rem_intr(dev_info_t *dip, dev_info_t *rdip,
 	ih_p->ih_sysino = 0;
 
 	hdlp->ih_vector = (uint32_t)sysino;
-	if (hdlp->ih_vector !=  NULL) i_ddi_rem_ivintr(hdlp);
+	if (hdlp->ih_vector != 0)
+		i_ddi_rem_ivintr(hdlp);
 
 fail:
 	return (ret);
