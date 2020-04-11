@@ -164,14 +164,14 @@ filenames(int nfiles, Eptr **files)
 	if (nfiles) {
 		someerrors++;
 		(void) fprintf(stdout, terse
-			? "%d file%s"
-			: "%d file%s contain%s errors",
-			nfiles, plural(nfiles), verbform(nfiles));
+		    ? "%d file%s"
+		    : "%d file%s contain%s errors",
+		    nfiles, plural(nfiles), verbform(nfiles));
 		if (!terse) {
 			FILEITERATE(fi, 1) {
 				(void) fprintf(stdout, "%s\"%s\" (%d)",
-					sep, (*files[fi])->error_text[0],
-					files[fi+1] - files[fi]);
+				    sep, (*files[fi])->error_text[0],
+				    files[fi+1] - files[fi]);
 				sep = ", ";
 			}
 		}
@@ -201,10 +201,10 @@ nopertain(Eptr **files)
 			someerrors++;
 		if (terse) {
 			(void) fprintf(stdout, "\t%d %s errors NOT PRINTED\n",
-				class_count[type], class_table[type]);
+			    class_count[type], class_table[type]);
 		} else {
 			(void) fprintf(stdout, "\n\t%d %s errors follow\n",
-				class_count[type], class_table[type]);
+			    class_count[type], class_table[type]);
 			EITERATE(erpp, files, 0) {
 				errorp = *erpp;
 				if (errorp->error_e_class == type) {
@@ -232,9 +232,9 @@ touchfiles(int nfiles, Eptr **files, int *r_edargc, char ***r_edargv)
 		name = (*files[fi])->error_text[0];
 		spread = files[fi+1] - files[fi];
 		(void) fprintf(stdout, terse
-			? "\"%s\" has %d error%s, "
-			: "\nFile \"%s\" has %d error%s.\n",
-			name, spread, plural(spread));
+		    ? "\"%s\" has %d error%s, "
+		    : "\nFile \"%s\" has %d error%s.\n",
+		    name, spread, plural(spread));
 		/*
 		 *	First, iterate through all error messages in this file
 		 *	to see how many of the error messages really will
@@ -336,9 +336,9 @@ settotouch(char *name)
 
 	if (query) {
 		switch (touchstatus = inquire(terse
-			? "Touch? "
-			: "Do you want to touch file \"%s\"? ",
-			name)) {
+		    ? "Touch? "
+		    : "Do you want to touch file \"%s\"? ",
+		    name)) {
 		case Q_NO:
 		case Q_no:
 			return (dest);
@@ -351,23 +351,23 @@ settotouch(char *name)
 	case F_NOTREAD:
 		dest = TOSTDOUT;
 		(void) fprintf(stdout, terse
-			? "\"%s\" unreadable\n"
-			: "File \"%s\" is unreadable\n",
-			name);
+		    ? "\"%s\" unreadable\n"
+		    : "File \"%s\" is unreadable\n",
+		    name);
 		break;
 	case F_NOTWRITE:
 		dest = TOSTDOUT;
 		(void) fprintf(stdout, terse
-			? "\"%s\" unwritable\n"
-			: "File \"%s\" is unwritable\n",
-			name);
+		    ? "\"%s\" unwritable\n"
+		    : "File \"%s\" is unwritable\n",
+		    name);
 		break;
 	case F_NOTEXIST:
 		dest = TOSTDOUT;
 		(void) fprintf(stdout,
 		    terse ? "\"%s\" not found\n" :
-			"Can't find file \"%s\" to insert error "
-			"messages into.\n",
+		    "Can't find file \"%s\" to insert error "
+		    "messages into.\n",
 		    name);
 		break;
 	default:
@@ -389,9 +389,9 @@ diverterrors(char *name, int dest, Eptr **files, int ix,
 
 	if ((nerrors != nterrors) && (!previewed)) {
 		(void) fprintf(stdout, terse
-			? "Uninserted errors\n"
-			: ">>Uninserted errors for file \"%s\" follow.\n",
-			name);
+		    ? "Uninserted errors\n"
+		    : ">>Uninserted errors for file \"%s\" follow.\n",
+		    name);
 	}
 
 	EITERATE(erpp, files, ix) {
@@ -422,7 +422,7 @@ oktotouch(char *filename)
 	extern		char	*suffixlist;
 	char	*src;
 	char	*pat;
-			char	*osrc;
+	char	*osrc;
 
 	pat = suffixlist;
 	if (pat == 0)
@@ -558,8 +558,8 @@ text(Eptr p, boolean use_all)
 	(void) fputs(lang_table[p->error_language].lang_incomment,
 	    n_touchedfile);
 	(void) fprintf(n_touchedfile, "%d [%s] ",
-		p->error_line,
-		lang_table[p->error_language].lang_name);
+	    p->error_line,
+	    lang_table[p->error_language].lang_name);
 	wordvprint(n_touchedfile, p->error_lgtext-offset, p->error_text+offset);
 	(void) fputs(lang_table[p->error_language].lang_outcomment,
 	    n_touchedfile);
@@ -605,8 +605,8 @@ writetouched(int overwrite)
 		tmpfile = NULL;
 		if ((localfile = fopen(o_name, "w")) == NULL) {
 			(void) fprintf(stderr,
-				"%s: Can't open file \"%s\" to overwrite.\n",
-				processname, o_name);
+			    "%s: Can't open file \"%s\" to overwrite.\n",
+			    processname, o_name);
 			botch++;
 		}
 		if ((tmpfile = fopen(n_name, "r")) == NULL) {
