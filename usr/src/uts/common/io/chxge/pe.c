@@ -414,12 +414,12 @@ pe_start(ch_t *sa, mblk_t *mp, uint32_t flg)
 				lseg = ch_bind_dvma_handle(sa, len,
 				    (void *)mp->b_rptr,
 				    &hmp[nseg], mseg - nseg);
-				if (lseg == NULL) {
+				if (lseg == 0) {
 					sa->sge->intr_cnt.tx_no_dvma1++;
 					if ((lseg = ch_bind_dma_handle(sa, len,
 					    (void *)mp->b_rptr,
 					    &hmp[nseg],
-					    mseg - nseg)) == NULL) {
+					    mseg - nseg)) == 0) {
 						sa->sge->intr_cnt.tx_no_dma1++;
 
 						/*
@@ -444,7 +444,7 @@ pe_start(ch_t *sa, mblk_t *mp, uint32_t flg)
 				lseg = ch_bind_dma_handle(sa, len,
 				    (void *)mp->b_rptr, &hmp[nseg],
 				    mseg - nseg);
-				if (lseg == NULL) {
+				if (lseg == 0) {
 					sa->sge->intr_cnt.tx_no_dma1++;
 
 					/*
@@ -512,12 +512,12 @@ pe_start(ch_t *sa, mblk_t *mp, uint32_t flg)
 			nseg = ch_bind_dvma_handle(sa, len,
 			    (void *)mp->b_rptr,
 			    &hmp[0], 16);
-			if (nseg == NULL) {
+			if (nseg == 0) {
 				sa->sge->intr_cnt.tx_no_dvma2++;
 				nseg = ch_bind_dma_handle(sa, len,
 				    (void *)mp->b_rptr,
 				    &hmp[0], 16);
-				if (nseg == NULL) {
+				if (nseg == 0) {
 					sa->sge->intr_cnt.tx_no_dma2++;
 
 					/*
@@ -530,7 +530,7 @@ pe_start(ch_t *sa, mblk_t *mp, uint32_t flg)
 		} else {
 			nseg = ch_bind_dma_handle(sa, len,
 			    (void *)mp->b_rptr, &hmp[0], 16);
-			if (nseg == NULL) {
+			if (nseg == 0) {
 				sa->sge->intr_cnt.tx_no_dma2++;
 
 				/*
