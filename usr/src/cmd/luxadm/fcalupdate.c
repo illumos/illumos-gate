@@ -66,7 +66,7 @@
 #include	<l_common.h>
 #include	"luxadm.h"
 
-/*	Defines 	*/
+/*	Defines		*/
 #define	FEPROM_SIZE		256*1024
 #define	FEPROM_MAX_PROGRAM	25
 #define	FEPROM_MAX_ERASE	1000
@@ -632,7 +632,7 @@ getbootdev(unsigned int verbose)
 			char *slot = ",0:slot";
 
 			ls = (char *)malloc(PATH_MAX);
-			(void) memset((char *)ls, NULL, PATH_MAX);
+			(void) memset((char *)ls, 0, PATH_MAX);
 			(void) strcpy(ls, "ls -l ");
 			(void) strcat(ls, bootdev);
 			if ((ptr = popen(ls, "r")) != NULL) {
@@ -827,9 +827,9 @@ loop1:
 
 /*
  * getsocpath():
- * 	Searches the /devices directory recursively returning all soc_name
+ *	Searches the /devices directory recursively returning all soc_name
  *	entries in sbussoc_list (global). This excludes port entries and
- * 	onboard socal (which leaves only directory entries with
+ *	onboard socal (which leaves only directory entries with
  *	soc_name included). devcnt is updated to reflect number of soc_name
  *	devices found.
  */

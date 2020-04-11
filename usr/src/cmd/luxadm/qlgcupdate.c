@@ -159,8 +159,8 @@ q_qlgc_update(unsigned int verbose, char *file)
 	 * is "sbus@12". They are initialized to a random value and are
 	 * set such that they are not equal initially.
 	 */
-	static char port1[MAXNAMELEN] = {NULL};
-	static char port2[MAXNAMELEN] = {NULL};
+	static char port1[MAXNAMELEN] = { 0 };
+	static char port2[MAXNAMELEN] = { 0 };
 
 	if (file) {
 		fflag++;
@@ -401,8 +401,8 @@ q_findversion(int verbose, int index, uchar_t *version, uint16_t *chip_id)
 {
 	int fd, ntries;
 	struct	ifp_fm_version *version_buffer = NULL;
-	char	prom_ver[100] = {NULL};
-	char	mcode_ver[100] = {NULL};
+	char	prom_ver[100] = { 0 };
+	char	mcode_ver[100] = { 0 };
 	fcio_t	fcio;
 
 	if (strstr(&pcibus_list[index][0], fc_trans)) {
@@ -516,7 +516,7 @@ q_findfileversion(char *dl_fcode, uchar_t *version_file, uint16_t *file_id,
 {
 	int mark;
 	int qlc_offset = 0;
-	char temp[4] = {NULL};
+	char temp[4] = { 0 };
 
 
 	/*
@@ -1328,7 +1328,7 @@ emulex_fcodeversion(di_node_t node, uchar_t *ver) {
 			promprop)) != NULL) &&
 			(strcmp(promname, "fcode-version") == 0)) {
 			size = di_prom_prop_data(promprop, &ver_data);
-			(void) memset(ver, NULL, size);
+			(void) memset(ver, 0, size);
 			(void) memcpy(ver, ver_data, size);
 			found = 1;
 		}

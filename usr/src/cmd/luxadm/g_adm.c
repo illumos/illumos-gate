@@ -94,7 +94,7 @@ static	void	display_lun_info(L_disk_state, Path_struct *,
 		struct mode_page *, int, WWN_list *, char *);
 static	void	display_fc_disk(struct path_struct *, char *, gfc_map_t *,
 		L_inquiry, int);
-static 	void	adm_display_err(char *, int);
+static	void	adm_display_err(char *, int);
 static	void	temperature_messages(struct l_state_struct *, int);
 static	void	ctlr_messages(struct l_state_struct *, int, int);
 static	void	fan_messages(struct l_state_struct *, int, int);
@@ -285,7 +285,7 @@ char		last_logical_path[MAXPATHLEN];
 				retval++;
 				continue;
 			}
-			*ptr = NULL;
+			*ptr = '\0';
 			slot = path_struct->slot;
 			f_r = path_struct->f_flag;
 			path_phys = NULL;
@@ -482,7 +482,7 @@ char		 err_path[MAXNAMELEN];
 			if (((ptr = strstr(err_path, ", ")) != NULL) &&
 				((*(ptr + 1) == 'f') || (*(ptr + 1) == 'r') ||
 							(*(ptr +1) == 's'))) {
-				*ptr = NULL;
+				*ptr = '\0';
 				slot = path_struct->slot;
 				f_r = path_struct->f_flag;
 				path_phys = NULL;
@@ -573,7 +573,7 @@ char		ses_path[MAXPATHLEN], inq_path[MAXNAMELEN];
 					retval++;
 					continue;
 				}
-				*ptr = NULL;
+				*ptr = '\0';
 				slot = path_struct->slot;
 				f_r = path_struct->f_flag;
 				if ((err = l_convert_name(inq_path, &path_phys,
@@ -2317,15 +2317,15 @@ int		num_status_entries;
 		(void) fprintf(stdout, MSGSTR(32,
 			"Information from %s"), fc_stats->drvr_name);
 		(void) fprintf(stdout, "\n");
-		if ((*fc_stats->node_wwn != NULL) &&
-			(*fc_stats->port_wwn[port] != NULL)) {
+		if ((*fc_stats->node_wwn != '\0') &&
+			(*fc_stats->port_wwn[port] != '\0')) {
 			(void) fprintf(stdout, MSGSTR(104,
 				"  Host Adapter WWN's: Node:%s"
 				"  Port:%s\n"),
 				fc_stats->node_wwn,
 				fc_stats->port_wwn[port]);
 		}
-		if (*fc_stats->fw_revision != NULL) {
+		if (*fc_stats->fw_revision != '\0') {
 			(void) fprintf(stdout, MSGSTR(105,
 				"  Host Adapter Firmware Revision: %s\n"),
 				fc_stats->fw_revision);
@@ -2613,15 +2613,15 @@ int		p_on = 0, p_st = 0;
 				"Information from %s"),
 				ifp_stats.drvr_name);
 			(void) fprintf(stdout, "\n");
-			if ((*ifp_stats.node_wwn != NULL) &&
-				(*ifp_stats.port_wwn != NULL)) {
+			if ((*ifp_stats.node_wwn != '\0') &&
+				(*ifp_stats.port_wwn != '\0')) {
 				(void) fprintf(stdout, MSGSTR(104,
 					"  Host Adapter WWN's: Node:%s"
 					"  Port:%s\n"),
 					ifp_stats.node_wwn,
 					ifp_stats.port_wwn);
 			}
-			if (*ifp_stats.fw_revision != NULL) {
+			if (*ifp_stats.fw_revision != 0) {
 				(void) fprintf(stdout, MSGSTR(105,
 				"  Host Adapter Firmware Revision: %s\n"),
 				ifp_stats.fw_revision);
@@ -2925,7 +2925,7 @@ char		temp2path[MAXPATHLEN];
 mp_pathlist_t	pathlist;
 int		p_pw = 0, p_on = 0, p_st = 0;
 gfc_dev_t	map_root, map_dev;
-int 		*port_addr, *hard_addr, pos = 0, count;
+int		*port_addr, *hard_addr, pos = 0, count;
 uchar_t		*hba_port_wwn, *port_wwn, *node_wwn, *dtype_prop;
 uint_t		map_topo;
 
@@ -4062,7 +4062,7 @@ struct mode_page	*pg_hdr;
 
 	if (no_path_flag) {
 		(void) fprintf(stdout, "  ");
-		if (port_a_flag != NULL) {
+		if (port_a_flag != 0) {
 			(void) fprintf(stdout, MSGSTR(142, "Status(Port B):"));
 		} else {
 			(void) fprintf(stdout, MSGSTR(141, "Status(Port A):"));
@@ -4870,7 +4870,7 @@ Interconnect_st	interconnect;
 			(void) fprintf(stdout,
 			MSGSTR(30, "Not Installed"));
 		} else if (interconnect.code == S_CRITICAL) {
-			if (interconnect.eprom_fail != NULL) {
+			if (interconnect.eprom_fail != 0) {
 				(void) fprintf(stdout, MSGSTR(2140,
 					"Critical Failure: EEPROM failure"));
 			} else {
@@ -4879,7 +4879,7 @@ Interconnect_st	interconnect;
 			}
 			revision_msg(l_state, elem_index + j);
 		} else if (interconnect.code == S_NONCRITICAL) {
-			if (interconnect.eprom_fail != NULL) {
+			if (interconnect.eprom_fail != 0) {
 				(void) fprintf(stdout, MSGSTR(2142,
 				"Non-Critical Failure: EEPROM failure"));
 			} else {
@@ -5566,7 +5566,7 @@ cleanup_and_go:
  *
  * Sample output for ifp:
  *
- * /devices/pci@1f,4000/SUNW,ifp@2:devctl 		CONNECTED
+ * /devices/pci@1f,4000/SUNW,ifp@2:devctl		CONNECTED
  * /devices/pci@1f,2000/SUNW,ifp@1:devctl		NOT CONNECTED
  *
  * Sample output for socal:
