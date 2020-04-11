@@ -377,7 +377,7 @@ iospc_create_picN_kstat(char *mod_name, int pic, uint64_t ev_offset,
 	(void) snprintf(pic_name, PIC_STR_LEN, "pic%1d", pic);
 
 	if ((picN_ksp = kstat_create(mod_name, 0, pic_name,
-	    "bus", KSTAT_TYPE_NAMED, num_ev, NULL)) == NULL) {
+	    "bus", KSTAT_TYPE_NAMED, num_ev, 0)) == NULL) {
 		return (NULL);
 	}
 
@@ -467,7 +467,7 @@ iospc_create_cntr_kstat(char *name, int dev_inst,
  */
 static int
 iospc_perfcnt_program(iospc_t *iospc_p, iospc_grp_t *grp_p,
-	iospc_ksinfo_t *ksinfo_p, uint64_t new_events)
+    iospc_ksinfo_t *ksinfo_p, uint64_t new_events)
 {
 	uint64_t old_events;
 	int rval = SUCCESS;
