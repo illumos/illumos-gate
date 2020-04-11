@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/plat_ecc_unum.h>
 #include <sys/utsname.h>
 #include <sys/cmn_err.h>
@@ -76,7 +74,7 @@ uint16_t ecc_indictment2_mailbox_flags = PLAT_ECC_SEND_INDICT2_DEFAULT;
  */
 void
 plat_log_fruid_error(int synd_code, struct async_flt *ecc, char *unum,
-	uint64_t afsr_bit)
+    uint64_t afsr_bit)
 {
 	plat_ecc_error_data_t ecc_error_data;
 	enum plat_ecc_type ecc_type = PLAT_ECC_UNKNOWN;
@@ -191,7 +189,7 @@ plat_log_fruid_error(int synd_code, struct async_flt *ecc, char *unum,
 		 * cpu id.
 		 */
 		ecc_error_data.proc_num =
-			plat_make_fru_cpuid(board_num, 0, proc_position);
+		    plat_make_fru_cpuid(board_num, 0, proc_position);
 
 		/*
 		 * Now pull out the Memory Bank number
@@ -218,7 +216,7 @@ plat_log_fruid_error(int synd_code, struct async_flt *ecc, char *unum,
 		for (i = PLAT_ECC_JNUMBER_LENGTH;
 		    i > 0 && *unum_ptr >= '0' && *unum_ptr <= '9'; i--)
 			*jno_ptr++ = *unum_ptr++;
-		*jno_ptr = NULL;
+		*jno_ptr = '\0';
 
 		/*
 		 * If we get here, we can assume the unum is valid
@@ -304,7 +302,7 @@ plat_log_fruid_error(int synd_code, struct async_flt *ecc, char *unum,
 		for (i = PLAT_ECC_JNUMBER_LENGTH;
 		    i > 0 && *unum_ptr >= '0' && *unum_ptr <= '9'; i--)
 			*jno_ptr++ = *unum_ptr++;
-		*jno_ptr = NULL;
+		*jno_ptr = '\0';
 
 		/*
 		 * If we get here, we can assume the unum is valid
