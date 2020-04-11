@@ -126,15 +126,15 @@ struct bus_ops ppb_bus_ops = {
 	ndi_busop_remove_eventcall,	/* (*bus_remove_eventcall)();   */
 	ndi_post_event,			/* (*bus_post_event)();		*/
 	0,				/* (*bus_intr_ctl)();		*/
-	0,				/* (*bus_config)(); 		*/
-	0,				/* (*bus_unconfig)(); 		*/
-	ppb_fm_init_child,		/* (*bus_fm_init)(); 		*/
-	NULL,				/* (*bus_fm_fini)(); 		*/
+	0,				/* (*bus_config)();		*/
+	0,				/* (*bus_unconfig)();		*/
+	ppb_fm_init_child,		/* (*bus_fm_init)();		*/
+	NULL,				/* (*bus_fm_fini)();		*/
 	ppb_bus_enter,			/* (*bus_enter)()		*/
 	ppb_bus_exit,			/* (*bus_exit)()		*/
 	ppb_bus_power,			/* (*bus_power)()		*/
-	ppb_intr_ops,			/* (*bus_intr_op)(); 		*/
-	pcie_hp_common_ops		/* (*bus_hp_op)(); 		*/
+	ppb_intr_ops,			/* (*bus_intr_op)();		*/
+	pcie_hp_common_ops		/* (*bus_hp_op)();		*/
 };
 
 static int ppb_open(dev_t *devp, int flags, int otyp, cred_t *credp);
@@ -543,7 +543,7 @@ ppb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 /*ARGSUSED*/
 static int
 ppb_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
-	off_t offset, off_t len, caddr_t *vaddrp)
+    off_t offset, off_t len, caddr_t *vaddrp)
 {
 	register dev_info_t *pdip;
 
@@ -555,7 +555,7 @@ ppb_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 /*ARGSUSED*/
 static int
 ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
-	ddi_ctl_enum_t ctlop, void *arg, void *result)
+    ddi_ctl_enum_t ctlop, void *arg, void *result)
 {
 	pci_regspec_t *drv_regp;
 	int	reglen;
@@ -1076,10 +1076,10 @@ ppb_pwr_setup(ppb_devstate_t *ppb, dev_info_t *pdip)
 	    kmem_zalloc(sizeof (pci_pwr_t), KM_SLEEP);
 	ppb->ppb_pwr_p->pwr_fp = 0;
 
-	pmcsr_bse = PCI_CAP_GET8(conf_hdl, NULL, ppb->ppb_pm_cap_ptr,
+	pmcsr_bse = PCI_CAP_GET8(conf_hdl, 0, ppb->ppb_pm_cap_ptr,
 	    PCI_PMCSR_BSE);
 
-	pmcap = PCI_CAP_GET16(conf_hdl, NULL, ppb->ppb_pm_cap_ptr,
+	pmcap = PCI_CAP_GET16(conf_hdl, 0, ppb->ppb_pm_cap_ptr,
 	    PCI_PMCAP);
 
 	if (pmcap == PCI_CAP_EINVAL16 || pmcsr_bse == PCI_CAP_EINVAL8) {
@@ -1165,7 +1165,7 @@ ppb_pwr_setup(ppb_devstate_t *ppb, dev_info_t *pdip)
 	}
 
 	if (ddi_prop_create(DDI_DEV_T_NONE, pdip, DDI_PROP_CANSLEEP,
-	    "pm-want-child-notification?", NULL, NULL) != DDI_PROP_SUCCESS) {
+	    "pm-want-child-notification?", NULL, 0) != DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN,
 		    "%s%d fail to create pm-want-child-notification? prop",
 		    ddi_driver_name(pdip), ddi_get_instance(pdip));
@@ -1239,7 +1239,7 @@ pci_pwr_current_lvl(pci_pwr_t *pwr_p)
 	ppb = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
 	    ddi_get_instance(pwr_p->pwr_dip));
 
-	if ((pmcsr = PCI_CAP_GET16(ppb->ppb_conf_hdl, NULL,
+	if ((pmcsr = PCI_CAP_GET16(ppb->ppb_conf_hdl, 0,
 	    ppb->ppb_pm_cap_ptr, PCI_PMCSR)) == PCI_CAP_EINVAL16)
 		return (DDI_FAILURE);
 
@@ -1316,7 +1316,7 @@ ppb_pwr(dev_info_t *dip, int component, int lvl)
 		pci_pwr_component_idle(ppb->ppb_pwr_p);
 	}
 
-	if ((pmcsr = PCI_CAP_GET16(ppb->ppb_conf_hdl, NULL,
+	if ((pmcsr = PCI_CAP_GET16(ppb->ppb_conf_hdl, 0,
 	    ppb->ppb_pm_cap_ptr, PCI_PMCSR)) == PCI_CAP_EINVAL16)
 		return (DDI_FAILURE);
 
@@ -1403,7 +1403,7 @@ ppb_pwr(dev_info_t *dip, int component, int lvl)
 		}
 	}
 
-	PCI_CAP_PUT16(ppb->ppb_conf_hdl, NULL, ppb->ppb_pm_cap_ptr, PCI_PMCSR,
+	PCI_CAP_PUT16(ppb->ppb_conf_hdl, 0, ppb->ppb_pm_cap_ptr, PCI_PMCSR,
 	    pmcsr);
 
 	/*
@@ -1475,7 +1475,7 @@ ppb_init_hotplug(ppb_devstate_t *ppb)
 
 static void
 ppb_create_ranges_prop(dev_info_t *dip,
-	ddi_acc_handle_t config_handle)
+    ddi_acc_handle_t config_handle)
 {
 	uint32_t base, limit;
 	ppb_ranges_t	ranges[PPB_RANGE_LEN];
@@ -1642,7 +1642,7 @@ ppb_close(dev_t dev, int flags, int otyp, cred_t *credp)
 /* ARGSUSED */
 static int
 ppb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-	int *rvalp)
+    int *rvalp)
 {
 	int		instance = PCI_MINOR_NUM_TO_INSTANCE(getminor(dev));
 	ppb_devstate_t	*ppb_p = ddi_get_soft_state(ppb_state, instance);
@@ -1785,7 +1785,7 @@ ppb_fm_fini(ppb_devstate_t *ppb_p)
 /*ARGSUSED*/
 static int
 ppb_fm_init_child(dev_info_t *dip, dev_info_t *tdip, int cap,
-		ddi_iblock_cookie_t *ibc)
+    ddi_iblock_cookie_t *ibc)
 {
 	ppb_devstate_t *ppb_p = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
 	    ddi_get_instance(dip));

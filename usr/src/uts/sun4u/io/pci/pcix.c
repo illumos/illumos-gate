@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/kmem.h>
 #include <sys/async.h>
@@ -52,33 +50,33 @@ pcix_set_cmd_reg(dev_info_t *child, uint16_t value)
 	 * Only modify the Command Register of non-bridge functions.
 	 */
 	if ((pci_config_get8(handle, PCI_CONF_HEADER) & PCI_HEADER_TYPE_M)
-		== PCI_HEADER_PPB)
+	    == PCI_HEADER_PPB)
 		goto teardown;
 
 	if (PCI_CAP_LOCATE(handle, PCI_CAP_ID_PCIX, &pcix_cap_ptr) ==
-		DDI_FAILURE)
+	    DDI_FAILURE)
 		goto teardown;
 
 	DEBUG1(DBG_INIT_CLD, child, "pcix_set_cmd_reg: pcix_cap_ptr = %x\n",
-		pcix_cap_ptr);
+	    pcix_cap_ptr);
 
 	/*
 	 * Read the PCI-X Command Register.
 	 */
-	if ((pcix_cmd = PCI_CAP_GET16(handle, NULL, pcix_cap_ptr, 2))
-		== PCI_CAP_EINVAL16)
+	if ((pcix_cmd = PCI_CAP_GET16(handle, 0, pcix_cap_ptr, 2))
+	    == PCI_CAP_EINVAL16)
 		goto teardown;
 
 	DEBUG1(DBG_INIT_CLD, child, "pcix_set_cmd_reg: PCI-X CMD Register "
-		"(Before) %x\n", pcix_cmd);
+	    "(Before) %x\n", pcix_cmd);
 
 	pcix_cmd &= ~(0x1f << 2); /* clear bits 6-2 */
 	pcix_cmd |= value;
 
 	DEBUG1(DBG_INIT_CLD, child, "pcix_set_cmd_reg: PCI-X CMD Register "
-		"(After) %x\n", pcix_cmd);
+	    "(After) %x\n", pcix_cmd);
 
-	PCI_CAP_PUT16(handle, NULL, pcix_cap_ptr, 2, pcix_cmd);
+	PCI_CAP_PUT16(handle, 0, pcix_cap_ptr, 2, pcix_cmd);
 
 teardown:
 	pci_config_teardown(&handle);
