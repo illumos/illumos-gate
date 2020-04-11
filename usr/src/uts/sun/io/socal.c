@@ -86,7 +86,7 @@
 #define	SOCAL_DEBUG 0
 #endif
 static uchar_t	socal_xrambuf[0x40000];
-static int 	socal_core = SOCAL_TAKE_CORE;
+static int	socal_core = SOCAL_TAKE_CORE;
 #if SOCAL_DEBUG > 0 && !defined(lint)
 static	int soc_debug = SOCAL_DEBUG;
 static  int socal_read_stale_data = 0;
@@ -224,7 +224,7 @@ static struct ddi_dma_attr socal_dma_attr = {
 	(unsigned long long)0xffffffff,	/* addr_hi */
 	(unsigned long long)0xffffffff,	/* count max */
 	(unsigned long long)4,		/* align */
-	DEFAULT_BURSTSIZE | BURST32 | BURST64, 	/* burst size */
+	DEFAULT_BURSTSIZE | BURST32 | BURST64,	/* burst size */
 	1,				/* minxfer */
 	(unsigned long long)0xffffffff,	/* maxxfer */
 	(unsigned long long)0xffffffff,	/* seg */
@@ -1111,7 +1111,7 @@ socal_dodetach(dev_info_t *dip)
 
 int
 socal_bus_ctl(dev_info_t *dip, dev_info_t *rip, ddi_ctl_enum_t op,
-	void *a, void *v)
+    void *a, void *v)
 {
 	int		port;
 
@@ -1252,12 +1252,12 @@ socal_bus_ctl(dev_info_t *dip, dev_info_t *rip, ddi_ctl_enum_t op,
 /*
  * int
  * socal_getinfo() - Given the device number, return the devinfo
- * 	pointer or the instance number.  Note: this routine must be
- * 	successful on DDI_INFO_DEVT2INSTANCE even before attach.
+ *	pointer or the instance number.  Note: this routine must be
+ *	successful on DDI_INFO_DEVT2INSTANCE even before attach.
  */
 int
 socal_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
-	void **result)
+    void **result)
 {
 	int instance;
 	socal_state_t *socalp;
@@ -1288,7 +1288,7 @@ socal_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
 int
 socal_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 {
-	int 	instance = getminor(*devp)/2;
+	int	instance = getminor(*devp) / 2;
 	socal_state_t	*socalp =
 	    ddi_get_soft_state(socal_soft_state_p, instance);
 	socal_port_t	*port_statep;
@@ -1312,7 +1312,7 @@ socal_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 int
 socal_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 {
-	int 	instance = getminor(dev)/2;
+	int	instance = getminor(dev) / 2;
 	socal_state_t	*socalp =
 	    ddi_get_soft_state(socal_soft_state_p, instance);
 	socal_port_t	*port_statep;
@@ -1334,15 +1334,15 @@ int
 socal_ioctl(dev_t dev,
     int cmd, intptr_t arg, int mode, cred_t *cred_p, int *rval_p)
 {
-	int 	instance = getminor(dev)/2;
+	int	instance = getminor(dev) / 2;
 	socal_state_t	*socalp =
 	    ddi_get_soft_state(socal_soft_state_p, instance);
 	int		port;
 	socal_port_t	*port_statep;
-	int 		i;
+	int		i;
 	uint_t		r;
 	int		offset;
-	int 		retval = FCAL_SUCCESS;
+	int		retval = FCAL_SUCCESS;
 	la_els_adisc_t		*adisc_pl;
 	la_els_rls_reply_t	*rls_pl;
 	dev_info_t	*dip;
@@ -2612,11 +2612,11 @@ socal_transport(fcal_packet_t *fcalpkt, fcal_sleep_t sleep, int req_q_no)
 /*ARGSUSED*/
 static int
 socal_cq_enque(socal_state_t *socalp, socal_port_t *port_statep, cqe_t *cqe,
-		int rqix, fcal_sleep_t sleep, fcal_packet_t *to_queue,
-		int mtxheld)
+    int rqix, fcal_sleep_t sleep, fcal_packet_t *to_queue,
+    int mtxheld)
 {
 #if defined(DEBUG) && !defined(lint)
-	int 		instance = ddi_get_instance(socalp->dip);
+	int		instance = ddi_get_instance(socalp->dip);
 #endif
 	socal_kcq_t	*kcq;
 	cqe_t		*sp;
@@ -2644,7 +2644,7 @@ socal_cq_enque(socal_state_t *socalp, socal_port_t *port_statep, cqe_t *cqe,
 	if (to_queue) {
 		if ((to_queue->fcal_socal_request.sr_soc_hdr.sh_request_token =
 		    SOCAL_ID_GET(to_queue, mtxheld ? FCAL_NOSLEEP :
-		    sleep)) == NULL) {
+		    sleep)) == 0) {
 			return (FCAL_TRANSPORT_QFULL);
 		}
 	}
@@ -3034,8 +3034,8 @@ socal_abort_cmd(void *ssp, uint_t port, fcal_packet_t *fcalpkt, uint_t polled)
 /*ARGSUSED*/
 static uint_t
 socal_els(void *ssp, uint_t port, uint_t elscode, uint_t dest,
-	void (*callback)(), void *arg, caddr_t reqpl, caddr_t *rsppl,
-	uint_t sleep)
+    void (*callback)(), void *arg, caddr_t reqpl, caddr_t *rsppl,
+    uint_t sleep)
 {
 	return (FCAL_TRANSPORT_FAILURE);
 }
@@ -3068,7 +3068,7 @@ socal_bypass_dev(void *ssp, uint_t port, uint_t dest)
 static void
 socal_force_reset(void *ssp, uint_t port, uint_t restart)
 {
-	socal_state_t 	*socalp = (socal_state_t *)ssp;
+	socal_state_t	*socalp = (socal_state_t *)ssp;
 
 	mutex_enter(&socalp->k_imr_mtx);
 	if (socalp->socal_shutdown) {
@@ -3090,8 +3090,8 @@ socal_force_reset(void *ssp, uint_t port, uint_t restart)
 
 static void
 socal_add_ulp(void *ssp, uint_t port, uchar_t type,
-	void (*ulp_statec_callback)(), void (*ulp_els_callback)(),
-	void (*ulp_data_callback)(), void *arg)
+    void (*ulp_statec_callback)(), void (*ulp_els_callback)(),
+    void (*ulp_data_callback)(), void *arg)
 {
 	socal_state_t	*socalp = (socal_state_t *)ssp;
 	socal_port_t	*port_statep = &socalp->port_state[port];
@@ -4265,13 +4265,13 @@ socal_force_offline(void *ssp, uint_t port, uint_t polled)
 
 static int
 socal_issue_adisc(socal_state_t *socalp, uint32_t port, uint32_t dest,
-	la_els_adisc_t *payload, uint32_t polled)
+    la_els_adisc_t *payload, uint32_t polled)
 {
 	int			retval;
 	la_els_adisc_t		*buf;
 	fcal_packet_t		*fcalpkt;
 	socal_port_t		*port_statep;
-	socal_priv_cmd_t 	*privp;
+	socal_priv_cmd_t	*privp;
 
 	port_statep = &socalp->port_state[port];
 
@@ -4314,7 +4314,7 @@ socal_issue_lbf(socal_state_t *socalp, uint32_t port,
 	int			retval;
 	fcal_packet_t		*fcalpkt;
 	socal_port_t		*port_statep;
-	socal_priv_cmd_t 	*privp;
+	socal_priv_cmd_t	*privp;
 
 	port_statep = &socalp->port_state[port];
 
@@ -4341,13 +4341,13 @@ socal_issue_lbf(socal_state_t *socalp, uint32_t port,
 
 static int
 socal_issue_rls(socal_state_t *socalp, uint32_t port, uint32_t dest,
-	la_els_rls_reply_t *payload, uint32_t polled)
+    la_els_rls_reply_t *payload, uint32_t polled)
 {
 	int	retval;
 	la_els_rls_t		*buf;
 	fcal_packet_t		*fcalpkt;
 	socal_port_t		*port_statep;
-	socal_priv_cmd_t 	*privp;
+	socal_priv_cmd_t	*privp;
 	uint32_t		arg;
 
 	port_statep = &socalp->port_state[port];
@@ -4406,7 +4406,7 @@ socal_issue_rls(socal_state_t *socalp, uint32_t port, uint32_t dest,
 
 fcal_packet_t *
 socal_els_alloc(socal_state_t *socalp, uint32_t port, uint32_t dest,
-	uint32_t cmd_size, uint32_t rsp_size, caddr_t *rprivp, uint32_t polled)
+    uint32_t cmd_size, uint32_t rsp_size, caddr_t *rprivp, uint32_t polled)
 {
 	struct fcal_packet	*fcalpkt;
 	ddi_dma_cookie_t	ccookie;
@@ -4555,8 +4555,8 @@ fail:
 
 fcal_packet_t *
 socal_lbf_alloc(socal_state_t *socalp, uint32_t port,
-	uint32_t cmd_size, uint32_t rsp_size, caddr_t *rprivp,
-	uint32_t polled)
+    uint32_t cmd_size, uint32_t rsp_size, caddr_t *rprivp,
+    uint32_t polled)
 {
 	struct fcal_packet	*fcalpkt;
 	ddi_dma_cookie_t	ccookie;
@@ -4755,7 +4755,7 @@ socal_lbf_free(socal_priv_cmd_t *privp)
 
 static int
 socal_getmap(socal_state_t *socalp, uint32_t port, caddr_t arg,
-	uint32_t polled, int flags)
+    uint32_t polled, int flags)
 {
 	ddi_dma_cookie_t	dcookie;
 	ddi_dma_handle_t	dhandle = NULL;
@@ -4848,7 +4848,9 @@ static	void
 socal_wcopy(uint_t *h_src, uint_t *h_dest, int len)
 {
 	int	i;
-	for (i = 0; i < len/4; i++) {
+
+	len /= 4;
+	for (i = 0; i < len; i++) {
 		*h_dest++ = *h_src++;
 	}
 }
@@ -4981,7 +4983,7 @@ socal_fix_harda(socal_state_t *socalp, int port)
 fcal_transport_t *
 socal_sftm_attach(dev_t dev, int loop_id)
 {
-	int 		instance = getminor(dev) / 2;
+	int		instance = getminor(dev) / 2;
 	int		port = getminor(dev) % 2;
 	int		hard_alpa;
 	char		*name;
