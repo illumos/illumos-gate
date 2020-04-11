@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * WARNING: The contents of this file are shared by all projects
  * that  wish to  perform  remote  Dynamic Reconfiguration  (DR)
@@ -121,7 +119,7 @@ struct {
 	{  SHORTMSG,	NOMSG	  },	/*  RDR_CONF_HELP		*/
 	{  SHORTMSG,	NOMSG	  },	/*  RDR_CONF_AP_ID_CMP		*/
 	{  SHORTMSG,	NOMSG	  },	/*  RDR_CONF_ABORT_CMD		*/
-	{  SHORTMSG,	SHORTMSG  },	/*  RDR_CONF_CONFIRM_CALLBACK 	*/
+	{  SHORTMSG,	SHORTMSG  },	/*  RDR_CONF_CONFIRM_CALLBACK	*/
 	{  SHORTMSG,	NOMSG	  },	/*  RDR_CONF_MSG_CALLBACK	*/
 	{  SHORTMSG,	LONGMSG	  }	/*  RDR_RSRC_INFO		*/
 };
@@ -129,7 +127,7 @@ struct {
 
 #define	RDR_BAD_FD		(-1)
 
-#define	RDR_MSG_HDR_SIZE 	sizeof (rdr_msg_hdr_t)
+#define	RDR_MSG_HDR_SIZE	sizeof (rdr_msg_hdr_t)
 
 static const int RDR_ALIGN_64_BIT = 8;   /* 8 bytes */
 
@@ -364,7 +362,7 @@ rdr_open(int family)
 	int	newfd;
 
 
-	if ((newfd = socket(family, SOCK_STREAM, 0)) == NULL) {
+	if ((newfd = socket(family, SOCK_STREAM, 0)) == -1) {
 		return (RDR_BAD_FD);
 	}
 
@@ -2013,7 +2011,7 @@ static int
 unpack_change_state_request(change_state_params_t *params, const char *buf)
 {
 	char				*bufptr;
-	rdr_variable_message_info_t 	var_msg_info;
+	rdr_variable_message_info_t	var_msg_info;
 	rdr_change_state_t		change_state_data;
 
 
@@ -2105,7 +2103,7 @@ pack_change_state_reply(change_state_params_t *params, char **buf,
 	int				i;
 	char				*bufptr;
 	rdr_change_state_reply_t	change_state_data;
-	rdr_variable_message_info_t 	var_msg_info;
+	rdr_variable_message_info_t	var_msg_info;
 
 
 	(void) memset(&var_msg_info, 0, sizeof (rdr_variable_message_info_t));
@@ -2348,7 +2346,7 @@ static int
 unpack_private_func_request(private_func_params_t *params, const char *buf)
 {
 	char				*bufptr;
-	rdr_variable_message_info_t 	var_msg_info;
+	rdr_variable_message_info_t	var_msg_info;
 	rdr_private_func_t		private_func_data;
 
 
@@ -2443,7 +2441,7 @@ pack_private_func_reply(private_func_params_t *params, char **buf,
 	int				i;
 	char				*bufptr;
 	rdr_private_func_reply_t	private_func_data;
-	rdr_variable_message_info_t 	var_msg_info;
+	rdr_variable_message_info_t	var_msg_info;
 
 
 	(void) memset(&var_msg_info, 0, sizeof (rdr_variable_message_info_t));
@@ -2657,7 +2655,7 @@ static int
 unpack_test_request(test_params_t *params, const char *buf)
 {
 	char				*bufptr;
-	rdr_variable_message_info_t 	var_msg_info;
+	rdr_variable_message_info_t	var_msg_info;
 	rdr_test_t			test_data;
 
 
@@ -2733,7 +2731,7 @@ pack_test_reply(test_params_t *params, char **buf, int *buf_size)
 	int				i;
 	char				*bufptr;
 	rdr_test_reply_t		test_data;
-	rdr_variable_message_info_t 	var_msg_info;
+	rdr_variable_message_info_t	var_msg_info;
 
 
 	if ((params == NULL) || (buf == NULL) || (buf_size == NULL)) {
@@ -2836,8 +2834,8 @@ pack_list_ext_request(list_ext_params_t *params, char **buf, int *buf_size)
 {
 	int				i;
 	char				*bufptr;
-	rdr_list_ext_t 			list_ext_data;
-	rdr_variable_message_info_t 	var_msg_info;
+	rdr_list_ext_t			list_ext_data;
+	rdr_variable_message_info_t	var_msg_info;
 
 
 	if ((params == NULL) || (buf == NULL) || (buf_size == NULL)) {
@@ -2959,7 +2957,7 @@ static int
 unpack_list_ext_request(list_ext_params_t *params, const char *buf)
 {
 	char				*bufptr;
-	rdr_variable_message_info_t 	var_msg_info;
+	rdr_variable_message_info_t	var_msg_info;
 	rdr_list_ext_t			list_ext_data;
 
 
@@ -3024,7 +3022,7 @@ unpack_list_ext_request(list_ext_params_t *params, const char *buf)
 		}
 		*(params->errstring) = NULL;
 	} else {	/* error_msg_ctl == RDR_DONT_GENERATE_ERR_MSGS */
-	    params->errstring = NULL;
+		params->errstring = NULL;
 	}
 	params->flags = list_ext_data.flags;
 	params->permissions = list_ext_data.permissions;
@@ -3044,8 +3042,8 @@ pack_list_ext_reply(list_ext_params_t *params, char **buf, int *buf_size)
 	int				i;
 	char				*bufptr;
 	rdr_list_ext_reply_t		list_ext_data;
-	rdr_variable_message_info_t 	var_msg_info;
-	int 				list_data_size;
+	rdr_variable_message_info_t	var_msg_info;
+	int				list_data_size;
 
 
 	(void) memset(&var_msg_info, 0, sizeof (rdr_variable_message_info_t));
@@ -3132,8 +3130,8 @@ pack_list_ext_reply(list_ext_params_t *params, char **buf, int *buf_size)
 static int
 unpack_list_ext_reply(list_ext_params_t *params, const char *buf)
 {
-	int 			list_data_size;
-	char 			*bufptr;
+	int			list_data_size;
+	char			*bufptr;
 	rdr_list_ext_reply_t	list_ext_data;
 
 
@@ -3160,7 +3158,7 @@ unpack_list_ext_reply(list_ext_params_t *params, const char *buf)
 			return (RDR_MEM_ALLOC);
 		}
 		*(params->ap_id_list) = (rdr_list_t *)
-		malloc(sizeof (rdr_list_t) * list_ext_data.num_ap_ids);
+		    malloc(sizeof (rdr_list_t) * list_ext_data.num_ap_ids);
 		if (*(params->ap_id_list) == NULL) {
 			return (RDR_MEM_ALLOC);
 		}
@@ -3177,7 +3175,7 @@ unpack_list_ext_reply(list_ext_params_t *params, const char *buf)
 		return (RDR_MEM_ALLOC);
 	}
 	if (get_string_from_buf(params->errstring,
-			list_ext_data.errstring_size, bufptr)) {
+	    list_ext_data.errstring_size, bufptr)) {
 		return (RDR_ERROR);
 	}
 	bufptr += list_ext_data.errstring_size;
@@ -3300,7 +3298,7 @@ static int
 unpack_help_request(help_params_t *params, const char *buf)
 {
 	char				*bufptr;
-	rdr_variable_message_info_t 	var_msg_info;
+	rdr_variable_message_info_t	var_msg_info;
 	rdr_help_t			help_data;
 
 
@@ -3569,8 +3567,8 @@ pack_confirm_request(confirm_callback_params_t *params, char **buf,
 	int				i;
 	char				*bufptr;
 	rdr_confirm_callback_t		confirm_callback_data;
-	int 				message_strlen;
-	int 				message_pad_sz;
+	int				message_strlen;
+	int				message_pad_sz;
 
 
 	if ((params == NULL) || (buf == NULL) || (buf_size == NULL)) {
@@ -3919,7 +3917,7 @@ pack_rsrc_info_request(rsrc_info_params_t *params, char **buf, int *buf_size)
 {
 	char				*bufptr;
 	rdr_rsrc_info_t			rsrc_info_data;
-	rdr_variable_message_info_t 	var_msg_info;
+	rdr_variable_message_info_t	var_msg_info;
 
 
 	if ((params == NULL) || (buf == NULL) || (buf_size == NULL)) {
@@ -3992,7 +3990,7 @@ static int
 unpack_rsrc_info_request(rsrc_info_params_t *params, const char *buf)
 {
 	char				*bufptr;
-	rdr_variable_message_info_t 	var_msg_info;
+	rdr_variable_message_info_t	var_msg_info;
 	rdr_rsrc_info_t			rsrc_info_data;
 
 
@@ -4040,7 +4038,7 @@ pack_rsrc_info_reply(rsrc_info_params_t *params, char **buf, int *buf_size,
 	rdr_rsrc_info_reply_t		rsrc_info_data;
 	int				pack_status;
 	caddr_t				rsrc_info_bufp = NULL;
-	size_t 				rsrc_info_size;
+	size_t				rsrc_info_size;
 
 
 	if ((params == NULL) || (buf == NULL) || (buf_size == NULL)) {
@@ -4100,7 +4098,7 @@ static int
 unpack_rsrc_info_reply(rsrc_info_params_t *params, const char *buf)
 {
 	int			unpack_status;
-	char 			*bufptr;
+	char			*bufptr;
 	rdr_rsrc_info_reply_t	rsrc_info_data;
 
 
@@ -4220,7 +4218,7 @@ unpack_ap_ids(int num_ap_ids, char **ap_ids, const char *buf,
 	var_msg_info->ap_id_int_size = sizeof (int) * num_ap_ids;
 	if (num_ap_ids > 0) {
 		var_msg_info->ap_id_sizes = (int *)
-		malloc(sizeof (int) * var_msg_info->ap_id_int_size);
+		    malloc(sizeof (int) * var_msg_info->ap_id_int_size);
 		if (var_msg_info->ap_id_sizes == NULL) {
 			return (RDR_MEM_ALLOC);
 		}
@@ -4236,7 +4234,7 @@ unpack_ap_ids(int num_ap_ids, char **ap_ids, const char *buf,
 			continue;
 		}
 		if ((chars_copied + ap_id_size) >
-			var_msg_info->ap_id_char_size) {
+		    var_msg_info->ap_id_char_size) {
 			return (RDR_ERROR);
 		}
 		ap_ids[i] = (char *)malloc(ap_id_size);
