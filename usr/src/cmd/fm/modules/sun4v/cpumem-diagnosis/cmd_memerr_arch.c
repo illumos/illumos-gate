@@ -64,7 +64,7 @@
 #define	FBR_ERROR	".fbr"
 #define	DSU_ERROR	".dsu"
 #define	FERG_INVALID	".invalid"
-#define	DBU_ERROR 	".dbu"
+#define	DBU_ERROR	".dbu"
 
 extern ldom_hdl_t *cpumem_diagnosis_lhp;
 
@@ -367,17 +367,17 @@ cmd_fb(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 
 	if (nvlist_lookup_nvlist(nvl, FM_RSRC_RESOURCE, &asru) < 0) {
 		CMD_STAT_BUMP(bad_mem_asru);
-		return (NULL);
+		return (CMD_EVD_UNUSED);
 	}
 
 	if (nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR, &det) < 0) {
 		CMD_STAT_BUMP(bad_mem_asru);
-		return (NULL);
+		return (CMD_EVD_UNUSED);
 	}
 
 	if (fmd_nvl_fmri_expand(hdl, det) < 0) {
 		fmd_hdl_debug(hdl, "Failed to expand detector");
-		return (NULL);
+		return (CMD_EVD_UNUSED);
 	}
 
 	branch = cmd_branch_lookup(hdl, asru);
@@ -612,12 +612,13 @@ static int galois_mul[16][16] = {
 };
 
 static int
-galois_div(int num, int denom) {
+galois_div(int num, int denom)
+{
 	int i;
 
 	for (i = 0; i < 16; i++) {
 		if (galois_mul[denom][i] == num)
-		    return (i);
+			return (i);
 	}
 	return (-1);
 }
@@ -628,8 +629,8 @@ galois_div(int num, int denom) {
  */
 
 int
-cmd_synd2upos(uint16_t syndrome) {
-
+cmd_synd2upos(uint16_t syndrome)
+{
 	uint16_t s0, s1, s2, s3;
 
 	if (syndrome == 0)
@@ -672,8 +673,8 @@ cmd_synd2upos(uint16_t syndrome) {
 }
 
 nvlist_t *
-cmd_mem2hc(fmd_hdl_t *hdl, nvlist_t *mem_fmri) {
-
+cmd_mem2hc(fmd_hdl_t *hdl, nvlist_t *mem_fmri)
+{
 	char **snp;
 	uint_t n;
 

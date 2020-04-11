@@ -345,8 +345,8 @@ cmd_ioxefrx_fire(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	(void) nvlist_lookup_uint64(nvl, FIRE_JBC_JITEL1, &afar);
 	rferr->rf_afar = afar & FIRE_JBC_ADDR_MASK;
 
-	rferr->rf_afsr = NULL;
-	rferr->rf_synd = NULL;
+	rferr->rf_afsr = 0;
+	rferr->rf_synd = 0;
 
 	if (nvlist_lookup_string(nvl, FM_EREPORT_PAYLOAD_NAME_ERR_TYPE,
 	    &typenm) == 0)
@@ -624,7 +624,8 @@ int msynd2bit [] = {  /* msynd 0-F */
 };
 
 int
-cmd_synd2upos(uint16_t syndrome) {
+cmd_synd2upos(uint16_t syndrome)
+{
 	return (esynd2bit[syndrome]);
 }
 
@@ -647,7 +648,7 @@ struct plat2id_map {
 	{"SUNW,Sun-Fire-15000",		1},
 	{"SUNW,Sun-Fire",		2},
 	{"SUNW,Netra-T12",		2},
-	{"SUNW,Sun-Fire-480R", 		3},
+	{"SUNW,Sun-Fire-480R",		3},
 	{"SUNW,Sun-Fire-V490",		3},
 	{"SUNW,Sun-Fire-V440",		3},
 	{"SUNW,Sun-Fire-V445",		3},

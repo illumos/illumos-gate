@@ -179,10 +179,10 @@ static fmd_xprt_t
 *etm_fmd_xprt = NULL;	/* FMD transport layer handle */
 
 static pthread_t
-etm_svr_tid = NULL;	/* thread id of connection acceptance server */
+etm_svr_tid = 0;	/* thread id of connection acceptance server */
 
 static pthread_t
-etm_resp_tid = NULL;	/* thread id of msg responder */
+etm_resp_tid = 0;	/* thread id of msg responder */
 
 static etm_resp_q_ele_t
 *etm_resp_q_head = NULL; /* ptr to cur head of responder queue */
@@ -554,7 +554,7 @@ static pthread_mutex_t
 iosvc_list_lock =  PTHREAD_MUTEX_INITIALIZER;
 
 static pthread_t
-etm_async_e_tid = NULL;	/* thread id of io svc async event handler */
+etm_async_e_tid = 0;	/* thread id of io svc async event handler */
 
 static etm_proto_v1_ev_hdr_t iosvc_hdr = {
 	ETM_PROTO_MAGIC_NUM,	/* magic number */
@@ -587,8 +587,8 @@ static etm_iosvc_t io_svc = {
 	0,				/* xid of last event posted to FMD */
 	DS_INVALID_HDL,			/* DS handle */
 	NULL,				/* fmd xprt handle */
-	NULL,				/* tid 4 send to remote RootDomain */
-	NULL,				/* tid 4 recv from remote RootDomain */
+	0,				/* tid 4 send to remote RootDomain */
+	0,				/* tid 4 recv from remote RootDomain */
 	PTHREAD_COND_INITIALIZER,	/* nudges etm_send_to_remote_root */
 	PTHREAD_MUTEX_INITIALIZER,	/* protects msg_ack_cv */
 	0,				/* send/recv threads are not dying */
@@ -756,7 +756,7 @@ etm_sleep(unsigned sleep_sec)
 
 static int
 etm_conn_open(fmd_hdl_t *hdl, char *err_substr,
-		etm_xport_addr_t addr, etm_xport_conn_t *connp)
+    etm_xport_addr_t addr, etm_xport_conn_t *connp)
 {
 	etm_xport_conn_t	conn;	/* connection to return */
 	int			nev;	/* -errno value */
@@ -810,7 +810,7 @@ etm_conn_close(fmd_hdl_t *hdl, char *err_substr, etm_xport_conn_t conn)
 
 static ssize_t
 etm_io_op(fmd_hdl_t *hdl, char *err_substr, etm_xport_conn_t conn,
-				void *buf, size_t byte_cnt, int io_op)
+    void *buf, size_t byte_cnt, int io_op)
 {
 	ssize_t		rv;		/* ret val / byte count */
 	ssize_t		n;		/* gen use */
@@ -1013,7 +1013,7 @@ etm_hdr_read(fmd_hdl_t *hdl, etm_xport_conn_t conn, size_t *szp)
 {
 	uint8_t			*hdrp;		/* ptr to header to return */
 	size_t			hdr_sz;		/* sizeof *hdrp */
-	etm_proto_v1_pp_t	pp; 		/* protocol preamble */
+	etm_proto_v1_pp_t	pp;		/* protocol preamble */
 	etm_proto_v1_ev_hdr_t	*ev_hdrp;	/* for FMA_EVENT msg */
 	etm_proto_v1_ctl_hdr_t	*ctl_hdrp;	/* for CONTROL msg */
 	etm_proto_v1_resp_hdr_t *resp_hdrp;	/* for RESPONSE msg */
@@ -1237,7 +1237,7 @@ etm_hdr_read(fmd_hdl_t *hdl, etm_xport_conn_t conn, size_t *szp)
 
 static void*
 etm_hdr_write(fmd_hdl_t *hdl, etm_xport_conn_t conn, nvlist_t *evp,
-						int encoding, size_t *szp)
+    int encoding, size_t *szp)
 {
 	etm_proto_v1_ev_hdr_t	*hdrp;		/* for FMA_EVENT msg */
 	size_t			hdr_sz;		/* sizeof *hdrp */
@@ -1348,7 +1348,7 @@ etm_post_to_fmd(fmd_hdl_t *hdl, fmd_xprt_t *fmd_xprt, nvlist_t *evp)
 
 static int
 etm_post_to_syslog(fmd_hdl_t *hdl, uint32_t priority, uint32_t body_sz,
-							uint8_t *body_buf)
+    uint8_t *body_buf)
 {
 	char		*sysmessage;	/* Formatted message */
 	size_t		formatlen;	/* maximum length of sysmessage */
@@ -1633,16 +1633,16 @@ etm_iosvc_cleanup(fmd_hdl_t *fmd_hdl, etm_iosvc_t *iosvc, boolean_t clean_msg_q,
 		iosvc->fmd_xprt = NULL;
 	} /* if fmd-xprt has been opened */
 
-	if (iosvc->send_tid != NULL) {
+	if (iosvc->send_tid != 0) {
 		fmd_thr_signal(fmd_hdl, iosvc->send_tid);
 		fmd_thr_destroy(fmd_hdl, iosvc->send_tid);
-		iosvc->send_tid = NULL;
+		iosvc->send_tid = 0;
 	} /* if io svc send thread was created ok */
 
-	if (iosvc->recv_tid != NULL) {
+	if (iosvc->recv_tid != 0) {
 		fmd_thr_signal(fmd_hdl, iosvc->recv_tid);
 		fmd_thr_destroy(fmd_hdl, iosvc->recv_tid);
-		iosvc->recv_tid = NULL;
+		iosvc->recv_tid = 0;
 	} /* if root domain recv thread was created */
 
 
@@ -1763,7 +1763,8 @@ etm_iosvc_lookup(fmd_hdl_t *fmd_hdl, char *ldom_name, ds_hdl_t ds_hdl,
  * remove the ckpt for the iosvc element
  */
 static void
-etm_ckpt_remove(fmd_hdl_t *hdl, etm_iosvc_q_ele_t *ele) {
+etm_ckpt_remove(fmd_hdl_t *hdl, etm_iosvc_q_ele_t *ele)
+{
 	int		err;			/* temp error */
 	nvlist_t	*evp = NULL;		/* event pointer */
 	etm_proto_v1_ev_hdr_t	*hdrp;		/* hdr for FMA_EVENT */
@@ -1871,15 +1872,15 @@ etm_send_ds_msg(fmd_hdl_t *fmd_hdl, boolean_t ckpt_remove, etm_iosvc_t *iosvc,
  */
 int
 etm_pack_ds_msg(fmd_hdl_t *fmd_hdl, etm_iosvc_t *iosvc,
-	etm_proto_v1_ev_hdr_t *ev_hdrp, size_t hdr_sz, nvlist_t *evp,
-	etm_pack_msg_type_t msg_type, uint_t ckpt_opt)
+    etm_proto_v1_ev_hdr_t *ev_hdrp, size_t hdr_sz, nvlist_t *evp,
+    etm_pack_msg_type_t msg_type, uint_t ckpt_opt)
 {
 	etm_proto_v1_ev_hdr_t	*hdrp;		/* for FMA_EVENT msg */
 	uint32_t		*lenp;		/* ptr to FMA event length */
 	size_t			evsz;		/* packed FMA event size */
-	char 			*buf;
+	char			*buf;
 	uint32_t		rc;		/* for return code  */
-	char 			*msg;		/* body of msg to be Qed */
+	char			*msg;		/* body of msg to be Qed */
 
 	etm_iosvc_q_ele_t	msg_ele;	/* io svc msg Q ele */
 	etm_proto_v1_ev_hdr_t	*evhdrp;
@@ -2851,7 +2852,7 @@ etm_async_q_deq(etm_async_event_ele_t *async_e)
  */
 void
 etm_iosvc_setup(fmd_hdl_t *fmd_hdl, etm_iosvc_t *iosvc,
-	etm_async_event_ele_t *async_e)
+    etm_async_event_ele_t *async_e)
 {
 	iosvc->ds_hdl = async_e->ds_hdl;
 	iosvc->cur_send_xid = 0;
@@ -2870,11 +2871,11 @@ etm_iosvc_setup(fmd_hdl_t *fmd_hdl, etm_iosvc_t *iosvc,
 	}
 
 	iosvc->thr_is_dying = 0;
-	if (iosvc->recv_tid == NULL) {
+	if (iosvc->recv_tid == 0) {
 		iosvc->recv_tid = fmd_thr_create(fmd_hdl,
 		    etm_recv_from_remote_root, iosvc);
 	}
-	if (iosvc->send_tid == NULL) {
+	if (iosvc->send_tid == 0) {
 		iosvc->send_tid = fmd_thr_create(fmd_hdl,
 		    etm_send_to_remote_root, iosvc);
 	}
@@ -2888,7 +2889,7 @@ etm_iosvc_setup(fmd_hdl_t *fmd_hdl, etm_iosvc_t *iosvc,
 /* ARGSUSED */
 static void
 etm_iosvc_reg_handler(ds_hdl_t ds_hdl, ds_cb_arg_t arg, ds_ver_t *ver,
-	ds_domain_hdl_t dhdl)
+    ds_domain_hdl_t dhdl)
 {
 	etm_async_event_ele_t	async_ele;
 
@@ -3397,15 +3398,15 @@ etm_recv_from_remote_root(void *arg)
 	int32_t			rc;		/* return value */
 	size_t			maxlen = MAXLEN;
 						/* max msg len */
-	char 			msgbuf[MAXLEN];	/* recv msg buf */
+	char			msgbuf[MAXLEN];	/* recv msg buf */
 	size_t			msg_size;	/* recv msg size */
 	size_t			hdr_sz;		/* sizeof *hdrp */
 	size_t			evsz;		/* sizeof *evp */
 	size_t			fma_event_size;	/* sizeof FMA event  */
-	nvlist_t 		*evp;		/* ptr to the nvlist */
+	nvlist_t		*evp;		/* ptr to the nvlist */
 	char			*buf;		/* ptr to the nvlist */
 	static uint32_t		mem_alloc = 0;	/* indicate if alloc mem */
-	char 			*msg;		/* ptr to alloc mem */
+	char			*msg;		/* ptr to alloc mem */
 	fmd_hdl_t		*fmd_hdl = init_hdl;
 
 
@@ -4096,7 +4097,7 @@ etm_send(fmd_hdl_t *fmd_hdl, fmd_xprt_t *xp, fmd_event_t *ep, nvlist_t *nvl)
 	etm_pack_msg_type_t	msg_type;
 					/* tell etm_pack_ds_msg() what to do */
 	etm_iosvc_t	*iosvc;		/* ptr to cur iosvc struct */
-	char 		*class;		/* nvlist class name */
+	char		*class;		/* nvlist class name */
 
 	pack_it = 1;
 	msg_type = FMD_XPRT_OTHER_MSG;
@@ -4197,22 +4198,22 @@ _fmd_fini(fmd_hdl_t *hdl)
 
 	etm_is_dying = 1;
 
-	if (etm_svr_tid != NULL) {
+	if (etm_svr_tid != 0) {
 		fmd_thr_signal(hdl, etm_svr_tid);
 		fmd_thr_destroy(hdl, etm_svr_tid);
-		etm_svr_tid = NULL;
+		etm_svr_tid = 0;
 	} /* if server thread was successfully created */
 
-	if (etm_resp_tid != NULL) {
+	if (etm_resp_tid != 0) {
 		fmd_thr_signal(hdl, etm_resp_tid);
 		fmd_thr_destroy(hdl, etm_resp_tid);
-		etm_resp_tid = NULL;
+		etm_resp_tid = 0;
 	} /* if responder thread was successfully created */
 
-	if (etm_async_e_tid != NULL) {
+	if (etm_async_e_tid != 0) {
 		fmd_thr_signal(hdl, etm_async_e_tid);
 		fmd_thr_destroy(hdl, etm_async_e_tid);
-		etm_async_e_tid = NULL;
+		etm_async_e_tid = 0;
 	} /* if async event handler thread was successfully created */
 
 
@@ -4273,16 +4274,16 @@ _fmd_fini(fmd_hdl_t *hdl)
 		 * On root domain side, there is only one iosvc struct in use.
 		 */
 		iosvc = &io_svc;
-		if (iosvc->send_tid != NULL) {
+		if (iosvc->send_tid != 0) {
 			fmd_thr_signal(hdl, iosvc->send_tid);
 			fmd_thr_destroy(hdl, iosvc->send_tid);
-			iosvc->send_tid = NULL;
+			iosvc->send_tid = 0;
 		} /* if io svc send thread was successfully created */
 
-		if (iosvc->recv_tid != NULL) {
+		if (iosvc->recv_tid != 0) {
 			fmd_thr_signal(hdl, iosvc->recv_tid);
 			fmd_thr_destroy(hdl, iosvc->recv_tid);
-			iosvc->recv_tid = NULL;
+			iosvc->recv_tid = 0;
 		} /* if io svc receive thread was successfully created */
 
 		(void) pthread_mutex_lock(&iosvc->msg_q_lock);

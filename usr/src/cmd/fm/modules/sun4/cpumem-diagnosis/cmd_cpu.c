@@ -1313,7 +1313,7 @@ cmd_trw_alloc(uint64_t ena, uint64_t afar)
 
 	for (i = 0; i < cmd.cmd_xxcu_ntrw; i++) {
 		cmd_xxcu_trw_t *trw = &cmd.cmd_xxcu_trw[i];
-		if (trw->trw_ena == NULL) {
+		if (trw->trw_ena == 0) {
 			trw->trw_ena = ena;
 			trw->trw_afar = afar;
 			return (trw);
