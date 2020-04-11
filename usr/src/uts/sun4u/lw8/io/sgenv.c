@@ -257,8 +257,8 @@ static boolean_t	env_cache_update_needed = B_TRUE;
  * board_cache won't change between the kstat_update and the kstat_snapshot
  * which will cause problems as the update sets the ks_data_size.
  */
-static sg_board_info_t	board_cache[SG_MAX_BDS] = {NULL};
-static sg_board_info_t	board_cache_snapshot[SG_MAX_BDS] = {NULL};
+static sg_board_info_t	board_cache[SG_MAX_BDS] = { 0 };
+static sg_board_info_t	board_cache_snapshot[SG_MAX_BDS] = { 0 };
 static int		board_cache_updated = FALSE;
 
 /*
@@ -546,7 +546,7 @@ sgenv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 
 		err = ddi_create_minor_node(dip, SGENV_DRV_NAME, S_IFCHR,
-		    instance, DDI_PSEUDO, NULL);
+		    instance, DDI_PSEUDO, 0);
 		if (err != DDI_SUCCESS) {
 			sgenv_remove_kstats(softsp);
 			(void) sgenv_remove_cache_update_threads();
@@ -644,7 +644,7 @@ sgenv_add_kstats(sgenv_soft_state_t *softsp)
 	 * Create the 'keyswitch position' named kstat.
 	 */
 	ksp = kstat_create(SGENV_DRV_NAME, inst, SG_KEYSWITCH_KSTAT_NAME,
-	    "misc", KSTAT_TYPE_NAMED, 1, NULL);
+	    "misc", KSTAT_TYPE_NAMED, 1, 0);
 
 	if (ksp != NULL) {
 		/* initialize the named kstat */
@@ -1451,7 +1451,7 @@ sgenv_board_info_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
  * This function coordinates reading the env data from the SC.
  *
  * ERROR:
- * 	If an error occurs while making a call to the mailbox and we have data
+ *	If an error occurs while making a call to the mailbox and we have data
  *	in the cache from a previous call to the SC, we return an error of 0.
  *	That way the kstat framework will return the old data instead of
  *	returning an error and an empty kstat.
@@ -2106,7 +2106,7 @@ sgenv_get_env_data(envresp_key_t key, int key_posn, uint16_t flag, int *status)
  */
 static int
 sgenv_handle_env_data_error(int err, int status, int key_posn,
-				envresp_key_t key, char *str)
+    envresp_key_t key, char *str)
 {
 	int	rv = DDI_SUCCESS;
 

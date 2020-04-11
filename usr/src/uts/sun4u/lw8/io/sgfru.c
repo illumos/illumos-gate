@@ -186,7 +186,7 @@ sgfru_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		softsp->instance = instance;
 
 		error = ddi_create_minor_node(dip, SGFRU_DRV_NAME, S_IFCHR,
-		    instance, DDI_PSEUDO, NULL);
+		    instance, DDI_PSEUDO, 0);
 		if (error == DDI_FAILURE) {
 			ddi_soft_state_free(sgfru_statep, instance);
 			return (DDI_FAILURE);
@@ -1525,7 +1525,7 @@ sgfru_copyin_append(const sgfru_init_arg_t *argp, append_info_t *app)
  */
 static int
 sgfru_copyin_buffer(const sgfru_init_arg_t *argp, const caddr_t data,
-	const int cnt, char *buffer)
+    const int cnt, char *buffer)
 {
 	static fn_t f = "sgfru_copyin_buffer";
 
