@@ -379,7 +379,7 @@ fbt_trampoline_unmap()
 	vmem_free(heap_arena, fbt_trampoline_window, fbt_trampoline_size);
 
 	fbt_trampoline_window = NULL;
-	fbt_trampoline = NULL;
+	fbt_trampoline = 0;
 	fbt_trampoline_size = 0;
 }
 
@@ -532,7 +532,7 @@ fbt_patch_entry(uint32_t *instr, uint32_t id, fbt_trampoline_t *tramp,
  * Likewise, rs1 and rs2 in the jmpl of case (b) may be outputs and/or globals.
  * If the jmpl uses outputs or globals, we restructure it to be:
  *
- * 	jmpl		ls2 + (ls3 | offset), (%g0 | %o7)
+ *	jmpl		ls2 + (ls3 | offset), (%g0 | %o7)
  *
  */
 /*ARGSUSED*/
@@ -1040,7 +1040,7 @@ fbt_provide_module(void *arg, struct modctl *ctl)
 	if (strcmp(modname, "kmdbmod") == 0)
 		return;
 
-	if (str == NULL || symhdr == NULL || symhdr->sh_addr == NULL) {
+	if (str == NULL || symhdr == NULL || symhdr->sh_addr == 0) {
 		/*
 		 * If this module doesn't (yet) have its string or symbol
 		 * table allocated, clear out.
@@ -1730,7 +1730,7 @@ fbt_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_create_minor_node(devi, "fbt", S_IFCHR, 0,
-	    DDI_PSEUDO, NULL) == DDI_FAILURE ||
+	    DDI_PSEUDO, 0) == DDI_FAILURE ||
 	    dtrace_register("fbt", &fbt_attr, DTRACE_PRIV_KERNEL, NULL,
 	    &fbt_pops, NULL, &fbt_id) != 0) {
 		ddi_remove_minor_node(devi, NULL);
