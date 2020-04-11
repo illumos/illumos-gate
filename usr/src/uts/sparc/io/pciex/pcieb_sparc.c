@@ -167,7 +167,7 @@ pcieb_plat_ctlops(dev_info_t *rdip, ddi_ctl_enum_t ctlop, void *arg)
 void
 pcieb_plat_initchild(dev_info_t *child)
 {
-	intptr_t ppd = NULL;
+	intptr_t ppd = (intptr_t)NULL;
 	/*
 	 * XXX set ppd to 1 to disable iommu BDF protection on SPARC.
 	 * It relies on unused parent private data for PCI devices.
@@ -204,7 +204,7 @@ pcieb_attach_plx_workarounds(pcieb_devstate_t *pcieb)
 	uint8_t		dev_type = bus_p->bus_dev_type;
 	uint16_t	vendor_id = bus_p->bus_dev_ven_id & 0xFFFF;
 	uint16_t	device_id = bus_p->bus_dev_ven_id >> 16;
-	int 		ce_mask = 0;
+	int		ce_mask = 0;
 
 	if (!IS_PLX_VENDORID(vendor_id))
 		return;
