@@ -899,3 +899,8 @@ lbolt_softint_post(void)
 {
 	setsoftint(lbolt_softint_inum);
 }
+
+void
+do_hotinlines(struct module *mp __unused)
+{
+}
