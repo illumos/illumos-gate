@@ -210,7 +210,7 @@ md_add_string_property(mmd_t *mdp, md_node_t *nodep, char *sp, char *bufp)
 	propp = md_new_property(mdp, nodep, MDET_PROP_STR, sp);
 	if (propp == NULL) {
 		md_free_data_block(mdp, dbp);
-		return (NULL);
+		return (ENOMEM);
 	}
 	propp->d.dbp = dbp;
 	return (0);
