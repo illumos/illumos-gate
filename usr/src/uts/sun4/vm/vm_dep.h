@@ -416,7 +416,7 @@ typedef	struct {
 }
 
 #define	PLCNT_DECR(pp, mn, mtype, szc, flags) {				\
-	long	cnt = ((-1) << PAGE_BSZS_SHIFT(szc));			\
+	long	cnt = ((ULONG_MAX) << PAGE_BSZS_SHIFT(szc));		\
 	PLCNT_DO(pp, mn, mtype, szc, cnt, flags);			\
 }
 
@@ -630,6 +630,7 @@ switch (consistent_coloring) {						\
 		cmn_err(CE_WARN,					\
 			"AS_2_BIN: bad consistent coloring value");	\
 		/* assume default algorithm -> continue */		\
+		/* FALLTHROUGH */					\
 	case 0: {                                                       \
 		uint32_t ndx, new;					\
 		int slew = 0;						\
