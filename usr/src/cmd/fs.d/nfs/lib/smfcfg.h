@@ -90,6 +90,7 @@ typedef struct fs_smfhandle {
 #define	SMF_NO_PERMISSION	2
 #define	SMF_NO_PGTYPE		3
 
+extern uint32_t nfs_convert_version_str(const char *);
 extern void nfs_config_upgrade(const char *);
 extern int nfs_smf_get_iprop(char *, int *, char *, scf_type_t, char *);
 extern int nfs_smf_get_prop(char *, char *, char *, scf_type_t, char *, int *);

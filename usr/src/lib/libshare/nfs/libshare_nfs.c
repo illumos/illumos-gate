@@ -77,7 +77,7 @@ static int nfs_is_security_opt(char *);
 static int nfs_parse_legacy_options(sa_group_t, char *);
 static char *nfs_format_options(sa_group_t, int);
 static int nfs_set_proto_prop(sa_property_t);
-static sa_protocol_properties_t nfs_get_proto_set();
+static sa_protocol_properties_t nfs_get_proto_set(void);
 static char *nfs_get_status(void);
 static char *nfs_space_alias(char *);
 static uint64_t nfs_features(void);
@@ -2512,8 +2512,6 @@ struct proto_option_defs {
 		.type = OPT_TYPE_STRING,
 		.defvalue.string = "2",
 		.svcs = SVC_NFSD | SVC_MOUNTD,
-		.minval =  NFS_VERSMIN,
-		.maxval = NFS_VERSMAX,
 		.validator = range_check_validator_server
 	},
 #define	PROTO_OPT_NFS_SERVER_VERSMAX		6
@@ -2524,8 +2522,6 @@ struct proto_option_defs {
 		.type = OPT_TYPE_STRING,
 		.defvalue.string = "4",
 		.svcs = SVC_NFSD | SVC_MOUNTD,
-		.minval = NFS_VERSMIN,
-		.maxval = NFS_VERSMAX,
 		.validator = range_check_validator_server
 	},
 #define	PROTO_OPT_NFS_CLIENT_VERSMIN		7
@@ -2681,7 +2677,7 @@ struct proto_option_defs {
  * Check the range of value as int range.
  */
 static int
-range_check_validator_value(uint_t index, int type, char *value, int *intval)
+range_check_validator_value(uint_t index, char *value, int *intval)
 {
 	int val;
 	const char *errstr;
@@ -2711,37 +2707,48 @@ range_check_validator_value(uint_t index, int type, char *value, int *intval)
 static int
 range_check_validator(uint_t index, char *value)
 {
-	return (range_check_validator_value(index, OPT_TYPE_NUMBER,
-	    value, NULL));
+	return (range_check_validator_value(index, value, NULL));
 }
 
 /*
  * Return integer value of versmin or versmax property.
- * This will need update, once we add support for minor versions.
+ * In case of error, return default value.
+ * If there is an error translating default value, we return 0.
  */
-static int
+static uint32_t
 nfs_get_vers_minmax(uint_t index)
 {
 	char *pvalue;
 	sa_property_t prop;
 	sa_optionset_t opts;
-	int rval;
+	struct proto_option_defs *po;
+	uint32_t rval = 0;	/* Impossible value */
 	const char *errstr;
 
+	po = &proto_options[index];
 	opts = nfs_get_proto_set();
-	prop = sa_get_property(opts, proto_options[index].name);
+	prop = sa_get_property(opts, po->name);
+
+	if (prop != NULL) {
+		pvalue = sa_get_property_attr(prop, "value");
+		/*
+		 * nfs_server properties are strings,
+		 * nfs_client properties are numbers.
+		 */
+		if (po->type == OPT_TYPE_STRING)
+			rval = nfs_convert_version_str(pvalue);
+		else
+			rval = strtonumx(pvalue, po->minval, po->maxval,
+			    &errstr, 0);
+		sa_free_attr_string(pvalue);
+	}
 
 	/* in case of failure, return default */
-	if (prop == NULL) {
-		rval = proto_options[index].defvalue.intval;
-	} else {
-		pvalue = sa_get_property_attr(prop, "value");
-		rval = strtonumx(pvalue,
-		    proto_options[index].minval,
-		    proto_options[index].maxval,
-		    &errstr, 0);
-		sa_free_attr_string(pvalue);
-		if (errstr != NULL)
+	if (rval == 0) {
+		if (po->type == OPT_TYPE_STRING)
+			rval = nfs_convert_version_str(
+			    proto_options[index].defvalue.string);
+		else
 			rval = proto_options[index].defvalue.intval;
 	}
 	return (rval);
@@ -2759,7 +2766,7 @@ range_check_validator_client(uint_t index, char *value)
 	if (value == NULL)
 		return (SA_BAD_VALUE);
 
-	ret = range_check_validator_value(index, OPT_TYPE_NUMBER, value, &val);
+	ret = range_check_validator_value(index, value, &val);
 	if (ret != SA_OK)
 		return (ret);
 
@@ -2793,15 +2800,22 @@ range_check_validator_client(uint_t index, char *value)
 static int
 range_check_validator_server(uint_t index, char *value)
 {
-	int ret, val;
+	int ret = SA_BAD_VALUE;
+	uint32_t val;
 
 	if (value == NULL)
-		return (SA_BAD_VALUE);
-
-	ret = range_check_validator_value(index, OPT_TYPE_STRING, value, &val);
-	if (ret != SA_OK)
 		return (ret);
 
+	if (index >= ARRAY_SIZE(proto_options))
+		return (SA_NO_SUCH_PROP);
+
+	VERIFY3S(proto_options[index].index, ==, index);
+
+	val = nfs_convert_version_str(value);
+	if (val == 0)
+		return (ret);
+
+	ret = SA_OK;
 	switch (index) {
 	case PROTO_OPT_NFS_SERVER_VERSMIN:
 		/* versmin must be <= versmax */

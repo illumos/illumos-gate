@@ -26,6 +26,7 @@
 
 /*
  * Copyright 2018 Nexenta Systems, Inc.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #include <sys/systm.h>
@@ -39,8 +40,6 @@
 #include <nfs/nfs4.h>
 #include <nfs/nfs_dispatch.h>
 #include <nfs/nfs4_drc.h>
-
-#define	NFS4_MAX_MINOR_VERSION	0
 
 /*
  * The default size of the duplicate request cache
@@ -351,7 +350,8 @@ rfs4_find_dr(struct svc_req *req, rfs4_drc_t *drc, rfs4_dupreq_t **dup)
 /*
  *
  * This function handles the duplicate request cache,
- * NULL_PROC and COMPOUND procedure calls for NFSv4;
+ * NULL_PROC and COMPOUND procedure calls for NFSv4.0;
+ * the 4.x where x > 0 case is handled in rfs4x_dispatch.
  *
  * Passed into this function are:-
  *
@@ -372,42 +372,27 @@ rfs4_find_dr(struct svc_req *req, rfs4_drc_t *drc, rfs4_dupreq_t **dup)
  *
  */
 int
-rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req, SVCXPRT *xprt,
-    char *ap)
+rfs40_dispatch(struct svc_req *req, SVCXPRT *xprt, char *ap)
 {
 
 	COMPOUND4res	 res_buf;
 	COMPOUND4res	*rbp;
 	COMPOUND4args	*cap;
-	cred_t		*cr = NULL;
 	int		 error = 0;
 	int		 dis_flags = 0;
 	int		 dr_stat = NFS4_NOT_DUP;
 	rfs4_dupreq_t	*drp = NULL;
 	int		 rv;
+	struct compound_state cs;
 	nfs4_srv_t *nsrv4 = nfs4_get_srv();
 	rfs4_drc_t *nfs4_drc = nsrv4->nfs4_drc;
-
-	ASSERT(disp);
-
-	/*
-	 * Short circuit the RPC_NULL proc.
-	 */
-	if (disp->dis_proc == rpc_null) {
-		DTRACE_NFSV4_1(null__start, struct svc_req *, req);
-		if (!svc_sendreply(xprt, xdr_void, NULL)) {
-			DTRACE_NFSV4_1(null__done, struct svc_req *, req);
-			svcerr_systemerr(xprt);
-			return (1);
-		}
-		DTRACE_NFSV4_1(null__done, struct svc_req *, req);
-		return (0);
-	}
 
 	/* Only NFSv4 Compounds from this point onward */
 
 	rbp = &res_buf;
 	cap = (COMPOUND4args *)ap;
+
+	rfs4_init_compound_state(&cs);
 
 	/*
 	 * Figure out the disposition of the whole COMPOUND
@@ -445,8 +430,10 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req, SVCXPRT *xprt,
 		case NFS4_DUP_NEW:
 			curthread->t_flag |= T_DONTPEND;
 			/* NON-IDEMPOTENT proc call */
-			rfs4_compound(cap, rbp, NULL, req, cr, &rv);
+			rfs4_compound(cap, rbp, &cs, req, &rv);
 			curthread->t_flag &= ~T_DONTPEND;
+
+			rfs4_fini_compound_state(&cs);
 
 			if (rv)		/* short ckt sendreply on error */
 				return (rv);
@@ -478,8 +465,10 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req, SVCXPRT *xprt,
 	} else {
 		curthread->t_flag |= T_DONTPEND;
 		/* IDEMPOTENT proc call */
-		rfs4_compound(cap, rbp, NULL, req, cr, &rv);
+		rfs4_compound(cap, rbp, &cs, req, &rv);
 		curthread->t_flag &= ~T_DONTPEND;
+
+		rfs4_fini_compound_state(&cs);
 
 		if (rv)		/* short ckt sendreply on error */
 			return (rv);
@@ -528,19 +517,11 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req, SVCXPRT *xprt,
 	return (error);
 }
 
-bool_t
-rfs4_minorvers_mismatch(struct svc_req *req, SVCXPRT *xprt, void *args)
+static int
+rfs4_send_minor_mismatch(SVCXPRT *xprt, COMPOUND4args *argsp)
 {
-	COMPOUND4args *argsp;
 	COMPOUND4res res_buf, *resp;
-
-	if (req->rq_vers != 4)
-		return (FALSE);
-
-	argsp = (COMPOUND4args *)args;
-
-	if (argsp->minorversion <= NFS4_MAX_MINOR_VERSION)
-		return (FALSE);
+	int err = 0;
 
 	resp = &res_buf;
 
@@ -563,8 +544,35 @@ rfs4_minorvers_mismatch(struct svc_req *req, SVCXPRT *xprt, void *args)
 		DTRACE_PROBE2(nfss__e__minorvers_mismatch,
 		    SVCXPRT *, xprt, char *, resp);
 		svcerr_systemerr(xprt);
+		err = 1;
 	}
 	rfs4_compound_free(resp);
+	return (err);
+}
+
+/*
+ * Test minor version against allowed minor versions.
+ */
+static inline bool_t
+rfs4_minorversion_enabled(uint32_t minorversion)
+{
+	return (minorversion <= nfs4_get_srv()->nfs4_minor_max);
+}
+
+bool_t
+rfs4_minorvers_mismatch(struct svc_req *req, SVCXPRT *xprt, void *args)
+{
+	COMPOUND4args *argsp;
+
+	if (req->rq_vers != 4)
+		return (FALSE);
+
+	argsp = (COMPOUND4args *)args;
+
+	if (rfs4_minorversion_enabled(argsp->minorversion))
+		return (FALSE);
+
+	(void) rfs4_send_minor_mismatch(xprt, argsp);
 	return (TRUE);
 }
 
@@ -618,4 +626,29 @@ rfs4_resource_err(struct svc_req *req, COMPOUND4args *argsp)
 
 	UTF8STRING_FREE(rbp->tag);
 	kmem_free(rbp->array, rbp->array_len * sizeof (nfs_resop4));
+}
+
+int
+rfs4_dispatch(struct rpcdisp *disp __unused, struct svc_req *req,
+    SVCXPRT *xprt, char *ap)
+{
+	COMPOUND4args	*cmp;
+
+	/*
+	 * Handle the NULL Proc here
+	 */
+	if (req->rq_proc == RFS_NULL) {
+		return (!svc_sendreply(xprt, xdr_void, NULL));
+	}
+
+	cmp = (COMPOUND4args *)ap;
+	ASSERT(cmp != NULL);
+
+	if (!rfs4_minorversion_enabled(cmp->minorversion))
+		return (rfs4_send_minor_mismatch(xprt, cmp));
+
+	if (cmp->minorversion == 0)
+		return (rfs40_dispatch(req, xprt, ap));
+
+	return (rfs4x_dispatch(req, xprt, ap));
 }

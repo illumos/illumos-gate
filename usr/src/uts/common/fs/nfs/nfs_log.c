@@ -1245,7 +1245,6 @@ nfslog_do_flush(struct flush_thread_params *tparams)
 		kmem_free(buf_inprog, buf_inprog_len);
 	}
 
-out:
 	if ((args->directive & NFSL_SYNC) == 0) {
 		/*
 		 * Work was performed asynchronously, the caller is

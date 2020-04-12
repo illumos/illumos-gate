@@ -29,8 +29,44 @@
 #include <stdlib.h>
 #include <syslog.h>
 #include <stdarg.h>
+#include <nfs/nfs.h>
 #include <rpcsvc/daemon_utils.h>
+#include <sys/sysmacros.h>
 #include "smfcfg.h"
+
+/*
+ * NFS version strings translation table to numeric form.
+ */
+static struct str_val {
+	const char *str;
+	uint32_t val;
+} nfs_versions[] = {
+	{ "2",		NFS_VERS_2 },
+	{ "3",		NFS_VERS_3 },
+	{ "4",		NFS_VERS_4 },
+	{ "4.0",	NFS_VERS_4 },
+	{ "4.1",	NFS_VERS_4_1 },
+	{ "4.2",	NFS_VERS_4_2 }
+};
+
+/*
+ * Translate NFS version string to numeric form.
+ * Returns NFS_VERS_... value or zero for invalid version string.
+ */
+uint32_t
+nfs_convert_version_str(const char *version)
+{
+	uint32_t v = 0;
+
+	for (size_t i = 0; i < ARRAY_SIZE(nfs_versions); i++) {
+		if (strcmp(version, nfs_versions[i].str) == 0) {
+			v = nfs_versions[i].val;
+			break;
+		}
+	}
+
+	return (v);
+}
 
 fs_smfhandle_t *
 fs_smf_init(const char *fmri, const char *instance)
