@@ -477,6 +477,7 @@ file path=usr/include/nfs/nfs4_clnt.h
 file path=usr/include/nfs/nfs4_db_impl.h
 file path=usr/include/nfs/nfs4_idmap_impl.h
 file path=usr/include/nfs/nfs4_kprot.h
+file path=usr/include/nfs/nfs4x.h
 file path=usr/include/nfs/nfs_acl.h
 file path=usr/include/nfs/nfs_clnt.h
 file path=usr/include/nfs/nfs_cmd.h

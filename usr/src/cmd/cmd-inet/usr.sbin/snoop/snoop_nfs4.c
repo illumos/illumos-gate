@@ -2024,8 +2024,8 @@ sumarg_setclid(char *buf, size_t buflen, void *obj)
 
 	snprintf(buf, buflen, "Prog=%u ID=%s Addr=%s CBID=%u",
 	    args->callback.cb_program,
-	    args->callback.cb_location.r_netid,
-	    args->callback.cb_location.r_addr, args->callback_ident);
+	    args->callback.cb_location.na_r_netid,
+	    args->callback.cb_location.na_r_addr, args->callback_ident);
 }
 
 static void
@@ -2042,9 +2042,9 @@ dtlarg_setclid(void *obj)
 	sprintf(get_line(0, 0), "Callback Program = %u",
 	    args->callback.cb_program);
 	sprintf(get_line(0, 0), "Callback Net ID = %s",
-	    args->callback.cb_location.r_netid);
+	    args->callback.cb_location.na_r_netid);
 	sprintf(get_line(0, 0), "Callback Addr = %s",
-	    args->callback.cb_location.r_addr);
+	    args->callback.cb_location.na_r_addr);
 	sprintf(get_line(0, 0), "Callback Ident = %u", args->callback_ident);
 }
 
@@ -3016,8 +3016,8 @@ sumres_setclid(char *buf, size_t buflen, void *obj)
 	case NFS4ERR_CLID_INUSE:
 		bp = buf + strlen(buf);
 		snprintf(bp, buflen - (bp - buf), " ID=%s Addr=%s",
-		    res->SETCLIENTID4res_u.client_using.r_netid,
-		    res->SETCLIENTID4res_u.client_using.r_addr);
+		    res->SETCLIENTID4res_u.client_using.na_r_netid,
+		    res->SETCLIENTID4res_u.client_using.na_r_addr);
 		break;
 	}
 }
@@ -3037,9 +3037,9 @@ dtlres_setclid(void *obj)
 		break;
 	case NFS4ERR_CLID_INUSE:
 		sprintf(get_line(0, 0), "Used by Net ID = %s",
-		    res->SETCLIENTID4res_u.client_using.r_netid);
+		    res->SETCLIENTID4res_u.client_using.na_r_netid);
 		sprintf(get_line(0, 0), "Used by Addr = %s",
-		    res->SETCLIENTID4res_u.client_using.r_addr);
+		    res->SETCLIENTID4res_u.client_using.na_r_addr);
 		break;
 	}
 }

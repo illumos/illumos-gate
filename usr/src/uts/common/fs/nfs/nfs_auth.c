@@ -122,15 +122,6 @@ typedef struct refreshq_auth_node {
 } refreshq_auth_node_t;
 
 /*
- * Used to manipulate things on the refreshq_queue.  Note that the refresh
- * thread will effectively pop a node off of the queue, at which point it
- * will no longer need to hold the mutex.
- */
-static kmutex_t refreshq_lock;
-static list_t refreshq_queue;
-static kcondvar_t refreshq_cv;
-
-/*
  * If there is ever a problem with loading the module, then nfsauth_fini()
  * needs to be called to remove state.  In that event, since the refreshq
  * thread has been started, they need to work together to get rid of state.
@@ -1046,7 +1037,7 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 		kmem_free(addr.buf, addr.maxlen);
 		addr = p->auth_clnt->authc_addr;
 
-		atomic_inc_uint(&nfsauth_cache_miss);
+		nfsauth_cache_miss++;
 
 		res = nfsauth_retrieve(nag, exi, svc_getnetid(req->rq_xprt),
 		    flavor, &addr, &access, cr, &tmpuid, &tmpgid, &tmpngids,
@@ -1124,7 +1115,7 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 			p->auth_state = NFS_AUTH_STALE;
 			mutex_exit(&p->auth_lock);
 
-			nacr = atomic_inc_uint_nv(&nfsauth_cache_refresh);
+			nacr = ++nfsauth_cache_refresh;
 			DTRACE_PROBE3(nfsauth__debug__cache__stale,
 			    struct exportinfo *, exi,
 			    struct auth_cache *, p,
@@ -1199,7 +1190,7 @@ nfsauth_cache_get(struct exportinfo *exi, struct svc_req *req, int flavor,
 			mutex_exit(&p->auth_lock);
 		}
 
-		nach = atomic_inc_uint_nv(&nfsauth_cache_hit);
+		nach = ++nfsauth_cache_hit;
 		DTRACE_PROBE2(nfsauth__debug__cache__hit,
 		    uint_t, nach,
 		    time_t, refresh);
@@ -1217,7 +1208,7 @@ retrieve:
 
 	ASSERT(p == NULL);
 
-	atomic_inc_uint(&nfsauth_cache_miss);
+	nfsauth_cache_miss++;
 
 	if (nfsauth_retrieve(nag, exi, svc_getnetid(req->rq_xprt), flavor,
 	    &addr, &access, cr, &tmpuid, &tmpgid, &tmpngids, &tmpgids)) {
@@ -1512,7 +1503,7 @@ exi_cache_reclaim_zone(nfs_globals_t *ng)
 
 	rw_exit(&ne->exported_lock);
 
-	atomic_inc_uint(&nfsauth_cache_reclaim);
+	nfsauth_cache_reclaim++;
 }
 
 static void

@@ -261,7 +261,6 @@ static SVC_CALLOUT_TABLE nfs_sct_rdma = {
  */
 nvlist_t *rfs4_dss_paths, *rfs4_dss_oldpaths;
 
-int rfs4_dispatch(struct rpcdisp *, struct svc_req *, SVCXPRT *, char *);
 bool_t rfs4_minorvers_mismatch(struct svc_req *, SVCXPRT *, void *);
 
 /*
@@ -1056,16 +1055,32 @@ static struct rpcdisp rfsdisptab_v4[] = {
 	 */
 
 	/* RFS_NULL = 0 */
-	{rpc_null,
-	    xdr_void, NULL_xdrproc_t, 0,
-	    xdr_void, NULL_xdrproc_t, 0,
-	    nullfree, RPC_IDEMPOTENT, 0},
+	[NFSPROC4_NULL] = {
+	    .dis_proc = NULL,
+	    .dis_xdrargs = xdr_void,
+	    .dis_fastxdrargs = NULL_xdrproc_t,
+	    .dis_argsz = 0,
+	    .dis_xdrres = xdr_void,
+	    .dis_fastxdrres = NULL_xdrproc_t,
+	    .dis_ressz = 0,
+	    .dis_resfree = nullfree,
+	    .dis_flags = RPC_IDEMPOTENT,
+	    .dis_getfh = NULL
+	},
 
 	/* RFS4_compound = 1 */
-	{rfs4_compound,
-	    xdr_COMPOUND4args_srv, NULL_xdrproc_t, sizeof (COMPOUND4args),
-	    xdr_COMPOUND4res_srv, NULL_xdrproc_t, sizeof (COMPOUND4res),
-	    rfs4_compound_free, 0, 0},
+	[NFSPROC4_COMPOUND] = {
+	    .dis_proc = NULL,
+	    .dis_xdrargs = xdr_COMPOUND4args_srv,
+	    .dis_fastxdrargs = NULL_xdrproc_t,
+	    .dis_argsz = sizeof (COMPOUND4args),
+	    .dis_xdrres = xdr_COMPOUND4res_srv,
+	    .dis_fastxdrres = NULL_xdrproc_t,
+	    .dis_ressz = sizeof (COMPOUND4res),
+	    .dis_resfree = rfs4_compound_free,
+	    .dis_flags = 0,
+	    .dis_getfh = NULL
+	},
 };
 
 union rfs_args {
