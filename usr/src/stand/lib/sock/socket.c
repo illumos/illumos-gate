@@ -25,8 +25,6 @@
  * socket.c, Code implementing a simple socket interface.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include "socket_impl.h"
 #include <sys/isa_defs.h>
@@ -85,7 +83,7 @@ so_check_fd(int fd, int *errno)
  *
  * Notes:
  *	Only PF_INET communication domains are supported. Within
- * 	this domain, only SOCK_RAW, SOCK_DGRAM and SOCK_STREAM types are
+ *	this domain, only SOCK_RAW, SOCK_DGRAM and SOCK_STREAM types are
  *	supported.
  */
 int
@@ -242,6 +240,7 @@ getsockopt(int s, int level, int option, void *optval, socklen_t *optlen)
 				*optlen = 0;
 				errno = EINVAL;
 			}
+			break;
 		default:
 			errno = ENOPROTOOPT;
 			break;

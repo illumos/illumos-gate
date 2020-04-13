@@ -219,7 +219,7 @@ frag_chk(void)
 	ipp = fragment[first_frag].ipp;
 	for (i = 0; i < FRAG_MAX; i++) {
 		if (fragment[i].mp != NULL && ip_id != fragment[i].ipid &&
-			fragment[i].ipp != ipp) {
+		    fragment[i].ipp != ipp) {
 #ifdef FRAG_DEBUG
 			printf("ipv4: Frag id mismatch: %x != %x\n",
 			    fragment[i].ipid, ip_id);
@@ -342,7 +342,7 @@ ipv4_route(int cmd, uint8_t flag, struct in_addr *destp,
 {
 	static	int	routing_table_initialized;
 	int		index;
-	uint8_t 	tmp_flag;
+	uint8_t		tmp_flag;
 
 	if (gatewayp == NULL) {
 		errno = EINVAL;
@@ -383,8 +383,10 @@ ipv4_route(int cmd, uint8_t flag, struct in_addr *destp,
 			table[index].flag = RT_UNUSED;
 			table[index].dest.s_addr = htonl(INADDR_ANY);
 			table[index].gateway.s_addr = htonl(INADDR_ANY);
-		} else
+		} else {
 			table[index].flag = RT_NG;
+		}
+		break;
 	default:
 		errno = EINVAL;
 		return (-1);
@@ -716,7 +718,7 @@ ipv4_try_again:
 		iphp = (struct ip *)igp->igm_mp->b_rptr;
 		if (iphp->ip_v != IPVERSION) {
 			dprintf("ipv4_input(%d): IPv%d datagram discarded\n",
-			index, iphp->ip_v);
+			    index, iphp->ip_v);
 			del_gram(&sockets[index].inq, igp, TRUE);
 			continue;
 		}
@@ -1080,7 +1082,7 @@ ipv4_tcp_output(int sock_id, mblk_t *pkt)
 
 	/* Routing necessary? */
 	if (((datagram.igm_oflags & MSG_DONTROUTE) == 0) &&
-		((iph->ip_dst.s_addr & netmask.s_addr) != mynet.s_addr)) {
+	    ((iph->ip_dst.s_addr & netmask.s_addr) != mynet.s_addr)) {
 		if ((rip = ipv4_get_route(RT_HOST, &iph->ip_dst,
 		    NULL)) == NULL) {
 			rip = ipv4_get_route(RT_DEFAULT, NULL, NULL);
@@ -1141,7 +1143,7 @@ again:
 	while ((c = *cp) != '\0') {
 		if (isdigit(c)) {
 			if ((c - '0') >= base)
-			    break;
+				break;
 			val = (val * base) + (c - '0');
 			cp++;
 			continue;
@@ -1186,20 +1188,20 @@ again:
 
 	case 2:				/* a.b -- 8.24 bits */
 		if (parts[1] > 0xffffff)
-		    return ((uint32_t)-1);
+			return ((uint32_t)-1);
 		val = (parts[0] << 24) | (parts[1] & 0xffffff);
 		break;
 
 	case 3:				/* a.b.c -- 8.8.16 bits */
 		if (parts[2] > 0xffff)
-		    return ((uint32_t)-1);
+			return ((uint32_t)-1);
 		val = (parts[0] << 24) | ((parts[1] & 0xff) << 16) |
-			(parts[2] & 0xffff);
+		    (parts[2] & 0xffff);
 		break;
 
 	case 4:				/* a.b.c.d -- 8.8.8.8 bits */
 		if (parts[3] > 0xff)
-		    return ((uint32_t)-1);
+			return ((uint32_t)-1);
 		val = (parts[0] << 24) | ((parts[1] & 0xff) << 16) |
 		    ((parts[2] & 0xff) << 8) | (parts[3] & 0xff);
 		break;
