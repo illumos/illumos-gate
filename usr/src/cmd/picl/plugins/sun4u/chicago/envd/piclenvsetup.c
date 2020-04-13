@@ -401,9 +401,11 @@ add_sensor_nodes_and_props()
 		 */
 		err = ptree_get_node_by_path(snodep->parent_path, &nodeh);
 		if (err != PICL_SUCCESS) {
-		if (env_debug)
-			envd_log(LOG_ERR, "failed to get_node_by_path %s\n",
-			    snodep->parent_path);
+			if (env_debug) {
+				envd_log(LOG_ERR,
+				    "failed to get_node_by_path %s\n",
+				    snodep->parent_path);
+			}
 			continue;
 		}
 		sensorp = snodep->sensorp;
