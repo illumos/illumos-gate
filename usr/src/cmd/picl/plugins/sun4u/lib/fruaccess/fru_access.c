@@ -639,9 +639,9 @@ get_container_info(const char *def_file, const char *cont_desc_str,
 		token = tokenizer(buf, "#", &field, &matched);
 		/* find the names */
 		token = tokenizer(buf, ":", &field, &matched);
-		if (token != 0x00) {
+		if (token != NULL) {
 			token = tokenizer(token, "|", &item, &matched);
-			while (token != 0x00) {
+			while (token != NULL) {
 				if (strcmp(token, cont_desc_str) == 0) {
 					foundIt = 1;
 					goto found;
@@ -649,7 +649,7 @@ get_container_info(const char *def_file, const char *cont_desc_str,
 				token = tokenizer(item, "|", &item, &matched);
 			}
 			/* check the last remaining item */
-			if ((item != 0x00) &&
+			if ((item != NULL) &&
 			    (strcmp(item, cont_desc_str) == 0)) {
 				foundIt = 1;
 				goto found;
@@ -660,16 +660,16 @@ get_container_info(const char *def_file, const char *cont_desc_str,
 found :
 	if (foundIt == 1) {
 		token = tokenizer(field, ":", &field, &matched);
-		if (token == 0x00) {
+		if (token == NULL) {
 			(void) fclose(file);
 			return (-1);
 		}
 		cont_info->header_ver = (headerrev_t)atoi(token);
 
 		token = tokenizer(field, ":\n", &field, &matched);
-		while (token != 0x00) {
+		while (token != NULL) {
 			token = tokenizer(token, ",", &item, &matched);
-			if (token == 0x00) {
+			if (token == NULL) {
 				(void) fclose(file);
 				return (-1);
 			}
@@ -696,7 +696,7 @@ found :
 			}
 
 			token = tokenizer(item, ",", &item, &matched);
-			if (token == 0x00) {
+			if (token == NULL) {
 				(void) fclose(file);
 				return (-1);
 			}
@@ -708,12 +708,12 @@ found :
 				 * data interpreter
 				 */
 				token = tokenizer(item, ",", &item, &matched);
-				if (token == 0x00) {
+				if (token == NULL) {
 					(void) fclose(file);
 					return (-1);
 				}
 			}
-			if (item == '\0') {
+			if (*item == '\0') {
 				(void) fclose(file);
 				return (-1);
 			}
