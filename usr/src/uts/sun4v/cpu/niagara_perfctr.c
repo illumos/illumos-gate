@@ -58,7 +58,7 @@ typedef struct ni_kev_mask {
  * counters.
  */
 #define	NUM_OF_PICS	2
-#define	NUM_OF_PIC_REGS	1
+#define	NUM_OF_PIC_REGS	2
 
 typedef struct ni_ksinfo {
 	uint8_t		pic_no_evs;			/* number of events */
