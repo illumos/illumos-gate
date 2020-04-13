@@ -853,6 +853,7 @@ plat_ecc_capability_sc_get(int type)
 			if (plat_ecc_capability_map_sc &
 			    PLAT_ECC_CAPABILITY_DIMM_SID)
 				return (1);
+			/* FALLTHROUGH */
 		default:
 			return (0);
 	}
