@@ -33,7 +33,8 @@
 
 CORE_OBJS +=	ddi_arch.o	\
 		polled_io.o	\
-		sparc_ddi.o
+		sparc_ddi.o	\
+		multi3.o
 
 #
 #	generic-unix module
@@ -84,9 +85,9 @@ ZFS_OBJS +=		\
 #			misc modules
 #
 KRTLD_OBJS +=		\
-	doreloc.o 	\
+	doreloc.o	\
 	kobj_convrelstr.o \
-	kobj_isa.o 	\
+	kobj_isa.o	\
 	kobj_reloc.o
 
 SWAPGENERIC_OBJS += swapgeneric.o

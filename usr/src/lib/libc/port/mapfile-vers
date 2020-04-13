@@ -3360,6 +3360,10 @@ $if sparc32
 	__ucmpdi2;
 $endif
 
+$if sparcv9
+	__multi3;
+$endif
+
 $if _x86
 	_D_cplx_lr_div;
 	_D_cplx_lr_div_ix;
