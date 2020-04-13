@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The debugger/PROM interface layer - debugger activation
  */
@@ -99,8 +97,10 @@ kaif_format_word(void)
 	    &kregs[KREG_TBA],			/* 14 */
 	    kaif_trap_obp);			/* 15 */
 
-	ASSERT(len <= sizeof (prom_str));
-
+	if (len >= sizeof (prom_str)) {
+		mdb_printf("%s: prom_str is too small to fit %d bytes\n",
+		    __func__, len);
+	}
 	return (prom_str);
 }
 
