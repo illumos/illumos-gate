@@ -266,7 +266,7 @@ static mac_callbacks_t eri_m_callbacks = {
 		start_offset = 0;				\
 		end_offset = MBLKL(bp) - ETHERHEADER_SIZE;	\
 		mac_hcksum_set(bp,				\
-			start_offset, 0, end_offset, sum, 	\
+			start_offset, 0, end_offset, sum,	\
 			HCK_PARTIALCKSUM);			\
 	} else {						\
 		/*						\
@@ -294,8 +294,8 @@ static mac_callbacks_t eri_m_callbacks = {
 	 * Strip the PADS for 802.3				\
 	 */							\
 	if (type <= ETHERMTU)					\
-		bp->b_wptr = bp->b_rptr + ETHERHEADER_SIZE + 	\
-			type;					\
+		bp->b_wptr = bp->b_rptr + ETHERHEADER_SIZE +	\
+		    type;					\
 }
 #endif  /* ERI_RCV_CKSUM */
 
@@ -509,7 +509,7 @@ static	int	lance_mode = 1;		/* to enable LANCE mode */
 static	int	mifpoll_enable = 0;	/* to enable mif poll */
 static	int	ngu_enable = 0;		/* to enable Never Give Up mode */
 
-static	int	eri_force_mlf = 0; 	/* to enable mif poll */
+static	int	eri_force_mlf = 0;	/* to enable mif poll */
 static	int	eri_phy_mintrans = 1;	/* Lu3X31T mintrans algorithm */
 /*
  * For the MII interface, the External Transceiver is selected when present.
@@ -594,7 +594,7 @@ static  param_t	param_arr[] = {
 };
 
 DDI_DEFINE_STREAM_OPS(eri_dev_ops, nulldev, nulldev, eri_attach, eri_detach,
-	nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
 
 /*
  * This is the loadable module wrapper.
@@ -725,11 +725,11 @@ eri_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Map in the device registers.
 	 * Separate pointers will be set up for the following
 	 * register groups within the GEM Register Space:
-	 * 	Global register set
-	 * 	ETX register set
-	 * 	ERX register set
-	 * 	BigMAC register set.
-	 * 	MIF register set
+	 *	Global register set
+	 *	ETX register set
+	 *	ERX register set
+	 *	BigMAC register set.
+	 *	MIF register set
 	 */
 
 	if (ddi_dev_nregs(dip, &regno) != (DDI_SUCCESS)) {
@@ -888,7 +888,7 @@ attach_fail:
 static int
 eri_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	struct eri 	*erip;
+	struct eri	*erip;
 	int i;
 
 	if ((erip = ddi_get_driver_private(dip)) == NULL) {
@@ -1238,7 +1238,7 @@ static int
 eri_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 {
 	struct eri		*erip = arg;
-	uint32_t 		ladrf_bit;
+	uint32_t		ladrf_bit;
 
 	/*
 	 * If this address's bit was not already set in the local address
@@ -2254,7 +2254,7 @@ eri_init(struct eri *erip)
 	uint32_t	carrier_ext = 0;
 	uint32_t	mac_ctl = 0;
 	boolean_t	ret;
-	uint32_t 	link_timeout = ERI_LINKCHECK_TIMER;
+	uint32_t	link_timeout = ERI_LINKCHECK_TIMER;
 	link_state_t	linkupdate = LINK_STATE_UNKNOWN;
 
 	/*
@@ -2646,13 +2646,13 @@ eri_allocthings(struct eri *erip)
 	erip->rmdp = (struct rmd *)a;
 	a += ERI_RPENDING * sizeof (struct rmd);
 	erip->eri_tmdp = (struct eri_tmd *)a;
-/*
- *	Specifically we reserve n (ERI_TPENDING + ERI_RPENDING)
- *	pagetable entries. Therefore we have 2 ptes for each
- *	descriptor. Since the ethernet buffers are 1518 bytes
- *	so they can at most use 2 ptes.
- * 	Will do a ddi_dma_addr_setup for each bufer
- */
+	/*
+	 * Specifically we reserve n (ERI_TPENDING + ERI_RPENDING)
+	 * pagetable entries. Therefore we have 2 ptes for each
+	 * descriptor. Since the ethernet buffers are 1518 bytes
+	 * so they can at most use 2 ptes.
+	 * Will do a ddi_dma_addr_setup for each bufer
+	 */
 	/*
 	 * In the current implementation, we use the ddi compliant
 	 * dma interface. We allocate ERI_RPENDING dma handles for receive
@@ -3646,7 +3646,7 @@ eri_reclaim(struct eri *erip, uint32_t tx_completion)
 /* <<<<<<<<<<<<<<<<<<<	PACKET RECEIVE FUNCTIONS	>>>>>>>>>>>>>>>>>>> */
 static mblk_t *
 eri_read_dma(struct eri *erip, volatile struct rmd *rmdp,
-	int rmdi, uint64_t flags)
+    int rmdi, uint64_t flags)
 {
 	mblk_t	*bp, *nbp;
 	int	len;
@@ -4604,7 +4604,7 @@ eri_debug_msg(const char *file, int line, struct eri *erip,
 /*PRINTFLIKE4*/
 static void
 eri_fault_msg(struct eri *erip, uint_t severity, msg_t type,
-	const char *fmt, ...)
+    const char *fmt, ...)
 {
 	char	msg_buffer[255];
 	va_list	ap;
@@ -4689,7 +4689,7 @@ static int
 eri_new_xcvr(struct eri *erip)
 {
 	int		status;
-	uint32_t 	cfg;
+	uint32_t	cfg;
 	int		old_transceiver;
 
 	if (pci_report_pmcap(erip->dip, PCI_PM_IDLESPEED,
@@ -5520,10 +5520,11 @@ eri_check_txhung(struct eri *erip)
 	boolean_t	macupdate = B_FALSE;
 
 	mutex_enter(&erip->xmitlock);
-	if (erip->flags & ERI_RUNNING)
+	if (erip->flags & ERI_RUNNING) {
 		erip->tx_completion = (uint32_t)(GET_ETXREG(tx_completion) &
 		    ETX_COMPLETION_MASK);
 		macupdate |= eri_reclaim(erip, erip->tx_completion);
+	}
 
 	/* Something needs to be sent out but it is not going out */
 	if ((erip->tcurp != erip->tnextp) &&
