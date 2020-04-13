@@ -377,10 +377,10 @@ get_retired_ways(uint64_t *tag_data)
 
 static cmd_evdisp_t
 extract_data_from_ereport_payload(fmd_hdl_t *hdl, nvlist_t *nvl,
-				    cmd_cpu_t *cpu,
-				    cmd_ptrsubtype_t pstype,
-				    uint64_t *afarp, uint64_t *tag_data,
-				    const char *fltnm)
+    cmd_cpu_t *cpu,
+    cmd_ptrsubtype_t pstype,
+    uint64_t *afarp, uint64_t *tag_data,
+    const char *fltnm)
 {
 	ch_ec_data_t	*ec_data;
 	char		*payload_namep;
@@ -472,19 +472,15 @@ matching_ecc(uint64_t *tag_data)
 
 static void
 gen_data_for_ecc(uint64_t *tag_data, uint64_t *data_for_ecc_gen,
-		    cmd_ptrsubtype_t pstype)
+    cmd_ptrsubtype_t pstype)
 {
 	uint64_t	ptag[PN_CACHE_NWAYS];
 	uint8_t		state[PN_CACHE_NWAYS];
 	int		i;
-	uint16_t	tag_ecc[PN_CACHE_NWAYS];
 	uint8_t		bit_position;
 
 	for (i = 0; i < PN_CACHE_NWAYS; i++) {
 		state[i] = tag_data[i] & CH_ECSTATE_MASK;
-		tag_ecc[i] =
-		    ((tag_data[i] & PN_TAG_ECC_MASK)
-		    >> PN_LX_TAG_ECC_START_BIT);
 		switch (pstype) {
 			case CMD_PTR_CPU_L2TAG:
 				ptag[i] = (tag_data[i] >> PN_L2_PTAG_SHIFT) &
@@ -603,7 +599,7 @@ find_bit_stickiness(uint64_t *tag_data, int8_t way, int16_t bit)
 
 static cmd_Lxcache_t *
 cmd_create_and_destroy_Lxcache(fmd_hdl_t *hdl, cmd_cpu_t *cpu,
-	cmd_Lxcache_t *Lxcache)
+    cmd_Lxcache_t *Lxcache)
 {
 	const char		*fltnm;
 	cmd_Lxcache_t	*new_Lxcache;
@@ -954,9 +950,9 @@ cmd_Lxcache_anonymous_tag_error_timeout(fmd_hdl_t *hdl, id_t id)
 
 cmd_evdisp_t
 cmd_us4plus_tag_err(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
-		cmd_cpu_t *cpu, cmd_ptrsubtype_t pstype,
-		const char *serdn, const char *serdt,
-		const char *fltnm, cmd_errcl_t clcode)
+    cmd_cpu_t *cpu, cmd_ptrsubtype_t pstype,
+    const char *serdn, const char *serdt,
+    const char *fltnm, cmd_errcl_t clcode)
 {
 	uint64_t	tag_afar;
 	int32_t	index;
@@ -1576,7 +1572,7 @@ pn_there_is_a_matching_synd(fmd_hdl_t *hdl, cmd_xr_t *xr)
 }
 
 /* add to cheetahregs.h */
-#define	CH_ECSTATE_NA 	5
+#define	CH_ECSTATE_NA	5
 
 static int32_t
 pn_extract_index(int32_t type, uint64_t afar)
@@ -1611,7 +1607,7 @@ pn_extract_index(int32_t type, uint64_t afar)
  *	If the way is anonomyous, it will attempt to choose a way for the
  *	given index to fault. If the maximum for the index has not been
  *	reached, it will attempt to unretire a different way previously retired
- * 	under suspicion for the index prior to faulting
+ *	under suspicion for the index prior to faulting
  *	the selected way.
  *	The routine will also fault the CPU if the maximum number of
  *	retired ways for the CPU has been exceeded based on the category.
