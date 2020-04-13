@@ -221,7 +221,7 @@ oplmsu_uwioctl_ipunlink(queue_t *uwq, mblk_t *mp)
 			 * When traditional_status isn't MSU_SETID,
 			 * the error is reported.
 			 */
-
+			/* FALLTHROUGH */
 		default :
 			/*
 			 * When upath->status isn't MSU_PSTAT_STOP or

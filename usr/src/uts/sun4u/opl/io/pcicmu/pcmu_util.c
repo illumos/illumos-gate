@@ -137,7 +137,7 @@ free_pcmu_properties(pcmu_t *pcmu_p)
  */
 int
 pcmu_reloc_reg(dev_info_t *dip, dev_info_t *rdip, pcmu_t *pcmu_p,
-	pci_regspec_t *rp)
+    pci_regspec_t *rp)
 {
 	int assign_len, assign_entries, i;
 	pci_regspec_t *assign_p;
@@ -507,11 +507,11 @@ pcmu_cfg_report(dev_info_t *dip, ddi_fm_error_t *derr,
 
 			switch (pci_err_tbl[i].reg_bit) {
 			case PCI_STAT_R_MAST_AB:
-				aux_msg = "Recieved Master Abort";
-				/* LINTED fallthrough on case statement */
+				aux_msg = "Receieved Master Abort";
+				/* FALLTHROUGH */
 			case PCI_STAT_R_TARG_AB:
 				if (aux_msg != NULL)
-					aux_msg = "Recieved Target Abort";
+					aux_msg = "Receieved Target Abort";
 				if (prierr) {
 					/*
 					 * piow case are already handled in
@@ -675,7 +675,7 @@ pcmu_dflag_to_str_t pcmu_dflag_strings [] = {
 
 void
 pcmu_debug(uint64_t flag, dev_info_t *dip, char *fmt,
-	uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5)
+    uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5)
 {
 	char *s = "pcmu unknown";
 	uint_t cont = 0;
