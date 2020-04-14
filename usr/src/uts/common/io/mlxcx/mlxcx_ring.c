@@ -1251,7 +1251,7 @@ mlxcx_rx_group_start(mlxcx_t *mlxp, mlxcx_ring_group_t *g)
 
 	g->mlg_state |= MLXCX_GROUP_RUNNING;
 
-	snprintf(tq_name, sizeof (tq_name), "%s_refill_%d_%ld",
+	(void) snprintf(tq_name, sizeof (tq_name), "%s_refill_%d_%ld",
 	    ddi_driver_name(mlxp->mlx_dip), mlxp->mlx_inst,
 	    g - &mlxp->mlx_rx_groups[0]);
 
