@@ -11,6 +11,7 @@
 
 #
 # Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 How to update the TZ database information.
@@ -52,6 +53,11 @@ new ones.
 ********** IMPORTANT **********
 *** zone_sun.tab must remain sorted.
 *** The upstream zone.tab.txt is not always completely in alphabetical order.
+
+To check the final zone_sun.tab file, the `zonelint` script in the current
+directory can be used within a bldenv environment. First run `dmake install`
+to stage the zone files to proto, then run `./zonelint`. If it produces no
+output then you're okay.
 
 After that's done, you'll need to go through the more agonizing process of
 packaging. To do this, you'll want to look through the differences that have

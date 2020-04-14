@@ -17,4 +17,5 @@ include		$(SRC)/Makefile.master
 
 ROOTETC=	$(ROOT)/etc
 ROOTLIB=	$(ROOT)/usr/lib
+ROOTSH=		$(ROOT)/usr/share
 ROOTSHLIB=	$(ROOT)/usr/share/lib

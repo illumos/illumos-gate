@@ -21286,6 +21286,7 @@ s usr/share/man/man9s/usba_hcdi_register_args_t.9s=usba_hcdi_register_args.9s
 f usr/share/man/man9s/usba_pipe_handle_data.9s 0444 root bin
 s usr/share/man/man9s/usba_pipe_handle_data_t.9s=usba_pipe_handle_data.9s
 d usr/share/src 0755 root sys
+s usr/share/terminfo=../share/lib/terminfo
 s usr/spool=../var/spool
 s usr/src=share/src
 s usr/tmp=../var/tmp

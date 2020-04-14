@@ -63,7 +63,7 @@ AQ	-6734-06808	Antarctica/Rothera	-	Rothera
 AQ	-690022+0393524	Antarctica/Syowa	-	Syowa
 AQ	-720041+0023206	Antarctica/Troll	-	Troll
 AQ	-7824+10654	Antarctica/Vostok	-	Vostok
-AR	-3436-05827	America/Argentina/Buenos_Aires	-	America/Buenos_Aires	Buenos Aires (BA, CF)
+AR	-3436-05827	America/Argentina/Buenos_Aires	America/Buenos_Aires	Buenos Aires (BA, CF)
 AR	-3124-06411	America/Argentina/Cordoba	-	Argentina (most areas: CB, CC, CN, ER, FM, MN, SE, SF)
 AR	-2447-06525	America/Argentina/Salta	-	Salta (SA, LP, NQ, RN)
 AR	-2411-06518	America/Argentina/Jujuy	America/Jujuy	Jujuy (JY)
@@ -192,8 +192,8 @@ EE	+5925+02445	Europe/Tallinn	-
 EG	+3003+03115	Africa/Cairo	Egypt
 EH	+2709-01312	Africa/El_Aaiun	-
 ER	+1520+03853	Africa/Asmara	-
-ES	+4024-00341	Europe/Madrid	Spain (mainland)
-ES	+3553-00519	Africa/Ceuta	Ceuta, Melilla
+ES	+4024-00341	Europe/Madrid	-	Spain (mainland)
+ES	+3553-00519	Africa/Ceuta	-	Ceuta, Melilla
 ES	+2806-01524	Atlantic/Canary	-	Canary Islands
 ET	+0902+03842	Africa/Addis_Ababa	-
 FI	+6010+02458	Europe/Helsinki	-
@@ -214,8 +214,8 @@ GH	+0533-00013	Africa/Accra	-
 GI	+3608-00521	Europe/Gibraltar	-
 GL	+6411-05144	America/Godthab	-	Greenland (most areas)
 GL	+7646-01840	America/Danmarkshavn	-	National Park (east coast)
-GL	+7029-02158	America/Scoresbysund	Scoresbysund/Ittoqqortoormiit
-GL	+7634-06847	America/Thule	Thule/Pituffik
+GL	+7029-02158	America/Scoresbysund	-	Scoresbysund/Ittoqqortoormiit
+GL	+7634-06847	America/Thule	-	Thule/Pituffik
 GM	+1328-01639	Africa/Banjul	-
 GN	+0931-01343	Africa/Conakry	-
 GP	+1614-06132	America/Guadeloupe	-
@@ -261,9 +261,9 @@ KR	+3733+12658	Asia/Seoul	ROK
 KW	+2920+04759	Asia/Kuwait	-
 KY	+1918-08123	America/Cayman	-
 KZ	+4315+07657	Asia/Almaty	-	Kazakhstan (most areas)
-KZ	+4448+06528	Asia/Qyzylorda	Qyzylorda/Kyzylorda/Kzyl-Orda
+KZ	+4448+06528	Asia/Qyzylorda	-	Qyzylorda/Kyzylorda/Kzyl-Orda
 KZ	+5312+06337	Asia/Qostanay	-	Qostanay/Kostanay/Kustanay
-KZ	+5017+05710	Asia/Aqtobe	Aqtobe/Aktobe
+KZ	+5017+05710	Asia/Aqtobe	-	Aqtobe/Aktobe
 KZ	+4431+05016	Asia/Aqtau	-	Mangghystau/Mankistau
 KZ	+4707+05156	Asia/Atyrau	-	Atyrau/Atirau/Gur'yev
 KZ	+5113+05121	Asia/Oral	-	West Kazakhstan
@@ -285,7 +285,7 @@ ME	+4226+01916	Europe/Podgorica	-
 MF	+1804-06305	America/Marigot	-
 MG	-1855+04731	Indian/Antananarivo	-
 MH	+0709+17112	Pacific/Majuro	-	Marshall Islands (most areas)
-MH	+0905+16720	Pacific/Kwajalein	-	Kwajalein
+MH	+0905+16720	Pacific/Kwajalein	Kwajalein
 MK	+4159+02126	Europe/Skopje	-
 ML	+1239-00800	Africa/Bamako	-
 MM	+1647+09610	Asia/Yangon	-
@@ -358,7 +358,7 @@ RU	+554521+0373704	Europe/Moscow	-	MSK+00 - Moscow area
 RU	+5836+04939	Europe/Kirov	-	MSK+00 - Kirov
 RU	+4621+04803	Europe/Astrakhan	-	MSK+01 - Astrakhan
 RU	+4844+04425	Europe/Volgograd	-	MSK+01 - Volgograd
-RU	+5134+04602	Europe/Saratov  -	MSK+01 - Saratov
+RU	+5134+04602	Europe/Saratov	-	MSK+01 - Saratov
 RU	+5420+04824	Europe/Ulyanovsk	-	MSK+01 - Ulyanovsk
 RU	+5312+05009	Europe/Samara	-	MSK+01 - Samara, Udmurtia
 RU	+5651+06036	Asia/Yekaterinburg	-	MSK+02 - Urals
@@ -455,7 +455,7 @@ US	+571035-1351807	America/Sitka	-	Alaska - Sitka area
 US	+550737-1313435	America/Metlakatla	-	Alaska - Annette Island
 US	+593249-1394338	America/Yakutat	-	Alaska - Yakutat
 US	+643004-1652423	America/Nome	-	Alaska (west)
-US	+515248-1763929	America/Adak	US/Aleutian	-	Aleutian Islands
+US	+515248-1763929	America/Adak	US/Aleutian	Aleutian Islands
 US	+211825-1575130	Pacific/Honolulu	US/Hawaii	Hawaii
 UY	-345433-0561245	America/Montevideo	-
 UZ	+3940+06648	Asia/Samarkand	-	Uzbekistan (west)
