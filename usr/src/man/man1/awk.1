@@ -41,221 +41,841 @@
 .\"
 .\"
 .\" Copyright 1989 AT&T
-.\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
-.\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 1992, X/Open Company Limited  All Rights Reserved
+.\" Portions Copyright (c) 2005, 2006 Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2020 Joyent, Inc.
 .\"
-.TH AWK 1 "Jun 22, 2005"
+.TH AWK 1 "Apr 20, 2020"
 .SH NAME
 awk \- pattern scanning and processing language
 .SH SYNOPSIS
-.LP
 .nf
-\fB/usr/bin/awk\fR [\fB-f\fR \fIprogfile\fR] [\fB-F\fIc\fR\fR] [' \fIprog\fR '] [\fIparameters\fR]
-     [\fIfilename\fR]...
+\fB/usr/bin/awk\fR [\fB-F\fR \fIERE\fR] [\fB-v\fR \fIassignment\fR] \fI\&'program'\fR | \fB-f\fR \fIprogfile\fR...
+     [\fIargument\fR]...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/awk\fR [\fB-F\fR\fIcERE\fR] [\fB-v\fR \fIassignment\fR]... \fI\&'program'\fR \fB-f\fR \fIprogfile\fR...
+\fB/usr/bin/nawk\fR [\fB-F\fR \fIERE\fR] [\fB-v\fR \fIassignment\fR] \fI\&'program'\fR | \fB-f\fR \fIprogfile\fR...
+     [\fIargument\fR]...
+.fi
+
+.LP
+.nf
+\fB/usr/xpg4/bin/awk\fR [\fB-F\fR \fIERE\fR] [\fB-v\fR \fIassignment\fR]... \fI\&'program'\fR | \fB-f\fR \fIprogfile\fR...
      [\fIargument\fR]...
 .fi
 
 .SH DESCRIPTION
+NOTE: The \fBnawk\fR command is now the system default awk for illumos.
+.LP
+The \fB/usr/bin/awk\fR and \fB/usr/xpg4/bin/awk\fR utilities execute
+\fIprogram\fRs written in the \fBawk\fR programming language, which is
+specialized for textual data manipulation. A \fBawk\fR \fIprogram\fR is a
+sequence of patterns and corresponding actions. The string specifying
+\fIprogram\fR must be enclosed in single quotes (') to protect it from
+interpretation by the shell. The sequence of pattern - action statements can be
+specified in the command line as \fIprogram\fR or in one, or more, file(s)
+specified by the \fB-f\fR\fIprogfile\fR option. When input is read that matches
+a pattern, the action associated with the pattern is performed.
 .sp
 .LP
-The \fB/usr/xpg4/bin/awk\fR utility is described on the \fBnawk\fR(1) manual
-page.
+Input is interpreted as a sequence of records. By default, a record is a line,
+but this can be changed by using the \fBRS\fR built-in variable. Each record of
+input is matched to each pattern in the \fIprogram\fR. For each pattern
+matched, the associated action is executed.
 .sp
 .LP
-The \fB/usr/bin/awk\fR utility scans each input \fIfilename\fR for lines that
-match any of a set of patterns specified in \fIprog\fR. The \fIprog\fR string
-must be enclosed in single quotes (\fB a\'\fR) to protect it from the shell.
-For each pattern in \fIprog\fR there can be an associated action performed when
-a line of a \fIfilename\fR matches the pattern. The set of pattern-action
-statements can appear literally as \fIprog\fR or in a file specified with the
-\fB-f\fR\fI progfile\fR option. Input files are read in order; if there are no
-files, the standard input is read. The file name \fB\&'\(mi'\fR means the
-standard input.
+The \fBawk\fR utility interprets each input record as a sequence of fields
+where, by default, a field is a string of non-blank characters. This default
+white-space field delimiter (blanks and/or tabs) can be changed by using the
+\fBFS\fR built-in variable or the \fB-F\fR\fIERE\fR option. The \fBawk\fR
+utility denotes the first field in a record \fB$1\fR, the second \fB$2\fR, and
+so forth. The symbol \fB$0\fR refers to the entire record; setting any other
+field causes the reevaluation of \fB$0\fR. Assigning to \fB$0\fR resets the
+values of all fields and the \fBNF\fR built-in variable.
+
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
 .na
-\fB\fB-f\fR\fI progfile\fR \fR
+\fB\fB-F\fR \fIERE\fR\fR
 .ad
-.RS 16n
-\fBawk\fR uses the set of patterns it reads from \fIprogfile\fR.
+.RS 17n
+Define the input field separator to be the extended regular expression
+\fIERE\fR, before any input is read (can be a character).
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fB-F\fR\fIc\fR \fR
+\fB\fB-f\fR \fIprogfile\fR\fR
 .ad
-.RS 16n
-Uses the character \fIc\fR as the field separator (FS) character.  See the
-discussion of \fBFS\fR below.
+.RS 17n
+Specifies the pathname of the file \fIprogfile\fR containing a \fBawk\fR
+program. If multiple instances of this option are specified, the concatenation
+of the files specified as \fIprogfile\fR in the order specified is the
+\fBawk\fR program. The \fBawk\fR program can alternatively be specified in
+the command line as a single argument.
 .RE
 
-.SH USAGE
-.SS "Input Lines"
+.sp
+.ne 2
+.na
+\fB\fB-v\fR \fIassignment\fR\fR
+.ad
+.RS 17n
+The \fIassignment\fR argument must be in the same form as an \fIassignment\fR
+operand. The assignment is of the form \fIvar=value\fR, where \fIvar\fR is the
+name of one of the variables described below. The specified assignment occurs
+before executing the \fBawk\fR program, including the actions associated with
+\fBBEGIN\fR patterns (if any). Multiple occurrences of this option can be
+specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-safe\fR\fR
+.ad
+.RS 17n
+When passed to \fBawk\fR, this flag will prevent the program from opening new
+files or running child processes. The \fBENVIRON\fR array will also not be
+initialized.
+.RE
+
+.SH OPERANDS
+The following operands are supported:
+.sp
+.ne 2
+.na
+\fB\fIprogram\fR\fR
+.ad
+.RS 12n
+If no \fB-f\fR option is specified, the first operand to \fBawk\fR is the text
+of the \fBawk\fR program. The application supplies the \fIprogram\fR operand
+as a single argument to \fBawk.\fR If the text does not end in a newline
+character, \fBawk\fR interprets the text as if it did.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIargument\fR\fR
+.ad
+.RS 12n
+Either of the following two types of \fIargument\fR can be intermixed:
+.sp
+.ne 2
+.na
+\fB\fIfile\fR\fR
+.ad
+.RS 14n
+A pathname of a file that contains the input to be read, which is matched
+against the set of patterns in the program. If no \fIfile\fR operands are
+specified, or if a \fIfile\fR operand is \fB\(mi\fR, the standard input is
+used.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fIassignment\fR\fR
+.ad
+.RS 14n
+An operand that begins with an underscore or alphabetic character from the
+portable character set, followed by a sequence of underscores, digits and
+alphabetics from the portable character set, followed by the \fB=\fR character
+specifies a variable assignment rather than a pathname. The characters before
+the \fB=\fR represent the name of a \fBawk\fR variable. If that name is a
+\fBawk\fR reserved word, the behavior is undefined. The characters following
+the equal sign is interpreted as if they appeared in the \fBawk\fR program
+preceded and followed by a double-quote (\fB"\fR) character, as a \fBSTRING\fR
+token , except that if the last character is an unescaped backslash, it is
+interpreted as a literal backslash rather than as the first character of the
+sequence \fB\e\fR\&.. The variable is assigned the value of that \fBSTRING\fR
+token. If the value is considered a \fInumeric\fRstring\fI,\fR the variable is
+assigned its numeric value. Each such variable assignment is performed just
+before the processing of the following \fIfile\fR, if any. Thus, an assignment
+before the first \fBfile\fR argument is executed after the \fBBEGIN\fR actions
+(if any), while an assignment after the last \fIfile\fR argument is executed
+before the \fBEND\fR actions (if any).  If there are no \fIfile\fR arguments,
+assignments are executed before processing the standard input.
+.RE
+
+.RE
+
+.SH INPUT FILES
+Input files to the \fBawk\fR program from any of the following sources:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+any \fIfile\fR operands or their equivalents, achieved by modifying the
+\fBawk\fR variables \fBARGV\fR and \fBARGC\fR
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+standard input in the absence of any \fIfile\fR operands
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+arguments to the \fBgetline\fR function
+.RE
 .sp
 .LP
-Each input line is matched against the pattern portion of every pattern-action
-statement; the associated action is performed for each matched pattern. Any
-\fIfilename\fR of the form \fIvar=value\fR is treated as an assignment, not a
-filename, and is executed at the time it would have been opened if it were a
-filename. \fIVariables\fR assigned in this manner are not available inside a
-\fBBEGIN\fR rule, and are assigned after previously specified files have been
-read.
+must be text files. Whether the variable \fBRS\fR is set to a value other than
+a newline character or not, for these files, implementations support records
+terminated with the specified separator up to \fB{LINE_MAX}\fR bytes and can
+support longer records.
 .sp
 .LP
-An input line is normally made up of fields separated by white spaces. (This
-default can be changed by using the \fBFS\fR built-in variable or the
-\fB-F\fR\fIc\fR option.) The default is to ignore leading blanks and to
-separate fields by blanks and/or tab characters. However, if \fBFS\fR is
-assigned a value that does not include any of the white spaces, then leading
-blanks are not ignored. The fields are denoted \fB$1\fR, \fB$2\fR,
-\fB\&.\|.\|.\fR\|; \fB$0\fR refers to the entire line.
-.SS "Pattern-action Statements"
+If \fB-\fR\fBf\fR \fIprogfile\fR is specified, the files named by each of the
+\fIprogfile\fR option-arguments must be text files containing an \fBawk\fR
+program.
 .sp
 .LP
-A pattern-action statement has the form:
+The standard input are used only if no \fIfile\fR operands are specified, or if
+a \fIfile\fR operand is \fB\(mi\fR\&.
+
+.SH EXTENDED DESCRIPTION
+A \fBawk\fR program is composed of pairs of the form:
 .sp
 .in +2
 .nf
-\fIpattern\fR\fB { \fR\fIaction\fR\fB } \fR
+pattern { \fIaction\fR }
 .fi
 .in -2
-.sp
 
 .sp
 .LP
-Either pattern or action can be omitted. If there is no action, the matching
-line is printed. If there is no pattern, the action is performed on every input
-line. Pattern-action statements are separated by newlines or semicolons.
+Either the pattern or the action (including the enclosing brace characters) can
+be omitted. Pattern-action statements are separated by a semicolon or by a
+newline.
 .sp
 .LP
-Patterns are arbitrary Boolean combinations ( \fB!\fR, ||, \fB&&\fR, and
-parentheses) of relational expressions and regular expressions. A relational
-expression is one of the following:
+A missing pattern matches any record of input, and a missing action is
+equivalent to an action that writes the matched record of input to standard
+output.
+.sp
+.LP
+Execution of the \fBawk\fR program starts by first executing the actions
+associated with all \fBBEGIN\fR patterns in the order they occur in the
+program. Then each \fIfile\fR operand (or standard input if no files were
+specified) is processed by reading data from the file until a record separator
+is seen (a newline character by default), splitting the current record into
+fields using the current value of \fBFS\fR, evaluating each pattern in the
+program in the order of occurrence, and executing the action associated with
+each pattern that matches the current record. The action for a matching pattern
+is executed before evaluating subsequent patterns. Last, the actions associated
+with all \fBEND\fR patterns is executed in the order they occur in the program.
+
+.SS "Expressions in awk"
+Expressions describe computations used in \fIpatterns\fR and \fIactions\fR. In
+the following table, valid expression operations are given in groups from
+highest precedence first to lowest precedence last, with equal-precedence
+operators grouped between horizontal lines. In expression evaluation, where the
+grammar is formally ambiguous, higher precedence operators are evaluated before
+lower precedence operators.  In this table \fIexpr,\fR \fIexpr1,\fR
+\fIexpr2,\fR and \fIexpr3\fR represent any expression, while \fIlvalue\fR
+represents any entity that can be assigned to (that is, on the left side of an
+assignment operator).
+.sp
+
+.sp
+.TS
+c c c c
+l l l l .
+\fBSyntax\fR	\fBName\fR	\fBType of Result\fR	\fBAssociativity\fR
+_
+( \fIexpr\fR )	Grouping	type of \fIexpr\fR	n/a
+_
+$\fIexpr\fR	Field reference	string	n/a
+_
+++ \fIlvalue\fR	Pre-increment	numeric	n/a
+\(mi\(mi \fIlvalue\fR	Pre-decrement	numeric	n/a
+\fIlvalue\fR ++	Post-increment	numeric	n/a
+\fIlvalue\fR \(mi\(mi	Post-decrement	numeric	n/a
+_
+\fIexpr\fR ^ \fIexpr\fR	Exponentiation	numeric	right
+_
+! \fIexpr\fR	Logical not	numeric	n/a
++ \fIexpr\fR	Unary plus	numeric	n/a
+\(mi \fIexpr\fR	Unary minus	numeric	n/a
+_
+\fIexpr\fR * \fIexpr\fR	Multiplication	numeric	left
+\fIexpr\fR / \fIexpr\fR	Division	numeric	left
+\fIexpr\fR % \fIexpr\fR	Modulus	numeric	left
+_
+\fIexpr\fR + \fIexpr\fR	Addition	numeric	left
+\fIexpr\fR \(mi \fIexpr\fR	Subtraction	numeric	left
+_
+\fIexpr\fR \fIexpr\fR	String concatenation	string	left
+_
+\fIexpr\fR < \fIexpr\fR	Less than	numeric	none
+\fIexpr\fR <= \fIexpr\fR	Less than or equal to	numeric	none
+\fIexpr\fR != \fIexpr\fR	Not equal to	numeric	none
+\fIexpr\fR == \fIexpr\fR	Equal to	numeric	none
+\fIexpr\fR > \fIexpr\fR	Greater than	numeric	none
+\fIexpr\fR >= \fIexpr\fR	Greater than or equal to	numeric	none
+_
+\fIexpr\fR ~ \fIexpr\fR	ERE match	numeric	none
+\fIexpr\fR !~ \fIexpr\fR	ERE non-match	 numeric	none
+_
+\fIexpr\fR in array	Array membership	numeric	left
+( \fIindex\fR ) in	Multi-dimension array	numeric	left
+    \fIarray\fR	    membership
+_
+\fBexpr\fR && \fIexpr\fR	Logical AND	numeric	left
+_
+\fBexpr\fR |\|| \fIexpr\fR	Logical OR	numeric	left
+_
+\fIexpr1\fR ? \fIexpr2\fR	Conditional expression	type of selected	right
+    : \fIexpr3\fR		   \fIexpr2\fR or \fIexpr3\fR
+_
+\fIlvalue\fR ^= \fIexpr\fR	Exponentiation	numeric	right
+	assignment
+\fIlvalue\fR %= \fIexpr\fR	Modulus assignment	numeric	right
+\fIlvalue\fR *= \fIexpr\fR	Multiplication	numeric	right
+	assignment
+\fIlvalue\fR /= \fIexpr\fR	Division assignment	numeric	right
+\fIlvalue\fR +=  \fIexpr\fR	Addition assignment	numeric	right
+\fIlvalue\fR \(mi= \fIexpr\fR	Subtraction assignment	numeric	right
+\fIlvalue\fR = \fIexpr\fR	Assignment	type of \fIexpr\fR	right
+.TE
+
+.sp
+.LP
+Each expression has either a string value, a numeric value or both. Except as
+stated for specific contexts, the value of an expression is implicitly
+converted to the type needed for the context in which it is used.  A string
+value is converted to a numeric value by the equivalent of the following calls:
 .sp
 .in +2
 .nf
-\fIexpression relop expression
-expression matchop regular_expression\fR
+setlocale(LC_NUMERIC, "");
+\fInumeric_value\fR = atof(\fIstring_value\fR);
 .fi
 .in -2
 
 .sp
 .LP
-where a \fIrelop\fR is any of the six relational operators in C, and a
-\fImatchop\fR is either \fB~\fR (contains) or \fB!~\fR (does not contain). An
-\fIexpression\fR is an arithmetic expression, a relational expression, the
-special expression
+A numeric value that is exactly equal to the value of an integer is converted
+to a string by the equivalent of a call to the \fBsprintf\fR function with the
+string \fB%d\fR as the \fBfmt\fR argument and the numeric value being converted
+as the first and only \fIexpr\fR argument.  Any other numeric value is
+converted to a string by the equivalent of a call to the \fBsprintf\fR function
+with the value of the variable \fBCONVFMT\fR as the \fBfmt\fR argument and the
+numeric value being converted as the first and only \fIexpr\fR argument.
+.sp
+.LP
+A string value is considered to be a \fInumeric string\fR in the following
+case:
+.RS +4
+.TP
+1.
+Any leading and trailing blank characters is ignored.
+.RE
+.RS +4
+.TP
+2.
+If the first unignored character is a \fB+\fR or \fB\(mi\fR, it is ignored.
+.RE
+.RS +4
+.TP
+3.
+If the remaining unignored characters would be lexically recognized as a
+\fBNUMBER\fR token, the string is considered a \fInumeric string\fR.
+.RE
+.sp
+.LP
+If a \fB\(mi\fR character is ignored in the above steps, the numeric value of
+the \fInumeric string\fR is the negation of the numeric value of the recognized
+\fBNUMBER\fR token. Otherwise the numeric value of the \fInumeric string\fR is
+the numeric value of the recognized \fBNUMBER\fR token. Whether or not a string
+is a \fInumeric string\fR is relevant only in contexts where that term is used
+in this section.
+.sp
+.LP
+When an expression is used in a Boolean context, if it has a numeric value, a
+value of zero is treated as false and any other value is treated as true.
+Otherwise, a string value of the null string is treated as false and any other
+value is treated as true. A Boolean context is one of the following:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the first subexpression of a conditional expression.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+an expression operated on by logical NOT, logical \fBAND,\fR or logical OR.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the second expression of a \fBfor\fR statement.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the expression of an \fBif\fR statement.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the expression of the \fBwhile\fR clause in either a \fBwhile\fR or \fBdo\fR
+\fB\&.\|.\|.\fR \fBwhile\fR statement.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+an expression used as a pattern (as in Overall Program Structure).
+.RE
+.sp
+.LP
+The \fBawk\fR language supplies arrays that are used for storing numbers or
+strings. Arrays need not be declared. They are initially empty, and their sizes
+changes dynamically. The subscripts, or element identifiers, are strings,
+providing a type of associative array capability. An array name followed by a
+subscript within square brackets can be used as an \fIlvalue\fR and as an
+expression, as described in the grammar.  Unsubscripted array names are used in
+only the following contexts:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+a parameter in a function definition or function call.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+the \fBNAME\fR token following any use of the keyword \fBin\fR.
+.RE
+.sp
+.LP
+A valid array \fIindex\fR consists of one or more comma-separated expressions,
+similar to the way in which multi-dimensional arrays are indexed in some
+programming languages. Because \fBawk\fR arrays are really one-dimensional,
+such a comma-separated list is converted to a single string by concatenating
+the string values of the separate expressions, each separated from the other by
+the value of the \fBSUBSEP\fR variable.
+.sp
+.LP
+Thus, the following two index operations are equivalent:
 .sp
 .in +2
 .nf
-\fIvar \fRin \fIarray\fR
+var[expr1, expr2, ... exprn]
+var[expr1 SUBSEP expr2 SUBSEP ... SUBSEP exprn]
 .fi
 .in -2
 
 .sp
 .LP
-or a Boolean combination of these.
+A multi-dimensioned \fIindex\fR used with the \fBin\fR operator must be put in
+parentheses. The \fBin\fR operator, which tests for the existence of a
+particular array element, does not create the element if it does not exist.
+Any other reference to a non-existent array element automatically creates it.
+
+.SS "Variables and Special Variables"
+Variables can be used in an \fBawk\fR program by referencing them. With the
+exception of function parameters, they are not explicitly declared.
+Uninitialized scalar variables and array elements have both a numeric value of
+zero and a string value of the empty string.
 .sp
 .LP
-Regular expressions are as in \fBegrep\fR(1). In patterns they must be
-surrounded by slashes. Isolated regular expressions in a pattern apply to the
-entire line. Regular expressions can also occur in relational expressions. A
-pattern can consist of two patterns separated by a comma; in this case, the
-action is performed for all lines between the occurrence of the first pattern
-to the occurrence of the second pattern.
+Field variables are designated by a \fB$\fR followed by a number or numerical
+expression. The effect of the field number \fIexpression\fR evaluating to
+anything other than a non-negative integer is unspecified. Uninitialized
+variables or string values need not be converted to numeric values in this
+context. New field variables are created by assigning a value to them.
+References to non-existent fields (that is, fields after \fB$NF\fR) produce the
+null string. However, assigning to a non-existent field (for example,
+\fB$(NF+2) = 5\fR) increases the value of \fBNF\fR, create any intervening
+fields with the null string as their values and cause the value of \fB$0\fR to
+be recomputed, with the fields being separated by the value of \fBOFS\fR. Each
+field variable has a string value when created. If the string, with any
+occurrence of the decimal-point character from the current locale changed to a
+period character, is considered a \fInumeric string\fR (see \fBExpressions in
+awk\fR above), the field variable also has the numeric value of the \fInumeric
+string\fR.
+
+.SS "/usr/bin/awk, /usr/xpg4/bin/awk"
+\fBawk\fR sets the following special variables that are supported by both
+\fB/usr/bin/awk\fR and \fB/usr/xpg4/bin/awk\fR:
+.sp
+.ne 2
+.na
+\fB\fBARGC\fR\fR
+.ad
+.RS 12n
+The number of elements in the \fBARGV\fR array.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBARGV\fR\fR
+.ad
+.RS 12n
+An array of command line arguments, excluding options and the \fIprogram\fR
+argument, numbered from zero to \fBARGC\fR\(mi1.
+.sp
+The arguments in \fBARGV\fR can be modified or added to; \fBARGC\fR can be
+altered.  As each input file ends, \fBawk\fR treats the next non-null element
+of \fBARGV\fR, up to the current value of \fBARGC\fR\(mi1, inclusive, as the
+name of the next input file.  Setting an element of \fBARGV\fR to null means
+that it is not treated as an input file. The name \fB\(mi\fR indicates the
+standard input. If an argument matches the format of an \fIassignment\fR
+operand, this argument is treated as an assignment rather than a \fIfile\fR
+argument.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBCONVFMT\fR\fR
+.ad
+.RS 12n
+The \fBprintf\fR format for converting numbers to strings (except for output
+statements, where \fBOFMT\fR is used). The default is \fB%.6g\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBENVIRON\fR\fR
+.ad
+.RS 12n
+The variable \fBENVIRON\fR is an array representing the value of the
+environment. The indices of the array are strings consisting of the names of
+the environment variables, and the value of each array element is a string
+consisting of the value of that variable. If the value of an environment
+variable is considered a \fInumeric string\fR, the array element also has its
+numeric value.
+.sp
+In all cases where \fBawk\fR behavior is affected by environment variables
+(including the environment of any commands that \fBawk\fR executes via the
+\fBsystem\fR function or via pipeline redirections with the \fBprint\fR
+statement, the \fBprintf\fR statement, or the \fBgetline\fR function), the
+environment used is the environment at the time \fBawk\fR began executing.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBFILENAME\fR\fR
+.ad
+.RS 12n
+A pathname of the current input file. Inside a \fBBEGIN\fR action the value is
+undefined. Inside an \fBEND\fR action the value is the name of the last input
+file processed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBFNR\fR\fR
+.ad
+.RS 12n
+The ordinal number of the current record in the current file. Inside a
+\fBBEGIN\fR action the value is zero. Inside an \fBEND\fR action the value is
+the number of the last record processed in the last file processed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBFS\fR\fR
+.ad
+.RS 12n
+Input field separator regular expression; a space character by default.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBNF\fR\fR
+.ad
+.RS 12n
+The number of fields in the current record. Inside a \fBBEGIN\fR action, the
+use of \fBNF\fR is undefined unless a \fBgetline\fR function without a
+\fIvar\fR argument is executed previously. Inside an \fBEND\fR action, \fBNF\fR
+retains the value it had for the last record read, unless a subsequent,
+redirected, \fBgetline\fR function without a \fIvar\fR argument is performed
+prior to entering the \fBEND\fR action.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBNR\fR\fR
+.ad
+.RS 12n
+The ordinal number of the current record from the start of input. Inside a
+\fBBEGIN\fR action the value is zero. Inside an \fBEND\fR action the value is
+the number of the last record processed.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBOFMT\fR\fR
+.ad
+.RS 12n
+The \fBprintf\fR format for converting numbers to strings in output statements
+\fB"%.6g"\fR by default. The result of the conversion is unspecified if the
+value of \fBOFMT\fR is not a floating-point format specification.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBOFS\fR\fR
+.ad
+.RS 12n
+The \fBprint\fR statement output field separator; a space character by default.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBORS\fR\fR
+.ad
+.RS 12n
+The \fBprint\fR output record separator; a newline character by default.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBRLENGTH\fR\fR
+.ad
+.RS 12n
+The length of the string matched by the \fBmatch\fR function.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBRS\fR\fR
+.ad
+.RS 12n
+The first character of the string value of \fBRS\fR is the input record
+separator; a newline character by default. If \fBRS\fR contains more than one
+character, the results are unspecified. If \fBRS\fR is null, then records are
+separated by sequences of one or more blank lines. Leading or trailing blank
+lines do not produce empty records at the beginning or end of input, and the
+field separator is always newline, no matter what the value of \fBFS\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBRSTART\fR\fR
+.ad
+.RS 12n
+The starting position of the string matched by the \fBmatch\fR function,
+numbering from 1. This is always equivalent to the return value of the
+\fBmatch\fR function.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSUBSEP\fR\fR
+.ad
+.RS 12n
+The subscript separator string for multi-dimensional arrays. The default value
+is \fB\e034\fR\&.
+.RE
+
+.SS "/usr/bin/awk"
+The following variable is supported for \fB/usr/bin/awk\fR only:
+.sp
+.ne 2
+.na
+\fB\fBRT\fR\fR
+.ad
+.RS 12n
+The record terminator for the most recent record read. For most records this
+will be the same value as \fBRS\fR. At the end of a file with no trailing
+separator value, though, this will be set to the empty string (\fB""\fR).
+.RE
+
+.SS "Regular Expressions"
+The \fBawk\fR utility makes use of the extended regular expression notation
+(see \fBregex\fR(5)) except that it allows the use of C-language conventions to
+escape special characters within the EREs, namely \fB\e\e\fR, \fB\ea\fR,
+\fB\eb\fR, \fB\ef\fR, \fB\en\fR, \fB\er\fR, \fB\et\fR, \fB\ev\fR, and those
+specified in the following table.  These escape sequences are recognized both
+inside and outside bracket expressions.  Note that records need not be
+separated by newline characters and string constants can contain newline
+characters, so even the \fB\en\fR sequence is valid in \fBawk\fR EREs.  Using
+a slash character within the regular expression requires escaping as shown in
+the table below:
+.sp
+
+.sp
+.TS
+l l l
+l l l .
+\fBEscape Sequence\fR	\fBDescription\fR	\fBMeaning\fR
+_
+\fB\e"\fR	Backslash quotation-mark	Quotation-mark character
+_
+\fB\e/\fR	Backslash slash	Slash character
+_
+\fB\e\fR\fIddd\fR	T{
+A backslash character followed by the longest sequence of one, two, or three octal-digit characters (01234567).  If all of the digits are 0, (that is, representation of the NULL character), the behavior is undefined.
+T}	T{
+The character encoded by the one-, two- or three-digit octal integer. Multi-byte characters require multiple, concatenated escape sequences, including the leading \e for each byte.
+T}
+_
+\fB\e\fR\fIc\fR	T{
+A backslash character followed by any character not described in this table or special characters (\fB\e\e\fR, \fB\ea\fR, \fB\eb\fR, \fB\ef\fR, \fB\en\fR, \fB\er\fR, \fB\et\fR, \fB\ev\fR).
+T}	Undefined
+.TE
+
 .sp
 .LP
-The special patterns \fBBEGIN\fR and \fBEND\fR can be used to capture control
-before the first input line has been read and after the last input line has
-been read respectively. These keywords do not combine with any other patterns.
-.SS "Built-in Variables"
+A regular expression can be matched against a specific field or string by using
+one of the two regular expression matching operators, \fB~\fR and \fB!\|~\fR.
+These operators interpret their right-hand operand as a regular expression and
+their left-hand operand as a string. If the regular expression matches the
+string, the \fB~\fR expression evaluates to the value \fB1\fR, and the
+\fB!\|~\fR expression evaluates to the value \fB0\fR. If the regular expression
+does not match the string, the \fB~\fR expression evaluates to the value
+\fB0\fR, and the \fB!\|~\fR expression evaluates to the value \fB1\fR. If the
+right-hand operand is any expression other than the lexical token \fBERE\fR,
+the string value of the expression is interpreted as an extended regular
+expression, including the escape conventions described above. Notice that these
+same escape conventions also are applied in the determining the value of a
+string literal (the lexical token \fBSTRING\fR), and is applied a second time
+when a string literal is used in this context.
 .sp
 .LP
-Built-in variables include:
+When an \fBERE\fR token appears as an expression in any context other than as
+the right-hand of the \fB~\fR or \fB!\|~\fR operator or as one of the built-in
+function arguments described below, the value of the resulting expression is
+the equivalent of:
 .sp
-.ne 2
-.na
-\fB\fBFILENAME\fR \fR
-.ad
-.RS 13n
-name of the current input file
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBFS\fR \fR
-.ad
-.RS 13n
-input field separator regular expression (default blank and tab)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBNF\fR \fR
-.ad
-.RS 13n
-number of fields in the current record
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBNR\fR \fR
-.ad
-.RS 13n
-ordinal number of the current record
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBOFMT\fR \fR
-.ad
-.RS 13n
-output format for numbers (default \fB%.6g\fR)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBOFS\fR \fR
-.ad
-.RS 13n
-output field separator (default blank)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBORS\fR \fR
-.ad
-.RS 13n
-output record separator (default new-line)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBRS\fR \fR
-.ad
-.RS 13n
-input record separator (default new-line)
-.RE
+.in +2
+.nf
+$0 ~ /\fIere\fR/
+.fi
+.in -2
 
 .sp
 .LP
+The \fIere\fR argument to the \fBgsub,\fR \fBmatch,\fR \fBsub\fR functions, and
+the \fIfs\fR argument to the \fBsplit\fR function (see \fBString Functions\fR)
+is interpreted as extended regular expressions. These can be either \fBERE\fR
+tokens or arbitrary expressions, and are interpreted in the same manner as the
+right-hand side of the \fB~\fR or \fB!\|~\fR operator.
+.sp
+.LP
+An extended regular expression can be used to separate fields by using the
+\fB-F\fR \fIERE\fR option or by assigning a string containing the expression to
+the built-in variable \fBFS\fR. The default value of the \fBFS\fR variable is a
+single space character. The following describes \fBFS\fR behavior:
+.RS +4
+.TP
+1.
+If \fBFS\fR is a single character:
+.RS +4
+.TP
+.ie t \(bu
+.el o
+If \fBFS\fR is the space character, skip leading and trailing blank characters;
+fields are delimited by sets of one or more blank characters.
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Otherwise, if \fBFS\fR is any other character \fIc\fR, fields are delimited by
+each single occurrence of \fIc\fR.
+.RE
+.RE
+.RS +4
+.TP
+2.
+Otherwise, the string value of \fBFS\fR is considered to be an extended
+regular expression. Each occurrence of a sequence matching the extended regular
+expression delimits fields.
+.RE
+.sp
+.LP
+Except in the \fBgsub\fR, \fBmatch\fR, \fBsplit\fR, and \fBsub\fR built-in
+functions, regular expression matching is based on input records. That is,
+record separator characters (the first character of the value of the variable
+\fBRS\fR, a newline character by default) cannot be embedded in the expression,
+and no expression matches the record separator character. If the record
+separator is not a newline character, newline characters embedded in the
+expression can be matched. In those four built-in functions, regular expression
+matching are based on text strings. So, any character (including the newline
+character and the record separator) can be embedded in the pattern and an
+appropriate pattern matches any character. However, in all \fBawk\fR regular
+expression matching, the use of one or more NULL characters in the pattern,
+input record or text string produces undefined results.
+
+.SS "Patterns"
+A \fIpattern\fR is any valid \fIexpression,\fR a range specified by two
+expressions separated by comma, or one of the two special patterns \fBBEGIN\fR
+or \fBEND\fR.
+
+.SS "Special Patterns"
+The \fBawk\fR utility recognizes two special patterns, \fBBEGIN\fR and
+\fBEND\fR. Each \fBBEGIN\fR pattern is matched once and its associated action
+executed before the first record of input is read (except possibly by use of
+the \fBgetline\fR function in a prior \fBBEGIN\fR action) and before command
+line assignment is done. Each \fBEND\fR pattern is matched once and its
+associated action executed after the last record of input has been read. These
+two patterns have associated actions.
+.sp
+.LP
+\fBBEGIN\fR and \fBEND\fR do not combine with other patterns.  Multiple
+\fBBEGIN\fR and \fBEND\fR patterns are allowed. The actions associated with the
+\fBBEGIN\fR patterns are executed in the order specified in the program, as are
+the \fBEND\fR actions. An \fBEND\fR pattern can precede a \fBBEGIN\fR pattern
+in a program.
+.sp
+.LP
+If an \fBawk\fR program consists of only actions with the pattern \fBBEGIN\fR,
+and the \fBBEGIN\fR action contains no \fBgetline\fR function, \fBawk\fR exits
+without reading its input when the last statement in the last \fBBEGIN\fR
+action is executed. If an \fBawk\fR program consists of only actions with the
+pattern \fBEND\fR or only actions with the patterns \fBBEGIN\fR and \fBEND\fR,
+the input is read before the statements in the \fBEND\fR actions are executed.
+
+.SS "Expression Patterns"
+An expression pattern is evaluated as if it were an expression in a Boolean
+context. If the result is true, the pattern is considered to match, and the
+associated action (if any) is executed. If the result is false, the action is
+not executed.
+
+.SS "Pattern Ranges"
+A pattern range consists of two expressions separated by a comma. In this case,
+the action is performed for all records between a match of the first expression
+and the following match of the second expression, inclusive. At this point, the
+pattern range can be repeated starting at input records subsequent to the end
+of the matched range.
+
+.SS "Actions"
 An action is a sequence of statements. A statement can be one of the following:
 .sp
 .in +2
@@ -265,50 +885,213 @@ while ( \fIexpression\fR ) \fIstatement\fR
 do \fIstatement\fR while ( \fIexpression\fR )
 for ( \fIexpression\fR ; \fIexpression\fR ; \fIexpression\fR ) \fIstatement\fR
 for ( \fIvar\fR in \fIarray\fR ) \fIstatement\fR
+delete \fIarray\fR[\fIsubscript\fR] #delete an array element
+delete \fIarray\fR #delete all elements within an array
 break
 continue
 { [ \fIstatement\fR ] .\|.\|. }
-\fIexpression\fR      # commonly variable = expression
+\fIexpression\fR        # commonly variable = expression
 print [ \fIexpression-list\fR ] [ >\fIexpression\fR ]
 printf format [ ,\fIexpression-list\fR ] [ >\fIexpression\fR ]
-next            # skip remaining patterns on this input line
-exit [expr]     # skip the rest of the input; exit status is expr
+next              # skip remaining patterns on this input line
+nextfile          # skip remaining patterns on this input file
+exit [expr] # skip the rest of the input; exit status is expr
+return [expr]
 .fi
 .in -2
 
 .sp
 .LP
-Statements are terminated by semicolons, newlines, or right braces. An empty
-expression-list stands for the whole input line. Expressions take on string or
-numeric values as appropriate, and are built using the operators \fB+\fR,
-\fB\(mi\fR, \fB*\fR, \fB/\fR, \fB%\fR, \fB^\fR and concatenation (indicated by
-a blank). The operators \fB++\fR, \fB\(mi\(mi\fR, \fB+=\fR, \fB\(mi=\fR,
-\fB*=\fR, \fB/=\fR, \fB%=\fR, \fB^=\fR, \fB>\fR, \fB>=\fR, \fB<\fR, \fB<=\fR,
-\fB==\fR, \fB!=\fR, and \fB?:\fR are also available in expressions. Variables
-can be scalars, array elements (denoted x[i]), or fields. Variables are
-initialized to the null string or zero. Array subscripts can be any string, not
-necessarily numeric; this allows for a form of associative memory. String
-constants are quoted (\fB""\fR), with the usual C escapes recognized within.
+Any single statement can be replaced by a statement list enclosed in braces.
+The statements are terminated by newline characters or semicolons, and are
+executed sequentially in the order that they appear.
 .sp
 .LP
-The \fBprint\fR statement prints its arguments on the standard output, or on a
-file if \fB>\fR\fIexpression\fR is present, or on a pipe if '\fB|\fR\fIcmd\fR'
-is present. The output resulted from the print statement is terminated by the
-output record separator with each argument separated by the current output
-field separator. The \fBprintf\fR statement formats its expression list
-according to the format (see \fBprintf\fR(3C)).
-.SS "Built-in Functions"
+The \fBnext\fR statement causes all further processing of the current input
+record to be abandoned. The behavior is undefined if a \fBnext\fR statement
+appears or is invoked in a \fBBEGIN\fR or \fBEND\fR action.
 .sp
 .LP
-The arithmetic functions are as follows:
+The \fBnextfile\fR statement is similar to \fBnext\fR, but also skips all other
+records in the current file, and moves on to processing the next input file if
+available (or exits the program if there are none). (Note that this keyword is
+not supported by \fB/usr/xpg4/bin/awk\fR.)
+.sp
+.LP
+The \fBexit\fR statement invokes all \fBEND\fR actions in the order in which
+they occur in the program source and then terminate the program without reading
+further input. An \fBexit\fR statement inside an \fBEND\fR action terminates
+the program without further execution of \fBEND\fR actions.  If an expression
+is specified in an \fBexit\fR statement, its numeric value is the exit status
+of \fBawk\fR, unless subsequent errors are encountered or a subsequent
+\fBexit\fR statement with an expression is executed.
+
+.SS "Output Statements"
+Both \fBprint\fR and \fBprintf\fR statements write to standard output by
+default.  The output is written to the location specified by
+\fIoutput_redirection\fR if one is supplied, as follows:
+.sp
+.in +2
+.nf
+\fB>\fR \fIexpression\fR\fB>>\fR \fIexpression\fR\fB|\fR \fIexpression\fR
+.fi
+.in -2
+
+.sp
+.LP
+In all cases, the \fIexpression\fR is evaluated to produce a string that is
+used as a full pathname to write into (for \fB>\fR or \fB>>\fR) or as a command
+to be executed (for \fB|\fR). Using the first two forms, if the file of that
+name is not currently open, it is opened, creating it if necessary and using
+the first form, truncating the file. The output then is appended to the file.
+As long as the file remains open, subsequent calls in which \fIexpression\fR
+evaluates to the same string value simply appends output to the file. The file
+remains open until the \fBclose\fR function, which is called with an expression
+that evaluates to the same string value.
+.sp
+.LP
+The third form writes output onto a stream piped to the input of a command. The
+stream is created if no stream is currently open with the value of
+\fIexpression\fR as its command name.  The stream created is equivalent to one
+created by a call to the \fBpopen\fR(3C) function with the value of
+\fIexpression\fR as the \fIcommand\fR argument and a value of \fBw\fR as the
+\fImode\fR argument.  As long as the stream remains open, subsequent calls in
+which \fIexpression\fR evaluates to the same string value writes output to the
+existing stream. The stream remains open until the \fBclose\fR function is
+called with an expression that evaluates to the same string value.  At that
+time, the stream is closed as if by a call to the \fBpclose\fR function.
+.sp
+.LP
+These output statements take a comma-separated list of \fIexpression\fR \fIs\fR
+referred in the grammar by the non-terminal symbols \fBexpr_list,\fR
+\fBprint_expr_list\fR or \fBprint_expr_list_opt.\fR This list is referred to
+here as the \fIexpression list\fR, and each member is referred to as an
+\fIexpression argument\fR.
+.sp
+.LP
+The \fBprint\fR statement writes the value of each expression argument onto the
+indicated output stream separated by the current output field separator (see
+variable \fBOFS\fR above), and terminated by the output record separator (see
+variable \fBORS\fR above). All expression arguments is taken as strings, being
+converted if necessary; with the exception that the \fBprintf\fR format in
+\fBOFMT\fR is used instead of the value in \fBCONVFMT\fR. An empty expression
+list stands for the whole input record \fB(\fR$0\fB)\fR.
+.sp
+.LP
+The \fBprintf\fR statement produces output based on a notation similar to the
+File Format Notation used to describe file formats in this document Output is
+produced as specified with the first expression argument as the string
+\fBformat\fR and subsequent expression arguments as the strings \fBarg1\fR to
+\fBargn,\fR inclusive, with the following exceptions:
+.RS +4
+.TP
+1.
+The \fIformat\fR is an actual character string rather than a graphical
+representation. Therefore, it cannot contain empty character positions. The
+space character in the \fIformat\fR string, in any context other than a
+\fIflag\fR of a conversion specification, is treated as an ordinary character
+that is copied to the output.
+.RE
+.RS +4
+.TP
+2.
+If the character set contains a Delta character and that character appears
+in the \fIformat\fR string, it is treated as an ordinary character that is
+copied to the output.
+.RE
+.RS +4
+.TP
+3.
+The \fIescape sequences\fR beginning with a backslash character is treated
+as sequences of ordinary characters that are copied to the output. Note that
+these same sequences is interpreted lexically by \fBawk\fR when they appear in
+literal strings, but they is not treated specially by the \fBprintf\fR
+statement.
+.RE
+.RS +4
+.TP
+4.
+A \fIfield width\fR or \fIprecision\fR can be specified as the \fB*\fR
+character instead of a digit string. In this case the next argument from the
+expression list is fetched and its numeric value taken as the field width or
+precision.
+.RE
+.RS +4
+.TP
+5.
+The implementation does not precede or follow output from the \fBd\fR or
+\fBu\fR conversion specifications with blank characters not specified by the
+\fIformat\fR string.
+.RE
+.RS +4
+.TP
+6.
+The implementation does not precede output from the \fBo\fR conversion
+specification with leading zeros not specified by the \fIformat\fR string.
+.RE
+.RS +4
+.TP
+7.
+For the \fBc\fR conversion specification: if the argument has a numeric
+value, the character whose encoding is that value is output.  If the value is
+zero or is not the encoding of any character in the character set, the behavior
+is undefined.  If the argument does not have a numeric value, the first
+character of the string value is output; if the string does not contain any
+characters the behavior is undefined.
+.RE
+.RS +4
+.TP
+8.
+For each conversion specification that consumes an argument, the next
+expression argument is evaluated. With the exception of the \fBc\fR conversion,
+the value is converted to the appropriate type for the conversion
+specification.
+.RE
+.RS +4
+.TP
+9.
+If there are insufficient expression arguments to satisfy all the conversion
+specifications in the \fIformat\fR string, the behavior is undefined.
+.RE
+.RS +4
+.TP
+10.
+If any character sequence in the \fIformat\fR string begins with a %
+character, but does not form a valid conversion specification, the behavior is
+unspecified.
+.RE
+.sp
+.LP
+Both \fBprint\fR and \fBprintf\fR can output at least \fB{LINE_MAX}\fR bytes.
+
+.SS "Functions"
+The \fBawk\fR language has a variety of built-in functions: arithmetic,
+string, input/output and general.
+
+.SS "Arithmetic Functions"
+The arithmetic functions, except for \fBint\fR, are based on the \fBISO\fR
+\fBC\fR standard. The behavior is undefined in cases where the \fBISO\fR
+\fBC\fR standard specifies that an error be returned or that the behavior is
+undefined. Although the grammar permits built-in functions to appear with no
+arguments or parentheses, unless the argument or parentheses are indicated as
+optional in the following list (by displaying them within the \fB[ ]\fR
+brackets), such use is undefined.
+.sp
+.ne 2
+.na
+\fB\fBatan2(\fR\fIy\fR,\fIx\fR\fB)\fR\fR
+.ad
+.RS 17n
+Return arctangent of \fIy\fR/\fIx\fR.
+.RE
+
 .sp
 .ne 2
 .na
 \fB\fBcos\fR(\fIx\fR)\fR
 .ad
-.RS 11n
-Return cosine of \fIx\fR, where \fIx\fR is in radians. (In
-\fB/usr/xpg4/bin/awk\fR only. See \fBnawk\fR(1).)
+.RS 17n
+Return cosine of \fIx,\fR where \fIx\fR is in radians.
 .RE
 
 .sp
@@ -316,9 +1099,8 @@ Return cosine of \fIx\fR, where \fIx\fR is in radians. (In
 .na
 \fB\fBsin\fR(\fIx\fR)\fR
 .ad
-.RS 11n
-Return sine of \fIx\fR, where \fIx\fR is in radians. (In
-\fB/usr/xpg4/bin/awk\fR only. See \fBnawk\fR(1).)
+.RS 17n
+Return sine of \fIx,\fR where \fIx\fR is in radians.
 .RE
 
 .sp
@@ -326,7 +1108,7 @@ Return sine of \fIx\fR, where \fIx\fR is in radians. (In
 .na
 \fB\fBexp\fR(\fIx\fR)\fR
 .ad
-.RS 11n
+.RS 17n
 Return the exponential function of \fIx\fR.
 .RE
 
@@ -335,7 +1117,7 @@ Return the exponential function of \fIx\fR.
 .na
 \fB\fBlog\fR(\fIx\fR)\fR
 .ad
-.RS 11n
+.RS 17n
 Return the natural logarithm of \fIx\fR.
 .RE
 
@@ -344,7 +1126,7 @@ Return the natural logarithm of \fIx\fR.
 .na
 \fB\fBsqrt\fR(\fIx\fR)\fR
 .ad
-.RS 11n
+.RS 17n
 Return the square root of \fIx\fR.
 .RE
 
@@ -353,125 +1135,513 @@ Return the square root of \fIx\fR.
 .na
 \fB\fBint\fR(\fIx\fR)\fR
 .ad
-.RS 11n
-Truncate its argument to an integer. It is truncated toward \fB0\fR when
-\fIx\fR >\fB 0\fR.
+.RS 17n
+Truncate its argument to an integer. It is truncated toward 0 when \fIx\fR > 0.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrand()\fR\fR
+.ad
+.RS 17n
+Return a random number \fIn\fR, such that 0 \(<= \fIn\fR < 1.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsrand\fR([\fBexpr\fR])\fR
+.ad
+.RS 17n
+Set the seed value for \fBrand\fR to \fIexpr\fR or use the time of day if
+\fIexpr\fR is omitted. The previous seed value is returned.
+.RE
+
+.SS "String Functions"
+The string functions in the following list shall be supported. Although the
+grammar permits built-in functions to appear with no arguments or parentheses,
+unless the argument or parentheses are indicated as optional in the following
+list (by displaying them within the \fB[ ]\fR brackets), such use is undefined.
+.sp
+.ne 2
+.na
+\fB\fBgsub\fR(\fIere\fR,\fIrepl\fR[,\|\fIin\fR])\fR
+.ad
+.sp .6
+.RS 4n
+Behave like \fBsub\fR (see below), except that it replaces all occurrences of
+the regular expression (like the \fBed\fR utility global substitute) in
+\fB$0\fR or in the \fIin\fR argument, when specified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBindex\fR(\fIs\fR,\fIt\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Return the position, in characters, numbering from 1, in string \fIs\fR where
+string \fIt\fR first occurs, or zero if it does not occur at all.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBlength\fR[([\fIv\fR])]\fR
+.ad
+.sp .6
+.RS 4n
+Given no argument, this function returns the length of the whole record,
+\fB$0\fR. If given an array as an argument (and using \fB/usr/bin/awk\fR),
+then this returns the number of elements it contains. Otherwise, this function
+interprets the argument as a string (performing any needed conversions) and
+returns its length in characters.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBmatch\fR(\fIs\fR,\fIere\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Return the position, in characters, numbering from 1, in string \fIs\fR where
+the extended regular expression \fIere\fR occurs, or zero if it does not occur
+at all. \fBRSTART\fR is set to the starting position (which is the same as the
+returned value), zero if no match is found; \fBRLENGTH\fR is set to the length
+of the matched string, \(mi1 if no match is found.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsplit\fR(\fIs\fR,\fIa\fR[,\|\fIfs\fR])\fR
+.ad
+.sp .6
+.RS 4n
+Split the string \fIs\fR into array elements \fIa\fR[1], \fIa\fR[2],
+\fB\&...,\fR \fIa\fR[\fIn\fR], and return \fIn\fR. The separation is done with
+the extended regular expression \fIfs\fR or with the field separator \fBFS\fR
+if \fIfs\fR is not given. Each array element has a string value when created.
+If the string assigned to any array element, with any occurrence of the
+decimal-point character from the current locale changed to a period character,
+would be considered a \fInumeric string\fR; the array element also has the
+numeric value of the \fInumeric string\fR. The effect of a null string as the
+value of \fIfs\fR is unspecified.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsprintf\fR(\fBfmt\fR,\fIexpr\fR,\fIexpr\fR,\fB\&...\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Format the expressions according to the \fBprintf\fR format given by \fIfmt\fR
+and return the resulting string.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsub\fR(\fIere\fR,\fIrepl\fR[,\|\fIin\fR])\fR
+.ad
+.sp .6
+.RS 4n
+Substitute the string \fIrepl\fR in place of the first instance of the extended
+regular expression \fBERE\fR in string in and return the number of
+substitutions. An ampersand ( \fB&\fR ) appearing in the string \fIrepl\fR is
+replaced by the string from in that matches the regular expression. An
+ampersand preceded with a backslash ( \fB\e\fR ) is interpreted as the literal
+ampersand character. An occurrence of two consecutive backslashes is
+interpreted as just a single literal backslash character.  Any other occurrence
+of a backslash (for example, preceding any other character) is treated as a
+literal backslash character. If \fIrepl\fR is a string literal, the handling of
+the ampersand character occurs after any lexical processing, including any
+lexical backslash escape sequence processing. If \fBin\fR is specified and it
+is not an \fBlvalue\fR the behavior is undefined. If in is omitted, \fBawk\fR
+uses the current record (\fB$0\fR) in its place.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsubstr\fR(\fIs\fR,\fIm\fR[,\|\fIn\fR])\fR
+.ad
+.sp .6
+.RS 4n
+Return the at most \fIn\fR-character substring of \fIs\fR that begins at
+position \fIm,\fR numbering from 1. If \fIn\fR is missing, the length of the
+substring is limited by the length of the string \fIs\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtolower\fR(\fIs\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Return a string based on the string \fIs\fR. Each character in \fIs\fR that is
+an upper-case letter specified to have a \fBtolower\fR mapping by the
+\fBLC_CTYPE\fR category of the current locale is replaced in the returned
+string by the lower-case letter specified by the mapping. Other characters in
+\fIs\fR are unchanged in the returned string.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBtoupper\fR(\fIs\fR)\fR
+.ad
+.sp .6
+.RS 4n
+Return a string based on the string \fIs\fR. Each character in \fIs\fR that is
+a lower-case letter specified to have a \fBtoupper\fR mapping by the
+\fBLC_CTYPE\fR category of the current locale is replaced in the returned
+string by the upper-case letter specified by the mapping. Other characters in
+\fIs\fR are unchanged in the returned string.
 .RE
 
 .sp
 .LP
-The string functions are as follows:
+All of the preceding functions that take \fIERE\fR as a parameter expect a
+pattern or a string valued expression that is a regular expression as defined
+below.
+
+.SS "Input/Output and General Functions"
+The input/output and general functions are:
 .sp
 .ne 2
 .na
-\fB\fBindex(\fR\fIs\fR\fB, \fR\fIt\fR\fB)\fR\fR
+\fB\fBclose(\fR\fIexpression\fR)\fR
 .ad
-.sp .6
-.RS 4n
-Return the position in string \fIs\fR where string \fIt\fR first occurs, or
-\fB0\fR if it does not occur at all.
+.RS 27n
+Close the file or pipe opened by a \fBprint\fR or \fBprintf\fR statement or a
+call to \fBgetline\fR with the same string-valued \fIexpression\fR. If the
+close was successful, the function returns \fB0\fR; otherwise, it returns
+non-zero.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBint(\fR\fIs\fR\fB)\fR\fR
+\fB\fBfflush(\fR\fIexpression\fR)\fR
 .ad
-.sp .6
-.RS 4n
-truncates \fIs\fR to an integer value. If \fIs\fR is not specified, $0 is used.
+.RS 27n
+Flush any buffered output for the file or pipe opened by a \fBprint\fR or
+\fBprintf\fR statement or a call to \fBgetline\fR with the same string-valued
+\fIexpression\fR. If the flush was successful, the function returns \fB0\fR;
+otherwise, it returns \fBEOF\fR. If no arguments or the empty string
+(\fB""\fR) are given, then all open files will be flushed. (Note that
+\fBfflush\fR is supported in \fB/usr/bin/awk\fR only.)
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBlength(\fR\fIs\fR\fB)\fR\fR
+\fB\fIexpression\fR|\fBgetline\fR[\fIvar\fR]\fR
 .ad
-.sp .6
-.RS 4n
-Return the length of its argument taken as a string, or of the whole line if
-there is no argument.
+.RS 27n
+Read a record of input from a stream piped from the output of a command. The
+stream is created if no stream is currently open with the value of
+\fIexpression\fR as its command name. The stream created is equivalent to one
+created by a call to the \fBpopen\fR function with the value of
+\fIexpression\fR as the \fIcommand\fR argument and a value of \fBr\fR as the
+\fImode\fR argument. As long as the stream remains open, subsequent calls in
+which \fIexpression\fR evaluates to the same string value reads subsequent
+records from the file. The stream remains open until the \fBclose\fR function
+is called with an expression that evaluates to the same string value. At that
+time, the stream is closed as if by a call to the \fBpclose\fR function. If
+\fIvar\fR is missing, \fB$0\fR and \fBNF\fR is set. Otherwise, \fIvar\fR is
+set.
+.sp
+The \fBgetline\fR operator can form ambiguous constructs when there are
+operators that are not in parentheses (including concatenate) to the left of
+the \fB|\fR (to the beginning of the expression containing \fBgetline\fR). In
+the context of the \fB$\fR operator, \fB|\fR behaves as if it had a lower
+precedence than \fB$\fR. The result of evaluating other operators is
+unspecified, and all such uses of portable applications must be put in
+parentheses properly.
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fBsplit(\fR\fIs\fR, \fIa\fR, \fIfs\fR\fB)\fR\fR
-.ad
-.sp .6
-.RS 4n
-Split the string \fIs\fR into array elements \fIa\fR[\fI1\fR],
-\fIa\fR[\fI2\fR], \|.\|.\|. \fIa\fR[\fIn\fR], and returns \fIn\fR. The
-separation is done with the regular expression \fIfs\fR or with the field
-separator \fBFS\fR if \fIfs\fR is not given.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBsprintf(\fR\fIfmt\fR, \fIexpr\fR, \fIexpr\fR,\|.\|.\|.\|\fB)\fR\fR
-.ad
-.sp .6
-.RS 4n
-Format the expressions according to the \fBprintf\fR(3C) format given by
-\fIfmt\fR and returns the resulting string.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBsubstr(\fR\fIs\fR, \fIm\fR, \fIn\fR\fB)\fR\fR
-.ad
-.sp .6
-.RS 4n
-returns the \fIn\fR-character substring of \fIs\fR that begins at position
-\fIm\fR.
-.RE
-
-.sp
-.LP
-The input/output function is as follows:
 .sp
 .ne 2
 .na
 \fB\fBgetline\fR\fR
 .ad
-.RS 11n
-Set \fB$0\fR to the next input record from the current input file.
-\fBgetline\fR returns \fB1\fR for successful input, \fB0\fR for end of file,
-and \fB\(mi1\fR for an error.
+.RS 27n
+Set \fB$0\fR to the next input record from the current input file. This form of
+\fBgetline\fR sets the \fBNF\fR, \fBNR\fR, and \fBFNR\fR variables.
 .RE
 
-.SS "Large File Behavior"
 .sp
-.LP
-See \fBlargefile\fR(5) for the description of the behavior of \fBawk\fR when
-encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRPrinting Lines Longer Than 72 Characters
-.sp
-.LP
-The following example is an \fBawk\fR script that can be executed by an \fBawk
--f examplescript\fR style command. It prints lines longer than seventy two
-characters:
+.ne 2
+.na
+\fB\fBgetline\fR \fIvar\fR\fR
+.ad
+.RS 27n
+Set variable \fIvar\fR to the next input record from the current input file.
+This form of \fBgetline\fR sets the \fBFNR\fR and \fBNR\fR variables.
+.RE
 
+.sp
+.ne 2
+.na
+\fB\fBgetline\fR [\fIvar\fR] \fB<\fR \fIexpression\fR\fR
+.ad
+.RS 27n
+Read the next record of input from a named file. The \fIexpression\fR is
+evaluated to produce a string that is used as a full pathname. If the file of
+that name is not currently open, it is opened. As long as the stream remains
+open, subsequent calls in which \fIexpression\fR evaluates to the same string
+value reads subsequent records from the file. The file remains open until the
+\fBclose\fR function is called with an expression that evaluates to the same
+string value. If \fIvar\fR is missing, \fB$0\fR and \fBNF\fR is set. Otherwise,
+\fIvar\fR is set.
+.sp
+The \fBgetline\fR operator can form ambiguous constructs when there are binary
+operators that are not in parentheses (including concatenate) to the right of
+the \fB<\fR (up to the end of the expression containing the \fBgetline\fR). The
+result of evaluating such a construct is unspecified, and all such uses of
+portable applications must be put in parentheses properly.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBsystem\fR(\fIexpression\fR)\fR
+.ad
+.RS 27n
+Execute the command given by \fIexpression\fR in a manner equivalent to the
+\fBsystem\fR(3C) function and return the exit status of the command.
+.RE
+
+.sp
+.LP
+All forms of \fBgetline\fR return \fB1\fR for successful input, \fB0\fR for end
+of file, and \fB\(mi1\fR for an error.
+.sp
+.LP
+Where strings are used as the name of a file or pipeline, the strings must be
+textually identical. The terminology ``same string value'' implies that
+``equivalent strings'', even those that differ only by space characters,
+represent different files.
+
+.SS "User-defined Functions"
+The \fBawk\fR language also provides user-defined functions. Such functions
+can be defined as:
 .sp
 .in +2
 .nf
-\fBlength > 72\fR
+\fBfunction\fR \fIname\fR(\fIargs\fR,\|.\|.\|.) { \fIstatements\fR }
+.fi
+.in -2
+
+.sp
+.LP
+A function can be referred to anywhere in an \fBawk\fR program; in particular,
+its use can precede its definition. The scope of a function is global.
+.sp
+.LP
+Function arguments can be either scalars or arrays; the behavior is undefined
+if an array name is passed as an argument that the function uses as a scalar,
+or if a scalar expression is passed as an argument that the function uses as an
+array. Function arguments are passed by value if scalar and by reference if
+array name. Argument names are local to the function; all other variable names
+are global. The same name is not used as both an argument name and as the name
+of a function or a special \fBawk\fR variable. The same name must not be used
+both as a variable name with global scope and as the name of a function. The
+same name must not be used within the same scope both as a scalar variable and
+as an array.
+.sp
+.LP
+The number of parameters in the function definition need not match the number
+of parameters in the function call. Excess formal parameters can be used as
+local variables. If fewer arguments are supplied in a function call than are in
+the function definition, the extra parameters that are used in the function
+body as scalars are initialized with a string value of the null string and a
+numeric value of zero, and the extra parameters that are used in the function
+body as arrays are initialized as empty arrays. If more arguments are supplied
+in a function call than are in the function definition, the behavior is
+undefined.
+.sp
+.LP
+When invoking a function, no white space can be placed between the function
+name and the opening parenthesis. Function calls can be nested and recursive
+calls can be made upon functions. Upon return from any nested or recursive
+function call, the values of all of the calling function's parameters are
+unchanged, except for array parameters passed by reference. The \fBreturn\fR
+statement can be used to return a value. If a \fBreturn\fR statement appears
+outside of a function definition, the behavior is undefined.
+.sp
+.LP
+In the function definition, newline characters are optional before the opening
+brace and after the closing brace. Function definitions can appear anywhere in
+the program where a \fIpattern-action\fR pair is allowed.
+
+.SH USAGE
+The \fBindex\fR, \fBlength\fR, \fBmatch\fR, and \fBsubstr\fR functions should
+not be confused with similar functions in the \fBISO C\fR standard; the
+\fBawk\fR versions deal with characters, while the \fBISO C\fR standard deals
+with bytes.
+.sp
+.LP
+Because the concatenation operation is represented by adjacent expressions
+rather than an explicit operator, it is often necessary to use parentheses to
+enforce the proper evaluation precedence.
+.sp
+.LP
+See \fBlargefile\fR(5) for the description of the behavior of \fBawk\fR when
+encountering files greater than or equal to 2 Gbyte (2^31 bytes).
+
+.SH EXAMPLES
+The \fBawk\fR program specified in the command line is most easily specified
+within single-quotes (for example, \fB\&'\fR\fIprogram\fR\fB\&'\fR) for
+applications using \fBsh\fR, because \fBawk\fR programs commonly contain
+characters that are special to the shell, including double-quotes. In the cases
+where a \fBawk\fR program contains single-quote characters, it is usually
+easiest to specify most of the program as strings within single-quotes
+concatenated by the shell with quoted single-quote characters. For example:
+.sp
+.in +2
+.nf
+awk '/'\e''/ { print "quote:", $0 }'
+.fi
+.in -2
+
+.sp
+.LP
+prints all lines from the standard input containing a single-quote character,
+prefixed with \fBquote:\fR.
+.sp
+.LP
+The following are examples of simple \fBawk\fR programs:
+.LP
+\fBExample 1 \fRWrite to the standard output all input lines for which field 3
+is greater than 5:
+.sp
+.in +2
+.nf
+\fB$3 > 5\fR
 .fi
 .in -2
 .sp
 
 .LP
-\fBExample 2 \fRPrinting Fields in Opposite Order
+\fBExample 2 \fRWrite every tenth line:
+.sp
+.in +2
+.nf
+\fB(NR % 10) == 0\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 3 \fRWrite any line with a substring matching the regular
+expression:
+.sp
+.in +2
+.nf
+\fB/(G|D)(2[0-9][[:alpha:]]*)/\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 4 \fRPrint any line with a substring containing a G or D, followed
+by a sequence of digits and characters:
 .sp
 .LP
-The following example is an \fBawk\fR script that can be executed by an \fBawk
--f examplescript\fR style command. It prints the first two fields in opposite
-order:
+This example uses character classes \fBdigit\fR and \fBalpha\fR to match
+language-independent digit and alphabetic characters, respectively.
 
+.sp
+.in +2
+.nf
+\fB/(G|D)([[:digit:][:alpha:]]*)/\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 5 \fRWrite any line in which the second field matches the regular
+expression and the fourth field does not:
+.sp
+.in +2
+.nf
+\fB$2 ~ /xyz/ && $4 !~ /xyz/\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 6 \fRWrite any line in which the second field contains a backslash:
+.sp
+.in +2
+.nf
+\fB$2 ~ /\e\e/\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 7 \fRWrite any line in which the second field contains a backslash
+(alternate method):
+.sp
+.LP
+Notice that backslash escapes are interpreted twice, once in lexical processing
+of the string and once in processing the regular expression.
+
+.sp
+.in +2
+.nf
+\fB$2 ~ "\e\e\e\e"\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 8 \fRWrite the second to the last and the last field in each line,
+separating the fields by a colon:
+.sp
+.in +2
+.nf
+\fB{OFS=":";print $(NF-1), $NF}\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 9 \fRWrite the line number and number of fields in each line:
+.sp
+.LP
+The three strings representing the line number, the colon and the number of
+fields are concatenated and that string is written to standard output.
+
+.sp
+.in +2
+.nf
+\fB{print NR ":" NF}\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 10 \fRWrite lines longer than 72 characters:
+.sp
+.in +2
+.nf
+\fB{length($0) > 72}\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 11 \fRWrite first two fields in opposite order separated by the OFS:
 .sp
 .in +2
 .nf
@@ -481,63 +1651,42 @@ order:
 .sp
 
 .LP
-\fBExample 3 \fRPrinting Fields in Opposite Order with the Input Fields
-Separated
-.sp
-.LP
-The following example is an \fBawk\fR script that can be executed by an \fBawk
--f examplescript\fR style command. It prints the first two input fields in
-opposite order, separated by a comma, blanks or tabs:
-
+\fBExample 12 \fRSame, with input fields separated by comma or space and tab
+characters, or both:
 .sp
 .in +2
 .nf
-\fBBEGIN { FS = ",[ \et]*|[ \et]+" }
+\fBBEGIN { FS = ",[\et]*|[\et]+" }
       { print $2, $1 }\fR
 .fi
 .in -2
 .sp
 
 .LP
-\fBExample 4 \fRAdding Up the First Column, Printing the Sum and Average
-.sp
-.LP
-The following example is an \fBawk\fR script that can be executed by an \fBawk
--f examplescript\fR style command.  It adds up the first column, and prints the
-sum and average:
-
+\fBExample 13 \fRAdd up first column, print sum and average:
 .sp
 .in +2
 .nf
-\fB{ s += $1 }
-END  { print "sum is", s, " average is", s/NR }\fR
+\fB{s += $1 }
+END {print "sum is ", s, " average is", s/NR}\fR
 .fi
 .in -2
 .sp
 
 .LP
-\fBExample 5 \fRPrinting Fields in Reverse Order
-.sp
-.LP
-The following example is an \fBawk\fR script that can be executed by an \fBawk
--f examplescript\fR style command. It prints fields in reverse order:
-
+\fBExample 14 \fRWrite fields in reverse order, one per line (many lines out
+for each line in):
 .sp
 .in +2
 .nf
-\fB{ for (i = NF; i > 0; \(mi\(mii) print $i }\fR
+\fB{ for (i = NF; i > 0; --i) print $i }\fR
 .fi
 .in -2
 .sp
 
 .LP
-\fBExample 6 \fRPrinting All lines Between \fBstart/stop\fR Pairs
-.sp
-.LP
-The following example is an \fBawk\fR script that can be executed by an \fBawk
--f examplescript\fR style command. It prints all lines between start/stop
-pairs.
-
+\fBExample 15 \fRWrite all lines between occurrences of the strings "start" and
+"stop":
 .sp
 .in +2
 .nf
@@ -547,14 +1696,8 @@ pairs.
 .sp
 
 .LP
-\fBExample 7 \fRPrinting All Lines Whose First Field is Different from the
-Previous One
-.sp
-.LP
-The following example is an \fBawk\fR script that can be executed by an \fBawk
--f examplescript\fR style command. It prints all lines whose first field is
-different from the previous one.
-
+\fBExample 16 \fRWrite all lines whose first field is different from the
+previous one:
 .sp
 .in +2
 .nf
@@ -564,44 +1707,78 @@ different from the previous one.
 .sp
 
 .LP
-\fBExample 8 \fRPrinting a File and Filling in Page numbers
-.sp
-.LP
-The following example is an \fBawk\fR script that can be executed by an \fBawk
--f examplescript\fR style command. It prints a file and fills in page numbers
-starting at 5:
-
+\fBExample 17 \fRSimulate the echo command:
 .sp
 .in +2
 .nf
-\fB/Page/	{ $2 = n++; }
-     	   { print }\fR
+\fBBEGIN  {
+       for (i = 1; i < ARGC; ++i)
+             printf "%s%s", ARGV[i], i==ARGC-1?"\en":""
+       }\fR
 .fi
 .in -2
 .sp
 
 .LP
-\fBExample 9 \fRPrinting a File and Numbering Its Pages
+\fBExample 18 \fRWrite the path prefixes contained in the PATH environment
+variable, one per line:
+.sp
+.in +2
+.nf
+\fBBEGIN  {
+       n = split (ENVIRON["PATH"], path, ":")
+       for (i = 1; i <= n; ++i)
+              print path[i]
+       }\fR
+.fi
+.in -2
+.sp
+
+.LP
+\fBExample 19 \fRPrint the file "input", filling in page numbers starting at 5:
 .sp
 .LP
-Assuming this program is in a file named \fBprog\fR, the following example
-prints the file \fBinput\fR numbering its pages starting at \fB5\fR:
+If there is a file named \fBinput\fR containing page headers of the form
 
 .sp
 .in +2
 .nf
-example% \fBawk -f prog n=5 input\fR
+Page#
+.fi
+.in -2
+
+.sp
+.LP
+and a file named \fBprogram\fR that contains
+
+.sp
+.in +2
+.nf
+/Page/{ $2 = n++; }
+{ print }
+.fi
+.in -2
+
+.sp
+.LP
+then the command line
+
+.sp
+.in +2
+.nf
+\fBawk -f program n=5 input\fR
 .fi
 .in -2
 .sp
+
+.sp
+.LP
+prints the file \fBinput\fR, filling in page numbers starting at 5.
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
-that affect the execution of \fBawk\fR: \fBLANG\fR, \fBLC_ALL\fR,
-\fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBNLSPATH\fR, and
-\fBPATH\fR.
+that affect execution: \fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and
+\fBNLSPATH\fR.
 .sp
 .ne 2
 .na
@@ -615,49 +1792,55 @@ POSIX locale) is the decimal-point character recognized in processing \fBawk\fR
 programs (including assignments in command-line arguments).
 .RE
 
-.SH ATTRIBUTES
+.SH EXIT STATUS
+The following exit values are returned:
+.sp
+.ne 2
+.na
+\fB\fB0\fR\fR
+.ad
+.RS 6n
+All input files were processed successfully.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB>0\fR\fR
+.ad
+.RS 6n
+An error occurred.
+.RE
+
 .sp
 .LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.SS "/usr/bin/awk"
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-CSI	Not Enabled
-.TE
-
-.SS "/usr/xpg4/bin/awk"
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-CSI	Enabled
-_
-Interface Stability	Standard
-.TE
+The exit status can be altered within the program by using an \fBexit\fR
+expression.
 
 .SH SEE ALSO
+\fBed\fR(1), \fBegrep\fR(1), \fBgrep\fR(1), \fBlex\fR(1), \fBoawk\fR(1),
+\fBsed\fR(1), \fBpopen\fR(3C), \fBprintf\fR(3C), \fBsystem\fR(3C),
+\fBattributes\fR(5), \fBenviron\fR(5), \fBlargefile\fR(5), \fBregex\fR(5),
+\fBXPG4\fR(5)
 .sp
 .LP
-\fBegrep\fR(1), \fBgrep\fR(1), \fBnawk\fR(1), \fBsed\fR(1), \fBprintf\fR(3C),
-\fBattributes\fR(5), \fBenviron\fR(5), \fBlargefile\fR(5), \fBstandards\fR(5)
+Aho, A. V., B. W. Kernighan, and P. J. Weinberger, \fIThe AWK Programming
+Language\fR, Addison-Wesley, 1988.
+
+.SH DIAGNOSTICS
+If any \fIfile\fR operand is specified and the named file cannot be accessed,
+\fBawk\fR writes a diagnostic message to standard error and terminate without
+any further action.
+.sp
+.LP
+If the program specified by either the \fIprogram\fR operand or a
+\fIprogfile\fR operand is not a valid \fBawk\fR program (as specified in
+\fBEXTENDED DESCRIPTION\fR), the behavior is undefined.
+
 .SH NOTES
-.sp
-.LP
 Input white space is not preserved on output if fields are involved.
 .sp
 .LP
 There are no explicit conversions between numbers and strings. To force an
-expression to be treated as a number, add \fB0\fR to it. To force an expression
-to be treated as a string, concatenate the null string (\fB""\fR) to it.
+expression to be treated as a number add 0 to it; to force it to be treated as
+a string concatenate the null string (\fB""\fR) to it.

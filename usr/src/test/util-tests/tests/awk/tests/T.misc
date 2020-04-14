@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Copyright 2019 Joyent, Inc.
+
 if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
     printf '$AWK and $WORKDIR must be set\n' >&2
     exit 1
@@ -130,7 +132,7 @@ $AWK 'BEGIN { foo() }' 2> $TEMP0
 grep "calling undefined function foo" $TEMP0 >/dev/null || fail "BAD: T.misc undefined function"
 
 
-# gawk arrayparm test; should give error about function 
+# gawk arrayparm test; should give error about function
 $AWK '
 BEGIN {
     foo[1]=1;
@@ -363,14 +365,14 @@ cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc immmediate exit 4'
 echo 1 > $TEMP1
 $AWK '	{ n = split($0, x)
 	  for (i in x) {
-	 	if (i == 1)
+		if (i == 1)
 			exit } }
 	END { print NR }' /etc/passwd > $TEMP2
 cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc immmediate exit 5'
 
 echo XXXXXXXX > $TEMP1
 $AWK 'BEGIN { s = "ab\fc\rd\be"
-	t = s; 	gsub("[" s "]", "X", t); print t }' > $TEMP2
+	t = s;	gsub("[" s "]", "X", t); print t }' > $TEMP2
 cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc weird escapes in char class'
 
 $AWK '{}' /etc/passwd glop/glop > $TEMP0 2> $TEMP2
@@ -483,7 +485,7 @@ awk '{ print NF, $0 }' $TEMP0| tail -1 > $TEMP2
 cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc END must preserve $0'
 
 
-LC_NUMERIC=ru_RU.ISO8859-5 $AWK 'BEGIN {
+LC_ALL= LC_NUMERIC=ru_RU.ISO8859-5 $AWK 'BEGIN {
 	"echo 1,200" | getline;
 	if ($1 == 1.2) {
 		printf "good ";
