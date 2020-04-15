@@ -20,9 +20,6 @@
 #
 # CDDL HEADER END
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -59,7 +56,6 @@ my $must_be_public = 0;
 # paths to skip outright.
 my @skip_list = qw(
 	/etc
-	/usr/4lib
 	/usr/perl5
 );
 my $path_skip = join('|', @skip_list);
@@ -114,7 +110,7 @@ while (<$contents_fh>) {
 		next unless ($pathname =~ m,\.so,);
 		next unless ($pathname =~ m,/lib,);
 		next unless ($pathname =~ m,/lib[^/]*\.so\b,);
-		next unless ($type =~ /regular file|symbolic link/i); 
+		next unless ($type =~ /regular file|symbolic link/i);
 		next unless ($status =~ /^\s*installed\s*$/);
 		$pathname = trim($pathname);
 		$link = trim($link);
@@ -216,7 +212,7 @@ sub do_pvs
 		next if ($path =~ /'/);
 		#
 		# quote the filename in case it has meta-characters
-		# (which should never happen in all normal usage) 
+		# (which should never happen in all normal usage)
 		#
 		$paths .= "'$path'";
 		$cnt++;

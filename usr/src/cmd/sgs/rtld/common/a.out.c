@@ -50,7 +50,6 @@
  * Default and secure dependency search paths.
  */
 static Spath_defn _aout_def_dirs[] = {
-	{ MSG_ORIG(MSG_PTH_USR4LIB),		MSG_PTH_USR4LIB_SIZE },
 	{ MSG_ORIG(MSG_PTH_USRLIB),		MSG_PTH_USRLIB_SIZE },
 	{ MSG_ORIG(MSG_PTH_USRLCLIB),		MSG_PTH_USRLCLIB_SIZE },
 	{ 0, 0 }

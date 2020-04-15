@@ -70,15 +70,9 @@ PLUGIN		^usr/sadm/lib/wbem
 PLUGIN		^usr/lib/dtrace/libdtrace_forceload\.so$
 PLUGIN		^usr/lib/dtrace/64/libdtrace_forceload\.so$
 
-# sbcp is a special case, and not a plugin. However, it does not have a
-# versioned name, and does not contain versioning, so the PLUGIN exemptions fit.
-PLUGIN	^usr/4lib/sbcp$
-
-
 # Objects that are not expected to contain versioning information.
 # Note that PLUGIN objects are automatically exempt from this,
 # so these directives are generally applied to non-plugin objects
-NOVERDEF	^usr/4lib/libc\.so\.
 NOVERDEF	^usr/MACH(lib)/0\@0\.so\.1$
 NOVERDEF	^usr/lib/MACH(abi)/apptrace\.so\.1$
 NOVERDEF	^usr/MACH(lib)/libfru.*\.so\.1$

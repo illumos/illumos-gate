@@ -86,7 +86,6 @@ TEXTREL		^platform/.*/MACH(kernel)/unix$
 # Directories and files that are allowed to have no direct bound symbols
 NODIRECT	^platform/.*/MACH(kernel)/unix$
 NODIRECT	^usr/ucb
-NODIRECT	^usr/4lib/sbcp$
 
 # Identify any files that should be skipped when building a crle(1)
 # configuration file.  As the hwcap libraries can be loop-back mounted onto
