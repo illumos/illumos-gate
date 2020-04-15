@@ -5495,7 +5495,8 @@ spa_import_rootpool(char *devpath, char *devid, uint64_t pool_guid,
 		if (strstr(devpath, "/iscsi/ssd") != NULL) {
 			/* iscsi boot */
 			get_iscsi_bootpath_phy(devpath);
-			config = spa_generate_rootconf(devpath, devid, &guid);
+			config = spa_generate_rootconf(devpath, devid, &guid,
+			    pool_guid);
 		}
 	}
 #endif

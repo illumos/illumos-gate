@@ -430,15 +430,10 @@ mlxcx_mac_ring_tx(void *arg, mblk_t *mp)
 		}
 	}
 
-	if (!mlxcx_buf_bind_or_copy(mlxp, sq, kmp, take, &b)) {
-		/*
-		 * Something went really wrong, and we probably will never be
-		 * able to TX again (all our buffers are broken and DMA is
-		 * failing). Drop the packet on the floor -- FMA should be
-		 * reporting this error elsewhere.
-		 */
-		freemsg(mp);
-		return (NULL);
+	b = mlxcx_buf_bind_or_copy(mlxp, sq, kmp, take);
+	if (b == NULL) {
+		atomic_or_uint(&sq->mlwq_state, MLXCX_WQ_BLOCKED_MAC);
+		return (mp);
 	}
 
 	mutex_enter(&sq->mlwq_mtx);
@@ -467,18 +462,20 @@ mlxcx_mac_ring_tx(void *arg, mblk_t *mp)
 	 */
 	if (cq->mlcq_bufcnt >= cq->mlcq_bufhwm) {
 		atomic_or_uint(&cq->mlcq_state, MLXCX_CQ_BLOCKED_MAC);
-		mutex_exit(&sq->mlwq_mtx);
-		mlxcx_buf_return_chain(mlxp, b, B_TRUE);
-		return (mp);
+		goto blocked;
+	}
+
+	if (sq->mlwq_wqebb_used >= sq->mlwq_bufhwm) {
+		atomic_or_uint(&sq->mlwq_state, MLXCX_WQ_BLOCKED_MAC);
+		goto blocked;
 	}
 
 	ok = mlxcx_sq_add_buffer(mlxp, sq, inline_hdrs, inline_hdrlen,
 	    chkflags, b);
 	if (!ok) {
 		atomic_or_uint(&cq->mlcq_state, MLXCX_CQ_BLOCKED_MAC);
-		mutex_exit(&sq->mlwq_mtx);
-		mlxcx_buf_return_chain(mlxp, b, B_TRUE);
-		return (mp);
+		atomic_or_uint(&sq->mlwq_state, MLXCX_WQ_BLOCKED_MAC);
+		goto blocked;
 	}
 
 	/*
@@ -493,6 +490,11 @@ mlxcx_mac_ring_tx(void *arg, mblk_t *mp)
 	mutex_exit(&sq->mlwq_mtx);
 
 	return (NULL);
+
+blocked:
+	mutex_exit(&sq->mlwq_mtx);
+	mlxcx_buf_return_chain(mlxp, b, B_TRUE);
+	return (mp);
 }
 
 static int
@@ -862,9 +864,8 @@ mlxcx_mac_ring_intr_disable(mac_intr_handle_t intrh)
 {
 	mlxcx_completion_queue_t *cq = (mlxcx_completion_queue_t *)intrh;
 
-	atomic_or_uint(&cq->mlcq_state, MLXCX_CQ_POLLING);
 	mutex_enter(&cq->mlcq_mtx);
-	VERIFY(cq->mlcq_state & MLXCX_CQ_POLLING);
+	atomic_or_uint(&cq->mlcq_state, MLXCX_CQ_POLLING);
 	mutex_exit(&cq->mlcq_mtx);
 
 	return (0);
@@ -1061,56 +1062,43 @@ mlxcx_mac_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	case MAC_PROP_EN_100GFDX_CAP:
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
 		mac_prop_info_set_default_uint8(prh,
-		    (port->mlp_oper_proto &
-		    (MLXCX_PROTO_100GBASE_CR4 | MLXCX_PROTO_100GBASE_SR4 |
-		    MLXCX_PROTO_100GBASE_KR4)) != 0);
+		    (port->mlp_oper_proto & MLXCX_PROTO_100G) != 0);
 		break;
 	case MAC_PROP_ADV_50GFDX_CAP:
 	case MAC_PROP_EN_50GFDX_CAP:
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
 		mac_prop_info_set_default_uint8(prh,
-		    (port->mlp_oper_proto &
-		    (MLXCX_PROTO_50GBASE_CR2 | MLXCX_PROTO_50GBASE_KR2 |
-		    MLXCX_PROTO_50GBASE_SR2)) != 0);
+		    (port->mlp_oper_proto & MLXCX_PROTO_50G) != 0);
 		break;
 	case MAC_PROP_ADV_40GFDX_CAP:
 	case MAC_PROP_EN_40GFDX_CAP:
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
 		mac_prop_info_set_default_uint8(prh,
-		    (port->mlp_oper_proto &
-		    (MLXCX_PROTO_40GBASE_SR4 | MLXCX_PROTO_40GBASE_LR4_ER4 |
-		    MLXCX_PROTO_40GBASE_CR4 | MLXCX_PROTO_40GBASE_KR4))
-		    != 0);
+		    (port->mlp_oper_proto & MLXCX_PROTO_40G) != 0);
 		break;
 	case MAC_PROP_ADV_25GFDX_CAP:
 	case MAC_PROP_EN_25GFDX_CAP:
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
 		mac_prop_info_set_default_uint8(prh,
-		    (port->mlp_oper_proto &
-		    (MLXCX_PROTO_25GBASE_CR | MLXCX_PROTO_25GBASE_KR |
-		    MLXCX_PROTO_25GBASE_SR)) != 0);
+		    (port->mlp_oper_proto & MLXCX_PROTO_25G) != 0);
 		break;
 	case MAC_PROP_ADV_10GFDX_CAP:
 	case MAC_PROP_EN_10GFDX_CAP:
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
 		mac_prop_info_set_default_uint8(prh,
-		    (port->mlp_oper_proto &
-		    (MLXCX_PROTO_10GBASE_CX4 | MLXCX_PROTO_10GBASE_KX4 |
-		    MLXCX_PROTO_10GBASE_KR | MLXCX_PROTO_10GBASE_CR |
-		    MLXCX_PROTO_10GBASE_SR | MLXCX_PROTO_10GBASE_ER_LR)) != 0);
+		    (port->mlp_oper_proto & MLXCX_PROTO_10G) != 0);
 		break;
 	case MAC_PROP_ADV_1000FDX_CAP:
 	case MAC_PROP_EN_1000FDX_CAP:
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
 		mac_prop_info_set_default_uint8(prh,
-		    (port->mlp_oper_proto & (MLXCX_PROTO_1000BASE_KX |
-		    MLXCX_PROTO_SGMII)) != 0);
+		    (port->mlp_oper_proto & MLXCX_PROTO_1G) != 0);
 		break;
 	case MAC_PROP_ADV_100FDX_CAP:
 	case MAC_PROP_EN_100FDX_CAP:
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
 		mac_prop_info_set_default_uint8(prh,
-		    (port->mlp_oper_proto & MLXCX_PROTO_SGMII_100BASE) != 0);
+		    (port->mlp_oper_proto & MLXCX_PROTO_100M) != 0);
 		break;
 	default:
 		break;
@@ -1252,8 +1240,7 @@ mlxcx_mac_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 		}
 		*(uint8_t *)pr_val = (port->mlp_max_proto &
-		    (MLXCX_PROTO_100GBASE_CR4 | MLXCX_PROTO_100GBASE_SR4 |
-		    MLXCX_PROTO_100GBASE_KR4)) != 0;
+		    MLXCX_PROTO_100G) != 0;
 		break;
 	case MAC_PROP_ADV_50GFDX_CAP:
 	case MAC_PROP_EN_50GFDX_CAP:
@@ -1262,8 +1249,7 @@ mlxcx_mac_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 		}
 		*(uint8_t *)pr_val = (port->mlp_max_proto &
-		    (MLXCX_PROTO_50GBASE_CR2 | MLXCX_PROTO_50GBASE_KR2 |
-		    MLXCX_PROTO_50GBASE_SR2)) != 0;
+		    MLXCX_PROTO_50G) != 0;
 		break;
 	case MAC_PROP_ADV_40GFDX_CAP:
 	case MAC_PROP_EN_40GFDX_CAP:
@@ -1272,8 +1258,7 @@ mlxcx_mac_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 		}
 		*(uint8_t *)pr_val = (port->mlp_max_proto &
-		    (MLXCX_PROTO_40GBASE_SR4 | MLXCX_PROTO_40GBASE_LR4_ER4 |
-		    MLXCX_PROTO_40GBASE_CR4 | MLXCX_PROTO_40GBASE_KR4)) != 0;
+		    MLXCX_PROTO_40G) != 0;
 		break;
 	case MAC_PROP_ADV_25GFDX_CAP:
 	case MAC_PROP_EN_25GFDX_CAP:
@@ -1282,8 +1267,7 @@ mlxcx_mac_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 		}
 		*(uint8_t *)pr_val = (port->mlp_max_proto &
-		    (MLXCX_PROTO_25GBASE_CR | MLXCX_PROTO_25GBASE_KR |
-		    MLXCX_PROTO_25GBASE_SR)) != 0;
+		    MLXCX_PROTO_25G) != 0;
 		break;
 	case MAC_PROP_ADV_10GFDX_CAP:
 	case MAC_PROP_EN_10GFDX_CAP:
@@ -1292,9 +1276,7 @@ mlxcx_mac_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 		}
 		*(uint8_t *)pr_val = (port->mlp_max_proto &
-		    (MLXCX_PROTO_10GBASE_CX4 | MLXCX_PROTO_10GBASE_KX4 |
-		    MLXCX_PROTO_10GBASE_KR | MLXCX_PROTO_10GBASE_CR |
-		    MLXCX_PROTO_10GBASE_SR | MLXCX_PROTO_10GBASE_ER_LR)) != 0;
+		    MLXCX_PROTO_10G) != 0;
 		break;
 	case MAC_PROP_ADV_1000FDX_CAP:
 	case MAC_PROP_EN_1000FDX_CAP:
@@ -1303,7 +1285,7 @@ mlxcx_mac_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 		}
 		*(uint8_t *)pr_val = (port->mlp_max_proto &
-		    (MLXCX_PROTO_1000BASE_KX | MLXCX_PROTO_SGMII)) != 0;
+		    MLXCX_PROTO_1G) != 0;
 		break;
 	case MAC_PROP_ADV_100FDX_CAP:
 	case MAC_PROP_EN_100FDX_CAP:
@@ -1312,7 +1294,7 @@ mlxcx_mac_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 			break;
 		}
 		*(uint8_t *)pr_val = (port->mlp_max_proto &
-		    MLXCX_PROTO_SGMII_100BASE) != 0;
+		    MLXCX_PROTO_100M) != 0;
 		break;
 	default:
 		ret = ENOTSUP;

@@ -12,6 +12,7 @@
 /*
  * Copyright 2020, The University of Queensland
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -32,6 +33,7 @@
 #include <sys/ddifm.h>
 #include <sys/id_space.h>
 #include <sys/list.h>
+#include <sys/taskq_impl.h>
 #include <sys/stddef.h>
 #include <sys/stream.h>
 #include <sys/strsun.h>
@@ -89,17 +91,35 @@ extern "C" {
  * Queues will be sized to (1 << *Q_SIZE_SHIFT) entries long.
  */
 #define	MLXCX_EQ_SIZE_SHIFT_DFLT	9
+
+/*
+ * The CQ, SQ and RQ sizes can effect throughput on higher speed interfaces.
+ * EQ less so, as it only takes a single EQ entry to indicate there are
+ * multiple completions on the CQ.
+ *
+ * Particularly on the Rx side, the RQ (and corresponding CQ) would run
+ * low on available entries. A symptom of this is the refill taskq running
+ * frequently. A larger RQ (and CQ) alleviates this, and as there is a
+ * close relationship between SQ and CQ size, the SQ is increased too.
+ */
 #define	MLXCX_CQ_SIZE_SHIFT_DFLT	10
+#define	MLXCX_CQ_SIZE_SHIFT_25G		12
 
 /*
  * Default to making SQs bigger than RQs for 9k MTU, since most packets will
  * spill over into more than one slot. RQ WQEs are always 1 slot.
  */
 #define	MLXCX_SQ_SIZE_SHIFT_DFLT	11
+#define	MLXCX_SQ_SIZE_SHIFT_25G		13
+
 #define	MLXCX_RQ_SIZE_SHIFT_DFLT	10
+#define	MLXCX_RQ_SIZE_SHIFT_25G		12
 
 #define	MLXCX_CQ_HWM_GAP		16
 #define	MLXCX_CQ_LWM_GAP		24
+
+#define	MLXCX_WQ_HWM_GAP		MLXCX_CQ_HWM_GAP
+#define	MLXCX_WQ_LWM_GAP		MLXCX_CQ_LWM_GAP
 
 #define	MLXCX_RQ_REFILL_STEP		64
 
@@ -134,6 +154,14 @@ extern "C" {
 #define	MLXCX_WQ_CHECK_INTERVAL_SEC_DFLT		300
 #define	MLXCX_CQ_CHECK_INTERVAL_SEC_DFLT		300
 #define	MLXCX_EQ_CHECK_INTERVAL_SEC_DFLT		30
+
+/*
+ * After this many packets, the packets received so far are passed to
+ * the mac layer.
+ */
+#define	MLXCX_RX_PER_CQ_DEFAULT			256
+#define	MLXCX_RX_PER_CQ_MIN			16
+#define	MLXCX_RX_PER_CQ_MAX			4096
 
 #define	MLXCX_DOORBELL_TRIES_DFLT		3
 extern uint_t mlxcx_doorbell_tries;
@@ -417,6 +445,11 @@ typedef struct mlxcx_buffer {
 	size_t			mlb_used;
 	mblk_t			*mlb_tx_mp;
 
+	/*
+	 * The number of work queue basic blocks this buf uses.
+	 */
+	uint_t			mlb_wqebbs;
+
 	mlxcx_t			*mlb_mlx;
 	mlxcx_buffer_state_t	mlb_state;
 	uint_t			mlb_wqe_index;
@@ -495,6 +528,8 @@ typedef enum {
 	MLXCX_WQ_DESTROYED	= 1 << 3,
 	MLXCX_WQ_TEARDOWN	= 1 << 4,
 	MLXCX_WQ_BUFFERS	= 1 << 5,
+	MLXCX_WQ_REFILLING	= 1 << 6,
+	MLXCX_WQ_BLOCKED_MAC	= 1 << 7
 } mlxcx_workq_state_t;
 
 typedef enum {
@@ -540,11 +575,17 @@ struct mlxcx_work_queue {
 	};
 	uint64_t			mlwq_pc;	/* producer counter */
 
+	uint64_t			mlwq_wqebb_used;
+	size_t				mlwq_bufhwm;
+	size_t				mlwq_buflwm;
+
 	mlxcx_dma_buffer_t		mlwq_doorbell_dma;
 	mlxcx_workq_doorbell_t		*mlwq_doorbell;
 
 	mlxcx_buf_shard_t		*mlwq_bufs;
 	mlxcx_buf_shard_t		*mlwq_foreign_bufs;
+
+	taskq_ent_t			mlwq_tqe;
 
 	boolean_t			mlwq_fm_repd_qstate;
 };
@@ -773,6 +814,8 @@ struct mlxcx_ring_group {
 	mlxcx_flow_group_t		*mlg_rx_vlan_promisc_fg;
 	list_t				mlg_rx_vlans;
 
+	taskq_t				*mlg_refill_tq;
+
 	/*
 	 * Flow table for separating out by protocol before hashing
 	 */
@@ -856,8 +899,11 @@ typedef struct {
 typedef struct {
 	uint_t			mldp_eq_size_shift;
 	uint_t			mldp_cq_size_shift;
+	uint_t			mldp_cq_size_shift_default;
 	uint_t			mldp_rq_size_shift;
+	uint_t			mldp_rq_size_shift_default;
 	uint_t			mldp_sq_size_shift;
+	uint_t			mldp_sq_size_shift_default;
 	uint_t			mldp_cqemod_period_usec;
 	uint_t			mldp_cqemod_count;
 	uint_t			mldp_intrmod_period_usec;
@@ -865,6 +911,7 @@ typedef struct {
 	uint_t			mldp_rx_ngroups_small;
 	uint_t			mldp_rx_nrings_per_large_group;
 	uint_t			mldp_rx_nrings_per_small_group;
+	uint_t			mldp_rx_per_cq;
 	uint_t			mldp_tx_ngroups;
 	uint_t			mldp_tx_nrings_per_group;
 	uint_t			mldp_ftbl_root_size_shift;
@@ -1098,6 +1145,7 @@ extern boolean_t mlxcx_intr_setup(mlxcx_t *);
 extern void mlxcx_intr_teardown(mlxcx_t *);
 extern void mlxcx_arm_eq(mlxcx_t *, mlxcx_event_queue_t *);
 extern void mlxcx_arm_cq(mlxcx_t *, mlxcx_completion_queue_t *);
+extern void mlxcx_update_cqci(mlxcx_t *, mlxcx_completion_queue_t *);
 
 extern mblk_t *mlxcx_rx_poll(mlxcx_t *, mlxcx_completion_queue_t *, size_t);
 
@@ -1109,8 +1157,6 @@ extern boolean_t mlxcx_register_mac(mlxcx_t *);
 /*
  * From mlxcx_ring.c
  */
-extern boolean_t mlxcx_cq_alloc_dma(mlxcx_t *, mlxcx_completion_queue_t *);
-extern void mlxcx_cq_rele_dma(mlxcx_t *, mlxcx_completion_queue_t *);
 extern boolean_t mlxcx_wq_alloc_dma(mlxcx_t *, mlxcx_work_queue_t *);
 extern void mlxcx_wq_rele_dma(mlxcx_t *, mlxcx_work_queue_t *);
 
@@ -1118,7 +1164,7 @@ extern boolean_t mlxcx_buf_create(mlxcx_t *, mlxcx_buf_shard_t *,
     mlxcx_buffer_t **);
 extern boolean_t mlxcx_buf_create_foreign(mlxcx_t *, mlxcx_buf_shard_t *,
     mlxcx_buffer_t **);
-extern void mlxcx_buf_take(mlxcx_t *, mlxcx_work_queue_t *, mlxcx_buffer_t **);
+extern mlxcx_buffer_t *mlxcx_buf_take(mlxcx_t *, mlxcx_work_queue_t *);
 extern size_t mlxcx_buf_take_n(mlxcx_t *, mlxcx_work_queue_t *,
     mlxcx_buffer_t **, size_t);
 extern boolean_t mlxcx_buf_loan(mlxcx_t *, mlxcx_buffer_t *);
@@ -1126,8 +1172,8 @@ extern void mlxcx_buf_return(mlxcx_t *, mlxcx_buffer_t *);
 extern void mlxcx_buf_return_chain(mlxcx_t *, mlxcx_buffer_t *, boolean_t);
 extern void mlxcx_buf_destroy(mlxcx_t *, mlxcx_buffer_t *);
 
-extern boolean_t mlxcx_buf_bind_or_copy(mlxcx_t *, mlxcx_work_queue_t *,
-    mblk_t *, size_t, mlxcx_buffer_t **);
+extern mlxcx_buffer_t *mlxcx_buf_bind_or_copy(mlxcx_t *, mlxcx_work_queue_t *,
+    mblk_t *, size_t);
 
 extern boolean_t mlxcx_rx_group_setup(mlxcx_t *, mlxcx_ring_group_t *);
 extern boolean_t mlxcx_tx_group_setup(mlxcx_t *, mlxcx_ring_group_t *);
