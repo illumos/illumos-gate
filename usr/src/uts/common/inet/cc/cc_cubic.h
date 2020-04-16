@@ -4,6 +4,7 @@
  * All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 RackTop Systems, Inc.
  *
  * This software was developed by Lawrence Stewart while studying at the Centre
  * for Advanced Internet Architectures, Swinburne University of Technology, made
@@ -69,6 +70,12 @@
 
 /* Don't trust s_rtt until this many rtt samples have been taken. */
 #define	CUBIC_MIN_RTT_SAMPLES	8
+
+/*
+ * (2^21)^3 is long max. Dividing (2^63) by Cubic_C_factor
+ * and taking cube-root yields 448845 as the effective useful limit
+ */
+#define	CUBED_ROOT_MAX_ULONG	448845
 
 /* Userland only bits. */
 #ifndef _KERNEL
@@ -188,6 +195,11 @@ cubic_cwnd(hrtime_t nsecs_since_cong, uint32_t wmax, uint32_t smss, int64_t K)
 	 */
 	cwnd = (t - K * MILLISEC) / MILLISEC;
 
+	if (cwnd > CUBED_ROOT_MAX_ULONG)
+		return (INT_MAX);
+	if (cwnd < -CUBED_ROOT_MAX_ULONG)
+		return (0);
+
 	/* cwnd = (t - K)^3, with CUBIC_SHIFT^3 worth of precision. */
 	cwnd *= (cwnd * cwnd);
 
@@ -199,7 +211,10 @@ cubic_cwnd(hrtime_t nsecs_since_cong, uint32_t wmax, uint32_t smss, int64_t K)
 	 */
 	cwnd = ((cwnd * CUBIC_C_FACTOR * smss) >> CUBIC_SHIFT_4) + wmax;
 
-	return ((uint32_t)cwnd);
+	/*
+	 * for negative cwnd, limiting to zero as lower bound
+	 */
+	return (max(0, cwnd));
 }
 
 /*

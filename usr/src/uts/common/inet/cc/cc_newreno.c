@@ -7,6 +7,7 @@
  * Copyright (c) 2010 The FreeBSD Foundation
  * All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright 2020 RackTop Systems, Inc.
  *
  * This software was developed at the Centre for Advanced Internet
  * Architectures, Swinburne University of Technology, by Lawrence Stewart, James
@@ -256,12 +257,25 @@ newreno_cong_signal(struct cc_var *ccv, uint32_t type)
 static void
 newreno_post_recovery(struct cc_var *ccv)
 {
+	uint32_t pipe;
+
 	if (IN_FASTRECOVERY(ccv->flags)) {
 		/*
 		 * Fast recovery will conclude after returning from this
-		 * function.
+		 * function. Window inflation should have left us with
+		 * approximately cwnd_ssthresh outstanding data. But in case we
+		 * would be inclined to send a burst, better to do it via the
+		 * slow start mechanism.
 		 */
-		if (CCV(ccv, tcp_cwnd) > CCV(ccv, tcp_cwnd_ssthresh)) {
+		pipe = CCV(ccv, tcp_snxt) - CCV(ccv, tcp_suna);
+		if (pipe < CCV(ccv, tcp_cwnd_ssthresh)) {
+			/*
+			 * Ensure that cwnd does not collapse to 1 MSS under
+			 * adverse conditions. Implements RFC6582
+			 */
+			CCV(ccv, tcp_cwnd) = MAX(pipe, CCV(ccv, tcp_mss)) +
+			    CCV(ccv, tcp_mss);
+		} else if (CCV(ccv, tcp_cwnd) > CCV(ccv, tcp_cwnd_ssthresh)) {
 			CCV(ccv, tcp_cwnd) = CCV(ccv, tcp_cwnd_ssthresh);
 		}
 	}
