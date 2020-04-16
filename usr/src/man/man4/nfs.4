@@ -18,8 +18,9 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2016 Nexenta Systems, Inc.
+.\" Copyright 2020 Joyent, Inc.
 .\"
-.Dd December 18, 2016
+.Dd February 4, 2020
 .Dt NFS 4
 .Os
 .Sh NAME
@@ -296,6 +297,16 @@ However, this is not functionally different from mapping the inbound string to
 .Sy nobody ,
 yet provides greater flexibility.
 .El
+.Sh ZONES
+NFS can be served out of a non-global zone.
+All of the above documentation applies to an in-zone NFS server.
+File sharing in zones is restricted to filesystems a zone completely controls.
+Some zone brands (see
+.Xr brands 5 )
+do not give the zone's root its own filesystem, for example.
+Delegated ZFS datasets to a zone are shareable, as well as lofs-remounted
+directories.
+The zone must have sys_nfs privileges; most brands grant this already.
 .Sh SEE ALSO
 .Xr lockd 1M ,
 .Xr mount_nfs 1M ,
@@ -303,4 +314,6 @@ yet provides greater flexibility.
 .Xr nfsd 1M ,
 .Xr nfsmapid 1M ,
 .Xr sharectl 1M ,
-.Xr smf 5
+.Xr brands 5 ,
+.Xr smf 5 ,
+.Xr zones 5

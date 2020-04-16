@@ -26,7 +26,7 @@
 /*
  * This file is mostly a result of compiling the mont_mulf.c file to generate an
  * assembly output and then hand-editing that output to replace the
- * compiler-generated loop for the 512-bit case (nlen == 16) in the 
+ * compiler-generated loop for the 512-bit case (nlen == 16) in the
  * mont_mulf_noconv routine with a hand-crafted version. This file also
  * has big_savefp() and big_restorefp() routines added by hand.
  */
@@ -41,45 +41,8 @@
 #include <sys/machtrap.h>
 #include <sys/machsig.h>
 
-#if defined(lint) || defined(__lint)
-#include <sys/types.h>
-
-/* ARGSUSED */
-uint64_t
-double2uint64_t(double* d)
-{
-	return (0ULL);
-}
-
-/* ARGSUSED */
-void
-conv_d16_to_i32(uint32_t *i32, double *d16, int64_t *tmp, int ilen)
-{
-}
-
-/* ARGSUSED */
-void
-conv_i32_to_d32(double *d32, uint32_t *i32, int len)
-{
-}
-
-/* ARGSUSED */
-void
-conv_i32_to_d16(double *d16, uint32_t *i32, int len)
-{
-}
-
-/* ARGSUSED */
-void
-mont_mulf_noconv(uint32_t *result, double *dm1, double *dm2, double *dt,
-    double *dn, uint32_t *nint, int nlen, double dn0)
-{
-}
-
-#else	/* lint || __lint */
-
 	.section	".text",#alloc,#execinstr
-	.file	"mont_mulf.c"
+	.file	"mont_mulf.s"
 
 	.section	".bss",#alloc,#write
 Bbss.bss:
@@ -257,7 +220,7 @@ TwoToMinus32:
 /* 0x0084	     */		ble,a,pt	%icc,.L900000110
 /* 0x0088	  64 */		ldd	[%g1],%f10
                        .L77000188:
-/* 0x008c	  69 */		retl	! Result = 
+/* 0x008c	  69 */		retl	! Result =
 /* 0x0090	     */		nop
 /* 0x0094	   0 */		.type	cleanup,2
 /* 0x0094	   0 */		.size	cleanup,(.-cleanup)
@@ -286,7 +249,7 @@ TwoToMinus32:
 !
 ! OFFSET    SOURCE LINE	LABEL	INSTRUCTION
 
-                       	.global double2uint64_t
+			.global double2uint64_t
                        double2uint64_t:
 /* 000000	  86 */		ldx	[%o0],%o2
 
@@ -350,7 +313,7 @@ TwoToMinus32:
 !
 ! OFFSET    SOURCE LINE	LABEL	INSTRUCTION
 
-                       	.global conv_d16_to_i32
+			.global conv_d16_to_i32
                        conv_d16_to_i32:
 /* 000000	 110 */		save	%sp,-176,%sp
 
@@ -522,7 +485,7 @@ TwoToMinus32:
 /* 0x01b8	     */		sllx	%l5,16,%l6
 /* 0x01bc	     */		add	%l2,%l6,%l7
 /* 0x01c0	     */		st	%l7,[%i0+%i2]
-/* 0x01c4	 129 */		ret	! Result = 
+/* 0x01c4	 129 */		ret	! Result =
 /* 0x01c8	     */		restore	%g0,%g0,%g0
 /* 0x01cc	   0 */		.type	conv_d16_to_i32,2
 /* 0x01cc	   0 */		.size	conv_d16_to_i32,(.-conv_d16_to_i32)
@@ -551,7 +514,7 @@ TwoToMinus32:
 !
 ! OFFSET    SOURCE LINE	LABEL	INSTRUCTION
 
-                       	.global conv_i32_to_d32
+			.global conv_i32_to_d32
                        conv_i32_to_d32:
 /* 000000	 140 */		orcc	%g0,%o2,%o2
 
@@ -657,7 +620,7 @@ TwoToMinus32:
 /* 0x015c	     */		ble,a,pt	%icc,.L900000409
 /* 0x0160	     */		ld	[%o1],%f15
                        .L77000254:
-/* 0x0164	 145 */		retl	! Result = 
+/* 0x0164	 145 */		retl	! Result =
 /* 0x0168	     */		nop
 /* 0x016c	   0 */		.type	conv_i32_to_d32,2
 /* 0x016c	   0 */		.size	conv_i32_to_d32,(.-conv_i32_to_d32)
@@ -686,7 +649,7 @@ TwoToMinus32:
 !
 ! OFFSET    SOURCE LINE	LABEL	INSTRUCTION
 
-                       	.global conv_i32_to_d16
+			.global conv_i32_to_d16
                        conv_i32_to_d16:
 /* 000000	 151 */		save	%sp,-368,%sp
 /* 0x0004	     */		orcc	%g0,%i2,%i2
@@ -828,7 +791,7 @@ TwoToMinus32:
 /* 0x01d0	     */		ble,a,pt	%icc,.L900000510
 /* 0x01d4	 157 */		ld	[%l7],%l2
                        .L77000272:
-/* 0x01d8	 159 */		ret	! Result = 
+/* 0x01d8	 159 */		ret	! Result =
 /* 0x01dc	     */		restore	%g0,%g0,%g0
 /* 0x01e0	   0 */		.type	conv_i32_to_d16,2
 /* 0x01e0	   0 */		.size	conv_i32_to_d16,(.-conv_i32_to_d16)
@@ -899,7 +862,7 @@ TwoToMinus32:
 !
 ! OFFSET    SOURCE LINE	LABEL	INSTRUCTION
 
-                       	.global conv_i32_to_d32_and_d16
+			.global conv_i32_to_d32_and_d16
                        conv_i32_to_d32_and_d16:
 /* 000000	 214 */		save	%sp,-368,%sp
 
@@ -1160,7 +1123,7 @@ TwoToMinus32:
 /* 0x03a0	     */		bl,a,pt	%icc,.L900000614
 /* 0x03a4	 225 */		ld	[%i2],%o2
                        .L77000294:
-/* 0x03a8	 222 */		ret	! Result = 
+/* 0x03a8	 222 */		ret	! Result =
 /* 0x03ac	     */		restore	%g0,%g0,%g0
 /* 0x03b0	   0 */		.type	conv_i32_to_d32_and_d16,2
 /* 0x03b0	   0 */		.size	conv_i32_to_d32_and_d16,(.-conv_i32_to_d32_and_d16)
@@ -1362,7 +1325,7 @@ TwoToMinus32:
 /* 0x0218	     */		ble,a,pt	%icc,.L900000711
 /* 0x021c	 250 */		ld	[%o4],%g5
                        .L77000332:
-/* 0x0220	 252 */		retl	! Result = 
+/* 0x0220	 252 */		retl	! Result =
 /* 0x0224	     */		nop
 /* 0x0228	   0 */		.type	adjust_montf_result,2
 /* 0x0228	   0 */		.size	adjust_montf_result,(.-adjust_montf_result)
@@ -1380,7 +1343,7 @@ TwoToMinus32:
 !  261		      !	int64_t acc;
 !  262		      !	int i;
 !  264		      !	c4++;
-!  265		      !	
+!  265		      !
 !  266		      !	if (i32[len] > 0) {
 !  267		      !		i = -1;
 !  268		      !		c1++;
@@ -1436,7 +1399,7 @@ TwoToMinus32:
 !
 ! OFFSET    SOURCE LINE	LABEL	INSTRUCTION
 
-                       	.global mont_mulf_noconv
+			.global mont_mulf_noconv
                        mont_mulf_noconv:
 /* 000000	 317 */		save	%sp,-176,%sp
 /* 0x0004	     */		ldx	[%fp+2223],%g1
@@ -1598,7 +1561,7 @@ TwoToMinus32:
 /* 0x0184	     */		std	%f0,[%i3+512]
 /* 0x0188	     */		std	%f0,[%i3+520]
 
-!BEGIN HAND CODED PART	
+!BEGIN HAND CODED PART
 
 ! cheetah schedule, no even-odd trick
 
@@ -1624,7 +1587,7 @@ TwoToMinus32:
 	ldd	[%i1+112],%f58
 
 	ldd	[%i4],%f44
-	ldd	[%i4+8],%f46	
+	ldd	[%i4+8],%f46
 	ldd	[%i4+104],%f50
 	ldd	[%i4+112],%f60
 
@@ -1667,7 +1630,7 @@ TwoToMinus32:
 !11
 	ldd	[%i3+8],%f6
 	faddd	%f16,%f18,%f16
-	fmuld	%f30,%f0,%f30	
+	fmuld	%f30,%f0,%f30
 !12
 	std	%f16,[%i3+16]
 	faddd	%f24,%f26,%f24
@@ -2289,7 +2252,7 @@ TwoToMinus32:
 !11
 	ldd	[%i3+8],%f6
 	faddd	%f16,%f18,%f16
-	fmuld	%f30,%f0,%f30	
+	fmuld	%f30,%f0,%f30
 !12
 	std	%f16,[%i3+16]
 	faddd	%f24,%f26,%f24
@@ -3041,7 +3004,7 @@ TwoToMinus32:
 /* 0x0c30	     */		ble,a,pt	%icc,.L900000841
 /* 0x0c34	     */		ld	[%i2],%o4
                        .L77000379:
-/* 0x0c38	 405 */		ret	! Result = 
+/* 0x0c38	 405 */		ret	! Result =
 /* 0x0c3c	     */		restore	%g0,%g0,%g0
 /* 0x0c40	   0 */		.type	mont_mulf_noconv,2
 /* 0x0c40	   0 */		.size	mont_mulf_noconv,(.-mont_mulf_noconv)
@@ -3151,5 +3114,3 @@ TwoToMinus32:
 	retl
 	nop
 	SET_SIZE(big_restorefp)
-
-#endif	/* lint || __lint */

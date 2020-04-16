@@ -363,7 +363,7 @@ opromioctl_cb(void *avp, int has_changed)
 	char *valbuf;
 	int error = 0;
 	uint_t userbufsize;
-	pnode_t node_id;
+	pnode_t node_id = OBP_NONODE;
 	char propname[OBP_MAXPROPNAME];
 
 	st = argp->st;
