@@ -23,6 +23,8 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -58,6 +60,7 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <time.h>
+#include <err.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <utmpx.h>
@@ -69,6 +72,7 @@
 #include <sys/loadavg.h>
 #include <limits.h>
 #include <priv_utils.h>
+#include <sys/sysmacros.h>
 
 /*
  * Use the full lengths from utmpx for user and line.
@@ -130,6 +134,10 @@ static void	calctotals(struct uproc *);
 static void	prttime(time_t, int);
 static void	prtat(time_t *time);
 
+static int	priv_proc_open(const char *, int);
+static int	priv_proc_openat(int, const char *, int);
+static boolean_t do_proc_read(int, void *, size_t);
+
 static char	*prog;		/* pointer to invocation name */
 static int	header = 1;	/* true if -h flag: don't print heading */
 static int	lflag = 1;	/* set if -l flag; 0 for -s flag: short form */
@@ -145,6 +153,18 @@ static char	doing[520];	/* process attached to terminal */
 static time_t	proctime;	/* cpu time of process in doing */
 static pid_t	curpid, empty;
 static int	add_times;	/* boolean: add the cpu times or not */
+
+/*
+ * Basic privs we never need and can drop. This is likely not exhaustive,
+ * but should significantly reduce any potential attack surfaces.
+ */
+static const char *drop_privs[] = {
+	PRIV_FILE_WRITE,
+	PRIV_NET_ACCESS,
+	PRIV_PROC_EXEC,
+	PRIV_PROC_FORK,
+	PRIV_FILE_LINK_ANY
+};
 
 #if SIGQUIT > SIGINT
 #define	ACTSIZE	SIGQUIT
@@ -163,24 +183,64 @@ main(int argc, char *argv[])
 	struct psinfo	info;
 	struct sigaction actinfo[ACTSIZE];
 	struct pstatus	statinfo;
-	size_t		size;
 	struct stat	sbuf;
 	DIR		*dirp;
 	struct	dirent	*dp;
-	char		pname[64];
-	char		*fname;
+	char		pname[PATH_MAX];
 	int		procfd;
+	int		dirfd;
 	char		*cp;
 	int		i;
 	int		days, hrs, mins;
 	int		entries;
 	double		loadavg[3];
+	priv_set_t	*pset;
+
+	if (__init_suid_priv(PU_CLEARLIMITSET, PRIV_PROC_OWNER, NULL) != 0) {
+		err(EXIT_FAILURE, "failed to enable privilege bracketing");
+	}
 
 	/*
-	 * This program needs the proc_owner privilege
+	 * After setting up privilege bracketing, we can further reduce the
+	 * privileges in use. The effective set is set to the basic set minus
+	 * the privs in drop_privs. The permitted set is the effective set
+	 * plus PRIV_PROC_OWNER (i.e. the privilege being bracketed).
 	 */
-	(void) __init_suid_priv(PU_CLEARLIMITSET, PRIV_PROC_OWNER,
-	    (char *)NULL);
+	pset = priv_allocset();
+	if (pset == NULL)
+		err(EXIT_FAILURE, "priv_allocset failed");
+
+	priv_basicset(pset);
+	for (i = 0; i < ARRAY_SIZE(drop_privs); i++) {
+		if (priv_delset(pset, drop_privs[i]) != 0) {
+			err(EXIT_FAILURE,
+			    "failed to remove %s privilege from privilege set",
+			    drop_privs[i]);
+		}
+	}
+
+	if (setppriv(PRIV_SET, PRIV_EFFECTIVE, pset) < 0)
+		err(EXIT_FAILURE, "failed setting effective privilege set");
+
+	if (priv_addset(pset, PRIV_PROC_OWNER) != 0) {
+		err(EXIT_FAILURE,
+		    "failed to add PRIV_PROC_OWNER privilege to privilege set");
+	}
+
+	if (setppriv(PRIV_SET, PRIV_PERMITTED, pset) < 0)
+		err(EXIT_FAILURE, "failed to set permitted privilege set");
+
+	/*
+	 * Unfortunately, when run as root, privilege bracketing is a no-op,
+	 * so we have to add PRIV_PROC_OWNER into our effective set for things
+	 * to work.
+	 */
+	if (getuid() == 0 && setppriv(PRIV_SET, PRIV_EFFECTIVE, pset) < 0) {
+		err(EXIT_FAILURE, "failed to set effective privilege set");
+	}
+
+	priv_freeset(pset);
+	pset = NULL;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)
@@ -235,23 +295,17 @@ main(int argc, char *argv[])
 	/*
 	 * read the UTMPX_FILE (contains information about each logged in user)
 	 */
-	if (stat(UTMPX_FILE, &sbuf) == ERR) {
-		(void) fprintf(stderr, gettext("%s: stat error of %s: %s\n"),
-		    prog, UTMPX_FILE, strerror(errno));
-		exit(1);
-	}
+	if (stat(UTMPX_FILE, &sbuf) < 0)
+		err(EXIT_FAILURE, gettext("stat error of %s"), UTMPX_FILE);
+
 	entries = sbuf.st_size / sizeof (struct futmpx);
-	size = sizeof (struct utmpx) * entries;
-	if ((ut = malloc(size)) == NULL) {
-		(void) fprintf(stderr, gettext("%s: malloc error of %s: %s\n"),
-		    prog, UTMPX_FILE, strerror(errno));
-		exit(1);
-	}
+	if ((ut = calloc(entries, sizeof (struct utmpx))) == NULL)
+		err(EXIT_FAILURE, gettext("calloc error of %s"), UTMPX_FILE);
 
 	(void) utmpxname(UTMPX_FILE);
 
 	utmpbegin = ut;
-	utmpend = (struct utmpx *)((char *)utmpbegin + size);
+	utmpend = utmpbegin + entries;
 
 	setutxent();
 	while ((ut < utmpend) && ((utp = getutxent()) != NULL))
@@ -317,8 +371,7 @@ main(int argc, char *argv[])
 		}
 
 		if (fflush(stdout) == EOF) {
-			perror((gettext("%s: fflush failed\n"), prog));
-			exit(1);
+			err(EXIT_FAILURE, "fflush failed");
 		}
 	}
 
@@ -326,68 +379,63 @@ main(int argc, char *argv[])
 	 * loop through /proc, reading info about each process
 	 * and build the parent/child tree
 	 */
-	if (!(dirp = opendir(PROCDIR))) {
-		(void) fprintf(stderr, gettext("%s: could not open %s: %s\n"),
-		    prog, PROCDIR, strerror(errno));
-		exit(1);
-	}
+	if ((dirp = opendir(PROCDIR)) == NULL)
+		err(EXIT_FAILURE, gettext("could not open %s"), PROCDIR);
 
 	while ((dp = readdir(dirp)) != NULL) {
 		if (dp->d_name[0] == '.')
 			continue;
-retry:
-		(void) sprintf(pname, "%s/%s/", PROCDIR, dp->d_name);
-		fname = pname + strlen(pname);
-		(void) strcpy(fname, "psinfo");
-		if ((procfd = open(pname, O_RDONLY)) < 0)
+
+		if (snprintf(pname, sizeof (pname), "%s/%s", PROCDIR,
+		    dp->d_name) > sizeof (pname))
 			continue;
-		if (read(procfd, &info, sizeof (info)) != sizeof (info)) {
-			int err = errno;
-			(void) close(procfd);
-			if (err == EAGAIN)
-				goto retry;
-			if (err != ENOENT)
-				(void) fprintf(stderr, gettext(
-				    "%s: read() failed on %s: %s \n"),
-				    prog, pname, strerror(err));
+
+		dirfd = priv_proc_open(pname, O_RDONLY | O_DIRECTORY);
+
+		if (dirfd < 0) {
+			if (errno == ENOENT)
+				continue;
+			warn(gettext("failed to open %s"), pname);
+			continue;
+		}
+
+		procfd = priv_proc_openat(dirfd, "psinfo", O_RDONLY);
+		if (procfd < 0) {
+			(void) close(dirfd);
+			continue;
+		}
+
+		if (!do_proc_read(procfd, &info, sizeof (info))) {
+			warn(gettext("read() failed on %s"), pname);
+			(void) close(dirfd);
 			continue;
 		}
 		(void) close(procfd);
 
 		up = findhash(info.pr_pid);
 		up->p_ttyd = info.pr_ttydev;
-		up->p_state = (info.pr_nlwp == 0? ZOMBIE : RUNNING);
+		up->p_state = (info.pr_nlwp == 0 ? ZOMBIE : RUNNING);
 		up->p_time = 0;
 		up->p_ctime = 0;
 		up->p_igintr = 0;
-		(void) strncpy(up->p_comm, info.pr_fname,
-		    sizeof (info.pr_fname));
+		(void) strlcpy(up->p_comm, info.pr_fname,
+		    sizeof (up->p_comm));
 		up->p_args[0] = 0;
 
 		if (up->p_state != NONE && up->p_state != ZOMBIE) {
-			(void) strcpy(fname, "status");
-
-			/* now we need the proc_owner privilege */
-			(void) __priv_bracket(PRIV_ON);
-
-			procfd = open(pname, O_RDONLY);
-
-			/* drop proc_owner privilege after open */
-			(void) __priv_bracket(PRIV_OFF);
-
-			if (procfd < 0)
+			procfd = priv_proc_openat(dirfd, "status", O_RDONLY);
+			if (procfd < 0) {
+				(void) close(dirfd);
 				continue;
+			}
 
-			if (read(procfd, &statinfo, sizeof (statinfo))
-			    != sizeof (statinfo)) {
-				int err = errno;
+			if (!do_proc_read(procfd, &statinfo,
+			    sizeof (statinfo))) {
+				warn(gettext("read() failed on %s/status"),
+				    pname);
+
 				(void) close(procfd);
-				if (err == EAGAIN)
-					goto retry;
-				if (err != ENOENT)
-					(void) fprintf(stderr, gettext(
-					    "%s: read() failed on %s: %s \n"),
-					    prog, pname, strerror(err));
+				(void) close(dirfd);
 				continue;
 			}
 			(void) close(procfd);
@@ -397,33 +445,22 @@ retry:
 			up->p_ctime = statinfo.pr_cutime.tv_sec +
 			    statinfo.pr_cstime.tv_sec;
 
-			(void) strcpy(fname, "sigact");
-
-			/* now we need the proc_owner privilege */
-			(void) __priv_bracket(PRIV_ON);
-
-			procfd = open(pname, O_RDONLY);
-
-			/* drop proc_owner privilege after open */
-			(void) __priv_bracket(PRIV_OFF);
-
-			if (procfd < 0)
+			procfd = priv_proc_openat(dirfd, "sigact", O_RDONLY);
+			if (procfd < 0) {
+				(void) close(dirfd);
 				continue;
+			}
 
-			if (read(procfd, actinfo, sizeof (actinfo))
-			    != sizeof (actinfo)) {
-				int err = errno;
+			if (!do_proc_read(procfd, actinfo, sizeof (actinfo))) {
+				warn(gettext("read() failed on %s/sigact"),
+				    pname);
+
 				(void) close(procfd);
-				if (err == EAGAIN)
-					goto retry;
-				if (err != ENOENT)
-					(void) fprintf(stderr, gettext(
-					    "%s: read() failed on %s: %s \n"),
-					    prog, pname, strerror(err));
+				(void) close(dirfd);
 				continue;
 			}
 			(void) close(procfd);
-
+			(void) close(dirfd);
 			up->p_igintr =
 			    actinfo[SIGINT-1].sa_handler == SIG_IGN &&
 			    actinfo[SIGQUIT-1].sa_handler == SIG_IGN;
@@ -431,15 +468,19 @@ retry:
 			/*
 			 * Process args.
 			 */
-			up->p_args[0] = 0;
+			up->p_args[0] = '\0';
 			clnarglist(info.pr_psargs);
-			(void) strcat(up->p_args, info.pr_psargs);
+			(void) strlcpy(up->p_args, info.pr_psargs,
+			    sizeof (up->p_args));
 			if (up->p_args[0] == 0 ||
 			    up->p_args[0] == '-' && up->p_args[1] <= ' ' ||
 			    up->p_args[0] == '?') {
-				(void) strcat(up->p_args, " (");
-				(void) strcat(up->p_args, up->p_comm);
-				(void) strcat(up->p_args, ")");
+				(void) strlcat(up->p_args, " (",
+				    sizeof (up->p_args));
+				(void) strlcat(up->p_args, up->p_comm,
+				    sizeof (up->p_args));
+				(void) strlcat(up->p_args, ")",
+				    sizeof (up->p_args));
 			}
 		}
 
@@ -466,7 +507,34 @@ retry:
 	}
 
 	/* revert to non-privileged user after opening */
-	(void) __priv_relinquish();
+	__priv_relinquish();
+	if (getuid() == 0) {
+		/*
+		 * Since the privilege bracketing functions are effectively
+		 * no-ops when running as root, we must explicitly
+		 * relinquish PRIV_PROC_OWNER ourselves.
+		 */
+		pset = priv_allocset();
+		if (pset == NULL) {
+			err(EXIT_FAILURE,
+			    gettext("failed to allocate privilege set"));
+		}
+
+		priv_emptyset(pset);
+
+		if (priv_addset(pset, PRIV_PROC_OWNER) != 0) {
+			err(EXIT_FAILURE, gettext("failed to add "
+			    "PRIV_PROC_OWNER to privilege set"));
+		}
+
+		if (setppriv(PRIV_OFF, PRIV_PERMITTED, pset) != 0) {
+			err(EXIT_FAILURE,
+			    gettext("failed to set permitted privilege set"));
+		}
+
+		priv_freeset(pset);
+		pset = NULL;
+	}
 
 	(void) closedir(dirp);
 	(void) time(&now);	/* get current time */
@@ -509,10 +577,9 @@ retry:
 		prttime(idle, 8);
 		showtotals(findhash(ut->ut_pid));
 	}
-	if (fclose(stdout) == EOF) {
-		perror((gettext("%s: fclose failed"), prog));
-		exit(1);
-	}
+	if (fclose(stdout) == EOF)
+		err(EXIT_FAILURE, gettext("fclose failed"));
+
 	return (0);
 }
 
@@ -579,9 +646,9 @@ calctotals(struct uproc *up)
 	if (up->p_upid > curpid && (!up->p_igintr || empty)) {
 		curpid = up->p_upid;
 		if (lflag)
-			(void) strcpy(doing, up->p_args);
+			(void) strlcpy(doing, up->p_args, sizeof (doing));
 		else
-			(void) strcpy(doing, up->p_comm);
+			(void) strlcpy(doing, up->p_comm, sizeof (doing));
 	}
 
 	if (add_times == 1) {
@@ -625,11 +692,9 @@ findhash(pid_t pid)
 			return (tp);
 	}
 	tp = malloc(sizeof (*tp));		/* add new node */
-	if (!tp) {
-		(void) fprintf(stderr, gettext("%s: out of memory!: %s\n"),
-		    prog, strerror(errno));
-		exit(1);
-	}
+	if (tp == NULL)
+		err(EXIT_FAILURE, gettext("out of memory!"));
+
 	(void) memset(tp, 0, sizeof (*tp));
 	tp->p_upid = pid;
 	tp->p_state = NONE;
@@ -662,7 +727,7 @@ prttime(time_t tim, int width)
 	} else if (tim > 0) {
 		(void) snprintf(value, sizeof (value), "%d", (int)tim);
 	} else {
-		(void) strcpy(value, "0");
+		(void) strlcpy(value, "0", sizeof (value));
 	}
 	width = (width > 2) ? width - 1 : 1;
 	PRINTF(("%*s ", width, value));
@@ -711,8 +776,8 @@ findidle(char *devname)
 	time_t lastaction, diff;
 	char ttyname[64];
 
-	(void) strcpy(ttyname, "/dev/");
-	(void) strcat(ttyname, devname);
+	(void) strlcpy(ttyname, "/dev/", sizeof (ttyname));
+	(void) strlcat(ttyname, devname, sizeof (ttyname));
 	if (stat(ttyname, &stbuf) != -1) {
 		lastaction = stbuf.st_atime;
 		diff = now - lastaction;
@@ -743,4 +808,67 @@ clnarglist(char *arglist)
 			*c = '?';
 		}
 	}
+}
+
+static int
+priv_proc_open(const char *path, int oflag)
+{
+	int fd, errsave = 0;
+
+	if (__priv_bracket(PRIV_ON) != 0)
+		err(EXIT_FAILURE, gettext("privilege bracketing failed"));
+
+	do {
+		fd = open(path, oflag);
+		if (fd < 0)
+			errsave = errno;
+	} while (fd < 0 && errno == EAGAIN);
+
+	if (__priv_bracket(PRIV_OFF) != 0)
+		err(EXIT_FAILURE, gettext("privilege bracketing failed"));
+
+	if (fd < 0)
+		errno = errsave;
+
+	return (fd);
+}
+
+static int
+priv_proc_openat(int dfd, const char *path, int mode)
+{
+	int fd, errsave = 0;
+
+	if (__priv_bracket(PRIV_ON) != 0)
+		err(EXIT_FAILURE, gettext("privilege bracketing failed"));
+
+	do {
+		fd = openat(dfd, path, mode);
+		if (fd < 0)
+			errsave = errno;
+	} while (fd < 0 && errno == EAGAIN);
+
+	if (__priv_bracket(PRIV_OFF) != 0)
+		err(EXIT_FAILURE, gettext("privilege bracketing failed"));
+
+	if (fd < 0)
+		errno = errsave;
+
+	return (fd);
+}
+
+static boolean_t
+do_proc_read(int fd, void *buf, size_t bufsize)
+{
+	ssize_t n;
+
+	do {
+		n = pread(fd, buf, bufsize, 0);
+		if (n == bufsize)
+			return (B_TRUE);
+		/*
+		 * Retry on a partial read or EAGAIN, otherwise fail
+		 */
+	} while (n >= 0 || errno == EAGAIN);
+
+	return (B_FALSE);
 }
