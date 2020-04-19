@@ -96,6 +96,8 @@ clean:
 
 $(CMDS): $(TESTDIR_pkcs) $(TESTDIR_kcf) $(PROGS)
 
+.PARALLEL: $(CMDS) $(PROGS)
+
 $(TESTDIR_pkcs) $(TESTDIR_kcf):
 	$(INS.dir)
 
