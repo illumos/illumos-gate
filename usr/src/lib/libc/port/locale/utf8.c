@@ -48,12 +48,6 @@ static size_t	_UTF8_wcsnrtombs(char *_RESTRICT_KYWD,
 		    const wchar_t **_RESTRICT_KYWD,
 		    size_t, size_t, mbstate_t *_RESTRICT_KYWD);
 
-typedef struct {
-	wchar_t	ch;
-	int	want;
-	wchar_t	lbound;
-} _UTF8State;
-
 void
 _UTF8_init(struct lc_ctype *lct)
 {

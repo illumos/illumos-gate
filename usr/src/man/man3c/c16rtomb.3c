@@ -1,0 +1,285 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 Robert Mustacchi
+.\"
+.Dd April 23, 2020
+.Dt C16RTOMB 3C
+.Os
+.Sh NAME
+.Nm c16rtomb ,
+.Nm c32rtomb ,
+.Nm wcrtomb ,
+.Nm wcrtomb_l
+.Nd convert wide-characters to character sequences
+.Sh SYNOPSIS
+.In uchar.h
+.Ft size_t
+.Fo c16rtomb
+.Fa "char *restrict str"
+.Fa "char16_t c16"
+.Fa "mbstate_t *restrict ps"
+.Fc
+.Ft size_t
+.Fo c32rtomb
+.Fa "char *restrict str"
+.Fa "char32_t c32"
+.Fa "mbstate_t *restrict ps"
+.Fc
+.In stdio.h
+.Ft size_t
+.Fo wcrtomb
+.Fa "char *restrict str"
+.Fa "wchar_t wc"
+.Fa "mbstate_t *restrict ps"
+.Fc
+.In stdio.h
+.In xlocale.h
+.Ft size_t
+.Fo wcrtomb_l
+.Fa "char *restrict str"
+.Fa "wchar_t wc"
+.Fa "mbstate_t *restrict ps"
+.Fa "locale_t loc"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn c16rtomb ,
+.Fn c32rtomb ,
+.Fn wcrtomb ,
+and
+.Fn wcrtomb_l
+functions convert wide-character sequences into a series of multi-byte
+characters.
+The functions work in the following formats:
+.Bl -tag -width wcrtomb_l
+.It Fn c16rtomb
+A UTF-16 code sequence, where every code point is represented by one or
+two
+.Vt char16_t .
+The UTF-16 encoding will encode certain Unicode code points as a pair of
+two 16-bit code sequences, commonly referred to as a surrogate pair.
+.It Fn c32rtomb
+A UTF-32 code sequence, where every code point is represented by a
+single
+.Vt char32_t .
+It is illegal to pass reserved Unicode code points.
+.It Fn wcrtomb , Fn wcrtomb_l
+Wide characters, being a 32-bit value where every code point is
+represented by a single
+.Vt wchar_t .
+While the
+.Vt wchar_t
+and
+.Vt char32_t
+are different types, in this implementation, they are similar encodings.
+.El
+.Pp
+The functions all work by looking at the passed in wide-character
+.Po
+.Fa c16 ,
+.Fa c32 ,
+.Fa wc
+.Pc
+and appending it to the current conversion state,
+.Fa ps .
+Once a valid code point, based on the current locale, is found, then it
+will be converted into a series of characters that are stored in
+.Fa str .
+Up to
+.Dv MB_CUR_MAX
+bytes will be stored in
+.Fa str .
+It is the caller's responsibility to ensure that there is sufficient
+space in
+.Fa str .
+.Pp
+The functions are all influenced by the
+.Dv LC_CTYPE
+category of the current locale for determining what is considered a
+valid character.
+For example, in the
+.Sy C
+locale,
+only ASCII characters are recognized, while in a
+.Sy UTF-8
+based locale like
+.Sy en_us.UTF-8 ,
+all valid Unicode code points are recognized and will be converted into
+the corresponding multi-byte sequence.
+The
+.Fn wcrtomb_l
+function uses the locale passed in
+.Fa loc
+rather than the locale of the current thread.
+.Pp
+The
+.Fa ps
+argument represents a multi-byte conversion state which can be used
+across multiple calls to a given function
+.Pq but not mixed between functions .
+These allow for characters to be consumed from subsequent buffers, e.g.
+different values of
+.Fa str .
+The functions may be called from multiple threads as long as they use
+unique values for
+.Fa ps .
+If
+.Fa ps
+is
+.Dv NULL ,
+then a function-specific buffer will be used for the conversion state;
+however, this is stored between all threads and its use is not
+recommended.
+.Pp
+The functions all have a special behavior when
+.Dv NULL
+is passed for
+.Fa str .
+They instead will treat it as though a the NULL wide-character was
+passed in
+.Fa c16 ,
+.Fa c32 ,
+or
+.Fa wc
+and an internal buffer
+.Pq buf
+will be used to write out the results of the
+converstion.
+In other words, the functions would be called as:
+.Bd -literal -offset indent
+c16rtomb(buf, L'\\0', ps)
+c32rtomb(buf, L'\\0', ps)
+wcrtomb(buf, L'\\0', ps)
+wcrtomb_l(buf, L'\\0', ps, loc)
+.Ed
+.Ss Locale Details
+Not all locales in the system are Unicode based locales.
+For example, ISO 8859 family locales have code points with values that
+do not match their counterparts in Unicode.
+When using these functions with non-Unicode based locales, the code
+points returned will be those determined by the locale.
+They will not be converted from the corresponding Unicode code point.
+For example, if using the Euro sign in ISO 8859-15, these functions
+will not encode the Unicode value 0x20ac into the ISO 8859-15 value
+0xa4.
+.Pp
+Regardless of the locale, the characters returned will be encoded as
+though the code point were the corresponding value in Unicode.
+This means that when using UTF-16, if the corresponding code point were
+in the range for surorgate pairs, then the
+.Fn c16rtomb
+function will expect to receive that code point in that fashion.
+.Pp
+This behavior of the
+.Fn c16rtomb
+and
+.Fn c32rtomb
+functions should not be relied upon, is not portable, and subject to
+change for non-Unicode locales.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn c16rtomb ,
+.Fn c32rtomb ,
+.Fn wcrtomb ,
+and
+.Fn wcrtomb_l
+functions return the number of bytes stored in
+.Fa str .
+Otherwise,
+.Sy (size_t)-1
+is returned to indicate an encoding error and
+.Va errno
+is set.
+.Sh EXAMPLES
+.Sy Example 1
+Converting a UTF-32 character into a multi-byte character sequence.
+.Bd -literal
+#include <locale.h>
+#include <stdlib.h>
+#include <string.h>
+#include <err.h>
+#include <stdio.h>
+#include <uchar.h>
+
+int
+main(void)
+{
+        mbstate_t mbs;
+        size_t ret;
+        char buf[MB_CUR_MAX];
+        char32_t val = 0x5149;
+        const char *uchar_exp = "\exe5\ex85\ex89";
+
+        (void) memset(&mbs, 0, sizeof (mbs));
+        (void) setlocale(LC_CTYPE, "en_US.UTF-8");
+        ret = c32rtomb(buf, val, &mbs);
+        if (ret != strlen(uchar_exp)) {
+                errx(EXIT_FAILURE, "failed to convert string, got %zd",
+                    ret);
+        }
+
+        if (strncmp(buf, uchar_exp, ret) != 0) {
+                errx(EXIT_FAILURE, "converted char32_t does not match "
+                    "expected value");
+        }
+
+        return (0);
+}
+.Ed
+.Sh ERRORS
+The
+.Fn c16rtomb ,
+.Fn c32rtomb ,
+.Fn wcrtomb ,
+and
+.Fn wcrtomb_l
+functions will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+The conversion state in
+.Fa ps
+is invalid.
+.It Er EILSEQ
+An invalid character sequence has been detected.
+.El
+.Sh MT-LEVEL
+The
+.Fn c16rtomb ,
+.Fn c32rtomb ,
+.Fn wcrtomb ,
+and
+.Fn wcrtomb_l
+functions are
+.Sy MT-Safe
+as long as different
+.Vt mbstate_t
+structures are passed in
+.Fa ps .
+If
+.Fa ps
+is
+.Dv NULL
+or different threads use the same value for
+.Fa ps ,
+then the functions are
+.Sy Unsafe .
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr mbrtoc16 3C ,
+.Xr mbrtoc32 3C ,
+.Xr mbrtowc 3C ,
+.Xr newlocale 3C ,
+.Xr setlocale 3C ,
+.Xr uselocale 3C ,
+.Xr uchar.h 3HEAD ,
+.Xr environ 5

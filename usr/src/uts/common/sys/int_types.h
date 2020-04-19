@@ -173,6 +173,9 @@ typedef long long		int_least64_t;
 #endif
 #endif
 
+/*
+ * If these are changed, please update char16_t and char32_t in head/uchar.h.
+ */
 typedef unsigned char		uint_least8_t;
 typedef unsigned short		uint_least16_t;
 typedef unsigned int		uint_least32_t;

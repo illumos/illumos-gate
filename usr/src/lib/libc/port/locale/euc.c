@@ -101,12 +101,6 @@ static size_t	_EUC_TW_wcsnrtombs(char *_RESTRICT_KYWD,
 
 static int	_EUC_mbsinit(const mbstate_t *);
 
-typedef struct {
-	wchar_t	ch;
-	int	set;
-	int	want;
-} _EucState;
-
 int
 _EUC_mbsinit(const mbstate_t *ps)
 {

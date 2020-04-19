@@ -58,6 +58,7 @@ file path=usr/share/man/man3c/bsearch.3c
 file path=usr/share/man/man3c/bstring.3c
 file path=usr/share/man/man3c/btowc.3c
 file path=usr/share/man/man3c/byteorder.3c
+file path=usr/share/man/man3c/c16rtomb.3c
 file path=usr/share/man/man3c/call_once.3c
 file path=usr/share/man/man3c/catgets.3c
 file path=usr/share/man/man3c/catopen.3c
@@ -234,7 +235,7 @@ file path=usr/share/man/man3c/makedev.3c
 file path=usr/share/man/man3c/malloc.3c
 file path=usr/share/man/man3c/mblen.3c
 file path=usr/share/man/man3c/mbrlen.3c
-file path=usr/share/man/man3c/mbrtowc.3c
+file path=usr/share/man/man3c/mbrtoc16.3c
 file path=usr/share/man/man3c/mbsinit.3c
 file path=usr/share/man/man3c/mbsrtowcs.3c
 file path=usr/share/man/man3c/mbstowcs.3c
@@ -536,7 +537,6 @@ file path=usr/share/man/man3c/wait3.3c
 file path=usr/share/man/man3c/waitpid.3c
 file path=usr/share/man/man3c/walkcontext.3c
 file path=usr/share/man/man3c/wcpcpy.3c
-file path=usr/share/man/man3c/wcrtomb.3c
 file path=usr/share/man/man3c/wcscasecmp.3c
 file path=usr/share/man/man3c/wcscoll.3c
 file path=usr/share/man/man3c/wcsdup.3c
@@ -722,6 +722,7 @@ link path=usr/share/man/man3c/bind_textdomain_codeset.3c target=gettext.3c
 link path=usr/share/man/man3c/bindtextdomain.3c target=gettext.3c
 link path=usr/share/man/man3c/btowc_l.3c target=btowc.3c
 link path=usr/share/man/man3c/bzero.3c target=bstring.3c
+link path=usr/share/man/man3c/c32rtomb.3c target=c16rtomb.3c
 link path=usr/share/man/man3c/calloc.3c target=malloc.3c
 link path=usr/share/man/man3c/canonicalize_file_name.3c target=realpath.3c
 link path=usr/share/man/man3c/catclose.3c target=catopen.3c
@@ -1006,7 +1007,9 @@ link path=usr/share/man/man3c/lrand48.3c target=drand48.3c
 link path=usr/share/man/man3c/major.3c target=makedev.3c
 link path=usr/share/man/man3c/mblen_l.3c target=mblen.3c
 link path=usr/share/man/man3c/mbrlen_l.3c target=mbrlen.3c
-link path=usr/share/man/man3c/mbrtowc_l.3c target=mbrtowc.3c
+link path=usr/share/man/man3c/mbrtoc32.3c target=mbrtoc16.3c
+link path=usr/share/man/man3c/mbrtowc.3c target=mbrtoc16.3c
+link path=usr/share/man/man3c/mbrtowc_l.3c target=mbrtoc16.3c
 link path=usr/share/man/man3c/mbsinit_l.3c target=mbsinit.3c
 link path=usr/share/man/man3c/mbsnrtowcs.3c target=mbsrtowcs.3c
 link path=usr/share/man/man3c/mbsnrtowcs_l.3c target=mbsrtowcs.3c
@@ -1457,7 +1460,8 @@ link path=usr/share/man/man3c/watoi.3c target=wcstol.3c
 link path=usr/share/man/man3c/watol.3c target=wcstol.3c
 link path=usr/share/man/man3c/watoll.3c target=wcstol.3c
 link path=usr/share/man/man3c/wcpncpy.3c target=wcpcpy.3c
-link path=usr/share/man/man3c/wcrtomb_l.3c target=wcrtomb.3c
+link path=usr/share/man/man3c/wcrtomb.3c target=c16rtomb.3c
+link path=usr/share/man/man3c/wcrtomb_l.3c target=c16rtomb.3c
 link path=usr/share/man/man3c/wcscasecmp_l.3c target=wcscasecmp.3c
 link path=usr/share/man/man3c/wcscat.3c target=wcstring.3c
 link path=usr/share/man/man3c/wcschr.3c target=wcstring.3c

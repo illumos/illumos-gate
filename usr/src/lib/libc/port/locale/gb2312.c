@@ -50,12 +50,6 @@ static size_t	_GB2312_wcsnrtombs(char *_RESTRICT_KYWD,
 		    const wchar_t **_RESTRICT_KYWD, size_t, size_t,
 		    mbstate_t *_RESTRICT_KYWD);
 
-
-typedef struct {
-	int	count;
-	uchar_t	bytes[2];
-} _GB2312State;
-
 void
 _GB2312_init(struct lc_ctype *lct)
 {

@@ -31,6 +31,64 @@
 
 #include "runetype.h"
 #include "lctype.h"
+#include <uchar.h>
+
+/*
+ * Actual implementation structures for mbstate_t data.
+ *
+ * All of the conversion states are independent of one another, with the
+ * exception of that used for mbrtoc16(). That needs to encode data not as a
+ * wide-character but as UTF-16 data, which means handling surrogate pairs. To
+ * minimize the amount of state in each locale, we instead have a conversion
+ * state for this which includes all the other conversion states, plus extra
+ * data to accomodate this.
+ */
+typedef struct {
+	wchar_t	ch;
+} _BIG5State;
+
+typedef struct {
+	wchar_t	ch;
+	int	set;
+	int	want;
+} _EucState;
+
+typedef struct {
+	int	count;
+	uchar_t	bytes[4];
+} _GB18030State;
+
+typedef struct {
+	int	count;
+	uchar_t	bytes[2];
+} _GB2312State;
+
+typedef struct {
+	wchar_t	ch;
+} _GBKState;
+
+typedef struct {
+	wchar_t	ch;
+} _MSKanjiState;
+
+typedef struct {
+	wchar_t	ch;
+	int	want;
+	wchar_t	lbound;
+} _UTF8State;
+
+typedef struct {
+	union {
+		_BIG5State	c16_big5;
+		_EucState	c16_euc;
+		_GB18030State	c16_gb18030;
+		_GB2312State	c16_gb2312;
+		_GBKState	c16_gbk;
+		_MSKanjiState	c16_mskanji;
+		_UTF8State	c16_utf8;
+	} c16_state;
+	char16_t c16_surrogate;
+} _CHAR16State;
 
 /*
  * Rune initialization function prototypes.

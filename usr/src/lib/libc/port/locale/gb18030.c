@@ -55,12 +55,6 @@ static size_t	_GB18030_wcsnrtombs(char *_RESTRICT_KYWD,
 		    const wchar_t **_RESTRICT_KYWD, size_t, size_t,
 		    mbstate_t *_RESTRICT_KYWD);
 
-
-typedef struct {
-	int	count;
-	uchar_t	bytes[4];
-} _GB18030State;
-
 void
 _GB18030_init(struct lc_ctype *lct)
 {
