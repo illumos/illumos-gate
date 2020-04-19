@@ -22,7 +22,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright 2018, Joyent, Inc.
  */
 
 /*
@@ -372,7 +372,7 @@ sdev_close(struct vnode *vp, int flag, int count,
 /*ARGSUSED*/
 static int
 sdev_read(struct vnode *vp, struct uio *uio, int ioflag, struct cred *cred,
-	struct caller_context *ct)
+    struct caller_context *ct)
 {
 	struct sdev_node *dv = (struct sdev_node *)VTOSDEV(vp);
 	int	error;
@@ -399,7 +399,7 @@ sdev_read(struct vnode *vp, struct uio *uio, int ioflag, struct cred *cred,
 /*ARGSUSED*/
 static int
 sdev_write(struct vnode *vp, struct uio *uio, int ioflag, struct cred *cred,
-	struct caller_context *ct)
+    struct caller_context *ct)
 {
 	struct sdev_node *dv = VTOSDEV(vp);
 	int	error = 0;
@@ -582,7 +582,9 @@ sdev_self_access(sdev_node_t *dv, int mode, int flags, struct cred *cr,
 {
 	int ret;
 
+	ASSERT(RW_READ_HELD(&dv->sdev_contents));
 	ASSERT(dv->sdev_attr || dv->sdev_attrvp);
+
 	if (dv->sdev_attrvp) {
 		ret = VOP_ACCESS(dv->sdev_attrvp, mode, flags, cr, ct);
 	} else if (dv->sdev_attr) {
@@ -1438,32 +1440,24 @@ sdev_readlink(struct vnode *vp, struct uio *uiop, struct cred *cred,
 
 /*ARGSUSED4*/
 static int
-sdev_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp,
+sdev_readdir(struct vnode *vp, struct uio *uiop, struct cred *cred, int *eofp,
     caller_context_t *ct, int flags)
 {
-	struct sdev_node *parent = VTOSDEV(dvp);
+	struct sdev_node *dv = VTOSDEV(vp);
 	int error;
 
+	VERIFY(RW_READ_HELD(&dv->sdev_contents));
+
 	/*
-	 * We must check that we have execute access to search the directory --
-	 * but because our sdev_contents lock is already held as a reader (the
-	 * caller must have done a VOP_RWLOCK()), we call directly into the
-	 * underlying access routine if sdev_attr is non-NULL.
+	 * We can't recursively take ->sdev_contents via an indirect
+	 * VOP_ACCESS(), but we don't need to use that anyway.
 	 */
-	if (parent->sdev_attr != NULL) {
-		VERIFY(RW_READ_HELD(&parent->sdev_contents));
+	if ((error = sdev_self_access(dv, VEXEC, 0, cred, ct)) != 0)
+		return (error);
 
-		if (sdev_unlocked_access(parent, VEXEC, cred) != 0)
-			return (EACCES);
-	} else {
-		if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred, ct)) != 0)
-			return (error);
-	}
-
-	ASSERT(parent);
-	if (!SDEV_IS_GLOBAL(parent))
-		prof_filldir(parent);
-	return (devname_readdir_func(dvp, uiop, cred, eofp, SDEV_BROWSE));
+	if (!SDEV_IS_GLOBAL(dv))
+		prof_filldir(dv);
+	return (devname_readdir_func(vp, uiop, cred, eofp, SDEV_BROWSE));
 }
 
 /*ARGSUSED1*/

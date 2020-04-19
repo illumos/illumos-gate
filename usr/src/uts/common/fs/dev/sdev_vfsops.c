@@ -173,7 +173,13 @@ devinit(int fstype, char *name)
 
 	if ((devmajor = getudev()) == (major_t)-1) {
 		cmn_err(CE_WARN, "%s: can't get unique dev", sdev_vfssw.name);
-		return (1);
+		return (ENXIO);
+	}
+
+	if (sdev_plugin_init() != 0) {
+		cmn_err(CE_WARN, "%s: failed to set init plugin subsystem",
+		    sdev_vfssw.name);
+		return (EIO);
 	}
 
 	/* initialize negative cache */
@@ -350,6 +356,7 @@ sdev_mount(struct vfs *vfsp, struct vnode *mvp, struct mounta *uap,
 		ASSERT(sdev_origins);
 		dv->sdev_flags &= ~SDEV_GLOBAL;
 		dv->sdev_origin = sdev_origins->sdev_root;
+		SDEV_HOLD(dv->sdev_origin);
 	} else {
 		sdev_ncache_setup();
 		rw_enter(&dv->sdev_contents, RW_WRITER);
@@ -525,5 +532,19 @@ sdev_mntinfo_rele(struct sdev_data *mntinfo)
 	mutex_enter(&vp->v_lock);
 	VN_RELE_LOCKED(vp);
 	mutex_exit(&vp->v_lock);
+	mutex_exit(&sdev_lock);
+}
+
+void
+sdev_mnt_walk(void (*func)(struct sdev_node *, void *), void *arg)
+{
+	struct sdev_data *mntinfo;
+
+	mutex_enter(&sdev_lock);
+	mntinfo = sdev_mntinfo;
+	while (mntinfo != NULL) {
+		func(mntinfo->sdev_root, arg);
+		mntinfo = mntinfo->sdev_next;
+	}
 	mutex_exit(&sdev_lock);
 }
