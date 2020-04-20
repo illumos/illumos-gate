@@ -27,8 +27,6 @@
  * tcp.c, Code implementing the TCP protocol.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <socket_impl.h>
 #include <socket_inet.h>
@@ -1734,7 +1732,7 @@ retry:
 	}
 
 	while ((in_gram = sockets[sock_id].inq) != NULL) {
-		if (tcp != NULL && tcp->tcp_state == state)
+		if (tcp->tcp_state == state)
 			break;
 
 		/* Remove unknown inetgrams from the head of inq. */
@@ -3943,7 +3941,6 @@ fin_acked:
 					DISP_ADDR_AND_PORT));
 				/* We should never get here... */
 				prom_panic("tcp_rput_data");
-				return;
 			}
 			goto pre_swnd_update;
 		}
@@ -5989,8 +5986,9 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 					tcp->tcp_state = TCPS_LAST_ACK;
 					break;
 				}
-				if (tcp->tcp_suna == tcp->tcp_snxt)
+				if (tcp->tcp_suna == tcp->tcp_snxt) {
 					TCP_TIMER_RESTART(tcp, tcp->tcp_rto);
+				}
 				tcp->tcp_snxt = tcp->tcp_fss + 1;
 			}
 		}

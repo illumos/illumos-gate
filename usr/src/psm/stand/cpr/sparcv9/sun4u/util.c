@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/cpr.h>
 #include <sys/promimpl.h>
 #include "cprboot.h"
@@ -491,7 +489,7 @@ int
 cb_usb_setup(void)
 {
 	char sp[OBP_MAXPATHLEN];
-	static char cb_nulldev[] = {
+	static char cb_nulldev[] =
 		"\" /\" select-dev "
 		"new-device "
 		"\" nulldev\" device-name "
@@ -503,8 +501,7 @@ cb_usb_setup(void)
 		": write 2drop 0 ; "
 		": restore ; "
 		"finish-device "
-		"unselect-dev"
-	};
+		"unselect-dev";
 
 	CB_VENTRY(cb_usb_setup);
 

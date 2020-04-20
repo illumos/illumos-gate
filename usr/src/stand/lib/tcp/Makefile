@@ -36,4 +36,7 @@ CPPFLAGS += -I../inet $(SOCKCPPFLAGS)
 CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += $(CNOWARN_UNINIT)
 
+# tcp.c is too hairy.
+SMATCH=off
+
 include ../Makefile.targ

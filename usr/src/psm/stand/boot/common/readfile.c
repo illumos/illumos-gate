@@ -469,7 +469,7 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 				 * the kernel image.
 				 */
 				if ((loadaddr = (uintptr_t)
-				    kmem_alloc(phdr->p_memsz, 0)) == NULL)
+				    kmem_alloc(phdr->p_memsz, 0)) == 0)
 					goto elferror;
 				/*
 				 * Save this to pass on
@@ -659,7 +659,7 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 		}
 		/* use uintptr_t to suppress the gcc warning */
 		if ((elfbootvec->eb_un.eb_ptr =
-		    (Elf32_Addr)(uintptr_t)kmem_alloc(size, 0)) == NULL) {
+		    (Elf32_Addr)(uintptr_t)kmem_alloc(size, 0)) == 0) {
 			kmem_free(elfbootvec, vsize);
 			goto elferror;
 		}
@@ -680,7 +680,7 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 		size = (av - auxv) * sizeof (auxv64_t);
 		/* use uintptr_t to suppress the gcc warning */
 		if ((elfbootvecELF32_64->eb_un.eb_ptr =
-		    (Elf32_Addr)(uintptr_t)kmem_alloc(size, 0)) == NULL) {
+		    (Elf32_Addr)(uintptr_t)kmem_alloc(size, 0)) == 0) {
 			kmem_free(elfbootvecELF32_64, vsize);
 			goto elferror;
 		} else {
@@ -877,10 +877,10 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 #ifdef	BOOTAMD64
 				if ((loadaddr = (Elf64_Addr)
 				    (ADDR_XTND(kmem_alloc(phdr->p_memsz, 0))))
-				    == NULL)
+				    == 0)
 #else	/* !BOOTAMD64 */
 				if ((loadaddr = (Elf64_Addr)(uintptr_t)
-				    kmem_alloc(phdr->p_memsz, 0)) == NULL)
+				    kmem_alloc(phdr->p_memsz, 0)) == 0)
 #endif	/* BOOTAMD64 */
 					goto elf64error;
 
@@ -1069,7 +1069,7 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 		    (char *)ADDR_TRUNC((elfbootvecELF64->eb_un.eb_ptr)), size);
 #else	/* !BOOTAMD64 */
 		if ((elfbootvecELF64->eb_un.eb_ptr =
-		    (Elf64_Addr)kmem_alloc(size, 0)) == NULL) {
+		    (Elf64_Addr)kmem_alloc(size, 0)) == 0) {
 			kmem_free(elfbootvecELF64, vsize);
 			goto elf64error;
 		}
@@ -1348,7 +1348,7 @@ iload64(char *rtld, Elf64_Phdr *thdr, Elf64_Phdr *dhdr, auxv64_t **avp)
 		    sp->sh_addralign);
 #endif	/* BOOTAMD64 */
 
-		if (load == NULL) {
+		if (load == 0) {
 			printf("boot: allocating memory for section %d "
 			    "failed\n", i);
 			goto error;

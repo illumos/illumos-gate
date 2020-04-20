@@ -170,7 +170,7 @@ restore_tlb(struct sun4u_tlb *utp, int cpu_id)
 	}
 
 	for (tail = utp + CPR_MAX_TLB; utp < tail; utp++) {
-		if (utp->va_tag == NULL)
+		if (utp->va_tag == 0)
 			continue;
 		virt = (caddr_t)utp->va_tag;
 		(*tfunc)(utp->index, virt, &utp->tte);

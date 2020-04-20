@@ -32,8 +32,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Boot subsystem client side rpc (TCP)
  */
@@ -181,7 +179,7 @@ clntbtcp_create(
 			rpc_createerr.cf_stat = RPC_SYSTEMERROR;
 			rpc_createerr.cf_error.re_errno = errno;
 			if (*sockp > 0)
-				close(*sockp);
+				(void) close(*sockp);
 			goto fooy;
 		}
 
@@ -190,7 +188,7 @@ clntbtcp_create(
 			rpc_createerr.cf_stat = RPC_SYSTEMERROR;
 			rpc_createerr.cf_error.re_errno = errno;
 			if (*sockp > 0)
-				close(*sockp);
+				(void) close(*sockp);
 			goto fooy;
 		}
 

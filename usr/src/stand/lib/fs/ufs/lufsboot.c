@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/vnode.h>
 #include <sys/fs/ufs_fsdir.h>
@@ -484,7 +482,7 @@ lufs_boot_init(fileid_t *filep)
 	 */
 	if (!lufs_support ||
 	    sb != (struct fs *)&filep->fi_devp->un_fs.di_fs ||
-	    sb->fs_clean != FSLOG || sb->fs_logbno == NULL) {
+	    sb->fs_clean != FSLOG || sb->fs_logbno == 0) {
 		return;
 	}
 
@@ -596,7 +594,7 @@ lufs_logscan_read(int32_t *addr, struct delta *d)
 	*addr = lufs_read_log(*addr, (caddr_t)d, sizeof (struct delta));
 
 	if (*addr == 0 ||
-	    d->d_typ < DT_NONE || d->d_typ > DT_MAX ||
+	    (int)d->d_typ < DT_NONE || d->d_typ > DT_MAX ||
 	    d->d_nb >= odi.od_logsize)
 		return (0);
 
@@ -632,7 +630,7 @@ lufs_logscan_skip(int32_t *addr, struct delta *d)
 		*addr = lufs_read_log(*addr, NULL, d->d_nb);
 	}
 
-	return (*addr != NULL);
+	return (*addr != 0);
 }
 
 static void

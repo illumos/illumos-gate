@@ -353,7 +353,7 @@ chip_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
 	md_proc_t *procp;
 
 	topo_mod_dprintf(mod, "enumerating cmp chip\n");
-	if (min < 0 || max < 0 || min > max) {
+	if (min > max) {
 		topo_mod_dprintf(mod, "Invalid chip range(%d,%d)\n", min, max);
 		return (-1);
 	}

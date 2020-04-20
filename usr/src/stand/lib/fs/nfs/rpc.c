@@ -27,8 +27,6 @@
  * used.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sysmacros.h>
 #include <rpc/types.h>
 #include <errno.h>
@@ -301,7 +299,7 @@ brpc_call(
 		 * Assumes we've configured the stack and thus know our
 		 * IP address/hostname, either by using DHCP or rarp/bootparams.
 		 */
-		gethostname(hostname, sizeof (hostname));
+		(void) gethostname(hostname, sizeof (hostname));
 		xmit_auth = authunix_create(hostname, 0, 1, 1, &fake_gids);
 		break;
 	default:

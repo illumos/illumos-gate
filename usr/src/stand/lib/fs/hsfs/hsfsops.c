@@ -424,7 +424,7 @@ boot_hsfs_read(int fd, caddr_t buf, size_t count)
 	while (i > 0) {
 		/* If we need to reload the buffer, do so */
 		if ((j = filep->fi_count) == 0) {
-			getblock(filep, buf, i, &rcount);
+			(void) getblock(filep, buf, i, &rcount);
 			i -= rcount;
 			buf += rcount;
 			filep->fi_offset += rcount;
@@ -936,8 +936,8 @@ parse_susp(char *bufp, uint_t *ce_len, struct hs_direct *hsdep)
 					}
 					break;
 				}
-			cur_off += susp_len;
-			break;
+				cur_off += susp_len;
+				break;
 			}
 		}
 		if (i > hsfs_num_sig) {
@@ -1041,7 +1041,8 @@ boot_hsfs_getdents(int fd, struct dirent *dep, unsigned size)
 		size -= n;
 		cnt += 1;
 
-		(void) strcpy(dep->d_name, hdp->hs_ufs_dir.d_name);
+		(void) strlcpy(dep->d_name, hdp->hs_ufs_dir.d_name,
+		    strlen(hdp->hs_ufs_dir.d_name) + 1);
 		dep->d_ino = hdp->hs_ufs_dir.d_ino;
 		dep->d_off = dir.loc;
 		dep->d_reclen = (unsigned short)n;

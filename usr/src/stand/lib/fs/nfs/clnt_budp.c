@@ -32,8 +32,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Boot subsystem client side rpc
  */
@@ -272,7 +270,7 @@ clntbudp_call(cl, proc, xargs, argsp, xresults, resultsp, utimeout)
 call_again:
 	xdrs = &(cu->cu_outxdrs);
 	xdrs->x_op = XDR_ENCODE;
-	XDR_SETPOS(xdrs, cu->cu_xdrpos);
+	(void) XDR_SETPOS(xdrs, cu->cu_xdrpos);
 	/*
 	 * the transaction is the first thing in the out buffer
 	 */

@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T */
 /*	All Rights Reserved */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/utsname.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -653,7 +651,7 @@ boot_nfs_mountroot(char *str)
 	 * Assumes we've configured the stack and thus know our
 	 * IP address/hostname, either by using DHCP or rarp/bootparams.
 	 */
-	gethostname(my_hostname, sizeof (my_hostname));
+	(void) gethostname(my_hostname, sizeof (my_hostname));
 
 	wait.tv_sec = RPC_RCVWAIT_MSEC / 1000;
 	wait.tv_usec = 0;

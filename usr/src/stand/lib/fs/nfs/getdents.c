@@ -26,8 +26,6 @@
  *  Stuff relating to directory reading ...
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <rpc/types.h>
 #include <rpc/auth.h>
 #include <rpc/xdr.h>
@@ -170,7 +168,8 @@ nfsgetdents(struct nfs_file *nfp, struct dirent *dep, unsigned size)
 				return (cnt);
 			size -= n;
 
-			(void) strcpy(dep->d_name, ep->name);
+			(void) strlcpy(dep->d_name, ep->name,
+			    strlen(ep->name) + 1);
 			dep->d_ino = ep->fileid;
 			bcopy(ep->cookie, &offset, sizeof (nfscookie));
 			dep->d_off = offset;
