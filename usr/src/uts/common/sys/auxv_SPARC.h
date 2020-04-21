@@ -45,6 +45,7 @@ extern "C" {
 #define	AV_SPARC_VIS2	0x0040	/* VIS2 instruction set supported */
 #define	AV_SPARC_ASI_BLK_INIT	0x0080	/* ASI_BLK_INIT_xxx ASI */
 #define	AV_SPARC_FMAF	0x0100	/* Fused Multiply-Add */
+/* Bit 9 is not in use */
 #define	AV_SPARC_VIS3	0x0400  /* VIS3 instruction set extensions */
 #define	AV_SPARC_HPC	0x0800  /* High Performance Computing insns */
 #define	AV_SPARC_RANDOM	0x1000  /* random instruction */
@@ -52,11 +53,25 @@ extern "C" {
 #define	AV_SPARC_FJFMAU	0x4000	/* Fujitsu Unfused Multiply-Add */
 #define	AV_SPARC_IMA	0x8000	/* Integer Multiply-add */
 #define	AV_SPARC_ASI_CACHE_SPARING	0x10000
+#define	AV_SPARC_PAUSE	0x20000	/* pause instruction */
+#define	AV_SPARC_CBCOND	0x40000	/* compare and branch instructions */
+#define	AV_SPARC_AES	0x80000	/* AES instructions */
+#define	AV_SPARC_DES	0x100000	/* DES instructions */
+#define	AV_SPARC_KASUMI	0x200000	/* Kasumi instructions */
+#define	AV_SPARC_CAMELLIA	0x400000	/* Camellia instructions */
+#define	AV_SPARC_MD5	0x800000	/* MD5 instructions */
+#define	AV_SPARC_SHA1	0x1000000	/* SHA1 instructions */
+#define	AV_SPARC_SHA256	0x2000000	/* SHA256 instructions */
+#define	AV_SPARC_SHA512	0x4000000	/* SHA512 instructions */
+#define	AV_SPARC_MPMUL	0x8000000	/* multiple precision multiply */
+#define	AV_SPARC_MONT	0x10000000	/* Montgomery mult/sqr instructions */
+#define	AV_SPARC_CRC32C	0x20000000	/* CRC32C instructions */
 
 #define	FMT_AV_SPARC	\
 	"\20" \
-	"\21cspare"	\
-	"\20ima\17fjfmau\16trans\15random\14hpc\13vis3\12-\11fmaf" 	\
+	"\36crc32c\35mont\34mpmul\33sha512\32sha256\31sha1"	\
+	"\30md5\27camellia\26kasumi\25des\24aes\23cbcond\22pause\21cspare" \
+	"\20ima\17fjfmau\16trans\15random\14hpc\13vis3\12-\11fmaf"	\
 	"\10ASIBlkInit\7vis2\6vis\5popc\4v8plus\3fsmuld\2div32\1mul32"
 
 /*

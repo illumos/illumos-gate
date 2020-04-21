@@ -113,7 +113,7 @@ typedef enum {
  * must be kept in sync with the arrays found in elfcap.c.
  */
 #define	ELFCAP_NUM_SF1			3
-#define	ELFCAP_NUM_HW1_SPARC		17
+#define	ELFCAP_NUM_HW1_SPARC		30
 #define	ELFCAP_NUM_HW1_386		32
 #define	ELFCAP_NUM_HW2_386		29
 
