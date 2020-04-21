@@ -376,7 +376,7 @@ ecc_psynd_score(ushort_t p_synd)
 #define	CPU_SPACE		0x0002	/* print flt_status (data or instr) */
 #define	CPU_ERRID		0x0004	/* print flt_id */
 #define	CPU_TL			0x0008	/* print flt_tl */
-#define	CPU_ERRID_FIRST 	0x0010	/* print flt_id first in message */
+#define	CPU_ERRID_FIRST		0x0010	/* print flt_id first in message */
 #define	CPU_AFSR		0x0020	/* print flt_stat as decoded %afsr */
 #define	CPU_AFAR		0x0040	/* print flt_addr as %afar */
 #define	CPU_AF_PSYND		0x0080	/* print flt_stat %afsr.PSYND */
@@ -808,7 +808,7 @@ cpu_aflt_size(void)
 /*ARGSUSED*/
 void
 cpu_ce_error(struct regs *rp, ulong_t p_afar, ulong_t p_afsr,
-	uint_t p_afsr_high, uint_t p_afar_high)
+    uint_t p_afsr_high, uint_t p_afar_high)
 {
 	ushort_t sdbh, sdbl;
 	ushort_t e_syndh, e_syndl;
@@ -1241,7 +1241,7 @@ cpu_ue_log_err(struct async_flt *aflt)
 /*ARGSUSED*/
 void
 cpu_async_error(struct regs *rp, ulong_t p_afar, ulong_t p_afsr,
-	uint_t p_afsr_high, uint_t p_afar_high)
+    uint_t p_afsr_high, uint_t p_afar_high)
 {
 	ushort_t sdbh, sdbl, ttype, tl;
 	spitf_async_flt spf_flt;
@@ -1937,7 +1937,7 @@ cpu_get_mem_unum_aflt(int synd_status, struct async_flt *aflt,
  */
 int
 cpu_get_mem_name(uint64_t synd, uint64_t *afsr, uint64_t afar,
-		char *buf, int buflen, int *lenp)
+    char *buf, int buflen, int *lenp)
 {
 	int synd_status, flt_in_memory, ret;
 	char unum[UNUM_NAMLEN];
@@ -2777,7 +2777,7 @@ static uint64_t hb_eclk[HB_LOWEST_DIV + 1] = {
 	uint64_t count, new_count;				\
 	clock_t delay;						\
 	data = lddphysio(HB_MEM_CNTRL0);			\
-	count = (data & HB_REFRESH_COUNT_MASK) >> 		\
+	count = (data & HB_REFRESH_COUNT_MASK) >>		\
 	    HB_REFRESH_COUNT_SHIFT;				\
 	new_count = (HB_REFRESH_INTERVAL *			\
 	    cpunodes[CPU->cpu_id].clock_freq) /			\
@@ -2785,7 +2785,7 @@ static uint64_t hb_eclk[HB_LOWEST_DIV + 1] = {
 	data = (data & ~HB_REFRESH_COUNT_MASK) |		\
 	    (new_count << HB_REFRESH_COUNT_SHIFT);		\
 	stdphysio(HB_MEM_CNTRL0, data);				\
-	data = lddphysio(HB_MEM_CNTRL0);        		\
+	data = lddphysio(HB_MEM_CNTRL0);			\
 	/*							\
 	 * If we are slowing down the cpu and Memory		\
 	 * Self Refresh is not enabled, it is required		\
@@ -2951,7 +2951,7 @@ clear_errors(spitf_async_flt *spf_flt, uint64_t *acc_afsr)
  */
 static void
 scan_ecache(uint64_t *t_afar, ec_data_t *ecache_data,
-	uint64_t *ecache_tag, int *linecnt, uint64_t *t_afsr)
+    uint64_t *ecache_tag, int *linecnt, uint64_t *t_afsr)
 {
 	ec_data_t t_ecdata[8];
 	uint64_t t_etag, oafsr;
@@ -3176,7 +3176,7 @@ cpu_log_ecmem_info(spitf_async_flt *spf_flt)
 /*PRINTFLIKE6*/
 static void
 cpu_aflt_log(int ce_code, int tagnum, spitf_async_flt *spflt, uint_t logflags,
-	const char *endstr, const char *fmt, ...)
+    const char *endstr, const char *fmt, ...)
 {
 	struct async_flt *aflt = (struct async_flt *)spflt;
 	char buf[400], *p, *q; /* see comments about buf[] size above */
@@ -3255,7 +3255,7 @@ cpu_aflt_log(int ce_code, int tagnum, spitf_async_flt *spflt, uint_t logflags,
 
 		if (logflags & CPU_AFSR) {
 			(void) snprintf(p, (size_t)(q - p),
-			    "\n    AFSR 0x%08b.%08b",
+			    "\n    AFSR 0x%8b.%8b",
 			    (uint32_t)(aflt->flt_stat >> 32), AFSR_FMTSTR0,
 			    (uint32_t)aflt->flt_stat, AFSR_FMTSTR1);
 			p += strlen(p);
@@ -3292,7 +3292,7 @@ cpu_aflt_log(int ce_code, int tagnum, spitf_async_flt *spflt, uint_t logflags,
 
 		if (logflags & CPU_UDBH) {
 			(void) snprintf(p, (size_t)(q - p),
-			    "\n    UDBH 0x%04b UDBH.ESYND 0x%02x",
+			    "\n    UDBH 0x%4b UDBH.ESYND 0x%02x",
 			    spflt->flt_sdbh, UDB_FMTSTR,
 			    spflt->flt_sdbh & 0xFF);
 			p += strlen(p);
@@ -3300,7 +3300,7 @@ cpu_aflt_log(int ce_code, int tagnum, spitf_async_flt *spflt, uint_t logflags,
 
 		if (logflags & CPU_UDBL) {
 			(void) snprintf(p, (size_t)(q - p),
-			    " UDBL 0x%04b UDBL.ESYND 0x%02x",
+			    " UDBL 0x%4b UDBL.ESYND 0x%02x",
 			    spflt->flt_sdbl, UDB_FMTSTR,
 			    spflt->flt_sdbl & 0xFF);
 			p += strlen(p);
@@ -3348,8 +3348,8 @@ cpu_aflt_log(int ce_code, int tagnum, spitf_async_flt *spflt, uint_t logflags,
  *	modify	parity	busy   idle
  *	----------------------------
  *	clean	good		X
- * 	clean	bad	X	X
- * 	dirty	good		X
+ *	clean	bad	X	X
+ *	dirty	good		X
  *	dirty	bad
  *
  * Bad or good refers to whether a line has an E$ parity error or not.
@@ -3885,7 +3885,7 @@ ecache_kstat_init(struct cpu *cp)
  */
 static void
 ecache_scrub_log(ec_data_t *ec_data, uint64_t ec_tag, uint64_t paddr, int mpb,
-		uint64_t afsr)
+    uint64_t afsr)
 {
 	spitf_async_flt spf_flt;
 	struct async_flt *aflt;
