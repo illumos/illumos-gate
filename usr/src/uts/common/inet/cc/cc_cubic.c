@@ -265,7 +265,7 @@ cubic_cb_init(struct cc_var *ccv)
 {
 	struct cubic *cubic_data;
 
-	cubic_data = kmem_alloc(sizeof (struct cubic), KM_NOSLEEP);
+	cubic_data = kmem_zalloc(sizeof (struct cubic), KM_NOSLEEP);
 
 	if (cubic_data == NULL)
 		return (ENOMEM);
@@ -368,6 +368,15 @@ cubic_post_recovery(struct cc_var *ccv)
 		    >> CUBIC_SHIFT;
 	}
 
+	/*
+	 * There is a risk that if the cwnd becomes less than mss, and
+	 * we do not get enough acks to drive it back up beyond mss,
+	 * we will stop transmitting data altogether.
+	 *
+	 * The Cubic RFC defines values in terms of units of mss. Therefore
+	 * we must make sure we have at least 1 mss to make progress
+	 * since the algorthm is written that way.
+	 */
 	mss = CCV(ccv, tcp_mss);
 
 	if (IN_FASTRECOVERY(ccv->flags)) {
@@ -385,9 +394,11 @@ cubic_post_recovery(struct cc_var *ccv)
 			CCV(ccv, tcp_cwnd) = MAX(pipe, mss) + mss;
 		} else {
 			/* Update cwnd based on beta and adjusted max_cwnd. */
-			CCV(ccv, tcp_cwnd) = max(1, ((CUBIC_BETA *
+			CCV(ccv, tcp_cwnd) = max(mss, ((CUBIC_BETA *
 			    cubic_data->max_cwnd) >> CUBIC_SHIFT));
 		}
+	} else {
+		CCV(ccv, tcp_cwnd) = max(mss, CCV(ccv, tcp_cwnd));
 	}
 
 	cubic_data->t_last_cong = gethrtime();
