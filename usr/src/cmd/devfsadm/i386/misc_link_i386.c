@@ -135,7 +135,7 @@ static devfsadm_remove_t misc_remove_cbt[] = {
 DEVFSADM_REMOVE_INIT_V0(misc_remove_cbt);
 
 /*
- * Any /dev/foo named named after the minor name such as
+ * Any /dev/foo entry named after the minor name such as
  * /devices/.../driver@0:foo
  */
 static int
