@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -94,11 +94,12 @@
  * logstream_err() should be used to log via syslog.
  */
 
-#include <assert.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <glob.h>
+#include <libcustr.h>
+#include <netdb.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -132,19 +133,37 @@
 #define	ZLOG_KEEP	"zlog-keep-rotated"	/* zonecfg attr */
 #define	ZLOG_KEEP_MAX	1000			/* number of log files */
 
+/*
+ * While we could get the numeric value of BUNYAN_LOG_INFO from bunyan.h,
+ * the log version is internal to the library, so we just define the values
+ * we need here.
+ */
+#define	BUNYAN_VERSION		0
+#define	BUNYAN_LOG_LEVEL	30	/* info */
+
 typedef struct logfile {
 	char	lf_path[MAXPATHLEN];	/* log file name (absolute path) */
 	char	lf_name[MAXNAMELEN];	/* tail of log file name */
+	char	lf_buf[BUFSIZ];		/* Buffer for event messages */
+	custr_t	*lf_cus;		/* custr_t wrapper for lf_buf */
 	int	lf_fd;			/* file descriptor */
 	size_t	lf_size;		/* Current size */
 	boolean_t lf_write_err;		/* Avoid spamming console via logsys */
 	boolean_t lf_closing;		/* Avoid rotation recursion */
 } logfile_t;
 
+/* Large enough to hold BUFSIZ bytes with some escaping */
+#define	LS_BUFSZ	(BUFSIZ * 2)
+
+/* Large enough to hold LS_BUF contents + bunyan mandatory properties */
+#define	LS_OBUFSZ	(LS_BUFSZ + MAXNAMELEN + 128)
+
 typedef struct logstream {
 	char		ls_stream[MAXNAMELEN];	/* stdout, stderr, etc. */
-	char		ls_buf[BUFSIZ * 2];	/* Not-yet written data, json */
-	int		ls_buflen;
+	char		ls_buf[LS_BUFSZ];	/* Not-yet written data, json */
+	char		ls_obuf[LS_OBUFSZ];	/* Buffer to form output json */
+	custr_t		*ls_cusbuf;	/* custr_t wrapper to ls_buf */
+	custr_t		*ls_cusobuf;	/* custr_t wrapper to ls_ofbuf */
 	logstream_flags_t ls_flags;
 	logfile_t	*ls_logfile;		/* N streams per log file */
 } logstream_t;
@@ -162,17 +181,20 @@ boolean_t logging_poisoned = B_FALSE;
 static logstream_t streams[MAX_LOG_STREAMS];
 static logfile_t logfiles[MAX_LOG_STREAMS];
 
+static char host[MAXHOSTNAMELEN];
+static char pidstr[10];
+
 static boolean_t logging_initialized = B_FALSE;
 static uint64_t logging_rot_size;		/* See ZLOG_MAXSZ */
 static uint64_t logging_rot_keep;		/* See ZLOG_KEEP */
 static int logging_pending_sig = 0;		/* Signal recvd while logging */
-static mutex_t logging_lock;			/* The global logging lock */
+static mutex_t logging_lock = ERRORCHECKMUTEX;	/* The global logging lock */
 
 static void logstream_flush_all(logfile_t *);
 static void logstream_sighandler(int);
 static void rotate_log(logfile_t *);
-static size_t make_json(jsonpair_t *, int, char *, size_t);
-static void logfile_write(logfile_t *, const char *, size_t);
+static size_t make_json(jsonpair_t *, size_t, custr_t *);
+static void logfile_write(logfile_t *, custr_t *);
 
 /*
  * If errors are encountered while logging_lock is held, we can't use zerror().
@@ -206,24 +228,19 @@ logstream_err(boolean_t use_strerror, const char *fmt, ...)
 static void
 logstream_lock(void)
 {
-	int ret;
+	VERIFY(logging_initialized);
+	VERIFY(!logging_poisoned);
 
-	assert(logging_initialized && !logging_poisoned);
-
-	ret = mutex_lock(&logging_lock);
-	assert(ret == 0);
+	mutex_enter(&logging_lock);
 }
 
 static void
 logstream_unlock(void)
 {
-	int ret;
-	int err = errno;
 	int sig = logging_pending_sig;
 
 	logging_pending_sig = 0;
-	ret = mutex_unlock(&logging_lock);
-	assert(ret == 0);
+	mutex_exit(&logging_lock);
 
 	/*
 	 * If a signal arrived while this thread was holding the lock, call the
@@ -232,28 +249,25 @@ logstream_unlock(void)
 	if (sig != 0) {
 		logstream_sighandler(sig);
 	}
-
-	errno = err;
 }
 
 static void
 logfile_write_event(logfile_t *lfp, const char *stream, const char *event)
 {
-	char buf[BUFSIZ];
 	size_t len;
 	jsonpair_t pairs[] = {
-		{ "event", event },
-		{ "stream", stream }
+		{ "stream", stream },
+		{ "msg", event }
 	};
 
-	len = make_json(pairs, ARRAY_SIZE(pairs), buf, sizeof (buf));
-	if (len >= sizeof (buf)) {
-		logstream_err(B_FALSE, "%s: buffer too small. Need %llu bytes, "
-		    "have %llu bytes", __func__, len + 1, sizeof (buf));
+	len = make_json(pairs, ARRAY_SIZE(pairs), lfp->lf_cus);
+	if (len >= sizeof (lfp->lf_buf)) {
+		logstream_err(B_FALSE, "%s: buffer too small. Need %zu bytes, "
+		    "have %zu bytes", __func__, len + 1, sizeof (lfp->lf_buf));
 		return;
 	}
 
-	logfile_write(lfp, buf, len);
+	logfile_write(lfp, lfp->lf_cus);
 }
 
 static void
@@ -261,7 +275,7 @@ close_log(logfile_t *lfp, const char *why, boolean_t ign_err)
 {
 	int err;
 
-	assert(MUTEX_HELD(&logging_lock));
+	VERIFY(MUTEX_HELD(&logging_lock));
 
 	/*
 	 * Something may have gone wrong during log rotation, leading to a
@@ -279,7 +293,7 @@ close_log(logfile_t *lfp, const char *why, boolean_t ign_err)
 
 	err = close(lfp->lf_fd);
 	if (!ign_err)
-		assert(err == 0);
+		VERIFY0(err);
 
 	lfp->lf_size = 0;
 	lfp->lf_fd = -1;
@@ -289,10 +303,9 @@ static void
 open_log(logfile_t *lfp, const char *why)
 {
 	struct stat64 sb;
-	int err;
 
-	assert(MUTEX_HELD(&logging_lock));
-	assert(lfp->lf_fd == -1);
+	VERIFY(MUTEX_HELD(&logging_lock));
+	VERIFY3S(lfp->lf_fd, ==, -1);
 
 	lfp->lf_fd = open(lfp->lf_path,
 	    O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0600);
@@ -303,8 +316,7 @@ open_log(logfile_t *lfp, const char *why)
 		return;
 	}
 
-	err = fstat64(lfp->lf_fd, &sb);
-	assert(err == 0);
+	VERIFY0(fstat64(lfp->lf_fd, &sb));
 	lfp->lf_size = sb.st_size;
 	lfp->lf_write_err = B_FALSE;
 	lfp->lf_closing = B_FALSE;
@@ -411,6 +423,7 @@ logstream_atfork_child(void)
 {
 	logging_poisoned = B_TRUE;
 	logging_pending_sig = 0;
+	(void) snprintf(pidstr, sizeof (pidstr), "%d", getpid());
 	logstream_unlock();
 }
 
@@ -418,21 +431,40 @@ void
 logstream_init(zlog_t *zlogp)
 {
 	zone_dochandle_t handle;
-	int err;
 	int i;
 
-	assert(!logging_initialized);
+	VERIFY(!logging_initialized);
 
-	err = mutex_init(&logging_lock, USYNC_THREAD | LOCK_ERRORCHECK, 0);
-	assert(err == 0);
+	VERIFY0(gethostname(host, sizeof (host)));
+	(void) snprintf(pidstr, sizeof (pidstr), "%d", getpid());
 
 	for (i = 0; i < ARRAY_SIZE(logfiles); i++) {
-		logfiles[i].lf_fd = -1;
+		logfile_t *lfp = &logfiles[i];
+
+		lfp->lf_fd = -1;
+		if (custr_alloc_buf(&lfp->lf_cus, lfp->lf_buf,
+		    sizeof (lfp->lf_buf)) != 0) {
+			(void) fprintf(stderr, "failed to allocate custr_t for "
+			    "log file\n");
+			abort();
+		}
 	}
 
-	err = pthread_atfork(logstream_atfork_prepare,
-	    logstream_atfork_parent, logstream_atfork_child);
-	assert(err == 0);
+	for (i = 0; i < ARRAY_SIZE(streams); i++) {
+		logstream_t *lsp = &streams[i];
+
+		if (custr_alloc_buf(&lsp->ls_cusbuf, lsp->ls_buf,
+		    sizeof (lsp->ls_buf)) != 0 ||
+		    custr_alloc_buf(&lsp->ls_cusobuf, lsp->ls_obuf,
+		    sizeof (lsp->ls_obuf)) != 0) {
+			(void) fprintf(stderr, "failed to allocate custr_t for "
+			    "log stream\n");
+			abort();
+		}
+	}
+
+	VERIFY0(pthread_atfork(logstream_atfork_prepare,
+	    logstream_atfork_parent, logstream_atfork_child));
 
 	logging_initialized = B_TRUE;
 
@@ -481,7 +513,7 @@ rotate_log(logfile_t *lfp)
 	glob_t glb = { 0 };
 	int err;
 
-	assert(MUTEX_HELD(&logging_lock));
+	VERIFY(MUTEX_HELD(&logging_lock));
 
 	if (lfp->lf_closing) {
 		return;
@@ -550,13 +582,10 @@ rotate_log(logfile_t *lfp)
  * sbuf to json.
  *
  *   sbuf, slen		Source buffer and the number of bytes in it to process
- *   dbuf, dlen		Destination buffer and its size.  On return, the result
- *			is always null terminated.
+ *   dest		Destination custr_t containing escaped JSON.
  *   scntp		On return, *scntp stores number of scnt bytes consumed
- *   dcntp		On return, *dcntp stores number of bytes stored in dcnt,
- *			excluding trailing nul.
  *   flushp		If non-NULL, line-buffered mode is enabled.  Processing
- *			will stop at the first newline or when obuf is full and
+ *			will stop at the first newline or when dest is full and
  *			*flushp will be set to B_TRUE.
  *
  * This function makes no attempt to handle wide characters properly because
@@ -566,10 +595,9 @@ rotate_log(logfile_t *lfp)
  * readers to interpret non-ASCII data.
  */
 static void
-escape_json(const char *sbuf, int slen, char *dbuf, int dlen, int *scntp,
-    int *dcntp, boolean_t *flushp)
+escape_json(const char *sbuf, size_t slen, custr_t *dest, size_t *scntp,
+    boolean_t *flushp)
 {
-	int i;
 	char c;
 	const char *save_sbuf = sbuf;
 	const char *sbuf_end = sbuf + slen - 1;
@@ -577,12 +605,16 @@ escape_json(const char *sbuf, int slen, char *dbuf, int dlen, int *scntp,
 	const char *append;
 	int len;
 
+	if (slen == 0) {
+		*scntp = 0;
+		return;
+	}
+
 	if (flushp != NULL) {
 		*flushp = B_FALSE;
 	}
 
-	i = 0;
-	while (i < (dlen - 1) && sbuf <= sbuf_end) {
+	while (sbuf <= sbuf_end) {
 		c = sbuf[0];
 
 		switch (c) {
@@ -624,47 +656,40 @@ escape_json(const char *sbuf, int slen, char *dbuf, int dlen, int *scntp,
 			} else {
 				len = snprintf(append_buf, sizeof (append_buf),
 				    "\\u%04x", (int)(0xff & c));
-				assert(len < sizeof (append_buf));
+				VERIFY3S(len, <, sizeof (append_buf));
 			}
 			append = append_buf;
 			break;
 		}
 
-		len = strlcpy(&dbuf[i], append, dlen - i);
-		if (len >= dlen - i) {
+		if (custr_append(dest, append) != 0) {
+			VERIFY3S(errno, ==, EOVERFLOW);
 			if (flushp != NULL) {
 				*flushp = B_TRUE;
 			}
 			break;
-		} else {
-			sbuf++;
-			i += len;
 		}
+
+		sbuf++;
+
 		if (flushp != NULL && *flushp) {
 			break;
 		}
 	}
 
-	dbuf[i] = '\0';
-
-	*dcntp = i;
 	*scntp = sbuf - save_sbuf;
 
-	assert(*dcntp < dlen);
-	assert(*scntp <= slen);
-
-	/* Buffer is too full to append "\\n". Force a flush. */
-	if (flushp != NULL && i >= dlen - 2) {
-		*flushp = B_TRUE;
-	}
+	VERIFY3U(*scntp, <=, slen);
 }
 
 /*
  * Like write(2), but to a logfile_t and with retries on short writes.
  */
 static void
-logfile_write(logfile_t *lfp, const char *buf, size_t buflen)
+logfile_write(logfile_t *lfp, custr_t *cus)
 {
+	const char *buf = custr_cstr(cus);
+	size_t buflen = custr_len(cus);
 	ssize_t wlen;
 	size_t wanted = buflen;
 
@@ -691,23 +716,14 @@ logfile_write(logfile_t *lfp, const char *buf, size_t buflen)
 	}
 }
 
-/*
- * Convert the json pairs into a json object.  A "time" element is added to
- * every object.  Returns the number of bytes that would have been written to
- * buf if bufsz had buf been sufficiently large (excluding the terminating null
- * byte).  Like snprintf().
- */
-static size_t
-make_json(jsonpair_t *pairs, int npairs, char *buf, size_t bufsz)
+static void
+add_bunyan_preamble(custr_t *cus)
 {
 	struct tm gtm;
 	struct timeval tv;
-	char ts[32];
-	size_t len = 0;
-	int i;
-	const char *key, *val, *start, *end;
-
-	assert(npairs > 0);
+	/* Large enough for YYYY-MM-DDTHH:MM:SS.000000000Z + NUL */
+	char timestr[32] = { 0 };
+	size_t len;
 
 	if (gettimeofday(&tv, NULL) != 0 ||
 	    gmtime_r(&tv.tv_sec, &gtm) == NULL) {
@@ -715,59 +731,87 @@ make_json(jsonpair_t *pairs, int npairs, char *buf, size_t bufsz)
 		abort();
 	}
 
-	if (snprintf(ts, sizeof (ts), "%04d-%02d-%02dT%02d:%02d:%02d.%09ldZ",
-	    gtm.tm_year + 1900, gtm.tm_mon + 1, gtm.tm_mday,
-	    gtm.tm_hour, gtm.tm_min, gtm.tm_sec, tv.tv_usec * 1000) >=
-	    sizeof (ts)) {
-		logstream_err(B_FALSE, "timestamp buffer too small");
-		abort();
-	}
+	len = strftime(timestr, sizeof (timestr) - 1, "%FT%T", &gtm);
+	VERIFY3U(len, >, 0);
+	VERIFY3U(len, <, sizeof (timestr) - 1);
 
-	start = "{";
-	end = "";
-	for (i = 0; i <= npairs; i++) {
-		if (i < npairs) {
-			key = pairs[i].jp_key;
-			val = pairs[i].jp_val;
-		} else {
-			key = "time";
-			val = ts;
-			end = "}\n";
+	VERIFY0(custr_append_printf(cus, "\"time\": \"%s.%09ldZ\", ",
+	    timestr, tv.tv_usec * 1000));
+	VERIFY0(custr_append_printf(cus, "\"v\": %d, ", BUNYAN_VERSION));
+	VERIFY0(custr_append_printf(cus, "\"hostname\": \"%s\", ", host));
+	VERIFY0(custr_append(cus, "\"name\": \"zoneadmd\","));
+	VERIFY0(custr_append_printf(cus, "\"pid\": %s, ", pidstr));
+	VERIFY0(custr_append_printf(cus, "\"level\": %d", BUNYAN_LOG_LEVEL));
+}
+
+/*
+ * Convert the json pairs into a json object. The properties required for
+ * bunyan-formatted json objects are added to every object.
+ * Returns the number of bytes that would have been written to
+ * buf if bufsz had buf been sufficiently large (excluding the terminating null
+ * byte).  Like snprintf().
+ */
+static size_t
+make_json(jsonpair_t *pairs, size_t npairs, custr_t *cus)
+{
+	int i;
+	const char *key, *val;
+	const char *start = ", ";
+
+	VERIFY3S(npairs, >, 0);
+
+	custr_reset(cus);
+
+	VERIFY0(custr_append(cus, "{ "));
+
+	add_bunyan_preamble(cus);
+
+	for (i = 0; i < npairs; i++) {
+		size_t len;
+
+		key = pairs[i].jp_key;
+		val = pairs[i].jp_val;
+
+		/* The total number of bytes we're adding to cus */
+		len = 3 + strlen(key) + 3 + strlen(val) + 1;
+		if (custr_append_printf(cus, "%s\"%s\":\"%s\"",
+		    start, key, val) != 0) {
+			VERIFY3S(errno, ==, EOVERFLOW);
+			return (custr_len(cus) + len);
 		}
-
-		len += snprintf(bufsz > len ? buf + len : NULL,
-		    bufsz > len ? bufsz - len : 0, "%s\"%s\":\"%s\"%s",
-		    start, key, val, end);
-
-		start = ",";
 	}
 
-	return (len);
+	if (custr_append(cus, " }\n") != 0) {
+		return (custr_len(cus) + 3);
+	}
+
+	return (custr_len(cus));
 }
 
 static void
 logstream_write_json(logstream_t *lsp)
 {
-	char obuf[sizeof (lsp->ls_buf) + sizeof (lsp->ls_stream) + 64];
 	size_t len;
 	jsonpair_t pairs[] = {
-		{ "log", lsp->ls_buf },
+		{ "msg", lsp->ls_buf },
 		{ "stream", lsp->ls_stream },
 	};
 
-	if (lsp->ls_buflen == 0) {
+	if (custr_len(lsp->ls_cusbuf) == 0) {
 		return;
 	}
 
-	len = make_json(pairs, ARRAY_SIZE(pairs), obuf, sizeof (obuf));
-	lsp->ls_buflen = 0;
-	if (len >= sizeof (obuf)) {
+	len = make_json(pairs, ARRAY_SIZE(pairs), lsp->ls_cusobuf);
+
+	custr_reset(lsp->ls_cusbuf);
+	if (len >= sizeof (lsp->ls_obuf)) {
 		logstream_err(B_FALSE, "%s: buffer too small. Need %llu bytes, "
-		    "have %llu bytes", __func__, len + 1, sizeof (obuf));
+		    "have %llu bytes", __func__, len + 1,
+		    sizeof (lsp->ls_obuf));
 		return;
 	}
 
-	logfile_write(lsp->ls_logfile, obuf, len);
+	logfile_write(lsp->ls_logfile, lsp->ls_cusobuf);
 }
 
 /*
@@ -784,14 +828,15 @@ void
 logstream_write(int ls, char *buf, int len)
 {
 	logstream_t *lsp;
-	int scnt, dcnt;
+	size_t scnt;
 	boolean_t newline;
 	boolean_t buffered;
 
 	if (ls == -1 || len == 0) {
 		return;
 	}
-	assert(ls >= 0 && ls < ARRAY_SIZE(streams));
+	VERIFY3S(ls, >=, 0);
+	VERIFY3S(ls, <, ARRAY_SIZE(streams));
 
 	logstream_lock();
 
@@ -804,11 +849,9 @@ logstream_write(int ls, char *buf, int len)
 	buffered = !!(lsp->ls_flags & LS_LINE_BUFFERED);
 
 	do {
-		escape_json(buf, len, lsp->ls_buf + lsp->ls_buflen,
-		    sizeof (lsp->ls_buf) - lsp->ls_buflen,
-		    &scnt, &dcnt, buffered ? &newline : NULL);
+		escape_json(buf, len, lsp->ls_cusbuf, &scnt,
+		    buffered ? &newline : NULL);
 
-		lsp->ls_buflen += dcnt;
 		buf += scnt;
 		len -= scnt;
 
@@ -825,7 +868,7 @@ logstream_flush(int ls)
 {
 	logstream_t *lsp;
 
-	assert(MUTEX_HELD(&logging_lock));
+	VERIFY(MUTEX_HELD(&logging_lock));
 
 	lsp = &streams[ls];
 	if (lsp->ls_stream[0] == '\0' || lsp->ls_logfile == NULL) {
@@ -839,7 +882,7 @@ logstream_flush_all(logfile_t *lfp)
 {
 	int i;
 
-	assert(MUTEX_HELD(&logging_lock));
+	VERIFY(MUTEX_HELD(&logging_lock));
 
 	for (i = 0; i < ARRAY_SIZE(streams); i++) {
 		if (streams[i].ls_logfile == lfp) {
@@ -856,8 +899,8 @@ logstream_open(const char *logname, const char *stream, logstream_flags_t flags)
 	logstream_t *lsp;
 	logfile_t *lfp = NULL;
 
-	assert(strlen(logname) < sizeof (lfp->lf_name));
-	assert(strlen(stream) < sizeof (lsp->ls_stream));
+	VERIFY3U(strlen(logname), <, sizeof (lfp->lf_name));
+	VERIFY3U(strlen(stream), <, sizeof (lsp->ls_stream));
 
 	logstream_lock();
 
@@ -867,7 +910,7 @@ logstream_open(const char *logname, const char *stream, logstream_flags_t flags)
 	 */
 	for (i = 0; i < ARRAY_SIZE(streams); i++) {
 		if (ls == -1 && streams[i].ls_stream[0] == '\0') {
-			assert(streams[i].ls_logfile == NULL);
+			VERIFY3P(streams[i].ls_logfile, ==, NULL);
 			ls = i;
 			continue;
 		}
@@ -878,7 +921,7 @@ logstream_open(const char *logname, const char *stream, logstream_flags_t flags)
 			return (-1);
 		}
 	}
-	assert(ls != -1);
+	VERIFY3S(ls, !=, -1);
 
 	/* Find an existing or available logfile_t */
 	for (i = 0; i < ARRAY_SIZE(logfiles); i++) {
@@ -927,7 +970,8 @@ logstream_close(int ls, boolean_t abrupt)
 	if (ls == -1) {
 		return;
 	}
-	assert(ls >= 0 && ls < ARRAY_SIZE(streams));
+	VERIFY3S(ls, >=, 0);
+	VERIFY3S(ls, <, ARRAY_SIZE(streams));
 
 	logstream_lock();
 	logstream_flush(ls);
@@ -935,8 +979,8 @@ logstream_close(int ls, boolean_t abrupt)
 	lsp = &streams[ls];
 	lfp = lsp->ls_logfile;
 
-	assert(lsp->ls_stream[0] != '\0');
-	assert(lfp != NULL);
+	VERIFY(lsp->ls_stream[0] != '\0');
+	VERIFY3P(lfp, !=, NULL);
 
 	(void) memset(lsp, 0, sizeof (*lsp));
 
