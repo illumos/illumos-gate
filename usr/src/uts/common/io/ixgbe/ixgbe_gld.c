@@ -304,8 +304,10 @@ ixgbe_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		mac_capab_lso_t *cap_lso = cap_data;
 
 		if (ixgbe->lso_enable) {
-			cap_lso->lso_flags = LSO_TX_BASIC_TCP_IPV4;
+			cap_lso->lso_flags = LSO_TX_BASIC_TCP_IPV4 |
+			    LSO_TX_BASIC_TCP_IPV6;
 			cap_lso->lso_basic_tcp_ipv4.lso_max = IXGBE_LSO_MAXLEN;
+			cap_lso->lso_basic_tcp_ipv6.lso_max = IXGBE_LSO_MAXLEN;
 			break;
 		} else {
 			return (B_FALSE);

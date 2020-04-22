@@ -408,6 +408,7 @@ typedef struct ixgbe_tx_context {
 	uint32_t		hcksum_flags;
 	uint32_t		ip_hdr_len;
 	uint32_t		mac_hdr_len;
+	uint32_t		l3_proto;
 	uint32_t		l4_proto;
 	uint32_t		mss;
 	uint32_t		l4_hdr_len;

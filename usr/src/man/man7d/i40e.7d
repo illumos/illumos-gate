@@ -11,7 +11,7 @@
 .\"
 .\" Copyright (c) 2018 Joyent, Inc.
 .\"
-.Dd Jan 10, 2020
+.Dd April 15, 2020
 .Dt I40E 7D
 .Os
 .Sh NAME
@@ -44,6 +44,8 @@ Promiscuous access via
 IPv4 Checksum Offload
 .It
 TCP, UDP, and SCTP checksum offload
+.It
+IPv4 and IPv6 TCP Segmentation offload
 .El
 .Pp
 At this time, the

@@ -794,8 +794,8 @@ typedef struct bge {
 	/*
 	 * For the BCM5705/5788/5721/5751/5752/5714 and 5715,
 	 * the statistic block is not available,the statistic counter must
-	 * be gotten from statistic registers.And bge_statistics_reg_t record
-	 * the statistic registers value
+	 * be gotten from statistic registers. And bge_statistics_reg_t record
+	 * the statistic registers value.
 	 */
 	bge_statistics_reg_t	*pstats;
 

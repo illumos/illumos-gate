@@ -586,7 +586,7 @@ bge_restart_copper(bge_t *bgep, boolean_t powerdown)
 	case MHCR_CHIP_ASIC_REV_5906:
 	case MHCR_CHIP_ASIC_REV_5700:
 	case MHCR_CHIP_ASIC_REV_5701:
-	case MHCR_CHIP_ASIC_REV_5723: /* 5717 and 5725 series as well */
+	case MHCR_CHIP_ASIC_REV_5723: /* 5717, 5725, 57765 series as well */
 	case MHCR_CHIP_ASIC_REV_5721_5751:
 		/*
 		 * Just a plain reset; the "check" code breaks these chips
@@ -1333,7 +1333,8 @@ bge_restart_serdes(bge_t *bgep, boolean_t powerdown)
 	macmode &= ~ETHERNET_MODE_PORTMODE_MASK;
 	if (DEVICE_5717_SERIES_CHIPSETS(bgep) ||
 	    DEVICE_5725_SERIES_CHIPSETS(bgep) ||
-	    DEVICE_5714_SERIES_CHIPSETS(bgep)) {
+	    DEVICE_5714_SERIES_CHIPSETS(bgep) ||
+	    DEVICE_57765_SERIES_CHIPSETS(bgep)) {
 		macmode |= ETHERNET_MODE_PORTMODE_GMII;
 	} else {
 		macmode |= ETHERNET_MODE_PORTMODE_TBI;
@@ -1561,11 +1562,12 @@ bge_check_serdes(bge_t *bgep, boolean_t recheck)
 		 * Don't call function bge_autoneg_serdes() as
 		 * RX_1000BASEX_AUTONEG_REG (0x0448) is not applicable
 		 * to BCM5705, BCM5788, BCM5721, BCM5751, BCM5752,
-		 * BCM5714, and BCM5715 devices.
+		 * BCM5714, BCM5715, and BCM57765 family devices.
 		 */
 		if (DEVICE_5717_SERIES_CHIPSETS(bgep) ||
 		    DEVICE_5725_SERIES_CHIPSETS(bgep) ||
-		    DEVICE_5714_SERIES_CHIPSETS(bgep)) {
+		    DEVICE_5714_SERIES_CHIPSETS(bgep) ||
+		    DEVICE_57765_SERIES_CHIPSETS(bgep)) {
 			tx_status = bge_reg_get32(bgep,
 			    TRANSMIT_MAC_STATUS_REG);
 			linkup = BIS(tx_status, TRANSMIT_STATUS_LINK_UP);

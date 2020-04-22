@@ -451,7 +451,8 @@ start_tx:
 			hw_sbd_p->flags |= SBD_FLAG_TCP_UDP_CKSUM;
 		if (!(bgep->chipid.flags & CHIP_FLAG_NO_JUMBO) &&
 		    (DEVICE_5717_SERIES_CHIPSETS(bgep) ||
-		     DEVICE_5725_SERIES_CHIPSETS(bgep)) &&
+		     DEVICE_5725_SERIES_CHIPSETS(bgep) ||
+		     DEVICE_57765_SERIES_CHIPSETS(bgep)) &&
 		    (txbuf->copy_len > ETHERMAX))
 			hw_sbd_p->flags |= SBD_FLAG_JMB_PKT;
 		hw_sbd_p->flags |= SBD_FLAG_PACKET_END;

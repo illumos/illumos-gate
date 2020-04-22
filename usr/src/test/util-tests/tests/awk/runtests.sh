@@ -12,10 +12,10 @@
 #
 
 #
-# Copyright 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
-AWK=/usr/bin/nawk
+AWK=/usr/bin/awk
 WORKDIR=$(mktemp -d /tmp/nawktest.XXXXXX)
 
 SUCCESSES=0

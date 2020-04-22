@@ -132,7 +132,7 @@ $AWK 'BEGIN { foo() }' 2> $TEMP0
 grep "calling undefined function foo" $TEMP0 >/dev/null || fail "BAD: T.misc undefined function"
 
 
-# gawk arrayparm test; should give error about function 
+# gawk arrayparm test; should give error about function
 $AWK '
 BEGIN {
     foo[1]=1;
@@ -365,14 +365,14 @@ cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc immmediate exit 4'
 echo 1 > $TEMP1
 $AWK '	{ n = split($0, x)
 	  for (i in x) {
-	 	if (i == 1)
+		if (i == 1)
 			exit } }
 	END { print NR }' /etc/passwd > $TEMP2
 cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc immmediate exit 5'
 
 echo XXXXXXXX > $TEMP1
 $AWK 'BEGIN { s = "ab\fc\rd\be"
-	t = s; 	gsub("[" s "]", "X", t); print t }' > $TEMP2
+	t = s;	gsub("[" s "]", "X", t); print t }' > $TEMP2
 cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc weird escapes in char class'
 
 $AWK '{}' /etc/passwd glop/glop > $TEMP0 2> $TEMP2

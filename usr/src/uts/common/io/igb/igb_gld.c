@@ -965,8 +965,10 @@ igb_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		mac_capab_lso_t *cap_lso = cap_data;
 
 		if (igb->lso_enable) {
-			cap_lso->lso_flags = LSO_TX_BASIC_TCP_IPV4;
+			cap_lso->lso_flags = LSO_TX_BASIC_TCP_IPV4 |
+			    LSO_TX_BASIC_TCP_IPV6;
 			cap_lso->lso_basic_tcp_ipv4.lso_max = IGB_LSO_MAXLEN;
+			cap_lso->lso_basic_tcp_ipv6.lso_max = IGB_LSO_MAXLEN;
 			break;
 		} else {
 			return (B_FALSE);
@@ -1645,7 +1647,7 @@ igb_priv_prop_info(igb_t *igb, const char *pr_name, mac_prop_info_handle_t prh)
 		value = DEFAULT_RX_COPY_THRESHOLD;
 	} else if (strcmp(pr_name, "_rx_limit_per_intr") == 0) {
 		value = DEFAULT_RX_LIMIT_PER_INTR;
-	} else 	if (strcmp(pr_name, "_intr_throttling") == 0) {
+	} else if (strcmp(pr_name, "_intr_throttling") == 0) {
 		value = igb->capab->def_intr_throttle;
 	} else {
 		return;

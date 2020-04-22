@@ -164,7 +164,7 @@ extern int peekpoke_mem(ddi_ctl_enum_t, peekpoke_ctlops_t *);
 /*
  * Helper functions
  */
-extern char *i_ddi_strdup(char *, uint_t);
+extern char *i_ddi_strdup(const char *, uint_t);
 extern void i_ddi_prop_list_delete(ddi_prop_t *);
 extern ddi_prop_t *i_ddi_prop_list_dup(ddi_prop_t *, uint_t);
 extern int i_ddi_load_drvconf(major_t);

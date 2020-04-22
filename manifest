@@ -11905,7 +11905,7 @@ f usr/share/man/man1/at.1 0444 root bin
 f usr/share/man/man1/atq.1 0444 root bin
 f usr/share/man/man1/atrm.1 0444 root bin
 f usr/share/man/man1/auths.1 0444 root bin
-s usr/share/man/man1/awk.1=nawk.1
+f usr/share/man/man1/awk.1 0444 root bin
 f usr/share/man/man1/banner.1 0444 root bin
 f usr/share/man/man1/basename.1 0444 root bin
 s usr/share/man/man1/batch.1=at.1
@@ -12122,7 +12122,7 @@ f usr/share/man/man1/mpss.so.1.1 0444 root bin
 f usr/share/man/man1/msgfmt.1 0444 root bin
 f usr/share/man/man1/mt.1 0444 root bin
 f usr/share/man/man1/mv.1 0444 root bin
-f usr/share/man/man1/nawk.1 0444 root bin
+s usr/share/man/man1/nawk.1=awk.1
 f usr/share/man/man1/nc.1 0444 root bin
 s usr/share/man/man1/neqn.1=eqn.1
 f usr/share/man/man1/newform.1 0444 root bin

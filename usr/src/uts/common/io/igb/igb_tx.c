@@ -598,6 +598,7 @@ igb_get_tx_context(mblk_t *mp, tx_context_t *ctx)
 	uint32_t start;
 	uint32_t flags;
 	uint32_t lso_flag;
+	uint32_t lso_cksum;
 	uint32_t mss;
 	uint32_t len;
 	uint32_t size;
@@ -621,19 +622,6 @@ igb_get_tx_context(mblk_t *mp, tx_context_t *ctx)
 	mac_lso_get(mp, &mss, &lso_flag);
 	ctx->mss = mss;
 	ctx->lso_flag = (lso_flag == HW_LSO);
-
-	/*
-	 * LSO relies on tx h/w checksum, so here the packet will be
-	 * dropped if the h/w checksum flags are not set.
-	 */
-	if (ctx->lso_flag) {
-		if (!((ctx->hcksum_flags & HCK_PARTIALCKSUM) &&
-		    (ctx->hcksum_flags & HCK_IPV4_HDRCKSUM))) {
-			igb_log(NULL, IGB_LOG_INFO, "igb_tx: h/w "
-			    "checksum flags are not set for LSO");
-			return (TX_CXT_E_LSO_CSUM);
-		}
-	}
 
 	etype = 0;
 	mac_hdr_len = 0;
@@ -679,6 +667,8 @@ igb_get_tx_context(mblk_t *mp, tx_context_t *ctx)
 	 * Here we assume the IP(V6) header is fully included in one
 	 * mblk fragment.
 	 */
+	lso_cksum = HCK_PARTIALCKSUM;
+	ctx->l3_proto = etype;
 	switch (etype) {
 	case ETHERTYPE_IP:
 		offset = mac_hdr_len;
@@ -703,11 +693,27 @@ igb_get_tx_context(mblk_t *mp, tx_context_t *ctx)
 			 * with zero. Currently the tcp/ip stack has done
 			 * these.
 			 */
+			lso_cksum |= HCK_IPV4_HDRCKSUM;
 		}
 
 		l4_proto = *(uint8_t *)(pos + offsetof(ipha_t, ipha_protocol));
 		break;
 	case ETHERTYPE_IPV6:
+		/*
+		 * We need to zero out the length in the header.
+		 */
+		if (ctx->lso_flag) {
+			offset = offsetof(ip6_t, ip6_plen) + mac_hdr_len;
+			while (size <= offset) {
+				mp = mp->b_cont;
+				ASSERT(mp != NULL);
+				len = MBLKL(mp);
+				size += len;
+			}
+			pos = mp->b_rptr + offset + len - size;
+			*((uint16_t *)(uintptr_t)(pos)) = 0;
+		}
+
 		offset = offsetof(ip6_t, ip6_nxt) + mac_hdr_len;
 		while (size <= offset) {
 			mp = mp->b_cont;
@@ -727,6 +733,18 @@ igb_get_tx_context(mblk_t *mp, tx_context_t *ctx)
 	}
 
 	if (ctx->lso_flag) {
+		/*
+		 * LSO relies on tx h/w checksum, so here the packet will be
+		 * dropped if the h/w checksum flags are not set.
+		 */
+		if ((ctx->hcksum_flags & lso_cksum) != lso_cksum) {
+			igb_log(NULL, IGB_LOG_INFO, "igb_tx: h/w "
+			    "checksum flags are not set for LSO, found "
+			    "0x%x, needed bits 0x%x", ctx->hcksum_flags,
+			    lso_cksum);
+			return (TX_CXT_E_LSO_CSUM);
+		}
+
 		offset = mac_hdr_len + start;
 		while (size <= offset) {
 			mp = mp->b_cont;
@@ -771,6 +789,7 @@ igb_check_tx_context(igb_tx_ring_t *tx_ring, tx_context_t *ctx)
 	 * need to be checked are:
 	 *	hcksum_flags
 	 *	l4_proto
+	 *	l3_proto
 	 *	mss (only check for LSO)
 	 *	l4_hdr_len (only check for LSO)
 	 *	ip_hdr_len
@@ -783,6 +802,7 @@ igb_check_tx_context(igb_tx_ring_t *tx_ring, tx_context_t *ctx)
 	if (ctx->hcksum_flags != 0) {
 		if ((ctx->hcksum_flags != last->hcksum_flags) ||
 		    (ctx->l4_proto != last->l4_proto) ||
+		    (ctx->l3_proto != last->l3_proto) ||
 		    (ctx->lso_flag && ((ctx->mss != last->mss) ||
 		    (ctx->l4_hdr_len != last->l4_hdr_len))) ||
 		    (ctx->ip_hdr_len != last->ip_hdr_len) ||
@@ -814,10 +834,19 @@ igb_fill_tx_context(struct e1000_adv_tx_context_desc *ctx_tbd,
 	ctx_tbd->type_tucmd_mlhl =
 	    E1000_ADVTXD_DCMD_DEXT | E1000_ADVTXD_DTYP_CTXT;
 
-	if (ctx->hcksum_flags & HCK_IPV4_HDRCKSUM)
-		ctx_tbd->type_tucmd_mlhl |= E1000_ADVTXD_TUCMD_IPV4;
+	/*
+	 * When we have a TX context set up, we enforce that the ethertype is
+	 * either IPv4 or IPv6 in igb_get_tx_context().
+	 */
+	if (ctx->lso_flag || ctx->hcksum_flags & HCK_IPV4_HDRCKSUM) {
+		if (ctx->l3_proto == ETHERTYPE_IP) {
+			ctx_tbd->type_tucmd_mlhl |= E1000_ADVTXD_TUCMD_IPV4;
+		} else {
+			ctx_tbd->type_tucmd_mlhl |= E1000_ADVTXD_TUCMD_IPV6;
+		}
+	}
 
-	if (ctx->hcksum_flags & HCK_PARTIALCKSUM) {
+	if (ctx->lso_flag || ctx->hcksum_flags & HCK_PARTIALCKSUM) {
 		switch (ctx->l4_proto) {
 		case IPPROTO_TCP:
 			ctx_tbd->type_tucmd_mlhl |= E1000_ADVTXD_TUCMD_L4T_TCP;

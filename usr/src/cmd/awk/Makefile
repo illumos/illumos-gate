@@ -24,11 +24,12 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 
-# NOTE: awk is oawk.
+# NOTE: awk is now nawk.
 
 PROG= nawk
+LINKPROG= awk
 
 OBJ1= b.o lib.o main.o parse.o proctab.o run.o tran.o lex.o
 OBJ2= awk.g.o
@@ -36,6 +37,8 @@ OBJS= $(OBJ2) $(OBJ1)
 SRCS= $(OBJ1:%.o=%.c)
 
 include ../Makefile.cmd
+
+ROOTLINK =	$(LINKPROG:%=$(ROOTBIN)/%)
 
 CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-parentheses
@@ -61,11 +64,14 @@ CLEANFILES= maketab proctab.c awk.g.c y.tab.h
 
 .KEEP_STATE:
 
-all: $(PROG)
+all: $(PROG) $(ROOTLINK)
 
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
+
+$(ROOTLINK):	$(ROOTPROG)
+	$(RM) $@; $(LN) $(ROOTPROG) $@
 
 #
 # message catalog
@@ -86,8 +92,6 @@ install: all $(ROOTPROG) $(ROOTLINK)
 
 clean:
 	$(RM) $(OBJS) $(CLEANFILES)
-
-lint: awk.g.c lint_SRCS
 
 awk.g.c + y.tab.h: awk.g.y
 
