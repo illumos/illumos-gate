@@ -25,7 +25,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -376,8 +376,6 @@
 /*
  * Local declarations
  */
-#define	NEXTSTATE(EV, ST)	ti_statetbl[EV][ST]
-
 #define	BADSEQNUM	(-1)	/* initial seq number used by T_DISCON_IND */
 #define	TL_BUFWAIT	(10000)	/* usecs to wait for allocb buffer timeout */
 #define	TL_TIDUSZ (64*1024)	/* tidu size when "strmsgz" is unlimited (0) */
@@ -415,15 +413,6 @@
  * LOCAL MACROS
  */
 #define	T_ALIGN(p)	P2ROUNDUP((p), sizeof (t_scalar_t))
-
-/*
- * EXTERNAL VARIABLE DECLARATIONS
- * -----------------------------
- */
-/*
- * state table defined in the OS space.c
- */
-extern	char	ti_statetbl[TE_NOEVENTS][TS_NOSTATES];
 
 /*
  * STREAMS DRIVER ENTRY POINTS PROTOTYPES
@@ -822,6 +811,82 @@ static int tl_disable_early_connect = 0;
 static int tl_client_closing_when_accepting;
 
 static int tl_serializer_noswitch;
+
+#define	nr	127		/* not reachable */
+
+#define	TE_NOEVENTS	28
+
+static char nextstate[TE_NOEVENTS][TS_NOSTATES] = {
+				/* STATES */
+	/* 0  1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16 */
+
+/* Initialization events */
+
+#define	TE_BIND_REQ	0	/* bind request				*/
+	{ 1, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr},
+#define	TE_UNBIND_REQ	1	/* unbind request			*/
+	{nr, nr, nr,  2, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr},
+#define	TE_OPTMGMT_REQ	2	/* manage options req			*/
+	{nr, nr, nr,  4, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr},
+#define	TE_BIND_ACK	3	/* bind acknowledment			*/
+	{nr,  3, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr},
+#define	TE_OPTMGMT_ACK	4	/* manage options ack			*/
+	{nr, nr, nr, nr,  3, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr},
+#define	TE_ERROR_ACK	5	/* error acknowledgment			*/
+	{nr,  0,  3, nr,  3,  3, nr, nr,  7, nr, nr, nr,  6,  7,  9, 10, 11},
+#define	TE_OK_ACK1	6	/* ok ack  seqcnt == 0			*/
+	{nr, nr,  0, nr, nr,  6, nr, nr, nr, nr, nr, nr,  3, nr,  3,  3,  3},
+#define	TE_OK_ACK2	7	/* ok ack  seqcnt == 1, q == resq	*/
+	{nr, nr, nr, nr, nr, nr, nr, nr,  9, nr, nr, nr, nr,  3, nr, nr, nr},
+#define	TE_OK_ACK3	8	/* ok ack  seqcnt == 1, q != resq	*/
+	{nr, nr, nr, nr, nr, nr, nr, nr,  3, nr, nr, nr, nr,  3, nr, nr, nr},
+#define	TE_OK_ACK4	9	/* ok ack  seqcnt > 1			*/
+	{nr, nr, nr, nr, nr, nr, nr, nr,  7, nr, nr, nr, nr,  7, nr, nr, nr},
+
+/* Connection oriented events */
+#define	TE_CONN_REQ	10	/* connection request			*/
+	{nr, nr, nr,  5, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr},
+#define	TE_CONN_RES	11	/* connection response			*/
+	{nr, nr, nr, nr, nr, nr, nr,  8, nr, nr, nr, nr, nr, nr, nr, nr, nr},
+#define	TE_DISCON_REQ	12	/* disconnect request			*/
+	{nr, nr, nr, nr, nr, nr, 12, 13, nr, 14, 15, 16, nr, nr, nr, nr, nr},
+#define	TE_DATA_REQ	13	/* data request				*/
+	{nr, nr, nr, nr, nr, nr, nr, nr, nr,  9, nr, 11, nr, nr, nr, nr, nr},
+#define	TE_EXDATA_REQ	14	/* expedited data request		*/
+	{nr, nr, nr, nr, nr, nr, nr, nr, nr,  9, nr, 11, nr, nr, nr, nr, nr},
+#define	TE_ORDREL_REQ	15	/* orderly release req			*/
+	{nr, nr, nr, nr, nr, nr, nr, nr, nr, 10, nr,  3, nr, nr, nr, nr, nr},
+#define	TE_CONN_IND	16	/* connection indication		*/
+	{nr, nr, nr,  7, nr, nr, nr,  7, nr, nr, nr, nr, nr, nr, nr, nr, nr},
+#define	TE_CONN_CON	17	/* connection confirmation		*/
+	{nr, nr, nr, nr, nr, nr,  9, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr},
+#define	TE_DATA_IND	18	/* data indication			*/
+	{nr, nr, nr, nr, nr, nr, nr, nr, nr,  9, 10, nr, nr, nr, nr, nr, nr},
+#define	TE_EXDATA_IND	19	/* expedited data indication		*/
+	{nr, nr, nr, nr, nr, nr, nr, nr, nr,  9, 10, nr, nr, nr, nr, nr, nr},
+#define	TE_ORDREL_IND	20	/* orderly release ind			*/
+	{nr, nr, nr, nr, nr, nr, nr, nr, nr, 11,  3, nr, nr, nr, nr, nr, nr},
+#define	TE_DISCON_IND1	21	/* disconnect indication seq == 0	*/
+	{nr, nr, nr, nr, nr, nr,  3, nr, nr,  3,  3,  3, nr, nr, nr, nr, nr},
+#define	TE_DISCON_IND2	22	/* disconnect indication seq == 1	*/
+	{nr, nr, nr, nr, nr, nr, nr,  3, nr, nr, nr, nr, nr, nr, nr, nr, nr},
+#define	TE_DISCON_IND3	23	/* disconnect indication seq > 1	*/
+	{nr, nr, nr, nr, nr, nr, nr,  7, nr, nr, nr, nr, nr, nr, nr, nr, nr},
+#define	TE_PASS_CONN	24	/* pass connection			*/
+	{nr, nr, nr,  9, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr},
+
+
+/* Unit data events */
+
+#define	TE_UNITDATA_REQ	25	/* unitdata request			*/
+	{nr, nr, nr,  3, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr},
+#define	TE_UNITDATA_IND	26	/* unitdata indication			*/
+	{nr, nr, nr,  3, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr},
+#define	TE_UDERROR_IND	27	/* unitdata error indication		*/
+	{nr, nr, nr,  3, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr, nr},
+};
+
+
 
 /*
  * LOCAL FUNCTION PROTOTYPES
@@ -1955,8 +2020,9 @@ tl_wput_data_ser(mblk_t *mp, tl_endpt_t *tep)
 	    (tep->te_state == TS_WREQ_ORDREL)) &&
 	    (tep->te_wq != NULL) &&
 	    (tep->te_wq->q_first == NULL) &&
-	    ((peer_tep->te_state == TS_DATA_XFER) ||
-	    (peer_tep->te_state == TS_WREQ_ORDREL))	&&
+	    (peer_tep->te_state == TS_DATA_XFER ||
+	    peer_tep->te_state == TS_WIND_ORDREL ||
+	    peer_tep->te_state == TS_WREQ_ORDREL) &&
 	    ((peer_rq = peer_tep->te_rq) != NULL) &&
 	    (canputnext(peer_rq) || tep->te_closing)) {
 		putnext(peer_rq, mp);
@@ -2382,7 +2448,7 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 		goto error;
 	}
 
-	tep->te_state = NEXTSTATE(TE_BIND_REQ, tep->te_state);
+	tep->te_state = nextstate[TE_BIND_REQ][tep->te_state];
 
 	ASSERT((bind->PRIM_type == O_T_BIND_REQ) ||
 	    (bind->PRIM_type == T_BIND_REQ));
@@ -2422,7 +2488,7 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 			(void) (STRLOG(TL_ID, tep->te_minor,
 			    1, SL_TRACE | SL_ERROR,
 			    "tl_bind: invalid socket addr"));
-			tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
+			tep->te_state = nextstate[TE_ERROR_ACK][tep->te_state];
 			tli_err = TSYSERR;
 			unix_err = EINVAL;
 			goto error;
@@ -2437,7 +2503,7 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 			(void) (STRLOG(TL_ID, tep->te_minor,
 			    1, SL_TRACE | SL_ERROR,
 			    "tl_bind: invalid socket magic"));
-			tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
+			tep->te_state = nextstate[TE_ERROR_ACK][tep->te_state];
 			tli_err = TSYSERR;
 			unix_err = EINVAL;
 			goto error;
@@ -2447,7 +2513,7 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 			(void) (STRLOG(TL_ID, tep->te_minor,
 			    1, SL_TRACE | SL_ERROR,
 			    "tl_bind: implicit addr non-empty"));
-			tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
+			tep->te_state = nextstate[TE_ERROR_ACK][tep->te_state];
 			tli_err = TSYSERR;
 			unix_err = EINVAL;
 			goto error;
@@ -2457,7 +2523,7 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 			(void) (STRLOG(TL_ID, tep->te_minor,
 			    1, SL_TRACE | SL_ERROR,
 			    "tl_bind: explicit addr empty"));
-			tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
+			tep->te_state = nextstate[TE_ERROR_ACK][tep->te_state];
 			tli_err = TSYSERR;
 			unix_err = EINVAL;
 			goto error;
@@ -2469,7 +2535,7 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 			(void) (STRLOG(TL_ID, tep->te_minor,
 			    1, SL_TRACE | SL_ERROR,
 			    "tl_bind: invalid message"));
-			tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
+			tep->te_state = nextstate[TE_ERROR_ACK][tep->te_state];
 			tli_err = TSYSERR;
 			unix_err = EINVAL;
 			goto error;
@@ -2478,7 +2544,7 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 			(void) (STRLOG(TL_ID, tep->te_minor,
 			    1, SL_TRACE | SL_ERROR,
 			    "tl_bind: bad addr in  message"));
-			tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
+			tep->te_state = nextstate[TE_ERROR_ACK][tep->te_state];
 			tli_err = TBADADDR;
 			goto error;
 		}
@@ -2644,7 +2710,7 @@ skip_addr_bind:
 			tep->te_flag |= TL_LISTENER;
 	}
 
-	tep->te_state = NEXTSTATE(TE_BIND_ACK, tep->te_state);
+	tep->te_state = nextstate[TE_BIND_ACK][tep->te_state];
 	/*
 	 * send T_BIND_ACK message
 	 */
@@ -2661,7 +2727,7 @@ error:
 		tl_memrecover(wq, mp, sizeof (struct T_error_ack));
 		return;
 	}
-	tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
+	tep->te_state = nextstate[TE_ERROR_ACK][tep->te_state];
 	tl_error_ack(wq, ackmp, tli_err, unix_err, save_prim_type);
 }
 
@@ -2707,7 +2773,7 @@ tl_unbind(mblk_t *mp, tl_endpt_t *tep)
 		tl_error_ack(wq, ackmp, TOUTSTATE, 0, T_UNBIND_REQ);
 		return;
 	}
-	tep->te_state = NEXTSTATE(TE_UNBIND_REQ, tep->te_state);
+	tep->te_state = nextstate[TE_UNBIND_REQ][tep->te_state];
 
 	/*
 	 * TPI says on T_UNBIND_REQ:
@@ -2727,7 +2793,7 @@ tl_unbind(mblk_t *mp, tl_endpt_t *tep)
 		tl_addr_unbind(tep);
 	}
 
-	tep->te_state = NEXTSTATE(TE_OK_ACK1, tep->te_state);
+	tep->te_state = nextstate[TE_OK_ACK1][tep->te_state];
 	/*
 	 * send  T_OK_ACK
 	 */
@@ -2965,7 +3031,7 @@ tl_conn_req(queue_t *wq, mblk_t *mp)
 		return;
 	}
 
-	tep->te_state = NEXTSTATE(TE_CONN_REQ, tep->te_state);
+	tep->te_state = nextstate[TE_CONN_REQ][tep->te_state];
 	/*
 	 * get endpoint to connect to
 	 * check that peer with DEST addr is bound to addr
@@ -3003,7 +3069,7 @@ tl_conn_req(queue_t *wq, mblk_t *mp)
 		if (peer_tep != NULL)
 			tl_refrele(peer_tep);
 		/* We are still expected to send T_OK_ACK */
-		tep->te_state = NEXTSTATE(TE_OK_ACK1, tep->te_state);
+		tep->te_state = nextstate[TE_OK_ACK1][tep->te_state];
 		tl_ok_ack(tep->te_wq, ackmp, T_CONN_REQ);
 		tl_closeok(tep);
 		dimp = tpi_ack_alloc(mp, sizeof (struct T_discon_ind),
@@ -3224,7 +3290,7 @@ tl_conn_req_ser(mblk_t *mp, tl_endpt_t *tep)
 	/*
 	 * ack validity of request and send the peer credential in the ACK.
 	 */
-	tep->te_state = NEXTSTATE(TE_OK_ACK1, tep->te_state);
+	tep->te_state = nextstate[TE_OK_ACK1][tep->te_state];
 
 	if (peer_tep != NULL && peer_tep->te_credp != NULL &&
 	    confmp != NULL) {
@@ -3298,7 +3364,7 @@ tl_conn_req_ser(mblk_t *mp, tl_endpt_t *tep)
 	list_insert_tail(&peer_tep->te_iconp, tip);
 	peer_tep->te_nicon++;
 
-	peer_tep->te_state = NEXTSTATE(TE_CONN_IND, peer_tep->te_state);
+	peer_tep->te_state = nextstate[TE_CONN_IND][peer_tep->te_state];
 	/*
 	 * send the T_CONN_IND message
 	 */
@@ -3309,7 +3375,7 @@ tl_conn_req_ser(mblk_t *mp, tl_endpt_t *tep)
 	 * Disable the queues until we have reached the correct state!
 	 */
 	if (confmp != NULL) {
-		tep->te_state = NEXTSTATE(TE_CONN_CON, tep->te_state);
+		tep->te_state = nextstate[TE_CONN_CON][tep->te_state];
 		noenable(wq);
 		putnext(tep->te_rq, confmp);
 	}
@@ -3429,14 +3495,14 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 		return;
 	}
 
-	tep->te_state = NEXTSTATE(TE_CONN_RES, tep->te_state);
+	tep->te_state = nextstate[TE_CONN_RES][tep->te_state];
 	ASSERT(tep->te_state == TS_WACK_CRES);
 
 	if (cres->SEQ_number < TL_MINOR_START &&
 	    cres->SEQ_number >= BADSEQNUM) {
 		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE | SL_ERROR,
 		    "tl_conn_res:remote endpoint sequence number bad"));
-		tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
+		tep->te_state = nextstate[TE_ERROR_ACK][tep->te_state];
 		tl_error_ack(wq, ackmp, TBADSEQ, 0, prim);
 		freemsg(mp);
 		return;
@@ -3450,7 +3516,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	    (mod_hash_val_t *)&acc_ep, tl_find_callback) != 0) {
 		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE | SL_ERROR,
 		    "tl_conn_res:bad accepting endpoint"));
-		tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
+		tep->te_state = nextstate[TE_ERROR_ACK][tep->te_state];
 		tl_error_ack(wq, ackmp, TBADF, 0, prim);
 		freemsg(mp);
 		return;
@@ -3462,7 +3528,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	if (!tl_noclose(acc_ep)) {
 		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE | SL_ERROR,
 		    "tl_conn_res:bad accepting endpoint"));
-		tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
+		tep->te_state = nextstate[TE_ERROR_ACK][tep->te_state];
 		tl_error_ack(wq, ackmp, TBADF, 0, prim);
 		tl_refrele(acc_ep);
 		freemsg(mp);
@@ -3480,7 +3546,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE | SL_ERROR,
 		    "tl_conn_res:accepting endpoint has no address bound,"
 		    "state=%d", acc_ep->te_state));
-		tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
+		tep->te_state = nextstate[TE_ERROR_ACK][tep->te_state];
 		tl_error_ack(wq, ackmp, TOUTSTATE, 0, prim);
 		freemsg(mp);
 		tl_closeok(acc_ep);
@@ -3496,7 +3562,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	if ((tep == acc_ep) && (tep->te_nicon > 1)) {
 		(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE | SL_ERROR,
 		    "tl_conn_res: > 1 conn_ind on listener-acceptor"));
-		tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
+		tep->te_state = nextstate[TE_ERROR_ACK][tep->te_state];
 		tl_error_ack(wq, ackmp, TBADF, 0, prim);
 		freemsg(mp);
 		tl_closeok(acc_ep);
@@ -3514,7 +3580,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	if (tip == NULL) {
 		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE | SL_ERROR,
 		    "tl_conn_res:no client in listener list"));
-		tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
+		tep->te_state = nextstate[TE_ERROR_ACK][tep->te_state];
 		tl_error_ack(wq, ackmp, TBADSEQ, 0, prim);
 		freemsg(mp);
 		tl_closeok(acc_ep);
@@ -3632,11 +3698,11 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	 */
 	if (tep->te_nicon == 1) {
 		if (tep == acc_ep)
-			tep->te_state = NEXTSTATE(TE_OK_ACK2, tep->te_state);
+			tep->te_state = nextstate[TE_OK_ACK2][tep->te_state];
 		else
-			tep->te_state = NEXTSTATE(TE_OK_ACK3, tep->te_state);
+			tep->te_state = nextstate[TE_OK_ACK3][tep->te_state];
 	} else {
-		tep->te_state = NEXTSTATE(TE_OK_ACK4, tep->te_state);
+		tep->te_state = nextstate[TE_OK_ACK4][tep->te_state];
 	}
 
 	/*
@@ -3689,7 +3755,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	 * now start connecting the accepting endpoint
 	 */
 	if (tep != acc_ep)
-		acc_ep->te_state = NEXTSTATE(TE_PASS_CONN, acc_ep->te_state);
+		acc_ep->te_state = nextstate[TE_PASS_CONN][acc_ep->te_state];
 
 	if (cl_ep == NULL) {
 		/*
@@ -3850,7 +3916,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 		/*
 		 * change client state on TE_CONN_CON event
 		 */
-		cl_ep->te_state = NEXTSTATE(TE_CONN_CON, cl_ep->te_state);
+		cl_ep->te_state = nextstate[TE_CONN_CON][cl_ep->te_state];
 		putnext(cl_ep->te_rq, ccmp);
 	}
 
@@ -3936,13 +4002,13 @@ tl_discon_req(mblk_t *mp, tl_endpt_t *tep)
 	 * Defer committing the state change until it is determined if
 	 * the message will be queued with the tl_icon or not.
 	 */
-	new_state  = NEXTSTATE(TE_DISCON_REQ, tep->te_state);
+	new_state  = nextstate[TE_DISCON_REQ][tep->te_state];
 
 	/* validate the message */
 	if (msz < sizeof (struct T_discon_req)) {
 		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_discon_req:invalid message"));
-		tep->te_state = NEXTSTATE(TE_ERROR_ACK, new_state);
+		tep->te_state = nextstate[TE_ERROR_ACK][new_state];
 		tl_error_ack(wq, ackmp, TSYSERR, EINVAL, T_DISCON_REQ);
 		freemsg(mp);
 		return;
@@ -3962,7 +4028,7 @@ tl_discon_req(mblk_t *mp, tl_endpt_t *tep)
 			(void) (STRLOG(TL_ID, tep->te_minor, 2,
 			    SL_TRACE | SL_ERROR,
 			    "tl_discon_req:no disconnect endpoint"));
-			tep->te_state = NEXTSTATE(TE_ERROR_ACK, new_state);
+			tep->te_state = nextstate[TE_ERROR_ACK][new_state];
 			tl_error_ack(wq, ackmp, TBADSEQ, 0, T_DISCON_REQ);
 			freemsg(mp);
 			return;
@@ -3992,12 +4058,12 @@ tl_discon_req(mblk_t *mp, tl_endpt_t *tep)
 	 * prepare message to ack validity of request
 	 */
 	if (tep->te_nicon == 0) {
-		new_state = NEXTSTATE(TE_OK_ACK1, new_state);
+		new_state = nextstate[TE_OK_ACK1][new_state];
 	} else {
 		if (tep->te_nicon == 1)
-			new_state = NEXTSTATE(TE_OK_ACK2, new_state);
+			new_state = nextstate[TE_OK_ACK2][new_state];
 		else
-			new_state = NEXTSTATE(TE_OK_ACK4, new_state);
+			new_state = nextstate[TE_OK_ACK4][new_state];
 	}
 
 	/*
@@ -4097,12 +4163,12 @@ tl_discon_req(mblk_t *mp, tl_endpt_t *tep)
 				save_state = peer_tep->te_state;
 				if (peer_tep->te_nicon == 1)
 					peer_tep->te_state =
-					    NEXTSTATE(TE_DISCON_IND2,
-					    peer_tep->te_state);
+					    nextstate[TE_DISCON_IND2]
+					    [peer_tep->te_state];
 				else
 					peer_tep->te_state =
-					    NEXTSTATE(TE_DISCON_IND3,
-					    peer_tep->te_state);
+					    nextstate[TE_DISCON_IND3]
+					    [peer_tep->te_state];
 				tl_freetip(peer_tep, tip);
 			}
 			ASSERT(tep->te_oconp != NULL);
@@ -4565,7 +4631,7 @@ tl_data(mblk_t *mp, tl_endpt_t *tep)
 		return;
 	}
 	/*
-	 * tep->te_state = NEXTSTATE(TE_DATA_REQ, tep->te_state);
+	 * tep->te_state = nextstate[TE_DATA_REQ][tep->te_state];
 	 * (State stays same on this event)
 	 */
 
@@ -4615,7 +4681,7 @@ tl_data(mblk_t *mp, tl_endpt_t *tep)
 			prim->type = T_OPTDATA_IND;
 	}
 	/*
-	 * peer_tep->te_state = NEXTSTATE(TE_DATA_IND, peer_tep->te_state);
+	 * peer_tep->te_state = nextstate[TE_DATA_IND][peer_tep->te_state];
 	 * (peer state stays same on this event)
 	 */
 	/*
@@ -4732,7 +4798,7 @@ tl_exdata(mblk_t *mp, tl_endpt_t *tep)
 		return;
 	}
 	/*
-	 * tep->te_state = NEXTSTATE(TE_EXDATA_REQ, tep->te_state);
+	 * tep->te_state = nextstate[TE_EXDATA_REQ][tep->te_state];
 	 * (state stays same on this event)
 	 */
 
@@ -4774,7 +4840,7 @@ tl_exdata(mblk_t *mp, tl_endpt_t *tep)
 		return;
 	}
 	/*
-	 * peer_tep->te_state = NEXTSTATE(TE_DATA_IND, peer_tep->te_state);
+	 * peer_tep->te_state = nextstate[TE_DATA_IND][peer_tep->te_state];
 	 * (peer state stays same on this event)
 	 */
 	/*
@@ -4858,7 +4924,7 @@ tl_ordrel(mblk_t *mp, tl_endpt_t *tep)
 		}
 		return;
 	}
-	tep->te_state = NEXTSTATE(TE_ORDREL_REQ, tep->te_state);
+	tep->te_state = nextstate[TE_ORDREL_REQ][tep->te_state];
 
 	/*
 	 * get connected endpoint
@@ -4897,7 +4963,7 @@ tl_ordrel(mblk_t *mp, tl_endpt_t *tep)
 		tl_merror(peer_tep->te_wq, mp, EPROTO);
 		return;
 	}
-	peer_tep->te_state = NEXTSTATE(TE_ORDREL_IND, peer_tep->te_state);
+	peer_tep->te_state = nextstate[TE_ORDREL_IND][peer_tep->te_state];
 
 	/*
 	 * reuse message block
@@ -4982,7 +5048,7 @@ tl_uderr(queue_t *wq, mblk_t *mp, t_scalar_t err)
 	/*
 	 * send indication message
 	 */
-	tep->te_state = NEXTSTATE(TE_UDERROR_IND, tep->te_state);
+	tep->te_state = nextstate[TE_UDERROR_IND][tep->te_state];
 
 	qreply(wq, err_mp);
 }
@@ -5040,7 +5106,7 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 		return;
 	}
 	/*
-	 * tep->te_state = NEXTSTATE(TE_UNITDATA_REQ, tep->te_state);
+	 * tep->te_state = nextstate[TE_UNITDATA_REQ][tep->te_state];
 	 * (state does not change on this event)
 	 */
 
@@ -5339,7 +5405,7 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 	/*
 	 * send indication message
 	 */
-	peer_tep->te_state = NEXTSTATE(TE_UNITDATA_IND, peer_tep->te_state);
+	peer_tep->te_state = nextstate[TE_UNITDATA_IND][peer_tep->te_state];
 	putnext(peer_tep->te_rq, mp);
 }
 
@@ -5661,12 +5727,12 @@ tl_co_unconnect(tl_endpt_t *tep)
 				 */
 				if (srv_tep->te_nicon == 1) {
 					srv_tep->te_state =
-					    NEXTSTATE(TE_DISCON_IND2,
-					    srv_tep->te_state);
+					    nextstate[TE_DISCON_IND2]
+					    [srv_tep->te_state];
 				} else {
 					srv_tep->te_state =
-					    NEXTSTATE(TE_DISCON_IND3,
-					    srv_tep->te_state);
+					    nextstate[TE_DISCON_IND3]
+					    [srv_tep->te_state];
 				}
 				ASSERT(*(uint32_t *)(d_mp->b_rptr) ==
 				    T_DISCON_IND);
@@ -5694,7 +5760,7 @@ tl_co_unconnect(tl_endpt_t *tep)
 			(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE,
 			"tl_co_unconnect:connected: ordrel_ind state %d->%d",
 			    peer_tep->te_state,
-			    NEXTSTATE(TE_ORDREL_IND, peer_tep->te_state)));
+			    nextstate[TE_ORDREL_IND][peer_tep->te_state]));
 			d_mp = tl_ordrel_ind_alloc();
 			if (d_mp == NULL) {
 				(void) (STRLOG(TL_ID, tep->te_minor, 3,
@@ -5709,7 +5775,7 @@ tl_co_unconnect(tl_endpt_t *tep)
 				goto discon_peer;
 			}
 			peer_tep->te_state =
-			    NEXTSTATE(TE_ORDREL_IND, peer_tep->te_state);
+			    nextstate[TE_ORDREL_IND][peer_tep->te_state];
 
 			putnext(peer_tep->te_rq, d_mp);
 			/*
@@ -5953,8 +6019,8 @@ tl_icon_sendmsgs(tl_endpt_t *tep, mblk_t **mpp)
 				putnext(tep->te_rq, mp);
 				break;
 			case T_ORDREL_IND:
-				tep->te_state = NEXTSTATE(TE_ORDREL_IND,
-				    tep->te_state);
+				tep->te_state = nextstate[TE_ORDREL_IND]
+				    [tep->te_state];
 				putnext(tep->te_rq, mp);
 				break;
 			case T_DISCON_IND:
