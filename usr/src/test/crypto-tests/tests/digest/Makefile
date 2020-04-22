@@ -27,6 +27,4 @@ all clean clobber install: $(ALGS)
 $(ALGS): FRC
 	$(MAKE) -e -f Makefile.digest BASEPROG=$@ $(TARGET)
 
-.PARALLEL: $(ALGS)
-
 FRC:
