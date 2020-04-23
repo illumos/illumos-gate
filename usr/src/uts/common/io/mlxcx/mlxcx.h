@@ -1172,8 +1172,8 @@ extern void mlxcx_buf_return(mlxcx_t *, mlxcx_buffer_t *);
 extern void mlxcx_buf_return_chain(mlxcx_t *, mlxcx_buffer_t *, boolean_t);
 extern void mlxcx_buf_destroy(mlxcx_t *, mlxcx_buffer_t *);
 
-extern mlxcx_buffer_t *mlxcx_buf_bind_or_copy(mlxcx_t *, mlxcx_work_queue_t *,
-    mblk_t *, size_t);
+extern uint_t mlxcx_buf_bind_or_copy(mlxcx_t *, mlxcx_work_queue_t *,
+    mblk_t *, size_t, mlxcx_buffer_t **);
 
 extern boolean_t mlxcx_rx_group_setup(mlxcx_t *, mlxcx_ring_group_t *);
 extern boolean_t mlxcx_tx_group_setup(mlxcx_t *, mlxcx_ring_group_t *);

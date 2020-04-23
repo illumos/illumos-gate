@@ -390,8 +390,16 @@ typedef enum {
 	MLXCX_WQE_OP_RDMA_R		= 0x10,
 } mlxcx_wqe_opcode_t;
 
+#define	MLXCX_WQE_OCTOWORD	16
 #define	MLXCX_SQE_MAX_DS	((1 << 6) - 1)
-#define	MLXCX_SQE_MAX_PTRS	61
+/*
+ * Calculate the max number of address pointers in a single ethernet
+ * send message. This is the remainder from MLXCX_SQE_MAX_DS
+ * after accounting for the Control and Ethernet segements.
+ */
+#define	MLXCX_SQE_MAX_PTRS	(MLXCX_SQE_MAX_DS - \
+	(sizeof (mlxcx_wqe_eth_seg_t) + sizeof (mlxcx_wqe_control_seg_t)) / \
+	MLXCX_WQE_OCTOWORD)
 
 typedef enum {
 	MLXCX_SQE_FENCE_NONE		= 0x0,
@@ -2496,6 +2504,8 @@ typedef struct {
 } mlxcx_cmd_access_register_out_t;
 
 #pragma pack()
+
+CTASSERT(MLXCX_SQE_MAX_PTRS > 0);
 
 #ifdef __cplusplus
 }
