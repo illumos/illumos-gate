@@ -14,6 +14,7 @@
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2019 Joyent, Inc.
+# Copyright 2020 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/test/cryptotest@$(PKGVERS)
@@ -25,6 +26,7 @@ set name=variant.arch value=$(ARCH)
 dir path=opt/crypto-tests
 dir path=opt/crypto-tests/bin
 dir path=opt/crypto-tests/runfiles
+dir path=opt/crypto-tests/share
 dir path=opt/crypto-tests/tests
 dir path=opt/crypto-tests/tests/aes group=root mode=0755 owner=root
 dir path=opt/crypto-tests/tests/aes/kcf group=root mode=0755 owner=root
@@ -38,6 +40,22 @@ dir path=opt/crypto-tests/tests/hmac/pkcs
 file path=opt/crypto-tests/README mode=0444
 file path=opt/crypto-tests/bin/cryptotest mode=0555
 file path=opt/crypto-tests/runfiles/default.run mode=0444
+file path=opt/crypto-tests/share/MD5Msg.rsp mode=0444
+file path=opt/crypto-tests/share/README mode=0444
+file path=opt/crypto-tests/share/SHA1LongMsg.rsp mode=0444
+file path=opt/crypto-tests/share/SHA1ShortMsg.rsp mode=0444
+file path=opt/crypto-tests/share/SHA224LongMsg.rsp mode=0444
+file path=opt/crypto-tests/share/SHA224ShortMsg.rsp mode=0444
+file path=opt/crypto-tests/share/SHA256LongMsg.rsp mode=0444
+file path=opt/crypto-tests/share/SHA256ShortMsg.rsp mode=0444
+file path=opt/crypto-tests/share/SHA384LongMsg.rsp mode=0444
+file path=opt/crypto-tests/share/SHA384ShortMsg.rsp mode=0444
+file path=opt/crypto-tests/share/SHA512LongMsg.rsp mode=0444
+file path=opt/crypto-tests/share/SHA512ShortMsg.rsp mode=0444
+file path=opt/crypto-tests/share/SHA512_224LongMsg.rsp mode=0444
+file path=opt/crypto-tests/share/SHA512_224ShortMsg.rsp mode=0444
+file path=opt/crypto-tests/share/SHA512_256LongMsg.rsp mode=0444
+file path=opt/crypto-tests/share/SHA512_256ShortMsg.rsp mode=0444
 file opt/crypto-tests/tests/aes/kcf/aes_cbc_32 \
     path=opt/crypto-tests/tests/aes/kcf/aes_cbc_32 group=root mode=0555 \
     owner=root

@@ -11,10 +11,11 @@
 
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2020 Oxide Computer Company
 #
 
 CRYPTO		= pkcs kcf
-COMMON_OBJS	= main.o
+COMMON_OBJS	= parser_runner.o
 
 TESTROOT	= $(ROOT)/opt/crypto-tests/tests/digest
 

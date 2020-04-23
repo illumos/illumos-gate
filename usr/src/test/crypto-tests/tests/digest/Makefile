@@ -11,9 +11,11 @@
 
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2020 Oxide Computer Company
 #
 
 ALGS	= sha1 sha256 sha384 sha512 sha512_224 sha512_256 md5
+SUBDIRS	= data
 
 all	:=	TARGET = all
 install	:=	TARGET = install
@@ -22,9 +24,12 @@ clobber	:=	TARGET = clobber
 
 .KEEP_STATE:
 
-all clean clobber install: $(ALGS)
+all clean clobber install: $(ALGS) $(SUBDIRS)
 
 $(ALGS): FRC
 	$(MAKE) -e -f Makefile.digest BASEPROG=$@ $(TARGET)
+
+$(SUBDIRS): FRC
+	cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

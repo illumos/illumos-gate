@@ -13,6 +13,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2019 Joyent, Inc.
+# Copyright 2020 Oxide Computer Company
 #
 
 include $(SRC)/cmd/Makefile.cmd
@@ -92,7 +93,7 @@ clobber: clean
 	-$(RM) $(PROGS)
 
 clean:
-	-$(RM) *.o $(COMMON_OBJS_32) $(COMMON_OBJS_64)
+	-$(RM) *.o $(COMMON_OBJS_32) $(COMMON_OBJS_64) $(PROGS)
 
 $(CMDS): $(TESTDIR_pkcs) $(TESTDIR_kcf) $(PROGS)
 
