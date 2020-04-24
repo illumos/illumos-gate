@@ -204,6 +204,10 @@ tests = ['zfs_rename_001_pos', 'zfs_rename_002_pos', 'zfs_rename_003_pos',
 [/opt/zfs-tests/tests/functional/cli_root/zfs_reservation]
 tests = ['zfs_reservation_001_pos', 'zfs_reservation_002_pos']
 
+[/opt/zfs-tests/tests/functional/resilver]
+tests = ['resilver_restart_001']
+tags = ['functional', 'resilver']
+
 [/opt/zfs-tests/tests/functional/cli_root/zfs_rollback]
 tests = ['zfs_rollback_001_pos', 'zfs_rollback_002_pos',
     'zfs_rollback_003_neg', 'zfs_rollback_004_neg']

@@ -150,6 +150,7 @@ dir path=opt/zfs-tests/tests/functional/removal
 dir path=opt/zfs-tests/tests/functional/rename_dirs
 dir path=opt/zfs-tests/tests/functional/replacement
 dir path=opt/zfs-tests/tests/functional/reservation
+dir path=opt/zfs-tests/tests/functional/resilver
 dir path=opt/zfs-tests/tests/functional/rootpool
 dir path=opt/zfs-tests/tests/functional/rsend
 dir path=opt/zfs-tests/tests/functional/scrub_mirror
@@ -2928,6 +2929,12 @@ file path=opt/zfs-tests/tests/functional/reservation/reservation_021_neg \
 file path=opt/zfs-tests/tests/functional/reservation/reservation_022_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/reservation/setup mode=0555
+file path=opt/zfs-tests/tests/functional/resilver/cleanup mode=0555
+file path=opt/zfs-tests/tests/functional/resilver/resilver.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/resilver/resilver_restart_001 \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/resilver/setup mode=0555
+file path=opt/zfs-tests/tests/functional/resilver/sysevent mode=0555
 file path=opt/zfs-tests/tests/functional/rootpool/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/rootpool/rootpool_002_neg mode=0555
 file path=opt/zfs-tests/tests/functional/rootpool/rootpool_003_neg mode=0555
