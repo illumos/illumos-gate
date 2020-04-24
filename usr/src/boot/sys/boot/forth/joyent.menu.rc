@@ -77,29 +77,17 @@ set optionsmenu_keycode[3]=118
 set optionsansi_caption[3]="^[1mV^[merbose............... ^[34;1mOff^[m"
 set optionstoggled_ansi[3]="^[1mV^[merbose............... ^[32;7mOn^[m"
 
-set optionsmenu_init[4]="init_kmdb"
-set optionsmenu_caption[4]="Load [k]mdb........... Off"
-set optionstoggled_text[4]="Load [k]mdb........... On"
-set optionsmenu_command[4]="toggle_kmdb"
+set optionsmenu_kmdb=4
+set optionsmenu_command[4]="cycle_kmdb"
 set optionsmenu_keycode[4]=107
-set optionsansi_caption[4]="Load ^[1mk^[mmdb............. ^[34;1mOff^[m"
-set optionstoggled_ansi[4]="Load ^[1mk^[mmdb............. ^[32;7mOn^[m"
 
-set optionsmenu_init[5]="init_drop_into_kmdb"
-set optionsmenu_caption[5]="[D]rop into kmdb...... Off"
-set optionstoggled_text[5]="[D]rop into kmdb...... On"
-set optionsmenu_command[5]="toggle_drop_into_kmdb"
-set optionsmenu_keycode[5]=100
-set optionsansi_caption[5]="^[1mD^[mrop into kmdb........ ^[34;1mOff^[m"
-set optionstoggled_ansi[5]="^[1mD^[mrop into kmdb........ ^[32;7mOn^[m"
-
-set optionsmenu_init[6]="init_rescue"
-set optionsmenu_caption[6]="[R]escue Mode......... Off"
-set optionstoggled_text[6]="[R]escue Mode......... On"
-set optionsmenu_command[6]="toggle_rescue"
-set optionsmenu_keycode[6]=114
-set optionsansi_caption[6]="^[1mR^[mescue Mode........... ^[34;1mOff^[m"
-set optionstoggled_ansi[6]="^[1mR^[mescue Mode........... ^[32;7mOn^[m"
+set optionsmenu_init[5]="init_rescue"
+set optionsmenu_caption[5]="[R]escue Mode......... Off"
+set optionstoggled_text[5]="[R]escue Mode......... On"
+set optionsmenu_command[5]="toggle_rescue"
+set optionsmenu_keycode[5]=114
+set optionsansi_caption[5]="^[1mR^[mescue Mode........... ^[34;1mOff^[m"
+set optionstoggled_ansi[5]="^[1mR^[mescue Mode........... ^[32;7mOn^[m"
 
 \ Enable automatic booting (add ``autoboot_delay=N'' to loader.conf(5) to
 \ customize the timeout; default is 10-seconds)
