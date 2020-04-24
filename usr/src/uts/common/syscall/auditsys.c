@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2020 The University of Queensland
  */
 
 #include <sys/systm.h>
@@ -468,6 +469,10 @@ setpolicy(caddr_t data)
 	 * segv's, the audit state may be "auditing" but the door may
 	 * be closed.  Returning an error if the door is open makes it
 	 * impossible for Greenline to restart auditd.
+	 *
+	 * Note that auk_current_vp can change (e.g. to NULL) as long as we
+	 * aren't holding auk_svc_lock -- so au_door_upcall() will eventually
+	 * double-check this condition after it takes auk_svc_lock.
 	 */
 	if (kctx->auk_current_vp != NULL)
 		(void) au_doormsg(kctx, AU_DBUF_POLICY, &policy);

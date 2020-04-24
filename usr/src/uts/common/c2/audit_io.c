@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2020 The University of Queensland
  */
 
 /*
@@ -547,6 +548,15 @@ au_door_upcall(au_kcontext_t *kctx, au_dbuf_t *aubuf)
 
 		retry = 0;
 		mutex_enter(&(kctx->auk_svc_lock));
+		/*
+		 * Only holding auk_svc_lock prevents this from changing, so
+		 * we need to double-check that the vp isn't NULL before we
+		 * call door_upcall (which will blindly deref it).
+		 */
+		if (kctx->auk_current_vp == NULL) {
+			mutex_exit(&(kctx->auk_svc_lock));
+			return (-1);
+		}
 		rc = door_upcall(kctx->auk_current_vp, &darg, NULL,
 		    SIZE_MAX, 0);
 		if (rc != 0) {
