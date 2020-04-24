@@ -26,7 +26,8 @@
 #
 
 #
-# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright (c) 2013, 2017 by Delphix. All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -43,7 +44,7 @@
 
 function cleanup
 {
-	rm -f $OUTFILE
+	rm -f $tmpfile
 }
 
 verify_runnable "global"
@@ -60,6 +61,7 @@ typeset bp=$(mdb -ke "$spa + $off_ub + $off_rbp =J")
 # dcmds and walkers skipped due to being DEBUG only or difficult to run:
 # ::zfs_params
 # ::refcount
+# ::walk zms_freelist
 
 set -A dcmds "::abuf_find 1 2" \
 	"::arc" \
@@ -84,47 +86,25 @@ set -A dcmds "::abuf_find 1 2" \
 	"$spa ::print -a spa_t spa_uberblock.ub_rootbp | ::blkptr" \
 	"$spa ::walk metaslab" \
 	"$spa ::walk metaslab | ::head -1 | ::metaslab_weight" \
-	"$spa ::walk metaslab | ::head -1 | ::metaslab_trace" \
+	"*metaslab_alloc_trace_cache::walk kmem | ::metaslab_trace" \
 	"$spa ::walk zio_root | ::zio -c" \
 	"$spa ::walk zio_root | ::zio -r" \
-	"$spa ::walk zms_freelist"
 	"$spa ::zfs_blkstats -v" \
 	"::dbufs" \
 	"::dbufs -n mos -o mdn -l 0 -b 0" \
 	"::dbufs | ::dbuf" \
 	"::dbuf_stats" \
-	"dbuf_cache ::walk multilist"
+	"dbuf_caches::print dbuf_cache_t cache | ::walk multilist"
 #
 # The commands above were supplied by the ZFS development team. The idea is to
 # do as much checking as possible without the need to hardcode addresses.
 #
 
-log_assert "Verify that the ZFS mdb dcmds and walkers are working as expected."
+for cmd in ${cmds[@]}; do
+	log_must eval "mdb -ke \"${cmd}\" >$tmpfile 2>&1"
 
-typeset -i RET=0
-
-i=0
-while (( $i < ${#dcmds[*]} )); do
-	log_note "Verifying: '${dcmds[i]}'"
-        echo "${dcmds[i]}" | mdb -k > $OUTFILE 2>&1
-	RET=$?
-	if (( $RET != 0 )); then
-		log_fail "mdb '${dcmds[i]}' returned error $RET"
-	fi
-
-	#
 	# mdb prefixes all errors with "mdb: " so we check the output.
-	#
-	grep "mdb:" $OUTFILE > /dev/null 2>&1
-	RET=$?
-	if (( $RET == 0 )); then
-		echo "mdb '${dcmds[i]}' contained 'mdb:'"
-		# Using tail limits the number of lines in the log
-		tail -100 $OUTFILE
-		log_fail "mdb walker or dcmd failed"
-	fi
-
-        ((i = i + 1))
+	log_mustnot grep -q "mdb:" $tmpfile
 done
 
 log_pass "The ZFS mdb dcmds and walkers are working as expected."
