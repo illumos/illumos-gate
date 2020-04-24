@@ -4,6 +4,7 @@
  * All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 RackTop Systems, Inc.
  *
  * This software was developed by Lawrence Stewart while studying at the Centre
  * for Advanced Internet Architectures, Swinburne University of Technology, made
@@ -85,6 +86,7 @@ static void	cubic_conn_init(struct cc_var *ccv);
 static void	cubic_post_recovery(struct cc_var *ccv);
 static void	cubic_record_rtt(struct cc_var *ccv);
 static void	cubic_ssthresh_update(struct cc_var *ccv);
+static void	cubic_after_idle(struct cc_var *ccv);
 
 struct cubic {
 	/* Cubic K in fixed point form with CUBIC_SHIFT worth of precision. */
@@ -115,6 +117,7 @@ struct cc_algo cubic_cc_algo = {
 	.cong_signal = cubic_cong_signal,
 	.conn_init = cubic_conn_init,
 	.post_recovery = cubic_post_recovery,
+	.after_idle = cubic_after_idle,
 };
 
 int
@@ -129,7 +132,7 @@ _init(void)
 		if ((err = mod_install(&cc_cubic_modlinkage)) != 0)
 			(void) cc_deregister_algo(&cubic_cc_algo);
 	}
-	cubic_cc_algo.after_idle = newreno_cc_algo->after_idle;
+
 	return (err);
 }
 
@@ -195,19 +198,22 @@ cubic_ack_received(struct cc_var *ccv, uint16_t type)
 				 * TCP-friendly region, follow tf
 				 * cwnd growth.
 				 */
-				CCV(ccv, tcp_cwnd) = w_tf;
+				if (CCV(ccv, tcp_cwnd) < w_tf)
+					CCV(ccv, tcp_cwnd) = w_tf;
 			} else if (CCV(ccv, tcp_cwnd) < w_cubic_next) {
 				/*
 				 * Concave or convex region, follow CUBIC
 				 * cwnd growth.
 				 */
 				if (CC_ABC(ccv))
-					CCV(ccv, tcp_cwnd) = w_cubic_next;
+					CCV(ccv, tcp_cwnd) = MIN(w_cubic_next,
+					    INT_MAX);
 				else
-					CCV(ccv, tcp_cwnd) += ((w_cubic_next -
+					CCV(ccv, tcp_cwnd) += MAX(1,
+					    ((MIN(w_cubic_next, INT_MAX) -
 					    CCV(ccv, tcp_cwnd)) *
 					    CCV(ccv, tcp_mss)) /
-					    CCV(ccv, tcp_cwnd);
+					    CCV(ccv, tcp_cwnd));
 			}
 
 			/*
@@ -218,10 +224,32 @@ cubic_ack_received(struct cc_var *ccv, uint16_t type)
 			 * max_cwnd.
 			 */
 			if (cubic_data->num_cong_events == 0 &&
-			    cubic_data->max_cwnd < CCV(ccv, tcp_cwnd))
+			    cubic_data->max_cwnd < CCV(ccv, tcp_cwnd)) {
 				cubic_data->max_cwnd = CCV(ccv, tcp_cwnd);
+				cubic_data->K = cubic_k(cubic_data->max_cwnd /
+				    CCV(ccv, tcp_mss));
+			}
 		}
 	}
+}
+
+/*
+ * This is a Cubic specific implementation of after_idle.
+ *   - Reset cwnd by calling New Reno implementation of after_idle.
+ *   - Reset t_last_cong.
+ */
+static void
+cubic_after_idle(struct cc_var *ccv)
+{
+	struct cubic *cubic_data;
+
+	cubic_data = ccv->cc_data;
+
+	cubic_data->max_cwnd = max(cubic_data->max_cwnd, CCV(ccv, tcp_cwnd));
+	cubic_data->K = cubic_k(cubic_data->max_cwnd / CCV(ccv, tcp_mss));
+
+	newreno_cc_algo->after_idle(ccv);
+	cubic_data->t_last_cong = gethrtime();
 }
 
 static void
@@ -237,7 +265,7 @@ cubic_cb_init(struct cc_var *ccv)
 {
 	struct cubic *cubic_data;
 
-	cubic_data = kmem_alloc(sizeof (struct cubic), KM_NOSLEEP);
+	cubic_data = kmem_zalloc(sizeof (struct cubic), KM_NOSLEEP);
 
 	if (cubic_data == NULL)
 		return (ENOMEM);
@@ -330,6 +358,7 @@ static void
 cubic_post_recovery(struct cc_var *ccv)
 {
 	struct cubic *cubic_data;
+	uint32_t mss, pipe;
 
 	cubic_data = ccv->cc_data;
 
@@ -339,11 +368,39 @@ cubic_post_recovery(struct cc_var *ccv)
 		    >> CUBIC_SHIFT;
 	}
 
+	/*
+	 * There is a risk that if the cwnd becomes less than mss, and
+	 * we do not get enough acks to drive it back up beyond mss,
+	 * we will stop transmitting data altogether.
+	 *
+	 * The Cubic RFC defines values in terms of units of mss. Therefore
+	 * we must make sure we have at least 1 mss to make progress
+	 * since the algorthm is written that way.
+	 */
+	mss = CCV(ccv, tcp_mss);
+
 	if (IN_FASTRECOVERY(ccv->flags)) {
-		/* Update cwnd based on beta and adjusted max_cwnd. */
-		CCV(ccv, tcp_cwnd) = max(1, ((CUBIC_BETA *
-		    cubic_data->max_cwnd) >> CUBIC_SHIFT));
+		/*
+		 * If inflight data is less than ssthresh, set cwnd
+		 * conservatively to avoid a burst of data, as suggested in
+		 * the NewReno RFC. Otherwise, use the CUBIC method.
+		 */
+		pipe = CCV(ccv, tcp_snxt) - CCV(ccv, tcp_suna);
+		if (pipe < CCV(ccv, tcp_cwnd_ssthresh)) {
+			/*
+			 * Ensure that cwnd does not collapse to 1 MSS under
+			 * adverse conditions. Implements RFC6582
+			 */
+			CCV(ccv, tcp_cwnd) = MAX(pipe, mss) + mss;
+		} else {
+			/* Update cwnd based on beta and adjusted max_cwnd. */
+			CCV(ccv, tcp_cwnd) = max(mss, ((CUBIC_BETA *
+			    cubic_data->max_cwnd) >> CUBIC_SHIFT));
+		}
+	} else {
+		CCV(ccv, tcp_cwnd) = max(mss, CCV(ccv, tcp_cwnd));
 	}
+
 	cubic_data->t_last_cong = gethrtime();
 
 	/* Calculate the average RTT between congestion epochs. */
@@ -355,7 +412,7 @@ cubic_post_recovery(struct cc_var *ccv)
 
 	cubic_data->epoch_ack_count = 0;
 	cubic_data->sum_rtt_nsecs = 0;
-	cubic_data->K = cubic_k(cubic_data->max_cwnd / CCV(ccv, tcp_mss));
+	cubic_data->K = cubic_k(cubic_data->max_cwnd / mss);
 }
 
 /*

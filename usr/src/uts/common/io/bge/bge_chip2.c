@@ -1005,8 +1005,8 @@ bge_nic_get64(bge_t *bgep, bge_regno_t addr)
 #elif defined(__sparc)
 	if (DEVICE_5723_SERIES_CHIPSETS(bgep) ||
 	    DEVICE_5717_SERIES_CHIPSETS(bgep) ||
-	    DEVICE_5725_SERIES_CHIPSETS(bgep ||
-	    DEVICE_57765_SERIES_CHIPSETS(bgep))) {
+	    DEVICE_5725_SERIES_CHIPSETS(bgep) ||
+	    DEVICE_57765_SERIES_CHIPSETS(bgep)) {
 		data = ddi_get32(bgep->io_handle, PIO_ADDR(bgep, addr));
 		data <<= 32;
 		data |= ddi_get32(bgep->io_handle,
