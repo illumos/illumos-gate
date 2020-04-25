@@ -54,6 +54,7 @@
 #include <signal.h>
 #include <sys/debug.h>
 #include <sys/list.h>
+#include <sys/sysmacros.h>
 #include <sys/mkdev.h>
 #include <sys/mntent.h>
 #include <sys/mnttab.h>
@@ -989,6 +990,31 @@ zfs_do_create(int argc, char **argv)
 			goto error;
 		}
 	}
+
+	/*
+	 * if volsize is not a multiple of volblocksize, round it up to the
+	 * nearest multiple of the volblocksize
+	 */
+	if (type == ZFS_TYPE_VOLUME) {
+		uint64_t volblocksize;
+
+		if (nvlist_lookup_uint64(props,
+		    zfs_prop_to_name(ZFS_PROP_VOLBLOCKSIZE),
+		    &volblocksize) != 0)
+			volblocksize = ZVOL_DEFAULT_BLOCKSIZE;
+
+		if (volsize % volblocksize) {
+			volsize = P2ROUNDUP_TYPED(volsize, volblocksize,
+			    uint64_t);
+
+			if (nvlist_add_uint64(props,
+			    zfs_prop_to_name(ZFS_PROP_VOLSIZE), volsize) != 0) {
+				nvlist_free(props);
+				nomem();
+			}
+		}
+	}
+
 
 	if (type == ZFS_TYPE_VOLUME && !noreserve) {
 		uint64_t spa_version;
