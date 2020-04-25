@@ -19,13 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri \
     value=pkg:/system/library/python/libbe$(PYTHON_PKGVERS)@$(PKGVERS)
 set name=pkg.description value="Boot Environment Management Python2 Module"
 set name=pkg.summary value="py_libbe module, python2"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Libraries
 set name=variant.arch value=$(ARCH)
 dir path=usr group=sys
 dir path=usr/lib

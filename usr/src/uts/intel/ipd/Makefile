@@ -12,6 +12,7 @@
 #
 # Copyright 2012 Joyent, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 UTSBASE	= ../..
@@ -28,7 +29,7 @@ ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-LDFLAGS += -dy -Nmisc/neti -Nmisch/hook
+LDFLAGS += -dy -Nmisc/neti -Nmisc/hook
 
 .KEEP_STATE:
 

@@ -15,7 +15,7 @@ set name=pkg.description \
 set name=pkg.summary \
     value="Interface to record user sessions in utmpx database"
 set name=info.classification \
-    value=org.opensolaris.category.2008:System/Library
+    value=org.opensolaris.category.2008:System/Libraries
 set name=variant.arch value=$(ARCH)
 dir path=usr group=sys
 dir path=usr/include

@@ -23,12 +23,15 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+#
 
 set name=pkg.fmri value=pkg:/consolidation/osnet/osnet-incorporation@$(PKGVERS)
 set name=variant.arch value=$(ARCH)
 set name=pkg.description value="This incorporation constrains packages from the OS/Net consolidation."
 set name=pkg.summary value="OS/Net consolidation incorporation"
 set name=pkg.depend.install-hold value=core-os.osnet
+set name=pkg.linted.opensolaris.manifest001.1 value=True
 <include packages.redist.current>
 <include packages.redist.renamed>
 <include packages.redist.obsolete>

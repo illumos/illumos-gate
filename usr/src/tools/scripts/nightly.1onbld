@@ -19,15 +19,15 @@
 .\" "Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 .\" "Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 .\" "Copyright 2019 Peter Tribble.
+.\" "Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\" "
-.TH NIGHTLY 1ONBLD "Jun 9, 2019"
+.TH NIGHTLY 1ONBLD "May 12, 2020"
 .SH NAME
 .I nightly
 \- build an OS-Net consolidation overnight
 .SH SYNOPSIS
 \fBnightly [-in] [-V VERS] <env_file>\fP
 .SH DESCRIPTION
-.LP
 .I nightly,
 the mother of all build scripts,
 can bringover, build, archive, package, error check, and
@@ -85,6 +85,12 @@ check for unreferenced files
 report on which proto area objects have changed (since the last build)
 .TP
 \(bu
+compare the proto area with package manifests
+.TP
+\(bu
+lint the generated packages
+.TP
+\(bu
 report the total build time
 .TP
 \(bu
@@ -128,6 +134,9 @@ Do a build with DEBUG on (non-DEBUG is built by default)
 .B \-F
 Do _not_ do a non-DEBUG build (use with -D to get just a DEBUG build)
 .TP
+.B \-L
+Do not run pkglint
+.TP
 .B \-M
 Do not run pmodes (safe file permission checker)
 .TP
@@ -170,7 +179,7 @@ Send mail to $MAILTO at end of build
 .B \-t
 Build and use the tools in $SRC/tools (default setting).
 .TP
-.B \+t
+.B +t
 Use the build tools in "$ONBLD_TOOLS/bin".
 
 .LP
@@ -221,7 +230,6 @@ Default group of options for building a release (-mp)
 set the build version string to VERS, overriding VERSION
 
 .SH ENVIRONMENT VARIABLES
-.LP
 Here is a list of prominent environment variables that
 .I nightly
 references and the meaning of each variable.
@@ -446,7 +454,6 @@ the DEBUG build will go in $ROOT and the non-DEBUG build will go in
 $ROOT-nd.  Other values will be treated as "no".
 .RE
 .SH NIGHTLY HOOK ENVIRONMENT VARIABLES
-.LP
 Several optional environment variables may specify commands to run at
 various points during the build.  Commands specified in the hook
 variable will be run in a subshell; command output will be appended to
@@ -488,7 +495,6 @@ This is reserved for per-build-machine customizations, and runs
 immedately after POST_NIGHTLY.
 .RE
 .SH FILES
-.LP
 .RS 5
 /etc/nightly.conf
 .RE
@@ -497,9 +503,8 @@ If present, nightly executes this file just prior to executing the
 .I env
 file.
 .SH EXAMPLES
-.LP
-Start with the example file in usr/src/tools/env/developer.sh
-(or gatekeeper.sh), copy to myenv and make your changes.
+Start with the example file in usr/src/tools/env/illumos.sh,
+copy to myenv and make your changes.
 .LP
 .PD 0
 # grep NIGHTLY_OPTIONS myenv

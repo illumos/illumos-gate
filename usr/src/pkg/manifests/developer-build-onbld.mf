@@ -26,7 +26,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2019 Joyent, Inc.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
-# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/developer/build/onbld@$(PKGVERS)
@@ -105,22 +105,27 @@ file path=opt/onbld/bin/Install mode=0555
 file path=opt/onbld/bin/bldenv mode=0555
 file path=opt/onbld/bin/bringovercheck mode=0555
 file path=opt/onbld/bin/build_cscope mode=0555
-file path=opt/onbld/bin/cddlchk mode=0555
+file path=opt/onbld/bin/cddlchk mode=0555 \
+    pkg.depend.bypass-generate=.*(?:Checks|onbld|Cddl).*
 file path=opt/onbld/bin/check_rtime mode=0555
 file path=opt/onbld/bin/checkpaths mode=0555
-file path=opt/onbld/bin/copyrightchk mode=0555
+file path=opt/onbld/bin/copyrightchk mode=0555 \
+    pkg.depend.bypass-generate=.*(?:Checks|onbld|Copyright).*
 file path=opt/onbld/bin/cstyle mode=0555
 file path=opt/onbld/bin/elfcmp mode=0555
 file path=opt/onbld/bin/find_elf mode=0555
 file path=opt/onbld/bin/findcrypto mode=0555
 file path=opt/onbld/bin/flg.flp mode=0555
 file path=opt/onbld/bin/genoffsets mode=0555
-file path=opt/onbld/bin/git-pbchk mode=0555
-file path=opt/onbld/bin/hdrchk mode=0555
+file path=opt/onbld/bin/git-pbchk mode=0555 \
+    pkg.depend.bypass-generate=.*(?:Checks|onbld|cStringIO).*
+file path=opt/onbld/bin/hdrchk mode=0555 \
+    pkg.depend.bypass-generate=.*(?:Checks|onbld|HdrChk).*
 file path=opt/onbld/bin/interface_check mode=0555
 file path=opt/onbld/bin/interface_cmp mode=0555
 file path=opt/onbld/bin/jstyle mode=0555
-file path=opt/onbld/bin/mapfilechk mode=0555
+file path=opt/onbld/bin/mapfilechk mode=0555 \
+    pkg.depend.bypass-generate=.*(?:Checks|onbld).*
 file path=opt/onbld/bin/nightly mode=0555
 file path=opt/onbld/bin/onu mode=0555
 file path=opt/onbld/bin/protocmp.terse mode=0555
@@ -134,8 +139,12 @@ file path=opt/onbld/bin/wdiff mode=0555
 file path=opt/onbld/bin/webrev mode=0555
 file path=opt/onbld/bin/which_scm mode=0555
 file path=opt/onbld/bin/ws mode=0555
-file path=opt/onbld/bin/wscheck mode=0555
-file path=opt/onbld/bin/wsdiff mode=0555
+file path=opt/onbld/bin/wscheck mode=0555 \
+    pkg.depend.bypass-generate=.*(?:Checks|onbld|WsCheck).*
+# wsdiff does not import the commands module when run under python3 but
+# pkgdepend still tries to resolve it, and fails.
+file path=opt/onbld/bin/wsdiff mode=0555 \
+    pkg.depend.bypass-generate=.*commands.*
 file path=opt/onbld/bin/xref mode=0555
 file path=opt/onbld/bin/xref.mk
 file path=opt/onbld/env/illumos

@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2012, Igor Kozhukhov <ikozhukhov@gmail.com>.  All rights reserved.
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 <include system-library-math.man3m.inc>
@@ -23,7 +23,6 @@ set name=description value="Math Libraries"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Libraries
 set name=variant.arch value=$(ARCH)
-set name=variant.opensolaris.zone value=global value=nonglobal
 dir path=lib
 dir path=lib/$(ARCH64)
 $(sparc_ONLY)dir path=lib/cpu
