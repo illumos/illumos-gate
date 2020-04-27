@@ -252,7 +252,7 @@ xmpp_connect(xmpp_conn_t *conn)
 	conn->tls_started = B_FALSE;
 
 	conn->parser = xmlCreatePushParserCtxt(&xml_handler, (void *) conn,
-	    NULL, NULL, NULL);
+	    NULL, 0, NULL);
 	if (conn->parser == NULL) {
 		return (-1);
 	}
@@ -417,7 +417,7 @@ xmpp_client_thr(void *data)
 			 * It should only be reset once after the ssl is opened
 			 * in the start_tls().
 			 */
-			(void) xmlCtxtResetPush(conn.parser, NULL, NULL, NULL,
+			(void) xmlCtxtResetPush(conn.parser, NULL, 0, NULL,
 			    NULL);
 		}
 		xmpp_close(&conn);

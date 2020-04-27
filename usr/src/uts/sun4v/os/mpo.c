@@ -148,8 +148,8 @@ static	int	szc_mask0 = 0;
 
 /* Save mblocks from the MD */
 #define	SMALL_MBLOCKS_COUNT	8
-static 	struct	mblock_md *mpo_mblock;
-static	struct 	mblock_md small_mpo_mblocks[SMALL_MBLOCKS_COUNT];
+static	struct	mblock_md *mpo_mblock;
+static	struct	mblock_md small_mpo_mblocks[SMALL_MBLOCKS_COUNT];
 static	int	n_mblocks = 0;
 
 /* Save mem_node stripes calculate from mblocks and lgroups. */
@@ -191,7 +191,7 @@ static void mnode_update(mpo_config_t *, pfn_t, pfn_t, update_t);
 
 /* Debug support */
 #if defined(DEBUG) && !defined(lint)
-#define	VALIDATE_SLICE(base, end) { 					\
+#define	VALIDATE_SLICE(base, end) {					\
 	ASSERT(IS_P2ALIGNED(ptob(base), TTEBYTES(TTE256M)));		\
 	ASSERT(IS_P2ALIGNED(ptob(end - base + 1), TTEBYTES(TTE256M)));	\
 }
@@ -307,7 +307,7 @@ cpuid_to_cpunode(md_t *md, int cpuid)
 {
 	mde_cookie_t    rootnode, foundnode, *cpunodes;
 	uint64_t	cpuid_prop;
-	int 	n_cpunodes, i;
+	int	n_cpunodes, i;
 
 	if (md == NULL)
 		return (MDE_INVAL_ELEM_COOKIE);
@@ -1333,7 +1333,7 @@ valid_pages(md_t *md, mde_cookie_t cpu0)
 	 * to get a sane mask.
 	 */
 
-	if (cpu0 == NULL)
+	if (cpu0 == 0)
 		szc_mask = szc_mask0;
 	else {
 		if (md_get_prop_val(md, cpu0, "mmu-page-size-list", &szc_mask))

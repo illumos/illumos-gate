@@ -868,7 +868,7 @@ cmd_ue_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 
 	if (fmd_nvl_fmri_expand(hdl, asru) < 0) {
 		CMD_STAT_BUMP(bad_mem_asru);
-		return (NULL);
+		return (CMD_EVD_BAD);
 	}
 
 	if ((bank = cmd_bank_lookup(hdl, asru)) == NULL &&

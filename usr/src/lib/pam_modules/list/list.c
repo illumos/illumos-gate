@@ -33,6 +33,7 @@
 #include <malloc.h>
 #include <unistd.h>
 #include <errno.h>
+#include <grp.h>
 #include <security/pam_appl.h>
 #include <security/pam_modules.h>
 #include <security/pam_impl.h>
@@ -68,24 +69,34 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	char	buf[BUFSIZ];
 	char	hostname[MAXHOSTNAMELEN];
 	char	*username = NULL;
+	char	*grbuf = NULL;
 	char	*bufp;
 	char	*rhost;
-	char 	*limit;
+	char	*limit;
 	int	userok = 0;
 	int	hostok = 0;
 	int	i;
 	int	allow_deny_test = 0;
+	long	grbuflen = 0;
 	boolean_t	debug = B_FALSE;
 	boolean_t	allow = B_FALSE;
 	boolean_t	matched = B_FALSE;
 	boolean_t	check_user = B_TRUE;
+	boolean_t	check_group = B_FALSE;
 	boolean_t	check_host = B_FALSE;
 	boolean_t	check_exact = B_FALSE;
 	pam_list_mode_t	op_mode = LIST_PLUS_CHECK;
 
+	// group reentrant interfaces limits
+	if ((grbuflen = sysconf(_SC_GETGR_R_SIZE_MAX)) <= 0)
+		return (PAM_BUF_ERR);
+
 	for (i = 0; i < argc; ++i) {
 		if (strncasecmp(argv[i], "debug", sizeof ("debug")) == 0) {
 			debug = B_TRUE;
+		} else if (strncasecmp(argv[i], "group",
+		    sizeof ("group")) == 0) {
+			check_group = B_TRUE;
 		} else if (strncasecmp(argv[i], "user", sizeof ("user")) == 0) {
 			check_user = B_TRUE;
 		} else if (strncasecmp(argv[i], "nouser",
@@ -140,14 +151,19 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		}
 	}
 
-	if (((check_user || check_host || check_exact) == B_FALSE) ||
-	    (allow_deny_test > 1)) {
+	if (((check_user || check_group || check_host ||
+	    check_exact) == B_FALSE) || (allow_deny_test > 1)) {
 		__pam_log(LOG_AUTH | LOG_ERR, ILLEGAL_COMBINATION);
 		return (PAM_SERVICE_ERR);
 	}
 
 	if ((op_mode == LIST_COMPAT_MODE) && (check_user == B_FALSE)) {
 		log_illegal_combination("compat", "nouser");
+		return (PAM_SERVICE_ERR);
+	}
+
+	if ((op_mode == LIST_COMPAT_MODE) && (check_group == B_TRUE)) {
+		log_illegal_combination("compat", "group");
 		return (PAM_SERVICE_ERR);
 	}
 
@@ -165,7 +181,7 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 	(void) pam_get_item(pamh, PAM_USER, (void**)&username);
 
-	if ((check_user || check_exact) && ((username == NULL) ||
+	if ((check_user || check_group || check_exact) && ((username == NULL) ||
 	    (*username == '\0'))) {
 		__pam_log(LOG_AUTH | LOG_ERR,
 		    "pam_list: username not supplied, critical error");
@@ -201,6 +217,12 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		__pam_log(LOG_AUTH | LOG_ERR, "pam_list: fopen of %s: %s",
 		    allowdeny_filename, strerror(errno));
 		return (PAM_SERVICE_ERR);
+	}
+
+	if (check_group && ((grbuf = calloc(1, grbuflen)) == NULL)) {
+		__pam_log(LOG_AUTH | LOG_ERR,
+		    "pam_list: could not allocate memory for group");
+		return (PAM_BUF_ERR);
 	}
 
 	while (fgets(buf, BUFSIZ, fd) != NULL) {
@@ -242,6 +264,7 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 				    "pam_list: simple minus unknown, "
 				    "illegal line in " PF_PATH);
 				(void) fclose(fd);
+				free(grbuf);
 				return (PAM_SERVICE_ERR);
 			}
 
@@ -251,6 +274,7 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 				    "pam_list: @ is not allowed on the first "
 				    "position in " PF_PATH);
 				(void) fclose(fd);
+				free(grbuf);
 				return (PAM_SERVICE_ERR);
 			}
 
@@ -282,6 +306,7 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 		/*
 		 * if -> netgroup line
+		 * else if -> group line
 		 * else -> user line
 		 */
 		if ((bufp[0] == '@') && (bufp[1] != '\0')) {
@@ -311,6 +336,28 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 					break;
 				}
 			}
+		} else if ((bufp[0] == '%') && (bufp[1] != '\0')) {
+			char	**member;
+			struct	group grp;
+
+			if (check_group == B_FALSE)
+				continue;
+
+			bufp++;
+
+			if (getgrnam_r(bufp, &grp, grbuf, grbuflen) != NULL) {
+				for (member = grp.gr_mem; *member != NULL;
+				    member++) {
+					if (strcmp(*member, username) == 0) {
+						matched = B_TRUE;
+						break;
+					}
+				}
+			} else {
+				__pam_log(LOG_AUTH | LOG_ERR,
+				    "pam_list: %s is not a known group",
+				    bufp);
+			}
 		} else {
 			if (check_user) {
 				if (strcmp(bufp, username) == 0) {
@@ -331,6 +378,7 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		}
 	}
 	(void) fclose(fd);
+	free(grbuf);
 
 	if (debug) {
 		__pam_log(LOG_AUTH | LOG_DEBUG,

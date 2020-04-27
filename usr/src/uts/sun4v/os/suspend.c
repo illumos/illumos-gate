@@ -669,7 +669,7 @@ suspend_start(char *error_reason, size_t max_reason_len)
 
 	/* Set the {%tick,%stick}.NPT bits on all CPUs */
 	if (enable_user_tick_stick_emulation) {
-		xc_all((xcfunc_t *)enable_tick_stick_npt, NULL, NULL);
+		xc_all((xcfunc_t *)enable_tick_stick_npt, 0, 0);
 		xt_sync(cpu_ready_set);
 		ASSERT(gettick_npt() != 0);
 		ASSERT(getstick_npt() != 0);

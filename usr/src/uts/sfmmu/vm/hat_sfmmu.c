@@ -1943,7 +1943,7 @@ hat_free_end(struct hat *sfmmup)
 	ASSERT(sfmmup->sfmmu_ttecnt[TTE256M] == 0);
 
 	if (sfmmup->sfmmu_rmstat) {
-		hat_freestat(sfmmup->sfmmu_as, NULL);
+		hat_freestat(sfmmup->sfmmu_as, 0);
 	}
 
 	while (sfmmup->sfmmu_tsb != NULL) {
@@ -10090,7 +10090,7 @@ sfmmu_check_page_sizes(sfmmu_t *sfmmup, int growing)
 	 * Kernel threads, processes with small address spaces not using
 	 * large pages, and dummy ISM HATs need not apply.
 	 */
-	if (sfmmup == ksfmmup || sfmmup->sfmmu_ismhat != NULL)
+	if (sfmmup == ksfmmup || sfmmup->sfmmu_ismhat != 0)
 		return;
 
 	if (!SFMMU_LGPGS_INUSE(sfmmup) &&
@@ -12082,7 +12082,7 @@ sfmmu_ismtlbcache_demap(caddr_t addr, sfmmu_t *ism_sfmmup,
 	 */
 	ASSERT(ism_sfmmup->sfmmu_ismhat);
 	ASSERT(MUTEX_HELD(&ism_mlist_lock));
-	addr = addr - ISMID_STARTADDR;
+	addr = (caddr_t)((uintptr_t)addr - (uintptr_t)ISMID_STARTADDR);
 
 	for (ment = ism_sfmmup->sfmmu_iment; ment; ment = ment->iment_next) {
 

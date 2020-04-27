@@ -316,7 +316,7 @@ kdi_tlb_page_unlock(caddr_t va, int do_dtlb)
 void
 sfmmu_clear_utsbinfo()
 {
-	(void) hv_set_ctxnon0(0, NULL);
+	(void) hv_set_ctxnon0(0, 0);
 }
 
 /*

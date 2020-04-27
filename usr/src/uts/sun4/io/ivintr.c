@@ -268,7 +268,7 @@ add_softintr(uint_t pil, softintrfunc intr_handler, caddr_t intr_arg1,
 	intr_vec_t	*iv_p;
 
 	if (pil > PIL_MAX)
-		return (NULL);
+		return ((uint64_t)NULL);
 
 	iv_p = iv_alloc(type);
 

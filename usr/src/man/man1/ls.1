@@ -45,11 +45,10 @@
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2014 Nexenta Systems, Inc.  All Rights Reserved.
 .\"
-.TH LS 1 "Nov 24, 2014"
+.TH LS 1 "Apr 25, 2020"
 .SH NAME
 ls \- list contents of directory
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/bin/ls\fR [\fB-aAbcCdeEfFghHiklLmnopqrRsStuUwvVx1@\fR]
      [\fB-/ c\fR | \fBv\fR] [\fB-% atime | crtime | ctime | mtime | all\fR]
@@ -74,7 +73,6 @@ ls \- list contents of directory
 .fi
 
 .SH DESCRIPTION
-.LP
 For each \fIfile\fR that is a directory, \fBls\fR lists the contents of the
 directory. For each \fIfile\fR that is an ordinary file, \fBls\fR repeats its
 name and any other information requested. The output is sorted alphabetically
@@ -392,7 +390,6 @@ permissions during access.
 For others permissions, the third position can be occupied by \fBt\fR or
 \fBT\fR. These refer to the state of the sticky bit and execution permissions.
 .SS "Color Output"
-.LP
 If color output is enabled, the environment variable LS_COLORS is checked.  If
 it exists, its contents are used to control the colors used to display
 filenames.  If it is not set, a default list of colors is used. The format of
@@ -849,10 +846,8 @@ The appropriate color codes are chosen by selecting the most specific match,
 starting with the file suffixes and proceeding with the file types until a
 match is found. The \fBno\fR (normal file) type matches any file.
 .SH OPTIONS
-.LP
 The following options are supported:
 .SS "/usr/bin/ls, /usr/xpg4/bin/ls, and /usr/xpg6/bin/ls"
-.LP
 The following options are supported for all three versions:
 .sp
 .ne 2
@@ -2175,7 +2170,7 @@ See \fBCOLOR OUTPUT\fR for information on how to control the output colors.
 .ad
 .sp .6
 .RS 4n
-Display a suffix after a file depending on it's type, similar to the \fB-F\fR
+Display a suffix after a file depending on its type, similar to the \fB-F\fR
 option, except \fB*\fR is not appended to executable files.
 .RE
 
@@ -2378,7 +2373,6 @@ crtime\fR, \fB-% ctime\fR, and \fB-% mtime\fR) determines the timestamps used
 for sorting or in long format listings. The last \fB-t\fR, \fB-S\fR, or
 \fB-U\fR option determines the sorting behavior.
 .SH OPERANDS
-.LP
 The following operand is supported:
 .sp
 .ne 2
@@ -2392,11 +2386,9 @@ diagnostic message is output on standard error.
 .RE
 
 .SH USAGE
-.LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBls\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRViewing File Permissions
 .sp
 .LP
@@ -2643,7 +2635,6 @@ example% ls -%crtime -tl file*
 .LP
 In this example the files are sorted by creation time.
 .SH ENVIRONMENT VARIABLES
-.LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBls\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_TIME\fR, \fBLC_MESSAGES\fR,
@@ -2736,7 +2727,6 @@ terminal information database
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .SS "/usr/bin/ls"
 
@@ -2814,12 +2804,10 @@ For all options except \fB-A\fR, \fB-b\fR, \fB-e\fR, \fB-E,\fR \fB-h\fR,
 \fB--numeric-uid-gid\fR, \fB--reverse\fR, \fB--recursive\fR, \fB--si\fR,
 \fB--size\fR, and \fB--time-style\fR, see \fBstandards\fR(5).
 .SH SEE ALSO
-.LP
 \fBchmod\fR(1), \fBcp\fR(1), \fBsetfacl\fR(1), \fBfgetattr\fR(3C),
 \fBstrftime\fR(3C), \fBterminfo\fR(4), \fBacl\fR(5), \fBattributes\fR(5),
 \fBenviron\fR(5), \fBfsattr\fR(5), \fBlargefile\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.LP
 Unprintable characters in file names can confuse the columnar output options.
 .sp
 .LP

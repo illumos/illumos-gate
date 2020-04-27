@@ -308,7 +308,7 @@ pi_walker(pi_enum_t *pip, tnode_t *t_parent, const char *hc_name,
  * by calling an appropriate creation routine for the node type.
  *
  * Output:
- * 	This routine returns MDE_WALK_NEXT, MDE_WALK_DONE or MDE_WALK_ERROR
+ *	This routine returns MDE_WALK_NEXT, MDE_WALK_DONE or MDE_WALK_ERROR
  * only.
  */
 static int
@@ -704,7 +704,7 @@ pi_walkerlist_create(topo_mod_t *mod)
 	/* Initialize the uutil list structure */
 	walker_pool = uu_list_pool_create("pi_walker_pool",
 	    sizeof (pi_walkernode_t), offsetof(pi_walkernode_t, walker_node),
-	    pi_walkerlist_compare, NULL);
+	    pi_walkerlist_compare, 0);
 	if (walker_pool == NULL) {
 		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
 		return (-1);

@@ -56,9 +56,9 @@
 extern sbd_status_t sbd_pgr_meta_init(sbd_lu_t *sl);
 extern sbd_status_t sbd_pgr_meta_load(sbd_lu_t *sl);
 extern void sbd_pgr_reset(sbd_lu_t *sl);
-extern int HardwareAcceleratedLocking;
-extern int HardwareAcceleratedInit;
-extern int HardwareAcceleratedMove;
+extern uint8_t HardwareAcceleratedLocking;
+extern uint8_t HardwareAcceleratedInit;
+extern uint8_t HardwareAcceleratedMove;
 extern uint8_t sbd_unmap_enable;
 
 static int sbd_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,

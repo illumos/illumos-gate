@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -422,7 +422,7 @@ prgetprfpregs(klwp_t *lwp, prfpregset_t *pfp)
 	 * This is supposed to be a pointer to the floating point queue.
 	 * We can't provide such a thing through the /proc interface.
 	 */
-	pfp->pr_filler = NULL;
+	pfp->pr_filler = 0;
 	/*
 	 * XXX: to be done: fetch the FP queue if it is non-empty.
 	 */
@@ -443,7 +443,7 @@ prgetprfpregs32(klwp_t *lwp, prfpregset32_t *pfp)
 	 * This is supposed to be a pointer to the floating point queue.
 	 * We can't provide such a thing through the /proc interface.
 	 */
-	pfp->pr_filler = NULL;
+	pfp->pr_filler = 0;
 	/*
 	 * XXX: to be done: fetch the FP queue if it is non-empty.
 	 */

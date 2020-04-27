@@ -267,6 +267,7 @@ cmd_nop_hdlr(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep)
 	fmd_hdl_debug(hdl, "nop train resolved for clcode %llx\n",
 	    xr->xr_clcode);
 }
+
 /*ARGSUSED*/
 static void
 cmd_xxu_hdlr(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep)
@@ -399,7 +400,7 @@ cmd_xxcu_resolve(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep,
 	uint64_t afar;
 
 
-	afar = NULL;
+	afar = 0;
 
 	if (xr->xr_afar_status == AFLT_STAT_VALID)
 		afar = xr->xr_afar;
@@ -500,7 +501,7 @@ cmd_xxcu_initial(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 
 	if (cmd_afar_valid(hdl, nvl, clcode, &afar) != 0) {
 		afar_status = AFLT_STAT_INVALID;
-		afar = NULL;
+		afar = 0;
 	} else {
 		afar_status = AFLT_STAT_VALID;
 	}

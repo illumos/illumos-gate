@@ -362,7 +362,7 @@ mach_htraptrace_setup(int cpuid)
 		    contig_mem_alloc_align(HTRAP_TSIZE, HTRAP_TSIZE);
 		if (ctlp->d.hvaddr_base == NULL) {
 			ctlp->d.hlimit = 0;
-			ctlp->d.hpaddr_base = NULL;
+			ctlp->d.hpaddr_base = 0;
 			cmn_err(CE_WARN, "!cpu%d: failed to allocate HV "
 			    "traptrace buffer", cpuid);
 		} else {
@@ -425,7 +425,7 @@ mach_htraptrace_configure(int cpuid)
 			if (ret != H_EOK) {
 				ctlp->d.hvaddr_base = NULL;
 				ctlp->d.hlimit = 0;
-				ctlp->d.hpaddr_base = NULL;
+				ctlp->d.hpaddr_base = 0;
 			}
 		}
 	} else {
@@ -438,7 +438,7 @@ mach_htraptrace_configure(int cpuid)
 					htrap_tr0_inuse = 0;
 				ctlp->d.hvaddr_base = NULL;
 				ctlp->d.hlimit = 0;
-				ctlp->d.hpaddr_base = NULL;
+				ctlp->d.hpaddr_base = 0;
 			} else
 				cmn_err(CE_WARN,
 				    "!cpu%d: HV traptracing is not disabled, "
@@ -468,7 +468,7 @@ mach_htraptrace_cleanup(int cpuid)
 		}
 		ctlp->d.hvaddr_base = NULL;
 		ctlp->d.hlimit = 0;
-		ctlp->d.hpaddr_base = NULL;
+		ctlp->d.hpaddr_base = 0;
 	}
 }
 

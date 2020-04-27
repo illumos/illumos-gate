@@ -102,7 +102,7 @@ idle_other_cpus(void)
 		return;
 
 	xt_some(cpu_idle_set, (xcfunc_t *)idle_stop_xcall,
-	    (uint64_t)cpu_idle_self, NULL);
+	    (uint64_t)cpu_idle_self, 0);
 
 	for (i = 0; i < NCPU; i++) {
 		if (!CPU_IN_SET(cpu_idle_set, i))
@@ -215,7 +215,7 @@ mp_cpu_quiesce(cpu_t *cp0)
 	volatile cpu_t  *cp = (volatile cpu_t *) cp0;
 	int i, sanity_limit = cpu_quiesce_microsecond_sanity_limit;
 	int		cpuid = cp->cpu_id;
-	int 		found_intr = 1;
+	int		found_intr = 1;
 	static fn_t	f = "mp_cpu_quiesce";
 
 	ASSERT(CPU->cpu_id != cpuid);

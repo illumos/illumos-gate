@@ -408,7 +408,7 @@ kobj_start(void *cif)
 		prom_panic("no ELF image");
 	ehdr = (Ehdr *)(uintptr_t)eadr;
 	for (i = 0; i < BA_NUM; i++)
-		bootaux[i].ba_val = NULL;
+		bootaux[i].ba_val = 0;
 	bootaux[BA_PHNUM].ba_val = ehdr->e_phnum;
 	bootaux[BA_PHENT].ba_val = ehdr->e_phentsize;
 	bootaux[BA_LDNAME].ba_ptr = NULL;

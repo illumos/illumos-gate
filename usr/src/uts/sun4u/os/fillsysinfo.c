@@ -1153,7 +1153,7 @@ have_eeprom(pnode_t node)
 	/*
 	 * If we have a chosen eeprom and it is not this node, keep looking.
 	 */
-	if (chosen_eeprom != NULL && chosen_eeprom != node) {
+	if (chosen_eeprom != 0 && chosen_eeprom != node) {
 		v_timecheck_addr = (caddr_t)(uintptr_t)eaddr;
 		return;
 	}

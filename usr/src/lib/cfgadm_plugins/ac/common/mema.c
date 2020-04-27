@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stddef.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -465,7 +463,7 @@ ap_stat(
 
 	if ((bank = ap_bk_idx(bank_spec)) == -1) {
 		__fmt_errstring(errstring, strlen(bank_spec),
-			dgettext(TEXT_DOMAIN, ap_invalid), bank_spec);
+		    dgettext(TEXT_DOMAIN, ap_invalid), bank_spec);
 		return (CFGA_ERROR);
 	}
 
@@ -831,7 +829,7 @@ mtest_run(
 	if (ret == -1) {
 		if (ret_errno == ENOTSUP) {
 			mema_err(&cmd, ret_errno, errstring,
-				CMD_MEM_TEST_START);
+			    CMD_MEM_TEST_START);
 			return (CFGA_OPNOTSUPP);
 		}
 		if (ret_errno == EBUSY && test_start.tester_pid > 0) {
@@ -1131,14 +1129,14 @@ cfga_test(
 				hlp = subopt_help_str(opts);
 				if (hlp != NULL) {
 					__fmt_errstring(errstring,
-					strlen(value) + strlen(hlp),
-					dgettext(TEXT_DOMAIN, unk_test),
-					value, hlp);
+					    strlen(value) + strlen(hlp),
+					    dgettext(TEXT_DOMAIN, unk_test),
+					    value, hlp);
 					free((void *)hlp);
 				} else {
 					__fmt_errstring(errstring, 20,
-					dgettext(TEXT_DOMAIN, calloc_fail),
-						strlen(options) + 1, 1);
+					    dgettext(TEXT_DOMAIN, calloc_fail),
+					    strlen(options) + 1, 1);
 				}
 				/* Free after printing value. */
 				free((void *)free_cp);
@@ -1161,18 +1159,18 @@ cfga_test(
 
 				if (max_errors != -1 && subopt == maxerr_idx) {
 					__fmt_errstring(errstring,
-					strlen(opts[subopt]),
-					dgettext(TEXT_DOMAIN, dup_num),
-					opts[subopt]);
+					    strlen(opts[subopt]),
+					    dgettext(TEXT_DOMAIN, dup_num),
+					    opts[subopt]);
 					free((void *)free_cp);
 					return (CFGA_ERROR);
 				}
 
 				if (value == NULL) {
 					__fmt_errstring(errstring,
-					0,
-					dgettext(TEXT_DOMAIN, no_num),
-					"");
+					    0,
+					    dgettext(TEXT_DOMAIN, no_num),
+					    "");
 					free((void *)free_cp);
 					return (CFGA_ERROR);
 				}
@@ -1181,9 +1179,9 @@ cfga_test(
 				if ((ret_p == value) || (*ret_p != '\0') ||
 				    (max_errors < 0)) {
 					__fmt_errstring(errstring,
-					strlen(value),
-					dgettext(TEXT_DOMAIN, no_num),
-					value);
+					    strlen(value),
+					    dgettext(TEXT_DOMAIN, no_num),
+					    value);
 					free((void *)free_cp);
 					return (CFGA_ERROR);
 				}
@@ -1300,7 +1298,7 @@ info_set(ac_stat_t *asp, mema_bank_t *bkp, cfga_info_t info)
 	char *end;
 
 	end = &info[sizeof (cfga_info_t)];
-	*info = NULL;
+	*info = '\0';
 
 	board = bkp->board;
 
@@ -1370,8 +1368,8 @@ mema_cvt(ac_stat_t *ac, mema_bank_t *bkp, cfga_stat_data_t *cs)
 	cs->ap_busy = (cfga_busy_t)ac->busy;
 	cs->ap_status_time = ac->status_time;
 	info_set(ac, bkp, cs->ap_info);
-	cs->ap_log_id[0] = NULL;
-	cs->ap_phys_id[0] = NULL;
+	cs->ap_log_id[0] = '\0';
+	cs->ap_phys_id[0] = '\0';
 }
 
 /*ARGSUSED*/

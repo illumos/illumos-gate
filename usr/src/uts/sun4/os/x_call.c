@@ -90,7 +90,8 @@ void	send_mondo_set(cpuset_t set);
  * values.
  */
 static int
-xc_func_timeout_adj(cpu_setup_t what, int cpuid) {
+xc_func_timeout_adj(cpu_setup_t what, int cpuid)
+{
 	uint64_t freq = cpunodes[cpuid].clock_freq;
 
 	switch (what) {
@@ -756,7 +757,7 @@ xc_attention(cpuset_t cpuset)
 	CPUSET_DEL(xc_cpuset, lcx);
 
 	XC_STAT_INC(x_dstat[lcx][XC_ATTENTION]);
-	XC_TRACE(XC_ATTENTION, &xc_cpuset, NULL, NULL, NULL);
+	XC_TRACE(XC_ATTENTION, &xc_cpuset, NULL, 0, 0);
 
 	if (CPUSET_ISNULL(xc_cpuset))
 		return;
@@ -843,7 +844,7 @@ xc_dismissed(cpuset_t cpuset)
 	 * exclude itself
 	 */
 	CPUSET_DEL(xc_cpuset, lcx);
-	XC_TRACE(XC_DISMISSED, &xc_cpuset, NULL, NULL, NULL);
+	XC_TRACE(XC_DISMISSED, &xc_cpuset, NULL, 0, 0);
 	if (CPUSET_ISNULL(xc_cpuset)) {
 		xc_holder = -1;
 		mutex_exit(&xc_sys_mutex);
@@ -963,9 +964,9 @@ xc_loop(void)
 	 *
 	 * The owner of xc_sys_mutex (or xc_holder) can expect
 	 * its xc/xt requests are handled as follows:
-	 * 	xc requests use xc_mbox's handshaking for their services
-	 * 	xt requests at TL>0 will be handled immediately
-	 * 	xt requests at TL=0:
+	 *	xc requests use xc_mbox's handshaking for their services
+	 *	xt requests at TL>0 will be handled immediately
+	 *	xt requests at TL=0:
 	 *		if their handlers'pils are <= XCALL_PIL, then
 	 *			they will be handled after xc_loop exits
 	 *			(so, they probably should not be used)
@@ -976,7 +977,7 @@ xc_loop(void)
 	 * the requests will be handled as follows:
 	 *	xc requests will be handled after they grab xc_sys_mutex
 	 *	xt requests at TL>0 will be handled immediately
-	 * 	xt requests at TL=0:
+	 *	xt requests at TL=0:
 	 *		if their handlers'pils are <= XCALL_PIL, then
 	 *			they will be handled after xc_loop exits
 	 *		else they will be handled immediately
@@ -988,7 +989,7 @@ xc_loop(void)
 	CPUSET_ADD(tset, lcx);
 	membar_stld();
 	XC_STAT_INC(x_rstat[lcx][XC_LOOP]);
-	XC_TRACE(XC_LOOP_ENTER, &tset, NULL, NULL, NULL);
+	XC_TRACE(XC_LOOP_ENTER, &tset, NULL, 0, 0);
 	while (xmp->xc_state != XC_EXIT) {
 		if (xmp->xc_state == XC_DOIT) {
 			func = xmp->xc_func;
@@ -1026,7 +1027,7 @@ xc_loop(void)
 	}
 	ASSERT(xmp->xc_state == XC_EXIT);
 	ASSERT(xc_holder != -1);
-	XC_TRACE(XC_LOOP_EXIT, &tset, NULL, NULL, NULL);
+	XC_TRACE(XC_LOOP_EXIT, &tset, NULL, 0, 0);
 	xmp->xc_state = XC_IDLE;
 	membar_stld();
 	return (1);
