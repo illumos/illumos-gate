@@ -141,7 +141,7 @@ done:
 	mutex_exit(&pci_global_mutex);
 	if (ret != DDI_SUCCESS)
 		cmn_err(CE_NOTE, "Interrupt register failure, returning 0x%x\n",
-			ret);
+		    ret);
 	return (ret);
 }
 
@@ -244,10 +244,10 @@ pci_intr_setup(pci_t *pci_p)
 	 * Get the interrupts property.
 	 */
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"interrupts", (caddr_t)&pci_p->pci_inos,
-		&pci_p->pci_inos_len) != DDI_SUCCESS)
+	    "interrupts", (caddr_t)&pci_p->pci_inos,
+	    &pci_p->pci_inos_len) != DDI_SUCCESS)
 		cmn_err(CE_PANIC, "%s%d: no interrupts property\n",
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 
 	/*
 	 * figure out number of interrupts in the "interrupts" property
@@ -322,7 +322,7 @@ map_pci_registers(pci_t *pci_p, dev_info_t *dip)
 	if (ddi_regs_map_setup(dip, 0, &pci_p->pci_address[0], 0, 0,
 	    &attr, &pci_p->pci_ac[0]) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d: unable to map reg entry 0\n",
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 		return (DDI_FAILURE);
 	}
 	/*
@@ -333,7 +333,7 @@ map_pci_registers(pci_t *pci_p, dev_info_t *dip)
 	    ddi_regs_map_setup(dip, 2, &pci_p->pci_address[2], 0, 0,
 	    &attr, &pci_p->pci_ac[2]) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d: unable to map reg entry 2\n",
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 		ddi_regs_map_free(&pci_p->pci_ac[0]);
 		return (DDI_FAILURE);
 	}
@@ -348,7 +348,7 @@ map_pci_registers(pci_t *pci_p, dev_info_t *dip)
 	    PCI_CONF_HDR_SIZE, &attr, &pci_p->pci_ac[1]) != DDI_SUCCESS) {
 
 		cmn_err(CE_WARN, "%s%d: unable to map reg entry 1\n",
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 		ddi_regs_map_free(&pci_p->pci_ac[0]);
 		if (pci_stream_buf_exists)
 			ddi_regs_map_free(&pci_p->pci_ac[2]);
@@ -484,7 +484,7 @@ pci_ib_setup(ib_t *ib_p)
 	ib_p->ib_slot_intr_map_regs = a + PSYCHO_IB_SLOT_INTR_MAP_REG_OFFSET;
 	ib_p->ib_obio_intr_map_regs = a + PSYCHO_IB_OBIO_INTR_MAP_REG_OFFSET;
 	ib_p->ib_obio_clear_intr_regs =
-		a + PSYCHO_IB_OBIO_CLEAR_INTR_REG_OFFSET;
+	    a + PSYCHO_IB_OBIO_CLEAR_INTR_REG_OFFSET;
 	return (a);
 }
 
@@ -498,7 +498,7 @@ pci_xlate_intr(dev_info_t *dip, dev_info_t *rdip, ib_t *ib_p, uint32_t intr)
 
 	if ((intr > PCI_INTD) || (intr < PCI_INTA))
 		goto done;
-	if (ddi_prop_exists(DDI_DEV_T_ANY, rdip, NULL, "interrupt-map"))
+	if (ddi_prop_exists(DDI_DEV_T_ANY, rdip, 0, "interrupt-map"))
 		goto done;
 	/*
 	 * Hack for pre 1275 imap machines e.g. quark & tazmo
@@ -507,7 +507,7 @@ pci_xlate_intr(dev_info_t *dip, dev_info_t *rdip, ib_t *ib_p, uint32_t intr)
 	 */
 	cdip = get_my_childs_dip(dip, rdip);
 	if (ddi_getlongprop(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS, "reg",
-		(caddr_t)&pci_rp, &len) != DDI_SUCCESS)
+	    (caddr_t)&pci_rp, &len) != DDI_SUCCESS)
 		return (0);
 	phys_hi = pci_rp->pci_phys_hi;
 	kmem_free(pci_rp, len);
@@ -525,7 +525,7 @@ pci_xlate_intr(dev_info_t *dip, dev_info_t *rdip, ib_t *ib_p, uint32_t intr)
 	 * if pci bus number > 0x80, then devices are located on the A side(66)
 	 */
 	DEBUG3(DBG_IB, dip, "pci_xlate_intr: bus=%x, dev=%x, intr=%x\n",
-		bus, dev, intr);
+	    bus, dev, intr);
 	intr--;
 	intr |= (bus & 0x80) ? ((dev - 1) << 2) : (0x10 | ((dev - 2) << 2));
 
@@ -748,7 +748,7 @@ cb_ino_to_clr_pa(cb_t *cb_p, ib_ino_t ino)
  */
 int
 cb_remove_xintr(pci_t *pci_p, dev_info_t *dip, dev_info_t *rdip,
-	ib_ino_t ino, ib_mondo_t mondo)
+    ib_ino_t ino, ib_mondo_t mondo)
 {
 	if (ino != pci_p->pci_inos[CBNINTR_THERMAL])
 		return (DDI_FAILURE);
@@ -879,19 +879,19 @@ pbm_configure(pbm_t *pbm_p)
 	 * Clear any PBM errors.
 	 */
 	l = (PSYCHO_PCI_AFSR_E_MASK << PSYCHO_PCI_AFSR_PE_SHIFT) |
-		(PSYCHO_PCI_AFSR_E_MASK << PSYCHO_PCI_AFSR_SE_SHIFT);
+	    (PSYCHO_PCI_AFSR_E_MASK << PSYCHO_PCI_AFSR_SE_SHIFT);
 	*pbm_p->pbm_async_flt_status_reg = l;
 
 	/*
 	 * Clear error bits in configuration status register.
 	 */
 	s = PCI_STAT_PERROR | PCI_STAT_S_PERROR |
-		PCI_STAT_R_MAST_AB | PCI_STAT_R_TARG_AB |
-		PCI_STAT_S_TARG_AB | PCI_STAT_S_PERROR;
+	    PCI_STAT_R_MAST_AB | PCI_STAT_R_TARG_AB |
+	    PCI_STAT_S_TARG_AB | PCI_STAT_S_PERROR;
 	DEBUG1(DBG_ATTACH, dip, "pbm_configure: conf status reg=%x\n", s);
 	pbm_p->pbm_config_header->ch_status_reg = s;
 	DEBUG1(DBG_ATTACH, dip, "pbm_configure: conf status reg==%x\n",
-		pbm_p->pbm_config_header->ch_status_reg);
+	    pbm_p->pbm_config_header->ch_status_reg);
 
 	l = *pbm_p->pbm_ctrl_reg;	/* save control register state */
 	DEBUG1(DBG_ATTACH, dip, "pbm_configure: ctrl reg==%llx\n", l);
@@ -990,7 +990,7 @@ pbm_configure(pbm_t *pbm_p)
 	DEBUG1(DBG_ATTACH, dip, "pbm_configure: conf command reg=%x\n", s);
 	pbm_p->pbm_config_header->ch_command_reg = s;
 	DEBUG1(DBG_ATTACH, dip, "pbm_configure: conf command reg==%x\n",
-		pbm_p->pbm_config_header->ch_command_reg);
+	    pbm_p->pbm_config_header->ch_command_reg);
 
 	/*
 	 * The current versions of the obp are suppose to set the latency
@@ -1002,13 +1002,13 @@ pbm_configure(pbm_t *pbm_p)
 	if (pci_set_latency_timer_register) {
 		DEBUG1(DBG_ATTACH, dip,
 		    "pbm_configure: set psycho latency timer to %x\n",
-			pci_latency_timer);
+		    pci_latency_timer);
 		pbm_p->pbm_config_header->ch_latency_timer_reg =
-			pci_latency_timer;
+		    pci_latency_timer;
 	}
 
 	(void) ndi_prop_update_int(DDI_DEV_T_ANY, dip, "latency-timer",
-		(int)pbm_p->pbm_config_header->ch_latency_timer_reg);
+	    (int)pbm_p->pbm_config_header->ch_latency_timer_reg);
 }
 
 uint_t
@@ -1022,7 +1022,7 @@ pbm_disable_pci_errors(pbm_t *pbm_p)
 	 * PBM control register.
 	 */
 	*pbm_p->pbm_ctrl_reg &=
-		~(PSYCHO_PCI_CTRL_ERR_INT_EN | PSYCHO_PCI_CTRL_SBH_INT_EN);
+	    ~(PSYCHO_PCI_CTRL_ERR_INT_EN | PSYCHO_PCI_CTRL_SBH_INT_EN);
 
 	/*
 	 * Disable error interrupts via the interrupt mapping register.
@@ -1066,7 +1066,7 @@ void
 pci_iommu_config(iommu_t *iommu_p, uint64_t iommu_ctl, uint64_t cfgpa)
 {
 	volatile uint64_t *pbm_csr_p = (volatile uint64_t *)
-		get_pbm_reg_base(iommu_p->iommu_pci_p);
+	    get_pbm_reg_base(iommu_p->iommu_pci_p);
 	volatile uint64_t pbm_ctl = *pbm_csr_p;
 
 	volatile uint64_t *iommu_ctl_p = iommu_p->iommu_ctrl_reg;
@@ -1074,13 +1074,13 @@ pci_iommu_config(iommu_t *iommu_p, uint64_t iommu_ctl, uint64_t cfgpa)
 	volatile uint64_t *tsb_bar_p = iommu_p->iommu_tsb_base_addr_reg;
 
 	DEBUG2(DBG_ATTACH, iommu_p->iommu_pci_p->pci_dip,
-		"\npci_iommu_config: pbm_csr_p=%016llx pbm_ctl=%016llx",
-		pbm_csr_p, pbm_ctl);
+	    "\npci_iommu_config: pbm_csr_p=%016llx pbm_ctl=%016llx",
+	    pbm_csr_p, pbm_ctl);
 	DEBUG2(DBG_ATTACH|DBG_CONT, iommu_p->iommu_pci_p->pci_dip,
-		"\n\tiommu_ctl_p=%016llx iommu_ctl=%016llx",
-		iommu_ctl_p, iommu_ctl);
+	    "\n\tiommu_ctl_p=%016llx iommu_ctl=%016llx",
+	    iommu_ctl_p, iommu_ctl);
 	DEBUG2(DBG_ATTACH|DBG_CONT, iommu_p->iommu_pci_p->pci_dip,
-		"\n\tcfgpa=%016llx tsb_bar_val=%016llx", cfgpa, tsb_bar_val);
+	    "\n\tcfgpa=%016llx tsb_bar_val=%016llx", cfgpa, tsb_bar_val);
 
 	if (!cfgpa)
 		goto reprog;
@@ -1167,17 +1167,17 @@ pci_iommu_setup(iommu_t *iommu_p)
 	uint_t tsb_size_prop;
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"virtual-dma", (caddr_t)&dvma_prop, &dvma_prop_len) !=
-		DDI_PROP_SUCCESS)
+	    "virtual-dma", (caddr_t)&dvma_prop, &dvma_prop_len) !=
+	    DDI_PROP_SUCCESS)
 		goto tsb_done;
 
 	if (dvma_prop_len != sizeof (pci_dvma_range_prop_t)) {
 		cmn_err(CE_WARN, "%s%d: invalid virtual-dma property",
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 		goto tsb_end;
 	}
 	iommu_p->iommu_dvma_end = dvma_prop->dvma_base +
-		(dvma_prop->dvma_len - 1);
+	    (dvma_prop->dvma_len - 1);
 	tsb_size_prop = IOMMU_BTOP(dvma_prop->dvma_len) * sizeof (uint64_t);
 	tsb_size = MIN(tsb_size_prop, tsb_size);
 tsb_end:
@@ -1214,7 +1214,7 @@ uintptr_t
 get_pbm_reg_base(pci_t *pci_p)
 {
 	return ((uintptr_t)(pci_p->pci_address[0] +
-		(pci_stream_buf_exists ? 0 : PSYCHO_PCI_PBM_REG_BASE)));
+	    (pci_stream_buf_exists ? 0 : PSYCHO_PCI_PBM_REG_BASE)));
 }
 
 void
@@ -1237,7 +1237,7 @@ pci_pbm_setup(pbm_t *pbm_p)
 	 * This should be mapped little-endian.
 	 */
 	pbm_p->pbm_config_header =
-		(config_header_t *)get_config_reg_base(pci_p);
+	    (config_header_t *)get_config_reg_base(pci_p);
 
 	/*
 	 * Get the virtual addresses for control, error and diag
@@ -1246,13 +1246,13 @@ pci_pbm_setup(pbm_t *pbm_p)
 	pbm_p->pbm_ctrl_reg = (uint64_t *)(a + PSYCHO_PCI_CTRL_REG_OFFSET);
 	pbm_p->pbm_diag_reg = (uint64_t *)(a + PSYCHO_PCI_DIAG_REG_OFFSET);
 	pbm_p->pbm_async_flt_status_reg =
-		(uint64_t *)(a + PSYCHO_PCI_ASYNC_FLT_STATUS_REG_OFFSET);
+	    (uint64_t *)(a + PSYCHO_PCI_ASYNC_FLT_STATUS_REG_OFFSET);
 	pbm_p->pbm_async_flt_addr_reg =
-		(uint64_t *)(a + PSYCHO_PCI_ASYNC_FLT_ADDR_REG_OFFSET);
+	    (uint64_t *)(a + PSYCHO_PCI_ASYNC_FLT_ADDR_REG_OFFSET);
 
 	if (CHIP_TYPE(pci_p) >= PCI_CHIP_SABRE)
 		pbm_p->pbm_sync_reg_pa =
-			pci_p->pci_cb_p->cb_base_pa + DMA_WRITE_SYNC_REG;
+		    pci_p->pci_cb_p->cb_base_pa + DMA_WRITE_SYNC_REG;
 }
 
 /*ARGSUSED*/
@@ -1282,18 +1282,18 @@ pci_sc_setup(sc_t *sc_p)
 	a = get_reg_base(pci_p);
 	if (pci_p->pci_bus_range.lo != 0) {
 		sc_p->sc_data_diag_acc = (uint64_t *)
-				(a + PSYCHO_SC_A_DATA_DIAG_OFFSET);
+		    (a + PSYCHO_SC_A_DATA_DIAG_OFFSET);
 		sc_p->sc_tag_diag_acc = (uint64_t *)
-				(a + PSYCHO_SC_A_TAG_DIAG_OFFSET);
+		    (a + PSYCHO_SC_A_TAG_DIAG_OFFSET);
 		sc_p->sc_ltag_diag_acc = (uint64_t *)
-				(a + PSYCHO_SC_A_LTAG_DIAG_OFFSET);
+		    (a + PSYCHO_SC_A_LTAG_DIAG_OFFSET);
 	} else {
 		sc_p->sc_data_diag_acc = (uint64_t *)
-				(a + PSYCHO_SC_B_DATA_DIAG_OFFSET);
+		    (a + PSYCHO_SC_B_DATA_DIAG_OFFSET);
 		sc_p->sc_tag_diag_acc = (uint64_t *)
-				(a + PSYCHO_SC_B_TAG_DIAG_OFFSET);
+		    (a + PSYCHO_SC_B_TAG_DIAG_OFFSET);
 		sc_p->sc_ltag_diag_acc = (uint64_t *)
-				(a + PSYCHO_SC_B_LTAG_DIAG_OFFSET);
+		    (a + PSYCHO_SC_B_LTAG_DIAG_OFFSET);
 	}
 }
 
@@ -1301,7 +1301,7 @@ int
 pci_get_numproxy(dev_info_t *dip)
 {
 	return (ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"#upa-interrupt-proxies", 1));
+	    "#upa-interrupt-proxies", 1));
 }
 
 int
@@ -1334,7 +1334,7 @@ pbm_has_pass_1_cheerio(pci_t *pci_p)
 		if (strcmp(s, "ebus") == 0 || strcmp(s, "pci108e,1000") == 0) {
 			rev =
 			    ddi_getprop(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
-				"revision-id", 0);
+			    "revision-id", 0);
 			if (rev == 0)
 				found = 1;
 		}
@@ -1371,17 +1371,17 @@ void
 pci_kstat_init()
 {
 	pci_name_kstat = (pci_ksinfo_t *)kmem_alloc(sizeof (pci_ksinfo_t),
-		KM_NOSLEEP);
+	    KM_NOSLEEP);
 
 	if (pci_name_kstat == NULL) {
 		cmn_err(CE_WARN, "pcipsy : no space for kstat\n");
 	} else {
 		pci_name_kstat->pic_no_evs =
-			sizeof (psycho_pci_events) / sizeof (pci_kev_mask_t);
+		    sizeof (psycho_pci_events) / sizeof (pci_kev_mask_t);
 		pci_name_kstat->pic_shift[0] = PSYCHO_SHIFT_PIC0;
 		pci_name_kstat->pic_shift[1] = PSYCHO_SHIFT_PIC1;
 		pci_create_name_kstat("pcip",
-			pci_name_kstat, psycho_pci_events);
+		    pci_name_kstat, psycho_pci_events);
 	}
 }
 
@@ -1416,14 +1416,14 @@ pci_rem_pci_kstat(pci_t *pci_p)
 void
 pci_add_upstream_kstat(pci_t *pci_p)
 {
-	pci_common_t 	*cmn_p = pci_p->pci_common_p;
+	pci_common_t	*cmn_p = pci_p->pci_common_p;
 	pci_cntr_pa_t	*cntr_pa_p = &cmn_p->pci_cmn_uks_pa;
 	uint64_t regbase = va_to_pa((void *)get_reg_base(pci_p));
 
 	cntr_pa_p->pcr_pa = regbase + PSYCHO_PERF_PCR_OFFSET;
 	cntr_pa_p->pic_pa = regbase + PSYCHO_PERF_PIC_OFFSET;
 	cmn_p->pci_common_uksp = pci_create_cntr_kstat(pci_p, "pcip",
-		NUM_OF_PICS, pci_cntr_kstat_pa_update, cntr_pa_p);
+	    NUM_OF_PICS, pci_cntr_kstat_pa_update, cntr_pa_p);
 }
 
 /*
@@ -1445,7 +1445,7 @@ pci_identity_init(pci_t *pci_p)
 	if (strcmp(name, "pci108e,a001") == 0)
 		return (CHIP_ID(PCI_CHIP_HUMMINGBIRD, 0x00, 0x00));
 	cmn_err(CE_CONT, "?%s%d:using default chip identity\n",
-		ddi_driver_name(dip), ddi_get_instance(dip));
+	    ddi_driver_name(dip), ddi_get_instance(dip));
 	return (CHIP_ID(PCI_CHIP_PSYCHO, 0x00, 0x00));
 }
 
@@ -1566,13 +1566,13 @@ pci_ecc_classify(uint64_t err, ecc_errstate_t *ecc_err_p)
 	 * Get the parent bus id that caused the error.
 	 */
 	ecc_err_p->ecc_dev_id = (ecc_err_p->ecc_afsr & PSYCHO_ECC_UE_AFSR_ID)
-			>> PSYCHO_ECC_UE_AFSR_ID_SHIFT;
+	    >> PSYCHO_ECC_UE_AFSR_ID_SHIFT;
 	/*
 	 * Determine the doubleword offset of the error.
 	 */
 	ecc_err_p->ecc_dw_offset = (ecc_err_p->ecc_afsr &
-			PSYCHO_ECC_UE_AFSR_DW_OFFSET)
-			>> PSYCHO_ECC_UE_AFSR_DW_OFFSET_SHIFT;
+	    PSYCHO_ECC_UE_AFSR_DW_OFFSET)
+	    >> PSYCHO_ECC_UE_AFSR_DW_OFFSET_SHIFT;
 	/*
 	 * Determine the primary error type.
 	 */
@@ -1586,7 +1586,7 @@ pci_ecc_classify(uint64_t err, ecc_errstate_t *ecc_err_p)
 			ecc->flt_panic = ecc_ue_is_fatal(&ecc_err_p->ecc_aflt);
 		} else {
 			ecc->flt_erpt_class = ecc_err_p->ecc_pri ?
-				PCI_ECC_PIO_CE : PCI_ECC_SEC_PIO_CE;
+			    PCI_ECC_PIO_CE : PCI_ECC_SEC_PIO_CE;
 			return;
 		}
 	} else if (err & COMMON_ECC_AFSR_E_DRD) {
@@ -1599,7 +1599,7 @@ pci_ecc_classify(uint64_t err, ecc_errstate_t *ecc_err_p)
 			ecc->flt_panic = ecc_ue_is_fatal(&ecc_err_p->ecc_aflt);
 		} else {
 			ecc->flt_erpt_class = ecc_err_p->ecc_pri ?
-				PCI_ECC_DRD_CE : PCI_ECC_SEC_DRD_CE;
+			    PCI_ECC_DRD_CE : PCI_ECC_SEC_DRD_CE;
 			return;
 		}
 	} else if (err & COMMON_ECC_AFSR_E_DWR) {
@@ -1612,7 +1612,7 @@ pci_ecc_classify(uint64_t err, ecc_errstate_t *ecc_err_p)
 			ecc->flt_panic = ecc_ue_is_fatal(&ecc_err_p->ecc_aflt);
 		} else {
 			ecc->flt_erpt_class = ecc_err_p->ecc_pri ?
-				PCI_ECC_DWR_CE : PCI_ECC_SEC_DWR_CE;
+			    PCI_ECC_DWR_CE : PCI_ECC_SEC_DWR_CE;
 			return;
 		}
 	}
@@ -1622,7 +1622,7 @@ ushort_t
 pci_ecc_get_synd(uint64_t afsr)
 {
 	return ((ushort_t)((afsr & PSYCHO_ECC_CE_AFSR_SYND)
-		>> PSYCHO_ECC_CE_AFSR_SYND_SHIFT));
+	    >> PSYCHO_ECC_CE_AFSR_SYND_SHIFT));
 }
 
 /*
@@ -1681,13 +1681,13 @@ pci_clear_error(pci_t *pci_p, pbm_errstate_t *pbm_err_p)
 	*pbm_p->pbm_ctrl_reg = pbm_err_p->pbm_ctl_stat;
 	*pbm_p->pbm_async_flt_status_reg = pbm_err_p->pbm_afsr;
 	pbm_p->pbm_config_header->ch_status_reg =
-		pbm_err_p->pbm_pci.pci_cfg_stat;
+	    pbm_err_p->pbm_pci.pci_cfg_stat;
 }
 
 /*ARGSUSED*/
 int
 pci_pbm_err_handler(dev_info_t *dip, ddi_fm_error_t *derr,
-		const void *impl_data, int caller)
+    const void *impl_data, int caller)
 {
 	int fatal = 0;
 	int nonfatal = 0;
@@ -1850,11 +1850,11 @@ pci_check_error(pci_t *pci_p)
 	pbm_afsr = *pbm_p->pbm_async_flt_status_reg;
 
 	if ((pci_cfg_stat & (PCI_STAT_S_PERROR | PCI_STAT_S_TARG_AB |
-				PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB |
-				PCI_STAT_S_SYSERR | PCI_STAT_PERROR)) ||
-			(pbm_ctl_stat & (COMMON_PCI_CTRL_SBH_ERR |
-				COMMON_PCI_CTRL_SERR)) ||
-			(PBM_AFSR_TO_PRIERR(pbm_afsr)))
+	    PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB |
+	    PCI_STAT_S_SYSERR | PCI_STAT_PERROR)) ||
+	    (pbm_ctl_stat & (COMMON_PCI_CTRL_SBH_ERR |
+	    COMMON_PCI_CTRL_SERR)) ||
+	    (PBM_AFSR_TO_PRIERR(pbm_afsr)))
 		return (1);
 
 	return (0);
@@ -1879,10 +1879,10 @@ pci_pbm_errstate_get(pci_t *pci_p, pbm_errstate_t *pbm_err_p)
 	 */
 	pbm_err_p->pbm_bridge_type = PCI_BRIDGE_TYPE(pci_p->pci_common_p);
 	pbm_err_p->pbm_pci.pci_cfg_stat =
-		pbm_p->pbm_config_header->ch_status_reg;
+	    pbm_p->pbm_config_header->ch_status_reg;
 	pbm_err_p->pbm_ctl_stat = *pbm_p->pbm_ctrl_reg;
 	pbm_err_p->pbm_pci.pci_cfg_comm =
-		pbm_p->pbm_config_header->ch_command_reg;
+	    pbm_p->pbm_config_header->ch_command_reg;
 	pbm_err_p->pbm_afsr = *pbm_p->pbm_async_flt_status_reg;
 	pbm_err_p->pbm_afar = *pbm_p->pbm_async_flt_addr_reg;
 	pbm_err_p->pbm_pci.pci_pa = *pbm_p->pbm_async_flt_addr_reg;
@@ -1959,7 +1959,7 @@ pci_thermal_rem_intr(dev_info_t *rdip, uint_t inum)
 	pci_t		*pci_p;
 	dev_info_t	*pdip;
 	uint32_t	dev_mondo, pci_mondo;
-	int 		instance;
+	int		instance;
 
 	for (pdip = ddi_get_parent(rdip); pdip; pdip = ddi_get_parent(pdip)) {
 		if (strcmp(ddi_driver_name(pdip), "pcipsy") == 0)

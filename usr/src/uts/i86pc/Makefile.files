@@ -117,6 +117,7 @@ CORE_OBJS +=			\
 	pwrnow.o		\
 	seg_vmm.o		\
 	smt.o			\
+	seg_vmm.o		\
 	speedstep.o		\
 	ssp.o			\
 	startup.o		\

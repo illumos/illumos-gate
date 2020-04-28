@@ -577,24 +577,24 @@ pcicfg_get_nslots(dev_info_t *dip, ddi_acc_handle_t handle)
 	    &cap_ptr)) == DDI_SUCCESS) {
 		uint32_t config;
 
-		PCI_CAP_PUT8(handle, NULL, cap_ptr, PCI_HP_DWORD_SELECT_OFF,
+		PCI_CAP_PUT8(handle, 0, cap_ptr, PCI_HP_DWORD_SELECT_OFF,
 		    PCI_HP_SLOT_CONFIGURATION_REG);
-		config = PCI_CAP_GET32(handle, NULL, cap_ptr,
+		config = PCI_CAP_GET32(handle, 0, cap_ptr,
 		    PCI_HP_DWORD_DATA_OFF);
 		num_slots = config & 0x1F;
 	} else if ((PCI_CAP_LOCATE(handle, PCI_CAP_ID_SLOT_ID, &cap_ptr))
 	    == DDI_SUCCESS) {
-		uint8_t esr_reg = PCI_CAP_GET8(handle, NULL,
+		uint8_t esr_reg = PCI_CAP_GET8(handle, 0,
 		    cap_ptr, PCI_CAP_ID_REGS_OFF);
 
 		num_slots = PCI_CAPSLOT_NSLOTS(esr_reg);
 	} else if ((PCI_CAP_LOCATE(handle, PCI_CAP_ID_PCI_E, &cap_ptr))
 	    == DDI_SUCCESS) {
-		int port_type = PCI_CAP_GET16(handle, NULL, cap_ptr,
+		int port_type = PCI_CAP_GET16(handle, 0, cap_ptr,
 		    PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 
 		if ((port_type == PCIE_PCIECAP_DEV_TYPE_DOWN) &&
-		    (PCI_CAP_GET16(handle, NULL, cap_ptr, PCIE_PCIECAP)
+		    (PCI_CAP_GET16(handle, 0, cap_ptr, PCIE_PCIECAP)
 		    & PCIE_PCIECAP_SLOT_IMPL))
 				num_slots = 1;
 	}
@@ -614,7 +614,7 @@ pcicfg_is_chassis(dev_info_t *dip, ddi_acc_handle_t handle)
 	if ((PCI_CAP_LOCATE(handle, PCI_CAP_ID_SLOT_ID, &cap_ptr)) !=
 	    DDI_FAILURE) {
 
-		uint8_t esr_reg = PCI_CAP_GET8(handle, NULL, cap_ptr, 2);
+		uint8_t esr_reg = PCI_CAP_GET8(handle, 0, cap_ptr, 2);
 		if (PCI_CAPSLOT_FIC(esr_reg))
 			return (B_TRUE);
 	}
@@ -665,7 +665,7 @@ pcicfg_pcie_port_type(dev_info_t *dip, ddi_acc_handle_t handle)
 
 	if ((PCI_CAP_LOCATE(handle, PCI_CAP_ID_PCI_E, &cap_ptr)) !=
 	    DDI_FAILURE)
-		port_type = PCI_CAP_GET16(handle, NULL,
+		port_type = PCI_CAP_GET16(handle, 0,
 		    cap_ptr, PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 
 	return (port_type);
@@ -3535,11 +3535,11 @@ pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 	ret = PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr);
 
 	if (pcie_dev && (ret == DDI_SUCCESS)) {
-		val = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+		val = PCI_CAP_GET16(config_handle, 0, cap_ptr,
 		    PCIE_PCIECAP) & PCIE_PCIECAP_SLOT_IMPL;
 		/* if slot implemented, get physical slot number */
 		if (val) {
-			wordval = (PCI_CAP_GET32(config_handle, NULL,
+			wordval = (PCI_CAP_GET32(config_handle, 0,
 			    cap_ptr, PCIE_SLOTCAP) >>
 			    PCIE_SLOTCAP_PHY_SLOT_NUM_SHIFT) &
 			    PCIE_SLOTCAP_PHY_SLOT_NUM_MASK;
@@ -3977,13 +3977,13 @@ pcicfg_disable_bridge_probe_err(dev_info_t *dip, ddi_acc_handle_t h,
 			return;
 
 		regs->pcie_cap_off = cap_ptr;
-		regs->devctl = devctl = PCI_CAP_GET16(h, NULL, cap_ptr,
+		regs->devctl = devctl = PCI_CAP_GET16(h, 0, cap_ptr,
 		    PCIE_DEVCTL);
 		devctl &= ~(PCIE_DEVCTL_UR_REPORTING_EN |
 		    PCIE_DEVCTL_CE_REPORTING_EN |
 		    PCIE_DEVCTL_NFE_REPORTING_EN |
 		    PCIE_DEVCTL_FE_REPORTING_EN);
-		PCI_CAP_PUT16(h, NULL, cap_ptr, PCIE_DEVCTL, devctl);
+		PCI_CAP_PUT16(h, 0, cap_ptr, PCIE_DEVCTL, devctl);
 	}
 }
 
@@ -4635,7 +4635,7 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus, uint_t device,
 			 * the status property if it exists.
 			 */
 			if (ddi_prop_lookup_string(DDI_DEV_T_ANY,
-			    new_child, NULL, "status", &status_prop) ==
+			    new_child, 0, "status", &status_prop) ==
 			    DDI_PROP_SUCCESS) {
 				if ((strncmp("disabled", status_prop, 8) ==
 				    0) || (strncmp("fail", status_prop, 4) ==

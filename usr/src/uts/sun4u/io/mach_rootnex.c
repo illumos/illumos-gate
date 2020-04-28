@@ -105,7 +105,7 @@ rootnex_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	 * Hack to support the UPA slave devices before the 1275
 	 * support for imap was introduced.
 	 */
-	if (ddi_getproplen(DDI_DEV_T_ANY, dip, NULL, "interrupt-map",
+	if (ddi_getproplen(DDI_DEV_T_ANY, dip, 0, "interrupt-map",
 	    &len) != DDI_PROP_SUCCESS && ddi_getprop(DDI_DEV_T_ANY,
 	    rdip, DDI_PROP_DONTPASS, "upa-interrupt-slave", 0) != 0 &&
 	    ddi_get_parent(rdip) == dip) {
@@ -176,7 +176,7 @@ rootnex_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	 * Hack to support the UPA slave devices before the 1275
 	 * support for imap was introduced.
 	 */
-	if (ddi_getproplen(DDI_DEV_T_ANY, dip, NULL, "interrupt-map",
+	if (ddi_getproplen(DDI_DEV_T_ANY, dip, 0, "interrupt-map",
 	    &len) != DDI_PROP_SUCCESS && ddi_getprop(DDI_DEV_T_ANY,
 	    rdip, DDI_PROP_DONTPASS, "upa-interrupt-slave", 0) != 0) {
 		int32_t r_upaid = -1;

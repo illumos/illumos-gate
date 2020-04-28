@@ -167,7 +167,7 @@ size_t cpp_name_max_depth = 1024;	/* max depth of name stack */
 char *
 cpp_demangle(const char *src, size_t srclen, sysdem_ops_t *ops)
 {
-	char *result = NULL;
+	char *volatile result = NULL;
 	cpp_db_t db;
 
 	if (!db_init(&db, ops))

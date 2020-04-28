@@ -6553,7 +6553,7 @@ release_sb_dma(struct fdctlr *fdc)
 	dma_reg = (struct sb_dma_reg *)fdc->c_dma_regs;
 	/* Unmask all the channels to release the DMA controller */
 	ddi_put8(fdc->c_handlep_dma,
-	    &dma_reg->sb_dma_regs[DMAC1_ALLMASK], NULL);
+	    &dma_reg->sb_dma_regs[DMAC1_ALLMASK], 0);
 	fdc->sb_dma_lock = 0;
 }
 

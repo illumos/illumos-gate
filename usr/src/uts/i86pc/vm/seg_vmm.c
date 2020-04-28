@@ -14,15 +14,12 @@
  */
 
 /*
- * segvmm - Virtual-Machine-Memory segment
+ * VM - Virtual-Machine-Memory segment
  *
  * The vmm segment driver was designed for mapping regions of kernel memory
  * allocated to an HVM instance into userspace for manipulation there.  It
  * draws direct lineage from the umap segment driver, but meant for larger
  * mappings with fewer restrictions.
- *
- * seg*k*vmm, in contrast, has mappings for every VMM into kas.  We use its
- * mappings here only to find the relevant PFNs in segvmm_fault_in().
  */
 
 
@@ -96,7 +93,7 @@ static struct seg_ops segvmm_ops = {
 
 
 /*
- * Create a kernel/user-mapped segment.  ->kaddr is the segkvmm mapping.
+ * Create a kernel/user-mapped segment.
  */
 int
 segvmm_create(struct seg **segpp, void *argsp)

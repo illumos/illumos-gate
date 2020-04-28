@@ -117,7 +117,7 @@ int zsh_h_log_n[2];
 	}
 
 #define	zsh_h_log_clear \
-	{ register char *p; \
+	{ char *p; \
 	for (p = &zsh_h_log[zs->zs_unit][ZSH_H_LOG_MAX]; \
 		p >= &zsh_h_log[zs->zs_unit][0]; p--) \
 		*p = '\0'; \
@@ -169,8 +169,8 @@ static struct module_info hdlc_minfo = {
 	"zsh",		/* module name */
 	0,		/* minimum packet size accepted */
 	INFPSZ,		/* maximum packet size accepted */
-	12*1024,	/* queue high water mark (bytes) */
-	4*1024		/* queue low water mark (bytes) */
+	12 * 1024,	/* queue high water mark (bytes) */
+	4 * 1024	/* queue low water mark (bytes) */
 };
 
 static struct qinit hdlc_rinit = {
@@ -292,9 +292,9 @@ static int	zsh_setmode(struct zscom *zs, struct syncline *zss,
  */
 #define	ZSH_GETBLOCK(zs, allocbcount) \
 { \
-	register int n = ZSH_MAX_RSTANDBY; \
+	int n = ZSH_MAX_RSTANDBY; \
 	while (--n >= 0) { \
-	    if (!zss->sl_rstandby[n]) { \
+	    if (zss->sl_rstandby[n] == NULL) { \
 		if ((zss->sl_rstandby[n] = \
 		    allocb(zss->sl_mru, BPRI_MED)) == NULL) { \
 		    if (zss->sl_bufcid == 0) { \
@@ -318,7 +318,7 @@ static int	zsh_setmode(struct zscom *zs, struct syncline *zss,
  */
 #define	ZSH_ALLOCB(mp) \
 { \
-	register int n = ZSH_MAX_RSTANDBY; \
+	int n = ZSH_MAX_RSTANDBY; \
 	mp = NULL; \
 	while (--n >= 0)  { \
 		if ((mp = zss->sl_rstandby[n]) != NULL) { \
@@ -330,7 +330,7 @@ static int	zsh_setmode(struct zscom *zs, struct syncline *zss,
 
 #define	ZSH_PUTQ(mp) \
 { \
-	register int wptr, rptr;  \
+	int wptr, rptr;  \
 	wptr = zss->sl_rdone_wptr; \
 	rptr = zss->sl_rdone_rptr; \
 	zss->sl_rdone[wptr] = mp; \
@@ -366,10 +366,10 @@ static int	zsh_setmode(struct zscom *zs, struct syncline *zss,
 
 #define	ZSH_FLUSHQ \
 { \
-	register mblk_t *tmp; \
+	mblk_t *tmp; \
 	for (;;) { \
 		ZSH_GETQ(tmp); \
-		if (!(tmp)) \
+		if (tmp == NULL) \
 			break; \
 		freemsg(tmp); \
 	} \
@@ -386,9 +386,8 @@ zsh_probe(dev_info_t *dev)
 static int
 zsh_attach(dev_info_t *dev, ddi_attach_cmd_t cmd)
 {
-	register int	unit;
-	char		name[3] = {
-		'\0', '\0', '\0' 	};
+	int	unit;
+	char	name[3] = { '\0', '\0', '\0' };
 
 	/*
 	 * Since zsh is a child of the "pseudo" nexus, we can expect the
@@ -406,25 +405,25 @@ zsh_attach(dev_info_t *dev, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);	/* only use cpu ports */
 
 	if (ddi_create_minor_node(dev, "zsh", S_IFCHR,
-	    NULL, DDI_PSEUDO, CLONE_DEV) == DDI_FAILURE) {
+	    0, DDI_PSEUDO, CLONE_DEV) == DDI_FAILURE) {
 		ddi_remove_minor_node(dev, NULL);
 		cmn_err(CE_WARN, "zsh clone device creation failed.");
 		return (DDI_FAILURE);
 	}
 
-	for (; unit < maxzsh/2; unit++) {
+	for (; unit < maxzsh / 2; unit++) {
 		zscom[unit].zs_hdlc_dip = dev;
 
 		(void) sprintf(name, "%d", unit);
 		if (ddi_create_minor_node(dev, name, S_IFCHR,
-		    2*unit, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+		    2 * unit, DDI_PSEUDO, 0) == DDI_FAILURE) {
 			ddi_remove_minor_node(dev, NULL);
 			return (DDI_FAILURE);
 		}
 		unit++;
 		(void) sprintf(name, "%d", unit);
 		if (ddi_create_minor_node(dev, name, S_IFCHR,
-		    2*(unit-1)+1, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+		    2 * (unit - 1) + 1, DDI_PSEUDO, 0) == DDI_FAILURE) {
 			ddi_remove_minor_node(dev, NULL);
 			return (DDI_FAILURE);
 		}
@@ -436,11 +435,11 @@ zsh_attach(dev_info_t *dev, ddi_attach_cmd_t cmd)
 /* ARGSUSED */
 int
 zsh_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
-void **result)
+    void **result)
 {
-	register dev_t dev = (dev_t)arg;
-	register int unit, error;
-	register struct zscom *zs;
+	dev_t dev = (dev_t)arg;
+	int unit, error;
+	struct zscom *zs;
 
 	if ((unit = UNIT(dev)) >= nzs)
 		return (DDI_FAILURE);
@@ -479,7 +478,7 @@ zsh_detach(dev_info_t *dev, ddi_detach_cmd_t cmd)
 static void
 zsh_init_port(struct zscom *zs, struct syncline *zss)
 {
-	register uchar_t s0;
+	uchar_t s0;
 
 	SCC_WRITE(3, (ZSWR3_RX_ENABLE | ZSWR3_RXCRC_ENABLE | ZSWR3_RX_8));
 	SCC_WRITE(5, (ZSWR5_TX_8 | ZSWR5_DTR | ZSWR5_TXCRC_ENABLE));
@@ -500,7 +499,7 @@ zsh_init_port(struct zscom *zs, struct syncline *zss)
 			zss->sl_txstate = TX_RTS;
 			zss->sl_rr0 &= ~ZSRR0_CTS;
 			zss->sl_wd_count = zsh_timer_count;
-			if (!zss->sl_wd_id)
+			if (zss->sl_wd_id == NULL)
 				zss->sl_wd_id = timeout(zsh_watchdog,
 				    zs, SIO_WATCHDOG_TICK);
 		}
@@ -520,11 +519,11 @@ zsh_init_port(struct zscom *zs, struct syncline *zss)
 static int
 zsh_open(queue_t *rq, dev_t *dev, int flag, int sflag, cred_t *cr)
 {
-	register struct zscom *zs;
-	register struct syncline *zss;
-	register struct ser_str *stp;
-	register int	unit;
-	register int 	tmp;
+	struct zscom *zs;
+	struct syncline *zss;
+	struct ser_str *stp;
+	int	unit;
+	int	tmp;
 
 	if (sflag != CLONEOPEN) {
 		if (rq->q_ptr)
@@ -559,7 +558,7 @@ zsh_open(queue_t *rq, dev_t *dev, int flag, int sflag, cred_t *cr)
 
 		zss = (struct syncline *)&zscom[unit].zs_priv_str;
 		stp = &zss->sl_stream;
-		stp->str_state = NULL;
+		stp->str_state = 0;
 		stp->str_com = (caddr_t)zs;
 
 		zss->sl_xhead = NULL;
@@ -600,7 +599,7 @@ zsh_open(queue_t *rq, dev_t *dev, int flag, int sflag, cred_t *cr)
 	} else {   /* CLONEOPEN */
 		mutex_enter(&zs_curr_lock);
 		for (unit = maxzsh; unit < MAXZSHCLONES; unit++)
-			if (!zsh_usedminor[unit]) {
+			if (zsh_usedminor[unit] == '\0') {
 				zsh_usedminor[unit] = (unsigned char)unit;
 				break;
 			}
@@ -804,7 +803,7 @@ out:
 static int
 zsh_hdp_ok_or_rts_state(struct zscom *zs, struct syncline *zss)
 {
-	register uchar_t s0;
+	uchar_t s0;
 
 	SCC_BIS(15, ZSR15_CTS);
 	SCC_BIS(5, ZSWR5_RTS);
@@ -827,14 +826,14 @@ zsh_hdp_ok_or_rts_state(struct zscom *zs, struct syncline *zss)
 static void
 zsh_wput(queue_t *wq, mblk_t *mp)
 {
-	register struct ser_str *stp = (struct ser_str *)wq->q_ptr;
-	register struct zscom *zs;
-	register struct syncline *zss = NULL;
-	register ulong_t prim, error = 0;
-	register union DL_primitives *dlp;
-	register int	ppa;
-	register mblk_t *tmp;
-	register struct copyresp	*resp;
+	struct ser_str *stp = (struct ser_str *)wq->q_ptr;
+	struct zscom *zs;
+	struct syncline *zss = NULL;
+	ulong_t prim, error = 0;
+	union DL_primitives *dlp;
+	int	ppa;
+	mblk_t *tmp;
+	struct copyresp	*resp;
 
 	/*
 	 * stp->str_com supplied by open or DLPI attach.
@@ -907,7 +906,7 @@ zsh_wput(queue_t *wq, mblk_t *mp)
 			(void) zsh_softint(zs);
 		}
 		while (mp->b_wptr == mp->b_rptr) {
-			register mblk_t *mp1;
+			mblk_t *mp1;
 			mp1 = unlinkb(mp);
 			freemsg(mp);
 			mp = mp1;
@@ -929,7 +928,7 @@ zsh_wput(queue_t *wq, mblk_t *mp)
 		}
 		tmp = NULL;
 again:
-		if (!zss->sl_xstandby) {
+		if (zss->sl_xstandby == NULL) {
 			if (tmp)
 				zss->sl_xstandby = tmp;
 			else {
@@ -955,7 +954,7 @@ again:
 			return;
 		}
 
-		if (!zss->sl_wd_id) {
+		if (zss->sl_wd_id == NULL) {
 			zss->sl_wd_count = zsh_timer_count;
 			zss->sl_txstate = TX_IDLE;
 			mutex_exit(zs->zs_excl_hi);
@@ -1060,7 +1059,7 @@ end_proto:
 			error = zsh_setmode(zs, zss,
 			    (struct scc_mode *)mp->b_cont->b_rptr);
 			if (error) {
-				register struct iocblk  *iocp =
+				struct iocblk  *iocp =
 				    (struct iocblk *)mp->b_rptr;
 				mp->b_datap->db_type = M_IOCNAK;
 				iocp->ioc_error = error;
@@ -1133,10 +1132,10 @@ end_proto:
 static int
 zsh_start(struct zscom *zs, struct syncline *zss)
 {
-	register mblk_t *mp;
-	register uchar_t *wptr;
-	register uchar_t *rptr;
-	register uchar_t sl_flags = zss->sl_flags;
+	mblk_t *mp;
+	uchar_t *wptr;
+	uchar_t *rptr;
+	uchar_t sl_flags = zss->sl_flags;
 
 	/*
 	 * Attempt to grab the next M_DATA message off the queue (that's
@@ -1176,7 +1175,7 @@ zsh_start(struct zscom *zs, struct syncline *zss)
 		if (!(sl_flags & SF_FDXPTP)) {
 			sl_flags |= SF_PHONY;
 			ZSH_ALLOCB(mp);
-			if (!mp)
+			if (mp == NULL)
 				return (0);
 			mp->b_datap->db_type = M_RSE;
 			mp->b_wptr = mp->b_rptr + 1;
@@ -1232,15 +1231,15 @@ transmit:
 static void
 zsh_ioctl(queue_t *wq, mblk_t *mp)
 {
-	register struct ser_str *stp = (struct ser_str *)wq->q_ptr;
-	register struct zscom *zs = (struct zscom *)stp->str_com;
-	register struct syncline *zss  = (struct syncline *)&zs->zs_priv_str;
-	register struct iocblk   *iocp = (struct iocblk *)mp->b_rptr;
-	register struct scc_mode *sm;
-	register struct sl_stats *st;
-	register uchar_t	 *msignals;
-	register mblk_t		 *tmp;
-	register int		 error = 0;
+	struct ser_str *stp = (struct ser_str *)wq->q_ptr;
+	struct zscom *zs = (struct zscom *)stp->str_com;
+	struct syncline *zss  = (struct syncline *)&zs->zs_priv_str;
+	struct iocblk   *iocp = (struct iocblk *)mp->b_rptr;
+	struct scc_mode *sm;
+	struct sl_stats *st;
+	uchar_t	 *msignals;
+	mblk_t		 *tmp;
+	int		 error = 0;
 
 	mutex_enter(zs->zs_excl);
 	if ((zs->zs_ops != &zsops_null) &&
@@ -1389,8 +1388,8 @@ end_zsh_ioctl:
 int
 zsh_setmode(struct zscom *zs, struct syncline *zss, struct scc_mode *sm)
 {
-	register int error = 0;
-	register mblk_t *mp;
+	int error = 0;
+	mblk_t *mp;
 
 	mutex_enter(zs->zs_excl_hi);
 	if (sm->sm_rxclock == RXC_IS_PLL) {
@@ -1450,10 +1449,10 @@ zsh_setmode(struct zscom *zs, struct syncline *zss, struct scc_mode *sm)
 static void
 zsh_txint(struct zscom *zs)
 {
-	register struct syncline *zss;
-	register mblk_t *mp;
-	register int tmp;
-	register uchar_t *wr_cur;
+	struct syncline *zss;
+	mblk_t *mp;
+	int tmp;
+	uchar_t *wr_cur;
 
 	TRACE_1(TR_ZSH, TR_ZSH_TXINT, "zsh_txint: zs = %p", zs);
 
@@ -1480,7 +1479,7 @@ again_txint:
 		if (mp) {
 			zss->sl_xactb = mp;
 			zss->sl_ocnt += tmp = mp->b_wptr - mp->b_rptr;
-			if (!tmp)
+			if (tmp == 0)
 				goto again_txint;
 			zs->zs_wr_cur = mp->b_rptr;
 			zs->zs_wr_lim = mp->b_wptr;
@@ -1563,8 +1562,8 @@ again_txint:
 static void
 zsh_xsint(struct zscom *zs)
 {
-	register struct syncline *zss = (struct syncline *)&zs->zs_priv_str;
-	register uchar_t s0, x0;
+	struct syncline *zss = (struct syncline *)&zs->zs_priv_str;
+	uchar_t s0, x0;
 
 	TRACE_1(TR_ZSH, TR_ZSH_XSINT, "zsh_xsint: zs = %p", zs);
 
@@ -1676,8 +1675,8 @@ zsh_xsint(struct zscom *zs)
 static void
 zsh_rxint(struct zscom *zs)
 {
-	register struct syncline *zss = (struct syncline *)&zs->zs_priv_str;
-	register mblk_t *bp = zss->sl_ractb;
+	struct syncline *zss = (struct syncline *)&zs->zs_priv_str;
+	mblk_t *bp = zss->sl_ractb;
 	unsigned char *rd_cur;
 
 	TRACE_1(TR_ZSH, TR_ZSH_RXINT, "zsh_rxint: zs = %p", zs);
@@ -1688,8 +1687,8 @@ zsh_rxint(struct zscom *zs)
 		return;
 	}
 
-	if (!rd_cur) { /* Beginning of frame */
-		if (!bp) {
+	if (rd_cur == NULL) { /* Beginning of frame */
+		if (bp == NULL) {
 			ZSH_ALLOCB(bp);
 			zss->sl_ractb = bp;
 		}
@@ -1699,7 +1698,7 @@ zsh_rxint(struct zscom *zs)
 		ZSH_ALLOCB(bp->b_cont);
 		bp = zss->sl_ractb = bp->b_cont;
 	}
-	if (!bp) {
+	if (bp == NULL) {
 		zss->sl_st.nobuffers++;
 		zsh_rxbad(zs, zss);
 		return;
@@ -1716,9 +1715,9 @@ zsh_rxint(struct zscom *zs)
 static void
 zsh_srint(struct zscom *zs)
 {
-	register struct syncline *zss = (struct syncline *)&zs->zs_priv_str;
-	register uchar_t s1;
-	register uchar_t *rd_cur;
+	struct syncline *zss = (struct syncline *)&zs->zs_priv_str;
+	uchar_t s1;
+	uchar_t *rd_cur;
 
 	TRACE_1(TR_ZSH, TR_ZSH_SRINT, "zsh_srint: zs = %p", zs);
 
@@ -1768,18 +1767,18 @@ zsh_srint(struct zscom *zs)
 static int
 zsh_softint(struct zscom *zs)
 {
-	register struct syncline *zss;
-	register queue_t *q;
-	register mblk_t *mp, *tmp;
-	register mblk_t *head = NULL, *tail = NULL;
-	register int allocbcount = 0;
+	struct syncline *zss;
+	queue_t *q;
+	mblk_t *mp, *tmp;
+	mblk_t *head = NULL, *tail = NULL;
+	int allocbcount = 0;
 	int m_error;
 
 	TRACE_1(TR_ZSH, TR_ZSH_SOFT_START, "zsh_soft start: zs = %p", zs);
 
 	mutex_enter(zs->zs_excl);
 	zss = (struct syncline *)zs->zs_priv;
-	if (!zss || (q = zss->sl_stream.str_rq) == NULL) {
+	if (zss == NULL || (q = zss->sl_stream.str_rq) == NULL) {
 		mutex_exit(zs->zs_excl);
 		return (0);
 	}
@@ -1788,7 +1787,7 @@ zsh_softint(struct zscom *zs)
 	zss->sl_m_error = 0;
 
 
-	if (!zss->sl_mstat)
+	if (zss->sl_mstat == NULL)
 		zss->sl_mstat = allocb(sizeof (struct sl_status), BPRI_MED);
 
 	mutex_enter(zs->zs_excl_hi);
@@ -1796,7 +1795,7 @@ zsh_softint(struct zscom *zs)
 		if (!(zss->sl_flags & SF_FDXPTP)) {
 			zss->sl_flags &= ~SF_FLUSH_WQ;
 		} else {
-			register uchar_t s0;
+			uchar_t s0;
 
 			s0 = SCC_READ0();
 			if (s0 & ZSRR0_CTS) {
@@ -1817,7 +1816,7 @@ zsh_softint(struct zscom *zs)
 next:
 	for (;;) {
 		ZSH_GETQ(mp);
-		if (!mp)
+		if (mp == NULL)
 			break;
 
 		if (mp->b_rptr == mp->b_wptr) {
@@ -1842,12 +1841,12 @@ next:
 				continue;
 			}
 		}
-		if (!head) {
+		if (head == NULL) {
 			allocbcount++;
 			zss->sl_soft_active = 1;
 			head = mp;
 		} else {
-			if (!tail)
+			if (tail == NULL)
 				tail = head;
 			tail->b_next = mp;
 			tail = mp;
@@ -1859,7 +1858,7 @@ next:
 	tmp = NULL;
 again:
 	mutex_enter(zs->zs_excl_hi);
-	if (!zss->sl_xstandby) {
+	if (zss->sl_xstandby == NULL) {
 		if (tmp) {
 			zss->sl_xstandby = tmp;
 			mutex_exit(zs->zs_excl_hi);
@@ -1877,7 +1876,7 @@ again:
 	mutex_exit(zs->zs_excl);
 
 	while (head) {
-		if (!tail) {
+		if (tail == NULL) {
 			putnext(q, head);
 			break;
 		}
@@ -1905,14 +1904,14 @@ again:
 static int
 zsh_program(struct zscom *zs, struct scc_mode *sm)
 {
-	register struct syncline *zss  = (struct syncline *)&zs->zs_priv_str;
-	register struct zs_prog *zspp;
-	register ushort_t	tconst = 0;
-	register int	wr11 = 0;
-	register int	baud = 0;
-	register int	pll = 0;
-	register int	speed = 0;
-	register int	flags = ZSP_SYNC;
+	struct syncline *zss  = (struct syncline *)&zs->zs_priv_str;
+	struct zs_prog *zspp;
+	ushort_t	tconst = 0;
+	int	wr11 = 0;
+	int	baud = 0;
+	int	pll = 0;
+	int	speed = 0;
+	int	flags = ZSP_SYNC;
 	int		err = 0;
 
 	ZSSETSOFT(zs); /* get our house in order */
@@ -2060,9 +2059,9 @@ out:
 static void
 zsh_setmstat(struct zscom *zs, int event)
 {
-	register struct syncline *zss = (struct syncline *)&zs->zs_priv_str;
-	register struct sl_status *mstat;
-	register mblk_t *mp;
+	struct syncline *zss = (struct syncline *)&zs->zs_priv_str;
+	struct sl_status *mstat;
+	mblk_t *mp;
 
 	if (((mp = zss->sl_mstat) != NULL) &&
 	    (zss->sl_mode.sm_config & (CONN_SIGNAL))) {
