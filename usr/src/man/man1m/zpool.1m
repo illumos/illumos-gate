@@ -27,7 +27,7 @@
 .\" Copyright 2020 Joyent, Inc.
 .\" Copyright (c) 2012 Cyril Plisko. All Rights Reserved.
 .\"
-.Dd August 30, 2019
+.Dd April 29, 2020
 .Dt ZPOOL 1M
 .Os
 .Sh NAME
@@ -60,6 +60,7 @@
 .Op Fl B
 .Op Fl m Ar mountpoint
 .Oo Fl o Ar property Ns = Ns Ar value Oc Ns ...
+.Oo Fl o Cm feature@ Ns Ar feature Ns = Ns Ar value Oc Ns ...
 .Oo Fl O Ar file-system-property Ns = Ns Ar value Oc Ns ...
 .Op Fl R Ar root
 .Op Fl t Ar tempname
@@ -1044,6 +1045,7 @@ another host, and resuming I/O could result in pool damage.
 .Op Fl B
 .Op Fl m Ar mountpoint
 .Oo Fl o Ar property Ns = Ns Ar value Oc Ns ...
+.Oo Fl o Cm feature@ Ns Ar feature Ns = Ns Ar value Oc Ns ...
 .Oo Fl O Ar file-system-property Ns = Ns Ar value Oc Ns ...
 .Op Fl R Ar root
 .Op Fl t Ar tempname
@@ -1174,6 +1176,17 @@ Sets the given pool properties.
 See the
 .Sx Properties
 section for a list of valid properties that can be set.
+.It Fl o Cm feature@ Ns Ar feature Ns = Ns Ar value
+Sets the given pool feature.
+See
+.Xr zpool-features 5
+for a list of valid features that can be set.
+.Pp
+.Ar value
+can either be
+.Sy disabled
+or
+.Sy enabled .
 .It Fl O Ar file-system-property Ns = Ns Ar value
 Sets the given file system properties in the root file system of the pool.
 See the
