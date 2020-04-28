@@ -27,7 +27,9 @@
  * drvsubr.c because of static linking requirements.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,18 +89,16 @@ devplcy_init(void)
 	devplcysys_sz = DEVPLCYSYS_SZ(privimplinfo);
 
 	toktab[RDPOL].off =
-		(char *)DEVPLCYSYS_RDP((devplcysys_t *)0, privimplinfo) -
-				(char *)0;
+	    (char *)DEVPLCYSYS_RDP((devplcysys_t *)0, privimplinfo) - (char *)0;
 	toktab[WRPOL].off =
-		(char *)DEVPLCYSYS_WRP((devplcysys_t *)0, privimplinfo) -
-				(char *)0;
+	    (char *)DEVPLCYSYS_WRP((devplcysys_t *)0, privimplinfo) - (char *)0;
 }
 
 /*
  * Read a configuration file line and return a static buffer pointing to it.
  * It returns a static struct fileentry which has several fields:
  *	- rawbuf, which includes the lines including empty lines and comments
- * 	leading up to the file and the entry as found in the file
+ *	leading up to the file and the entry as found in the file
  *	- orgentry, pointer in rawbuf to the start of the entry proper.
  *	- entry, a pre-parsed entry, escaped newlines removed.
  *	- startline, the line number of the first line in the file
@@ -481,13 +481,14 @@ parse_plcy_token(char *token, devplcysys_t *dp)
 			case PSET:
 				pset = priv_str_to_set(val, ",", &perr);
 				if (pset == NULL) {
-					if (perr == NULL)
-					    (void) fprintf(stderr,
-							gettext(ERR_NO_MEM));
-					else
-					    (void) fprintf(stderr,
-						gettext(ERR_BAD_PRIVS),
-						perr - val, val, perr);
+					if (perr == NULL) {
+						(void) fprintf(stderr,
+						    gettext(ERR_NO_MEM));
+					} else {
+						(void) fprintf(stderr,
+						    gettext(ERR_BAD_PRIVS),
+						    perr - val, val, perr);
+					}
 					return (1);
 				}
 				priv_copyset(pset, item);
@@ -495,8 +496,8 @@ parse_plcy_token(char *token, devplcysys_t *dp)
 				break;
 			default:
 				(void) fprintf(stderr,
-					"Internal Error: bad token type: %d\n",
-						toktab[i].type);
+				    "Internal Error: bad token type: %d\n",
+				    toktab[i].type);
 				return (1);
 			}
 			/* Standard cleanup & return for good tokens */
@@ -547,6 +548,7 @@ check_plcy_entry(char *entry, const char *driver, boolean_t todel)
 
 	if (res == NULL || ds == NULL) {
 		(void) fprintf(stderr, gettext(ERR_NO_MEM));
+		free(res);
 		return (NULL);
 	}
 
@@ -612,7 +614,7 @@ check_plcy_entry(char *entry, const char *driver, boolean_t todel)
 			tokseen = B_TRUE;
 		}
 	}
-	if (todel && tokseen || *res == '\0' || !todel && !tokseen) {
+	if ((todel && tokseen) || *res == '\0' || (!todel && !tokseen)) {
 		(void) fprintf(stderr, gettext(ERR_INVALID_PLCY));
 		free(res);
 		return (NULL);
@@ -690,7 +692,7 @@ check_priv_entry(const char *privlist, boolean_t add)
 
 		if (add && modctl(MODALLOCPRIV, pr) != 0) {
 			(void) fprintf(stderr, gettext(ERR_BAD_PRIV), pr,
-				strerror(errno));
+			    strerror(errno));
 			return (ERROR);
 		}
 	}

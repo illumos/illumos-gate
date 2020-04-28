@@ -26,6 +26,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -116,7 +119,7 @@ log_minorperm_error(minorperm_err_t err, int key)
  *  open file
  * for each entry in list
  *	where list entries are separated by <list_separator>
- * 	append entry : driver_name <entry_separator> entry
+ *	append entry : driver_name <entry_separator> entry
  * close file
  * return error/noerr
  */
@@ -207,7 +210,7 @@ append_to_file(
  *  open file
  * for each entry in list
  *	where list entries are separated by <list_separator>
- * 	append entry : driver_name <entry_separator> entry
+ *	append entry : driver_name <entry_separator> entry
  * close file
  * return error/noerr
  */
@@ -347,7 +350,7 @@ delete_entry(
 	int		rv, i;
 	int		status = NOERR;
 	int		drvr_found = 0;
-	boolean_t 	nomatch = B_TRUE;
+	boolean_t	nomatch = B_TRUE;
 	char		newfile[MAXPATHLEN];
 	char		*cp;
 	char		line[MAX_DBFILE_ENTRY];
@@ -1213,9 +1216,6 @@ exec_devfsadm(
 	int n = 0;
 	char *cmdline[MAX_CMD_LINE];
 	char maj_num[128];
-	char *previous;
-	char *current;
-	int len;
 	int rv;
 
 	/* build command line */
@@ -1242,24 +1242,35 @@ exec_devfsadm(
 		cmdline[n++] = "-x";
 
 	if (aliases != NULL) {
+		char *buf, *p;
+		size_t len;
+		int n_start = n;
+
 		len = strlen(aliases);
-		previous = aliases;
-		do {
-			cmdline[n++] = "-a";
-			cmdline[n] = calloc(len + 1, 1);
-			if (cmdline[n] == NULL) {
-				(void) fprintf(stderr,
-				    gettext(ERR_NO_MEM));
-				return (ERROR);
+
+		p = buf = calloc(len + 1, 1);
+		if (buf == NULL) {
+			(void) fprintf(stderr, gettext(ERR_NO_MEM));
+			return (ERROR);
+		}
+
+		while (*aliases != '\0') {
+			while (n < MAX_CMD_LINE - 3 && *aliases != '\0') {
+				cmdline[n++] = "-a";
+				aliases = get_entry(aliases, p, ' ', 0);
+				cmdline[n++] = p;
+				p += strlen(p) + 1;
 			}
-			current = get_entry(previous,
-			    cmdline[n++], ' ', 0);
-			previous = current;
-
-		} while (*current != '\0');
-
+			cmdline[n] = NULL;
+			rv = exec_command(DRVCONFIG_PATH, cmdline);
+			if (rv != NOERR)
+				break;
+			n = n_start;
+		}
+		free(buf);
+		return (rv == NOERR ? NOERR : ERROR);
 	}
-	cmdline[n] = (char *)0;
+	cmdline[n] = NULL;
 
 	rv = exec_command(DRVCONFIG_PATH, cmdline);
 	if (rv == NOERR)
@@ -1387,7 +1398,7 @@ create_reconfig(char *basedir)
  *	open file
  *	for each entry in list
  *		where list entries are separated by <list_separator>
- * 		modify entry : driver_name <entry_separator> entry
+ *		modify entry : driver_name <entry_separator> entry
  *	close file
  *
  *	return error/noerr
@@ -1538,7 +1549,7 @@ update_minor_entry(char *driver_name, char *perm_list)
 	}
 
 	if (!match) {
-		(void) bzero(line, sizeof (&line[0]));
+		(void) bzero(line, sizeof (line));
 		(void) snprintf(line, sizeof (line),
 		    "%s:%s %s %s %s\n",
 		    driver_name, minor, perm, own, grp);
@@ -1929,7 +1940,7 @@ unique_drv_alias(char *drv_alias)
 				continue;
 			/* sanity-check */
 			if (sscanf(line,
-			    "%" VAL2STR(FILENAME_MAX) "s" 	/* drv */
+			    "%" VAL2STR(FILENAME_MAX) "s"	/* drv */
 			    "%" VAL2STR(FILENAME_MAX) "s",	/* alias */
 			    drv, alias) != 2)
 				(void) fprintf(stderr, gettext(ERR_BAD_LINE),
@@ -1965,8 +1976,7 @@ unique_drv_alias(char *drv_alias)
  * from the remainder of the line by white space.
  */
 int
-unique_driver_name(char *driver_name, char *file_name,
-	int *is_unique)
+unique_driver_name(char *driver_name, char *file_name, int *is_unique)
 {
 	int ret, err;
 
@@ -2174,7 +2184,7 @@ update_name_to_major(char *driver_name, major_t *major_num, int server)
 
 	/*
 	 * if driver_name already in rem_name_to_major
-	 * 	delete entry from rem_nam_to_major
+	 *	delete entry from rem_nam_to_major
 	 *	put entry into name_to_major
 	 */
 
