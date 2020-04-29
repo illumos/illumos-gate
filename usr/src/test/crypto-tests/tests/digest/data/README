@@ -1,0 +1,11 @@
+These files are comprised of the NIST Test Vectors.
+
+The SHA* vectors are taken directly from:
+https://csrc.nist.gov/Projects/Cryptographic-Algorithm-Validation-Program/Secure-Hashing
+
+The MD5 vectors are taken from:
+https://s3.amazonaws.com/docs.nsrl.nist.gov/legacy/NSRLvectors.zip
+
+Given that the initial format of the MD5 vectors is different than the SHA data,
+the included convert.awk script was used to transform them into so the same
+parser could be used for all the data.

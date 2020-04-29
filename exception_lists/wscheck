@@ -9,6 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2020 Oxide Computer Company
 #
 syntax: glob
 
@@ -105,6 +106,7 @@ usr/src/uts/i86pc/sys/vmm_dev.h
 usr/src/uts/i86pc/sys/vmm_instruction_emul.h
 usr/src/uts/common/io/qede/*
 usr/src/uts/common/io/i40e/core/*
+usr/src/test/crypto-tests/tests/digest/data/*.rsp
 usr/src/test/util-tests/tests/dis/i386/*.out
 usr/src/tools/smatch/src/*
 usr/src/uts/common/io/cxgbe/*
