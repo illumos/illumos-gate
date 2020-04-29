@@ -6066,9 +6066,16 @@ new_zone_did()
 	int len;
 	int val;
 	struct flock lck;
+	char pathbuf[PATH_MAX];
 	char buf[80];
 
-	if ((fd = open(DEBUGID_FILE, O_RDWR | O_CREAT,
+	if (snprintf(pathbuf, sizeof (pathbuf), "%s%s", zonecfg_get_root(),
+	    DEBUGID_FILE) >= sizeof (pathbuf)) {
+		printf(gettext("alternate root path is too long"));
+		return (-1);
+	}
+
+	if ((fd = open(pathbuf, O_RDWR | O_CREAT,
 	    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) < 0) {
 		perror("new_zone_did open failed");
 		return (-1);
