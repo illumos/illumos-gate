@@ -286,6 +286,8 @@ add_disk(char *disk, char *path, char *slotconf, size_t slotconf_len)
 		    strcmp(guest_block_size, "0") == 0) {
 			guest_block_size = NULL;
 		}
+	} else if (is_env_string("device", disk, "model", "nvme")) {
+		model = "nvme";
 	} else if (is_env_string("device", disk, "model", "ahci")) {
 		if (is_env_string("device", disk, "media", "cdrom")) {
 			model = "ahci-cd";
