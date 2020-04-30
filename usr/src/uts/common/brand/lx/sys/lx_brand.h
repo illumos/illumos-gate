@@ -94,6 +94,7 @@ extern "C" {
 #define	B_LPID_TO_SPAIR		128
 #define	B_GET_CURRENT_CONTEXT	129
 #define	B_EMULATION_DONE	130
+/* Some native programs use B_START_NFS_LOCKD, so don't change this. */
 #define	B_START_NFS_LOCKD	131
 #define	B_BLOCK_ALL_SIGS	132
 #define	B_UNBLOCK_ALL_SIGS	133

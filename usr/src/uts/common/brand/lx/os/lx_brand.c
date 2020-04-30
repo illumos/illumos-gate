@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -1402,8 +1402,15 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 	if (p->p_brand == NULL)
 		return (ENOSYS);
 
-	VERIFY(p->p_brand == &lx_brand);
-	VERIFY(p->p_brand_data != NULL);
+	/*
+	 * Certain native applications may wish to start the lx_lockd process.
+	 * Every other process that's not branded should be denied.
+	 */
+	if (p->p_brand != &lx_brand && cmd != B_START_NFS_LOCKD)
+		return (ENOSYS);
+
+	if (cmd != B_START_NFS_LOCKD)
+		VERIFY(p->p_brand_data != NULL);
 
 	switch (cmd) {
 	case B_REGISTER:
