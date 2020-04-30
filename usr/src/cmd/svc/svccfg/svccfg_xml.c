@@ -23,7 +23,7 @@
  */
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 
@@ -3404,6 +3404,28 @@ out:
 }
 
 /*
+ * Validate the svc:/-prefixed FMRI generated from the service name.
+ */
+static void
+validate_service_name(const entity_t *s)
+{
+	char *fmri;
+	int ftype;
+	const char *finst;
+
+	if ((fmri = uu_strdup(s->sc_fmri)) == NULL)
+		uu_die(gettext("couldn't allocate memory"));
+
+	if (scf_parse_fmri(fmri, &ftype, NULL, NULL, &finst, NULL, NULL) != 0 ||
+	    finst != NULL || ftype != SCF_FMRI_TYPE_SVC) {
+		uu_die(gettext("invalid value \"%s\": should be a bare "
+		    "service name\n"), s->sc_name);
+	}
+
+	uu_free(fmri);
+}
+
+/*
  * Translate a service element into an internal instance/property tree, added
  * to bundle.
  *
@@ -3426,6 +3448,8 @@ lxml_get_service(bundle_t *bundle, xmlNodePtr svc, svccfg_op_t op)
 	 */
 	s = internal_service_new((char *)xmlGetProp(svc,
 	    (xmlChar *)name_attr));
+
+	validate_service_name(s);
 
 	version = xmlGetProp(svc, (xmlChar *)version_attr);
 	s->sc_u.sc_service.sc_service_version = atol((const char *)version);

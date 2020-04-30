@@ -901,11 +901,6 @@ lbolt_softint_post(void)
 }
 
 void
-thread_splitstack_run(caddr_t addr, void (*func)(void *), void *)
+do_hotinlines(struct module *mp __unused)
 {
-	panic("thread_splitstack() not supported on SPARC");
 }
-
-void
-thread_splitstack_cleanup(void)
-{}

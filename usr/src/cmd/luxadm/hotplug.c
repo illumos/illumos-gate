@@ -104,7 +104,7 @@ static	int	h_pre_hotplug_sena(Hotplug_Devlist *,
 static	int	h_post_hotplug_sena(Hotplug_Devlist *,
 		WWN_list *, int, int, int, int);
 static	int	h_remove_ses_nodes(struct dlist *);
-static 	int	h_print_list_warn(Hotplug_Devlist *, int, int);
+static	int	h_print_list_warn(Hotplug_Devlist *, int, int);
 static	int	h_display_logical_nodes(struct dlist *);
 static	void	h_print_logical_nodes(struct dlist *);
 static	int	h_remove_nodes(struct dlist *);
@@ -394,7 +394,7 @@ char		choice[2];
 	for (list = bsyRsrv_disk_list; list != NULL; list = list->next, i++) {
 	    if ((list->dev_type == DTYPE_DIRECT) &&
 		(list->dev_location == SENA)) {
-		if (list->f_flag != NULL) {
+		if (list->f_flag != 0) {
 		    if (enc_type == DAK_ENC_TYPE) {
 			(void) fprintf(stdout, MSGSTR(5663,
 			    "  %d: Box Name:    \"%s\"  slot %d\n"),
@@ -549,7 +549,7 @@ int		p_pw = 0, p_on = 0, p_st = 0;
 					err = 0;
 					continue;
 				}
-				*ptr = NULL;
+				*ptr = '\0';
 				slot = path_struct->slot;
 				f_r = path_struct->f_flag;
 				if ((err = l_convert_name(inq_path, &path_phys,
@@ -687,7 +687,7 @@ int		p_pw = 0, p_on = 0, p_st = 0;
 				 * set dev_path to NULL,
 				 * if disk has null wwn.
 				 */
-				*dev_path = NULL;
+				*dev_path = '\0';
 				dev_location = SENA;
 				goto getinfo;
 			}
@@ -2193,12 +2193,12 @@ Box_list		*bl1, *box_list = NULL;
  */
 static	int
 h_post_remove_dev(Hotplug_Devlist *hotplug_disk,
-				int todo, int verbose_flag)
+    int todo, int verbose_flag)
 {
-char   		device_name[MAXNAMELEN], *dev_path = NULL;
-int		tid, err;
-gfc_map_t	map;
-int		nArg;
+	char		device_name[MAXNAMELEN], *dev_path = NULL;
+	int		tid, err;
+	gfc_map_t	map;
+	int		nArg;
 
 
 	tid = hotplug_disk->tid;
@@ -2669,7 +2669,7 @@ char		*tape_entries[] = { "", "b", "bn", "c", "cb", "cbn", "cn",
 		(void) strcpy(buf, ptr);
 		if ((ptr = strrchr(buf, 's')) == NULL)
 			continue;
-		*(++ptr) = NULL;
+		*(++ptr) = '\0';
 		found_dev++;
 		if (found_dev == 1)
 			(void) fprintf(stdout,
@@ -2695,7 +2695,7 @@ char		*tape_entries[] = { "", "b", "bn", "c", "cb", "cbn", "cn",
 			buf_ptr = ptr;
 			while (*ptr >= '0' && *ptr <= '9')
 				ptr++;
-			*ptr = NULL;
+			*ptr = '\0';
 			for (i = 0, ptr = tape_entries[0];
 					ptr != NULL;
 					i++, ptr = tape_entries[i]) {
@@ -2795,7 +2795,7 @@ Hotplug_Devlist		*disk_list = disk_list_head;
 	for (i = 1; disk_list; i++, disk_list = disk_list->next) {
 		if ((disk_list->dev_type == DTYPE_DIRECT) &&
 			(disk_list->dev_location == SENA)) {
-		    if (disk_list->f_flag != NULL) {
+		    if (disk_list->f_flag != 0) {
 			if (enc_type == DAK_ENC_TYPE) {
 			    (void) fprintf(stdout, MSGSTR(5665,
 				"  %d: Box Name:    \"%s\" slot %d\n"),

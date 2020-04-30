@@ -273,11 +273,16 @@
  * before making a WQE for it.
  *
  * After a completion event occurs, the packet is either discarded (and the
- * buffer_t returned to the free list), or it is readied for loaning to MAC.
+ * buffer_t returned to the free list), or it is readied for loaning to MAC
+ * and placed on the "loaned" list in the mlxcx_buffer_shard_t.
  *
  * Once MAC and the rest of the system have finished with the packet, they call
- * freemsg() on its mblk, which will call mlxcx_buf_mp_return and return the
- * buffer_t to the free list.
+ * freemsg() on its mblk, which will call mlxcx_buf_mp_return. At this point
+ * the fate of the buffer_t is determined by the state of the
+ * mlxcx_buffer_shard_t. When the shard is in its normal state the buffer_t
+ * will be returned to the free list, potentially to be recycled and used
+ * again. But if the shard is draining (E.g. after a ring stop) there will be
+ * no recycling and the buffer_t is immediately destroyed.
  *
  * At detach/teardown time, buffers are only every destroyed from the free list.
  *
@@ -289,18 +294,18 @@
  *                         v
  *                    +----+----+
  *                    | created |
- *                    +----+----+
- *                         |
- *                         |
- *                         | mlxcx_buf_return
- *                         |
- *                         v
- * mlxcx_buf_destroy  +----+----+
- *          +---------|  free   |<---------------+
- *          |         +----+----+                |
+ *                    +----+----+                        +------+
+ *                         |                             | dead |
+ *                         |                             +------+
+ *                         | mlxcx_buf_return                ^
+ *                         |                                 |
+ *                         v                                 | mlxcx_buf_destroy
+ * mlxcx_buf_destroy  +----+----+          +-----------+     |
+ *          +---------|  free   |<------no-| draining? |-yes-+
+ *          |         +----+----+          +-----------+
+ *          |              |                     ^
  *          |              |                     |
- *          |              |                     | mlxcx_buf_return
- *          v              | mlxcx_buf_take      |
+ *          v              | mlxcx_buf_take      | mlxcx_buf_return
  *      +---+--+           v                     |
  *      | dead |       +---+---+                 |
  *      +------+       | on WQ |- - - - - - - - >O
@@ -759,13 +764,19 @@ mlxcx_mlbs_teardown(mlxcx_t *mlxp, mlxcx_buf_shard_t *s)
 	mlxcx_buffer_t *buf;
 
 	mutex_enter(&s->mlbs_mtx);
+
 	while (!list_is_empty(&s->mlbs_busy))
 		cv_wait(&s->mlbs_free_nonempty, &s->mlbs_mtx);
-	while ((buf = list_head(&s->mlbs_free)) != NULL) {
+
+	while (!list_is_empty(&s->mlbs_loaned))
+		cv_wait(&s->mlbs_free_nonempty, &s->mlbs_mtx);
+
+	while ((buf = list_head(&s->mlbs_free)) != NULL)
 		mlxcx_buf_destroy(mlxp, buf);
-	}
+
 	list_destroy(&s->mlbs_free);
 	list_destroy(&s->mlbs_busy);
+	list_destroy(&s->mlbs_loaned);
 	mutex_exit(&s->mlbs_mtx);
 
 	cv_destroy(&s->mlbs_free_nonempty);
@@ -1335,6 +1346,8 @@ mlxcx_mlbs_create(mlxcx_t *mlxp)
 	list_create(&s->mlbs_busy, sizeof (mlxcx_buffer_t),
 	    offsetof(mlxcx_buffer_t, mlb_entry));
 	list_create(&s->mlbs_free, sizeof (mlxcx_buffer_t),
+	    offsetof(mlxcx_buffer_t, mlb_entry));
+	list_create(&s->mlbs_loaned, sizeof (mlxcx_buffer_t),
 	    offsetof(mlxcx_buffer_t, mlb_entry));
 	cv_init(&s->mlbs_free_nonempty, NULL, CV_DRIVER, NULL);
 
