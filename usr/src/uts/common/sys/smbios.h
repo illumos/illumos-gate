@@ -1315,11 +1315,12 @@ typedef struct smbios_memdevice {
 #define	SMB_MTECH_NVDIMM_P	0x06	/* NVDIMM-P */
 #define	SMB_MTECH_INTCPM	0x07	/* Intel Optane DC Persistent Memory */
 
-#define	SMB_MOMC_OTHER		0x01	/* other */
-#define	SMB_MOMC_UNKNOWN	0x02	/* unknown */
-#define	SMB_MOMC_VOLATILE	0x04	/* Volatile memory */
-#define	SMB_MOMC_BYTE_PM	0x08	/* Byte-accessible persistent memory */
-#define	SMB_MOMC_BLOCK_PM	0x10	/* Block-accessible persistent memory */
+#define	SMB_MOMC_RESERVED	0x01	/* reserved */
+#define	SMB_MOMC_OTHER		0x02	/* other */
+#define	SMB_MOMC_UNKNOWN	0x04	/* unknown */
+#define	SMB_MOMC_VOLATILE	0x08	/* Volatile memory */
+#define	SMB_MOMC_BYTE_PM	0x10	/* Byte-accessible persistent memory */
+#define	SMB_MOMC_BLOCK_PM	0x20	/* Block-accessible persistent memory */
 
 /*
  * SMBIOS Memory Array Mapped Address.  See DSP0134 Section 7.20 for more
