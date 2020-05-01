@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
+ * Copyright (c) 2017, Intel Corporation.
  */
 
 /*
@@ -100,6 +101,26 @@ static kmutex_t inject_delay_mtx;
 static int inject_next_id = 1;
 
 /*
+ * Test if the requested frequency was triggered
+ */
+static boolean_t
+freq_triggered(uint32_t frequency)
+{
+	/*
+	 * zero implies always (100%)
+	 */
+	if (frequency == 0)
+		return (B_TRUE);
+
+	/*
+	 * Note: we still handle legacy (unscaled) frequecy values
+	 */
+	uint32_t maximum = (frequency <= 100) ? 100 : ZI_PERCENTAGE_MAX;
+
+	return (spa_get_random(maximum) < frequency);
+}
+
+/*
  * Returns true if the given record matches the I/O in progress.
  */
 static boolean_t
@@ -114,8 +135,7 @@ zio_match_handler(zbookmark_phys_t *zb, uint64_t type, int dva,
 	    record->zi_object == DMU_META_DNODE_OBJECT) {
 		if (record->zi_type == DMU_OT_NONE ||
 		    type == record->zi_type)
-			return (record->zi_freq == 0 ||
-			    spa_get_random(100) < record->zi_freq);
+			return (freq_triggered(record->zi_freq));
 		else
 			return (B_FALSE);
 	}
@@ -130,8 +150,7 @@ zio_match_handler(zbookmark_phys_t *zb, uint64_t type, int dva,
 	    zb->zb_blkid <= record->zi_end &&
 	    (record->zi_dvas == 0 || (record->zi_dvas & (1ULL << dva))) &&
 	    error == record->zi_error) {
-		return (record->zi_freq == 0 ||
-		    spa_get_random(100) < record->zi_freq);
+		return (freq_triggered(record->zi_freq));
 	}
 
 	return (B_FALSE);
@@ -360,6 +379,12 @@ zio_handle_device_injection(vdev_t *vd, zio_t *zio, int error)
 
 			if (handler->zi_record.zi_error == error) {
 				/*
+				 * limit error injection if requested
+				 */
+				if (!freq_triggered(handler->zi_record.zi_freq))
+					continue;
+
+				/*
 				 * For a failed open, pretend like the device
 				 * has gone away.
 				 */
@@ -525,6 +550,9 @@ zio_handle_io_delay(zio_t *zio)
 	for (inject_handler_t *handler = list_head(&inject_handlers);
 	    handler != NULL; handler = list_next(&inject_handlers, handler)) {
 		if (handler->zi_record.zi_cmd != ZINJECT_DELAY_IO)
+			continue;
+
+		if (!freq_triggered(handler->zi_record.zi_freq))
 			continue;
 
 		if (vd->vdev_guid != handler->zi_record.zi_guid)
