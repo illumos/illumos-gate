@@ -177,13 +177,23 @@ jedec_print(FILE *fp, const char *desc, uint_t id)
 	const char *name;
 	uint_t cont, vendor;
 
-	vendor = id & 0xff;
-	cont = (id >> 8) & 0xff;
+	/*
+	 * SMBIOS encodes data in the way that the underlying memory standard
+	 * does. In this case, the upper byte indicates the vendor that we care
+	 * about while the lower byte indicates the number of continuations that
+	 * are needed. libjedec indexes this based on zero (e.g. table 1 is zero
+	 * continuations), which is how the spec encodes it. We add one so that
+	 * we can match how the spec describes it.
+	 */
+	vendor = id >> 8;
+	cont = id & 0x7f;
 	name = libjedec_vendor_string(cont, vendor);
 	if (name == NULL) {
-		oprintf(fp, "  %s: 0x%x\n", desc, id);
+		oprintf(fp, "  %s: Bank: 0x%x Vendor: 0x%x\n", desc, cont + 1,
+		    vendor);
 	} else {
-		oprintf(fp, "  %s: 0x%x (%s)\n", desc, id, name);
+		oprintf(fp, "  %s: Bank: 0x%x Vendor: 0x%x (%s)\n", desc,
+		    cont + 1, vendor, name);
 	}
 }
 
@@ -1014,7 +1024,7 @@ print_memdevice(smbios_hdl_t *shp, id_t id, FILE *fp)
 	}
 
 	if (md.smbmd_opcap_flags != 0) {
-		flag_printf(fp, "  Operating Mode Capabilities",
+		flag_printf(fp, "Operating Mode Capabilities",
 		    md.smbmd_opcap_flags, sizeof (md.smbmd_opcap_flags) * NBBY,
 		    smbios_memdevice_op_capab_name,
 		    smbios_memdevice_op_capab_desc);
