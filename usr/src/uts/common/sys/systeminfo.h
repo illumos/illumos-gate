@@ -21,6 +21,7 @@
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2017 RackTop Systems.
+ * Copyright 2020 Oxide Computer Company
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -56,8 +57,8 @@ extern char platform[];
  *  257 -  512	Unix International assigned numbers for `set' style commands
  *		where the value is selected to be the value for the
  *		corresponding `get' command plus 256.
- *  513 -  768	Solaris specific `get' style commands.
- *  769 - 1024	Solaris specific `set' style commands where the value is
+ *  513 -  768	illumos-defined `get' style commands.
+ *  769 - 1024	illumos-defined `set' style commands where the value is
  *		selected to be the value for the corresponding `get' command
  *		plus 256.
  *
@@ -69,7 +70,7 @@ extern char platform[];
 /* UI defined `get' commands (1-256) */
 #define	SI_SYSNAME		1	/* return name of operating system */
 #define	SI_HOSTNAME		2	/* return name of node */
-#define	SI_RELEASE 		3	/* return release of operating system */
+#define	SI_RELEASE		3	/* return release of operating system */
 #define	SI_VERSION		4	/* return version field of utsname */
 #define	SI_MACHINE		5	/* return kind of machine */
 #define	SI_ARCHITECTURE		6	/* return instruction set arch */
@@ -81,7 +82,7 @@ extern char platform[];
 #define	SI_SET_HOSTNAME		258	/* set name of node */
 #define	SI_SET_SRPC_DOMAIN	265	/* set secure RPC domain */
 
-/* Solaris defined `get' commands (513-768) */
+/* illumos-defined `get' commands (513-768) */
 #define	SI_PLATFORM		513	/* return platform identifier */
 #define	SI_ISALIST		514	/* return supported isa list */
 #define	SI_DHCP_CACHE		515	/* return kernel-cached DHCPACK */
@@ -89,8 +90,9 @@ extern char platform[];
 #define	SI_ARCHITECTURE_64	517	/* basic 64-bit SI_ARCHITECTURE */
 #define	SI_ARCHITECTURE_K	518	/* kernel SI_ARCHITECTURE equivalent */
 #define	SI_ARCHITECTURE_NATIVE	519	/* SI_ARCHITECTURE of the caller */
+#define	SI_ADDRESS_WIDTH	520	/* number of bits in native address */
 
-/* Solaris defined `set' commands (769-1024) (none currently assigned) */
+/* illumos-defined `set' commands (769-1024) (none currently assigned) */
 
 
 #define	HW_INVALID_HOSTID	0xFFFFFFFF	/* an invalid hostid */

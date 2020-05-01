@@ -26,6 +26,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright (c) 2017 by Delphix. All rights reserved.
+# Copyright 2020 Oxide Computer Company
 #
 
 #
@@ -1518,6 +1519,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/krtld/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(COMMONBASE)/bootbanner/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(COMMONBASE)/list/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -1541,6 +1546,13 @@ $(OBJS_DIR)/%.o:		$(COMMONBASE)/net/dhcp/%.c
 $(OBJS_DIR)/%.o:		$(COMMONBASE)/nvpair/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/bootbanner.o := CPPFLAGS += \
+	-DBOOTBANNER1='"$(BOOTBANNER1)"' \
+	-DBOOTBANNER2='"$(BOOTBANNER2)"' \
+	-DBOOTBANNER3='"$(BOOTBANNER3)"' \
+	-DBOOTBANNER4='"$(BOOTBANNER4)"' \
+	-DBOOTBANNER5='"$(BOOTBANNER5)"'
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/os/%.c
 	$(COMPILE.c) -o $@ $<
