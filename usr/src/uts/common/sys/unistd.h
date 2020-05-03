@@ -106,9 +106,9 @@ extern "C" {
 #define	_SC_ARG_MAX			1
 #define	_SC_CHILD_MAX			2
 #define	_SC_CLK_TCK			3
-#define	_SC_NGROUPS_MAX 		4
+#define	_SC_NGROUPS_MAX			4
 #define	_SC_OPEN_MAX			5
-#define	_SC_JOB_CONTROL 		6
+#define	_SC_JOB_CONTROL			6
 #define	_SC_SAVED_IDS			7
 #define	_SC_VERSION			8
 /* SVR4 names */
@@ -151,21 +151,21 @@ extern "C" {
 #define	_SC_TIMER_MAX			44
 /* XPG4 names */
 #define	_SC_2_C_BIND			45
-#define	_SC_2_C_DEV    			46
+#define	_SC_2_C_DEV			46
 #define	_SC_2_C_VERSION			47
-#define	_SC_2_FORT_DEV 			48
-#define	_SC_2_FORT_RUN 			49
+#define	_SC_2_FORT_DEV			48
+#define	_SC_2_FORT_RUN			49
 #define	_SC_2_LOCALEDEF			50
-#define	_SC_2_SW_DEV   			51
+#define	_SC_2_SW_DEV			51
 #define	_SC_2_UPE			52
 #define	_SC_2_VERSION			53
 #define	_SC_BC_BASE_MAX			54
-#define	_SC_BC_DIM_MAX 			55
+#define	_SC_BC_DIM_MAX			55
 #define	_SC_BC_SCALE_MAX		56
 #define	_SC_BC_STRING_MAX		57
 #define	_SC_COLL_WEIGHTS_MAX		58
 #define	_SC_EXPR_NEST_MAX		59
-#define	_SC_LINE_MAX 			60
+#define	_SC_LINE_MAX			60
 #define	_SC_RE_DUP_MAX			61
 #define	_SC_XOPEN_CRYPT			62
 #define	_SC_XOPEN_ENH_I18N		63
@@ -210,6 +210,7 @@ extern "C" {
 #define	_SC_NPROCESSORS_MAX	516	/* maximum # of processors */
 #define	_SC_CPUID_MAX		517	/* maximum CPU id */
 #define	_SC_EPHID_MAX		518	/* maximum ephemeral id */
+#define	_SC_UADDR_MAX		519	/* maximum user address */
 
 /*
  * POSIX.1c (pthreads) names. These values are defined above
@@ -351,7 +352,7 @@ extern "C" {
 #ifdef	_XPG6
 #define	_POSIX_VERSION		200112L	/* Supports IEEE Std 1003.1-2001 */
 #else
-#define	_POSIX_VERSION		199506L /* Supports POSIX-1c DIS */
+#define	_POSIX_VERSION		199506L	/* Supports POSIX-1c DIS */
 #endif
 #endif /* _POSIX_VERSION */
 
@@ -359,7 +360,7 @@ extern "C" {
 #ifdef	_XPG6
 #define	_POSIX2_VERSION		200112L	/* Supports IEEE Std 1003.1-2001 */
 #else
-#define	_POSIX2_VERSION		199209L /* Supports ISO POSIX-2 DIS */
+#define	_POSIX2_VERSION		199209L	/* Supports ISO POSIX-2 DIS */
 #endif
 #endif /* _POSIX2_VERSION */
 
@@ -395,14 +396,14 @@ extern "C" {
 #define	_POSIX2_FORT_RUN  200112L	/* Supports FORTRAN runtime */
 #define	_POSIX2_LOCALEDEF 200112L	/* Supports creation of locales */
 #define	_POSIX2_SW_DEV	  200112L	/* Supports S/W Development Utility */
-#define	_POSIX2_UPE	  200112L 	/* Supports User Portability Utility */
+#define	_POSIX2_UPE	  200112L	/* Supports User Portability Utility */
 #else
 #define	_POSIX2_C_BIND		1	/* Supports C Language Bindings */
 #define	_POSIX2_C_DEV		1	/* Supports C language dev utility */
 #define	_POSIX2_FORT_RUN	1	/* Supports FORTRAN runtime */
 #define	_POSIX2_LOCALEDEF	1	/* Supports creation of locales */
 #define	_POSIX2_SW_DEV		1	/* Supports S/W Development Utility */
-#define	_POSIX2_UPE		1 	/* Supports User Portability Utility */
+#define	_POSIX2_UPE		1	/* Supports User Portability Utility */
 #endif /* _XPG6 */
 
 /* UNIX 03 names */

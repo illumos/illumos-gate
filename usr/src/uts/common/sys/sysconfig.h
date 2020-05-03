@@ -100,6 +100,7 @@ extern int	mach_sysconfig(int);
 #define	_CONFIG_SYMLOOP_MAX	46	/* maximum # of symlinks in pathname */
 
 #define	_CONFIG_EPHID_MAX	47	/* maximum ephemeral uid */
+#define	_CONFIG_UADDR_MAX	48	/* maximum user address */
 
 #ifdef	__cplusplus
 }
