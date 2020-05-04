@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH _FINI 9E "Jan 22, 2002"
+.TH _FINI 9E "May 06, 2020"
 .SH NAME
 _fini, _info, _init \- loadable module configuration entry points
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/modctl.h>
 
@@ -27,13 +26,10 @@ _fini, _info, _init \- loadable module configuration entry points
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
 Solaris DDI specific (Solaris DDI). These entry points are required. You must
 write them.
 .SH PARAMETERS
 .SS "_info(\|)"
-.sp
 .ne 2
 .na
 \fB\fImodinfop\fR \fR
@@ -43,8 +39,6 @@ A pointer to an opaque \fBmodinfo\fR structure.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fB_init()\fR initializes a loadable module. It is called before any other
 routine in a loadable module. \fB_init()\fR returns the value returned by
 \fBmod_install\fR(9F). The module may optionally perform some other work before
@@ -61,10 +55,10 @@ returns the value returned by \fBmod_info\fR(9F).
 system wants to unload a module. If the module determines that it can be
 unloaded, then \fB_fini()\fR returns the value returned by
 \fBmod_remove\fR(9F). Upon successful return from \fB_fini()\fR no other
-routine in the module will be called before \fB_init()\fR is called.
+routine in the module will be called before \fB_init()\fR is called. If
+\fB_init()\fR did not successfully complete, \fB_fini()\fR will not be
+called.
 .SH RETURN VALUES
-.sp
-.LP
 \fB_init()\fR should return the appropriate error number if there is an error,
 otherwise it should return the return value from \fBmod_install\fR(9F).
 .sp
@@ -79,7 +73,6 @@ resources, such as mutexes and calls to \fBddi_soft_state_fini\fR(9F), should
 only be destroyed in \fB_fini()\fR after \fBmod_remove()\fR returns
 successfully.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRInitializing and Freeing a Mutex
 .sp
 .LP
@@ -158,8 +151,6 @@ _fini(void)
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBadd_drv\fR(1M), \fBmod_info\fR(9F), \fBmod_install\fR(9F),
 \fBmod_remove\fR(9F), \fBmutex\fR(9F), \fBmodldrv\fR(9S), \fBmodlinkage\fR(9S),
 \fBmodlstrmod\fR(9S)
@@ -167,17 +158,11 @@ _fini(void)
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-.sp
-.LP
 Do not change the structures referred to by the \fBmodlinkage\fR structure
 after the call to \fBmod_install()\fR, as the system may copy or change them.
 .SH NOTES
-.sp
-.LP
 Even though the identifiers \fB_fini()\fR, \fB_info()\fR, and \fB_init()\fR
 appear to be declared as globals, their scope is restricted by the kernel to
 the module that they are defined in.
 .SH BUGS
-.sp
-.LP
 On some implementations \fB_info()\fR may be called before \fB_init()\fR.
