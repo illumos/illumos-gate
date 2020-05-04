@@ -24,6 +24,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 Oxide Computer Company
 
 PROG= init 
 OBJS= init.o
@@ -34,12 +35,17 @@ DEFAULTFILES= init.dfl
 include ../Makefile.cmd
 include ../Makefile.ctf
 
+OBJS = init.o bootbanner.o
 CSTD = $(CSTD_GNU99)
 LDLIBS += -lpam -lbsm -lcontract -lscf
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += $(CNOWARN_UNINIT)
-LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
 CLOBBERFILES= $(STATIC)
+CPPFLAGS += -DBOOTBANNER1='"$(BOOTBANNER1)"'
+CPPFLAGS += -DBOOTBANNER2='"$(BOOTBANNER2)"'
+CPPFLAGS += -DBOOTBANNER3='"$(BOOTBANNER3)"'
+CPPFLAGS += -DBOOTBANNER4='"$(BOOTBANNER4)"'
+CPPFLAGS += -DBOOTBANNER5='"$(BOOTBANNER5)"'
 
 # needs work
 SMATCH=off
@@ -62,15 +68,17 @@ install: all $(ROOTETCDEFAULTFILES) $(ROOTSBINPROG)
 	$(RM) $(ROOTETC)/TIMEZONE
 	cd $(ROOTETC); $(SYMLINK) default/init TIMEZONE
 
+$(PROG):	$(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
+
+%.o:	$(SRC)/common/bootbanner/%.c
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(POST_PROCESS_O)
+
 test:
 	rtest $(PROG)
 
 clean:
-
-lint:	lint_PROG
-
-%.o: %.c
-	$(COMPILE.c) $<
-	$(POST_PROCESS_O)
 
 include ../Makefile.targ

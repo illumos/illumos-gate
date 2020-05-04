@@ -20,11 +20,10 @@
 .\" Copyright 2016 Nexenta Systems, Inc.
 .\" Copyright 2017 Peter Tribble
 .\"
-.TH FILESYSTEM 5 "Nov 26, 2017"
+.TH FILESYSTEM 5 "Apr 15, 2020"
 .SH NAME
 filesystem \- File system organization
 .SH SYNOPSIS
-.LP
 .nf
 /
 .fi
@@ -35,7 +34,6 @@ filesystem \- File system organization
 .fi
 
 .SH DESCRIPTION
-.LP
 The file system tree is organized for administrative convenience. Distinct
 areas within the file system tree are provided for files that are private to
 one machine, files that can be shared by multiple machines of a common
@@ -85,7 +83,6 @@ the \fBplatform-specific\fR file is installed only on a subset of supported
 platforms. Most platform-specific files are gathered under \fB/platform\fR and
 \fB/usr/platform\fR.
 .SS "Root File System"
-.LP
 The root file system contains files that are unique to each machine. It
 contains the following directories:
 .sp
@@ -1544,7 +1541,6 @@ Databases used by \fBNIS\fR and \fBypbind\fR(1M).
 .RE
 
 .SS "\fB/usr\fR File System"
-.LP
 Because it is desirable to keep the root file system small and not volatile, on
 disk-based systems larger file systems are often mounted on \fB/home\fR,
 \fB/opt\fR, \fB/usr\fR, and \fB/var\fR.
@@ -1563,16 +1559,6 @@ accidentally change any shared files.
 .sp
 .LP
 The \fB/usr\fR file system contains the following subdirectories:
-.sp
-.ne 2
-.na
-\fB\fB/usr/4lib\fR\fR
-.ad
-.sp .6
-.RS 4n
-\fBa.out\fR libraries for the Binary Compatibility Package.
-.RE
-
 .sp
 .ne 2
 .na
@@ -2951,7 +2937,6 @@ Directory for newer versions of POSIX-compliant utilities.
 .RE
 
 .SH SEE ALSO
-.LP
 \fBat\fR(1), \fBex\fR(1), \fBiconv\fR(1), \fBlp\fR(1),
 \fBisainfo\fR(1), \fBmail\fR(1), \fBmailx\fR(1), \fBnroff\fR(1),
 \fBpriocntl\fR(1), \fBrefer\fR(1), \fBsar\fR(1), \fBsh\fR(1), \fBspell\fR(1),

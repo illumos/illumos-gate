@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2020 Oxide Computer Company
  * Copyright (c) 2013 Gary Mills
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
@@ -43,6 +44,7 @@
 #include <sys/utsname.h>
 #include <sys/id_space.h>
 #include <sys/zone.h>
+#include <sys/bootbanner.h>
 
 log_zone_t log_global;
 queue_t *log_consq;
@@ -182,6 +184,14 @@ log_zonefree(zoneid_t zoneid, void *arg)
 	kmem_free(lzp, sizeof (log_zone_t));
 }
 
+static void
+log_bootbanner_print(const char *line, uint_t num)
+{
+	const char *pfx = (num == 0) ? "\r" : "";
+
+	printf("%s%s\n", pfx, line);
+}
+
 void
 log_init(void)
 {
@@ -246,11 +256,15 @@ log_init(void)
 	log_update(&log_backlog, log_backlogq, SL_CONSOLE, log_console);
 
 	/*
-	 * Now that logging is enabled, emit the SunOS banner.
+	 * Now that logging is enabled, emit the boot banner.
 	 */
+#ifdef	LEGACY_BANNER
 	printf("\rSunOS Release %s Version %s %u-bit\n",
 	    utsname.release, utsname.version, NBBY * (uint_t)sizeof (void *));
 	printf("Copyright 2010-2020 Joyent, Inc.\n");
+#else
+	bootbanner_print(log_bootbanner_print, KM_SLEEP);
+#endif
 #ifdef DEBUG
 	printf("DEBUG enabled\n");
 #endif

@@ -250,7 +250,6 @@ DIRS= \
 	/system/object \
 	/tmp \
 	/usr  \
-	/usr/4lib \
 	/usr/ast \
 	/usr/ast/bin \
 	/usr/bin \

@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright 2020 Oxide Computer Company
  * Copyright (c) 2013 Gary Mills
  *
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
@@ -100,6 +101,7 @@
 #include <sys/tty.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
+#include <sys/bootbanner.h>
 
 #include <bsm/adt_event.h>
 #include <bsm/libbsm.h>
@@ -605,6 +607,7 @@ static int	startd_failure_rate_critical();
 static char	*audit_boot_msg();
 static int	audit_put_record(int, int, char *);
 static void	update_boot_archive(int new_state);
+static void	init_bootbanner_print(const char *, uint_t);
 
 int
 main(int argc, char *argv[])
@@ -674,34 +677,33 @@ main(int argc, char *argv[])
 	st_init();
 
 	if (booting && print_banner) {
-		struct utsname un;
-		char buf[BUFSIZ], *isa;
-		long ret;
-		int bits = 32;
-
 		/*
 		 * We want to print the boot banner as soon as
 		 * possible.  In the global zone, the kernel does it,
 		 * but we do not have that luxury in non-global zones,
 		 * so we will print it here.
 		 */
+#ifdef	LEGACY_BANNER
+		struct utsname un;
+		char buf[BUFSIZ];
+		const char *bits;
+		int r;
+
 		(void) uname(&un);
-		ret = sysinfo(SI_ISALIST, buf, sizeof (buf));
-		if (ret != -1L && ret <= sizeof (buf)) {
-			for (isa = strtok(buf, " "); isa;
-			    isa = strtok(NULL, " ")) {
-				if (strcmp(isa, "sparcv9") == 0 ||
-				    strcmp(isa, "amd64") == 0) {
-					bits = 64;
-					break;
-				}
-			}
+		if ((r = sysinfo(SI_ADDRESS_WIDTH, buf, sizeof (buf))) > 0 &&
+		    r < sizeof (buf)) {
+			bits = buf;
+		} else {
+			bits = "64";
 		}
 
 		console(B_FALSE,
-		    "\n\n%s Release %s Version %s %d-bit\r\n",
+		    "\n\n%s Release %s Version %s %s-bit\r\n",
 		    un.sysname, un.release, un.version, bits);
 		console(B_FALSE, "Copyright 2010-2020 Joyent, Inc.\r\n");
+#else
+		bootbanner_print(init_bootbanner_print, 0);
+#endif
 	}
 
 	/*
@@ -915,6 +917,14 @@ main(int argc, char *argv[])
 	}
 
 	/*NOTREACHED*/
+}
+
+static void
+init_bootbanner_print(const char *line, uint_t num)
+{
+	const char *pfx = (num == 0) ? "\n\n" : "";
+
+	console(B_FALSE, "%s%s\r\n", pfx, line);
 }
 
 static void

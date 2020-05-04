@@ -65,6 +65,8 @@ motd:	$(ROOT)/buildstamp
 
 issue: issue.in $(ROOT)/buildstamp
 	sed "s+build: 00000000T000000Z+$$(cat $(ROOT)/buildstamp)+" issue.in >$@
+	@$(NOT_RELEASE_BUILD)-$(ECHO) $(DEV_CM) | sed -e "s/@(#)//" >> motd
+	@-$(CAT) release_info >> motd
 
 smbpasswd:
 	$(TOUCH) smbpasswd

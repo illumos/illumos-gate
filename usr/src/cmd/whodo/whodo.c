@@ -371,13 +371,8 @@ main(int argc, char *argv[])
 
 		dirfd = priv_proc_open(pname, O_RDONLY | O_DIRECTORY);
 
-		if (dirfd < 0) {
-			if (errno == ENOENT)
-				continue;
-			warn(gettext("failed to open %s"), pname);
+		if (dirfd < 0)
 			continue;
-		}
-
 
 		procfd = priv_proc_openat(dirfd, "psinfo", O_RDONLY);
 		if (procfd < 0) {

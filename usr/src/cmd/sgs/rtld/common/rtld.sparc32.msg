@@ -48,7 +48,6 @@
 @ MSG_FIL_LIB		"lib"
 
 @ MSG_PTH_USRLCLIB	"/usr/local/lib"
-@ MSG_PTH_USR4LIB	"/usr/4lib"
 
 @ MSG_SYM_LAV8PLTENTER	"la_sparcv8_pltenter"
 

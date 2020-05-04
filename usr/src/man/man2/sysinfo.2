@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SYSINFO 2 "Sep 7, 2015"
+.TH SYSINFO 2 "Apr 27, 2020"
 .SH NAME
 sysinfo \- get and set system information strings
 .SH SYNOPSIS
@@ -172,6 +172,18 @@ Copy into the array pointed to by \fIbuf\fR a string describing the native
 instruction set architecture of the current system, for example \fBsparcv9\fR
 or \fBi386\fR.  These names might not match predefined names in the C language
 compilation system.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSI_ADDRESS_WIDTH\fR\fR
+.ad
+.sp .6
+.RS 4n
+Copy into the array pointed to by \fIbuf\fR a string describing the number
+of bits in the address space of the native instruction set; e.g., \fB32\fR
+or \fB64\fR.
 .RE
 
 .sp

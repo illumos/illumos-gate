@@ -162,11 +162,6 @@ usr/include/inet/sadb.h
 usr/include/sys/sha1_consts.h
 usr/include/sys/sha2_consts.h
 #
-#
-# Filtering out directories not shipped
-#
-usr/4lib				i386
-#
 # These files contain definitions shared privately between the kernel
 # and libc.  There is no reason for them to be part of a package that
 # a customer should ever see.  They are installed in the proto area by
@@ -529,6 +524,10 @@ usr/platform/sun4v/include/sys/vlds.h	sparc
 # Private/Internal u8_textprep header file. Do not ship.
 #
 usr/include/sys/u8_textprep_data.h
+#
+# Private, for the boot banner code shared between zone init and the kernel:
+#
+usr/include/sys/bootbanner.h
 #
 # SQLite is private, used by SMF (svc.configd), idmapd and libsmb.
 #

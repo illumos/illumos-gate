@@ -19,12 +19,14 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2020 Oxide Computer Company
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All rights reserved.	*/
+
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -81,6 +83,9 @@ systeminfo(int command, char *buf, long count)
 		kstr = utsname.machine;
 		break;
 #ifdef _LP64
+	case SI_ADDRESS_WIDTH:
+		kstr = "64";
+		break;
 	case SI_ARCHITECTURE_64:
 	case SI_ARCHITECTURE_K:
 		kstr = architecture;
@@ -94,6 +99,9 @@ systeminfo(int command, char *buf, long count)
 		    architecture : architecture_32;
 		break;
 #else
+	case SI_ADDRESS_WIDTH:
+		kstr = "32";
+		break;
 	case SI_ARCHITECTURE_K:
 	case SI_ARCHITECTURE_32:
 	case SI_ARCHITECTURE:

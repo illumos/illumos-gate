@@ -159,7 +159,7 @@
 			 /usr/lib/secure/64  (system default)\n"
 
 @ MSG_DEF_AOUTDLP	"  Default Library Path (AOUT):\t\
-			 /usr/4lib:/usr/lib:/usr/local/lib  \
+			 /usr/lib:/usr/local/lib  \
 			 (system default)\n"
 @ MSG_DEF_AOUTNEWTD	"  Trusted Directories (AOUT):\t\
 			 /lib/secure:/usr/lib/secure  (system default)\n"
@@ -193,7 +193,7 @@
 
 @ MSG_DMP_HEAD		"\nConfiguration file [version %d]: %s  %s\n"
 @ MSG_DMP_PLATFORM	"  Platform:\t%s %s %s\n"
-@ MSG_DMP_APP		"  Specific application: %s  (original: %s)\n" 
+@ MSG_DMP_APP		"  Specific application: %s  (original: %s)\n"
 @ MSG_DMP_DLIBPTH	"  Default Library Path (%s):\t%s\n"
 @ MSG_DMP_TLIBPTH	"  Trusted Directories (%s):\t%s\n"
 @ MSG_DMP_RESV		"\nMemory Reservation:\t%llx - %llx (%llx bytes)\n"
@@ -291,7 +291,7 @@
 @ MSG_PTH_OLDTD_64	"/usr/lib/secure/64"
 @ MSG_PTH_UPTD_64	"/lib/secure/64"
 
-@ MSG_PTH_AOUTDLP	"/usr/4lib:/usr/lib:/usr/local/lib"
+@ MSG_PTH_AOUTDLP	"/usr/lib:/usr/local/lib"
 
 @ MSG_DIR_ROOT		"/"
 @ MSG_DIR_DOT		"."

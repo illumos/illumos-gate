@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CRLE 1 "Oct 6, 2008"
+.TH CRLE 1 "Apr 15, 2020"
 .SH NAME
 crle \- configure runtime linking environment
 .SH SYNOPSIS
-.LP
 .nf
 \fBcrle\fR [\fB-64\fR] [\fB-a\fR \fIname\fR] [\fB-A\fR \fIname\fR] [\fB-c\fR \fIconf\fR] [\fB-e\fR \fIenv\fR] [\fB-E\fR \fIenv\fR]
      [\fB-f\fR \fIflags\fR] [\fB-i\fR \fIname\fR] [\fB-I\fR \fIname\fR] [\fB-g\fR \fIname\fR] [\fB-G\fR \fIname\fR]
@@ -15,7 +14,6 @@ crle \- configure runtime linking environment
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBcrle\fR utility provides for the creation and display of a runtime
 linking configuration file. The configuration file is read and interpreted by
 the runtime linker, \fBld.so.1\fR(1), during process startup. The runtime
@@ -182,7 +180,6 @@ alternate object is created in the directory specified by the preceding
 is created. The flags used by \fBdldump()\fR are specified using the \fB-f\fR
 option, or default to \fBRTLD_REL_RELATIVE\fR.
 .SH OPTIONS
-.LP
 The following options are supported.
 .sp
 .ne 2
@@ -383,8 +380,8 @@ The default search paths for 32-bit \fBELF\fR objects are \fB/lib\fR followed
 by \fB/usr/lib\fR. For 64-bit \fBELF\fR objects, the default search paths are
 \fB/lib/64\fR followed by \fB/usr/lib/64\fR.
 .sp
-The default search paths for \fBAOUT\fR objects are \fB/usr/4lib\fR, followed
-by \fB/usr/lib\fR and finally \fB/usr/local/lib\fR.
+The default search paths for \fBAOUT\fR objects are \fB/usr/lib\fR and
+\fB/usr/local/lib\fR.
 .sp
 Use of this option \fBreplaces\fR the default search path. Therefore, a
 \fB-l\fR option is normally required to specify the original system default in
@@ -502,7 +499,6 @@ the \fBLD_CONFIG\fR environment variable. An alternative configuration file can
 also be specified by recording the configuration file name in the application
 at the time the application is built. See the \fB-c\fR option of \fBld\fR(1).
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRExperimenting With a Temporary Configuration File
 .sp
 .LP
@@ -792,12 +788,10 @@ together with a permanent preload object which becomes appended to the process
 environment definition.
 
 .SH EXIT STATUS
-.LP
 The creation or display of a configuration file results in a \fB0\fR being
 returned. Otherwise, any error condition is accompanied with a diagnostic
 message and a non-zero value being returned.
 .SH NOTES
-.LP
 The ability to tag an alternative application to use an application-specific
 configuration file, is possible if the original application contains one of the
 \fI\&.dynamic\fR tags \fBDT_FLAGS_1\fR or \fBDT_FEATURE_1\fR. Without these
@@ -914,7 +908,6 @@ Audit library that is employed to \fBdldump\fR(3C) 64-bit objects.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.LP
 There are no environment variables that are referenced by \fBcrle\fR. However,
 several environment variables affect the runtime linkers behavior in regard to
 the processing of configuration files that are created by \fBcrle\fR.
@@ -969,7 +962,6 @@ Disable alternative object processing from a configuration file.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes.
 .sp
 
@@ -984,7 +976,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.LP
 \fBfile\fR(1), \fBld\fR(1), \fBld.so.1\fR(1), \fBdldump\fR(3C),
 \fBtempnam\fR(3C), \fBattributes\fR(5)
 .sp

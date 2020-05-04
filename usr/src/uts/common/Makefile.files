@@ -110,6 +110,7 @@ GENUNIX_OBJS +=	\
 		bio.o		\
 		bitmap.o	\
 		blabel.o	\
+		bootbanner.o	\
 		brandsys.o	\
 		bz2blocksort.o	\
 		bz2compress.o	\

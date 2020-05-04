@@ -22,6 +22,7 @@
 
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2020 Oxide Computer Company
 #
 
 #
@@ -147,7 +148,7 @@ use vars  qw($EXRE_exec_data $EXRE_exec_stack $EXRE_nocrlealt);
 use vars  qw($EXRE_nodirect $EXRE_nosymsort $EXRE_forbidden_dep $EXRE_forbidden);
 use vars  qw($EXRE_olddep $EXRE_skip $EXRE_stab $EXRE_textrel $EXRE_undef_ref);
 use vars  qw($EXRE_unref_obj $EXRE_unused_deps $EXRE_unused_obj);
-use vars  qw($EXRE_unused_rpath);
+use vars  qw($EXRE_unused_rpath $EXRE_no_comment);
 
 use strict;
 use Getopt::Std;
@@ -279,11 +280,12 @@ sub ProcFile {
 	# Determine whether this ELF executable or shared object has a
 	# conforming mcs(1) comment section.  If the correct $(POST_PROCESS)
 	# macros are used, only a 3 or 4 line .comment section should exist
-	# containing one or two "@(#)SunOS" identifying comments (one comment
+	# containing one or two "@(#)illumos" identifying comments (one comment
 	# for a non-debug build, and two for a debug build). The results of
 	# the following split should be three or four lines, the last empty
 	# line being discarded by the split.
-	if ($opt{m}) {
+	if ($opt{m} &&
+	    (!defined($EXRE_no_comment) || ($RelPath !~ $EXRE_no_comment))) {
 		my(@Mcs, $Con, $Dev);
 
 		@Mcs = split(/\n/, `mcs -p $FullPath 2>&1`);
@@ -292,11 +294,11 @@ sub ProcFile {
 		foreach my $Line (@Mcs) {
 			$Val++;
 
-			if (($Val == 3) && ($Line !~ /^@\(#\)SunOS/)) {
+			if (($Val == 3) && ($Line !~ /^@\(#\)illumos/)) {
 				$Con = 1;
 				last;
 			}
-			if (($Val == 4) && ($Line =~ /^@\(#\)SunOS/)) {
+			if (($Val == 4) && ($Line =~ /^@\(#\)illumos/)) {
 				$Dev = 1;
 				next;
 			}

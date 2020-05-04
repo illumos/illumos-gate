@@ -25,6 +25,7 @@
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2020 Joyent, Inc.
+# Copyright 2020 Oxide Computer Company
 #
 # Uses supplied "env" file, based on /opt/onbld/etc/env, to set shell variables
 # before spawning a shell for doing a release-style builds interactively
@@ -247,14 +248,20 @@ if [ "${flags.d_set}" != "true" ] && "${flags.DF_build}"; then
 fi
 
 POUND_SIGN="#"
+basews=$(basename -- "$CODEMGR_WS")
 # have we set RELEASE_DATE in our env file?
 if [ -z "$RELEASE_DATE" ]; then
 	RELEASE_DATE=$(LC_ALL=C date +"%B %Y")
 fi
-BUILD_DATE=$(LC_ALL=C date +%Y-%b-%d)
-BASEWSDIR=$(basename -- "${CODEMGR_WS}")
-DEV_CM="\"@(#)SunOS Internal Development: $LOGNAME $BUILD_DATE [$BASEWSDIR]\""
-export DEV_CM RELEASE_DATE POUND_SIGN
+now=$(LC_ALL=C date +%Y-%b-%d)
+DEV_CM_TAIL="development build: $LOGNAME $now [$basews]"
+
+#
+# We export POUND_SIGN, RELEASE_DATE and DEV_CM_TAIL to speed up the build
+# process by avoiding repeated shell invocations to evaluate Makefile.master
+# definitions.
+#
+export POUND_SIGN RELEASE_DATE DEV_CM_TAIL
 
 print 'Build type   is  \c'
 if ${flags.d} ; then
