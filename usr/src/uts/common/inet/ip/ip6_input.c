@@ -23,7 +23,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved
  *
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -1903,13 +1903,12 @@ ip_input_cksum_v6(iaflags_t iraflags, mblk_t *mp, ip6_t *ip6h,
 		return (ip_input_sw_cksum_v6(mp, ip6h, ira));
 	}
 
+	hck_flags = DB_CKSUMFLAGS(mp);
+
 	/*
 	 * We apply this for all ULP protocols. Does the HW know to
 	 * not set the flags for SCTP and other protocols.
 	 */
-
-	hck_flags = DB_CKSUMFLAGS(mp);
-
 	if (hck_flags & HCK_FULLCKSUM_OK) {
 		/*
 		 * Hardware has already verified the checksum.

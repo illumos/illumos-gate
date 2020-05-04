@@ -839,7 +839,7 @@ frnop_func(void *arg)
  */
 static mblk_t *
 gesballoc(unsigned char *base, size_t size, uint32_t db_rtfu, frtn_t *frp,
-	void (*lastfree)(mblk_t *, dblk_t *), int kmflags)
+    void (*lastfree)(mblk_t *, dblk_t *), int kmflags)
 {
 	dblk_t *dbp;
 	mblk_t *mp;
@@ -1449,6 +1449,16 @@ copyb(mblk_t *bp)
 	nbp->b_flag = bp->b_flag;
 	nbp->b_band = bp->b_band;
 	ndp = nbp->b_datap;
+
+	/*
+	 * Copy the various checksum information that came in
+	 * originally.
+	 */
+	ndp->db_cksumstart = dp->db_cksumstart;
+	ndp->db_cksumend = dp->db_cksumend;
+	ndp->db_cksumstuff = dp->db_cksumstuff;
+	bcopy(dp->db_struioun.data, ndp->db_struioun.data,
+	    sizeof (dp->db_struioun.data));
 
 	/*
 	 * Well, here is a potential issue.  If we are trying to

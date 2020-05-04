@@ -1,0 +1,44 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2019 Joyent, Inc.
+#
+
+[DEFAULT]
+outputdir = /var/tmp/test_results
+quiet = False
+timeout = 300
+
+[/opt/net-tests/tests/forwarding]
+tests = [
+      'ip_fwd_001',
+      'ip_fwd_002',
+      'ip_fwd_003',
+      'ip_fwd_004',
+      'ip_fwd_005',
+      'ip_fwd_006',
+      'ip_fwd_007',
+      'ip_fwd_008',
+      'ip_fwd_009',
+      'ip_fwd_010',
+      'ip_fwd_011',
+      'ip_fwd_012',
+      'ip_fwd_013',
+      'ip_fwd_014',
+      'ip_fwd_015',
+      'ip_fwd_016',
+      'ip_fwd_017',
+      'ip_fwd_018',
+      'ip_fwd_019',
+      'ip_fwd_020'
+      ]
+user = root

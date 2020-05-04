@@ -115,6 +115,7 @@
 #include <sys/stream.h>
 #include <sys/strsun.h>
 #include <sys/strsubr.h>
+#include <sys/pattr.h>
 #include <sys/dlpi.h>
 #include <sys/modhash.h>
 #include <sys/mac_impl.h>
@@ -1357,7 +1358,7 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 
 	mcip->mci_mip = mip;
 	mcip->mci_upper_mip = NULL;
-	mcip->mci_rx_fn = mac_pkt_drop;
+	mcip->mci_rx_fn = mac_rx_def;
 	mcip->mci_rx_arg = NULL;
 	mcip->mci_rx_p_fn = NULL;
 	mcip->mci_rx_p_arg = NULL;
@@ -1629,7 +1630,7 @@ mac_rx_set(mac_client_handle_t mch, mac_rx_t rx_fn, void *arg)
 void
 mac_rx_clear(mac_client_handle_t mch)
 {
-	mac_rx_set(mch, mac_pkt_drop, NULL);
+	mac_rx_set(mch, mac_rx_def, NULL);
 }
 
 void
@@ -1641,7 +1642,7 @@ mac_rx_barrier(mac_client_handle_t mch)
 	i_mac_perim_enter(mip);
 
 	/* If a RX callback is set, quiesce and restart that datapath */
-	if (mcip->mci_rx_fn != mac_pkt_drop) {
+	if (mcip->mci_rx_fn != mac_rx_def) {
 		mac_rx_client_quiesce(mch);
 		mac_rx_client_restart(mch);
 	}
@@ -2998,7 +2999,7 @@ mac_client_datapath_teardown(mac_client_handle_t mch, mac_unicast_impl_t *muip,
 	mac_misc_stat_delete(flent);
 
 	/* Initialize the receiver function to a safe routine */
-	flent->fe_cb_fn = (flow_fn_t)mac_pkt_drop;
+	flent->fe_cb_fn = (flow_fn_t)mac_rx_def;
 	flent->fe_cb_arg1 = NULL;
 	flent->fe_cb_arg2 = NULL;
 
@@ -3578,7 +3579,9 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 	srs_tx = &srs->srs_tx;
 	if (srs_tx->st_mode == SRS_TX_DEFAULT &&
 	    (srs->srs_state & SRS_ENQUEUED) == 0 &&
-	    mip->mi_nactiveclients == 1 && mp_chain->b_next == NULL) {
+	    mip->mi_nactiveclients == 1 &&
+	    mp_chain->b_next == NULL &&
+	    (DB_CKSUMFLAGS(mp_chain) & HW_LSO) == 0) {
 		uint64_t	obytes;
 
 		/*
@@ -3613,7 +3616,9 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 		obytes = (mp_chain->b_cont == NULL ? MBLKL(mp_chain) :
 		    msgdsize(mp_chain));
 
-		MAC_TX(mip, srs_tx->st_arg2, mp_chain, mcip);
+		mp_chain = mac_provider_tx(mip, srs_tx->st_arg2, mp_chain,
+		    mcip);
+
 		if (mp_chain == NULL) {
 			cookie = 0;
 			SRS_TX_STAT_UPDATE(srs, opackets, 1);
@@ -3625,7 +3630,74 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 			mutex_exit(&srs->srs_lock);
 		}
 	} else {
-		cookie = srs_tx->st_func(srs, mp_chain, hint, flag, ret_mp);
+		mblk_t *mp = mp_chain;
+		mblk_t *new_head = NULL;
+		mblk_t *new_tail = NULL;
+
+		/*
+		 * There are occasions where the packets arriving here
+		 * may request hardware offloads that are not
+		 * available from the underlying MAC provider. This
+		 * currently only happens when a packet is sent across
+		 * the MAC-loopback path of one MAC and then forwarded
+		 * (via IP) to another MAC that lacks one or more of
+		 * the hardware offloads provided by the first one.
+		 * However, in the future, we may choose to pretend
+		 * all MAC providers support all offloads, performing
+		 * emulation on Tx as needed.
+		 *
+		 * We iterate each mblk in-turn, emulating hardware
+		 * offloads as required. From this process, we create
+		 * a new chain. The new chain may be the same as the
+		 * original chain (no hardware emulation needed), a
+		 * collection of new mblks (hardware emulation
+		 * needed), or a mix. At this point, the chain is safe
+		 * for consumption by the underlying MAC provider and
+		 * is passed down to the SRS.
+		 */
+		while (mp != NULL) {
+			mblk_t *next = mp->b_next;
+			mblk_t *tail = NULL;
+			const uint16_t needed =
+			    (DB_CKSUMFLAGS(mp) ^ mip->mi_tx_cksum_flags) &
+			    DB_CKSUMFLAGS(mp);
+
+			mp->b_next = NULL;
+
+			if ((needed & (HCK_TX_FLAGS | HW_LSO_FLAGS)) != 0) {
+				mac_emul_t emul = 0;
+
+				if (needed & HCK_IPV4_HDRCKSUM)
+					emul |= MAC_IPCKSUM_EMUL;
+				if (needed & (HCK_PARTIALCKSUM | HCK_FULLCKSUM))
+					emul |= MAC_HWCKSUM_EMUL;
+				if (needed & HW_LSO)
+					emul = MAC_LSO_EMUL;
+
+				mac_hw_emul(&mp, &tail, NULL, emul);
+
+				if (mp == NULL) {
+					mp = next;
+					continue;
+				}
+			}
+
+			if (new_head == NULL) {
+				new_head = mp;
+			} else {
+				new_tail->b_next = mp;
+			}
+
+			new_tail = (tail == NULL) ? mp : tail;
+			mp = next;
+		}
+
+		if (new_head == NULL) {
+			cookie = 0;
+			goto done;
+		}
+
+		cookie = srs_tx->st_func(srs, new_head, hint, flag, ret_mp);
 	}
 
 done:
@@ -4026,14 +4098,15 @@ mac_client_get_effective_resources(mac_client_handle_t mch,
  * The unicast packets of MAC_CLIENT_PROMISC_FILTER callbacks are dispatched
  * after classification by mac_rx_deliver().
  */
-
 static void
 mac_promisc_dispatch_one(mac_promisc_impl_t *mpip, mblk_t *mp,
-    boolean_t loopback)
+    boolean_t loopback, boolean_t local)
 {
-	mblk_t *mp_copy, *mp_next;
+	mblk_t *mp_next;
 
 	if (!mpip->mpi_no_copy || mpip->mpi_strip_vlan_tag) {
+		mblk_t *mp_copy;
+
 		mp_copy = copymsg(mp);
 		if (mp_copy == NULL)
 			return;
@@ -4043,16 +4116,24 @@ mac_promisc_dispatch_one(mac_promisc_impl_t *mpip, mblk_t *mp,
 			if (mp_copy == NULL)
 				return;
 		}
-		mp_next = NULL;
-	} else {
-		mp_copy = mp;
-		mp_next = mp->b_next;
-	}
-	mp_copy->b_next = NULL;
 
-	mpip->mpi_fn(mpip->mpi_arg, NULL, mp_copy, loopback);
-	if (mp_copy == mp)
-		mp->b_next = mp_next;
+		/*
+		 * There is code upstack that can't deal with message
+		 * chains.
+		 */
+		for (mblk_t *tmp = mp_copy; tmp != NULL; tmp = mp_next) {
+			mp_next = tmp->b_next;
+			tmp->b_next = NULL;
+			mpip->mpi_fn(mpip->mpi_arg, NULL, tmp, loopback);
+		}
+
+		return;
+	}
+
+	mp_next = mp->b_next;
+	mp->b_next = NULL;
+	mpip->mpi_fn(mpip->mpi_arg, NULL, mp, loopback);
+	mp->b_next = mp_next;
 }
 
 /*
@@ -4094,7 +4175,7 @@ mac_is_mcast(mac_impl_t *mip, mblk_t *mp)
  */
 void
 mac_promisc_dispatch(mac_impl_t *mip, mblk_t *mp_chain,
-    mac_client_impl_t *sender)
+    mac_client_impl_t *sender, boolean_t local)
 {
 	mac_promisc_impl_t *mpip;
 	mac_cb_t *mcb;
@@ -4134,8 +4215,10 @@ mac_promisc_dispatch(mac_impl_t *mip, mblk_t *mp_chain,
 
 			if (is_sender ||
 			    mpip->mpi_type == MAC_CLIENT_PROMISC_ALL ||
-			    is_mcast)
-				mac_promisc_dispatch_one(mpip, mp, is_sender);
+			    is_mcast) {
+				mac_promisc_dispatch_one(mpip, mp, is_sender,
+				    local);
+			}
 		}
 	}
 	MAC_PROMISC_WALKER_DCR(mip);
@@ -4164,7 +4247,8 @@ mac_promisc_client_dispatch(mac_client_impl_t *mcip, mblk_t *mp_chain)
 			mpip = (mac_promisc_impl_t *)mcb->mcb_objp;
 			if (mpip->mpi_type == MAC_CLIENT_PROMISC_FILTERED &&
 			    !is_mcast) {
-				mac_promisc_dispatch_one(mpip, mp, B_FALSE);
+				mac_promisc_dispatch_one(mpip, mp, B_FALSE,
+				    B_FALSE);
 			}
 		}
 	}
@@ -4278,8 +4362,9 @@ mac_capab_get(mac_handle_t mh, mac_capab_t cap, void *cap_data)
 	mac_impl_t *mip = (mac_impl_t *)mh;
 
 	/*
-	 * if mi_nactiveclients > 1, only MAC_CAPAB_LEGACY, MAC_CAPAB_HCKSUM,
-	 * MAC_CAPAB_NO_NATIVEVLAN and MAC_CAPAB_NO_ZCOPY can be advertised.
+	 * Some capabilities are restricted when there are more than one active
+	 * clients on the MAC resource.  The ones noted below are safe,
+	 * independent of that count.
 	 */
 	if (mip->mi_nactiveclients > 1) {
 		switch (cap) {
@@ -4287,6 +4372,7 @@ mac_capab_get(mac_handle_t mh, mac_capab_t cap, void *cap_data)
 			return (B_TRUE);
 		case MAC_CAPAB_LEGACY:
 		case MAC_CAPAB_HCKSUM:
+		case MAC_CAPAB_LSO:
 		case MAC_CAPAB_NO_NATIVEVLAN:
 			break;
 		default:

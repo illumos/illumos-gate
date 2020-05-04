@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_INET_IP6_H
@@ -255,7 +256,7 @@ extern in6_addr_t ip_get_dst_v6(ip6_t *, const mblk_t *, boolean_t *);
 extern ip6_rthdr_t	*ip_find_rthdr_v6(ip6_t *, uint8_t *);
 extern boolean_t	ip_hdr_length_nexthdr_v6(mblk_t *, ip6_t *,
     uint16_t *, uint8_t **);
-extern int	ip_hdr_length_v6(mblk_t *, ip6_t *);
+extern uint16_t	ip_hdr_length_v6(mblk_t *, ip6_t *);
 extern uint32_t	ip_massage_options_v6(ip6_t *, ip6_rthdr_t *, netstack_t *);
 extern void	ip_forward_xmit_v6(nce_t *, mblk_t *, ip6_t *, ip_recv_attr_t *,
     uint32_t, uint32_t);

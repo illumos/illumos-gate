@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -51,6 +53,7 @@
 #include <sys/atomic.h>
 #include <sys/mac_wifi.h>
 #include <sys/mac_impl.h>
+#include <sys/pattr.h>
 #include <inet/wifi_ioctl.h>
 #include <sys/thread.h>
 #include <sys/synch.h>
@@ -107,14 +110,15 @@ static int simnet_m_stat(void *, uint_t, uint64_t *);
 static void simnet_m_ioctl(void *, queue_t *, mblk_t *);
 static mblk_t *simnet_m_tx(void *, mblk_t *);
 static int simnet_m_setprop(void *, const char *, mac_prop_id_t,
-    uint_t, const void *);
+    const uint_t, const void *);
 static int simnet_m_getprop(void *, const char *, mac_prop_id_t,
     uint_t, void *);
 static void simnet_m_propinfo(void *, const char *, mac_prop_id_t,
     mac_prop_info_handle_t);
+static boolean_t simnet_m_getcapab(void *, mac_capab_t, void *);
 
 static mac_callbacks_t simnet_m_callbacks = {
-	(MC_IOCTL | MC_SETPROP | MC_GETPROP | MC_PROPINFO),
+	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP | MC_PROPINFO),
 	simnet_m_stat,
 	simnet_m_start,
 	simnet_m_stop,
@@ -124,7 +128,7 @@ static mac_callbacks_t simnet_m_callbacks = {
 	simnet_m_tx,
 	NULL,
 	simnet_m_ioctl,
-	NULL,
+	simnet_m_getcapab,
 	NULL,
 	NULL,
 	simnet_m_setprop,
@@ -671,6 +675,12 @@ simnet_thread_unref(simnet_dev_t *sdev)
 	mutex_exit(&sdev->sd_instlock);
 }
 
+/*
+ * TODO: Add properties to set Rx checksum flag behavior.
+ *
+ * o HCK_PARTIALCKSUM.
+ * o HCK_FULLCKSUM_OK.
+ */
 static void
 simnet_rx(void *arg)
 {
@@ -683,7 +693,7 @@ simnet_rx(void *arg)
 
 	/* Check for valid packet header */
 	if (mac_header_info(sdev->sd_mh, mp, &hdr_info) != 0) {
-		freemsg(mp);
+		mac_drop_pkt(mp, "invalid L2 header");
 		sdev->sd_stats.recv_errors++;
 		goto rx_done;
 	}
@@ -712,6 +722,16 @@ simnet_rx(void *arg)
 		}
 	}
 
+	/*
+	 * We don't actually calculate and verify the IP header
+	 * checksum because the nature of simnet makes it redundant to
+	 * do so. The point is to test the presence of the flags. The
+	 * Tx side will have already populated the checksum field.
+	 */
+	if ((sdev->sd_rx_cksum & HCKSUM_IPHDRCKSUM) != 0) {
+		mac_hcksum_set(mp, 0, 0, 0, 0, HCK_IPV4_HDRCKSUM_OK);
+	}
+
 	sdev->sd_stats.recv_count++;
 	sdev->sd_stats.rbytes += msgdsize(mp);
 	mac_rx(sdev->sd_mh, NULL, mp);
@@ -719,19 +739,22 @@ rx_done:
 	simnet_thread_unref(sdev);
 }
 
+#define	SIMNET_ULP_CKSUM	(HCKSUM_INET_FULL_V4 | HCKSUM_INET_PARTIAL)
+
 static mblk_t *
 simnet_m_tx(void *arg, mblk_t *mp_chain)
 {
 	simnet_dev_t *sdev = arg;
 	simnet_dev_t *sdev_rx;
 	mblk_t *mpnext = mp_chain;
-	mblk_t *mp;
+	mblk_t *mp, *nmp;
+	mac_emul_t emul = 0;
 
 	rw_enter(&simnet_dev_lock, RW_READER);
 	if ((sdev_rx = sdev->sd_peer_dev) == NULL) {
 		/* Discard packets when no peer exists */
 		rw_exit(&simnet_dev_lock);
-		freemsgchain(mp_chain);
+		mac_drop_chain(mp_chain, "no peer");
 		return (NULL);
 	}
 
@@ -748,20 +771,20 @@ simnet_m_tx(void *arg, mblk_t *mp_chain)
 	 */
 	if (!simnet_thread_ref(sdev_rx)) {
 		rw_exit(&simnet_dev_lock);
-		freemsgchain(mp_chain);
+		mac_drop_chain(mp_chain, "simnet peer dev not ready");
 		return (NULL);
 	}
 	rw_exit(&simnet_dev_lock);
 
 	if (!simnet_thread_ref(sdev)) {
 		simnet_thread_unref(sdev_rx);
-		freemsgchain(mp_chain);
+		mac_drop_chain(mp_chain, "simnet dev not ready");
 		return (NULL);
 	}
 
 	while ((mp = mpnext) != NULL) {
-		int len;
-		int size;
+		size_t len;
+		size_t size;
 		mblk_t *mp_new;
 		mblk_t *mp_tmp;
 
@@ -775,7 +798,7 @@ simnet_m_tx(void *arg, mblk_t *mp_chain)
 			mp_new = allocb(size, BPRI_HI);
 			if (mp_new == NULL) {
 				sdev->sd_stats.xmit_errors++;
-				freemsg(mp);
+				mac_drop_pkt(mp, "allocb failed");
 				continue;
 			}
 			bzero(mp_new->b_wptr, size);
@@ -789,24 +812,43 @@ simnet_m_tx(void *arg, mblk_t *mp_chain)
 		}
 
 		/* Pullup packet into a single mblk */
-		if (!pullupmsg(mp, -1)) {
+		if ((nmp = msgpullup(mp, -1)) == NULL) {
 			sdev->sd_stats.xmit_errors++;
+			mac_drop_pkt(mp, "msgpullup failed");
+			continue;
+		} else {
+			mac_hcksum_clone(mp, nmp);
 			freemsg(mp);
-			continue;
-		}
-
-		/* Fix mblk checksum as the pkt dest is local */
-		if ((mp = mac_fix_cksum(mp)) == NULL) {
-			sdev->sd_stats.xmit_errors++;
-			continue;
+			mp = nmp;
 		}
 
 		/* Hold reference for taskq receive processing per-pkt */
 		if (!simnet_thread_ref(sdev_rx)) {
-			freemsg(mp);
-			freemsgchain(mpnext);
+			mac_drop_pkt(mp, "failed to get thread ref");
+			mac_drop_chain(mpnext, "failed to get thread ref");
 			break;
 		}
+
+		if ((sdev->sd_tx_cksum & HCKSUM_IPHDRCKSUM) != 0)
+			emul |= MAC_IPCKSUM_EMUL;
+		if ((sdev->sd_tx_cksum & SIMNET_ULP_CKSUM) != 0)
+			emul |= MAC_HWCKSUM_EMUL;
+		if (sdev->sd_lso)
+			emul |= MAC_LSO_EMUL;
+
+		if (emul != 0)
+			mac_hw_emul(&mp, NULL, NULL, emul);
+
+		if (mp == NULL) {
+			sdev->sd_stats.xmit_errors++;
+			continue;
+		}
+
+		/*
+		 * Remember, we are emulating a real NIC here; the
+		 * checksum flags can't make the trip across the link.
+		 */
+		DB_CKSUMFLAGS(mp) = 0;
 
 		/* Use taskq for pkt receive to avoid kernel stack explosion */
 		mp->b_next = (mblk_t *)sdev_rx;
@@ -884,6 +926,43 @@ simnet_m_ioctl(void *arg, queue_t *q, mblk_t *mp)
 	mp1->b_wptr = mp1->b_rptr;
 	rc = simnet_wifi_ioctl(sdev, mp1);
 	miocack(q, mp, msgdsize(mp1), rc);
+}
+
+static boolean_t
+simnet_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
+{
+	simnet_dev_t *sdev = arg;
+	const uint_t tcp_cksums = HCKSUM_INET_FULL_V4 | HCKSUM_INET_PARTIAL;
+
+	switch (cap) {
+	case MAC_CAPAB_HCKSUM: {
+		uint32_t *tx_cksum_flags = cap_data;
+		*tx_cksum_flags = sdev->sd_tx_cksum;
+		break;
+	}
+	case MAC_CAPAB_LSO: {
+		mac_capab_lso_t *cap_lso = cap_data;
+
+		if (sdev->sd_lso &&
+		    (sdev->sd_tx_cksum & HCKSUM_IPHDRCKSUM) != 0 &&
+		    (sdev->sd_tx_cksum & tcp_cksums) != 0) {
+			/*
+			 * The LSO configuration is hardwried for now,
+			 * but there's no reason we couldn't also make
+			 * this configurable in the future.
+			 */
+			cap_lso->lso_flags = LSO_TX_BASIC_TCP_IPV4;
+			cap_lso->lso_basic_tcp_ipv4.lso_max = SD_LSO_MAXLEN;
+			break;
+		} else {
+			return (B_FALSE);
+		}
+	}
+	default:
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
 }
 
 static int
@@ -1142,20 +1221,20 @@ set_wl_esslist_priv_prop(simnet_wifidev_t *wdev, uint_t pr_valsize,
 }
 
 static int
-simnet_set_priv_prop(simnet_dev_t *sdev, const char *pr_name,
-    uint_t pr_valsize, const void *pr_val)
+simnet_set_priv_prop_wifi(simnet_dev_t *sdev, const char *name,
+    const uint_t len, const void *val)
 {
 	simnet_wifidev_t *wdev = sdev->sd_wifidev;
 	long result;
 
-	if (strcmp(pr_name, "_wl_esslist") == 0) {
-		if (pr_val == NULL)
+	if (strcmp(name, "_wl_esslist") == 0) {
+		if (val == NULL)
 			return (EINVAL);
-		return (set_wl_esslist_priv_prop(wdev, pr_valsize, pr_val));
-	} else if (strcmp(pr_name, "_wl_connected") == 0) {
-		if (pr_val == NULL)
+		return (set_wl_esslist_priv_prop(wdev, len, val));
+	} else if (strcmp(name, "_wl_connected") == 0) {
+		if (val == NULL)
 			return (EINVAL);
-		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
+		(void) ddi_strtol(val, (char **)NULL, 0, &result);
 		wdev->swd_linkstatus = ((result == 1) ?
 		    WL_CONNECTED:WL_NOTCONNECTED);
 		return (0);
@@ -1164,37 +1243,89 @@ simnet_set_priv_prop(simnet_dev_t *sdev, const char *pr_name,
 	return (EINVAL);
 }
 
+/* ARGSUSED */
 static int
-simnet_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
-    uint_t wldp_length, const void *wldp_buf)
+simnet_set_priv_prop_ether(simnet_dev_t *sdev, const char *name,
+    const uint_t len, const void *val)
 {
-	simnet_dev_t *sdev = arg;
-	simnet_wifidev_t *wdev = sdev->sd_wifidev;
-	int err = 0;
-	uint32_t mtu;
-
-	switch (wldp_pr_num) {
-	case MAC_PROP_MTU:
-		(void) memcpy(&mtu, wldp_buf, sizeof (mtu));
-		if (mtu > ETHERMIN && mtu < SIMNET_MAX_MTU)
-			return (mac_maxsdu_update(sdev->sd_mh, mtu));
-		else
+	if (strcmp(name, SD_PROP_RX_IP_CKSUM) == 0) {
+		if (val == NULL)
 			return (EINVAL);
-	default:
-		break;
+
+		if (strcmp(val, "off") == 0) {
+			sdev->sd_rx_cksum &= ~HCKSUM_IPHDRCKSUM;
+		} else if (strcmp(val, "on") == 0) {
+			sdev->sd_rx_cksum |= HCKSUM_IPHDRCKSUM;
+		} else {
+			return (EINVAL);
+		}
+
+		return (0);
+	} else if (strcmp(name, SD_PROP_TX_ULP_CKSUM) == 0) {
+		if (val == NULL)
+			return (EINVAL);
+
+		/*
+		 * Remember, full and partial checksum are mutually
+		 * exclusive.
+		 */
+		if (strcmp(val, "none") == 0) {
+			sdev->sd_tx_cksum &= ~HCKSUM_INET_FULL_V4;
+		} else if (strcmp(val, "fullv4") == 0) {
+			sdev->sd_tx_cksum &= ~HCKSUM_INET_PARTIAL;
+			sdev->sd_tx_cksum |= HCKSUM_INET_FULL_V4;
+		} else if (strcmp(val, "partial") == 0) {
+			sdev->sd_tx_cksum &= HCKSUM_INET_FULL_V4;
+			sdev->sd_tx_cksum |= HCKSUM_INET_PARTIAL;
+		} else {
+			return (EINVAL);
+		}
+
+		return (0);
+	} else if (strcmp(name, SD_PROP_TX_IP_CKSUM) == 0) {
+		if (val == NULL)
+			return (EINVAL);
+
+		if (strcmp(val, "off") == 0) {
+			sdev->sd_tx_cksum &= ~HCKSUM_IPHDRCKSUM;
+		} else if (strcmp(val, "on") == 0) {
+			sdev->sd_tx_cksum |= HCKSUM_IPHDRCKSUM;
+		} else {
+			return (EINVAL);
+		}
+
+		return (0);
+	} else if (strcmp(name, SD_PROP_LSO) == 0) {
+		if (val == NULL)
+			return (EINVAL);
+
+		if (strcmp(val, "off") == 0) {
+			sdev->sd_lso = B_FALSE;
+		} else if (strcmp(val, "on") == 0) {
+			sdev->sd_lso = B_TRUE;
+		} else {
+			return (EINVAL);
+		}
+
+		return (0);
 	}
 
-	if (sdev->sd_type == DL_ETHER)
-		return (ENOTSUP);
+	return (ENOTSUP);
+}
 
-	/* mac_prop_id */
-	switch (wldp_pr_num) {
+static int
+simnet_setprop_wifi(simnet_dev_t *sdev, const char *name,
+    const mac_prop_id_t num, const uint_t len, const void *val)
+{
+	int err = 0;
+	simnet_wifidev_t *wdev = sdev->sd_wifidev;
+
+	switch (num) {
 	case MAC_PROP_WL_ESSID: {
 		int i;
 		wl_ess_conf_t *wls;
 
-		(void) memcpy(&wdev->swd_essid, wldp_buf,
-		    sizeof (wl_essid_t));
+		(void) memcpy(&wdev->swd_essid, val, sizeof (wl_essid_t));
 		wdev->swd_linkstatus = WL_CONNECTED;
 
 		/* Lookup the signal strength of the connected ESSID */
@@ -1209,8 +1340,7 @@ simnet_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 		break;
 	}
 	case MAC_PROP_WL_BSSID: {
-		(void) memcpy(&wdev->swd_bssid, wldp_buf,
-		    sizeof (wl_bssid_t));
+		(void) memcpy(&wdev->swd_bssid, val, sizeof (wl_bssid_t));
 		break;
 	}
 	case MAC_PROP_WL_PHY_CONFIG:
@@ -1221,77 +1351,170 @@ simnet_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 	case MAC_PROP_WL_DESIRED_RATES:
 		break;
 	case MAC_PROP_PRIVATE:
-		err = simnet_set_priv_prop(sdev, pr_name,
-		    wldp_length, wldp_buf);
+		err = simnet_set_priv_prop_wifi(sdev, name, len, val);
 		break;
+	default:
+		err = EINVAL;
+		break;
+	}
+
+	return (err);
+}
+
+static int
+simnet_setprop_ether(simnet_dev_t *sdev, const char *name,
+    const mac_prop_id_t num, const uint_t len, const void *val)
+{
+	int err = 0;
+
+	switch (num) {
+	case MAC_PROP_PRIVATE:
+		err = simnet_set_priv_prop_ether(sdev, name, len, val);
+		break;
+	default:
+		err = EINVAL;
+		break;
+	}
+
+	return (err);
+}
+
+static int
+simnet_m_setprop(void *arg, const char *name, mac_prop_id_t num,
+    const uint_t len, const void *val)
+{
+	simnet_dev_t *sdev = arg;
+	int err = 0;
+	uint32_t mtu;
+
+	switch (num) {
+	case MAC_PROP_MTU:
+		(void) memcpy(&mtu, val, sizeof (mtu));
+		if (mtu > ETHERMIN && mtu < SIMNET_MAX_MTU)
+			return (mac_maxsdu_update(sdev->sd_mh, mtu));
+		else
+			return (EINVAL);
 	default:
 		break;
 	}
 
-	return (err);
-}
-
-static int
-simnet_get_priv_prop(simnet_dev_t *sdev, const char *pr_name,
-    uint_t pr_valsize, void *pr_val)
-{
-	simnet_wifidev_t *wdev = sdev->sd_wifidev;
-	int err = 0;
-	int value;
-
-	if (strcmp(pr_name, "_wl_esslist") == 0) {
-		/* Returns num of _wl_ess_conf_t that have been set */
-		value = wdev->swd_esslist_num;
-	} else if (strcmp(pr_name, "_wl_connected") == 0) {
-		value = ((wdev->swd_linkstatus == WL_CONNECTED) ? 1:0);
-	} else {
-		err = ENOTSUP;
+	switch (sdev->sd_type) {
+	case DL_ETHER:
+		err = simnet_setprop_ether(sdev, name, num, len, val);
+		break;
+	case DL_WIFI:
+		err = simnet_setprop_wifi(sdev, name, num, len, val);
+		break;
+	default:
+		err = EINVAL;
+		break;
 	}
 
-	if (err == 0)
-		(void) snprintf(pr_val, pr_valsize, "%d", value);
+	/*
+	 * We may have modified the configuration of hardware
+	 * offloads. Make sure to renegotiate capabilities with the
+	 * upstream clients.
+	 */
+	mac_capab_update(sdev->sd_mh);
 	return (err);
 }
 
 static int
-simnet_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
-    uint_t wldp_length, void *wldp_buf)
+simnet_get_priv_prop_wifi(const simnet_dev_t *sdev, const char *name,
+    const uint_t len, void *val)
 {
-	simnet_dev_t *sdev = arg;
 	simnet_wifidev_t *wdev = sdev->sd_wifidev;
-	int err = 0;
-	int i;
+	int ret, value;
 
-	if (sdev->sd_type == DL_ETHER)
+	if (strcmp(name, "_wl_esslist") == 0) {
+		/* Returns num of _wl_ess_conf_t that have been set */
+		value = wdev->swd_esslist_num;
+	} else if (strcmp(name, "_wl_connected") == 0) {
+		value = ((wdev->swd_linkstatus == WL_CONNECTED) ? 1:0);
+	} else {
 		return (ENOTSUP);
+	}
 
-	/* mac_prop_id */
-	switch (wldp_pr_num) {
+	ret = snprintf(val, len, "%d", value);
+
+	if (ret < 0 || ret >= len)
+		return (EOVERFLOW);
+
+	return (0);
+}
+
+static int
+simnet_get_priv_prop_ether(const simnet_dev_t *sdev, const char *name,
+    const uint_t len, void *val)
+{
+	int ret;
+	char *value;
+
+	if (strcmp(name, SD_PROP_RX_IP_CKSUM) == 0) {
+		if ((sdev->sd_rx_cksum & HCKSUM_IPHDRCKSUM) != 0) {
+			value = "on";
+		} else {
+			value = "off";
+		}
+	} else if (strcmp(name, SD_PROP_TX_ULP_CKSUM) == 0) {
+		if ((sdev->sd_tx_cksum & HCKSUM_INET_FULL_V4) != 0) {
+			value = "fullv4";
+		} else if ((sdev->sd_tx_cksum & HCKSUM_INET_PARTIAL) != 0) {
+			value = "partial";
+		} else {
+			value = "none";
+		}
+	} else if (strcmp(name, SD_PROP_TX_IP_CKSUM) == 0) {
+		if ((sdev->sd_tx_cksum & HCKSUM_IPHDRCKSUM) != 0) {
+			value = "on";
+		} else {
+			value = "off";
+		}
+	} else if (strcmp(name, SD_PROP_LSO) == 0) {
+		value = sdev->sd_lso ? "on" : "off";
+	} else {
+		return (ENOTSUP);
+	}
+
+	ret = snprintf(val, len, "%s", value);
+
+	if (ret < 0 || ret >= len) {
+		return (EOVERFLOW);
+	}
+
+	return (0);
+}
+
+static int
+simnet_getprop_wifi(const simnet_dev_t *sdev, const char *name,
+    const mac_prop_id_t num, const uint_t len, void *val)
+{
+	const simnet_wifidev_t *wdev = sdev->sd_wifidev;
+	int err = 0;
+
+	switch (num) {
 	case MAC_PROP_WL_ESSID:
-		(void) memcpy(wldp_buf, &wdev->swd_essid,
-		    sizeof (wl_essid_t));
+		(void) memcpy(val, &wdev->swd_essid, sizeof (wl_essid_t));
 		break;
 	case MAC_PROP_WL_BSSID:
-		(void) memcpy(wldp_buf, &wdev->swd_bssid,
-		    sizeof (wl_bssid_t));
+		(void) memcpy(val, &wdev->swd_bssid, sizeof (wl_bssid_t));
 		break;
 	case MAC_PROP_WL_PHY_CONFIG:
 	case MAC_PROP_WL_AUTH_MODE:
 	case MAC_PROP_WL_ENCRYPTION:
 		break;
 	case MAC_PROP_WL_LINKSTATUS:
-		(void) memcpy(wldp_buf, &wdev->swd_linkstatus,
+		(void) memcpy(val, &wdev->swd_linkstatus,
 		    sizeof (wdev->swd_linkstatus));
 		break;
 	case MAC_PROP_WL_ESS_LIST: {
 		wl_ess_conf_t *w_ess_conf;
 
-		((wl_ess_list_t *)wldp_buf)->wl_ess_list_num =
-		    wdev->swd_esslist_num;
+		((wl_ess_list_t *)val)->wl_ess_list_num = wdev->swd_esslist_num;
 		/* LINTED E_BAD_PTR_CAST_ALIGN */
-		w_ess_conf = (wl_ess_conf_t *)((char *)wldp_buf +
+		w_ess_conf = (wl_ess_conf_t *)((char *)val +
 		    offsetof(wl_ess_list_t, wl_ess_list_ess));
-		for (i = 0; i < wdev->swd_esslist_num; i++) {
+		for (uint_t i = 0; i < wdev->swd_esslist_num; i++) {
 			(void) memcpy(w_ess_conf, wdev->swd_esslist[i],
 			    sizeof (wl_ess_conf_t));
 			w_ess_conf++;
@@ -1299,18 +1522,17 @@ simnet_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 		break;
 	}
 	case MAC_PROP_WL_RSSI:
-		*(wl_rssi_t *)wldp_buf = wdev->swd_rssi;
+		*(wl_rssi_t *)val = wdev->swd_rssi;
 		break;
 	case MAC_PROP_WL_RADIO:
-		*(wl_radio_t *)wldp_buf = B_TRUE;
+		*(wl_radio_t *)val = B_TRUE;
 		break;
 	case MAC_PROP_WL_POWER_MODE:
 		break;
 	case MAC_PROP_WL_DESIRED_RATES:
 		break;
 	case MAC_PROP_PRIVATE:
-		err = simnet_get_priv_prop(sdev, pr_name, wldp_length,
-		    wldp_buf);
+		err = simnet_get_priv_prop_wifi(sdev, name, len, val);
 		break;
 	default:
 		err = ENOTSUP;
@@ -1320,14 +1542,54 @@ simnet_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 	return (err);
 }
 
+static int
+simnet_getprop_ether(const simnet_dev_t *sdev, const char *name,
+    const mac_prop_id_t num, const uint_t len, void *val)
+{
+	int err = 0;
+
+	switch (num) {
+	case MAC_PROP_PRIVATE:
+		err = simnet_get_priv_prop_ether(sdev, name, len, val);
+		break;
+	default:
+		err = ENOTSUP;
+		break;
+	}
+
+	return (err);
+}
+
+static int
+simnet_m_getprop(void *arg, const char *name, const mac_prop_id_t num,
+    const uint_t len, void *val)
+{
+	const simnet_dev_t *sdev = arg;
+	int err = 0;
+
+	switch (sdev->sd_type) {
+	case DL_ETHER:
+		err = simnet_getprop_ether(sdev, name, num, len, val);
+		break;
+	case DL_WIFI:
+		err = simnet_getprop_wifi(sdev, name, num, len, val);
+		break;
+	default:
+		err = EINVAL;
+		break;
+	}
+
+	return (err);
+}
+
 static void
-simnet_priv_propinfo(const char *pr_name, mac_prop_info_handle_t prh)
+simnet_priv_propinfo_wifi(const char *name, mac_prop_info_handle_t prh)
 {
 	char valstr[MAXNAMELEN];
 
 	bzero(valstr, sizeof (valstr));
 
-	if (strcmp(pr_name, "_wl_esslist") == 0) {
+	if (strcmp(name, "_wl_esslist") == 0) {
 		(void) snprintf(valstr, sizeof (valstr), "%d", 0);
 	}
 
@@ -1336,15 +1598,10 @@ simnet_priv_propinfo(const char *pr_name, mac_prop_info_handle_t prh)
 }
 
 static void
-simnet_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+simnet_propinfo_wifi(const char *name, const mac_prop_id_t num,
     mac_prop_info_handle_t prh)
 {
-	simnet_dev_t *sdev = arg;
-
-	if (sdev->sd_type == DL_ETHER)
-		return;
-
-	switch (wldp_pr_num) {
+	switch (num) {
 	case MAC_PROP_WL_BSSTYPE:
 	case MAC_PROP_WL_ESS_LIST:
 	case MAC_PROP_WL_SUPPORTED_RATES:
@@ -1352,7 +1609,55 @@ simnet_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 		mac_prop_info_set_perm(prh, MAC_PROP_PERM_READ);
 		break;
 	case MAC_PROP_PRIVATE:
-		simnet_priv_propinfo(pr_name, prh);
+		simnet_priv_propinfo_wifi(name, prh);
+		break;
+	}
+}
+
+static void
+simnet_priv_propinfo_ether(const char *name, mac_prop_info_handle_t prh)
+{
+	if (strcmp(name, SD_PROP_RX_IP_CKSUM) == 0 ||
+	    strcmp(name, SD_PROP_TX_ULP_CKSUM) == 0 ||
+	    strcmp(name, SD_PROP_TX_IP_CKSUM) == 0 ||
+	    strcmp(name, SD_PROP_LSO) == 0) {
+		mac_prop_info_set_perm(prh, MAC_PROP_PERM_RW);
+	}
+
+	if (strcmp(name, SD_PROP_TX_ULP_CKSUM) == 0) {
+		mac_prop_info_set_default_str(prh, "none");
+	}
+
+	if (strcmp(name, SD_PROP_RX_IP_CKSUM) == 0 ||
+	    strcmp(name, SD_PROP_TX_IP_CKSUM) == 0 ||
+	    strcmp(name, SD_PROP_LSO) == 0) {
+		mac_prop_info_set_default_str(prh, "off");
+	}
+}
+
+static void
+simnet_propinfo_ether(const char *name, const mac_prop_id_t num,
+    mac_prop_info_handle_t prh)
+{
+	switch (num) {
+	case MAC_PROP_PRIVATE:
+		simnet_priv_propinfo_ether(name, prh);
+		break;
+	}
+}
+
+static void
+simnet_m_propinfo(void *arg, const char *name, const mac_prop_id_t num,
+    const mac_prop_info_handle_t prh)
+{
+	simnet_dev_t *sdev = arg;
+
+	switch (sdev->sd_type) {
+	case DL_ETHER:
+		simnet_propinfo_ether(name, num, prh);
+		break;
+	case DL_WIFI:
+		simnet_propinfo_wifi(name, num, prh);
 		break;
 	}
 }

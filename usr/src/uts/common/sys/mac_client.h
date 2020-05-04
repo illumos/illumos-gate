@@ -200,6 +200,8 @@ extern int mac_set_mtu(mac_handle_t, uint_t, uint_t *);
 
 extern void mac_client_set_rings(mac_client_handle_t, int, int);
 
+extern void mac_hw_emul(mblk_t **, mblk_t **, uint_t *, mac_emul_t);
+
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -146,7 +147,7 @@ mac_bcast_send(void *arg1, void *arg2, mblk_t *mp_chain, boolean_t is_loopback)
 	uint64_t gen;
 	uint_t i;
 	mblk_t *mp_chain1;
-	flow_entry_t	*flent;
+	flow_entry_t *flent;
 	int err;
 
 	rw_enter(&mip->mi_rw_lock, RW_READER);
@@ -181,13 +182,6 @@ mac_bcast_send(void *arg1, void *arg2, mblk_t *mp_chain, boolean_t is_loopback)
 		 * flow_ent here.
 		 */
 		if ((mp_chain1 = mac_copymsgchain_cksum(mp_chain)) == NULL)
-			break;
-		/*
-		 * Fix the checksum for packets originating
-		 * from the local machine.
-		 */
-		if ((src_mcip != NULL) &&
-		    (mp_chain1 = mac_fix_cksum(mp_chain1)) == NULL)
 			break;
 
 		FLOW_TRY_REFHOLD(flent, err);
@@ -246,7 +240,8 @@ mac_bcast_send(void *arg1, void *arg2, mblk_t *mp_chain, boolean_t is_loopback)
 		MCIP_STAT_UPDATE(src_mcip, brdcstxmt, 1);
 		MCIP_STAT_UPDATE(src_mcip, brdcstxmtbytes, msgdsize(mp_chain));
 
-		MAC_TX(mip, mip->mi_default_tx_ring, mp_chain, src_mcip);
+		mp_chain = mac_provider_tx(mip, mip->mi_default_tx_ring,
+		    mp_chain, src_mcip);
 		if (mp_chain != NULL)
 			freemsgchain(mp_chain);
 	} else {

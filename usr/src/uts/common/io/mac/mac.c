@@ -1753,7 +1753,7 @@ mac_client_clear_flow_cb(mac_client_handle_t mch)
 	flow_entry_t		*flent = mcip->mci_flent;
 
 	mutex_enter(&flent->fe_lock);
-	flent->fe_cb_fn = (flow_fn_t)mac_pkt_drop;
+	flent->fe_cb_fn = (flow_fn_t)mac_rx_def;
 	flent->fe_cb_arg1 = NULL;
 	flent->fe_cb_arg2 = NULL;
 	flent->fe_flags |= FE_MC_NO_DATAPATH;
@@ -1936,8 +1936,7 @@ mac_hwring_send_priv(mac_client_handle_t mch, mac_ring_handle_t rh, mblk_t *mp)
 	mac_client_impl_t *mcip = (mac_client_impl_t *)mch;
 	mac_impl_t *mip = mcip->mci_mip;
 
-	MAC_TX(mip, rh, mp, mcip);
-	return (mp);
+	return (mac_provider_tx(mip, rh, mp, mcip));
 }
 
 /*
@@ -4712,9 +4711,9 @@ mac_group_remmac(mac_group_t *group, const uint8_t *addr)
 }
 
 /*
- * This is the entry point for packets transmitted through the bridging code.
- * If no bridge is in place, MAC_RING_TX transmits using tx ring. The 'rh'
- * pointer may be NULL to select the default ring.
+ * This is the entry point for packets transmitted through the bridge
+ * code. If no bridge is in place, mac_ring_tx() transmits via the tx
+ * ring. The 'rh' pointer may be NULL to select the default ring.
  */
 mblk_t *
 mac_bridge_tx(mac_impl_t *mip, mac_ring_handle_t rh, mblk_t *mp)
@@ -4731,8 +4730,34 @@ mac_bridge_tx(mac_impl_t *mip, mac_ring_handle_t rh, mblk_t *mp)
 		mac_bridge_ref_cb(mh, B_TRUE);
 	mutex_exit(&mip->mi_bridge_lock);
 	if (mh == NULL) {
-		MAC_RING_TX(mip, rh, mp, mp);
+		mp = mac_ring_tx((mac_handle_t)mip, rh, mp);
 	} else {
+		/*
+		 * The bridge may place this mblk on a provider's Tx
+		 * path, a mac's Rx path, or both. Since we don't have
+		 * enough information at this point, we can't be sure
+		 * that the destination(s) are capable of handling the
+		 * hardware offloads requested by the mblk. We emulate
+		 * them here as it is the safest choice. In the
+		 * future, if bridge performance becomes a priority,
+		 * we can elide the emulation here and leave the
+		 * choice up to bridge.
+		 *
+		 * We don't clear the DB_CKSUMFLAGS here because
+		 * HCK_IPV4_HDRCKSUM (Tx) and HCK_IPV4_HDRCKSUM_OK
+		 * (Rx) still have the same value. If the bridge
+		 * receives a packet from a HCKSUM_IPHDRCKSUM NIC then
+		 * the mac(s) it is forwarded on may calculate the
+		 * checksum again, but incorrectly (because the
+		 * checksum field is not zero). Until the
+		 * HCK_IPV4_HDRCKSUM/HCK_IPV4_HDRCKSUM_OK issue is
+		 * resovled, we leave the flag clearing in bridge
+		 * itself.
+		 */
+		if ((DB_CKSUMFLAGS(mp) & (HCK_TX_FLAGS | HW_LSO_FLAGS)) != 0) {
+			mac_hw_emul(&mp, NULL, NULL, MAC_ALL_EMULS);
+		}
+
 		mp = mac_bridge_tx_cb(mh, rh, mp);
 		mac_bridge_ref_cb(mh, B_FALSE);
 	}
@@ -8803,4 +8828,53 @@ mac_led_set(mac_handle_t mh, mac_led_mode_t desired)
 	}
 
 	return (ret);
+}
+
+/*
+ * Send packets through the Tx ring ('mrh') or through the default
+ * handler if no ring is specified. Before passing the packet down to
+ * the MAC provider, emulate any hardware offloads which have been
+ * requested but are not supported by the provider.
+ */
+mblk_t *
+mac_ring_tx(mac_handle_t mh, mac_ring_handle_t mrh, mblk_t *mp)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	if (mrh == NULL)
+		mrh = mip->mi_default_tx_ring;
+
+	if (mrh == NULL)
+		return (mip->mi_tx(mip->mi_driver, mp));
+	else
+		return (mac_hwring_tx(mrh, mp));
+}
+
+/*
+ * This is the final stop before reaching the underlying MAC provider.
+ * This is also where the bridging hook is inserted. Packets that are
+ * bridged will return through mac_bridge_tx(), with rh nulled out if
+ * the bridge chooses to send output on a different link due to
+ * forwarding.
+ */
+mblk_t *
+mac_provider_tx(mac_impl_t *mip, mac_ring_handle_t rh, mblk_t *mp,
+    mac_client_impl_t *mcip)
+{
+	/*
+	 * If there is a bound Hybrid I/O share, send packets through
+	 * the default tx ring. When there's a bound Hybrid I/O share,
+	 * the tx rings of this client are mapped in the guest domain
+	 * and not accessible from here.
+	 */
+	if (mcip->mci_state_flags & MCIS_SHARE_BOUND)
+		rh = mip->mi_default_tx_ring;
+
+	if (mip->mi_promisc_list != NULL)
+		mac_promisc_dispatch(mip, mp, mcip, B_FALSE);
+
+	if (mip->mi_bridge_link == NULL)
+		return (mac_ring_tx((mac_handle_t)mip, rh, mp));
+	else
+		return (mac_bridge_tx(mip, rh, mp));
 }

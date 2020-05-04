@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -566,7 +566,13 @@ dls_rx_promisc(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 	dls_head_t			*dhp;
 	mod_hash_key_t			key;
 
+	/*
+	 * We expect to deal with only a single packet.
+	 */
+	ASSERT3P(mp->b_next, ==, NULL);
+
 	DLS_PREPARE_PKT(dlp->dl_mh, mp, &mhi, err);
+
 	if (err != 0)
 		goto drop;
 

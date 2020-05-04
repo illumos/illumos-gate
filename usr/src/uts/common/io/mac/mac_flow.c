@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/strsun.h>
@@ -229,7 +230,7 @@ mac_flow_create(flow_desc_t *fd, mac_resource_props_t *mrp, char *name,
 		cv_init(&flent->fe_cv, NULL, CV_DEFAULT, NULL);
 
 		/* Initialize the receiver function to a safe routine */
-		flent->fe_cb_fn = (flow_fn_t)mac_pkt_drop;
+		flent->fe_cb_fn = (flow_fn_t)mac_rx_def;
 		flent->fe_index = -1;
 	}
 	(void) strlcpy(flent->fe_flow_name, name, MAXFLOWNAMELEN);

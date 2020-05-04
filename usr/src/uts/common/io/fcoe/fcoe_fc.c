@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -39,6 +40,7 @@
 #include <sys/fcntl.h>
 #include <sys/unistd.h>
 #include <sys/mac_client.h>
+#include <sys/strsubr.h>
 
 /*
  * FCoE header files
@@ -209,6 +211,7 @@ tx_frame:
 	ret_cookie = mac_tx(mac->fm_cli_handle, FRM2MBLK(frm), 0,
 	    MAC_TX_NO_ENQUEUE, &ret_mblk);
 	if (ret_cookie != (mac_tx_cookie_t)NULL) {
+		frm->frm_netb = ret_mblk;
 		mutex_enter(&mac->fm_mutex);
 		(void) cv_reltimedwait(&mac->fm_tx_cv, &mac->fm_mutex,
 		    drv_usectohz(100000), TR_CLOCK_TICK);
@@ -265,7 +268,7 @@ fcoe_alloc_netb(fcoe_port_t *eport, uint32_t fc_frame_size, uint8_t **ppfc)
 static void
 fcoe_free_netb(void *netb)
 {
-	freeb((mblk_t *)netb);
+	freemsgchain((mblk_t *)netb);
 }
 
 fcoe_frame_t *

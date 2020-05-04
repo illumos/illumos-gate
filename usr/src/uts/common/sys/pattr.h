@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _SYS_PATTR_H
@@ -97,6 +98,8 @@ typedef struct pattr_hcksum_s {
 
 #define	HCK_FLAGS		(HCK_IPV4_HDRCKSUM | HCK_PARTIALCKSUM |	\
 				HCK_FULLCKSUM | HCK_FULLCKSUM_OK)
+#define	HCK_TX_FLAGS		(HCK_IPV4_HDRCKSUM | HCK_PARTIALCKSUM | \
+				HCK_FULLCKSUM)
 /*
  * Extended hardware offloading flags that also use hcksum_flags
  */

@@ -23,7 +23,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -57,6 +57,7 @@
 #include <sys/vtrace.h>
 #include <sys/isa_defs.h>
 #include <sys/mac.h>
+#include <sys/mac_client.h>
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <net/route.h>
@@ -659,11 +660,12 @@ ill_input_short_v4(mblk_t *mp, void *iph_arg, void *nexthop_arg,
 	}
 
 	/*
-	 * If there is a good HW IP header checksum we clear the need
+	 * If the packet originated from a same-machine sender or
+	 * there is a good HW IP header checksum, we clear the need
 	 * look at the IP header checksum.
 	 */
-	if ((DB_CKSUMFLAGS(mp) & HCK_IPV4_HDRCKSUM) &&
-	    ILL_HCKSUM_CAPABLE(ill) && dohwcksum) {
+	if (((DB_CKSUMFLAGS(mp) & HCK_IPV4_HDRCKSUM) &&
+	    ILL_HCKSUM_CAPABLE(ill) && dohwcksum)) {
 		/* Header checksum was ok. Clear the flag */
 		DB_CKSUMFLAGS(mp) &= ~HCK_IPV4_HDRCKSUM;
 		ira->ira_flags &= ~IRAF_VERIFY_IP_CKSUM;
@@ -1134,8 +1136,12 @@ ip_forward_xmit_v4(nce_t *nce, ill_t *ill, mblk_t *mp, ipha_t *ipha,
 		icmp_time_exceeded(mp, ICMP_TTL_EXCEEDED, ira);
 		return;
 	}
+
+	/*
+	 * Count the forward as a hop and update the checksum
+	 * accordingly.
+	 */
 	ipha->ipha_ttl--;
-	/* Adjust the checksum to reflect the ttl decrement. */
 	sum = (int)ipha->ipha_hdr_checksum + IP_HDR_CSUM_TTL_ADJUST;
 	ipha->ipha_hdr_checksum = (uint16_t)(sum + (sum >> 16));
 
@@ -2240,6 +2246,7 @@ ip_input_cksum_v4(iaflags_t iraflags, mblk_t *mp, ipha_t *ipha,
 		/* No ULP checksum to verify. */
 		return (B_TRUE);
 	}
+
 	/*
 	 * Revert to software checksum calculation if the interface
 	 * isn't capable of checksum offload.
@@ -2252,13 +2259,12 @@ ip_input_cksum_v4(iaflags_t iraflags, mblk_t *mp, ipha_t *ipha,
 		return (ip_input_sw_cksum_v4(mp, ipha, ira));
 	}
 
+	hck_flags = DB_CKSUMFLAGS(mp);
+
 	/*
 	 * We apply this for all ULP protocols. Does the HW know to
 	 * not set the flags for SCTP and other protocols.
 	 */
-
-	hck_flags = DB_CKSUMFLAGS(mp);
-
 	if (hck_flags & HCK_FULLCKSUM_OK) {
 		/*
 		 * Hardware has already verified the checksum.
