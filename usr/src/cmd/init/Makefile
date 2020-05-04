@@ -26,14 +26,12 @@
 # Copyright (c) 2018, Joyent, Inc.
 # Copyright 2020 Oxide Computer Company
 
-PROG= init 
-OBJS= init.o
+PROG= init
 ROOTFS_PROG= $(PROG)
 
 DEFAULTFILES= init.dfl
 
 include ../Makefile.cmd
-include ../Makefile.ctf
 
 OBJS = init.o bootbanner.o
 CSTD = $(CSTD_GNU99)
@@ -53,10 +51,6 @@ SMATCH=off
 .KEEP_STATE:
 
 all: $(ROOTFS_PROG)
-
-$(ROOTFS_PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-	$(POST_PROCESS)
 
 install: all $(ROOTETCDEFAULTFILES) $(ROOTSBINPROG)
 	$(RM) $(ROOTETCPROG)
