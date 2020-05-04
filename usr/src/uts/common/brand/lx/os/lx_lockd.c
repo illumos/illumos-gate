@@ -297,6 +297,18 @@ lx_upcall_statd(int op, struct nlm_globals *g, struct nlm_host *host)
 	 * as we pass to monitor, so that is also handled here by this same
 	 * brand hook.
 	 */
+
+	/*
+	 * If the NLM was set up to be "v4 only" (i.e. no RPC call handlers
+	 * to localhost at configure time), the semaphore is uninitialized,
+	 * and will indefinitely hang.  FURTHERMORE if just the semaphore
+	 * was initialized, we'd still panic with a NULL nsm->ns_handle.
+	 */
+	if (g->nlm_v4_only) {
+		stat = RPC_SYSTEMERROR;
+		goto bail;
+	}
+
 	nlm_netbuf_to_netobj(&host->nh_addr, &family, &obj);
 	nsm = &g->nlm_nsm;
 
@@ -327,6 +339,7 @@ lx_upcall_statd(int op, struct nlm_globals *g, struct nlm_host *host)
 	}
 	sema_v(&nsm->ns_sem);
 
+bail:
 	if (stat != RPC_SUCCESS) {
 		NLM_WARN("Failed to contact local statd, stat=%d", stat);
 		if (op == SM_MON) {
