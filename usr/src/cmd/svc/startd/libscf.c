@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 
@@ -1681,13 +1682,20 @@ libscf_set_deathrow(scf_instance_t *inst, int deathrow)
 }
 
 /*
+ * Since we're clearing the over-ridden enabled state for the service, we'll
+ * also take the opportunity to remove any comment.
+ *
  * Returns 0, ECONNABORTED, ECANCELED, or EPERM.
  */
 int
 libscf_delete_enable_ovr(scf_instance_t *inst)
 {
+	int r = scf_instance_delete_prop(inst, SCF_PG_GENERAL_OVR,
+	    SCF_PROPERTY_ENABLED);
+	if (r != 0)
+		return (r);
 	return (scf_instance_delete_prop(inst, SCF_PG_GENERAL_OVR,
-	    SCF_PROPERTY_ENABLED));
+	    SCF_PROPERTY_COMMENT));
 }
 
 /*

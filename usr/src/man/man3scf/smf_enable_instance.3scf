@@ -1,16 +1,16 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2020 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SMF_ENABLE_INSTANCE 3SCF "Nov 5, 2007"
+.TH SMF_ENABLE_INSTANCE 3SCF "May 15, 2020"
 .SH NAME
-smf_enable_instance, smf_disable_instance, smf_refresh_instance,
-smf_restart_instance, smf_maintain_instance, smf_degrade_instance,
-smf_restore_instance, smf_get_state \- administrative interface to the Service
-Configuration Facility
+smf_enable_instance, smf_disable_instance, smf_disable_instance_with_comment,
+smf_refresh_instance, smf_restart_instance, smf_maintain_instance,
+smf_degrade_instance, smf_restore_instance, smf_get_state \-
+administrative interface to the Service Configuration Facility
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libscf.h>
@@ -21,6 +21,12 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.
 .LP
 .nf
 \fBint\fR \fBsmf_disable_instance\fR(\fBconst char *\fR\fIinstance\fR, \fBint\fR \fIflags\fR);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBsmf_disable_instance_with_comment\fR(\fBconst char *\fR\fIinstance\fR,
+    \fBint\fR \fIflags\fR, \fBconst char *\fR\fIcomment\fR);
 .fi
 
 .LP
@@ -54,8 +60,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions provide administrative control over service instances. Using
 these functions, an administrative tool can make a request to enable, disable,
 refresh, or restart an instance. All calls are asynchronous. They request an
@@ -75,6 +79,13 @@ by \fIinstance\fR FMRI in the disabled state and triggers the stop method (see
 the service instance is a temporary change, lasting only for the lifetime of
 the current system instance. The \fIflags\fR argument is set to \fB0\fR if no
 flags are to be use.
+.sp
+.LP
+The \fBsmf_disable_instance_with_comment()\fR function behaves the same as
+\fBsmf_disable_instance()\fR, except the given free-form comment is recorded
+under the \fIcomment\fR property, as reported by \fBsvcs\fR(1).
+The comment may be up to \fBSCF_COMMENT_MAX_LENGTH\fR characters including
+the NUL terminator.
 .sp
 .LP
 The \fBsmf_refresh_instance()\fR function causes the service instance specified
@@ -123,20 +134,17 @@ string. Possible state strings are defined as the following:
 .in -2
 
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBsmf_enable_instance()\fR,
-\fBsmf_disable_instance()\fR, \fBsmf_refresh_instance()\fR,
-\fBsmf_restart_instance()\fR, \fBsmf_maintain_instance()\fR,
-\fBsmf_degrade_instance()\fR, and \fBsmf_restore_instance()\fR return \fB0\fR.
+\fBsmf_disable_instance()\fR, \fBsmf_disable_instance_with_comment()\fR,
+\fBsmf_refresh_instance()\fR, \fBsmf_restart_instance()\fR,
+\fBsmf_maintain_instance()\fR, \fBsmf_degrade_instance()\fR,
+and \fBsmf_restore_instance()\fR return \fB0\fR.
 Otherwise, they return \fB-1\fR\&.
 .sp
 .LP
 Upon successful completion, smf_get_state returns an allocated string.
 Otherwise, it returns \fINULL\fR.
 .SH ERRORS
-.sp
-.LP
 These functions will fail if:
 .sp
 .ne 2
@@ -241,8 +249,6 @@ The function is called on an instance in an inappropriate state.
 .LP
 The \fBscf_error\fR(3SCF) function can be used to retrieve the error value.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -259,7 +265,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBsvc.startd\fR(1M), \fBlibscf\fR(3LIB), \fBscf_error\fR(3SCF),
-\fBattributes\fR(5), \fBsmf_security\fR(5)
+\fBattributes\fR(5), \fBsmf_security\fR(5), \fBsvcs\fR(1)

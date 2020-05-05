@@ -12,35 +12,36 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3scf
+MANSECT=	3scf
 
-MANFILES= 	scf_entry_create.3scf		\
-	 	scf_error.3scf			\
-	 	scf_handle_create.3scf		\
-	 	scf_handle_decode_fmri.3scf	\
-	 	scf_instance_create.3scf	\
-	 	scf_iter_create.3scf		\
-	 	scf_limit.3scf			\
-	 	scf_pg_create.3scf		\
-	 	scf_property_create.3scf	\
-	 	scf_scope_create.3scf		\
-	 	scf_service_create.3scf		\
-	 	scf_simple_prop_get.3scf	\
-	 	scf_simple_walk_instances.3scf	\
-	 	scf_snaplevel_create.3scf	\
-	 	scf_snapshot_create.3scf	\
-	 	scf_tmpl_pg_create.3scf		\
-	 	scf_tmpl_pg_name.3scf		\
-	 	scf_tmpl_prop_create.3scf	\
-	 	scf_tmpl_prop_name.3scf		\
-	 	scf_tmpl_validate_fmri.3scf	\
-	 	scf_transaction_create.3scf	\
-	 	scf_value_create.3scf		\
-	 	smf_enable_instance.3scf
+MANFILES=	scf_entry_create.3scf		\
+		scf_error.3scf			\
+		scf_handle_create.3scf		\
+		scf_handle_decode_fmri.3scf	\
+		scf_instance_create.3scf	\
+		scf_iter_create.3scf		\
+		scf_limit.3scf			\
+		scf_pg_create.3scf		\
+		scf_property_create.3scf	\
+		scf_scope_create.3scf		\
+		scf_service_create.3scf		\
+		scf_simple_prop_get.3scf	\
+		scf_simple_walk_instances.3scf	\
+		scf_snaplevel_create.3scf	\
+		scf_snapshot_create.3scf	\
+		scf_tmpl_pg_create.3scf		\
+		scf_tmpl_pg_name.3scf		\
+		scf_tmpl_prop_create.3scf	\
+		scf_tmpl_prop_name.3scf		\
+		scf_tmpl_validate_fmri.3scf	\
+		scf_transaction_create.3scf	\
+		scf_value_create.3scf		\
+		smf_enable_instance.3scf
 
 
 MANLINKS=	scf_count_ranges_destroy.3scf			\
@@ -241,6 +242,7 @@ MANLINKS=	scf_count_ranges_destroy.3scf			\
 		scf_values_destroy.3scf				\
 		smf_degrade_instance.3scf			\
 		smf_disable_instance.3scf			\
+		smf_disable_instance_with_comment.3scf		\
 		smf_get_state.3scf				\
 		smf_maintain_instance.3scf			\
 		smf_refresh_instance.3scf			\
@@ -465,6 +467,7 @@ scf_value_type.3scf				:= LINKSRC = scf_value_create.3scf
 
 smf_degrade_instance.3scf			:= LINKSRC = smf_enable_instance.3scf
 smf_disable_instance.3scf			:= LINKSRC = smf_enable_instance.3scf
+smf_disable_instance_with_comment.3scf		:= LINKSRC = smf_enable_instance.3scf
 smf_get_state.3scf				:= LINKSRC = smf_enable_instance.3scf
 smf_maintain_instance.3scf			:= LINKSRC = smf_enable_instance.3scf
 smf_refresh_instance.3scf			:= LINKSRC = smf_enable_instance.3scf

@@ -1,13 +1,13 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2020 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SVCS 1 "Apr 17, 2011"
+.TH SVCS 1 "May 11, 2020"
 .SH NAME
 svcs \- report service status
 .SH SYNOPSIS
-.LP
 .nf
 \fBsvcs\fR [\fB-aHpv?\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] [\fB-o\fR \fIcol\fR[,\fIcol\fR]]... [\fB-R\fR \fIFMRI-instance\fR]...
      [\fB-sS\fR \fIcol\fR]... [\fIFMRI\fR | \fIpattern\fR]...
@@ -30,8 +30,6 @@ svcs \- report service status
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBsvcs\fR command displays information about service instances as recorded
 in the service configuration repository.
 .sp
@@ -62,8 +60,6 @@ Error messages are printed to the standard error stream.
 The output of this command can be used appropriately as input to the
 \fBsvcadm\fR(1M) command.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -212,6 +208,10 @@ temporarily (until the next system reboot). The former is specified as either
 A service might be temporarily disabled because an administrator has run
 \fBsvcadm disable -t\fR, used \fBsvcadm milestone\fR, or booted the system to a
 specific milestone. See \fBsvcadm\fR(1M) for details.
+.sp
+If a service instance was disabled via
+\fBsvcadm disable -c\fR
+, then the provided comment will also be displayed.
 .RE
 
 .RE
@@ -337,8 +337,6 @@ zone, see \fBzones\fR(5).
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -421,8 +419,6 @@ An FMRI that specifies an instance.
 .RE
 
 .SH COLUMNS
-.sp
-.LP
 Column names are case insensitive. The default output format is equivalent to
 "\fB-o\fR \fBstate,stime,fmri\fR". The default sorting columns are \fBSTATE\fR,
 \fBSTIME\fR, \fBFMRI\fR.
@@ -607,7 +603,6 @@ blanks.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRDisplaying the Default Output
 .sp
 .LP
@@ -767,8 +762,6 @@ Impact: This service is not running.
 .sp
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -798,8 +791,6 @@ Invalid command line options were specified.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -817,8 +808,6 @@ Interface Stability	See below.
 .LP
 Screen output is Uncommitted. The invocation is Committed.
 .SH SEE ALSO
-.sp
-.LP
 \fBps\fR(1), \fBsvcprop\fR(1), \fBsvcadm\fR(1M), \fBsvccfg\fR(1M),
 \fBsvc.startd\fR(1M), \fBstat\fR(2), \fBlibscf\fR(3LIB), \fBattributes\fR(5),
 \fBfnmatch\fR(5), \fBsmf\fR(5), \fBzones\fR(5)

@@ -1,10 +1,10 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
-.\" Copyright 2019 Joyent, Inc.
+.\" Copyright 2020 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SVCADM 1M "Oct 24, 2019"
+.TH SVCADM 1M "May 11, 2020"
 .SH NAME
 svcadm \- manipulate service instances
 .SH SYNOPSIS
@@ -15,8 +15,8 @@ svcadm \- manipulate service instances
 
 .LP
 .nf
-\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] disable [\fB-st\fR]
-     [{\fIFMRI\fR | \fIpattern\fR}...]
+\fB/usr/sbin/svcadm\fR [\fB-S state\fR] [\fB-v\fR] [\fB-Z\fR | \fB-z\fR \fIzone\fR] disable
+     [\fB-c\fR \fIcomment\fR] [\fB-st\fR] [{\fIFMRI\fR | \fIpattern\fR}...]
 .fi
 
 .LP
@@ -142,7 +142,7 @@ persistent across reboot.
 .sp
 .ne 2
 .na
-\fB\fBdisable\fR [\fB-st\fR] {\fIFMRI\fR | \fIpattern\fR}...\fR
+\fB\fBdisable\fR [\fB-c\fR \fIcomment\fR] [\fB-st\fR] {\fIFMRI\fR | \fIpattern\fR}...\fR
 .ad
 .sp .6
 .RS 4n
@@ -161,6 +161,11 @@ service instance. Temporary disable only lasts until reboot. This action
 requires permission to modify the "restarter_actions" property group of the
 service instance (see \fBsmf_security\fR(5)). By default, \fBdisable\fR is
 persistent across reboot.
+.sp
+If the \fB-c\fR option is specified, the given free-form comment is recorded
+in the (temporary) service configuration under the \fBgeneral/comment\fR
+property.  This can serve as an administrator reason for disabling the service,
+and is reported by \fBsvcs\fR(1).
 .RE
 
 .sp
@@ -379,16 +384,16 @@ However, you can abbreviate the full \fIFMRI\fR as follows:
 .sp
 
 .LP
-\fBExample 2 \fRDisabling the Standard HTTP Server
+\fBExample 2 \fRDisabling a service
 .sp
 .LP
-The following command disables the standard HTTP server, using an abbreviated
-\fIFMRI\fR:
+The following command synchronously disables a service, using an abbreviated
+\fIFMRI\fR, and recording a ticket ID as the administrative reason:
 
 .sp
 .in +2
 .nf
-$ svcadm disable http
+$ svcadm disable -c "OPS-1000" -s http
 .fi
 .in -2
 .sp
