@@ -30,17 +30,16 @@ SUBDIRS =	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
 # conditional assignments
-all	:= 	TARGET = all
+all	:=	TARGET = all
 install	:=	TARGET = install
 clean	:=	TARGET = clean
 clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
-_msg :=         TARGET= _msg
+_msg :=		TARGET= _msg
 
-LIBRARY= 	libtnfctl.a
+LIBRARY=	libtnfctl.a
 TEXT_DOMAIN=	SUNW_OST_OSLIB
 XGETFLAGS=	-a
-MSGDIRS=	
+MSGDIRS=
 POFILE=		$(LIBRARY:.a=.po)
 POFILES=	generic.po
 
@@ -52,12 +51,12 @@ HDRS=		tnfctl.h
 ROOTHDRDIR=	$(ROOT)/usr/include/tnf
 ROOTHDRS=	$(HDRS:%=$(ROOTHDRDIR)/%)
 CHECKHDRS=	$(HDRS:%.h=%.check)
-$(ROOTHDRS) := 	FILEMODE = 0644
+$(ROOTHDRS) :=	FILEMODE = 0644
 CHECKHDRS =	$(HDRS:%.h=%.check)
 
 .KEEP_STATE:
 
-all install clean clobber lint:  $(SUBDIRS)
+all install clean clobber:  $(SUBDIRS)
 
 install_h: $(ROOTHDRDIR) $(ROOTHDRS)
 

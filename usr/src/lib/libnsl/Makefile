@@ -73,7 +73,6 @@ clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 delete :=	TARGET= delete
 install :=	TARGET= install
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 package :=	TARGET= package
 
@@ -92,7 +91,7 @@ install_h:	$(ROOTHDRS)
 # nss.h isn't delivered; no reason to check
 check:
 
-clean clobber delete lint package:	$(SUBDIRS)
+clean clobber delete package:	$(SUBDIRS)
 
 $(PROTOCOL_DIR):
 	$(INS.dir)
@@ -118,7 +117,7 @@ $(PROTOCOL_DIR)/%.x:	$(PROTOCOL_UTS_SRCDIR)/%.x
 #
 # Derived header files
 #
-nis/gen/nis_clnt.h: $(PROTOCOL_DIR)/nis.x $(PROTOCOL_DIR)/nis_object.x 
+nis/gen/nis_clnt.h: $(PROTOCOL_DIR)/nis.x $(PROTOCOL_DIR)/nis_object.x
 	$(RPCGEN) -C -h $(PROTOCOL_DIR)/nis.x > nis_clnt-gen.h
 	$(SED) -n -e '/EDIT_START/,$$ p' < nis_clnt-gen.h |\
 	$(SED) -e 's/_3_svc/_svc/' |\

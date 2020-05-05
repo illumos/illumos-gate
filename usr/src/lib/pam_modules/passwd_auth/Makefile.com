@@ -25,7 +25,6 @@
 #
 # usr/src/lib/pam_modules/passwd_auth/Makefile.com
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 LIBRARY=	pam_passwd_auth.a
 VERS=		.1
@@ -37,6 +36,5 @@ LDLIBS		+= -lpam -lc
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include		../../../Makefile.targ

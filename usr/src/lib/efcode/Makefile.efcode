@@ -70,8 +70,6 @@ FCPACKAGE64 = $(ROOTLIBDIR64)/fcpackage.so
 
 all: $(LIBS)
 
-lint: lintcheck
-
 $(ROOTSYMLINKS64): $(ROOTLIBDIR64)/$(DYNLIB)
 	-$(RM) $@; $(SYMLINK) $(DYNLIB) $@
 

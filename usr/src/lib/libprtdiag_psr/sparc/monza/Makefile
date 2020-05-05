@@ -39,7 +39,6 @@ IFLAGS +=  -I ../../../libprtdiag/inc
 IFLAGS += -I$(SRC)/cmd/picl/plugins/inc
 LDLIBS += -lpicl
 
-LINTFLAGS += $(IFLAGS)
 
 PLATFORM=SUNW,Netra-CP3260
 

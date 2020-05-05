@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	libpsvcpolicy_psr.a
 VERS=		.1
@@ -43,8 +41,6 @@ LIBS =		$(DYNLIB)
 
 PLATFORM=SUNW,Sun-Fire-480R
 
-CLEANFILES=	$(LINTOUT) $(LINTLIB)
-
 CPPFLAGS +=	-I$(SRC)/uts/sun4u
 CPPFLAGS +=	-I$(SRC)/cmd/picl/plugins/sun4u/psvc/psvcobj
 CPPFLAGS +=	-D_REENTRANT
@@ -58,8 +54,6 @@ DYNFLAGS +=	-R/usr/platform/\$$PLATFORM/lib/picl/plugins:/usr/platform/sun4u/lib
 
 LDLIBS +=	-lpicltree -lpsvcobj -lpsvcplugin
 LDLIBS +=	-lc -ldevice -ldevinfo -lHBAAPI
-
-LINTFLAGS +=
 
 .KEEP_STATE:
 
@@ -76,7 +70,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 all: $(LIBS) $(LIBLINKS)
@@ -107,7 +100,6 @@ $(USR_PSM_LIB_DIR)/%: % $(USR_PSM_LIB_DIR)
 	$(SYMLINK) ./libpsvcpolicy_psr.so$(VERS) $(USR_PSM_LIB_DIR)/libpsvcpolicy_psr.so
 
 lint :
-	$(LINT.c) $(SRCS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

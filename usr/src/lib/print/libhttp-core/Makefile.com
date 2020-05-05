@@ -31,7 +31,6 @@ OBJECTS = http-addr.o http-support.o http.o
 ROOTLIBDIR =	$(ROOT)/usr/lib/print
 
 include ../../../Makefile.lib
-include ../../../Makefile.rootfs
 
 SRCDIR =	../common
 
@@ -40,7 +39,6 @@ ROOTLIBDIR64=	$(ROOT)/usr/lib/print/$(MACH)
 
 LIBS =			$(DYNLIB)
 
-$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
@@ -57,7 +55,6 @@ LDLIBS +=	-lsocket -lnsl -lc
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 $(ROOTLIBDIR):
 	$(INS.dir)

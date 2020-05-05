@@ -47,7 +47,7 @@ ROOTLIBDIR=     $(ROOTFS_LIBDIR)/fm
 ROOTLIBDIR64=   $(ROOTFS_LIBDIR)/fm/$(MACH64)
 
 SRCS = $(LIBSRCS:%.c=../common/%.c)
-LIBS = $(DYNLIB) $(LINTLIB)
+LIBS = $(DYNLIB)
 
 SRCDIR =	../common
 
@@ -72,20 +72,27 @@ $(DYNLIB) := LDLIBS += -lumem -lnvpair -luutil -lsysevent \
 $(BUILD64)$(DYNLIB) := LDLIBS64 += -lumem -lnvpair -luutil -lsysevent \
 	-L$(ROOT)/$(FMLIBDIR64) -ltopo -lc
 
-LINTFLAGS = -msux
-LINTFLAGS64 = -msux -m64
-
-$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
-$(LINTLIB) := LINTFLAGS = -nsvx
-$(LINTLIB) := LINTFLAGS64 = -nsvx -m64
 
 CLEANFILES += ../common/fmev_errstring.c
+
+COMPATLINKS =	usr/lib/fm/$(DYNLIB) \
+		usr/lib/fm/$(LIBLINKS)
+
+COMPATLINKS64 =	usr/lib/fm/$(MACH64)/$(DYNLIB) \
+		usr/lib/fm/$(MACH64)/$(LIBLINKS)
+
+$(ROOT)/usr/lib/fm/libfmevent.so.1 := \
+	COMPATLINKTARGET=../../../lib/fm/libfmevent.so.1
+$(ROOT)/usr/lib/fm/libfmevent.so := \
+	COMPATLINKTARGET=../../../lib/fm/libfmevent.so.1
+$(ROOT)/usr/lib/fm/$(MACH64)/libfmevent.so.1:= \
+	COMPATLINKTARGET=../../../../lib/fm/$(MACH64)/libfmevent.so.1
+$(ROOT)/usr/lib/fm/$(MACH64)/libfmevent.so:= \
+	COMPATLINKTARGET=../../../../lib/fm/$(MACH64)/libfmevent.so.1
 
 .KEEP_STATE:
 
 all: $(LIBS)
-
-lint: $(LINTLIB) lintcheck
 
 pics/%.o: ../$(MACH)/%.c
 	$(COMPILE.c) -o $@ $<

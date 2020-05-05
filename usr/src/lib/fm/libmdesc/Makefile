@@ -22,27 +22,24 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../../Makefile.lib
 include ../Makefile.lib
 
-FMHDRS = 
+FMHDRS =
 HDRDIR = common
 
-SUBDIRS = $(MACH) 
+SUBDIRS = $(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
 all := TARGET = all
 clean := TARGET = clean
 clobber := TARGET = clobber
 install := TARGET = install
-lint := TARGET = lint
 
 .KEEP_STATE:
 
-all clean clobber lint: $(SUBDIRS)
+all clean clobber: $(SUBDIRS)
 
 install: install_h .WAIT $(SUBDIRS)
 

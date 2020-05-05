@@ -29,7 +29,6 @@ include $(SRC)/lib/iconv_modules/Makefile.iconv
 
 install		:=	TARGET = install
 all		:=	TARGET = all
-lint		:=	TARGET = lint
 clean		:=	TARGET = clean
 clobber		:=	TARGET = clobber
 

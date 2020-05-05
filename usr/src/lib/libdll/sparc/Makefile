@@ -30,4 +30,4 @@ DLLPLATFORMCPPFLAGS = '-DHOSTTYPE="sol$(RELEASE_MINOR).sun4"'
 
 include ../Makefile.com
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBS) $(ROOTLINKS)

@@ -30,7 +30,7 @@
 #
 # This make file will build mech_dummy.so.1. This shared object
 # contains all the functionality needed to support the Dummy GSS-API
-# mechanism. 
+# mechanism.
 #
 
 include ../../../Makefile.master
@@ -51,13 +51,10 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 
 .KEEP_STATE:
 
 all:	.WAIT $(SUBDIRS)
-
-lint:	.WAIT $(SUBDIRS)
 
 install: all
 

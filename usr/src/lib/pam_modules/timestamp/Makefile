@@ -11,7 +11,7 @@
 # Copyright 2014 Nexenta Systems, Inc.
 #
 
-include 	../../Makefile.lib
+include		../../Makefile.lib
 
 TEXT_DOMAIN=	SUNW_OST_SYSOSPAM
 POFILE=		pam_timestamp.po
@@ -24,11 +24,10 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 _msg:		$(MSGDOMAINPOFILE)
 

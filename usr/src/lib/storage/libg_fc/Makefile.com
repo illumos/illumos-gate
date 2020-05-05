@@ -37,27 +37,19 @@ OBJECTS=	cmd.o	    \
 include ../../../Makefile.lib
 include ../../../Makefile.rootfs
 
-LIBS =	$(DYNLIB) $(LINTLIB)
+LIBS =	$(DYNLIB)
 
 SRCDIR = ../common
 
 LDLIBS += -lc -ldevinfo -ldevice -lnvpair -ldevid
 
-COMMON_LINTFLAGS = -erroff=E_SEC_SPRINTF_UNBOUNDED_COPY
-COMMON_LINTFLAGS += -erroff=E_SEC_PRINTF_VAR_FMT
-
-LINTFLAGS += $(COMMON_LINTFLAGS)
-LINTFLAGS64 += $(COMMON_LINTFLAGS)
-
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += $(CNOWARN_UNINIT)
 
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include  ../../../Makefile.targ

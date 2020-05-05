@@ -23,10 +23,7 @@
 # Copyright (c) 1999-2001 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libdhcputil/i386/Makefile
 
 include ../Makefile.com
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTCOMPATLINKS)

@@ -46,6 +46,5 @@ $(SUPPRESS_LIBS)ZDEFS = -zdefs
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include	../../../Makefile.targ

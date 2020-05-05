@@ -46,14 +46,13 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 
 MSGFILES =	`$(GREP) -l gettext smb/*.[ch]`
 POFILE =	libsmbfs.po
 
 .KEEP_STATE:
 
-all install clean clobber lint:  $(SUBDIRS)
+all install clean clobber:  $(SUBDIRS)
 
 _msg: $(MSGDOMAINPOFILE)
 

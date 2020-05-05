@@ -237,13 +237,12 @@ ISA-specific Makefiles.  You can do this by:
 		clean	:= TARGET= clean
 		clobber := TARGET= clobber
 		install := TARGET= install
-		lint	:= TARGET= lint
 
 	   The order doesn't matter, but alphabetical is preferable.
 
 	4. Having the aforementioned targets depend on SUBDIRS:
 
-		all clean clobber install lint: $(SUBDIRS)
+		all clean clobber install: $(SUBDIRS)
 
 	   The `all' target must be listed first so that make uses it as the
 	   default target; the others might as well be listed alphabetically.
@@ -262,11 +261,10 @@ top-level library Makefile (license notice and copyright omitted):
 	clean :=	TARGET = clean
 	clobber :=	TARGET = clobber
 	install :=	TARGET = install
-	lint :=		TARGET = lint
 
 	.KEEP_STATE:
 
-	all clean clobber install lint: $(SUBDIRS)
+	all clean clobber install: $(SUBDIRS)
 
 	install_h:	$(ROOTHDRS)
 
@@ -348,10 +346,7 @@ The third section typically consists of the following macros:
 
 	  Set to the list of the types of libraries to build when building
 	  your library.  For dynamic libraries, you should set this to
-	  `$(DYNLIB) $(LINTLIB)' so that a dynamic library and lint library
-	  are built.  For loadable modules, you should just list DYNLIB,
-	  since there's no point in building a lint library for libraries
-	  that are never linked at compile-time.
+	  `$(DYNLIB)' so that a dynamic library is built.
 
 	  If your library needs to be built as a static library (typically
 	  to be used in other parts of the build), you should set LIBS to
@@ -387,15 +382,6 @@ The third section typically consists of the following macros:
 	  than SRCDIR are needed.  Keep in mind that SRCS should be set to a
 	  list of source file *pathnames*, not just a list of filenames.
 
-	LINTLIB-specific SRCS (required if building a lint library)
-
-	  Set to a special "lint stubs" file to use when constructing your
-	  library's lint library.  The lint stubs file must be used to
-	  guarantee that programs that link against your library will be able
-	  to lint clean.  To do this, you must conditionally set SRCS to use
-	  your stubs file by specifying `LINTLIB := SRCS= $(SRCDIR)/$(LINTSRC)'
-	  in your Makefile.  Of course, you do not need to set this if your
-	  library does not build a lint library.
 
 	LDLIBS
 
@@ -404,11 +390,6 @@ The third section typically consists of the following macros:
 	  *never* be set, since that will inadvertently clear the library
 	  search path, causing the linker to look in the wrong place for
 	  the libraries.
-
-	  Since lint targets also make use of LDLIBS, LDLIBS *must* only
-	  contain -l and -L directives; all other link-related directives
-	  should be put in DYNFLAGS (if they apply only to shared object
-	  construction) or LDFLAGS (if they apply in general).
 
 	MAPFILES (if necessary)
 
@@ -425,11 +406,9 @@ The third section typically consists of the following macros:
 	CPPFLAGS (if necessary)
 
 	   Appended with any flags that need to be passed to the C
-	   preprocessor (typically -D and -I flags).  Since lint macros use
-	   CPPFLAGS, CPPFLAGS *must* only contain directives known to the C
-	   preprocessor.  When compiling MT-safe code, CPPFLAGS *must*
-	   include -D_REENTRANT.  When compiling large file aware code,
-	   CPPFLAGS *must* include -D_FILE_OFFSET_BITS=64.
+	   preprocessor (typically -D and -I flags).  When compiling MT-safe
+	   code, CPPFLAGS *must* include -D_REENTRANT.  When compiling large
+	   file aware code, CPPFLAGS *must* include -D_FILE_OFFSET_BITS=64.
 
 	CFLAGS
 
@@ -457,17 +436,18 @@ The third section typically consists of the following macros:
 	   necessary, and it should only contain optimization-related
 	   settings (or -g).
 
-	LINTFLAGS (if necessary)
+	COMPATLINKS (if necessary)
 
-	   Appended with any flags that need to be passed to lint when
-	   linting 32-bit code.  You should only modify LINTFLAGS in
-	   rare instances where your code cannot (or should not) be fixed.
+	  Set to a list of symbolic links that should also be provided for
+	  this library.  Each should also have a target-specific assignment to
+	  COMPATLINKTARGET stating what the target of each link should be
 
-	LINTFLAGS64 (if necessary)
+          COMPATLINKS= usr/lib/libfoo.so
+          $(ROOT)/usr/lib/libfoo.so := COMPATLINKTARGET= libbar.so
 
-	   Appended with any flags that need to be passed to lint when
-	   linting 64-bit code.  You should only modify LINTFLAGS64 in
-	   rare instances where your code cannot (or should not) be fixed.
+	COMPATLINKS64 (if necessary)
+
+          As COMPATLINKS, above, for 64bit objects.
 
 Of course, you may use other macros as necessary.
 
@@ -485,14 +465,6 @@ The fourth section typically consists of the following targets:
 	  though it should be listed as an empty target if LIBS is set by your
 	  ISA-specific Makefiles (see above).
 
-	lint
-
-	  Use the `lintcheck' rule provided by lib/Makefile.targ to lint the
-	  actual library sources.  Historically, this target has also been
-	  used to build the lint library (using LINTLIB), but that usage is
-	  now discouraged.  Thus, this rule should be specified as
-
-		lint: lintcheck
 
 Conspicuously absent from this section are the `clean' and `clobber' targets.
 These targets are already provided by lib/Makefile.targ and thus should not
@@ -511,7 +483,7 @@ cause libinetutil.so.1 to be installed in /lib rather than /usr/lib:
 	include ../../Makefile.lib
 	include ../../Makefile.rootfs
 
-	LIBS =		$(DYNLIB) $(LINTLIB)
+	LIBS =		$(DYNLIB)
 
 	SRCDIR =	../common
 	COMDIR =	$(SRC)/common/net/dhcp
@@ -519,7 +491,6 @@ cause libinetutil.so.1 to be installed in /lib rather than /usr/lib:
 			$(SRCDIR)/ifspec.c $(SRCDIR)/eh.c $(SRCDIR)/tq.c \
 			$(SRCDIR)/ifaddrlist.c
 
-	$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 	LDLIBS +=	-lsocket -lc
 
 	CFLAGS +=	$(CCVERBOSE)
@@ -528,8 +499,6 @@ cause libinetutil.so.1 to be installed in /lib rather than /usr/lib:
 	.KEEP_STATE:
 
 	all: $(LIBS)
-
-	lint: lintcheck
 
 	pics/%.o: $(COMDIR)/%.c
 		$(COMPILE.c) -o $@ $<
@@ -561,7 +530,7 @@ Makefiles for libinetutil:
 
 		include ../Makefile.com
 
-		install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+		install: all $(ROOTLIBS) $(ROOTLINKS)
 
 	sparcv9/Makefile:
 
@@ -574,7 +543,7 @@ Makefiles for libinetutil:
 
 		include ../Makefile.com
 
-		install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+		install: all $(ROOTLIBS) $(ROOTLINKS)
 
 	amd64/Makefile:
 
@@ -582,6 +551,10 @@ Makefiles for libinetutil:
 		include ../../Makefile.lib.64
 
 		install: all $(ROOTLIBS64) $(ROOTLINKS64)
+
+If you included Makefile.rootfs to install your library into /lib, you should
+also add $(ROOTCOMPATLINKS) and $(ROOTCOMPATLINKS64) to your install: target
+to install compatibility symlinks into /usr/lib.
 
 Observe that there is no .KEEP_STATE directive in these Makefiles, since all
 of these Makefiles include libinetutil/Makefile.com, and it already has a

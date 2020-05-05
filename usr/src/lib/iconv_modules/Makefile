@@ -29,11 +29,10 @@ SUBDIRS		=	common euro hi_IN ja ko th_TH zh utf-8 vi
 
 install		:=	TARGET = install
 all		:=	TARGET = all
-lint		:=	TARGET = lint
 clean		:=	TARGET = clean
 clobber		:=	TARGET = clobber
 
-all install lint clean clobber: $(SUBDIRS)
+all install clean clobber: $(SUBDIRS)
 
 .PARALLEL: $(SUBDIRS)
 

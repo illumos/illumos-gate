@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	libpiclfrutree.a
 VERS=		.1
@@ -51,7 +49,6 @@ ROOTCONF=	$(CONF:%=$(ROOTLIBDIR)/%)
 $(ROOTCONF)	:= FILEMODE = 0644
 INFOS=		$(CONF:%.conf=%.info)
 
-CLEANFILES=	$(LINTOUT) $(LINTLIB)
 CLOBBERFILES += $(LIBLINKS)
 
 CPPFLAGS +=	-I$(SRC)/lib/libdevfsevent -I$(SRC)/uts/common
@@ -64,7 +61,6 @@ LDLIBS +=       -L$(ROOT)/usr/lib/picl/plugins
 LDLIBS +=	-L$(SRC)/lib/libptree/$(MACH)
 LDLIBS +=       -lc -lpicltree -lpicldevtree
 DYNFLAGS +=	-R/usr/platform/\$$PLATFORM/lib/picl/plugins:/usr/platform/sun4u/lib/picl/plugins:/usr/lib/picl/plugins
-LINTFLAGS +=	-L$(SRC)/lib/libptree/$(MACH) -lpicltree
 
 .KEEP_STATE:
 
@@ -77,7 +73,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 all: $(LIBS) $(LIBLINKS) $(CONF)
@@ -99,7 +94,6 @@ include $(SRC)/cmd/picl/plugins/Makefile.targ
 include $(SRC)/lib/Makefile.targ
 
 lint :
-	$(LINT.c) $(SRCS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

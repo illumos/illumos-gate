@@ -146,8 +146,6 @@ CPPFLAGS +=	-I$(SRC)/uts/common/sys/ib/clients/daplt
 CPPFLAGS +=	-I$(SRC)/uts/common
 CPPFLAGS +=	-I$(SRC)/uts/common/sys/ib/clients
 CFLAGS +=	$(CCVERBOSE)
-LINTFLAGS +=	-DDAPL_DBG
-LINTFLAGS64 +=	-DDAPL_DBG
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	$(CNOWARN_UNINIT)
@@ -165,7 +163,6 @@ all: $(LIBS)
 
 debug: all
 
-lint: lintcheck
 
 pics/%.o: $(TAVORSRCDIR)/%.c
 	$(COMPILE.c) -o $@ $<

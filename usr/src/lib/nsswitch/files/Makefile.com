@@ -56,10 +56,22 @@ include		../../Makefile.com
 include ../../../Makefile.rootfs
 
 CPPFLAGS +=	-I../../../common/inc
-LINTFLAGS +=	-erroff=E_GLOBAL_COULD_BE_STATIC2
-LINTFLAGS64 +=	-erroff=E_GLOBAL_COULD_BE_STATIC2
 
 LDLIBS +=	-lnsl
 DYNLIB1 =	nss_files.so$(VERS)
 
+COMPATLINKS=	usr/lib/$(DYNLIB1) \
+		etc/lib/$(DYNLIB1)
+COMPATLINKS64=	usr/lib/$(MACH64)/$(DYNLIB1)
+
+$(ROOT)/usr/lib/$(DYNLIB1) := COMPATLINKTARGET=../../lib/$(DYNLIB1)
+$(ROOT)/usr/lib/$(MACH64)/$(DYNLIB1):= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/$(DYNLIB1)
+$(ROOT)/usr/lib/$(DYNLIB1) := COMPATLINKTARGET=../../lib/$(DYNLIB1)
+$(ROOT)/usr/lib/$(MACH64)/$(DYNLIB1):= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/$(DYNLIB1)
+
+$(ROOT)/etc/lib/$(DYNLIB1) := COMPATLINKTARGET= ../../lib/$(DYNLIB1)
+
 all: $(DYNLIB1)
+

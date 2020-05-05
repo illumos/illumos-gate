@@ -49,8 +49,6 @@ SMATCH=off
 
 all: $(LIBS)
 
-lint:
-	$(LINT.c) $(SRCS) $(LDLIBS)
 
 # include library targets
 include ../../Makefile.targ

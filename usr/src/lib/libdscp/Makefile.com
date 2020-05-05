@@ -31,9 +31,8 @@ OBJECTS=	libdscp.o
 include	../../Makefile.lib
 include	../../Makefile.rootfs
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lsocket
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CPPFLAGS +=	-I..
 CFLAGS +=	$(CCVERBOSE)
@@ -55,6 +54,5 @@ all: $(LIBS)
 
 install: all .WAIT $(ROOTLIBDIR) $(ROOTLIB)
 
-lint: lintcheck
 
 include ../../Makefile.targ

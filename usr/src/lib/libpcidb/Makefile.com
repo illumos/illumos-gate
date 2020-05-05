@@ -28,18 +28,16 @@ OBJECTS = pcidb.o
 
 include ../../Makefile.lib
 
-LIBS = $(DYNLIB) $(LINTLIB)
+LIBS = $(DYNLIB)
 
 SRCDIR = ../common
 
 LDLIBS += -lc
 
-$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include ../../Makefile.targ

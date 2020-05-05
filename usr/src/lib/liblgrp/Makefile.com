@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	liblgrp.a
 VERS=		.1
@@ -35,20 +33,14 @@ include ../../Makefile.lib
 
 SRCDIR=		../common
 
-LIBS =		$(DYNLIB) $(LINTLIB)
-
-LINTSRC =       $(LINTLIB:%.ln=%)
+LIBS =		$(DYNLIB)
 
 CFLAGS +=	$(CCVERBOSE)
 LDLIBS +=	-lc
 
-$(LINTLIB) :=	SRCS = ../common/llib-llgrp
-
 .KEEP_STATE:
 
 all : $(LIBS)
-
-lint :	lintcheck
 
 # include library targets
 include ../../Makefile.targ

@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../Makefile.lib
 
@@ -33,16 +31,15 @@ TESTDIRS = fcode_test
 
 EFCODEDIRS= $(ROOTLIBDIR)/efcode $(ROOTLIBDIR)/efcode/$(MACH64)
 
-all:= 		TARGET= all
+all:=		TARGET= all
 install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
-lint:=		TARGET= lint
 
 .PARALLEL: $(SUBDIRS)
 .KEEP_STATE:
 
-all clean clobber lint: $(SUBDIRS)
+all clean clobber: $(SUBDIRS)
 
 $(EFCODEDIRS):
 	$(INS.dir)

@@ -32,7 +32,7 @@ OBJECTS=	adt_jni.o	\
 
 include		$(SRC)/lib/Makefile.lib
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 
 SRCDIR =	../common
 
@@ -45,26 +45,11 @@ SMATCH=off
 DYNFLAGS +=
 LDLIBS +=	-lc -lbsm
 
-CLEANFILES=	$(LINTOUT) $(LINTLIB)
-CLOBBERFILES +=
-
-$(LINTLIB) :=	SRCS=../common/llib-ladt_jni
-
-LINTSRC=	$(LINTLIB:%.ln=%)
-ROOTLINTDIR=	$(ROOTLIBDIR)
-ROOTLINT=	$(LINTSRC:%=$(ROOTLINTDIR)/%)
-
 .KEEP_STATE:
 
-lint:		lintcheck
 
 include		$(SRC)/lib/Makefile.targ
 
 pics/%.o: ../common/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
-
-# install rule for lint library target
-$(ROOTLINTDIR)/%: ../common/%
-	$(INS.file)
-

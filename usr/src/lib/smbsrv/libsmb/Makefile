@@ -28,7 +28,7 @@ HDRS=	libsmb.h
 GENSRCS = common/smb_status_tbl.h
 CLEANFILES += $(GENSRCS)
 
-all install lint: $(GENSRCS)
+all install: $(GENSRCS)
 
 include ../Makefile.smbsrv
 

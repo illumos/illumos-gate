@@ -59,9 +59,7 @@ AS_CPPFLAGS += -D_ASM
 
 all:		$(LIBS)
 
-install:	all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
-
-lint:		lintcheck
+install:	all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTCOMPATLINKS64)
 
 pics/%.o: %.s
 		$(COMPILE.s) -o $@ ${@F:.o=.s}

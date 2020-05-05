@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 ISASRCDIR=../$(MACH)/
 
@@ -33,6 +31,7 @@ include ../../Makefile.lib.64
 
 TYPES=library standalone
 
-INSTALL_DEPS_library = $(ROOTLINKS64) $(ROOTLINT64) $(ROOTLIBS64)
+INSTALL_DEPS_library = $(ROOTLINKS64) $(ROOTLIBS64) \
+	$(ROOTCOMPATLINKS64)
 
 include ../Makefile.targ

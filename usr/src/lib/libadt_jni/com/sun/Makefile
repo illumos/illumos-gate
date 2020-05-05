@@ -23,10 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libadt_jni/com/sun/Makefile
 
 include Makefile.com
 
@@ -44,7 +40,6 @@ all clean install clobber: ${SUBDIRS}
 ${SUBDIRS}: FRC
 	cd $@; pwd; $(MAKE) $(TARGET)
 
-lint:
 
 .WAIT:
 

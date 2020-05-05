@@ -20,17 +20,14 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1996-1997 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-# cmd/ldap/sparc/Makefile
-#
+
 include ../Makefile.com
 
 .KEEP_STATE:
 
-install: $(ALLPROG) $(ROOTPROG) $(ROOTLINKS) $(ROOTLINT)
+install: $(ALLPROG) $(ROOTPROG) $(ROOTLINKS)
 
 FRC:

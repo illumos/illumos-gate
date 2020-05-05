@@ -35,9 +35,7 @@ OBJECTS=	libsysevent.o		\
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
-LIBS =		$(DYNLIB) $(LINTLIB)
-
-LINTSRC =       $(LINTLIB:%.ln=%)
+LIBS =		$(DYNLIB)
 
 CPPFLAGS +=	-D_REENTRANT -I..
 CFLAGS +=	$(CCVERBOSE)
@@ -46,13 +44,9 @@ LDLIBS +=	-lnvpair -lc
 # not linted
 SMATCH=off
 
-$(LINTLIB) :=	SRCS = ../llib-lsysevent
-
 .KEEP_STATE:
 
 all : $(LIBS)
-
-lint : lintcheck
 
 # include library targets
 include ../../Makefile.targ
@@ -60,6 +54,3 @@ include ../../Makefile.targ
 pics/%.o:	../%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
-
-$(ROOTLINTDIR)/%: ../%
-	$(INS.file)

@@ -14,6 +14,6 @@ DYNFLAGS +=	-R$(NSS_LDPATH)
 
 all: $(LIBS)
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBS) $(ROOTLINKS)
 
 FRC:

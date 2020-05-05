@@ -47,13 +47,12 @@ CLEANFILES += $(NDLLIST:%=%_ndr.c)
 
 include ../../Makefile.lib
 
-LIBS=		$(DYNLIB) $(LINTLIB)
+LIBS=		$(DYNLIB)
 
 LDLIBS +=	-lsmbfs -luuid -lc
 
 SRCDIR=		../common
 SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)
-$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 
 NDLDIR =	$(SRCDIR)
 
@@ -63,7 +62,6 @@ CPPFLAGS += $(INCS) -D_REENTRANT
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include ../../Makefile.targ
 

@@ -34,6 +34,6 @@ MISCOBJS=	$(MISCOBJS64)
 
 .KEEP_STATE:
 
-install:	all .WAIT $(ROOTFS_LIBS64) $(ROOTFS_LINKS64)
+install:	all .WAIT $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTCOMPATLINKS64)
 
 include		../Makefile.targ.64

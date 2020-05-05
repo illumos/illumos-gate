@@ -23,16 +23,13 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libgss/sparcv9/Makefile
 
 include ../Makefile.com
 include ../../Makefile.lib.64
 
 GSSMECH_DIR_V9 = $(ROOT)/usr/lib/sparcv9/gss
 
-install: all $(GSSMECH_DIR_V9) $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+install: all $(GSSMECH_DIR_V9) $(ROOTLIBS64) $(ROOTLINKS64)
 
 $(GSSMECH_DIR_V9):
 	$(INS.dir)

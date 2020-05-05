@@ -45,7 +45,7 @@ include ../../Makefile.lib
 
 SRCS = $(LIBSRCS:%.c=$(SRC)/common/mdesc/%.c)
 
-LIBS = $(DYNLIB) $(LINTLIB)
+LIBS = $(DYNLIB)
 
 SRCDIR =	../common
 
@@ -54,24 +54,14 @@ CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS64)
 LDLIBS += -lc
 
-LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN -v
-LINTFLAGS64 += -erroff=E_BAD_PTR_CAST_ALIGN -v
-$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
-$(LINTLIB) := LINTFLAGS = -nsvx
-$(LINTLIB) := LINTFLAGS64 = -nsvx -m64
 
 .KEEP_STATE:
 
 all: $(LIBS)
 
-lint: $(LINTLIB) lintcheck
-
 pics/%.o: $(SRC)/common/mdesc/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
-
-%.ln: $(SRC)/common/mdesc/%.c
-	$(LINT.c) -o $@ $<
 
 include ../../../Makefile.targ
 include ../../Makefile.targ

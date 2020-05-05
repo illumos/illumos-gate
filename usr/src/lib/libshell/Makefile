@@ -35,20 +35,19 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
-_msg := 	TARGET= _msg
+_msg :=		TARGET= _msg
 
 .KEEP_STATE:
 
-all clean clobber install lint _msg: $(SUBDIRS)
+all clean clobber install _msg: $(SUBDIRS)
 
-LIBRARY= 	libshell.a
+LIBRARY=	libshell.a
 
 HDRS= \
 	history.h \
 	nval.h \
 	shell.h
-	
+
 HDRDIR32= $(MACH)/include/ast
 HDRDIR64= $(MACH64)/include/ast
 include ../Makefile.asthdr

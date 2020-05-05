@@ -31,24 +31,23 @@ HDRDIR = common
 
 ROOTHDRDIR = $(ROOT)/usr/platform/sun4v/include/sys
 
-SUBDIRS = $(MACH) 
+SUBDIRS = $(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
 all := TARGET = all
 clean := TARGET = clean
 clobber := TARGET = clobber
 install := TARGET = install
-lint := TARGET = lint
 
 .KEEP_STATE:
 
-all clean clobber lint: $(SUBDIRS)
+all clean clobber: $(SUBDIRS)
 
 check: $(CHECKHDRS)
 
 install: all .WAIT $(SUBDIRS)
 
-install_h: $(ROOTHDRS) 
+install_h: $(ROOTHDRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

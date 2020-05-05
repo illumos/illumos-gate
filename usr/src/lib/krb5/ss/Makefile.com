@@ -82,7 +82,6 @@ $(PICS) :=      CFLAGS += $(XFFLAG)
 
 all:	$(LIBS)
 
-lint: lintcheck
 
 # include library targets
 include ../../Makefile.targ

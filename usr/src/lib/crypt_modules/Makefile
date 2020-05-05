@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 SUBDIRS = \
 	bsdmd5 \
@@ -36,14 +35,13 @@ clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 delete :=	TARGET= delete
 install :=	TARGET= install
-lint :=		TARGET= lint
 catalog :=	TARGET= catalog
 package :=	TARGET= package
 _msg :=		TARGET= _msg
 
 .KEEP_STATE:
 
-all lint clean clobber catalog package install _msg: $(SUBDIRS)
+all clean clobber catalog package install _msg: $(SUBDIRS)
 
 install: all
 

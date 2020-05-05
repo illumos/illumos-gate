@@ -61,14 +61,13 @@ HDRS=		tnf.h
 ROOTHDRDIR=	$(ROOT)/usr/include/tnf
 ROOTHDRS=	$(HDRS:%=$(ROOTHDRDIR)/%)
 CHECKHDRS=	$(HDRS:%.h=%.check)
-$(ROOTHDRS) := 	FILEMODE = 0644
+$(ROOTHDRS) :=	FILEMODE = 0644
 CHECKHDRS =	$(HDRS:%.h=%.check)
 
 $(ROOTHDRS) :=	FILEMODE = 644
 
 CPPFLAGS +=	-D_DATUM_MACROS -D_REENTRANT
 
-LINTFLAGS +=	-y
 
 CERRWARN +=	-_gcc=-Wno-unused-variable
 
@@ -80,8 +79,6 @@ install: all $(ROOTLIBDIR) $(ROOTLIBS) $(ROOTLINKS)
 
 install_h: $(ROOTHDRDIR) $(ROOTHDRS)
 
-lint:
-	$(LINT.c) $(SRCS)
 
 check: $(CHECKHDRS)
 

@@ -27,14 +27,13 @@ all	:= TARGET= all
 clean	:= TARGET= clean
 clobber	:= TARGET= clobber
 install	:= TARGET= install
-lint	:= TARGET= lint
 
 
 # This is the default Makefile target.  The objects listed here
 # are what get build when you type just "make" with no arguments.
 #
 all install:	sqlite.h $(SUBDIRS)
-clobber lint:	$(SUBDIRS)
+clobber:	$(SUBDIRS)
 
 $(ROOTHDRDIR):
 	$(INS.dir)

@@ -41,6 +41,5 @@ SMATCH=off
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include	$(SRC)/lib/Makefile.targ

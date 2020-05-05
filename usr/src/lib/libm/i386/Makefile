@@ -23,6 +23,6 @@ include ../Makefile.com
 CFLAGS		+= -_gcc=-ffloat-store
 $(OBJS_M9XSSE)	:= CFLAGS += -xarch=sse2
 
-install: 	all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install:	all $(ROOTLIBS) $(ROOTLINKS) $(ROOTCOMPATLINKS)
 
 include ../Makefile.targ

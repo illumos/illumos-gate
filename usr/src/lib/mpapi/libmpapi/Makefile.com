@@ -31,12 +31,11 @@ OBJECTS=	mpapi.o mpapi-sun.o
 include ../../../Makefile.lib
 include ../../../Makefile.rootfs
 
-SRCDIR = 	../common
+SRCDIR =	../common
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc
 
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR) -mt $(CCVERBOSE) -D_POSIX_PTHREAD_SEMANTICS
@@ -61,7 +60,6 @@ $(IETCFILES) := FILEMODE = 0644
 
 all: $(LIBS) $(IETCFILES)
 
-lint:
 
 $(ROOTETC)/%:	$(CONFDIR)/%
 	$(INS.file)

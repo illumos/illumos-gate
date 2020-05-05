@@ -20,24 +20,19 @@ OBJECTS = str.o strview.o util.o cxx_util.o cxx.o demangle.o rust.o
 
 include ../../Makefile.lib
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lcustr
 
 SRCDIR =	../common
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CSTD =		$(CSTD_GNU99)
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR) -D_REENTRANT -D__EXTENSIONS__
 
-LINTFLAGS +=	-erroff=E_BAD_FORMAT_ARG_TYPE2
-LINTFLAGS64 +=	-erroff=E_BAD_FORMAT_ARG_TYPE2
-C99LMODE =	-Xc99=%all
 
 .KEEP_STATE:
 
 all:		$(LIBS)
 
-lint:		lintcheck
 
 include $(SRC)/lib/Makefile.targ

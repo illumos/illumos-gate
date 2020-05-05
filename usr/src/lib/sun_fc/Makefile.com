@@ -156,14 +156,9 @@ $(__SUNC)CCNEEDED	= $(CCEXTNEEDED)
 LDLIBS			+= $(CCNEEDED)
 LDLIBS			+= -lc
 
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:
 
 all: $(LIBS)
-
-lint:
-	@echo "This section is not required to be lint clean"
-	@echo "C++"
 
 include ../../Makefile.targ

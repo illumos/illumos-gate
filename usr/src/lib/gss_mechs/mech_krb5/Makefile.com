@@ -55,10 +55,10 @@ CRYPTO_UTS= cksumtypes.o decrypt.o encrypt.o encrypt_length.o \
 CRYPTO_RAW= raw_decrypt.o raw_encrypt.o
 
 # crypto/des user space only
-CRYPTO_DES= afsstring2key.o string2key.o 
+CRYPTO_DES= afsstring2key.o string2key.o
 
 # crypto/des common to user and kernel space
-CRYPTO_DES_UTS= f_cbc.o f_cksum.o f_parity.o weak_key.o d3_cbc.o 
+CRYPTO_DES_UTS= f_cbc.o f_cksum.o f_parity.o weak_key.o d3_cbc.o
 
 # crypto/arcfour user space only
 CRYPTO_ARCFOUR= arcfour_str2key.o
@@ -95,7 +95,7 @@ CRYPTO_KEYHASH= k5_md5des.o hmac_md5.o
 CRYPTO_KEYHASH_UTS= descbc.o
 
 # crypto/old
-CRYPTO_OLD=  des_stringtokey.o 
+CRYPTO_OLD=  des_stringtokey.o
 
 # crypto/old
 CRYPTO_OLD_UTS=  old_encrypt.o old_decrypt.o
@@ -159,7 +159,7 @@ K5_POSIX= setenv.o
 K5_RCACHE=rc_base.o rc_file.o rc_mem.o rc_common.o rc_io.o rcdef.o rc_conv.o \
 	ser_rc.o rcfns.o rc_none.o
 
-MECH= 	accept_sec_context.o store_cred.o \
+MECH=	accept_sec_context.o store_cred.o \
 	add_cred.o disp_com_err_status.o  disp_major_status.o \
 	compare_name.o context_time.o copy_ccache.o \
 	disp_name.o disp_status.o export_sec_context.o \
@@ -269,7 +269,7 @@ SMATCH=off
 
 MAPFILES =	../mapfile-vers
 
-#CPPFLAGS += 	-D_REENTRANT
+#CPPFLAGS +=	-D_REENTRANT
 $(PICS) :=	CFLAGS += $(XFFLAG)
 $(PICS) :=	CFLAGS64 += $(XFFLAG)
 $(PICS) :=	CCFLAGS += $(XFFLAG)
@@ -572,10 +572,3 @@ kwarnd_handle.c: $(SRC)/cmd/krb5/kwarn/kwarnd_handle.c
 
 CLOBBERFILES += kwarnd.h \
 	kwarnd_clnt.c kwarnd_clnt_stubs.c kwarnd_handle.c kwarnd_xdr.c
-
-# So lint.out won't be needlessly recreated
-lint: $(LINTOUT)
-
-$(LINTOUT): $(SOURCES)
-	$(LINT.c) -o $(LIBNAME) $(SOURCES) > $(LINTOUT) 2>&1
-

@@ -24,9 +24,8 @@
 #
 
 #
-# This make file will build mech_spnego.so.1. This shared object
-# contains all the functionality needed to support the 
-# SPNEGO GSS-API mechanism. 
+# This make file will build mech_spnego.so.1. This shared object contains all
+# the functionality needed to support the SPNEGO GSS-API mechanism.
 #
 
 include ../../Makefile.lib
@@ -41,11 +40,10 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=         TARGET= lint
 
 .KEEP_STATE:
 
-all clean clobber install lint:  $(SUBDIRS)
+all clean clobber install:  $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

@@ -32,19 +32,18 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 
 
 HDRS = gfc.h g_state.h g_scsi.h
 HDRDIR = common/hdrs
 
 .KEEP_STATE:
- 
+
 install_h: $(ROOTHDRS)
 
 check: $(CHECKHDRS)
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

@@ -33,7 +33,7 @@ include ../../../Makefile.lib
 include ../../Makefile.lib
 
 SRCS = $(LIBSRCS:%.c=../common/%.c)
-LIBS = $(DYNLIB) $(LINTLIB)
+LIBS = $(DYNLIB)
 CLEANFILES += fmd_rpc.c fmd_xdr.c fmd_rpc_adm.h fmd_rpc_adm.x
 
 SRCDIR =	../common
@@ -44,18 +44,10 @@ CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CERRWARN += -_gcc=-Wno-unused-variable
 LDLIBS += -lnvpair -lnsl -lc
 
-LINTFLAGS = -msux
-LINTFLAGS64 = -msux -m64
-
-$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
-$(LINTLIB) := LINTFLAGS = -nsvx
-$(LINTLIB) := LINTFLAGS64 = -nsvx -m64
 
 .KEEP_STATE:
 
 all: $(LIBS)
-
-lint: $(LINTLIB) lintcheck
 
 fmd_rpc_adm.x: $(SRC)/cmd/fm/fmd/common/fmd_rpc_adm.x
 	$(RM) $@; $(CP) $? $@

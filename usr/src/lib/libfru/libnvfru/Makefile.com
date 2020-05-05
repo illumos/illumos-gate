@@ -35,25 +35,14 @@ CLOBBERFILES += $(LIBLINKS)
 
 LIBS =		$(DYNLIB)
 
-LINTFLAGS =	-uxn
-LINTFLAGS64 =	$(LINTFLAGS) -m64
-LINTOUT=	lint.out
-LINTSRC =       $(LINTLIB:%.ln=%)
-ROOTLINTDIR =   $(ROOTLIBDIR)
-ROOTLINT =      $(LINTSRC:%=$(ROOTLINTDIR)/%)
-
-CLEANFILES=	$(LINTOUT)
-
 CPPFLAGS +=	-I.. \
 		-I$(SRC)/lib/libfru/include \
 		-I$(SRC)/lib/libfruutils
-CPPFLAGS += 	-D_REENTRANT
+CPPFLAGS +=	-D_REENTRANT
 CFLAGS +=	$(CCVERBOSE)
 
 CERRWARN +=	-_gcc=-Wno-switch
 
-$(LINTLIB) :=	LINTFLAGS = -nvx -I..
-$(LINTLIB) :=	LINTFLAGS64 = -nvx -m64 -I..
 
 XGETFLAGS += -a
 
@@ -61,14 +50,9 @@ XGETFLAGS += -a
 
 all : $(LIBS)
 
-lint :	lintcheck
-
 # include library targets
 include $(SRC)/lib/Makefile.targ
 
 pics/%.o:	../%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
-
-$(ROOTLINTDIR)/%: ../%
-	$(INS.file)

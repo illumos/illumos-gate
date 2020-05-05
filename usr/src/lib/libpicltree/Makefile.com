@@ -30,9 +30,8 @@ OBJECTS=	picltree.o
 
 include $(SRC)/lib/Makefile.lib
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CPPFLAGS +=	-D_REENTRANT -I.. -I../../libpicl -I$(SRC)/cmd/picl/plugins/inc
 CFLAGS +=	$(CCVERBOSE)
@@ -46,6 +45,5 @@ SMATCH=off
 
 all : $(LIBS)
 
-lint: lintcheck
 
 include $(SRC)/lib/Makefile.targ

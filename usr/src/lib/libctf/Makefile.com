@@ -30,7 +30,6 @@ include ../../Makefile.rootfs
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include ../../Makefile.targ
 include ../Makefile.shared.targ

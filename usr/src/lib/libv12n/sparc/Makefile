@@ -46,7 +46,7 @@ LDLIBS += -luuid -lc
 
 CPPFLAGS += -I. -I$(SRC)/lib/libds/common -I$(SRC)/cmd/ldmad
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBS) $(ROOTLINKS)
 
 pics/%.o: $(SRC)/common/mdesc/%.c
 	$(COMPILE.c) -o $@ $<

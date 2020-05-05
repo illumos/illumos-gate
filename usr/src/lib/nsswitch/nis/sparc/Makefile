@@ -23,7 +23,7 @@
 # Copyright 1993,2001-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # lib/nsswitch/nis/sparc/Makefile
 
@@ -33,4 +33,4 @@ LIBS =		$(DYNLIB1)
 
 include		../../Makefile.targ
 
-install:	all $(ROOTLIBS)
+install:	all $(ROOTLIBS) $(ROOTCOMPATLINKS)

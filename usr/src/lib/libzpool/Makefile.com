@@ -48,7 +48,7 @@ SRCDIR=		../common
 # There should be a mapfile here
 MAPFILES =
 
-LIBS +=		$(DYNLIB) $(LINTLIB)
+LIBS +=		$(DYNLIB)
 
 INCS += -I../common
 INCS += -I../../../uts/common/fs/zfs
@@ -62,12 +62,9 @@ INCS += -I../../libzutil/common
 CLEANFILES += ../common/zfs.h
 CLEANFILES += $(EXTPICS)
 
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
-$(LINTLIB): ../common/zfs.h
 $(LIBS): ../common/zfs.h
 
 CSTD=	$(CSTD_GNU99)
-C99LMODE=	-Xc99=%all
 
 CFLAGS +=	$(CCGDEBUG) $(CCVERBOSE) $(CNOGLOBAL)
 CFLAGS64 +=	$(CCGDEBUG) $(CCVERBOSE) $(CNOGLOBAL)
@@ -77,8 +74,6 @@ NATIVE_LIBS +=	libz.so
 CPPFLAGS.first =	-I$(SRC)/lib/libfakekernel/common
 CPPFLAGS +=	$(INCS)	-DDEBUG -D_FAKE_KERNEL
 
-LINTFLAGS +=	-erroff=E_STATIC_UNUSED $(INCS)
-LINTFLAGS64 +=	-erroff=E_STATIC_UNUSED $(INCS)
 
 # The following is needed to fix the SmartOS build; see OS-6582. We cannot do
 # a conditional appendage to INCS, since that breaks the lint build.
@@ -100,7 +95,6 @@ SMATCH=off
 
 all: $(LIBS)
 
-lint: $(LINTLIB)
 
 include ../../Makefile.targ
 

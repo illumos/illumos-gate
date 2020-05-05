@@ -31,7 +31,7 @@ OBJECTS = $(MACHCOBJS) $(CMNOBJS)
 
 include ../../Makefile.lib
 
-LIBS = $(DYNLIB) $(LINTLIB)
+LIBS = $(DYNLIB)
 
 SRCDIR = ../common
 SRCS = $(MACHCOBJS:%.o=../$(MACH)/%.c)
@@ -41,13 +41,11 @@ CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
 CERRWARN += $(CNOWARN_UNINIT)
 
-$(LINTLIB) :=	SRCS = ../common/llib-lv12n
 
 .KEEP_STATE:
 
 all: $(LIBS)
 
-lint: $(LINTLIB) lintcheck
 
 pics/%.o: ../$(MACH)/%.c
 	$(COMPILE.c) -o $@ $<

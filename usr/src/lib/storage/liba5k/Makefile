@@ -35,14 +35,13 @@ install_h :=	TARGET= install_h
 check :=	TARGET= check
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 
 HDRS =	a5k.h a_state.h exec.h rom.h
 HDRDIR = common/hdrs
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 install_h:      $(ROOTHDRS)
 check:          $(CHECKHDRS)

@@ -24,13 +24,10 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# usr/src/lib/pam_modules/sample/Makefile.com
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 LIBRARY=	pam_sample.a
 VERS=		.1
-OBJECTS= 	sample_authenticate.o \
+OBJECTS=	sample_authenticate.o \
 		sample_setcred.o \
 		sample_acct_mgmt.o \
 		sample_close_session.o \
@@ -44,6 +41,5 @@ LDLIBS +=	-lpam -lc
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include $(SRC)/lib/Makefile.targ

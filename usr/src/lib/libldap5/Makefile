@@ -32,7 +32,6 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 LIBRARY=        libldap.a
@@ -46,10 +45,6 @@ POFILES=        generic.po
 all clean install: $(SUBDIRS)
 clobber: $(SUBDIRS)
 	$(RM) $(CLOBBERFILES)
-
-lint:
-	@ $(ECHO) "usr/src/lib/libldap5 is third-party code that"
-	@ $(ECHO) "will never be made lint-clean: skipping"
 
 # install rule for install_h target
 $(ROOTHDRDIR)/%: %

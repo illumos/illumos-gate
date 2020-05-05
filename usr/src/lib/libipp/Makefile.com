@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY =	libipp.a
 VERS =		.1
@@ -33,8 +31,7 @@ OBJECTS =	libipp.o
 # include library definitions
 include ../../Makefile.lib
 
-LIBS =		$(DYNLIB) $(LINTLIB)
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lnvpair
 
 CFLAGS +=	$(CCVERBOSE)
@@ -44,6 +41,5 @@ CPPFLAGS +=	-D_REENTRANT
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include ../../Makefile.targ

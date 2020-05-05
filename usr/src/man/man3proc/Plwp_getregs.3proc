@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd May 02, 2020
 .Dt PLWP_GETREGS 3PROC
 .Os
 .Sh NAME
@@ -40,13 +40,13 @@
 .Fo Plwp_getregs
 .Fa "struct ps_prochandle *P"
 .Fa "lwpid_t lwpid"
-.Fa "prpregset_t *gregs"
+.Fa "prgregset_t gregs"
 .Fc
 .Ft int
 .Fo Plwp_setregs
 .Fa "struct ps_prochandle *P"
 .Fa "lwpid_t lwpid"
-.Fa "const prpregset_t gregs"
+.Fa "const prgregset_t gregs"
 .Fc
 .Sh DESCRIPTION
 The
@@ -98,8 +98,8 @@ Processes may be stopped with
 .Xr Pstop 3PROC .
 The structures used for registers are described in
 .Xr proc 4
-and their defintions may be found in
-.In sys/regset.h .
+and their definitions may be found in
+.In procfs.h .
 The definitions of these structures varies based on the architecture of
 the system and the running process.
 .Pp

@@ -47,7 +47,6 @@ clean :=        TARGET= clean
 clobber :=      TARGET= clobber
 delete :=       TARGET= delete
 install :=      TARGET= install
-lint :=         TARGET= lint
 catalog :=      TARGET= catalog
 package :=      TARGET= package
 _msg :=		TARGET= _msg
@@ -57,7 +56,7 @@ all:            $(DERIVED_FILES) .WAIT $(SUBDIRS)
 
 install:        $(DERIVED_FILES) .WAIT $(SUBDIRS)
 
-clean clobber delete lint catalog package:      $(SUBDIRS)
+clean clobber delete catalog package:      $(SUBDIRS)
 
 #
 # Rules for building the derived files

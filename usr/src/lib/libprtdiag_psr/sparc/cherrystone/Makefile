@@ -37,7 +37,6 @@ IFLAGS += -I$(UTSBASE)/sun4u
 
 LDLIBS +=	-lpicl
 
-LINTFLAGS += $(IFLAGS)
 
 #
 # links in /usr/platform

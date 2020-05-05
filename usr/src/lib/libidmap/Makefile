@@ -38,15 +38,14 @@ XGETFLAGS =	--foreign-user --strict -n -E --width=72 \
 		--omit-header --keyword=directoryError:2 \
 		--language=C --force-po
 
-all := 		TARGET = all
+all :=		TARGET = all
 clean :=	TARGET = clean
 clobber :=	TARGET = clobber
 install	:=	TARGET = install
-lint :=		TARGET = lint
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 install_h:	$(ROOTHDRS)
 

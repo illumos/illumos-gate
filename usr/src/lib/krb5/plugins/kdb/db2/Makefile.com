@@ -37,7 +37,7 @@ DB2_OBJS= \
 	kdb_db2.o \
 	kdb_xdr.o \
 	pol_xdr.o
- 
+
 OBJECTS= $(DB2_OBJS)
 
 # include library definitions
@@ -54,7 +54,7 @@ POFILES = generic.po
 #override liblink
 INS.liblink=	-$(RM) $@; $(SYMLINK) $(LIBLINKS)$(VERS) $@
 
-CPPFLAGS += 	-DHAVE_CONFIG_H -DHAVE_BT_RSEQ \
+CPPFLAGS +=	-DHAVE_CONFIG_H -DHAVE_BT_RSEQ \
 		-I$(SRC)/cmd/krb5/iprop \
 		-I$(SRC)/lib/krb5 \
 		-I$(SRC)/lib/krb5/kdb \
@@ -80,7 +80,6 @@ LDLIBS +=	-L $(ROOTLIBDIR) -ldb2 -lkdb -lkadm5srv -lc -lnsl
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 # include library targets
 include $(SRC)/lib/krb5/Makefile.targ

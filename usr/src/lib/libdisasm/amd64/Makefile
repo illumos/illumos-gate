@@ -30,7 +30,7 @@ include ../../Makefile.lib.64
 
 TYPES=library standalone
 
-INSTALL_DEPS_library = $(ROOTLINKS64) $(ROOTLINT64) $(ROOTLIBS64)
+INSTALL_DEPS_library = $(ROOTLINKS64) $(ROOTLIBS64)
 INSTALL_DEPS_standalone = $(ROOTLIBS64)
 
 include ../Makefile.targ

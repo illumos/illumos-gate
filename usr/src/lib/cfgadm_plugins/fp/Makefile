@@ -18,13 +18,12 @@
 #
 # CDDL HEADER END
 #
-# lib/cfgadm_plugins/fp/Makefile
-# 
+
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
+
 
 include		../../Makefile.lib
 
@@ -35,10 +34,9 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint := 	TARGET= lint
 _msg :=		TARGET= _msg
 
-TEXT_DOMAIN= 	SUNW_OST_OSLIB
+TEXT_DOMAIN=	SUNW_OST_OSLIB
 XGETFLAGS=	-a -x fp.xcl
 POFILE=		fp.po
 POFILES=	generic.po
@@ -49,9 +47,10 @@ CP=	cp
 
 .KEEP_STATE:
 
-all lint clean delete install package: $(SUBDIRS)
+all clean delete install package: $(SUBDIRS)
 clobber: $(SUBDIRS)
 	$(RM) $(POFILE) $(POFILES)
+
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

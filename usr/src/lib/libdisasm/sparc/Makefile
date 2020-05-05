@@ -29,7 +29,7 @@ include ../Makefile.com
 
 TYPES=library standalone
 
-INSTALL_DEPS_library =		$(ROOTLINKS) $(ROOTLINT) $(ROOTLIBS)
+INSTALL_DEPS_library =		$(ROOTLINKS) $(ROOTLIBS)
 INSTALL_DEPS_standalone =	$(ROOTLIBS)
 
 include ../Makefile.targ

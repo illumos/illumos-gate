@@ -26,21 +26,14 @@
 
 include		../Makefile.com
 
-ROOTFS_LIBDIR64 = \
-		$(VAR_LIBLDDBG_64_ROOTFS_LIBDIR)
-ROOTFS_DYNLIB64 = \
-		$(DYNLIB:%=$(ROOTFS_LIBDIR64)/%)
-
 CONVLIBDIR =	$(CONVLIBDIR64)
 
 .KEEP_STATE:
 
-$(ROOTFS_DYNLIB64) :=	FILEMODE= 755
-
 all:		$(DYNLIB) $(LIBLINKS)
 
 install \
-package:	all $(ROOTFS_DYNLIB64)
+package:	all $(ROOTLIBS64) $(ROOTCOMPATLINKS64)
 
 include		../Makefile.targ
 include		../../Makefile.sub.64

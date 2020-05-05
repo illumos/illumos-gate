@@ -42,7 +42,6 @@ $(POFILE): $(POFILES)
 	$(RM) $@
 	$(CAT) $(POFILES) > $@
 
-lint:
 
 clean:
 	-$(RM) $(PROGS) $(POFILES) $(POFILE)

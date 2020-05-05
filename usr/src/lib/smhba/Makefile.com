@@ -35,7 +35,7 @@ include ../../Makefile.lib
 
 HETCFILES=	$(CONFIGFILE:%=$(ROOTETC)/%)
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 SRCDIR=		../common
 
 INCS +=		-I$(SRCDIR)
@@ -54,7 +54,6 @@ SMOFF += indenting,all_func_returns
 
 LDLIBS +=	-lc
 
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 $(ROOTETC)/%:	../common/%
 	$(INS.file)
@@ -63,6 +62,5 @@ $(ROOTETC)/%:	../common/%
 
 all:	$(LIBS) $(HETCFILES)
 
-lint: lintcheck
 
 include ../../Makefile.targ

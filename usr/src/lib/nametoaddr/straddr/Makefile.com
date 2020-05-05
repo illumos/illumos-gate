@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY =	libstraddr.a
 VERS =		.2
@@ -48,6 +46,5 @@ CPPFLAGS +=	-D_REENTRANT
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include ../../../Makefile.targ

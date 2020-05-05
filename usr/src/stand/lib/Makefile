@@ -28,13 +28,10 @@ include Makefile.com
 
 i386_SUBDIRS =
 sparc_SUBDIRS =
-SUBDIRS = fakeboot fs/hsfs fs/nfs fs/ufs inet sa sock tcpstubs xdr \
+SUBDIRS = fs/hsfs fs/nfs fs/ufs inet sa sock tcpstubs xdr \
 	tcp $($(MACH)_SUBDIRS)
 
-#
-# Don't lint fakeboot since it doesn't have any source files.
-#
-LINTSUBDIRS = $(SUBDIRS:fakeboot=)
+LINTSUBDIRS = $(SUBDIRS)
 
 #
 # We can get away with this since we're only building .a's, and by the

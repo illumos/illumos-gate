@@ -7,4 +7,4 @@
 
 include ../Makefile.com
 
-install: all $(ROOTLIBS) .WAIT $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBS) .WAIT $(ROOTLINKS)

@@ -23,11 +23,10 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 LIBRARY=	pam_allow.a
 VERS=		.1
-OBJECTS= 	allow.o
+OBJECTS=	allow.o
 
 include		../../Makefile.pam_modules
 
@@ -35,6 +34,5 @@ LDLIBS +=	-lpam -lc
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include $(SRC)/lib/Makefile.targ

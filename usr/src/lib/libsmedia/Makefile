@@ -22,11 +22,6 @@
 # Copyright (c) 1991-1999 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libsmedia/Makefile
-#
-
 
 SUBDIRS = plugins library
 def             :=      TARGET= def
@@ -34,12 +29,9 @@ all             :=      TARGET= all
 install         :=      TARGET= install
 clean           :=      TARGET= clean
 clobber         :=      TARGET= clobber
-lint            :=      TARGET= lint
-modlintlib      :=      TARGET= modlintlib
-clean.lint      :=      TARGET= clean.lint
-_msg      	:=      TARGET= catalog
+_msg		:=	TARGET= catalog
 
-all install clean clobber lint _msg : $(SUBDIRS)
+all install clean clobber _msg: $(SUBDIRS)
 
 $(SUBDIRS) : FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
@@ -47,5 +39,5 @@ $(SUBDIRS) : FRC
 install_h check :
 	@cd library; pwd; $(MAKE) $@
 
-FRC : 
+FRC :
 

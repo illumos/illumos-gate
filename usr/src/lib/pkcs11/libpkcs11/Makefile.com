@@ -29,33 +29,33 @@ VERS= .1
 
 
 OBJECTS= \
-	metaAttrManager.o \
-	metaCrypt.o \
-	metaDigest.o \
-	metaDualCrypt.o \
-	metaGeneral.o \
-	metaKeys.o \
-	metaMechManager.o \
-	metaObject.o \
-	metaObjectManager.o \
-	metaRand.o \
-	metaSession.o \
-	metaSessionManager.o \
-	metaSign.o \
-	metaSlotManager.o \
-	metaSlotToken.o \
-	metaUtil.o \
-	metaVerify.o \
-	pkcs11General.o 	\
-	pkcs11SlotToken.o 	\
-	pkcs11Session.o 	\
-	pkcs11Object.o 		\
-	pkcs11Crypt.o 		\
-	pkcs11Digest.o	 	\
-	pkcs11Sign.o 		\
-	pkcs11Verify.o 		\
-	pkcs11DualCrypt.o 	\
-	pkcs11Keys.o 		\
+	metaAttrManager.o	\
+	metaCrypt.o		\
+	metaDigest.o		\
+	metaDualCrypt.o		\
+	metaGeneral.o		\
+	metaKeys.o		\
+	metaMechManager.o	\
+	metaObject.o		\
+	metaObjectManager.o	\
+	metaRand.o		\
+	metaSession.o		\
+	metaSessionManager.o	\
+	metaSign.o		\
+	metaSlotManager.o	\
+	metaSlotToken.o		\
+	metaUtil.o		\
+	metaVerify.o		\
+	pkcs11General.o		\
+	pkcs11SlotToken.o	\
+	pkcs11Session.o		\
+	pkcs11Object.o		\
+	pkcs11Crypt.o		\
+	pkcs11Digest.o		\
+	pkcs11Sign.o		\
+	pkcs11Verify.o		\
+	pkcs11DualCrypt.o	\
+	pkcs11Keys.o		\
 	pkcs11Rand.o		\
 	pkcs11Slottable.o	\
 	pkcs11Conf.o		\
@@ -67,14 +67,12 @@ include ../../../Makefile.lib
 SRCDIR=		../common
 INCDIR=		../../include
 
-LIBS =		$(DYNLIB) $(LINTLIB)
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lcryptoutil -lc
 
 CFLAGS	+=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(INCDIR) -I$(SRCDIR) -D_REENTRANT
 
-LINTFLAGS64 += -errchk=longptr64
 
 CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	$(CNOWARN_UNINIT)
@@ -86,6 +84,5 @@ SMATCH=off
 
 all:	$(LIBS)
 
-lint: lintcheck
 
 include $(SRC)/lib/Makefile.targ

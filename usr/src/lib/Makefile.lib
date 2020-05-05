@@ -119,6 +119,7 @@ $(ROOTDEMODIRS) :=	DIRMODE =	755
 
 ARFLAGS=	r
 SONAME=		$(DYNLIB)
+
 # For most libraries, we should be able to resolve all symbols at link time,
 # either within the library or as dependencies, all text should be pure, and
 # combining relocations into one relocation table reduces startup costs.
@@ -262,5 +263,16 @@ CLOBBERTARGFILES= $(LIBS) $(DYNLIB) $(CLOBBERFILES)
 TYPECHECK_LIB32 =		$(TYPECHECK_LIB:%=$(MACH)/%)
 TYPECHECK_LIB64 =		$(TYPECHECK_LIB:%=$(MACH64)/%)
 TYPECHECK_LIST=			$(TYPELIST:%=-T %)
-$(BUILD64)TYPECHECK.lib =	$(CTFDIFF) -t -I $(TYPECHECK_LIST) $(TYPECHECK_LIB32) $(TYPECHECK_LIB64)
+$(BUILD64)TYPECHECK.lib =	$(CTFDIFF) -t -I $(TYPECHECK_LIST) \
+	$(TYPECHECK_LIB32) $(TYPECHECK_LIB64)
 TYPECHECK =			$(TYPECHECK_LIB:%=%.typecheck)
+
+# Links we need to create for compatibility
+COMPATLINKS=
+COMPATLINKS64=
+ROOTCOMPATLINKS=	$(COMPATLINKS:%=$(ROOT)/%)
+ROOTCOMPATLINKS64=	$(COMPATLINKS64:%=$(ROOT)/%)
+
+# So if someone doesn't set the target-specific variable they get a clue what
+# went wrong.
+COMPATLINKTARGET=	/__you_didnt_use_COMPATLINKS_properly__

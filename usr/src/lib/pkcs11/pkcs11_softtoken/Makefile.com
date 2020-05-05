@@ -124,7 +124,6 @@ LIBS    =       $(DYNLIB)
 LDLIBS  +=      -lc -lmd -lcryptoutil -lsoftcrypto -lgen
 
 CSTD =	$(CSTD_GNU99)
-C99LMODE = -Xc99=%all
 
 CFLAGS	+=      $(CCVERBOSE)
 
@@ -145,21 +144,14 @@ CPPFLAGS += -I$(AESDIR) -I$(BLOWFISHDIR) -I$(ARCFOURDIR) -I$(DESDIR) \
 	    -I$(BIGNUMDIR) -I$(PADDIR) -D_POSIX_PTHREAD_SEMANTICS \
 	    -DMP_API_COMPATIBLE -DNSS_ECC_MORE_THAN_SUITE_B
 
-LINTFLAGS64 += -errchk=longptr64
 
 ROOTLIBDIR=     $(ROOT)/usr/lib/security
 ROOTLIBDIR64=   $(ROOT)/usr/lib/security/$(MACH64)
-
-LINTSRC = \
-	$(LCL_OBJECTS:%.o=$(SRCDIR)/%.c) \
-	$(RNG_COBJECTS:%.o=$(RNGDIR)/%.c)
 
 .KEEP_STATE:
 
 all:	$(LIBS)
 
-lint:	$$(LINTSRC)
-	$(LINT.c) $(LINTCHECKFLAGS) $(LINTSRC) $(LDLIBS)
 
 pics/%.o:	$(BERDIR)/%.c
 	$(COMPILE.c) -o $@ $< -D_SOLARIS_SDK -I$(BERDIR) \

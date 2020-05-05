@@ -30,11 +30,10 @@ OBJECTS =	config_admin.o
 
 include ../../Makefile.lib
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-ldevinfo -lc
 
 SRCDIR =	../common
-$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-type-limits
@@ -46,6 +45,5 @@ SMOFF += snprintf_overflow
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include ../../Makefile.targ

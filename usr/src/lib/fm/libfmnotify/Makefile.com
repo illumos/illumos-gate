@@ -33,7 +33,7 @@ include ../../../Makefile.lib
 include ../../Makefile.lib
 
 SRCS = $(LIBSRCS:%.c=../common/%.c)
-LIBS = $(DYNLIB) $(LINTLIB)
+LIBS = $(DYNLIB)
 
 SRCDIR =	../common
 
@@ -46,18 +46,10 @@ CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 $(DYNLIB) := LDLIBS += $(MACH_LDLIBS)
 $(DYNLIB) := LDLIBS += -lnvpair -lc -lfmd_msg -lfmevent -lscf -ldiagcode
 
-LINTFLAGS = -msux
-LINTFLAGS64 = -msux -m64
-
-$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
-$(LINTLIB) := LINTFLAGS = -nsvx
-$(LINTLIB) := LINTFLAGS64 = -nsvx -m64
 
 .KEEP_STATE:
 
 all: $(LIBS)
-
-lint: $(LINTLIB) lintcheck
 
 include ../../../Makefile.targ
 include ../../Makefile.targ

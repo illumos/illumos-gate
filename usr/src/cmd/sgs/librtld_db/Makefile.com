@@ -32,6 +32,7 @@ BLTOBJ=		msg.o
 OBJECTS =	$(BLTOBJ) $(COMOBJS) $(COMOBJS64) $(PLTOBJS)
 
 include		$(SRC)/lib/Makefile.lib
+include		$(SRC)/lib/Makefile.rootfs
 include		$(SRC)/cmd/sgs/Makefile.com
 
 SRCDIR =	../common

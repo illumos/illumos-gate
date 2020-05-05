@@ -78,7 +78,7 @@ OBJECTS= $(OBJ_LIB) $(OBJ_CMN)
 
 include $(SRC)/lib/Makefile.lib
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 
 SRCDIR=		../smb
 CMNDIR=		$(SRC)/common/smbclnt
@@ -86,7 +86,6 @@ CMNDIR=		$(SRC)/common/smbclnt
 SRCS=		$(OBJ_LIB:%.o=$(SRCDIR)/%.c) \
 		$(OBJ_CMN:%.o=$(CMNDIR)/%.c)
 
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CSTD=	$(CSTD_GNU99)
 
@@ -106,18 +105,11 @@ CPPFLAGS += -D__EXTENSIONS__ -D_REENTRANT -DMIA \
 	-I$(SRC)/uts/common \
 	-I$(SRC)/common/smbclnt
 
-# This is pretty mature code, so let's just ignore these.
-LINTCHECKFLAGS += -erroff=E_INCONS_ARG_DECL2
-LINTCHECKFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2
-LINTCHECKFLAGS += -erroff=E_FUNC_RET_MAYBE_IGNORED2
-LINTCHECKFLAGS += -erroff=E_FUNC_RET_ALWAYS_IGNOR2
-
 # Debugging
 ${NOT_RELEASE_BUILD} CPPFLAGS += -DDEBUG
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include ../../Makefile.targ
 

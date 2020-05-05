@@ -53,7 +53,7 @@ LDLIBS=		-lc
 
 ICONV_DIR	= $(ROOT)/usr/lib/iconv
 
-ICONV_DIR_64 	= $(ROOT)/usr/lib/iconv/$(MACH64)
+ICONV_DIR_64	= $(ROOT)/usr/lib/iconv/$(MACH64)
 
 ICONV_LIBS	= $(PROGS:%=$(ICONV_DIR)/%)
 
@@ -90,8 +90,6 @@ $(ICONV_DIR)/%: ../%
 %.o: %.c
 	$(COMPILE.c) $(CFLAGS) -o $@ $<
 	$(POST_PROCESS_O)
-
-lint: FRC
 
 clean:
 	$(RM) $(CLEANFILES)

@@ -776,45 +776,45 @@ usage(void)
 {
 	(void) fprintf(stderr, "\nUsage:  snoop\n");
 	(void) fprintf(stderr,
-	"\t[ -a ]			# Listen to packets on audio\n");
+	"\t[ -a ]                       # Listen to packets on audio\n");
 	(void) fprintf(stderr,
-	"\t[ -d link ]		# Listen on named link\n");
+	"\t[ -d link ]                  # Listen on named link\n");
 	(void) fprintf(stderr,
-	"\t[ -s snaplen ]		# Truncate packets\n");
+	"\t[ -s snaplen ]               # Truncate packets\n");
 	(void) fprintf(stderr,
-	"\t[ -I IP interface ]		# Listen on named IP interface\n");
+	"\t[ -I IP interface ]          # Listen on named IP interface\n");
 	(void) fprintf(stderr,
-	"\t[ -c count ]		# Quit after count packets\n");
+	"\t[ -c count ]                 # Quit after count packets\n");
 	(void) fprintf(stderr,
-	"\t[ -P ]			# Turn OFF promiscuous mode\n");
+	"\t[ -P ]                       # Turn OFF promiscuous mode\n");
 	(void) fprintf(stderr,
-	"\t[ -D ]			# Report dropped packets\n");
+	"\t[ -D ]                       # Report dropped packets\n");
 	(void) fprintf(stderr,
-	"\t[ -S ]			# Report packet size\n");
+	"\t[ -S ]                       # Report packet size\n");
 	(void) fprintf(stderr,
-	"\t[ -i file ]		# Read previously captured packets\n");
+	"\t[ -i file ]                  # Read previously captured packets\n");
 	(void) fprintf(stderr,
-	"\t[ -o file ]		# Capture packets in file\n");
+	"\t[ -o file ]                  # Capture packets in file\n");
 	(void) fprintf(stderr,
-	"\t[ -n file ]		# Load addr-to-name table from file\n");
+	"\t[ -n file ]                  # Load addr-to-name table from file\n");
 	(void) fprintf(stderr,
-	"\t[ -N ]			# Create addr-to-name table\n");
+	"\t[ -N ]                       # Create addr-to-name table\n");
 	(void) fprintf(stderr,
-	"\t[ -t  r|a|d ]		# Time: Relative, Absolute or Delta\n");
+	"\t[ -t  r|a|d ]                # Time: Relative, Absolute or Delta\n");
 	(void) fprintf(stderr,
-	"\t[ -v ]			# Verbose packet display\n");
+	"\t[ -v ]                       # Verbose packet display\n");
 	(void) fprintf(stderr,
-	"\t[ -V ]			# Show all summary lines\n");
+	"\t[ -V ]                       # Show all summary lines\n");
 	(void) fprintf(stderr,
-	"\t[ -p first[,last] ]	# Select packet(s) to display\n");
+	"\t[ -p first[,last] ]          # Select packet(s) to display\n");
 	(void) fprintf(stderr,
-	"\t[ -x offset[,length] ]	# Hex dump from offset for length\n");
+	"\t[ -x offset[,length] ]       # Hex dump from offset for length\n");
 	(void) fprintf(stderr,
-	"\t[ -C ]			# Print packet filter code\n");
+	"\t[ -C ]                       # Print packet filter code\n");
 	(void) fprintf(stderr,
-	"\t[ -q ]			# Suppress printing packet count\n");
+	"\t[ -q ]                       # Suppress printing packet count\n");
 	(void) fprintf(stderr,
-	"\t[ -r ]			# Do not resolve address to name\n");
+	"\t[ -r ]                       # Do not resolve address to name\n");
 	(void) fprintf(stderr,
 	"\t[ -z zone ]		# Open links from named zone\n");
 	(void) fprintf(stderr,

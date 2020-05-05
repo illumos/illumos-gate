@@ -24,17 +24,15 @@ include $(SRC)/lib/Makefile.lib
 # split onto its own filesystem.
 include $(SRC)/lib/Makefile.rootfs
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc
 CPPFLAGS +=	-D__EXTENSIONS__
 
 SRCDIR =	../common
-$(LINTLIB)	:= SRCS = $(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include $(SRC)/lib/Makefile.targ

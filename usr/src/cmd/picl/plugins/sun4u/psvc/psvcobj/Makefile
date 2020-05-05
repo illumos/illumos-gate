@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	libpsvcobj.a
 VERS=		.1
@@ -45,15 +43,11 @@ PLATFORM = sun4u
 
 USR_PLAT_PSVCOBJ = $(LIBS:%=$(USR_PSM_LIB_DIR)/%)
 
-CLEANFILES=	$(LINTOUT) $(LINTLIB)
-
 CPPFLAGS +=	-I$(SRC)/uts/sun4u -I.
 
 CFLAGS +=	$(CCVERBOSE)
 LDLIBS +=	-L$(SRC)/lib/libdevfsevent
-LDLIBS +=	-lc 
-
-LINTFLAGS +=
+LDLIBS +=	-lc
 
 # definitions for install_h target
 HDRS=		psvc_objects.h
@@ -70,7 +64,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 all: $(LIBS) $(LIBLINKS)
@@ -90,7 +83,7 @@ include $(SRC)/lib/Makefile.targ
 
 $(USR_PSM_LIB_DIR):	FRC
 	$(INS.dir)
- 
+
 $(USR_PSM_INCL_DIR)/%: %
 	$(INS.file)
 
@@ -100,7 +93,6 @@ $(USR_PSM_LIB_DIR)/%: % $(USR_PSM_LIB_DIR)
 	$(SYMLINK) ./libpsvcobj.so$(VERS) $(USR_PSM_LIB_DIR)/libpsvcobj.so
 
 lint :
-	$(LINT.c) $(SRCS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

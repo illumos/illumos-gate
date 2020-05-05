@@ -45,13 +45,12 @@ SRCS =		$(AES_SRC) $(ARCFOUR_SRC) $(BIGNUM_SRC) $(BLOWFISH_SRC) \
 
 SRCDIR =	$(SRC)/lib/pkcs11/libsoftcrypto/common
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 MAPFILEDIR =	../common
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(CRYPTODIR) -I$(UTSDIR) -D_POSIX_PTHREAD_SEMANTICS
 LDLIBS +=	-lcryptoutil -lc
-LINTFLAGS +=	$(EXTRA_LINT_FLAGS)
 
 # Symbol capabilities objects are i386.
 EXTPICS =	../capabilities/intel/i386/pics/symcap.o
@@ -60,8 +59,6 @@ EXTPICS =	../capabilities/intel/i386/pics/symcap.o
 
 all:		$(LIBS)
 
-lint:		$(SRCS)
-
-install:	all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install:	all $(ROOTLIBS) $(ROOTLINKS)
 
 include		../Makefile.targ

@@ -40,7 +40,6 @@ clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
 install_h :=	TARGET= install_h
-lint :=		TARGET= lint
 
 HDRS=   sun_fc_version.h
 HDRDIR=		common
@@ -48,7 +47,7 @@ HDRDIR=		common
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS) 
+all clean clobber install: $(SUBDIRS)
 
 install_h: $(ROOTHDRS)
 

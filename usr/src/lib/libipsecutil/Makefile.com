@@ -29,16 +29,14 @@ OBJECTS =	ipsec_util.o algs.o
 
 include ../../Makefile.lib
 
-LIBS +=		$(DYNLIB) $(LINTLIB)
+LIBS +=		$(DYNLIB)
 
 SRCDIR =	../common
 
 BERDIR = $(SRC)/lib/libkmf/ber_der/inc
 
-$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 LDLIBS +=	-ltecla -lsocket -lnsl -lc -lkmf -lkmfberder
 LAZYLIBS = $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
-lint := LAZYLIBS = -ltsol
 LDLIBS += $(LAZYLIBS)
 
 CFLAGS +=	$(CCVERBOSE)
@@ -53,6 +51,5 @@ SMOFF += shift_to_zero
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include ../../Makefile.targ

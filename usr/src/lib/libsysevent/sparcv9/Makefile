@@ -23,9 +23,6 @@
 # Copyright 2000,2002-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libsysevent/sparcv9/Makefile
 
 include ../Makefile.com
 include ../../Makefile.lib.64
@@ -34,4 +31,4 @@ include ../../Makefile.lib.64
 
 all: $(LIBS)
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTCOMPATLINKS64)

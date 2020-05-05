@@ -2,13 +2,6 @@
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-#
-# lib/krb5/Makefile.targ
-#
-# included to define local library targets
-#
 
 include $(SRC)/lib/Makefile.targ
 
@@ -33,7 +26,3 @@ $(POFILE): $(DERIVED_FILES) .WAIT $(POFILES)
 
 $(MSGDOMAIN):
 	$(INS.dir)
-
-# install rule for lint library target
-$(ROOTLINTDIR)/%: ./%
-	$(INS.file)

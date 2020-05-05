@@ -22,11 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# usr/src/lib/pam_modules/tsol/Makefile.com
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-#
 
 LIBRARY=	pam_tsol_account.a
 VERS=		.1
@@ -38,6 +33,5 @@ LDLIBS +=       -lc -lpam -ltsol -ltsnet
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include	$(SRC)/lib/Makefile.targ

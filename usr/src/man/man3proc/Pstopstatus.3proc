@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd May 02, 2020
 .Dt PSTOPSTATUS 3PROC
 .Os
 .Sh NAME
@@ -40,10 +40,12 @@
 .Ft int
 .Fo Pstop
 .Fa "struct ps_prochandle *P"
+.Fa "uint_t msec"
 .Fc
 .Ft int
 .Fo Pwait
 .Fa "struct ps_prochandle *P"
+.Fa "uint_t msec"
 .Fc
 .Ft int
 .Fo Ldstop
@@ -52,10 +54,12 @@
 .Ft int
 .Fo Lstop
 .Fa "struct ps_lwphandle *L"
+.Fa "uint_t msec"
 .Fc
 .Ft int
 .Fo Lwait
 .Fa "struct ps_lwphandle *L"
+.Fa "uint_t msec"
 .Fc
 .Sh DESCRIPTION
 The
@@ -133,16 +137,14 @@ The
 function is is equivalent to calling the
 .Fn Pstopstatus
 function with the request set to
-.Dv PCSTOP
-and an infinite timeout.
+.Dv PCSTOP .
 .Pp
 The
 .Fn Pwait
 function is is equivalent to calling the
 .Fn Pstopstatus
 function with the request set to
-.Dv PCWSTOP
-and an infinite timeout.
+.Dv PCWSTOP .
 .Pp
 The
 .Fn Pdstop

@@ -43,7 +43,6 @@ PYFILES=	$(PYSRCS) $(PYSRCS:%.py=%.pyc)
 ROOTPYZFSFILES= $(PYFILES:%=$(ROOTLIBDIR)/%)
 
 CSTD=        $(CSTD_GNU99)
-C99LMODE=       -Xc99=%all
 
 LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lnvpair -lpython$(PYVER)$(PYSUFFIX) -lzfs

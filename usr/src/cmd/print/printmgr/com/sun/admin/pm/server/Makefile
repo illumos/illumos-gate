@@ -92,7 +92,7 @@ SMATCH=off
 
 LDLIBS +=	-lprint -lnsl -lsocket -lc
 
-CLEANFILES=	*.class $(LINTLIB) $(LINTOUT)
+CLEANFILES=	*.class
 CLOBBERFILES=	$(JNIHDR_FILES) $(LIBLINKS)
 
 all: $(CLASSFILES) $(JNIHDR_FILES) $(DYNLIB)
@@ -114,7 +114,7 @@ NS: NS.c
 	$(CC) NS.c $(CCGDEBUG) $(ILDOFF) -o NS -DMAIN=1 $(ENVLDLIBS1) $(ENVLIBS2) \
 	    -lprint -lnsl -lsocket
 
-lint: $(JNIHDR_FILES) lintcheck
+lint: $(JNIHDR_FILES)
 
 cstyle:
 	cstyle $(SRCS)

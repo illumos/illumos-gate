@@ -22,8 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include	../Makefile.lib
 
@@ -35,15 +33,14 @@ $(BUILD64)SUBDIRS += $(MACH64)
 HDRS=           libipp.h
 HDRDIR=		.
 
-all :=      	TARGET= all
+all :=		TARGET= all
 install :=      TARGET= install
 clean :=        TARGET= clean
 clobber :=      TARGET= clobber
-lint :=         TARGET= lint
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+all install clean clobber: $(SUBDIRS)
 
 install_h:	$(ROOTHDRS)
 

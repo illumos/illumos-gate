@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../Makefile.lib
 
@@ -36,15 +34,14 @@ MSGFILES =	common/process_dump.c common/device_dump.c \
 		common/libcontract_priv.c
 POFILE =	libcontract.po
 
-all := 		TARGET = all
+all :=		TARGET = all
 clean :=	TARGET = clean
 clobber :=	TARGET = clobber
 install	:=	TARGET = install
-lint :=		TARGET = lint
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 $(POFILE):	$(MSGFILES)
 	$(BUILDPO.msgfiles)

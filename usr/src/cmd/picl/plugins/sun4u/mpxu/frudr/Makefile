@@ -69,12 +69,6 @@ OTHERINFOS	+= fru_HDD2_data.info fru_HDD3_data.info
 OTHERINFOS	+= fru_SC_data.info SB-tables.info
 OTHERINFOS	+= fru_usb-a-1_data.info fru_usb-a-2_data.info
 
-LINTSRC =	$(LINTLIB:%.ln=%)
-ROOTLINTDIR =	$(ROOTLIBDIR)
-ROOTLINT =	$(LINTSRC:%=$(ROOTLINTDIR)/%)
-
-CLEANFILES =	$(LINTOUT) $(LINTLIB)
-
 CPPFLAGS +=	-D_REENTRANT
 CPPFLAGS +=	-I$(SRC)/cmd/picl/plugins/lib/picld_pluginutil
 CPPFLAGS +=	-I$(SRC)/uts/sun4u/mpxu
@@ -108,7 +102,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 
 all: $(LIBS) $(LIBLINKS) $(CONFS)
@@ -163,11 +156,7 @@ $(USR_PLAT_PLUGINS_LIBLINKS): $(PLAT_PLUGINS_DIRS)
 	$(RM) -r $@ ;\
 	$(SYMLINK) $(MPXU_DYNLIB_DIR)/$(DYNLIB) $@
 
-$(ROOTLINTDIR)/%: ../%
-	$(INS.file)
-
 lint:
-	$(LINT.c) $(SRCS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

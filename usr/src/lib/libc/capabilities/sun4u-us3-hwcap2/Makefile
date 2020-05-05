@@ -39,7 +39,6 @@ install :=	TARGET= install
 all clean clobber install: \
 		$(SUBDIRS)
 
-lint:
 
 $(SUBDIRS):	FRC
 		@cd $@; pwd; $(MAKE) $(TARGET)

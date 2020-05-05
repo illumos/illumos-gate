@@ -29,18 +29,18 @@ include $(SRC)/lib/Makefile.lib
 SUBDIRS = $(MACH)
 
 TEXT_DOMAIN=	SUNW_OST_OSCMD
-POFILE= 	audit_remote.po
+POFILE=		audit_remote.po
 MSGFILES=	audit_remote.c transport.c
 
 all	:=	TARGET= all
 clean	:=	TARGET= clean
 clobber	:=	TARGET= clobber
 install	:=	TARGET= install
-lint	:=	TARGET= lint
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
+
 
 $(POFILE): $(MSGFILES)
 	$(BUILDPO.msgfiles)

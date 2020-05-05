@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= liblm.a
 VERS= .1
@@ -46,7 +44,6 @@ LDLIBS +=	-lc
 
 all: $(LIBS)
 
-lint:	lintcheck
 
 # include library targets
 include ../../Makefile.targ

@@ -22,18 +22,15 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 LIBRARY=	crypt_bsdmd5.a
-VERS= 		.1
+VERS=		.1
 OBJECTS=	bsdmd5.o
 
 include		../../Makefile.crypt_modules
 
-LDLIBS 		+= -lc -lmd
+LDLIBS		+= -lc -lmd
 
 all: $(LIBS)
-
-lint: lintcheck
 
 include $(SRC)/lib/Makefile.targ

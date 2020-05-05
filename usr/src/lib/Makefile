@@ -563,13 +563,14 @@ install_extra:
 
 clean clobber:		$(NOWAIT_SUBDIRS:%=%-nodepend)
 
-lint:
 
 install_h check:	$(HDRSUBDIRS:%=%-nodepend)
 
 _msg:			$(MSGSUBDIRS:%=%-nodepend) .WAIT _dc
 
 _dc:			$(DCSUBDIRS:%=%-nodepend)
+
+lint:
 
 # Library interdependencies are called out explicitly here.
 ../cmd/sgs/libconv: crt

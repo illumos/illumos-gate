@@ -38,9 +38,8 @@ include $(SRC)/lib/Makefile.rootfs
 SRCDIR=	../common
 INCDIR=	../inc
 
-LIBS=	$(DYNLIB) $(LINTLIB)
+LIBS=	$(DYNLIB)
 
-$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS		+=	$(CCVERBOSE) -xCC
 CFLAGS64	+=	$(CCVERBOSE) -xCC
@@ -59,6 +58,5 @@ SMATCH=off
 
 all:    $(LIBS)
 
-lint:	lintcheck
 
 include $(SRC)/lib/Makefile.targ

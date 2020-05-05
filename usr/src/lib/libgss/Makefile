@@ -42,7 +42,6 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=         TARGET= lint
 
 POFILE =	$(LIBRARY:.a=.po)
 XGETFLAGS+=	-a
@@ -50,7 +49,7 @@ MSGFILES =	`$(GREP) -l gettext *.[ch]`
 
 .KEEP_STATE:
 
-all clean clobber lint:  $(SUBDIRS)
+all clean clobber: $(SUBDIRS)
 
 install: $(GSSMECH_DIR) all .WAIT $(SUBDIRS)
 

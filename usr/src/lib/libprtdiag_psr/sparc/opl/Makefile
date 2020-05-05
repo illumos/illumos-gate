@@ -34,7 +34,6 @@ IFLAGS += -I$(USR_PLAT_DIR)/sun4u/include -I ../../../libprtdiag/inc
 IFLAGS += -I$(SRC)/uts/common/ -I$(SRC)/cmd/picl/plugins/inc
 LDLIBS += -lpicl -lkstat
 
-LINTFLAGS += $(IFLAGS)
 
 #IMPLEMENTED_PLATFORM	= SUNW,OPL-Enterprise
 #PLATFORM=$(IMPLEMENTED_PLATFORM)

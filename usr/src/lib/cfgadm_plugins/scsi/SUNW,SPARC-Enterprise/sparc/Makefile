@@ -22,14 +22,11 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../Makefile.com
 CFLAGS += -I../../common -I$(SRC)/uts/sun4u/opl
 
-LINTFLAGS += -I../../common -I$(SRC)/uts/sun4u/opl
 
 .KEEP_STATE:
 
-install: all $(ROOTLIBS) $(ROOTLINKS) 
+install: all $(ROOTLIBS) $(ROOTLINKS)

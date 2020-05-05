@@ -15,8 +15,8 @@
 
 TARGET_ARCH=	i386
 
-LIBRARY 	= libmvec.a
-VERS 		= .1
+LIBRARY		= libmvec.a
+VERS		= .1
 
 OBJECTS		= $(mvecOBJS)
 
@@ -24,6 +24,6 @@ include ../Makefile.com
 
 SRCS		= $(SRCS_mvec)
 
-install: all $(ROOTLIBS) $(ROOTLINKS)
+install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTCOMPATLINKS)
 
 include $(SRC)/lib/libm/Makefile.targ

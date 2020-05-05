@@ -29,7 +29,7 @@
 #	confuse make
 #
 CLASS		= 32
-UTSBASE 	= $(SRC)/uts
+UTSBASE		= $(SRC)/uts
 
 LIBRARY		= libprtdiag.a
 VERS		= .1
@@ -37,7 +37,7 @@ VERS		= .1
 include $(SRC)/lib/Makefile.lib
 include $(SRC)/Makefile.psm
 
-LIBS		= $(DYNLIB) $(LINTLIB)
+LIBS		= $(DYNLIB)
 IFLAGS		= -I ../../inc -I $(USR_PSM_INCL_DIR)
 IFLAGS		+= -I $(SRC)/cmd/picl/plugins/inc
 IFLAGS		+= -I $(UTSBASE)/sun4u
@@ -56,8 +56,6 @@ DYNFLAGS	+= -Wl,-f/usr/platform/\$$PLATFORM/lib/$(DYNLIBPSR)
 MAPFILES =
 
 SRCDIR		= ../../common
-$(LINTLIB)	:= SRCS = $(SRCDIR)/$(LINTSRC)
-USR_PSMLINT=	$(LINTSRC:%=$(USR_PSM_LIB_DIR)/%)
 
 #
 # install rule

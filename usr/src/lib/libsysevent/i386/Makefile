@@ -23,9 +23,6 @@
 # Copyright 2000,2002-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libsysevent/i386/Makefile
 
 include ../Makefile.com
 
@@ -33,4 +30,4 @@ all: $(LIBS)
 
 .KEEP_STATE:
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTCOMPATLINKS)

@@ -32,7 +32,7 @@ HDRS =		instzones_api.h
 HDRDIR =        hdrs
 
 
-SUBDIRS	=	$(MACH) 
+SUBDIRS	=	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
 all :=		TARGET = all
@@ -40,12 +40,11 @@ install :=	TARGET = install
 clean :=	TARGET = clean
 clobber :=	TARGET = clobber
 _msg :=		TARGET = _msg
-lint :=		TARGET = lint
 
 
 .KEEP_STATE:
 
-all clean clobber install _msg lint: $(SUBDIRS)
+all clean clobber install _msg: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

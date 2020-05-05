@@ -21,8 +21,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = libcommputil.a
 VERS    = .1
@@ -31,8 +29,7 @@ OBJECTS = commp_util.o sdp_parse_helper.o sdp.o sdp_parse.o
 include ../../Makefile.lib
 
 SRCDIR =	../common
-LIBS =		$(DYNLIB) $(LINTLIB)
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc
 
 CFLAGS +=	$(CCVERBOSE)
@@ -42,6 +39,5 @@ CPPFLAGS +=	-DNDEBUG
 
 all:		$(LIBS)
 
-lint:		lintcheck
 
 include ../../Makefile.targ

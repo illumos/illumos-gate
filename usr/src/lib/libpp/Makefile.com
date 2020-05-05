@@ -66,13 +66,12 @@ MAPFILES=       ../mapfile-vers
 # Set common AST build flags (e.g. C99/XPG6, needed to support the math stuff)
 include ../../../Makefile.ast
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 
 LDLIBS += \
 	-last \
 	-lc
 
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 SRCDIR =	../common
 
@@ -108,14 +107,14 @@ CERRWARN	+= -_gcc=-Wno-unused-value
 # "pplex() parse error: turning off implications after 60 seconds"
 SMATCH		= off
 
-pics/ppcall.o 		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
-pics/ppcontrol.o 	:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
+pics/ppcall.o		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
+pics/ppcontrol.o	:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
 pics/ppcpp.o		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
 pics/ppexpr.o		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
 pics/pplex.o		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
-pics/ppop.o 		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
-pics/ppsearch.o 	:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
-pics/ppsearch.o 	:= CERRWARN += -_gcc=-Wno-sequence-point
+pics/ppop.o		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
+pics/ppsearch.o		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
+pics/ppsearch.o		:= CERRWARN += -_gcc=-Wno-sequence-point
 pics/pplex.o		:= CERRWARN += -_gcc=-Wno-implicit-fallthrough
 pics/ppcpp.o		:= CERRWARN += -_gcc=-Wno-implicit-fallthrough
 pics/ppproto.o		:= CERRWARN += -_gcc=-Wno-implicit-fallthrough
@@ -123,13 +122,5 @@ pics/ppproto.o		:= CERRWARN += -_gcc=-Wno-implicit-fallthrough
 .KEEP_STATE:
 
 all: $(LIBS)
-
-#
-# libpp is not lint-clean yet; fake up a target.  (You can use
-# "make lintcheck" to actually run lint; please send all lint fixes
-# upstream (to AT&T) so the next update will pull them into ON.)
-#
-lint:
-	@ print "usr/src/lib/libpp is not lint-clean: skipping"
 
 include ../../Makefile.targ

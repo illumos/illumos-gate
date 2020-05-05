@@ -27,5 +27,35 @@ VERS =		.1
 
 include		$(SRC)/lib/Makefile.rootfs
 
-LIBS +=		$(LINTLIB)
 DYNFLAGS +=	-F libc.so.1
+
+COMPATLINKS +=	usr/lib/lwp/libthread.so.1 \
+		usr/lib/lwp/libthread_db.so.1 \
+		lib/libthread_db.so.1 \
+		lib/libthread_db.so \
+		usr/lib/libthread_db.so.1 \
+		usr/lib/libthread_db.so
+
+COMPATLINKS64 +=	usr/lib/lwp/$(MACH64)/libthread.so.1 \
+			usr/lib/lwp/$(MACH64)/libthread_db.so.1 \
+			lib/$(MACH64)/libthread_db.so.1 \
+			lib/$(MACH64)/libthread_db.so \
+			usr/lib/$(MACH64)/libthread_db.so.1 \
+			usr/lib/$(MACH64)/libthread_db.so
+
+$(ROOT)/usr/lib/lwp/libthread.so.1 := COMPATLINKTARGET=../libthread.so.1
+$(ROOT)/usr/lib/lwp/libthread_db.so.1 := COMPATLINKTARGET=../libthread_db.so.1
+$(ROOT)/usr/lib/lwp/$(MACH64)/libthread.so.1:= \
+	COMPATLINKTARGET=../../$(MACH64)/libthread.so.1
+$(ROOT)/usr/lib/lwp/$(MACH64)/libthread_db.so.1:= \
+	COMPATLINKTARGET=../../$(MACH64)/libthread_db.so.1
+$(ROOT)/lib/libthread_db.so.1 := COMPATLINKTARGET=libc_db.so.1
+$(ROOT)/lib/libthread_db.so := COMPATLINKTARGET=libc_db.so.1
+$(ROOT)/usr/lib/libthread_db.so.1 := COMPATLINKTARGET=../../lib/libc_db.so.1
+$(ROOT)/usr/lib/libthread_db.so := COMPATLINKTARGET=../../lib/libc_db.so.1
+$(ROOT)/lib/$(MACH64)/libthread_db.so.1 := COMPATLINKTARGET=libc_db.so.1
+$(ROOT)/lib/$(MACH64)/libthread_db.so := COMPATLINKTARGET=libc_db.so.1
+$(ROOT)/usr/lib/$(MACH64)/libthread_db.so.1:= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/libc_db.so.1
+$(ROOT)/usr/lib/$(MACH64)/libthread_db.so:= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/libc_db.so.1

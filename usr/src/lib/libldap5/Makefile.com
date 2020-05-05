@@ -30,7 +30,7 @@ VERS= .5
 # Definition of all the objects macros
 # The LDAP specific objects
 
-BEROBJS=	bprint.o	decode.o 	encode.o       io.o
+BEROBJS=	bprint.o	decode.o	encode.o       io.o
 
 LDAPOBJS=  abandon.o add.o bind.o cache.o charray.o \
         charset.o compare.o compat.o control.o countvalues.o \
@@ -60,7 +60,7 @@ include ../../Makefile.lib
 NSS_LIBS=	-lnspr4 -lplc4 -lnss3 -lssl3
 NSS_HDRS=	$(ADJUNCT_PROTO)/usr/include/mps
 NSS_LDPATH=	/usr/lib/mps
-NSS_LDPATH64=	$(NSS_LDPATH)/64	
+NSS_LDPATH64=	$(NSS_LDPATH)/64
 
 
 LDAP_FLAGS=     -DSVR4 -DSYSV -D__svr4 -D__svr4__ -DSOLARIS \
@@ -81,25 +81,10 @@ SRCS=		$(BEROBJS:%.o=../sources/ldap/ber/%.c) \
 		$(PRLDAPOBJS:%.o=../sources/ldap/prldap/%.c) \
 		$(UTILOBJS:%.o=../sources/ldap/util/%.c)
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 DYNFLAGS +=	$(ZNODELETE)
 
 CPPFLAGS=	$(COM_INC) $(CPPFLAGS.master)
-
-# definitions for lint
-
-$(LINTLIB):= 	SRCS=../sources/ldap/common/llib-lldap
-$(LINTLIB):= 	LINTFLAGS=-nvx 
-$(LINTLIB):= 	TARGET_ARCH=
-
-LINTOUT=	lint.out
-
-LINTSRC=	$(LINTLIB:%.ln=%)
-ROOTLINTDIR=	$(ROOTLIBDIR)
-ROOTLINT=	$(LINTSRC:%=$(ROOTLINTDIR)/%)
-
-
-CLEANFILES += 	$(LINTOUT) $(LINTLIB)
 
 # Local Libldap definitions
 LOCFLAGS +=	 $(XSTRCONST) -D_REENTRANT
@@ -150,7 +135,3 @@ pics/%.o: ../sources/ldap/prldap/%.c
 pics/%.o: ../sources/ldap/util/%.c
 	$(COMPILE.c) $(LDAP_FLAGS) $(COM_INC) -w -o $@ $<
 	$(POST_PROCESS_O)
-
-# install rule for lint library target
-$(ROOTLINTDIR)/%: ../sources/ldap/common/%
-	$(INS.file)

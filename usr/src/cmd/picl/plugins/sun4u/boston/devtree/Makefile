@@ -40,8 +40,6 @@ CONF=           picldevtree.conf picl_asr.conf
 ROOTCONF=       $(CONF:%=$(ROOTLIBDIR)/%)
 $(ROOTCONF)	:= FILEMODE = 0644
 
-ROOTLINTDIR =   $(ROOTLIBDIR)
-
 .KEEP_STATE:
 
 SUBDIRS=
@@ -50,18 +48,14 @@ all	:=	TARGET= all
 install :=	TARGET= install
 clean	:=	TARGET= clean
 clobber	:=	TARGET= clobber
-lint	:=	TARGET= lint
 
-all: 
+all:
 
 install:	$(ROOTLIBDIR) $(ROOTCONF)
 
 # include library targets
 include $(SRC)/lib/Makefile.targ
 include	$(SRC)/cmd/picl/plugins/Makefile.targ
-
-$(ROOTLINTDIR)/%: ../%
-	$(INS.file)
 
 lint:
 

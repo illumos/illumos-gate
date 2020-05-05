@@ -27,10 +27,8 @@
 LIBRARY =		psm-ipp.a
 VERS =			.1
 OBJECTS = ipp-support.o job.o printer.o service.o
-ROOTLIBDIR =	$(ROOT)/usr/lib/print
 
 include ../../../Makefile.lib
-include ../../../Makefile.rootfs
 
 SRCDIR =	../common
 
@@ -43,7 +41,6 @@ $(EXTRALINKS):	$(ROOTLINKS)
 
 LIBS =			$(DYNLIB)
 
-$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
@@ -67,7 +64,6 @@ LDLIBS +=	-lipp-core -lc
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 $(ROOTLIBDIR):
 	$(INS.dir)

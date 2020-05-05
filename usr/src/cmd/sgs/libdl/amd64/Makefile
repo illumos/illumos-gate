@@ -29,6 +29,7 @@ include		$(SRC)/lib/Makefile.lib.64
 
 DYNFLAGS +=	-F /usr/lib/$(MACH64)/ld.so.1
 
-install:	all $(ROOTLIBDIR64) .WAIT $(ROOTLIBS64) $(ROOTLINKS64)
+install:	all $(ROOTLIBDIR64) .WAIT $(ROOTLIBS64) $(ROOTLINKS64) \
+	$(ROOTCOMPATLINKS64)
 
 include		$(SRC)/lib/Makefile.filter.targ

@@ -27,4 +27,4 @@
 include ../Makefile.com
 include ../../Makefile.lib.64
 
-install:	$(ROOTOBJECTS64)
+install:	$(ROOTOBJECTS64) $(ROOTCOMPATLINKS64)

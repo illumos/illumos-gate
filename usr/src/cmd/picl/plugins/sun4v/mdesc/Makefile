@@ -23,10 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/picl/plugins/sun4v/mdesc/Makefile
-#
+
 LIBRARY=	libmdescplugin.a
 VERS=		.1
 
@@ -48,19 +45,6 @@ include $(SRC)/cmd/picl/plugins/Makefile.com
 
 SRCS=		$(OBJECTS:%.o=%.c)
 
-LINT_SRC=	./mdescplugin.c ./init.c ./dr.c \
-		./cpu_prop_update.c ./disk_discovery.c \
-		$(SRC)/common/mdesc/mdesc_findname.c \
-		$(SRC)/common/mdesc/mdesc_findnodeprop.c \
-		$(SRC)/common/mdesc/mdesc_fini.c \
-		$(SRC)/common/mdesc/mdesc_getpropdata.c \
-		$(SRC)/common/mdesc/mdesc_getpropstr.c \
-		$(SRC)/common/mdesc/mdesc_getpropval.c \
-		$(SRC)/common/mdesc/mdesc_init_intern.c \
-		$(SRC)/common/mdesc/mdesc_nodecount.c \
-		$(SRC)/common/mdesc/mdesc_rootnode.c \
-		$(SRC)/common/mdesc/mdesc_scandag.c
-
 $(OBJS_DIR)/%.o:		$(SRC)/common/mdesc/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -74,8 +58,6 @@ DYNFLAGS_COM =		/usr/lib/picl/plugins
 
 ROOTLIBDIR =	$(ROOT_PLAT_PLUGINDIR)
 
-CLEANFILES=	$(LINTOUT) $(LINTLIB)
-
 CPPFLAGS +=	-I$(SRC)/common/mdesc
 CPPFLAGS +=	-I$(SRC)/uts/common/sys
 CPPFLAGS +=	-D_REENTRANT
@@ -86,8 +68,6 @@ LDLIBS +=	-L$(ROOT)/usr/lib/picl/plugins -L$(ROOT)/usr/lib/sparcv9
 DYNFLAGS +=	-R$(DYNFLAGS_COM)
 
 LDLIBS +=	-lc -lpicltree -ldevinfo -lpicldevtree -lcfgadm -lnvpair
-
-LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN -v
 
 .KEEP_STATE:
 
@@ -103,6 +83,5 @@ include $(SRC)/cmd/picl/plugins/Makefile.targ
 include $(SRC)/lib/Makefile.targ
 
 lint :
-	$(LINT.c) $(LINT_SRC)
 
 FRC:

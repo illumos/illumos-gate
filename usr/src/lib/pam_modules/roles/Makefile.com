@@ -23,13 +23,10 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# usr/src/lib/pam_modules/roles/Makefile.com
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 LIBRARY=	pam_roles.a
 VERS=		.1
-OBJECTS= 	roles.o
+OBJECTS=	roles.o
 
 include		../../Makefile.pam_modules
 
@@ -37,6 +34,5 @@ LDLIBS +=	-lpam -lsecdb -lc
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include $(SRC)/lib/Makefile.targ

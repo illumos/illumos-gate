@@ -39,11 +39,9 @@ OBJECTS=  \
 # include library definitions
 include ../../../Makefile.lib
 
-LIBS =          $(DYNLIB) $(LINTLIB)
+LIBS =          $(DYNLIB)
 
 SRCDIR=		../common
-
-$(LINTLIB) :=	SRCS=$(SRCDIR)/$(LINTSRC)
 
 CPPFLAGS +=	-I../inc
 CFLAGS +=       $(CCVERBOSE)
@@ -51,11 +49,17 @@ LDLIBS +=       -lcurses -lc
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 
+COMPATLINKS=	usr/ccs/lib/libpanel.so
+COMPATLINKS64=	usr/ccs/lib/$(MACH64)/libpanel.so
+
+$(ROOT)/usr/ccs/lib/libpanel.so:=	COMPATLINKTARGET=../../lib/libpanel.so.1
+$(ROOT)/usr/ccs/lib/$(MACH64)/libpanel.so:= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/libpanel.so.1
+
 .KEEP_STATE:
 
 all: $(LIBS)
 
-lint: lintcheck
 
 # include library targets
 include ../../../Makefile.targ

@@ -44,7 +44,7 @@ COMMON_SRCDIR = ../../../common/smbios
 COMMON_HDR = $(SRC)/uts/common/sys/smbios.h
 
 SRCS = $(COMMON_OBJS:%.o=$(COMMON_SRCDIR)/%.c) $(LIB_OBJS:%.o=../common/%.c)
-LIBS = $(DYNLIB) $(LINTLIB)
+LIBS = $(DYNLIB)
 
 SRCDIR = ../common
 
@@ -56,13 +56,11 @@ LDLIBS += -ldevinfo -lc
 CFLAGS += $(C_BIGPICFLAGS)
 CFLAGS64 += $(C_BIGPICFLAGS64)
 
-$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include ../../Makefile.targ
 

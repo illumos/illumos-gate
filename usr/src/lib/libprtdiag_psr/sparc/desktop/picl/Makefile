@@ -41,7 +41,6 @@ LDLIBS += -lpicl
 
 IFLAGS += -I$(USR_PLAT_DIR)/sun4u/include -I ../../../../libprtdiag/inc
 IFLAGS += -I$(SRC)/cmd/picl/plugins/inc
-LINTFLAGS += $(IFLAGS)
 
 #
 # links in /usr/platform

@@ -23,10 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# usr/src/lib/pam_modules/rhosts_auth/Makefile.com
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	pam_rhosts_auth.a
 VERS=		.1
@@ -38,6 +34,5 @@ LDLIBS +=	-lpam -lsocket -lc
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include $(SRC)/lib/Makefile.targ

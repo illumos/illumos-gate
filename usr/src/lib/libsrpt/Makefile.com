@@ -28,17 +28,15 @@ OBJECTS =	libsrpt.o
 
 include ../../Makefile.lib
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 
 SRCDIR =	../common
-$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 SRPTMODDIR =	../../../uts/common/io/comstar/port/srpt
 
 INCS +=		-I$(SRCDIR) -I$(SRPTMODDIR)
 
 CSTD =	$(CSTD_GNU99)
-C99LMODE =	-Xc99=%all
 LDLIBS +=	-lc -lnvpair -lstmf
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 
@@ -46,6 +44,5 @@ CPPFLAGS +=	$(INCS) -D_REENTRANT
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include ../../Makefile.targ

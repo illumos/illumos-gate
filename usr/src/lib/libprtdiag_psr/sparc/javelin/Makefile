@@ -31,7 +31,6 @@ PLATFORM_OBJECTS= javelin.o
 include ../Makefile.com
 
 IFLAGS += -I$(USR_PLAT_DIR)/sun4u/include -I ../../../libprtdiag/inc
-LINTFLAGS += $(IFLAGS)
 LDLIBS += -lkstat
 
 #

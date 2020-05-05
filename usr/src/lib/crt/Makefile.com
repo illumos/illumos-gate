@@ -59,6 +59,39 @@ $(COMMON_CRT) $(VALUES) := CFLAGS64 += $(C_PICFLAGS64)
 # intentional double exit
 SMOFF += unreachable
 
+COMPATLINKS=	usr/ccs/lib/values-Xa.o \
+		usr/ccs/lib/values-Xc.o \
+		usr/ccs/lib/values-Xs.o \
+		usr/ccs/lib/values-Xt.o \
+		usr/ccs/lib/values-xpg4.o \
+		usr/ccs/lib/values-xpg6.o
+
+COMPATLINKS64=	usr/ccs/lib/$(MACH64)/values-Xa.o \
+		usr/ccs/lib/$(MACH64)/values-Xc.o \
+		usr/ccs/lib/$(MACH64)/values-Xs.o \
+		usr/ccs/lib/$(MACH64)/values-Xt.o \
+		usr/ccs/lib/$(MACH64)/values-xpg4.o \
+		usr/ccs/lib/$(MACH64)/values-xpg6.o
+
+$(ROOT)/usr/ccs/lib/values-Xa.o:=	COMPATLINKTARGET=../../lib/values-Xa.o
+$(ROOT)/usr/ccs/lib/values-Xc.o:=	COMPATLINKTARGET=../../lib/values-Xc.o
+$(ROOT)/usr/ccs/lib/values-Xs.o:=	COMPATLINKTARGET=../../lib/values-Xs.o
+$(ROOT)/usr/ccs/lib/values-Xt.o:=	COMPATLINKTARGET=../../lib/values-Xt.o
+$(ROOT)/usr/ccs/lib/values-xpg4.o:=	COMPATLINKTARGET=../../lib/values-xpg4.o
+$(ROOT)/usr/ccs/lib/values-xpg6.o:=	COMPATLINKTARGET=../../lib/values-xpg6.o
+$(ROOT)/usr/ccs/lib/$(MACH64)/values-Xa.o:= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/values-Xa.o
+$(ROOT)/usr/ccs/lib/$(MACH64)/values-Xc.o:= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/values-Xc.o
+$(ROOT)/usr/ccs/lib/$(MACH64)/values-Xs.o:= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/values-Xs.o
+$(ROOT)/usr/ccs/lib/$(MACH64)/values-Xt.o:= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/values-Xt.o
+$(ROOT)/usr/ccs/lib/$(MACH64)/values-xpg4.o:= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/values-xpg4.o
+$(ROOT)/usr/ccs/lib/$(MACH64)/values-xpg6.o:= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/values-xpg6.o
+
 .KEEP_STATE:
 
 all:	$(OBJECTS)
@@ -95,4 +128,5 @@ $(ROOTLIB64)/%.o: %.o
 $(ROOTLIB64)/gcrt1.o:
 	$(RM) $(ROOTLIB64)/gcrt1.o; $(SYMLINK) crt1.o $(ROOTLIB64)/gcrt1.o
 
-FRC:
+$(ROOTCOMPATLINKS) $(ROOTCOMPATLINKS64):
+	$(RM) $@; $(SYMLINK) $(COMPATLINKTARGET) $@

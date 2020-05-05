@@ -22,22 +22,19 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 LIBRARY=	crypt_sha512.a
-VERS= 		.1
+VERS=		.1
 OBJECTS=	crypt_sha.o
 
 include		../../Makefile.crypt_modules
 
 CPPFLAGS	+= -DCRYPT_SHA512
-LDLIBS 		+= -lc -lmd
+LDLIBS		+= -lc -lmd
 
 SRCDIR = ../../sha256/
 
 all: $(LIBS)
-
-lint: lintcheck
 
 include $(SRC)/lib/Makefile.targ
 

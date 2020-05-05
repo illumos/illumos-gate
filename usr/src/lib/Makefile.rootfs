@@ -22,11 +22,25 @@
 #
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+
 # To install libraries in the root filesystem (/lib),
 # include this Makefile right after Makefile.lib
 
 ROOTLIBDIR=	$(ROOTFS_LIBDIR)
 ROOTLIBDIR64=	$(ROOTFS_LIBDIR64)
+
+
+# By default, libraries installed in /lib get a symbolic link added in
+# /usr/lib for both the shared object and the compilation link.
+COMPATLINKS=	usr/lib/$(DYNLIB) \
+		usr/lib/$(LIBLINKS)
+
+COMPATLINKS64=	usr/lib/$(MACH64)/$(DYNLIB) \
+		usr/lib/$(MACH64)/$(LIBLINKS)
+
+$(ROOT)/usr/lib/$(DYNLIB) := COMPATLINKTARGET=../../lib/$(DYNLIB)
+$(ROOT)/usr/lib/$(LIBLINKS) := COMPATLINKTARGET=../../lib/$(DYNLIB)
+$(ROOT)/usr/lib/$(MACH64)/$(DYNLIB):= \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/$(DYNLIB)
+$(ROOT)/usr/lib/$(MACH64)/$(LIBLINKS) := \
+	COMPATLINKTARGET=../../../lib/$(MACH64)/$(DYNLIB)

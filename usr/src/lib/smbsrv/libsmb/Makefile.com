@@ -76,9 +76,6 @@ include ../../Makefile.lib
 INCS += -I$(SRC)/common/smbsrv
 INCS += -I$(SRC)/lib/libsmbfs/smb
 
-LINTCHECKFLAGS += -erroff=E_INCONS_ARG_DECL2
-LINTCHECKFLAGS += -erroff=E_BAD_FORMAT_STR2
-
 LDLIBS +=	$(MACH_LDLIBS)
 # perfer to keep libs ordered by dependence
 LDLIBS +=	-lscf -lmd -luuid -lpkcs11 -lcryptoutil

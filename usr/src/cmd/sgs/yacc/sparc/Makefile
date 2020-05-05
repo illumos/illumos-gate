@@ -38,7 +38,7 @@ all_lib:	$(LIBS)
 
 install:	all $(ROOTPROG) $(ROOTYACCPAR) $(ROOTCCSBINLINK)
 
-install_lib:	all_lib $(ROOTLIBS) $(ROOTLINKS) $(DYNLINKLIB)
+install_lib:	all_lib $(ROOTLIBS) $(ROOTLINKS) $(DYNLINKLIB) $(ROOTCOMPATLINKS)
 		$(RM) $(ROOTCCSBIN)/yaccpar
 		$(SYMLINK) ../../share/lib/ccs/yaccpar $(ROOTCCSBIN)/yaccpar
 

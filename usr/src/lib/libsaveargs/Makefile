@@ -33,11 +33,10 @@ clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 delete :=	TARGET= delete
 install :=	TARGET= install
-lint :=		TARGET= lint
 _msg :=		TARGET= _msg
 package :=	TARGET= package
 
-LIBRARY= 	libsaveargs.a
+LIBRARY=	libsaveargs.a
 
 # definitions for install_h target
 HDRS=		saveargs.h
@@ -53,7 +52,7 @@ $(ROOTHDRDIR)/%: common/%
 
 .KEEP_STATE:
 
-all clean clobber delete install lint package: $(SUBDIRS)
+all clean clobber delete install package: $(SUBDIRS)
 
 install_h: $(ROOTHDRS)
 

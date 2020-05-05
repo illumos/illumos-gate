@@ -29,15 +29,11 @@ VERS =			.0
 OBJECTS = attribute.o common.o library.o list.o misc.o status.o uri.o
 
 include ../../../Makefile.lib
-include ../../../Makefile.rootfs
-
-ROOTLIBDIR=	$(ROOT)/usr/lib
 
 SRCDIR =	../common
 
 LIBS =			$(DYNLIB)
 
-$(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
@@ -55,6 +51,5 @@ LDLIBS +=	-lc -lsocket -lnsl
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include ../../../Makefile.targ

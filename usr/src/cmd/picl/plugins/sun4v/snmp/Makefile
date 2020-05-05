@@ -23,10 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/picl/plugins/sun4v/snmp/Makefile
-#
 
 LIBRARY=	libsnmpplugin.a
 VERS=		.1
@@ -44,8 +40,6 @@ LIBS =		$(DYNLIB)
 
 ROOT_PLATFORM =	$(USR_PLAT_DIR)/sun4v
 ROOTLIBDIR =	$(ROOT_PLAT_PLUGINDIR)
-
-CLEANFILES=	$(LINTOUT) $(LINTLIB)
 
 CPPFLAGS +=	-I. -I../include -I$(SRC)/uts/common/sys
 CPPFLAGS +=	-D_REENTRANT
@@ -92,6 +86,5 @@ include $(SRC)/cmd/picl/plugins/Makefile.targ
 include $(SRC)/lib/Makefile.targ
 
 lint :
-	$(LINT.c) $(SRCS)
 
 FRC:

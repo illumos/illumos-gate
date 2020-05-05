@@ -79,5 +79,8 @@ objs/%.o pics/%.o:	../common/%.c
 $(DYNLINKLIBDIR)/%: %$(VERS)
 	$(INS.liblink)
 
+$(ROOTCOMPATLINKS) $(ROOTCOMPATLINKS64):
+	$(RM) $@; $(SYMLINK) $(COMPATLINKTARGET) $@
+
 clean:
 	$(RM) $(POBJS) $(OBJS) $(PICS) $(CLEANFILES)

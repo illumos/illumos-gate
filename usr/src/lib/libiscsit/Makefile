@@ -32,7 +32,6 @@ all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
-lint :=		TARGET= lint
 
 
 HDRS=		libiscsit.h
@@ -41,7 +40,7 @@ ROOTHDRS=	$(ROOTHDRDIR)/libiscsit.h
 
 .KEEP_STATE:
 
-all clean clobber install lint: $(SUBDIRS)
+all clean clobber install: $(SUBDIRS)
 
 $(ROOTHDRDIR)/%: common/%
 	$(INS.file)

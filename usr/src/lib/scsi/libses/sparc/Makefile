@@ -23,7 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 include ../Makefile.com
 include ../../../Makefile.lib
@@ -31,6 +30,6 @@ include ../Makefile.defs
 
 DYNFLAGS += $(DYNFLAGS32)
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBS) $(ROOTLINKS)
 
 include ../Makefile.targ

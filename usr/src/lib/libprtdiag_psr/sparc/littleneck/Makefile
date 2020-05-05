@@ -36,7 +36,6 @@ IFLAGS += -I$(UTSBASE)/sun4u
 
 LDLIBS +=	-lpicl
 
-LINTFLAGS += $(IFLAGS)
 
 #
 # Workgroup Server platform library should install into

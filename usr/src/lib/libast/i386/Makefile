@@ -41,4 +41,4 @@ include ../Makefile.com
 # (and on 32bit it is close to the barrier)
 i386_C_PICFLAGS  = $(C_BIGPICFLAGS)
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBS) $(ROOTLINKS)

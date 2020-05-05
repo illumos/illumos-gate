@@ -116,8 +116,3 @@ PAD_SRC =		$(PAD_COMMON_SRC)	$(PAD_PSM_SRC)
 # Header include directories
 CRYPTODIR =		$(SRC)/common/crypto
 UTSDIR =		$(SRC)/uts/common/
-
-# Lint
-EXTRA_LINT_FLAGS =	$(AES_FLAGS) $(BLOWFISH_FLAGS) $(ARCFOUR_FLAGS) \
-			$(DES_FLAGS) $(BIGNUM_FLAGS) $(MODES_FLAGS) \
-			$(DH_FLAGS) $(DSA_FLAGS) $(RSA_FLAGS) $(PAD_FLAGS)

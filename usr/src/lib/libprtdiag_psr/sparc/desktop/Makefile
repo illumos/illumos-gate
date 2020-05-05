@@ -23,14 +23,10 @@
 # Copyright (c) 2000 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libprtdiag_psr/sparc/desktop/Makefile
 
 PRTDIAG_DIRS=	nonpicl picl
 
 all :=		TARGET= all
-lint :=		TARGET= lint
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 install :=	TARGET= install
@@ -38,7 +34,7 @@ _msg :=		TARGET= _msg
 
 .KEEP_STATE:
 
-all lint clean clobber install _msg : $(PRTDIAG_DIRS)
+all clean clobber install _msg: $(PRTDIAG_DIRS)
 
 $(PRTDIAG_DIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

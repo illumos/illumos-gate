@@ -23,12 +23,8 @@
 # Copyright (c) 2001 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libpool/sparcv9/Makefile
-#
 
 include ../Makefile.com
 include ../../Makefile.lib.64
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+install: all $(ROOTLIBS64) $(ROOTLINKS64)

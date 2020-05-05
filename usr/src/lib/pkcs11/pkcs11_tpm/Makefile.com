@@ -100,19 +100,10 @@ CERRWARN +=	$(CNOWARN_UNINIT)
 # not linted
 SMATCH=off
 
-LINTSRC= $(OBJECTS:%.o=$(SRCDIR)/%.c)
-
-$(LINTLIB):=	SRCS	=	$(SRCDIR)/$(LINTSRC)
-LINTSRC= $(SRCS)
-
-CLOBBERFILES += C.ln
-
 .KEEP_STATE:
 
 all: $(LIBS)
 
-lint: $$(LINTSRC)
-	$(LINT.c) $(LINTCHECKFLAGS) $(LINTSRC) $(LDLIBS)
 
 pics/%.o: $(SRCDIR)/%.c
 	$(COMPILE.c) -o $@ $<

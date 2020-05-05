@@ -38,8 +38,6 @@ CONF=		platsvcd.conf psvcobj.conf
 ROOTCONF=	$(CONF:%=$(ROOTLIBDIR)/%)
 $(ROOTCONF)	:= FILEMODE = 0444
 
-ROOTLINTDIR =   $(ROOTLIBDIR)
-
 .KEEP_STATE:
 
 SUBDIRS=
@@ -48,7 +46,6 @@ all	:=	TARGET= all
 install :=	TARGET= install
 clean	:=	TARGET= clean
 clobber	:=	TARGET= clobber
-lint	:=	TARGET= lint
 
 all: $(CONF)
 

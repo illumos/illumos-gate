@@ -14,8 +14,8 @@
 #
 
 
-LIBRARY 	= libm.a
-VERS 		= .1
+LIBRARY		= libm.a
+VERS		= .1
 
 LIBMDIR		= $(SRC)/lib/libm
 
@@ -23,19 +23,19 @@ OBJECTS		= libmv1.o
 
 include		$(SRC)/lib/Makefile.lib
 include		$(SRC)/lib/Makefile.rootfs
-include 	$(LIBMDIR)/Makefile.libm.com
+include		$(LIBMDIR)/Makefile.libm.com
 
-LIBS 		= $(DYNLIB)
+LIBS		= $(DYNLIB)
 SRCS		= $(OBJECTS:%.o=../common/%.c)
 SRCDIR		= ../common/
 
 CPPFLAGS	+= -DLIBM_BUILD
 MAPFILEDIR	= ../common/
-DYNFLAGS 	+= -zignore -Wl,-F'libm.so.2'
-LINTFLAGS64     += -errchk=longptr64
+DYNFLAGS	+= -zignore -Wl,-F'libm.so.2'
+
+COMPATLINKS	= usr/lib/$(DYNLIB)
+COMPATLINKS64	= usr/lib/$(MACH64)/$(DYNLIB)
 
 .KEEP_STATE:
 
 all: $(LIBS)
-
-lint: lintcheck

@@ -39,11 +39,10 @@ HDRDIR =	common
 SUBDIRS	=	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
-all := 		TARGET = all
+all :=		TARGET = all
 clean :=	TARGET = clean
 clobber :=	TARGET = clobber
 install	:=	TARGET = install
-lint :=		TARGET = lint
 
 MSGFILES = \
 	common/uu_dprintf.c \

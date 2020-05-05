@@ -15,8 +15,8 @@
 
 TARGET_ARCH	= sparcv9
 
-LIBRARY 	= libmvec.a
-VERS 		= .1
+LIBRARY		= libmvec.a
+VERS		= .1
 
 OBJECTS		= $(mvecOBJS)
 
@@ -27,6 +27,6 @@ CHIP		= ultra
 
 SRCS		= $(SRCS_mvec)
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64) 
+install: all $(ROOTLIBS64) $(ROOTLINKS64)  $(ROOTCOMPATLINKS64)
 
 include $(SRC)/lib/libm/Makefile.targ

@@ -35,11 +35,10 @@ clean :=        TARGET= clean
 clobber :=      TARGET= clobber
 delete :=       TARGET= delete
 install :=      TARGET= install
-lint :=         TARGET= lint
 _msg :=		TARGET= _msg
 package :=      TARGET= package
 
-LIBRARY= 	libmapmalloc.a
+LIBRARY=	libmapmalloc.a
 TEXT_DOMAIN=	SUNW_OST_OSLIB
 XGETFLAGS=	-a
 POFILE=		$(LIBRARY:.a=.po)
@@ -50,7 +49,7 @@ GREP=	grep
 
 .KEEP_STATE:
 
-all clean clobber delete install lint package: $(SUBDIRS)
+all clean clobber delete install package: $(SUBDIRS)
 
 # definitions for install_h target
 HDRS=

@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 MACHCOBJS =	conf_ultra.o event_ultra.o
 
@@ -32,4 +30,4 @@ include ../Makefile.com
 
 LDLIBS	+= -ldevinfo
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBS) $(ROOTLINKS)

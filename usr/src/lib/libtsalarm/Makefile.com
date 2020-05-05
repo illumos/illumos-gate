@@ -55,11 +55,6 @@ INS.slink8=	$(RM) -r $@; $(SYMLINK) ../$(PLATFORM)/include $@
 
 .KEEP_STATE:
 
-#
-# build/lint rules
-#
 all:	$(LIBS)
-
-lint:	lintcheck
 
 include $(SRC)/lib/Makefile.targ

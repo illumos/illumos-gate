@@ -57,8 +57,6 @@ OTHERINFOS	+= fru_SC_data.info SB-tables.info
 OTHERINFOS	+= fru_usb-a-1_data.info fru_usb-a-2_data.info
 OTHERINFOS	+= fru_usb-b-1_data.info fru_usb-b-2_data.info
 
-CLEANFILES =	$(LINTOUT) $(LINTLIB)
-
 .KEEP_STATE:
 
 all: $(CONFS)
@@ -87,11 +85,7 @@ $(LIBLINKS):	FRC
 include $(SRC)/lib/Makefile.targ
 include	$(SRC)/cmd/picl/plugins/Makefile.targ
 
-$(ROOTLINTDIR)/%: ../%
-	$(INS.file)
-
 lint:
-	@echo "nothing to lint"
 
 FRC:
 

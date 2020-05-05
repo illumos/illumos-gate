@@ -28,7 +28,7 @@
 LIBRARY=	pam_ldap.a
 VERS=		 .1
 
-OBJECTS= 	ldap_authenticate.o \
+OBJECTS=	ldap_authenticate.o \
 		ldap_setcred.o \
 		ldap_acct_mgmt.o \
 		ldap_close_session.o \
@@ -44,6 +44,5 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include $(SRC)/lib/Makefile.targ

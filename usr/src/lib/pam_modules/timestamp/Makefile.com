@@ -17,7 +17,7 @@
 
 LIBRARY=	pam_timestamp.a
 VERS=		.1
-OBJECTS= 	pam_timestamp.o
+OBJECTS=	pam_timestamp.o
 
 include		../../Makefile.pam_modules
 
@@ -25,6 +25,5 @@ LDLIBS +=	-lpam -lc
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 include $(SRC)/lib/Makefile.targ

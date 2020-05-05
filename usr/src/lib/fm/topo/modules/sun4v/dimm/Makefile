@@ -49,9 +49,6 @@ CPPFLAGS += $(INCDIRS:%=-I%)
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-%.ln: $(SUN4DIR)/%.c
-	$(LINT.c) -c $<
-
 # end of what would be body of ../../sun4/mem/Makefile.mem
 LDLIBS += -lumem -lmdesc -lldom
 
@@ -59,12 +56,6 @@ LDLIBS += -lumem -lmdesc -lldom
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-%.ln: $(PRIDIR)/%.c
-	$(LINT.c) -c $<
-
 %.o: $(PIDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
-%.ln: $(PIDIR)/%.c
-	$(LINT.c) -c $<

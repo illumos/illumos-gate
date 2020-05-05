@@ -31,11 +31,10 @@ all	:= TARGET = all
 clean	:= TARGET = clean
 clobber	:= TARGET = clobber
 check	:= TARGET = check
-lint	:= TARGET = lint
 
 .KEEP_STATE:
 
-all clean clobber lint install: $(SRCSUBDIRS)
+all clean clobber install: $(SRCSUBDIRS)
 
 install_h check: $(ALLSUBDIRS)
 

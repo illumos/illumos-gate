@@ -47,7 +47,7 @@ LINKED_LIBRSC1_DIR	= \
 MAPFILES =
 
 SRCDIR =	common
-LIBS = $(DYNLIB) $(LINTLIB)
+LIBS = $(DYNLIB)
 CFLAGS +=	$(CCVERBOSE)
 LDLIBS +=	-lc
 PLATLIBS =	$(USR_PLAT_DIR)/$(PLATFORM)/lib/
@@ -60,7 +60,6 @@ INS.slink7=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/librsc.so $@
 # build/lint rules
 #
 all:	$(LIBS)
-lint:	lintcheck
 
 #
 # install rules

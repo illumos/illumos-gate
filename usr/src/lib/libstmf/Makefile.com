@@ -31,14 +31,13 @@ OBJECTS= stmf.o store.o
 
 include ../../Makefile.lib
 
-LIBS=	$(DYNLIB) $(LINTLIB)
+LIBS=	$(DYNLIB)
 
 SRCDIR =	../common
 
 INCS += -I$(SRCDIR)
 
 CSTD=	$(CSTD_GNU99)
-C99LMODE=	-Xc99=%all
 LDLIBS +=	-lc -lnvpair -lscf -lm
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 
@@ -47,12 +46,10 @@ CERRWARN +=	-_gcc=-Wno-unused-label
 # not linted
 SMATCH=off
 
-$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:
 
 all: $(LIBS)
 
-lint: lintcheck
 
 include ../../Makefile.targ

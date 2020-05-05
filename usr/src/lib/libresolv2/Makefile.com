@@ -27,7 +27,7 @@
 LIBRARY= libresolv.a
 VERS= .2
 
-BSDOBJS=   	putenv.o	strcasecmp.o	strsep.o \
+BSDOBJS=	putenv.o	strcasecmp.o	strsep.o \
 		ftruncate.o	readv.o		strdup.o	strtoul.o \
 		gettimeofday.o	setenv.o	strerror.o	utimes.o \
 		mktemp.o	setitimer.o	strpbrk.o	writev.o
@@ -36,30 +36,30 @@ DSTOBJS=	dst_api.o	support.o	hmac_link.o
 
 # inet_addr, inet_pton, inet_ntop, and inet_ntoa removed due to overlap with
 # libnsl
-INETOBJS= 	inet_net_pton.o	inet_neta.o	inet_lnaof.o \
-		inet_netof.o 	nsap_addr.o	inet_makeaddr.o	\
+INETOBJS=	inet_net_pton.o	inet_neta.o	inet_lnaof.o \
+		inet_netof.o	nsap_addr.o	inet_makeaddr.o	\
 		inet_network.o	inet_net_ntop.o	inet_cidr_ntop.o \
-		inet_cidr_pton.o 		inet_data.o
+		inet_cidr_pton.o		inet_data.o
 
 # build only the IRS objects that the ISC libbind's make would
-IRSTHROBJS=	gethostent_r.o	getnetent_r.o 	getnetgrent_r.o \
+IRSTHROBJS=	gethostent_r.o	getnetent_r.o	getnetgrent_r.o \
 		getprotoent_r.o	getservent_r.o
 IRSOBJS=	${IRSTHROBJS} \
 		dns.o		dns_ho.o	dns_nw.o	dns_pr.o \
 		dns_sv.o	gai_strerror.o	gen.o		gen_ho.o \
 		gen_ng.o	gen_nw.o	gen_pr.o	gen_sv.o \
 		getaddrinfo.o	gethostent.o	getnameinfo.o	getnetent.o \
-		getnetgrent.o	getprotoent.o	getservent.o 	hesiod.o \
-		irp.o		irp_ho.o	irp_ng.o 	irp_nw.o \
+		getnetgrent.o	getprotoent.o	getservent.o	hesiod.o \
+		irp.o		irp_ho.o	irp_ng.o	irp_nw.o \
 		irp_pr.o	irp_sv.o	irpmarshall.o	irs_data.o \
 		lcl.o		lcl_ho.o	lcl_ng.o	lcl_nw.o \
-		lcl_pr.o 	lcl_sv.o	nis.o		nul_ng.o \
+		lcl_pr.o	lcl_sv.o	nis.o		nul_ng.o \
 		util.o
 
 ISCOBJS=	assertions.o	base64.o	bitncmp.o	ctl_clnt.o \
-		ctl_p.o 	ctl_srvr.o	ev_connects.o	ev_files.o \
+		ctl_p.o		ctl_srvr.o	ev_connects.o	ev_files.o \
 		ev_streams.o	ev_timers.o	ev_waits.o	eventlib.o \
-		heap.o		hex.o 		logging.o	memcluster.o \
+		heap.o		hex.o		logging.o	memcluster.o \
 		movefile.o	tree.o
 
 NAMESEROBJS=	ns_date.o	ns_name.o	ns_netint.o	ns_parse.o \
@@ -95,9 +95,8 @@ SRCS=		$(BSDOBJS:%.o=../common/bsd/%.c) \
 		$(RESOLVOBJS:%.o=../common/resolv/%.c) \
 		$(SUNWOBJS:%.o=../common/sunw/%.c)
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 
-$(LINTLIB):= 	SRCS = ../common/llib-lresolv
 
 # Local Libresolv definitions
 
@@ -123,7 +122,6 @@ LDLIBS +=	-lsocket -lnsl -lc -lmd
 
 all:	$(LIBS)
 
-lint:	lintcheck
 
 # include library targets
 include ../../Makefile.targ
@@ -159,7 +157,3 @@ pics/%.o: ../common/resolv/%.c
 pics/%.o: ../common/sunw/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
-
-# install rule for lint library target
-$(ROOTLINTDIR)/%:	../common/%
-	$(INS.file)

@@ -16,6 +16,6 @@
 TARGET_ARCH=	i386
 include ../Makefile.com
 
-install: all $(ROOTLIBS)
+install: all $(ROOTLIBS) $(ROOTCOMPATLINKS)
 
 include $(SRC)/lib/Makefile.targ

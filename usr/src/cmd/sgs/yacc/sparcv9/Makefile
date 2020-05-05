@@ -20,12 +20,8 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1997 by Sun Microsystems, Inc.
 # All rights reserved.
-#
-# cmd/sgs/yacc/sparcv9/Makefile
 #
 
 # This Makefile is only to produce 64-bit yacc shared library liby.so.1
@@ -41,7 +37,7 @@ POFILE=
 
 all_lib: $(LIBS)
 
-install_lib: all_lib $(ROOTLIBS64) $(ROOTLINKS64)
+install_lib: all_lib $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTCOMPATLINKS64)
 
 include ../Makefile.targ
 include ../../../Makefile.targ

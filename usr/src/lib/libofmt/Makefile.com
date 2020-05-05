@@ -24,10 +24,9 @@ include		$(SRC)/lib/Makefile.rootfs
 
 SRCDIR=		../common
 
-LIBS=		$(DYNLIB) $(LINTLIB)
+LIBS=		$(DYNLIB)
 SRCS=		$(SRCDIR)/ofmt.c
 
-$(LINTLIB)	:= SRCS = $(SRCDIR)/$(LINTSRC)
 LDLIBS +=	-lc
 
 SMOFF += kmalloc_wrong_size
@@ -36,6 +35,5 @@ SMOFF += kmalloc_wrong_size
 
 all:		$(LIBS)
 
-lint:		lintcheck
 
 include		$(SRC)/lib/Makefile.targ

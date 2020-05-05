@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 MACH_LDLIBS +=	-L$(ROOT)/usr/lib/smbsrv/$(MACH64)
 
@@ -32,4 +30,4 @@ include ../../../Makefile.lib.64
 
 DYNFLAGS +=	-R/usr/lib/smbsrv/$(MACH64)
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+install: all $(ROOTLIBS64) $(ROOTLINKS64)

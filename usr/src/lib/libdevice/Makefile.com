@@ -30,9 +30,8 @@ OBJECTS=	devctl.o
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lnvpair
-$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT
@@ -41,7 +40,6 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 
 all: $(LIBS)
 
-lint: lintcheck
 
 .KEEP_STATE:
 
