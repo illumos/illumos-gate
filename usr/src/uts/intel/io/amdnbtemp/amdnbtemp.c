@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Robert Mustacchi
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*
@@ -36,9 +37,6 @@
 #include <sys/conf.h>
 #include <sys/devops.h>
 #include <sys/types.h>
-#include <sys/file.h>
-#include <sys/open.h>
-#include <sys/cred.h>
 #include <sys/stat.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -84,18 +82,17 @@
 typedef enum andnbtemp_state {
 	AMDNBTEMP_S_CFGSPACE	= 1 << 0,
 	AMDNBTEMP_S_MUTEX	= 1 << 1,
-	AMDNBTEMP_S_MINOR	= 1 << 2,
-	AMDNBTEMP_S_LIST	= 1 << 3
+	AMDNBTMEP_S_KSENSOR	= 1 << 2
 } amdnbtemp_state_t;
 
 typedef struct amdnbtemp {
 	amdnbtemp_state_t	at_state;
-	list_node_t		at_link;
 	dev_info_t		*at_dip;
 	ddi_acc_handle_t	at_cfgspace;
 	uint_t			at_bus;
 	uint_t			at_dev;
 	uint_t			at_func;
+	id_t			at_ksensor;
 	minor_t			at_minor;
 	boolean_t		at_tjsel;
 	kmutex_t		at_mutex;
@@ -104,34 +101,16 @@ typedef struct amdnbtemp {
 } amdnbtemp_t;
 
 static void *amdnbtemp_state;
-static list_t amdnbtemp_list;
-static kmutex_t amdnbtemp_mutex;
-
-static amdnbtemp_t *
-amdnbtemp_find_by_dev(dev_t dev)
-{
-	minor_t m = getminor(dev);
-	amdnbtemp_t *at;
-
-	mutex_enter(&amdnbtemp_mutex);
-	for (at = list_head(&amdnbtemp_list); at != NULL;
-	    at = list_next(&amdnbtemp_list, at)) {
-		if (at->at_minor == m) {
-			break;
-		}
-	}
-	mutex_exit(&amdnbtemp_mutex);
-
-	return (at);
-}
 
 static int
-amdnbtemp_read(amdnbtemp_t *at)
+amdnbtemp_read(void *arg, sensor_ioctl_temperature_t *temp)
 {
-	ASSERT(MUTEX_HELD(&at->at_mutex));
+	amdnbtemp_t *at = arg;
 
+	mutex_enter(&at->at_mutex);
 	at->at_raw = pci_config_get32(at->at_cfgspace, AMDNBTEMP_TEMPREG);
 	if (at->at_raw == PCI_EINVAL32) {
+		mutex_exit(&at->at_mutex);
 		return (EIO);
 	}
 
@@ -141,107 +120,18 @@ amdnbtemp_read(amdnbtemp_t *at)
 		at->at_temp -= AMDNBTEMP_TEMP_ADJUST;
 	}
 
-	return (0);
-}
-
-static int
-amdnbtemp_open(dev_t *devp, int flags, int otype, cred_t *credp)
-{
-	amdnbtemp_t *at;
-
-	if (crgetzoneid(credp) != GLOBAL_ZONEID || drv_priv(credp) != 0) {
-		return (EPERM);
-	}
-
-	if ((flags & (FEXCL | FNDELAY | FWRITE)) != 0) {
-		return (EINVAL);
-	}
-
-	if (otype != OTYP_CHR) {
-		return (EINVAL);
-	}
-
-	at = amdnbtemp_find_by_dev(*devp);
-	if (at == NULL) {
-		return (ENXIO);
-	}
-
-	return (0);
-}
-
-static int
-amdnbtemp_ioctl_kind(intptr_t arg, int mode)
-{
-	sensor_ioctl_kind_t kind;
-
-	bzero(&kind, sizeof (kind));
-	kind.sik_kind = SENSOR_KIND_TEMPERATURE;
-
-	if (ddi_copyout(&kind, (void *)arg, sizeof (kind), mode & FKIOCTL) !=
-	    0) {
-		return (EFAULT);
-	}
-
-	return (0);
-}
-
-static int
-amdnbtemp_ioctl_temp(amdnbtemp_t *at, intptr_t arg, int mode)
-{
-	int ret;
-	sensor_ioctl_temperature_t temp;
-
-	bzero(&temp, sizeof (temp));
-
-	mutex_enter(&at->at_mutex);
-	if ((ret = amdnbtemp_read(at)) != 0) {
-		mutex_exit(&at->at_mutex);
-		return (ret);
-	}
-
-	temp.sit_unit = SENSOR_UNIT_CELSIUS;
-	temp.sit_gran = AMDNBTEMP_GRANULARITY;
-	temp.sit_temp = at->at_temp;
+	temp->sit_unit = SENSOR_UNIT_CELSIUS;
+	temp->sit_gran = AMDNBTEMP_GRANULARITY;
+	temp->sit_temp = at->at_temp;
 	mutex_exit(&at->at_mutex);
 
-	if (ddi_copyout(&temp, (void *)arg, sizeof (temp), mode & FKIOCTL) !=
-	    0) {
-		return (EFAULT);
-	}
-
 	return (0);
 }
 
-static int
-amdnbtemp_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-    int *rvalp)
-{
-	amdnbtemp_t *at;
-
-	at = amdnbtemp_find_by_dev(dev);
-	if (at == NULL) {
-		return (ENXIO);
-	}
-
-	if ((mode & FREAD) == 0) {
-		return (EINVAL);
-	}
-
-	switch (cmd) {
-	case SENSOR_IOCTL_TYPE:
-		return (amdnbtemp_ioctl_kind(arg, mode));
-	case SENSOR_IOCTL_TEMPERATURE:
-		return (amdnbtemp_ioctl_temp(at, arg, mode));
-	default:
-		return (ENOTTY);
-	}
-}
-
-static int
-amdnbtemp_close(dev_t dev, int flags, int otype, cred_t *credp)
-{
-	return (0);
-}
+static const ksensor_ops_t amdnbtemp_temp_ops = {
+	.kso_kind = ksensor_kind_temperature,
+	.kso_temp = amdnbtemp_read
+};
 
 static void
 amdnbtemp_cleanup(amdnbtemp_t *at)
@@ -249,16 +139,9 @@ amdnbtemp_cleanup(amdnbtemp_t *at)
 	int inst;
 	inst = ddi_get_instance(at->at_dip);
 
-	if ((at->at_state & AMDNBTEMP_S_LIST) != 0) {
-		mutex_enter(&amdnbtemp_mutex);
-		list_remove(&amdnbtemp_list, at);
-		mutex_exit(&amdnbtemp_mutex);
-		at->at_state &= ~AMDNBTEMP_S_LIST;
-	}
-
-	if ((at->at_state & AMDNBTEMP_S_MINOR) != 0) {
-		ddi_remove_minor_node(at->at_dip, NULL);
-		at->at_state &= ~AMDNBTEMP_S_MINOR;
+	if ((at->at_state & AMDNBTMEP_S_KSENSOR) != 0) {
+		(void) ksensor_remove(at->at_dip, KSENSOR_ALL_IDS);
+		at->at_state &= ~AMDNBTMEP_S_KSENSOR;
 	}
 
 	if ((at->at_state & AMDNBTEMP_S_MUTEX) != 0) {
@@ -309,9 +192,9 @@ amdnbtemp_erratum_319(void)
 static int
 amdnbtemp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	int inst, *regs;
+	int inst, *regs, ret;
 	amdnbtemp_t *at;
-	uint_t nregs;
+	uint_t nregs, id;
 	char buf[128];
 
 	switch (cmd) {
@@ -377,26 +260,12 @@ amdnbtemp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto err;
 	}
 
-	at->at_minor = at->at_dev - AMDNBTEMP_FIRST_DEV;
-	if (snprintf(buf, sizeof (buf), "procnode.%u", at->at_minor) >=
-	    sizeof (buf)) {
+	id = at->at_dev - AMDNBTEMP_FIRST_DEV;
+	if (snprintf(buf, sizeof (buf), "procnode.%u", id) >= sizeof (buf)) {
 		dev_err(dip, CE_WARN, "unexpected buffer name overrun "
-		    "constructing minor %u", at->at_minor);
+		    "constructing sensor %u", id);
 		goto err;
 	}
-
-	if (ddi_create_minor_node(dip, buf, S_IFCHR, at->at_minor,
-	    DDI_NT_SENSOR_TEMP_CPU, 0) != DDI_SUCCESS) {
-		dev_err(dip, CE_WARN, "failed to create minor node %s",
-		    buf);
-		goto err;
-	}
-	at->at_state |= AMDNBTEMP_S_MINOR;
-
-	mutex_enter(&amdnbtemp_mutex);
-	list_insert_tail(&amdnbtemp_list, at);
-	mutex_exit(&amdnbtemp_mutex);
-	at->at_state |= AMDNBTEMP_S_LIST;
 
 	/*
 	 * On families 15h and 16h the BKDG documents that the CurTmpTjSel bits
@@ -407,39 +276,19 @@ amdnbtemp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		at->at_tjsel = B_TRUE;
 	}
 
-	mutex_enter(&at->at_mutex);
-	(void) amdnbtemp_read(at);
-	mutex_exit(&at->at_mutex);
+	if ((ret = ksensor_create(dip, &amdnbtemp_temp_ops, at, buf,
+	    DDI_NT_SENSOR_TEMP_CPU, &at->at_ksensor)) != 0) {
+		dev_err(dip, CE_WARN, "failed to create ksensor for %s: %d",
+		    buf, ret);
+		goto err;
+	}
+	at->at_state |= AMDNBTMEP_S_KSENSOR;
 
 	return (DDI_SUCCESS);
 
 err:
 	amdnbtemp_cleanup(at);
 	return (DDI_FAILURE);
-}
-
-static int
-amdnbtemp_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
-    void **resultp)
-{
-	amdnbtemp_t *at;
-
-	if (cmd != DDI_INFO_DEVT2DEVINFO && cmd != DDI_INFO_DEVT2INSTANCE) {
-		return (DDI_FAILURE);
-	}
-
-	at = amdnbtemp_find_by_dev((dev_t)arg);
-	if (at == NULL) {
-		return (DDI_FAILURE);
-	}
-
-	if (cmd == DDI_INFO_DEVT2DEVINFO) {
-		*resultp = at->at_dip;
-	} else {
-		*resultp = (void *)(uintptr_t)ddi_get_instance(at->at_dip);
-	}
-
-	return (DDI_SUCCESS);
 }
 
 static int
@@ -469,38 +318,17 @@ amdnbtemp_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
-static struct cb_ops amdnbtemp_cb_ops = {
-	.cb_open = amdnbtemp_open,
-	.cb_close = amdnbtemp_close,
-	.cb_strategy = nodev,
-	.cb_print = nodev,
-	.cb_dump = nodev,
-	.cb_read = nodev,
-	.cb_write = nodev,
-	.cb_ioctl = amdnbtemp_ioctl,
-	.cb_devmap = nodev,
-	.cb_mmap = nodev,
-	.cb_segmap = nodev,
-	.cb_chpoll = nochpoll,
-	.cb_prop_op = ddi_prop_op,
-	.cb_flag = D_MP,
-	.cb_rev = CB_REV,
-	.cb_aread = nodev,
-	.cb_awrite = nodev
-};
-
 static struct dev_ops amdnbtemp_dev_ops = {
 	.devo_rev = DEVO_REV,
 	.devo_refcnt = 0,
-	.devo_getinfo = amdnbtemp_getinfo,
+	.devo_getinfo = nodev,
 	.devo_identify = nulldev,
 	.devo_probe = nulldev,
 	.devo_attach = amdnbtemp_attach,
 	.devo_detach = amdnbtemp_detach,
 	.devo_reset = nodev,
 	.devo_power = ddi_power,
-	.devo_quiesce = ddi_quiesce_not_needed,
-	.devo_cb_ops = &amdnbtemp_cb_ops
+	.devo_quiesce = ddi_quiesce_not_needed
 };
 
 static struct modldrv amdnbtemp_modldrv = {
@@ -529,10 +357,6 @@ _init(void)
 		return (ret);
 	}
 
-	list_create(&amdnbtemp_list, sizeof (amdnbtemp_t),
-	    offsetof(amdnbtemp_t, at_link));
-	mutex_init(&amdnbtemp_mutex, NULL, MUTEX_DRIVER, NULL);
-
 	return (ret);
 }
 
@@ -551,8 +375,6 @@ _fini(void)
 		return (ret);
 	}
 
-	mutex_destroy(&amdnbtemp_mutex);
-	list_destroy(&amdnbtemp_list);
 	ddi_soft_state_fini(&amdnbtemp_state);
 	return (ret);
 }
