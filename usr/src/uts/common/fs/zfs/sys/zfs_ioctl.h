@@ -24,6 +24,7 @@
  * Copyright (c) 2012, 2017 by Delphix. All rights reserved.
  * Copyright 2016 RackTop Systems.
  * Copyright (c) 2014 Integros [integros.com]
+ * Copyright (c) 2017, Intel Corporation.
  */
 
 #ifndef	_SYS_ZFS_IOCTL_H
@@ -388,6 +389,10 @@ typedef struct zinject_record {
 #define	ZINJECT_CALC_RANGE	0x8
 
 #define	ZI_NO_DVA		(-1)
+
+/* scaled frequency ranges */
+#define	ZI_PERCENTAGE_MIN	4294UL
+#define	ZI_PERCENTAGE_MAX	UINT32_MAX
 
 typedef enum zinject_type {
 	ZINJECT_UNINITIALIZED,

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
+ * Copyright (c) 2017, Intel Corporation.
  */
 
 /*
@@ -124,7 +125,7 @@
  * cache.
  *
  * The '-f' flag controls the frequency of errors injected, expressed as a
- * integer percentage between 1 and 100.  The default is 100.
+ * real number percentage between 0.0001 and 100.  The default is 100.
  *
  * The this form is responsible for actually injecting the handler into the
  * framework.  It takes the arguments described above, translates them to the
@@ -231,12 +232,14 @@ usage(void)
 	    "\t\tspa_vdev_exit() will trigger a panic.\n"
 	    "\n"
 	    "\tzinject -d device [-e errno] [-L <nvlist|uber|pad1|pad2>] [-F]\n"
-	    "\t    [-T <read|write|free|claim|all> pool\n"
+	    "\t    [-T <read|write|free|claim|all>] [-f frequency] pool\n"
 	    "\n"
 	    "\t\tInject a fault into a particular device or the device's\n"
 	    "\t\tlabel.  Label injection can either be 'nvlist', 'uber',\n "
 	    "\t\t'pad1', or 'pad2'.\n"
 	    "\t\t'errno' can be 'nxio' (the default), 'io', or 'dtl'.\n"
+	    "\t\t'frequency' is a value between 0.0001 and 100.0 that limits\n"
+	    "\t\tdevice error injection to a percentage of the IOs.\n"
 	    "\n"
 	    "\tzinject -d device -A <degrade|fault> pool\n"
 	    "\n"
@@ -313,7 +316,7 @@ usage(void)
 	    "\t\t-u\tUnload the associated pool.  Can be specified with only\n"
 	    "\t\t\ta pool object.\n"
 	    "\t\t-f\tOnly inject errors a fraction of the time.  Expressed as\n"
-	    "\t\t\ta percentage between 1 and 100.\n"
+	    "\t\t\ta percentage between 0.0001 and 100.\n"
 	    "\n"
 	    "\t-t data\t\tInject an error into the plain file contents of a\n"
 	    "\t\t\tfile.  The object must be specified as a complete path\n"
@@ -657,6 +660,27 @@ parse_delay(char *str, uint64_t *delay, uint64_t *nlanes)
 	return (0);
 }
 
+static int
+parse_frequency(const char *str, uint32_t *percent)
+{
+	double val;
+	char *post;
+
+	val = strtod(str, &post);
+	if (post == NULL || *post != '\0')
+		return (EINVAL);
+
+	/* valid range is [0.0001, 100.0] */
+	val /= 100.0f;
+	if (val < 0.000001f || val > 1.0f)
+		return (ERANGE);
+
+	/* convert to an integer for use by kernel */
+	*percent = ((uint32_t)(val * ZI_PERCENTAGE_MAX));
+
+	return (0);
+}
+
 /*
  * This function converts a string specifier for DVAs into a bit mask.
  * The dva's provided by the user should be 0 indexed and separated by
@@ -834,10 +858,12 @@ main(int argc, char **argv)
 			}
 			break;
 		case 'f':
-			record.zi_freq = atoi(optarg);
-			if (record.zi_freq < 1 || record.zi_freq > 100) {
-				(void) fprintf(stderr, "frequency range must "
-				    "be in the range (0, 100]\n");
+			ret = parse_frequency(optarg, &record.zi_freq);
+			if (ret != 0) {
+				(void) fprintf(stderr, "%sfrequency value must "
+				    "be in the range [0.0001, 100.0]\n",
+				    ret == EINVAL ? "invalid value: " :
+				    ret == ERANGE ? "out of range: " : "");
 				return (1);
 			}
 			break;
