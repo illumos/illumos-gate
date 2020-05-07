@@ -22,6 +22,7 @@
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -139,13 +140,8 @@ extern char *strdup(const char *);
 
 #if defined(__EXTENSIONS__) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
-#if defined(__GNUC__)
 
-/*
- * gcc provides this inlining facility but Studio C does not.
- * We should use it exclusively once Studio C also provides it.
- */
-extern void *__builtin_alloca(size_t);
+#if defined(__GNUC__)
 
 #define	strdupa(s)							\
 	(__extension__(							\
