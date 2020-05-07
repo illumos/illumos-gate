@@ -27,19 +27,21 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include "ixgbe_sw.h"
 
-static int ixgbe_tx_copy(ixgbe_tx_ring_t *, tx_control_block_t *, mblk_t *,
-    uint32_t, boolean_t);
-static int ixgbe_tx_bind(ixgbe_tx_ring_t *, tx_control_block_t *, mblk_t *,
-    uint32_t);
+static int ixgbe_tx_copy(ixgbe_tx_ring_t *, tx_control_block_t **,
+    link_list_t *, const void *, size_t);
+static int ixgbe_tx_bind(ixgbe_tx_ring_t *, tx_control_block_t **,
+    link_list_t *, uint8_t *, size_t);
+static uint_t ixgbe_tcb_done(tx_control_block_t *);
 static int ixgbe_tx_fill_ring(ixgbe_tx_ring_t *, link_list_t *,
     ixgbe_tx_context_t *, size_t);
 static void ixgbe_save_desc(tx_control_block_t *, uint64_t, size_t);
-static tx_control_block_t *ixgbe_get_free_list(ixgbe_tx_ring_t *);
+static tx_control_block_t *ixgbe_get_free_list(ixgbe_tx_ring_t *,
+    link_list_t *);
 
 static int ixgbe_get_context(mblk_t *, ixgbe_tx_context_t *);
 static boolean_t ixgbe_check_context(ixgbe_tx_ring_t *,
@@ -65,42 +67,71 @@ static void ixgbe_fill_context(struct ixgbe_adv_tx_context_desc *,
  * they will be processed by using bcopy; otherwise, they will
  * be processed by using DMA binding.
  *
- * To process the mblk, a tx control block is got from the
- * free list. One tx control block contains one tx buffer, which
- * is used to copy mblk fragments' data; and one tx DMA handle,
- * which is used to bind a mblk fragment with DMA resource.
+ * To process the mblk, for each fragment, we pass a pointer to the location
+ * of the current transmit control block (tcb) (initialized to NULL) to either
+ * ixgbe_tx_copy() or ixgbe_tx_bind() (based on the size of the mblk fragment).
+ * ixgbe_tx_copy() and ixgbe_tx_bind() will either continue to use the current
+ * if possible, or close out the current tcb, allocate a new tcb, and update
+ * the passed location (tx_control_block_t **) to reflect the new current tcb.
  *
- * Several small mblk fragments can be copied into one tx control
- * block's buffer, and then the buffer will be transmitted with
- * one tx descriptor.
+ * Since bound mblk fragments require their own tcb, the close, allocate new,
+ * and update steps occur on every call to ixgbe_tx_bind(), but since
+ * consecutive small mblk fragments can be combined into a single tcb, the
+ * close, allocate new, and update steps may not occur on every call to
+ * ixgbe_tx_copy(). If the current tcb is already being used to copy data and
+ * we call ixgbe_tx_copy(), if there is enough room in the current tcb for
+ * the current mblk fragment, we append the data from the mblk fragment. If
+ * we call ixgbe_tx_copy() and the current tcb isn't being used to copy (i.e.
+ * the previous iteration of the loop called ixgbe_tx_bind()), or doesn't
+ * have enough space for the mblk fragment, we close out the current tcb,
+ * grab a new tcb from the free list, and update the current tcb to the
+ * newly obtained tcb.
  *
- * A large fragment only binds with one tx control block's DMA
- * handle, and it can span several tx descriptors for transmitting.
+ * When LSO (large segment offload) is enabled, we first copy the packet
+ * headers (ethernet, IP, and TCP/UDP) into their own descriptor before
+ * processing the remainder of the packet. The remaining bytes of the packet
+ * are then copied or mapped based on the fragment size as described above.
  *
- * So to transmit a packet (mblk), several tx control blocks can
- * be used. After the processing, those tx control blocks will
- * be put to the work list.
+ * Through the entire processing of a packet, we keep track of the number of
+ * DMA descriptors being used (either bound or pre-bound buffers used for
+ * copying) by this packet. Each tcb requires at least one DMA descriptor, but
+ * may require more than one. When a tcb is closed by ixgbe_tx_bind() or
+ * ixgbe_tx_copy(), it does so by calling ixgbe_tcb_done() which returns the
+ * number of DMA descriptors that are closed (ready for the HW). Since the
+ * hardware limits the number of descriptors that can be used to transmit a
+ * single packet, if the total number DMA descriptors required to transmit
+ * this packet exceeds this limit, we perform a msgpullup() and try again.
+ * Since our DMA attributes limit the number of DMA cookies allowed to
+ * map a single span of memory to a value (MAX_COOKIE) less than the
+ * maximum number of descriptors allowed for a packet (IXGBE_TX_DESC_LIMIT),
+ * as long as sufficient tcbs are available, we should always be able to
+ * process a packet that's contained in a single mblk_t (no additional
+ * fragments).
+ *
+ * Once all of the tcbs have been setup, ixgbe_tx_fill_ring() is called to
+ * setup the tx ring to transmit the tcbs and then tell the HW to start
+ * transmitting. When transmission is complete, an interrupt is triggered
+ * which calls the appropriate recycle routine to place the tcbs that were
+ * used in transmission back in the free list. We also may also try to
+ * recycle any available tcbs when the size of the tcb free list gets low
+ * or if the watchdog timer triggers.
+ *
  */
 mblk_t *
-ixgbe_ring_tx(void *arg, mblk_t *mp)
+ixgbe_ring_tx(void *arg, mblk_t *orig_mp)
 {
 	ixgbe_tx_ring_t *tx_ring = (ixgbe_tx_ring_t *)arg;
 	ixgbe_t *ixgbe = tx_ring->ixgbe;
-	tx_type_t current_flag, next_flag;
-	uint32_t current_len, next_len;
-	uint32_t desc_total;
-	size_t mbsize;
-	int desc_num;
-	boolean_t copy_done, eop;
-	mblk_t *current_mp, *next_mp, *nmp, *pull_mp = NULL;
+	mblk_t *mp = orig_mp;
+	mblk_t *pull_mp = NULL;
 	tx_control_block_t *tcb;
-	ixgbe_tx_context_t tx_context, *ctx;
-	link_list_t pending_list;
-	uint32_t len, hdr_frag_len, hdr_len;
+	size_t mbsize, offset, len;
+	uint32_t desc_total;
 	uint32_t copy_thresh;
-	mblk_t *hdr_new_mp = NULL;
-	mblk_t *hdr_pre_mp = NULL;
-	mblk_t *hdr_nmp = NULL;
+	int desc_num;
+	ixgbe_tx_context_t tx_context, *ctx = NULL;
+	link_list_t pending_list;
+	boolean_t limit_retry = B_FALSE;
 
 	ASSERT(mp->b_next == NULL);
 
@@ -115,11 +146,7 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 
 	copy_thresh = ixgbe->tx_copy_thresh;
 
-	/* Get the mblk size */
-	mbsize = 0;
-	for (nmp = mp; nmp != NULL; nmp = nmp->b_cont) {
-		mbsize += MBLKL(nmp);
-	}
+	mbsize = msgsize(mp);
 
 	if (ixgbe->tx_hcksum_enable) {
 		/*
@@ -145,10 +172,15 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 			IXGBE_DEBUGLOG_0(ixgbe, "ixgbe_tx: packet oversize");
 			return (NULL);
 		}
-	} else {
-		ctx = NULL;
 	}
 
+	/*
+	 * If we use too many descriptors (see comments below), we may do
+	 * pull_mp = msgpullup(orig_mp, -1), and jump back to here. As such,
+	 * any time we error return past here, we should check and free
+	 * pull_mp if != NULL.
+	 */
+retry:
 	/*
 	 * Check and recycle tx descriptors.
 	 * The recycle threshold here should be selected carefully
@@ -165,7 +197,9 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 	if (tx_ring->tbd_free < ixgbe->tx_overload_thresh) {
 		tx_ring->reschedule = B_TRUE;
 		tx_ring->stat_overload++;
-		return (mp);
+		if (pull_mp != NULL)
+			freemsg(pull_mp);
+		return (orig_mp);
 	}
 
 	/*
@@ -175,313 +209,149 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 	 * It is used to reduce the lock contention of the tx_lock.
 	 */
 	LINK_LIST_INIT(&pending_list);
+
+	tcb = NULL;
 	desc_num = 0;
 	desc_total = 0;
+	offset = 0;
 
 	/*
-	 * The software should guarantee LSO packet header(MAC+IP+TCP)
-	 * to be within one descriptor. Here we reallocate and refill the
-	 * the header if it's physical memory non-contiguous.
+	 * For LSO, we always copy the packet header (Ethernet + IP + TCP/UDP)
+	 * into a single descriptor separate from the remaining data.
 	 */
 	if ((ctx != NULL) && ctx->lso_flag) {
-		/* find the last fragment of the header */
-		len = MBLKL(mp);
-		ASSERT(len > 0);
-		hdr_nmp = mp;
+		size_t hdr_len;
+
 		hdr_len = ctx->ip_hdr_len + ctx->mac_hdr_len + ctx->l4_hdr_len;
-		while (len < hdr_len) {
-			hdr_pre_mp = hdr_nmp;
-			hdr_nmp = hdr_nmp->b_cont;
-			len += MBLKL(hdr_nmp);
-		}
-		/*
-		 * If the header and the payload are in different mblks,
-		 * we simply force the header to be copied into pre-allocated
-		 * page-aligned buffer.
-		 */
-		if (len == hdr_len)
-			goto adjust_threshold;
 
-		hdr_frag_len = hdr_len - (len - MBLKL(hdr_nmp));
 		/*
-		 * There are two cases we need to reallocate a mblk for the
-		 * last header fragment:
-		 * 1. the header is in multiple mblks and the last fragment
-		 * share the same mblk with the payload
-		 * 2. the header is in a single mblk shared with the payload
-		 * and the header is physical memory non-contiguous
+		 * copy the first hdr_len bytes of mp (i.e. the Ethernet, IP,
+		 * and TCP/UDP headers) into tcb.
 		 */
-		if ((hdr_nmp != mp) ||
-		    (P2NPHASE((uintptr_t)hdr_nmp->b_rptr, ixgbe->sys_page_size)
-		    < hdr_len)) {
-			tx_ring->stat_lso_header_fail++;
+		for (len = hdr_len; mp != NULL && len > 0; mp = mp->b_cont) {
+			size_t mlen = MBLKL(mp);
+			size_t amt = MIN(mlen, len);
+			int ret;
+
+			ret = ixgbe_tx_copy(tx_ring, &tcb, &pending_list,
+			    mp->b_rptr, amt);
 			/*
-			 * reallocate the mblk for the last header fragment,
-			 * expect to bcopy into pre-allocated page-aligned
-			 * buffer
+			 * Since we're trying to copy all of the headers into
+			 * a single buffer in a single tcb, if ixgbe_tx_copy()
+			 * returns anything but 0, it means either no tcbs
+			 * are available (< 0), or while copying, we spilled
+			 * over and couldn't fit all the headers into a
+			 * single tcb.
 			 */
-			hdr_new_mp = allocb(hdr_frag_len, 0);
-			if (!hdr_new_mp)
-				return (mp);
-			bcopy(hdr_nmp->b_rptr, hdr_new_mp->b_rptr,
-			    hdr_frag_len);
-			/* link the new header fragment with the other parts */
-			hdr_new_mp->b_wptr = hdr_new_mp->b_rptr + hdr_frag_len;
-			hdr_new_mp->b_cont = hdr_nmp;
-			if (hdr_pre_mp)
-				hdr_pre_mp->b_cont = hdr_new_mp;
-			else
-				mp = hdr_new_mp;
-			hdr_nmp->b_rptr += hdr_frag_len;
-		}
-adjust_threshold:
-		/*
-		 * adjust the bcopy threshhold to guarantee
-		 * the header to use bcopy way
-		 */
-		if (copy_thresh < hdr_len)
-			copy_thresh = hdr_len;
-	}
-
-	current_mp = mp;
-	current_len = MBLKL(current_mp);
-	/*
-	 * Decide which method to use for the first fragment
-	 */
-	current_flag = (current_len <= copy_thresh) ?
-	    USE_COPY : USE_DMA;
-	/*
-	 * If the mblk includes several contiguous small fragments,
-	 * they may be copied into one buffer. This flag is used to
-	 * indicate whether there are pending fragments that need to
-	 * be copied to the current tx buffer.
-	 *
-	 * If this flag is B_TRUE, it indicates that a new tx control
-	 * block is needed to process the next fragment using either
-	 * copy or DMA binding.
-	 *
-	 * Otherwise, it indicates that the next fragment will be
-	 * copied to the current tx buffer that is maintained by the
-	 * current tx control block. No new tx control block is needed.
-	 */
-	copy_done = B_TRUE;
-	while (current_mp) {
-		next_mp = current_mp->b_cont;
-		eop = (next_mp == NULL); /* Last fragment of the packet? */
-		next_len = eop ? 0: MBLKL(next_mp);
-
-		/*
-		 * When the current fragment is an empty fragment, if
-		 * the next fragment will still be copied to the current
-		 * tx buffer, we cannot skip this fragment here. Because
-		 * the copy processing is pending for completion. We have
-		 * to process this empty fragment in the tx_copy routine.
-		 *
-		 * If the copy processing is completed or a DMA binding
-		 * processing is just completed, we can just skip this
-		 * empty fragment.
-		 */
-		if ((current_len == 0) && (copy_done)) {
-			current_mp = next_mp;
-			current_len = next_len;
-			current_flag = (current_len <= copy_thresh) ?
-			    USE_COPY : USE_DMA;
-			continue;
-		}
-
-		if (copy_done) {
-			/*
-			 * Get a new tx control block from the free list
-			 */
-			tcb = ixgbe_get_free_list(tx_ring);
-
-			if (tcb == NULL) {
-				tx_ring->stat_fail_no_tcb++;
+			if (ret != 0) {
+				if (ret > 0)
+					tx_ring->stat_lso_header_fail++;
 				goto tx_failure;
 			}
 
-			/*
-			 * Push the tx control block to the pending list
-			 * to avoid using lock too early
-			 */
-			LIST_PUSH_TAIL(&pending_list, &tcb->link);
-		}
+			len -= amt;
 
-		if (current_flag == USE_COPY) {
 			/*
-			 * Check whether to use bcopy or DMA binding to process
-			 * the next fragment, and if using bcopy, whether we
-			 * need to continue copying the next fragment into the
-			 * current tx buffer.
+			 * If we copy less than the full amount of this
+			 * mblk_t, we have some amount to copy below.
 			 */
-			ASSERT((tcb->tx_buf.len + current_len) <=
-			    tcb->tx_buf.size);
-
-			if (eop) {
-				/*
-				 * This is the last fragment of the packet, so
-				 * the copy processing will be completed with
-				 * this fragment.
-				 */
-				next_flag = USE_NONE;
-				copy_done = B_TRUE;
-			} else if ((tcb->tx_buf.len + current_len + next_len) >
-			    tcb->tx_buf.size) {
-				/*
-				 * If the next fragment is too large to be
-				 * copied to the current tx buffer, we need
-				 * to complete the current copy processing.
-				 */
-				next_flag = (next_len > copy_thresh) ?
-				    USE_DMA: USE_COPY;
-				copy_done = B_TRUE;
-			} else if (next_len > copy_thresh) {
-				/*
-				 * The next fragment needs to be processed with
-				 * DMA binding. So the copy prcessing will be
-				 * completed with the current fragment.
-				 */
-				next_flag = USE_DMA;
-				copy_done = B_TRUE;
-			} else {
-				/*
-				 * Continue to copy the next fragment to the
-				 * current tx buffer.
-				 */
-				next_flag = USE_COPY;
-				copy_done = B_FALSE;
+			if (amt < mlen) {
+				offset = amt;
+				break;
 			}
-
-			desc_num = ixgbe_tx_copy(tx_ring, tcb, current_mp,
-			    current_len, copy_done);
-		} else {
-			/*
-			 * Check whether to use bcopy or DMA binding to process
-			 * the next fragment.
-			 */
-			next_flag = (next_len > copy_thresh) ?
-			    USE_DMA: USE_COPY;
-			ASSERT(copy_done == B_TRUE);
-
-			desc_num = ixgbe_tx_bind(tx_ring, tcb, current_mp,
-			    current_len);
 		}
 
-		if (desc_num > 0)
-			desc_total += desc_num;
-		else if (desc_num < 0)
-			goto tx_failure;
+		ASSERT0(len);
 
-		current_mp = next_mp;
-		current_len = next_len;
-		current_flag = next_flag;
+		/*
+		 * Finish off the header tcb, and start anew for the
+		 * rest of the packet.
+		 */
+		desc_total += ixgbe_tcb_done(tcb);
+		tcb = NULL;
 	}
 
 	/*
-	 * Attach the mblk to the last tx control block
+	 * Process each remaining segment in the packet -- either binding
+	 * the dblk_t or copying the contents of the dblk_t to an already
+	 * bound buffer. When we copy, we will accumulate consecutive small
+	 * (less than copy_thresh bytes) segments into a single tcb buffer
+	 * until no more can fit (or we encounter a segment larger than
+	 * copy_thresh and bind the dblk_t).
+	 *
+	 * Both ixgbe_tx_bind() and ixgbe_tx_copy() will allocate new
+	 * transmit control blocks (tcb)s as needed (and append them onto
+	 * 'pending_list'). Both functions also replace 'tcb' with the new
+	 * tcb when they allocate a new tcb.
+	 *
+	 * We stop trying to process the packet once the number of descriptors
+	 * used equals IXGBE_TX_DESC_LIMIT. Even if we're copying into the
+	 * IXGBE_TX_DESC_LIMIT-th descriptor, we won't have room to add a
+	 * context descriptor (since we're already at the limit), so there's
+	 * no point in continuing. We'll pull up the mblk_t (see below)
+	 * and try again.
 	 */
-	ASSERT(tcb);
-	ASSERT(tcb->mp == NULL);
-	tcb->mp = mp;
+	while (mp != NULL && desc_total < IXGBE_TX_DESC_LIMIT) {
+		uint8_t *rptr = mp->b_rptr + offset;
+		int ret;
+
+		len = MBLKL(mp) - offset;
+		offset = 0;
+
+		if (len > copy_thresh) {
+			ret = ixgbe_tx_bind(tx_ring, &tcb, &pending_list, rptr,
+			    len);
+		} else {
+			ret = ixgbe_tx_copy(tx_ring, &tcb, &pending_list, rptr,
+			    len);
+		}
+
+		if (ret < 0)
+			goto tx_failure;
+
+		desc_total += ret;
+		mp = mp->b_cont;
+	}
+
+	/* Finish off the last tcb */
+	desc_total += ixgbe_tcb_done(tcb);
 
 	/*
 	 * 82598/82599 chipset has a limitation that no more than 32 tx
-	 * descriptors can be transmited out at one time.
+	 * descriptors can be transmited out at one time. As noted above,
+	 * we need to include space for a context descriptor in case its
+	 * necessary, so we do this even if desc_total == IXGBE_TX_DESC_LIMIT
+	 * as well as when it exceeds the limit.
 	 *
-	 * Here is a workaround for it: pull up the mblk then send it
-	 * out with bind way. By doing so, no more than MAX_COOKIE (18)
-	 * descriptors is needed.
+	 * If we exceed this limit, we take the hit, do a msgpullup(), and
+	 * then try again. Our DMA attributes guarantee we should never use
+	 * more than MAX_COOKIE (18) descriptors to map a single mblk_t, so we
+	 * should only need to retry once.
 	 */
-	if (desc_total + 1 > IXGBE_TX_DESC_LIMIT) {
+	if (desc_total >= IXGBE_TX_DESC_LIMIT) {
+		/* We shouldn't hit this path twice */
+		VERIFY0(limit_retry);
+
 		tx_ring->stat_break_tbd_limit++;
 
-		/*
-		 * Discard the mblk and free the used resources
-		 */
-		tcb = (tx_control_block_t *)LIST_GET_HEAD(&pending_list);
-		while (tcb) {
-			tcb->mp = NULL;
-			ixgbe_free_tcb(tcb);
-			tcb = (tx_control_block_t *)
-			    LIST_GET_NEXT(&pending_list, &tcb->link);
-		}
-
-		/*
-		 * Return the tx control blocks in the pending list to
-		 * the free list.
-		 */
+		/* Release all the tcbs we used previously */
 		ixgbe_put_free_list(tx_ring, &pending_list);
-
-		/*
-		 * pull up the mblk and send it out with bind way
-		 */
-		if ((pull_mp = msgpullup(mp, -1)) == NULL) {
-			tx_ring->reschedule = B_TRUE;
-
-			/*
-			 * If new mblk has been allocted for the last header
-			 * fragment of a LSO packet, we should restore the
-			 * modified mp.
-			 */
-			if (hdr_new_mp) {
-				hdr_new_mp->b_cont = NULL;
-				freeb(hdr_new_mp);
-				hdr_nmp->b_rptr -= hdr_frag_len;
-				if (hdr_pre_mp)
-					hdr_pre_mp->b_cont = hdr_nmp;
-				else
-					mp = hdr_nmp;
-			}
-			return (mp);
-		}
-
-		LINK_LIST_INIT(&pending_list);
 		desc_total = 0;
+		offset = 0;
 
-		/*
-		 * if the packet is a LSO packet, we simply
-		 * transmit the header in one descriptor using the copy way
-		 */
-		if ((ctx != NULL) && ctx->lso_flag) {
-			hdr_len = ctx->ip_hdr_len + ctx->mac_hdr_len +
-			    ctx->l4_hdr_len;
-
-			tcb = ixgbe_get_free_list(tx_ring);
-			if (tcb == NULL) {
-				tx_ring->stat_fail_no_tcb++;
-				goto tx_failure;
-			}
-			desc_num = ixgbe_tx_copy(tx_ring, tcb, pull_mp,
-			    hdr_len, B_TRUE);
-			LIST_PUSH_TAIL(&pending_list, &tcb->link);
-			desc_total  += desc_num;
-
-			pull_mp->b_rptr += hdr_len;
+		pull_mp = msgpullup(orig_mp, -1);
+		if (pull_mp == NULL) {
+			tx_ring->reschedule = B_TRUE;
+			return (orig_mp);
 		}
 
-		tcb = ixgbe_get_free_list(tx_ring);
-		if (tcb == NULL) {
-			tx_ring->stat_fail_no_tcb++;
-			goto tx_failure;
-		}
-		if ((ctx != NULL) && ctx->lso_flag) {
-			desc_num = ixgbe_tx_bind(tx_ring, tcb, pull_mp,
-			    mbsize - hdr_len);
-		} else {
-			desc_num = ixgbe_tx_bind(tx_ring, tcb, pull_mp,
-			    mbsize);
-		}
-		if (desc_num < 0) {
-			goto tx_failure;
-		}
-		LIST_PUSH_TAIL(&pending_list, &tcb->link);
-
-		desc_total += desc_num;
-		tcb->mp = pull_mp;
+		mp = pull_mp;
+		limit_retry = B_TRUE;
+		goto retry;
 	}
 
 	/*
-	 * Before fill the tx descriptor ring with the data, we need to
+	 * Before filling the tx descriptor ring with the data, we need to
 	 * ensure there are adequate free descriptors for transmit
 	 * (including one context descriptor).
 	 * Do not use up all the tx descriptors.
@@ -506,22 +376,31 @@ adjust_threshold:
 		goto tx_failure;
 	}
 
+	/*
+	 * Attach the mblk_t we've setup to the last control block.
+	 * This is only done once we know there are enough free descriptors
+	 * to transmit so that the cleanup in tx_failure doesn't try to
+	 * call freemsg() on mp (since we will want to return it).
+	 */
+	tcb->mp = (pull_mp != NULL) ? pull_mp : orig_mp;
+
 	desc_num = ixgbe_tx_fill_ring(tx_ring, &pending_list, ctx,
 	    mbsize);
 
 	ASSERT((desc_num == desc_total) || (desc_num == (desc_total + 1)));
 
 	tx_ring->stat_obytes += mbsize;
-	tx_ring->stat_opackets ++;
+	tx_ring->stat_opackets++;
 
 	mutex_exit(&tx_ring->tx_lock);
 
 	/*
-	 * now that the transmission succeeds, need to free the original
-	 * mp if we used the pulling up mblk for transmission.
+	 * Now that tx is done, if we pulled up the original message, we
+	 * can free the original message since it is no longer being
+	 * used.
 	 */
-	if (pull_mp) {
-		freemsg(mp);
+	if (pull_mp != NULL) {
+		freemsg(orig_mp);
 	}
 
 	return (NULL);
@@ -535,31 +414,10 @@ tx_failure:
 	}
 
 	/*
-	 * If new mblk has been allocted for the last header
-	 * fragment of a LSO packet, we should restore the
-	 * modified mp.
+	 * tcb->mp should not be set until we know we can transmit (see above),
+	 * so it should always be NULL if we get here.
 	 */
-	if (hdr_new_mp) {
-		hdr_new_mp->b_cont = NULL;
-		freeb(hdr_new_mp);
-		hdr_nmp->b_rptr -= hdr_frag_len;
-		if (hdr_pre_mp)
-			hdr_pre_mp->b_cont = hdr_nmp;
-		else
-			mp = hdr_nmp;
-	}
-	/*
-	 * Discard the mblk and free the used resources
-	 */
-	tcb = (tx_control_block_t *)LIST_GET_HEAD(&pending_list);
-	while (tcb) {
-		tcb->mp = NULL;
-
-		ixgbe_free_tcb(tcb);
-
-		tcb = (tx_control_block_t *)
-		    LIST_GET_NEXT(&pending_list, &tcb->link);
-	}
+	VERIFY3P(tcb->mp, ==, NULL);
 
 	/*
 	 * Return the tx control blocks in the pending list to the free list.
@@ -569,22 +427,44 @@ tx_failure:
 	/* Transmit failed, do not drop the mblk, rechedule the transmit */
 	tx_ring->reschedule = B_TRUE;
 
-	return (mp);
+	return (orig_mp);
 }
 
 /*
  * ixgbe_tx_copy
  *
- * Copy the mblk fragment to the pre-allocated tx buffer
+ * Copy the mblk fragment to the pre-allocated tx buffer. Return -1 on error,
+ * otherwise return the number of descriptors we've completed in this call.
  */
 static int
-ixgbe_tx_copy(ixgbe_tx_ring_t *tx_ring, tx_control_block_t *tcb, mblk_t *mp,
-    uint32_t len, boolean_t copy_done)
+ixgbe_tx_copy(ixgbe_tx_ring_t *tx_ring, tx_control_block_t **tcbp,
+    link_list_t *pending_list, const void *buf, size_t len)
 {
+	tx_control_block_t *tcb = *tcbp;
 	dma_buffer_t *tx_buf;
-	uint32_t desc_num;
-	_NOTE(ARGUNUSED(tx_ring));
+	uint32_t desc_num = 0;
 
+	/*
+	 * We need a new tcb -- either the current one (tcb) is NULL because
+	 * we just started, tcb is being used for DMA, or tcb isn't large enough
+	 * to hold the contents we need to copy.
+	 */
+	if (tcb == NULL || tcb->tx_type == USE_DMA ||
+	    tcb->tx_buf.len + len > tcb->tx_buf.size) {
+		tx_control_block_t *newtcb;
+
+		newtcb = ixgbe_get_free_list(tx_ring, pending_list);
+		if (newtcb == NULL)
+			return (-1);
+
+		newtcb->tx_type = USE_COPY;
+
+		if (tcb != NULL)
+			desc_num += ixgbe_tcb_done(tcb);
+		*tcbp = tcb = newtcb;
+	}
+
+	ASSERT3S(tcb->tx_type, ==, USE_COPY);
 	tx_buf = &tcb->tx_buf;
 
 	/*
@@ -598,36 +478,10 @@ ixgbe_tx_copy(ixgbe_tx_ring_t *tx_ring, tx_control_block_t *tcb, mblk_t *mp,
 	 * fragment.
 	 */
 	if (len > 0) {
-		bcopy(mp->b_rptr, tx_buf->address + tx_buf->len, len);
+		bcopy(buf, tx_buf->address + tx_buf->len, len);
 
 		tx_buf->len += len;
 		tcb->frag_num++;
-	}
-
-	desc_num = 0;
-
-	/*
-	 * If it is the last fragment copied to the current tx buffer,
-	 * in other words, if there's no remaining fragment or the remaining
-	 * fragment requires a new tx control block to process, we need to
-	 * complete the current copy processing by syncing up the current
-	 * DMA buffer and saving the descriptor data.
-	 */
-	if (copy_done) {
-		/*
-		 * Sync the DMA buffer of the packet data
-		 */
-		DMA_SYNC(tx_buf, DDI_DMA_SYNC_FORDEV);
-
-		tcb->tx_type = USE_COPY;
-
-		/*
-		 * Save the address and length to the private data structure
-		 * of the tx control block, which will be used to fill the
-		 * tx descriptor ring after all the fragments are processed.
-		 */
-		ixgbe_save_desc(tcb, tx_buf->dma_address, tx_buf->len);
-		desc_num++;
 	}
 
 	return (desc_num);
@@ -636,24 +490,31 @@ ixgbe_tx_copy(ixgbe_tx_ring_t *tx_ring, tx_control_block_t *tcb, mblk_t *mp,
 /*
  * ixgbe_tx_bind
  *
- * Bind the mblk fragment with DMA
+ * Bind the mblk fragment with DMA. Returns -1 on error, otherwise it
+ * returns the number of descriptors completed in this call. This count
+ * can include descriptors that weren't filled in by the current call to
+ * ixgbe_tx_bind() but were being used (but not yet completed) in previous
+ * calls to ixgbe_tx_bind() or ixgbe_tx_copy().
  */
 static int
-ixgbe_tx_bind(ixgbe_tx_ring_t *tx_ring, tx_control_block_t *tcb, mblk_t *mp,
-    uint32_t len)
+ixgbe_tx_bind(ixgbe_tx_ring_t *tx_ring, tx_control_block_t **tcbp,
+    link_list_t *pending_list, uint8_t *buf, size_t len)
 {
-	int status, i;
-	ddi_dma_cookie_t dma_cookie;
-	uint_t ncookies;
-	int desc_num;
+	tx_control_block_t *tcb = NULL;
+	uint_t desc_num = 0;
+	int status;
+
+	tcb = ixgbe_get_free_list(tx_ring, pending_list);
+	if (tcb == NULL)
+		return (-1);
 
 	/*
 	 * Use DMA binding to process the mblk fragment
 	 */
 	status = ddi_dma_addr_bind_handle(tcb->tx_dma_handle, NULL,
-	    (caddr_t)mp->b_rptr, len,
+	    (caddr_t)buf, len,
 	    DDI_DMA_WRITE | DDI_DMA_STREAMING, DDI_DMA_DONTWAIT,
-	    0, &dma_cookie, &ncookies);
+	    0, NULL, NULL);
 
 	if (status != DDI_DMA_MAPPED) {
 		tx_ring->stat_fail_dma_bind++;
@@ -662,25 +523,51 @@ ixgbe_tx_bind(ixgbe_tx_ring_t *tx_ring, tx_control_block_t *tcb, mblk_t *mp,
 
 	tcb->frag_num++;
 	tcb->tx_type = USE_DMA;
+
 	/*
-	 * Each fragment can span several cookies. One cookie will have
-	 * one tx descriptor to transmit.
+	 * If there was an old tcb, we're about to replace it. Finish
+	 * setting up the old tcb so we can replace it with the new one.
 	 */
-	desc_num = 0;
-	for (i = ncookies; i > 0; i--) {
-		/*
-		 * Save the address and length to the private data structure
-		 * of the tx control block, which will be used to fill the
-		 * tx descriptor ring after all the fragments are processed.
-		 */
-		ixgbe_save_desc(tcb,
-		    dma_cookie.dmac_laddress,
-		    dma_cookie.dmac_size);
+	if (*tcbp != NULL)
+		desc_num += ixgbe_tcb_done(*tcbp);
 
+	*tcbp = tcb;
+	return (desc_num);
+}
+
+/*
+ * Once we're done populating a tcb (either by binding or copying into
+ * a buffer in the tcb), get it ready for tx and return the number of
+ * descriptors used.
+ */
+static uint_t
+ixgbe_tcb_done(tx_control_block_t *tcb)
+{
+	uint_t desc_num = 0;
+
+	if (tcb->tx_type == USE_DMA) {
+		const ddi_dma_cookie_t *c;
+
+		for (c = ddi_dma_cookie_iter(tcb->tx_dma_handle, NULL);
+		    c != NULL;
+		    c = ddi_dma_cookie_iter(tcb->tx_dma_handle, c)) {
+			/*
+			 * Save the address and length to the private data
+			 * structure of the tx control block, which will be
+			 * used to fill the tx descriptor ring after all the
+			 * fragments are processed.
+			 */
+			ixgbe_save_desc(tcb, c->dmac_laddress, c->dmac_size);
+			desc_num++;
+		}
+	} else if (tcb->tx_type == USE_COPY) {
+		dma_buffer_t *tx_buf = &tcb->tx_buf;
+
+		DMA_SYNC(tx_buf, DDI_DMA_SYNC_FORDEV);
+		ixgbe_save_desc(tcb, tx_buf->dma_address, tx_buf->len);
 		desc_num++;
-
-		if (i > 1)
-			ddi_dma_nextcookie(tcb->tx_dma_handle, &dma_cookie);
+	} else {
+		panic("invalid tcb type");
 	}
 
 	return (desc_num);
@@ -1364,21 +1251,6 @@ ixgbe_tx_recycle_legacy(ixgbe_tx_ring_t *tx_ring)
 	mutex_exit(&tx_ring->recycle_lock);
 
 	/*
-	 * Free the resources used by the tx control blocks
-	 * in the pending list
-	 */
-	tcb = (tx_control_block_t *)LIST_GET_HEAD(&pending_list);
-	while (tcb != NULL) {
-		/*
-		 * Release the resources occupied by the tx control block
-		 */
-		ixgbe_free_tcb(tcb);
-
-		tcb = (tx_control_block_t *)
-		    LIST_GET_NEXT(&pending_list, &tcb->link);
-	}
-
-	/*
 	 * Add the tx control blocks in the pending list to the free list.
 	 */
 	ixgbe_put_free_list(tx_ring, &pending_list);
@@ -1511,21 +1383,6 @@ ixgbe_tx_recycle_head_wb(ixgbe_tx_ring_t *tx_ring)
 	mutex_exit(&tx_ring->recycle_lock);
 
 	/*
-	 * Free the resources used by the tx control blocks
-	 * in the pending list
-	 */
-	tcb = (tx_control_block_t *)LIST_GET_HEAD(&pending_list);
-	while (tcb) {
-		/*
-		 * Release the resources occupied by the tx control block
-		 */
-		ixgbe_free_tcb(tcb);
-
-		tcb = (tx_control_block_t *)
-		    LIST_GET_NEXT(&pending_list, &tcb->link);
-	}
-
-	/*
 	 * Add the tx control blocks in the pending list to the free list.
 	 */
 	ixgbe_put_free_list(tx_ring, &pending_list);
@@ -1543,6 +1400,9 @@ ixgbe_tx_recycle_head_wb(ixgbe_tx_ring_t *tx_ring)
 void
 ixgbe_free_tcb(tx_control_block_t *tcb)
 {
+	if (tcb == NULL)
+		return;
+
 	switch (tcb->tx_type) {
 	case USE_COPY:
 		/*
@@ -1576,14 +1436,15 @@ ixgbe_free_tcb(tx_control_block_t *tcb)
 }
 
 /*
- * ixgbe_get_free_list - Get a free tx control block from the free list
+ * ixgbe_get_free_list - Get a free tx control block from the free list.
+ * Returns the tx control block and appends it to list.
  *
  * The atomic operation on the number of the available tx control block
  * in the free list is used to keep this routine mutual exclusive with
  * the routine ixgbe_put_check_list.
  */
 static tx_control_block_t *
-ixgbe_get_free_list(ixgbe_tx_ring_t *tx_ring)
+ixgbe_get_free_list(ixgbe_tx_ring_t *tx_ring, link_list_t *list)
 {
 	tx_control_block_t *tcb;
 
@@ -1591,8 +1452,10 @@ ixgbe_get_free_list(ixgbe_tx_ring_t *tx_ring)
 	 * Check and update the number of the free tx control block
 	 * in the free list.
 	 */
-	if (ixgbe_atomic_reserve(&tx_ring->tcb_free, 1) < 0)
+	if (ixgbe_atomic_reserve(&tx_ring->tcb_free, 1) < 0) {
+		tx_ring->stat_fail_no_tcb++;
 		return (NULL);
+	}
 
 	mutex_enter(&tx_ring->tcb_head_lock);
 
@@ -1604,6 +1467,7 @@ ixgbe_get_free_list(ixgbe_tx_ring_t *tx_ring)
 
 	mutex_exit(&tx_ring->tcb_head_lock);
 
+	LIST_PUSH_TAIL(list, &tcb->link);
 	return (tcb);
 }
 
@@ -1622,6 +1486,16 @@ ixgbe_put_free_list(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list)
 	uint32_t index;
 	int tcb_num;
 	tx_control_block_t *tcb;
+
+	for (tcb = (tx_control_block_t *)LIST_GET_HEAD(pending_list);
+	    tcb != NULL;
+	    tcb = (tx_control_block_t *)LIST_GET_NEXT(pending_list, tcb)) {
+		/*
+		 * Despite the name, ixgbe_free_tcb() just releases the
+		 * resources in tcb, but does not free tcb itself.
+		 */
+		ixgbe_free_tcb(tcb);
+	}
 
 	mutex_enter(&tx_ring->tcb_tail_lock);
 
