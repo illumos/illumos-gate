@@ -94,7 +94,7 @@ static struct cb_ops cn_cb_ops = {
 	cnioctl,		/* ioctl */
 	nodev,			/* devmap */
 	nodev,			/* mmap */
-	nodev, 			/* segmap */
+	nodev,			/* segmap */
 	cnpoll,			/* poll */
 	ddi_prop_op,		/* cb_prop_op */
 	0,			/* streamtab  */
@@ -237,9 +237,9 @@ cn_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
-/* ARGSUSED */
 static int
-cn_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
+cn_info(dev_info_t *dip __unused, ddi_info_cmd_t infocmd, void *arg,
+    void **result)
 {
 	int error = DDI_FAILURE;
 
@@ -346,9 +346,8 @@ cnopen(dev_t *dev, int flag, int state, struct cred *cred)
 	return (0);
 }
 
-/* ARGSUSED */
 static int
-cnclose(dev_t dev, int flag, int state, struct cred *cred)
+cnclose(dev_t dev __unused, int flag, int state, struct cred *cred)
 {
 	int	err = 0;
 	vnode_t	*vp;
@@ -374,9 +373,8 @@ cnclose(dev_t dev, int flag, int state, struct cred *cred)
 	return (err);
 }
 
-/* ARGSUSED */
 static int
-cnread(dev_t dev, struct uio *uio, struct cred *cred)
+cnread(dev_t dev __unused, struct uio *uio, struct cred *cred)
 {
 	kcondvar_t	sleep_forever;
 	kmutex_t	sleep_forever_mutex;
@@ -402,9 +400,8 @@ cnread(dev_t dev, struct uio *uio, struct cred *cred)
 		return (cdev_read(rconsdev, uio, cred));
 }
 
-/* ARGSUSED */
 static int
-cnwrite(dev_t dev, struct uio *uio, struct cred *cred)
+cnwrite(dev_t dev __unused, struct uio *uio, struct cred *cred)
 {
 	if (rconsvp == NULL) {
 		uio->uio_resid = 0;
@@ -442,13 +439,40 @@ cnwrite(dev_t dev, struct uio *uio, struct cred *cred)
 		return (cdev_write(rconsdev, uio, cred));
 }
 
-/* ARGSUSED */
 static int
-cnprivateioc(dev_t dev, int cmd, intptr_t arg, int flag, struct cred *cred,
-	int *rvalp)
+cnprivateioc(dev_t dev __unused, int cmd, intptr_t arg, int flag,
+    struct cred *cred, int *rvalp)
 {
+	if (cmd == CONS_GETDEV) {
+		/*
+		 * The user has requested the device number of the redirection
+		 * client.
+		 */
+		STRUCT_DECL(cons_getdev, cnd);
+		STRUCT_INIT(cnd, flag);
 
-	/* currently we only support one ioctl */
+		bzero(STRUCT_BUF(cnd), STRUCT_SIZE(cnd));
+
+		if ((flag & DATAMODEL_MASK) == DATAMODEL_ILP32) {
+			dev32_t rconsdev32;
+
+			if (cmpldev(&rconsdev32, rconsdev) != 1) {
+				return (EOVERFLOW);
+			}
+
+			STRUCT_FSET(cnd, cnd_rconsdev, rconsdev32);
+		} else {
+			STRUCT_FSET(cnd, cnd_rconsdev, rconsdev);
+		}
+
+		if (ddi_copyout(STRUCT_BUF(cnd), (void *)arg,
+		    STRUCT_SIZE(cnd), flag) != 0) {
+			return (EFAULT);
+		}
+
+		return (0);
+	}
+
 	if (cmd != CONS_GETTERM)
 		return (EINVAL);
 
@@ -470,7 +494,7 @@ cnprivateioc(dev_t dev, int cmd, intptr_t arg, int flag, struct cred *cred,
 /* ARGSUSED */
 static int
 cnioctl(dev_t dev, int cmd, intptr_t arg, int flag, struct cred *cred,
-	int *rvalp)
+    int *rvalp)
 {
 	if (rconsvp == NULL)
 		return (0);
@@ -498,7 +522,7 @@ cnioctl(dev_t dev, int cmd, intptr_t arg, int flag, struct cred *cred,
 /* ARGSUSED */
 static int
 cnpoll(dev_t dev, short events, int anyyet, short *reventsp,
-	struct pollhead **phpp)
+    struct pollhead **phpp)
 {
 	if (rconsvp == NULL)
 		return (nochpoll(dev, events, anyyet, reventsp, phpp));
