@@ -111,7 +111,7 @@ ssm_err_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data);
  */
 static int
 ssm_fm_init_child(dev_info_t *dip, dev_info_t *tdip, int cap,
-		ddi_iblock_cookie_t *ibc);
+    ddi_iblock_cookie_t *ibc);
 
 /*
  * init/fini routines to alloc/dealloc fm structures and
@@ -585,7 +585,7 @@ init_child(dev_info_t *child)
  * Requests handled completely:
  *      DDI_CTLOPS_INITCHILD
  *      DDI_CTLOPS_UNINITCHILD
- * 	DDI_CTLOPS_REPORTDEV
+ *	DDI_CTLOPS_REPORTDEV
  * All others are passed to the parent.
  * The name of the ssm node is ssm@nodeid,0.
  * ssm is the equivalent of rootnex.
@@ -687,7 +687,7 @@ ssm_make_nodes(dev_info_t *dip, int instance, int ssm_nodeid)
 		minor_num = (instance << SSM_INSTANCE_SHIFT) | bd;
 
 		rv = ddi_create_minor_node(dip, filename, S_IFCHR,
-		    minor_num, DDI_NT_SBD_ATTACHMENT_POINT, NULL);
+		    minor_num, DDI_NT_SBD_ATTACHMENT_POINT, 0);
 		if (rv == DDI_FAILURE) {
 			cmn_err(CE_WARN,
 			    "ssm_make_nodes:%d: failed to create "
@@ -798,7 +798,7 @@ ssm_close(dev_t dev, int flags, int otyp, cred_t *credp)
 /* ARGSUSED */
 static int
 ssm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-	int *rvalp)
+    int *rvalp)
 {
 	struct ssm_soft_state *softsp;
 	char *addr;
@@ -1092,7 +1092,7 @@ ssm_fm_fini(struct ssm_soft_state *softsp)
 /*ARGSUSED*/
 static int
 ssm_fm_init_child(dev_info_t *dip, dev_info_t *tdip, int cap,
-		ddi_iblock_cookie_t *ibc)
+    ddi_iblock_cookie_t *ibc)
 {
 	struct ssm_soft_state *softsp = ddi_get_soft_state(ssm_softstates,
 	    ddi_get_instance(dip));

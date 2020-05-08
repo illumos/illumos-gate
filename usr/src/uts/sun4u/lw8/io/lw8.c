@@ -163,7 +163,7 @@ static struct modlinkage modlinkage = {
 struct led_info {
 	char	id[MAX_ID_LEN];
 	int	position;
-	int 	status;
+	int	status;
 	char	color[MAX_COLOR_LEN];
 };
 
@@ -367,7 +367,7 @@ lw8_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			return (DDI_FAILURE);
 
 		err = ddi_create_minor_node(dip, "lw8", S_IFCHR,
-		    instance, DDI_PSEUDO, NULL);
+		    instance, DDI_PSEUDO, 0);
 		if (err != DDI_SUCCESS)
 			return (DDI_FAILURE);
 

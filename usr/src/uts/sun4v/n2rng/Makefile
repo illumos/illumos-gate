@@ -40,7 +40,6 @@ COM_DIR   = $(COMMONBASE)/crypto
 #
 MODULE		= n2rng
 OBJECTS		= $(N2RNG_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(N2RNG_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 CONF_SRCDIR     = $(UTSBASE)/sun4v/io/n2rng
 
@@ -60,14 +59,9 @@ CLEANFILES	+= $(MODSTUBS_O)
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-#
-# lint pass one enforcement
-#
 CFLAGS += $(CCVERBOSE) -DN2 -I$(COM_DIR)
-LINTFLAGS += -DN2 -I$(COM_DIR)
 CERRWARN += $(CNOWARN_UNINIT)
 
 #
@@ -87,12 +81,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

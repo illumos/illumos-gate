@@ -37,13 +37,10 @@ SRCDIR = ../common
 SRCS = $(LIBSRCS:%.c=$(SRCDIR)/%.c)
 
 CPPFLAGS += -I. -I$(SRC)/uts/sun4v
-CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
-CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
+CFLAGS += $(C_BIGPICFLAGS)
+CFLAGS64 += $(C_BIGPICFLAGS)
 
 LDLIBS += -lc
-
-
-	-I$(ROOT)/usr/platform/sun4v/include
 
 .KEEP_STATE:
 

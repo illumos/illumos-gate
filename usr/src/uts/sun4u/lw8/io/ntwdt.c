@@ -484,7 +484,7 @@ static struct dev_ops ntwdt_ops = {
 };
 
 static struct modldrv modldrv = {
-	&mod_driverops, 		/* This one is a driver */
+	&mod_driverops,			/* This one is a driver */
 	"ntwdt-Netra-T12",		/* Name of the module. */
 	&ntwdt_ops,			/* Driver ops */
 };
@@ -675,7 +675,7 @@ ntwdt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * is initialized.
 	 */
 	if (ddi_create_minor_node(dip, NTWDT_MINOR_NODE, S_IFCHR, 0,
-	    DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    DDI_PSEUDO, 0) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "failed to create Minor Node: %s",
 		    NTWDT_MINOR_NODE);
 		goto err4;
@@ -1791,8 +1791,8 @@ ntwdt_set_awdt_state(ntwdt_wdog_t *rstatep)
 static int
 ntwdt_set_cfgvar(int var, int val)
 {
-	int 		rv;
-	int 		mbox_val;
+	int		rv;
+	int		mbox_val;
 	lw8_set_wdt_t	set_wdt;
 
 	switch (var) {

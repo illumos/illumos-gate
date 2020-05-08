@@ -32,17 +32,19 @@
 static int rxbuf_ctor(void *, void *, int);
 static void rxbuf_dtor(void *, void *);
 
-void
+int
 cxgb_printf(dev_info_t *dip, int level, char *f, ...)
 {
 	va_list list;
 	char fmt[128];
+	int rv;
 
-	(void) snprintf(fmt, sizeof (fmt), "%s%d: %s", ddi_driver_name(dip),
+	rv = snprintf(fmt, sizeof (fmt), "%s%d: %s", ddi_driver_name(dip),
 	    ddi_get_instance(dip), f);
 	va_start(list, f);
 	vcmn_err(level, fmt, list);
 	va_end(list);
+	return (rv);
 }
 
 kmem_cache_t *
