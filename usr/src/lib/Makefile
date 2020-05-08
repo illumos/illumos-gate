@@ -232,6 +232,7 @@ SUBDIRS +=				\
 	libtsnet	\
 	libtsol		\
 	libumem		\
+	libutempter	\
 	libuuid		\
 	libuutil	\
 	libvolmgt	\
@@ -479,6 +480,7 @@ HDRSUBDIRS=				\
 	libtsnet	\
 	libtsol		\
 	libumem		\
+	libutempter	\
 	libuutil	\
 	libvolmgt	\
 	libvrrpadm	\
