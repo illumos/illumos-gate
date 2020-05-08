@@ -23,7 +23,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Pawel Jakub Dawidek. All rights reserved.
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef	_LIBZFS_IMPL_H
@@ -35,6 +35,7 @@
 #include <sys/dmu.h>
 #include <sys/zfs_ioctl.h>
 #include <synch.h>
+#include <regex.h>
 
 #include <libuutil.h>
 #include <libzfs.h>
@@ -91,6 +92,7 @@ struct libzfs_handle {
 	char libzfs_chassis_id[256];
 	boolean_t libzfs_prop_debug;
 	di_devlink_handle_t libzfs_devlink;
+	regex_t libzfs_urire;
 };
 
 struct zfs_handle {
@@ -141,6 +143,50 @@ typedef enum {
 	SHARED_NFS = 0x2,
 	SHARED_SMB = 0x4
 } zfs_share_type_t;
+
+
+/*
+ * From RFC3986 Appendix B. The regex is a bit of a beast, but with an
+ * example URI of:
+ *
+ * http://www.ics.uci.edu/pub/ietf/uri/#Related
+ *
+ * URI_REGEX should match with the following subexpressions:
+ *
+ * $1 = http:
+ * $2 = http
+ * $3 = //www.ics.uci.edu
+ * $4 = www.ics.uci.edu
+ * $5 = /pub/ietf/uri/
+ * $6 = <undefined>
+ * $7 = <undefined>
+ * $8 = #Related
+ * $9 = Related
+ *
+ * More generally:
+ *
+ * scheme    = $2
+ * authority = $4
+ * path      = $5
+ * query     = $7
+ * fragment  = $9
+ *
+ * We only care about the value of the scheme component ($2) in order to
+ * invoke the correct handler. Each handler should do any additional URI
+ * validation as required.
+ */
+#define	URI_REGEX \
+	"^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\\?([^#]*))?(#(.*))?"
+#define	URI_NMATCH		10	/* whole URI match ($0) + 9 subexps */
+#define	URI_SCHEMESUBEXP	2	/* '$2' */
+
+typedef int (*zfs_uri_handler_fn_t)(struct libzfs_handle *, const char *,
+    const char *, zfs_keyformat_t, boolean_t, uint8_t **, size_t *);
+
+typedef struct zfs_uri_handler {
+	const char *zuh_scheme;
+	zfs_uri_handler_fn_t zuh_handler;
+} zfs_uri_handler_t;
 
 #define	CONFIG_BUF_MINSIZE	262144
 
