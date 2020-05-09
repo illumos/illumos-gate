@@ -1437,8 +1437,49 @@ bge_unicst_find(bge_t *bgep, const uint8_t *mac_addr)
 }
 
 /*
- * Programs the classifier to start steering packets matching 'mac_addr' to the
- * specified ring 'arg'.
+ * The job of bge_addmac() is to set up everything in hardware for the mac
+ * address indicated to map to the specified group.
+ *
+ * For this to make sense, we need to first understand how most of the bge chips
+ * work. A given packet reaches a ring in two distinct logical steps:
+ *
+ *  1) The device must accept the packet.
+ *  2) The device must steer an accepted packet to a specific ring.
+ *
+ * For step 1, the device has four global MAC address filtering registers. We
+ * must either add the address here or put the device in promiscuous mode.
+ * Because there are only four of these and up to four groups, each group is
+ * only allowed to program a single entry. Note, this is not explicitly done in
+ * the driver. Rather, it is implicitly done by how we implement step 2. These
+ * registers start at 0x410 and are referred to as the 'EMAC MAC Addresses' in
+ * the manuals.
+ *
+ * For step 2, the device has eight sets of rule registers that are used to
+ * control how a packet in step 1 is mapped to a specific ring. Each set is
+ * comprised of a control register and a mask register. These start at 0x480 and
+ * are referred to as the 'Receive Rules Control Registers' and 'Receive Rules
+ * Value/Mask Registers'. These can be used to check for a 16-bit or 32-bit
+ * value at an offset in the packet. In addition, two sets can be combined to
+ * create a single conditional rule.
+ *
+ * For our purposes, we need to use this mechanism to steer a mac address to a
+ * specific ring. This requires that we use two of the sets of registers per MAC
+ * address that comes in here. The data about this is stored in 'mac_addr_rule'
+ * member of the 'recv_ring_t'.
+ *
+ * A reasonable question to ask is why are we storing this on the ring, when it
+ * relates to the group. The answer is that the current implementation of the
+ * driver assumes that each group is comprised of a single ring. While some
+ * parts may support additional rings, the driver doesn't take advantage of
+ * that.
+ *
+ * A result of all this is that the driver will support up to 4 groups today.
+ * Each group has a single ring. We want to make sure that each group can have a
+ * single MAC address programmed into it. This results in the check for a rule
+ * being assigned in the 'mac_addr_rule' member of the recv_ring_t below. If a
+ * future part were to support more global MAC address filters in part 1 and
+ * more rule registers needed for part 2, then we could relax this constraint
+ * and allow a group to have more than one MAC address assigned to it.
  */
 static int
 bge_addmac(void *arg, const uint8_t * mac_addr)
@@ -1461,12 +1502,26 @@ bge_addmac(void *arg, const uint8_t * mac_addr)
 	}
 
 	/*
-	 * First add the unicast address to a available slot.
+	 * The driver only supports a MAC address being programmed to be
+	 * received by one ring in step 2. We check the global table of MAC
+	 * addresses to see if this address has already been claimed by another
+	 * group as a way to determine that.
 	 */
 	slot = bge_unicst_find(bgep, mac_addr);
 	if (slot != -1) {
 		mutex_exit(bgep->genlock);
 		return (EEXIST);
+	}
+
+	/*
+	 * Check to see if this group has already used its hardware resources
+	 * for step 2. If so, we have to return ENOSPC to MAC to indicate that
+	 * this group cannot handle an additional MAC address and that MAC will
+	 * need to use software classification on the default group.
+	 */
+	if (rrp->mac_addr_rule != NULL) {
+		mutex_exit(bgep->genlock);
+		return (ENOSPC);
 	}
 
 	for (slot = 0; slot < bgep->unicst_addr_total; slot++) {
@@ -1482,12 +1537,6 @@ bge_addmac(void *arg, const uint8_t * mac_addr)
 
 	if ((err = bge_unicst_set(bgep, mac_addr, slot)) != 0)
 		goto fail;
-
-	/* A rule is already here. Deny this.  */
-	if (rrp->mac_addr_rule != NULL) {
-		err = ether_cmp(mac_addr, rrp->mac_addr_val) ? EEXIST : EBUSY;
-		goto fail;
-	}
 
 	/*
 	 * Allocate a bge_rule_info_t to keep track of which rule slots
