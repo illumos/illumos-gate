@@ -276,6 +276,7 @@ CFLAGS_uts		+= $(EXTRA_CFLAGS)
 CFLAGS_uts		+= $(CSOURCEDEBUGFLAGS)
 CFLAGS_uts		+= $(CUSERFLAGS)
 CFLAGS_uts		+= $(CFLAGS_uts_$(MACH))
+CFLAGS_uts		+= -_gcc=-fno-asynchronous-unwind-tables
 
 #
 #	Declare that $(OBJECTS) and $(LINTS) can be compiled in parallel.
