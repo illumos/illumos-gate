@@ -12,6 +12,7 @@
 /*
  * Copyright 2014 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #ifndef _COMPAT_FREEBSD_SYS_CALLOUT_H_
@@ -21,20 +22,27 @@
 
 struct callout {
 	cyclic_id_t	c_cyc_id;
-	int		c_flags;
+	hrtime_t	c_target;
+	hrtime_t	c_fired;
 	void		(*c_func)(void *);
 	void		*c_arg;
-
 };
-
-#define	CALLOUT_ACTIVE		0x0002	/* callout is currently active */
-#define	CALLOUT_PENDING		0x0004	/* callout is waiting for timeout */
 
 #define	C_ABSOLUTE		0x0200	/* event time is absolute. */
 
-#define	callout_active(c)	((c)->c_flags & CALLOUT_ACTIVE)
-#define	callout_deactivate(c)	((c)->c_flags &= ~CALLOUT_ACTIVE)
-#define	callout_pending(c)	((c)->c_flags & CALLOUT_PENDING)
+/* Callout considered active if t_target has not been zeroed */
+#define	callout_active(c)	((c)->c_target != 0)
+#define	callout_deactivate(c)	((c)->c_target = 0)
+
+/*
+ * If a callout is rescheduled (into the future) while its handler is running,
+ * it will be able to detect the pending invocation by the target time being
+ * greater than the time at which the handler was fired.
+ *
+ * This is only valid when checked from the callout handler, which is the only
+ * place where it is used by bhyve today.
+ */
+#define	callout_pending(c)	((c)->c_target > (c)->c_fired)
 
 void	vmm_glue_callout_init(struct callout *c, int mpsafe);
 int	vmm_glue_callout_reset_sbt(struct callout *c, sbintime_t sbt,
