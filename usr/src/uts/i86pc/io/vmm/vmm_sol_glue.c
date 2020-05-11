@@ -37,6 +37,7 @@
  *
  * Copyright 2014 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -320,8 +321,13 @@ vmm_glue_callout_handler(void *arg)
 {
 	struct callout *c = arg;
 
-	c->c_flags &= ~CALLOUT_PENDING;
-	if (c->c_flags & CALLOUT_ACTIVE) {
+	if (callout_active(c)) {
+		/*
+		 * Record the handler fire time so that callout_pending() is
+		 * able to detect if the callout becomes rescheduled during the
+		 * course of the handler.
+		 */
+		c->c_fired = gethrtime();
 		(c->c_func)(c->c_arg);
 	}
 }
@@ -337,17 +343,9 @@ vmm_glue_callout_init(struct callout *c, int mpsafe)
 	hdlr.cyh_arg = c;
 	when.cyt_when = CY_INFINITY;
 	when.cyt_interval = CY_INFINITY;
+	bzero(c, sizeof (*c));
 
 	mutex_enter(&cpu_lock);
-#if 0
-	/*
-	 * XXXJOY: according to the freebsd sources, callouts do not begin
-	 * their life in the ACTIVE state.
-	 */
-	c->c_flags |= CALLOUT_ACTIVE;
-#else
-	bzero(c, sizeof (*c));
-#endif
 	c->c_cyc_id = cyclic_add(&hdlr, &when);
 	mutex_exit(&cpu_lock);
 }
@@ -367,15 +365,14 @@ vmm_glue_callout_reset_sbt(struct callout *c, sbintime_t sbt, sbintime_t pr,
 
 	ASSERT(c->c_cyc_id != CYCLIC_NONE);
 
+	if ((flags & C_ABSOLUTE) == 0) {
+		target += gethrtime();
+	}
+
 	c->c_func = func;
 	c->c_arg = arg;
-	c->c_flags |= (CALLOUT_ACTIVE | CALLOUT_PENDING);
-
-	if (flags & C_ABSOLUTE) {
-		cyclic_reprogram(c->c_cyc_id, target);
-	} else {
-		cyclic_reprogram(c->c_cyc_id, target + gethrtime());
-	}
+	c->c_target = target;
+	cyclic_reprogram(c->c_cyc_id, target);
 
 	return (0);
 }
@@ -384,8 +381,9 @@ int
 vmm_glue_callout_stop(struct callout *c)
 {
 	ASSERT(c->c_cyc_id != CYCLIC_NONE);
+
+	c->c_target = 0;
 	cyclic_reprogram(c->c_cyc_id, CY_INFINITY);
-	c->c_flags &= ~(CALLOUT_ACTIVE | CALLOUT_PENDING);
 
 	return (0);
 }
@@ -394,10 +392,11 @@ int
 vmm_glue_callout_drain(struct callout *c)
 {
 	ASSERT(c->c_cyc_id != CYCLIC_NONE);
+
+	c->c_target = 0;
 	mutex_enter(&cpu_lock);
 	cyclic_remove(c->c_cyc_id);
 	c->c_cyc_id = CYCLIC_NONE;
-	c->c_flags &= ~(CALLOUT_ACTIVE | CALLOUT_PENDING);
 	mutex_exit(&cpu_lock);
 
 	return (0);
