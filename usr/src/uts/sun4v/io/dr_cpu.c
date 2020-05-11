@@ -583,7 +583,7 @@ dr_cpu_res_array_init(dr_cpu_hdr_t *req, drctl_rsrc_t *rsrc, int nrsrc)
 		 * on the memory allocated for the message buffer
 		 * itself.
 		 */
-		if (rsrc[idx].offset != NULL) {
+		if (rsrc[idx].offset != 0) {
 			err_str = (char *)rsrc + rsrc[idx].offset;
 			err_len = strlen(err_str) + 1;
 

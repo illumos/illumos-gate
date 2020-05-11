@@ -394,7 +394,7 @@ vsw_destroy_tx_dring(vsw_ldc_t *ldcp)
 		 */
 		for (i = 0; i < vsw_num_descriptors; i++) {
 			paddr = (vsw_private_desc_t *)dp->priv_addr + i;
-			if (paddr->memhandle != NULL) {
+			if (paddr->memhandle != 0) {
 				if (paddr->bound == 1) {
 					if (ldc_mem_unbind_handle(
 					    paddr->memhandle) != 0) {
@@ -414,7 +414,7 @@ vsw_destroy_tx_dring(vsw_ldc_t *ldcp)
 					    "at pos %d", dp, i);
 					continue;
 				}
-				paddr->memhandle = NULL;
+				paddr->memhandle = 0;
 			}
 			mutex_destroy(&paddr->dstate_lock);
 		}
@@ -425,7 +425,7 @@ vsw_destroy_tx_dring(vsw_ldc_t *ldcp)
 	/*
 	 * Now unbind and destroy the ring itself.
 	 */
-	if (dp->dring_handle != NULL) {
+	if (dp->dring_handle != 0) {
 		(void) ldc_mem_dring_unbind(dp->dring_handle);
 		(void) ldc_mem_dring_destroy(dp->dring_handle);
 	}
@@ -505,7 +505,7 @@ vsw_unmap_rx_dring(vsw_ldc_t *ldcp)
 		    vsw_destroy_rxpools, fvmp, DDI_SLEEP);
 	}
 
-	if (dp->dring_handle != NULL) {
+	if (dp->dring_handle != 0) {
 		(void) ldc_mem_dring_unmap(dp->dring_handle);
 	}
 	kmem_free(dp, sizeof (dring_info_t));
@@ -800,7 +800,7 @@ vsw_dringsend(vsw_ldc_t *ldcp, mblk_t *mp)
 
 	/* TODO: make test a macro */
 	if ((!(ldcp->lane_out.lstate & VSW_LANE_ACTIVE)) ||
-	    (ldcp->ldc_status != LDC_UP) || (ldcp->ldc_handle == NULL)) {
+	    (ldcp->ldc_status != LDC_UP) || (ldcp->ldc_handle == 0)) {
 		DWARN(vswp, "%s(%lld) status(%d) lstate(0x%llx), dropping "
 		    "packet\n", __func__, ldcp->ldc_id, ldcp->ldc_status,
 		    ldcp->lane_out.lstate);
@@ -942,7 +942,7 @@ vsw_dringsend_free_exit:
  */
 int
 vsw_dring_find_free_desc(dring_info_t *dringp,
-		vsw_private_desc_t **priv_p, int *idx)
+    vsw_private_desc_t **priv_p, int *idx)
 {
 	vsw_private_desc_t	*addr = NULL;
 	int			num = vsw_num_descriptors;

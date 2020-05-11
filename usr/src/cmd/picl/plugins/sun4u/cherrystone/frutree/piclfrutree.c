@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * PICL plug-in that creates the FRU Hierarchy for the
  * SUNW,Sun-Fire-480R (Cherrystone) platform
@@ -267,8 +265,8 @@ picl_frutree_fini(void)
  *
  * It processes the following events:
  *
- * 	PICLEVENT_SYSEVENT_DEVICE_ADDED
- * 	PICLEVENT_SYSEVENT_DEVICE_REMOVED
+ *	PICLEVENT_SYSEVENT_DEVICE_ADDED
+ *	PICLEVENT_SYSEVENT_DEVICE_REMOVED
  */
 /* ARGSUSED */
 static void
@@ -1024,10 +1022,10 @@ frudr_completion_handler(char *ename, void *earg, size_t size)
 		 * now frudata has been notified that the node is to be
 		 * removed, we can actually remove it
 		 */
-		fruh = NULL;
+		fruh = 0;
 		(void) nvlist_lookup_uint64(earg,
 		    PICLEVENTARG_FRUHANDLE, &fruh);
-		if (fruh != NULL) {
+		if (fruh != 0) {
 			(void) remove_picl_node(fruh);
 		}
 	}
@@ -1048,7 +1046,7 @@ post_frudr_event(char *ename, picl_nodehdl_t parenth, picl_nodehdl_t fruh)
 	ev_name = strdup(ename);
 	if (ev_name == NULL)
 		return;
-	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME_TYPE, NULL)) {
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME_TYPE, 0)) {
 		free(ev_name);
 		return;
 	}
@@ -1111,7 +1109,7 @@ add_power_supply(int slotnum)
 				return (err);
 
 			/* Post picl-fru-added event */
-			post_frudr_event(PICL_FRU_ADDED, NULL, powermodh);
+			post_frudr_event(PICL_FRU_ADDED, 0, powermodh);
 		}
 	}
 	return (PICL_SUCCESS);
@@ -1141,7 +1139,7 @@ remove_power_supply(int slotnum)
 		}
 		(void) ptree_destroy_node(powermodh);
 		/* Post picl-fru-removed event */
-		post_frudr_event(PICL_FRU_REMOVED, NULL, powermodh);
+		post_frudr_event(PICL_FRU_REMOVED, 0, powermodh);
 	}
 	return (PICL_SUCCESS);
 }

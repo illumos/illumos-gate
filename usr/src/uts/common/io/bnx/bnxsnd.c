@@ -611,7 +611,7 @@ bnx_xmit_ring_xmit_mblk(um_device_t * const umdevice,
 	umpacket->frag_list.cnt = 0;
 	umpacket->mp = mp;
 
-	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL, &pflags);
+	mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &pflags);
 
 	bnx_xmit_pkt_cpy(umdevice, umpacket);
 

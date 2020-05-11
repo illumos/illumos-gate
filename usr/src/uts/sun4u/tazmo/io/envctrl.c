@@ -59,13 +59,13 @@
 #include <sys/envctrl.h>	/* Environment header */
 
 /* driver entry point fn definitions */
-static int 	envctrl_open(queue_t *, dev_t *, int, int, cred_t *);
+static int	envctrl_open(queue_t *, dev_t *, int, int, cred_t *);
 static int	envctrl_close(queue_t *, int, cred_t *);
-static uint_t 	envctrl_bus_isr(caddr_t);
-static uint_t 	envctrl_dev_isr(caddr_t);
+static uint_t	envctrl_bus_isr(caddr_t);
+static uint_t	envctrl_dev_isr(caddr_t);
 
 /* configuration entry point fn definitions */
-static int 	envctrl_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
+static int	envctrl_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int	envctrl_attach(dev_info_t *, ddi_attach_cmd_t);
 static int	envctrl_detach(dev_info_t *, ddi_detach_cmd_t);
 
@@ -141,7 +141,7 @@ static int controller_present[] = {-1, -1, -1};
 #ifdef MULTIFAN
 static int	envctrl_fan_debug = 0;
 #endif
-static int 	eHc_debug = 0;
+static int	eHc_debug = 0;
 static int	power_supply_previous_state[] = {-1, -1, -1};
 
 extern void	pci_thermal_rem_intr(dev_info_t *, uint_t);
@@ -274,12 +274,12 @@ static struct modlinkage envctrlmodlinkage = {
 #define	EHC_DEV3	0x06
 #define	EHC_DEV4	0x08
 #define	EHC_DEV5	0x0A
-#define	EHC_DEV6    	0x0C
+#define	EHC_DEV6	0x0C
 #define	EHC_DEV7	0x0E
 
 
 /*
- * 		CONTROL OF CHIP
+ *		CONTROL OF CHIP
  * PCF8591 Temp sensing control register definitions
  *
  *   7      6     5   4  3   2      1   0
@@ -520,7 +520,7 @@ envctrl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	(void) sprintf(name, "envctrl%d", instance);
 
 	if (ddi_create_minor_node(dip, name, S_IFCHR, instance, DDI_PSEUDO,
-	    NULL) == DDI_FAILURE) {
+	    0) == DDI_FAILURE) {
 		ddi_remove_minor_node(dip, NULL);
 		goto remhardintr1;
 	}
@@ -1449,7 +1449,7 @@ envctrl_init_bus(struct envctrlunit *unitp)
 {
 
 	int i;
-	uint8_t noval = NULL;
+	uint8_t noval = 0;
 	struct envctrl_tda8444t_chip fan;
 	int fans[] = {ENVCTRL_CPU_FANS, ENVCTRL_PS_FANS, ENVCTRL_AFB_FANS};
 
@@ -1890,7 +1890,7 @@ envctrl_get_lm75_temp(struct envctrlunit *unitp)
 	} else {
 		k = lmval /2;
 	}
-		return (k);
+	return (k);
 }
 
 
@@ -1975,7 +1975,7 @@ envctrl_get_sys_temperatures(struct envctrlunit *unitp, uint8_t *diag_tempr)
 	int i;
 	struct envctrl_tda8444t_chip fan;
 	uint8_t psaddr[] = {PSTEMP3, PSTEMP2, PSTEMP1, PSTEMP0};
-	uint8_t noval = NULL;
+	uint8_t noval = 0;
 	uint8_t fspval;
 
 	ASSERT(MUTEX_HELD(&unitp->umutex));
@@ -2050,11 +2050,11 @@ envctrl_get_sys_temperatures(struct envctrlunit *unitp, uint8_t *diag_tempr)
 		    unitp->current_mode == ENVCTRL_NORMAL_MODE) {
 			unitp->shutdown = B_TRUE;
 		}
-			if (unitp->current_mode == ENVCTRL_NORMAL_MODE) {
-				cmn_err(CE_WARN,
-			"Ambient Temperature is %d C, shutdown now\n",
-				    ambtemp);
-			}
+		if (unitp->current_mode == ENVCTRL_NORMAL_MODE) {
+			cmn_err(CE_WARN,
+			    "Ambient Temperature is %d C, shutdown now\n",
+			    ambtemp);
+		}
 	} else {
 		if (envctrl_isother_fault_led(unitp, fspval,
 		    ENVCTRL_FSP_TEMP_ERR)) {
@@ -2106,16 +2106,16 @@ envctrl_get_sys_temperatures(struct envctrlunit *unitp, uint8_t *diag_tempr)
 	}
 
 	if (temperature < 0) {
-		fan.val = MAX_FAN_SPEED; 	/* blast it is out of range */
+		fan.val = MAX_FAN_SPEED;	/* blast it is out of range */
 	} else if (temperature > MAX_AMB_TEMP) {
 		fan.val = MAX_FAN_SPEED;
 		fspval |= (ENVCTRL_FSP_TEMP_ERR | ENVCTRL_FSP_GEN_ERR);
 
-			if (unitp->current_mode == ENVCTRL_NORMAL_MODE) {
-				cmn_err(CE_WARN,
-				    "CPU Fans set to MAX. CPU Temp is %d C\n",
-				    hicputemp);
-			}
+		if (unitp->current_mode == ENVCTRL_NORMAL_MODE) {
+			cmn_err(CE_WARN,
+			    "CPU Fans set to MAX. CPU Temp is %d C\n",
+			    hicputemp);
+		}
 	} else if (ambtemp < MAX_AMB_TEMP) {
 		if (!envctrl_p0_enclosure) {
 			fan.val = acme_cpu_fanspd[temperature];
@@ -3635,7 +3635,7 @@ eHc_after_read_pcf8584(struct eHc_envcunit *ehcp, uint8_t *data)
  */
 static int
 eHc_write_tda8444(struct eHc_envcunit *ehcp, int byteaddress, int instruction,
-	int subaddress, uint8_t *buf, int size)
+    int subaddress, uint8_t *buf, int size)
 {
 	uint8_t control;
 	int i, status;
@@ -3687,7 +3687,7 @@ eHc_write_tda8444(struct eHc_envcunit *ehcp, int byteaddress, int instruction,
  */
 static int
 eHc_read_pcf8574a(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
-	int size)
+    int size)
 {
 	int i;
 	int status;
@@ -3742,7 +3742,7 @@ eHc_read_pcf8574a(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
  */
 static int
 eHc_write_pcf8574a(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
-	int size)
+    int size)
 {
 	int i;
 	int status;
@@ -3789,7 +3789,7 @@ eHc_write_pcf8574a(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
  */
 static int
 eHc_read_pcf8574(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
-	int size)
+    int size)
 {
 	int i;
 	int status;
@@ -3844,7 +3844,7 @@ eHc_read_pcf8574(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
  */
 static int
 eHc_write_pcf8574(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
-	int size)
+    int size)
 {
 	int i;
 	int status;
@@ -3890,7 +3890,7 @@ eHc_write_pcf8574(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
  */
 static int
 eHc_read_lm75(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
-	int size)
+    int size)
 {
 	int i;
 	int status;
@@ -3944,7 +3944,7 @@ eHc_read_lm75(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
  */
 static int
 eHc_write_pcf8583(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
-	int size)
+    int size)
 {
 	int i;
 	int status;
@@ -3988,7 +3988,7 @@ eHc_write_pcf8583(struct eHc_envcunit *ehcp, int byteaddress, uint8_t *buf,
  */
 static int
 eHc_read_pcf8591(struct eHc_envcunit *ehcp, int byteaddress, int channel,
-	int autoinc, int amode, int aenable, uint8_t *buf, int size)
+    int autoinc, int amode, int aenable, uint8_t *buf, int size)
 {
 	int i;
 	int status;

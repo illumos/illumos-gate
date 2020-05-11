@@ -13,11 +13,11 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright (c) 2014 Joyent, Inc. All rights reserved.
 # Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/data/zoneinfo@2019.3,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/data/zoneinfo@2020.1,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.description value="timezone information"
 set name=pkg.summary value="Timezone Information"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -122,7 +122,6 @@ file path=usr/share/lib/zoneinfo/America/El_Salvador
 file path=usr/share/lib/zoneinfo/America/Fort_Nelson
 file path=usr/share/lib/zoneinfo/America/Fortaleza
 file path=usr/share/lib/zoneinfo/America/Glace_Bay
-file path=usr/share/lib/zoneinfo/America/Godthab
 file path=usr/share/lib/zoneinfo/America/Goose_Bay
 file path=usr/share/lib/zoneinfo/America/Grand_Turk
 file path=usr/share/lib/zoneinfo/America/Grenada
@@ -173,6 +172,7 @@ file path=usr/share/lib/zoneinfo/America/Noronha
 file path=usr/share/lib/zoneinfo/America/North_Dakota/Beulah
 file path=usr/share/lib/zoneinfo/America/North_Dakota/Center
 file path=usr/share/lib/zoneinfo/America/North_Dakota/New_Salem
+file path=usr/share/lib/zoneinfo/America/Nuuk
 file path=usr/share/lib/zoneinfo/America/Ojinaga
 file path=usr/share/lib/zoneinfo/America/Panama
 file path=usr/share/lib/zoneinfo/America/Pangnirtung
@@ -525,6 +525,7 @@ hardlink path=usr/share/lib/zoneinfo/America/Ensenada \
     target=../America/Tijuana
 hardlink path=usr/share/lib/zoneinfo/America/Fort_Wayne \
     target=../America/Indiana/Indianapolis
+hardlink path=usr/share/lib/zoneinfo/America/Godthab target=Nuuk
 hardlink path=usr/share/lib/zoneinfo/America/Indianapolis \
     target=../America/Indiana/Indianapolis
 hardlink path=usr/share/lib/zoneinfo/America/Jujuy \

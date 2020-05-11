@@ -23,9 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	This makefile drives the production of all Daktari system
 #	dependent modules for the sun4u architecture.
 #
@@ -47,12 +44,8 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
-lintlib		:=	TARGET= lintlib
-modlintlib	:=	TARGET= modlintlib
 modlist		:=	TARGET= modlist
 modlist		:=	NO_STATE= -K $$MODSTATE$$$$
-clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
 #
@@ -60,15 +53,13 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean.lint clean clobber modlist: $(DAKTARI_KMODS)
-
-modlintlib:	$(DAKTARI_KMODS)
+def all clean clobber modlist: $(DAKTARI_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,Sun-Fire-880
 
 LINKED_PLATFORMS	= SUNW,Sun-Fire-V890
 
-install: 	$(ROOT_DAKTARI_DIR) $(USR_DAKTARI_DIR) \
+install:	$(ROOT_DAKTARI_DIR) $(USR_DAKTARI_DIR) \
 		$(USR_DAKTARI_INC_DIR) \
 		$(USR_DAKTARI_SBIN_DIR) \
 		$(USR_DAKTARI_LIB_DIR) \
@@ -85,25 +76,6 @@ $(DAKTARI_CRYPTO_LINKS): $(ROOT_DAKTARI_CRYPTO_DIR_64)
 
 install_h check:	FRC
 	@cd sys; pwd; $(MAKE) $(TARGET)
-
-
-lint:		modlintlib
-
-#
-# The 'lint.platmod' target lints the daktari platform module against the sun4u
-# kernel.  This ends up doing all the kernel cross-checks, so it takes a couple
-# of minutes.  Due to the low ROI, it's not run by default, but it's a good
-# idea to run this if you change os/daktari.c.
-#
-LINT_LIBS	 = $(LINT_LIB) \
-		   -L$(DAKTARI_LINT_LIB_DIR) \
-		   -L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
-		       $(CLOSED_LINT_KMODS:%=-l%) \
-		   -L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
-
-lint.platmod:   modlintlib
-	@-$(ECHO) "\nDaktari Platform-dependent module: global crosschecks:"
-	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
 $(DAKTARI_KMODS):	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)

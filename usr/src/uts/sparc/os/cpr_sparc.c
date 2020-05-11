@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * cpr functions for supported sparc platforms
  */
@@ -363,8 +361,8 @@ cpr_abbreviate_devpath(char *in_path, char *out_path)
 	*out_path = '\0';
 
 	while ((cmpt = cpr_next_component(&position)) != NULL) {
-		pnode_t long_match = NULL;
-		pnode_t short_match = NULL;
+		pnode_t long_match = 0;
+		pnode_t short_match = 0;
 		int short_hits = 0;
 		char *name;
 		char *prefix = cpr_get_prefix(cmpt);

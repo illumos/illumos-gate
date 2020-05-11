@@ -598,7 +598,7 @@ ni_delete_name_kstat(ni_ksinfo_t *pp)
  */
 static kstat_t *
 ni_create_picN_kstat(char *mod_name, int pic, int pic_sel_shift,
-	int num_ev, ni_kev_mask_t *ev_array)
+    int num_ev, ni_kev_mask_t *ev_array)
 {
 	struct kstat_named *pic_named_data;
 	int	inst = 0;
@@ -608,7 +608,7 @@ ni_create_picN_kstat(char *mod_name, int pic, int pic_sel_shift,
 
 	(void) sprintf(pic_name, "pic%d", pic);
 	if ((picN_ksp = kstat_create(mod_name, inst, pic_name,
-	    "bus", KSTAT_TYPE_NAMED, num_ev, NULL)) == NULL) {
+	    "bus", KSTAT_TYPE_NAMED, num_ev, 0)) == NULL) {
 		cmn_err(CE_WARN, "%s %s : kstat create failed",
 		    mod_name, pic_name);
 
@@ -656,7 +656,7 @@ ni_create_picN_kstat(char *mod_name, int pic, int pic_sel_shift,
  */
 static kstat_t *
 ni_create_cntr_kstat(char *name, int instance, int (*update)(kstat_t *, int),
-	void *ksinfop)
+    void *ksinfop)
 {
 	struct kstat	*counters_ksp;
 	struct kstat_named	*counters_named_data;

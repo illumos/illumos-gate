@@ -11375,7 +11375,7 @@ f usr/share/lib/zoneinfo/America/Fort_Nelson 0644 root bin
 h usr/share/lib/zoneinfo/America/Fort_Wayne=usr/share/lib/zoneinfo/US/East-Indiana
 f usr/share/lib/zoneinfo/America/Fortaleza 0644 root bin
 f usr/share/lib/zoneinfo/America/Glace_Bay 0644 root bin
-f usr/share/lib/zoneinfo/America/Godthab 0644 root bin
+h usr/share/lib/zoneinfo/America/Godthab=usr/share/lib/zoneinfo/America/Nuuk
 f usr/share/lib/zoneinfo/America/Goose_Bay 0644 root bin
 f usr/share/lib/zoneinfo/America/Grand_Turk 0644 root bin
 f usr/share/lib/zoneinfo/America/Grenada 0644 root bin
@@ -11438,6 +11438,7 @@ d usr/share/lib/zoneinfo/America/North_Dakota 0755 root bin
 f usr/share/lib/zoneinfo/America/North_Dakota/Beulah 0644 root bin
 f usr/share/lib/zoneinfo/America/North_Dakota/Center 0644 root bin
 f usr/share/lib/zoneinfo/America/North_Dakota/New_Salem 0644 root bin
+f usr/share/lib/zoneinfo/America/Nuuk 0644 root bin
 f usr/share/lib/zoneinfo/America/Ojinaga 0644 root bin
 f usr/share/lib/zoneinfo/America/Panama 0644 root bin
 f usr/share/lib/zoneinfo/America/Pangnirtung 0644 root bin

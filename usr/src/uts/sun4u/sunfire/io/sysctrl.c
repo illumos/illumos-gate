@@ -806,7 +806,7 @@ sysctrl_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * perform initialization to allow setting of powerfail-time
 	 */
 	if ((dip = ddi_find_devinfo("options", -1, 0)) == NULL)
-		softsp->options_nodeid = (pnode_t)NULL;
+		softsp->options_nodeid = (pnode_t)0;
 	else
 		softsp->options_nodeid = (pnode_t)ddi_get_nodeid(dip);
 
@@ -1218,7 +1218,7 @@ sysc_pkt_fini(sysc_cfga_pkt_t *pkt, intptr_t arg, int flag)
 /* ARGSUSED */
 static int
 sysctrl_ioctl(dev_t devt, int cmd, intptr_t arg, int flag, cred_t *cred_p,
-		int *rval_p)
+    int *rval_p)
 {
 	struct sysctrl_soft_state *softsp;
 	sysc_cfga_pkt_t sysc_pkt;

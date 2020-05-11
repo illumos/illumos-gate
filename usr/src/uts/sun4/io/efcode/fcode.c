@@ -206,7 +206,7 @@ fc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    fc_max_opens * sizeof (struct fc_state), KM_SLEEP);
 
 		if (ddi_create_minor_node(dip, "fcode", S_IFCHR,
-		    0, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+		    0, DDI_PSEUDO, 0) == DDI_FAILURE) {
 			kmem_free(fc_states,
 			    fc_max_opens * sizeof (struct fc_state));
 			error = DDI_FAILURE;

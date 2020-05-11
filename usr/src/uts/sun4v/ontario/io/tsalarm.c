@@ -410,7 +410,7 @@ tsalarm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * the device's softc, is used to direct peculiar behavior.
 		 */
 		if (ddi_create_minor_node(dip, "lom", S_IFCHR, 0,
-		    DDI_PSEUDO, NULL) == DDI_FAILURE) {
+		    DDI_PSEUDO, 0) == DDI_FAILURE) {
 			goto attach_failed;
 		}
 
@@ -749,7 +749,7 @@ glvc_alarm_get(int alarm_type, int *alarm_state, tsalarm_softc_t *sc)
 	req_ptr->alarm_id = alarm_type;
 
 	send_msg.msg_type = PCP_ALARM_CONTROL;
-	send_msg.sub_type = NULL;
+	send_msg.sub_type = 0;
 	send_msg.msg_len = sizeof (tsal_pcp_alarm_req_t);
 	send_msg.msg_data = (uint8_t *)req_ptr;
 
@@ -824,7 +824,7 @@ glvc_alarm_set(int alarm_type, int new_state, tsalarm_softc_t *sc)
 	req_ptr->alarm_id = alarm_type;
 
 	send_msg.msg_type = PCP_ALARM_CONTROL;
-	send_msg.sub_type = NULL;
+	send_msg.sub_type = 0;
 	send_msg.msg_len = sizeof (tsal_pcp_alarm_req_t);
 	send_msg.msg_data = (uint8_t *)req_ptr;
 

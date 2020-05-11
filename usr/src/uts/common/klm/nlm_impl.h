@@ -28,7 +28,7 @@
  */
 
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2016 Joyent, Inc.
  */
@@ -112,7 +112,7 @@ struct _kthread;
  * We pass three callback functions to nlm_do_lock:
  *    nlm_reply_cb: send a normal RPC reply
  *      nlm_res_cb: do a _res (message style) RPC (call)
- * nlm_testargs_cb: do a "granted" RPC call (after blocking)
+ * nlm_granted_cb: do a "granted" RPC call (after blocking)
  * Only one of the 1st or 2nd is used.
  * The 3rd is used only for blocking
  *
@@ -123,7 +123,7 @@ struct _kthread;
  */
 typedef bool_t (*nlm_reply_cb)(SVCXPRT *, nlm4_res *);
 typedef enum clnt_stat (*nlm_res_cb)(nlm4_res *, void *, CLIENT *);
-typedef enum clnt_stat (*nlm_testargs_cb)(nlm4_testargs *, void *, CLIENT *);
+typedef enum clnt_stat (*nlm_granted_cb)(nlm4_testargs *, nlm4_res *, CLIENT *);
 typedef enum clnt_stat (*nlm_testres_cb)(nlm4_testres *, void *, CLIENT *);
 
 /*
@@ -624,7 +624,7 @@ void nlm_do_notify2(nlm_sm_status *, void *, struct svc_req *);
 void nlm_do_test(nlm4_testargs *, nlm4_testres *,
     struct svc_req *, nlm_testres_cb);
 void nlm_do_lock(nlm4_lockargs *, nlm4_res *, struct svc_req *,
-    nlm_reply_cb, nlm_res_cb, nlm_testargs_cb);
+    nlm_reply_cb, nlm_res_cb, nlm_granted_cb);
 void nlm_do_cancel(nlm4_cancargs *, nlm4_res *,
     struct svc_req *, nlm_res_cb);
 void nlm_do_unlock(nlm4_unlockargs *, nlm4_res *,

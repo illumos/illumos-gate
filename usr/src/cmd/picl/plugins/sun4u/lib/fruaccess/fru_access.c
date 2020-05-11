@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <limits.h>
 #include <alloca.h>
 #include "fru_access_impl.h"
@@ -777,41 +775,41 @@ fru_open_container(picl_nodehdl_t fruhdl)
 	retval = ptree_get_propval_by_name(fruhdl, PICL_REFPROP_SEEPROM_SRC,
 	    &tmphdl, sizeof (tmphdl));
 	if (retval != PICL_SUCCESS) {
-		return (NULL);
+		return (0);
 	}
 
 	/* Get the device path of the fru */
 	retval = ptree_get_propval_by_name(tmphdl, PICL_PROP_DEVICEPATH,
 	    devpath, PATH_MAX);
 	if (retval != PICL_SUCCESS) {
-		return (NULL);
+		return (0);
 	}
 
 	retval = ptree_get_prop_by_name(tmphdl, PICL_PROP_BINDING_NAME,
 	    &prophdl);
 	if (retval != PICL_SUCCESS) {
-		return (NULL);
+		return (0);
 	}
 
 	retval = ptree_get_propinfo(prophdl, &propinfo);
 	if (retval != PICL_SUCCESS) {
-		return (NULL);
+		return (0);
 	}
 
 	bname = alloca(propinfo.piclinfo.size);
 	if (bname == NULL) {
-		return (NULL);
+		return (0);
 	}
 
 	/* get the driver binding name */
 	retval = ptree_get_propval(prophdl, bname, propinfo.piclinfo.size);
 	if (retval != PICL_SUCCESS) {
-		return (NULL);
+		return (0);
 	}
 
 	cont_hash_obj	= create_container_hash_object();
 	if (cont_hash_obj == NULL) {
-		return (NULL);
+		return (0);
 	}
 
 	add_hashobject_to_hashtable(cont_hash_obj);
@@ -823,7 +821,7 @@ fru_open_container(picl_nodehdl_t fruhdl)
 	if (strcmp(bname, "i2c-at34c02") == 0) {
 		device_fd = open(devpath, O_RDONLY);
 		if (device_fd < 0) {
-			return (NULL);
+			return (0);
 		}
 		first_byte = 0x00;
 
@@ -861,7 +859,7 @@ fru_open_container(picl_nodehdl_t fruhdl)
 		retval = get_container_info(devpath, bname, &cont_info);
 	}
 	if (retval < 0) {
-		return (NULL);
+		return (0);
 	}
 
 	cont_hash_obj->u.cont_obj->num_of_section =  cont_info.num_sections;
@@ -870,7 +868,7 @@ fru_open_container(picl_nodehdl_t fruhdl)
 	for (count = 0; count < cont_info.num_sections; count++) {
 		sec_hash_obj = create_section_hash_object();
 		if (sec_hash_obj == NULL) {
-			return (NULL);
+			return (0);
 		}
 
 		add_hashobject_to_hashtable(sec_hash_obj);
@@ -1101,7 +1099,7 @@ call_devfsadm(void)
 
 /*
  * Description	:
- *   		fru_get_sections() fills an array of section structures passed
+ *		fru_get_sections() fills an array of section structures passed
  *		as an argument.
  *
  * Arguments	:
@@ -1110,16 +1108,16 @@ call_devfsadm(void)
  *		int		: maximum number of section in a container.
  *
  * Returns	:
- *   		int
- *     		On success,the number of section structures written is returned;
- *     		on error, -1 is returned and "errno" is set appropriately.
+ *		int
+ *		On success,the number of section structures written is returned;
+ *		on error, -1 is returned and "errno" is set appropriately.
  *
  */
 
 /* ARGSUSED */
 int
 fru_get_sections(container_hdl_t container, section_t *section, int maxsec,
-							door_cred_t *cred)
+    door_cred_t *cred)
 {
 	int		device_fd;
 	int		retrys = 1;
@@ -1168,16 +1166,16 @@ fru_get_sections(container_hdl_t container, section_t *section, int maxsec,
 
 /*
  * Description	:
- * 		fru_get_num_segments() returns the current number of segments
+ *		fru_get_num_segments() returns the current number of segments
  *		in a section.
  *
  * Arguments	:
  *		section_hdl_t : section header holding section information.
  *
  * Return	:
- * 		int
- *     		On success, the number of segments in the argument section is
- *     		returned; on error -1 is returned.
+ *		int
+ *		On success, the number of segments in the argument section is
+ *		returned; on error -1 is returned.
  */
 
 /* ARGSUSED */
@@ -1284,7 +1282,7 @@ fru_get_segments(section_hdl_t section, segment_t *segment, int maxseg,
 
 int
 fru_add_segment(section_hdl_t section, segment_t *segment,
-				section_hdl_t *newsection, door_cred_t *cred)
+    section_hdl_t *newsection, door_cred_t *cred)
 {
 	int		fd;
 	int		retval;
@@ -1300,7 +1298,7 @@ fru_add_segment(section_hdl_t section, segment_t *segment,
 	hash_obj_t	*sec_hash;
 	hash_obj_t	*seg_hash;
 	fru_segdesc_t	*new_seg_desc;
-	unsigned char 	*crcbuf;
+	unsigned char	*crcbuf;
 	section_layout_t sec_layout;
 	segment_layout_t *seg_layout;
 	segment_layout_t *segment_buf;
@@ -1560,7 +1558,7 @@ free_segment_hash(handle_t	handle, hash_obj_t	*sec_hash)
 
 int
 fru_delete_segment(segment_hdl_t segment, section_hdl_t *newsection,
-							door_cred_t *cred)
+    door_cred_t *cred)
 {
 	int			num_of_seg;
 	int			bufsize;
@@ -1712,14 +1710,14 @@ fru_delete_segment(segment_hdl_t segment, section_hdl_t *newsection,
 
 /*
  * Description	:
- * 		fru_read_segment() reads the raw contents of a segment.
+ *		fru_read_segment() reads the raw contents of a segment.
  *
  * Arguments	: segment_hdl_t : segment handle.
  *		 void *	: buffer containing segment data when function returns.
  *		size_t :number of bytes.
  *
  * Return	:
- * 		int
+ *		int
  *		On success, the number of bytes read is returned;
  *
  * Notes	:
@@ -2223,8 +2221,8 @@ fru_get_packets(segment_hdl_t segment, packet_t *packet, int maxpackets,
  *		size_t	: sizeof the buffer.
  *
  * Return	:
- *    		int
- *     		On success, the number of bytes copied is returned; On error
+ *		int
+ *		On success, the number of bytes copied is returned; On error
  *		-1 returned.
  */
 
@@ -2252,7 +2250,7 @@ fru_get_payload(packet_hdl_t packet, void *buffer, size_t nbytes,
 
 /*
  * Description	:
- * 		fru_update_payload() writes the contents of a packet's payload.
+ *		fru_update_payload() writes the contents of a packet's payload.
  *
  * Arguments	: packet_hdl_t : packet handle.
  *		const void * : data buffer.
@@ -2260,7 +2258,7 @@ fru_get_payload(packet_hdl_t packet, void *buffer, size_t nbytes,
  *		packet_hdl_t	: new packet handle.
  *
  * Return	:
- * 		int
+ *		int
  *		On success, 0 is returned; on failure
  *		-1 is returned.
  */
@@ -2360,22 +2358,22 @@ fru_update_payload(packet_hdl_t packet, const void *data, size_t nbytes,
  *		segment_hdl_t segment
  *		A handle for the segment to which the packet will be appended.
  *
- *   		packet_t *packet
- *     		On entry, the "tag" component of "packet" specifies the tag
- *     		value for the added packet; the "handle" component is ignored.
- *     		On return, the "handle" component is set to the handle of the
- *     		appended packet.
+ *		packet_t *packet
+ *		On entry, the "tag" component of "packet" specifies the tag
+ *		value for the added packet; the "handle" component is ignored.
+ *		On return, the "handle" component is set to the handle of the
+ *		appended packet.
  *
- *   		const void *payload
- *     		A pointer to the caller's buffer containing the payload data for
- *     		the appended packet.
+ *		const void *payload
+ *		A pointer to the caller's buffer containing the payload data for
+ *		the appended packet.
  *
- *   		size_t nbytes
- *     		The size of the caller buffer.
+ *		size_t nbytes
+ *		The size of the caller buffer.
  *
  * Return	:
- *   		int
- *     		On success, 0 is returned; on error -1 is returned;
+ *		int
+ *		On success, 0 is returned; on error -1 is returned;
  */
 
 int
@@ -2522,7 +2520,7 @@ fru_append_packet(segment_hdl_t segment, packet_t *packet, const void *payload,
 		seg_hash->u.seg_obj->trailer_offset = trailer_offset;
 		seg_hash->u.seg_obj->num_of_packets += 1;
 
-		*newsegment	= segment; 	/* return new segment handle */
+		*newsegment = segment;	/* return new segment handle */
 		return (0);
 	} else {
 		errno = EAGAIN;
@@ -2601,18 +2599,18 @@ free_packet_object(handle_t	handle, hash_obj_t *seg_hash)
 
 /*
  * Description	:
- *   		fru_delete_packet() deletes a packet from a segment.
+ *		fru_delete_packet() deletes a packet from a segment.
  *
  * Arguments	: packet_hdl_t : packet number to be deleted.
  *		segment_hdl_t : new segment handler.
  *
  * Return	:
- *   		int
- *     		On success, 0 is returned; on error, -1.
+ *		int
+ *		On success, 0 is returned; on error, -1.
  *
  * NOTES
- * 		Packets are adjacent; thus, deleting a packet requires moving
- *   		succeeding packets to compact the resulting hole.
+ *		Packets are adjacent; thus, deleting a packet requires moving
+ *		succeeding packets to compact the resulting hole.
  */
 
 int
@@ -2666,7 +2664,7 @@ fru_delete_packet(packet_hdl_t packet, segment_hdl_t *newsegment,
 
 	if (sec_hash->u.sec_obj->section.protection == READ_ONLY_SECTION) {
 		errno = EPERM;
-		return (-1); 		/* read-only section */
+		return (-1);		/* read-only section */
 	}
 
 	prev_obj	= seg_hash->u.seg_obj->pkt_obj_list;

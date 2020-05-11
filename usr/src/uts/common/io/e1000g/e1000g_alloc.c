@@ -830,7 +830,7 @@ e1000g_free_dvma_buffer(dma_buffer_t *buf)
 		return;
 	}
 
-	buf->dma_address = NULL;
+	buf->dma_address = 0;
 
 	if (buf->address != NULL) {
 		kmem_free(buf->address, buf->size);

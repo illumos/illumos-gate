@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the environmental PICL plug-in module.
  */
@@ -233,15 +231,15 @@ static int get_tach(ptree_rarg_t *parg, void *buf);
 static int set_tach(ptree_warg_t *parg, const void *buf);
 
 static int	shutdown_override = 0;
-static int 	sensor_poll_interval	= SENSORPOLL_INTERVAL;
+static int	sensor_poll_interval	= SENSORPOLL_INTERVAL;
 static int	warning_interval	= WARNING_INTERVAL;
-static int 	shutdown_interval	= SHUTDOWN_INTERVAL;
+static int	shutdown_interval	= SHUTDOWN_INTERVAL;
 static int	ovtemp_monitor		= 1;	/* enabled */
 static int	pm_monitor		= 1;	/* enabled */
 static int	mon_fanstat		= 1;	/* enabled */
 
-static int 	hwm_mode;
-static int 	hwm_tach_enable;
+static int	hwm_mode;
+static int	hwm_tach_enable;
 static char	shutdown_cmd[] = SHUTDOWN_CMD;
 
 env_tuneable_t tuneables[] = {
@@ -901,7 +899,7 @@ envd_setup_sensors(void)
 		 */
 
 		if (ioctl(sensorp->fd, ADM1031_GET_TEMP_MIN_RANGE,
-			&tmin) != -1) {
+		    &tmin) != -1) {
 			sensorp->tmin = TMIN(tmin);
 		} else {
 			sensorp->tmin = -1;
@@ -1006,13 +1004,13 @@ updateadm_ranges(char *name, uchar_t cur_lpstate)
 	if (sysfd == -1) {
 		if (env_debug)
 			envd_log(LOG_ERR, ENV_ADM_OPEN_FAIL, hwm_devs[sys_id],
-				errno, strerror(errno));
+			    errno, strerror(errno));
 		return;
 	}
 	/* Read ADM default value only for the first time */
 	if (tsave == 0) {
 		if (ioctl(sensorp->fd, ADM1031_GET_TEMP_MIN_RANGE,
-			&tsave) == -1) {
+		    &tsave) == -1) {
 			if (env_debug)
 				envd_log(LOG_ERR,
 				    "read tminrange ioctl failed");
@@ -1038,7 +1036,7 @@ updateadm_ranges(char *name, uchar_t cur_lpstate)
 	 * ADM 1031 Tmin/Trange register need to be reprogrammed.
 	 */
 		tdata = ((fanctl->fan_ctl_pairs[cur_lpstate].tMin / TMIN_UNITS)
-				<< TMIN_SHIFT);
+		    << TMIN_SHIFT);
 		/* Need to pack tRange in ADM bits 2:0 */
 		switch (fanctl->fan_ctl_pairs[cur_lpstate].tRange) {
 			case 5:
@@ -1112,13 +1110,13 @@ pmthr(void *args)
 		do {
 			if (env_debug) {
 				envd_log(LOG_INFO,
-					"pmstate event:0x%x flags:%x comp:%d "
-					"oldval:%d newval:%d path:%s\n",
-						pmstate.event, pmstate.flags,
-						pmstate.component,
-						pmstate.old_level,
-						pmstate.new_level,
-						pmstate.physpath);
+				    "pmstate event:0x%x flags:%x comp:%d "
+				    "oldval:%d newval:%d path:%s\n",
+				    pmstate.event, pmstate.flags,
+				    pmstate.component,
+				    pmstate.old_level,
+				    pmstate.new_level,
+				    pmstate.physpath);
 			}
 			cur_lpstate =
 			    (pmstate.flags & PSC_ALL_LOWEST) ? 1 : 0;
@@ -1149,11 +1147,11 @@ pmthr(void *args)
  *
  *			FAN ON
  * Tmin
- * 	-------------------------------------------
+ *	-------------------------------------------
  *
- * 			FAN ON/OFF
+ *			FAN ON/OFF
  *
- * 	--------------------------------------------
+ *	--------------------------------------------
  * Tmin - Hysterisis
  *			FAN OFF
  *
@@ -1303,13 +1301,13 @@ handle_overtemp_interrupt(int hwm_id)
 
 			if (env_debug)
 				envd_log(LOG_ERR,
-					"sensor name %s, cur temp %d, "
-					"HW %d LW %d SD %d LS %d\n",
-					    sensorp->name, temp,
-					    sensorp->es_ptr->high_warning,
-					    (int)sensorp->es_ptr->low_warning,
-					    sensorp->es_ptr->high_shutdown,
-					    (int)sensorp->es_ptr->low_shutdown);
+				    "sensor name %s, cur temp %d, "
+				    "HW %d LW %d SD %d LS %d\n",
+				    sensorp->name, temp,
+				    sensorp->es_ptr->high_warning,
+				    (int)sensorp->es_ptr->low_warning,
+				    sensorp->es_ptr->high_shutdown,
+				    (int)sensorp->es_ptr->low_shutdown);
 
 			if (TEMP_IN_WARNING_RANGE(sensorp->cur_temp, sensorp)) {
 				/*
@@ -1484,7 +1482,7 @@ envd_setup(void)
 	 * at least one sensor.
 	 */
 	if (envd_setup_sensors() <= 0) {
-		return (NULL);
+		return (0);
 	}
 
 	/*

@@ -315,7 +315,7 @@ static struct cb_ops dcd_cb_ops = {
 	0,			/* streamtab  */
 	D_64BIT | D_MP | D_NEW,	/* Driver compatibility flag */
 	CB_REV,			/* cb_rev */
-	dcdaread, 		/* async I/O read entry point */
+	dcdaread,		/* async I/O read entry point */
 	dcdawrite		/* async I/O write entry point */
 };
 
@@ -2255,7 +2255,7 @@ make_dcd_cmd(struct dcd_disk *un, struct buf *bp, int (*func)())
 		    &p_lblksrt,
 		    NULL,
 		    NULL,
-		    0) != NULL) {
+		    0) != 0) {
 			lblocks = 0;
 			p_lblksrt = 0;
 		}
@@ -3041,7 +3041,7 @@ dcddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 /* ARGSUSED3 */
 static int
 dcdioctl(dev_t dev, int cmd, intptr_t arg, int flag,
-	cred_t *cred_p, int *rval_p)
+    cred_t *cred_p, int *rval_p)
 {
 	auto int32_t data[512 / (sizeof (int32_t))];
 	struct dk_cinfo *info;
@@ -3882,7 +3882,7 @@ static int
 dcd_write_deviceid(struct dcd_disk *un)
 {
 
-	int 	status;
+	int	status;
 	diskaddr_t blk;
 	struct udcd_cmd ucmd;
 	struct dcd_cmd cdb;
@@ -4177,7 +4177,7 @@ dcd_validate_model_serial(char *str, int *retlen, int totallen)
 #ifndef lint
 void
 clean_print(dev_info_t *dev, char *label, uint_t level,
-	char *title, char *data, int len)
+    char *title, char *data, int len)
 {
 	int	i;
 	char	buf[256];

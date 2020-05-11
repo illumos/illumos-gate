@@ -254,7 +254,7 @@ glvc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	int			instance;
 	int			err;
-	glvc_soft_state_t 	*softsp;
+	glvc_soft_state_t	*softsp;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -338,7 +338,7 @@ glvc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    va_to_pa((caddr_t)softsp->mb_send_buf);
 
 		err = ddi_create_minor_node(dip, "glvc", S_IFCHR,
-		    instance, DDI_PSEUDO, NULL);
+		    instance, DDI_PSEUDO, 0);
 		if (err != DDI_SUCCESS) {
 			kmem_free(softsp->mb_recv_buf, softsp->mtu);
 			kmem_free(softsp->mb_send_buf, softsp->mtu);
@@ -412,7 +412,7 @@ glvc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	int	instance;
 	int	err;
-	glvc_soft_state_t 	*softsp;
+	glvc_soft_state_t	*softsp;
 
 
 	switch (cmd) {

@@ -2481,7 +2481,7 @@ vnet_rx_ring_stat(mac_ring_driver_t rdriver, uint_t stat, uint64_t *val)
 	macp = &vresp->macreg;
 	cbp = macp->m_callbacks;
 
-	cbp->mc_getstat(macp->m_driver, stat, val);
+	(void) cbp->mc_getstat(macp->m_driver, stat, val);
 
 	return (0);
 }

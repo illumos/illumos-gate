@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains code for setting up environmental related nodes
  * and properties in the PICL tree.
@@ -154,7 +152,7 @@ static sensor_node_t sensor_nodes[] = {
  */
 typedef struct {
 	char		*fan_name;	/* fan name */
-	env_fan_t 	*fanp;		/* fan information */
+	env_fan_t	*fanp;		/* fan information */
 	char		*speed_unit;	/* speed unit string */
 	picl_nodehdl_t	nodeh;		/* "fan" node handle */
 	picl_prophdl_t	proph;		/* "Speed" property handle */
@@ -188,7 +186,7 @@ static void delete_fan_nodes_and_props(void);
 static int
 get_current_temp(ptree_rarg_t *parg, void *buf)
 {
-	tempr_t 	temp;
+	tempr_t		temp;
 	picl_prophdl_t	proph;
 	sensor_node_t	*snodep;
 
@@ -275,7 +273,7 @@ add_node_to_list(picl_nodehdl_t nodeh, node_list_t *listp)
  */
 static node_list_t *
 get_node_list_by_class(picl_nodehdl_t nodeh, const char *classname,
-	node_list_t *listp)
+    node_list_t *listp)
 {
 	int		err;
 	char		clname[PICL_CLASSNAMELEN_MAX+1];
@@ -484,7 +482,7 @@ add_sensor_nodes_and_props(picl_nodehdl_t plath)
 			 * Skip if already initialized or no sensor info
 			 */
 			sensorp = snodep->sensorp;
-			if (snodep->nodeh != NULL || sensorp == NULL)
+			if (snodep->nodeh != 0 || sensorp == NULL)
 				continue;
 
 			/*
@@ -590,18 +588,18 @@ delete_sensor_nodes_and_props(void)
 	 */
 
 	for (snodep = sensor_nodes; snodep->sensor_name != NULL; snodep++) {
-		if (snodep->sdev_proph != NULL) {
+		if (snodep->sdev_proph != 0) {
 			(void) ptree_delete_prop(snodep->sdev_proph);
 			(void) ptree_destroy_prop(snodep->sdev_proph);
-			snodep->sdev_proph = NULL;
+			snodep->sdev_proph = 0;
 		}
 
-		if (snodep->nodeh != NULL) {
+		if (snodep->nodeh != 0) {
 			/* delete node and all properties under it */
 			(void) ptree_delete_node(snodep->nodeh);
 			(void) ptree_destroy_node(snodep->nodeh);
-			snodep->nodeh = NULL;
-			snodep->proph = NULL;
+			snodep->nodeh = 0;
+			snodep->proph = 0;
 		}
 	}
 }
@@ -644,7 +642,7 @@ add_fan_nodes_and_props(picl_nodehdl_t plath)
 		for (fnodep = fan_nodes; fnodep->fan_name != NULL; fnodep++) {
 
 			/* Skip if already initialized or no fan info */
-			if (fnodep->nodeh != NULL || fnodep->fanp == NULL)
+			if (fnodep->nodeh != 0 || fnodep->fanp == NULL)
 				continue;
 
 			/*
@@ -691,7 +689,7 @@ add_fan_nodes_and_props(picl_nodehdl_t plath)
 			/*
 			 * Add other "fan" class properties
 			 */
-			pname = PROP_FAN_SPEED_UNIT,
+			pname = PROP_FAN_SPEED_UNIT;
 			err = add_regular_prop(cnodeh, pname,
 			    PICL_PTYPE_CHARSTRING, PICL_READ,
 			    strlen(fnodep->speed_unit)+1,
@@ -732,10 +730,10 @@ delete_fan_nodes_and_props(void)
 	 */
 
 	for (fnodep = fan_nodes; fnodep->fan_name != NULL; fnodep++) {
-		if (fnodep->nodeh != NULL) {
+		if (fnodep->nodeh != 0) {
 			(void) ptree_delete_node(fnodep->nodeh);
 			(void) ptree_destroy_node(fnodep->nodeh);
-			fnodep->nodeh = NULL;
+			fnodep->nodeh = 0;
 		}
 	}
 }
@@ -768,7 +766,7 @@ get_envmodel_conf_file(char *outfilename)
 	}
 
 	(void) snprintf(pname, PATH_MAX, "%s/%s", PICLD_COMMON_PLUGIN_DIR,
-		ENVMODEL_CONF_FILE);
+	    ENVMODEL_CONF_FILE);
 
 	if (access(pname, R_OK) == 0) {
 		(void) strlcpy(outfilename, pname, PATH_MAX);
@@ -793,9 +791,9 @@ env_picl_setup(void)
 	 */
 	for (snodep = sensor_nodes; snodep->sensor_name != NULL; snodep++) {
 		snodep->sensorp = sensor_lookup(snodep->sensor_name);
-		snodep->nodeh = NULL;
-		snodep->proph = NULL;
-		snodep->sdev_proph = NULL;
+		snodep->nodeh = 0;
+		snodep->proph = 0;
+		snodep->sdev_proph = 0;
 	}
 
 	/*
@@ -803,8 +801,8 @@ env_picl_setup(void)
 	 */
 	for (fnodep = fan_nodes; fnodep->fan_name != NULL; fnodep++) {
 		fnodep->fanp = fan_lookup(fnodep->fan_name);
-		fnodep->nodeh = NULL;
-		fnodep->proph = NULL;
+		fnodep->nodeh = 0;
+		fnodep->proph = 0;
 	}
 
 	/*

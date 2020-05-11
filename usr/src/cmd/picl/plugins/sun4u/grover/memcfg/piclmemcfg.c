@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This plugin creates memory configuration nodes and properties in the
  * PICL tree for Grover/Grover+ platform.
@@ -101,7 +99,7 @@ create_logical_tree(picl_nodehdl_t memh, mmodinfo_t *mmodinfo)
 		 * It means no segment for the slot if size is zero
 		 */
 		if (mmodinfo[i].size == 0) {
-			memsegh[i] = NULL;
+			memsegh[i] = 0;
 			continue;
 		}
 
@@ -165,7 +163,7 @@ create_logical_tree(picl_nodehdl_t memh, mmodinfo_t *mmodinfo)
 		 * Add reference property to the memory module if memory
 		 * module node handle is not NULL.
 		 */
-		if (mmodinfo[i].memmodh == NULL)
+		if (mmodinfo[i].memmodh == 0)
 			continue;
 
 		err = ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
@@ -185,7 +183,7 @@ create_logical_tree(picl_nodehdl_t memh, mmodinfo_t *mmodinfo)
 		 * Undo in the logical memory tree
 		 */
 		for (i = 0; i < TOTAL_MEM_SLOTS; i++) {
-			if (memsegh[i] == NULL)
+			if (memsegh[i] == 0)
 				continue;
 
 			(void) ptree_delete_node(memsegh[i]);
@@ -274,7 +272,7 @@ create_physical_tree(picl_nodehdl_t plfh, mmodinfo_t *mmodinfo)
 		 * logical memory tree won't link to memory module.
 		 */
 		for (i = 0; i < TOTAL_MEM_SLOTS; i++)
-			mmodinfo[i].memmodh = NULL;
+			mmodinfo[i].memmodh = 0;
 
 		/*
 		 * Undo in the physical memory tree

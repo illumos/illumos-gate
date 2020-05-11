@@ -40,7 +40,6 @@ UTSBASE	= ../../..
 #
 MODULE		= platmod
 OBJECTS		= $(GROVER_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(GROVER_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_GROVER_MISC_DIR)/$(MODULE)
 
 PLAT_DIR	= .
@@ -60,7 +59,6 @@ CLEANFILES	+= $(PLATLIB) $(SYM_MOD)
 #	Define targets
 #
 ALL_TARGET	= $(SYM_MOD)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -81,17 +79,9 @@ clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
 
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
-
 install:	$(INSTALL_DEPS)
 
 check:
-
-LINT_LIB_DIR	= $(GROVER_LINT_LIB_DIR)
 
 $(PLATLIB):	$(OBJECTS)
 	$(BUILD.SO) $(OBJECTS)

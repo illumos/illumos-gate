@@ -23,8 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	This makefile drives the production of the sun4u sunfire platform
 #	module.
 #
@@ -47,12 +45,8 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
-lintlib		:=	TARGET= lintlib
-modlintlib	:=	TARGET= modlintlib
 modlist		:=	TARGET= modlist
 modlist		:=	NO_STATE= -K $$MODSTATE$$$$
-clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
 #
@@ -60,10 +54,8 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clean.lint clobber modlist: \
+def all clean clobber modlist: \
 	$(SUNFIRE_KMODS) $(CLOSED_SUNFIRE_KMODS)
-
-modlintlib:	$(SUNFIRE_KMODS) $(CLOSED_SUNFIRE_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,Ultra-Enterprise
 
@@ -75,24 +67,6 @@ install:	$(ROOT_SUNFIRE_DIR) $(USR_SUNFIRE_DIR) \
 
 install_h check:	FRC
 	@cd sys; pwd; $(MAKE) $(TARGET)
-
-lint:		modlintlib
-
-#
-# The 'lint.platmod' target lints the sunfire platform module against the sun4u
-# kernel.  This ends up doing all the kernel cross-checks, so it takes a couple
-# of minutes.  Due to the low ROI, it's not run by default, but it's a good
-# idea to run this if you change os/sunfire.c.
-#
-LINT_LIBS	 = $(LINT_LIB) \
-		   -L$(SUNFIRE_LINT_LIB_DIR) \
-		   -L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
-		       $(CLOSED_LINT_KMODS:%=-l%) \
-		   -L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
-
-lint.platmod:	modlintlib
-	@-$(ECHO) "\nSunfire Platform-dependent module: global crosschecks:"
-	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
 $(SUNFIRE_KMODS): FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)

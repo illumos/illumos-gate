@@ -27,7 +27,7 @@
 
 /*
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright 2014 Joyent, Inc.  All rights reserved.
  */
 
@@ -81,6 +81,7 @@ struct nlm_block_cb_data {
 	struct nlm_host		*hostp;
 	struct nlm_vhold	*nvp;
 	struct flock64		*flp;
+	bool_t			registered;
 };
 
 /*
@@ -107,9 +108,9 @@ static void nlm_block(
 	nlm4_lockargs *lockargs,
 	struct nlm_host *host,
 	struct nlm_vhold *nvp,
-	nlm_rpc_t *rpcp,
 	struct flock64 *fl,
-	nlm_testargs_cb grant_cb);
+	nlm_granted_cb grant_cb,
+	rpcvers_t);
 
 static vnode_t *nlm_fh_to_vp(struct netobj *);
 static struct nlm_vhold *nlm_fh_to_vhold(struct nlm_host *, struct netobj *);
@@ -314,6 +315,11 @@ nlm_do_notify2(nlm_sm_status *argp, void *res, struct svc_req *sr)
  * NLM_TEST, NLM_TEST_MSG,
  * NLM4_TEST, NLM4_TEST_MSG,
  * Client inquiry about locks, non-blocking.
+ *
+ * Arg cb is NULL for NLM_TEST, NLM4_TEST, and
+ *	non-NULL for NLM_TEST_MSG, NLM4_TEST_MSG
+ * The MSG forms use the cb to send the reply,
+ * and don't return a reply for this call.
  */
 void
 nlm_do_test(nlm4_testargs *argp, nlm4_testres *resp,
@@ -455,10 +461,19 @@ out:
  * We also have to keep a list of locks (pending + granted)
  * both to handle retransmitted requests, and to keep the
  * vnodes for those locks active.
+ *
+ * Callback arguments:
+ *	reply_cb	Used to send a normal RPC reply just as if
+ *			we had filled in a response for our caller.
+ *			Needed because we do work after the reply.
+ *	res_cb		Used for the MSG calls, where there's no
+ *			regular RPC response.
+ *	grant_cb	Used to CALL the client informing them of a
+ *			granted lock after a "blocked" reply.
  */
 void
 nlm_do_lock(nlm4_lockargs *argp, nlm4_res *resp, struct svc_req *sr,
-    nlm_reply_cb reply_cb, nlm_res_cb res_cb, nlm_testargs_cb grant_cb)
+    nlm_reply_cb reply_cb, nlm_res_cb res_cb, nlm_granted_cb grant_cb)
 {
 	struct nlm_globals *g;
 	struct flock64 fl;
@@ -492,20 +507,18 @@ nlm_do_lock(nlm4_lockargs *argp, nlm4_res *resp, struct svc_req *sr,
 	    struct nlm_host *, host, nlm4_lockargs *, argp);
 
 	/*
-	 * If we may need to do _msg_ call needing an RPC
-	 * callback, get the RPC client handle now,
-	 * so we know if we can bind to the NLM service on
-	 * this client.
-	 *
-	 * Note: host object carries transport type.
-	 * One client using multiple transports gets
-	 * separate sysids for each of its transports.
+	 * If this is a MSG call (NLM_LOCK_MSG, NLM4_LOCK_MSG)
+	 * we'll have res_cb != NULL, and we know we'll need an
+	 * RPC client handle _now_ so we can send the response.
+	 * If we can't get an rpc handle (rpcp) then we have
+	 * no way to respond, and the client will time out.
 	 */
-	if (res_cb != NULL || (grant_cb != NULL && argp->block == TRUE)) {
+	if (res_cb != NULL) {
 		error = nlm_host_get_rpc(host, sr->rq_vers, &rpcp);
 		if (error != 0) {
+			ASSERT(rpcp == NULL);
 			status = nlm4_denied_nolocks;
-			goto doreply;
+			goto out;
 		}
 	}
 
@@ -584,6 +597,8 @@ nlm_do_lock(nlm4_lockargs *argp, nlm4_res *resp, struct svc_req *sr,
 		/*
 		 * OK, can detach this thread, so this call
 		 * will block below (after we reply).
+		 * The "blocked" reply tells the client to
+		 * expect a "granted" call-back later.
 		 */
 		status = nlm4_blocked;
 		do_blocking = TRUE;
@@ -655,11 +670,12 @@ doreply:
 		 * "detach" it from the RPC SVC pool, allowing it
 		 * to block indefinitely if needed.
 		 */
-		ASSERT(rpcp != NULL);
+		ASSERT(grant_cb != NULL);
 		(void) svc_detach_thread(sr->rq_xprt);
-		nlm_block(argp, host, nvp, rpcp, &fl, grant_cb);
+		nlm_block(argp, host, nvp, &fl, grant_cb, sr->rq_vers);
 	}
 
+out:
 	DTRACE_PROBE3(lock__end, struct nlm_globals *, g,
 	    struct nlm_host *, host, nlm4_res *, resp);
 
@@ -679,25 +695,26 @@ static void
 nlm_block(nlm4_lockargs *lockargs,
     struct nlm_host *host,
     struct nlm_vhold *nvp,
-    nlm_rpc_t *rpcp,
     struct flock64 *flp,
-    nlm_testargs_cb grant_cb)
+    nlm_granted_cb grant_cb,
+    rpcvers_t vers)
 {
 	nlm4_testargs args;
+	nlm4_res res;
 	int error;
 	flk_callback_t flk_cb;
 	struct nlm_block_cb_data cb_data;
+	nlm_rpc_t *rpcp = NULL;
+	enum clnt_stat status;
 
 	/*
 	 * Keep a list of blocked locks on nh_pending, and use it
 	 * to cancel these threads in nlm_destroy_client_pending.
 	 *
-	 * Check to see if this lock is already in the list
-	 * and if not, add an entry for it.  Allocate first,
-	 * then if we don't insert, free the new one.
-	 * Caller already has vp held.
+	 * Check to see if this lock is already in the list. If so,
+	 * some earlier call is already blocked getting this lock,
+	 * so there's nothing more this call needs to do.
 	 */
-
 	error = nlm_slreq_register(host, nvp, flp);
 	if (error != 0) {
 		/*
@@ -710,9 +727,22 @@ nlm_block(nlm4_lockargs *lockargs,
 		return;
 	}
 
+	/*
+	 * Make sure we can get an RPC client handle we can use to
+	 * deliver the "granted" callback if/when we get the lock.
+	 * If we can't, there's no point blocking to get the lock
+	 * for them because they'll never find out about it.
+	 */
+	error = nlm_host_get_rpc(host, vers, &rpcp);
+	if (error != 0) {
+		(void) nlm_slreq_unregister(host, nvp, flp);
+		return;
+	}
+
 	cb_data.hostp = host;
 	cb_data.nvp = nvp;
 	cb_data.flp = flp;
+	cb_data.registered = TRUE;
 	flk_init_callback(&flk_cb, nlm_block_callback, &cb_data);
 
 	/* BSD: VOP_ADVLOCK(vp, NULL, F_SETLK, fl, F_REMOTE); */
@@ -720,23 +750,60 @@ nlm_block(nlm4_lockargs *lockargs,
 	    F_REMOTELOCK | FREAD | FWRITE,
 	    (u_offset_t)0, &flk_cb, CRED(), NULL);
 
+	/*
+	 * If the nlm_block_callback didn't already do it...
+	 */
+	if (cb_data.registered)
+		(void) nlm_slreq_unregister(host, nvp, flp);
+
 	if (error != 0) {
 		/*
 		 * We failed getting the lock, but have no way to
 		 * tell the client about that.  Let 'em time out.
 		 */
-		(void) nlm_slreq_unregister(host, nvp, flp);
 		return;
 	}
-
 	/*
+	 * ... else we got the lock on behalf of this client.
+	 *
+	 * We MUST either tell the client about this lock
+	 * (via the "granted" callback RPC) or unlock.
+	 *
 	 * Do the "granted" call-back to the client.
 	 */
+	bzero(&args, sizeof (args));
 	args.cookie	= lockargs->cookie;
 	args.exclusive	= lockargs->exclusive;
 	args.alock	= lockargs->alock;
+	bzero(&res, sizeof (res));
 
-	NLM_INVOKE_CALLBACK("grant", rpcp, &args, grant_cb);
+	/*
+	 * Not using the NLM_INVOKE_CALLBACK() macro because
+	 * we need to take actions on errors.
+	 */
+	status = (*grant_cb)(&args, &res, (rpcp)->nr_handle);
+	if (status != RPC_SUCCESS) {
+		struct rpc_err err;
+
+		CLNT_GETERR((rpcp)->nr_handle, &err);
+		NLM_ERR("NLM: %s callback failed: "
+		    "stat %d, err %d\n", "grant", status,
+		    err.re_errno);
+		res.stat.stat = nlm4_failed;
+	}
+	if (res.stat.stat != nlm4_granted) {
+		/*
+		 * Failed to deliver the granted callback, so
+		 * the client doesn't know about this lock.
+		 * Unlock the lock.  The client will time out.
+		 */
+		(void) nlm_vop_frlock(nvp->nv_vp, F_UNLCK, flp,
+		    F_REMOTELOCK | FREAD | FWRITE,
+		    (u_offset_t)0, NULL, CRED(), NULL);
+	}
+	xdr_free((xdrproc_t)xdr_nlm4_res, (void *)&res);
+
+	nlm_host_rele_rpc(host, rpcp);
 }
 
 /*
@@ -756,6 +823,7 @@ nlm_block_callback(flk_cb_when_t when, void *data)
 	if (when == FLK_AFTER_SLEEP) {
 		(void) nlm_slreq_unregister(cb_data->hostp,
 		    cb_data->nvp, cb_data->flp);
+		cb_data->registered = FALSE;
 	}
 
 	return (0);

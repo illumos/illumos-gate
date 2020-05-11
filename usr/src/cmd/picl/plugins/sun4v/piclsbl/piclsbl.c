@@ -192,12 +192,12 @@ check_raid(int target)
 
 /*
  * Ontario SBL event handler, subscribed to:
- * 	PICLEVENT_SYSEVENT_DEVICE_ADDED
- * 	PICLEVENT_SYSEVENT_DEVICE_REMOVED
+ *	PICLEVENT_SYSEVENT_DEVICE_ADDED
+ *	PICLEVENT_SYSEVENT_DEVICE_REMOVED
  */
 static void
 piclsbl_handler(const char *ename, const void *earg, size_t size,
-		void *cookie)
+    void *cookie)
 {
 	char		*devfs_path;
 	char		hdd_location[PICL_PROPNAMELEN_MAX];
@@ -236,7 +236,7 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 	/*
 	 * retrieve the device's physical path from the event payload
 	 */
-	if (nvlist_unpack((char *)earg, size, &nvlp, NULL))
+	if (nvlist_unpack((char *)earg, size, &nvlp, 0))
 		goto sbl_return;
 	if (nvlist_lookup_string(nvlp, "devfs-path", &devfs_path))
 		goto sbl_return;
@@ -248,7 +248,7 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 	 * otherwise, return as it is not one of our disks.
 	 */
 	lookup.path = strdup(devfs_path);
-	lookup.disk = NULL;
+	lookup.disk = 0;
 	lookup.result = DISK_NOT_FOUND;
 
 	/* first, find the disk */
@@ -315,7 +315,7 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 	 * populate the message for libpcp
 	 */
 	send_msg.msg_type = PCP_SBL_CONTROL;
-	send_msg.sub_type = NULL;
+	send_msg.sub_type = 0;
 	send_msg.msg_len = sizeof (pcp_sbl_req_t);
 	send_msg.msg_data = (uint8_t *)req_ptr;
 
@@ -387,7 +387,7 @@ piclsbl_init(void)
 		return;
 
 	/* retrieve the root node for lookups in the event handler */
-	if ((ptree_get_root(&root_node)) != NULL)
+	if ((ptree_get_root(&root_node)) != 0)
 		return;
 
 	/* load libpcp */

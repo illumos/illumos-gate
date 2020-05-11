@@ -894,19 +894,19 @@ find_child_by_name(picl_nodehdl_t parh, char *name)
 	err = ptree_get_propval_by_name(parh, PICL_PROP_CHILD,
 	    &nodeh, sizeof (picl_nodehdl_t));
 	if (err != PICL_SUCCESS)
-		return (NULL);
+		return (0);
 	for (;;) {
 		err = ptree_get_propval_by_name(nodeh, PICL_PROP_NAME, nodename,
 		    sizeof (nodename));
 		if (err != PICL_SUCCESS)
-			return (NULL);
+			return (0);
 		if (strcmp(name, nodename) == 0) {
 			return (nodeh);
 		}
 		err = ptree_get_propval_by_name(nodeh, PICL_PROP_PEER,
 		    &nodeh, sizeof (picl_nodehdl_t));
 		if (err != PICL_SUCCESS)
-			return (NULL);
+			return (0);
 	}
 }
 
@@ -1241,7 +1241,7 @@ frudr_completion_handler(char *ename, void *earg, size_t size)
 {
 	picl_nodehdl_t	fruh;
 	picl_nodehdl_t	parh;
-	picl_nodehdl_t	peerh = NULL;
+	picl_nodehdl_t	peerh = 0;
 	char	nodename[PICL_PROPNAMELEN_MAX] = { '\0' };
 	int err;
 
@@ -1250,10 +1250,10 @@ frudr_completion_handler(char *ename, void *earg, size_t size)
 		 * now frudata has been notified that the node is to be
 		 * removed, we can actually remove it
 		 */
-		fruh = NULL;
+		fruh = 0;
 		(void) nvlist_lookup_uint64(earg,
 		    PICLEVENTARG_FRUHANDLE, &fruh);
-		if (fruh != NULL) {
+		if (fruh != 0) {
 			(void) ptree_get_propval_by_name(fruh, PICL_PROP_PEER,
 			    &peerh, sizeof (peerh));
 
@@ -1301,7 +1301,7 @@ frudr_completion_handler(char *ename, void *earg, size_t size)
 
 			if ((sys_platform == PLAT_CHALUPA19) &&
 			    (strncmp(nodename, FT_NAME, FT_NAME_LEN) == 0) &&
-			    (peerh != NULL)) {
+			    (peerh != 0)) {
 				/*
 				 * On Netra-440 platforms, a fan tray
 				 * may contain 2 fans (F0 and F1) but
@@ -1337,7 +1337,7 @@ post_frudr_event(char *ename, picl_nodehdl_t parenth, picl_nodehdl_t fruh)
 	ev_name = strdup(ename);
 	if (ev_name == NULL)
 		return;
-	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME_TYPE, NULL)) {
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME_TYPE, 0)) {
 		free(ev_name);
 		return;
 	}
@@ -1488,7 +1488,7 @@ frudr_evhandler(const char *ename, const void *earg, size_t size, void *cookie)
 		return;
 	}
 
-	if (nvlist_unpack((char *)earg, size, &nvlp, NULL)) {
+	if (nvlist_unpack((char *)earg, size, &nvlp, 0)) {
 		return;
 	}
 
@@ -1579,7 +1579,7 @@ frudr_evhandler(const char *ename, const void *earg, size_t size, void *cookie)
 			/*
 			 * fru was there - but has gone away
 			 */
-			post_frudr_event(PICL_FRU_REMOVED, NULL, fruh);
+			post_frudr_event(PICL_FRU_REMOVED, 0, fruh);
 		}
 	} else if (rmc_flag) {
 		/*
@@ -1589,7 +1589,7 @@ frudr_evhandler(const char *ename, const void *earg, size_t size, void *cookie)
 		 */
 		if (ptree_get_propval_by_name(locnodeh, PICL_PROP_CHILD,
 		    &fruh, sizeof (picl_nodehdl_t)) != PICL_SUCCESS) {
-			fruh = NULL;
+			fruh = 0;
 		}
 		post_frudr_event(PICL_FRU_ADDED, locnodeh, fruh);
 	} else {
@@ -1598,7 +1598,7 @@ frudr_evhandler(const char *ename, const void *earg, size_t size, void *cookie)
 		 * if node already there, then just return
 		 */
 		childh = find_child_by_name(locnodeh, fru_name);
-		if (childh != NULL) {
+		if (childh != 0) {
 			nvlist_free(nvlp);
 			return;
 		}
@@ -1641,7 +1641,7 @@ frudr_evhandler(const char *ename, const void *earg, size_t size, void *cookie)
 		/*
 		 * now post event
 		 */
-		post_frudr_event(PICL_FRU_ADDED, locnodeh, NULL);
+		post_frudr_event(PICL_FRU_ADDED, locnodeh, 0);
 	}
 	nvlist_free(nvlp);
 }
@@ -1752,7 +1752,7 @@ frutree_evhandler(const char *ename, const void *earg, size_t size,
 	if (strcmp(ename, PICLEVENT_SYSEVENT_DEVICE_ADDED) != 0)
 		return;
 
-	if (nvlist_unpack((char *)earg, size, &nvlp, NULL))
+	if (nvlist_unpack((char *)earg, size, &nvlp, 0))
 		return;
 
 	if (nvlist_lookup_string(nvlp, PICLEVENTARG_DATA_TYPE, &dtype)) {
@@ -1894,7 +1894,7 @@ set_led(char *name, char *ptr, char *value)
 	/*
 	 * if no fru node, then turn led off
 	 */
-	if (find_child_by_name(locnodeh, DISK_FRU_NAME) != NULL)
+	if (find_child_by_name(locnodeh, DISK_FRU_NAME) != 0)
 		value_ptr = value;
 	else
 		value_ptr = PICL_PROPVAL_OFF;
@@ -2344,7 +2344,7 @@ update_disk_node(char *fruname, char *devpath)
 		return;
 	}
 	diskndh = find_child_by_name(slotndh, DISK_FRU_NAME);
-	if (diskndh == NULL) {
+	if (diskndh == 0) {
 		return;
 	}
 	err = ptree_get_node_by_path(devpath, &devhdl);
@@ -2491,16 +2491,14 @@ check_raid(int target)
 static void *
 disk_leds_thread(void *args)
 {
-	int 	c;
-	int 	i;
+	int	c;
+	int	i;
 	char	**disk_dev;
 	int fd;
 
 	devctl_hdl_t dhdl;
 
-	int 	n_disks = 0,
-	    do_raid = 0,
-	    err 	= 0;
+	int	n_disks = 0, do_raid = 0, err = 0;
 	uint_t	statep	= 0;
 
 	static char *mpxu_devs[] = {

@@ -176,7 +176,7 @@ static ddi_softintr_t	ds1287_softintr_id;
 static kmutex_t ds1287_reg_mutex;	/* Protects ds1287 Registers */
 
 static struct modldrv modldrv = {
-	&mod_driverops, 	/* Type of module. This one is a driver */
+	&mod_driverops,		/* Type of module. This one is a driver */
 	"ds1287 clock driver",	/* Name of the module. */
 	&ds1287_ops,		/* driver ops */
 };
@@ -354,7 +354,7 @@ ds1287_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * creating the minor node.
 	 */
 	if (ddi_create_minor_node(dip, "power_button", S_IFCHR,
-	    (instance << 8) + 0, "ddi_power_button", NULL) == DDI_FAILURE) {
+	    (instance << 8) + 0, "ddi_power_button", 0) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "ds1287_attach: Failed to create minor node");
 		goto error3;
 	}
@@ -453,7 +453,7 @@ ds1287_close(dev_t dev, int flags, int otyp, cred_t *credp)
 /*ARGSUSED4*/
 static int
 ds1287_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
-	cred_t *credp, int *rvalp)
+    cred_t *credp, int *rvalp)
 {
 	struct ds1287 *softsp;
 	int clone;

@@ -23,8 +23,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	This makefile drives the production of all Littleneck system
 #	dependent modules for the sun4u architecture.
 #
@@ -45,12 +43,8 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
-lintlib		:=	TARGET= lintlib
-modlintlib	:=	TARGET= modlintlib
 modlist		:=	TARGET= modlist
 modlist		:=	NO_STATE= -K $$MODSTATE$$$$
-clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
 #
@@ -58,11 +52,9 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean.lint clean clobber modlist: $(LITTLENECK_KMODS)
+def all clean clobber modlist: $(LITTLENECK_KMODS)
 
-modlintlib:	$(LITTLENECK_KMODS)
-
-install: 	$(ROOT_LITTLENECK_DIR) $(USR_LITTLENECK_DIR) \
+install:	$(ROOT_LITTLENECK_DIR) $(USR_LITTLENECK_DIR) \
 		$(USR_LITTLENECK_INC_DIR) \
 		$(USR_LITTLENECK_SBIN_DIR) \
 		$(USR_LITTLENECK_LIB_DIR) \
@@ -70,18 +62,6 @@ install: 	$(ROOT_LITTLENECK_DIR) $(USR_LITTLENECK_DIR) \
 		.WAIT $(LITTLENECK_KMODS)
 
 install_h check:
-
-lint:		modlintlib
-
-LINT_LIBS	 = $(LINT_LIB) \
-		   -L$(LITTLENECK_LINT_LIB_DIR) \
-		   -L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
-		       $(CLOSED_LINT_KMODS:%=-l%) \
-		   -L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
-
-lint.platmod:   modlintlib
-	@-$(ECHO) "\nLittleneck Platform-dependent module: global crosschecks:"
-	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
 $(LITTLENECK_KMODS):	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)

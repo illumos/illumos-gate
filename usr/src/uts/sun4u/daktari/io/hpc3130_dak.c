@@ -336,7 +336,7 @@ hpc3130_get(intptr_t arg, int reg, hpc3130_unit_t *unitp, int mode)
 	i2c_transfer_t		*i2c_tran_pointer;
 	int err = DDI_SUCCESS;
 
-	if (arg == NULL) {
+	if (arg == (intptr_t)NULL) {
 		D2CMN_ERR((CE_WARN, "ioctl: arg passed in to "
 		    "ioctl = NULL"));
 		return (EINVAL);
@@ -380,7 +380,7 @@ hpc3130_set(intptr_t arg, int reg, hpc3130_unit_t *unitp, int mode)
 	int err = DDI_SUCCESS;
 	uint8_t passin_byte;
 
-	if (arg == NULL) {
+	if (arg == (intptr_t)NULL) {
 		D2CMN_ERR((CE_WARN, "ioctl: arg passed in to "
 		    "ioctl = NULL"));
 		return (EINVAL);
@@ -413,11 +413,11 @@ hpc3130_set(intptr_t arg, int reg, hpc3130_unit_t *unitp, int mode)
 
 static int
 hpc3130_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-		int *rvalp)
+    int *rvalp)
 {
 	_NOTE(ARGUNUSED(credp, rvalp))
 	hpc3130_unit_t		*unitp;
-	int 			err = DDI_SUCCESS;
+	int			err = DDI_SUCCESS;
 	i2c_transfer_t		*i2c_tran_pointer;
 	i2c_reg_t		ioctl_reg;
 	int port = MINOR_TO_PORT(getminor(dev));
@@ -522,7 +522,7 @@ hpc3130_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		break;
 
 	case I2C_GET_REG:
-		if (arg == NULL) {
+		if (arg == (intptr_t)NULL) {
 			D2CMN_ERR((CE_WARN, "ioctl: arg passed in to "
 			    "ioctl = NULL"));
 			err = EINVAL;
@@ -566,7 +566,7 @@ hpc3130_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		break;
 
 	case I2C_SET_REG:
-		if (arg == NULL) {
+		if (arg == (intptr_t)NULL) {
 			D2CMN_ERR((CE_WARN, "ioctl: arg passed in to "
 			    "ioctl = NULL"));
 			err = EINVAL;
@@ -581,7 +581,7 @@ hpc3130_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		}
 		(void) i2c_transfer_alloc(unitp->hpc3130_hdl, &i2c_tran_pointer,
 		    2, 0, I2C_SLEEP);
-	if (i2c_tran_pointer == NULL) {
+		if (i2c_tran_pointer == NULL) {
 			D2CMN_ERR((CE_WARN, "Failed in I2C_GET_REG "
 			    "i2c_tran_pointer not allocated"));
 			err = ENOMEM;
@@ -685,11 +685,11 @@ hpc3130_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 }
 
 static int
-hpc3130_poll(dev_t dev, short events, int anyyet,  short
-	*reventsp, struct pollhead **phpp)
+hpc3130_poll(dev_t dev, short events, int anyyet, short *reventsp,
+    struct pollhead **phpp)
 {
 	_NOTE(ARGUNUSED(events))
-	hpc3130_unit_t 	*unitp;
+	hpc3130_unit_t *unitp;
 	int port = MINOR_TO_PORT(getminor(dev));
 	int instance = MINOR_TO_INST(getminor(dev));
 
@@ -983,7 +983,7 @@ hpc3130_do_attach(dev_info_t *dip)
 		minor_number = INST_TO_MINOR(instance) |
 		    PORT_TO_MINOR(I2C_PORT(i));
 		if (ddi_create_minor_node(dip, name, S_IFCHR, minor_number,
-		    "ddi_i2c:controller", NULL) == DDI_FAILURE) {
+		    "ddi_i2c:controller", 0) == DDI_FAILURE) {
 			D1CMN_ERR((CE_WARN, "ddi_create_minor_node failed "
 			    "for %s", name));
 			ddi_remove_intr(dip, 0u,
@@ -1112,7 +1112,7 @@ hpc3130_set_led(hpc3130_unit_t *unitp, int slot, int led, uint8_t value)
 
 int
 hpc3130_get_led(i2c_client_hdl_t handle, int slot,
-	int led, uint8_t *value)
+    int led, uint8_t *value)
 {
 	uint8_t	temp;
 
@@ -1126,7 +1126,7 @@ hpc3130_get_led(i2c_client_hdl_t handle, int slot,
 
 static int
 hpc3130_write(i2c_client_hdl_t handle, uint8_t offset,
-	uint8_t port, uint8_t data)
+    uint8_t port, uint8_t data)
 {
 	ASSERT(port < HPC3130_MAX_SLOT);
 	ASSERT(handle);
@@ -1137,7 +1137,7 @@ hpc3130_write(i2c_client_hdl_t handle, uint8_t offset,
 
 static int
 hpc3130_read(i2c_client_hdl_t handle, uint8_t offset,
-	uint8_t port, uint8_t *data)
+    uint8_t port, uint8_t *data)
 {
 	ASSERT(port < HPC3130_MAX_SLOT);
 	ASSERT(handle);
@@ -1148,7 +1148,7 @@ hpc3130_read(i2c_client_hdl_t handle, uint8_t offset,
 
 static int
 hpc3130_rw(i2c_client_hdl_t handle, uint8_t reg,
-	boolean_t write, uint8_t *data)
+    boolean_t write, uint8_t *data)
 {
 	i2c_transfer_t	*i2c_tran_pointer;
 	int		err;
@@ -1201,7 +1201,7 @@ hpc3130_rw(i2c_client_hdl_t handle, uint8_t reg,
  */
 static int
 hpc3130_init(dev_info_t *dip,
-	struct tuple *init_sequence)
+    struct tuple *init_sequence)
 {
 
 	int			slot;
@@ -1445,7 +1445,7 @@ out:
 
 static int
 hpc3130_debounce_status(i2c_client_hdl_t handle,
-	int slot, uint8_t *status)
+    int slot, uint8_t *status)
 {
 	int	count, limit;
 	uint8_t	old;
@@ -1484,7 +1484,7 @@ hpc3130_debounce_status(i2c_client_hdl_t handle,
 
 static int
 hpc3130_slot_connect(caddr_t ops_arg, hpc_slot_t slot_hdl,
-		void *data, uint_t flags)
+    void *data, uint_t flags)
 {
 	_NOTE(ARGUNUSED(slot_hdl, data, flags))
 	uint8_t			control;
@@ -1673,7 +1673,7 @@ out:
 
 static int
 hpc3130_slot_disconnect(caddr_t ops_arg, hpc_slot_t slot_hdl,
-	void *data, uint_t flags)
+    void *data, uint_t flags)
 {
 	_NOTE(ARGUNUSED(slot_hdl, data, flags))
 	uint8_t			control;
@@ -1800,7 +1800,7 @@ out:
 
 static int
 hpc3130_verify_slot_power(hpc3130_unit_t *hpc3130_p, i2c_client_hdl_t handle,
-	uint8_t offset, char *phys_slot, boolean_t slot_target_state)
+    uint8_t offset, char *phys_slot, boolean_t slot_target_state)
 {
 	uint8_t			tries = 0;
 	uint8_t			status;
@@ -1870,7 +1870,7 @@ hpc3130_verify_slot_power(hpc3130_unit_t *hpc3130_p, i2c_client_hdl_t handle,
 
 static int
 hpc3130_slot_insert(caddr_t ops_arg, hpc_slot_t slot_hdl,
-		void *data, uint_t flags)
+    void *data, uint_t flags)
 {
 	_NOTE(ARGUNUSED(ops_arg, slot_hdl, data, flags))
 	return (HPC_ERR_NOTSUPPORTED);
@@ -1878,7 +1878,7 @@ hpc3130_slot_insert(caddr_t ops_arg, hpc_slot_t slot_hdl,
 
 static int
 hpc3130_slot_remove(caddr_t ops_arg, hpc_slot_t slot_hdl,
-		void *data, uint_t flags)
+    void *data, uint_t flags)
 {
 	_NOTE(ARGUNUSED(ops_arg, slot_hdl, data, flags))
 	return (HPC_ERR_NOTSUPPORTED);
@@ -1886,7 +1886,7 @@ hpc3130_slot_remove(caddr_t ops_arg, hpc_slot_t slot_hdl,
 
 static int
 hpc3130_slot_control(caddr_t ops_arg, hpc_slot_t slot_hdl,
-		int request, caddr_t arg)
+    int request, caddr_t arg)
 {
 	_NOTE(ARGUNUSED(slot_hdl))
 	i2c_client_hdl_t	handle;
@@ -2049,9 +2049,9 @@ hpc3130_lookup_slot(char *nexus, int pcidev)
 {
 	int	i = 0;
 
-	while ((slot_translate[i].pcidev != pcidev ||
-	    strcmp(nexus, slot_translate[i].nexus) != 0) &&
-	    i < HPC3130_LOOKUP_SLOTS)
+	while (i < HPC3130_LOOKUP_SLOTS &&
+	    (slot_translate[i].pcidev != pcidev ||
+	    strcmp(nexus, slot_translate[i].nexus) != 0))
 		i++;
 	ASSERT(i != HPC3130_LOOKUP_SLOTS);
 	return (i);

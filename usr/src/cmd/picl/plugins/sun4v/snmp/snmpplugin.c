@@ -332,7 +332,7 @@ snmpplugin_init(void)
 	 * Create the tree-builder thread and let it take over
 	 */
 	LOGPRINTF("Tree-builder thread being created.\n");
-	if ((ret = thr_create(NULL, NULL, tree_builder, NULL,
+	if ((ret = thr_create(NULL, 0, tree_builder, NULL,
 	    THR_BOUND, &tree_builder_thr_id)) < 0) {
 		log_msg(LOG_ERR, SNMPP_CANT_CREATE_TREE_BUILDER, ret);
 		snmp_fini(hdl);
@@ -356,7 +356,7 @@ snmpplugin_init(void)
 	cache_refresh_thr_exit = B_FALSE;
 
 	LOGPRINTF("Cache refresher thread being created.\n");
-	if (thr_create(NULL, NULL, cache_refresher, NULL, THR_BOUND,
+	if (thr_create(NULL, 0, cache_refresher, NULL, THR_BOUND,
 	    &cache_refresh_thr_id) < 0) {
 		(void) cond_destroy(&cache_refresh_cv);
 		(void) mutex_destroy(&cache_refresh_lock);
@@ -489,8 +489,8 @@ tree_builder(void *arg)
 			return (NULL);
 		}
 
-		old_physplat_root = NULL;
-		physplat_root = NULL;
+		old_physplat_root = 0;
+		physplat_root = 0;
 
 		LOGPRINTF("tree_builder: getting root node\n");
 		if ((ret = ptree_get_root(&root_node)) != PICL_SUCCESS) {
@@ -514,7 +514,7 @@ tree_builder(void *arg)
 			return ((void *)-3);
 		}
 
-		if (rv == PICL_SUCCESS && old_physplat_root != NULL) {
+		if (rv == PICL_SUCCESS && old_physplat_root != 0) {
 			LOGPRINTF("tree_builder: destroying existing nodes\n");
 			ptree_delete_node(old_physplat_root);
 			ptree_destroy_node(old_physplat_root);
@@ -705,7 +705,7 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 	/*
 	 * If we've already created this picl node, just return it
 	 */
-	if ((nodeh = lookup_nodeh(row)) != NULL)
+	if ((nodeh = lookup_nodeh(row)) != 0)
 		return (nodeh);
 
 	/*
@@ -715,13 +715,13 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 	 */
 	ret = snmp_get_int(hdl, OID_entPhysicalContainedIn, row,
 	    &parent_row, snmp_syserr_p);
-	CHECK_LINKRESET(snmp_syserr_p, NULL)
+	CHECK_LINKRESET(snmp_syserr_p, 0)
 	if (ret < 0 || parent_row <= 0)
 		parenth = subtree_root;
 	else {
 		parenth = make_node(subtree_root, parent_row, snmp_syserr_p);
-		CHECK_LINKRESET(snmp_syserr_p, NULL)
-		if (parenth == NULL)
+		CHECK_LINKRESET(snmp_syserr_p, 0)
+		if (parenth == 0)
 			parenth = subtree_root;
 	}
 
@@ -732,49 +732,49 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 	 */
 	ret = snmp_get_str(hdl, OID_entPhysicalName, row,
 	    &phys_name, snmp_syserr_p);
-	CHECK_LINKRESET(snmp_syserr_p, NULL)
+	CHECK_LINKRESET(snmp_syserr_p, 0)
 	if (ret < 0 || phys_name == NULL) {
 		log_msg(LOG_WARNING, SNMPP_NO_ENTPHYSNAME, row);
-		return (NULL);
+		return (0);
 	}
 
 	node_name = basename(phys_name);
 
 	ret = snmp_get_int(hdl, OID_entPhysicalClass, row,
 	    &ent_physclass, snmp_syserr_p);
-	CHECK_LINKRESET(snmp_syserr_p, NULL)
+	CHECK_LINKRESET(snmp_syserr_p, 0)
 	if (ret < 0) {
 		log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL,
 		    *snmp_syserr_p ? *snmp_syserr_p : ret,
 		    OID_entPhysicalClass, row);
 		free(phys_name);
-		return (NULL);
+		return (0);
 	}
 
 	switch (ent_physclass) {
 	case SPC_OTHER:
 		ret = snmp_get_int(hdl, OID_sunPlatPhysicalClass, row,
 		    &sunplat_physclass, snmp_syserr_p);
-		CHECK_LINKRESET(snmp_syserr_p, NULL)
+		CHECK_LINKRESET(snmp_syserr_p, 0)
 		if (ret < 0) {
 			log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL,
 			    *snmp_syserr_p ? *snmp_syserr_p : ret,
 			    OID_sunPlatPhysicalClass, row);
 			free(phys_name);
-			return (NULL);
+			return (0);
 		}
 
 		if (sunplat_physclass == SSPC_ALARM) {
 			ret = snmp_get_int(hdl, OID_sunPlatAlarmType,
 			    row, &alarm_type, snmp_syserr_p);
-			CHECK_LINKRESET(snmp_syserr_p, NULL)
+			CHECK_LINKRESET(snmp_syserr_p, 0)
 			if (ret < 0) {
 				log_msg(LOG_WARNING,
 				    SNMPP_CANT_FETCH_OBJECT_VAL,
 				    *snmp_syserr_p ? *snmp_syserr_p : ret,
 				    OID_sunPlatAlarmType, row);
 				free(phys_name);
-				return (NULL);
+				return (0);
 			}
 
 			if (alarm_type == SSAT_VISIBLE) {
@@ -785,14 +785,14 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 
 			add_prop(nodeh, &proph, node_name, row, PP_STATE,
 			    snmp_syserr_p);
-			CHECK_LINKRESET(snmp_syserr_p, NULL)
+			CHECK_LINKRESET(snmp_syserr_p, 0)
 		} else {
 			ADD_NODE(PICL_CLASS_OTHER)
 		}
 
 		add_prop(nodeh, &proph, node_name, row, PP_OPSTATUS,
 		    snmp_syserr_p);
-		CHECK_LINKRESET(snmp_syserr_p, NULL)
+		CHECK_LINKRESET(snmp_syserr_p, 0)
 		break;
 
 	case SPC_UNKNOWN:
@@ -803,14 +803,14 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 		ADD_NODE(PICL_CLASS_CHASSIS)
 		add_prop(nodeh, &proph, node_name, row, PP_OPSTATUS,
 		    snmp_syserr_p);
-		CHECK_LINKRESET(snmp_syserr_p, NULL)
+		CHECK_LINKRESET(snmp_syserr_p, 0)
 		break;
 
 	case SPC_BACKPLANE:
 		ADD_NODE(PICL_CLASS_BACKPLANE)
 		add_prop(nodeh, &proph, node_name, row, PP_OPSTATUS,
 		    snmp_syserr_p);
-		CHECK_LINKRESET(snmp_syserr_p, NULL)
+		CHECK_LINKRESET(snmp_syserr_p, 0)
 		break;
 
 	case SPC_CONTAINER:
@@ -818,66 +818,66 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 
 		add_prop(nodeh, &proph, node_name, row, PP_OPSTATUS,
 		    snmp_syserr_p);
-		CHECK_LINKRESET(snmp_syserr_p, NULL)
+		CHECK_LINKRESET(snmp_syserr_p, 0)
 
 		add_prop(nodeh, &proph, node_name, row, PP_SLOT_TYPE,
 		    snmp_syserr_p);
-		CHECK_LINKRESET(snmp_syserr_p, NULL)
+		CHECK_LINKRESET(snmp_syserr_p, 0)
 		break;
 
 	case SPC_POWERSUPPLY:
 		ret = snmp_get_int(hdl, OID_sunPlatPowerSupplyClass,
 		    row, &ps_class, snmp_syserr_p);
-		CHECK_LINKRESET(snmp_syserr_p, NULL)
+		CHECK_LINKRESET(snmp_syserr_p, 0)
 		if (ret < 0) {
 			log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL,
 			    *snmp_syserr_p ? *snmp_syserr_p : ret,
 			    OID_sunPlatPowerSupplyClass, row);
 			free(phys_name);
-			return (NULL);
+			return (0);
 		}
 
 		if (ps_class == SSPSC_BATTERY) {
 			ADD_NODE(PICL_CLASS_BATTERY)
 			add_prop(nodeh, &proph, node_name, row,
 			    PP_BATT_STATUS, snmp_syserr_p);
-			CHECK_LINKRESET(snmp_syserr_p, NULL)
+			CHECK_LINKRESET(snmp_syserr_p, 0)
 		} else {
 			ADD_NODE(PICL_CLASS_POWERSUPPLY)
 		}
 		add_prop(nodeh, &proph, node_name, row, PP_OPSTATUS,
 		    snmp_syserr_p);
-		CHECK_LINKRESET(snmp_syserr_p, NULL)
+		CHECK_LINKRESET(snmp_syserr_p, 0)
 		break;
 
 	case SPC_FAN:
 		ADD_NODE(PICL_CLASS_FAN)
 		add_prop(nodeh, &proph, node_name, row, PP_OPSTATUS,
 		    snmp_syserr_p);
-		CHECK_LINKRESET(snmp_syserr_p, NULL)
+		CHECK_LINKRESET(snmp_syserr_p, 0)
 		break;
 
 	case SPC_SENSOR:
 		ret = snmp_get_int(hdl, OID_sunPlatSensorClass,
 		    row, &sensor_class, snmp_syserr_p);
-		CHECK_LINKRESET(snmp_syserr_p, NULL)
+		CHECK_LINKRESET(snmp_syserr_p, 0)
 		if (ret < 0) {
 			log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL,
 			    *snmp_syserr_p ? *snmp_syserr_p : ret,
 			    OID_sunPlatSensorClass, row);
 			free(phys_name);
-			return (NULL);
+			return (0);
 		}
 
 		ret = snmp_get_int(hdl, OID_sunPlatSensorType,
 		    row, &sensor_type, snmp_syserr_p);
-		CHECK_LINKRESET(snmp_syserr_p, NULL)
+		CHECK_LINKRESET(snmp_syserr_p, 0)
 		if (ret < 0) {
 			log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL,
 			    *snmp_syserr_p ? *snmp_syserr_p : ret,
 			    OID_sunPlatSensorType, row);
 			free(phys_name);
-			return (NULL);
+			return (0);
 		}
 
 		if (sensor_class == SSSC_NUMERIC) {
@@ -902,26 +902,26 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 				add_prop(nodeh, &proph, node_name, row,
 				    PP_SENSOR_VALUE, snmp_syserr_p);
 			}
-			CHECK_LINKRESET(snmp_syserr_p, NULL)
+			CHECK_LINKRESET(snmp_syserr_p, 0)
 
 			add_prop(nodeh, &proph, node_name, row,
 			    PP_OPSTATUS, snmp_syserr_p);
-			CHECK_LINKRESET(snmp_syserr_p, NULL)
+			CHECK_LINKRESET(snmp_syserr_p, 0)
 
 			add_prop(nodeh, &proph, node_name, row,
 			    PP_BASE_UNITS, snmp_syserr_p);
-			CHECK_LINKRESET(snmp_syserr_p, NULL)
+			CHECK_LINKRESET(snmp_syserr_p, 0)
 
 			add_prop(nodeh, &proph, node_name, row,
 			    PP_EXPONENT, snmp_syserr_p);
-			CHECK_LINKRESET(snmp_syserr_p, NULL)
+			CHECK_LINKRESET(snmp_syserr_p, 0)
 
 			add_prop(nodeh, &proph, node_name, row,
 			    PP_RATE_UNITS, snmp_syserr_p);
-			CHECK_LINKRESET(snmp_syserr_p, NULL)
+			CHECK_LINKRESET(snmp_syserr_p, 0)
 
 			add_thresholds(nodeh, row, snmp_syserr_p);
-			CHECK_LINKRESET(snmp_syserr_p, NULL)
+			CHECK_LINKRESET(snmp_syserr_p, 0)
 
 		} else if (sensor_class == SSSC_BINARY) {
 			if (sensor_type == SSST_TEMPERATURE) {
@@ -940,19 +940,19 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 
 			add_prop(nodeh, &proph, node_name, row, PP_OPSTATUS,
 			    snmp_syserr_p);
-			CHECK_LINKRESET(snmp_syserr_p, NULL)
+			CHECK_LINKRESET(snmp_syserr_p, 0)
 
 			add_prop(nodeh, &proph, node_name, row, PP_CONDITION,
 			    snmp_syserr_p);
-			CHECK_LINKRESET(snmp_syserr_p, NULL)
+			CHECK_LINKRESET(snmp_syserr_p, 0)
 
 			add_prop(nodeh, &proph, node_name, row, PP_EXPECTED,
 			    snmp_syserr_p);
-			CHECK_LINKRESET(snmp_syserr_p, NULL)
+			CHECK_LINKRESET(snmp_syserr_p, 0)
 		} else {
 			log_msg(LOG_ERR,
 			    SNMPP_UNSUPP_SENSOR_CLASS, sensor_class, row);
-			return (NULL);
+			return (0);
 		}
 		break;
 
@@ -961,15 +961,15 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 
 		add_prop(nodeh, &proph, node_name, row, PP_OPSTATUS,
 		    snmp_syserr_p);
-		CHECK_LINKRESET(snmp_syserr_p, NULL)
+		CHECK_LINKRESET(snmp_syserr_p, 0)
 
 		add_prop(nodeh, &proph, node_name, row, PP_REPLACEABLE,
 		    snmp_syserr_p);
-		CHECK_LINKRESET(snmp_syserr_p, NULL)
+		CHECK_LINKRESET(snmp_syserr_p, 0)
 
 		add_prop(nodeh, &proph, node_name, row, PP_HOTSWAPPABLE,
 		    snmp_syserr_p);
-		CHECK_LINKRESET(snmp_syserr_p, NULL)
+		CHECK_LINKRESET(snmp_syserr_p, 0)
 		break;
 
 	case SPC_PORT:
@@ -984,32 +984,32 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 		log_msg(LOG_WARNING,
 		    SNMPP_UNKNOWN_ENTPHYSCLASS, ent_physclass, row);
 		free(phys_name);
-		return (NULL);
+		return (0);
 	}
 
 	add_prop(nodeh, &proph, node_name, row, PP_DESCRIPTION, snmp_syserr_p);
-	CHECK_LINKRESET(snmp_syserr_p, NULL)
+	CHECK_LINKRESET(snmp_syserr_p, 0)
 
 	add_prop(nodeh, &proph, node_name, row, PP_LABEL, snmp_syserr_p);
-	CHECK_LINKRESET(snmp_syserr_p, NULL)
+	CHECK_LINKRESET(snmp_syserr_p, 0)
 
 	add_prop(nodeh, &proph, node_name, row, PP_HW_REVISION, snmp_syserr_p);
-	CHECK_LINKRESET(snmp_syserr_p, NULL)
+	CHECK_LINKRESET(snmp_syserr_p, 0)
 
 	add_prop(nodeh, &proph, node_name, row, PP_FW_REVISION, snmp_syserr_p);
-	CHECK_LINKRESET(snmp_syserr_p, NULL)
+	CHECK_LINKRESET(snmp_syserr_p, 0)
 
 	add_prop(nodeh, &proph, node_name, row, PP_SERIAL_NUM, snmp_syserr_p);
-	CHECK_LINKRESET(snmp_syserr_p, NULL)
+	CHECK_LINKRESET(snmp_syserr_p, 0)
 
 	add_prop(nodeh, &proph, node_name, row, PP_MFG_NAME, snmp_syserr_p);
-	CHECK_LINKRESET(snmp_syserr_p, NULL)
+	CHECK_LINKRESET(snmp_syserr_p, 0)
 
 	add_prop(nodeh, &proph, node_name, row, PP_MODEL_NAME, snmp_syserr_p);
-	CHECK_LINKRESET(snmp_syserr_p, NULL)
+	CHECK_LINKRESET(snmp_syserr_p, 0)
 
 	add_prop(nodeh, &proph, node_name, row, PP_IS_FRU, snmp_syserr_p);
-	CHECK_LINKRESET(snmp_syserr_p, NULL)
+	CHECK_LINKRESET(snmp_syserr_p, 0)
 
 	free(phys_name);
 	save_nodeh(nodeh, row);
@@ -1057,7 +1057,7 @@ static picl_nodehdl_t
 lookup_nodeh(int row)
 {
 	if (row >= n_physplat_nodes)
-		return (NULL);
+		return (0);
 
 	return (physplat_nodes[row]);
 }

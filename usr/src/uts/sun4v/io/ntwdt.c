@@ -314,7 +314,7 @@ ntwdt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * is initialized.
 	 */
 	if (ddi_create_minor_node(dip, NTWDT_MINOR_NODE, S_IFCHR, 0,
-	    DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    DDI_PSEUDO, 0) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "failed to create Minor Node: %s",
 		    NTWDT_MINOR_NODE);
 		goto err3;
@@ -466,7 +466,7 @@ ntwdt_close(dev_t dev, int flag, int otyp, cred_t *credp)
 /*ARGSUSED*/
 static int
 ntwdt_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-	int *rvalp)
+    int *rvalp)
 {
 	int instance = getminor(dev);
 	int retval = 0;

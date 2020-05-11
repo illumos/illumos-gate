@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/file.h>
 #include <sys/sunndi.h>
 #include <sys/sunddi.h>
@@ -189,8 +187,7 @@ bad_regs_length:
 	if (regs_p)
 		kmem_free(regs_p, regs_length);
 bad_regs_p:
-	if (platform_specific_data)
-		kmem_free(platform_specific_data, sizeof (fire4u_specific_t));
+	kmem_free(platform_specific_data, sizeof (fire4u_specific_t));
 	if (nodename)
 		kmem_free(nodename, nodename_size);
 

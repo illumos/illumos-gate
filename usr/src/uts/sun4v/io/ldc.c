@@ -288,18 +288,6 @@ ldc_inject_error(ldc_chan_t *ldcp, uint64_t error)
 	return (B_TRUE);
 }
 
-#define	D1		\
-if (ldcdbg & 0x01)	\
-	ldcdebug
-
-#define	D2		\
-if (ldcdbg & 0x02)	\
-	ldcdebug
-
-#define	DWARN		\
-if (ldcdbg & 0x04)	\
-	ldcdebug
-
 #define	DUMP_PAYLOAD(id, addr)						\
 {									\
 	char buf[65*3];							\
@@ -321,10 +309,10 @@ if (ldcdbg & 0x04)	\
 	    (msg->env & LDC_FRAG_START) ? 'B' : ' ',                    \
 	    (msg->env & LDC_FRAG_STOP) ? 'E' : ' ',                     \
 	    (msg->env & LDC_LEN_MASK));					\
-	} else { 							\
+	} else {							\
 	    D2((c)->id, "%s: msg%d (/%x/%x/%x/,env=%x)", (s),		\
 	    mid, msg->type, msg->stype, msg->ctrl, msg->env);		\
-	} 								\
+	}								\
 }
 
 #define	LDC_INJECT_RESET(_ldcp)	ldc_inject_error(_ldcp, LDC_ERR_RESET)
@@ -336,10 +324,6 @@ extern void i_ldc_mem_inject_dring_clear(ldc_chan_t *ldcp);
 #else
 
 #define	DBG_ALL_LDCS -1
-
-#define	D1
-#define	D2
-#define	DWARN
 
 #define	DUMP_PAYLOAD(id, addr)
 #define	DUMP_LDC_PKT(c, s, addr)
@@ -461,10 +445,10 @@ _info(struct modinfo *modinfop)
 int
 _fini(void)
 {
-	int 		rv, status;
-	ldc_chan_t 	*tmp_ldcp, *ldcp;
-	ldc_dring_t 	*tmp_dringp, *dringp;
-	ldc_mem_info_t 	minfo;
+	int		rv, status;
+	ldc_chan_t	*tmp_ldcp, *ldcp;
+	ldc_dring_t	*tmp_dringp, *dringp;
+	ldc_mem_info_t	minfo;
 
 	/* Unlink the driver module from the system */
 	status = mod_remove(&ml);
@@ -564,7 +548,7 @@ i_ldc_h2v_error(int h_error)
 	case	H_ENOTSUPPORTED:
 		return (ENOTSUP);
 
-	case 	H_ETOOMANY:
+	case	H_ETOOMANY:
 		return (ENOSPC);
 
 	case	H_ECHANNEL:
@@ -809,8 +793,8 @@ i_ldc_clear_intr(ldc_chan_t *ldcp, cnex_intrtype_t itype)
 static int
 i_ldc_set_rx_head(ldc_chan_t *ldcp, uint64_t head)
 {
-	int 	rv;
-	int 	retries;
+	int	rv;
+	int	retries;
 
 	ASSERT(MUTEX_HELD(&ldcp->lock));
 	for (retries = 0; retries < ldc_max_retries; retries++) {
@@ -840,7 +824,7 @@ i_ldc_set_rx_head(ldc_chan_t *ldcp, uint64_t head)
 static void
 i_ldc_get_tx_head(ldc_chan_t *ldcp, uint64_t *head)
 {
-	ldc_msg_t 	*pkt;
+	ldc_msg_t	*pkt;
 
 	ASSERT(MUTEX_HELD(&ldcp->tx_lock));
 
@@ -876,8 +860,8 @@ i_ldc_get_tx_head(ldc_chan_t *ldcp, uint64_t *head)
 static int
 i_ldc_get_tx_tail(ldc_chan_t *ldcp, uint64_t *tail)
 {
-	int 		rv;
-	uint64_t 	current_head, new_tail;
+	int		rv;
+	uint64_t	current_head, new_tail;
 
 	ASSERT(MUTEX_HELD(&ldcp->tx_lock));
 	/* Read the head and tail ptrs from HV */
@@ -924,7 +908,7 @@ static int
 i_ldc_set_tx_tail(ldc_chan_t *ldcp, uint64_t tail)
 {
 	int		rv, retval = EWOULDBLOCK;
-	int 		retries;
+	int		retries;
 
 	ASSERT(MUTEX_HELD(&ldcp->tx_lock));
 	for (retries = 0; retries < ldc_max_retries; retries++) {
@@ -1131,7 +1115,7 @@ i_ldc_send_pkt(ldc_chan_t *ldcp, uint8_t pkttype, uint8_t subtype,
     uint8_t ctrlmsg)
 {
 	int		rv;
-	ldc_msg_t 	*pkt;
+	ldc_msg_t	*pkt;
 	uint64_t	tx_tail;
 	uint32_t	curr_seqid;
 
@@ -1236,8 +1220,8 @@ i_ldc_check_seqid(ldc_chan_t *ldcp, ldc_msg_t *msg)
 static int
 i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 {
-	int 		rv = 0, idx = ldcp->next_vidx;
-	ldc_msg_t 	*pkt;
+	int		rv = 0, idx = ldcp->next_vidx;
+	ldc_msg_t	*pkt;
 	uint64_t	tx_tail;
 	ldc_ver_t	*rcvd_ver;
 
@@ -1533,8 +1517,8 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 static int
 i_ldc_process_RTS(ldc_chan_t *ldcp, ldc_msg_t *msg)
 {
-	int 		rv = 0;
-	ldc_msg_t 	*pkt;
+	int		rv = 0;
+	ldc_msg_t	*pkt;
 	uint64_t	tx_tail;
 	boolean_t	sent_NACK = B_FALSE;
 
@@ -1660,7 +1644,7 @@ i_ldc_process_RTS(ldc_chan_t *ldcp, ldc_msg_t *msg)
 static int
 i_ldc_process_RTR(ldc_chan_t *ldcp, ldc_msg_t *msg)
 {
-	int 		rv = 0;
+	int		rv = 0;
 	boolean_t	sent_NACK = B_FALSE;
 
 	D2(ldcp->id, "i_ldc_process_RTR: (0x%llx) received RTR\n", ldcp->id);
@@ -1824,7 +1808,7 @@ static int
 i_ldc_process_data_ACK(ldc_chan_t *ldcp, ldc_msg_t *msg)
 {
 	int		rv;
-	uint64_t 	tx_head;
+	uint64_t	tx_head;
 	ldc_msg_t	*pkt;
 
 	/* Obtain Tx lock */
@@ -1892,7 +1876,7 @@ i_ldc_process_data_ACK(ldc_chan_t *ldcp, ldc_msg_t *msg)
 static int
 i_ldc_ctrlmsg(ldc_chan_t *ldcp, ldc_msg_t *msg)
 {
-	int 		rv = 0;
+	int		rv = 0;
 
 	D1(ldcp->id, "i_ldc_ctrlmsg: (%llx) tstate = %lx, hstate = %lx\n",
 	    ldcp->id, ldcp->tstate, ldcp->hstate);
@@ -2102,9 +2086,9 @@ i_ldc_tx_hdlr(caddr_t arg1, caddr_t arg2)
 {
 	_NOTE(ARGUNUSED(arg2))
 
-	int 		rv;
-	ldc_chan_t 	*ldcp;
-	boolean_t 	notify_client = B_FALSE;
+	int		rv;
+	ldc_chan_t	*ldcp;
+	boolean_t	notify_client = B_FALSE;
 	uint64_t	notify_event = 0, link_state;
 
 	/* Get the channel for which interrupt was received */
@@ -2227,8 +2211,8 @@ i_ldc_rx_process_hvq(ldc_chan_t *ldcp, boolean_t *notify_client,
     uint64_t *notify_event)
 {
 	int		rv;
-	uint64_t 	rx_head, rx_tail;
-	ldc_msg_t 	*msg;
+	uint64_t	rx_head, rx_tail;
+	ldc_msg_t	*msg;
 	uint64_t	link_state, first_fragment = 0;
 	boolean_t	trace_length = B_TRUE;
 
@@ -2580,7 +2564,7 @@ i_ldc_rx_ackpeek(ldc_chan_t *ldcp, uint64_t rx_head, uint64_t rx_tail)
 int
 ldc_init(uint64_t id, ldc_attr_t *attr, ldc_handle_t *handle)
 {
-	ldc_chan_t 	*ldcp;
+	ldc_chan_t	*ldcp;
 	int		rv, exit_val;
 	uint64_t	ra_base, nentries;
 	uint64_t	qlen;
@@ -2728,7 +2712,7 @@ ldc_init(uint64_t id, ldc_attr_t *attr, ldc_handle_t *handle)
 	/* Create a transmit queue */
 	ldcp->tx_q_va = (uint64_t)
 	    contig_mem_alloc(ldcp->tx_q_entries << LDC_PACKET_SHIFT);
-	if (ldcp->tx_q_va == NULL) {
+	if (ldcp->tx_q_va == 0) {
 		cmn_err(CE_WARN,
 		    "ldc_init: (0x%lx) TX queue allocation failed\n",
 		    ldcp->id);
@@ -2745,7 +2729,7 @@ ldc_init(uint64_t id, ldc_attr_t *attr, ldc_handle_t *handle)
 	/* Create a receive queue */
 	ldcp->rx_q_va = (uint64_t)
 	    contig_mem_alloc(ldcp->rx_q_entries << LDC_PACKET_SHIFT);
-	if (ldcp->rx_q_va == NULL) {
+	if (ldcp->rx_q_va == 0) {
 		cmn_err(CE_WARN,
 		    "ldc_init: (0x%lx) RX queue allocation failed\n",
 		    ldcp->id);
@@ -2775,7 +2759,7 @@ ldc_init(uint64_t id, ldc_attr_t *attr, ldc_handle_t *handle)
 		ldcp->rx_dq_va = (uint64_t)
 		    kmem_alloc(ldcp->rx_dq_entries << LDC_PACKET_SHIFT,
 		    KM_SLEEP);
-		if (ldcp->rx_dq_va == NULL) {
+		if (ldcp->rx_dq_va == 0) {
 			cmn_err(CE_WARN,
 			    "ldc_init: (0x%lx) RX data queue "
 			    "allocation failed\n", ldcp->id);
@@ -2831,8 +2815,7 @@ cleanup_on_exit:
 	mutex_destroy(&ldcp->tx_lock);
 	mutex_destroy(&ldcp->lock);
 
-	if (ldcp)
-		kmem_free(ldcp, sizeof (ldc_chan_t));
+	kmem_free(ldcp, sizeof (ldc_chan_t));
 
 	return (exit_val);
 }
@@ -2846,11 +2829,11 @@ cleanup_on_exit:
 int
 ldc_fini(ldc_handle_t handle)
 {
-	ldc_chan_t 	*ldcp;
-	ldc_chan_t 	*tmp_ldcp;
-	uint64_t 	id;
+	ldc_chan_t	*ldcp;
+	ldc_chan_t	*tmp_ldcp;
+	uint64_t	id;
 
-	if (handle == NULL) {
+	if (handle == 0) {
 		DWARN(DBG_ALL_LDCS, "ldc_fini: invalid channel handle\n");
 		return (EINVAL);
 	}
@@ -2895,7 +2878,7 @@ ldc_fini(ldc_handle_t handle)
 
 	/* Free the map table for this channel */
 	if (ldcp->mtbl) {
-		(void) hv_ldc_set_map_table(ldcp->id, NULL, NULL);
+		(void) hv_ldc_set_map_table(ldcp->id, 0, 0);
 		if (ldcp->mtbl->contigmem)
 			contig_mem_free(ldcp->mtbl->table, ldcp->mtbl->size);
 		else
@@ -2951,10 +2934,10 @@ ldc_fini(ldc_handle_t handle)
 int
 ldc_open(ldc_handle_t handle)
 {
-	ldc_chan_t 	*ldcp;
-	int 		rv;
+	ldc_chan_t	*ldcp;
+	int		rv;
 
-	if (handle == NULL) {
+	if (handle == 0) {
 		DWARN(DBG_ALL_LDCS, "ldc_open: invalid channel handle\n");
 		return (EINVAL);
 	}
@@ -2979,7 +2962,7 @@ ldc_open(ldc_handle_t handle)
 	/*
 	 * Unregister/Register the tx queue with the hypervisor
 	 */
-	rv = hv_ldc_tx_qconf(ldcp->id, NULL, NULL);
+	rv = hv_ldc_tx_qconf(ldcp->id, 0, 0);
 	if (rv) {
 		cmn_err(CE_WARN,
 		    "ldc_open: (0x%lx) channel tx queue unconf failed\n",
@@ -3003,7 +2986,7 @@ ldc_open(ldc_handle_t handle)
 	/*
 	 * Unregister/Register the rx queue with the hypervisor
 	 */
-	rv = hv_ldc_rx_qconf(ldcp->id, NULL, NULL);
+	rv = hv_ldc_rx_qconf(ldcp->id, 0, 0);
 	if (rv) {
 		cmn_err(CE_WARN,
 		    "ldc_open: (0x%lx) channel rx queue unconf failed\n",
@@ -3032,8 +3015,8 @@ ldc_open(ldc_handle_t handle)
 		cmn_err(CE_WARN,
 		    "ldc_open: (0x%lx) channel register failed\n", ldcp->id);
 		ldcp->tstate &= ~TS_QCONF_RDY;
-		(void) hv_ldc_tx_qconf(ldcp->id, NULL, NULL);
-		(void) hv_ldc_rx_qconf(ldcp->id, NULL, NULL);
+		(void) hv_ldc_tx_qconf(ldcp->id, 0, 0);
+		(void) hv_ldc_rx_qconf(ldcp->id, 0, 0);
 		mutex_exit(&ldcp->lock);
 		return (EIO);
 	}
@@ -3050,8 +3033,8 @@ ldc_open(ldc_handle_t handle)
 		    ldcp->id);
 		(void) i_ldc_unregister_channel(ldcp);
 		ldcp->tstate &= ~TS_QCONF_RDY;
-		(void) hv_ldc_tx_qconf(ldcp->id, NULL, NULL);
-		(void) hv_ldc_rx_qconf(ldcp->id, NULL, NULL);
+		(void) hv_ldc_tx_qconf(ldcp->id, 0, 0);
+		(void) hv_ldc_rx_qconf(ldcp->id, 0, 0);
 		mutex_exit(&ldcp->lock);
 		return (EIO);
 	}
@@ -3102,11 +3085,11 @@ ldc_open(ldc_handle_t handle)
 int
 ldc_close(ldc_handle_t handle)
 {
-	ldc_chan_t 	*ldcp;
+	ldc_chan_t	*ldcp;
 	int		rv = 0, retries = 0;
 	boolean_t	chk_done = B_FALSE;
 
-	if (handle == NULL) {
+	if (handle == 0) {
 		DWARN(DBG_ALL_LDCS, "ldc_close: invalid channel handle\n");
 		return (EINVAL);
 	}
@@ -3230,7 +3213,7 @@ ldc_close(ldc_handle_t handle)
 	/*
 	 * Unregister queues
 	 */
-	rv = hv_ldc_tx_qconf(ldcp->id, NULL, NULL);
+	rv = hv_ldc_tx_qconf(ldcp->id, 0, 0);
 	if (rv) {
 		cmn_err(CE_WARN,
 		    "ldc_close: (0x%lx) channel TX queue unconf failed\n",
@@ -3239,7 +3222,7 @@ ldc_close(ldc_handle_t handle)
 		mutex_exit(&ldcp->lock);
 		return (EIO);
 	}
-	rv = hv_ldc_rx_qconf(ldcp->id, NULL, NULL);
+	rv = hv_ldc_rx_qconf(ldcp->id, 0, 0);
 	if (rv) {
 		cmn_err(CE_WARN,
 		    "ldc_close: (0x%lx) channel RX queue unconf failed\n",
@@ -3280,7 +3263,7 @@ ldc_reg_callback(ldc_handle_t handle,
 {
 	ldc_chan_t *ldcp;
 
-	if (handle == NULL) {
+	if (handle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_reg_callback: invalid channel handle\n");
 		return (EINVAL);
@@ -3327,7 +3310,7 @@ ldc_unreg_callback(ldc_handle_t handle)
 {
 	ldc_chan_t *ldcp;
 
-	if (handle == NULL) {
+	if (handle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_unreg_callback: invalid channel handle\n");
 		return (EINVAL);
@@ -3373,12 +3356,12 @@ ldc_unreg_callback(ldc_handle_t handle)
 int
 ldc_up(ldc_handle_t handle)
 {
-	int 		rv;
-	ldc_chan_t 	*ldcp;
-	ldc_msg_t 	*ldcmsg;
-	uint64_t 	tx_tail, tstate, link_state;
+	int		rv;
+	ldc_chan_t	*ldcp;
+	ldc_msg_t	*ldcmsg;
+	uint64_t	tx_tail, tstate, link_state;
 
-	if (handle == NULL) {
+	if (handle == 0) {
 		DWARN(DBG_ALL_LDCS, "ldc_up: invalid channel handle\n");
 		return (EINVAL);
 	}
@@ -3515,9 +3498,9 @@ ldc_up(ldc_handle_t handle)
 int
 ldc_down(ldc_handle_t handle)
 {
-	ldc_chan_t 	*ldcp;
+	ldc_chan_t	*ldcp;
 
-	if (handle == NULL) {
+	if (handle == 0) {
 		DWARN(DBG_ALL_LDCS, "ldc_down: invalid channel handle\n");
 		return (EINVAL);
 	}
@@ -3539,7 +3522,7 @@ ldc_status(ldc_handle_t handle, ldc_status_t *status)
 {
 	ldc_chan_t *ldcp;
 
-	if (handle == NULL || status == NULL) {
+	if (handle == 0 || status == NULL) {
 		DWARN(DBG_ALL_LDCS, "ldc_status: invalid argument\n");
 		return (EINVAL);
 	}
@@ -3559,9 +3542,9 @@ ldc_status(ldc_handle_t handle, ldc_status_t *status)
 int
 ldc_set_cb_mode(ldc_handle_t handle, ldc_cb_mode_t cmode)
 {
-	ldc_chan_t 	*ldcp;
+	ldc_chan_t	*ldcp;
 
-	if (handle == NULL) {
+	if (handle == 0) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_set_intr_mode: invalid channel handle\n");
 		return (EINVAL);
@@ -3613,11 +3596,11 @@ ldc_set_cb_mode(ldc_handle_t handle, ldc_cb_mode_t cmode)
 int
 ldc_chkq(ldc_handle_t handle, boolean_t *hasdata)
 {
-	int 		rv;
-	uint64_t 	rx_head, rx_tail;
-	ldc_chan_t 	*ldcp;
+	int		rv;
+	uint64_t	rx_head, rx_tail;
+	ldc_chan_t	*ldcp;
 
-	if (handle == NULL) {
+	if (handle == 0) {
 		DWARN(DBG_ALL_LDCS, "ldc_chkq: invalid channel handle\n");
 		return (EINVAL);
 	}
@@ -3720,11 +3703,11 @@ ldc_chkq(ldc_handle_t handle, boolean_t *hasdata)
 int
 ldc_read(ldc_handle_t handle, caddr_t bufp, size_t *sizep)
 {
-	ldc_chan_t 	*ldcp;
-	uint64_t 	rx_head = 0, rx_tail = 0;
+	ldc_chan_t	*ldcp;
+	uint64_t	rx_head = 0, rx_tail = 0;
 	int		rv = 0, exit_val;
 
-	if (handle == NULL) {
+	if (handle == 0) {
 		DWARN(DBG_ALL_LDCS, "ldc_read: invalid channel handle\n");
 		return (EINVAL);
 	}
@@ -3809,11 +3792,11 @@ ldc_read(ldc_handle_t handle, caddr_t bufp, size_t *sizep)
 static int
 i_ldc_read_raw(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 {
-	uint64_t 	q_size_mask;
-	ldc_msg_t 	*msgp;
+	uint64_t	q_size_mask;
+	ldc_msg_t	*msgp;
 	uint8_t		*msgbufp;
 	int		rv = 0, space;
-	uint64_t 	rx_head, rx_tail;
+	uint64_t	rx_head, rx_tail;
 
 	space = *sizep;
 
@@ -3885,13 +3868,13 @@ static int
 i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 {
 	int		rv = 0;
-	uint64_t 	rx_head = 0, rx_tail = 0;
-	uint64_t 	curr_head = 0;
-	ldc_msg_t 	*msg;
-	caddr_t 	target;
-	size_t 		len = 0, bytes_read = 0;
-	int 		retries = 0;
-	uint64_t 	q_va, q_size_mask;
+	uint64_t	rx_head = 0, rx_tail = 0;
+	uint64_t	curr_head = 0;
+	ldc_msg_t	*msg;
+	caddr_t		target;
+	size_t		len = 0, bytes_read = 0;
+	int		retries = 0;
+	uint64_t	q_va, q_size_mask;
 	uint64_t	first_fragment = 0;
 
 	target = target_bufp;
@@ -4286,7 +4269,7 @@ ldc_write(ldc_handle_t handle, caddr_t buf, size_t *sizep)
 	ldc_chan_t	*ldcp;
 	int		rv = 0;
 
-	if (handle == NULL) {
+	if (handle == 0) {
 		DWARN(DBG_ALL_LDCS, "ldc_write: invalid channel handle\n");
 		return (EINVAL);
 	}
@@ -4332,8 +4315,8 @@ ldc_write(ldc_handle_t handle, caddr_t buf, size_t *sizep)
 static int
 i_ldc_write_raw(ldc_chan_t *ldcp, caddr_t buf, size_t *sizep)
 {
-	ldc_msg_t 	*ldcmsg;
-	uint64_t 	tx_head, tx_tail, new_tail;
+	ldc_msg_t	*ldcmsg;
+	uint64_t	tx_head, tx_tail, new_tail;
 	int		rv = 0;
 	size_t		size;
 
@@ -4463,11 +4446,11 @@ i_ldc_write_raw(ldc_chan_t *ldcp, caddr_t buf, size_t *sizep)
 static int
 i_ldc_write_packet(ldc_chan_t *ldcp, caddr_t buf, size_t *size)
 {
-	ldc_msg_t 	*ldcmsg;
-	uint64_t 	tx_head, tx_tail, new_tail, start;
+	ldc_msg_t	*ldcmsg;
+	uint64_t	tx_head, tx_tail, new_tail, start;
 	uint64_t	txq_size_mask, numavail;
-	uint8_t 	*msgbuf, *source = (uint8_t *)buf;
-	size_t 		len, bytes_written = 0, remaining;
+	uint8_t		*msgbuf, *source = (uint8_t *)buf;
+	size_t		len, bytes_written = 0, remaining;
 	int		rv;
 	uint32_t	curr_seqid;
 
@@ -4735,7 +4718,7 @@ ldc_info(ldc_handle_t handle, ldc_info_t *info)
 	ldc_chan_t	*ldcp;
 	uint64_t	avail;
 
-	if (handle == NULL || info == NULL) {
+	if (handle == 0 || info == NULL) {
 		DWARN(DBG_ALL_LDCS, "ldc_get_info: invalid args\n");
 		return (EINVAL);
 	}

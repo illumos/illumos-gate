@@ -41,7 +41,6 @@ UTSBASE	= ../..
 #
 MODULE		= n2piupc
 OBJECTS		= $(N2PIUPC_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(N2PIUPC_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/sun4v/io/n2piupc
 
@@ -54,7 +53,6 @@ include $(UTSBASE)/sun4v/Makefile.sun4v
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
@@ -62,21 +60,12 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 INC_PATH	+= -I$(UTSBASE)/sun4v/io/n2piupc
 
-#
-# lint pass one enforcement
-#
-CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-unused-label
 
 #
 # Turn on doubleword alignment for 64 bit registers, and pass in module name
 #
 CFLAGS += -dalign -DMODULE_NAME=\"$(MODULE)\"
-
-#
-# Lint needs module name too
-#
-LINTFLAGS += -DMODULE_NAME=\"$(MODULE)\"
 
 #
 #	Default build targets.
@@ -90,12 +79,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

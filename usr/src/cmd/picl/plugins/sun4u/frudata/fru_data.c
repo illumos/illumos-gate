@@ -210,7 +210,7 @@ lock_container_lock(picl_nodehdl_t nodehdl, int object_type, int operation)
 
 static hash_obj_t *
 lookup_node_object(picl_nodehdl_t nodehdl, int	object_type,
-					container_tbl_t *cont_tbl)
+    container_tbl_t *cont_tbl)
 {
 	int		index_to_hash;
 	hash_obj_t	*first_hash;
@@ -561,7 +561,7 @@ free_packet_list(hash_obj_t	*hash_obj, container_tbl_t *cont_tbl)
 
 static void
 free_segment_node(hash_obj_t *hash_obj, picl_nodehdl_t nodehdl,
-					container_tbl_t *cont_tbl)
+    container_tbl_t *cont_tbl)
 {
 	hash_obj_t	*prev_hash_obj;
 	hash_obj_t	*next_obj;
@@ -1107,7 +1107,7 @@ frudata_delete_packet(ptree_warg_t *warg, const void *buf)
 
 static int
 add_row_to_table(hash_obj_t *seg_obj, picl_nodehdl_t tblhdl, packet_t *pkt,
-					container_tbl_t *cont_tbl)
+    container_tbl_t *cont_tbl)
 {
 	int			retval;
 	int			paylen;
@@ -1195,7 +1195,7 @@ add_row_to_table(hash_obj_t *seg_obj, picl_nodehdl_t tblhdl, packet_t *pkt,
 
 static int
 frudata_read_packet(picl_nodehdl_t nodeh, picl_prophdl_t *tblhdl,
-		container_tbl_t *cont_tbl, door_cred_t *cred)
+    container_tbl_t *cont_tbl, door_cred_t *cred)
 {
 	int		cnt;
 	int		retval;
@@ -1388,7 +1388,7 @@ freeup(picl_nodehdl_t nodeh)
 
 static int
 create_segment_node(hash_obj_t *sec_obj, picl_nodehdl_t sec_node,
-	segment_t *segment, container_tbl_t *cont_tbl, door_cred_t *cred)
+    segment_t *segment, container_tbl_t *cont_tbl, door_cred_t *cred)
 {
 
 	int			retval;
@@ -1745,7 +1745,7 @@ frudata_add_segment(ptree_warg_t *warg, const void *buf)
 
 static int
 create_section_node(picl_nodehdl_t nodehdl, int section_count,
-				section_t *section, container_tbl_t *cont_tbl)
+    section_t *section, container_tbl_t *cont_tbl)
 {
 	char		sec_name[SECNAMESIZE];
 	hash_obj_t	*hash_obj;
@@ -2167,7 +2167,7 @@ delete_frudata_props(picl_nodehdl_t	fru_hdl)
 /* ARGSUSED */
 static void
 frudata_state_change_evhandler(const char *event_name, const void *event_arg,
-	size_t size, void *cookie)
+    size_t size, void *cookie)
 {
 	int rc;
 	nvlist_t *nvlp;
@@ -2180,7 +2180,7 @@ frudata_state_change_evhandler(const char *event_name, const void *event_arg,
 	if (strcmp(event_name, PICLEVENT_STATE_CHANGE) != 0)
 		return;
 
-	if (nvlist_unpack((char *)event_arg, size, &nvlp, NULL)) {
+	if (nvlist_unpack((char *)event_arg, size, &nvlp, 0)) {
 		return;
 	}
 
@@ -2271,7 +2271,7 @@ frudata_state_change_evhandler(const char *event_name, const void *event_arg,
 /* ARGSUSED */
 static void
 frudata_event_handler(const char *event_name, const void *event_arg,
-						size_t size, void *cookie)
+    size_t size, void *cookie)
 {
 	int		retval;
 	char		fullfilename[PATH_MAX];
@@ -2316,7 +2316,7 @@ frudata_event_handler(const char *event_name, const void *event_arg,
 
 /*
  * Function : plugin_init() is called by daemon. this routine is specified
- * 		while registering with daemon. it performs the initialization
+ *		while registering with daemon. it performs the initialization
  *		of plugin module.
  */
 

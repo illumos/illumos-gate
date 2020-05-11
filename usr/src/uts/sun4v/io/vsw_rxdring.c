@@ -415,7 +415,7 @@ vsw_destroy_rx_dring(vsw_ldc_t *ldcp)
 	}
 
 	/* Finally, free the receive descriptor ring */
-	if (dp->dring_handle != NULL) {
+	if (dp->dring_handle != 0) {
 		(void) ldc_mem_dring_unbind(dp->dring_handle);
 		(void) ldc_mem_dring_destroy(dp->dring_handle);
 	}
@@ -491,7 +491,7 @@ vsw_map_tx_dring(vsw_ldc_t *ldcp, void *pkt)
 	return (dp);
 
 fail:
-	if (dp->dring_handle != NULL) {
+	if (dp->dring_handle != 0) {
 		(void) ldc_mem_dring_unmap(dp->dring_handle);
 	}
 	kmem_free(dp, sizeof (*dp));
@@ -512,10 +512,10 @@ vsw_unmap_tx_dring(vsw_ldc_t *ldcp)
 	}
 
 	/* Unmap tx data area and free data handle */
-	if (dp->data_handle != NULL) {
+	if (dp->data_handle != 0) {
 		(void) ldc_mem_unmap(dp->data_handle);
 		(void) ldc_mem_free_handle(dp->data_handle);
-		dp->data_handle = NULL;
+		dp->data_handle = 0;
 	}
 
 	/* Free tx data area cookies */
@@ -527,9 +527,9 @@ vsw_unmap_tx_dring(vsw_ldc_t *ldcp)
 	}
 
 	/* Unmap peer's dring */
-	if (dp->dring_handle != NULL) {
+	if (dp->dring_handle != 0) {
 		(void) ldc_mem_dring_unmap(dp->dring_handle);
-		dp->dring_handle = NULL;
+		dp->dring_handle = 0;
 	}
 
 	mutex_destroy(&dp->txlock);
@@ -877,7 +877,7 @@ vsw_dringsend_shm(vsw_ldc_t *ldcp, mblk_t *mp)
 	vsw_t				*vswp = ldcp->ldc_vswp;
 
 	if ((!(lane_in->lstate & VSW_LANE_ACTIVE)) ||
-	    (ldcp->ldc_status != LDC_UP) || (ldcp->ldc_handle == NULL)) {
+	    (ldcp->ldc_status != LDC_UP) || (ldcp->ldc_handle == 0)) {
 		DWARN(vswp, "%s(%lld) status(%d) lstate(0x%llx), dropping "
 		    "packet\n", __func__, ldcp->ldc_id, ldcp->ldc_status,
 		    lane_in->lstate);

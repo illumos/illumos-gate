@@ -229,7 +229,7 @@ typedef struct ldc_msg {
 			uint8_t		_type;	/* Message type */
 			uint8_t		_stype;	/* Message subtype */
 			uint8_t		_ctrl;	/* Control/Error Message */
-			uint8_t 	_env;	/* Message Envelope */
+			uint8_t		_env;	/* Message Envelope */
 			uint32_t	_seqid;	/* Sequence ID */
 
 			union {
@@ -285,7 +285,7 @@ typedef union {
 				pgszc:4;	/* <3:0> pgsz code */
 	} mte_bit;
 
-	uint64_t 		ll;
+	uint64_t		ll;
 
 } ldc_mte_t;
 
@@ -300,8 +300,8 @@ typedef union {
 #define	mte_pgszc	mte_bit.pgszc
 
 #define	MTE_BSZS_SHIFT(sz)	((sz) * 3)
-#define	MTEBYTES(sz)    	(MMU_PAGESIZE << MTE_BSZS_SHIFT(sz))
-#define	MTEPAGES(sz)    	(1 << MTE_BSZS_SHIFT(sz))
+#define	MTEBYTES(sz)		(MMU_PAGESIZE << MTE_BSZS_SHIFT(sz))
+#define	MTEPAGES(sz)		(1 << MTE_BSZS_SHIFT(sz))
 #define	MTE_PAGE_SHIFT(sz)	(MMU_PAGESHIFT + MTE_BSZS_SHIFT(sz))
 #define	MTE_PAGE_OFFSET(sz)	(MTEBYTES(sz) - 1)
 #define	MTE_PAGEMASK(sz)	(~MTE_PAGE_OFFSET(sz))
@@ -400,7 +400,7 @@ typedef struct ldc_dring {
 	ldc_mem_handle_t	mhdl;		/* Mem handle to desc ring */
 
 	struct ldc_dring	*ch_next;	/* Next dring in channel */
-	struct ldc_dring 	*next;		/* Next dring overall */
+	struct ldc_dring	*next;		/* Next dring overall */
 
 } ldc_dring_t;
 
@@ -493,11 +493,11 @@ struct ldc_chan {
  * LDC module soft state structure
  */
 typedef struct ldc_soft_state {
-	kmutex_t 	lock;		/* Protects ldc_soft_state_t  */
+	kmutex_t	lock;		/* Protects ldc_soft_state_t  */
 	ldc_cnex_t	cinfo;		/* channel nexus info */
 	uint64_t	channel_count;	/* Number of channels */
 	uint64_t	channels_open;	/* Number of open channels */
-	ldc_chan_t 	*chan_list;	/* List of LDC endpoints */
+	ldc_chan_t	*chan_list;	/* List of LDC endpoints */
 	ldc_dring_t	*dring_list;	/* Descriptor rings (for export) */
 
 	kmem_cache_t	*memhdl_cache;	/* Memory handle cache */
@@ -522,9 +522,9 @@ if (ldcdbg & 0x02)	\
 if (ldcdbg & 0x04)	\
 	ldcdebug
 #else
-#define	D1
-#define	D2
-#define	DWARN
+#define	D1(...)
+#define	D2(...)
+#define	DWARN(...)
 #endif
 
 #ifdef __cplusplus

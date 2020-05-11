@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysmacros.h>
@@ -53,7 +51,7 @@ static void get_ebus_rtc_vaddr(void);
 void
 startup_platform(void)
 {
-	mutex_init(&chicago_mi2cv_mutex, NULL, NULL, NULL);
+	mutex_init(&chicago_mi2cv_mutex, NULL, MUTEX_ADAPTIVE, NULL);
 }
 
 int

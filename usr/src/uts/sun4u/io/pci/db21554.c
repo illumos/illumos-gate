@@ -321,7 +321,7 @@ static void	db_pci_get_conf_regs(ddi_acc_handle_t config_handle,
 #ifdef DEBUG
 static void
 db_debug(uint64_t func_id, dev_info_t *dip, char *fmt,
-	uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5);
+    uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5);
 #endif
 
 static int db_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
@@ -348,34 +348,34 @@ static struct cb_ops db_cb_ops = {
 	nodev				/* int (*cb_awrite)() */
 };
 
-static uint8_t 	db_ddi_get8(ddi_acc_impl_t *handle, uint8_t *addr);
+static uint8_t	db_ddi_get8(ddi_acc_impl_t *handle, uint8_t *addr);
 static uint16_t db_ddi_get16(ddi_acc_impl_t *handle, uint16_t *addr);
 static uint32_t db_ddi_get32(ddi_acc_impl_t *handle, uint32_t *addr);
 static uint64_t db_ddi_get64(ddi_acc_impl_t *handle, uint64_t *addr);
-static void 	db_ddi_put8(ddi_acc_impl_t *handle, uint8_t *addr,
-			uint8_t data);
-static void 	db_ddi_put16(ddi_acc_impl_t *handle, uint16_t *addr,
-			uint16_t data);
-static void 	db_ddi_put32(ddi_acc_impl_t *handle, uint32_t *addr,
-			uint32_t data);
-static void 	db_ddi_put64(ddi_acc_impl_t *handle, uint64_t *addr,
-			uint64_t data);
-static void 	db_ddi_rep_get8(ddi_acc_impl_t *handle, uint8_t *host_addr,
-			uint8_t *dev_addr, size_t repcount, uint_t flags);
-static void 	db_ddi_rep_get16(ddi_acc_impl_t *handle, uint16_t *host_addr,
-			uint16_t *dev_addr, size_t repcount, uint_t flags);
-static void 	db_ddi_rep_get32(ddi_acc_impl_t *handle, uint32_t *host_addr,
-			uint32_t *dev_addr, size_t repcount, uint_t flags);
-static void 	db_ddi_rep_get64(ddi_acc_impl_t *handle, uint64_t *host_addr,
-			uint64_t *dev_addr, size_t repcount, uint_t flags);
-static void 	db_ddi_rep_put8(ddi_acc_impl_t *handle, uint8_t *host_addr,
-			uint8_t *dev_addr, size_t repcount, uint_t flags);
-static void 	db_ddi_rep_put16(ddi_acc_impl_t *handle, uint16_t *host_addr,
-			uint16_t *dev_addr, size_t repcount, uint_t flags);
-static void 	db_ddi_rep_put32(ddi_acc_impl_t *handle, uint32_t *host_addr,
-			uint32_t *dev_addr, size_t repcount, uint_t flags);
-static void 	db_ddi_rep_put64(ddi_acc_impl_t *handle, uint64_t *host_addr,
-			uint64_t *dev_addr, size_t repcount, uint_t flags);
+static void	db_ddi_put8(ddi_acc_impl_t *handle, uint8_t *addr,
+    uint8_t data);
+static void	db_ddi_put16(ddi_acc_impl_t *handle, uint16_t *addr,
+    uint16_t data);
+static void	db_ddi_put32(ddi_acc_impl_t *handle, uint32_t *addr,
+    uint32_t data);
+static void	db_ddi_put64(ddi_acc_impl_t *handle, uint64_t *addr,
+    uint64_t data);
+static void	db_ddi_rep_get8(ddi_acc_impl_t *handle, uint8_t *host_addr,
+    uint8_t *dev_addr, size_t repcount, uint_t flags);
+static void	db_ddi_rep_get16(ddi_acc_impl_t *handle, uint16_t *host_addr,
+    uint16_t *dev_addr, size_t repcount, uint_t flags);
+static void	db_ddi_rep_get32(ddi_acc_impl_t *handle, uint32_t *host_addr,
+    uint32_t *dev_addr, size_t repcount, uint_t flags);
+static void	db_ddi_rep_get64(ddi_acc_impl_t *handle, uint64_t *host_addr,
+    uint64_t *dev_addr, size_t repcount, uint_t flags);
+static void	db_ddi_rep_put8(ddi_acc_impl_t *handle, uint8_t *host_addr,
+    uint8_t *dev_addr, size_t repcount, uint_t flags);
+static void	db_ddi_rep_put16(ddi_acc_impl_t *handle, uint16_t *host_addr,
+    uint16_t *dev_addr, size_t repcount, uint_t flags);
+static void	db_ddi_rep_put32(ddi_acc_impl_t *handle, uint32_t *host_addr,
+    uint32_t *dev_addr, size_t repcount, uint_t flags);
+static void	db_ddi_rep_put64(ddi_acc_impl_t *handle, uint64_t *host_addr,
+    uint64_t *dev_addr, size_t repcount, uint_t flags);
 
 static struct dev_ops db_dev_ops = {
 	DEVO_REV,		/* devo_rev */
@@ -410,16 +410,16 @@ static struct modlinkage modlinkage = {
 };
 
 /* soft state pointer and structure template. */
-static void 	*db_state;
+static void	*db_state;
 
 /*
  * forward function declarations:
  */
 static void	db_uninitchild(dev_info_t *);
-static int 	db_initchild(dev_info_t *child);
-static int 	db_create_pci_prop(dev_info_t *child);
-static int 	db_save_config_regs(db_ctrl_t *dbp);
-static int 	db_restore_config_regs(db_ctrl_t *dbp);
+static int	db_initchild(dev_info_t *child);
+static int	db_create_pci_prop(dev_info_t *child);
+static int	db_save_config_regs(db_ctrl_t *dbp);
+static int	db_restore_config_regs(db_ctrl_t *dbp);
 
 /*
  * FMA error callback
@@ -675,7 +675,7 @@ db_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		if (ddi_create_minor_node(dip, name, S_IFCHR,
 		    PCIHP_AP_MINOR_NUM(instance, PCIHP_DEBUG_MINOR),
-		    NULL, NULL) == DDI_FAILURE) {
+		    NULL, 0) == DDI_FAILURE) {
 			cmn_err(CE_NOTE, "%s#%d: node creation failure",
 			    ddi_driver_name(dbp->dip), instance);
 		}
@@ -1443,7 +1443,7 @@ db_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 /*ARGSUSED*/
 static int
 db_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
-		int *rval_p)
+    int *rval_p)
 {
 	int		rc = DDI_SUCCESS;
 #ifdef	DB_DEBUG
@@ -1698,15 +1698,15 @@ db_pci_get_conf_regs(ddi_acc_handle_t config_handle, db_conf_regs_t *cr)
 /*
  * Function: db_pci_map
  *
- * Note:  	Only memory accesses are direct. IO could be direct
- * 		or indirect. Config accesses are always indirect.
- * 		The question here is, does the "assigned-addresses"
- * 		property entry represents the addresses in the
- * 		local domain or the host domain itself.
- * 		Strictly speaking, the assumption should be that
- * 		it is in the local domain, as the transactions
- * 		upstream or downstream are automatically
- * 		translated by the bridge chip anyway.
+ * Note:	Only memory accesses are direct. IO could be direct
+ *		or indirect. Config accesses are always indirect.
+ *		The question here is, does the "assigned-addresses"
+ *		property entry represents the addresses in the
+ *		local domain or the host domain itself.
+ *		Strictly speaking, the assumption should be that
+ *		it is in the local domain, as the transactions
+ *		upstream or downstream are automatically
+ *		translated by the bridge chip anyway.
  *
  * Return values:
  *		DDI_SUCCESS: map call by child device success
@@ -1715,7 +1715,7 @@ db_pci_get_conf_regs(ddi_acc_handle_t config_handle, db_conf_regs_t *cr)
 
 static int
 db_pci_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
-				off_t offset, off_t len, caddr_t *addrp)
+    off_t offset, off_t len, caddr_t *addrp)
 {
 	register dev_info_t *pdip;
 	int reg_proplen, num_regs, rnumber;
@@ -2088,7 +2088,7 @@ char *db_ctlop_name[] = {
 
 static int
 db_ctlops(dev_info_t *dip, dev_info_t *rdip,
-	ddi_ctl_enum_t ctlop, void *arg, void *result)
+    ddi_ctl_enum_t ctlop, void *arg, void *result)
 {
 
 	if ((ctlop >= DDI_CTLOPS_DMAPMAPC) &&
@@ -2865,7 +2865,7 @@ db_ddi_put64(ddi_acc_impl_t *handle, uint64_t *addr, uint64_t data)
  */
 static void
 db_ddi_rep_get8(ddi_acc_impl_t *handle, uint8_t *host_addr,
-			uint8_t *dev_addr, size_t repcount, uint_t flags)
+    uint8_t *dev_addr, size_t repcount, uint_t flags)
 {
 	if (flags == DDI_DEV_AUTOINCR)
 		for (; repcount; repcount--)
@@ -2881,7 +2881,7 @@ db_ddi_rep_get8(ddi_acc_impl_t *handle, uint8_t *host_addr,
  */
 static void
 db_ddi_rep_get16(ddi_acc_impl_t *handle, uint16_t *host_addr,
-			uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	if (flags == DDI_DEV_AUTOINCR)
 		for (; repcount; repcount--)
@@ -2897,7 +2897,7 @@ db_ddi_rep_get16(ddi_acc_impl_t *handle, uint16_t *host_addr,
  */
 static void
 db_ddi_rep_get32(ddi_acc_impl_t *handle, uint32_t *host_addr,
-			uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	if (flags == DDI_DEV_AUTOINCR)
 		for (; repcount; repcount--)
@@ -2913,7 +2913,7 @@ db_ddi_rep_get32(ddi_acc_impl_t *handle, uint32_t *host_addr,
  */
 static void
 db_ddi_rep_get64(ddi_acc_impl_t *handle, uint64_t *host_addr,
-			uint64_t *dev_addr, size_t repcount, uint_t flags)
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
 {
 	if (flags == DDI_DEV_AUTOINCR)
 		for (; repcount; repcount--)
@@ -2929,7 +2929,7 @@ db_ddi_rep_get64(ddi_acc_impl_t *handle, uint64_t *host_addr,
  */
 static void
 db_ddi_rep_put8(ddi_acc_impl_t *handle, uint8_t *host_addr,
-			uint8_t *dev_addr, size_t repcount, uint_t flags)
+    uint8_t *dev_addr, size_t repcount, uint_t flags)
 {
 	if (flags == DDI_DEV_AUTOINCR)
 		for (; repcount; repcount--)
@@ -2945,7 +2945,7 @@ db_ddi_rep_put8(ddi_acc_impl_t *handle, uint8_t *host_addr,
  */
 static void
 db_ddi_rep_put16(ddi_acc_impl_t *handle, uint16_t *host_addr,
-			uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	if (flags == DDI_DEV_AUTOINCR)
 		for (; repcount; repcount--)
@@ -2961,7 +2961,7 @@ db_ddi_rep_put16(ddi_acc_impl_t *handle, uint16_t *host_addr,
  */
 static void
 db_ddi_rep_put32(ddi_acc_impl_t *handle, uint32_t *host_addr,
-			uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	if (flags == DDI_DEV_AUTOINCR)
 		for (; repcount; repcount--)
@@ -2977,7 +2977,7 @@ db_ddi_rep_put32(ddi_acc_impl_t *handle, uint32_t *host_addr,
  */
 static void
 db_ddi_rep_put64(ddi_acc_impl_t *handle, uint64_t *host_addr,
-			uint64_t *dev_addr, size_t repcount, uint_t flags)
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
 {
 	if (flags == DDI_DEV_AUTOINCR)
 		for (; repcount; repcount--)
@@ -2991,7 +2991,7 @@ db_ddi_rep_put64(ddi_acc_impl_t *handle, uint64_t *host_addr,
 
 static void
 db_debug(uint64_t func_id, dev_info_t *dip, char *fmt,
-	uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5)
+    uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5)
 {
 	char *s = NULL;
 	uint_t dip_no_disp = 0;
@@ -3097,7 +3097,7 @@ db_fm_fini(db_ctrl_t *db_p)
 /*ARGSUSED*/
 static int
 db_fm_init_child(dev_info_t *dip, dev_info_t *tdip, int cap,
-		ddi_iblock_cookie_t *ibc)
+    ddi_iblock_cookie_t *ibc)
 {
 	db_ctrl_t *db_p = (db_ctrl_t *)ddi_get_soft_state(db_state,
 	    ddi_get_instance(dip));

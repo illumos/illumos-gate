@@ -71,7 +71,7 @@ typedef struct {
 	if (ptree_create_and_add_node(parenth, node_name, cl,		\
 	    &nodeh) != PICL_SUCCESS) {					\
 		log_msg(LOG_ERR, SNMPP_ADD_NODE_FAIL, node_name, cl);	\
-		return (NULL);						\
+		return (0);						\
 	}								\
 }
 

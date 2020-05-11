@@ -607,12 +607,12 @@ mc_close(dev_t devp, int flag, int otyp, cred_t *credp)
 /* ARGSUSED */
 static int
 mc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-	int *rvalp)
+    int *rvalp)
 {
 	mc_flt_page_t flt_page;
 
 	if (cmd == MCIOC_FAULT_PAGE) {
-		if (arg == NULL)
+		if (arg == (intptr_t)NULL)
 			return (EINVAL);
 
 		if (ddi_copyin((const void *)arg, (void *)&flt_page,
@@ -1986,7 +1986,7 @@ mc_error_handler_mir(mc_opl_t *mcp, int bank, mc_rsaddr_info_t *rsaddr)
 }
 static int
 mc_process_error(mc_opl_t *mcp, int bank, mc_aflt_t *mc_aflt,
-	mc_flt_stat_t *flt_stat)
+    mc_flt_stat_t *flt_stat)
 {
 	int ptrl_error = mc_aflt->mflt_is_ptrl;
 	int rv = 0;
@@ -2981,7 +2981,7 @@ mc_opl_get_physical_board(int sb)
 /* ARGSUSED */
 int
 mc_get_mem_unum(int synd_code, uint64_t flt_addr, char *buf, int buflen,
-	int *lenp)
+    int *lenp)
 {
 	int i;
 	int j;
@@ -4019,7 +4019,7 @@ mc_dump_dimm_info(board_dimm_info_t *bd_dimmp)
 /* ARGSUSED */
 static int
 mc_ioctl_debug(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-	int *rvalp)
+    int *rvalp)
 {
 	caddr_t	buf, kbuf;
 	uint64_t pa;

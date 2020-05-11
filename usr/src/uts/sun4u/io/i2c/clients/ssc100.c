@@ -294,7 +294,7 @@ ssc100_set(struct ssc100_unit *unitp, uchar_t byte)
 
 static int
 ssc100_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
-		cred_t *credp, int *rvalp)
+    cred_t *credp, int *rvalp)
 {
 	_NOTE(ARGUNUSED(credp, rvalp))
 
@@ -306,7 +306,7 @@ ssc100_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	i2c_reg_t ioctl_reg;
 	uchar_t			byte;
 
-	if (arg == NULL) {
+	if (arg == (intptr_t)NULL) {
 		D2CMN_ERR((CE_WARN, "SSC100: ioctl: arg passed in to ioctl "
 		    "= NULL"));
 		err = EINVAL;
@@ -529,7 +529,7 @@ ssc100_do_attach(dev_info_t *dip)
 	    "%s%d", ddi_node_name(dip), instance);
 
 	if (ddi_create_minor_node(dip, "ssc100", S_IFCHR, instance,
-	    "ddi_i2c:ioexp", NULL) == DDI_FAILURE) {
+	    "ddi_i2c:ioexp", 0) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s ddi_create_minor_node failed for "
 		    "%s", unitp->ssc100_name, "ssc100");
 		ddi_soft_state_free(ssc100soft_statep, instance);

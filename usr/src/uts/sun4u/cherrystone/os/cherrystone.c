@@ -101,7 +101,7 @@ startup_platform(void)
 	extern int disable_watchdog_on_exit;
 	disable_watchdog_on_exit = 1;
 
-	mutex_init(&cherry_pcf8584_mutex, NULL, NULL, NULL);
+	mutex_init(&cherry_pcf8584_mutex, NULL, MUTEX_ADAPTIVE, NULL);
 }
 
 #pragma weak mmu_init_large_pages
@@ -295,14 +295,15 @@ plat_discover_slice(pfn_t pfn, pfn_t *first, pfn_t *last)
 /*ARGSUSED*/
 void
 plat_freelist_process(int mnode)
-{}
+{
+}
 
 /*
  * Called for each board/cpu/PA range detected in plat_fill_mc().
  */
 static void
 update_mem_bounds(int boardid, int cpuid, int bankid,
-	uint64_t base, uint64_t size)
+    uint64_t base, uint64_t size)
 {
 	uint64_t	end;
 	int		mnode;

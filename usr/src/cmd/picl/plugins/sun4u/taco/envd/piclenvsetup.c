@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains code for setting up environmental related nodes
  * and properties in the PICL tree.
@@ -87,15 +85,15 @@ typedef struct {
 static sensor_node_t sensor_nodes[] = {
 	{"/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c",
 	SENSOR_CPU_DIE, NULL,
-	NULL, NULL, NULL},
+	0, 0, 0},
 
 	{"/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c",
 	SENSOR_INT_AMB, NULL,
-	NULL, NULL, NULL},
+	0, 0, 0},
 
 	{"/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c",
 	SENSOR_SYS_IN, NULL,
-	NULL, NULL, NULL}
+	0, 0, 0}
 };
 #define	NSENSORS	(sizeof (sensor_nodes)/sizeof (sensor_nodes[0]))
 
@@ -106,7 +104,7 @@ static sensor_node_t sensor_nodes[] = {
 typedef struct {
 	char		*parent_path;	/* parent node path */
 	char		*fan_name;	/* fan name */
-	env_fan_t 	*fanp;		/* fan information */
+	env_fan_t	*fanp;		/* fan information */
 	char		*speed_unit;	/* speed unit string */
 	picl_nodehdl_t	nodeh;		/* "fan" node handle */
 	picl_prophdl_t	proph;		/* "Speed" property handle */
@@ -118,13 +116,13 @@ typedef struct {
  */
 static fan_node_t fan_nodes[] =  {
 	{"/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c",
-	ENV_CPU_FAN, NULL, PROP_FAN_SPEED_UNIT_VALUE, NULL, NULL},
+	ENV_CPU_FAN, NULL, PROP_FAN_SPEED_UNIT_VALUE, 0, 0},
 
 	{"/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c",
-	ENV_SYSTEM_INTAKE_FAN, NULL, PROP_FAN_SPEED_UNIT_VALUE, NULL, NULL},
+	ENV_SYSTEM_INTAKE_FAN, NULL, PROP_FAN_SPEED_UNIT_VALUE, 0, 0},
 
 	{"/platform/pci@1e,600000/isa@7/i2c@0,320/hardware-monitor@0,5c",
-	ENV_SYSTEM_OUT_FAN, NULL, PROP_FAN_SPEED_UNIT_VALUE, NULL, NULL}
+	ENV_SYSTEM_OUT_FAN, NULL, PROP_FAN_SPEED_UNIT_VALUE, 0, 0}
 };
 #define	NFANS	(sizeof (fan_nodes)/sizeof (fan_nodes[0]))
 
@@ -141,7 +139,7 @@ static void delete_fan_nodes_and_props(void);
 static int
 get_current_temp(ptree_rarg_t *parg, void *buf)
 {
-	tempr_t 	temp;
+	tempr_t		temp;
 	picl_prophdl_t	proph;
 	sensor_node_t	*snodep;
 	int		i;
@@ -427,12 +425,12 @@ delete_sensor_nodes_and_props(void)
 
 	for (i = 0; i < NSENSORS; ++i) {
 		snodep = &sensor_nodes[i];
-		if (snodep->nodeh != NULL) {
+		if (snodep->nodeh != 0) {
 			/* delete node and all properties under it */
 			(void) ptree_delete_node(snodep->nodeh);
 			(void) ptree_destroy_node(snodep->nodeh);
-			snodep->nodeh = NULL;
-			snodep->proph = NULL;
+			snodep->nodeh = 0;
+			snodep->proph = 0;
 		}
 	}
 }
@@ -553,10 +551,10 @@ delete_fan_nodes_and_props(void)
 
 	for (i = 0; i < NFANS; ++i) {
 		fnodep = &fan_nodes[i];
-		if (fnodep->nodeh != NULL) {
+		if (fnodep->nodeh != 0) {
 			(void) ptree_delete_node(fnodep->nodeh);
 			(void) ptree_destroy_node(fnodep->nodeh);
-			fnodep->nodeh = NULL;
+			fnodep->nodeh = 0;
 		}
 	}
 }
@@ -723,9 +721,9 @@ env_picl_setup(void)
 	for (i = 0; i < NSENSORS; ++i) {
 		snodep = &sensor_nodes[i];
 		snodep->sensorp = sensor_lookup(snodep->sensor_name);
-		snodep->nodeh = NULL;
-		snodep->proph = NULL;
-		snodep->target_proph = NULL;
+		snodep->nodeh = 0;
+		snodep->proph = 0;
+		snodep->target_proph = 0;
 	}
 
 	/*
@@ -734,8 +732,8 @@ env_picl_setup(void)
 	for (i = 0; i < NFANS; ++i) {
 		fnodep = &fan_nodes[i];
 		fnodep->fanp = fan_lookup(fnodep->fan_name);
-		fnodep->nodeh = NULL;
-		fnodep->proph = NULL;
+		fnodep->nodeh = 0;
+		fnodep->proph = 0;
 	}
 
 	/*

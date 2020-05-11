@@ -28,6 +28,7 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>

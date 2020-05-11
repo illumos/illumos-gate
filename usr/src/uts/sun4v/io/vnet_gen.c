@@ -297,7 +297,7 @@ static char vgen_linkprop_propname[] = "linkprop";
  * 1.3			VLAN and HybridIO support.
  * 1.4			Jumbo Frame support.
  * 1.5			Link State Notification support with optional support
- * 			for Physical Link information.
+ *			for Physical Link information.
  * 1.6			Support for RxDringData mode.
  */
 static vgen_ver_t vgen_versions[VGEN_NUM_VER] =  { {1, 6} };
@@ -697,7 +697,7 @@ vgen_tx(void *arg, mblk_t *mp)
  */
 static mblk_t *
 vgen_vlan_frame_fixtag(vgen_port_t *portp, mblk_t *mp, boolean_t is_tagged,
-	uint16_t vid)
+    uint16_t vid)
 {
 	vgen_t		*vgenp;
 	boolean_t	dst_tagged;
@@ -781,8 +781,8 @@ vgen_portsend(vgen_port_t *portp, mblk_t *mp)
 	vgen_ldc_t		*ldcp;
 	int			status;
 	int			rv = VGEN_SUCCESS;
-	vgen_t			*vgenp = portp->vgenp;
-	vnet_t			*vnetp = vgenp->vnetp;
+	vgen_t			*vgenp;
+	vnet_t			*vnetp;
 	boolean_t		is_tagged;
 	boolean_t		dec_refcnt = B_FALSE;
 	uint16_t		vlan_id;
@@ -791,6 +791,9 @@ vgen_portsend(vgen_port_t *portp, mblk_t *mp)
 	if (portp == NULL) {
 		return (VGEN_FAILURE);
 	}
+
+	vgenp = portp->vgenp;
+	vnetp = vgenp->vnetp;
 
 	if (portp->use_vsw_port) {
 		(void) atomic_inc_32(&vgenp->vsw_port_refcnt);
@@ -1396,8 +1399,8 @@ vgen_readmd_exit:
  */
 static void
 vgen_vlan_read_ids(void *arg, int type, md_t *mdp, mde_cookie_t node,
-	uint16_t *pvidp, uint16_t **vidspp, uint16_t *nvidsp,
-	uint16_t *default_idp)
+    uint16_t *pvidp, uint16_t **vidspp, uint16_t *nvidsp,
+    uint16_t *default_idp)
 {
 	vgen_t		*vgenp;
 	vnet_t		*vnetp;
@@ -1686,7 +1689,7 @@ vgen_mtu_read(vgen_t *vgenp, md_t *mdp, mde_cookie_t node, uint32_t *mtu)
 
 static void
 vgen_linkprop_read(vgen_t *vgenp, md_t *mdp, mde_cookie_t node,
-	boolean_t *pls)
+    boolean_t *pls)
 {
 	int		rv;
 	uint64_t	val;
@@ -1714,8 +1717,8 @@ vgen_mdeg_reg(vgen_t *vgenp)
 	mdeg_node_spec_t	*parentp;
 	uint_t			templatesz;
 	int			rv;
-	mdeg_handle_t		dev_hdl = NULL;
-	mdeg_handle_t		port_hdl = NULL;
+	mdeg_handle_t		dev_hdl = 0;
+	mdeg_handle_t		port_hdl = 0;
 
 	templatesz = sizeof (vgen_prop_template);
 	pspecp = kmem_zalloc(templatesz, KM_NOSLEEP);
@@ -1767,7 +1770,7 @@ vgen_mdeg_reg(vgen_t *vgenp)
 	return (DDI_SUCCESS);
 
 mdeg_reg_fail:
-	if (dev_hdl != NULL) {
+	if (dev_hdl != 0) {
 		(void) mdeg_unregister(dev_hdl);
 	}
 	KMEM_FREE(parentp);
@@ -1780,13 +1783,13 @@ mdeg_reg_fail:
 static void
 vgen_mdeg_unreg(vgen_t *vgenp)
 {
-	if (vgenp->mdeg_dev_hdl != NULL) {
+	if (vgenp->mdeg_dev_hdl != 0) {
 		(void) mdeg_unregister(vgenp->mdeg_dev_hdl);
-		vgenp->mdeg_dev_hdl = NULL;
+		vgenp->mdeg_dev_hdl = 0;
 	}
-	if (vgenp->mdeg_port_hdl != NULL) {
+	if (vgenp->mdeg_port_hdl != 0) {
 		(void) mdeg_unregister(vgenp->mdeg_port_hdl);
-		vgenp->mdeg_port_hdl = NULL;
+		vgenp->mdeg_port_hdl = 0;
 	}
 
 	if (vgenp->mdeg_parentp != NULL) {
@@ -1803,7 +1806,7 @@ vgen_mdeg_port_cb(void *cb_argp, mdeg_result_t *resp)
 {
 	int		idx;
 	int		vsw_idx = -1;
-	uint64_t 	val;
+	uint64_t	val;
 	vgen_t		*vgenp;
 
 	if ((resp == NULL) || (cb_argp == NULL)) {
@@ -2108,7 +2111,7 @@ vgen_add_port(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex)
 /* read properties of the port from its md node */
 static int
 vgen_port_read_props(vgen_port_t *portp, vgen_t *vgenp, md_t *mdp,
-	mde_cookie_t mdex)
+    mde_cookie_t mdex)
 {
 	uint64_t		port_num;
 	uint64_t		*ldc_ids;
@@ -2362,7 +2365,7 @@ vgen_port_detach_mdeg(vgen_port_t *portp)
 
 static int
 vgen_update_port(vgen_t *vgenp, md_t *curr_mdp, mde_cookie_t curr_mdex,
-	md_t *prev_mdp, mde_cookie_t prev_mdex)
+    md_t *prev_mdp, mde_cookie_t prev_mdex)
 {
 	uint64_t	cport_num;
 	uint64_t	pport_num;
@@ -2454,10 +2457,10 @@ vgen_port_stat(vgen_port_t *portp, uint_t stat)
 static int
 vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id)
 {
-	vgen_t 		*vgenp;
-	vgen_ldc_t 	*ldcp;
-	ldc_attr_t 	attr;
-	int 		status;
+	vgen_t		*vgenp;
+	vgen_ldc_t	*ldcp;
+	ldc_attr_t	attr;
+	int		status;
 	ldc_status_t	istatus;
 	char		kname[MAXNAMELEN];
 	int		instance;
@@ -2567,7 +2570,7 @@ static void
 vgen_ldc_detach(vgen_ldc_t *ldcp)
 {
 	vgen_port_t	*portp;
-	vgen_t 		*vgenp;
+	vgen_t		*vgenp;
 
 	ASSERT(ldcp != NULL);
 
@@ -3000,7 +3003,7 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 	_NOTE(ARGUNUSED(event))
 	vgen_ldc_t	*ldcp;
 	vgen_t		*vgenp;
-	ldc_status_t 	istatus;
+	ldc_status_t	istatus;
 	vgen_stats_t	*statsp;
 	uint_t		ret = LDC_SUCCESS;
 
@@ -3012,7 +3015,7 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 
 	mutex_enter(&ldcp->cblock);
 	statsp->callbacks++;
-	if ((ldcp->ldc_status == LDC_INIT) || (ldcp->ldc_handle == NULL)) {
+	if ((ldcp->ldc_status == LDC_INIT) || (ldcp->ldc_handle == 0)) {
 		DWARN(vgenp, ldcp, "status(%d) is LDC_INIT\n",
 		    ldcp->ldc_status);
 		mutex_exit(&ldcp->cblock);
@@ -3111,8 +3114,8 @@ vgen_handle_evt_read(vgen_ldc_t *ldcp, vgen_caller_t caller)
 	size_t		msglen;
 	vgen_t		*vgenp = LDC_TO_VGEN(ldcp);
 	vio_msg_tag_t	*tagp;
-	ldc_status_t 	istatus;
-	boolean_t 	has_data;
+	ldc_status_t	istatus;
+	boolean_t	has_data;
 
 	DBG1(vgenp, ldcp, "enter\n");
 
@@ -4227,7 +4230,7 @@ vgen_handshake_done(vgen_ldc_t *ldcp)
 {
 	vgen_t		*vgenp = LDC_TO_VGEN(ldcp);
 	uint32_t	hphase = ldcp->hphase;
-	int 		status = 0;
+	int		status = 0;
 
 	switch (hphase) {
 
@@ -5724,7 +5727,7 @@ vgen_check_sid(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
  */
 static void
 vgen_init_dring_reg_msg(vgen_ldc_t *ldcp, vio_dring_reg_msg_t *msg,
-	uint8_t option)
+    uint8_t option)
 {
 	vio_msg_tag_t		*tagp;
 

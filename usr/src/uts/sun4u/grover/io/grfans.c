@@ -215,7 +215,7 @@ grfans_do_attach(dev_info_t *dip)
 
 	if (ddi_create_minor_node(dip, "cpu_fan", S_IFCHR,
 	    DEVINST_TO_MINOR(instance) | CHANNEL_TO_MINOR(CPU_FAN_CHANNEL),
-	    FANS_NODE_TYPE, NULL) == DDI_FAILURE) {
+	    FANS_NODE_TYPE, 0) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s ddi_create_minor_node failed"
 		    " for cpu fan", name);
 		ddi_regs_map_free(&unitp->cpufan_rhandle);
@@ -228,7 +228,7 @@ grfans_do_attach(dev_info_t *dip)
 
 	if (ddi_create_minor_node(dip, "sys_fan", S_IFCHR,
 	    DEVINST_TO_MINOR(instance) | CHANNEL_TO_MINOR(SYSTEM_FAN_CHANNEL),
-	    FANS_NODE_TYPE, NULL) == DDI_FAILURE) {
+	    FANS_NODE_TYPE, 0) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s ddi_create_minor_node failed"
 		    " for system fan", name);
 		ddi_regs_map_free(&unitp->cpufan_rhandle);
