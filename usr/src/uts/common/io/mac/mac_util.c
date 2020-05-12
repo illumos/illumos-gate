@@ -1543,7 +1543,7 @@ mac_strip_vlan_tag_chain(mblk_t *mp_chain)
  */
 /* ARGSUSED */
 void
-mac_pkt_drop(void *arg, mac_resource_handle_t resource, mblk_t *mp_chain,
+mac_pkt_drop(void *arg, mac_resource_handle_t resource, mblk_t *mp,
     boolean_t loopback)
 {
 	mblk_t  *mp1 = mp;

@@ -1347,7 +1347,7 @@ int mac_srs_worker_wakeup_ticks = 0;
 	if (!(srs->srs_type & SRST_TX))					\
 		mutex_exit(&srs->srs_bw->mac_bw_lock);
 
-#define	MAC_TX_SRS_DROP_MESSAGE(srs, chain, cookie, s) {	\
+#define	MAC_TX_SRS_DROP_MESSAGE(srs, mp, cookie) {		\
 	mac_pkt_drop(NULL, NULL, mp, B_FALSE);			\
 	/* increment freed stats */				\
 	(srs)->srs_tx.st_stat.mts_sdrops++;			\
@@ -3461,8 +3461,7 @@ mac_tx_srs_no_desc(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 
 	ASSERT(tx_mode == SRS_TX_DEFAULT || tx_mode == SRS_TX_BW);
 	if (flag & MAC_DROP_ON_NO_DESC) {
-		MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie,
-		    "Tx no desc");
+		MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie);
 	} else {
 		if (mac_srs->srs_first != NULL)
 			wakeup_worker = B_FALSE;
@@ -3525,8 +3524,7 @@ mac_tx_srs_enqueue(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 	MAC_COUNT_CHAIN(mac_srs, mp_chain, tail, cnt, sz);
 	if (flag & MAC_DROP_ON_NO_DESC) {
 		if (mac_srs->srs_count > mac_srs->srs_tx.st_hiwat) {
-			MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie,
-			    "Tx SRS hiwat");
+			MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie);
 		} else {
 			MAC_TX_SRS_ENQUEUE_CHAIN(mac_srs,
 			    mp_chain, tail, cnt, sz);
@@ -3899,8 +3897,7 @@ mac_tx_bw_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 			cookie = (mac_tx_cookie_t)mac_srs;
 			*ret_mp = mp_chain;
 		} else {
-			MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie,
-			    "Tx no bandwidth");
+			MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie);
 		}
 		mutex_exit(&mac_srs->srs_lock);
 		return (cookie);
