@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -107,6 +107,7 @@ union ihead *ihead;	/* inode LRU cache, Chris Maltby */
 kmutex_t *ih_lock;	/* protect inode cache hash table */
 static int ino_hashlen = 4;	/* desired average hash chain length */
 int inohsz;		/* number of buckets in the hash table */
+struct timeval32 iuniqtime;
 
 kmutex_t	ufs_scan_lock;	/* stop racing multiple ufs_scan_inodes() */
 kmutex_t	ufs_iuniqtime_lock; /* protect iuniqtime */
@@ -838,8 +839,8 @@ ufs_iupdat(struct inode *ip, int waitfor)
 	struct buf	*bp;
 	struct fs	*fp;
 	struct dinode	*dp;
-	struct ufsvfs	*ufsvfsp 	= ip->i_ufsvfs;
-	int 		i;
+	struct ufsvfs	*ufsvfsp = ip->i_ufsvfs;
+	int		i;
 	int		do_trans_times;
 	ushort_t	flag;
 	o_uid_t		suid;
