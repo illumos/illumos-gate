@@ -1358,7 +1358,7 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 
 	mcip->mci_mip = mip;
 	mcip->mci_upper_mip = NULL;
-	mcip->mci_rx_fn = mac_rx_def;
+	mcip->mci_rx_fn = mac_pkt_drop;
 	mcip->mci_rx_arg = NULL;
 	mcip->mci_rx_p_fn = NULL;
 	mcip->mci_rx_p_arg = NULL;
@@ -1630,33 +1630,7 @@ mac_rx_set(mac_client_handle_t mch, mac_rx_t rx_fn, void *arg)
 void
 mac_rx_clear(mac_client_handle_t mch)
 {
-	mac_rx_set(mch, mac_rx_def, NULL);
-}
-
-void
-mac_rx_barrier(mac_client_handle_t mch)
-{
-	mac_client_impl_t *mcip = (mac_client_impl_t *)mch;
-	mac_impl_t *mip = mcip->mci_mip;
-
-	i_mac_perim_enter(mip);
-
-	/* If a RX callback is set, quiesce and restart that datapath */
-	if (mcip->mci_rx_fn != mac_rx_def) {
-		mac_rx_client_quiesce(mch);
-		mac_rx_client_restart(mch);
-	}
-
-	/* If any promisc callbacks are registered, perform a barrier there */
-	if (mcip->mci_promisc_list != NULL || mip->mi_promisc_list != NULL) {
-		mac_cb_info_t *mcbi =  &mip->mi_promisc_cb_info;
-
-		mutex_enter(mcbi->mcbi_lockp);
-		mac_callback_barrier(mcbi);
-		mutex_exit(mcbi->mcbi_lockp);
-	}
-
-	i_mac_perim_exit(mip);
+	mac_rx_set(mch, mac_pkt_drop, NULL);
 }
 
 void
@@ -3025,7 +2999,7 @@ mac_client_datapath_teardown(mac_client_handle_t mch, mac_unicast_impl_t *muip,
 	mac_misc_stat_delete(flent);
 
 	/* Initialize the receiver function to a safe routine */
-	flent->fe_cb_fn = (flow_fn_t)mac_rx_def;
+	flent->fe_cb_fn = (flow_fn_t)mac_pkt_drop;
 	flent->fe_cb_arg1 = NULL;
 	flent->fe_cb_arg2 = NULL;
 

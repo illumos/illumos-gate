@@ -1328,7 +1328,7 @@ int mac_srs_worker_wakeup_ticks = 0;
 			 * b_prev may be set to the fanout hint		\
 			 * hence can't use freemsg directly		\
 			 */						\
-			mac_drop_chain(mp_chain, "SRS Tx max queue");	\
+			mac_pkt_drop(NULL, NULL, mp_chain, B_FALSE);	\
 			DTRACE_PROBE1(tx_queued_hiwat,			\
 			    mac_soft_ring_set_t *, srs);		\
 			enqueue = 0;					\
@@ -1348,7 +1348,7 @@ int mac_srs_worker_wakeup_ticks = 0;
 		mutex_exit(&srs->srs_bw->mac_bw_lock);
 
 #define	MAC_TX_SRS_DROP_MESSAGE(srs, chain, cookie, s) {	\
-	mac_drop_chain((chain), (s));				\
+	mac_pkt_drop(NULL, NULL, mp, B_FALSE);			\
 	/* increment freed stats */				\
 	(srs)->srs_tx.st_stat.mts_sdrops++;			\
 	(cookie) = (mac_tx_cookie_t)(srs);			\
@@ -2894,7 +2894,7 @@ again:
 		mac_srs->srs_bw->mac_bw_sz -= sz;
 		mac_srs->srs_bw->mac_bw_drop_bytes += sz;
 		mutex_exit(&mac_srs->srs_bw->mac_bw_lock);
-		mac_drop_chain(head, "Rx no bandwidth");
+		mac_pkt_drop(NULL, NULL, head, B_FALSE);
 		goto leave_poll;
 	} else {
 		mutex_exit(&mac_srs->srs_bw->mac_bw_lock);
@@ -3339,7 +3339,7 @@ mac_rx_srs_process(void *arg, mac_resource_handle_t srs, mblk_t *mp_chain,
 			mac_bw->mac_bw_drop_bytes += sz;
 			mutex_exit(&mac_bw->mac_bw_lock);
 			mutex_exit(&mac_srs->srs_lock);
-			mac_drop_chain(mp_chain, "Rx no bandwidth");
+			mac_pkt_drop(NULL, NULL, mp_chain, B_FALSE);
 			return;
 		} else {
 			if ((mac_bw->mac_bw_sz + sz) <=
@@ -4804,7 +4804,7 @@ mac_tx_sring_enqueue(mac_soft_ring_t *ringp, mblk_t *mp_chain, uint16_t flag,
 	ASSERT(MUTEX_HELD(&ringp->s_ring_lock));
 	MAC_COUNT_CHAIN(mac_srs, mp_chain, tail, cnt, sz);
 	if (flag & MAC_DROP_ON_NO_DESC) {
-		mac_drop_chain(mp_chain, "Tx softring no desc");
+		mac_pkt_drop(NULL, NULL, mp_chain, B_FALSE);
 		/* increment freed stats */
 		ringp->s_ring_drops += cnt;
 		cookie = (mac_tx_cookie_t)ringp;
@@ -4848,8 +4848,8 @@ mac_tx_sring_enqueue(mac_soft_ring_t *ringp, mblk_t *mp_chain, uint16_t flag,
 					 * b_prev may be set to the fanout hint
 					 * hence can't use freemsg directly
 					 */
-					mac_drop_chain(mp_chain,
-					    "Tx softring max queue");
+					mac_pkt_drop(NULL, NULL,
+					    mp_chain, B_FALSE);
 					DTRACE_PROBE1(tx_queued_hiwat,
 					    mac_soft_ring_t *, ringp);
 					enqueue = B_FALSE;
