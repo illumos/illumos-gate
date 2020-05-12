@@ -20,6 +20,10 @@
  * release for licensing terms and conditions.
  */
 
+/*
+ * Copyright 2020 RackTop Systems, Inc.
+ */
+
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/dlpi.h>
@@ -930,6 +934,62 @@ t4_mc_getcapab(void *arg, mac_capab_t cap, void *data)
 	return (status);
 }
 
+static link_fec_t
+fec_to_link_fec(cc_fec_t cc_fec)
+{
+	link_fec_t link_fec = 0;
+
+	if ((cc_fec & (FEC_RS | FEC_BASER_RS)) == (FEC_RS | FEC_BASER_RS))
+		return (LINK_FEC_AUTO);
+
+	if ((cc_fec & FEC_NONE) != 0)
+		link_fec |= LINK_FEC_NONE;
+
+	if ((cc_fec & FEC_AUTO) != 0)
+		link_fec |= LINK_FEC_AUTO;
+
+	if ((cc_fec & FEC_RS) != 0)
+		link_fec |= LINK_FEC_RS;
+
+	if ((cc_fec & FEC_BASER_RS) != 0)
+		link_fec |= LINK_FEC_BASE_R;
+
+	return (link_fec);
+}
+
+static int
+link_fec_to_fec(int v)
+{
+	int fec = 0;
+
+	if ((v & LINK_FEC_AUTO) != 0) {
+		fec = FEC_AUTO;
+		v &= ~LINK_FEC_AUTO;
+	} else {
+		if ((v & LINK_FEC_NONE) != 0) {
+			fec = FEC_NONE;
+			v &= ~LINK_FEC_NONE;
+		}
+
+		if ((v & LINK_FEC_RS) != 0) {
+			fec |= FEC_RS;
+			v &= ~LINK_FEC_RS;
+		}
+
+		if ((v & LINK_FEC_BASE_R) != 0) {
+			fec |= FEC_BASER_RS;
+			v &= ~LINK_FEC_BASE_R;
+		}
+	}
+
+	if (v != 0)
+		return (-1);
+
+	ASSERT3S(fec, !=, 0);
+
+	return (fec);
+}
+
 /* ARGSUSED */
 static int
 t4_mc_setprop(void *arg, const char *name, mac_prop_id_t id, uint_t size,
@@ -941,7 +1001,9 @@ t4_mc_setprop(void *arg, const char *name, mac_prop_id_t id, uint_t size,
 	uint8_t v8 = *(uint8_t *)val;
 	uint32_t v32 = *(uint32_t *)val;
 	int old, new = 0, relink = 0, rx_mode = 0, rc = 0;
+	boolean_t down_link = B_TRUE;
 	link_flowctrl_t fc;
+	link_fec_t fec;
 
 	/*
 	 * Save a copy of link_config. This can be used to restore link_config
@@ -1009,6 +1071,30 @@ t4_mc_setprop(void *arg, const char *name, mac_prop_id_t id, uint_t size,
 		}
 		break;
 
+	case MAC_PROP_EN_FEC_CAP:
+		if (!fec_supported(lc->pcaps)) {
+			rc = ENOTSUP;
+			break;
+		}
+
+		fec = *(link_fec_t *)val;
+		new = link_fec_to_fec(fec);
+		if (new < 0) {
+			rc = EINVAL;
+		} else if (new != lc->requested_fec) {
+			lc->requested_fec = new;
+			relink = 1;
+			/*
+			 * For fec, do not preemptively force the link
+			 * down. If changing fec causes the link state
+			 * to transition, then appropriate asynchronous
+			 * events are generated which correctly reflect
+			 * the link state.
+			 */
+			down_link = B_FALSE;
+		}
+		break;
+
 	case MAC_PROP_EN_10GFDX_CAP:
 		if (lc->pcaps & FW_PORT_CAP32_ANEG && is_10G_port(pi)) {
 			old = lc->acaps & FW_PORT_CAP32_SPEED_10G;
@@ -1062,7 +1148,8 @@ t4_mc_setprop(void *arg, const char *name, mac_prop_id_t id, uint_t size,
 
 	if (isset(&sc->open_device_map, pi->port_id) != 0) {
 		if (relink != 0) {
-			t4_os_link_changed(pi->adapter, pi->port_id, 0);
+			if (down_link)
+				t4_os_link_changed(pi->adapter, pi->port_id, 0);
 			rc = begin_synchronized_op(pi, 1, 1);
 			if (rc != 0)
 				return (rc);
@@ -1143,6 +1230,20 @@ t4_mc_getprop(void *arg, const char *name, mac_prop_id_t id, uint_t size,
 			*(link_flowctrl_t *)val = LINK_FLOWCTRL_NONE;
 		break;
 
+	case MAC_PROP_ADV_FEC_CAP:
+		if (!fec_supported(lc->pcaps))
+			return (ENOTSUP);
+
+		*(link_fec_t *)val = fec_to_link_fec(lc->fec);
+		break;
+
+	case MAC_PROP_EN_FEC_CAP:
+		if (!fec_supported(lc->pcaps))
+			return (ENOTSUP);
+
+		*(link_fec_t *)val = fec_to_link_fec(lc->requested_fec);
+		break;
+
 	case MAC_PROP_ADV_100GFDX_CAP:
 	case MAC_PROP_EN_100GFDX_CAP:
 		*u = !!(lc->acaps & FW_PORT_CAP32_SPEED_100G);
@@ -1210,6 +1311,15 @@ t4_mc_propinfo(void *arg, const char *name, mac_prop_id_t id,
 
 	case MAC_PROP_FLOWCTRL:
 		mac_prop_info_set_default_link_flowctrl(ph, LINK_FLOWCTRL_BI);
+		break;
+
+	case MAC_PROP_EN_FEC_CAP:
+		mac_prop_info_set_default_fec(ph, LINK_FEC_AUTO);
+		break;
+
+	case MAC_PROP_ADV_FEC_CAP:
+		mac_prop_info_set_perm(ph, MAC_PROP_PERM_READ);
+		mac_prop_info_set_default_fec(ph, LINK_FEC_AUTO);
 		break;
 
 	case MAC_PROP_EN_10GFDX_CAP:

@@ -1756,6 +1756,11 @@ mlxcx_setup_ports(mlxcx_t *mlxp)
 			mutex_exit(&p->mlp_mtx);
 			goto err;
 		}
+		if (!mlxcx_cmd_query_port_fec(mlxp, p)) {
+			mutex_exit(&p->mlp_mtx);
+			goto err;
+		}
+		p->mlp_fec_requested = LINK_FEC_AUTO;
 
 		mutex_exit(&p->mlp_mtx);
 	}

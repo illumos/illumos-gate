@@ -355,6 +355,7 @@ mlxcx_update_link_state(mlxcx_t *mlxp, mlxcx_port_t *port)
 	mutex_enter(&port->mlp_mtx);
 	(void) mlxcx_cmd_query_port_status(mlxp, port);
 	(void) mlxcx_cmd_query_port_speed(mlxp, port);
+	(void) mlxcx_cmd_query_port_fec(mlxp, port);
 
 	switch (port->mlp_oper_status) {
 	case MLXCX_PORT_STATUS_UP:

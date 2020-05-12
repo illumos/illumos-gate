@@ -42,12 +42,12 @@
 .\"
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2016 Joyent, Inc.
+.\" Copyright 2020 RackTop Systems, Inc.
 .\"
-.TH DLADM 1M "Dec 16, 2016"
+.TH DLADM 1M "May 4, 2020"
 .SH NAME
 dladm \- administer data links
 .SH SYNOPSIS
-.LP
 .nf
 \fBdladm show-link\fR [\fB-P\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]] [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]] [\fIlink\fR]
 \fBdladm rename-link\fR [\fB-R\fR \fIroot-dir\fR] \fIlink\fR \fInew-link\fR
@@ -179,7 +179,6 @@ dladm \- administer data links
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBdladm\fR command is used to administer data-links. A data-link is
 represented in the system as a \fBSTREAMS DLPI\fR (v2) interface which can be
 plumbed under protocol stacks such as \fBTCP/IP\fR. Each data-link relies on
@@ -332,7 +331,6 @@ characters.
 .RE
 
 .SS "Options"
-.LP
 Each \fBdladm\fR subcommand has its own set of options. However, many of the
 subcommands have the following as a common option:
 .sp
@@ -347,7 +345,6 @@ deletion, or renaming-should apply.
 .RE
 
 .SS "SUBCOMMANDS"
-.LP
 The following subcommands are supported:
 .sp
 .ne 2
@@ -4438,7 +4435,6 @@ display network usage for all links.
 .RE
 
 .SS "Parsable Output Format"
-.LP
 Many \fBdladm\fR subcommands have an option that displays output in a
 machine-parsable format. The output format is one or more lines of colon
 (\fB:\fR) delimited fields. The fields displayed are specific to the subcommand
@@ -4454,7 +4450,6 @@ by using shell \fBread\fR(1) functions with the environment variable
 \fBIFS=:\fR (see \fBEXAMPLES\fR, below). Note that escaping is not done when
 you request only a single field.
 .SS "General Link Properties"
-.LP
 The following general link properties are supported:
 .sp
 .ne 2
@@ -4725,7 +4720,6 @@ currently running on the system. By default, the zone binding is as per
 .RE
 
 .SS "Wifi Link Properties"
-.LP
 The following \fBWiFi\fR link properties are supported. Note that the ability
 to set a given property to a given value depends on the driver and hardware.
 .sp
@@ -4777,7 +4771,6 @@ is no fixed speed.
 .RE
 
 .SS "Ethernet Link Properties"
-.LP
 The following MII Properties, as documented in \fBieee802.3\fR(5), are
 supported in read-only mode:
 .RS +4
@@ -4938,6 +4931,75 @@ capabilities allowed by the device and the link partner.
 .sp
 .ne 2
 .na
+\fB\fBen_fec_cap\fR\fR
+.ad
+.sp .6
+.RS 4n
+Sets the Forward Error Correct (FEC) code(s) to be advertised by the
+device.
+Valid values are:
+.sp
+.ne 2
+.na
+\fB\fBnone\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allow the device not to use FEC.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBauto\fR\fR
+.ad
+.sp .6
+.RS 4n
+The device will automatically decide which FEC code to use.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBrs\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allow Reed-Solomon FEC code.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBbase-r\fR\fR
+.ad
+.sp .6
+.RS 4n
+Allow Base-R (also known as FireCode) code.
+.RE
+
+Valid input is either \fBauto\fR as a single value, or a comma separated
+combination of \fBnone\fR, \fBrs\fR and \fBbase-r\fR.
+The default value is \fBauto\fR.
+.sp
+.LP
+Note the actual FEC settings and combinations are constrained by the
+capabilities allowed by the device and the link partner.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBadv_fec_cap\fR\fR
+.ad
+.sp .6
+.RS 4n
+(read only) The current negotiated Forward Error Correction code.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fBsecondary-macs\fR\fR
 .ad
 .sp .6
@@ -4992,7 +5054,6 @@ The default value is \fBvlanonly\fR.
 .RE
 
 .SS "IP Tunnel Link Properties"
-.LP
 The following IP tunnel link properties are supported.
 .sp
 .ne 2
@@ -5019,7 +5080,6 @@ default value is 4. A value of 0 disables the encapsulation limit.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRConfiguring an Aggregation
 .sp
 .LP
@@ -5494,7 +5554,6 @@ interface. See \fBifconfig\fR(1M) for a description of how IPv6 addresses are
 configured on 6to4 tunnel links.
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 .LP
@@ -5527,12 +5586,10 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.LP
 \fBacctadm\fR(1M), \fBautopush\fR(1M), \fBifconfig\fR(1M), \fBipsecconf\fR(1M),
 \fBndd\fR(1M), \fBpsrset\fR(1M), \fBwpad\fR(1M), \fBzonecfg\fR(1M),
 \fBattributes\fR(5), \fBieee802.3\fR(5), \fBdlpi\fR(7P)
 .SH NOTES
-.LP
 The preferred method of referring to an aggregation in the aggregation
 subcommands is by its link name. Referring to an aggregation by its integer
 \fIkey\fR is supported for backward compatibility, but is not necessary. When

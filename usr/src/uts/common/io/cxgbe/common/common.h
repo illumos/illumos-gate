@@ -20,6 +20,10 @@
  * release for licensing terms and conditions.
  */
 
+/*
+ * Copyright 2020 RackTop Systems, Inc.
+ */
+
 #ifndef __CHELSIO_COMMON_H
 #define __CHELSIO_COMMON_H
 
@@ -103,9 +107,16 @@ enum {
 typedef unsigned char cc_pause_t;
 
 enum {
-	FEC_AUTO	= 1 << 0,	/* IEEE 802.3 "automatic" */
-	FEC_RS		= 1 << 1,	/* Reed-Solomon */
-	FEC_BASER_RS	= 1 << 2,	/* BaseR/Reed-Solomon */
+	FEC_RS		= 1 << 0,	/* Reed-Solomon */
+	FEC_BASER_RS	= 1 << 1,	/* Base-R, aka Firecode */
+	FEC_NONE	= 1 << 2,	/* no FEC */
+
+	/*
+	 * Pseudo FECs that translate to real FECs.  The firmware knows nothing
+	 * about these and they start at M_FW_PORT_CAP32_FEC + 1.  AUTO should
+	 * be set all by itself.
+	 */
+	FEC_AUTO	= 1 << 5,
 };
 typedef unsigned char cc_fec_t;
 
