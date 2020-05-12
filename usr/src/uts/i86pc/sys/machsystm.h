@@ -135,10 +135,10 @@ extern uintptr_t (*get_intr_handler)(int, short);
 /*
  * Dispatcher hooks.
  */
-void    (*idle_cpu)();
-void    (*non_deep_idle_cpu)();
-void    (*disp_enq_thread)(cpu_t *, int);
-void    (*non_deep_idle_disp_enq_thread)(cpu_t *, int);
+extern void    (*idle_cpu)();
+extern void    (*non_deep_idle_cpu)();
+extern void    (*disp_enq_thread)(cpu_t *, int);
+extern void    (*non_deep_idle_disp_enq_thread)(cpu_t *, int);
 
 #ifndef __xpv
 extern unsigned int microdata;
