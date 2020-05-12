@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Context-saving routine used for pipelines.  Designed for use only
  * with kmdb_setcontext, and with the assumption that func() will never
@@ -59,6 +57,6 @@ kmdb_makecontext(ucontext_t *ucp, void (*func)(void *), void *arg, caddr_t stk,
 	ucp->uc_mcontext.gregs[REG_nPC] = (greg_t)func + 4;
 	ucp->uc_mcontext.gregs[REG_O0] = (greg_t)arg;
 	ucp->uc_mcontext.gregs[REG_SP] = (greg_t)(stack - STACK_BIAS);
-	ucp->uc_mcontext.gregs[REG_O7] = NULL;
-	ucp->uc_mcontext.gregs[REG_G7] = NULL;
+	ucp->uc_mcontext.gregs[REG_O7] = 0;
+	ucp->uc_mcontext.gregs[REG_G7] = 0;
 }

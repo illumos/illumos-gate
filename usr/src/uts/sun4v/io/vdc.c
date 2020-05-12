@@ -173,14 +173,14 @@ static int	vdc_process_data_msg(vdc_t *vdc, vio_msg_t *msg);
 static int	vdc_handle_ver_msg(vdc_t *vdc, vio_ver_msg_t *ver_msg);
 static int	vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg);
 static int	vdc_handle_dring_reg_msg(vdc_t *vdc, vio_dring_reg_msg_t *msg);
-static int 	vdc_send_request(vdc_t *vdcp, int operation,
+static int	vdc_send_request(vdc_t *vdcp, int operation,
 		    caddr_t addr, size_t nbytes, int slice, diskaddr_t offset,
 		    buf_t *bufp, vio_desc_direction_t dir, int flags);
 static int	vdc_map_to_shared_dring(vdc_t *vdcp, int idx);
-static int 	vdc_populate_descriptor(vdc_t *vdcp, int operation,
+static int	vdc_populate_descriptor(vdc_t *vdcp, int operation,
 		    caddr_t addr, size_t nbytes, int slice, diskaddr_t offset,
 		    buf_t *bufp, vio_desc_direction_t dir, int flags);
-static int 	vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr,
+static int	vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr,
 		    size_t nbytes, int slice, diskaddr_t offset,
 		    vio_desc_direction_t dir, boolean_t);
 static int	vdc_do_op(vdc_t *vdc, int op, caddr_t addr, size_t nbytes,
@@ -224,7 +224,7 @@ static int	vdc_get_efi_convert(vdc_t *vdc, void *from, void *to,
 static int	vdc_set_efi_convert(vdc_t *vdc, void *from, void *to,
 		    int mode, int dir);
 
-static void 	vdc_ownership_update(vdc_t *vdc, int ownership_flags);
+static void	vdc_ownership_update(vdc_t *vdc, int ownership_flags);
 static int	vdc_access_set(vdc_t *vdc, uint64_t flags);
 static vdc_io_t	*vdc_eio_queue(vdc_t *vdc, int index);
 static void	vdc_eio_unqueue(vdc_t *vdc, clock_t deadline,
@@ -284,7 +284,7 @@ static uint_t vdc_hattr_min = VDC_HATTR_MIN;
  * various operations
  */
 static int	vdc_timeout = 0; /* units: seconds */
-static int 	vdc_ldcup_timeout = 1; /* units: seconds */
+static int	vdc_ldcup_timeout = 1; /* units: seconds */
 
 static uint64_t vdc_hz_min_ldc_delay;
 static uint64_t vdc_min_timeout_ldc = 1 * MILLISEC;
@@ -1074,7 +1074,7 @@ vdc_create_device_nodes_vtoc(vdc_t *vdc)
  *	refers to a whole disk. Slices start at 'a'
  *
  * Parameters:
- *	vdc 		- soft state pointer
+ *	vdc		- soft state pointer
  *
  * Return Values
  *	0		- Success
@@ -1192,7 +1192,7 @@ vdc_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
  *	currently opened.
  *
  * Parameters:
- *	vdc 		- soft state pointer
+ *	vdc		- soft state pointer
  *
  * Return Values
  *	B_TRUE		- at least one slice is opened.
@@ -2576,7 +2576,7 @@ vdc_terminate_ldc(vdc_t *vdc, vdc_server_t *srvr)
 	if (srvr->state & VDC_LDC_INIT) {
 		DMSG(vdc, 0, "[%d] ldc_fini()\n", instance);
 		(void) ldc_fini(srvr->ldc_handle);
-		srvr->ldc_handle = NULL;
+		srvr->ldc_handle = 0;
 	}
 
 	srvr->state &= ~(VDC_LDC_INIT | VDC_LDC_CB | VDC_LDC_OPEN);
@@ -2682,7 +2682,7 @@ vdc_init_descriptor_ring(vdc_t *vdc)
 
 		status = ldc_mem_dring_create(vdc->dring_len,
 		    vdc->dring_entry_size, &vdc->dring_hdl);
-		if ((vdc->dring_hdl == NULL) || (status != 0)) {
+		if ((vdc->dring_hdl == 0) || (status != 0)) {
 			DMSG(vdc, 0, "[%d] Descriptor ring creation failed",
 			    vdc->instance);
 			return (status);
@@ -2773,7 +2773,7 @@ static void
 vdc_destroy_descriptor_ring(vdc_t *vdc)
 {
 	vdc_local_desc_t	*ldep = NULL;	/* Local Dring Entry Pointer */
-	ldc_mem_handle_t	mhdl = NULL;
+	ldc_mem_handle_t	mhdl = 0;
 	ldc_mem_info_t		minfo;
 	int			status = -1;
 	int			i;	/* loop */
@@ -2790,7 +2790,7 @@ vdc_destroy_descriptor_ring(vdc_t *vdc)
 			ldep = &vdc->local_dring[i];
 			mhdl = ldep->desc_mhdl;
 
-			if (mhdl == NULL)
+			if (mhdl == 0)
 				continue;
 
 			if ((status = ldc_mem_info(mhdl, &minfo)) != 0) {
@@ -2803,7 +2803,7 @@ vdc_destroy_descriptor_ring(vdc_t *vdc)
 				 * is not valid. Clear it out so that
 				 * no one tries to use it.
 				 */
-				ldep->desc_mhdl = NULL;
+				ldep->desc_mhdl = 0;
 				continue;
 			}
 
@@ -2813,7 +2813,7 @@ vdc_destroy_descriptor_ring(vdc_t *vdc)
 
 			(void) ldc_mem_free_handle(mhdl);
 
-			ldep->desc_mhdl = NULL;
+			ldep->desc_mhdl = 0;
 		}
 		vdc->initialized &= ~VDC_DRING_ENTRY;
 	}
@@ -2841,7 +2841,7 @@ vdc_destroy_descriptor_ring(vdc_t *vdc)
 		DMSG(vdc, 0, "[%d] Destroying DRing\n", vdc->instance);
 		status = ldc_mem_dring_destroy(vdc->dring_hdl);
 		if (status == 0) {
-			vdc->dring_hdl = NULL;
+			vdc->dring_hdl = 0;
 			bzero(&vdc->dring_mem_info, sizeof (ldc_mem_info_t));
 			vdc->initialized &= ~VDC_DRING_INIT;
 		} else {
@@ -3197,7 +3197,7 @@ loop:
  *	vdc_do_op
  *
  * Description:
- * 	Wrapper around vdc_submit_request(). Each request is associated with a
+ *	Wrapper around vdc_submit_request(). Each request is associated with a
  *	buf structure. If a buf structure is provided (bufp != NULL) then the
  *	request will be submitted with that buf, and the caller can wait for
  *	completion of the request with biowait(). If a buf structure is not
@@ -3321,7 +3321,7 @@ done:
  *	vdc_do_sync_op
  *
  * Description:
- * 	Wrapper around vdc_do_op that serializes requests.
+ *	Wrapper around vdc_do_op that serializes requests.
  *
  * Arguments:
  *	vdcp	  - the soft state pointer
@@ -3411,9 +3411,9 @@ vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr, size_t nbytes,
  *	vdc_drain_response()
  *
  * Description:
- * 	When a guest is panicking, the completion of requests needs to be
- * 	handled differently because interrupts are disabled and vdc
- * 	will not get messages. We have to poll for the messages instead.
+ *	When a guest is panicking, the completion of requests needs to be
+ *	handled differently because interrupts are disabled and vdc
+ *	will not get messages. We have to poll for the messages instead.
  *
  *	Note: since we are panicking we don't implement	the io:::done
  *	DTrace probe or update the I/O statistics kstats.
@@ -3431,9 +3431,9 @@ vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr, size_t nbytes,
 static int
 vdc_drain_response(vdc_t *vdc, struct buf *buf)
 {
-	int 			rv, idx, retries;
+	int			rv, idx, retries;
 	size_t			msglen;
-	vdc_local_desc_t 	*ldep = NULL;	/* Local Dring Entry Pointer */
+	vdc_local_desc_t	*ldep = NULL;	/* Local Dring Entry Pointer */
 	vio_dring_msg_t		dmsg;
 	struct buf		*mbuf;
 	boolean_t		ack;
@@ -3926,7 +3926,7 @@ vdc_wait_for_response(vdc_t *vdcp, vio_msg_t *msgp)
  *
  * Description:
  *	Resubmit each descriptor in the backed up dring to
- * 	vDisk server. The Dring was backed up during connection
+ *	vDisk server. The Dring was backed up during connection
  *	reset.
  *
  * Arguments:
@@ -4030,7 +4030,7 @@ void
 vdc_cancel_backup_dring(vdc_t *vdcp)
 {
 	vdc_local_desc_t *ldep;
-	struct buf 	*bufp;
+	struct buf	*bufp;
 	int		count;
 	int		b_idx;
 	int		dring_size;
@@ -4118,7 +4118,7 @@ vdc_cancel_backup_dring(vdc_t *vdcp)
 void
 vdc_connection_timeout(void *arg)
 {
-	vdc_t 		*vdcp = (vdc_t *)arg;
+	vdc_t		*vdcp = (vdc_t *)arg;
 
 	mutex_enter(&vdcp->lock);
 
@@ -4213,7 +4213,7 @@ static void
 vdc_switch_server(vdc_t *vdcp)
 {
 	int		rv;
-	vdc_server_t 	*curr_server, *new_server;
+	vdc_server_t	*curr_server, *new_server;
 
 	ASSERT(MUTEX_HELD(&vdcp->lock));
 
@@ -4410,9 +4410,9 @@ vdc_handshake_retry(vdc_t *vdcp, int hshake_cnt, int hattr_cnt)
  * Description:
  *
  *	Main VDC message processing thread. Each vDisk instance
- * 	consists of a copy of this thread. This thread triggers
- * 	all the handshakes and data exchange with the server. It
- * 	also handles all channel resets
+ *	consists of a copy of this thread. This thread triggers
+ *	all the handshakes and data exchange with the server. It
+ *	also handles all channel resets
  *
  * Arguments:
  *      vdc     - soft state pointer for this instance of the device driver.
@@ -5516,7 +5516,7 @@ typedef struct vdc_dk_arg {
 
 /*
  * Function:
- * 	vdc_dkio_flush_cb()
+ *	vdc_dkio_flush_cb()
  *
  * Description:
  *	This routine is a callback for DKIOCFLUSHWRITECACHE which can be called
@@ -5572,7 +5572,7 @@ vdc_dkio_flush_cb(void *arg)
 
 /*
  * Function:
- * 	vdc_dkio_gapart()
+ *	vdc_dkio_gapart()
  *
  * Description:
  *	This function implements the DKIOCGAPART ioctl.
@@ -5638,7 +5638,7 @@ vdc_dkio_gapart(vdc_t *vdc, caddr_t arg, int flag)
 
 /*
  * Function:
- * 	vdc_dkio_partition()
+ *	vdc_dkio_partition()
  *
  * Description:
  *	This function implements the DKIOCPARTITION ioctl.
@@ -5691,7 +5691,7 @@ vdc_dkio_partition(vdc_t *vdc, caddr_t arg, int flag)
 
 /*
  * Function:
- * 	vdc_dioctl_rwcmd()
+ *	vdc_dioctl_rwcmd()
  *
  * Description:
  *	This function implements the DIOCTL_RWCMD ioctl. This ioctl is used
@@ -5934,15 +5934,15 @@ vdc_scsi_status(vdc_t *vdc, vd_scsi_t *vd_scsi, boolean_t log_error)
 static int
 vdc_uscsi_cmd(vdc_t *vdc, caddr_t arg, int mode)
 {
-	struct uscsi_cmd 	uscsi;
+	struct uscsi_cmd	uscsi;
 	struct uscsi_cmd32	uscsi32;
-	vd_scsi_t 		*vd_scsi;
-	int 			vd_scsi_len;
+	vd_scsi_t		*vd_scsi;
+	int			vd_scsi_len;
 	union scsi_cdb		*cdb;
 	struct scsi_extended_sense *sense;
-	char 			*datain, *dataout;
+	char			*datain, *dataout;
 	size_t			cdb_len, datain_len, dataout_len, sense_len;
-	int 			rv;
+	int			rv;
 
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
 		if (ddi_copyin(arg, &uscsi32, sizeof (struct uscsi_cmd32),
@@ -7200,7 +7200,7 @@ static vdc_dk_ioctl_t	dk_ioctl[] = {
 		vdc_get_geom_convert},
 	{VD_OP_GET_DISKGEOM,	DKIOCG_PHYGEOM,		sizeof (vd_geom_t),
 		vdc_get_geom_convert},
-	{VD_OP_GET_DISKGEOM, 	DKIOCG_VIRTGEOM,	sizeof (vd_geom_t),
+	{VD_OP_GET_DISKGEOM,	DKIOCG_VIRTGEOM,	sizeof (vd_geom_t),
 		vdc_get_geom_convert},
 	{VD_OP_SET_DISKGEOM,	DKIOCSGEOM,		sizeof (vd_geom_t),
 		vdc_set_geom_convert},
@@ -7222,7 +7222,7 @@ static vdc_dk_ioctl_t	dk_ioctl[] = {
 	{0, MHIOCGRP_INKEYS,			0, vdc_null_copy_func},
 	{0, MHIOCGRP_INRESV,			0, vdc_null_copy_func},
 	{0, MHIOCGRP_REGISTER,			0, vdc_null_copy_func},
-	{0, MHIOCGRP_RESERVE, 			0, vdc_null_copy_func},
+	{0, MHIOCGRP_RESERVE,			0, vdc_null_copy_func},
 	{0, MHIOCGRP_PREEMPTANDABORT,		0, vdc_null_copy_func},
 	{0, MHIOCGRP_REGISTERANDIGNOREKEY,	0, vdc_null_copy_func},
 
@@ -7578,9 +7578,10 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode, int *rvalp)
 				vdc->dkio_flush_pending--;
 				mutex_exit(&vdc->lock);
 				kmem_free(dkarg, sizeof (vdc_dk_arg_t));
+				return (ENOMEM);
 			}
 
-			return (rv == NULL ? ENOMEM : 0);
+			return (0);
 		}
 	}
 

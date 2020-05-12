@@ -431,7 +431,7 @@ ds_ldc_fini(ds_port_t *port)
 	}
 
 	port->ldc.id = (uint64_t)-1;
-	port->ldc.hdl = NULL;
+	port->ldc.hdl = 0;
 	port->ldc.state = 0;
 
 	return (rv);
@@ -2492,7 +2492,7 @@ ds_ucap_init(ds_capability_t *cap, ds_clnt_ops_t *ops, uint32_t flags,
 	ds_vers_check_t	status;
 	ds_svc_t	*svc;
 	int		rv = 0;
-	ds_svc_hdl_t 	lb_hdl, hdl;
+	ds_svc_hdl_t	lb_hdl, hdl;
 	int		is_loopback;
 	int		is_client;
 

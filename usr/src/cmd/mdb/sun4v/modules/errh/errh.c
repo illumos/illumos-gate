@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/sysmacros.h>
@@ -208,14 +206,13 @@ errh_prtaddr(uintptr_t addr, const void *data, void *private)
 	return (WALK_NEXT);
 }
 
-/*ARGSUSED*/
 int
 rq_walk_init(mdb_walk_state_t *wsp)
 {
 	cpu_t cpu;
 	uintptr_t *ao, *lower, *upper;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == (uintptr_t)NULL) {
 		mdb_warn("address of struct cpu_t is required\n");
 		return (WALK_ERR);
 	}
@@ -245,14 +242,13 @@ rq_walk_init(mdb_walk_state_t *wsp)
 	return (WALK_NEXT);
 }
 
-/*ARGSUSED*/
 int
 nrq_walk_init(mdb_walk_state_t *wsp)
 {
 	cpu_t cpu;
 	uintptr_t *ao, *lower, *upper;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == (uintptr_t)NULL) {
 		mdb_warn("address of struct cpu_t is required\n");
 		return (WALK_ERR);
 	}
@@ -282,14 +278,13 @@ nrq_walk_init(mdb_walk_state_t *wsp)
 	return (WALK_NEXT);
 }
 
-/*ARGSUSED*/
 int
 errh_walk_step(mdb_walk_state_t *wsp)
 {
 	int status;
 	uintptr_t *ao, *lower, *upper;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == (uintptr_t)NULL)
 		return (WALK_DONE);
 
 	status = wsp->walk_callback(wsp->walk_addr, wsp->walk_data,

@@ -1,0 +1,44 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+set name=pkg.fmri value=pkg:/system/library/libutempter@$(PKGVERS)
+set name=pkg.description \
+    value="Interface to record user sessions in utmpx database"
+set name=pkg.summary \
+    value="Interface to record user sessions in utmpx database"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Library
+set name=variant.arch value=$(ARCH)
+dir path=usr group=sys
+dir path=usr/include
+dir path=usr/lib
+dir path=usr/lib/$(ARCH64)
+dir path=usr/share
+dir path=usr/share/man
+dir path=usr/share/man/man3utempter
+file path=usr/include/utempter.h
+file path=usr/lib/$(ARCH64)/libutempter.so.1
+file path=usr/lib/libutempter.so.1
+file path=usr/share/man/man3utempter/utempter_add_record.3utempter
+license usr/src/lib/libutempter/THIRDPARTYLICENSE \
+    license=usr/src/lib/libutempter/THIRDPARTYLICENSE
+link path=usr/lib/$(ARCH64)/libutempter.so target=libutempter.so.1
+link path=usr/lib/libutempter.so target=libutempter.so.1
+link path=usr/share/man/man3utempter/addToUtmp.3utempter \
+    target=utempter_add_record.3utempter
+link path=usr/share/man/man3utempter/removeFromUtmp.3utempter \
+    target=utempter_add_record.3utempter
+link path=usr/share/man/man3utempter/removeLineFromUtmp.3utempter \
+    target=utempter_add_record.3utempter
+link path=usr/share/man/man3utempter/utempter_remove_added_record.3utempter \
+    target=utempter_add_record.3utempter
+link path=usr/share/man/man3utempter/utempter_remove_record.3utempter \
+    target=utempter_add_record.3utempter

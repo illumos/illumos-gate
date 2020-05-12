@@ -233,7 +233,7 @@ rmcadm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			return (DDI_FAILURE);
 
 		err = ddi_create_minor_node(dip, "rmcadm", S_IFCHR,
-		    instance, DDI_PSEUDO, NULL);
+		    instance, DDI_PSEUDO, 0);
 		if (err != DDI_SUCCESS)
 			return (DDI_FAILURE);
 

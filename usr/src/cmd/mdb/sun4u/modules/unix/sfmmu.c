@@ -131,7 +131,7 @@ sfmmu_vtop(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (ret == 0) {
 		mdb_printf("address space %p: virtual %lr mapped to physical "
-			"%llr", asp, addr, paddr);
+		    "%llr", asp, addr, paddr);
 	} else {
 		return (DCMD_ERR);
 	}
@@ -174,7 +174,7 @@ sfmmu_vtop_common(struct as *asp, uintptr_t addr, physaddr_t *pap)
 
 static int
 sfmmu_vtop_impl(uintptr_t addr, sfmmu_t *sfmmup, sfmmu_t *msfmmup,
-	    physaddr_t *pap)
+    physaddr_t *pap)
 {
 	struct hmehash_bucket *uhme_hash;
 	struct hmehash_bucket *khme_hash;
@@ -225,7 +225,7 @@ sfmmu_vtop_impl(uintptr_t addr, sfmmu_t *sfmmup, sfmmu_t *msfmmup,
 		}
 		ism_blkp = &mism_blk;
 		ism_map = ism_blkp->iblk_maps;
-		for (i = 0; ism_map[i].imap_ismhat && i < ISM_MAP_SLOTS; i++) {
+		for (i = 0; i < ISM_MAP_SLOTS && ism_map[i].imap_ismhat; i++) {
 			if ((caddr_t)addr >= ism_start(ism_map[i]) &&
 			    (caddr_t)addr < ism_end(ism_map[i])) {
 				sfmmup = ism_hatid = ism_map[i].imap_ismhat;
@@ -252,18 +252,18 @@ sfmmu_vtop_impl(uintptr_t addr, sfmmu_t *sfmmup, sfmmu_t *msfmmup,
 
 #ifdef __sparcv9
 		SFMMU_VTOP_DBG_DBG("hblktag=%lx %lx\n",
-				(uint64_t)hblktag.htag_tag[0],
-				(uint64_t)hblktag.htag_tag[1]);
+		    (uint64_t)hblktag.htag_tag[0],
+		    (uint64_t)hblktag.htag_tag[1]);
 #else
 		SFMMU_VTOP_DBG_DBG("hblktag=%llx\n",
-				(uint64_t)hblktag.htag_tag);
+		    (uint64_t)hblktag.htag_tag);
 #endif
 
 		hmebp = shmebp = HME_HASH_FUNCTION(sfmmup, addr, hmeshift);
 		SFMMU_VTOP_DBG_DBG("hmebp=%p\n", hmebp);
 
 		if (mdb_vread(&mbucket, sizeof (mbucket),
-				(uintptr_t)hmebp) == -1) {
+		    (uintptr_t)hmebp) == -1) {
 			mdb_warn("couldn't read mbucket at %p\n", hmebp);
 			return (DCMD_ERR);
 		}
@@ -271,7 +271,7 @@ sfmmu_vtop_impl(uintptr_t addr, sfmmu_t *sfmmup, sfmmu_t *msfmmup,
 		hmebp = &mbucket;
 
 		for (hmeblkp = hmebp->hmeblkp; hmeblkp;
-			hmeblkp = hmeblkp->hblk_next) {
+		    hmeblkp = hmeblkp->hblk_next) {
 
 			SFMMU_VTOP_DBG_DBG("hmeblkp=%p\n", hmeblkp);
 
@@ -279,9 +279,9 @@ sfmmu_vtop_impl(uintptr_t addr, sfmmu_t *sfmmup, sfmmu_t *msfmmup,
 				break;
 
 			if (mdb_vread(&mhmeblkmax, sizeof (struct hme_blk),
-					(uintptr_t)hmeblkp) == -1) {
+			    (uintptr_t)hmeblkp) == -1) {
 				mdb_warn("couldn't read hme_blk at %p\n",
-					hmeblkp);
+				    hmeblkp);
 				return (DCMD_ERR);
 			}
 
@@ -298,7 +298,7 @@ sfmmu_vtop_impl(uintptr_t addr, sfmmu_t *sfmmup, sfmmu_t *msfmmup,
 			sfmmu_vtop_print_hmeblk(hmeblkp);
 
 			sfhmep = mdb_sfmmu_hblktohme(hmeblkp, (caddr_t)addr,
-					&sfhmeinx);
+			    &sfhmeinx);
 
 			SFMMU_VTOP_DBG_DBG("sfhmeinx=%d ", sfhmeinx);
 
@@ -307,28 +307,26 @@ sfmmu_vtop_impl(uintptr_t addr, sfmmu_t *sfmmup, sfmmu_t *msfmmup,
 				    sizeof (struct sf_hment) * (sfhmeinx - 1);
 
 				if (mdb_vread(sfhmep, sizeof (struct sf_hment),
-						thmeblkp) == -1) {
+				    thmeblkp) == -1) {
 					mdb_warn("couldn't read msfhme at %p\n",
-						sfhmep);
+					    sfhmep);
 					return (DCMD_ERR);
 				}
 			}
 
 			SFMMU_VTOP_DBG_VRB("sfmmup=%p hmebp=%p hmeblkp=%p\n",
-					sfmmup, shmebp, thmeblkp);
+			    sfmmup, shmebp, thmeblkp);
 
 			tte = sfhmep->hme_tte;
 			SFMMU_VTOP_DBG_VRB("tte=%llx ", tte.ll);
 			if (TTE_IS_VALID(&tte)) {
 				start_pfn = TTE_TO_TTEPFN(&tte);
 				*pap = (start_pfn << MMU_PAGESHIFT) +
-					(addr & TTE_PAGE_OFFSET(tte.tte_size));
+				    (addr & TTE_PAGE_OFFSET(tte.tte_size));
 				pfn = *pap >> MMU_PAGESHIFT;
 				pp = (sfhmep->hme_page != 0) ?
-					sfhmep->hme_page + (pfn - start_pfn) :
-					0;
-				SFMMU_VTOP_DBG_VRB("pfn=%lx pp=%p\n",
-					pfn, pp);
+				    sfhmep->hme_page + (pfn - start_pfn) : 0;
+				SFMMU_VTOP_DBG_VRB("pfn=%lx pp=%p\n", pfn, pp);
 				ret = 0;
 			}
 			break;
@@ -345,13 +343,13 @@ static void
 sfmmu_vtop_print_hmeblk(struct hme_blk *hmeblkp)
 {
 
-	if ((sfmmu_vtop_dbg & SFMMU_VTOP_DBG_DEBUG) == NULL)
+	if ((sfmmu_vtop_dbg & SFMMU_VTOP_DBG_DEBUG) == 0)
 		return;
 
 	mdb_printf("    hblk_nextpa=%llx\n", hmeblkp->hblk_nextpa);
 #ifdef __sparcv9
 	mdb_printf("    hblktag=%lx %lx\n", hmeblkp->hblk_tag.htag_tag[0],
-			hmeblkp->hblk_tag.htag_tag[1]);
+	    hmeblkp->hblk_tag.htag_tag[1]);
 #else
 	mdb_printf("    hblktag=%llx\n", hmeblkp->hblk_tag.htag_tag);
 #endif
@@ -403,7 +401,7 @@ memseg_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (DCMD_HDRSPEC(flags))
 		mdb_printf("%<u>%?s %?s %?s %?s %?s%</u>\n", "ADDR",
-			"PAGES", "EPAGES", "BASE", "END");
+		    "PAGES", "EPAGES", "BASE", "END");
 
 	if (mdb_vread(&ms, sizeof (struct memseg), addr) == -1) {
 		mdb_warn("can't read memseg at %#lx", addr);
@@ -411,7 +409,7 @@ memseg_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf("%0?lx %0?lx %0?lx %0?lx %0?lx\n", addr,
-		ms.pages, ms.epages, ms.pages_base, ms.pages_end);
+	    ms.pages, ms.epages, ms.pages_base, ms.pages_end);
 
 	return (DCMD_OK);
 }
@@ -422,7 +420,7 @@ memseg_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 int
 memseg_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != (uintptr_t)NULL) {
 		mdb_warn("memseg only supports global walks\n");
 		return (WALK_ERR);
 	}
@@ -535,9 +533,9 @@ tsbinfo_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (mdb_getopts(argc, argv,
-		'l', MDB_OPT_SETBITS, TRUE, &lflag,
-		'a', MDB_OPT_SETBITS, TRUE, &aflag,
-		NULL) != argc) {
+	    'l', MDB_OPT_SETBITS, TRUE, &lflag,
+	    'a', MDB_OPT_SETBITS, TRUE, &aflag,
+	    NULL) != argc) {
 		return (DCMD_USAGE);
 	}
 
@@ -600,24 +598,24 @@ tsbinfo_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    UM_SLEEP);
 
 			if (mdb_vread(tsbp, sizeof (struct tsbe) * entries,
-				(uintptr_t)tsbinfo.tsb_va) == -1) {
+			    (uintptr_t)tsbinfo.tsb_va) == -1) {
 				mdb_warn("failed to read TSB at %p",
 				    tsbinfo.tsb_va);
 				return (DCMD_ERR);
 			}
 
 			mdb_printf(
-				"TSB @ %lx (%d entries)\n"
-				    "%-?s %-17s %s\n"
-				    "%<u>%-?s %1s %1s %-11s "
-				    "%1s %1s %1s %1s %1s %1s %8s "
-				    "%1s %1s %1s %1s %1s %1s %1s "
-				    "%1s %1s %1s %1s %1s %1s%</u>\n",
-				    tsbinfo.tsb_va, entries, "", "TAG", "TTE",
-				    "ADDR", "I", "L", "VA 63:22",
-				    "V", "S", "N", "I", "H", "S", "PA 42:13",
-				    "N", "U", "R", "W", "E", "X", "L",
-				    "P", "V", "E", "P", "W", "G");
+			    "TSB @ %lx (%d entries)\n"
+			    "%-?s %-17s %s\n"
+			    "%<u>%-?s %1s %1s %-11s "
+			    "%1s %1s %1s %1s %1s %1s %8s "
+			    "%1s %1s %1s %1s %1s %1s %1s "
+			    "%1s %1s %1s %1s %1s %1s%</u>\n",
+			    tsbinfo.tsb_va, entries, "", "TAG", "TTE",
+			    "ADDR", "I", "L", "VA 63:22",
+			    "V", "S", "N", "I", "H", "S", "PA 42:13",
+			    "N", "U", "R", "W", "E", "X", "L",
+			    "P", "V", "E", "P", "W", "G");
 
 			tsbend = tsbp + entries;
 			for (tsbstart = tsbp; tsbp < tsbend; tsbp++) {
@@ -626,8 +624,8 @@ tsbinfo_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 					va = (caddr_t)
 					    (((uint64_t)tsbp->tte_tag.tag_vahi
-						<< 32) +
-						tsbp->tte_tag.tag_valo);
+					    << 32) +
+					    tsbp->tte_tag.tag_valo);
 					pa = (tsbp->tte_data.tte_pahi << 19) +
 					    tsbp->tte_data.tte_palo;
 					mdb_printf("%0?lx %-1u %-1u %011lx "

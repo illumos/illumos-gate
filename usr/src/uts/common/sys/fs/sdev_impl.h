@@ -39,6 +39,7 @@ extern "C" {
 #include <sys/nvpair.h>
 #include <sys/fs/sdev_plugin.h>
 #include <sys/sunddi.h>
+#include <sys/fs/sdev_plugin.h>
 
 /*
  * sdev_nodes are the file-system specific part of the

@@ -1660,6 +1660,32 @@ mac_rx_barrier(mac_client_handle_t mch)
 }
 
 void
+mac_rx_barrier(mac_client_handle_t mch)
+{
+	mac_client_impl_t *mcip = (mac_client_impl_t *)mch;
+	mac_impl_t *mip = mcip->mci_mip;
+
+	i_mac_perim_enter(mip);
+
+	/* If a RX callback is set, quiesce and restart that datapath */
+	if (mcip->mci_rx_fn != mac_pkt_drop) {
+		mac_rx_client_quiesce(mch);
+		mac_rx_client_restart(mch);
+	}
+
+	/* If any promisc callbacks are registered, perform a barrier there */
+	if (mcip->mci_promisc_list != NULL || mip->mi_promisc_list != NULL) {
+		mac_cb_info_t *mcbi =  &mip->mi_promisc_cb_info;
+
+		mutex_enter(mcbi->mcbi_lockp);
+		mac_callback_barrier(mcbi);
+		mutex_exit(mcbi->mcbi_lockp);
+	}
+
+	i_mac_perim_exit(mip);
+}
+
+void
 mac_secondary_dup(mac_client_handle_t smch, mac_client_handle_t dmch)
 {
 	mac_client_impl_t *smcip = (mac_client_impl_t *)smch;

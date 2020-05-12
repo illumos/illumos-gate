@@ -83,6 +83,7 @@ SUBDIRS=	man1		\
 		man3tecla	\
 		man3tnf		\
 		man3tsol	\
+		man3utempter	\
 		man3uuid	\
 		man3volmgt	\
 		man3vnd		\

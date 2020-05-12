@@ -676,7 +676,7 @@ ttrace_walk_init(mdb_walk_state_t *wsp)
 	ttrace_cpu_data_t *tc;
 	struct trap_trace_record *buf;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != (uintptr_t)NULL) {
 		mdb_warn("ttrace only supports global walks\n");
 		return (WALK_ERR);
 	}
@@ -965,7 +965,7 @@ httrace_walk_init(mdb_walk_state_t *wsp)
 	struct htrap_trace_record *buf;
 	htrap_trace_hdr_t *hdr;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != (uintptr_t)NULL) {
 		mdb_warn("httrace only supports global walks\n");
 		return (WALK_ERR);
 	}
@@ -1347,7 +1347,7 @@ vecint_walk_init(mdb_walk_state_t *wsp)
 {
 	vecint_walk_data_t	*vecint;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != (uintptr_t)NULL) {
 		mdb_warn("vecint walk only supports global walks\n");
 		return (WALK_ERR);
 	}
@@ -1378,13 +1378,14 @@ vecint_walk_step(mdb_walk_state_t *wsp)
 	intr_vec_t		iv;
 	int			status;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == (uintptr_t)NULL) {
 		while ((vecint->vec_idx < max) && ((wsp->walk_addr =
-		    (uintptr_t)vecint->vec_table[vecint->vec_idx++]) == NULL))
+		    (uintptr_t)vecint->vec_table[vecint->vec_idx++]) ==
+		    (uintptr_t)NULL))
 			continue;
 	}
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == (uintptr_t)NULL)
 		return (WALK_DONE);
 
 	status = wsp->walk_callback(wsp->walk_addr, wsp->walk_data,
@@ -1443,7 +1444,7 @@ softint_walk_init(mdb_walk_state_t *wsp)
 {
 	intr_vec_t	*list;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != (uintptr_t)NULL) {
 		mdb_warn("softint walk only supports global walks\n");
 		return (WALK_ERR);
 	}
@@ -1471,7 +1472,7 @@ softint_walk_step(mdb_walk_state_t *wsp)
 	intr_vec_t		iv;
 	int			status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == (uintptr_t)NULL)
 		return (WALK_DONE);
 
 	status = wsp->walk_callback(wsp->walk_addr, wsp->walk_data,
@@ -1568,7 +1569,7 @@ mutex_owner_step(mdb_walk_state_t *wsp)
 	if (!MUTEX_TYPE_ADAPTIVE(&mtx))
 		return (WALK_DONE);
 
-	if ((owner = (uintptr_t)MUTEX_OWNER(&mtx)) == NULL)
+	if ((owner = (uintptr_t)MUTEX_OWNER(&mtx)) == (uintptr_t)NULL)
 		return (WALK_DONE);
 
 	if (mdb_vread(&thr, sizeof (thr), owner) != -1)

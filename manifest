@@ -4151,6 +4151,7 @@ f usr/include/sys/fs/pc_label.h 0644 root bin
 f usr/include/sys/fs/pc_node.h 0644 root bin
 f usr/include/sys/fs/pxfs_ki.h 0644 root bin
 f usr/include/sys/fs/sdev_impl.h 0644 root bin
+f usr/include/sys/fs/sdev_plugin.h 0644 root bin
 f usr/include/sys/fs/snode.h 0644 root bin
 f usr/include/sys/fs/swapnode.h 0644 root bin
 f usr/include/sys/fs/tmp.h 0644 root bin
@@ -4901,6 +4902,7 @@ f usr/include/unistd.h 0644 root bin
 f usr/include/user_attr.h 0644 root bin
 f usr/include/userdefs.h 0644 root bin
 f usr/include/ustat.h 0644 root bin
+f usr/include/utempter.h 0644 root bin
 f usr/include/utility.h 0644 root bin
 f usr/include/utime.h 0644 root bin
 f usr/include/utmp.h 0644 root bin
@@ -5413,6 +5415,8 @@ s usr/lib/amd64/libtsol.so.2=../../../lib/amd64/libtsol.so.2
 s usr/lib/amd64/libtsol.so=../../../lib/amd64/libtsol.so.2
 s usr/lib/amd64/libumem.so.1=../../../lib/amd64/libumem.so.1
 s usr/lib/amd64/libumem.so=../../../lib/amd64/libumem.so.1
+f usr/lib/amd64/libutempter.so.1 0755 root bin
+s usr/lib/amd64/libutempter.so=../../../lib/amd64/libutempter.so.1
 s usr/lib/amd64/libuuid.so.1=../../../lib/amd64/libuuid.so.1
 s usr/lib/amd64/libuuid.so=../../../lib/amd64/libuuid.so.1
 s usr/lib/amd64/libuutil.so.1=../../../lib/amd64/libuutil.so.1
@@ -6943,6 +6947,8 @@ s usr/lib/libtsol.so.2=../../lib/libtsol.so.2
 s usr/lib/libtsol.so=../../lib/libtsol.so.2
 s usr/lib/libumem.so.1=../../lib/libumem.so.1
 s usr/lib/libumem.so=../../lib/libumem.so.1
+f usr/lib/libutempter.so.1 0755 root bin
+s usr/lib/libutempter.so=../../lib/libutempter.so.1
 s usr/lib/libuuid.so.1=../../lib/libuuid.so.1
 s usr/lib/libuuid.so=../../lib/libuuid.so.1
 s usr/lib/libuutil.so.1=../../lib/libuutil.so.1
@@ -18625,6 +18631,13 @@ f usr/share/man/man3tnf/tnfctl_strerror.3tnf 0444 root bin
 f usr/share/man/man3tnf/tnfctl_trace_attrs_get.3tnf 0444 root bin
 f usr/share/man/man3tnf/tnfctl_trace_state_set.3tnf 0444 root bin
 f usr/share/man/man3tnf/tracing.3tnf 0444 root bin
+d usr/share/man/man3utempter 0755 root bin
+s usr/share/man/man3utempter/addToUtmp.3utempter=utempter_add_record.3utempter
+s usr/share/man/man3utempter/removeFromUtmp.3utempter=utempter_add_record.3utempter
+s usr/share/man/man3utempter/removeLineFromUtmp.3utempter=utempter_add_record.3utempter
+f usr/share/man/man3utempter/utempter_add_record.3utempter 0444 root bin
+s usr/share/man/man3utempter/utempter_remove_added_record.3utempter=utempter_add_record.3utempter
+s usr/share/man/man3utempter/utempter_remove_record.3utempter=utempter_add_record.3utempter
 d usr/share/man/man3uuid 0755 root bin
 f usr/share/man/man3uuid/uuid_clear.3uuid 0444 root bin
 s usr/share/man/man3uuid/uuid_compare.3uuid=uuid_clear.3uuid

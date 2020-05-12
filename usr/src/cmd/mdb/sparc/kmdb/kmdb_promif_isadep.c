@@ -75,7 +75,7 @@ kmdb_prom_get_ddi_prop(kmdb_auxv_t *kav, char *propname)
 	ssize_t len;
 	char *val;
 
-	if ((node = prom_finddevice("/options")) == NULL)
+	if ((node = prom_finddevice("/options")) == 0)
 		return (NULL);
 
 	if ((len = prom_getproplen(node, propname)) < 0)

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This module provides debugging tools for the LDoms channels (ldc)
  */
@@ -233,13 +231,13 @@ ldc_walk_init(mdb_walk_state_t *wsp)
 	ldc_soft_state_t	softstate;
 
 	/* Must have a start addr.  */
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == (uintptr_t)NULL) {
 		if (mdb_readvar(&wsp->walk_addr, "ldcssp") == -1) {
 			mdb_warn("failed to read 'ldcssp'");
 			return (WALK_ERR);
 		}
 
-		if (wsp->walk_addr == NULL)
+		if (wsp->walk_addr == (uintptr_t)NULL)
 			return (WALK_DONE);
 
 		if (mdb_vread(&softstate, sizeof (softstate), wsp->walk_addr)
@@ -263,7 +261,7 @@ ldc_walk_step(mdb_walk_state_t *wsp)
 	int			status;
 	ldc_chan_t		ldcp;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == (uintptr_t)NULL)
 		return (WALK_DONE);
 
 	if (mdb_vread(&ldcp, sizeof (ldc_chan_t), wsp->walk_addr) == -1) {
@@ -289,7 +287,7 @@ int
 ldcmsg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	ldc_msg_t	msg;
-	uint64_t 	count = 1;
+	uint64_t	count = 1;
 	int		i;
 
 	/*
@@ -476,7 +474,7 @@ ldcmhdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_printf("\n");
 		}
 
-		if ((addr = (uintptr_t)mhdl.next) == NULL)
+		if ((addr = (uintptr_t)mhdl.next) == (uintptr_t)NULL)
 			break;
 	}
 

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SPARC-specific portions of the KDI
  */
@@ -66,7 +64,8 @@ kdi_cpu_ready_iter(int (*cb)(int, void *), void *arg)
 static int
 kdi_xc_one(int cpuid, void (*cb)(void))
 {
-	return (mdb.m_kdi->mkdi_xc_one(cpuid, (void (*)())cb, NULL, NULL));
+	return (mdb.m_kdi->mkdi_xc_one(cpuid, (void (*)())cb, (uintptr_t)NULL,
+	    (uintptr_t)NULL));
 }
 
 /*ARGSUSED1*/
@@ -157,7 +156,7 @@ kdi_halt_cpu(int cpuid, void *state_saverp)
 
 	if (state != DPI_CPU_STATE_MASTER && state != DPI_CPU_STATE_SLAVE) {
 		res = kdi_xc_one(cpuid, state_saver);
-			rc = 1;
+		rc = 1;
 
 		if (res == KDI_XC_RES_OK)
 			msg = "accepted the";

@@ -397,7 +397,7 @@ kaif_wapt_reserve(kmdb_wapt_t *wp)
 	else
 		addrp = &kaif_vwapt_addr;
 
-	if (*addrp != NULL)
+	if (*addrp != 0)
 		return (set_errno(EMDB_WPTOOMANY));
 
 	*addrp = wp->wp_addr;
@@ -412,8 +412,8 @@ kaif_wapt_release(kmdb_wapt_t *wp)
 	uint64_t *addrp = (wp->wp_type == DPI_WAPT_TYPE_PHYS ?
 	    &kaif_pwapt_addr : &kaif_vwapt_addr);
 
-	ASSERT(*addrp != NULL);
-	*addrp = NULL;
+	ASSERT(*addrp != 0);
+	*addrp = 0;
 }
 
 /*ARGSUSED*/
@@ -487,10 +487,10 @@ kaif_wapt_set_regs(void)
 
 	ASSERT((kaif_lsuctl & ~KAIF_LSUCTL_WAPT_MASK) == NULL);
 
-	lsu = rdasi(ASI_LSU, NULL);
+	lsu = rdasi(ASI_LSU, (uintptr_t)NULL);
 	lsu &= ~KAIF_LSUCTL_WAPT_MASK;
 	lsu |= kaif_lsuctl;
-	wrasi(ASI_LSU, NULL, lsu);
+	wrasi(ASI_LSU, (uintptr_t)NULL, lsu);
 #endif /* sun4v */
 }
 
@@ -501,9 +501,9 @@ kaif_wapt_clear_regs(void)
 	 * Sun4v doesn't have watch point regs
 	 */
 #ifndef sun4v
-	uint64_t lsu = rdasi(ASI_LSU, NULL);
+	uint64_t lsu = rdasi(ASI_LSU, (uintptr_t)NULL);
 	lsu &= ~KAIF_LSUCTL_WAPT_MASK;
-	wrasi(ASI_LSU, NULL, lsu);
+	wrasi(ASI_LSU, (uintptr_t)NULL, lsu);
 #endif /* sun4v */
 }
 
@@ -742,7 +742,7 @@ static const mdb_bitmask_t krm_flag_bits[] = {
 	{ "M_PE",	KAIF_CRUMB_F_MAIN_OBPPENT, KAIF_CRUMB_F_MAIN_OBPPENT },
 	{ "M_NRM",	KAIF_CRUMB_F_MAIN_NORMAL, KAIF_CRUMB_F_MAIN_NORMAL },
 	{ "I_RE",	KAIF_CRUMB_F_IVEC_REENTER, KAIF_CRUMB_F_IVEC_REENTER },
-	{ "I_OBP", 	KAIF_CRUMB_F_IVEC_INOBP, KAIF_CRUMB_F_IVEC_INOBP },
+	{ "I_OBP",	KAIF_CRUMB_F_IVEC_INOBP, KAIF_CRUMB_F_IVEC_INOBP },
 	{ "I_NRM",	KAIF_CRUMB_F_IVEC_NORMAL, KAIF_CRUMB_F_IVEC_NORMAL },
 	{ "O_NRM",	KAIF_CRUMB_F_OBP_NORMAL, KAIF_CRUMB_F_OBP_NORMAL },
 	{ "O_REVEC",	KAIF_CRUMB_F_OBP_REVECT, KAIF_CRUMB_F_OBP_REVECT },
@@ -798,7 +798,7 @@ kaif_dump_crumbs(uintptr_t addr, int cpuid)
 {
 	int i;
 
-	if (addr != NULL) {
+	if (addr != (uintptr_t)NULL) {
 		/* dump_crumb will protect us from bogus addresses */
 		dump_crumb((kaif_crumb_t *)addr);
 

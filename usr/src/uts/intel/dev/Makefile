@@ -71,6 +71,7 @@ LINTTAGS	+= -erroff=E_STATIC_UNUSED
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= $(CNOWARN_UNINIT)
+CERRWARN	+= -_gcc=-Wno-unused-function
 
 #
 #	Default build targets.
