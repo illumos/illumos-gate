@@ -1553,7 +1553,7 @@ mac_pkt_drop(void *arg, mac_resource_handle_t resource, mblk_t *mp,
 		mp1->b_queue = NULL;
 		mp1 = mp1->b_next;
 	}
-	freemsgchain(mp_chain);
+	freemsgchain(mp);
 }
 
 /*
