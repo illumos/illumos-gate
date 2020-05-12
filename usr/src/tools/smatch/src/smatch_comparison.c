@@ -2748,8 +2748,8 @@ split:
 }
 
 struct sm_state *comparison_implication_hook(struct expression *expr,
-				struct state_list **true_stack,
-				struct state_list **false_stack)
+					     struct state_list **true_stack,
+					     struct state_list **false_stack)
 {
 	struct sm_state *sm;
 	char *left, *right;

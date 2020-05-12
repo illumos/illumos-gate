@@ -151,6 +151,9 @@ static void handle_non_struct_assignments(struct expression *left, struct expres
 	struct symbol *type;
 	struct expression *assign;
 
+	while (right && right->type == EXPR_ASSIGNMENT)
+		right = strip_parens(right->left);
+
 	type = get_type(left);
 	if (!type)
 		return;
@@ -234,13 +237,15 @@ static void __struct_members_copy(int mode, struct expression *faked,
 	struct expression *assign;
 	int op = '.';
 
-
 	if (__in_fake_assign)
 		return;
 	faked_expression = faked;
 
 	left = strip_expr(left);
 	right = strip_expr(right);
+
+	if (left->type == EXPR_PREOP && left->op == '*' && is_pointer(left))
+		left = preop_expression(left, '(');
 
 	struct_type = get_struct_type(left);
 	if (!struct_type) {

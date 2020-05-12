@@ -1067,21 +1067,6 @@ static void match_call_info(struct expression *expr)
 	} END_FOR_EACH_PTR(arg);
 }
 
-static int is_struct_ptr(struct symbol *sym)
-{
-	struct symbol *type;
-
-	if (!sym)
-		return 0;
-	type = get_real_base_type(sym);
-	if (!type || type->type != SYM_PTR)
-		return 0;
-	type = get_real_base_type(type);
-	if (!type || type->type != SYM_STRUCT)
-		return 0;
-	return 1;
-}
-
 static void struct_member_callback(struct expression *call, int param, char *printed_name, struct sm_state *sm)
 {
 	struct smatch_state *state;

@@ -37,6 +37,7 @@ fi
 
 BUILD_STATUS=0
 $SCRIPT_DIR/test_kernel.sh --call-tree --info --spammy --data=$DATA_DIR || BUILD_STATUS=$?
+echo "smatch_warns.txt built."
 
 for i in $SCRIPT_DIR/gen_* ; do
 	$i smatch_warns.txt -p=kernel

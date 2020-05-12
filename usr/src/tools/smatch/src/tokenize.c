@@ -829,7 +829,7 @@ void show_identifier_stats(void)
 	}
 }
 
-static struct ident *alloc_ident(const char *name, int len)
+struct ident *alloc_ident(const char *name, int len)
 {
 	struct ident *ident = __alloc_ident(len);
 	ident->symbols = NULL;

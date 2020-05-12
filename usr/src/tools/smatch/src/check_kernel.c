@@ -32,10 +32,10 @@ static int implied_err_cast_return(struct expression *call, void *unused, struct
 	struct expression *arg;
 
 	arg = get_argument_from_call_expr(call->args, 0);
-	if (!get_implied_rl(arg, rl)) {
+	if (!get_implied_rl(arg, rl))
 		*rl = alloc_rl(err_ptr_min, err_ptr_max);
-		*rl = cast_rl(get_type(arg), *rl);
-	}
+
+	*rl = cast_rl(get_type(call), *rl);
 	return 1;
 }
 
@@ -130,12 +130,9 @@ static void match_not_err(const char *fn, struct expression *call_expr,
 
 	arg = get_argument_from_call_expr(call_expr->args, 0);
 	pre_state = get_state_expr(SMATCH_EXTRA, arg);
-	if (estate_rl(pre_state)) {
-		rl = estate_rl(pre_state);
-		rl = remove_range(rl, err_ptr_min, err_ptr_max);
-	} else {
-		rl = alloc_rl(valid_ptr_min_sval, valid_ptr_max_sval);
-	}
+	if (pre_state)
+		return;
+	rl = alloc_rl(valid_ptr_min_sval, valid_ptr_max_sval);
 	rl = cast_rl(get_type(arg), rl);
 	set_extra_expr_nomod(arg, alloc_estate_rl(rl));
 }
@@ -154,6 +151,14 @@ static void match_err(const char *fn, struct expression *call_expr,
 		rl = alloc_rl(err_ptr_min, err_ptr_max);
 	rl = rl_intersection(rl, alloc_rl(err_ptr_min, err_ptr_max));
 	rl = cast_rl(get_type(arg), rl);
+	if (pre_state && rl) {
+		/*
+		 * Ideally this would all be handled by smatch_implied.c
+		 * but it doesn't work very well for impossible paths.
+		 *
+		 */
+		return;
+	}
 	set_extra_expr_nomod(arg, alloc_estate_rl(rl));
 }
 
@@ -256,8 +261,6 @@ static int match_fls(struct expression *call, void *unused, struct range_list **
 	*rl = alloc_rl(start, end);
 	return 1;
 }
-
-
 
 static void find_module_init_exit(struct symbol_list *sym_list)
 {
@@ -406,6 +409,22 @@ static void match__read_once_size(const char *fn, struct expression *call,
 	__in_fake_assign--;
 }
 
+static void match_closure_call(const char *name, struct expression *call,
+			       void *unused)
+{
+	struct expression *cl, *fn, *fake_call;
+	struct expression_list *args = NULL;
+
+	cl = get_argument_from_call_expr(call->args, 0);
+	fn = get_argument_from_call_expr(call->args, 1);
+	if (!fn || !cl)
+		return;
+
+	add_ptr_list(&args, cl);
+	fake_call = call_expression(fn, args);
+	__split_expr(fake_call);
+}
+
 bool is_ignored_kernel_data(const char *name)
 {
 	if (option_project != PROJ_KERNEL)
@@ -462,6 +481,8 @@ void check_kernel(int id)
 
 	add_function_hook("__read_once_size", &match__read_once_size, NULL);
 	add_function_hook("__read_once_size_nocheck", &match__read_once_size, NULL);
+
+	add_function_hook("closure_call", &match_closure_call, NULL);
 
 	if (option_info)
 		add_hook(match_end_file, END_FILE_HOOK);

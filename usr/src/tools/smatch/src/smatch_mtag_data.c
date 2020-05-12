@@ -81,8 +81,47 @@ static bool is_ignored_macro(struct expression *expr)
 	return false;
 }
 
+static bool is_head_next(struct expression *expr)
+{
+	struct symbol *type;
+
+	/* Smatch thinks head->next == head is always true.  *sad face* */
+
+	if (option_project != PROJ_KERNEL)
+		return false;
+
+	if (expr->type != EXPR_DEREF)
+		return false;
+	if (!expr->member || !expr->member->name ||
+	    strcmp(expr->member->name, "next") != 0)
+		return false;
+
+	type = get_type(expr->deref);
+	if (!type)
+		return false;
+	if (type->type == SYM_PTR)
+		type = get_real_base_type(type);
+	if (type->type != SYM_STRUCT)
+		return false;
+	if (!type->ident || !type->ident->name ||
+	    strcmp(type->ident->name, "list_head") != 0)
+		return false;
+	return true;
+}
+
+mtag_t ignored_mtag;
+static bool is_ignored_tag(mtag_t tag)
+{
+	if (tag == ignored_mtag)
+		return true;
+	return false;
+}
+
 static void insert_mtag_data(mtag_t tag, int offset, struct range_list *rl)
 {
+	if (is_ignored_tag(tag))
+		return;
+
 	rl = clone_rl_permanent(rl);
 
 	mem_sql(NULL, NULL, "delete from mtag_data where tag = %lld and offset = %d and type = %d",
@@ -104,6 +143,16 @@ static bool invalid_type(struct symbol *type)
 	return false;
 }
 
+static bool parent_is_fresh_alloc(struct expression *expr)
+{
+	struct symbol *sym;
+
+	sym = expr_to_sym(expr);
+	if (!sym || !sym->ident)
+		return false;
+	return is_fresh_alloc_var_sym(sym->ident->name, sym);
+}
+
 void update_mtag_data(struct expression *expr, struct smatch_state *state)
 {
 	struct range_list *orig, *new;
@@ -117,6 +166,8 @@ void update_mtag_data(struct expression *expr, struct smatch_state *state)
 	if (is_local_variable(expr))
 		return;
 	if (is_ignored_macro(expr))
+		return;
+	if (is_head_next(expr))
 		return;
 	name = expr_to_var(expr);
 	if (is_kernel_param(name)) {
@@ -132,7 +183,10 @@ void update_mtag_data(struct expression *expr, struct smatch_state *state)
 	if (offset == 0 && invalid_type(type))
 		return;
 
-	orig = select_orig(tag, offset);
+	if (parent_is_fresh_alloc(expr))
+		orig = NULL;
+	else
+		orig = select_orig(tag, offset);
 	new = rl_union(orig, estate_rl(state));
 	insert_mtag_data(tag, offset, new);
 }
@@ -145,6 +199,8 @@ static void match_global_assign(struct expression *expr)
 	char *name;
 
 	if (is_ignored_macro(expr))
+		return;
+	if (is_head_next(expr->left))
 		return;
 	name = expr_to_var(expr->left);
 	if (is_kernel_param(name)) {
@@ -278,6 +334,7 @@ void register_mtag_data(int id)
 {
 	my_id = id;
 
+	ignored_mtag = str_to_mtag("extern boot_params");
 	add_hook(&clear_cache, FUNC_DEF_HOOK);
 
 //	if (!option_info)

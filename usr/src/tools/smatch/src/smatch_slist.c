@@ -456,6 +456,9 @@ struct sm_state *merge_sm_states(struct sm_state *one, struct sm_state *two)
 	struct sm_state *result;
 	static int warned;
 
+	if (one->state->data && !has_dynamic_states(one->owner))
+		sm_msg("dynamic state: %s", show_sm(one));
+
 	if (one == two)
 		return one;
 	if (out_of_memory()) {

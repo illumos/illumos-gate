@@ -111,10 +111,46 @@ static struct smatch_state *unmatched_state(struct sm_state *sm)
 	return alloc_bstate(0, possible);
 }
 
+static bool is_loop_iterator(struct expression *expr)
+{
+	struct statement *pre_stmt, *loop_stmt;
+
+	pre_stmt = expr_get_parent_stmt(expr);
+	if (!pre_stmt || pre_stmt->type != STMT_EXPRESSION)
+		return false;
+
+	loop_stmt = stmt_get_parent_stmt(pre_stmt);
+	if (!loop_stmt || loop_stmt->type != STMT_ITERATOR)
+		return false;
+	if (loop_stmt->iterator_pre_statement != pre_stmt)
+		return false;
+
+	return true;
+}
+
+static bool handled_by_assign_hook(struct expression *expr)
+{
+	if (!expr || expr->type != EXPR_ASSIGNMENT)
+		return false;
+	if (__in_fake_assign)
+		return false;
+	if (is_loop_iterator(expr))
+		return false;
+
+	if (expr->op == '=' ||
+	    expr->op == SPECIAL_OR_ASSIGN ||
+	    expr->op == SPECIAL_AND_ASSIGN)
+		return true;
+
+	return false;
+}
+
 static void match_modify(struct sm_state *sm, struct expression *mod_expr)
 {
 	// FIXME: we really need to store the type
 
+	if (handled_by_assign_hook(mod_expr))
+		return;
 	set_state(my_id, sm->name, sm->sym, alloc_bstate(0, -1ULL));
 }
 
@@ -283,40 +319,31 @@ static void match_compare(struct expression *expr)
 			(expr->op == SPECIAL_EQUAL) ? NULL : alloc_bstate(val.uvalue, val.uvalue));
 }
 
-static bool is_loop_iterator(struct expression *expr)
-{
-	struct statement *pre_stmt, *loop_stmt;
-
-	pre_stmt = expr_get_parent_stmt(expr);
-	if (!pre_stmt || pre_stmt->type != STMT_EXPRESSION)
-		return false;
-
-	loop_stmt = stmt_get_parent_stmt(pre_stmt);
-	if (!loop_stmt || loop_stmt->type != STMT_ITERATOR)
-		return false;
-	if (loop_stmt->iterator_pre_statement != pre_stmt)
-		return false;
-
-	return true;
-}
-
 static void match_assign(struct expression *expr)
 {
-	struct bit_info *binfo;
+	struct bit_info *start, *binfo;
+	struct smatch_state *new;
 
-	if (expr->op != '=')
-		return;
-	if (__in_fake_assign)
-		return;
-	if (is_loop_iterator(expr))
+	if (!handled_by_assign_hook(expr))
 		return;
 
 	binfo = get_bit_info(expr->right);
 	if (!binfo)
 		return;
-	if (is_unknown_binfo(get_type(expr->left), binfo))
-		return;
-	set_state_expr(my_id, expr->left, alloc_bstate(binfo->set, binfo->possible));
+	if (expr->op == '=') {
+		if (is_unknown_binfo(get_type(expr->left), binfo))
+			return;
+
+		set_state_expr(my_id, expr->left, alloc_bstate(binfo->set, binfo->possible));
+	} else if (expr->op == SPECIAL_OR_ASSIGN) {
+		start = get_bit_info(expr->left);
+		new = alloc_bstate(start->set | binfo->set, start->possible | binfo->possible);
+		set_state_expr(my_id, expr->left, new);
+	} else if (expr->op == SPECIAL_AND_ASSIGN) {
+		start = get_bit_info(expr->left);
+		new = alloc_bstate(start->set & binfo->set, start->possible & binfo->possible);
+		set_state_expr(my_id, expr->left, new);
+	}
 }
 
 static void match_condition(struct expression *expr)

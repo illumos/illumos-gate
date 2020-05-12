@@ -29,8 +29,8 @@ static int my_id;
 static void match_assign(struct expression *expr)
 {
 	struct expression *left, *right;
-	mtag_t left_tag;
-	int offset;
+	mtag_t right_tag, left_tag;
+	int right_offset, left_offset;
 	sval_t sval;
 
 	if (expr->op != '=')
@@ -46,13 +46,14 @@ static void match_assign(struct expression *expr)
 	if (sval_cmp(sval, valid_ptr_min_sval) < 0 ||
 	    sval_cmp(sval, valid_ptr_max_sval) > 0)
 		return;
-	if (sval.uvalue & MTAG_OFFSET_MASK)
+	right_tag = sval.uvalue & ~MTAG_OFFSET_MASK;
+	right_offset = sval.uvalue & MTAG_OFFSET_MASK;
+
+	if (!expr_to_mtag_offset(left, &left_tag, &left_offset) ||
+	    left_offset >= MTAG_OFFSET_MASK)
 		return;
 
-	if (!expr_to_mtag_offset(left, &left_tag, &offset))
-		return;
-
-	sql_insert_mtag_map(sval.uvalue, -offset, left_tag);
+	sql_insert_mtag_map(left_tag, left_offset, right_tag, right_offset);
 }
 
 void register_mtag_map(int id)

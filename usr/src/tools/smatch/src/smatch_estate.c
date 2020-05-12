@@ -56,6 +56,9 @@ struct smatch_state *merge_estates(struct smatch_state *s1, struct smatch_state 
 	if (estate_treat_untagged(s1) && estate_treat_untagged(s2))
 		estate_set_treat_untagged(tmp);
 
+	if (estate_new(s1) || estate_new(s2))
+		estate_set_new(tmp);
+
 	return tmp;
 }
 
@@ -126,6 +129,9 @@ int estate_has_hard_max(struct smatch_state *state)
 
 void estate_set_hard_max(struct smatch_state *state)
 {
+	/* pointers don't have a hard max */
+	if (is_ptr_type(estate_type(state)))
+		return;
 	get_dinfo(state)->hard_max = 1;
 }
 
@@ -172,6 +178,18 @@ bool estate_treat_untagged(struct smatch_state *state)
 void estate_set_treat_untagged(struct smatch_state *state)
 {
 	get_dinfo(state)->treat_untagged = true;
+}
+
+bool estate_new(struct smatch_state *state)
+{
+	if (!estate_rl(state))
+		return false;
+	return get_dinfo(state)->set;
+}
+
+void estate_set_new(struct smatch_state *state)
+{
+	get_dinfo(state)->set = true;
 }
 
 sval_t estate_min(struct smatch_state *state)
@@ -225,6 +243,10 @@ int estates_equiv(struct smatch_state *one, struct smatch_state *two)
 	if (estate_capped(one) != estate_capped(two))
 		return 0;
 	if (estate_treat_untagged(one) != estate_treat_untagged(two))
+		return 0;
+	if (estate_has_hard_max(one) != estate_has_hard_max(two))
+		return 0;
+	if (estate_new(one) != estate_new(two))
 		return 0;
 	if (strcmp(one->name, two->name) == 0)
 		return 1;

@@ -32,6 +32,7 @@ struct data_info {
 	unsigned int hard_max:1;
 	unsigned int capped:1;
 	unsigned int treat_untagged:1;
+	unsigned int set:1;
 };
 DECLARE_ALLOCATOR(data_info);
 
@@ -101,6 +102,7 @@ struct range_list *rl_truncate_cast(struct symbol *type, struct range_list *rl);
 struct range_list *cast_rl(struct symbol *type, struct range_list *rl);
 int get_implied_rl(struct expression *expr, struct range_list **rl);
 int get_absolute_rl(struct expression *expr, struct range_list **rl);
+void set_real_absolute(struct expression *expr, struct smatch_state *state);
 int get_real_absolute_rl(struct expression *expr, struct range_list **rl);
 struct range_list *var_to_absolute_rl(struct expression *expr);
 int custom_get_absolute_rl(struct expression *expr,
@@ -151,6 +153,8 @@ bool estate_capped(struct smatch_state *state);
 void estate_set_capped(struct smatch_state *state);
 bool estate_treat_untagged(struct smatch_state *state);
 void estate_set_treat_untagged(struct smatch_state *state);
+bool estate_new(struct smatch_state *state);
+void estate_set_new(struct smatch_state *state);
 
 int estate_get_single_value(struct smatch_state *state, sval_t *sval);
 struct smatch_state *get_implied_estate(struct expression *expr);

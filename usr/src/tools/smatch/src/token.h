@@ -218,6 +218,7 @@ extern struct token eof_token_entry;
 
 extern int init_stream(const char *, int fd, const char **next_path);
 extern const char *stream_name(int stream);
+struct ident *alloc_ident(const char *name, int len);
 extern struct ident *hash_ident(struct ident *);
 extern struct ident *built_in_ident(const char *);
 extern struct token *built_in_token(int, struct ident *);

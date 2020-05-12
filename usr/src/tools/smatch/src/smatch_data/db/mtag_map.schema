@@ -1,1 +1,1 @@
-CREATE TABLE mtag_map (tag big int, offset integer, container big int);
+CREATE TABLE mtag_map (container big int, container_offset int, tag big int, tag_offset int);

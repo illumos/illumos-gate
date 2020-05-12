@@ -22,17 +22,6 @@ $sth = $db->prepare('select distinct(ptr) from function_ptr;');
 $sth->execute();
 
 while ($fn_ptr = $sth->fetchrow_array()) {
-
-    # following a pointer to pointer chain is too complicated for now
-    $ptr_to_ptr = $db->selectrow_array("select function from function_ptr where ptr = '$fn_ptr' and function like '% %';");
-    if ($ptr_to_ptr) {
-        next;
-    }
-    $ptr_to_ptr = $db->selectrow_array("select function from function_ptr where ptr = '$fn_ptr' and function like '%[]';");
-    if ($ptr_to_ptr) {
-        next;
-    }
-
     $count = $db->selectrow_array("select count(*) from return_states join function_ptr where return_states.function == function_ptr.function and ptr = '$fn_ptr';");
     # if there are too many states then bail
     if ($count > 1000) {

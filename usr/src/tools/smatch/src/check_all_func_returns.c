@@ -74,7 +74,7 @@ static void check_func_return(struct expression *expr)
 
 	stmt = last_ptr_list((struct ptr_list *)big_statement_stack);
 
-	if (stmt->type == STMT_EXPRESSION && stmt->expression == expr)
+	if (stmt && stmt->type == STMT_EXPRESSION && stmt->expression == expr)
 		sm_error("unchecked function return '%s'", expr_to_str(expr->fn));
 }
 

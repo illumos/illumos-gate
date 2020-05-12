@@ -551,6 +551,16 @@ int is_string(struct expression *expr)
 	return 0;
 }
 
+bool is_struct_ptr(struct symbol *type)
+{
+	if (!type || type->type != SYM_PTR)
+		return false;
+	type = get_real_base_type(type);
+	if (!type || type->type != SYM_STRUCT)
+		return false;
+	return true;
+}
+
 int is_static(struct expression *expr)
 {
 	char *name;
@@ -593,6 +603,23 @@ int types_equiv(struct symbol *one, struct symbol *two)
 	if (type_positive_bits(one) != type_positive_bits(two))
 		return 0;
 	return 1;
+}
+
+bool type_fits(struct symbol *type, struct symbol *test)
+{
+	if (!type || !test)
+		return false;
+
+	if (type == test)
+		return true;
+
+	if (type_bits(test) > type_bits(type))
+		return false;
+	if (type_signed(test) && !type_signed(type))
+		return false;
+	if (type_positive_bits(test) > type_positive_bits(type))
+		return false;
+	return true;
 }
 
 int fn_static(void)
@@ -685,6 +712,8 @@ static struct symbol *get_member_from_string(struct symbol_list *symbol_list, co
 struct symbol *get_member_type_from_key(struct expression *expr, const char *key)
 {
 	struct symbol *sym;
+	int star = 0;
+	int i;
 
 	if (strcmp(key, "$") == 0)
 		return get_type(expr);
@@ -702,11 +731,26 @@ struct symbol *get_member_type_from_key(struct expression *expr, const char *key
 	if (sym->type == SYM_PTR)
 		sym = get_real_base_type(sym);
 
-	key = key + 1;
+	while (*key == '*') {
+		key++;
+		star++;
+	}
+
+	if (*key != '$')
+		return NULL;
+	key++;
+
 	sym = get_member_from_string(sym->symbol_list, key);
 	if (!sym)
 		return NULL;
-	return get_real_base_type(sym);
+	if (sym->type == SYM_RESTRICT || sym->type == SYM_NODE)
+		sym = get_real_base_type(sym);
+	for (i = 0; i < star; i++) {
+		if (!sym || sym->type != SYM_PTR)
+			return NULL;
+		sym = get_real_base_type(sym);
+	}
+	return sym;
 }
 
 struct symbol *get_arg_type_from_key(struct expression *fn, int param, struct expression *arg, const char *key)

@@ -27,7 +27,7 @@ struct expression *alloc_tmp_expression(struct position pos, int type)
 	struct expression *expr;
 
 	expr = __alloc_tmp_expression(0);
-	expr->smatch_flags |= Fake;
+	expr->smatch_flags |= Tmp;
 	expr->type = type;
 	expr->pos = pos;
 	return expr;
@@ -300,7 +300,7 @@ void expr_set_parent_expr(struct expression *expr, struct expression *parent)
 {
 	if (!expr)
 		return;
-	if (parent->smatch_flags & Fake)
+	if (parent && parent->smatch_flags & Tmp)
 		return;
 
 	expr->parent = (unsigned long)parent | 0x1UL;
