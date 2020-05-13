@@ -2677,7 +2677,10 @@ sbd_modify_lu(sbd_modify_lu_t *mlu, int struct_sz, uint32_t *err_ret)
 
 	/* if there is data in the buf, null terminate it */
 	if (struct_sz > sizeof (*mlu)) {
-		mlu->mlu_buf[struct_sz - sizeof (*mlu) + 8 - 1] = 0;
+		char *mlu_buf;
+
+		mlu_buf = &(mlu->mlu_buf[0]);
+		mlu_buf[struct_sz - sizeof (*mlu) + 8 - 1] = '\0';
 	}
 
 	*err_ret = 0;
@@ -2904,7 +2907,10 @@ sbd_set_global_props(sbd_global_props_t *mlu, int struct_sz,
 
 	/* if there is data in the buf, null terminate it */
 	if (struct_sz > sizeof (*mlu)) {
-		mlu->mlu_buf[struct_sz - sizeof (*mlu) + 8 - 1] = 0;
+		char *mlu_buf;
+
+		mlu_buf = &(mlu->mlu_buf[0]);
+		mlu_buf[struct_sz - sizeof (*mlu) + 8 - 1] = '\0';
 	}
 
 	*err_ret = 0;
