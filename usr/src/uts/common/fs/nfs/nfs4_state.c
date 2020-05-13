@@ -74,6 +74,7 @@ stateid4 special1 = {
 int rfs4_debug;
 #endif
 
+rfs4_db_mem_cache_t rfs4_db_mem_cache_table[RFS4_DB_MEM_CACHE_NUM];
 static uint32_t rfs4_database_debug = 0x00;
 
 /* CSTYLED */

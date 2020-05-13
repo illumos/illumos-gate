@@ -115,6 +115,13 @@ krwlock_t	nfssrv_globals_rwl;
 kmem_cache_t *nfs_xuio_cache;
 int nfs_loaned_buffers = 0;
 
+/* array of paths passed-in from nfsd command-line; stored in nvlist */
+char		**rfs4_dss_newpaths;
+uint_t		rfs4_dss_numnewpaths;
+
+/* nvlists of all DSS paths: current, and before last warmstart */
+nvlist_t *rfs4_dss_paths, *rfs4_dss_oldpaths;
+
 int
 _init(void)
 {
