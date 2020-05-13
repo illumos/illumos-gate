@@ -107,6 +107,8 @@ idm_transport_t idm_transport_list[] = {
 
 };
 
+idm_global_t idm;	/* Global state */
+
 int
 _init(void)
 {
