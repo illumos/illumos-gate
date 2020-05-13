@@ -128,7 +128,7 @@ static boolean_t BnxeRssEnable(um_device_t * pUM)
 
 static lm_status_t BnxeRssDisable(um_device_t * pUM)
 {
-    int rc;
+    lm_status_t rc;
 
     rc = lm_disable_rss((lm_device_t *)pUM, FALSE, NULL);
 
@@ -146,7 +146,7 @@ static lm_status_t BnxeRssDisable(um_device_t * pUM)
         BnxeFmErrorReport(pUM, DDI_FM_DEVICE_INVAL_STATE);
     }
 
-    return (rc == LM_STATUS_SUCCESS) ? B_TRUE : B_FALSE;
+    return (rc);
 }
 
 
@@ -693,7 +693,7 @@ void BnxeUpdatePhy(um_device_t * pUM)
      * This is problematic. For non-PMF functions the lm_niv_vif_set for
      * a link up will come very early and is queued for processing right
      * after lm_chip_start. Thereafter setting the loopback mode brings
-     * the interface back down. Don't know if setting the loopback mode 
+     * the interface back down. Don't know if setting the loopback mode
      * is even required when forcing it off. XXX
      */
     if (IS_MF_AFEX_MODE(&pUM->lm_dev))
@@ -1300,7 +1300,7 @@ int BnxeHwStartL2(um_device_t * pUM)
 
     BnxeLogDbg(pUM, "Setting L2 MAC Address");
 
-    /* use the hw programmed address (GLDv3 will overwrite if needed) */ 
+    /* use the hw programmed address (GLDv3 will overwrite if needed) */
 
     {
         u8_t zero_mac_addr[ETHERNET_ADDRESS_SIZE];
