@@ -139,6 +139,7 @@ SYMBOL_SCOPE {
 	ddi_ufm_image_set_nslots	{ FLAGS = EXTERN };
 	ddi_ufm_init			{ FLAGS = EXTERN };
 	ddi_ufm_slot_set_attrs		{ FLAGS = EXTERN };
+	ddi_ufm_slot_set_imgsize	{ FLAGS = EXTERN };
 	ddi_ufm_slot_set_misc		{ FLAGS = EXTERN };
 	ddi_ufm_slot_set_version	{ FLAGS = EXTERN };
 	ddi_ufm_update			{ FLAGS = EXTERN };

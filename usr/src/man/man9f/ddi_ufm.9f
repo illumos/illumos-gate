@@ -125,7 +125,7 @@ It should be used at the end of a driver's
 .Xr attach 9E
 endpoint to indicate that it is ready to receive UFM requests.
 It should also be called whenever the driver believes that the UFM might have
-changed.
+changed or the device's capabilities.
 This may happen after a device reset or firmware change.
 Unlike the other functions, this can be called from any context with any locks
 held, excepting high-level interrupt context which normal device drivers

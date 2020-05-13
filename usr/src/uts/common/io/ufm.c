@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*
@@ -27,6 +28,9 @@
 #include <sys/file.h>
 #include <sys/kmem.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
+
+#define	UFM_READ_SIZE		(1 * 1024 * 1024)
 
 #define	UFMTEST_IOC		('u' << 24) | ('f' << 16) | ('t' << 8)
 #define	UFMTEST_IOC_SETFW	(UFMTEST_IOC | 1)
@@ -145,6 +149,7 @@ ufm_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	if (devi != NULL)
 		ddi_remove_minor_node(devi, NULL);
 
+	ufm_devi = NULL;
 	return (DDI_SUCCESS);
 }
 
@@ -454,6 +459,101 @@ ufm_do_report(intptr_t data, int mode)
 }
 
 static int
+ufm_do_readimg(intptr_t data, int mode)
+{
+	int ret;
+	uint_t model;
+	ufm_ioc_readimg_t ufri;
+	char devpath[MAXPATHLEN];
+	ddi_ufm_handle_t *ufmh;
+	dev_info_t *dip;
+#ifdef _MULTI_DATAMODEL
+	ufm_ioc_readimg32_t ufri32;
+#endif
+
+	model = ddi_model_convert_from(mode);
+	switch (model) {
+#ifdef _MULTI_DATAMODEL
+	case DDI_MODEL_ILP32:
+		if (ddi_copyin((void *)data, &ufri32, sizeof (ufri32),
+		    mode) != 0) {
+			return (EFAULT);
+		}
+		ufri.ufri_version = ufri32.ufri_version;
+		ufri.ufri_imageno = ufri32.ufri_imageno;
+		ufri.ufri_slotno = ufri32.ufri_slotno;
+		ufri.ufri_offset = ufri32.ufri_offset;
+		ufri.ufri_len = ufri32.ufri_len;
+		ufri.ufri_nread = ufri32.ufri_nread;
+
+		if (strlcpy(ufri.ufri_devpath, ufri32.ufri_devpath,
+		    MAXPATHLEN) >= MAXPATHLEN) {
+			return (EOVERFLOW);
+		}
+		ufri.ufri_buf = (caddr_t)(uintptr_t)ufri32.ufri_buf;
+		break;
+#endif /* _MULTI_DATAMODEL */
+	case DDI_MODEL_NONE:
+	default:
+		if (ddi_copyin((void *)data, &ufri, sizeof (ufri), mode) != 0) {
+			return (EFAULT);
+		}
+	}
+
+	if (strlcpy(devpath, ufri.ufri_devpath, MAXPATHLEN) >= MAXPATHLEN)
+		return (EOVERFLOW);
+
+	if ((dip = e_ddi_hold_devi_by_path(devpath, 0)) == NULL) {
+			return (ENOTSUP);
+	}
+	if ((ufmh = ufm_find(devpath)) == NULL) {
+		ddi_release_devi(dip);
+		return (ENOTSUP);
+	}
+	ASSERT(MUTEX_HELD(&ufmh->ufmh_lock));
+
+	if (!ufm_driver_ready(ufmh)) {
+		ret = EAGAIN;
+		goto out;
+	}
+
+	if (ufri.ufri_version != ufmh->ufmh_version) {
+		ret = ENOTSUP;
+		goto out;
+	}
+
+	ret = ufm_read_img(ufmh, ufri.ufri_imageno, ufri.ufri_slotno,
+	    ufri.ufri_len, ufri.ufri_offset, (uintptr_t)ufri.ufri_buf,
+	    &ufri.ufri_nread, mode);
+
+out:
+	mutex_exit(&ufmh->ufmh_lock);
+	ddi_release_devi(dip);
+
+	if (ret == 0) {
+		switch (model) {
+#ifdef _MULTI_DATAMODEL
+		case DDI_MODEL_ILP32:
+			ufri32.ufri_nread = ufri.ufri_nread;
+			if (ddi_copyout(&ufri32, (void *)data, sizeof (ufri32),
+			    mode) != 0) {
+				return (EFAULT);
+			}
+			break;
+#endif /* _MULTI_DATAMODEL */
+		case DDI_MODEL_NONE:
+		default:
+			if (ddi_copyout(&ufri, (void *)data, sizeof (ufri),
+			    mode) != 0) {
+				return (EFAULT);
+			}
+		}
+	}
+
+	return (ret);
+}
+
+static int
 ufm_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
     int *rvalp)
 {
@@ -473,6 +573,10 @@ ufm_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 
 	case UFM_IOC_REPORT:
 		ret = ufm_do_report(data, mode);
+		break;
+
+	case UFM_IOC_READIMG:
+		ret = ufm_do_readimg(data, mode);
 		break;
 	default:
 		return (ENOTTY);

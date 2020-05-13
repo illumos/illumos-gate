@@ -926,6 +926,7 @@ MANLINKS=	AVL_NEXT.9f					\
 		ddi_ufm_image_set_nslots.9f			\
 		ddi_ufm_init.9f					\
 		ddi_ufm_slot_set_attrs.9f			\
+		ddi_ufm_slot_set_imgsize.9f			\
 		ddi_ufm_slot_set_misc.9f			\
 		ddi_ufm_slot_set_version.9f			\
 		ddi_ufm_update.9f				\
@@ -1778,6 +1779,7 @@ ddi_ufm_image_set_misc.9f		:= LINKSRC = ddi_ufm_image.9f
 ddi_ufm_image_set_nslots.9f		:= LINKSRC = ddi_ufm_image.9f
 ddi_ufm_init.9f				:= LINKSRC = ddi_ufm.9f
 ddi_ufm_slot_set_attrs.9f		:= LINKSRC = ddi_ufm_slot.9f
+ddi_ufm_slot_set_imgsize.9f		:= LINKSRC = ddi_ufm_slot.9f
 ddi_ufm_slot_set_misc.9f		:= LINKSRC = ddi_ufm_slot.9f
 ddi_ufm_slot_set_version.9f		:= LINKSRC = ddi_ufm_slot.9f
 ddi_ufm_update.9f			:= LINKSRC = ddi_ufm.9f

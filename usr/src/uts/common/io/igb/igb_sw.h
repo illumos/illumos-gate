@@ -27,6 +27,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Pluribus Networks Inc.
  * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #ifndef	_IGB_SW_H
@@ -71,6 +72,7 @@ extern "C" {
 #include <sys/fm/protocol.h>
 #include <sys/fm/util.h>
 #include <sys/fm/io/ddi.h>
+#include <sys/ddi_ufm.h>
 #include "e1000_api.h"
 #include "e1000_82575.h"
 
@@ -191,6 +193,7 @@ extern "C" {
 #define	ATTACH_PROGRESS_MAC		0x0800	/* MAC registered */
 #define	ATTACH_PROGRESS_ENABLE_INTR	0x1000	/* DDI interrupts enabled */
 #define	ATTACH_PROGRESS_FMINIT		0x2000	/* FMA initialized */
+#define	ATTACH_PROGRESS_UFM		0x4000	/* UFM enabled */
 
 #define	PROP_ADV_AUTONEG_CAP		"adv_autoneg_cap"
 #define	PROP_ADV_1000FDX_CAP		"adv_1000fdx_cap"
@@ -733,6 +736,7 @@ typedef struct igb {
 	int			fm_capabilities;
 
 	ulong_t			page_size;
+	ddi_ufm_handle_t	*igb_ufmh;
 } igb_t;
 
 typedef struct igb_stat {

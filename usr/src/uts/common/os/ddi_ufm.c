@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <sys/avl.h>
@@ -20,6 +21,9 @@
 #include <sys/kmem.h>
 #include <sys/sunddi.h>
 #include <sys/stddef.h>
+#include <sys/sunndi.h>
+#include <sys/file.h>
+#include <sys/sysmacros.h>
 
 /*
  * The UFM subsystem tracks its internal state with respect to device
@@ -65,6 +69,12 @@
  * These tests should be run whenever changes are made to the DDI UFM
  * subsystem or the ufm driver.
  */
+
+/*
+ * Amount of data to read in one go (1 MiB).
+ */
+#define	UFM_READ_STRIDE	(1024 * 1024)
+
 static avl_tree_t ufm_handles;
 static kmutex_t ufm_lock;
 
@@ -234,6 +244,12 @@ ufm_cache_fill(ddi_ufm_handle_t *ufmh)
 			if (slot->ufms_attrs & DDI_UFM_ATTR_EMPTY)
 				continue;
 
+			if (slot->ufms_imgsize != 0) {
+				fnvlist_add_uint64(slots[s],
+				    DDI_UFM_NV_SLOT_IMGSIZE,
+				    slot->ufms_imgsize);
+			}
+
 			fnvlist_add_string(slots[s], DDI_UFM_NV_SLOT_VERSION,
 			    slot->ufms_version);
 			if (slot->ufms_misc != NULL) {
@@ -254,6 +270,56 @@ ufm_cache_fill(ddi_ufm_handle_t *ufmh)
 
 cache_fail:
 	ufm_cache_invalidate(ufmh);
+	return (ret);
+}
+
+int
+ufm_read_img(ddi_ufm_handle_t *ufmh, uint_t img, uint_t slot, uint64_t len,
+    uint64_t off, uintptr_t uaddr, uint64_t *nreadp, int copyflags)
+{
+	int ret = 0;
+	ddi_ufm_cap_t caps;
+	void *buf;
+	uint64_t nread;
+
+	ret = ufmh->ufmh_ops->ddi_ufm_op_getcaps(ufmh, ufmh->ufmh_arg, &caps);
+	if (ret != 0) {
+		return (ret);
+	}
+
+	if ((caps & DDI_UFM_CAP_READIMG) == 0 ||
+	    ufmh->ufmh_ops->ddi_ufm_op_readimg == NULL) {
+		return (ENOTSUP);
+	}
+
+	if (off + len < MAX(off, len)) {
+		return (EOVERFLOW);
+	}
+
+	buf = kmem_zalloc(UFM_READ_STRIDE, KM_SLEEP);
+	nread = 0;
+	while (len > 0) {
+		uint64_t toread = MIN(len, UFM_READ_STRIDE);
+		uint64_t iter;
+
+		ret = ufmh->ufmh_ops->ddi_ufm_op_readimg(ufmh, ufmh->ufmh_arg,
+		    img, slot, toread, off + nread, buf, &iter);
+		if (ret != 0) {
+			break;
+		}
+
+		if (ddi_copyout(buf, (void *)(uintptr_t)(uaddr + nread), iter,
+		    copyflags & FKIOCTL) != 0) {
+			ret = EFAULT;
+			break;
+		}
+
+		nread += iter;
+		len -= iter;
+	}
+
+	*nreadp = nread;
+	kmem_free(buf, UFM_READ_STRIDE);
 	return (ret);
 }
 
@@ -375,6 +441,12 @@ ddi_ufm_init(dev_info_t *dip, uint_t version, ddi_ufm_ops_t *ufmops,
 		mutex_exit(&old_ufmh->ufmh_lock);
 	}
 
+	/*
+	 * Give a hint in the devinfo tree that this device supports UFM
+	 * capabilities.
+	 */
+	(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, dip, "ddi-ufm-capable");
+
 	return (DDI_SUCCESS);
 }
 
@@ -452,4 +524,11 @@ ddi_ufm_slot_set_misc(ddi_ufm_slot_t *usp, nvlist_t *misc)
 	VERIFY(usp != NULL && misc != NULL);
 	nvlist_free(usp->ufms_misc);
 	usp->ufms_misc = misc;
+}
+
+void
+ddi_ufm_slot_set_imgsize(ddi_ufm_slot_t *usp, uint64_t size)
+{
+	VERIFY3P(usp, !=, NULL);
+	usp->ufms_imgsize = size;
 }

@@ -48,6 +48,7 @@ file path=usr/lib/fwflash/identify/hermon.so
 file path=usr/lib/fwflash/identify/sd.so
 file path=usr/lib/fwflash/identify/ses.so
 file path=usr/lib/fwflash/identify/tavor.so
+file path=usr/lib/fwflash/identify/ufm.so
 file path=usr/lib/fwflash/verify/hermon-MELLANOX.so
 file path=usr/lib/fwflash/verify/sd-GENERIC.so
 file path=usr/lib/fwflash/verify/ses-SUN.so
