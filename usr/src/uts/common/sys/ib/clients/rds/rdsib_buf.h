@@ -75,8 +75,6 @@
 #ifndef _RDSIB_BUF_H
 #define	_RDSIB_BUF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -149,8 +147,8 @@ typedef struct rds_bufpool_s {
 } rds_bufpool_t;
 
 /* Global pools of buffers */
-rds_bufpool_t		rds_dpool; /* data pool */
-rds_bufpool_t		rds_cpool; /* ctrl pool */
+extern rds_bufpool_t	rds_dpool; /* data pool */
+extern rds_bufpool_t	rds_cpool; /* ctrl pool */
 
 /* defined in rds_buf.c */
 int rds_init_recv_caches(rds_state_t *statep);
