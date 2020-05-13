@@ -327,7 +327,7 @@ void usba_free_binary_object_store(usba_device_t *);
 #define	DPRINT_MASK_REGISTER		0x00000040
 #define	DPRINT_MASK_DEVDB		0x00000080
 #define	DPRINT_MASK_WHCDI		0x00000100
-#define	DPRINT_MASK_ALL 		0xFFFFFFFF
+#define	DPRINT_MASK_ALL			0xFFFFFFFF
 
 typedef struct usba_log_handle_impl {
 	dev_info_t	*lh_dip;
@@ -445,7 +445,7 @@ typedef struct usb_dev_cap {
 	usb_dev_driver_callback_t	usba_dev_driver_cb;
 } usb_dev_cap_t;
 
-usb_dev_cap_t usb_cap;
+extern usb_dev_cap_t usb_cap;
 _NOTE(SCHEME_PROTECTS_DATA("unique device capture data", usb_cap))
 
 #ifdef __cplusplus
