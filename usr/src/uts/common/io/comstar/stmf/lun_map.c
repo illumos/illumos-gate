@@ -247,6 +247,7 @@ stmf_session_prepare_report_lun_data(stmf_lun_map_t *sm)
 	stmf_xfer_data_t *xd;
 	uint16_t nluns, ent;
 	uint32_t alloc_size, data_size;
+	uchar_t *buf;
 	int i;
 
 	nluns = sm->lm_nluns;
@@ -272,12 +273,13 @@ stmf_session_prepare_report_lun_data(stmf_lun_map_t *sm)
 
 	ent = 0;
 
+	buf = &(xd->buf[0]);
 	for (i = 0; ((i < sm->lm_nentries) && (ent < nluns)); i++) {
 		if (sm->lm_plus[i] == NULL)
 			continue;
 		/* Fill in the entry */
-		xd->buf[8 + (ent << 3) + 1] = (uchar_t)i;
-		xd->buf[8 + (ent << 3) + 0] = ((uchar_t)(i >> 8));
+		buf[8 + (ent << 3) + 1] = (uchar_t)i;
+		buf[8 + (ent << 3) + 0] = ((uchar_t)(i >> 8));
 		ent++;
 	}
 
