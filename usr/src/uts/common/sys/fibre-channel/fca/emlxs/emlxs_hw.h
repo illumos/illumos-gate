@@ -2140,7 +2140,7 @@ typedef struct
 #define	SLI_FW_TYPE_101   SLI_FW_TYPE_SHIFT(0xb)	/* LP101 */
 
 
-enum emlxs_prog_type
+typedef enum emlxs_prog_type
 {
 	TEST_PROGRAM,	/* 0 */
 	UTIL_PROGRAM,	/* 1 */
