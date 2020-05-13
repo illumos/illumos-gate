@@ -103,7 +103,7 @@ extern int	mach_sysconfig(int);
 #define	_CONFIG_EPHID_MAX	47	/* maximum ephemeral uid */
 #define	_CONFIG_UADDR_MAX	48	/* maximum user address */
 
-#define	_CONFIG_NPROC_NCPU	48	/* NCPU (sometimes > NPROC_MAX) */
+#define	_CONFIG_NPROC_NCPU	49	/* NCPU (sometimes > NPROC_MAX) */
 
 #ifdef	__cplusplus
 }
