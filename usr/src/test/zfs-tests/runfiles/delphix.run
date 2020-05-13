@@ -370,6 +370,10 @@ tests = ['zpool_replace_001_neg', 'zpool_replace_002_neg', 'replace-o_ashift',
 tests = ['zpool_resilver_bad_args', 'zpool_resilver_restart']
 tags = ['functional', 'cli_root', 'zpool_resilver']
 
+[/opt/zfs-tests/tests/functional/resilver]
+tests = ['resilver_restart_001']
+tags = ['functional', 'resilver']
+
 [/opt/zfs-tests/tests/functional/cli_root/zpool_scrub]
 tests = ['zpool_scrub_001_neg', 'zpool_scrub_002_pos', 'zpool_scrub_003_pos',
     'zpool_scrub_004_pos', 'zpool_scrub_005_pos', 'zpool_scrub_print_repairing',

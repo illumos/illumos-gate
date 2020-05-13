@@ -27,7 +27,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /* sysconf(3C) - returns system configuration information */
 
@@ -463,6 +463,9 @@ sysconf(int name)
 
 		case _SC_EPHID_MAX:
 			return (_sysconfig(_CONFIG_EPHID_MAX));
+
+		case _SC_UADDR_MAX:
+			return (_sysconfig(_CONFIG_UADDR_MAX));
 
 		/* UNIX 03 names - XPG6/SUSv3/POSIX.1-2001 */
 

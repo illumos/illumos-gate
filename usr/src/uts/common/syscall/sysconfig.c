@@ -47,6 +47,7 @@
 #include <sys/timer.h>
 #include <sys/zone.h>
 #include <sys/vm_usage.h>
+#include <vm/as.h>
 
 extern rctl_hndl_t rc_process_sigqueue;
 
@@ -207,6 +208,9 @@ sysconfig(int which)
 
 	case _CONFIG_EPHID_MAX:
 		return (MAXEPHUID);
+
+	case _CONFIG_UADDR_MAX:
+		return ((long)(uintptr_t)curproc->p_as->a_userlimit);
 
 	case _CONFIG_SYMLOOP_MAX:
 		return (MAXSYMLINKS);

@@ -45,11 +45,10 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright (c) 2013 Gary Mills
 .\"
-.TH SYSCONF 3C "Apr 16, 2013"
+.TH SYSCONF 3C "May 04, 2020"
 .SH NAME
 sysconf \- get configurable system variables
 .SH SYNOPSIS
-.LP
 .nf
 #include <unistd.h>
 
@@ -57,8 +56,6 @@ sysconf \- get configurable system variables
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBsysconf()\fR function provides a method for an application to determine
 the current value of a configurable system limit or option (variable).
 .sp
@@ -319,6 +316,12 @@ _SC_TTY_NAME_MAX        TTYNAME_MAX                Max length of tty
 _SC_TZNAME_MAX          TZNAME_MAX                 Max number of bytes
                                                    supported for name
                                                    of a time zone
+_SC_UADDR_MAX                                      Maximum valid user
+                                                   address in a process.
+                                                   The returned value
+                                                   should be cast to a
+                                                   uintptr_t before
+                                                   being interpreted.
 _SC_V6_ILP32_OFF32      _POSIX_V6_ILP32_OFF32      Supports  X/Open
                                                    ILP32 w/32-bit
                                                    offset build
@@ -424,8 +427,6 @@ l l .
 .TE
 
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBsysconf()\fR returns the current variable value
 on the system. The value returned will not be more restrictive than the
 corresponding value described to the application when it was compiled with the
@@ -474,8 +475,6 @@ _SC_SPLIT_CACHE
 .in -2
 
 .SH ERRORS
-.sp
-.LP
 The \fBsysconf()\fR function will fail if:
 .sp
 .ne 2
@@ -487,8 +486,6 @@ The value of the \fIname\fR argument is invalid.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -509,13 +506,9 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBpooladm\fR(1M), \fBzoneadm\fR(1M), \fBfpathconf\fR(2), \fBseteuid\fR(2),
 \fBsetrlimit\fR(2), \fBconfstr\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
-.LP
 A call to \fBsetrlimit()\fR can cause the value of \fBOPEN_MAX\fR to change.
 .sp
 .LP
