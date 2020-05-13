@@ -117,7 +117,7 @@ typedef unsigned int	atomic_t;
 #define	clear_le_bit(b, p)	clear_bit(b ^ LE_BIT_XOR, p)
 #define	test_le_bit(b, p)	test_bit(b ^ LE_BIT_XOR, p)
 
-uint_t	rdsv3_one_sec_in_hz;
+extern uint_t	rdsv3_one_sec_in_hz;
 
 #define	jiffies	100
 #define	HZ	(drv_hztousec(1))
