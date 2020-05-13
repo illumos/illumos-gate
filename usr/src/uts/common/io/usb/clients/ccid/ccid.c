@@ -3989,7 +3989,7 @@ ccid_ioctl_status(ccid_slot_t *slot, intptr_t arg, int mode)
 
 	if ((slot->cs_flags & CCID_SLOT_F_ACTIVE) != 0) {
 		ucs.ucs_status |= UCCID_STATUS_F_PARAMS_VALID;
-		ucs.ucs_prot = slot->cs_icc.icc_cur_protocol;
+		ucs.ucs_prot = (uccid_prot_t)slot->cs_icc.icc_cur_protocol;
 		ucs.ucs_params = slot->cs_icc.icc_params;
 	}
 
