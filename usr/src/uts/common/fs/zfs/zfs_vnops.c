@@ -5586,7 +5586,6 @@ zfs_isdir()
 /*
  * Directory vnode operations template
  */
-vnodeops_t *zfs_dvnodeops;
 const fs_operation_def_t zfs_dvnodeops_template[] = {
 	VOPNAME_OPEN,		{ .vop_open = zfs_open },
 	VOPNAME_CLOSE,		{ .vop_close = zfs_close },
@@ -5619,7 +5618,6 @@ const fs_operation_def_t zfs_dvnodeops_template[] = {
 /*
  * Regular file vnode operations template
  */
-vnodeops_t *zfs_fvnodeops;
 const fs_operation_def_t zfs_fvnodeops_template[] = {
 	VOPNAME_OPEN,		{ .vop_open = zfs_open },
 	VOPNAME_CLOSE,		{ .vop_close = zfs_close },
@@ -5654,7 +5652,6 @@ const fs_operation_def_t zfs_fvnodeops_template[] = {
 /*
  * Symbolic link vnode operations template
  */
-vnodeops_t *zfs_symvnodeops;
 const fs_operation_def_t zfs_symvnodeops_template[] = {
 	VOPNAME_GETATTR,	{ .vop_getattr = zfs_getattr },
 	VOPNAME_SETATTR,	{ .vop_setattr = zfs_setattr },
@@ -5671,7 +5668,6 @@ const fs_operation_def_t zfs_symvnodeops_template[] = {
 /*
  * special share hidden files vnode operations template
  */
-vnodeops_t *zfs_sharevnodeops;
 const fs_operation_def_t zfs_sharevnodeops_template[] = {
 	VOPNAME_GETATTR,	{ .vop_getattr = zfs_getattr },
 	VOPNAME_ACCESS,		{ .vop_access = zfs_access },
@@ -5697,7 +5693,6 @@ const fs_operation_def_t zfs_sharevnodeops_template[] = {
  *	zfs_link()	- no links into/out of attribute space
  *	zfs_rename()	- no moves into/out of attribute space
  */
-vnodeops_t *zfs_xdvnodeops;
 const fs_operation_def_t zfs_xdvnodeops_template[] = {
 	VOPNAME_OPEN,		{ .vop_open = zfs_open },
 	VOPNAME_CLOSE,		{ .vop_close = zfs_close },
@@ -5728,7 +5723,6 @@ const fs_operation_def_t zfs_xdvnodeops_template[] = {
 /*
  * Error vnode operations template
  */
-vnodeops_t *zfs_evnodeops;
 const fs_operation_def_t zfs_evnodeops_template[] = {
 	VOPNAME_INACTIVE,	{ .vop_inactive = zfs_inactive },
 	VOPNAME_PATHCONF,	{ .vop_pathconf = zfs_pathconf },
