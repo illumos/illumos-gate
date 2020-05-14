@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IOCTL 9E "Dec 3, 1996"
+.TH IOCTL 9E "May 6, 2020"
 .SH NAME
 ioctl \- control a character device
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/cred.h>
 #include <sys/file.h>
@@ -23,11 +22,8 @@ ioctl \- control a character device
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
 Architecture independent level 1 (DDI/DKI). This entry point is \fBoptional\fR.
 .SH ARGUMENTS
-.sp
 .ne 2
 .na
 \fB\fIdev\fR\fR
@@ -112,8 +108,6 @@ value which is valid only if the  \fBioctl()\fR succeeds.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBioctl()\fR provides character-access drivers with an alternate entry point
 that can be used for almost any operation other than a simple transfer of
 characters in and out of buffers. Most often,  \fBioctl()\fR is used to control
@@ -132,7 +126,10 @@ I/O control commands are used to implement the terminal settings passed from
 \fBttymon\fR(1M) and  \fBstty\fR(1), to format disk devices, to implement a
 trace driver for debugging, and to clean up character queues. Since the kernel
 does not interpret the command type that defines the operation, a driver is
-free to define its own commands.
+free to define its own commands. Drivers must be prepared to receive commands
+that they do not recognize or are in contexts that they do not expect. In the
+case where \fIcmd\fR is unknown, it is recommended that the driver return
+\fBENOTTY\fR.
 .sp
 .LP
 Drivers that use an  \fBioctl()\fR routine typically have a command to ``read''
@@ -205,13 +202,10 @@ action that should be taken. However, the command passed to the driver by the
 user process is an integer value associated with the command name in the
 header.
 .SH RETURN VALUES
-.sp
-.LP
 \fBioctl()\fR should return  \fB0\fR on success, or the appropriate error
 number. The driver may also set the value returned to the calling process
 through \fIrval_p\fR.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fR\fBioctl()\fR entry point
 .sp
 .LP
@@ -263,8 +257,6 @@ xxioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBstty\fR(1), \fBttymon\fR(1M), \fBdkio\fR(7I), \fBfbio\fR(7I),
 \fBtermio\fR(7I), \fBopen\fR(9E), \fBput\fR(9E), \fBsrv\fR(9E),
 \fBcopyin\fR(9F), \fBcopyout\fR(9F), \fBddi_copyin\fR(9F),
@@ -273,7 +265,6 @@ xxioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-.sp
 .LP
 Non-STREAMS driver  \fBioctl()\fR routines must make sure that user data is
 copied into or out of the kernel address space explicitly using
@@ -288,8 +279,6 @@ even when in user context.
 Failure to use the appropriate copying routines can result in panics under load
 on some platforms, and reproducible panics on others.
 .SH NOTES
-.sp
-.LP
 STREAMS drivers do not have  \fBioctl()\fR routines. The stream head converts
 I/O control commands to  \fBM_IOCTL\fR messages, which are handled by the
 driver's  \fBput\fR(9E) or \fBsrv\fR(9E) routine.
