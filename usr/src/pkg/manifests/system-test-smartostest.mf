@@ -44,7 +44,7 @@ file path=usr/bin/ctfmerge mode=0555
 # The libc-tests attempt to forge a hardlink to isaexec
 # so we need to redeliver isaexec in order to create the
 # proto area correctly.
-file path=usr/lib/isaexec
+file path=usr/lib/isaexec mode=0555
 
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
