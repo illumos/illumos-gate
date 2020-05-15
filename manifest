@@ -5416,7 +5416,7 @@ s usr/lib/amd64/libtsol.so=../../../lib/amd64/libtsol.so.2
 s usr/lib/amd64/libumem.so.1=../../../lib/amd64/libumem.so.1
 s usr/lib/amd64/libumem.so=../../../lib/amd64/libumem.so.1
 f usr/lib/amd64/libutempter.so.1 0755 root bin
-s usr/lib/amd64/libutempter.so=../../../lib/amd64/libutempter.so.1
+s usr/lib/amd64/libutempter.so=libutempter.so.1
 s usr/lib/amd64/libuuid.so.1=../../../lib/amd64/libuuid.so.1
 s usr/lib/amd64/libuuid.so=../../../lib/amd64/libuuid.so.1
 s usr/lib/amd64/libuutil.so.1=../../../lib/amd64/libuutil.so.1
@@ -6948,7 +6948,7 @@ s usr/lib/libtsol.so=../../lib/libtsol.so.2
 s usr/lib/libumem.so.1=../../lib/libumem.so.1
 s usr/lib/libumem.so=../../lib/libumem.so.1
 f usr/lib/libutempter.so.1 0755 root bin
-s usr/lib/libutempter.so=../../lib/libutempter.so.1
+s usr/lib/libutempter.so=libutempter.so.1
 s usr/lib/libuuid.so.1=../../lib/libuuid.so.1
 s usr/lib/libuuid.so=../../lib/libuuid.so.1
 s usr/lib/libuutil.so.1=../../lib/libuutil.so.1
