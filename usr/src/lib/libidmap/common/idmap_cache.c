@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2020 Nexenta by DDN, Inc. All rights reserved.
+ */
+
+/*
  * Windows to Solaris Identity Mapping
  * This module provides the libidmap idmap_cache.
  */
@@ -91,7 +95,7 @@ typedef struct sid2uid_gid {
 	avl_node_t		avl_link;
 	struct sid2uid_gid	*flink;
 	struct sid2uid_gid	*blink;
-	const char 		*sid_prefix;
+	const char		*sid_prefix;
 	idmap_rid_t		rid;
 	uid_t			uid;
 	time_t			uid_ttl;
@@ -211,7 +215,7 @@ idmap_compare_sid(const sid2uid_gid_t *entry1, const sid2uid_gid_t *entry2)
 
 static int
 idmap_compare_pid(const pid2sid_winname_t *entry1,
-			const pid2sid_winname_t *entry2)
+    const pid2sid_winname_t *entry2)
 {
 	if (entry2->pid > entry1->pid)
 		return (1);
@@ -223,7 +227,7 @@ idmap_compare_pid(const pid2sid_winname_t *entry1,
 
 static int
 idmap_compare_winname(const winname2uid_gid_t *entry1,
-			const winname2uid_gid_t *entry2)
+    const winname2uid_gid_t *entry2)
 {
 	int comp;
 
@@ -446,9 +450,9 @@ idmap_cache_purge(void)
 
 void
 idmap_cache_get_data(size_t *uidbysid, size_t *gidbysid,
-	size_t *pidbysid, size_t *sidbyuid, size_t *sidbygid,
-	size_t *winnamebyuid, size_t *winnamebygid,
-	size_t *uidbywinname, size_t *gidbywinname)
+    size_t *pidbysid, size_t *sidbyuid, size_t *sidbygid,
+    size_t *winnamebyuid, size_t *winnamebygid,
+    size_t *uidbywinname, size_t *gidbywinname)
 {
 	(void) pthread_mutex_lock(&idmap_cache.sid2uid_gid.mutex);
 	*uidbysid = idmap_cache.sid2uid_gid.uid_num;
@@ -475,7 +479,7 @@ idmap_cache_get_data(size_t *uidbysid, size_t *gidbysid,
 
 idmap_stat
 idmap_cache_lookup_uidbysid(const char *sid_prefix,
-			idmap_rid_t rid, uid_t *uid)
+    idmap_rid_t rid, uid_t *uid)
 {
 	sid2uid_gid_t	entry;
 	sid2uid_gid_t	*result;
@@ -506,7 +510,7 @@ idmap_cache_lookup_uidbysid(const char *sid_prefix,
 
 idmap_stat
 idmap_cache_lookup_gidbysid(const char *sid_prefix,
-			idmap_rid_t rid, gid_t *gid)
+    idmap_rid_t rid, gid_t *gid)
 {
 	sid2uid_gid_t	entry;
 	sid2uid_gid_t	*result;
@@ -538,7 +542,7 @@ idmap_cache_lookup_gidbysid(const char *sid_prefix,
 
 idmap_stat
 idmap_cache_lookup_pidbysid(const char *sid_prefix,
-			idmap_rid_t rid, uid_t *pid, int *is_user)
+    idmap_rid_t rid, uid_t *pid, int *is_user)
 {
 	sid2uid_gid_t	entry;
 	sid2uid_gid_t	*result;
@@ -575,7 +579,7 @@ idmap_cache_lookup_pidbysid(const char *sid_prefix,
 
 idmap_stat
 idmap_cache_lookup_sidbyuid(char **sid_prefix,
-			idmap_rid_t *rid, uid_t uid)
+    idmap_rid_t *rid, uid_t uid)
 {
 	pid2sid_winname_t	entry;
 	pid2sid_winname_t	*result;
@@ -607,7 +611,7 @@ idmap_cache_lookup_sidbyuid(char **sid_prefix,
 
 idmap_stat
 idmap_cache_lookup_sidbygid(char **sid_prefix,
-			idmap_rid_t *rid, gid_t gid)
+    idmap_rid_t *rid, gid_t gid)
 {
 	pid2sid_winname_t	entry;
 	pid2sid_winname_t	*result;
@@ -730,7 +734,7 @@ idmap_cache_lookup_winnamebygid(char **name, char **domain, gid_t gid)
 
 idmap_stat
 idmap_cache_lookup_uidbywinname(const char *name, const char *domain,
-			uid_t *uid)
+    uid_t *uid)
 {
 	winname2uid_gid_t	entry;
 	winname2uid_gid_t	*result;
@@ -760,7 +764,7 @@ idmap_cache_lookup_uidbywinname(const char *name, const char *domain,
 
 idmap_stat
 idmap_cache_lookup_gidbywinname(const char *name, const char *domain,
-			gid_t *gid)
+    gid_t *gid)
 {
 	winname2uid_gid_t	entry;
 	winname2uid_gid_t	*result;
@@ -790,8 +794,7 @@ idmap_cache_lookup_gidbywinname(const char *name, const char *domain,
 
 void
 idmap_cache_add_sid2uid(const char *sid_prefix,
-			idmap_rid_t rid, uid_t uid, int direction)
-
+    idmap_rid_t rid, uid_t uid, int direction)
 {
 	avl_index_t	where;
 	time_t		ttl = CACHE_TTL + time(NULL);
@@ -903,7 +906,7 @@ exit_pid2sid_winname:
 
 void
 idmap_cache_add_sid2gid(const char *sid_prefix,
-			idmap_rid_t rid, gid_t gid, int direction)
+    idmap_rid_t rid, gid_t gid, int direction)
 {
 	avl_index_t	where;
 	time_t		ttl = CACHE_TTL + time(NULL);
@@ -1013,7 +1016,7 @@ exit_gid2sid_winname:
 
 void
 idmap_cache_add_sid2pid(const char *sid_prefix,
-			idmap_rid_t rid, uid_t pid, int is_user, int direction)
+    idmap_rid_t rid, uid_t pid, int is_user, int direction)
 {
 	avl_index_t	where;
 	time_t		ttl = CACHE_TTL + time(NULL);
@@ -1121,6 +1124,7 @@ exit_sid2uid_gid:
 				new->sid_ttl = ttl;
 				new->winname = NULL;
 				new->windomain = NULL;
+				new->winname_ttl = 0;
 				idmap_cache.uid2sid_winname.sid_num++;
 
 				list_insert(&idmap_cache.uid2sid_winname.head,
@@ -1167,6 +1171,7 @@ exit_uid2sid_winname:
 				new->sid_ttl = ttl;
 				new->winname = NULL;
 				new->windomain = NULL;
+				new->winname_ttl = 0;
 				idmap_cache.gid2sid_winname.sid_num++;
 
 				list_insert(&idmap_cache.gid2sid_winname.head,
@@ -1192,7 +1197,7 @@ exit_gid2sid_winname:
 
 void
 idmap_cache_add_winname2uid(const char *name, const char *domain, uid_t uid,
-			int direction)
+    int direction)
 {
 	avl_index_t	where;
 	time_t		ttl = CACHE_TTL + time(NULL);
@@ -1322,7 +1327,7 @@ exit_uid2sid_winname:
 
 void
 idmap_cache_add_winname2gid(const char *name, const char *domain, gid_t gid,
-			int direction)
+    int direction)
 {
 	avl_index_t	where;
 	time_t		ttl = CACHE_TTL + time(NULL);
