@@ -21,11 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-<<<<<<< HEAD
  * Copyright 2019 Joyent, Inc.
-=======
- * Copyright 2017, Joyent, Inc.
->>>>>>> 91a7ed35601b9dac7c03b16025b401dc9f7a6bbd
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
