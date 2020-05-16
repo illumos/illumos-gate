@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DLOPEN 3C "Sep 7, 2015"
+.TH DLOPEN 3C "May 16, 2020"
 .SH NAME
 dlopen, dlmopen \- gain access to an executable object file
 .SH SYNOPSIS
-.LP
 .nf
 #include <dlfcn.h>
 #include <link.h>
@@ -21,7 +20,6 @@ dlopen, dlmopen \- gain access to an executable object file
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBdlopen()\fR function makes an executable object file available to a
 running process. \fBdlopen()\fR returns to the process a \fIhandle\fR that the
 process can use on subsequent calls to \fBdlsym\fR(3C), \fBdladdr\fR(3C),
@@ -130,7 +128,7 @@ of other objects that include the same group.
 The program image file and any objects loaded at program startup have the mode
 \fBRTLD_GLOBAL\fR. The mode \fBRTLD_LOCAL\fR is the default mode for any
 objects that are acquired with \fBdlopen()\fR. A local object can be a
-dependency of more then one group. Any object of mode \fBRTLD_LOCAL\fR that is
+dependency of more than one group. Any object of mode \fBRTLD_LOCAL\fR that is
 referenced as a dependency of an object of mode \fBRTLD_GLOBAL\fR is promoted
 to \fBRTLD_GLOBAL\fR. In other words, the \fBRTLD_LOCAL\fR mode is ignored.
 .sp
@@ -273,7 +271,6 @@ are opened on a new link-map list must express all of their dependencies.
 .RE
 
 .SH RETURN VALUES
-.LP
 The \fBdlopen()\fR function returns \fINULL\fR if \fIpathname\fR cannot be
 found, cannot be opened for reading, or is not a shared object or a relocatable
 object. \fBdlopen()\fR also returns \fINULL\fR if an error occurs during the
@@ -281,13 +278,11 @@ process of loading \fIpathname\fR or relocating its symbolic references. See
 \fBNOTES\fR. Additional diagnostic information is available through
 \fBdlerror()\fR.
 .SH USAGE
-.LP
 The \fBdlopen()\fR and \fBdlmopen()\fR functions are members of a family of
 functions that give the user direct access to the dynamic linking facilities.
 This family of functions is available only to dynamically-linked processes. See
 the \fILinker and Libraries Guide\fR.
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -304,7 +299,6 @@ MT\(miLevel	MT\(miSafe
 .TE
 
 .SH SEE ALSO
-.LP
 \fBld\fR(1), \fBld.so.1\fR(1), \fBdladdr\fR(3C), \fBdlclose\fR(3C),
 \fBdldump\fR(3C), \fBdlerror\fR(3C), \fBdlinfo\fR(3C), \fBdlsym\fR(3C),
 \fBattributes\fR(5), \fBstandards\fR(5)
@@ -312,7 +306,6 @@ MT\(miLevel	MT\(miSafe
 .LP
 \fILinker and Libraries Guide\fR
 .SH NOTES
-.LP
 If \fIpathname\fR has dependencies on other objects, these objects are
 automatically loaded by \fBdlopen()\fR. The directory search path used to find
 \fIpathname\fR and any dependencies can be affected by setting the environment
