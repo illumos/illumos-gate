@@ -450,10 +450,10 @@ bitmap_cons_clear(struct gfxp_fb_softc *softc, struct vis_consclear *ca)
 		for (i = 0; i < console->fb.screen.y; i++) {
 			if (softc->mode == KD_TEXT) {
 				fb = console->fb.fb + i * pitch;
-				(void) memset(fb, ca->bg_color, pitch);
+				(void) memset(fb, data, pitch);
 			}
 			fb = console->fb.shadow_fb + i * pitch;
-			(void) memset(fb, ca->bg_color, pitch);
+			(void) memset(fb, data, pitch);
 		}
 		break;
 	case 15:
