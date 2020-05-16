@@ -3,18 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PICLD 1M "Aug 10, 2004"
+.TH PICLD 1M "May 16, 2020"
 .SH NAME
 picld \- PICL daemon
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/lib/picl/picld\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The Platform Information and Control Library (\fBPICL\fR) provides a mechanism
 to publish platform-specific information for clients to access in a
 platform-independent way. \fBpicld\fR maintains and controls access to the
@@ -29,8 +26,6 @@ information. After the plug-in modules are initialized, the daemon opens the
 \fBPICL\fR daemon door to service client requests to access information in the
 \fBPICL\fR tree.
 .SS "PICL Tree"
-.sp
-.LP
 The \fBPICL\fR tree is the repository of all the nodes and properties created
 by the plug-in modules to represent the platform configuration. Every node in
 the \fBPICL\fR tree is an instance of a well-defined \fBPICL\fR class. The name
@@ -42,15 +37,13 @@ nodes in the \fBPICL\fR tree have well-known names. For example, the name of
 the root node of the \fBPICL\fR tree is \fB/\fR and the name of the root node
 of the sub-tree containing platform device nodes is \fBplatform\fR.
 .SS "PICL plug-in Modules"
-.sp
-.LP
 The \fBPICL\fR plug-in modules are shared objects that publish
 platform-specific data in the \fBPICL\fR tree. They are located in well-known
 directories so that the daemon can locate and load them.
 .sp
 .LP
 Plug-in modules are located in one of the following plug-in directories
-depending on the plaform-specific nature of the data that they collect and
+depending on the platform-specific nature of the data that they collect and
 publish:
 .sp
 .in +2
@@ -92,11 +85,8 @@ environmental information in the \fBPICL\fR tree so clients can access them.
 Clients use the \fBlibpicl\fR(3PICL) interface to send requests to \fBpicld\fR
 for accessing the \fBPICL\fR tree.
 .SH EXIT STATUS
-.sp
-.LP
 \fBpicld\fR does not return an exit status.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/run/picld_door\fR\fR
@@ -115,14 +105,10 @@ for accessing the \fBPICL\fR tree.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBsvcs\fR(1), \fBsvcadm\fR(1M), \fBdlopen\fR(3C), \fBlibpicl\fR(3PICL),
 \fBlibpicltree\fR(3PICLTREE), \fBpicld_log\fR(3PICLTREE),
 \fBpicld_plugin_register\fR(3PICLTREE), \fBattributes\fR(5), \fBsmf\fR(5)
 .SH NOTES
-.sp
-.LP
 The \fBpicld\fR service is managed by the service management facility,
 \fBsmf\fR(5), under the service identifier:
 .sp

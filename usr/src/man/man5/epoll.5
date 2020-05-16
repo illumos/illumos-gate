@@ -8,7 +8,7 @@
 .\"  A full copy of the text of the CDDL should have accompanied this
 .\"  source.  A copy of the CDDL is also available via the Internet at
 .\"  http://www.illumos.org/license/CDDL.
-.TH EPOLL 5 "Apr 17, 2014"
+.TH EPOLL 5 "May 16, 2020"
 .SH NAME
 epoll \- Linux-compatible I/O event notification facility
 .SH SYNOPSIS
@@ -28,7 +28,7 @@ the Linux facility, including the following interfaces:
 .ie t \(bu
 .el o
 \fBepoll_create\fR(3C) creates an \fBepoll\fR instance, returning a file
-descriptor. It contains a size arugment which is meaningful only in as
+descriptor. It contains a size argument which is meaningful only in as
 much as it cannot be 0.
 .RE
 .RS +4
@@ -59,7 +59,7 @@ via \fBepoll_ctl\fR(3C), blocking the caller if no such events are pending.
 .TP
 .ie t \(bu
 .el o
-\fBepoll_pwait\fR(3C) opeates in a similar manner to \fBepoll_wait\fR(3C), but
+\fBepoll_pwait\fR(3C) operates in a similar manner to \fBepoll_wait\fR(3C), but
 allows the caller to specify a signal mask to be set atomically with respect
 to waiting for events.
 .RE

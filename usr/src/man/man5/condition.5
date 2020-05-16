@@ -44,12 +44,10 @@
 .\" Copyright (c) 1998 Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\"
-.TH CONDITION 5 "Jul 20, 1998"
+.TH CONDITION 5 "May 16, 2020"
 .SH NAME
 condition \- concepts related to condition variables
 .SH DESCRIPTION
-.sp
-.LP
 Occasionally, a thread running within a mutex needs to wait for an event,  in
 which case it blocks or sleeps. When a thread is waiting for another thread to
 communicate its disposition, it uses a condition variable in conjunction with a
@@ -68,8 +66,6 @@ If another thread changes the condition, it may wake up waiting threads by
 signaling the associated condition variable. The waiting threads, upon
 awakening, reacquire the mutex and re-evaluate the condition.
 .SS "Initialize"
-.sp
-.LP
 Condition variables and mutexes should be global. Condition variables that are
 allocated in writable memory can synchronize threads among processes if they
 are shared by the cooperating processes (see \fBmmap\fR(2)) and are initialized
@@ -99,26 +95,18 @@ initialization of the condition variable. Solaris condition variables also
 implement as the default,  intra-process; however, they set this attribute
 according to the argument, \fItype\fR, passed to their initialization function.
 .SS "Condition Wait"
-.sp
-.LP
 The condition wait interface allows a thread to wait for a condition and
 atomically release the associated mutex that it needs to hold to check the
 condition. The thread waits for another thread to make the condition true and
 that thread's resulting call to signal and wakeup the waiting thread.
 .SS "Condition Signaling"
-.sp
-.LP
 A condition signal allows a thread to unblock the next thread waiting on the
 condition variable, whereas, a condition broadcast allows a thread to unblock
 all threads waiting on the  condition variable.
 .SS "Destroy"
-.sp
-.LP
 The condition destroy functions destroy any state, but not the space,
 associated with the condition variable.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -133,8 +121,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBfork\fR(2), \fBmmap\fR(2), \fBsetitimer\fR(2), \fBshmop\fR(2),
 \fBcond_broadcast\fR(3C), \fBcond_destroy\fR(3C), \fBcond_init\fR(3C),
 \fBcond_signal\fR(3C), \fBcond_timedwait\fR(3C), \fBcond_wait\fR(3C),
@@ -144,13 +130,11 @@ MT-Level	MT-Safe
 \fBpthread_condattr_init\fR(3C), \fBsignal\fR(3C), \fBattributes\fR(5),
 \fBmutex\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
-.LP
 If more than one thread is blocked on a condition variable, the order in which
 threads are unblocked is determined by the scheduling policy.
 .sp
 .LP
-\fBUSYNC_THREAD\fR does not support multiple mapplings to the same logical
+\fBUSYNC_THREAD\fR does not support multiple mappings to the same logical
 synch object. If you need to \fBmmap()\fR a synch object to different locations
 within the same address space, then the synch object should be initialized as a
 shared object \fBUSYNC_PROCESS\fR for Solaris, and

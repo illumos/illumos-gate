@@ -3,12 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TNF_KERNEL_PROBES 4 "Nov 8, 1999"
+.TH TNF_KERNEL_PROBES 4 "May 16, 2020"
 .SH NAME
 tnf_kernel_probes \- TNF kernel probes
 .SH DESCRIPTION
-.sp
-.LP
 The set of probes (trace instrumentation points) available in the standard
 kernel.  The probes log trace data to a kernel trace buffer in Trace Normal
 Form  (TNF).  Kernel probes are controlled by \fBprex\fR(1). A snapshot of the
@@ -22,7 +20,6 @@ from \fBprex\fR(1). A probe that is enabled for tracing generates a  \fBTNF\fR
 record, called an \fIevent record\fR. An event record contains two common
 members and may contain other probe-specific data members.
 .SS "Common Members"
-.sp
 .in +2
 .nf
 \fBtnf_probe_event\fR    \fItag\fR
@@ -70,7 +67,6 @@ time of the event.
 
 .SS "Threads"
 .SS "\fBthread_create\fR"
-.sp
 .in +2
 .nf
 \fBtnf_kthread_id\fR    \fItid\fR
@@ -110,7 +106,6 @@ The kernel address of its start routine.
 .RE
 
 .SS "\fBthread_state\fR"
-.sp
 .in +2
 .nf
 \fBtnf_kthread_id\fR    \fItid\fR
@@ -181,16 +176,11 @@ is implicit in the system call entry and exit events.
 .RE
 
 .SS "thread_exit"
-.sp
-.LP
 Thread termination event for writing thread.  This probe has no data members
 other than the common members.
 .SS "Scheduling"
-.sp
-.LP
 \fB\fR
 .SS "thread_queue"
-.sp
 .in +2
 .nf
 \fBtnf_kthread_id\fR    \fItid\fR
@@ -233,7 +223,6 @@ The current length of the cpu's dispatch queue.
 
 .SS "Blocking"
 .SS "\fBthread_block\fR"
-.sp
 .in +2
 .nf
 \fBtnf_opaque\fR     \fIreason\fR
@@ -266,7 +255,6 @@ stack at the time the thread blocks.
 
 .SS "System Calls"
 .SS "\fBsyscall_start\fR"
-.sp
 .in +2
 .nf
 \fBtnf_sysnum\fR    \fIsysnum\fR
@@ -287,7 +275,6 @@ microstate with this event.
 .RE
 
 .SS "\fBsyscall_end\fR"
-.sp
 .in +2
 .nf
 \fBtnf_long\fR    \fIrval1\fR
@@ -322,7 +309,6 @@ The error return.
 The writing thread implicitly enters the \fIuser\fR microstate with this event.
 .SS "Page Faults"
 .SS "\fBaddress_fault\fR"
-.sp
 .in +2
 .nf
 \fBtnf_opaque\fR      \fIaddress\fR
@@ -364,7 +350,6 @@ for these two members are defined in <\fBvm/seg_enum.h\fR>.
 .RE
 
 .SS "\fBmajor_fault\fR"
-.sp
 .in +2
 .nf
 \fBtnf_opaque\fR    \fIvnode\fR
@@ -379,7 +364,6 @@ Major page fault event.  The faulting page is mapped to the file given by the
 virtual address is in the most recent \fBaddress_fault\fR event for the writing
 thread.)
 .SS "\fBanon_private\fR"
-.sp
 .in +2
 .nf
 \fBtnf_opaque\fR    \fIaddress\fR
@@ -399,7 +383,6 @@ The virtual address at which the new page is mapped.
 .RE
 
 .SS "\fBanon_zero\fR"
-.sp
 .in +2
 .nf
 \fBtnf_opaque\fR    \fIaddress\fR
@@ -419,7 +402,6 @@ The virtual address at which the new page is mapped.
 .RE
 
 .SS "\fBpage_unmap\fR"
-.sp
 .in +2
 .nf
 \fBtnf_opaque\fR    \fIvnode\fR
@@ -442,7 +424,6 @@ Identifies the file and offset of the page being unmapped.
 
 .SS "Pageins and Pageouts"
 .SS "\fBpagein\fR"
-.sp
 .in +2
 .nf
 \fBtnf_opaque\fR    \fIvnode\fR
@@ -460,7 +441,7 @@ Pagein start event.  This event signals the initiation of pagein I/O.
 \fB\fIvnode\fRand\fIoffset\fR\fR
 .ad
 .RS 18n
-Identifyies the file and offset to be paged in.
+Identifies the file and offset to be paged in.
 .RE
 
 .sp
@@ -473,7 +454,6 @@ Specifies the number of bytes to be paged in.
 .RE
 
 .SS "\fBpageout\fR"
-.sp
 .in +2
 .nf
 \fBtnf_opaque\fR    \fIvnode\fR
@@ -524,7 +504,6 @@ The number of pages reclaimed after being written out.
 
 .SS "Page Daemon (Page Stealer)"
 .SS "\fBpageout_scan_start\fR"
-.sp
 .in +2
 .nf
 \fBtnf_ulong\fR    \fIpages_free\fR
@@ -555,7 +534,6 @@ The number of pages desired free.
 .RE
 
 .SS "\fBpageout_scan_end\fR"
-.sp
 .in +2
 .nf
 \fBtnf_ulong\fR    \fIpages_free\fR
@@ -588,7 +566,6 @@ be freed when any queued pageout requests complete.)
 
 .SS "Swapper"
 .SS "\fBswapout_process\fR"
-.sp
 .in +2
 .nf
 \fBtnf_pid\fR      \fIpid\fR
@@ -619,7 +596,6 @@ Reports the number of pages either freed or queued for pageout.
 .RE
 
 .SS "\fBswapout_lwp\fR"
-.sp
 .in +2
 .nf
 \fBtnf_pid\fR         \fIpid\fR
@@ -670,7 +646,6 @@ The number of pages swapped out.
 .RE
 
 .SS "\fBswapin_lwp\fR"
-.sp
 .in +2
 .nf
 \fBtnf_pid\fR         \fIpid\fR
@@ -722,7 +697,6 @@ The number of pages swapped in.
 
 .SS "Local I/O"
 .SS "\fBstrategy\fR"
-.sp
 .in +2
 .nf
 \fBtnf_device\fR      \fIdevice\fR
@@ -783,7 +757,6 @@ The \fBbuf\fR(9S) flags associated with the transfer.
 .RE
 
 .SS "\fBbiodone\fR"
-.sp
 .in +2
 .nf
 \fBtnf_device\fR     \fIdevice\fR
@@ -824,7 +797,6 @@ The kernel address of the \fBbuf\fR(9S) structure associated with the transfer.
 .RE
 
 .SS "\fBphysio_start\fR"
-.sp
 .in +2
 .nf
 \fBtnf_device\fR     \fIdevice\fR
@@ -837,7 +809,7 @@ The kernel address of the \fBbuf\fR(9S) structure associated with the transfer.
 .sp
 .LP
 Raw I/O start event.  This event marks entry into the \fBphysio\fR(9F)
-fufnction which performs unbuffered I/O.
+function which performs unbuffered I/O.
 .sp
 .ne 2
 .na
@@ -875,7 +847,6 @@ The direction of the transfer: read or write (see \fBbuf\fR(9S)).
 .RE
 
 .SS "\fBphysio_end\fR"
-.sp
 .in +2
 .nf
 \fBtnf_device\fR    \fIdevice\fR
@@ -884,7 +855,7 @@ The direction of the transfer: read or write (see \fBbuf\fR(9S)).
 
 .sp
 .LP
-Raw I/O end event.  This event marks exit from the \fBphysio\fR(9F) fufnction.
+Raw I/O end event.  This event marks exit from the \fBphysio\fR(9F) function.
 .sp
 .ne 2
 .na
@@ -895,8 +866,6 @@ The major and minor numbers of the device of the transfer.
 .RE
 
 .SH USAGE
-.sp
-.LP
 Use the \fBprex\fR utility to control kernel probes. The standard \fBprex\fR
 commands to list and manipulate probes are available to you, along with
 commands to set up and manage kernel tracing.
@@ -968,8 +937,6 @@ A convenient way to follow these steps is to use two shell windows; run an
 interactive \fBprex\fR session in one, and run your application and
 \fBtnfxtract\fR in the other.
 .SH SEE ALSO
-.sp
-.LP
 \fBprex\fR(1), \fBtnfdump\fR(1), \fBtnfxtract\fR(1), \fBlibtnfctl\fR(3TNF),
 \fBTNF_PROBE\fR(3TNF), \fBtracing\fR(3TNF), \fBstrategy\fR(9E),
 \fBbiodone\fR(9F), \fBphysio\fR(9F), \fBbuf\fR(9S)

@@ -3,17 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KRB5.CONF 4 "Nov 26, 2017"
+.TH KRB5.CONF 4 "May 16, 2020"
 .SH NAME
 krb5.conf \- Kerberos configuration file
 .SH SYNOPSIS
-.LP
 .nf
 /etc/krb5/krb5.conf
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBkrb5.conf\fR file contains Kerberos configuration information, including
 the locations of \fBKDC\fRs and administration daemons for the Kerberos realms
 of interest, defaults for the current realm and for Kerberos applications, and
@@ -141,7 +139,6 @@ For a Key Distribution Center (\fBKDC\fR), can contain the location of the
 .RE
 
 .SS "The \fB[libdefaults]\fR Section"
-.LP
 The \fB[libdefaults]\fR section can contain any of the following relations:
 .sp
 .ne 2
@@ -346,7 +343,7 @@ above.
 Indicates whether DNS SRV records need to be used to locate the KDCs and the
 other servers for a realm, if they have not already been listed in the
 \fB[realms]\fR section. This option makes the machine vulnerable to a certain
-type of DoS attack if somone spoofs the DNS records and does a redirect to
+type of DoS attack if someone spoofs the DNS records and does a redirect to
 another server. This is, however, no worse than a DoS, since the bogus KDC is
 unable to decode anything sent (excepting the initial ticket request, which has
 no encrypted data). Also, anything the fake KDC sends out isl not trusted
@@ -407,7 +404,6 @@ to make it a network-wide setting for all realms.
 .RE
 
 .SS "The \fB[appdefaults]\fR Section"
-.LP
 This section contains subsections for Kerberos V5 applications, where
 \fIrelation-subsection\fR is the name of an application. Each subsection
 contains relations that define the default behaviors for that application.
@@ -589,7 +585,6 @@ In the following example, \fBkinit\fR gets forwardable tickets by default and
 The application defaults specified here are overridden by those specified in
 the \fB[realms]\fR section.
 .SS "The \fB[realms]\fR Section"
-.LP
 This section contains subsections for Kerberos realms, where
 \fIrelation-subsection\fR is the name of a realm. Each subsection contains
 relations that define the properties for that particular realm. The following
@@ -869,7 +864,6 @@ parameters. Most often, you need to specify them only when using a
 non-Solaris-based Kerberos server. Otherwise, the change request is sent over
 \fBRPCSEC_GSS\fR to the Solaris Kerberos administration server.
 .SS "The \fB[domain_realm]\fR Section"
-.LP
 This section provides a translation from a domain name or hostname to a
 Kerberos realm name. The \fIrelation\fR can be a host name, or a domain name,
 where domain names are indicated by a period (`\fB\&.\fR') prefix.
@@ -902,7 +896,6 @@ default into the \fBFUBAR.ORG\fR realm. The entries for the hosts \fBmit.edu\fR
 and \fBfubar.org\fR. Without these entries, these hosts would be mapped into
 the Kerberos realms \fBEDU\fR and \fBORG\fR, respectively.
 .SS "The \fB[logging]\fR Section"
-.LP
 This section indicates how Kerberos programs are to perform logging. There are
 two types of relations for this section: relations to specify how to log and a
 relation to specify how to rotate \fBkdc\fR log files.
@@ -1111,7 +1104,6 @@ with a specified time interval of a day.
 .sp
 
 .SS "The \fB[capaths]\fR Section"
-.LP
 In order to perform direct (non-hierarchical) cross-realm authentication, a
 database is needed to construct the authentication paths between the realms.
 This section defines that database.
@@ -1215,7 +1207,6 @@ In the above examples, the ordering is not important, except when the same
 relation is used more than once. The client uses this to determine the path.
 (It is not important to the server, since the transited field is not sorted.)
 .SS "PKINIT-specific Options"
-.LP
 The following are \fBpkinit-specific\fR options. These values can be specified
 in \fB[libdefaults]\fR as global defaults, or within a realm-specific
 subsection of \fB[libdefaults]\fR, or can be specified as realm-specific values
@@ -1646,7 +1637,6 @@ been set to \fBFILE:/tmp/my_proxy.pem\fR.
 .RE
 
 .SS "The \fB[dbmodules]\fR Section"
-.LP
 This section consists of relations that provide configuration information for
 plug-in modules. In particular, the relations describe the configuration for
 LDAP KDB plug-in. Use of the \fBdb2\fR KDB plug-in is the default behavior and
@@ -1761,7 +1751,6 @@ Port number for SSL connection with directory server. The default is \fB389\fR.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRSample File
 .sp
 .LP
@@ -1840,7 +1829,6 @@ a Kerberos configuration file when the KDC is using the LDAP KDB plug-in.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -1859,12 +1847,10 @@ Interface Stability	See below.
 All of the keywords are Committed, except for the \fBPKINIT\fR keywords, which
 are Volatile.
 .SH SEE ALSO
-.LP
 \fBkinit\fR(1), \fBrcp\fR(1), \fBrdist\fR(1), \fBrlogin\fR(1), \fBrsh\fR(1),
 \fBtelnet\fR(1), \fBsyslog\fR(3C), \fBattributes\fR(5), \fBkerberos\fR(5),
 \fBregex\fR(5)
 .SH NOTES
-.LP
 If the \fBkrb5.conf\fR file is not formatted properly, the \fBtelnet\fR command
 fails. However, the \fBdtlogin\fR and \fBlogin\fR commands still succeed, even
 if the \fBkrb5.conf\fR file is specified as required for the commands. If this

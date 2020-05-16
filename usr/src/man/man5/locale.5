@@ -43,12 +43,11 @@
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH LOCALE 5 "April 9, 2016"
+.TH LOCALE 5 "May 16, 2020"
 .SH NAME
 locale \- subset of a user's environment that depends on language and cultural
 conventions
 .SH DESCRIPTION
-.LP
 A \fBlocale\fR is the definition of the subset of a user's environment that
 depends on language and cultural conventions. It is made up from one or more
 categories. Each category is identified by its name and controls specific
@@ -139,7 +138,6 @@ the value of the corresponding environment variable is used. If the environment
 variable is unset or is set to the empty string, the  \fBsetlocale()\fR
 function sets the appropriate environment.
 .SS "Locale Definition"
-.LP
 Locales can be described with the file format accepted by the \fBlocaledef\fR
 utility.
 .sp
@@ -341,7 +339,6 @@ decimal or hexadecimal constants. Symbolic names not present in the charmap
 file can be specified and will be ignored, as specified under item 1 above.
 .RE
 .SS "LC_CTYPE"
-.LP
 The  \fBLC_CTYPE\fR category defines character classification, case conversion
 and other character attributes. In addition, a series of characters can be
 represented by three adjacent periods representing an ellipsis symbol
@@ -719,7 +716,6 @@ the mapping will be the reverse mapping of the one specified for \fBtoupper\fR.
 .RE
 
 .SS "LC_COLLATE"
-.LP
 The  \fBLC_COLLATE\fR category provides a collation sequence definition for
 numerous utilities (such as \fBsort\fR(1), \fBuniq\fR(1), and so forth),
 regular expression matching (see \fBregex\fR(5)), and the \fBstrcoll\fR(3C),
@@ -744,7 +740,7 @@ as an entity).
 \fBUser-defined ordering of collating elements\fR. Each collating element is
 assigned a collation value defining its order in the character (or basic)
 collation sequence. This ordering is used by regular expressions and pattern
-matching and, unless  collation weights are explicity specified, also as the
+matching and, unless collation weights are explicitly specified, also as the
 collation weight to be used in sorting.
 .RE
 .RS +4
@@ -833,7 +829,6 @@ Specify the end of the collation-order statements.
 .RE
 
 .SS "collating-element \fIkeyword\fR"
-.LP
 In addition to the collating elements in the character set, the
 \fBcollating-element\fR keyword is used to define multi-character collating
 elements. The syntax is:
@@ -868,7 +863,6 @@ Example:
 \fBcollating-element\fR <\fBll\fR> from "\fBll\fR"
 .in -2
 .SS "collating-symbol \fIkeyword\fR"
-.LP
 This keyword will be used to define symbols for use in collation sequence
 statements; that is, between the \fBorder_start\fR and the \fBorder_end\fR
 keywords. The syntax is:
@@ -907,7 +901,6 @@ associated with a relative position in the character order sequence. While such
 a symbolic name does not represent any collating element, it can be used as a
 weight.
 .SS "order_start \fIkeyword\fR"
-.LP
 The \fBorder_start\fR keyword must precede collation order entries and also
 defines the number of weights for this collation sequence definition and other
 collation rules.
@@ -987,7 +980,6 @@ order_start	forward;backward
 .LP
 If no operands are specified, a single \fBforward\fR operand is assumed.
 .SS "Collation Order"
-.LP
 The \fBorder_start\fR keyword is followed by collating identifier entries. The
 syntax for the collating element entries is:
 .sp
@@ -1139,7 +1131,7 @@ l l
 l l .
 \fBorder_start\fR	\fBforward;backward\fR
 \fBUNDEFINED\fR	\fBIGNORE;IGNORE\fR
-\fB<LOW>\fR	
+\fB<LOW>\fR
 \fB<space>\fR	\fB<LOW>;<space>\fR
 \fB\&.\|.\|.\fR	\fB<LOW>;.\|.\|.\fR
 \fB<a>\fR	\fB<a>;<a>\fR
@@ -1152,7 +1144,7 @@ l l .
 \fB<Ch>\fR	\fB<ch>;<Ch>\fR
 \fB<s>\fR	\fB<s>;<s>\fR
 \fB<eszet>\fR	\fB"<s><s>";"<eszet><eszet>"\fR
-\fBorder_end\fR	
+\fBorder_end\fR
 .TE
 
 .sp
@@ -1186,10 +1178,8 @@ collating symbol <\fBch\fR> and belongs to the same primary equivalence class
 as the multi-character collating element <\fBCh\fR>.
 .RE
 .SS "order_end \fIkeyword\fR"
-.LP
 The collating order entries must be terminated with an \fBorder_end\fR keyword.
 .SS "LC_MONETARY"
-.LP
 The  \fBLC_MONETARY\fR category defines the rules and symbols that are used to
 format monetary numeric information. This information is available through the
 \fBlocaleconv\fR(3C) function
@@ -1637,18 +1627,18 @@ The following table shows the result of various combinations:
 .TS
 l l l l l l
 l l l l l l .
-		\fBp_sep_by_space\fR	
-		2	1	0	
-\fBp_cs_precedes\fR= 1	\fBp_sign_posn\fR= 0	\fB($1.25)\fR	\fB($1.25)\fR	\fB($1.25)\fR	
-	\fBp_sign_posn\fR= 1	\fB+$1.25\fR	\fB+$1.25\fR	\fB+$1.25\fR	
-	\fBp_sign_posn\fR= 2	\fB$1.25+\fR	\fB$1.25+\fR	\fB$1.25+\fR	
-	\fBp_sign_posn\fR= 3	\fB+$1.25\fR	\fB+$1.25\fR	\fB+$1.25\fR	
-	\fBp_sign_posn\fR= 4	\fB$+1.25\fR	\fB$+1.25\fR	\fB$+1.25\fR	
-\fBp_cs_precedes\fR= 0	\fBp_sign_posn\fR= 0	\fB(1.25 $)\fR	\fB(1.25 $)\fR	\fB(1.25$)\fR	
-	\fBp_sign_posn\fR= 1	\fB+1.25 $\fR	\fB+1.25 $\fR	\fB+1.25$\fR	
-	\fBp_sign_posn\fR= 2	\fB1.25$ +\fR	\fB1.25 $+\fR	\fB1.25$+\fR	
-	\fBp_sign_posn\fR= 3	\fB1.25+ $\fR	\fB1.25 +$\fR	\fB1.25+$\fR	
-	\fBp_sign_posn\fR= 4	\fB1.25$ +\fR	\fB1.25 $+\fR	\fB1.25$+\fR	
+		\fBp_sep_by_space\fR
+		2	1	0
+\fBp_cs_precedes\fR= 1	\fBp_sign_posn\fR= 0	\fB($1.25)\fR	\fB($1.25)\fR	\fB($1.25)\fR
+	\fBp_sign_posn\fR= 1	\fB+$1.25\fR	\fB+$1.25\fR	\fB+$1.25\fR
+	\fBp_sign_posn\fR= 2	\fB$1.25+\fR	\fB$1.25+\fR	\fB$1.25+\fR
+	\fBp_sign_posn\fR= 3	\fB+$1.25\fR	\fB+$1.25\fR	\fB+$1.25\fR
+	\fBp_sign_posn\fR= 4	\fB$+1.25\fR	\fB$+1.25\fR	\fB$+1.25\fR
+\fBp_cs_precedes\fR= 0	\fBp_sign_posn\fR= 0	\fB(1.25 $)\fR	\fB(1.25 $)\fR	\fB(1.25$)\fR
+	\fBp_sign_posn\fR= 1	\fB+1.25 $\fR	\fB+1.25 $\fR	\fB+1.25$\fR
+	\fBp_sign_posn\fR= 2	\fB1.25$ +\fR	\fB1.25 $+\fR	\fB1.25$+\fR
+	\fBp_sign_posn\fR= 3	\fB1.25+ $\fR	\fB1.25 +$\fR	\fB1.25+$\fR
+	\fBp_sign_posn\fR= 4	\fB1.25$ +\fR	\fB1.25 $+\fR	\fB1.25$+\fR
 .TE
 
 .sp
@@ -1696,7 +1686,6 @@ END LC_MONETARY
 The entry \fBn/a\fR indicates that the value is not available in the POSIX
 locale.
 .SS "LC_NUMERIC"
-.LP
 The  \fBLC_NUMERIC\fR category defines the rules and symbols that will be used
 to format non-monetary numeric information. This information is available
 through the \fBlocaleconv\fR(3C) function.
@@ -1795,7 +1784,6 @@ _
 The entry \fBn/a\fR indicates that the value is not available in the POSIX
 locale.
 .SS "LC_TIME"
-.LP
 The  \fBLC_TIME\fR category defines the interpretation of the field descriptors
 supported by  \fBdate\fR(1) and affects the behavior of the \fBstrftime\fR(3C),
 \fBwcsftime\fR(3C), \fBstrptime\fR(3C), and \fBnl_langinfo\fR(3C) functions.
@@ -2062,7 +2050,6 @@ field descriptor will be used instead of the value.
 .RE
 
 .SS "LC_TIME \fIC-language\fR Access"
-.LP
 The following information can be accessed. These correspond to constants
 defined in <\fBlanginfo.h\fR> and used as arguments to the
 \fBnl_langinfo\fR(3C) function.
@@ -2324,7 +2311,6 @@ _
 .TE
 
 .SS "LC_TIME \fIGeneral\fR Information"
-.LP
 Although certain of the field descriptors in the POSIX locale (such as the name
 of the month) are shown with initial capital letters, this need not be the case
 in other locales. Programs using these fields may need to adjust the
@@ -2362,7 +2348,6 @@ in 1776" while 7/14/1789 would come out as "The 14 day of July in 1789" The
 above example is for illustrative purposes only. The \fB%O\fR modifier is
 primarily intended to provide for Kanji or Hindi digits in \fBdate\fR formats.
 .SS "LC_MESSAGES"
-.LP
 The  \fBLC_MESSAGES\fR category defines the format and values for affirmative
 and negative responses.
 .sp
@@ -2455,7 +2440,6 @@ l | l | l .
 In an application conforming to the SUSv3 standard, the information on
 \fByesstr\fR and \fBnostr\fR is not available.
 .SH SEE ALSO
-.LP
 \fBdate\fR(1), \fBlocale\fR(1), \fBlocaledef\fR(1), \fBsort\fR(1), \fBtr\fR(1),
 \fBuniq\fR(1), \fBlocaleconv\fR(3C), \fBnl_langinfo\fR(3C),
 \fBsetlocale\fR(3C), \fBstrcoll\fR(3C), \fBstrftime\fR(3C), \fBstrptime\fR(3C),

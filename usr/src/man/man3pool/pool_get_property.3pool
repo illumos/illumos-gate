@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH POOL_GET_PROPERTY 3POOL "Sep 23, 2003"
+.TH POOL_GET_PROPERTY 3POOL "May 16, 2020"
 .SH NAME
 pool_get_property, pool_put_property, pool_rm_property, pool_walk_properties \-
 resource pool element property manipulation
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <pool.h>
@@ -38,8 +37,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lpool\fR [ \fIlibrary\fR\&.\|
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The various pool types are converted to the common pool element type
 (\fBpool_elem_t\fR) before property manipulation. A \fBpool_value_t\fR is an
 opaque type that contains a property value of one of the following types:
@@ -110,7 +107,7 @@ error.
 .LP
 The \fBpool_rm_property()\fR function attempts to remove the named property
 from the element.  If the property does not exist or is not removable, -1 is
-returned and \fBpool_error\fR(3POOL) reporst an error of \fBPOE_PUTPROP\fR.
+returned and \fBpool_error\fR(3POOL) reports an error of \fBPOE_PUTPROP\fR.
 .sp
 .LP
 The \fBpool_walk_properties()\fR function invokes \fIcallback\fR on all
@@ -123,8 +120,6 @@ A number of special properties are reserved for internal use and cannot be set
 or removed. Attempting to do so will fail. These properties are documented on
 the \fBlibpool\fR(3LIB) manual page.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBpool_get_property()\fR returns the type of the
 property. Otherwise it returns \fBPOC_INVAL\fR and \fBpool_error()\fR returns
 the pool-specific error value.
@@ -134,8 +129,6 @@ Upon successful completion, \fBpool_put_property()\fR,
 \fBpool_rm_property()\fR, and \fBpool_walk_properties()\fR return 0. Otherwise
 they return \(mi1 and \fBpool_error()\fR returns the pool-specific error value.
 .SH ERRORS
-.sp
-.LP
 The \fBpool_get_property()\fR function will fail if:
 .sp
 .ne 2
@@ -253,8 +246,6 @@ A system error has occurred. Check the system error code for more details.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -273,6 +264,4 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibpool\fR(3LIB), \fBpool_error\fR(3POOL), \fBattributes\fR(5)
