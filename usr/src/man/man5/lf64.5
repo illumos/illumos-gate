@@ -4,11 +4,10 @@
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright (c) 2015, Joyent, Inc.  All rights reserved.
-.TH LF64 5 "Jan 14, 2015"
+.TH LF64 5 "May 17, 2020"
 .SH NAME
 lf64 \- transitional interfaces for 64-bit file offsets
 .SH DESCRIPTION
-.LP
 The data types, interfaces, and macros described on this page provide explicit
 access to 64-bit file offsets. They are accessible through the transitional
 compilation environment described on the \fBlfcompile64\fR(5) manual page. The
@@ -16,7 +15,6 @@ function prototype and semantics of a transitional interface are equivalent to
 those of the standard version of the call, except that relevant data types are
 64-bit entities.
 .SS "Data Types"
-.LP
 The following tables list the standard data or struct types in the left-hand
 column and their  corresponding explicit 64-bit file offset types in the
 right-hand column, grouped by header. The absence of an entry in the  left-hand
@@ -99,7 +97,7 @@ l l .
 struct \fBstatvfs\fR	struct \fBstatvfs64\fR
    \fBfsblkcnt_t\fR f_blocks;	   \fBfsblkcnt64_t\fR f_blocks;
    \fBfsblkcnt_t\fR f_bfree;	   \fBfsblkcnt64_t\fR f_bfree;
-   \fBfsblkcnt_t\fR f_bavial;	   \fBfsblkcnt64_t\fR f_bavial;
+   \fBfsblkcnt_t\fR f_bavail;	   \fBfsblkcnt64_t\fR f_bavail;
    \fBfsfilcnt_t\fR  f_files;	   \fBfsfilcnt64_t\fR  f_files;
    \fBfsfilcnt_t\fR  f_ffree;	   \fBfsfilcnt64_t\fR  f_ffree;
    \fBfsfilcnt_t\fR  f_favail;	   \fBfsfilcnt64_t\fR  f_favail;
@@ -138,7 +136,6 @@ l l .
 .TE
 
 .SS "System Interfaces"
-.LP
 The following tables display the standard API and the corresponding
 transitional  interfaces for 64-bit file offsets. The interfaces are grouped by
 header. The interface name and the affected data types are displayed in courier
@@ -148,11 +145,11 @@ font.
 .TS
 l l
 l l .
-int \fBaio_cancel\fR(..., 	int \fBaio_cancel64\fR(...,
+int \fBaio_cancel\fR(...,	int \fBaio_cancel64\fR(...,
    struct \fBaiocb\fR *);	   struct \fBaiocb64\fR *);
 int \fBaio_error\fR(	int \fBaio_error64\fR(
    const struct \fBaiocb\fR *);	   const struct \fBaiocb64\fR *);
-int \fBaio_fsync\fR(..., 	int \fBaio_fsync64\fR(...,
+int \fBaio_fsync\fR(...,	int \fBaio_fsync64\fR(...,
    struct \fBaiocb\fR *);	   struct \fBaiocb64\fR *);
 int \fBaio_read\fR(struct \fBaiocb\fR *);	int \fBaio_read64\fR(struct \fBaiocb64\fR *);
 int \fBaio_return\fR(struct \fBaiocb\fR *);	int \fBaio_return64\fR(struct \fBaiocb64\fR *);
@@ -161,7 +158,7 @@ int \fBaio_suspend\fR(	int \fBaio_suspend64\fR(
 int \fBaio_waitn\fR(aiocb_t *[],	int \fBaio_waitn64\fR(aiocb64_t *[],
    ...);	   ...);
 int \fBaio_write\fR(struct \fBaiocb\fR *);	int \fBaio_write64\fR(struct \fBaiocb64\fR *);
-int \fBlio_listio\fR(..., 	int \fBlio_listio64\fR(...,
+int \fBlio_listio\fR(...,	int \fBlio_listio64\fR(...,
    const struct \fBaiocb\fR *, ...);	   const struct \fBaiocb64\fR *, ...);
 .TE
 
@@ -171,12 +168,12 @@ int \fBlio_listio\fR(..., 	int \fBlio_listio64\fR(...,
 l l
 l l .
 int \fBalphasort\fR(	int \fBalphasort64\fR(
-   const struct dirent **, 	   const struct dirent64 **,
+   const struct dirent **,	   const struct dirent64 **,
    const struct dirent **)	   const struct dirent64 **)
 struct \fBdirent *\fR\fBreaddir()\fR;	struct \fBdirent64 *\fR\fBreaddir64()\fR;
 struct \fBdirent *\fR\fBreaddir_r()\fR;	struct \fBdirent64 *\fR\fBreaddir64_r()\fR;
-int \fBscandir\fR(..., 	int \fBscandir64\fR(...,
-   struct dirent *(*[]), 	   struct dirent64 *(*[]),
+int \fBscandir\fR(...,	int \fBscandir64\fR(...,
+   struct dirent *(*[]),	   struct dirent64 *(*[]),
    int (*)(const struct dirent *),	   int (*)(const struct dirent64 *),
    int (*)(const struct dirent **,	   int (*)(const struct dirent64 **,
       const struct dirent **))	      const struct dirent64 **))
@@ -202,10 +199,10 @@ l l
 l l .
 int \fBftw\fR(...,	int \fBftw64\fR(...,
    const struct \fBstat\fR *, ...);	   const struct \fBstat64\fR *, ...);
-	
+
 int \fBnftw\fR(..	int \fBnftw64\fR(...,
    const struct \fBstat\fR *, ...);	   const struct \fBstat64\fR *,  ...);
-	
+
 .TE
 
 .SS "<\fBlibgen.h\fR>"
@@ -252,7 +249,7 @@ int \fBaiowrite\fR(..., \fBoff_t\fR, ...);	int \fBaiowrite64\fR(..., \fBoff64_t\
 l l
 l l .
 int \fBgetdents\fR(..., \fBdirent\fR);	int \fBgetdents64\fR(..., \fBdirent64\fR);
-	
+
 .TE
 
 .SS "<\fBsys/mman.h\fR>"
@@ -278,11 +275,11 @@ int \fBsetrlimit\fR(...,	int \fBsetrlimit64\fR(...,
 .TS
 l l
 l l .
-ssize_t \fBsendfile\fR(..., 	ssize_t \fBsendfile64\fR(...,
+ssize_t \fBsendfile\fR(...,	ssize_t \fBsendfile64\fR(...,
    \fBoff_t\fR *, ...);	   \fBoff64_t\fR *, ...);
-ssize_t \fBsendfilev\fR(..., const 	ssize_t \fBsendfilev64\fR(..., const
+ssize_t \fBsendfilev\fR(..., const	ssize_t \fBsendfilev64\fR(..., const
    struct \fBsendfilevec\fR *,  ...);	  struct \fBsendfilevec64\fR *, ...);
-	
+
 .TE
 
 .SS "<\fBsys/stat.h\fR>"
@@ -291,7 +288,7 @@ ssize_t \fBsendfilev\fR(..., const 	ssize_t \fBsendfilev64\fR(..., const
 l l
 l l .
 int \fBfstat\fR(..., struct \fBstat\fR *);	int \fBfstat64\fR(...,  struct \fBstat64\fR *);
-int \fBfstatat\fR(..., 	int \fBfstatat64\fR(...,
+int \fBfstatat\fR(...,	int \fBfstatat64\fR(...,
    struct \fBstat\fR *, int);	   struct \fBstat64\fR *, int);
 int \fBlstat\fR(..., struct \fBstat\fR *);	int \fBlstat64\fR(..., struct \fBstat64\fR *);
 int \fBstat\fR(..., struct \fBstat\fR *);	int \fBstat64\fR(..., struct \fBstat64\fR *);
@@ -304,7 +301,7 @@ l l
 l l .
 int \fBstatvfs\fR(...,	int \fBstatvfs64\fR(...,
    struct \fBstatvfs\fR *);	   struct \fBstatvfs64\fR *);
-int \fBfstatvfs\fR(..., 	int \fBfstatvfs64\fR(...,
+int \fBfstatvfs\fR(...,	int \fBfstatvfs64\fR(...,
    struct \fBstatvfs\fR *);	  struct \fBstatvfs64\fR *);
 .TE
 
@@ -328,7 +325,7 @@ int \fBalphasort\fR(	int \fBalphasort64\fR(
 struct \fBdirect *\fR\fBreaddir()\fR;	struct \fBdirect64 *\fR\fBreaddir64()\fR;
 int \fBscandir\fR(...,	int \fBscandir64\fR(...,
    struct \fBdirect\fR *(*[]);,  ...);	   struct \fBdirect64\fR *(*[]);,  ...);
-	
+
 .TE
 
 .SS "<\fBunistd.h\fR>"
@@ -347,5 +344,4 @@ int \fBtruncate\fR(..., \fBoff_t\fR);	int \fBtruncate64\fR(..., \fBoff64_t\fR);
 .TE
 
 .SH SEE ALSO
-.LP
 \fBlfcompile\fR(5), \fBlfcompile64\fR(5)

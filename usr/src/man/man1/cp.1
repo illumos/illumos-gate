@@ -45,11 +45,10 @@
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2013 Nexenta Systems, Inc. All rights reserved.
 .\"
-.TH CP 1 "Apr 15, 2013"
+.TH CP 1 "May 17, 2020"
 .SH NAME
 cp \- copy files
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/bin/cp\fR [\fB-afip@/\fR] \fIsource_file\fR \fItarget_file\fR
 .fi
@@ -90,8 +89,6 @@ cp \- copy files
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 In the first synopsis form, neither \fIsource_file\fR nor \fItarget_file\fR are
 directory files, nor can they have the same name. The \fBcp\fR utility copies
 the contents of \fIsource_file\fR to the destination path named by
@@ -121,8 +118,6 @@ In the third or fourth synopsis forms, one or more directories specified by
 the \fB-r\fR or \fB-R\fR must be specified. For each \fIsource_dir\fR, \fBcp\fR
 copies all files and subdirectories.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported for both \fB/usr/bin/cp\fR and
 \fB/usr/xpg4/bin/cp\fR:
 .sp
@@ -272,8 +267,6 @@ Specifying more than one of the mutually-exclusive options \fB-H\fR, \fB-L\fR,
 and \fB-P\fR is not considered an error. The last option specified determines
 the behavior of the utility.
 .SS "/usr/bin/cp"
-.sp
-.LP
 If the \fB-p\fR option is specified with either the \fB-@\fR option or the
 \fB-/\fR option, \fB/usr/bin/cp\fR behaves as follows
 .RS +4
@@ -291,10 +284,8 @@ When both \fB-p\fR and \fB-/\fR are specified in any order, the copy fails if
 extended system attributes cannot be copied.
 .RE
 .SS "/usr/xpg4/bin/cp"
-.sp
-.LP
 If the \fB-p\fR option is specified with either the \fB-@\fR option or the
-\fB-/\fR option, /\fBusr/xpg4/bin/cp\fR behaves as follows:
+\fB-/\fR option, \fB/usr/xpg4/bin/cp\fR behaves as follows:
 .RS +4
 .TP
 .ie t \(bu
@@ -311,8 +302,6 @@ determines whether the copy fails if extended system attributes cannot be
 preserved.
 .RE
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -352,12 +341,9 @@ A pathname of a directory to contain the copied files.
 .RE
 
 .SH USAGE
-.sp
-.LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBcp\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCopying a File
 .sp
 .LP
@@ -462,8 +448,6 @@ $ ls -/c /tmp/file1
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBcp\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
@@ -478,8 +462,6 @@ in \fBLC_CTYPE\fR determines the locale for interpretation of sequences of
 bytes of text data a characters, the behavior of character classes used in the
 expression defined for the \fByesexpr\fR. See \fBlocale\fR(5).
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -500,13 +482,8 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .SS "/usr/bin/cp"
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -519,9 +496,6 @@ Interface Stability	Committed
 .TE
 
 .SS "/usr/xpg4/bin/cp"
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -534,14 +508,10 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBchmod\fR(1), \fBchown\fR(1), \fBsetfacl\fR(1), \fButime\fR(2),
 \fBfgetattr\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5), \fBfsattr\fR(5),
 \fBlargefile\fR(5), \fBlocale\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
-.LP
 The permission modes of the source file are preserved in the copy.
 .sp
 .LP
