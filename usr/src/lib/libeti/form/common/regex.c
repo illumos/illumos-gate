@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -31,8 +31,6 @@
 /*
  * Copyright (c) 2018, Joyent, Inc.
  */
-
-/*LINTLIBRARY*/
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -74,7 +72,7 @@
 
 char	*__braslist[NBRA];
 char	*__braelist[NBRA];
-char	*__loc1;
+extern char *__loc1;
 intptr_t	__bravar[NBRA];
 intptr_t	*__st[SSIZE + 1];
 intptr_t	*__eptr_, *__lptr_;
