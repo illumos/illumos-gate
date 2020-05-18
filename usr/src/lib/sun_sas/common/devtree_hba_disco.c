@@ -33,6 +33,8 @@
 #include	<inttypes.h>
 #include	<ctype.h>
 
+struct sun_sas_hba *global_hba_head;
+
 /* free hba port info for the given hba */
 static void
 free_hba_port(struct sun_sas_hba *hba_ptr)

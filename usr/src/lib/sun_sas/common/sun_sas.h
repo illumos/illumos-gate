@@ -107,11 +107,11 @@ extern "C" {
 /* misc */
 #define	SUN_MICROSYSTEMS	"Sun Microsystems, Inc."
 
-mutex_t		all_hbas_lock;
-mutex_t		open_handles_lock;
-mutex_t		log_file_lock;
-HBA_UINT32	hba_count;
-HBA_UINT16	open_handle_index;
+extern mutex_t		all_hbas_lock;
+extern mutex_t		open_handles_lock;
+extern mutex_t		log_file_lock;
+extern HBA_UINT32	hba_count;
+extern HBA_UINT16	open_handle_index;
 
 
 /* Internal structures that aren't exposed to clients */
@@ -136,7 +136,7 @@ struct sun_sas_hba {
 	struct sun_sas_port	*first_port;
 };
 
-struct sun_sas_hba *global_hba_head;
+extern struct sun_sas_hba *global_hba_head;
 
 struct ScsiEntryList {
 	SMHBA_SCSIENTRY		entry;

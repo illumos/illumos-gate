@@ -48,6 +48,7 @@ Sun_sasFreeLibrary(void)
 	open_handle_index = 1;
 	unlock(&all_hbas_lock);
 	(void) mutex_destroy(&all_hbas_lock);
+	(void) mutex_destroy(&open_handles_lock);
 
 	/* free sysevent handle. */
 	if (gSysEventHandle != NULL)
