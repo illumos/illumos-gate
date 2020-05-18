@@ -27,6 +27,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2022 Jason King
 #
 
 set name=pkg.fmri value=pkg:/developer/build/onbld@$(PKGVERS)
@@ -59,6 +60,7 @@ file path=opt/onbld/bin/$(ARCH)/ctfstrip mode=0555
 file path=opt/onbld/bin/$(ARCH)/cw mode=0555
 link path=opt/onbld/bin/$(ARCH)/dmake target=make
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/elfextract mode=0555
+file path=opt/onbld/bin/$(ARCH)/find_elf mode=0555
 file path=opt/onbld/bin/$(ARCH)/findunref mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/forth mode=0555
 $(sparc_ONLY)file path=opt/onbld/bin/$(ARCH)/forth_preload.so.1 mode=0555
@@ -89,7 +91,6 @@ file path=opt/onbld/bin/copyrightchk mode=0555 \
     pkg.depend.bypass-generate=.*(?:Checks|onbld|Copyright).*
 file path=opt/onbld/bin/cstyle mode=0555
 file path=opt/onbld/bin/elfcmp mode=0555
-file path=opt/onbld/bin/find_elf mode=0555
 file path=opt/onbld/bin/findcrypto mode=0555
 file path=opt/onbld/bin/flg.flp mode=0555
 file path=opt/onbld/bin/genoffsets mode=0555
