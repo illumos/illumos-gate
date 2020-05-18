@@ -83,7 +83,6 @@ usr/src/data/perfmon/readme.txt
 usr/contrib/freebsd/*/*.h
 usr/contrib/freebsd/*/*/*.h
 usr/contrib/freebsd/lib/libutil/*.c
-usr/src/head/bhyve.h
 usr/src/lib/libvmmapi/common/vmmapi.[ch]
 usr/src/uts/i86pc/io/vmm/amd/*.[ch]
 usr/src/uts/i86pc/io/vmm/intel/*.[chs]

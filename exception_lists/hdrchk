@@ -421,7 +421,6 @@ usr/src/compat/freebsd/*/*.h
 usr/src/compat/freebsd/amd64/machine/*.h
 usr/contrib/freebsd/*/*.h
 usr/contrib/freebsd/*/*/*.h
-usr/src/head/bhyve.h
 usr/src/lib/libvmmapi/common/vmmapi.h
 usr/src/uts/i86pc/io/vmm/intel/*.h
 usr/src/uts/i86pc/io/vmm/io/*.h

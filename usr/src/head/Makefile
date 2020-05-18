@@ -33,8 +33,7 @@ include ../Makefile.master
 
 sparc_HDRS=
 i386_HDRS=		\
-	stack_unwind.h	\
-	bhyve.h
+	stack_unwind.h
 
 KRB5HDRS=		\
 	mit_copyright.h	\

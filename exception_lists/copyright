@@ -552,7 +552,6 @@ usr/src/compat/freebsd/amd64/machine/*.h
 usr/contrib/freebsd/*/*.h
 usr/contrib/freebsd/*/*/*.h
 usr/contrib/freebsd/lib/libutil/*.c
-usr/src/head/bhyve.h
 usr/src/lib/libvmmapi/common/vmmapi.[ch]
 usr/src/tools/scripts/gensetdefs.pl
 usr/src/uts/i86pc/io/vmm/amd/*.[chs]
