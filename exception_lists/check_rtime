@@ -25,6 +25,7 @@
 # Copyright 2018 Joyent, Inc.
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2019 Peter Tribble.
+# Copyright 2018 Joyent, Inc.
 # Copyright 2020 Oxide Computer Company
 #
 
@@ -84,7 +85,7 @@ EXEC_STACK	^opt/os-tests/tests/secflags/stacky$
 
 # Objects for which we allow relocations to the text segment
 TEXTREL		^platform/.*/MACH(kernel)/unix$
-TEXTREL		^usr/sbin/bhyve$
+TEXTREL		^usr/sbin/amd64/bhyve$
 
 # Directories and files that are allowed to have no direct bound symbols
 NODIRECT	^platform/.*/MACH(kernel)/unix$

@@ -1,10 +1,10 @@
 '\" te
 .\" To view license terms, attribution, and copyright for IP Filter, the
-.\" default path is /usr/lib/ipf/IPFILTER.LICENCE. If the Illumos operating
+.\" default path is /usr/lib/ipf/IPFILTER.LICENCE. If the illumos operating
 .\" environment has been installed anywhere other than the default, modify the
 .\" given path to access the file at the installed location.
 .\" Portions Copyright (c) 2015, Joyent, Inc.
-.TH IPPOOL 4 "April 9, 2016"
+.TH IPPOOL 4 "May 16, 2020"
 .SH NAME
 ippool, ippool.conf \- IP Pool file format
 .SH DESCRIPTION
@@ -62,7 +62,6 @@ of a mixture of netmask sizes, from 0 to 32.
 .PP
 At this point in time, only IPv4 addressing is supported.
 .SH OVERVIEW
-.PP
 The IP pool configuration file provides for defining two different mechanisms
 for improving speed in matching IP addresses with rules.
 The first,
@@ -86,7 +85,6 @@ or
 respectively, for determining which filter group to jump to next for
 continuation of filter packet processing.
 .SH POOL TYPES
-.PP
 Two storage formats are provided: hash tables and tree structure.  The hash
 table is intended for use with objects all containing the same netmask or a
 few different sized netmasks of non-overlapping address space and the tree
@@ -96,8 +94,7 @@ to use the tree data storage type with
 .B group-map
 configuration entries.
 .SH POOL ROLES
-.PP
-When a pool is defined in the configruation file, it must have an associated
+When a pool is defined in the configuration file, it must have an associated
 role.  At present the only supported role is
 .B ipf.
 Future development will see further expansion of their use by other sections

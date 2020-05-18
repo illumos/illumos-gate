@@ -1375,6 +1375,7 @@ usr/src/cmd/bhyve/fwctl.[ch]
 usr/src/cmd/bhyve/gdb.[ch]
 usr/src/cmd/bhyve/inout.[ch]
 usr/src/cmd/bhyve/ioapic.[ch]
+usr/src/cmd/bhyve/iov.[ch]
 usr/src/cmd/bhyve/mem.[ch]
 usr/src/cmd/bhyve/mevent.[ch]
 usr/src/cmd/bhyve/mevent_test.c

@@ -17,8 +17,6 @@
  * implemented.
  */
 
-#ifndef _KMDB
-
 #include <mdb/mdb_gcore.h>
 
 /* ARGSUSED */
@@ -54,5 +52,3 @@ gcore_prgetrvals(mdb_klwp_t *lwp, long *rval1, long *rval2)
 {
 	return (0);
 }
-
-#endif /* _KMDB */

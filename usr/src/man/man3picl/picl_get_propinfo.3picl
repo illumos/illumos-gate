@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PICL_GET_PROPINFO 3PICL "Mar 28, 2000"
+.TH PICL_GET_PROPINFO 3PICL "May 16, 2020"
 .SH NAME
 picl_get_propinfo \- get the information about a property
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lpicl\fR [ \fIlibrary\fR... ]
 #include <picl.h>
@@ -17,8 +16,6 @@ picl_get_propinfo \- get the information about a property
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBpicl_get_propinfo()\fR function gets the information about the property
 specified by handle \fIproph\fR and copies it into the location specified by
 \fIpinfo\fR.  The property information includes the property type, access mode,
@@ -29,8 +26,6 @@ page.
 The maximum size of a property value is specified by \fBPICL_PROPSIZE_MAX\fR.
 It is currently set to 512KB.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fB0\fR is returned. On failure, a non-negative
 integer is returned to indicate an error.
 .sp
@@ -44,7 +39,6 @@ This error may be returned for a previously valid handle if the daemon was
 brought down and restarted. When this occurs a client must revalidate any saved
 handles.
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBPICL_NOTINITIALIZED\fR\fR
@@ -86,7 +80,7 @@ Invalid handle specified
 \fB\fBPICL_STALEHANDLE\fR\fR
 .ad
 .RS 23n
-Stale handle specifie
+Stale handle specified
 .RE
 
 .sp
@@ -99,8 +93,6 @@ General system failure
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -115,7 +107,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibpicl\fR(3PICL), \fBpicl_get_propval\fR(3PICL),
 \fBpicl_get_propval_by_name\fR(3PICL), \fBattributes\fR(5)

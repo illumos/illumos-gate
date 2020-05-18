@@ -38,6 +38,7 @@ KMODSRCS = \
 
 MODSRCS = \
 	$(COMMONSRCS) \
+	gcore.c \
 	typegraph.c
 
 #
