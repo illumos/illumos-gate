@@ -73,6 +73,11 @@ static topo_modinfo_t	x86pi_modinfo =
  */
 int x86pi_smbios = 0;
 
+/* indication of successful fac node creation */
+int fac_done;
+/* one for each struct */
+smbs_cnt_t stypes[SMB_TYPE_OEM_HI];
+
 /*
  * Called by libtopo when the topo module is loaded.
  */
@@ -264,7 +269,7 @@ x86pi_enum_gentopo(topo_mod_t *mod, tnode_t *t_parent)
 	smbios_pciexrc_t hbr;
 	smbios_port_ext_t export;
 	char		*f = "x86pi_enum_gentopo";
-	smbios_hdl_t 	*shp;
+	smbios_hdl_t	*shp;
 
 	shp = topo_mod_smbios(mod);
 	if (shp == NULL) {
