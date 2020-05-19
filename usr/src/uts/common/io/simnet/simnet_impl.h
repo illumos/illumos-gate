@@ -42,6 +42,8 @@ extern "C" {
 #define	MAX_ESSLIST_ARGS	10	/* Max num of ESS list arguments */
 #define	MAX_ESSLIST_ARGLEN	50	/* Max ESS list argument len */
 
+#define	SM_MAX_NUM_MCAST_ADDRS	1024
+
 struct simnet_dev;
 
 typedef struct simnet_wifidev {
@@ -81,7 +83,7 @@ typedef struct simnet_dev {
 	/* Num of multicast addresses stored in sd_mcastaddrs */
 	uint_t			sd_mcastaddr_count;
 	/* Multicast address list stored in single buffer */
-	uint8_t			*sd_mcastaddrs;
+	struct ether_addr	sd_mcastaddrs[SM_MAX_NUM_MCAST_ADDRS];
 	uint_t			sd_mac_len;
 	uchar_t			sd_mac_addr[MAXMACADDRLEN];
 	simnet_stats_t		sd_stats;

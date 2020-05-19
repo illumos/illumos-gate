@@ -73,7 +73,8 @@ static int simnet_ioc_create(void *, intptr_t, int, cred_t *, int *);
 static int simnet_ioc_delete(void *, intptr_t, int, cred_t *, int *);
 static int simnet_ioc_info(void *, intptr_t, int, cred_t *, int *);
 static int simnet_ioc_modify(void *, intptr_t, int, cred_t *, int *);
-static uint8_t *mcastaddr_lookup(simnet_dev_t *, const uint8_t *);
+static const struct ether_addr *mcastaddr_lookup(const simnet_dev_t *,
+    const uint8_t *);
 
 static dld_ioc_info_t simnet_ioc_list[] = {
 	{SIMNET_IOC_CREATE, DLDCOPYINOUT, sizeof (simnet_ioc_create_t),
@@ -316,7 +317,6 @@ simnet_dev_unref(simnet_dev_t *sdev)
 
 	mutex_destroy(&sdev->sd_instlock);
 	cv_destroy(&sdev->sd_threadwait);
-	kmem_free(sdev->sd_mcastaddrs, ETHERADDRL * sdev->sd_mcastaddr_count);
 	kmem_free(sdev, sizeof (*sdev));
 	simnet_count--;
 }
@@ -1061,21 +1061,63 @@ simnet_m_promisc(void *arg, boolean_t on)
  * Returns matching multicast address enabled on the simnet instance.
  * Assumes simnet instance mutex lock is held.
  */
-static uint8_t *
-mcastaddr_lookup(simnet_dev_t *sdev, const uint8_t *addrp)
+static const struct ether_addr *
+mcastaddr_lookup(const simnet_dev_t *sdev, const uint8_t *addrp)
 {
-	int idx;
-	uint8_t *maddrptr;
-
 	ASSERT(MUTEX_HELD(&sdev->sd_instlock));
-	maddrptr = sdev->sd_mcastaddrs;
-	for (idx = 0; idx < sdev->sd_mcastaddr_count; idx++) {
-		if (bcmp(maddrptr, addrp, ETHERADDRL) == 0)
-			return (maddrptr);
-		maddrptr += ETHERADDRL;
+	for (uint_t i = 0; i < sdev->sd_mcastaddr_count; i++) {
+		const struct ether_addr *maddrp = &sdev->sd_mcastaddrs[i];
+
+		if (bcmp(maddrp->ether_addr_octet, addrp,
+		    sizeof (maddrp->ether_addr_octet)) == 0) {
+			return (maddrp);
+		}
 	}
 
 	return (NULL);
+}
+
+static int
+simnet_multicst_add(simnet_dev_t *sdev, const struct ether_addr *eap)
+{
+	ASSERT(MUTEX_HELD(&sdev->sd_instlock));
+
+	if ((eap->ether_addr_octet[0] & 01) == 0) {
+		return (EINVAL);
+	}
+
+	if (sdev->sd_mcastaddr_count == SM_MAX_NUM_MCAST_ADDRS) {
+		return (ENOSPC);
+	}
+
+	bcopy(eap, &sdev->sd_mcastaddrs[sdev->sd_mcastaddr_count],
+	    sizeof (*eap));
+	sdev->sd_mcastaddr_count++;
+	return (0);
+}
+
+static int
+simnet_multicst_rm(simnet_dev_t *sdev, const struct ether_addr *eap)
+{
+	ASSERT(MUTEX_HELD(&sdev->sd_instlock));
+
+	for (uint_t i = 0; i < sdev->sd_mcastaddr_count; i++) {
+		if (bcmp(eap, &sdev->sd_mcastaddrs[i], sizeof (*eap)) == 0) {
+			for (i++; i < sdev->sd_mcastaddr_count; i++) {
+				sdev->sd_mcastaddrs[i - 1] =
+				    sdev->sd_mcastaddrs[i];
+			}
+
+			/* Zero-out the last entry as it is no longer valid. */
+			bzero(&sdev->sd_mcastaddrs[i - 1],
+			    sizeof (sdev->sd_mcastaddrs[0]));
+
+			sdev->sd_mcastaddr_count--;
+			return (0);
+		}
+	}
+
+	return (EINVAL);
 }
 
 /* Add or remove Multicast addresses on simnet instance */
@@ -1083,55 +1125,21 @@ static int
 simnet_m_multicst(void *arg, boolean_t add, const uint8_t *addrp)
 {
 	simnet_dev_t *sdev = arg;
-	uint8_t *maddrptr;
-	uint8_t *newbuf;
-	size_t prevsize;
-	size_t newsize;
-	ptrdiff_t len;
-	ptrdiff_t len2;
+	struct ether_addr ea;
+	int ret;
 
-alloc_retry:
-	prevsize = sdev->sd_mcastaddr_count * ETHERADDRL;
-	newsize = prevsize + (add ? ETHERADDRL:-ETHERADDRL);
-	newbuf = kmem_alloc(newsize, KM_SLEEP);
-
+	bcopy(addrp, ea.ether_addr_octet, sizeof (ea.ether_addr_octet));
 	mutex_enter(&sdev->sd_instlock);
-	if (prevsize != (sdev->sd_mcastaddr_count * ETHERADDRL)) {
-		mutex_exit(&sdev->sd_instlock);
-		kmem_free(newbuf, newsize);
-		goto alloc_retry;
-	}
 
-	maddrptr = mcastaddr_lookup(sdev, addrp);
-	if (!add && maddrptr != NULL) {
-		/* Removing a Multicast address */
-		if (newbuf != NULL) {
-			/* LINTED: E_PTRDIFF_OVERFLOW */
-			len = maddrptr - sdev->sd_mcastaddrs;
-			(void) memcpy(newbuf, sdev->sd_mcastaddrs, len);
-			len2 = prevsize - len - ETHERADDRL;
-			(void) memcpy(newbuf + len,
-			    maddrptr + ETHERADDRL, len2);
-		}
-		sdev->sd_mcastaddr_count--;
-	} else if (add && maddrptr == NULL) {
-		/* Adding a new Multicast address */
-		(void) memcpy(newbuf, sdev->sd_mcastaddrs, prevsize);
-		(void) memcpy(newbuf + prevsize, addrp, ETHERADDRL);
-		sdev->sd_mcastaddr_count++;
+	if (add) {
+		ret = simnet_multicst_add(sdev, &ea);
 	} else {
-		/* Error: removing a non-existing Multicast address */
-		mutex_exit(&sdev->sd_instlock);
-		kmem_free(newbuf, newsize);
-		cmn_err(CE_WARN, "simnet: MAC call to remove a "
-		    "Multicast address failed");
-		return (EINVAL);
+		ret = simnet_multicst_rm(sdev, &ea);
 	}
 
-	kmem_free(sdev->sd_mcastaddrs, prevsize);
-	sdev->sd_mcastaddrs = newbuf;
+	ASSERT3U(sdev->sd_mcastaddr_count, <=, SM_MAX_NUM_MCAST_ADDRS);
 	mutex_exit(&sdev->sd_instlock);
-	return (0);
+	return (ret);
 }
 
 static int
