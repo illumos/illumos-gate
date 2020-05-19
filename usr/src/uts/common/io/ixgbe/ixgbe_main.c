@@ -30,6 +30,7 @@
  * Copyright (c) 2013 Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013 OSN Online Service Nuernberg GmbH. All rights reserved.
  * Copyright 2016 OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include "ixgbe_sw.h"
@@ -133,6 +134,13 @@ static int ixgbe_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err,
     const void *impl_data);
 static void ixgbe_fm_init(ixgbe_t *);
 static void ixgbe_fm_fini(ixgbe_t *);
+static int ixgbe_ufm_fill_image(ddi_ufm_handle_t *, void *arg, uint_t,
+    ddi_ufm_image_t *);
+static int ixgbe_ufm_fill_slot(ddi_ufm_handle_t *, void *, uint_t, uint_t,
+    ddi_ufm_slot_t *);
+static int ixgbe_ufm_getcaps(ddi_ufm_handle_t *, void *, ddi_ufm_cap_t *);
+static int ixgbe_ufm_readimg(ddi_ufm_handle_t *, void *, uint_t, uint_t,
+    uint64_t, uint64_t, void *, uint64_t *);
 
 char *ixgbe_priv_props[] = {
 	"_tx_copy_thresh",
@@ -354,6 +362,14 @@ static adapter_info_t ixgbe_X550_cap = {
 	| IXGBE_FLAG_VMDQ_CAPABLE
 	| IXGBE_FLAG_RSC_CAPABLE) /* capability flags */
 };
+
+static ddi_ufm_ops_t ixgbe_ufm_ops = {
+	.ddi_ufm_op_fill_image = ixgbe_ufm_fill_image,
+	.ddi_ufm_op_fill_slot = ixgbe_ufm_fill_slot,
+	.ddi_ufm_op_getcaps = ixgbe_ufm_getcaps,
+	.ddi_ufm_op_readimg = ixgbe_ufm_readimg
+};
+
 
 /*
  * Module Initialization Functions.
@@ -650,6 +666,16 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	}
 	ixgbe->attach_progress |= ATTACH_PROGRESS_ENABLE_INTR;
 
+	if (ixgbe->hw.bus.func == 0) {
+		if (ddi_ufm_init(devinfo, DDI_UFM_CURRENT_VERSION,
+		    &ixgbe_ufm_ops, &ixgbe->ixgbe_ufmh, ixgbe) != 0) {
+			ixgbe_error(ixgbe, "Failed to enable DDI UFM support");
+			goto attach_fail;
+		}
+		ixgbe->attach_progress |= ATTACH_PROGRESS_UFM;
+		ddi_ufm_update(ixgbe->ixgbe_ufmh);
+	}
+
 	ixgbe_log(ixgbe, "%s", ixgbe_ident);
 	atomic_or_32(&ixgbe->ixgbe_state, IXGBE_INITIALIZED);
 
@@ -795,6 +821,13 @@ ixgbe_unconfigure(dev_info_t *devinfo, ixgbe_t *ixgbe)
 			ddi_periodic_delete(ixgbe->periodic_id);
 			ixgbe->periodic_id = NULL;
 		}
+	}
+
+	/*
+	 * Clean up the UFM subsystem. Note this only is set on function 0.
+	 */
+	if (ixgbe->attach_progress & ATTACH_PROGRESS_UFM) {
+		ddi_ufm_fini(ixgbe->ixgbe_ufmh);
 	}
 
 	/*
@@ -6709,4 +6742,136 @@ ixgbe_remmac(void *arg, const uint8_t *mac_addr)
 	mutex_exit(&ixgbe->gen_lock);
 
 	return (0);
+}
+
+static int
+ixgbe_ufm_fill_image(ddi_ufm_handle_t *ufmh, void *arg, uint_t imgno,
+    ddi_ufm_image_t *imgp)
+{
+	ixgbe_t *ixgbe = arg;
+	const char *type;
+
+	if (imgno != 0) {
+		return (EINVAL);
+	}
+
+	ddi_ufm_image_set_desc(imgp, "NVM");
+	ddi_ufm_image_set_nslots(imgp, 1);
+	switch (ixgbe->hw.eeprom.type) {
+	case ixgbe_eeprom_spi:
+		type = "SPI EEPROM";
+		break;
+	case ixgbe_flash:
+		type = "Flash";
+		break;
+	default:
+		type = NULL;
+		break;
+	}
+
+	if (type != NULL) {
+		nvlist_t *nvl;
+
+		nvl = fnvlist_alloc();
+		fnvlist_add_string(nvl, "image-type", type);
+		/*
+		 * The DDI takes ownership of the nvlist_t at this point.
+		 */
+		ddi_ufm_image_set_misc(imgp, nvl);
+	}
+
+	return (0);
+}
+
+static int
+ixgbe_ufm_fill_slot(ddi_ufm_handle_t *ufmh, void *arg, uint_t imgno,
+    uint_t slotno, ddi_ufm_slot_t *slotp)
+{
+	ixgbe_t *ixgbe = arg;
+
+	if (imgno != 0 || slotno != 0) {
+		return (EINVAL);
+	}
+
+	/*
+	 * Unfortunately there is no generic versioning in the ixgbe family
+	 * eeprom parts.
+	 */
+	ddi_ufm_slot_set_version(slotp, "unknown");
+	ddi_ufm_slot_set_attrs(slotp, DDI_UFM_ATTR_ACTIVE |
+	    DDI_UFM_ATTR_READABLE | DDI_UFM_ATTR_WRITEABLE);
+	ddi_ufm_slot_set_imgsize(slotp, ixgbe->hw.eeprom.word_size * 2);
+
+	return (0);
+}
+
+static int
+ixgbe_ufm_getcaps(ddi_ufm_handle_t *ufmh, void *arg, ddi_ufm_cap_t *caps)
+{
+	ixgbe_t *ixgbe = arg;
+
+	*caps = 0;
+	switch (ixgbe->hw.eeprom.type) {
+	case ixgbe_eeprom_spi:
+	case ixgbe_flash:
+		*caps |= DDI_UFM_CAP_REPORT;
+		if (ixgbe->hw.eeprom.ops.read_buffer != NULL) {
+			*caps |= DDI_UFM_CAP_READIMG;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return (0);
+}
+
+static int
+ixgbe_ufm_readimg(ddi_ufm_handle_t *ufmh, void *arg, uint_t imgno,
+    uint_t slotno, uint64_t len, uint64_t offset, void *buf, uint64_t *nread)
+{
+	int ret;
+	uint16_t wordoff, nwords, *buf16 = buf;
+	ixgbe_t *ixgbe = arg;
+	uint32_t imgsize = ixgbe->hw.eeprom.word_size * 2;
+
+	if (imgno != 0 || slotno != 0) {
+		return (EINVAL);
+	}
+
+	if (len > imgsize || offset > imgsize || len + offset > imgsize) {
+		return (EINVAL);
+	}
+
+	if (ixgbe->hw.eeprom.ops.read_buffer == NULL) {
+		return (ENOTSUP);
+	}
+
+	/*
+	 * Hardware provides us a means to read 16-bit words. For the time
+	 * being, restrict offset and length to be 2 byte aligned. We should
+	 * probably reduce this restriction. We could probably just use a bounce
+	 * buffer.
+	 */
+	if ((offset % 2) != 0 || (len % 2) != 0) {
+		return (EINVAL);
+	}
+
+	wordoff = offset >> 1;
+	nwords = len >> 1;
+	mutex_enter(&ixgbe->gen_lock);
+	ret = ixgbe_read_eeprom_buffer(&ixgbe->hw, wordoff, nwords, buf16);
+	mutex_exit(&ixgbe->gen_lock);
+
+	if (ret == 0) {
+		uint16_t i;
+		*nread = len;
+		for (i = 0; i < nwords; i++) {
+			buf16[i] = LE_16(buf16[i]);
+		}
+	} else {
+		ret = EIO;
+	}
+
+	return (ret);
 }
