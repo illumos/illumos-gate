@@ -302,7 +302,7 @@
 static char keystore_path[MAXPATHLEN];
 static boolean_t keystore_path_initialized = 0;
 
-TSS_HKEY hPrivateLeafKey;
+extern TSS_HKEY hPrivateLeafKey;
 static CK_RV
 restore_private_token_object(TSS_HCONTEXT, CK_BYTE  *, CK_ULONG, OBJECT *);
 
@@ -753,7 +753,7 @@ save_private_token_object(TSS_HCONTEXT hContext, OBJECT *obj)
 	UINT32	obj_data_len_32;
 	UINT32	total_len;
 	UINT32	chunksize, blocks;
-	char 	*p = get_tpm_keystore_path();
+	char	*p = get_tpm_keystore_path();
 
 	if (p == NULL)
 		return (CKR_FUNCTION_FAILED);
