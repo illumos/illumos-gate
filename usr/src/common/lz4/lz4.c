@@ -33,6 +33,7 @@
  */
 /*
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
@@ -921,7 +922,7 @@ real_LZ4_compress(const char *source, char *dest, int isize, int osize)
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
 	void *ctx = kmem_zalloc(sizeof (struct refTables), KM_NOSLEEP);
 #else
-	void *ctx = malloc(sizeof (struct refTables));
+	void *ctx = calloc(1, sizeof (struct refTables));
 #endif
 	int result;
 
