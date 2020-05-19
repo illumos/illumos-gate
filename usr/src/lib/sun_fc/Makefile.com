@@ -145,10 +145,6 @@ CCERRWARN +=	-_gcc=-Wno-unused-function
 CCERRWARN +=	-_gcc=-Wno-type-limits
 CCERRWARN +=	-_gcc=-Wno-return-type
 
-CCERRWARN +=	-_gcc7=-Wno-c++11-compat
-CCERRWARN +=	-_gcc8=-Wno-c++11-compat
-CCERRWARN +=	-_gcc9=-Wno-c++11-compat
-
 LDLIBS			+= -ldevinfo
 LDLIBS			+= -lsysevent
 LDLIBS			+= -lnvpair
