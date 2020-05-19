@@ -195,7 +195,7 @@ struct dapls_ib_hca_state {
 	char	hca_path[MAXPATHLEN];
 };
 
-DAPL_OS_LOCK	dapls_ib_dbp_lock;
+extern DAPL_OS_LOCK	dapls_ib_dbp_lock;
 
 /* Function that returns a pointer to the specified doorbell entry */
 uint32_t *dapls_ib_get_dbp(uint64_t maplen, int fd, uint64_t mapoffset,
