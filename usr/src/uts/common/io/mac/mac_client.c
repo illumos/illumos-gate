@@ -1358,7 +1358,7 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 
 	mcip->mci_mip = mip;
 	mcip->mci_upper_mip = NULL;
-	mcip->mci_rx_fn = mac_pkt_drop;
+	mcip->mci_rx_fn = mac_rx_def;
 	mcip->mci_rx_arg = NULL;
 	mcip->mci_rx_p_fn = NULL;
 	mcip->mci_rx_p_arg = NULL;
@@ -1630,7 +1630,7 @@ mac_rx_set(mac_client_handle_t mch, mac_rx_t rx_fn, void *arg)
 void
 mac_rx_clear(mac_client_handle_t mch)
 {
-	mac_rx_set(mch, mac_pkt_drop, NULL);
+	mac_rx_set(mch, mac_rx_def, NULL);
 }
 
 void
@@ -1642,7 +1642,7 @@ mac_rx_barrier(mac_client_handle_t mch)
 	i_mac_perim_enter(mip);
 
 	/* If a RX callback is set, quiesce and restart that datapath */
-	if (mcip->mci_rx_fn != mac_pkt_drop) {
+	if (mcip->mci_rx_fn != mac_rx_def) {
 		mac_rx_client_quiesce(mch);
 		mac_rx_client_restart(mch);
 	}
@@ -2999,7 +2999,7 @@ mac_client_datapath_teardown(mac_client_handle_t mch, mac_unicast_impl_t *muip,
 	mac_misc_stat_delete(flent);
 
 	/* Initialize the receiver function to a safe routine */
-	flent->fe_cb_fn = (flow_fn_t)mac_pkt_drop;
+	flent->fe_cb_fn = (flow_fn_t)mac_rx_def;
 	flent->fe_cb_arg1 = NULL;
 	flent->fe_cb_arg2 = NULL;
 
@@ -4243,7 +4243,7 @@ mac_promisc_dispatch(mac_impl_t *mip, mblk_t *mp_chain,
 			    mpip->mpi_type == MAC_CLIENT_PROMISC_ALL ||
 			    is_mcast) {
 				mac_promisc_dispatch_one(mpip, mp, is_sender,
-					local);
+				    local);
 			}
 		}
 	}
@@ -4274,7 +4274,7 @@ mac_promisc_client_dispatch(mac_client_impl_t *mcip, mblk_t *mp_chain)
 			if (mpip->mpi_type == MAC_CLIENT_PROMISC_FILTERED &&
 			    !is_mcast) {
 				mac_promisc_dispatch_one(mpip, mp, B_FALSE,
-					B_FALSE);
+				    B_FALSE);
 			}
 		}
 	}

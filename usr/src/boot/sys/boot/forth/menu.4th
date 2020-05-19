@@ -571,8 +571,7 @@ also menu-infrastructure definitions
 \
 : menu-timeout-update ( N -- )
 
-	\ Enforce minimum/maximum
-	dup 9 > if drop 9 then
+	\ Enforce minimum
 	dup 0 < if drop 0 then
 
 	s" headnode" getenv? if
@@ -585,16 +584,13 @@ also menu-infrastructure definitions
 		s" Autoboot in N seconds. [Space] to pause" ( n -- n c-addr/u )
 	then
 
-	2 pick 0> if
-		rot 48 + -rot ( n c-addr/u -- n' c-addr/u ) \ convert to ASCII
-		12 +c!        ( n' c-addr/u -- c-addr/u )   \ replace 'N' above
-
-		menu_timeout_x @ menu_timeout_y @ at-xy \ position cursor
-		type ( c-addr/u -- ) \ print message
+	dup 0> if
+		s" Autoboot in " type
+		dup . s" second" type
+		1 > if [char] s emit then
+		s" . [Space] to pause " type
 	else
-		menu_timeout_x @ menu_timeout_y @ at-xy \ position cursor
-		spaces ( n c-addr/u -- n c-addr ) \ erase message
-		2drop ( n c-addr -- )
+		drop 40 spaces \ erase message
 	then
 
 	at-bl

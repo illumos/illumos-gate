@@ -76,7 +76,7 @@
  */
 
 /*PRINTFLIKE2*/
-static void
+void
 mac_drop_pkt(mblk_t *mp, const char *fmt, ...)
 {
 	va_list adx;
@@ -91,6 +91,31 @@ mac_drop_pkt(mblk_t *mp, const char *fmt, ...)
 
 	DTRACE_PROBE2(mac__drop, mblk_t *, mp, char *, msgp);
 	freemsg(mp);
+}
+
+/*PRINTFLIKE2*/
+void
+mac_drop_chain(mblk_t *chain, const char *fmt, ...)
+{
+	va_list adx;
+	char msg[128];
+	char *msgp = msg;
+
+	va_start(adx, fmt);
+	(void) vsnprintf(msgp, sizeof (msg), fmt, adx);
+	va_end(adx);
+
+	/*
+	 * We could use freemsgchain() for the actual freeing but
+	 * since we are already walking the chain to fire the dtrace
+	 * probe we might as well free the msg here too.
+	 */
+	for (mblk_t *mp = chain, *next; mp != NULL; ) {
+		next = mp->b_next;
+		DTRACE_PROBE2(mac__drop, mblk_t *, mp, char *, msgp);
+		freemsg(mp);
+		mp = next;
+	}
 }
 
 /*
@@ -233,7 +258,7 @@ bail:
 static boolean_t
 mac_sw_cksum_ipv6(mblk_t *mp, uint32_t ip_hdr_offset, const char **err)
 {
-	ip6_t* ip6h = (ip6_t *)(mp->b_rptr + ip_hdr_offset);
+	ip6_t *ip6h = (ip6_t *)(mp->b_rptr + ip_hdr_offset);
 	const uint8_t proto = ip6h->ip6_nxt;
 	const uint16_t *iphs = (uint16_t *)ip6h;
 	/* ULP offset from start of L2. */
@@ -1543,17 +1568,10 @@ mac_strip_vlan_tag_chain(mblk_t *mp_chain)
  */
 /* ARGSUSED */
 void
-mac_pkt_drop(void *arg, mac_resource_handle_t resource, mblk_t *mp,
+mac_rx_def(void *arg, mac_resource_handle_t resource, mblk_t *mp_chain,
     boolean_t loopback)
 {
-	mblk_t  *mp1 = mp;
-
-	while (mp1 != NULL) {
-		mp1->b_prev = NULL;
-		mp1->b_queue = NULL;
-		mp1 = mp1->b_next;
-	}
-	freemsgchain(mp);
+	freemsgchain(mp_chain);
 }
 
 /*

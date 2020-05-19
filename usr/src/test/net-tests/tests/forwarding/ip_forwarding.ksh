@@ -18,7 +18,7 @@
 #
 #     ip_forwarding.ksh -bcflnpuv <client> <router> <server>
 #
-#     Where client, router, and server are the UUIDs of three native
+#     Where client, router, and server are the names of three native
 #     zones. The user must create and start these zones; but other
 #     than that there is no special configuration required for them.
 #
@@ -113,7 +113,7 @@ nt_rx_ip_cksum=0
 nt_cleanup=1
 nt_cleanup_only=0
 
-nt_tdirprefix=/tmp/${nt_tname}
+nt_tdirprefix=/var/tmp/${nt_tname}
 nt_tdir=${nt_tdirprefix}.$$
 nt_dfile=${nt_tdir}/${nt_tname}.data
 nt_efile=${nt_tdir}/${nt_tname}-expected-sha1
@@ -230,9 +230,18 @@ if ((nt_cleanup_only == 1)); then
 	exit 0
 fi
 
-mkdir $nt_tdir
-zlogin $nt_client mkdir $nt_tdir
-zlogin $nt_server mkdir $nt_tdir
+if ! mkdir $nt_tdir; then
+	fail "failed to mkdir $nt_tdir in GZ"
+fi
+dbg "created dir $nt_tdir in GZ"
+if ! zlogin $nt_client mkdir $nt_tdir; then
+	fail "failed to mkdir $nt_tdir in $nt_client"
+fi
+dbg "created dir $nt_tdir in $nt_client"
+if ! zlogin $nt_server mkdir $nt_tdir; then
+	fail "failed to mkdir $nt_tdir in $nt_server"
+fi
+dbg "created dir $nt_tdir in $nt_server"
 
 trap cleanup ERR
 

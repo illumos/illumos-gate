@@ -693,7 +693,7 @@ simnet_rx(void *arg)
 
 	/* Check for valid packet header */
 	if (mac_header_info(sdev->sd_mh, mp, &hdr_info) != 0) {
-		freemsg(mp);
+		mac_drop_pkt(mp, "invalid L2 header");
 		sdev->sd_stats.recv_errors++;
 		goto rx_done;
 	}
@@ -754,7 +754,7 @@ simnet_m_tx(void *arg, mblk_t *mp_chain)
 	if ((sdev_rx = sdev->sd_peer_dev) == NULL) {
 		/* Discard packets when no peer exists */
 		rw_exit(&simnet_dev_lock);
-		freemsgchain(mp_chain);
+		mac_drop_chain(mp_chain, "no peer");
 		return (NULL);
 	}
 
@@ -771,14 +771,14 @@ simnet_m_tx(void *arg, mblk_t *mp_chain)
 	 */
 	if (!simnet_thread_ref(sdev_rx)) {
 		rw_exit(&simnet_dev_lock);
-		freemsgchain(mp_chain);
+		mac_drop_chain(mp_chain, "simnet peer dev not ready");
 		return (NULL);
 	}
 	rw_exit(&simnet_dev_lock);
 
 	if (!simnet_thread_ref(sdev)) {
 		simnet_thread_unref(sdev_rx);
-		freemsgchain(mp_chain);
+		mac_drop_chain(mp_chain, "simnet dev not ready");
 		return (NULL);
 	}
 
@@ -798,7 +798,7 @@ simnet_m_tx(void *arg, mblk_t *mp_chain)
 			mp_new = allocb(size, BPRI_HI);
 			if (mp_new == NULL) {
 				sdev->sd_stats.xmit_errors++;
-				freemsg(mp);
+				mac_drop_pkt(mp, "allocb failed");
 				continue;
 			}
 			bzero(mp_new->b_wptr, size);
@@ -814,7 +814,7 @@ simnet_m_tx(void *arg, mblk_t *mp_chain)
 		/* Pullup packet into a single mblk */
 		if ((nmp = msgpullup(mp, -1)) == NULL) {
 			sdev->sd_stats.xmit_errors++;
-			freemsg(mp);
+			mac_drop_pkt(mp, "msgpullup failed");
 			continue;
 		} else {
 			mac_hcksum_clone(mp, nmp);
@@ -824,8 +824,8 @@ simnet_m_tx(void *arg, mblk_t *mp_chain)
 
 		/* Hold reference for taskq receive processing per-pkt */
 		if (!simnet_thread_ref(sdev_rx)) {
-			freemsg(mp);
-			freemsgchain(mpnext);
+			mac_drop_pkt(mp, "failed to get thread ref");
+			mac_drop_chain(mpnext, "failed to get thread ref");
 			break;
 		}
 

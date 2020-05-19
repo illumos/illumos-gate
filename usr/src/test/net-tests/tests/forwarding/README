@@ -101,9 +101,6 @@ to router via mac-loopback.
 Requirements
 ------------
 
-* These tests are currently SmartOS specific as they rely on simnet
-  extensions only found in illumos-joyent.
-
 * The client and server zones must provide `/usr/bin/socat`. It would
   be nice to use netcat but our native version is missing features
   like connection timeout.

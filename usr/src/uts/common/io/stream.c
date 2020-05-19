@@ -839,7 +839,7 @@ frnop_func(void *arg)
  */
 static mblk_t *
 gesballoc(unsigned char *base, size_t size, uint32_t db_rtfu, frtn_t *frp,
-	void (*lastfree)(mblk_t *, dblk_t *), int kmflags)
+    void (*lastfree)(mblk_t *, dblk_t *), int kmflags)
 {
 	dblk_t *dbp;
 	mblk_t *mp;

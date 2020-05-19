@@ -290,54 +290,6 @@ struct mac_group_s {
 #define	GROUP_INTR_ENABLE_FUNC(g)	(g)->mrg_info.mgi_intr.mi_enable
 #define	GROUP_INTR_DISABLE_FUNC(g)	(g)->mrg_info.mgi_intr.mi_disable
 
-#define	MAC_RING_TX(mhp, rh, mp, rest) {				\
-	mac_ring_handle_t mrh = rh;					\
-	mac_impl_t *mimpl = (mac_impl_t *)mhp;				\
-	/*								\
-	 * Send packets through a selected tx ring, or through the	\
-	 * default handler if there is no selected ring.		\
-	 */								\
-	if (mrh == NULL)						\
-		mrh = mimpl->mi_default_tx_ring;			\
-	if (mrh == NULL) {						\
-		rest = mimpl->mi_tx(mimpl->mi_driver, mp);		\
-	} else {							\
-		rest = mac_hwring_tx(mrh, mp);				\
-	}								\
-}
-
-/*
- * This is the final stop before reaching the underlying driver
- * or aggregation, so this is where the bridging hook is implemented.
- * Packets that are bridged will return through mac_bridge_tx(), with
- * rh nulled out if the bridge chooses to send output on a different
- * link due to forwarding.
- */
-#define	MAC_TX(mip, rh, mp, src_mcip) {					\
-	mac_ring_handle_t	rhandle = (rh);				\
-	/*								\
-	 * If there is a bound Hybrid I/O share, send packets through	\
-	 * the default tx ring. (When there's a bound Hybrid I/O share,	\
-	 * the tx rings of this client are mapped in the guest domain	\
-	 * and not accessible from here.)				\
-	 */								\
-	_NOTE(CONSTANTCONDITION)					\
-	if ((src_mcip)->mci_state_flags & MCIS_SHARE_BOUND)		\
-		rhandle = (mip)->mi_default_tx_ring;			\
-	if (mip->mi_promisc_list != NULL)				\
-		mac_promisc_dispatch(mip, mp, src_mcip);		\
-	/*								\
-	 * Grab the proper transmit pointer and handle. Special		\
-	 * optimization: we can test mi_bridge_link itself atomically,	\
-	 * and if that indicates no bridge send packets through tx ring.\
-	 */								\
-	if (mip->mi_bridge_link == NULL) {				\
-		MAC_RING_TX(mip, rhandle, mp, mp);			\
-	} else {							\
-		mp = mac_bridge_tx(mip, rhandle, mp);			\
-	}								\
-}
-
 /* mci_tx_flag */
 #define	MCI_TX_QUIESCE	0x1
 
@@ -726,6 +678,18 @@ typedef struct mac_client_impl_s mac_client_impl_t;
 extern void	mac_init(void);
 extern int	mac_fini(void);
 
+/*
+ * MAC packet/chain drop functions to aggregate all dropped-packet
+ * debugging to a single surface.
+ */
+/*PRINTFLIKE2*/
+extern void	mac_drop_pkt(mblk_t *, const char *, ...)
+    __KPRINTFLIKE(2);
+
+/*PRINTFLIKE2*/
+extern void	mac_drop_chain(mblk_t *, const char *, ...)
+    __KPRINTFLIKE(2);
+
 extern void	mac_ndd_ioctl(mac_impl_t *, queue_t *, mblk_t *);
 extern boolean_t mac_ip_hdr_length_v6(ip6_t *, uint8_t *, uint16_t *,
     uint8_t *, ip6_frag_t **);
@@ -839,7 +803,7 @@ extern void mac_flow_set_name(flow_entry_t *, const char *);
 extern mblk_t *mac_add_vlan_tag(mblk_t *, uint_t, uint16_t);
 extern mblk_t *mac_add_vlan_tag_chain(mblk_t *, uint_t, uint16_t);
 extern mblk_t *mac_strip_vlan_tag_chain(mblk_t *);
-extern void mac_pkt_drop(void *, mac_resource_handle_t, mblk_t *, boolean_t);
+extern void mac_rx_def(void *, mac_resource_handle_t, mblk_t *, boolean_t);
 extern mblk_t *mac_rx_flow(mac_handle_t, mac_resource_handle_t, mblk_t *);
 
 extern void i_mac_share_alloc(mac_client_impl_t *);

@@ -178,10 +178,13 @@ function vnic_exists
 		fail "$0: incorrect number of args provided"
 	fi
 
-	if dladm show-vnic -z $zone $name > /dev/null 2>&1; then
-		typeset avid=$(dladm show-vnic -z $zone -p -o vid $name)
-		typeset aover=$(dladm show-vnic -z $zone -p -o over $name)
-		if (($avid == $vid)) && [ $aover == $over ]; then
+	if dladm show-vnic $name > /dev/null 2>&1; then
+		typeset avid=$(dladm show-vnic -p -o vid $name)
+		typeset aover=$(dladm show-vnic -p -o over $name)
+		typeset azone=$(dladm show-linkprop -cp zone -o value $name)
+		if (($avid == $vid)) && [ $aover == $over ] && \
+			   [ $azone == $zone ]
+		then
 			return 0
 		else
 			return 1
@@ -211,14 +214,31 @@ function create_vnic
 	fi
 
 	dbg "creating VNIC: $vnic_info"
-	if dladm create-vnic -t -p zone=$zone -l $over \
-		 $vid_opt $name > /dev/null 2>&1
+	if ! dladm create-vnic -t -l $over $vid_opt $name > /dev/null 2>&1
 	then
-		dbg "created VNIC: $vnic_info"
+		maybe_fail "$err"
+		return 1
+	fi
+
+	dbg "created VNIC: $vnic_info"
+	if ! zonecfg -z $zone "add net; set physical=$name; end"; then
+		maybe_fail "failed to assign $name to $zone"
+		return 1
+	fi
+
+	dbg "assigned VNIC $name to $zone"
+	if zoneadm -z $zone reboot; then
+		dbg "rebooted $zone"
+		#
+		# Make sure the vnic is visible before returning. Without this
+		# a create_addr command following immediately afterwards could
+		# fail because the zone is up but the vnic isn't visible yet.
+		#
+		sleep 1
 		return 0
 	fi
 
-	maybe_fail "$err"
+	maybe_fail "failed to reboot $zone"
 }
 
 function delete_vnic
@@ -235,8 +255,13 @@ function delete_vnic
 	fi
 
 	dbg "assigning VNIC $name from $zone to GZ"
-	if ! dladm set-linkprop -t -z $zone -p zone=global $name; then
-		maybe_fail "$err1"
+
+	if ! zonecfg -z $zone "remove net physical=$name"; then
+		maybe_fail "failed to remove $name from $zone"
+		return 1
+	fi
+	if ! zoneadm -z $zone reboot; then
+		maybe_fail "failed to reboot $zone"
 		return 1
 	fi
 

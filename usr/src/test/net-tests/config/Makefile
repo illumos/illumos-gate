@@ -20,7 +20,7 @@ ROOTOPTPKG = $(ROOT)/opt/net-tests
 ROOTOPTPKGCFG = $(ROOT)/opt/net-tests/config
 ROOTOPTPKGDIRS = $(ROOTOPTPKG) $(ROOTOPTPKGCFG)
 FILES = $(CFGS:%=$(ROOTOPTPKGCFG)/%)
-$(FILES) := FILEMODE = 0555
+$(FILES) := FILEMODE = 0644
 
 include $(SRC)/test/Makefile.com
 

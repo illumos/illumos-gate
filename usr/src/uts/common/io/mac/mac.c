@@ -1753,7 +1753,7 @@ mac_client_clear_flow_cb(mac_client_handle_t mch)
 	flow_entry_t		*flent = mcip->mci_flent;
 
 	mutex_enter(&flent->fe_lock);
-	flent->fe_cb_fn = (flow_fn_t)mac_pkt_drop;
+	flent->fe_cb_fn = (flow_fn_t)mac_rx_def;
 	flent->fe_cb_arg1 = NULL;
 	flent->fe_cb_arg2 = NULL;
 	flent->fe_flags |= FE_MC_NO_DATAPATH;
@@ -4741,7 +4741,7 @@ mac_bridge_tx(mac_impl_t *mip, mac_ring_handle_t rh, mblk_t *mp)
 		 * The bridge may place this mblk on a provider's Tx
 		 * path, a mac's Rx path, or both. Since we don't have
 		 * enough information at this point, we can't be sure
-		 * that the desination(s) are capable of handling the
+		 * that the destination(s) are capable of handling the
 		 * hardware offloads requested by the mblk. We emulate
 		 * them here as it is the safest choice. In the
 		 * future, if bridge performance becomes a priority,

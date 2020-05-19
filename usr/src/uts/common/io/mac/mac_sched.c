@@ -1328,7 +1328,7 @@ int mac_srs_worker_wakeup_ticks = 0;
 			 * b_prev may be set to the fanout hint		\
 			 * hence can't use freemsg directly		\
 			 */						\
-			mac_pkt_drop(NULL, NULL, mp_chain, B_FALSE);	\
+			mac_drop_chain(mp_chain, "SRS Tx max queue");	\
 			DTRACE_PROBE1(tx_queued_hiwat,			\
 			    mac_soft_ring_set_t *, srs);		\
 			enqueue = 0;					\
@@ -1347,8 +1347,8 @@ int mac_srs_worker_wakeup_ticks = 0;
 	if (!(srs->srs_type & SRST_TX))					\
 		mutex_exit(&srs->srs_bw->mac_bw_lock);
 
-#define	MAC_TX_SRS_DROP_MESSAGE(srs, mp, cookie) {		\
-	mac_pkt_drop(NULL, NULL, mp, B_FALSE);			\
+#define	MAC_TX_SRS_DROP_MESSAGE(srs, chain, cookie, s) {	\
+	mac_drop_chain((chain), (s));				\
 	/* increment freed stats */				\
 	(srs)->srs_tx.st_stat.mts_sdrops++;			\
 	(cookie) = (mac_tx_cookie_t)(srs);			\
@@ -2894,7 +2894,7 @@ again:
 		mac_srs->srs_bw->mac_bw_sz -= sz;
 		mac_srs->srs_bw->mac_bw_drop_bytes += sz;
 		mutex_exit(&mac_srs->srs_bw->mac_bw_lock);
-		mac_pkt_drop(NULL, NULL, head, B_FALSE);
+		mac_drop_chain(head, "Rx no bandwidth");
 		goto leave_poll;
 	} else {
 		mutex_exit(&mac_srs->srs_bw->mac_bw_lock);
@@ -3339,7 +3339,7 @@ mac_rx_srs_process(void *arg, mac_resource_handle_t srs, mblk_t *mp_chain,
 			mac_bw->mac_bw_drop_bytes += sz;
 			mutex_exit(&mac_bw->mac_bw_lock);
 			mutex_exit(&mac_srs->srs_lock);
-			mac_pkt_drop(NULL, NULL, mp_chain, B_FALSE);
+			mac_drop_chain(mp_chain, "Rx no bandwidth");
 			return;
 		} else {
 			if ((mac_bw->mac_bw_sz + sz) <=
@@ -3461,7 +3461,8 @@ mac_tx_srs_no_desc(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 
 	ASSERT(tx_mode == SRS_TX_DEFAULT || tx_mode == SRS_TX_BW);
 	if (flag & MAC_DROP_ON_NO_DESC) {
-		MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie);
+		MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie,
+		    "Tx no desc");
 	} else {
 		if (mac_srs->srs_first != NULL)
 			wakeup_worker = B_FALSE;
@@ -3524,7 +3525,8 @@ mac_tx_srs_enqueue(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 	MAC_COUNT_CHAIN(mac_srs, mp_chain, tail, cnt, sz);
 	if (flag & MAC_DROP_ON_NO_DESC) {
 		if (mac_srs->srs_count > mac_srs->srs_tx.st_hiwat) {
-			MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie);
+			MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie,
+			    "Tx SRS hiwat");
 		} else {
 			MAC_TX_SRS_ENQUEUE_CHAIN(mac_srs,
 			    mp_chain, tail, cnt, sz);
@@ -3897,7 +3899,8 @@ mac_tx_bw_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 			cookie = (mac_tx_cookie_t)mac_srs;
 			*ret_mp = mp_chain;
 		} else {
-			MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie);
+			MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie,
+			    "Tx no bandwidth");
 		}
 		mutex_exit(&mac_srs->srs_lock);
 		return (cookie);
@@ -4440,9 +4443,9 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 				mac_hw_emul(&mp, NULL, NULL, MAC_ALL_EMULS);
 				if (mp != NULL) {
 					(dst_flow_ent->fe_cb_fn)(
-						dst_flow_ent->fe_cb_arg1,
-						dst_flow_ent->fe_cb_arg2,
-						mp, do_switch);
+					    dst_flow_ent->fe_cb_arg1,
+					    dst_flow_ent->fe_cb_arg2,
+					    mp, do_switch);
 				}
 
 			}
@@ -4801,7 +4804,7 @@ mac_tx_sring_enqueue(mac_soft_ring_t *ringp, mblk_t *mp_chain, uint16_t flag,
 	ASSERT(MUTEX_HELD(&ringp->s_ring_lock));
 	MAC_COUNT_CHAIN(mac_srs, mp_chain, tail, cnt, sz);
 	if (flag & MAC_DROP_ON_NO_DESC) {
-		mac_pkt_drop(NULL, NULL, mp_chain, B_FALSE);
+		mac_drop_chain(mp_chain, "Tx softring no desc");
 		/* increment freed stats */
 		ringp->s_ring_drops += cnt;
 		cookie = (mac_tx_cookie_t)ringp;
@@ -4845,8 +4848,8 @@ mac_tx_sring_enqueue(mac_soft_ring_t *ringp, mblk_t *mp_chain, uint16_t flag,
 					 * b_prev may be set to the fanout hint
 					 * hence can't use freemsg directly
 					 */
-					mac_pkt_drop(NULL, NULL,
-					    mp_chain, B_FALSE);
+					mac_drop_chain(mp_chain,
+					    "Tx softring max queue");
 					DTRACE_PROBE1(tx_queued_hiwat,
 					    mac_soft_ring_t *, ringp);
 					enqueue = B_FALSE;

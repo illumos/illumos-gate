@@ -27,6 +27,7 @@
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 2020 Data Direct Networks.
  */
 
 /*
@@ -616,6 +617,9 @@ set_option(struct menu_lst *menu, char *dummy, char *opt)
 	val = strchr(opt, '=');
 	if (val != NULL) {
 		*val++ = '\0';
+	} else {
+		bam_error(_("missing value in key=value\n"));
+		return (BAM_ERROR);
 	}
 
 	if (strcmp(opt, "default") == 0) {
