@@ -45,31 +45,6 @@
 
 /* Porting note: This is named 'vmx_support.S' upstream. */
 
-
-
-#if defined(lint)
-
-struct vmxctx;
-struct vmx;
-
-/*ARGSUSED*/
-void
-vmx_launch(struct vmxctx *ctx)
-{}
-
-void
-vmx_exit_guest()
-{}
-
-/*ARGSUSED*/
-int
-vmx_enter_guest(struct vmxctx *ctx, struct vmx *vmx, int launched)
-{
-	return (0);
-}
-
-#else /* lint */
-
 #include "vmx_assym.h"
 #include "vmcs.h"
 
@@ -155,7 +130,7 @@ vmx_enter_guest(struct vmxctx *ctx, struct vmx *vmx, int launched)
 #define	VMXSTKSIZE	VMXSTK_FP
 
 /*
- * vmx_enter_guest(struct vmxctx *vmxctx, int launched)
+ * vmx_enter_guest(struct vmxctx *ctx, struct vmx *vmx, int launched)
  * Interrupts must be disabled on entry.
  */
 ENTRY_NP(vmx_enter_guest)
@@ -380,5 +355,3 @@ ENTRY_NP(vmx_call_isr)
 	popq	%rbp
 	ret
 SET_SIZE(vmx_call_isr)
-
-#endif /* lint */

@@ -26,7 +26,6 @@ all	:=	TARGET = all
 install	:=	TARGET = install
 clean	:=	TARGET = clean
 clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
 
 SRCS =	acpi.c			\
 	atkbdc.c		\
@@ -129,7 +128,6 @@ SMOFF += all_func_returns,leaks,no_if_block
 # Force c99 for everything
 CSTD=		$(CSTD_GNU99)
 C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all
 
 $(PROG) := LDLIBS += -lsocket -lnsl -ldlpi -ldladm -lmd -luuid -lvmmapi -lz
 $(MEVENT_TEST_PROG) := LDLIBS += -lsocket
@@ -152,8 +150,6 @@ clean: $(SUBDIRS)
 
 clobber: clean $(SUBDIRS)
 	$(RM) $(CLOBBERFILES)
-
-lint:	lint_SRCS $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

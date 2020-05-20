@@ -37,8 +37,6 @@ LDLIBS +=	-lc -lvmmapi
 
 all: $(LIBS)
 
-lint: lintcheck
-
 pics/%.o: $(SRC)/common/list/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)

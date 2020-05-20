@@ -43,11 +43,6 @@ $(ROOTTSTDIR)/%.exe: %.exe $(ROOTTSTDIR)
 
 all: install
 
-%.exe.ln: %.c $(SUPOBJS)
-	$(LINT.c) $< $(LDLIBS)
-
-lint: $(LINTEXE)
-
 clean:
 	-$(RM) *.o $(CLEANFILES)
 
