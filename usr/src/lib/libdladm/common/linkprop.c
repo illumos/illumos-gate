@@ -155,7 +155,7 @@ static pd_getf_t	get_zone, get_autopush, get_rate_mod, get_rate,
 			get_bridge_pvid, get_protection, get_rxrings,
 			get_txrings, get_cntavail, get_secondary_macs,
 			get_allowallcids, get_allowedips, get_allowedcids,
-			get_pool, get_rings_range, get_linkmode_prop,
+			get_pool, get_rings_range, get_linkmode_prop, get_bits,
 			get_promisc_filtered, get_dynamic_methods;
 
 static pd_setf_t	set_zone, set_rate, set_powermode, set_radio,

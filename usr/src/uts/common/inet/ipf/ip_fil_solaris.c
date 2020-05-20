@@ -221,12 +221,6 @@ ipf_hook_protocol_notify_ngz(hook_notify_cmd_t command, void *arg,
 	return (ipf_hook_protocol_notify(command, arg, name, dummy, he_name));
 }
 
-/* viona hook names */
-char *hook_viona_in =		"ipfilter_hookviona_in";
-char *hook_viona_in_gz =	"ipfilter_hookviona_in_gz";
-char *hook_viona_out =		"ipfilter_hookviona_out";
-char *hook_viona_out_gz =	"ipfilter_hookviona_out_gz";
-
 /* ------------------------------------------------------------------------ */
 /* Function:    ipldetach                                                   */
 /* Returns:     int - 0 == success, else error.                             */
@@ -2540,30 +2534,6 @@ int ipf_hook_ether(hook_event_token_t token, hook_data_t info, void *arg,
 }
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_hookviona_{in,out}                                      */
-/* Returns:     int - 0 == packet ok, else problem, free packet if not done */
-/* Parameters:  event(I)     - pointer to event                             */
-/*              info(I)      - pointer to hook information for firewalling  */
-/*                                                                          */
-/* The viona hooks are private hooks to illumos. They represents a layer 2  */
-/* datapath generally used to implement virtual machines.                   */
-/* along L2 packets.                                                        */
-/*                                                                          */
-/* They end up calling the appropriate traditional ip hooks.                */
-/* ------------------------------------------------------------------------ */
-int
-ipf_hookviona_in(hook_event_token_t token, hook_data_t info, void *arg)
-{
-	return (ipf_hook_ether(token, info, arg, B_FALSE));
-}
-
-int
-ipf_hookviona_out(hook_event_token_t token, hook_data_t info, void *arg)
-{
-	return (ipf_hook_ether(token, info, arg, B_TRUE));
-}
-
-/* ------------------------------------------------------------------------ */
 /* Function:    ipf_hookvndl3_in					    */
 /* Returns:     int - 0 == packet ok, else problem, free packet if not done */
 /* Parameters:  event(I)     - pointer to event                             */
@@ -2597,100 +2567,6 @@ int ipf_hookvndl3v4_out(hook_event_token_t token, hook_data_t info, void *arg)
 int ipf_hookvndl3v6_out(hook_event_token_t token, hook_data_t info, void *arg)
 {
 	return ipf_hook6_out(token, info, arg);
-}
-
-/* Static constants used by ipf_hook_ether */
-static uint8_t ipf_eth_bcast_addr[ETHERADDRL] = {
-	0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
-};
-static uint8_t ipf_eth_ipv4_mcast[3] = { 0x01, 0x00, 0x5E };
-static uint8_t ipf_eth_ipv6_mcast[2] = { 0x33, 0x33 };
-
-/* ------------------------------------------------------------------------ */
-/* Function:	ipf_hook_ether                                              */
-/* Returns:	int - 0 == packet ok, else problem, free packet if not done */
-/* Parameters:	token(I)     - pointer to event                             */
-/*              info(I)      - pointer to hook information for firewalling  */
-/*                                                                          */
-/* The ipf_hook_ether hook is currently private to illumos.  It represents  */
-/* a layer 2 datapath generally used by virtual machines.  Currently the    */
-/* hook is only used by the viona driver to pass along L2 frames for        */
-/* inspection.  It requires that the L2 ethernet header is contained within */
-/* a single dblk_t (however layers above the L2 header have no restrctions  */
-/* in ipf).  ipf does not currently support filtering on L2 fields (e.g.    */
-/* filtering on a MAC address or ethertype), however virtual machines do    */
-/* not have native IP stack instances where ipf traditionally hooks in.     */
-/* Instead this entry point is used to determine if the packet is unicast,  */
-/* broadcast, or multicast. The IPv4 or IPv6 packet is then passed to the   */
-/* traditional ip hooks for filtering.  Non IPv4 or non IPv6 packets are    */
-/* not subject to examination.                                              */
-/* ------------------------------------------------------------------------ */
-int ipf_hook_ether(hook_event_token_t token, hook_data_t info, void *arg,
-    boolean_t out)
-{
-	struct ether_header *ethp;
-	hook_pkt_event_t *hpe = (hook_pkt_event_t *)info;
-	mblk_t *mp;
-	size_t offset, len;
-	uint16_t etype;
-	boolean_t v6;
-
-	/*
-	 * viona will only pass us mblks with the L2 header contained in a
-	 * single data block.
-	 */
-	mp = *hpe->hpe_mp;
-	len = MBLKL(mp);
-
-	VERIFY3S(len, >=, sizeof (struct ether_header));
-
-	ethp = (struct ether_header *)mp->b_rptr;
-	if ((etype = ntohs(ethp->ether_type)) == ETHERTYPE_VLAN) {
-		struct ether_vlan_header *evh =
-		    (struct ether_vlan_header *)ethp;
-
-		VERIFY3S(len, >=, sizeof (struct ether_vlan_header));
-
-		etype = ntohs(evh->ether_type);
-		offset = sizeof (*evh);
-	} else {
-		offset = sizeof (*ethp);
-	}
-
-	/*
-	 * ipf only support filtering IPv4 and IPv6.  Ignore other types.
-	 */
-	if (etype == ETHERTYPE_IP)
-		v6 = B_FALSE;
-	else if (etype == ETHERTYPE_IPV6)
-		v6 = B_TRUE;
-	else
-		return (0);
-
-	if (bcmp(ipf_eth_bcast_addr, ethp, ETHERADDRL) == 0)
-		hpe->hpe_flags |= HPE_BROADCAST;
-	else if (bcmp(ipf_eth_ipv4_mcast, ethp,
-	    sizeof (ipf_eth_ipv4_mcast)) == 0)
-		hpe->hpe_flags |= HPE_MULTICAST;
-	else if (bcmp(ipf_eth_ipv6_mcast, ethp,
-	    sizeof (ipf_eth_ipv6_mcast)) == 0)
-		hpe->hpe_flags |= HPE_MULTICAST;
-
-	/* Find the start of the IPv4 or IPv6 header */
-	for (; offset >= len; len = MBLKL(mp)) {
-		offset -= len;
-		mp = mp->b_cont;
-		if (mp == NULL) {
-			freemsg(*hpe->hpe_mp);
-			*hpe->hpe_mp = NULL;
-			return (-1);
-		}
-	}
-	hpe->hpe_mb = mp;
-	hpe->hpe_hdr = mp->b_rptr + offset;
-
-	return (v6 ? ipf_hook6(info, out, 0, arg) :
-	    ipf_hook(info, out, 0, arg));
 }
 
 /* ------------------------------------------------------------------------ */
