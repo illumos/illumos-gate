@@ -68,6 +68,8 @@ timeout = 600
 [/opt/libc-tests/tests/stdio/fmemopentest.64]
 [/opt/libc-tests/tests/stdio/ftell_ungetc.32]
 [/opt/libc-tests/tests/stdio/ftell_ungetc.64]
+[/opt/libc-tests/tests/stdio/ftello_12768.lfs]
+[/opt/libc-tests/tests/stdio/ftello_12768.64]
 [/opt/libc-tests/tests/stdio/memstream.32]
 [/opt/libc-tests/tests/stdio/memstream.64]
 [/opt/libc-tests/tests/stdio/memstream_reopen.32]
