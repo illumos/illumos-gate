@@ -12,6 +12,7 @@
 /*
  * Copyright 2020, The University of Queensland
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -1594,6 +1595,8 @@ mlxcx_reg_name(mlxcx_register_id_t rid)
 		return ("MCIA");
 	case MLXCX_REG_PPCNT:
 		return ("PPCNT");
+	case MLXCX_REG_PPLM:
+		return ("PPLM");
 	default:
 		return ("???");
 	}
@@ -1639,6 +1642,9 @@ mlxcx_cmd_access_register(mlxcx_t *mlxp, mlxcx_cmd_reg_opmod_t opmod,
 		break;
 	case MLXCX_REG_PPCNT:
 		dsize = sizeof (mlxcx_reg_ppcnt_t);
+		break;
+	case MLXCX_REG_PPLM:
+		dsize = sizeof (mlxcx_reg_pplm_t);
 		break;
 	default:
 		dsize = 0;
@@ -1776,6 +1782,25 @@ mlxcx_cmd_query_port_status(mlxcx_t *mlxp, mlxcx_port_t *mlp)
 }
 
 boolean_t
+mlxcx_cmd_modify_port_status(mlxcx_t *mlxp, mlxcx_port_t *mlp,
+    mlxcx_port_status_t status)
+{
+	mlxcx_register_data_t data;
+	boolean_t ret;
+
+	ASSERT(mutex_owned(&mlp->mlp_mtx));
+	bzero(&data, sizeof (data));
+	data.mlrd_paos.mlrd_paos_local_port = mlp->mlp_num + 1;
+	data.mlrd_paos.mlrd_paos_admin_status = status;
+	set_bit32(&data.mlrd_paos.mlrd_paos_flags, MLXCX_PAOS_ADMIN_ST_EN);
+
+	ret = mlxcx_cmd_access_register(mlxp, MLXCX_CMD_ACCESS_REGISTER_WRITE,
+	    MLXCX_REG_PAOS, &data);
+
+	return (ret);
+}
+
+boolean_t
 mlxcx_cmd_query_port_speed(mlxcx_t *mlxp, mlxcx_port_t *mlp)
 {
 	mlxcx_register_data_t data;
@@ -1804,6 +1829,82 @@ mlxcx_cmd_query_port_speed(mlxcx_t *mlxp, mlxcx_port_t *mlp)
 		mlp->mlp_oper_proto =
 		    from_bits32(data.mlrd_ptys.mlrd_ptys_proto_oper);
 	}
+
+	return (ret);
+}
+
+boolean_t
+mlxcx_cmd_query_port_fec(mlxcx_t *mlxp, mlxcx_port_t *mlp)
+{
+	mlxcx_register_data_t data;
+	boolean_t ret;
+
+	ASSERT(mutex_owned(&mlp->mlp_mtx));
+	bzero(&data, sizeof (data));
+	data.mlrd_pplm.mlrd_pplm_local_port = mlp->mlp_num + 1;
+
+	ret = mlxcx_cmd_access_register(mlxp, MLXCX_CMD_ACCESS_REGISTER_READ,
+	    MLXCX_REG_PPLM, &data);
+
+	if (ret) {
+		mlp->mlp_fec_active =
+		    from_be24(data.mlrd_pplm.mlrd_pplm_fec_mode_active);
+	}
+
+	return (ret);
+}
+
+boolean_t
+mlxcx_cmd_modify_port_fec(mlxcx_t *mlxp, mlxcx_port_t *mlp,
+    mlxcx_pplm_fec_caps_t fec)
+{
+	mlxcx_register_data_t data_in, data_out;
+	mlxcx_pplm_fec_caps_t caps;
+	mlxcx_reg_pplm_t *pplm_in, *pplm_out;
+	boolean_t ret;
+
+	ASSERT(mutex_owned(&mlp->mlp_mtx));
+	bzero(&data_in, sizeof (data_in));
+	pplm_in = &data_in.mlrd_pplm;
+	pplm_in->mlrd_pplm_local_port = mlp->mlp_num + 1;
+
+	ret = mlxcx_cmd_access_register(mlxp, MLXCX_CMD_ACCESS_REGISTER_READ,
+	    MLXCX_REG_PPLM, &data_in);
+
+	if (!ret)
+		return (B_FALSE);
+
+	bzero(&data_out, sizeof (data_out));
+	pplm_out = &data_out.mlrd_pplm;
+	pplm_out->mlrd_pplm_local_port = mlp->mlp_num + 1;
+
+	caps = get_bits32(pplm_in->mlrd_pplm_fec_override_cap,
+	    MLXCX_PPLM_CAP_56G);
+	set_bits32(&pplm_out->mlrd_pplm_fec_override_admin,
+	    MLXCX_PPLM_CAP_56G, fec & caps);
+
+	caps = get_bits32(pplm_in->mlrd_pplm_fec_override_cap,
+	    MLXCX_PPLM_CAP_100G);
+	set_bits32(&pplm_out->mlrd_pplm_fec_override_admin,
+	    MLXCX_PPLM_CAP_100G, fec & caps);
+
+	caps = get_bits32(pplm_in->mlrd_pplm_fec_override_cap,
+	    MLXCX_PPLM_CAP_50G);
+	set_bits32(&pplm_out->mlrd_pplm_fec_override_admin,
+	    MLXCX_PPLM_CAP_50G, fec & caps);
+
+	caps = get_bits32(pplm_in->mlrd_pplm_fec_override_cap,
+	    MLXCX_PPLM_CAP_25G);
+	set_bits32(&pplm_out->mlrd_pplm_fec_override_admin,
+	    MLXCX_PPLM_CAP_25G, fec & caps);
+
+	caps = get_bits32(pplm_in->mlrd_pplm_fec_override_cap,
+	    MLXCX_PPLM_CAP_10_40G);
+	set_bits32(&pplm_out->mlrd_pplm_fec_override_admin,
+	    MLXCX_PPLM_CAP_10_40G, fec & caps);
+
+	ret = mlxcx_cmd_access_register(mlxp, MLXCX_CMD_ACCESS_REGISTER_WRITE,
+	    MLXCX_REG_PPLM, &data_out);
 
 	return (ret);
 }

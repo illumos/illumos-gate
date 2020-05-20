@@ -133,16 +133,8 @@ SMOFF += all_func_returns,leaks,no_if_block
 CSTD=		$(CSTD_GNU99)
 C99MODE=	-xc99=%all
 
-$(PROG) := LDLIBS +=	\
-	-lsocket	\
-	-lnsl		\
-	-ldlpi		\
-	-ldladm		\
-	-lmd		\
-	-lsunw_crypto	\
-	-luuid		\
-	-lvmmapi	\
-	-lz
+$(PROG) := LDLIBS += -lsocket -lnsl -ldlpi -ldladm -lmd -lsunw_crypto -luuid \
+	-lvmmapi -lz
 $(ZHYVE_PROG) := LDLIBS += -lnvpair
 $(MEVENT_TEST_PROG) := LDLIBS += -lsocket
 

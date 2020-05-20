@@ -23,6 +23,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright (c) 2015 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #ifndef	_SYS_MAC_H
@@ -86,6 +87,13 @@ typedef enum {
 	LINK_FLOWCTRL_TX,
 	LINK_FLOWCTRL_BI
 } link_flowctrl_t;
+
+typedef enum {
+	LINK_FEC_NONE		= 1 << 0,
+	LINK_FEC_AUTO		= 1 << 1,
+	LINK_FEC_RS		= 1 << 2,
+	LINK_FEC_BASE_R		= 1 << 3
+} link_fec_t;
 
 typedef enum {
 	LINK_TAGMODE_VLANONLY = 0,
@@ -239,6 +247,8 @@ typedef enum {
 	MAC_PROP_EN_25GFDX_CAP,
 	MAC_PROP_ADV_50GFDX_CAP,
 	MAC_PROP_EN_50GFDX_CAP,
+	MAC_PROP_EN_FEC_CAP,
+	MAC_PROP_ADV_FEC_CAP,
 	MAC_PROP_PRIVATE = -1
 } mac_prop_id_t;
 

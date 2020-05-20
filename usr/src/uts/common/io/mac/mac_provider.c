@@ -23,6 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -1523,6 +1524,22 @@ mac_prop_info_set_default_link_flowctrl(mac_prop_info_handle_t ph,
 		return;
 
 	ASSERT(pr->pr_default_size >= sizeof (link_flowctrl_t));
+
+	bcopy(&val, pr->pr_default, sizeof (val));
+
+	pr->pr_flags |= MAC_PROP_INFO_DEFAULT;
+}
+
+void
+mac_prop_info_set_default_fec(mac_prop_info_handle_t ph, link_fec_t val)
+{
+	mac_prop_info_state_t *pr = (mac_prop_info_state_t *)ph;
+
+	/* nothing to do if the caller doesn't want the default value */
+	if (pr->pr_default == NULL)
+		return;
+
+	ASSERT(pr->pr_default_size >= sizeof (link_fec_t));
 
 	bcopy(&val, pr->pr_default, sizeof (val));
 

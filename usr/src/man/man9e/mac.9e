@@ -10,8 +10,9 @@
 .\"
 .\"
 .\" Copyright 2019 Joyent, Inc.
+.\" Copyright 2020 RackTop Systems, Inc.
 .\"
-.Dd July 22, 2019
+.Dd May 11, 2020
 .Dt MAC 9E
 .Os
 .Sh NAME
@@ -894,6 +895,57 @@ it has configured the device, not what the device has actually
 negotiated.
 When setting the property, it should update the hardware and allow the link to
 potentially perform auto-negotiation again.
+.It Sy MAC_PROP_EN_FEC_CAP
+.Bd -filled -compact
+Type:
+.Sy link_fec_t |
+Permissions:
+.Sy Read/Write
+.Ed
+.Pp
+The
+.Sy MAC_PROP_EN_FEC_CAP
+property indicates which Forward Error Correction (FEC) code is advertised
+by the device.
+.Pp
+The
+.Sy link_fec_t
+is an enumeration that may be a combination of the following bit values:
+.Bl -tag -width Ds
+.It Sy LINK_FEC_NONE
+No FEC over the link.
+.It Sy LINK_FEC_AUTO
+The FEC coding to use is auto-negotiated,
+.Sy LINK_FEC_AUTO
+cannot be set along with any of the other values.
+This is the default setting the device driver should use.
+.It Sy LINK_FEC_RS
+The link may use Reed-Solomon FEC coding.
+.It Sy LINK_FEC_BASE_R
+The link may use Base-R coding, also common referred to as FireCode.
+.El
+.Pp
+When setting the property, it should update the hardware with the requested, or
+combination of requested codings.
+If a particular combination of codings is not supported by the hardware,
+the device driver should return
+.Er EINVAL .
+When retrieving this property, the device driver should return the current
+value of the property.
+.It Sy MAC_PROP_ADV_FEC_CAP
+.Bd -filled -compact
+Type:
+.Sy link_fec_t |
+Permissions:
+.Sy Read-Only
+.Ed
+.Pp
+The
+.Sy MAC_PROP_ADV_FEC_CAP
+has the same values as
+.Sy MAC_PROP_EN_FEC_CAP .
+The property indicates which Forward Error Correction (FEC) code has been
+negotiated over the link.
 .El
 .Pp
 The remaining properties are all about various auto-negotiation link

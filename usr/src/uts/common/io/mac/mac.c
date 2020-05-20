@@ -23,6 +23,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -3341,6 +3342,10 @@ mac_prop_check_size(mac_prop_id_t id, uint_t valsize, boolean_t is_range)
 	case MAC_PROP_FLOWCTRL:
 		minsize = sizeof (link_flowctrl_t);
 		break;
+	case MAC_PROP_ADV_FEC_CAP:
+	case MAC_PROP_EN_FEC_CAP:
+		minsize = sizeof (link_fec_t);
+		break;
 	case MAC_PROP_ADV_5000FDX_CAP:
 	case MAC_PROP_EN_5000FDX_CAP:
 	case MAC_PROP_ADV_2500FDX_CAP:
@@ -3526,6 +3531,28 @@ mac_set_prop(mac_handle_t mh, mac_prop_id_t id, char *name, void *val,
 		else
 			mip->mi_ldecay = learnval;
 		err = 0;
+		break;
+	}
+
+	case MAC_PROP_ADV_FEC_CAP:
+	case MAC_PROP_EN_FEC_CAP: {
+		link_fec_t fec;
+
+		ASSERT(valsize >= sizeof (link_fec_t));
+
+		/*
+		 * fec cannot be zero, and auto must be set exclusively.
+		 */
+		bcopy(val, &fec, sizeof (link_fec_t));
+		if (fec == 0)
+			return (EINVAL);
+		if ((fec & LINK_FEC_AUTO) != 0 && (fec & ~LINK_FEC_AUTO) != 0)
+			return (EINVAL);
+
+		if (mip->mi_callbacks->mc_callbacks & MC_SETPROP) {
+			err = mip->mi_callbacks->mc_setprop(mip->mi_driver,
+			    name, id, valsize, val);
+		}
 		break;
 	}
 
