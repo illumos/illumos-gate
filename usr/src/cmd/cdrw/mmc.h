@@ -26,8 +26,6 @@
 #ifndef	_MMC_H
 #define	_MMC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -156,9 +154,9 @@ int format_media(int fd);
 uint32_t read_format_capacity(int fd, uint_t *bsize);
 void reset_dev(int fd);
 
-int uscsi_error;		/* used for debugging failed uscsi */
+extern int uscsi_error;		/* used for debugging failed uscsi */
 
-#define	REZERO_UNIT_CMD 	0x01
+#define	REZERO_UNIT_CMD		0x01
 #define	FORMAT_UNIT_CMD		0x04
 #define	INQUIRY_CMD		0x12
 #define	MODE_SELECT_6_CMD	0x15
