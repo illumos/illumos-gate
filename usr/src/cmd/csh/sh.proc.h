@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * C shell - process structure declarations
  */
@@ -78,13 +76,4 @@ struct process	{
 #define	JOBDIR		0100		/* print job's dir if not the same */
 #define	AREASON		0200
 
-struct	process	proclist;		/* list head of all processes */
-bool	pnoprocesses;			/* pchild found nothing to wait for */
-
-struct	process *pholdjob;		/* one level stack of current jobs */
-
-struct	process *pcurrjob;		/* current job */
-struct	process	*pcurrent;		/* current job in table */
-struct	process *pprevious;		/* previous job in table */
-
-short	pmaxindex;			/* current maximum job index */
+extern struct	process *pcurrjob;	/* current job */

@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "sh.h"
 #include "sh.tconst.h"
 
@@ -150,9 +148,9 @@ asyn3(struct wordent *p1, struct wordent *p2)
 	redid = lex(&alout);
 	alhistp = alhistt = 0;
 	alvec = 0;
-	if (err) {
+	if (err_msg) {
 		freelex(&alout);
-		error("%s", gettext(err));
+		error("%s", gettext(err_msg));
 	}
 	if (p1->word[0] && eq(p1->word, alout.next->word)) {
 		tchar *cp = alout.next->word;
@@ -623,7 +621,7 @@ savep:
 		default:
 			if (l != 0 && !specp)
 				continue;
-			if (err == 0)
+			if (err_msg == NULL)
 				av[n] = savestr(p->word);
 			n++;
 			continue;

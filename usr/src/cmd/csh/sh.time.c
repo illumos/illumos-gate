@@ -12,10 +12,11 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "sh.h"
 #include "sh.tconst.h"
+
+struct timeval	time0;
+static struct rusage ru0;
 
 void ruadd(struct rusage *ru, struct rusage *ru2);
 void prusage(struct rusage *r0, struct rusage *r1, struct timeval *e,

@@ -13,8 +13,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "sh.h"
 #include "sh.dir.h"
 #include "sh.tconst.h"
@@ -30,9 +28,15 @@ void	dtildepr(tchar *, tchar *);
 void	dfree(struct directory *);
 void	dnewcwd(struct directory *);
 
+int	didchdir;
+bool	loginsh;
+bool	havhash2;
+struct varent shvhed;
+struct directory *dcwd;
 struct	directory dhead;		/* "head" of loop */
 int	printd;				/* force name to be printed */
 static tchar *fakev[] = { S_dirs, NOSTR };
+char	xhash2[HSHSIZ / 8];
 
 /*
  * dinit - initialize current working directory

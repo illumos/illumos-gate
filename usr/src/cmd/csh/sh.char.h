@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Macros to classify characters.
  */
@@ -35,7 +33,7 @@
 #define	isauxspZ 	0
 #endif
 extern unsigned short _cmap[];/* Defined in sh.char.c */
-unsigned int	Z; 	/* A place to save macro arg to avoid side-effect!*/
+extern unsigned int Z; 	/* A place to save macro arg to avoid side-effect!*/
 
 #define _Q	0x01		/* '" */
 #define _Q1	0x02		/* ` */

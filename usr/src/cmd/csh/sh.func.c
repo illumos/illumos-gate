@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "sh.h"
 #include <locale.h>	/* For LC_ALL */
 #include "sh.tconst.h"
@@ -49,6 +47,19 @@ struct limits {
 		1024,	S_kbytes,	/* "kbytes" */
 	-1,		0,
 };
+
+struct Bin	B;
+struct whyle	*whyles;
+bool		chkstop;
+bool		doneinp;
+bool		intty;
+bool		setintr;
+int		shpgrp;
+int		opgrp;
+off_t		lineloc;
+tchar		*evalp;
+tchar		**evalvec;
+tchar		*gointr;
 
 
 static int getval(struct limits *lp, tchar **v, rlim_t *);
