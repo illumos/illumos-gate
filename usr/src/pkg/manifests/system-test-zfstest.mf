@@ -2933,6 +2933,8 @@ file path=opt/zfs-tests/tests/functional/resilver/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/resilver/resilver.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/resilver/resilver_restart_001 \
     mode=0555
+file path=opt/zfs-tests/tests/functional/resilver/resilver_restart_002 \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/resilver/setup mode=0555
 file path=opt/zfs-tests/tests/functional/resilver/sysevent mode=0555
 file path=opt/zfs-tests/tests/functional/rootpool/cleanup mode=0555

@@ -105,7 +105,7 @@ log_onexit cleanup
 
 # Monitor for resilver start events and log them to $EVTFILE as they occur
 EVTFILE=$(mktemp /tmp/resilver_events.XXXXXX)
-EVTPID=$($SYSEVENT $EVTFILE)
+EVTPID=$($SYSEVENT -o $EVTFILE ESC_ZFS_resilver_start)
 log_must test -n "$EVTPID"
 
 log_must truncate -s $VDEV_FILE_SIZE ${VDEV_FILES[@]} $SPARE_VDEV_FILE

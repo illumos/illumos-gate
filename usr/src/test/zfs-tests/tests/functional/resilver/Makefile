@@ -19,6 +19,7 @@ PROG = sysevent
 
 SCRIPTS = cleanup \
 	resilver_restart_001 \
+	resilver_restart_002 \
 	setup
 
 include $(SRC)/cmd/Makefile.cmd
@@ -39,6 +40,8 @@ $(FILES) := FILEMODE = 0444
 
 CPPFLAGS += -D__EXTENSIONS__
 LDLIBS += -lsysevent
+
+CSTD = $(CSTD_GNU99)
 
 all: $(PROG)
 

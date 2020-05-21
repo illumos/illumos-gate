@@ -52,7 +52,6 @@ process_event(sysevent_t *ev)
 		errx(EXIT_FAILURE, "failed to retrieve sysevent metadata");
 
 	VERIFY0(strcmp(class, EC_ZFS));
-	VERIFY0(strcmp(subclass, ESC_ZFS_RESILVER_START));
 
 	flockfile(out);
 	(void) fprintf(out, "Received %s.%s event\n", class, subclass);
@@ -77,11 +76,8 @@ child_fatal(int fd, const char *msg, ...)
 }
 
 static void
-do_child(int fd)
+do_child(int fd, char * const subclasses[], size_t n)
 {
-	const char *subclasses[] = {
-		ESC_ZFS_RESILVER_START,
-	};
 	sysevent_handle_t *handle;
 	int ret = 0;
 
@@ -90,8 +86,8 @@ do_child(int fd)
 		    strerror(errno));
 	}
 
-	if (sysevent_subscribe_event(handle, EC_ZFS, subclasses,
-	    ARRAY_SIZE(subclasses)) != 0) {
+	if (sysevent_subscribe_event(handle, EC_ZFS,
+	    (const char **)subclasses, n) != 0) {
 		child_fatal(fd, "failed to subscribe to sysevents: %s",
 		    strerror(errno));
 	}
@@ -107,20 +103,39 @@ do_child(int fd)
 		(void) pause();
 }
 
-int
-main(int argc, char **argv)
+static void
+usage(const char *name)
 {
+	(void) fprintf(stderr, "Usage: %s [-o outfile] zfs_event...\n", name);
+	exit(2);
+}
+
+int
+main(int argc, char * const argv[])
+{
+	const char *outfile = NULL;
 	pid_t child;
 	int fds[2];
 	int ret = 0;
+	int c;
 
-	if (argc < 2) {
-		(void) fprintf(stderr, "Usage: %s outfile\n", argv[0]);
-		exit(EXIT_FAILURE);
+	while ((c = getopt(argc, argv, "o:")) != -1) {
+		switch (c) {
+		case 'o':
+			outfile = optarg;
+			break;
+		case '?':
+			(void) fprintf(stderr, "Invalid option -%c\n", optopt);
+			usage(argv[0]);
+		}
 	}
 
-	if ((out = fopen(argv[1], "w")) == NULL)
-		err(EXIT_FAILURE, "unable to open %s", argv[1]);
+	if (outfile != NULL) {
+		if ((out = fopen(optarg, "w")) == NULL)
+			err(EXIT_FAILURE, "unable to open %s", optarg);
+	} else {
+		out = stdout;
+	}
 
 	VERIFY0(pipe(fds));
 
@@ -128,7 +143,7 @@ main(int argc, char **argv)
 	case -1:
 		err(EXIT_FAILURE, "unable to fork");
 	case 0:
-		do_child(fds[1]);
+		do_child(fds[1], argv + optind, (size_t)(argc - optind));
 		break;
 	default:
 		break;
