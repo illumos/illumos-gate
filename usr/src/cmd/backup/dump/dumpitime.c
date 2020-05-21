@@ -12,17 +12,26 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "dump.h"
 
 #ifndef LOCK_EX
-static 	struct flock fl;
+static	struct flock fl;
 #define	flock(fd, flag) (fl.l_type = (flag), fcntl(fd, F_SETLKW, &fl))
 #define	LOCK_EX F_WRLCK
 #define	LOCK_SH F_RDLCK
 #define	LOCK_UN F_UNLCK
 #endif
+
+char		*disk;
+char		*dname;
+char		*increm;
+
+char		incno;
+char		lastincno;
+int		uflag;
+uint_t		msiz;
+u_offset_t	o_esize;
+u_offset_t	f_esize;
 
 /*
  * Print a date.  A date of 0 is the beginning of time (the "epoch").
@@ -32,8 +41,7 @@ static 	struct flock fl;
  * locale-independent.
  */
 char *
-prdate(d)
-	time_t	d;
+prdate(time_t d)
 {
 	static char buf[256];
 	struct tm *tm;
@@ -71,11 +79,7 @@ static int makeidate();
 #endif
 
 void
-#ifdef __STDC__
 inititimes(void)
-#else
-inititimes()
-#endif
 {
 	FILE *df;
 	int saverr;
@@ -98,10 +102,10 @@ inititimes()
 		if (errno == ENOENT)
 			msg(gettext(
 			    "Warning - dump record file `%s' does not exist\n"),
-				increm);
+			    increm);
 		else {
 			msg(gettext("Cannot open dump record file `%s': %s\n"),
-				increm, strerror(saverr));
+			    increm, strerror(saverr));
 			dumpabort();
 			/*NOTREACHED*/
 		}
@@ -119,8 +123,7 @@ inititimes()
 }
 
 static void
-readitimes(df)
-	FILE *df;
+readitimes(FILE *df)
 {
 	struct idates *idp;
 
@@ -141,11 +144,7 @@ readitimes(df)
 }
 
 void
-#ifdef __STDC__
 getitime(void)
-#else
-getitime()
-#endif
 {
 	struct	idates	*ip;
 	int	i;
@@ -164,7 +163,7 @@ getitime()
 
 	/* XGETTEXT:  #ifdef FDEBUG only */
 	msg(gettext("Looking for name %s in increm = %s for delta = %c\n"),
-		fname, increm, (uchar_t)incno);
+	    fname, increm, (uchar_t)incno);
 #endif
 	spcl.c_ddate = 0;
 	lastincno = '0';
@@ -189,11 +188,7 @@ getitime()
 }
 
 void
-#ifdef __STDC__
 putitime(void)
-#else
-putitime()
-#endif
 {
 	FILE		*df;
 	struct	idates	*itwalk;
@@ -232,7 +227,7 @@ putitime()
 	if (fseek(df, 0L, 0) < 0) {   /* rewind() was redefined in dumptape.c */
 		saverr = errno;
 		msg(gettext("%s: %s error:\n"),
-			increm, "fseek", strerror(saverr));
+		    increm, "fseek", strerror(saverr));
 		dumpabort();
 		/*NOTREACHED*/
 	}
@@ -240,7 +235,7 @@ putitime()
 	/* LINTED: won't dereference idatev if it is NULL (see readitimes) */
 	ITITERATE(i, itwalk) {
 		if (strncmp(fname, itwalk->id_name,
-				sizeof (itwalk->id_name)) != 0)
+		    sizeof (itwalk->id_name)) != 0)
 			continue;
 		if (itwalk->id_incno != incno)
 			continue;
@@ -251,7 +246,7 @@ putitime()
 	 */
 	nidates++;
 	idatev = (struct idates **)xrealloc((void *)idatev,
-		nidates * (size_t)sizeof (struct idates *));
+	    nidates * (size_t)sizeof (struct idates *));
 	itwalk = idatev[nidates - 1] =
 	    (struct idates *)xcalloc(1, sizeof (*itwalk));
 found:
@@ -276,22 +271,16 @@ found:
 }
 
 static void
-recout(file, what)
-	FILE	*file;
-	struct	idates	*what;
+recout(FILE *file, struct idates *what)
 {
 	time_t ddate = what->id_ddate;
 	/* must use ctime, so we can later use unctime() */
-	(void) fprintf(file, DUMPOUTFMT,
-		what->id_name,
-		(uchar_t)what->id_incno,
-		ctime(&ddate));
+	(void) fprintf(file, DUMPOUTFMT, what->id_name,
+	    (uchar_t)what->id_incno, ctime(&ddate));
 }
 
 static int
-getrecord(df, idatep)
-	FILE	*df;
-	struct	idates	*idatep;
+getrecord(FILE *df, struct idates *idatep)
 {
 	char		buf[BUFSIZ];
 
@@ -301,7 +290,7 @@ getrecord(df, idatep)
 	if (makeidate(idatep, buf) < 0) {
 		msg(gettext(
 		    "Malformed entry in dump record file `%s', line %d\n"),
-			increm, recno);
+		    increm, recno);
 		if (strcmp(increm, NINCREM)) {
 			msg(gettext("`%s' not a dump record file\n"), increm);
 			dumpabort();
@@ -312,17 +301,15 @@ getrecord(df, idatep)
 
 #ifdef FDEBUG
 	msg("getrecord: %s %c %s\n",
-		idatep->id_name,
-		(uchar_t)idatep->id_incno,
-		prdate(idatep->id_ddate));
+	    idatep->id_name,
+	    (uchar_t)idatep->id_incno,
+	    prdate(idatep->id_ddate));
 #endif
 	return (0);
 }
 
 static int
-makeidate(ip, buf)
-	struct	idates	*ip;
-	char	*buf;
+makeidate(struct idates	*ip, char *buf)
 {
 	char	un_buf[128];	/* size must be >= second one in DUMPINFMT */
 
@@ -354,8 +341,7 @@ makeidate(ip, buf)
  * hence the estimate may be high.
  */
 void
-est(ip)
-	struct dinode *ip;
+est(struct dinode *ip)
 {
 	u_offset_t s, t;
 
@@ -382,16 +368,15 @@ est(ip)
 		/* calculate the number of indirect blocks on the dump tape */
 		/* LINTED: spurious complaint sign-extending 32 to 64 bits */
 		s += d_howmany(t -
-			(unsigned)(NDADDR * sblock->fs_bsize / tp_bsize),
-			(unsigned)TP_NINDIR);
+		    (unsigned)(NDADDR * sblock->fs_bsize / tp_bsize),
+		    (unsigned)TP_NINDIR);
 	}
 	f_esize += s;
 }
 
 /*ARGSUSED*/
 void
-bmapest(map)
-	uchar_t *map;
+bmapest(uchar_t *map)
 {
 	o_esize++;
 	/* LINTED: spurious complaint sign-extending 32 to 64 bits */

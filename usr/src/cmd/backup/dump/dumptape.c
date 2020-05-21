@@ -41,6 +41,7 @@
 
 #define	SLEEPMS		50
 
+int newtape;
 static uint_t writesize;	/* size of malloc()ed buffer for tape */
 static ino_t inos[TP_NINOS];	/* starting inodes on each tape */
 
@@ -153,7 +154,6 @@ int caught;			/* caught signal -- imported by mapfile() */
 extern	int xflag;
 #endif
 
-#ifdef __STDC__
 static void cmdwrterr(void);
 static void cmdrderr(void);
 static void freetape(void);
@@ -176,30 +176,6 @@ static void onxfsz(int);
 static void dowrite(int);
 static void checkpoint(struct bdesc *, int);
 static ssize_t atomic(int (*)(), int, char *, int);
-#else
-static void cmdwrterr();
-static void cmdrderr();
-static void freetape();
-static void bufclear();
-static pid_t setuparchive();
-static pid_t setupwriter();
-static void nextslave();
-static void tperror();
-static void rollforward();
-static void nap();
-static void alrm();
-static void just_rewind();
-static void killall();
-static void proceed();
-static void die();
-static void enslave();
-static void wait_our_turn();
-static void dumpoffline();
-static void onxfsz();
-static void dowrite();
-static void checkpoint();
-static ssize_t atomic();
-#endif
 
 static size_t tapesize;
 
@@ -208,9 +184,6 @@ static size_t tapesize;
  * allocated on page boundaries for tape write() efficiency.
  */
 void
-#ifdef __STDC__
-#else
-#endif
 alloctape(void)
 {
 	struct slaves *slavep;
@@ -223,7 +196,7 @@ alloctape(void)
 	writesize = ntrec * tp_bsize;
 	if (!printsize)
 		msg(gettext("Writing %d Kilobyte records\n"),
-			writesize / TP_BSIZE_MIN);
+		    writesize / TP_BSIZE_MIN);
 
 	/*
 	 * set up shared memory seg for here and child
@@ -232,7 +205,7 @@ alloctape(void)
 	if (mapfd == -1) {
 		saverr = errno;
 		msg(gettext("Cannot open `%s': %s\n"),
-			"/dev/zero", strerror(saverr));
+		    "/dev/zero", strerror(saverr));
 		dumpabort();
 		/*NOTREACHED*/
 	}
@@ -312,11 +285,7 @@ alloctape(void)
 }
 
 static void
-#ifdef __STDC__
 freetape(void)
-#else
-freetape()
-#endif
 {
 	if (shared == NULL)
 		return;
@@ -330,11 +299,7 @@ freetape()
  * before a pass to dump active files.
  */
 void
-#ifdef __STDC__
 reset(void)
-#else
-reset()
-#endif
 {
 	bufclear();
 
@@ -355,11 +320,7 @@ reset()
 }
 
 static void
-#ifdef __STDC__
 bufclear(void)
-#else
-bufclear()
-#endif
 {
 	struct bdesc *bp;
 	int i;
@@ -377,7 +338,7 @@ bufclear()
 	    (*current < &bufp[0] || *current > &bufp[NBUF*ntrec])) {
 		/* ANSI string catenation, to shut cstyle up */
 		msg(gettext("bufclear: current buffer pointer (0x%x) "
-			"out of range of buffer\naddresses (0x%x - 0x%x)\n"),
+		    "out of range of buffer\naddresses (0x%x - 0x%x)\n"),
 		    *current, &bufp[0], &bufp[NBUF*ntrec]);
 		dumpabort();
 		/*NOTREACHED*/
@@ -430,7 +391,7 @@ setuparchive(void)
 		if (lseek64(archivefd, lf_archoffset, 0) < 0) {
 			saverr = errno;
 			msg(gettext(
-				    "Cannot position archive file `%s' : %s\n"),
+			    "Cannot position archive file `%s' : %s\n"),
 			    archivefile, strerror(saverr));
 			dumpabort();
 			/*NOTREACHED*/
@@ -438,7 +399,7 @@ setuparchive(void)
 		if (ftruncate64(archivefd, lf_archoffset) < 0) {
 			saverr = errno;
 			msg(gettext(
-				    "Cannot truncate archive file `%s' : %s\n"),
+			    "Cannot truncate archive file `%s' : %s\n"),
 			    archivefile, strerror(saverr));
 			dumpabort();
 			/*NOTREACHED*/
@@ -509,7 +470,7 @@ setuparchive(void)
 				}
 
 				if (fstat64(archivefd, &stats) < 0)
-				    stats.st_size = -1;
+					stats.st_size = -1;
 
 				/* cast to keep lint&printf happy */
 				msg(gettext(
@@ -557,14 +518,14 @@ setupwriter(void)
 	if (pipe(cmd) < 0) {
 		saverr = errno;
 		msg(gettext("%s: %s error: %s\n"),
-			"setupwriter", "pipe", strerror(saverr));
+		    "setupwriter", "pipe", strerror(saverr));
 		return (0);
 	}
 	sighold(SIGINT);
 	if ((pid = fork()) < 0) {
 		saverr = errno;
 		msg(gettext("%s: %s error: %s\n"),
-			"setupwriter", "fork", strerror(saverr));
+		    "setupwriter", "fork", strerror(saverr));
 		return (0);
 	}
 	if (pid > 0) {
@@ -608,11 +569,7 @@ setupwriter(void)
 }
 
 void
-#ifdef __STDC__
 spclrec(void)
-#else
-spclrec()
-#endif
 {
 	int s, i;
 	int32_t *ip;
@@ -742,9 +699,9 @@ tperror(int sig)
 		if (tapeout && (isrewind(to) || offline)) {
 			/* ANSI string catenation, to shut cstyle up */
 			msg(gettext("This tape will rewind.  After "
-				    "it is rewound,\nreplace the faulty tape "
-				    "with a new one;\nthis dump volume will "
-				    "be rewritten.\n"));
+			    "it is rewound,\nreplace the faulty tape "
+			    "with a new one;\nthis dump volume will "
+			    "be rewritten.\n"));
 		}
 	} else {
 		broadcast(gettext("TAPE VERIFICATION ERROR!\n"));
@@ -755,7 +712,7 @@ tperror(int sig)
 			/*NOTREACHED*/
 		}
 		msg(gettext(
-			"This tape will be rewritten and then verified\n"));
+		    "This tape will be rewritten and then verified\n"));
 	}
 	killall();
 	trewind();
@@ -784,8 +741,9 @@ toslave(void (*fn)(), ino_t inumber)
 		if (wasactive) {
 			active++;
 			msg(gettext(
-		"The file at inode `%lu' was active and will be recopied\n"),
-				slp->sl_req->ir_inumber);
+			    "The file at inode `%lu' was active and will "
+			    "be recopied\n"),
+			    slp->sl_req->ir_inumber);
 			/* LINTED: 32-bit to 8-bit assignment ok */
 			BIS(slp->sl_req->ir_inumber, activemap);
 		}
@@ -818,11 +776,7 @@ dospcl(ino_t inumber)
 }
 
 static void
-#ifdef __STDC__
 nextslave(void)
-#else
-nextslave()
-#endif
 {
 	if (++rotor >= SLAVES) {
 		rotor = 0;
@@ -831,11 +785,7 @@ nextslave()
 }
 
 void
-#ifdef __STDC__
 flushcmds(void)
-#else
-flushcmds()
-#endif
 {
 	int i;
 	int wasactive;
@@ -859,7 +809,7 @@ flushcmds()
 			active++;
 			msg(gettext(
 			    "inode %d was active and will be recopied\n"),
-				slp->sl_req->ir_inumber);
+			    slp->sl_req->ir_inumber);
 			/* LINTED: 32-bit to 8-bit assignment ok */
 			BIS(slp->sl_req->ir_inumber, activemap);
 		}
@@ -868,11 +818,7 @@ flushcmds()
 }
 
 void
-#ifdef __STDC__
 flusht(void)
-#else
-flusht()
-#endif
 {
 	sigset_t block_set, oset;	/* hold SIGUSR1 and atomically sleep */
 
@@ -973,7 +919,7 @@ rollforward(int sig)
 		if (lf_archoffset < 0) {
 			int saverr = errno;
 			msg(gettext("Cannot position archive file `%s': %s\n"),
-				archivefile, strerror(saverr));
+			    archivefile, strerror(saverr));
 			dumpabort();
 			/*NOTREACHED*/
 		}
@@ -984,7 +930,7 @@ rollforward(int sig)
 
 	if (dumpstate == DS_START) {
 		msg(gettext(
-			"Tape too short: changing volumes and restarting\n"));
+		    "Tape too short: changing volumes and restarting\n"));
 		reset();
 	}
 
@@ -1024,11 +970,7 @@ alrm(int sig)
 }
 
 void
-#ifdef __STDC__
 nextdevice(void)
-#else
-nextdevice()
-#endif
 {
 	char	*cp;
 
@@ -1112,7 +1054,7 @@ isrewind(int f)
 		if (fstat64(f, &sbuf) < 0) {
 			msg(gettext(
 			    "Cannot obtain status of output device `%s'\n"),
-				tape);
+			    tape);
 			dumpabort();
 			/*NOTREACHED*/
 		}
@@ -1122,11 +1064,7 @@ isrewind(int f)
 }
 
 static void
-#ifdef __STDC__
 just_rewind(void)
-#else
-just_rewind()
-#endif
 {
 	struct slaves *slavep;
 	char *rewinding = gettext("Tape rewinding\n");
@@ -1179,11 +1117,7 @@ just_rewind()
 }
 
 void
-#ifdef __STDC__
 trewind(void)
-#else
-trewind()
-#endif
 {
 	(void) timeclock((time_t)0);
 	if (offline && (!verify || doingverify)) {
@@ -1200,11 +1134,7 @@ trewind()
 }
 
 void
-#ifdef __STDC__
 close_rewind(void)
-#else
-close_rewind()
-#endif
 {
 	char *rewinding = gettext("Tape rewinding\n");
 
@@ -1238,11 +1168,7 @@ close_rewind()
 }
 
 void
-#ifdef __STDC__
 changevol(void)
-#else
-changevol()
-#endif
 {
 	char buf1[3000], buf2[3000];
 	char volname[LBLSIZE+1];
@@ -1408,7 +1334,7 @@ restore_check_point:
 	if (childpid < 0) {
 		msg(gettext(
 		    "Context-saving fork failed in parent %ld\n"),
-			(long)parentpid);
+		    (long)parentpid);
 		Exit(X_ABORT);
 	}
 	if (childpid != 0) {
@@ -1426,7 +1352,7 @@ restore_check_point:
 		/* XGETTEXT:  #ifdef TDEBUG only */
 		msg(gettext(
 		    "Volume: %d; parent process: %ld child process %ld\n"),
-			tapeno+1, (long)parentpid, (long)childpid);
+		    tapeno+1, (long)parentpid, (long)childpid);
 #endif /* TDEBUG */
 		for (;;) {
 			waitproc = waitpid(0, &status, 0);
@@ -1523,7 +1449,7 @@ restore_check_point:
 		/* XGETTEXT:  #ifdef TDEBUG only */
 		msg(gettext(
 		    "Child on Volume %d has parent %ld, my pid = %ld\n"),
-			tapeno+1, (long)parentpid, (long)getpid());
+		    tapeno+1, (long)parentpid, (long)getpid());
 #endif
 		(void) snprintf(buf, sizeof (buf), gettext(
 "Cannot open `%s'.  Do you want to retry the open?: (\"yes\" or \"no\") "),
@@ -1585,10 +1511,11 @@ restore_check_point:
 					 * The tape is rewinding;
 					 * we're screwed.
 					 */
-				    msg(gettext(
-			    "Cannot position tape using rewind device!\n"));
-				    dumpabort();
-				    /*NOTREACHED*/
+					msg(gettext(
+					    "Cannot position tape using "
+					    "rewind device!\n"));
+					dumpabort();
+					/*NOTREACHED*/
 				} else {
 					sv.sv_handler = alrm;
 					(void) sigvec(SIGALRM, &sv, &osv);
@@ -1670,7 +1597,7 @@ restore_check_point:
 		} else if (tapeno > 1) {
 			msg(gettext(
 			    "Volume %d begins with blocks from inode %lu\n"),
-				tapeno, chkpt.sl_inos);
+			    tapeno, chkpt.sl_inos);
 		}
 		(void) timeclock((time_t)1);
 		(void) time(tstart_writing);
@@ -1679,11 +1606,7 @@ restore_check_point:
 }
 
 void
-#ifdef __STDC__
 dumpabort(void)
-#else
-dumpabort()
-#endif
 {
 
 	if (master && master != getpid())
@@ -1723,17 +1646,13 @@ Exit(status)
 
 	/* XGETTEXT:  #ifdef TDEBUG only */
 	msg(gettext("pid = %ld exits with status %d\n"),
-		(long)getpid(), status);
+	    (long)getpid(), status);
 #endif /* TDEBUG */
 	exit(status);
 }
 
 static void
-#ifdef __STDC__
 killall(void)
-#else
-killall()
-#endif
 {
 	struct slaves *slavep;
 
@@ -1744,7 +1663,7 @@ killall()
 
 			/* XGETTEXT:  #ifdef TDEBUG only */
 			msg(gettext("Slave child %ld killed\n"),
-				(long)slavep->sl_slavepid);
+			    (long)slavep->sl_slavepid);
 #endif
 		}
 	if (writepid) {
@@ -1780,11 +1699,7 @@ die(int sig)
 }
 
 static void
-#ifdef __STDC__
 enslave(void)
-#else
-enslave()
-#endif
 {
 	int cmd[2];			/* file descriptors */
 	int i;
@@ -1871,7 +1786,7 @@ enslave()
 				saverr = errno;
 				msg(gettext(
 				    "Cannot open dump device `%s': %s\n"),
-					disk, strerror(saverr));
+				    disk, strerror(saverr));
 				dumpabort();
 				/*NOTREACHED*/
 			}
@@ -1929,11 +1844,7 @@ enslave()
 }
 
 static void
-#ifdef __STDC__
 wait_our_turn(void)
-#else
-wait_our_turn()
-#endif
 {
 	(void) sighold(SIGUSR1);
 
@@ -2108,7 +2019,7 @@ dowrite(int cmd)
 					    gettext(
 		    "Verification error %ld feet into tape %d\n"),
 					    (cartridge ? asize/tracks :
-						asize)/120L,
+					    asize)/120L,
 					    tapeno);
 				else
 					(void) snprintf(buf, sizeof (buf),
@@ -2127,7 +2038,7 @@ dowrite(int cmd)
 					    gettext(
 			"Write error %ld feet into tape %d\n"),
 					    (cartridge ? asize/tracks :
-						asize)/120L, tapeno);
+					    asize)/120L, tapeno);
 				else
 					(void) snprintf(buf, sizeof (buf),
 					    gettext(
@@ -2174,13 +2085,12 @@ dowrite(int cmd)
 				if (sp->s_spcl.c_type != TS_ADDR) {
 					lastnonaddr = sp->s_spcl.c_type;
 					lastnonaddrm =
-						sp->s_spcl.c_dinode.di_mode;
+					    sp->s_spcl.c_dinode.di_mode;
 					if (sp->s_spcl.c_type != TS_TAPE)
 						chkpt.sl_offset = 0;
 				}
 				chkpt.sl_count = sp->s_spcl.c_count;
-				bcopy((char *)sp,
-					(char *)&spcl, sizeof (spcl));
+				bcopy((char *)sp, (char *)&spcl, sizeof (spcl));
 				mp = recmap;
 				endmp = &recmap[spcl.c_count];
 				count = 0;
@@ -2385,11 +2295,7 @@ atomic(int (*func)(), int fd, char *buf, int count)
 }
 
 void
-#ifdef __STDC__
 positiontape(char *msgbuf)
-#else
-positiontape(char *msgbuf)
-#endif
 {
 	/* Static as never change, no need to waste stack space */
 	static struct mtget mt;
@@ -2455,22 +2361,14 @@ positiontape(char *msgbuf)
 }
 
 static void
-#ifdef __STDC__
 cmdwrterr(void)
-#else
-cmdwrterr()
-#endif
 {
 	int saverr = errno;
 	msg(gettext("Error writing command pipe: %s\n"), strerror(saverr));
 }
 
 static void
-#ifdef __STDC__
 cmdrderr(void)
-#else
-cmdrderr()
-#endif
 {
 	int saverr = errno;
 	msg(gettext("Error reading command pipe: %s\n"), strerror(saverr));

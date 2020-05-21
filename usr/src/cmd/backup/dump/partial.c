@@ -24,32 +24,20 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "dump.h"
 #include <ftw.h>
 #include <ulimit.h>
 
+dev_t partial_dev;
 static int partial;
 
-#ifdef __STDC__
 static dev_t devfromopts(struct mntent *);
 static int lf_mark_root(dev_t, char *);
 static int lf_ftw_mark(const char *, const struct stat64 *, int);
 static void markino(ino_t);
-#else
-static dev_t devfromopts();
-static int lf_mark_root();
-static int lf_ftw_mark();
-static void markino();
-#endif
 
 void
-#ifdef __STDC__
 partial_check(void)
-#else
-partial_check()
-#endif
 {
 	struct mntent *mnt;
 	struct stat64 st;
@@ -92,8 +80,7 @@ partial_check()
  *  extract the device id and avoid having to stat.
  */
 static dev_t
-devfromopts(mnt)
-	struct mntent *mnt;
+devfromopts(struct mntent *mnt)
 {
 	char *str;
 
@@ -105,9 +92,7 @@ devfromopts(mnt)
 }
 
 int
-partial_mark(argc, argv)
-	int argc;
-	char **argv;
+partial_mark(int argc, char **argv)
 {
 	char *path;
 	struct stat64 st;
@@ -119,9 +104,9 @@ partial_mark(argc, argv)
 		path = *argv++;
 
 		if (stat64(path, &st) < 0 ||
-			st.st_dev != partial_dev) {
+		    st.st_dev != partial_dev) {
 			msg(gettext("`%s' is not on dump device `%s'\n"),
-				path, disk);
+			    path, disk);
 			dumpabort();
 			/*NOTREACHED*/
 		}
@@ -139,7 +124,7 @@ partial_mark(argc, argv)
 		    < 0) {
 			int saverr = errno;
 			msg(gettext("Error in %s (%s)\n"),
-				"ftw", strerror(saverr));
+			    "ftw", strerror(saverr));
 			dumpabort();
 			/*NOTREACHED*/
 		}
@@ -150,9 +135,7 @@ partial_mark(argc, argv)
 
 /* mark directories between target and root */
 static int
-lf_mark_root(dev, path)
-	dev_t dev;
-	char *path;
+lf_mark_root(dev_t dev, char *path)
 {
 	struct stat64 st;
 	char dotdot[MAXPATHLEN + 16];
@@ -182,8 +165,8 @@ lf_mark_root(dev, path)
 	/* keep marking parent until we hit mount point */
 	do {
 		if (stat64(dotdot, &st) < 0 ||
-			(st.st_mode & S_IFMT) != S_IFDIR ||
-			st.st_dev != dev)
+		    (st.st_mode & S_IFMT) != S_IFDIR ||
+		    st.st_dev != dev)
 			return (1);
 		markino(st.st_ino);
 		if (strlen(dotdot) > (sizeof (dotdot) - 4))
@@ -196,15 +179,7 @@ lf_mark_root(dev, path)
 
 /*ARGSUSED*/
 static int
-lf_ftw_mark(name, st, flag)
-#ifdef __STDC__
-	const char *name;
-	const struct stat64 *st;
-#else
-	char *name;
-	struct stat64 *st;
-#endif
-	int flag;
+lf_ftw_mark(const char *name, const struct stat64 *st, int flag)
 {
 	if (flag != FTW_NS) {
 		/* LINTED ufs only uses the lower 32 bits */
@@ -214,8 +189,7 @@ lf_ftw_mark(name, st, flag)
 }
 
 static void
-markino(i)
-	ino_t i;
+markino(ino_t i)
 {
 	struct dinode *dp;
 

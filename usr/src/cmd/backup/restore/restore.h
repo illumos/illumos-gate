@@ -171,7 +171,7 @@ typedef struct _rstdirdesc {
 /*
  * The entry describes the next file available on the tape
  */
-struct context {
+extern struct context {
 	char	*name;		/* name of file */
 	ino_t	ino;		/* inumber of file */
 	struct	dinode *dip;	/* pointer to inode */

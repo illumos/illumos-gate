@@ -12,33 +12,24 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "dump.h"
 #include <sys/file.h>
 #include <sys/mman.h>
 
-#ifdef __STDC__
 static void lf_dmpindir(daddr32_t, int, u_offset_t *);
 static void indir(daddr32_t, int, u_offset_t *);
 static void lf_blksout(daddr32_t *, u_offset_t);
 static void lf_dumpinode(struct dinode *);
 static void dsrch(daddr32_t, ulong_t, u_offset_t);
 void lf_dump(struct dinode *);
-#else
-static void lf_dmpindir();
-static void indir();
-static void lf_blksout();
-static void dsrch();
-void lf_dump();
-#endif
 
+int	dadded;
+int	nsubdir;
+int	shortmeta;
 static	char msgbuf[256];
 
 void
-pass(fn, map)
-	void (*fn)(struct dinode *);
-	uchar_t *map;
+pass(void (*fn)(struct dinode *), uchar_t *map)
 {
 	int bits;
 	ino_t maxino;
@@ -84,8 +75,7 @@ restart:
 }
 
 void
-mark(ip)
-	struct dinode *ip;
+mark(struct dinode *ip)
 {
 	int f;
 
@@ -118,8 +108,7 @@ mark(ip)
 }
 
 void
-active_mark(ip)
-	struct dinode *ip;
+active_mark(struct dinode *ip)
 {
 	int f;
 
@@ -161,8 +150,7 @@ static struct shcount {
 static struct shcount *shc = NULL;
 
 void
-markshad(ip)
-	struct dinode *ip;
+markshad(struct dinode *ip)
 {
 	ino_t shadow;
 
@@ -195,8 +183,7 @@ markshad(ip)
 }
 
 void
-estshad(ip)
-	struct dinode *ip;
+estshad(struct dinode *ip)
 {
 	u_offset_t esizeprime;
 	u_offset_t tmpesize;
@@ -240,8 +227,7 @@ freeshad()
 }
 
 void
-add(ip)
-	struct	dinode	*ip;
+add(struct dinode *ip)
 {
 	int i;
 	u_offset_t filesize;
@@ -292,10 +278,7 @@ add(ip)
 }
 
 static void
-indir(d, n, filesize)
-	daddr32_t d;
-	int n;
-	u_offset_t *filesize;
+indir(daddr32_t d, int n, u_offset_t *filesize)
 {
 	int i;
 	daddr32_t idblk[MAXNINDIR];
@@ -344,15 +327,13 @@ blocks than valid maximum.\n"));
 }
 
 void
-dirdump(ip)
-	struct dinode *ip;
+dirdump(struct dinode *ip)
 {
 	/* watchout for dir inodes deleted and maybe reallocated */
 	if (((ip->di_mode & IFMT) != IFDIR &&
 	    (ip->di_mode & IFMT) != IFATTRDIR) || ip->di_nlink < 2) {
 		(void) snprintf(msgbuf, sizeof (msgbuf), gettext(
-		    "Warning - directory at inode `%lu' vanished!\n"),
-			ino);
+		    "Warning - directory at inode `%lu' vanished!\n"), ino);
 		msg(msgbuf);
 		return;
 	}
@@ -362,18 +343,16 @@ dirdump(ip)
 static u_offset_t loffset; /* current offset in file (ufsdump) */
 
 static void
-lf_dumpmeta(ip)
-	struct dinode *ip;
+lf_dumpmeta(struct dinode *ip)
 {
 	if ((ip->di_shadow == 0) || shortmeta)
-	    return;
+		return;
 
 	lf_dumpinode(getino((ino_t)(unsigned)(ip->di_shadow)));
 }
 
 int
-hasshortmeta(ip)
-	struct dinode **ip;
+hasshortmeta(struct dinode **ip)
 {
 	ino_t savino;
 	int rc;
@@ -388,8 +367,7 @@ hasshortmeta(ip)
 }
 
 void
-lf_dumpinode(ip)
-    struct dinode *ip;
+lf_dumpinode(struct dinode *ip)
 {
 	int i;
 	u_offset_t size;
@@ -425,8 +403,7 @@ lf_dumpinode(ip)
 }
 
 void
-lf_dump(ip)
-	struct dinode *ip;
+lf_dump(struct dinode *ip)
 {
 
 	if ((!BIT(ino, nodmap)) && (!BIT(ino, shamap)))
@@ -460,10 +437,7 @@ lf_dump(ip)
 }
 
 static void
-lf_dmpindir(blk, lvl, size)
-	daddr32_t blk;
-	int lvl;
-	u_offset_t *size;
+lf_dmpindir(daddr32_t blk, int lvl, u_offset_t *size)
 {
 	int i;
 	u_offset_t cnt;
@@ -507,9 +481,7 @@ blocks than valid maximum.\n"));
 }
 
 static void
-lf_blksout(blkp, bytes)
-	daddr32_t *blkp;
-	u_offset_t bytes;
+lf_blksout(daddr32_t *blkp, u_offset_t bytes)
 {
 	u_offset_t i;
 	u_offset_t tbperfsb = (unsigned)(sblock->fs_bsize / tp_bsize);
@@ -620,9 +592,7 @@ lf_blksout(blkp, bytes)
 }
 
 void
-bitmap(map, typ)
-	uchar_t *map;
-	int typ;
+bitmap(uchar_t *map, int typ)
 {
 	int i;
 	u_offset_t count;
@@ -653,10 +623,7 @@ bitmap(map, typ)
 }
 
 static void
-dsrch(d, size, filesize)
-	daddr32_t d;
-	ulong_t size; 	/* block size */
-	u_offset_t filesize;
+dsrch(daddr32_t d, ulong_t size, u_offset_t filesize)
 {
 	struct direct *dp;
 	struct dinode *ip;
@@ -688,8 +655,8 @@ dsrch(d, size, filesize)
 		dp = (struct direct *)(dblk + loc);
 		if (dp->d_reclen == 0) {
 			(void) snprintf(msgbuf, sizeof (msgbuf), gettext(
-		    "Warning - directory at inode `%lu' is corrupted\n"),
-				ino);
+			    "Warning - directory at inode `%lu' is "
+			    "corrupted\n"), ino);
 			msg(msgbuf);
 			break;
 		}
@@ -734,8 +701,7 @@ dsrch(d, size, filesize)
 #define	CACHESIZE 32
 
 struct dinode *
-getino(ino)
-	ino_t ino;
+getino(ino_t ino)
 {
 	static ino_t minino, maxino;
 	static struct dinode itab[MAXINOPB];
@@ -794,10 +760,7 @@ getino(ino)
 
 
 void
-bread(da, ba, cnt)
-diskaddr_t da;
-uchar_t	*ba;
-size_t	cnt;
+bread(diskaddr_t da, uchar_t *ba, size_t cnt)
 {
 	caddr_t maddr;
 	uchar_t *dest;
@@ -848,7 +811,7 @@ size_t	cnt;
 	}
 
 	if (read(fi, ba, (size_t)cnt) == (size_t)cnt)
-	    return;
+		return;
 
 	while (cnt != 0) {
 

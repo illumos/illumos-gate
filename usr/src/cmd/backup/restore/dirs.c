@@ -18,6 +18,8 @@
 #include <unistd.h>
 #include <utime.h>
 
+struct context curfile;
+
 /*
  * Symbol table of directories read from tape.
  */

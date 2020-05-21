@@ -43,6 +43,7 @@ static int	numtrec;	/* # of logical blocks in current tape record */
 static char	*tbf = NULL;
 static size_t	tbfsize = 0;
 static int	recsread;
+union		u_spcl u_spcl;
 static union	u_spcl endoftapemark;
 static struct	s_spcl dumpinfo;
 static long	blksread;	/* # of logical blocks actually read/touched */
@@ -1233,18 +1234,14 @@ metaset(char *name)
 }
 
 void
-metaget(data, size)
-	char **data;
-	size_t *size;
+metaget(char **data, size_t *size)
 {
 	*data = metadata;
 	*size = metasize;
 }
 
 static void
-fsd_acl(name, aclp, size)
-	char *name, *aclp;
-	unsigned size;
+fsd_acl(char *name, char *aclp, unsigned size)
 {
 	static aclent_t *aclent = NULL;
 	ufs_acl_t *diskacl;
