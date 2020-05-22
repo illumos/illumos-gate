@@ -46,42 +46,25 @@ extern "C" {
 #define	TRIPLET(u, m, l)	((int)((((u))&0xff<<16) + \
 				(((m)&0xff)<<8) + (l&0xff)))
 #if	defined(i386)
-diskaddr_t	altsec_offset;	/* Alternate sector offset */
+extern diskaddr_t	altsec_offset;	/* Alternate sector offset */
 #endif	/* defined(i386) */
 
-#ifdef	__STDC__
 /*
  *	Local prototypes for ANSI C compilers
  */
 
 #if	defined(i386)
-int	ata_rdwr(int, int, diskaddr_t, int, caddr_t, int, int *);
-#else	/* defined(i386) */
-static int	ata_rdwr(int, int, diskaddr_t, int, caddr_t, int, int *);
+#define	_STATIC
+#else
+#define	_STATIC	static
 #endif	/* defined(i386) */
+
+_STATIC int	ata_rdwr(int, int, diskaddr_t, int, caddr_t, int, int *);
 
 int	ata_ex_man(struct defect_list *);
 int	ata_ex_grown(struct defect_list *);
 int	ata_read_defect_data(struct defect_list *, int);
 int	apply_chg_list(int, int, uchar_t *, uchar_t *, struct chg_list *);
-
-#else /* ! _STDC_ */
-
-#if	defined(i386)
-int	ata_rdwr();
-int	ata_ex_cur();
-#else	/* defined(i386) */
-static int	ata_rdwr();
-static int	ata_ex_cur();
-#endif	/* defined(i386) */
-
-int	ata_ck_format();
-int	ata_ex_man();
-int	ata_ex_grown();
-int	ata_read_defect_data();
-int	apply_chg_list();
-
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

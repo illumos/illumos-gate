@@ -56,25 +56,18 @@
 
 #include "menu_fdisk.h"
 
+diskaddr_t altsec_offset;
+
 int	wr_altsctr();
 int	read_altsctr();
 int	updatebadsec();
 
-#ifdef  __STDC__
 static int	ata_ck_format(void);
 #ifdef i386
 static int	ata_ex_cur(struct defect_list *);
 static int	ata_wr_cur(struct defect_list *);
 static int	ata_repair(diskaddr_t, int);
 #endif /* i386 */
-#else /* __STDC__ */
-static int	ata_ck_format();
-#ifdef i386
-static int	ata_ex_cur();
-static int	ata_wr_cur();
-static int	ata_repair();
-#endif /* i386 */
-#endif
 
 struct  ctlr_ops ataops = {
 #if defined(sparc)
@@ -138,15 +131,9 @@ static char *dadkrawioerrs[] = {
 	};
 
 /*ARGSUSED6*/
-#if	defined(i386)
-int
+_STATIC int
 ata_rdwr(int dir, int fd, diskaddr_t blk64, int secnt, caddr_t bufaddr,
-		int flags, int *xfercntp)
-#else	/* defined(i386) */
-static int
-ata_rdwr(int dir, int fd, diskaddr_t blk64, int secnt, caddr_t bufaddr,
-		int flags, int *xfercntp)
-#endif	/* defined(i386) */
+    int flags, int *xfercntp)
 {
 	int	tmpsec;
 	struct dadkio_rwcmd	dadkio_rwcmd;
@@ -159,7 +146,7 @@ ata_rdwr(int dir, int fd, diskaddr_t blk64, int secnt, caddr_t bufaddr,
 
 	/* Doing raw read */
 	dadkio_rwcmd.cmd = (dir == DIR_READ) ? DADKIO_RWCMD_READ :
-					DADKIO_RWCMD_WRITE;
+	    DADKIO_RWCMD_WRITE;
 	dadkio_rwcmd.blkaddr = blkno;
 	dadkio_rwcmd.buflen  = tmpsec;
 	dadkio_rwcmd.flags   = flags;
@@ -204,7 +191,7 @@ ata_rdwr(int dir, int fd, diskaddr_t blk64, int secnt, caddr_t bufaddr,
 	if (dadkio_rwcmd.status.status) {
 		if ((flags & F_SILENT) == 0)
 			err_print(dadkrawioerrs[dadkio_rwcmd.status.status],
-				dadkio_rwcmd.status.failed_blk);
+			    dadkio_rwcmd.status.failed_blk);
 		return (1);
 	}
 	return (0);

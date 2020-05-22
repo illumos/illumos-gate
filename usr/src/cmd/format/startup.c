@@ -62,6 +62,26 @@ extern	long	strtol();
 
 extern	int	errno;
 
+char	*file_name;
+char	*option_d;
+char	*option_f;
+char	*option_l;
+char	*option_p;
+char	option_s;
+char	*option_t;
+char	*option_x;
+char	diag_msg;
+char	option_msg;
+int	need_newline;
+int	dev_expert;
+int	expert_mode;
+uint_t	cur_blksz;
+struct ctlr_info	*ctlr_list;
+struct disk_info	*disk_list;
+struct mctlr_list	*controlp;
+char	x86_devname[MAXNAMELEN];
+FILE	*data_file;
+
 #ifdef __STDC__
 
 /* Function prototypes for ANSI C Compilers */
@@ -2218,13 +2238,11 @@ disk_is_known(struct dk_cinfo *dkinfo)
  * in the disk label.
  */
 int
-dtype_match(label, dtype)
-	register struct dk_label *label;
-	register struct disk_type *dtype;
+dtype_match(struct dk_label *label, struct disk_type *dtype)
 {
 
 	if (dtype->dtype_asciilabel == NULL) {
-	    return (0);
+		return (0);
 	}
 
 	/*
@@ -2249,9 +2267,7 @@ dtype_match(label, dtype)
  * in the disk label.
  */
 int
-parts_match(label, pinfo)
-	register struct dk_label *label;
-	register struct partition_info *pinfo;
+parts_match(struct dk_label *label, struct partition_info *pinfo)
 {
 	int i;
 
@@ -2286,10 +2302,10 @@ parts_match(label, pinfo)
 		return (0);
 	for (i = 0; i < NDKMAP; i++) {
 		if (label->dkl_vtoc.v_part[i].p_tag !=
-				pinfo->vtoc.v_part[i].p_tag)
+		    pinfo->vtoc.v_part[i].p_tag)
 			return (0);
 		if (label->dkl_vtoc.v_part[i].p_flag !=
-				pinfo->vtoc.v_part[i].p_flag)
+		    pinfo->vtoc.v_part[i].p_flag)
 			return (0);
 	}
 	/*
@@ -2457,9 +2473,7 @@ search_duplicate_pinfo()
  * If so, print an error message and abort.
  */
 static void
-check_dtypes_for_inconsistency(dp1, dp2)
-	struct disk_type	*dp1;
-	struct disk_type	*dp2;
+check_dtypes_for_inconsistency(struct disk_type	*dp1, struct disk_type *dp2)
 {
 	int		i;
 	int		result;
@@ -2520,13 +2534,13 @@ check_dtypes_for_inconsistency(dp1, dp2)
 
 	if (result) {
 		err_print("Inconsistent definitions for disk type '%s'\n",
-			dp1->dtype_asciilabel);
+		    dp1->dtype_asciilabel);
 		if (dp1->dtype_filename != NULL &&
-					dp2->dtype_filename != NULL) {
+		    dp2->dtype_filename != NULL) {
 			err_print("%s (%d) - %s (%d)\n",
-				dp1->dtype_filename, dp1->dtype_lineno,
-				dp2->dtype_filename, dp2->dtype_lineno);
-			}
+			    dp1->dtype_filename, dp1->dtype_lineno,
+			    dp2->dtype_filename, dp2->dtype_lineno);
+		}
 		fullabort();
 	}
 }
@@ -2538,9 +2552,8 @@ check_dtypes_for_inconsistency(dp1, dp2)
  * If so, print an error message and abort.
  */
 static void
-check_pinfo_for_inconsistency(pp1, pp2)
-	struct partition_info	*pp1;
-	struct partition_info	*pp2;
+check_pinfo_for_inconsistency(struct partition_info *pp1,
+    struct partition_info *pp2)
 {
 	int		i;
 	int		result;
@@ -2588,13 +2601,13 @@ check_pinfo_for_inconsistency(pp1, pp2)
 
 	if (result) {
 		err_print("Inconsistent definitions for partition type '%s'\n",
-			pp1->pinfo_name);
+		    pp1->pinfo_name);
 		if (pp1->pinfo_filename != NULL &&
-					pp2->pinfo_filename != NULL) {
+		    pp2->pinfo_filename != NULL) {
 			err_print("%s (%d) - %s (%d)\n",
-				pp1->pinfo_filename, pp1->pinfo_lineno,
-				pp2->pinfo_filename, pp2->pinfo_lineno);
-			}
+			    pp1->pinfo_filename, pp1->pinfo_lineno,
+			    pp2->pinfo_filename, pp2->pinfo_lineno);
+		}
 		fullabort();
 	}
 }
@@ -2935,7 +2948,7 @@ disk_name_compare(
 }
 
 static void
-make_controller_list()
+make_controller_list(void)
 {
 	int	x;
 	struct	mctlr_list	*ctlrp;
@@ -2952,8 +2965,7 @@ make_controller_list()
 }
 
 static void
-check_for_duplicate_disknames(arglist)
-char *arglist[];
+check_for_duplicate_disknames(char *arglist[])
 {
 	char			*directory = "/dev/rdsk/";
 	char			**disklist;
@@ -2974,9 +2986,9 @@ char *arglist[];
 			 *  disk list.
 			 */
 			for (i = 0; i < diskno; i++) {
-			    canonicalize_name(t, arglist[i]);
-			    if (strncmp(s, t, strlen(t)) == 0)
-				break;
+				canonicalize_name(t, arglist[i]);
+				if (strncmp(s, t, strlen(t)) == 0)
+					break;
 			}
 			if (i != diskno)
 				continue;

@@ -76,67 +76,67 @@ extern "C" {
 /*
  * These declarations are global state variables.
  */
-struct	disk_info *disk_list;		/* list of found disks */
-struct	ctlr_info *ctlr_list;		/* list of found ctlrs */
-char	cur_menu;			/* current menu level */
-char	last_menu;			/* last menu level */
-char	option_msg;			/* extended message options */
-char	diag_msg;			/* extended diagnostic msgs */
-char	option_s;			/* silent mode option */
-char	*option_f;			/* input redirect option */
-char	*option_l;			/* log file option */
-FILE	*log_file;			/* log file pointer */
-char	*option_d;			/* forced disk option */
-char	*option_t;			/* forced disk type option */
-char	*option_p;			/* forced partition table option */
-char	*option_x;			/* data file redirection option */
-FILE	*data_file;			/* data file pointer */
-char	*file_name;			/* current data file name */
+extern struct	disk_info *disk_list;		/* list of found disks */
+extern struct	ctlr_info *ctlr_list;		/* list of found ctlrs */
+extern char	cur_menu;			/* current menu level */
+extern char	last_menu;			/* last menu level */
+extern char	option_msg;			/* extended message options */
+extern char	diag_msg;			/* extended diagnostic msgs */
+extern char	option_s;			/* silent mode option */
+extern char	*option_f;			/* input redirect option */
+extern char	*option_l;			/* log file option */
+extern FILE	*log_file;			/* log file pointer */
+extern char	*option_d;			/* forced disk option */
+extern char	*option_t;			/* forced disk type option */
+extern char	*option_p;		/* forced partition table option */
+extern char	*option_x;		/* data file redirection option */
+extern FILE	*data_file;		/* data file pointer */
+extern char	*file_name;		/* current data file name */
 					/* for useful error messages */
-int	expert_mode;			/* enable for expert mode */
+extern int	expert_mode;		/* enable for expert mode */
 					/* commands */
-int	need_newline;			/* for correctly formatted output */
-int	dev_expert;			/* enable for developer mode */
+extern int	need_newline;		/* for correctly formatted output */
+extern int	dev_expert;		/* enable for developer mode */
 					/* commands */
 
 /*
  * These declarations are used for quick access to information about
  * the disk being worked on.
  */
-int	cur_file;			/* file descriptor for current disk */
-int	cur_flags;			/* flags for current disk */
-int	cur_label;			/* current label type */
-uint_t	cur_blksz;			/* currect disk block size */
-struct	disk_info *cur_disk;		/* current disk */
-struct	disk_type *cur_dtype;		/* current dtype */
-struct	ctlr_info *cur_ctlr;		/* current ctlr */
-struct	ctlr_type *cur_ctype;		/* current ctype */
-struct	ctlr_ops *cur_ops;		/* current ctlr's ops vector */
-struct	partition_info *cur_parts;	/* current disk's partitioning */
-struct	defect_list cur_list;		/* current disk's defect list */
-void	*cur_buf;			/* current disk's I/O buffer */
-void	*pattern_buf;			/* current disk's pattern buffer */
-uint_t	pcyl;				/* # physical cyls */
-uint_t	ncyl;				/* # data cyls */
-uint_t	acyl;				/* # alt cyls */
-uint_t	nhead;				/* # heads */
-uint_t	phead;				/* # physical heads */
-uint_t	nsect;				/* # data sects/track */
-uint_t	psect;				/* # physical sects/track */
-uint_t	apc;				/* # alternates/cyl */
-uint_t	solaris_offset;			/* Solaris offset, this value is zero */
+extern int	cur_file;		/* file descriptor for current disk */
+extern int	cur_flags;			/* flags for current disk */
+extern int	cur_label;			/* current label type */
+extern uint_t	cur_blksz;			/* currect disk block size */
+extern struct	disk_info *cur_disk;		/* current disk */
+extern struct	disk_type *cur_dtype;		/* current dtype */
+extern struct	ctlr_info *cur_ctlr;		/* current ctlr */
+extern struct	ctlr_type *cur_ctype;		/* current ctype */
+extern struct	ctlr_ops *cur_ops;		/* current ctlr's ops vector */
+extern struct	partition_info *cur_parts; /* current disk's partitioning */
+extern struct	defect_list cur_list;		/* current disk's defect list */
+extern void	*cur_buf;			/* current disk's I/O buffer */
+extern void	*pattern_buf;		/* current disk's pattern buffer */
+extern uint_t	pcyl;				/* # physical cyls */
+extern uint_t	ncyl;				/* # data cyls */
+extern uint_t	acyl;				/* # alt cyls */
+extern uint_t	nhead;				/* # heads */
+extern uint_t	phead;				/* # physical heads */
+extern uint_t	nsect;				/* # data sects/track */
+extern uint_t	psect;				/* # physical sects/track */
+extern uint_t	apc;				/* # alternates/cyl */
+extern uint_t	solaris_offset;		/* Solaris offset, this value is zero */
 					/* for non-fdisk machines. */
-int	prot_type;			/* protection type to format disk */
+extern int	prot_type;		/* protection type to format disk */
 
 #if defined(_SUNOS_VTOC_16)
-uint_t	bcyl;				/* # other cyls */
+extern uint_t	bcyl;				/* # other cyls */
 #endif		/* defined(_SUNOS_VTOC_16) */
 
-struct	mboot boot_sec;			/* fdisk partition info */
-uint_t	xstart;				/* solaris partition start */
-char	x86_devname[MAXNAMELEN];	/* saved device name for fdisk */
+extern struct	mboot boot_sec;			/* fdisk partition info */
+extern uint_t	xstart;				/* solaris partition start */
+extern char	x86_devname[MAXNAMELEN]; /* saved device name for fdisk */
 					/* information accesses */
-struct	mctlr_list	*controlp;	/* master controller list ptr */
+extern struct	mctlr_list	*controlp;	/* master controller list ptr */
 
 
 /*
