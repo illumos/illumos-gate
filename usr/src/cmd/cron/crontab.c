@@ -103,7 +103,7 @@ extern int	audit_crontab_modify(char *, char *, int);
 extern int	audit_crontab_delete(char *, int);
 extern int	audit_crontab_not_allowed(uid_t, char *);
 
-int		err;
+static int	err;
 int		cursor;
 char		*cf;
 char		*tnam;
