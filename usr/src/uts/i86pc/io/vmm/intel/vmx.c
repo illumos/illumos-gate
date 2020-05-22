@@ -40,6 +40,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -1242,11 +1243,9 @@ vmx_handle_cpuid(struct vm *vm, int vcpu, struct vmxctx *vmxctx)
 	int handled;
 #endif
 
-	handled = x86_emulate_cpuid(vm, vcpu,
-				    (uint32_t*)(&vmxctx->guest_rax),
-				    (uint32_t*)(&vmxctx->guest_rbx),
-				    (uint32_t*)(&vmxctx->guest_rcx),
-				    (uint32_t*)(&vmxctx->guest_rdx));
+	handled = x86_emulate_cpuid(vm, vcpu, (uint64_t *)&vmxctx->guest_rax,
+	    (uint64_t *)&vmxctx->guest_rbx, (uint64_t *)&vmxctx->guest_rcx,
+	    (uint64_t *)&vmxctx->guest_rdx);
 	return (handled);
 }
 
