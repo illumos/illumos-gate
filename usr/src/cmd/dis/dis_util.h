@@ -27,8 +27,6 @@
 #ifndef _DIS_UTIL_H
 #define	_DIS_UTIL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus
@@ -41,7 +39,7 @@ void warn(const char *, ...);
 void *safe_malloc(size_t);
 const char *dis_demangle(const char *);
 
-int g_error;
+extern int g_error;
 
 #define	BUFSIZE	1024
 
