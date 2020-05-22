@@ -27,9 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "uucp.h"
 
 #include "pk.h"
@@ -39,4 +36,3 @@ int pkdebug;
 int pksizes[] = {
 	1, 32, 64, 128, 256, 512, 1024, 2048, 4096, 1
 };
-struct pack	*Pk;

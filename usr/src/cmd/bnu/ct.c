@@ -28,7 +28,6 @@
 /*
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -77,6 +76,7 @@ extern int dkminor();
 #define TRUE	1
 #define FALSE	0
 
+int	Dologin = 0;
 static
 int	_Status;		/* exit status of child */
 

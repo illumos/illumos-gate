@@ -61,6 +61,7 @@ jmp_buf Sjbuf;
 extern unsigned msgtime;
 char	uuxqtarg[MAXBASENAME] = {'\0'};
 int	uuxqtflag = 0;
+int	Dologin = 0;
 
 extern int	(*Setup)(), (*Teardown)();	/* defined in interface.c */
 

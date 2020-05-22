@@ -27,10 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include "uucp.h"
 
 GLOBAL char _Protocol[40] = "";	/* working protocol string */
@@ -70,7 +66,7 @@ static int notin(), ifdate(), checkdate(), checktime(), classmatch();
 
 GLOBAL char *Myline = CNULL;	/* to force which line will be used */
 GLOBAL char *Mytype = CNULL;	/* to force selection of specific device type */
-GLOBAL int Dologin;		/* to force login chat sequence */
+EXTERN int Dologin;		/* to force login chat sequence */
 
 /*
  * conn - place a telephone call to system and login, etc.
