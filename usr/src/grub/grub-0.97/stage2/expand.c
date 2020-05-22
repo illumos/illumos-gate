@@ -2,6 +2,7 @@
  *  GRUB  --  GRand Unified Bootloader
  *  Copyright (C) 1999,2000,2001,2002,2003,2004  Free Software Foundation, Inc.
  *  Copyright (c) 2013 Joyent, Inc.  All rights reserved.
+ *  Copyright 2021 RackTop Systems, Inc.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -388,6 +389,15 @@ expand_string(const char *s, char *d, unsigned int len)
 			if (current_devid[0] != '\0')
 				vlen += 13 + strlen(current_devid);
 
+			if (current_bootguid != 0) {
+				vlen += grub_sprintf(NULL,
+				    ",zfs-bootpool=\"%llu\"", current_bootguid);
+			}
+			if (current_bootvdev != 0) {
+				vlen += grub_sprintf(NULL,
+				    ",zfs-bootvdev=\"%llu\"", current_bootvdev);
+			}
+
 			if (q + vlen >= d + len)
 				return (ERR_WONT_FIT);
 
@@ -405,6 +415,14 @@ expand_string(const char *s, char *d, unsigned int len)
 			if (current_devid[0] != '\0') {
 				q += grub_sprintf(q, ",diskdevid=\"%s\"",
 				    current_devid);
+			}
+			if (current_bootguid != 0) {
+				q += grub_sprintf(q, ",zfs-bootpool=\"%llu\"",
+				    current_bootguid);
+			}
+			if (current_bootvdev != 0) {
+				q += grub_sprintf(q, ",zfs-bootvdev=\"%llu\"",
+				    current_bootvdev);
 			}
 
 			p += 11;	/* $ZFS-BOOTFS */
