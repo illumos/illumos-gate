@@ -25,6 +25,7 @@
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 Joshua M. Clulow <josh@sysmgr.org>
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -2228,18 +2229,34 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 		 * Our count is maintained in the vfs structure, but the
 		 * number is off by 1 to indicate a hold on the vfs
 		 * structure itself.
-		 *
-		 * The '.zfs' directory maintains a reference of its
-		 * own, and any active references underneath are
-		 * reflected in the vnode count.
 		 */
-		if (zfsvfs->z_ctldir == NULL) {
-			if (vfsp->vfs_count > 1)
-				return (SET_ERROR(EBUSY));
-		} else {
-			if (vfsp->vfs_count > 2 ||
-			    zfsvfs->z_ctldir->v_count > 1)
-				return (SET_ERROR(EBUSY));
+		boolean_t draining;
+		uint_t thresh = 1;
+
+		/*
+		 * The '.zfs' directory maintains a reference of its own, and
+		 * any active references underneath are reflected in the vnode
+		 * count. Allow one additional reference for it.
+		 */
+		if (zfsvfs->z_ctldir != NULL)
+			thresh++;
+
+		/*
+		 * If it's running, the asynchronous unlinked drain task needs
+		 * to be stopped before the number of active vnodes can be
+		 * reliably checked.
+		 */
+		draining = zfsvfs->z_draining;
+		if (draining)
+			zfs_unlinked_drain_stop_wait(zfsvfs);
+
+		if (vfsp->vfs_count > thresh || (zfsvfs->z_ctldir != NULL &&
+		    zfsvfs->z_ctldir->v_count > 1)) {
+			if (draining) {
+				/* If it was draining, restart the task */
+				zfs_unlinked_drain(zfsvfs);
+			}
+			return (SET_ERROR(EBUSY));
 		}
 	}
 
