@@ -617,17 +617,22 @@ aggr_grp_add_port(aggr_grp_t *grp, datalink_id_t port_linkid, boolean_t force,
 }
 
 /*
- * This is called in response to either our LACP state machine or a MAC
- * notification that the link has gone down via aggr_send_port_disable(). At
- * this point, we may need to update our default ring. To that end, we go
- * through the set of ports (underlying datalinks in an aggregation) that are
- * currently enabled to transmit data. If all our links have been disabled for
- * transmit, then we don't do anything.
+ * This is called when the 'lg_tx_ports' arrangement has changed and
+ * we need to update the corresponding 'mi_default_tx_ring'. This
+ * happens for several reasons.
  *
- * Note, because we only have a single TX group, we don't have to worry about
- * the rings moving between groups and the chance that mac will reassign it
- * unless someone removes a port, at which point, we play it safe and call this
- * again.
+ *     - A pseudo TX mac group was added or removed.
+ *     - An LACP message has changed the port's state.
+ *     - A link event has changed the port's state.
+ *
+ * In any case, we see if there is at least one port enabled (see
+ * 'aggr_send_port_enable()'), and if so we use its first ring as the
+ * mac's default TX ring.
+ *
+ * Note, because we only have a single TX group, we don't have to
+ * worry about the rings moving between groups and the chance that mac
+ * will reassign it unless someone removes a port, at which point, we
+ * play it safe and call this again.
  */
 void
 aggr_grp_update_default(aggr_grp_t *grp)
