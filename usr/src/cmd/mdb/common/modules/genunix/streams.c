@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ks.h>
 
@@ -147,7 +151,7 @@ static const struct str_flags stdf[] = {
 	{ SF(STRCLOSE),		"wait for a close to complete"		},
 	{ SF(SNDMREAD),		"used for read notification"		},
 	{ SF(OLDNDELAY),	"use old NDELAY TTY semantics"		},
-	{ SF(0x00020000),	"unused"				},
+	{ SF(STRXPG4TTY),	"Use XPG4 TTY semantics"		},
 	{ SF(0x00040000),	"unused"				},
 	{ SF(STRTOSTOP),	"block background writes"		},
 	{ SF(STRCMDWAIT),	"someone is doing an _I_CMD"		},
