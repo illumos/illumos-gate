@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -36,8 +36,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	diff - differential file comparison
@@ -324,7 +322,7 @@ main(int argc, char **argv)
 			/* Not sure how it would get here, but just in case */
 			(void) fprintf(stderr, "diff: ");
 			(void) fprintf(stderr,
-				gettext("invalid option -%c\n"), flag);
+			    gettext("invalid option -%c\n"), flag);
 			usage();
 		}
 	}
@@ -343,8 +341,8 @@ main(int argc, char **argv)
 
 	if (hflag) {
 		if (opt) {
-			error(
-gettext("-h doesn't support -e, -f, -n, -c, or -I"));
+			error(gettext(
+			    "-h doesn't support -e, -f, -n, -c, or -I"));
 		} else {
 			diffargv[0] = "diffh";
 			(void) execv(diffh, diffargv);
@@ -392,7 +390,7 @@ gettext("-h doesn't support -e, -f, -n, -c, or -I"));
 	    (stb2.st_mode & S_IFMT) == S_IFDIR) {
 		diffdir(argv);
 		done();
-	    }
+	}
 
 	filename(&file1, &file2, &stb1, &input_file1);
 	filename(&file2, &file1, &stb2, &input_file2);
@@ -586,8 +584,7 @@ unravel(int p)
 
 	for (i = 0; i <= len[0]; i++)
 		J[i] = i <= pref ? i :
-			i > len[0] - suff ? i + len[1] - len[0]:
-			0;
+		    i > len[0] - suff ? i + len[1] - len[0]: 0;
 	for (q = clist + p; q->y != 0; q = clist + q->pred)
 		J[q->x + pref] = q->y + pref;
 }
@@ -832,9 +829,8 @@ change(int a, int b, int c, int d)
 				(void) printf("--- %s	%s\n", input_file2,
 				    time_buf);
 
-			context_vec_start = (struct context_vec *)
-					    malloc(MAX_CONTEXT *
-					    sizeof (struct context_vec));
+			context_vec_start = malloc(MAX_CONTEXT *
+			    sizeof (struct context_vec));
 			if (context_vec_start == NULL)
 				error(gettext(NO_MEM_ERR));
 
@@ -961,7 +957,7 @@ fetch(long *f, int a, int b, int filen, char *s, int oldfile)
 			} else {
 				endifname = oldfile ? ifdef1 : ifdef2;
 				(void) fprintf(stdout,
-					"#ifdef %s\n", endifname);
+				    "#ifdef %s\n", endifname);
 			}
 		}
 		inifdef = 1 + oldfile;
@@ -976,9 +972,9 @@ fetch(long *f, int a, int b, int filen, char *s, int oldfile)
 		while (ch = getbufwchar(filen, &mlen)) {
 			if (ch != '\n' && ch != WEOF) {
 				if (ch == '\t' && tflag)
-					do
+					do {
 						(void) putchar(' ');
-					while (++col & 7);
+					} while (++col & 7);
 				else {
 					(void) wcput(ch);
 					col++;
@@ -1014,7 +1010,7 @@ readhash(FILE *f, int filen, char *str)
 				/* In this case, diff doesn't have to take */
 				/* care of multibyte characters. */
 				for (shift = 0; (t = getc(f)) != '\n';
-					shift += 7) {
+				    shift += 7) {
 					if (t == EOF) {
 						if (shift) {
 							(void) fprintf(stderr,
@@ -1024,14 +1020,14 @@ readhash(FILE *f, int filen, char *str)
 							return (0);
 					}
 					sum += (isupper(t) ? tolower(t) : t) <<
-						(shift &= HALFMASK);
+					    (shift &= HALFMASK);
 				}
 			} else {
 				/* In this case, diff needs to take care of */
 				/* multibyte characters. */
 				for (shift = 0;
-				(wt = getbufwchar(filen, &mlen)) != '\n';
-					shift += 7) {
+				    (wt = getbufwchar(filen, &mlen)) != '\n';
+				    shift += 7) {
 					if (wt == WEOF) {
 						if (shift) {
 							(void) fprintf(stderr,
@@ -1041,7 +1037,7 @@ readhash(FILE *f, int filen, char *str)
 							return (0);
 					}
 					sum += NCCHRTRAN(wt) <<
-						(shift &= HALFMASK);
+					    (shift &= HALFMASK);
 				}
 			}
 		else
@@ -1082,7 +1078,7 @@ readhash(FILE *f, int filen, char *str)
 						space = 0;
 					}
 					sum += CHRTRAN(wt) <<
-						(shift &= HALFMASK);
+					    (shift &= HALFMASK);
 					shift += 7;
 					continue;
 				case L'\n':
@@ -1100,7 +1096,7 @@ readhash(FILE *f, int filen, char *str)
 static void
 dump_context_vec(void)
 {
-	int	a, b, c, d;
+	int	a, b = 0, c, d = 0;
 	char	ch;
 	struct	context_vec *cvp = context_vec_start;
 	int	lowa, upb, lowc, upd;
@@ -1156,7 +1152,7 @@ dump_context_vec(void)
 					fetch(ixnew, c, d, 1, "+", 0);
 			} else if (ch == 'd') {
 				fetch(ixold, lowa, a - 1, 0, uflag ? " " :
-					    "  ", 1);
+				    "  ", 1);
 				fetch(ixold, a, b, 0, uflag ? "-" : "- ", 1);
 			} else {
 				/* The last argument should not affect */
@@ -1250,7 +1246,7 @@ diffdir(char **argv)
 	if (opt == D_EDIT && (sflag || lflag)) {
 		(void) fprintf(stderr, "diff: ");
 		(void) fprintf(stderr, gettext(
-			"warning: should not give -s or -l with -e\n"));
+		    "warning: should not give -s or -l with -e\n"));
 	}
 	dirstatus = 0;
 	title[0] = 0;
@@ -1312,9 +1308,9 @@ diffdir(char **argv)
 	}
 	if (lflag) {
 		scanpr(dir1, ONLY,
-			gettext("Only in %.*s"), file1, efile1, 0, 0);
+		    gettext("Only in %.*s"), file1, efile1, 0, 0);
 		scanpr(dir2, ONLY,
-			gettext("Only in %.*s"), file2, efile2, 0, 0);
+		    gettext("Only in %.*s"), file2, efile2, 0, 0);
 		scanpr(dir1, SAME,
 		    gettext("Common identical files in %.*s and %.*s"),
 		    file1, efile1, file2, efile2);
@@ -1361,8 +1357,8 @@ setfile(char **fpp, char **epp, char *file)
 }
 
 static void
-scanpr(struct dir *dp, int test,
-	char *title, char *file1, char *efile1, char *file2, char *efile2)
+scanpr(struct dir *dp, int test, char *title, char *file1, char *efile1,
+    char *file2, char *efile2)
 {
 	int titled = 0;
 
@@ -1430,14 +1426,14 @@ setupdir(char *cp)
 			(void) strcpy(ep->d_entry, rp->d_name);
 		}
 		dp = (struct dir *)realloc((char *)dp,
-			(nitems + 1) * sizeof (struct dir));
+		    (nitems + 1) * sizeof (struct dir));
 		if (dp == 0)
 			error(gettext(NO_MEM_ERR));
 	}
 	dp[nitems].d_entry = 0;		/* delimiter */
 	(void) closedir(dirp);
 	qsort(dp, nitems, sizeof (struct dir),
-		(int (*)(const void *, const void *))entcmp);
+	    (int (*)(const void *, const void *))entcmp);
 	return (dp);
 }
 
@@ -1564,10 +1560,10 @@ compare(struct dir *dp)
  * an event port
  * an unknown type
  */
-				(void) printf(
-gettext("File %s is %s while file %s is %s\n"),
-					file1, pfiletype(fmt1),
-					file2, pfiletype(fmt2));
+				(void) printf(gettext(
+				    "File %s is %s while file %s is %s\n"),
+				    file1, pfiletype(fmt1),
+				    file2, pfiletype(fmt2));
 			}
 		}
 		(void) close(f1); (void) close(f2);
@@ -1600,7 +1596,7 @@ same:
 		dp->d_flags = SAME;
 	else
 		(void) printf(gettext("Files %s and %s are identical\n"),
-			file1, file2);
+		    file1, file2);
 
 closem:
 	(void) close(f1); (void) close(f2);
@@ -1612,7 +1608,7 @@ notsame:
 			dp->d_flags |= DIFFER;
 		else if (opt == D_NORMAL || opt == D_CONTEXT)
 			(void) printf(
-				gettext("Binary files %s and %s differ\n"),
+			    gettext("Binary files %s and %s differ\n"),
 			    file1, file2);
 		(void) close(f1); (void) close(f2);
 		return (1);
@@ -1868,7 +1864,7 @@ filename(char **pa1, char **pa2, struct stat *st, char **ifile)
 
 	if (*ifile == (char *)NULL) {
 		(void) fprintf(stderr, gettext(
-			"no more memory - try again later\n"));
+		    "no more memory - try again later\n"));
 		status = 2;
 		done();
 	}
@@ -1886,7 +1882,7 @@ filename(char **pa1, char **pa2, struct stat *st, char **ifile)
 
 		if (*ifile == (char *)NULL) {
 			(void) fprintf(stderr, gettext(
-				"no more memory - try again later\n"));
+			    "no more memory - try again later\n"));
 			status = 2;
 			done();
 		}
@@ -1940,7 +1936,7 @@ copytemp(char *fn)
 		if (write(ofd, buf, i) != i) {
 			(void) fprintf(stderr, "diff: ");
 			(void) fprintf(stderr,
-				gettext("write failed %s\n"), template);
+			    gettext("write failed %s\n"), template);
 			done();
 		}
 	(void) close(ifd); (void) close(ofd);
@@ -1969,13 +1965,12 @@ prune(void)
 	int i, j;
 
 	for (pref = 0; pref < len[0] && pref < len[1] &&
-			file[0][pref + 1].value == file[1][pref + 1].value;
+	    file[0][pref + 1].value == file[1][pref + 1].value;
 	    pref++)
 		;
 	for (suff = 0; (suff < len[0] - pref) &&
-			(suff < len[1] - pref) &&
-			(file[0][len[0] - suff].value ==
-			file[1][len[1] - suff].value);
+	    (suff < len[1] - pref) &&
+	    (file[0][len[0] - suff].value == file[1][len[1] - suff].value);
 	    suff++)
 		;
 
@@ -2046,12 +2041,12 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr, gettext(
-		"usage: diff [-bitw] [-c | -e | -f | -h | -n | -u] file1 "
-			"file2\n"
-		"       diff [-bitw] [-C number | -U number] file1 file2\n"
-		"       diff [-bitw] [-D string] file1 file2\n"
-		"       diff [-bitw] [-c | -e | -f | -h | -n | -u] [-l] [-r] "
-			"[-s] [-S name] directory1 directory2\n"));
+	    "usage: diff [-bitw] [-c | -e | -f | -h | -n | -u] file1 "
+	    "file2\n"
+	    "       diff [-bitw] [-C number | -U number] file1 file2\n"
+	    "       diff [-bitw] [-D string] file1 file2\n"
+	    "       diff [-bitw] [-c | -e | -f | -h | -n | -u] [-l] [-r] "
+	    "[-s] [-S name] directory1 directory2\n"));
 	status = 2;
 	done();
 }
@@ -2081,7 +2076,7 @@ initbuf(FILE *iop, int filen, long offset)
 }
 
 /*
- * 	Reset a buff structure, and rewind the associated file.
+ *	Reset a buff structure, and rewind the associated file.
  */
 static void
 resetbuf(int filen)
@@ -2169,7 +2164,7 @@ getbufwchar(int filen, int *len)
 		/* Not buffered */
 		bufwchar[filen].ptr = &(bufwchar[filen].buf[MB_LEN_MAX]);
 		num = fread((void *)bufwchar[filen].ptr,
-			sizeof (char), NW, bufwchar[filen].iop);
+		    sizeof (char), NW, bufwchar[filen].iop);
 		if (ferror(bufwchar[filen].iop)) {
 			(void) fprintf(stderr, "diff: ");
 			(void) fprintf(stderr, gettext("Error reading "));
@@ -2185,12 +2180,12 @@ getbufwchar(int filen, int *len)
 	if (bufwchar[filen].buffered < mbcurmax) {
 		for (i = 0; i < bufwchar[filen].buffered; i++) {
 			bufwchar[filen].buf[MB_LEN_MAX -
-				(bufwchar[filen].buffered - i)] =
-				*(bufwchar[filen].ptr + i);
+			    (bufwchar[filen].buffered - i)] =
+			    *(bufwchar[filen].ptr + i);
 		}
 		bufwchar[filen].ptr = &(bufwchar[filen].buf[MB_LEN_MAX]);
 		num = fread((void *)bufwchar[filen].ptr,
-			sizeof (char), NW, bufwchar[filen].iop);
+		    sizeof (char), NW, bufwchar[filen].iop);
 		if (ferror(bufwchar[filen].iop)) {
 			(void) fprintf(stderr, "diff: ");
 			(void) fprintf(stderr, gettext("Error reading "));
@@ -2199,7 +2194,7 @@ getbufwchar(int filen, int *len)
 			done();
 		}
 		bufwchar[filen].ptr = &(bufwchar[filen].buf[MB_LEN_MAX -
-				bufwchar[filen].buffered]);
+		    bufwchar[filen].buffered]);
 		bufwchar[filen].buffered += num;
 		if (bufwchar[filen].buffered < mbcurmax) {
 			mxlen = bufwchar[filen].buffered;
