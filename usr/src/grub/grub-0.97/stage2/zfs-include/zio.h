@@ -22,6 +22,7 @@
  */
 /*
  * Copyright 2013 by Saso Kiselkov. All rights reserved.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #ifndef _ZIO_H
@@ -73,6 +74,9 @@ enum zio_checksum {
 	ZIO_CHECKSUM_EDONR,
 	ZIO_CHECKSUM_FUNCTIONS
 };
+
+/* macros defining encryption lengths */
+#define	ZIO_OBJSET_MAC_LEN	32
 
 enum zio_compress {
 	ZIO_COMPRESS_INHERIT = 0,
