@@ -13,7 +13,7 @@
 .\" Copyright (c) 2019 Carlos Neira <cneirabustos@gmail.com>
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd February 22, 2019
+.Dd May 22, 2020
 .Dt LIBPROC 3LIB
 .Os
 .Sh NAME
@@ -310,7 +310,7 @@ library.
 .It Sy proc_arg_xpsinfo Ta Sy proc_content2str
 .It Sy proc_dmodelname Ta Sy proc_finistdio
 .It Sy proc_fltname Ta Sy proc_fltset2str
-.It Sy proc_flushstdio Ta Sy proc_proc_get_auxv
+.It Sy proc_flushstdio Ta Sy proc_get_auxv
 .It Sy proc_fdinfo_misc Ta Sy proc_get_cred
 .It Sy proc_get_fdinfo Ta Sy proc_get_priv
 .It Sy proc_get_psinfo Ta Sy proc_get_status
