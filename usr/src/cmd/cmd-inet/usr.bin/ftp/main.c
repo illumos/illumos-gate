@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	All Rights Reserved  	*/
+/*	All Rights Reserved	*/
 
 /*
  *	University Copyright- Copyright (c) 1982, 1986, 1988
@@ -36,14 +36,85 @@
  *	contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * FTP User Program -- Command Interface.
  */
-#define	EXTERN
 #include	"ftp_var.h"
 #include	<deflt.h>	/* macros that make using libcmd easier */
+
+int	trace;
+int	hash;
+int	sendport;
+int	verbose;
+int	connected;
+int	fromatty;
+int	interactive;
+int	debug;
+int	bell;
+int	doglob;
+int	autologin;
+int	proxy;
+int	proxflag;
+int	sunique;
+int	runique;
+int	mcase;
+int	ntflag;
+int	mapflag;
+int	code;
+int	crflag;
+char	pasv[64];
+char	*altarg;
+char	ntin[17];
+char	ntout[17];
+char	mapin[MAXPATHLEN];
+char	mapout[MAXPATHLEN];
+char	typename[32];
+int	type;
+char	structname[32];
+int	stru;
+char	formname[32];
+int	form;
+char	modename[32];
+int	mode;
+char	bytename[32];
+int	bytesize;
+int	passivemode;
+off_t	restart_point;
+int	tcpwindowsize;
+boolean_t ls_invokes_NLST;
+char	*hostname;
+char	*home;
+char	*globerr;
+struct	sockaddr_in6 myctladdr;
+struct	sockaddr_in6 remctladdr;
+int	clevel;
+int	dlevel;
+int	autoauth;
+int	auth_error;
+int	autoencrypt;
+int	fflag;
+boolean_t goteof;
+int	skipsyst;
+char	mechstr[MECH_SZ];
+char	*buf;
+jmp_buf	toplevel;
+char	line[BUFSIZE];
+char	*stringbase;
+char	argbuf[BUFSIZE];
+char	*argbase;
+int	margc;
+char	**margv;
+int	cpend;
+int	mflag;
+char	reply_buf[FTPBUFSIZ];
+char	*reply_ptr;
+int	options;
+int	timeout;
+int	timeoutms;
+jmp_buf	timeralarm;
+int	macnum;
+struct macel macros[16];
+char	macbuf[4096];
 
 static void usage(void);
 static void timeout_sig(int sig);
@@ -132,7 +203,7 @@ main(int argc, char *argv[])
 		case 'T':
 			if (!isdigit(*optarg)) {
 				(void) fprintf(stderr,
-					"ftp: bad timeout: \"%s\"\n", optarg);
+				    "ftp: bad timeout: \"%s\"\n", optarg);
 				break;
 			}
 			timeout = atoi(optarg);
@@ -627,7 +698,7 @@ help(int argc, char *argv[])
 		extern int NCMDS;
 
 		(void) printf(
-			"Commands may be abbreviated.  Commands are:\n\n");
+		    "Commands may be abbreviated.  Commands are:\n\n");
 		for (c = cmdtab; c < &cmdtab[NCMDS]; c++) {
 			int len = strlen(c->c_name);
 
@@ -673,7 +744,7 @@ help(int argc, char *argv[])
 			(void) printf("?Invalid help command %s\n", arg);
 		else
 			(void) printf("%-*s\t%s\n", HELPINDENT,
-				c->c_name, c->c_help);
+			    c->c_name, c->c_help);
 	}
 }
 

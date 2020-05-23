@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	All Rights Reserved  	*/
+/*	All Rights Reserved	*/
 
 /*
  *	University Copyright- Copyright (c) 1982, 1986, 1988
@@ -38,8 +38,6 @@
 
 #ifndef	_FTP_VAR_H
 #define	_FTP_VAR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -92,90 +90,87 @@ extern "C" {
 /*
  * FTP global variables.
  */
-#ifndef	EXTERN
-#define	EXTERN	extern
-#endif
 
 #define	DEFAULTFTPFILE	"/etc/default/ftp"
 
 /*
  * Options and other state info.
  */
-EXTERN int	trace;		/* trace packets exchanged */
-EXTERN int	hash;		/* print # for each buffer transferred */
-EXTERN int	sendport;	/* use PORT cmd for each data connection */
-EXTERN int	verbose;	/* print messages coming back from server */
-EXTERN int	connected;	/* connected to server */
-EXTERN int	fromatty;	/* input is from a terminal */
-EXTERN int	interactive;	/* interactively prompt on m* cmds */
-EXTERN int	debug;		/* debugging level */
-EXTERN int	bell;		/* ring bell on cmd completion */
-EXTERN int	doglob;		/* glob local file names */
-EXTERN int	autologin;	/* establish user account on connection */
-EXTERN int	proxy;		/* proxy server connection active */
-EXTERN int	proxflag;	/* proxy connection exists */
-EXTERN int	sunique;	/* store files on server with unique name */
-EXTERN int	runique;	/* store local files with unique name */
-EXTERN int	mcase;		/* map upper to lower case for mget names */
-EXTERN int	ntflag;		/* use ntin ntout tables for name translation */
-EXTERN int	mapflag;	/* use mapin mapout templates on file names */
-EXTERN int	code;		/* return/reply code for ftp command */
-EXTERN int	crflag;		/* if 1, strip car. rets. on ascii gets */
-EXTERN char	pasv[64];	/* passive port for proxy data connection */
-EXTERN char	*altarg;	/* argv[1] with no shell-like preprocessing  */
-EXTERN char	ntin[17];	/* input translation table */
-EXTERN char	ntout[17];	/* output translation table */
-EXTERN char	mapin[MAXPATHLEN]; /* input map template */
-EXTERN char	mapout[MAXPATHLEN]; /* output map template */
-EXTERN char	typename[32];	/* name of file transfer type */
-EXTERN int	type;		/* file transfer type */
-EXTERN char	structname[32];	/* name of file transfer structure */
-EXTERN int	stru;		/* file transfer structure */
-EXTERN char	formname[32];	/* name of file transfer format */
-EXTERN int	form;		/* file transfer format */
-EXTERN char	modename[32];	/* name of file transfer mode */
-EXTERN int	mode;		/* file transfer mode */
-EXTERN char	bytename[32];	/* local byte size in ascii */
-EXTERN int	bytesize;	/* local byte size in binary */
-EXTERN int	passivemode;	/* passive transfer mode toggle */
-EXTERN off_t	restart_point;	/* transfer restart offset */
-EXTERN int	tcpwindowsize;	/* TCP window size for the data connection */
+extern int	trace;		/* trace packets exchanged */
+extern int	hash;		/* print # for each buffer transferred */
+extern int	sendport;	/* use PORT cmd for each data connection */
+extern int	verbose;	/* print messages coming back from server */
+extern int	connected;	/* connected to server */
+extern int	fromatty;	/* input is from a terminal */
+extern int	interactive;	/* interactively prompt on m* cmds */
+extern int	debug;		/* debugging level */
+extern int	bell;		/* ring bell on cmd completion */
+extern int	doglob;		/* glob local file names */
+extern int	autologin;	/* establish user account on connection */
+extern int	proxy;		/* proxy server connection active */
+extern int	proxflag;	/* proxy connection exists */
+extern int	sunique;	/* store files on server with unique name */
+extern int	runique;	/* store local files with unique name */
+extern int	mcase;		/* map upper to lower case for mget names */
+extern int	ntflag;		/* use ntin ntout tables for name translation */
+extern int	mapflag;	/* use mapin mapout templates on file names */
+extern int	code;		/* return/reply code for ftp command */
+extern int	crflag;		/* if 1, strip car. rets. on ascii gets */
+extern char	pasv[64];	/* passive port for proxy data connection */
+extern char	*altarg;	/* argv[1] with no shell-like preprocessing  */
+extern char	ntin[17];	/* input translation table */
+extern char	ntout[17];	/* output translation table */
+extern char	mapin[MAXPATHLEN]; /* input map template */
+extern char	mapout[MAXPATHLEN]; /* output map template */
+extern char	typename[32];	/* name of file transfer type */
+extern int	type;		/* file transfer type */
+extern char	structname[32];	/* name of file transfer structure */
+extern int	stru;		/* file transfer structure */
+extern char	formname[32];	/* name of file transfer format */
+extern int	form;		/* file transfer format */
+extern char	modename[32];	/* name of file transfer mode */
+extern int	mode;		/* file transfer mode */
+extern char	bytename[32];	/* local byte size in ascii */
+extern int	bytesize;	/* local byte size in binary */
+extern int	passivemode;	/* passive transfer mode toggle */
+extern off_t	restart_point;	/* transfer restart offset */
+extern int	tcpwindowsize;	/* TCP window size for the data connection */
 
-EXTERN boolean_t	ls_invokes_NLST;	/* behaviour of 'ls' */
-EXTERN char		*hostname;		/* name of host connected to */
-EXTERN char		*home;
-EXTERN char		*globerr;
+extern boolean_t	ls_invokes_NLST;	/* behaviour of 'ls' */
+extern char		*hostname;		/* name of host connected to */
+extern char		*home;
+extern char		*globerr;
 
-EXTERN struct	sockaddr_in6 myctladdr;		/* for channel bindings */
-EXTERN struct	sockaddr_in6 remctladdr;	/* for channel bindings */
+extern struct	sockaddr_in6 myctladdr;		/* for channel bindings */
+extern struct	sockaddr_in6 remctladdr;	/* for channel bindings */
 
-EXTERN int	clevel;		/* command channel protection level */
-EXTERN int	dlevel;		/* data channel protection level */
+extern int	clevel;		/* command channel protection level */
+extern int	dlevel;		/* data channel protection level */
 
-EXTERN int	autoauth;	/* do authentication on connect */
-EXTERN int	auth_type;	/* authentication type */
-EXTERN int	auth_error;	/* one error code for all auth types */
-EXTERN int	autoencrypt;	/* do encryption on connect */
-EXTERN int	fflag;		/* forward credentials */
-EXTERN boolean_t goteof;
+extern int	autoauth;	/* do authentication on connect */
+extern int	auth_type;	/* authentication type */
+extern int	auth_error;	/* one error code for all auth types */
+extern int	autoencrypt;	/* do encryption on connect */
+extern int	fflag;		/* forward credentials */
+extern boolean_t goteof;
 
-EXTERN int	skipsyst;	/* enable automatic sending of SYST command */
+extern int	skipsyst;	/* enable automatic sending of SYST command */
 
-EXTERN uchar_t	*ucbuf;		/* clear text buffer */
+extern uchar_t	*ucbuf;		/* clear text buffer */
 
 #define	MECH_SZ		40
 #define	FTP_DEF_MECH	"kerberos_v5"
-EXTERN char	mechstr[MECH_SZ];	/* mechanism type */
+extern char	mechstr[MECH_SZ];	/* mechanism type */
 
-EXTERN gss_OID	mechoid;	/* corresponding mechanism oid type */
-EXTERN gss_ctx_id_t gcontext;	/* gss security context */
+extern gss_OID	mechoid;	/* corresponding mechanism oid type */
+extern gss_ctx_id_t gcontext;	/* gss security context */
 
 #define	FTPBUFSIZ	BUFSIZ*16
 #define	HASHSIZ		BUFSIZ*8
 
-EXTERN char *buf;		/* buffer for binary sends and gets */
+extern char *buf;		/* buffer for binary sends and gets */
 
-EXTERN jmp_buf toplevel;	/* non-local goto stuff for cmd scanner */
+extern jmp_buf toplevel;	/* non-local goto stuff for cmd scanner */
 
 /*
  * BUFSIZE includes
@@ -192,25 +187,25 @@ EXTERN jmp_buf toplevel;	/* non-local goto stuff for cmd scanner */
 #define	MAXCMDLEN	10	/* The length of longest command in cmdtab[] */
 #define	BUFSIZE	((MAXPATHLEN)*2+MAXCMDLEN+4)
 
-EXTERN char	line[BUFSIZE];	/* input line buffer */
-EXTERN char	*stringbase;	/* current scan point in line buffer */
-EXTERN char	argbuf[BUFSIZE]; /* argument storage buffer */
-EXTERN char	*argbase;	/* current storage point in arg buffer */
-EXTERN int	margc;		/* count of arguments on input line */
-EXTERN char	**margv;	/* args parsed from input line */
-EXTERN int	cpend;		/* flag: if != 0, then pending server reply */
-EXTERN int	mflag;		/* flag: if != 0, then active multi command */
-EXTERN FILE	*tmp_nlst;	/* tmp file; holds NLST results for mget, etc */
+extern char	line[BUFSIZE];	/* input line buffer */
+extern char	*stringbase;	/* current scan point in line buffer */
+extern char	argbuf[BUFSIZE]; /* argument storage buffer */
+extern char	*argbase;	/* current storage point in arg buffer */
+extern int	margc;		/* count of arguments on input line */
+extern char	**margv;	/* args parsed from input line */
+extern int	cpend;		/* flag: if != 0, then pending server reply */
+extern int	mflag;		/* flag: if != 0, then active multi command */
+extern FILE	*tmp_nlst;	/* tmp file; holds NLST results for mget, etc */
 
-EXTERN char	*reply_parse;	/* for parsing replies to the ADAT command */
-EXTERN char	reply_buf[FTPBUFSIZ];
-EXTERN char	*reply_ptr;
+extern char	*reply_parse;	/* for parsing replies to the ADAT command */
+extern char	reply_buf[FTPBUFSIZ];
+extern char	*reply_ptr;
 
-EXTERN int	options;	/* used during socket creation */
+extern int	options;	/* used during socket creation */
 
-EXTERN int	timeout;	/* connection timeout */
-EXTERN int	timeoutms;	/* connection timeout in msec */
-EXTERN jmp_buf	timeralarm;	/* to recover from global timeout */
+extern int	timeout;	/* connection timeout */
+extern int	timeoutms;	/* connection timeout in msec */
+extern jmp_buf	timeralarm;	/* to recover from global timeout */
 
 
 /*
@@ -231,9 +226,9 @@ struct macel {
 	char *mac_end;		/* end of macro in macbuf */
 };
 
-EXTERN int macnum;			/* number of defined macros */
-EXTERN struct macel macros[16];
-EXTERN char macbuf[4096];
+extern int macnum;			/* number of defined macros */
+extern struct macel macros[16];
+extern char macbuf[4096];
 
 extern void macdef(int argc, char *argv[]);
 extern void doproxy(int argc, char *argv[]);
