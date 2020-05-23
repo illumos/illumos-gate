@@ -1,0 +1,9 @@
+These are the compatibility headers for building bhyve on illumos.  They are
+comprised of the shims and glue needed to use native functionality as the
+backing for FreeBSD interfaces.  It often means heavy use of #include_next,
+#define renames, and forward definitions to some glue functions.
+
+For headers which would otherwise be copied verbatim from FreeBSD, the
+usr/src/contrib/bhyve area is the appropriate home.  This allows us to carry
+only the bare minimum in the 'compat' headers while making updates for the
+'contrib' headers easy (simply copy over the new version).

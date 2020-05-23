@@ -44,8 +44,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 ALL_BUILDS	= $(ALL_BUILDSONLY64)
 DEF_BUILDS	= $(DEF_BUILDSONLY64)
-PRE_INC_PATH	= -I$(COMPAT)/freebsd -I$(COMPAT)/freebsd/amd64 \
-	-I$(CONTRIB)/freebsd -I$(CONTRIB)/freebsd/amd64
+PRE_INC_PATH	= -I$(COMPAT)/bhyve -I$(COMPAT)/bhyve/amd64 \
+	-I$(CONTRIB)/bhyve -I$(CONTRIB)/bhyve/amd64
 INC_PATH	+= -I$(UTSBASE)/i86pc/io/vmm -I$(UTSBASE)/i86pc/io/vmm/io
 AS_INC_PATH	+= -I$(UTSBASE)/i86pc/io/vmm -I$(OBJS_DIR)
 

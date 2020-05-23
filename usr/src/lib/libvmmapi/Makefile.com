@@ -29,7 +29,7 @@ SRCDIR		= ../common
 
 LIBS		= $(DYNLIB)
 
-CPPFLAGS	= -I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
+CPPFLAGS	= -I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 	$(CPPFLAGS.master) -I$(SRC)/uts/i86pc
 
 # not linted
@@ -41,7 +41,7 @@ LDLIBS		+= -lc
 
 all: $(LIBS)
 
-pics/%.o: $(CONTRIB)/freebsd/lib/libutil/%.c
+pics/%.o: $(CONTRIB)/bhyve/lib/libutil/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 

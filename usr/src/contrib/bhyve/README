@@ -1,0 +1,12 @@
+These are headers (and sources) contributed directly from FreeBSD which are
+required to build bhyve.  Updates are made to our copies here when corresponding
+updates to bhyve require them.
+
+With few exceptions (noted below) they are verbatim copies taken from the
+FreeBSD source tree.  Files requiring extensive modification are likely a
+candidate to exist as a shim in usr/src/compat/bhyve.  Conversely, if only a
+tiny modification is needed to make a file suitable for contrib, that trade-off
+is probably worthwhile (if done with a '#ifdef _FreeBSD_' guard for clarity).
+
+Files modified for compatibility:
+- isa/rtc.h

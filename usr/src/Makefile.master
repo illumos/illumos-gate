@@ -61,7 +61,7 @@ NATIVE_ADJUNCT=	/usr
 # Compatibility code for FreeBSD etc.
 #
 COMPAT=	$(SRC)/compat
-CONTRIB= $(SRC)/../contrib
+CONTRIB= $(SRC)/contrib
 
 #
 # RELEASE_BUILD should be cleared for final release builds.

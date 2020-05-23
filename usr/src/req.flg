@@ -33,5 +33,3 @@ echo_file usr/src/Makefile.master.64
 echo_file usr/src/Makefile.msg.targ
 echo_file usr/src/Makefile.psm
 echo_file usr/src/Makefile.psm.targ
-
-find_files "s.*" usr/contrib/freebsd
