@@ -499,31 +499,34 @@ static int slp_index	= 0;
  * Returns the index of dport in the table if found, otherwise -1.
  */
 static int
-find_slp(uint_t dport) {
-    int i;
+find_slp(uint_t dport)
+{
+	int i;
 
-    if (!dport)
-	return (0);
+	if (!dport)
+		return (0);
 
-    for (i = slp_index; i >= 0; i--)
-	if (slp_table[i] == dport) {
-	    return (i);
-	}
-    for (i = SLP_CACHE_SIZE - 1; i > slp_index; i--)
-	if (slp_table[i] == dport) {
-	    return (i);
-	}
-    return (-1);
+	for (i = slp_index; i >= 0; i--)
+		if (slp_table[i] == dport) {
+			return (i);
+		}
+	for (i = SLP_CACHE_SIZE - 1; i > slp_index; i--)
+		if (slp_table[i] == dport) {
+			return (i);
+		}
+	return (-1);
 }
 
-static void stash_slp(uint_t sport) {
-    if (slp_table[slp_index - 1] == sport)
-	/* avoid redundancy due to multicast retransmissions */
-	return;
+static void
+stash_slp(uint_t sport)
+{
+	if (slp_table[slp_index - 1] == sport)
+		/* avoid redundancy due to multicast retransmissions */
+		return;
 
-    slp_table[slp_index++] = sport;
-    if (slp_index == SLP_CACHE_SIZE)
-	slp_index = 0;
+	slp_table[slp_index++] = sport;
+	if (slp_index == SLP_CACHE_SIZE)
+		slp_index = 0;
 }
 
 /*
@@ -1123,8 +1126,7 @@ resolve_chain(uint_t p)
 
 char *tkp, *sav_tkp;
 char *token;
-enum { EOL, ALPHA, NUMBER, FIELD, ADDR_IP, ADDR_ETHER, SPECIAL,
-	ADDR_IP6, ADDR_AT } tokentype;
+enum tokentype tokentype;
 uint_t tokenval;
 
 /*
@@ -1134,7 +1136,7 @@ uint_t tokenval;
  * ALPHA:	A name that begins with a letter and contains
  *		letters or digits, hyphens or underscores.
  * NUMBER:	A number.  The value can be represented as
- * 		a decimal value (1234) or an octal value
+ *		a decimal value (1234) or an octal value
  *		that begins with zero (066) or a hex value
  *		that begins with 0x or 0X (0xff).
  * FIELD:	A name followed by a left square bracket.
@@ -1460,7 +1462,6 @@ comparison(char *s)
 	return (n_checks > 0);
 }
 
-enum direction { ANY, TO, FROM };
 enum direction dir;
 
 /*

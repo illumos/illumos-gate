@@ -74,10 +74,6 @@ extern struct Pf_ext_packetfilt pf;
 static ushort_t *pfp;
 jmp_buf env;
 
-int eaddr;	/* need ethernet addr */
-
-int opstack;	/* operand stack depth */
-
 #define	EQ(val)		(strcmp(token, val) == 0)
 #define	IPV4_ONLY	0
 #define	IPV6_ONLY	1
@@ -234,14 +230,6 @@ datalink_t	dl;
 
 static int inBrace = 0, inBraceOR = 0;
 static int foundOR = 0;
-char *tkp, *sav_tkp;
-char *token;
-enum { EOL, ALPHA, NUMBER, FIELD, ADDR_IP, ADDR_ETHER, SPECIAL,
-	ADDR_IP6 } tokentype;
-uint_t tokenval;
-
-enum direction { ANY, TO, FROM };
-enum direction dir;
 
 extern void next();
 
@@ -271,8 +259,7 @@ static void pf_matchfn(const char *name);
 static void *last_offset_operation = (void*)pf_clear_offset_register;
 
 static void
-pf_emit(x)
-	ushort_t x;
+pf_emit(ushort_t x)
 {
 	if (pfp > &pf.Pf_Filter[PF_MAXFILTERS - 1])
 		longjmp(env, 1);
@@ -280,9 +267,7 @@ pf_emit(x)
 }
 
 static void
-pf_codeprint(code, len)
-	ushort_t *code;
-	int len;
+pf_codeprint(ushort_t *code, int len)
 {
 	ushort_t *pc;
 	ushort_t *plast = code + len;
@@ -599,10 +584,7 @@ pf_compare_zoneid(int offset, uint32_t val)
  * Generate pf code to match an IPv4 or IPv6 address.
  */
 static void
-pf_ipaddr_match(which, hostname, inet_type)
-	enum direction which;
-	char *hostname;
-	int inet_type;
+pf_ipaddr_match(enum direction which, char *hostname, int inet_type)
 {
 	bool_t found_host;
 	uint_t *addr4ptr;
@@ -766,7 +748,7 @@ pf_ipaddr_match(which, hostname, inet_type)
 					first = B_FALSE;
 			}
 			addr6ptr = (struct in6_addr *)
-				hp->h_addr_list[++h_addr_index];
+			    hp->h_addr_list[++h_addr_index];
 		}
 		if (!first) {
 			pf_emit(ENF_AND);
@@ -781,7 +763,7 @@ pf_ipaddr_match(which, hostname, inet_type)
 					pf_matchfn("ip6");
 					if (dl.dl_type == DL_ETHER) {
 						pf_check_vlan_tag(
-							ENCAP_ETHERTYPE_OFF/2);
+						    ENCAP_ETHERTYPE_OFF / 2);
 					}
 					pass++;
 				}
@@ -803,7 +785,7 @@ pf_ipaddr_match(which, hostname, inet_type)
 					first = B_FALSE;
 			}
 			addr6ptr = (struct in6_addr *)
-				hp->h_addr_list[++h_addr_index];
+			    hp->h_addr_list[++h_addr_index];
 		}
 		if (!first) {
 			pf_emit(ENF_AND);
@@ -858,9 +840,7 @@ pf_compare_address(int offset, uint_t len, uchar_t *addr)
  * Compare ethernet addresses.
  */
 static void
-pf_etheraddr_match(which, hostname)
-	enum direction which;
-	char *hostname;
+pf_etheraddr_match(enum direction which, char *hostname)
 {
 	struct ether_addr e, *ep = NULL;
 
@@ -870,7 +850,7 @@ pf_etheraddr_match(which, hostname)
 		if (ether_hostton(hostname, &e))
 			if (!arp_for_ether(hostname, &e))
 				pr_err("cannot obtain ether addr for %s",
-					hostname);
+				    hostname);
 		ep = &e;
 	}
 
@@ -900,9 +880,7 @@ pf_etheraddr_match(which, hostname)
  * an IP address.
  */
 static void
-pf_netaddr_match(which, netname)
-	enum direction which;
-	char *netname;
+pf_netaddr_match(enum direction which, char *netname)
 {
 	uint_t addr;
 	uint_t mask = 0xff000000;
@@ -1530,9 +1508,7 @@ pf_expression()
  * filter.
  */
 int
-pf_compile(e, print)
-	char *e;
-	int print;
+pf_compile(char *e, int print)
 {
 	char *argstr;
 	char *sav_str, *ptr, *sav_ptr;
@@ -1616,8 +1592,7 @@ pf_compile(e, print)
 
 			/* CHECK IF NO OR AHEAD */
 			sav_ptr = (char *)((uintptr_t)sav_str +
-						(uintptr_t)sav_tkp -
-						(uintptr_t)argstr);
+			    (uintptr_t)sav_tkp - (uintptr_t)argstr);
 			ptr = sav_ptr;
 			while (*ptr != '\0') {
 				switch (*ptr) {
@@ -1630,7 +1605,7 @@ pf_compile(e, print)
 				case 'o':
 				case 'O':
 					if ((*(ptr + 1) == 'R' ||
-						*(ptr + 1) == 'r') && !inBr)
+					    *(ptr + 1) == 'r') && !inBr)
 						aheadOR = 1;
 					break;
 				case ',':
@@ -1646,7 +1621,7 @@ pf_compile(e, print)
 				pf.Pf_Priority = 5;
 				if (print) {
 					pf_codeprint(&pf.Pf_Filter[0],
-							pf.Pf_FilterLen);
+					    pf.Pf_FilterLen);
 				}
 				compile(sav_ptr, print);
 				return (2);
