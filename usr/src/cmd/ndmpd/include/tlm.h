@@ -437,7 +437,7 @@ typedef struct tm_ops {
 
 #define	LONGNAME_PREFIX	"././_LoNg_NaMe_"
 extern void ndmp_log(ulong_t, char *, char *, ...);
-char ndmp_log_info[256];
+extern char ndmp_log_info[256];
 #define	NDMP_LOG(p, ...) { \
 				(void) snprintf(ndmp_log_info, \
 				    sizeof (ndmp_log_info), \

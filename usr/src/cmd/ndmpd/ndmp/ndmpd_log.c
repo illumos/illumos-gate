@@ -65,11 +65,11 @@
 #define	LOG_FILE_SIZE	4 * 1024 * 1024
 #define	LOG_SIZE_INT	256
 
+char ndmp_log_info[256];
 static boolean_t debug = B_FALSE;
 static boolean_t log_to_stderr = B_FALSE;
 static FILE *logfp;
 static int ndmp_synclog = 1;
-
 
 /*
  * Since we use buffered file I/O for log file, the thread may lose CPU.
