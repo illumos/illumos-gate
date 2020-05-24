@@ -62,9 +62,9 @@ static turbo_info_t	*t_new = NULL;
 static int
 pt_turbo_init(void)
 {
-	kstat_ctl_t 		*kc;
-	kstat_t 		*ksp;
-	kstat_named_t 		*knp;
+	kstat_ctl_t		*kc;
+	kstat_t			*ksp;
+	kstat_named_t		*knp;
 
 	/*
 	 * check if the CPU turbo is supported
@@ -111,10 +111,10 @@ pt_turbo_init(void)
 static int
 pt_turbo_snapshot(turbo_info_t *turbo_snapshot)
 {
-	kstat_ctl_t 		*kc;
-	kstat_t 		*ksp;
-	kstat_named_t 		*knp;
-	int 			cpu;
+	kstat_ctl_t		*kc;
+	kstat_t			*ksp;
+	kstat_named_t		*knp;
+	int			cpu;
 	turbo_info_t		*turbo_info;
 
 	if ((kc = kstat_open()) == NULL)
