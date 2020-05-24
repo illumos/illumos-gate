@@ -7,8 +7,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/ioctl.h>
 #include "ipf.h"
 #include "netinet/ipl.h"
@@ -25,7 +23,7 @@ int opts;
 {
 	iphtent_t entry, *top, *node;
 	ipflookupiter_t iter;
-	int i, printed, last;
+	int i, printed = 0, last;
 	ipfobj_t obj;
 
 	if ((name != NULL) && strncmp(name, hp->iph_name, FR_GROUPLEN))

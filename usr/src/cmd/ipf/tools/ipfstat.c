@@ -815,6 +815,7 @@ char *group, *comment;
 	int n;
 	ipfruleiter_t rule;
 	ipfobj_t obj;
+	u_long array[1000];
 
 	fb.fr_next = fp;
 	n = 0;
@@ -838,8 +839,6 @@ char *group, *comment;
 	obj.ipfo_ptr = &rule;
 
 	do {
-		u_long array[1000];
-
 		memset(array, 0xff, sizeof(array));
 		fp = (frentry_t *)array;
 		rule.iri_rule = fp;
