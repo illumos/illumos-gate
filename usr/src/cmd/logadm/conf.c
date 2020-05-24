@@ -443,7 +443,7 @@ conf_open(const char *cfname, const char *tfname, struct opts *cliopts)
 
 	/*
 	 * possible future enhancement:  go through and mark any entries:
-	 * 		logfile -P <date>
+	 *		logfile -P <date>
 	 * as DELETED if the logfile doesn't exist
 	 */
 
@@ -688,6 +688,8 @@ conf_print(FILE *cstream, FILE *tstream)
 
 #ifdef	TESTMODULE
 
+int Debug;
+
 /*
  * test main for conf module, usage: a.out conffile
  */
@@ -705,7 +707,7 @@ main(int argc, char *argv[])
 	if (argc != 2)
 		err(EF_RAW, "usage: %s conffile\n", argv[0]);
 
-	conf_open(argv[1], argv[1], opts);
+	(void) conf_open(argv[1], argv[1], opts);
 
 	printf("conffile <%s>:\n", argv[1]);
 	conf_print(stdout, NULL);
