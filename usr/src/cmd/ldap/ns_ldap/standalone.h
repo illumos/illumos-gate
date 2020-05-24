@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef	_STANDALONE_H
 #define	_STANDALONE_H
 
@@ -37,7 +35,7 @@ extern "C" {
 #include "ns_sldap.h"
 #include "ns_internal.h"
 
-ns_standalone_conf_t standaloneDefaults;
+extern ns_standalone_conf_t standaloneDefaults;
 
 int separatePort(char *peer, char **name, uint16_t *port);
 
