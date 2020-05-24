@@ -82,16 +82,16 @@ extern "C" {
 #endif
 
 /* pointers to add_drv/rem_drv database files */
-char *driver_aliases;
-char *driver_classes;
-char *minor_perm;
-char *name_to_major;
-char *rem_name_to_major;
-char *device_policy;
-char *extra_privs;
+extern char *driver_aliases;
+extern char *driver_classes;
+extern char *minor_perm;
+extern char *name_to_major;
+extern char *rem_name_to_major;
+extern char *device_policy;
+extern char *extra_privs;
 
 /* devfs root string */
-char *devfs_root;
+extern char *devfs_root;
 
 /* module path searching structure */
 struct drvmod_dir {
@@ -99,7 +99,7 @@ struct drvmod_dir {
 	struct drvmod_dir *next;
 };
 
-struct drvmod_dir *moddir;
+extern struct drvmod_dir *moddir;
 
 /* names of things: directories, commands, files */
 #define	KERNEL_DRV	"/kernel/drv"

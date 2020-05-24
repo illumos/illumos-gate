@@ -66,6 +66,15 @@
  */
 #define	isquote(c)	(((c) == '"') || ((c) == '\''))
 
+char *driver_aliases;
+char *driver_classes;
+char *device_policy;
+char *extra_privs;
+char *devfs_root;
+char *minor_perm;
+struct drvmod_dir *moddir;
+char *name_to_major;
+char *rem_name_to_major;
 
 static char *add_rem_lock;	/* lock file */
 static int  add_rem_lock_fd = -1;
