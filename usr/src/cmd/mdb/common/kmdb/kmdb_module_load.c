@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/modctl.h>
 #include <sys/kobj.h>
@@ -123,7 +121,7 @@ kmdb_module_loaded(kmdb_wr_load_t *dlr)
 	struct modctl *modp = dlr->dlr_modctl;
 	const char *modname = strbasename(dlr->dlr_fname);
 	struct module *mp;
-	kmdb_modctl_t *kmc;
+	kmdb_modctl_t *kmc = NULL;
 	mdb_var_t *v;
 
 	v = mdb_nv_lookup(&mdb.m_dmodctl, modname);

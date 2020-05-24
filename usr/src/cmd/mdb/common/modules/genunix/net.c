@@ -384,7 +384,7 @@ sonode(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	const char *optf = NULL;
 	const char *optt = NULL;
 	const char *optp = NULL;
-	int family, type, proto;
+	int family = AF_UNSPEC, type = 0, proto = 0;
 	int filter = 0;
 	struct sonode so;
 
@@ -1414,7 +1414,6 @@ do_show_bridge(uintptr_t addr, const void *data, void *ptr)
 	trill_nickinfo_t tni;
 	char bname[MAXLINKNAMELEN];
 	char macaddr[ETHERADDRL * 3];
-	char *cp;
 	uint_t nnicks;
 	int i;
 
@@ -1430,9 +1429,9 @@ do_show_bridge(uintptr_t addr, const void *data, void *ptr)
 
 	(void) strncpy(bname, bip->bi_name, sizeof (bname) - 1);
 	bname[MAXLINKNAMELEN - 1] = '\0';
-	cp = bname + strlen(bname);
-	if (cp > bname && cp[-1] == '0')
-		cp[-1] = '\0';
+	i = strlen(bname);
+	if (i > 1 && bname[i - 1] == '0')
+		bname[i - 1] = '\0';
 
 	if (args->name != NULL && strcmp(args->name, bname) != 0)
 		return (WALK_NEXT);

@@ -1022,7 +1022,7 @@ bhyve_aread(mdb_tgt_t *tgt, mdb_tgt_as_t as, void *buf, size_t nbytes,
     mdb_tgt_addr_t addr)
 {
 	bhyve_data_t *bd = tgt->t_data;
-	ssize_t cnt;
+	ssize_t cnt = 0;
 
 	switch ((uintptr_t)as) {
 	case (uintptr_t)MDB_TGT_AS_VIRT:
@@ -1061,7 +1061,7 @@ bhyve_awrite(mdb_tgt_t *tgt, mdb_tgt_as_t as, const void *buf, size_t nbytes,
     mdb_tgt_addr_t addr)
 {
 	bhyve_data_t *bd = tgt->t_data;
-	ssize_t cnt;
+	ssize_t cnt = 0;
 
 	switch ((uintptr_t)as) {
 	case (uintptr_t)MDB_TGT_AS_VIRT:

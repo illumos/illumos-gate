@@ -1119,7 +1119,7 @@ umem_walk_init_common(mdb_walk_state_t *wsp, int type)
 
 	size_t magmax, magcnt;
 	void **maglist = NULL;
-	uint_t chunksize, slabsize;
+	uint_t chunksize = 1, slabsize = 1;
 	int status = WALK_ERR;
 	uintptr_t addr = wsp->walk_addr;
 	const char *layered;

@@ -563,7 +563,7 @@ cmd_nm(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	int hwidth;
 	size_t nsyms = 0;
 
-	nm_sym_t *syms, *symp;
+	nm_sym_t *syms = NULL, *symp;
 
 	nm_iter_info_t nii;
 

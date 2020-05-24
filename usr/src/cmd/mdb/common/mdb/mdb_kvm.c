@@ -563,7 +563,7 @@ kt_activate(mdb_tgt_t *t)
 	kt_data_t *kt = t->t_data;
 	void *sym;
 
-	int oflag;
+	int oflag = 0;
 
 	mdb_prop_postmortem = kt->k_xpv_domu || (kt->k_dumphdr != NULL);
 	mdb_prop_kernel = TRUE;

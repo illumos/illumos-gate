@@ -27,8 +27,6 @@
 #ifndef _UTIL_H
 #define	_UTIL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libelf.h>
 
 #ifdef __cplusplus
@@ -37,8 +35,8 @@ extern "C" {
 
 extern int findelfsecidx(Elf *, char *);
 
-extern void die(char *, ...);
-extern void elfdie(char *, ...);
+extern void die(char *, ...) __NORETURN;
+extern void elfdie(char *, ...) __NORETURN;
 
 extern const char *progname;
 

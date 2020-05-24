@@ -506,7 +506,7 @@ ssize_t
 mdb_tgt_readstr(mdb_tgt_t *t, mdb_tgt_as_t as, char *buf,
     size_t nbytes, mdb_tgt_addr_t addr)
 {
-	ssize_t n, nread = mdb_tgt_aread(t, as, buf, nbytes, addr);
+	ssize_t n = -1, nread = mdb_tgt_aread(t, as, buf, nbytes, addr);
 	char *p;
 
 	if (nread >= 0) {

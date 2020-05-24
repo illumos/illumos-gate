@@ -805,6 +805,9 @@ mdb_fmt_print(mdb_tgt_t *t, mdb_tgt_as_t as,
 				}
 				rvalue = u.i8;
 				break;
+			default:
+				rvalue = 0;
+				break;
 			}
 
 			mdb_nv_set_value(mdb.m_rvalue, rvalue);
