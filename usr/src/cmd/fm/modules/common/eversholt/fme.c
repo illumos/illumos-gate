@@ -56,6 +56,10 @@
 #include "platform.h"
 #include "esclex.h"
 
+struct lut *Istats;
+struct lut *SerdEngines;
+nvlist_t *Action_nvl;
+
 /* imported from eft.c... */
 extern hrtime_t Hesitate;
 extern char *Serd_Override;
