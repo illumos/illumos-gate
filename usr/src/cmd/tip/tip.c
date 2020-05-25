@@ -19,6 +19,10 @@
 #include <sys/wait.h>
 #include <locale.h>
 
+int	vflag;
+int	cumode;
+FILE	*phfd;
+
 /*
  * Baud rate mapping table
  */

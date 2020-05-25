@@ -9,9 +9,37 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "tip.h"
+
+char *DV;	/* UNIX device(s) to open */
+char *EL;	/* chars marking an EOL */
+char *CM;	/* initial connection message */
+char *IE;	/* EOT to expect on input */
+char *OE;	/* EOT to send to complete FT */
+char *CU;	/* call unit if making a phone call */
+char *AT;	/* acu type */
+char *PN;	/* phone number(s) */
+char *DI;	/* disconnect string */
+char *PA;	/* parity to be generated */
+
+char *PH;	/* phone number file */
+char *RM;	/* remote file name */
+char *HO;	/* host name */
+
+int BR;		/* line speed for conversation */
+int FS;		/* frame size for transfers */
+char DU;	/* this host is dialed up */
+char HW;	/* this device is hardwired, see hunt.c */
+char *ES;	/* escape character */
+char *EX;	/* exceptions */
+char *FO;	/* force (literal next) char */
+char *RC;	/* raise character */
+char *RE;	/* script record file */
+char *PR;	/* remote prompt */
+int DL;		/* line delay for file transfers to remote */
+int CL;		/* char delay for file transfers to remote */
+int ET;		/* echocheck timeout */
+int DB;		/* dialback - ignore hangup */
 
 /*
  * Attributes to be gleened from remote host description

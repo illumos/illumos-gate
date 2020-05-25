@@ -9,8 +9,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "tip.h"
 #include <limits.h>
 #ifdef USG
@@ -25,8 +23,20 @@
  * miscellaneous commands
  */
 
+struct termios arg;
+struct termios defarg;
+int	FD;
+int	fildes[2];
+int	repdes[2];
+int	pid;
+int	sfd;
+int	stoprompt;
+int	timedout;
 int	quant[] = { 60, 60, 24 };
 
+char	copyname[80];
+char	fname[80];
+char	ccc;
 char	null = '\0';
 char	*sep[] = { "second", "minute", "hour" };
 static	char *argv[10];		/* argument vector for take and put */

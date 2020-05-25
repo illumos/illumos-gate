@@ -9,8 +9,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Routines for dialing up on Vadic 831
  */
@@ -18,6 +16,7 @@
 
 #include "tip.h"
 
+int AC;
 static char	dialit(char *, char *);
 static char	*sanitize(char *);
 static void	alarmtr(void);

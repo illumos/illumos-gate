@@ -9,8 +9,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * remcap - routines for dealing with the remote host data base
  *
@@ -28,6 +26,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <ctype.h>
+#include "tip.h"
 
 #ifndef BUFSIZ
 #define	BUFSIZ		1024
@@ -44,8 +43,6 @@
 #define	E_TERMCAP	RM = SYSREMOTE
 #define	V_TERMCAP	"REMOTE"
 #define	V_TERM		"HOST"
-
-char	*RM;
 
 /*
  * termcap - routines for dealing with the terminal capability data base
