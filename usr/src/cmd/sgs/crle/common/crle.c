@@ -435,7 +435,7 @@ main(int argc, char **argv, char **envp)
 		 * can access any directories.
 		 */
 		if (crle.c_flags & CRLE_DUMP) {
-			Objdir	*objdir;
+			Objdir	*objdir = NULL;
 			Aliste	idx;
 			int	err = 0;
 

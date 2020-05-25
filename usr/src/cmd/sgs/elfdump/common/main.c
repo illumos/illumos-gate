@@ -732,7 +732,7 @@ main(int argc, char **argv, char **envp)
 	uint_t		flags = 0;
 	match_rec_t	match_data;
 	int		ret;
-	uchar_t		osabi;
+	uchar_t		osabi = ELFOSABI_NONE;
 
 	/*
 	 * If we're on a 64-bit kernel, try to exec a full 64-bit version of

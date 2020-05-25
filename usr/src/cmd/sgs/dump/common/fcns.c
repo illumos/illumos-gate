@@ -60,14 +60,17 @@ ar_sym_read(Elf *elf, char *filename)
 
 	if (!p_flag) {
 		(void) printf("     **** ARCHIVE SYMBOL TABLE ****\n");
-		if (is64) {
+		if (is64)
 			(void) printf("%-8s         %s\n\n", "Offset", "Name");
-			fmt = "%-16.16llx %s\n";
-		} else {
+		else
 			(void) printf("%-8s %s\n\n", "Offset", "Name");
-			fmt = "%-8.8llx %s\n";
-		}
 	}
+
+	if (is64)
+		fmt = "%-16.16llx %s\n";
+	else
+		fmt = "%-8.8llx %s\n";
+
 	for (cnt = 0; cnt < ptr; cnt++, arsym++) {
 		if (arsym->as_off)
 			(void) printf(fmt, EC_XWORD(arsym->as_off),

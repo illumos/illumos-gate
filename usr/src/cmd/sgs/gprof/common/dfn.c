@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include "gprof.h"
 
@@ -170,10 +168,10 @@ dfn_busy(nltype *childp)
 void
 dfn_findcycle(nltype *childp)
 {
-	int		cycletop;
-	nltype	*cycleheadp;
+	int	cycletop;
+	nltype	*cycleheadp = NULL;
 	nltype	*tailp;
-	int		index;
+	int	index;
 
 	for (cycletop = dfn_depth; cycletop > 0; cycletop -= 1) {
 		cycleheadp = dfn_stack[cycletop].nlentryp;
