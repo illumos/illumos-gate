@@ -34,7 +34,6 @@ include $(SRC)/cmd/stat/Makefile.stat
 
 LDLIBS += -lavl -lcmdutils -ldevinfo -lgen -lkstat
 CFLAGS += $(CCVERBOSE) -I${STATCOMMONDIR}
-CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-parentheses
 
@@ -42,16 +41,6 @@ CPPFLAGS_sparc += -I$(SRC)/uts/sfmmu
 CPPFLAGS += $(CPPFLAGS_$(MACH))
 
 FILEMODE= 0555
-
-lint := LINTFLAGS = -muxs -I$(STATCOMMONDIR)
-
-#
-# Maddeningly, lint both chokes on "%hhx" in a format string and refuses to be
-# suppressed about it (ironically further complaining that the suppression
-# directive itself is unused -- without suppressing the error itself).  So we
-# must unfortunately disable E_BAD_FORMAT_STR2 entirely...
-#
-lint := LINTFLAGS += -xerroff=E_BAD_FORMAT_STR2
 
 .KEEP_STATE:
 
@@ -69,7 +58,5 @@ $(PROG): $(OBJS) $(COMMON_OBJS)
 
 clean:
 	-$(RM) $(OBJS) $(COMMON_OBJS)
-
-lint: lint_SRCS
 
 include $(SRC)/cmd/Makefile.targ
