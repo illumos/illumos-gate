@@ -325,7 +325,7 @@ typedef struct graph_vertex {
 	 *
 	 * Currently, only relevant for GVT_SVC and GVT_INST type vertices.
 	 */
-	int 				gv_refs;
+	int				gv_refs;
 
 	int32_t				gv_stn_tset;
 	int32_t				gv_reason;
@@ -564,7 +564,7 @@ typedef struct contract_entry {
 
 extern volatile uint16_t	storing_contract;
 
-uu_list_pool_t *contract_list_pool;
+extern uu_list_pool_t *contract_list_pool;
 
 /* contract.c */
 ctid_t contract_init(void);

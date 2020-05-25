@@ -135,6 +135,7 @@
 #include "startd.h"
 #include "protocol.h"
 
+uu_list_pool_t *contract_list_pool;
 static uu_list_pool_t *restarter_instance_pool;
 static restarter_instance_list_t instance_list;
 
