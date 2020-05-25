@@ -4,8 +4,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ctype.h>
 
 typedef int	boolean;
@@ -25,7 +23,7 @@ static void	expconv(void);
 #define makelower(c)	(isupper((c)) ? tolower((c)) : (c))
 
 /*  STRNCMP -	like strncmp except that we convert the
- *	 	first string to lower case before comparing
+ *		first string to lower case before comparing
  *		if l_onecase is set.
  */
 
@@ -98,7 +96,7 @@ STRNCMP(char *s1, char *s2, int len)
 #define SNEXT(A) (A+2+*(A+1))	/* character following the string */
 
 /*
- *  bit flags in the descriptor 
+ * bit flags in the descriptor
  */
 #define OPT 1
 #define STR 2
@@ -160,8 +158,9 @@ expconv(void)
 		    *cs = STR;
 		    SCNT(cs) = 1;
 		    ccre += 2;
-		} else 
+		} else {
 		    SCNT(cs)++;
+		}
 		*ccre++ = c;
 		break;
 
@@ -173,7 +172,7 @@ expconv(void)
 		if (acs != NIL && acs != cs) {
 		    do {
 			temp = OCNT(acs);
-			OCNT(acs) = ccre - acs; 
+			OCNT(acs) = ccre - acs;
 			acs -= temp;
 		    } while (temp != 0);
 		    acs = NIL;
@@ -185,7 +184,7 @@ expconv(void)
 		break;
 	    }
 	    break;
-	    
+
 	/* just put the symbol in */
 	case '^':
 	case '$':
@@ -206,7 +205,7 @@ expconv(void)
 	/* mark the last match sequence as optional */
 	case '?':
 	    if (cs)
-	    	*cs = *cs | OPT;
+		*cs = *cs | OPT;
 	    break;
 
 	/* recurse and define a subexpression */
@@ -302,12 +301,12 @@ expconv(void)
  *	The irregular expression must be translated to internal form
  *	prior to calling this routine
  *
- *	The value returned is the pointer to the first non \a 
+ *	The value returned is the pointer to the first non \a
  *	character matched.
  */
 
-boolean _escaped;		/* true if we are currently _escaped */
-char *Start;			/* start of string */
+extern boolean _escaped;	/* true if we are currently _escaped */
+extern char *Start;		/* start of string */
 
 char *
 expmatch(char *s, char *re, char *mstring)
@@ -467,7 +466,7 @@ expmatch(char *s, char *re, char *mstring)
 	    case 'e':
 		if (_escaped)
 		    return(NIL);
-		cs = MNEXT(cs); 
+		cs = MNEXT(cs);
 		break;
 
 	    /* match any number of tabs and spaces */
@@ -479,12 +478,12 @@ expmatch(char *s, char *re, char *mstring)
 
 		    /* match, be happy */
 		    matched = 1;
-		    cs = MNEXT(cs); 
+		    cs = MNEXT(cs);
 		} else if (*s == '\n' || *s == '\0') {
 
 		    /* match, be happy */
 		    matched = 1;
-		    cs = MNEXT(cs); 
+		    cs = MNEXT(cs);
 		} else if (*cs & ALT) {
 
 		    /* try the next part */
