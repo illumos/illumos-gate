@@ -4,7 +4,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 1980, 1986, 1990 The Regents of the University of California.
@@ -61,7 +61,13 @@
 #include <inttypes.h>
 #include "fsck.h"
 
+struct bufarea *pbp;
+struct bufarea *pdirbp;
 caddr_t mount_point = NULL;
+static struct bufarea bufhead;	/* head of list of other blks in filesys */
+char *elock_combuf;
+char *elock_mountp;
+static struct lockfs *lfp;		/* current lockfs status */
 
 static int64_t diskreads, totalreads;	/* Disk cache statistics */
 
@@ -1064,7 +1070,7 @@ mounted(caddr_t name, caddr_t devstr, size_t str_size)
 	if (hasmntopt(mntent, MNTOPT_RO) != 0)
 		found = M_RO;	/* mounted as RO */
 	else
-		found = M_RW; 	/* mounted as R/W */
+		found = M_RW;	/* mounted as R/W */
 
 	if (mount_point == NULL) {
 		mount_point = strdup(mntent->mnt_mountp);
@@ -2498,7 +2504,7 @@ brute_force_get_device_size(int fd)
 	diskaddr_t	min_fail = 0;
 	diskaddr_t	max_succeed = 0;
 	diskaddr_t	cur_db_off;
-	char 		buf[DEV_BSIZE];
+	char		buf[DEV_BSIZE];
 
 	/*
 	 * First, see if we can read the device at all, just to

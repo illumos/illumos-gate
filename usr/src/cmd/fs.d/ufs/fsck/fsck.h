@@ -1,5 +1,5 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 1980, 1986, 1990 The Regents of the University of California.
@@ -27,8 +27,6 @@
 
 #ifndef	_FSCK_FSCK_H
 #define	_FSCK_FSCK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.3   */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -83,11 +81,11 @@ extern "C" {
 /*
  * These tests depend on the state/type defines above not overlapping bits.
  *
- *     	DUNFOUND === (state == DSTATE || state == DZLINK)
+ *	DUNFOUND === (state == DSTATE || state == DZLINK)
  *          INCLEAR is irrelevant to the determination of
  *          connectedness, so it's not included in this test.
  *
- *     	DVALID   === (state == DSTATE || state == DZLINK || state == DFOUND)
+ *	DVALID   === (state == DSTATE || state == DZLINK || state == DFOUND)
  */
 #define	S_IS_DUNFOUND(state)	(((state) & (DSTATE | INZLINK)) \
 				== (state))
@@ -121,12 +119,10 @@ struct bufarea {
 #define	B_INUSE 1
 
 #define	MINBUFS		5	/* minimum number of buffers required */
-struct bufarea bufhead;		/* head of list of other blks in filesys */
-struct bufarea sblk;		/* file system superblock */
-struct bufarea asblk;		/* alternate superblock */
-struct bufarea cgblk;		/* cylinder group blocks */
-struct bufarea *pbp;		/* pointer to inode data in buffer pool */
-struct bufarea *pdirbp;		/* pointer to directory data in buffer pool */
+extern struct bufarea sblk;	/* file system superblock */
+extern struct bufarea cgblk;	/* cylinder group blocks */
+extern struct bufarea *pbp;	/* pointer to inode data in buffer pool */
+extern struct bufarea *pdirbp;	/* pointer to directory data in buffer pool */
 
 #define	sbdirty()	dirty(&sblk)
 #define	cgdirty()	dirty(&cgblk)
@@ -243,14 +239,14 @@ struct inoinfo {
 /*
  * Inode cache
  */
-struct inoinfo **inphead, **inpsort;
-int64_t numdirs, listmax, inplast;
+extern struct inoinfo **inphead, **inpsort;
+extern int64_t numdirs, listmax, inplast;
 
 /*
  * ACL cache
  */
-struct inoinfo **aclphead, **aclpsort;
-int64_t numacls, aclmax, aclplast;
+extern struct inoinfo **aclphead, **aclpsort;
+extern int64_t numacls, aclmax, aclplast;
 
 /*
  * Tree of directories we haven't reconnected or cleared.  Any
@@ -261,13 +257,13 @@ int64_t numacls, aclmax, aclplast;
  *
  * Elements are fsck_ino_t instances (not pointers).
  */
-void *limbo_dirs;
+extern void *limbo_dirs;
 
 /*
  * Number of directories we actually found in the filesystem,
  * as opposed to how many the superblock claims there are.
  */
-fsck_ino_t countdirs;
+extern fsck_ino_t countdirs;
 
 /*
  * shadowclients and shadowclientinfo are structures for keeping track of
@@ -287,8 +283,8 @@ struct shadowclientinfo {
 	struct shadowclientinfo *next; /* link to the next shadow inode */
 };
 /* global pointer to this shadow/client information */
-struct shadowclientinfo *shadowclientinfo;
-struct shadowclientinfo *attrclientinfo;
+extern struct shadowclientinfo *shadowclientinfo;
+extern struct shadowclientinfo *attrclientinfo;
 
 /*
  * In ufs_inode.h ifdef _KERNEL, this is defined as `/@/'.  However,
@@ -312,64 +308,62 @@ extern caddr_t lfname;
 /*
  * Unitialized globals.
  */
-char	*devname;		/* name of device being checked */
-size_t	dev_bsize;		/* computed value of DEV_BSIZE */
-int	secsize;		/* actual disk sector size */
-char	nflag;			/* assume a no response */
-char	yflag;			/* assume a yes response */
-daddr32_t	bflag;		/* location of alternate super block */
-int	debug;			/* output debugging info */
-int	rflag;			/* check raw file systems */
-int	roflag;			/* do normal checks but don't update disk */
-int	fflag;			/* check regardless of clean flag (force) */
-int	mflag;			/* sanity check only */
-int	verbose;		/* be chatty */
-char	preen;			/* just fix normal inconsistencies */
-char	mountedfs;		/* checking mounted device */
-int	exitstat;		/* exit status (see EX* defines below) */
-char	hotroot;		/* checking root device */
-char	rerun;			/* rerun fsck. Only used in non-preen mode */
-int	interrupted;		/* 1 => exit EXSIGNAL on exit */
-char	havesb;			/* superblock has been read */
-int	fsmodified;		/* 1 => write done to file system */
-int	fsreadfd;		/* file descriptor for reading file system */
-int	fswritefd;		/* file descriptor for writing file system */
-int	iscorrupt;		/* known to be corrupt/inconsistent */
+extern char	*devname;	/* name of device being checked */
+extern size_t	dev_bsize;	/* computed value of DEV_BSIZE */
+extern int	secsize;	/* actual disk sector size */
+extern char	nflag;		/* assume a no response */
+extern char	yflag;		/* assume a yes response */
+extern daddr32_t	bflag;	/* location of alternate super block */
+extern int	debug;		/* output debugging info */
+extern int	rflag;		/* check raw file systems */
+extern int	fflag;		/* check regardless of clean flag (force) */
+extern int	mflag;		/* sanity check only */
+extern int	verbose;	/* be chatty */
+extern char	preen;		/* just fix normal inconsistencies */
+extern char	mountedfs;	/* checking mounted device */
+extern int	exitstat;	/* exit status (see EX* defines below) */
+extern char	hotroot;	/* checking root device */
+extern char	rerun;		/* rerun fsck. Only used in non-preen mode */
+extern int	interrupted;	/* 1 => exit EXSIGNAL on exit */
+extern char	havesb;		/* superblock has been read */
+extern int	fsmodified;	/* 1 => write done to file system */
+extern int	fsreadfd;	/* file descriptor for reading file system */
+extern int	fswritefd;	/* file descriptor for writing file system */
+extern int	iscorrupt;	/* known to be corrupt/inconsistent */
 				/* -1 means mark clean so user can mount+fix */
-int	isdirty;		/* 1 => write pending to file system */
+extern int	isdirty;	/* 1 => write pending to file system */
 
-int	islog;			/* logging file system */
-int	islogok;		/* log is okay */
+extern int	islog;		/* logging file system */
+extern int	islogok;	/* log is okay */
 
-int	errorlocked;		/* set => mounted fs has been error-locked */
+extern int	errorlocked;	/* set => mounted fs has been error-locked */
 				/* implies fflag "force check flag" */
-char	*elock_combuf;		/* error lock comment buffer */
-char	*elock_mountp;		/* mount point; used to unlock error-lock */
-int	pid;			/* fsck's process id (put in lockfs comment) */
-int	mountfd;		/* fd of mount point */
-struct lockfs	*lfp;		/* current lockfs status */
+extern char	*elock_combuf;	/* error lock comment buffer */
+extern char	*elock_mountp;	/* mount point; used to unlock error-lock */
+extern int	pid;		/* fsck's process id (put in lockfs comment) */
+extern int	mountfd;	/* fd of mount point */
 
-daddr32_t	maxfsblock;	/* number of blocks in the file system */
-uint_t	largefile_count;	/* global largefile counter */
-char	*mount_point;		/* if mounted, this is where */
-char	*blockmap;		/* ptr to primary blk allocation map */
-fsck_ino_t	maxino;		/* number of inodes in file system */
-fsck_ino_t	lastino;	/* last inode in use */
-ushort_t *statemap;		/* ptr to inode state table */
-short	*lncntp;		/* ptr to link count table */
+extern daddr32_t maxfsblock;	/* number of blocks in the file system */
+extern uint_t	largefile_count; /* global largefile counter */
+extern char	*mount_point;	/* if mounted, this is where */
+extern char	*blockmap;	/* ptr to primary blk allocation map */
+extern fsck_ino_t	maxino;	/* number of inodes in file system */
+extern fsck_ino_t	lastino; /* last inode in use */
+extern ushort_t *statemap;	/* ptr to inode state table */
+extern short	*lncntp;	/* ptr to link count table */
 
-fsck_ino_t	lfdir;		/* lost & found directory inode number */
-int		overflowed_lf;	/* tried to wrap lost & found's link count */
-int		reattached_dir;	/* reconnected at least one directory */
-int		broke_dir_link;	/* broke at least one directory hardlink */
+extern fsck_ino_t	lfdir;	/* lost & found directory inode number */
+extern int	overflowed_lf;	/* tried to wrap lost & found's link count */
+extern int	reattached_dir;	/* reconnected at least one directory */
+extern int	broke_dir_link;	/* broke at least one directory hardlink */
 
-daddr32_t	n_blks;		/* number of blocks in use */
-fsck_ino_t	n_files;	/* number of files in use */
+extern daddr32_t	n_blks;		/* number of blocks in use */
+extern fsck_ino_t	n_files;	/* number of files in use */
 
 #define	clearinode(dp)	{ \
 	*(dp) = zino; \
 }
-struct	dinode zino;
+extern struct	dinode zino;
 
 #define	testbmap(blkno)	isset(blockmap, blkno)
 #define	setbmap(blkno)	setbit(blockmap, blkno)

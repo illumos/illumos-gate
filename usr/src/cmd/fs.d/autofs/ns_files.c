@@ -46,6 +46,7 @@
 #include <strings.h>
 #include "automount.h"
 
+int did_exec_map;
 static int read_execout(char *, char **, char *, char *, int);
 static int call_read_execout(char *, char *, char *, int);
 static FILE *file_open(char *, char *, char **, char ***);
@@ -349,7 +350,7 @@ loadmaster_files(char *mastermap, char *defopts, char **stack, char ***stkptr)
 			/*
 			 * Check for no embedded blanks.
 			 */
-			if (strcspn(opts, " 	") == strlen(opts)) {
+			if (strcspn(opts, " \t") == strlen(opts)) {
 				dir++;
 				(void) loadmaster_map(dir, opts, stack, stkptr);
 			} else {
@@ -377,7 +378,7 @@ pr_msg("Warning: invalid entry for %s in %s ignored.\n", dir, fname);
 			/*
 			 * Check for no embedded blanks.
 			 */
-			if (strcspn(opts, " 	") == strlen(opts)) {
+			if (strcspn(opts, " \t") == strlen(opts)) {
 				dirinit(dir, map, opts, 0, stack, stkptr);
 			} else {
 pr_msg("Warning: invalid entry for %s in %s ignored.\n", dir, fname);

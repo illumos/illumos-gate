@@ -3,7 +3,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 1980, 1986, 1990 The Regents of the University of California.
@@ -43,6 +43,12 @@
 #undef _KERNEL
 #include <pwd.h>
 #include "fsck.h"
+
+uint_t largefile_count = 0;
+fsck_ino_t lastino;
+struct bufarea cgblk;
+struct inoinfo **aclphead, **aclpsort;
+struct dinode zino;
 
 static int get_indir_offsets(int, daddr_t, int *, int *);
 static int clearanentry(struct inodesc *);
@@ -508,7 +514,7 @@ iblock(struct inodesc *idesc, int ilevel, u_offset_t iblks,
 		nif = 0;
 	/*
 	 * first pass: all "free" retrieval pointers (from [nif] thru
-	 * 	the end of the indirect block) should be zero. (This
+	 *	the end of the indirect block) should be zero. (This
 	 *	assertion does not hold for directories, which may be
 	 *	truncated without releasing their allocated space)
 	 */

@@ -4,7 +4,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 1980, 1986, 1990 The Regents of the University of California.
@@ -39,6 +39,8 @@
 #include "fsck.h"
 #include "udfs.h"
 #include <locale.h>
+
+uint64_t maxuniqid;	/* maximum unique id on medium */
 
 /*
  * for each large file ( size > MAXOFF_T) this global counter
