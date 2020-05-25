@@ -38,6 +38,8 @@ char	*lint_libs[] = {
 	IG_FILE2,
 	0
 };
+char	**names_ignored;
+int	nignored;
 
 extern	char	*processname;
 

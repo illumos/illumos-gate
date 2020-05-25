@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <ctype.h>
 #include <signal.h>
@@ -35,6 +33,8 @@
 #include <string.h>
 #include "error.h"
 
+FILE	*errorfile;
+FILE	*queryfile;
 int	nerrors = 0;
 Eptr	er_head;
 Eptr	*errors;
@@ -181,8 +181,8 @@ main(int argc, char *argv[])
 	if ((queryfile = fopen(im_on, "r")) == NULL) {
 		if (query) {
 			(void) fprintf(stderr,
-				"%s: Can't open \"%s\" to query the user.\n",
-				processname, im_on);
+			    "%s: Can't open \"%s\" to query the user.\n",
+			    processname, im_on);
 			exit(9);
 		}
 	}

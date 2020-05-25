@@ -62,6 +62,7 @@ static void writetouched(int overwrite);
 
 #define	FILEITERATE(fi, lb)	for (fi = lb; fi <= nfiles; fi++)
 int	touchstatus = Q_YES;
+boolean	*touchedfiles;
 
 void
 findfiles(int nerrors, Eptr *errors, int *r_nfiles, Eptr ***r_files)
