@@ -25,10 +25,13 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<stdlib.h>
 #include	"gprof.h"
+
+double	printtime;
+sztype	total_names;
+int	ncycle;
+nltype	*cyclenl;
 
 /*
  *	add (or just increment) an arc
@@ -334,11 +337,13 @@ cyclelink(void)
 						continue;
 
 					if (arcp->arc_parentp->cycleno ==
-									cycle) {
-					    cyclenlp->selfcalls +=
-							arcp->arc_count;
-					} else
-					    cyclenlp->ncall += arcp->arc_count;
+					    cycle) {
+						cyclenlp->selfcalls +=
+						    arcp->arc_count;
+					} else {
+						cyclenlp->ncall +=
+						    arcp->arc_count;
+					}
 				}
 			}
 		}
@@ -607,10 +612,8 @@ doarcs(void)
 			 * the program executable.
 			 */
 			if (cflag && (mi == &modules)) {
-				findcalls(
-					parentp,
-					parentp->value,
-					parentp->value + parentp->sz);
+				findcalls(parentp, parentp->value,
+				    parentp->value + parentp->sz);
 			}
 		}
 	}
@@ -643,7 +646,7 @@ doarcs(void)
 	index = 0;
 	for (mi = &modules; mi; mi = mi->next) {
 		for (i = 0; i < mi->nname; i++)
-		    topsortnlp[index++] = &(mi->nl[i]);
+			topsortnlp[index++] = &(mi->nl[i]);
 	}
 
 	qsort(topsortnlp, total_names, sizeof (nltype *), topcmp);
@@ -677,7 +680,7 @@ doarcs(void)
 	 *	and cycle headers.
 	 */
 	timesortnlp = (nltype **) calloc(total_names + ncycle,
-							sizeof (nltype *));
+	    sizeof (nltype *));
 	if (timesortnlp == (nltype **) 0) {
 		(void) fprintf(stderr,
 		    "%s: ran out of memory for sorting\n", whoami);
@@ -686,7 +689,7 @@ doarcs(void)
 	index = 0;
 	for (mi = &modules; mi; mi = mi->next) {
 		for (i = 0; i < mi->nname; i++)
-		    timesortnlp[index++] = &(mi->nl[i]);
+			timesortnlp[index++] = &(mi->nl[i]);
 	}
 
 	for (index = 1; index <= ncycle; index++)
