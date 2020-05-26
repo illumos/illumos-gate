@@ -21,7 +21,7 @@
 
 #define	PQ_ACTIVE	1
 
-void vm_page_unwire(vm_page_t , uint8_t);
+void vm_page_unwire(vm_page_t, uint8_t);
 
 #define	VM_PAGE_TO_PHYS(page)	(mmu_ptob((uintptr_t)((page)->vmp_pfn)))
 

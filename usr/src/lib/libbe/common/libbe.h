@@ -81,7 +81,7 @@ extern "C" {
  *       in sync please make sure to add any new error messages at the end
  *       of this enumeration.
  */
-enum {
+typedef enum {
 	BE_SUCCESS = 0,
 	BE_ERR_ACCESS = 4000,	/* permission denied */
 	BE_ERR_ACTIVATE_CURR,	/* Activation of current BE failed */

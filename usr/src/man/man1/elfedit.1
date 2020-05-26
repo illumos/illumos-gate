@@ -4,19 +4,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ELFEDIT 1 "Jan 28, 2008"
+.TH ELFEDIT 1 "May 17, 2020"
 .SH NAME
 elfedit \- examine or edit ELF files
 .SH SYNOPSIS
-.LP
 .nf
 \fBelfedit\fR [\fB-adr\fR] [\fB-e\fR \fIcmd\fR] [\fB-L\fR \fIpath\fR] [\fB-o\fR \fBdefault\fR | \fBsimple\fR | \fBnum\fR]
      [\fIinfile\fR] [\fIoutfile\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBelfedit\fR is a tool for examining or modifying the contents of an existing
 ELF object. Specifically, \fBelfedit\fR is used to modify the ELF metadata
 contained in the object. Access is provided to most of the ELF data contained
@@ -24,8 +21,6 @@ in an object, including the ELF header, section header table, program header
 table, dynamic section, hardware and software capabilities, string tables, and
 symbol tables.
 .SS "Syntax"
-.sp
-.LP
 \fBelfedit\fR processes commands from the command line (\fB-e\fR option) or
 from standard input. If standard input is a terminal, \fBelfedit\fR provides
 terminal editing capabilities, as well as extensive command completion. ELF
@@ -302,8 +297,6 @@ Core built in \fBelfedit\fR commands
 .RE
 
 .SS "Status And Command Documentation"
-.sp
-.LP
 Status And Command Documentation
 .sp
 .LP
@@ -399,8 +392,6 @@ help (\fBsys:help\fR) can be used to obtain help on itself:
 .sp
 
 .SS "Module Search Path"
-.sp
-.LP
 \fBelfedit\fR modules are implemented as sharable objects which are loaded on
 demand. When a module is required, \fBelfedit\fR searches a module path in
 order to locate the sharable object that implements the module. The path is a
@@ -444,7 +435,7 @@ appending or prepending directories to the default path.
 .ad
 .RS 6n
 Root of file system tree holding the \fBelfedit\fR program, assuming that
-\fBelfedit\fR is installed as \fBusr/bin/elfedi\fRt within the tree. On a
+\fBelfedit\fR is installed as \fBusr/bin/elfedit\fR within the tree. On a
 standard system, this is simply the standard system root directory (\fB/\fR).
 On a development system, where the copy of \fBelfedit\fR can be installed
 elsewhere, the use of \fB%r\fR can be used to ensure that the matching set of
@@ -507,8 +498,6 @@ The default search path can be changed by setting the \fBELFEDIT_PATH\fR
 environment variable, or by using the \fB-L\fR command line option. If you
 specify both, the \fB-L\fR option supersedes the environment variable.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -628,8 +617,6 @@ examination of files for which the user does not have write permission.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -672,8 +659,6 @@ is opened for read-only access, and the modified object contents are written to
 .RE
 
 .SH USAGE
-.sp
-.LP
 When supported by the system, \fBelfedit\fR runs as a 64-bit application,
 capable of processing files greater than or equal to 2 Gbytes (2^31 bytes).
 .sp
@@ -702,8 +687,6 @@ If no \fB-e\fR options are specified, \fBelfedit\fR reads commands from
 issue the write (\fBsys:write\fR) and quit (\fBsys:quit\fR) commands to save
 their work and exit when running in this mode.
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -733,8 +716,6 @@ Invalid command line options were specified.
 .RE
 
 .SH EXAMPLES
-.sp
-.LP
 In the following examples, interactive use of \fBelfedit\fR is shown with the
 shell prompt (\fB%\fR) and the \fBelfedit\fR prompt (\fB>\fR). Neither of these
 characters should be entered by the user.
@@ -866,7 +847,6 @@ STT_FUNC
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .ne 2
 .na
 \fB\fBELFEDIT_PATH\fR\fR
@@ -897,7 +877,6 @@ Interactively delivers output from \fBelfedit\fR to the screen. If not set,
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/elfedit\fR\fR
@@ -918,8 +897,6 @@ Personal \fBtecla\fR customization file for command line editing. See
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -934,8 +911,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBdump\fR(1), \fBelfdump\fR(1), \fBld.so.1\fR(1), \fBmore\fR(1), \fBnm\fR(1),
 \fBpvs\fR(1), \fBelf\fR(3ELF), \fBlibelf\fR(3LIB), \fBtecla\fR(5),
 \fBattributes\fR(5)
@@ -943,8 +918,6 @@ Interface Stability	Committed
 .LP
 \fILinker and Libraries Guide\fR
 .SH WARNINGS
-.sp
-.LP
 \fBelfedit\fR is designed to be a tool for testing and development of the ELF
 system. It offers the ability to examine and change nearly every piece of ELF
 metadata in the object. It quietly allows edits that can produce an invalid or
@@ -965,8 +938,6 @@ Higher level operations, such as the use of the \fBdyn:runpath\fR command to
 change the \fBrunpath\fR of an object, are safe, and can be carried out without
 the sort of risk detailed in this section.
 .SH NOTES
-.sp
-.LP
 Not every ELF operation supported by \fBelfedit\fR can be successfully carried
 out on every ELF object. \fBelfedit\fR is constrained by the existing sections
 found in the file.

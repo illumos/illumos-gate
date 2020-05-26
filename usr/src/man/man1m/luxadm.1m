@@ -3,18 +3,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LUXADM 1M "May 13, 2017"
+.TH LUXADM 1M "May 17, 2020"
 .SH NAME
 luxadm \- administer Sun Fire 880 storage subsystem and FC_AL devices
 .SH SYNOPSIS
-.LP
 .nf
 \fBluxadm\fR [\fIoptions\fR]... \fIsubcommand\fR [\fIoptions\fR]... \fIenclosure\fR
      [,\fIdev\fR] | \fIpathname\fR...
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBluxadm\fR program is an administrative command that manages the
 \fBSENA\fR, Sun Fire 880 internal storage subsystem, and individual Fiber
 Channel Arbitrated Loop (\fBFC_AL\fR) devices. \fBluxadm\fR performs a variety
@@ -36,7 +34,6 @@ of the \fBSENA\fR enclosure, and an optional identifier for the particular
 device in the enclosure. The individual \fBFC_AL\fR devices may be specified by
 entering the \fBWWN\fR for the device or a port to the device.
 .SS "Pathname"
-.LP
 Specify the device or controller by either a complete physical pathname or a
 complete logical pathname.
 .sp
@@ -120,7 +117,6 @@ and a typical logical pathname is:
 .sp
 
 .SS "Enclosure"
-.LP
 For \fBSENA,\fR a device may be identified by its enclosure name and slotname:
 .br
 .in +2
@@ -169,7 +165,6 @@ the disk slot number in the Sun Fire 880 internal storage subsystem, \fB0\fR -
 See \fBdisks\fR(1M) and \fBdevlinks\fR(1M) for additional information on
 logical names for disks and subsystems.
 .SH OPTIONS
-.LP
 The following options are supported by all subcommands:
 .sp
 .ne 2
@@ -194,7 +189,6 @@ Verbose mode.
 Options that are specific to particular subcommands are described with the
 subcommand in the \fBUSAGE\fR section.
 .SH OPERANDS
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -315,7 +309,7 @@ pathname.
 When the \fBSENA's\fR download is complete, the \fBSENA\fR will be reset and
 the downloaded code executed. If no filename is specified, the default prom
 image will be used. The default prom image for the \fBSENA\fR is in the
-directory \fBusr/lib/locale/C/LC_MESSAGES\fR and is named \fBibfirmware\fR
+directory \fB/usr/lib/locale/C/LC_MESSAGES\fR and is named \fBibfirmware\fR
 .sp
 When the Sun Fire 880 internal storage subsystem's download is complete, the
 subsystem resets and the downloaded code begins execution. The default firmware
@@ -746,7 +740,6 @@ Spin down the specified disks in a SENA.
 .RE
 
 .SS "SENA, Sun Fire 880 Internal Storage Subsystem, and Individual FC_AL Drive Expert Mode Subcommands"
-.LP
 The following subcommands are for expert use only, and are applicable only to
 the \fBSENA\fR, Sun Fire 880 internal storage subsystem, and fiber channel
 loops. They should only be used by users that are knowledgeable about the
@@ -867,7 +860,6 @@ the loop that contains the device specified by the enclosure or pathname.
 .RE
 
 .SS "Other Expert Mode Subcommands"
-.LP
 See \fBNOTES\fR for limitations of these subcommands. They should only be used
 by users that are knowledgeable about the systems they are managing.
 .sp
@@ -955,7 +947,6 @@ Put the specified device online.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRDisplaying the \fBSENA\fRs and Individual FC_AL Devices on a
 System
 .sp
@@ -1207,11 +1198,9 @@ example# \fBluxadm release /dev/rdsk/c1t8d0s2\fR
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.LP
 See \fBenviron\fR(5) for a description of the \fBLANG\fR environment variable
 that affects the execution of \fBluxadm\fR.
 .SH EXIT STATUS
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -1234,7 +1223,7 @@ An error occurred.
 .SH FILES
 .ne 2
 .na
-\fB\fBusr/lib/firmware/fc_s/fc_s_fcode\fR\fR
+\fB\fB/usr/lib/firmware/fc_s/fc_s_fcode\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -1244,7 +1233,7 @@ An error occurred.
 .sp
 .ne 2
 .na
-\fB\fBusr/lib/locale/C/LC_MESSAGES/ibfirmware\fR\fR
+\fB\fB/usr/lib/locale/C/LC_MESSAGES/ibfirmware\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -1252,11 +1241,9 @@ An error occurred.
 .RE
 
 .SH SEE ALSO
-.LP
 \fBdevlinks\fR(1M), \fBdisks\fR(1M), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBses\fR(7D)
 .SH NOTES
-.LP
 Currently, only some device drivers
 support hot plugging. If hot plugging is attempted on a disk or bus where it is
 not supported, an error message of the form:

@@ -51,8 +51,6 @@ install: all $(ROOTUSRSBINPROG)
 clean:
 	$(RM) $(OBJS) $(CLEANFILES)
 
-lint:	lint_SRCS
-
 include ../Makefile.targ
 
 %.o: $(CONTRIB)/freebsd/lib/libutil/%.c

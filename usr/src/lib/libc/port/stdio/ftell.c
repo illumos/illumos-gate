@@ -91,7 +91,7 @@ ftell_common(FILE *iop)
 		tres += adjust;
 
 	FUNLOCKFILE(lk);
-	return ((long)tres);
+	return (tres);
 }
 
 long

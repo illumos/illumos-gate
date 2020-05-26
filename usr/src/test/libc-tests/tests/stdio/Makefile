@@ -23,17 +23,23 @@ PROGS = \
 	orientation_test \
 	test_mbrtowc
 
+LFSPROGS = \
+	ftello_12768
+
 PROGS32 = $(PROGS:%=%.32)
-PROGS64 = $(PROGS:%=%.64)
+PROGSLFS = $(LFSPROGS:%=%.lfs)
+PROGS64 = $(PROGS:%=%.64) $(LFSPROGS:%=%.64)
 
 ROOTOPTDIR = $(ROOT)/opt/libc-tests/tests
 ROOTOPTSTDIO = $(ROOTOPTDIR)/stdio
 ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTSTDIO)/%) \
-	$(PROGS64:%=$(ROOTOPTSTDIO)/%)
+	$(PROGS64:%=$(ROOTOPTSTDIO)/%) \
+	$(PROGSLFS:%=$(ROOTOPTSTDIO)/%)
 
 include $(SRC)/cmd/Makefile.cmd
 
 CPPFLAGS += -D_REENTRANT -D__EXTENSIONS__
+LFSCPPFLAGS = -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 #
 # libumem is used to interpose on all of these tests to modify the
@@ -58,9 +64,9 @@ orientation_test.64 := SMOFF += all_func_returns
 
 .KEEP_STATE:
 
-install: $(ROOTOPTPROGS)
-
 all: $(PROGS32) $(PROGS64)
+
+install: $(ROOTOPTPROGS)
 
 clean:
 
@@ -77,6 +83,10 @@ $(ROOTOPTSTDIO)/%: %
 
 %.64: %.c
 	$(LINK64.c) -o $@ $< $(LDLIBS64)
+	$(POST_PROCESS)
+
+%.lfs: %.c
+	$(LINK.c) $(LFSCPPFLAGS) -o $@ $< $(LDLIBS)
 	$(POST_PROCESS)
 
 %.32: %.c

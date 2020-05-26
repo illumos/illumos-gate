@@ -392,6 +392,7 @@ syntax: glob
 usr/src/cmd/bhyve/acpi.h
 usr/src/cmd/bhyve/ahci.h
 usr/src/cmd/bhyve/atkbdc.h
+usr/src/cmd/bhyve/audio.h
 usr/src/cmd/bhyve/bhyvegc.h
 usr/src/cmd/bhyve/bhyverun.h
 usr/src/cmd/bhyve/block_if.h
@@ -403,6 +404,7 @@ usr/src/cmd/bhyve/ioapic.h
 usr/src/cmd/bhyve/mem.h
 usr/src/cmd/bhyve/mptbl.h
 usr/src/cmd/bhyve/pci_emul.h
+usr/src/cmd/bhyve/pci_hda.h
 usr/src/cmd/bhyve/pci_irq.h
 usr/src/cmd/bhyve/pci_lpc.h
 usr/src/cmd/bhyve/ps2kbd.h

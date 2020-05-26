@@ -45,23 +45,20 @@
 .\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\"
-.TH WAIT 1 "Mar 13, 2008"
+.TH WAIT 1 "May 17, 2020"
 .SH NAME
 wait \- await process completion
 .SH SYNOPSIS
-.LP
 .nf
 
 .fi
 
 .SS "/bin/sh"
-.LP
 .nf
 \fBwait\fR [\fIpid\fR]...
 .fi
 
 .SS "/bin/jsh /bin/ksh /usr/xpg4/bin/sh"
-.LP
 .nf
 \fBwait\fR [\fIpid\fR]...
 .fi
@@ -72,20 +69,16 @@ wait \- await process completion
 .fi
 
 .SS "/bin/csh"
-.LP
 .nf
 \fBwait\fR
 .fi
 
 .SS "ksh93"
-.LP
 .nf
 \fBwait\fR [\fIjob...\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The shell itself executes \fBwait\fR, without creating a new process. If you
 get the error message \fBcannot fork,too many processes\fR, try using the
 \fBwait\fR command to clean up your background processes. If this doesn't help,
@@ -97,8 +90,6 @@ associated with your login, and to the number the system can keep track of.
 Not all the processes of a pipeline with three or more stages are children of
 the shell, and thus cannot be waited for.
 .SS "/bin/sh, /bin/jsh"
-.sp
-.LP
 Wait for your background process whose process \fBID\fR is \fIpid\fR and report
 its termination status. If \fIpid\fR is omitted, all your shell's currently
 active background processes are waited for and the return code is \fB0\fR. The
@@ -109,12 +100,8 @@ and the argument, \fIjobid\fR, is preceded by a percent sign (\fB%\fR).
 If \fIpid\fR is not an active process \fBID,\fR the \fBwait\fR utility returns
 immediately and the return code is \fB0\fR.
 .SS "csh"
-.sp
-.LP
 Wait for your background processes.
 .SS "ksh"
-.sp
-.LP
 When an asynchronous list is started by the shell, the process \fBID\fR of the
 last command in each element of the asynchronous list becomes known in the
 current shell execution environment.
@@ -138,8 +125,6 @@ is the exit status of the process requested by the last \fIpid\fR or
 The known process \fBID\fRs are applicable only for invocations of \fBwait\fR
 in the current shell execution environment.
 .SS "ksh93"
-.sp
-.LP
 wait with no operands, waits until all jobs known to the invoking shell have
 terminated. If one or more job operands are specified, wait waits until all of
 them have completed. Each job can be specified as one of the following:
@@ -212,12 +197,10 @@ Refers to the previous job
 
 .sp
 .LP
-If one ore more job operands is a process id or process group id not known by
+If one or more job operands is a process id or process group id not known by
 the current shell environment, \fBwait\fR treats each of them as if it were a
 process that exited with status 127.
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -242,8 +225,6 @@ on systems supporting the job control option.
 .RE
 
 .SH USAGE
-.sp
-.LP
 On most implementations, \fBwait\fR is a shell built-in. If it is called in a
 subshell or separate utility execution environment, such as one of the
 following,
@@ -262,7 +243,6 @@ find . -exec wait ... \e;
 it returns immediately because there is no known process \fBID\fRs to wait for
 in those environments.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing A Script To Identify The Termination Signal
 .sp
 .LP
@@ -315,15 +295,11 @@ wait %%
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBwait\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
 .SS "ksh93"
-.sp
-.LP
 The following exit values are returned by the \fBwait\fR built-in in
 \fBksh93\fR:
 .sp
@@ -347,8 +323,6 @@ shell environment.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -365,7 +339,5 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBcsh\fR(1), \fBjobs\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBsh\fR(1),
 \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)

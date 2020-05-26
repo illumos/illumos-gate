@@ -1311,8 +1311,9 @@ fcnname/**/_info:							\
 	END_MODULE(ppt);
 #endif
 
-/ this is just a marker for the area of text that contains stubs
-
+/*
+ * this is just a marker for the area of text that contains stubs
+ */
 	ENTRY_NP(stubs_end)
 	nop
 

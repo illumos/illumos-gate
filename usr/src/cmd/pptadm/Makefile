@@ -21,7 +21,6 @@ include ../Makefile.ctf
 LDLIBS += -lofmt -lppt -lnvpair
 
 CSTD = $(CSTD_GNU99)
-C99LMODE = -Xc99=%all
 
 CLEANFILES += $(OBJS)
 
@@ -33,8 +32,6 @@ install: all $(ROOTUSRSBINPROG)
 
 clean:
 	-$(RM) $(CLEANFILES)
-
-lint: lint_SRCS
 
 %.o: ../%.c
 	$(COMPILE.c) $<

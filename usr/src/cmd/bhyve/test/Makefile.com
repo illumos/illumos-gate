@@ -22,7 +22,6 @@ include $(SRC)/cmd/Makefile.cmd.64
 #
 CSTD=		$(CSTD_GNU99)
 C99MODE=	-xc99=%all
-C99LMODE=	-Xc99=%all
 
 CFLAGS +=	$(CCVERBOSE) -_gcc=-Wimplicit-function-declaration \
 		-_gcc=-Wno-parentheses
@@ -59,4 +58,3 @@ ROOTOUT =	$(OUTFILES:%=$(ROOTTSTDIR)/%)
 ROOTTESTS =	$(ROOTTSTEXES) $(ROOTTSTSH) $(ROOTOUT)
 FILEMODE =	0555
 LDLIBS =	$(LDLIBS.cmd)
-LINTEXE =	$(EXETESTS:%.exe=%.exe.ln)

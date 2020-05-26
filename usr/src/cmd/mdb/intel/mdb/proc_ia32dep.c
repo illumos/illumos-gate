@@ -24,8 +24,8 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2019 Doma Gergő Mihály <doma.gergo.mihaly@gmail.com>
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*

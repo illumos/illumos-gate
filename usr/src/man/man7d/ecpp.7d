@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ECPP 7D "Jan 10, 2020"
+.TH ECPP 7D "May 17, 2020"
 .SH NAME
 ecpp \- IEEE 1284 compliant parallel port driver
 .SH SYNOPSIS
@@ -25,7 +25,7 @@ ecpp@unit-address
 The \fBecpp\fR driver provides a bi-directional interface to \fIIEEE 1284\fR
 compliant devices as well as a forward single-directional interface to
 Centronics devices. In addition to the Centronics protocol, the \fBecpp\fR
-driver supports the \fIIEEE 1284\fRCompatibility, Nibble, and ECP protocols.
+driver supports the \fIIEEE 1284\fR Compatibility, Nibble, and ECP protocols.
 \fBECPP_COMPAT_MODE\fR and \fBECPP_CENTRONICS\fR modes of operation have
 logically identical handshaking protocols, however devices that support
 \fBECPP_COMPAT_MODE\fR are \fIIEEE 1284\fR compliant devices. \fIIEEE 1284\fR
@@ -231,8 +231,7 @@ conditions are ok, \fB0\fR is returned. Otherwise, \fB-1\fR is returned, errno
 is set to \fBEIO\fR and the state of the status pins is captured. The captured
 status can be retrieved using the \fBBPPIOC_GETERR\fR \fBioctl\fR(2) call. The
 \fBtimeout_occurred\fR and \fBbus_error\fR fields will never be set by this
-\fBioctl\fR(2). \fBBPPIOC_TESTIO\fR and \fBBPPIOC_GETERR\fR are compatible to
-the ioctls specified in \fBbpp\fR(7D).
+\fBioctl\fR(2).
 .RE
 
 .sp
@@ -450,7 +449,7 @@ Interface stability	Evolving
 .SH SEE ALSO
 \fBmodload\fR(1M), \fBmodunload\fR(1M), \fBupdate_drv\fR(1M), \fBioctl\fR(2),
 \fBopen\fR(2), \fBread\fR(2), \fBwrite\fR(2), \fBattributes\fR(5),
-\fBbpp\fR(7D), \fBusbprn\fR(7D), \fBprnio\fR(7I), \fBstreamio\fR(7I)
+\fBusbprn\fR(7D), \fBprnio\fR(7I), \fBstreamio\fR(7I)
 .sp
 .LP
 \fIIEEE Std 1284-1994\fR
@@ -464,4 +463,3 @@ Interface stability	Evolving
 Driver does not support parallel port controller on the given host. Attach
 failed.
 .RE
-

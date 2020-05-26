@@ -1364,6 +1364,7 @@ syntax: glob
 usr/src/cmd/bhyve/acpi.[ch]
 usr/src/cmd/bhyve/ahci.h
 usr/src/cmd/bhyve/atkbdc.[ch]
+usr/src/cmd/bhyve/audio.[ch]
 usr/src/cmd/bhyve/bhyvegc.[ch]
 usr/src/cmd/bhyve/bhyverun.[ch]
 usr/src/cmd/bhyve/block_if.[ch]
@@ -1373,6 +1374,9 @@ usr/src/cmd/bhyve/consport.c
 usr/src/cmd/bhyve/dbgport.[ch]
 usr/src/cmd/bhyve/fwctl.[ch]
 usr/src/cmd/bhyve/gdb.[ch]
+usr/src/cmd/bhyve/hda_codec.c
+usr/src/cmd/bhyve/hda_reg.h
+usr/src/cmd/bhyve/hdac_reg.h
 usr/src/cmd/bhyve/inout.[ch]
 usr/src/cmd/bhyve/ioapic.[ch]
 usr/src/cmd/bhyve/iov.[ch]
@@ -1380,10 +1384,13 @@ usr/src/cmd/bhyve/mem.[ch]
 usr/src/cmd/bhyve/mevent.[ch]
 usr/src/cmd/bhyve/mevent_test.c
 usr/src/cmd/bhyve/mptbl.[ch]
+usr/src/cmd/bhyve/net_utils.[ch]
+usr/src/cmd/bhyve/net_backends.[ch]
 usr/src/cmd/bhyve/pci_ahci.c
 usr/src/cmd/bhyve/pci_e82545.c
 usr/src/cmd/bhyve/pci_emul.[ch]
 usr/src/cmd/bhyve/pci_fbuf.c
+usr/src/cmd/bhyve/pci_hda.[ch]
 usr/src/cmd/bhyve/pci_hostbridge.c
 usr/src/cmd/bhyve/pci_irq.[ch]
 usr/src/cmd/bhyve/pci_lpc.[ch]

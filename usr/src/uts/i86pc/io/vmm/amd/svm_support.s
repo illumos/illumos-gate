@@ -36,18 +36,6 @@
 
 /* Porting note: This is named 'svm_support.S' upstream. */
 
-#if defined(lint)
-
-struct svm_regctx;
-struct cpu;
-
-/*ARGSUSED*/
-void
-svm_launch(uint64_t pa, struct svm_regctx *gctx, struct cpu *cpu)
-{}
-
-#else /* lint */
-
 #define	VMLOAD	.byte 0x0f, 0x01, 0xda
 #define	VMRUN	.byte 0x0f, 0x01, 0xd8
 #define	VMSAVE	.byte 0x0f, 0x01, 0xdb
@@ -160,5 +148,3 @@ ENTRY_NP(svm_launch)
 	popq	%rbp
 	ret
 SET_SIZE(svm_launch)
-
-#endif /* lint */

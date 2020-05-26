@@ -24,7 +24,6 @@ UTSBASE	= ../..
 #
 MODULE		= viona
 OBJECTS	= $(VIONA_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(VIONA_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/i86pc/io/viona
 MAPFILE		= $(UTSBASE)/i86pc/io/viona/viona.mapfile
@@ -38,17 +37,11 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 # Define targets
 #
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
 # Overrides
 #
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-LINTTAGS	+= -erroff=E_FUNC_ARG_UNUSED
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_FUNC_RET_MAYBE_IGNORED2
-LINTTAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
 
 # needs work
 SMOFF += all_func_returns
@@ -73,12 +66,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
