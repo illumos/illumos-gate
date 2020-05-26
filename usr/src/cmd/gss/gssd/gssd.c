@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Usermode daemon which assists the kernel when handling gssapi calls.
  * It is gssd that actually implements all gssapi calls.
@@ -62,7 +60,7 @@ extern int  svc_create_local_service();
 int _rpcpmstart = 0;		/* Started by a port monitor ? */
 int _rpcfdtype;			/* Whether Stream or Datagram ? */
 int _rpcsvcdirty;		/* Still serving ? */
-
+mutex_t _svcstate_lock = ERRORCHECKMUTEX;
 
 static void
 /* LINTED */
@@ -83,17 +81,14 @@ catch_hup(int sig_num)
 	syslog(LOG_INFO,
 	    "catch_hup: read gsscred.conf opts");
 	if (gssd_debug)
-		(void) fprintf(stderr,
-			"catch_hup: read gsscred.conf opts");
+		(void) fprintf(stderr, "catch_hup: read gsscred.conf opts");
 
 	(void) sigprocmask(SIG_SETMASK, &old_set, NULL);
 }
 
 
 int
-main(argc, argv)
-int argc;
-char **argv;
+main(int argc, char **argv)
 {
 	register SVCXPRT *transp;
 	int maxrecsz = RPC_MAXDATASIZE;
@@ -105,7 +100,6 @@ char **argv;
 	setlocale(LC_ALL, "");
 	textdomain(TEXT_DOMAIN);
 
-
 	/*
 	 * Take special note that "getuid()" is called here.  This call is used
 	 * rather than app_krb5_user_uid(), to ensure gssd(1M) is running as
@@ -116,7 +110,7 @@ char **argv;
 #endif /* DEBUG */
 	if (getuid()) {
 		(void) fprintf(stderr,
-			gettext("[%s] must be run as root\n"), argv[0]);
+		    gettext("[%s] must be run as root\n"), argv[0]);
 #ifdef DEBUG
 		(void) fprintf(stderr, gettext(" warning only\n"));
 #else /* DEBUG */
@@ -128,11 +122,11 @@ char **argv;
 
 	while ((c = getopt(argc, argv, "d")) != -1)
 		switch (c) {
-		    case 'd':
+		case 'd':
 			/* turn on debugging */
 			gssd_debug = 1;
 			break;
-		    default:
+		default:
 			usage();
 		}
 
@@ -147,9 +141,8 @@ char **argv;
 	 * Started by inetd if name of module just below stream
 	 * head is either a sockmod or timod.
 	 */
-	if (!ioctl(0, I_LOOK, mname) &&
-		((strcmp(mname, "sockmod") == 0) ||
-			(strcmp(mname, "timod") == 0))) {
+	if (!ioctl(0, I_LOOK, mname) && ((strcmp(mname, "sockmod") == 0) ||
+	    (strcmp(mname, "timod") == 0))) {
 
 		char *netid;
 		struct netconfig *nconf;
@@ -168,14 +161,14 @@ char **argv;
 		if (strcmp(mname, "sockmod") == 0) {
 			if (ioctl(0, I_POP, 0) || ioctl(0, I_PUSH, "timod")) {
 				syslog(LOG_ERR,
-					gettext("could not get the "
-						"right module"));
+				    gettext("could not get the "
+				    "right module"));
 				exit(1);
 			}
 		}
 		if (!rpc_control(RPC_SVC_CONNMAXREC_SET, &maxrecsz)) {
 			syslog(LOG_ERR,
-				gettext("unable to set RPC max record size"));
+			    gettext("unable to set RPC max record size"));
 			exit(1);
 		}
 		/* XXX - is nconf even needed here? */
@@ -190,8 +183,8 @@ char **argv;
 		 */
 		if (!svc_reg(transp, GSSPROG, GSSVERS, gssprog_1, NULL)) {
 			syslog(LOG_ERR,
-				gettext("unable to register "
-					"(GSSPROG, GSSVERS)"));
+			    gettext("unable to register "
+			    "(GSSPROG, GSSVERS)"));
 			exit(1);
 		}
 
