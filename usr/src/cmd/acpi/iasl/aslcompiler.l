@@ -156,7 +156,8 @@
 
 #include <stdlib.h>
 #include <string.h>
-YYSTYPE AslCompilerlval;
+
+extern YYSTYPE AslCompilerlval;
 
 /*
  * Generation:  Use the following command line:
