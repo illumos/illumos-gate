@@ -12,7 +12,7 @@
 #
 
 #
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 #
@@ -238,21 +238,46 @@ function install_required_pkgs {
 
 function add_test_accounts {
 
-    grep -q cyrus: /etc/passwd
+    grep -q '^cyrus:' /etc/passwd
     if [[ $? -ne 0 ]]; then
         log "Adding cyrus user"
         echo "cyrus:x:977:1::/zones/global/cyrus:/bin/sh" >> /etc/passwd
-        echo "cyrus:*LK*:::::::" >> /etc/shadow
+        if ! grep -q '^cyrus:' /etc/shadow; then
+            echo "cyrus:*LK*:::::::" >> /etc/shadow
+        fi
         mkdir -p /zones/global/cyrus
         chown cyrus /zones/global/cyrus
     fi
-    grep -q ztest: /etc/passwd
+    grep -q '^ztest:' /etc/passwd
     if [[ $? -ne 0 ]]; then
         log "Adding ztest user"
         echo "ztest:x:978:1::/zones/global/ztest:/bin/sh" >> /etc/passwd
-        echo "ztest:*LK*:::::::" >> /etc/shadow
+        if ! grep -q '^ztest:' /etc/shadow; then
+            # For sudo to work, the ztest account must not be locked
+            echo "ztest:NP:::::::" >> /etc/shadow
+        fi
         mkdir -p /zones/global/ztest
         chown ztest /zones/global/ztest
+        zprofile=/zones/global/ztest/.profile
+        if [[ ! -f $zprofile ]]; then
+            cat > $zprofile <<-EOF
+PATH=/bin:/usr/bin:/sbin:/usr/sbin:/opt/tools/bin:/opt/tools/sbin:/opt/zfs-tests/bin
+export PATH
+
+KEEP="zones"
+export KEEP
+EOF
+
+            if [[ -n "$DISKS" ]]; then
+                echo "DISKS=\"$DISKS\"" >> $zprofile
+		echo "export DISKS" >> $zprofile
+            else
+                msg="echo Please set \$DISKS appropriate before running zfstest"
+                echo $msg >> $zprofile
+            fi
+
+            chown ztest $zprofile
+        fi
     fi
     if [[ ! -f /opt/tools/etc/sudoers.d/ztest ]]; then
         mkdir -p /opt/tools/etc/sudoers.d
