@@ -76,6 +76,7 @@ UNSHIPPED_SUBDIRS = \
 	$(SGSLD) \
 	localedef \
 	mandoc \
+	rpcgen \
 	tic \
 	vtfontcvt \
 	zic
