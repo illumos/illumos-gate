@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef _SYS_DDI_UFM_H
@@ -51,7 +51,7 @@ extern "C" {
  * the UFM_IOC_GETCAPS should be extended appropriately.
  */
 typedef enum {
-	DDI_UFM_CAP_REPORT	= 1 << 0,
+	DDI_UFM_CAP_REPORT	= 1 << 0
 } ddi_ufm_cap_t;
 
 /*
