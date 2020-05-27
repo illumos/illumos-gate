@@ -18,6 +18,7 @@
 #define	_COMPAT_FREEBSD_X86_SEGMENTS_H
 
 #if defined(_COMPAT_FREEBSD_AMD64_MACHINE_VMM_H_) || defined(_KERNEL)
+#define	IDT_BP		3	/* #BP: Breakpoint */
 #define	IDT_UD		6	/* #UD: Undefined/Invalid Opcode */
 #define	IDT_SS		12	/* #SS: Stack Segment Fault */
 #define	IDT_GP		13	/* #GP: General Protection Fault */

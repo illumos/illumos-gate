@@ -62,6 +62,7 @@ __FBSDID("$FreeBSD$");
 
 #include "acpi.h"
 #include "bhyverun.h"
+#include "debug.h"
 #include "inout.h"
 #include "ioapic.h"
 #include "mem.h"
@@ -175,7 +176,7 @@ static void
 pci_parse_slot_usage(char *aopt)
 {
 
-	fprintf(stderr, "Invalid PCI slot info field \"%s\"\n", aopt);
+	EPRINTLN("Invalid PCI slot info field \"%s\"", aopt);
 }
 
 int
@@ -228,13 +229,13 @@ pci_parse_slot(char *opt)
 	si = &bi->slotinfo[snum];
 
 	if (si->si_funcs[fnum].fi_name != NULL) {
-		fprintf(stderr, "pci slot %d:%d already occupied!\n",
+		EPRINTLN("pci slot %d:%d already occupied!",
 			snum, fnum);
 		goto done;
 	}
 
 	if (pci_emul_finddev(emul) == NULL) {
-		fprintf(stderr, "pci slot %d:%d: unknown device \"%s\"\n",
+		EPRINTLN("pci slot %d:%d: unknown device \"%s\"",
 			snum, fnum, emul);
 		goto done;
 	}
@@ -892,7 +893,7 @@ pci_emul_add_msixcap(struct pci_devinst *pi, int msgnum, int barnum)
 					sizeof(msixcap)));
 }
 
-void
+static void
 msixcap_cfgwrite(struct pci_devinst *pi, int capoff, int offset,
 		 int bytes, uint32_t val)
 {
@@ -916,7 +917,7 @@ msixcap_cfgwrite(struct pci_devinst *pi, int capoff, int offset,
 	CFGWRITE(pi, offset, val, bytes);
 }
 
-void
+static void
 msicap_cfgwrite(struct pci_devinst *pi, int capoff, int offset,
 		int bytes, uint32_t val)
 {
@@ -933,26 +934,26 @@ msicap_cfgwrite(struct pci_devinst *pi, int capoff, int offset,
 		msgctrl &= ~rwmask;
 		msgctrl |= val & rwmask;
 		val = msgctrl;
-
-		addrlo = pci_get_cfgdata32(pi, capoff + 4);
-		if (msgctrl & PCIM_MSICTRL_64BIT)
-			msgdata = pci_get_cfgdata16(pi, capoff + 12);
-		else
-			msgdata = pci_get_cfgdata16(pi, capoff + 8);
-
-		mme = msgctrl & PCIM_MSICTRL_MME_MASK;
-		pi->pi_msi.enabled = msgctrl & PCIM_MSICTRL_MSI_ENABLE ? 1 : 0;
-		if (pi->pi_msi.enabled) {
-			pi->pi_msi.addr = addrlo;
-			pi->pi_msi.msg_data = msgdata;
-			pi->pi_msi.maxmsgnum = 1 << (mme >> 4);
-		} else {
-			pi->pi_msi.maxmsgnum = 0;
-		}
-		pci_lintr_update(pi);
 	}
-
 	CFGWRITE(pi, offset, val, bytes);
+
+	msgctrl = pci_get_cfgdata16(pi, capoff + 2);
+	addrlo = pci_get_cfgdata32(pi, capoff + 4);
+	if (msgctrl & PCIM_MSICTRL_64BIT)
+		msgdata = pci_get_cfgdata16(pi, capoff + 12);
+	else
+		msgdata = pci_get_cfgdata16(pi, capoff + 8);
+
+	mme = msgctrl & PCIM_MSICTRL_MME_MASK;
+	pi->pi_msi.enabled = msgctrl & PCIM_MSICTRL_MSI_ENABLE ? 1 : 0;
+	if (pi->pi_msi.enabled) {
+		pi->pi_msi.addr = addrlo;
+		pi->pi_msi.msg_data = msgdata;
+		pi->pi_msi.maxmsgnum = 1 << (mme >> 4);
+	} else {
+		pi->pi_msi.maxmsgnum = 0;
+	}
+	pci_lintr_update(pi);
 }
 
 void
@@ -995,30 +996,34 @@ pci_emul_add_pciecap(struct pci_devinst *pi, int type)
 
 /*
  * This function assumes that 'coff' is in the capabilities region of the
- * config space.
+ * config space. A capoff parameter of zero will force a search for the
+ * offset and type.
  */
-static void
-pci_emul_capwrite(struct pci_devinst *pi, int offset, int bytes, uint32_t val)
+void
+pci_emul_capwrite(struct pci_devinst *pi, int offset, int bytes, uint32_t val,
+    uint8_t capoff, int capid)
 {
-	int capid;
-	uint8_t capoff, nextoff;
+	uint8_t nextoff;
 
 	/* Do not allow un-aligned writes */
 	if ((offset & (bytes - 1)) != 0)
 		return;
 
-	/* Find the capability that we want to update */
-	capoff = CAP_START_OFFSET;
-	while (1) {
-		nextoff = pci_get_cfgdata8(pi, capoff + 1);
-		if (nextoff == 0)
-			break;
-		if (offset >= capoff && offset < nextoff)
-			break;
+	if (capoff == 0) {
+		/* Find the capability that we want to update */
+		capoff = CAP_START_OFFSET;
+		while (1) {
+			nextoff = pci_get_cfgdata8(pi, capoff + 1);
+			if (nextoff == 0)
+				break;
+			if (offset >= capoff && offset < nextoff)
+				break;
 
-		capoff = nextoff;
+			capoff = nextoff;
+		}
+		assert(offset >= capoff);
+		capid = pci_get_cfgdata8(pi, capoff);
 	}
-	assert(offset >= capoff);
 
 	/*
 	 * Capability ID and Next Capability Pointer are readonly.
@@ -1035,7 +1040,6 @@ pci_emul_capwrite(struct pci_devinst *pi, int offset, int bytes, uint32_t val)
 			return;
 	}
 
-	capid = pci_get_cfgdata8(pi, capoff);
 	switch (capid) {
 	case PCIY_MSI:
 		msicap_cfgwrite(pi, capoff, offset, bytes, val);
@@ -1287,7 +1291,6 @@ pci_bus_write_dsdt(int bus)
 	dsdt_line("  Device (PC%02X)", bus);
 	dsdt_line("  {");
 	dsdt_line("    Name (_HID, EisaId (\"PNP0A03\"))");
-	dsdt_line("    Name (_ADR, Zero)");
 
 	dsdt_line("    Method (_BBN, 0, NotSerialized)");
 	dsdt_line("    {");
@@ -1921,7 +1924,7 @@ pci_cfgrw(struct vmctx *ctx, int vcpu, int in, int bus, int slot, int func,
 			pci_set_cfgdata32(pi, coff, bar);
 
 		} else if (pci_emul_iscap(pi, coff)) {
-			pci_emul_capwrite(pi, coff, bytes, *eax);
+			pci_emul_capwrite(pi, coff, bytes, *eax, 0, 0);
 		} else if (coff >= PCIR_COMMAND && coff < PCIR_REVID) {
 			pci_emul_cmdsts_write(pi, coff, *eax, bytes);
 		} else {

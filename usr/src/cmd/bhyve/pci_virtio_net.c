@@ -83,6 +83,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #include "bhyverun.h"
+#include "debug.h"
 #include "pci_emul.h"
 #ifdef __FreeBSD__
 #include "mevent.h"
@@ -127,6 +128,8 @@ __FBSDID("$FreeBSD$");
 struct virtio_net_config {
 	uint8_t  mac[6];
 	uint16_t status;
+	uint16_t max_virtqueue_pairs;
+	uint16_t mtu;
 } __packed;
 
 /*
@@ -155,8 +158,8 @@ struct virtio_net_rxhdr {
  * Debug printf
  */
 static int pci_vtnet_debug;
-#define DPRINTF(params) if (pci_vtnet_debug) printf params
-#define WPRINTF(params) printf params
+#define DPRINTF(params) if (pci_vtnet_debug) PRINTLN params
+#define WPRINTF(params) PRINTLN params
 
 /*
  * Per-device softc
@@ -181,6 +184,7 @@ struct pci_vtnet_softc {
 	uint64_t	vsc_features;	/* negotiated features */
 
 	struct virtio_net_config vsc_config;
+	struct virtio_consts vsc_consts;
 
 	pthread_mutex_t	rx_mtx;
 	int		rx_vhdrlen;
@@ -219,7 +223,7 @@ pci_vtnet_reset(void *vsc)
 {
 	struct pci_vtnet_softc *sc = vsc;
 
-	DPRINTF(("vtnet: device reset requested !\n"));
+	DPRINTF(("vtnet: device reset requested !"));
 
 	/* Acquire the RX lock to block RX processing. */
 	pthread_mutex_lock(&sc->rx_mtx);
@@ -403,7 +407,7 @@ pci_vtnet_tap_rx(struct pci_vtnet_softc *sc)
 			 * No more packets, but still some avail ring
 			 * entries.  Interrupt if needed/appropriate.
 			 */
-			vq_retchain(vq);
+			vq_retchains(vq, 1);
 			vq_endchains(vq, 0);
 			return;
 		}
@@ -673,7 +677,7 @@ pci_vtnet_ping_rxq(void *vsc, struct vqueue_info *vq)
 	struct pci_vtnet_softc *sc = vsc;
 
 	/*
-	 * A qnotify means that the rx process can now begin
+	 * A qnotify means that the rx process can now begin.
 	 */
 	if (sc->vsc_rx_ready == 0) {
 		sc->vsc_rx_ready = 1;
@@ -788,7 +792,7 @@ static void
 pci_vtnet_ping_ctlq(void *vsc, struct vqueue_info *vq)
 {
 
-	DPRINTF(("vtnet: control qnotify!\n\r"));
+	DPRINTF(("vtnet: control qnotify!"));
 }
 #endif /* __FreeBSD__ */
 
@@ -914,85 +918,131 @@ pci_vtnet_netmap_setup(struct pci_vtnet_softc *sc, char *ifname)
 static int
 pci_vtnet_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 {
-	char tname[MAXCOMLEN + 1];
 	struct pci_vtnet_softc *sc;
-	const char *env_msi;
-	char *devname;
-	char *vtopts;
+	char tname[MAXCOMLEN + 1];
 #ifdef __FreeBSD__
 	int mac_provided;
+	int mtu_provided;
+	unsigned long mtu = ETHERMTU;
+#else
+	int use_msix = 1;
 #endif
-	int use_msix;
 
+	/*
+	 * Allocate data structures for further virtio initializations.
+	 * sc also contains a copy of vtnet_vi_consts, since capabilities
+	 * change depending on the backend.
+	 */
 	sc = calloc(1, sizeof(struct pci_vtnet_softc));
 
+	sc->vsc_consts = vtnet_vi_consts;
 	pthread_mutex_init(&sc->vsc_mtx, NULL);
-
-	vi_softc_linkup(&sc->vsc_vs, &vtnet_vi_consts, sc, pi, sc->vsc_queues);
-	sc->vsc_vs.vs_mtx = &sc->vsc_mtx;
 
 	sc->vsc_queues[VTNET_RXQ].vq_qsize = VTNET_RINGSZ;
 	sc->vsc_queues[VTNET_RXQ].vq_notify = pci_vtnet_ping_rxq;
 	sc->vsc_queues[VTNET_TXQ].vq_qsize = VTNET_RINGSZ;
 	sc->vsc_queues[VTNET_TXQ].vq_notify = pci_vtnet_ping_txq;
-#ifdef __FreeBSD__
+#ifdef notyet
 	sc->vsc_queues[VTNET_CTLQ].vq_qsize = VTNET_RINGSZ;
         sc->vsc_queues[VTNET_CTLQ].vq_notify = pci_vtnet_ping_ctlq;
 #endif
  
 	/*
-	 * Use MSI if set by user
+	 * Attempt to open the backend device and read the MAC address
+	 * if specified.
 	 */
-	use_msix = 1;
-	if ((env_msi = getenv("BHYVE_USE_MSI")) != NULL) {
-		if (strcasecmp(env_msi, "yes") == 0)
-			use_msix = 0;
-	}
-
-	/*
-	 * Attempt to open the tap device and read the MAC address
-	 * if specified
-	 */
-#ifdef	__FreeBSD__
+#ifdef __FreeBSD__
 	mac_provided = 0;
-	sc->vsc_tapfd = -1;
+	mtu_provided = 0;
 #endif
-	sc->vsc_nmd = NULL;
 	if (opts != NULL) {
-#ifdef	__FreeBSD__
-		int err;
-#endif
+		char *optscopy;
+		char *vtopts;
+		int err = 0;
 
-		devname = vtopts = strdup(opts);
+		/* Get the device name. */
+		optscopy = vtopts = strdup(opts);
 		(void) strsep(&vtopts, ",");
 
-#ifdef	__FreBSD__
-		if (vtopts != NULL) {
-			err = net_parsemac(vtopts, sc->vsc_config.mac);
-			if (err != 0) {
-				free(devname);
-				return (err);
+#ifdef __FreeBSD__
+		/*
+		 * Parse the list of options in the form
+		 *     key1=value1,...,keyN=valueN.
+		 */
+		while (vtopts != NULL) {
+			char *value = vtopts;
+			char *key;
+
+			key = strsep(&value, "=");
+			if (value == NULL)
+				break;
+			vtopts = value;
+			(void) strsep(&vtopts, ",");
+
+			if (strcmp(key, "mac") == 0) {
+				err = net_parsemac(value, sc->vsc_config.mac);
+				if (err)
+					break;
+				mac_provided = 1;
+			} else if (strcmp(key, "mtu") == 0) {
+				err = net_parsemtu(value, &mtu);
+				if (err)
+					break;
+
+				if (mtu < VTNET_MIN_MTU || mtu > VTNET_MAX_MTU) {
+					err = EINVAL;
+					errno = EINVAL;
+					break;
+				}
+				mtu_provided = 1;
 			}
-			mac_provided = 1;
 		}
 #endif
 
-#ifdef __FreeBSD__
-		if (strncmp(devname, "vale", 4) == 0)
-			pci_vtnet_netmap_setup(sc, devname);
+#ifndef __FreeBSD__
+		/* Use the already strsep(",")-ed optscopy */
+		if (strncmp(optscopy, "tap", 3) == 0 ||
+		    strncmp(optscopy, "vmnet", 5) == 0)
+			pci_vtnet_tap_setup(sc, optscopy);
 #endif
-		if (strncmp(devname, "tap", 3) == 0 ||
-		    strncmp(devname, "vmnet", 5) == 0)
-			pci_vtnet_tap_setup(sc, devname);
 
-		free(devname);
+		free(optscopy);
+
+		if (err) {
+			free(sc);
+			return (err);
+		}
+
+#ifdef __FreeBSD__
+		err = netbe_init(&sc->vsc_be, opts, pci_vtnet_rx_callback,
+		          sc);
+		if (err) {
+			free(sc);
+			return (err);
+		}
+
+		sc->vsc_consts.vc_hv_caps |= VIRTIO_NET_F_MRG_RXBUF |
+		    netbe_get_cap(sc->vsc_be);
+#endif
+
 	}
 
-#ifdef	__FreeBSD__
+#ifdef __FreeBSD__
 	if (!mac_provided) {
 		net_genmac(pi, sc->vsc_config.mac);
 	}
+
+	sc->vsc_config.mtu = mtu;
+	if (mtu_provided) {
+		sc->vsc_consts.vc_hv_caps |= VIRTIO_NET_F_MTU;
+	}
 #endif
+
+	/* 
+	 * Since we do not actually support multiqueue,
+	 * set the maximum virtqueue pairs to 1. 
+	 */
+	sc->vsc_config.max_virtqueue_pairs = 1;
 
 	/* initialize config space */
 	pci_set_cfgdata16(pi, PCIR_DEVICE, VIRTIO_DEV_NET);
@@ -1006,9 +1056,9 @@ pci_vtnet_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 	sc->vsc_config.status = (opts == NULL || sc->vsc_tapfd >= 0 ||
 #else
 	sc->vsc_config.status = (opts == NULL || sc->vsc_dlpifd >= 0 ||
-#endif
 	    sc->vsc_nmd != NULL);
-	
+#endif
+
 	/* use BAR 1 to map MSI-X table and PBA, if we're using MSI-X */
 	if (vi_intr_init(&sc->vsc_vs, 1, use_msix))
 		return (1);
@@ -1053,7 +1103,7 @@ pci_vtnet_cfgwrite(void *vsc, int offset, int size, uint32_t value)
 		memcpy(ptr, &value, size);
 	} else {
 		/* silently ignore other writes */
-		DPRINTF(("vtnet: write to readonly reg %d\n\r", offset));
+		DPRINTF(("vtnet: write to readonly reg %d", offset));
 	}
 
 	return (0);

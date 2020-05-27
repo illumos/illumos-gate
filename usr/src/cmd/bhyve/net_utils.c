@@ -31,35 +31,68 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <net/ethernet.h>
 
+#include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <md5.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "bhyverun.h"
+#include "debug.h"
 #include "net_utils.h"
 
 int
 net_parsemac(char *mac_str, uint8_t *mac_addr)
 {
         struct ether_addr *ea;
-        char *tmpstr;
         char zero_addr[ETHER_ADDR_LEN] = { 0, 0, 0, 0, 0, 0 };
 
-        tmpstr = strsep(&mac_str,"=");
+	if (mac_str == NULL)
+		return (EINVAL);
 
-        if ((mac_str != NULL) && (!strcmp(tmpstr,"mac"))) {
-                ea = ether_aton(mac_str);
+	ea = ether_aton(mac_str);
 
-                if (ea == NULL || ETHER_IS_MULTICAST(ea->octet) ||
-                    memcmp(ea->octet, zero_addr, ETHER_ADDR_LEN) == 0) {
-			fprintf(stderr, "Invalid MAC %s\n", mac_str);
-                        return (EINVAL);
-                } else
-                        memcpy(mac_addr, ea->octet, ETHER_ADDR_LEN);
-        }
+	if (ea == NULL || ETHER_IS_MULTICAST(ea->octet) ||
+	    memcmp(ea->octet, zero_addr, ETHER_ADDR_LEN) == 0) {
+		EPRINTLN("Invalid MAC %s", mac_str);
+		return (EINVAL);
+	} else
+		memcpy(mac_addr, ea->octet, ETHER_ADDR_LEN);
 
         return (0);
+}
+
+int
+net_parsemtu(const char *mtu_str, unsigned long *mtu)
+{
+	char *end;
+	unsigned long val;
+
+	assert(mtu_str != NULL);
+
+	if (*mtu_str == '-')
+		goto err;
+
+	val = strtoul(mtu_str, &end, 0);
+
+	if (*end != '\0')
+		goto err;
+
+	if (val == ULONG_MAX)
+		return (ERANGE);
+
+	if (val == 0 && errno == EINVAL)
+		return (EINVAL);
+
+	*mtu = val;
+
+	return (0);
+
+err:
+	errno = EINVAL;
+	return (EINVAL);
 }
 
 void

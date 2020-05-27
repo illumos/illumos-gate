@@ -37,15 +37,19 @@ typedef struct net_backend net_backend_t;
 
 /* Interface between network frontends and the network backends. */
 typedef void (*net_be_rxeof_t)(int, enum ev_type, void *param);
-int	netbe_init(net_backend_t **be, const char *devname, net_be_rxeof_t cb,
+int	netbe_init(net_backend_t **be, const char *opts, net_be_rxeof_t cb,
             void *param);
 void	netbe_cleanup(net_backend_t *be);
 uint64_t netbe_get_cap(net_backend_t *be);
 int	 netbe_set_cap(net_backend_t *be, uint64_t cap,
              unsigned vnet_hdr_len);
-ssize_t	netbe_send(net_backend_t *be, struct iovec *iov, int iovcnt);
-ssize_t	netbe_recv(net_backend_t *be, struct iovec *iov, int iovcnt);
+size_t	netbe_get_vnet_hdr_len(net_backend_t *be);
+ssize_t	netbe_send(net_backend_t *be, const struct iovec *iov, int iovcnt);
+ssize_t	netbe_peek_recvlen(net_backend_t *be);
+ssize_t	netbe_recv(net_backend_t *be, const struct iovec *iov, int iovcnt);
 ssize_t	netbe_rx_discard(net_backend_t *be);
+void	netbe_rx_disable(net_backend_t *be);
+void	netbe_rx_enable(net_backend_t *be);
 
 
 /*
@@ -55,6 +59,7 @@ ssize_t	netbe_rx_discard(net_backend_t *be);
  */
 #define	VIRTIO_NET_F_CSUM	(1 <<  0) /* host handles partial cksum */
 #define	VIRTIO_NET_F_GUEST_CSUM	(1 <<  1) /* guest handles partial cksum */
+#define	VIRTIO_NET_F_MTU	(1 <<  3) /* initial MTU advice */
 #define	VIRTIO_NET_F_MAC	(1 <<  5) /* host supplies MAC */
 #define	VIRTIO_NET_F_GSO_DEPREC	(1 <<  6) /* deprecated: host handles GSO */
 #define	VIRTIO_NET_F_GUEST_TSO4	(1 <<  7) /* guest can rcv TSOv4 */
@@ -72,6 +77,7 @@ ssize_t	netbe_rx_discard(net_backend_t *be);
 #define	VIRTIO_NET_F_CTRL_VLAN	(1 << 19) /* control channel VLAN filtering */
 #define	VIRTIO_NET_F_GUEST_ANNOUNCE \
 				(1 << 21) /* guest can send gratuitous pkts */
+#define	VIRTIO_NET_F_MQ		(1 << 22) /* host supports multiple VQ pairs */
 
 /*
  * Fixed network header size

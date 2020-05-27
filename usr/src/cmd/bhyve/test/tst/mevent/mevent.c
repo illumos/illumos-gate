@@ -42,7 +42,7 @@ test_mevent_count_lists(int *ret_global, int *ret_change, int *ret_del_pending)
 
 	LIST_FOREACH(mevp, &change_head, me_list) {
 		change++;
-		if (mevp->me_state == MEV_DEL_PENDING) {
+		if (mevp->me_state == EV_DELETE) {
 			del_pending++;
 		}
 		VERBOSE(("on change: type %d fd %d state %d", mevp->me_type,

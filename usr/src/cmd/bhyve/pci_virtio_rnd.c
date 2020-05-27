@@ -58,6 +58,7 @@ __FBSDID("$FreeBSD$");
 #include <sysexits.h>
 
 #include "bhyverun.h"
+#include "debug.h"
 #include "pci_emul.h"
 #include "virtio.h"
 
@@ -65,8 +66,8 @@ __FBSDID("$FreeBSD$");
 
 
 static int pci_vtrnd_debug;
-#define DPRINTF(params) if (pci_vtrnd_debug) printf params
-#define WPRINTF(params) printf params
+#define DPRINTF(params) if (pci_vtrnd_debug) PRINTLN params
+#define WPRINTF(params) PRINTLN params
 
 /*
  * Per-device softc
@@ -102,7 +103,7 @@ pci_vtrnd_reset(void *vsc)
 
 	sc = vsc;
 
-	DPRINTF(("vtrnd: device reset requested !\n"));
+	DPRINTF(("vtrnd: device reset requested !"));
 	vi_reset_dev(&sc->vrsc_vs);
 }
 
@@ -127,7 +128,7 @@ pci_vtrnd_notify(void *vsc, struct vqueue_info *vq)
 
 		len = read(sc->vrsc_fd, iov.iov_base, iov.iov_len);
 
-		DPRINTF(("vtrnd: vtrnd_notify(): %d\r\n", len));
+		DPRINTF(("vtrnd: vtrnd_notify(): %d", len));
 
 		/* Catastrophe if unable to read from /dev/random */
 		assert(len > 0);

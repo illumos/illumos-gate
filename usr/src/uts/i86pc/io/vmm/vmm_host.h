@@ -91,7 +91,7 @@ vmm_get_host_gdtrbase(void)
 {
 
 #ifdef	__FreeBSD__
-	return ((uint64_t)&gdt[NGDT * curcpu]);
+	return ((uint64_t)*PCPU_PTR(gdt));
 #else
 	desctbr_t gdtr;
 

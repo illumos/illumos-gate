@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <pthread_np.h>
 
 #include "bhyverun.h"
+#include "debug.h"
 #include "pci_emul.h"
 #include "virtio.h"
 
@@ -102,6 +103,7 @@ vi_reset_dev(struct virtio_softc *vs)
 	for (vq = vs->vs_queues, i = 0; i < nvq; vq++, i++) {
 		vq->vq_flags = 0;
 		vq->vq_last_avail = 0;
+		vq->vq_next_used = 0;
 		vq->vq_save_used = 0;
 		vq->vq_pfn = 0;
 		vq->vq_msix_idx = VIRTIO_MSI_NO_VECTOR;
@@ -199,6 +201,7 @@ vi_vq_init(struct virtio_softc *vs, uint32_t pfn)
 	/* Mark queue as allocated, and start at 0 when we use it. */
 	vq->vq_flags = VQ_ALLOC;
 	vq->vq_last_avail = 0;
+	vq->vq_next_used = 0;
 	vq->vq_save_used = 0;
 }
 
@@ -279,7 +282,7 @@ vq_getchain(struct vqueue_info *vq, uint16_t *pidx,
          * the guest has written are valid (including all their
          * vd_next fields and vd_flags).
 	 *
-	 * Compute (last_avail - va_idx) in integers mod 2**16.  This is
+	 * Compute (va_idx - last_avail) in integers mod 2**16.  This is
 	 * the number of descriptors the device has made available
 	 * since the last time we updated vq->vq_last_avail.
 	 *
@@ -292,8 +295,8 @@ vq_getchain(struct vqueue_info *vq, uint16_t *pidx,
 		return (0);
 	if (ndesc > vq->vq_qsize) {
 		/* XXX need better way to diagnose issues */
-		fprintf(stderr,
-		    "%s: ndesc (%u) out of range, driver confused?\r\n",
+		EPRINTLN(
+		    "%s: ndesc (%u) out of range, driver confused?",
 		    name, (u_int)ndesc);
 		return (-1);
 	}
@@ -311,9 +314,9 @@ vq_getchain(struct vqueue_info *vq, uint16_t *pidx,
 	vq->vq_last_avail++;
 	for (i = 0; i < VQ_MAX_DESCRIPTORS; next = vdir->vd_next) {
 		if (next >= vq->vq_qsize) {
-			fprintf(stderr,
+			EPRINTLN(
 			    "%s: descriptor index %u out of range, "
-			    "driver confused?\r\n",
+			    "driver confused?",
 			    name, next);
 			return (-1);
 		}
@@ -323,17 +326,17 @@ vq_getchain(struct vqueue_info *vq, uint16_t *pidx,
 			i++;
 		} else if ((vs->vs_vc->vc_hv_caps &
 		    VIRTIO_RING_F_INDIRECT_DESC) == 0) {
-			fprintf(stderr,
+			EPRINTLN(
 			    "%s: descriptor has forbidden INDIRECT flag, "
-			    "driver confused?\r\n",
+			    "driver confused?",
 			    name);
 			return (-1);
 		} else {
 			n_indir = vdir->vd_len / 16;
 			if ((vdir->vd_len & 0xf) || n_indir == 0) {
-				fprintf(stderr,
+				EPRINTLN(
 				    "%s: invalid indir len 0x%x, "
-				    "driver confused?\r\n",
+				    "driver confused?",
 				    name, (u_int)vdir->vd_len);
 				return (-1);
 			}
@@ -350,9 +353,9 @@ vq_getchain(struct vqueue_info *vq, uint16_t *pidx,
 			for (;;) {
 				vp = &vindir[next];
 				if (vp->vd_flags & VRING_DESC_F_INDIRECT) {
-					fprintf(stderr,
+					EPRINTLN(
 					    "%s: indirect desc has INDIR flag,"
-					    " driver confused?\r\n",
+					    " driver confused?",
 					    name);
 					return (-1);
 				}
@@ -363,9 +366,9 @@ vq_getchain(struct vqueue_info *vq, uint16_t *pidx,
 					break;
 				next = vp->vd_next;
 				if (next >= n_indir) {
-					fprintf(stderr,
+					EPRINTLN(
 					    "%s: invalid next %u > %u, "
-					    "driver confused?\r\n",
+					    "driver confused?",
 					    name, (u_int)next, n_indir);
 					return (-1);
 				}
@@ -375,23 +378,59 @@ vq_getchain(struct vqueue_info *vq, uint16_t *pidx,
 			return (i);
 	}
 loopy:
-	fprintf(stderr,
-	    "%s: descriptor loop? count > %d - driver confused?\r\n",
+	EPRINTLN(
+	    "%s: descriptor loop? count > %d - driver confused?",
 	    name, i);
 	return (-1);
 }
 
 /*
- * Return the currently-first request chain back to the available queue.
+ * Return the first n_chain request chains back to the available queue.
  *
- * (This chain is the one you handled when you called vq_getchain()
+ * (These chains are the ones you handled when you called vq_getchain()
  * and used its positive return value.)
  */
 void
-vq_retchain(struct vqueue_info *vq)
+vq_retchains(struct vqueue_info *vq, uint16_t n_chains)
 {
 
-	vq->vq_last_avail--;
+	vq->vq_last_avail -= n_chains;
+}
+
+void
+vq_relchain_prepare(struct vqueue_info *vq, uint16_t idx, uint32_t iolen)
+{
+	volatile struct vring_used *vuh;
+	volatile struct virtio_used *vue;
+	uint16_t mask;
+
+	/*
+	 * Notes:
+	 *  - mask is N-1 where N is a power of 2 so computes x % N
+	 *  - vuh points to the "used" data shared with guest
+	 *  - vue points to the "used" ring entry we want to update
+	 *
+	 * (I apologize for the two fields named vu_idx; the
+	 * virtio spec calls the one that vue points to, "id"...)
+	 */
+	mask = vq->vq_qsize - 1;
+	vuh = vq->vq_used;
+
+	vue = &vuh->vu_ring[vq->vq_next_used++ & mask];
+	vue->vu_idx = idx;
+	vue->vu_tlen = iolen;
+}
+
+void
+vq_relchain_publish(struct vqueue_info *vq)
+{
+	/*
+	 * Ensure the used descriptor is visible before updating the index.
+	 * This is necessary on ISAs with memory ordering less strict than x86
+	 * (and even on x86 to act as a compiler barrier).
+	 */
+	atomic_thread_fence_rel();
+	vq->vq_used->vu_idx = vq->vq_next_used;
 }
 
 /*
@@ -404,35 +443,8 @@ vq_retchain(struct vqueue_info *vq)
 void
 vq_relchain(struct vqueue_info *vq, uint16_t idx, uint32_t iolen)
 {
-	uint16_t uidx, mask;
-	volatile struct vring_used *vuh;
-	volatile struct virtio_used *vue;
-
-	/*
-	 * Notes:
-	 *  - mask is N-1 where N is a power of 2 so computes x % N
-	 *  - vuh points to the "used" data shared with guest
-	 *  - vue points to the "used" ring entry we want to update
-	 *  - head is the same value we compute in vq_iovecs().
-	 *
-	 * (I apologize for the two fields named vu_idx; the
-	 * virtio spec calls the one that vue points to, "id"...)
-	 */
-	mask = vq->vq_qsize - 1;
-	vuh = vq->vq_used;
-
-	uidx = vuh->vu_idx;
-	vue = &vuh->vu_ring[uidx++ & mask];
-	vue->vu_idx = idx;
-	vue->vu_tlen = iolen;
-
-	/*
-	 * Ensure the used descriptor is visible before updating the index.
-	 * This is necessary on ISAs with memory ordering less strict than x86
-	 * (and even on x86 to act as a compiler barrier).
-	 */
-	atomic_thread_fence_rel();
-	vuh->vu_idx = uidx;
+	vq_relchain_prepare(vq, idx, iolen);
+	vq_relchain_publish(vq);
 }
 
 /*
@@ -598,12 +610,12 @@ bad:
 	if (cr == NULL || cr->cr_size != size) {
 		if (cr != NULL) {
 			/* offset must be OK, so size must be bad */
-			fprintf(stderr,
-			    "%s: read from %s: bad size %d\r\n",
+			EPRINTLN(
+			    "%s: read from %s: bad size %d",
 			    name, cr->cr_name, size);
 		} else {
-			fprintf(stderr,
-			    "%s: read from bad offset/size %jd/%d\r\n",
+			EPRINTLN(
+			    "%s: read from bad offset/size %jd/%d",
 			    name, (uintmax_t)offset, size);
 		}
 		goto done;
@@ -718,16 +730,16 @@ bad:
 		if (cr != NULL) {
 			/* offset must be OK, wrong size and/or reg is R/O */
 			if (cr->cr_size != size)
-				fprintf(stderr,
-				    "%s: write to %s: bad size %d\r\n",
+				EPRINTLN(
+				    "%s: write to %s: bad size %d",
 				    name, cr->cr_name, size);
 			if (cr->cr_ro)
-				fprintf(stderr,
-				    "%s: write to read-only reg %s\r\n",
+				EPRINTLN(
+				    "%s: write to read-only reg %s",
 				    name, cr->cr_name);
 		} else {
-			fprintf(stderr,
-			    "%s: write to bad offset/size %jd/%d\r\n",
+			EPRINTLN(
+			    "%s: write to bad offset/size %jd/%d",
 			    name, (uintmax_t)offset, size);
 		}
 		goto done;
@@ -755,7 +767,7 @@ bad:
 		break;
 	case VTCFG_R_QNOTIFY:
 		if (value >= vc->vc_nvq) {
-			fprintf(stderr, "%s: queue %d notify out of range\r\n",
+			EPRINTLN("%s: queue %d notify out of range",
 				name, (int)value);
 			goto done;
 		}
@@ -765,8 +777,8 @@ bad:
 		else if (vc->vc_qnotify)
 			(*vc->vc_qnotify)(DEV_SOFTC(vs), vq);
 		else
-			fprintf(stderr,
-			    "%s: qnotify queue %d: missing vq/vc notify\r\n",
+			EPRINTLN(
+			    "%s: qnotify queue %d: missing vq/vc notify",
 				name, (int)value);
 		break;
 	case VTCFG_R_STATUS:
@@ -787,8 +799,8 @@ bad:
 	goto done;
 
 bad_qindex:
-	fprintf(stderr,
-	    "%s: write config reg %s: curq %d >= max %d\r\n",
+	EPRINTLN(
+	    "%s: write config reg %s: curq %d >= max %d",
 	    name, cr->cr_name, vs->vs_curq, vc->vc_nvq);
 done:
 	if (vs->vs_mtx)

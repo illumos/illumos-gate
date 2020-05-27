@@ -108,6 +108,7 @@ enum vm_reg_name {
 	VM_REG_GUEST_DR2,
 	VM_REG_GUEST_DR3,
 	VM_REG_GUEST_DR6,
+	VM_REG_GUEST_ENTRY_INST_LENGTH,
 	VM_REG_LAST
 };
 
@@ -480,6 +481,7 @@ enum vm_cap_type {
 	VM_CAP_PAUSE_EXIT,
 	VM_CAP_UNRESTRICTED_GUEST,
 	VM_CAP_ENABLE_INVPCID,
+	VM_CAP_BPT_EXIT,
 	VM_CAP_MAX
 };
 
@@ -538,6 +540,8 @@ struct vie_op {
 	uint8_t		op_type;	/* type of operation (e.g. MOV) */
 	uint16_t	op_flags;
 };
+_Static_assert(sizeof(struct vie_op) == 4, "ABI");
+_Static_assert(_Alignof(struct vie_op) == 2, "ABI");
 
 #define	VIE_INST_SIZE	15
 struct vie {
@@ -562,13 +566,22 @@ struct vie {
 			rm:4;
 
 	uint8_t		ss:2,			/* SIB byte */
-			index:4,
-			base:4;
+			vex_present:1,		/* VEX prefixed */
+			vex_l:1,		/* L bit */
+			index:4,		/* SIB byte */
+			base:4;			/* SIB byte */
 
 	uint8_t		disp_bytes;
 	uint8_t		imm_bytes;
 
 	uint8_t		scale;
+
+	uint8_t		vex_reg:4,		/* vvvv: first source register specifier */
+			vex_pp:2,		/* pp */
+			_sparebits:2;
+
+	uint8_t		_sparebytes[2];
+
 	int		base_register;		/* VM_REG_GUEST_xyz */
 	int		index_register;		/* VM_REG_GUEST_xyz */
 	int		segment_register;	/* VM_REG_GUEST_xyz */
@@ -578,8 +591,14 @@ struct vie {
 
 	uint8_t		decoded;	/* set to 1 if successfully decoded */
 
+	uint8_t		_sparebyte;
+
 	struct vie_op	op;			/* opcode description */
 };
+_Static_assert(sizeof(struct vie) == 64, "ABI");
+_Static_assert(__offsetof(struct vie, disp_bytes) == 22, "ABI");
+_Static_assert(__offsetof(struct vie, scale) == 24, "ABI");
+_Static_assert(__offsetof(struct vie, base_register) == 28, "ABI");
 
 enum vm_exitcode {
 	VM_EXITCODE_INOUT,
@@ -605,6 +624,7 @@ enum vm_exitcode {
 	VM_EXITCODE_REQIDLE,
 	VM_EXITCODE_DEBUG,
 	VM_EXITCODE_VMINSN,
+	VM_EXITCODE_BPT,
 #ifndef	__FreeBSD__
 	VM_EXITCODE_HT,
 #endif
@@ -694,6 +714,9 @@ struct vm_exit {
 			uint64_t	exitinfo1;
 			uint64_t	exitinfo2;
 		} svm;
+		struct {
+			int		inst_length;
+		} bpt;
 		struct {
 			uint32_t	code;		/* ecx value */
 			uint64_t	wval;
