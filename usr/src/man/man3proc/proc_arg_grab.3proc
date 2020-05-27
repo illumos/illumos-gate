@@ -11,18 +11,18 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd May 22, 2020
 .Dt PROC_ARG_GRAB 3PROC
 .Os
 .Sh NAME
 .Nm proc_arg_grab ,
-.Nm proc_arg_xrgab
+.Nm proc_arg_xgrab
 .Nd process grabbing utility function
 .Sh SYNOPSIS
 .Lb libproc
 .In libproc.h
 .Ft "struct ps_prochandle"
-.Fo proc_arg_grag
+.Fo proc_arg_grab
 .Fa "const char *arg"
 .Fa "int oflag"
 .Fa "int gflag"
@@ -63,7 +63,7 @@ Allows
 .Fa arg
 to specify core files.
 .It PR_ARG_ANY
-Encompasses all of the previous opens.
+Encompasses all of the previous flags.
 .El
 .Pp
 The argument
@@ -96,20 +96,24 @@ If the
 .Fa lwps
 argument is
 .Pf non- Dv NULL ,
-then if there is a thread specification present in
-.Fa arg ,
-it will be validated to see if it is a valid range and then a pointer to
-the start of the thread specification will be stored in
-.Fa lwps .
-For more information on determining process range validity, see
+then the functions will treat any portion of
+.Fa arg
+after a
+.Sq /
+character as a thread range.
+The thread range will be validated as though a call to the
 .Xr proc_lwp_range_valid 3PROC
-for more information on valid and invalid tread specifications.
+function had been made, and a pointer to the start of the range will be
+stored in
+.Fa lwps .
+For a discussion of what constitutes a valid thread range, please see
+.Xr proc_lwp_range_valid 3PROC .
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn proc_arg_grab
 and
 .Fn proc_arg_xgrab
-functions return a pointer to the process handle is returned.
+functions return a pointer to the process handle.
 Otherwise,
 .Dv NULL
 is returned and

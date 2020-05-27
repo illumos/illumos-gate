@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * DACF (Device Autoconfiguration Framework) client code.
  *
@@ -67,8 +65,8 @@
  * 	for the operation to be invoked at post-attach and/or pre-detach time.
  */
 void
-dacfc_match_create_minor(char *name, char *node_type, dev_info_t *dip,
-    struct ddi_minor_data *dmdp, int flag)
+dacfc_match_create_minor(const char *name, const char *node_type,
+    dev_info_t *dip, struct ddi_minor_data *dmdp, int flag)
 {
 	dacf_rule_t *r;
 	char *dev_path, *dev_pathp, *drv_mname = NULL;

@@ -623,7 +623,7 @@ struct dev_info  {
 #define	DEVI_SET_PCI(dip)	(DEVI(dip)->devi_flags |= (DEVI_PCI_DEVICE))
 
 char	*i_ddi_devi_class(dev_info_t *);
-int	i_ddi_set_devi_class(dev_info_t *, char *, int);
+int	i_ddi_set_devi_class(dev_info_t *, const char *, int);
 
 /*
  * This structure represents one piece of bus space occupied by a given
@@ -709,7 +709,7 @@ struct ddi_minor {
 	dev_t		dev;		/* device number */
 	int		spec_type;	/* block or char */
 	int		flags;		/* access flags */
-	char		*node_type;	/* block, byte, serial, network */
+	const char	*node_type;	/* block, byte, serial, network */
 	struct devplcy	*node_priv;	/* privilege for this minor */
 	mode_t		priv_mode;	/* default apparent privilege mode */
 };

@@ -3,21 +3,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_REMOVE_MINOR_NODE 9F "Mar 10, 1992"
+.TH DDI_REMOVE_MINOR_NODE 9F "May 01, 2020"
 .SH NAME
 ddi_remove_minor_node \- remove a minor node for this dev_info
 .SH SYNOPSIS
-.LP
 .nf
-\fBvoid\fR \fBddi_remove_minor_node\fR(\fBdev_info_t\fR \fI*dip\fR, \fBchar\fR \fI*name\fR);
+\fBvoid\fR \fBddi_remove_minor_node\fR(\fBdev_info_t\fR \fI*dip\fR, \fBconst char\fR \fI*name\fR);
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
 Solaris \fBDDI\fR specific (Solaris \fBDDI\fR).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR \fR
@@ -37,13 +33,10 @@ minor data structures from this \fBdev_info\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBddi_remove_minor_node()\fR removes a data structure from the linked list of
 minor data structures that is pointed to by the \fBdev_info\fR structure for
 this driver.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRRemoving a minor node
 .sp
 .LP
@@ -58,8 +51,6 @@ which is linked into the \fBdev_info\fR structure pointed to by \fBdip\fR:
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBattach\fR(9E), \fBdetach\fR(9E), \fBddi_create_minor_node\fR(9F)
 .sp
 .LP

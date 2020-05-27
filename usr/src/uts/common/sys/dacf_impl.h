@@ -121,7 +121,7 @@ void dacf_rsrv_make(dacf_rsrvlist_t *, dacf_rule_t *, void *,
 void dacf_process_rsrvs(dacf_rsrvlist_t **, dacf_opid_t, int);
 void dacf_clr_rsrvs(dev_info_t *, dacf_opid_t);
 
-dacf_rule_t *dacf_match(dacf_opid_t, dacf_devspec_t, void *);
+dacf_rule_t *dacf_match(dacf_opid_t, dacf_devspec_t, const void *);
 
 /*
  * Failure codes from dacf_op_invoke, assigned to dacf_rsrvlist_t.rsrv_result
@@ -147,7 +147,7 @@ extern int dacfdebug;
  * that utilize the dacf framework
  */
 
-void dacfc_match_create_minor(char *, char *, dev_info_t *,
+void dacfc_match_create_minor(const char *, const char *, dev_info_t *,
     struct ddi_minor_data *, int);
 
 int dacfc_postattach(dev_info_t *);

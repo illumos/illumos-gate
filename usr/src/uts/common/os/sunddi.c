@@ -5614,7 +5614,7 @@ fail:
  * devfs event subclass names as device class names.
  */
 static int
-derive_devi_class(dev_info_t *dip, char *node_type, int flag)
+derive_devi_class(dev_info_t *dip, const char *node_type, int flag)
 {
 	int rv = DDI_SUCCESS;
 
@@ -5659,10 +5659,10 @@ derive_devi_class(dev_info_t *dip, char *node_type, int flag)
  * exceed IFNAMSIZ (16) characters in length.
  */
 static boolean_t
-verify_name(char *name)
+verify_name(const char *name)
 {
-	size_t	len = strlen(name);
-	char	*cp;
+	size_t len = strlen(name);
+	const char *cp;
 
 	if (len == 0 || len > IFNAMSIZ)
 		return (B_FALSE);
@@ -5680,9 +5680,9 @@ verify_name(char *name)
  *				attach it to the given devinfo node.
  */
 
-int
-ddi_create_minor_common(dev_info_t *dip, char *name, int spec_type,
-    minor_t minor_num, char *node_type, int flag, ddi_minor_type mtype,
+static int
+ddi_create_minor_common(dev_info_t *dip, const char *name, int spec_type,
+    minor_t minor_num, const char *node_type, int flag, ddi_minor_type mtype,
     const char *read_priv, const char *write_priv, mode_t priv_mode)
 {
 	struct ddi_minor_data *dmdp;
@@ -5793,7 +5793,7 @@ ddi_create_minor_common(dev_info_t *dip, char *name, int spec_type,
 	 */
 	if (!(DEVI_IS_ATTACHING(dip) || DEVI_IS_DETACHING(dip)) &&
 	    mtype != DDM_INTERNAL_PATH) {
-		(void) i_log_devfs_minor_create(dip, name);
+		(void) i_log_devfs_minor_create(dip, dmdp->ddm_name);
 	}
 
 	/*
@@ -5804,16 +5804,16 @@ ddi_create_minor_common(dev_info_t *dip, char *name, int spec_type,
 }
 
 int
-ddi_create_minor_node(dev_info_t *dip, char *name, int spec_type,
-    minor_t minor_num, char *node_type, int flag)
+ddi_create_minor_node(dev_info_t *dip, const char *name, int spec_type,
+    minor_t minor_num, const char *node_type, int flag)
 {
 	return (ddi_create_minor_common(dip, name, spec_type, minor_num,
 	    node_type, flag, DDM_MINOR, NULL, NULL, 0));
 }
 
 int
-ddi_create_priv_minor_node(dev_info_t *dip, char *name, int spec_type,
-    minor_t minor_num, char *node_type, int flag,
+ddi_create_priv_minor_node(dev_info_t *dip, const char *name, int spec_type,
+    minor_t minor_num, const char *node_type, int flag,
     const char *rdpriv, const char *wrpriv, mode_t priv_mode)
 {
 	return (ddi_create_minor_common(dip, name, spec_type, minor_num,
@@ -5821,8 +5821,8 @@ ddi_create_priv_minor_node(dev_info_t *dip, char *name, int spec_type,
 }
 
 int
-ddi_create_default_minor_node(dev_info_t *dip, char *name, int spec_type,
-    minor_t minor_num, char *node_type, int flag)
+ddi_create_default_minor_node(dev_info_t *dip, const char *name, int spec_type,
+    minor_t minor_num, const char *node_type, int flag)
 {
 	return (ddi_create_minor_common(dip, name, spec_type, minor_num,
 	    node_type, flag, DDM_DEFAULT, NULL, NULL, 0));
@@ -5842,7 +5842,7 @@ ddi_create_internal_pathname(dev_info_t *dip, char *name, int spec_type,
 }
 
 void
-ddi_remove_minor_node(dev_info_t *dip, char *name)
+ddi_remove_minor_node(dev_info_t *dip, const char *name)
 {
 	int			circ;
 	struct ddi_minor_data	*dmdp, *dmdp1;
@@ -8950,7 +8950,7 @@ i_ddi_devi_class(dev_info_t *dip)
 }
 
 int
-i_ddi_set_devi_class(dev_info_t *dip, char *devi_class, int flag)
+i_ddi_set_devi_class(dev_info_t *dip, const char *devi_class, int flag)
 {
 	struct dev_info *devi = DEVI(dip);
 

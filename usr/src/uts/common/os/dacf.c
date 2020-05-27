@@ -642,7 +642,7 @@ dacf_arglist_delete(dacf_arg_t **list)
  * 	Match a device-spec to a rule.
  */
 dacf_rule_t *
-dacf_match(dacf_opid_t op, dacf_devspec_t ds, void *match_info)
+dacf_match(dacf_opid_t op, dacf_devspec_t ds, const void *match_info)
 {
 	dacf_rule_t *rule;
 
