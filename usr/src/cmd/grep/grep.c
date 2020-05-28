@@ -35,6 +35,7 @@
  */
 
 /*
+ * Copyright 2020 Peter Tribble.
  * Copyright 2018 RackTop Systems.
  * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2013 Damian Bogel. All rights reserved.
@@ -64,8 +65,8 @@
 #define	BUFSIZE		8192		/* Input buffer size */
 #define	MAX_DEPTH	1000		/* how deep to recurse */
 
-#define	AFTER 	1			/* 'After' Context */
-#define	BEFORE 	2			/* 'Before' Context */
+#define	AFTER	1			/* 'After' Context */
+#define	BEFORE	2			/* 'Before' Context */
 #define	CONTEXT	(AFTER|BEFORE)		/* Full Context */
 
 #define	M_CSETSIZE	256		/* singlebyte chars */
@@ -91,11 +92,11 @@ static boolean_t	nvflag = B_TRUE;	/* Print matching lines */
 static uchar_t	cflag;			/* Count of matches */
 static uchar_t	iflag;			/* Case insensitve matching */
 static uchar_t	Hflag;			/* Precede lines by file name */
-static uchar_t	hflag;			/* Supress printing of filename */
+static uchar_t	hflag;			/* Suppress printing of filename */
 static uchar_t	lflag;			/* Print file names of matches */
 static uchar_t	nflag;			/* Precede lines by line number */
 static uchar_t	rflag;			/* Search directories recursively */
-static uchar_t	bflag;			/* Preccede matches by block number */
+static uchar_t	bflag;			/* Precede matches by block number */
 static uchar_t	sflag;			/* Suppress file error messages */
 static uchar_t	qflag;			/* Suppress standard output */
 static uchar_t	wflag;			/* Search for expression as a word */
@@ -110,7 +111,7 @@ static char	*cmdname;
 static int	use_wchar, use_bmg, mblocale;
 
 static size_t	outbuflen, prntbuflen, conbuflen;
-static unsigned long 	conalen, conblen, conmatches;
+static unsigned long	conalen, conblen, conmatches;
 static char	*prntbuf, *conbuf;
 static wchar_t	*outline;
 
@@ -264,11 +265,11 @@ main(int argc, char **argv)
 			break;
 
 		/* based on options order h or H is set as in GNU grep */
-		case 'h':	/* Solaris: supress printing of file name */
+		case 'h':	/* Solaris: suppress printing of file name */
 			hflag = 1;
 			Hflag = 0;
 			break;
-		/* Solaris: precede every matching with file name */
+		/* Solaris: precede every match with file name */
 		case 'H':
 			Hflag = 1;
 			hflag = 0;
@@ -485,7 +486,8 @@ process_path(const char *path)
 	if (rflag) {
 		if (stat(path, &st) != -1 &&
 		    (st.st_mode & S_IFMT) == S_IFDIR) {
-			outfn = 1; /* Print filename */
+			if (!hflag)
+				outfn = 1; /* Print filename unless -h */
 
 			/*
 			 * Add trailing slash if arg
@@ -898,7 +900,7 @@ grep(int fd, const char *fn)
 	off_t	blkoffset;	/* line_offset but context-compatible */
 	long long	lineno, linenum;
 	long long	matches = 0;	/* Number of matching lines */
-	long long	conacnt = 0, conbcnt = 0; 	/* context line count */
+	long long	conacnt = 0, conbcnt = 0;	/* context line count */
 	int	newlinep;	/* 0 if the last line of file has no newline */
 	char	*ptr, *ptrend, *prntptr, *prntptrend;
 	char	*nextptr = NULL, *nextend = NULL;

@@ -12,6 +12,7 @@
 #
 # Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2020 Peter Tribble.
 #
 
 include $(SRC)/cmd/Makefile.cmd
@@ -95,6 +96,10 @@ PROGS = test0 \
 	gout64 \
 	gout65 \
 	gout66 \
+	gout67 \
+	gout68 \
+	gout69 \
+	gout70 \
 	testnl
 
 CMDS = $(PROGS:%=$(TESTDIR)/%)

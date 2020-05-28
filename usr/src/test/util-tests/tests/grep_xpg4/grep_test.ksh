@@ -13,6 +13,7 @@
 
 #
 # Copyright 2017 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2020 Peter Tribble.
 #
 
 XGREP=${XGREP:=/usr/bin/grep}
@@ -137,6 +138,49 @@ echo "$FLAGS3" > /tmp/flags
 while read flags; do
 	print -n "test $i: grep $flags: "
 	$XGREP $flags a testnl > out
+	err="$?"
+	if [[ $err -ne 0 ]]; then
+		fail "failed on exit: $err"
+	elif [ -n "$(diff out gout$i)" ]; then
+		print "$(diff out gout$i)"
+		fail "output is different"
+	fi
+	echo "passed"
+	((i++))
+done < /tmp/flags
+
+FLAGS4="-h
+-H"
+
+echo "$FLAGS4" > /tmp/flags
+
+while read flags; do
+	print -n "test $i: grep $flags: "
+	$XGREP $flags a test0 > out
+	err="$?"
+	if [[ $err -ne 0 ]]; then
+		fail "failed on exit: $err"
+	elif [ -n "$(diff out gout$i)" ]; then
+		print "$(diff out gout$i)"
+		fail "output is different"
+	fi
+	echo "passed"
+	((i++))
+done < /tmp/flags
+
+FLAGS5="-r
+-hr"
+
+# need a directory with predictable contents
+rm -fr /tmp/test0
+mkdir /tmp/test0
+cp test0 /tmp/test0
+
+echo "$FLAGS5" > /tmp/flags
+
+while read flags; do
+	print -n "test $i: grep $flags: "
+	$XGREP $flags a /tmp/test0 > out
 	err="$?"
 	if [[ $err -ne 0 ]]; then
 		fail "failed on exit: $err"
