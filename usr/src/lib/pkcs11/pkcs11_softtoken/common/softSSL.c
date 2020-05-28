@@ -21,7 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018, Joyent, Inc.
+ *
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <fcntl.h>
@@ -999,23 +1000,23 @@ soft_add_derived_key(CK_ATTRIBUTE_PTR tmpl, CK_ULONG attrcount,
 
 	/* ... and, if it needs to persist, write on the token */
 	if (IS_TOKEN_OBJECT(secret_key)) {
-		secret_key->session_handle = (CK_SESSION_HANDLE)NULL;
+		secret_key->session_handle = CK_INVALID_HANDLE;
 		soft_add_token_object_to_slot(secret_key);
 		rv = soft_put_object_to_keystore(secret_key);
 		if (rv != CKR_OK) {
 			soft_delete_token_object(secret_key, B_FALSE, B_FALSE);
 			return (rv);
 		}
-		*phKey = (CK_OBJECT_HANDLE)secret_key;
+		*phKey = set_objecthandle(secret_key);
 
 		return (CKR_OK);
 	}
 
 	/* Add the new object to the session's object list. */
 	soft_add_object_to_session(secret_key, sp);
-	secret_key->session_handle = (CK_SESSION_HANDLE)sp;
+	secret_key->session_handle = sp->handle;
 
-	*phKey = (CK_OBJECT_HANDLE)secret_key;
+	*phKey = set_objecthandle(secret_key);
 
 	return (rv);
 }

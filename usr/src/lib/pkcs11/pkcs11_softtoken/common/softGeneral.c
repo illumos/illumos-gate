@@ -23,6 +23,8 @@
  * Use is subject to license terms.
  *
  * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+ *
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <strings.h>
@@ -30,7 +32,9 @@
 #include <cryptoutil.h>
 #include <unistd.h> /* for pid_t */
 #include <pthread.h>
+#include <stddef.h>
 #include <security/cryptoki.h>
+#include <sys/debug.h>
 #include "softGlobal.h"
 #include "softSession.h"
 #include "softObject.h"
@@ -118,9 +122,31 @@ boolean_t softtoken_initialized = B_FALSE;
 
 static pid_t softtoken_pid = 0;
 
-/* This mutex protects soft_session_list, all_sessions_closing */
+/*
+ * Lock ordering in pkcs11_softtoken is as follows:
+ *	soft_giant_mutex
+ *	soft_sessionlist_mutex
+ *	soft_slot.slot_mutex
+ *	soft_slot.keystore_mutex
+ *	token session mutexes
+ *	soft_session_t->session_mutex
+ *	soft_object_mutex
+ *	soft_object_t->object_mutex
+ *	obj_delay_freed.obj_to_be_free_mutex
+ *	ses_delay_freed.ses_to_br_free_mutex
+ */
+
+/*
+ * This mutex protects soft_session_list, all_sessions_closing,
+ * and soft_session_tree
+ */
 pthread_mutex_t soft_sessionlist_mutex;
 soft_session_t *soft_session_list = NULL;
+avl_tree_t soft_session_tree;
+
+/* This protects soft_object_tree */
+pthread_mutex_t soft_object_mutex;
+avl_tree_t soft_object_tree;
 
 int all_sessions_closing = 0;
 
@@ -132,15 +158,17 @@ ses_to_be_freed_list_t ses_delay_freed;
 pthread_mutex_t soft_giant_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static CK_RV finalize_common(boolean_t force, CK_VOID_PTR pReserved);
-static void softtoken_init();
-static void softtoken_fini();
-static void softtoken_fork_prepare();
-static void softtoken_fork_after();
+static void softtoken_init(void);
+static void softtoken_fini(void);
+static void softtoken_fork_prepare(void);
+static void softtoken_fork_after(void);
+static int session_compare(const void *a, const void *b);
+static int object_compare(const void *a, const void *b);
 
 CK_RV
 C_Initialize(CK_VOID_PTR pInitArgs)
 {
-
+	pthread_mutexattr_t attr = { 0 };
 	int initialize_pid;
 	boolean_t supplied_ok;
 	CK_RV rv;
@@ -211,11 +239,27 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 		}
 	}
 
+	if (pthread_mutexattr_init(&attr) != 0) {
+		(void) pthread_mutex_unlock(&soft_giant_mutex);
+		return (CKR_HOST_MEMORY);
+	}
+
+	VERIFY0(pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK));
+
 	/* Initialize the session list lock */
-	if (pthread_mutex_init(&soft_sessionlist_mutex, NULL) != 0) {
+	if (pthread_mutex_init(&soft_sessionlist_mutex, &attr) != 0) {
+		(void) pthread_mutexattr_destroy(&attr);
 		(void) pthread_mutex_unlock(&soft_giant_mutex);
 		return (CKR_CANT_LOCK);
 	}
+
+	if (pthread_mutex_init(&soft_object_mutex, &attr) != 0) {
+		(void) pthread_mutexattr_destroy(&attr);
+		(void) pthread_mutex_unlock(&soft_giant_mutex);
+		return (CKR_CANT_LOCK);
+	}
+
+	VERIFY0(pthread_mutexattr_destroy(&attr));
 
 	/*
 	 * token object related initialization
@@ -322,8 +366,8 @@ C_Finalize(CK_VOID_PTR pReserved)
  * must be held before calling this function.
  */
 static CK_RV
-finalize_common(boolean_t force, CK_VOID_PTR pReserved) {
-
+finalize_common(boolean_t force, CK_VOID_PTR pReserved)
+{
 	CK_RV rv = CKR_OK;
 	struct object *delay_free_obj, *tmpo;
 	struct session *delay_free_ses, *tmps;
@@ -362,6 +406,8 @@ finalize_common(boolean_t force, CK_VOID_PTR pReserved) {
 	 * cleaning up libcryptoutil here makes no sense.  Decoupling these
 	 * two also prevent deadlocks and other artificial dependencies.
 	 */
+
+	(void) pthread_mutex_destroy(&soft_object_mutex);
 
 	/* Destroy the session list lock here */
 	(void) pthread_mutex_destroy(&soft_sessionlist_mutex);
@@ -404,6 +450,12 @@ finalize_common(boolean_t force, CK_VOID_PTR pReserved) {
 static void
 softtoken_init()
 {
+	avl_create(&soft_session_tree, session_compare, sizeof (soft_session_t),
+	    offsetof(soft_session_t, node));
+
+	avl_create(&soft_object_tree, object_compare, sizeof (soft_object_t),
+	    offsetof(soft_object_t, node));
+
 	/* Children inherit parent's atfork handlers */
 	(void) pthread_atfork(softtoken_fork_prepare,
 	    softtoken_fork_after, softtoken_fork_after);
@@ -425,6 +477,9 @@ softtoken_fini()
 	}
 
 	(void) finalize_common(B_TRUE, NULL_PTR);
+
+	avl_destroy(&soft_object_tree);
+	avl_destroy(&soft_session_tree);
 
 	(void) pthread_mutex_unlock(&soft_giant_mutex);
 }
@@ -510,6 +565,7 @@ softtoken_fork_prepare()
 		(void) pthread_mutex_lock(&soft_slot.keystore_mutex);
 		soft_acquire_all_session_mutexes(&token_session);
 		soft_acquire_all_session_mutexes(soft_session_list);
+		VERIFY0(pthread_mutex_lock(&soft_object_mutex));
 		(void) pthread_mutex_lock(
 		    &obj_delay_freed.obj_to_be_free_mutex);
 		(void) pthread_mutex_lock(
@@ -529,6 +585,7 @@ softtoken_fork_after()
 		    &ses_delay_freed.ses_to_be_free_mutex);
 		(void) pthread_mutex_unlock(
 		    &obj_delay_freed.obj_to_be_free_mutex);
+		VERIFY0(pthread_mutex_unlock(&soft_object_mutex));
 		soft_release_all_session_mutexes(soft_session_list);
 		soft_release_all_session_mutexes(&token_session);
 		(void) pthread_mutex_unlock(&soft_slot.keystore_mutex);
@@ -536,4 +593,30 @@ softtoken_fork_after()
 		(void) pthread_mutex_unlock(&soft_sessionlist_mutex);
 	}
 	(void) pthread_mutex_unlock(&soft_giant_mutex);
+}
+
+static int
+session_compare(const void *a, const void *b)
+{
+	const soft_session_t *l = a;
+	const soft_session_t *r = b;
+
+	if (l->handle < r->handle)
+		return (-1);
+	if (l->handle > r->handle)
+		return (1);
+	return (0);
+}
+
+static int
+object_compare(const void *a, const void *b)
+{
+	const soft_object_t *l = a;
+	const soft_object_t *r = b;
+
+	if (l->handle < r->handle)
+		return (-1);
+	if (l->handle > r->handle)
+		return (1);
+	return (0);
 }

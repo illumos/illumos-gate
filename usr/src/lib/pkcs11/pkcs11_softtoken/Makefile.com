@@ -22,9 +22,8 @@
 # Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
-# Copyright 2018, Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
-# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY = pkcs11_softtoken.a
 VERS= .1
@@ -121,7 +120,7 @@ SRCS =	\
 
 # libelfsign needs a static pkcs11_softtoken
 LIBS    =       $(DYNLIB)
-LDLIBS  +=      -lc -lmd -lcryptoutil -lsoftcrypto -lgen
+LDLIBS  +=      -lc -lmd -lcryptoutil -lsoftcrypto -lgen -lavl
 
 CSTD =	$(CSTD_GNU99)
 
