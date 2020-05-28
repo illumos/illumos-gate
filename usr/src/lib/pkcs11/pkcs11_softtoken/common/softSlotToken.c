@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <strings.h>
@@ -417,6 +417,9 @@ C_GetMechanismList(CK_SLOT_ID slotID, CK_MECHANISM_TYPE_PTR pMechanismList,
 
 	if (slotID != SOFTTOKEN_SLOTID)
 		return (CKR_SLOT_ID_INVALID);
+
+	if (pulCount == NULL)
+		return (CKR_ARGUMENTS_BAD);
 
 	mechnum = sizeof (soft_mechanisms) / sizeof (CK_MECHANISM_TYPE);
 
