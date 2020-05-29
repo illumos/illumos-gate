@@ -3974,6 +3974,20 @@ lx_getsockopt_socket(sonode_t *so, int optname, void *optval,
 	lx_socket_aux_data_t *sad;
 
 	switch (optname) {
+	case LX_SO_PROTOCOL:
+		/*
+		 * We need to special-case netlink and AF_UNIX too.
+		 */
+		if (so->so_family != AF_LX_NETLINK && so->so_family != AF_UNIX)
+			break;	/* Common-case it. */
+		if (*optlen < sizeof (int)) {
+			error = EINVAL;
+		} else {
+			*intval = so->so_protocol;
+		}
+		*optlen = sizeof (int);
+		return (error);
+
 	case LX_SO_TYPE:
 		/*
 		 * Special handling for connectionless AF_UNIX sockets.
