@@ -51,12 +51,6 @@ extern int guest_ncpus;
 extern uint16_t cores, sockets, threads;
 extern char *guest_uuid_str;
 extern char *vmname;
-#ifndef	__FreeBSD__
-extern int bcons_wait;
-extern int bcons_connected;
-extern pthread_mutex_t bcons_wait_lock;
-extern pthread_cond_t bcons_wait_done;
-#endif
 
 void *paddr_guest2host(struct vmctx *ctx, uintptr_t addr, size_t len);
 

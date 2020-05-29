@@ -204,13 +204,6 @@ static int acpi;
 static char *progname;
 static const int BSP = 0;
 
-#ifndef	__FreeBSD__
-int bcons_wait = 0;
-int bcons_connected = 0;
-pthread_mutex_t bcons_wait_lock = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t bcons_wait_done = PTHREAD_COND_INITIALIZER;
-#endif
-
 static cpuset_t cpumask;
 
 static void vm_loop(struct vmctx *ctx, int vcpu, uint64_t rip);
@@ -1358,21 +1351,6 @@ main(int argc, char *argv[])
 
 	if (caph_enter() == -1)
 		errx(EX_OSERR, "cap_enter() failed");
-#endif
-
-#ifndef	__FreeBSD__
-	/*
-	 * If applicable, wait for bhyveconsole
-	 */
-	if (bcons_wait) {
-		printf("Waiting for bhyveconsole connection...\n");
-		(void) pthread_mutex_lock(&bcons_wait_lock);
-		while (!bcons_connected) {
-			(void) pthread_cond_wait(&bcons_wait_done,
-			    &bcons_wait_lock);
-		}
-		(void) pthread_mutex_unlock(&bcons_wait_lock);
-	}
 #endif
 
 	/*
