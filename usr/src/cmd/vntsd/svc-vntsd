@@ -87,9 +87,9 @@ add_user_entries()
 			w
 			q
 			EOF
-		else 
+		else
 		    #
-		    # Add a root entry with vntsd attribute. 
+		    # Add a root entry with vntsd attribute.
 		    #
 		    $CAT >>${USER_ATTR} << EOF
 # Added by svc-vntsd
@@ -155,9 +155,9 @@ if [ -x /usr/lib/ldoms/vntsd ]; then
 	# if vntsd exited in error with status 1, let SMF restart it
 	# otherwise we want it to go into maintenance.
 	if [ $rc -eq 1 ]; then
-	    exit $SMF_ERR_OTHER
+	    exit $rc
 	else
-	    exit $SMF_ERR_FATAL
+	    exit $SMF_EXIT_ERR_FATAL
 	fi
     fi
 else

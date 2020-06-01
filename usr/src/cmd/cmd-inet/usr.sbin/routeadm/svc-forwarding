@@ -40,7 +40,7 @@ proto="$2"
 
 if [ -z "$proto" ]; then
 	usage
-	exit $SMF_ERROR_FATAL
+	exit $SMF_EXIT_ERROR_FATAL
 fi
 
 case "$1" in
@@ -65,7 +65,7 @@ case "$1" in
 	;;
 *)
 	usage
-        exit $SMF_ERROR_FATAL
+        exit $SMF_EXIT_ERROR_FATAL
         ;;
 esac
 

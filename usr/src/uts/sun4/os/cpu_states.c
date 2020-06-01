@@ -185,11 +185,11 @@ abort_sequence_enter(char *msg)
 			 */
 			abort_seq_tstamp = 0LL;
 			mutex_exit(&abort_seq_lock);
-		if (!on_intr && auditing)
-			audit_enterprom(1);
+			if (!on_intr && auditing)
+				audit_enterprom(1);
 			(*abort_seq_handler)(msg);
-		if (!on_intr && auditing)
-			audit_exitprom(1);
+			if (!on_intr && auditing)
+				audit_exitprom(1);
 		}
 	} else {
 		if (auditing)
