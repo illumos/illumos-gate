@@ -23,9 +23,9 @@ PROGS +=	$(PROG1) $(PROG2)
 CLEANFILES +=	$(PROG1) $(PROG2)
 
 $(PROG1) :=	LDLIBS += -lnvpair -lcustr
-$(PROG2) :=	CPPFLAGS = -I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
+$(PROG2) :=	CPPFLAGS = -I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 	$(CPPFLAGS.master) -I$(SRC)/uts/i86pc \
-	-I$(COMPAT)/freebsd/amd64 -I$(CONTRIB)/freebsd/amd64
+	-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64
 
 TEMPLATES =	SYSbhyve.xml
 XMLDOCS =	config.xml platform.xml
