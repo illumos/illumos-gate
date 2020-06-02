@@ -28,8 +28,8 @@ CLOBBERFILES +=	$(ROOTUSRSBINPROG)
 .KEEP_STATE:
 
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS =	-I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
-		-I$(COMPAT)/freebsd/amd64 -I$(CONTRIB)/freebsd/amd64 \
+CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
+		-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64 \
 		$(CPPFLAGS.master) \
 		-I$(ROOT)/usr/platform/i86pc/include \
 		-I$(SRC)/uts/i86pc/io/vmm
@@ -53,6 +53,6 @@ clean:
 
 include ../Makefile.targ
 
-%.o: $(CONTRIB)/freebsd/lib/libutil/%.c
+%.o: $(CONTRIB)/bhyve/lib/libutil/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)

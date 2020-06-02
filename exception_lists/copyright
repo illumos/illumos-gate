@@ -546,14 +546,9 @@ usr/src/cmd/bhyve/vga.[ch]
 usr/src/cmd/bhyve/virtio.[ch]
 usr/src/cmd/bhyve/xmsr.[ch]
 usr/src/cmd/bhyvectl/bhyvectl.c
-usr/src/compat/freebsd/*.h
-usr/src/compat/freebsd/*/*.h
-usr/src/compat/freebsd/amd64/machine/*.h
-usr/contrib/freebsd/*/*.h
-usr/contrib/freebsd/*/*/*.h
-usr/contrib/freebsd/lib/libutil/*.c
+usr/src/compat/bhyve/*
+usr/src/contrib/bhyve/*
 usr/src/lib/libvmmapi/common/vmmapi.[ch]
-usr/src/tools/scripts/gensetdefs.pl
 usr/src/uts/i86pc/io/vmm/amd/*.[chs]
 usr/src/uts/i86pc/io/vmm/intel/*.[chs]
 usr/src/uts/i86pc/io/vmm/intel/offsets.in

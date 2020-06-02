@@ -28,9 +28,9 @@ CFLAGS +=	$(CCVERBOSE) -_gcc=-Wimplicit-function-declaration \
 CFLAGS64 +=	$(CCVERBOSE) -_gcc=-Wimplicit-function-declaration \
 		-_gcc=-Wno-parentheses
 CPPFLAGS =	-I$(SRC)/cmd/bhyve \
-		-I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
-		-I$(CONTRIB)/freebsd/dev/usb/controller \
-		-I$(CONTRIB)/freebsd/dev/mii \
+		-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
+		-I$(CONTRIB)/bhyve/dev/usb/controller \
+		-I$(CONTRIB)/bhyve/dev/mii \
 		$(CPPFLAGS.master) \
 		-I$(ROOT)/usr/platform/i86pc/include \
 		-I$(SRC)/uts/i86pc/io/vmm \
@@ -38,7 +38,7 @@ CPPFLAGS =	-I$(SRC)/cmd/bhyve \
 		-I$(SRC)/uts/i86pc \
 		-I$(SRC)/lib/libdladm/common \
 		-DWITHOUT_CAPSICUM
-CPPFLAGS +=	-I$(COMPAT)/freebsd/amd64 -I$(CONTRIB)/freebsd/amd64
+CPPFLAGS +=	-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64
 
 SMOFF += all_func_returns
 

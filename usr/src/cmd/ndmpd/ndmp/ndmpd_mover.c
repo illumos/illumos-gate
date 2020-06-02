@@ -10,10 +10,10 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 	- Redistributions of source code must retain the above copyright
+ *	- Redistributions of source code must retain the above copyright
  *	  notice, this list of conditions and the following disclaimer.
  *
- * 	- Redistributions in binary form must reproduce the above copyright
+ *	- Redistributions in binary form must reproduce the above copyright
  *	  notice, this list of conditions and the following disclaimer in
  *	  the documentation and/or other materials provided with the
  *	  distribution.
@@ -2503,8 +2503,8 @@ mover_tape_read_one_buf(ndmpd_session_t *session, tlm_buffer_t *buf)
  *   0: on success
  *  -1: otherwise
  */
-int
-mover_tape_reader(ndmpd_session_t *session)
+void *
+mover_tape_reader(void *ptr)
 {
 	int bidx;	/* buffer index */
 	int rv;
@@ -2513,10 +2513,11 @@ mover_tape_reader(ndmpd_session_t *session)
 	tlm_buffers_t *bufs;
 	tlm_cmd_t *lcmd;	/* Local command */
 	tlm_commands_t *cmds;	/* Commands structure */
+	ndmpd_session_t *session = ptr;
 
 	if ((nlp = ndmp_get_nlp(session)) == NULL) {
 		NDMP_LOG(LOG_DEBUG, "nlp == NULL");
-		return (-1);
+		return ((void *)(uintptr_t)-1);
 	}
 
 	cmds = &nlp->nlp_cmds;
@@ -2582,7 +2583,7 @@ mover_tape_reader(ndmpd_session_t *session)
 	cmds->tcs_reader_count--;
 	lcmd->tc_ref--;
 	lcmd->tc_writer = TLM_STOP;
-	return (0);
+	return (NULL);
 }
 
 
@@ -2652,8 +2653,8 @@ mover_socket_write_one_buf(ndmpd_session_t *session, tlm_buffer_t *buf)
  *   0: on success
  *  -1: otherwise
  */
-int
-mover_socket_writer(ndmpd_session_t *session)
+void *
+mover_socket_writer(void *ptr)
 {
 	int bidx;	/* buffer index */
 	ndmp_lbr_params_t *nlp;
@@ -2661,10 +2662,11 @@ mover_socket_writer(ndmpd_session_t *session)
 	tlm_buffers_t *bufs;
 	tlm_cmd_t *lcmd;	/* Local command */
 	tlm_commands_t *cmds;	/* Commands structure */
+	ndmpd_session_t *session = ptr;
 
 	if ((nlp = ndmp_get_nlp(session)) == NULL) {
 		NDMP_LOG(LOG_DEBUG, "nlp == NULL");
-		return (-1);
+		return ((void *)(uintptr_t)-1);
 	}
 
 	cmds = &nlp->nlp_cmds;
@@ -2725,7 +2727,7 @@ mover_socket_writer(ndmpd_session_t *session)
 	cmds->tcs_writer_count--;
 	lcmd->tc_ref--;
 	lcmd->tc_reader = TLM_STOP;
-	return (0);
+	return (NULL);
 }
 
 
@@ -2772,7 +2774,7 @@ start_mover_for_restore(ndmpd_session_t *session)
 	 * must be sent to the client before probable errors are sent
 	 * to the client.
 	 */
-	rc = pthread_create(NULL, NULL, (funct_t)mover_tape_reader, session);
+	rc = pthread_create(NULL, NULL, mover_tape_reader, session);
 	if (rc == 0) {
 		tlm_cmd_wait(cmds->tcs_command, TLM_TAPE_READER);
 	} else {
@@ -2781,7 +2783,7 @@ start_mover_for_restore(ndmpd_session_t *session)
 		return (-1);
 	}
 
-	rc = pthread_create(NULL, NULL, (funct_t)mover_socket_writer, session);
+	rc = pthread_create(NULL, NULL, mover_socket_writer, session);
 	if (rc == 0) {
 		tlm_cmd_wait(cmds->tcs_command, TLM_SOCK_WRITER);
 	} else {
@@ -2874,8 +2876,8 @@ mover_socket_read_one_buf(ndmpd_session_t *session, tlm_buffer_t *buf,
  *   0: on success
  *  -1: otherwise
  */
-int
-mover_socket_reader(ndmpd_session_t *session)
+void *
+mover_socket_reader(void *ptr)
 {
 	int bidx;	/* buffer index */
 	ndmp_lbr_params_t *nlp;
@@ -2883,11 +2885,12 @@ mover_socket_reader(ndmpd_session_t *session)
 	tlm_buffers_t *bufs;
 	tlm_cmd_t *lcmd;	/* Local command */
 	tlm_commands_t *cmds;	/* Commands structure */
+	ndmpd_session_t *session = ptr;
 	static int nr = 0;
 
 	if ((nlp = ndmp_get_nlp(session)) == NULL) {
 		NDMP_LOG(LOG_DEBUG, "nlp == NULL");
-		return (-1);
+		return ((void *)(uintptr_t)-1);
 	}
 
 	cmds = &nlp->nlp_cmds;
@@ -2951,7 +2954,7 @@ mover_socket_reader(ndmpd_session_t *session)
 	cmds->tcs_reader_count--;
 	lcmd->tc_ref--;
 	lcmd->tc_writer = TLM_STOP;
-	return (0);
+	return (NULL);
 }
 
 
@@ -3014,8 +3017,8 @@ mover_tape_write_one_buf(ndmpd_session_t *session, tlm_buffer_t *buf)
  *   0: on success
  *  -1: otherwise
  */
-int
-mover_tape_writer(ndmpd_session_t *session)
+void *
+mover_tape_writer(void *ptr)
 {
 	int bidx;
 	ndmp_lbr_params_t *nlp;
@@ -3023,11 +3026,12 @@ mover_tape_writer(ndmpd_session_t *session)
 	tlm_buffers_t *bufs;
 	tlm_cmd_t *lcmd;
 	tlm_commands_t *cmds;
+	ndmpd_session_t *session = ptr;
 	static int nw = 0;
 
 	if ((nlp = ndmp_get_nlp(session)) == NULL) {
 		NDMP_LOG(LOG_DEBUG, "nlp == NULL");
-		return (-1);
+		return ((void *)(uintptr_t)-1);
 	}
 
 	cmds = &nlp->nlp_cmds;
@@ -3096,7 +3100,7 @@ mover_tape_writer(ndmpd_session_t *session)
 	cmds->tcs_writer_count--;
 	lcmd->tc_ref--;
 	lcmd->tc_reader = TLM_STOP;
-	return (0);
+	return (NULL);
 }
 
 
@@ -3143,7 +3147,7 @@ start_mover_for_backup(ndmpd_session_t *session)
 	 * must be sent to the client before probable errors are sent
 	 * to the client.
 	 */
-	rc = pthread_create(NULL, NULL, (funct_t)mover_socket_reader, session);
+	rc = pthread_create(NULL, NULL, mover_socket_reader, session);
 	if (rc == 0) {
 		tlm_cmd_wait(cmds->tcs_command, TLM_SOCK_READER);
 	} else {
@@ -3152,7 +3156,7 @@ start_mover_for_backup(ndmpd_session_t *session)
 		return (-1);
 	}
 
-	rc = pthread_create(NULL, NULL, (funct_t)mover_tape_writer, session);
+	rc = pthread_create(NULL, NULL, mover_tape_writer, session);
 	if (rc == 0) {
 		tlm_cmd_wait(cmds->tcs_command, TLM_TAPE_WRITER);
 	} else {
@@ -3180,7 +3184,7 @@ start_mover_for_backup(ndmpd_session_t *session)
  *	Note: non-zero is also returned if the backup type is
  *		neither TAR nor DUMP.  I.e. the is_writer_running()
  *		check does not apply in this case and things should
- * 		appear successful.
+ *		appear successful.
  */
 static boolean_t
 is_writer_running(ndmpd_session_t *session)
@@ -3216,7 +3220,7 @@ is_writer_running(ndmpd_session_t *session)
  *	Note: non-zero is also returned if the backup type is
  *		neither TAR nor DUMP.  I.e. the is_writer_running()
  *		check does not apply in this case and things should
- * 		appear successful.
+ *		appear successful.
  */
 static boolean_t
 is_writer_running_v3(ndmpd_session_t *session)

@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 # Copyright (c) 2012, 2015 by Delphix. All rights reserved.
 # Copyright (c) 2013 DEY Storage Systems, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
@@ -343,6 +343,7 @@ COMMON_SUBDIRS=		\
 	pwconv		\
 	pwd		\
 	raidctl		\
+	raidz_test	\
 	ramdiskadm	\
 	rcap		\
 	rcm_daemon	\

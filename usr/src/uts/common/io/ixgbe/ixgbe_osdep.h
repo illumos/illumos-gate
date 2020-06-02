@@ -113,7 +113,7 @@ boolean_t ixgbe_removed(struct ixgbe_hw *);
 #ifdef _BIG_ENDIAN
 #define	IXGBE_CPU_TO_LE16	BSWAP_16
 #define	IXGBE_CPU_TO_LE32	BSWAP_32
-#define	IXGBE_LE32_TO_CPUS	BSWAP_32
+#define	IXGBE_LE32_TO_CPUS(x)	*(x) = BSWAP_32(*(x))
 #define	IXGBE_CPU_TO_BE16(x)	(x)
 #define	IXGBE_CPU_TO_BE32(x)	(x)
 #define	IXGBE_BE32_TO_CPU(x)	(x)

@@ -1434,6 +1434,8 @@ ZFS_COMMON_OBJS +=		\
 	vdev_missing.o		\
 	vdev_queue.o		\
 	vdev_raidz.o		\
+	vdev_raidz_math.o	\
+	vdev_raidz_math_scalar.o \
 	vdev_removal.o		\
 	vdev_root.o		\
 	vdev_trim.o		\

@@ -10,12 +10,12 @@
 #
 
 #
-# Copyright 2013 Pluribus Networks Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
-include ../Makefile.com
-include ../../Makefile.lib.64
+include $(SRC)/Makefile.master
 
-CPPFLAGS += -I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64
+ROOTOPTPKG = $(ROOT)/opt/zfs-tests
+TARGETDIR = $(ROOTOPTPKG)/tests/functional/raidz
 
-install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+include $(SRC)/test/zfs-tests/Makefile.com

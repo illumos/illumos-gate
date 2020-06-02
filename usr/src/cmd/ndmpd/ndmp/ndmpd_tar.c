@@ -10,10 +10,10 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 	- Redistributions of source code must retain the above copyright
+ *	- Redistributions of source code must retain the above copyright
  *	  notice, this list of conditions and the following disclaimer.
  *
- * 	- Redistributions in binary form must reproduce the above copyright
+ *	- Redistributions in binary form must reproduce the above copyright
  *	  notice, this list of conditions and the following disclaimer in
  *	  the documentation and/or other materials provided with the
  *	  distribution.
@@ -370,8 +370,7 @@ ndmp_write_utf8magic(tlm_cmd_t *cmd)
  *
  */
 static boolean_t
-timecmp(bk_selector_t *bksp,
-		struct stat64 *attr)
+timecmp(bk_selector_t *bksp, struct stat64 *attr)
 {
 	ndmp_lbr_params_t *nlp;
 
@@ -476,7 +475,7 @@ get_dir_acl_info(char *dir, tlm_acls_t *tlm_acls, tlm_job_stats_t *js)
 	char	*spot;
 	char	*fil;
 	acl_t	*aclp = NULL;
-	char 	*acltp;
+	char	*acltp;
 
 	checkpointed_dir = ndmp_malloc(TLM_MAX_PATH_NAME);
 	if (checkpointed_dir == NULL)
@@ -656,7 +655,7 @@ backup_work(char *bk_path, tlm_job_stats_t *job_stats,
 	longlong_t fsize;
 	bk_selector_t bks;
 	tlm_cmd_t *local_commands;
-	long 	dpos;
+	long	dpos;
 
 	NDMP_LOG(LOG_DEBUG, "nr_chkpnted %d nr_ldate: %u bk_path: \"%s\"",
 	    NLP_ISCHKPNTED(nlp), nlp->nlp_ldate, bk_path);
@@ -1067,8 +1066,8 @@ read_one_buf(ndmpd_module_params_t *mod_params, tlm_buffers_t *bufs,
  * file from the tape and wakes up the consumer thread to extract
  * it on the disk
  */
-int
-ndmp_tar_reader(ndmp_tar_reader_arg_t *argp)
+void *
+ndmp_tar_reader(void *ptr)
 {
 	int bidx;
 	int err;
@@ -1078,9 +1077,10 @@ ndmp_tar_reader(ndmp_tar_reader_arg_t *argp)
 	ndmpd_session_t *session;
 	ndmpd_module_params_t *mod_params;
 	tlm_commands_t *cmds;
+	ndmp_tar_reader_arg_t *argp = ptr;
 
 	if (!argp)
-		return (-1);
+		return ((void *)(uintptr_t)-1);
 
 	session = argp->tr_session;
 	mod_params = argp->tr_mod_params;
@@ -1097,7 +1097,7 @@ ndmp_tar_reader(ndmp_tar_reader_arg_t *argp)
 
 	if (err != 0) {
 		tlm_cmd_signal(cmds->tcs_command, TLM_TAR_READER);
-		return (err);
+		return ((void *)(uintptr_t)err);
 	}
 
 	lcmd = cmds->tcs_command;
@@ -1160,7 +1160,7 @@ ndmp_tar_reader(ndmp_tar_reader_arg_t *argp)
 	 */
 	cmds->tcs_reader_count--;
 	lcmd->tc_ref--;
-	return (err);
+	return ((void *)(uintptr_t)err);
 }
 
 
@@ -1314,8 +1314,7 @@ ndmpd_tar_restore(ndmpd_session_t *session, ndmpd_module_params_t *mod_params,
 		arg.tr_mod_params = mod_params;
 		arg.tr_cmds = cmds;
 
-		err = pthread_create(&rdtp, NULL, (funct_t)ndmp_tar_reader,
-		    (void *)&arg);
+		err = pthread_create(&rdtp, NULL, ndmp_tar_reader, &arg);
 		if (err == 0) {
 			tlm_cmd_wait(cmds->tcs_command, TLM_TAR_READER);
 		} else {
@@ -1346,8 +1345,8 @@ ndmpd_tar_restore(ndmpd_session_t *session, ndmpd_module_params_t *mod_params,
 
 
 		if (tm_tar_ops.tm_getfile != NULL) {
-			err = pthread_create(&wrtp, NULL,
-			    (funct_t)tm_tar_ops.tm_getfile, (void *)&tlm_arg);
+			err = pthread_create(&wrtp, NULL, tm_tar_ops.tm_getfile,
+			    &tlm_arg);
 		} else {
 			(void) pthread_barrier_destroy(&tlm_arg.ba_barrier);
 			NDMP_LOG(LOG_DEBUG,
@@ -1859,7 +1858,7 @@ ndmp_restore_extract_params(ndmpd_session_t *session,
  * and calls ndmp_tar_backup to perform the actual backup. It does the cleanup
  * and release the snapshot at the end.
  */
-int
+void *
 ndmpd_tar_backup_starter(void *arg)
 {
 	ndmpd_module_params_t *mod_params = arg;
@@ -1933,7 +1932,7 @@ ndmpd_tar_backup_starter(void *arg)
 
 	NS_DEC(nbk);
 	ndmp_session_unref(session);
-	return (err);
+	return ((void *)(uintptr_t)err);
 }
 
 
@@ -1966,7 +1965,7 @@ ndmpd_tar_backup_abort(void *module_cookie)
  * Starts the restore by running ndmpd_tar_restore function (V2 only)
  */
 
-int
+void *
 ndmpd_tar_restore_starter(void *arg)
 {
 	ndmpd_module_params_t *mod_params = arg;
@@ -1986,7 +1985,7 @@ ndmpd_tar_restore_starter(void *arg)
 
 	NS_DEC(nrs);
 	ndmp_session_unref(session);
-	return (err);
+	return ((void *)(uintptr_t)err);
 }
 
 

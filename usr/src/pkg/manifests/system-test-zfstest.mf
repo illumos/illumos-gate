@@ -143,6 +143,7 @@ dir path=opt/zfs-tests/tests/functional/poolversion
 dir path=opt/zfs-tests/tests/functional/privilege
 dir path=opt/zfs-tests/tests/functional/projectquota
 dir path=opt/zfs-tests/tests/functional/quota
+dir path=opt/zfs-tests/tests/functional/raidz
 dir path=opt/zfs-tests/tests/functional/redundancy
 dir path=opt/zfs-tests/tests/functional/refquota
 dir path=opt/zfs-tests/tests/functional/refreserv
@@ -2800,6 +2801,10 @@ file path=opt/zfs-tests/tests/functional/quota/quota_004_pos mode=0555
 file path=opt/zfs-tests/tests/functional/quota/quota_005_pos mode=0555
 file path=opt/zfs-tests/tests/functional/quota/quota_006_neg mode=0555
 file path=opt/zfs-tests/tests/functional/quota/setup mode=0555
+file path=opt/zfs-tests/tests/functional/raidz/cleanup mode=0555
+file path=opt/zfs-tests/tests/functional/raidz/raidz_001_neg mode=0555
+file path=opt/zfs-tests/tests/functional/raidz/raidz_002_pos mode=0555
+file path=opt/zfs-tests/tests/functional/raidz/setup mode=0555
 file path=opt/zfs-tests/tests/functional/redundancy/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/redundancy/redundancy.cfg mode=0444
 file path=opt/zfs-tests/tests/functional/redundancy/redundancy.kshlib \

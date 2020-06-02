@@ -225,7 +225,7 @@ ushort_t zshiwat[NSPEED] = {
  */
 #define	ZSA_GETBLOCK(zs, allocbcount) \
 { \
-	register int n = zsa_rstandby; \
+	int n = zsa_rstandby; \
 	while (--n >= 0 && allocbcount > 0) { \
 		if (!za->za_rstandby[n]) { \
 			if ((za->za_rstandby[n] = allocb(ZSA_RCV_SIZE, \
@@ -243,7 +243,7 @@ ushort_t zshiwat[NSPEED] = {
 	if (za->za_ttycommon.t_cflag & CRTSXOFF) { \
 		mutex_enter(zs->zs_excl_hi); \
 		if (!(zs->zs_wreg[5] & ZSWR5_RTS)) { \
-			register int usedcnt = 0; \
+			int usedcnt = 0; \
 			for (n = 0; n < zsa_rstandby; n++) \
 				if (!za->za_rstandby[n]) \
 					usedcnt++; \
@@ -260,7 +260,7 @@ ushort_t zshiwat[NSPEED] = {
  */
 #define	ZSA_ALLOCB(mp) \
 { \
-	register int n = zsa_rstandby; \
+	int n = zsa_rstandby; \
 	while (--n >= 0) { \
 		if ((mp = za->za_rstandby[n]) != NULL) { \
 			za->za_rstandby[n] = NULL; \
@@ -274,7 +274,7 @@ ushort_t zshiwat[NSPEED] = {
 			cmn_err(CE_WARN, "zs%d: message lost\n", \
 				UNIT(za->za_dev)); \
 		} else if (zs->zs_wreg[5] & ZSWR5_RTS) { \
-			register int usedcnt = 0; \
+			int usedcnt = 0; \
 			for (n = 0; n < zsa_rstandby; n++) \
 				if (!za->za_rstandby[n]) \
 					usedcnt++; \
@@ -301,7 +301,7 @@ ushort_t zshiwat[NSPEED] = {
  */
 #define	ZSA_PUTQ(mp) \
 { \
-	register int wptr, rptr; \
+	int wptr, rptr; \
 	wptr = za->za_rdone_wptr; \
 	rptr = za->za_rdone_rptr; \
 	za->za_rdone[wptr] = mp; \
@@ -321,7 +321,7 @@ ushort_t zshiwat[NSPEED] = {
  */
 #define	ZSA_KICK_RCV \
 { \
-	register mblk_t *mp = za->za_rcvblk; \
+	mblk_t *mp = za->za_rcvblk; \
 	if (mp) { \
 		if (zs->zs_rd_cur) {	/* M_DATA */ \
 			mp->b_wptr = zs->zs_rd_cur; \
@@ -364,7 +364,7 @@ ushort_t zshiwat[NSPEED] = {
  */
 #define	ZSA_FLUSHQ \
 { \
-	register mblk_t *tmp; \
+	mblk_t *tmp; \
 	for (;;) { \
 		ZSA_GETQ(tmp); \
 		if (!(tmp)) \
@@ -412,7 +412,7 @@ int zsa_h_log_n[40];
 
 #define	zsa_h_log_clear \
 { \
-	register char *p; \
+	char *p; \
 	for (p = &zsa_h_log[zs->zs_unit][ZSA_H_LOG_MAX]; \
 		p >= &zsa_h_log[zs->zs_unit][0]; /* null */) \
 		*p-- = '\0'; \
@@ -498,8 +498,7 @@ static int	zsa_resume(struct zscom *zs);
 static void
 zsa_null(struct zscom *zs)
 {
-	/* LINTED */
-	register short	c;
+	short	c;
 
 	SCC_WRITE0(ZSWR0_RESET_TXINT);
 	SCC_WRITE0(ZSWR0_RESET_STATUS);
@@ -542,8 +541,8 @@ static void	zsa_reioctl(void *);
 static void	zsa_ioctl(struct asyncline *za, queue_t *q, mblk_t *mp);
 static void	zsa_program(struct asyncline *za, int setibaud);
 static void	zsa_start(struct zscom *zs);
-static void 	zsa_kick_rcv(void *);
-static void 	zsa_callback(void *);
+static void	zsa_kick_rcv(void *);
+static void	zsa_callback(void *);
 static void	zsa_set_za_rcv_flags_mask(struct asyncline *za);
 int		zsgetspeed(dev_t dev);
 
@@ -554,9 +553,9 @@ int
 zsc_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
     void **result)
 {
-	register dev_t dev = (dev_t)arg;
-	register int unit, error;
-	register struct zscom *zs;
+	dev_t dev = (dev_t)arg;
+	int unit, error;
+	struct zscom *zs;
 
 	if ((unit = UNIT(dev)) >= nzs)
 		return (DDI_FAILURE);
@@ -716,12 +715,12 @@ zsa_init(struct zscom *zs)
 static int
 zsa_open(queue_t *rq, dev_t *dev, int flag, int sflag, cred_t *cr)
 {
-	register struct zscom *zs;
-	register struct asyncline *za;
-	register int	speed, unit;
+	struct zscom *zs;
+	struct asyncline *za;
+	int	speed, unit;
 	struct termios *termiosp;
 	int len;
-	register int allocbcount = zsa_rstandby;
+	int allocbcount = zsa_rstandby;
 	boolean_t set_zsoptinit = B_FALSE;
 
 	unit = UNIT(*dev);
@@ -1205,10 +1204,10 @@ out:
 static void
 zsa_wput(queue_t *q, mblk_t *mp)
 {
-	register struct asyncline	*za;
-	register struct zscom		*zs;
-	register struct copyresp	*resp;
-	register mblk_t			*bp = NULL;
+	struct asyncline	*za;
+	struct zscom		*zs;
+	struct copyresp	*resp;
+	mblk_t			*bp = NULL;
 	int				error;
 	struct iocblk			*iocp;
 
@@ -1321,7 +1320,7 @@ zsa_wput(queue_t *q, mblk_t *mp)
 				freemsg(mp->b_cont);
 				mp->b_cont = NULL;
 			}
-			if (za->za_pps == NULL) {
+			if (za->za_pps == 0) {
 				mp->b_datap->db_type = M_IOCNAK;
 				iocp->ioc_error = ENXIO;
 				ZSA_QREPLY(q, mp);
@@ -1640,9 +1639,9 @@ zsa_rsrv(queue_t *q)
 static void
 zsa_txint(struct zscom *zs)
 {
-	register struct asyncline *za = (struct asyncline *)&zs->zs_priv_str;
-	register uchar_t *wr_cur;
-	register uchar_t s0;
+	struct asyncline *za = (struct asyncline *)&zs->zs_priv_str;
+	uchar_t *wr_cur;
+	uchar_t s0;
 
 	s0 = SCC_READ0();
 
@@ -1701,8 +1700,8 @@ zsa_txint(struct zscom *zs)
 static void
 zsa_xsint(struct zscom *zs)
 {
-	register struct asyncline *za = (struct asyncline *)&zs->zs_priv_str;
-	register uchar_t s0, x0;
+	struct asyncline *za = (struct asyncline *)&zs->zs_priv_str;
+	uchar_t s0, x0;
 
 	s0 = SCC_READ0();
 	ZSA_R0_LOG(s0);
@@ -1833,12 +1832,12 @@ zsa_xsint(struct zscom *zs)
 static void
 zsa_rxint(struct zscom *zs)
 {
-	register struct asyncline *za = (struct asyncline *)&zs->zs_priv_str;
-	register uchar_t c;
-	register uchar_t *rd_cur = zs->zs_rd_cur;
-	register uchar_t *rd_lim = zs->zs_rd_lim;
-	register mblk_t	*bp;
-	register uint_t	fm = za->za_rcv_flags_mask;
+	struct asyncline *za = (struct asyncline *)&zs->zs_priv_str;
+	uchar_t c;
+	uchar_t *rd_cur = zs->zs_rd_cur;
+	uchar_t *rd_lim = zs->zs_rd_lim;
+	mblk_t	*bp;
+	uint_t	fm = za->za_rcv_flags_mask;
 
 
 #ifdef ZSA_DEBUG
@@ -1956,12 +1955,12 @@ zsa_rxint(struct zscom *zs)
 static void
 zsa_srint(struct zscom *zs)
 {
-	register struct asyncline *za = (struct asyncline *)&zs->zs_priv_str;
-	register short s1;
-	register uchar_t c;
-	register uchar_t c1;
-	register mblk_t *bp = za->za_rcvblk;
-	register uchar_t *rd_cur = zs->zs_rd_cur;
+	struct asyncline *za = (struct asyncline *)&zs->zs_priv_str;
+	short s1;
+	uchar_t c;
+	uchar_t c1;
+	mblk_t *bp = za->za_rcvblk;
+	uchar_t *rd_cur = zs->zs_rd_cur;
 
 	SCC_READ(1, s1);
 	if (s1 & (ZSRR1_FE | ZSRR1_PE | ZSRR1_DO)) {
@@ -2080,17 +2079,17 @@ zsa_srint(struct zscom *zs)
 static int
 zsa_softint(struct zscom *zs)
 {
-	register struct asyncline *za = (struct asyncline *)&zs->zs_priv_str;
-	register uchar_t r0;
-	register uchar_t za_kick_active;
-	register int	m_error;
-	register int	allocbcount = 0;
-	register int 	do_ttycommon_qfull = 0;
+	struct asyncline *za = (struct asyncline *)&zs->zs_priv_str;
+	uchar_t r0;
+	uchar_t za_kick_active;
+	int	m_error;
+	int	allocbcount = 0;
+	int	do_ttycommon_qfull = 0;
 	boolean_t	hangup = B_FALSE, unhangup = B_FALSE;
 	boolean_t	m_break = B_FALSE, wakeup = B_FALSE;
-	register queue_t *q;
-	register mblk_t	*bp;
-	register mblk_t *head = NULL, *tail = NULL;
+	queue_t *q;
+	mblk_t	*bp;
+	mblk_t *head = NULL, *tail = NULL;
 
 	mutex_enter(zs->zs_excl);
 	if (zs->zs_suspended || (zs->zs_flags & ZS_CLOSED)) {
@@ -2351,10 +2350,10 @@ zsa_softint(struct zscom *zs)
 static void
 zsa_start(struct zscom *zs)
 {
-	register struct asyncline *za = (struct asyncline *)&zs->zs_priv_str;
-	register int cc;
-	register queue_t *q;
-	register mblk_t *bp;
+	struct asyncline *za = (struct asyncline *)&zs->zs_priv_str;
+	int cc;
+	queue_t *q;
+	mblk_t *bp;
 	uchar_t *rptr, *wptr;
 
 	/*
@@ -2501,8 +2500,8 @@ zsa_start_transmit:
 	 * so we need to explicitly mask before transmitting
 	 */
 	if ((za->za_ttycommon.t_cflag & CSIZE) == CS5) {
-		register unsigned char *p = rptr;
-		register int cnt = cc;
+		unsigned char *p = rptr;
+		int cnt = cc;
 
 		while (cnt--)
 			*p++ &= (unsigned char) 0x1f;
@@ -2741,11 +2740,11 @@ zsa_reioctl(void *arg)
 static void
 zsa_ioctl(struct asyncline *za, queue_t *wq, mblk_t *mp)
 {
-	register struct zscom *zs = za->za_common;
-	register struct iocblk *iocp;
-	register unsigned datasize;
+	struct zscom *zs = za->za_common;
+	struct iocblk *iocp;
+	unsigned datasize;
 	int error;
-	register mblk_t *tmp;
+	mblk_t *tmp;
 
 	if (za->za_ttycommon.t_iocpending != NULL) {
 		/*
@@ -2934,7 +2933,7 @@ zsa_ioctl(struct asyncline *za, queue_t *wq, mblk_t *mp)
 static int
 dmtozs(int bits)
 {
-	register int b = 0;
+	int b = 0;
 
 	if (bits & TIOCM_CAR)
 		b |= ZSRR0_CD;
@@ -2950,7 +2949,7 @@ dmtozs(int bits)
 static int
 zstodm(int bits)
 {
-	register int b;
+	int b;
 
 	b = 0;
 	if (bits & ZSRR0_CD)
@@ -2972,9 +2971,9 @@ zstodm(int bits)
 static void
 zsa_program(struct asyncline *za, int setibaud)
 {
-	register struct zscom *zs = za->za_common;
-	register struct zs_prog *zspp;
-	register int wr3, wr4, wr5, wr15, speed, baudrate, flags = 0;
+	struct zscom *zs = za->za_common;
+	struct zs_prog *zspp;
+	int wr3, wr4, wr5, wr15, speed, baudrate, flags = 0;
 
 	if ((baudrate = SPEED(za->za_ttycommon.t_cflag)) == 0) {
 		/*
@@ -3129,9 +3128,9 @@ zsa_program(struct asyncline *za, int setibaud)
 int
 zsgetspeed(dev_t dev)
 {
-	register struct zscom *zs;
-	register int uspeed, zspeed;
-	register uchar_t rr;
+	struct zscom *zs;
+	int uspeed, zspeed;
+	uchar_t rr;
 
 	zs = &zscom[UNIT(dev)];
 	SCC_READ(12, zspeed);
@@ -3170,7 +3169,7 @@ zsa_callback(void *arg)
 static void
 zsa_set_za_rcv_flags_mask(struct asyncline *za)
 {
-	register uint_t mask;
+	uint_t mask;
 
 	za->za_rcv_flags_mask &= ~0xFF;
 	switch (za->za_ttycommon.t_cflag & CSIZE) {
@@ -3303,7 +3302,7 @@ zsa_suspend(struct zscom *zs)
 static int
 zsa_resume(struct zscom *zs)
 {
-	register struct asyncline *za;
+	struct asyncline *za;
 	struct zs_prog	*zspp;
 
 	za = (struct asyncline *)&zs->zs_priv_str;
@@ -3343,8 +3342,8 @@ zsa_resume(struct zscom *zs)
 static void
 zsa_print_info(struct zscom *zs)
 {
-	register struct asyncline *za = (struct asyncline *)&zs->zs_priv_str;
-	register queue_t *q = za->za_ttycommon.t_writeq;
+	struct asyncline *za = (struct asyncline *)&zs->zs_priv_str;
+	queue_t *q = za->za_ttycommon.t_writeq;
 
 	printf(" next q=%s\n", (RD(q))->q_next->q_qinfo->qi_minfo->mi_idname);
 	printf("unit=%d\n", zs->zs_unit);

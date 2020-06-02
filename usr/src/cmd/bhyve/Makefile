@@ -111,10 +111,10 @@ MEVENT_TEST_OBJS = $(MEVENT_TEST_SRCS:.c=.o)
 CLEANFILES =	$(PROG) $(ZHYVE_PROG) $(MEVENT_TEST_PROG) $(MEVENT_TEST_OBJS)
 
 CFLAGS +=	$(CCVERBOSE) -_gcc=-Wimplicit-function-declaration -_gcc=-Wno-parentheses
-CPPFLAGS =	-I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
-		-I$(COMPAT)/freebsd/amd64 -I$(CONTRIB)/freebsd/amd64 \
-		-I$(CONTRIB)/freebsd/dev/usb/controller \
-		-I$(CONTRIB)/freebsd/dev/mii \
+CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
+		-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64 \
+		-I$(CONTRIB)/bhyve/dev/usb/controller \
+		-I$(CONTRIB)/bhyve/dev/mii \
 		-I$(SRC)/uts/common/io/e1000api \
 		$(CPPFLAGS.master) \
 		-I$(ROOT)/usr/platform/i86pc/include \

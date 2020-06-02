@@ -418,11 +418,8 @@ usr/src/cmd/bhyve/uart_emul.h
 usr/src/cmd/bhyve/vga.h
 usr/src/cmd/bhyve/virtio.h
 usr/src/cmd/bhyve/xmsr.h
-usr/src/compat/freebsd/*.h
-usr/src/compat/freebsd/*/*.h
-usr/src/compat/freebsd/amd64/machine/*.h
-usr/contrib/freebsd/*/*.h
-usr/contrib/freebsd/*/*/*.h
+usr/src/compat/bhyve/*
+usr/src/contrib/bhyve/*
 usr/src/lib/libvmmapi/common/vmmapi.h
 usr/src/uts/i86pc/io/vmm/intel/*.h
 usr/src/uts/i86pc/io/vmm/io/*.h

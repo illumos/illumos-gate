@@ -510,6 +510,9 @@ tests = ['projectid_001_pos', 'projectid_002_pos', 'projectid_003_pos',
 tests = ['quota_001_pos', 'quota_002_pos', 'quota_003_pos', 'quota_004_pos',
     'quota_005_pos', 'quota_006_neg']
 
+[/opt/zfs-tests/tests/functional/raidz]
+tests = ['raidz_001_neg', 'raidz_002_pos']
+
 [/opt/zfs-tests/tests/functional/refquota]
 tests = ['refquota_001_pos', 'refquota_002_pos', 'refquota_003_pos',
     'refquota_004_pos', 'refquota_005_pos', 'refquota_006_neg']

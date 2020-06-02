@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/ksh -p
 #
 # CDDL HEADER START
 #
@@ -19,18 +19,20 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright (c) 2016 by Gvozden Neskovic. All rights reserved.
 # Use is subject to license terms.
-# Copyright 2018 Joyent, Inc
-#
-# Copyright 2019 Joyent, Inc.
 #
 
-echo_file usr/src/Makefile
-echo_file usr/src/Targetdirs
-echo_file usr/src/Makefile.master
-echo_file usr/src/Makefile.master.64
-echo_file usr/src/Makefile.msg.targ
-echo_file usr/src/Makefile.psm
-echo_file usr/src/Makefile.psm.targ
+. $STF_SUITE/include/libtest.shlib
+
+#
+# DESCRIPTION:
+#	Call the raidz_test tool with -T options to test the infrastructure.
+#	This option should make raidz_test to return non 0.
+#
+
+log_mustnot raidz_test -T
+
+log_pass "raidz_test detects errors as espected."
