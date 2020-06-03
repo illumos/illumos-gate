@@ -93,7 +93,7 @@ clock_highres_fire(void *arg)
 
 static int
 clock_highres_timer_settime(itimer_t *it, int flags,
-	const struct itimerspec *when)
+    const struct itimerspec *when)
 {
 	cyclic_id_t cyc, *cycp = it->it_arg;
 	proc_t *p = curproc;

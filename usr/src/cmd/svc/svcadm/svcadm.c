@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2020, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -80,6 +80,19 @@ struct ht_elt {
 	boolean_t	active;
 	char		str[1];
 };
+
+
+/*
+ * Callback data for enable/disable.
+ */
+#define	SET_ENABLED	0x1
+#define	SET_TEMPORARY	0x2
+#define	SET_RECURSIVE	0x4
+
+typedef struct {
+	char ed_comment[SCF_COMMENT_MAX_LENGTH];
+	int ed_flags;
+} enable_data_t;
 
 
 scf_handle_t *h;
@@ -146,7 +159,7 @@ usage()
 	(void) fprintf(stderr, gettext(
 	"Usage: %1$s [-S <state>] [-v] [-Z | -z zone] [cmd [args ... ]]\n\n"
 	"\t%1$s enable [-rst] [<service> ...]\t- enable and online service(s)\n"
-	"\t%1$s disable [-st] [<service> ...]\t- disable and offline "
+	"\t%1$s disable [-c comment] [-st] [<service> ...] - disable "
 	"service(s)\n"
 	"\t%1$s restart [-d] [<service> ...]\t- restart specified service(s)\n"
 	"\t%1$s refresh [<service> ...]\t\t- re-read service configuration\n"
@@ -567,20 +580,150 @@ out:
 	return (ret);
 }
 
+static int
+delete_prop(const char *fmri, scf_instance_t *inst, const char *pgname,
+    const char *propname)
+{
+	int r = scf_instance_delete_prop(inst, pgname, propname);
+
+	switch (r) {
+	case 0:
+		break;
+
+	case ECANCELED:
+		uu_warn(emsg_no_service, fmri);
+		break;
+
+	case EACCES:
+		uu_warn(gettext("Could not delete %s/%s "
+		    "property of %s: backend access denied.\n"),
+		    pgname, propname, fmri);
+		break;
+
+	case EROFS:
+		uu_warn(gettext("Could not delete %s/%s "
+		    "property of %s: backend is read-only.\n"),
+		    pgname, propname, fmri);
+		break;
+
+	default:
+		bad_error("scf_instance_delete_prop", r);
+	}
+
+	return (r);
+}
+
 /*
- * Enable or disable inst, per enable.  If temp is true, set
- * general_ovr/enabled.  Otherwise set general/enabled and delete
- * general_ovr/enabled if it exists (order is important here: we don't want the
- * enabled status to glitch).
+ * Returns 0, EPERM, or EROFS.
+ */
+static int
+set_enabled_props(scf_propertygroup_t *pg, enable_data_t *ed)
+{
+	scf_transaction_entry_t *ent1;
+	scf_transaction_entry_t *ent2;
+	scf_transaction_t *tx;
+	scf_value_t *v2;
+	scf_value_t *v1;
+	int ret = 0, r;
+
+	if ((tx = scf_transaction_create(h)) == NULL ||
+	    (ent1 = scf_entry_create(h)) == NULL ||
+	    (ent2 = scf_entry_create(h)) == NULL ||
+	    (v1 = scf_value_create(h)) == NULL ||
+	    (v2 = scf_value_create(h)) == NULL)
+		scfdie();
+
+	for (;;) {
+		if (scf_transaction_start(tx, pg) == -1) {
+			switch (scf_error()) {
+			case SCF_ERROR_PERMISSION_DENIED:
+				ret = EPERM;
+				goto out;
+
+			case SCF_ERROR_BACKEND_READONLY:
+				ret = EROFS;
+				goto out;
+
+			default:
+				scfdie();
+			}
+		}
+
+		if (scf_transaction_property_change_type(tx, ent1,
+		    SCF_PROPERTY_ENABLED, SCF_TYPE_BOOLEAN) != 0) {
+			if (scf_error() != SCF_ERROR_NOT_FOUND)
+				scfdie();
+
+			if (scf_transaction_property_new(tx, ent1,
+			    SCF_PROPERTY_ENABLED, SCF_TYPE_BOOLEAN) != 0)
+				scfdie();
+		}
+
+		scf_value_set_boolean(v1, !!(ed->ed_flags & SET_ENABLED));
+
+		r = scf_entry_add_value(ent1, v1);
+		assert(r == 0);
+
+		if (scf_transaction_property_change_type(tx, ent2,
+		    SCF_PROPERTY_COMMENT, SCF_TYPE_ASTRING) != 0) {
+			if (scf_error() != SCF_ERROR_NOT_FOUND)
+				scfdie();
+
+			if (scf_transaction_property_new(tx, ent2,
+			    SCF_PROPERTY_COMMENT, SCF_TYPE_ASTRING) != 0)
+				scfdie();
+		}
+
+		if (scf_value_set_astring(v2, ed->ed_comment) != SCF_SUCCESS)
+			scfdie();
+
+		if (scf_entry_add_value(ent2, v2) != SCF_SUCCESS)
+			scfdie();
+
+		r = scf_transaction_commit(tx);
+		if (r == 1)
+			break;
+
+		scf_transaction_reset(tx);
+
+		if (r != 0) {
+			switch (scf_error()) {
+			case SCF_ERROR_PERMISSION_DENIED:
+				ret = EPERM;
+				goto out;
+
+			case SCF_ERROR_BACKEND_READONLY:
+				ret = EROFS;
+				goto out;
+
+			default:
+				scfdie();
+			}
+		}
+
+		if (scf_pg_update(pg) == -1)
+			scfdie();
+	}
+
+out:
+	scf_transaction_destroy(tx);
+	scf_entry_destroy(ent1);
+	scf_entry_destroy(ent2);
+	scf_value_destroy(v1);
+	scf_value_destroy(v2);
+	return (ret);
+}
+
+/*
+ * Enable or disable an instance.  SET_TEMPORARY modifications apply to
+ * general_ovr/ property group.
  */
 static void
-set_inst_enabled(const char *fmri, scf_instance_t *inst, boolean_t temp,
-    boolean_t enable)
+set_inst_enabled(const char *fmri, scf_instance_t *inst, enable_data_t *ed)
 {
 	scf_propertygroup_t *pg;
 	uint8_t b;
 	const char *pgname = NULL;	/* For emsg_pg_perm_denied */
-	int r;
 
 	pg = scf_pg_create(h);
 	if (pg == NULL)
@@ -625,14 +768,13 @@ set_inst_enabled(const char *fmri, scf_instance_t *inst, boolean_t temp,
 		}
 	}
 
-	if (temp) {
-		/* Set general_ovr/enabled */
+	if (ed->ed_flags & SET_TEMPORARY) {
 		pgname = SCF_PG_GENERAL_OVR;
 		if (pg_get_or_add(inst, pgname, SCF_PG_GENERAL_OVR_TYPE,
 		    SCF_PG_GENERAL_OVR_FLAGS, pg) != 0)
 			goto eperm;
 
-		switch (set_bool_prop(pg, SCF_PROPERTY_ENABLED, enable)) {
+		switch (set_enabled_props(pg, ed)) {
 		case 0:
 			break;
 
@@ -656,7 +798,7 @@ set_inst_enabled(const char *fmri, scf_instance_t *inst, boolean_t temp,
 		}
 
 		if (verbose)
-			(void) printf(enable ?
+			(void) printf((ed->ed_flags & SET_ENABLED) ?
 			    gettext("%s temporarily enabled.\n") :
 			    gettext("%s temporarily disabled.\n"), fmri);
 	} else {
@@ -671,7 +813,7 @@ again:
 		    SCF_PG_GENERAL_FLAGS, pg) != 0)
 			goto eperm;
 
-		switch (set_bool_prop(pg, SCF_PROPERTY_ENABLED, enable)) {
+		switch (set_enabled_props(pg, ed)) {
 		case 0:
 			break;
 
@@ -685,7 +827,7 @@ again:
 			 */
 			switch (get_bool_prop(pg, SCF_PROPERTY_ENABLED, &b)) {
 			case 0:
-				if ((b != 0) == (enable != B_FALSE))
+				if (!(b) == !(ed->ed_flags & SET_ENABLED))
 					break;
 				/* FALLTHROUGH */
 
@@ -716,39 +858,35 @@ again:
 			abort();
 		}
 
-		pgname = SCF_PG_GENERAL_OVR;
-		r = scf_instance_delete_prop(inst, pgname,
-		    SCF_PROPERTY_ENABLED);
-		switch (r) {
+		switch (delete_prop(fmri, inst, SCF_PG_GENERAL_OVR,
+		    SCF_PROPERTY_ENABLED)) {
 		case 0:
 			break;
-
-		case ECANCELED:
-			uu_warn(emsg_no_service, fmri);
-			goto out;
 
 		case EPERM:
 			goto eperm;
 
-		case EACCES:
-			uu_warn(gettext("Could not delete %s/%s "
-			    "property of %s: backend access denied.\n"),
-			    pgname, SCF_PROPERTY_ENABLED, fmri);
-			goto out;
-
-		case EROFS:
-			uu_warn(gettext("Could not delete %s/%s "
-			    "property of %s: backend is read-only.\n"),
-			    pgname, SCF_PROPERTY_ENABLED, fmri);
-			goto out;
-
 		default:
-			bad_error("scf_instance_delete_prop", r);
+			goto out;
 		}
 
-		if (verbose)
-			(void) printf(enable ?  gettext("%s enabled.\n") :
+		switch (delete_prop(fmri, inst, SCF_PG_GENERAL_OVR,
+		    SCF_PROPERTY_COMMENT)) {
+		case 0:
+			break;
+
+		case EPERM:
+			goto eperm;
+
+		default:
+			goto out;
+		}
+
+		if (verbose) {
+			(void) printf((ed->ed_flags & SET_ENABLED) ?
+			    gettext("%s enabled.\n") :
 			    gettext("%s disabled.\n"), fmri);
+		}
 	}
 
 	scf_pg_destroy(pg);
@@ -1014,7 +1152,7 @@ out:
  * on cycle detection, or 0 on success.
  */
 static int
-enable_fmri_rec(char *fmri, boolean_t temp)
+enable_fmri_rec(char *fmri, enable_data_t *ed)
 {
 	scf_instance_t *inst;
 	scf_snapshot_t *snap;
@@ -1068,7 +1206,7 @@ enable_fmri_rec(char *fmri, boolean_t temp)
 		return (0);
 	}
 
-	set_inst_enabled(fmri, inst, temp, B_TRUE);
+	set_inst_enabled(fmri, inst, ed);
 
 	if ((snap = scf_snapshot_create(h)) == NULL ||
 	    (pg = scf_pg_create(h)) == NULL ||
@@ -1118,7 +1256,7 @@ enable_fmri_rec(char *fmri, boolean_t temp)
 		ret = 0;
 		goto out;
 	} else if (sz >= 0) {
-		switch (enable_fmri_rec(buf, temp)) {
+		switch (enable_fmri_rec(buf, ed)) {
 		case 0:
 			break;
 
@@ -1269,7 +1407,7 @@ enable_fmri_rec(char *fmri, boolean_t temp)
 			    -1)
 				scfdie();
 
-			switch (enable_fmri_rec(buf, temp)) {
+			switch (enable_fmri_rec(buf, ed)) {
 			case 0:
 				break;
 
@@ -1668,17 +1806,10 @@ out:
 }
 
 
-/*
- * Flags to control enable and disable actions.
- */
-#define	SET_ENABLED	0x1
-#define	SET_TEMPORARY	0x2
-#define	SET_RECURSIVE	0x4
-
 static int
 set_fmri_enabled(void *data, scf_walkinfo_t *wip)
 {
-	int flags = (int)data;
+	enable_data_t *ed = data;
 
 	assert(wip->inst != NULL);
 	assert(wip->pg == NULL);
@@ -1692,7 +1823,7 @@ set_fmri_enabled(void *data, scf_walkinfo_t *wip)
 			return (0);
 	}
 
-	if (flags & SET_RECURSIVE) {
+	if (ed->ed_flags & SET_RECURSIVE) {
 		char *fmri_buf = malloc(max_scf_fmri_sz);
 		if (fmri_buf == NULL)
 			uu_die(emsg_nomem);
@@ -1705,7 +1836,7 @@ set_fmri_enabled(void *data, scf_walkinfo_t *wip)
 		assert(strlen(wip->fmri) <= max_scf_fmri_sz);
 		(void) strlcpy(fmri_buf, wip->fmri, max_scf_fmri_sz);
 
-		switch (enable_fmri_rec(fmri_buf, (flags & SET_TEMPORARY))) {
+		switch (enable_fmri_rec(fmri_buf, ed)) {
 		case E2BIG:
 			uu_warn(gettext("operation on service %s is ambiguous; "
 			    "instance specification needed.\n"), fmri_buf);
@@ -1720,8 +1851,7 @@ set_fmri_enabled(void *data, scf_walkinfo_t *wip)
 		free(fmri_buf);
 
 	} else {
-		set_inst_enabled(wip->fmri, wip->inst,
-		    (flags & SET_TEMPORARY) != 0, (flags & SET_ENABLED) != 0);
+		set_inst_enabled(wip->fmri, wip->inst, ed);
 	}
 
 	return (0);
@@ -1972,7 +2102,6 @@ set_milestone(const char *fmri, boolean_t temporary)
 {
 	scf_instance_t *inst;
 	scf_propertygroup_t *pg;
-	int r;
 
 	if (temporary) {
 		set_astring_prop(SCF_SERVICE_STARTD, SCF_PG_OPTIONS_OVR,
@@ -1998,43 +2127,10 @@ set_milestone(const char *fmri, boolean_t temporary)
 	    SCF_PG_OPTIONS_TYPE, SCF_PG_OPTIONS_FLAGS, SCF_PROPERTY_MILESTONE,
 	    fmri);
 
-	r = scf_instance_delete_prop(inst, SCF_PG_OPTIONS_OVR,
-	    SCF_PROPERTY_MILESTONE);
-	switch (r) {
-	case 0:
-		break;
-
-	case ECANCELED:
-		uu_warn(emsg_no_service, fmri);
+	if (delete_prop(SCF_SERVICE_STARTD, inst, SCF_PG_OPTIONS_OVR,
+	    SCF_PROPERTY_MILESTONE) != 0)
 		exit_status = 1;
-		goto out;
 
-	case EPERM:
-		uu_warn(gettext("Could not delete %s/%s property of "
-		    "%s: permission denied.\n"), SCF_PG_OPTIONS_OVR,
-		    SCF_PROPERTY_MILESTONE, SCF_SERVICE_STARTD);
-		exit_status = 1;
-		goto out;
-
-	case EACCES:
-		uu_warn(gettext("Could not delete %s/%s property of "
-		    "%s: access denied.\n"), SCF_PG_OPTIONS_OVR,
-		    SCF_PROPERTY_MILESTONE, SCF_SERVICE_STARTD);
-		exit_status = 1;
-		goto out;
-
-	case EROFS:
-		uu_warn(gettext("Could not delete %s/%s property of "
-		    "%s: backend read-only.\n"), SCF_PG_OPTIONS_OVR,
-		    SCF_PROPERTY_MILESTONE, SCF_SERVICE_STARTD);
-		exit_status = 1;
-		goto out;
-
-	default:
-		bad_error("scf_instance_delete_prop", r);
-	}
-
-out:
 	scf_pg_destroy(pg);
 	scf_instance_destroy(inst);
 }
@@ -2315,7 +2411,10 @@ again:
 		usage();
 
 	if (strcmp(argv[optind], "enable") == 0) {
-		int flags = SET_ENABLED;
+		enable_data_t ed = {
+			.ed_flags = SET_ENABLED,
+			.ed_comment = ""
+		};
 		int wait = 0;
 		int error = 0;
 
@@ -2323,9 +2422,9 @@ again:
 
 		while ((o = getopt(argc, argv, "rst")) != -1) {
 			if (o == 'r')
-				flags |= SET_RECURSIVE;
+				ed.ed_flags |= SET_RECURSIVE;
 			else if (o == 't')
-				flags |= SET_TEMPORARY;
+				ed.ed_flags |= SET_TEMPORARY;
 			else if (o == 's')
 				wait = 1;
 			else if (o == '?')
@@ -2351,7 +2450,7 @@ again:
 		 * the errors the first time.
 		 */
 		if ((err = scf_walk_fmri(h, argc, argv, WALK_FLAGS,
-		    set_fmri_enabled, (void *)flags, &error, pr_warn)) != 0) {
+		    set_fmri_enabled, &ed, &error, pr_warn)) != 0) {
 
 			pr_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
@@ -2359,7 +2458,7 @@ again:
 
 		} else if (wait && exit_status == 0 &&
 		    (err = scf_walk_fmri(h, argc, argv, WALK_FLAGS,
-		    wait_fmri_enabled, (void *)flags, &error, quiet)) != 0) {
+		    wait_fmri_enabled, NULL, &error, quiet)) != 0) {
 
 			pr_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));
@@ -2370,15 +2469,25 @@ again:
 			exit_status = error;
 
 	} else if (strcmp(argv[optind], "disable") == 0) {
-		int flags = 0;
+		enable_data_t ed = {
+			.ed_flags = 0,
+			.ed_comment = ""
+		};
 		int wait = 0;
 		int error = 0;
 
 		++optind;
 
-		while ((o = getopt(argc, argv, "st")) != -1) {
-			if (o == 't')
-				flags |= SET_TEMPORARY;
+		while ((o = getopt(argc, argv, "c:st")) != -1) {
+			if (o == 'c') {
+				if (strlcpy(ed.ed_comment, optarg,
+				    sizeof (ed.ed_comment)) >=
+				    sizeof (ed.ed_comment)) {
+					uu_die(gettext("disable -c comment "
+					    "too long.\n"));
+				}
+			} else if (o == 't')
+				ed.ed_flags |= SET_TEMPORARY;
 			else if (o == 's')
 				wait = 1;
 			else if (o == '?')
@@ -2404,7 +2513,7 @@ again:
 		 * the errors the first time.
 		 */
 		if ((err = scf_walk_fmri(h, argc, argv, WALK_FLAGS,
-		    set_fmri_enabled, (void *)flags, &exit_status,
+		    set_fmri_enabled, &ed, &exit_status,
 		    pr_warn)) != 0) {
 
 			pr_warn(gettext("failed to iterate over "
@@ -2413,7 +2522,7 @@ again:
 
 		} else if (wait && exit_status == 0 &&
 		    (err = scf_walk_fmri(h, argc, argv, WALK_FLAGS,
-		    wait_fmri_disabled, (void *)flags, &error, quiet)) != 0) {
+		    wait_fmri_disabled, NULL, &error, quiet)) != 0) {
 
 			pr_warn(gettext("failed to iterate over "
 			    "instances: %s\n"), scf_strerror(err));

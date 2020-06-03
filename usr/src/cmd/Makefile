@@ -322,7 +322,6 @@ COMMON_SUBDIRS=		\
 	ppgsz		\
 	pg		\
 	plockstat	\
-	pptadm		\
 	pr		\
 	prctl		\
 	printf		\
@@ -495,6 +494,7 @@ i386_SUBDIRS=		\
 	cxgbetool	\
 	diskscan	\
 	nvmeadm		\
+	pptadm		\
 	rdmsr		\
 	rtc		\
 	ucodeadm	\

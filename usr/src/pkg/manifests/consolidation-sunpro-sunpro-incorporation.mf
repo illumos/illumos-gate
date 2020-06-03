@@ -10,9 +10,11 @@
 #
 
 # Copyright 2011, Richard Lowe.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 
 set name=pkg.fmri \
     value=pkg:/consolidation/sunpro/sunpro-incorporation@$(PKGVERS)
+set name=pkg.linted value=True
 # Don't incorporate, as we were one and that would get deeply confusing
 set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=$(ARCH)

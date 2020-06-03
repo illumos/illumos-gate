@@ -22,12 +22,12 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef	_SVCS_H
 #define	_SVCS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libscf.h>
 
@@ -51,6 +51,10 @@ void scfdie(void);
 
 void *safe_malloc(size_t);
 char *safe_strdup(const char *);
+
+/* Flags for pg_get_single_val() */
+#define	EMPTY_OK	0x01
+#define	MULTI_OK	0x02
 
 int pg_get_single_val(scf_propertygroup_t *, const char *, scf_type_t, void *,
     size_t, uint_t);

@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
 
 file path=usr/share/man/man3scf/scf_entry_create.3scf
@@ -424,6 +425,8 @@ link path=usr/share/man/man3scf/scf_values_destroy.3scf \
 link path=usr/share/man/man3scf/smf_degrade_instance.3scf \
     target=smf_enable_instance.3scf
 link path=usr/share/man/man3scf/smf_disable_instance.3scf \
+    target=smf_enable_instance.3scf
+link path=usr/share/man/man3scf/smf_disable_instance_with_comment.3scf \
     target=smf_enable_instance.3scf
 link path=usr/share/man/man3scf/smf_get_state.3scf \
     target=smf_enable_instance.3scf

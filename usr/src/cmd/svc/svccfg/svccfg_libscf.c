@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2017 RackTop Systems.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
@@ -10521,6 +10521,8 @@ export_inst_general(scf_propertygroup_t *pg, xmlNodePtr inode,
 			scfdie();
 
 		if (strcmp(exp_str, scf_property_enabled) == 0) {
+			continue;
+		} else if (strcmp(exp_str, SCF_PROPERTY_COMMENT) == 0) {
 			continue;
 		} else if (strcmp(exp_str, SCF_PROPERTY_RESTARTER) == 0) {
 			xmlNodePtr rnode, sfnode;

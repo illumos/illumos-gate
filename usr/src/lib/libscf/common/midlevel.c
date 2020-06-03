@@ -23,6 +23,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2018 RackTop Systems.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include "libscf_impl.h"
@@ -512,16 +513,21 @@ out:
  * instance and the desired state for the enabled bit in the instance's
  * named property group.  If the group doesn't exist, it's created with the
  * given flags.  Called by smf_{dis,en}able_instance().
+ *
+ * Note that if we're enabling, comment will be "", and we use that to clear out
+ * any old disabled comment.
  */
 static int
 set_inst_enabled(const scf_instance_t *inst, uint8_t desired,
-    const char *pgname, uint32_t pgflags)
+    const char *pgname, uint32_t pgflags, const char *comment)
 {
 	scf_transaction_t	*tx = NULL;
-	scf_transaction_entry_t *ent = NULL;
+	scf_transaction_entry_t *ent1 = NULL;
+	scf_transaction_entry_t *ent2 = NULL;
 	scf_propertygroup_t	*gpg = NULL;
 	scf_property_t		*eprop = NULL;
-	scf_value_t		*v = NULL;
+	scf_value_t		*v1 = NULL;
+	scf_value_t		*v2 = NULL;
 	scf_handle_t		*h = NULL;
 	int			ret = -1;
 	int			committed;
@@ -532,9 +538,11 @@ set_inst_enabled(const scf_instance_t *inst, uint8_t desired,
 
 	if ((gpg = scf_pg_create(h)) == NULL ||
 	    (eprop = scf_property_create(h)) == NULL ||
-	    (v = scf_value_create(h)) == NULL ||
+	    (v1 = scf_value_create(h)) == NULL ||
+	    (v2 = scf_value_create(h)) == NULL ||
 	    (tx = scf_transaction_create(h)) == NULL ||
-	    (ent = scf_entry_create(h)) == NULL)
+	    (ent1 = scf_entry_create(h)) == NULL ||
+	    (ent2 = scf_entry_create(h)) == NULL)
 		goto out;
 
 general_pg_get:
@@ -575,7 +583,7 @@ get:
 	/*
 	 * If it's already set the way we want, forgo the transaction.
 	 */
-	if (scf_property_get_value(eprop, v) == -1) {
+	if (scf_property_get_value(eprop, v1) == -1) {
 		switch (scf_error()) {
 		case SCF_ERROR_CONSTRAINT_VIOLATED:
 		case SCF_ERROR_NOT_FOUND:
@@ -586,7 +594,7 @@ get:
 			goto out;
 		}
 	}
-	if (scf_value_get_boolean(v, &b) == -1) {
+	if (scf_value_get_boolean(v1, &b) == -1) {
 		if (scf_error() != SCF_ERROR_TYPE_MISMATCH)
 			goto out;
 		goto set;
@@ -601,7 +609,7 @@ set:
 		if (scf_transaction_start(tx, gpg) == -1)
 			goto out;
 
-		if (transaction_property_set(tx, ent, SCF_PROPERTY_ENABLED,
+		if (transaction_property_set(tx, ent1, SCF_PROPERTY_ENABLED,
 		    SCF_TYPE_BOOLEAN) != 0) {
 			switch (scf_error()) {
 			case SCF_ERROR_CONNECTION_BROKEN:
@@ -618,8 +626,31 @@ set:
 			}
 		}
 
-		scf_value_set_boolean(v, desired);
-		if (scf_entry_add_value(ent, v) == -1)
+		scf_value_set_boolean(v1, desired);
+		if (scf_entry_add_value(ent1, v1) == -1)
+			goto out;
+
+		if (transaction_property_set(tx, ent2,
+		    SCF_PROPERTY_COMMENT, SCF_TYPE_ASTRING) != 0) {
+			switch (scf_error()) {
+			case SCF_ERROR_CONNECTION_BROKEN:
+			case SCF_ERROR_DELETED:
+			default:
+				goto out;
+
+			case SCF_ERROR_HANDLE_MISMATCH:
+			case SCF_ERROR_INVALID_ARGUMENT:
+			case SCF_ERROR_NOT_BOUND:
+			case SCF_ERROR_NOT_SET:
+				bad_error("transaction_property_set",
+				    scf_error());
+			}
+		}
+
+		if (scf_value_set_astring(v2, comment) == -1)
+			goto out;
+
+		if (scf_entry_add_value(ent2, v2) == -1)
 			goto out;
 
 		committed = scf_transaction_commit(tx);
@@ -637,8 +668,10 @@ set:
 	ret = 0;
 
 out:
-	scf_value_destroy(v);
-	scf_entry_destroy(ent);
+	scf_value_destroy(v1);
+	scf_value_destroy(v2);
+	scf_entry_destroy(ent1);
+	scf_entry_destroy(ent2);
 	scf_transaction_destroy(tx);
 	scf_property_destroy(eprop);
 	scf_pg_destroy(gpg);
@@ -650,7 +683,8 @@ static int
 delete_inst_enabled(const scf_instance_t *inst, const char *pgname)
 {
 	scf_transaction_t	*tx = NULL;
-	scf_transaction_entry_t *ent = NULL;
+	scf_transaction_entry_t *ent1 = NULL;
+	scf_transaction_entry_t *ent2 = NULL;
 	scf_propertygroup_t	*gpg = NULL;
 	scf_handle_t		*h = NULL;
 	int			ret = -1;
@@ -661,16 +695,31 @@ delete_inst_enabled(const scf_instance_t *inst, const char *pgname)
 
 	if ((gpg = scf_pg_create(h)) == NULL ||
 	    (tx = scf_transaction_create(h)) == NULL ||
-	    (ent = scf_entry_create(h)) == NULL)
+	    (ent1 = scf_entry_create(h)) == NULL ||
+	    (ent2 = scf_entry_create(h)) == NULL)
 		goto out;
 
 	if (scf_instance_get_pg(inst, pgname, gpg) != 0)
 		goto error;
 	do {
-		if (scf_transaction_start(tx, gpg) == -1 ||
-		    scf_transaction_property_delete(tx, ent,
-		    SCF_PROPERTY_ENABLED) == -1 ||
-		    (committed = scf_transaction_commit(tx)) == -1)
+		if (scf_transaction_start(tx, gpg) == -1)
+			goto error;
+
+		ret = scf_transaction_property_delete(tx, ent1,
+		    SCF_PROPERTY_ENABLED);
+
+		if (ret == -1 && scf_error() != SCF_ERROR_DELETED &&
+		    scf_error() != SCF_ERROR_NOT_FOUND)
+			goto error;
+
+		ret = scf_transaction_property_delete(tx, ent2,
+		    SCF_PROPERTY_COMMENT);
+
+		if (ret == -1 && scf_error() != SCF_ERROR_DELETED &&
+		    scf_error() != SCF_ERROR_NOT_FOUND)
+			goto error;
+
+		if ((committed = scf_transaction_commit(tx)) == -1)
 			goto error;
 
 		scf_transaction_reset(tx);
@@ -691,7 +740,8 @@ error:
 	}
 
 out:
-	scf_entry_destroy(ent);
+	scf_entry_destroy(ent1);
+	scf_entry_destroy(ent2);
 	scf_transaction_destroy(tx);
 	scf_pg_destroy(gpg);
 
@@ -1016,7 +1066,8 @@ out:
  * present state, if it is different.
  */
 static int
-set_inst_enabled_atboot(scf_instance_t *inst, uint8_t desired)
+set_inst_enabled_atboot(scf_instance_t *inst, uint8_t desired,
+    const char *comment)
 {
 	int enabled;
 	int persistent;
@@ -1034,13 +1085,14 @@ set_inst_enabled_atboot(scf_instance_t *inst, uint8_t desired)
 			 * Temporarily store the present enabled state.
 			 */
 			if (set_inst_enabled(inst, persistent,
-			    SCF_PG_GENERAL_OVR, SCF_PG_GENERAL_OVR_FLAGS))
+			    SCF_PG_GENERAL_OVR, SCF_PG_GENERAL_OVR_FLAGS,
+			    comment))
 				goto out;
 		}
 	}
 	if (persistent != desired)
 		if (set_inst_enabled(inst, desired, SCF_PG_GENERAL,
-		    SCF_PG_GENERAL_FLAGS))
+		    SCF_PG_GENERAL_FLAGS, comment))
 			goto out;
 	if (enabled == desired)
 		ret = delete_inst_enabled(inst, SCF_PG_GENERAL_OVR);
@@ -1052,7 +1104,8 @@ out:
 }
 
 static int
-set_inst_enabled_flags(const char *fmri, int flags, uint8_t desired)
+set_inst_enabled_flags(const char *fmri, int flags, uint8_t desired,
+    const char *comment)
 {
 	int ret = -1;
 	scf_handle_t *h;
@@ -1080,11 +1133,11 @@ set_inst_enabled_flags(const char *fmri, int flags, uint8_t desired)
 	}
 
 	if (flags & SMF_AT_NEXT_BOOT) {
-		ret = set_inst_enabled_atboot(inst, desired);
+		ret = set_inst_enabled_atboot(inst, desired, comment);
 	} else {
 		if (set_inst_enabled(inst, desired, flags & SMF_TEMPORARY ?
 		    SCF_PG_GENERAL_OVR : SCF_PG_GENERAL, flags & SMF_TEMPORARY ?
-		    SCF_PG_GENERAL_OVR_FLAGS : SCF_PG_GENERAL_FLAGS))
+		    SCF_PG_GENERAL_OVR_FLAGS : SCF_PG_GENERAL_FLAGS, comment))
 			goto out;
 
 		/*
@@ -1150,15 +1203,21 @@ get_instance_pg(scf_simple_handle_t *simple_h)
 int
 smf_enable_instance(const char *fmri, int flags)
 {
-	return (set_inst_enabled_flags(fmri, flags, B_TRUE));
+	return (set_inst_enabled_flags(fmri, flags, B_TRUE, ""));
+}
+
+int
+smf_disable_instance_with_comment(const char *fmri, int flags,
+    const char *comment)
+{
+	return (set_inst_enabled_flags(fmri, flags, B_FALSE, comment));
 }
 
 int
 smf_disable_instance(const char *fmri, int flags)
 {
-	return (set_inst_enabled_flags(fmri, flags, B_FALSE));
+	return (set_inst_enabled_flags(fmri, flags, B_FALSE, ""));
 }
-
 int
 _smf_refresh_instance_i(scf_instance_t *inst)
 {

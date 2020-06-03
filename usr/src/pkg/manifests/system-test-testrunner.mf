@@ -11,6 +11,7 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/test/testrunner@$(PKGVERS)
@@ -27,7 +28,9 @@ dir path=opt/test-runner/stf
 dir path=opt/test-runner/stf/contrib
 dir path=opt/test-runner/stf/contrib/include
 dir path=opt/test-runner/stf/include
-file path=opt/test-runner/bin/run mode=0555
+# In python2, the module is "ConfigParser" and in python3 it's "configparser"
+file path=opt/test-runner/bin/run mode=0555 \
+    pkg.depend.bypass-generate=.*[cC]onfig[pP]arser.*
 file path=opt/test-runner/man/man1/run.1 mode=0444
 file path=opt/test-runner/stf/contrib/include/ctiutils.shlib mode=0555
 file path=opt/test-runner/stf/contrib/include/logapi.shlib mode=0555

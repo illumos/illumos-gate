@@ -188,7 +188,6 @@ SUBDIRS +=				\
 	libpkg		\
 	libpool		\
 	libpp		\
-	libppt		\
 	libproc		\
 	libproject	\
 	libpthread	\
@@ -287,6 +286,7 @@ SUBDIRS +=				\
 
 i386_SUBDIRS=		\
 	libfdisk	\
+	libppt		\
 	libsaveargs	\
 	libvmm		\
 	libvmmapi
@@ -457,7 +457,6 @@ HDRSUBDIRS=				\
 	libpicltree	\
 	libpool		\
 	libpp		\
-	libppt		\
 	libproc		\
 	libraidcfg	\
 	librcm		\
@@ -520,6 +519,7 @@ HDRSUBDIRS=				\
 
 i386_HDRSUBDIRS=	\
 	libfdisk	\
+	libppt		\
 	libsaveargs	\
 	libvmm		\
 	libvmmapi

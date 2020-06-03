@@ -23,7 +23,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright 2016 RackTop Systems.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef	_LIBSCF_H
@@ -327,6 +327,7 @@ typedef struct {
 #define	SCF_PROPERTY_AUX_STATE			"auxiliary_state"
 #define	SCF_PROPERTY_AUX_FMRI			"auxiliary_fmri"
 #define	SCF_PROPERTY_AUX_TTY			"auxiliary_tty"
+#define	SCF_PROPERTY_COMMENT			"comment"
 #define	SCF_PROPERTY_CONTRACT			"contract"
 #define	SCF_PROPERTY_COREFILE_PATTERN		"corefile_pattern"
 #define	SCF_PROPERTY_DEGRADED			"degraded"
@@ -485,6 +486,9 @@ ssize_t scf_limit(uint32_t code);
 #define	SCF_LIMIT_MAX_VALUE_LENGTH	-2001U
 #define	SCF_LIMIT_MAX_PG_TYPE_LENGTH	-2002U
 #define	SCF_LIMIT_MAX_FMRI_LENGTH	-2003U
+
+
+#define	SCF_COMMENT_MAX_LENGTH		(1024)
 
 scf_handle_t *scf_handle_create(scf_version_t);
 
@@ -808,6 +812,7 @@ int scf_tmpl_error_value(const scf_tmpl_error_t *, char **);
  * Simplified calls
  */
 int smf_enable_instance(const char *, int);
+int smf_disable_instance_with_comment(const char *, int, const char *);
 int smf_disable_instance(const char *, int);
 int smf_refresh_instance(const char *);
 int smf_restart_instance(const char *);

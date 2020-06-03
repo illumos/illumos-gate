@@ -25,7 +25,7 @@
 # Copyright 2014 Gary Mills
 # Copyright 2020 Peter Tribble.
 # Copyright 2019 Joyent, Inc.
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -691,7 +691,8 @@ $(sparc_ONLY)file \
     group=sys mode=0755
 $(sparc_ONLY)file path=platform/SUNW,UltraAX-i2/kernel/misc/$(ARCH64)/platmod \
     group=sys mode=0755
-$(i386_ONLY)file path=platform/i86pc/kernel/$(ARCH64)/unix group=sys mode=0755
+$(i386_ONLY)file path=platform/i86pc/kernel/$(ARCH64)/unix group=sys mode=0755 \
+    pkg.depend.bypass-generate=dtracestubs
 $(i386_ONLY)file path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu.generic \
     group=sys mode=0755
 $(i386_ONLY)file path=platform/i86pc/kernel/cpu/$(ARCH64)/cpu_ms.AuthenticAMD \
@@ -732,7 +733,7 @@ $(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/acpidev group=sys \
 $(i386_ONLY)file path=platform/i86pc/kernel/misc/$(ARCH64)/gfx_private \
     group=sys mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/$(ARCH64)/unix group=sys \
-    mode=0755
+    mode=0755 pkg.depend.bypass-generate=dtracestubs
 $(i386_ONLY)file path=platform/i86xpv/kernel/cpu/$(ARCH64)/cpu.generic \
     group=sys mode=0755
 $(i386_ONLY)file path=platform/i86xpv/kernel/cpu/$(ARCH64)/cpu_ms.AuthenticAMD \

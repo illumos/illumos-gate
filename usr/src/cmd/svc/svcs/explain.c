@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -132,6 +132,8 @@ typedef struct {
 	int temporary;
 	const char *restarter;
 	uu_list_t *dependencies;	/* list of dependency_group's */
+
+	char comment[SCF_COMMENT_MAX_LENGTH];
 
 	int active;			/* In use?  (cycle detection) */
 	int restarter_bad;
@@ -404,7 +406,7 @@ add_instance(const char *svcname, const char *instname, scf_instance_t *inst)
 {
 	inst_t *instp;
 	svc_t *svcp;
-	int have_enabled = 0;
+	int ovr_set = 0;
 	uint8_t i;
 	uint32_t h;
 	int r;
@@ -480,7 +482,10 @@ add_instance(const char *svcname, const char *instname, scf_instance_t *inst)
 	if (scf_instance_get_pg(inst, SCF_PG_GENERAL_OVR, g_pg) == 0) {
 		if (pg_get_single_val(g_pg, SCF_PROPERTY_ENABLED,
 		    SCF_TYPE_BOOLEAN, &instp->enabled, 0, 0) == 0)
-			have_enabled = 1;
+			ovr_set = 1;
+		(void) pg_get_single_val(g_pg, SCF_PROPERTY_COMMENT,
+		    SCF_TYPE_ASTRING, instp->comment,
+		    sizeof (instp->comment), EMPTY_OK);
 	} else {
 		switch (scf_error()) {
 		case SCF_ERROR_NOT_FOUND:
@@ -509,11 +514,18 @@ add_instance(const char *svcname, const char *instname, scf_instance_t *inst)
 	if (pg_get_single_val(g_pg, SCF_PROPERTY_ENABLED, SCF_TYPE_BOOLEAN,
 	    &i, 0, 0) != 0)
 		return;
-	if (!have_enabled) {
+
+	if (ovr_set) {
+		instp->temporary = (instp->enabled != i);
+	} else {
 		instp->enabled = i;
 		instp->temporary = 0;
-	} else {
-		instp->temporary = (instp->enabled != i);
+	}
+
+	if (!instp->temporary) {
+		(void) pg_get_single_val(g_pg, SCF_PROPERTY_COMMENT,
+		    SCF_TYPE_ASTRING, instp->comment,
+		    sizeof (instp->comment), EMPTY_OK);
 	}
 
 	if (pg_get_single_val(g_pg, SCF_PROPERTY_RESTARTER, SCF_TYPE_ASTRING,
@@ -1737,12 +1749,23 @@ print_reasons(const inst_t *svcp, int verbose)
 
 	} else if (strcmp(svcp->state, SCF_STATE_STRING_DISABLED) == 0) {
 		if (!svcp->temporary) {
-			(void) puts(gettext(
-			    "Reason: Disabled by an administrator."));
+			if (svcp->comment[0] != '\0') {
+				(void) printf(gettext("Reason: Disabled by "
+				    "an administrator: %s\n"), svcp->comment);
+			} else {
+				(void) printf(gettext("Reason: Disabled by "
+				    "an administrator.\n"));
+			}
 			dc = DC_DISABLED;
 		} else {
-			(void) puts(gettext("Reason: "
-			    "Temporarily disabled by an administrator."));
+			if (svcp->comment[0] != '\0') {
+				(void) printf(gettext("Reason: Temporarily "
+				    "disabled by an administrator: %s\n"),
+				    svcp->comment);
+			} else {
+				(void) printf(gettext("Reason: Temporarily "
+				    "disabled by an administrator.\n"));
+			}
 			dc = DC_TEMPDISABLED;
 		}
 
