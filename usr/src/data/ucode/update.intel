@@ -19,6 +19,9 @@
 set -e
 set -o pipefail
 
+# Remove this once we start using pkgfmt without it in the rest of -gate.
+export PKGFMT_OUTPUT=v1
+
 [[ -z "$1" ]] || [[ ! -f "$1" ]] && {
 	echo "Syntax: $0 <path to microcode tar>" >&2
 	exit 1
