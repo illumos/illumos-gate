@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
  */
@@ -850,6 +850,37 @@ vn_rele(vnode_t *vp)
 	}
 	VN_RELE_LOCKED(vp);
 	mutex_exit(&vp->v_lock);
+}
+
+void
+vn_phantom_rele(vnode_t *vp)
+{
+	VERIFY(vp->v_count > 0);
+
+	mutex_enter(&vp->v_lock);
+	VERIFY3U(vp->v_count, >=, vp->v_phantom_count);
+	vp->v_phantom_count--;
+	DTRACE_PROBE1(vn__phantom_rele, vnode_t *, vp);
+	if (vp->v_count == 1) {
+		ASSERT0(vp->v_phantom_count);
+		mutex_exit(&vp->v_lock);
+		VOP_INACTIVE(vp, CRED(), NULL);
+		return;
+	}
+	VN_RELE_LOCKED(vp);
+	mutex_exit(&vp->v_lock);
+}
+
+/*
+ * Return the number of non-phantom holds. Things such as portfs will use
+ * phantom holds to prevent it from blocking filesystems from mounting over
+ * watched directories.
+ */
+uint_t
+vn_count(vnode_t *vp)
+{
+	ASSERT(MUTEX_HELD(&vp->v_lock));
+	return (vp->v_count - vp->v_phantom_count);
 }
 
 /*
@@ -2428,6 +2459,7 @@ vn_reinit(vnode_t *vp)
 {
 	vp->v_count = 1;
 	vp->v_count_dnlc = 0;
+	vp->v_phantom_count = 0;
 	vp->v_vfsp = NULL;
 	vp->v_stream = NULL;
 	vp->v_vfsmountedhere = NULL;
@@ -2484,6 +2516,7 @@ vn_free(vnode_t *vp)
 	 */
 	ASSERT((vp->v_count == 0) || (vp->v_count == 1));
 	ASSERT(vp->v_count_dnlc == 0);
+	ASSERT0(vp->v_phantom_count);
 	VERIFY(vp->v_path != NULL);
 	if (vp->v_path != vn_vpath_empty) {
 		kmem_free(vp->v_path, strlen(vp->v_path) + 1);
