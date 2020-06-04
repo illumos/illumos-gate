@@ -71,61 +71,61 @@
  * table.
  */
 static struct sbus_slot_entry ino_1 = {SBUS_SLOT0_CONFIG, SBUS_SLOT0_MAPREG,
-					SBUS_SLOT0_L1_CLEAR, NULL};
+					SBUS_SLOT0_L1_CLEAR, 0};
 static struct sbus_slot_entry ino_2 = {SBUS_SLOT0_CONFIG, SBUS_SLOT0_MAPREG,
-					SBUS_SLOT0_L2_CLEAR, NULL};
+					SBUS_SLOT0_L2_CLEAR, 0};
 static struct sbus_slot_entry ino_3 = {SBUS_SLOT0_CONFIG, SBUS_SLOT0_MAPREG,
-					SBUS_SLOT0_L3_CLEAR, NULL};
+					SBUS_SLOT0_L3_CLEAR, 0};
 static struct sbus_slot_entry ino_4 = {SBUS_SLOT0_CONFIG, SBUS_SLOT0_MAPREG,
-					SBUS_SLOT0_L4_CLEAR, NULL};
+					SBUS_SLOT0_L4_CLEAR, 0};
 static struct sbus_slot_entry ino_5 = {SBUS_SLOT0_CONFIG, SBUS_SLOT0_MAPREG,
-					SBUS_SLOT0_L5_CLEAR, NULL};
+					SBUS_SLOT0_L5_CLEAR, 0};
 static struct sbus_slot_entry ino_6 = {SBUS_SLOT0_CONFIG, SBUS_SLOT0_MAPREG,
-					SBUS_SLOT0_L6_CLEAR, NULL};
+					SBUS_SLOT0_L6_CLEAR, 0};
 static struct sbus_slot_entry ino_7 = {SBUS_SLOT0_CONFIG, SBUS_SLOT0_MAPREG,
-					SBUS_SLOT0_L7_CLEAR, NULL};
+					SBUS_SLOT0_L7_CLEAR, 0};
 static struct sbus_slot_entry ino_9 = {SBUS_SLOT1_CONFIG, SBUS_SLOT1_MAPREG,
-					SBUS_SLOT1_L1_CLEAR, NULL};
+					SBUS_SLOT1_L1_CLEAR, 0};
 static struct sbus_slot_entry ino_10 = {SBUS_SLOT1_CONFIG, SBUS_SLOT1_MAPREG,
-					SBUS_SLOT1_L2_CLEAR, NULL};
+					SBUS_SLOT1_L2_CLEAR, 0};
 static struct sbus_slot_entry ino_11 = {SBUS_SLOT1_CONFIG, SBUS_SLOT1_MAPREG,
-					SBUS_SLOT1_L3_CLEAR, NULL};
+					SBUS_SLOT1_L3_CLEAR, 0};
 static struct sbus_slot_entry ino_12 = {SBUS_SLOT1_CONFIG, SBUS_SLOT1_MAPREG,
-					SBUS_SLOT1_L4_CLEAR, NULL};
+					SBUS_SLOT1_L4_CLEAR, 0};
 static struct sbus_slot_entry ino_13 = {SBUS_SLOT1_CONFIG, SBUS_SLOT1_MAPREG,
-					SBUS_SLOT1_L5_CLEAR, NULL};
+					SBUS_SLOT1_L5_CLEAR, 0};
 static struct sbus_slot_entry ino_14 = {SBUS_SLOT1_CONFIG, SBUS_SLOT1_MAPREG,
-					SBUS_SLOT1_L6_CLEAR, NULL};
+					SBUS_SLOT1_L6_CLEAR, 0};
 static struct sbus_slot_entry ino_15 = {SBUS_SLOT1_CONFIG, SBUS_SLOT1_MAPREG,
-					SBUS_SLOT1_L7_CLEAR, NULL};
+					SBUS_SLOT1_L7_CLEAR, 0};
 static struct sbus_slot_entry ino_17 = {SBUS_SLOT2_CONFIG, SBUS_SLOT2_MAPREG,
-					SBUS_SLOT2_L1_CLEAR, NULL};
+					SBUS_SLOT2_L1_CLEAR, 0};
 static struct sbus_slot_entry ino_18 = {SBUS_SLOT2_CONFIG, SBUS_SLOT2_MAPREG,
-					SBUS_SLOT2_L2_CLEAR, NULL};
+					SBUS_SLOT2_L2_CLEAR, 0};
 static struct sbus_slot_entry ino_19 = {SBUS_SLOT2_CONFIG, SBUS_SLOT2_MAPREG,
-					SBUS_SLOT2_L3_CLEAR, NULL};
+					SBUS_SLOT2_L3_CLEAR, 0};
 static struct sbus_slot_entry ino_20 = {SBUS_SLOT2_CONFIG, SBUS_SLOT2_MAPREG,
-					SBUS_SLOT2_L4_CLEAR, NULL};
+					SBUS_SLOT2_L4_CLEAR, 0};
 static struct sbus_slot_entry ino_21 = {SBUS_SLOT2_CONFIG, SBUS_SLOT2_MAPREG,
-					SBUS_SLOT2_L5_CLEAR, NULL};
+					SBUS_SLOT2_L5_CLEAR, 0};
 static struct sbus_slot_entry ino_22 = {SBUS_SLOT2_CONFIG, SBUS_SLOT2_MAPREG,
-					SBUS_SLOT2_L6_CLEAR, NULL};
+					SBUS_SLOT2_L6_CLEAR, 0};
 static struct sbus_slot_entry ino_23 = {SBUS_SLOT2_CONFIG, SBUS_SLOT2_MAPREG,
-					SBUS_SLOT2_L7_CLEAR, NULL};
+					SBUS_SLOT2_L7_CLEAR, 0};
 static struct sbus_slot_entry ino_25 = {SBUS_SLOT3_CONFIG, SBUS_SLOT3_MAPREG,
-					SBUS_SLOT3_L1_CLEAR, NULL};
+					SBUS_SLOT3_L1_CLEAR, 0};
 static struct sbus_slot_entry ino_26 = {SBUS_SLOT3_CONFIG, SBUS_SLOT3_MAPREG,
-					SBUS_SLOT3_L2_CLEAR, NULL};
+					SBUS_SLOT3_L2_CLEAR, 0};
 static struct sbus_slot_entry ino_27 = {SBUS_SLOT3_CONFIG, SBUS_SLOT3_MAPREG,
-					SBUS_SLOT3_L3_CLEAR, NULL};
+					SBUS_SLOT3_L3_CLEAR, 0};
 static struct sbus_slot_entry ino_28 = {SBUS_SLOT3_CONFIG, SBUS_SLOT3_MAPREG,
-					SBUS_SLOT3_L4_CLEAR, NULL};
+					SBUS_SLOT3_L4_CLEAR, 0};
 static struct sbus_slot_entry ino_29 = {SBUS_SLOT3_CONFIG, SBUS_SLOT3_MAPREG,
-					SBUS_SLOT3_L5_CLEAR, NULL};
+					SBUS_SLOT3_L5_CLEAR, 0};
 static struct sbus_slot_entry ino_30 = {SBUS_SLOT3_CONFIG, SBUS_SLOT3_MAPREG,
-					SBUS_SLOT3_L6_CLEAR, NULL};
+					SBUS_SLOT3_L6_CLEAR, 0};
 static struct sbus_slot_entry ino_31 = {SBUS_SLOT3_CONFIG, SBUS_SLOT3_MAPREG,
-					SBUS_SLOT3_L7_CLEAR, NULL};
+					SBUS_SLOT3_L7_CLEAR, 0};
 static struct sbus_slot_entry ino_32 = {SBUS_SLOT5_CONFIG, ESP_MAPREG,
 					ESP_CLEAR, ESP_INTR_STATE_SHIFT};
 static struct sbus_slot_entry ino_33 = {SBUS_SLOT5_CONFIG, ETHER_MAPREG,
@@ -154,8 +154,8 @@ static struct sbus_slot_entry ino_54 = {SBUS_SLOT6_CONFIG, SBUS_ERR_MAPREG,
 					SBUS_ERR_CLEAR, SERR_INTR_STATE_SHIFT};
 static struct sbus_slot_entry ino_55 = {SBUS_SLOT6_CONFIG, PM_WAKEUP_MAPREG,
 					PM_WAKEUP_CLEAR, PM_INTR_STATE_SHIFT};
-static struct sbus_slot_entry ino_ffb = {NULL, FFB_MAPPING_REG, NULL, NULL};
-static struct sbus_slot_entry ino_exp = {NULL, EXP_MAPPING_REG, NULL, NULL};
+static struct sbus_slot_entry ino_ffb = {0, FFB_MAPPING_REG, 0, 0};
+static struct sbus_slot_entry ino_exp = {0, EXP_MAPPING_REG, 0, 0};
 
 /* Construct the interrupt number array */
 struct sbus_slot_entry *ino_table[] = {
@@ -370,7 +370,7 @@ static kmutex_t	sbus_attachcnt_mutex; /* sbus_attachcnt lock - attach/detach */
 extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
-	&mod_driverops, 	/* Type of module.  This one is a driver */
+	&mod_driverops,		/* Type of module.  This one is a driver */
 	"SBus (sysio) nexus driver",	/* Name of module. */
 	&sbus_ops,		/* driver ops */
 };
@@ -1648,14 +1648,14 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	uint_t cpu_id;
 	struct sbus_wrapper_arg *sbus_arg;
 	struct sbus_intr_handler *intr_handler;
-	uint32_t slot;
+	int slot;
 	/* Interrupt state machine reset flag */
 	int reset_ism_register = 1;
 	int ret = DDI_SUCCESS;
 
 	/* Check if we have a valid sbus slot address */
-	if (((slot = (uint_t)find_sbus_slot(dip, rdip)) >=
-	    MAX_SBUS_SLOT_ADDR) || (slot < (uint_t)0)) {
+	slot = find_sbus_slot(dip, rdip);
+	if (slot >= MAX_SBUS_SLOT_ADDR || slot < 0) {
 		cmn_err(CE_WARN, "Invalid sbus slot 0x%x during add intr\n",
 		    slot);
 		return (DDI_FAILURE);
@@ -2284,8 +2284,7 @@ sbus_intr_reset(void *arg)
 
 	for (mondo = 0; mondo < SZ_INO_TABLE; mondo++) {
 		if (ino_table[mondo] == NULL ||
-		    ino_table[mondo]->clear_reg == NULL) {
-
+		    ino_table[mondo]->clear_reg == 0) {
 			continue;
 		}
 
@@ -2350,8 +2349,8 @@ sbus_add_picN_kstats(dev_info_t *dip)
 	};
 
 	struct kstat_named *sbus_pic_named_data;
-	int  		event, pic;
-	char 		pic_name[30];
+	int		event, pic;
+	char		pic_name[30];
 	int		instance = ddi_get_instance(dip);
 	int		pic_shift = 0;
 
@@ -2363,9 +2362,9 @@ sbus_add_picN_kstats(dev_info_t *dip)
 		(void) sprintf(pic_name, "pic%d", pic);	/* pic0, pic1 ... */
 		if ((sbus_picN_ksp[pic] = kstat_create("sbus",
 		    instance, pic_name, "bus", KSTAT_TYPE_NAMED,
-		    SBUS_NUM_EVENTS + 1, NULL)) == NULL) {
-				cmn_err(CE_WARN, "sbus %s: kstat_create failed",
-				    pic_name);
+		    SBUS_NUM_EVENTS + 1, 0)) == NULL) {
+			cmn_err(CE_WARN, "sbus %s: kstat_create failed",
+			    pic_name);
 
 			/* remove pic0 kstat if pic1 create fails */
 			if (pic == 1) {
@@ -2448,9 +2447,8 @@ sbus_add_kstats(struct sbus_soft_state *softsp)
 	    ddi_get_instance(softsp->dip), "counters",
 	    "bus", KSTAT_TYPE_NAMED, SBUS_NUM_PICS + 1,
 	    KSTAT_FLAG_WRITABLE)) == NULL) {
-
-			cmn_err(CE_WARN, "sbus%d counters: kstat_create"
-			    " failed", ddi_get_instance(softsp->dip));
+		cmn_err(CE_WARN, "sbus%d counters: kstat_create"
+		    " failed", ddi_get_instance(softsp->dip));
 		return;
 	}
 

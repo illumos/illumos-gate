@@ -50,7 +50,7 @@ typedef vector<Listener *>::iterator ListenerIterator;
  * @memo	    Create a new generic listener
  * @exception	    ... underlying exceptions will be thrown
  * @param	    userData The opaque user data for event callback
- * 
+ *
  */
 Listener::Listener(void *userData) {
 	data = userData;
@@ -66,22 +66,15 @@ Listener::Listener(void *userData) {
 
 /**
  * @memo	    Free up a generic listener, keeping global list in sync.
- * @exception	    ... underlying exceptions will be thrown
  */
 Listener::~Listener() {
 	Lockable::lock(&staticLock);
-	try {
-	    for (ListenerIterator tmp = listeners.begin();
-			tmp != listeners.end(); tmp++) {
+	for (ListenerIterator tmp = listeners.begin();
+	    tmp != listeners.end(); tmp++) {
 		if (*tmp == this) {
-		    listeners.erase(tmp);
-		    Lockable::unlock(&staticLock);
-		    return;
+			listeners.erase(tmp);
+			break;
 		}
-	    }
-	} catch (...) {
-	    Lockable::unlock(&staticLock);
-	    throw;
 	}
 	Lockable::unlock(&staticLock);
 }

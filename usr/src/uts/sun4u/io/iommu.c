@@ -898,7 +898,7 @@ iommu_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 
 		/* We don't need the addr anymore if we have a shadow list */
 		if (pplist != NULL)
-			addr = NULL;
+			addr = (uintptr_t)NULL;
 		pp = NULL;
 		break;
 
