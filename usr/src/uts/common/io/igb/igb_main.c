@@ -579,6 +579,12 @@ igb_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	igb->attach_progress |= ATTACH_PROGRESS_INIT_ADAPTER;
 
 	/*
+	 * Initialize sensors. This swallows any errors to ensure that access to
+	 * the network is still available.
+	 */
+	igb_init_sensors(igb);
+
+	/*
 	 * Initialize statistics
 	 */
 	if (igb_init_stats(igb) != IGB_SUCCESS) {
@@ -829,6 +835,11 @@ igb_unconfigure(dev_info_t *devinfo, igb_t *igb)
 		if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
 			ddi_fm_service_impact(igb->dip, DDI_SERVICE_UNAFFECTED);
 	}
+
+	/*
+	 * Clean up sensors
+	 */
+	igb_fini_sensors(igb);
 
 	/*
 	 * Free multicast table

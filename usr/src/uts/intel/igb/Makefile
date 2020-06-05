@@ -69,7 +69,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 # Driver depends on MAC
 #
 LDFLAGS		+= -dy -N misc/mac
-MAPFILES	+= ddi mac random kernel
+MAPFILES	+= ddi mac random kernel ksensor
 
 #
 #	Default build targets.
