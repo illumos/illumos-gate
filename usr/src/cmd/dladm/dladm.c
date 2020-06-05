@@ -7676,8 +7676,9 @@ show_etherprop(dladm_handle_t dh, datalink_id_t linkid, void *arg)
 	}
 
 	status = dladm_ether_info(dh, linkid, &eattr);
-	if (status != DLADM_STATUS_OK)
-		goto cleanup;
+	if (status != DLADM_STATUS_OK) {
+		return (DLADM_WALK_CONTINUE);
+	}
 
 	(void) strlcpy(ebuf.eth_ptype, "current", sizeof (ebuf.eth_ptype));
 
@@ -7699,7 +7700,6 @@ show_etherprop(dladm_handle_t dh, datalink_id_t linkid, void *arg)
 	if (statep->es_extended)
 		show_ether_xprop(arg, &eattr);
 
-cleanup:
 	dladm_ether_info_done(&eattr);
 	return (DLADM_WALK_CONTINUE);
 }
