@@ -37,7 +37,7 @@
  */
 /*
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _SYS_SOCKETVAR_H
@@ -903,6 +903,8 @@ extern void	fdbuf_free(struct fdbuf *);
 extern mblk_t	*fdbuf_allocmsg(int, struct fdbuf *);
 extern int	fdbuf_create(void *, int, struct fdbuf **);
 extern void	so_closefds(void *, t_uscalar_t, int, int);
+extern void	so_truncatecmsg(void *, t_uscalar_t, uint_t);
+
 extern int	so_getfdopt(void *, t_uscalar_t, int, void **, int *);
 t_uscalar_t	so_optlen(void *, t_uscalar_t, int);
 extern void	so_cmsg2opt(void *, t_uscalar_t, int, mblk_t *);

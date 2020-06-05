@@ -22,8 +22,8 @@
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2015, Joyent, Inc. All rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -959,7 +959,46 @@ so_closefds(void *control, t_uscalar_t controllen, int oldflg,
 			    (int)CMSG_CONTENTLEN(cmsg),
 			    startoff - (int)sizeof (struct cmsghdr));
 		}
-		startoff -= cmsg->cmsg_len;
+		startoff -= ROUNDUP_cmsglen(cmsg->cmsg_len);
+	}
+}
+
+/*
+ * Handle truncation of a cmsg when the receive buffer is not big enough.
+ * Adjust the cmsg_len header field in the last cmsg that will be included in
+ * the buffer to reflect the number of bytes included.
+ */
+void
+so_truncatecmsg(void *control, t_uscalar_t controllen, uint_t maxlen)
+{
+	struct cmsghdr *cmsg;
+	uint_t len = 0;
+
+	if (control == NULL)
+		return;
+
+	for (cmsg = control;
+	    CMSG_VALID(cmsg, control, (uintptr_t)control + controllen);
+	    cmsg = CMSG_NEXT(cmsg)) {
+
+		len += ROUNDUP_cmsglen(cmsg->cmsg_len);
+
+		if (len > maxlen) {
+			/*
+			 * This cmsg is the last one that will be included in
+			 * the truncated buffer.
+			 */
+			socklen_t diff = len - maxlen;
+
+			if (diff < CMSG_CONTENTLEN(cmsg)) {
+				dprint(1, ("so_truncatecmsg: %d -> %d\n",
+				    cmsg->cmsg_len, cmsg->cmsg_len - diff));
+				cmsg->cmsg_len -= diff;
+			} else {
+				cmsg->cmsg_len = sizeof (struct cmsghdr);
+			}
+			break;
+		}
 	}
 }
 

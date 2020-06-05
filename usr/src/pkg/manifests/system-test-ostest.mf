@@ -13,6 +13,7 @@
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2020 Joyent, Inc.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/test/ostest@$(PKGVERS)
@@ -87,6 +88,8 @@ file path=opt/os-tests/tests/sockfs/conn mode=0555
 file path=opt/os-tests/tests/sockfs/dgram mode=0555
 file path=opt/os-tests/tests/sockfs/drop_priv mode=0555
 file path=opt/os-tests/tests/sockfs/nosignal mode=0555
+file path=opt/os-tests/tests/sockfs/rights.32 mode=0555
+file path=opt/os-tests/tests/sockfs/rights.64 mode=0555
 file path=opt/os-tests/tests/sockfs/sockpair mode=0555
 file path=opt/os-tests/tests/spoof-ras mode=0555
 file path=opt/os-tests/tests/stress/dladm-kstat mode=0555
