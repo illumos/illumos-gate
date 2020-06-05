@@ -37,7 +37,6 @@ static void match_err_ptr(struct expression *expr)
 		err_ptr = 1;
 }
 
-extern int check_assigned_expr_id;
 static void match_return(struct expression *ret_value)
 {
 	struct state_list *slist;

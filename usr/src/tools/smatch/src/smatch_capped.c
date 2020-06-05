@@ -94,12 +94,14 @@ int is_capped(struct expression *expr)
 
 	if (expr->type == EXPR_BINOP) {
 		struct range_list *left_rl, *right_rl;
+		sval_t sval;
 
-		if (expr->op == '&')
+		if (expr->op == '&' && !get_value(expr->right, &sval))
 			return 1;
 		if (expr->op == SPECIAL_RIGHTSHIFT)
-			return 1;
-		if (expr->op == '%' && is_capped(expr->right))
+			return 0;
+		if (expr->op == '%' &&
+		    !get_value(expr->right, &sval) && is_capped(expr->right))
 			return 1;
 		if (!is_capped(expr->left))
 			return 0;

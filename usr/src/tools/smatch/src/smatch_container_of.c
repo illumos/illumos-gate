@@ -528,7 +528,7 @@ static struct stree *load_tag_info_sym(mtag_t tag, struct symbol *arg, int arg_o
 			tag, arg_offset, DATA_VALUE);
 	} else {  /* presumably the parameter is a struct pointer */
 		run_sql(save_vals, &db_info,
-			"select offset, value from mtag_data where tag = %lld and type = %d;",
+			"select offset, value from mtag_data where tag = %lld and type = %d order by offset;",
 			tag, DATA_VALUE);
 	}
 
@@ -579,7 +579,7 @@ static void load_container_data(struct symbol *arg, const char *info)
 		if (local_debug)
 			sm_msg("%s: cur_tag = %llu container_offset = %d",
 			       __func__, cur_tag, container_offset);
-		if (!mtag_map_select_container(cur_tag, container_offset, &container_tag))
+		if (!mtag_map_select_container(cur_tag, -container_offset, &container_tag))
 			return;
 		cur_tag = container_tag;
 		if (local_debug)
@@ -603,7 +603,7 @@ static void load_container_data(struct symbol *arg, const char *info)
 	if (!arg_offset || star) {
 		arg_tag = container_tag;
 	} else {
-		if (!mtag_map_select_tag(container_tag, -arg_offset, &arg_tag))
+		if (!mtag_map_select_tag(container_tag, arg_offset, &arg_tag))
 			return;
 	}
 

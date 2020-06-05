@@ -20,7 +20,7 @@
 #
 
 PROG = smatch
-SPARSE_VERSION = 0.6.1-rc1-il-4
+SPARSE_VERSION = 0.6.1-rc1-il-5
 
 include ../Makefile.tools
 
@@ -230,6 +230,7 @@ SMATCH_DB_DATA += mtag_alias.schema
 SMATCH_DB_DATA += type_size.schema
 SMATCH_DB_DATA += fn_ptr_data_link.schema
 SMATCH_DB_DATA += mtag_data.schema
+SMATCH_DB_DATA += mtag_info.schema
 SMATCH_DB_DATA += type_value.schema
 
 ROOTONBLDDATAFILES = $(SMATCH_DATA:%=$(SMATCHDATADIR)/smatch_data/%)

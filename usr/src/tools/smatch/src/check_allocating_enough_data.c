@@ -23,6 +23,7 @@ static void db_returns_buf_size(struct expression *expr, int param, char *unused
 	struct symbol *left_type, *right_type;
 	int bytes;
 	sval_t sval;
+	char *str;
 
 	if (expr->type != EXPR_ASSIGNMENT)
 		return;
@@ -42,7 +43,10 @@ static void db_returns_buf_size(struct expression *expr, int param, char *unused
 		return;
 	if (sval.uvalue >= bytes)
 		return;
-	sm_error("not allocating enough data %d vs %s", bytes, sval_to_str(sval));
+
+	str = expr_to_str(expr->left);
+	sm_error("not allocating enough for = '%s' %d vs %s", str, bytes, sval_to_str(sval));
+	free_string(str);
 }
 
 void check_allocating_enough_data(int id)

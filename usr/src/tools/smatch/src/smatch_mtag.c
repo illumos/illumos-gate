@@ -68,42 +68,64 @@ mtag_t str_to_mtag(const char *str)
 	return *tag;
 }
 
-const struct {
-	const char *name;
-	int size_arg;
-} allocator_info[] = {
-	{ "kmalloc", 0 },
-	{ "kzalloc", 0 },
-	{ "devm_kmalloc", 1},
-	{ "devm_kzalloc", 1},
-};
-
-static bool is_mtag_call(struct expression *expr)
+static int save_allocator(void *_allocator, int argc, char **argv, char **azColName)
 {
-	struct expression *arg;
-	int i;
-	sval_t sval;
+	char **allocator = _allocator;
 
-	if (expr->type != EXPR_CALL ||
-	    expr->fn->type != EXPR_SYMBOL ||
-	    !expr->fn->symbol)
-		return false;
-
-	for (i = 0; i < ARRAY_SIZE(allocator_info); i++) {
-		if (strcmp(expr->fn->symbol->ident->name, allocator_info[i].name) == 0)
-			break;
+	if (*allocator) {
+		if (strcmp(*allocator, argv[0]) == 0)
+			return 0;
+		/* should be impossible */
+		free_string(*allocator);
+		*allocator = alloc_string("unknown");
+		return 0;
 	}
-	if (i == ARRAY_SIZE(allocator_info))
-		return false;
-
-	arg = get_argument_from_call_expr(expr->args, allocator_info[i].size_arg);
-	if (!get_implied_value(arg, &sval))
-		return false;
-
-	return true;
+	*allocator = alloc_string(argv[0]);
+	return 0;
 }
 
-struct smatch_state *swap_mtag_return(struct expression *expr, struct smatch_state *state)
+char *get_allocator_info_from_tag(mtag_t tag)
+{
+	char *allocator = NULL;
+
+	run_sql(save_allocator, &allocator,
+		"select value from mtag_info where tag = %lld and type = %d;",
+		tag, ALLOCATOR);
+
+	return allocator;
+}
+
+static char *get_allocator_info(struct expression *expr, struct smatch_state *state)
+{
+	sval_t sval;
+
+	if (expr->type != EXPR_ASSIGNMENT)
+		return NULL;
+	if (estate_get_single_value(state, &sval))
+		return get_allocator_info_from_tag(sval.value);
+
+	expr = strip_expr(expr->right);
+	if (expr->type != EXPR_CALL ||
+	    !expr->fn ||
+	    expr->fn->type != EXPR_SYMBOL)
+		return NULL;
+	return expr_to_str(expr->fn);
+}
+
+static void update_mtag_info(struct expression *expr, mtag_t tag,
+			     const char *left_name, const char *tag_info,
+			     struct smatch_state *state)
+{
+	char *allocator;
+
+	sql_insert_mtag_about(tag, left_name, tag_info);
+
+	allocator = get_allocator_info(expr, state);
+	if (allocator)
+		sql_insert_mtag_info(tag, ALLOCATOR, allocator);
+}
+
+struct smatch_state *get_mtag_return(struct expression *expr, struct smatch_state *state)
 {
 	struct expression *left, *right;
 	char *left_name, *right_name;
@@ -114,20 +136,18 @@ struct smatch_state *swap_mtag_return(struct expression *expr, struct smatch_sta
 	sval_t tag_sval;
 
 	if (!expr || expr->type != EXPR_ASSIGNMENT || expr->op != '=')
-		return state;
-
-	if (!estate_rl(state) || strcmp(state->name, "0,4096-ptr_max") != 0)
-		return state;
+		return NULL;
+	if (!is_fresh_alloc(expr->right))
+		return NULL;
+	if (!rl_intersection(estate_rl(state), valid_ptr_rl))
+		return NULL;
 
 	left = strip_expr(expr->left);
 	right = strip_expr(expr->right);
 
-	if (!is_mtag_call(right))
-		return state;
-
 	left_name = expr_to_str_sym(left, &left_sym);
 	if (!left_name || !left_sym)
-		return state;
+		return NULL;
 	right_name = expr_to_str(right);
 
 	snprintf(buf, sizeof(buf), "%s %s %s %s", get_filename(), get_function(),
@@ -140,7 +160,7 @@ struct smatch_state *swap_mtag_return(struct expression *expr, struct smatch_sta
 	rl = clone_rl(rl);
 	add_range(&rl, tag_sval, tag_sval);
 
-	sql_insert_mtag_about(tag, left_name, buf);
+	update_mtag_info(expr, tag, left_name, buf, state);
 
 	free_string(left_name);
 	free_string(right_name);

@@ -36,6 +36,11 @@
 
 static int my_id;
 
+void set_real_absolute(struct expression *expr, struct smatch_state *state)
+{
+	set_state_expr(my_id, expr, clone_estate(state));
+}
+
 static void extra_mod_hook(const char *name, struct symbol *sym, struct expression *expr, struct smatch_state *state)
 {
 	struct smatch_state *abs;

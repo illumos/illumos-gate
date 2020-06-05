@@ -28,7 +28,6 @@
 #include "smatch_slist.h"
 #include "smatch_extra.h"
 
-extern int check_assigned_expr_id;
 static int my_id;
 static int link_id;
 

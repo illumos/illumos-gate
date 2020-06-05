@@ -167,7 +167,7 @@ seeprom_do_attach(dev_info_t *dip)
 	    "%s%d", ddi_driver_name(dip), instance);
 
 	if (ddi_create_minor_node(dip, ddi_node_name(dip), S_IFCHR,
-	    instance, SEEPROM_NODE_TYPE, NULL) == DDI_FAILURE) {
+	    instance, SEEPROM_NODE_TYPE, 0) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "%s ddi_create_minor_node failed for '%s'",
 		    unitp->seeprom_name, ddi_node_name(dip));
 		ddi_soft_state_free(seepromsoft_statep, instance);

@@ -335,6 +335,27 @@ static int handle_offset_subtraction(struct expression *expr)
 	return left_offset - right_offset;
 }
 
+static bool max_is_unknown_max(struct range_list *rl)
+{
+	/*
+	 * The issue with this code is that we had:
+	 * if (foo > 1) return 1 - foo;
+	 * Ideally we would say that returns s32min-(-1) but what Smatch
+	 * was saying was that the lowest possible value was "1 - INT_MAX"
+	 *
+	 * My solution is to ignore max values for int or larger.  I keep
+	 * the max for shorts etc, because those might be worthwhile.
+	 *
+	 * The problem with just returning 1 - INT_MAX is that that is
+	 * treated as useful information but s32min is treated as basically
+	 * unknown.
+	 */
+
+	if (type_bits(rl_type(rl)) < 31)
+		return false;
+	return sval_is_max(rl_max(rl));
+}
+
 static bool handle_subtract_rl(struct expression *expr, int implied, int *recurse_cnt, struct range_list **res)
 {
 	struct symbol *type;
@@ -409,7 +430,8 @@ static bool handle_subtract_rl(struct expression *expr, int implied, int *recurs
 		return true;
 	}
 
-	if (!sval_binop_overflows(rl_min(left_rl), '-', rl_max(right_rl))) {
+	if (!max_is_unknown_max(right_rl) &&
+	    !sval_binop_overflows(rl_min(left_rl), '-', rl_max(right_rl))) {
 		tmp = sval_binop(rl_min(left_rl), '-', rl_max(right_rl));
 		if (sval_cmp(tmp, min) > 0)
 			min = tmp;
@@ -1215,7 +1237,7 @@ static bool handle_call_rl(struct expression *expr, int implied, int *recurse_cn
 	if (sym_name_is("strlen", expr->fn))
 		return handle_strlen(expr, implied, recurse_cnt, res, res_sval);
 
-	if (implied == RL_EXACT || implied == RL_HARD || implied == RL_FUZZY)
+	if (implied == RL_EXACT || implied == RL_HARD)
 		return false;
 
 	if (custom_handle_variable) {

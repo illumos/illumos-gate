@@ -29,7 +29,7 @@ save_thoughts()
     read ans
     if echo $ans | grep ^$ > /dev/null ; then
         return
-    fi 
+    fi
 
     #store the result
     echo $sm_err       >> summary
@@ -76,7 +76,7 @@ for sm_err in $TXT ; do
 
     set_title $sm_err
 
-    #grep -A1 "$file $line" *summary* 2> /dev/null 
+    #grep -A1 "$file $line" *summary* 2> /dev/null
     grep -A1 -F "$last" *summary* 2> /dev/null
 
     ans="?"
@@ -102,5 +102,5 @@ for sm_err in $TXT ; do
     vim $file +${line}
 
     save_thoughts
-done	
+done
 IFS=

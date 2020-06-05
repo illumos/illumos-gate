@@ -177,9 +177,9 @@ _info(struct modinfo *modinfop)
 static int
 pca9556_resume(dev_info_t *dip)
 {
-	int 		instance = ddi_get_instance(dip);
+	int		instance = ddi_get_instance(dip);
 	pca9556_unit_t	*pcap;
-	int 		err = DDI_SUCCESS;
+	int		err = DDI_SUCCESS;
 	int		reg_offset, num_of_ports;
 	int		i, j;
 	uint8_t		reg, reg_num = 0;
@@ -257,7 +257,7 @@ static void
 pca9556_detach(dev_info_t *dip)
 {
 	pca9556_unit_t *pcap;
-	int 		instance = ddi_get_instance(dip);
+	int		instance = ddi_get_instance(dip);
 
 	pcap = ddi_get_soft_state(pca9556_soft_statep, instance);
 
@@ -279,11 +279,11 @@ pca9556_detach(dev_info_t *dip)
 static int
 pca9556_attach(dev_info_t *dip)
 {
-	pca9556_unit_t 		*pcap;
-	int 			instance = ddi_get_instance(dip);
+	pca9556_unit_t		*pcap;
+	int			instance = ddi_get_instance(dip);
 	char			name[MAXNAMELEN];
 	char *device_name;
-	minor_t 		minor;
+	minor_t			minor;
 	int			i, num_ports;
 
 	if (ddi_soft_state_zalloc(pca9556_soft_statep, instance) != 0) {
@@ -328,7 +328,7 @@ pca9556_attach(dev_info_t *dip)
 		}
 
 		if (ddi_create_minor_node(dip, name, S_IFCHR, minor,
-		    PCA9556_NODE_TYPE, NULL) == DDI_FAILURE) {
+		    PCA9556_NODE_TYPE, 0) == DDI_FAILURE) {
 			cmn_err(CE_WARN, "%s: failed to create node for %s",
 			    pcap->pca9556_name, name);
 			pca9556_detach(dip);
@@ -414,8 +414,8 @@ pca9556_s_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 static int
 pca9556_suspend(dev_info_t *dip)
 {
-	pca9556_unit_t 	*pcap;
-	int 		instance = ddi_get_instance(dip);
+	pca9556_unit_t	*pcap;
+	int		instance = ddi_get_instance(dip);
 	int		err = DDI_SUCCESS;
 	int		reg_offset, num_of_ports;
 	int		i, j;
@@ -574,7 +574,7 @@ static int
 pca9556_close(dev_t dev, int flags, int otyp, cred_t *credp)
 {
 	int		instance;
-	pca9556_unit_t 	*pcap;
+	pca9556_unit_t	*pcap;
 
 	_NOTE(ARGUNUSED(flags, credp))
 
@@ -599,7 +599,7 @@ pca9556_close(dev_t dev, int flags, int otyp, cred_t *credp)
 
 static int
 pca9556_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-	int *rvalp)
+    int *rvalp)
 {
 	pca9556_unit_t		*pcap;
 	int			err = 0;

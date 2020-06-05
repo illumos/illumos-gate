@@ -63,7 +63,7 @@ static inline long long __smatch_type_rl_helper(long long type, const char *str,
 #define __smatch_type_rl(type, fmt...) __smatch_type_rl_helper((type)0, fmt)
 #define __smatch_rl(fmt...) __smatch_type_rl(long long, fmt)
 
-static inline void __smatch_bit_info(long long expr){}
+static inline void __smatch_bits(long long expr){}
 
 static inline void __smatch_oops(unsigned long null_val){}
 
@@ -75,8 +75,11 @@ static inline void __smatch_mtag(void *p){}
 static inline void __smatch_mtag_data(long long arg){}
 static inline void __smatch_exit(void){}
 
+static inline void __smatch_expr(const char *str, void *p){}
+
 static inline void __smatch_state_count(void){}
 static inline void __smatch_mem(void){}
 
 static inline void __smatch_container(long long container, long long x){}
+
 #endif

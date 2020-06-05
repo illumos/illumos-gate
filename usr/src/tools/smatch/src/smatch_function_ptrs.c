@@ -218,7 +218,7 @@ char *get_fnptr_name(struct expression *expr)
 			return alloc_string(buf);
 		}
 
-		name =  expr_to_var_sym(expr, &sym);
+		name = expr_to_var_sym(expr, &sym);
 		if (!name)
 			return NULL;
 		type = get_type(expr);

@@ -340,6 +340,7 @@ int main(int argc, char **argv)
 
 	allocate_hook_memory();
 	allocate_dynamic_states_array(num_checks);
+	allocate_tracker_array(num_checks);
 	create_function_hook_hash();
 	open_smatch_db(option_db_file);
 	sparse_initialize(argc, argv, &filelist);

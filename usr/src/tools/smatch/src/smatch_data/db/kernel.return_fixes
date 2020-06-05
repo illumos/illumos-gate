@@ -20,6 +20,7 @@ nilfs_mdt_insert_new_block s32min-(-23),(-21)-(-1),1-s32max (-4095)-(-23),(-21)-
 simple_write_to_buffer s64min-s64max 0-s32max[<=$1]
 atomic_read s32min-s32max s32min-s32max[==$0->counter]
 notifier_to_errno (-2147483646)-(-1) (-4095)-(-1)
+notifier_to_errno (-2147450878)-(-1) (-4095)-(-1)
 mc_status_to_error s32min-s32max (-4095)-0
 fls s32min-s32max 0-32
 fls64 s64min-s64max 0-64
@@ -57,3 +58,13 @@ __rounddown_pow_of_two 0-u64max 0-u64max[<=$0]
 __roundup_pow_of_two 0-u64max 0-u64max[>=$0]
 kthread_probe_data 0 0-u64max
 bus_for_each_dev (-4095)-1 (-4095)-1[r\ $3]
+ahd_probe_stack_size 0 0-s32max
+mutex_lock_interruptible_nested (-35),(-4) (-4)
+dlfb_get_urb 0-u64max 4096-ptr_max
+bitmap_find_free_region 0 0-s32max
+mutex_lock_interruptible (-35),(-4) (-4)
+mutex_lock_interruptible_nested (-35),(-4) (-4)
+mutex_lock_killable (-35),(-4) (-4)
+mutex_lock_killable_nested (-35),(-4) (-4)
+ww_mutex_lock_interruptible (-35),(-4) (-4)
+ww_mutex_lock (-35),(-4) (-35)

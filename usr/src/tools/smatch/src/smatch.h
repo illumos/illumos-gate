@@ -196,6 +196,7 @@ void select_return_states_before(void (*fn)(void));
 void select_return_states_after(void (*fn)(void));
 int get_implied_return(struct expression *expr, struct range_list **rl);
 void allocate_hook_memory(void);
+void allocate_tracker_array(int num_checks);
 
 struct modification_data {
 	struct smatch_state *prev;
@@ -388,6 +389,7 @@ struct smatch_state *merge_str_state(struct smatch_state *s1, struct smatch_stat
 struct smatch_state *alloc_state_expr(struct expression *expr);
 struct expression *get_argument_from_call_expr(struct expression_list *args,
 					       int num);
+struct expression *get_array_expr(struct expression *expr);
 
 char *expr_to_var(struct expression *expr);
 struct symbol *expr_to_sym(struct expression *expr);
@@ -446,9 +448,16 @@ int positions_eq(struct position pos1, struct position pos2);
 struct statement *get_current_statement(void);
 struct statement *get_prev_statement(void);
 struct expression *get_last_expr_from_expression_stmt(struct expression *expr);
+
+#define RETURN_VAR    -1
+#define LOCAL_SCOPE   -2
+#define FILE_SCOPE    -3
+#define GLOBAL_SCOPE  -4
+#define UNKNOWN_SCOPE -5
 int get_param_num_from_sym(struct symbol *sym);
 int get_param_num(struct expression *expr);
 struct symbol *get_param_sym_from_num(int num);
+
 int ms_since(struct timeval *start);
 int parent_is_gone_var_sym(const char *name, struct symbol *sym);
 int parent_is_gone(struct expression *expr);
@@ -478,9 +487,11 @@ int nr_bits(struct expression *expr);
 int is_void_pointer(struct expression *expr);
 int is_char_pointer(struct expression *expr);
 int is_string(struct expression *expr);
+bool is_struct_ptr(struct symbol *type);
 int is_static(struct expression *expr);
 bool is_local_variable(struct expression *expr);
 int types_equiv(struct symbol *one, struct symbol *two);
+bool type_fits(struct symbol *type, struct symbol *test);
 int fn_static(void);
 const char *global_static();
 struct symbol *cur_func_return_type(void);
@@ -581,7 +592,7 @@ int __handle_expr_statement_assigns(struct expression *expr);
 
 /* smatch_implied.c */
 struct range_list_stack;
-void param_limit_implications(struct expression *expr, int param, char *key, char *value);
+void param_limit_implications(struct expression *expr, int param, char *key, char *value, struct stree **implied);
 struct stree *__implied_case_stree(struct expression *switch_expr,
 				   struct range_list *case_rl,
 				   struct range_list_stack **remaining_cases,
@@ -780,6 +791,9 @@ void __save_gotos(const char *name, struct symbol *sym);
 void __merge_gotos(const char *name, struct symbol *sym);
 
 void __print_cur_stree(void);
+bool __print_states(const char *owner);
+typedef void (check_tracker_hook)(int owner, const char *name, struct symbol *sym, struct smatch_state *state);
+void add_check_tracker(const char *check_name, check_tracker_hook *fn);
 
 /* smatch_hooks.c */
 void __pass_to_client(void *data, enum hook_type type);
@@ -847,6 +861,7 @@ enum info_type {
 	STMT_CNT	= 1037,
 	TERMINATED	= 1038,
 	FRESH_ALLOC	= 1044,
+	ALLOCATOR	= 1045,
 
 	/* put random temporary stuff in the 7000-7999 range for testing */
 	USER_DATA	= 8017,
@@ -862,6 +877,7 @@ enum info_type {
 	SET_FS		= 8022,
 	ATOMIC_INC	= 8023,
 	ATOMIC_DEC	= 8024,
+	REFCOUNT	= 9025,
 	NO_SIDE_EFFECT  = 8025,
 	FN_ARG_LINK	= 8028,
 	DATA_VALUE	= 8029,
@@ -885,6 +901,7 @@ extern struct sqlite3 *cache_db;
 void db_ignore_states(int id);
 void select_caller_info_hook(void (*callback)(const char *name, struct symbol *sym, char *key, char *value), int type);
 void add_member_info_callback(int owner, void (*callback)(struct expression *call, int param, char *printed_name, struct sm_state *sm));
+void add_caller_info_callback(int owner, void (*callback)(struct expression *call, int param, char *printed_name, struct sm_state *sm));
 void add_split_return_callback(void (*fn)(int return_id, char *return_ranges, struct expression *returned_expr));
 void add_returned_member_callback(int owner, void (*callback)(int return_id, char *return_ranges, struct expression *expr, char *printed_name, struct smatch_state *state));
 void select_call_implies_hook(int type, void (*callback)(struct expression *call, struct expression *arg, char *key, char *value));
@@ -996,11 +1013,12 @@ void sql_copy_constraint_required(const char *new_limit, const char *old_limit);
 void sql_insert_fn_ptr_data_link(const char *ptr, const char *data);
 void sql_insert_fn_data_link(struct expression *fn, int type, int param, const char *key, const char *value);
 void sql_insert_mtag_about(mtag_t tag, const char *left_name, const char *right_name);
-void sql_insert_mtag_map(mtag_t tag, int offset, mtag_t container);
+void sql_insert_mtag_info(mtag_t tag, int type, const char *value);
+void sql_insert_mtag_map(mtag_t container, int container_offset, mtag_t tag, int tag_offset);
 void sql_insert_mtag_alias(mtag_t orig, mtag_t alias);
-int mtag_map_select_container(mtag_t tag, int offset, mtag_t *container);
+int mtag_map_select_container(mtag_t tag, int container_offset, mtag_t *container);
 int mtag_map_select_tag(mtag_t container, int offset, mtag_t *tag);
-struct smatch_state *swap_mtag_return(struct expression *expr, struct smatch_state *state);
+struct smatch_state *get_mtag_return(struct expression *expr, struct smatch_state *state);
 struct range_list *swap_mtag_seed(struct expression *expr, struct range_list *rl);
 
 void sql_select_return_states(const char *cols, struct expression *call,
@@ -1069,6 +1087,7 @@ struct range_list *var_user_rl(struct expression *expr);
 void print_held_locks();
 
 /* check_assigned_expr.c */
+extern int check_assigned_expr_id;
 struct expression *get_assigned_expr(struct expression *expr);
 struct expression *get_assigned_expr_name_sym(const char *name, struct symbol *sym);
 /* smatch_return_to_param.c */
@@ -1119,9 +1138,6 @@ int negate_comparison(int op);
 int remove_unsigned_from_comparison(int op);
 int param_compare_limit_is_impossible(struct expression *expr, int left_param, char *left_key, char *value);
 void filter_by_comparison(struct range_list **rl, int comparison, struct range_list *right);
-struct sm_state *comparison_implication_hook(struct expression *expr,
-			struct state_list **true_stack,
-			struct state_list **false_stack);
 void __compare_param_limit_hook(struct expression *left_expr, struct expression *right_expr,
 				const char *state_name,
 				struct smatch_state *true_state, struct smatch_state *false_state);
@@ -1193,6 +1209,10 @@ struct sm_state *stored_condition_implication_hook(struct expression *expr,
 struct sm_state *parsed_condition_implication_hook(struct expression *expr,
 			struct state_list **true_stack,
 			struct state_list **false_stack);
+/* smatch_comparison.c */
+struct sm_state *comparison_implication_hook(struct expression *expr,
+					     struct state_list **true_stack,
+					     struct state_list **false_stack);
 
 /* check_string_len.c */
 int get_formatted_string_size(struct expression *call, int arg);
@@ -1240,10 +1260,14 @@ void __get_state_hook(int owner, const char *name, struct symbol *sym);
 /* smatch_buf_comparison.c */
 int db_var_is_array_limit(struct expression *array, const char *name, struct var_sym_list *vsl);
 
+struct range_list *get_fs(void);
+
 struct stree *get_all_return_states(void);
 struct stree_stack *get_all_return_strees(void);
 int on_atomic_dec_path(void);
 int was_inced(const char *name, struct symbol *sym);
+void set_refcount_inc(char *name, struct symbol *sym);
+void set_refcount_dec(char *name, struct symbol *sym);
 
 /* smatch_constraints.c */
 char *get_constraint_str(struct expression *expr);

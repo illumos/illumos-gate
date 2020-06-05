@@ -269,6 +269,7 @@ static void db_returns_buf_size(struct expression *expr, int param, char *unused
 {
 	struct expression *call;
 	struct range_list *rl;
+	sval_t sval;
 
 	if (expr->type != EXPR_ASSIGNMENT)
 		return;
@@ -276,6 +277,8 @@ static void db_returns_buf_size(struct expression *expr, int param, char *unused
 
 	call_results_to_rl(call, &int_ctype, math, &rl);
 	rl = cast_rl(&int_ctype, rl);
+	if (rl_to_sval(rl, &sval) && sval.value == 0)
+		return;
 	set_state_expr(my_size_id, expr->left, alloc_estate_rl(rl));
 }
 
@@ -451,7 +454,7 @@ static int get_stored_size_end_struct_bytes(struct expression *expr)
 		return 0;
 
 	state = get_state(my_size_id, sym->ident->name, sym);
-	if (!estate_to_size(state))
+	if (!estate_to_size(state) || estate_to_size(state) == -1)
 		return 0;
 
 	return estate_to_size(state) - type_bytes(base_sym) + type_bytes(get_type(expr));
@@ -504,6 +507,11 @@ struct range_list *get_array_size_bytes_rl(struct expression *expr)
 		return alloc_int_rl(size - offset.value);
 	}
 
+	/* buf = malloc(1024); */
+	ret = get_stored_size_bytes(expr);
+	if (ret)
+		return ret;
+
 	size = get_stored_size_end_struct_bytes(expr);
 	if (size)
 		return alloc_int_rl(size);
@@ -512,11 +520,6 @@ struct range_list *get_array_size_bytes_rl(struct expression *expr)
 	size = get_real_array_size(expr);
 	if (size)
 		return alloc_int_rl(elements_to_bytes(expr, size));
-
-	/* buf = malloc(1024); */
-	ret = get_stored_size_bytes(expr);
-	if (ret)
-		return ret;
 
 	/* char *foo = "BAR" */
 	size = get_size_from_initializer(expr);
@@ -636,7 +639,11 @@ static void store_alloc(struct expression *expr, struct range_list *rl)
 	rl = clone_rl(rl); // FIXME!!!
 	if (!rl)
 		rl = size_to_rl(UNKNOWN_SIZE);
-	set_state_expr(my_size_id, expr, alloc_estate_rl(rl));
+
+	if (rl_min(rl).value != UNKNOWN_SIZE ||
+	    rl_max(rl).value != UNKNOWN_SIZE ||
+	    get_state_expr(my_size_id, expr))
+		set_state_expr(my_size_id, expr, alloc_estate_rl(rl));
 
 	type = get_type(expr);
 	if (!type)
@@ -654,6 +661,16 @@ static void store_alloc(struct expression *expr, struct range_list *rl)
 	info_record_alloction(expr, rl);
 }
 
+static bool is_array_base(struct expression *expr)
+{
+	struct symbol *type;
+
+	type = get_type(expr);
+	if (type && type->type == SYM_ARRAY)
+		return true;
+	return false;
+}
+
 static void match_array_assignment(struct expression *expr)
 {
 	struct expression *left;
@@ -664,11 +681,15 @@ static void match_array_assignment(struct expression *expr)
 
 	if (expr->op != '=')
 		return;
+
 	left = strip_expr(expr->left);
 	right = strip_expr(expr->right);
 	right = strip_ampersands(right);
 
 	if (!is_pointer(left))
+		return;
+	/* char buf[24] = "str"; */
+	if (is_array_base(left))
 		return;
 	if (is_allocation_function(right))
 		return;
@@ -710,15 +731,16 @@ static void match_alloc(const char *fn, struct expression *expr, void *_size_arg
 	store_alloc(expr->left, rl);
 }
 
-static void match_calloc(const char *fn, struct expression *expr, void *unused)
+static void match_calloc(const char *fn, struct expression *expr, void *_param)
 {
 	struct expression *right;
 	struct expression *size, *nr, *mult;
 	struct range_list *rl;
+	int param = PTR_INT(_param);
 
 	right = strip_expr(expr->right);
-	nr = get_argument_from_call_expr(right->args, 0);
-	size = get_argument_from_call_expr(right->args, 1);
+	nr = get_argument_from_call_expr(right->args, param);
+	size = get_argument_from_call_expr(right->args, param + 1);
 	mult = binop_expression(nr, '*', size);
 	if (get_implied_rl(mult, &rl))
 		store_alloc(expr->left, rl);
@@ -811,6 +833,9 @@ static void match_call(struct expression *expr)
 			continue;
 		rl = get_array_size_bytes_rl(arg);
 		if (!rl)
+			continue;
+		if (rl_min(rl).value == UNKNOWN_SIZE &&
+		    rl_max(rl).value == UNKNOWN_SIZE)
 			continue;
 		if (is_whole_rl(rl))
 			continue;
@@ -909,12 +934,12 @@ void register_buf_size(int id)
 		add_allocation_function("kzalloc", &match_alloc, 0);
 		add_allocation_function("kzalloc_node", &match_alloc, 0);
 		add_allocation_function("vmalloc", &match_alloc, 0);
+		add_allocation_function("vzalloc", &match_alloc, 0);
 		add_allocation_function("__vmalloc", &match_alloc, 0);
 		add_allocation_function("kvmalloc", &match_alloc, 0);
 		add_allocation_function("kcalloc", &match_calloc, 0);
 		add_allocation_function("kmalloc_array", &match_calloc, 0);
-		add_allocation_function("drm_malloc_ab", &match_calloc, 0);
-		add_allocation_function("drm_calloc_large", &match_calloc, 0);
+		add_allocation_function("devm_kmalloc_array", &match_calloc, 1);
 		add_allocation_function("sock_kmalloc", &match_alloc, 1);
 		add_allocation_function("kmemdup", &match_alloc, 1);
 		add_allocation_function("kmemdup_user", &match_alloc, 1);

@@ -337,6 +337,8 @@ static int is_ignored_function(void)
 		return 1;
 	if (sym_name_is("i2c_get_clientdata", expr->fn))
 		return 1;
+	if (sym_name_is("idr_find", expr->fn))
+		return 1;
 
 	return 0;
 }
