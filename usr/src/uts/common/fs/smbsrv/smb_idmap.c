@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -83,12 +83,12 @@ smb_idmap_getsid(uid_t id, int idtype, smb_sid_t **sid)
 
 	switch (idtype) {
 	case SMB_IDMAP_USER:
-		sim.sim_stat = kidmap_getsidbyuid(global_zone, id,
+		sim.sim_stat = kidmap_getsidbyuid(curzone, id,
 		    (const char **)&sim.sim_domsid, &sim.sim_rid);
 		break;
 
 	case SMB_IDMAP_GROUP:
-		sim.sim_stat = kidmap_getsidbygid(global_zone, id,
+		sim.sim_stat = kidmap_getsidbygid(curzone, id,
 		    (const char **)&sim.sim_domsid, &sim.sim_rid);
 		break;
 
@@ -150,17 +150,17 @@ smb_idmap_getid(smb_sid_t *sid, uid_t *id, int *idtype)
 
 	switch (*idtype) {
 	case SMB_IDMAP_USER:
-		sim.sim_stat = kidmap_getuidbysid(global_zone, sim.sim_domsid,
+		sim.sim_stat = kidmap_getuidbysid(curzone, sim.sim_domsid,
 		    sim.sim_rid, sim.sim_id);
 		break;
 
 	case SMB_IDMAP_GROUP:
-		sim.sim_stat = kidmap_getgidbysid(global_zone, sim.sim_domsid,
+		sim.sim_stat = kidmap_getgidbysid(curzone, sim.sim_domsid,
 		    sim.sim_rid, sim.sim_id);
 		break;
 
 	case SMB_IDMAP_UNKNOWN:
-		sim.sim_stat = kidmap_getpidbysid(global_zone, sim.sim_domsid,
+		sim.sim_stat = kidmap_getpidbysid(curzone, sim.sim_domsid,
 		    sim.sim_rid, sim.sim_id, &sim.sim_idtype);
 		break;
 
@@ -186,7 +186,7 @@ smb_idmap_batch_create(smb_idmap_batch_t *sib, uint16_t nmap, int flags)
 
 	bzero(sib, sizeof (smb_idmap_batch_t));
 
-	sib->sib_idmaph = kidmap_get_create(global_zone);
+	sib->sib_idmaph = kidmap_get_create(curzone);
 
 	sib->sib_flags = flags;
 	sib->sib_nmap = nmap;
