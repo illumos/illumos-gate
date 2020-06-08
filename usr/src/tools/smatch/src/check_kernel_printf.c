@@ -15,6 +15,8 @@
  * along with this program; if not, see http://www.gnu.org/copyleft/gpl.txt
  */
 
+#define _GNU_SOURCE
+
 #include <assert.h>
 #include <ctype.h>
 #include <string.h>
@@ -207,7 +209,7 @@ qualifier:
 		return ++fmt - start;
 
 	case 's':
-		if (qualifier)
+		if (qualifier && qualifier != 'l')
 			sm_warning("qualifier '%c' ignored for %%s specifier", qualifier);
 
 		spec->type = FORMAT_TYPE_STR;
@@ -672,6 +674,12 @@ pointer(const char *fmt, struct expression *arg, int vaidx)
 			vaidx, type_to_str(type));
 		return;
 	}
+
+	/* error pointers */
+	if (*fmt == 'e')
+		fmt++;
+
+
 	/* Just plain %p, nothing to check. */
 	if (!isalnum(*fmt))
 		return;

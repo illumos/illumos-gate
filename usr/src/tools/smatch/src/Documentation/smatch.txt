@@ -1,9 +1,13 @@
 Smatch
 
+0.  Introduction
 1.  Building Smatch
 2.  Using Smatch
 3.  Smatch vs Sparse
 
+Section 0: Introduction
+
+The Smatch mailing list is <smatch@vger.kernel.org>.
 
 Section 1:  Building Smatch
 ---------------------------

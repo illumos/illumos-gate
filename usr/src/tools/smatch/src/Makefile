@@ -1,4 +1,4 @@
-VERSION=0.6.1-rc1-il-5
+VERSION=0.6.1-rc1-il-6
 
 ########################################################################
 # The following variables can be overwritten from the command line

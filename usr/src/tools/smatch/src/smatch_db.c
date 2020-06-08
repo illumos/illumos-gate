@@ -2719,8 +2719,9 @@ const char *state_name_to_param_name(const char *state_name, const char *param_n
 		return alloc_sname(buf);
 	}
 
-	if (state_name[name_len] == '-' && /* check for '-' from "->" */
-	    strncmp(state_name, param_name, name_len) == 0) {
+	/* check for '-' from "->" */
+	if (strncmp(state_name, param_name, name_len) == 0 &&
+	    state_name[name_len] == '-') {
 		snprintf(buf, sizeof(buf), "%.*s$%s", star_cnt, "**********", state_name + name_len);
 		return alloc_sname(buf);
 	}
