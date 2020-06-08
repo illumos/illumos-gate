@@ -210,7 +210,7 @@ epic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		(void) sprintf(name, "env-monitor%d", inst);
 		minor = inst;
 		if (ddi_create_minor_node(dip, name, S_IFCHR, minor,
-		    DDI_PSEUDO, NULL) == DDI_FAILURE) {
+		    DDI_PSEUDO, 0) == DDI_FAILURE) {
 			cmn_err(CE_WARN,
 			    "ddi_create_minor_node() failed for inst %d\n",
 			    inst);
@@ -325,7 +325,7 @@ epic_close(dev_t dev, int flag, int otyp, cred_t *credp)
 /*ARGSUSED*/
 static int
 epic_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-int *rvalp)
+    int *rvalp)
 {
 	_NOTE(ARGUNUSED(credp))
 

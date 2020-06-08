@@ -222,7 +222,7 @@ pcf8591_close(dev_t dev, int flags, int otyp, cred_t *credp)
 
 static int
 pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
-		cred_t *credp, int *rvalp)
+    cred_t *credp, int *rvalp)
 {
 	_NOTE(ARGUNUSED(credp, rvalp))
 
@@ -236,7 +236,7 @@ pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	int32_t value;
 	uint8_t uvalue;
 
-	if (arg == NULL) {
+	if (arg == (intptr_t)NULL) {
 		D2CMN_ERR((CE_WARN, "PCF8591: ioctl: arg passed in to ioctl "
 		    "= NULL\n"));
 		err = EINVAL;
@@ -485,7 +485,7 @@ pcf8591_do_attach(dev_info_t *dip)
 		    PORT_TO_MINOR(I2C_PORT(i));
 
 		if (ddi_create_minor_node(dip, name, S_IFCHR, minor_number,
-		    "ddi_i2c:adio", NULL) == DDI_FAILURE) {
+		    "ddi_i2c:adio", 0) == DDI_FAILURE) {
 			cmn_err(CE_WARN, "%s ddi_create_minor_node failed for "
 			    "%s\n", unitp->pcf8591_name, name);
 			ddi_soft_state_free(pcf8591soft_statep, instance);
