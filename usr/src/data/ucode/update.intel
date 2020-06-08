@@ -10,7 +10,7 @@
 # http://www.illumos.org/license/CDDL.
 
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2019 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 
 # A simple update script that extracts an Intel microcode download file
 # into the intel/ directory, and updates the hardlinks in the
@@ -22,13 +22,12 @@ set -o pipefail
 # Remove this once we start using pkgfmt without it in the rest of -gate.
 export PKGFMT_OUTPUT=v1
 
-[[ -z "$1" ]] || [[ ! -f "$1" ]] && {
-	echo "Syntax: $0 <path to microcode tar>" >&2
-	exit 1
-}
+# Change me if the world evolves, but for now, this is the source of
+# truth for Intel microcode.
+REPOSOURCE="https://github.com/intel/Intel-Linux-Processor-Microcode-Data-Files"
 
-ucodetar="$1"
-
+tmp=$(mktemp -d)
+mkdir $tmp/out
 mf=../../pkg/manifests/system-microcode-intel.mf
 [[ -f $mf ]] || {
 	echo "Run from usr/src/data/ucode" 2>&1
@@ -37,12 +36,27 @@ mf=../../pkg/manifests/system-microcode-intel.mf
 
 fw=platform/i86pc/ucode/GenuineIntel
 
-tmp=$(mktemp -d)
-mkdir $tmp/out
+if [[ -z "$1" ]]; then
+	goback=`pwd`
+	cd $tmp
+	# Hope git is available if we need it...
+	git clone $REPOSOURCE || {
+		echo "Git clone of $REPOSOURCE failed." 2>&1
+		exit 1
+	}
+	cd $goback
+	# Change with REPOSOURCE name
+	dir=$tmp/Intel-Linux-Processor-Microcode-Data-Files
+elif [[ -d "$1" ]]; then
+	dir=$1
+else
+	gtar -C $tmp -xvf "$1"
+	# This will expand properly if the tarball appends a release
+	# to the name.
+	dir=$tmp/Intel-Linux-Processor-Microcode-Data-Files*
+fi
 
-gtar -C $tmp -xvf "$ucodetar"
-
-find $tmp/Intel-Linux-Processor-Microcode-Data*/intel-ucode*/ -type f \
+find $dir/intel-ucode*/ -type f \
     | while read f; do
 	echo "Converting $(basename $f)"
 	cp $f $tmp/intel-fw
@@ -57,7 +71,7 @@ rm -f $mf.tmp
 
 rm -f intel/*
 
-cp $tmp/Intel-Linux-Processor-Microcode-Data*/license intel/THIRDPARTYLICENSE
+cp $dir/license intel/THIRDPARTYLICENSE
 echo Intel Processor Microcode Data Files > intel/THIRDPARTYLICENSE.descrip
 
 rm -f Makefile.links
