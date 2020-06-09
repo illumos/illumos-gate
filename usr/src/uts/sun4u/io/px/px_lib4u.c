@@ -698,13 +698,9 @@ px_lib_dma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	 * CPU's internal "invalidate FIFOs" are flushed.
 	 */
 
-#if !defined(lint)
 	kpreempt_disable();
-#endif
 	jbus_stst_order();
-#if !defined(lint)
 	kpreempt_enable();
-#endif
 	return (DDI_SUCCESS);
 }
 
@@ -1416,7 +1412,7 @@ oberon_set_cb(dev_info_t *dip, uint64_t val)
 	 * register array.
 	 */
 	for (ubc_id = 0; ubc_id < OBERON_UBC_ID_MAX; ubc_id++) {
-		if (px_oberon_ubc_scratch_regs[ubc_id] != NULL)
+		if (px_oberon_ubc_scratch_regs[ubc_id] != 0)
 			return;
 	}
 
@@ -1559,7 +1555,7 @@ px_lib_clr_errs(px_t *px_p, dev_info_t *rdip, uint64_t addr)
 		}
 	}
 
-	(void) px_rp_en_q(px_p, bdf, addr_low, NULL);
+	(void) px_rp_en_q(px_p, bdf, addr_low, 0);
 
 	/*
 	 * XXX - Current code scans the fabric for all px_tool accesses.
@@ -1877,8 +1873,8 @@ px_goto_l23ready(px_t *px_p)
 	int		mutex_held = 1;
 
 	/* If no PM info, return failure */
-	if (!PCIE_PMINFO(px_p->px_dip) ||
-	    !(pwr_p = PCIE_NEXUS_PMINFO(px_p->px_dip)))
+	if (PCIE_PMINFO(px_p->px_dip) == NULL ||
+	    (pwr_p = PCIE_NEXUS_PMINFO(px_p->px_dip)) == NULL)
 		return (DDI_FAILURE);
 
 	mutex_enter(&pwr_p->pwr_lock);
@@ -2001,8 +1997,8 @@ px_pre_pwron_check(px_t *px_p)
 	pcie_pwr_t	*pwr_p;
 
 	/* If no PM info, return failure */
-	if (!PCIE_PMINFO(px_p->px_dip) ||
-	    !(pwr_p = PCIE_NEXUS_PMINFO(px_p->px_dip)))
+	if (PCIE_PMINFO(px_p->px_dip) == NULL ||
+	    (pwr_p = PCIE_NEXUS_PMINFO(px_p->px_dip)) == NULL)
 		return (DDI_FAILURE);
 
 	/*
@@ -2023,8 +2019,8 @@ px_goto_l0(px_t *px_p)
 	uint64_t	time_spent = 0;
 
 	/* If no PM info, return failure */
-	if (!PCIE_PMINFO(px_p->px_dip) ||
-	    !(pwr_p = PCIE_NEXUS_PMINFO(px_p->px_dip)))
+	if (PCIE_PMINFO(px_p->px_dip) == NULL ||
+	    (pwr_p = PCIE_NEXUS_PMINFO(px_p->px_dip)) == NULL)
 		return (DDI_FAILURE);
 
 	mutex_enter(&pwr_p->pwr_lock);
@@ -2139,7 +2135,7 @@ px_cb_intr_redist(void *arg)
 	mutex_enter(&cb_p->cb_mutex);
 
 	pxl = cb_p->pxl;
-	if (!pxl)
+	if (pxl == NULL)
 		goto cb_done;
 
 	pxp = pxl->pxp;
@@ -2275,7 +2271,7 @@ px_cb_rem_intr(px_fault_t *fault_p)
 		pxl = pxl->next;
 		for (; pxl && (pxl->pxp != px_p); prev = pxl, pxl = pxl->next) {
 		};
-		if (!pxl) {
+		if (pxl == NULL) {
 			cmn_err(CE_WARN, "px_cb_rem_intr: can't find px_p 0x%p "
 			    "in registered CB list.", (void *)px_p);
 			mutex_exit(&cb_p->cb_mutex);
@@ -2342,7 +2338,7 @@ px_cb_intr(caddr_t arg)
 
 	mutex_enter(&cb_p->cb_mutex);
 
-	if (!cb_p->pxl) {
+	if (cb_p->pxl == NULL) {
 		mutex_exit(&cb_p->cb_mutex);
 		return (DDI_INTR_UNCLAIMED);
 	}

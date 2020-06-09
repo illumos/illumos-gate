@@ -19,3 +19,16 @@ Kernel submitting process.
 
    Notice that sparse uses the MIT License.
 
+4. Smatch is built on top of Sparse but it is licensed under the GPLv2+ the
+   git repostories are:
+
+	https://github.com/error27/smatch
+	https://repo.or.cz/w/smatch.git
+
+   They are identical mirrors so it doesn't matter which you use.
+
+   Send patches for to Smatch to <smatch@vger.kernel.org>.  If the code is
+   shared with both Sparse and Smatch then please send it to the Sparse
+   mailing list instead <linux-sparse@vger.kernel.org> and I will pick it up
+   from there.
+

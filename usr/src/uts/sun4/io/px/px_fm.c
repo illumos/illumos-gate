@@ -329,7 +329,7 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 			switch (ranges_p->child_high & PCI_ADDR_MASK) {
 			case PCI_ADDR_CONFIG:
 				acc_type = PF_ADDR_CFG;
-				addr = NULL;
+				addr = 0;
 				bdf = (pcie_req_id_t)((fault_addr >> 12) &
 				    0xFFFF);
 				break;
@@ -448,7 +448,7 @@ px_err_fabric_intr(px_t *px_p, msgcode_t msg_code, pcie_req_id_t rid)
 	}
 
 	/* Ensure that the rid of the fabric message will get scanned. */
-	pfd_p = px_rp_en_q(px_p, rid, NULL, NULL);
+	pfd_p = px_rp_en_q(px_p, rid, 0, 0);
 	PCIE_ROOT_EH_SRC(pfd_p)->intr_type = PF_INTR_TYPE_FABRIC;
 
 	rc_err = px_err_cmn_intr(px_p, &derr, PX_INTR_CALL, PX_FM_BLOCK_PCIE);
@@ -739,7 +739,7 @@ px_get_pfd(px_t *px_p) {
 	PCIE_ROOT_FAULT(pfd_p)->scan_addr = 0;
 	PCIE_ROOT_EH_SRC(pfd_p)->intr_type = PF_INTR_TYPE_NONE;
 	PCIE_ROOT_EH_SRC(pfd_p)->intr_data = NULL;
-	PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags = NULL;
+	PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags = 0;
 	PFD_AFFECTED_DEV(pfd_p)->pe_affected_bdf = PCIE_INVALID_BDF;
 	PCI_BDG_ERR_REG(pfd_p)->pci_bdg_sec_stat = 0;
 	PCIE_ADV_REG(pfd_p)->pcie_ce_status = 0;
@@ -890,7 +890,7 @@ px_err_pio_hdl_check(dev_info_t *dip, const void *handle, const void *arg1,
 	 */
 	size = hp->ah_len;
 	if (((fault_addr >= base_addr) && (fault_addr < (base_addr + size))) ||
-	    ((fault_addr == NULL) && (PCIE_CHECK_VALID_BDF(bdf) &&
+	    ((fault_addr == 0) && (PCIE_CHECK_VALID_BDF(bdf) &&
 	    (bdf == PCIE_DIP2BUS(dip)->bus_bdf))))
 		status = DDI_FM_NONFATAL;
 
@@ -927,7 +927,7 @@ px_err_dma_hdl_check(dev_info_t *dip, const void *handle, const void *arg1,
 	 * know the BDF and ADDR == 0.
 	 */
 	if (((addr >= base_addr) && (addr < (base_addr + size))) ||
-	    ((addr == NULL) && PCIE_CHECK_VALID_BDF(bdf)))
+	    ((addr == 0) && PCIE_CHECK_VALID_BDF(bdf)))
 		status = DDI_FM_NONFATAL;
 
 	return (status);

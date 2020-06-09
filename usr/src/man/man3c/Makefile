@@ -62,6 +62,7 @@ MANFILES=	__fbufsize.3c					\
 		bstring.3c					\
 		btowc.3c					\
 		byteorder.3c					\
+		c16rtomb.3c					\
 		call_once.3c					\
 		catgets.3c					\
 		catopen.3c					\
@@ -241,7 +242,7 @@ MANFILES=	__fbufsize.3c					\
 		malloc.3c					\
 		mblen.3c					\
 		mbrlen.3c					\
-		mbrtowc.3c					\
+		mbrtoc16.3c					\
 		mbsinit.3c					\
 		mbsrtowcs.3c					\
 		mbstowcs.3c					\
@@ -543,7 +544,6 @@ MANFILES=	__fbufsize.3c					\
 		waitpid.3c					\
 		walkcontext.3c					\
 		wcpcpy.3c					\
-		wcrtomb.3c					\
 		wcscasecmp.3c					\
 		wcscoll.3c					\
 		wcsdup.3c					\
@@ -729,6 +729,7 @@ MANLINKS=	FD_CLR.3c				\
 		bindtextdomain.3c			\
 		btowc_l.3c				\
 		bzero.3c				\
+		c32rtomb.3c				\
 		calloc.3c				\
 		canonicalize_file_name.3c		\
 		catclose.3c				\
@@ -1006,6 +1007,8 @@ MANLINKS=	FD_CLR.3c				\
 		major.3c				\
 		mblen_l.3c				\
 		mbrlen_l.3c				\
+		mbrtoc32.3c				\
+		mbrtowc.3c				\
 		mbrtowc_l.3c				\
 		mbsinit_l.3c				\
 		mbsnrtowcs.3c				\
@@ -1385,6 +1388,7 @@ MANLINKS=	FD_CLR.3c				\
 		watol.3c				\
 		watoll.3c				\
 		wcpncpy.3c				\
+		wcrtomb.3c				\
 		wcrtomb_l.3c				\
 		wcscasecmp_l.3c				\
 		wcscat.3c				\
@@ -1598,6 +1602,10 @@ htons.3c				:= LINKSRC = byteorder.3c
 ntohl.3c				:= LINKSRC = byteorder.3c
 ntohll.3c				:= LINKSRC = byteorder.3c
 ntohs.3c				:= LINKSRC = byteorder.3c
+
+c32rtomb.3c				:= LINKSRC = c16rtomb.3c
+wcrtomb.3c				:= LINKSRC = c16rtomb.3c
+wcrtomb_l.3c				:= LINKSRC = c16rtomb.3c
 
 canonicalize_file_name.3c		:= LINKSRC = realpath.3c
 
@@ -2012,9 +2020,11 @@ mblen_l.3c				:= LINKSRC = mblen.3c
 
 mbrlen_l.3c				:= LINKSRC = mbrlen.3c
 
-mbrtowc_l.3c				:= LINKSRC = mbrtowc.3c
-
 mbsinit_l.3c				:= LINKSRC = mbsinit.3c
+
+mbrtoc32.3c				:= LINKSRC = mbrtoc16.3c
+mbrtowc.3c				:= LINKSRC = mbrtoc16.3c
+mbrtowc_l.3c				:= LINKSRC = mbrtoc16.3c
 
 mbsnrtowcs.3c				:= LINKSRC = mbsrtowcs.3c
 mbsnrtowcs_l.3c				:= LINKSRC = mbsrtowcs.3c
@@ -2508,8 +2518,6 @@ backtrace_symbols_fd.3c			:= LINKSRC = walkcontext.3c
 printstack.3c				:= LINKSRC = walkcontext.3c
 
 wcpncpy.3c				:= LINKSRC = wcpcpy.3c
-
-wcrtomb_l.3c				:= LINKSRC = wcrtomb.3c
 
 wcscasecmp_l.3c				:= LINKSRC = wcscasecmp.3c
 wcsncasecmp.3c				:= LINKSRC = wcscasecmp.3c

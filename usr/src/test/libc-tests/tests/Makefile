@@ -51,7 +51,8 @@ PROGS = \
 	timespec_get \
 	wcsncasecmp \
 	wcsncasecmp-7344 \
-	wcsncasecmp-7350
+	wcsncasecmp-7350 \
+	uchar
 
 SCRIPTS = \
 	quick_exit \

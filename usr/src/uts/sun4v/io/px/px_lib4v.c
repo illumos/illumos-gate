@@ -1686,7 +1686,7 @@ px_lib_log_safeacc_err(px_t *px_p, ddi_acc_handle_t handle, int fme_flag,
 		}
 	}
 
-	(void) px_rp_en_q(px_p, bdf, addr, NULL);
+	(void) px_rp_en_q(px_p, bdf, addr, 0);
 	(void) px_scan_fabric(px_p, px_p->px_dip, &derr);
 	px_fm_exit(px_p);
 }

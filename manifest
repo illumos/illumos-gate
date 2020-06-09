@@ -4891,6 +4891,7 @@ f usr/include/tnf/writer.h 0644 root bin
 d usr/include/tsol 0755 root bin
 f usr/include/tsol/label.h 0644 root bin
 f usr/include/tzfile.h 0644 root bin
+f usr/include/uchar.h 0644 root bin
 f usr/include/ucontext.h 0644 root bin
 f usr/include/ucred.h 0644 root bin
 f usr/include/uid_stp.h 0644 root bin
@@ -13226,6 +13227,8 @@ f usr/share/man/man3c/btowc.3c 0444 root bin
 s usr/share/man/man3c/btowc_l.3c=btowc.3c
 f usr/share/man/man3c/byteorder.3c 0444 root bin
 s usr/share/man/man3c/bzero.3c=bstring.3c
+f usr/share/man/man3c/c16rtomb.3c 0444 root bin
+s usr/share/man/man3c/c32rtomb.3c=c16rtomb.3c
 f usr/share/man/man3c/call_once.3c 0444 root bin
 s usr/share/man/man3c/calloc.3c=malloc.3c
 s usr/share/man/man3c/canonicalize_file_name.3c=realpath.3c
@@ -13686,8 +13689,10 @@ f usr/share/man/man3c/mblen.3c 0444 root bin
 s usr/share/man/man3c/mblen_l.3c=mblen.3c
 f usr/share/man/man3c/mbrlen.3c 0444 root bin
 s usr/share/man/man3c/mbrlen_l.3c=mbrlen.3c
-f usr/share/man/man3c/mbrtowc.3c 0444 root bin
-s usr/share/man/man3c/mbrtowc_l.3c=mbrtowc.3c
+f usr/share/man/man3c/mbrtoc16.3c 0444 root bin
+s usr/share/man/man3c/mbrtowc.3c==mbrtoc16.3c
+s usr/share/man/man3c/mbrtowc32.3c==mbrtoc16.3c
+s usr/share/man/man3c/mbrtowc_l.3c=mbrtowc16.3c
 f usr/share/man/man3c/mbsinit.3c 0444 root bin
 s usr/share/man/man3c/mbsinit_l.3c=mbsinit.3c
 s usr/share/man/man3c/mbsnrtowcs.3c=mbsrtowcs.3c
@@ -14367,8 +14372,8 @@ s usr/share/man/man3c/watol.3c=wcstol.3c
 s usr/share/man/man3c/watoll.3c=wcstol.3c
 f usr/share/man/man3c/wcpcpy.3c 0444 root bin
 s usr/share/man/man3c/wcpncpy.3c=wcpcpy.3c
-f usr/share/man/man3c/wcrtomb.3c 0444 root bin
-s usr/share/man/man3c/wcrtomb_l.3c=wcrtomb.3c
+s usr/share/man/man3c/wcrtomb.3c=c16rtomb.3c
+s usr/share/man/man3c/wcrtomb_l.3c=c16rtomb.3c
 f usr/share/man/man3c/wcscasecmp.3c 0444 root bin
 s usr/share/man/man3c/wcscasecmp_l.3c=wcscasecmp.3c
 s usr/share/man/man3c/wcscat.3c=wcstring.3c
@@ -16059,6 +16064,7 @@ s usr/share/man/man3head/types.3head=types.h.3head
 f usr/share/man/man3head/types.h.3head 0444 root bin
 s usr/share/man/man3head/types32.3head=types32.h.3head
 f usr/share/man/man3head/types32.h.3head 0444 root bin
+f usr/share/man/man3head/uchar.h.3head 0444 root bin
 s usr/share/man/man3head/ucontext.3head=ucontext.h.3head
 f usr/share/man/man3head/ucontext.h.3head 0444 root bin
 s usr/share/man/man3head/uio.3head=uio.h.3head

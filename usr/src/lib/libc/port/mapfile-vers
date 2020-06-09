@@ -78,6 +78,14 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.33 {
+    protected:
+	c16rtomb;
+	c32rtomb;
+	mbrtoc16;
+	mbrtoc32;
+} ILLUMOS_0.32;
+
 SYMBOL_VERSION ILLUMOS_0.32 {
     protected:
 	fmemopen;

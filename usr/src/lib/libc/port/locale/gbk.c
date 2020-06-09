@@ -55,10 +55,6 @@ static size_t	_GBK_wcsnrtombs(char *_RESTRICT_KYWD,
 		    const wchar_t **_RESTRICT_KYWD, size_t, size_t,
 		    mbstate_t *_RESTRICT_KYWD);
 
-typedef struct {
-	wchar_t	ch;
-} _GBKState;
-
 void
 _GBK_init(struct lc_ctype *lct)
 {

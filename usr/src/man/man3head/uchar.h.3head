@@ -1,0 +1,95 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 Robert Mustacchi
+.\"
+.Dd April 22, 2020
+.Dt UCHAR.H 3HEAD
+.Os
+.Sh NAME
+.Nm uchar.h
+.Nd unicode utilities header
+.Sh SYNOPSIS
+.In uchar.h
+.Sh DESCRIPTION
+The
+.In uchar.h
+header provides support for the C11 Unicode utilities.
+The types and functions provide means for working with data encoded as
+UTF-16 and UTF-32.
+When working in non-Unicode locales, these types may not represent
+Unicode code points.
+.Pp
+The
+.In uchar.h
+header defines the following types:
+.Bl -tag -width Vt
+.It Vt char16_t
+An unsigned integer that can represent 16-bit characters, generally a
+single single UTF-16 code unit.
+A Unicode code point may be one or two UTF-16 code units due to
+surrogate pairs.
+.It Vt char32_t
+An unsigned integer that can represent 32-bit characters, generally a
+single UTF-32 code unit.
+.It Vt size_t
+An unsigned integer that represents the size of various objects.
+This can hold the result of the
+.Sy sizeof
+operator.
+See also
+.Xr stddef.h 3HEAD .
+.It Vt mbstate_t
+An object that holds the state for converting between character
+sequences and wide characters
+.Po
+.Vt wchar_t ,
+.Vt char16_t ,
+.Vt char32_t
+.Pc .
+See also,
+.Xr wchar.h 3HEAD .
+.El
+The
+.In uchar.h
+header also defines the following functions which are used to convert
+between
+.Vt char16_t
+and
+.Vt char32_t
+sequences and other character sequences:
+.Bl -tag -width cr16rtomb
+.It Xr c16rtomb 3C
+Convert
+.Vt char16_t
+sequences to multi-byte character sequences.
+.It Xr c32rtomb 3C
+Convert
+.Vt char32_t
+sequences to multi-byte character sequences.
+.It Xr mbrtoc16 3C
+Convert multi-byte character sequences to
+.Vt char16_t
+sequences.
+.It Xr mbrtoc32 3C
+Convert multi-byte character sequences to
+.Vt char32_t
+sequences.
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr c16rtomb 3C ,
+.Xr c32rtomb 3C ,
+.Xr mbrtoc16 3C ,
+.Xr mbrtoc32 3C ,
+.Xr stddef.h 3HEAD ,
+.Xr wchar.h 3HEAD
