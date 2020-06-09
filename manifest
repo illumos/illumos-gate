@@ -13690,6 +13690,7 @@ s usr/share/man/man3c/mblen_l.3c=mblen.3c
 f usr/share/man/man3c/mbrlen.3c 0444 root bin
 s usr/share/man/man3c/mbrlen_l.3c=mbrlen.3c
 f usr/share/man/man3c/mbrtoc16.3c 0444 root bin
+s usr/share/man/man3c/mbrtoc32.3c=mbrtoc16.3c
 s usr/share/man/man3c/mbrtowc.3c=mbrtoc16.3c
 s usr/share/man/man3c/mbrtowc32.3c=mbrtoc16.3c
 s usr/share/man/man3c/mbrtowc_l.3c=mbrtowc16.3c
