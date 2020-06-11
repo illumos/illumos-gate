@@ -22,7 +22,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -132,11 +131,8 @@ display_cpu_devices(Sys_tree *tree)
 	    "------  ----\n", 0);
 
 	/* Now display all of the cpus on each board */
-	bnode = tree->bd_list;
-	while (bnode != NULL) {
+	for (bnode = tree->bd_list; bnode != NULL; bnode = bnode->next)
 		display_cpus(bnode);
-	bnode = bnode->next;
-	}
 
 	log_printf("\n", 0);
 }

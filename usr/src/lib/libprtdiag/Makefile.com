@@ -37,6 +37,7 @@ VERS		= .1
 include $(SRC)/lib/Makefile.lib
 include $(SRC)/Makefile.psm
 
+CSTD		= $(CSTD_GNU99)
 LIBS		= $(DYNLIB)
 IFLAGS		= -I ../../inc -I $(USR_PSM_INCL_DIR)
 IFLAGS		+= -I $(SRC)/cmd/picl/plugins/inc

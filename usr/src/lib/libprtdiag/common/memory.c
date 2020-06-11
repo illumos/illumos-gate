@@ -85,7 +85,7 @@ static memory_seg_t *match_seg(uint64_t);
 /*ARGSUSED0*/
 void
 display_memorysize(Sys_tree *tree, struct system_kstat_data *kstats,
-	struct mem_total *memory_total)
+    struct mem_total *memory_total)
 {
 	log_printf(dgettext(TEXT_DOMAIN, "Memory size: "), 0);
 
@@ -96,14 +96,14 @@ display_memorysize(Sys_tree *tree, struct system_kstat_data *kstats,
 
 		mem_size =
 		    (uint64_t)sysconf(_SC_PAGESIZE) * \
-			(uint64_t)sysconf(_SC_PHYS_PAGES);
+		    (uint64_t)sysconf(_SC_PHYS_PAGES);
 
 		if (mem_size >= MBYTE)
 			log_printf(dgettext(TEXT_DOMAIN, "%d Megabytes\n"),
-				(int)((mem_size+MBYTE-1) / MBYTE), 0);
+			    (int)((mem_size+MBYTE-1) / MBYTE), 0);
 		else
 			log_printf(dgettext(TEXT_DOMAIN, "%d Kilobytes\n"),
-				(int)((mem_size+KBYTE-1) / KBYTE), 0);
+			    (int)((mem_size+KBYTE-1) / KBYTE), 0);
 	}
 }
 
@@ -135,15 +135,15 @@ get_us3_mem_regs(Board_node *bnode)
 	int		i, status_offset;
 
 	for (pnode = dev_find_node(bnode->nodes, "memory-controller");
-		pnode != NULL;
-		pnode = dev_next_node(pnode, "memory-controller")) {
+	    pnode != NULL;
+	    pnode = dev_next_node(pnode, "memory-controller")) {
 
 		/* Get portid of this mc from libdevinfo. */
 		portid = (*(int *)get_prop_val(find_prop(pnode, "portid")));
 
 		/* read the logical_bank_ma_regs property for this mc node. */
 		ma_reg_arr = (uint64_t *)get_prop_val(
-				find_prop(pnode, MEM_CFG_PROP_NAME));
+		    find_prop(pnode, MEM_CFG_PROP_NAME));
 
 		/*
 		 * There are situations where a memory-controller node
@@ -176,7 +176,7 @@ get_us3_mem_regs(Board_node *bnode)
 		 * OBP. This contains the bank-status for each logical bank.
 		 */
 		bank_status_array = (void *)get_prop_val(
-				find_prop(pnode, "bank-status"));
+		    find_prop(pnode, "bank-status"));
 		status_offset = 0;
 
 		/*
@@ -196,8 +196,7 @@ get_us3_mem_regs(Board_node *bnode)
 				/* Move offset to next bank_status string */
 				status_offset += (strlen(bank_status) + 1);
 			} else {
-				bank_status = malloc(strlen("no_status"));
-				strcpy(bank_status, "no_status");
+				bank_status = strdup("no_status");
 			}
 
 			/*
@@ -292,10 +291,10 @@ display_us3_banks(void)
 		 * See section 9.1.5 of Cheetah Programmer's reference
 		 * manual.
 		 */
-		intlv 		= ((bank->lk ^ 0xF) + 1);
-		base 		= bank->um & ~(bank->uk);
+		intlv = ((bank->lk ^ 0xF) + 1);
+		base = bank->um & ~(bank->uk);
 
-		mcid 		= SG_PORTID_TO_SAFARI_ID(bank->portid);
+		mcid = SG_PORTID_TO_SAFARI_ID(bank->portid);
 
 		/* If bank is not valid, set size to zero incase it's garbage */
 		if (bank->valid)
@@ -412,13 +411,13 @@ display_us3_banks(void)
 	 * we find here. Scream if there is a mis-match.
 	 */
 	total_sys_mem = (((uint64_t)sysconf(_SC_PAGESIZE) * \
-		(uint64_t)sysconf(_SC_PHYS_PAGES)) / MBYTE);
+	    (uint64_t)sysconf(_SC_PHYS_PAGES)) / MBYTE);
 
 	if (total_bank_size != total_sys_mem) {
 		log_printf(dgettext(TEXT_DOMAIN,
 		    "\nError: total bank size [%lldMB] does not match total "
-			"system memory [%lldMB]\n"), total_bank_size,
-				total_sys_mem, 0);
+		    "system memory [%lldMB]\n"), total_bank_size,
+		    total_sys_mem, 0);
 	}
 
 }
