@@ -74,8 +74,7 @@ get_tag_size(fru_tagtype_t tag)
 }
 
 int
-mk_tag(fru_tagtype_t type, uint32_t dense, size_t pl_len,
-	fru_tag_t *tag)
+mk_tag(fru_tagtype_t type, uint32_t dense, size_t pl_len, fru_tag_t *tag)
 {
 	static fru_tag_t max = { 0xFFFFFFFFFFFFFFFFULL };
 	/* make sure the tag is clear. */
@@ -215,9 +214,9 @@ get_tag_type(fru_tag_t *tag)
 		return (FRU_F);
 	else if (tag->g.type == FRU_G_ID)
 		return (FRU_G);
-	else
-		errno = EINVAL;
-		return (-1);
+
+	errno = EINVAL;
+	return (-1);
 }
 #endif  /* _LITTLE_ENDIAN */
 
