@@ -93,8 +93,6 @@ int	__lintzero;		/* Alway zero for shutting up lint */
 pfn_t	physmax;
 pgcnt_t	physinstalled;
 
-struct var v;
-
 #include <sys/systm.h>
 #include <sys/conf.h>
 #include <sys/kmem.h>
