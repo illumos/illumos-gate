@@ -21,6 +21,9 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ *
  */
 
 /*
@@ -43,13 +46,13 @@ extern int pci_boot_debug;
 void
 memlist_dump(struct memlist *listp)
 {
-	dprintf("memlist 0x%p content", (void *)listp);
+	dprintf("memlist 0x%p content: ", (void *)listp);
 	while (listp) {
-		dprintf("(0x%x%x, 0x%x%x)",
-		    (int)(listp->ml_address >> 32), (int)listp->ml_address,
-		    (int)(listp->ml_size >> 32), (int)listp->ml_size);
+		dprintf("(0x%lx, 0x%lx) ",
+		    listp->ml_address, listp->ml_size);
 		listp = listp->ml_next;
 	}
+	dprintf("\n");
 }
 
 struct memlist *

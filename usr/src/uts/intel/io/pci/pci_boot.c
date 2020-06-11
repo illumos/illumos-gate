@@ -22,6 +22,131 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ */
+
+/*
+ * PCI bus enumeration and device programming are done in several passes. The
+ * following is a high level overview of this process.
+ *
+ * pci_enumerate(reprogram=0)
+ *				The main entry point to PCI bus enumeration is
+ *				pci_enumerate(). This function is invoked
+ *				twice, once to set up the PCI portion of the
+ *				device tree, and then a second time to
+ *				reprogram any devices which were not set up by
+ *				the system firmware. On this first call, the
+ *				reprogram parameter is set to 0.
+ *   add_pci_fixes()
+ *	enumerate_bus_devs(CONFIG_FIX)
+ *	    <foreach bus>
+ *	        process_devfunc(CONFIG_FIX)
+ *				Some devices need a specific action taking in
+ *				order for subsequent enumeration to be
+ *				successful. add_pci_fixes() retrieves the
+ *				vendor and device IDs for each item on the bus
+ *				and applies fixes as required. It also creates
+ *				a list which is used by undo_pci_fixes() to
+ *				reverse the process later.
+ *   pci_setup_tree()
+ *	enumerate_bus_devs(CONFIG_INFO)
+ *	    <foreach bus>
+ *	        process_devfunc(CONFIG_INFO)
+ *	            <set up most device properties>
+ *				The next stage is to enumerate the bus and set
+ *				up the bulk of the properties for each device.
+ *				This is where the generic properties such as
+ *				'device-id' are created.
+ *		    <if PPB device>
+ *			add_ppb_props()
+ *				For a PCI-to-PCI bridge (ppb) device, any
+ *				memory ranges for IO, memory or pre-fetchable
+ *				memory that have been programmed by the system
+ *				firmware (BIOS/EFI) are retrieved and stored in
+ *				bus-specific lists (pci_bus_res[bus].io_avail,
+ *				mem_avail and pmem_avail). The contents of
+ *				these lists are used to set the initial 'ranges'
+ *				property on the ppb device. Later, as children
+ *				are found for this bridge, resources will be
+ *				removed from these avail lists as necessary.
+ *				This is an initial pass so the ppb devices can
+ *				still be reprogrammed later in fix_ppb_res().
+ *		    <else>
+ *			<add to list of non-PPB devices for the bus>
+ *				Any non-PPB device on the bus is recorded in a
+ *				bus-specific list, to be set up (and possibly
+ *				reprogrammed) later.
+ *		    add_reg_props(CONFIG_INFO)
+ *				The final step in this phase is to add the
+ *				initial 'reg' and 'assigned-addresses'
+ *				properties to all devices. At the same time,
+ *				any IO or memory ranges which have been
+ *				assigned to the bus are moved from the avail
+ *				list to the corresponding used one. If no
+ *				resources have been assigned to a device at
+ *				this stage, then it is flagged for subsequent
+ *				reprogramming.
+ *     undo_pci_fixes()
+ *				Any fixes which were applied in add_pci_fixes()
+ *				are now undone before returning, using the
+ *				undo list which was created earier.
+ *
+ * pci_enumerate(reprogram=1)
+ *				The second bus enumeration pass is to take care
+ *				of any devices that were not set up by the
+ *				system firmware. These devices were flagged
+ *				during the first pass. This pass is bracketed
+ *				by the same pci fix application and removal as
+ *				the first.
+ *   add_pci_fixes()
+ *				As for first pass.
+ *   pci_reprogram()
+ *	pci_scan_bbn()
+ *				The ACPI namespace is scanned for top-level
+ *				instances of _BBN in order to enumerate the
+ *				root-bridges in the system. If a root bridge is
+ *				found that has not been previously discovered
+ *				(existence inferred through its children) then
+ *				it is added to the system.
+ *	<foreach ROOT bus>
+ *	    populate_bus_res()
+ *				Find resources associated with this root bus
+ *				from either ACPI or BIOS tables. See
+ *				find_bus_res() in pci_resource.c
+ *	<foreach bus>
+ *	    fix_ppb_res()
+ *				Reprogram pci(e) bridges which have not already
+ *				had resources assigned, or which are under a
+ *				bus that has been flagged for reprogramming.
+ *				If the parent bus has not been flagged, then IO
+ *				space is reprogrammed only if there are no
+ *				assigned IO resources. Memory space is
+ *				reprogrammed only if there is both no assigned
+ *				ordinary memory AND no assigned pre-fetchable
+ *				memory. However, if memory reprogramming is
+ *				necessary then both ordinary and prefetch are
+ *				done together so that both memory ranges end up
+ *				in the avail lists for add_reg_props() to find
+ *				later.
+ *	    enumerate_bus_devs(CONFIG_NEW)
+ *		<foreach non-PPB device on the bus>
+ *		    add_reg_props(CONFIG_NEW)
+ *				Using the list of non-PPB devices on the bus
+ *				which was assembled during the first pass, add
+ *				or update the 'reg' and 'assigned-address'
+ *				properties for these devices. For devices which
+ *				have been flagged for reprogramming or have no
+ *				assigned resources, this is where resources are
+ *				finally assigned and programmed into the
+ *				device. This can result in these properties
+ *				changing from their previous values.
+ *	<foreach bus>
+ *	    add_bus_available_prop()
+ *				Finally, the 'available' properties is set on
+ *				each device, representing that device's final
+ *				unallocated (available) IO and memory ranges.
+ *   undo_pci_fixes()
+ *				As for first pass.
  */
 
 #include <sys/types.h>
@@ -54,7 +179,12 @@
 #define	pci_putb	(*pci_putb_func)
 #define	pci_putw	(*pci_putw_func)
 #define	pci_putl	(*pci_putl_func)
-#define	dcmn_err	if (pci_boot_debug) cmn_err
+#define	dcmn_err	if (pci_boot_debug != 0) cmn_err
+#define	bus_debug(bus)	(pci_boot_debug != 0 && pci_debug_bus_start != -1 && \
+	    pci_debug_bus_end != -1 && (bus) >= pci_debug_bus_start && \
+	    (bus) <= pci_debug_bus_end)
+#define	dump_memlists(tag, bus) \
+	if (bus_debug((bus))) dump_memlists_impl((tag), (bus))
 
 #define	CONFIG_INFO	0
 #define	CONFIG_UPDATE	1
@@ -79,6 +209,15 @@ enum io_mem {
 	IO,
 	MEM
 };
+
+/* for get_parbus_res */
+
+enum parbus_mem {
+	PB_IO,
+	PB_MEM,
+	PB_PMEM
+};
+
 
 /* See AMD-8111 Datasheet Rev 3.03, Page 149: */
 #define	LPC_IO_CONTROL_REG_1	0x40
@@ -106,6 +245,8 @@ extern int pseudo_isa;
 extern int pci_bios_maxbus;
 static uchar_t max_dev_pci = 32;	/* PCI standard */
 int pci_boot_debug = 0;
+int pci_debug_bus_start = -1;
+int pci_debug_bus_end = -1;
 extern struct memlist *find_bus_res(int, int);
 static struct pci_fixundo *undolist = NULL;
 static int num_root_bus = 0;	/* count of root buses */
@@ -185,6 +326,35 @@ typedef struct {
 nvf_handle_t	puafd_handle;
 int		pua_cache_valid = 0;
 
+static void
+dump_memlists_impl(const char *tag, int bus)
+{
+	printf("Memlist dump at %s - bus %x\n", tag, bus);
+	if (pci_bus_res[bus].io_used != NULL) {
+		printf("    io_used ");
+		memlist_dump(pci_bus_res[bus].io_used);
+	}
+	if (pci_bus_res[bus].io_avail != NULL) {
+		printf("    io_avail ");
+		memlist_dump(pci_bus_res[bus].io_avail);
+	}
+	if (pci_bus_res[bus].mem_used != NULL) {
+		printf("    mem_used ");
+		memlist_dump(pci_bus_res[bus].mem_used);
+	}
+	if (pci_bus_res[bus].mem_avail != NULL) {
+		printf("    mem_avail ");
+		memlist_dump(pci_bus_res[bus].mem_avail);
+	}
+	if (pci_bus_res[bus].pmem_used != NULL) {
+		printf("    pmem_used ");
+		memlist_dump(pci_bus_res[bus].pmem_used);
+	}
+	if (pci_bus_res[bus].pmem_avail != NULL) {
+		printf("    pmem_avail ");
+		memlist_dump(pci_bus_res[bus].pmem_avail);
+	}
+}
 
 /*ARGSUSED*/
 static ACPI_STATUS
@@ -230,7 +400,7 @@ pci_process_acpi_device(ACPI_HANDLE hdl, UINT32 level, void *ctx, void **rv)
 		 */
 		if ((busnum < 0) || (busnum > pci_bios_maxbus)) {
 			dcmn_err(CE_NOTE,
-			    "pci_process_acpi_device: invalid _BBN 0x%x\n",
+			    "pci_process_acpi_device: invalid _BBN 0x%x",
 			    busnum);
 			return (AE_CTRL_DEPTH);
 		}
@@ -718,33 +888,55 @@ setup_bus_res(int bus)
 	(void) memlist_remove(&pci_bus_res[bus].bus_avail, bus, 1);
 }
 
+/*
+ * Allocate a resource from the parent bus
+ */
 static uint64_t
-get_parbus_io_res(uchar_t parbus, uchar_t bus, uint64_t size, uint64_t align)
+get_parbus_res(uchar_t parbus, uchar_t bus, uint64_t size, uint64_t align,
+    enum parbus_mem mem)
 {
 	uint64_t addr = 0;
 	uchar_t res_bus;
 
 	/*
 	 * Skip root(peer) buses in multiple-root-bus systems when
-	 * ACPI resource discovery was not successfully done.
+	 * ACPI resource discovery was not successfully done; the
+	 * initial resources set on each root bus might not be correctly
+	 * accounted for in this case.
 	 */
 	if ((pci_bus_res[parbus].par_bus == (uchar_t)-1) &&
-	    (num_root_bus > 1) && (acpi_resource_discovery <= 0))
+	    (num_root_bus > 1) && (acpi_resource_discovery <= 0)) {
 		return (0);
-
-	res_bus = parbus;
-	while (pci_bus_res[res_bus].subtractive) {
-		if (pci_bus_res[res_bus].io_avail)
-			break;
-		res_bus = pci_bus_res[res_bus].par_bus;
-		if (res_bus == (uchar_t)-1)
-			break; /* root bus already */
 	}
 
-	if (pci_bus_res[res_bus].io_avail) {
+	/*
+	 * Set res_bus to the bus from which resources should be allocated.
+	 * A device under a subtractive PPB can allocate resources from its
+	 * parent bus if there are no resources available on its own bus, so
+	 * iterate up the chain until resources are found or the root is
+	 * reached.
+	 */
+	res_bus = parbus;
+	while (pci_bus_res[res_bus].subtractive) {
+		if (mem == PB_IO && pci_bus_res[res_bus].io_avail != NULL)
+			break;
+		if (mem == PB_MEM && pci_bus_res[res_bus].mem_avail != NULL)
+			break;
+		if (mem == PB_PMEM && pci_bus_res[res_bus].pmem_avail != NULL)
+			break;
+		res_bus = pci_bus_res[res_bus].par_bus;
+		/* Has the root bus been reached? */
+		if (res_bus == (uchar_t)-1)
+			break;
+	}
+
+	switch (mem) {
+	case PB_IO:
+		if (pci_bus_res[res_bus].io_avail == NULL)
+			break;
 		addr = memlist_find(&pci_bus_res[res_bus].io_avail,
 		    size, align);
-		if (addr) {
+		if (addr > 0) {
 			memlist_insert(&pci_bus_res[res_bus].io_used,
 			    addr, size);
 
@@ -755,38 +947,13 @@ get_parbus_io_res(uchar_t parbus, uchar_t bus, uint64_t size, uint64_t align)
 			/* add the new resource */
 			memlist_insert(&pci_bus_res[bus].io_avail, addr, size);
 		}
-	}
-
-	return (addr);
-}
-
-static uint64_t
-get_parbus_mem_res(uchar_t parbus, uchar_t bus, uint64_t size, uint64_t align)
-{
-	uint64_t addr = 0;
-	uchar_t res_bus;
-
-	/*
-	 * Skip root(peer) buses in multiple-root-bus systems when
-	 * ACPI resource discovery was not successfully done.
-	 */
-	if ((pci_bus_res[parbus].par_bus == (uchar_t)-1) &&
-	    (num_root_bus > 1) && (acpi_resource_discovery <= 0))
-		return (0);
-
-	res_bus = parbus;
-	while (pci_bus_res[res_bus].subtractive) {
-		if (pci_bus_res[res_bus].mem_avail)
+		break;
+	case PB_MEM:
+		if (pci_bus_res[res_bus].mem_avail == NULL)
 			break;
-		res_bus = pci_bus_res[res_bus].par_bus;
-		if (res_bus == (uchar_t)-1)
-			break; /* root bus already */
-	}
-
-	if (pci_bus_res[res_bus].mem_avail) {
 		addr = memlist_find(&pci_bus_res[res_bus].mem_avail,
 		    size, align);
-		if (addr) {
+		if (addr > 0) {
 			memlist_insert(&pci_bus_res[res_bus].mem_used,
 			    addr, size);
 			(void) memlist_remove(&pci_bus_res[res_bus].pmem_avail,
@@ -799,6 +966,27 @@ get_parbus_mem_res(uchar_t parbus, uchar_t bus, uint64_t size, uint64_t align)
 			/* add the new resource */
 			memlist_insert(&pci_bus_res[bus].mem_avail, addr, size);
 		}
+		break;
+	case PB_PMEM:
+		if (pci_bus_res[res_bus].pmem_avail == NULL)
+			break;
+		addr = memlist_find(&pci_bus_res[res_bus].pmem_avail,
+		    size, align);
+		if (addr > 0) {
+			memlist_insert(&pci_bus_res[res_bus].pmem_used,
+			    addr, size);
+			(void) memlist_remove(&pci_bus_res[res_bus].mem_avail,
+			    addr, size);
+
+			/* free the old resource */
+			memlist_free_all(&pci_bus_res[bus].pmem_avail);
+			memlist_free_all(&pci_bus_res[bus].pmem_used);
+
+			/* add the new resource */
+			memlist_insert(&pci_bus_res[bus].pmem_avail,
+			    addr, size);
+		}
+		break;
 	}
 
 	return (addr);
@@ -842,33 +1030,54 @@ get_pci_cap(uchar_t bus, uchar_t dev, uchar_t func, uint8_t cap_id)
  * Does this resource element live in the legacy VGA range?
  */
 
-int
+static boolean_t
 is_vga(struct memlist *elem, enum io_mem io)
 {
-
 	if (io == IO) {
 		if ((elem->ml_address == 0x3b0 && elem->ml_size == 0xc) ||
 		    (elem->ml_address == 0x3c0 && elem->ml_size == 0x20))
-			return (1);
+			return (B_TRUE);
 	} else {
 		if (elem->ml_address == 0xa0000 && elem->ml_size == 0x20000)
-			return (1);
+			return (B_TRUE);
 	}
-	return (0);
+	return (B_FALSE);
 }
 
 /*
  * Does this entire resource list consist only of legacy VGA resources?
  */
 
-int
+static boolean_t
 list_is_vga_only(struct memlist *l, enum io_mem io)
 {
 	do {
 		if (!is_vga(l, io))
-			return (0);
+			return (B_FALSE);
 	} while ((l = l->ml_next) != NULL);
-	return (1);
+	return (B_TRUE);
+}
+
+/*
+ * Find the start and end addresses that cover the range for all list entries,
+ * excluding legacy VGA addresses. Relies on the list being sorted.
+ */
+static void
+pci_memlist_range(struct memlist *list, enum io_mem iomem, uint64_t *basep,
+    uint64_t *limitp)
+{
+	*limitp = *basep = 0;
+
+	for (; list != NULL; list = list->ml_next) {
+		if (is_vga(list, iomem))
+			continue;
+
+		if (*basep == 0)
+			*basep = list->ml_address;
+
+		if (list->ml_address + list->ml_size >= *limitp)
+			*limitp = list->ml_address + list->ml_size - 1;
+	}
 }
 
 /*
@@ -876,7 +1085,7 @@ list_is_vga_only(struct memlist *l, enum io_mem io)
  * to reprogram the bridge when its
  *		i)   SECBUS == SUBBUS	||
  *		ii)  IOBASE > IOLIM	||
- *		iii) MEMBASE > MEMLIM
+ *		iii) MEMBASE > MEMLIM && PMEMBASE > PMEMLIM
  * This must be done after one full pass through the PCI tree to collect
  * all BIOS-configured resources, so that we know what resources are
  * free and available to assign to the unconfigured PPBs.
@@ -889,13 +1098,15 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 	uint_t io_base, io_limit, mem_base;
 	uint_t io_size, io_align;
 	uint64_t mem_size, mem_align, mem_limit;
+	uint64_t pmem_size, pmem_base, pmem_limit;
 	uint64_t addr = 0;
 	int *regp = NULL;
-	uint_t reglen;
+	uint_t val, reglen;
 	int rv, cap_ptr, physhi;
 	dev_info_t *dip;
 	uint16_t cmd_reg;
-	struct memlist *list, *scratch_list;
+	struct memlist *scratch_list;
+	boolean_t reprogram_mem;
 
 	/* skip root (peer) PCI busses */
 	if (pci_bus_res[secbus].par_bus == (uchar_t)-1)
@@ -921,6 +1132,9 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 	dev = (uchar_t)PCI_REG_DEV_G(physhi);
 	bus = (uchar_t)PCI_REG_BUS_G(physhi);
 
+	dump_memlists("fix_ppb_res start bus", bus);
+	dump_memlists("fix_ppb_res start secbus", secbus);
+
 	/*
 	 * If pcie bridge, check to see if link is enabled
 	 */
@@ -930,7 +1144,7 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 		    (uint16_t)cap_ptr + PCIE_LINKCTL);
 		if (cmd_reg & PCIE_LINKCTL_LINK_DISABLE) {
 			dcmn_err(CE_NOTE,
-			    "!fix_ppb_res: ppb[%x/%x/%x] link is disabled.\n",
+			    "!fix_ppb_res: ppb[%x/%x/%x] link is disabled.",
 			    bus, dev, func);
 			return;
 		}
@@ -970,7 +1184,7 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 			add_bus_range_prop(secbus);
 
 			cmn_err(CE_NOTE, "!reprogram bus-range on ppb"
-			    "[%x/%x/%x]: %x ~ %x\n", bus, dev, func,
+			    "[%x/%x/%x]: %x ~ %x", bus, dev, func,
 			    secbus, subbus);
 		}
 	}
@@ -1035,8 +1249,8 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 		 * Add an arbitrary I/O resource to the subtractive PPB
 		 */
 		if (pci_bus_res[secbus].io_avail == NULL) {
-			addr = get_parbus_io_res(parbus, secbus, io_size,
-			    io_align);
+			addr = get_parbus_res(parbus, secbus, io_size,
+			    io_align, PB_IO);
 			if (addr) {
 				add_ranges_prop(secbus, 1);
 				pci_bus_res[secbus].io_reprogram =
@@ -1044,7 +1258,7 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 
 				cmn_err(CE_NOTE, "!add io-range on subtractive"
 				    " ppb[%x/%x/%x]: "
-				    "0x%"PRIx64" ~ 0x%"PRIx64"\n",
+				    "0x%"PRIx64" ~ 0x%"PRIx64"",
 				    bus, dev, func, addr, addr + io_size - 1);
 			}
 		}
@@ -1052,8 +1266,8 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 		 * Add an arbitrary memory resource to the subtractive PPB
 		 */
 		if (pci_bus_res[secbus].mem_avail == NULL) {
-			addr = get_parbus_mem_res(parbus, secbus, mem_size,
-			    mem_align);
+			addr = get_parbus_res(parbus, secbus, mem_size,
+			    mem_align, PB_MEM);
 			if (addr) {
 				add_ranges_prop(secbus, 1);
 				pci_bus_res[secbus].mem_reprogram =
@@ -1061,7 +1275,7 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 
 				cmn_err(CE_NOTE, "!add mem-range on "
 				    "subtractive ppb[%x/%x/%x]: "
-				    "0x%"PRIx64" ~ 0x%"PRIx64"\n",
+				    "0x%"PRIx64" ~ 0x%"PRIx64"",
 				    bus, dev, func,
 				    addr, addr + mem_size - 1);
 			}
@@ -1075,11 +1289,11 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 	 * parent bus needed reprogramming and so do we, or because I/O space is
 	 * disabled in base/limit or command register.
 	 */
-	io_base = pci_getb(bus, dev, func, PCI_BCNF_IO_BASE_LOW);
+	val = io_base = pci_getb(bus, dev, func, PCI_BCNF_IO_BASE_LOW);
 	io_limit = pci_getb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW);
 	io_base = (io_base & PCI_BCNF_IO_MASK) << PCI_BCNF_IO_SHIFT;
 	io_limit = ((io_limit & PCI_BCNF_IO_MASK) << PCI_BCNF_IO_SHIFT) | 0xfff;
-	if ((io_base & PCI_BCNF_ADDR_MASK) == PCI_BCNF_IO_32BIT) {
+	if ((val & PCI_BCNF_ADDR_MASK) == PCI_BCNF_IO_32BIT) {
 		uint16_t io_base_hi, io_limit_hi;
 		io_base_hi = pci_getw(bus, dev, func, PCI_BCNF_IO_BASE_HI);
 		io_limit_hi = pci_getw(bus, dev, func, PCI_BCNF_IO_LIMIT_HI);
@@ -1096,35 +1310,26 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 	    (io_base > io_limit) ||
 	    (!(cmd_reg & PCI_COMM_IO))) &&
 	    !list_is_vga_only(scratch_list, IO)) {
+
 		if (pci_bus_res[secbus].io_used) {
 			memlist_subsume(&pci_bus_res[secbus].io_used,
 			    &pci_bus_res[secbus].io_avail);
 		}
+
 		if (pci_bus_res[secbus].io_avail &&
-		    (!pci_bus_res[parbus].io_reprogram) &&
-		    (!pci_bus_res[parbus].subtractive)) {
-			/* rechoose old io ports info */
-			list = pci_bus_res[secbus].io_avail;
-			io_base = 0;
-			do {
-				if (is_vga(list, IO))
-					continue;
-				if (!io_base) {
-					io_base = (uint_t)list->ml_address;
-					io_limit = (uint_t)list->ml_address +
-					    list->ml_size - 1;
-					io_base =
-					    P2ALIGN(io_base, PPB_IO_ALIGNMENT);
-				} else {
-					if (list->ml_address + list->ml_size >
-					    io_limit) {
-						io_limit = (uint_t)
-						    (list->ml_address +
-						    list->ml_size - 1);
-					}
-				}
-			} while ((list = list->ml_next) != NULL);
+		    !pci_bus_res[parbus].io_reprogram &&
+		    !pci_bus_res[parbus].subtractive) {
+			/* re-choose old io ports info */
+
+			uint64_t base, limit;
+
+			pci_memlist_range(pci_bus_res[secbus].io_avail,
+			    IO, &base, &limit);
+			io_base = (uint_t)base;
+			io_limit = (uint_t)limit;
+
 			/* 4K aligned */
+			io_base = P2ALIGN(base, PPB_IO_ALIGNMENT);
 			io_limit = P2ROUNDUP(io_limit, PPB_IO_ALIGNMENT) - 1;
 			io_size = io_limit - io_base + 1;
 			ASSERT(io_base <= io_limit);
@@ -1138,8 +1343,8 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 			pci_bus_res[secbus].io_reprogram = B_TRUE;
 		} else {
 			/* get new io ports from parent bus */
-			addr = get_parbus_io_res(parbus, secbus, io_size,
-			    io_align);
+			addr = get_parbus_res(parbus, secbus, io_size,
+			    io_align, PB_IO);
 			if (addr) {
 				io_base = addr;
 				io_limit = addr + io_size - 1;
@@ -1157,7 +1362,7 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 			add_ranges_prop(secbus, 1);
 
 			cmn_err(CE_NOTE, "!reprogram io-range on"
-			    " ppb[%x/%x/%x]: 0x%x ~ 0x%x\n",
+			    " ppb[%x/%x/%x]: 0x%x ~ 0x%x",
 			    bus, dev, func, io_base, io_limit);
 		}
 	}
@@ -1166,46 +1371,76 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 	/*
 	 * Check memory space as we did I/O space.
 	 */
+
 	mem_base = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_MEM_BASE);
-	mem_base = (mem_base & 0xfff0) << 16;
+	mem_base = (mem_base & PCI_BCNF_MEM_MASK) << PCI_BCNF_MEM_SHIFT;
 	mem_limit = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_MEM_LIMIT);
-	mem_limit = ((mem_limit & 0xfff0) << 16) | 0xfffff;
+	mem_limit = ((mem_limit & PCI_BCNF_MEM_MASK) << PCI_BCNF_MEM_SHIFT)
+	    | 0xfffff;
+
+	val = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_PF_LIMIT_LOW);
+	pmem_limit = ((val & PCI_BCNF_MEM_MASK) << PCI_BCNF_MEM_SHIFT) |
+	    0xfffff;
+	val = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_PF_BASE_LOW);
+	pmem_base = ((val & PCI_BCNF_MEM_MASK) << PCI_BCNF_MEM_SHIFT);
+
+	if ((val & PCI_BCNF_ADDR_MASK) == PCI_BCNF_PF_MEM_64BIT) {
+		uint32_t pf_addr_hi, pf_limit_hi;
+
+		pf_addr_hi = pci_getl(bus, dev, func, PCI_BCNF_PF_BASE_HIGH);
+		pf_limit_hi = pci_getl(bus, dev, func, PCI_BCNF_PF_LIMIT_HIGH);
+		pmem_base |= (uint64_t)pf_addr_hi << 32;
+		pmem_limit |= (uint64_t)pf_limit_hi << 32;
+	}
+
+	/*
+	 * Reprogram memory if any of:
+	 *
+	 *	- The parent bus is flagged for reprogramming;
+	 *	- Mem space is currently disabled in the command register;
+	 *	- Both mem and pmem space are disabled via base/limit.
+	 *
+	 * Always reprogram both mem and pmem together since this leaves
+	 * resources in the 'avail' list for add_reg_props() to subsequently
+	 * find and assign.
+	 */
+	reprogram_mem = pci_bus_res[parbus].mem_reprogram ||
+	    !(cmd_reg & PCI_COMM_MAE) ||
+	    (mem_base > mem_limit && pmem_base > pmem_limit);
 
 	scratch_list = memlist_dup(pci_bus_res[secbus].mem_avail);
 	memlist_merge(&pci_bus_res[secbus].mem_used, &scratch_list);
 
-	if ((pci_bus_res[parbus].mem_reprogram ||
-	    (mem_base > mem_limit) ||
-	    (!(cmd_reg & PCI_COMM_MAE))) &&
-	    !list_is_vga_only(scratch_list, MEM)) {
+	if (reprogram_mem && !list_is_vga_only(scratch_list, MEM)) {
+
 		if (pci_bus_res[secbus].mem_used) {
 			memlist_subsume(&pci_bus_res[secbus].mem_used,
 			    &pci_bus_res[secbus].mem_avail);
 		}
+
+		/*
+		 * At this point, if the parent bus has not been
+		 * reprogrammed and there is memory in this bus' available
+		 * pool, then it can just be re-used. Otherwise a new range
+		 * is requested from the parent bus - note that
+		 * get_parbus_res() also takes care of constructing new
+		 * avail and used lists for the bus.
+		 *
+		 * For a subtractive parent bus, always request a fresh
+		 * memory range.
+		 */
 		if (pci_bus_res[secbus].mem_avail &&
-		    (!pci_bus_res[parbus].mem_reprogram) &&
-		    (!pci_bus_res[parbus].subtractive)) {
-			/* rechoose old mem resource */
-			list = pci_bus_res[secbus].mem_avail;
-			mem_base = 0;
-			do {
-				if (is_vga(list, MEM))
-					continue;
-				if (mem_base == 0) {
-					mem_base = list->ml_address;
-					mem_base = P2ALIGN(mem_base,
-					    PPB_MEM_ALIGNMENT);
-					mem_limit = (list->ml_address +
-					    list->ml_size - 1);
-				} else {
-					if ((list->ml_address + list->ml_size) >
-					    mem_limit) {
-						mem_limit =
-						    (list->ml_address +
-						    list->ml_size - 1);
-					}
-				}
-			} while ((list = list->ml_next) != NULL);
+		    !pci_bus_res[parbus].mem_reprogram &&
+		    !pci_bus_res[parbus].subtractive) {
+			/* re-choose old mem resource */
+
+			uint64_t base;
+
+			pci_memlist_range(pci_bus_res[secbus].mem_avail,
+			    MEM, &base, &mem_limit);
+			mem_base = (uint_t)base;
+
+			mem_base = P2ALIGN(mem_base, PPB_MEM_ALIGNMENT);
 			mem_limit = P2ROUNDUP(mem_limit, PPB_MEM_ALIGNMENT) - 1;
 			mem_size = mem_limit + 1 - mem_base;
 			ASSERT(mem_base <= mem_limit);
@@ -1219,54 +1454,126 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 			pci_bus_res[secbus].mem_reprogram = B_TRUE;
 		} else {
 			/* get new mem resource from parent bus */
-			addr = get_parbus_mem_res(parbus, secbus, mem_size,
-			    mem_align);
+			addr = get_parbus_res(parbus, secbus, mem_size,
+			    mem_align, PB_MEM);
 			if (addr) {
 				mem_base = addr;
 				mem_limit = addr + mem_size - 1;
 				pci_bus_res[secbus].mem_reprogram = B_TRUE;
 			}
 		}
-
-		if (pci_bus_res[secbus].mem_reprogram) {
-			/* reprogram PPB MEM regs */
-			pci_putw(bus, dev, func, PCI_BCNF_MEM_BASE,
-			    (uint16_t)((mem_base>>16) & 0xfff0));
-			pci_putw(bus, dev, func, PCI_BCNF_MEM_LIMIT,
-			    (uint16_t)((mem_limit>>16) & 0xfff0));
-			/*
-			 * Disable PMEM window by setting base > limit.
-			 * We currently don't reprogram the PMEM like we've
-			 * done for I/O and MEM. (Devices that support prefetch
-			 * can use non-prefetch MEM.) Anyway, if the MEM access
-			 * bit is initially disabled by BIOS, we disable the
-			 * PMEM window manually by setting PMEM base > PMEM
-			 * limit here, in case there are incorrect values in
-			 * them from BIOS, so that we won't get in trouble once
-			 * the MEM access bit is enabled at the end of this
-			 * function.
-			 */
-			if (!(cmd_reg & PCI_COMM_MAE)) {
-				pci_putw(bus, dev, func, PCI_BCNF_PF_BASE_LOW,
-				    0xfff0);
-				pci_putw(bus, dev, func, PCI_BCNF_PF_LIMIT_LOW,
-				    0x0);
-				pci_putl(bus, dev, func, PCI_BCNF_PF_BASE_HIGH,
-				    0xffffffff);
-				pci_putl(bus, dev, func, PCI_BCNF_PF_LIMIT_HIGH,
-				    0x0);
-			}
-
-			add_ranges_prop(secbus, 1);
-
-			cmn_err(CE_NOTE, "!reprogram mem-range on"
-			    " ppb[%x/%x/%x]: 0x%x ~ 0x%"PRIx64"\n",
-			    bus, dev, func, mem_base, mem_limit);
-		}
 	}
 	memlist_free_all(&scratch_list);
 
+	/* Prefetch memory */
+
+	scratch_list = memlist_dup(pci_bus_res[secbus].pmem_avail);
+	memlist_merge(&pci_bus_res[secbus].pmem_used, &scratch_list);
+
+	/*
+	 * Only reprogram prefetchable memory If the MEM access bit is
+	 * currently enabled. If it is not, then prefetchable memory will be
+	 * disabled anyway via base/limit below.
+	 */
+	if (reprogram_mem && !list_is_vga_only(scratch_list, MEM) &&
+	    (cmd_reg & PCI_COMM_MAE)) {
+
+		if (pci_bus_res[secbus].pmem_used) {
+			memlist_subsume(&pci_bus_res[secbus].pmem_used,
+			    &pci_bus_res[secbus].pmem_avail);
+		}
+
+		/* Same logic as for non-prefetch memory, see above */
+		if (pci_bus_res[secbus].pmem_avail &&
+		    !pci_bus_res[parbus].mem_reprogram &&
+		    !pci_bus_res[parbus].subtractive) {
+			/* re-choose old mem resource */
+
+			pci_memlist_range(pci_bus_res[secbus].pmem_avail,
+			    MEM, &pmem_base, &pmem_limit);
+
+			pmem_base = P2ALIGN(pmem_base, PPB_MEM_ALIGNMENT);
+			pmem_limit = P2ROUNDUP(pmem_limit,
+			    PPB_MEM_ALIGNMENT) - 1;
+			pmem_size = pmem_limit + 1 - pmem_base;
+			ASSERT(pmem_base <= pmem_limit);
+			memlist_free_all(&pci_bus_res[secbus].pmem_avail);
+			memlist_insert(&pci_bus_res[secbus].pmem_avail,
+			    pmem_base, pmem_size);
+			memlist_insert(&pci_bus_res[parbus].pmem_used,
+			    pmem_base, pmem_size);
+			(void) memlist_remove(&pci_bus_res[parbus].pmem_avail,
+			    pmem_base, pmem_size);
+			pci_bus_res[secbus].mem_reprogram = B_TRUE;
+		} else {
+			/* get new mem resource from parent bus */
+			addr = get_parbus_res(parbus, secbus, mem_size,
+			    mem_align, PB_PMEM);
+			if (addr) {
+				pmem_base = addr;
+				pmem_limit = addr + mem_size - 1;
+				pci_bus_res[secbus].mem_reprogram = B_TRUE;
+			}
+		}
+	}
+
+	memlist_free_all(&scratch_list);
+
+	if (pci_bus_res[secbus].mem_reprogram) {
+		/* reprogram PPB MEM regs */
+
+		pci_putw(bus, dev, func, PCI_BCNF_MEM_BASE,
+		    (uint16_t)((mem_base >> PCI_BCNF_MEM_SHIFT) &
+		    PCI_BCNF_MEM_MASK));
+		pci_putw(bus, dev, func, PCI_BCNF_MEM_LIMIT,
+		    (uint16_t)((mem_limit >> PCI_BCNF_MEM_SHIFT) &
+		    PCI_BCNF_MEM_MASK));
+
+		cmn_err(CE_NOTE, "!reprogram mem-range on"
+		    " ppb[%x/%x/%x]: 0x%x ~ 0x%"PRIx64"",
+		    bus, dev, func, mem_base, mem_limit);
+
+		if (!(cmd_reg & PCI_COMM_MAE)) {
+			/*
+			 * If the MEM access bit is initially disabled by BIOS,
+			 * we disable the PMEM window manually by setting PMEM
+			 * base > PMEM limit here, in case there are incorrect
+			 * values in them from BIOS, so that we won't get in
+			 * trouble once the MEM access bit is enabled at the
+			 * end of this function.
+			 */
+			pci_putw(bus, dev, func, PCI_BCNF_PF_BASE_LOW, 0xfff0);
+			pci_putw(bus, dev, func, PCI_BCNF_PF_LIMIT_LOW, 0x0);
+			pci_putl(bus, dev, func, PCI_BCNF_PF_BASE_HIGH,
+			    0xffffffff);
+			pci_putl(bus, dev, func, PCI_BCNF_PF_LIMIT_HIGH, 0x0);
+
+		} else {
+
+			pci_putw(bus, dev, func, PCI_BCNF_PF_BASE_LOW,
+			    ((pmem_base & 0xffffffff) >> PCI_BCNF_MEM_SHIFT) &
+			    PCI_BCNF_MEM_MASK);
+			pci_putl(bus, dev, func, PCI_BCNF_PF_BASE_HIGH,
+			    pmem_base >> 32);
+
+			pci_putw(bus, dev, func, PCI_BCNF_PF_LIMIT_LOW,
+			    ((pmem_limit & 0xffffffff) >> PCI_BCNF_MEM_SHIFT) &
+			    PCI_BCNF_MEM_MASK);
+			pci_putl(bus, dev, func, PCI_BCNF_PF_LIMIT_HIGH,
+			    pmem_limit >> 32);
+
+			cmn_err(CE_NOTE, "!reprogram pmem-range on"
+			    " ppb[%x/%x/%x]: 0x%"PRIx64" ~ 0x%"PRIx64"",
+			    bus, dev, func, pmem_base, pmem_limit);
+		}
+
+		add_ranges_prop(secbus, 1);
+	}
+
 cmd_enable:
+	dump_memlists("fix_ppb_res end bus", bus);
+	dump_memlists("fix_ppb_res end secbus", secbus);
+
 	if (pci_bus_res[secbus].io_avail)
 		cmd_reg |= PCI_COMM_IO | PCI_COMM_ME;
 	if (pci_bus_res[secbus].mem_avail)
@@ -1467,7 +1774,6 @@ populate_bus_res(uchar_t bus)
 	add_ranges_prop(bus, 0);
 }
 
-
 /*
  * Create top-level bus dips, i.e. /pci@0,0, /pci@1,0...
  */
@@ -1513,12 +1819,16 @@ enumerate_bus_devs(uchar_t bus, int config_op)
 	ushort_t venid;
 	struct pci_devfunc *devlist = NULL, *entry;
 
-	if (config_op == CONFIG_NEW) {
-		dcmn_err(CE_NOTE, "configuring pci bus 0x%x", bus);
-	} else if (config_op == CONFIG_FIX) {
-		dcmn_err(CE_NOTE, "fixing devices on pci bus 0x%x", bus);
-	} else
-		dcmn_err(CE_NOTE, "enumerating pci bus 0x%x", bus);
+	if (pci_debug_bus_start == -1 || bus_debug(bus)) {
+		if (config_op == CONFIG_NEW) {
+			dcmn_err(CE_NOTE, "configuring pci bus 0x%x", bus);
+		} else if (config_op == CONFIG_FIX) {
+			dcmn_err(CE_NOTE,
+			    "fixing devices on pci bus 0x%x", bus);
+		} else {
+			dcmn_err(CE_NOTE, "enumerating pci bus 0x%x", bus);
+		}
+	}
 
 	if (config_op == CONFIG_NEW) {
 		devlist = (struct pci_devfunc *)pci_bus_res[bus].privdata;
@@ -1541,9 +1851,6 @@ enumerate_bus_devs(uchar_t bus, int config_op)
 	for (dev = 0; dev < max_dev_pci; dev++) {
 		nfunc = 1;
 		for (func = 0; func < nfunc; func++) {
-
-			dcmn_err(CE_NOTE, "probing dev 0x%x, func 0x%x",
-			    dev, func);
 
 			venid = pci_getw(bus, dev, func, PCI_CONF_VENID);
 
@@ -2388,7 +2695,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 {
 	uchar_t baseclass, subclass, progclass, header;
 	ushort_t bar_sz;
-	uint64_t value = 0;
+	uint64_t value = 0, fbase;
 	uint_t devloc;
 	uint_t base, base_hi, type;
 	ushort_t offset, end;
@@ -2409,6 +2716,8 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	mem_used = &pci_bus_res[bus].mem_used;
 	pmem_avail = &pci_bus_res[bus].pmem_avail;
 	pmem_used = &pci_bus_res[bus].pmem_used;
+
+	dump_memlists("add_reg_props start", bus);
 
 	devloc = (uint_t)bus << 16 | (uint_t)dev << 11 | (uint_t)func << 8;
 	regs[0].pci_phys_hi = devloc;
@@ -2454,7 +2763,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	end = PCI_CONF_BASE0 + max_basereg * sizeof (uint_t);
 	for (j = 0, offset = PCI_CONF_BASE0; offset < end;
 	    j++, offset += bar_sz) {
-		uint_t	command;
+		uint_t	command = 0;
 
 		/* determine the size of the address space */
 		base = pci_getl(bus, dev, func, offset);
@@ -2612,51 +2921,63 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 					 */
 					if ((*pmem_avail &&
 					    (phys_hi & PCI_PREFETCH_B)) ||
-					    *mem_avail)
+					    *mem_avail) {
 						break;
+					}
 				}
 			}
 
 			regs[nreg].pci_phys_hi =
 			    assigned[nasgn].pci_phys_hi = phys_hi;
 			assigned[nasgn].pci_phys_hi |= PCI_RELOCAT_B;
-			assigned[nasgn].pci_phys_mid = base_hi;
 			type = base & ~PCI_BASE_M_ADDR_M;
 			base &= PCI_BASE_M_ADDR_M;
 
+			fbase = (((uint64_t)base_hi) << 32) | base;
+
 			if (config_op == CONFIG_INFO) {
 				/* take out of the resource map of the bus */
-				if (base != 0) {
+				if (fbase != 0) {
 					/* remove from PMEM and MEM space */
 					(void) memlist_remove(mem_avail,
-					    base, len);
+					    fbase, len);
 					(void) memlist_remove(pmem_avail,
-					    base, len);
+					    fbase, len);
 					/* only note as used in correct map */
 					if (phys_hi & PCI_PREFETCH_B)
 						memlist_insert(pmem_used,
-						    base, len);
+						    fbase, len);
 					else
 						memlist_insert(mem_used,
-						    base, len);
+						    fbase, len);
 				} else {
 					reprogram = 1;
 				}
 				pci_bus_res[bus].mem_size += len;
-			} else if ((*mem_avail && base == 0) ||
-			    pci_bus_res[bus].mem_reprogram) {
+			} else if (pci_bus_res[bus].mem_reprogram ||
+			    (fbase == 0 &&
+			    (*mem_avail != NULL || *pmem_avail != NULL))) {
+
+				fbase = 0;
+
 				/*
 				 * When desired, attempt a prefetchable
 				 * allocation first
 				 */
-				if (phys_hi & PCI_PREFETCH_B) {
-					base = (uint_t)memlist_find(pmem_avail,
+				if ((phys_hi & PCI_PREFETCH_B) &&
+				    *pmem_avail != NULL) {
+					fbase = memlist_find(pmem_avail,
 					    len, len);
-					if (base != 0) {
+					if (fbase != 0) {
 						memlist_insert(pmem_used,
-						    base, len);
-						(void) memlist_remove(mem_avail,
-						    base, len);
+						    fbase, len);
+						(void) memlist_remove(
+						    pmem_avail, fbase, len);
+						cmn_err(CE_NOTE, "!program "
+						    "[%x/%x/%x] BAR@0x%x"
+						    " 0x%lx length 0x%lx",
+						    bus, dev, func, offset,
+						    fbase, len);
 					}
 				}
 				/*
@@ -2664,28 +2985,58 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 				 * desired, or failed, attempt ordinary
 				 * memory allocation
 				 */
-				if (base == 0) {
-					base = (uint_t)memlist_find(mem_avail,
+				if (fbase == 0 && *mem_avail != NULL) {
+					fbase = memlist_find(mem_avail,
 					    len, len);
-					if (base != 0) {
+					if (fbase != 0) {
 						memlist_insert(mem_used,
-						    base, len);
+						    fbase, len);
 						(void) memlist_remove(
-						    pmem_avail, base, len);
+						    mem_avail, fbase, len);
+						cmn_err(CE_NOTE, "!program "
+						    "[%x/%x/%x] BAR@0x%x"
+						    " 0x%lx length 0x%lx",
+						    bus, dev, func, offset,
+						    fbase, len);
 					}
 				}
-				if (base != 0) {
+
+				base_hi = fbase >> 32;
+				base = fbase & 0xffffffff;
+
+				if (fbase != 0) {
 					pci_putl(bus, dev, func, offset,
 					    base | type);
 					base = pci_getl(bus, dev, func, offset);
+
+					if (bar_sz == PCI_BAR_SZ_64) {
+						pci_putl(bus, dev, func,
+						    offset + 4, base_hi);
+						base_hi = pci_getl(bus, dev,
+						    func, offset + 4);
+					}
+
 					base &= PCI_BASE_M_ADDR_M;
-				} else
+				} else {
 					cmn_err(CE_WARN, "failed to program "
-					    "mem space [%d/%d/%d] BAR@0x%x"
+					    "mem space [%x/%x/%x] BAR@0x%x"
 					    " length 0x%"PRIx64,
 					    bus, dev, func, offset, len);
+				}
 			}
+
+			assigned[nasgn].pci_phys_mid = base_hi;
 			assigned[nasgn].pci_phys_low = base;
+
+			dcmn_err(CE_NOTE,
+			    "![%x/%x/%x] --- %08x.%x.%x.%x.%x",
+			    bus, dev, func,
+			    assigned[nasgn].pci_phys_hi,
+			    assigned[nasgn].pci_phys_mid,
+			    assigned[nasgn].pci_phys_low,
+			    assigned[nasgn].pci_size_hi,
+			    assigned[nasgn].pci_size_low);
+
 			nreg++, nasgn++;
 		}
 	}
@@ -2803,6 +3154,8 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	}
 
 done:
+	dump_memlists("add_reg_props end", bus);
+
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip, "reg",
 	    (int *)regs, nreg * sizeof (pci_regspec_t) / sizeof (int));
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
@@ -2825,6 +3178,9 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	uchar_t progclass;
 
 	ASSERT(secbus <= subbus);
+
+	dump_memlists("add_ppb_props start bus", bus);
+	dump_memlists("add_ppb_props start secbus", secbus);
 
 	/*
 	 * Check if it's a subtractive PPB.
@@ -2901,12 +3257,12 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	 */
 	val = (uint_t)pci_getw(bus, dev, func, PCI_CONF_COMM);
 	if (val & PCI_COMM_IO) {
-		val = (uint_t)pci_getb(bus, dev, func, PCI_BCNF_IO_BASE_LOW);
-		io_range[0] = ((val & PCI_BCNF_IO_MASK) << PCI_BCNF_IO_SHIFT);
 		val = (uint_t)pci_getb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW);
 		io_range[1]  = ((val & PCI_BCNF_IO_MASK) << PCI_BCNF_IO_SHIFT) |
 		    0xfff;
-		if ((io_range[0] & PCI_BCNF_ADDR_MASK) == PCI_BCNF_IO_32BIT) {
+		val = (uint_t)pci_getb(bus, dev, func, PCI_BCNF_IO_BASE_LOW);
+		io_range[0] = ((val & PCI_BCNF_IO_MASK) << PCI_BCNF_IO_SHIFT);
+		if ((val & PCI_BCNF_ADDR_MASK) == PCI_BCNF_IO_32BIT) {
 			uint16_t io_base_hi, io_limit_hi;
 			io_base_hi = pci_getw(bus, dev, func,
 			    PCI_BCNF_IO_BASE_HI);
@@ -2936,7 +3292,7 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 			(void) memlist_remove(&pci_bus_res[bus].io_avail,
 			    io_range[0], (io_range[1] - io_range[0] + 1));
 		}
-		dcmn_err(CE_NOTE, "bus %d io-range: 0x%" PRIx64 "-%" PRIx64,
+		dcmn_err(CE_NOTE, "bus %x io-range: 0x%" PRIx64 "-%" PRIx64,
 		    secbus, io_range[0], io_range[1]);
 	}
 
@@ -2948,29 +3304,25 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	    0xfffff;
 	if (mem_range[0] != 0 && mem_range[0] < mem_range[1]) {
 		memlist_insert(&pci_bus_res[secbus].mem_avail,
-		    (uint64_t)mem_range[0],
-		    (uint64_t)(mem_range[1] - mem_range[0] + 1));
+		    mem_range[0], mem_range[1] - mem_range[0] + 1);
 		memlist_insert(&pci_bus_res[bus].mem_used,
-		    (uint64_t)mem_range[0],
-		    (uint64_t)(mem_range[1] - mem_range[0] + 1));
+		    mem_range[0], mem_range[1] - mem_range[0] + 1);
 		/* remove from parent resource list */
 		(void) memlist_remove(&pci_bus_res[bus].mem_avail,
-		    (uint64_t)mem_range[0],
-		    (uint64_t)(mem_range[1] - mem_range[0] + 1));
+		    mem_range[0], mem_range[1] - mem_range[0] + 1);
 		(void) memlist_remove(&pci_bus_res[bus].pmem_avail,
-		    (uint64_t)mem_range[0],
-		    (uint64_t)(mem_range[1] - mem_range[0] + 1));
-		dcmn_err(CE_NOTE, "bus %d mem-range: 0x%" PRIx64 "-%" PRIx64,
+		    mem_range[0], mem_range[1] - mem_range[0] + 1);
+		dcmn_err(CE_NOTE, "bus %x mem-range: 0x%" PRIx64 "-%" PRIx64,
 		    secbus, mem_range[0], mem_range[1]);
 	}
 
 	/* prefetchable memory range */
-	val = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_PF_BASE_LOW);
-	pmem_range[0] = ((val & PCI_BCNF_MEM_MASK) << PCI_BCNF_MEM_SHIFT);
 	val = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_PF_LIMIT_LOW);
 	pmem_range[1] = ((val & PCI_BCNF_MEM_MASK) << PCI_BCNF_MEM_SHIFT) |
 	    0xfffff;
-	if ((pmem_range[0] & PCI_BCNF_ADDR_MASK) == PCI_BCNF_PF_MEM_64BIT) {
+	val = (uint_t)pci_getw(bus, dev, func, PCI_BCNF_PF_BASE_LOW);
+	pmem_range[0] = ((val & PCI_BCNF_MEM_MASK) << PCI_BCNF_MEM_SHIFT);
+	if ((val & PCI_BCNF_ADDR_MASK) == PCI_BCNF_PF_MEM_64BIT) {
 		uint32_t pf_addr_hi, pf_limit_hi;
 		pf_addr_hi = pci_getl(bus, dev, func, PCI_BCNF_PF_BASE_HIGH);
 		pf_limit_hi = pci_getl(bus, dev, func, PCI_BCNF_PF_LIMIT_HIGH);
@@ -2979,19 +3331,15 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	}
 	if (pmem_range[0] != 0 && pmem_range[0] < pmem_range[1]) {
 		memlist_insert(&pci_bus_res[secbus].pmem_avail,
-		    (uint64_t)pmem_range[0],
-		    (uint64_t)(pmem_range[1] - pmem_range[0] + 1));
+		    pmem_range[0], pmem_range[1] - pmem_range[0] + 1);
 		memlist_insert(&pci_bus_res[bus].pmem_used,
-		    (uint64_t)pmem_range[0],
-		    (uint64_t)(pmem_range[1] - pmem_range[0] + 1));
+		    pmem_range[0], pmem_range[1] - pmem_range[0] + 1);
 		/* remove from parent resource list */
 		(void) memlist_remove(&pci_bus_res[bus].pmem_avail,
-		    (uint64_t)pmem_range[0],
-		    (uint64_t)(pmem_range[1] - pmem_range[0] + 1));
+		    pmem_range[0], pmem_range[1] - pmem_range[0] + 1);
 		(void) memlist_remove(&pci_bus_res[bus].mem_avail,
-		    (uint64_t)pmem_range[0],
-		    (uint64_t)(pmem_range[1] - pmem_range[0] + 1));
-		dcmn_err(CE_NOTE, "bus %d pmem-range: 0x%" PRIx64 "-%" PRIx64,
+		    pmem_range[0], pmem_range[1] - pmem_range[0] + 1);
+		dcmn_err(CE_NOTE, "bus %x pmem-range: 0x%" PRIx64 "-%" PRIx64,
 		    secbus, pmem_range[0], pmem_range[1]);
 	}
 
@@ -3034,6 +3382,9 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	}
 	add_bus_range_prop(secbus);
 	add_ranges_prop(secbus, 1);
+
+	dump_memlists("add_ppb_props end bus", bus);
+	dump_memlists("add_ppb_props end secbus", secbus);
 }
 
 extern const struct pci_class_strings_s class_pci[];
@@ -3193,6 +3544,8 @@ add_ranges_prop(int bus, int ppb)
 	/* no devinfo node - unused bus, return */
 	if (pci_bus_res[bus].dip == NULL)
 		return;
+
+	dump_memlists("add_ranges_prop", bus);
 
 	iolist = memlist = pmemlist = (struct memlist *)NULL;
 

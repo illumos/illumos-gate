@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  *
  * pci_resource.c -- routines to retrieve available bus resources from
  *		 the MP Spec. Table and Hotplug Resource Table
@@ -248,23 +249,52 @@ bus_res_fini(void)
 	}
 }
 
-
-struct memlist **
-rlistpp(UINT8 t, UINT8 flags, int bus)
+static struct memlist **
+rlistpp(UINT8 t, UINT8 caching, int bus)
 {
 	switch (t) {
+	case ACPI_MEMORY_RANGE:
+		if (caching == ACPI_PREFETCHABLE_MEMORY)
+			return (&acpi_pmem_res[bus]);
+		else
+			return (&acpi_mem_res[bus]);
+		break;
 
-		case ACPI_MEMORY_RANGE:
-			/* is this really the best we've got? */
-			if (((flags >> 1) & 0x3) == ACPI_PREFETCHABLE_MEMORY)
-				return (&acpi_pmem_res[bus]);
-			else
-				return (&acpi_mem_res[bus]);
+	case ACPI_IO_RANGE:
+		return (&acpi_io_res[bus]);
+		break;
 
-		case ACPI_IO_RANGE:	return &acpi_io_res[bus];
-		case ACPI_BUS_NUMBER_RANGE: return &acpi_bus_res[bus];
+	case ACPI_BUS_NUMBER_RANGE:
+		return (&acpi_bus_res[bus]);
+		break;
 	}
-	return ((struct memlist **)NULL);
+
+	return (NULL);
+}
+
+static void
+acpi_dbg(uint_t bus, uint64_t addr, uint64_t len, uint8_t caching, uint8_t type,
+    char *tag)
+{
+	char *s;
+
+	switch (type) {
+	case ACPI_MEMORY_RANGE:
+		s = "MEM";
+		break;
+	case ACPI_IO_RANGE:
+		s = "IO";
+		break;
+	case ACPI_BUS_NUMBER_RANGE:
+		s = "BUS";
+		break;
+	default:
+		s = "???";
+		break;
+	}
+
+	dprintf("ACPI: bus %x %s/%s %lx/%lx (Caching: %x)\n", bus,
+	    tag, s, addr, len, caching);
 }
 
 
@@ -302,6 +332,10 @@ acpi_wr_cb(ACPI_RESOURCE *rp, void *context)
 		acpi_cb_cnt++;
 		memlist_insert(&acpi_io_res[bus], rp->Data.Io.Minimum,
 		    rp->Data.Io.AddressLength);
+		if (pci_boot_debug != 0) {
+			acpi_dbg(bus, rp->Data.Io.Minimum,
+			    rp->Data.Io.AddressLength, 0, ACPI_IO_RANGE, "IO");
+		}
 		break;
 
 	case ACPI_RESOURCE_TYPE_FIXED_IO:
@@ -337,9 +371,16 @@ acpi_wr_cb(ACPI_RESOURCE *rp, void *context)
 			break;
 		acpi_cb_cnt++;
 		memlist_insert(rlistpp(rp->Data.Address16.ResourceType,
-		    rp->Data.Address16.Info.TypeSpecific, bus),
+		    rp->Data.Address.Info.Mem.Caching, bus),
 		    rp->Data.Address16.Address.Minimum,
 		    rp->Data.Address16.Address.AddressLength);
+		if (pci_boot_debug != 0) {
+			acpi_dbg(bus,
+			    rp->Data.Address16.Address.Minimum,
+			    rp->Data.Address16.Address.AddressLength,
+			    rp->Data.Address.Info.Mem.Caching,
+			    rp->Data.Address16.ResourceType, "ADDRESS16");
+		}
 		break;
 
 	case ACPI_RESOURCE_TYPE_ADDRESS32:
@@ -347,38 +388,51 @@ acpi_wr_cb(ACPI_RESOURCE *rp, void *context)
 			break;
 		acpi_cb_cnt++;
 		memlist_insert(rlistpp(rp->Data.Address32.ResourceType,
-		    rp->Data.Address32.Info.TypeSpecific, bus),
+		    rp->Data.Address.Info.Mem.Caching, bus),
 		    rp->Data.Address32.Address.Minimum,
 		    rp->Data.Address32.Address.AddressLength);
+		if (pci_boot_debug != 0) {
+			acpi_dbg(bus,
+			    rp->Data.Address32.Address.Minimum,
+			    rp->Data.Address32.Address.AddressLength,
+			    rp->Data.Address.Info.Mem.Caching,
+			    rp->Data.Address32.ResourceType, "ADDRESS32");
+		}
 		break;
 
 	case ACPI_RESOURCE_TYPE_ADDRESS64:
-	/*
-	 * We comment out this block because we currently cannot deal with
-	 * PCI 64-bit addresses. Will revisit this when we add PCI 64-bit MMIO
-	 * support.
-	 */
-#if 0
-		if (rp->Data.Address64.AddressLength == 0)
+		if (rp->Data.Address64.Address.AddressLength == 0)
 			break;
+
 		acpi_cb_cnt++;
 		memlist_insert(rlistpp(rp->Data.Address64.ResourceType,
-		    rp->Data.Address64.Info.TypeSpecific, bus),
-		    rp->Data.Address64.Minimum,
-		    rp->Data.Address64.AddressLength);
-#endif
+		    rp->Data.Address.Info.Mem.Caching, bus),
+		    rp->Data.Address64.Address.Minimum,
+		    rp->Data.Address64.Address.AddressLength);
+		if (pci_boot_debug != 0) {
+			acpi_dbg(bus,
+			    rp->Data.Address64.Address.Minimum,
+			    rp->Data.Address64.Address.AddressLength,
+			    rp->Data.Address.Info.Mem.Caching,
+			    rp->Data.Address64.ResourceType, "ADDRESS64");
+		}
 		break;
 
 	case ACPI_RESOURCE_TYPE_EXTENDED_ADDRESS64:
-#if 0	/* Will revisit this when we add PCI 64-bit MMIO support */
-		if (rp->Data.ExtAddress64.AddressLength == 0)
+		if (rp->Data.ExtAddress64.Address.AddressLength == 0)
 			break;
 		acpi_cb_cnt++;
 		memlist_insert(rlistpp(rp->Data.ExtAddress64.ResourceType,
-		    rp->Data.ExtAddress64.Info.TypeSpecific, bus),
-		    rp->Data.ExtAddress64.Minimum,
-		    rp->Data.ExtAddress64.AddressLength);
-#endif
+		    rp->Data.Address.Info.Mem.Caching, bus),
+		    rp->Data.ExtAddress64.Address.Minimum,
+		    rp->Data.ExtAddress64.Address.AddressLength);
+		if (pci_boot_debug != 0) {
+			acpi_dbg(bus,
+			    rp->Data.ExtAddress64.Address.Minimum,
+			    rp->Data.ExtAddress64.Address.AddressLength,
+			    rp->Data.Address.Info.Mem.Caching,
+			    rp->Data.ExtAddress64.ResourceType, "EXTADDRESS64");
+		}
 		break;
 
 	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:

@@ -21,6 +21,9 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ *
  */
 
 #ifndef	_SYS_PCI_CFGACC_X86_H
@@ -66,8 +69,8 @@ extern "C" {
 
 #define	IS_AMD_8132_CHIP(vid, did) \
 	    (((vid) == AMD_NTBRDIGE_VID) && \
-	    (((did) == AMD_8132_BRIDGE_DID)) || \
-	    (((did) == AMD_8132_IOAPIC_DID)))
+	    (((did) == AMD_8132_BRIDGE_DID) || \
+	    ((did) == AMD_8132_IOAPIC_DID)))
 
 #define	MSR_AMD_NB_MMIO_CFG_BADDR	0xc0010058
 #define	AMD_MMIO_CFG_BADDR_ADDR_MASK	0xFFFFFFF00000ULL
