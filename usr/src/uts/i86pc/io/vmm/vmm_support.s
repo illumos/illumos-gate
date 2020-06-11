@@ -10,6 +10,7 @@
  *
  * Copyright 2019 Joyent, Inc.
  */
+/* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 #include <sys/asm_linkage.h>
 #include <sys/segments.h>
