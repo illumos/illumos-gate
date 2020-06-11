@@ -21,6 +21,7 @@
 #include <sys/list.h>
 #include <sys/types.h>
 #include <sys/vmm.h>
+#include <sys/vmm_kernel.h>
 #include <sys/vmm_impl.h>
 #include <sys/zone.h>
 

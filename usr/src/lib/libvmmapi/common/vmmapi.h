@@ -46,6 +46,7 @@
 
 #include <sys/param.h>
 #include <sys/cpuset.h>
+#include <x86/segments.h>
 
 #include <stdbool.h>
 
@@ -170,6 +171,27 @@ int	vm_reinit(struct vmctx *ctx);
 int	vm_apicid2vcpu(struct vmctx *ctx, int apicid);
 int	vm_inject_exception(struct vmctx *ctx, int vcpu, int vector,
     int errcode_valid, uint32_t errcode, int restart_instruction);
+#ifndef __FreeBSD__
+void	vm_inject_fault(struct vmctx *ctx, int vcpu, int vector,
+    int errcode_valid, int errcode);
+
+static __inline void
+vm_inject_gp(struct vmctx *ctx, int vcpuid)
+{
+	vm_inject_fault(ctx, vcpuid, IDT_GP, 1, 0);
+}
+
+static __inline void
+vm_inject_ac(struct vmctx *ctx, int vcpuid, int errcode)
+{
+	vm_inject_fault(ctx, vcpuid, IDT_AC, 1, errcode);
+}
+static __inline void
+vm_inject_ss(struct vmctx *ctx, int vcpuid, int errcode)
+{
+	vm_inject_fault(ctx, vcpuid, IDT_SS, 1, errcode);
+}
+#endif
 int	vm_lapic_irq(struct vmctx *ctx, int vcpu, int vector);
 int	vm_lapic_local_irq(struct vmctx *ctx, int vcpu, int vector);
 int	vm_lapic_msi(struct vmctx *ctx, uint64_t addr, uint64_t msg);

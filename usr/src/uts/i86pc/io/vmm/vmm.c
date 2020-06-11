@@ -2490,18 +2490,38 @@ vm_inject_exception(struct vm *vm, int vcpuid, int vector, int errcode_valid,
 }
 
 void
-vm_inject_fault(void *vmarg, int vcpuid, int vector, int errcode_valid,
+vm_inject_fault(struct vm *vm, int vcpuid, int vector, int errcode_valid,
     int errcode)
 {
-	struct vm *vm;
-	int error, restart_instruction;
-
-	vm = vmarg;
-	restart_instruction = 1;
+	int error;
 
 	error = vm_inject_exception(vm, vcpuid, vector, errcode_valid,
-	    errcode, restart_instruction);
+	    errcode, 1);
 	KASSERT(error == 0, ("vm_inject_exception error %d", error));
+}
+
+void
+vm_inject_ud(struct vm *vm, int vcpuid)
+{
+	vm_inject_fault(vm, vcpuid, IDT_UD, 0, 0);
+}
+
+void
+vm_inject_gp(struct vm *vm, int vcpuid)
+{
+	vm_inject_fault(vm, vcpuid, IDT_GP, 1, 0);
+}
+
+void
+vm_inject_ac(struct vm *vm, int vcpuid, int errcode)
+{
+	vm_inject_fault(vm, vcpuid, IDT_AC, 1, errcode);
+}
+
+void
+vm_inject_ss(struct vm *vm, int vcpuid, int errcode)
+{
+	vm_inject_fault(vm, vcpuid, IDT_SS, 1, errcode);
 }
 
 void

@@ -12,6 +12,7 @@
 #
 # Copyright 2013 Pluribus Networks Inc.
 # Copyright 2019 Joyent, Inc.
+# Copyright 2020 Oxide Computer Company
 #
 
 #
@@ -74,6 +75,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_gla2gpa;
 		vm_gla2gpa_nofault;
 		vm_inject_exception;
+		vm_inject_fault;
 		vm_inject_nmi;
 		vm_isa_assert_irq;
 		vm_isa_deassert_irq;

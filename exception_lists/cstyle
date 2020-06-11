@@ -1399,6 +1399,7 @@ usr/src/lib/libvmmapi/common/vmmapi.[ch]
 usr/src/uts/i86pc/io/vmm/amd/*.[ch]
 usr/src/uts/i86pc/io/vmm/intel/*.[chs]
 usr/src/uts/i86pc/io/vmm/io/*.[ch]
+usr/src/uts/i86pc/io/vmm/sys/vmm_kernel.h
 usr/src/uts/i86pc/io/vmm/vmm.c
 usr/src/uts/i86pc/io/vmm/vmm_host.[ch]
 usr/src/uts/i86pc/io/vmm/vmm_instruction_emul.c

@@ -436,7 +436,6 @@ pincpu_parse(const char *opt)
 	CPU_SET(pcpu, vcpumap[vcpu]);
 	return (0);
 }
-#endif
 
 void
 vm_inject_fault(void *arg, int vcpu, int vector, int errcode_valid,
@@ -452,6 +451,7 @@ vm_inject_fault(void *arg, int vcpu, int vector, int errcode_valid,
 	    restart_instruction);
 	assert(error == 0);
 }
+#endif /* __FreeBSD__ */
 
 void *
 paddr_guest2host(struct vmctx *ctx, uintptr_t gaddr, size_t len)

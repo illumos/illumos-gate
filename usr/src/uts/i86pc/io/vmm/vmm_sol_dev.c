@@ -37,6 +37,7 @@
 #include <x86/apicreg.h>
 
 #include <sys/vmm.h>
+#include <sys/vmm_kernel.h>
 #include <sys/vmm_instruction_emul.h>
 #include <sys/vmm_dev.h>
 #include <sys/vmm_impl.h>
