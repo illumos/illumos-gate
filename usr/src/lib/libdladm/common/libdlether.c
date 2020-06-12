@@ -375,6 +375,8 @@ dladm_ether_info_done(dladm_ether_info_t *eattr)
 {
 	int i;
 
-	for (i = CURRENT; i <= PEERADV; i++)
+	for (i = CURRENT; i <= PEERADV; i++) {
 		free(eattr->lei_attr[i].le_spdx);
+		eattr->lei_attr[i].le_spdx = NULL;
+	}
 }
