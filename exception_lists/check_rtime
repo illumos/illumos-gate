@@ -275,11 +275,16 @@ NO_COMMENT	^usr/lib/inet/amd64/in\.iked
 NO_COMMENT	^usr/lib/inet/certdb
 NO_COMMENT	^usr/lib/inet/certlocal
 NO_COMMENT	^usr/lib/inet/certrldb
+NO_COMMENT	^usr/lib/inet/sparcv9/in\.iked
 NO_COMMENT	^usr/lib/labeld
 NO_COMMENT	^usr/lib/libike\.so\.1
 NO_COMMENT	^usr/lib/mdb/kvm/amd64/mpt\.so
 NO_COMMENT	^usr/lib/mdb/kvm/amd64/nfs\.so
+NO_COMMENT	^usr/lib/mdb/kvm/sparcv9/mpt\.so
+NO_COMMENT	^usr/lib/mdb/kvm/sparcv9/nfs\.so
 NO_COMMENT	^usr/lib/raidcfg/amd64/mpt\.so\.1
 NO_COMMENT	^usr/lib/raidcfg/mpt\.so\.1
+NO_COMMENT	^usr/lib/raidcfg/sparcv9/mpt\.so\.1
+NO_COMMENT	^usr/lib/sparcv9/libike\.so\.1
 NO_COMMENT	^usr/sbin/chk_encodings
 NO_COMMENT	^usr/xpg4/bin/more
