@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -360,6 +360,12 @@ smb2_dh_import_share(void *arg)
 			break;
 
 		/*
+		 * If the server's stopping, no point importing.
+		 */
+		if (smb_server_is_stopping(sr->sr_server))
+			break;
+
+		/*
 		 * Read a stream name and info
 		 */
 		rc = smb_odir_read_streaminfo(sr, od, str_info, &eof);
@@ -392,6 +398,7 @@ smb2_dh_import_share(void *arg)
 			of = NULL;
 		}
 		sr->fid_ofile = NULL;
+		smb_llist_flush(&sr->tid_tree->t_ofile_list);
 
 	} while (!eof);
 
