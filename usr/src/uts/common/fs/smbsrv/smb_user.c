@@ -1000,6 +1000,9 @@ smb_is_same_user(cred_t *cr1, cred_t *cr2)
 	ksid_t *ks1 = crgetsid(cr1, KSID_USER);
 	ksid_t *ks2 = crgetsid(cr2, KSID_USER);
 
+	if (ks1 == NULL || ks2 == NULL) {
+		return (B_FALSE);
+	}
 	return (ks1->ks_rid == ks2->ks_rid &&
 	    strcmp(ks1->ks_domain->kd_name, ks2->ks_domain->kd_name) == 0);
 }
