@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
@@ -23,8 +23,7 @@ PROGS = timer_limit
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
-CSTD= $(CSTD_GNU99)
-
+CSTD = $(CSTD_GNU99)
 
 CMDS = $(PROGS:%=$(TESTDIR)/%)
 $(CMDS) := FILEMODE = 0555
@@ -32,8 +31,6 @@ $(CMDS) := FILEMODE = 0555
 all: $(PROGS)
 
 install: all $(CMDS)
-
-lint:
 
 clobber: clean
 	-$(RM) $(PROGS)

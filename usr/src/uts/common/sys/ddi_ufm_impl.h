@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #ifndef _SYS_DDI_UFM_IMPL_H
@@ -38,11 +39,14 @@ void ufm_init();
 /* private interfaces for ufm driver */
 struct ddi_ufm_handle *ufm_find(const char *);
 int ufm_cache_fill(struct ddi_ufm_handle *ufmh);
+int ufm_read_img(ddi_ufm_handle_t *, uint_t, uint_t, uint64_t, uint64_t,
+    uintptr_t, uint64_t *, int);
 
 struct ddi_ufm_slot {
 	uint_t			ufms_slotno;
 	char			*ufms_version;
 	ddi_ufm_attr_t		ufms_attrs;
+	uint64_t		ufms_imgsize;
 	nvlist_t		*ufms_misc;
 };
 

@@ -52,7 +52,8 @@ __FBSDID("$FreeBSD$");
 #include "iommu.h"
 
 SYSCTL_DECL(_hw_vmm);
-SYSCTL_NODE(_hw_vmm, OID_AUTO, iommu, CTLFLAG_RW, 0, "bhyve iommu parameters");
+SYSCTL_NODE(_hw_vmm, OID_AUTO, iommu, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+    "bhyve iommu parameters");
 
 static int iommu_avail;
 SYSCTL_INT(_hw_vmm_iommu, OID_AUTO, initialized, CTLFLAG_RD, &iommu_avail,
@@ -215,7 +216,7 @@ iommu_init(void)
 
 	if (vmm_is_intel())
 		ops = &iommu_ops_intel;
-	else if (vmm_is_amd())
+	else if (vmm_is_svm())
 		ops = &iommu_ops_amd;
 	else
 		ops = NULL;

@@ -1376,6 +1376,9 @@ i40e_unconfigure(dev_info_t *devinfo, i40e_t *i40e)
 		i40e->i40e_periodic_id = 0;
 	}
 
+	if (i40e->i40e_attach_progress & I40E_ATTACH_UFM_INIT)
+		ddi_ufm_fini(i40e->i40e_ufmh);
+
 	if (i40e->i40e_attach_progress & I40E_ATTACH_MAC) {
 		rc = mac_unregister(i40e->i40e_mac_hdl);
 		if (rc != 0) {
@@ -1419,9 +1422,6 @@ i40e_unconfigure(dev_info_t *devinfo, i40e_t *i40e)
 
 	if (i40e->i40e_attach_progress & I40E_ATTACH_FM_INIT)
 		i40e_fm_fini(i40e);
-
-	if (i40e->i40e_attach_progress & I40E_ATTACH_UFM_INIT)
-		ddi_ufm_fini(i40e->i40e_ufmh);
 
 	kmem_free(i40e->i40e_aqbuf, I40E_ADMINQ_BUFSZ);
 	kmem_free(i40e, sizeof (i40e_t));
@@ -3404,13 +3404,15 @@ i40e_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	}
 	i40e->i40e_attach_progress |= I40E_ATTACH_ENABLE_INTR;
 
-	if (ddi_ufm_init(i40e->i40e_dip, DDI_UFM_CURRENT_VERSION, &i40e_ufm_ops,
-	    &i40e->i40e_ufmh, i40e) != 0) {
-		i40e_error(i40e, "failed to initialize UFM subsystem");
-		goto attach_fail;
+	if (i40e->i40e_hw_space.bus.func == 0) {
+		if (ddi_ufm_init(i40e->i40e_dip, DDI_UFM_CURRENT_VERSION,
+		    &i40e_ufm_ops, &i40e->i40e_ufmh, i40e) != 0) {
+			i40e_error(i40e, "failed to initialize UFM subsystem");
+			goto attach_fail;
+		}
+		ddi_ufm_update(i40e->i40e_ufmh);
+		i40e->i40e_attach_progress |= I40E_ATTACH_UFM_INIT;
 	}
-	ddi_ufm_update(i40e->i40e_ufmh);
-	i40e->i40e_attach_progress |= I40E_ATTACH_UFM_INIT;
 
 	atomic_or_32(&i40e->i40e_state, I40E_INITIALIZED);
 

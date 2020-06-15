@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2013  Peter Grehan <grehan@freebsd.org>
  * All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -68,6 +69,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/atomic.h>
 
 #include "bhyverun.h"
+#include "debug.h"
 #ifdef	__FreeBSD__
 #include "mevent.h"
 #endif
@@ -544,7 +546,7 @@ blockif_open(const char *optstr, const char *ident)
 		else if (sscanf(cp, "sectorsize=%d", &ssopt) == 1)
 			pssopt = ssopt;
 		else {
-			fprintf(stderr, "Invalid device option \"%s\"\n", cp);
+			EPRINTLN("Invalid device option \"%s\"", cp);
 			goto err;
 		}
 	}
@@ -692,7 +694,7 @@ blockif_open(const char *optstr, const char *ident)
 	if (ssopt != 0) {
 		if (!powerof2(ssopt) || !powerof2(pssopt) || ssopt < 512 ||
 		    ssopt > pssopt) {
-			fprintf(stderr, "Invalid sector size %d/%d\n",
+			EPRINTLN("Invalid sector size %d/%d",
 			    ssopt, pssopt);
 			goto err;
 		}
@@ -706,8 +708,8 @@ blockif_open(const char *optstr, const char *ident)
 		 */
 		if (S_ISCHR(sbuf.st_mode)) {
 			if (ssopt < sectsz || (ssopt % sectsz) != 0) {
-				fprintf(stderr, "Sector size %d incompatible "
-				    "with underlying device sector size %d\n",
+				EPRINTLN("Sector size %d incompatible "
+				    "with underlying device sector size %d",
 				    ssopt, sectsz);
 				goto err;
 			}

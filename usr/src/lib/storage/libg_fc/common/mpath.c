@@ -235,19 +235,17 @@ get_pathlist(char *dev_path, sv_iocdata_t *ioc, int *num_paths_to_copy)
 	int	fd;
 	int	initial_path_count;
 	int	current_path_count;
-	int 	i;
+	int	i;
 	char	*delimiter;
 	int	malloc_error = 0;
-	int 	prop_buf_size;
+	int	prop_buf_size;
 	int	pathlist_retry_count = 0;
 
-	if (strncmp(dev_path, SCSI_VHCI,
-			strlen(SCSI_VHCI)) != NULL) {
+	if (strncmp(dev_path, SCSI_VHCI, strlen(SCSI_VHCI)) != 0) {
 		if ((physical_path = g_get_physical_name(dev_path)) == NULL) {
 			return (L_INVALID_PATH);
 		}
-		if (strncmp(physical_path, SCSI_VHCI,
-				strlen(SCSI_VHCI)) != NULL) {
+		if (strncmp(physical_path, SCSI_VHCI, strlen(SCSI_VHCI)) != 0) {
 			free(physical_path);
 			return (L_INVALID_PATH);
 		}
@@ -265,7 +263,7 @@ get_pathlist(char *dev_path, sv_iocdata_t *ioc, int *num_paths_to_copy)
 	delimiter = strrchr(physical_path, ':');
 	/* if we didn't find the ':' fine, else truncate */
 	if (delimiter != NULL) {
-		*delimiter = NULL;
+		*delimiter = '\0';
 	}
 
 	/*
@@ -388,7 +386,7 @@ return (0);
  *	dev_path client device path
  *	example: /devices/scsi_vhci/ssd@g280000602200416d6257333030303261:c,raw
  * outputs:
- * 	pathlist_p pathlist structure containing pathinfo node data
+ *	pathlist_p pathlist structure containing pathinfo node data
  * returns:
  *   0 - success
  *  !0 - failure
@@ -400,8 +398,8 @@ g_get_pathlist(char *dev_path, struct mp_pathlist *pathlist_p)
 	sv_iocdata_t	ioc;
 	int	retval, caller_ret = 0;
 	int	num_paths_to_copy;
-	int 	i;
-	int 	prop_buf_size;
+	int	i;
+	int	prop_buf_size;
 	char	*path_class_val = NULL;
 	char	*temp_addr;
 	char	phci_path[MAXPATHLEN];

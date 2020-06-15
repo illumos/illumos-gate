@@ -162,7 +162,8 @@ static MALLOC_DEFINE(M_VMX, "vmx", "vmx");
 static MALLOC_DEFINE(M_VLAPIC, "vlapic", "vlapic");
 
 SYSCTL_DECL(_hw_vmm);
-SYSCTL_NODE(_hw_vmm, OID_AUTO, vmx, CTLFLAG_RW, NULL, NULL);
+SYSCTL_NODE(_hw_vmm, OID_AUTO, vmx, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
+    NULL);
 
 #ifdef __FreeBSD__
 int vmxon_enabled[MAXCPU];
@@ -191,7 +192,11 @@ SYSCTL_INT(_hw_vmm_vmx, OID_AUTO, initialized, CTLFLAG_RD,
 /*
  * Optional capabilities
  */
-SYSCTL_NODE(_hw_vmm_vmx, OID_AUTO, cap, CTLFLAG_RW, NULL, NULL);
+#ifdef __FreeBSD__
+static SYSCTL_NODE(_hw_vmm_vmx, OID_AUTO, cap,
+    CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
+    NULL);
+#endif
 
 static int cap_halt_exit;
 SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, halt_exit, CTLFLAG_RD, &cap_halt_exit, 0,
@@ -213,6 +218,10 @@ static int cap_invpcid;
 SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, invpcid, CTLFLAG_RD, &cap_invpcid,
     0, "Guests are allowed to use INVPCID");
 
+static int tpr_shadowing;
+SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, tpr_shadowing, CTLFLAG_RD,
+    &tpr_shadowing, 0, "TPR shadowing support");
+
 static int virtual_interrupt_delivery;
 SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, virtual_interrupt_delivery, CTLFLAG_RD,
     &virtual_interrupt_delivery, 0, "APICv virtual interrupt delivery support");
@@ -230,10 +239,10 @@ static u_int vpid_alloc_failed;
 SYSCTL_UINT(_hw_vmm_vmx, OID_AUTO, vpid_alloc_failed, CTLFLAG_RD,
 	    &vpid_alloc_failed, 0, NULL);
 
-static int guest_l1d_flush;
+int guest_l1d_flush;
 SYSCTL_INT(_hw_vmm_vmx, OID_AUTO, l1d_flush, CTLFLAG_RD,
     &guest_l1d_flush, 0, NULL);
-static int guest_l1d_flush_sw;
+int guest_l1d_flush_sw;
 SYSCTL_INT(_hw_vmm_vmx, OID_AUTO, l1d_flush_sw, CTLFLAG_RD,
     &guest_l1d_flush_sw, 0, NULL);
 
@@ -697,7 +706,7 @@ vmx_restore(void)
 static int
 vmx_init(int ipinum)
 {
-	int error, use_tpr_shadow;
+	int error;
 #ifdef __FreeBSD__
 	uint64_t basic, fixed0, fixed1, feature_control;
 #else
@@ -827,6 +836,24 @@ vmx_init(int ipinum)
 	    &tmp) == 0);
 
 	/*
+	 * Check support for TPR shadow.
+	 */
+	error = vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS,
+	    MSR_VMX_TRUE_PROCBASED_CTLS, PROCBASED_USE_TPR_SHADOW, 0,
+	    &tmp);
+	if (error == 0) {
+		tpr_shadowing = 1;
+		TUNABLE_INT_FETCH("hw.vmm.vmx.use_tpr_shadowing",
+		    &tpr_shadowing);
+	}
+
+	if (tpr_shadowing) {
+		procbased_ctls |= PROCBASED_USE_TPR_SHADOW;
+		procbased_ctls &= ~PROCBASED_CR8_LOAD_EXITING;
+		procbased_ctls &= ~PROCBASED_CR8_STORE_EXITING;
+	}
+
+	/*
 	 * Check support for virtual interrupt delivery.
 	 */
 	procbased2_vid_bits = (PROCBASED2_VIRTUALIZE_APIC_ACCESSES |
@@ -834,13 +861,9 @@ vmx_init(int ipinum)
 	    PROCBASED2_APIC_REGISTER_VIRTUALIZATION |
 	    PROCBASED2_VIRTUAL_INTERRUPT_DELIVERY);
 
-	use_tpr_shadow = (vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS,
-	    MSR_VMX_TRUE_PROCBASED_CTLS, PROCBASED_USE_TPR_SHADOW, 0,
-	    &tmp) == 0);
-
 	error = vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS2, MSR_VMX_PROCBASED_CTLS2,
 	    procbased2_vid_bits, 0, &tmp);
-	if (error == 0 && use_tpr_shadow) {
+	if (error == 0 && tpr_shadowing) {
 		virtual_interrupt_delivery = 1;
 		TUNABLE_INT_FETCH("hw.vmm.vmx.use_apic_vid",
 		    &virtual_interrupt_delivery);
@@ -850,13 +873,6 @@ vmx_init(int ipinum)
 		procbased_ctls |= PROCBASED_USE_TPR_SHADOW;
 		procbased_ctls2 |= procbased2_vid_bits;
 		procbased_ctls2 &= ~PROCBASED2_VIRTUALIZE_X2APIC_MODE;
-
-		/*
-		 * No need to emulate accesses to %CR8 if virtual
-		 * interrupt delivery is enabled.
-		 */
-		procbased_ctls &= ~PROCBASED_CR8_LOAD_EXITING;
-		procbased_ctls &= ~PROCBASED_CR8_STORE_EXITING;
 
 		/*
 		 * Check for Posted Interrupts only if Virtual Interrupt
@@ -1179,14 +1195,17 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 		vmx->ctx[i].guest_dr6 = DBREG_DR6_RESERVED1;
 		error += vmwrite(VMCS_GUEST_DR7, DBREG_DR7_RESERVED1);
 
-		if (virtual_interrupt_delivery) {
-			error += vmwrite(VMCS_APIC_ACCESS, APIC_ACCESS_ADDRESS);
+		if (tpr_shadowing) {
 #ifdef __FreeBSD__
 			error += vmwrite(VMCS_VIRTUAL_APIC,
 			    vtophys(&vmx->apic_page[i]));
 #else
 			error += vmwrite(VMCS_VIRTUAL_APIC, apic_page_pa);
 #endif
+		}
+
+		if (virtual_interrupt_delivery) {
+			error += vmwrite(VMCS_APIC_ACCESS, APIC_ACCESS_ADDRESS);
 			error += vmwrite(VMCS_EOI_EXIT0, 0);
 			error += vmwrite(VMCS_EOI_EXIT1, 0);
 			error += vmwrite(VMCS_EOI_EXIT2, 0);
@@ -1207,6 +1226,7 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 		vmx->cap[i].set = 0;
 		vmx->cap[i].proc_ctls = procbased_ctls;
 		vmx->cap[i].proc_ctls2 = procbased_ctls2;
+		vmx->cap[i].exc_bitmap = exc_bitmap;
 
 		vmx->state[i].nextrip = ~0;
 		vmx->state[i].lastcpu = NOCPU;
@@ -2940,6 +2960,18 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 			return (1);
 		}
 
+		/*
+		 * If the hypervisor has requested user exits for
+		 * debug exceptions, bounce them out to userland.
+		 */
+		if (intr_type == VMCS_INTR_T_SWEXCEPTION && intr_vec == IDT_BP &&
+		    (vmx->cap[vcpu].set & (1 << VM_CAP_BPT_EXIT))) {
+			vmexit->exitcode = VM_EXITCODE_BPT;
+			vmexit->u.bpt.inst_length = vmexit->inst_length;
+			vmexit->inst_length = 0;
+			break;
+		}
+
 		if (intr_vec == IDT_PF) {
 			error = vmxctx_setreg(vmxctx, VM_REG_GUEST_CR2, qual);
 			KASSERT(error == 0, ("%s: vmxctx_setreg(cr2) error %d",
@@ -3037,6 +3069,12 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 	case EXIT_REASON_MWAIT:
 		SDT_PROBE3(vmm, vmx, exit, mwait, vmx, vcpu, vmexit);
 		vmexit->exitcode = VM_EXITCODE_MWAIT;
+		break;
+	case EXIT_REASON_TPR:
+		vlapic = vm_lapic(vmx->vm, vcpu);
+		vlapic_sync_tpr(vlapic);
+		vmexit->inst_length = 0;
+		handled = HANDLED;
 		break;
 	case EXIT_REASON_VMCALL:
 	case EXIT_REASON_VMCLEAR:
@@ -3408,6 +3446,16 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 		ldt_sel = sldt();
 #endif
 
+		/*
+		 * If TPR Shadowing is enabled, the TPR Threshold
+		 * must be updated right before entering the guest.
+		 */
+		if (tpr_shadowing && !virtual_interrupt_delivery) {
+			if ((vmx->cap[vcpu].proc_ctls & PROCBASED_USE_TPR_SHADOW) != 0) {
+				vmcs_write(VMCS_TPR_THRESHOLD, vlapic_get_cr8(vlapic));
+			}
+		}
+
 		vmx_run_trace(vmx, vcpu);
 		vmx_dr_enter_guest(vmxctx);
 		rc = vmx_enter_guest(vmxctx, vmx, launched);
@@ -3770,6 +3818,9 @@ vmx_getcap(void *arg, int vcpu, int type, int *retval)
 		if (cap_invpcid)
 			ret = 0;
 		break;
+	case VM_CAP_BPT_EXIT:
+		ret = 0;
+		break;
 	default:
 		break;
 	}
@@ -3841,11 +3892,25 @@ vmx_setcap(void *arg, int vcpu, int type, int val)
 			reg = VMCS_SEC_PROC_BASED_CTLS;
 		}
 		break;
+	case VM_CAP_BPT_EXIT:
+		retval = 0;
+
+		/* Don't change the bitmap if we are tracing all exceptions. */
+		if (vmx->cap[vcpu].exc_bitmap != 0xffffffff) {
+			pptr = &vmx->cap[vcpu].exc_bitmap;
+			baseval = *pptr;
+			flag = (1 << IDT_BP);
+			reg = VMCS_EXCEPTION_BITMAP;
+		}
+		break;
 	default:
 		break;
 	}
 
-	if (retval == 0) {
+	if (retval)
+		return (retval);
+
+	if (pptr != NULL) {
 		if (val) {
 			baseval |= flag;
 		} else {
@@ -3855,26 +3920,23 @@ vmx_setcap(void *arg, int vcpu, int type, int val)
 		error = vmwrite(reg, baseval);
 		VMCLEAR(vmcs);
 
-		if (error) {
-			retval = error;
-		} else {
-			/*
-			 * Update optional stored flags, and record
-			 * setting
-			 */
-			if (pptr != NULL) {
-				*pptr = baseval;
-			}
+		if (error)
+			return (error);
 
-			if (val) {
-				vmx->cap[vcpu].set |= (1 << type);
-			} else {
-				vmx->cap[vcpu].set &= ~(1 << type);
-			}
-		}
+		/*
+		 * Update optional stored flags, and record
+		 * setting
+		 */
+		*pptr = baseval;
 	}
 
-	return (retval);
+	if (val) {
+		vmx->cap[vcpu].set |= (1 << type);
+	} else {
+		vmx->cap[vcpu].set &= ~(1 << type);
+	}
+
+	return (0);
 }
 
 struct vlapic_vtx {
@@ -4058,7 +4120,30 @@ vmx_set_tmr(struct vlapic *vlapic, const uint32_t *masks)
 }
 
 static void
-vmx_enable_x2apic_mode(struct vlapic *vlapic)
+vmx_enable_x2apic_mode_ts(struct vlapic *vlapic)
+{
+	struct vmx *vmx;
+	struct vmcs *vmcs;
+	uint32_t proc_ctls;
+	int vcpuid;
+
+	vcpuid = vlapic->vcpuid;
+	vmx = ((struct vlapic_vtx *)vlapic)->vmx;
+	vmcs = &vmx->vmcs[vcpuid];
+
+	proc_ctls = vmx->cap[vcpuid].proc_ctls;
+	proc_ctls &= ~PROCBASED_USE_TPR_SHADOW;
+	proc_ctls |= PROCBASED_CR8_LOAD_EXITING;
+	proc_ctls |= PROCBASED_CR8_STORE_EXITING;
+	vmx->cap[vcpuid].proc_ctls = proc_ctls;
+
+	VMPTRLD(vmcs);
+	vmcs_write(VMCS_PRI_PROC_BASED_CTLS, proc_ctls);
+	VMCLEAR(vmcs);
+}
+
+static void
+vmx_enable_x2apic_mode_vid(struct vlapic *vlapic)
 {
 	struct vmx *vmx;
 	struct vmcs *vmcs;
@@ -4222,12 +4307,16 @@ vmx_vlapic_init(void *arg, int vcpuid)
 	vlapic_vtx->pir_desc = &vmx->pir_desc[vcpuid];
 	vlapic_vtx->vmx = vmx;
 
+	if (tpr_shadowing) {
+		vlapic->ops.enable_x2apic_mode = vmx_enable_x2apic_mode_ts;
+	}
+
 	if (virtual_interrupt_delivery) {
 		vlapic->ops.set_intr_ready = vmx_set_intr_ready;
 		vlapic->ops.pending_intr = vmx_pending_intr;
 		vlapic->ops.intr_accepted = vmx_intr_accepted;
 		vlapic->ops.set_tmr = vmx_set_tmr;
-		vlapic->ops.enable_x2apic_mode = vmx_enable_x2apic_mode;
+		vlapic->ops.enable_x2apic_mode = vmx_enable_x2apic_mode_vid;
 	}
 
 	if (posted_interrupts)

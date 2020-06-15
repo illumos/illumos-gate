@@ -8,6 +8,7 @@
  * source.  A copy of the CDDL is also available via the Internet at
  * http://www.illumos.org/license/CDDL.
  */
+/* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
  * Copyright 2015 Pluribus Networks Inc.
@@ -33,6 +34,7 @@
 #include <sys/kernel.h>
 #include <sys/hma.h>
 #include <sys/x86_archext.h>
+#include <x86/apicreg.h>
 
 #include <sys/vmm.h>
 #include <sys/vmm_instruction_emul.h>
@@ -431,6 +433,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_SET_INTINFO:
 	case VM_GET_INTINFO:
 	case VM_RESTART_INSTRUCTION:
+	case VM_SET_KERNEMU_DEV:
+	case VM_GET_KERNEMU_DEV:
 		/*
 		 * Copy in the ID of the vCPU chosen for this operation.
 		 * Since a nefarious caller could update their struct between
@@ -963,6 +967,62 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			}
 			error = vm_set_register(sc->vmm_vm, vcpu, regnums[i],
 			    regvals[i]);
+		}
+		break;
+	}
+
+	case VM_SET_KERNEMU_DEV:
+	case VM_GET_KERNEMU_DEV: {
+		struct vm_readwrite_kernemu_device kemu;
+		size_t size = 0;
+		mem_region_write_t mwrite = NULL;
+		mem_region_read_t mread = NULL;
+		uint64_t ignored = 0;
+
+		if (ddi_copyin(datap, &kemu, sizeof (kemu), md)) {
+			error = EFAULT;
+			break;
+		}
+
+		if (kemu.access_width > 3) {
+			error = EINVAL;
+			break;
+		}
+		size = (1 << kemu.access_width);
+		ASSERT(size >= 1 && size <= 8);
+
+		if (kemu.gpa >= DEFAULT_APIC_BASE &&
+		    kemu.gpa < DEFAULT_APIC_BASE + PAGE_SIZE) {
+			mread = lapic_mmio_read;
+			mwrite = lapic_mmio_write;
+		} else if (kemu.gpa >= VIOAPIC_BASE &&
+		    kemu.gpa < VIOAPIC_BASE + VIOAPIC_SIZE) {
+			mread = vioapic_mmio_read;
+			mwrite = vioapic_mmio_write;
+		} else if (kemu.gpa >= VHPET_BASE &&
+		    kemu.gpa < VHPET_BASE + VHPET_SIZE) {
+			mread = vhpet_mmio_read;
+			mwrite = vhpet_mmio_write;
+		} else {
+			error = EINVAL;
+			break;
+		}
+
+		if (cmd == VM_SET_KERNEMU_DEV) {
+			VERIFY(mwrite != NULL);
+			error = mwrite(sc->vmm_vm, vcpu, kemu.gpa, kemu.value,
+			    size, &ignored);
+		} else {
+			VERIFY(mread != NULL);
+			error = mread(sc->vmm_vm, vcpu, kemu.gpa, &kemu.value,
+			    size, &ignored);
+		}
+
+		if (error == 0) {
+			if (ddi_copyout(&kemu, datap, sizeof (kemu), md)) {
+				error = EFAULT;
+				break;
+			}
 		}
 		break;
 	}
@@ -1912,7 +1972,7 @@ vmm_is_supported(intptr_t arg)
 
 	if (vmm_is_intel()) {
 		r = vmx_x86_supported(&msg);
-	} else if (vmm_is_amd()) {
+	} else if (vmm_is_svm()) {
 		/*
 		 * HMA already ensured that the features necessary for SVM
 		 * operation were present and online during vmm_attach().

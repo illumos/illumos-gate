@@ -10,8 +10,9 @@
 .\"
 .\"
 .\" Copyright 2019 Joyent, Inc.
+.\" Copyright 2020 Oxide Computer Company
 .\"
-.Dd February 15, 2020
+.Dd May 19, 2020
 .Dt DDI_UFM 9E
 .Os
 .Sh NAME
@@ -43,7 +44,7 @@
 .Fa "ddi_ufm_handle_t *uhp"
 .Fa "void *drv_arg"
 .Fa "uint_t imgid"
-.Fa "ddi_ufm_image_t *uip"
+.Fa "ddi_ufm_image_t *imgp"
 .Fc
 .Ft int
 .Fo ddi_ufm_op_fill_slot
@@ -51,7 +52,18 @@
 .Fa "void *drv_arg"
 .Fa "uint_t imgid"
 .Fa "uint_t slotid"
-.Fa "ddi_ufm_slot_t *usp"
+.Fa "ddi_ufm_slot_t *slotp"
+.Fc
+.Ft int
+.Fo ddi_ufm_op_readimg
+.Fa "ddi_ufm_handle_t *uhp"
+.Fa "void *drv_arg"
+.Fa "uint_t imgid"
+.Fa "uint_t slotid"
+.Fa "uint64_t len"
+.Fa "uint64_t offset"
+.Fa "void *buf"
+.Fa "uint64_t *nreadp"
 .Fc
 .Sh INTERFACE LEVEL
 .Sy Evolving - This interface is evolving still in illumos. API and ABI stability is not guaranteed.
@@ -70,12 +82,21 @@ A pointer that the driver should set with a number of images.
 A pointer that the driver should set with a number of slots.
 .It Fa imgid
 An integer indicating which image information is being requested for.
-.It Fa uip
+.It Fa imgp
 An opaque pointer that represents a UFM image.
 .It Fa slotid
 An integer indicating which slot information is being requested for.
-.It Fa usp
+.It Fa slotp
 An opaque pointer that represents a UFM slot.
+.It Fa len
+Indicates the number of bytes from a firmware payload that are desired.
+.It Fa offset
+Indicates an offset in a firmware payload to start reading from.
+.It Fa buf
+A buffer to place data firmware data read into.
+.It Fa nreadp
+A pointer whose value should be updated with the number of bytes
+actually read from the image.
 .El
 .Sh DESCRIPTION
 Upgradable firmware modules (UFM) are a potential component of many
@@ -157,23 +178,29 @@ a given time.
 The UFM operations vector is a structure that has the following members:
 .Bd -literal -offset indent
 typedef struct ddi_ufm_ops {
-	int (*ddi_ufm_op_nimages)(ddi_ufm_handle_t *uhp, void *arg,
+	int (*ddi_ufm_op_nimages)(ddi_ufm_handle_t *uhp, void *drv_arg,
 	    uint_t *nimgp);
-	int (*ddi_ufm_op_fill_image)(ddi_ufm_handle_t *uhp, void *arg,
-            uint_t imgid, ddi_ufm_image_t *img);
-	int (*ddi_ufm_op_fill_slot)(ddi_ufm_handle_t *uhp, void *arg,
+	int (*ddi_ufm_op_fill_image)(ddi_ufm_handle_t *uhp, void *drv_arg,
+            uint_t imgid, ddi_ufm_image_t *imgp);
+	int (*ddi_ufm_op_fill_slot)(ddi_ufm_handle_t *uhp, void *drv_arg,
             int imgid, ddi_ufm_image_t *img, uint_t slotid,
 	    ddi_ufm_slot_t *slotp);
-	int (*ddi_ufm_op_getcaps)(ddi_ufm_handle_t *uhp, void *arg,
+	int (*ddi_ufm_op_getcaps)(ddi_ufm_handle_t *uhp, void *drv_arg,
 	    ddi_ufm_cap_t *caps);
+	int (*ddi_ufm_op_readimg)(ddi_ufm_handle_t *uhp, void *drv_arg,
+	    uint_t imgid, uint_t slotid, uint64_t len, uint64_t offset,
+	    void *buf, uint64_t *nreadp);
 } ddi_ufm_ops_t;
 .Ed
 .Pp
 The
 .Fn ddi_ufm_op_nimages
-entry point is optional.
+and
+.Fn ddi_ufm_op_readimg
+entry points are optional.
 If a device only has a single image, then there is no reason to implement the
-.Fn ddi_ufm_op_nimages entry point.
+.Fn ddi_ufm_op_nimages
+entry point.
 The system will assume that there is only a single image.
 .Pp
 Slots and images are numbered starting at zero.
@@ -193,7 +220,8 @@ The
 entry point is an optional entry point that answers the question of how
 many different, distinct firmware images are present on the device.
 Once the driver determines how many are present, it should set the value in
-.Fa nimgp to the determined value.
+.Fa nimgp
+to the determined value.
 .Pp
 It is legal for a device to pass in zero for this value, which indicates
 that there are none present.
@@ -224,7 +252,7 @@ then it should return an error.
 The
 .Ft ddi_ufm_image_t
 structure passed in
-.Fa uip
+.Fa imgp
 is opaque.
 To fill in information about the image, the driver should call the functions
 described in
@@ -277,7 +305,7 @@ then it should return an error.
 The
 .Ft ddi_ufm_slot_t
 structure passed in
-.Fa usp
+.Fa slotp
 is opaque.
 To fill in information about the image the driver should call the functions
 described in
@@ -314,10 +342,17 @@ This attributes indicates that the specified slot does not currently contain
 any firmware image.
 .El
 .Pp
+If the driver supports the
+.Fn ddi_ufm_op_readimg
+entry point, then the driver should attempt to determine the size in
+bytes of the image in the slot and indicate that by calling the
+.Xr ddi_ufm_slot_set_imgsize 9F
+function.
+.Pp
 Finally, if there are any device-specific key-value pairs that form
 useful, ancillary data, then the driver should assemble an nvlist and
 pass it to the
-.Xr ddi_ufm_set_misc 9F
+.Xr ddi_ufm_slot_set_misc 9F
 function.
 .Pp
 Once the driver has finished setting all of the information about the
@@ -346,12 +381,20 @@ The
 .Fn ddi_ufm_op_getcaps
 function is used to indicate which DDI UFM capabilities are supported by this
 driver instance.
-Currently there is only a single capability
-.Pq DDI_UFM_CAP_REPORT
-which indicates that the driver is capable of reporting UFM information for this
-instance.
-Future UFM versions may add additional capabilities such as the ability to
-obtain a raw dump of the firmware image or to upgrade the firmware.
+The following capabilities are supported and the drivers should return a
+bitwise-inclusive-OR of the following values:
+.Bl -tag -width Dv -offset width
+.It Dv DDI_UFM_CAP_REPORT
+Indicates that the driver is capable of reporting UFM information and
+implements the
+.Fn ddi_ufm_op_fill_slot
+entry point and optionally the
+.Fn ddi_ufm_op_fill_image
+entry point.
+.It Dv DDI_UFM_CAP_READIMG
+Indicates that the driver is capable of reading a binary firmware
+payload off of a device.
+.El
 .Pp
 The driver should indicate the supported capabilities by setting the value in
 the
@@ -371,6 +414,55 @@ An error occurred talking to the device while trying to discover firmware
 capabilities.
 .It Er ENOMEM
 The driver was unable to allocate memory.
+.El
+.It Fn ddi_ufm_op_readimg
+The
+.Fn ddi_ufm_op_readimg
+is an optional entry point that allows the system to read a binary
+firmware payload from the device.
+The driver should read the firmware payload indicated by both
+.Fa imgid
+and
+.Fa slotid .
+The driver should check to make sure that the region requested, starting
+at
+.Fa offset
+bytes into the image
+and
+.Fa len
+bytes long is valid for the image and if not, return the error
+.Er EINVAL .
+Data from the device should be copied into
+.Fa buf
+and the number of bytes successfully read should be placed into
+.Fa nreadp .
+.Pp
+Upon successfully reading this data, the driver should return
+.Sy 0 .
+Otherwise the driver should return the appropriate error number.
+For a full list of error numbers, see
+.Xr Intro 2 .
+Common values are:
+.Bl -tag -width Er -offset width
+.It Er EINVAL
+The image or slot indicate by
+.Fa imgid
+and
+.Fa slotid
+is unknown.
+The combination of
+.Fa offset
+and
+.Fa len
+would overflow or read from a region of the image which is not valid.
+The device currently has an alignment restriction and the requested
+offset and length do not honor that.
+.It Er EIO
+An error occurred while communicating with the device to read the
+firmware image.
+.It Er ENOTSUP
+The driver does not support reading a firmware payload on this device or
+from a particular image and slot.
 .El
 .El
 .Ss Caching and Updates

@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #ifndef _SYS_DDI_UFM_H
@@ -39,19 +40,19 @@ extern "C" {
 #define	UFM_IOC_GETCAPS		(UFM_IOC | 1)
 #define	UFM_IOC_REPORTSZ	(UFM_IOC | 2)
 #define	UFM_IOC_REPORT		(UFM_IOC | 3)
+#define	UFM_IOC_READIMG		(UFM_IOC | 4)
 #define	UFM_IOC_MAX		UFM_IOC_REPORT
 
 /*
  * Bitfield enumerating the DDI UFM capabilities supported by this device
  * instance.  Currently there is only a single capability of being able to
- * report UFM information.  Future UFM versions may add additional capabilities
- * such as the ability to obtain a raw dump the firmware image or ability to
- * upgrade the firmware.  When support for new capabilties are added to the DDI
- * UFM subsystem, it should be reflected in this enum and the implementation of
- * the UFM_IOC_GETCAPS should be extended appropriately.
+ * report UFM information.  When support for new capabilties are added to the
+ * DDI UFM subsystem, it should be reflected in this enum and the implementation
+ * of the UFM_IOC_GETCAPS should be extended appropriately.
  */
 typedef enum {
-	DDI_UFM_CAP_REPORT	= 1 << 0
+	DDI_UFM_CAP_REPORT	= 1 << 0,
+	DDI_UFM_CAP_READIMG	= 1 << 1
 } ddi_ufm_cap_t;
 
 /*
@@ -111,6 +112,36 @@ typedef struct ufm_ioc_report32 {
 #endif	/* _KERNEL */
 
 /*
+ * This struct defines the input/output data for the UFM_IOC_READ ioctl, which
+ * reads the firmware image from a given slot.
+ */
+typedef struct ufm_ioc_readimg {
+	uint_t		ufri_version;
+	uint_t		ufri_imageno;
+	uint_t		ufri_slotno;
+	uint64_t	ufri_offset;
+	uint64_t	ufri_len;
+	uint64_t	ufri_nread;
+	void		*ufri_buf;
+	char		ufri_devpath[MAXPATHLEN];
+} ufm_ioc_readimg_t;
+
+#ifdef _KERNEL
+#pragma pack(4)
+typedef struct ufm_ioc_readimg32 {
+	uint_t		ufri_version;
+	uint_t		ufri_imageno;
+	uint_t		ufri_slotno;
+	uint64_t	ufri_offset;
+	uint64_t	ufri_len;
+	uint64_t	ufri_nread;
+	caddr32_t	ufri_buf;
+	char		ufri_devpath[MAXPATHLEN];
+} ufm_ioc_readimg32_t;
+#pragma pack()
+#endif	/* _KERNEL */
+
+/*
  * The UFM_IOC_REPORT ioctl return UFM image and slot data in the form of a
  * packed nvlist.  The nvlist contains and array of nvlists (one-per-image).
  * Each image nvlist contains will contain a string nvpair containing a
@@ -127,12 +158,18 @@ typedef struct ufm_ioc_report32 {
 #define	DDI_UFM_NV_IMAGE_SLOTS		"ufm-image-slots"
 
 /*
- * Each slot nvlist as a string nvpair describing the firmware image version
- * and an uint32 nvpair describing the slot attributes (see ddi_ufm_attr_t
- * above).  An option nvlist nvpar may be present containing additional
- * miscellaneous slot data.
+ * Each slot nvlist has the following:
+ *
+ *  o A string nvpair describing the firmware image version
+ *  o A uint32 nvpair describing the slot attributes (see ddi_ufm_attr_t
+ *    below).
+ *  o An optional nvlist nvpar may be present containing additional
+ *    miscellaneous slot data.
+ *  o An optional uint64 slot length that indicates the size of the image in
+ *    that slot. Note htis is the size of the image, not the size of the slot.
  */
 #define	DDI_UFM_NV_SLOT_VERSION		"ufm-slot-version"
+#define	DDI_UFM_NV_SLOT_IMGSIZE		"ufm-slot-imgsize"
 
 typedef enum {
 	DDI_UFM_ATTR_READABLE	= 1 << 0,
@@ -166,6 +203,8 @@ typedef struct ddi_ufm_ops {
 	int (*ddi_ufm_op_fill_slot)(ddi_ufm_handle_t *, void *, uint_t, uint_t,
 	    ddi_ufm_slot_t *);
 	int (*ddi_ufm_op_getcaps)(ddi_ufm_handle_t *, void *, ddi_ufm_cap_t *);
+	int (*ddi_ufm_op_readimg)(ddi_ufm_handle_t *, void *, uint_t, uint_t,
+	    uint64_t, uint64_t, void *, uint64_t *);
 } ddi_ufm_ops_t;
 
 /*
@@ -215,6 +254,7 @@ void ddi_ufm_image_set_misc(ddi_ufm_image_t *, nvlist_t *);
 void ddi_ufm_slot_set_version(ddi_ufm_slot_t *, const char *);
 void ddi_ufm_slot_set_attrs(ddi_ufm_slot_t *, ddi_ufm_attr_t);
 void ddi_ufm_slot_set_misc(ddi_ufm_slot_t *, nvlist_t *);
+void ddi_ufm_slot_set_imgsize(ddi_ufm_slot_t *, uint64_t);
 #endif /* _KERNEL */
 
 #ifdef __cplusplus

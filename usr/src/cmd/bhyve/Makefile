@@ -75,10 +75,15 @@ SRCS =	acpi.c			\
 	vga.c			\
 	virtio.c		\
 	vmm_instruction_emul.c	\
+	vmgenc.c		\
 	xmsr.c			\
 	spinup_ap.c		\
 	iov.c			\
 	bhyve_sol_glue.c
+
+# We are not yet performing instruction emulation in userspace, so going to the
+# trouble of fixing the header tangle for this is not worth the complexity.
+	#kernemu_dev.c		\
 
 # The virtio-scsi driver appears to include  a slew of materials from FreeBSD's
 # native SCSI implementation.  We will omit that complexity for now.
@@ -125,6 +130,7 @@ CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-DWITHOUT_CAPSICUM
 
 pci_nvme.o := CERRWARN += -_gcc=-Wno-pointer-sign
+pci_nvme.o := SMOFF += kmalloc_wrong_size
 
 SMOFF += all_func_returns,leaks,no_if_block
 

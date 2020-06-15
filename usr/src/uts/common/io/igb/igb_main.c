@@ -27,6 +27,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013, Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include "igb_sw.h"
@@ -123,6 +124,13 @@ static int igb_fm_error_cb(dev_info_t *, ddi_fm_error_t *,
 static void igb_fm_init(igb_t *);
 static void igb_fm_fini(igb_t *);
 static void igb_release_multicast(igb_t *);
+static int igb_ufm_fill_image(ddi_ufm_handle_t *, void *arg, uint_t,
+    ddi_ufm_image_t *);
+static int igb_ufm_fill_slot(ddi_ufm_handle_t *, void *, uint_t, uint_t,
+    ddi_ufm_slot_t *);
+static int igb_ufm_getcaps(ddi_ufm_handle_t *, void *, ddi_ufm_cap_t *);
+static int igb_ufm_readimg(ddi_ufm_handle_t *, void *, uint_t, uint_t,
+    uint64_t, uint64_t, void *, uint64_t *);
 
 char *igb_priv_props[] = {
 	"_eee_support",
@@ -360,6 +368,13 @@ static adapter_info_t igb_i354_cap = {
 	0xfff00000		/* mask for RXDCTL register */
 };
 
+static ddi_ufm_ops_t igb_ufm_ops = {
+	.ddi_ufm_op_fill_image = igb_ufm_fill_image,
+	.ddi_ufm_op_fill_slot = igb_ufm_fill_slot,
+	.ddi_ufm_op_getcaps = igb_ufm_getcaps,
+	.ddi_ufm_op_readimg = igb_ufm_readimg
+};
+
 /*
  * Module Initialization Functions
  */
@@ -591,6 +606,21 @@ igb_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	}
 	igb->attach_progress |= ATTACH_PROGRESS_ENABLE_INTR;
 
+	/*
+	 * Only enable UFM support on function zero of the device as the images
+	 * are always device wide.
+	 */
+	if (igb->hw.bus.func == 0) {
+		if (ddi_ufm_init(devinfo, DDI_UFM_CURRENT_VERSION, &igb_ufm_ops,
+		    &igb->igb_ufmh, igb) != 0) {
+			igb_log(igb, IGB_LOG_ERROR, "Failed to enable DDI UFM "
+			    "support");
+			goto attach_fail;
+		}
+		igb->attach_progress |= ATTACH_PROGRESS_UFM;
+		ddi_ufm_update(igb->igb_ufmh);
+	}
+
 	igb_log(igb, IGB_LOG_INFO, "%s", igb_version);
 	atomic_or_32(&igb->igb_state, IGB_INITIALIZED);
 
@@ -743,6 +773,10 @@ igb_quiesce(dev_info_t *devinfo)
 static void
 igb_unconfigure(dev_info_t *devinfo, igb_t *igb)
 {
+	if (igb->attach_progress & ATTACH_PROGRESS_UFM) {
+		ddi_ufm_fini(igb->igb_ufmh);
+	}
+
 	/*
 	 * Disable interrupt
 	 */
@@ -5365,4 +5399,141 @@ igb_fm_ereport(igb_t *igb, char *detail)
 		ddi_fm_ereport_post(igb->dip, buf, ena, DDI_NOSLEEP,
 		    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0, NULL);
 	}
+}
+
+static int
+igb_ufm_fill_image(ddi_ufm_handle_t *ufmh, void *arg, uint_t imgno,
+    ddi_ufm_image_t *imgp)
+{
+	igb_t *igb = arg;
+	const char *type;
+
+	if (imgno != 0) {
+		return (EINVAL);
+	}
+
+	ddi_ufm_image_set_desc(imgp, "NVM");
+	ddi_ufm_image_set_nslots(imgp, 1);
+	switch (igb->hw.nvm.type) {
+	case e1000_nvm_eeprom_spi:
+		type = "SPI EEPROM";
+		break;
+	case e1000_nvm_eeprom_microwire:
+		type = "Microwire EEPROM";
+		break;
+	case e1000_nvm_invm:
+		type = "Internal NVM";
+		break;
+	case e1000_nvm_flash_hw:
+	case e1000_nvm_flash_sw:
+		type = "Flash";
+		break;
+	default:
+		type = NULL;
+		break;
+	}
+
+	if (type != NULL) {
+		nvlist_t *nvl;
+
+		nvl = fnvlist_alloc();
+		fnvlist_add_string(nvl, "image-type", type);
+		/*
+		 * The DDI takes ownership of the nvlist_t at this point.
+		 */
+		ddi_ufm_image_set_misc(imgp, nvl);
+	}
+
+	return (0);
+}
+
+static int
+igb_ufm_fill_slot(ddi_ufm_handle_t *ufmh, void *arg, uint_t imgno,
+    uint_t slotno, ddi_ufm_slot_t *slotp)
+{
+	igb_t *igb = arg;
+	char *ver;
+
+	if (imgno != 0 || slotno != 0) {
+		return (EINVAL);
+	}
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, igb->dip, DDI_PROP_DONTPASS,
+	    "nvm-version", &ver) == 0) {
+		ddi_ufm_slot_set_version(slotp, ver);
+		ddi_prop_free(ver);
+	}
+
+	ddi_ufm_slot_set_attrs(slotp, DDI_UFM_ATTR_ACTIVE |
+	    DDI_UFM_ATTR_READABLE | DDI_UFM_ATTR_WRITEABLE);
+	ddi_ufm_slot_set_imgsize(slotp, igb->hw.nvm.word_size * 2);
+	return (0);
+}
+
+static int
+igb_ufm_getcaps(ddi_ufm_handle_t *ufmh, void *arg, ddi_ufm_cap_t *caps)
+{
+	igb_t *igb = arg;
+
+	*caps = 0;
+	if (igb->hw.nvm.type != e1000_nvm_none &&
+	    igb->hw.nvm.type != e1000_nvm_unknown) {
+		*caps |= DDI_UFM_CAP_REPORT;
+
+		if (igb->hw.nvm.ops.read != NULL) {
+			*caps |= DDI_UFM_CAP_READIMG;
+		}
+	}
+
+	return (0);
+}
+
+static int
+igb_ufm_readimg(ddi_ufm_handle_t *ufmh, void *arg, uint_t imgno, uint_t slotno,
+    uint64_t len, uint64_t offset, void *buf, uint64_t *nread)
+{
+	igb_t *igb = arg;
+	uint16_t wordoff, nwords, *buf16 = buf;
+	uint32_t imgsize = igb->hw.nvm.word_size * 2;
+	int ret;
+
+	if (imgno != 0 || slotno != 0) {
+		return (EINVAL);
+	}
+
+	if (len > imgsize || offset > imgsize || len + offset > imgsize) {
+		return (EINVAL);
+	}
+
+	if (igb->hw.nvm.ops.read == NULL) {
+		return (ENOTSUP);
+	}
+
+	/*
+	 * Hardware provides us a means to read 16-bit words. For the time
+	 * being, restrict offset and length to be 2 byte aligned. We should
+	 * probably reduce this restriction. We could probably just use a bounce
+	 * buffer.
+	 */
+	if ((offset % 2) != 0 || (len % 2) != 0) {
+		return (EINVAL);
+	}
+
+	wordoff = offset >> 1;
+	nwords = len >> 1;
+	mutex_enter(&igb->gen_lock);
+	ret = e1000_read_nvm(&igb->hw, wordoff, nwords, buf16);
+	mutex_exit(&igb->gen_lock);
+
+	if (ret == 0) {
+		uint16_t i;
+		*nread = len;
+		for (i = 0; i < nwords; i++) {
+			buf16[i] = LE_16(buf16[i]);
+		}
+	} else {
+		ret = EIO;
+	}
+
+	return (ret);
 }

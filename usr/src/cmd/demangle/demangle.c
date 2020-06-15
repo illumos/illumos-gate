@@ -183,7 +183,7 @@ do_demangle(const char *sym, sysdem_lang_t lang, FILE *out)
 {
 	char *demangled = sysdemangle(sym, lang, NULL);
 
-	if (demangled == NULL && errno != EINVAL) {
+	if (demangled == NULL && errno != EINVAL && errno != ENOTSUP) {
 		warn(_("error while demangling '%s'"), sym);
 		return (-1);
 	}

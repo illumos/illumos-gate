@@ -1,13 +1,19 @@
 /*
- * COPYRIGHT 2014 Pluribus Networks Inc.
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
  *
- * All rights reserved. This copyright notice is Copyright Management
- * Information under 17 USC 1202 and is included to protect this work and
- * deter copyright infringement.  Removal or alteration of this Copyright
- * Management Information without the express written permission from
- * Pluribus Networks Inc is prohibited, and any such unauthorized removal
- * or alteration will be a violation of federal law.
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
  */
+/* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
+
+/*
+ * Copyright 2014 Pluribus Networks Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>

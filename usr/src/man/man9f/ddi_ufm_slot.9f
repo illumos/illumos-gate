@@ -10,15 +10,17 @@
 .\"
 .\"
 .\" Copyright 2019 Joyent, Inc.
+.\" Copyright 2020 Oxide Computer Company
 .\"
-.Dd Apr 30, 2019
+.Dd May 19, 2020
 .Dt DDI_UFM_SLOT 9F
 .Os
 .Sh NAME
 .Nm ddi_ufm_slot ,
 .Nm ddi_ufm_slot_set_version ,
 .Nm ddi_ufm_slot_set_attrs ,
-.Nm ddi_ufm_slot_set_misc
+.Nm ddi_ufm_slot_set_misc ,
+.Nm ddi_ufm_slot_set_imgsize
 .Nd UFM slot property routines
 .Sh SYNOPSIS
 #include <sys/ddi_ufm.h>
@@ -37,6 +39,11 @@
 .Fo ddi_ufm_slot_set_misc
 .Fa "ddi_ufm_slot_t *usp"
 .Fa "nvlist_t *nvl"
+.Fc
+.Ft void
+.Fo ddi_ufm_slot_set_imgsize
+.Fa "ddi_ufm_slot_t *usp"
+.Fa "uint64_t len"
 .Fc
 .Sh INTERFACE LEVEL
 .Sy Evolving -
@@ -60,13 +67,16 @@ function in
 .Xr ddi_ufm 9E .
 .It Fa nvl
 An nvlist_t with ancillary, device-specific data.
+.It Fa len
+The length in bytes of a firmware image in a slot.
 .El
 .Sh DESCRIPTION
 The
 .Fn ddi_ufm_slot_set_version ,
 .Fn ddi_ufm_slot_set_attrs ,
+.Fn ddi_ufm_slot_set_misc ,
 and
-.Fn ddi_ufm_slot_set_misc
+.Fn ddi_ufm_slot_set_imgsize
 functions are used by device drivers to set information about a firmware
 slot on the slot structure
 .Fa usp
@@ -104,6 +114,13 @@ Once the driver passes the nvlist to the
 .Fn ddi_ufm_slot_set_misc
 function, then the driver must not manipulate or free the nvlist at all.
 It is the property of the UFM subsystem.
+.Pp
+the
+.Fn ddi_ufm_slot_set_imgsize
+function is used by the driver to indicate the size of a firmware image
+in a slot.
+Consumers use this to determine the amount of data that they should read
+for a firmware image itself.
 .Sh CONTEXT
 These functions should only be called in the context of the
 .Xr ddi_ufm_op_fill_slot 9E

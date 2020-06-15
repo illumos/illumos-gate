@@ -1,30 +1,37 @@
 The bhyve kernel module and its associated userland consumers have been updated
 to the latest upstream FreeBSD sources as of:
 
-commit 37e8a0e0058c226e6bd0ed5c3a07ee15b1146122
-Author: mav <mav@FreeBSD.org>
-Date:   Mon Sep 23 17:53:47 2019 +0000
+commit 8ade7383cafed0f7555cac16ef7f9e956e46eaeb
+Author: grehan <grehan@FreeBSD.org>
+Date:   Mon May 25 06:25:31 2020 +0000
 
-    Make nvme(4) driver some more NUMA aware.
+    Fix pci-passthru MSI issues with OpenBSD guests
 
-     - For each queue pair precalculate CPU and domain it is bound to.
-    If queue pairs are not per-CPU, then use the domain of the device.
-     - Allocate most of queue pair memory from the domain it is bound to.
-     - Bind callouts to the same CPUs as queue pair to avoid migrations.
-     - Do not assign queue pairs to each SMT thread.  It just wasted
-    resources and increased lock congestions.
-     - Remove fixed multiplier of CPUs per queue pair, spread them even.
-    This allows to use more queue pairs in some hardware configurations.
-     - If queue pair serves multiple CPUs, bind different NVMe devices to
-    different CPUs.
+    - Return 2 x 16-bit registers in the correct byte order
+     for a 4-byte read that spans the CMD/STATUS register.
+      This reversal was hiding the capabilities-list, which prevented
+     the MSI capability from being found for XHCI passthru.
 
-    MFC after:      1 month
-    Sponsored by:   iXsystems, Inc.
+    - Reorganize MSI/MSI-x config writes so that a 4-byte write at the
+     capability offset would have the read-only portion skipped.
+      This prevented MSI interrupts from being enabled.
 
-Which corresponds to SVN revision: 352630
+     Reported and extensively tested by Anatoli (me at anatoli dot ws)
 
+    PR:     245392
+    Reported by:    Anatoli (me at anatoli dot ws)
+    Reviewed by:    jhb (bhyve)
+    Approved by:    jhb, bz (mentor)
+    MFC after:      1 week
+    Differential Revision:  https://reviews.freebsd.org/D24951
 
-NOTE:
-This sync ignores commit c8edafdabc27533d9c51eddc2896e772c16d965c.
-There are big changes to the virtio net devices that we haven't synced up yet
-because SmartOS relies heavily on viona instead.
+Divergence Notes:
+A previous sync skipped commit c8edafdabc27533d9c51eddc2896e772c16d965c which
+introduced a generic backend functionality to network devices.  Without that in
+place, subsequent updates reflect the absence of that subsystem.  Integrating
+net backends has not been a priority, given the common use of viona on illumos.
+
+The draft Save/Restore functionality, added in FreeBSD commit
+d3e4e512238b072fb9282e024610b981ba679869, has not been synced into illumos bhyve
+yet.  It is not built by default in FreeBSD, so we're not interested in taking
+it until it successfully endures more in-depth testing.

@@ -399,8 +399,10 @@ usr/src/cmd/bhyve/block_if.h
 usr/src/cmd/bhyve/bootrom.h
 usr/src/cmd/bhyve/console.h
 usr/src/cmd/bhyve/dbgport.h
+usr/src/cmd/bhyve/debug.h
 usr/src/cmd/bhyve/inout.h
 usr/src/cmd/bhyve/ioapic.h
+usr/src/cmd/bhyve/kernemu_dev.h
 usr/src/cmd/bhyve/mem.h
 usr/src/cmd/bhyve/mptbl.h
 usr/src/cmd/bhyve/pci_emul.h
@@ -416,6 +418,7 @@ usr/src/cmd/bhyve/sockstream.h
 usr/src/cmd/bhyve/spinup_ap.h
 usr/src/cmd/bhyve/uart_emul.h
 usr/src/cmd/bhyve/vga.h
+usr/src/cmd/bhyve/vmgenc.h
 usr/src/cmd/bhyve/virtio.h
 usr/src/cmd/bhyve/xmsr.h
 usr/src/compat/bhyve/*

@@ -22,6 +22,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2020 Joyent, Inc.
+# Copyright 2020 Oxide Computer Company
 #
 include $(SRC)/lib/Makefile.lib
 
@@ -29,8 +30,9 @@ SES_LIB=	ses.so
 TAVOR_LIB=	tavor.so
 HERMON_LIB=	hermon.so
 SD_LIB=		sd.so
+UFM_LIB=	ufm.so
 
-PLUGINS=	$(SES_LIB) $(TAVOR_LIB) $(HERMON_LIB) $(SD_LIB)
+PLUGINS=	$(SES_LIB) $(TAVOR_LIB) $(HERMON_LIB) $(SD_LIB) $(UFM_LIB)
 
 OBJECTS= $(PLUGINS:%.so=%.o)
 DYNLIB=	$(PLUGINS:%=%)
@@ -43,10 +45,10 @@ SRCDIR= ../common
 
 include $(SRC)/cmd/fwflash/Makefile.com
 
-CLEANFILES=	$(PLUGINS) $(POFILES) $(POFILE) $(LINTFILE) $(SLINKS) 
+CLEANFILES=	$(PLUGINS) $(POFILES) $(POFILE) $(LINTFILE) $(SLINKS)
 
 LIBS= $(DYNLIB)
-CFLAGS += $(C_PICFLAGS) 
+CFLAGS += $(C_PICFLAGS)
 ROOTLIBDIR= $(ROOTUSRLIBFWFLASHIDF)
 LDLIBS		+= -ldevinfo
 MAPFILES= ../common/mapfile-vers
@@ -56,22 +58,26 @@ $(SES_LIB):=	PICS= pics/$(SES_LIB:%.so=%.o)
 $(TAVOR_LIB):=	PICS= pics/$(TAVOR_LIB:%.so=%.o)
 $(HERMON_LIB):=	PICS= pics/$(HERMON_LIB:%.so=%.o)
 $(SD_LIB):=	PICS= pics/$(SD_LIB:%.so=%.o)
+$(UFM_LIB):=	PICS= pics/$(UFM_LIB:%.so=%.o)
 
 $(SES_LIB):=    SONAME = $(SES_LIB)
 $(TAVOR_LIB):=  SONAME = $(TAVOR_LIB)
 $(HERMON_LIB):= SONAME = $(HERMON_LIB)
 $(SD_LIB):=     SONAME = $(SD_LIB)
+$(UFM_LIB):=     SONAME = $(UFM_LIB)
 
 $(HERMON_LIB):=	MAPFILES += ../common/mapfile-vers-hermon
 $(SD_LIB):=	MAPFILES += ../common/mapfile-vers-plus
+$(UFM_LIB):=	MAPFILES += ../common/mapfile-vers-plus
 
 $(HERMON_LIB):=	LDLIBS += -lc
 $(TAVOR_LIB):=	LDLIBS += -lc
 $(SES_LIB):=	LDLIBS += -L$(ROOT)/usr/lib/scsi -lscsi -lses -lnvpair -lc
 $(SD_LIB):=	LDLIBS += -L$(ROOT)/usr/lib/scsi -lscsi -lumem -lc
+$(UFM_LIB):=	LDLIBS += -lpcidb -lnvpair -lc
 
-$(SES_LIB):=	DYNFLAGS += -R/usr/lib/scsi 
-$(SD_LIB):=	DYNFLAGS += -R/usr/lib/scsi 
+$(SES_LIB):=	DYNFLAGS += -R/usr/lib/scsi
+$(SD_LIB):=	DYNFLAGS += -R/usr/lib/scsi
 
 .KEEP STATE:
 
@@ -89,5 +95,3 @@ lint: $(LINTFILE)
 _msg msg: $(POFILE)
 
 include $(SRC)/lib/Makefile.targ
-
-

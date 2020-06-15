@@ -63,9 +63,14 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/vmm.h>
 
+#include <err.h>
 #include <assert.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <strings.h>
 #include <vmmapi.h>
 #define	KASSERT(exp,msg)	assert((exp))
+#define	panic(...)		errx(4, __VA_ARGS__)
 #endif	/* _KERNEL */
 
 #include <machine/vmm_instruction_emul.h>
@@ -92,6 +97,7 @@ enum {
 	VIE_OP_TYPE_TWOB_GRP15,
 	VIE_OP_TYPE_ADD,
 	VIE_OP_TYPE_TEST,
+	VIE_OP_TYPE_BEXTR,
 	VIE_OP_TYPE_LAST
 };
 
@@ -102,11 +108,17 @@ enum {
 #define	VIE_OP_F_NO_MODRM	(1 << 3)
 #define	VIE_OP_F_NO_GLA_VERIFICATION (1 << 4)
 
-#ifdef _KERNEL
+static const struct vie_op three_byte_opcodes_0f38[256] = {
+	[0xF7] = {
+		.op_byte = 0xF7,
+		.op_type = VIE_OP_TYPE_BEXTR,
+	},
+};
+
 static const struct vie_op two_byte_opcodes[256] = {
 	[0xAE] = {
-		  .op_byte = 0xAE,
-		  .op_type = VIE_OP_TYPE_TWOB_GRP15,
+		.op_byte = 0xAE,
+		.op_type = VIE_OP_TYPE_TWOB_GRP15,
 	},
 	[0xB6] = {
 		.op_byte = 0xB6,
@@ -248,7 +260,6 @@ static const struct vie_op one_byte_opcodes[256] = {
 		.op_type = VIE_OP_TYPE_PUSH,
 	}
 };
-#endif
 
 /* struct vie.mod */
 #define	VIE_MOD_INDIRECT		0
@@ -1325,6 +1336,83 @@ emulate_test(void *vm, int vcpuid, uint64_t gpa, struct vie *vie,
 }
 
 static int
+emulate_bextr(void *vm, int vcpuid, uint64_t gpa, struct vie *vie,
+    struct vm_guest_paging *paging, mem_region_read_t memread,
+    mem_region_write_t memwrite, void *arg)
+{
+	uint64_t src1, src2, dst, rflags;
+	unsigned start, len;
+	int error, size;
+
+	size = vie->opsize;
+	error = EINVAL;
+
+	/*
+	 * VEX.LZ.0F38.W0 F7 /r		BEXTR r32a, r/m32, r32b
+	 * VEX.LZ.0F38.W1 F7 /r		BEXTR r64a, r/m64, r64b
+	 *
+	 * Destination operand is ModRM:reg.  Source operands are ModRM:r/m and
+	 * Vex.vvvv.
+	 *
+	 * Operand size is always 32-bit if not in 64-bit mode (W1 is ignored).
+	 */
+	if (size != 4 && paging->cpu_mode != CPU_MODE_64BIT)
+		size = 4;
+
+	/*
+	 * Extracts contiguous bits from the first /source/ operand (second
+	 * operand) using an index and length specified in the second /source/
+	 * operand (third operand).
+	 */
+	error = memread(vm, vcpuid, gpa, &src1, size, arg);
+	if (error)
+		return (error);
+	error = vie_read_register(vm, vcpuid, gpr_map[vie->vex_reg], &src2);
+	if (error)
+		return (error);
+	error = vie_read_register(vm, vcpuid, VM_REG_GUEST_RFLAGS, &rflags);
+	if (error)
+		return (error);
+
+	start = (src2 & 0xff);
+	len = (src2 & 0xff00) >> 8;
+
+	/* If no bits are extracted, the destination register is cleared. */
+	dst = 0;
+
+	/* If START exceeds the operand size, no bits are extracted. */
+	if (start > size * 8)
+		goto done;
+	/* Length is bounded by both the destination size and start offset. */
+	if (start + len > size * 8)
+		len = (size * 8) - start;
+	if (len == 0)
+		goto done;
+
+	if (start > 0)
+		src1 = (src1 >> start);
+	if (len < 64)
+		src1 = src1 & ((1ull << len) - 1);
+	dst = src1;
+
+done:
+	error = vie_update_register(vm, vcpuid, gpr_map[vie->reg], dst, size);
+	if (error)
+		return (error);
+
+	/*
+	 * AMD: OF, CF cleared; SF/AF/PF undefined; ZF set by result.
+	 * Intel: ZF is set by result; AF/SF/PF undefined; all others cleared.
+	 */
+	rflags &= ~RFLAGS_STATUS_BITS;
+	if (dst == 0)
+		rflags |= PSL_Z;
+	error = vie_update_register(vm, vcpuid, VM_REG_GUEST_RFLAGS, rflags,
+	    8);
+	return (error);
+}
+
+static int
 emulate_add(void *vm, int vcpuid, uint64_t gpa, struct vie *vie,
 	    mem_region_read_t memread, mem_region_write_t memwrite, void *arg)
 {
@@ -1753,6 +1841,10 @@ vmm_emulate_instruction(void *vm, int vcpuid, uint64_t gpa, struct vie *vie,
 		error = emulate_test(vm, vcpuid, gpa, vie,
 		    memread, memwrite, memarg);
 		break;
+	case VIE_OP_TYPE_BEXTR:
+		error = emulate_bextr(vm, vcpuid, gpa, vie, paging,
+		    memread, memwrite, memarg);
+		break;
 	default:
 		error = EINVAL;
 		break;
@@ -1926,7 +2018,6 @@ vie_calculate_gla(enum vm_cpu_mode cpu_mode, enum vm_reg_name seg,
 	return (0);
 }
 
-#ifdef _KERNEL
 void
 vie_init(struct vie *vie, const char *inst_bytes, int inst_length)
 {
@@ -1945,6 +2036,7 @@ vie_init(struct vie *vie, const char *inst_bytes, int inst_length)
 	}
 }
 
+#ifdef _KERNEL
 static int
 pf_error_code(int usermode, int prot, int rsvd, uint64_t pte)
 {
@@ -2227,6 +2319,7 @@ vmm_fetch_instruction(struct vm *vm, int vcpuid, struct vm_guest_paging *paging,
 	vie->num_valid = inst_length;
 	return (0);
 }
+#endif	/* _KERNEL */
 
 static int
 vie_peek(struct vie *vie, uint8_t *x)
@@ -2318,6 +2411,81 @@ decode_prefixes(struct vie *vie, enum vm_cpu_mode cpu_mode, int cs_d)
 	}
 
 	/*
+	 * § 2.3.5, "The VEX Prefix", SDM Vol 2.
+	 */
+	if ((cpu_mode == CPU_MODE_64BIT || cpu_mode == CPU_MODE_COMPATIBILITY)
+	    && x == 0xC4) {
+		const struct vie_op *optab;
+
+		/* 3-byte VEX prefix. */
+		vie->vex_present = 1;
+
+		vie_advance(vie);
+		if (vie_peek(vie, &x))
+			return (-1);
+
+		/*
+		 * 2nd byte: [R', X', B', mmmmm[4:0]].  Bits are inverted
+		 * relative to REX encoding.
+		 */
+		vie->rex_r = x & 0x80 ? 0 : 1;
+		vie->rex_x = x & 0x40 ? 0 : 1;
+		vie->rex_b = x & 0x20 ? 0 : 1;
+
+		switch (x & 0x1F) {
+		case 0x2:
+			/* 0F 38. */
+			optab = three_byte_opcodes_0f38;
+			break;
+		case 0x1:
+			/* 0F class - nothing handled here yet. */
+			/* FALLTHROUGH */
+		case 0x3:
+			/* 0F 3A class - nothing handled here yet. */
+			/* FALLTHROUGH */
+		default:
+			/* Reserved (#UD). */
+			return (-1);
+		}
+
+		vie_advance(vie);
+		if (vie_peek(vie, &x))
+			return (-1);
+
+		/* 3rd byte: [W, vvvv[6:3], L, pp[1:0]]. */
+		vie->rex_w = x & 0x80 ? 1 : 0;
+
+		vie->vex_reg = ((~(unsigned)x & 0x78u) >> 3);
+		vie->vex_l = !!(x & 0x4);
+		vie->vex_pp = (x & 0x3);
+
+		/* PP: 1=66 2=F3 3=F2 prefixes. */
+		switch (vie->vex_pp) {
+		case 0x1:
+			vie->opsize_override = 1;
+			break;
+		case 0x2:
+			vie->repz_present = 1;
+			break;
+		case 0x3:
+			vie->repnz_present = 1;
+			break;
+		}
+
+		vie_advance(vie);
+
+		/* Opcode, sans literal prefix prefix. */
+		if (vie_peek(vie, &x))
+			return (-1);
+
+		vie->op = optab[x];
+		if (vie->op.op_type == VIE_OP_TYPE_NONE)
+			return (-1);
+
+		vie_advance(vie);
+	}
+
+	/*
 	 * Section "Operand-Size And Address-Size Attributes", Intel SDM, Vol 1
 	 */
 	if (cpu_mode == CPU_MODE_64BIT) {
@@ -2368,6 +2536,10 @@ decode_opcode(struct vie *vie)
 
 	if (vie_peek(vie, &x))
 		return (-1);
+
+	/* Already did this via VEX prefix. */
+	if (vie->op.op_type != VIE_OP_TYPE_NONE)
+		return (0);
 
 	vie->op = one_byte_opcodes[x];
 
@@ -2649,6 +2821,7 @@ decode_moffset(struct vie *vie)
 	return (0);
 }
 
+#ifdef _KERNEL
 /*
  * Verify that the 'guest linear address' provided as collateral of the nested
  * page table fault matches with our instruction decoding.
@@ -2740,10 +2913,15 @@ verify_gla(struct vm *vm, int cpuid, uint64_t gla, struct vie *vie,
 
 	return (0);
 }
+#endif	/* _KERNEL */
 
 int
+#ifdef _KERNEL
 vmm_decode_instruction(struct vm *vm, int cpuid, uint64_t gla,
 		       enum vm_cpu_mode cpu_mode, int cs_d, struct vie *vie)
+#else
+vmm_decode_instruction(enum vm_cpu_mode cpu_mode, int cs_d, struct vie *vie)
+#endif
 {
 
 	if (decode_prefixes(vie, cpu_mode, cs_d))
@@ -2767,13 +2945,14 @@ vmm_decode_instruction(struct vm *vm, int cpuid, uint64_t gla,
 	if (decode_moffset(vie))
 		return (-1);
 
+#ifdef _KERNEL
 	if ((vie->op.op_flags & VIE_OP_F_NO_GLA_VERIFICATION) == 0) {
 		if (verify_gla(vm, cpuid, gla, vie, cpu_mode))
 			return (-1);
 	}
+#endif
 
 	vie->decoded = 1;	/* success */
 
 	return (0);
 }
-#endif	/* _KERNEL */

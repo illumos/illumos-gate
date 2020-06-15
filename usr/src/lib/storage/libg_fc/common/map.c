@@ -113,8 +113,8 @@ typedef struct impl_map_dev_prop {
 	char	prop_name[MAXNAMELEN];
 	int	prop_type;
 	int	prop_size;
-	void 	*prop_data;
-	int 	prop_error;
+	void	*prop_data;
+	int	prop_error;
 	struct impl_map_dev_prop	*next;
 } impl_map_dev_prop_t;
 
@@ -124,10 +124,10 @@ typedef struct impl_map_dev {
 	impl_map_dev_prop_t	*prop_list;
 	struct impl_map_dev	*parent;
 	struct impl_map_dev	*child;
-	struct impl_map_dev 	*next;
+	struct impl_map_dev	*next;
 } impl_map_dev_t;
 
-/*	Defines 	*/
+/*	Defines		*/
 #define	VERBPRINT	if (verbose) (void) printf
 
 #define	DIR_MATCH_ST		"*[0-9+]n"
@@ -732,7 +732,8 @@ g_devices_get_all(struct wwn_list_struct **wwn_list_ptr)
 }
 
 void
-g_free_wwn_list_found(struct wwn_list_found_struct **wwn_list_found) {
+g_free_wwn_list_found(struct wwn_list_found_struct **wwn_list_found)
+{
 	WWN_list_found	    *next = NULL;
 
 	/* return if wwn_list_found is NULL */
@@ -1065,7 +1066,7 @@ g_issue_fcio_ioctl(int fd, fcio_t *fcio, int verbose)
 static int
 g_issue_fcp_ioctl(int fd, struct fcp_ioctl *fcp_data, int verbose)
 {
-	int 			num_tries = 0;
+	int			num_tries = 0;
 	struct device_data	*dev_data = NULL;
 
 	/*
@@ -1711,7 +1712,7 @@ create_map(char *path, gfc_map_t *map_ptr, int verbose, int map_type)
 		if (map_type == MAP_FORMAT_LILP && num_devices > 0) {
 
 			/* First we need to allocate one additional	*/
-			/* device to the dev_addr structure, for the 	*/
+			/* device to the dev_addr structure, for the	*/
 			/* local hba					*/
 			if ((dev_list = (fc_port_dev_t *)realloc(dev_list,
 			    (num_devices * sizeof (fc_port_dev_t))))
@@ -2076,7 +2077,7 @@ handle_map_dev_FCP_prop(minor_t fp_xport_minor, la_wwn_t port_wwn,
     impl_map_dev_prop_t **prop_list)
 {
 	struct device_data	inq_data;
-	int 			fcp_fd, err;
+	int			fcp_fd, err;
 	struct fcp_ioctl	fcp_data;
 	uchar_t			inq_dtype;
 
@@ -2410,7 +2411,7 @@ g_dev_map_init(char *path, int *l_err, int flag)
 		/* dev_addr array so it's in physical order.		*/
 		if ((flag & MAP_FORMAT_LILP) == MAP_FORMAT_LILP) {
 			/* First we need to allocate one additional	*/
-			/* device to the dev_addr structure, for the 	*/
+			/* device to the dev_addr structure, for the	*/
 			/* local hba					*/
 			if (num_devices > 0) {
 				if ((dev_list = (fc_port_dev_t *)
@@ -3752,7 +3753,7 @@ get_wwns(char *path_phys, uchar_t port_wwn[], uchar_t node_wwn[], int *al_pa,
 	int		i, err, count;
 	char		*char_ptr, *ptr;
 	int		found = 0, pathcnt, *port_addr;
-	unsigned long long 	pwwn;
+	unsigned long long	pwwn;
 	uchar_t			*port_wwn_byte, *node_wwn_byte;
 	char		drvr_path[MAXPATHLEN];
 	int		p_on = 0, p_st = 0;
@@ -4138,7 +4139,7 @@ g_stop(char *path, int immediate_flag)
 int
 g_reserve(char *path)
 {
-	int 	fd, status;
+	int	fd, status;
 
 	P_DPRINTF("  g_reserve: Reserve: Path %s\n", path);
 	if ((fd = g_object_open(path, O_NDELAY | O_RDONLY)) == -1)
@@ -4151,7 +4152,7 @@ g_reserve(char *path)
 int
 g_release(char *path)
 {
-	int 	fd, status;
+	int	fd, status;
 
 	P_DPRINTF("  g_release: Release: Path %s\n", path);
 	if ((fd = g_object_open(path, O_NDELAY | O_RDONLY)) == -1)
@@ -4423,7 +4424,7 @@ get_multipath_disk(char *devpath, struct dlist **multipath_list,
 
 int
 get_multipath(char *devpath, struct dlist **multipath_list,
-	struct wwn_list_struct *wwn_list)
+    struct wwn_list_struct *wwn_list)
 {
 	WWN_list	*wwn_list_ptr;
 	struct dlist	*dl, *dlt;
@@ -4452,7 +4453,8 @@ get_multipath(char *devpath, struct dlist **multipath_list,
 		return (L_NULL_WWN_LIST);
 	}
 
-	for (*node_wwn_s = NULL, wwn_list_ptr = wwn_list;
+	*node_wwn_s = '\0';
+	for (wwn_list_ptr = wwn_list;
 	    wwn_list_ptr != NULL;
 	    wwn_list_ptr = wwn_list_ptr->wwn_next) {
 
@@ -4471,8 +4473,8 @@ get_multipath(char *devpath, struct dlist **multipath_list,
 		}
 	}
 
-	if (*node_wwn_s == NULL) {
-		H_DPRINTF("node_wwn_s is NULL!\n");
+	if (*node_wwn_s == '\0') {
+		H_DPRINTF("node_wwn_s is not found!\n");
 		return (L_NO_NODE_WWN_IN_WWNLIST);
 	}
 
@@ -4716,7 +4718,7 @@ g_get_nexus_path(char *path_phys, char **nexus_path)
  * The routine calls g_get_path_type to determine the stack of
  * the input path.
  *
- * 	If it a socal path
+ *	If it a socal path
  *		it returns FC_TOP_PRIVATE_LOOP
  *	else
  *		calls fc_get_topology ioctl to
@@ -4734,29 +4736,29 @@ g_get_nexus_path(char *path_phys, char **nexus_path)
  *	error code.
  *
  * The input path is expected to be something like below:
- * 	1)
- * 	/devices/sbus@1f,0/SUNW,socal@1,0/SUNW,sf@0,0/ses@e,0:0
- * 	/devices/sbus@1f,0/SUNW,socal@1,0/SUNW,sf@0,0/ssd@..
- * 	/devices/sbus@1f,0/SUNW,socal@1,0/SUNW,sf@1,0
- * 	/devices/sbus@1f,0/SUNW,socal@1,0
- * 	/devices/sbus@1f,0/SUNW,socal@1,0:1
- * 	/devices/sbus@1f,0/SUNW,socal@1,0/SUNW,sf@0,0:devctl
- * 	(or "qlc" instead of "socal" and "fp" for "sf")
+ *	1)
+ *	/devices/sbus@1f,0/SUNW,socal@1,0/SUNW,sf@0,0/ses@e,0:0
+ *	/devices/sbus@1f,0/SUNW,socal@1,0/SUNW,sf@0,0/ssd@..
+ *	/devices/sbus@1f,0/SUNW,socal@1,0/SUNW,sf@1,0
+ *	/devices/sbus@1f,0/SUNW,socal@1,0
+ *	/devices/sbus@1f,0/SUNW,socal@1,0:1
+ *	/devices/sbus@1f,0/SUNW,socal@1,0/SUNW,sf@0,0:devctl
+ *	(or "qlc" instead of "socal" and "fp" for "sf")
  *
- * 	Which should resolve to a path like this:
- * 	/devices/sbus@1f,0/SUNW,socal@1,0:1
- * 	/devices/pci@6,2000/pci@2/SUNW,qlc@5
+ *	Which should resolve to a path like this:
+ *	/devices/sbus@1f,0/SUNW,socal@1,0:1
+ *	/devices/pci@6,2000/pci@2/SUNW,qlc@5
  *
- * 	2)
- * 	/devices/pci@4,2000/scsi@1/ses@w50800200000000d2,0:0
- * 	which should resolve to
- * 	/devices/pci@4,2000/scsi@1:devctl
+ *	2)
+ *	/devices/pci@4,2000/scsi@1/ses@w50800200000000d2,0:0
+ *	which should resolve to
+ *	/devices/pci@4,2000/scsi@1:devctl
  *
- *      3) The nexus(hba or nexus) path will get an error only for qlc
+ *	3) The nexus(hba or nexus) path will get an error only for qlc
  *	since the routine need to open fp :devctl node for fcio ioctl.
- * 	/devices/sbus@1f,0/SUNW,socal@1,0
- * 	/devices/sbus@1f,0/SUNW,socal@1,0:1
- * 	/devices/pci@6,2000/pci@2/SUNW,qlc@5 => error
+ *	/devices/sbus@1f,0/SUNW,socal@1,0
+ *	/devices/sbus@1f,0/SUNW,socal@1,0:1
+ *	/devices/pci@6,2000/pci@2/SUNW,qlc@5 => error
  */
 int
 g_get_fca_port_topology(char *path, uint32_t *port_top, int verbose)
@@ -4989,7 +4991,7 @@ g_port_online(char *path)
  * INPUTS :
  *	portpath	- Pointer to the path of the FCA port on which to
  *			set the loopback mode
- *	cmd       	- EXT_LPBACK
+ *	cmd		- EXT_LPBACK
  *			  INT_LPBACK
  *			  NO_LPBACK
  * RETURNS :

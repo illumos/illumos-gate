@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD$");
 
 #include "bhyvegc.h"
 #include "bhyverun.h"
+#include "debug.h"
 #include "console.h"
 #include "inout.h"
 #include "pci_emul.h"
@@ -64,7 +65,7 @@ __FBSDID("$FreeBSD$");
 static int fbuf_debug = 1;
 #define	DEBUG_INFO	1
 #define	DEBUG_VERBOSE	4
-#define	DPRINTF(level, params)  if (level <= fbuf_debug) printf params
+#define	DPRINTF(level, params)  if (level <= fbuf_debug) PRINTLN params
 
 
 #define	KB	(1024UL)
@@ -121,9 +122,9 @@ static void
 pci_fbuf_usage(char *opt)
 {
 
-	fprintf(stderr, "Invalid fbuf emulation option \"%s\"\r\n", opt);
-	fprintf(stderr, "fbuf: {wait,}{vga=on|io|off,}rfb=<ip>:port"
-	    "{,w=width}{,h=height}\r\n");
+	EPRINTLN("Invalid fbuf emulation option \"%s\"", opt);
+	EPRINTLN("fbuf: {wait,}{vga=on|io|off,}rfb=<ip>:port"
+	    "{,w=width}{,h=height}");
 }
 
 static void
@@ -138,7 +139,7 @@ pci_fbuf_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 	sc = pi->pi_arg;
 
 	DPRINTF(DEBUG_VERBOSE,
-	    ("fbuf wr: offset 0x%lx, size: %d, value: 0x%lx\n",
+	    ("fbuf wr: offset 0x%lx, size: %d, value: 0x%lx",
 	    offset, size, value));
 
 	if (offset + size > DMEMSZ) {
@@ -169,13 +170,13 @@ pci_fbuf_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 
 	if (!sc->gc_image->vgamode && sc->memregs.width == 0 &&
 	    sc->memregs.height == 0) {
-		DPRINTF(DEBUG_INFO, ("switching to VGA mode\r\n"));
+		DPRINTF(DEBUG_INFO, ("switching to VGA mode"));
 		sc->gc_image->vgamode = 1;
 		sc->gc_width = 0;
 		sc->gc_height = 0;
 	} else if (sc->gc_image->vgamode && sc->memregs.width != 0 &&
 	    sc->memregs.height != 0) {
-		DPRINTF(DEBUG_INFO, ("switching to VESA mode\r\n"));
+		DPRINTF(DEBUG_INFO, ("switching to VESA mode"));
 		sc->gc_image->vgamode = 0;
 	}
 }
@@ -220,7 +221,7 @@ pci_fbuf_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 	}
 
 	DPRINTF(DEBUG_VERBOSE,
-	    ("fbuf rd: offset 0x%lx, size: %d, value: 0x%lx\n",
+	    ("fbuf rd: offset 0x%lx, size: %d, value: 0x%lx",
 	     offset, size, value));
 
 	return (value);
@@ -249,7 +250,7 @@ pci_fbuf_parse_opts(struct pci_fbuf_softc *sc, char *opts)
 
 		*config++ = '\0';
 
-		DPRINTF(DEBUG_VERBOSE, ("pci_fbuf option %s = %s\r\n",
+		DPRINTF(DEBUG_VERBOSE, ("pci_fbuf option %s = %s",
 		   xopts, config));
 
 		if (!strcmp(xopts, "tcp") || !strcmp(xopts, "rfb")) {
@@ -363,7 +364,7 @@ pci_fbuf_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 	struct pci_fbuf_softc *sc;
 	
 	if (fbuf_sc != NULL) {
-		fprintf(stderr, "Only one frame buffer device is allowed.\n");
+		EPRINTLN("Only one frame buffer device is allowed.");
 		return (-1);
 	}
 
@@ -403,7 +404,7 @@ pci_fbuf_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 
 	/* XXX until VGA rendering is enabled */
 	if (sc->vga_full != 0) {
-		fprintf(stderr, "pci_fbuf: VGA rendering not enabled");
+		EPRINTLN("pci_fbuf: VGA rendering not enabled");
 		goto done;
 	}
 
@@ -412,7 +413,7 @@ pci_fbuf_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 		error = -1;
 		goto done;
 	}
-	DPRINTF(DEBUG_INFO, ("fbuf frame buffer base: %p [sz %lu]\r\n",
+	DPRINTF(DEBUG_INFO, ("fbuf frame buffer base: %p [sz %lu]",
 	        sc->fb_base, FB_SIZE));
 
 	/*
@@ -423,7 +424,7 @@ pci_fbuf_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 	 */
 	prot = PROT_READ | PROT_WRITE;
 	if (vm_mmap_memseg(ctx, sc->fbaddr, VM_FRAMEBUFFER, 0, FB_SIZE, prot) != 0) {
-		fprintf(stderr, "pci_fbuf: mapseg failed - try deleting VM and restarting\n");
+		EPRINTLN("pci_fbuf: mapseg failed - try deleting VM and restarting");
 		error = -1;
 		goto done;
 	}

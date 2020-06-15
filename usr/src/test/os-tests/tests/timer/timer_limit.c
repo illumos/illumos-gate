@@ -13,14 +13,14 @@
  * Copyright 2016 Joyent, Inc.
  */
 
-
+#include <assert.h>
+#include <err.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
 #include <time.h>
 #include <limits.h>
-#include <assert.h>
 #include <sys/sysconfig.h>
 #include <sys/sysmacros.h>
 
@@ -40,7 +40,7 @@ mktimer(timer_t *timer)
 }
 
 int
-main()
+main(void)
 {
 	long ncpu;
 	size_t limit;
@@ -53,7 +53,8 @@ main()
 	/* Current specified limit is 4 * NCPU */
 	limit = 4 * ncpu;
 	timers = calloc(limit + 1, sizeof (timer_t));
-	assert(timers != NULL);
+	if (timers == NULL)
+		err(EXIT_FAILURE, "failed to allocate %zu timers", limit + 1);
 
 	/* Slowly walk up to the limit doing creations/deletions */
 	for (int i = 1; i <= limit; i = MIN(limit, i*2)) {

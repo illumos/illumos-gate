@@ -928,6 +928,7 @@ link path=usr/share/man/man9f/ddi_ufm_image_set_desc.9f target=ddi_ufm_image.9f
 link path=usr/share/man/man9f/ddi_ufm_image_set_misc.9f target=ddi_ufm_image.9f
 link path=usr/share/man/man9f/ddi_ufm_image_set_nslots.9f target=ddi_ufm_image.9f
 link path=usr/share/man/man9f/ddi_ufm_slot_set_attrs.9f target=ddi_ufm_slot.9f
+link path=usr/share/man/man9f/ddi_ufm_slot_set_imgsize.9f target=ddi_ufm_slot.9f
 link path=usr/share/man/man9f/ddi_ufm_slot_set_misc.9f target=ddi_ufm_slot.9f
 link path=usr/share/man/man9f/ddi_ufm_slot_set_version.9f target=ddi_ufm_slot.9f
 link path=usr/share/man/man9f/ddi_umem_free.9f target=ddi_umem_alloc.9f

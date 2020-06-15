@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <sys/timer.h>
@@ -209,8 +209,9 @@ timer_grab(proc_t *p, timer_t tid)
 	}
 
 	mutex_enter(&p->p_lock);
-	if (p->p_itimer == NULL || tid >= p->p_itimer_sz ||
-	    (it = p->p_itimer[tid]) == NULL) {
+
+	if ((itp = p->p_itimer) == NULL || tid >= p->p_itimer_sz ||
+	    (it = itp[tid]) == NULL) {
 		mutex_exit(&p->p_lock);
 		return (NULL);
 	}
@@ -482,14 +483,121 @@ timer_fire(itimer_t *it)
 }
 
 /*
- * Allocate an itimer_t and find and appropriate slot for it in p_itimer.
- * Acquires p_lock and holds it on return, regardless of success.
+ * Find an unused (i.e. NULL) entry in p->p_itimer and set *id to the
+ * index of the unused entry, growing p->p_itimer as necessary (up to timer_max
+ * entries). Returns B_TRUE (with *id set) on success, B_FALSE on failure
+ * (e.g. the process already has the maximum number of allowed timers
+ * allocated).
  */
-static itimer_t *
-timer_alloc(proc_t *p, timer_t *id)
+static boolean_t
+timer_get_id(proc_t *p, timer_t *id)
 {
-	itimer_t *it, **itp = NULL;
+	itimer_t **itp = NULL, **itp_new;
+	uint_t target_sz;
 	uint_t i;
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+
+	if (p->p_itimer == NULL) {
+		/*
+		 * No timers have been allocated for this process, allocate
+		 * the initial array.
+		 */
+		ASSERT0(p->p_itimer_sz);
+		target_sz = _TIMER_ALLOC_INIT;
+
+		mutex_exit(&p->p_lock);
+		itp_new = kmem_zalloc(target_sz * sizeof (itimer_t *),
+		    KM_SLEEP);
+		mutex_enter(&p->p_lock);
+
+		if (p->p_itimer == NULL) {
+			/*
+			 * As long as no other thread beat us to allocating
+			 * the initial p_itimer array, use what we allocated.
+			 * Since we just allocated it, we know slot 0 is
+			 * free.
+			 */
+			p->p_itimer = itp_new;
+			p->p_itimer_sz = target_sz;
+			i = 0;
+			goto done;
+		}
+
+		/*
+		 * Another thread beat us to allocating the initial array.
+		 * Proceed to searching for an empty slot and growing the
+		 * array if needed.
+		 */
+		kmem_free(itp_new, target_sz * sizeof (itimer_t *));
+	}
+
+retry:
+	/* Use the first empty slot (if any exist) */
+	for (i = 0; i < p->p_itimer_sz; i++) {
+		if (p->p_itimer[i] == NULL) {
+			goto done;
+		}
+	}
+
+	/* No empty slots, try to grow p->p_itimer and retry */
+	target_sz = p->p_itimer_sz * 2;
+	if (target_sz > timer_max || target_sz > INT_MAX ||
+	    target_sz < p->p_itimer_sz) {
+		/* Protect against exceeding the max or overflow */
+		return (B_FALSE);
+	}
+
+	mutex_exit(&p->p_lock);
+	itp_new = kmem_zalloc(target_sz * sizeof (itimer_t *), KM_SLEEP);
+	mutex_enter(&p->p_lock);
+
+	if (target_sz <= p->p_itimer_sz) {
+		/*
+		 * A racing thread performed the resize while we were
+		 * waiting outside p_lock.  Discard our now-useless
+		 * allocation and retry.
+		 */
+		kmem_free(itp_new, target_sz * sizeof (itimer_t *));
+		goto retry;
+	}
+
+	ASSERT3P(p->p_itimer, !=, NULL);
+	bcopy(p->p_itimer, itp_new, p->p_itimer_sz * sizeof (itimer_t *));
+	kmem_free(p->p_itimer, p->p_itimer_sz * sizeof (itimer_t *));
+
+	/*
+	 * Short circuit to use the first free entry in the new allocation.
+	 * It's possible that other lower-indexed timers were freed while
+	 * p_lock was dropped, but skipping over them is not harmful at all.
+	 * In the common case, we skip the need to walk over an array filled
+	 * with timers before arriving at the slot we know is fresh from the
+	 * allocation.
+	 */
+	i = p->p_itimer_sz;
+
+	p->p_itimer = itp_new;
+	p->p_itimer_sz = target_sz;
+
+done:
+	ASSERT3U(i, <=, INT_MAX);
+	*id = (timer_t)i;
+	return (B_TRUE);
+}
+
+int
+timer_create(clockid_t clock, struct sigevent *evp, timer_t *tid)
+{
+	struct sigevent ev;
+	proc_t *p = curproc;
+	clock_backend_t *backend;
+	itimer_t *it;
+	sigqueue_t *sigq;
+	cred_t *cr = CRED();
+	int error = 0;
+	timer_t i;
+	port_notify_t tim_pnevp;
+	port_kevent_t *pkevp = NULL;
 
 	ASSERT(MUTEX_NOT_HELD(&p->p_lock));
 
@@ -612,19 +720,20 @@ timer_setup(clock_backend_t *backend, struct sigevent *evp, port_notify_t *pnp,
 	sigq = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
 
 	/*
-	 * Allocate a timer and choose a slot for it. This acquires p_lock.
+	 * Allocate a timer and choose a slot for it.
 	 */
-	it = timer_alloc(p, &tid);
-	ASSERT(MUTEX_HELD(&p->p_lock));
+	it = kmem_cache_alloc(clock_timer_cache, KM_SLEEP);
+	bzero(it, sizeof (*it));
+	mutex_init(&it->it_mutex, NULL, MUTEX_DEFAULT, NULL);
 
-	if (it == NULL) {
+	mutex_enter(&p->p_lock);
+	if (!timer_get_id(p, &i)) {
 		mutex_exit(&p->p_lock);
 		kmem_free(sigq, sizeof (sigqueue_t));
-		return (EAGAIN);
+		return (set_errno(EAGAIN));
 	}
 
-	ASSERT(tid < p->p_itimer_sz && p->p_itimer[tid] == NULL);
-	ASSERT(evp != NULL);
+	ASSERT(i < p->p_itimer_sz && p->p_itimer[i] == NULL);
 
 	/*
 	 * If we develop other notification mechanisms, this will need
@@ -644,8 +753,8 @@ timer_setup(clock_backend_t *backend, struct sigevent *evp, port_notify_t *pnp,
 	it->it_backend = backend;
 	it->it_lock = ITLK_LOCKED;
 
-	if (evp->sigev_notify == SIGEV_THREAD ||
-	    evp->sigev_notify == SIGEV_PORT) {
+	if (ev.sigev_notify == SIGEV_THREAD ||
+	    ev.sigev_notify == SIGEV_PORT) {
 		int port;
 		port_kevent_t *pkevp = NULL;
 
@@ -705,7 +814,7 @@ timer_setup(clock_backend_t *backend, struct sigevent *evp, port_notify_t *pnp,
 	}
 
 	/* Populate the slot now that the timer is prepped. */
-	p->p_itimer[tid] = it;
+	p->p_itimer[i] = it;
 	mutex_exit(&p->p_lock);
 
 	/*
@@ -970,7 +1079,7 @@ timer_lwpexit(void)
 	}
 
 	for (i = 0; i < p->p_itimer_sz; i++) {
-		if ((it = p->p_itimer[i]) == NULL) {
+		if ((it = itp[i]) == NULL)
 			continue;
 		}
 
@@ -1017,7 +1126,7 @@ timer_lwpbind()
 	}
 
 	for (i = 0; i < p->p_itimer_sz; i++) {
-		if ((it = p->p_itimer[i]) == NULL)
+		if ((it = itp[i]) == NULL)
 			continue;
 
 		/* This may drop p_lock temporarily. */

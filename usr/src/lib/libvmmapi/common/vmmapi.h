@@ -47,6 +47,8 @@
 #include <sys/param.h>
 #include <sys/cpuset.h>
 
+#include <stdbool.h>
+
 /*
  * API version for out-of-tree consumers like grub-bhyve for making compile
  * time decisions.
@@ -175,6 +177,8 @@ int	vm_ioapic_assert_irq(struct vmctx *ctx, int irq);
 int	vm_ioapic_deassert_irq(struct vmctx *ctx, int irq);
 int	vm_ioapic_pulse_irq(struct vmctx *ctx, int irq);
 int	vm_ioapic_pincount(struct vmctx *ctx, int *pincount);
+int	vm_readwrite_kernemu_device(struct vmctx *ctx, int vcpu,
+	    vm_paddr_t gpa, bool write, int size, uint64_t *value);
 int	vm_isa_assert_irq(struct vmctx *ctx, int atpic_irq, int ioapic_irq);
 int	vm_isa_deassert_irq(struct vmctx *ctx, int atpic_irq, int ioapic_irq);
 int	vm_isa_pulse_irq(struct vmctx *ctx, int atpic_irq, int ioapic_irq);

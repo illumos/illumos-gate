@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef	_SYS_TIMER_H
@@ -48,6 +48,8 @@ extern "C" {
 /*
  * Max timers per process.  This is patchable via /etc/system and can be
  * updated via kmdb.  Sticking to positive powers of 2 is recommended.
+ * The default value is 4 * NCPU. Setting timer_max to a value below the
+ * default via /etc/system is ignored.
  */
 extern	int	timer_max;
 

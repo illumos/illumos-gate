@@ -38,4 +38,6 @@ SYMBOL_SCOPE {
     global:
 	bt_getlowbit			{ FLAGS = EXTERN };
 	servicing_interrupt		{ FLAGS = EXTERN };
+	fnvlist_alloc			{ FLAGS = EXTERN };
+	fnvlist_add_string		{ FLAGS = EXTERN };
 };
