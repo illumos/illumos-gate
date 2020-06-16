@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -102,10 +102,15 @@ smbd_krb5ssp_fini(authsvc_context_t *ctx)
 	free(be);
 }
 
+static char *krb5ssp_def_username = "Unknown-Kerberos-User";
+static char *krb5ssp_def_domain = "Unknown-Domain";
+
 /*
  * Handle a Kerberos auth message.
  *
- * State across messages is in ctx->ctx_backend
+ * State across messages is in ctx->ctx_backend.
+ *
+ * Equivalent to smbd_user_auth_logon().
  */
 int
 smbd_krb5ssp_work(authsvc_context_t *ctx)
@@ -119,11 +124,14 @@ smbd_krb5ssp_work(authsvc_context_t *ctx)
 	gss_OID mech_type = GSS_C_NULL_OID;
 	krb5_error_code kerr;
 	uint32_t status;
+	smb_token_t *token = NULL;
 
 	intok.length = ctx->ctx_ibodylen;
 	intok.value  = ctx->ctx_ibodybuf;
 	bzero(&outtok, sizeof (gss_buffer_desc));
 	bzero(&namebuf, sizeof (gss_buffer_desc));
+
+	assert(be->be_username == NULL);
 
 	/* Do this early, for error message support. */
 	kerr = krb5_init_context(&be->be_kctx);
@@ -158,7 +166,8 @@ smbd_krb5ssp_work(authsvc_context_t *ctx)
 		    (int)mech_type, major, minor);
 		smbd_report(" krb5: %s",
 		    krb5_get_error_message(be->be_kctx, minor));
-		return (NT_STATUS_WRONG_PASSWORD);
+		status = NT_STATUS_WRONG_PASSWORD;
+		goto out;
 	}
 
 	switch (major) {
@@ -170,9 +179,11 @@ smbd_krb5ssp_work(authsvc_context_t *ctx)
 			/* becomes NT_STATUS_MORE_PROCESSING_REQUIRED */
 			return (0);
 		}
-		return (NT_STATUS_WRONG_PASSWORD);
+		status = NT_STATUS_WRONG_PASSWORD;
+		goto out;
 	default:
-		return (NT_STATUS_WRONG_PASSWORD);
+		status = NT_STATUS_WRONG_PASSWORD;
+		goto out;
 	}
 
 	/*
@@ -198,14 +209,15 @@ smbd_krb5ssp_work(authsvc_context_t *ctx)
 	status = get_authz_data_pac(be->be_gssctx,
 	    &be->be_authz_pac);
 	if (status)
-		return (status);
+		goto out;
 
 	kerr = krb5_pac_parse(be->be_kctx, be->be_authz_pac.value,
 	    be->be_authz_pac.length, &be->be_kpac);
 	if (kerr) {
 		smbd_report("krb5ssp, krb5_pac_parse: %s",
 		    krb5_get_error_message(be->be_kctx, kerr));
-		return (NT_STATUS_UNSUCCESSFUL);
+		status = NT_STATUS_UNSUCCESSFUL;
+		goto out;
 	}
 
 	kerr = krb5_pac_get_buffer(be->be_kctx, be->be_kpac,
@@ -213,29 +225,60 @@ smbd_krb5ssp_work(authsvc_context_t *ctx)
 	if (kerr) {
 		smbd_report("krb5ssp, krb5_pac_get_buffer: %s",
 		    krb5_get_error_message(be->be_kctx, kerr));
-		return (NT_STATUS_UNSUCCESSFUL);
+		status = NT_STATUS_UNSUCCESSFUL;
+		goto out;
 	}
 
 	ctx->ctx_token = calloc(1, sizeof (smb_token_t));
-	if (ctx->ctx_token == NULL)
-		return (NT_STATUS_NO_MEMORY);
+	if (ctx->ctx_token == NULL) {
+		status = NT_STATUS_NO_MEMORY;
+		goto out;
+	}
 
 	status = smb_decode_krb5_pac(ctx->ctx_token, be->be_pac.data,
 	    be->be_pac.length);
 	if (status)
-		return (status);
+		goto out;
 
 	status = get_ssnkey(ctx);
 	if (status)
-		return (status);
+		goto out;
 
-	if (!smb_token_setup_common(ctx->ctx_token))
-		return (NT_STATUS_UNSUCCESSFUL);
+	if (!smb_token_setup_common(ctx->ctx_token)) {
+		status = NT_STATUS_UNSUCCESSFUL;
+		goto out;
+	}
 
 	/* Success! */
 	ctx->ctx_orawtype = LSA_MTYPE_ES_DONE;
 
-	return (0);
+	status = 0;
+	token = ctx->ctx_token;
+
+	/*
+	 * Before we return, audit successful and failed logons.
+	 *
+	 * Successful logons are audited using the username and domain
+	 * contained in the ticket (where the domain comes from the PAC data).
+	 *
+	 * Failed logins use a 'default' domain. If we fail after obtaining
+	 * the username in the ticket, we audit under that username.
+	 *
+	 * Prior to decoding the username, we only audit failures where we'll
+	 * return NT_STATUS_WRONG_PASSWORD, so that we audit attempts with
+	 * invalid (or forged) tickets. These records use a 'default' username;
+	 * As such, they serve only to inform an administrator that
+	 * a particular client used a bad ticket, but does not contain any
+	 * information on the ticket itself.
+	 *
+	 * Once we have a username, we'll audit all failed authentications.
+	 */
+out:
+	status = smbd_logon_final(token, &ctx->ctx_clinfo.lci_clnt_ipaddr,
+	    (be->be_username != NULL) ? be->be_username : krb5ssp_def_username,
+	    krb5ssp_def_domain, status);
+
+	return (status);
 }
 
 /*

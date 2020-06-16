@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2022 Tintri by DDN, Inc.  All rights reserved.
  */
 
 #ifndef _SMBD_H
@@ -57,6 +57,8 @@ void smbd_set_secmode(int);
 boolean_t smbd_online(void);
 void smbd_online_wait(const char *);
 void smbd_get_authconf(smb_kmod_cfg_t *);
+boolean_t smbd_logon_final(smb_token_t *, smb_inaddr_t *, char *, char *,
+    uint32_t);
 
 void smbd_spool_start(void);
 void smbd_spool_stop(void);
