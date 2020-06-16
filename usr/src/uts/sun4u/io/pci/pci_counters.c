@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/async.h>
 #include <sys/sunddi.h>
@@ -69,7 +67,7 @@ pci_create_name_kstat(char *name, pci_ksinfo_t *pp, pci_kev_mask_t *ev)
 
 	for (i = 0; i < NUM_OF_PICS; i++) {
 		pp->pic_name_ksp[i] = pci_create_picN_kstat(name,
-			i, pp->pic_shift[i], pp->pic_no_evs, ev);
+		    i, pp->pic_shift[i], pp->pic_no_evs, ev);
 
 		if (pp->pic_name_ksp[i] == NULL) {
 			cmn_err(CE_WARN, "pci: unable to create name kstat");
@@ -97,7 +95,7 @@ pci_delete_name_kstat(pci_ksinfo_t *pp)
  */
 static kstat_t *
 pci_create_picN_kstat(char *mod_name, int pic, int pic_shift,
-	int num_ev, pci_kev_mask_t *ev_array)
+    int num_ev, pci_kev_mask_t *ev_array)
 {
 	struct kstat_named *pic_named_data;
 	int	inst = 0;
@@ -107,9 +105,9 @@ pci_create_picN_kstat(char *mod_name, int pic, int pic_shift,
 
 	(void) sprintf(pic_name, "pic%d", pic);
 	if ((picN_ksp = kstat_create(mod_name, inst, pic_name,
-		"bus", KSTAT_TYPE_NAMED, num_ev, NULL)) == NULL) {
+	    "bus", KSTAT_TYPE_NAMED, num_ev, 0)) == NULL) {
 		cmn_err(CE_WARN, "%s %s : kstat create failed",
-			mod_name, pic_name);
+		    mod_name, pic_name);
 
 		/*
 		 * It is up to the calling function to delete any kstats
@@ -119,8 +117,7 @@ pci_create_picN_kstat(char *mod_name, int pic, int pic_shift,
 		return (NULL);
 	}
 
-	pic_named_data = (struct kstat_named *)
-		picN_ksp->ks_data;
+	pic_named_data = (struct kstat_named *)picN_ksp->ks_data;
 
 	/*
 	 * Write event names and their associated pcr masks. The
@@ -129,22 +126,20 @@ pci_create_picN_kstat(char *mod_name, int pic, int pic_shift,
 	 */
 	for (event = 0; event < num_ev - 1; event++) {
 		pic_named_data[event].value.ui64 =
-			(ev_array[event].pcr_mask << pic_shift);
+		    (ev_array[event].pcr_mask << pic_shift);
 
 		kstat_named_init(&pic_named_data[event],
-			ev_array[event].event_name,
-			KSTAT_DATA_UINT64);
+		    ev_array[event].event_name, KSTAT_DATA_UINT64);
 	}
 
 	/*
 	 * add the clear_pic entry.
 	 */
 	pic_named_data[event].value.ui64 =
-		(uint64_t)~(ev_array[event].pcr_mask << pic_shift);
+	    (uint64_t)~(ev_array[event].pcr_mask << pic_shift);
 
 	kstat_named_init(&pic_named_data[event],
-		ev_array[event].event_name,
-		KSTAT_DATA_UINT64);
+	    ev_array[event].event_name, KSTAT_DATA_UINT64);
 
 	kstat_install(picN_ksp);
 
@@ -171,27 +166,26 @@ kstat_t *pci_create_cntr_kstat(pci_t *pci_p, char *name,
 	 * also contains the %pcr
 	 */
 	if ((counters_ksp = kstat_create(name, drv_instance,
-		"counters", "bus", KSTAT_TYPE_NAMED,
-		num_pics + 1,
-		KSTAT_FLAG_WRITABLE)) == NULL) {
+	    "counters", "bus", KSTAT_TYPE_NAMED, num_pics + 1,
+	    KSTAT_FLAG_WRITABLE)) == NULL) {
 
 		cmn_err(CE_WARN, "%s%d counters kstat_create failed",
-			drv_name, drv_instance);
+		    drv_name, drv_instance);
 		return (NULL);
 	}
 
 	counters_named_data =
-		(struct kstat_named *)(counters_ksp->ks_data);
+	    (struct kstat_named *)(counters_ksp->ks_data);
 
 	/* initialize the named kstats */
 	kstat_named_init(&counters_named_data[0],
-		"pcr", KSTAT_DATA_UINT64);
+	    "pcr", KSTAT_DATA_UINT64);
 
 	for (i = 0; i < num_pics; i++) {
 		(void) sprintf(pic_str, "pic%d", i);
 
 		kstat_named_init(&counters_named_data[i+1],
-			pic_str, KSTAT_DATA_UINT64);
+		    pic_str, KSTAT_DATA_UINT64);
 	}
 
 	/*
