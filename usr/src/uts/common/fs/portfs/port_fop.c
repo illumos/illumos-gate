@@ -778,12 +778,12 @@ port_fop_getdvp(void *objptr, vnode_t **vp, vnode_t **dvp,
 	}
 
 	/* Trade VN_HOLD()s from lookuppn with VN_PHANTOM_HOLD()s */
-	if (dvp != NULL) {
+	if (dvp != NULL && *dvp != NULL) {
 		VN_PHANTOM_HOLD(*dvp);
 		VN_RELE(*dvp);
 	}
 
-	if (vp != NULL) {
+	if (vp != NULL && *vp != NULL) {
 		VN_PHANTOM_HOLD(*vp);
 		VN_RELE(*vp);
 	}
