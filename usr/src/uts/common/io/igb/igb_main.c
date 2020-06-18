@@ -5462,6 +5462,8 @@ igb_ufm_fill_slot(ddi_ufm_handle_t *ufmh, void *arg, uint_t imgno,
 	    "nvm-version", &ver) == 0) {
 		ddi_ufm_slot_set_version(slotp, ver);
 		ddi_prop_free(ver);
+	} else {
+		ddi_ufm_slot_set_version(slotp, "unknown");
 	}
 
 	ddi_ufm_slot_set_attrs(slotp, DDI_UFM_ATTR_ACTIVE |
