@@ -1,106 +1,133 @@
 .\"
-.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for
-.\" permission to reproduce portions of its copyrighted documentation.
-.\" Original documentation from The Open Group can be obtained online at
-.\" http://www.opengroup.org/bookstore/.
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
 .\"
-.\" The Institute of Electrical and Electronics Engineers and The Open
-.\" Group, have given us permission to reprint portions of their
-.\" documentation.
-.\"
-.\" In the following statement, the phrase ``this text'' refers to portions
-.\" of the system documentation.
-.\"
-.\" Portions of this text are reprinted and reproduced in electronic form
-.\" in the SunOS Reference Manual, from IEEE Std 1003.1, 2004 Edition,
-.\" Standard for Information Technology -- Portable Operating System
-.\" Interface (POSIX), The Open Group Base Specifications Issue 6,
-.\" Copyright (C) 2001-2004 by the Institute of Electrical and Electronics
-.\" Engineers, Inc and The Open Group.  In the event of any discrepancy
-.\" between these versions and the original IEEE and The Open Group
-.\" Standard, the original IEEE and The Open Group Standard is the referee
-.\" document.  The original Standard can be obtained online at
-.\" http://www.opengroup.org/unix/online.html.
-.\"
-.\" This notice shall appear on any product containing this material.
-.\"
-.\" The contents of this file are subject to the terms of the
-.\" Common Development and Distribution License (the "License").
-.\" You may not use this file except in compliance with the License.
-.\"
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-.\" or http://www.opensolaris.org/os/licensing.
-.\" See the License for the specific language governing permissions
-.\" and limitations under the License.
-.\"
-.\" When distributing Covered Code, include this CDDL HEADER in each
-.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
-.\" If applicable, add the following below this CDDL HEADER, with the
-.\" fields enclosed by brackets "[]" replaced with your own identifying
-.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
-.\" Portions Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
-.\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
+.\" Copyright 2020 Oxide Computer Company
 .\"
-.TH WCSWIDTH 3C "Jul 11, 2014"
-.SH NAME
-wcswidth, wcswidth_l \- number of column positions of a wide-character string
-.SH SYNOPSIS
-.LP
-.nf
+.Dd June 17, 2020
+.Dt WCSWIDTH 3C
+.Os
+.Sh NAME
+.Nm wcswidth ,
+.Nm wcswidth_l
+.Nd determine number of columns for wide-character string
+.Sh SYNOPSIS
+.In wchar.h
+.Ft int
+.Fo wcswidth
+.Fa "const wchar_t *str"
+.Fa "size_t len"
+.Fc
+.In wchar.h
+.In xlocale.h
+.Ft int
+.Fo wcswidth_l
+.Fa "const wchar_t *str"
+.Fa "size_t len"
+.Fa "locale_t loc"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn wcswidth
+and
+.Fn wcswidth_l
+functions count the total number of columns that are required
+to display the contents of the wide-character string
+.Fa str .
+For each wide-character in the string
+.Fa str ,
+the equivalent of
+.Xr wcwidth 3C
+is called and the result summed to a running total which is returned.
+.Pp
+Up to
+.Fa len
+wide-characters from
+.Fa str
+will be evaluated; however, the functions will stop iterating if they
+encounter the null wide-character
+.Pq L'\e0' .
+.Pp
+The wide-characters in
+.Fa str
+must be valid characters in the current locale or in the case of the
+.Fn wcswidth_l
+function, the locale specified by
+.Fa loc .
+The functions will fail if any of the wide-characters in
+.Fa str
+are valid in the current
+locale, but considered non-printable
+.Po
+as in
+.Xr iswprint 3C
+would fail for the character
+.Pc
+or the wide-character does not represent a valid character in the
+locale.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn wcswidth
+and
+.Fn wcswidth_l
+functions return the total number of columns that are required to
+display the wide-character string.
+Otherwise,
+.Sy -1
+is returned to indicate that an invalid or non-printable wide-character
+was encountered.
+.Sh EXAMPLES
+.Sy Example 1
+Using the
+.Fn wcswidth
+function to count characters in a string.
+.Bd -literal
 #include <wchar.h>
+#include <stdio.h>
 
-\fBint\fR \fBwcswidth\fR(\fBconst wchar_t *\fR\fIpwcs\fR, \fBsize_t\fR \fIn\fR);
-.fi
-.LP
-.nf
-#include <wchar.h>
-#include <xlocale.h>
-
-\fBint\fR \fBwcswidth_l\fR(\fBconst wchar_t *\fR\fIpwcs\fR, \fBsize_t\fR \fIn\fR, \fBlocale_t\fR \fIloc\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBwcswidth()\fR function determines the number of column positions
-required for \fIn\fR wide-character codes (or fewer than \fIn\fR wide-character
-codes if a null wide-character code is encountered before \fIn\fR
-wide-character codes are exhausted) in the string pointed to by \fIpwcs\fR.
-.SH RETURN VALUES
-.LP
-The \fBwcswidth()\fR function either returns \fB0\fR (if \fIpwcs\fR points to a
-null wide-character code), or returns the number of column positions to be
-occupied by the wide-character string pointed to by \fIpwcs\fR, or returns
-\fB\(mi1\fR (if any of the first \fIn\fR wide-character codes in the
-wide-character string pointed to by \fIpwcs\fR is not a printing wide-character
-code).
-.LP
-The function \fBwcwidth_l()\fR behaves identically to \fBwcwidth()\fR, except
-instead of operating in the current environemtn, it operates in the environment
-specified by \fIloc\fR.
-.SH ERRORS
-.LP
-No errors are defined.
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-CSI	Enabled
-_
-Interface Stability	Standard
-_
-MT-Level	MT-Safe with exceptions
-.TE
-
-.SH SEE ALSO
-.LP
-\fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBuselocale\fR(3C),
-\fBwcwidth\fR(3C), \fBattributes\fR(5), \fBstandards\fR(5)
+int
+main(void)
+{
+        wchar_t *str = L"Hello world";
+        int ret = wcswidth(str, wcslen(str));
+        (void) printf("wcswidth returned: %d\n", ret);
+        return (0);
+}
+.Ed
+.Pp
+When compiled and run, this program outputs:
+.Bd -literal
+$ gcc -Wall -Wextra example.c
+$ ./a.out
+wcswidth returned: 11
+.Ed
+.Sh MT-LEVEL
+The
+.Fn wcswidth
+function is
+.Sy MT-Safe
+as long as the thread-specific or global locale is not changed while it
+is running.
+.Pp
+The
+.Fn wcswidth_l
+function is
+.Sy MT-Safe
+as long as the locale
+.Fa loc
+is not freed while the function is running.
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr iswprint 3C ,
+.Xr newlocale 3C ,
+.Xr setlocale 3C ,
+.Xr uselocale 3C ,
+.Xr wcwidth 3C
