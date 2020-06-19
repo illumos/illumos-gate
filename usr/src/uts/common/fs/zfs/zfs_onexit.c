@@ -125,13 +125,18 @@ zfs_onexit_fd_hold(int fd, minor_t *minorp)
 {
 	file_t *fp;
 	zfs_onexit_t *zo;
+	int ret;
 
 	fp = getf(fd);
 	if (fp == NULL)
 		return (SET_ERROR(EBADF));
 
 	*minorp = getminor(fp->f_vnode->v_rdev);
-	return (zfs_onexit_minor_to_state(*minorp, &zo));
+	ret = zfs_onexit_minor_to_state(*minorp, &zo);
+	if (ret != 0)
+		releasef(fd);
+
+	return (ret);
 }
 
 void

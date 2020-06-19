@@ -10,6 +10,7 @@
 #
 #
 # Copyright (C) 2015 STRATO AG. All rights reserved.
+# Copyright 2020 Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
@@ -17,7 +18,7 @@ include $(SRC)/Makefile.master
 ROOTOPTPKG = $(ROOT)/opt/zfs-tests
 TESTDIR = $(ROOTOPTPKG)/tests/functional/libzfs
 PROG = many_fds
-SCRIPTS =
+SCRIPTS = setup libzfs_input cleanup
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
@@ -39,8 +40,6 @@ $(PROG): $(OBJS)
 	$(COMPILE.c) $<
 
 install: all $(CMDS)
-
-lint: lint_SRCS
 
 clobber: clean
 	-$(RM) $(PROG)

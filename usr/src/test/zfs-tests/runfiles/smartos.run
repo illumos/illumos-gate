@@ -637,9 +637,7 @@ tests = ['zvol_misc_001_neg', 'zvol_misc_002_pos', 'zvol_misc_003_neg',
     'zvol_misc_004_pos', 'zvol_misc_005_neg', 'zvol_misc_006_pos']
 
 [/opt/zfs-tests/tests/functional/libzfs]
-tests = ['many_fds']
-pre =
-post =
+tests = ['many_fds', 'libzfs_input']
 
 [/opt/zfs-tests/tests/functional/log_spacemap]
 tests = ['log_spacemap_import_logs']

@@ -192,6 +192,7 @@ file path=opt/zfs-tests/bin/file_write mode=0555
 file path=opt/zfs-tests/bin/getholes mode=0555
 file path=opt/zfs-tests/bin/has_unmap mode=0555
 file path=opt/zfs-tests/bin/largest_file mode=0555
+file path=opt/zfs-tests/bin/libzfs_input_check mode=0555
 file path=opt/zfs-tests/bin/memory_balloon mode=0555
 file path=opt/zfs-tests/bin/mkbusy mode=0555
 file path=opt/zfs-tests/bin/mkfiles mode=0555
@@ -2595,7 +2596,10 @@ file path=opt/zfs-tests/tests/functional/largest_pool/largest_pool.cfg \
     mode=0444
 file path=opt/zfs-tests/tests/functional/largest_pool/largest_pool_001_pos \
     mode=0555
+file path=opt/zfs-tests/tests/functional/libzfs/cleanup mode=0555
+file path=opt/zfs-tests/tests/functional/libzfs/libzfs_input mode=0555
 file path=opt/zfs-tests/tests/functional/libzfs/many_fds mode=0555
+file path=opt/zfs-tests/tests/functional/libzfs/setup mode=0555
 file path=opt/zfs-tests/tests/functional/link_count/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/link_count/link_count_001 mode=0555
 file path=opt/zfs-tests/tests/functional/link_count/setup mode=0555
