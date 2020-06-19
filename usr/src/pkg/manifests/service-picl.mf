@@ -221,7 +221,8 @@ $(sparc_ONLY)file \
     path=usr/platform/SUNW,Sun-Blade-2500/lib/picl/plugins/piclfrutree.conf \
     group=sys
 $(sparc_ONLY)file \
-    path=usr/platform/SUNW,Sun-Fire-280R/lib/libpsvcpolicy_psr.so.1 group=sys
+    path=usr/platform/SUNW,Sun-Fire-280R/lib/libpsvcpolicy_psr.so.1 group=sys \
+    pkg.depend.runpath=$PKGDEPEND_RUNPATH:usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins/libpiclfrutree.so.1 \
     group=sys
@@ -230,7 +231,8 @@ $(sparc_ONLY)file \
     group=sys
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins/libpsvcplugin_psr.so.1 \
-    group=sys
+    group=sys \
+    pkg.depend.runpath=$PKGDEPEND_RUNPATH:usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins/picldevtree.conf \
     group=sys mode=0444
@@ -242,13 +244,15 @@ $(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-280R/lib/platsvcd.conf \
 $(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-280R/lib/psvcobj.conf \
     group=sys mode=0444
 $(sparc_ONLY)file \
-    path=usr/platform/SUNW,Sun-Fire-480R/lib/libpsvcpolicy_psr.so.1 group=sys
+    path=usr/platform/SUNW,Sun-Fire-480R/lib/libpsvcpolicy_psr.so.1 group=sys \
+    pkg.depend.runpath=$PKGDEPEND_RUNPATH:usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins:usr/platform/sun4u/lib
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins/libpiclfrutree.so.1 \
     group=sys
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins/libpsvcplugin_psr.so.1 \
-    group=sys
+    group=sys \
+    pkg.depend.runpath=$PKGDEPEND_RUNPATH:usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins/picldevtree.conf \
     group=sys mode=0444
@@ -260,13 +264,15 @@ $(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-480R/lib/platsvcd.conf \
 $(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-480R/lib/psvcobj.conf \
     group=sys mode=0444
 $(sparc_ONLY)file \
-    path=usr/platform/SUNW,Sun-Fire-880/lib/libpsvcpolicy_psr.so.1 group=sys
+    path=usr/platform/SUNW,Sun-Fire-880/lib/libpsvcpolicy_psr.so.1 group=sys \
+    pkg.depend.runpath=$PKGDEPEND_RUNPATH:usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins:usr/platform/sun4u/lib
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins/libpiclfrutree.so.1 \
     group=sys
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins/libpsvcplugin_psr.so.1 \
-    group=sys
+    group=sys \
+    pkg.depend.runpath=$PKGDEPEND_RUNPATH:usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins/picldevtree.conf \
     group=sys mode=0444
@@ -592,7 +598,8 @@ $(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-V890/lib/platsvcd.conf \
 $(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-V890/lib/psvcobj.conf \
     group=sys mode=0444
 $(sparc_ONLY)file path=usr/platform/sun4u/lib/libpsvcobj.so.1 group=sys
-$(sparc_ONLY)file path=usr/platform/sun4u/lib/libpsvcpolicy.so.1 group=sys
+$(sparc_ONLY)file path=usr/platform/sun4u/lib/libpsvcpolicy.so.1 group=sys \
+    pkg.depend.runpath=$PKGDEPEND_RUNPATH:usr/platform/SUNW,Sun-Fire-V490/lib/picl/plugins:usr/platform/SUNW,Sun-Fire-280R/lib/picl/plugins:usr/platform/SUNW,Sun-Fire-V890/lib/picl/plugins:usr/platform/SUNW,Sun-Fire-880/lib/picl/plugins:usr/platform/SUNW,Sun-Fire-480R/lib/picl/plugins
 $(sparc_ONLY)file path=usr/platform/sun4u/lib/picl/plugins/libpiclenvmon.so.1 \
     group=sys
 $(sparc_ONLY)file path=usr/platform/sun4v/lib/libpiclsnmp.so.1 group=sys
@@ -601,7 +608,7 @@ $(sparc_ONLY)file path=usr/platform/sun4v/lib/picl/plugins/libmdescplugin.so.1 \
 $(sparc_ONLY)file path=usr/platform/sun4v/lib/picl/plugins/libpiclsbl.so.1 \
     group=sys
 $(sparc_ONLY)file path=usr/platform/sun4v/lib/picl/plugins/libpriplugin.so.1 \
-    group=sys
+    group=sys variant.opensolaris.zone=global
 $(sparc_ONLY)file path=usr/platform/sun4v/lib/picl/plugins/libsnmpplugin.so.1 \
     group=sys
 file path=usr/sbin/prtpicl mode=0755
