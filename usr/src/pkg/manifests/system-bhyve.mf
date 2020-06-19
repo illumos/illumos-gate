@@ -52,6 +52,8 @@ file path=usr/sbin/bhyvectl mode=0555
 file path=usr/sbin/pptadm mode=0555
 file path=usr/share/man/man1m/pptadm.1m
 license lic_CDDL license=lic_CDDL
+license usr/src/uts/i86pc/io/vmm/THIRDPARTYLICENSE \
+    license=usr/src/uts/i86pc/io/vmm/THIRDPARTYLICENSE
 depend fmri=developer/acpi type=require
 depend fmri=system/bhyve/firmware type=require
 depend fmri=system/library/bhyve type=require

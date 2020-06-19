@@ -33,3 +33,5 @@ file path=lib/$(ARCH64)/libvmmapi.so.1
 file path=usr/lib/$(ARCH64)/libppt.so.1
 file path=usr/lib/libppt.so.1
 license lic_CDDL license=lic_CDDL
+license usr/src/lib/libvmmapi/THIRDPARTYLICENSE \
+    license=usr/src/lib/libvmmapi/THIRDPARTYLICENSE
