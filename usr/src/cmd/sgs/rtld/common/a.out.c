@@ -356,7 +356,7 @@ aout_find_com(struct nlist *sp, const char *name)
 	(void) strcpy(rs->rtc_sp->n_un.n_name, name);
 	rs->rtc_sp->n_type = N_COMM;
 	if ((rs->rtc_sp->n_value =
-	    (long)calloc(rs->rtc_sp->n_value, 1)) == NULL)
+	    (long)calloc(rs->rtc_sp->n_value, 1)) == (long)NULL)
 		return (NULL);
 	return (rs->rtc_sp);
 }
@@ -419,7 +419,7 @@ aout_findsb(const char *aname, Rt_map *lmp, int flag)
 				if (*name++ == '\0')
 					return (sp);	/* found */
 			}
-			if (p->next == NULL)
+			if (p->next == 0)
 				return (NULL);		/* not found */
 			else
 				continue;

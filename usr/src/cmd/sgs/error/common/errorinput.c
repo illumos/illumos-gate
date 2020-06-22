@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
@@ -129,7 +127,7 @@ erroradd(int errorlength, char **errorv, Errorclass errorclass,
 #ifdef FULLDEBUG
 		if (errorclass != C_TRUE)
 			printf("The 2nd word, \"%s\" is not a number.\n",
-				errorv[1]);
+			    errorv[1]);
 #endif
 	}
 	if (errorlength > 0) {
@@ -143,10 +141,10 @@ erroradd(int errorlength, char **errorv, Errorclass errorclass,
 		newerror->error_s_class = errorsubclass;
 		switch (newerror->error_e_class = discardit(newerror)) {
 			case C_SYNC:		nsyncerrors++; break;
-			case C_DISCARD: 	ndiscard++; break;
+			case C_DISCARD:		ndiscard++; break;
 			case C_NULLED:		nnulled++; break;
 			case C_NONSPEC:		nnonspec++; break;
-			case C_THISFILE: 	nthisfile++; break;
+			case C_THISFILE:	nthisfile++; break;
 			case C_TRUE:		ntrue++; break;
 			case C_UNKNOWN:		nunknown++; break;
 			case C_IGNORE:		nignore++; break;
@@ -315,7 +313,7 @@ Errorclass
 lint0(void)
 {
 	char	**nwordv;
-		char	*line, *file;
+	char	*line, *file;
 	/*
 	 *	Attempt a match for the new lint style normal compiler
 	 *	error messages, of the form
@@ -453,8 +451,8 @@ f77(void)
 		return (C_UNKNOWN);
 	if ((lastchar(wordv[6]) == ':') &&
 	    ((wordvcmp(wordv+1, 3, F77_fatal) == 0) ||
-		(wordvcmp(wordv+1, 3, F77_error) == 0) ||
-		(wordvcmp(wordv+1, 3, F77_warning) == 0))) {
+	    (wordvcmp(wordv+1, 3, F77_error) == 0) ||
+	    (wordvcmp(wordv+1, 3, F77_warning) == 0))) {
 		language = INF77;
 		nwordv = wordvsplice(2, wordc, wordv+1);
 		nwordv[0] = wordv[6];
@@ -564,10 +562,10 @@ mod2(void)
 	 */
 	if (((strcmp(wordv[1], "!!!") == 0) ||		/* early version */
 	    (strcmp(wordv[1], "File") == 0)) &&		/* later version */
-		(lastchar(wordv[2]) == ',') &&		/* file name */
-		(strcmp(wordv[3], "line") == 0) &&
-		(isdigit(firstchar(wordv[4]))) &&	/* line number */
-		(lastchar(wordv[4]) == ':')) {	/* line number */
+	    (lastchar(wordv[2]) == ',') &&		/* file name */
+	    (strcmp(wordv[3], "line") == 0) &&
+	    (isdigit(firstchar(wordv[4]))) &&	/* line number */
+	    (lastchar(wordv[4]) == ':')) {	/* line number */
 		clob_last(wordv[2], '\0');	/* drop last , on file name */
 		clob_last(wordv[4], '\0');	/* drop last : on line number */
 		wordv[3] = wordv[2];		/* file name on top of "line" */
@@ -596,10 +594,10 @@ sunf77(void)
 	    (strcmp(wordv[2], "line") == 0) &&
 	    (isdigit(firstchar(wordv[3]))) &&
 	    (lastchar(wordv[3]) == ':') &&
-		((strcmp(wordv[4], "Error:") == 0) ||
-		    (strcmp(wordv[4], "Warning:") == 0) ||
-		    ((strcmp(wordv[4], "ANSI") == 0) &&
-		    (strcmp(wordv[5], "extension:") == 0)))) {
+	    ((strcmp(wordv[4], "Error:") == 0) ||
+	    (strcmp(wordv[4], "Warning:") == 0) ||
+	    ((strcmp(wordv[4], "ANSI") == 0) &&
+	    (strcmp(wordv[5], "extension:") == 0)))) {
 		clob_last(wordv[1], '\0');	/* drop last , */
 		clob_last(wordv[1], '\0');	/* drop last " */
 		wordv[1]++;			/* drop first " */

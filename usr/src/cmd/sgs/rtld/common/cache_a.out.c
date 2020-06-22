@@ -38,16 +38,16 @@
 #include	"_rtld.h"
 #include	"msg.h"
 
-static int	stol();
-static int	rest_ok();
-static int	verscmp();
-static void	fix_lo();
-static int	extract_name();
-static int	hash();
+static int	stol(char *, char, char **, int *);
+static int	rest_ok(char *);
+static int	verscmp(const char *, const char *);
+static void	fix_lo(struct db *);
+static int	extract_name(char **);
+static int	hash(char *, int, int);
 
-static struct link_object *get_lo();
-static struct dbd *new_dbd();
-static struct db *find_so();
+static struct link_object *get_lo(struct db *, char *, int, int, int);
+static struct dbd *new_dbd(struct dbd **, struct db *);
+static struct db *find_so(const char *);
 
 #define	SKIP_DOT(str)	((*str == '.')  ? ++str : str)
 #define	EMPTY(str)	((str == NULL) || (*str == '\0'))
@@ -62,9 +62,7 @@ static struct dbd *dbd_head = NULL;	/* head of data bases */
  * but the highest minor number
  */
 char *
-ask_db(dbp, file)
-	struct db *dbp;
-	const char *file;
+ask_db(struct db *dbp, const char *file)
 {
 	char *libname, *n;
 	char *mnp;
@@ -82,7 +80,7 @@ ask_db(dbp, file)
 	if ((libname = malloc(liblen + 1)) == 0)
 		return (NULL);
 	(void) strncpy(libname, n, liblen);
-	libname[liblen] = NULL;
+	libname[liblen] = '\0';
 
 	if (strncmp(MSG_ORIG(MSG_FIL_DOTSODOT), (n + liblen),
 	    MSG_FIL_DOTSODOT_SIZE))
@@ -245,7 +243,7 @@ find_so(const char *ds)
 			 */
 			index = hash(cp, cplen, m);
 			ep = &(dbp->db_hash[index]);
-			if (ep->dbe_lop == NULL) {
+			if (ep->dbe_lop == 0) {
 				ep->dbe_lop = (long)get_lo(dbp, cp,
 				    cplen, m, to_min);
 				/* LINTED */
@@ -278,7 +276,7 @@ find_so(const char *ds)
 						    dp->d_name);
 					break;
 				}
-				if (ep->dbe_next == NULL) {
+				if (ep->dbe_next == 0) {
 					ep->dbe_next = RELPTR(dbp,
 					    calloc(sizeof (struct dbe), 1));
 					/* LINTED */
@@ -302,14 +300,15 @@ find_so(const char *ds)
 
 /*
  * Allocate and fill in the fields for a link_object
+ * Arguments:
+ *	struct db *dbp;		data base
+ *	char *cp;		ptr. to X of libX
+ *	int cplen;		length of X
+ *	int m;			major version
+ *	int n;			index to minor version
  */
 static struct link_object *
-get_lo(dbp, cp, cplen, m, n)
-	struct db *dbp;			/* data base */
-	char *cp;			/* ptr. to X of libX */
-	int cplen;			/* length of X */
-	int m;				/* major version */
-	int n;				/* index to minor version */
+get_lo(struct db *dbp, char *cp, int cplen, int m, int n)
 {
 	struct link_object *lop;	/* link_object to be returned */
 	struct link_object *tlop;	/* working copy of the above */
@@ -353,8 +352,7 @@ get_lo(dbp, cp, cplen, m, n)
  * length of X
  */
 static int
-extract_name(name)
-	char **name;
+extract_name(char **name)
 {
 	char *ls;			/* string after LIB root */
 	char *dp;			/* string before first delimiter */
@@ -375,8 +373,7 @@ extract_name(name)
  * but only one will be chosen.
  */
 static void
-fix_lo(dbp)
-	struct db *dbp;
+fix_lo(struct db *dbp)
 {
 	int i;				/* loop temporary */
 	int dirlen = strlen(&AP(dbp)[dbp->db_name]);
@@ -408,11 +405,12 @@ fix_lo(dbp)
 
 /*
  * Allocate a new dbd, append it after dbdpp and set the dbd_dbp to dbp.
+ * Arguments:
+ *	struct dbd **dbdpp;	insertion point
+ *	struct db *dbp;		db associated with this dbd
  */
 static struct dbd *
-new_dbd(dbdpp, dbp)
-	struct dbd **dbdpp;		/* insertion point */
-	struct db *dbp;			/* db associated with this dbd */
+new_dbd(struct dbd **dbdpp, struct db *dbp)
 {
 	struct dbd *dbdp;		/* working dbd ptr. */
 
@@ -426,12 +424,13 @@ new_dbd(dbdpp, dbp)
 /*
  * Calculate hash index for link object.
  * This is based on X.major from libX.so.major.minor.
+ * Arguments:
+ *	char *np;	X of libX
+ *	int nchrs;	no of chrs. to hash on
+ *	int m;		the major version
  */
 static int
-hash(np, nchrs, m)
-	char *np; 			/* X of libX */
-	int nchrs;			/* no of chrs. to hash on */
-	int m;				/* the major version */
+hash(char *np, int nchrs, int m)
 {
 	int h;				/* for loop counter */
 	char *cp;			/* working (char *) ptr */
@@ -447,8 +446,7 @@ hash(np, nchrs, m)
  * Test whether the string is of digit[.digit]* format
  */
 static int
-rest_ok(str)
-	char *str;			/* input string */
+rest_ok(char *str)
 {
 	int dummy;			/* integer place holder */
 	int legal = 1;			/* return flag */
@@ -509,14 +507,15 @@ verscmp(const char *c1p, const char *c2p)
  * as a decimal digit. It stops interpreting when it reaches a delimiter or
  * when character does not represent a digit. In the first case it returns
  * success and the latter failure.
+ * Arguments:
+ *	char *cp;		ptr to input string
+ *	char delimit;		delimiter
+ *	char **ptr;		left pointing to next del. or
+ *				illegal character
+ *	int *i;			digit that the string represents
  */
 static int
-stol(cp, delimit, ptr, i)
-	char *cp;			/* ptr to input string */
-	char delimit;			/* delimiter */
-	char **ptr;			/* left pointing to next del. or */
-					/* illegal character */
-	int *i;				/* digit that the string represents */
+stol(char *cp, char delimit, char **ptr, int *i)
 {
 	int c = 0;			/* current char */
 	int n = 0;			/* working copy of i */

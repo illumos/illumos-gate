@@ -24,6 +24,7 @@
  * Copyright 2015, Joyent, Inc.  All rights reserved.
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -831,7 +832,7 @@ recvit(int sock, struct nmsghdr *msg, struct uio *uiop, int flags,
 	void *name;
 	socklen_t namelen;
 	void *control;
-	socklen_t controllen;
+	socklen_t controllen, free_controllen;
 	ssize_t len;
 	int error;
 
@@ -857,6 +858,8 @@ recvit(int sock, struct nmsghdr *msg, struct uio *uiop, int flags,
 	}
 	lwp_stat_update(LWP_STAT_MSGRCV, 1);
 	releasef(sock);
+
+	free_controllen = msg->msg_controllen;
 
 	error = copyout_name(name, namelen, namelenp,
 	    msg->msg_name, msg->msg_namelen);
@@ -887,11 +890,7 @@ recvit(int sock, struct nmsghdr *msg, struct uio *uiop, int flags,
 			goto err;
 		}
 	}
-	/*
-	 * Note: This MUST be done last. There can be no "goto err" after this
-	 * point since it could make so_closefds run twice on some part
-	 * of the file descriptor array.
-	 */
+
 	if (controllen != 0) {
 		if (!(flags & MSG_XPG4_2)) {
 			/*
@@ -900,36 +899,65 @@ recvit(int sock, struct nmsghdr *msg, struct uio *uiop, int flags,
 			 */
 			controllen &= ~((int)sizeof (uint32_t) - 1);
 		}
+
+		if (msg->msg_controllen > controllen || control == NULL) {
+			/*
+			 * If the truncated part contains file descriptors,
+			 * then they must be closed in the kernel as they
+			 * will not be included in the data returned to
+			 * user space. Close them now so that the header size
+			 * can be safely adjusted prior to copyout. In case of
+			 * an error during copyout, the remaining file
+			 * descriptors will be closed in the error handler
+			 * below.
+			 */
+			so_closefds(msg->msg_control, msg->msg_controllen,
+			    !(flags & MSG_XPG4_2),
+			    control == NULL ? 0 : controllen);
+
+			/*
+			 * In the case of a truncated control message, the last
+			 * cmsg header that fits into the available buffer
+			 * space must be adjusted to reflect the actual amount
+			 * of associated data that will be returned. This only
+			 * needs to be done for XPG4 messages as non-XPG4
+			 * messages are not structured (they are just a
+			 * buffer and a length - msg_accrights(len)).
+			 */
+			if (control != NULL && (flags & MSG_XPG4_2)) {
+				so_truncatecmsg(msg->msg_control,
+				    msg->msg_controllen, controllen);
+				msg->msg_controllen = controllen;
+			}
+		}
+
 		error = copyout_arg(control, controllen, controllenp,
 		    msg->msg_control, msg->msg_controllen);
+
 		if (error)
 			goto err;
 
-		if (msg->msg_controllen > controllen || control == NULL) {
-			if (control == NULL)
-				controllen = 0;
-			so_closefds(msg->msg_control, msg->msg_controllen,
-			    !(flags & MSG_XPG4_2), controllen);
-		}
 	}
 	if (msg->msg_namelen != 0)
 		kmem_free(msg->msg_name, (size_t)msg->msg_namelen);
-	if (msg->msg_controllen != 0)
-		kmem_free(msg->msg_control, (size_t)msg->msg_controllen);
+	if (free_controllen != 0)
+		kmem_free(msg->msg_control, (size_t)free_controllen);
 	return (len - uiop->uio_resid);
 
 err:
 	/*
 	 * If we fail and the control part contains file descriptors
-	 * we have to close the fd's.
+	 * we have to close them. For a truncated control message, the
+	 * descriptors which were cut off have already been closed and the
+	 * length adjusted so that they will not be closed again.
 	 */
 	if (msg->msg_controllen != 0)
 		so_closefds(msg->msg_control, msg->msg_controllen,
 		    !(flags & MSG_XPG4_2), 0);
 	if (msg->msg_namelen != 0)
 		kmem_free(msg->msg_name, (size_t)msg->msg_namelen);
-	if (msg->msg_controllen != 0)
-		kmem_free(msg->msg_control, (size_t)msg->msg_controllen);
+	if (free_controllen != 0)
+		kmem_free(msg->msg_control, (size_t)free_controllen);
 	return (set_errno(error));
 }
 

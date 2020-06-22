@@ -13,16 +13,18 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2017 Gordon W. Ross
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
-PROG = conn dgram drop_priv nosignal sockpair
-
-LINTS = $(PROGS:%=%.ln)
+PROG =	conn dgram drop_priv nosignal sockpair \
+	rights.32 rights.64
 
 LDLIBS += -lsocket
+LDLIBS64 += -lsocket
+
 CSTD = $(CSTD_GNU99)
 CPPFLAGS += -D_XOPEN_SOURCE=600 -D__EXTENSIONS__
 
@@ -30,7 +32,8 @@ CPPFLAGS += -D_XOPEN_SOURCE=600 -D__EXTENSIONS__
 SMOFF += all_func_returns
 
 nosignal := LDLIBS += -lnsl
-nosignal.ln := LDLIBS += -lnsl
+rights.32 := LDLIBS += -lproc
+rights.64 := LDLIBS64 += -lproc
 
 ROOTOPTPKG = $(ROOT)/opt/os-tests
 TESTDIR = $(ROOTOPTPKG)/tests/sockfs
@@ -42,8 +45,6 @@ all: $(PROG)
 
 install: $(CMDS)
 
-lint: $(LINTS)
-
 clobber: clean
 	-$(RM) $(PROG)
 
@@ -51,11 +52,16 @@ clean:
 
 $(CMDS): $(TESTDIR) $(PROG)
 
-%.ln : %.c
-	$(LINT.c) $*.c $(UTILS) $(LDLIBS)
-
 $(TESTDIR):
 	$(INS.dir)
 
 $(TESTDIR)/%: %
 	$(INS.file)
+
+%.64: %.c
+	$(LINK64.c) -o $@ $< $(LDLIBS64)
+	$(POST_PROCESS)
+
+%.32: %.c
+	$(LINK.c) -o $@ $< $(LDLIBS)
+	$(POST_PROCESS)
