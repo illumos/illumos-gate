@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -36,6 +36,7 @@ static check_symbol_t check_syms[] = {
 	{ "g", "int [4][5][6][7][8]" },
 	{ "h", "int [4][5][6][7][8][9]" },
 	{ "i", "int [4][5][6][7][8][9][10]" },
+	{ "empty", "int [0]" },
 	{ NULL }
 };
 
@@ -72,11 +73,18 @@ static check_descent_t check_array_i[] = {
 	{ NULL },
 };
 
+static check_descent_t check_array_empty[] = {
+	{ "int [0]", CTF_K_ARRAY, "int", 0 },
+	{ "int", CTF_K_INTEGER },
+	{ NULL }
+};
+
 static check_descent_test_t descents[] = {
 	{ "a", check_array_a },
 	{ "b", check_array_b },
 	{ "c", check_array_c },
 	{ "i", check_array_i },
+	{ "empty", check_array_empty },
 	{ NULL }
 };
 

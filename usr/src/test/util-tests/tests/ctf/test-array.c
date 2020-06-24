@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -27,3 +27,5 @@ int f[4][5][6][7];
 int g[4][5][6][7][8];
 int h[4][5][6][7][8][9];
 int i[4][5][6][7][8][9][10];
+
+int empty[] = { };
