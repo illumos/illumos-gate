@@ -64,13 +64,6 @@ struct vm_memseg {
 	char		name[SPECNAMELEN + 1];
 };
 
-struct vm_memseg_fbsd12 {
-	int		segid;
-	size_t		len;
-	char		name[64];
-};
-_Static_assert(sizeof(struct vm_memseg_fbsd12) == 80, "COMPAT_FREEBSD12 ABI");
-
 struct vm_register {
 	int		cpuid;
 	int		regnum;		/* enum vm_reg_name */
@@ -134,51 +127,6 @@ struct vm_capability {
 	int		allcpus;
 };
 
-#ifdef __FreeBSD__
-struct vm_pptdev {
-	int		bus;
-	int		slot;
-	int		func;
-};
-
-struct vm_pptdev_mmio {
-	int		bus;
-	int		slot;
-	int		func;
-	vm_paddr_t	gpa;
-	vm_paddr_t	hpa;
-	size_t		len;
-};
-
-struct vm_pptdev_msi {
-	int		vcpu;
-	int		bus;
-	int		slot;
-	int		func;
-	int		numvec;		/* 0 means disabled */
-	uint64_t	msg;
-	uint64_t	addr;
-};
-
-struct vm_pptdev_msix {
-	int		vcpu;
-	int		bus;
-	int		slot;
-	int		func;
-	int		idx;
-	uint64_t	msg;
-	uint32_t	vector_control;
-	uint64_t	addr;
-};
-
-struct vm_pptdev_limits {
-	int		bus;
-	int		slot;
-	int		func;
-	int		msi_limit;
-	int		msix_limit;
-};
-#else /* __FreeBSD__ */
 struct vm_pptdev {
 	int		pptfd;
 };
@@ -212,7 +160,6 @@ struct vm_pptdev_limits {
 	int		msi_limit;
 	int		msix_limit;
 };
-#endif /* __FreeBSD__ */
 
 struct vm_nmi {
 	int		cpuid;
@@ -296,12 +243,10 @@ struct vm_rtc_data {
 	uint8_t		value;
 };
 
-#ifndef __FreeBSD__
 struct vm_devmem_offset {
 	int		segid;
 	off_t		offset;
 };
-#endif
 
 struct vm_cpu_topology {
 	uint16_t	sockets;
@@ -319,230 +264,92 @@ struct vm_readwrite_kernemu_device {
 };
 _Static_assert(sizeof(struct vm_readwrite_kernemu_device) == 24, "ABI");
 
-enum {
-	/* general routines */
-	IOCNUM_ABIVERS = 0,
-	IOCNUM_RUN = 1,
-	IOCNUM_SET_CAPABILITY = 2,
-	IOCNUM_GET_CAPABILITY = 3,
-	IOCNUM_SUSPEND = 4,
-	IOCNUM_REINIT = 5,
+#define	VMMCTL_IOC_BASE		(('V' << 16) | ('M' << 8))
+#define	VMM_IOC_BASE		(('v' << 16) | ('m' << 8))
+#define	VMM_LOCK_IOC_BASE	(('v' << 16) | ('l' << 8))
+#define	VMM_CPU_IOC_BASE	(('v' << 16) | ('p' << 8))
 
-	/* memory apis */
-	IOCNUM_MAP_MEMORY = 10,			/* deprecated */
-	IOCNUM_GET_MEMORY_SEG = 11,		/* deprecated */
-	IOCNUM_GET_GPA_PMAP = 12,
-	IOCNUM_GLA2GPA = 13,
-	IOCNUM_ALLOC_MEMSEG = 14,
-	IOCNUM_GET_MEMSEG = 15,
-	IOCNUM_MMAP_MEMSEG = 16,
-	IOCNUM_MMAP_GETNEXT = 17,
-	IOCNUM_GLA2GPA_NOFAULT = 18,
+/* Operations performed on the vmmctl device */
+#define	VMM_CREATE_VM		(VMMCTL_IOC_BASE | 0x01)
+#define	VMM_DESTROY_VM		(VMMCTL_IOC_BASE | 0x02)
+#define	VMM_VM_SUPPORTED	(VMMCTL_IOC_BASE | 0x03)
 
-	/* register/state accessors */
-	IOCNUM_SET_REGISTER = 20,
-	IOCNUM_GET_REGISTER = 21,
-	IOCNUM_SET_SEGMENT_DESCRIPTOR = 22,
-	IOCNUM_GET_SEGMENT_DESCRIPTOR = 23,
-	IOCNUM_SET_REGISTER_SET = 24,
-	IOCNUM_GET_REGISTER_SET = 25,
-	IOCNUM_GET_KERNEMU_DEV = 26,
-	IOCNUM_SET_KERNEMU_DEV = 27,
+/* Operations performed in the context of a given vCPU */
+#define	VM_RUN				(VMM_CPU_IOC_BASE | 0x01)
+#define	VM_SET_REGISTER			(VMM_CPU_IOC_BASE | 0x02)
+#define	VM_GET_REGISTER			(VMM_CPU_IOC_BASE | 0x03)
+#define	VM_SET_SEGMENT_DESCRIPTOR	(VMM_CPU_IOC_BASE | 0x04)
+#define	VM_GET_SEGMENT_DESCRIPTOR	(VMM_CPU_IOC_BASE | 0x05)
+#define	VM_SET_REGISTER_SET		(VMM_CPU_IOC_BASE | 0x06)
+#define	VM_GET_REGISTER_SET		(VMM_CPU_IOC_BASE | 0x07)
+#define	VM_INJECT_EXCEPTION		(VMM_CPU_IOC_BASE | 0x08)
+#define	VM_SET_CAPABILITY		(VMM_CPU_IOC_BASE | 0x09)
+#define	VM_GET_CAPABILITY		(VMM_CPU_IOC_BASE | 0x0a)
+#define	VM_PPTDEV_MSI			(VMM_CPU_IOC_BASE | 0x0b)
+#define	VM_PPTDEV_MSIX			(VMM_CPU_IOC_BASE | 0x0c)
+#define	VM_SET_X2APIC_STATE		(VMM_CPU_IOC_BASE | 0x0d)
+#define	VM_GLA2GPA			(VMM_CPU_IOC_BASE | 0x0e)
+#define	VM_GLA2GPA_NOFAULT		(VMM_CPU_IOC_BASE | 0x0f)
+#define	VM_ACTIVATE_CPU			(VMM_CPU_IOC_BASE | 0x10)
+#define	VM_SET_INTINFO			(VMM_CPU_IOC_BASE | 0x11)
+#define	VM_GET_INTINFO			(VMM_CPU_IOC_BASE | 0x12)
+#define	VM_RESTART_INSTRUCTION		(VMM_CPU_IOC_BASE | 0x13)
+#define	VM_SET_KERNEMU_DEV		(VMM_CPU_IOC_BASE | 0x14)
+#define	VM_GET_KERNEMU_DEV		(VMM_CPU_IOC_BASE | 0x15)
 
-	/* interrupt injection */
-	IOCNUM_GET_INTINFO = 28,
-	IOCNUM_SET_INTINFO = 29,
-	IOCNUM_INJECT_EXCEPTION = 30,
-	IOCNUM_LAPIC_IRQ = 31,
-	IOCNUM_INJECT_NMI = 32,
-	IOCNUM_IOAPIC_ASSERT_IRQ = 33,
-	IOCNUM_IOAPIC_DEASSERT_IRQ = 34,
-	IOCNUM_IOAPIC_PULSE_IRQ = 35,
-	IOCNUM_LAPIC_MSI = 36,
-	IOCNUM_LAPIC_LOCAL_IRQ = 37,
-	IOCNUM_IOAPIC_PINCOUNT = 38,
-	IOCNUM_RESTART_INSTRUCTION = 39,
+/* Operations requiring write-locking the VM */
+#define	VM_REINIT		(VMM_LOCK_IOC_BASE | 0x01)
+#define	VM_BIND_PPTDEV		(VMM_LOCK_IOC_BASE | 0x02)
+#define	VM_UNBIND_PPTDEV	(VMM_LOCK_IOC_BASE | 0x03)
+#define	VM_MAP_PPTDEV_MMIO	(VMM_LOCK_IOC_BASE | 0x04)
+#define	VM_ALLOC_MEMSEG		(VMM_LOCK_IOC_BASE | 0x05)
+#define	VM_MMAP_MEMSEG		(VMM_LOCK_IOC_BASE | 0x06)
 
-	/* PCI pass-thru */
-	IOCNUM_BIND_PPTDEV = 40,
-	IOCNUM_UNBIND_PPTDEV = 41,
-	IOCNUM_MAP_PPTDEV_MMIO = 42,
-	IOCNUM_PPTDEV_MSI = 43,
-	IOCNUM_PPTDEV_MSIX = 44,
-	IOCNUM_GET_PPTDEV_LIMITS = 45,
+#define	VM_WRLOCK_CYCLE		(VMM_LOCK_IOC_BASE | 0xff)
 
-	/* statistics */
-	IOCNUM_VM_STATS = 50, 
-	IOCNUM_VM_STAT_DESC = 51,
+/* All other ioctls */
+#define	VM_GET_GPA_PMAP			(VMM_IOC_BASE | 0x01)
+#define	VM_GET_MEMSEG			(VMM_IOC_BASE | 0x02)
+#define	VM_MMAP_GETNEXT			(VMM_IOC_BASE | 0x03)
 
-	/* kernel device state */
-	IOCNUM_SET_X2APIC_STATE = 60,
-	IOCNUM_GET_X2APIC_STATE = 61,
-	IOCNUM_GET_HPET_CAPABILITIES = 62,
+#define	VM_LAPIC_IRQ 			(VMM_IOC_BASE | 0x04)
+#define	VM_LAPIC_LOCAL_IRQ 		(VMM_IOC_BASE | 0x05)
+#define	VM_LAPIC_MSI			(VMM_IOC_BASE | 0x06)
 
-	/* CPU Topology */
-	IOCNUM_SET_TOPOLOGY = 63,
-	IOCNUM_GET_TOPOLOGY = 64,
+#define	VM_IOAPIC_ASSERT_IRQ		(VMM_IOC_BASE | 0x07)
+#define	VM_IOAPIC_DEASSERT_IRQ		(VMM_IOC_BASE | 0x08)
+#define	VM_IOAPIC_PULSE_IRQ		(VMM_IOC_BASE | 0x09)
 
-	/* legacy interrupt injection */
-	IOCNUM_ISA_ASSERT_IRQ = 80,
-	IOCNUM_ISA_DEASSERT_IRQ = 81,
-	IOCNUM_ISA_PULSE_IRQ = 82,
-	IOCNUM_ISA_SET_IRQ_TRIGGER = 83,
+#define	VM_ISA_ASSERT_IRQ		(VMM_IOC_BASE | 0x0a)
+#define	VM_ISA_DEASSERT_IRQ		(VMM_IOC_BASE | 0x0b)
+#define	VM_ISA_PULSE_IRQ		(VMM_IOC_BASE | 0x0c)
+#define	VM_ISA_SET_IRQ_TRIGGER		(VMM_IOC_BASE | 0x0d)
 
-	/* vm_cpuset */
-	IOCNUM_ACTIVATE_CPU = 90,
-	IOCNUM_GET_CPUSET = 91,
-	IOCNUM_SUSPEND_CPU = 92,
-	IOCNUM_RESUME_CPU = 93,
+#define	VM_RTC_WRITE			(VMM_IOC_BASE | 0x0e)
+#define	VM_RTC_READ			(VMM_IOC_BASE | 0x0f)
+#define	VM_RTC_SETTIME			(VMM_IOC_BASE | 0x10)
+#define	VM_RTC_GETTIME			(VMM_IOC_BASE | 0x11)
 
-	/* RTC */
-	IOCNUM_RTC_READ = 100,
-	IOCNUM_RTC_WRITE = 101,
-	IOCNUM_RTC_SETTIME = 102,
-	IOCNUM_RTC_GETTIME = 103,
+#define	VM_SUSPEND			(VMM_IOC_BASE | 0x12)
 
-#ifndef __FreeBSD__
-	/* illumos-custom ioctls */
-	IOCNUM_DEVMEM_GETOFFSET = 256,
-	IOCNUM_WRLOCK_CYCLE = 257,
-#endif
-};
+#define	VM_IOAPIC_PINCOUNT		(VMM_IOC_BASE | 0x13)
+#define	VM_GET_PPTDEV_LIMITS		(VMM_IOC_BASE | 0x14)
+#define	VM_GET_HPET_CAPABILITIES	(VMM_IOC_BASE | 0x15)
 
-#define	VM_RUN		\
-	_IOWR('v', IOCNUM_RUN, struct vm_run)
-#define	VM_SUSPEND	\
-	_IOW('v', IOCNUM_SUSPEND, struct vm_suspend)
-#define	VM_REINIT	\
-	_IO('v', IOCNUM_REINIT)
-#define	VM_ALLOC_MEMSEG_FBSD12	\
-	_IOW('v', IOCNUM_ALLOC_MEMSEG, struct vm_memseg_fbsd12)
-#define	VM_ALLOC_MEMSEG	\
-	_IOW('v', IOCNUM_ALLOC_MEMSEG, struct vm_memseg)
-#define	VM_GET_MEMSEG_FBSD12	\
-	_IOWR('v', IOCNUM_GET_MEMSEG, struct vm_memseg_fbsd12)
-#define	VM_GET_MEMSEG	\
-	_IOWR('v', IOCNUM_GET_MEMSEG, struct vm_memseg)
-#define	VM_MMAP_MEMSEG	\
-	_IOW('v', IOCNUM_MMAP_MEMSEG, struct vm_memmap)
-#define	VM_MMAP_GETNEXT	\
-	_IOWR('v', IOCNUM_MMAP_GETNEXT, struct vm_memmap)
-#define	VM_SET_REGISTER \
-	_IOW('v', IOCNUM_SET_REGISTER, struct vm_register)
-#define	VM_GET_REGISTER \
-	_IOWR('v', IOCNUM_GET_REGISTER, struct vm_register)
-#define	VM_SET_SEGMENT_DESCRIPTOR \
-	_IOW('v', IOCNUM_SET_SEGMENT_DESCRIPTOR, struct vm_seg_desc)
-#define	VM_GET_SEGMENT_DESCRIPTOR \
-	_IOWR('v', IOCNUM_GET_SEGMENT_DESCRIPTOR, struct vm_seg_desc)
-#define	VM_SET_REGISTER_SET \
-	_IOW('v', IOCNUM_SET_REGISTER_SET, struct vm_register_set)
-#define	VM_GET_REGISTER_SET \
-	_IOWR('v', IOCNUM_GET_REGISTER_SET, struct vm_register_set)
-#define	VM_SET_KERNEMU_DEV \
-	_IOW('v', IOCNUM_SET_KERNEMU_DEV, \
-	    struct vm_readwrite_kernemu_device)
-#define	VM_GET_KERNEMU_DEV \
-	_IOWR('v', IOCNUM_GET_KERNEMU_DEV, \
-	    struct vm_readwrite_kernemu_device)
-#define	VM_INJECT_EXCEPTION	\
-	_IOW('v', IOCNUM_INJECT_EXCEPTION, struct vm_exception)
-#define	VM_LAPIC_IRQ 		\
-	_IOW('v', IOCNUM_LAPIC_IRQ, struct vm_lapic_irq)
-#define	VM_LAPIC_LOCAL_IRQ 	\
-	_IOW('v', IOCNUM_LAPIC_LOCAL_IRQ, struct vm_lapic_irq)
-#define	VM_LAPIC_MSI		\
-	_IOW('v', IOCNUM_LAPIC_MSI, struct vm_lapic_msi)
-#define	VM_IOAPIC_ASSERT_IRQ	\
-	_IOW('v', IOCNUM_IOAPIC_ASSERT_IRQ, struct vm_ioapic_irq)
-#define	VM_IOAPIC_DEASSERT_IRQ	\
-	_IOW('v', IOCNUM_IOAPIC_DEASSERT_IRQ, struct vm_ioapic_irq)
-#define	VM_IOAPIC_PULSE_IRQ	\
-	_IOW('v', IOCNUM_IOAPIC_PULSE_IRQ, struct vm_ioapic_irq)
-#define	VM_IOAPIC_PINCOUNT	\
-	_IOR('v', IOCNUM_IOAPIC_PINCOUNT, int)
-#define	VM_ISA_ASSERT_IRQ	\
-	_IOW('v', IOCNUM_ISA_ASSERT_IRQ, struct vm_isa_irq)
-#define	VM_ISA_DEASSERT_IRQ	\
-	_IOW('v', IOCNUM_ISA_DEASSERT_IRQ, struct vm_isa_irq)
-#define	VM_ISA_PULSE_IRQ	\
-	_IOW('v', IOCNUM_ISA_PULSE_IRQ, struct vm_isa_irq)
-#define	VM_ISA_SET_IRQ_TRIGGER	\
-	_IOW('v', IOCNUM_ISA_SET_IRQ_TRIGGER, struct vm_isa_irq_trigger)
-#define	VM_SET_CAPABILITY \
-	_IOW('v', IOCNUM_SET_CAPABILITY, struct vm_capability)
-#define	VM_GET_CAPABILITY \
-	_IOWR('v', IOCNUM_GET_CAPABILITY, struct vm_capability)
-#define	VM_BIND_PPTDEV \
-	_IOW('v', IOCNUM_BIND_PPTDEV, struct vm_pptdev)
-#define	VM_UNBIND_PPTDEV \
-	_IOW('v', IOCNUM_UNBIND_PPTDEV, struct vm_pptdev)
-#define	VM_MAP_PPTDEV_MMIO \
-	_IOW('v', IOCNUM_MAP_PPTDEV_MMIO, struct vm_pptdev_mmio)
-#define	VM_PPTDEV_MSI \
-	_IOW('v', IOCNUM_PPTDEV_MSI, struct vm_pptdev_msi)
-#define	VM_PPTDEV_MSIX \
-	_IOW('v', IOCNUM_PPTDEV_MSIX, struct vm_pptdev_msix)
-#define	VM_GET_PPTDEV_LIMITS \
-	_IOR('v', IOCNUM_GET_PPTDEV_LIMITS, struct vm_pptdev_limits)
-#define VM_INJECT_NMI \
-	_IOW('v', IOCNUM_INJECT_NMI, struct vm_nmi)
-#define	VM_STATS_IOC \
-	_IOWR('v', IOCNUM_VM_STATS, struct vm_stats)
-#define	VM_STAT_DESC \
-	_IOWR('v', IOCNUM_VM_STAT_DESC, struct vm_stat_desc)
-#define	VM_SET_X2APIC_STATE \
-	_IOW('v', IOCNUM_SET_X2APIC_STATE, struct vm_x2apic)
-#define	VM_GET_X2APIC_STATE \
-	_IOWR('v', IOCNUM_GET_X2APIC_STATE, struct vm_x2apic)
-#define	VM_GET_HPET_CAPABILITIES \
-	_IOR('v', IOCNUM_GET_HPET_CAPABILITIES, struct vm_hpet_cap)
-#define VM_SET_TOPOLOGY \
-	_IOW('v', IOCNUM_SET_TOPOLOGY, struct vm_cpu_topology)
-#define VM_GET_TOPOLOGY \
-	_IOR('v', IOCNUM_GET_TOPOLOGY, struct vm_cpu_topology)
-#define	VM_GET_GPA_PMAP \
-	_IOWR('v', IOCNUM_GET_GPA_PMAP, struct vm_gpa_pte)
-#define	VM_GLA2GPA	\
-	_IOWR('v', IOCNUM_GLA2GPA, struct vm_gla2gpa)
-#define	VM_GLA2GPA_NOFAULT \
-	_IOWR('v', IOCNUM_GLA2GPA_NOFAULT, struct vm_gla2gpa)
-#define	VM_ACTIVATE_CPU	\
-	_IOW('v', IOCNUM_ACTIVATE_CPU, struct vm_activate_cpu)
-#define	VM_GET_CPUS	\
-	_IOW('v', IOCNUM_GET_CPUSET, struct vm_cpuset)
-#define	VM_SUSPEND_CPU \
-	_IOW('v', IOCNUM_SUSPEND_CPU, struct vm_activate_cpu)
-#define	VM_RESUME_CPU \
-	_IOW('v', IOCNUM_RESUME_CPU, struct vm_activate_cpu)
-#define	VM_SET_INTINFO	\
-	_IOW('v', IOCNUM_SET_INTINFO, struct vm_intinfo)
-#define	VM_GET_INTINFO	\
-	_IOWR('v', IOCNUM_GET_INTINFO, struct vm_intinfo)
-#define VM_RTC_WRITE \
-	_IOW('v', IOCNUM_RTC_WRITE, struct vm_rtc_data)
-#define VM_RTC_READ \
-	_IOWR('v', IOCNUM_RTC_READ, struct vm_rtc_data)
-#define VM_RTC_SETTIME	\
-	_IOW('v', IOCNUM_RTC_SETTIME, struct vm_rtc_time)
-#define VM_RTC_GETTIME	\
-	_IOR('v', IOCNUM_RTC_GETTIME, struct vm_rtc_time)
-#define	VM_RESTART_INSTRUCTION \
-	_IOW('v', IOCNUM_RESTART_INSTRUCTION, int)
+#define	VM_STATS_IOC			(VMM_IOC_BASE | 0x16)
+#define	VM_STAT_DESC			(VMM_IOC_BASE | 0x17)
 
-#ifndef __FreeBSD__
-#define	VM_DEVMEM_GETOFFSET \
-	_IOW('v', IOCNUM_DEVMEM_GETOFFSET, struct vm_devmem_offset)
-#define	VM_WRLOCK_CYCLE _IO('v', IOCNUM_WRLOCK_CYCLE)
+#define	VM_INJECT_NMI			(VMM_IOC_BASE | 0x18)
+#define	VM_GET_X2APIC_STATE		(VMM_IOC_BASE | 0x19)
+#define	VM_SET_TOPOLOGY			(VMM_IOC_BASE | 0x1a)
+#define	VM_GET_TOPOLOGY			(VMM_IOC_BASE | 0x1b)
+#define	VM_GET_CPUS			(VMM_IOC_BASE | 0x1c)
+#define	VM_SUSPEND_CPU			(VMM_IOC_BASE | 0x1d)
+#define	VM_RESUME_CPU			(VMM_IOC_BASE | 0x1e)
 
-/* ioctls used against ctl device for vm create/destroy */
-#define	VMM_IOC_BASE		(('V' << 16) | ('M' << 8))
-#define	VMM_CREATE_VM		(VMM_IOC_BASE | 0x01)
-#define	VMM_DESTROY_VM		(VMM_IOC_BASE | 0x02)
-#define	VMM_VM_SUPPORTED	(VMM_IOC_BASE | 0x03)
+
+#define	VM_DEVMEM_GETOFFSET		(VMM_IOC_BASE | 0xff)
 
 #define	VMM_CTL_DEV		"/dev/vmmctl"
-
-#endif
 
 #endif

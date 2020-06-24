@@ -528,7 +528,8 @@ $(sparc_ONLY)file path=platform/SUNW,Netra-T4/kernel/drv/$(ARCH64)/lombus \
     group=sys
 $(sparc_ONLY)file path=platform/SUNW,Netra-T4/kernel/drv/lombus.conf group=sys
 $(sparc_ONLY)file path=platform/SUNW,SPARC-Enterprise/kernel/$(ARCH64)/unix \
-    group=sys mode=0755
+    group=sys mode=0755 pkg.depend.bypass-generate=\$CPU \
+    pkg.depend.bypass-generate=dtracestubs pkg.depend.bypass-generate=genunix
 $(sparc_ONLY)file \
     path=platform/SUNW,SPARC-Enterprise/kernel/cpu/$(ARCH64)/FJSV,SPARC64-VI \
     group=sys mode=0755
@@ -537,7 +538,8 @@ $(sparc_ONLY)file path=platform/SUNW,SPARC-Enterprise/kernel/drv/$(ARCH64)/dr \
 $(sparc_ONLY)file \
     path=platform/SUNW,SPARC-Enterprise/kernel/drv/$(ARCH64)/mc-opl group=sys
 $(sparc_ONLY)file \
-    path=platform/SUNW,SPARC-Enterprise/kernel/drv/$(ARCH64)/oplmsu group=sys
+    path=platform/SUNW,SPARC-Enterprise/kernel/drv/$(ARCH64)/oplmsu group=sys \
+    pkg.depend.bypass-generate=su
 $(sparc_ONLY)file \
     path=platform/SUNW,SPARC-Enterprise/kernel/drv/$(ARCH64)/oplpanel \
     group=sys
@@ -557,7 +559,7 @@ $(sparc_ONLY)file path=platform/SUNW,SPARC-Enterprise/kernel/drv/scfd.conf \
     group=sys
 $(sparc_ONLY)file \
     path=platform/SUNW,SPARC-Enterprise/kernel/misc/$(ARCH64)/drmach \
-    group=sys mode=0755
+    group=sys mode=0755 pkg.depend.bypass-generate=opl_cfg
 $(sparc_ONLY)file \
     path=platform/SUNW,SPARC-Enterprise/kernel/misc/$(ARCH64)/platmod \
     group=sys mode=0755
@@ -571,7 +573,8 @@ $(sparc_ONLY)file \
     path=platform/SUNW,Sun-Blade-100/kernel/misc/$(ARCH64)/platmod group=sys \
     mode=0755
 $(sparc_ONLY)file \
-    path=platform/SUNW,Sun-Blade-1000/kernel/drv/$(ARCH64)/xcalppm group=sys
+    path=platform/SUNW,Sun-Blade-1000/kernel/drv/$(ARCH64)/xcalppm group=sys \
+    pkg.depend.bypass-generate=schppm
 $(sparc_ONLY)file \
     path=platform/SUNW,Sun-Blade-1000/kernel/drv/$(ARCH64)/xcalwd group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Blade-1000/kernel/drv/xcalppm.conf \
@@ -592,7 +595,8 @@ $(sparc_ONLY)file \
     path=platform/SUNW,Sun-Blade-2500/kernel/misc/$(ARCH64)/platmod group=sys \
     mode=0755
 $(sparc_ONLY)file \
-    path=platform/SUNW,Sun-Fire-280R/kernel/drv/$(ARCH64)/pcf8574 group=sys
+    path=platform/SUNW,Sun-Fire-280R/kernel/drv/$(ARCH64)/pcf8574 group=sys \
+    pkg.depend.bypass-generate=i2c_svc
 $(sparc_ONLY)file \
     path=platform/SUNW,Sun-Fire-280R/kernel/misc/$(ARCH64)/platmod group=sys \
     mode=0755
@@ -600,14 +604,15 @@ $(sparc_ONLY)file \
     path=platform/SUNW,Sun-Fire-480R/kernel/misc/$(ARCH64)/platmod group=sys \
     mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-880/kernel/drv/$(ARCH64)/hpc3130 \
-    group=sys
+    group=sys pkg.depend.bypass-generate=i2c_svc
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-880/kernel/drv/hpc3130.conf \
     group=sys
 $(sparc_ONLY)file \
     path=platform/SUNW,Sun-Fire-880/kernel/misc/$(ARCH64)/platmod group=sys \
     mode=0755
 $(sparc_ONLY)file \
-    path=platform/SUNW,Sun-Fire-T200/kernel/drv/$(ARCH64)/tsalarm group=sys
+    path=platform/SUNW,Sun-Fire-T200/kernel/drv/$(ARCH64)/tsalarm group=sys \
+    pkg.depend.bypass-generate=rmclomv
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-T200/kernel/drv/tsalarm.conf \
     group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-V215/kernel/drv/su.conf \
@@ -616,9 +621,11 @@ $(sparc_ONLY)file \
     path=platform/SUNW,Sun-Fire-V215/kernel/misc/$(ARCH64)/platmod group=sys \
     mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-V240/kernel/drv/$(ARCH64)/ntwdt \
-    group=sys
+    group=sys pkg.depend.bypass-generate=pmugpio \
+    pkg.depend.bypass-generate=rmc_comm pkg.depend.bypass-generate=rmclomv
 $(sparc_ONLY)file \
-    path=platform/SUNW,Sun-Fire-V240/kernel/drv/$(ARCH64)/tsalarm group=sys
+    path=platform/SUNW,Sun-Fire-V240/kernel/drv/$(ARCH64)/tsalarm group=sys \
+    pkg.depend.bypass-generate=rmclomv
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-V240/kernel/drv/ntwdt.conf \
     group=sys
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire-V240/kernel/drv/tsalarm.conf \
@@ -636,7 +643,8 @@ $(sparc_ONLY)file \
     path=platform/SUNW,Sun-Fire-V445/kernel/misc/$(ARCH64)/platmod group=sys \
     mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire/kernel/$(ARCH64)/unix group=sys \
-    mode=0755
+    mode=0755 pkg.depend.bypass-generate=\$CPU \
+    pkg.depend.bypass-generate=dtracestubs pkg.depend.bypass-generate=genunix
 $(sparc_ONLY)file \
     path=platform/SUNW,Sun-Fire/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-III \
     group=sys mode=0755
@@ -657,11 +665,11 @@ $(sparc_ONLY)file path=platform/SUNW,Sun-Fire/kernel/misc/$(ARCH64)/platmod \
 $(sparc_ONLY)file path=platform/SUNW,Sun-Fire/kernel/misc/$(ARCH64)/sbdp \
     group=sys mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Ultra-250/kernel/drv/$(ARCH64)/envctrltwo \
-    group=sys
+    group=sys pkg.depend.bypass-generate=pcipsy
 $(sparc_ONLY)file path=platform/SUNW,Ultra-250/kernel/misc/$(ARCH64)/platmod \
     group=sys mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Ultra-4/kernel/drv/$(ARCH64)/envctrl \
-    group=sys
+    group=sys pkg.depend.bypass-generate=pcipsy
 $(sparc_ONLY)file path=platform/SUNW,Ultra-4/kernel/misc/$(ARCH64)/platmod \
     group=sys mode=0755
 $(sparc_ONLY)file path=platform/SUNW,Ultra-5_10/kernel/misc/$(ARCH64)/platmod \
@@ -784,7 +792,8 @@ $(sparc_ONLY)file path=platform/sun4u/bootlst group=sys reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4u/kernel/$(ARCH64)/genunix group=sys \
     mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/$(ARCH64)/unix group=sys \
-    mode=0755
+    mode=0755 pkg.depend.bypass-generate=\$CPU \
+    pkg.depend.bypass-generate=dtracestubs
 $(sparc_ONLY)file path=platform/sun4u/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-II \
     group=sys mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/cpu/$(ARCH64)/SUNW,UltraSPARC-III \
@@ -889,7 +898,7 @@ $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/pcie group=sys \
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/platmod group=sys \
     mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/sbd group=sys \
-    mode=0755
+    mode=0755 pkg.depend.bypass-generate=sbdp
 $(sparc_ONLY)file path=platform/sun4u/kernel/misc/$(ARCH64)/vis group=sys \
     mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todbq4802 group=sys \
@@ -909,12 +918,13 @@ $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todmostek group=sys \
 $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todopl group=sys \
     mode=0755
 $(sparc_ONLY)file path=platform/sun4u/kernel/tod/$(ARCH64)/todsg group=sys \
-    mode=0755
+    mode=0755 pkg.depend.bypass-generate=sgsbbc
 $(sparc_ONLY)file path=platform/sun4v/bootlst group=sys reboot-needed=true
 $(sparc_ONLY)file path=platform/sun4v/kernel/$(ARCH64)/genunix group=sys \
     mode=0755
 $(sparc_ONLY)file path=platform/sun4v/kernel/$(ARCH64)/unix group=sys \
-    mode=0755
+    mode=0755 pkg.depend.bypass-generate=\$CPU \
+    pkg.depend.bypass-generate=dtracestubs
 $(sparc_ONLY)file path=platform/sun4v/kernel/cpu/$(ARCH64)/generic group=sys \
     mode=0755
 $(sparc_ONLY)file path=platform/sun4v/kernel/crypto/$(ARCH64)/arcfour \

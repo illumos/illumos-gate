@@ -32,8 +32,8 @@
 <include global_zone_only_component>
 set name=pkg.fmri \
     value=pkg:/system/boot/loader@1.1,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
-$(i386_ONLY)set name=pkg.description value="Boot Loader"
-$(i386_ONLY)set name=pkg.summary value="BootForth Boot Loader"
+set name=pkg.description value="Boot Loader"
+set name=pkg.summary value="BootForth Boot Loader"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
 set name=variant.arch value=$(ARCH)
 $(i386_ONLY)dir path=boot group=sys
