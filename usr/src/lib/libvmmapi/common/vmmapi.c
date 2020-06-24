@@ -39,6 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -1004,7 +1005,9 @@ static const char *capstrmap[] = {
 	[VM_CAP_HALT_EXIT]  = "hlt_exit",
 	[VM_CAP_MTRAP_EXIT] = "mtrap_exit",
 	[VM_CAP_PAUSE_EXIT] = "pause_exit",
+#ifdef __FreeBSD__
 	[VM_CAP_UNRESTRICTED_GUEST] = "unrestricted_guest",
+#endif
 	[VM_CAP_ENABLE_INVPCID] = "enable_invpcid",
 	[VM_CAP_BPT_EXIT] = "bpt_exit",
 };

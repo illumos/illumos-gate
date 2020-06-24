@@ -29,7 +29,17 @@
  */
 
 /*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ *
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #ifndef _VMX_H_
@@ -151,12 +161,19 @@ struct vmx {
 	struct vmxcap	cap[VM_MAXCPU];
 	struct vmxstate	state[VM_MAXCPU];
 	uint64_t	eptp;
+	enum vmx_caps	vmx_caps;
 	struct vm	*vm;
 	long		eptgen[MAXCPU];		/* cached pmap->pm_eptgen */
 };
 CTASSERT((offsetof(struct vmx, vmcs) & PAGE_MASK) == 0);
 CTASSERT((offsetof(struct vmx, msr_bitmap) & PAGE_MASK) == 0);
 CTASSERT((offsetof(struct vmx, pir_desc[0]) & 63) == 0);
+
+static __inline bool
+vmx_cap_en(const struct vmx *vmx, enum vmx_caps cap)
+{
+	return ((vmx->vmx_caps & cap) == cap);
+}
 
 #define	VMX_GUEST_VMEXIT	0
 #define	VMX_VMRESUME_ERROR	1

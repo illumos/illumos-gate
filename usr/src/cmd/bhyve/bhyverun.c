@@ -39,6 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -948,6 +949,7 @@ vm_loop(struct vmctx *ctx, int vcpu, uint64_t startrip)
 static int
 num_vcpus_allowed(struct vmctx *ctx)
 {
+#ifdef __FreeBSD__
 	int tmp, error;
 
 	error = vm_get_capability(ctx, BSP, VM_CAP_UNRESTRICTED_GUEST, &tmp);
@@ -960,6 +962,10 @@ num_vcpus_allowed(struct vmctx *ctx)
 		return (VM_MAXCPU);
 	else
 		return (1);
+#else
+	/* Unrestricted Guest is always enabled on illumos */
+	return (VM_MAXCPU);
+#endif /* __FreeBSD__ */
 }
 
 void
@@ -1314,11 +1320,15 @@ main(int argc, char *argv[])
 	vga_init(1);
 
 	if (lpc_bootrom()) {
+#ifdef __FreeBSD__
 		if (vm_set_capability(ctx, BSP, VM_CAP_UNRESTRICTED_GUEST, 1)) {
 			fprintf(stderr, "ROM boot failed: unrestricted guest "
 			    "capability not available\n");
 			exit(4);
 		}
+#else
+		/* Unrestricted Guest is always enabled on illumos */
+#endif
 		error = vcpu_reset(ctx, BSP);
 		assert(error == 0);
 	}

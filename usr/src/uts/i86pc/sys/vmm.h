@@ -39,6 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #ifndef _VMM_H_
@@ -165,10 +166,17 @@ enum vm_cap_type {
 	VM_CAP_HALT_EXIT,
 	VM_CAP_MTRAP_EXIT,
 	VM_CAP_PAUSE_EXIT,
-	VM_CAP_UNRESTRICTED_GUEST,
 	VM_CAP_ENABLE_INVPCID,
 	VM_CAP_BPT_EXIT,
 	VM_CAP_MAX
+};
+
+enum vmx_caps {
+	VMX_CAP_NONE		= 0,
+	VMX_CAP_TPR_SHADOW	= (1UL << 0),
+	VMX_CAP_APICV		= (1UL << 1),
+	VMX_CAP_APICV_X2APIC	= (1UL << 2),
+	VMX_CAP_APICV_PIR	= (1UL << 3),
 };
 
 enum vm_intr_trigger {
