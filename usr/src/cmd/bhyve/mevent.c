@@ -713,8 +713,9 @@ mevent_dispatch(void)
 
 		/* Block awaiting events */
 		ret = port_get(portfd, &pev, NULL);
-		if (ret != 0 && errno != EINTR) {
-			perror("Error return from port_get");
+		if (ret != 0) {
+			if (errno != EINTR)
+				perror("Error return from port_get");
 			continue;
 		}
 
