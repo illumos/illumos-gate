@@ -1503,13 +1503,6 @@ zpool_add(zpool_handle_t *zhp, nvlist_t *nvroot)
 			(void) zfs_error(hdl, EZFS_BADVERSION, msg);
 			break;
 
-		case EDOM:
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "root pool can not have multiple vdevs"
-			    " or separate logs"));
-			(void) zfs_error(hdl, EZFS_POOL_NOTSUP, msg);
-			break;
-
 		default:
 			(void) zpool_standard_error(hdl, errno, msg);
 		}
