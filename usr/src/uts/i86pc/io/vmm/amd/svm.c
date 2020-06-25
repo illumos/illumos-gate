@@ -1564,6 +1564,9 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 	    handled ? "handled" : "unhandled", exit_reason_to_str(code),
 	    vmexit->rip, vmexit->inst_length);
 
+	DTRACE_PROBE3(vmm__vexit, int, vcpu, uint64_t, vmexit->rip, uint32_t,
+	    code);
+
 	if (handled) {
 		vmexit->rip += vmexit->inst_length;
 		vmexit->inst_length = 0;
