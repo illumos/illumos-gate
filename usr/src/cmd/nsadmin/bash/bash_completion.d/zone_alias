@@ -1,5 +1,6 @@
 _zone_alias()
 {
+    local RES alias completed_alias results_arr uuid
     # Attempt alias -> uuid mapping
     alias="${COMP_WORDS[COMP_CWORD]}"
     RES=$(vmadm list -H -o alias,uuid | awk -v alias="$alias" '
