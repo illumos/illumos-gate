@@ -21,21 +21,11 @@
   Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston MA 02110-1301,
   USA.
 
-  Contact information:  Silicon Graphics, Inc., 1500 Crittenden Lane,
-  Mountain View, CA 94043, or:
-
-  http://www.sgi.com
-
-  For further information regarding this notice, see:
-
-  http://oss.sgi.com/projects/GenInfo/NoticeExplan
-
 */
-
 
 /* malloc_check.h */
 
-/* A simple libdwarf-aware malloc checker. 
+/* A simple libdwarf-aware malloc checker.
    define WANT_LIBBDWARF_MALLOC_CHECK and rebuild libdwarf
    do make a checking-for-alloc-mistakes libdwarf.
    NOT  recommended for production use.
@@ -44,7 +34,7 @@
    files in Makefile.
 */
 
-#undef WANT_LIBBDWARF_MALLOC_CHECK 
+#undef WANT_LIBBDWARF_MALLOC_CHECK
 /*#define WANT_LIBBDWARF_MALLOC_CHECK  1 */
 
 #ifdef WANT_LIBBDWARF_MALLOC_CHECK

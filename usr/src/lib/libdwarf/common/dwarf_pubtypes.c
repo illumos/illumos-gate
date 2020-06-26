@@ -4,42 +4,33 @@
   Portions Copyright (C) 2009-2010 David Anderson. All Rights Reserved.
 
   This program is free software; you can redistribute it and/or modify it
-  under the terms of version 2.1 of the GNU Lesser General Public License 
+  under the terms of version 2.1 of the GNU Lesser General Public License
   as published by the Free Software Foundation.
 
   This program is distributed in the hope that it would be useful, but
   WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
   Further, this software is distributed without any warranty that it is
-  free of the rightful claim of any third person regarding infringement 
-  or the like.  Any license provided herein, whether implied or 
+  free of the rightful claim of any third person regarding infringement
+  or the like.  Any license provided herein, whether implied or
   otherwise, applies only to this software file.  Patent licenses, if
-  any, provided herein do not apply to combinations of this program with 
-  other software, or any other product whatsoever.  
+  any, provided herein do not apply to combinations of this program with
+  other software, or any other product whatsoever.
 
-  You should have received a copy of the GNU Lesser General Public 
-  License along with this program; if not, write the Free Software 
+  You should have received a copy of the GNU Lesser General Public
+  License along with this program; if not, write the Free Software
   Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston MA 02110-1301,
   USA.
-
-  Contact information:  Silicon Graphics, Inc., 1500 Crittenden Lane,
-  Mountain View, CA 94043, or:
-
-  http://www.sgi.com
-
-  For further information regarding this notice, see:
-
-  http://oss.sgi.com/projects/GenInfo/NoticeExplan
 
 */
 
 /* Reads DWARF3 .debug_pubtypes section. */
 
-
 #include "config.h"
-#include "dwarf_incl.h"
 #include <stdio.h>
+#include "dwarf_incl.h"
+#include "dwarf_error.h"
 #include "dwarf_types.h"
 #include "dwarf_global.h"
 
@@ -52,18 +43,22 @@ dwarf_get_pubtypes(Dwarf_Debug dbg,
     if (res != DW_DLV_OK) {
         return res;
     }
+    if (!dbg->de_debug_pubtypes.dss_size) {
+        return DW_DLV_NO_ENTRY;
+    }
 
-    return _dwarf_internal_get_pubnames_like_data(dbg, 
-        dbg->de_debug_pubtypes.dss_data, 
-        dbg->de_debug_pubtypes.dss_size, 
-        (Dwarf_Global **) types, /* Type punning for sections 
+    res = _dwarf_internal_get_pubnames_like_data(dbg,
+        dbg->de_debug_pubtypes.dss_data,
+        dbg->de_debug_pubtypes.dss_size,
+        (Dwarf_Global **) types, /* Type punning for sections
             with identical format. */
-        ret_type_count, error, 
-        DW_DLA_PUBTYPES_CONTEXT, 
-        DW_DLA_GLOBAL, /* We don't have DW_DLA_PUBTYPES, 
+        ret_type_count, error,
+        DW_DLA_PUBTYPES_CONTEXT,
+        DW_DLA_GLOBAL, /* We don't have DW_DLA_PUBTYPES,
             so use DW_DLA_GLOBAL. */
         DW_DLE_DEBUG_PUBTYPES_LENGTH_BAD,
         DW_DLE_DEBUG_PUBTYPES_VERSION_ERROR);
+    return res;
 }
 
 /* Deallocating fully requires deallocating the list
@@ -75,11 +70,11 @@ void
 dwarf_pubtypes_dealloc(Dwarf_Debug dbg, Dwarf_Type * dwgl,
     Dwarf_Signed count)
 {
-    _dwarf_internal_globals_dealloc(dbg, 
-        (Dwarf_Global *) dwgl, 
-        count, 
-        DW_DLA_PUBTYPES_CONTEXT, 
-        DW_DLA_GLOBAL, /* We don't have DW_DLA_PUBTYPES, 
+    _dwarf_internal_globals_dealloc(dbg,
+        (Dwarf_Global *) dwgl,
+        count,
+        DW_DLA_PUBTYPES_CONTEXT,
+        DW_DLA_GLOBAL, /* We don't have DW_DLA_PUBTYPES,
             so use DW_DLA_GLOBAL. */
         DW_DLA_LIST);
     return;

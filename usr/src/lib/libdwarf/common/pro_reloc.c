@@ -1,93 +1,89 @@
 /*
-
   Copyright (C) 2000,2004 Silicon Graphics, Inc.  All Rights Reserved.
-  Portions Copyright 2008-2010 David Anderson, Inc. All rights reserved.
+  Portions Copyright 2008-2016 David Anderson, Inc. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify it
-  under the terms of version 2.1 of the GNU Lesser General Public License 
+  under the terms of version 2.1 of the GNU Lesser General Public License
   as published by the Free Software Foundation.
 
   This program is distributed in the hope that it would be useful, but
   WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
   Further, this software is distributed without any warranty that it is
-  free of the rightful claim of any third person regarding infringement 
-  or the like.  Any license provided herein, whether implied or 
+  free of the rightful claim of any third person regarding infringement
+  or the like.  Any license provided herein, whether implied or
   otherwise, applies only to this software file.  Patent licenses, if
-  any, provided herein do not apply to combinations of this program with 
-  other software, or any other product whatsoever.  
+  any, provided herein do not apply to combinations of this program with
+  other software, or any other product whatsoever.
 
-  You should have received a copy of the GNU Lesser General Public 
-  License along with this program; if not, write the Free Software 
+  You should have received a copy of the GNU Lesser General Public
+  License along with this program; if not, write the Free Software
   Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston MA 02110-1301,
   USA.
 
-  Contact information:  Silicon Graphics, Inc., 1500 Crittenden Lane,
-  Mountain View, CA 94043, or:
-
-  http://www.sgi.com
-
-  For further information regarding this notice, see:
-
-  http://oss.sgi.com/projects/GenInfo/NoticeExplan
-
 */
-
-
 
 #include "config.h"
 #include "libdwarfdefs.h"
 #include <stdio.h>
+#ifdef HAVE_STRING_H
 #include <string.h>
-/*#include <elfaccess.h> */
+#endif /* HAVE_STRING_H */
+#ifdef HAVE_STDDEF_H
+#include <stddef.h>
+#endif /* HAVE_STDDEF_H */
 #include "pro_incl.h"
+#include "dwarf.h"
+#include "libdwarf.h"
+#include "pro_opaque.h"
+#include "pro_error.h"
+#include "pro_alloc.h"
+#include "pro_reloc.h"
 
 
-/*Do initial alloc of newslots slots.
-  Fails only if malloc fails.
+/*  Do initial alloc of newslots slots.
+    Fails only if malloc fails.
 
-  Supposed to be called before any relocs allocated.
-  Ignored if after any allocated.
+    Supposed to be called before any relocs allocated.
+    Ignored if after any allocated.
 
-  Part of an optimization, so that for a known 'newslots' 
-  relocations count we can preallocate the right size block.
-  Called from just 2 places.
+    Part of an optimization, so that for a known 'newslots'
+    relocations count we can preallocate the right size block.
+    Called from just 2 places.
 
-  returns DW_DLV_OK or  DW_DLV_ERROR
+    We use 'slots' so we don't have to do a new
+    allocation for every relocation, just a new
+    allocation every n slots. slots_in_block.
+
+    returns DW_DLV_OK or  DW_DLV_ERROR
 */
 int
-_dwarf_pro_pre_alloc_n_reloc_slots(Dwarf_P_Debug dbg,
-    int rel_sec_index,
+_dwarf_pro_pre_alloc_specific_reloc_slots(Dwarf_P_Debug dbg,
+    Dwarf_P_Per_Reloc_Sect prel,
     Dwarf_Unsigned newslots)
 {
     unsigned long len = 0;
     struct Dwarf_P_Relocation_Block_s *data = 0;
-    Dwarf_P_Per_Reloc_Sect prel = &dbg->de_reloc_sect[rel_sec_index];
     unsigned long slots_in_blk = (unsigned long) newslots;
     unsigned long rel_rec_size = dbg->de_relocation_record_size;
 
-    if (prel->pr_first_block)
+    if (prel->pr_first_block) {
         return DW_DLV_OK;       /* do nothing */
+    }
 
     len = sizeof(struct Dwarf_P_Relocation_Block_s) +
         slots_in_blk * rel_rec_size;
-
-
     data = (struct Dwarf_P_Relocation_Block_s *)
         _dwarf_p_get_alloc(dbg, len);
     if (!data) {
         return DW_DLV_ERROR;
     }
     data->rb_slots_in_block = slots_in_blk;     /* could use default
-                                                   here, as fallback in 
-                                                   case our origininal
-                                                   estimate wrong. When 
-                                                   we call this we
-                                                   presumably know what 
-                                                   we are doing, so
-                                                   keep this count for
-                                                   now */
+        here, as fallback in case our origininal
+        estimate wrong. When we call this we
+        presumably know what we are doing, so
+        keep this count for now */
     data->rb_next_slot_to_use = 0;
     data->rb_where_to_add_next =
         ((char *) data) + sizeof(struct Dwarf_P_Relocation_Block_s);
@@ -96,8 +92,6 @@ _dwarf_pro_pre_alloc_n_reloc_slots(Dwarf_P_Debug dbg,
     prel->pr_first_block = data;
     prel->pr_last_block = data;
     prel->pr_block_count = 1;
-
-
     return DW_DLV_OK;
 }
 
@@ -131,32 +125,26 @@ _dwarf_pro_alloc_reloc_slots(Dwarf_P_Debug dbg, int rel_sec_index)
         prel->pr_last_block->rb_next = data;
         prel->pr_last_block = data;
         prel->pr_block_count += 1;
-
     } else {
-
         prel->pr_first_block = data;
         prel->pr_last_block = data;
         prel->pr_block_count = 1;
     }
-
     data->rb_slots_in_block = slots_in_blk;
     data->rb_next_slot_to_use = 0;
     data->rb_where_to_add_next =
         ((char *) data) + sizeof(struct Dwarf_P_Relocation_Block_s);
     data->rb_data = data->rb_where_to_add_next;
-
     return DW_DLV_OK;
 
 }
 
-/*
-        Reserve a slot. return DW_DLV_OK if succeeds.
+/*  Reserve a slot. return DW_DLV_OK if succeeds.
 
-        Return DW_DLV_ERROR if fails (malloc error).
+    Return DW_DLV_ERROR if fails (malloc error).
 
-        Use the relrec_to_fill to pass back a pointer to
-        a slot space to use.
-*/
+    Use the relrec_to_fill to pass back a pointer to
+    a slot space to use.  */
 int
 _dwarf_pro_reloc_get_a_slot(Dwarf_P_Debug dbg,
     int base_sec_index, void **relrec_to_fill)
@@ -181,44 +169,36 @@ _dwarf_pro_reloc_get_a_slot(Dwarf_P_Debug dbg,
     data = prel->pr_last_block;
     /* now we have an empty slot */
     ret_addr = data->rb_where_to_add_next;
-
     data->rb_where_to_add_next += rel_rec_size;
     data->rb_next_slot_to_use += 1;
-
     prel->pr_reloc_total_count += 1;
-
     *relrec_to_fill = (void *) ret_addr;
-
     return DW_DLV_OK;
 
 }
 
 /*
-   On success  returns count of
-   .rel.* sections that are symbolic 
-   thru count_of_relocation_sections.
+    On success  returns count of
+    .rel.* sections that are symbolic
+    thru count_of_relocation_sections.
 
-   On success, returns DW_DLV_OK.
+    On success, returns DW_DLV_OK.
 
-   If this is not a 'symbolic' run, returns
+    If this is not a 'symbolic' run, returns
     DW_DLV_NO_ENTRY.
 
-   No errors are possible.
-
-
-
-
+    No errors are possible.
 */
-
- /*ARGSUSED*/ int
+/*ARGSUSED*/
+int
 dwarf_get_relocation_info_count(Dwarf_P_Debug dbg,
     Dwarf_Unsigned *
     count_of_relocation_sections,
     int *drd_buffer_version,
-    Dwarf_Error * error)
+    UNUSEDARG Dwarf_Error * error)
 {
     if (dbg->de_flags & DW_DLC_SYMBOLIC_RELOCATIONS) {
-        int i;
+        int i = 0;
         unsigned int count = 0;
 
         for (i = 0; i < NUM_DEBUG_SECTIONS; ++i) {
@@ -230,6 +210,8 @@ dwarf_get_relocation_info_count(Dwarf_P_Debug dbg,
         *drd_buffer_version = DWARF_DRD_BUFFER_VERSION;
         return DW_DLV_OK;
     }
+    /*  Reset to start at beginning of reloc groups. */
+    dbg->de_reloc_next_to_return = 0;
     return DW_DLV_NO_ENTRY;
 }
 
@@ -244,19 +226,25 @@ dwarf_get_relocation_info(Dwarf_P_Debug dbg,
     int next = dbg->de_reloc_next_to_return;
 
     if (dbg->de_flags & DW_DLC_SYMBOLIC_RELOCATIONS) {
-        int i;
+        int i = 0;
 
         for (i = next; i < NUM_DEBUG_SECTIONS; ++i) {
+            /*  de_reloc_sect[] and de_elf_sects[] are
+                in direct parallel. */
             Dwarf_P_Per_Reloc_Sect prel = &dbg->de_reloc_sect[i];
+            int elf_sect_num =  dbg->de_elf_sects[i];
 
             if (prel->pr_reloc_total_count > 0) {
+                /*  Set up 'next' for subsequent call to
+                    dwarf_get_relocation_info(). */
                 dbg->de_reloc_next_to_return = i + 1;
 
-
-                /* ASSERT: prel->.pr_block_count == 1 */
-
+                /* ASSERT: prel->pr_block_count == 1 */
                 *elf_section_index = prel->pr_sect_num_of_reloc_sect;
-                *elf_section_index_link = dbg->de_elf_sects[i];
+
+                /*  Elf sec num in generated elf */
+                *elf_section_index_link = elf_sect_num;
+
                 *relocation_buffer_count = prel->pr_reloc_total_count;
                 *reldata_buffer = (Dwarf_Relocation_Data)
                     (prel->pr_first_block->rb_data);

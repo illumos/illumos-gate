@@ -2,7 +2,7 @@
 #define _DWARF_ELF_PORT_H
 /*
 
-  Copyright (C) 2008-2010 David Anderson. All rights reserved.
+  Copyright (C) 2008-2011 David Anderson. All rights reserved.
   Portions Copyright 2008-2010 Arxan Technologies, Inc. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify it
@@ -25,15 +25,6 @@
   Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston MA 02110-1301,
   USA.
 
-  Contact information:  Silicon Graphics, Inc., 1500 Crittenden Lane,
-  Mountain View, CA 94043, or:
-
-  http://www.sgi.com
-
-  For further information regarding this notice, see:
-
-  http://oss.sgi.com/projects/GenInfo/NoticeExplan
-
 */
 
 
@@ -42,13 +33,13 @@
 
 int
 dwarf_elf_object_access_init(dwarf_elf_handle  elf ,
-                    int libdwarf_owns_elf,
-                    Dwarf_Obj_Access_Interface**  ret_obj,
-                    int *err );
+    int libdwarf_owns_elf,
+    Dwarf_Obj_Access_Interface**  ret_obj,
+    int *err );
 
 void
 dwarf_elf_object_access_finish(Dwarf_Obj_Access_Interface*  obj );
-  
+
 /* End ELF object access for the generic object file interface */
 
 
