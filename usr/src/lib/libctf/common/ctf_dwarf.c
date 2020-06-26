@@ -1751,40 +1751,12 @@ ctf_dwarf_create_reference(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp,
 	return (ctf_dwmap_add(cup, *idp, die, B_FALSE));
 }
 
-/*
- * Get the size of the type of a particular die. Note that this is a simple
- * version that doesn't attempt to traverse further than expecting a single
- * sized type reference (so no qualifiers etc.). Nor does it attempt to do as
- * much as ctf_type_size() - which we cannot use here as that doesn't look up
- * dynamic types, and we don't yet want to do a ctf_update().
- */
-static int
-ctf_dwarf_get_type_size(ctf_cu_t *cup, Dwarf_Die die, size_t *sizep)
-{
-	const ctf_type_t *t;
-	Dwarf_Die tdie;
-	ctf_id_t tid;
-	int ret;
-
-	if ((ret = ctf_dwarf_refdie(cup, die, DW_AT_type, &tdie)) != 0)
-		return (ret);
-
-	if ((ret = ctf_dwarf_convert_type(cup, tdie, &tid,
-	    CTF_ADD_NONROOT)) != 0)
-		return (ret);
-
-	if ((t = ctf_dyn_lookup_by_id(cup->cu_ctfp, tid)) == NULL)
-		return (ENOENT);
-
-	*sizep = ctf_get_ctt_size(cup->cu_ctfp, t, NULL, NULL);
-	return (0);
-}
-
 static int
 ctf_dwarf_create_enum(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp, int isroot)
 {
 	size_t size = 0;
 	Dwarf_Die child;
+	Dwarf_Unsigned dw;
 	ctf_id_t id;
 	char *name;
 	int ret;
@@ -1795,7 +1767,15 @@ ctf_dwarf_create_enum(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp, int isroot)
 	if (ret == ENOENT)
 		name = NULL;
 
-	(void) ctf_dwarf_get_type_size(cup, die, &size);
+	/*
+	 * Enumerations may have a size associated with them, particularly if
+	 * they're packed. Note, a Dwarf_Unsigned is larger than a size_t on an
+	 * ILP32 system.
+	 */
+	if (ctf_dwarf_unsigned(cup, die, DW_AT_byte_size, &dw) == 0 &&
+	    dw < SIZE_MAX) {
+		size = (size_t)dw;
+	}
 
 	id = ctf_add_enum(cup->cu_ctfp, isroot, name, size);
 	ctf_dprintf("added enum %s (%d)\n", name, id);
