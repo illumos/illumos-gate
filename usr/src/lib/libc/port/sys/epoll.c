@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -56,7 +57,7 @@
  * Events that we ignore entirely.  They can be set in events, but they will
  * never be returned.
  */
-#define	EPOLLIGNORED 	(EPOLLMSG | EPOLLWAKEUP)
+#define	EPOLLIGNORED	(EPOLLMSG | EPOLLWAKEUP | EPOLLEXCLUSIVE)
 
 /*
  * Events that we swizzle into other bit positions.
@@ -140,6 +141,11 @@ epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 		break;
 
 	case EPOLL_CTL_MOD:
+		/* EPOLLEXCLUSIVE is prohibited for modify operations */
+		if ((event->events & EPOLLEXCLUSIVE) != 0) {
+			errno = EINVAL;
+			return (-1);
+		}
 		/*
 		 * In the modify case, we pass down two events:  one to
 		 * remove the event and another to add it back.

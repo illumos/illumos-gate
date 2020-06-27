@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #ifndef _SYS_EPOLL_H
@@ -60,6 +61,7 @@ typedef struct epoll_event {
 #define	EPOLLHUP	0x0010
 #define	EPOLLRDHUP	0x2000
 
+#define	EPOLLEXCLUSIVE	(1UL << 28)	/* sets exclusive wake-up mode */
 #define	EPOLLWAKEUP	(1UL << 29)	/* no meaning; silently ignored */
 #define	EPOLLONESHOT	(1UL << 30)	/* translated to POLLONESHOT */
 #define	EPOLLET		(1UL << 31)	/* translated to POLLET */
