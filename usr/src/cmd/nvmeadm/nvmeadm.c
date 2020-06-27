@@ -13,6 +13,7 @@
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2017 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*
@@ -75,7 +76,7 @@ struct nvme_feature {
 	uint8_t f_feature;
 	size_t f_bufsize;
 	uint_t f_getflags;
-	int (*f_get)(int, const nvme_feature_t *, nvme_identify_ctrl_t *);
+	int (*f_get)(int, const nvme_feature_t *, const nvme_process_arg_t *);
 	void (*f_print)(uint64_t, void *, size_t, nvme_identify_ctrl_t *);
 };
 
@@ -106,9 +107,11 @@ static int do_get_logpage_health(int, const nvme_process_arg_t *);
 static int do_get_logpage_fwslot(int, const nvme_process_arg_t *);
 static int do_get_logpage(int, const nvme_process_arg_t *);
 static int do_get_feat_common(int, const nvme_feature_t *,
-    nvme_identify_ctrl_t *);
+    const nvme_process_arg_t *);
 static int do_get_feat_intr_vect(int, const nvme_feature_t *,
-    nvme_identify_ctrl_t *);
+    const nvme_process_arg_t *);
+static int do_get_feat_temp_thresh(int, const nvme_feature_t *,
+    const nvme_process_arg_t *);
 static int do_get_features(int, const nvme_process_arg_t *);
 static int do_format(int, const nvme_process_arg_t *);
 static int do_secure_erase(int, const nvme_process_arg_t *);
@@ -217,7 +220,7 @@ static const nvme_feature_t features[] = {
 	    do_get_feat_common, nvme_print_feat_lba_range },
 	{ "Temperature Threshold", "",
 	    NVME_FEAT_TEMPERATURE, 0, NVMEADM_CTRL,
-	    do_get_feat_common, nvme_print_feat_temperature },
+	    do_get_feat_temp_thresh, nvme_print_feat_temperature },
 	{ "Error Recovery", "",
 	    NVME_FEAT_ERROR, 0, NVMEADM_CTRL,
 	    do_get_feat_common, nvme_print_feat_error },
@@ -694,7 +697,7 @@ do_get_logpage_health(int fd, const nvme_process_arg_t *npa)
 		return (-1);
 
 	(void) printf("%s: ", npa->npa_name);
-	nvme_print_health_log(hlog, npa->npa_idctl);
+	nvme_print_health_log(hlog, npa->npa_idctl, npa->npa_version);
 
 	free(hlog);
 
@@ -777,7 +780,7 @@ usage_get_features(const char *c_name)
 
 static int
 do_get_feat_common(int fd, const nvme_feature_t *feat,
-    nvme_identify_ctrl_t *idctl)
+    const nvme_process_arg_t *npa)
 {
 	void *buf = NULL;
 	size_t bufsize = feat->f_bufsize;
@@ -788,15 +791,154 @@ do_get_feat_common(int fd, const nvme_feature_t *feat,
 		return (EINVAL);
 
 	nvme_print(2, feat->f_name, -1, NULL);
-	feat->f_print(res, buf, bufsize, idctl);
+	feat->f_print(res, buf, bufsize, npa->npa_idctl);
 	free(buf);
 
 	return (0);
 }
 
 static int
+do_get_feat_temp_thresh_one(int fd, const nvme_feature_t *feat,
+    const char *label, uint16_t tmpsel, uint16_t thsel,
+    const nvme_process_arg_t *npa)
+{
+	uint64_t res;
+	void *buf = NULL;
+	size_t bufsize = feat->f_bufsize;
+	nvme_temp_threshold_t tt;
+
+	tt.r = 0;
+	tt.b.tt_tmpsel = tmpsel;
+	tt.b.tt_thsel = thsel;
+
+	if (!nvme_get_feature(fd, feat->f_feature, tt.r, &res, &bufsize,
+	    &buf)) {
+		return (EINVAL);
+	}
+
+	feat->f_print(res, (void *)label, 0, npa->npa_idctl);
+	free(buf);
+	return (0);
+}
+
+/*
+ * In NVMe 1.2, the specification allowed for up to 8 sensors to be on the
+ * device and changed the main device to have a composite temperature sensor. As
+ * a result, there is a set of thresholds for each sensor. In addition, they
+ * added both an over-temperature and under-temperature threshold. Since most
+ * devices don't actually implement all the sensors, we get the health page and
+ * see which sensors have a non-zero value to determine how to proceed.
+ */
+static int
+do_get_feat_temp_thresh(int fd, const nvme_feature_t *feat,
+    const nvme_process_arg_t *npa)
+{
+	int ret;
+	size_t bufsize = sizeof (nvme_health_log_t);
+	nvme_health_log_t *hlog;
+
+	nvme_print(2, feat->f_name, -1, NULL);
+	if ((ret = do_get_feat_temp_thresh_one(fd, feat,
+	    "Composite Over Temp. Threshold", 0, NVME_TEMP_THRESH_OVER,
+	    npa)) != 0) {
+		return (ret);
+	}
+
+	if (!NVME_VERSION_ATLEAST(npa->npa_version, 1, 2)) {
+		return (0);
+	}
+
+	if ((ret = do_get_feat_temp_thresh_one(fd, feat,
+	    "Composite Under Temp. Threshold", 0, NVME_TEMP_THRESH_UNDER,
+	    npa)) != 0) {
+		return (ret);
+	}
+
+	hlog = nvme_get_logpage(fd, NVME_LOGPAGE_HEALTH, &bufsize);
+	if (hlog == NULL) {
+		warnx("failed to get health log page, unable to get "
+		    "thresholds for additional sensors");
+		return (0);
+	}
+
+	if (hlog->hl_temp_sensor_1 != 0) {
+		(void) do_get_feat_temp_thresh_one(fd, feat,
+		    "Temp. Sensor 1 Over Temp. Threshold", 1,
+		    NVME_TEMP_THRESH_OVER, npa);
+		(void) do_get_feat_temp_thresh_one(fd, feat,
+		    "Temp. Sensor 1 Under Temp. Threshold", 1,
+		    NVME_TEMP_THRESH_UNDER, npa);
+	}
+
+	if (hlog->hl_temp_sensor_2 != 0) {
+		(void) do_get_feat_temp_thresh_one(fd, feat,
+		    "Temp. Sensor 2 Over Temp. Threshold", 2,
+		    NVME_TEMP_THRESH_OVER, npa);
+		(void) do_get_feat_temp_thresh_one(fd, feat,
+		    "Temp. Sensor 2 Under Temp. Threshold", 2,
+		    NVME_TEMP_THRESH_UNDER, npa);
+	}
+
+	if (hlog->hl_temp_sensor_3 != 0) {
+		(void) do_get_feat_temp_thresh_one(fd, feat,
+		    "Temp. Sensor 3 Over Temp. Threshold", 3,
+		    NVME_TEMP_THRESH_OVER, npa);
+		(void) do_get_feat_temp_thresh_one(fd, feat,
+		    "Temp. Sensor 3 Under Temp. Threshold", 3,
+		    NVME_TEMP_THRESH_UNDER, npa);
+	}
+
+	if (hlog->hl_temp_sensor_4 != 0) {
+		(void) do_get_feat_temp_thresh_one(fd, feat,
+		    "Temp. Sensor 4 Over Temp. Threshold", 4,
+		    NVME_TEMP_THRESH_OVER, npa);
+		(void) do_get_feat_temp_thresh_one(fd, feat,
+		    "Temp. Sensor 4 Under Temp. Threshold", 4,
+		    NVME_TEMP_THRESH_UNDER, npa);
+	}
+
+	if (hlog->hl_temp_sensor_5 != 0) {
+		(void) do_get_feat_temp_thresh_one(fd, feat,
+		    "Temp. Sensor 5 Over Temp. Threshold", 5,
+		    NVME_TEMP_THRESH_OVER, npa);
+		(void) do_get_feat_temp_thresh_one(fd, feat,
+		    "Temp. Sensor 5 Under Temp. Threshold", 5,
+		    NVME_TEMP_THRESH_UNDER, npa);
+	}
+
+	if (hlog->hl_temp_sensor_6 != 0) {
+		(void) do_get_feat_temp_thresh_one(fd, feat,
+		    "Temp. Sensor 6 Over Temp. Threshold", 6,
+		    NVME_TEMP_THRESH_OVER, npa);
+		(void) do_get_feat_temp_thresh_one(fd, feat,
+		    "Temp. Sensor 6 Under Temp. Threshold", 6,
+		    NVME_TEMP_THRESH_UNDER, npa);
+	}
+
+	if (hlog->hl_temp_sensor_7 != 0) {
+		(void) do_get_feat_temp_thresh_one(fd, feat,
+		    "Temp. Sensor 7 Over Temp. Threshold", 7,
+		    NVME_TEMP_THRESH_OVER, npa);
+		(void) do_get_feat_temp_thresh_one(fd, feat,
+		    "Temp. Sensor 7 Under Temp. Threshold", 7,
+		    NVME_TEMP_THRESH_UNDER, npa);
+	}
+
+	if (hlog->hl_temp_sensor_8 != 0) {
+		(void) do_get_feat_temp_thresh_one(fd, feat,
+		    "Temp. Sensor 8 Over Temp. Threshold", 8,
+		    NVME_TEMP_THRESH_OVER, npa);
+		(void) do_get_feat_temp_thresh_one(fd, feat,
+		    "Temp. Sensor 8 Under Temp. Threshold", 8,
+		    NVME_TEMP_THRESH_UNDER, npa);
+	}
+	free(hlog);
+	return (0);
+}
+
+static int
 do_get_feat_intr_vect(int fd, const nvme_feature_t *feat,
-    nvme_identify_ctrl_t *idctl)
+    const nvme_process_arg_t *npa)
 {
 	uint64_t res;
 	uint64_t arg;
@@ -814,7 +956,7 @@ do_get_feat_intr_vect(int fd, const nvme_feature_t *feat,
 		    == B_FALSE)
 			return (EINVAL);
 
-		feat->f_print(res, NULL, 0, idctl);
+		feat->f_print(res, NULL, 0, npa->npa_idctl);
 	}
 
 	return (0);
@@ -842,7 +984,7 @@ do_get_features(int fd, const nvme_process_arg_t *npa)
 			    (feat->f_getflags & NVMEADM_CTRL) == 0))
 				continue;
 
-			(void) feat->f_get(fd, feat, npa->npa_idctl);
+			(void) feat->f_get(fd, feat, npa);
 		}
 
 		return (0);
@@ -887,7 +1029,7 @@ do_get_features(int fd, const nvme_process_arg_t *npa)
 			header_printed = B_TRUE;
 		}
 
-		if (feat->f_get(fd, feat, npa->npa_idctl) != 0) {
+		if (feat->f_get(fd, feat, npa) != 0) {
 			warnx("unsupported feature: %s", feat->f_name);
 			continue;
 		}
