@@ -717,8 +717,18 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 			else
 				err = drv_ioc_clrap(linkid);
 		} else {
-			if (kprop->pr_valsize == 0)
-				return (ENOBUFS);
+			/*
+			 * You might think that the earlier call to
+			 * mac_prop_check_size() should catch this but
+			 * it can't. The autopush prop uses 0 as a
+			 * sentinel value to clear the prop. This
+			 * check ensures we don't allow a get with a
+			 * valsize of 0.
+			 */
+			if (kprop->pr_valsize == 0) {
+				err = ENOBUFS;
+				goto done;
+			}
 
 			kprop->pr_perm_flags = MAC_PROP_PERM_RW;
 			err = drv_ioc_getap(linkid, dlap);
