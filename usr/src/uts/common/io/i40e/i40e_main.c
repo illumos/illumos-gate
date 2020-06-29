@@ -14,6 +14,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2020 Ryan Zezeski
  */
 
 /*
@@ -1220,7 +1221,7 @@ i40e_hw_to_instance(i40e_t *i40e, i40e_hw_t *hw)
 	}
 
 	if (i40e->i40e_num_rx_groups == 0) {
-		i40e->i40e_num_rx_groups = I40E_GROUP_MAX;
+		i40e->i40e_num_rx_groups = I40E_DEF_NUM_RX_GROUPS;
 	}
 }
 
@@ -1589,6 +1590,10 @@ i40e_init_properties(i40e_t *i40e)
 	    i40e->i40e_tx_ring_size - I40E_TX_MAX_COOKIE,
 	    I40E_DEF_TX_BLOCK_THRESH);
 
+	i40e->i40e_num_rx_groups = i40e_get_prop(i40e, "rx_num_groups",
+	    I40E_MIN_NUM_RX_GROUPS, I40E_MAX_NUM_RX_GROUPS,
+	    I40E_DEF_NUM_RX_GROUPS);
+
 	i40e->i40e_rx_ring_size = i40e_get_prop(i40e, "rx_ring_size",
 	    I40E_MIN_RX_RING_SIZE, I40E_MAX_RX_RING_SIZE,
 	    I40E_DEF_RX_RING_SIZE);
@@ -1776,7 +1781,6 @@ i40e_alloc_intrs(i40e_t *i40e, dev_info_t *devinfo)
 	}
 
 	i40e->i40e_intr_type = 0;
-	i40e->i40e_num_rx_groups = I40E_GROUP_MAX;
 
 	/*
 	 * We need to determine the number of queue pairs per traffic

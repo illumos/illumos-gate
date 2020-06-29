@@ -10,8 +10,9 @@
 .\"
 .\"
 .\" Copyright (c) 2018 Joyent, Inc.
+.\" Copyright 2020 Ryan Zezeski
 .\"
-.Dd April 15, 2020
+.Dd July 1, 2020
 .Dt I40E 7D
 .Os
 .Sh NAME
@@ -156,6 +157,25 @@ property determines whether or not support for multiple rings is enabled
 for the device.
 The default is always to enable them.
 It is not recommended to to disable them.
+.Ed
+.It Sy rx_num_groups
+.Bd -filled -compact
+Minimum:
+.Sy 1 |
+Maximum:
+.Sy 32
+.Ed
+.Bd -filled
+The
+.Sy rx_num_groups
+property determines the number of receive mac groups provided by the driver.
+Each group can handle all unicast traffic for a single MAC address, more groups
+means more unicast traffic that can be steered by hardware.
+However, more groups also means more demand for kernel memory.
+If you are not making heavy use of VNICs, or do not need the efficiency gains
+of hardware steering, then reducing this number can reduce kernel memory
+taken by
+.Nm i40e.
 .Ed
 .It Sy rx_ring_size
 .Bd -filled -compact

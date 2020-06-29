@@ -13,6 +13,7 @@
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
+ * Copyright 2020 Ryan Zezeski
  */
 
 /*
@@ -88,6 +89,16 @@ extern "C" {
 #define	I40E_MIN_TX_RING_SIZE	64
 #define	I40E_MAX_TX_RING_SIZE	4096
 #define	I40E_DEF_TX_RING_SIZE	1024
+
+/*
+ * Place an artificial limit on the max number of groups. The X710
+ * series supports up to 384 VSIs to be partitioned across PFs as the
+ * driver sees fit. But until we support more interrupts this seems
+ * like a good place to start.
+ */
+#define	I40E_MIN_NUM_RX_GROUPS	1
+#define	I40E_MAX_NUM_RX_GROUPS	32
+#define	I40E_DEF_NUM_RX_GROUPS	16
 
 #define	I40E_MIN_RX_RING_SIZE	64
 #define	I40E_MAX_RX_RING_SIZE	4096
@@ -268,14 +279,6 @@ typedef enum i40e_itr_index {
  * enough to hold 32-bit quantities transformed to strings as %d.%d or %x.
  */
 #define	I40E_DDI_PROP_LEN	64
-
-/*
- * Place an artificial limit on the max number of groups. The X710
- * series supports up to 384 VSIs to be partitioned across PFs as the
- * driver sees fit. But until we support more interrupts this seems
- * like a good place to start.
- */
-#define	I40E_GROUP_MAX		32
 
 #define	I40E_GROUP_NOMSIX	1
 #define	I40E_TRQPAIR_NOMSIX	1
@@ -834,7 +837,7 @@ typedef struct i40e {
 	/*
 	 * Device state, switch information, and resources.
 	 */
-	i40e_vsi_t		i40e_vsis[I40E_GROUP_MAX];
+	i40e_vsi_t		i40e_vsis[I40E_MAX_NUM_RX_GROUPS];
 	uint16_t		i40e_mac_seid;	 /* SEID of physical MAC */
 	uint16_t		i40e_veb_seid;	 /* switch atop MAC (SEID) */
 	uint16_t		i40e_vsi_avail;	 /* VSIs avail to this PF */
