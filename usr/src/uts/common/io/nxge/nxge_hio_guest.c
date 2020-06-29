@@ -572,7 +572,7 @@ nxge_hio_vr_release(nxge_t *nxge)
 	MUTEX_ENTER(&nhd->lock);
 	for (vr_index = 0; vr_index < FUNC_VIR_MAX; vr_index++) {
 		if (nhd->vr[vr_index].nxge == (uintptr_t)nxge) {
-			nhd->vr[vr_index].nxge = NULL;
+			nhd->vr[vr_index].nxge = (uintptr_t)NULL;
 			break;
 		}
 	}

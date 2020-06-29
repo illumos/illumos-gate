@@ -3056,10 +3056,11 @@ nxge_rx_err_evnts(p_nxge_t nxgep, int channel, rx_dma_ctl_stat_t cs)
 		NXGE_FM_REPORT_ERROR(nxgep, portn, channel,
 		    NXGE_FM_EREPORT_RDMC_RCRFULL);
 		rxchan_fatal = B_TRUE;
-		if (rdc_stats->rcrfull < error_disp_cnt)
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		    "==> nxge_rx_err_evnts(channel %d): "
-		    "fatal error: rcrfull error", channel));
+		if (rdc_stats->rcrfull < error_disp_cnt) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "==> nxge_rx_err_evnts(channel %d): "
+			    "fatal error: rcrfull error", channel));
+		}
 	}
 	if (cs.bits.hdw.rbr_empty) {
 		/*

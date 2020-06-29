@@ -615,7 +615,7 @@ npi_fflp_fcram_entry_write(npi_handle_t handle, part_id_t partid,
 	switch (format) {
 	case FCRAM_ENTRY_OPTIM:
 		if (location % 8) {
-		/* need to be 8 byte alligned */
+		/* need to be 8 byte aligned */
 
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " FCRAM_ENTRY_OOPTIM Write:"
@@ -631,31 +631,31 @@ npi_fflp_fcram_entry_write(npi_handle_t handle, part_id_t partid,
 
 	case FCRAM_ENTRY_EX_IP4:
 		if (location % 32) {
-/* need to be 32 byte alligned */
+			/* need to be 32 byte aligned */
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " FCRAM_ENTRY_EX_IP4 Write:"
 			    " unaligned location %llx \n",
 			    location));
 			return (NPI_FFLP_FCRAM_LOC_INVALID);
-	}
+		}
 
-	num_subareas = 4;
-	autoinc = 1;
+		num_subareas = 4;
+		autoinc = 1;
 
-	break;
+		break;
 	case FCRAM_ENTRY_EX_IP6:
 		if (location % 64) {
-				/* need to be 64 byte alligned */
+			/* need to be 64 byte aligned */
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " FCRAM_ENTRY_EX_IP6 Write:"
-				    " unaligned location %llx \n",
-				    location));
-				return (NPI_FFLP_FCRAM_LOC_INVALID);
+			    " FCRAM_ENTRY_EX_IP6 Write:"
+			    " unaligned location %llx \n",
+			    location));
+			return (NPI_FFLP_FCRAM_LOC_INVALID);
 
 		}
 		num_subareas = 7;
 		autoinc = 1;
-			break;
+		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " fcram_entry_write:"
@@ -713,11 +713,11 @@ npi_fflp_fcram_entry_read(npi_handle_t handle,  part_id_t partid,
 	switch (format) {
 		case FCRAM_ENTRY_OPTIM:
 			if (location % 8) {
-			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " FCRAM_ENTRY_OOPTIM Read:"
-			    " unaligned location %llx \n",
-			    location));
-			/* need to be 8 byte alligned */
+				NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+				    " FCRAM_ENTRY_OOPTIM Read:"
+				    " unaligned location %llx \n",
+				    location));
+				/* need to be 8 byte aligned */
 				return (NPI_FFLP_FCRAM_LOC_INVALID);
 			}
 			num_subareas = 1;
@@ -725,11 +725,11 @@ npi_fflp_fcram_entry_read(npi_handle_t handle,  part_id_t partid,
 			break;
 		case FCRAM_ENTRY_EX_IP4:
 			if (location % 32) {
-					/* need to be 32 byte alligned */
-			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " FCRAM_ENTRY_EX_IP4 READ:"
-			    " unaligned location %llx \n",
-			    location));
+				/* need to be 32 byte aligned */
+				NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+				    " FCRAM_ENTRY_EX_IP4 READ:"
+				    " unaligned location %llx \n",
+				    location));
 				return (NPI_FFLP_FCRAM_LOC_INVALID);
 			}
 			num_subareas = 4;
@@ -738,24 +738,24 @@ npi_fflp_fcram_entry_read(npi_handle_t handle,  part_id_t partid,
 			break;
 		case FCRAM_ENTRY_EX_IP6:
 			if (location % 64) {
-					/* need to be 64 byte alligned */
-			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " FCRAM_ENTRY_EX_IP6 READ:"
-			    " unaligned location %llx \n",
-			    location));
+				/* need to be 64 byte aligned */
+				NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+				    " FCRAM_ENTRY_EX_IP6 READ:"
+				    " unaligned location %llx \n",
+				    location));
 
 				return (NPI_FFLP_FCRAM_LOC_INVALID);
-	}
+			}
 			num_subareas = 7;
 			autoinc = 1;
 
 			break;
 		default:
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-		    " fcram_entry_read:"
-		    " unknown format param location %llx\n",
-		    location));
-		return (NPI_FFLP_SW_PARAM_ERROR);
+			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+			    " fcram_entry_read:"
+			    " unknown format param location %llx\n",
+			    location));
+			return (NPI_FFLP_SW_PARAM_ERROR);
 	}
 
 	addr.value = 0;
@@ -867,7 +867,7 @@ npi_fflp_fcram_subarea_write(npi_handle_t handle, part_id_t partid,
 		    " fcram_subarea_write:"
 		    " unaligned location %llx \n",
 		    location));
-			/* need to be 8 byte alligned */
+			/* need to be 8 byte aligned */
 		return (NPI_FFLP_FCRAM_LOC_INVALID);
 	}
 
@@ -928,7 +928,7 @@ npi_fflp_fcram_subarea_read(npi_handle_t handle, part_id_t partid,
 				    " fcram_subarea_read:"
 				    " unaligned location %llx \n",
 				    location));
-			/* need to be 8 byte alligned */
+			/* need to be 8 byte aligned */
 		return (NPI_FFLP_FCRAM_LOC_INVALID);
 	}
 
@@ -958,19 +958,18 @@ npi_fflp_fcram_subarea_read(npi_handle_t handle, part_id_t partid,
 npi_status_t
 npi_fflp_cfg_fcram_partition(npi_handle_t handle, part_id_t partid,
 				    uint8_t base_mask, uint8_t base_reloc)
-
 {
-/*
- * assumes that the base mask and relocation are computed somewhere
- * and kept in the state data structure. Alternativiely, one can pass
- * a partition size and a starting address and this routine can compute
- * the mask and reloc vlaues.
- */
+	/*
+	 * assumes that the base mask and relocation are computed somewhere
+	 * and kept in the state data structure. Alternativiely, one can pass
+	 * a partition size and a starting address and this routine can compute
+	 * the mask and reloc vlaues.
+	 */
 
-    flow_prt_sel_t sel;
-    uint64_t offset;
+	flow_prt_sel_t sel;
+	uint64_t offset;
 
-    ASSERT(FCRAM_PARTITION_VALID(partid));
+	ASSERT(FCRAM_PARTITION_VALID(partid));
 	if (!FCRAM_PARTITION_VALID(partid)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 				    " npi_fflp_cfg_fcram_partition:"
@@ -979,14 +978,13 @@ npi_fflp_cfg_fcram_partition(npi_handle_t handle, part_id_t partid,
 		return (NPI_FFLP_FCRAM_PART_INVALID);
 	}
 
-    offset = FFLP_PART_OFFSET(partid, FFLP_FLW_PRT_SEL_REG);
-    sel.value = 0;
-    sel.bits.ldw.mask = base_mask;
-    sel.bits.ldw.base = base_reloc;
-    sel.bits.ldw.ext = BIT_DISABLE; /* disable */
-    REG_PIO_WRITE64(handle, offset, sel.value);
-    return (NPI_SUCCESS);
-
+	offset = FFLP_PART_OFFSET(partid, FFLP_FLW_PRT_SEL_REG);
+	sel.value = 0;
+	sel.bits.ldw.mask = base_mask;
+	sel.bits.ldw.base = base_reloc;
+	sel.bits.ldw.ext = BIT_DISABLE; /* disable */
+	REG_PIO_WRITE64(handle, offset, sel.value);
+	return (NPI_SUCCESS);
 }
 
 /*
@@ -1572,7 +1570,7 @@ npi_fflp_cfg_enet_vlan_table_assoc(npi_handle_t handle, uint8_t mac_portn,
 			parity_bit = vlan_parity[cfg.bits.ldw.vlanrdctbln0] +
 			    vlan_parity[cfg.bits.ldw.vlanrdctbln1] +
 			    cfg.bits.ldw.vpr0 + cfg.bits.ldw.vpr1;
-				cfg.bits.ldw.parity0 = parity_bit & 0x1;
+			cfg.bits.ldw.parity0 = parity_bit & 0x1;
 
 			break;
 		case 2:

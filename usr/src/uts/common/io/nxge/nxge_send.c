@@ -1219,10 +1219,13 @@ nxge_lso_info_get(mblk_t *mp, uint32_t *mss, uint32_t *flags)
 {
 	ASSERT(DB_TYPE(mp) == M_DATA);
 
+	if (mss == NULL || flags == NULL)
+		return;
+
 	*mss = 0;
 	if (flags != NULL) {
 		*flags = DB_CKSUMFLAGS(mp) & HW_LSO;
-		if ((*flags != 0) && (mss != NULL)) {
+		if (*flags != 0) {
 			*mss = (uint32_t)DB_LSOMSS(mp);
 		}
 		NXGE_DEBUG_MSG((NULL, TX_CTL,

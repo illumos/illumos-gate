@@ -203,6 +203,8 @@ nxge_intr(void *arg1, void *arg2)
 	int i, j, nldvs, nintrs = 1;
 	npi_status_t rs = NPI_SUCCESS;
 
+	VERIFY(ldvp != NULL);
+
 	/* DDI interface returns second arg as NULL (n2 niumx driver) !!! */
 	if (arg2 == NULL || (void *) ldvp->nxgep != arg2) {
 		nxgep = ldvp->nxgep;
