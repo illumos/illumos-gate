@@ -64,6 +64,10 @@
 .Ar ctl[/ns]
 .Nm
 .Op Fl dv
+.Cm list-firmware
+.Ar ctl
+.Nm
+.Op Fl dv
 .Cm load-firmware
 .Ar ctl
 .Ar firmware-file
@@ -173,11 +177,10 @@ using the
 command, and subsequently activated with the
 .Cm activate-firmware
 command.
-Slots and their contents can be printed using
-.Cm nvmeadm get-logpage
-to request the
-.Ar firmware
-logpage.
+Slots and their contents can be printed using the
+.Nm
+.Cm list-firmware
+command.
 .El
 .Sh COMMANDS
 .Bl -tag -width ""
@@ -402,6 +405,19 @@ previous
 command.
 .It Xo
 .Nm
+.Cm list-firmware
+.Ar ctl
+.Xc
+List currently active firmware slot, the next active firmware slot, and the
+current contents of all firmware slots of an NVMe controller.
+This is a synonym for the
+.Nm
+.Cm get-logpage
+.Ar ctl
+.Cm firmware
+command.
+.It Xo
+.Nm
 .Cm load-firmware
 .Ar ctl
 .Ar firmware-file
@@ -527,7 +543,7 @@ nvme4: Get Features
 .Ed
 .It Sy Example 5: Load and activate firmware
 .Bd -literal
-# nvmeadm get-logpage nvme3 firmware
+# nvmeadm list-firmware nvme3
 nvme3: Firmware Slot Information
   Active Firmware Slot:                     4
   Next Firmware Slot:                       4
@@ -546,7 +562,7 @@ Firmware committed to slot 5.
 # nvmeadm -v activate-firmware nvme3 5
 Slot 5 activated: NVM subsystem reset required - power cycle your system.
 
-# nvmeadm get-logpage nvme3 firmware
+# nvmeadm list-firmware nvme3
 nvme3: Firmware Slot Information
   Active Firmware Slot:                     4
   Next Firmware Slot:                       5

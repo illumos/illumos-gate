@@ -27,8 +27,7 @@
  *		secure-erase ...
  *		detach ...
  *		attach ...
- *		get-param ...
- *		set-param ...
+ *		list-firmware ...
  *		load-firmware ...
  *		commit-firmware ...
  *		activate-firmware ...
@@ -109,6 +108,7 @@ static void usage_get_features(const char *);
 static void usage_format(const char *);
 static void usage_secure_erase(const char *);
 static void usage_attach_detach(const char *);
+static void usage_firmware_list(const char *);
 static void usage_firmware_load(const char *);
 static void usage_firmware_commit(const char *);
 static void usage_firmware_activate(const char *);
@@ -166,6 +166,12 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		"attach blkdev(7d) to namespace(s) of a controller",
 		NULL,
 		do_attach_detach, usage_attach_detach, B_FALSE
+	},
+	{
+		"list-firmware",
+		"list firmware on a controller",
+		NULL,
+		do_get_logpage_fwslot, usage_firmware_list, B_FALSE
 	},
 	{
 		"load-firmware",
@@ -719,6 +725,14 @@ usage_get_logpage(const char *c_name)
 	    "  Print the specified log page of the specified NVMe "
 	    "controllers and/or name-\n  spaces. Supported log pages "
 	    "are error, health, and firmware.\n", c_name);
+}
+
+static void
+usage_firmware_list(const char *c_name)
+{
+	(void) fprintf(stderr, "%s <ctl>\n\n"
+	    "  Print the log page that contains the list of firmware "
+	    "images installed on the specified NVMe controller.\n", c_name);
 }
 
 static int
