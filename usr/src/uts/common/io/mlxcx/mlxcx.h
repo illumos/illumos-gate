@@ -315,6 +315,9 @@ typedef enum {
 	MLXCX_EQ_DESTROYED	= 1 << 2,	/* DESTROY_EQ sent to hw */
 	MLXCX_EQ_ARMED		= 1 << 3,	/* Armed through the UAR */
 	MLXCX_EQ_POLLING	= 1 << 4,	/* Currently being polled */
+	MLXCX_EQ_INTR_ENABLED	= 1 << 5,	/* ddi_intr_enable()'d */
+	MLXCX_EQ_INTR_ACTIVE	= 1 << 6,	/* 'rupt handler running */
+	MLXCX_EQ_INTR_QUIESCE	= 1 << 7,	/* 'rupt handler to quiesce */
 } mlxcx_eventq_state_t;
 
 typedef struct mlxcx_bf {
@@ -414,8 +417,39 @@ typedef enum {
 	MLXCX_EQ_TYPE_TX
 } mlxcx_eventq_type_t;
 
+/*
+ * mlxcx_event_queue_t is a representation of an event queue (EQ).
+ * There is a 1-1 tie in between an EQ and an interrupt vector, and
+ * knowledge of that effects how some members of the struct are used
+ * and modified.
+ *
+ * Most of the struct members are immmutable except for during set up and
+ * teardown, for those it is safe to access them without a mutex once
+ * the driver is initialized.
+ *
+ * Members which are not immutable and are protected by mleq_mtx are:
+ *	* mleq_state - EQ state. Changes during transitions between
+ *		       polling modes.
+ *	* mleq_cq - an AVL tree of completions queues using this EQ.
+ *
+ * Another member which is not immutable is mleq_cc. This is the EQ
+ * consumer counter, it *must* only be incremented in the EQ's interrupt
+ * context. It is also fed back to the hardware during re-arming of
+ * the EQ, again this *must* only happen in the EQ's interrupt context.
+ *
+ * There are a couple of struct members (mleq_check_disarm_cc and
+ * mleq_check_disarm_cnt) which are used to help monitor the health
+ * and consistency of the EQ. They are only used and modified during health
+ * monitoring, which is both infrequent and single threaded, consequently
+ * no mutex guards are needed.
+ *
+ * Care is taken not to use the mleq_mtx when possible, both to avoid
+ * contention in what is "hot" code and avoid breaking requirements
+ * of mac(9E).
+ */
 typedef struct mlxcx_event_queue {
 	kmutex_t		mleq_mtx;
+	kcondvar_t		mleq_cv;
 	mlxcx_t			*mleq_mlx;
 	mlxcx_eventq_state_t	mleq_state;
 	mlxcx_eventq_type_t	mleq_type;
@@ -523,6 +557,7 @@ typedef struct mlxcx_work_queue mlxcx_work_queue_t;
 
 typedef struct mlxcx_completion_queue {
 	kmutex_t			mlcq_mtx;
+	kmutex_t			mlcq_arm_mtx;
 	mlxcx_t				*mlcq_mlx;
 	mlxcx_completionq_state_t	mlcq_state;
 
@@ -1204,6 +1239,7 @@ mlxcx_dma_cookie_one(const mlxcx_dma_buffer_t *db)
  * From mlxcx_intr.c
  */
 extern boolean_t mlxcx_intr_setup(mlxcx_t *);
+extern void mlxcx_intr_disable(mlxcx_t *);
 extern void mlxcx_intr_teardown(mlxcx_t *);
 extern void mlxcx_arm_eq(mlxcx_t *, mlxcx_event_queue_t *);
 extern void mlxcx_arm_cq(mlxcx_t *, mlxcx_completion_queue_t *);

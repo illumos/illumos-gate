@@ -2120,7 +2120,6 @@ mlxcx_cmd_query_eq(mlxcx_t *mlxp, mlxcx_event_queue_t *mleq,
 	bzero(&in, sizeof (in));
 	bzero(&out, sizeof (out));
 
-	ASSERT(mutex_owned(&mleq->mleq_mtx));
 	VERIFY(mleq->mleq_state & MLXCX_EQ_ALLOC);
 	VERIFY(mleq->mleq_state & MLXCX_EQ_CREATED);
 
@@ -2270,7 +2269,7 @@ mlxcx_cmd_create_cq(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq)
 
 	ret = mlxcx_cmd_evaluate(mlxp, &cmd);
 	if (ret) {
-		mlcq->mlcq_state |= MLXCX_CQ_CREATED;
+		atomic_or_uint(&mlcq->mlcq_state, MLXCX_CQ_CREATED);
 		mlcq->mlcq_num = from_be24(out.mlxo_create_cq_cqn);
 	}
 	mlxcx_cmd_fini(mlxp, &cmd);
@@ -2289,7 +2288,6 @@ mlxcx_cmd_query_rq(mlxcx_t *mlxp, mlxcx_work_queue_t *mlwq,
 	bzero(&in, sizeof (in));
 	bzero(&out, sizeof (out));
 
-	ASSERT(mutex_owned(&mlwq->mlwq_mtx));
 	VERIFY(mlwq->mlwq_state & MLXCX_WQ_ALLOC);
 	VERIFY(mlwq->mlwq_state & MLXCX_WQ_CREATED);
 	ASSERT3S(mlwq->mlwq_type, ==, MLXCX_WQ_TYPE_RECVQ);
@@ -2327,7 +2325,6 @@ mlxcx_cmd_query_sq(mlxcx_t *mlxp, mlxcx_work_queue_t *mlwq,
 	bzero(&in, sizeof (in));
 	bzero(&out, sizeof (out));
 
-	ASSERT(mutex_owned(&mlwq->mlwq_mtx));
 	VERIFY(mlwq->mlwq_state & MLXCX_WQ_ALLOC);
 	VERIFY(mlwq->mlwq_state & MLXCX_WQ_CREATED);
 	ASSERT3S(mlwq->mlwq_type, ==, MLXCX_WQ_TYPE_SENDQ);
@@ -2365,7 +2362,6 @@ mlxcx_cmd_query_cq(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq,
 	bzero(&in, sizeof (in));
 	bzero(&out, sizeof (out));
 
-	ASSERT(mutex_owned(&mlcq->mlcq_mtx));
 	VERIFY(mlcq->mlcq_state & MLXCX_CQ_ALLOC);
 	VERIFY(mlcq->mlcq_state & MLXCX_CQ_CREATED);
 
@@ -2419,7 +2415,7 @@ mlxcx_cmd_destroy_cq(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq)
 
 	ret = mlxcx_cmd_evaluate(mlxp, &cmd);
 	if (ret) {
-		mlcq->mlcq_state |= MLXCX_CQ_DESTROYED;
+		atomic_or_uint(&mlcq->mlcq_state, MLXCX_CQ_DESTROYED);
 	}
 	mlxcx_cmd_fini(mlxp, &cmd);
 	return (ret);

@@ -163,7 +163,7 @@ mlxcx_cq_alloc_dma(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq,
 	mlcq->mlcq_doorbell =
 	    (mlxcx_completionq_doorbell_t *)mlcq->mlcq_doorbell_dma.mxdb_va;
 
-	mlcq->mlcq_state |= MLXCX_CQ_ALLOC;
+	atomic_or_uint(&mlcq->mlcq_state, MLXCX_CQ_ALLOC);
 
 	return (B_TRUE);
 }
@@ -180,7 +180,7 @@ mlxcx_cq_rele_dma(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq)
 	mlxcx_dma_free(&mlcq->mlcq_doorbell_dma);
 	mlcq->mlcq_doorbell = NULL;
 
-	mlcq->mlcq_state &= ~MLXCX_CQ_ALLOC;
+	atomic_and_uint(&mlcq->mlcq_state, ~MLXCX_CQ_ALLOC);
 }
 
 void
@@ -314,7 +314,7 @@ mlxcx_cq_teardown(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq)
 		 */
 		if (mlcq->mlcq_state & MLXCX_CQ_EQAVL) {
 			avl_remove(&mleq->mleq_cqs, mlcq);
-			mlcq->mlcq_state &= ~MLXCX_CQ_EQAVL;
+			atomic_and_uint(&mlcq->mlcq_state, ~MLXCX_CQ_EQAVL);
 		}
 		mutex_exit(&mlcq->mlcq_mtx);
 		mutex_exit(&mleq->mleq_mtx);
@@ -326,6 +326,7 @@ mlxcx_cq_teardown(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq)
 	mutex_exit(&mlcq->mlcq_mtx);
 
 	mutex_destroy(&mlcq->mlcq_mtx);
+	mutex_destroy(&mlcq->mlcq_arm_mtx);
 	mutex_destroy(&mlcq->mlcq_bufbmtx);
 	list_destroy(&mlcq->mlcq_buffers);
 	list_destroy(&mlcq->mlcq_buffers_b);
@@ -340,6 +341,8 @@ mlxcx_cq_setup(mlxcx_t *mlxp, mlxcx_event_queue_t *eq,
 
 	cq = kmem_zalloc(sizeof (mlxcx_completion_queue_t), KM_SLEEP);
 	mutex_init(&cq->mlcq_mtx, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(mlxp->mlx_intr_pri));
+	mutex_init(&cq->mlcq_arm_mtx, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(mlxp->mlx_intr_pri));
 	mutex_init(&cq->mlcq_bufbmtx, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(mlxp->mlx_intr_pri));
@@ -378,7 +381,7 @@ mlxcx_cq_setup(mlxcx_t *mlxp, mlxcx_event_queue_t *eq,
 	mutex_enter(&cq->mlcq_mtx);
 	ASSERT0(cq->mlcq_state & MLXCX_CQ_EQAVL);
 	avl_add(&eq->mleq_cqs, cq);
-	cq->mlcq_state |= MLXCX_CQ_EQAVL;
+	atomic_or_uint(&cq->mlcq_state, MLXCX_CQ_EQAVL);
 	mlxcx_arm_cq(mlxp, cq);
 	mutex_exit(&cq->mlcq_mtx);
 	mutex_exit(&eq->mleq_mtx);

@@ -910,23 +910,22 @@ static int
 mlxcx_mac_ring_intr_enable(mac_intr_handle_t intrh)
 {
 	mlxcx_completion_queue_t *cq = (mlxcx_completion_queue_t *)intrh;
-	mlxcx_event_queue_t *eq = cq->mlcq_eq;
 	mlxcx_t *mlxp = cq->mlcq_mlx;
 
 	/*
-	 * We are going to call mlxcx_arm_cq() here, so we take the EQ lock
+	 * We are going to call mlxcx_arm_cq() here, so we take the arm lock
 	 * as well as the CQ one to make sure we don't race against
 	 * mlxcx_intr_n().
 	 */
-	mutex_enter(&eq->mleq_mtx);
+	mutex_enter(&cq->mlcq_arm_mtx);
 	mutex_enter(&cq->mlcq_mtx);
 	if (cq->mlcq_state & MLXCX_CQ_POLLING) {
-		cq->mlcq_state &= ~MLXCX_CQ_POLLING;
+		atomic_and_uint(&cq->mlcq_state, ~MLXCX_CQ_POLLING);
 		if (!(cq->mlcq_state & MLXCX_CQ_ARMED))
 			mlxcx_arm_cq(mlxp, cq);
 	}
 	mutex_exit(&cq->mlcq_mtx);
-	mutex_exit(&eq->mleq_mtx);
+	mutex_exit(&cq->mlcq_arm_mtx);
 
 	return (0);
 }

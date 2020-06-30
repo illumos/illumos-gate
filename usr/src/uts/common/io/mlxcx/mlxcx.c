@@ -411,10 +411,11 @@
  * Interrupt side:
  *
  *  - mleq_mtx
- *    - mlcq_mtx
- *      - mlcq_bufbmtx
- *      - mlwq_mtx
- *        - mlbs_mtx
+ *    - mlcq_arm_mtx
+ *      - mlcq_mtx
+ *        - mlcq_bufbmtx
+ *        - mlwq_mtx
+ *          - mlbs_mtx
  *    - mlp_mtx
  *
  * GLD side:
@@ -427,7 +428,8 @@
  *      - mlbs_mtx
  *      - mlcq_bufbmtx
  *  - mleq_mtx
- *    - mlcq_mtx
+ *    - mlcq_arm_mtx
+ *      - mlcq_mtx
  *
  */
 
@@ -1022,8 +1024,6 @@ mlxcx_teardown_eqs(mlxcx_t *mlxp)
 	mlxcx_event_queue_t *mleq;
 	uint_t i;
 
-	mlxcx_cmd_eq_disable(mlxp);
-
 	for (i = 0; i < mlxp->mlx_intr_count; ++i) {
 		mleq = &mlxp->mlx_eqs[i];
 		mutex_enter(&mleq->mleq_mtx);
@@ -1058,6 +1058,13 @@ mlxcx_teardown(mlxcx_t *mlxp)
 {
 	uint_t i;
 	dev_info_t *dip = mlxp->mlx_dip;
+
+	if (mlxp->mlx_attach & MLXCX_ATTACH_INTRS) {
+		/*
+		 * Disable interrupts and let any active vectors quiesce.
+		 */
+		mlxcx_intr_disable(mlxp);
+	}
 
 	if (mlxp->mlx_attach & MLXCX_ATTACH_CHKTIMERS) {
 		mlxcx_teardown_checktimers(mlxp);
@@ -2343,6 +2350,7 @@ mlxcx_setup_eq(mlxcx_t *mlxp, uint_t vec, uint64_t events)
 		mutex_exit(&mleq->mleq_mtx);
 		return (B_FALSE);
 	}
+
 	if (ddi_intr_enable(mlxp->mlx_intr_handles[vec]) != DDI_SUCCESS) {
 		/*
 		 * mlxcx_teardown_eqs() will handle calling cmd_destroy_eq and
@@ -2351,6 +2359,7 @@ mlxcx_setup_eq(mlxcx_t *mlxp, uint_t vec, uint64_t events)
 		mutex_exit(&mleq->mleq_mtx);
 		return (B_FALSE);
 	}
+	mleq->mleq_state |= MLXCX_EQ_INTR_ENABLED;
 	mlxcx_arm_eq(mlxp, mleq);
 	mutex_exit(&mleq->mleq_mtx);
 
@@ -2430,6 +2439,7 @@ mlxcx_setup_eqs(mlxcx_t *mlxp)
 			mutex_exit(&mleq->mleq_mtx);
 			return (B_FALSE);
 		}
+		mleq->mleq_state |= MLXCX_EQ_INTR_ENABLED;
 		mlxcx_arm_eq(mlxp, mleq);
 		mutex_exit(&mleq->mleq_mtx);
 	}

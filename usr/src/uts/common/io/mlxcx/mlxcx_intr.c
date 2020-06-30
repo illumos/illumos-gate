@@ -22,6 +22,7 @@
 #include <sys/conf.h>
 #include <sys/devops.h>
 #include <sys/sysmacros.h>
+#include <sys/disp.h>
 #include <sys/sdt.h>
 
 #include <sys/mac_provider.h>
@@ -32,6 +33,41 @@
  * CTASSERT(s) to cover bad values which would induce bugs.
  */
 CTASSERT(MLXCX_CQ_LWM_GAP >= MLXCX_CQ_HWM_GAP);
+
+/*
+ * Disable interrupts.
+ * The act of calling ddi_intr_disable() does not guarantee an interrupt
+ * routine is not running, so flag the vector as quiescing and wait
+ * for anything active to finish.
+ */
+void
+mlxcx_intr_disable(mlxcx_t *mlxp)
+{
+	int i;
+
+	mlxcx_cmd_eq_disable(mlxp);
+
+	for (i = 0; i < mlxp->mlx_intr_count; ++i) {
+		mlxcx_event_queue_t *mleq = &mlxp->mlx_eqs[i];
+
+		mutex_enter(&mleq->mleq_mtx);
+
+		if ((mleq->mleq_state & MLXCX_EQ_INTR_ENABLED) == 0) {
+			mutex_exit(&mleq->mleq_mtx);
+			continue;
+		}
+
+		(void) ddi_intr_disable(mlxp->mlx_intr_handles[i]);
+
+		mleq->mleq_state |= MLXCX_EQ_INTR_QUIESCE;
+		while ((mleq->mleq_state & MLXCX_EQ_INTR_ACTIVE) != 0)
+			cv_wait(&mleq->mleq_cv, &mleq->mleq_mtx);
+
+		mleq->mleq_state &= ~MLXCX_EQ_INTR_ENABLED;
+
+		mutex_exit(&mleq->mleq_mtx);
+	}
+}
 
 void
 mlxcx_intr_teardown(mlxcx_t *mlxp)
@@ -51,7 +87,6 @@ mlxcx_intr_teardown(mlxcx_t *mlxp)
 			avl_destroy(&mleq->mleq_cqs);
 		}
 		mutex_exit(&mleq->mleq_mtx);
-		(void) ddi_intr_disable(mlxp->mlx_intr_handles[i]);
 		(void) ddi_intr_remove_handler(mlxp->mlx_intr_handles[i]);
 		ret = ddi_intr_free(mlxp->mlx_intr_handles[i]);
 		if (ret != DDI_SUCCESS) {
@@ -59,6 +94,7 @@ mlxcx_intr_teardown(mlxcx_t *mlxp)
 			    i, ret);
 		}
 		mutex_destroy(&mleq->mleq_mtx);
+		cv_destroy(&mleq->mleq_cv);
 	}
 	kmem_free(mlxp->mlx_intr_handles, mlxp->mlx_intr_size);
 	kmem_free(mlxp->mlx_eqs, mlxp->mlx_eqs_size);
@@ -77,7 +113,11 @@ mlxcx_eq_next(mlxcx_event_queue_t *mleq)
 	uint_t ci;
 	const uint_t swowner = ((mleq->mleq_cc >> mleq->mleq_entshift) & 1);
 
-	ASSERT(mutex_owned(&mleq->mleq_mtx));
+	/*
+	 * This should only be called from interrupt context to ensure
+	 * correctness of mleq_cc.
+	 */
+	ASSERT(servicing_interrupt());
 	ASSERT(mleq->mleq_state & MLXCX_EQ_CREATED);
 	ASSERT0(mleq->mleq_state & MLXCX_EQ_DESTROYED);
 
@@ -114,7 +154,12 @@ mlxcx_arm_eq(mlxcx_t *mlxp, mlxcx_event_queue_t *mleq)
 	ddi_fm_error_t err;
 	bits32_t v = new_bits32();
 
-	ASSERT(mutex_owned(&mleq->mleq_mtx));
+	/*
+	 * This is only called during initialization when the EQ is
+	 * armed for the first time, and when re-armed at the end of
+	 * interrupt processing.
+	 */
+	ASSERT(mutex_owned(&mleq->mleq_mtx) || servicing_interrupt());
 	ASSERT(mleq->mleq_state & MLXCX_EQ_CREATED);
 	ASSERT0(mleq->mleq_state & MLXCX_EQ_DESTROYED);
 	ASSERT0(mleq->mleq_state & MLXCX_EQ_ARMED);
@@ -146,7 +191,11 @@ mlxcx_update_eq(mlxcx_t *mlxp, mlxcx_event_queue_t *mleq)
 	bits32_t v = new_bits32();
 	ddi_fm_error_t err;
 
-	ASSERT(mutex_owned(&mleq->mleq_mtx));
+	/*
+	 * This should only be called from interrupt context to ensure
+	 * correctness of mleq_cc.
+	 */
+	ASSERT(servicing_interrupt());
 	ASSERT(mleq->mleq_state & MLXCX_EQ_CREATED);
 	ASSERT0(mleq->mleq_state & MLXCX_EQ_DESTROYED);
 	ASSERT0(mleq->mleq_state & MLXCX_EQ_ARMED);
@@ -230,17 +279,19 @@ mlxcx_arm_cq(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq)
 	ddi_fm_error_t err;
 	uint_t try = 0;
 
+	ASSERT(mutex_owned(&mlcq->mlcq_arm_mtx));
 	ASSERT(mutex_owned(&mlcq->mlcq_mtx));
 	ASSERT(mlcq->mlcq_state & MLXCX_CQ_CREATED);
 	ASSERT0(mlcq->mlcq_state & MLXCX_CQ_DESTROYED);
 
-	if (mlcq->mlcq_state & MLXCX_CQ_ARMED)
+	if (mlcq->mlcq_state & MLXCX_CQ_ARMED) {
 		ASSERT3U(mlcq->mlcq_ec, >, mlcq->mlcq_ec_armed);
+	}
 
 	if (mlcq->mlcq_state & MLXCX_CQ_TEARDOWN)
 		return;
 
-	mlcq->mlcq_state |= MLXCX_CQ_ARMED;
+	atomic_or_uint(&mlcq->mlcq_state, MLXCX_CQ_ARMED);
 	mlcq->mlcq_cc_armed = mlcq->mlcq_cc;
 	mlcq->mlcq_ec_armed = mlcq->mlcq_ec;
 
@@ -639,6 +690,52 @@ mlxcx_report_module_error(mlxcx_t *mlxp, mlxcx_evdata_port_mod_t *evd)
 	ddi_fm_service_impact(mlxp->mlx_dip, DDI_SERVICE_LOST);
 }
 
+/*
+ * Common beginning of interrupt processing.
+ * Confirm interrupt hasn't been disabled, verify its state and
+ * mark the vector as active.
+ */
+static boolean_t
+mlxcx_intr_ini(mlxcx_t *mlxp, mlxcx_event_queue_t *mleq)
+{
+	mutex_enter(&mleq->mleq_mtx);
+
+	if ((mleq->mleq_state & MLXCX_EQ_INTR_ENABLED) == 0) {
+		mutex_exit(&mleq->mleq_mtx);
+		return (B_FALSE);
+	}
+
+	if (!(mleq->mleq_state & MLXCX_EQ_ALLOC) ||
+	    !(mleq->mleq_state & MLXCX_EQ_CREATED) ||
+	    (mleq->mleq_state & MLXCX_EQ_DESTROYED)) {
+		mlxcx_warn(mlxp, "intr %d in bad eq state",
+		    mleq->mleq_intr_index);
+		mutex_exit(&mleq->mleq_mtx);
+		return (B_FALSE);
+	}
+
+	mleq->mleq_state |= MLXCX_EQ_INTR_ACTIVE;
+	mutex_exit(&mleq->mleq_mtx);
+
+	return (B_TRUE);
+}
+
+/*
+ * End of interrupt processing.
+ * Mark vector as no longer active and if shutdown is blocked on this vector,
+ * wake it up.
+ */
+static void
+mlxcx_intr_fini(mlxcx_event_queue_t *mleq)
+{
+	mutex_enter(&mleq->mleq_mtx);
+	if ((mleq->mleq_state & MLXCX_EQ_INTR_QUIESCE) != 0)
+		cv_signal(&mleq->mleq_cv);
+
+	mleq->mleq_state &= ~MLXCX_EQ_INTR_ACTIVE;
+	mutex_exit(&mleq->mleq_mtx);
+}
+
 static uint_t
 mlxcx_intr_async(caddr_t arg, caddr_t arg2)
 {
@@ -649,21 +746,12 @@ mlxcx_intr_async(caddr_t arg, caddr_t arg2)
 	uint_t portn;
 	uint16_t func;
 
-	mutex_enter(&mleq->mleq_mtx);
-
-	if (!(mleq->mleq_state & MLXCX_EQ_ALLOC) ||
-	    !(mleq->mleq_state & MLXCX_EQ_CREATED) ||
-	    (mleq->mleq_state & MLXCX_EQ_DESTROYED)) {
-		mlxcx_warn(mlxp, "intr %d in bad eq state",
-		    mleq->mleq_intr_index);
-		mutex_exit(&mleq->mleq_mtx);
+	if (!mlxcx_intr_ini(mlxp, mleq))
 		return (DDI_INTR_CLAIMED);
-	}
 
 	ent = mlxcx_eq_next(mleq);
 	if (ent == NULL) {
-		mutex_exit(&mleq->mleq_mtx);
-		return (DDI_INTR_CLAIMED);
+		goto done;
 	}
 
 	ASSERT(mleq->mleq_state & MLXCX_EQ_ARMED);
@@ -745,8 +833,9 @@ mlxcx_intr_async(caddr_t arg, caddr_t arg2)
 	}
 
 	mlxcx_arm_eq(mlxp, mleq);
-	mutex_exit(&mleq->mleq_mtx);
 
+done:
+	mlxcx_intr_fini(mleq);
 	return (DDI_INTR_CLAIMED);
 }
 
@@ -936,14 +1025,8 @@ mlxcx_intr_n(caddr_t arg, caddr_t arg2)
 	mblk_t *mp = NULL;
 	boolean_t tellmac = B_FALSE;
 
-	mutex_enter(&mleq->mleq_mtx);
-
-	if (!(mleq->mleq_state & MLXCX_EQ_ALLOC) ||
-	    !(mleq->mleq_state & MLXCX_EQ_CREATED) ||
-	    (mleq->mleq_state & MLXCX_EQ_DESTROYED)) {
-		mutex_exit(&mleq->mleq_mtx);
+	if (!mlxcx_intr_ini(mlxp, mleq))
 		return (DDI_INTR_CLAIMED);
-	}
 
 	ent = mlxcx_eq_next(mleq);
 	if (ent == NULL) {
@@ -953,8 +1036,7 @@ mlxcx_intr_n(caddr_t arg, caddr_t arg2)
 			(void) ddi_intr_disable(mlxp->mlx_intr_handles[
 			    mleq->mleq_intr_index]);
 		}
-		mutex_exit(&mleq->mleq_mtx);
-		return (DDI_INTR_CLAIMED);
+		goto done;
 	}
 	mleq->mleq_badintrs = 0;
 
@@ -967,14 +1049,15 @@ mlxcx_intr_n(caddr_t arg, caddr_t arg2)
 			ddi_fm_service_impact(mlxp->mlx_dip, DDI_SERVICE_LOST);
 			(void) ddi_intr_disable(mlxp->mlx_intr_handles[
 			    mleq->mleq_intr_index]);
-			mutex_exit(&mleq->mleq_mtx);
-			return (DDI_INTR_CLAIMED);
+			goto done;
 		}
 		ASSERT3U(ent->mleqe_event_type, ==, MLXCX_EVENT_COMPLETION);
 
 		probe.mlcq_num =
 		    from_be24(ent->mleqe_completion.mled_completion_cqn);
+		mutex_enter(&mleq->mleq_mtx);
 		mlcq = avl_find(&mleq->mleq_cqs, &probe, NULL);
+		mutex_exit(&mleq->mleq_mtx);
 
 		if (mlcq == NULL)
 			continue;
@@ -982,18 +1065,18 @@ mlxcx_intr_n(caddr_t arg, caddr_t arg2)
 		mlwq = mlcq->mlcq_wq;
 
 		/*
-		 * The polling function might have the mutex and stop us from
-		 * getting the lock in mlxcx_process_cq(), so we increment
-		 * the event counter atomically from outside.
+		 * mlcq_arm_mtx is used to avoid race conditions between
+		 * this interrupt routine and the transition from polling
+		 * back to interrupt mode. When exiting poll mode the
+		 * CQ is likely to be un-armed, which means there will
+		 * be no events for the CQ coming though here,
+		 * consequently very low contention on mlcq_arm_mtx.
 		 *
-		 * This way at the end of polling when we go back to interrupts
-		 * from this CQ, the event counter is still correct.
-		 *
-		 * Note that mlxcx_mac_ring_intr_enable() takes the EQ lock so
-		 * as to avoid any possibility of racing against us here, so we
-		 * only have to consider mlxcx_rx_poll().
+		 * mlcq_arm_mtx must be released before calls into mac
+		 * layer in order to avoid deadlocks.
 		 */
-		atomic_inc_32(&mlcq->mlcq_ec);
+		mutex_enter(&mlcq->mlcq_arm_mtx);
+		mlcq->mlcq_ec++;
 		atomic_and_uint(&mlcq->mlcq_state, ~MLXCX_CQ_ARMED);
 
 		if (mutex_tryenter(&mlcq->mlcq_mtx) == 0) {
@@ -1003,8 +1086,10 @@ mlxcx_intr_n(caddr_t arg, caddr_t arg2)
 			 * We don't want to block other CQs behind
 			 * this one.
 			 */
-			if (mlcq->mlcq_state & MLXCX_CQ_POLLING)
+			if ((mlcq->mlcq_state & MLXCX_CQ_POLLING) != 0) {
+				mutex_exit(&mlcq->mlcq_arm_mtx);
 				goto update_eq;
+			}
 
 			/* Otherwise we will wait. */
 			mutex_enter(&mlcq->mlcq_mtx);
@@ -1033,6 +1118,7 @@ mlxcx_intr_n(caddr_t arg, caddr_t arg2)
 			mlxcx_arm_cq(mlxp, mlcq);
 
 			mutex_exit(&mlcq->mlcq_mtx);
+			mutex_exit(&mlcq->mlcq_arm_mtx);
 
 			if (tellmac) {
 				mac_tx_ring_update(mlxp->mlx_mac_hdl,
@@ -1046,6 +1132,7 @@ mlxcx_intr_n(caddr_t arg, caddr_t arg2)
 			}
 		} else {
 			mutex_exit(&mlcq->mlcq_mtx);
+			mutex_exit(&mlcq->mlcq_arm_mtx);
 		}
 
 update_eq:
@@ -1060,8 +1147,9 @@ update_eq:
 	}
 
 	mlxcx_arm_eq(mlxp, mleq);
-	mutex_exit(&mleq->mleq_mtx);
 
+done:
+	mlxcx_intr_fini(mleq);
 	return (DDI_INTR_CLAIMED);
 }
 
@@ -1141,6 +1229,7 @@ mlxcx_intr_setup(mlxcx_t *mlxp)
 	for (i = 0; i < mlxp->mlx_intr_count; ++i) {
 		mutex_init(&mlxp->mlx_eqs[i].mleq_mtx, NULL, MUTEX_DRIVER,
 		    DDI_INTR_PRI(mlxp->mlx_intr_pri));
+		cv_init(&mlxp->mlx_eqs[i].mleq_cv, NULL, CV_DRIVER, NULL);
 
 		if (i < mlxp->mlx_intr_cq0)
 			continue;
