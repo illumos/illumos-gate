@@ -146,8 +146,10 @@ locale/%/$(DTIME): locale/%/stamp
 
 $(ROOTDATA):	$(ROOTLOCDIRS) $(ROOTCATDIRS) $(DATA)
 		$(RM) $@
-		-$(CP) $(@:$(ROOTLIB)/%=%) $@
-		$(CHMOD) -f 0444 $@
+		if [[ -f $(@:$(ROOTLIB)/%=%) ]]; then \
+			$(CP) $(@:$(ROOTLIB)/%=%) $@; \
+			$(CHMOD) -f 0444 $@ ; \
+		fi
 
 %.mo:		%.po
 		$(MSGFMT) -o $@ $<

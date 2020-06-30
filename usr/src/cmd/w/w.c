@@ -53,26 +53,28 @@
  * fixing bugs here, then you should probably fix 'em there too.
  */
 
-#include <stdio.h>
-#include <string.h>
-#include <stdarg.h>
-#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/loadavg.h>
+#include <sys/queue.h>
+#include <sys/stat.h>
+#include <sys/sysmacros.h>
+
 #include <ctype.h>
-#include <fcntl.h>
-#include <time.h>
+#include <dirent.h>
 #include <err.h>
 #include <errno.h>
-#include <sys/types.h>
-#include <utmpx.h>
-#include <sys/stat.h>
-#include <dirent.h>
-#include <procfs.h>		/* /proc header file */
-#include <locale.h>
-#include <unistd.h>
-#include <sys/loadavg.h>
+#include <fcntl.h>
 #include <limits.h>
+#include <locale.h>
 #include <priv_utils.h>
-#include <sys/sysmacros.h>
+#include <procfs.h>		/* /proc header file */
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+#include <utmpx.h>
 
 /*
  * Use the full lengths from utmpx for user and line.
@@ -87,50 +89,25 @@ static struct utmpx dummy;
 
 #define	DIV60(t)	((t+30)/60)	/* x/60 rounded */
 
-#ifdef ERR
-#undef ERR
-#endif
-#define	ERR		(-1)
-
-#define	HSIZE		256		/* size of process hash table	*/
 #define	PROCDIR		"/proc"
-#define	INITPROCESS	(pid_t)1	/* init process pid */
-#define	NONE		'n'		/* no state */
-#define	RUNNING		'r'		/* runnable process */
-#define	ZOMBIE		'z'		/* zombie process */
-#define	VISITED		'v'		/* marked node as visited */
 #define	PRINTF(a)	if (printf a < 0) { \
 		perror((gettext("%s: printf failed"), prog)); \
 		exit(1); }
 
 struct uproc {
 	pid_t	p_upid;			/* process id */
-	char	p_state;		/* numeric value of process state */
 	dev_t   p_ttyd;			/* controlling tty of process */
 	time_t  p_time;			/* seconds of user & system time */
 	time_t	p_ctime;		/* seconds of child user & sys time */
 	int	p_igintr;		/* 1 = ignores SIGQUIT and SIGINT */
 	char    p_comm[PRARGSZ+1];	/* command */
 	char    p_args[PRARGSZ+1];	/* command line arguments */
-	struct uproc	*p_child,	/* first child pointer */
-			*p_sibling,	/* sibling pointer */
-			*p_pgrpl,	/* pgrp link */
-			*p_link;	/* hash table chain pointer */
+	STAILQ_ENTRY(uproc) uprocs;
 };
+STAILQ_HEAD(uprochead, uproc) uphead;
 
-/*
- *	define hash table for struct uproc
- *	Hash function uses process id
- *	and the size of the hash table(HSIZE)
- *	to determine process index into the table.
- */
-static struct uproc	pr_htbl[HSIZE];
-
-static struct	uproc	*findhash(pid_t);
 static time_t	findidle(char *);
 static void	clnarglist(char *);
-static void	showtotals(struct uproc *);
-static void	calctotals(struct uproc *);
 static void	prttime(time_t, int);
 static void	prtat(time_t *time);
 
@@ -147,12 +124,6 @@ static int	login;		/* true if invoked as login shell */
 static time_t	now;		/* current time of day */
 static time_t	uptime;		/* time of last reboot & elapsed time since */
 static int	nusers;		/* number of users logged in now */
-static time_t	idle;		/* number of minutes user is idle */
-static time_t	jobtime;	/* total cpu time visible */
-static char	doing[520];	/* process attached to terminal */
-static time_t	proctime;	/* cpu time of process in doing */
-static pid_t	curpid, empty;
-static int	add_times;	/* boolean: add the cpu times or not */
 
 /*
  * Basic privs we never need and can drop. This is likely not exhaustive,
@@ -179,13 +150,13 @@ main(int argc, char *argv[])
 	struct utmpx	*utmpbegin;
 	struct utmpx	*utmpend;
 	struct utmpx	*utp;
-	struct uproc	*up, *parent, *pgrp;
+	struct uproc	*up;
 	struct psinfo	info;
 	struct sigaction actinfo[ACTSIZE];
 	struct pstatus	statinfo;
 	struct stat	sbuf;
 	DIR		*dirp;
-	struct	dirent	*dp;
+	struct dirent	*dp;
 	char		pname[PATH_MAX];
 	int		procfd;
 	int		dirfd;
@@ -375,13 +346,11 @@ main(int argc, char *argv[])
 		}
 	}
 
-	/*
-	 * loop through /proc, reading info about each process
-	 * and build the parent/child tree
-	 */
+	/* Loop through /proc, reading info about each process */
 	if ((dirp = opendir(PROCDIR)) == NULL)
 		err(EXIT_FAILURE, gettext("could not open %s"), PROCDIR);
 
+	STAILQ_INIT(&uphead);
 	while ((dp = readdir(dirp)) != NULL) {
 		if (dp->d_name[0] == '.')
 			continue;
@@ -391,7 +360,6 @@ main(int argc, char *argv[])
 			continue;
 
 		dirfd = priv_proc_open(pname, O_RDONLY | O_DIRECTORY);
-
 		if (dirfd < 0)
 			continue;
 
@@ -400,106 +368,73 @@ main(int argc, char *argv[])
 			(void) close(dirfd);
 			continue;
 		}
-
 		if (!do_proc_read(procfd, &info, sizeof (info))) {
-			warn(gettext("read() failed on %s"), pname);
+			warn(gettext("failed to read %s"), pname);
 			(void) close(dirfd);
 			continue;
 		}
 		(void) close(procfd);
 
-		up = findhash(info.pr_pid);
-		up->p_ttyd = info.pr_ttydev;
-		up->p_state = (info.pr_nlwp == 0 ? ZOMBIE : RUNNING);
-		up->p_time = 0;
-		up->p_ctime = 0;
-		up->p_igintr = 0;
-		(void) strlcpy(up->p_comm, info.pr_fname,
-		    sizeof (up->p_comm));
-		up->p_args[0] = 0;
+		/* Not interested in zombies */
+		if (info.pr_nlwp == 0)
+			continue;
+		/* Not interested in processes without a terminal */
+		if (info.pr_ttydev == NODEV)
+			continue;
 
-		if (up->p_state != NONE && up->p_state != ZOMBIE) {
-			procfd = priv_proc_openat(dirfd, "status", O_RDONLY);
-			if (procfd < 0) {
-				(void) close(dirfd);
-				continue;
-			}
-
-			if (!do_proc_read(procfd, &statinfo,
-			    sizeof (statinfo))) {
-				warn(gettext("read() failed on %s/status"),
-				    pname);
-
-				(void) close(procfd);
-				(void) close(dirfd);
-				continue;
-			}
-			(void) close(procfd);
-
-			up->p_time = statinfo.pr_utime.tv_sec +
-			    statinfo.pr_stime.tv_sec;	/* seconds */
-			up->p_ctime = statinfo.pr_cutime.tv_sec +
-			    statinfo.pr_cstime.tv_sec;
-
-			procfd = priv_proc_openat(dirfd, "sigact", O_RDONLY);
-			if (procfd < 0) {
-				(void) close(dirfd);
-				continue;
-			}
-
-			if (!do_proc_read(procfd, actinfo, sizeof (actinfo))) {
-				warn(gettext("read() failed on %s/sigact"),
-				    pname);
-
-				(void) close(procfd);
-				(void) close(dirfd);
-				continue;
-			}
+		procfd = priv_proc_openat(dirfd, "status", O_RDONLY);
+		if (procfd < 0) {
+			(void) close(dirfd);
+			continue;
+		}
+		if (!do_proc_read(procfd, &statinfo, sizeof (statinfo))) {
+			warn(gettext("failed to read %s/status"), pname);
 			(void) close(procfd);
 			(void) close(dirfd);
-			up->p_igintr =
-			    actinfo[SIGINT-1].sa_handler == SIG_IGN &&
-			    actinfo[SIGQUIT-1].sa_handler == SIG_IGN;
+			continue;
+		}
+		(void) close(procfd);
 
-			/*
-			 * Process args.
-			 */
-			up->p_args[0] = '\0';
-			clnarglist(info.pr_psargs);
-			(void) strlcpy(up->p_args, info.pr_psargs,
+		procfd = priv_proc_openat(dirfd, "sigact", O_RDONLY);
+		if (procfd < 0) {
+			(void) close(dirfd);
+			continue;
+		}
+		if (!do_proc_read(procfd, actinfo, sizeof (actinfo))) {
+			warn(gettext("failed to read %s/sigact"), pname);
+			(void) close(procfd);
+			(void) close(dirfd);
+			continue;
+		}
+		(void) close(procfd);
+		(void) close(dirfd);
+
+		up = calloc(1, sizeof (*up));
+		if (up == NULL)
+			err(EXIT_FAILURE, "calloc");
+		up->p_upid = info.pr_pid;
+		up->p_ttyd = info.pr_ttydev;
+		up->p_time =
+		    statinfo.pr_utime.tv_sec +
+		    statinfo.pr_stime.tv_sec;
+		up->p_ctime =
+		    statinfo.pr_cutime.tv_sec +
+		    statinfo.pr_cstime.tv_sec;
+		up->p_igintr =
+		    actinfo[SIGINT-1].sa_handler == SIG_IGN &&
+		    actinfo[SIGQUIT-1].sa_handler == SIG_IGN;
+		(void) strlcpy(up->p_comm, info.pr_fname, sizeof (up->p_comm));
+		/* Process args */
+		clnarglist(info.pr_psargs);
+		(void) strlcpy(up->p_args, info.pr_psargs, sizeof (up->p_args));
+		if (up->p_args[0] == 0 || up->p_args[0] == '?' ||
+		    (up->p_args[0] == '-' && up->p_args[1] <= ' ')) {
+			(void) strlcat(up->p_args, " (", sizeof (up->p_args));
+			(void) strlcat(up->p_args, up->p_comm,
 			    sizeof (up->p_args));
-			if (up->p_args[0] == 0 ||
-			    up->p_args[0] == '-' && up->p_args[1] <= ' ' ||
-			    up->p_args[0] == '?') {
-				(void) strlcat(up->p_args, " (",
-				    sizeof (up->p_args));
-				(void) strlcat(up->p_args, up->p_comm,
-				    sizeof (up->p_args));
-				(void) strlcat(up->p_args, ")",
-				    sizeof (up->p_args));
-			}
+			(void) strlcat(up->p_args, ")", sizeof (up->p_args));
 		}
-
-		/*
-		 * link pgrp together in case parents go away
-		 * Pgrp chain is a single linked list originating
-		 * from the pgrp leader to its group member.
-		 */
-		if (info.pr_pgid != info.pr_pid) {	/* not pgrp leader */
-			pgrp = findhash(info.pr_pgid);
-			up->p_pgrpl = pgrp->p_pgrpl;
-			pgrp->p_pgrpl = up;
-		}
-		parent = findhash(info.pr_ppid);
-
-		/* if this is the new member, link it in */
-		if (parent->p_upid != INITPROCESS) {
-			if (parent->p_child) {
-				up->p_sibling = parent->p_child;
-				up->p_child = 0;
-			}
-			parent->p_child = up;
-		}
+		STAILQ_INSERT_TAIL(&uphead, up, uprocs);
 	}
 
 	/* revert to non-privileged user after opening */
@@ -540,10 +475,17 @@ main(int argc, char *argv[])
 	 * about each logged in user
 	 */
 	for (ut = utmpbegin; ut < utmpend; ut++) {
+		struct uproc *upt;
+		char linedev[PATH_MAX];
+		char what[1024];
+		time_t idle, jobtime, proctime;
+		pid_t curpid;
+
 		if (ut->ut_type != USER_PROCESS)
 			continue;
-		if (sel_user && strncmp(ut->ut_name, sel_user, NMAX) != 0)
-			continue;	/* we're looking for somebody else */
+		if (sel_user != NULL &&
+		    strncmp(ut->ut_name, sel_user, NMAX) != 0)
+			continue;
 
 		/* print login name of the user */
 		PRINTF(("%-*.*s ", LOGIN_WIDTH, NMAX, ut->ut_name));
@@ -552,8 +494,7 @@ main(int argc, char *argv[])
 		if (lflag) {
 			PRINTF(("%-*.*s ", LINE_WIDTH, LMAX, ut->ut_line));
 		} else {
-			if (ut->ut_line[0] == 'p' && ut->ut_line[1] == 't' &&
-			    ut->ut_line[2] == 's' && ut->ut_line[3] == '/') {
+			if (strncmp(ut->ut_line, "pts/", strlen("pts/")) == 0) {
 				PRINTF(("%-*.*s ", LINE_WIDTH, LMAX,
 				    &ut->ut_line[4]));
 			} else {
@@ -571,133 +512,62 @@ main(int argc, char *argv[])
 		/* print idle time */
 		idle = findidle(ut->ut_line);
 		prttime(idle, 8);
-		showtotals(findhash(ut->ut_pid));
+
+		/*
+		 * Go through the list of processes for this terminal,
+		 * calculating job/process times, and look for the
+		 * "most interesting" process.
+		 */
+		jobtime = 0;
+		proctime = 0;
+		curpid = -1;
+		(void) strlcpy(what, "-", sizeof (what));
+
+		(void) snprintf(linedev, sizeof (linedev), "/dev/%s",
+		    ut->ut_line);
+		if (stat(linedev, &sbuf) == -1 ||
+		    (sbuf.st_mode & S_IFMT) != S_IFCHR ||
+		    sbuf.st_rdev == NODEV)
+			goto skip;
+
+		STAILQ_FOREACH_SAFE(up, &uphead, uprocs, upt) {
+			if (up->p_ttyd != sbuf.st_rdev)
+				continue;
+			jobtime += up->p_time + up->p_ctime;
+			proctime += up->p_time;
+			/*
+			 * Check for "most interesting" process, currently
+			 * the one having the highest PID.
+			 */
+			if (up->p_upid > curpid && !up->p_igintr) {
+				curpid = up->p_upid;
+				if (lflag) {
+					(void) strlcpy(what, up->p_args,
+					    sizeof (what));
+				} else {
+					(void) strlcpy(what, up->p_comm,
+					    sizeof (what));
+				}
+			}
+			STAILQ_REMOVE(&uphead, up, uproc, uprocs);
+			free(up);
+		}
+
+skip:
+		if (lflag) {
+			/* Print CPU time for all processes & children */
+			prttime(jobtime, 8);
+			/* Print cpu time for interesting process */
+			prttime(proctime, 8);
+		}
+		/* "Most interesting" process */
+		PRINTF(("%-.32s\n", what));
 	}
+
 	if (fclose(stdout) == EOF)
 		err(EXIT_FAILURE, gettext("fclose failed"));
 
 	return (0);
-}
-
-/*
- *  Prints the CPU time for all processes & children,
- *  and the cpu time for interesting process,
- *  and what the user is doing.
- */
-static void
-showtotals(struct uproc *up)
-{
-	jobtime = 0;
-	proctime = 0;
-	empty = 1;
-	curpid = -1;
-	add_times = 1;
-
-	calctotals(up);
-
-	if (lflag) {
-		/* print CPU time for all processes & children */
-		/* and need to convert clock ticks to seconds first */
-		prttime((time_t)jobtime, 8);
-
-		/* print cpu time for interesting process */
-		/* and need to convert clock ticks to seconds first */
-		prttime((time_t)proctime, 8);
-	}
-	/* what user is doing, current process */
-	PRINTF(("%-.32s\n", doing));
-}
-
-/*
- *  This recursive routine descends the process
- *  tree starting from the given process pointer(up).
- *  It used depth-first search strategy and also marked
- *  each node as visited as it traversed down the tree.
- *  It calculates the process time for all processes &
- *  children.  It also finds the interesting process
- *  and determines its cpu time and command.
- */
-static void
-calctotals(struct uproc *up)
-{
-	struct uproc   *zp;
-
-	/*
-	 * Once a node has been visited, stop adding cpu times
-	 * for its children so they don't get totalled twice.
-	 * Still look for the interesting job for this utmp
-	 * entry, however.
-	 */
-	if (up->p_state == VISITED)
-		add_times = 0;
-	up->p_state = VISITED;
-	if (up->p_state == NONE || up->p_state == ZOMBIE)
-		return;
-
-	if (empty && !up->p_igintr) {
-		empty = 0;
-		curpid = -1;
-	}
-
-	if (up->p_upid > curpid && (!up->p_igintr || empty)) {
-		curpid = up->p_upid;
-		if (lflag)
-			(void) strlcpy(doing, up->p_args, sizeof (doing));
-		else
-			(void) strlcpy(doing, up->p_comm, sizeof (doing));
-	}
-
-	if (add_times == 1) {
-		jobtime += up->p_time + up->p_ctime;
-		proctime += up->p_time;
-	}
-
-	/* descend for its children */
-	if (up->p_child) {
-		calctotals(up->p_child);
-		for (zp = up->p_child->p_sibling; zp; zp = zp->p_sibling)
-			calctotals(zp);
-	}
-}
-
-/*
- *   Findhash  finds the appropriate entry in the process
- *   hash table (pr_htbl) for the given pid in case that
- *   pid exists on the hash chain. It returns back a pointer
- *   to that uproc structure. If this is a new pid, it allocates
- *   a new node, initializes it, links it into the chain (after
- *   head) and returns a structure pointer.
- */
-static struct uproc *
-findhash(pid_t pid)
-{
-	struct uproc *up, *tp;
-
-	tp = up = &pr_htbl[pid % HSIZE];
-	if (up->p_upid == 0) {			/* empty slot */
-		up->p_upid = pid;
-		up->p_state = NONE;
-		up->p_child = up->p_sibling = up->p_pgrpl = up->p_link = 0;
-		return (up);
-	}
-	if (up->p_upid == pid) {		/* found in hash table */
-		return (up);
-	}
-	for (tp = up->p_link; tp; tp = tp->p_link) {	/* follow chain */
-		if (tp->p_upid == pid)
-			return (tp);
-	}
-	tp = malloc(sizeof (*tp));		/* add new node */
-	if (tp == NULL)
-		err(EXIT_FAILURE, gettext("out of memory!"));
-
-	(void) memset(tp, 0, sizeof (*tp));
-	tp->p_upid = pid;
-	tp->p_state = NONE;
-	tp->p_child = tp->p_sibling = tp->p_pgrpl = 0;
-	tp->p_link = up->p_link;		/* insert after head */
-	up->p_link = tp;
-	return (tp);
 }
 
 #define	HR	(60 * 60)
