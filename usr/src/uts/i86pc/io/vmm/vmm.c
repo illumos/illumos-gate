@@ -39,6 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -203,35 +204,56 @@ struct vm {
 
 static int vmm_initialized;
 
-static struct vmm_ops *ops;
-#define	VMM_INIT(num)	(ops != NULL ? (*ops->init)(num) : 0)
-#define	VMM_CLEANUP()	(ops != NULL ? (*ops->cleanup)() : 0)
-#define	VMM_RESUME()	(ops != NULL ? (*ops->resume)() : 0)
 
-#define	VMINIT(vm, pmap) (ops != NULL ? (*ops->vminit)(vm, pmap): NULL)
+static void
+nullop_panic(void)
+{
+	panic("null vmm operation call");
+}
+
+/* Do not allow use of an un-set `ops` to do anything but panic */
+static struct vmm_ops vmm_ops_null = {
+	.init		= (vmm_init_func_t)nullop_panic,
+	.cleanup	= (vmm_cleanup_func_t)nullop_panic,
+	.resume		= (vmm_resume_func_t)nullop_panic,
+	.vminit		= (vmi_init_func_t)nullop_panic,
+	.vmrun		= (vmi_run_func_t)nullop_panic,
+	.vmcleanup	= (vmi_cleanup_func_t)nullop_panic,
+	.vmgetreg	= (vmi_get_register_t)nullop_panic,
+	.vmsetreg	= (vmi_set_register_t)nullop_panic,
+	.vmgetdesc	= (vmi_get_desc_t)nullop_panic,
+	.vmsetdesc	= (vmi_set_desc_t)nullop_panic,
+	.vmgetcap	= (vmi_get_cap_t)nullop_panic,
+	.vmsetcap	= (vmi_set_cap_t)nullop_panic,
+	.vmspace_alloc	= (vmi_vmspace_alloc)nullop_panic,
+	.vmspace_free	= (vmi_vmspace_free)nullop_panic,
+	.vlapic_init	= (vmi_vlapic_init)nullop_panic,
+	.vlapic_cleanup	= (vmi_vlapic_cleanup)nullop_panic,
+	.vmsavectx	= (vmi_savectx)nullop_panic,
+	.vmrestorectx	= (vmi_restorectx)nullop_panic,
+};
+
+static struct vmm_ops *ops = &vmm_ops_null;
+
+#define	VMM_INIT(num)			((*ops->init)(num))
+#define	VMM_CLEANUP()			((*ops->cleanup)())
+#define	VMM_RESUME()			((*ops->resume)())
+
+#define	VMINIT(vm, pmap)		((*ops->vminit)(vm, pmap))
 #define	VMRUN(vmi, vcpu, rip, pmap, evinfo) \
-	(ops != NULL ? (*ops->vmrun)(vmi, vcpu, rip, pmap, evinfo) : ENXIO)
-#define	VMCLEANUP(vmi)	(ops != NULL ? (*ops->vmcleanup)(vmi) : NULL)
-#define	VMSPACE_ALLOC(min, max) \
-	(ops != NULL ? (*ops->vmspace_alloc)(min, max) : NULL)
-#define	VMSPACE_FREE(vmspace) \
-	(ops != NULL ? (*ops->vmspace_free)(vmspace) : ENXIO)
-#define	VMGETREG(vmi, vcpu, num, retval)		\
-	(ops != NULL ? (*ops->vmgetreg)(vmi, vcpu, num, retval) : ENXIO)
-#define	VMSETREG(vmi, vcpu, num, val)		\
-	(ops != NULL ? (*ops->vmsetreg)(vmi, vcpu, num, val) : ENXIO)
-#define	VMGETDESC(vmi, vcpu, num, desc)		\
-	(ops != NULL ? (*ops->vmgetdesc)(vmi, vcpu, num, desc) : ENXIO)
-#define	VMSETDESC(vmi, vcpu, num, desc)		\
-	(ops != NULL ? (*ops->vmsetdesc)(vmi, vcpu, num, desc) : ENXIO)
-#define	VMGETCAP(vmi, vcpu, num, retval)	\
-	(ops != NULL ? (*ops->vmgetcap)(vmi, vcpu, num, retval) : ENXIO)
-#define	VMSETCAP(vmi, vcpu, num, val)		\
-	(ops != NULL ? (*ops->vmsetcap)(vmi, vcpu, num, val) : ENXIO)
-#define	VLAPIC_INIT(vmi, vcpu)			\
-	(ops != NULL ? (*ops->vlapic_init)(vmi, vcpu) : NULL)
-#define	VLAPIC_CLEANUP(vmi, vlapic)		\
-	(ops != NULL ? (*ops->vlapic_cleanup)(vmi, vlapic) : NULL)
+	((*ops->vmrun)(vmi, vcpu, rip, pmap, evinfo) )
+#define	VMCLEANUP(vmi)			((*ops->vmcleanup)(vmi) )
+#define	VMSPACE_ALLOC(min, max)		((*ops->vmspace_alloc)(min, max))
+#define	VMSPACE_FREE(vmspace)		((*ops->vmspace_free)(vmspace))
+
+#define	VMGETREG(vmi, vcpu, num, rv)	((*ops->vmgetreg)(vmi, vcpu, num, rv))
+#define	VMSETREG(vmi, vcpu, num, val)	((*ops->vmsetreg)(vmi, vcpu, num, val))
+#define	VMGETDESC(vmi, vcpu, num, dsc)	((*ops->vmgetdesc)(vmi, vcpu, num, dsc))
+#define	VMSETDESC(vmi, vcpu, num, dsc)	((*ops->vmsetdesc)(vmi, vcpu, num, dsc))
+#define	VMGETCAP(vmi, vcpu, num, rv)	((*ops->vmgetcap)(vmi, vcpu, num, rv))
+#define	VMSETCAP(vmi, vcpu, num, val)	((*ops->vmsetcap)(vmi, vcpu, num, val))
+#define	VLAPIC_INIT(vmi, vcpu)		((*ops->vlapic_init)(vmi, vcpu))
+#define	VLAPIC_CLEANUP(vmi, vlapic)	((*ops->vlapic_cleanup)(vmi, vlapic))
 
 #define	fpu_start_emulating()	load_cr0(rcr0() | CR0_TS)
 #define	fpu_stop_emulating()	clts()
@@ -380,14 +402,6 @@ vm_exitinfo(struct vm *vm, int cpuid)
 	return (&vcpu->exitinfo);
 }
 
-#ifdef __FreeBSD__
-static void
-vmm_resume(void)
-{
-	VMM_RESUME();
-}
-#endif
-
 static int
 vmm_init(void)
 {
@@ -423,66 +437,12 @@ vmm_init(void)
 	return (VMM_INIT(vmm_ipinum));
 }
 
-#ifdef __FreeBSD__
-
-static int
-vmm_handler(module_t mod, int what, void *arg)
-{
-	int error;
-
-	switch (what) {
-	case MOD_LOAD:
-		vmmdev_init();
-		error = vmm_init();
-		if (error == 0)
-			vmm_initialized = 1;
-		break;
-	case MOD_UNLOAD:
-		error = vmmdev_cleanup();
-		if (error == 0) {
-			vmm_resume_p = NULL;
-			iommu_cleanup();
-#ifdef __FreeBSD__
-			if (vmm_ipinum != IPI_AST)
-				lapic_ipi_free(vmm_ipinum);
-#endif
-			error = VMM_CLEANUP();
-			/*
-			 * Something bad happened - prevent new
-			 * VMs from being created
-			 */
-			if (error)
-				vmm_initialized = 0;
-		}
-		break;
-	default:
-		error = 0;
-		break;
-	}
-	return (error);
-}
-
-static moduledata_t vmm_kmod = {
-	"vmm",
-	vmm_handler,
-	NULL
-};
-
-/*
- * vmm initialization has the following dependencies:
- *
- * - VT-x initialization requires smp_rendezvous() and therefore must happen
- *   after SMP is fully functional (after SI_SUB_SMP).
- */
-DECLARE_MODULE(vmm, vmm_kmod, SI_SUB_SMP + 1, SI_ORDER_ANY);
-MODULE_VERSION(vmm, 1);
-
-#else /* __FreeBSD__ */
-
 int
 vmm_mod_load()
 {
 	int	error;
+
+	VERIFY(vmm_initialized == 0);
 
 	error = vmm_init();
 	if (error == 0)
@@ -496,6 +456,8 @@ vmm_mod_unload()
 {
 	int	error;
 
+	VERIFY(vmm_initialized == 1);
+
 	iommu_cleanup();
 	error = VMM_CLEANUP();
 	if (error)
@@ -504,8 +466,6 @@ vmm_mod_unload()
 
 	return (0);
 }
-
-#endif /* __FreeBSD__ */
 
 static void
 vm_init(struct vm *vm, bool create)
