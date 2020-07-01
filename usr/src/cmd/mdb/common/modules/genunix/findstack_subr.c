@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -130,7 +131,7 @@ crawl(uintptr_t frame, uintptr_t kbase, uintptr_t ktop, uintptr_t ubase,
 typedef struct mdb_findstack_kthread {
 	struct _sobj_ops *t_sobj_ops;
 	uint_t	t_state;
-	ushort_t t_flag;
+	uint_t t_flag;
 	ushort_t t_schedflag;
 	caddr_t	t_stk;
 	caddr_t	t_stkbase;

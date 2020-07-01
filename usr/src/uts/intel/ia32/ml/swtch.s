@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -205,11 +205,16 @@
 	call	savectx			/* call ctx ops */
 .nosavectx:
 
+	/*
+	 * Check that the curthread is not using the FPU while in the kernel.
+	 */
+	call	kernel_fpu_no_swtch
+
         /*
          * Call savepctx if process has installed context ops.
          */
 	movq	T_PROCP(%r13), %r14	/* %r14 = proc */
-        cmpq    $0, P_PCTX(%r14)         /* should current thread savectx? */
+        cmpq    $0, P_PCTX(%r14)         /* should current thread savepctx? */
         je      .nosavepctx              /* skip call when zero */
 
         movq    %r14, %rdi              /* arg = proc pointer */

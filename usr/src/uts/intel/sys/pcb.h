@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef _SYS_PCB_H
@@ -92,9 +92,10 @@ typedef struct pcb {
 #define	PCB_CLEAR_UPDATE_FPU(pcb)	((pcb)->pcb_rupdate &= ~PCB_UPDATE_FPU)
 
 /* fpu_flags */
-#define	FPU_EN		0x1	/* flag signifying fpu in use */
-#define	FPU_VALID	0x2	/* fpu_regs has valid fpu state */
-#define	FPU_MODIFIED	0x4	/* fpu_regs is modified (/proc) */
+#define	FPU_EN		0x01	/* FPU in use (user or kernel) */
+#define	FPU_VALID	0x02	/* fpu_regs has valid fpu state */
+#define	FPU_MODIFIED	0x04	/* fpu_regs is modified (/proc) */
+#define	FPU_KERNEL	0x08	/* Kernel is using the FPU */
 
 #define	FPU_INVALID	0x0	/* fpu context is not in use */
 

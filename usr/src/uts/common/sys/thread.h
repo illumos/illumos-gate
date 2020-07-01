@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef	_SYS_THREAD_H
@@ -122,7 +122,7 @@ typedef struct _kthread {
 	struct cpu *t_bound_cpu; /* cpu bound to, or NULL if not bound */
 	short	t_affinitycnt;	/* nesting level of kernel affinity-setting */
 	short	t_bind_cpu;	/* user-specified CPU binding (-1 if none) */
-	ushort_t t_flag;		/* modified only by current thread */
+	uint_t t_flag;		/* modified only by current thread */
 	ushort_t t_proc_flag;	/* modified holding ttproc(t)->p_lock */
 	ushort_t t_schedflag;	/* modified holding thread_lock(t) */
 	volatile char t_preempt;	/* don't preempt thread if set */
@@ -384,6 +384,7 @@ typedef struct _kthread {
 #define	T_CAPTURING	0x2000	/* thread is in page capture logic */
 #define	T_VFPARENT	0x4000	/* thread is vfork parent, must call vfwait */
 #define	T_DONTDTRACE	0x8000  /* disable DTrace probes */
+#define	T_KFPU		0x10000	/* kernel FPU active */
 
 /*
  * Flags in t_proc_flag.
