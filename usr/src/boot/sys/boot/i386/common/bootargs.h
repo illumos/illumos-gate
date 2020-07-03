@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2012 Andriy Gapon <avg@FreeBSD.org>
  * All rights reserved.
  *
@@ -11,8 +11,6 @@
  * implied warranties, including, without limitation, the implied
  * warranties of merchantability and fitness for a particular
  * purpose.
- *
- * $FreeBSD$
  */
 
 #ifndef _BOOT_I386_ARGS_H_
@@ -43,8 +41,7 @@
 
 #ifndef __ASSEMBLER__
 
-struct bootargs
-{
+struct bootargs {
 	uint32_t			howto;
 	uint32_t			bootdev;
 	uint32_t			bootflags;
@@ -64,6 +61,15 @@ struct bootargs
 	 */
 };
 
-#endif /*__ASSEMBLER__*/
+struct zfs_boot_args {
+	uint32_t		size;
+	uint32_t		reserved;
+	uint64_t		pool;
+	uint64_t		root;
+	uint64_t		primary_pool;
+	uint64_t		primary_vdev;
+};
+
+#endif /* __ASSEMBLER__ */
 
 #endif	/* !_BOOT_I386_ARGS_H_ */
