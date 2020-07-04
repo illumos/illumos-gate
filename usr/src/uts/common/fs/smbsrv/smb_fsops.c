@@ -1571,7 +1571,7 @@ smb_fsop_write(
 		cr = kcr;
 	}
 
-	smb_node_start_crit(snode, RW_WRITER);
+	smb_node_start_crit(snode, RW_READER);
 	rc = nbl_svmand(vp, kcr, &svmand);
 	if (rc) {
 		smb_node_end_crit(snode);
