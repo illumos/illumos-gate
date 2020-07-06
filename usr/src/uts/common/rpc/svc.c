@@ -1026,8 +1026,8 @@ svc_xprt_cleanup(SVCMASTERXPRT *xprt, bool_t detached)
  * table for an entry with a matching RPC program number `prog'
  * and a version range that covers `vers'.
  * - if it finds a matching entry it returns pointer to the dispatch routine
- * - otherwise it returns NULL and, if `minp' or `maxp' are not NULL,
- *   fills them with, respectively, lowest version and highest version
+ * - otherwise it returns NULL and fills both vers_min and vers_max
+ *   with, respectively, lowest version and highest version
  *   supported for the program `prog'
  */
 static SVC_DISPATCH *
