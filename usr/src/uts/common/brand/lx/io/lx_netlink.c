@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -922,6 +923,7 @@ lx_netlink_reply_done(lx_netlink_reply_t *reply)
 		hdr->lxnh_len = sizeof (lx_netlink_err_t);
 		hdr->lxnh_seq = reply->lxnr_hdr.lxnh_seq;
 		hdr->lxnh_pid = lxsock->lxns_port;
+		hdr->lxnh_flags = 0;
 	} else {
 		uint32_t status = 0;
 
