@@ -13,6 +13,7 @@
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -1757,6 +1758,7 @@ alloc_handle_fail:
 static boolean_t
 i40e_alloc_intrs(i40e_t *i40e, dev_info_t *devinfo)
 {
+	i40e_hw_t *hw = &i40e->i40e_hw_space;
 	int intr_types, rc;
 	uint_t max_trqpairs;
 
@@ -1786,7 +1788,7 @@ i40e_alloc_intrs(i40e_t *i40e, dev_info_t *devinfo)
 	if ((intr_types & DDI_INTR_TYPE_MSIX) &&
 	    (i40e->i40e_intr_force <= I40E_INTR_MSIX) &&
 	    (i40e_alloc_intr_handles(i40e, devinfo, DDI_INTR_TYPE_MSIX))) {
-		uint32_t n;
+		uint32_t n, qp_cap, num_trqpairs;
 
 		/*
 		 * While we want the number of queue pairs to match
@@ -1820,9 +1822,25 @@ i40e_alloc_intrs(i40e_t *i40e, dev_info_t *devinfo)
 		 */
 		n = 0x1 << ddi_fls(n);
 		i40e->i40e_num_trqpairs_per_vsi = n;
+
+		/*
+		 * Make sure the number of tx/rx qpairs does not exceed
+		 * the device's capabilities.
+		 */
 		ASSERT3U(i40e->i40e_num_rx_groups, >, 0);
-		i40e->i40e_num_trqpairs = i40e->i40e_num_trqpairs_per_vsi *
+		qp_cap = MIN(hw->func_caps.num_rx_qp, hw->func_caps.num_tx_qp);
+		num_trqpairs = i40e->i40e_num_trqpairs_per_vsi *
 		    i40e->i40e_num_rx_groups;
+		if (num_trqpairs > qp_cap) {
+			i40e->i40e_num_rx_groups = MAX(1, qp_cap /
+			    i40e->i40e_num_trqpairs_per_vsi);
+			num_trqpairs = i40e->i40e_num_trqpairs_per_vsi *
+			    i40e->i40e_num_rx_groups;
+			i40e_log(i40e, "Rx groups restricted to %u",
+			    i40e->i40e_num_rx_groups);
+		}
+		ASSERT3U(num_trqpairs, >, 0);
+		i40e->i40e_num_trqpairs = num_trqpairs;
 		return (B_TRUE);
 	}
 
