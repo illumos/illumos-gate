@@ -1031,6 +1031,8 @@ usr/src/uts/common/io/i40e/core/i40e_adminq.c
 usr/src/uts/common/io/i40e/core/i40e_adminq.h
 usr/src/uts/common/io/i40e/core/i40e_alloc.h
 usr/src/uts/common/io/i40e/core/i40e_common.c
+usr/src/uts/common/io/i40e/core/i40e_dcb.c
+usr/src/uts/common/io/i40e/core/i40e_dcb.h
 usr/src/uts/common/io/i40e/core/i40e_devids.h
 usr/src/uts/common/io/i40e/core/i40e_hmc.c
 usr/src/uts/common/io/i40e/core/i40e_hmc.h
@@ -1041,7 +1043,7 @@ usr/src/uts/common/io/i40e/core/i40e_prototype.h
 usr/src/uts/common/io/i40e/core/i40e_register.h
 usr/src/uts/common/io/i40e/core/i40e_status.h
 usr/src/uts/common/io/i40e/core/i40e_type.h
-usr/src/uts/common/io/i40e/core/i40e_virtchnl.h
+usr/src/uts/common/io/i40e/core/virtchnl.h
 usr/src/uts/common/io/iwn/if_iwn.c
 usr/src/uts/common/io/iwn/if_iwnreg.h
 usr/src/uts/common/io/iwn/if_iwnvar.h
