@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/errno.h>
@@ -941,8 +942,15 @@ ict_tcgets_native(file_t *fp, int cmd, intptr_t arg, int lxcmd)
 
 	error = VOP_IOCTL(fp->f_vnode, cmd, (intptr_t)&s_tios,
 	    FLFAKE(fp), fp->f_cred, &rv, NULL);
+	/*
+	 * systemd calls isatty() on the standard input for a process in order
+	 * to determine if it should call chown() upon it. It expects to
+	 * receive ENOTTY when the input is not a TTY, but the native illumos
+	 * ioctl() call returns ENXIO. Without the following translation,
+	 * systemd services fail with 'Failed to change ownership of terminal'
+	 */
 	if (error)
-		return (set_errno(error));
+		return (set_errno(error == ENXIO ? ENOTTY : error));
 
 	/* Now munge the data to how Linux wants it. */
 	s2l_termios(&s_tios, &l_tios);
