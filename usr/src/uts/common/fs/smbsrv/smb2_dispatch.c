@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2019 RackTop Systems.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 
@@ -973,6 +973,19 @@ cmd_done:
 	 */
 	(void) smb2_encode_header(sr, B_TRUE);
 
+	/*
+	 * Cannot move this into smb2_session_setup() - encoded header required.
+	 */
+	if (session->dialect >= SMB_VERS_3_11 &&
+	    sr->smb2_cmd_code == SMB2_SESSION_SETUP &&
+	    sr->smb2_status == NT_STATUS_MORE_PROCESSING_REQUIRED) {
+		if (smb31_preauth_sha512_calc(sr, &sr->reply,
+		    sr->uid_user->u_preauth_hashval,
+		    sr->uid_user->u_preauth_hashval) != 0)
+			cmn_err(CE_WARN, "(3) Preauth hash calculation "
+			    "failed");
+	}
+
 	/* Don't sign if we're going to encrypt */
 	if (sr->tform_ssn == NULL &&
 	    (sr->smb2_hdr_flags & SMB2_FLAGS_SIGNED) != 0)
@@ -1109,8 +1122,8 @@ cmd_start:
 		disconnect = B_TRUE;
 		goto cleanup;
 	}
-	sr->smb2_hdr_flags |=  (SMB2_FLAGS_SERVER_TO_REDIR |
-				SMB2_FLAGS_ASYNC_COMMAND);
+	sr->smb2_hdr_flags |= (SMB2_FLAGS_SERVER_TO_REDIR |
+	    SMB2_FLAGS_ASYNC_COMMAND);
 	sr->smb2_async_id = SMB2_ASYNCID(sr);
 
 	/*
@@ -1587,6 +1600,66 @@ smb2sr_put_error_data(smb_request_t *sr, uint32_t status, mbuf_chain_t *mbc)
 		    0,	/* reserved */		/* w */
 		    0);				/* l. */
 	}
+}
+
+/*
+ * Build an SMB2 error context response (dialect 3.1.1).
+ */
+void
+smb2sr_put_error_ctx(smb_request_t *sr, uint32_t status, uint32_t errid,
+    mbuf_chain_t *mbc)
+{
+	DWORD len;
+
+	/*
+	 * The common dispatch code writes this when it
+	 * updates the SMB2 header before sending.
+	 */
+	sr->smb2_status = status;
+
+	/* Rewind to the end of the SMB header. */
+	sr->reply.chain_offset = sr->smb2_reply_hdr + SMB2_HDR_SIZE;
+
+	/*
+	 *  Error Context is 8-byte header plus encaps. data (ErrorContextData),
+	 *  which can be zero-length.
+	 */
+	if (mbc != NULL && (len = MBC_LENGTH(mbc)) != 0) {
+		(void) smb_mbc_encodef(
+		    &sr->reply,
+		    "wbblllC",
+		    9,		/* StructSize */	/* w */
+		    1,		/* ErrorContextCount */	/* b */
+		    0,		/* reserved */		/* b */
+		    8+len,	/* ByteCount */		/* l */
+		    len,	/* ErrorDataLength */	/* l */
+		    errid,	/* ErrorId */		/* l */
+		    mbc);				/* C */
+	} else {
+		(void) smb_mbc_encodef(
+		    &sr->reply,
+		    "wbblll",
+		    9,		/* StructSize */	/* w */
+		    1,		/* ErrorContextCount */	/* b */
+		    0,		/* reserved */		/* b */
+		    8,		/* ByteCount */		/* l */
+		    0,		/* ErrorDataLength */	/* l */
+		    errid);	/* ErrorId */		/* l */
+	}
+}
+
+/*
+ * Build an SMB2 error context response with SMB2_ERROR_ID_DEFAULT ErrorId.
+ *
+ * This only handles the case we currently need, encapsulating a
+ * single error data section inside an SMB2_ERROR_ID_DEFAULT
+ * error context type (which is type zero, and that's what
+ * the zero on the end of this function name refers to).
+ */
+void
+smb2sr_put_error_ctx0(smb_request_t *sr, uint32_t status, mbuf_chain_t *mbc)
+{
+	return (smb2sr_put_error_ctx(sr, status, SMB2_ERROR_ID_DEFAULT, mbc));
 }
 
 /*

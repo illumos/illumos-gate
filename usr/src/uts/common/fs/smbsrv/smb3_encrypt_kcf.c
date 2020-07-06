@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -28,36 +29,63 @@
 #include <sys/cmn_err.h>
 
 /*
+ * Common function to see if a mech is available.
+ */
+static int
+find_mech(smb_crypto_mech_t *mech, crypto_mech_name_t name)
+{
+	crypto_mech_type_t t;
+
+	t = crypto_mech2id(name);
+	if (t == CRYPTO_MECH_INVALID) {
+		cmn_err(CE_NOTE, "smb: no kcf mech: %s", name);
+		return (-1);
+	}
+	mech->cm_type = t;
+	return (0);
+}
+
+/*
  * SMB3 encryption helpers:
  * (getmech, init, update, final)
  */
 
 int
-smb3_encrypt_getmech(smb_crypto_mech_t *mech)
+smb3_aes_ccm_getmech(smb_crypto_mech_t *mech)
 {
-	crypto_mech_type_t t;
+	return (find_mech(mech, SUN_CKM_AES_CCM));
+}
 
-	t = crypto_mech2id(SUN_CKM_AES_CCM);
-	if (t == CRYPTO_MECH_INVALID) {
-		cmn_err(CE_NOTE, "smb: no kcf mech: %s", SUN_CKM_AES_CCM);
-		return (-1);
-	}
-	mech->cm_type = t;
-
-	return (0);
+int
+smb3_aes_gcm_getmech(smb_crypto_mech_t *mech)
+{
+	return (find_mech(mech, SUN_CKM_AES_GCM));
 }
 
 void
-smb3_crypto_init_param(smb3_crypto_param_t *param,
+smb3_crypto_init_ccm_param(smb3_crypto_param_t *param,
     uint8_t *nonce, size_t noncesize, uint8_t *auth, size_t authsize,
     size_t datasize)
 {
-	param->ulMACSize = SMB2_SIG_SIZE;
-	param->ulNonceSize = noncesize;
-	param->nonce = nonce;
-	param->ulDataSize = datasize;
-	param->ulAuthDataSize = authsize;
-	param->authData = auth;
+	param->ccm.ulMACSize = SMB2_SIG_SIZE;
+	param->ccm.ulNonceSize = noncesize;
+	param->ccm.nonce = nonce;
+	param->ccm.ulDataSize = datasize;
+	param->ccm.ulAuthDataSize = authsize;
+	param->ccm.authData = auth;
+}
+
+void
+smb3_crypto_init_gcm_param(smb3_crypto_param_t *param,
+    uint8_t *nonce, size_t noncesize, uint8_t *auth, size_t authsize)
+{
+	ASSERT3U(noncesize, ==, 12);
+	param->gcm.pIv = nonce;
+	param->gcm.ulIvLen = noncesize;		/* should be 12 bytes */
+	/* tform hdr size - (protcolo id + signing) == 32 bytes */
+	param->gcm.ulTagBits = SMB2_SIG_SIZE << 3; /* convert bytes to bits */
+	param->gcm.pAAD = auth;			/* auth data */
+	param->gcm.ulAADLen = authsize;		/* auth data len */
 }
 
 /*
@@ -199,7 +227,22 @@ smb3_encrypt_final(smb3_enc_ctx_t *ctxp, uint8_t *digest16)
 		return (-1);
 	}
 
-	outlen = out.cd_offset - SMB2_SIG_SIZE;
+	/*
+	 * For some reason AES module processes ccm_encrypt_final and
+	 * gcm_encrypt_final differently.
+	 * For GCM it restores original offset (which is 0) and updates
+	 * cd_length to size of residual data + mac len.
+	 * For CCM it does nothing, what means offset is updated and cd_length
+	 * is decreased by size of residual data + mac len.
+	 */
+	if (out.cd_offset == 0) {
+		/* GCM */
+		outlen = out.cd_length - SMB2_SIG_SIZE;
+	} else {
+		/* CCM */
+		outlen = out.cd_offset - SMB2_SIG_SIZE;
+	}
+
 	if (outlen > 0)
 		bcopy(buf, ctxp->output.cd_raw.iov_base +
 		    ctxp->output.cd_offset, outlen);

@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -24,23 +25,8 @@
 
 #define	SMB3_NONCE_OFFS		20
 #define	SMB3_SIG_OFFS		4
-#define	SMB3_NONCE_SIZE		11 /* 12 for gcm later */
-
-/*
- * Inputs to KDF for EncryptionKey and DecryptionKey.
- * See comment for smb3_do_kdf for content.
- */
-static uint8_t encrypt_kdf_input[30] = {
-	0, 0, 0, 1, 'S', 'M', 'B', '2',
-	'A', 'E', 'S', 'C', 'C', 'M', 0, 0,
-	'S', 'e', 'r', 'v', 'e', 'r', 'O',
-	'u', 't', 0, 0, 0, 0, 0x80 };
-
-static uint8_t decrypt_kdf_input[30] = {
-	0, 0, 0, 1, 'S', 'M', 'B', '2',
-	'A', 'E', 'S', 'C', 'C', 'M', 0, 0,
-	'S', 'e', 'r', 'v', 'e', 'r', 'I',
-	'n', ' ', 0, 0, 0, 0, 0x80 };
+#define	SMB3_AES128_CCM_NONCE_SIZE	11
+#define	SMB3_AES128_GCM_NONCE_SIZE	12
 
 /*
  * Arbitrary value used to prevent nonce reuse via overflow. Currently
@@ -100,8 +86,23 @@ smb3_encrypt_init_mech(smb_session_t *s)
 	if (s->enc_mech != NULL)
 		return (0);
 
+	if (s->dialect < SMB_VERS_3_11)
+		s->smb31_enc_cipherid = SMB3_CIPHER_AES128_CCM;
+
 	mech = kmem_zalloc(sizeof (*mech), KM_SLEEP);
-	rc = smb3_encrypt_getmech(mech);
+
+	switch (s->smb31_enc_cipherid) {
+	case SMB3_CIPHER_AES128_GCM:
+		rc = smb3_aes_gcm_getmech(mech);
+		break;
+	case SMB3_CIPHER_AES128_CCM:
+		rc = smb3_aes_ccm_getmech(mech);
+		break;
+	default:
+		rc = -1;
+		break;
+	}
+
 	if (rc != 0) {
 		kmem_free(mech, sizeof (*mech));
 		return (rc);
@@ -150,15 +151,31 @@ smb3_encrypt_begin(smb_request_t *sr, smb_token_t *token)
 	 * For SMB3, the encrypt/decrypt keys are derived from
 	 * the session key using KDF in counter mode.
 	 */
-	if (smb3_do_kdf(enc_key->key, encrypt_kdf_input,
-	    sizeof (encrypt_kdf_input), token->tkn_ssnkey.val,
-	    token->tkn_ssnkey.len) != 0)
-		return;
+	if (s->dialect >= SMB_VERS_3_11) {
+		if (smb3_kdf(enc_key->key,
+		    token->tkn_ssnkey.val, token->tkn_ssnkey.len,
+		    (uint8_t *)"SMBS2CCipherKey", 16,
+		    u->u_preauth_hashval, SHA512_DIGEST_LENGTH) != 0)
+			return;
 
-	if (smb3_do_kdf(dec_key->key, decrypt_kdf_input,
-	    sizeof (decrypt_kdf_input), token->tkn_ssnkey.val,
-	    token->tkn_ssnkey.len) != 0)
-		return;
+		if (smb3_kdf(dec_key->key,
+		    token->tkn_ssnkey.val, token->tkn_ssnkey.len,
+		    (uint8_t *)"SMBC2SCipherKey", 16,
+		    u->u_preauth_hashval, SHA512_DIGEST_LENGTH) != 0)
+			return;
+	} else {
+		if (smb3_kdf(enc_key->key,
+		    token->tkn_ssnkey.val, token->tkn_ssnkey.len,
+		    (uint8_t *)"SMB2AESCCM", 11,
+		    (uint8_t *)"ServerOut", 10) != 0)
+			return;
+
+		if (smb3_kdf(dec_key->key,
+		    token->tkn_ssnkey.val, token->tkn_ssnkey.len,
+		    (uint8_t *)"SMB2AESCCM", 11,
+		    (uint8_t *)"ServerIn ", 10) != 0)
+			return;
+	}
 
 	smb3_encrypt_init_nonce(u);
 
@@ -184,6 +201,10 @@ smb3_decrypt_sr(smb_request_t *sr)
 	int offset, resid, tlen, rc;
 	smb3_crypto_param_t param;
 	smb_crypto_mech_t mech;
+	boolean_t gcm = sr->session->smb31_enc_cipherid ==
+	    SMB3_CIPHER_AES128_GCM;
+	size_t nonce_size = (gcm ? SMB3_AES128_GCM_NONCE_SIZE :
+	    SMB3_AES128_CCM_NONCE_SIZE);
 
 	ASSERT(u != NULL);
 	if (s->enc_mech == NULL || dec_key->len != 16) {
@@ -210,8 +231,12 @@ smb3_decrypt_sr(smb_request_t *sr)
 	 * The transform header, minus the PROTOCOL_ID and the
 	 * SIGNATURE, is authenticated but not encrypted.
 	 */
-	smb3_crypto_init_param(&param, sr->nonce, SMB3_NONCE_SIZE,
-	    tmp_hdr, tlen, sr->msgsize + SMB2_SIG_SIZE);
+	if (gcm)
+		smb3_crypto_init_gcm_param(&param, sr->nonce, nonce_size,
+		    tmp_hdr, tlen);
+	else
+		smb3_crypto_init_ccm_param(&param, sr->nonce, nonce_size,
+		    tmp_hdr, tlen, sr->msgsize + SMB2_SIG_SIZE);
 
 	/*
 	 * Unlike signing, which uses one global mech struct,
@@ -317,13 +342,17 @@ smb3_encrypt_sr(smb_request_t *sr, struct mbuf_chain *in_mbc,
 	int resid, tlen, rc;
 	smb3_crypto_param_t param;
 	smb_crypto_mech_t mech;
+	boolean_t gcm = sr->session->smb31_enc_cipherid ==
+	    SMB3_CIPHER_AES128_GCM;
+	size_t nonce_size = (gcm ? SMB3_AES128_GCM_NONCE_SIZE :
+	    SMB3_AES128_CCM_NONCE_SIZE);
 
 	ASSERT(u != NULL);
 	if (s->enc_mech == NULL || enc_key->len != 16) {
 		return (-1);
 	}
 
-	rc = smb3_encrypt_gen_nonce(u, sr->nonce, SMB3_NONCE_SIZE);
+	rc = smb3_encrypt_gen_nonce(u, sr->nonce, nonce_size);
 
 	if (rc != 0) {
 		cmn_err(CE_WARN, "ran out of nonces");
@@ -331,7 +360,7 @@ smb3_encrypt_sr(smb_request_t *sr, struct mbuf_chain *in_mbc,
 	}
 
 	(void) smb_mbc_poke(out_mbc, SMB3_NONCE_OFFS, "#c",
-	    SMB3_NONCE_SIZE, sr->nonce);
+	    nonce_size, sr->nonce);
 
 	resid = in_mbc->max_bytes;
 
@@ -339,10 +368,14 @@ smb3_encrypt_sr(smb_request_t *sr, struct mbuf_chain *in_mbc,
 	 * The transform header, minus the PROTOCOL_ID and the
 	 * SIGNATURE, is authenticated but not encrypted.
 	 */
-	smb3_crypto_init_param(&param,
-	    sr->nonce, SMB3_NONCE_SIZE,
-	    buf + SMB3_NONCE_OFFS, SMB3_TFORM_HDR_SIZE - SMB3_NONCE_OFFS,
-	    resid);
+	if (gcm)
+		smb3_crypto_init_gcm_param(&param, sr->nonce, nonce_size,
+		    buf + SMB3_NONCE_OFFS,
+		    SMB3_TFORM_HDR_SIZE - SMB3_NONCE_OFFS);
+	else
+		smb3_crypto_init_ccm_param(&param, sr->nonce, nonce_size,
+		    buf + SMB3_NONCE_OFFS,
+		    SMB3_TFORM_HDR_SIZE - SMB3_NONCE_OFFS, resid);
 
 	/*
 	 * Unlike signing, which uses one global mech struct,

@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -33,7 +34,15 @@
 
 /* ARGSUSED */
 int
-smb3_encrypt_getmech(smb_crypto_mech_t *mech)
+smb3_aes_ccm_getmech(smb_crypto_mech_t *mech)
+{
+	cmn_err(CE_NOTE, "fksmbsrv does not support SMB3 Encryption");
+	return (-1);
+}
+
+/* ARGSUSED */
+int
+smb3_aes_gcm_getmech(smb_crypto_mech_t *mech)
 {
 	cmn_err(CE_NOTE, "fksmbsrv does not support SMB3 Encryption");
 	return (-1);
@@ -41,9 +50,16 @@ smb3_encrypt_getmech(smb_crypto_mech_t *mech)
 
 /* ARGSUSED */
 void
-smb3_crypto_init_param(smb3_crypto_param_t *param,
+smb3_crypto_init_ccm_param(smb3_crypto_param_t *param,
     uint8_t *nonce, size_t noncesize, uint8_t *auth, size_t authsize,
     size_t datasize)
+{
+}
+
+/* ARGSUSED */
+void
+smb3_crypto_init_gcm_param(smb3_crypto_param_t *param,
+    uint8_t *nonce, size_t noncesize, uint8_t *auth, size_t authsize)
 {
 }
 

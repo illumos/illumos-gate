@@ -14,6 +14,10 @@
  */
 
 /*
+ * Copyright 2020 RackTop Systems, Inc.
+ */
+
+/*
  * Dispatch function for SMB2_QUERY_INFO
  */
 
@@ -107,16 +111,42 @@ errout:
 		/* Not really an error, per se.  Advisory. */
 		break;
 
-	case NT_STATUS_BUFFER_TOO_SMALL:
-	case NT_STATUS_INFO_LENGTH_MISMATCH:
+	case NT_STATUS_BUFFER_TOO_SMALL:	/* only in smb2_qinfo_sec.c */
 		/*
-		 * These are special, per. [MS-SMB2] 3.2.5.17
-		 * The error data is a 4-byte count of the size
-		 * required to successfully query the data.
-		 * That error data is built by the functions
-		 * that returns one of these errors.
+		 * [MS-SMB2] 3.3.5.20.3
+		 * Handling SMB2_0_INFO_SECURITY
+		 *  If dialect 3.1.1 must return 4-byte value
+		 *  containing required buffer size.
+		 *  ByteCount==12, ErrorContextCount==1,
+		 *  ErrorData: ErrorDataLength==4,ErrorId==0
+		 *  ErrorContextData==<buffer size>
+		 *  Otherwise ByteCount==4
+		 *
+		 * When returning with data, 3.1.1 encapsulate.
 		 */
-		smb2sr_put_error_data(sr, status, &sr->raw_data);
+		if (sr->session->dialect < SMB_VERS_3_11) {
+			smb2sr_put_error_data(sr, status, &sr->raw_data);
+		} else {
+			smb2sr_put_error_ctx0(sr, status, &sr->raw_data);
+		}
+		return (SDRC_SUCCESS);
+
+	case NT_STATUS_INFO_LENGTH_MISMATCH: /* there is no in smb2_qinfo_*.c */
+		/*
+		 * [MS-SMB2] 3.3.5.20.1
+		 * SMB 3.1.1 Handling SMB2_0_INFO_FILE
+		 * [MS-SMB2] 3.3.5.20.2
+		 * SMB 3.1.1 Handling SMB2_0_INFO_FILESYSTEM
+		 *
+		 *  ByteCount==8, ErrorContextCount==1,
+		 *  ErrorData: ErrorDataLength==0,ErrorId==0
+		 *  Otherwise ByteCount==0
+		 */
+		if (sr->session->dialect < SMB_VERS_3_11) {
+			smb2sr_put_error_data(sr, status, NULL);
+		} else {
+			smb2sr_put_error_ctx0(sr, status, NULL);
+		}
 		return (SDRC_SUCCESS);
 
 	default:

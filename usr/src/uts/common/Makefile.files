@@ -28,6 +28,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2016 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+# Copyright 2020 RackTop Systems, Inc.
 #
 
 #
@@ -1244,7 +1245,9 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb2_write.o \
 		\
 		smb3_encrypt.o \
-		smb3_encrypt_kcf.o
+		smb3_encrypt_kcf.o \
+		smb3_kdf.o \
+		smb31_preauth.o
 
 PCFS_OBJS +=	pc_alloc.o	pc_dir.o	pc_node.o	pc_subr.o \
 		pc_vfsops.o	pc_vnops.o
