@@ -27,7 +27,7 @@
 
 include		../../Makefile.lib
 
-$(INTEL_BLD)SUBDIRS =	$(MACH) $(BUILD64) $(MACH64)
+SUBDIRS =	$(MACH) $(BUILD64) $(MACH64)
 
 all :=		TARGET= all
 clean :=	TARGET= clean

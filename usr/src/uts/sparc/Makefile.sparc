@@ -290,13 +290,32 @@ DRV_KMODS	+= bge dmfe eri fas hme qfe
 DRV_KMODS	+= openeepr options sd ses st
 DRV_KMODS	+= ssd
 DRV_KMODS	+= ecpp
-DRV_KMODS	+= hid hubd ehci ohci uhci usb_mid usb_ia scsa2usb usbprn ugen
-DRV_KMODS	+= usbser usbsacm usbsksp usbsprl
-DRV_KMODS	+= usb_as usb_ac
+
+#
+#	USB specific modules
+#
+DRV_KMODS	+= ccid
+DRV_KMODS	+= hid
+DRV_KMODS	+= hubd
+DRV_KMODS	+= ehci
+DRV_KMODS	+= ohci
+DRV_KMODS	+= uhci
+DRV_KMODS	+= usb_mid
+DRV_KMODS	+= usb_ia
+DRV_KMODS	+= scsa2usb
+DRV_KMODS	+= usbprn
+DRV_KMODS	+= ugen
+DRV_KMODS	+= usbser
+DRV_KMODS	+= usbsacm
+DRV_KMODS	+= usbsksp
+DRV_KMODS	+= usbsprl
+DRV_KMODS	+= usb_as
+DRV_KMODS	+= usb_ac
 DRV_KMODS	+= usbskel
 DRV_KMODS	+= usbvc
 DRV_KMODS	+= usbftdi
 DRV_KMODS	+= usbecm
+
 DRV_KMODS	+= hci1394 av1394 scsa1394 dcam1394
 DRV_KMODS	+= sbp2
 DRV_KMODS	+= ib ibp eibnx eoib rdsib sdp iser daplt hermon tavor sol_ucma sol_uverbs

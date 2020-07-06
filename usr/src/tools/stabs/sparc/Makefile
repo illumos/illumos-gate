@@ -47,9 +47,9 @@ include ../../Makefile.tools
 
 FILEMODE        = 555
 
-CFLAGS		+= $(CCVERBOSE)
-
 INC_PATH	= -I$(STABS_SRC)
+# GCC false positive in stabs.c
+CERRWARN	+= -_gcc=-Wno-clobbered
 
 LDLIBS		+= -lm
 NATIVE_LIBS	+= libm.so

@@ -261,9 +261,8 @@ lookup(int h)
 static char *
 whitesp(char *cp)
 {
-	char *orig, c;
+	char c;
 
-	orig = cp;
 	for (c = *cp++; isspace(c); c = *cp++)
 		;
 	--cp;
