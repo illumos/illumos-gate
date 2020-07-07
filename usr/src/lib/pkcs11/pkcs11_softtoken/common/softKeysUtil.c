@@ -21,7 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2018, Joyent, Inc.
+ *
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <pthread.h>
@@ -61,11 +62,10 @@ soft_pkcs12_pbe(soft_session_t *, CK_MECHANISM_PTR, soft_object_t *);
  */
 CK_RV
 soft_gen_keyobject(CK_ATTRIBUTE_PTR pTemplate,  CK_ULONG ulCount,
-    CK_ULONG *objecthandle_p, soft_session_t *sp,
+    soft_object_t **objp, soft_session_t *sp,
     CK_OBJECT_CLASS class, CK_KEY_TYPE key_type, CK_ULONG keylen, CK_ULONG mode,
     boolean_t internal)
 {
-
 	CK_RV rv;
 	soft_object_t *new_objp = NULL;
 
@@ -109,24 +109,22 @@ soft_gen_keyobject(CK_ATTRIBUTE_PTR pTemplate,  CK_ULONG ulCount,
 	/* Write the new token object to the keystore */
 	if (IS_TOKEN_OBJECT(new_objp)) {
 		new_objp->version = 1;
-		new_objp->session_handle = (CK_SESSION_HANDLE)NULL;
+		new_objp->session_handle = CK_INVALID_HANDLE;
 		soft_add_token_object_to_slot(new_objp);
-		/*
-		 * Type casting the address of an object struct to
-		 * an object handle.
-		 */
-		*objecthandle_p = (CK_ULONG)new_objp;
+
+		set_objecthandle(new_objp);
+		*objp = new_objp;
 
 		return (CKR_OK);
 	}
 
-	new_objp->session_handle = (CK_SESSION_HANDLE)sp;
+	new_objp->session_handle = sp->handle;
 
 	/* Add the new object to the session's object list. */
 	soft_add_object_to_session(new_objp, sp);
 
-	/* Type casting the address of an object struct to an object handle. */
-	*objecthandle_p =  (CK_ULONG)new_objp;
+	set_objecthandle(new_objp);
+	*objp = new_objp;
 
 	return (CKR_OK);
 
@@ -258,15 +256,12 @@ soft_genkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	}
 
 	/* Create a new object for secret key. */
-	rv = soft_gen_keyobject(pTemplate, ulCount, phKey, session_p,
+	rv = soft_gen_keyobject(pTemplate, ulCount, &secret_key, session_p,
 	    CKO_SECRET_KEY, key_type, keylen, SOFT_GEN_KEY, B_FALSE);
 
 	if (rv != CKR_OK) {
 		return (rv);
 	}
-
-	/* Obtain the secret object pointer. */
-	secret_key = (soft_object_t *)*phKey;
 
 	switch (pMechanism->mechanism) {
 	case CKM_DES_KEY_GEN:
@@ -410,6 +405,7 @@ soft_genkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 			soft_delete_token_object(secret_key, B_FALSE, B_FALSE);
 	}
 
+	*phKey = secret_key->handle;
 	return (rv);
 }
 
@@ -448,19 +444,16 @@ soft_genkey_pair(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 
 	/* Create a new object for public key. */
 	rv = soft_gen_keyobject(pPublicKeyTemplate, ulPublicAttrCount,
-	    phPublicKey, session_p, CKO_PUBLIC_KEY, key_type, 0,
+	    &public_key, session_p, CKO_PUBLIC_KEY, key_type, 0,
 	    SOFT_GEN_KEY, B_FALSE);
 
 	if (rv != CKR_OK) {
 		return (rv);
 	}
 
-	/* Obtain the public object pointer. */
-	public_key = (soft_object_t *)*phPublicKey;
-
 	/* Create a new object for private key. */
 	rv = soft_gen_keyobject(pPrivateKeyTemplate, ulPrivateAttrCount,
-	    phPrivateKey, session_p, CKO_PRIVATE_KEY, key_type, 0,
+	    &private_key, session_p, CKO_PRIVATE_KEY, key_type, 0,
 	    SOFT_GEN_KEY, B_FALSE);
 
 	if (rv != CKR_OK) {
@@ -474,9 +467,6 @@ soft_genkey_pair(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 			    B_FALSE, B_FALSE);
 		return (rv);
 	}
-
-	/* Obtain the private object pointer. */
-	private_key = (soft_object_t *)*phPrivateKey;
 
 	/*
 	 * At this point, both public key and private key objects
@@ -541,6 +531,9 @@ soft_genkey_pair(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 			soft_delete_token_object(private_key, B_FALSE, B_FALSE);
 		}
 	}
+
+	*phPublicKey = public_key->handle;
+	*phPrivateKey = private_key->handle;
 
 	return (rv);
 }
@@ -851,15 +844,12 @@ soft_derivekey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		 * be provided in the template.
 		 */
 		rv = soft_gen_keyobject(pTemplate, ulAttributeCount,
-		    phKey, session_p, CKO_SECRET_KEY, (CK_KEY_TYPE)~0UL, 0,
-		    SOFT_DERIVE_KEY_DH, B_FALSE);
+		    &secret_key, session_p, CKO_SECRET_KEY, (CK_KEY_TYPE)~0UL,
+		    0, SOFT_DERIVE_KEY_DH, B_FALSE);
 
 		if (rv != CKR_OK) {
 			return (rv);
 		}
-
-		/* Obtain the secret object pointer. */
-		secret_key = (soft_object_t *)*phKey;
 
 		rv = soft_dh_key_derive(basekey_p, secret_key,
 		    (CK_BYTE *)pMechanism->pParameter,
@@ -883,15 +873,12 @@ soft_derivekey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		 * be provided in the template.
 		 */
 		rv = soft_gen_keyobject(pTemplate, ulAttributeCount,
-		    phKey, session_p, CKO_SECRET_KEY, (CK_KEY_TYPE)~0UL, 0,
-		    SOFT_DERIVE_KEY_DH, B_FALSE);
+		    &secret_key, session_p, CKO_SECRET_KEY, (CK_KEY_TYPE)~0UL,
+		    0, SOFT_DERIVE_KEY_DH, B_FALSE);
 
 		if (rv != CKR_OK) {
 			return (rv);
 		}
-
-		/* Obtain the secret object pointer. */
-		secret_key = (soft_object_t *)*phKey;
 
 		rv = soft_ec_key_derive(basekey_p, secret_key,
 		    (CK_BYTE *)pMechanism->pParameter,
@@ -951,7 +938,7 @@ common:
 		 * the template, the default is CKK_GENERIC_SECRET.
 		 */
 		rv = soft_gen_keyobject(pTemplate, ulAttributeCount,
-		    phKey, session_p, CKO_SECRET_KEY,
+		    &secret_key, session_p, CKO_SECRET_KEY,
 		    (CK_KEY_TYPE)CKK_GENERIC_SECRET, 0,
 		    SOFT_DERIVE_KEY_OTHER, B_FALSE);
 
@@ -959,8 +946,7 @@ common:
 			return (rv);
 		}
 
-		/* Obtain the secret object pointer. */
-		secret_key = (soft_object_t *)*phKey;
+		*phKey = secret_key->handle;
 
 		/* Validate the key type and key length */
 		rv = soft_key_derive_check_length(secret_key, hash_size);
@@ -1249,6 +1235,8 @@ soft_create_hmac_key(soft_session_t *session_p,  CK_BYTE *passwd,
 	CK_KEY_TYPE keytype = CKK_GENERIC_SECRET;
 	CK_BBOOL True = TRUE;
 	CK_ATTRIBUTE keytemplate[4];
+	soft_object_t *keyobj;
+
 	/*
 	 * We must initialize each template member individually
 	 * because at the time of initial coding for ON10, the
@@ -1277,9 +1265,12 @@ soft_create_hmac_key(soft_session_t *session_p,  CK_BYTE *passwd,
 	 * mechanism parameter structure.
 	 */
 	rv = soft_gen_keyobject(keytemplate,
-	    sizeof (keytemplate)/sizeof (CK_ATTRIBUTE), phKey, session_p,
+	    sizeof (keytemplate)/sizeof (CK_ATTRIBUTE), &keyobj, session_p,
 	    CKO_SECRET_KEY, (CK_KEY_TYPE)CKK_GENERIC_SECRET, 0,
 	    SOFT_CREATE_OBJ, B_TRUE);
+
+	if (keyobj != NULL)
+		*phKey = keyobj->handle;
 
 	return (rv);
 }
@@ -1675,7 +1666,7 @@ soft_unwrapkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 
 	/* Create a new object based on the attribute template. */
 	rv = soft_gen_keyobject(pTemplate, ulAttributeCount,
-	    (CK_ULONG *)&new_objp, session_p, (CK_OBJECT_CLASS)~0UL,
+	    &new_objp, session_p, (CK_OBJECT_CLASS)~0UL,
 	    (CK_KEY_TYPE)~0UL, 0, SOFT_UNWRAP_KEY, B_FALSE);
 	if (rv != CKR_OK)
 		return (rv);

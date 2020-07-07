@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <md5.h>
@@ -95,7 +97,6 @@ soft_delete_all_sessions(boolean_t force)
 
 }
 
-
 /*
  * Create a new session struct, and add it to the session linked list.
  *
@@ -104,9 +105,8 @@ soft_delete_all_sessions(boolean_t force)
  */
 CK_RV
 soft_add_session(CK_FLAGS flags, CK_VOID_PTR pApplication,
-	CK_NOTIFY notify, CK_ULONG *sessionhandle_p)
+    CK_NOTIFY notify, CK_ULONG *sessionhandle_p)
 {
-
 	soft_session_t *new_sp = NULL;
 
 	/* Allocate a new session struct */
@@ -152,6 +152,16 @@ soft_add_session(CK_FLAGS flags, CK_VOID_PTR pApplication,
 	/* Acquire the global session list lock */
 	(void) pthread_mutex_lock(&soft_sessionlist_mutex);
 
+	/* Generate a unique session handle. */
+	do {
+		arc4random_buf(&new_sp->handle, sizeof (new_sp->handle));
+		if (new_sp->handle == CK_INVALID_HANDLE)
+			continue;
+	} while (avl_find(&soft_session_tree, new_sp, NULL) != NULL);
+
+	avl_add(&soft_session_tree, new_sp);
+	*sessionhandle_p = new_sp->handle;
+
 	/* Insert the new session in front of session list */
 	if (soft_session_list == NULL) {
 		soft_session_list = new_sp;
@@ -164,8 +174,6 @@ soft_add_session(CK_FLAGS flags, CK_VOID_PTR pApplication,
 		soft_session_list = new_sp;
 	}
 
-	/* Type casting the address of a session struct to a session handle */
-	*sessionhandle_p =  (CK_ULONG)new_sp;
 	++soft_session_cnt;
 	if (flags & CKF_RW_SESSION)
 		++soft_session_rw_cnt;
@@ -276,6 +284,8 @@ soft_delete_session(soft_session_t *session_p,
 		}
 	}
 
+	avl_remove(&soft_session_tree, session_p);
+
 	--soft_session_cnt;
 	if (session_p->flags & CKF_RW_SESSION)
 		--soft_session_rw_cnt;
@@ -379,7 +389,7 @@ soft_delete_session(soft_session_t *session_p,
 		free(fcontext);
 	}
 
-	/* Reset SESSION_IS_CLOSIN flag. */
+	/* Reset SESSION_IS_CLOSING flag. */
 	session_p->ses_close_sync &= ~SESSION_IS_CLOSING;
 
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
@@ -410,7 +420,8 @@ CK_RV
 handle2session(CK_SESSION_HANDLE hSession, soft_session_t **session_p)
 {
 
-	soft_session_t *sp = (soft_session_t *)(hSession);
+	soft_session_t *sp;
+	soft_session_t node;
 
 	/*
 	 * No need to hold soft_sessionlist_mutex as we are
@@ -420,11 +431,19 @@ handle2session(CK_SESSION_HANDLE hSession, soft_session_t **session_p)
 		return (CKR_SESSION_CLOSED);
 	}
 
+	(void) memset(&node, 0, sizeof (node));
+	node.handle = hSession;
+
+	(void) pthread_mutex_lock(&soft_sessionlist_mutex);
+
+	sp = avl_find(&soft_session_tree, &node, NULL);
 	if ((sp == NULL) ||
 	    (sp->magic_marker != SOFTTOKEN_SESSION_MAGIC)) {
+		(void) pthread_mutex_unlock(&soft_sessionlist_mutex);
 		return (CKR_SESSION_HANDLE_INVALID);
 	}
 	(void) pthread_mutex_lock(&sp->session_mutex);
+	(void) pthread_mutex_unlock(&soft_sessionlist_mutex);
 
 	if (sp->ses_close_sync & SESSION_IS_CLOSING) {
 		(void) pthread_mutex_unlock(&sp->session_mutex);

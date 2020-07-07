@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef _SOFTSESSION_H
@@ -32,7 +34,7 @@ extern "C" {
 
 #include <pthread.h>
 #include <security/pkcs11t.h>
-
+#include <sys/avl.h>
 
 #define	SOFTTOKEN_SESSION_MAGIC	0xECF00002
 
@@ -71,6 +73,8 @@ typedef struct crypto_active_op {
 #define	CRYPTO_KEY_DIGESTED		3 /* A C_DigestKey() was called */
 
 typedef struct session {
+	avl_node_t	node;
+	CK_SESSION_HANDLE handle;
 	ulong_t		magic_marker;	/* magic # be validated for integrity */
 	pthread_mutex_t	session_mutex;	/* session's mutex lock */
 	pthread_cond_t	ses_free_cond;	/* cond variable for signal and wait */
@@ -168,6 +172,7 @@ typedef struct ses_to_be_freed_list {
 
 extern pthread_mutex_t soft_sessionlist_mutex;
 extern soft_session_t *soft_session_list;
+extern avl_tree_t soft_session_tree;
 extern int all_sessions_closing;
 extern CK_ULONG soft_session_cnt;	/* the number of opened sessions */
 extern CK_ULONG soft_session_rw_cnt;	/* the number of opened R/W sessions */

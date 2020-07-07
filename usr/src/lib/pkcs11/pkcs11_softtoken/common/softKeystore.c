@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <crypt.h>
@@ -2004,7 +2004,6 @@ soft_gen_crypt_key(uchar_t *pPIN, soft_object_t **key, CK_BYTE **saltdata)
 	CK_KEY_TYPE keytype = CKK_AES;
 	static CK_BBOOL truevalue = TRUE;
 	soft_object_t *secret_key;
-	CK_OBJECT_HANDLE hKey;
 	CK_ULONG	passwd_size;
 
 	if (pPIN == NULL)
@@ -2062,15 +2061,13 @@ soft_gen_crypt_key(uchar_t *pPIN, soft_object_t **key, CK_BYTE **saltdata)
 	params.pPassword = (CK_UTF8CHAR_PTR)pPIN;
 	params.ulPasswordLen = &passwd_size;
 
-	rv = soft_gen_keyobject(tmpl, attrs, &hKey, &token_session,
+	rv = soft_gen_keyobject(tmpl, attrs, &secret_key, &token_session,
 	    CKO_SECRET_KEY, CKK_AES, 0, SOFT_GEN_KEY, B_TRUE);
 
 	if (rv != CKR_OK) {
 		return (rv);
 	}
 
-	/* Obtain the secret object pointer. */
-	secret_key = (soft_object_t *)hKey;
 	keylen = OBJ_SEC_VALUE_LEN(secret_key);
 	if ((OBJ_SEC_VALUE(secret_key) = malloc(keylen)) == NULL) {
 		soft_delete_object(&token_session, secret_key,
@@ -2129,7 +2126,6 @@ soft_gen_hmac_key(uchar_t *pPIN, soft_object_t **key, CK_BYTE **saltdata)
 	CK_KEY_TYPE keytype = CKK_GENERIC_SECRET;
 	static CK_BBOOL truevalue = TRUE;
 	soft_object_t *secret_key;
-	CK_OBJECT_HANDLE hKey;
 	CK_ULONG	passwd_size;
 
 	if (pPIN == NULL)
@@ -2187,15 +2183,13 @@ soft_gen_hmac_key(uchar_t *pPIN, soft_object_t **key, CK_BYTE **saltdata)
 	params.pPassword = (CK_UTF8CHAR_PTR)pPIN;
 	params.ulPasswordLen = &passwd_size;
 
-	rv = soft_gen_keyobject(tmpl, attrs, &hKey, &token_session,
+	rv = soft_gen_keyobject(tmpl, attrs, &secret_key, &token_session,
 	    CKO_SECRET_KEY, CKK_GENERIC_SECRET, 0, SOFT_GEN_KEY, B_TRUE);
 
 	if (rv != CKR_OK) {
 		return (rv);
 	}
 
-	/* Obtain the secret object pointer. */
-	secret_key = (soft_object_t *)hKey;
 	keylen = OBJ_SEC_VALUE_LEN(secret_key);
 	if ((OBJ_SEC_VALUE(secret_key) = malloc(keylen)) == NULL) {
 		soft_delete_object(&token_session, secret_key,

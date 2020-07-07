@@ -22,12 +22,12 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef _SOFTKEYS_H
 #define	_SOFTKEYS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -55,7 +55,7 @@ CK_RV soft_derivekey(soft_session_t *, CK_MECHANISM_PTR, soft_object_t *,
 void soft_derive_enforce_flags(soft_object_t *, soft_object_t *);
 
 CK_RV soft_gen_keyobject(CK_ATTRIBUTE_PTR,  CK_ULONG,
-	CK_ULONG *, soft_session_t *, CK_OBJECT_CLASS, CK_KEY_TYPE,
+	soft_object_t **, soft_session_t *, CK_OBJECT_CLASS, CK_KEY_TYPE,
 	CK_ULONG, CK_ULONG, boolean_t);
 
 CK_RV soft_generate_pkcs5_pbkdf2_key(soft_session_t *, CK_MECHANISM_PTR,

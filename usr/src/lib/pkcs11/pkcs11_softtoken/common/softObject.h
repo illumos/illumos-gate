@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef	_SOFTOBJECT_H
@@ -32,6 +33,7 @@ extern "C" {
 
 #include <pthread.h>
 #include <security/pkcs11t.h>
+#include <sys/avl.h>
 #include "softKeystoreUtil.h"
 #include "softSession.h"
 
@@ -272,8 +274,8 @@ typedef struct x509_attr_cert {
 typedef struct certificate_obj {
 	CK_CERTIFICATE_TYPE certificate_type;
 	union {
-		x509_cert_t  	x509;
-		x509_attr_cert_t x509_attr;
+		x509_cert_t		x509;
+		x509_attr_cert_t	x509_attr;
 	} cert_type_u;
 } certificate_obj_t;
 
@@ -293,9 +295,11 @@ typedef attribute_info_t *CK_ATTRIBUTE_INFO_PTR;
  * This is the main structure of the Objects.
  */
 typedef struct object {
+	avl_node_t		node;
+	CK_OBJECT_HANDLE	handle;
 	/* Generic common fields. Always present */
 	uint_t			version;	/* for token objects only */
-	CK_OBJECT_CLASS 	class;
+	CK_OBJECT_CLASS		class;
 	CK_KEY_TYPE		key_type;
 	CK_CERTIFICATE_TYPE	cert_type;
 	ulong_t			magic_marker;
@@ -745,38 +749,11 @@ typedef enum {
 #define	OBJECT_REFCNT_WAITING	2	/* Waiting for object reference */
 					/* count to become zero */
 
-/*
- * This macro is used to type cast an object handle to a pointer to
- * the object struct. Also, it checks to see if the object struct
- * is tagged with an object magic number. This is to detect when an
- * application passes a bogus object pointer.
- * Also, it checks to see if the object is in the deleting state that
- * another thread is performing. If not, increment the object reference
- * count by one. This is to prevent this object from being deleted by
- * other thread.
- */
-#define	HANDLE2OBJECT_COMMON(hObject, object_p, rv, REFCNT_CODE) { \
-	object_p = (soft_object_t *)(hObject); \
-	if ((object_p == NULL) || \
-		(object_p->magic_marker != SOFTTOKEN_OBJECT_MAGIC)) {\
-			rv = CKR_OBJECT_HANDLE_INVALID; \
-	} else { \
-		(void) pthread_mutex_lock(&object_p->object_mutex); \
-		if (!(object_p->obj_delete_sync & OBJECT_IS_DELETING)) { \
-			REFCNT_CODE; \
-			rv = CKR_OK; \
-		} else { \
-			rv = CKR_OBJECT_HANDLE_INVALID; \
-		} \
-		(void) pthread_mutex_unlock(&object_p->object_mutex); \
-	} \
-}
-
 #define	HANDLE2OBJECT(hObject, object_p, rv) \
-	HANDLE2OBJECT_COMMON(hObject, object_p, rv, object_p->obj_refcnt++)
+	rv = handle2object(hObject, &(object_p), B_TRUE);
 
 #define	HANDLE2OBJECT_DESTROY(hObject, object_p, rv) \
-	HANDLE2OBJECT_COMMON(hObject, object_p, rv, /* no refcnt increment */)
+	rv = handle2object(hObject, &(object_p), B_FALSE);
 
 
 #define	OBJ_REFRELE(object_p) { \
@@ -788,13 +765,22 @@ typedef enum {
 	(void) pthread_mutex_unlock(&object_p->object_mutex); \
 }
 
+extern pthread_mutex_t soft_object_mutex;
+extern avl_tree_t soft_object_tree;
+
 /*
  * Function Prototypes.
  */
+
+CK_RV handle2object(CK_OBJECT_HANDLE hObject, soft_object_t **object_p,
+    boolean_t refhold);
+
+CK_ULONG set_objecthandle(soft_object_t *obj);
+
 void soft_cleanup_object(soft_object_t *objp);
 
 CK_RV soft_add_object(CK_ATTRIBUTE_PTR pTemplate,  CK_ULONG ulCount,
-	CK_ULONG *objecthandle_p, soft_session_t *sp);
+	CK_OBJECT_HANDLE_PTR objecthandle_p, soft_session_t *sp);
 
 void soft_delete_object(soft_session_t *sp, soft_object_t *objp,
 	boolean_t force, boolean_t lock_held);

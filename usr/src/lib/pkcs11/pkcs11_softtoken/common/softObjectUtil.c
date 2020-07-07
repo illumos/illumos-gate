@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <pthread.h>
@@ -28,6 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <security/cryptoki.h>
+#include <sys/debug.h>
 #include "softGlobal.h"
 #include "softObject.h"
 #include "softSession.h"
@@ -159,7 +161,7 @@ soft_copy_object(soft_object_t *old_object, soft_object_t **new_object,
 		 * Save the session handle of the C_CopyObject function
 		 * in the new copy of the session object.
 		 */
-		new_objp->session_handle = (CK_SESSION_HANDLE)sp;
+		new_objp->session_handle = sp->handle;
 		break;
 	}
 
@@ -220,13 +222,72 @@ soft_merge_object(soft_object_t *old_object, soft_object_t *new_object)
 	old_object->extra_attrlistp = new_object->extra_attrlistp;
 }
 
+/*
+ * Sets *object_p to the soft_object_t corresponding to hObject. If
+ * hObject is valid, and not in the deleting state, CKR_OK is returned,
+ * otherwise an error is returned. If hObject is valid and refhold is B_TRUE,
+ * the object is also held.
+ */
+CK_RV
+handle2object(CK_OBJECT_HANDLE hObject, soft_object_t **object_p,
+    boolean_t refhold)
+{
+	soft_object_t *obj;
+	soft_object_t node;
+
+	(void) memset(&node, 0, sizeof (node));
+	node.handle = hObject;
+
+	VERIFY0(pthread_mutex_lock(&soft_object_mutex));
+	if ((obj = avl_find(&soft_object_tree, &node, NULL)) == NULL ||
+	    obj->magic_marker != SOFTTOKEN_OBJECT_MAGIC) {
+		VERIFY0(pthread_mutex_unlock(&soft_object_mutex));
+		return (CKR_OBJECT_HANDLE_INVALID);
+	}
+
+	(void) pthread_mutex_lock(&obj->object_mutex);
+	VERIFY0(pthread_mutex_unlock(&soft_object_mutex));
+
+	if (obj->obj_delete_sync & OBJECT_IS_DELETING) {
+		(void) pthread_mutex_unlock(&obj->object_mutex);
+		return (CKR_OBJECT_HANDLE_INVALID);
+	}
+
+	if (refhold)
+		obj->obj_refcnt++;
+
+	(void) pthread_mutex_unlock(&obj->object_mutex);
+
+	*object_p = obj;
+	return (CKR_OK);
+}
+
+CK_ULONG
+set_objecthandle(soft_object_t *obj)
+{
+	avl_index_t where;
+
+	(void) pthread_mutex_lock(&soft_object_mutex);
+
+	do {
+		arc4random_buf(&obj->handle, sizeof (obj->handle));
+		if (obj->handle == CK_INVALID_HANDLE)
+			continue;
+	} while (avl_find(&soft_object_tree, obj, &where) != NULL);
+
+	avl_insert(&soft_object_tree, obj, where);
+
+	(void) pthread_mutex_unlock(&soft_object_mutex);
+
+	return (obj->handle);
+}
 
 /*
  * Create a new object struct, and add it to the session's object list.
  */
 CK_RV
 soft_add_object(CK_ATTRIBUTE_PTR pTemplate,  CK_ULONG ulCount,
-	CK_ULONG *objecthandle_p, soft_session_t *sp)
+    CK_OBJECT_HANDLE_PTR objecthandle_p, soft_session_t *sp)
 {
 
 	CK_RV rv = CKR_OK;
@@ -278,24 +339,20 @@ soft_add_object(CK_ATTRIBUTE_PTR pTemplate,  CK_ULONG ulCount,
 			(void) pthread_mutex_destroy(&new_objp->object_mutex);
 			goto fail_cleanup2;
 		}
-		new_objp->session_handle = (CK_SESSION_HANDLE)NULL;
+		new_objp->session_handle = CK_INVALID_HANDLE;
 		soft_add_token_object_to_slot(new_objp);
-		/*
-		 * Type casting the address of an object struct to
-		 * an object handle.
-		 */
-		*objecthandle_p = (CK_ULONG)new_objp;
+
+		*objecthandle_p = set_objecthandle(new_objp);
 
 		return (CKR_OK);
 	}
 
-	new_objp->session_handle = (CK_SESSION_HANDLE)sp;
+	new_objp->session_handle = sp->handle;
 
 	/* Add the new object to the session's object list. */
 	soft_add_object_to_session(new_objp, sp);
 
-	/* Type casting the address of an object struct to an object handle. */
-	*objecthandle_p =  (CK_ULONG)new_objp;
+	*objecthandle_p = set_objecthandle(new_objp);
 
 	return (CKR_OK);
 
@@ -470,6 +527,10 @@ soft_delete_object_cleanup(soft_object_t *objp, boolean_t force)
 	 */
 	soft_cleanup_object(objp);
 
+	(void) pthread_mutex_lock(&soft_object_mutex);
+	avl_remove(&soft_object_tree, objp);
+	(void) pthread_mutex_unlock(&soft_object_mutex);
+
 	/* Reset OBJECT_IS_DELETING flag. */
 	objp->obj_delete_sync &= ~OBJECT_IS_DELETING;
 
@@ -506,7 +567,7 @@ soft_delete_object_cleanup(soft_object_t *objp, boolean_t force)
  */
 void
 soft_delete_object(soft_session_t *sp, soft_object_t *objp,
-	boolean_t force, boolean_t lock_held)
+    boolean_t force, boolean_t lock_held)
 {
 
 	/*
@@ -801,8 +862,7 @@ soft_find_objects(soft_session_t *sp, CK_OBJECT_HANDLE *obj_found,
 			(void) pthread_mutex_lock(&obj->object_mutex);
 			/* a sanity check to make sure the obj is still valid */
 			if (obj->magic_marker == SOFTTOKEN_OBJECT_MAGIC) {
-				obj_found[num_obj_found] =
-				    (CK_OBJECT_HANDLE)obj;
+				obj_found[num_obj_found] = obj->handle;
 				num_obj_found++;
 			}
 			(void) pthread_mutex_unlock(&obj->object_mutex);
