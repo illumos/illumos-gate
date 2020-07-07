@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -668,6 +669,15 @@ main(int argc, const char **argv)
 	pid_t pid, ppid;
 	sigset_t set;
 	int ret = 0;
+
+	/*
+	 * The tests make assumptions about the number of open file descriptors
+	 * present. In case we are invoked with more than just STDIN_FILENO,
+	 * STDOUT_FILENO, and STDERR_FILENO open, close any other open
+	 * descriptors that might exist. Otherwise their presence will violate
+	 * the assumptions of the test and cause an erroneous failure.
+	 */
+	closefrom(STDERR_FILENO + 1);
 
 	if (argc > 1 && strcmp(argv[1], "-d") == 0)
 		debug = _B_TRUE;
