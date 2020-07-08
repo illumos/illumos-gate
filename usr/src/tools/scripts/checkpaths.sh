@@ -90,11 +90,6 @@ if [ -r $SRC/tools/findunref/exception_list ]; then
 	validate_paths -k ISUSED -r -e '^\*' $SRC/tools/findunref/exception_list
 fi
 
-if [ -f $SRC/tools/opensolaris/license-list ]; then
-	sed -e 's/$/.descrip/' < $SRC/tools/opensolaris/license-list | \
-		validate_paths -n SRC/tools/opensolaris/license-list
-fi
-
 validate_flg -f
 
 exit 0
