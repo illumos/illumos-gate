@@ -96,6 +96,12 @@ __FBSDID("$FreeBSD$");
 static void vlapic_set_error(struct vlapic *, uint32_t, bool);
 static void vlapic_tmr_reset(struct vlapic *);
 
+#ifdef __ISRVEC_DEBUG
+static void vlapic_isrstk_accept(struct vlapic *, int);
+static void vlapic_isrstk_eoi(struct vlapic *, int);
+static void vlapic_isrstk_verify(const struct vlapic *);
+#endif /* __ISRVEC_DEBUG */
+
 static __inline uint32_t
 vlapic_get_id(struct vlapic *vlapic)
 {
@@ -495,21 +501,33 @@ vlapic_fire_lvt(struct vlapic *vlapic, u_int lvt)
 	return (1);
 }
 
-#if 1
-static void
-dump_isrvec_stk(struct vlapic *vlapic)
+static uint_t
+vlapic_active_isr(struct vlapic *vlapic)
 {
 	int i;
-	uint32_t *isrptr;
+	uint32_t *isrp;
 
-	isrptr = &vlapic->apic_page->isr0;
-	for (i = 0; i < 8; i++)
-		printf("ISR%d 0x%08x\n", i, isrptr[i * 4]);
+	isrp = &vlapic->apic_page->isr7;
 
-	for (i = 0; i <= vlapic->isrvec_stk_top; i++)
-		printf("isrvec_stk[%d] = %d\n", i, vlapic->isrvec_stk[i]);
+	for (i = 7; i >= 0; i--, isrp -= 4) {
+		uint32_t reg = *isrp;
+
+		if (reg != 0) {
+			uint_t vec = (i * 32) + bsrl(reg);
+
+			if (vec < 16) {
+				/*
+				 * Truncate the illegal low vectors to value of
+				 * 0, indicating that no active ISR was found.
+				 */
+				return (0);
+			}
+			return (vec);
+		}
+	}
+
+	return (0);
 }
-#endif
 
 /*
  * Algorithm adopted from section "Interrupt, Task and Processor Priority"
@@ -520,55 +538,11 @@ vlapic_update_ppr(struct vlapic *vlapic)
 {
 	int isrvec, tpr, ppr;
 
-	/*
-	 * Note that the value on the stack at index 0 is always 0.
-	 *
-	 * This is a placeholder for the value of ISRV when none of the
-	 * bits is set in the ISRx registers.
-	 */
-	isrvec = vlapic->isrvec_stk[vlapic->isrvec_stk_top];
+	isrvec = vlapic_active_isr(vlapic);
 	tpr = vlapic->apic_page->tpr;
 
-#if 1
-	{
-		int i, lastprio, curprio, vector, idx;
-		uint32_t *isrptr;
-
-		if (vlapic->isrvec_stk_top == 0 && isrvec != 0)
-			panic("isrvec_stk is corrupted: %d", isrvec);
-
-		/*
-		 * Make sure that the priority of the nested interrupts is
-		 * always increasing.
-		 */
-		lastprio = -1;
-		for (i = 1; i <= vlapic->isrvec_stk_top; i++) {
-			curprio = PRIO(vlapic->isrvec_stk[i]);
-			if (curprio <= lastprio) {
-				dump_isrvec_stk(vlapic);
-				panic("isrvec_stk does not satisfy invariant");
-			}
-			lastprio = curprio;
-		}
-
-		/*
-		 * Make sure that each bit set in the ISRx registers has a
-		 * corresponding entry on the isrvec stack.
-		 */
-		i = 1;
-		isrptr = &vlapic->apic_page->isr0;
-		for (vector = 0; vector < 256; vector++) {
-			idx = (vector / 32) * 4;
-			if (isrptr[idx] & (1 << (vector % 32))) {
-				if (i > vlapic->isrvec_stk_top ||
-				    vlapic->isrvec_stk[i] != vector) {
-					dump_isrvec_stk(vlapic);
-					panic("ISR and isrvec_stk out of sync");
-				}
-				i++;
-			}
-		}
-	}
+#ifdef __ISRVEC_DEBUG
+	vlapic_isrstk_verify(vlapic);
 #endif
 
 	if (PRIO(tpr) >= PRIO(isrvec))
@@ -593,25 +567,25 @@ vlapic_process_eoi(struct vlapic *vlapic)
 {
 	struct LAPIC	*lapic = vlapic->apic_page;
 	uint32_t	*isrptr, *tmrptr;
-	int		i, idx, bitpos, vector;
+	int		i;
+	uint_t		idx, bitpos, vector;
 
 	isrptr = &lapic->isr0;
 	tmrptr = &lapic->tmr0;
 
 	for (i = 7; i >= 0; i--) {
 		idx = i * 4;
-		bitpos = fls(isrptr[idx]);
-		if (bitpos-- != 0) {
-			if (vlapic->isrvec_stk_top <= 0) {
-				panic("invalid vlapic isrvec_stk_top %d",
-				      vlapic->isrvec_stk_top);
-			}
-			isrptr[idx] &= ~(1 << bitpos);
+		if (isrptr[idx] != 0) {
+			bitpos = bsrl(isrptr[idx]);
 			vector = i * 32 + bitpos;
+
+			isrptr[idx] &= ~(1 << bitpos);
 			VCPU_CTR1(vlapic->vm, vlapic->vcpuid, "EOI vector %d",
 			    vector);
 			VLAPIC_CTR_ISR(vlapic, "vlapic_process_eoi");
-			vlapic->isrvec_stk_top--;
+#ifdef __ISRVEC_DEBUG
+			vlapic_isrstk_eoi(vlapic, vector);
+#endif
 			vlapic_update_ppr(vlapic);
 			if ((tmrptr[idx] & (1 << bitpos)) != 0) {
 				vioapic_process_eoi(vlapic->vm, vlapic->vcpuid,
@@ -1143,7 +1117,7 @@ vlapic_intr_accepted(struct vlapic *vlapic, int vector)
 {
 	struct LAPIC	*lapic = vlapic->apic_page;
 	uint32_t	*irrptr, *isrptr;
-	int		idx, stk_top;
+	int		idx;
 
 	if (vlapic->ops.intr_accepted)
 		return ((*vlapic->ops.intr_accepted)(vlapic, vector));
@@ -1162,16 +1136,9 @@ vlapic_intr_accepted(struct vlapic *vlapic, int vector)
 	isrptr[idx] |= 1 << (vector % 32);
 	VLAPIC_CTR_ISR(vlapic, "vlapic_intr_accepted");
 
-	/*
-	 * Update the PPR
-	 */
-	vlapic->isrvec_stk_top++;
-
-	stk_top = vlapic->isrvec_stk_top;
-	if (stk_top >= ISRVEC_STK_SIZE)
-		panic("isrvec_stk_top overflow %d", stk_top);
-
-	vlapic->isrvec_stk[stk_top] = vector;
+#ifdef __ISRVEC_DEBUG
+	vlapic_isrstk_accept(vlapic, vector);
+#endif
 }
 
 void
@@ -1708,3 +1675,92 @@ vlapic_localize_resources(struct vlapic *vlapic)
 	vmm_glue_callout_localize(&vlapic->callout);
 }
 #endif /* __FreeBSD */
+
+#ifdef __ISRVEC_DEBUG
+static void
+vlapic_isrstk_eoi(struct vlapic *vlapic, int vector)
+{
+	if (vlapic->isrvec_stk_top <= 0) {
+		panic("invalid vlapic isrvec_stk_top %d",
+		      vlapic->isrvec_stk_top);
+	}
+	vlapic->isrvec_stk_top--;
+}
+
+static void
+vlapic_isrstk_accept(struct vlapic *vlapic, int vector)
+{
+	int stk_top;
+
+	vlapic->isrvec_stk_top++;
+
+	stk_top = vlapic->isrvec_stk_top;
+	if (stk_top >= ISRVEC_STK_SIZE)
+		panic("isrvec_stk_top overflow %d", stk_top);
+
+	vlapic->isrvec_stk[stk_top] = vector;
+}
+
+static void
+vlapic_isrstk_dump(const struct vlapic *vlapic)
+{
+	int i;
+	uint32_t *isrptr;
+
+	isrptr = &vlapic->apic_page->isr0;
+	for (i = 0; i < 8; i++)
+		printf("ISR%d 0x%08x\n", i, isrptr[i * 4]);
+
+	for (i = 0; i <= vlapic->isrvec_stk_top; i++)
+		printf("isrvec_stk[%d] = %d\n", i, vlapic->isrvec_stk[i]);
+}
+
+static void
+vlapic_isrstk_verify(const struct vlapic *vlapic)
+{
+	int i, lastprio, curprio, vector, idx;
+	uint32_t *isrptr;
+
+	/*
+	 * Note: The value at index 0 in isrvec_stk is always 0.
+	 *
+	 * It is a placeholder for the value of ISR vector when no bits are set
+	 * in the ISRx registers.
+	 */
+	if (vlapic->isrvec_stk_top == 0 && vlapic->isrvec_stk[0] != 0) {
+		panic("isrvec_stk is corrupted: %d", vlapic->isrvec_stk[0]);
+	}
+
+	/*
+	 * Make sure that the priority of the nested interrupts is
+	 * always increasing.
+	 */
+	lastprio = -1;
+	for (i = 1; i <= vlapic->isrvec_stk_top; i++) {
+		curprio = PRIO(vlapic->isrvec_stk[i]);
+		if (curprio <= lastprio) {
+			vlapic_isrstk_dump(vlapic);
+			panic("isrvec_stk does not satisfy invariant");
+		}
+		lastprio = curprio;
+	}
+
+	/*
+	 * Make sure that each bit set in the ISRx registers has a
+	 * corresponding entry on the isrvec stack.
+	 */
+	i = 1;
+	isrptr = &vlapic->apic_page->isr0;
+	for (vector = 0; vector < 256; vector++) {
+		idx = (vector / 32) * 4;
+		if (isrptr[idx] & (1 << (vector % 32))) {
+			if (i > vlapic->isrvec_stk_top ||
+			    vlapic->isrvec_stk[i] != vector) {
+				vlapic_isrstk_dump(vlapic);
+				panic("ISR and isrvec_stk out of sync");
+			}
+			i++;
+		}
+	}
+}
+#endif
