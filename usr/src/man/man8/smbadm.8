@@ -19,7 +19,7 @@
 .\" Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
 .\" Copyright 2021-2023 RackTop Systems, Inc.
 .\"
-.Dd Jun 20, 2023
+.Dd Aug 29, 2025
 .Dt SMBADM 8
 .Os
 .Sh NAME
@@ -79,6 +79,7 @@ membership
 .Fl w Ar workgroup
 .Nm
 .Cm lookup
+.Op Fl p
 .Ar account-name Oo Ar account-name Oc Ns ...
 .Nm
 .Cm list
@@ -445,6 +446,7 @@ Specifying
 will bypass the SMB service restart prompt.
 .It Xo
 .Cm lookup
+.Op Fl p
 .Ar account-name Oo Ar account-name Oc Ns ...
 .Xc
 Lookup the SID for the given
@@ -452,6 +454,9 @@ Lookup the SID for the given
 or lookup the
 .Ar account-name
 for the given SID.
+Specifying
+.Fl p
+will produce parsable output.
 This subcommand is primarily for diagnostic use, to confirm whether the server
 can lookup domain accounts and/or SIDs.
 .It Xo

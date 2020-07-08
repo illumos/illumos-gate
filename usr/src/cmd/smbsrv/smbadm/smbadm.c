@@ -117,8 +117,8 @@ static void smbadm_update_groups(smbadm_grp_action_t);
 static int smbadm_join(int, char **);
 static int smbadm_list(int, char **);
 static int smbadm_lookup(int, char **);
-static void smbadm_lookup_name(char *);
-static void smbadm_lookup_sid(char *);
+static void smbadm_lookup_name(char *, boolean_t);
+static void smbadm_lookup_sid(char *, boolean_t);
 static int smbadm_group_create(int, char **);
 static int smbadm_group_delete(int, char **);
 static int smbadm_group_rename(int, char **);
@@ -309,7 +309,7 @@ smbadm_cmdusage(FILE *fp, smbadm_cmdinfo_t *cmd)
 
 	case HELP_LOOKUP:
 		(void) fprintf(fp,
-		    gettext("\t%s <account-name>\n"),
+		    gettext("\t%s [-p] <account-name>\n"),
 		    cmd->name);
 		return;
 
@@ -974,23 +974,37 @@ static int
 smbadm_lookup(int argc, char **argv)
 {
 	int i;
+	boolean_t parsable = B_FALSE;
+	char option;
 
 	if (argc < 2) {
 		(void) fprintf(stderr, gettext("missing account name\n"));
 		smbadm_usage(B_FALSE);
 	}
 
-	for (i = 1; i < argc; i++) {
+	while ((option = getopt(argc, argv, "p")) != -1) {
+		switch (option) {
+		case 'p':
+			parsable = B_TRUE;
+			break;
+
+		default:
+			smbadm_usage(B_FALSE);
+			break;
+		}
+	}
+
+	for (i = optind; i < argc; i++) {
 		if (strncmp(argv[i], "S-1-", 4) == 0)
-			smbadm_lookup_sid(argv[i]);
+			smbadm_lookup_sid(argv[i], parsable);
 		else
-			smbadm_lookup_name(argv[i]);
+			smbadm_lookup_name(argv[i], parsable);
 	}
 	return (0);
 }
 
 static void
-smbadm_lookup_name(char *name)
+smbadm_lookup_name(char *name, boolean_t parsable)
 {
 	lsa_account_t	acct;
 	int rc;
@@ -1006,11 +1020,16 @@ smbadm_lookup_name(char *name)
 		    name, xlate_nt_status(acct.a_status));
 		return;
 	}
-	(void) printf("\t%s\n", acct.a_sid);
+	if (parsable) {
+		(void) printf("%s:%u:%s:%s\n",
+		    acct.a_sid, acct.a_sidtype, acct.a_name, acct.a_domain);
+	} else {
+		(void) printf("\t%s\n", acct.a_sid);
+	}
 }
 
 static void
-smbadm_lookup_sid(char *sidstr)
+smbadm_lookup_sid(char *sidstr, boolean_t parsable)
 {
 	lsa_account_t	acct;
 	int rc;
@@ -1026,7 +1045,12 @@ smbadm_lookup_sid(char *sidstr)
 		    sidstr, xlate_nt_status(acct.a_status));
 		return;
 	}
-	(void) printf("\t%s\\%s\n", acct.a_domain, acct.a_name);
+	if (parsable) {
+		(void) printf("%s:%u:%s:%s\n",
+		    acct.a_sid, acct.a_sidtype, acct.a_name, acct.a_domain);
+	} else {
+		(void) printf("\t%s\\%s\n", acct.a_domain, acct.a_name);
+	}
 }
 
 /*
