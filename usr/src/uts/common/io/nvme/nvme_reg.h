@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation
  */
 
@@ -422,6 +422,22 @@ typedef union {
 	uint32_t r;
 } nvme_getlogpage_t;
 
+/*
+ * dword11 values for the dataset management command. Note that the dword11
+ * attributes are distinct from the context attributes (nr_ctxattr) values
+ * for an individual range (of the context attribute values defined by the NVMe
+ * spec, none are currently used by the NVMe driver).
+ */
+#define	NVME_DSET_MGMT_ATTR_OPT_READ	0x01
+#define	NVME_DSET_MGMT_ATTR_OPT_WRITE	0x02
+#define	NVME_DSET_MGMT_ATTR_DEALLOCATE	0x04
+
+#define	NVME_DSET_MGMT_MAX_RANGES	256
+typedef struct {
+	uint32_t	nr_ctxattr;
+	uint32_t	nr_len;
+	uint64_t	nr_lba;
+} nvme_range_t;
 
 #ifdef __cplusplus
 }

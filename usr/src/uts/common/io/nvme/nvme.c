@@ -13,7 +13,7 @@
  * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2016 Tegile Systems, Inc. All rights reserved.
  * Copyright (c) 2016 The MathWorks, Inc.  All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation.
  * Copyright 2020 Racktop Systems.
  */
@@ -272,6 +272,7 @@
 #include <sys/stat.h>
 #include <sys/policy.h>
 #include <sys/list.h>
+#include <sys/dkio.h>
 
 #include <sys/nvme.h>
 
@@ -289,6 +290,7 @@
 CTASSERT(sizeof (nvme_identify_ctrl_t) == 0x1000);
 CTASSERT(offsetof(nvme_identify_ctrl_t, id_oacs) == 256);
 CTASSERT(offsetof(nvme_identify_ctrl_t, id_sqes) == 512);
+CTASSERT(offsetof(nvme_identify_ctrl_t, id_oncs) == 520);
 CTASSERT(offsetof(nvme_identify_ctrl_t, id_subnqn) == 768);
 CTASSERT(offsetof(nvme_identify_ctrl_t, id_nvmof) == 1792);
 CTASSERT(offsetof(nvme_identify_ctrl_t, id_psd) == 2048);
@@ -390,6 +392,7 @@ static int nvme_bd_read(void *, bd_xfer_t *);
 static int nvme_bd_write(void *, bd_xfer_t *);
 static int nvme_bd_sync(void *, bd_xfer_t *);
 static int nvme_bd_devid(void *, dev_info_t *, ddi_devid_t *);
+static int nvme_bd_free_space(void *, bd_xfer_t *);
 
 static int nvme_prp_dma_constructor(void *, void *, int);
 static void nvme_prp_dma_destructor(void *, void *);
@@ -550,7 +553,7 @@ static bd_ops_t nvme_bd_ops = {
 	.o_sync_cache	= nvme_bd_sync,
 	.o_read		= nvme_bd_read,
 	.o_write	= nvme_bd_write,
-	.o_free_space	= NULL,
+	.o_free_space	= nvme_bd_free_space,
 };
 
 /*
@@ -3272,6 +3275,7 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	off_t regsize;
 	int i;
 	char name[32];
+	bd_ops_t ops = nvme_bd_ops;
 
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
@@ -3421,6 +3425,9 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (nvme_init(nvme) != DDI_SUCCESS)
 		goto fail;
 
+	if (!nvme->n_idctl->id_oncs.on_dset_mgmt)
+		ops.o_free_space = NULL;
+
 	/*
 	 * Initialize the driver with the UFM subsystem
 	 */
@@ -3449,7 +3456,7 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			continue;
 
 		nvme->n_ns[i].ns_bd_hdl = bd_alloc_handle(&nvme->n_ns[i],
-		    &nvme_bd_ops, &nvme->n_prp_dma_attr, KM_SLEEP);
+		    &ops, &nvme->n_prp_dma_attr, KM_SLEEP);
 
 		if (nvme->n_ns[i].ns_bd_hdl == NULL) {
 			dev_err(dip, CE_WARN,
@@ -3672,17 +3679,82 @@ nvme_fill_prp(nvme_cmd_t *cmd, bd_xfer_t *xfer)
 	return (DDI_SUCCESS);
 }
 
+/*
+ * The maximum number of requests supported for a deallocate request is
+ * NVME_DSET_MGMT_MAX_RANGES (256) -- this is from the NVMe 1.1 spec (and
+ * unchanged through at least 1.4a). The definition of nvme_range_t is also
+ * from the NVMe 1.1 spec. Together, the result is that all of the ranges for
+ * a deallocate request will fit into the smallest supported namespace page
+ * (4k).
+ */
+CTASSERT(sizeof (nvme_range_t) * NVME_DSET_MGMT_MAX_RANGES == 4096);
+
+static int
+nvme_fill_ranges(nvme_cmd_t *cmd, bd_xfer_t *xfer, uint64_t blocksize,
+    int allocflag)
+{
+	const dkioc_free_list_t *dfl = xfer->x_dfl;
+	const dkioc_free_list_ext_t *exts = dfl->dfl_exts;
+	nvme_t *nvme = cmd->nc_nvme;
+	nvme_range_t *ranges = NULL;
+	uint_t i;
+
+	/*
+	 * The number of ranges in the request is 0s based (that is
+	 * word10 == 0 -> 1 range, word10 == 1 -> 2 ranges, ...,
+	 * word10 == 255 -> 256 ranges). Therefore the allowed values are
+	 * [1..NVME_DSET_MGMT_MAX_RANGES]. If blkdev gives us a bad request,
+	 * we either provided bad info in nvme_bd_driveinfo() or there is a bug
+	 * in blkdev.
+	 */
+	VERIFY3U(dfl->dfl_num_exts, >, 0);
+	VERIFY3U(dfl->dfl_num_exts, <=, NVME_DSET_MGMT_MAX_RANGES);
+	cmd->nc_sqe.sqe_cdw10 = (dfl->dfl_num_exts - 1) & 0xff;
+
+	cmd->nc_sqe.sqe_cdw11 = NVME_DSET_MGMT_ATTR_DEALLOCATE;
+
+	cmd->nc_dma = kmem_cache_alloc(nvme->n_prp_cache, allocflag);
+	if (cmd->nc_dma == NULL)
+		return (DDI_FAILURE);
+
+	bzero(cmd->nc_dma->nd_memp, cmd->nc_dma->nd_len);
+	ranges = (nvme_range_t *)cmd->nc_dma->nd_memp;
+
+	cmd->nc_sqe.sqe_dptr.d_prp[0] = cmd->nc_dma->nd_cookie.dmac_laddress;
+	cmd->nc_sqe.sqe_dptr.d_prp[1] = 0;
+
+	for (i = 0; i < dfl->dfl_num_exts; i++) {
+		uint64_t lba, len;
+
+		lba = (dfl->dfl_offset + exts[i].dfle_start) / blocksize;
+		len = exts[i].dfle_length / blocksize;
+
+		VERIFY3U(len, <=, UINT32_MAX);
+
+		/* No context attributes for a deallocate request */
+		ranges[i].nr_ctxattr = 0;
+		ranges[i].nr_len = len;
+		ranges[i].nr_lba = lba;
+	}
+
+	(void) ddi_dma_sync(cmd->nc_dma->nd_dmah, 0, cmd->nc_dma->nd_len,
+	    DDI_DMA_SYNC_FORDEV);
+
+	return (DDI_SUCCESS);
+}
+
 static nvme_cmd_t *
 nvme_create_nvm_cmd(nvme_namespace_t *ns, uint8_t opc, bd_xfer_t *xfer)
 {
 	nvme_t *nvme = ns->ns_nvme;
 	nvme_cmd_t *cmd;
+	int allocflag;
 
 	/*
 	 * Blkdev only sets BD_XFER_POLL when dumping, so don't sleep.
 	 */
-	cmd = nvme_alloc_cmd(nvme, (xfer->x_flags & BD_XFER_POLL) ?
-	    KM_NOSLEEP : KM_SLEEP);
+	allocflag = (xfer->x_flags & BD_XFER_POLL) ? KM_NOSLEEP : KM_SLEEP;
+	cmd = nvme_alloc_cmd(nvme, allocflag);
 
 	if (cmd == NULL)
 		return (NULL);
@@ -3708,6 +3780,14 @@ nvme_create_nvm_cmd(nvme_namespace_t *ns, uint8_t opc, bd_xfer_t *xfer)
 
 	case NVME_OPC_NVM_FLUSH:
 		cmd->nc_sqe.sqe_nsid = ns->ns_id;
+		break;
+
+	case NVME_OPC_NVM_DSET_MGMT:
+		cmd->nc_sqe.sqe_nsid = ns->ns_id;
+
+		if (nvme_fill_ranges(cmd, xfer,
+		    (uint64_t)ns->ns_block_size, allocflag) != DDI_SUCCESS)
+			goto fail;
 		break;
 
 	default:
@@ -3796,6 +3876,14 @@ nvme_bd_driveinfo(void *arg, bd_drive_t *drive)
 	drive->d_serial_len = sizeof (nvme->n_idctl->id_serial);
 	drive->d_revision = nvme->n_idctl->id_fwrev;
 	drive->d_revision_len = sizeof (nvme->n_idctl->id_fwrev);
+
+	/*
+	 * If we support the dataset management command, the only restrictions
+	 * on a discard request are the maximum number of ranges (segments)
+	 * per single request.
+	 */
+	if (nvme->n_idctl->id_oncs.on_dset_mgmt)
+		drive->d_max_free_seg = NVME_DSET_MGMT_MAX_RANGES;
 }
 
 static int
@@ -3913,6 +4001,20 @@ nvme_bd_devid(void *arg, dev_info_t *devinfo, ddi_devid_t *devid)
 		return (ddi_devid_init(devinfo, DEVID_ENCAP,
 		    strlen(ns->ns_devid), ns->ns_devid, devid));
 	}
+}
+
+static int
+nvme_bd_free_space(void *arg, bd_xfer_t *xfer)
+{
+	nvme_namespace_t *ns = arg;
+
+	if (xfer->x_dfl == NULL)
+		return (EINVAL);
+
+	if (!ns->ns_nvme->n_idctl->id_oncs.on_dset_mgmt)
+		return (ENOTSUP);
+
+	return (nvme_bd_cmd(ns, xfer, NVME_OPC_NVM_DSET_MGMT));
 }
 
 static int
