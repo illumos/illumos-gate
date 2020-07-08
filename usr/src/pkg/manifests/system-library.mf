@@ -467,7 +467,6 @@ file path=usr/lib/libsldap.so.1
 file path=usr/lib/libsmbios.so.1
 file path=usr/lib/libsoftcrypto.so.1
 file path=usr/lib/libsum.so.1
-file path=usr/lib/libsys.so.1
 $(sparc_ONLY)file path=usr/lib/libv12n.so.1
 file path=usr/lib/libvolmgt.so.1
 file path=usr/lib/libwrap.so.1.0
@@ -1209,7 +1208,6 @@ link path=usr/lib/libsmbios.so target=libsmbios.so.1
 link path=usr/lib/libsocket.so target=../../lib/libsocket.so.1
 link path=usr/lib/libsocket.so.1 target=../../lib/libsocket.so.1
 link path=usr/lib/libsoftcrypto.so target=./libsoftcrypto.so.1
-link path=usr/lib/libsys.so target=./libsys.so.1
 link path=usr/lib/libsysevent.so target=../../lib/libsysevent.so.1
 link path=usr/lib/libsysevent.so.1 target=../../lib/libsysevent.so.1
 link path=usr/lib/libtermcap.so target=../../lib/libtermcap.so.1

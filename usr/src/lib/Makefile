@@ -221,7 +221,6 @@ SUBDIRS +=				\
 	libstmfproxy	\
 	libsum		\
 	libsun_ima	\
-	libsys		\
 	libsysevent	\
 	libtecla	\
 	libtermcap	\

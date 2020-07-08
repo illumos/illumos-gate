@@ -346,7 +346,6 @@
 
 @ MSG_PTH_LDPROF	"/usr/lib/link_audit/ldprof.so.1"
 @ MSG_PTH_LDPROFSE	"/usr/lib/secure/ldprof.so.1"
-@ MSG_PTH_LIBSYS	"/usr/lib/libsys.so.1"
 @ MSG_PTH_RTLD		"/usr/lib/ld.so.1"
 @ MSG_PTH_LIB		"/lib"
 @ MSG_PTH_USRLIB	"/usr/lib"

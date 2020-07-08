@@ -126,40 +126,13 @@ elf_get_sec_dirs()
 }
 
 /*
- * Redefine NEEDED name if necessary.
+ * For a.out we have actual work to do here, on ELF we just perform path
+ * expansion.
  */
 static int
 elf_fix_name(const char *name, Rt_map *clmp, Alist **alpp, Aliste alni,
     uint_t orig)
 {
-	/*
-	 * For ABI compliance, if we are asked for ld.so.1, then really give
-	 * them libsys.so.1 (the SONAME of libsys.so.1 is ld.so.1).
-	 */
-	if (((*name == '/') &&
-	/* BEGIN CSTYLED */
-#if	defined(_ELF64)
-	    (strcmp(name, MSG_ORIG(MSG_PTH_RTLD_64)) == 0)) ||
-#else
-	    (strcmp(name, MSG_ORIG(MSG_PTH_RTLD)) == 0)) ||
-#endif
-	    (strcmp(name, MSG_ORIG(MSG_FIL_RTLD)) == 0)) {
-		/* END CSTYLED */
-		Pdesc	*pdp;
-
-		DBG_CALL(Dbg_file_fixname(LIST(clmp), name,
-		    MSG_ORIG(MSG_PTH_LIBSYS)));
-		if ((pdp = alist_append(alpp, NULL, sizeof (Pdesc),
-		    alni)) == NULL)
-			return (0);
-
-		pdp->pd_pname = (char *)MSG_ORIG(MSG_PTH_LIBSYS);
-		pdp->pd_plen = MSG_PTH_LIBSYS_SIZE;
-		pdp->pd_flags = PD_FLG_PNSLASH;
-
-		return (1);
-	}
-
 	return (expand_paths(clmp, name, alpp, alni, orig, 0));
 }
 

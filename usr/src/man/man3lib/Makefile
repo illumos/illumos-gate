@@ -97,7 +97,6 @@ MANFILES=	libMPAPI.3lib		\
 		libslp.3lib		\
 		libsocket.3lib		\
 		libstmf.3lib		\
-		libsys.3lib		\
 		libsysevent.3lib	\
 		libtecla.3lib		\
 		libthread.3lib		\
