@@ -14,6 +14,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  * Copyright 2020 Ryan Zezeski
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -304,6 +305,7 @@ typedef enum i40e_itr_index {
  */
 #define	I40E_RING_WAIT_NTRIES	10
 #define	I40E_RING_WAIT_PAUSE	10	/* ms */
+#define	I40E_RING_ENABLE_GAP	50	/* ms */
 
 /*
  * Printed Board Assembly (PBA) length. These are derived from Table 6-2.
@@ -565,6 +567,14 @@ typedef struct i40e_txq_stat {
 typedef struct i40e_trqpair {
 	struct i40e *itrq_i40e;
 
+	/* interrupt control structures */
+	kmutex_t itrq_intr_lock;
+	kcondvar_t itrq_intr_cv;
+	boolean_t itrq_intr_busy;	/* Busy processing interrupt */
+	boolean_t itrq_intr_quiesce;	/* Interrupt quiesced */
+
+	hrtime_t irtq_time_stopped;	/* Time when ring was stopped */
+
 	/* Receive-side structures. */
 	kmutex_t itrq_rx_lock;
 	mac_ring_handle_t itrq_macrxring; /* Receive ring handle. */
@@ -580,6 +590,9 @@ typedef struct i40e_trqpair {
 
 	/* Transmit-side structures. */
 	kmutex_t itrq_tx_lock;
+	kcondvar_t itrq_tx_cv;
+	uint_t itrq_tx_active;		/* No. of active i40e_ring_tx()'s */
+	boolean_t itrq_tx_quiesce;	/* Tx is quiesced */
 	mac_ring_handle_t itrq_mactxring; /* Transmit ring handle. */
 	uint32_t itrq_tx_intrvec;	/* Transmit interrupt vector. */
 	boolean_t itrq_tx_blocked;	/* Does MAC think we're blocked? */
@@ -1006,6 +1019,7 @@ extern void i40e_intr_io_clear_cause(i40e_t *);
 extern void i40e_intr_rx_queue_disable(i40e_trqpair_t *);
 extern void i40e_intr_rx_queue_enable(i40e_trqpair_t *);
 extern void i40e_intr_set_itr(i40e_t *, i40e_itr_index_t, uint_t);
+extern void i40e_intr_quiesce(i40e_trqpair_t *);
 
 /*
  * Receive-side functions
@@ -1013,6 +1027,7 @@ extern void i40e_intr_set_itr(i40e_t *, i40e_itr_index_t, uint_t);
 extern mblk_t *i40e_ring_rx(i40e_trqpair_t *, int);
 extern mblk_t *i40e_ring_rx_poll(void *, int);
 extern void i40e_rx_recycle(caddr_t);
+extern boolean_t i40e_ring_tx_quiesce(i40e_trqpair_t *);
 
 /*
  * Transmit-side functions
@@ -1038,15 +1053,17 @@ extern int i40e_tx_ring_stat(mac_ring_driver_t, uint_t, uint64_t *);
  * MAC/GLDv3 functions, and functions called by MAC/GLDv3 support code.
  */
 extern boolean_t i40e_register_mac(i40e_t *);
-extern boolean_t i40e_start(i40e_t *, boolean_t);
-extern void i40e_stop(i40e_t *, boolean_t);
+extern boolean_t i40e_start(i40e_t *);
+extern void i40e_stop(i40e_t *);
+extern int i40e_setup_ring(i40e_trqpair_t *);
+extern boolean_t i40e_shutdown_ring(i40e_trqpair_t *);
 
 /*
  * DMA & buffer functions and attributes
  */
 extern void i40e_init_dma_attrs(i40e_t *, boolean_t);
-extern boolean_t i40e_alloc_ring_mem(i40e_t *);
-extern void i40e_free_ring_mem(i40e_t *, boolean_t);
+extern boolean_t i40e_alloc_ring_mem(i40e_trqpair_t *);
+extern void i40e_free_ring_mem(i40e_trqpair_t *, boolean_t);
 
 #ifdef __cplusplus
 }
