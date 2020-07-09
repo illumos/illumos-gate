@@ -24,6 +24,7 @@
  * Copyright (c) 2012, Alexey Zaytsev <alexey.zaytsev@gmail.com>
  * Copyright 2020 Joyent Inc.
  * Copyright 2019 Western Digital Corporation.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*
@@ -163,6 +164,7 @@ vioblk_req_alloc(vioblk_t *vib)
 	VERIFY0(vbr->vbr_status);
 	vbr->vbr_status |= VIOBLK_REQSTAT_ALLOCATED;
 
+	VERIFY3P(vbr->vbr_chain, !=, NULL);
 	VERIFY3P(vbr->vbr_xfer, ==, NULL);
 	VERIFY3S(vbr->vbr_error, ==, 0);
 
@@ -184,6 +186,7 @@ vioblk_req_free(vioblk_t *vib, vioblk_req_t *vbr)
 	vbr->vbr_xfer = NULL;
 	vbr->vbr_error = 0;
 	vbr->vbr_type = 0;
+	virtio_chain_clear(vbr->vbr_chain);
 
 	list_insert_head(&vib->vib_reqs, vbr);
 
@@ -214,12 +217,11 @@ vioblk_complete(vioblk_t *vib, vioblk_req_t *vbr)
 	}
 }
 
-static virtio_chain_t *
+static vioblk_req_t *
 vioblk_common_start(vioblk_t *vib, int type, uint64_t sector,
     boolean_t polled)
 {
 	vioblk_req_t *vbr = NULL;
-	virtio_chain_t *vic = NULL;
 
 	if ((vbr = vioblk_req_alloc(vib)) == NULL) {
 		vib->vib_stats->vbs_rw_outofmemory.value.ui64++;
@@ -235,45 +237,32 @@ vioblk_common_start(vioblk_t *vib, int type, uint64_t sector,
 		vbr->vbr_status |= VIOBLK_REQSTAT_POLLED;
 	}
 
-	if ((vic = virtio_chain_alloc(vib->vib_vq, KM_NOSLEEP)) == NULL) {
-		vib->vib_stats->vbs_rw_outofmemory.value.ui64++;
-		goto fail;
-	}
-
 	struct vioblk_req_hdr vbh;
 	vbh.vbh_type = type;
 	vbh.vbh_ioprio = 0;
 	vbh.vbh_sector = (sector * vib->vib_blk_size) / DEV_BSIZE;
 	bcopy(&vbh, virtio_dma_va(vbr->vbr_dma, 0), sizeof (vbh));
 
-	virtio_chain_data_set(vic, vbr);
-
 	/*
 	 * Put the header in the first descriptor.  See the block comment at
 	 * the top of the file for more details on the chain layout.
 	 */
-	if (virtio_chain_append(vic, virtio_dma_cookie_pa(vbr->vbr_dma, 0),
+	if (virtio_chain_append(vbr->vbr_chain,
+	    virtio_dma_cookie_pa(vbr->vbr_dma, 0),
 	    sizeof (struct vioblk_req_hdr), VIRTIO_DIR_DEVICE_READS) !=
 	    DDI_SUCCESS) {
-		goto fail;
+		vioblk_req_free(vib, vbr);
+		return (NULL);
 	}
 
-	return (vic);
-
-fail:
-	vbr->vbr_xfer = NULL;
-	vioblk_req_free(vib, vbr);
-	if (vic != NULL) {
-		virtio_chain_free(vic);
-	}
-	return (NULL);
+	return (vbr);
 }
 
 static int
-vioblk_common_submit(vioblk_t *vib, virtio_chain_t *vic)
+vioblk_common_submit(vioblk_t *vib, vioblk_req_t *vbr)
 {
+	virtio_chain_t *vic = vbr->vbr_chain;
 	int r;
-	vioblk_req_t *vbr = virtio_chain_data(vic);
 
 	VERIFY(MUTEX_HELD(&vib->vib_mutex));
 
@@ -285,8 +274,8 @@ vioblk_common_submit(vioblk_t *vib, virtio_chain_t *vic)
 	if (virtio_chain_append(vic, virtio_dma_cookie_pa(vbr->vbr_dma, 0) +
 	    sizeof (struct vioblk_req_hdr), sizeof (uint8_t),
 	    VIRTIO_DIR_DEVICE_WRITES) != DDI_SUCCESS) {
-		r = ENOMEM;
-		goto out;
+		vioblk_req_free(vib, vbr);
+		return (ENOMEM);
 	}
 
 	virtio_dma_sync(vbr->vbr_dma, DDI_DMA_SYNC_FORDEV);
@@ -324,10 +313,7 @@ vioblk_common_submit(vioblk_t *vib, virtio_chain_t *vic)
 
 	vioblk_complete(vib, vbr);
 	r = vbr->vbr_error;
-
-out:
 	vioblk_req_free(vib, vbr);
-	virtio_chain_free(vic);
 	return (r);
 }
 
@@ -335,19 +321,16 @@ static int
 vioblk_internal(vioblk_t *vib, int type, virtio_dma_t *dma,
     uint64_t sector, virtio_direction_t dir)
 {
-	virtio_chain_t *vic;
 	vioblk_req_t *vbr;
-	int r;
 
 	VERIFY(MUTEX_HELD(&vib->vib_mutex));
 
 	/*
 	 * Allocate a polled request.
 	 */
-	if ((vic = vioblk_common_start(vib, type, sector, B_TRUE)) == NULL) {
+	if ((vbr = vioblk_common_start(vib, type, sector, B_TRUE)) == NULL) {
 		return (ENOMEM);
 	}
-	vbr = virtio_chain_data(vic);
 
 	/*
 	 * If there is a request payload, it goes between the header and the
@@ -355,23 +338,19 @@ vioblk_internal(vioblk_t *vib, int type, virtio_dma_t *dma,
 	 * detail on the chain layout.
 	 */
 	if (dma != NULL) {
+		virtio_chain_t *vic = vbr->vbr_chain;
 		for (uint_t n = 0; n < virtio_dma_ncookies(dma); n++) {
 			if (virtio_chain_append(vic,
 			    virtio_dma_cookie_pa(dma, n),
 			    virtio_dma_cookie_size(dma, n), dir) !=
 			    DDI_SUCCESS) {
-				r = ENOMEM;
-				goto out;
+				vioblk_req_free(vib, vbr);
+				return (ENOMEM);
 			}
 		}
 	}
 
-	return (vioblk_common_submit(vib, vic));
-
-out:
-	vioblk_req_free(vib, vbr);
-	virtio_chain_free(vic);
-	return (r);
+	return (vioblk_common_submit(vib, vbr));
 }
 
 static int
@@ -416,11 +395,9 @@ vioblk_map_discard(vioblk_t *vib, virtio_chain_t *vic, const bd_xfer_t *xfer)
 static int
 vioblk_request(vioblk_t *vib, bd_xfer_t *xfer, int type)
 {
-	virtio_chain_t *vic = NULL;
 	vioblk_req_t *vbr = NULL;
 	uint_t total_cookies = 2;
 	boolean_t polled = (xfer->x_flags & BD_XFER_POLL) != 0;
-	int r;
 
 	VERIFY(MUTEX_HELD(&vib->vib_mutex));
 
@@ -434,11 +411,10 @@ vioblk_request(vioblk_t *vib, bd_xfer_t *xfer, int type)
 		return (EINVAL);
 	}
 
-	if ((vic = vioblk_common_start(vib, type, xfer->x_blkno, polled)) ==
+	if ((vbr = vioblk_common_start(vib, type, xfer->x_blkno, polled)) ==
 	    NULL) {
 		return (ENOMEM);
 	}
-	vbr = virtio_chain_data(vic);
 	vbr->vbr_xfer = xfer;
 
 	/*
@@ -450,6 +426,7 @@ vioblk_request(vioblk_t *vib, bd_xfer_t *xfer, int type)
 	    xfer->x_nblks > 0) {
 		virtio_direction_t dir = (type == VIRTIO_BLK_T_OUT) ?
 		    VIRTIO_DIR_DEVICE_READS : VIRTIO_DIR_DEVICE_WRITES;
+		virtio_chain_t *vic = vbr->vbr_chain;
 
 		for (uint_t n = 0; n < xfer->x_ndmac; n++) {
 			ddi_dma_cookie_t dmac;
@@ -465,8 +442,8 @@ vioblk_request(vioblk_t *vib, bd_xfer_t *xfer, int type)
 
 			if (virtio_chain_append(vic, dmac.dmac_laddress,
 			    dmac.dmac_size, dir) != DDI_SUCCESS) {
-				r = ENOMEM;
-				goto fail;
+				vioblk_req_free(vib, vbr);
+				return (ENOMEM);
 			}
 		}
 
@@ -477,9 +454,10 @@ vioblk_request(vioblk_t *vib, bd_xfer_t *xfer, int type)
 		    "request of type %d had payload length of %lu blocks", type,
 		    xfer->x_nblks);
 	} else if (type == VIRTIO_BLK_T_DISCARD) {
-		r = vioblk_map_discard(vib, vic, xfer);
+		int r = vioblk_map_discard(vib, vbr->vbr_chain, xfer);
 		if (r != 0) {
-			goto fail;
+			vioblk_req_free(vib, vbr);
+			return (r);
 		}
 	}
 
@@ -487,13 +465,7 @@ vioblk_request(vioblk_t *vib, bd_xfer_t *xfer, int type)
 		vib->vib_stats->vbs_rw_cookiesmax.value.ui32 = total_cookies;
 	}
 
-	return (vioblk_common_submit(vib, vic));
-
-fail:
-	vbr->vbr_xfer = NULL;
-	vioblk_req_free(vib, vbr);
-	virtio_chain_free(vic);
-	return (r);
+	return (vioblk_common_submit(vib, vbr));
 }
 
 static int
@@ -753,7 +725,6 @@ vioblk_poll(vioblk_t *vib)
 		vioblk_complete(vib, vbr);
 
 		vioblk_req_free(vib, vbr);
-		virtio_chain_free(vic);
 	}
 
 	if (wakeup) {
@@ -797,6 +768,10 @@ vioblk_free_reqs(vioblk_t *vib)
 
 		VERIFY0(vbr->vbr_status);
 
+		if (vbr->vbr_chain != NULL) {
+			virtio_chain_free(vbr->vbr_chain);
+			vbr->vbr_chain = NULL;
+		}
 		if (vbr->vbr_dma != NULL) {
 			virtio_dma_free(vbr->vbr_dma);
 			vbr->vbr_dma = NULL;
@@ -833,6 +808,11 @@ vioblk_alloc_reqs(vioblk_t *vib)
 		    KM_SLEEP)) == NULL) {
 			goto fail;
 		}
+		vbr->vbr_chain = virtio_chain_alloc(vib->vib_vq, KM_SLEEP);
+		if (vbr->vbr_chain == NULL) {
+			goto fail;
+		}
+		virtio_chain_data_set(vbr->vbr_chain, vbr);
 	}
 
 	return (0);
