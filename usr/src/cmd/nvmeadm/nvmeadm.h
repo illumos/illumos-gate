@@ -12,6 +12,7 @@
 /*
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2019 Western Digital Corporation
+ * Copyright 2020 Oxide Computer Company
  */
 
 #ifndef _NVMEADM_H
@@ -29,14 +30,15 @@ extern int verbose;
 extern int debug;
 
 /* printing functions */
-extern void nvme_print(int, char *, int, const char *, ...);
+extern void nvme_print(int, const char *, int, const char *, ...);
 extern void nvme_print_ctrl_summary(nvme_identify_ctrl_t *, nvme_version_t *);
 extern void nvme_print_nsid_summary(nvme_identify_nsid_t *);
 extern void nvme_print_identify_ctrl(nvme_identify_ctrl_t *,
     nvme_capabilities_t *, nvme_version_t *);
 extern void nvme_print_identify_nsid(nvme_identify_nsid_t *, nvme_version_t *);
 extern void nvme_print_error_log(int, nvme_error_log_entry_t *);
-extern void nvme_print_health_log(nvme_health_log_t *, nvme_identify_ctrl_t *);
+extern void nvme_print_health_log(nvme_health_log_t *, nvme_identify_ctrl_t *,
+    nvme_version_t *);
 extern void nvme_print_fwslot_log(nvme_fwslot_log_t *);
 
 extern void nvme_print_feat_arbitration(uint64_t, void *, size_t,

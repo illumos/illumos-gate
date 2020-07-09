@@ -135,7 +135,8 @@ COMOBJS=			\
 	strtol.o		\
 	strtoul.o		\
 	strtoll.o		\
-	strtoull.o
+	strtoull.o		\
+	multi3.o
 
 GENOBJS=			\
 	_getsp.o		\

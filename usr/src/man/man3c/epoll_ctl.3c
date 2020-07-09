@@ -1,5 +1,6 @@
 '\" te
 .\"  Copyright (c) 2014, Joyent, Inc. All Rights Reserved.
+.\"  Copyright 2020 Oxide Computer Company
 .\"  This file and its contents are supplied under the terms of the
 .\"  Common Development and Distribution License ("CDDL"), version 1.0.
 .\"  You may only use this file in accordance with the terms of version
@@ -8,7 +9,7 @@
 .\"  A full copy of the text of the CDDL should have accompanied this
 .\"  source.  A copy of the CDDL is also available via the Internet at
 .\"  http://www.illumos.org/license/CDDL.
-.TH EPOLL_CTL 3C "April 9, 2016"
+.TH EPOLL_CTL 3C "June 29, 2020"
 .SH NAME
 epoll_ctl \- control an epoll instance
 .SH SYNOPSIS
@@ -201,6 +202,23 @@ this event and  \fBEPOLLIN\fR, \fBEPOLLRDNORM\fR, \fBEPOLLRDBAND\fR,
 The stream socket peer shutdown the writing half of the connection and no
 further data will be readable via the socket.  This event is not mutually
 exclusive with \fBEPOLLIN\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEPOLLEXCLUSIVE\fR
+.ad
+.RS 14n
+This is present for binary compatibility and is effectively a no-op on illumos.
+
+The flag was added to Linux in v4.5 to provide a means to mitigate thundering
+herd problems when multiple epoll instances contain the same event source.  Set
+on a specified event source during \fBEPOLL_CTL_ADD\fR (and not allowed with
+\fBEPOLL_CTL_MOD\fR), it indicates that epoll should attempt to limit the scope
+of pollers woken when a shared target resource changes state.  All pollers
+without the flag set in the event will be notified and one \fIor more\fR of
+those with it set will be as well.
 .RE
 
 .sp

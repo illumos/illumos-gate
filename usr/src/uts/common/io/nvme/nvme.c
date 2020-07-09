@@ -4339,7 +4339,6 @@ nvme_ioctl_get_features(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 	switch (feature) {
 	case NVME_FEAT_ARBITRATION:
 	case NVME_FEAT_POWER_MGMT:
-	case NVME_FEAT_TEMPERATURE:
 	case NVME_FEAT_ERROR:
 	case NVME_FEAT_NQUEUES:
 	case NVME_FEAT_INTR_COAL:
@@ -4348,6 +4347,27 @@ nvme_ioctl_get_features(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 	case NVME_FEAT_PROGRESS:
 		if (nsid != 0)
 			return (EINVAL);
+		break;
+
+	case NVME_FEAT_TEMPERATURE:
+		if (nsid != 0)
+			return (EINVAL);
+		res = nioc->n_arg & 0xffffffffUL;
+		if (NVME_VERSION_ATLEAST(&nvme->n_version, 1, 2)) {
+			nvme_temp_threshold_t tt;
+
+			tt.r = res;
+			if (tt.b.tt_thsel != NVME_TEMP_THRESH_OVER &&
+			    tt.b.tt_thsel != NVME_TEMP_THRESH_UNDER) {
+				return (EINVAL);
+			}
+
+			if (tt.b.tt_tmpsel > NVME_TEMP_THRESH_MAX_SENSOR) {
+				return (EINVAL);
+			}
+		} else if (res != 0) {
+			return (EINVAL);
+		}
 		break;
 
 	case NVME_FEAT_INTR_VECT:

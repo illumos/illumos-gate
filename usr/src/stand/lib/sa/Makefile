@@ -21,7 +21,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# 
+#
 
 LIBRARY		= libsa.a
 LOCOBJS		= assert.o ctype.o errno.o libintl.o malloc.o memlist.o \
@@ -32,7 +32,7 @@ CMNOBJS		= cache.o diskread.o fsswitch.o promfs.o
 sparc_CMNUTILOBJS = memchr.o memmove.o
 CMNUTILOBJS	= $($(MACH)_CMNUTILOBJS) \
 		  bsearch.o memcmp.o memcpy.o memset.o qsort.o \
-		  string.o strtol.o strtoul.o
+		  string.o strtol.o strtoul.o multi3.o
 
 i386_MACHOBJS	= get.o map_prog.o
 sparc_MACHOBJS	= prom_misc.o
@@ -49,8 +49,8 @@ include ../Makefile.com
 CMNDIR		= ../fs/common
 CMNUTILDIR	= $(TOPDIR)/common/util
 SRCS		= $(LOCOBJS:%.o=$(SRCDIR)/%.c) $(CMNOBJS:%.o=$(CMNDIR)/%.c) \
-	  	  $(CMNUTILOBJS:%.o=$(CMNUTILDIR)/%.c) \
-	  	  $($(MACH)_ASMOBJS:%.o=$(MACH)/%.s) \
+		  $(CMNUTILOBJS:%.o=$(CMNUTILDIR)/%.c) \
+		  $($(MACH)_ASMOBJS:%.o=$(MACH)/%.s) \
 		  $($(MACH)_OBJS:%.o=$(MACH)/%.c)
 
 LDLIBS += -lsock

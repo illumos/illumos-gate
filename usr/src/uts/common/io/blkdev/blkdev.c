@@ -25,6 +25,7 @@
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2017 The MathWorks, Inc.  All rights reserved.
  * Copyright 2019 Western Digital Corporation.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -228,8 +229,10 @@ struct bd_queue {
 static void bd_prop_update_inqstring(dev_info_t *, char *, char *, size_t);
 static void bd_create_inquiry_props(dev_info_t *, bd_drive_t *);
 static void bd_create_errstats(bd_t *, int, bd_drive_t *);
+static void bd_destroy_errstats(bd_t *);
 static void bd_errstats_setstr(kstat_named_t *, char *, size_t, char *);
 static void bd_init_errstats(bd_t *, bd_drive_t *);
+static void bd_fini_errstats(bd_t *);
 
 static int bd_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int bd_attach(dev_info_t *, ddi_attach_cmd_t);
@@ -490,6 +493,21 @@ bd_create_errstats(bd_t *bd, int inst, bd_drive_t *drive)
 	bd->d_errstats->ks_private = bd;
 
 	kstat_install(bd->d_errstats);
+	bd_init_errstats(bd, drive);
+}
+
+static void
+bd_destroy_errstats(bd_t *bd)
+{
+	if (bd->d_errstats != NULL) {
+		bd_fini_errstats(bd);
+		kstat_delete(bd->d_errstats);
+		bd->d_errstats = NULL;
+	} else {
+		kmem_free(bd->d_kerr, sizeof (struct bd_errstats));
+		bd->d_kerr = NULL;
+		mutex_destroy(&bd->d_errmutex);
+	}
 }
 
 static void
@@ -707,7 +725,6 @@ bd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	bd_create_inquiry_props(dip, &drive);
 
 	bd_create_errstats(bd, inst, &drive);
-	bd_init_errstats(bd, &drive);
 	bd_update_state(bd);
 
 	bd->d_queues = kmem_alloc(sizeof (*bd->d_queues) * bd->d_qcount,
@@ -732,19 +749,23 @@ bd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    drive.d_lun >= 0 ? DDI_NT_BLOCK_CHAN : DDI_NT_BLOCK,
 	    CMLB_FAKE_LABEL_ONE_PARTITION, bd->d_cmlbh, 0);
 	if (rv != 0) {
-		cmlb_free_handle(&bd->d_cmlbh);
-		kmem_cache_destroy(bd->d_cache);
-		mutex_destroy(&bd->d_ksmutex);
-		mutex_destroy(&bd->d_ocmutex);
-		mutex_destroy(&bd->d_statemutex);
-		cv_destroy(&bd->d_statecv);
 		bd_queues_free(bd);
+		bd_destroy_errstats(bd);
+		cmlb_free_handle(&bd->d_cmlbh);
+
 		if (bd->d_ksp != NULL) {
 			kstat_delete(bd->d_ksp);
 			bd->d_ksp = NULL;
 		} else {
 			kmem_free(bd->d_kiop, sizeof (kstat_io_t));
+			bd->d_kiop = NULL;
 		}
+
+		kmem_cache_destroy(bd->d_cache);
+		cv_destroy(&bd->d_statecv);
+		mutex_destroy(&bd->d_statemutex);
+		mutex_destroy(&bd->d_ocmutex);
+		mutex_destroy(&bd->d_ksmutex);
 		ddi_soft_state_free(bd_state, inst);
 		return (DDI_FAILURE);
 	}
@@ -797,6 +818,7 @@ bd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	default:
 		return (DDI_FAILURE);
 	}
+
 	if (bd->d_ksp != NULL) {
 		kstat_delete(bd->d_ksp);
 		bd->d_ksp = NULL;
@@ -804,15 +826,7 @@ bd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		kmem_free(bd->d_kiop, sizeof (kstat_io_t));
 	}
 
-	if (bd->d_errstats != NULL) {
-		bd_fini_errstats(bd);
-		kstat_delete(bd->d_errstats);
-		bd->d_errstats = NULL;
-	} else {
-		kmem_free(bd->d_kerr, sizeof (struct bd_errstats));
-		mutex_destroy(&bd->d_errmutex);
-	}
-
+	bd_destroy_errstats(bd);
 	cmlb_detach(bd->d_cmlbh, 0);
 	cmlb_free_handle(&bd->d_cmlbh);
 	if (bd->d_devid)
@@ -2052,11 +2066,12 @@ bd_attach_handle(dev_info_t *dip, bd_handle_t hdl)
 	ddi_set_parent_data(child, hdl);
 	hdl->h_child = child;
 
-	if (ndi_devi_online(child, 0) == NDI_FAILURE) {
+	if (ndi_devi_online(child, 0) != NDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d: failed bringing node %s@%s online",
 		    ddi_driver_name(dip), ddi_get_instance(dip),
 		    hdl->h_name, hdl->h_addr);
 		(void) ndi_devi_free(child);
+		hdl->h_child = NULL;
 		return (DDI_FAILURE);
 	}
 

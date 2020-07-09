@@ -12,6 +12,7 @@
 /*
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2019 Western Digital Corporation
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*
@@ -32,11 +33,15 @@
 
 static int nvme_strlen(const char *, int);
 
-static void nvme_print_str(int, char *, int, const char *, int);
-static void nvme_print_double(int, char *, double, int, char *);
-static void nvme_print_uint64(int, char *, uint64_t, const char *, char *);
-static void nvme_print_uint128(int, char *, nvme_uint128_t, char *, int, int);
-static void nvme_print_bit(int, char *, int, char *, char *);
+static void nvme_print_str(int, const char *, int, const char *, int);
+static void nvme_print_double(int, const char *, double, int, const char *);
+static void nvme_print_int64(int, const char *, uint64_t, const char *,
+    const char *);
+static void nvme_print_uint64(int, const char *, uint64_t, const char *,
+    const char *);
+static void nvme_print_uint128(int, const char *, nvme_uint128_t, const char *,
+    int, int);
+static void nvme_print_bit(int, const char *, int, const char *, const char *);
 
 #define	ARRAYSIZE(x)		(sizeof (x) / sizeof (*(x)))
 
@@ -163,7 +168,7 @@ static const char *lba_range_types[] = {
 #define	NVME_PRINT_ALIGN	43
 
 void
-nvme_print(int indent, char *name, int index, const char *fmt, ...)
+nvme_print(int indent, const char *name, int index, const char *fmt, ...)
 {
 	int align = NVME_PRINT_ALIGN - (indent + strlen(name) + 1);
 	va_list ap;
@@ -209,7 +214,8 @@ nvme_strlen(const char *str, int len)
  * nvme_print_str -- print a string up to the specified length
  */
 static void
-nvme_print_str(int indent, char *name, int index, const char *value, int len)
+nvme_print_str(int indent, const char *name, int index, const char *value,
+    int len)
 {
 	if (len == 0)
 		len = strlen(value);
@@ -222,7 +228,8 @@ nvme_print_str(int indent, char *name, int index, const char *value, int len)
  * optional unit
  */
 static void
-nvme_print_double(int indent, char *name, double value, int places, char *unit)
+nvme_print_double(int indent, const char *name, double value, int places,
+    const char *unit)
 {
 	if (unit == NULL)
 		unit = "";
@@ -231,12 +238,12 @@ nvme_print_double(int indent, char *name, double value, int places, char *unit)
 }
 
 /*
- * nvme_print_uint64 -- print uint64_t with optional unit in decimal or another
+ * nvme_print_int64 -- print int64_t with optional unit in decimal or another
  * format specified
  */
 static void
-nvme_print_uint64(int indent, char *name, uint64_t value, const char *fmt,
-    char *unit)
+nvme_print_int64(int indent, const char *name, uint64_t value, const char *fmt,
+    const char *unit)
 {
 	char *tmp_fmt;
 
@@ -245,6 +252,43 @@ nvme_print_uint64(int indent, char *name, uint64_t value, const char *fmt,
 
 	if (fmt == NULL)
 		fmt = "%"PRId64;
+
+	if (asprintf(&tmp_fmt, "%s%%s", fmt) < 0)
+		err(-1, "nvme_print_int64()");
+
+	nvme_print(indent, name, -1, tmp_fmt, value, unit);
+
+	free(tmp_fmt);
+}
+
+/*
+ * nvme_print_temp -- The NVMe specification passes most temperature values as
+ * uint16_t values that are encoded in kelvin. This converts them in one place
+ * to Celsius.
+ */
+static void
+nvme_print_temp(int indent, const char *name, uint16_t value)
+{
+	int64_t temp = (int64_t)value;
+	temp -= 273;
+	nvme_print_int64(indent, name, temp, NULL, "C");
+}
+
+/*
+ * nvme_print_uint64 -- print uint64_t with optional unit in decimal or another
+ * format specified
+ */
+static void
+nvme_print_uint64(int indent, const char *name, uint64_t value, const char *fmt,
+    const char *unit)
+{
+	char *tmp_fmt;
+
+	if (unit == NULL)
+		unit = "";
+
+	if (fmt == NULL)
+		fmt = "%"PRIu64;
 
 	if (asprintf(&tmp_fmt, "%s%%s", fmt) < 0)
 		err(-1, "nvme_print_uint64()");
@@ -259,8 +303,8 @@ nvme_print_uint64(int indent, char *name, uint64_t value, const char *fmt,
  * binary and/or decimal shifting
  */
 static void
-nvme_print_uint128(int indent, char *name, nvme_uint128_t value, char *unit,
-    int scale_bits, int scale_tens)
+nvme_print_uint128(int indent, const char *name, nvme_uint128_t value,
+    const char *unit, int scale_bits, int scale_tens)
 {
 	const char hex[] = "0123456789abcdef";
 	uint8_t o[(128 + scale_bits) / 3];
@@ -360,7 +404,8 @@ nvme_print_uint128(int indent, char *name, nvme_uint128_t value, char *unit,
  * nvme_print_bit -- print a bit with optional names for both states
  */
 static void
-nvme_print_bit(int indent, char *name, int value, char *s_true, char *s_false)
+nvme_print_bit(int indent, const char *name, int value, const char *s_true,
+    const char *s_false)
 {
 	if (s_true == NULL)
 		s_true = "supported";
@@ -784,7 +829,8 @@ nvme_print_error_log(int nlog, nvme_error_log_entry_t *elog)
  * of the log if verbose is set.
  */
 void
-nvme_print_health_log(nvme_health_log_t *hlog, nvme_identify_ctrl_t *idctl)
+nvme_print_health_log(nvme_health_log_t *hlog, nvme_identify_ctrl_t *idctl,
+    nvme_version_t *vers)
 {
 	nvme_print(0, "SMART/Health Information", -1, NULL);
 	nvme_print(2, "Critical Warnings", -1, NULL);
@@ -800,8 +846,7 @@ nvme_print_health_log(nvme_health_log_t *hlog, nvme_identify_ctrl_t *idctl)
 		nvme_print_bit(4, "Volatile Memory Backup",
 		    hlog->hl_crit_warn.cw_volatile, "failed", "OK");
 
-	nvme_print_uint64(2, "Temperature",
-	    hlog->hl_temp - 273, NULL, "C");
+	nvme_print_temp(2, "Temperature", hlog->hl_temp);
 	nvme_print_uint64(2, "Available Spare Capacity",
 	    hlog->hl_avail_spare, NULL, "%");
 
@@ -817,7 +862,7 @@ nvme_print_health_log(nvme_health_log_t *hlog, nvme_identify_ctrl_t *idctl)
 
 	/*
 	 * The following two fields are in 1000 512 byte units. Convert that to
-	 * GB by doing binary shifts (9 left and 30 right) and muliply by 10^3.
+	 * GB by doing binary shifts (9 left and 30 right) and multiply by 10^3.
 	 */
 	nvme_print_uint128(2, "Data Read",
 	    hlog->hl_data_read, "GB", 30 - 9, 3);
@@ -840,6 +885,76 @@ nvme_print_health_log(nvme_health_log_t *hlog, nvme_identify_ctrl_t *idctl)
 	    hlog->hl_media_errors, NULL, 0, 0);
 	nvme_print_uint128(2, "Errors Logged",
 	    hlog->hl_errors_logged, NULL, 0, 0);
+
+	if (!NVME_VERSION_ATLEAST(vers, 1, 2)) {
+		return;
+	}
+
+	if (idctl->ap_wctemp != 0) {
+		nvme_print_uint64(2, "Warning Composite Temperature Time",
+		    hlog->hl_warn_temp_time, NULL, "min");
+	}
+
+	if (idctl->ap_cctemp != 0) {
+		nvme_print_uint64(2, "Critical Composite Temperature Time",
+		    hlog->hl_crit_temp_time, NULL, "min");
+	}
+
+	if (hlog->hl_temp_sensor_1 != 0) {
+		nvme_print_temp(2, "Temperature Sensor 1",
+		    hlog->hl_temp_sensor_1);
+	}
+
+	if (hlog->hl_temp_sensor_2 != 0) {
+		nvme_print_temp(2, "Temperature Sensor 2",
+		    hlog->hl_temp_sensor_2);
+	}
+
+	if (hlog->hl_temp_sensor_3 != 0) {
+		nvme_print_temp(2, "Temperature Sensor 3",
+		    hlog->hl_temp_sensor_3);
+	}
+
+	if (hlog->hl_temp_sensor_4 != 0) {
+		nvme_print_temp(2, "Temperature Sensor 4",
+		    hlog->hl_temp_sensor_4);
+	}
+
+	if (hlog->hl_temp_sensor_5 != 0) {
+		nvme_print_temp(2, "Temperature Sensor 5",
+		    hlog->hl_temp_sensor_5);
+	}
+
+	if (hlog->hl_temp_sensor_6 != 0) {
+		nvme_print_temp(2, "Temperature Sensor 6",
+		    hlog->hl_temp_sensor_6);
+	}
+
+	if (hlog->hl_temp_sensor_7 != 0) {
+		nvme_print_temp(2, "Temperature Sensor 7",
+		    hlog->hl_temp_sensor_7);
+	}
+
+	if (hlog->hl_temp_sensor_8 != 0) {
+		nvme_print_temp(2, "Temperature Sensor 8",
+		    hlog->hl_temp_sensor_8);
+	}
+
+	if (!NVME_VERSION_ATLEAST(vers, 1, 3)) {
+		return;
+	}
+
+	nvme_print_uint64(2, "Thermal Management Temp 1 Transition Count",
+	    hlog->hl_tmtemp_1_tc, NULL, NULL);
+
+	nvme_print_uint64(2, "Thermal Management Temp 2 Transition Count",
+	    hlog->hl_tmtemp_2_tc, NULL, NULL);
+
+	nvme_print_uint64(2, "Time for Thermal Management Temp 1",
+	    hlog->hl_tmtemp_1_time, NULL, "sec");
+
+	nvme_print_uint64(2, "Time for Thermal Management Temp 2",
+	    hlog->hl_tmtemp_2_time, NULL, "sec");
 }
 
 /*
@@ -970,14 +1085,13 @@ void
 nvme_print_feat_temperature(uint64_t res, void *b, size_t s,
     nvme_identify_ctrl_t *id)
 {
-	_NOTE(ARGUNUSED(b));
 	_NOTE(ARGUNUSED(s));
 	_NOTE(ARGUNUSED(id));
 	nvme_temp_threshold_t tt;
+	char *label = b;
 
 	tt.r = (uint32_t)res;
-	nvme_print_uint64(4, "Temperature Threshold", tt.b.tt_tmpth - 273,
-	    NULL, "C");
+	nvme_print_temp(4, label, tt.b.tt_tmpth);
 }
 
 void
