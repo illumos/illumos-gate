@@ -84,6 +84,17 @@ fi
 #
 smf_netstrategy
 
+#
+# Read /etc/inet/static_routes.vmadm and add each link-local route.
+#
+if [ -f /etc/inet/static_routes.vmadm ]; then
+	echo "Adding vmadm persistent link-local routes:"
+	/usr/bin/egrep -v "^(#|$)"  /etc/inet/static_routes.vmadm |
+	    /usr/bin/grep -- "-interface " | while read line; do
+			/usr/sbin/route add $line
+        done
+fi
+
 if [ "$_INIT_NET_STRATEGY" = "dhcp" ] && \
     [ -n "`/sbin/dhcpinfo Router`" ]; then
 	defrouters=`/sbin/dhcpinfo Router`
@@ -216,11 +227,12 @@ if [ -f /etc/inet/static_routes ]; then
 fi
 
 #
-# Read /etc/inet/static_routes.vmadm and add each route.
+# Read /etc/inet/static_routes.vmadm and add each non-link-local route.
 #
 if [ -f /etc/inet/static_routes.vmadm ]; then
 	echo "Adding vmadm persistent routes:"
-	/usr/bin/egrep -v "^(#|$)" /etc/inet/static_routes.vmadm | while read line; do
+	/usr/bin/egrep -v "^(#|$)" /etc/inet/static_routes.vmadm |
+	    /usr/bin/grep -v -- "-interface " | while read line; do
 		/usr/sbin/route add $line
 	done
 fi
