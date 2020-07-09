@@ -1464,21 +1464,37 @@ ctf_dwarf_array_upper_bound(ctf_cu_t *cup, Dwarf_Die range, ctf_arinfo_t *ar)
 	Dwarf_Half form;
 	Dwarf_Error derr;
 	const char *formstr = NULL;
+	uint_t adj = 0;
 	int ret = 0;
 
 	ctf_dprintf("setting array upper bound\n");
 
 	ar->ctr_nelems = 0;
 
-	ret = ctf_dwarf_attribute(cup, range, DW_AT_upper_bound, &attr);
 	/*
-	 * Treat the lack of an upper bound attribute as a zero element array
-	 * and return success, otherwise return the error.
+	 * Different compilers use different attributes to indicate the size of
+	 * an array. GCC has traditionally used DW_AT_upper_bound, while Clang
+	 * uses DW_AT_count. They have slightly different semantics. DW_AT_count
+	 * indicates the total number of elements that are present, while
+	 * DW_AT_upper_bound indicates the last index, hence we need to add one
+	 * to that index to get the count.
+	 *
+	 * We first search for DW_AT_count and then for DW_AT_upper_bound. If we
+	 * find neither, then we treat the lack of this as a zero element array.
+	 * Our value is initialized assuming we find a DW_AT_count value.
 	 */
-	if (ret != 0) {
-		if (ret == ENOENT)
-			return (0);
+	ret = ctf_dwarf_attribute(cup, range, DW_AT_count, &attr);
+	if (ret != 0 && ret != ENOENT) {
 		return (ret);
+	} else if (ret == ENOENT) {
+		ret = ctf_dwarf_attribute(cup, range, DW_AT_upper_bound, &attr);
+		if (ret != 0 && ret != ENOENT) {
+			return (ret);
+		} else if (ret == ENOENT) {
+			return (0);
+		} else {
+			adj = 1;
+		}
 	}
 
 	if (dwarf_whatform(attr, &form, &derr) != DW_DLV_OK) {
@@ -1520,14 +1536,14 @@ ctf_dwarf_array_upper_bound(ctf_cu_t *cup, Dwarf_Die range, ctf_arinfo_t *ar)
 	switch (form) {
 	case DW_FORM_sdata:
 		if (dwarf_formsdata(attr, &sval, &derr) == DW_DLV_OK) {
-			ar->ctr_nelems = sval + 1;
+			ar->ctr_nelems = sval + adj;
 			goto done;
 		}
 		break;
 	case DW_FORM_udata:
 	default:
 		if (dwarf_formudata(attr, &uval, &derr) == DW_DLV_OK) {
-			ar->ctr_nelems = uval + 1;
+			ar->ctr_nelems = uval + adj;
 			goto done;
 		}
 		break;
