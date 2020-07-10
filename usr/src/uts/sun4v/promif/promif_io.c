@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/promif_impl.h>
 #include <sys/systm.h>
 #include <sys/hypervisor_api.h>
@@ -229,7 +227,7 @@ promif_write(void *p)
 	len = p1275_cell2size(ci[5]);
 
 	/* only support stdout (console) */
-	ASSERT(fd == istdout);
+	VERIFY(fd == istdout);
 
 	rlen = promif_do_write(buf, len);
 
@@ -256,7 +254,7 @@ promif_read(void *p)
 	len = p1275_cell2size(ci[5]);
 
 	/* only support stdin (console) */
-	ASSERT(fd == istdin);
+	VERIFY(fd == istdin);
 
 	rlen = promif_do_read(buf, len, B_FALSE);
 

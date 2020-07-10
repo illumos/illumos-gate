@@ -23,6 +23,7 @@
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Western Digital Corporation.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef	_SYS_BLKDEV_H
@@ -79,8 +80,10 @@ typedef struct bd_handle *bd_handle_t;
 typedef struct bd_xfer bd_xfer_t;
 typedef struct bd_drive bd_drive_t;
 typedef struct bd_media bd_media_t;
+typedef struct bd_free_info bd_free_info_t;
 typedef struct bd_ops bd_ops_t;
 
+struct dkioc_free_list_s;
 
 struct bd_xfer {
 	/*
@@ -95,6 +98,7 @@ struct bd_xfer {
 	caddr_t			x_kaddr;
 	unsigned		x_flags;
 	unsigned		x_qnum;
+	const struct dkioc_free_list_s *x_dfl;
 };
 
 #define	BD_XFER_POLL		(1U << 0)	/* no interrupts (dump) */
@@ -119,6 +123,33 @@ struct bd_drive {
 	uint8_t			d_eui64[8];
 	/* Added at the end to maintain binary compatibility */
 	uint32_t		d_qcount;
+
+	/*
+	 * Required starting alignment for free_space requests (in logical
+	 * blocks). Must be >= 1.
+	 */
+	uint64_t		d_free_align;
+
+	/*
+	 * Maximum number of segments supported in a free space request.
+	 * 0 implies no limit.
+	 */
+	uint64_t		d_max_free_seg;
+
+	/*
+	 * Maximum number of logical blocks allowed in a free space request.
+	 * 0 implies no limit.
+	 */
+	uint64_t		d_max_free_blks;
+
+	/*
+	 * Maximum number of logical blocks to free in a single segment.
+	 * 0 implies no limit. If no limit, d_max_free_blks must also be 0.
+	 * If > 0, d_max_free_seg_blks must be <= d_max_free_blks (basically
+	 * you can't set a bigger value of d_max_free_seg_blks than
+	 * d_max_free_blks).
+	 */
+	uint64_t		d_max_free_seg_blks;
 };
 
 struct bd_media {
@@ -147,14 +178,15 @@ struct bd_media {
 #define	BD_INFO_FLAG_READ_ONLY		(1U << 2)
 
 /*
- * If the API changes and we want to bump the version, add another
- * enum value, Eg BD_OPS_VERSION_1. BD_OPS_CURRENT_VERSION should always
- * be last.
+ * When adding a new version of the bd_ops_t struct, be sure to update
+ * BD_OPS_CURRENT_VERSION
  */
 typedef enum {
 	BD_OPS_VERSION_0 = 0,
-	BD_OPS_CURRENT_VERSION
+	BD_OPS_VERSION_1 = 1,
+	BD_OPS_VERSION_2 = 2,
 } bd_version_t;
+#define	BD_OPS_CURRENT_VERSION BD_OPS_VERSION_2
 
 struct bd_ops {
 	bd_version_t	o_version;
@@ -164,6 +196,7 @@ struct bd_ops {
 	int		(*o_sync_cache)(void *, bd_xfer_t *);
 	int		(*o_read)(void *, bd_xfer_t *);
 	int		(*o_write)(void *, bd_xfer_t *);
+	int		(*o_free_space)(void *, bd_xfer_t *);
 };
 
 struct bd_errstats {

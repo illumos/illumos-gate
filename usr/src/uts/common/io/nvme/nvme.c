@@ -567,6 +567,7 @@ static bd_ops_t nvme_bd_ops = {
 	.o_sync_cache	= nvme_bd_sync,
 	.o_read		= nvme_bd_read,
 	.o_write	= nvme_bd_write,
+	.o_free_space	= NULL,
 };
 
 /*

@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2015, Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2012, Alexey Zaytsev <alexey.zaytsev@gmail.com>
- * Copyright 2019 Joyent Inc.
+ * Copyright 2020 Joyent Inc.
  * Copyright 2019 Western Digital Corporation.
  */
 
@@ -87,10 +87,10 @@
 #include <sys/containerof.h>
 #include <sys/ctype.h>
 #include <sys/sysmacros.h>
+#include <sys/dkioc_free_util.h>
 
 #include "virtio.h"
 #include "vioblk.h"
-
 
 static void vioblk_get_id(vioblk_t *);
 uint_t vioblk_int_handler(caddr_t, caddr_t);
@@ -147,7 +147,6 @@ static const ddi_dma_attr_t vioblk_dma_attr = {
 	.dma_attr_granular =		1,
 	.dma_attr_flags =		0
 };
-
 
 static vioblk_req_t *
 vioblk_req_alloc(vioblk_t *vib)
@@ -376,6 +375,45 @@ out:
 }
 
 static int
+vioblk_map_discard(vioblk_t *vib, virtio_chain_t *vic, const bd_xfer_t *xfer)
+{
+	const dkioc_free_list_t *dfl = xfer->x_dfl;
+	const dkioc_free_list_ext_t *exts = dfl->dfl_exts;
+	virtio_dma_t *dma = NULL;
+	struct vioblk_discard_write_zeroes *wzp = NULL;
+
+	dma = virtio_dma_alloc(vib->vib_virtio,
+	    dfl->dfl_num_exts * sizeof (*wzp), &vioblk_dma_attr,
+	    DDI_DMA_CONSISTENT | DDI_DMA_WRITE, KM_SLEEP);
+	if (dma == NULL)
+		return (ENOMEM);
+
+	wzp = virtio_dma_va(dma, 0);
+
+	for (uint64_t i = 0; i < dfl->dfl_num_exts; i++, exts++, wzp++) {
+		uint64_t start = dfl->dfl_offset + exts->dfle_start;
+
+		const struct vioblk_discard_write_zeroes vdwz = {
+			.vdwz_sector = start >> DEV_BSHIFT,
+			.vdwz_num_sectors = exts->dfle_length >> DEV_BSHIFT,
+			.vdwz_flags = 0
+		};
+
+		bcopy(&vdwz, wzp, sizeof (*wzp));
+	}
+
+	if (virtio_chain_append(vic,
+	    virtio_dma_cookie_pa(dma, 0),
+	    virtio_dma_cookie_size(dma, 0),
+	    VIRTIO_DIR_DEVICE_READS) != DDI_SUCCESS) {
+		virtio_dma_free(dma);
+		return (ENOMEM);
+	}
+
+	return (0);
+}
+
+static int
 vioblk_request(vioblk_t *vib, bd_xfer_t *xfer, int type)
 {
 	virtio_chain_t *vic = NULL;
@@ -438,6 +476,11 @@ vioblk_request(vioblk_t *vib, bd_xfer_t *xfer, int type)
 		dev_err(vib->vib_dip, CE_PANIC,
 		    "request of type %d had payload length of %lu blocks", type,
 		    xfer->x_nblks);
+	} else if (type == VIRTIO_BLK_T_DISCARD) {
+		r = vioblk_map_discard(vib, vic, xfer);
+		if (r != 0) {
+			goto fail;
+		}
 	}
 
 	if (vib->vib_stats->vbs_rw_cookiesmax.value.ui32 < total_cookies) {
@@ -524,6 +567,24 @@ vioblk_bd_driveinfo(void *arg, bd_drive_t *drive)
 
 	drive->d_revision = "0000";
 	drive->d_revision_len = strlen(drive->d_revision);
+
+	if (vib->vib_can_discard) {
+		drive->d_free_align = vib->vib_discard_sector_align;
+		drive->d_max_free_seg = vib->vib_max_discard_seg;
+		drive->d_max_free_blks = vib->vib_max_discard_sectors;
+		/*
+		 * The virtio 1.1 spec doesn't specify a per segment sector
+		 * limit for discards -- only a limit on the total sectors in
+		 * a discard request. Therefore, we assume a vioblk device must
+		 * be able to accept a single segment of vib_max_discard_sectors
+		 * (when it supports discard requests) and use
+		 * vib_max_discard_sectors both for the overall limit for
+		 * a discard request, but also as the limit for a single
+		 * segment. blkdev will ensure we are never called with
+		 * a dkioc_free_list_t that violates either limit.
+		 */
+		drive->d_max_free_seg_blks = vib->vib_max_discard_sectors;
+	}
 }
 
 static int
@@ -610,6 +671,27 @@ vioblk_bd_devid(void *arg, dev_info_t *dip, ddi_devid_t *devid)
 
 	return (ddi_devid_init(dip, DEVID_ATA_SERIAL, len, vib->vib_devid,
 	    devid));
+}
+
+static int
+vioblk_bd_free_space(void *arg, bd_xfer_t *xfer)
+{
+	vioblk_t *vib = arg;
+	int r = 0;
+
+	/*
+	 * Since vib_can_discard is write once (and set during attach),
+	 * we can check if it's enabled without taking the mutex.
+	 */
+	if (!vib->vib_can_discard) {
+		return (ENOTSUP);
+	}
+
+	mutex_enter(&vib->vib_mutex);
+	r = vioblk_request(vib, xfer, VIRTIO_BLK_T_DISCARD);
+	mutex_exit(&vib->vib_mutex);
+
+	return (r);
 }
 
 /*
@@ -804,6 +886,36 @@ vioblk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 	}
 
+	if (virtio_feature_present(vio, VIRTIO_BLK_F_DISCARD)) {
+		vib->vib_max_discard_sectors = virtio_dev_get32(vio,
+		    VIRTIO_BLK_CONFIG_MAX_DISCARD_SECT);
+		vib->vib_max_discard_seg = virtio_dev_get32(vio,
+		    VIRTIO_BLK_CONFIG_MAX_DISCARD_SEG);
+		vib->vib_discard_sector_align = virtio_dev_get32(vio,
+		    VIRTIO_BLK_CONFIG_DISCARD_ALIGN);
+
+		if (vib->vib_max_discard_sectors == 0 ||
+		    vib->vib_max_discard_seg == 0 ||
+		    vib->vib_discard_sector_align == 0) {
+			vib->vib_can_discard = B_FALSE;
+
+			/*
+			 * The hypervisor shouldn't be giving us bad values.
+			 * If it is, it's probably worth notifying the
+			 * operator.
+			 */
+			dev_err(dip, CE_NOTE,
+			    "Host is advertising DISCARD support but with bad"
+			    "parameters: max_discard_sectors=%u, "
+			    "max_discard_segments=%u, discard_sector_align=%u",
+			    vib->vib_max_discard_sectors,
+			    vib->vib_max_discard_seg,
+			    vib->vib_discard_sector_align);
+		} else {
+			vib->vib_can_discard = B_TRUE;
+		}
+	}
+
 	/*
 	 * When allocating the request queue, we include two additional
 	 * descriptors (beyond those required for request data) to account for
@@ -924,6 +1036,10 @@ vioblk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * "o_sync_cache" member from the ops vector.  As "bd_alloc_handle()"
 	 * makes a copy of the ops vector, we can safely assemble one on the
 	 * stack based on negotiated features.
+	 *
+	 * Similarly, the blkdev framework does not provide a way to indicate
+	 * if a device supports an TRIM/UNMAP/DISCARD type operation except
+	 * by omitting the "o_free_space" member from the ops vector.
 	 */
 	bd_ops_t vioblk_bd_ops = {
 		.o_version =		BD_OPS_CURRENT_VERSION,
@@ -933,9 +1049,13 @@ vioblk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		.o_sync_cache =		vioblk_bd_flush,
 		.o_read =		vioblk_bd_read,
 		.o_write =		vioblk_bd_write,
+		.o_free_space =		vioblk_bd_free_space,
 	};
 	if (!virtio_feature_present(vio, VIRTIO_BLK_F_FLUSH)) {
 		vioblk_bd_ops.o_sync_cache = NULL;
+	}
+	if (!vib->vib_can_discard) {
+		vioblk_bd_ops.o_free_space = NULL;
 	}
 
 	vib->vib_bd_h = bd_alloc_handle(vib, &vioblk_bd_ops,
