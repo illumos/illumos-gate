@@ -27,6 +27,7 @@ SUBDIRS = mdb_kb \
 	generic_cpu \
 	amd_opteron \
 	sata \
+	smbios \
 	xhci
 
 include ../../Makefile.subdirs
