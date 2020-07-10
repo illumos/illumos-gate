@@ -932,6 +932,40 @@ imc_fixup_stubs(imc_t *imc)
 }
 
 /*
+ * In the wild we've hit a few odd cases where not all devices are exposed that
+ * we might expect by firmware. In particular we've seen and validate the
+ * following cases:
+ *
+ *  o We don't find all of the channel devices that we expect, e.g. we have the
+ *    stubs for channels 1-3, but not 0. That has been seen on an Intel S2600CW
+ *    with an E5-2630v3.
+ */
+static boolean_t
+imc_validate_stubs(imc_t *imc)
+{
+	for (uint_t sock = 0; sock < imc->imc_nsockets; sock++) {
+		imc_socket_t *socket = &imc->imc_sockets[sock];
+
+		for (uint_t mc = 0; mc < socket->isock_nimc; mc++) {
+			imc_mc_t *mcp = &socket->isock_imcs[mc];
+
+			for (uint_t chan = 0; chan < mcp->icn_nchannels;
+			    chan++) {
+				if (mcp->icn_channels[chan].ich_desc == NULL) {
+					dev_err(imc->imc_dip, CE_WARN,
+					    "!missing device for socket %u/"
+					    "imc %u/channel %u", sock, mc,
+					    chan);
+					return (B_FALSE);
+				}
+			}
+		}
+	}
+
+	return (B_TRUE);
+}
+
+/*
  * Attempt to map all of the discovered sockets to the corresponding APIC based
  * socket. We do these mappings by getting the node id of the socket and
  * adjusting it to make sure that no home agent is present in it. We use the
@@ -2191,6 +2225,11 @@ imc_attach_complete(void *arg)
 	 * bad PCIe reads.
 	 */
 	if (!imc_map_stubs(imc)) {
+		goto done;
+	}
+
+	if (!imc_validate_stubs(imc)) {
+		imc->imc_flags |= IMC_F_VALIDATE_FAILED;
 		goto done;
 	}
 
