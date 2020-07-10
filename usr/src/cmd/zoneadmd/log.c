@@ -960,6 +960,32 @@ logstream_open(const char *logname, const char *stream, logstream_flags_t flags)
 	return (ls);
 }
 
+static void
+logstream_reset(logstream_t *lsp)
+{
+	custr_t *buf = lsp->ls_cusbuf;
+	custr_t *obuf = lsp->ls_cusobuf;
+
+	(void) memset(lsp, 0, sizeof (*lsp));
+	lsp->ls_cusbuf = buf;
+	lsp->ls_cusobuf = obuf;
+
+	custr_reset(buf);
+	custr_reset(obuf);
+}
+
+static void
+logfile_reset(logfile_t *lfp)
+{
+	custr_t *buf = lfp->lf_cus;
+
+	(void) memset(lfp, 0, sizeof (*lfp));
+	lfp->lf_cus = buf;
+	lfp->lf_fd = -1;
+
+	custr_reset(buf);
+}
+
 void
 logstream_close(int ls, boolean_t abrupt)
 {
@@ -982,7 +1008,7 @@ logstream_close(int ls, boolean_t abrupt)
 	VERIFY(lsp->ls_stream[0] != '\0');
 	VERIFY3P(lfp, !=, NULL);
 
-	(void) memset(lsp, 0, sizeof (*lsp));
+	logstream_reset(lsp);
 
 	for (i = 0; i < ARRAY_SIZE(streams); i++) {
 		if (streams[i].ls_logfile == lfp) {
@@ -995,8 +1021,7 @@ logstream_close(int ls, boolean_t abrupt)
 
 	close_log(lfp, "close", abrupt);
 
-	(void) memset(lfp, 0, sizeof (*lfp));
-	lfp->lf_fd = -1;
+	logfile_reset(lfp);
 
 	logstream_unlock();
 }
