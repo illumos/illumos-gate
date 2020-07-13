@@ -96,7 +96,7 @@ FILEMODE =	0755
 SRCDIR =	$(SRC)/lib/libdwarf/common/
 SRCS =		$(PICS:%.o=$(SRCDIR)/%.c)
 
-CPPFLAGS +=	-I$(SRCDIR) -DELF_TARGET_ALL=1
+CPPFLAGS +=	-I$(ADJUNCT_PROTO)/usr/include -I$(SRCDIR) -DELF_TARGET_ALL=1
 CERRWARN +=	-_gcc=-Wno-unused
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 
@@ -104,7 +104,7 @@ CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 SMATCH=off
 
 DYNFLAGS += '-R$$ORIGIN/../../lib/$(MACH)'
-LDLIBS = -lelf -lc -lz
+LDLIBS = -L$(ADJUNCT_PROTO)/lib -R$(ADJUNCT_PROTO)/lib -lelf -lc -lz
 NATIVE_LIBS += libelf.so libc.so libz.so
 
 .KEEP_STATE:
