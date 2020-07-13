@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #ifndef _SMB_KCRYPT_H_
@@ -36,6 +37,7 @@ extern "C" {
 
 #define	MD5_DIGEST_LENGTH	16	/* MD5 digest length in bytes */
 #define	SHA256_DIGEST_LENGTH	32	/* SHA256 digest length in bytes */
+#define	SHA512_DIGEST_LENGTH	64	/* SHA512 digest length in bytes */
 #define	SMB2_SIG_SIZE		16
 #define	SMB2_KEYLEN		16
 #define	SMB3_KEYLEN		16	/* AES-128 keys */
@@ -49,7 +51,12 @@ typedef struct smb3_enc_ctx {
 	crypto_data_t output;
 	size_t len;
 } smb3_enc_ctx_t;
-typedef CK_AES_CCM_PARAMS	smb3_crypto_param_t;
+
+typedef union {
+	CK_AES_CCM_PARAMS	ccm;
+	CK_AES_GCM_PARAMS	gcm;
+} smb3_crypto_param_t;
+
 #else	/* _KERNEL */
 /* PKCS11 variant */
 typedef CK_MECHANISM		smb_crypto_mech_t;
@@ -93,11 +100,16 @@ int smb3_cmac_init(smb_sign_ctx_t *, smb_crypto_mech_t *, uint8_t *, size_t);
 int smb3_cmac_update(smb_sign_ctx_t, uint8_t *, size_t);
 int smb3_cmac_final(smb_sign_ctx_t, uint8_t *);
 
-int smb3_do_kdf(void *, void *, size_t, uint8_t *, uint32_t);
+int smb3_kdf(uint8_t *outbuf, uint8_t *key, size_t key_len,
+    uint8_t *label, size_t label_len,
+    uint8_t *context, size_t context_len);
 
-int smb3_encrypt_getmech(smb_crypto_mech_t *);
-void smb3_crypto_init_param(smb3_crypto_param_t *, uint8_t *, size_t,
+int smb3_aes_ccm_getmech(smb_crypto_mech_t *);
+int smb3_aes_gcm_getmech(smb_crypto_mech_t *);
+void smb3_crypto_init_ccm_param(smb3_crypto_param_t *, uint8_t *, size_t,
     uint8_t *, size_t, size_t);
+void smb3_crypto_init_gcm_param(smb3_crypto_param_t *, uint8_t *, size_t,
+    uint8_t *, size_t);
 
 int smb3_encrypt_init(smb3_enc_ctx_t *, smb_crypto_mech_t *,
     smb3_crypto_param_t *, uint8_t *, size_t, uint8_t *, size_t);

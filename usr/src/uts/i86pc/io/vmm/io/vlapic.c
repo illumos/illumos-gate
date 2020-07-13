@@ -40,6 +40,7 @@
  *
  * Copyright 2014 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -931,7 +932,8 @@ vlapic_calcdest(struct vm *vm, cpuset_t *dmask, uint32_t dest, bool phys,
 	}
 }
 
-static VMM_STAT_ARRAY(IPIS_SENT, VM_MAXCPU, "ipis sent to vcpu");
+static VMM_STAT(VLAPIC_IPI_SEND, "ipis sent from vcpu");
+static VMM_STAT(VLAPIC_IPI_RECV, "ipis received by vcpu");
 
 static void
 vlapic_set_tpr(struct vlapic *vlapic, uint8_t val)
@@ -1036,8 +1038,10 @@ vlapic_icrlo_write_handler(struct vlapic *vlapic, bool *retu)
 			CPU_CLR(i, &dmask);
 			if (mode == APIC_DELMODE_FIXED) {
 				lapic_intr_edge(vlapic->vm, i, vec);
-				vmm_stat_array_incr(vlapic->vm, vlapic->vcpuid,
-						    IPIS_SENT, i, 1);
+				vmm_stat_incr(vlapic->vm, vlapic->vcpuid,
+				    VLAPIC_IPI_SEND, 1);
+				vmm_stat_incr(vlapic->vm, i,
+				    VLAPIC_IPI_RECV, 1);
 				VLAPIC_CTR2(vlapic, "vlapic sending ipi %d "
 				    "to vcpuid %d", vec, i);
 			} else {
@@ -1104,8 +1108,8 @@ vlapic_self_ipi_handler(struct vlapic *vlapic, uint64_t val)
 
 	vec = val & 0xff;
 	lapic_intr_edge(vlapic->vm, vlapic->vcpuid, vec);
-	vmm_stat_array_incr(vlapic->vm, vlapic->vcpuid, IPIS_SENT,
-	    vlapic->vcpuid, 1);
+	vmm_stat_incr(vlapic->vm, vlapic->vcpuid, VLAPIC_IPI_SEND, 1);
+	vmm_stat_incr(vlapic->vm, vlapic->vcpuid, VLAPIC_IPI_RECV, 1);
 	VLAPIC_CTR1(vlapic, "vlapic self-ipi %d", vec);
 }
 

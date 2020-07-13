@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -36,6 +37,7 @@
 #include <smbsrv/smb_idmap.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_token.h>
+#include <smbsrv/smb2_kproto.h>
 
 static uint32_t smb_authsock_open(smb_request_t *);
 static int smb_authsock_send(ksocket_t, void *, size_t);
@@ -285,6 +287,14 @@ smb_authenticate_ext(smb_request_t *sr)
 			goto errout;
 
 		msg_hdr.lmh_msgtype = LSA_MTYPE_ESFIRST;
+
+		if (sr->session->dialect >= SMB_VERS_3_11) {
+			if (smb31_preauth_sha512_calc(sr, &sr->command,
+			    sr->session->smb31_preauth_hashval,
+			    user->u_preauth_hashval) != 0)
+				cmn_err(CE_WARN, "(2) Preauth hash calculation "
+				    "failed");
+		}
 	} else {
 		user = smb_session_lookup_uid_st(sr->session,
 		    sr->smb2_ssnid, sr->smb_uid, SMB_USER_STATE_LOGGING_ON);
@@ -295,6 +305,14 @@ smb_authenticate_ext(smb_request_t *sr)
 		sr->uid_user = user;
 
 		msg_hdr.lmh_msgtype = LSA_MTYPE_ESNEXT;
+
+		if (sr->session->dialect >= SMB_VERS_3_11) {
+			if (smb31_preauth_sha512_calc(sr, &sr->command,
+			    user->u_preauth_hashval,
+			    user->u_preauth_hashval) != 0)
+				cmn_err(CE_WARN, "(4) Preauth hash calculation "
+				    "failed");
+		}
 	}
 
 	/*

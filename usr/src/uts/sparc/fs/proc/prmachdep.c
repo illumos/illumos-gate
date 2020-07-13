@@ -97,7 +97,7 @@ prgetprregs(klwp_t *lwp, prgregset_t prp)
 	ASSERT(MUTEX_NOT_HELD(&lwptoproc(lwp)->p_lock));
 
 	getgregs(lwp, gr);
-	bzero(prp, sizeof (prp));
+	bzero(prp, NPRGREG * sizeof (*prp));
 
 	/*
 	 * Can't copy since prgregset_t and gregset_t
@@ -318,7 +318,7 @@ prgetprregs32(klwp_t *lwp, prgregset32_t prp)
 	ASSERT(MUTEX_NOT_HELD(&lwptoproc(lwp)->p_lock));
 
 	getgregs32(lwp, gr);
-	bzero(prp, sizeof (prp));
+	bzero(prp, NPRGREG * sizeof (*prp));
 
 	/*
 	 * Can't copy since prgregset_t and gregset_t

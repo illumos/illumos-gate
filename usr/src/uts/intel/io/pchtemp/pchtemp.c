@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*
@@ -109,6 +110,7 @@ typedef struct pchtemp {
 	int			pcht_fm_caps;
 	caddr_t			pcht_base;
 	ddi_acc_handle_t	pcht_handle;
+	id_t			pcht_ksensor;
 	kmutex_t		pcht_mutex;	/* Protects members below */
 	uint16_t		pcht_temp_raw;
 	uint8_t			pcht_tsel_raw;
@@ -119,12 +121,6 @@ typedef struct pchtemp {
 } pchtemp_t;
 
 void *pchtemp_state;
-
-static pchtemp_t *
-pchtemp_find_by_dev(dev_t dev)
-{
-	return (ddi_get_soft_state(pchtemp_state, getminor(dev)));
-}
 
 static int
 pchtemp_read_check(pchtemp_t *pch)
@@ -141,12 +137,13 @@ pchtemp_read_check(pchtemp_t *pch)
 }
 
 static int
-pchtemp_read(pchtemp_t *pch)
+pchtemp_read(void *arg, sensor_ioctl_temperature_t *sit)
 {
 	uint16_t temp, ctt, tahv, talv;
 	uint8_t tsel;
+	pchtemp_t *pch = arg;
 
-	ASSERT(MUTEX_HELD(&pch->pcht_mutex));
+	mutex_enter(&pch->pcht_mutex);
 
 	temp = ddi_get16(pch->pcht_handle,
 	    (uint16_t *)((uintptr_t)pch->pcht_base + PCHTEMP_REG_TEMP));
@@ -160,6 +157,7 @@ pchtemp_read(pchtemp_t *pch)
 	    (uint16_t *)((uintptr_t)pch->pcht_base + PCHTEMP_REG_TALV));
 
 	if (pchtemp_read_check(pch) != DDI_FM_OK) {
+		mutex_exit(&pch->pcht_mutex);
 		dev_err(pch->pcht_dip, CE_WARN, "failed to read temperature "
 		    "data due to FM device error");
 		return (EIO);
@@ -172,112 +170,23 @@ pchtemp_read(pchtemp_t *pch)
 	pch->pcht_talv_raw = talv;
 
 	if ((tsel & PCHTEMP_REG_TSEL_ETS) == 0) {
+		mutex_exit(&pch->pcht_mutex);
 		return (ENXIO);
 	}
 
 	pch->pcht_temp = (temp & PCHTEMP_REG_TEMP_TSR) - PCHTEMP_TEMP_OFFSET;
-
-	return (0);
-}
-
-static int
-pchtemp_open(dev_t *devp, int flags, int otype, cred_t *credp)
-{
-	pchtemp_t *pch;
-
-	if (crgetzoneid(credp) != GLOBAL_ZONEID || drv_priv(credp)) {
-		return (EPERM);
-	}
-
-	if ((flags & (FEXCL | FNDELAY | FWRITE)) != 0) {
-		return (EINVAL);
-	}
-
-	if (otype != OTYP_CHR) {
-		return (EINVAL);
-	}
-
-	pch = pchtemp_find_by_dev(*devp);
-	if (pch == NULL) {
-		return (ENXIO);
-	}
-
-	return (0);
-}
-
-static int
-pchtemp_ioctl_kind(intptr_t arg, int mode)
-{
-	sensor_ioctl_kind_t kind;
-
-	bzero(&kind, sizeof (sensor_ioctl_kind_t));
-	kind.sik_kind = SENSOR_KIND_TEMPERATURE;
-
-	if (ddi_copyout((void *)&kind, (void *)arg, sizeof (kind),
-	    mode & FKIOCTL) != 0) {
-		return (EFAULT);
-	}
-
-	return (0);
-}
-
-static int
-pchtemp_ioctl_temp(pchtemp_t *pch, intptr_t arg, int mode)
-{
-	int ret;
-	sensor_ioctl_temperature_t temp;
-
-	bzero(&temp, sizeof (temp));
-
-	mutex_enter(&pch->pcht_mutex);
-	if ((ret = pchtemp_read(pch)) != 0) {
-		mutex_exit(&pch->pcht_mutex);
-		return (ret);
-	}
-
-	temp.sit_unit = SENSOR_UNIT_CELSIUS;
-	temp.sit_gran = PCHTEMP_TEMP_RESOLUTION;
-	temp.sit_temp = pch->pcht_temp;
+	sit->sit_unit = SENSOR_UNIT_CELSIUS;
+	sit->sit_gran = PCHTEMP_TEMP_RESOLUTION;
+	sit->sit_temp = pch->pcht_temp;
 	mutex_exit(&pch->pcht_mutex);
 
-	if (ddi_copyout(&temp, (void *)arg, sizeof (temp),
-	    mode & FKIOCTL) != 0) {
-		return (EFAULT);
-	}
-
 	return (0);
 }
 
-static int
-pchtemp_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-    int *rvalp)
-{
-	pchtemp_t *pch;
-
-	pch = pchtemp_find_by_dev(dev);
-	if (pch == NULL) {
-		return (ENXIO);
-	}
-
-	if ((mode & FREAD) == 0) {
-		return (EINVAL);
-	}
-
-	switch (cmd) {
-	case SENSOR_IOCTL_TYPE:
-		return (pchtemp_ioctl_kind(arg, mode));
-	case SENSOR_IOCTL_TEMPERATURE:
-		return (pchtemp_ioctl_temp(pch, arg, mode));
-	default:
-		return (ENOTTY);
-	}
-}
-
-static int
-pchtemp_close(dev_t dev, int flags, int otype, cred_t *credp)
-{
-	return (0);
-}
+static const ksensor_ops_t pchtemp_temp_ops = {
+	.kso_kind = ksensor_kind_temperature,
+	.kso_temp = pchtemp_read
+};
 
 static void
 pchtemp_cleanup(pchtemp_t *pch)
@@ -287,7 +196,7 @@ pchtemp_cleanup(pchtemp_t *pch)
 	ASSERT3P(pch->pcht_dip, !=, NULL);
 	inst = ddi_get_instance(pch->pcht_dip);
 
-	ddi_remove_minor_node(pch->pcht_dip, NULL);
+	(void) ksensor_remove(pch->pcht_dip, KSENSOR_ALL_IDS);
 
 	if (pch->pcht_handle != NULL) {
 		ddi_regs_map_free(&pch->pcht_handle);
@@ -370,50 +279,17 @@ pchtemp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto err;
 	}
 
-	if (ddi_create_minor_node(pch->pcht_dip, name, S_IFCHR, (minor_t)inst,
-	    DDI_NT_SENSOR_TEMP_PCH, 0) != DDI_SUCCESS) {
+	if ((ret = ksensor_create(pch->pcht_dip, &pchtemp_temp_ops, pch, name,
+	    DDI_NT_SENSOR_TEMP_PCH, &pch->pcht_ksensor)) != 0) {
 		dev_err(dip, CE_WARN, "failed to create minor node %s", name);
 		goto err;
 	}
-
-	/*
-	 * Attempt a single read to lock in the temperature. We don't mind if
-	 * this fails for some reason.
-	 */
-	mutex_enter(&pch->pcht_mutex);
-	(void) pchtemp_read(pch);
-	mutex_exit(&pch->pcht_mutex);
 
 	return (DDI_SUCCESS);
 
 err:
 	pchtemp_cleanup(pch);
 	return (DDI_FAILURE);
-}
-
-static int
-pchtemp_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
-    void **resultp)
-{
-	pchtemp_t *pch;
-
-	switch (cmd) {
-	case DDI_INFO_DEVT2DEVINFO:
-		pch = pchtemp_find_by_dev((dev_t)arg);
-		if (pch == NULL) {
-			return (DDI_FAILURE);
-		}
-
-		*resultp = pch->pcht_dip;
-		break;
-	case DDI_INFO_DEVT2INSTANCE:
-		*resultp = (void *)(uintptr_t)getminor((dev_t)arg);
-		break;
-	default:
-		return (DDI_FAILURE);
-	}
-
-	return (DDI_SUCCESS);
 }
 
 static int
@@ -443,38 +319,17 @@ pchtemp_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
-static struct cb_ops pchtemp_cb_ops = {
-	.cb_open = pchtemp_open,
-	.cb_close = pchtemp_close,
-	.cb_strategy = nodev,
-	.cb_print = nodev,
-	.cb_dump = nodev,
-	.cb_read = nodev,
-	.cb_write = nodev,
-	.cb_ioctl = pchtemp_ioctl,
-	.cb_devmap = nodev,
-	.cb_mmap = nodev,
-	.cb_segmap = nodev,
-	.cb_chpoll = nochpoll,
-	.cb_prop_op = ddi_prop_op,
-	.cb_flag = D_MP,
-	.cb_rev = CB_REV,
-	.cb_aread = nodev,
-	.cb_awrite = nodev
-};
-
 static struct dev_ops pchtemp_dev_ops = {
 	.devo_rev = DEVO_REV,
 	.devo_refcnt = 0,
-	.devo_getinfo = pchtemp_getinfo,
+	.devo_getinfo = nodev,
 	.devo_identify = nulldev,
 	.devo_probe = nulldev,
 	.devo_attach = pchtemp_attach,
 	.devo_detach = pchtemp_detach,
 	.devo_reset = nodev,
 	.devo_power = ddi_power,
-	.devo_quiesce = ddi_quiesce_not_needed,
-	.devo_cb_ops = &pchtemp_cb_ops
+	.devo_quiesce = ddi_quiesce_not_needed
 };
 
 static struct modldrv pchtemp_modldrv = {

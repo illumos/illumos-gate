@@ -163,7 +163,7 @@ mlxcx_cq_alloc_dma(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq,
 	mlcq->mlcq_doorbell =
 	    (mlxcx_completionq_doorbell_t *)mlcq->mlcq_doorbell_dma.mxdb_va;
 
-	mlcq->mlcq_state |= MLXCX_CQ_ALLOC;
+	atomic_or_uint(&mlcq->mlcq_state, MLXCX_CQ_ALLOC);
 
 	return (B_TRUE);
 }
@@ -180,7 +180,7 @@ mlxcx_cq_rele_dma(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq)
 	mlxcx_dma_free(&mlcq->mlcq_doorbell_dma);
 	mlcq->mlcq_doorbell = NULL;
 
-	mlcq->mlcq_state &= ~MLXCX_CQ_ALLOC;
+	atomic_and_uint(&mlcq->mlcq_state, ~MLXCX_CQ_ALLOC);
 }
 
 void
@@ -314,7 +314,7 @@ mlxcx_cq_teardown(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq)
 		 */
 		if (mlcq->mlcq_state & MLXCX_CQ_EQAVL) {
 			avl_remove(&mleq->mleq_cqs, mlcq);
-			mlcq->mlcq_state &= ~MLXCX_CQ_EQAVL;
+			atomic_and_uint(&mlcq->mlcq_state, ~MLXCX_CQ_EQAVL);
 		}
 		mutex_exit(&mlcq->mlcq_mtx);
 		mutex_exit(&mleq->mleq_mtx);
@@ -326,6 +326,7 @@ mlxcx_cq_teardown(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq)
 	mutex_exit(&mlcq->mlcq_mtx);
 
 	mutex_destroy(&mlcq->mlcq_mtx);
+	mutex_destroy(&mlcq->mlcq_arm_mtx);
 	mutex_destroy(&mlcq->mlcq_bufbmtx);
 	list_destroy(&mlcq->mlcq_buffers);
 	list_destroy(&mlcq->mlcq_buffers_b);
@@ -340,6 +341,8 @@ mlxcx_cq_setup(mlxcx_t *mlxp, mlxcx_event_queue_t *eq,
 
 	cq = kmem_zalloc(sizeof (mlxcx_completion_queue_t), KM_SLEEP);
 	mutex_init(&cq->mlcq_mtx, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(mlxp->mlx_intr_pri));
+	mutex_init(&cq->mlcq_arm_mtx, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(mlxp->mlx_intr_pri));
 	mutex_init(&cq->mlcq_bufbmtx, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(mlxp->mlx_intr_pri));
@@ -378,7 +381,7 @@ mlxcx_cq_setup(mlxcx_t *mlxp, mlxcx_event_queue_t *eq,
 	mutex_enter(&cq->mlcq_mtx);
 	ASSERT0(cq->mlcq_state & MLXCX_CQ_EQAVL);
 	avl_add(&eq->mleq_cqs, cq);
-	cq->mlcq_state |= MLXCX_CQ_EQAVL;
+	atomic_or_uint(&cq->mlcq_state, MLXCX_CQ_EQAVL);
 	mlxcx_arm_cq(mlxp, cq);
 	mutex_exit(&cq->mlcq_mtx);
 	mutex_exit(&eq->mleq_mtx);
@@ -553,16 +556,22 @@ mlxcx_teardown_rx_group(mlxcx_t *mlxp, mlxcx_ring_group_t *g)
 			mutex_enter(&g->mlg_rx_vlan_ft->mlft_mtx);
 			ASSERT(list_is_empty(&g->mlg_rx_vlans));
 			fg = g->mlg_rx_vlan_def_fg;
-			fe = list_head(&fg->mlfg_entries);
-			if (fe->mlfe_state & MLXCX_FLOW_ENTRY_CREATED) {
-				(void) mlxcx_cmd_delete_flow_table_entry(
-				    mlxp, fe);
+			if (fg != NULL) {
+				fe = list_head(&fg->mlfg_entries);
+				if (fe->mlfe_state & MLXCX_FLOW_ENTRY_CREATED) {
+					(void)
+					    mlxcx_cmd_delete_flow_table_entry(
+					    mlxp, fe);
+				}
 			}
 			fg = g->mlg_rx_vlan_promisc_fg;
-			fe = list_head(&fg->mlfg_entries);
-			if (fe->mlfe_state & MLXCX_FLOW_ENTRY_CREATED) {
-				(void) mlxcx_cmd_delete_flow_table_entry(
-				    mlxp, fe);
+			if (fg != NULL) {
+				fe = list_head(&fg->mlfg_entries);
+				if (fe->mlfe_state & MLXCX_FLOW_ENTRY_CREATED) {
+					(void)
+					    mlxcx_cmd_delete_flow_table_entry(
+					    mlxp, fe);
+				}
 			}
 			mlxcx_teardown_flow_table(mlxp, g->mlg_rx_vlan_ft);
 			list_destroy(&g->mlg_rx_vlans);
@@ -771,7 +780,7 @@ mlxcx_rx_group_setup(mlxcx_t *mlxp, mlxcx_ring_group_t *g)
 		while (eq == NULL) {
 			eq = &mlxp->mlx_eqs[mlxp->mlx_next_eq++];
 			if (mlxp->mlx_next_eq >= mlxp->mlx_intr_count)
-				mlxp->mlx_next_eq = 1;
+				mlxp->mlx_next_eq = mlxp->mlx_intr_cq0;
 			if (eq->mleq_type != MLXCX_EQ_TYPE_ANY &&
 			    eq->mleq_type != MLXCX_EQ_TYPE_RX) {
 				/* Try the next one */
@@ -1344,7 +1353,7 @@ mlxcx_tx_group_setup(mlxcx_t *mlxp, mlxcx_ring_group_t *g)
 		while (eq == NULL) {
 			eq = &mlxp->mlx_eqs[mlxp->mlx_next_eq++];
 			if (mlxp->mlx_next_eq >= mlxp->mlx_intr_count)
-				mlxp->mlx_next_eq = 1;
+				mlxp->mlx_next_eq = mlxp->mlx_intr_cq0;
 			if (eq->mleq_type != MLXCX_EQ_TYPE_ANY &&
 			    eq->mleq_type != MLXCX_EQ_TYPE_TX) {
 				/* Try the next one */
@@ -2375,8 +2384,8 @@ mlxcx_buf_take(mlxcx_t *mlxp, mlxcx_work_queue_t *wq)
 }
 
 size_t
-mlxcx_buf_take_n(mlxcx_t *mlxp, mlxcx_work_queue_t *wq,
-    mlxcx_buffer_t **bp, size_t nbufs)
+mlxcx_buf_take_n(mlxcx_t *mlxp, mlxcx_work_queue_t *wq, mlxcx_buffer_t **bp,
+    size_t nbufs)
 {
 	mlxcx_buffer_t *b;
 	size_t done = 0;

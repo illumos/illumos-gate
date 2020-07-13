@@ -22,20 +22,9 @@
   Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston MA 02110-1301,
   USA.
 
-  Contact information:  Silicon Graphics, Inc., 1500 Crittenden Lane,
-  Mountain View, CA 94043, or:
-
-  http://www.sgi.com
-
-  For further information regarding this notice, see:
-
-  http://oss.sgi.com/projects/GenInfo/NoticeExplan
-
 */
 
-
-
-/* malloc_check.c For checking dealloc completeness. 
+/* malloc_check.c For checking dealloc completeness.
 
    This code is as simple as possible and works ok for
    reasonable size allocation counts.
@@ -47,15 +36,20 @@
 */
 
 #include <stdio.h>
-#include <stdlib.h>             /* for exit() and various malloc
-                                   prototypes */
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#endif /* HAVE_STDLIB_H */
+#ifdef HAVE_MALLOC_H
+/* Useful include for some Windows compilers. */
+#include <malloc.h>
+#endif /* HAVE_MALLOC_H */
 #include "config.h"
 #include "dwarf_incl.h"
 #include "malloc_check.h"
 #ifdef  WANT_LIBBDWARF_MALLOC_CHECK
 
-/* To turn off printing every entry, just change the define
-   to set PRINT_MALLOC_DETAILS 0.
+/*  To turn off printing every entry, just change the define
+    to set PRINT_MALLOC_DETAILS 0.
 */
 #define PRINT_MALLOC_DETAILS 0
 
@@ -65,21 +59,20 @@
 
 struct mc_data_s {
     struct mc_data_s *mc_prev;
-    unsigned long mc_address;   /* Assumes this is large enough to hold 
-                                   a pointer! */
+    unsigned long mc_address;   /* Assumes this is large enough to hold
+        a pointer! */
 
     long mc_alloc_number;       /* Assigned in order by when record
-                                   created. */
+        created. */
     unsigned char mc_alloc_code;        /* Allocation code, libdwarf. */
     unsigned char mc_type;
     unsigned char mc_dealloc_noted;     /* Used on an ALLOC node. */
     unsigned char mc_dealloc_noted_count;       /* Used on an ALLOC
-                                                   node. */
+        node. */
 };
 
-/* 
-   
-   
+/*
+
 */
 #define HASH_TABLE_SIZE 10501
 static struct mc_data_s *mc_data_hash[HASH_TABLE_SIZE];
@@ -129,8 +122,8 @@ static char *alloc_type_name[MAX_DW_DLA + 1] = {
     "DW_DLA_VAR_CONTEXT",
     "DW_DLA_WEAK_CONTEXT",
     "DW_DLA_PUBTYPES_CONTEXT"
-        /* Don't forget to expand this list if the list of codes
-           expands. */
+    /*  Don't forget to expand this list if the list of codes
+        expands. */
 };
 
 static unsigned
@@ -144,12 +137,12 @@ hash_address(unsigned long addr)
 #if PRINT_MALLOC_DETAILS
 static void
 print_alloc_dealloc_detail(unsigned long addr,
-                           int code, char *whichisit)
+    int code, char *whichisit)
 {
     fprintf(stderr,
-            "%s  addr 0x%lx code %d (%s) entry %ld\n",
-            whichisit, addr, code, alloc_type_name[code],
-            mc_data_list_size);
+        "%s  addr 0x%lx code %d (%s) entry %ld\n",
+        whichisit, addr, code, alloc_type_name[code],
+        mc_data_list_size);
 }
 #else
 #define  print_alloc_dealloc_detail(a,b,c)      /* nothing */
@@ -192,24 +185,24 @@ static void
 print_entry(char *msg, struct mc_data_s *data)
 {
     fprintf(stderr,
-            "%s: 0x%08lx code %2d (%s) type %s dealloc noted %u ct %u\n",
-            msg,
-            (long) data->mc_address,
-            data->mc_alloc_code,
-            alloc_type_name[data->mc_alloc_code],
-            (data->mc_type == MC_TYPE_ALLOC) ? "alloc  " :
-            (data->mc_type == MC_TYPE_DEALLOC) ? "dealloc" : "unknown",
-            (unsigned) data->mc_dealloc_noted,
-            (unsigned) data->mc_dealloc_noted_count);
+        "%s: 0x%08lx code %2d (%s) type %s dealloc noted %u ct %u\n",
+        msg,
+        (long) data->mc_address,
+        data->mc_alloc_code,
+        alloc_type_name[data->mc_alloc_code],
+        (data->mc_type == MC_TYPE_ALLOC) ? "alloc  " :
+        (data->mc_type == MC_TYPE_DEALLOC) ? "dealloc" : "unknown",
+        (unsigned) data->mc_dealloc_noted,
+        (unsigned) data->mc_dealloc_noted_count);
 }
 
 /* newd is a 'dealloc'.
 */
 static long
 balanced_by_alloc_p(struct mc_data_s *newd,
-                    long *addr_match_num,
-                    struct mc_data_s **addr_match,
-                    struct mc_data_s *base)
+    long *addr_match_num,
+    struct mc_data_s **addr_match,
+    struct mc_data_s *base)
 {
     struct mc_data_s *cur = base;
 
@@ -259,7 +252,7 @@ dwarf_malloc_check_dealloc_data(void *addr_in, unsigned char code)
         balanced_by_alloc_p(newd, &addr_match_num, &addr_match, *base);
     if (prev < 0) {
         fprintf(stderr,
-                "Unbalanced dealloc at index %ld\n", mc_data_list_size);
+            "Unbalanced dealloc at index %ld\n", mc_data_list_size);
         print_entry("new", newd);
         fprintf(stderr, "addr-match_num? %ld\n", addr_match_num);
         if (addr_match) {
@@ -306,15 +299,15 @@ dwarf_malloc_check_complete(char *msg)
                 if (cur->mc_dealloc_noted) {
                     if (cur->mc_dealloc_noted > 1) {
                         fprintf(stderr,
-                                " Duplicate dealloc! entry %ld\n",
-                                cur->mc_alloc_number);
+                            " Duplicate dealloc! entry %ld\n",
+                            cur->mc_alloc_number);
                         print_entry("duplicate dealloc", cur);
 
                     }
                     continue;
                 } else {
                     fprintf(stderr, "malloc no dealloc, entry %ld\n",
-                            cur->mc_alloc_number);
+                        cur->mc_alloc_number);
                     print_entry("dangle", cur);
                 }
             } else {
@@ -327,13 +320,13 @@ dwarf_malloc_check_complete(char *msg)
         }
     }
     fprintf(stderr, "mc hash table slots=%ld, "
-            "used=%ld,  maxchain=%ld\n",
-            (long) HASH_TABLE_SIZE, hash_slots_used, max_chain_length);
+        "used=%ld,  maxchain=%ld\n",
+        (long) HASH_TABLE_SIZE, hash_slots_used, max_chain_length);
     return;
 }
 
 #else
 
-extern void *libdwarf_an_unused_function_so_not_empty_c_file();
+extern void *libdwarf_an_unused_function_so_not_empty_c_file(void);
 
 #endif /* WANT_LIBBDWARF_MALLOC_CHECK */

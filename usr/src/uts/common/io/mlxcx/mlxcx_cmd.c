@@ -470,10 +470,6 @@ mlxcx_cmd_queue_fini(mlxcx_t *mlxp)
 {
 	mlxcx_cmd_queue_t *cmd = &mlxp->mlx_cmd;
 
-	mutex_enter(&cmd->mcmd_lock);
-	VERIFY3S(cmd->mcmd_status, ==, MLXCX_CMD_QUEUE_S_IDLE);
-	mutex_exit(&cmd->mcmd_lock);
-
 	if (cmd->mcmd_tokens != NULL) {
 		id_space_destroy(cmd->mcmd_tokens);
 		cmd->mcmd_tokens = NULL;
@@ -487,7 +483,6 @@ mlxcx_cmd_queue_fini(mlxcx_t *mlxp)
 	cv_destroy(&cmd->mcmd_cv);
 	mutex_destroy(&cmd->mcmd_lock);
 
-	cmd->mcmd_ent = NULL;
 	mlxcx_dma_free(&cmd->mcmd_dma);
 }
 
@@ -496,7 +491,8 @@ mlxcx_cmd_queue_init(mlxcx_t *mlxp)
 {
 	uint32_t tmp, cmd_low, cmd_high, i;
 	mlxcx_cmd_queue_t *cmd = &mlxp->mlx_cmd;
-	char buf[64];
+	char buf[32];
+	char tq_name[TASKQ_NAMELEN];
 	const ddi_dma_cookie_t *ck;
 
 	ddi_device_acc_attr_t acc;
@@ -519,10 +515,18 @@ mlxcx_cmd_queue_init(mlxcx_t *mlxp)
 	cmd_low = mlxcx_get32(mlxp, MLXCX_ISS_CMD_LOW);
 	cmd->mcmd_size_l2 = MLXCX_ISS_CMDQ_SIZE(cmd_low);
 	cmd->mcmd_stride_l2 = MLXCX_ISS_CMDQ_STRIDE(cmd_low);
+	cmd->mcmd_size = 1U << cmd->mcmd_size_l2;
+
+	if (cmd->mcmd_size > MLXCX_CMD_MAX) {
+		mlxcx_warn(mlxp, "command queue size %u is too "
+		    "large. Maximum is %u", cmd->mcmd_size, MLXCX_CMD_MAX);
+		return (B_FALSE);
+	}
+
+	cmd->mcmd_mask = (uint32_t)((1ULL << cmd->mcmd_size) - 1);
 
 	mutex_init(&cmd->mcmd_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&cmd->mcmd_cv, NULL, CV_DRIVER, NULL);
-	cmd->mcmd_status = MLXCX_CMD_QUEUE_S_IDLE;
 
 	(void) snprintf(buf, sizeof (buf), "mlxcx_tokens_%d", mlxp->mlx_inst);
 	if ((cmd->mcmd_tokens = id_space_create(buf, 1, UINT8_MAX)) == NULL) {
@@ -531,8 +535,8 @@ mlxcx_cmd_queue_init(mlxcx_t *mlxp)
 		return (B_FALSE);
 	}
 
-	(void) snprintf(buf, sizeof (buf), "mlxcx_cmdq_%d", mlxp->mlx_inst);
-	if ((cmd->mcmd_taskq = ddi_taskq_create(mlxp->mlx_dip, buf, 1,
+	(void) snprintf(tq_name, sizeof (tq_name), "cmdq_%d", mlxp->mlx_inst);
+	if ((cmd->mcmd_taskq = ddi_taskq_create(mlxp->mlx_dip, tq_name, 1,
 	    TASKQ_DEFAULTPRI, 0)) == NULL) {
 		mlxcx_warn(mlxp, "failed to create command queue task queue");
 		mlxcx_cmd_queue_fini(mlxp);
@@ -572,9 +576,24 @@ mlxcx_cmd_queue_init(mlxcx_t *mlxp)
 		return (B_FALSE);
 	}
 
-	cmd->mcmd_ent = (void *)cmd->mcmd_dma.mxdb_va;
+	/*
+	 * start in polling mode.
+	 */
+	mlxcx_cmd_eq_disable(mlxp);
 
 	return (B_TRUE);
+}
+
+void
+mlxcx_cmd_eq_enable(mlxcx_t *mlxp)
+{
+	mlxp->mlx_cmd.mcmd_polled = B_FALSE;
+}
+
+void
+mlxcx_cmd_eq_disable(mlxcx_t *mlxp)
+{
+	mlxp->mlx_cmd.mcmd_polled = B_TRUE;
 }
 
 static void
@@ -651,6 +670,7 @@ mlxcx_cmd_init(mlxcx_t *mlxp, mlxcx_cmd_t *cmd)
 	mutex_init(&cmd->mlcmd_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&cmd->mlcmd_cv, NULL, CV_DRIVER, NULL);
 	cmd->mlcmd_token = id_alloc(mlxp->mlx_cmd.mcmd_tokens);
+	cmd->mlcmd_poll = mlxp->mlx_cmd.mcmd_polled;
 	list_create(&cmd->mlcmd_mbox_in, sizeof (mlxcx_cmd_mbox_t),
 	    offsetof(mlxcx_cmd_mbox_t, mlbox_node));
 	list_create(&cmd->mlcmd_mbox_out, sizeof (mlxcx_cmd_mbox_t),
@@ -772,6 +792,65 @@ mlxcx_cmd_copy_output(mlxcx_cmd_ent_t *ent, mlxcx_cmd_t *cmd)
 	VERIFY0(rem);
 }
 
+static uint_t
+mlxcx_cmd_reserve_slot(mlxcx_cmd_queue_t *cmdq)
+{
+	uint_t slot;
+
+	mutex_enter(&cmdq->mcmd_lock);
+	slot = ddi_ffs(cmdq->mcmd_mask);
+	while (slot == 0) {
+		cv_wait(&cmdq->mcmd_cv, &cmdq->mcmd_lock);
+		slot = ddi_ffs(cmdq->mcmd_mask);
+	}
+
+	cmdq->mcmd_mask &= ~(1U << --slot);
+
+	ASSERT3P(cmdq->mcmd_active[slot], ==, NULL);
+
+	mutex_exit(&cmdq->mcmd_lock);
+
+	return (slot);
+}
+
+static void
+mlxcx_cmd_release_slot(mlxcx_cmd_queue_t *cmdq, uint_t slot)
+{
+	mutex_enter(&cmdq->mcmd_lock);
+	cmdq->mcmd_mask |= 1U << slot;
+	cv_broadcast(&cmdq->mcmd_cv);
+	mutex_exit(&cmdq->mcmd_lock);
+}
+
+static void
+mlxcx_cmd_done(mlxcx_cmd_t *cmd, uint_t slot)
+{
+	mlxcx_t *mlxp = cmd->mlcmd_mlxp;
+	mlxcx_cmd_queue_t *cmdq = &mlxp->mlx_cmd;
+	mlxcx_cmd_ent_t *ent;
+
+	/*
+	 * Command is done. Save relevant data. Once we broadcast on the CV and
+	 * drop the lock, we must not touch it again.
+	 */
+	MLXCX_DMA_SYNC(cmdq->mcmd_dma, DDI_DMA_SYNC_FORKERNEL);
+
+	ent = (mlxcx_cmd_ent_t *)(cmdq->mcmd_dma.mxdb_va +
+	    (slot << cmdq->mcmd_stride_l2));
+
+	mutex_enter(&cmd->mlcmd_lock);
+	cmd->mlcmd_status = MLXCX_CMD_STATUS(ent->mce_status);
+	if (cmd->mlcmd_status == 0)
+		mlxcx_cmd_copy_output(ent, cmd);
+
+	cmd->mlcmd_state = MLXCX_CMD_S_DONE;
+	cv_broadcast(&cmd->mlcmd_cv);
+	mutex_exit(&cmd->mlcmd_lock);
+
+	cmdq->mcmd_active[slot] = NULL;
+	mlxcx_cmd_release_slot(cmdq, slot);
+}
+
 static void
 mlxcx_cmd_taskq(void *arg)
 {
@@ -779,28 +858,15 @@ mlxcx_cmd_taskq(void *arg)
 	mlxcx_t *mlxp = cmd->mlcmd_mlxp;
 	mlxcx_cmd_queue_t *cmdq = &mlxp->mlx_cmd;
 	mlxcx_cmd_ent_t *ent;
-	uint_t poll;
+	uint_t poll, slot;
 
 	ASSERT3S(cmd->mlcmd_op, !=, 0);
 
-	mutex_enter(&cmdq->mcmd_lock);
-	while (cmdq->mcmd_status == MLXCX_CMD_QUEUE_S_BUSY) {
-		cv_wait(&cmdq->mcmd_cv, &cmdq->mcmd_lock);
-	}
+	slot = mlxcx_cmd_reserve_slot(cmdq);
+	ent = (mlxcx_cmd_ent_t *)(cmdq->mcmd_dma.mxdb_va +
+	    (slot << cmdq->mcmd_stride_l2));
 
-	if (cmdq->mcmd_status != MLXCX_CMD_QUEUE_S_IDLE) {
-		mutex_exit(&cmdq->mcmd_lock);
-
-		mutex_enter(&cmd->mlcmd_lock);
-		cmd->mlcmd_state = MLXCX_CMD_S_ERROR;
-		cv_broadcast(&cmd->mlcmd_cv);
-		mutex_exit(&cmd->mlcmd_lock);
-		return;
-	}
-
-	cmdq->mcmd_status = MLXCX_CMD_QUEUE_S_BUSY;
-	ent = cmdq->mcmd_ent;
-	mutex_exit(&cmdq->mcmd_lock);
+	cmdq->mcmd_active[slot] = cmd;
 
 	/*
 	 * Command queue is currently ours as we set busy.
@@ -816,8 +882,10 @@ mlxcx_cmd_taskq(void *arg)
 	mlxcx_cmd_prep_output(ent, cmd);
 	MLXCX_DMA_SYNC(cmdq->mcmd_dma, DDI_DMA_SYNC_FORDEV);
 
-	/* This assumes we only ever use the first command */
-	mlxcx_put32(mlxp, MLXCX_ISS_CMD_DOORBELL, 1);
+	mlxcx_put32(mlxp, MLXCX_ISS_CMD_DOORBELL, 1 << slot);
+
+	if (!cmd->mlcmd_poll)
+		return;
 
 	for (poll = 0; poll < mlxcx_cmd_tries; poll++) {
 		delay(drv_usectohz(mlxcx_cmd_delay));
@@ -830,26 +898,46 @@ mlxcx_cmd_taskq(void *arg)
 	 * Command is done (or timed out). Save relevant data. Once we broadcast
 	 * on the CV and drop the lock, we must not touch the cmd again.
 	 */
-	mutex_enter(&cmd->mlcmd_lock);
 
 	if (poll == mlxcx_cmd_tries) {
+		mutex_enter(&cmd->mlcmd_lock);
 		cmd->mlcmd_status = MLXCX_CMD_R_TIMEOUT;
 		cmd->mlcmd_state = MLXCX_CMD_S_ERROR;
-		mlxcx_fm_ereport(mlxp, DDI_FM_DEVICE_NO_RESPONSE);
-	} else {
-		cmd->mlcmd_status = MLXCX_CMD_STATUS(ent->mce_status);
-		cmd->mlcmd_state = MLXCX_CMD_S_DONE;
-		if (cmd->mlcmd_status == 0) {
-			mlxcx_cmd_copy_output(ent, cmd);
-		}
-	}
-	cv_broadcast(&cmd->mlcmd_cv);
-	mutex_exit(&cmd->mlcmd_lock);
+		cv_broadcast(&cmd->mlcmd_cv);
+		mutex_exit(&cmd->mlcmd_lock);
 
-	mutex_enter(&cmdq->mcmd_lock);
-	cmdq->mcmd_status = MLXCX_CMD_QUEUE_S_IDLE;
-	cv_broadcast(&cmdq->mcmd_cv);
-	mutex_exit(&cmdq->mcmd_lock);
+		mlxcx_fm_ereport(mlxp, DDI_FM_DEVICE_NO_RESPONSE);
+
+		cmdq->mcmd_active[slot] = NULL;
+		mlxcx_cmd_release_slot(cmdq, slot);
+
+		return;
+	}
+
+	mlxcx_cmd_done(cmd, slot);
+}
+
+void
+mlxcx_cmd_completion(mlxcx_t *mlxp, mlxcx_eventq_ent_t *ent)
+{
+	mlxcx_cmd_queue_t *cmdq = &mlxp->mlx_cmd;
+	mlxcx_evdata_cmd_completion_t *eqe_cmd = &ent->mleqe_cmd_completion;
+	mlxcx_cmd_t *cmd;
+	uint32_t comp_vec = from_be32(eqe_cmd->mled_cmd_completion_vec);
+	uint_t slot;
+
+	DTRACE_PROBE2(cmd_event, mlxcx_t *, mlxp,
+	    mlxcx_evdata_cmd_completion_t *, eqe_cmd);
+
+	while ((slot = ddi_ffs(comp_vec)) != 0) {
+		comp_vec &= ~(1U << --slot);
+
+		cmd = cmdq->mcmd_active[slot];
+		if (cmd->mlcmd_poll)
+			continue;
+
+		mlxcx_cmd_done(cmd, slot);
+	}
 }
 
 static boolean_t
@@ -1119,7 +1207,7 @@ mlxcx_cmd_give_pages(mlxcx_t *mlxp, uint_t type, int32_t npages,
     mlxcx_dev_page_t **pages)
 {
 	mlxcx_cmd_t cmd;
-	mlxcx_cmd_manage_pages_in_t in;
+	mlxcx_cmd_manage_pages_in_t *in;
 	mlxcx_cmd_manage_pages_out_t out;
 	size_t insize, outsize;
 	boolean_t ret;
@@ -1136,7 +1224,8 @@ mlxcx_cmd_give_pages(mlxcx_t *mlxp, uint_t type, int32_t npages,
 		}
 		break;
 	case MLXCX_MANAGE_PAGES_OPMOD_GIVE_PAGES:
-		if (npages <= 0 || npages > MLXCX_MANAGE_PAGES_MAX_PAGES) {
+		ASSERT3S(npages, <=, MLXCX_MANAGE_PAGES_MAX_PAGES);
+		if (npages <= 0) {
 			mlxcx_warn(mlxp, "passed invalid number of pages (%d) "
 			    "to give pages", npages);
 			return (B_FALSE);
@@ -1148,34 +1237,34 @@ mlxcx_cmd_give_pages(mlxcx_t *mlxp, uint_t type, int32_t npages,
 		return (B_FALSE);
 	}
 
-	bzero(&in, sizeof (in));
-	bzero(&out, sizeof (out));
 	insize = offsetof(mlxcx_cmd_manage_pages_in_t, mlxi_manage_pages_pas) +
 	    npages * sizeof (uint64_t);
 	outsize = offsetof(mlxcx_cmd_manage_pages_out_t, mlxo_manage_pages_pas);
 
+	in = kmem_zalloc(insize, KM_SLEEP);
+	bzero(&out, sizeof (out));
+
 	mlxcx_cmd_init(mlxp, &cmd);
-	mlxcx_cmd_in_header_init(&cmd, &in.mlxi_manage_pages_head,
+	mlxcx_cmd_in_header_init(&cmd, &in->mlxi_manage_pages_head,
 	    MLXCX_OP_MANAGE_PAGES, type);
-	in.mlxi_manage_pages_func = MLXCX_FUNCTION_SELF;
-	in.mlxi_manage_pages_npages = to_be32(npages);
+	in->mlxi_manage_pages_func = MLXCX_FUNCTION_SELF;
+	in->mlxi_manage_pages_npages = to_be32(npages);
 	for (i = 0; i < npages; i++) {
 		ck = mlxcx_dma_cookie_one(&pages[i]->mxdp_dma);
 		pa = ck->dmac_laddress;
 		ASSERT3U(pa & 0xfff, ==, 0);
 		ASSERT3U(ck->dmac_size, ==, MLXCX_HW_PAGE_SIZE);
-		in.mlxi_manage_pages_pas[i] = to_be64(pa);
+		in->mlxi_manage_pages_pas[i] = to_be64(pa);
 	}
 
-	if (!mlxcx_cmd_send(mlxp, &cmd, &in, insize, &out, outsize)) {
-		mlxcx_cmd_fini(mlxp, &cmd);
-		return (B_FALSE);
+	if ((ret = mlxcx_cmd_send(mlxp, &cmd, in, insize, &out, outsize))) {
+		mlxcx_cmd_wait(&cmd);
+		ret = mlxcx_cmd_evaluate(mlxp, &cmd);
 	}
-	mlxcx_cmd_wait(&cmd);
 
-	ret = mlxcx_cmd_evaluate(mlxp, &cmd);
 	mlxcx_cmd_fini(mlxp, &cmd);
 
+	kmem_free(in, insize);
 	return (ret);
 }
 
@@ -1185,7 +1274,7 @@ mlxcx_cmd_return_pages(mlxcx_t *mlxp, int32_t nreq, uint64_t *pas,
 {
 	mlxcx_cmd_t cmd;
 	mlxcx_cmd_manage_pages_in_t in;
-	mlxcx_cmd_manage_pages_out_t out;
+	mlxcx_cmd_manage_pages_out_t *out;
 	size_t insize, outsize;
 	boolean_t ret;
 	uint32_t i;
@@ -1195,13 +1284,13 @@ mlxcx_cmd_return_pages(mlxcx_t *mlxp, int32_t nreq, uint64_t *pas,
 		    "to return pages", nreq);
 		return (B_FALSE);
 	}
-	VERIFY3S(nreq, <=, MLXCX_MANAGE_PAGES_MAX_PAGES);
 
-	bzero(&in, sizeof (in));
-	bzero(&out, sizeof (out));
 	insize = offsetof(mlxcx_cmd_manage_pages_in_t, mlxi_manage_pages_pas);
 	outsize = offsetof(mlxcx_cmd_manage_pages_out_t,
 	    mlxo_manage_pages_pas) + nreq * sizeof (uint64_t);
+
+	bzero(&in, sizeof (in));
+	out = kmem_alloc(outsize, KM_SLEEP);
 
 	mlxcx_cmd_init(mlxp, &cmd);
 	mlxcx_cmd_in_header_init(&cmd, &in.mlxi_manage_pages_head,
@@ -1209,21 +1298,22 @@ mlxcx_cmd_return_pages(mlxcx_t *mlxp, int32_t nreq, uint64_t *pas,
 	in.mlxi_manage_pages_func = MLXCX_FUNCTION_SELF;
 	in.mlxi_manage_pages_npages = to_be32(nreq);
 
-	if (!mlxcx_cmd_send(mlxp, &cmd, &in, insize, &out, outsize)) {
-		mlxcx_cmd_fini(mlxp, &cmd);
-		return (B_FALSE);
-	}
-	mlxcx_cmd_wait(&cmd);
+	if ((ret = mlxcx_cmd_send(mlxp, &cmd, &in, insize, out, outsize))) {
+		mlxcx_cmd_wait(&cmd);
 
-	ret = mlxcx_cmd_evaluate(mlxp, &cmd);
-	if (ret) {
-		*nret = from_be32(out.mlxo_manage_pages_npages);
-		for (i = 0; i < *nret; i++) {
-			pas[i] = from_be64(out.mlxo_manage_pages_pas[i]);
+		ret = mlxcx_cmd_evaluate(mlxp, &cmd);
+		if (ret) {
+			*nret = from_be32(out->mlxo_manage_pages_npages);
+			for (i = 0; i < *nret; i++) {
+				pas[i] =
+				    from_be64(out->mlxo_manage_pages_pas[i]);
+			}
 		}
 	}
+
 	mlxcx_cmd_fini(mlxp, &cmd);
 
+	kmem_free(out, outsize);
 	return (ret);
 }
 
@@ -2030,7 +2120,6 @@ mlxcx_cmd_query_eq(mlxcx_t *mlxp, mlxcx_event_queue_t *mleq,
 	bzero(&in, sizeof (in));
 	bzero(&out, sizeof (out));
 
-	ASSERT(mutex_owned(&mleq->mleq_mtx));
 	VERIFY(mleq->mleq_state & MLXCX_EQ_ALLOC);
 	VERIFY(mleq->mleq_state & MLXCX_EQ_CREATED);
 
@@ -2180,7 +2269,7 @@ mlxcx_cmd_create_cq(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq)
 
 	ret = mlxcx_cmd_evaluate(mlxp, &cmd);
 	if (ret) {
-		mlcq->mlcq_state |= MLXCX_CQ_CREATED;
+		atomic_or_uint(&mlcq->mlcq_state, MLXCX_CQ_CREATED);
 		mlcq->mlcq_num = from_be24(out.mlxo_create_cq_cqn);
 	}
 	mlxcx_cmd_fini(mlxp, &cmd);
@@ -2199,7 +2288,6 @@ mlxcx_cmd_query_rq(mlxcx_t *mlxp, mlxcx_work_queue_t *mlwq,
 	bzero(&in, sizeof (in));
 	bzero(&out, sizeof (out));
 
-	ASSERT(mutex_owned(&mlwq->mlwq_mtx));
 	VERIFY(mlwq->mlwq_state & MLXCX_WQ_ALLOC);
 	VERIFY(mlwq->mlwq_state & MLXCX_WQ_CREATED);
 	ASSERT3S(mlwq->mlwq_type, ==, MLXCX_WQ_TYPE_RECVQ);
@@ -2237,7 +2325,6 @@ mlxcx_cmd_query_sq(mlxcx_t *mlxp, mlxcx_work_queue_t *mlwq,
 	bzero(&in, sizeof (in));
 	bzero(&out, sizeof (out));
 
-	ASSERT(mutex_owned(&mlwq->mlwq_mtx));
 	VERIFY(mlwq->mlwq_state & MLXCX_WQ_ALLOC);
 	VERIFY(mlwq->mlwq_state & MLXCX_WQ_CREATED);
 	ASSERT3S(mlwq->mlwq_type, ==, MLXCX_WQ_TYPE_SENDQ);
@@ -2275,7 +2362,6 @@ mlxcx_cmd_query_cq(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq,
 	bzero(&in, sizeof (in));
 	bzero(&out, sizeof (out));
 
-	ASSERT(mutex_owned(&mlcq->mlcq_mtx));
 	VERIFY(mlcq->mlcq_state & MLXCX_CQ_ALLOC);
 	VERIFY(mlcq->mlcq_state & MLXCX_CQ_CREATED);
 
@@ -2329,7 +2415,7 @@ mlxcx_cmd_destroy_cq(mlxcx_t *mlxp, mlxcx_completion_queue_t *mlcq)
 
 	ret = mlxcx_cmd_evaluate(mlxp, &cmd);
 	if (ret) {
-		mlcq->mlcq_state |= MLXCX_CQ_DESTROYED;
+		atomic_or_uint(&mlcq->mlcq_state, MLXCX_CQ_DESTROYED);
 	}
 	mlxcx_cmd_fini(mlxp, &cmd);
 	return (ret);

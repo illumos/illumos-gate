@@ -78,6 +78,7 @@ _MANFILES=	aac.7d		\
 		ixgbe.7d	\
 		kmdb.7d		\
 		kstat.7d	\
+		ksensor.7d	\
 		ksyms.7d	\
 		llc1.7d		\
 		lockstat.7d	\

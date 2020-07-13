@@ -53,6 +53,7 @@
 #include <sys/fm/util.h>
 #include <sys/ddifm_impl.h>
 #include <sys/ddi_ufm_impl.h>
+#include <sys/ksensor_impl.h>
 
 extern dev_info_t *top_devinfo;
 extern dev_info_t *scsi_vhci_dip;
@@ -96,6 +97,7 @@ setup_ddi(void)
 	ndi_fm_init();
 	irm_init();
 	ufm_init();
+	ksensor_init();
 
 	(void) i_ddi_load_drvconf(DDI_MAJOR_T_NONE);
 

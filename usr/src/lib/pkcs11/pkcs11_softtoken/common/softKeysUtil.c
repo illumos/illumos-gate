@@ -1228,14 +1228,13 @@ cleanup:
 
 static CK_RV
 soft_create_hmac_key(soft_session_t *session_p,  CK_BYTE *passwd,
-    CK_ULONG passwd_len, CK_OBJECT_HANDLE_PTR phKey)
+    CK_ULONG passwd_len, soft_object_t **keyp)
 {
 	CK_RV rv = CKR_OK;
 	CK_OBJECT_CLASS keyclass = CKO_SECRET_KEY;
 	CK_KEY_TYPE keytype = CKK_GENERIC_SECRET;
 	CK_BBOOL True = TRUE;
 	CK_ATTRIBUTE keytemplate[4];
-	soft_object_t *keyobj;
 
 	/*
 	 * We must initialize each template member individually
@@ -1265,12 +1264,9 @@ soft_create_hmac_key(soft_session_t *session_p,  CK_BYTE *passwd,
 	 * mechanism parameter structure.
 	 */
 	rv = soft_gen_keyobject(keytemplate,
-	    sizeof (keytemplate)/sizeof (CK_ATTRIBUTE), &keyobj, session_p,
+	    sizeof (keytemplate)/sizeof (CK_ATTRIBUTE), keyp, session_p,
 	    CKO_SECRET_KEY, (CK_KEY_TYPE)CKK_GENERIC_SECRET, 0,
 	    SOFT_CREATE_OBJ, B_TRUE);
-
-	if (keyobj != NULL)
-		*phKey = keyobj->handle;
 
 	return (rv);
 }
@@ -1285,7 +1281,6 @@ soft_generate_pkcs5_pbkdf2_key(soft_session_t *session_p,
 	CK_ULONG hLen = SHA1_HASH_SIZE;
 	CK_ULONG dkLen, i;
 	CK_ULONG blocks, remainder;
-	CK_OBJECT_HANDLE phKey = 0;
 	soft_object_t *hmac_key = NULL;
 	CK_BYTE *salt = NULL;
 	CK_BYTE *keydata = NULL;
@@ -1306,12 +1301,10 @@ soft_generate_pkcs5_pbkdf2_key(soft_session_t *session_p,
 	 * Create a key object to use for HMAC operations.
 	 */
 	rv = soft_create_hmac_key(session_p, params->pPassword,
-	    *params->ulPasswordLen, &phKey);
+	    *params->ulPasswordLen, &hmac_key);
 
 	if (rv != CKR_OK)
 		return (rv);
-
-	hmac_key = (soft_object_t *)phKey;
 
 	/* Step 1. */
 	dkLen = OBJ_SEC_VALUE_LEN(secret_key);  /* length of desired key */

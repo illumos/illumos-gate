@@ -4438,7 +4438,6 @@ vdev_children_are_offline(vdev_t *vd)
 /*
  * Check the vdev configuration to ensure that it's capable of supporting
  * a root pool. We do not support partial configuration.
- * In addition, only a single top-level vdev is allowed.
  */
 boolean_t
 vdev_is_bootable(vdev_t *vd)
@@ -4446,23 +4445,7 @@ vdev_is_bootable(vdev_t *vd)
 	if (!vd->vdev_ops->vdev_op_leaf) {
 		char *vdev_type = vd->vdev_ops->vdev_op_type;
 
-		if (strcmp(vdev_type, VDEV_TYPE_ROOT) == 0 &&
-		    vd->vdev_children > 1) {
-			int non_indirect = 0;
-
-			for (int c = 0; c < vd->vdev_children; c++) {
-				vdev_type =
-				    vd->vdev_child[c]->vdev_ops->vdev_op_type;
-				if (strcmp(vdev_type, VDEV_TYPE_INDIRECT) != 0)
-					non_indirect++;
-			}
-			/*
-			 * non_indirect > 1 means we have more than one
-			 * top-level vdev, so we stop here.
-			 */
-			if (non_indirect > 1)
-				return (B_FALSE);
-		} else if (strcmp(vdev_type, VDEV_TYPE_MISSING) == 0) {
+		if (strcmp(vdev_type, VDEV_TYPE_MISSING) == 0) {
 			return (B_FALSE);
 		}
 	}

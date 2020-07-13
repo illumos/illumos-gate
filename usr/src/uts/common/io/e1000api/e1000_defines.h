@@ -252,6 +252,7 @@
 #define E1000_SWFW_CSR_SM	0x08
 #define E1000_SWFW_PHY2_SM	0x20
 #define E1000_SWFW_PHY3_SM	0x40
+#define	E1000_SWFW_PWRTS_SM	0x80
 #define E1000_SWFW_SW_MNG_SM	0x400
 
 /* Device Control */

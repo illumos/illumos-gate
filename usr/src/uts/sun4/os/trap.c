@@ -86,7 +86,7 @@ static int ldstub_nc(struct regs *, int);
 void	trap_cleanup(struct regs *, uint_t, k_siginfo_t *, int);
 void	trap_rtt(void);
 
-static int
+static int __NORETURN
 die(unsigned type, struct regs *rp, caddr_t addr, uint_t mmu_fsr)
 {
 	struct panic_trap_info ti;
@@ -114,8 +114,6 @@ die(unsigned type, struct regs *rp, caddr_t addr, uint_t mmu_fsr)
 		panic("BAD TRAP: type=%x rp=%p addr=%p mmu_fsr=%x",
 		    type, (void *)rp, (void *)addr, mmu_fsr);
 	}
-
-	return (0);	/* avoid optimization of restore in call's delay slot */
 }
 
 #if defined(SF_ERRATA_23) || defined(SF_ERRATA_30) /* call ... illegal-insn */
@@ -775,7 +773,7 @@ trap(struct regs *rp, caddr_t addr, uint32_t type, uint32_t mmu_fsr)
 				rp->r_npc += 4;
 				goto out;
 			}
-			/* fall into ... */
+			/* FALLTHROUGH */
 		case FT_PRIV:
 			siginfo.si_signo = SIGSEGV;
 			siginfo.si_code = SEGV_ACCERR;

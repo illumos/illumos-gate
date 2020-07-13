@@ -25,6 +25,8 @@
 # Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
 #
 # Copyright (c) 2018, Joyent, Inc.
+#
+# Copyright 2020 RackTop Systems, Inc.
 
 LIBRARY =	libfksmbsrv.a
 VERS =		.1
@@ -36,6 +38,7 @@ OBJS_LOCAL = \
 		fksmb_idmap.o \
 		fksmb_init.o \
 		fksmb_kdoor.o \
+		fksmb_preauth_pkcs.o \
 		fksmb_sign_pkcs.o \
 		fake_lookup.o \
 		fake_nblk.o \
@@ -161,6 +164,7 @@ OBJS_FS_SMBSRV = \
 		smb2_tree_disconn.o \
 		smb2_write.o \
 	        \
+	        smb3_kdf.o \
 	        smb3_encrypt.o
 
 # Can't just link with -lsmb because of user vs kernel API

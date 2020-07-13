@@ -212,10 +212,41 @@ extern uint_t mlxcx_stuck_intr_count;
 #define	MLXCX_NULL_LKEY		0x100
 
 /*
+ * The max function id we support in manage pages requests.
+ * At the moment we only support/expect func 0 from manage pages, but
+ * structures and code are in place to support any number.
+ */
+#define	MLXCX_FUNC_ID_MAX	0
+
+/*
  * Forwards
  */
 struct mlxcx;
 typedef struct mlxcx mlxcx_t;
+typedef struct mlxcx_cmd mlxcx_cmd_t;
+typedef struct mlxcx_port mlxcx_port_t;
+
+typedef struct {
+	mlxcx_t		*mlp_mlx;
+	int32_t		mlp_npages;
+	uint16_t	mlp_func;
+} mlxcx_pages_request_t;
+
+typedef struct mlxcx_async_param {
+	mlxcx_t		*mla_mlx;
+	taskq_ent_t	mla_tqe;
+	boolean_t	mla_pending;
+	kmutex_t	mla_mtx;
+
+	/*
+	 * Parameters specific to the function dispatched.
+	 */
+	union {
+		void			*mla_arg;
+		mlxcx_pages_request_t	mla_pages;
+		mlxcx_port_t		*mla_port;
+	};
+} mlxcx_async_param_t;
 
 typedef enum {
 	MLXCX_DMABUF_HDL_ALLOC		= 1 << 0,
@@ -253,12 +284,20 @@ typedef struct mlxcx_cmd_queue {
 	kmutex_t		mcmd_lock;
 	kcondvar_t		mcmd_cv;
 	mlxcx_dma_buffer_t	mcmd_dma;
-	mlxcx_cmd_ent_t		*mcmd_ent;
+
+	boolean_t		mcmd_polled;
 
 	uint8_t			mcmd_size_l2;
 	uint8_t			mcmd_stride_l2;
+	uint_t			mcmd_size;
+	/*
+	 * The mask has a bit for each command slot, there are a maximum
+	 * of 32 slots. When the bit is set in the mask, it indicates
+	 * the slot is available.
+	 */
+	uint32_t		mcmd_mask;
 
-	mlxcx_cmd_queue_status_t	mcmd_status;
+	mlxcx_cmd_t		*mcmd_active[MLXCX_CMD_MAX];
 
 	ddi_taskq_t		*mcmd_taskq;
 	id_space_t		*mcmd_tokens;
@@ -276,6 +315,9 @@ typedef enum {
 	MLXCX_EQ_DESTROYED	= 1 << 2,	/* DESTROY_EQ sent to hw */
 	MLXCX_EQ_ARMED		= 1 << 3,	/* Armed through the UAR */
 	MLXCX_EQ_POLLING	= 1 << 4,	/* Currently being polled */
+	MLXCX_EQ_INTR_ENABLED	= 1 << 5,	/* ddi_intr_enable()'d */
+	MLXCX_EQ_INTR_ACTIVE	= 1 << 6,	/* 'rupt handler running */
+	MLXCX_EQ_INTR_QUIESCE	= 1 << 7,	/* 'rupt handler to quiesce */
 } mlxcx_eventq_state_t;
 
 typedef struct mlxcx_bf {
@@ -319,7 +361,7 @@ typedef enum {
 	MLXCX_PORT_INIT		= 1 << 0
 } mlxcx_port_init_t;
 
-typedef struct mlxcx_port {
+struct mlxcx_port {
 	kmutex_t		mlp_mtx;
 	mlxcx_port_init_t	mlp_init;
 	mlxcx_t			*mlp_mlx;
@@ -365,7 +407,9 @@ typedef struct mlxcx_port {
 
 	mlxcx_module_status_t	mlp_last_modstate;
 	mlxcx_module_error_type_t	mlp_last_moderr;
-} mlxcx_port_t;
+
+	mlxcx_async_param_t	mlx_port_event;
+};
 
 typedef enum {
 	MLXCX_EQ_TYPE_ANY,
@@ -373,8 +417,39 @@ typedef enum {
 	MLXCX_EQ_TYPE_TX
 } mlxcx_eventq_type_t;
 
+/*
+ * mlxcx_event_queue_t is a representation of an event queue (EQ).
+ * There is a 1-1 tie in between an EQ and an interrupt vector, and
+ * knowledge of that effects how some members of the struct are used
+ * and modified.
+ *
+ * Most of the struct members are immmutable except for during set up and
+ * teardown, for those it is safe to access them without a mutex once
+ * the driver is initialized.
+ *
+ * Members which are not immutable and are protected by mleq_mtx are:
+ *	* mleq_state - EQ state. Changes during transitions between
+ *		       polling modes.
+ *	* mleq_cq - an AVL tree of completions queues using this EQ.
+ *
+ * Another member which is not immutable is mleq_cc. This is the EQ
+ * consumer counter, it *must* only be incremented in the EQ's interrupt
+ * context. It is also fed back to the hardware during re-arming of
+ * the EQ, again this *must* only happen in the EQ's interrupt context.
+ *
+ * There are a couple of struct members (mleq_check_disarm_cc and
+ * mleq_check_disarm_cnt) which are used to help monitor the health
+ * and consistency of the EQ. They are only used and modified during health
+ * monitoring, which is both infrequent and single threaded, consequently
+ * no mutex guards are needed.
+ *
+ * Care is taken not to use the mleq_mtx when possible, both to avoid
+ * contention in what is "hot" code and avoid breaking requirements
+ * of mac(9E).
+ */
 typedef struct mlxcx_event_queue {
 	kmutex_t		mleq_mtx;
+	kcondvar_t		mleq_cv;
 	mlxcx_t			*mleq_mlx;
 	mlxcx_eventq_state_t	mleq_state;
 	mlxcx_eventq_type_t	mleq_type;
@@ -482,6 +557,7 @@ typedef struct mlxcx_work_queue mlxcx_work_queue_t;
 
 typedef struct mlxcx_completion_queue {
 	kmutex_t			mlcq_mtx;
+	kmutex_t			mlcq_arm_mtx;
 	mlxcx_t				*mlcq_mlx;
 	mlxcx_completionq_state_t	mlcq_state;
 
@@ -842,11 +918,12 @@ typedef enum mlxcx_cmd_state {
 	MLXCX_CMD_S_ERROR	= 1 << 1
 } mlxcx_cmd_state_t;
 
-typedef struct mlxcx_cmd {
+struct mlxcx_cmd {
 	struct mlxcx		*mlcmd_mlxp;
 	kmutex_t		mlcmd_lock;
 	kcondvar_t		mlcmd_cv;
 
+	boolean_t		mlcmd_poll;
 	uint8_t			mlcmd_token;
 	mlxcx_cmd_op_t		mlcmd_op;
 
@@ -866,7 +943,7 @@ typedef struct mlxcx_cmd {
 	 */
 	mlxcx_cmd_state_t	mlcmd_state;
 	uint8_t			mlcmd_status;
-} mlxcx_cmd_t;
+};
 
 /*
  * Our view of capabilities.
@@ -893,6 +970,7 @@ typedef struct {
 	size_t			mlc_max_rx_ft_shift;
 	size_t			mlc_max_rx_fe_dest;
 	size_t			mlc_max_rx_flows;
+	size_t			mlc_max_rx_ft;
 
 	size_t			mlc_max_tir;
 
@@ -949,6 +1027,7 @@ typedef enum {
 	MLXCX_ATTACH_BUFS	= 1 << 14,
 	MLXCX_ATTACH_CAPS	= 1 << 15,
 	MLXCX_ATTACH_CHKTIMERS	= 1 << 16,
+	MLXCX_ATTACH_ASYNC_TQ	= 1 << 17,
 } mlxcx_attach_progress_t;
 
 struct mlxcx {
@@ -1006,6 +1085,7 @@ struct mlxcx {
 	uint_t			mlx_intr_type;		/* always MSI-X */
 	int			mlx_intr_count;
 	size_t			mlx_intr_size;		/* allocation size */
+	int			mlx_intr_cq0;
 	ddi_intr_handle_t	*mlx_intr_handles;
 
 	/*
@@ -1045,6 +1125,14 @@ struct mlxcx {
 	kmutex_t		mlx_pagemtx;
 	uint_t			mlx_npages;
 	avl_tree_t		mlx_pages;
+
+	mlxcx_async_param_t	mlx_npages_req[MLXCX_FUNC_ID_MAX + 1];
+
+	/*
+	 * Taskq for processing asynchronous events which may issue
+	 * commands to the HCA.
+	 */
+	taskq_t			*mlx_async_tq;
 
 	/*
 	 * Port state
@@ -1130,7 +1218,7 @@ extern void mlxcx_dma_queue_attr(mlxcx_t *, ddi_dma_attr_t *);
 extern void mlxcx_dma_qdbell_attr(mlxcx_t *, ddi_dma_attr_t *);
 extern void mlxcx_dma_buf_attr(mlxcx_t *, ddi_dma_attr_t *);
 
-extern boolean_t mlxcx_give_pages(mlxcx_t *, int32_t);
+extern boolean_t mlxcx_give_pages(mlxcx_t *, int32_t, int32_t *);
 
 static inline const ddi_dma_cookie_t *
 mlxcx_dma_cookie_iter(const mlxcx_dma_buffer_t *db,
@@ -1151,6 +1239,7 @@ mlxcx_dma_cookie_one(const mlxcx_dma_buffer_t *db)
  * From mlxcx_intr.c
  */
 extern boolean_t mlxcx_intr_setup(mlxcx_t *);
+extern void mlxcx_intr_disable(mlxcx_t *);
 extern void mlxcx_intr_teardown(mlxcx_t *);
 extern void mlxcx_arm_eq(mlxcx_t *, mlxcx_event_queue_t *);
 extern void mlxcx_arm_cq(mlxcx_t *, mlxcx_completion_queue_t *);
@@ -1241,6 +1330,10 @@ extern boolean_t mlxcx_add_vlan_entry(mlxcx_t *, mlxcx_ring_group_t *,
  */
 extern boolean_t mlxcx_cmd_queue_init(mlxcx_t *);
 extern void mlxcx_cmd_queue_fini(mlxcx_t *);
+
+extern void mlxcx_cmd_completion(mlxcx_t *, mlxcx_eventq_ent_t *);
+extern void mlxcx_cmd_eq_enable(mlxcx_t *);
+extern void mlxcx_cmd_eq_disable(mlxcx_t *);
 
 extern boolean_t mlxcx_cmd_enable_hca(mlxcx_t *);
 extern boolean_t mlxcx_cmd_disable_hca(mlxcx_t *);

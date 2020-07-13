@@ -533,3 +533,8 @@ KICONV_KMODS	+= kiconv_emea kiconv_ja kiconv_ko kiconv_sc kiconv_tc
 #
 $(LINTFLAGSUPPRESS)LINTFLAGS	+= -D_MACHDEP -I$(UTSBASE)/sun4 \
 				   -I$(UTSBASE)/sun4u -I$(UTSBASE)/sfmmu
+
+#
+#	Sensor related drivers
+#
+DRV_KMODS	+= ksensor ksensor_test

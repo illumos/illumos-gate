@@ -19,6 +19,7 @@ SUBDIRS_i386 = i386 imc
 SUBDIRS =       \
 		ddi_ufm \
 		file-locking \
+		ksensor \
 		libtopo \
 		pf_key \
 		poll \

@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*
@@ -193,6 +194,7 @@ typedef struct vioblk_req {
 	int				vbr_type;
 	int				vbr_error;
 	virtio_dma_t			*vbr_dma;
+	virtio_chain_t			*vbr_chain;
 	bd_xfer_t			*vbr_xfer;
 	list_node_t			vbr_link;
 } vioblk_req_t;

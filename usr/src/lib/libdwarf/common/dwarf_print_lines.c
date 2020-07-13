@@ -1,174 +1,512 @@
 /*
-
   Copyright (C) 2000,2002,2004,2005,2006 Silicon Graphics, Inc.  All Rights Reserved.
-  Portions Copyright (C) 2007-2010 David Anderson. All Rights Reserved.
+  Portions Copyright (C) 2007-2020 David Anderson. All Rights Reserved.
+  Portions Copyright 2012 SN Systems Ltd. All rights reserved.
 
-  This program is free software; you can redistribute it and/or modify it
-  under the terms of version 2.1 of the GNU Lesser General Public License 
-  as published by the Free Software Foundation.
+  This program is free software; you can redistribute it
+  and/or modify it under the terms of version 2.1 of the
+  GNU Lesser General Public License as published by the Free
+  Software Foundation.
 
-  This program is distributed in the hope that it would be useful, but
-  WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+  This program is distributed in the hope that it would be
+  useful, but WITHOUT ANY WARRANTY; without even the implied
+  warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+  PURPOSE.
 
-  Further, this software is distributed without any warranty that it is
-  free of the rightful claim of any third person regarding infringement 
-  or the like.  Any license provided herein, whether implied or 
-  otherwise, applies only to this software file.  Patent licenses, if
-  any, provided herein do not apply to combinations of this program with 
-  other software, or any other product whatsoever.  
+  Further, this software is distributed without any warranty
+  that it is free of the rightful claim of any third person
+  regarding infringement or the like.  Any license provided
+  herein, whether implied or otherwise, applies only to this
+  software file.  Patent licenses, if any, provided herein
+  do not apply to combinations of this program with other
+  software, or any other product whatsoever.
 
-  You should have received a copy of the GNU Lesser General Public 
-  License along with this program; if not, write the Free Software 
-  Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston MA 02110-1301,
-  USA.
-
-  Contact information:  Silicon Graphics, Inc., 1500 Crittenden Lane,
-  Mountain View, CA 94043, or:
-
-  http://www.sgi.com
-
-  For further information regarding this notice, see:
-
-  http://oss.sgi.com/projects/GenInfo/NoticeExplan
+  You should have received a copy of the GNU Lesser General
+  Public License along with this program; if not, write the
+  Free Software Foundation, Inc., 51 Franklin Street - Fifth
+  Floor, Boston MA 02110-1301, USA.
 
 */
-/* The address of the Free Software Foundation is
-   Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, 
-   Boston, MA 02110-1301, USA.
-   SGI has moved from the Crittenden Lane address.
-*/
-
-
-
 
 #include "config.h"
-#include "dwarf_incl.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
+
+#include "dwarf_incl.h"
+#include "dwarf_alloc.h"
+#include "dwarf_error.h"
+#include "dwarf_util.h"
 #include "dwarf_line.h"
+#include "dwarfstring.h"
 
-/* FIXME Need to add prologue_end epilogue_begin isa fields. */
+#define PRINTING_DETAILS 1
+
 static void
-print_line_header(void)
+print_line_header(Dwarf_Debug dbg,
+    Dwarf_Bool is_single_tab,
+    Dwarf_Bool is_actuals_tab)
 {
-    printf
-        ("                                                         s b e\n"
-         "                                                         t l s\n"
-         "                                                         m c e\n"
-         " section    op                                       col t k q\n"
-         " offset     code               address     file line umn ? ? ?\n");
+if (!is_single_tab) {
+    /* Ugly indenting follows, it makes lines shorter to see them better.
+        Best to use a wider text window to really see how it looks.*/
+if (is_actuals_tab) {
+_dwarf_printf(dbg,"\nActuals Table\n");
+_dwarf_printf(dbg,
+"                                                         be\n"
+"                                                         ls\n"
+"                                                         ce\n"
+" section    op                                           kq\n"
+" offset     code                address/index    row isa ??\n");
+    return;
+} else {
+_dwarf_printf(dbg,"\nLogicals Table\n");
+_dwarf_printf(dbg,
+"                                                                              s pe\n"
+"                                                                              tirp\n"
+"                                                                              msoi\n"
+" section          op                                                          tall\n"
+" offset      row  code                address/indx fil lne col disc cntx subp ????\n");
+    return;
+}
 }
 
-/* FIXME: print new line values:   prologue_end epilogue_begin isa */
-static void
-print_line_detail(char *prefix,
-                  int opcode,
-                  Dwarf_Unsigned address,
-                  unsigned long file,
-                  unsigned long line,
-                  unsigned long column,
-                  int is_stmt, int basic_block, int end_sequence,
-                  int prologue_end, int epilogue_begin, int isa)
-{
-    printf("%-15s %2d 0x%08" DW_PR_DUx " "
-           "%2lu   %4lu %2lu   %1d %1d %1d\n",
-           prefix,
-           (int) opcode,
-           (Dwarf_Unsigned) address,
-           (unsigned long) file,
-           (unsigned long) line,
-           (unsigned long) column,
-           (int) is_stmt, (int) basic_block, (int) end_sequence);
+/* Single level table */
+_dwarf_printf(dbg,
+"                                                         s b e p e i d\n"
+"                                                         t l s r p s i\n"
+"                                                         m c e o i a s\n"
+" section    op                                       col t k q l l   c\n"
+" offset     code               address     file line umn ? ? ? ? ?\n");
+} /* End of function with ugly indenting. */
 
+static void
+print_line_detail(
+    Dwarf_Debug dbg,
+    const char *prefix,
+    int opcode,
+    unsigned curr_line,
+    struct Dwarf_Line_Registers_s * regs,
+    Dwarf_Bool is_single_table, Dwarf_Bool is_actuals_table)
+{
+    dwarfstring m1;
+
+    dwarfstring_constructor(&m1);
+    if(!is_single_table && is_actuals_table) {
+        dwarfstring_append_printf_s(&m1,"%-15s ",(char *)prefix);
+        dwarfstring_append_printf_i(&m1,"%3d ",opcode);
+        dwarfstring_append_printf_u(&m1,"0x%" DW_PR_XZEROS DW_PR_DUx ,
+            regs->lr_address);
+        dwarfstring_append_printf_u(&m1,"/%01u",regs->lr_op_index);
+        dwarfstring_append_printf_u(&m1," %5lu", regs->lr_line);
+        dwarfstring_append_printf_u(&m1," %3d",regs->lr_isa);
+        dwarfstring_append_printf_i(&m1,"   %1d", regs->lr_basic_block);
+        dwarfstring_append_printf_i(&m1,"%1d\n",  regs->lr_end_sequence);
+        _dwarf_printf(dbg,dwarfstring_string(&m1));
+        dwarfstring_destructor(&m1);
+        return;
+    }
+    if(!is_single_table && !is_actuals_table) {
+        dwarfstring_append_printf_i(&m1,
+            "[%3d] "  /* row number */, curr_line);
+        dwarfstring_append_printf_s(&m1,
+            "%-15s ",(char *)prefix);
+        dwarfstring_append_printf_i(&m1,
+            "%3d ",opcode);
+        dwarfstring_append_printf_u(&m1,
+            "x%" DW_PR_XZEROS DW_PR_DUx, regs->lr_address);
+        dwarfstring_append_printf_u(&m1,
+            "/%01u", regs->lr_op_index);
+        dwarfstring_append_printf_u(&m1," %2lu ",regs->lr_file);
+        dwarfstring_append_printf_u(&m1,"%4lu  ",regs->lr_line);
+        dwarfstring_append_printf_u(&m1,"%1lu",regs->lr_column);
+        if (regs->lr_discriminator ||
+            regs->lr_prologue_end ||
+            regs->lr_epilogue_begin ||
+            regs->lr_isa ||
+            regs->lr_is_stmt ||
+            regs->lr_call_context ||
+            regs->lr_subprogram) {
+            dwarfstring_append_printf_u(&m1,
+                "   x%02" DW_PR_DUx ,
+                regs->lr_discriminator); /* DWARF4 */
+            dwarfstring_append_printf_u(&m1,
+                "  x%02" DW_PR_DUx , regs->lr_call_context); /* EXPERIMENTAL */
+            dwarfstring_append_printf_u(&m1,
+                "  x%02" DW_PR_DUx , regs->lr_subprogram); /* EXPERIMENTAL */
+            dwarfstring_append_printf_i(&m1,
+                "  %1d", regs->lr_is_stmt);
+            dwarfstring_append_printf_i(&m1,
+                "%1d", (int) regs->lr_isa);
+            dwarfstring_append_printf_i(&m1,
+                "%1d", regs->lr_prologue_end); /* DWARF3 */
+            dwarfstring_append_printf_i(&m1,
+                "%1d", regs->lr_epilogue_begin); /* DWARF3 */
+        }
+        dwarfstring_append(&m1,"\n");
+        _dwarf_printf(dbg,dwarfstring_string(&m1));
+        dwarfstring_destructor(&m1);
+        return;
+    }
+    /*  In the first quoted line below:
+        3d looks better than 2d, but best to do that as separate
+        change and test from two-level-line-tables.  */
+    dwarfstring_append_printf_s(&m1,
+        "%-15s ",(char *)prefix);
+    dwarfstring_append_printf_i(&m1,
+        "%2d ",opcode);
+    dwarfstring_append_printf_u(&m1,
+        "0x%" DW_PR_XZEROS DW_PR_DUx " ",
+        regs->lr_address);
+    dwarfstring_append_printf_u(&m1,
+        "%2lu   ", regs->lr_file);
+    dwarfstring_append_printf_u(&m1,
+        "%4lu ", regs->lr_line);
+    dwarfstring_append_printf_u(&m1,
+        "%2lu   ", regs->lr_column);
+    dwarfstring_append_printf_i(&m1,
+        "%1d ",regs->lr_is_stmt);
+    dwarfstring_append_printf_i(&m1,
+        "%1d ", regs->lr_basic_block);
+    dwarfstring_append_printf_i(&m1,
+        "%1d",regs->lr_end_sequence);
+    if (regs->lr_discriminator ||
+        regs->lr_prologue_end ||
+        regs->lr_epilogue_begin ||
+        regs->lr_isa) {
+        dwarfstring_append_printf_i(&m1,
+            " %1d", regs->lr_prologue_end); /* DWARF3 */
+        dwarfstring_append_printf_i(&m1,
+            " %1d", regs->lr_epilogue_begin); /* DWARF3 */
+        dwarfstring_append_printf_i(&m1,
+            " %1d", regs->lr_isa); /* DWARF3 */
+        dwarfstring_append_printf_u(&m1,
+            " 0x%" DW_PR_DUx , regs->lr_discriminator); /* DWARF4 */
+    }
+    dwarfstring_append(&m1, "\n");
+    _dwarf_printf(dbg,dwarfstring_string(&m1));
+    dwarfstring_destructor(&m1);
 }
 
 
-/*
-        return DW_DLV_OK if ok. else DW_DLV_NO_ENTRY or DW_DLV_ERROR
-        If err_count_out is non-NULL, this is a special 'check'
-        call.
-*/
-int
-_dwarf_internal_printlines(Dwarf_Die die, Dwarf_Error * error,
-   int * err_count_out, int only_line_header)
+#include "dwarf_line_table_reader_common.h"
+
+
+static void
+print_include_directory_details(Dwarf_Debug dbg,
+    unsigned int line_version,
+    Dwarf_Line_Context line_context)
 {
-    /* 
-       This pointer is used to scan the portion of the .debug_line
-       section for the current cu. */
+    Dwarf_Unsigned u = 0;
+    dwarfstring m4;
+
+    dwarfstring_constructor(&m4);
+    if (line_version == DW_LINE_VERSION5) {
+        unsigned i = 0;
+        unsigned dfcount = line_context->lc_directory_entry_format_count;
+        dwarfstring_constructor(&m4);
+        dwarfstring_append_printf_u(&m4,
+            "  directory entry format count %u\n",dfcount);
+        _dwarf_printf(dbg,dwarfstring_string(&m4));
+        dwarfstring_reset(&m4);
+        for ( ; i < dfcount;++i) {
+            struct Dwarf_Unsigned_Pair_s *valpair = 0;
+            const char *tname = 0;
+            const char *fname = 0;
+            int res;
+
+            valpair = line_context->lc_directory_format_values +i;
+            dwarfstring_append_printf_u(&m4,
+                "  format [%2u] ",i);
+            res = dwarf_get_LNCT_name(valpair->up_first,
+                &tname);
+            if ( res != DW_DLV_OK) {
+                tname = "<unknown type>";
+            }
+            dwarfstring_append_printf_u (&m4,
+                " type 0x%" DW_PR_XZEROS DW_PR_DUx ,valpair->up_first);
+            dwarfstring_append_printf_s (&m4,
+                " %-20s\n",(char *)tname);
+            res = dwarf_get_FORM_name(valpair->up_second,&fname);
+            if ( res != DW_DLV_OK) {
+                fname = "<unknown form>";
+            }
+            dwarfstring_append_printf_u(&m4,
+                "               code 0x%" DW_PR_XZEROS DW_PR_DUx ,
+                valpair->up_second);
+            dwarfstring_append_printf_s(&m4,
+                " %-20s\n", (char *)fname);
+            _dwarf_printf(dbg,dwarfstring_string(&m4));
+            dwarfstring_reset(&m4);
+
+        }
+    }
+    /* common print of the files */
+    dwarfstring_append_printf_i(&m4,
+        "  include directories count %d\n",
+        (int) line_context->lc_include_directories_count);
+    _dwarf_printf(dbg,dwarfstring_string(&m4));
+    dwarfstring_reset(&m4);
+    for (u = 0; u < line_context->lc_include_directories_count; ++u) {
+        dwarfstring_append_printf_u(&m4,
+            "  include dir[%u] ",u);
+        dwarfstring_append_printf_s(&m4,
+            "%s\n",
+            (char *)line_context->lc_include_directories[u]);
+        _dwarf_printf(dbg,dwarfstring_string(&m4));
+        dwarfstring_reset(&m4);
+    }
+    dwarfstring_destructor(&m4);
+}
+
+static void
+print_just_file_entry_details(Dwarf_Debug dbg,
+    Dwarf_Line_Context line_context)
+{
+    unsigned fiu = 0;
+    Dwarf_File_Entry fe = line_context->lc_file_entries;
+    Dwarf_File_Entry fe2 = fe;
+    dwarfstring m3;
+
+    dwarfstring_constructor(&m3);
+    dwarfstring_append_printf_i(&m3,
+        "  file names count      %d\n",
+        line_context->lc_file_entry_count);
+    _dwarf_printf(dbg,dwarfstring_string(&m3));
+    dwarfstring_reset(&m3);
+    for (fiu = 0 ; fe2 ; fe2 = fe->fi_next,++fiu ) {
+        Dwarf_Unsigned tlm2 = 0;
+        unsigned filenum = 0;
+
+        fe = fe2;
+        tlm2 = fe->fi_time_last_mod;
+        filenum = fiu+1;
+
+        /*  The space character at the end of line is silly,
+            but lets leave it there for the moment to avoid
+            changing output.  */
+        if (line_context->lc_file_entry_count > 9) {
+            dwarfstring_append_printf_u(&m3,
+                "  file[%2u] ",fiu);
+            dwarfstring_append_printf_s(&m3,
+                "%-20s ",
+                (char *) fe->fi_file_name);
+            dwarfstring_append_printf_u(&m3,
+                "(file-number: %u)\n",
+                filenum);
+        } else {
+            dwarfstring_append_printf_u(&m3,
+                "  file[%u]  ", fiu);
+            dwarfstring_append_printf_s(&m3,
+                "%-20s ",(char *)fe->fi_file_name);
+            dwarfstring_append_printf_u(&m3,
+                "(file-number: %u)\n",filenum);
+        }
+        _dwarf_printf(dbg,dwarfstring_string(&m3));
+        dwarfstring_reset(&m3);
+        if (fe->fi_dir_index_present) {
+            Dwarf_Unsigned di = 0;
+            di = fe->fi_dir_index;
+            dwarfstring_append_printf_i(&m3,
+                "    dir index %d\n", di);
+        }
+        if (fe->fi_time_last_mod_present) {
+            time_t tt = (time_t) tlm2;
+
+            /* ctime supplies newline */
+            dwarfstring_append_printf_u(&m3,
+                "    last time 0x%x ",tlm2);
+            dwarfstring_append(&m3,(char *)ctime(&tt));
+        }
+        if (fe->fi_file_length_present) {
+            Dwarf_Unsigned fl = 0;
+
+            fl = fe->fi_file_length;
+            dwarfstring_append_printf_i(&m3,
+                "    file length %ld ",fl);
+            dwarfstring_append_printf_u(&m3,
+                "0x%lx\n",fl);
+        }
+        if (fe->fi_md5_present) {
+            char *c = (char *)&fe->fi_md5_value;
+            char *end = c+sizeof(fe->fi_md5_value);
+            dwarfstring_append(&m3, "    file md5 value 0x");
+            while(c < end) {
+                dwarfstring_append_printf_u(&m3,
+                    "%02x",0xff&*c);
+                ++c;
+            }
+            dwarfstring_append(&m3,"\n");
+        }
+        if (dwarfstring_strlen(&m3)) {
+            _dwarf_printf(dbg,dwarfstring_string(&m3));
+            dwarfstring_reset(&m3);
+        }
+    }
+    dwarfstring_destructor(&m3);
+}
+
+static void
+print_file_entry_details(Dwarf_Debug dbg,
+    unsigned int line_version,
+    Dwarf_Line_Context line_context)
+{
+    dwarfstring m5;
+
+    dwarfstring_constructor(&m5);
+    if (line_version == DW_LINE_VERSION5) {
+        unsigned i = 0;
+        unsigned dfcount = line_context->lc_file_name_format_count;
+
+        dwarfstring_append_printf_u(&m5,
+            "  file entry format count      %u\n",dfcount);
+        for ( ; i < dfcount;++i) {
+            struct Dwarf_Unsigned_Pair_s *valpair = 0;
+            const char *tname = 0;
+            const char *fname = 0;
+            int res;
+
+            valpair = line_context->lc_file_format_values +i;
+            dwarfstring_append_printf_u(&m5,
+                "  format [%2u] ",i);
+            res = dwarf_get_LNCT_name(valpair->up_first,&tname);
+            if ( res != DW_DLV_OK) {
+                tname = "<unknown type>";
+            }
+            dwarfstring_append_printf_u(&m5,
+                " type 0x%" DW_PR_XZEROS DW_PR_DUx,
+                valpair->up_first);
+            dwarfstring_append_printf_s(&m5,
+                " %-20s\n",(char *)tname);
+            res = dwarf_get_FORM_name(valpair->up_second,&fname);
+            if ( res != DW_DLV_OK) {
+                fname = "<unknown form>";
+            }
+            dwarfstring_append_printf_u(&m5,
+                "               code 0x%"
+                DW_PR_XZEROS DW_PR_DUx,
+                valpair->up_second);
+            dwarfstring_append_printf_s(&m5, " %-20s\n",
+                (char *)fname);
+            _dwarf_printf(dbg,dwarfstring_string(&m5));
+            dwarfstring_reset(&m5);
+        }
+        dwarfstring_destructor(&m5);
+        print_just_file_entry_details(dbg,line_context);
+    } else {
+        print_just_file_entry_details(dbg,line_context);
+        dwarfstring_destructor(&m5);
+    }
+
+}
+
+static void
+print_experimental_subprograms_list(Dwarf_Debug dbg,
+    Dwarf_Line_Context line_context)
+{
+    /*  Print the subprograms list. */
+    Dwarf_Unsigned count = line_context->lc_subprogs_count;
+    Dwarf_Unsigned exu = 0;
+    Dwarf_Subprog_Entry sub = line_context->lc_subprogs;
+    dwarfstring m6;
+
+    dwarfstring_constructor(&m6);
+    dwarfstring_append_printf_u(&m6,
+        "  subprograms count %" DW_PR_DUu "\n",count);
+    if (count > 0) {
+        dwarfstring_append(&m6,"    indx  file   line   name\n");
+    }
+    _dwarf_printf(dbg,dwarfstring_string(&m6));
+    dwarfstring_reset(&m6);
+    for (exu = 0 ; exu < count ; exu++,sub++) {
+        dwarfstring_append_printf_u(&m6,
+            "    [%2" DW_PR_DUu,exu+1);
+        dwarfstring_append_printf_u(&m6,
+            "] %4" DW_PR_DUu,sub->ds_decl_file);
+        dwarfstring_append_printf_u(&m6,
+            "    %4" DW_PR_DUu ,sub->ds_decl_line);
+        dwarfstring_append_printf_s(&m6,
+            " %s\n",(char *)sub->ds_subprog_name);
+        _dwarf_printf(dbg,dwarfstring_string(&m6));
+        dwarfstring_reset(&m6);
+    }
+    dwarfstring_destructor(&m6);
+}
+
+static void
+do_line_print_now(Dwarf_Debug dbg,int line_version,
+    Dwarf_Small * comp_dir,
+    Dwarf_Line_Context line_context) ;
+static void print_experimental_counts(Dwarf_Debug dbg,
+    int line_version,
+    Dwarf_Line_Context line_context);
+
+static int print_actuals_and_locals(Dwarf_Debug dbg,
+    Dwarf_Line_Context line_context,
+    Dwarf_Unsigned bogus_bytes_count,
+    Dwarf_Small *bogus_bytes_ptr,
+    Dwarf_Small *orig_line_ptr,
+    Dwarf_Small *line_ptr,
+    Dwarf_Small *section_start,
+    Dwarf_Small *line_ptr_actuals,
+    Dwarf_Small *line_ptr_end,
+    Dwarf_Half   address_size,
+    int *        err_count_out,
+    Dwarf_Error *err);
+
+/*  return DW_DLV_OK if ok. else DW_DLV_NO_ENTRY or DW_DLV_ERROR
+    If err_count_out is non-NULL, this is a special 'check'
+    call.  */
+static int
+_dwarf_internal_printlines(Dwarf_Die die,
+    int * err_count_out,
+    int only_line_header,
+    Dwarf_Error * error)
+{
+    /*  This pointer is used to scan the portion of the .debug_line
+        section for the current cu. */
     Dwarf_Small *line_ptr = 0;
     Dwarf_Small *orig_line_ptr = 0;
 
-    /* 
-       This points to the last byte of the .debug_line portion for the
-       current cu. */
-    Dwarf_Small *line_ptr_end = 0;
-
-    /* 
-       Pointer to a DW_AT_stmt_list attribute in case it exists in the
-       die. */
+    /*  Pointer to a DW_AT_stmt_list attribute in case it exists in the
+        die. */
     Dwarf_Attribute stmt_list_attr = 0;
 
-    /* Pointer to DW_AT_comp_dir attribute in die. */
+    /*  Pointer to DW_AT_comp_dir attribute in die. */
     Dwarf_Attribute comp_dir_attr = 0;
 
-    /* Pointer to name of compilation directory. */
+    /*  Pointer to name of compilation directory. */
     Dwarf_Small *comp_dir = NULL;
 
-    /* 
-       Offset into .debug_line specified by a DW_AT_stmt_list
-       attribute. */
+    /*  Offset into .debug_line specified by a DW_AT_stmt_list
+        attribute. */
     Dwarf_Unsigned line_offset = 0;
 
-    struct Line_Table_Prefix_s prefix;
-
-
-    /* These are the state machine state variables. */
-    Dwarf_Addr address = 0;
-    Dwarf_Word file = 1;
-    Dwarf_Word line = 1;
-    Dwarf_Word column = 0;
-    Dwarf_Bool is_stmt = false;
-    Dwarf_Bool basic_block = false;
-    Dwarf_Bool end_sequence = false;
-    Dwarf_Bool prologue_end = false;
-    Dwarf_Bool epilogue_begin = false;
-    Dwarf_Small isa = 0;
-
-
-    Dwarf_Sword i=0;
-
-    /* 
-       This is the current opcode read from the statement program. */
-    Dwarf_Small opcode=0;
-
-
-    /* 
-       These variables are used to decode leb128 numbers. Leb128_num
-       holds the decoded number, and leb128_length is its length in
-       bytes. */
-    Dwarf_Word leb128_num=0;
-    Dwarf_Word leb128_length=0;
-    Dwarf_Sword advance_line=0;
+    /*  These variables are used to decode leb128 numbers. Leb128_num
+        holds the decoded number, and leb128_length is its length in
+        bytes. */
     Dwarf_Half attrform = 0;
-    /* 
-       This is the operand of the latest fixed_advance_pc extended
-       opcode. */
-    Dwarf_Half fixed_advance_pc=0;
 
-    /* In case there are wierd bytes 'after' the line table
-     * prologue this lets us print something. This is a gcc
-     * compiler bug and we expect the bytes count to be 12.
-     */
+    /*  In case there are wierd bytes 'after' the line table
+        prologue this lets us print something. This is a gcc
+        compiler bug and we expect the bytes count to be 12.  */
     Dwarf_Small* bogus_bytes_ptr = 0;
     Dwarf_Unsigned bogus_bytes_count = 0;
+    Dwarf_Half address_size = 0;
+    Dwarf_Unsigned fission_offset = 0;
+    unsigned line_version = 0;
 
 
     /* The Dwarf_Debug this die belongs to. */
-    Dwarf_Debug dbg=0;
+    Dwarf_Debug dbg = 0;
+    Dwarf_CU_Context cu_context = 0;
+    Dwarf_Line_Context line_context = 0;
     int resattr = DW_DLV_ERROR;
     int lres =    DW_DLV_ERROR;
     int res  =    DW_DLV_ERROR;
+    Dwarf_Small *line_ptr_actuals  = 0;
+    Dwarf_Small *line_ptr_end = 0;
+    Dwarf_Small *section_start = 0;
 
     /* ***** BEGIN CODE ***** */
 
@@ -177,47 +515,64 @@ _dwarf_internal_printlines(Dwarf_Die die, Dwarf_Error * error,
     }
 
     CHECK_DIE(die, DW_DLV_ERROR);
-    dbg = die->di_cu_context->cc_dbg;
+    cu_context = die->di_cu_context;
+    dbg = cu_context->cc_dbg;
 
     res = _dwarf_load_section(dbg, &dbg->de_debug_line,error);
     if (res != DW_DLV_OK) {
         return res;
     }
+    if (!dbg->de_debug_line.dss_size) {
+        return (DW_DLV_NO_ENTRY);
+    }
 
+    address_size = _dwarf_get_address_size(dbg, die);
     resattr = dwarf_attr(die, DW_AT_stmt_list, &stmt_list_attr, error);
     if (resattr != DW_DLV_OK) {
         return resattr;
     }
-
-
-    /* The list of relevant FORMs is small. 
-       DW_FORM_data4, DW_FORM_data8, DW_FORM_sec_offset 
+    /*  The list of relevant FORMs is small.
+        DW_FORM_data4, DW_FORM_data8, DW_FORM_sec_offset
     */
     lres = dwarf_whatform(stmt_list_attr,&attrform,error);
     if (lres != DW_DLV_OK) {
+        dwarf_dealloc(dbg,stmt_list_attr, DW_DLA_ATTR);
         return lres;
     }
     if (attrform != DW_FORM_data4 && attrform != DW_FORM_data8 &&
         attrform != DW_FORM_sec_offset ) {
+        dwarf_dealloc(dbg,stmt_list_attr, DW_DLA_ATTR);
         _dwarf_error(dbg, error, DW_DLE_LINE_OFFSET_BAD);
         return (DW_DLV_ERROR);
     }
     lres = dwarf_global_formref(stmt_list_attr, &line_offset, error);
     if (lres != DW_DLV_OK) {
+        dwarf_dealloc(dbg,stmt_list_attr, DW_DLA_ATTR);
         return lres;
     }
 
     if (line_offset >= dbg->de_debug_line.dss_size) {
+        dwarf_dealloc(dbg,stmt_list_attr, DW_DLA_ATTR);
         _dwarf_error(dbg, error, DW_DLE_LINE_OFFSET_BAD);
         return (DW_DLV_ERROR);
     }
-    orig_line_ptr = dbg->de_debug_line.dss_data;
-    line_ptr = dbg->de_debug_line.dss_data + line_offset;
+    section_start =  dbg->de_debug_line.dss_data;
+    {
+        Dwarf_Unsigned fission_size = 0;
+        int resfis = _dwarf_get_fission_addition_die(die, DW_SECT_LINE,
+            &fission_offset,&fission_size,error);
+        if(resfis != DW_DLV_OK) {
+            dwarf_dealloc(dbg,stmt_list_attr, DW_DLA_ATTR);
+            return resfis;
+        }
+    }
+
+    orig_line_ptr = section_start + line_offset + fission_offset;
+    line_ptr = orig_line_ptr;
     dwarf_dealloc(dbg, stmt_list_attr, DW_DLA_ATTR);
 
-    /* 
-       If die has DW_AT_comp_dir attribute, get the string that names
-       the compilation directory. */
+    /*  If die has DW_AT_comp_dir attribute, get the string that names
+        the compilation directory. */
     resattr = dwarf_attr(die, DW_AT_comp_dir, &comp_dir_attr, error);
     if (resattr == DW_DLV_ERROR) {
         return resattr;
@@ -236,473 +591,334 @@ _dwarf_internal_printlines(Dwarf_Die die, Dwarf_Error * error,
     if (resattr == DW_DLV_OK) {
         dwarf_dealloc(dbg, comp_dir_attr, DW_DLA_ATTR);
     }
-
-    dwarf_init_line_table_prefix(&prefix);
+    line_context = (Dwarf_Line_Context)
+        _dwarf_get_alloc(dbg, DW_DLA_LINE_CONTEXT, 1);
+    if (line_context == NULL) {
+        _dwarf_error(dbg, error, DW_DLE_ALLOC_FAIL);
+        return (DW_DLV_ERROR);
+    }
     {
-        Dwarf_Small *line_ptr_out = 0;
-        int dres = dwarf_read_line_table_prefix(dbg,
-            line_ptr,dbg->de_debug_line.dss_size - line_offset,
-            &line_ptr_out,
-            &prefix, 
+        Dwarf_Small *newlinep = 0;
+        int dres = _dwarf_read_line_table_header(dbg,
+            cu_context,
+            section_start,
+            line_ptr,
+            dbg->de_debug_line.dss_size,
+            &newlinep,
+            line_context,
             &bogus_bytes_ptr,
             &bogus_bytes_count,
             error,
             err_count_out);
         if (dres == DW_DLV_ERROR) {
-            dwarf_free_line_table_prefix(&prefix);
+            dwarf_srclines_dealloc_b(line_context);
             return dres;
         }
         if (dres == DW_DLV_NO_ENTRY) {
-            dwarf_free_line_table_prefix(&prefix);
+            dwarf_srclines_dealloc_b(line_context);
             return dres;
         }
-        line_ptr_end = prefix.pf_line_ptr_end;
-        line_ptr = line_ptr_out;
-    }
-    if(only_line_header) {
-         /* Just checking for header errors, nothing more here.*/
-         dwarf_free_line_table_prefix(&prefix);
-         return DW_DLV_OK;
-    }
-
-
-    printf("total line info length %ld bytes, "
-           "line offset 0x%" DW_PR_DUx " %" DW_PR_DSd "\n",
-           (long) prefix.pf_total_length,
-           (Dwarf_Unsigned) line_offset, 
-           (Dwarf_Signed) line_offset);
-    printf("line table version %d\n",(int) prefix.pf_version);
-    printf("line table length field length %d prologue length %d\n",
-           (int)prefix.pf_length_field_length,
-           (int)prefix.pf_prologue_length);
-    printf("compilation_directory %s\n",
-           comp_dir ? ((char *) comp_dir) : "");
-
-    printf("  min instruction length %d\n",
-           (int) prefix.pf_minimum_instruction_length);
-    printf("  default is stmt        %d\n", (int)
-           prefix.pf_default_is_stmt);
-    printf("  line base              %d\n", (int)
-           prefix.pf_line_base);
-    printf("  line_range             %d\n", (int)
-           prefix.pf_line_range);
-    printf("  opcode base            %d\n", (int)
-           prefix.pf_opcode_base);
-    printf("  standard opcode count  %d\n", (int)
-           prefix.pf_std_op_count);
-
-    for (i = 1; i < prefix.pf_opcode_base; i++) {
-        printf("  opcode[%2d] length  %d\n", (int) i,
-               (int) prefix.pf_opcode_length_table[i - 1]);
-    }
-    printf("  include directories count %d\n", (int)
-           prefix.pf_include_directories_count);
-
-    
-    for (i = 0; i < prefix.pf_include_directories_count; ++i) {
-        printf("  include dir[%d] %s\n",
-               (int) i, prefix.pf_include_directories[i]);
-    }
-    printf("  files count            %d\n", (int)
-           prefix.pf_files_count);
-
-    for (i = 0; i < prefix.pf_files_count; ++i) {
-        struct Line_Table_File_Entry_s *lfile =
-            prefix.pf_line_table_file_entries + i;
-
-        Dwarf_Unsigned tlm2 = lfile->lte_last_modification_time;
-        Dwarf_Unsigned di = lfile->lte_directory_index;
-        Dwarf_Unsigned fl = lfile->lte_length_of_file;
-
-        printf("  file[%d]  %s (file-number: %d) \n",
-               (int) i, (char *) lfile->lte_filename,
-               (int)(i+1));
-
-        printf("    dir index %d\n", (int) di);
-        {
-            time_t tt = (time_t) tlm2;
-
-            printf("    last time 0x%x %s",     /* ctime supplies
-                                                   newline */
-                   (unsigned) tlm2, ctime(&tt));
-        }
-        printf("    file length %ld 0x%lx\n",
-               (long) fl, (unsigned long) fl);
-
-
-    }
-
-
-    {
-        Dwarf_Unsigned offset = 0;
-        if(bogus_bytes_count > 0) {
-            Dwarf_Unsigned wcount = bogus_bytes_count;
-            Dwarf_Unsigned boffset = bogus_bytes_ptr - orig_line_ptr;
-            printf("*** DWARF CHECK: the line table prologue  header_length "
-                " is %" DW_PR_DUu " too high, we pretend it is smaller."
-                "Section offset: %" DW_PR_DUu " (0x%" DW_PR_DUx ") ***\n",
-                wcount, boffset,boffset);
-            *err_count_out += 1;
-        }
-        offset = line_ptr - orig_line_ptr;
-
-        printf("  statement prog offset in section: %" DW_PR_DUu " 0x%" DW_PR_DUx "\n",
-               offset, offset);
-    }
-
-    /* Initialize the part of the state machine dependent on the
-       prefix.  */
-    is_stmt = prefix.pf_default_is_stmt;
-
-
-    print_line_header();
-    /* Start of statement program.  */
-    while (line_ptr < line_ptr_end) {
-        int type = 0;
-
-        printf(" [0x%06" DW_PR_DSx "] ", 
-            (Dwarf_Signed) (line_ptr - orig_line_ptr));
-        opcode = *(Dwarf_Small *) line_ptr;
-        line_ptr++;
-        /* 'type' is the output */
-        WHAT_IS_OPCODE(type, opcode, prefix.pf_opcode_base,
-                       prefix.pf_opcode_length_table, line_ptr,
-                       prefix.pf_std_op_count);
-
-        if (type == LOP_DISCARD) {
-            int oc;
-            int opcnt = prefix.pf_opcode_length_table[opcode];
-
-            printf("*** DWARF CHECK: DISCARD standard opcode %d "
-                "with %d operands: "
-                "not understood.", opcode, opcnt);
-            *err_count_out += 1;
-            for (oc = 0; oc < opcnt; oc++) {
-                /* 
-                 * Read and discard operands we don't
-                 * understand.
-                 * Arbitrary choice of unsigned read.
-                 * Signed read would work as well.
-                 */
-                Dwarf_Unsigned utmp2;
-
-                DECODE_LEB128_UWORD(line_ptr, utmp2);
-                printf(" %" DW_PR_DUu " (0x%" DW_PR_DUx ")",
-                       (Dwarf_Unsigned) utmp2,
-                       (Dwarf_Unsigned) utmp2);
-            }
-
-            printf("***\n");
-            /* do nothing, necessary ops done */
-        } else if (type == LOP_SPECIAL) {
-            /* This op code is a special op in the object, no matter
-               that it might fall into the standard op range in this
-               compile Thatis, these are special opcodes between
-               special_opcode_base and MAX_LINE_OP_CODE.  (including
-               special_opcode_base and MAX_LINE_OP_CODE) */
-            char special[50];
-            unsigned origop = opcode;
-
-            opcode = opcode - prefix.pf_opcode_base;
-            address = address + prefix.pf_minimum_instruction_length *
-                (opcode / prefix.pf_line_range);
-            line =
-                line + prefix.pf_line_base +
-                opcode % prefix.pf_line_range;
-
-            sprintf(special, "Specialop %3u", origop);
-            print_line_detail(special,
-                              opcode, address, (int) file, line, column,
-                              is_stmt, basic_block, end_sequence,
-                              prologue_end, epilogue_begin, isa);
-
-            basic_block = false;
-
-        } else if (type == LOP_STANDARD) {
-            switch (opcode) {
-
-            case DW_LNS_copy:{
-
-                    print_line_detail("DW_LNS_copy",
-                                      opcode, address, file, line,
-                                      column, is_stmt, basic_block,
-                                      end_sequence, prologue_end,
-                                      epilogue_begin, isa);
-
-                    basic_block = false;
-                    break;
-                }
-
-            case DW_LNS_advance_pc:{
-                    Dwarf_Unsigned utmp2;
-
-
-                    DECODE_LEB128_UWORD(line_ptr, utmp2);
-                    printf("DW_LNS_advance_pc val %" DW_PR_DSd " 0x%" DW_PR_DUx "\n",
-                           (Dwarf_Signed) (Dwarf_Word) utmp2,
-                           (Dwarf_Unsigned) (Dwarf_Word) utmp2);
-                    leb128_num = (Dwarf_Word) utmp2;
-                    address =
-                        address +
-                        prefix.pf_minimum_instruction_length *
-                        leb128_num;
-                    break;
-                }
-
-            case DW_LNS_advance_line:{
-                    Dwarf_Signed stmp;
-
-
-                    DECODE_LEB128_SWORD(line_ptr, stmp);
-                    advance_line = (Dwarf_Sword) stmp;
-                    printf("DW_LNS_advance_line val %" DW_PR_DSd " 0x%" DW_PR_DSx "\n",
-                           (Dwarf_Signed) advance_line,
-                           (Dwarf_Signed) advance_line);
-                    line = line + advance_line;
-                    break;
-                }
-
-            case DW_LNS_set_file:{
-                    Dwarf_Unsigned utmp2;
-
-
-                    DECODE_LEB128_UWORD(line_ptr, utmp2);
-                    file = (Dwarf_Word) utmp2;
-                    printf("DW_LNS_set_file  %ld\n", (long) file);
-                    break;
-                }
-
-            case DW_LNS_set_column:{
-                    Dwarf_Unsigned utmp2;
-
-
-                    DECODE_LEB128_UWORD(line_ptr, utmp2);
-                    column = (Dwarf_Word) utmp2;
-                    printf("DW_LNS_set_column val %" DW_PR_DSd " 0x%" DW_PR_DSx "\n",
-                           (Dwarf_Signed) column, (Dwarf_Signed) column);
-                    break;
-                }
-
-            case DW_LNS_negate_stmt:{
-                    is_stmt = !is_stmt;
-                    printf("DW_LNS_negate_stmt\n");
-                    break;
-                }
-
-            case DW_LNS_set_basic_block:{
-
-                    printf("DW_LNS_set_basic_block\n");
-                    basic_block = true;
-                    break;
-                }
-
-            case DW_LNS_const_add_pc:{
-                    opcode = MAX_LINE_OP_CODE - prefix.pf_opcode_base;
-                    address =
-                        address +
-                        prefix.pf_minimum_instruction_length * (opcode /
-                                                                prefix.
-                                                                pf_line_range);
-
-                    printf("DW_LNS_const_add_pc new address 0x%" DW_PR_DSx "\n",
-                           (Dwarf_Signed) address);
-                    break;
-                }
-
-            case DW_LNS_fixed_advance_pc:{
-
-                    READ_UNALIGNED(dbg, fixed_advance_pc, Dwarf_Half,
-                                   line_ptr, sizeof(Dwarf_Half));
-                    line_ptr += sizeof(Dwarf_Half);
-                    address = address + fixed_advance_pc;
-                    printf("DW_LNS_fixed_advance_pc val %" DW_PR_DSd 
-                       " 0x%" DW_PR_DSx " new address 0x%" DW_PR_DSx "\n",
-                           (Dwarf_Signed) fixed_advance_pc,
-                           (Dwarf_Signed) fixed_advance_pc,
-                           (Dwarf_Signed) address);
-                    break;
-                }
-            case DW_LNS_set_prologue_end:{
-
-                    prologue_end = true;
-                    printf("DW_LNS_set_prologue_end set true.\n");
-                    break;
-
-
-                }
-                /* New in DWARF3 */
-            case DW_LNS_set_epilogue_begin:{
-                    epilogue_begin = true;
-                    printf("DW_LNS_set_epilogue_begin set true.\n");
-                    break;
-                }
-
-                /* New in DWARF3 */
-            case DW_LNS_set_isa:{
-                    Dwarf_Unsigned utmp2;
-
-                    DECODE_LEB128_UWORD(line_ptr, utmp2);
-                    isa = utmp2;
-                    printf("DW_LNS_set_isa new value 0x%" DW_PR_DUx ".\n",
-                           (Dwarf_Unsigned) utmp2);
-                    if (isa != utmp2) {
-                        /* The value of the isa did not fit in our
-                           local so we record it wrong. declare an
-                           error. */
-                        dwarf_free_line_table_prefix(&prefix);
-
-                        _dwarf_error(dbg, error,
-                                     DW_DLE_LINE_NUM_OPERANDS_BAD);
-                        return (DW_DLV_ERROR);
-                    }
-                    break;
-                }
-            }
-
-
-        } else if (type == LOP_EXTENDED) {
-            Dwarf_Unsigned utmp3 = 0;
-            Dwarf_Word instr_length = 0;
-            Dwarf_Small ext_opcode = 0;
-
-            DECODE_LEB128_UWORD(line_ptr, utmp3);
-            instr_length = (Dwarf_Word) utmp3;
-            ext_opcode = *(Dwarf_Small *) line_ptr;
-            line_ptr++;
-            switch (ext_opcode) {
-
-            case DW_LNE_end_sequence:{
-                    end_sequence = true;
-
-                    print_line_detail("DW_LNE_end_sequence extended",
-                                      opcode, address, file, line,
-                                      column, is_stmt, basic_block,
-                                      end_sequence, prologue_end,
-                                      epilogue_begin, isa);
-
-                    address = 0;
-                    file = 1;
-                    line = 1;
-                    column = 0;
-                    is_stmt = prefix.pf_default_is_stmt;
-                    basic_block = false;
-                    end_sequence = false;
-                    prologue_end = false;
-                    epilogue_begin = false;
-
-
-                    break;
-                }
-
-            case DW_LNE_set_address:{
-                    {
-                        READ_UNALIGNED(dbg, address, Dwarf_Addr,
-                                       line_ptr, 
-                                       die->di_cu_context->cc_address_size);
-
-                        line_ptr += die->di_cu_context->cc_address_size;
-                        printf("DW_LNE_set_address address 0x%" DW_PR_DUx "\n",
-                               (Dwarf_Unsigned) address);
-                    }
-
-                    break;
-                }
-
-            case DW_LNE_define_file:{
-                    Dwarf_Unsigned di = 0;
-                    Dwarf_Unsigned tlm = 0;
-                    Dwarf_Unsigned fl = 0;
-
-                    Dwarf_Small *fn = (Dwarf_Small *) line_ptr;
-                    line_ptr = line_ptr + strlen((char *) line_ptr) + 1;
-
-                    di = _dwarf_decode_u_leb128(line_ptr,
-                                                &leb128_length);
-                    line_ptr = line_ptr + leb128_length;
-
-                    tlm = _dwarf_decode_u_leb128(line_ptr,
-                                                 &leb128_length);
-                    line_ptr = line_ptr + leb128_length;
-
-                    fl = _dwarf_decode_u_leb128(line_ptr,
-                                                &leb128_length);
-                    line_ptr = line_ptr + leb128_length;
-
-
-                    printf("DW_LNE_define_file %s \n", fn);
-                    printf("    dir index %d\n", (int) di);
-                    {
-                        time_t tt3 = (time_t) tlm;
-
-                        /* ctime supplies newline */
-                        printf("    last time 0x%x %s",
-                               (unsigned) tlm, ctime(&tt3));
-                    }
-                    printf("    file length %ld 0x%lx\n",
-                           (long) fl, (unsigned long) fl);
-
-                    break;
-                }
-
-            default:{
-                 /* This is an extended op code we do not know about,
-                    other than we know now many bytes it is
-                    (and the op code and the bytes of operand). */
-
-                 Dwarf_Unsigned remaining_bytes = instr_length -1;
-                 if(instr_length < 1 || remaining_bytes > DW_LNE_LEN_MAX) {
-                      dwarf_free_line_table_prefix(&prefix);
-                      _dwarf_error(dbg, error,
-                                 DW_DLE_LINE_EXT_OPCODE_BAD);
-                      return (DW_DLV_ERROR);
-                 }
-                 printf("DW_LNE extended op 0x%x ",ext_opcode);
-                 printf("Bytecount: " DW_PR_DUu , instr_length);
-                 if(remaining_bytes > 0) {
-                     printf(" linedata: 0x");
-                     while (remaining_bytes > 0) {
-                        printf("%02x",(unsigned char)(*(line_ptr)));
-                        line_ptr++;
-                        remaining_bytes--;
-                     }
-                 }
-                 printf("\n");
-                }
-                break;
-            }
-
+        line_ptr_end = line_context->lc_line_ptr_end;
+        line_ptr = newlinep;
+        if (line_context->lc_actuals_table_offset > 0) {
+            line_ptr_actuals = line_context->lc_line_prologue_start +
+                line_context->lc_actuals_table_offset;
         }
     }
-
-    dwarf_free_line_table_prefix(&prefix);
-    return (DW_DLV_OK);
-}
-
-/*
-        This is support for dwarfdump: making it possible
-        for clients wanting line detail info on stdout
-        to get that detail without including internal libdwarf
-        header information.
-        Caller passes in compilation unit DIE.
-        The _dwarf_ version is obsolete (though supported for
-        compatibility).
-        The dwarf_ version is preferred.
-        The functions are intentionally identical: having
-        _dwarf_print_lines call dwarf_print_lines might
-        better emphasize they are intentionally identical, but
-        that seemed slightly silly given how short the functions are.
-        Interface adds error_count (output value) February 2009.
-*/
-int
-dwarf_print_lines(Dwarf_Die die, Dwarf_Error * error,int *error_count)
-{
-    int only_line_header = 0;
-    int res = _dwarf_internal_printlines(die, error,
-        error_count,
-        only_line_header);
-    if (res != DW_DLV_OK) {
+    line_version = line_context->lc_version_number;
+    line_context->lc_compilation_directory = comp_dir;
+    if (only_line_header) {
+        /* Just checking for header errors, nothing more here.*/
+        dwarf_srclines_dealloc_b(line_context);
+        return DW_DLV_OK;
+    }
+    do_line_print_now(dbg,line_version,comp_dir,line_context);
+    print_include_directory_details(dbg,line_version,line_context);
+    print_file_entry_details(dbg,line_version,line_context);
+    print_experimental_counts(dbg, line_version,line_context);
+    res = print_actuals_and_locals(dbg, line_context,
+        bogus_bytes_count,bogus_bytes_ptr,
+        orig_line_ptr,
+        line_ptr,
+        section_start,
+        line_ptr_actuals,
+        line_ptr_end,
+        address_size,
+        err_count_out,
+        error);
+    if (res  !=  DW_DLV_OK) {
         return res;
     }
+    return DW_DLV_OK;
+}
+
+static void
+do_line_print_now(Dwarf_Debug dbg,
+    int line_version,
+    Dwarf_Small *comp_dir,
+    Dwarf_Line_Context line_context)
+{
+    dwarfstring m7;
+    Dwarf_Unsigned i = 0;
+
+    dwarfstring_constructor(&m7);
+    dwarfstring_append_printf_i(&m7,
+        "total line info length %ld bytes,",
+        line_context->lc_total_length);
+
+    dwarfstring_append_printf_u(&m7,
+        " line offset 0x%" DW_PR_XZEROS DW_PR_DUx,
+        line_context->lc_section_offset);
+
+    dwarfstring_append_printf_u(&m7,
+        " %" DW_PR_DUu "\n",
+        line_context->lc_section_offset);
+
+    if (line_version <= DW_LINE_VERSION5) {
+        dwarfstring_append_printf_i(&m7,
+            "  line table version     %d\n",
+        (int) line_context->lc_version_number);
+    } else {
+        dwarfstring_append_printf_u(&m7,
+            "  line table version 0x%x\n",
+            (int) line_context->lc_version_number);
+    }
+    if (line_version == DW_LINE_VERSION5) {
+        dwarfstring_append_printf_i(&m7,
+            "  address size          %d\n",
+            line_context->lc_address_size);
+        dwarfstring_append_printf_i(&m7,
+            "  segment selector size %d\n",
+            line_context->lc_segment_selector_size);
+    }
+    _dwarf_printf(dbg,dwarfstring_string(&m7));
+    dwarfstring_reset(&m7);
+    dwarfstring_append_printf_i(&m7,
+        "  line table length field length %d\n",
+        line_context->lc_length_field_length);
+    dwarfstring_append_printf_i(&m7,
+        "  prologue length       %d\n",
+        line_context->lc_prologue_length);
+    dwarfstring_append_printf_s(&m7,
+        "  compilation_directory %s\n",
+        comp_dir ? ((char *) comp_dir) : "");
+
+    dwarfstring_append_printf_i(&m7,
+        "  min instruction length %d\n",
+        line_context->lc_minimum_instruction_length);
+    _dwarf_printf(dbg,dwarfstring_string(&m7));
+    dwarfstring_reset(&m7);
+    if (line_version == DW_LINE_VERSION5 ||
+        line_version == DW_LINE_VERSION4 ||
+        line_version == EXPERIMENTAL_LINE_TABLES_VERSION) {
+        dwarfstring_append_printf_u(&m7,
+            "  maximum ops per instruction %u\n",
+            line_context->lc_maximum_ops_per_instruction);
+        _dwarf_printf(dbg,dwarfstring_string(&m7));
+        dwarfstring_reset(&m7);
+    }
+    if (line_version == EXPERIMENTAL_LINE_TABLES_VERSION) {
+        dwarfstring_append_printf_u(&m7, "  actuals table offset "
+            "0x%" DW_PR_XZEROS DW_PR_DUx "\n",
+            line_context->lc_actuals_table_offset);
+        dwarfstring_append_printf_u(&m7,"  logicals table offset "
+            "0x%" DW_PR_XZEROS DW_PR_DUx "\n",
+            line_context->lc_logicals_table_offset);
+        _dwarf_printf(dbg,dwarfstring_string(&m7));
+        dwarfstring_reset(&m7);
+    }
+    dwarfstring_append_printf_i(&m7,
+        "  default is stmt        %d\n",
+        (int)line_context->lc_default_is_stmt);
+    dwarfstring_append_printf_i(&m7,
+        "  line base              %d\n",
+        (int)line_context->lc_line_base);
+    dwarfstring_append_printf_i(&m7,
+        "  line_range             %d\n",
+        (int)line_context->lc_line_range);
+    dwarfstring_append_printf_i(&m7,
+        "  opcode base            %d\n",
+        (int)line_context->lc_opcode_base);
+    dwarfstring_append_printf_i(&m7,
+        "  standard opcode count  %d\n",
+        (int)line_context->lc_std_op_count);
+    _dwarf_printf(dbg,dwarfstring_string(&m7));
+    dwarfstring_reset(&m7);
+
+    for (i = 1; i < line_context->lc_opcode_base; i++) {
+        dwarfstring_append_printf_i(&m7,
+            "  opcode[%2d] length", (int) i);
+        dwarfstring_append_printf_i(&m7,
+            "  %d\n",
+            (int) line_context->lc_opcode_length_table[i - 1]);
+        _dwarf_printf(dbg,dwarfstring_string(&m7));
+        dwarfstring_reset(&m7);
+    }
+    dwarfstring_destructor(&m7);
+}
+
+static void
+print_experimental_counts(Dwarf_Debug dbg, int line_version,
+    Dwarf_Line_Context line_context)
+{
+    if (line_version == EXPERIMENTAL_LINE_TABLES_VERSION) {
+        print_experimental_subprograms_list(dbg,line_context);
+    }
+}
+
+static int
+print_actuals_and_locals(Dwarf_Debug dbg,
+    Dwarf_Line_Context line_context,
+    Dwarf_Unsigned bogus_bytes_count,
+    Dwarf_Small *bogus_bytes_ptr,
+    Dwarf_Small *orig_line_ptr,
+    Dwarf_Small *line_ptr,
+    Dwarf_Small *section_start,
+    Dwarf_Small *line_ptr_actuals,
+    Dwarf_Small *line_ptr_end,
+    Dwarf_Half   address_size,
+    int *        err_count_out,
+    Dwarf_Error *error)
+{
+    int res = 0;
+    dwarfstring m8;
+    Dwarf_Unsigned offset = 0;
+
+    dwarfstring_constructor(&m8);
+    if (bogus_bytes_count > 0) {
+        Dwarf_Unsigned wcount = bogus_bytes_count;
+        Dwarf_Unsigned boffset = bogus_bytes_ptr - section_start;
+
+        dwarfstring_append_printf_u(&m8,
+            "*** DWARF CHECK: the line table prologue  header_length "
+            " is %" DW_PR_DUu " too high, we pretend it is smaller.",
+            wcount);
+        dwarfstring_append_printf_u(&m8,
+            "Section offset: 0x%"
+            DW_PR_XZEROS DW_PR_DUx,
+            boffset);
+        dwarfstring_append_printf_u(&m8,
+            " (%" DW_PR_DUu ") ***\n",
+            boffset);
+        *err_count_out += 1;
+    }
+    offset = line_ptr - section_start;
+    dwarfstring_append_printf_u(&m8,
+        "  statement prog offset in section: 0x%"
+        DW_PR_XZEROS DW_PR_DUx,
+        offset);
+    dwarfstring_append_printf_u(&m8,
+        " (%" DW_PR_DUu ")\n",
+        offset);
+    _dwarf_printf(dbg,dwarfstring_string(&m8));
+    dwarfstring_reset(&m8);
+
+    {
+        Dwarf_Bool doaddrs = false;
+        Dwarf_Bool dolines = true;
+
+        if (!line_ptr_actuals) {
+            /* Normal single level line table. */
+
+            Dwarf_Bool is_single_table = true;
+            Dwarf_Bool is_actuals_table = false;
+            print_line_header(dbg, is_single_table, is_actuals_table);
+            res = read_line_table_program(dbg,
+                line_ptr, line_ptr_end, orig_line_ptr,
+                section_start,
+                line_context,
+                address_size, doaddrs, dolines,
+                is_single_table,
+                is_actuals_table,
+                error,
+                err_count_out);
+            if (res != DW_DLV_OK) {
+                dwarfstring_destructor(&m8);
+                dwarf_srclines_dealloc_b(line_context);
+                return res;
+            }
+        } else {
+            Dwarf_Bool is_single_table = false;
+            Dwarf_Bool is_actuals_table = false;
+            if (line_context->lc_version_number !=
+                EXPERIMENTAL_LINE_TABLES_VERSION) {
+                dwarf_srclines_dealloc_b(line_context);
+                dwarfstring_destructor(&m8);
+                _dwarf_error(dbg, error, DW_DLE_VERSION_STAMP_ERROR);
+                return (DW_DLV_ERROR);
+            }
+            /* Read Logicals */
+            print_line_header(dbg, is_single_table, is_actuals_table);
+            res = read_line_table_program(dbg,
+                line_ptr, line_ptr_actuals, orig_line_ptr,
+                section_start,
+                line_context,
+                address_size, doaddrs, dolines,
+                is_single_table,
+                is_actuals_table,
+                error,err_count_out);
+            if (res != DW_DLV_OK) {
+                dwarfstring_destructor(&m8);
+                dwarf_srclines_dealloc_b(line_context);
+                return res;
+            }
+            if (line_context->lc_actuals_table_offset > 0) {
+                is_actuals_table = true;
+                /* Read Actuals */
+
+                print_line_header(dbg, is_single_table, is_actuals_table);
+                res = read_line_table_program(dbg,
+                    line_ptr_actuals, line_ptr_end, orig_line_ptr,
+                    section_start,
+                    line_context,
+                    address_size, doaddrs, dolines,
+                    is_single_table,
+                    is_actuals_table,
+                    error,
+                    err_count_out);
+                if (res != DW_DLV_OK) {
+                    dwarfstring_destructor(&m8);
+                    dwarf_srclines_dealloc_b(line_context);
+                    return res;
+                }
+            }
+        }
+    }
+    dwarfstring_destructor(&m8);
+    dwarf_srclines_dealloc_b(line_context);
+    return DW_DLV_OK;
+}
+
+
+
+/*  This is support for dwarfdump: making it possible
+    for clients wanting line detail info on stdout
+    to get that detail without including internal libdwarf
+    header information.
+    Caller passes in compilation unit DIE.
+    The _dwarf_ version is obsolete (though supported for
+    compatibility).
+    The dwarf_ version is preferred.
+    The functions are intentionally identical: having
+    _dwarf_print_lines call dwarf_print_lines might
+    better emphasize they are intentionally identical, but
+    that seemed slightly silly given how short the functions are.
+    Interface adds error_count (output value) February 2009.
+
+    These *print_lines() functions print two-level tables in full
+    even when the user is not asking for both (ie, when
+    the caller asked for dwarf_srclines().
+    It was an accident, but after a short reflection
+    this seems like a good idea for -vvv. */
+int
+dwarf_print_lines(Dwarf_Die die,
+    Dwarf_Error * error,
+    int *error_count)
+{
+    int only_line_header = 0;
+    int res = _dwarf_internal_printlines(die,
+        error_count,
+        only_line_header,error);
     return res;
 }
 int
@@ -710,13 +926,10 @@ _dwarf_print_lines(Dwarf_Die die, Dwarf_Error * error)
 {
     int only_line_header = 0;
     int err_count = 0;
-    int res = _dwarf_internal_printlines(die, error,
+    int res = _dwarf_internal_printlines(die,
         &err_count,
-        only_line_header);
+        only_line_header,error);
     /* No way to get error count back in this interface */
-    if (res != DW_DLV_OK) {
-        return res;
-    }
     return res;
 }
 
@@ -724,14 +937,41 @@ _dwarf_print_lines(Dwarf_Die die, Dwarf_Error * error)
    this gets some of the issues noted with .debug_line,
    but not all. Call dwarf_print_lines() to get all issues.
    Intended for apps like dwarfdump.
+   dwarf_check_lineheader_b() new 14 April 2020.
 */
+int
+dwarf_check_lineheader_b(Dwarf_Die die, int *err_count_out,
+    Dwarf_Error *err)
+{
+    int res = 0;
+
+    int only_line_header = 1;
+    res = _dwarf_internal_printlines(die,err_count_out,
+        only_line_header,err);
+    return res;
+}
+
+/*  This is ugly, no way to detect errors. They get ignored.
+    see dwarf_check_lineheader_b() above. */
 void
 dwarf_check_lineheader(Dwarf_Die die, int *err_count_out)
 {
-    Dwarf_Error err;
-    int only_line_header = 1;
-    _dwarf_internal_printlines(die, &err,err_count_out,
-        only_line_header);
-    return;
-}
+    int res = 0;
+    Dwarf_Error err = 0;
 
+    int only_line_header = 1;
+    res = _dwarf_internal_printlines(die,err_count_out,
+        only_line_header,&err);
+    if (res == DW_DLV_ERROR) {
+        Dwarf_CU_Context c = 0;
+        Dwarf_Debug dbg = 0;
+
+        c = die->di_cu_context;
+        if (!c) {
+            return;
+        }
+        dbg = c->cc_dbg;
+        dwarf_dealloc(dbg,err,DW_DLA_ERROR);
+        err = 0;
+    }
+}

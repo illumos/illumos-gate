@@ -363,11 +363,17 @@
  * -- that takes place only on the queues that are set up through it.
  *
  * In mlxcx_cmd.c we implement our use of the command interface on top of a
- * simple taskq. Since it's not performance critical, we busy-wait on command
- * completions and only process a single command at a time.
+ * simple taskq. As commands are submitted from the taskq they choose a
+ * "slot", if there are no free slots then execution of the command will
+ * be paused until one is free. The hardware permits up to 32 independent
+ * slots for concurrent command execution.
  *
- * If this becomes a problem later we can wire command completions up to EQ 0
- * once we have interrupts running.
+ * Before interrupts are enabled, command completion is polled, once
+ * interrupts are up command completions become asynchronous and are
+ * wired to EQ 0. A caveat to this is commands can not be submitted
+ * directly from EQ 0's completion handler, and any processing resulting from
+ * an asynchronous event which requires further use of the command interface
+ * is posted through a taskq.
  *
  * The startup/attach process for this card involves a bunch of different steps
  * which are summarised pretty well in the PRM. We have to send a number of
@@ -405,10 +411,11 @@
  * Interrupt side:
  *
  *  - mleq_mtx
- *    - mlcq_mtx
- *      - mlcq_bufbmtx
- *      - mlwq_mtx
- *        - mlbs_mtx
+ *    - mlcq_arm_mtx
+ *      - mlcq_mtx
+ *        - mlcq_bufbmtx
+ *        - mlwq_mtx
+ *          - mlbs_mtx
  *    - mlp_mtx
  *
  * GLD side:
@@ -421,7 +428,8 @@
  *      - mlbs_mtx
  *      - mlcq_bufbmtx
  *  - mleq_mtx
- *    - mlcq_mtx
+ *    - mlcq_arm_mtx
+ *      - mlcq_mtx
  *
  */
 
@@ -801,12 +809,15 @@ static void
 mlxcx_teardown_pages(mlxcx_t *mlxp)
 {
 	uint_t nzeros = 0;
+	uint64_t *pas;
+
+	pas = kmem_alloc(sizeof (*pas) * MLXCX_MANAGE_PAGES_MAX_PAGES,
+	    KM_SLEEP);
 
 	mutex_enter(&mlxp->mlx_pagemtx);
 
 	while (mlxp->mlx_npages > 0) {
 		int32_t req, ret;
-		uint64_t pas[MLXCX_MANAGE_PAGES_MAX_PAGES];
 
 		ASSERT0(avl_is_empty(&mlxp->mlx_pages));
 		req = MIN(mlxp->mlx_npages, MLXCX_MANAGE_PAGES_MAX_PAGES);
@@ -856,6 +867,8 @@ mlxcx_teardown_pages(mlxcx_t *mlxp)
 out:
 	mutex_exit(&mlxp->mlx_pagemtx);
 	mutex_destroy(&mlxp->mlx_pagemtx);
+
+	kmem_free(pas, sizeof (*pas) * MLXCX_MANAGE_PAGES_MAX_PAGES);
 }
 
 static boolean_t
@@ -973,6 +986,9 @@ mlxcx_teardown_ports(mlxcx_t *mlxp)
 		}
 		mutex_exit(&p->mlp_mtx);
 		mutex_destroy(&p->mlp_mtx);
+		mutex_destroy(&p->mlx_port_event.mla_mtx);
+		p->mlx_port_event.mla_mlx = NULL;
+		p->mlx_port_event.mla_port = NULL;
 		p->mlp_init &= ~MLXCX_PORT_INIT;
 	}
 
@@ -1043,14 +1059,21 @@ mlxcx_teardown(mlxcx_t *mlxp)
 	uint_t i;
 	dev_info_t *dip = mlxp->mlx_dip;
 
-	if (mlxp->mlx_attach & MLXCX_ATTACH_GROUPS) {
-		mlxcx_teardown_groups(mlxp);
-		mlxp->mlx_attach &= ~MLXCX_ATTACH_GROUPS;
+	if (mlxp->mlx_attach & MLXCX_ATTACH_INTRS) {
+		/*
+		 * Disable interrupts and let any active vectors quiesce.
+		 */
+		mlxcx_intr_disable(mlxp);
 	}
 
 	if (mlxp->mlx_attach & MLXCX_ATTACH_CHKTIMERS) {
 		mlxcx_teardown_checktimers(mlxp);
 		mlxp->mlx_attach &= ~MLXCX_ATTACH_CHKTIMERS;
+	}
+
+	if (mlxp->mlx_attach & MLXCX_ATTACH_GROUPS) {
+		mlxcx_teardown_groups(mlxp);
+		mlxp->mlx_attach &= ~MLXCX_ATTACH_GROUPS;
 	}
 
 	if (mlxp->mlx_attach & MLXCX_ATTACH_WQS) {
@@ -1109,6 +1132,16 @@ mlxcx_teardown(mlxcx_t *mlxp)
 	if (mlxp->mlx_attach & MLXCX_ATTACH_PAGE_LIST) {
 		mlxcx_teardown_pages(mlxp);
 		mlxp->mlx_attach &= ~MLXCX_ATTACH_PAGE_LIST;
+	}
+
+	if (mlxp->mlx_attach & MLXCX_ATTACH_ASYNC_TQ) {
+		for (i = 0; i <= MLXCX_FUNC_ID_MAX; i++) {
+			mlxp->mlx_npages_req[i].mla_mlx = NULL;
+			mutex_destroy(&mlxp->mlx_npages_req[i].mla_mtx);
+		}
+		taskq_destroy(mlxp->mlx_async_tq);
+		mlxp->mlx_async_tq = NULL;
+		mlxp->mlx_attach &= ~MLXCX_ATTACH_ASYNC_TQ;
 	}
 
 	if (mlxp->mlx_attach & MLXCX_ATTACH_ENABLE_HCA) {
@@ -1216,21 +1249,27 @@ mlxcx_check_issi(mlxcx_t *mlxp)
 }
 
 boolean_t
-mlxcx_give_pages(mlxcx_t *mlxp, int32_t npages)
+mlxcx_give_pages(mlxcx_t *mlxp, int32_t npages, int32_t *ngiven)
 {
 	ddi_device_acc_attr_t acc;
 	ddi_dma_attr_t attr;
 	int32_t i;
 	list_t plist;
 	mlxcx_dev_page_t *mdp;
+	mlxcx_dev_page_t **pages;
 	const ddi_dma_cookie_t *ck;
 
 	/*
 	 * If there are no pages required, then we're done here.
 	 */
 	if (npages <= 0) {
+		*ngiven = 0;
 		return (B_TRUE);
 	}
+
+	npages = MIN(npages, MLXCX_MANAGE_PAGES_MAX_PAGES);
+
+	pages = kmem_alloc(sizeof (*pages) * npages, KM_SLEEP);
 
 	list_create(&plist, sizeof (mlxcx_dev_page_t),
 	    offsetof(mlxcx_dev_page_t, mxdp_list));
@@ -1256,38 +1295,36 @@ mlxcx_give_pages(mlxcx_t *mlxp, int32_t npages)
 	 * Now that all of the pages have been allocated, given them to hardware
 	 * in chunks.
 	 */
-	while (npages > 0) {
-		mlxcx_dev_page_t *pages[MLXCX_MANAGE_PAGES_MAX_PAGES];
-		int32_t togive = MIN(MLXCX_MANAGE_PAGES_MAX_PAGES, npages);
-
-		for (i = 0; i < togive; i++) {
-			pages[i] = list_remove_head(&plist);
-		}
-
-		if (!mlxcx_cmd_give_pages(mlxp,
-		    MLXCX_MANAGE_PAGES_OPMOD_GIVE_PAGES, togive, pages)) {
-			mlxcx_warn(mlxp, "!hardware refused our gift of %u "
-			    "pages!", togive);
-			for (i = 0; i < togive; i++) {
-				list_insert_tail(&plist, pages[i]);
-			}
-			goto cleanup_npages;
-		}
-
-		mutex_enter(&mlxp->mlx_pagemtx);
-		for (i = 0; i < togive; i++) {
-			avl_add(&mlxp->mlx_pages, pages[i]);
-		}
-		mlxp->mlx_npages += togive;
-		mutex_exit(&mlxp->mlx_pagemtx);
-		npages -= togive;
+	for (i = 0; i < npages; i++) {
+		pages[i] = list_remove_head(&plist);
 	}
 
+	if (!mlxcx_cmd_give_pages(mlxp,
+	    MLXCX_MANAGE_PAGES_OPMOD_GIVE_PAGES, npages, pages)) {
+		mlxcx_warn(mlxp, "!hardware refused our gift of %u "
+		    "pages!", npages);
+		for (i = 0; i < npages; i++) {
+			list_insert_tail(&plist, pages[i]);
+		}
+		goto cleanup_npages;
+	}
+
+	mutex_enter(&mlxp->mlx_pagemtx);
+	for (i = 0; i < npages; i++) {
+		avl_add(&mlxp->mlx_pages, pages[i]);
+	}
+	mlxp->mlx_npages += npages;
+	mutex_exit(&mlxp->mlx_pagemtx);
+
 	list_destroy(&plist);
+	kmem_free(pages, sizeof (*pages) * npages);
+
+	*ngiven = npages;
 
 	return (B_TRUE);
 
 cleanup_npages:
+	kmem_free(pages, sizeof (*pages) * npages);
 	while ((mdp = list_remove_head(&plist)) != NULL) {
 		mlxcx_dma_free(&mdp->mxdp_dma);
 		kmem_free(mdp, sizeof (mlxcx_dev_page_t));
@@ -1299,14 +1336,21 @@ cleanup_npages:
 static boolean_t
 mlxcx_init_pages(mlxcx_t *mlxp, uint_t type)
 {
-	int32_t npages;
+	int32_t npages, given;
 
 	if (!mlxcx_cmd_query_pages(mlxp, type, &npages)) {
 		mlxcx_warn(mlxp, "failed to determine boot pages");
 		return (B_FALSE);
 	}
 
-	return (mlxcx_give_pages(mlxp, npages));
+	while (npages > 0) {
+		if (!mlxcx_give_pages(mlxp, npages, &given))
+			return (B_FALSE);
+
+		npages -= given;
+	}
+
+	return (B_TRUE);
 }
 
 static int
@@ -1398,6 +1442,21 @@ mlxcx_fm_qstate_ereport(mlxcx_t *mlxp, const char *qtype, uint32_t qnum,
 	ddi_fm_service_impact(mlxp->mlx_dip, DDI_SERVICE_DEGRADED);
 }
 
+/*
+ * The following set of routines are for monitoring the health of
+ * event, completion and work queues. They run infrequently peeking at
+ * the structs to catch stalls and inconsistent state.
+ *
+ * They peek at the structs *without* acquiring locks - we don't want
+ * to impede flow of data. Driver start up and shutdown semantics
+ * guarantee the structs are present and won't disappear underneath
+ * these routines.
+ *
+ * As previously noted, the routines peek at active data in the structs and
+ * they will store some values for comparison on next invocation. To
+ * maintain integrity of the saved values, these values are only modified
+ * within these routines.
+ */
 static void
 mlxcx_eq_check(void *arg)
 {
@@ -1410,14 +1469,19 @@ mlxcx_eq_check(void *arg)
 
 	for (i = 0; i < mlxp->mlx_intr_count; ++i) {
 		eq = &mlxp->mlx_eqs[i];
-		if (!(eq->mleq_state & MLXCX_EQ_CREATED) ||
-		    (eq->mleq_state & MLXCX_EQ_DESTROYED))
+
+		if ((eq->mleq_state & MLXCX_EQ_CREATED) == 0)
 			continue;
-		mutex_enter(&eq->mleq_mtx);
-		if (!mlxcx_cmd_query_eq(mlxp, eq, &ctx)) {
-			mutex_exit(&eq->mleq_mtx);
+
+		/*
+		 * If the event queue was successfully created in the HCA,
+		 * then initialization and shutdown sequences guarantee
+		 * the queue exists.
+		 */
+		ASSERT0(eq->mleq_state & MLXCX_EQ_DESTROYED);
+
+		if (!mlxcx_cmd_query_eq(mlxp, eq, &ctx))
 			continue;
-		}
 
 		str = "???";
 		switch (ctx.mleqc_status) {
@@ -1427,6 +1491,7 @@ mlxcx_eq_check(void *arg)
 			str = "WRITE_FAILURE";
 			break;
 		}
+
 		if (ctx.mleqc_status != MLXCX_EQ_STATUS_OK) {
 			mlxcx_fm_qstate_ereport(mlxp, "event",
 			    eq->mleq_num, str, ctx.mleqc_status);
@@ -1447,8 +1512,6 @@ mlxcx_eq_check(void *arg)
 			eq->mleq_check_disarm_cc = 0;
 			eq->mleq_check_disarm_cnt = 0;
 		}
-
-		mutex_exit(&eq->mleq_mtx);
 	}
 }
 
@@ -1463,21 +1526,24 @@ mlxcx_cq_check(void *arg)
 
 	for (cq = list_head(&mlxp->mlx_cqs); cq != NULL;
 	    cq = list_next(&mlxp->mlx_cqs, cq)) {
-		mutex_enter(&cq->mlcq_mtx);
-		if (!(cq->mlcq_state & MLXCX_CQ_CREATED) ||
-		    (cq->mlcq_state & MLXCX_CQ_DESTROYED) ||
-		    (cq->mlcq_state & MLXCX_CQ_TEARDOWN)) {
-			mutex_exit(&cq->mlcq_mtx);
+
+		if ((cq->mlcq_state & MLXCX_CQ_CREATED) == 0)
 			continue;
-		}
-		if (cq->mlcq_fm_repd_qstate) {
-			mutex_exit(&cq->mlcq_mtx);
+
+		/*
+		 * If the completion queue was successfully created in the HCA,
+		 * then initialization and shutdown sequences guarantee
+		 * the queue exists.
+		 */
+		ASSERT0(cq->mlcq_state & MLXCX_CQ_DESTROYED);
+		ASSERT0(cq->mlcq_state & MLXCX_CQ_TEARDOWN);
+
+		if (cq->mlcq_fm_repd_qstate)
 			continue;
-		}
-		if (!mlxcx_cmd_query_cq(mlxp, cq, &ctx)) {
-			mutex_exit(&cq->mlcq_mtx);
+
+		if (!mlxcx_cmd_query_cq(mlxp, cq, &ctx))
 			continue;
-		}
+
 		if (cq->mlcq_wq != NULL) {
 			mlxcx_work_queue_t *wq = cq->mlcq_wq;
 			if (wq->mlwq_type == MLXCX_WQ_TYPE_RECVQ)
@@ -1505,6 +1571,7 @@ mlxcx_cq_check(void *arg)
 			str = "INVALID";
 			break;
 		}
+
 		if (v != MLXCX_CQC_STATUS_OK) {
 			mlxcx_fm_qstate_ereport(mlxp, "completion",
 			    cq->mlcq_num, str, v);
@@ -1528,7 +1595,6 @@ mlxcx_cq_check(void *arg)
 			cq->mlcq_check_disarm_cnt = 0;
 			cq->mlcq_check_disarm_cc = 0;
 		}
-		mutex_exit(&cq->mlcq_mtx);
 	}
 }
 
@@ -1537,8 +1603,6 @@ mlxcx_check_sq(mlxcx_t *mlxp, mlxcx_work_queue_t *sq)
 {
 	mlxcx_sq_ctx_t ctx;
 	mlxcx_sq_state_t state;
-
-	ASSERT(mutex_owned(&sq->mlwq_mtx));
 
 	if (!mlxcx_cmd_query_sq(mlxp, sq, &ctx))
 		return;
@@ -1579,7 +1643,6 @@ mlxcx_check_rq(mlxcx_t *mlxp, mlxcx_work_queue_t *rq)
 	mlxcx_rq_ctx_t ctx;
 	mlxcx_rq_state_t state;
 
-	ASSERT(mutex_owned(&rq->mlwq_mtx));
 
 	if (!mlxcx_cmd_query_rq(mlxp, rq, &ctx))
 		return;
@@ -1622,17 +1685,21 @@ mlxcx_wq_check(void *arg)
 
 	for (wq = list_head(&mlxp->mlx_wqs); wq != NULL;
 	    wq = list_next(&mlxp->mlx_wqs, wq)) {
-		mutex_enter(&wq->mlwq_mtx);
-		if (!(wq->mlwq_state & MLXCX_WQ_CREATED) ||
-		    (wq->mlwq_state & MLXCX_WQ_DESTROYED) ||
-		    (wq->mlwq_state & MLXCX_WQ_TEARDOWN)) {
-			mutex_exit(&wq->mlwq_mtx);
+
+		if ((wq->mlwq_state & MLXCX_WQ_CREATED) == 0)
 			continue;
-		}
-		if (wq->mlwq_fm_repd_qstate) {
-			mutex_exit(&wq->mlwq_mtx);
+
+		/*
+		 * If the work queue was successfully created in the HCA,
+		 * then initialization and shutdown sequences guarantee
+		 * the queue exists.
+		 */
+		ASSERT0(wq->mlwq_state & MLXCX_WQ_DESTROYED);
+		ASSERT0(wq->mlwq_state & MLXCX_WQ_TEARDOWN);
+
+		if (wq->mlwq_fm_repd_qstate)
 			continue;
-		}
+
 		switch (wq->mlwq_type) {
 		case MLXCX_WQ_TYPE_SENDQ:
 			mlxcx_check_sq(mlxp, wq);
@@ -1641,7 +1708,6 @@ mlxcx_wq_check(void *arg)
 			mlxcx_check_rq(mlxp, wq);
 			break;
 		}
-		mutex_exit(&wq->mlwq_mtx);
 	}
 }
 
@@ -1731,6 +1797,10 @@ mlxcx_setup_ports(mlxcx_t *mlxp)
 	for (i = 0; i < mlxp->mlx_nports; ++i) {
 		p = &mlxp->mlx_ports[i];
 		p->mlp_num = i;
+		p->mlx_port_event.mla_mlx = mlxp;
+		p->mlx_port_event.mla_port = p;
+		mutex_init(&p->mlx_port_event.mla_mtx, NULL,
+		    MUTEX_DRIVER, DDI_INTR_PRI(mlxp->mlx_intr_pri));
 		p->mlp_init |= MLXCX_PORT_INIT;
 		mutex_init(&p->mlp_mtx, NULL, MUTEX_DRIVER,
 		    DDI_INTR_PRI(mlxp->mlx_intr_pri));
@@ -2260,9 +2330,9 @@ mlxcx_setup_flow_group(mlxcx_t *mlxp, mlxcx_flow_table_t *ft,
 }
 
 static boolean_t
-mlxcx_setup_eq0(mlxcx_t *mlxp)
+mlxcx_setup_eq(mlxcx_t *mlxp, uint_t vec, uint64_t events)
 {
-	mlxcx_event_queue_t *mleq = &mlxp->mlx_eqs[0];
+	mlxcx_event_queue_t *mleq = &mlxp->mlx_eqs[vec];
 
 	mutex_enter(&mleq->mleq_mtx);
 	if (!mlxcx_eq_alloc_dma(mlxp, mleq)) {
@@ -2272,7 +2342,37 @@ mlxcx_setup_eq0(mlxcx_t *mlxp)
 	}
 	mleq->mleq_mlx = mlxp;
 	mleq->mleq_uar = &mlxp->mlx_uar;
-	mleq->mleq_events =
+	mleq->mleq_events = events;
+	mleq->mleq_intr_index = vec;
+
+	if (!mlxcx_cmd_create_eq(mlxp, mleq)) {
+		/* mlxcx_teardown_eqs() will clean this up */
+		mutex_exit(&mleq->mleq_mtx);
+		return (B_FALSE);
+	}
+
+	if (ddi_intr_enable(mlxp->mlx_intr_handles[vec]) != DDI_SUCCESS) {
+		/*
+		 * mlxcx_teardown_eqs() will handle calling cmd_destroy_eq and
+		 * eq_rele_dma
+		 */
+		mutex_exit(&mleq->mleq_mtx);
+		return (B_FALSE);
+	}
+	mleq->mleq_state |= MLXCX_EQ_INTR_ENABLED;
+	mlxcx_arm_eq(mlxp, mleq);
+	mutex_exit(&mleq->mleq_mtx);
+
+	return (B_TRUE);
+}
+
+static boolean_t
+mlxcx_setup_async_eqs(mlxcx_t *mlxp)
+{
+	boolean_t ret;
+
+	ret = mlxcx_setup_eq(mlxp, 0,
+	    (1ULL << MLXCX_EVENT_CMD_COMPLETION) |
 	    (1ULL << MLXCX_EVENT_PAGE_REQUEST) |
 	    (1ULL << MLXCX_EVENT_PORT_STATE) |
 	    (1ULL << MLXCX_EVENT_INTERNAL_ERROR) |
@@ -2285,23 +2385,12 @@ mlxcx_setup_eq0(mlxcx_t *mlxp)
 	    (1ULL << MLXCX_EVENT_WQ_INVALID_REQ) |
 	    (1ULL << MLXCX_EVENT_WQ_ACCESS_VIOL) |
 	    (1ULL << MLXCX_EVENT_NIC_VPORT) |
-	    (1ULL << MLXCX_EVENT_DOORBELL_CONGEST);
-	if (!mlxcx_cmd_create_eq(mlxp, mleq)) {
-		/* mlxcx_teardown_eqs() will clean this up */
-		mutex_exit(&mleq->mleq_mtx);
-		return (B_FALSE);
-	}
-	if (ddi_intr_enable(mlxp->mlx_intr_handles[0]) != DDI_SUCCESS) {
-		/*
-		 * mlxcx_teardown_eqs() will handle calling cmd_destroy_eq and
-		 * eq_rele_dma
-		 */
-		mutex_exit(&mleq->mleq_mtx);
-		return (B_FALSE);
-	}
-	mlxcx_arm_eq(mlxp, mleq);
-	mutex_exit(&mleq->mleq_mtx);
-	return (B_TRUE);
+	    (1ULL << MLXCX_EVENT_DOORBELL_CONGEST));
+
+	if (ret)
+		mlxcx_cmd_eq_enable(mlxp);
+
+	return (ret);
 }
 
 int
@@ -2327,7 +2416,7 @@ mlxcx_setup_eqs(mlxcx_t *mlxp)
 
 	ASSERT3S(mlxp->mlx_intr_count, >, 0);
 
-	for (i = 1; i < mlxp->mlx_intr_count; ++i) {
+	for (i = mlxp->mlx_intr_cq0; i < mlxp->mlx_intr_count; ++i) {
 		mleq = &mlxp->mlx_eqs[i];
 		mutex_enter(&mleq->mleq_mtx);
 		if (!mlxcx_eq_alloc_dma(mlxp, mleq)) {
@@ -2350,11 +2439,12 @@ mlxcx_setup_eqs(mlxcx_t *mlxp)
 			mutex_exit(&mleq->mleq_mtx);
 			return (B_FALSE);
 		}
+		mleq->mleq_state |= MLXCX_EQ_INTR_ENABLED;
 		mlxcx_arm_eq(mlxp, mleq);
 		mutex_exit(&mleq->mleq_mtx);
 	}
 
-	mlxp->mlx_next_eq = 1;
+	mlxp->mlx_next_eq = mlxp->mlx_intr_cq0;
 
 	return (B_TRUE);
 }
@@ -2458,6 +2548,8 @@ mlxcx_init_caps(mlxcx_t *mlxp)
 	    mlcap_flow_prop_log_max_ft_size;
 	c->mlc_max_rx_flows = (1 << c->mlc_nic_flow_cur.mhc_flow.
 	    mlcap_flow_nic_rx.mlcap_flow_prop_log_max_flow);
+	c->mlc_max_rx_ft = (1 << c->mlc_nic_flow_cur.mhc_flow.
+	    mlcap_flow_nic_rx.mlcap_flow_prop_log_max_ft_num);
 	c->mlc_max_rx_fe_dest = (1 << c->mlc_nic_flow_cur.mhc_flow.
 	    mlcap_flow_nic_rx.mlcap_flow_prop_log_max_destination);
 
@@ -2515,6 +2607,20 @@ mlxcx_calc_rx_ngroups(mlxcx_t *mlxp)
 		ngroups = flowlim;
 	}
 
+	/*
+	 * Restrict the number of groups not to exceed the max flow
+	 * table number from the devices capabilities.
+	 * There is one root table entry per port and 2 entries per
+	 * group.
+	 */
+	flowlim = (mlxp->mlx_caps->mlc_max_rx_ft - mlxp->mlx_nports) / 2;
+	if (flowlim < ngroups) {
+		mlxcx_note(mlxp, "limiting number of rx groups to %u based "
+		    "on max number of RX flow tables",
+		    flowlim);
+		ngroups = flowlim;
+	}
+
 	do {
 		gflowlim = mlxp->mlx_caps->mlc_max_rx_flows - 16 * ngroups - 2;
 		if (gflowlim < ngroups) {
@@ -2531,6 +2637,7 @@ static int
 mlxcx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	mlxcx_t *mlxp;
+	char tq_name[TASKQ_NAMELEN];
 	uint_t i;
 	int inst, ret;
 
@@ -2595,6 +2702,24 @@ mlxcx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    sizeof (mlxcx_dev_page_t), offsetof(mlxcx_dev_page_t, mxdp_tree));
 	mlxp->mlx_attach |= MLXCX_ATTACH_PAGE_LIST;
 
+	/*
+	 * Taskq for asynchronous events which may interact with the HCA
+	 * via the command interface. Single threaded FIFO.
+	 */
+	(void) snprintf(tq_name, sizeof (tq_name), "%s_async_%d",
+	    ddi_driver_name(mlxp->mlx_dip), mlxp->mlx_inst);
+	mlxp->mlx_async_tq = taskq_create(tq_name, 1, minclsyspri, 1, INT_MAX,
+	    TASKQ_PREPOPULATE);
+	/*
+	 * Initialize any pre-allocated taskq param structs.
+	 */
+	for (i = 0; i <= MLXCX_FUNC_ID_MAX; i++) {
+		mlxp->mlx_npages_req[i].mla_mlx = mlxp;
+		mutex_init(&mlxp->mlx_npages_req[i].mla_mtx, NULL,
+		    MUTEX_DRIVER, DDI_INTR_PRI(mlxp->mlx_intr_pri));
+	}
+	mlxp->mlx_attach |= MLXCX_ATTACH_ASYNC_TQ;
+
 	if (!mlxcx_init_pages(mlxp, MLXCX_QUERY_PAGES_OPMOD_BOOT)) {
 		goto err;
 	}
@@ -2631,13 +2756,12 @@ mlxcx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mlxp->mlx_attach |= MLXCX_ATTACH_UAR_PD_TD;
 
 	/*
-	 * Set up event queue #0 -- it's special and only handles control
-	 * type events, like PAGE_REQUEST (which we will probably get during
-	 * the commands below).
+	 * Set up asynchronous event queue which handles control type events
+	 * like PAGE_REQUEST and CMD completion events.
 	 *
-	 * This will enable and arm the interrupt on EQ 0, too.
+	 * This will enable and arm the interrupt on EQ 0.
 	 */
-	if (!mlxcx_setup_eq0(mlxp)) {
+	if (!mlxcx_setup_async_eqs(mlxp)) {
 		goto err;
 	}
 
@@ -2695,12 +2819,6 @@ mlxcx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    offsetof(mlxcx_work_queue_t, mlwq_entry));
 	mlxp->mlx_attach |= MLXCX_ATTACH_WQS;
 
-	/* Set up periodic fault check timers which check the queue states */
-	if (!mlxcx_setup_checktimers(mlxp)) {
-		goto err;
-	}
-	mlxp->mlx_attach |= MLXCX_ATTACH_CHKTIMERS;
-
 	/*
 	 * Construct our arrays of mlxcx_ring_group_ts, which represent the
 	 * "groups" we advertise to MAC.
@@ -2739,6 +2857,17 @@ mlxcx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (!mlxcx_rx_group_setup(mlxp, &mlxp->mlx_rx_groups[i]))
 			goto err;
 	}
+
+	/*
+	 * Set up periodic fault check timers which check the queue states,
+	 * set up should be after all the queues have been initialized and
+	 * consequently the teardown of timers must happen before
+	 * queue teardown.
+	 */
+	if (!mlxcx_setup_checktimers(mlxp)) {
+		goto err;
+	}
+	mlxp->mlx_attach |= MLXCX_ATTACH_CHKTIMERS;
 
 	/*
 	 * Finally, tell MAC that we exist!

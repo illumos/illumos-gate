@@ -289,6 +289,12 @@ struct dev_info  {
 	/* detach event data */
 	char	*devi_ev_path;
 	int	devi_ev_instance;
+
+	/*
+	 * Unbind callback data.
+	 */
+	kmutex_t	devi_unbind_lock;
+	list_t		devi_unbind_cbs;
 };
 
 #define	DEVI(dev_info_type)	((struct dev_info *)(dev_info_type))

@@ -276,7 +276,6 @@ smt_acquire(void)
 	/* A VCPU thread should never change zone. */
 	ASSERT3U(CS_ZONE(smt->cs_state), ==, zoneid);
 	ASSERT3U(CS_MARK(smt->cs_state), ==, CM_VCPU);
-	ASSERT3U(zoneid, !=, GLOBAL_ZONEID);
 	ASSERT3U(curthread->t_preempt, >=, 1);
 	ASSERT(curthread->t_schedflag & TS_VCPU);
 
@@ -326,7 +325,6 @@ smt_release(void)
 	if (smt->cs_sib == NULL)
 		return;
 
-	ASSERT3U(zoneid, !=, GLOBAL_ZONEID);
 	ASSERT3U(CS_ZONE(smt->cs_state), ==, zoneid);
 	ASSERT3U(CS_MARK(smt->cs_state), ==, CM_POISONED);
 	ASSERT3U(curthread->t_preempt, >=, 1);

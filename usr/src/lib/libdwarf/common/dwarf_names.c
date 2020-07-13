@@ -1,5 +1,5 @@
 /* Generated routines, do not edit. */
-/* Generated on May 22 2011  03:05:33 */
+/* Generated sourcedate  2020-06-12 14:47:15-07:00   */
 
 /* BEGIN FILE */
 
@@ -126,6 +126,7 @@ dwarf_get_TAG_name (unsigned int val,const char ** s_out)
     case DW_TAG_namelist_item:
         *s_out = "DW_TAG_namelist_item";
         return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x2c. DW_TAG_namelist_items */
     case DW_TAG_packed_type:
         *s_out = "DW_TAG_packed_type";
         return DW_DLV_OK;
@@ -135,9 +136,11 @@ dwarf_get_TAG_name (unsigned int val,const char ** s_out)
     case DW_TAG_template_type_parameter:
         *s_out = "DW_TAG_template_type_parameter";
         return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x2f. DW_TAG_template_type_param */
     case DW_TAG_template_value_parameter:
         *s_out = "DW_TAG_template_value_parameter";
         return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x30. DW_TAG_template_value_param */
     case DW_TAG_thrown_type:
         *s_out = "DW_TAG_thrown_type";
         return DW_DLV_OK;
@@ -195,6 +198,30 @@ dwarf_get_TAG_name (unsigned int val,const char ** s_out)
     case DW_TAG_template_alias:
         *s_out = "DW_TAG_template_alias";
         return DW_DLV_OK;
+    case DW_TAG_coarray_type:
+        *s_out = "DW_TAG_coarray_type";
+        return DW_DLV_OK;
+    case DW_TAG_generic_subrange:
+        *s_out = "DW_TAG_generic_subrange";
+        return DW_DLV_OK;
+    case DW_TAG_dynamic_type:
+        *s_out = "DW_TAG_dynamic_type";
+        return DW_DLV_OK;
+    case DW_TAG_atomic_type:
+        *s_out = "DW_TAG_atomic_type";
+        return DW_DLV_OK;
+    case DW_TAG_call_site:
+        *s_out = "DW_TAG_call_site";
+        return DW_DLV_OK;
+    case DW_TAG_call_site_parameter:
+        *s_out = "DW_TAG_call_site_parameter";
+        return DW_DLV_OK;
+    case DW_TAG_skeleton_unit:
+        *s_out = "DW_TAG_skeleton_unit";
+        return DW_DLV_OK;
+    case DW_TAG_immutable_type:
+        *s_out = "DW_TAG_immutable_type";
+        return DW_DLV_OK;
     case DW_TAG_lo_user:
         *s_out = "DW_TAG_lo_user";
         return DW_DLV_OK;
@@ -222,11 +249,18 @@ dwarf_get_TAG_name (unsigned int val,const char ** s_out)
     case DW_TAG_GNU_template_template_parameter:
         *s_out = "DW_TAG_GNU_template_template_parameter";
         return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x4106. DW_TAG_GNU_template_template_param */
     case DW_TAG_GNU_template_parameter_pack:
         *s_out = "DW_TAG_GNU_template_parameter_pack";
         return DW_DLV_OK;
     case DW_TAG_GNU_formal_parameter_pack:
         *s_out = "DW_TAG_GNU_formal_parameter_pack";
+        return DW_DLV_OK;
+    case DW_TAG_GNU_call_site:
+        *s_out = "DW_TAG_GNU_call_site";
+        return DW_DLV_OK;
+    case DW_TAG_GNU_call_site_parameter:
+        *s_out = "DW_TAG_GNU_call_site_parameter";
         return DW_DLV_OK;
     case DW_TAG_SUN_function_template:
         *s_out = "DW_TAG_SUN_function_template";
@@ -301,7 +335,7 @@ dwarf_get_TAG_name (unsigned int val,const char ** s_out)
         *s_out = "DW_TAG_hi_user";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -315,7 +349,7 @@ dwarf_get_children_name (unsigned int val,const char ** s_out)
         *s_out = "DW_children_yes";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -394,11 +428,77 @@ dwarf_get_FORM_name (unsigned int val,const char ** s_out)
     case DW_FORM_flag_present:
         *s_out = "DW_FORM_flag_present";
         return DW_DLV_OK;
+    case DW_FORM_strx:
+        *s_out = "DW_FORM_strx";
+        return DW_DLV_OK;
+    case DW_FORM_addrx:
+        *s_out = "DW_FORM_addrx";
+        return DW_DLV_OK;
+    case DW_FORM_ref_sup4:
+        *s_out = "DW_FORM_ref_sup4";
+        return DW_DLV_OK;
+    case DW_FORM_strp_sup:
+        *s_out = "DW_FORM_strp_sup";
+        return DW_DLV_OK;
+    case DW_FORM_data16:
+        *s_out = "DW_FORM_data16";
+        return DW_DLV_OK;
+    case DW_FORM_line_strp:
+        *s_out = "DW_FORM_line_strp";
+        return DW_DLV_OK;
     case DW_FORM_ref_sig8:
         *s_out = "DW_FORM_ref_sig8";
         return DW_DLV_OK;
+    case DW_FORM_implicit_const:
+        *s_out = "DW_FORM_implicit_const";
+        return DW_DLV_OK;
+    case DW_FORM_loclistx:
+        *s_out = "DW_FORM_loclistx";
+        return DW_DLV_OK;
+    case DW_FORM_rnglistx:
+        *s_out = "DW_FORM_rnglistx";
+        return DW_DLV_OK;
+    case DW_FORM_ref_sup8:
+        *s_out = "DW_FORM_ref_sup8";
+        return DW_DLV_OK;
+    case DW_FORM_strx1:
+        *s_out = "DW_FORM_strx1";
+        return DW_DLV_OK;
+    case DW_FORM_strx2:
+        *s_out = "DW_FORM_strx2";
+        return DW_DLV_OK;
+    case DW_FORM_strx3:
+        *s_out = "DW_FORM_strx3";
+        return DW_DLV_OK;
+    case DW_FORM_strx4:
+        *s_out = "DW_FORM_strx4";
+        return DW_DLV_OK;
+    case DW_FORM_addrx1:
+        *s_out = "DW_FORM_addrx1";
+        return DW_DLV_OK;
+    case DW_FORM_addrx2:
+        *s_out = "DW_FORM_addrx2";
+        return DW_DLV_OK;
+    case DW_FORM_addrx3:
+        *s_out = "DW_FORM_addrx3";
+        return DW_DLV_OK;
+    case DW_FORM_addrx4:
+        *s_out = "DW_FORM_addrx4";
+        return DW_DLV_OK;
+    case DW_FORM_GNU_addr_index:
+        *s_out = "DW_FORM_GNU_addr_index";
+        return DW_DLV_OK;
+    case DW_FORM_GNU_str_index:
+        *s_out = "DW_FORM_GNU_str_index";
+        return DW_DLV_OK;
+    case DW_FORM_GNU_ref_alt:
+        *s_out = "DW_FORM_GNU_ref_alt";
+        return DW_DLV_OK;
+    case DW_FORM_GNU_strp_alt:
+        *s_out = "DW_FORM_GNU_strp_alt";
+        return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -501,6 +601,7 @@ dwarf_get_AT_name (unsigned int val,const char ** s_out)
     case DW_AT_bit_stride:
         *s_out = "DW_AT_bit_stride";
         return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x2e. DW_AT_stride_size */
     case DW_AT_upper_bound:
         *s_out = "DW_AT_upper_bound";
         return DW_DLV_OK;
@@ -600,9 +701,10 @@ dwarf_get_AT_name (unsigned int val,const char ** s_out)
     case DW_AT_data_location:
         *s_out = "DW_AT_data_location";
         return DW_DLV_OK;
-    case DW_AT_stride:
-        *s_out = "DW_AT_stride";
+    case DW_AT_byte_stride:
+        *s_out = "DW_AT_byte_stride";
         return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x51. DW_AT_stride */
     case DW_AT_entry_pc:
         *s_out = "DW_AT_entry_pc";
         return DW_DLV_OK;
@@ -690,24 +792,121 @@ dwarf_get_AT_name (unsigned int val,const char ** s_out)
     case DW_AT_linkage_name:
         *s_out = "DW_AT_linkage_name";
         return DW_DLV_OK;
-    case DW_AT_lo_user:
-        *s_out = "DW_AT_lo_user";
+    case DW_AT_string_length_bit_size:
+        *s_out = "DW_AT_string_length_bit_size";
         return DW_DLV_OK;
-    case DW_AT_HP_unmodifiable:
-        *s_out = "DW_AT_HP_unmodifiable";
+    case DW_AT_string_length_byte_size:
+        *s_out = "DW_AT_string_length_byte_size";
         return DW_DLV_OK;
+    case DW_AT_rank:
+        *s_out = "DW_AT_rank";
+        return DW_DLV_OK;
+    case DW_AT_str_offsets_base:
+        *s_out = "DW_AT_str_offsets_base";
+        return DW_DLV_OK;
+    case DW_AT_addr_base:
+        *s_out = "DW_AT_addr_base";
+        return DW_DLV_OK;
+    case DW_AT_rnglists_base:
+        *s_out = "DW_AT_rnglists_base";
+        return DW_DLV_OK;
+    case DW_AT_dwo_id:
+        *s_out = "DW_AT_dwo_id";
+        return DW_DLV_OK;
+    case DW_AT_dwo_name:
+        *s_out = "DW_AT_dwo_name";
+        return DW_DLV_OK;
+    case DW_AT_reference:
+        *s_out = "DW_AT_reference";
+        return DW_DLV_OK;
+    case DW_AT_rvalue_reference:
+        *s_out = "DW_AT_rvalue_reference";
+        return DW_DLV_OK;
+    case DW_AT_macros:
+        *s_out = "DW_AT_macros";
+        return DW_DLV_OK;
+    case DW_AT_call_all_calls:
+        *s_out = "DW_AT_call_all_calls";
+        return DW_DLV_OK;
+    case DW_AT_call_all_source_calls:
+        *s_out = "DW_AT_call_all_source_calls";
+        return DW_DLV_OK;
+    case DW_AT_call_all_tail_calls:
+        *s_out = "DW_AT_call_all_tail_calls";
+        return DW_DLV_OK;
+    case DW_AT_call_return_pc:
+        *s_out = "DW_AT_call_return_pc";
+        return DW_DLV_OK;
+    case DW_AT_call_value:
+        *s_out = "DW_AT_call_value";
+        return DW_DLV_OK;
+    case DW_AT_call_origin:
+        *s_out = "DW_AT_call_origin";
+        return DW_DLV_OK;
+    case DW_AT_call_parameter:
+        *s_out = "DW_AT_call_parameter";
+        return DW_DLV_OK;
+    case DW_AT_call_pc:
+        *s_out = "DW_AT_call_pc";
+        return DW_DLV_OK;
+    case DW_AT_call_tail_call:
+        *s_out = "DW_AT_call_tail_call";
+        return DW_DLV_OK;
+    case DW_AT_call_target:
+        *s_out = "DW_AT_call_target";
+        return DW_DLV_OK;
+    case DW_AT_call_target_clobbered:
+        *s_out = "DW_AT_call_target_clobbered";
+        return DW_DLV_OK;
+    case DW_AT_call_data_location:
+        *s_out = "DW_AT_call_data_location";
+        return DW_DLV_OK;
+    case DW_AT_call_data_value:
+        *s_out = "DW_AT_call_data_value";
+        return DW_DLV_OK;
+    case DW_AT_noreturn:
+        *s_out = "DW_AT_noreturn";
+        return DW_DLV_OK;
+    case DW_AT_alignment:
+        *s_out = "DW_AT_alignment";
+        return DW_DLV_OK;
+    case DW_AT_export_symbols:
+        *s_out = "DW_AT_export_symbols";
+        return DW_DLV_OK;
+    case DW_AT_deleted:
+        *s_out = "DW_AT_deleted";
+        return DW_DLV_OK;
+    case DW_AT_defaulted:
+        *s_out = "DW_AT_defaulted";
+        return DW_DLV_OK;
+    case DW_AT_loclists_base:
+        *s_out = "DW_AT_loclists_base";
+        return DW_DLV_OK;
+    case DW_AT_HP_block_index:
+        *s_out = "DW_AT_HP_block_index";
+        return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x2000. DW_AT_lo_user */
+    case DW_AT_MIPS_fde:
+        *s_out = "DW_AT_MIPS_fde";
+        return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x2001. DW_AT_HP_unmodifiable */
+    /* Skipping alternate spelling of value 0x2001. DW_AT_CPQ_discontig_ranges */
     case DW_AT_MIPS_loop_begin:
         *s_out = "DW_AT_MIPS_loop_begin";
         return DW_DLV_OK;
-    case DW_AT_CPQ_split_lifetimes_var:
-        *s_out = "DW_AT_CPQ_split_lifetimes_var";
+    /* Skipping alternate spelling of value 0x2002. DW_AT_CPQ_semantic_events */
+    case DW_AT_MIPS_tail_loop_begin:
+        *s_out = "DW_AT_MIPS_tail_loop_begin";
         return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x2003. DW_AT_CPQ_split_lifetimes_var */
     case DW_AT_MIPS_epilog_begin:
         *s_out = "DW_AT_MIPS_epilog_begin";
         return DW_DLV_OK;
-    case DW_AT_CPQ_prologue_length:
-        *s_out = "DW_AT_CPQ_prologue_length";
+    /* Skipping alternate spelling of value 0x2004. DW_AT_CPQ_split_lifetimes_rtn */
+    case DW_AT_MIPS_loop_unroll_factor:
+        *s_out = "DW_AT_MIPS_loop_unroll_factor";
         return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x2005. DW_AT_CPQ_prologue_length */
     case DW_AT_MIPS_software_pipeline_depth:
         *s_out = "DW_AT_MIPS_software_pipeline_depth";
         return DW_DLV_OK;
@@ -741,9 +940,11 @@ dwarf_get_AT_name (unsigned int val,const char ** s_out)
     case DW_AT_MIPS_assumed_shape_dopetype:
         *s_out = "DW_AT_MIPS_assumed_shape_dopetype";
         return DW_DLV_OK;
-    case DW_AT_HP_proc_per_section:
-        *s_out = "DW_AT_HP_proc_per_section";
+    /* Skipping alternate spelling of value 0x2010. DW_AT_HP_actuals_stmt_list */
+    case DW_AT_MIPS_assumed_size:
+        *s_out = "DW_AT_MIPS_assumed_size";
         return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x2011. DW_AT_HP_proc_per_section */
     case DW_AT_HP_raw_data_ptr:
         *s_out = "DW_AT_HP_raw_data_ptr";
         return DW_DLV_OK;
@@ -798,12 +999,85 @@ dwarf_get_AT_name (unsigned int val,const char ** s_out)
     case DW_AT_GNU_vector:
         *s_out = "DW_AT_GNU_vector";
         return DW_DLV_OK;
+    case DW_AT_GNU_guarded_by:
+        *s_out = "DW_AT_GNU_guarded_by";
+        return DW_DLV_OK;
+    case DW_AT_GNU_pt_guarded_by:
+        *s_out = "DW_AT_GNU_pt_guarded_by";
+        return DW_DLV_OK;
+    case DW_AT_GNU_guarded:
+        *s_out = "DW_AT_GNU_guarded";
+        return DW_DLV_OK;
+    case DW_AT_GNU_pt_guarded:
+        *s_out = "DW_AT_GNU_pt_guarded";
+        return DW_DLV_OK;
+    case DW_AT_GNU_locks_excluded:
+        *s_out = "DW_AT_GNU_locks_excluded";
+        return DW_DLV_OK;
+    case DW_AT_GNU_exclusive_locks_required:
+        *s_out = "DW_AT_GNU_exclusive_locks_required";
+        return DW_DLV_OK;
+    case DW_AT_GNU_shared_locks_required:
+        *s_out = "DW_AT_GNU_shared_locks_required";
+        return DW_DLV_OK;
+    case DW_AT_GNU_odr_signature:
+        *s_out = "DW_AT_GNU_odr_signature";
+        return DW_DLV_OK;
     case DW_AT_GNU_template_name:
         *s_out = "DW_AT_GNU_template_name";
         return DW_DLV_OK;
-    case DW_AT_VMS_rtnbeg_pd_address:
-        *s_out = "DW_AT_VMS_rtnbeg_pd_address";
+    case DW_AT_GNU_call_site_value:
+        *s_out = "DW_AT_GNU_call_site_value";
         return DW_DLV_OK;
+    case DW_AT_GNU_call_site_data_value:
+        *s_out = "DW_AT_GNU_call_site_data_value";
+        return DW_DLV_OK;
+    case DW_AT_GNU_call_site_target:
+        *s_out = "DW_AT_GNU_call_site_target";
+        return DW_DLV_OK;
+    case DW_AT_GNU_call_site_target_clobbered:
+        *s_out = "DW_AT_GNU_call_site_target_clobbered";
+        return DW_DLV_OK;
+    case DW_AT_GNU_tail_call:
+        *s_out = "DW_AT_GNU_tail_call";
+        return DW_DLV_OK;
+    case DW_AT_GNU_all_tail_call_sites:
+        *s_out = "DW_AT_GNU_all_tail_call_sites";
+        return DW_DLV_OK;
+    case DW_AT_GNU_all_call_sites:
+        *s_out = "DW_AT_GNU_all_call_sites";
+        return DW_DLV_OK;
+    case DW_AT_GNU_all_source_call_sites:
+        *s_out = "DW_AT_GNU_all_source_call_sites";
+        return DW_DLV_OK;
+    case DW_AT_GNU_macros:
+        *s_out = "DW_AT_GNU_macros";
+        return DW_DLV_OK;
+    case DW_AT_GNU_dwo_name:
+        *s_out = "DW_AT_GNU_dwo_name";
+        return DW_DLV_OK;
+    case DW_AT_GNU_dwo_id:
+        *s_out = "DW_AT_GNU_dwo_id";
+        return DW_DLV_OK;
+    case DW_AT_GNU_ranges_base:
+        *s_out = "DW_AT_GNU_ranges_base";
+        return DW_DLV_OK;
+    case DW_AT_GNU_addr_base:
+        *s_out = "DW_AT_GNU_addr_base";
+        return DW_DLV_OK;
+    case DW_AT_GNU_pubnames:
+        *s_out = "DW_AT_GNU_pubnames";
+        return DW_DLV_OK;
+    case DW_AT_GNU_pubtypes:
+        *s_out = "DW_AT_GNU_pubtypes";
+        return DW_DLV_OK;
+    case DW_AT_GNU_discriminator:
+        *s_out = "DW_AT_GNU_discriminator";
+        return DW_DLV_OK;
+    case DW_AT_SUN_template:
+        *s_out = "DW_AT_SUN_template";
+        return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x2201. DW_AT_VMS_rtnbeg_pd_address */
     case DW_AT_SUN_alignment:
         *s_out = "DW_AT_SUN_alignment";
         return DW_DLV_OK;
@@ -942,6 +1216,36 @@ dwarf_get_AT_name (unsigned int val,const char ** s_out)
     case DW_AT_ALTIUM_loclist:
         *s_out = "DW_AT_ALTIUM_loclist";
         return DW_DLV_OK;
+    case DW_AT_use_GNAT_descriptive_type:
+        *s_out = "DW_AT_use_GNAT_descriptive_type";
+        return DW_DLV_OK;
+    case DW_AT_GNAT_descriptive_type:
+        *s_out = "DW_AT_GNAT_descriptive_type";
+        return DW_DLV_OK;
+    case DW_AT_GNU_numerator:
+        *s_out = "DW_AT_GNU_numerator";
+        return DW_DLV_OK;
+    case DW_AT_GNU_denominator:
+        *s_out = "DW_AT_GNU_denominator";
+        return DW_DLV_OK;
+    case DW_AT_GNU_bias:
+        *s_out = "DW_AT_GNU_bias";
+        return DW_DLV_OK;
+    case DW_AT_go_kind:
+        *s_out = "DW_AT_go_kind";
+        return DW_DLV_OK;
+    case DW_AT_go_key:
+        *s_out = "DW_AT_go_key";
+        return DW_DLV_OK;
+    case DW_AT_go_elem:
+        *s_out = "DW_AT_go_elem";
+        return DW_DLV_OK;
+    case DW_AT_go_embedded_field:
+        *s_out = "DW_AT_go_embedded_field";
+        return DW_DLV_OK;
+    case DW_AT_go_runtime_type:
+        *s_out = "DW_AT_go_runtime_type";
+        return DW_DLV_OK;
     case DW_AT_upc_threads_scaled:
         *s_out = "DW_AT_upc_threads_scaled";
         return DW_DLV_OK;
@@ -954,20 +1258,35 @@ dwarf_get_AT_name (unsigned int val,const char ** s_out)
     case DW_AT_PGI_lstride:
         *s_out = "DW_AT_PGI_lstride";
         return DW_DLV_OK;
-    case DW_AT_APPLE_closure:
-        *s_out = "DW_AT_APPLE_closure";
+    case DW_AT_APPLE_optimized:
+        *s_out = "DW_AT_APPLE_optimized";
         return DW_DLV_OK;
+    case DW_AT_APPLE_flags:
+        *s_out = "DW_AT_APPLE_flags";
+        return DW_DLV_OK;
+    case DW_AT_APPLE_isa:
+        *s_out = "DW_AT_APPLE_isa";
+        return DW_DLV_OK;
+    case DW_AT_APPLE_block:
+        *s_out = "DW_AT_APPLE_block";
+        return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x3fe4. DW_AT_APPLE_closure */
     case DW_AT_APPLE_major_runtime_vers:
         *s_out = "DW_AT_APPLE_major_runtime_vers";
         return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x3fe5. DW_AT_APPLE_major_runtime_vers */
     case DW_AT_APPLE_runtime_class:
         *s_out = "DW_AT_APPLE_runtime_class";
+        return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x3fe6. DW_AT_APPLE_runtime_class */
+    case DW_AT_APPLE_omit_frame_ptr:
+        *s_out = "DW_AT_APPLE_omit_frame_ptr";
         return DW_DLV_OK;
     case DW_AT_hi_user:
         *s_out = "DW_AT_hi_user";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -1436,9 +1755,41 @@ dwarf_get_OP_name (unsigned int val,const char ** s_out)
     case DW_OP_stack_value:
         *s_out = "DW_OP_stack_value";
         return DW_DLV_OK;
-    case DW_OP_lo_user:
-        *s_out = "DW_OP_lo_user";
+    case DW_OP_implicit_pointer:
+        *s_out = "DW_OP_implicit_pointer";
         return DW_DLV_OK;
+    case DW_OP_addrx:
+        *s_out = "DW_OP_addrx";
+        return DW_DLV_OK;
+    case DW_OP_constx:
+        *s_out = "DW_OP_constx";
+        return DW_DLV_OK;
+    case DW_OP_entry_value:
+        *s_out = "DW_OP_entry_value";
+        return DW_DLV_OK;
+    case DW_OP_const_type:
+        *s_out = "DW_OP_const_type";
+        return DW_DLV_OK;
+    case DW_OP_regval_type:
+        *s_out = "DW_OP_regval_type";
+        return DW_DLV_OK;
+    case DW_OP_deref_type:
+        *s_out = "DW_OP_deref_type";
+        return DW_DLV_OK;
+    case DW_OP_xderef_type:
+        *s_out = "DW_OP_xderef_type";
+        return DW_DLV_OK;
+    case DW_OP_convert:
+        *s_out = "DW_OP_convert";
+        return DW_DLV_OK;
+    case DW_OP_reinterpret:
+        *s_out = "DW_OP_reinterpret";
+        return DW_DLV_OK;
+    case DW_OP_GNU_push_tls_address:
+        *s_out = "DW_OP_GNU_push_tls_address";
+        return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0xe0. DW_OP_lo_user */
+    /* Skipping alternate spelling of value 0xe0. DW_OP_HP_unknown */
     case DW_OP_HP_is_value:
         *s_out = "DW_OP_HP_is_value";
         return DW_DLV_OK;
@@ -1460,14 +1811,51 @@ dwarf_get_OP_name (unsigned int val,const char ** s_out)
     case DW_OP_INTEL_bit_piece:
         *s_out = "DW_OP_INTEL_bit_piece";
         return DW_DLV_OK;
-    case DW_OP_APPLE_uninit:
-        *s_out = "DW_OP_APPLE_uninit";
+    case DW_OP_GNU_uninit:
+        *s_out = "DW_OP_GNU_uninit";
+        return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0xf0. DW_OP_APPLE_uninit */
+    case DW_OP_GNU_encoded_addr:
+        *s_out = "DW_OP_GNU_encoded_addr";
+        return DW_DLV_OK;
+    case DW_OP_GNU_implicit_pointer:
+        *s_out = "DW_OP_GNU_implicit_pointer";
+        return DW_DLV_OK;
+    case DW_OP_GNU_entry_value:
+        *s_out = "DW_OP_GNU_entry_value";
+        return DW_DLV_OK;
+    case DW_OP_GNU_const_type:
+        *s_out = "DW_OP_GNU_const_type";
+        return DW_DLV_OK;
+    case DW_OP_GNU_regval_type:
+        *s_out = "DW_OP_GNU_regval_type";
+        return DW_DLV_OK;
+    case DW_OP_GNU_deref_type:
+        *s_out = "DW_OP_GNU_deref_type";
+        return DW_DLV_OK;
+    case DW_OP_GNU_convert:
+        *s_out = "DW_OP_GNU_convert";
+        return DW_DLV_OK;
+    case DW_OP_PGI_omp_thread_num:
+        *s_out = "DW_OP_PGI_omp_thread_num";
+        return DW_DLV_OK;
+    case DW_OP_GNU_reinterpret:
+        *s_out = "DW_OP_GNU_reinterpret";
+        return DW_DLV_OK;
+    case DW_OP_GNU_parameter_ref:
+        *s_out = "DW_OP_GNU_parameter_ref";
+        return DW_DLV_OK;
+    case DW_OP_GNU_addr_index:
+        *s_out = "DW_OP_GNU_addr_index";
+        return DW_DLV_OK;
+    case DW_OP_GNU_const_index:
+        *s_out = "DW_OP_GNU_const_index";
         return DW_DLV_OK;
     case DW_OP_hi_user:
         *s_out = "DW_OP_hi_user";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -1519,12 +1907,24 @@ dwarf_get_ATE_name (unsigned int val,const char ** s_out)
     case DW_ATE_decimal_float:
         *s_out = "DW_ATE_decimal_float";
         return DW_DLV_OK;
-    case DW_ATE_HP_float80:
-        *s_out = "DW_ATE_HP_float80";
+    case DW_ATE_UTF:
+        *s_out = "DW_ATE_UTF";
         return DW_DLV_OK;
-    case DW_ATE_HP_complex_float80:
-        *s_out = "DW_ATE_HP_complex_float80";
+    case DW_ATE_UCS:
+        *s_out = "DW_ATE_UCS";
         return DW_DLV_OK;
+    case DW_ATE_ASCII:
+        *s_out = "DW_ATE_ASCII";
+        return DW_DLV_OK;
+    case DW_ATE_ALTIUM_fract:
+        *s_out = "DW_ATE_ALTIUM_fract";
+        return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x80. DW_ATE_lo_user */
+    /* Skipping alternate spelling of value 0x80. DW_ATE_HP_float80 */
+    case DW_ATE_ALTIUM_accum:
+        *s_out = "DW_ATE_ALTIUM_accum";
+        return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x81. DW_ATE_HP_complex_float80 */
     case DW_ATE_HP_float128:
         *s_out = "DW_ATE_HP_float128";
         return DW_DLV_OK;
@@ -1550,7 +1950,207 @@ dwarf_get_ATE_name (unsigned int val,const char ** s_out)
         *s_out = "DW_ATE_hi_user";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
+}
+/* ARGSUSED */
+int
+dwarf_get_DEFAULTED_name (unsigned int val,const char ** s_out)
+{
+    switch (val) {
+    case DW_DEFAULTED_no:
+        *s_out = "DW_DEFAULTED_no";
+        return DW_DLV_OK;
+    case DW_DEFAULTED_in_class:
+        *s_out = "DW_DEFAULTED_in_class";
+        return DW_DLV_OK;
+    case DW_DEFAULTED_out_of_class:
+        *s_out = "DW_DEFAULTED_out_of_class";
+        return DW_DLV_OK;
+    }
+    return DW_DLV_NO_ENTRY;
+}
+/* ARGSUSED */
+int
+dwarf_get_IDX_name (unsigned int val,const char ** s_out)
+{
+    switch (val) {
+    case DW_IDX_compile_unit:
+        *s_out = "DW_IDX_compile_unit";
+        return DW_DLV_OK;
+    case DW_IDX_type_unit:
+        *s_out = "DW_IDX_type_unit";
+        return DW_DLV_OK;
+    case DW_IDX_die_offset:
+        *s_out = "DW_IDX_die_offset";
+        return DW_DLV_OK;
+    case DW_IDX_parent:
+        *s_out = "DW_IDX_parent";
+        return DW_DLV_OK;
+    case DW_IDX_type_hash:
+        *s_out = "DW_IDX_type_hash";
+        return DW_DLV_OK;
+    case DW_IDX_hi_user:
+        *s_out = "DW_IDX_hi_user";
+        return DW_DLV_OK;
+    case DW_IDX_lo_user:
+        *s_out = "DW_IDX_lo_user";
+        return DW_DLV_OK;
+    }
+    return DW_DLV_NO_ENTRY;
+}
+/* ARGSUSED */
+int
+dwarf_get_LLEX_name (unsigned int val,const char ** s_out)
+{
+    switch (val) {
+    case DW_LLEX_end_of_list_entry:
+        *s_out = "DW_LLEX_end_of_list_entry";
+        return DW_DLV_OK;
+    case DW_LLEX_base_address_selection_entry:
+        *s_out = "DW_LLEX_base_address_selection_entry";
+        return DW_DLV_OK;
+    case DW_LLEX_start_end_entry:
+        *s_out = "DW_LLEX_start_end_entry";
+        return DW_DLV_OK;
+    case DW_LLEX_start_length_entry:
+        *s_out = "DW_LLEX_start_length_entry";
+        return DW_DLV_OK;
+    case DW_LLEX_offset_pair_entry:
+        *s_out = "DW_LLEX_offset_pair_entry";
+        return DW_DLV_OK;
+    }
+    return DW_DLV_NO_ENTRY;
+}
+/* ARGSUSED */
+int
+dwarf_get_LLE_name (unsigned int val,const char ** s_out)
+{
+    switch (val) {
+    case DW_LLE_end_of_list:
+        *s_out = "DW_LLE_end_of_list";
+        return DW_DLV_OK;
+    case DW_LLE_base_addressx:
+        *s_out = "DW_LLE_base_addressx";
+        return DW_DLV_OK;
+    case DW_LLE_startx_endx:
+        *s_out = "DW_LLE_startx_endx";
+        return DW_DLV_OK;
+    case DW_LLE_startx_length:
+        *s_out = "DW_LLE_startx_length";
+        return DW_DLV_OK;
+    case DW_LLE_offset_pair:
+        *s_out = "DW_LLE_offset_pair";
+        return DW_DLV_OK;
+    case DW_LLE_default_location:
+        *s_out = "DW_LLE_default_location";
+        return DW_DLV_OK;
+    case DW_LLE_base_address:
+        *s_out = "DW_LLE_base_address";
+        return DW_DLV_OK;
+    case DW_LLE_start_end:
+        *s_out = "DW_LLE_start_end";
+        return DW_DLV_OK;
+    case DW_LLE_start_length:
+        *s_out = "DW_LLE_start_length";
+        return DW_DLV_OK;
+    }
+    return DW_DLV_NO_ENTRY;
+}
+/* ARGSUSED */
+int
+dwarf_get_RLE_name (unsigned int val,const char ** s_out)
+{
+    switch (val) {
+    case DW_RLE_end_of_list:
+        *s_out = "DW_RLE_end_of_list";
+        return DW_DLV_OK;
+    case DW_RLE_base_addressx:
+        *s_out = "DW_RLE_base_addressx";
+        return DW_DLV_OK;
+    case DW_RLE_startx_endx:
+        *s_out = "DW_RLE_startx_endx";
+        return DW_DLV_OK;
+    case DW_RLE_startx_length:
+        *s_out = "DW_RLE_startx_length";
+        return DW_DLV_OK;
+    case DW_RLE_offset_pair:
+        *s_out = "DW_RLE_offset_pair";
+        return DW_DLV_OK;
+    case DW_RLE_base_address:
+        *s_out = "DW_RLE_base_address";
+        return DW_DLV_OK;
+    case DW_RLE_start_end:
+        *s_out = "DW_RLE_start_end";
+        return DW_DLV_OK;
+    case DW_RLE_start_length:
+        *s_out = "DW_RLE_start_length";
+        return DW_DLV_OK;
+    }
+    return DW_DLV_NO_ENTRY;
+}
+/* ARGSUSED */
+int
+dwarf_get_UT_name (unsigned int val,const char ** s_out)
+{
+    switch (val) {
+    case DW_UT_compile:
+        *s_out = "DW_UT_compile";
+        return DW_DLV_OK;
+    case DW_UT_type:
+        *s_out = "DW_UT_type";
+        return DW_DLV_OK;
+    case DW_UT_partial:
+        *s_out = "DW_UT_partial";
+        return DW_DLV_OK;
+    case DW_UT_skeleton:
+        *s_out = "DW_UT_skeleton";
+        return DW_DLV_OK;
+    case DW_UT_split_compile:
+        *s_out = "DW_UT_split_compile";
+        return DW_DLV_OK;
+    case DW_UT_split_type:
+        *s_out = "DW_UT_split_type";
+        return DW_DLV_OK;
+    case DW_UT_lo_user:
+        *s_out = "DW_UT_lo_user";
+        return DW_DLV_OK;
+    case DW_UT_hi_user:
+        *s_out = "DW_UT_hi_user";
+        return DW_DLV_OK;
+    }
+    return DW_DLV_NO_ENTRY;
+}
+/* ARGSUSED */
+int
+dwarf_get_SECT_name (unsigned int val,const char ** s_out)
+{
+    switch (val) {
+    case DW_SECT_INFO:
+        *s_out = "DW_SECT_INFO";
+        return DW_DLV_OK;
+    case DW_SECT_TYPES:
+        *s_out = "DW_SECT_TYPES";
+        return DW_DLV_OK;
+    case DW_SECT_ABBREV:
+        *s_out = "DW_SECT_ABBREV";
+        return DW_DLV_OK;
+    case DW_SECT_LINE:
+        *s_out = "DW_SECT_LINE";
+        return DW_DLV_OK;
+    case DW_SECT_LOCLISTS:
+        *s_out = "DW_SECT_LOCLISTS";
+        return DW_DLV_OK;
+    case DW_SECT_STR_OFFSETS:
+        *s_out = "DW_SECT_STR_OFFSETS";
+        return DW_DLV_OK;
+    case DW_SECT_MACRO:
+        *s_out = "DW_SECT_MACRO";
+        return DW_DLV_OK;
+    case DW_SECT_RNGLISTS:
+        *s_out = "DW_SECT_RNGLISTS";
+        return DW_DLV_OK;
+    }
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -1573,7 +2173,7 @@ dwarf_get_DS_name (unsigned int val,const char ** s_out)
         *s_out = "DW_DS_trailing_separate";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -1596,7 +2196,7 @@ dwarf_get_END_name (unsigned int val,const char ** s_out)
         *s_out = "DW_END_hi_user";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -1634,7 +2234,7 @@ dwarf_get_ATCF_name (unsigned int val,const char ** s_out)
         *s_out = "DW_ATCF_hi_user";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -1651,7 +2251,7 @@ dwarf_get_ACCESS_name (unsigned int val,const char ** s_out)
         *s_out = "DW_ACCESS_private";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -1668,7 +2268,7 @@ dwarf_get_VIS_name (unsigned int val,const char ** s_out)
         *s_out = "DW_VIS_qualified";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -1685,7 +2285,7 @@ dwarf_get_VIRTUALITY_name (unsigned int val,const char ** s_out)
         *s_out = "DW_VIRTUALITY_pure_virtual";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -1758,6 +2358,51 @@ dwarf_get_LANG_name (unsigned int val,const char ** s_out)
     case DW_LANG_Go:
         *s_out = "DW_LANG_Go";
         return DW_DLV_OK;
+    case DW_LANG_Modula3:
+        *s_out = "DW_LANG_Modula3";
+        return DW_DLV_OK;
+    case DW_LANG_Haskel:
+        *s_out = "DW_LANG_Haskel";
+        return DW_DLV_OK;
+    case DW_LANG_C_plus_plus_03:
+        *s_out = "DW_LANG_C_plus_plus_03";
+        return DW_DLV_OK;
+    case DW_LANG_C_plus_plus_11:
+        *s_out = "DW_LANG_C_plus_plus_11";
+        return DW_DLV_OK;
+    case DW_LANG_OCaml:
+        *s_out = "DW_LANG_OCaml";
+        return DW_DLV_OK;
+    case DW_LANG_Rust:
+        *s_out = "DW_LANG_Rust";
+        return DW_DLV_OK;
+    case DW_LANG_C11:
+        *s_out = "DW_LANG_C11";
+        return DW_DLV_OK;
+    case DW_LANG_Swift:
+        *s_out = "DW_LANG_Swift";
+        return DW_DLV_OK;
+    case DW_LANG_Julia:
+        *s_out = "DW_LANG_Julia";
+        return DW_DLV_OK;
+    case DW_LANG_Dylan:
+        *s_out = "DW_LANG_Dylan";
+        return DW_DLV_OK;
+    case DW_LANG_C_plus_plus_14:
+        *s_out = "DW_LANG_C_plus_plus_14";
+        return DW_DLV_OK;
+    case DW_LANG_Fortran03:
+        *s_out = "DW_LANG_Fortran03";
+        return DW_DLV_OK;
+    case DW_LANG_Fortran08:
+        *s_out = "DW_LANG_Fortran08";
+        return DW_DLV_OK;
+    case DW_LANG_RenderScript:
+        *s_out = "DW_LANG_RenderScript";
+        return DW_DLV_OK;
+    case DW_LANG_BLISS:
+        *s_out = "DW_LANG_BLISS";
+        return DW_DLV_OK;
     case DW_LANG_lo_user:
         *s_out = "DW_LANG_lo_user";
         return DW_DLV_OK;
@@ -1777,7 +2422,7 @@ dwarf_get_LANG_name (unsigned int val,const char ** s_out)
         *s_out = "DW_LANG_hi_user";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -1797,7 +2442,7 @@ dwarf_get_ID_name (unsigned int val,const char ** s_out)
         *s_out = "DW_ID_case_insensitive";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -1813,8 +2458,18 @@ dwarf_get_CC_name (unsigned int val,const char ** s_out)
     case DW_CC_nocall:
         *s_out = "DW_CC_nocall";
         return DW_DLV_OK;
+    case DW_CC_pass_by_reference:
+        *s_out = "DW_CC_pass_by_reference";
+        return DW_DLV_OK;
+    case DW_CC_pass_by_value:
+        *s_out = "DW_CC_pass_by_value";
+        return DW_DLV_OK;
     case DW_CC_lo_user:
         *s_out = "DW_CC_lo_user";
+        return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x40. DW_CC_GNU_renesas_sh */
+    case DW_CC_GNU_borland_fastcall_i386:
+        *s_out = "DW_CC_GNU_borland_fastcall_i386";
         return DW_DLV_OK;
     case DW_CC_ALTIUM_interrupt:
         *s_out = "DW_CC_ALTIUM_interrupt";
@@ -1832,7 +2487,7 @@ dwarf_get_CC_name (unsigned int val,const char ** s_out)
         *s_out = "DW_CC_hi_user";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -1852,7 +2507,7 @@ dwarf_get_INL_name (unsigned int val,const char ** s_out)
         *s_out = "DW_INL_declared_inlined";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -1866,7 +2521,7 @@ dwarf_get_ORD_name (unsigned int val,const char ** s_out)
         *s_out = "DW_ORD_col_major";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -1880,7 +2535,45 @@ dwarf_get_DSC_name (unsigned int val,const char ** s_out)
         *s_out = "DW_DSC_range";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
+}
+/* ARGSUSED */
+int
+dwarf_get_LNCT_name (unsigned int val,const char ** s_out)
+{
+    switch (val) {
+    case DW_LNCT_path:
+        *s_out = "DW_LNCT_path";
+        return DW_DLV_OK;
+    case DW_LNCT_directory_index:
+        *s_out = "DW_LNCT_directory_index";
+        return DW_DLV_OK;
+    case DW_LNCT_timestamp:
+        *s_out = "DW_LNCT_timestamp";
+        return DW_DLV_OK;
+    case DW_LNCT_size:
+        *s_out = "DW_LNCT_size";
+        return DW_DLV_OK;
+    case DW_LNCT_MD5:
+        *s_out = "DW_LNCT_MD5";
+        return DW_DLV_OK;
+    case DW_LNCT_GNU_subprogram_name:
+        *s_out = "DW_LNCT_GNU_subprogram_name";
+        return DW_DLV_OK;
+    case DW_LNCT_GNU_decl_file:
+        *s_out = "DW_LNCT_GNU_decl_file";
+        return DW_DLV_OK;
+    case DW_LNCT_GNU_decl_line:
+        *s_out = "DW_LNCT_GNU_decl_line";
+        return DW_DLV_OK;
+    case DW_LNCT_lo_user:
+        *s_out = "DW_LNCT_lo_user";
+        return DW_DLV_OK;
+    case DW_LNCT_hi_user:
+        *s_out = "DW_LNCT_hi_user";
+        return DW_DLV_OK;
+    }
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -1923,8 +2616,18 @@ dwarf_get_LNS_name (unsigned int val,const char ** s_out)
     case DW_LNS_set_isa:
         *s_out = "DW_LNS_set_isa";
         return DW_DLV_OK;
+    case DW_LNS_set_address_from_logical:
+        *s_out = "DW_LNS_set_address_from_logical";
+        return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0xd. DW_LNS_set_subprogram */
+    case DW_LNS_inlined_call:
+        *s_out = "DW_LNS_inlined_call";
+        return DW_DLV_OK;
+    case DW_LNS_pop_context:
+        *s_out = "DW_LNS_pop_context";
+        return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -1973,14 +2676,15 @@ dwarf_get_LNE_name (unsigned int val,const char ** s_out)
     case DW_LNE_HP_define_proc:
         *s_out = "DW_LNE_HP_define_proc";
         return DW_DLV_OK;
-    case DW_LNE_lo_user:
-        *s_out = "DW_LNE_lo_user";
+    case DW_LNE_HP_source_file_correlation:
+        *s_out = "DW_LNE_HP_source_file_correlation";
         return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x80. DW_LNE_lo_user */
     case DW_LNE_hi_user:
         *s_out = "DW_LNE_hi_user";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -1997,7 +2701,57 @@ dwarf_get_ISA_name (unsigned int val,const char ** s_out)
         *s_out = "DW_ISA_ARM_arm";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
+}
+/* ARGSUSED */
+int
+dwarf_get_MACRO_name (unsigned int val,const char ** s_out)
+{
+    switch (val) {
+    case DW_MACRO_define:
+        *s_out = "DW_MACRO_define";
+        return DW_DLV_OK;
+    case DW_MACRO_undef:
+        *s_out = "DW_MACRO_undef";
+        return DW_DLV_OK;
+    case DW_MACRO_start_file:
+        *s_out = "DW_MACRO_start_file";
+        return DW_DLV_OK;
+    case DW_MACRO_end_file:
+        *s_out = "DW_MACRO_end_file";
+        return DW_DLV_OK;
+    case DW_MACRO_define_strp:
+        *s_out = "DW_MACRO_define_strp";
+        return DW_DLV_OK;
+    case DW_MACRO_undef_strp:
+        *s_out = "DW_MACRO_undef_strp";
+        return DW_DLV_OK;
+    case DW_MACRO_import:
+        *s_out = "DW_MACRO_import";
+        return DW_DLV_OK;
+    case DW_MACRO_define_sup:
+        *s_out = "DW_MACRO_define_sup";
+        return DW_DLV_OK;
+    case DW_MACRO_undef_sup:
+        *s_out = "DW_MACRO_undef_sup";
+        return DW_DLV_OK;
+    case DW_MACRO_import_sup:
+        *s_out = "DW_MACRO_import_sup";
+        return DW_DLV_OK;
+    case DW_MACRO_define_strx:
+        *s_out = "DW_MACRO_define_strx";
+        return DW_DLV_OK;
+    case DW_MACRO_undef_strx:
+        *s_out = "DW_MACRO_undef_strx";
+        return DW_DLV_OK;
+    case DW_MACRO_lo_user:
+        *s_out = "DW_MACRO_lo_user";
+        return DW_DLV_OK;
+    case DW_MACRO_hi_user:
+        *s_out = "DW_MACRO_hi_user";
+        return DW_DLV_OK;
+    }
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -2020,7 +2774,7 @@ dwarf_get_MACINFO_name (unsigned int val,const char ** s_out)
         *s_out = "DW_MACINFO_vendor_ext";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -2030,6 +2784,7 @@ dwarf_get_CFA_name (unsigned int val,const char ** s_out)
     case DW_CFA_extended:
         *s_out = "DW_CFA_extended";
         return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x0. DW_CFA_nop */
     case DW_CFA_set_loc:
         *s_out = "DW_CFA_set_loc";
         return DW_DLV_OK;
@@ -2099,6 +2854,7 @@ dwarf_get_CFA_name (unsigned int val,const char ** s_out)
     case DW_CFA_lo_user:
         *s_out = "DW_CFA_lo_user";
         return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x1c. DW_CFA_low_user */
     case DW_CFA_MIPS_advance_loc8:
         *s_out = "DW_CFA_MIPS_advance_loc8";
         return DW_DLV_OK;
@@ -2110,6 +2866,9 @@ dwarf_get_CFA_name (unsigned int val,const char ** s_out)
         return DW_DLV_OK;
     case DW_CFA_GNU_negative_offset_extended:
         *s_out = "DW_CFA_GNU_negative_offset_extended";
+        return DW_DLV_OK;
+    case DW_CFA_METAWARE_info:
+        *s_out = "DW_CFA_METAWARE_info";
         return DW_DLV_OK;
     case DW_CFA_high_user:
         *s_out = "DW_CFA_high_user";
@@ -2124,7 +2883,7 @@ dwarf_get_CFA_name (unsigned int val,const char ** s_out)
         *s_out = "DW_CFA_restore";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -2177,7 +2936,7 @@ dwarf_get_EH_name (unsigned int val,const char ** s_out)
         *s_out = "DW_EH_PE_omit";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -2187,6 +2946,9 @@ dwarf_get_FRAME_name (unsigned int val,const char ** s_out)
     case DW_FRAME_CFA_COL:
         *s_out = "DW_FRAME_CFA_COL";
         return DW_DLV_OK;
+    /* Skipping alternate spelling of value 0x0. DW_FRAME_LAST_REG_NUM */
+    /* Skipping alternate spelling of value 0x0. DW_FRAME_RA_COL */
+    /* Skipping alternate spelling of value 0x0. DW_FRAME_STATIC_LINK */
     case DW_FRAME_REG1:
         *s_out = "DW_FRAME_REG1";
         return DW_DLV_OK;
@@ -2373,11 +3135,149 @@ dwarf_get_FRAME_name (unsigned int val,const char ** s_out)
     case DW_FRAME_FREG30:
         *s_out = "DW_FRAME_FREG30";
         return DW_DLV_OK;
+    case DW_FRAME_FREG31:
+        *s_out = "DW_FRAME_FREG31";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG32:
+        *s_out = "DW_FRAME_FREG32";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG33:
+        *s_out = "DW_FRAME_FREG33";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG34:
+        *s_out = "DW_FRAME_FREG34";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG35:
+        *s_out = "DW_FRAME_FREG35";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG36:
+        *s_out = "DW_FRAME_FREG36";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG37:
+        *s_out = "DW_FRAME_FREG37";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG38:
+        *s_out = "DW_FRAME_FREG38";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG39:
+        *s_out = "DW_FRAME_FREG39";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG40:
+        *s_out = "DW_FRAME_FREG40";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG41:
+        *s_out = "DW_FRAME_FREG41";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG42:
+        *s_out = "DW_FRAME_FREG42";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG43:
+        *s_out = "DW_FRAME_FREG43";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG44:
+        *s_out = "DW_FRAME_FREG44";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG45:
+        *s_out = "DW_FRAME_FREG45";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG46:
+        *s_out = "DW_FRAME_FREG46";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG47:
+        *s_out = "DW_FRAME_FREG47";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG48:
+        *s_out = "DW_FRAME_FREG48";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG49:
+        *s_out = "DW_FRAME_FREG49";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG50:
+        *s_out = "DW_FRAME_FREG50";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG51:
+        *s_out = "DW_FRAME_FREG51";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG52:
+        *s_out = "DW_FRAME_FREG52";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG53:
+        *s_out = "DW_FRAME_FREG53";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG54:
+        *s_out = "DW_FRAME_FREG54";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG55:
+        *s_out = "DW_FRAME_FREG55";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG56:
+        *s_out = "DW_FRAME_FREG56";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG57:
+        *s_out = "DW_FRAME_FREG57";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG58:
+        *s_out = "DW_FRAME_FREG58";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG59:
+        *s_out = "DW_FRAME_FREG59";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG60:
+        *s_out = "DW_FRAME_FREG60";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG61:
+        *s_out = "DW_FRAME_FREG61";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG62:
+        *s_out = "DW_FRAME_FREG62";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG63:
+        *s_out = "DW_FRAME_FREG63";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG64:
+        *s_out = "DW_FRAME_FREG64";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG65:
+        *s_out = "DW_FRAME_FREG65";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG66:
+        *s_out = "DW_FRAME_FREG66";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG67:
+        *s_out = "DW_FRAME_FREG67";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG68:
+        *s_out = "DW_FRAME_FREG68";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG69:
+        *s_out = "DW_FRAME_FREG69";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG70:
+        *s_out = "DW_FRAME_FREG70";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG71:
+        *s_out = "DW_FRAME_FREG71";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG72:
+        *s_out = "DW_FRAME_FREG72";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG73:
+        *s_out = "DW_FRAME_FREG73";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG74:
+        *s_out = "DW_FRAME_FREG74";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG75:
+        *s_out = "DW_FRAME_FREG75";
+        return DW_DLV_OK;
+    case DW_FRAME_FREG76:
+        *s_out = "DW_FRAME_FREG76";
+        return DW_DLV_OK;
     case DW_FRAME_HIGHEST_NORMAL_REGISTER:
         *s_out = "DW_FRAME_HIGHEST_NORMAL_REGISTER";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -2391,7 +3291,7 @@ dwarf_get_CHILDREN_name (unsigned int val,const char ** s_out)
         *s_out = "DW_CHILDREN_yes";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 /* ARGSUSED */
 int
@@ -2402,7 +3302,7 @@ dwarf_get_ADDR_name (unsigned int val,const char ** s_out)
         *s_out = "DW_ADDR_none";
         return DW_DLV_OK;
     }
-    return DW_DLV_NO_ENTRY; 
+    return DW_DLV_NO_ENTRY;
 }
 
 /* END FILE */
