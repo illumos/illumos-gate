@@ -1835,6 +1835,55 @@ vdev_label_read(vdev_t *vd, int l, void *buf, uint64_t offset,
 	return (vdev_read_phys(vd, &bp, buf, off, size));
 }
 
+static uint64_t
+vdev_get_label_asize(unsigned char *nvl)
+{
+	unsigned char *vdevs;
+	uint64_t asize;
+	const char *type;
+	int len;
+
+	asize = 0;
+	/* Get vdev tree */
+	if (nvlist_find(nvl, ZPOOL_CONFIG_VDEV_TREE, DATA_TYPE_NVLIST,
+	    NULL, &vdevs, NULL) != 0)
+		return (asize);
+
+	/*
+	 * Get vdev type. We will calculate asize for raidz, mirror and disk.
+	 * For raidz, the asize is raw size of all children.
+	 */
+	if (nvlist_find(vdevs, ZPOOL_CONFIG_TYPE, DATA_TYPE_STRING,
+	    NULL, &type, &len) != 0)
+		goto done;
+
+	if (memcmp(type, VDEV_TYPE_MIRROR, len) != 0 &&
+	    memcmp(type, VDEV_TYPE_DISK, len) != 0 &&
+	    memcmp(type, VDEV_TYPE_RAIDZ, len) != 0)
+		goto done;
+
+	if (nvlist_find(vdevs, ZPOOL_CONFIG_ASIZE, DATA_TYPE_UINT64,
+	    NULL, &asize, NULL) != 0)
+		goto done;
+
+	if (memcmp(type, VDEV_TYPE_RAIDZ, len) == 0) {
+		unsigned char *kids;
+		int nkids;
+
+		if (nvlist_find(vdevs, ZPOOL_CONFIG_CHILDREN,
+		    DATA_TYPE_NVLIST_ARRAY, &nkids, &kids, NULL) != 0) {
+			asize = 0;
+			goto done;
+		}
+
+		asize /= nkids;
+	}
+
+	asize += VDEV_LABEL_START_SIZE + VDEV_LABEL_END_SIZE;
+done:
+	return (asize);
+}
+
 static unsigned char *
 vdev_label_read_config(vdev_t *vd, uint64_t txg)
 {
@@ -1882,10 +1931,9 @@ vdev_label_read_config(vdev_t *vd, uint64_t txg)
 			 * Use asize from pool config. We need this
 			 * because we can get bad value from BIOS.
 			 */
-			if (nvlist_find(nvlist, ZPOOL_CONFIG_ASIZE,
-			    DATA_TYPE_UINT64, NULL, &asize, NULL) == 0) {
-				vd->v_psize = asize +
-				    VDEV_LABEL_START_SIZE + VDEV_LABEL_END_SIZE;
+			asize = vdev_get_label_asize(nvl);
+			if (asize != 0) {
+				vd->v_psize = asize;
 			}
 		}
 	}
