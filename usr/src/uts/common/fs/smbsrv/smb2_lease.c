@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Nexenta by DDN, Inc.  All rights reserved.
  */
 
 /*
@@ -653,7 +653,6 @@ done:
 		ofile->f_oplock.og_state = op->op_oplock_state;
 		mutex_enter(&lease->ls_mutex);
 		lease->ls_state = op->op_oplock_state & CACHE_RWH;
-		lease->ls_oplock_ofile = ofile;
 		lease->ls_epoch++;
 		mutex_exit(&lease->ls_mutex);
 	}
@@ -685,6 +684,9 @@ smb2_lease_ofile_close(smb_ofile_t *ofile)
 	smb_lease_t *lease = ofile->f_lease;
 	smb_ofile_t *o;
 
+	ASSERT(RW_READ_HELD(&node->n_ofile_list.ll_lock));
+	ASSERT(MUTEX_HELD(&node->n_oplock.ol_mutex));
+
 	/*
 	 * If this ofile was not the oplock owner for this lease,
 	 * we can leave things as they are.
@@ -696,24 +698,22 @@ smb2_lease_ofile_close(smb_ofile_t *ofile)
 	 * Find another ofile to which we can move the oplock.
 	 * The ofile must be open and allow a new ref.
 	 */
-	smb_llist_enter(&node->n_ofile_list, RW_READER);
 	FOREACH_NODE_OFILE(node, o) {
 		if (o == ofile)
 			continue;
 		if (o->f_lease != lease)
 			continue;
+		if (o->f_oplock.og_closing)
+			continue;
 		/* If we can get a hold, use this ofile. */
-		if (smb_ofile_hold(o))
+		if (smb_ofile_hold_olbrk(o))
 			break;
 	}
 	if (o == NULL) {
 		/* Normal for last close on a lease. */
-		smb_llist_exit(&node->n_ofile_list);
 		return;
 	}
 	smb_oplock_move(node, ofile, o);
-	lease->ls_oplock_ofile = o;
 
-	smb_llist_exit(&node->n_ofile_list);
 	smb_ofile_release(o);
 }

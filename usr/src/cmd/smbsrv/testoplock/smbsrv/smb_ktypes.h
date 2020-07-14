@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Nexenta by DDN, Inc.  All rights reserved.
  */
 
 /*
@@ -98,6 +98,7 @@ typedef struct smb_oplock_grant {
 	uint32_t		og_state;	/* latest sent to client */
 	uint32_t		og_breaking;	/* BREAK_TO... flags */
 	uint16_t		og_dialect;	/* how to send breaks */
+	boolean_t		og_closing;
 	/* File-system level state */
 	uint8_t			onlist_II;
 	uint8_t			onlist_R;

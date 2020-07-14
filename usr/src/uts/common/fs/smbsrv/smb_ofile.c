@@ -449,6 +449,20 @@ smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 
 	SMB_OFILE_VALID(of);
 
+	if (of->f_ftype == SMB_FTYPE_DISK) {
+		smb_node_t *node = of->f_node;
+
+		smb_llist_enter(&node->n_ofile_list, RW_READER);
+		mutex_enter(&node->n_oplock.ol_mutex);
+
+		if (of->f_lease != NULL)
+			smb2_lease_ofile_close(of);
+		smb_oplock_break_CLOSE(node, of);
+
+		mutex_exit(&node->n_oplock.ol_mutex);
+		smb_llist_exit(&node->n_ofile_list);
+	}
+
 	mutex_enter(&of->f_mutex);
 	ASSERT(of->f_refcnt);
 
@@ -479,9 +493,6 @@ smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 			smb2_dh_close_persistent(of);
 		if (of->f_persistid != 0)
 			smb_ofile_del_persistid(of);
-		if (of->f_lease != NULL)
-			smb2_lease_ofile_close(of);
-		smb_oplock_break_CLOSE(of->f_node, of);
 		/* FALLTHROUGH */
 
 	case SMB_FTYPE_PRINTER: /* or FTYPE_DISK */
@@ -1442,11 +1453,18 @@ smb_ofile_delete(void *arg)
 	 */
 	if (of->f_ftype == SMB_FTYPE_DISK ||
 	    of->f_ftype == SMB_FTYPE_PRINTER) {
-		ASSERT(of->f_node != NULL);
+		smb_node_t *node = of->f_node;
+
+		/*
+		 * Oplock cleanup should have made sure that
+		 * excl_open does not point to this ofile.
+		 */
+		VERIFY(node->n_oplock.excl_open != of);
+
 		/*
 		 * Note smb_ofile_close did smb_node_dec_open_ofiles()
 		 */
-		smb_node_rem_ofile(of->f_node, of);
+		smb_node_rem_ofile(node, of);
 	}
 
 	/*
