@@ -28,6 +28,19 @@
  * $FreeBSD$
  */
 
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ *
+ * Copyright 2020 Oxide Computer Company
+ */
+
 #ifndef _VMCB_H_
 #define	_VMCB_H_
 
@@ -215,12 +228,40 @@ struct vmcb_segment {
 	uint16_t	attrib;
 	uint32_t	limit;
 	uint64_t	base;
-} __attribute__ ((__packed__));
+};
 CTASSERT(sizeof(struct vmcb_segment) == 16);
 
 /* Code segment descriptor attribute in 12 bit format as saved by VMCB. */
 #define	VMCB_CS_ATTRIB_L		BIT(9)	/* Long mode. */
 #define	VMCB_CS_ATTRIB_D		BIT(10)	/* OPerand size bit. */
+
+/* Fields for Virtual Interrupt Control (v_irq) */
+#define	V_IRQ		BIT(0)	/* Offset 0x60 bit 8 (0x61 bit 0) */
+#define	V_VGIF_VALUE	BIT(1)	/* Offset 0x60 bit 9 (0x61 bit 1) */
+
+/* Fields for Virtual Interrupt Control (v_intr_prio) */
+#define	V_INTR_PRIO	0xf	/* Offset 0x60 bits 16-19 (0x62 bits 0-3) */
+#define	V_IGN_TPR	BIT(4)	/* Offset 0x60 bit 20 (0x62 bit 4) */
+
+/* Fields for Virtual Interrupt Control (v_intr_ctrl) */
+#define	V_INTR_MASKING	BIT(0)	/* Offset 0x60 bit 24 (0x63 bit 0) */
+#define	V_VGIF_ENABLE	BIT(1)	/* Offset 0x60 bit 25 (0x63 bit 1) */
+#define	V_AVIC_ENABLE	BIT(7)	/* Offset 0x60 bit 31 (0x63 bit 7) */
+
+/* Fields in Interrupt Shadow, offset 0x68 */
+#define	VIRTUAL_INTR_SHADOW	BIT(0)
+#define	GUEST_INTERRUPT_MASK	BIT(1)
+
+/* Fields in Nested Paging, offset 0x90 */
+#define	NP_ENABLE		BIT(0)	/* Enable nested paging */
+#define	SEV_ENABLE		BIT(1)	/* Enable SEV */
+#define	SEV_ES_ENABLE		BIT(2)	/* Enable SEV-ES */
+#define	GUEST_MODE_EXEC_TRAP	BIT(3)	/* Guest mode execute trap */
+#define	VIRT_TRANSPAR_ENCRYPT	BIT(5)	/* Virtual transparent encryption */
+
+/* Fields in Misc virt controls, offset 0xB8 */
+#define	LBR_VIRT_ENABLE		BIT(0)	/* Enable LBR virtualization accel */
+#define	VIRT_VMSAVE_VMLOAD	BIT(1)	/* Virtualized VMSAVE/VMLOAD */
 
 /*
  * The VMCB is divided into two areas - the first one contains various
@@ -230,99 +271,99 @@ CTASSERT(sizeof(struct vmcb_segment) == 16);
 
 /* VMCB control area - padded up to 1024 bytes */
 struct vmcb_ctrl {
-	uint32_t intercept[5];	/* all intercepts */
-	uint8_t	 pad1[0x28];	/* Offsets 0x14-0x3B are reserved. */
-	uint16_t pause_filthresh; /* Offset 0x3C, PAUSE filter threshold */
-	uint16_t pause_filcnt;  /* Offset 0x3E, PAUSE filter count */
+	uint32_t intercept[5];	/* 0x00-0x13: all intercepts */
+	uint32_t _pad1[10];	/* 0x14-0x3B: Reserved. */
+	uint32_t pause_ctrl;	/* 0x3C, PAUSE filter thresh/count */
 	uint64_t iopm_base_pa;	/* 0x40: IOPM_BASE_PA */
 	uint64_t msrpm_base_pa; /* 0x48: MSRPM_BASE_PA */
 	uint64_t tsc_offset;	/* 0x50: TSC_OFFSET */
 	uint32_t asid;		/* 0x58: Guest ASID */
-	uint8_t	 tlb_ctrl;	/* 0x5C: TLB_CONTROL */
-	uint8_t  pad2[3];	/* 0x5D-0x5F: Reserved. */
-	uint8_t	 v_tpr;		/* 0x60: V_TPR, guest CR8 */
-	uint8_t	 v_irq:1;	/* Is virtual interrupt pending? */
-	uint8_t	:7; 		/* Padding */
-	uint8_t v_intr_prio:4;	/* 0x62: Priority for virtual interrupt. */
-	uint8_t v_ign_tpr:1;
-	uint8_t :3;
-	uint8_t	v_intr_masking:1; /* Guest and host sharing of RFLAGS. */
-	uint8_t	:7;
-	uint8_t	v_intr_vector;	/* 0x64: Vector for virtual interrupt. */
-	uint8_t pad3[3];	/* 0x65-0x67 Reserved. */
-	uint64_t intr_shadow:1; /* 0x68: Interrupt shadow, section15.2.1 APM2 */
-	uint64_t :63;
+	uint8_t tlb_ctrl;	/* 0x5C: TLB_CONTROL */
+	uint8_t _pad2[3];	/* 0x5D-0x5F: Reserved. */
+	uint8_t v_tpr;		/* 0x60: Virtual TPR */
+	uint8_t v_irq;		/* 0x61: V_IRQ, V_GIF_VALUE + Reserved */
+	uint8_t v_intr_prio;	/* 0x62: V_INTR_PRIO, V_IGN_TPR */
+	uint8_t v_intr_ctrl;	/* 0x63: V_INTR_MASKING, vGIF and AVIC enable */
+	uint8_t v_intr_vector;	/* 0x64: Virtual interrupt vector */
+	uint8_t _pad3[3];	/* 0x65-0x67: Reserved */
+	uint64_t intr_shadow;	/* 0x68: Interrupt shadow (and more) */
 	uint64_t exitcode;	/* 0x70, Exitcode */
 	uint64_t exitinfo1;	/* 0x78, EXITINFO1 */
 	uint64_t exitinfo2;	/* 0x80, EXITINFO2 */
 	uint64_t exitintinfo;	/* 0x88, Interrupt exit value. */
-	uint64_t np_enable:1;   /* 0x90, Nested paging enable. */
-	uint64_t :63;
-	uint8_t  pad4[0x10];	/* 0x98-0xA7 reserved. */
+	uint64_t np_ctrl;	/* 0x90, Nested paging control. */
+	uint64_t _pad4[2];	/* 0x98-0xA7 reserved. */
 	uint64_t eventinj;	/* 0xA8, Event injection. */
-	uint64_t n_cr3;		/* B0, Nested page table. */
-	uint64_t lbr_virt_en:1;	/* Enable LBR virtualization. */
-	uint64_t :63;
+	uint64_t n_cr3;		/* 0xB0, Nested page table. */
+	uint64_t misc_ctrl;	/* 0xB8, Misc virt controls */
 	uint32_t vmcb_clean;	/* 0xC0: VMCB clean bits for caching */
-	uint32_t :32;		/* 0xC4: Reserved */
+	uint32_t _pad5;		/* 0xC4: Reserved */
 	uint64_t nrip;		/* 0xC8: Guest next nRIP. */
-	uint8_t	inst_len;	/* 0xD0: #NPF decode assist */
-	uint8_t	inst_bytes[15];
-	uint8_t	padd6[0x320];
-} __attribute__ ((__packed__));
+	uint8_t inst_len;	/* 0xD0: #NPF decode assist */
+	uint8_t inst_bytes[15]; /* 0xD1-0xDF: guest instr bytes */
+	uint64_t avic_page_pa;	/* 0xEO: AVIC backing page */
+	uint64_t _pad6;		/* 0xE8-0xEF: Reserved */
+	uint64_t avic_log_tbl;	/* 0xFO: AVIC logical table */
+	uint64_t avic_phys_tbl;	/* 0xF8: AVIC physical page */
+	uint64_t _pad7;		/* 0x100-0x107: Reserved */
+	uint64_t vmsa_pa;	/* 0x108: VMSA pointer */
+	uint64_t _pad8[94];	/* 0x110-0x3FF: Reserved */
+};
 CTASSERT(sizeof(struct vmcb_ctrl) == 1024);
+CTASSERT(offsetof(struct vmcb_ctrl, vmsa_pa) == 0x108);
 
 struct vmcb_state {
-	struct   vmcb_segment es;
-	struct   vmcb_segment cs;
-	struct   vmcb_segment ss;
-	struct   vmcb_segment ds;
-	struct   vmcb_segment fs;
-	struct   vmcb_segment gs;
-	struct   vmcb_segment gdt;
-	struct   vmcb_segment ldt;
-	struct   vmcb_segment idt;
-	struct   vmcb_segment tr;
-	uint8_t	 pad1[0x2b];		/* Reserved: 0xA0-0xCA */
-	uint8_t	 cpl;
-	uint8_t  pad2[4];
-	uint64_t efer;
-	uint8_t	 pad3[0x70];		/* Reserved: 0xd8-0x147 */
-	uint64_t cr4;
-	uint64_t cr3;			/* Guest CR3 */
-	uint64_t cr0;
-	uint64_t dr7;
-	uint64_t dr6;
-	uint64_t rflags;
-	uint64_t rip;
-	uint8_t	 pad4[0x58]; 		/* Reserved: 0x180-0x1D7 */
-	uint64_t rsp;
-	uint8_t	 pad5[0x18]; 		/* Reserved 0x1E0-0x1F7 */
-	uint64_t rax;
-	uint64_t star;
-	uint64_t lstar;
-	uint64_t cstar;
-	uint64_t sfmask;
-	uint64_t kernelgsbase;
-	uint64_t sysenter_cs;
-	uint64_t sysenter_esp;
-	uint64_t sysenter_eip;
-	uint64_t cr2;
-	uint8_t	 pad6[0x20];
-	uint64_t g_pat;
-	uint64_t dbgctl;
-	uint64_t br_from;
-	uint64_t br_to;
-	uint64_t int_from;
-	uint64_t int_to;
-	uint8_t	 pad7[0x968];		/* Reserved up to end of VMCB */
-} __attribute__ ((__packed__));
+	struct vmcb_segment es;		/* 0x00: 32bit base */
+	struct vmcb_segment cs;		/* 0x10: 32bit base */
+	struct vmcb_segment ss;		/* 0x20: 32bit base */
+	struct vmcb_segment ds;		/* 0x30: 32bit base */
+	struct vmcb_segment fs;		/* 0x40 */
+	struct vmcb_segment gs;		/* 0x50 */
+	struct vmcb_segment gdt;	/* 0x60: base + 16bit limit */
+	struct vmcb_segment ldt;	/* 0x70 */
+	struct vmcb_segment idt;	/* 0x80: base + 16bit limit */
+	struct vmcb_segment tr;		/* 0x90 */
+	uint8_t _pad1[43];		/* 0xA0-0xCA: Reserved */
+	uint8_t cpl;			/* 0xCB: CPL (real mode: 0, virt: 3) */
+	uint32_t _pad2;			/* 0xCC-0xCF: Reserved */
+	uint64_t efer;			/* 0xD0 */
+	uint64_t _pad3[14];		/* 0xD8-0x147: Reserved */
+	uint64_t cr4;			/* 0x148 */
+	uint64_t cr3;			/* 0x150 */
+	uint64_t cr0;			/* 0x158 */
+	uint64_t dr7;			/* 0x160 */
+	uint64_t dr6;			/* 0x168 */
+	uint64_t rflags;		/* 0x170 */
+	uint64_t rip;			/* 0x178 */
+	uint64_t _pad4[11];		/* 0x180-0x1D7: Reserved */
+	uint64_t rsp;			/* 0x1D8 */
+	uint64_t _pad5[3];		/* 0x1E0-0x1F7: Reserved */
+	uint64_t rax;			/* 0x1F8 */
+	uint64_t star;			/* 0x200 */
+	uint64_t lstar;			/* 0x208 */
+	uint64_t cstar;			/* 0x210 */
+	uint64_t sfmask;		/* 0x218 */
+	uint64_t kernelgsbase;		/* 0x220 */
+	uint64_t sysenter_cs;		/* 0x228 */
+	uint64_t sysenter_esp;		/* 0x230 */
+	uint64_t sysenter_eip;		/* 0x238 */
+	uint64_t cr2;			/* 0x240 */
+	uint64_t _pad6[4];		/* 0x248-0x267: Reserved */
+	uint64_t g_pat;			/* 0x268 */
+	uint64_t dbgctl;		/* 0x270 */
+	uint64_t br_from;		/* 0x278 */
+	uint64_t br_to;			/* 0x280 */
+	uint64_t int_from;		/* 0x288 */
+	uint64_t int_to;		/* 0x290 */
+	uint64_t _pad7[301];		/* Reserved up to end of VMCB */
+};
 CTASSERT(sizeof(struct vmcb_state) == 0xC00);
+CTASSERT(offsetof(struct vmcb_state, int_to) == 0x290);
 
 struct vmcb {
 	struct vmcb_ctrl ctrl;
 	struct vmcb_state state;
-} __attribute__ ((__packed__));
+};
 CTASSERT(sizeof(struct vmcb) == PAGE_SIZE);
 CTASSERT(offsetof(struct vmcb, state) == 0x400);
 
