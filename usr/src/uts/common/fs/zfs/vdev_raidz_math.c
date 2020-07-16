@@ -53,6 +53,15 @@ static raidz_impl_ops_t vdev_raidz_fastest_impl = {
 const raidz_impl_ops_t *raidz_all_maths[] = {
 	&vdev_raidz_original_impl,
 	&vdev_raidz_scalar_impl,
+#if defined(__amd64)
+	&vdev_raidz_sse2_impl,
+#endif
+#if defined(__amd64)
+	&vdev_raidz_ssse3_impl,
+#endif
+#if defined(__amd64)
+	&vdev_raidz_avx2_impl,
+#endif
 };
 
 /* Indicate that benchmark has been completed */
@@ -106,15 +115,8 @@ static raidz_impl_kstat_t raidz_impl_kstats[ARRAY_SIZE(raidz_all_maths) + 1];
 const raidz_impl_ops_t *
 vdev_raidz_math_get_ops(void)
 {
-	/*
-	 * illumos porting note:
-	 * The following check from OpenZFS is disabled since we don't have
-	 * this compiled in yet and we need to be able to change the
-	 * implementation for the user-level test suite.
-	 *
-	 * if (!kfpu_allowed())
-	 *	return (&vdev_raidz_scalar_impl);
-	 */
+	if (!kfpu_allowed())
+		return (&vdev_raidz_scalar_impl);
 
 	raidz_impl_ops_t *ops = NULL;
 	const uint32_t impl = RAIDZ_IMPL_READ(zfs_vdev_raidz_impl);

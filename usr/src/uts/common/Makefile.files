@@ -1365,7 +1365,15 @@ LUA_OBJS +=			\
 	llex.o			\
 	lparser.o
 
+amd64_ZFS_OBJS +=		\
+	vdev_raidz_math_avx2.o	\
+	vdev_raidz_math_sse2.o	\
+	vdev_raidz_math_ssse3.o
+
+sparcv9_ZFS_OBJS +=
+
 ZFS_COMMON_OBJS +=		\
+	$($(MACH64)_ZFS_OBJS)	\
 	abd.o			\
 	aggsum.o		\
 	arc.o			\

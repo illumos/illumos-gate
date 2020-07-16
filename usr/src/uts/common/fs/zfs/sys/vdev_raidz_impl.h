@@ -133,13 +133,22 @@ typedef struct raidz_map {
 #define	RAIDZ_ORIGINAL_IMPL	(INT_MAX)
 
 extern const raidz_impl_ops_t vdev_raidz_scalar_impl;
+#if defined(__x86)
+extern const raidz_impl_ops_t vdev_raidz_sse2_impl;
+#endif
+#if defined(__x86)
+extern const raidz_impl_ops_t vdev_raidz_ssse3_impl;
+#endif
+#if defined(__x86)
+extern const raidz_impl_ops_t vdev_raidz_avx2_impl;
+#endif
 
 /*
  * Commonly used raidz_map helpers
  *
  * raidz_parity		Returns parity of the RAIDZ block
  * raidz_ncols		Returns number of columns the block spans
- * raidz_nbigcols	Returns number of big columns columns
+ * raidz_nbigcols	Returns number of big columns
  * raidz_col_p		Returns pointer to a column
  * raidz_col_size	Returns size of a column
  * raidz_big_size	Returns size of big columns
@@ -225,8 +234,8 @@ impl ## _rec_ ## code(void *rmp, const int *tgtidx)			\
 
 
 typedef struct raidz_impl_kstat {
-	uint64_t gen[RAIDZ_GEN_NUM];	/* gen method speed kiB/s */
-	uint64_t rec[RAIDZ_REC_NUM];	/* rec method speed kiB/s */
+	uint64_t gen[RAIDZ_GEN_NUM];	/* gen method speed B/s */
+	uint64_t rec[RAIDZ_REC_NUM];	/* rec method speed B/s */
 } raidz_impl_kstat_t;
 
 /*
