@@ -38,7 +38,7 @@ struct vpmtmr;
 struct vpmtmr *vpmtmr_init(struct vm *vm);
 void vpmtmr_cleanup(struct vpmtmr *pmtmr);
 
-int vpmtmr_handler(struct vm *vm, int vcpuid, bool in, int port, int bytes,
-    uint32_t *val);
+int vpmtmr_handler(struct vm *vm, int vcpuid, bool in, uint16_t port,
+    uint8_t bytes, uint32_t *val);
 
 #endif

@@ -25,6 +25,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ *
+ * Copyright 2020 Oxide Computer Company
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -33,18 +45,16 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 
 #include <machine/vmm.h>
-#include <machine/vmm_instruction_emul.h>
 
 #include "vatpic.h"
 #include "vatpit.h"
 #include "vpmtmr.h"
 #include "vrtc.h"
 #include "vmm_ioport.h"
-#include "vmm_ktr.h"
 
 #define	MAX_IOPORTS		1280
 
-ioport_handler_func_t ioport_handler[MAX_IOPORTS] = {
+static ioport_handler_func_t ioport_handler[MAX_IOPORTS] = {
 	[TIMER_MODE] = vatpit_handler,
 	[TIMER_CNTR0] = vatpit_handler,
 	[TIMER_CNTR1] = vatpit_handler,
@@ -61,144 +71,24 @@ ioport_handler_func_t ioport_handler[MAX_IOPORTS] = {
 	[IO_RTC + 1] = vrtc_data_handler,
 };
 
-#ifdef KTR
-static const char *
-inout_instruction(struct vm_exit *vmexit)
-{
-	int index;
-
-	static const char *iodesc[] = {
-		"outb", "outw", "outl",
-		"inb", "inw", "inl",
-		"outsb", "outsw", "outsd",
-		"insb", "insw", "insd",
-	};
-
-	switch (vmexit->u.inout.bytes) {
-	case 1:
-		index = 0;
-		break;
-	case 2:
-		index = 1;
-		break;
-	default:
-		index = 2;
-		break;
-	}
-
-	if (vmexit->u.inout.in)
-		index += 3;
-
-	if (vmexit->u.inout.string)
-		index += 6;
-
-	KASSERT(index < nitems(iodesc), ("%s: invalid index %d",
-	    __func__, index));
-
-	return (iodesc[index]);
-}
-#endif	/* KTR */
-
-static int
-emulate_inout_port(struct vm *vm, int vcpuid, struct vm_exit *vmexit,
-    bool *retu)
+int
+vm_inout_access(struct vm *vm, int vcpuid, bool in, uint16_t port,
+    uint8_t bytes, uint32_t *val)
 {
 	ioport_handler_func_t handler;
-	uint32_t mask, val;
 	int error;
 
-#ifdef __FreeBSD__
-	/*
-	 * If there is no handler for the I/O port then punt to userspace.
-	 */
-	if (vmexit->u.inout.port >= MAX_IOPORTS ||
-	    (handler = ioport_handler[vmexit->u.inout.port]) == NULL) {
-		*retu = true;
-		return (0);
-	}
-#else /* __FreeBSD__ */
 	handler = NULL;
-	if (vmexit->u.inout.port < MAX_IOPORTS) {
-		handler = ioport_handler[vmexit->u.inout.port];
-	}
-	/* Look for hooks, if a standard handler is not present */
-	if (handler == NULL) {
-		mask = vie_size2mask(vmexit->u.inout.bytes);
-		if (!vmexit->u.inout.in) {
-			val = vmexit->u.inout.eax & mask;
-		}
-		error = vm_ioport_handle_hook(vm, vcpuid, vmexit->u.inout.in,
-		    vmexit->u.inout.port, vmexit->u.inout.bytes, &val);
-		if (error == 0) {
-			goto finish;
-		}
-
-		*retu = true;
-		return (0);
+	if (port < MAX_IOPORTS) {
+		handler = ioport_handler[port];
 	}
 
-#endif /* __FreeBSD__ */
-
-	mask = vie_size2mask(vmexit->u.inout.bytes);
-
-	if (!vmexit->u.inout.in) {
-		val = vmexit->u.inout.eax & mask;
+	if (handler != NULL) {
+		error = (*handler)(vm, vcpuid, in, port, bytes, val);
+	} else {
+		/* Look for hooks, if a standard handler is not present */
+		error = vm_ioport_handle_hook(vm, vcpuid, in, port, bytes, val);
 	}
-
-	error = (*handler)(vm, vcpuid, vmexit->u.inout.in,
-	    vmexit->u.inout.port, vmexit->u.inout.bytes, &val);
-	if (error) {
-		/*
-		 * The value returned by this function is also the return value
-		 * of vm_run(). This needs to be a positive number otherwise it
-		 * can be interpreted as a "pseudo-error" like ERESTART.
-		 *
-		 * Enforce this by mapping all errors to EIO.
-		 */
-		return (EIO);
-	}
-
-#ifndef __FreeBSD__
-finish:
-#endif /* __FreeBSD__ */
-	if (vmexit->u.inout.in) {
-		vmexit->u.inout.eax &= ~mask;
-		vmexit->u.inout.eax |= val & mask;
-		error = vm_set_register(vm, vcpuid, VM_REG_GUEST_RAX,
-		    vmexit->u.inout.eax);
-		KASSERT(error == 0, ("emulate_ioport: error %d setting guest "
-		    "rax register", error));
-	}
-	*retu = false;
-	return (0);
-}
-
-static int
-emulate_inout_str(struct vm *vm, int vcpuid, struct vm_exit *vmexit, bool *retu)
-{
-	*retu = true;
-	return (0);	/* Return to userspace to finish emulation */
-}
-
-int
-vm_handle_inout(struct vm *vm, int vcpuid, struct vm_exit *vmexit, bool *retu)
-{
-	int bytes, error;
-
-	bytes = vmexit->u.inout.bytes;
-	KASSERT(bytes == 1 || bytes == 2 || bytes == 4,
-	    ("vm_handle_inout: invalid operand size %d", bytes));
-
-	if (vmexit->u.inout.string)
-		error = emulate_inout_str(vm, vcpuid, vmexit, retu);
-	else
-		error = emulate_inout_port(vm, vcpuid, vmexit, retu);
-
-	VCPU_CTR4(vm, vcpuid, "%s%s 0x%04x: %s",
-	    vmexit->u.inout.rep ? "rep " : "",
-	    inout_instruction(vmexit),
-	    vmexit->u.inout.port,
-	    error ? "error" : (*retu ? "userspace" : "handled"));
 
 	return (error);
 }

@@ -83,11 +83,6 @@ struct vm_register_set {
 	uint64_t	*regvals;
 };
 
-struct vm_run {
-	int		cpuid;
-	struct vm_exit	vm_exit;
-};
-
 struct vm_exception {
 	int		cpuid;
 	int		vector;

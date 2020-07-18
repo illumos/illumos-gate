@@ -53,8 +53,8 @@ struct mem_range {
 #define	MEM_F_IMMUTABLE		0x4	/* mem_range cannot be unregistered */
 
 void	init_mem(void);
-int     emulate_mem(struct vmctx *, int vcpu, uint64_t paddr, struct vie *vie,
-		    struct vm_guest_paging *paging);
+
+int	emulate_mem(struct vmctx *ctx, int vcpu, struct vm_mmio *mmio);
 
 int	read_mem(struct vmctx *ctx, int vcpu, uint64_t gpa, uint64_t *rval,
 		 int size);

@@ -988,7 +988,6 @@ vlapic_icrlo_write_handler(struct vlapic *vlapic, bool *retu)
 	uint64_t icrval;
 	uint32_t dest, vec, mode;
 	struct vlapic *vlapic2;
-	struct vm_exit *vmexit;
 	struct LAPIC *lapic;
 	uint16_t maxcpus;
 
@@ -1082,13 +1081,7 @@ vlapic_icrlo_write_handler(struct vlapic *vlapic, bool *retu)
 				return (0);
 
 			vlapic2->boot_state = BS_RUNNING;
-
-			*retu = true;
-			vmexit = vm_exitinfo(vlapic->vm, vlapic->vcpuid);
-			vmexit->exitcode = VM_EXITCODE_SPINUP_AP;
-			vmexit->u.spinup_ap.vcpu = dest;
-			vmexit->u.spinup_ap.rip = vec << PAGE_SHIFT;
-
+			vm_req_spinup_ap(vlapic->vm, dest, vec << PAGE_SHIFT);
 			return (0);
 		}
 	}

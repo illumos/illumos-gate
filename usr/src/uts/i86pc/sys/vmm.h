@@ -122,31 +122,13 @@ enum x2apic_state {
 #define	VM_INTINFO_HWEXCEPTION	(3 << 8)
 #define	VM_INTINFO_SWINTR	(4 << 8)
 
-#ifndef __FreeBSD__
 /*
  * illumos doesn't have a limitation based on SPECNAMELEN like FreeBSD does.
  * Instead of picking an arbitrary value we will just rely on the same
  * calculation that's made below. If this calculation ever changes we need to
  * update the the VM_MAX_NAMELEN mapping in the bhyve brand's boot.c file.
  */
-#else
-/*
- * The VM name has to fit into the pathname length constraints of devfs,
- * governed primarily by SPECNAMELEN.  The length is the total number of
- * characters in the full path, relative to the mount point and not
- * including any leading '/' characters.
- * A prefix and a suffix are added to the name specified by the user.
- * The prefix is usually "vmm/" or "vmm.io/", but can be a few characters
- * longer for future use.
- * The suffix is a string that identifies a bootrom image or some similar
- * image that is attached to the VM. A separator character gets added to
- * the suffix automatically when generating the full path, so it must be
- * accounted for, reducing the effective length by 1.
- * The effective length of a VM name is 229 bytes for FreeBSD 13 and 37
- * bytes for FreeBSD 12.  A minimum length is set for safety and supports
- * a SPECNAMELEN as small as 32 on old systems.
- */
-#endif
+
 #define VM_MAX_PREFIXLEN 10
 #define VM_MAX_SUFFIXLEN 15
 #define VM_MIN_NAMELEN   6
@@ -224,76 +206,6 @@ struct vm_guest_paging {
 	enum vm_paging_mode paging_mode;
 };
 
-/*
- * The data structures 'vie' and 'vie_op' are meant to be opaque to the
- * consumers of instruction decoding. The only reason why their contents
- * need to be exposed is because they are part of the 'vm_exit' structure.
- */
-struct vie_op {
-	uint8_t		op_byte;	/* actual opcode byte */
-	uint8_t		op_type;	/* type of operation (e.g. MOV) */
-	uint16_t	op_flags;
-};
-_Static_assert(sizeof(struct vie_op) == 4, "ABI");
-_Static_assert(_Alignof(struct vie_op) == 2, "ABI");
-
-#define	VIE_INST_SIZE	15
-struct vie {
-	uint8_t		inst[VIE_INST_SIZE];	/* instruction bytes */
-	uint8_t		num_valid;		/* size of the instruction */
-	uint8_t		num_processed;
-
-	uint8_t		addrsize:4, opsize:4;	/* address and operand sizes */
-	uint8_t		rex_w:1,		/* REX prefix */
-			rex_r:1,
-			rex_x:1,
-			rex_b:1,
-			rex_present:1,
-			repz_present:1,		/* REP/REPE/REPZ prefix */
-			repnz_present:1,	/* REPNE/REPNZ prefix */
-			opsize_override:1,	/* Operand size override */
-			addrsize_override:1,	/* Address size override */
-			segment_override:1;	/* Segment override */
-
-	uint8_t		mod:2,			/* ModRM byte */
-			reg:4,
-			rm:4;
-
-	uint8_t		ss:2,			/* SIB byte */
-			vex_present:1,		/* VEX prefixed */
-			vex_l:1,		/* L bit */
-			index:4,		/* SIB byte */
-			base:4;			/* SIB byte */
-
-	uint8_t		disp_bytes;
-	uint8_t		imm_bytes;
-
-	uint8_t		scale;
-
-	uint8_t		vex_reg:4,		/* vvvv: first source register specifier */
-			vex_pp:2,		/* pp */
-			_sparebits:2;
-
-	uint8_t		_sparebytes[2];
-
-	int		base_register;		/* VM_REG_GUEST_xyz */
-	int		index_register;		/* VM_REG_GUEST_xyz */
-	int		segment_register;	/* VM_REG_GUEST_xyz */
-
-	int64_t		displacement;		/* optional addr displacement */
-	int64_t		immediate;		/* optional immediate operand */
-
-	uint8_t		decoded;	/* set to 1 if successfully decoded */
-
-	uint8_t		_sparebyte;
-
-	struct vie_op	op;			/* opcode description */
-};
-_Static_assert(sizeof(struct vie) == 64, "ABI");
-_Static_assert(__offsetof(struct vie, disp_bytes) == 22, "ABI");
-_Static_assert(__offsetof(struct vie, scale) == 24, "ABI");
-_Static_assert(__offsetof(struct vie, base_register) == 28, "ABI");
-
 enum vm_exitcode {
 	VM_EXITCODE_INOUT,
 	VM_EXITCODE_VMX,
@@ -306,11 +218,11 @@ enum vm_exitcode {
 	VM_EXITCODE_PAGING,
 	VM_EXITCODE_INST_EMUL,
 	VM_EXITCODE_SPINUP_AP,
-	VM_EXITCODE_DEPRECATED1,	/* used to be SPINDOWN_CPU */
+	VM_EXITCODE_MMIO_EMUL,
 	VM_EXITCODE_RUNBLOCK,
 	VM_EXITCODE_IOAPIC_EOI,
 	VM_EXITCODE_SUSPENDED,
-	VM_EXITCODE_INOUT_STR,
+	VM_EXITCODE_MMIO,
 	VM_EXITCODE_TASK_SWITCH,
 	VM_EXITCODE_MONITOR,
 	VM_EXITCODE_MWAIT,
@@ -325,25 +237,38 @@ enum vm_exitcode {
 	VM_EXITCODE_MAX
 };
 
-struct vm_inout {
-	uint16_t	bytes:3;	/* 1 or 2 or 4 */
-	uint16_t	in:1;
-	uint16_t	string:1;
-	uint16_t	rep:1;
-	uint16_t	port;
-	uint32_t	eax;		/* valid for out */
+enum inout_flags {
+	INOUT_IN	= (1U << 0), /* direction: 'in' when set, else 'out' */
+
+	/*
+	 * The following flags are used only for in-kernel emulation logic and
+	 * are not exposed to userspace.
+	 */
+	INOUT_STR	= (1U << 1), /* ins/outs operation */
+	INOUT_REP	= (1U << 2), /* 'rep' prefix present on instruction */
 };
 
-struct vm_inout_str {
-	struct vm_inout	inout;		/* must be the first element */
-	struct vm_guest_paging paging;
-	uint64_t	rflags;
-	uint64_t	cr0;
-	uint64_t	index;
-	uint64_t	count;		/* rep=1 (%rcx), rep=0 (1) */
-	int		addrsize;
-	enum vm_reg_name seg_name;
-	struct seg_desc seg_desc;
+struct vm_inout {
+	uint32_t	eax;
+	uint16_t	port;
+	uint8_t		bytes;		/* 1 or 2 or 4 */
+	uint8_t		flags;		/* see: inout_flags */
+
+	/*
+	 * The address size and segment are relevant to INS/OUTS operations.
+	 * Userspace is not concerned with them since the in-kernel emulation
+	 * handles those specific aspects.
+	 */
+	uint8_t		addrsize;
+	uint8_t		segment;
+};
+
+struct vm_mmio {
+	uint8_t		bytes;		/* 1/2/4/8 bytes */
+	uint8_t		read;		/* read: 1, write: 0 */
+	uint16_t	_pad[3];
+	uint64_t	gpa;
+	uint64_t	data;
 };
 
 enum task_switch_reason {
@@ -368,18 +293,25 @@ struct vm_exit {
 	uint64_t		rip;
 	union {
 		struct vm_inout	inout;
-		struct vm_inout_str inout_str;
+		struct vm_mmio	mmio;
 		struct {
 			uint64_t	gpa;
 			int		fault_type;
 		} paging;
+		/*
+		 * Kernel-internal MMIO decoding and emulation.
+		 * Userspace should not expect to see this, but rather a
+		 * VM_EXITCODE_MMIO with the above 'mmio' context.
+		 */
 		struct {
 			uint64_t	gpa;
 			uint64_t	gla;
 			uint64_t	cs_base;
 			int		cs_d;		/* CS.D */
-			struct vm_guest_paging paging;
-			struct vie	vie;
+		} mmio_emul;
+		struct {
+			uint8_t		inst[15];
+			uint8_t		num_valid;
 		} inst_emul;
 		/*
 		 * VMX specific payload. Used when there is no "better"
@@ -430,6 +362,23 @@ struct vm_exit {
 			enum vm_suspend_how how;
 		} suspended;
 		struct vm_task_switch task_switch;
+	} u;
+};
+
+enum vm_entry_cmds {
+	VEC_DEFAULT = 0,
+	VEC_DISCARD_INSTR,	/* discard inst emul state */
+	VEC_COMPLETE_MMIO,	/* entry includes result for mmio emul */
+	VEC_COMPLETE_INOUT,	/* entry includes result for inout emul */
+};
+
+struct vm_entry {
+	int cpuid;
+	uint_t cmd;		/* see: vm_entry_cmds */
+	void *exit_data;
+	union {
+		struct vm_inout inout;
+		struct vm_mmio mmio;
 	} u;
 };
 

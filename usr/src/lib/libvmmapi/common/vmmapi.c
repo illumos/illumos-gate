@@ -772,17 +772,16 @@ vm_get_register_set(struct vmctx *ctx, int vcpu, unsigned int count,
 }
 
 int
-vm_run(struct vmctx *ctx, int vcpu, struct vm_exit *vmexit)
+vm_run(struct vmctx *ctx, int vcpu, const struct vm_entry *vm_entry,
+    struct vm_exit *vm_exit)
 {
-	int error;
-	struct vm_run vmrun;
+	struct vm_entry entry;
 
-	bzero(&vmrun, sizeof(vmrun));
-	vmrun.cpuid = vcpu;
+	bcopy(vm_entry, &entry, sizeof (entry));
+	entry.cpuid = vcpu;
+	entry.exit_data = vm_exit;
 
-	error = ioctl(ctx->fd, VM_RUN, &vmrun);
-	bcopy(&vmrun.vm_exit, vmexit, sizeof(struct vm_exit));
-	return (error);
+	return (ioctl(ctx->fd, VM_RUN, &entry));
 }
 
 int
