@@ -29,6 +29,7 @@
 #include <sys/ucontext.h>
 #include <setjmp.h>
 #include <ucontext.h>
+#include "sigjmp_struct.h"
 #include "libc.h"
 
 #pragma weak _siglongjmp = siglongjmp
@@ -36,8 +37,7 @@
 void
 siglongjmp(sigjmp_buf env, int val)
 {
-	/* LINTED alignment */
-	ucontext_t *ucp = (ucontext_t *)env;
+	ucontext_t *ucp = SIGJMP2UCONTEXT(env);
 
 	if (val)
 		ucp->uc_mcontext.gregs[REG_R0] = val;

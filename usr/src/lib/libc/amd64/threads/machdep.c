@@ -28,6 +28,7 @@
 #include <procfs.h>
 #include <ucontext.h>
 #include <setjmp.h>
+#include "sigjmp_struct.h"
 
 extern int getlwpstatus(thread_t, lwpstatus_t *);
 extern int putlwpregs(thread_t, prgregset_t);
@@ -66,7 +67,7 @@ setup_top_frame(void *stk, size_t stksize, ulwp_t *ulwp)
 
 int
 setup_context(ucontext_t *ucp, void *(*func)(ulwp_t *),
-	ulwp_t *ulwp, caddr_t stk, size_t stksize)
+    ulwp_t *ulwp, caddr_t stk, size_t stksize)
 {
 	uint64_t *stack;
 
@@ -172,8 +173,7 @@ setgregs(ulwp_t *ulwp, gregset_t rs)
 int
 __csigsetjmp(sigjmp_buf env, int savemask, gregset_t rs)
 {
-	/* LINTED alignment */
-	ucontext_t *ucp = (ucontext_t *)env;
+	ucontext_t *ucp = SIGJMP2UCONTEXT(env);
 	ulwp_t *self = curthread;
 
 	ucp->uc_link = self->ul_siglink;
