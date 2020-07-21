@@ -238,7 +238,7 @@ static int nlm_host_ctor(void *, void *, int);
 static void nlm_host_dtor(void *, void *);
 static void nlm_host_destroy(struct nlm_host *);
 static struct nlm_host *nlm_host_create(char *, const char *,
-    struct knetconfig *, struct netbuf *);
+    struct knetconfig *, struct netbuf *, struct netbuf *);
 static struct nlm_host *nlm_host_find_locked(struct nlm_globals *,
     const char *, struct netbuf *, avl_index_t *);
 static void nlm_host_unregister(struct nlm_globals *, struct nlm_host *);
@@ -1382,7 +1382,7 @@ nlm_host_wait_grace(struct nlm_host *hostp)
  */
 static struct nlm_host *
 nlm_host_create(char *name, const char *netid,
-    struct knetconfig *knc, struct netbuf *naddr)
+    struct knetconfig *knc, struct netbuf *naddr, struct netbuf *laddr)
 {
 	struct nlm_host *host;
 
@@ -1398,6 +1398,7 @@ nlm_host_create(char *name, const char *netid,
 	host->nh_netid = strdup(netid);
 	host->nh_knc = *knc;
 	nlm_copy_netbuf(&host->nh_addr, naddr);
+	nlm_copy_netbuf(&host->nh_laddr, laddr);
 
 	host->nh_state = 0;
 	host->nh_rpcb_state = NRPCB_NEED_UPDATE;
@@ -1679,7 +1680,7 @@ out:
  */
 struct nlm_host *
 nlm_host_findcreate(struct nlm_globals *g, char *name,
-    const char *netid, struct netbuf *addr)
+    const char *netid, struct netbuf *addr, struct netbuf *laddr)
 {
 	int err;
 	struct nlm_host *host, *newhost = NULL;
@@ -1694,8 +1695,27 @@ nlm_host_findcreate(struct nlm_globals *g, char *name,
 
 	host = nlm_host_find_locked(g, netid, addr, NULL);
 	mutex_exit(&g->lock);
-	if (host != NULL)
+	if (host != NULL) {
+		if ((&host->nh_laddr)->len != 0 &&
+		    (laddr == NULL || laddr->len == 0)) {
+			cmn_err(CE_NOTE, "nlm_host_findcreate: "
+			    "Incoming laddr is absent but "
+			    "host has a recorded nh_laddr.\n");
+		} else if ((&host->nh_laddr)->len == 0 &&
+		    laddr != NULL && laddr->len != 0) {
+			cmn_err(CE_NOTE, "nlm_host_findcreate: "
+			    "Incoming laddr is present but "
+			    "host has no recorded nh_laddr.\n");
+		} else if (laddr != NULL &&
+		    (((&host->nh_laddr)->len != laddr->len) ||
+		    bcmp((&host->nh_laddr)->buf, laddr->buf,
+		    (size_t)laddr->len) != 0)) {
+			cmn_err(CE_NOTE, "nlm_host_findcreate: received "
+			    "laddr different from recorded nh_laddr.\n");
+		}
+
 		return (host);
+	}
 
 	err = nlm_knc_from_netid(netid, &knc);
 	if (err != 0)
@@ -1704,7 +1724,7 @@ nlm_host_findcreate(struct nlm_globals *g, char *name,
 	 * Do allocations (etc.) outside of mutex,
 	 * and then check again before inserting.
 	 */
-	newhost = nlm_host_create(name, netid, &knc, addr);
+	newhost = nlm_host_create(name, netid, &knc, addr, laddr);
 	newhost->nh_sysid = nlm_sysid_alloc();
 	if (newhost->nh_sysid == LM_NOSYSID)
 		goto out;

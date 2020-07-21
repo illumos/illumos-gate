@@ -349,6 +349,9 @@ svc_clts_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 			    = pkti->ipi6_addr;
 			((sin6_t *)(clone_xprt->xp_lcladdr.buf))->sin6_family
 			    = AF_INET6;
+			clone_xprt->xp_lcladdr.len = sizeof (sin6_t);
+			clone_xprt->xp_lcladdr.maxlen =
+			    clone_xprt->xp_lcladdr.len;
 		} else if (toh->level == IPPROTO_IP && toh->status == 0 &&
 		    toh->name == IP_RECVDSTADDR) {
 			dstopt += sizeof (struct T_opthdr);
@@ -356,6 +359,9 @@ svc_clts_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 			    = *(struct in_addr *)dstopt;
 			((sin_t *)(clone_xprt->xp_lcladdr.buf))->sin_family
 			    = AF_INET;
+			clone_xprt->xp_lcladdr.len = sizeof (sin_t);
+			clone_xprt->xp_lcladdr.maxlen =
+			    clone_xprt->xp_lcladdr.len;
 		}
 	}
 

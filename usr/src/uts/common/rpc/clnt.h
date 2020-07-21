@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 Tintri by DDN. All rights reserved.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
@@ -197,9 +198,9 @@ typedef struct __client {
 #define	CLCR_SET_LOWVERS	3
 #define	CLCR_GET_LOWVERS	4
 #define	CLCR_SET_RPCB_RMTTIME	5
-#define	CLCR_GET_RPCB_RMTTIME  	6
-#define	CLCR_SET_CRED_CACHE_SZ 	7
-#define	CLCR_GET_CRED_CACHE_SZ 	8
+#define	CLCR_GET_RPCB_RMTTIME	6
+#define	CLCR_SET_CRED_CACHE_SZ	7
+#define	CLCR_GET_CRED_CACHE_SZ	8
 
 #define	RPCSMALLMSGSIZE	400	/* a more reasonable packet size */
 
@@ -352,6 +353,11 @@ extern int clnt_tli_kinit(CLIENT *h, struct knetconfig *config,
 
 extern int rpc_uaddr2port(int af, char *addr);
 
+extern void clnt_init_netbuf(struct netbuf *, int);
+extern void clnt_free_netbuf(struct netbuf *);
+extern void clnt_dup_netbuf(const struct netbuf *, struct netbuf *);
+extern int clnt_cmp_netaddr(const struct netbuf *, struct netbuf *);
+
 /*
  * kRPC internal function. Not for general use. Subject to rapid change.
  */
@@ -466,12 +472,15 @@ extern int kstr_push(struct vnode *, char *);
 extern void t_kadvise(TIUSER *, uchar_t *, int);
 
 extern boolean_t connmgr_cpr_reset(void *, int);
+extern void connmgr_destroy(queue_t *);
 
 extern void put_inet_port(struct netbuf *, ushort_t);
 extern void put_inet6_port(struct netbuf *, ushort_t);
 extern void put_loopback_port(struct netbuf *, char *);
 extern enum clnt_stat rpcbind_getaddr(struct knetconfig *, rpcprog_t,
     rpcvers_t, struct netbuf *);
+extern enum clnt_stat rpcbind_getaddr5(struct knetconfig *, rpcprog_t,
+    rpcvers_t, struct netbuf *, struct netbuf *);
 
 /*
  * Kstat stuff
@@ -517,7 +526,7 @@ extern void svc_cots_stats_fini(zoneid_t, struct rpc_cots_server **);
 /*
  * enum clnt_stat
  * CLNT_CALL(rh, proc, xargs, argsp, xres, resp, timeout)
- * 	CLIENT *rh;
+ *	CLIENT *rh;
  *	rpcproc_t proc;
  *	xdrproc_t xargs;
  *	caddr_t argsp;
@@ -539,7 +548,7 @@ extern void svc_cots_stats_fini(zoneid_t, struct rpc_cots_server **);
 /*
  * enum clnt_stat
  * CLNT_SEND(rh, proc, xargs, argsp)
- * 	CLIENT *rh;
+ *	CLIENT *rh;
  *	rpcproc_t proc;
  *	xdrproc_t xargs;
  *	caddr_t argsp;
@@ -555,7 +564,7 @@ extern void svc_cots_stats_fini(zoneid_t, struct rpc_cots_server **);
 /*
  * void
  * CLNT_ABORT(rh);
- * 	CLIENT *rh;
+ *	CLIENT *rh;
  */
 #define	CLNT_ABORT(rh)	((*(rh)->cl_ops->cl_abort)(rh))
 #define	clnt_abort(rh)	((*(rh)->cl_ops->cl_abort)(rh))
@@ -563,7 +572,7 @@ extern void svc_cots_stats_fini(zoneid_t, struct rpc_cots_server **);
 /*
  * struct rpc_err
  * CLNT_GETERR(rh);
- * 	CLIENT *rh;
+ *	CLIENT *rh;
  */
 #define	CLNT_GETERR(rh, errp)	((*(rh)->cl_ops->cl_geterr)(rh, errp))
 #define	clnt_geterr(rh, errp)	((*(rh)->cl_ops->cl_geterr)(rh, errp))
@@ -571,7 +580,7 @@ extern void svc_cots_stats_fini(zoneid_t, struct rpc_cots_server **);
 /*
  * bool_t
  * CLNT_FREERES(rh, xres, resp);
- * 	CLIENT *rh;
+ *	CLIENT *rh;
  *	xdrproc_t xres;
  *	caddr_t resp;
  */
@@ -606,7 +615,7 @@ extern void svc_cots_stats_fini(zoneid_t, struct rpc_cots_server **);
 #define	CLGET_SVC_ADDR		7	/* get server's address (netbuf) */
 #define	CLSET_FD_CLOSE		8	/* close fd while clnt_destroy */
 #define	CLSET_FD_NCLOSE		9	/* Do not close fd while clnt_destroy */
-#define	CLGET_XID 		10	/* Get xid */
+#define	CLGET_XID		10	/* Get xid */
 #define	CLSET_XID		11	/* Set xid */
 #define	CLGET_VERS		12	/* Get version number */
 #define	CLSET_VERS		13	/* Set version number */
@@ -662,6 +671,8 @@ typedef enum {
 					/* connection setup error	  */
 #define	CLSET_BINDRESVPORT	10005	/* Set preference for reserve port */
 #define	CLGET_BINDRESVPORT	10006	/* Get preference for reserve port */
+#define	CLSET_BINDSRCADDR	10007	/* Set preference for interface */
+					/* and end port */
 #endif
 
 /*
@@ -686,7 +697,7 @@ typedef enum {
 /*
  * void
  * CLNT_DESTROY(rh);
- * 	CLIENT *rh;
+ *	CLIENT *rh;
  *
  * PSARC 2003/523 Contract Private Interface
  * CLNT_DESTROY
@@ -731,7 +742,7 @@ extern  CLIENT * clnt_create(const char *, const rpcprog_t, const rpcvers_t,
 	const char *);
 /*
  *
- * 	const char *hostname;			-- hostname
+ *	const char *hostname;			-- hostname
  *	const rpcprog_t prog;			-- program number
  *	const rpcvers_t vers;			-- version number
  *	const char *nettype;			-- network type
@@ -749,7 +760,7 @@ extern  CLIENT * clnt_create_timed(const char *, const rpcprog_t,
 	const rpcvers_t, const char *, const struct timeval *);
 /*
  *
- * 	const char *hostname;			-- hostname
+ *	const char *hostname;			-- hostname
  *	const rpcprog_t prog;			-- program number
  *	const rpcvers_t vers;			-- version number
  *	const char *nettype;			-- network type
@@ -811,7 +822,7 @@ extern CLIENT * clnt_tp_create(const char *, const rpcprog_t, const rpcvers_t,
  *	const char *hostname;			-- hostname
  *	const rpcprog_t prog;			-- program number
  *	const rpcvers_t vers;			-- version number
- *	const struct netconfig *netconf; 	-- network config structure
+ *	const struct netconfig *netconf;	-- network config structure
  */
 #else
 extern CLIENT * clnt_tp_create();
@@ -828,7 +839,7 @@ extern CLIENT * clnt_tp_create_timed(const char *, const rpcprog_t,
  *	const char *hostname;			-- hostname
  *	const rpcprog_t prog;			-- program number
  *	const rpcvers_t vers;			-- version number
- *	const struct netconfig *netconf; 	-- network config structure
+ *	const struct netconfig *netconf;	-- network config structure
  *	const struct timeval *tp;		-- timeout
  */
 #else
@@ -1047,8 +1058,8 @@ extern struct rpc_err rpc_callerr;
  *	const xdrproc_t	xresults;	-- xdr routine for results
  *	caddr_t		resultsp;	-- pointer to results
  *	const resultproc_t	eachresult;	-- call with each result
- *	const int 		inittime;	-- how long to wait initially
- *	const int 		waittime;	-- maximum time to wait
+ *	const int		inittime;	-- how long to wait initially
+ *	const int		waittime;	-- maximum time to wait
  *	const char		*nettype;	-- Transport type
  */
 

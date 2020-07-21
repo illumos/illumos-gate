@@ -20,9 +20,9 @@
  */
 
 /*
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Tintri by DDN. All rights reserved.
  */
 
 /*
@@ -354,7 +354,8 @@ typedef struct cku_private_s {
 	calllist_t		cku_call;	/* for dispatching calls */
 	struct rpc_err		cku_err;	/* error status */
 
-	struct netbuf		cku_srcaddr;	/* source address for retries */
+	struct netbuf		cku_srcaddr;	/* source or bind address */
+						/* for retries */
 	int			cku_addrfmly;  /* for binding port */
 	struct netbuf		cku_addr;	/* remote address */
 	dev_t			cku_device;	/* device to use */
@@ -377,6 +378,7 @@ typedef struct cku_private_s {
 	bool_t			cku_nodelayonerr;
 						/* for CLSET_NODELAYONERR */
 	int			cku_useresvport; /* Use reserved port */
+	int			cku_bindsrc;	/* bind to src address */
 	struct rpc_cots_client	*cku_stats;	/* stats for zone */
 } cku_private_t;
 
@@ -401,11 +403,11 @@ static void	connmgr_snddis(struct cm_xprt *);
 static void	connmgr_close(struct cm_xprt *);
 static void	connmgr_release(struct cm_xprt *);
 static struct cm_xprt *connmgr_wrapget(struct netbuf *, const struct timeval *,
-	cku_private_t *);
+	cku_private_t *, bool_t);
 
 static struct cm_xprt *connmgr_get(struct netbuf *, const struct timeval *,
 	struct netbuf *, int, struct netbuf *, struct rpc_err *, dev_t,
-	bool_t, int, cred_t *);
+	bool_t, int, cred_t *, bool_t);
 
 static void connmgr_cancelconn(struct cm_xprt *);
 static enum clnt_stat connmgr_cwait(struct cm_xprt *, const struct timeval *,
@@ -637,7 +639,8 @@ clnt_cots_kcreate(dev_t dev, struct netbuf *addr, int family, rpcprog_t prog,
 	p->cku_addr.len = addr->len;
 	bcopy(addr->buf, p->cku_addr.buf, addr->len);
 	p->cku_stats = rpcstat->rpc_cots_client;
-	p->cku_useresvport = -1; /* value is has not been set */
+	p->cku_useresvport = -1; /* value has not been set */
+	p->cku_bindsrc = 0;
 
 	*ncl = h;
 	return (0);
@@ -734,6 +737,17 @@ clnt_cots_kcontrol(CLIENT *h, int cmd, char *arg)
 
 		return (TRUE);
 
+	case CLSET_BINDSRCADDR:
+		if (arg == NULL)
+			return (FALSE);
+
+		struct netbuf *addr = (struct netbuf *)arg;
+		clnt_dup_netbuf(addr, &p->cku_srcaddr);
+		p->cku_bindsrc = 1;
+
+		return (TRUE);
+
+
 	default:
 		return (FALSE);
 	}
@@ -799,6 +813,7 @@ clnt_cots_kcallit(CLIENT *h, rpcproc_t procnum, xdrproc_t xdr_args,
 	enum clnt_stat status;
 	struct timeval cwait;
 	bool_t delay_first = FALSE;
+	bool_t srcbind_only = FALSE;
 	clock_t ticks, now;
 
 	RPCLOG(2, "clnt_cots_kcallit, procnum %u\n", procnum);
@@ -850,7 +865,12 @@ call_again:
 		 */
 		ASSERT(p->cku_xid != 0);
 
-		retryaddr = NULL;
+		if (p->cku_bindsrc) {
+			retryaddr = &p->cku_srcaddr;
+			srcbind_only = TRUE;
+		} else {
+			retryaddr = NULL;
+		}
 		p->cku_flags &= ~CKU_SENT;
 
 		if (p->cku_flags & CKU_ONQUEUE) {
@@ -872,6 +892,7 @@ call_again:
 
 	} else if (p->cku_flags & CKU_SENT) {
 		retryaddr = &p->cku_srcaddr;
+		srcbind_only = FALSE;
 
 	} else {
 		/*
@@ -879,7 +900,12 @@ call_again:
 		 * NULL and let connmgr_get() bind to any source port it
 		 * can get.
 		 */
-		retryaddr = NULL;
+		if (p->cku_bindsrc) {
+			retryaddr = &p->cku_srcaddr;
+			srcbind_only = TRUE;
+		} else {
+			retryaddr = NULL;
+		}
 	}
 
 	RPCLOG(64, "clnt_cots_kcallit: xid = 0x%x", p->cku_xid);
@@ -888,7 +914,7 @@ call_again:
 	p->cku_err.re_status = RPC_TIMEDOUT;
 	p->cku_err.re_errno = p->cku_err.re_terrno = 0;
 
-	cm_entry = connmgr_wrapget(retryaddr, &cwait, p);
+	cm_entry = connmgr_wrapget(retryaddr, &cwait, p, srcbind_only);
 
 	if (cm_entry == NULL) {
 		RPCLOG(1, "clnt_cots_kcallit: can't connect status %s\n",
@@ -1580,8 +1606,10 @@ clnt_cots_kinit(CLIENT *h, dev_t dev, int family, struct netbuf *addr,
 	p->cku_addrfmly = family;
 	p->cku_cred = cred;
 
-	if (p->cku_addr.maxlen < addr->len) {
-		kmem_free(p->cku_addr.buf, p->cku_addr.maxlen);
+	if (p->cku_addr.maxlen < addr->maxlen) {
+		if (p->cku_addr.maxlen != 0 && p->cku_addr.buf != NULL)
+			kmem_free(p->cku_addr.buf, p->cku_addr.maxlen);
+
 		p->cku_addr.buf = kmem_zalloc(addr->maxlen, KM_SLEEP);
 		p->cku_addr.maxlen = addr->maxlen;
 	}
@@ -1764,13 +1792,15 @@ static struct cm_xprt *
 connmgr_wrapget(
 	struct netbuf *retryaddr,
 	const struct timeval *waitp,
-	cku_private_t *p)
+	cku_private_t *p,
+	bool_t srcbind_only)
 {
 	struct cm_xprt *cm_entry;
 
 	cm_entry = connmgr_get(retryaddr, waitp, &p->cku_addr, p->cku_addrfmly,
 	    &p->cku_srcaddr, &p->cku_err, p->cku_device,
-	    p->cku_client.cl_nosignal, p->cku_useresvport, p->cku_cred);
+	    p->cku_client.cl_nosignal, p->cku_useresvport, p->cku_cred,
+	    srcbind_only);
 
 	if (cm_entry == NULL) {
 		/*
@@ -1812,7 +1842,8 @@ connmgr_get(
 	dev_t		device,
 	bool_t		nosignal,
 	int		useresvport,
-	cred_t		*cr)
+	cred_t		*cr,
+	bool_t		do_srcbind)
 {
 	struct cm_xprt *cm_entry;
 	struct cm_xprt *lru_entry;
@@ -1831,7 +1862,7 @@ connmgr_get(
 	 */
 	mutex_enter(&connmgr_lock);
 
-	if (retryaddr == NULL) {
+	if (retryaddr == NULL || (do_srcbind && retryaddr != NULL)) {
 use_new_conn:
 		i = 0;
 		cm_entry = lru_entry = NULL;
@@ -1880,12 +1911,29 @@ use_new_conn:
 			}
 
 
+			/*
+			 * Playing safe, there is a goto below,
+			 * which sets retryaddr to NULL,
+			 * Invalidating the if check above.
+			 */
+			if (retryaddr == NULL) {
+				do_srcbind = FALSE;
+			}
 			if ((cm_entry->x_state_flags & X_BADSTATES) == 0 &&
 			    cm_entry->x_zoneid == zoneid &&
 			    cm_entry->x_rdev == device &&
 			    destaddr->len == cm_entry->x_server.len &&
 			    bcmp(destaddr->buf, cm_entry->x_server.buf,
 			    destaddr->len) == 0) {
+
+				if (do_srcbind) {
+					if (cm_entry->x_src.buf == NULL ||
+					    clnt_cmp_netaddr(retryaddr,
+					    &cm_entry->x_src) != 0) {
+						cmp = &cm_entry->x_next;
+						continue;
+					}
+				}
 				/*
 				 * If the matching entry isn't connected,
 				 * attempt to reconnect it.
@@ -2374,6 +2422,7 @@ connmgr_wrapconnect(
 		 * If we need to send a T_DISCON_REQ, send one.
 		 */
 		connmgr_dis_and_wait(cm_entry);
+		cm_entry->x_dead = FALSE;
 
 		mutex_exit(&connmgr_lock);
 
@@ -2496,6 +2545,7 @@ connmgr_dis_and_wait(struct cm_xprt *cm_entry)
 		 * then send another T_DISCON_REQ.
 		 */
 		if (cm_entry->x_waitdis == FALSE) {
+			cm_entry->x_dead = TRUE;
 			break;
 		} else {
 			RPCLOG(8, "connmgr_dis_and_wait: did"
@@ -3095,6 +3145,37 @@ connmgr_snddis(struct cm_xprt *cm_entry)
 
 	RPCLOG(8, "connmgr_snddis: sending discon to queue %p\n", (void *)q);
 	put(q, mp);
+}
+
+/*
+ * We end up here if there is a connection disconnect.
+ * The cm_entry is taken off the list.
+ */
+void
+connmgr_destroy(queue_t *wq)
+{
+	struct cm_xprt *cm_entry, *cm_prev;
+
+	mutex_enter(&connmgr_lock);
+	cm_entry = cm_hd;
+	cm_prev = NULL;
+
+	while (cm_entry) {
+		if (cm_entry->x_wq == wq) {
+			if (cm_prev)
+				cm_prev->x_next = cm_entry->x_next;
+			else
+				cm_hd = cm_entry->x_next;
+			cm_entry->x_next = NULL;
+			break;
+		}
+		cm_prev = cm_entry;
+		cm_entry = cm_entry->x_next;
+	}
+	mutex_exit(&connmgr_lock);
+
+	if (cm_entry)
+		connmgr_close(cm_entry);
 }
 
 /*

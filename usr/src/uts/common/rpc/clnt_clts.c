@@ -114,6 +114,7 @@ typedef struct endpnt_type {
 	zoneid_t	e_zoneid;	/* zoneid of endpoint type */
 	kcondvar_t	e_async_cv;	/* cv for asynchronous reap threads */
 	uint_t		e_async_count;	/* count of asynchronous reap threads */
+	struct netbuf	e_laddr;	/* endpnt local address */
 } endpnt_type_t;
 
 typedef struct endpnt {
@@ -165,7 +166,8 @@ static call_table_t *clts_call_ht;
 static struct endpnt_type *endpnt_type_create(struct knetconfig *);
 static void endpnt_type_free(struct endpnt_type *);
 static int check_endpnt(struct endpnt *, struct endpnt **);
-static struct endpnt *endpnt_get(struct knetconfig *, int);
+static struct endpnt *endpnt_get(struct knetconfig *, int, int,
+				struct netbuf *);
 static void endpnt_rele(struct endpnt *);
 static void endpnt_reap_settimer(endpnt_type_t *);
 static void endpnt_reap(endpnt_type_t *);
@@ -204,6 +206,7 @@ struct cku_private {
 	struct endpnt		*cku_endpnt;	/* open end point */
 	struct knetconfig	 cku_config;
 	struct netbuf		 cku_addr;	/* remote address */
+	struct netbuf		 cku_lcladdr;	/* local address */
 	struct rpc_err		 cku_err;	/* error status */
 	XDR			 cku_outxdr;	/* xdr stream for output */
 	XDR			 cku_inxdr;	/* xdr stream for input */
@@ -217,6 +220,7 @@ struct cku_private {
 	uint32_t		 cku_xid;	/* current XID */
 	bool_t			 cku_bcast;	/* RPC broadcast hint */
 	int			cku_useresvport; /* Use reserved port */
+	int			cku_bindsrc;	/* Use source address */
 	struct rpc_clts_client	*cku_stats;	/* counters for the zone */
 };
 
@@ -358,7 +362,8 @@ clnt_clts_kcreate(struct knetconfig *config, struct netbuf *addr,
 	plen = strlen(config->knc_protofmly) + 1;
 	p->cku_config.knc_protofmly = kmem_alloc(plen, KM_SLEEP);
 	bcopy(config->knc_protofmly, p->cku_config.knc_protofmly, plen);
-	p->cku_useresvport = -1; /* value is has not been set */
+	p->cku_useresvport = -1; /* value has not been set */
+	p->cku_bindsrc = 0; /* value has not been set */
 
 	cv_init(&p->cku_call.call_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&p->cku_call.call_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -386,7 +391,7 @@ clnt_clts_kinit(CLIENT *h, struct netbuf *addr, int retrys, cred_t *cred)
 
 	p->cku_retrys = retrys;
 
-	if (p->cku_addr.maxlen < addr->len) {
+	if (p->cku_addr.maxlen < addr->maxlen) {
 		if (p->cku_addr.maxlen != 0 && p->cku_addr.buf != NULL)
 			kmem_free(p->cku_addr.buf, p->cku_addr.maxlen);
 
@@ -580,7 +585,8 @@ call_again:
 	 */
 
 	if (p->cku_endpnt == NULL)
-		p->cku_endpnt = endpnt_get(&p->cku_config, p->cku_useresvport);
+		p->cku_endpnt = endpnt_get(&p->cku_config, p->cku_useresvport,
+		    p->cku_bindsrc, &p->cku_lcladdr);
 
 	if (p->cku_endpnt == NULL) {
 		freemsg(mp);
@@ -1090,6 +1096,16 @@ clnt_clts_kcontrol(CLIENT *h, int cmd, char *arg)
 
 		return (TRUE);
 
+	case CLSET_BINDSRCADDR:
+		if (arg == NULL)
+			return (FALSE);
+
+		struct netbuf *addr = (struct netbuf *)arg;
+		clnt_dup_netbuf(addr, &p->cku_lcladdr);
+		p->cku_bindsrc = 1;
+
+		return (TRUE);
+
 	default:
 		return (FALSE);
 	}
@@ -1121,6 +1137,7 @@ clnt_clts_kdestroy(CLIENT *h)
 	plen = strlen(p->cku_config.knc_protofmly) + 1;
 	kmem_free(p->cku_config.knc_protofmly, plen);
 	kmem_free(p->cku_addr.buf, p->cku_addr.maxlen);
+	kmem_free(p->cku_lcladdr.buf, p->cku_lcladdr.maxlen);
 	kmem_free(p, sizeof (*p));
 }
 
@@ -1267,6 +1284,9 @@ endpnt_type_create(struct knetconfig *config)
 	etype = kmem_alloc(sizeof (struct endpnt_type), KM_SLEEP);
 	etype->e_next = NULL;
 	etype->e_pcurr = NULL;
+	etype->e_laddr.buf = NULL;
+	etype->e_laddr.maxlen = 0;
+	etype->e_laddr.len = 0;
 	etype->e_itimer = 0;
 	etype->e_cnt = 0;
 
@@ -1310,6 +1330,8 @@ endpnt_type_free(struct endpnt_type *etype)
 	mutex_destroy(&etype->e_ilock);
 	list_destroy(&etype->e_pool);
 	list_destroy(&etype->e_ilist);
+	if (etype->e_laddr.buf != NULL)
+		clnt_free_netbuf(&etype->e_laddr);
 	kmem_free(etype, sizeof (endpnt_type_t));
 }
 
@@ -1393,7 +1415,8 @@ static int endpnt_get_return_null = 0;
  * can be obtained.
  */
 static struct endpnt *
-endpnt_get(struct knetconfig *config, int useresvport)
+endpnt_get(struct knetconfig *config, int useresvport,
+    int useintf, struct netbuf *laddr)
 {
 	struct endpnt_type	*n_etype = NULL;
 	struct endpnt_type	*np = NULL;
@@ -1424,12 +1447,21 @@ endpnt_get(struct knetconfig *config, int useresvport)
 	rw_enter(&endpnt_type_lock, RW_READER);
 
 top:
-	for (np = endpnt_type_list; np != NULL; np = np->e_next)
+	for (np = endpnt_type_list; np != NULL; np = np->e_next) {
 		if ((np->e_zoneid == zoneid) &&
 		    (np->e_rdev == config->knc_rdev) &&
 		    (strcmp(np->e_protofmly,
-		    config->knc_protofmly) == 0))
+		    config->knc_protofmly) == 0)) {
+			if (useintf == 1 && laddr != NULL &&
+			    laddr->buf != NULL && np->e_laddr.buf != NULL) {
+				retval = clnt_cmp_netaddr(laddr, &np->e_laddr);
+				if (retval != 0) {
+					continue;
+				}
+			}
 			break;
+		}
+	}
 
 	if (np == NULL && n_etype != NULL) {
 		ASSERT(rw_write_held(&endpnt_type_lock));
@@ -1460,6 +1492,9 @@ top:
 		 */
 		rw_exit(&endpnt_type_lock);
 		n_etype = endpnt_type_create(config);
+		if (useintf == 1 && laddr != NULL) {
+			clnt_dup_netbuf(laddr, &n_etype->e_laddr);
+		}
 
 		/*
 		 * We need to reaquire the lock with RW_WRITER here so that
@@ -1662,12 +1697,12 @@ top:
 	if (useresvport == -1)
 		useresvport = clnt_clts_do_bindresvport;
 
-	if (useresvport &&
+	if ((useresvport || useintf) &&
 	    (strcmp(config->knc_protofmly, NC_INET) == 0 ||
 	    strcmp(config->knc_protofmly, NC_INET6) == 0)) {
 
 		while ((error =
-		    bindresvport(new->e_tiptr, NULL, NULL, FALSE)) != 0) {
+		    bindresvport(new->e_tiptr, laddr, NULL, FALSE)) != 0) {
 			RPCLOG(1,
 			    "endpnt_get: bindresvport error %d\n", error);
 			if (error != EPROTO) {

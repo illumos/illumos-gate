@@ -277,7 +277,8 @@ nlm_frlock(struct vnode *vp, int cmd, struct flock64 *flkp,
 	}
 
 	g = zone_getspecific(nlm_zone_key, curzone);
-	hostp = nlm_host_findcreate(g, sv->sv_hostname, netid, &sv->sv_addr);
+	hostp = nlm_host_findcreate(g, sv->sv_hostname, netid,
+	    &sv->sv_addr, NULL);
 	if (hostp == NULL)
 		return (ENOSYS);
 
@@ -633,7 +634,7 @@ nlm_register_lock_locally(struct vnode *vp, struct nlm_host *hostp,
 		if (netid != NULL) {
 			g = zone_getspecific(nlm_zone_key, curzone);
 			hostp = nlm_host_findcreate(g, sv->sv_hostname,
-			    netid, &sv->sv_addr);
+			    netid, &sv->sv_addr, NULL);
 		}
 	}
 
@@ -1228,7 +1229,8 @@ nlm_shrlock(struct vnode *vp, int cmd, struct shrlock *shr,
 	}
 
 	g = zone_getspecific(nlm_zone_key, curzone);
-	host = nlm_host_findcreate(g, sv->sv_hostname, netid, &sv->sv_addr);
+	host = nlm_host_findcreate(g, sv->sv_hostname, netid,
+	    &sv->sv_addr, NULL);
 	if (host == NULL)
 		return (ENOSYS);
 

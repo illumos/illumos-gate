@@ -518,6 +518,7 @@ struct __svcxprt {
  *  address mask, and netid of transport.
  */
 #define	svc_getrpccaller(x) (&(x)->xp_rtaddr)
+#define	svc_getrpchost(x) (&(x)->xp_lcladdr)
 #ifdef _KERNEL
 #define	svc_getcaller(x) (&(x)->xp_rtaddr.buf)
 #define	svc_getaddrmask(x) (&(x)->xp_master->xp_addrmask)

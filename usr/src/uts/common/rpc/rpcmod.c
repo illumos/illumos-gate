@@ -25,8 +25,8 @@
 /*
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2012 Marcel Telka <marcel@telka.sk>
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 Tintri by DDN. All rights reserved.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -1177,6 +1177,10 @@ mir_close(queue_t *q)
 		}
 
 		mutex_exit(&mir->mir_mutex);
+		/*
+		 * Destroy the cm_entry
+		 */
+		connmgr_destroy(WR(q));
 		qprocsoff(q);
 
 		/* Notify kRPC that this stream is going away. */

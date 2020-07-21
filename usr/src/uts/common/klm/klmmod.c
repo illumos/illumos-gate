@@ -438,7 +438,7 @@ lm_get_sysid(struct knetconfig *knc, struct netbuf *addr,
 
 	g = zone_getspecific(nlm_zone_key, curzone);
 
-	hostp = nlm_host_findcreate(g, name, netid, addr);
+	hostp = nlm_host_findcreate(g, name, netid, addr, NULL);
 	if (hostp == NULL)
 		return (NULL);
 

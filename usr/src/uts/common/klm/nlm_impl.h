@@ -346,6 +346,7 @@ enum nlm_rpcb_state {
  *   nh_shrlist: a list of all active share resevations on the client side.
  *   nh_reclaimer: a pointer to reclamation thread (kthread_t)
  *                 NULL if reclamation thread doesn't exist
+ *   nh_laddr: the server address through which the request came from.
  */
 struct nlm_host {
 	kmutex_t		nh_lock;		/* (c) */
@@ -369,6 +370,7 @@ struct nlm_host {
 	struct nlm_vhold_list	nh_vholds_list;		/* (l) */
 	struct nlm_shres	*nh_shrlist;		/* (l) */
 	kthread_t		*nh_reclaimer;		/* (l) */
+	struct netbuf		nh_laddr;
 };
 TAILQ_HEAD(nlm_host_list, nlm_host);
 
@@ -570,7 +572,7 @@ int nlm_knc_from_netid(const char *, struct knetconfig *);
  * NLM host functions (nlm_impl.c)
  */
 struct nlm_host *nlm_host_findcreate(struct nlm_globals *, char *,
-    const char *, struct netbuf *);
+    const char *, struct netbuf *, struct netbuf *);
 struct nlm_host *nlm_host_find(struct nlm_globals *,
     const char *, struct netbuf *);
 struct nlm_host *nlm_host_find_by_sysid(struct nlm_globals *, sysid_t);

@@ -331,7 +331,7 @@ nlm_do_test(nlm4_testargs *argp, nlm4_testres *resp,
 	struct nlm_owner_handle *oh;
 	nlm_rpc_t *rpcp = NULL;
 	vnode_t *vp = NULL;
-	struct netbuf *addr;
+	struct netbuf *addr, *laddr;
 	char *netid;
 	char *name;
 	int error;
@@ -342,9 +342,10 @@ nlm_do_test(nlm4_testargs *argp, nlm4_testres *resp,
 	name = argp->alock.caller_name;
 	netid = svc_getnetid(sr->rq_xprt);
 	addr = svc_getrpccaller(sr->rq_xprt);
+	laddr = svc_getrpchost(sr->rq_xprt);
 
 	g = zone_getspecific(nlm_zone_key, curzone);
-	host = nlm_host_findcreate(g, name, netid, addr);
+	host = nlm_host_findcreate(g, name, netid, addr, laddr);
 	if (host == NULL) {
 		resp->stat.stat = nlm4_denied_nolocks;
 		return;
@@ -478,7 +479,7 @@ nlm_do_lock(nlm4_lockargs *argp, nlm4_res *resp, struct svc_req *sr,
 	struct nlm_globals *g;
 	struct flock64 fl;
 	struct nlm_host *host = NULL;
-	struct netbuf *addr;
+	struct netbuf *addr, *laddr;
 	struct nlm_vhold *nvp = NULL;
 	nlm_rpc_t *rpcp = NULL;
 	char *netid;
@@ -493,9 +494,10 @@ nlm_do_lock(nlm4_lockargs *argp, nlm4_res *resp, struct svc_req *sr,
 	name = argp->alock.caller_name;
 	netid = svc_getnetid(sr->rq_xprt);
 	addr = svc_getrpccaller(sr->rq_xprt);
+	laddr = svc_getrpchost(sr->rq_xprt);
 
 	g = zone_getspecific(nlm_zone_key, curzone);
-	host = nlm_host_findcreate(g, name, netid, addr);
+	host = nlm_host_findcreate(g, name, netid, addr, laddr);
 	if (host == NULL) {
 		DTRACE_PROBE4(no__host, struct nlm_globals *, g,
 		    char *, name, char *, netid, struct netbuf *, addr);
@@ -516,6 +518,8 @@ nlm_do_lock(nlm4_lockargs *argp, nlm4_res *resp, struct svc_req *sr,
 	if (res_cb != NULL) {
 		error = nlm_host_get_rpc(host, sr->rq_vers, &rpcp);
 		if (error != 0) {
+			cmn_err(CE_WARN,
+			"NLM: RPCBIND/PORTMAP failed at res_cb, deny\n");
 			ASSERT(rpcp == NULL);
 			status = nlm4_denied_nolocks;
 			goto out;
@@ -690,6 +694,10 @@ out:
  * Helper for nlm_do_lock(), partly for observability,
  * (we'll see a call blocked in this function) and
  * because nlm_do_lock() was getting quite long.
+ *
+ * Note See nlm_do_lock() calls for the grant_cb, eg:
+ * nlm_granted_1_cb, nlm_granted_msg_1_cb
+ * nlm4_granted_4, nlm4_granted_msg_4_cb
  */
 static void
 nlm_block(nlm4_lockargs *lockargs,
@@ -840,7 +848,7 @@ nlm_do_cancel(nlm4_cancargs *argp, nlm4_res *resp,
 {
 	struct nlm_globals *g;
 	struct nlm_host *host;
-	struct netbuf *addr;
+	struct netbuf *addr, *laddr;
 	struct nlm_vhold *nvp = NULL;
 	nlm_rpc_t *rpcp = NULL;
 	char *netid;
@@ -850,11 +858,12 @@ nlm_do_cancel(nlm4_cancargs *argp, nlm4_res *resp,
 
 	nlm_copy_netobj(&resp->cookie, &argp->cookie);
 	netid = svc_getnetid(sr->rq_xprt);
-	addr = svc_getrpccaller(sr->rq_xprt);
 	name = argp->alock.caller_name;
+	addr = svc_getrpccaller(sr->rq_xprt);
+	laddr = svc_getrpchost(sr->rq_xprt);
 
 	g = zone_getspecific(nlm_zone_key, curzone);
-	host = nlm_host_findcreate(g, name, netid, addr);
+	host = nlm_host_findcreate(g, name, netid, addr, laddr);
 	if (host == NULL) {
 		resp->stat.stat = nlm4_denied_nolocks;
 		return;
@@ -937,7 +946,7 @@ nlm_do_unlock(nlm4_unlockargs *argp, nlm4_res *resp,
 {
 	struct nlm_globals *g;
 	struct nlm_host *host;
-	struct netbuf *addr;
+	struct netbuf *addr, *laddr;
 	nlm_rpc_t *rpcp = NULL;
 	vnode_t *vp = NULL;
 	char *netid;
@@ -948,8 +957,9 @@ nlm_do_unlock(nlm4_unlockargs *argp, nlm4_res *resp,
 	nlm_copy_netobj(&resp->cookie, &argp->cookie);
 
 	netid = svc_getnetid(sr->rq_xprt);
-	addr = svc_getrpccaller(sr->rq_xprt);
 	name = argp->alock.caller_name;
+	addr = svc_getrpccaller(sr->rq_xprt);
+	laddr = svc_getrpchost(sr->rq_xprt);
 
 	/*
 	 * NLM_UNLOCK operation doesn't have an error code
@@ -960,7 +970,7 @@ nlm_do_unlock(nlm4_unlockargs *argp, nlm4_res *resp,
 	resp->stat.stat = nlm4_granted;
 
 	g = zone_getspecific(nlm_zone_key, curzone);
-	host = nlm_host_findcreate(g, name, netid, addr);
+	host = nlm_host_findcreate(g, name, netid, addr, laddr);
 	if (host == NULL)
 		return;
 
@@ -1194,7 +1204,7 @@ nlm_do_share(nlm4_shareargs *argp, nlm4_shareres *resp, struct svc_req *sr)
 {
 	struct nlm_globals *g;
 	struct nlm_host *host;
-	struct netbuf *addr;
+	struct netbuf *addr, *laddr;
 	struct nlm_vhold *nvp = NULL;
 	char *netid;
 	char *name;
@@ -1206,9 +1216,10 @@ nlm_do_share(nlm4_shareargs *argp, nlm4_shareres *resp, struct svc_req *sr)
 	name = argp->share.caller_name;
 	netid = svc_getnetid(sr->rq_xprt);
 	addr = svc_getrpccaller(sr->rq_xprt);
+	laddr = svc_getrpchost(sr->rq_xprt);
 
 	g = zone_getspecific(nlm_zone_key, curzone);
-	host = nlm_host_findcreate(g, name, netid, addr);
+	host = nlm_host_findcreate(g, name, netid, addr, laddr);
 	if (host == NULL) {
 		resp->stat = nlm4_denied_nolocks;
 		return;

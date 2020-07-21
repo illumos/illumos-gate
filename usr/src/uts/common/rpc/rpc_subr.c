@@ -65,7 +65,7 @@ static int strtoi(char *, char **);
 static void grow_netbuf(struct netbuf *, size_t);
 static void loopb_u2t(const char *, struct netbuf *);
 
-#define	RPC_PMAP_TIMEOUT	15
+#define	RPC_PMAP_TIMEOUT	5
 /*
  * define for max length of an ip address and port address, the value was
  * calculated using INET6_ADDRSTRLEN (46) + max port address (12) +
@@ -495,6 +495,13 @@ out:
 	return (status);
 }
 
+enum clnt_stat
+rpcbind_getaddr(struct knetconfig *config, rpcprog_t prog, rpcvers_t vers,
+    struct netbuf *addr)
+{
+	return (rpcbind_getaddr5(config, prog, vers, addr, NULL));
+}
+
 /*
  * Try to get the address for the desired service by using the rpcbind
  * protocol.  Ignores signals.  If addr is a loopback address, it is
@@ -505,8 +512,8 @@ out:
  * it tries portmapper protocol version 2.
  */
 enum clnt_stat
-rpcbind_getaddr(struct knetconfig *config, rpcprog_t prog, rpcvers_t vers,
-    struct netbuf *addr)
+rpcbind_getaddr5(struct knetconfig *config, rpcprog_t prog, rpcvers_t vers,
+    struct netbuf *addr, struct netbuf *laddr)
 {
 	char *ua = NULL;
 	enum clnt_stat status;
@@ -585,6 +592,14 @@ rpcbind_getaddr(struct knetconfig *config, rpcprog_t prog, rpcvers_t vers,
 			status = RPC_TLIERROR;
 			sigreplace(&oldmask, (k_sigset_t *)NULL);
 			continue;
+		}
+
+		if (laddr != NULL) {
+			if (!clnt_control(client, CLSET_BINDSRCADDR,
+			    (char *)laddr)) {
+				cmn_err(CE_WARN, "rpcbind_getaddr: "
+				    "Unable to set CLSET_BINDSRCADDR\n");
+			}
 		}
 
 		client->cl_nosignal = 1;
