@@ -1420,14 +1420,15 @@ kernel_fpu_end(kfpu_state_t *kfpu, uint_t flags)
 
 	if ((flags & KFPU_NO_STATE) == 0) {
 		/*
-		 * Disable preemption so that we don't swtch after removing
-		 * the context handlers but before we turn off T_KFPU.
+		 * Disable preemption so that we don't swtch in the middle of
+		 * removing the context handlers. We turn off T_KFPU first,
+		 * since it is possible to voluntarily swtch during kmem_free
+		 * while removing the context handlers.
 		 */
 		kpreempt_disable();
+		curthread->t_flag &= ~T_KFPU;
 		removectx(curthread, kfpu, kernel_fpu_ctx_save,
 		    kernel_fpu_ctx_restore, NULL, NULL, NULL, NULL);
-
-		curthread->t_flag &= ~T_KFPU;
 		kpreempt_enable();
 
 		if (kfpu != NULL) {
