@@ -23,7 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef _SYS_SID_H
@@ -89,6 +89,7 @@ typedef struct ksidlist {
 	uint_t		ksl_ref;
 	uint_t		ksl_nsid;
 	uint_t		ksl_neid;	/* Number of ids which are ephemeral */
+	ksid_t		**ksl_sorted;	/* ksl_sids sorted by ID */
 	ksid_t		ksl_sids[1];	/* Allocate ksl_nsid times */
 } ksidlist_t;
 
@@ -119,6 +120,8 @@ void ksiddomain_rele(ksiddomain_t *);
 void ksiddomain_hold(ksiddomain_t *);
 void ksidlist_rele(ksidlist_t *);
 void ksidlist_hold(ksidlist_t *);
+boolean_t ksidlist_has_sid(ksidlist_t *, const char *, uint32_t);
+boolean_t ksidlist_has_pid(ksidlist_t *, uint32_t);
 
 ksiddomain_t *ksid_lookupdomain(const char *);
 

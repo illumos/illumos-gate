@@ -107,6 +107,14 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	issig;
 
 	kcred;
+
+	kcrsid_alloc;
+	kcrsid_hold;
+	kcrsid_rele;
+	kcrsid_setsid;
+	kcrsid_setsidlist;
+	kcrsidcopy_to;
+
 	kiconv;
 	kiconv_close;
 	kiconv_open;
@@ -132,8 +140,19 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	ksema_destroy;
 	ksema_init;
 
+	ksid_getdomain;
+	ksid_getid;
+	ksid_getrid;
+	ksid_hold;
 	ksid_lookupdomain;
+	ksid_rele;
+	ksiddomain_hold;
 	ksiddomain_rele;
+	ksidlist_has_pid;
+	ksidlist_has_sid;
+	ksidlist_hold;
+	ksidlist_rele;
+	ksl_bin_search_cutoff;
 
 	ksocket_accept;
 	ksocket_bind;
