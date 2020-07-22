@@ -124,7 +124,7 @@ retry:
 		switch (up_err) {
 		case EINTR:
 			DR_DBG_CTL("%s: door call returned EINTR\n", me);
-			_NOTE(FALLTHROUGH)
+			/* FALLTHROUGH */
 		case EAGAIN:
 			/*
 			 * Server process may be forking, try again.

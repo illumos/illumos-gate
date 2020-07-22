@@ -10069,6 +10069,7 @@ f usr/lib/mdb/kvm/amd64/scsi_vhci.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/sctp.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/sd.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/smbfs.so 0555 root sys
+f usr/lib/mdb/kvm/amd64/smbios.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/smbsrv.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/sockfs.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/specfs.so 0555 root sys

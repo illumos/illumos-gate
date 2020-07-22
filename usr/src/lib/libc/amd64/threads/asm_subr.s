@@ -104,7 +104,11 @@ __sighndlrend:
 
 #undef	sigsetjmp
 
-#if SIZEOF_SIGJMP_BUF < SIZEOF_UCONTEXT_T
+/*
+ * Ensure that a "ucontext_t" will fit within a "sigjmp_buf", including the
+ * extra 8 bytes we may need for correct alignment on AMD64.
+ */
+#if SIZEOF_SIGJMP_BUF - _LONG_ALIGNMENT < SIZEOF_UCONTEXT_T
 
 #error "sigjmp_buf is too small to contain a ucontext_t"
 
@@ -171,4 +175,4 @@ __sighndlrend:
 	SET_SIZE(sigsetjmp)
 	SET_SIZE(_sigsetjmp)
 
-#endif	/* SIZEOF_SIGJMP_BUF < SIZEOF_UCONTEXT_T */
+#endif	/* SIZEOF_SIGJMP_BUF - _LONG_ALIGNMENT < SIZEOF_UCONTEXT_T */

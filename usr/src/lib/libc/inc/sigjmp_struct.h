@@ -32,6 +32,7 @@ extern "C" {
 
 #include <sys/types.h>
 #include <sys/stack.h>
+#include <sys/sysmacros.h>
 #include <ucontext.h>
 #include <setjmp.h>
 
@@ -72,6 +73,20 @@ typedef struct {
 #define	JB_FRAMEPTR	0x2
 
 #endif	/* __sparc */
+
+#if defined(__amd64)
+/*
+ * The "sigjmp_buf" type is an array of long and thus can have 8-byte alignment
+ * on AMD64 systems.  The "ucontext_t" type has a stricter 16-byte alignment
+ * requirement, so we must round the pointer up when casting.
+ *
+ * This is not required on other architectures:
+ *  - SPARC does not store the ucontext_t in the sigjmp_buf
+ *  - i386 only requires 4-byte alignment for ucontext_t
+ */
+#define	SIGJMP2UCONTEXT(x)	\
+	((ucontext_t *)P2ROUNDUP((uintptr_t)(x),  sizeof (upad128_t)))
+#endif
 
 #ifdef	__cplusplus
 }
