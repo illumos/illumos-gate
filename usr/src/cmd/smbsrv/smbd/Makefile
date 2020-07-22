@@ -45,6 +45,7 @@ OBJS=				\
 SRCS=	$(OBJS:%.o=%.c)
 
 include ../../Makefile.cmd
+include ../../Makefile.ctf
 
 MANIFEST=	server.xml
 SVCMETHOD=	svc-smbd
