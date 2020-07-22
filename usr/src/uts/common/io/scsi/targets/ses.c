@@ -25,6 +25,7 @@
  * Use is subject to license terms.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #include <sys/modctl.h>
@@ -95,6 +96,7 @@ static int ses_doattach(dev_info_t *dip);
 static int  ses_open(dev_t *, int, int, cred_t *);
 static int  ses_close(dev_t, int, int, cred_t *);
 static int  ses_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
+static void ses_register_dev_id(ses_softc_t *, dev_info_t *);
 
 static encvec vecs[3] = {
 {
@@ -126,10 +128,6 @@ static void ses_restart(void *arg);
 /*
  * Local Static Data
  */
-#ifndef	D_HOTPLUG
-#define	D_HOTPLUG	0
-#endif /* D_HOTPLUG */
-
 static struct cb_ops ses_cb_ops = {
 	ses_open,			/* open */
 	ses_close,			/* close */
@@ -145,14 +143,10 @@ static struct cb_ops ses_cb_ops = {
 	nochpoll,			/* poll */
 	ddi_prop_op,			/* cb_prop_op */
 	0,				/* streamtab  */
-#if	!defined(CB_REV)
-	D_MP | D_NEW | D_HOTPLUG	/* Driver compatibility flag */
-#else	/* !defined(CB_REV) */
 	D_MP | D_NEW | D_HOTPLUG,	/* Driver compatibility flag */
 	CB_REV,				/* cb_ops version number */
 	nodev,				/* aread */
 	nodev				/* awrite */
-#endif	/* !defined(CB_REV) */
 };
 
 static struct dev_ops ses_dev_ops = {
@@ -165,7 +159,7 @@ static struct dev_ops ses_dev_ops = {
 	ses_detach,		/* detach */
 	nodev,			/* reset */
 	&ses_cb_ops,		/* driver operations */
-	(struct bus_ops *)NULL,	/* bus operations */
+	NULL,			/* bus operations */
 	NULL,			/* power */
 	ddi_quiesce_not_needed,		/* quiesce */
 };
@@ -536,6 +530,12 @@ ses_doattach(dev_info_t *dip)
 	}
 
 	/*
+	 * Register a device id.  This also arranges for the
+	 * serial number property to be set.
+	 */
+	ses_register_dev_id(ssc, dip);
+
+	/*
 	 * create this property so that PM code knows we want
 	 * to be suspended at PM time
 	 */
@@ -566,26 +566,20 @@ ses_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		inst = ddi_get_instance(dip);
 		ssc = ddi_get_soft_state(estate, inst);
 		if (ssc == NULL) {
-			cmn_err(CE_NOTE,
-			    "ses%d: DDI_DETACH, no softstate found", inst);
+			dev_err(dip, CE_NOTE, "DDI_DETACH, no softstate");
 			return (DDI_FAILURE);
 		}
 		if (ISOPEN(ssc)) {
 			return (DDI_FAILURE);
 		}
 
-#if		!defined(lint)
-		/* LINTED */
-		_NOTE(COMPETING_THREADS_NOW);
-#endif		/* !defined(lint) */
-
 		if (ssc->ses_vec.softc_init)
 			(void) (*ssc->ses_vec.softc_init)(ssc, 0);
 
-#if		!defined(lint)
-		_NOTE(NO_COMPETING_THREADS_NOW);
-#endif		/* !defined(lint) */
-
+		if (ssc->ses_dev_id) {
+			ddi_devid_unregister(dip);
+			ddi_devid_free(ssc->ses_dev_id);
+		}
 		(void) scsi_ifsetcap(SES_ROUTE(ssc), "auto-rqsense", 1, 0);
 		scsi_destroy_pkt(ssc->ses_rqpkt);
 		scsi_free_consistent_buf(ssc->ses_rqbp);
@@ -600,8 +594,7 @@ ses_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	case DDI_SUSPEND:
 		inst = ddi_get_instance(dip);
 		if ((ssc = ddi_get_soft_state(estate, inst)) == NULL) {
-			cmn_err(CE_NOTE,
-			    "ses%d: DDI_SUSPEND, no softstate found", inst);
+			dev_err(dip, CE_NOTE, "DDI_SUSPEND, no softstate");
 			return (DDI_FAILURE);
 		}
 
@@ -867,25 +860,6 @@ ses_runcmd(ses_softc_t *ssc, Uscmd *lp)
 	lp->uscsi_status = 0;
 	e = ses_uscsi_cmd(ssc, lp, FKIOCTL);
 
-#ifdef	not
-	/*
-	 * Debug:  Nice cross-check code for verifying consistent status.
-	 */
-	if (lp->uscsi_status) {
-		if (lp->uscsi_status == STATUS_CHECK) {
-			SES_LOG(ssc, CE_NOTE, "runcmd<cdb[0]="
-			    "0x%x->%s ASC/ASCQ=0x%x/0x%x>",
-			    lp->uscsi_cdb[0],
-			    scsi_sname(lp->uscsi_rqbuf[2] & 0xf),
-			    lp->uscsi_rqbuf[12] & 0xff,
-			    lp->uscsi_rqbuf[13] & 0xff);
-		} else {
-			SES_LOG(ssc, CE_NOTE, "runcmd<cdb[0]="
-			    "0x%x -> Status 0x%x", lp->uscsi_cdb[0],
-			    lp->uscsi_status);
-		}
-	}
-#endif	/* not */
 	return (e);
 }
 
@@ -1036,15 +1010,7 @@ ses_start(struct buf *bp)
 	bp->b_resid = 0;
 	SET_BP_ERROR(bp, 0);
 
-#if	!defined(lint)
-	_NOTE(NO_COMPETING_THREADS_NOW);
-#endif	/* !defined(lint) */
 	ssc->ses_retries = ses_retry_count;
-
-#if	!defined(lint)
-	/* LINTED */
-	_NOTE(COMPETING_THREADS_NOW);
-#endif	/* !defined(lint) */
 
 	SES_LOG(ssc, SES_CE_DEBUG9, "ses_start -> scsi_transport");
 	switch (scsi_transport(BP_PKT(bp))) {
@@ -1536,45 +1502,6 @@ ses_decode_sense(struct scsi_pkt *pkt, int *err)
 	    scmd->uscsi_cdb[0], err_action,
 	    sense->es_key, sense->es_add_code, sense->es_qual_code);
 
-#ifdef	not
-	/*
-	 * Dump cdb and sense data stat's for manufacturing.
-	 */
-	if (DEBUGGING_ERR || sd_error_level == SDERR_ALL) {
-		auto buf[128];
-
-		p = pkt->pkt_cdbp;
-		if ((j = scsi_cdb_size[CDB_GROUPID(*p)]) == 0)
-			j = CDB_SIZE;
-
-		/* Print cdb */
-		(void) sprintf(buf, "cmd:");
-		for (i = 0; i < j; i++) {
-			(void) sprintf(&buf[strlen(buf)],
-			    hex, (uchar_t)*p++);
-		}
-		SES_LOG(ssc, SES_CE_DEBUG3, "%s", buf);
-
-		/* Suppress trailing zero's in sense data */
-		if (amt > 3) {
-			p = (char *)devp->sd_sense + amt;
-			for (j = amt; j > 3; j--) {
-				if (*(--p))  break;
-			}
-		} else {
-			j = amt;
-		}
-
-		/* Print sense data. */
-		(void) sprintf(buf, "sense:");
-		p = (char *)devp->sd_sense;
-		for (i = 0; i < j; i++) {
-			(void) sprintf(&buf[strlen(buf)],
-			    hex, (uchar_t)*p++);
-		}
-		SES_LOG(ssc, SES_CE_DEBUG3, "%s", buf);
-	}
-#endif	/* not */
 	return (action);
 }
 
@@ -1699,6 +1626,149 @@ ses_log(ses_softc_t *ssc, int level, const char *fmt, ...)
 		break;
 	}
 }
+
+static size_t
+ses_get_vpd_page(ses_softc_t *ssc, uint8_t page, uint8_t *buf, uint16_t size)
+{
+	Uscmd	uc;
+	uint8_t cdb[6];
+	int	rv;
+	int	try = 0;
+
+	for (try = 0; try < 3; try++) {
+		cdb[0] = SCMD_INQUIRY;
+		cdb[1] = 0x01; /* EVPD */
+		cdb[2] = page;
+		cdb[3] = (size >> 8);
+		cdb[4] = (size & 0xff);
+		cdb[5] = 0;
+
+		/* First we get the header, so we know the size to retrieve */
+		bzero(&uc, sizeof (uc));
+		uc.uscsi_cdb		= (char *)cdb;
+		uc.uscsi_cdblen		= CDB_GROUP0;
+		uc.uscsi_bufaddr	= (char *)buf;
+		uc.uscsi_buflen		= size;
+		uc.uscsi_rqbuf		= NULL;
+		uc.uscsi_rqlen		= 0;
+		uc.uscsi_flags		= USCSI_READ | USCSI_SILENT;
+		uc.uscsi_timeout	= ses_io_time;
+		uc.uscsi_status		= 0;
+
+		if ((rv = ses_uscsi_cmd(ssc, &uc, FKIOCTL)) == 0) {
+			return (size - uc.uscsi_resid);
+		}
+	}
+
+	ses_log(ssc, CE_WARN, "failed getting page header %x: %d", page, rv);
+	return (0);
+}
+
+/*
+ * No devices ever need more than a full 255 bytes for VPD.
+ * page 83.  (Page 0 and 80 are limited to 255 by definition.)
+ * An extra byte is added for termination and alignment.
+ */
+#define	SES_VPD_SIZE	0x100
+
+static void
+ses_register_dev_id(ses_softc_t *ssc, dev_info_t *dip)
+{
+	int		rv;
+	int		i;
+	uint8_t		*inq;
+	size_t		len80 = 0;
+	size_t		len83 = 0;
+	size_t		len00;
+	uint8_t		*inq80;
+	uint8_t		*inq83;
+	uint8_t		*inq00;
+	ddi_devid_t	dev_id;
+
+	inq = (void *)ssc->ses_devp->sd_inq;
+
+	inq00 = kmem_zalloc(SES_VPD_SIZE, KM_SLEEP);
+	inq80 = kmem_zalloc(SES_VPD_SIZE, KM_SLEEP);
+	inq83 = kmem_zalloc(SES_VPD_SIZE, KM_SLEEP);
+
+	/*
+	 * Inquiry needs up to 255 plus 4 bytes of header.
+	 * We also leave an extra byte on the end so we can
+	 * ASCIIZ terminate the serial number.
+	 */
+	len00 = ses_get_vpd_page(ssc, 0x00, inq00, SES_VPD_SIZE - 1);
+	if (len00 <= 4) {
+		/* No VPD pages, nothing we can do */
+		goto done;
+	}
+	len00 -= 4;			/* skip the header */
+	len00 = min(len00, inq00[3]);	/* limit to page length */
+	for (i = 0; i < len00; i++) {
+		switch (inq00[i+4]) {
+		case 0x80:
+			len80 = ses_get_vpd_page(ssc, 0x80, inq80,
+			    SES_VPD_SIZE - 1);
+			break;
+		case 0x83:
+			len83 = ses_get_vpd_page(ssc, 0x83, inq83,
+			    SES_VPD_SIZE - 1);
+			break;
+		}
+	}
+
+	/*
+	 * Create "inquiry-serial-number" property if not already present.
+	 * This is from page 0x80, which may or may not be present.
+	 */
+	if ((len80 > 4) &&
+	    (!ddi_prop_exists(DDI_DEV_T_NONE, dip,
+	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, INQUIRY_SERIAL_NO))) {
+		char *sn;
+
+		/* SPC-3 7.6.10 */
+		sn = (char *)&inq80[4];
+		/* ensure ASCIIZ */
+		inq80[0xff] = '\0';
+
+		/* Serial num is right justified, left padded with spaces. */
+		while (*sn == ' ') {
+			sn++;
+		}
+		if (*sn != '\0') {
+			(void) ddi_prop_update_string(DDI_DEV_T_NONE,
+			    dip, INQUIRY_SERIAL_NO, sn);
+		}
+	}
+
+	if ((rv = ddi_devid_get(dip, &dev_id)) == DDI_SUCCESS) {
+		ddi_devid_free(dev_id);
+		goto done;
+	}
+
+	rv = ddi_devid_scsi_encode(DEVID_SCSI_ENCODE_VERSION_LATEST,
+	    (char *)ddi_driver_name(dip), inq, SUN_INQSIZE,
+	    inq80, len80, inq83, len83, &ssc->ses_dev_id);
+
+	if (rv != DDI_SUCCESS) {
+		ses_log(ssc, CE_WARN, "failed to encode device id");
+		goto done;
+	}
+
+	rv = ddi_devid_register(dip, ssc->ses_dev_id);
+	if (rv != DDI_SUCCESS) {
+		ddi_devid_free(ssc->ses_dev_id);
+		ssc->ses_dev_id = NULL;
+		ses_log(ssc, CE_WARN, "failed to register device id");
+	}
+
+done:
+	/* clean up pages */
+	kmem_free(inq83, SES_VPD_SIZE);
+	kmem_free(inq80, SES_VPD_SIZE);
+	kmem_free(inq00, SES_VPD_SIZE);
+}
+
+
 /*
  * mode: c
  * Local variables:
