@@ -12,6 +12,7 @@
 /*
  * Copyright 2019 Joyent, Inc.
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -723,6 +724,53 @@ i40e_intr_other_work(i40e_t *i40e)
 }
 
 /*
+ * The prolog/epilog pair of functions ensure the integrity of the trqpair
+ * across ring stop/start operations.
+ *
+ * A ring stop operation will wait whilst an interrupt is processing a
+ * trqpair, and when a ring is stopped the interrupt handler will skip
+ * the trqpair.
+ */
+static boolean_t
+i40e_intr_trqpair_prolog(i40e_trqpair_t *itrq)
+{
+	boolean_t enabled;
+
+	mutex_enter(&itrq->itrq_intr_lock);
+	enabled = !itrq->itrq_intr_quiesce;
+	if (enabled)
+		itrq->itrq_intr_busy = B_TRUE;
+	mutex_exit(&itrq->itrq_intr_lock);
+
+	return (enabled);
+}
+
+static void
+i40e_intr_trqpair_epilog(i40e_trqpair_t *itrq)
+{
+	mutex_enter(&itrq->itrq_intr_lock);
+	itrq->itrq_intr_busy = B_FALSE;
+	if (itrq->itrq_intr_quiesce)
+		cv_signal(&itrq->itrq_intr_cv);
+	mutex_exit(&itrq->itrq_intr_lock);
+}
+
+/*
+ * Tell any active interrupt vectors the ring is quiescing, then
+ * wait until any active interrupt thread has finished with this
+ * trqpair.
+ */
+void
+i40e_intr_quiesce(i40e_trqpair_t *itrq)
+{
+	mutex_enter(&itrq->itrq_intr_lock);
+	itrq->itrq_intr_quiesce = B_TRUE;
+	while (itrq->itrq_intr_busy)
+		cv_wait(&itrq->itrq_intr_cv, &itrq->itrq_intr_lock);
+	mutex_exit(&itrq->itrq_intr_lock);
+}
+
+/*
  * Handle an MSI-X interrupt. See section 7.5.1.3 for an overview of
  * the MSI-X interrupt sequence.
  */
@@ -762,8 +810,13 @@ i40e_intr_msix(void *arg1, void *arg2)
 
 		ASSERT3U(i, <, i40e->i40e_num_trqpairs);
 		ASSERT3P(itrq, !=, NULL);
+		if (!i40e_intr_trqpair_prolog(itrq))
+			continue;
+
 		i40e_intr_rx_work(i40e, itrq);
 		i40e_intr_tx_work(i40e, itrq);
+
+		i40e_intr_trqpair_epilog(itrq);
 	}
 
 	i40e_intr_io_enable(i40e, vector_idx);
@@ -804,11 +857,15 @@ i40e_intr_notx(i40e_t *i40e, boolean_t shared)
 	if (reg & I40E_PFINT_ICR0_ADMINQ_MASK)
 		i40e_intr_adminq_work(i40e);
 
-	if (reg & I40E_INTR_NOTX_RX_MASK)
-		i40e_intr_rx_work(i40e, itrq);
+	if (i40e_intr_trqpair_prolog(itrq)) {
+		if (reg & I40E_INTR_NOTX_RX_MASK)
+			i40e_intr_rx_work(i40e, itrq);
 
-	if (reg & I40E_INTR_NOTX_TX_MASK)
-		i40e_intr_tx_work(i40e, itrq);
+		if (reg & I40E_INTR_NOTX_TX_MASK)
+			i40e_intr_tx_work(i40e, itrq);
+
+		i40e_intr_trqpair_epilog(itrq);
+	}
 
 done:
 	i40e_intr_adminq_enable(i40e);

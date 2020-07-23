@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Mouse streams module.
  */
@@ -706,7 +704,7 @@ mswput(q, mp)
 			flushq(q, FLUSHDATA);
 		if (*mp->b_rptr & FLUSHR)
 			flushq(RD(q), FLUSHDATA);
-
+		/* FALLTHROUGH */
 	default:
 		putnext(q, mp);	/* pass it down the line */
 		break;
@@ -924,7 +922,7 @@ msrput(q, mp)
 			flushq(WR(q), FLUSHDATA);
 		if (*mp->b_rptr & FLUSHR)
 			flushq(q, FLUSHDATA);
-
+		/* FALLTHROUGH */
 	default:
 		putnext(q, mp);
 		return;

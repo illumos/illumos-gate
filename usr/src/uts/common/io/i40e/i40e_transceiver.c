@@ -12,6 +12,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #include "i40e_sw.h"
@@ -1043,75 +1044,65 @@ cleanup:
 }
 
 /*
- * Free all memory associated with all of the rings on this i40e instance. Note,
- * this is done as part of the GLDv3 stop routine.
+ * Free all memory associated with a ring. Note, this is done as part of
+ * the GLDv3 ring stop routine.
  */
 void
-i40e_free_ring_mem(i40e_t *i40e, boolean_t failed_init)
+i40e_free_ring_mem(i40e_trqpair_t *itrq, boolean_t failed_init)
 {
-	int i;
+	i40e_t *i40e = itrq->itrq_i40e;
+	i40e_rx_data_t *rxd = itrq->itrq_rxdata;
 
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
-		i40e_rx_data_t *rxd = i40e->i40e_trqpairs[i].itrq_rxdata;
+	/*
+	 * In some cases i40e_alloc_rx_data() may have failed
+	 * and in that case there is no rxd to free.
+	 */
+	if (rxd == NULL)
+		return;
 
-		/*
-		 * In some cases i40e_alloc_rx_data() may have failed
-		 * and in that case there is no rxd to free.
-		 */
-		if (rxd == NULL)
-			continue;
+	/*
+	 * Clean up our RX data. We have to free DMA resources first and
+	 * then if we have no more pending RCB's, then we'll go ahead
+	 * and clean things up. Note, we can't set the stopped flag on
+	 * the RX data until after we've done the first pass of the
+	 * pending resources. Otherwise we might race with
+	 * i40e_rx_recycle on determining who should free the
+	 * i40e_rx_data_t above.
+	 */
+	i40e_free_rx_dma(rxd, failed_init);
 
-		/*
-		 * Clean up our RX data. We have to free DMA resources first and
-		 * then if we have no more pending RCB's, then we'll go ahead
-		 * and clean things up. Note, we can't set the stopped flag on
-		 * the RX data until after we've done the first pass of the
-		 * pending resources. Otherwise we might race with
-		 * i40e_rx_recycle on determining who should free the
-		 * i40e_rx_data_t above.
-		 */
-		i40e_free_rx_dma(rxd, failed_init);
-
-		mutex_enter(&i40e->i40e_rx_pending_lock);
-		rxd->rxd_shutdown = B_TRUE;
-		if (rxd->rxd_rcb_pending == 0) {
-			i40e_free_rx_data(rxd);
-			i40e->i40e_trqpairs[i].itrq_rxdata = NULL;
-		}
-		mutex_exit(&i40e->i40e_rx_pending_lock);
-
-		i40e_free_tx_dma(&i40e->i40e_trqpairs[i]);
+	mutex_enter(&i40e->i40e_rx_pending_lock);
+	rxd->rxd_shutdown = B_TRUE;
+	if (rxd->rxd_rcb_pending == 0) {
+		i40e_free_rx_data(rxd);
+		itrq->itrq_rxdata = NULL;
 	}
+	mutex_exit(&i40e->i40e_rx_pending_lock);
+
+	i40e_free_tx_dma(itrq);
 }
 
 /*
- * Allocate all of the resources associated with all of the rings on this i40e
- * instance. Note this is done as part of the GLDv3 start routine and thus we
- * should not use blocking allocations. This takes care of both DMA and non-DMA
- * related resources.
+ * Allocate all of the resources associated with a ring.
+ * Note this is done as part of the GLDv3 ring start routine.
+ * This takes care of both DMA and non-DMA related resources.
  */
 boolean_t
-i40e_alloc_ring_mem(i40e_t *i40e)
+i40e_alloc_ring_mem(i40e_trqpair_t *itrq)
 {
-	int i;
+	if (!i40e_alloc_rx_data(itrq->itrq_i40e, itrq))
+		goto free;
 
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
-		if (i40e_alloc_rx_data(i40e, &i40e->i40e_trqpairs[i]) ==
-		    B_FALSE)
-			goto unwind;
+	if (!i40e_alloc_rx_dma(itrq->itrq_rxdata))
+		goto free;
 
-		if (i40e_alloc_rx_dma(i40e->i40e_trqpairs[i].itrq_rxdata) ==
-		    B_FALSE)
-			goto unwind;
-
-		if (i40e_alloc_tx_dma(&i40e->i40e_trqpairs[i]) == B_FALSE)
-			goto unwind;
-	}
+	if (!i40e_alloc_tx_dma(itrq))
+		goto free;
 
 	return (B_TRUE);
 
-unwind:
-	i40e_free_ring_mem(i40e, B_TRUE);
+free:
+	i40e_free_ring_mem(itrq, B_TRUE);
 	return (B_FALSE);
 }
 
@@ -2629,6 +2620,77 @@ fail:
 }
 
 /*
+ * Keep track of activity through the transmit data path.
+ *
+ * We need to ensure we don't try and transmit when a trqpair has been
+ * stopped, nor do we want to stop a trqpair whilst transmitting.
+ */
+static boolean_t
+i40e_ring_tx_enter(i40e_trqpair_t *itrq)
+{
+	boolean_t allow;
+
+	mutex_enter(&itrq->itrq_tx_lock);
+	allow = !itrq->itrq_tx_quiesce;
+	if (allow)
+		itrq->itrq_tx_active++;
+	mutex_exit(&itrq->itrq_tx_lock);
+
+	return (allow);
+}
+
+static void
+i40e_ring_tx_exit_nolock(i40e_trqpair_t *itrq)
+{
+	ASSERT(MUTEX_HELD(&itrq->itrq_tx_lock));
+
+	itrq->itrq_tx_active--;
+	if (itrq->itrq_tx_quiesce)
+		cv_signal(&itrq->itrq_tx_cv);
+}
+
+static void
+i40e_ring_tx_exit(i40e_trqpair_t *itrq)
+{
+	mutex_enter(&itrq->itrq_tx_lock);
+	i40e_ring_tx_exit_nolock(itrq);
+	mutex_exit(&itrq->itrq_tx_lock);
+}
+
+
+/*
+ * Tell the transmit path to quiesce and wait until there is no
+ * more activity.
+ * Will return B_TRUE if the transmit path is already quiesced, B_FALSE
+ * otherwise.
+ */
+boolean_t
+i40e_ring_tx_quiesce(i40e_trqpair_t *itrq)
+{
+	mutex_enter(&itrq->itrq_tx_lock);
+	if (itrq->itrq_tx_quiesce) {
+		/*
+		 * When itrq_tx_quiesce is set, then the ring has already
+		 * been shutdown.
+		 */
+		mutex_exit(&itrq->itrq_tx_lock);
+		return (B_TRUE);
+	}
+
+	/*
+	 * Tell any threads in transmit path this trqpair is quiesced and
+	 * wait until they've all exited the critical code path.
+	 */
+	itrq->itrq_tx_quiesce = B_TRUE;
+	while (itrq->itrq_tx_active > 0)
+		cv_wait(&itrq->itrq_tx_cv, &itrq->itrq_tx_lock);
+
+	mutex_exit(&itrq->itrq_tx_lock);
+
+	return (B_FALSE);
+}
+
+/*
  * We've been asked to send a message block on the wire. We'll only have a
  * single chain. There will not be any b_next pointers; however, there may be
  * multiple b_cont blocks. The number of b_cont blocks may exceed the
@@ -2667,7 +2729,8 @@ i40e_ring_tx(void *arg, mblk_t *mp)
 	    (i40e->i40e_state & I40E_OVERTEMP) ||
 	    (i40e->i40e_state & I40E_SUSPENDED) ||
 	    (i40e->i40e_state & I40E_ERROR) ||
-	    (i40e->i40e_link_state != LINK_STATE_UP)) {
+	    (i40e->i40e_link_state != LINK_STATE_UP) ||
+	    !i40e_ring_tx_enter(itrq)) {
 		freemsg(mp);
 		return (NULL);
 	}
@@ -2675,6 +2738,7 @@ i40e_ring_tx(void *arg, mblk_t *mp)
 	if (mac_ether_offload_info(mp, &meo) != 0) {
 		freemsg(mp);
 		itrq->itrq_txstat.itxs_hck_meoifail.value.ui64++;
+		i40e_ring_tx_exit(itrq);
 		return (NULL);
 	}
 
@@ -2686,6 +2750,7 @@ i40e_ring_tx(void *arg, mblk_t *mp)
 	if (i40e_tx_context(i40e, itrq, mp, &meo, &tctx) < 0) {
 		freemsg(mp);
 		itrq->itrq_txstat.itxs_err_context.value.ui64++;
+		i40e_ring_tx_exit(itrq);
 		return (NULL);
 	}
 	if (tctx.itc_ctx_cmdflags & I40E_TX_CTX_DESC_TSO) {
@@ -2827,6 +2892,8 @@ i40e_ring_tx(void *arg, mblk_t *mp)
 	txs->itxs_packets.value.ui64++;
 	txs->itxs_descriptors.value.ui64 += needed_desc;
 
+	i40e_ring_tx_exit_nolock(itrq);
+
 	mutex_exit(&itrq->itrq_tx_lock);
 
 	return (NULL);
@@ -2858,6 +2925,7 @@ txfail:
 	}
 
 	mutex_enter(&itrq->itrq_tx_lock);
+	i40e_ring_tx_exit_nolock(itrq);
 	itrq->itrq_tx_blocked = B_TRUE;
 	mutex_exit(&itrq->itrq_tx_lock);
 

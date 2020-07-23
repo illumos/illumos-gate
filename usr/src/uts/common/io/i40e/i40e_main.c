@@ -330,10 +330,11 @@
  *
  * 2) i40e_trqpair_t`itrq_rx_lock
  * 3) i40e_trqpair_t`itrq_tx_lock
- * 4) i40e_t`i40e_rx_pending_lock
- * 5) i40e_trqpair_t`itrq_tcb_lock
+ * 4) i40e_trqpair_t`itrq_intr_lock
+ * 5) i40e_t`i40e_rx_pending_lock
+ * 6) i40e_trqpair_t`itrq_tcb_lock
  *
- * 6) i40e_t`i40e_stat_lock
+ * 7) i40e_t`i40e_stat_lock
  *
  * Rules and expectations:
  *
@@ -351,6 +352,9 @@
  * 4) The following pairs of locks are not expected to be held at the same time:
  *
  * o i40e_t`i40e_rx_pending_lock and i40e_trqpair_t`itrq_tcb_lock
+ * o i40e_trqpair_t`itrq_intr_lock is not expected to be held with any
+ *   other lock except i40e_t`i40e_general_lock in mc_start(9E) and
+ *   mc_stop(9e).
  *
  * -----------
  * Future Work
@@ -1136,16 +1140,14 @@ i40e_free_trqpairs(i40e_t *i40e)
 	if (i40e->i40e_trqpairs != NULL) {
 		for (uint_t i = 0; i < i40e->i40e_num_trqpairs; i++) {
 			itrq = &i40e->i40e_trqpairs[i];
+			mutex_destroy(&itrq->itrq_intr_lock);
 			mutex_destroy(&itrq->itrq_rx_lock);
 			mutex_destroy(&itrq->itrq_tx_lock);
 			mutex_destroy(&itrq->itrq_tcb_lock);
+			cv_destroy(&itrq->itrq_intr_cv);
+			cv_destroy(&itrq->itrq_tx_cv);
 
-			/*
-			 * Should have already been cleaned up by start/stop,
-			 * etc.
-			 */
-			ASSERT(itrq->itrq_txkstat == NULL);
-			ASSERT(itrq->itrq_rxkstat == NULL);
+			i40e_stats_trqpair_fini(itrq);
 		}
 
 		kmem_free(i40e->i40e_trqpairs,
@@ -1181,10 +1183,26 @@ i40e_alloc_trqpairs(i40e_t *i40e)
 		i40e_trqpair_t *itrq = &i40e->i40e_trqpairs[i];
 
 		itrq->itrq_i40e = i40e;
+		mutex_init(&itrq->itrq_intr_lock, NULL, MUTEX_DRIVER, mutexpri);
 		mutex_init(&itrq->itrq_rx_lock, NULL, MUTEX_DRIVER, mutexpri);
 		mutex_init(&itrq->itrq_tx_lock, NULL, MUTEX_DRIVER, mutexpri);
 		mutex_init(&itrq->itrq_tcb_lock, NULL, MUTEX_DRIVER, mutexpri);
+		cv_init(&itrq->itrq_intr_cv, NULL, CV_DRIVER, NULL);
+		cv_init(&itrq->itrq_tx_cv, NULL, CV_DRIVER, NULL);
 		itrq->itrq_index = i;
+		itrq->itrq_intr_quiesce = B_TRUE;
+		itrq->itrq_tx_quiesce = B_TRUE;
+	}
+
+	for (uint_t i = 0; i < i40e->i40e_num_trqpairs; i++) {
+		/*
+		 * Keeping this in a separate iteration makes the
+		 * clean up path safe.
+		 */
+		if (!i40e_stats_trqpair_init(&i40e->i40e_trqpairs[i])) {
+			i40e_free_trqpairs(i40e);
+			return (B_FALSE);
+		}
 	}
 
 	i40e->i40e_rx_groups = kmem_zalloc(sizeof (i40e_rx_group_t) *
@@ -2565,161 +2583,180 @@ i40e_chip_start(i40e_t *i40e)
  * Take care of tearing down the rx ring. See 8.3.3.1.2 for more information.
  */
 static void
-i40e_shutdown_rx_rings(i40e_t *i40e)
+i40e_shutdown_rx_ring(i40e_trqpair_t *itrq)
 {
-	int i;
+	i40e_t *i40e = itrq->itrq_i40e;
+	i40e_hw_t *hw = &i40e->i40e_hw_space;
 	uint32_t reg;
 
-	i40e_hw_t *hw = &i40e->i40e_hw_space;
-
 	/*
-	 * Step 1. The interrupt linked list (see i40e_intr.c for more
-	 * information) should have already been cleared before calling this
-	 * function.
+	 * Step 1. 8.3.3.1.2 suggests the interrupt is removed from the
+	 * hardware interrupt linked list (see i40e_intr.c) but for
+	 * simplicity we keep this list immutable until the device
+	 * (distinct from an individual ring) is stopped.
 	 */
-#ifdef	DEBUG
-	if (i40e->i40e_intr_type == DDI_INTR_TYPE_MSIX) {
-		for (i = 1; i < i40e->i40e_intr_count; i++) {
-			reg = I40E_READ_REG(hw, I40E_PFINT_LNKLSTN(i - 1));
-			VERIFY3U(reg, ==, I40E_QUEUE_TYPE_EOL);
-		}
-	} else {
-		reg = I40E_READ_REG(hw, I40E_PFINT_LNKLST0);
-		VERIFY3U(reg, ==, I40E_QUEUE_TYPE_EOL);
-	}
-
-#endif	/* DEBUG */
-
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
-		/*
-		 * Step 1. Request the queue by clearing QENA_REQ. It may not be
-		 * set due to unwinding from failures and a partially enabled
-		 * ring set.
-		 */
-		reg = I40E_READ_REG(hw, I40E_QRX_ENA(i));
-		if (!(reg & I40E_QRX_ENA_QENA_REQ_MASK))
-			continue;
-		VERIFY((reg & I40E_QRX_ENA_QENA_REQ_MASK) ==
-		    I40E_QRX_ENA_QENA_REQ_MASK);
-		reg &= ~I40E_QRX_ENA_QENA_REQ_MASK;
-		I40E_WRITE_REG(hw, I40E_QRX_ENA(i), reg);
-	}
 
 	/*
-	 * Step 2. Wait for the disable to take, by having QENA_STAT in the FPM
+	 * Step 2. Request the queue by clearing QENA_REQ. It may not be
+	 * set due to unwinding from failures and a partially enabled
+	 * ring set.
+	 */
+	reg = I40E_READ_REG(hw, I40E_QRX_ENA(itrq->itrq_index));
+	if (!(reg & I40E_QRX_ENA_QENA_REQ_MASK))
+		return;
+	VERIFY((reg & I40E_QRX_ENA_QENA_REQ_MASK) ==
+	    I40E_QRX_ENA_QENA_REQ_MASK);
+	reg &= ~I40E_QRX_ENA_QENA_REQ_MASK;
+	I40E_WRITE_REG(hw, I40E_QRX_ENA(itrq->itrq_index), reg);
+
+	/*
+	 * Step 3. Wait for the disable to take, by having QENA_STAT in the FPM
 	 * be cleared. Note that we could still receive data in the queue during
 	 * this time. We don't actually wait for this now and instead defer this
-	 * to i40e_shutdown_rings_wait(), after we've interleaved disabling the
-	 * TX queues as well.
+	 * to i40e_shutdown_ring_wait(), after we've interleaved disabling the
+	 * TX queue as well.
 	 */
 }
 
 static void
-i40e_shutdown_tx_rings(i40e_t *i40e)
+i40e_shutdown_tx_ring(i40e_trqpair_t *itrq)
 {
-	int i;
+	i40e_t *i40e = itrq->itrq_i40e;
+	i40e_hw_t *hw = &i40e->i40e_hw_space;
 	uint32_t reg;
 
-	i40e_hw_t *hw = &i40e->i40e_hw_space;
-
 	/*
-	 * Step 1. The interrupt linked list should already have been cleared.
+	 * Step 2. Set the SET_QDIS flag for the queue.
 	 */
-#ifdef DEBUG
-	if (i40e->i40e_intr_type == DDI_INTR_TYPE_MSIX) {
-		for (i = 1; i < i40e->i40e_intr_count; i++) {
-			reg = I40E_READ_REG(hw, I40E_PFINT_LNKLSTN(i - 1));
-			VERIFY3U(reg, ==, I40E_QUEUE_TYPE_EOL);
-		}
-	} else {
-		reg = I40E_READ_REG(hw, I40E_PFINT_LNKLST0);
-		VERIFY3U(reg, ==, I40E_QUEUE_TYPE_EOL);
-
-	}
-#endif	/* DEBUG */
-
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
-		/*
-		 * Step 2. Set the SET_QDIS flag for every queue.
-		 */
-		i40e_pre_tx_queue_cfg(hw, i, B_FALSE);
-	}
+	i40e_pre_tx_queue_cfg(hw, itrq->itrq_index, B_FALSE);
 
 	/*
-	 * Step 3. Wait at least 400 usec (can be done once for all queues).
+	 * Step 3. Wait at least 400 usec.
 	 */
 	drv_usecwait(500);
 
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
-		/*
-		 * Step 4. Clear the QENA_REQ flag which tells hardware to
-		 * quiesce. If QENA_REQ is not already set then that means that
-		 * we likely already tried to disable this queue.
-		 */
-		reg = I40E_READ_REG(hw, I40E_QTX_ENA(i));
-		if (!(reg & I40E_QTX_ENA_QENA_REQ_MASK))
-			continue;
+	/*
+	 * Step 4. Clear the QENA_REQ flag which tells hardware to
+	 * quiesce. If QENA_REQ is not already set then that means that
+	 * we likely already tried to disable this queue.
+	 */
+	reg = I40E_READ_REG(hw, I40E_QTX_ENA(itrq->itrq_index));
+	if ((reg & I40E_QTX_ENA_QENA_REQ_MASK) != 0) {
 		reg &= ~I40E_QTX_ENA_QENA_REQ_MASK;
-		I40E_WRITE_REG(hw, I40E_QTX_ENA(i), reg);
+		I40E_WRITE_REG(hw, I40E_QTX_ENA(itrq->itrq_index), reg);
 	}
 
 	/*
-	 * Step 5. Wait for all drains to finish. This will be done by the
+	 * Step 5. Wait for the drain to finish. This will be done by the
 	 * hardware removing the QENA_STAT flag from the queue. Rather than
-	 * waiting here, we interleave it with all the others in
-	 * i40e_shutdown_rings_wait().
+	 * waiting here, we interleave it with the receive shutdown in
+	 * i40e_shutdown_ring_wait().
 	 */
 }
 
 /*
- * Wait for all the rings to be shut down. e.g. Steps 2 and 5 from the above
+ * Wait for a ring to be shut down. e.g. Steps 2 and 5 from the above
  * functions.
  */
 static boolean_t
-i40e_shutdown_rings_wait(i40e_t *i40e)
+i40e_shutdown_ring_wait(i40e_trqpair_t *itrq)
 {
-	int i, try;
+	i40e_t *i40e = itrq->itrq_i40e;
 	i40e_hw_t *hw = &i40e->i40e_hw_space;
+	uint32_t reg;
+	int try;
 
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
-		uint32_t reg;
+	for (try = 0; try < I40E_RING_WAIT_NTRIES; try++) {
+		reg = I40E_READ_REG(hw, I40E_QRX_ENA(itrq->itrq_index));
+		if ((reg & I40E_QRX_ENA_QENA_STAT_MASK) == 0)
+			break;
+		i40e_msec_delay(I40E_RING_WAIT_PAUSE);
+	}
 
-		for (try = 0; try < I40E_RING_WAIT_NTRIES; try++) {
-			reg = I40E_READ_REG(hw, I40E_QRX_ENA(i));
-			if ((reg & I40E_QRX_ENA_QENA_STAT_MASK) == 0)
-				break;
-			i40e_msec_delay(I40E_RING_WAIT_PAUSE);
-		}
+	if ((reg & I40E_QRX_ENA_QENA_STAT_MASK) != 0) {
+		i40e_error(i40e, "timed out disabling rx queue %d",
+		    itrq->itrq_index);
+		return (B_FALSE);
+	}
 
-		if ((reg & I40E_QRX_ENA_QENA_STAT_MASK) != 0) {
-			i40e_error(i40e, "timed out disabling rx queue %d",
-			    i);
-			return (B_FALSE);
-		}
+	for (try = 0; try < I40E_RING_WAIT_NTRIES; try++) {
+		reg = I40E_READ_REG(hw, I40E_QTX_ENA(itrq->itrq_index));
+		if ((reg & I40E_QTX_ENA_QENA_STAT_MASK) == 0)
+			break;
+		i40e_msec_delay(I40E_RING_WAIT_PAUSE);
+	}
 
-		for (try = 0; try < I40E_RING_WAIT_NTRIES; try++) {
-			reg = I40E_READ_REG(hw, I40E_QTX_ENA(i));
-			if ((reg & I40E_QTX_ENA_QENA_STAT_MASK) == 0)
-				break;
-			i40e_msec_delay(I40E_RING_WAIT_PAUSE);
-		}
-
-		if ((reg & I40E_QTX_ENA_QENA_STAT_MASK) != 0) {
-			i40e_error(i40e, "timed out disabling tx queue %d",
-			    i);
-			return (B_FALSE);
-		}
+	if ((reg & I40E_QTX_ENA_QENA_STAT_MASK) != 0) {
+		i40e_error(i40e, "timed out disabling tx queue %d",
+		    itrq->itrq_index);
+		return (B_FALSE);
 	}
 
 	return (B_TRUE);
 }
 
+
+/*
+ * Shutdown an individual ring and release any memory.
+ */
+boolean_t
+i40e_shutdown_ring(i40e_trqpair_t *itrq)
+{
+	boolean_t rv = B_TRUE;
+
+	/*
+	 * Tell transmit path to quiesce, and wait until done.
+	 */
+	if (i40e_ring_tx_quiesce(itrq)) {
+		/* Already quiesced. */
+		return (B_TRUE);
+	}
+
+	i40e_shutdown_rx_ring(itrq);
+	i40e_shutdown_tx_ring(itrq);
+	if (!i40e_shutdown_ring_wait(itrq))
+		rv = B_FALSE;
+
+	/*
+	 * After the ring has stopped, we need to wait 50ms before
+	 * programming it again. Rather than wait here, we'll record
+	 * the time the ring was stopped. When the ring is started, we'll
+	 * check if enough time has expired and then wait if necessary.
+	 */
+	itrq->irtq_time_stopped = gethrtime();
+
+	/*
+	 * The rings have been stopped in the hardware, now wait for
+	 * a possibly active interrupt thread.
+	 */
+	i40e_intr_quiesce(itrq);
+
+	mutex_enter(&itrq->itrq_tx_lock);
+	i40e_tx_cleanup_ring(itrq);
+	mutex_exit(&itrq->itrq_tx_lock);
+
+	i40e_free_ring_mem(itrq, B_FALSE);
+
+	return (rv);
+}
+
+/*
+ * Shutdown all the rings.
+ * Called from i40e_stop(), and hopefully the mac layer has already
+ * called ring stop for each ring, which would make this almost a no-op.
+ */
 static boolean_t
 i40e_shutdown_rings(i40e_t *i40e)
 {
-	i40e_shutdown_rx_rings(i40e);
-	i40e_shutdown_tx_rings(i40e);
-	return (i40e_shutdown_rings_wait(i40e));
+	boolean_t rv = B_TRUE;
+	int i;
+
+	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
+		if (!i40e_shutdown_ring(&i40e->i40e_trqpairs[i]))
+			rv = B_FALSE;
+	}
+
+	return (rv);
 }
 
 static void
@@ -2797,74 +2834,64 @@ i40e_setup_rx_hmc(i40e_trqpair_t *itrq)
 }
 
 /*
- * Take care of setting up the descriptor rings and actually programming the
+ * Take care of setting up the descriptor ring and actually programming the
  * device. See 8.3.3.1.1 for the full list of steps we need to do to enable the
  * rx rings.
  */
 static boolean_t
-i40e_setup_rx_rings(i40e_t *i40e)
+i40e_setup_rx_ring(i40e_trqpair_t *itrq)
 {
-	int i;
+	i40e_t *i40e = itrq->itrq_i40e;
 	i40e_hw_t *hw = &i40e->i40e_hw_space;
-
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
-		i40e_trqpair_t *itrq = &i40e->i40e_trqpairs[i];
-		i40e_rx_data_t *rxd = itrq->itrq_rxdata;
-		uint32_t reg;
-
-		/*
-		 * Step 1. Program all receive ring descriptors.
-		 */
-		i40e_setup_rx_descs(itrq);
-
-		/*
-		 * Step 2. Program the queue's FPM/HMC context.
-		 */
-		if (i40e_setup_rx_hmc(itrq) == B_FALSE)
-			return (B_FALSE);
-
-		/*
-		 * Step 3. Clear the queue's tail pointer and set it to the end
-		 * of the space.
-		 */
-		I40E_WRITE_REG(hw, I40E_QRX_TAIL(i), 0);
-		I40E_WRITE_REG(hw, I40E_QRX_TAIL(i), rxd->rxd_ring_size - 1);
-
-		/*
-		 * Step 4. Enable the queue via the QENA_REQ.
-		 */
-		reg = I40E_READ_REG(hw, I40E_QRX_ENA(i));
-		VERIFY0(reg & (I40E_QRX_ENA_QENA_REQ_MASK |
-		    I40E_QRX_ENA_QENA_STAT_MASK));
-		reg |= I40E_QRX_ENA_QENA_REQ_MASK;
-		I40E_WRITE_REG(hw, I40E_QRX_ENA(i), reg);
-	}
+	i40e_rx_data_t *rxd = itrq->itrq_rxdata;
+	uint32_t reg;
+	int i;
 
 	/*
-	 * Note, we wait for every queue to be enabled before we start checking.
-	 * This will hopefully cause most queues to be enabled at this point.
+	 * Step 1. Program all receive ring descriptors.
 	 */
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
-		uint32_t j, reg;
+	i40e_setup_rx_descs(itrq);
 
-		/*
-		 * Step 5. Verify that QENA_STAT has been set. It's promised
-		 * that this should occur within about 10 us, but like other
-		 * systems, we give the card a bit more time.
-		 */
-		for (j = 0; j < I40E_RING_WAIT_NTRIES; j++) {
-			reg = I40E_READ_REG(hw, I40E_QRX_ENA(i));
+	/*
+	 * Step 2. Program the queue's FPM/HMC context.
+	 */
+	if (!i40e_setup_rx_hmc(itrq))
+		return (B_FALSE);
 
-			if (reg & I40E_QRX_ENA_QENA_STAT_MASK)
-				break;
-			i40e_msec_delay(I40E_RING_WAIT_PAUSE);
-		}
+	/*
+	 * Step 3. Clear the queue's tail pointer and set it to the end
+	 * of the space.
+	 */
+	I40E_WRITE_REG(hw, I40E_QRX_TAIL(itrq->itrq_index), 0);
+	I40E_WRITE_REG(hw, I40E_QRX_TAIL(itrq->itrq_index),
+	    rxd->rxd_ring_size - 1);
 
-		if ((reg & I40E_QRX_ENA_QENA_STAT_MASK) == 0) {
-			i40e_error(i40e, "failed to enable rx queue %d, timed "
-			    "out.", i);
-			return (B_FALSE);
-		}
+	/*
+	 * Step 4. Enable the queue via the QENA_REQ.
+	 */
+	reg = I40E_READ_REG(hw, I40E_QRX_ENA(itrq->itrq_index));
+	VERIFY0(reg & (I40E_QRX_ENA_QENA_REQ_MASK |
+	    I40E_QRX_ENA_QENA_STAT_MASK));
+	reg |= I40E_QRX_ENA_QENA_REQ_MASK;
+	I40E_WRITE_REG(hw, I40E_QRX_ENA(itrq->itrq_index), reg);
+
+	/*
+	 * Step 5. Verify that QENA_STAT has been set. It's promised
+	 * that this should occur within about 10 us, but like other
+	 * systems, we give the card a bit more time.
+	 */
+	for (i = 0; i < I40E_RING_WAIT_NTRIES; i++) {
+		reg = I40E_READ_REG(hw, I40E_QRX_ENA(itrq->itrq_index));
+
+		if (reg & I40E_QRX_ENA_QENA_STAT_MASK)
+			break;
+		i40e_msec_delay(I40E_RING_WAIT_PAUSE);
+	}
+
+	if ((reg & I40E_QRX_ENA_QENA_STAT_MASK) == 0) {
+		i40e_error(i40e, "failed to enable rx queue %d, timed "
+		    "out.", itrq->itrq_index);
+		return (B_FALSE);
 	}
 
 	return (B_TRUE);
@@ -2938,82 +2965,120 @@ i40e_setup_tx_hmc(i40e_trqpair_t *itrq)
 }
 
 /*
- * Take care of setting up the descriptor rings and actually programming the
+ * Take care of setting up the descriptor ring and actually programming the
  * device. See 8.4.3.1.1 for what we need to do here.
  */
 static boolean_t
-i40e_setup_tx_rings(i40e_t *i40e)
+i40e_setup_tx_ring(i40e_trqpair_t *itrq)
 {
-	int i;
+	i40e_t *i40e = itrq->itrq_i40e;
 	i40e_hw_t *hw = &i40e->i40e_hw_space;
-
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
-		i40e_trqpair_t *itrq = &i40e->i40e_trqpairs[i];
-		uint32_t reg;
-
-		/*
-		 * Step 1. Clear the queue disable flag and verify that the
-		 * index is set correctly.
-		 */
-		i40e_pre_tx_queue_cfg(hw, i, B_TRUE);
-
-		/*
-		 * Step 2. Prepare the queue's FPM/HMC context.
-		 */
-		if (i40e_setup_tx_hmc(itrq) == B_FALSE)
-			return (B_FALSE);
-
-		/*
-		 * Step 3. Verify that it's clear that this PF owns this queue.
-		 */
-		reg = I40E_QTX_CTL_PF_QUEUE;
-		reg |= (hw->pf_id << I40E_QTX_CTL_PF_INDX_SHIFT) &
-		    I40E_QTX_CTL_PF_INDX_MASK;
-		I40E_WRITE_REG(hw, I40E_QTX_CTL(itrq->itrq_index), reg);
-		i40e_flush(hw);
-
-		/*
-		 * Step 4. Set the QENA_REQ flag.
-		 */
-		reg = I40E_READ_REG(hw, I40E_QTX_ENA(i));
-		VERIFY0(reg & (I40E_QTX_ENA_QENA_REQ_MASK |
-		    I40E_QTX_ENA_QENA_STAT_MASK));
-		reg |= I40E_QTX_ENA_QENA_REQ_MASK;
-		I40E_WRITE_REG(hw, I40E_QTX_ENA(i), reg);
-	}
+	uint32_t reg;
+	int i;
 
 	/*
-	 * Note, we wait for every queue to be enabled before we start checking.
-	 * This will hopefully cause most queues to be enabled at this point.
+	 * Step 1. Clear the queue disable flag and verify that the
+	 * index is set correctly.
 	 */
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
-		uint32_t j, reg;
+	i40e_pre_tx_queue_cfg(hw, itrq->itrq_index, B_TRUE);
 
-		/*
-		 * Step 5. Verify that QENA_STAT has been set. It's promised
-		 * that this should occur within about 10 us, but like BSD,
-		 * we'll try for up to 100 ms for this queue.
-		 */
-		for (j = 0; j < I40E_RING_WAIT_NTRIES; j++) {
-			reg = I40E_READ_REG(hw, I40E_QTX_ENA(i));
+	/*
+	 * Step 2. Prepare the queue's FPM/HMC context.
+	 */
+	if (!i40e_setup_tx_hmc(itrq))
+		return (B_FALSE);
 
-			if (reg & I40E_QTX_ENA_QENA_STAT_MASK)
-				break;
-			i40e_msec_delay(I40E_RING_WAIT_PAUSE);
-		}
+	/*
+	 * Step 3. Verify that it's clear that this PF owns this queue.
+	 */
+	reg = I40E_QTX_CTL_PF_QUEUE;
+	reg |= (hw->pf_id << I40E_QTX_CTL_PF_INDX_SHIFT) &
+	    I40E_QTX_CTL_PF_INDX_MASK;
+	I40E_WRITE_REG(hw, I40E_QTX_CTL(itrq->itrq_index), reg);
+	i40e_flush(hw);
 
-		if ((reg & I40E_QTX_ENA_QENA_STAT_MASK) == 0) {
-			i40e_error(i40e, "failed to enable tx queue %d, timed "
-			    "out", i);
-			return (B_FALSE);
-		}
+	/*
+	 * Step 4. Set the QENA_REQ flag.
+	 */
+	reg = I40E_READ_REG(hw, I40E_QTX_ENA(itrq->itrq_index));
+	VERIFY0(reg & (I40E_QTX_ENA_QENA_REQ_MASK |
+	    I40E_QTX_ENA_QENA_STAT_MASK));
+	reg |= I40E_QTX_ENA_QENA_REQ_MASK;
+	I40E_WRITE_REG(hw, I40E_QTX_ENA(itrq->itrq_index), reg);
+
+	/*
+	 * Step 5. Verify that QENA_STAT has been set. It's promised
+	 * that this should occur within about 10 us, but like BSD,
+	 * we'll try for up to 100 ms for this queue.
+	 */
+	for (i = 0; i < I40E_RING_WAIT_NTRIES; i++) {
+		reg = I40E_READ_REG(hw, I40E_QTX_ENA(itrq->itrq_index));
+
+		if (reg & I40E_QTX_ENA_QENA_STAT_MASK)
+			break;
+		i40e_msec_delay(I40E_RING_WAIT_PAUSE);
+	}
+
+	if ((reg & I40E_QTX_ENA_QENA_STAT_MASK) == 0) {
+		i40e_error(i40e, "failed to enable tx queue %d, timed "
+		    "out", itrq->itrq_index);
+		return (B_FALSE);
 	}
 
 	return (B_TRUE);
 }
 
+int
+i40e_setup_ring(i40e_trqpair_t *itrq)
+{
+	i40e_t *i40e = itrq->itrq_i40e;
+	hrtime_t now, gap;
+
+	if (!i40e_alloc_ring_mem(itrq)) {
+		i40e_error(i40e, "Failed to allocate ring memory");
+		return (ENOMEM);
+	}
+
+	/*
+	 * 8.3.3.1.1 Receive Queue Enable Flow states software should
+	 * wait at least 50ms between ring disable and enable. See how
+	 * long we need to wait, and wait only if required.
+	 */
+	now = gethrtime();
+	gap = NSEC2MSEC(now - itrq->irtq_time_stopped);
+	if (gap < I40E_RING_ENABLE_GAP && gap != 0)
+		delay(drv_usectohz(gap * 1000));
+
+	mutex_enter(&itrq->itrq_intr_lock);
+	if (!i40e_setup_rx_ring(itrq))
+		goto failed;
+
+	if (!i40e_setup_tx_ring(itrq))
+		goto failed;
+
+	if (i40e_check_acc_handle(i40e->i40e_osdep_space.ios_reg_handle) !=
+	    DDI_FM_OK)
+		goto failed;
+
+	itrq->itrq_intr_quiesce = B_FALSE;
+	mutex_exit(&itrq->itrq_intr_lock);
+
+	mutex_enter(&itrq->itrq_tx_lock);
+	itrq->itrq_tx_quiesce = B_FALSE;
+	mutex_exit(&itrq->itrq_tx_lock);
+
+	return (0);
+
+failed:
+	mutex_exit(&itrq->itrq_intr_lock);
+	i40e_free_ring_mem(itrq, B_TRUE);
+	ddi_fm_service_impact(i40e->i40e_dip, DDI_SERVICE_LOST);
+
+	return (EIO);
+}
+
 void
-i40e_stop(i40e_t *i40e, boolean_t free_allocations)
+i40e_stop(i40e_t *i40e)
 {
 	uint_t i;
 	i40e_hw_t *hw = &i40e->i40e_hw_space;
@@ -3046,11 +3111,8 @@ i40e_stop(i40e_t *i40e, boolean_t free_allocations)
 	i40e_intr_io_disable_all(i40e);
 	i40e_intr_io_clear_cause(i40e);
 
-	if (i40e_shutdown_rings(i40e) == B_FALSE) {
+	if (!i40e_shutdown_rings(i40e))
 		ddi_fm_service_impact(i40e->i40e_dip, DDI_SERVICE_LOST);
-	}
-
-	delay(50 * drv_usectohz(1000));
 
 	/*
 	 * We don't delete the default VSI because it replaces the VEB
@@ -3075,31 +3137,9 @@ i40e_stop(i40e_t *i40e, boolean_t free_allocations)
 
 	i40e_intr_chip_fini(i40e);
 
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
-		mutex_enter(&i40e->i40e_trqpairs[i].itrq_rx_lock);
-		mutex_enter(&i40e->i40e_trqpairs[i].itrq_tx_lock);
-	}
-
-	/*
-	 * We should consider refactoring this to be part of the ring start /
-	 * stop routines at some point.
-	 */
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
-		i40e_stats_trqpair_fini(&i40e->i40e_trqpairs[i]);
-	}
-
 	if (i40e_check_acc_handle(i40e->i40e_osdep_space.ios_cfg_handle) !=
 	    DDI_FM_OK) {
 		ddi_fm_service_impact(i40e->i40e_dip, DDI_SERVICE_LOST);
-	}
-
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
-		i40e_tx_cleanup_ring(&i40e->i40e_trqpairs[i]);
-	}
-
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
-		mutex_exit(&i40e->i40e_trqpairs[i].itrq_rx_lock);
-		mutex_exit(&i40e->i40e_trqpairs[i].itrq_tx_lock);
 	}
 
 	for (i = 0; i < i40e->i40e_num_rx_groups; i++) {
@@ -3109,58 +3149,19 @@ i40e_stop(i40e_t *i40e, boolean_t free_allocations)
 	i40e->i40e_link_speed = 0;
 	i40e->i40e_link_duplex = 0;
 	i40e_link_state_set(i40e, LINK_STATE_UNKNOWN);
-
-	if (free_allocations) {
-		i40e_free_ring_mem(i40e, B_FALSE);
-	}
 }
 
 boolean_t
-i40e_start(i40e_t *i40e, boolean_t alloc)
+i40e_start(i40e_t *i40e)
 {
 	i40e_hw_t *hw = &i40e->i40e_hw_space;
 	boolean_t rc = B_TRUE;
-	int i, err;
+	int err;
 
 	ASSERT(MUTEX_HELD(&i40e->i40e_general_lock));
 
-	if (alloc) {
-		if (i40e_alloc_ring_mem(i40e) == B_FALSE) {
-			i40e_error(i40e,
-			    "Failed to allocate ring memory");
-			return (B_FALSE);
-		}
-	}
-
-	/*
-	 * This should get refactored to be part of ring start and stop at
-	 * some point, along with most of the logic here.
-	 */
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
-		if (i40e_stats_trqpair_init(&i40e->i40e_trqpairs[i]) ==
-		    B_FALSE) {
-			int j;
-
-			for (j = 0; j < i; j++) {
-				i40e_trqpair_t *itrq = &i40e->i40e_trqpairs[j];
-				i40e_stats_trqpair_fini(itrq);
-			}
-			return (B_FALSE);
-		}
-	}
-
 	if (!i40e_chip_start(i40e)) {
 		i40e_fm_ereport(i40e, DDI_FM_DEVICE_INVAL_STATE);
-		rc = B_FALSE;
-		goto done;
-	}
-
-	if (i40e_setup_rx_rings(i40e) == B_FALSE) {
-		rc = B_FALSE;
-		goto done;
-	}
-
-	if (i40e_setup_tx_rings(i40e) == B_FALSE) {
 		rc = B_FALSE;
 		goto done;
 	}
@@ -3201,10 +3202,7 @@ i40e_start(i40e_t *i40e, boolean_t alloc)
 
 done:
 	if (rc == B_FALSE) {
-		i40e_stop(i40e, B_FALSE);
-		if (alloc == B_TRUE) {
-			i40e_free_ring_mem(i40e, B_TRUE);
-		}
+		i40e_stop(i40e);
 		ddi_fm_service_impact(i40e->i40e_dip, DDI_SERVICE_LOST);
 	}
 
@@ -3510,7 +3508,7 @@ static struct dev_ops i40e_dev_ops = {
 	nodev,			/* devo_reset */
 	&i40e_cb_ops,		/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
-	ddi_power,		/* devo_power */
+	nulldev,		/* devo_power */
 	ddi_quiesce_not_supported /* devo_quiesce */
 };
 
