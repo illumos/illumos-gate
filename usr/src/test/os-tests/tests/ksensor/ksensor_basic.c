@@ -26,66 +26,101 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/sysmacros.h>
 
-static const char *ksensor_path = "/dev/sensors/test/test.temp.0.1";
+typedef struct sensor_test {
+	const char *st_path;
+	uint64_t st_kind;
+	uint32_t st_unit;
+	int32_t st_gran;
+	uint32_t st_prec;
+	int64_t st_val;
+} sensor_test_t;
+
+/*
+ * These values come from the dummy sensors in the ksensor_test driver.
+ */
+static sensor_test_t ksensor_basic_tests[] = {
+	{ "/dev/sensors/test/test.temp.0.1", SENSOR_KIND_TEMPERATURE,
+	    SENSOR_UNIT_CELSIUS, 4, -2, 23 },
+	{ "/dev/sensors/test/test.volt.0.1", SENSOR_KIND_VOLTAGE,
+	    SENSOR_UNIT_VOLTS, 1000, 0, 3300 },
+	{ "/dev/sensors/test/test.current.0.1", SENSOR_KIND_CURRENT,
+	    SENSOR_UNIT_AMPS, 10, 0, 5 },
+};
+
+static boolean_t
+ksensor_basic(sensor_test_t *st)
+{
+	sensor_ioctl_kind_t kind;
+	sensor_ioctl_scalar_t scalar;
+	int fd;
+
+	fd = open(st->st_path, O_RDONLY);
+	if (fd < 0) {
+		warn("TEST FAILED: failed to open %s", st->st_path);
+		return (B_FALSE);
+	}
+
+	arc4random_buf(&kind, sizeof (kind));
+	arc4random_buf(&scalar, sizeof (scalar));
+
+	if (ioctl(fd, SENSOR_IOCTL_KIND, &kind) != 0) {
+		warn("TEST FAILED: %s: failed to get sensor kind", st->st_path);
+		goto err;
+	}
+
+	if (kind.sik_kind != st->st_kind) {
+		warnx("TEST FAILED: %s: expected kind %" PRIu64 ", found kind %"
+		    PRIu64, st->st_path, st->st_kind, kind);
+		goto err;
+	}
+
+	if (ioctl(fd, SENSOR_IOCTL_SCALAR, &scalar) != 0) {
+		warn("TEST FAILED: %s: failed to read sensor", st->st_path);
+		goto err;
+	}
+
+	if (scalar.sis_unit != st->st_unit) {
+		warnx("TEST FAILED: %s: expected unit %" PRIu32 ", but found "
+		    "%" PRIu32, st->st_path, st->st_unit, scalar.sis_unit);
+		goto err;
+	}
+
+	if (scalar.sis_gran != st->st_gran) {
+		warnx("TEST FAILED: %s: expected gran %" PRId32 ", but found "
+		    "%" PRId32, st->st_path, st->st_gran, scalar.sis_gran);
+		goto err;
+	}
+
+	if (scalar.sis_prec != st->st_prec) {
+		warnx("TEST FAILED: %s: expected prec %" PRIu32 ", but found "
+		    "%" PRIu32, st->st_path, st->st_prec, scalar.sis_prec);
+		goto err;
+	}
+
+	if (scalar.sis_value != st->st_val) {
+		warnx("TEST FAILED: %s: expected value %" PRId64 ", but found "
+		    "%" PRId64, st->st_path, st->st_val, scalar.sis_value);
+		goto err;
+	}
+
+	return (B_TRUE);
+err:
+	(void) close(fd);
+	return (B_FALSE);
+}
 
 int
 main(void)
 {
-	sensor_ioctl_kind_t kind;
-	sensor_ioctl_temperature_t temp;
-	int ret = 0;
+	size_t i;
+	int ret = EXIT_SUCCESS;
 
-	int fd = open(ksensor_path, O_RDONLY);
-	if (fd < 0) {
-		err(EXIT_FAILURE, "TEST FAILED: failed to open %s",
-		    ksensor_path);
-	}
-
-	arc4random_buf(&kind, sizeof (kind));
-	arc4random_buf(&temp, sizeof (temp));
-
-	if (ioctl(fd, SENSOR_IOCTL_TYPE, &kind) != 0) {
-		warn("TEST FAILED: failed to get sensor type");
-		ret = EXIT_FAILURE;
-	}
-
-	if (kind.sik_kind != SENSOR_KIND_TEMPERATURE) {
-		warnx("TEST FAILED: expected temperature sensor, found kind %d",
-		    kind);
-		ret = EXIT_FAILURE;
-	}
-
-	if (ioctl(fd, SENSOR_IOCTL_TEMPERATURE, &temp) != 0) {
-		warn("TEST FAILED: failed to get sensor temperature");
-		ret = EXIT_FAILURE;
-	}
-
-	/*
-	 * These values come from the dummy temperature sensor in ksensor_test.
-	 */
-	if (temp.sit_unit != SENSOR_UNIT_CELSIUS) {
-		warnx("TEST FAILED: expected temp unit %" PRIu32 ", but found "
-		    "%" PRIu32, SENSOR_UNIT_CELSIUS, temp.sit_unit);
-		ret = EXIT_FAILURE;
-	}
-
-	if (temp.sit_gran != 4) {
-		warnx("TEST FAILED: expected temp gran %" PRId32 ", but found "
-		    "%" PRId32, 4, temp.sit_gran);
-		ret = EXIT_FAILURE;
-	}
-
-	if (temp.sit_prec != -2) {
-		warnx("TEST FAILED: expected temp prec %" PRId32 ", but found "
-		    "%" PRId32, -2, temp.sit_prec);
-		ret = EXIT_FAILURE;
-	}
-
-	if (temp.sit_temp != 23) {
-		warnx("TEST FAILED: expected temp %" PRId64 ", but found "
-		    "%" PRId64, 23, temp.sit_temp);
-		ret = EXIT_FAILURE;
+	for (i = 0; i < ARRAY_SIZE(ksensor_basic_tests); i++) {
+		if (!ksensor_basic(&ksensor_basic_tests[i])) {
+			ret = EXIT_FAILURE;
+		}
 	}
 
 	return (ret);

@@ -58,7 +58,7 @@ main(int argc, const char *argv[])
 		char buf[PATH_MAX];
 		uint32_t sens, inst;
 		struct timespec ts;
-		sensor_ioctl_temperature_t temp;
+		sensor_ioctl_scalar_t scalar;
 
 		/* 0s based */
 		sens = arc4random_uniform(nsensors);
@@ -73,15 +73,15 @@ main(int argc, const char *argv[])
 			goto wait;
 		}
 
-		bzero(&temp, sizeof (temp));
-		if (ioctl(fd, SENSOR_IOCTL_TEMPERATURE, &temp) != 0) {
-			warn("failed to get sensor temp on %s", buf);
+		bzero(&scalar, sizeof (scalar));
+		if (ioctl(fd, SENSOR_IOCTL_SCALAR, &scalar) != 0) {
+			warn("failed to get sensor temperature on %s", buf);
 		}
 
-		if (temp.sit_unit != SENSOR_UNIT_CELSIUS) {
+		if (scalar.sis_unit != SENSOR_UNIT_CELSIUS) {
 			warnx("data from sensor %s looks off, expected sensor "
 			    "to indicate Celsius, but instead %u",
-			    temp.sit_unit);
+			    scalar.sis_unit);
 		}
 
 		(void) close(fd);

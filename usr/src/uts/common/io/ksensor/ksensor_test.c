@@ -32,21 +32,53 @@ typedef struct ksensor_test {
 	id_t kt_sensor3;
 	id_t kt_sensor4;
 	id_t kt_sensor5;
+	id_t kt_volt;
+	id_t kt_current;
 } ksensor_test_t;
 
 static int
-ksensor_test_temperature(void *arg, sensor_ioctl_temperature_t *temp)
+ksensor_test_temp(void *arg, sensor_ioctl_scalar_t *scalar)
 {
-	temp->sit_unit = SENSOR_UNIT_CELSIUS;
-	temp->sit_gran = 4;
-	temp->sit_prec = -2;
-	temp->sit_temp = 23;
+	scalar->sis_unit = SENSOR_UNIT_CELSIUS;
+	scalar->sis_gran = 4;
+	scalar->sis_prec = -2;
+	scalar->sis_value = 23;
 	return (0);
 }
 
 static const ksensor_ops_t ksensor_test_temp_ops = {
-	ksensor_kind_temperature,
-	ksensor_test_temperature
+	.kso_kind = ksensor_kind_temperature,
+	.kso_scalar = ksensor_test_temp
+};
+
+static int
+ksensor_test_volt(void *arg, sensor_ioctl_scalar_t *scalar)
+{
+	scalar->sis_unit = SENSOR_UNIT_VOLTS;
+	scalar->sis_gran = 1000;
+	scalar->sis_prec = 0;
+	scalar->sis_value = 3300;
+	return (0);
+}
+
+static const ksensor_ops_t ksensor_test_volt_ops = {
+	.kso_kind = ksensor_kind_voltage,
+	.kso_scalar = ksensor_test_volt
+};
+
+static int
+ksensor_test_current(void *arg, sensor_ioctl_scalar_t *scalar)
+{
+	scalar->sis_unit = SENSOR_UNIT_AMPS;
+	scalar->sis_gran = 10;
+	scalar->sis_prec = 0;
+	scalar->sis_value = 5;
+	return (0);
+}
+
+static const ksensor_ops_t ksensor_test_current_ops = {
+	.kso_kind = ksensor_kind_current,
+	.kso_scalar = ksensor_test_current
 };
 
 static int
@@ -56,14 +88,14 @@ ksensor_test_kind_eio(void *arg, sensor_ioctl_kind_t *kindp)
 }
 
 static int
-ksensor_test_temp_eio(void *arg, sensor_ioctl_temperature_t *tempp)
+ksensor_test_temp_eio(void *arg, sensor_ioctl_scalar_t *scalar)
 {
 	return (EIO);
 }
 
 static const ksensor_ops_t ksensor_test_eio_ops = {
-	ksensor_test_kind_eio,
-	ksensor_test_temp_eio
+	.kso_kind = ksensor_test_kind_eio,
+	.kso_scalar = ksensor_test_temp_eio
 };
 
 static int
@@ -107,7 +139,7 @@ ksensor_test_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    ddi_get_instance(dip));
 	if ((ret = ksensor_create(dip, &ksensor_test_temp_ops, NULL, buf,
 	    "ddi_sensor:test", &kt->kt_sensor3)) != 0) {
-		dev_err(dip, CE_WARN, "failed to attatch sensor %s: %d", buf,
+		dev_err(dip, CE_WARN, "failed to attach sensor %s: %d", buf,
 		    ret);
 		goto err;
 	}
@@ -116,7 +148,7 @@ ksensor_test_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    ddi_get_instance(dip));
 	if ((ret = ksensor_create(dip, &ksensor_test_temp_ops, NULL, buf,
 	    "ddi_sensor:test", &kt->kt_sensor4)) != 0) {
-		dev_err(dip, CE_WARN, "failed to attatch sensor %s: %d", buf,
+		dev_err(dip, CE_WARN, "failed to attach sensor %s: %d", buf,
 		    ret);
 		goto err;
 	}
@@ -125,7 +157,25 @@ ksensor_test_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    ddi_get_instance(dip));
 	if ((ret = ksensor_create(dip, &ksensor_test_eio_ops, NULL, buf,
 	    "ddi_sensor:test", &kt->kt_sensor5)) != 0) {
-		dev_err(dip, CE_WARN, "failed to attatch sensor %s: %d", buf,
+		dev_err(dip, CE_WARN, "failed to attach sensor %s: %d", buf,
+		    ret);
+		goto err;
+	}
+
+	(void) snprintf(buf, sizeof (buf), "test.volt.%d.1",
+	    ddi_get_instance(dip));
+	if ((ret = ksensor_create(dip, &ksensor_test_volt_ops, NULL, buf,
+	    "ddi_sensor:test", &kt->kt_volt)) != 0) {
+		dev_err(dip, CE_WARN, "failed to attach sensor %s: %d", buf,
+		    ret);
+		goto err;
+	}
+
+	(void) snprintf(buf, sizeof (buf), "test.current.%d.1",
+	    ddi_get_instance(dip));
+	if ((ret = ksensor_create(dip, &ksensor_test_current_ops, NULL, buf,
+	    "ddi_sensor:test", &kt->kt_current)) != 0) {
+		dev_err(dip, CE_WARN, "failed to attach sensor %s: %d", buf,
 		    ret);
 		goto err;
 	}

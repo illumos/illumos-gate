@@ -103,7 +103,7 @@ typedef struct amdnbtemp {
 static void *amdnbtemp_state;
 
 static int
-amdnbtemp_read(void *arg, sensor_ioctl_temperature_t *temp)
+amdnbtemp_read(void *arg, sensor_ioctl_scalar_t *scalar)
 {
 	amdnbtemp_t *at = arg;
 
@@ -120,9 +120,9 @@ amdnbtemp_read(void *arg, sensor_ioctl_temperature_t *temp)
 		at->at_temp -= AMDNBTEMP_TEMP_ADJUST;
 	}
 
-	temp->sit_unit = SENSOR_UNIT_CELSIUS;
-	temp->sit_gran = AMDNBTEMP_GRANULARITY;
-	temp->sit_temp = at->at_temp;
+	scalar->sis_unit = SENSOR_UNIT_CELSIUS;
+	scalar->sis_gran = AMDNBTEMP_GRANULARITY;
+	scalar->sis_value = at->at_temp;
 	mutex_exit(&at->at_mutex);
 
 	return (0);
@@ -130,7 +130,7 @@ amdnbtemp_read(void *arg, sensor_ioctl_temperature_t *temp)
 
 static const ksensor_ops_t amdnbtemp_temp_ops = {
 	.kso_kind = ksensor_kind_temperature,
-	.kso_temp = amdnbtemp_read
+	.kso_scalar = amdnbtemp_read
 };
 
 static void

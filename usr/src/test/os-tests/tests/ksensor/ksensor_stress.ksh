@@ -50,7 +50,7 @@ fi
 
 
 if [[ ! -L "$sensor_base/test.temp.0.1" ]]; then
-	printf "missing ksensor test data, ksensor_temp driver loaded\n" 2>&1
+	printf "missing ksensor test data, ksensor_tstp driver loaded?\n" 2>&1
 	exit 1
 fi
 

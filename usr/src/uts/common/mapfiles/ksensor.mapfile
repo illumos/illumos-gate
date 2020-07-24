@@ -36,8 +36,10 @@ $mapfile_version 2
 SYMBOL_SCOPE {
     global:
 	ksensor_create			{ FLAGS = EXTERN };
-	ksensor_create_temp_pcidev	{ FLAGS = EXTERN };
+	ksensor_create_scalar_pcidev	{ FLAGS = EXTERN };
 	ksensor_remove			{ FLAGS = EXTERN };
+	ksensor_kind_current		{ FLAGS = EXTERN };
 	ksensor_kind_temperature	{ FLAGS = EXTERN };
+	ksensor_kind_voltage		{ FLAGS = EXTERN };
 };
 

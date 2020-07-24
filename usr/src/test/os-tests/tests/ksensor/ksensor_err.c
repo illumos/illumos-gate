@@ -39,20 +39,20 @@ error_kind(int fd, int exp)
 	arc4random_buf(&alt_kind, sizeof (alt_kind));
 	(void) memcpy(&kind, &alt_kind, sizeof (alt_kind));
 
-	if (ioctl(fd, SENSOR_IOCTL_TYPE, &kind) == 0) {
-		warnx("TEST FAILED: SENSIOR_IOCTL_TYPE succeeded on EIO "
+	if (ioctl(fd, SENSOR_IOCTL_KIND, &kind) == 0) {
+		warnx("TEST FAILED: SENSOR_IOCTL_KIND succeeded on EIO "
 		    "sensor");
 		error_exit = EXIT_FAILURE;
 	}
 
 	if (errno != exp) {
-		warnx("TEST FAILED: SENSIOR_IOCTL_TYPE got errno %d, "
+		warnx("TEST FAILED: SENSOR_IOCTL_KIND got errno %d, "
 		    "expected %d", errno, exp);
 		error_exit = EXIT_FAILURE;
 	}
 
 	if (memcmp(&kind, &alt_kind, sizeof (alt_kind)) != 0) {
-		warnx("TEST FAILED: SENSIOR_IOCTL_TYPE modified data on error");
+		warnx("TEST FAILED: SENSOR_IOCTL_KIND modified data on error");
 		error_exit = EXIT_FAILURE;
 	}
 }
@@ -60,25 +60,25 @@ error_kind(int fd, int exp)
 static void
 error_temp(int fd, int exp)
 {
-	sensor_ioctl_temperature_t temp, alt_temp;
+	sensor_ioctl_scalar_t scalar, alt_scalar;
 
-	arc4random_buf(&alt_temp, sizeof (alt_temp));
-	(void) memcpy(&temp, &alt_temp, sizeof (alt_temp));
+	arc4random_buf(&alt_scalar, sizeof (alt_scalar));
+	(void) memcpy(&scalar, &alt_scalar, sizeof (alt_scalar));
 
-	if (ioctl(fd, SENSOR_IOCTL_TEMPERATURE, &temp) == 0) {
-		warnx("TEST FAILED: SENSIOR_IOCTL_TEMPERATURE suceeded on "
+	if (ioctl(fd, SENSOR_IOCTL_SCALAR, &scalar) == 0) {
+		warnx("TEST FAILED: SENSIOR_IOCTL_SCALAR suceeded on "
 		    "EIO sensor");
 		error_exit = EXIT_FAILURE;
 	}
 
 	if (errno != exp) {
-		warnx("TEST FAILED: SENSIOR_IOCTL_TEMPERATURE got errno %d, "
+		warnx("TEST FAILED: SENSIOR_IOCTL_SCALAR got errno %d, "
 		    "expected %d", errno, EIO);
 		error_exit = EXIT_FAILURE;
 	}
 
-	if (memcmp(&temp, &alt_temp, sizeof (alt_temp)) != 0) {
-		warnx("TEST FAILED: SENSIOR_IOCTL_TEMPERATURE modified "
+	if (memcmp(&scalar, &alt_scalar, sizeof (alt_scalar)) != 0) {
+		warnx("TEST FAILED: SENSIOR_IOCTL_SCALAR modified "
 		    "data on error");
 		error_exit = EXIT_FAILURE;
 	}

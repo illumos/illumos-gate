@@ -259,7 +259,7 @@ coretemp_update(coretemp_t *ct, coretemp_sensor_t *sensor, cmi_hdl_t hdl)
 }
 
 static int
-coretemp_read(void *arg, sensor_ioctl_temperature_t *sit)
+coretemp_read(void *arg, sensor_ioctl_scalar_t *scalar)
 {
 	coretemp_sensor_t *sensor = arg;
 	coretemp_t *ct = sensor->cs_coretemp;
@@ -313,10 +313,10 @@ coretemp_read(void *arg, sensor_ioctl_temperature_t *sit)
 	sensor->cs_temperature = sensor->cs_tjmax - reading;
 	sensor->cs_resolution = resolution;
 
-	sit->sit_unit = SENSOR_UNIT_CELSIUS;
-	sit->sit_temp = sensor->cs_temperature;
-	sit->sit_gran = CORETEMP_GRANULARITY;
-	sit->sit_prec = sensor->cs_resolution;
+	scalar->sis_unit = SENSOR_UNIT_CELSIUS;
+	scalar->sis_value = sensor->cs_temperature;
+	scalar->sis_gran = CORETEMP_GRANULARITY;
+	scalar->sis_prec = sensor->cs_resolution;
 	mutex_exit(&ct->coretemp_mutex);
 
 	return (0);
@@ -324,7 +324,7 @@ coretemp_read(void *arg, sensor_ioctl_temperature_t *sit)
 
 static const ksensor_ops_t coretemp_temp_ops = {
 	.kso_kind = ksensor_kind_temperature,
-	.kso_temp = coretemp_read
+	.kso_scalar = coretemp_read
 };
 
 static void

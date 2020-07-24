@@ -684,13 +684,14 @@ amdf17nbdf_ioctl_kind(intptr_t arg, int mode)
 }
 
 static int
-amdf17nbdf_ioctl_temp(amdf17nbdf_t *nbdf, minor_t minor, intptr_t arg, int mode)
+amdf17nbdf_ioctl_scalar(amdf17nbdf_t *nbdf, minor_t minor, intptr_t arg,
+    int mode)
 {
 	amdf17nb_t *nb;
 	hrtime_t diff;
-	sensor_ioctl_temperature_t temp;
+	sensor_ioctl_scalar_t scalar;
 
-	bzero(&temp, sizeof (temp));
+	bzero(&scalar, sizeof (scalar));
 
 	mutex_enter(&nbdf->amd_nbdf_lock);
 	nb = amdf17nbdf_lookup_nb(nbdf, minor);
@@ -710,12 +711,12 @@ amdf17nbdf_ioctl_temp(amdf17nbdf_t *nbdf, minor_t minor, intptr_t arg, int mode)
 		}
 	}
 
-	temp.sit_unit = SENSOR_UNIT_CELSIUS;
-	temp.sit_temp = nb->amd_nb_temp;
-	temp.sit_gran = AMDF17_THERMAL_GRANULARITY;
+	scalar.sis_unit = SENSOR_UNIT_CELSIUS;
+	scalar.sis_value = nb->amd_nb_temp;
+	scalar.sis_gran = AMDF17_THERMAL_GRANULARITY;
 	mutex_exit(&nbdf->amd_nbdf_lock);
 
-	if (ddi_copyout(&temp, (void *)arg, sizeof (temp),
+	if (ddi_copyout(&scalar, (void *)arg, sizeof (scalar),
 	    mode & FKIOCTL) != 0) {
 		return (EFAULT);
 	}
@@ -737,10 +738,10 @@ amdf17nbdf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	m = getminor(dev);
 
 	switch (cmd) {
-	case SENSOR_IOCTL_TYPE:
+	case SENSOR_IOCTL_KIND:
 		return (amdf17nbdf_ioctl_kind(arg, mode));
-	case SENSOR_IOCTL_TEMPERATURE:
-		return (amdf17nbdf_ioctl_temp(nbdf, m, arg, mode));
+	case SENSOR_IOCTL_SCALAR:
+		return (amdf17nbdf_ioctl_scalar(nbdf, m, arg, mode));
 	default:
 		return (ENOTTY);
 	}
