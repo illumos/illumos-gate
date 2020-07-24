@@ -667,7 +667,8 @@ static void
 mlxcx_cmd_init(mlxcx_t *mlxp, mlxcx_cmd_t *cmd)
 {
 	bzero(cmd, sizeof (*cmd));
-	mutex_init(&cmd->mlcmd_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&cmd->mlcmd_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(mlxp->mlx_async_intr_pri));
 	cv_init(&cmd->mlcmd_cv, NULL, CV_DRIVER, NULL);
 	cmd->mlcmd_token = id_alloc(mlxp->mlx_cmd.mcmd_tokens);
 	cmd->mlcmd_poll = mlxp->mlx_cmd.mcmd_polled;

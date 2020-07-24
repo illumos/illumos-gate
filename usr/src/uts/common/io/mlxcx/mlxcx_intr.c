@@ -922,6 +922,20 @@ lookagain:
 			if (added)
 				goto lookagain;
 
+			/*
+			 * This check could go just after the lookagain
+			 * label, but it is a hot code path so we don't
+			 * want to unnecessarily grab a lock and check
+			 * a flag for a relatively rare event (the ring
+			 * being stopped).
+			 */
+			mutex_enter(&wq->mlwq_mtx);
+			if ((wq->mlwq_state & MLXCX_WQ_STARTED) == 0) {
+				mutex_exit(&wq->mlwq_mtx);
+				goto nextcq;
+			}
+			mutex_exit(&wq->mlwq_mtx);
+
 			buf = list_head(&mlcq->mlcq_buffers);
 			mlxcx_warn(mlxp, "got completion on CQ %x but "
 			    "no buffer matching wqe found: %x (first "
@@ -1165,6 +1179,7 @@ mlxcx_intr_setup(mlxcx_t *mlxp)
 
 	ret = ddi_intr_get_supported_types(dip, &types);
 	if (ret != DDI_SUCCESS) {
+		mlxcx_warn(mlxp, "Failed to get supported interrupt types");
 		return (B_FALSE);
 	}
 
@@ -1176,6 +1191,7 @@ mlxcx_intr_setup(mlxcx_t *mlxp)
 
 	ret = ddi_intr_get_nintrs(dip, DDI_INTR_TYPE_MSIX, &nintrs);
 	if (ret != DDI_SUCCESS) {
+		mlxcx_warn(mlxp, "Failed to get number of interrupts");
 		return (B_FALSE);
 	}
 	if (nintrs < 2) {
@@ -1203,10 +1219,14 @@ mlxcx_intr_setup(mlxcx_t *mlxp)
 	ret = ddi_intr_alloc(dip, mlxp->mlx_intr_handles, DDI_INTR_TYPE_MSIX,
 	    0, navail, &mlxp->mlx_intr_count, DDI_INTR_ALLOC_NORMAL);
 	if (ret != DDI_SUCCESS) {
+		mlxcx_warn(mlxp, "Failed to allocate %d interrupts", navail);
 		mlxcx_intr_teardown(mlxp);
 		return (B_FALSE);
 	}
 	if (mlxp->mlx_intr_count < mlxp->mlx_intr_cq0 + 1) {
+		mlxcx_warn(mlxp, "%d MSI-X interrupts allocated, but mlxcx "
+		    "requires %d", mlxp->mlx_intr_count,
+		    mlxp->mlx_intr_cq0 + 1);
 		mlxcx_intr_teardown(mlxp);
 		return (B_FALSE);
 	}
@@ -1214,8 +1234,27 @@ mlxcx_intr_setup(mlxcx_t *mlxp)
 
 	ret = ddi_intr_get_pri(mlxp->mlx_intr_handles[0], &mlxp->mlx_intr_pri);
 	if (ret != DDI_SUCCESS) {
+		mlxcx_warn(mlxp, "Failed to get interrupt priority");
 		mlxcx_intr_teardown(mlxp);
 		return (B_FALSE);
+	}
+
+	/*
+	 * Set the interrupt priority for the asynchronous handler higher
+	 * than the ring handlers. Some operations which issue commands,
+	 * and thus rely on the async interrupt handler for posting
+	 * completion, do so with a CQ mutex held. The CQ mutex is also
+	 * acquired during ring processing, so if the ring processing vector
+	 * happens to be assigned to the same CPU as the async vector
+	 * it can hold off the async interrupt thread and lead to a deadlock.
+	 * By assigning a higher priority to the async vector, it will
+	 * always be dispatched.
+	 */
+	mlxp->mlx_async_intr_pri = mlxp->mlx_intr_pri;
+	if (mlxp->mlx_async_intr_pri < LOCK_LEVEL) {
+		mlxp->mlx_async_intr_pri++;
+	} else {
+		mlxp->mlx_intr_pri--;
 	}
 
 	mlxp->mlx_eqs_size = mlxp->mlx_intr_count *
@@ -1227,8 +1266,11 @@ mlxcx_intr_setup(mlxcx_t *mlxp)
 	 * mutex and avl tree to be init'ed - so do it now.
 	 */
 	for (i = 0; i < mlxp->mlx_intr_count; ++i) {
+		uint_t pri = (i == 0) ? mlxp->mlx_async_intr_pri :
+		    mlxp->mlx_intr_pri;
+
 		mutex_init(&mlxp->mlx_eqs[i].mleq_mtx, NULL, MUTEX_DRIVER,
-		    DDI_INTR_PRI(mlxp->mlx_intr_pri));
+		    DDI_INTR_PRI(pri));
 		cv_init(&mlxp->mlx_eqs[i].mleq_cv, NULL, CV_DRIVER, NULL);
 
 		if (i < mlxp->mlx_intr_cq0)
@@ -1239,9 +1281,19 @@ mlxcx_intr_setup(mlxcx_t *mlxp)
 		    offsetof(mlxcx_completion_queue_t, mlcq_eq_entry));
 	}
 
+	ret = ddi_intr_set_pri(mlxp->mlx_intr_handles[0],
+	    mlxp->mlx_async_intr_pri);
+	if (ret != DDI_SUCCESS) {
+		mlxcx_warn(mlxp, "Failed to set interrupt priority to %u for "
+		    "async interrupt vector", mlxp->mlx_async_intr_pri);
+		mlxcx_intr_teardown(mlxp);
+		return (B_FALSE);
+	}
+
 	ret = ddi_intr_add_handler(mlxp->mlx_intr_handles[0], mlxcx_intr_async,
 	    (caddr_t)mlxp, (caddr_t)&mlxp->mlx_eqs[0]);
 	if (ret != DDI_SUCCESS) {
+		mlxcx_warn(mlxp, "Failed to add async interrupt handler");
 		mlxcx_intr_teardown(mlxp);
 		return (B_FALSE);
 	}
@@ -1268,9 +1320,21 @@ mlxcx_intr_setup(mlxcx_t *mlxp)
 			eqt = MLXCX_EQ_TYPE_RX;
 		}
 
+		ret = ddi_intr_set_pri(mlxp->mlx_intr_handles[i],
+		    mlxp->mlx_intr_pri);
+		if (ret != DDI_SUCCESS) {
+			mlxcx_warn(mlxp, "Failed to set interrupt priority to "
+			    "%u for interrupt vector %d", mlxp->mlx_intr_pri,
+			    i);
+			mlxcx_intr_teardown(mlxp);
+			return (B_FALSE);
+		}
+
 		ret = ddi_intr_add_handler(mlxp->mlx_intr_handles[i],
 		    mlxcx_intr_n, (caddr_t)mlxp, (caddr_t)&mlxp->mlx_eqs[i]);
 		if (ret != DDI_SUCCESS) {
+			mlxcx_warn(mlxp, "Failed to add interrupt handler %d",
+			    i);
 			mlxcx_intr_teardown(mlxp);
 			return (B_FALSE);
 		}
