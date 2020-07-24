@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2014, 2017 by Delphix. All rights reserved.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -1779,8 +1780,7 @@ xnf_mblk_map(xnf_t *xnfp, mblk_t *mp, int *countp)
 
 	for (mblk_t *ml = mp; ml != NULL; ml = ml->b_cont) {
 		ddi_dma_handle_t dma_handle;
-		ddi_dma_cookie_t dma_cookie;
-		uint_t ncookies;
+		const ddi_dma_cookie_t *dma_cookie, *dma_cookie_prev;
 		xnf_txbuf_t *txp;
 
 		if (MBLKL(ml) == 0)
@@ -1804,8 +1804,7 @@ xnf_mblk_map(xnf_t *xnfp, mblk_t *mp, int *countp)
 		int ret = ddi_dma_addr_bind_handle(dma_handle,
 		    NULL, (char *)ml->b_rptr, MBLKL(ml),
 		    DDI_DMA_WRITE | DDI_DMA_STREAMING,
-		    DDI_DMA_DONTWAIT, 0, &dma_cookie,
-		    &ncookies);
+		    DDI_DMA_DONTWAIT, 0, NULL, NULL);
 		if (ret != DDI_DMA_MAPPED) {
 			if (ret != DDI_DMA_NORESOURCES) {
 				dev_err(xnfp->xnf_devinfo, CE_WARN,
@@ -1816,15 +1815,16 @@ xnf_mblk_map(xnf_t *xnfp, mblk_t *mp, int *countp)
 		}
 		txp->tx_handle_bound = B_TRUE;
 
-		ASSERT(ncookies > 0);
-		for (int i = 0; i < ncookies; i++) {
+		dma_cookie_prev = NULL;
+		while ((dma_cookie = ddi_dma_cookie_iter(dma_handle,
+		    dma_cookie_prev)) != NULL) {
 			if (nsegs == XEN_MAX_TX_DATA_PAGES) {
 				dev_err(xnfp->xnf_devinfo, CE_WARN,
 				    "xnf_dmamap_alloc() failed: "
 				    "too many segments");
 				goto error;
 			}
-			if (i > 0) {
+			if (dma_cookie_prev != NULL) {
 				txp = xnf_data_txbuf_alloc(xnfp);
 				ASSERT(tail != NULL);
 				TXBUF_SETNEXT(tail, txp);
@@ -1832,7 +1832,7 @@ xnf_mblk_map(xnf_t *xnfp, mblk_t *mp, int *countp)
 			}
 
 			txp->tx_mfn =
-			    xnf_btop(pa_to_ma(dma_cookie.dmac_laddress));
+			    xnf_btop(pa_to_ma(dma_cookie->dmac_laddress));
 			txp->tx_txreq.gref = xnf_gref_get(xnfp);
 			if (txp->tx_txreq.gref == INVALID_GRANT_REF) {
 				dev_err(xnfp->xnf_devinfo, CE_WARN,
@@ -1843,16 +1843,17 @@ xnf_mblk_map(xnf_t *xnfp, mblk_t *mp, int *countp)
 			gnttab_grant_foreign_access_ref(txp->tx_txreq.gref,
 			    oeid, txp->tx_mfn, 1);
 			txp->tx_txreq.offset =
-			    dma_cookie.dmac_laddress & PAGEOFFSET;
-			txp->tx_txreq.size = dma_cookie.dmac_size;
+			    dma_cookie->dmac_laddress & PAGEOFFSET;
+			txp->tx_txreq.size = dma_cookie->dmac_size;
 			txp->tx_txreq.flags = 0;
 
-			ddi_dma_nextcookie(dma_handle, &dma_cookie);
 			nsegs++;
 
 			if (tail != NULL)
 				tail->tx_txreq.flags = NETTXF_more_data;
 			tail = txp;
+
+			dma_cookie_prev = dma_cookie;
 		}
 	}
 
