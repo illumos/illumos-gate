@@ -785,7 +785,7 @@ wpi_destroy_locks(wpi_sc_t *sc)
  */
 static int
 wpi_alloc_dma_mem(wpi_sc_t *sc, size_t memsize, ddi_dma_attr_t *dma_attr_p,
-	ddi_device_acc_attr_t *acc_attr_p, uint_t dma_flags, wpi_dma_t *dma_p)
+    ddi_device_acc_attr_t *acc_attr_p, uint_t dma_flags, wpi_dma_t *dma_p)
 {
 	caddr_t vaddr;
 	int err;
@@ -885,8 +885,9 @@ wpi_alloc_fw_dma(wpi_sc_t *sc)
 		goto fail;
 	}
 	for (i = 0; i < dma_p->ncookies; i++) {
-		sc->sc_fw_text_cookie[i] = dma_p->cookie;
-		ddi_dma_nextcookie(dma_p->dma_hdl, &dma_p->cookie);
+		const ddi_dma_cookie_t *c;
+		c = ddi_dma_cookie_get(dma_p->dma_hdl, i);
+		sc->sc_fw_text_cookie[i] = *c;
 	}
 	err = wpi_alloc_dma_mem(sc, LE_32(sc->sc_hdr->datasz),
 	    &fw_buffer_dma_attr, &wpi_dma_accattr,
@@ -902,8 +903,9 @@ wpi_alloc_fw_dma(wpi_sc_t *sc)
 		goto fail;
 	}
 	for (i = 0; i < dma_p->ncookies; i++) {
-		sc->sc_fw_data_cookie[i] = dma_p->cookie;
-		ddi_dma_nextcookie(dma_p->dma_hdl, &dma_p->cookie);
+		const ddi_dma_cookie_t *c;
+		c = ddi_dma_cookie_get(dma_p->dma_hdl, i);
+		sc->sc_fw_data_cookie[i] = *c;
 	}
 fail:
 	return (err);
