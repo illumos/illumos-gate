@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -71,7 +72,7 @@
 	pushq	%r14;				\
 	subq	$KPTI_R14, %rsp;		\
 	/* Check for clobbering */		\
-	cmp	$0, KPTI_FLAG(%rsp);		\
+	cmpq	$0, KPTI_FLAG(%rsp);		\
 	je	1f;				\
 	/* Don't worry, this totally works */	\
 	int	$8;				\

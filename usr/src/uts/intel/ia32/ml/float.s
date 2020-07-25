@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*      Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
@@ -262,7 +263,7 @@
  */
 
 	ENTRY_NP(fpdisable)
-	STTS(%rdi)			/* set TS bit in %cr0 (disable FPU) */ 
+	STTS(%rdi)			/* set TS bit in %cr0 (disable FPU) */
 	ret
 	SET_SIZE(fpdisable)
 
@@ -284,7 +285,7 @@
 	leaq	avx_initial(%rip), %rcx
 	xorl	%edx, %edx
 	movl	$XFEATURE_AVX, %eax
-	bt	$X86FSET_AVX, x86_featureset
+	btl	$X86FSET_AVX, x86_featureset
 	cmovael	%edx, %eax
 	orl	$(XFEATURE_LEGACY_FP | XFEATURE_SSE), %eax
 	xrstor (%rcx)

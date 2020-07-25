@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
@@ -184,7 +185,7 @@
 	/*
 	 * (We just assert this works by virtue of being here)
 	 */
-	bts	$X86FSET_CPUID, x86_featureset(%rip)
+	btsl	$X86FSET_CPUID, x86_featureset(%rip)
 
 	/*
 	 * mlsetup() gets called with a struct regs as argument, while
