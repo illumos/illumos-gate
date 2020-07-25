@@ -328,7 +328,6 @@ static struct dev_ops pchtemp_dev_ops = {
 	.devo_attach = pchtemp_attach,
 	.devo_detach = pchtemp_detach,
 	.devo_reset = nodev,
-	.devo_power = ddi_power,
 	.devo_quiesce = ddi_quiesce_not_needed
 };
 

@@ -327,7 +327,6 @@ static struct dev_ops amdnbtemp_dev_ops = {
 	.devo_attach = amdnbtemp_attach,
 	.devo_detach = amdnbtemp_detach,
 	.devo_reset = nodev,
-	.devo_power = ddi_power,
 	.devo_quiesce = ddi_quiesce_not_needed
 };
 

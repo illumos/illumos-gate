@@ -504,7 +504,6 @@ static struct dev_ops coretemp_dev_ops = {
 	.devo_attach = coretemp_attach,
 	.devo_detach = coretemp_detach,
 	.devo_reset = nodev,
-	.devo_power = ddi_power,
 	.devo_quiesce = ddi_quiesce_not_needed
 };
 
