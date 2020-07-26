@@ -354,28 +354,44 @@ boot_get_color(uint32_t *fg, uint32_t *bg)
 	/* ansi to solaris colors, see also boot_console.c */
 	if (fb_info.inverse == B_TRUE ||
 	    fb_info.inverse_screen == B_TRUE) {
-		if (fb_info.fg_color < 16)
-			*bg = dim_xlate[fb_info.fg_color];
-		else
+		if (fb_info.fg_color < XLATE_NCOLORS) {
+			/*
+			 * white fg -> bright white bg
+			 */
+			if (fb_info.fg_color == pc_white)
+				*bg = brt_xlate[fb_info.fg_color];
+			else
+				*bg = dim_xlate[fb_info.fg_color];
+		} else {
 			*bg = fb_info.fg_color;
+		}
 
-		if (fb_info.bg_color < 16)
-			*fg = brt_xlate[fb_info.bg_color];
-		else
+		if (fb_info.bg_color < XLATE_NCOLORS) {
+			if (fb_info.bg_color == pc_white)
+				*fg = brt_xlate[fb_info.bg_color];
+			else
+				*fg = dim_xlate[fb_info.bg_color];
+		} else {
 			*fg = fb_info.bg_color;
+		}
 	} else {
-		if (fb_info.bg_color < 16) {
-			if (fb_info.bg_color == 7)
+		if (fb_info.fg_color < XLATE_NCOLORS) {
+			if (fb_info.fg_color == pc_white)
+				*fg = brt_xlate[fb_info.fg_color];
+			else
+				*fg = dim_xlate[fb_info.fg_color];
+		} else {
+			*fg = fb_info.fg_color;
+		}
+
+		if (fb_info.bg_color < XLATE_NCOLORS) {
+			if (fb_info.bg_color == pc_white)
 				*bg = brt_xlate[fb_info.bg_color];
 			else
 				*bg = dim_xlate[fb_info.bg_color];
 		} else {
 			*bg = fb_info.bg_color;
 		}
-		if (fb_info.fg_color < 16)
-			*fg = dim_xlate[fb_info.fg_color];
-		else
-			*fg = fb_info.fg_color;
 	}
 }
 

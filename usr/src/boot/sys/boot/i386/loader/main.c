@@ -186,7 +186,7 @@ main(void)
 	printf("\n%s", bootprog_info);
 
 	extract_currdev();		/* set $currdev and $loaddev */
-	autoload_font();		/* Set up the font list for console. */
+	autoload_font(OPT_CHECK(RBX_TEXT_MODE) != 0);
 
 	bi_isadir();
 	bios_getsmap();

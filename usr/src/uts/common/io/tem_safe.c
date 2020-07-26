@@ -129,9 +129,12 @@ static void	tem_safe_copy_area(struct tem_vt_state *tem,
 			screen_pos_t e_col, screen_pos_t e_row,
 			screen_pos_t t_col, screen_pos_t t_row,
 			cred_t *credp, enum called_from called_from);
+#if 0
+/* Currently unused */
 static void	tem_safe_image_display(struct tem_vt_state *, uchar_t *,
 			int, int, screen_pos_t, screen_pos_t,
 			cred_t *, enum called_from);
+#endif
 static void	tem_safe_bell(struct tem_vt_state *tem,
 			enum called_from called_from);
 static void	tem_safe_pix_clear_prom_output(struct tem_vt_state *tem,
@@ -1568,6 +1571,7 @@ tem_safe_text_display(struct tem_vt_state *tem, term_char_t *string,
 	}
 }
 
+#if 0
 /*
  * This function is used to blit a rectangular color image,
  * unperturbed on the underlying framebuffer, to render
@@ -1600,6 +1604,7 @@ tem_safe_image_display(struct tem_vt_state *tem, uchar_t *image,
 	mutex_exit(&tem->tvs_lock);
 	mutex_exit(&tems.ts_lock);
 }
+#endif
 
 /*ARGSUSED*/
 void
@@ -2385,12 +2390,22 @@ tem_safe_get_attr(struct tem_vt_state *tem, text_color_t *fg,
 static void
 tem_safe_get_color(text_color_t *fg, text_color_t *bg, term_char_t c)
 {
+	boolean_t bold_font;
+
 	*fg = c.tc_fg_color;
 	*bg = c.tc_bg_color;
 
+	bold_font = tems.ts_font.vf_map_count[VFNT_MAP_BOLD] != 0;
+
+	/*
+	 * If we have both normal and bold font components,
+	 * we use bold font for TEM_ATTR_BOLD.
+	 * The bright color is traditionally used with TEM_ATTR_BOLD,
+	 * in case there is no bold font.
+	 */
 	if (c.tc_fg_color < XLATE_NCOLORS) {
-		if (TEM_ATTR_ISSET(c.tc_char,
-		    TEM_ATTR_BRIGHT_FG | TEM_ATTR_BOLD))
+		if (TEM_ATTR_ISSET(c.tc_char, TEM_ATTR_BRIGHT_FG) ||
+		    (TEM_ATTR_ISSET(c.tc_char, TEM_ATTR_BOLD) && !bold_font))
 			*fg = brt_xlate[c.tc_fg_color];
 		else
 			*fg = dim_xlate[c.tc_fg_color];

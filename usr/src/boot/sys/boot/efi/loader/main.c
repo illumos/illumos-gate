@@ -694,7 +694,7 @@ main(int argc, CHAR16 *argv[])
 		if (!interactive_interrupt("Failed to find bootable partition"))
 			return (EFI_NOT_FOUND);
 
-	autoload_font();		/* Set up the font list for console. */
+	autoload_font(false);		/* Set up the font list for console. */
 	efi_init_environment();
 	setenv("ISADIR", "amd64", 1);	/* we only build 64bit */
 	bi_isadir();			/* set ISADIR */

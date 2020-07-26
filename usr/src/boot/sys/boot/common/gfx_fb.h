@@ -105,6 +105,7 @@ struct vesa_edid_info {
 
 extern multiboot_tag_framebuffer_t gfx_fb;
 
+void bios_text_font(bool);
 void gfx_framework_init(struct visual_ops *);
 uint32_t gfx_fb_color_map(uint8_t);
 void gfx_fb_display_cursor(struct vis_conscursor *);

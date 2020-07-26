@@ -63,6 +63,7 @@ typedef uint32_t tem_char_t;	/* 32bit char to support UTF-8 */
 #define	TEM_CHAR(c)		((c) & 0x1fffff)
 #define	TEM_CHAR_ATTR(c)	(((c) >> 21) & TEM_ATTR_MASK)
 #define	TEM_ATTR(c)		(((c) & TEM_ATTR_MASK) << 21)
+#define	TEM_ATTR_ISSET(c, a)	((TEM_CHAR_ATTR(c) & (a)) == (a))
 
 #define	TEM_MAXPARAMS	5	/* maximum number of ANSI paramters */
 #define	TEM_MAXTAB	40	/* maximum number of tab stops */

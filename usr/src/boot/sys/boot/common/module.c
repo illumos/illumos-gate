@@ -531,7 +531,14 @@ build_font_module(void)
 	/* helper pointers */
 	bd = NULL;
 	STAILQ_FOREACH(fl, &fonts, font_next) {
-		if (fl->font_data->font != NULL) {
+		if (tems.ts_font.vf_width == fl->font_data->width &&
+		    tems.ts_font.vf_height == fl->font_data->height) {
+			/*
+			 * Kernel does have better built in font.
+			 */
+			if (fl->font_flags == FONT_BUILTIN)
+				return;
+
 			bd = fl->font_data;
 			break;
 		}
