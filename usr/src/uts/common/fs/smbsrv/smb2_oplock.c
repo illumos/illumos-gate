@@ -10,7 +10,8 @@
  */
 
 /*
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc.  All rights reserved.
+ * Copyright 2019 RackTop Systems.
  */
 
 /*
@@ -96,13 +97,35 @@ smb2_oplock_break_ack(smb_request_t *sr)
 		NewLevel = OPLOCK_LEVEL_BATCH;
 		break;
 	case SMB2_OPLOCK_LEVEL_LEASE:	/* 0xFF */
-	default:
 		NewLevel = OPLOCK_LEVEL_NONE;
 		break;
+	default:
+		status = NT_STATUS_INVALID_PARAMETER;
+		goto errout;
 	}
 
 	ofile = sr->fid_ofile;
+	if (ofile->f_oplock.og_breaking == 0) {
+		/*
+		 * This is an unsolicited Ack. (There is no
+		 * outstanding oplock break in progress now.)
+		 * There are WPTS tests that care which error
+		 * is returned.  See [MS-SMB2] 3.3.5.22.1
+		 */
+		if (smbOplockLevel == SMB2_OPLOCK_LEVEL_LEASE) {
+			status = NT_STATUS_INVALID_PARAMETER;
+			goto errout;
+		}
+		if (NewLevel >= (ofile->f_oplock.og_state &
+		    OPLOCK_LEVEL_TYPE_MASK)) {
+			status = NT_STATUS_INVALID_OPLOCK_PROTOCOL;
+			goto errout;
+		}
+		status = NT_STATUS_INVALID_DEVICE_STATE;
+		goto errout;
+	}
 	ofile->f_oplock.og_breaking = 0;
+
 	status = smb_oplock_ack_break(sr, ofile, &NewLevel);
 	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
 		status = smb2sr_go_async(sr);
