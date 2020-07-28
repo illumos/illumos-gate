@@ -720,11 +720,11 @@ vatpic_master_handler(struct vm *vm, int vcpuid, bool in, uint16_t port,
 
 	if (bytes != 1)
 		return (-1);
- 
+
 	if (in) {
 		return (vatpic_read(vatpic, atpic, in, port, bytes, eax));
 	}
- 
+
 	return (vatpic_write(vatpic, atpic, in, port, bytes, eax));
 }
 

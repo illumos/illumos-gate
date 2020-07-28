@@ -1321,7 +1321,7 @@ ppt_setup_msix(struct vm *vm, int vcpu, int pptfd, int idx, uint64_t addr,
 
 	/*
 	 * First-time configuration:
-	 * 	Allocate the MSI-X table
+	 *	Allocate the MSI-X table
 	 *	Allocate the IRQ resources
 	 *	Set up some variables in ppt->msix
 	 */

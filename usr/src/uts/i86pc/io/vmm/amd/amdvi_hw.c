@@ -1003,8 +1003,8 @@ amdvi_teardown_hw(struct amdvi_softc *softc)
 
 	dev = softc->dev;
 
-	/* 
-	 * Called after disable, h/w is stopped by now, free all the resources. 
+	/*
+	 * Called after disable, h/w is stopped by now, free all the resources.
 	 */
 	amdvi_free_evt_intr_res(dev);
 
@@ -1026,7 +1026,7 @@ amdvi_init(void)
 	}
 	if (!amdvi_enable_user && ivhd_count) {
 		printf("bhyve: Found %d AMD-Vi/IOMMU device(s), "
-		    	"use hw.vmm.amdvi.enable=1 to enable pass-through.\n",
+		    "use hw.vmm.amdvi.enable=1 to enable pass-through.\n",
 		    ivhd_count);
 		return (EINVAL);
 	}
@@ -1304,7 +1304,7 @@ amdvi_set_dte(struct amdvi_domain *domain, uint16_t devid, bool enable)
 	struct amdvi_dte* temp;
 
 	KASSERT(domain, ("domain is NULL for pci_rid:0x%x\n", devid));
-	
+
 	softc = amdvi_find_iommu(devid);
 	KASSERT(softc, ("softc is NULL for pci_rid:0x%x\n", devid));
 
@@ -1397,11 +1397,11 @@ amdvi_enable(void)
 		ctrl = softc->ctrl;
 		KASSERT(ctrl, ("ctrl is NULL\n"));
 
-		val = (	AMDVI_CTRL_EN 		|
-			AMDVI_CTRL_CMD 		|
-		    	AMDVI_CTRL_ELOG 	|
-		    	AMDVI_CTRL_ELOGINT 	|
-		    	AMDVI_CTRL_INV_TO_1S);
+		val = (	AMDVI_CTRL_EN		|
+			AMDVI_CTRL_CMD		|
+			AMDVI_CTRL_ELOG		|
+			AMDVI_CTRL_ELOGINT	|
+			AMDVI_CTRL_INV_TO_1S);
 
 		if (softc->ivhd_flag & IVHD_FLAG_COH)
 			val |= AMDVI_CTRL_COH;

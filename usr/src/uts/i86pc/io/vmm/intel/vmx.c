@@ -117,7 +117,7 @@ __FBSDID("$FreeBSD$");
 	 PROCBASED_CR8_STORE_EXITING)
 #else
 /* We consider TSC offset a necessity for unsynched TSC handling */
-#define	PROCBASED_CTLS_ONE_SETTING 					\
+#define	PROCBASED_CTLS_ONE_SETTING					\
 	(PROCBASED_SECONDARY_CONTROLS	|				\
 	 PROCBASED_TSC_OFFSET		|				\
 	 PROCBASED_MWAIT_EXITING	|				\

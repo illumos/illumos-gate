@@ -61,10 +61,10 @@ static MALLOC_DEFINE(M_VHPET, "vhpet", "bhyve virtual hpet");
 #define	FS_PER_S	1000000000000000ul
 
 /* Timer N Configuration and Capabilities Register */
-#define	HPET_TCAP_RO_MASK	(HPET_TCAP_INT_ROUTE 	|		\
-				 HPET_TCAP_FSB_INT_DEL	|		\
-				 HPET_TCAP_SIZE		|		\
-				 HPET_TCAP_PER_INT)
+#define	HPET_TCAP_RO_MASK	(HPET_TCAP_INT_ROUTE	|	\
+				HPET_TCAP_FSB_INT_DEL	|	\
+				HPET_TCAP_SIZE		|	\
+				HPET_TCAP_PER_INT)
 /*
  * HPET requires at least 3 timers and up to 32 timers per block.
  */
@@ -242,7 +242,7 @@ vhpet_timer_interrupt(struct vhpet *vhpet, int n)
 		lapic_intr_msi(vhpet->vm, vhpet->timer[n].msireg >> 32,
 		    vhpet->timer[n].msireg & 0xffffffff);
 		return;
-	}	
+	}
 
 	pin = vhpet_timer_ioapic_pin(vhpet, n);
 	if (pin == 0) {
@@ -504,7 +504,7 @@ vhpet_mmio_write(void *vm, int vcpuid, uint64_t gpa, uint64_t val, int size,
 		if ((offset & 0x4) != 0) {
 			mask <<= 32;
 			data <<= 32;
-		} 
+		}
 		break;
 	default:
 		VM_CTR2(vhpet->vm, "hpet invalid mmio write: "
@@ -658,7 +658,7 @@ vhpet_mmio_read(void *vm, int vcpuid, uint64_t gpa, uint64_t *rval, int size,
 
 	if (offset == HPET_CAPABILITIES || offset == HPET_CAPABILITIES + 4) {
 		data = vhpet_capabilities();
-		goto done;	
+		goto done;
 	}
 
 	if (offset == HPET_CONFIG || offset == HPET_CONFIG + 4) {

@@ -40,7 +40,7 @@
 #define	VHPET_SIZE	1024
 
 struct vhpet *vhpet_init(struct vm *vm);
-void 	vhpet_cleanup(struct vhpet *vhpet);
+void	vhpet_cleanup(struct vhpet *vhpet);
 int	vhpet_mmio_write(void *vm, int vcpuid, uint64_t gpa, uint64_t val,
 	    int size, void *arg);
 int	vhpet_mmio_read(void *vm, int vcpuid, uint64_t gpa, uint64_t *val,

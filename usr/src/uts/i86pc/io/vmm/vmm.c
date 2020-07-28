@@ -109,7 +109,7 @@ struct vlapic;
  * (x) initialized before use
  */
 struct vcpu {
-	struct mtx 	mtx;		/* (o) protects 'state' and 'hostcpu' */
+	struct mtx	mtx;		/* (o) protects 'state' and 'hostcpu' */
 	enum vcpu_state	state;		/* (o) vcpu state */
 #ifndef __FreeBSD__
 	kcondvar_t	vcpu_cv;	/* (o) cpu waiter cv */
@@ -186,7 +186,7 @@ struct vm {
 	volatile cpuset_t active_cpus;		/* (i) active vcpus */
 	volatile cpuset_t debug_cpus;		/* (i) vcpus stopped for debug */
 	int		suspend;		/* (i) stop VM execution */
-	volatile cpuset_t suspended_cpus; 	/* (i) suspended vcpus */
+	volatile cpuset_t suspended_cpus;	/* (i) suspended vcpus */
 	volatile cpuset_t halted_cpus;		/* (x) cpus in a hard halt */
 	struct mem_map	mem_maps[VM_MAX_MEMMAPS]; /* (i) guest address space */
 	struct mem_seg	mem_segs[VM_MAX_MEMSEGS]; /* (o) guest memory regions */
@@ -1222,7 +1222,6 @@ vm_set_register(struct vm *vm, int vcpuid, int reg, uint64_t val)
 static bool
 is_descriptor_table(int reg)
 {
-
 	switch (reg) {
 	case VM_REG_GUEST_IDTR:
 	case VM_REG_GUEST_GDTR:
@@ -1235,7 +1234,6 @@ is_descriptor_table(int reg)
 static bool
 is_segment_register(int reg)
 {
-	
 	switch (reg) {
 	case VM_REG_GUEST_ES:
 	case VM_REG_GUEST_CS:
@@ -2916,7 +2914,7 @@ vmm_is_pptdev(int bus, int slot, int func)
 				found = true;
 				break;
 			}
-		
+
 			if (cp2 != NULL)
 				*cp2++ = ' ';
 
@@ -3326,7 +3324,7 @@ vm_copyin(struct vm *vm, int vcpuid, struct vm_copyinfo *copyinfo, void *kaddr,
 {
 	char *dst;
 	int idx;
-	
+
 	dst = kaddr;
 	idx = 0;
 	while (len > 0) {
@@ -3367,8 +3365,8 @@ vm_get_rescnt(struct vm *vm, int vcpu, struct vmm_stat_type *stat)
 
 	if (vcpu == 0) {
 		vmm_stat_set(vm, vcpu, VMM_MEM_RESIDENT,
-	       	    PAGE_SIZE * vmspace_resident_count(vm->vmspace));
-	}	
+		    PAGE_SIZE * vmspace_resident_count(vm->vmspace));
+	}
 }
 
 static void
@@ -3377,8 +3375,8 @@ vm_get_wiredcnt(struct vm *vm, int vcpu, struct vmm_stat_type *stat)
 
 	if (vcpu == 0) {
 		vmm_stat_set(vm, vcpu, VMM_MEM_WIRED,
-	      	    PAGE_SIZE * pmap_wired_count(vmspace_pmap(vm->vmspace)));
-	}	
+		    PAGE_SIZE * pmap_wired_count(vmspace_pmap(vm->vmspace)));
+	}
 }
 
 VMM_STAT_FUNC(VMM_MEM_RESIDENT, "Resident memory", vm_get_rescnt);
