@@ -248,7 +248,6 @@ VMM_OBJS += vmm.o \
 	vmm_util.o \
 	x86.o \
 	iommu.o \
-	vdev.o \
 	vatpic.o \
 	vatpit.o \
 	vhpet.o \
