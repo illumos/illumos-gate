@@ -2342,11 +2342,6 @@ svm_setcap(void *arg, int vcpu, int type, int val)
 		svm_set_intercept(sc, vcpu, VMCB_CTRL1_INTCPT,
 		    VMCB_INTCPT_PAUSE, val);
 		break;
-	case VM_CAP_UNRESTRICTED_GUEST:
-		/* Unrestricted guest execution cannot be disabled in SVM */
-		if (val == 0)
-			error = EINVAL;
-		break;
 	default:
 		error = ENOENT;
 		break;
@@ -2371,9 +2366,6 @@ svm_getcap(void *arg, int vcpu, int type, int *retval)
 	case VM_CAP_PAUSE_EXIT:
 		*retval = svm_get_intercept(sc, vcpu, VMCB_CTRL1_INTCPT,
 		    VMCB_INTCPT_PAUSE);
-		break;
-	case VM_CAP_UNRESTRICTED_GUEST:
-		*retval = 1;	/* unrestricted guest is always enabled */
 		break;
 	default:
 		error = ENOENT;

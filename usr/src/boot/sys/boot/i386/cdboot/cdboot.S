@@ -34,7 +34,7 @@
 #
 # Basically, we first create a set of boot arguments to pass to the loaded
 # binary.  Then we attempt to load /boot/loader from the CD we were booted
-# off of. 
+# from.
 #
 
 #include <bootargs.h>
@@ -136,7 +136,7 @@ real_start:	cld				# string ops inc
 		stosl				#  to zero
 		mov drive,%dl			# Store BIOS boot device
 		mov %dl,0x4(%bx)		#  in kargs->bootdev
-		or $KARGS_FLAGS_CD,0x8(%bx)	# kargs->bootflags |=
+		orb $KARGS_FLAGS_CD,0x8(%bx)	# kargs->bootflags |=
 						#  KARGS_FLAGS_CD
 #
 # Load Volume Descriptor
@@ -494,7 +494,7 @@ twiddle:	push %ax			# Save
 # legacy-free and simply doesn't have a keyboard controller.
 # Thus, the A20 line is already enabled.
 #
-seta20: 	cli				# Disable interrupts
+seta20:		cli				# Disable interrupts
 		xor %cx,%cx			# Clear
 seta20.1:	inc %cx				# Increment, overflow?
 		jz seta20.3			# Yes
@@ -518,7 +518,7 @@ hex8:		pushl %eax			# Save
 		shrb $0x4,%al			# Do upper
 		call hex8.1			#  4
 		popl %eax			# Restore
-hex8.1: 	andb $0xf,%al			# Get lower 4
+hex8.1:		andb $0xf,%al			# Get lower 4
 		cmpb $0xa,%al			# Convert
 		sbbb $0x69,%al			#  to hex
 		das				#  digit

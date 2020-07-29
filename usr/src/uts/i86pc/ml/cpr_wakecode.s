@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/asm_linkage.h>
@@ -583,7 +584,7 @@ kernel_wc_code:
 	 * Before proceeding, enable usage of the page table NX bit if
 	 * that's how the page tables are set up.
 	 */
-	bt      $X86FSET_NX, x86_featureset(%rip)
+	btl     $X86FSET_NX, x86_featureset(%rip)
 	jnc     1f
 	movl    $MSR_AMD_EFER, %ecx
 	rdmsr

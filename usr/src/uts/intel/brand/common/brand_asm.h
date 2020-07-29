@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _COMMON_BRAND_ASM_H
@@ -65,7 +66,7 @@ extern "C" {
  *      24 | saved stack pointer		|
  *    | 16 | lwp pointer			|
  *    v  8 | user return address		|
- *       0 | BRAND_CALLBACK()'s return addr 	|
+ *       0 | BRAND_CALLBACK()'s return addr	|
  *         --------------------------------------
  */
 
@@ -182,7 +183,7 @@ extern "C" {
 	GET_P_BRAND_DATA(SP_REG, 0, scr);	/* get p_brand_data */	\
 	cmp	$0, scr;						\
 	je	9f;							\
-	cmp	$0, handler(scr);		/* check handler */	\
+	cmpq	$0, handler(scr);		/* check handler */	\
 	je	9f
 
 /*
