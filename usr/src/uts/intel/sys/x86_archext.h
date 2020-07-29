@@ -603,13 +603,6 @@ extern "C" {
 #define	IA32_PKG_THERM_INTERRUPT_TR2_IE		0x00800000
 #define	IA32_PKG_THERM_INTERRUPT_PL_NE		0x01000000
 
-/*
- * This MSR exists on families, 10h, 12h+ for AMD. This controls instruction
- * decoding. Most notably, for the AMD variant of retpolines, we must improve
- * the serializability of lfence for the lfence based method to work.
- */
-#define	MSR_AMD_DECODE_CONFIG			0xc0011029
-#define	AMD_DECODE_CONFIG_LFENCE_DISPATCH	0x02
 
 #define	MCI_CTL_VALUE		0xffffffff
 
