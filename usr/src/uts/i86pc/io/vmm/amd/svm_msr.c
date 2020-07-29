@@ -25,6 +25,18 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ *
+ * Copyright 2020 Oxide Computer Company
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -152,6 +164,14 @@ svm_rdmsr(struct svm_softc *sc, int vcpu, u_int num, uint64_t *result,
 	case MSR_EXTFEATURES:
 		*result = 0;
 		break;
+	case MSR_DE_CFG:
+		/*
+		 * MSR_DE_CFG is used for a vast array of AMD errata, spanning
+		 * from family 10h to 17h.  In the future, it might make sense
+		 * to more thoroughly emulate its contents.
+		 */
+		*result = 0;
+		break;
 	default:
 		error = EINVAL;
 		break;
@@ -177,7 +197,11 @@ svm_wrmsr(struct svm_softc *sc, int vcpu, u_int num, uint64_t val, bool *retu)
 	case MSR_MTRR16kBase ... MSR_MTRR16kBase + 1:
 	case MSR_MTRR64kBase:
 	case MSR_SYSCFG:
-		break;		/* Ignore writes */
+		/* Ignore writes */
+		break;
+	case MSR_DE_CFG:
+		/* Ignore writes for now. (See: svm_rdmsr) */
+		break;
 	case MSR_AMDK8_IPM:
 		/*
 		 * Ignore writes to the "Interrupt Pending Message" MSR.
