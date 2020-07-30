@@ -1,0 +1,5 @@
+Having been ported from FreeBSD, bhyve bears the BSD license.  Subsequent
+changes made to bhyve in illumos are dual-licensed under both the BSD license
+and the CDDL.  Use or redistribution of those subsequent changes may be done
+under either license. The CDDL license header added to bhyve source files is
+meant to cover only those dual-licensed modifications, not the entire file.
