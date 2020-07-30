@@ -25,6 +25,7 @@
  * Copyright (c) 2012, 2018 by Delphix. All rights reserved.
  * Copyright 2015 RackTop Systems.
  * Copyright (c) 2016, Intel Corporation.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -913,8 +914,11 @@ zpool_read_label(int fd, nvlist_t **config, int *num_labels)
 
 	*config = NULL;
 
+	if (num_labels != NULL)
+		*num_labels = 0;
+
 	if (fstat64(fd, &statbuf) == -1)
-		return (-1);
+		return (0);
 	size = P2ALIGN_TYPED(statbuf.st_size, sizeof (vdev_label_t), uint64_t);
 
 	if ((label = malloc(sizeof (vdev_label_t))) == NULL)
@@ -967,11 +971,6 @@ zpool_read_label(int fd, nvlist_t **config, int *num_labels)
 
 	free(label);
 	*config = expected_config;
-
-	if (count == 0) {
-		errno = ENOENT;
-		return (-1);
-	}
 
 	return (0);
 }

@@ -1884,6 +1884,12 @@ file \
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_labelclear/zpool_labelclear_exported \
     mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_labelclear/zpool_labelclear_removed \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_labelclear/zpool_labelclear_valid \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_offline/cleanup \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_offline/setup \
