@@ -137,6 +137,7 @@ dir path=opt/zfs-tests/tests/functional/nestedfs
 dir path=opt/zfs-tests/tests/functional/no_space
 dir path=opt/zfs-tests/tests/functional/nopwrite
 dir path=opt/zfs-tests/tests/functional/online_offline
+dir path=opt/zfs-tests/tests/functional/persist_l2arc
 dir path=opt/zfs-tests/tests/functional/pool_checkpoint
 dir path=opt/zfs-tests/tests/functional/pool_names
 dir path=opt/zfs-tests/tests/functional/poolversion
@@ -408,6 +409,7 @@ file path=opt/zfs-tests/tests/functional/cache/cache_008_neg mode=0555
 file path=opt/zfs-tests/tests/functional/cache/cache_009_pos mode=0555
 file path=opt/zfs-tests/tests/functional/cache/cache_010_neg mode=0555
 file path=opt/zfs-tests/tests/functional/cache/cache_011_pos mode=0555
+file path=opt/zfs-tests/tests/functional/cache/cache_012_pos mode=0555
 file path=opt/zfs-tests/tests/functional/cache/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cache/setup mode=0555
 file path=opt/zfs-tests/tests/functional/cachefile/cachefile.cfg mode=0444
@@ -2695,6 +2697,26 @@ file path=opt/zfs-tests/tests/functional/online_offline/online_offline_002_neg \
 file path=opt/zfs-tests/tests/functional/online_offline/online_offline_003_neg \
     mode=0555
 file path=opt/zfs-tests/tests/functional/online_offline/setup mode=0555
+file path=opt/zfs-tests/tests/functional/persist_l2arc/cleanup mode=0555
+file path=opt/zfs-tests/tests/functional/persist_l2arc/persist_l2arc.cfg \
+    mode=0444
+file path=opt/zfs-tests/tests/functional/persist_l2arc/persist_l2arc_001_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/persist_l2arc/persist_l2arc_002_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/persist_l2arc/persist_l2arc_003_neg \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/persist_l2arc/persist_l2arc_004_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/persist_l2arc/persist_l2arc_005_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/persist_l2arc/persist_l2arc_006_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/persist_l2arc/persist_l2arc_007_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/persist_l2arc/persist_l2arc_008_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/persist_l2arc/setup mode=0555
 file \
     path=opt/zfs-tests/tests/functional/pool_checkpoint/checkpoint_after_rewind \
     mode=0555
