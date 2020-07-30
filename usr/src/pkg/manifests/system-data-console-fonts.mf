@@ -31,14 +31,25 @@ dir path=usr group=sys
 dir path=usr/share
 dir path=usr/share/lib
 file path=boot/fonts/10x18.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/10x18b.fnt group=bin mode=0444 owner=root
 file path=boot/fonts/10x20.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/10x20b.fnt group=bin mode=0444 owner=root
 file path=boot/fonts/11x22.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/11x22b.fnt group=bin mode=0444 owner=root
 file path=boot/fonts/12x24.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/12x24b.fnt group=bin mode=0444 owner=root
 file path=boot/fonts/14x28.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/14x28b.fnt group=bin mode=0444 owner=root
 file path=boot/fonts/16x32.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/16x32b.fnt group=bin mode=0444 owner=root
 file path=boot/fonts/6x12.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/6x12b.fnt group=bin mode=0444 owner=root
 file path=boot/fonts/8x14.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/8x14b.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/8x14v.fnt group=bin mode=0444 owner=root
 file path=boot/fonts/8x16.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/8x16b.fnt group=bin mode=0444 owner=root
+file path=boot/fonts/8x16v.fnt group=bin mode=0444 owner=root
 file path=boot/fonts/Gallant19.fnt group=bin mode=0444 owner=root
 file path=boot/fonts/fonts.dir group=bin mode=0444 owner=root
 license lic_CDDL license=lic_CDDL
