@@ -2284,4 +2284,4 @@ BNX_OBJS += \
 # mlxcx(7D)
 #
 MLXCX_OBJS +=	mlxcx.o mlxcx_dma.o mlxcx_cmd.o mlxcx_intr.o mlxcx_gld.o \
-		mlxcx_ring.o
+		mlxcx_ring.o mlxcx_sensor.o

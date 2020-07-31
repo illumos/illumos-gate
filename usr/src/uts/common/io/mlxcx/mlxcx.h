@@ -1009,6 +1009,15 @@ typedef struct {
 	uint64_t		mldp_wq_check_interval_sec;
 } mlxcx_drv_props_t;
 
+typedef struct {
+	mlxcx_t	*mlts_mlx;
+	uint8_t	mlts_index;
+	id_t	mlts_ksensor;
+	int16_t	mlts_value;
+	int16_t	mlts_max_value;
+	uint8_t	mlts_name[MLXCX_MTMP_NAMELEN];
+} mlxcx_temp_sensor_t;
+
 typedef enum {
 	MLXCX_ATTACH_FM		= 1 << 0,
 	MLXCX_ATTACH_PCI_CONFIG	= 1 << 1,
@@ -1028,6 +1037,7 @@ typedef enum {
 	MLXCX_ATTACH_CAPS	= 1 << 15,
 	MLXCX_ATTACH_CHKTIMERS	= 1 << 16,
 	MLXCX_ATTACH_ASYNC_TQ	= 1 << 17,
+	MLXCX_ATTACH_SENSORS	= 1 << 18
 } mlxcx_attach_progress_t;
 
 struct mlxcx {
@@ -1172,6 +1182,12 @@ struct mlxcx {
 	ddi_periodic_t		mlx_eq_checktimer;
 	ddi_periodic_t		mlx_cq_checktimer;
 	ddi_periodic_t		mlx_wq_checktimer;
+
+	/*
+	 * Sensors
+	 */
+	uint8_t			mlx_temp_nsensors;
+	mlxcx_temp_sensor_t	*mlx_temp_sensors;
 };
 
 /*
@@ -1446,6 +1462,12 @@ extern void mlxcx_eth_proto_to_string(mlxcx_eth_proto_t, char *, size_t);
 extern const char *mlxcx_port_status_string(mlxcx_port_status_t);
 
 extern const char *mlxcx_event_name(mlxcx_event_t);
+
+/*
+ * Sensor Functions
+ */
+extern boolean_t mlxcx_setup_sensors(mlxcx_t *);
+extern void mlxcx_teardown_sensors(mlxcx_t *);
 
 #ifdef __cplusplus
 }
