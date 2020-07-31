@@ -238,9 +238,15 @@ extern "C" {
 
 #define	AMD_BU_CFG_E298			(UINT64_C(1) << 1)
 
+/*
+ * This MSR exists on families, 10h, 12h+ for AMD. This controls instruction
+ * decoding. Most notably, for the AMD variant of retpolines, we must improve
+ * the serializability of lfence for the lfence based method to work.
+ */
 #define	MSR_AMD_DE_CFG	0xc0011029
 
-#define	AMD_DE_CFG_E721			(UINT64_C(1))
+#define	AMD_DE_CFG_E721			(1UL << 0)
+#define	AMD_DE_CFG_LFENCE_DISPATCH	(1UL << 1)
 
 /* AMD's osvw MSRs */
 #define	MSR_AMD_OSVW_ID_LEN		0xc0010140

@@ -2746,8 +2746,8 @@ cpuid_use_amd_retpoline(struct cpuid_info *cpi)
 	/*
 	 * We need to determine whether or not lfence is serializing. It always
 	 * is on families 0xf and 0x11. On others, it's controlled by
-	 * MSR_AMD_DECODE_CONFIG (MSRC001_1029). If some hypervisor gives us a
-	 * crazy old family, don't try and do anything.
+	 * MSR_AMD_DE_CFG (MSRC001_1029). If some hypervisor gives us a crazy
+	 * old family, don't try and do anything.
 	 */
 	if (cpi->cpi_family < 0xf)
 		return (B_FALSE);
@@ -2762,16 +2762,16 @@ cpuid_use_amd_retpoline(struct cpuid_info *cpi)
 	 * for it.
 	 */
 	if (!on_trap(&otd, OT_DATA_ACCESS)) {
-		val = rdmsr(MSR_AMD_DECODE_CONFIG);
-		val |= AMD_DECODE_CONFIG_LFENCE_DISPATCH;
-		wrmsr(MSR_AMD_DECODE_CONFIG, val);
-		val = rdmsr(MSR_AMD_DECODE_CONFIG);
+		val = rdmsr(MSR_AMD_DE_CFG);
+		val |= AMD_DE_CFG_LFENCE_DISPATCH;
+		wrmsr(MSR_AMD_DE_CFG, val);
+		val = rdmsr(MSR_AMD_DE_CFG);
 	} else {
 		val = 0;
 	}
 	no_trap();
 
-	if ((val & AMD_DECODE_CONFIG_LFENCE_DISPATCH) != 0)
+	if ((val & AMD_DE_CFG_LFENCE_DISPATCH) != 0)
 		return (B_TRUE);
 	return (B_FALSE);
 }
