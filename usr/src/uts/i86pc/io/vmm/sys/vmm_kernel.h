@@ -280,8 +280,15 @@ vcpu_should_yield(struct vm *vm, int vcpu)
 }
 #endif /* _SYS_THREAD_H */
 
+typedef enum vcpu_notify {
+	VCPU_NOTIFY_NONE,
+	VCPU_NOTIFY_APIC,	/* Posted intr notification (if possible) */
+	VCPU_NOTIFY_EXIT,	/* IPI to cause VM exit */
+} vcpu_notify_t;
+
 void *vcpu_stats(struct vm *vm, int vcpu);
-void vcpu_notify_event(struct vm *vm, int vcpuid, bool lapic_intr);
+void vcpu_notify_event(struct vm *vm, int vcpuid);
+void vcpu_notify_event_type(struct vm *vm, int vcpuid, vcpu_notify_t);
 struct vmspace *vm_get_vmspace(struct vm *vm);
 struct vatpic *vm_atpic(struct vm *vm);
 struct vatpit *vm_atpit(struct vm *vm);
@@ -373,6 +380,25 @@ void vm_inject_gp(struct vm *vm, int vcpuid);
 void vm_inject_ac(struct vm *vm, int vcpuid, int errcode);
 void vm_inject_ss(struct vm *vm, int vcpuid, int errcode);
 void vm_inject_pf(struct vm *vm, int vcpuid, int errcode, uint64_t cr2);
+
+/*
+ * Both SVM and VMX have complex logic for injecting events such as exceptions
+ * or interrupts into the guest.  Within those two backends, the progress of
+ * event injection is tracked by event_inject_state, hopefully making it easier
+ * to reason about.
+ */
+enum event_inject_state {
+	EIS_CAN_INJECT	= 0, /* exception/interrupt can be injected */
+	EIS_EV_EXISTING	= 1, /* blocked by existing event */
+	EIS_EV_INJECTED	= 2, /* blocked by injected event */
+	EIS_GI_BLOCK	= 3, /* blocked by guest interruptability */
+
+	/*
+	 * Flag to request an immediate exit from VM context after event
+	 * injection in order to perform more processing
+	 */
+	EIS_REQ_EXIT	= (1 << 15),
+};
 
 #ifndef	__FreeBSD__
 

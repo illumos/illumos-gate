@@ -67,6 +67,7 @@ int
 lapic_set_intr(struct vm *vm, int cpu, int vector, bool level)
 {
 	struct vlapic *vlapic;
+	vcpu_notify_t notify;
 
 	if (cpu < 0 || cpu >= vm_get_maxcpus(vm))
 		return (EINVAL);
@@ -79,8 +80,8 @@ lapic_set_intr(struct vm *vm, int cpu, int vector, bool level)
 		return (EINVAL);
 
 	vlapic = vm_lapic(vm, cpu);
-	if (vlapic_set_intr_ready(vlapic, vector, level))
-		vcpu_notify_event(vm, cpu, true);
+	notify = vlapic_set_intr_ready(vlapic, vector, level);
+	vcpu_notify_event_type(vm, cpu, notify);
 	return (0);
 }
 
