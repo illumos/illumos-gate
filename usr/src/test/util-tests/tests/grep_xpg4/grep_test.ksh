@@ -167,6 +167,42 @@ run_tests 0 t5 a /tmp/test0
 rm -rf /tmp/test0
 
 #
+# Test Group 6: Test -l and -L which are supposed to match the file or
+# not. We break this into cases that should always pass and those that
+# should fail. The first group should always pass.
+#
+FLAGS="-l
+-L
+-il
+-vl
+-vil
+-hl
+-hL
+-Hl
+-HL
+-cl
+-cL
+-nl
+-nL
+-l -A5 -B5
+-L -C5
+-nHvl
+-l -L -l
+-L -l
+-l -L
+-L -l -L"
+run_tests 0 t6 foo test.lL.0 test.lL.1
+
+#
+# Test Group 7: -l and -L variants that should cause us to not match or
+# fail for another reason.
+#
+FLAGS="-vL
+-viL
+-nHvL"
+run_tests 1 t7 foo test.lL.0 test.lL.1
+
+#
 # Clean up temporary files.
 #
 rm -f $FLAGSFILE $OUTFILE

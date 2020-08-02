@@ -30,6 +30,8 @@ PROGS = test0 \
 	test5 \
 	test6 \
 	test7 \
+	test.lL.0 \
+	test.lL.1 \
 	gout.t1.0 \
 	gout.t1.1 \
 	gout.t1.2 \
@@ -101,6 +103,26 @@ PROGS = test0 \
 	gout.t4.1 \
 	gout.t5.0 \
 	gout.t5.1 \
+	gout.t6.0 \
+	gout.t6.1 \
+	gout.t6.2 \
+	gout.t6.3 \
+	gout.t6.4 \
+	gout.t6.5 \
+	gout.t6.6 \
+	gout.t6.7 \
+	gout.t6.8 \
+	gout.t6.9 \
+	gout.t6.10 \
+	gout.t6.11 \
+	gout.t6.12 \
+	gout.t6.13 \
+	gout.t6.14 \
+	gout.t6.15 \
+	gout.t6.16 \
+	gout.t6.17 \
+	gout.t6.18 \
+	gout.t6.19 \
 	testnl
 
 CMDS = $(PROGS:%=$(TESTDIR)/%)

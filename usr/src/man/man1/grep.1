@@ -44,8 +44,9 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
 .\" Copyright 2018 Nexenta Systems, Inc.
+.\" Copyright 2020 Oxide Computer Company
 .\"
-.Dd February 10, 2018
+.Dd August 02, 2020
 .Dt GREP 1
 .Os
 .Sh NAME
@@ -56,7 +57,7 @@
 .Sh SYNOPSIS
 .Nm grep
 .Op Fl E Ns | Ns Fl F
-.Op Fl bchHilnrRsqvwx
+.Op Fl bchHilLnrRsqvwx
 .Op Fl A Ar num
 .Op Fl B Ar num
 .Op Fl C Ar num Ns | Ns Fl Ns Ar num
@@ -107,7 +108,9 @@ delimiter line.
 .It Fl c
 Prints only a count of the lines that contain the pattern.
 Overrides
-.Fl l .
+.Fl l
+and
+.Fl L .
 .It Fl C Ar num Ns \&, Fl Ns Ar num
 Prints
 .Ar num
@@ -168,6 +171,23 @@ Ignores upper/lower case distinction during comparisons.
 Prints only the names of files with matching lines, separated by NEWLINE
 characters.
 Does not repeat the names of files when the pattern is found more than once.
+If both
+.Fl l
+and
+.Fl L
+are specified, only the last specified takes effect.
+Overrides
+.Fl H .
+.It Fl L
+The opposite of the
+.Fl l
+flag.
+Prints only the names of files without matching lines.
+If both
+.Fl l
+and
+.Fl L
+are specified, only the last specified takes effect.
 Overrides
 .Fl H .
 .It Fl n
@@ -177,9 +197,10 @@ Quiet.
 Does not write anything to the standard output, regardless of matching lines.
 Exits with zero status if an input line is selected.
 Overrides
-.Fl c
+.Fl c ,
+.Fl l ,
 and
-.Fl l .
+.Fl L .
 .It Fl r
 Read all files under each directory, recursively.
 Follow symbolic links on the command line, but skip symlinks that are

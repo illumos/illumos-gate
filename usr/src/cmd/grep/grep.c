@@ -39,6 +39,7 @@
  * Copyright 2018 RackTop Systems.
  * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2013 Damian Bogel. All rights reserved.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <string.h>
@@ -94,6 +95,7 @@ static uchar_t	iflag;			/* Case insensitve matching */
 static uchar_t	Hflag;			/* Precede lines by file name */
 static uchar_t	hflag;			/* Suppress printing of filename */
 static uchar_t	lflag;			/* Print file names of matches */
+static uchar_t	Lflag;			/* Print file names of non-matches */
 static uchar_t	nflag;			/* Precede lines by line number */
 static uchar_t	rflag;			/* Search directories recursively */
 static uchar_t	bflag;			/* Precede matches by block number */
@@ -201,7 +203,8 @@ main(int argc, char **argv)
 		}
 	}
 
-	while ((c = getopt(argc, argv, "vwchHilnrbse:f:qxEFIRA:B:C:")) != EOF) {
+	while ((c = getopt(argc, argv, "vwchHilLnrbse:f:qxEFIRA:B:C:")) !=
+	    EOF) {
 		unsigned long tval;
 		switch (c) {
 		case 'v':	/* POSIX: negate matches */
@@ -217,8 +220,17 @@ main(int argc, char **argv)
 			regflags |= REG_ICASE;
 			break;
 
+		/*
+		 * The last of -l and -L are honored.
+		 */
 		case 'l':	/* POSIX: Write filenames only */
 			lflag++;
+			Lflag = 0;
+			break;
+
+		case 'L':	/* Write non-matching filenames */
+			Lflag++;
+			lflag = 0;
 			break;
 
 		case 'n':	/* POSIX: Write line numbers */
@@ -399,9 +411,9 @@ main(int argc, char **argv)
 		usage();
 
 	/*
-	 * -l overrides -H like in GNU grep
+	 * -l or -L overrides -H like in GNU grep
 	 */
-	if (lflag)
+	if (lflag || Lflag)
 		Hflag = 0;
 
 	/*
@@ -409,8 +421,10 @@ main(int argc, char **argv)
 	 * We have -c override -l like in Solaris.
 	 * -q overrides -l & -c programmatically in grep() function.
 	 */
-	if (cflag && lflag)
+	if (cflag && (lflag || Lflag)) {
 		lflag = 0;
+		Lflag = 0;
+	}
 
 	argv += optind - 1;
 	argc -= optind - 1;
@@ -1446,6 +1460,9 @@ L_next_line:
 				(void) printf("%s\n", fn);
 				goto out;
 			}
+			if (Lflag) {
+				goto out;
+			}
 			if (!cflag) {
 				if (Hflag || outfn) {
 					(void) printf("%s%c", fn, separate);
@@ -1518,6 +1535,20 @@ out:
 			(void) printf("%lld\n", matches);
 		}
 	}
+
+	/*
+	 * -L tells us to print the filename only when it doesn't match. So we
+	 * run through the normal operationa and then invert it.
+	 */
+	if (Lflag) {
+		if (matches == 0) {
+			(void) printf("%s\n", fn);
+			matches = 1;
+		} else {
+			matches = 0;
+		}
+	}
+
 	return (matches != 0);
 }
 
@@ -1530,7 +1561,7 @@ usage(void)
 	(void) fprintf(stderr, gettext("usage: %5s"), cmdname);
 	if (!egrep && !fgrep)
 		(void) fprintf(stderr, gettext(" [-E|-F]"));
-	(void) fprintf(stderr, gettext(" [-bchHilnqrRsvx] [-A num] [-B num] "
+	(void) fprintf(stderr, gettext(" [-bchHilLnqrRsvx] [-A num] [-B num] "
 	    "[-C num|-num]\n             [-e pattern_list]... "
 	    "[-f pattern_file]... [pattern_list] [file]...\n"));
 	exit(2);
