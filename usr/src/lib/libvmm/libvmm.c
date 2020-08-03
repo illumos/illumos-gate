@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*
@@ -199,12 +200,31 @@ vmm_map(vmm_t *vmm, boolean_t writable)
 	for (ms = list_head(&vmm->vmm_memlist);
 	    ms != NULL;
 	    ms = list_next(&vmm->vmm_memlist, ms)) {
-		off_t mapoff = ms->vms_gpa;
+		off_t mapoff;
 
-		if ((ms->vms_flags & VMM_MEMSEG_DEVMEM) &&
-		    vm_get_devmem_offset(vmm->vmm_ctx, ms->vms_segid, &mapoff)
-		    != 0)
-			goto fail;
+		if ((ms->vms_flags & VMM_MEMSEG_DEVMEM) == 0) {
+			/*
+			 * sysmem segments will be located at an offset
+			 * equivalent to their GPA.
+			 */
+			mapoff = ms->vms_gpa;
+		} else {
+			/*
+			 * devmem segments are located in a special region away
+			 * from the normal GPA space.
+			 */
+			if (vm_get_devmem_offset(vmm->vmm_ctx, ms->vms_segid,
+			    &mapoff) != 0) {
+				goto fail;
+			}
+		}
+
+		/*
+		 * While 'mapoff' points to the front of the segment, the actual
+		 * mapping may be at some offset beyond that.
+		 */
+		VERIFY(ms->vms_segoff >= 0);
+		mapoff += ms->vms_segoff;
 
 		vmm->vmm_memsize += ms->vms_maplen;
 

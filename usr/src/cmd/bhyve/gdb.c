@@ -1840,6 +1840,42 @@ limit_gdb_socket(int s)
 }
 #endif
 
+
+#ifndef __FreeBSD__
+/*
+ * Equivalent to init_gdb() below, but without configuring the listening socket.
+ * This will allow the bhyve process to tolerate mdb attaching/detaching from
+ * the instance while it is running.
+ */
+void
+init_mdb(struct vmctx *_ctx, bool wait)
+{
+	int error;
+
+	error = pthread_mutex_init(&gdb_lock, NULL);
+	if (error != 0)
+		errc(1, error, "gdb mutex init");
+	error = pthread_cond_init(&idle_vcpus, NULL);
+	if (error != 0)
+		errc(1, error, "gdb cv init");
+
+	ctx = _ctx;
+	stopped_vcpu = -1;
+	TAILQ_INIT(&breakpoints);
+	vcpu_state = calloc(guest_ncpus, sizeof(*vcpu_state));
+	if (wait) {
+		/*
+		 * Set vcpu 0 in vcpus_suspended.  This will trigger the
+		 * logic in gdb_cpu_add() to suspend the first vcpu before
+		 * it starts execution.  The vcpu will remain suspended
+		 * until a debugger connects.
+		 */
+		CPU_SET(0, &vcpus_suspended);
+		stopped_vcpu = 0;
+	}
+}
+#endif
+
 void
 init_gdb(struct vmctx *_ctx, int sport, bool wait)
 {

@@ -1311,8 +1311,20 @@ main(int argc, char *argv[])
 	if (dbg_port != 0)
 		init_dbgport(dbg_port);
 
+#ifdef __FreeBSD__
 	if (gdb_port != 0)
 		init_gdb(ctx, gdb_port, gdb_stop);
+#else
+	if (gdb_port < 0) {
+		/*
+		 * Set up the internal gdb state needed for basic debugging, but
+		 * skip the step of listening on a port for the GDB server.
+		 */
+		init_mdb(ctx, gdb_stop);
+	} else if (gdb_port != 0) {
+		init_gdb(ctx, gdb_port, gdb_stop);
+	}
+#endif
 
 	if (bvmcons)
 		init_bvmcons();
