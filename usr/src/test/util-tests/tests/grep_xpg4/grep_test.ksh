@@ -74,6 +74,41 @@ run_tests() {
 	done < $FLAGSFILE
 }
 
+run_tests_stdin() {
+	i=0
+	exp=$1
+	pass=$2
+	pattern=$3
+	file=$4
+
+	echo "$FLAGS" > $FLAGSFILE
+	while read flags; do
+		difffile="gout.$pass.$i"
+		print -n "test $total: grep (stdin) $flags: "
+		((total++))
+		((i++))
+		$XGREP $flags $pattern < $file > $OUTFILE
+		err=$?
+		if [[ $err -ne $exp ]]; then
+			test_fail "failed on exit: $err"
+			continue
+		fi
+
+		if [[ $exp -eq 0 ]]; then
+			if [[ ! -f "$difffile" ]]; then
+				test_fail "missing output file $difffile"
+				continue
+			fi
+
+			if [[ -n "$(diff $OUTFILE $difffile)" ]]; then
+				print "$(diff $OUTFILE $difffile)"
+				test_fail "output is different"
+				continue
+			fi
+		fi
+		echo "passed"
+	done < $FLAGSFILE
+}
 total=0
 failures=0
 
@@ -201,6 +236,21 @@ FLAGS="-vL
 -viL
 -nHvL"
 run_tests 1 t7 foo test.lL.0 test.lL.1
+
+#
+# Test Group 8, 9: Here we are testing the ability for --label to
+# properly replace the name of a file from standard in, but not
+# replacing that of a file that's normally specified. Set 8 verifies the
+# former while set 9 verifies the latter.
+#
+FLAGS="-H
+-H --label=zelda
+--label=zelda
+-h --label=zelda
+-n --label=zelda
+-H -n --label=zelda"
+run_tests_stdin 0 t8 a test0
+run_tests 0 t9 a test0
 
 #
 # Clean up temporary files.

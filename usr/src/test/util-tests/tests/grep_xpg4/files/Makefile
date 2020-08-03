@@ -123,6 +123,18 @@ PROGS = test0 \
 	gout.t6.17 \
 	gout.t6.18 \
 	gout.t6.19 \
+	gout.t8.0 \
+	gout.t8.1 \
+	gout.t8.2 \
+	gout.t8.3 \
+	gout.t8.4 \
+	gout.t8.5 \
+	gout.t9.0 \
+	gout.t9.1 \
+	gout.t9.2 \
+	gout.t9.3 \
+	gout.t9.4 \
+	gout.t9.5 \
 	testnl
 
 CMDS = $(PROGS:%=$(TESTDIR)/%)

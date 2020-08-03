@@ -61,6 +61,7 @@
 .Op Fl A Ar num
 .Op Fl B Ar num
 .Op Fl C Ar num Ns | Ns Fl Ns Ar num
+.Op Fl -label Ns = Ns Ar name
 .Oo Fl e Ar pattern_list Oc Ns ...
 .Oo Fl f Ar pattern_file Oc Ns ...
 .Op Ar pattern_list
@@ -167,6 +168,16 @@ Used when searching multiple files.
 Precedes each line by the name of the file containing the matching line.
 .It Fl i
 Ignores upper/lower case distinction during comparisons.
+.It Fl -label Ns = Ns Ar name
+When the name of the matching file is printed
+.Pq Fl H ,
+instead of printing the string
+.Ql (standard input)
+the string
+.Ar name
+is printed instead.
+See
+.Sx Example 5 .
 .It Fl l
 Prints only the names of files with matching lines, separated by NEWLINE
 characters.
@@ -361,6 +372,20 @@ $ grep -E '^abc$
 ^def$'
 $ grep -F -x 'abc
 def'
+.Ed
+.It Sy Example 5 No Using Fl -label
+When piping standard input into
+.Nm ,
+as part of a pipeline, occasionally it can be useful override the file
+name
+.Ql (standard input)
+with something from the pipeline.
+This would output each matching line instead with the name of the input
+file.
+.Bd -literal
+$ for f in *.gz; do
+> gzcat $f | grep -H --label=$f foo
+> done
 .Ed
 .El
 .Sh ENVIRONMENT VARIABLES

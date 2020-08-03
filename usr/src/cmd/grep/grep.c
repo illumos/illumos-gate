@@ -59,6 +59,7 @@
 #include <wctype.h>
 #include <ftw.h>
 #include <sys/param.h>
+#include <getopt.h>
 
 #define	STDIN_FILENAME gettext("(standard input)")
 
@@ -109,6 +110,7 @@ static uchar_t	Rflag;			/* Like rflag, but follow symlinks */
 static uchar_t	outfn;			/* Put out file name */
 static uchar_t	conflag;		/* show context of matches */
 static char	*cmdname;
+static char	*stdin_label;		/* Optional lable for stdin */
 
 static int	use_wchar, use_bmg, mblocale;
 
@@ -127,6 +129,20 @@ static char	*bmgexec(char *, char *);
 static int	recursive(const char *, const struct stat *, int, struct FTW *);
 static void	process_path(const char *);
 static void	process_file(const char *, int);
+
+/*
+ * These are values that we use to return from getopt_long. They start at
+ * SHRT_MAX to avoid any possible conflict with the normal options. These are
+ * used for long options that have no short option equivalent.
+ */
+enum grep_opts {
+	OPT_LABEL = SHRT_MAX + 1
+};
+
+static struct option grep_options[] = {
+	{ "label", required_argument, NULL, OPT_LABEL },
+	{ NULL }
+};
 
 /*
  * mainline for grep
@@ -203,8 +219,8 @@ main(int argc, char **argv)
 		}
 	}
 
-	while ((c = getopt(argc, argv, "vwchHilLnrbse:f:qxEFIRA:B:C:")) !=
-	    EOF) {
+	while ((c = getopt_long(argc, argv, "+vwchHilLnrbse:f:qxEFIRA:B:C:",
+	    grep_options, NULL)) != EOF) {
 		unsigned long tval;
 		switch (c) {
 		case 'v':	/* POSIX: negate matches */
@@ -364,6 +380,10 @@ main(int argc, char **argv)
 			}
 			break;
 
+		case OPT_LABEL:
+			stdin_label = optarg;
+			break;
+
 		default:
 			usage();
 		}
@@ -469,9 +489,13 @@ main(int argc, char **argv)
 	 */
 	fixpatterns();
 
+	if (stdin_label == NULL) {
+		stdin_label = STDIN_FILENAME;
+	}
+
 	/* Process all files: stdin, or rest of arg list */
 	if (argc < 2) {
-		matched = grep(0, STDIN_FILENAME);
+		matched = grep(0, stdin_label);
 	} else {
 		if (Hflag || (argc > 2 && hflag == 0))
 			outfn = 1;	/* Print filename on match line */
@@ -1562,8 +1586,8 @@ usage(void)
 	if (!egrep && !fgrep)
 		(void) fprintf(stderr, gettext(" [-E|-F]"));
 	(void) fprintf(stderr, gettext(" [-bchHilLnqrRsvx] [-A num] [-B num] "
-	    "[-C num|-num]\n             [-e pattern_list]... "
-	    "[-f pattern_file]... [pattern_list] [file]...\n"));
+	    "[-C num|-num]\n             [--label=name] [-e pattern_list]... "
+	    "[-f pattern_file]...\n             [pattern_list] [file]...\n"));
 	exit(2);
 	/* NOTREACHED */
 }
