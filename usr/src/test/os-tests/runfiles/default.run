@@ -106,7 +106,9 @@ tests = ['digraph-test']
 # The stress test is designed to be run separately.
 #
 [/opt/os-tests/tests/ksensor]
+pre_user = root
 user = root
+post_user = root
 pre = ksensor_init
 tests = [ 'ksensor_basic.32','ksensor_basic.64', 'ksensor_err.32',
     'ksensor_err.64' ]
