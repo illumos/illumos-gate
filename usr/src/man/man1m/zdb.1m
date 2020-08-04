@@ -174,18 +174,21 @@ If specified multiple times, display counts of each intent log transaction type.
 Examine the checkpointed state of the pool.
 Note, the on disk format of the pool is not reverted to the checkpointed state.
 .It Fl l Ar device
-Read the vdev labels from the specified device.
+Read the vdev labels from the specified device and dump the unique configuration
+nvlists(t).
 .Nm Fl l
-will return 0 if valid label was found, 1 if error occurred, and 2 if no valid
-labels were found.
+will return 1 if an error occurred, 2 if no configuration nvlist could be
+unpacked (errors or not), and 0 otherwise.
+Specify multiple times to increase verbosity.
 .Pp
 If the
 .Fl q
-option is also specified, don't print the labels.
+option is also specified, don't dump the configurations or the uberblocks.
 .Pp
 If the
 .Fl u
 option is also specified, also display the uberblocks on this device.
+Specify multiple times to increase verbosity.
 .It Fl L
 Disable leak detection and the loading of space maps.
 By default,
