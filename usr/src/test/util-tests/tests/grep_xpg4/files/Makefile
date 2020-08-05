@@ -13,13 +13,14 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2020 Peter Tribble.
+# Copyright 2020 Oxide Computer Company
 #
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
 ROOTOPTPKG = $(ROOT)/opt/util-tests
-TESTDIR = $(ROOTOPTPKG)/tests/files
+TESTDIR = $(ROOTOPTPKG)/tests/files/grep
 
 PROGS = test0 \
 	test1 \
@@ -29,77 +30,77 @@ PROGS = test0 \
 	test5 \
 	test6 \
 	test7 \
-	gout0 \
-	gout1 \
-	gout2 \
-	gout3 \
-	gout4 \
-	gout5 \
-	gout6 \
-	gout7 \
-	gout8 \
-	gout9 \
-	gout10 \
-	gout11 \
-	gout12 \
-	gout13 \
-	gout14 \
-	gout15 \
-	gout16 \
-	gout17 \
-	gout18 \
-	gout19 \
-	gout20 \
-	gout21 \
-	gout22 \
-	gout23 \
-	gout24 \
-	gout25 \
-	gout26 \
-	gout27 \
-	gout28 \
-	gout29 \
-	gout30 \
-	gout31 \
-	gout32 \
-	gout33 \
-	gout34 \
-	gout35 \
-	gout36 \
-	gout37 \
-	gout38 \
-	gout39 \
-	gout40 \
-	gout41 \
-	gout42 \
-	gout43 \
-	gout44 \
-	gout45 \
-	gout46 \
-	gout47 \
-	gout48 \
-	gout49 \
-	gout50 \
-	gout51 \
-	gout52 \
-	gout53 \
-	gout54 \
-	gout55 \
-	gout56 \
-	gout57 \
-	gout58 \
-	gout59 \
-	gout60 \
-	gout61 \
-	gout62 \
-	gout63 \
-	gout64 \
-	gout65 \
-	gout66 \
-	gout67 \
-	gout68 \
-	gout69 \
-	gout70 \
+	gout.t1.0 \
+	gout.t1.1 \
+	gout.t1.2 \
+	gout.t1.3 \
+	gout.t1.4 \
+	gout.t1.5 \
+	gout.t1.6 \
+	gout.t1.7 \
+	gout.t1.8 \
+	gout.t1.9 \
+	gout.t1.10 \
+	gout.t1.11 \
+	gout.t1.12 \
+	gout.t1.13 \
+	gout.t1.14 \
+	gout.t1.15 \
+	gout.t1.16 \
+	gout.t1.17 \
+	gout.t1.18 \
+	gout.t1.19 \
+	gout.t1.20 \
+	gout.t1.21 \
+	gout.t1.22 \
+	gout.t1.23 \
+	gout.t1.24 \
+	gout.t1.25 \
+	gout.t1.26 \
+	gout.t1.27 \
+	gout.t1.28 \
+	gout.t1.29 \
+	gout.t1.30 \
+	gout.t1.31 \
+	gout.t1.32 \
+	gout.t1.33 \
+	gout.t1.34 \
+	gout.t1.35 \
+	gout.t1.36 \
+	gout.t1.37 \
+	gout.t1.38 \
+	gout.t1.39 \
+	gout.t1.40 \
+	gout.t1.41 \
+	gout.t1.42 \
+	gout.t1.43 \
+	gout.t1.44 \
+	gout.t1.45 \
+	gout.t1.46 \
+	gout.t1.47 \
+	gout.t1.48 \
+	gout.t1.49 \
+	gout.t1.50 \
+	gout.t1.51 \
+	gout.t1.52 \
+	gout.t1.53 \
+	gout.t1.54 \
+	gout.t1.55 \
+	gout.t1.56 \
+	gout.t1.57 \
+	gout.t1.58 \
+	gout.t1.59 \
+	gout.t1.60 \
+	gout.t1.61 \
+	gout.t1.62 \
+	gout.t2.0 \
+	gout.t3.0 \
+	gout.t3.1 \
+	gout.t3.2 \
+	gout.t4.0 \
+	gout.t4.1 \
+	gout.t5.0 \
+	gout.t5.1 \
 	testnl
 
 CMDS = $(PROGS:%=$(TESTDIR)/%)
