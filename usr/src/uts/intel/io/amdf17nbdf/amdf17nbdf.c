@@ -984,7 +984,6 @@ static struct dev_ops amdf17nbdf_dev_ops = {
 	.devo_attach = amdf17nbdf_attach,
 	.devo_detach = amdf17nbdf_detach,
 	.devo_reset = nodev,
-	.devo_power = ddi_power,
 	.devo_quiesce = ddi_quiesce_not_needed,
 	.devo_cb_ops = &amdf17nbdf_cb_ops
 };

@@ -685,6 +685,8 @@ audioens_count(void *arg)
 		page = CONC_ADCCTL_PAGE;
 		offs = CONC_wADCFC_OFF;
 		break;
+	default:
+		panic("Unknown port number: %d\n", port->num);
 	}
 
 	mutex_enter(&dev->mutex);
