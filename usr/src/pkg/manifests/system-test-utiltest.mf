@@ -16,6 +16,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2017 Jason King.
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/test/utiltest@$(PKGVERS)
@@ -1420,9 +1421,41 @@ file path=opt/util-tests/tests/files/grep/gout.t1.6 mode=0444
 file path=opt/util-tests/tests/files/grep/gout.t1.60 mode=0444
 file path=opt/util-tests/tests/files/grep/gout.t1.61 mode=0444
 file path=opt/util-tests/tests/files/grep/gout.t1.62 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t1.63 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t1.64 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t1.65 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t1.66 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t1.67 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t1.68 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t1.69 mode=0444
 file path=opt/util-tests/tests/files/grep/gout.t1.7 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t1.70 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t1.71 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t1.72 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t1.73 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t1.74 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t1.75 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t1.76 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t1.77 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t1.78 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t1.79 mode=0444
 file path=opt/util-tests/tests/files/grep/gout.t1.8 mode=0444
 file path=opt/util-tests/tests/files/grep/gout.t1.9 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t10.0 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t10.1 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t10.2 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t10.3 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t10.4 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t10.5 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t10.6 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t10.7 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t11.0 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t11.1 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t11.2 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t11.3 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t11.4 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t11.5 mode=0444
+file path=opt/util-tests/tests/files/grep/gout.t11.6 mode=0444
 file path=opt/util-tests/tests/files/grep/gout.t2.0 mode=0444
 file path=opt/util-tests/tests/files/grep/gout.t3.0 mode=0444
 file path=opt/util-tests/tests/files/grep/gout.t3.1 mode=0444
@@ -1465,6 +1498,8 @@ file path=opt/util-tests/tests/files/grep/gout.t9.4 mode=0444
 file path=opt/util-tests/tests/files/grep/gout.t9.5 mode=0444
 file path=opt/util-tests/tests/files/grep/test.lL.0 mode=0444
 file path=opt/util-tests/tests/files/grep/test.lL.1 mode=0444
+file path=opt/util-tests/tests/files/grep/test.mb.0 mode=0444
+file path=opt/util-tests/tests/files/grep/test.o.0 mode=0444
 file path=opt/util-tests/tests/files/grep/test0 mode=0444
 file path=opt/util-tests/tests/files/grep/test1 mode=0444
 file path=opt/util-tests/tests/files/grep/test2 mode=0444

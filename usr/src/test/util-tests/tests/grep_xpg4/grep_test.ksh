@@ -22,6 +22,11 @@ FILEDIR=$MY_TESTS/tests/files/grep
 OUTFILE=/tmp/grep_test.out.$$
 FLAGSFILE=/tmp/grep_flags.$$
 
+#
+# Set the tests to a known multi-byte locale to start with.
+#
+export LC_ALL=C.UTF-8
+
 fail() {
 	echo $1
 	exit -1
@@ -174,10 +179,42 @@ FLAGS="
 -qC 5 -B 4 -A 2
 -vC 5 -B 4 -A 2
 -nvC 5 -B 4 -A 2
--vcC 5 -B 4 -A 2"
+-vcC 5 -B 4 -A 2
+-b
+-bh
+-bn
+-bnh
+-ib
+-ibnH
+-b -C 1
+-bn -C 1
+-o
+-no
+-cno
+-bo
+-bno
+-cbno
+-ho
+-xo
+-o -C 3"
 
 cd $FILEDIR || fail "failed to cd to $FILEDIR"
+
+#
+# Test Pass 1: General flags with a basic pattern, checked against all
+# three primary forms of grep: grep, egrep, and fgrep. We do this in two
+# different passes. In one we're in a default multi-byte locale and in
+# the other we're in a single-byte locale. This ensures that we get
+# basic coverage of the use_bmg path in grep.
+#
 run_tests 0 t1 a test0 test1 test2 test3 test4 test5 test6 test7
+run_tests 0 t1 -E a test0 test1 test2 test3 test4 test5 test6 test7
+run_tests 0 t1 -F a test0 test1 test2 test3 test4 test5 test6 test7
+export LC_ALL=C
+run_tests 0 t1 a test0 test1 test2 test3 test4 test5 test6 test7
+run_tests 0 t1 -E a test0 test1 test2 test3 test4 test5 test6 test7
+run_tests 0 t1 -F a test0 test1 test2 test3 test4 test5 test6 test7
+export LC_ALL=C.UTF-8
 
 FLAGS="-nE"
 run_tests 0 t2 ".*" testnl
@@ -251,6 +288,34 @@ FLAGS="-H
 -H -n --label=zelda"
 run_tests_stdin 0 t8 a test0
 run_tests 0 t9 a test0
+
+#
+# Test group 10, using multiple regexps.
+#
+FLAGS="-o
+-E -o
+-o -n
+-E -o -n
+-o -n -b
+-E -o -n -b
+-E -o -n -H
+-E -o -n -H -b"
+run_tests 0 t10 -e '[fF]oo' -e 's[df]+;' test.o.0
+
+#
+# Test group 11, using multibyte files.
+#
+OLDLOC=$LC_ALL
+export LC_ALL=C.UTF-8
+FLAGS="
+-o
+-n
+-n -o
+-H -n -o
+-l
+-c"
+run_tests 0 t11 -e ï -e à test.mb.0
+export LC_ALL=$OLDLOC
 
 #
 # Clean up temporary files.

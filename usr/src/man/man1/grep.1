@@ -46,7 +46,7 @@
 .\" Copyright 2018 Nexenta Systems, Inc.
 .\" Copyright 2020 Oxide Computer Company
 .\"
-.Dd August 02, 2020
+.Dd August 13, 2020
 .Dt GREP 1
 .Os
 .Sh NAME
@@ -57,7 +57,7 @@
 .Sh SYNOPSIS
 .Nm grep
 .Op Fl E Ns | Ns Fl F
-.Op Fl bchHilLnrRsqvwx
+.Op Fl bchHilLnorRsqvwx
 .Op Fl A Ar num
 .Op Fl B Ar num
 .Op Fl C Ar num Ns | Ns Fl Ns Ar num
@@ -203,6 +203,27 @@ Overrides
 .Fl H .
 .It Fl n
 Precedes each line by its line number in the file (first line is 1).
+.It Fl o
+Prints only the matching part of a line.
+If a pattern appears more than once in a line, it will be matched and
+printed multiple times.
+.Pp
+The
+.Fl o
+option is overridden when any of the
+.Fl l ,
+.Fl L ,
+or
+.Fl c
+options are specified.
+When the
+.Fl o
+option is specified, all context options are ignored.
+The
+.Fl o
+and
+.Fl v
+options are not supported together at this time.
 .It Fl q
 Quiet.
 Does not write anything to the standard output, regardless of matching lines.
