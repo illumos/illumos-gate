@@ -495,6 +495,8 @@ usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/*
 usr/src/uts/sparc/nsmb/ioc_check.ref
 
 # bhyve sources
+usr/src/cmd/bhyve/THIRDPARTYLICENSE
+usr/src/cmd/bhyve/THIRDPARTYLICENSE.descrip
 usr/src/cmd/bhyve/acpi.[ch]
 usr/src/cmd/bhyve/ahci.h
 usr/src/cmd/bhyve/atkbdc.[ch]
@@ -545,10 +547,16 @@ usr/src/cmd/bhyve/usb_mouse.c
 usr/src/cmd/bhyve/vga.[ch]
 usr/src/cmd/bhyve/virtio.[ch]
 usr/src/cmd/bhyve/xmsr.[ch]
+usr/src/cmd/bhyvectl/THIRDPARTYLICENSE
+usr/src/cmd/bhyvectl/THIRDPARTYLICENSE.descrip
 usr/src/cmd/bhyvectl/bhyvectl.c
 usr/src/compat/bhyve/*
 usr/src/contrib/bhyve/*
+usr/src/lib/libvmmapi/THIRDPARTYLICENSE
+usr/src/lib/libvmmapi/THIRDPARTYLICENSE.descrip
 usr/src/lib/libvmmapi/common/vmmapi.[ch]
+usr/src/uts/i86pc/io/vmm/THIRDPARTYLICENSE
+usr/src/uts/i86pc/io/vmm/THIRDPARTYLICENSE.descrip
 usr/src/uts/i86pc/io/vmm/amd/*.[chs]
 usr/src/uts/i86pc/io/vmm/intel/*.[chs]
 usr/src/uts/i86pc/io/vmm/intel/offsets.in
@@ -576,3 +584,5 @@ usr/src/cmd/bhyve/README.license
 usr/src/cmd/bhyvectl/README.license
 usr/src/lib/libvmmapi/README.license
 usr/src/uts/i86pc/io/vmm/README.license
+usr/src/uts/i86pc/io/viona/THIRDPARTYLICENSE
+usr/src/uts/i86pc/io/viona/THIRDPARTYLICENSE.descrip
