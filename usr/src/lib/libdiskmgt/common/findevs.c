@@ -27,6 +27,7 @@
 /*
  * Copyright (c) 2011 by Delphix. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <fcntl.h>
@@ -149,8 +150,23 @@ findevs(struct search_args *args)
 	args->controller_listp = NULL;
 	args->disk_listp = NULL;
 
+	args->ph = DI_PROM_HANDLE_NIL;
+	args->handle = DI_LINK_NIL;
 	args->dev_walk_status = 0;
-	args->handle = di_devlink_init(NULL, 0);
+
+	/*
+	 * Create device information library handles, which must be destroyed
+	 * before we return.
+	 */
+	if ((args->ph = di_prom_init()) == DI_PROM_HANDLE_NIL ||
+	    (args->handle = di_devlink_init(NULL, 0)) == DI_LINK_NIL) {
+		/*
+		 * We could not open all of the handles we need, so clean up
+		 * and report failure to the caller.
+		 */
+		args->dev_walk_status = errno;
+		goto cleanup;
+	}
 
 	/*
 	 * Have to make several passes at this with the new devfs caching.
@@ -158,7 +174,6 @@ findevs(struct search_args *args)
 	 * devices.
 	 */
 	di_root = di_init("/", DINFOCACHE);
-	args->ph = di_prom_init();
 	(void) di_walk_minor(di_root, NULL, 0, args, add_devs);
 	di_fini(di_root);
 
@@ -166,9 +181,16 @@ findevs(struct search_args *args)
 	(void) di_walk_minor(di_root, NULL, 0, args, add_devs);
 	di_fini(di_root);
 
-	(void) di_devlink_fini(&(args->handle));
-
 	clean_paths(args);
+
+cleanup:
+	if (args->ph != DI_PROM_HANDLE_NIL) {
+		di_prom_fini(args->ph);
+		args->ph = DI_PROM_HANDLE_NIL;
+	}
+	if (args->handle != DI_LINK_NIL) {
+		(void) di_devlink_fini(&(args->handle));
+	}
 }
 
 /*
