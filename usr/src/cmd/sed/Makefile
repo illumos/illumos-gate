@@ -48,6 +48,4 @@ install: all $(DIRS) $(ROOTPROG) $(ROOTXPG4PROG)
 clean:
 	$(RM) $(OBJS) $(POFILES)
 
-lint:	lint_SRCS
-
 include ../Makefile.targ
