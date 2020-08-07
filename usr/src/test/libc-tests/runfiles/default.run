@@ -38,6 +38,8 @@ outputdir = /var/tmp/test_results
 [/opt/libc-tests/tests/wcsncasecmp-7350.32]
 [/opt/libc-tests/tests/wcsncasecmp-7350.64]
 
+[/opt/libc-tests/tests/i18n/bindtextdomain_test]
+
 [/opt/libc-tests/tests/random/getrandom]
 [/opt/libc-tests/tests/random/getentropy]
 [/opt/libc-tests/tests/random/chacha]

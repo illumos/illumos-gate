@@ -58,7 +58,7 @@ char *
 _real_gettext_u(const char *domain, const char *msgid1, const char *msgid2,
     unsigned long int ln, int category, int plural, locale_t loc)
 {
-	char	msgfile[MAXPATHLEN]; 	/* 1024 */
+	char	msgfile[MAXPATHLEN]; /* 1024 */
 	char	mydomain[TEXTDOMAINMAX + 1]; /* 256 + 1 */
 	char	*cur_binding;	/* points to current binding in list */
 	const char *cur_locale;
@@ -326,7 +326,7 @@ static int
 process_nlspath(const char *cur_domain, const char *cur_msgloc,
     const char *nlspath, char **binding)
 {
-	char 	*s;				/* generic string ptr */
+	char	*s;			/* generic string ptr */
 	char	*territory;		/* our current territory element */
 	char	*codeset;		/* our current codeset element */
 	char	*s1;			/* for handling territory */
@@ -684,12 +684,12 @@ _real_bindtextdomain_u(const char *domain, const char *binding,
 				return (*binding_addr);
 			}
 			/* replace existing binding with new binding */
-			if (*binding_addr) {
-				free(*binding_addr);
-			}
-			if ((*binding_addr = strdup(binding)) == NULL) {
+			char *new_binding = strdup(binding);
+			if (new_binding == NULL) {
 				return (NULL);
 			}
+			free(*binding_addr);
+			*binding_addr = new_binding;
 #ifdef GETTEXT_DEBUG
 			printlist();
 #endif

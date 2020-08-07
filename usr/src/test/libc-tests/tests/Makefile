@@ -18,6 +18,7 @@
 SUBDIRS = \
 	catopen \
 	fpround \
+	i18n \
 	newlocale \
 	nl_langinfo \
 	priv_gettext \
