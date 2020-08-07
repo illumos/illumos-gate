@@ -202,6 +202,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_find_vdev;
 	zpool_find_vdev_by_physpath;
 	zpool_fru_set;
+	zpool_get_bootenv;
 	zpool_get_config;
 	zpool_get_errlog;
 	zpool_get_features;
@@ -241,6 +242,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_reguid;
 	zpool_reopen;
 	zpool_scan;
+	zpool_set_bootenv;
 	zpool_set_prop;
 	zpool_skip_pool;
 	zpool_state_to_name;

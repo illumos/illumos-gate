@@ -38,6 +38,13 @@
 
 $mapfile_version 2
 
+SYMBOL_VERSION ILLUMOS_0.8 {
+	global:
+
+	lzc_get_bootenv;
+	lzc_set_bootenv;
+} ILLUMOS_0.7;
+
 SYMBOL_VERSION ILLUMOS_0.7 {
 	global:
 
