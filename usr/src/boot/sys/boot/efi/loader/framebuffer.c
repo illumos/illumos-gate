@@ -50,10 +50,11 @@ EFI_GUID gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
 static EFI_GUID pciio_guid = EFI_PCI_IO_PROTOCOL_GUID;
 EFI_GUID uga_guid = EFI_UGA_DRAW_PROTOCOL_GUID;
 static EFI_GUID active_edid_guid = EFI_EDID_ACTIVE_PROTOCOL_GUID;
-static EFI_GUID discovered_edid_guid = EFI_EDID_DISCOVERED_PROTOCOL_GUID;
 
 /* Saved initial GOP mode. */
 static uint32_t default_mode = UINT32_MAX;
+/* Cached EDID. */
+static struct vesa_edid_info *edid_info;
 
 static uint32_t gop_default_mode(void);
 static int efifb_set_mode(EFI_GRAPHICS_OUTPUT *, uint_t);
@@ -451,63 +452,54 @@ efifb_gop_get_edid(EFI_HANDLE gop)
 {
 	const uint8_t magic[] = EDID_MAGIC;
 	EFI_EDID_ACTIVE_PROTOCOL *edid;
-	struct vesa_edid_info *edid_info;
+	struct vesa_edid_info *edid_infop;
 	EFI_GUID *guid;
 	EFI_STATUS status;
 	size_t size;
 
-	edid_info = calloc(1, sizeof (*edid_info));
-	if (edid_info == NULL)
+	guid = &active_edid_guid;
+	status = OpenProtocolByHandle(gop, guid, (void **)&edid);
+	if (status != EFI_SUCCESS)
 		return (NULL);
 
-	guid = &active_edid_guid;
-	status = BS->OpenProtocol(gop, guid, (void **)&edid, IH, NULL,
-	    EFI_OPEN_PROTOCOL_GET_PROTOCOL);
-	if (status != EFI_SUCCESS) {
-		guid = &discovered_edid_guid;
-		status = BS->OpenProtocol(gop, guid, (void **)&edid, IH, NULL,
-		    EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+	size = sizeof (*edid_infop);
+	if (size < edid->SizeOfEdid)
+		size = edid->SizeOfEdid;
+
+	edid_infop = calloc(1, size);
+	if (edid_infop == NULL) {
+		status = BS->CloseProtocol(gop, guid, IH, NULL);
+		return (NULL);
 	}
-	if (status != EFI_SUCCESS)
-		goto error;
 
-	size = edid->SizeOfEdid;
-	if (size > sizeof (*edid_info))
-		size = sizeof (*edid_info);
-
-	memcpy(edid_info, edid->Edid, size);
+	memcpy(edid_infop, edid->Edid, edid->SizeOfEdid);
 	status = BS->CloseProtocol(gop, guid, IH, NULL);
 
 	/* Validate EDID */
-	if (memcmp(edid_info, magic, sizeof (magic)) != 0)
+	if (memcmp(edid_infop, magic, sizeof (magic)) != 0)
 		goto error;
 
-	if (edid_info->header.version == 1 &&
-	    (edid_info->display.supported_features
-	    & EDID_FEATURE_PREFERRED_TIMING_MODE) &&
-	    edid_info->detailed_timings[0].pixel_clock) {
-		return (edid_info);
-	}
+	if (edid_infop->header.version != 1)
+		goto error;
 
+	return (edid_infop);
 error:
-	free(edid_info);
+	free(edid_infop);
 	return (NULL);
 }
 
-static int
-efifb_get_edid(UINT32 *pwidth, UINT32 *pheight)
+static bool
+efifb_get_edid(edid_res_list_t *res)
 {
 	extern EFI_GRAPHICS_OUTPUT *gop;
-	struct vesa_edid_info *edid_info;
-	int rv = 1;
+	bool rv = false;
 
-	edid_info = efifb_gop_get_edid(gop);
-	if (edid_info != NULL) {
-		*pwidth = GET_EDID_INFO_WIDTH(edid_info, 0);
-		*pheight = GET_EDID_INFO_HEIGHT(edid_info, 0);
-		rv = 0;
-	}
-	free(edid_info);
+	if (edid_info == NULL)
+		edid_info = efifb_gop_get_edid(gop);
+
+	if (edid_info != NULL)
+		rv = gfx_get_edid_resolution(edid_info, res);
+
 	return (rv);
 }
 
@@ -548,13 +540,22 @@ static void
 print_efifb(int mode, struct efi_fb *efifb, int verbose)
 {
 	uint_t depth;
-	UINT32 width, height;
+	edid_res_list_t res;
+	struct resolution *rp;
 
+	TAILQ_INIT(&res);
 	if (verbose == 1) {
 		printf("Framebuffer mode: %s\n",
 		    plat_stdout_is_framebuffer() ? "on" : "off");
-		if (efifb_get_edid(&width, &height) == 0)
-			printf("EDID mode: %dx%d\n\n", width, height);
+		if (efifb_get_edid(&res)) {
+			printf("EDID");
+			while ((rp = TAILQ_FIRST(&res)) != NULL) {
+				printf(" %dx%d", rp->width, rp->height);
+				TAILQ_REMOVE(&res, rp, next);
+				free(rp);
+			}
+			printf("\n");
+		}
 	}
 
 	if (mode >= 0) {
@@ -665,12 +666,23 @@ efifb_find_mode(char *str)
 static uint32_t
 gop_default_mode(void)
 {
+	edid_res_list_t res;
+	struct resolution *rp;
 	extern EFI_GRAPHICS_OUTPUT *gop;
-	UINT32 mode, width = 0, height = 0;
+	UINT32 mode;
 
 	mode = gop->Mode->MaxMode;
-	if (efifb_get_edid(&width, &height) == 0)
-		mode = efifb_find_mode_xydm(width, height, -1, -1);
+	TAILQ_INIT(&res);
+	if (efifb_get_edid(&res)) {
+		while ((rp = TAILQ_FIRST(&res)) != NULL) {
+			if (mode == gop->Mode->MaxMode) {
+				mode = efifb_find_mode_xydm(
+				    rp->width, rp->height, -1, -1);
+			}
+			TAILQ_REMOVE(&res, rp, next);
+			free(rp);
+		}
+	}
 
 	if (mode == gop->Mode->MaxMode)
 		mode = default_mode;
