@@ -1802,30 +1802,6 @@ done:
 	}
 }
 
-static __inline void
-restore_host_tss(void)
-{
-#ifdef __FreeBSD__
-	struct system_segment_descriptor *tss_sd;
-
-	/*
-	 * The TSS descriptor was in use prior to launching the guest so it
-	 * has been marked busy.
-	 *
-	 * 'ltr' requires the descriptor to be marked available so change the
-	 * type to "64-bit available TSS".
-	 */
-	tss_sd = PCPU_GET(tss);
-	tss_sd->sd_type = SDT_SYSTSS;
-	ltr(GSEL(GPROC0_SEL, SEL_KPL));
-#else
-	system_desc_t *tss = (system_desc_t *)&CPU->cpu_gdt[GDT_KTSS];
-
-	tss->ssd_type = SDT_SYSTSS;
-	wr_tsr(KTSS_SEL);
-#endif
-}
-
 #ifdef __FreeBSD__
 static void
 check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, u_int thiscpu)
@@ -2173,13 +2149,6 @@ svm_vmrun(void *arg, int vcpu, register_t rip, pmap_t pmap,
 		svm_dr_leave_guest(gctx);
 
 		CPU_CLR_ATOMIC(curcpu, &pmap->pm_active);
-
-		/*
-		 * The host GDTR and IDTR is saved by VMRUN and restored
-		 * automatically on #VMEXIT. However, the host TSS needs
-		 * to be restored explicitly.
-		 */
-		restore_host_tss();
 
 		/* Restore host LDTR. */
 		lldt(ldt_sel);
