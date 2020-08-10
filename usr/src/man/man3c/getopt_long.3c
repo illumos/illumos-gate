@@ -29,12 +29,14 @@
 .\"
 .\" Copyright 2018 Jason King
 .\" Copyright 2018, Joyent, Inc.
+.\" Copyright 2020 Oxide Computer Company
 .\"
-.Dd July 17, 2018
+.Dd August 10, 2020
 .Dt GETOPT_LONG 3C
 .Os
 .Sh NAME
 .Nm getopt_long ,
+.Nm getopt_long_clip ,
 .Nm getopt_long_only
 .Nd get long options from command line argument list
 .Sh SYNOPSIS
@@ -72,20 +74,56 @@ The
 .Fn getopt_long
 function is similar to
 .Xr getopt 3C
-but it accepts options in two forms: words and characters.
-The
-.Fn getopt_long
-function provides a superset of the functionality of
+but it accepts options in two forms: short options and long options.
+Short options are the traditional option flags that use a hyphen followed
+by a single character.
+This is the only form of option that is portable and it is supported by
 .Xr getopt 3C .
+Note, some implementation of
+.Xr getopt 3C
+do support non-standard extensions for long options; however, these are
+not portable and not considered in this manual page.
+Common example of short options are:
+.Fl a ,
+.Fl l ,
+and
+.Fl r .
+Long options use two hyphen characters are generally full words.
+The long versions of the above might be:
+.Fl -all ,
+.Fl -list ,
+and
+.Fl -recursive .
+.Pp
 The
 .Fn getopt_long
-function
-can be used in two ways.
+function can be used to:
+.Bl -enum
+.It
+Support an option with both short and long forms.
+.It
+Support an option with only a short form.
+.It
+Support an option with only a long form.
+.El
 .Pp
-In the first way, every long option understood
-by the program has a corresponding short option, and the option
-structure is only used to translate from long options to short
-options.
+To have a short option selected, as with
+.Xr getopt 3C ,
+it must be listed in
+.Fa optstring .
+Long options are instead listed in the
+.Fa longopts
+array.
+For an option to have both a short and long form it must be present in
+both
+.Fa optstring
+and
+.Fa longopts .
+.Pp
+Long options can be handled in two different ways.
+In the first way, every long option understood by the program has a
+corresponding short option, and the option structure is only used to
+translate from long options to short options.
 When used in this fashion,
 .Fn getopt_long
 behaves identically to
@@ -125,7 +163,8 @@ and
 acts similar to
 .Fa optstring
 in
-.Xr getopt 3C .
+.Xr getopt 3C ,
+listing the set of supported short option flags.
 In addition,
 .Fa optstring
 can begin with
@@ -190,7 +229,7 @@ struct option {
 .Pp
 The
 .Fa name
-field should contain the option name without the leading double dash.
+field should contain the option name without the leading double hyphen.
 .Pp
 The
 .Fa has_arg
@@ -281,12 +320,12 @@ is treated the same as
 .It
 Long options cannot be abbreviated on the command line.
 .It
-Long options must use a double dash
+Long options must use a double hyphen
 .Pq Ql -- .
 .It
 Option processing stops at the first non-option.
 .It
-All long options must have an eqivalent short option (single character) and
+All long options must have an equivalent short option (single character) and
 vice-versa.
 .It
 A leading
@@ -465,6 +504,22 @@ The correct invocation would be:
 .Pp
 .Dl cmd Fl cd Fl e Ar ieio
 .Sh EXAMPLES
+.Sy Example 1
+Basic usage of
+.Fn getopt_long .
+.Pp
+In this example, the short options,
+.Fl b
+and
+.Fl f
+are treated the same way as their corresponding long options
+.Fl -buffy
+and
+.Fl -fluoride .
+The long option
+.Fl -daggerset
+is only matched as a long option.
+.Pp
 .Bd -literal -compact
 int bflag, ch, fd;
 int daggerset;
@@ -499,6 +554,88 @@ while ((ch = getopt_long(argc, argv, "bf:", longopts, NULL)) != -1) {
 }
 argc -= optind;
 argv += optind;
+.Ed
+.Pp
+.Sy Example 2
+Mixing short-only and long-only options.
+.Pp
+This example has a program that uses both short and long options and
+always causes the option to be handled in a way that is similar to
+.Xr getopt 3C
+regardless of if it is short or long.
+Options that are only long options are assigned a character value that
+is outside of the common 8-bit range
+.Po
+starting at
+.Dv USHRT_MAX
++ 1.
+.Pc
+This allows them to still integrate into a normal
+.Xr getopt 3C
+style option processing loop.
+.Pp
+In the following code,
+.Fl s
+is only usable as a short option while
+.Fl -long-only
+is only usable as a long option, hence
+.Fl s
+is only specified in
+.Fa optstring
+and
+.Fl -long-only
+is only specified in the
+.Fa longopts
+.Vt option
+array.
+.Pp
+.Bd -literal -compact
+#include <getopt.h>
+#include <stdio.h>
+#include <limits.h>
+
+enum longopt_chars {
+        LONG_ONLY = USHRT_MAX +1
+};
+
+static struct option longopts[] = {
+        { "all", no_argument, NULL, 'a' },
+        { "list", no_argument, NULL, 'l' },
+        { "long-only", no_argument, NULL, LONG_ONLY },
+        { "output", required_argument, NULL, 'o' },
+        { NULL }
+};
+
+int
+main(int argc, char *argv[])
+{
+        int ch;
+
+        while ((ch = getopt_long(argc, argv, "alo:s", longopts,
+            NULL)) != -1) {
+                switch (ch) {
+                case 'a':
+                        printf("found -a\en");
+                        break;
+                case 'l':
+                        printf("found -l\en");
+                        break;
+                case 'o':
+                        printf("found -o: %s\en", optarg);
+                        break;
+                case 's':
+                        printf("found -s\en");
+                        break;
+                case LONG_ONLY:
+                        printf("found --long-only\en");
+                        break;
+                default:
+                        break;
+                }
+        }
+
+        return (0);
+}
 .Ed
 .Sh ERRORS
 The
