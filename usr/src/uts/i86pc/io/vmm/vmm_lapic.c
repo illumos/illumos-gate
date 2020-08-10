@@ -170,7 +170,7 @@ lapic_msr(u_int msr)
 }
 
 int
-lapic_rdmsr(struct vm *vm, int cpu, u_int msr, uint64_t *rval, bool *retu)
+lapic_rdmsr(struct vm *vm, int cpu, u_int msr, uint64_t *rval)
 {
 	int error;
 	u_int offset;
@@ -183,14 +183,14 @@ lapic_rdmsr(struct vm *vm, int cpu, u_int msr, uint64_t *rval, bool *retu)
 		error = 0;
 	} else {
 		offset = x2apic_msr_to_regoff(msr);
-		error = vlapic_read(vlapic, 0, offset, rval, retu);
+		error = vlapic_read(vlapic, 0, offset, rval);
 	}
 
 	return (error);
 }
 
 int
-lapic_wrmsr(struct vm *vm, int cpu, u_int msr, uint64_t val, bool *retu)
+lapic_wrmsr(struct vm *vm, int cpu, u_int msr, uint64_t val)
 {
 	int error;
 	u_int offset;
@@ -202,15 +202,14 @@ lapic_wrmsr(struct vm *vm, int cpu, u_int msr, uint64_t val, bool *retu)
 		error = vlapic_set_apicbase(vlapic, val);
 	} else {
 		offset = x2apic_msr_to_regoff(msr);
-		error = vlapic_write(vlapic, 0, offset, val, retu);
+		error = vlapic_write(vlapic, 0, offset, val);
 	}
 
 	return (error);
 }
 
 int
-lapic_mmio_write(void *vm, int cpu, uint64_t gpa, uint64_t wval, int size,
-		 void *arg)
+lapic_mmio_write(struct vm *vm, int cpu, uint64_t gpa, uint64_t wval, int size)
 {
 	int error;
 	uint64_t off;
@@ -226,13 +225,12 @@ lapic_mmio_write(void *vm, int cpu, uint64_t gpa, uint64_t wval, int size,
 		return (EINVAL);
 
 	vlapic = vm_lapic(vm, cpu);
-	error = vlapic_write(vlapic, 1, off, wval, arg);
+	error = vlapic_write(vlapic, 1, off, wval);
 	return (error);
 }
 
 int
-lapic_mmio_read(void *vm, int cpu, uint64_t gpa, uint64_t *rval, int size,
-		void *arg)
+lapic_mmio_read(struct vm *vm, int cpu, uint64_t gpa, uint64_t *rval, int size)
 {
 	int error;
 	uint64_t off;
@@ -250,6 +248,6 @@ lapic_mmio_read(void *vm, int cpu, uint64_t gpa, uint64_t *rval, int size,
 		return (EINVAL);
 
 	vlapic = vm_lapic(vm, cpu);
-	error = vlapic_read(vlapic, 1, off, rval, arg);
+	error = vlapic_read(vlapic, 1, off, rval);
 	return (error);
 }

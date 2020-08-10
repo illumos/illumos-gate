@@ -1112,7 +1112,7 @@ clear_nmi_blocking(struct svm_softc *sc, int vcpu)
 #define	EFER_MBZ_BITS	0xFFFFFFFFFFFF0200UL
 
 static int
-svm_write_efer(struct svm_softc *sc, int vcpu, uint64_t newval, bool *retu)
+svm_write_efer(struct svm_softc *sc, int vcpu, uint64_t newval)
 {
 	struct vm_exit *vme;
 	struct vmcb_state *state;
@@ -1157,8 +1157,7 @@ svm_write_efer(struct svm_softc *sc, int vcpu, uint64_t newval, bool *retu)
 	if (newval & EFER_LMSLE) {
 		vme = vm_exitinfo(sc->vm, vcpu);
 		vm_exit_svm(vme, VMCB_EXIT_MSR, 1, 0);
-		*retu = true;
-		return (0);
+		return (-1);
 	}
 
 	if (newval & EFER_FFXSR) {
@@ -1180,23 +1179,22 @@ gpf:
 }
 
 static int
-emulate_wrmsr(struct svm_softc *sc, int vcpu, u_int num, uint64_t val,
-    bool *retu)
+emulate_wrmsr(struct svm_softc *sc, int vcpu, u_int num, uint64_t val)
 {
 	int error;
 
 	if (lapic_msr(num))
-		error = lapic_wrmsr(sc->vm, vcpu, num, val, retu);
+		error = lapic_wrmsr(sc->vm, vcpu, num, val);
 	else if (num == MSR_EFER)
-		error = svm_write_efer(sc, vcpu, val, retu);
+		error = svm_write_efer(sc, vcpu, val);
 	else
-		error = svm_wrmsr(sc, vcpu, num, val, retu);
+		error = svm_wrmsr(sc, vcpu, num, val);
 
 	return (error);
 }
 
 static int
-emulate_rdmsr(struct svm_softc *sc, int vcpu, u_int num, bool *retu)
+emulate_rdmsr(struct svm_softc *sc, int vcpu, u_int num)
 {
 	struct vmcb_state *state;
 	struct svm_regctx *ctx;
@@ -1204,9 +1202,9 @@ emulate_rdmsr(struct svm_softc *sc, int vcpu, u_int num, bool *retu)
 	int error;
 
 	if (lapic_msr(num))
-		error = lapic_rdmsr(sc->vm, vcpu, num, &result, retu);
+		error = lapic_rdmsr(sc->vm, vcpu, num, &result);
 	else
-		error = svm_rdmsr(sc, vcpu, num, &result, retu);
+		error = svm_rdmsr(sc, vcpu, num, &result);
 
 	if (error == 0) {
 		state = svm_get_vmcb_state(sc, vcpu);
@@ -1302,7 +1300,6 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 #else
 	int error, errcode_valid = 0, handled, idtvec, reflect;
 #endif
-	bool retu;
 
 	ctx = svm_get_guest_regctx(svm_sc, vcpu);
 	vmcb = svm_get_vmcb(svm_sc, vcpu);
@@ -1438,19 +1435,19 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		eax = state->rax;
 		ecx = ctx->sctx_rcx;
 		edx = ctx->sctx_rdx;
-		retu = false;
 
 		if (info1) {
 			vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_WRMSR, 1);
 			val = (uint64_t)edx << 32 | eax;
 			VCPU_CTR2(svm_sc->vm, vcpu, "wrmsr %x val %lx",
 			    ecx, val);
-			if (emulate_wrmsr(svm_sc, vcpu, ecx, val, &retu)) {
+			error = emulate_wrmsr(svm_sc, vcpu, ecx, val);
+			if (error == 0) {
+				handled = 1;
+			} else if (error > 0) {
 				vmexit->exitcode = VM_EXITCODE_WRMSR;
 				vmexit->u.msr.code = ecx;
 				vmexit->u.msr.wval = val;
-			} else if (!retu) {
-				handled = 1;
 			} else {
 				KASSERT(vmexit->exitcode != VM_EXITCODE_BOGUS,
 				    ("emulate_wrmsr retu with bogus exitcode"));
@@ -1458,11 +1455,12 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		} else {
 			VCPU_CTR1(svm_sc->vm, vcpu, "rdmsr %x", ecx);
 			vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_RDMSR, 1);
-			if (emulate_rdmsr(svm_sc, vcpu, ecx, &retu)) {
+			error = emulate_rdmsr(svm_sc, vcpu, ecx);
+			if (error == 0) {
+				handled = 1;
+			} else if (error > 0) {
 				vmexit->exitcode = VM_EXITCODE_RDMSR;
 				vmexit->u.msr.code = ecx;
-			} else if (!retu) {
-				handled = 1;
 			} else {
 				KASSERT(vmexit->exitcode != VM_EXITCODE_BOGUS,
 				    ("emulate_rdmsr retu with bogus exitcode"));

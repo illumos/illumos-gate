@@ -40,12 +40,12 @@
 #define	VHPET_SIZE	1024
 
 struct vhpet *vhpet_init(struct vm *vm);
-void	vhpet_cleanup(struct vhpet *vhpet);
-int	vhpet_mmio_write(void *vm, int vcpuid, uint64_t gpa, uint64_t val,
-	    int size, void *arg);
-int	vhpet_mmio_read(void *vm, int vcpuid, uint64_t gpa, uint64_t *val,
-	    int size, void *arg);
-int	vhpet_getcap(struct vm_hpet_cap *cap);
+void vhpet_cleanup(struct vhpet *vhpet);
+int vhpet_mmio_write(struct vm *vm, int vcpuid, uint64_t gpa, uint64_t val,
+    int size);
+int vhpet_mmio_read(struct vm *vm, int vcpuid, uint64_t gpa, uint64_t *val,
+    int size);
+int vhpet_getcap(struct vm_hpet_cap *cap);
 
 #ifndef __FreeBSD__
 void vhpet_localize_resources(struct vhpet *vhpet);

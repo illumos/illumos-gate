@@ -398,7 +398,7 @@ vmx_msr_guest_exit(struct vmx *vmx, int vcpuid)
 }
 
 int
-vmx_rdmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t *val, bool *retu)
+vmx_rdmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t *val)
 {
 	const uint64_t *guest_msrs;
 	int error;
@@ -439,7 +439,7 @@ vmx_rdmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t *val, bool *retu)
 }
 
 int
-vmx_wrmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t val, bool *retu)
+vmx_wrmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t val)
 {
 	uint64_t *guest_msrs;
 	uint64_t changed;

@@ -68,7 +68,7 @@ void vie_fallback_exitinfo(const struct vie *vie, struct vm_exit *vme);
 void vie_reset(struct vie *vie);
 void vie_advance_pc(struct vie *vie, uint64_t *nextrip);
 
-int vie_emulate_mmio(struct vie *vie, void *vm, int vcpuid);
+int vie_emulate_mmio(struct vie *vie, struct vm *vm, int vcpuid);
 int vie_emulate_inout(struct vie *vie, struct vm *vm, int vcpuid);
 
 /*

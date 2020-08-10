@@ -372,7 +372,7 @@ void vm_inject_ud(struct vm *vm, int vcpuid);
 void vm_inject_gp(struct vm *vm, int vcpuid);
 void vm_inject_ac(struct vm *vm, int vcpuid, int errcode);
 void vm_inject_ss(struct vm *vm, int vcpuid, int errcode);
-
+void vm_inject_pf(struct vm *vm, int vcpuid, int errcode, uint64_t cr2);
 
 #ifndef	__FreeBSD__
 

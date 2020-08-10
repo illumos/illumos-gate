@@ -39,9 +39,9 @@ struct vm;
 enum x2apic_state;
 
 int vlapic_write(struct vlapic *vlapic, int mmio_access, uint64_t offset,
-    uint64_t data, bool *retu);
+    uint64_t data);
 int vlapic_read(struct vlapic *vlapic, int mmio_access, uint64_t offset,
-    uint64_t *data, bool *retu);
+    uint64_t *data);
 
 /*
  * Returns 0 if there is no eligible vector that can be delivered to the
@@ -103,7 +103,7 @@ void vlapic_ldr_write_handler(struct vlapic *vlapic);
 void vlapic_dfr_write_handler(struct vlapic *vlapic);
 void vlapic_svr_write_handler(struct vlapic *vlapic);
 void vlapic_esr_write_handler(struct vlapic *vlapic);
-int vlapic_icrlo_write_handler(struct vlapic *vlapic, bool *retu);
+int vlapic_icrlo_write_handler(struct vlapic *vlapic);
 void vlapic_icrtmr_write_handler(struct vlapic *vlapic);
 void vlapic_dcr_write_handler(struct vlapic *vlapic);
 void vlapic_lvt_write_handler(struct vlapic *vlapic, uint32_t offset);

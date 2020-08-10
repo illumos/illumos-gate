@@ -433,7 +433,7 @@ vie_calc_bytereg(struct vie *vie, enum vm_reg_name *reg, int *lhbr)
 }
 
 static int
-vie_read_bytereg(struct vie *vie, void *vm, int vcpuid, uint8_t *rval)
+vie_read_bytereg(struct vie *vie, struct vm *vm, int vcpuid, uint8_t *rval)
 {
 	uint64_t val;
 	int error, lhbr;
@@ -454,7 +454,7 @@ vie_read_bytereg(struct vie *vie, void *vm, int vcpuid, uint8_t *rval)
 }
 
 static int
-vie_write_bytereg(struct vie *vie, void *vm, int vcpuid, uint8_t byte)
+vie_write_bytereg(struct vie *vie, struct vm *vm, int vcpuid, uint8_t byte)
 {
 	uint64_t origval, val, mask;
 	int error, lhbr;
@@ -480,8 +480,8 @@ vie_write_bytereg(struct vie *vie, void *vm, int vcpuid, uint8_t byte)
 }
 
 static int
-vie_update_register(void *vm, int vcpuid, enum vm_reg_name reg, uint64_t val,
-    int size)
+vie_update_register(struct vm *vm, int vcpuid, enum vm_reg_name reg,
+    uint64_t val, int size)
 {
 	int error;
 	uint64_t origval;
@@ -639,7 +639,7 @@ getandflags(int opsize, uint64_t x, uint64_t y)
 }
 
 static int
-emulate_mov(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
+vie_emulate_mov(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 {
 	int error, size;
 	enum vm_reg_name reg;
@@ -753,7 +753,7 @@ emulate_mov(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
 }
 
 static int
-emulate_movx(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
+vie_emulate_movx(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 {
 	int error, size;
 	enum vm_reg_name reg;
@@ -840,8 +840,9 @@ emulate_movx(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
  * Helper function to calculate and validate a linear address.
  */
 static int
-vie_get_gla(struct vie *vie, void *vm, int vcpuid, int opsize, int addrsize,
-    int prot, enum vm_reg_name seg, enum vm_reg_name gpr, uint64_t *gla)
+vie_get_gla(struct vie *vie, struct vm *vm, int vcpuid, int opsize,
+    int addrsize, int prot, enum vm_reg_name seg, enum vm_reg_name gpr,
+    uint64_t *gla)
 {
 	struct seg_desc desc;
 	uint64_t cr0, val, rflags;
@@ -890,7 +891,7 @@ vie_get_gla(struct vie *vie, void *vm, int vcpuid, int opsize, int addrsize,
 }
 
 static int
-emulate_movs(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
+vie_emulate_movs(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 {
 	struct vm_copyinfo copyinfo[2];
 	uint64_t dstaddr, srcaddr, dstgpa, srcgpa, val;
@@ -1069,7 +1070,7 @@ done:
 }
 
 static int
-emulate_stos(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
+vie_emulate_stos(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 {
 	int error, opsize, repeat;
 	uint64_t val;
@@ -1129,7 +1130,7 @@ emulate_stos(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
 }
 
 static int
-emulate_and(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
+vie_emulate_and(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 {
 	int error, size;
 	enum vm_reg_name reg;
@@ -1216,7 +1217,7 @@ emulate_and(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
 }
 
 static int
-emulate_or(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
+vie_emulate_or(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 {
 	int error, size;
 	enum vm_reg_name reg;
@@ -1303,7 +1304,7 @@ emulate_or(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
 }
 
 static int
-emulate_cmp(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
+vie_emulate_cmp(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 {
 	int error, size;
 	uint64_t regop, memop, op1, op2, rflags, rflags2;
@@ -1394,7 +1395,7 @@ emulate_cmp(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
 }
 
 static int
-emulate_test(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
+vie_emulate_test(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 {
 	int error, size;
 	uint64_t op1, rflags, rflags2;
@@ -1442,7 +1443,7 @@ emulate_test(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
 }
 
 static int
-emulate_bextr(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
+vie_emulate_bextr(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 {
 	uint64_t src1, src2, dst, rflags;
 	unsigned start, len;
@@ -1519,7 +1520,7 @@ done:
 }
 
 static int
-emulate_add(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
+vie_emulate_add(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 {
 	int error, size;
 	uint64_t nval, rflags, rflags2, val1, val2;
@@ -1574,7 +1575,7 @@ emulate_add(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
 }
 
 static int
-emulate_sub(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
+vie_emulate_sub(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 {
 	int error, size;
 	uint64_t nval, rflags, rflags2, val1, val2;
@@ -1629,7 +1630,7 @@ emulate_sub(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
 }
 
 static int
-emulate_stack_op(void *vm, int vcpuid, uint64_t mmio_gpa, struct vie *vie)
+vie_emulate_stack_op(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 {
 	struct vm_copyinfo copyinfo[2];
 	struct seg_desc ss_desc;
@@ -1708,12 +1709,12 @@ emulate_stack_op(void *vm, int vcpuid, uint64_t mmio_gpa, struct vie *vie)
 		return (error);
 
 	if (pushop) {
-		error = vie_mmio_read(vie, vm, vcpuid, mmio_gpa, &val, size);
+		error = vie_mmio_read(vie, vm, vcpuid, gpa, &val, size);
 		if (error == 0)
 			vm_copyout(vm, vcpuid, &val, copyinfo, size);
 	} else {
 		vm_copyin(vm, vcpuid, copyinfo, &val, size);
-		error = vie_mmio_write(vie, vm, vcpuid, mmio_gpa, val, size);
+		error = vie_mmio_write(vie, vm, vcpuid, gpa, val, size);
 		rsp += size;
 	}
 	vm_copy_teardown(vm, vcpuid, copyinfo, nitems(copyinfo));
@@ -1727,7 +1728,7 @@ emulate_stack_op(void *vm, int vcpuid, uint64_t mmio_gpa, struct vie *vie)
 }
 
 static int
-emulate_push(void *vm, int vcpuid, uint64_t mmio_gpa, struct vie *vie)
+vie_emulate_push(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 {
 	int error;
 
@@ -1740,12 +1741,12 @@ emulate_push(void *vm, int vcpuid, uint64_t mmio_gpa, struct vie *vie)
 	if ((vie->reg & 7) != 6)
 		return (EINVAL);
 
-	error = emulate_stack_op(vm, vcpuid, mmio_gpa, vie);
+	error = vie_emulate_stack_op(vie, vm, vcpuid, gpa);
 	return (error);
 }
 
 static int
-emulate_pop(void *vm, int vcpuid, uint64_t mmio_gpa, struct vie *vie)
+vie_emulate_pop(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 {
 	int error;
 
@@ -1758,24 +1759,24 @@ emulate_pop(void *vm, int vcpuid, uint64_t mmio_gpa, struct vie *vie)
 	if ((vie->reg & 7) != 0)
 		return (EINVAL);
 
-	error = emulate_stack_op(vm, vcpuid, mmio_gpa, vie);
+	error = vie_emulate_stack_op(vie, vm, vcpuid, gpa);
 	return (error);
 }
 
 static int
-emulate_group1(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
+vie_emulate_group1(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 {
 	int error;
 
 	switch (vie->reg & 7) {
 	case 0x1:	/* OR */
-		error = emulate_or(vm, vcpuid, gpa, vie);
+		error = vie_emulate_or(vie, vm, vcpuid, gpa);
 		break;
 	case 0x4:	/* AND */
-		error = emulate_and(vm, vcpuid, gpa, vie);
+		error = vie_emulate_and(vie, vm, vcpuid, gpa);
 		break;
 	case 0x7:	/* CMP */
-		error = emulate_cmp(vm, vcpuid, gpa, vie);
+		error = vie_emulate_cmp(vie, vm, vcpuid, gpa);
 		break;
 	default:
 		error = EINVAL;
@@ -1786,7 +1787,7 @@ emulate_group1(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
 }
 
 static int
-emulate_bittest(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
+vie_emulate_bittest(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 {
 	uint64_t val, rflags;
 	int error, bitmask, bitoff;
@@ -1827,7 +1828,8 @@ emulate_bittest(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
 }
 
 static int
-emulate_twob_group15(void *vm, int vcpuid, uint64_t gpa, struct vie *vie)
+vie_emulate_twob_group15(struct vie *vie, struct vm *vm, int vcpuid,
+    uint64_t gpa)
 {
 	int error;
 	uint64_t buf;
@@ -1931,7 +1933,7 @@ vie_mmio_write(struct vie *vie, struct vm *vm, int cpuid, uint64_t gpa,
 }
 
 int
-vie_emulate_mmio(struct vie *vie, void *vm, int vcpuid)
+vie_emulate_mmio(struct vie *vie, struct vm *vm, int vcpuid)
 {
 	int error;
 	uint64_t gpa;
@@ -1945,53 +1947,53 @@ vie_emulate_mmio(struct vie *vie, void *vm, int vcpuid)
 
 	switch (vie->op.op_type) {
 	case VIE_OP_TYPE_GROUP1:
-		error = emulate_group1(vm, vcpuid, gpa, vie);
+		error = vie_emulate_group1(vie, vm, vcpuid, gpa);
 		break;
 	case VIE_OP_TYPE_POP:
-		error = emulate_pop(vm, vcpuid, gpa, vie);
+		error = vie_emulate_pop(vie, vm, vcpuid, gpa);
 		break;
 	case VIE_OP_TYPE_PUSH:
-		error = emulate_push(vm, vcpuid, gpa, vie);
+		error = vie_emulate_push(vie, vm, vcpuid, gpa);
 		break;
 	case VIE_OP_TYPE_CMP:
-		error = emulate_cmp(vm, vcpuid, gpa, vie);
+		error = vie_emulate_cmp(vie, vm, vcpuid, gpa);
 		break;
 	case VIE_OP_TYPE_MOV:
-		error = emulate_mov(vm, vcpuid, gpa, vie);
+		error = vie_emulate_mov(vie, vm, vcpuid, gpa);
 		break;
 	case VIE_OP_TYPE_MOVSX:
 	case VIE_OP_TYPE_MOVZX:
-		error = emulate_movx(vm, vcpuid, gpa, vie);
+		error = vie_emulate_movx(vie, vm, vcpuid, gpa);
 		break;
 	case VIE_OP_TYPE_MOVS:
-		error = emulate_movs(vm, vcpuid, gpa, vie);
+		error = vie_emulate_movs(vie, vm, vcpuid, gpa);
 		break;
 	case VIE_OP_TYPE_STOS:
-		error = emulate_stos(vm, vcpuid, gpa, vie);
+		error = vie_emulate_stos(vie, vm, vcpuid, gpa);
 		break;
 	case VIE_OP_TYPE_AND:
-		error = emulate_and(vm, vcpuid, gpa, vie);
+		error = vie_emulate_and(vie, vm, vcpuid, gpa);
 		break;
 	case VIE_OP_TYPE_OR:
-		error = emulate_or(vm, vcpuid, gpa, vie);
+		error = vie_emulate_or(vie, vm, vcpuid, gpa);
 		break;
 	case VIE_OP_TYPE_SUB:
-		error = emulate_sub(vm, vcpuid, gpa, vie);
+		error = vie_emulate_sub(vie, vm, vcpuid, gpa);
 		break;
 	case VIE_OP_TYPE_BITTEST:
-		error = emulate_bittest(vm, vcpuid, gpa, vie);
+		error = vie_emulate_bittest(vie, vm, vcpuid, gpa);
 		break;
 	case VIE_OP_TYPE_TWOB_GRP15:
-		error = emulate_twob_group15(vm, vcpuid, gpa, vie);
+		error = vie_emulate_twob_group15(vie, vm, vcpuid, gpa);
 		break;
 	case VIE_OP_TYPE_ADD:
-		error = emulate_add(vm, vcpuid, gpa, vie);
+		error = vie_emulate_add(vie, vm, vcpuid, gpa);
 		break;
 	case VIE_OP_TYPE_TEST:
-		error = emulate_test(vm, vcpuid, gpa, vie);
+		error = vie_emulate_test(vie, vm, vcpuid, gpa);
 		break;
 	case VIE_OP_TYPE_BEXTR:
-		error = emulate_bextr(vm, vcpuid, gpa, vie);
+		error = vie_emulate_bextr(vie, vm, vcpuid, gpa);
 		break;
 	default:
 		error = EINVAL;

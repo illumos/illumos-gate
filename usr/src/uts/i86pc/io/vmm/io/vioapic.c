@@ -514,8 +514,8 @@ vioapic_mmio_rw(struct vioapic *vioapic, int vcpuid, uint64_t gpa,
 }
 
 int
-vioapic_mmio_read(void *vm, int vcpuid, uint64_t gpa, uint64_t *rval,
-    int size, void *arg)
+vioapic_mmio_read(struct vm *vm, int vcpuid, uint64_t gpa, uint64_t *rval,
+    int size)
 {
 	int error;
 	struct vioapic *vioapic;
@@ -526,8 +526,8 @@ vioapic_mmio_read(void *vm, int vcpuid, uint64_t gpa, uint64_t *rval,
 }
 
 int
-vioapic_mmio_write(void *vm, int vcpuid, uint64_t gpa, uint64_t wval,
-    int size, void *arg)
+vioapic_mmio_write(struct vm *vm, int vcpuid, uint64_t gpa, uint64_t wval,
+    int size)
 {
 	int error;
 	struct vioapic *vioapic;
