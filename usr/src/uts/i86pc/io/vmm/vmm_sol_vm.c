@@ -12,6 +12,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <sys/param.h>
@@ -894,11 +895,14 @@ vm_map_wire(vm_map_t map, vm_offset_t start, vm_offset_t end, int flags)
 
 /* Provided custom for bhyve 'devmem' segment mapping */
 int
-vm_segmap_obj(struct vmspace *vms, vm_object_t vmo, struct as *as,
+vm_segmap_obj(vm_object_t vmo, off_t map_off, size_t size, struct as *as,
     caddr_t *addrp, uint_t prot, uint_t maxprot, uint_t flags)
 {
-	const size_t size = vmo->vmo_size;
 	int err;
+
+	VERIFY(map_off >= 0);
+	VERIFY(size <= vmo->vmo_size);
+	VERIFY((size + map_off) <= vmo->vmo_size);
 
 	if (vmo->vmo_type != OBJT_DEFAULT) {
 		/* Only support default objects for now */
@@ -911,7 +915,7 @@ vm_segmap_obj(struct vmspace *vms, vm_object_t vmo, struct as *as,
 	if (err == 0) {
 		segvmm_crargs_t svma;
 
-		svma.kaddr = vmo->vmo_data;
+		svma.kaddr = (caddr_t)vmo->vmo_data + map_off;
 		svma.prot = prot;
 		svma.cookie = vmo;
 		svma.hold = (segvmm_holdfn_t)vm_object_reference;

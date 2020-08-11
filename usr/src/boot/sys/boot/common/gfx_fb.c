@@ -48,6 +48,10 @@ static int gfx_inverse = 0;
 static int gfx_inverse_screen = 0;
 static uint8_t gfx_fg = DEFAULT_ANSI_FOREGROUND;
 static uint8_t gfx_bg = DEFAULT_ANSI_BACKGROUND;
+#if	defined(EFI)
+static EFI_GRAPHICS_OUTPUT_BLT_PIXEL *GlyphBuffer;
+static size_t GlyphBufferSize;
+#endif
 
 static int gfx_fb_cons_clear(struct vis_consclear *);
 static void gfx_fb_cons_copy(struct vis_conscopy *);
@@ -57,10 +61,12 @@ static void gfx_fb_cons_display(struct vis_consdisplay *);
 static int gfx_gop_cons_clear(uint32_t data, uint32_t width, uint32_t height);
 static void gfx_gop_cons_copy(struct vis_conscopy *);
 static void gfx_gop_cons_display(struct vis_consdisplay *);
+static void gfx_gop_display_cursor(struct vis_conscursor *);
 #endif
 static int gfx_bm_cons_clear(uint32_t data, uint32_t width, uint32_t height);
 static void gfx_bm_cons_copy(struct vis_conscopy *);
 static void gfx_bm_cons_display(struct vis_consdisplay *);
+static void gfx_bm_display_cursor(struct vis_conscursor *);
 
 /*
  * Set default operations to use bitmap based implementation.
@@ -75,10 +81,12 @@ struct gfx_fb_ops {
 	int (*gfx_cons_clear)(uint32_t, uint32_t, uint32_t);
 	void (*gfx_cons_copy)(struct vis_conscopy *);
 	void (*gfx_cons_display)(struct vis_consdisplay *);
+	void (*gfx_cons_display_cursor)(struct vis_conscursor *);
 } gfx_fb_ops = {
 	.gfx_cons_clear = gfx_bm_cons_clear,
 	.gfx_cons_copy = gfx_bm_cons_copy,
-	.gfx_cons_display = gfx_bm_cons_display
+	.gfx_cons_display = gfx_bm_cons_display,
+	.gfx_cons_display_cursor = gfx_bm_display_cursor
 };
 
 /*
@@ -323,6 +331,7 @@ gfx_framework_init(struct visual_ops *fb_ops)
 		gfx_fb_ops.gfx_cons_clear = gfx_gop_cons_clear;
 		gfx_fb_ops.gfx_cons_copy = gfx_gop_cons_copy;
 		gfx_fb_ops.gfx_cons_display = gfx_gop_cons_display;
+		gfx_fb_ops.gfx_cons_display_cursor = gfx_gop_display_cursor;
 	}
 #endif
 
@@ -614,10 +623,25 @@ gfx_gop_cons_display(struct vis_consdisplay *da)
 
 	bpp = roundup2(gfx_fb.framebuffer_common.framebuffer_bpp, 8) >> 3;
 	size = sizeof (*BltBuffer) * da->width * da->height;
-	BltBuffer = malloc(size);
-	if (BltBuffer == NULL && gfx_get_fb_address() != NULL) {
-		/* Fall back to bitmap implementation */
-		gfx_bm_cons_display(da);
+
+	/*
+	 * Common data to display is glyph, use preallocated
+	 * glyph buffer.
+	 */
+	if (size == GlyphBufferSize) {
+		BltBuffer = GlyphBuffer;
+	} else {
+		BltBuffer = malloc(size);
+	}
+	if (BltBuffer == NULL) {
+		if (gfx_get_fb_address() != NULL) {
+			/* Fall back to bitmap implementation */
+			gfx_bm_cons_display(da);
+		}
+		/*
+		 * We can not use Blt() and we have no address
+		 * to write data to FB.
+		 */
 		return;
 	}
 
@@ -626,7 +650,9 @@ gfx_gop_cons_display(struct vis_consdisplay *da)
 	bitmap_cpy((void *)BltBuffer, da->data, size, bpp);
 	(void) gop->Blt(gop, BltBuffer, EfiBltBufferToVideo,
 	    0, 0, da->col, da->row, da->width, da->height, 0);
-	free(BltBuffer);
+
+	if (BltBuffer != GlyphBuffer)
+		free(BltBuffer);
 }
 #endif
 
@@ -680,14 +706,88 @@ gfx_fb_cons_display(struct vis_consdisplay *da)
 void
 gfx_fb_display_cursor(struct vis_conscursor *ca)
 {
+#if	defined(EFI)
+	EFI_TPL tpl;
+
+	tpl = BS->RaiseTPL(TPL_NOTIFY);
+#endif
+	gfx_fb_ops.gfx_cons_display_cursor(ca);
+#if	defined(EFI)
+	BS->RestoreTPL(tpl);
+#endif
+}
+
+#if	defined(EFI)
+static void
+gfx_gop_display_cursor(struct vis_conscursor *ca)
+{
+	union pixel {
+		EFI_GRAPHICS_OUTPUT_BLT_PIXEL p;
+		uint32_t p32;
+	} *row, fg, bg;
+	size_t size;
+	extern EFI_GRAPHICS_OUTPUT *gop;
+
+	size = sizeof (*GlyphBuffer) * ca->width * ca->height;
+	if (size != GlyphBufferSize) {
+		free(GlyphBuffer);
+		GlyphBuffer = malloc(size);
+		if (GlyphBuffer == NULL) {
+			if (gfx_get_fb_address() != NULL) {
+				/* Fall back to bitmap implementation */
+				gfx_bm_display_cursor(ca);
+			}
+			/*
+			 * We can not use Blt() and we have no address
+			 * to write data to FB.
+			 */
+			return;
+		}
+		GlyphBufferSize = size;
+	}
+
+	/*
+	 * Since EfiBltVideoToBltBuffer is valid, Blt() can fail only
+	 * due to device error.
+	 */
+	if (gop->Blt(gop, GlyphBuffer, EfiBltVideoToBltBuffer,
+	    ca->col, ca->row, 0, 0, ca->width, ca->height, 0) != EFI_SUCCESS)
+		return;
+
+	fg.p.Reserved = 0;
+	fg.p.Red = ca->fg_color.twentyfour[0];
+	fg.p.Green = ca->fg_color.twentyfour[1];
+	fg.p.Blue = ca->fg_color.twentyfour[2];
+	bg.p.Reserved = 0;
+	bg.p.Red = ca->bg_color.twentyfour[0];
+	bg.p.Green = ca->bg_color.twentyfour[1];
+	bg.p.Blue = ca->bg_color.twentyfour[2];
+
+	/*
+	 * Build inverse image of the glyph.
+	 * Since xor has self-inverse property, drawing cursor
+	 * second time on the same spot, will restore the original content.
+	 */
+	for (screen_size_t i = 0; i < ca->height; i++) {
+		row = (union pixel *)(GlyphBuffer + i * ca->width);
+		for (screen_size_t j = 0; j < ca->width; j++) {
+			row[j].p32 = (row[j].p32 ^ fg.p32) ^ bg.p32;
+		}
+	}
+
+	(void) gop->Blt(gop, GlyphBuffer, EfiBltBufferToVideo,
+	    0, 0, ca->col, ca->row, ca->width, ca->height, 0);
+}
+#endif
+
+static void
+gfx_bm_display_cursor(struct vis_conscursor *ca)
+{
 	uint32_t fg, bg;
 	uint32_t offset, size, *fb32;
 	uint16_t *fb16;
 	uint8_t *fb8, *fb;
 	uint32_t bpp, pitch;
-#if	defined(EFI)
-	EFI_TPL tpl;
-#endif
 
 	fb = gfx_get_fb_address();
 	bpp = roundup2(gfx_fb.framebuffer_common.framebuffer_bpp, 8) >> 3;
@@ -700,9 +800,6 @@ gfx_fb_display_cursor(struct vis_conscursor *ca)
 	 * frame buffer by (D xor FG) xor BG.
 	 */
 	offset = ca->col * bpp + ca->row * pitch;
-#if	defined(EFI)
-	tpl = BS->RaiseTPL(TPL_NOTIFY);
-#endif
 	switch (gfx_fb.framebuffer_common.framebuffer_bpp) {
 	case 8:		/* 8 bit */
 		fg = ca->fg_color.mono;
@@ -762,9 +859,6 @@ gfx_fb_display_cursor(struct vis_conscursor *ca)
 		}
 		break;
 	}
-#if	defined(EFI)
-	BS->RestoreTPL(tpl);
-#endif
 }
 
 /*
@@ -799,6 +893,10 @@ gfx_fb_setpixel(uint32_t x, uint32_t y)
 	uint32_t c, offset, pitch, bpp;
 	uint8_t *fb;
 	text_color_t fg, bg;
+#if	defined(EFI)
+	EFI_GRAPHICS_OUTPUT_BLT_PIXEL p;
+	extern EFI_GRAPHICS_OUTPUT *gop;
+#endif
 
 	if (plat_stdout_is_framebuffer() == 0)
 		return;
@@ -829,6 +927,16 @@ gfx_fb_setpixel(uint32_t x, uint32_t y)
 		fb[offset + 2] = c & 0xff;
 		break;
 	case 32:
+#if	defined(EFI)
+		if (gop != NULL) {
+			p.Reserved = 0;
+			p.Red = (c >> 16) & 0xff;
+			p.Green = (c >> 8) & 0xff;
+			p.Blue = c & 0xff;
+			gop->Blt(gop, &p, EfiBltBufferToVideo, 0, 0,
+			    x, y, 1, 1, 0);
+		} else
+#endif
 		*(uint32_t *)(fb + offset) = c;
 		break;
 	}

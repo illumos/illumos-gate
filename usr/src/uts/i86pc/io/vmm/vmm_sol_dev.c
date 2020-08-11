@@ -14,6 +14,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -184,25 +185,30 @@ vmmdev_devmem_create(vmm_softc_t *sc, struct vm_memseg *mseg, const char *name)
 }
 
 static boolean_t
-vmmdev_devmem_segid(vmm_softc_t *sc, off_t off, off_t len, int *segidp)
+vmmdev_devmem_segid(vmm_softc_t *sc, off_t off, off_t len, int *segidp,
+    off_t *map_offp)
 {
 	list_t *dl = &sc->vmm_devmem_list;
 	vmm_devmem_entry_t *de = NULL;
+	const off_t map_end = off + len;
 
 	VERIFY(off >= VM_DEVMEM_START);
 
-	for (de = list_head(dl); de != NULL; de = list_next(dl, de)) {
-		/* XXX: Only hit on direct offset/length matches for now */
-		if (de->vde_off == off && de->vde_len == len) {
-			break;
-		}
-	}
-	if (de == NULL) {
+	if (map_end < off) {
+		/* No match on overflow */
 		return (B_FALSE);
 	}
 
-	*segidp = de->vde_segid;
-	return (B_TRUE);
+	for (de = list_head(dl); de != NULL; de = list_next(dl, de)) {
+		const off_t item_end = de->vde_off + de->vde_len;
+
+		if (de->vde_off <= off && item_end >= map_end) {
+			*segidp = de->vde_segid;
+			*map_offp = off - de->vde_off;
+			return (B_TRUE);
+		}
+	}
+	return (B_FALSE);
 }
 
 static void
@@ -2076,9 +2082,10 @@ vmm_segmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp, off_t len,
 	vms = vm_get_vmspace(vm);
 	if (off >= VM_DEVMEM_START) {
 		int segid;
+		off_t map_off = 0;
 
 		/* Mapping a devmem "device" */
-		if (!vmmdev_devmem_segid(sc, off, len, &segid)) {
+		if (!vmmdev_devmem_segid(sc, off, len, &segid, &map_off)) {
 			err = ENODEV;
 			goto out;
 		}
@@ -2086,7 +2093,8 @@ vmm_segmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp, off_t len,
 		if (err != 0) {
 			goto out;
 		}
-		err = vm_segmap_obj(vms, vmo, as, addrp, prot, maxprot, flags);
+		err = vm_segmap_obj(vmo, map_off, len, as, addrp, prot, maxprot,
+		    flags);
 	} else {
 		/* Mapping a part of the guest physical space */
 		err = vm_segmap_space(vms, off, as, addrp, len, prot, maxprot,
