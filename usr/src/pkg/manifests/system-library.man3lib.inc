@@ -74,7 +74,6 @@ file path=usr/share/man/man3lib/libsecdb.3lib
 file path=usr/share/man/man3lib/libsendfile.3lib
 file path=usr/share/man/man3lib/libsip.3lib
 file path=usr/share/man/man3lib/libsocket.3lib
-file path=usr/share/man/man3lib/libsys.3lib
 file path=usr/share/man/man3lib/libsysevent.3lib
 file path=usr/share/man/man3lib/libthread.3lib
 file path=usr/share/man/man3lib/libtsnet.3lib

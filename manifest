@@ -6936,8 +6936,6 @@ f usr/lib/libsun_ima.so.1 0755 root bin
 s usr/lib/libsun_ima.so=libsun_ima.so.1
 f usr/lib/libsun_sas.so.1 0755 root bin
 s usr/lib/libsun_sas.so=libsun_sas.so.1
-f usr/lib/libsys.so.1 0755 root bin
-s usr/lib/libsys.so=libsys.so.1
 s usr/lib/libsysevent.so.1=../../lib/libsysevent.so.1
 s usr/lib/libsysevent.so=../../lib/libsysevent.so.1
 f usr/lib/libtecla.so.1 0755 root bin
@@ -16462,7 +16460,6 @@ f usr/share/man/man3lib/libslp.3lib 0444 root bin
 s usr/share/man/man3lib/libsmhbaapi.3lib=libSMHBAAPI.3lib
 f usr/share/man/man3lib/libsocket.3lib 0444 root bin
 f usr/share/man/man3lib/libstmf.3lib 0444 root bin
-f usr/share/man/man3lib/libsys.3lib 0444 root bin
 f usr/share/man/man3lib/libsysevent.3lib 0444 root bin
 f usr/share/man/man3lib/libtecla.3lib 0444 root bin
 s usr/share/man/man3lib/libtermcap.3lib=libcurses.3lib
