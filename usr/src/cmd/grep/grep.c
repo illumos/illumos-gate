@@ -756,6 +756,51 @@ addpattern(char *s)
 }
 
 /*
+ * Check if a given grep pattern that is being used with egrep or grep can be
+ * considered 'simple'. That is there are no characters that would be treated
+ * differently from fgrep. In this particular case, we're a little bit
+ * conservative and look for characters that are:
+ *
+ *  o 7-bit ASCII
+ *  o Letters
+ *  o Numbers
+ *  o Meta-characters not used in BREs/EREs: !, @, #, /, -, _, <, >, =
+ *
+ * This can certianly be made more complex and less restrictive with additional
+ * testing.
+ */
+static boolean_t
+simple_pattern(const char *str)
+{
+	for (; *str != '\0'; str++) {
+		if (!isascii(*str)) {
+			return (B_FALSE);
+		}
+
+		if (isalnum(*str)) {
+			continue;
+		}
+
+		switch (*str) {
+		case '!':
+		case '@':
+		case '#':
+		case '/':
+		case '-':
+		case '_':
+		case '<':
+		case '>':
+		case '=':
+			continue;
+		default:
+			return (B_FALSE);
+		}
+	}
+
+	return (B_TRUE);
+}
+
+/*
  * Fix patterns.
  * Must do after all arguments read, in case later -i option.
  */
@@ -768,7 +813,7 @@ fixpatterns(void)
 	/*
 	 * Decide if we are able to run the Boyer-Moore-Gosper algorithm.
 	 * Use the Boyer-Moore-Gosper algorithm if:
-	 * - fgrep			(Fflag)
+	 * - fgrep or non-BRE/ERE	(Fflag || simple_pattern())
 	 * - singlebyte locale		(!mblocale)
 	 * - no ignoring case		(!iflag)
 	 * - no printing line numbers	(!nflag)
@@ -778,10 +823,12 @@ fixpatterns(void)
 	 * - non zero length pattern	(strlen(patterns->pattern) != 0)
 	 * - no context required	(conflag == 0)
 	 * - no exact matches		(!oflag)
+	 * - no word matches		(!wlag)
 	 */
-	use_bmg = Fflag && !mblocale && !iflag && !nflag && nvflag && !oflag &&
-	    (patterns != NULL && patterns->next == NULL) &&
-	    (strlen(patterns->pattern) != 0) && conflag == 0;
+	use_bmg = !mblocale && !iflag && !nflag && nvflag && !oflag &&
+	    (patterns != NULL && patterns->next == NULL) && !wflag &&
+	    (strlen(patterns->pattern) != 0) && conflag == 0 &&
+	    (Fflag || simple_pattern(patterns->pattern));
 
 	if (use_bmg) {
 		return;
