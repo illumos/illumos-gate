@@ -26,6 +26,7 @@
 
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -1876,23 +1877,35 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 		(void) lx_start_nfs_lockd();
 		return (0);
 
-	case B_BLOCK_ALL_SIGS:
+	case B_BLOCK_ALL_SIGS: {
+		uint_t result = 0;
+
 		mutex_enter(&p->p_lock);
 		pd = ptolxproc(p);
-		pd->l_block_all_signals++;
+		/*
+		 * This is used to block handling of all signals during vfork()
+		 * or clone(LX_CLONE_VFORK) emulation to match Linux semantics
+		 * and prevent the parent's signal handlers being called before
+		 * they are properly reset.
+		 */
+		if (pd->l_block_all_signals != 0) {
+			result = set_errno(EAGAIN);
+		} else {
+			pd->l_block_all_signals = 1;
+		}
 		mutex_exit(&p->p_lock);
-		return (0);
+		return (result);
+	}
 
 	case B_UNBLOCK_ALL_SIGS: {
-		uint_t result;
+		uint_t result = 0;
 
 		mutex_enter(&p->p_lock);
 		pd = ptolxproc(p);
 		if (pd->l_block_all_signals == 0) {
 			result = set_errno(EINVAL);
 		} else {
-			pd->l_block_all_signals--;
-			result = 0;
+			pd->l_block_all_signals = 0;
 		}
 		mutex_exit(&p->p_lock);
 		return (result);

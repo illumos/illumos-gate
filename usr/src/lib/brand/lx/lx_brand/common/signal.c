@@ -26,6 +26,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -2400,10 +2401,21 @@ lx_signalfd4(int fd, uintptr_t mask, size_t msize, int flags)
 	return (r == -1 ? -errno : r);
 }
 
+/*
+ * Since this brackets vfork, we also use it as a synchronisation point to
+ * prevent multiple vfork() calls occuring in parallel. This is necessary
+ * because vfork() on illumos is not MT-safe whereas it is on Linux (with
+ * caveats).
+ *
+ * Some real-world applications (java in particular) can run multiple vfork()
+ * calls in parallel across different threads and they need to be serialised
+ * in the lx brand.
+ */
 void
 lx_block_all_signals()
 {
-	(void) syscall(SYS_brand, B_BLOCK_ALL_SIGS);
+	while (syscall(SYS_brand, B_BLOCK_ALL_SIGS) != 0 && errno == EAGAIN)
+		yield();
 }
 
 void
