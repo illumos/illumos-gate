@@ -548,6 +548,7 @@ d etc/skel 0755 root sys
 f etc/skel/.bashrc 0644 root other
 f etc/skel/.kshrc 0644 root other
 f etc/skel/.profile 0644 root other
+f etc/smhba.conf 0644 root sys
 d etc/sock2path.d 0755 root sys
 f etc/sock2path.d/driver%2Fnetwork%2Fbpf 0644 root sys
 f etc/sock2path.d/driver%2Fnetwork%2Fsdp 0644 root sys
@@ -10974,6 +10975,7 @@ f usr/sbin/rtquery 0555 root bin
 f usr/sbin/rwall 0555 root bin
 f usr/sbin/sacadm 4755 root sys
 f usr/sbin/safe_finger 0555 root bin
+f usr/sbin/sasinfo 0555 root bin
 f usr/sbin/sbdadm 0555 root bin
 s usr/sbin/sendmail=../lib/mailwrapper
 f usr/sbin/setmnt 0555 root bin
