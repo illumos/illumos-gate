@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 Joyent, Inc.
  */
 
 /*
@@ -2745,7 +2746,11 @@ conn_get_socket_info(conn_t *connp, mib2_socketInfoEntry_t *sie)
 		return (NULL);
 	}
 
-	mutex_exit(&connp->conn_lock);
+	/*
+	 * Continue to hold conn_lock because we don't want to race with an
+	 * in-progress close, which will have set-to-NULL (and destroyed
+	 * upper_handle, aka sonode (and vnode)) BEFORE setting CONN_CLOSING.
+	 */
 
 	if (connp->conn_upper_handle != NULL) {
 		vn = (*connp->conn_upcalls->su_get_vnode)
@@ -2756,6 +2761,8 @@ conn_get_socket_info(conn_t *connp, mib2_socketInfoEntry_t *sie)
 			VN_HOLD(vn);
 		flags |= MIB2_SOCKINFO_STREAM;
 	}
+
+	mutex_exit(&connp->conn_lock);
 
 	if (vn == NULL || VOP_GETATTR(vn, &attr, 0, CRED(), NULL) != 0) {
 		if (vn != NULL)

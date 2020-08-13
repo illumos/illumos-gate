@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #ifndef _SYS_SOCKET_PROTO_H_
@@ -202,7 +203,16 @@ struct sock_upcalls_s {
 	void	(*su_signal_oob)(sock_upper_handle_t, ssize_t);
 	void	(*su_zcopy_notify)(sock_upper_handle_t);
 	void	(*su_set_error)(sock_upper_handle_t, int);
+	/*
+	 * NOTE: This function frees upper handle items. Caller cannot
+	 * rely on them after this upcall.
+	 */
 	void	(*su_closed)(sock_upper_handle_t);
+	/*
+	 * NOTE: This function MUST be implemented without using lower-level
+	 * downcalls or accesses. This allows callers to ensure su_closed()
+	 * upcalls can happen indepdently or concurrently.
+	 */
 	vnode_t *(*su_get_vnode)(sock_upper_handle_t);
 };
 
