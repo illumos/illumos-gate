@@ -12,6 +12,7 @@
 /*
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -1193,10 +1194,6 @@ gfx_term_drawrect(uint32_t ux1, uint32_t uy1, uint32_t ux2, uint32_t uy2)
 	for (i = 0; i <= width; i++)
 		gfx_fb_bezier(x1, y1 - i, x2 + i, y1 - i, x2 + i, y2, width-i);
 }
-
-#define	FL_PUTIMAGE_BORDER	0x1
-#define	FL_PUTIMAGE_NOSCROLL	0x2
-#define	FL_PUTIMAGE_DEBUG	0x80
 
 int
 gfx_fb_putimage(png_t *png, uint32_t ux1, uint32_t uy1, uint32_t ux2,
