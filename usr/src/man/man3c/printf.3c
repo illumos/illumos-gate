@@ -45,11 +45,10 @@
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\"
-.TH PRINTF 3C "Jan 7, 2009"
+.TH PRINTF 3C "Aug 19, 2020"
 .SH NAME
 printf, fprintf, sprintf, snprintf, asprintf \- print formatted output
 .SH SYNOPSIS
-.LP
 .nf
 #include <stdio.h>
 
@@ -82,8 +81,6 @@ printf, fprintf, sprintf, snprintf, asprintf \- print formatted output
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBprintf()\fR function places output on the standard output stream
 \fBstdout\fR.
 .sp
@@ -149,8 +146,6 @@ defined by the program's locale (category \fBLC_NUMERIC\fR). In the POSIX
 locale, or in a locale where the radix character is not defined, the radix
 character defaults to a period (\fB\&.\fR).
 .SS "Conversion Specifications"
-.sp
-.LP
 Each conversion specification is introduced by the \fB%\fR character or by the
 character sequence \fB%\fR\fIn\fR\fB$\fR, after which the following appear in
 sequence:
@@ -264,8 +259,6 @@ used, specifying the \fIN\fRth argument requires that all the leading
 arguments, from the first to the (\fIN-1\fR)th, are specified in the format
 string.
 .SS "Flag Characters"
-.sp
-.LP
 The flag characters and their meanings are:
 .sp
 .ne 2
@@ -349,8 +342,6 @@ conversions, the behavior is undefined.
 .RE
 
 .SS "Length Modifiers"
-.sp
-.LP
 The length modifiers and their meanings are:
 .sp
 .ne 2
@@ -461,8 +452,6 @@ double\fR argument.
 If a length modifier appears with any conversion specifier other than as
 specified above, the behavior is undefined.
 .SS "Conversion Specifiers"
-.sp
-.LP
 Each conversion specifier results in fetching zero or more arguments. The
 results are undefined if there are insufficient arguments for the format. If
 the format is exhausted while arguments remain, the excess arguments are
@@ -706,8 +695,11 @@ write only the number of bytes specified by precision; an application that is
 not standard-conforming will write only the portion of the string that will
 display in the number of columns of screen display specified by precision. If
 the precision is not specified, it is taken to be infinite, so all bytes up to
-the first null byte are printed. An argument with a null value will yield
-undefined results.
+the first null byte are printed. An argument with a null value will print
+.BR (null) .
+Note, while this behavior is common across many operating systems, POSIX does
+not guarantee this behavior and portable applications should avoid passing
+NULL.
 .sp
 If an \fBl\fR (ell) qualifier is present, the argument must be a pointer to an
 array of type \fBwchar_t\fR. Wide-characters from the array are converted to
@@ -745,7 +737,8 @@ the precision is specified, only that portion of the wide-character array that
 will display in the number of columns of screen display specified by precision
 will be written. If the precision is not specified, it is taken to be infinite,
 so all wide characters up to the first null character are printed. An argument
-with a null value will yield undefined results.
+with a null value will print
+.BR (null) .
 .RE
 
 .sp
@@ -800,8 +793,6 @@ update between the call to a successful execution of \fBprintf()\fR or
 \fBfflush\fR(3C) or \fBfclose\fR(3C) on the same stream or a call to
 \fBexit\fR(3C) or \fBabort\fR(3C).
 .SH RETURN VALUES
-.sp
-.LP
 The \fBprintf()\fR, \fBfprintf()\fR, \fBsprintf()\fR, and \fBasprintf()\fR
 functions return the number of bytes transmitted (excluding the terminating
 null byte in the case of \fBsprintf()\fR and \fBasprintf()\fR).
@@ -817,8 +808,6 @@ terminating null byte) is returned.
 .LP
 Each function returns a negative value if an output error was encountered.
 .SH ERRORS
-.sp
-.LP
 For the conditions under which \fBprintf()\fR and \fBfprintf()\fR will fail and
 may fail, refer to \fBfputc\fR(3C) or \fBfputwc\fR(3C).
 .sp
@@ -881,14 +870,10 @@ Insufficient storage space is available.
 .RE
 
 .SH USAGE
-.sp
-.LP
 If the application calling the \fBprintf()\fR functions has any objects of type
 \fBwint_t\fR or \fBwchar_t\fR, it must also include the header \fB<wchar.h>\fR
 to have these objects defined.
 .SS "Escape Character Sequences"
-.sp
-.LP
 It is common to use the following escape sequences built into the C language
 when entering format strings for the \fBprintf()\fR functions, but these
 sequences are processed by the C compiler, not by the \fBprintf()\fR function.
@@ -983,7 +968,6 @@ number, omit the zero so that the prefix is an 'x' (uppercase 'X' is not
 allowed in this context). Support for hexadecimal sequences is an ANSI
 extension. See \fBstandards\fR(5).
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRTo print the language-independent date and time format, the
 following statement could be used:
 .sp
@@ -1058,7 +1042,6 @@ printf("pi = %.5f", 4 * atan(1.0));
 .in -2
 
 .SS "Default"
-.LP
 \fBExample 4 \fRThe following example applies only to applications that are not
 standard-conforming. To print a list of names in columns which are 20
 characters wide:
@@ -1070,8 +1053,6 @@ characters wide:
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -1103,16 +1084,12 @@ See \fBstandards\fR(5) for the standards conformance of \fBprintf()\fR,
 function is modeled on the one that appears in the FreeBSD, NetBSD, and GNU C
 libraries.
 .SH SEE ALSO
-.sp
-.LP
 \fBexit\fR(2), \fBlseek\fR(2), \fBwrite\fR(2), \fBabort\fR(3C), \fBecvt\fR(3C),
 \fBexit\fR(3C), \fBfclose\fR(3C), \fBfflush\fR(3C), \fBfputwc\fR(3C),
 \fBfree\fR(3C), \fBmalloc\fR(3C), \fBputc\fR(3C), \fBscanf\fR(3C),
 \fBsetlocale\fR(3C), \fBstdio\fR(3C), \fBvprintf\fR(3C), \fBwcstombs\fR(3C),
 \fBwctomb\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.sp
-.LP
 If the \fBj\fR length modifier is used, 32-bit applications that were compiled
 using \fBc89\fR on releases prior to Solaris 10 will experience undefined
 behavior.
