@@ -27,8 +27,6 @@
 #ifndef	_SYS_SER_ASYNC_H
 #define	_SYS_SER_ASYNC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Initial port setup parameters for async lines
  */
@@ -57,9 +55,9 @@ extern "C" {
 
 #define	ZFIFOSZ		3
 /*
- * this macro needs a constant Hertz, but we can now have a hires_tick.
+ * This macro needs a constant 100 Hz, but hires_tick or hz may change that.
  * ztdelay in zs_async.c converts to a true delay based on hz so we
- * can use 100 for Hertz here.
+ * can use 100 Hz here.
  */
 #define	ZDELAY(n)	ZSDelayConst(100, ZFIFOSZ, NBBY, n)
 
@@ -166,9 +164,9 @@ struct asyncline {
 	 * and the second byte is the actual data.  The ring buffer
 	 * needs to be defined as ushort_t to accomodate this.
 	 */
-	ushort_t 	za_ring[RINGSIZE];
+	ushort_t	za_ring[RINGSIZE];
 	timeout_id_t	za_kick_rcv_id;
-	int 		za_kick_rcv_count;
+	int		za_kick_rcv_count;
 	timeout_id_t	za_zsa_restart_id;
 	bufcall_id_t	za_bufcid;
 	mblk_t		*za_rstandby[ZSA_MAX_RSTANDBY];

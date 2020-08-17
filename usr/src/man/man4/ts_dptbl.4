@@ -7,8 +7,6 @@
 .SH NAME
 ts_dptbl \- time-sharing dispatcher parameter table
 .SH DESCRIPTION
-.sp
-.LP
 The process scheduler (or dispatcher) is the portion of the kernel that
 controls allocation of the \fBCPU\fR to processes. The scheduler supports the
 notion of scheduling classes where each class defines a scheduling policy, used
@@ -65,9 +63,11 @@ only member of the \fBts_dptbl\fR which cannot be changed with
 The length of the time quantum allocated to processes at this level in ticks
 (\fBhz\fR).
 .sp
-In the high resolution clock mode (\fBhires_tick\fR set to \fB1\fR), the value
-of \fBhz\fR is set to \fB1000\fR. Increase quantums to maintain the same
-absolute time quantums.
+In the default high resolution clock mode (\fBhires_tick\fR set to \fB1\fR),
+the value of \fBhz\fR is set to \fB1000\fR.  If this value is overridden to
+\fB0\fR then \fBhz\fR will instead be \fB100\fR; the number of ticks per
+quantum must then be decreased to maintain the same length of quantum in
+absolute time.
 .RE
 
 .sp
@@ -129,8 +129,6 @@ scheduling classes. There are two methods available for doing this: reconfigure
 with a loadable module at boot-time or by using \fBdispadmin\fR(1M) at
 run-time.
 .SS "ts_dptbl Loadable Module"
-.sp
-.LP
 The \fBts_dptbl\fR can be reconfigured with a loadable module which contains a
 new time sharing dispatch table. The module containing the dispatch table is
 separate from the TS loadable module which contains the rest of the
@@ -140,8 +138,6 @@ scheduling priorities used by the time-sharing and inter-active classes. The
 relevant procedure and source code is described in the \fBREPLACING THE
 TS_DPTBL LOADABLE MODULE\fR section.
 .SS "dispadmin Configuration File"
-.sp
-.LP
 With the exception of \fBts_globpri\fR all of the members of the \fBts_dptbl\fR
 can be examined and modified on a running system using the \fBdispadmin\fR(1M)
 command. Invoking \fBdispadmin\fR for the time-sharing or inter-active class
@@ -177,7 +173,6 @@ parameters for time-sharing level 0, the second line specifies the parameters
 for time-sharing level 1, etc. There must be exactly one line for each
 configured time-sharing priority level.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRA Sample From a Configuration File
 .sp
 .LP
@@ -435,8 +430,6 @@ ts_getmaxumdpri()
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBpriocntl\fR(1), \fBdispadmin\fR(1M), \fBpriocntl\fR(2), \fBsystem\fR(4)
 .sp
 .LP
@@ -445,8 +438,6 @@ ts_getmaxumdpri()
 .LP
 \fIProgramming Interfaces Guide\fR
 .SH NOTES
-.sp
-.LP
 \fBdispadmin\fR does some limited sanity checking on the values supplied in the
 configuration file. The sanity checking is intended to ensure that the new
 \fBts_dptbl\fR values do not cause the system to panic. The sanity checking

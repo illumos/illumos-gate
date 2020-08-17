@@ -127,11 +127,11 @@ Moreover, the values must describe a table that is the same size (has same
 number of priority levels) as the table being overwritten. Super-user
 privileges are required in order to use the \fB-s\fR option.
 .sp
-Specify time quantum values for scheduling classes in system clock ticks, and
-not in constant-time units. Time quantum values are based on the value of the
-kernel's \fBhz\fR variable. If kernel variable \fBhires_tick\fR is set to
-\fB1\fR to get higher resolution clock behavior, the actual time quanta will be
-reduced by the order of \fB10\fR.
+Time quantum values for scheduling classes are specified in system clock ticks
+rather than constant-time units.  These values are based on the value of the
+kernel's \fBhz\fR variable.  By default, the system operates at 1000 Hz and
+thus with a quantum of 1 millisecond.  If the kernel tunable \fBhires_tick\fR
+is set to 0, this drops to 100 Hz for a larger quantum of 10 milliseconds.
 .sp
 The \fB-g\fR and \fB-s\fR options are mutually exclusive: you may not retrieve
 the table at the same time you are overwriting it.

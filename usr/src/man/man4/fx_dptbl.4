@@ -7,14 +7,11 @@
 .SH NAME
 fx_dptbl \- fixed priority dispatcher parameter table
 .SH SYNOPSIS
-.LP
 .nf
 \fBfx_dptbl\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The process scheduler or dispatcher is the portion of the kernel that controls
 allocation of the CPU to processes. The scheduler supports the notion of
 scheduling classes, where each class defines a scheduling policy used to
@@ -67,9 +64,11 @@ processes at a particular level, as the time quantum of a fixed priority
 process can be changed by the user with the \fBpriocntl\fR(1) command or the
 \fBpriocntl\fR(2) system call.
 .sp
-In the high resolution clock mode (\fBhires_tick\fR set to \fB1\fR), the value
-of \fBhz\fR is set to \fB1000\fR. Increase quantums to maintain the same
-absolute time quantums.
+In the default high resolution clock mode (\fBhires_tick\fR set to \fB1\fR),
+the value of \fBhz\fR is set to \fB1000\fR.  If this value is overridden to
+\fB0\fR then \fBhz\fR will instead be \fB100\fR; the number of ticks per
+quantum must then be decreased to maintain the same length of quantum in
+absolute time.
 .sp
 An administrator can affect the behavior of the fixed priority portion of the
 scheduler by reconfiguring the \fBfx_dptbl\fR. There are two methods available
@@ -78,8 +77,6 @@ for doing this: reconfigure with a loadable module at boot-time or by using
 .RE
 
 .SS "fx_dptbl Loadable Module"
-.sp
-.LP
 The \fBfx_dptbl\fR can be reconfigured with a loadable module that contains a
 new fixed priority dispatch table. The module containing the dispatch table is
 separate from the \fBFX\fR loadable module, which contains the rest of the
@@ -88,8 +85,6 @@ number of fixed priority priority levels or the set of global scheduling
 priorities used by the fixed priority class. The relevant procedure and source
 code is described in Replacing the fx_dptbl Loadable Module below.
 .SS "dispadmin Configuration File"
-.sp
-.LP
 The \fBfx_quantum\fR values in the \fBfx_dptbl\fR can be examined and modified
 on a running system using the \fBdispadmin\fR(1M) command. Invoking
 \fBdispadmin\fR for the fixed-priority class allows the administrator to
@@ -141,8 +136,6 @@ positive integer specifying the desired time quantum in the resolution given by
 See Examples for an example of an excerpt of a \fBdispadmin\fR configuration
 file.
 .SS "Replacing the fx_dptbl Loadable Module"
-.sp
-.LP
 To change the size of the fixed priority dispatch table, you must build the
 loadable module that contains the dispatch table information. Save the existing
 module before using the following procedure.
@@ -202,7 +195,6 @@ Reboot the system to use the new dispatch table.
 Exercise great care in using the preceding method to replace the dispatch
 table. A mistake can result in panics, thus making the system unusable.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRConfiguration File Excerpt
 .sp
 .LP
@@ -395,15 +387,11 @@ fx_getmaxumdpri()
 .sp
 
 .SH SEE ALSO
-.sp
-.LP
 \fBpriocntl\fR(1), \fBdispadmin\fR(1M), \fBpriocntl\fR(2), \fBsystem\fR(4)
 .sp
 .LP
 \fISystem Administration Guide, Volume 1, System Interface Guide\fR
 .SH NOTES
-.sp
-.LP
 In order to improve performance under heavy system load, both the \fBnfsd\fR
 daemon and the \fBlockd\fR daemon utilize the maximum priority in the \fBFX\fR
 class. Unusual \fBfx_dptbl\fR configurations may have significant negative
