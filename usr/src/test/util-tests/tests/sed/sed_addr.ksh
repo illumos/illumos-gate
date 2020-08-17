@@ -11,6 +11,8 @@
 
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 
+SED=${SED:=/usr/bin/sed}
+
 function fatal {
 	echo "[FATAL] $*" > /dev/stderr
 	exit 1
@@ -24,7 +26,7 @@ function runtest {
 	typeset ef=`mktemp`
 	[[ -n "$expect" ]] && printf "%s\n" $expect > $ef
 
-	sed -n "$script" $files > $output
+	$SED -n "$script" $files > $output
 	if [[ $? -eq 0 ]] && cmp -s $output $ef; then
 		echo "[PASS] sed $script $files"
 	else

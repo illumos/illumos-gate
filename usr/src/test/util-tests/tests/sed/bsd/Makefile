@@ -13,28 +13,33 @@
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
-.PARALLEL: $(SUBDIRS)
-SUBDIRS = bsd
-
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
-PROG = sed_addr
+PROG = multi_test
+DATAFILES :sh= (cd regress.multitest.out; print *)
 
 ROOTOPTPKG = $(ROOT)/opt/util-tests
 TESTDIR = $(ROOTOPTPKG)/tests/sed
+DATADIR = $(TESTDIR)/regress.multitest.out
 
 TESTS = $(PROG:%=$(TESTDIR)/%)
+DATAS = $(DATAFILES:%=$(DATADIR)/%)
 $(TESTS) := FILEMODE = 0555
+$(DATAS) := FILEMODE = 0444
 
 all clean clobber:
 
-install: all $(TESTS)
+install: all $(TESTS) $(DATAS)
 
 $(TESTS): $(TESTDIR) $(PROG).ksh
+$(DATAS): $(DATADIR)
 
-$(TESTDIR):
+$(TESTDIR) $(DATADIR):
 	$(INS.dir)
 
 $(TESTDIR)/%: %.ksh
 	$(INS.rename)
+
+$(DATADIR)/%: regress.multitest.out/%
+	$(INS.file)
