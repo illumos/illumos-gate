@@ -1,5 +1,6 @@
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  * Copyright (c) 1992 Diomidis Spinellis.
  * Copyright (c) 1992, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -34,6 +35,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/ccompile.h>
 
 #include <ctype.h>
 #include <err.h>
@@ -271,9 +273,22 @@ new:		if (!nflag && !pd)
  * TRUE if the address passed matches the current program state
  * (lastline, linenumber, ps).
  */
-#define	MATCH(a)							\
-	((a)->type == AT_RE ? regexec_e((a)->u.r, ps, 0, 1, psl) :	\
-	    (a)->type == AT_LINE ? linenum == (a)->u.l : lastline())
+static __GNU_INLINE int
+MATCH(struct s_command *cp, struct s_addr *a)
+{
+	switch (a->type) {
+	case AT_RE:
+		return (regexec_e(a->u.r, ps, 0, 1, psl));
+	case AT_LINE:
+		return (linenum == a->u.l);
+	case AT_RELLINE:
+		return (linenum - cp->startline == a->u.l);
+	case AT_LAST:
+		return (lastline());
+	}
+	fatal(_("Unhandled match type"));
+	return (0);
+}
 
 /*
  * Return TRUE if the command applies to the current line.  Sets the start
@@ -289,13 +304,11 @@ applies(struct s_command *cp)
 		r = 1;
 	else if (cp->a2)
 		if (cp->startline > 0) {
-			if (MATCH(cp->a2)) {
+			if (MATCH(cp, cp->a2)) {
 				cp->startline = 0;
 				lastaddr = 1;
 				r = 1;
-			} else if (linenum - cp->startline <= cp->a2->u.l)
-				r = 1;
-			else if ((cp->a2->type == AT_LINE &&
+			} else if ((cp->a2->type == AT_LINE &&
 			    linenum > cp->a2->u.l) ||
 			    (cp->a2->type == AT_RELLINE &&
 			    linenum - cp->startline > cp->a2->u.l)) {
@@ -305,9 +318,10 @@ applies(struct s_command *cp)
 				 */
 				cp->startline = 0;
 				r = 0;
-			} else
+			} else {
 				r = 1;
-		} else if (MATCH(cp->a1)) {
+			}
+		} else if (MATCH(cp, cp->a1)) {
 			/*
 			 * If the second address is a number less than or
 			 * equal to the line number first selected, only
@@ -326,7 +340,7 @@ applies(struct s_command *cp)
 		} else
 			r = 0;
 	else
-		r = MATCH(cp->a1);
+		r = MATCH(cp, cp->a1);
 	return (cp->nonsel ? ! r : r);
 }
 
@@ -642,7 +656,7 @@ lputs(char *s, size_t len)
 
 static int
 regexec_e(regex_t *preg, const char *string, int eflags, int nomatch,
-	size_t slen)
+    size_t slen)
 {
 	int eval;
 

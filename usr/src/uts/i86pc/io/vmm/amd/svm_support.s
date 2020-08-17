@@ -28,6 +28,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <sys/asm_linkage.h>
@@ -141,6 +142,18 @@ ENTRY_NP(svm_launch)
 	shrq	$32, %rdx
 	movl	$MSR_GSBASE, %ecx
 	wrmsr
+
+	/*
+	 * While SVM will save/restore the GDTR and IDTR, the TR does not enjoy
+	 * such treatment.  Reload the KTSS immediately, since it is used by
+	 * dtrace and other fault/trap handlers.
+	 */
+	movq	SVMSTK_RDX(%rsp), %rdi		/* %rdi = CPU */
+	movq	CPU_GDT(%rdi), %rdi		/* %rdi = cpu->cpu_gdt */
+	leaq	GDT_KTSS_OFF(%rdi), %rdi	/* %rdi = &cpu_gdt[GDT_KTSS] */
+	andb	$0xfd, SSD_TYPE(%rdi)		/* ssd_type.busy = 0 */
+	movw	$KTSS_SEL, %ax			/* reload kernel TSS */
+	ltr	%ax
 
 	SVM_GUEST_FLUSH_SCRATCH
 

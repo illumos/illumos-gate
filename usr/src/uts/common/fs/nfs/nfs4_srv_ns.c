@@ -660,7 +660,6 @@ treeclimb_export(struct exportinfo *exip)
 		if (error)
 			break;
 
-		/* XXX KEBE ASKS DO WE NEED THIS?!? */
 		ASSERT3U(exip->exi_zoneid, ==, curzone->zone_id);
 		/*
 		 * The root of the file system, or the zone's root for

@@ -10,17 +10,28 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2014 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2017 Jason King
-# Copyright 2020 Joyent, Inc.
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
-SUBDIRS = date dis dladm iconv libnvpair_json libsff printf xargs grep_xpg4
-SUBDIRS += demangle mergeq workq chown ctf smbios libjedec awk make sleep
-SUBDIRS += bunyan libcustr find mdb sed
-SUBDIRS += libcustr find mdb sed
-
+include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
+
+PROG = sed_addr
+
+ROOTOPTPKG = $(ROOT)/opt/util-tests
+TESTDIR = $(ROOTOPTPKG)/tests
+
+CMDS = $(PROG:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0555
+
+all clean clobber:
+
+install: all $(CMDS)
+
+$(CMDS): $(TESTDIR) $(PROG).ksh
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%: %.ksh
+	$(INS.rename)
