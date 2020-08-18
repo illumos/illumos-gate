@@ -31,6 +31,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -113,6 +114,14 @@ gcpu_init_ident_ppin(cmi_hdl_t hdl)
 		return (NULL);
 	}
 
+	/*
+	 * If the PPIN is not enabled and not locked, attempt to enable it.
+	 * Note: in some environments such as Amazon EC2 the PPIN appears
+	 * to be disabled and unlocked but our attempts to enable it don't
+	 * stick, and when we attempt to read the PPIN we get an uncaught
+	 * #GP. To avoid that happening we read the MSR back and verify it
+	 * has taken the new value.
+	 */
 	if ((value & MSR_PPIN_CTL_ENABLED) == 0) {
 		if ((value & MSR_PPIN_CTL_LOCKED) != 0) {
 			return (NULL);
@@ -120,6 +129,14 @@ gcpu_init_ident_ppin(cmi_hdl_t hdl)
 
 		if (cmi_hdl_wrmsr(hdl, ppin_ctl_msr, MSR_PPIN_CTL_ENABLED) !=
 		    CMI_SUCCESS) {
+			return (NULL);
+		}
+
+		if (cmi_hdl_rdmsr(hdl, ppin_ctl_msr, &value) != CMI_SUCCESS) {
+			return (NULL);
+		}
+
+		if ((value & MSR_PPIN_CTL_ENABLED) == 0) {
 			return (NULL);
 		}
 	}
