@@ -21,6 +21,5 @@
 SUBDIRS = date dis dladm iconv libnvpair_json libsff printf xargs grep_xpg4
 SUBDIRS += demangle mergeq workq chown ctf smbios libjedec awk make sleep
 SUBDIRS += bunyan libcustr find mdb sed
-SUBDIRS += libcustr find mdb sed
 
 include $(SRC)/test/Makefile.com
