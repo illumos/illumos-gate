@@ -400,6 +400,7 @@ dump_vm_run_exitcode(struct vm_exit *vmexit, int vcpu)
 #define MSR_AMD7TH_START	0xC0010000
 #define MSR_AMD7TH_END		0xC0011FFF
 
+#ifdef __FreeBSD__
 static const char *
 msr_name(uint32_t msr)
 {
@@ -563,6 +564,21 @@ vm_set_vmcs_field(struct vmctx *ctx, int vcpu, int field, uint64_t val)
 
 	return (vm_set_register(ctx, vcpu, VMCS_IDENT(field), val));
 }
+#else /* __FreeBSD__ */
+/* VMCS does not allow arbitrary reads/writes */
+static int
+vm_get_vmcs_field(struct vmctx *ctx, int vcpu, int field, uint64_t *ret_val)
+{
+	*ret_val = 0;
+	return (0);
+}
+
+static int
+vm_set_vmcs_field(struct vmctx *ctx, int vcpu, int field, uint64_t val)
+{
+	return (EINVAL);
+}
+#endif /* __FreeBSD__ */
 
 static int
 vm_get_vmcb_field(struct vmctx *ctx, int vcpu, int off, int bytes,
@@ -2182,8 +2198,15 @@ main(int argc, char *argv[])
 						  &addr);
 		}
 
+#ifdef __FreeBSD__
 		if (error == 0)
 			error = dump_msr_bitmap(vcpu, addr, cpu_intel);
+#else
+		/*
+		 * Skip dumping the MSR bitmap since raw access to the VMCS is
+		 * currently not possible.
+		 */
+#endif /* __FreeBSD__ */
 	}
 
 	if (!error && (get_vpid_asid || get_all)) {

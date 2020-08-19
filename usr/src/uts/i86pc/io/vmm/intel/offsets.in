@@ -22,7 +22,6 @@
 #include <machine/pmap.h>
 #include <machine/vmm.h>
 
-#include "intel/vmx_cpufunc.h"
 #include "intel/vmx.h"
 #include "vm/vm_glue.h"
 

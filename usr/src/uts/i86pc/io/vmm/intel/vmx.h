@@ -156,6 +156,7 @@ struct vmx {
 	uint64_t	host_msrs[VM_MAXCPU][GUEST_MSR_NUM];
 	uint64_t	tsc_offset_active[VM_MAXCPU];
 	vmcs_state_t	vmcs_state[VM_MAXCPU];
+	uintptr_t	vmcs_pa[VM_MAXCPU];
 #endif
 	struct vmxctx	ctx[VM_MAXCPU];
 	struct vmxcap	cap[VM_MAXCPU];
@@ -175,16 +176,37 @@ vmx_cap_en(const struct vmx *vmx, enum vmx_caps cap)
 	return ((vmx->vmx_caps & cap) == cap);
 }
 
+
+/*
+ * Section 5.2 "Conventions" from Intel Architecture Manual 2B.
+ *
+ *			error
+ * VMsucceed		  0
+ * VMFailInvalid	  1
+ * VMFailValid		  2	see also VMCS VM-Instruction Error Field
+ */
+#define	VM_SUCCESS		0
+#define	VM_FAIL_INVALID		1
+#define	VM_FAIL_VALID		2
+#define	VMX_SET_ERROR_CODE_ASM \
+	"	jnc 1f;"						\
+	"	mov $1, %[error];"	/* CF: error = 1 */		\
+	"	jmp 3f;"						\
+	"1:	jnz 2f;"						\
+	"	mov $2, %[error];"	/* ZF: error = 2 */		\
+	"	jmp 3f;"						\
+	"2:	mov $0, %[error];"					\
+	"3:"
+
+
 #define	VMX_GUEST_VMEXIT	0
 #define	VMX_VMRESUME_ERROR	1
 #define	VMX_VMLAUNCH_ERROR	2
 #define	VMX_INVEPT_ERROR	3
 #define	VMX_VMWRITE_ERROR	4
+
 int	vmx_enter_guest(struct vmxctx *ctx, struct vmx *vmx, int launched);
 void	vmx_call_isr(uintptr_t entry);
-
-u_long	vmx_fix_cr0(u_long cr0);
-u_long	vmx_fix_cr4(u_long cr4);
 
 int	vmx_set_tsc_offset(struct vmx *vmx, int vcpu, uint64_t offset);
 

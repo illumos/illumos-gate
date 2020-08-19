@@ -59,7 +59,6 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/vmm.h>
 
-#include "vmx_cpufunc.h"
 #include "ept.h"
 
 #define	EPT_SUPPORTS_EXEC_ONLY(cap)	((cap) & (1UL << 0))
@@ -171,31 +170,12 @@ ept_dump(uint64_t *ptp, int nlevels)
 }
 #endif
 
-#ifdef __FreeBSD__
-static void
-invept_single_context(void *arg)
-{
-	struct invept_desc desc = *(struct invept_desc *)arg;
 
-	invept(INVEPT_TYPE_SINGLE_CONTEXT, desc);
-}
-
-void
-ept_invalidate_mappings(u_long eptp)
-{
-	struct invept_desc invept_desc = { 0 };
-
-	invept_desc.eptp = eptp;
-
-	smp_rendezvous(NULL, invept_single_context, NULL, &invept_desc);
-}
-#else /* __FreeBSD__ */
 void
 ept_invalidate_mappings(u_long eptp)
 {
 	hma_vmx_invept_allcpus((uintptr_t)eptp);
 }
-#endif /* __FreeBSD__ */
 
 static int
 ept_pinit(pmap_t pmap)

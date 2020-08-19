@@ -62,13 +62,6 @@ vmx_ctl_allows_zero_setting(uint64_t msr_val, int bitpos)
 	return ((msr_val & (1UL << bitpos)) == 0);
 }
 
-uint32_t
-vmx_revision(void)
-{
-
-	return (rdmsr(MSR_VMX_BASIC) & 0xffffffff);
-}
-
 /*
  * Generate a bitmask to be used for the VMCS execution control fields.
  *
