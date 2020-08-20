@@ -24,6 +24,7 @@
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright (c) 2017, Intel Corporation.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <sys/sysmacros.h>
@@ -1983,6 +1984,10 @@ zio_suspend(spa_t *spa, zio_t *zio, zio_suspend_reason_t reason)
 		fm_panic("Pool '%s' has encountered an uncorrectable I/O "
 		    "failure and the failure mode property for this pool "
 		    "is set to panic.", spa_name(spa));
+
+	cmn_err(CE_WARN, "Pool '%s' has encountered an uncorrectable I/O "
+	    "failure and has been suspended; `zpool clear` will be required "
+	    "before the pool can be written to.", spa_name(spa));
 
 	zfs_ereport_post(FM_EREPORT_ZFS_IO_FAILURE, spa, NULL,
 	    NULL, NULL, 0, 0);
