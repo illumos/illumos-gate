@@ -43,29 +43,24 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.TH CRONTAB 1 "Oct 22, 2019"
+.TH CRONTAB 1 "Aug 20, 2020"
 .SH NAME
 crontab \- user crontab file
 .SH SYNOPSIS
 .nf
-\fB/usr/bin/crontab\fR [\fIfilename\fR]
+\fB/usr/bin/crontab\fR [\fB-u\fR \fIusername\fR] [\fIfilename\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/bin/crontab\fR \fB-e\fR [\fIusername\fR]
+\fB/usr/bin/crontab\fR \fB{ -e | -l | -r }\fR [\fIusername\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/bin/crontab\fR \fB-l\fR [\fIusername\fR]
-.fi
-
-.LP
-.nf
-\fB/usr/bin/crontab\fR \fB-r\fR [\fIusername\fR]
+\fB/usr/bin/crontab\fR \fB-u\fR \fIusername\fR \fB{ -e | -l | -r }\fR
 .fi
 
 .LP
@@ -75,17 +70,12 @@ crontab \- user crontab file
 
 .LP
 .nf
-\fB/usr/xpg4/bin/crontab\fR \fB-e\fR [\fIusername\fR]
+\fB/usr/xpg4/bin/crontab\fR \fB{ -e | -l | -r }\fR [\fIusername\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/crontab\fR \fB-l\fR [\fIusername\fR]
-.fi
-
-.LP
-.nf
-\fB/usr/xpg4/bin/crontab\fR \fB-r\fR [\fIusername\fR]
+\fB/usr/xpg4/bin/crontab\fR \fB-u\fR \fIusername\fR \fB{ -e | -l | -r }\fR
 .fi
 
 .LP
@@ -95,17 +85,12 @@ crontab \- user crontab file
 
 .LP
 .nf
-\fB/usr/xpg6/bin/crontab\fR \fB-e\fR [\fIusername\fR]
+\fB/usr/xpg6/bin/crontab\fR \fB{ -e | -l | -r }\fR [\fIusername\fR]
 .fi
 
 .LP
 .nf
-\fB/usr/xpg6/bin/crontab\fR \fB-l\fR [\fIusername\fR]
-.fi
-
-.LP
-.nf
-\fB/usr/xpg6/bin/crontab\fR \fB-r\fR [\fIusername\fR]
+\fB/usr/xpg6/bin/crontab\fR \fB-u\fR \fIusername\fR \fB{ -e | -l | -r }\fR
 .fi
 
 .SH DESCRIPTION
@@ -117,7 +102,8 @@ users' crontabs.
 .sp
 .LP
 If \fBcrontab\fR is invoked with \fIfilename\fR, this overwrites an existing
-\fBcrontab\fR entry for the user that invokes it.
+\fBcrontab\fR entry for the user that invokes it, or for the user specified
+with the \fB-u\fR option.
 .SS "\fBcrontab\fR Access Control"
 Users: Access to \fBcrontab\fR is allowed:
 .RS +4
@@ -272,11 +258,11 @@ The following variables are supported:
 .sp
 .ne 2
 .na
-\fB\fBHOME\fR\fR
+\fBHOME\fR
 .ad
 .sp .6
 .RS 4n
-Allows the user to choose and alternative directory for cron to change
+Allows the user to choose an alternative directory for cron to change
 directory to prior to running the command. For example:
 .sp
 .in +2
@@ -291,7 +277,7 @@ HOME=/var/tmp
 .sp
 .ne 2
 .na
-\fB\fBSHELL\fR\fR
+\fBSHELL\fR
 .ad
 .sp .6
 .RS 4n
@@ -309,7 +295,7 @@ SHELL=/usr/bin/ksh
 .sp
 .ne 2
 .na
-\fB\fBTZ\fR\fR
+\fBTZ\fR
 .ad
 .sp .6
 .RS 4n
@@ -352,7 +338,7 @@ The following options are supported:
 .sp
 .ne 2
 .na
-\fB\fB-e\fR\fR
+\fB-e\fR
 .ad
 .RS 6n
 Edits a copy of the current user's \fBcrontab\fR file, or creates an empty file
@@ -376,7 +362,7 @@ done by root or by a user with the \fBsolaris.jobs.admin\fR authorization.
 .sp
 .ne 2
 .na
-\fB\fB-l\fR\fR
+\fB-l\fR
 .ad
 .RS 6n
 Lists the \fBcrontab\fR file for the invoking user. Only root or a user with
@@ -387,13 +373,25 @@ the \fBsolaris.jobs.admin\fR authorization can specify a username following the
 .sp
 .ne 2
 .na
-\fB\fB-r\fR\fR
+\fB-r\fR
 .ad
 .RS 6n
 Removes a user's \fBcrontab\fR from the \fBcrontab\fR directory. Only root or a
 user with the \fBsolaris.jobs.admin\fR authorization can specify a username
 following the \fB-r\fR option to remove the \fBcrontab\fR file of the specified
 user.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-u\fR \fIusername\fR
+.ad
+.RS 6n
+Specifies the name of the user whose \fBcrontab\fR is to be replaced, viewed or
+modified. This can only be done by root or by a user with the
+\fBsolaris.jobs.admin\fR authorization.
+
 .RE
 
 .SH EXAMPLES
@@ -520,7 +518,7 @@ that affect the execution of \fBcrontab\fR: \fBLANG\fR, \fBLC_ALL\fR,
 .SS "\fB/usr/bin/crontab\fR"
 .ne 2
 .na
-\fB\fBEDITOR\fR\fR
+\fBEDITOR\fR
 .ad
 .RS 10n
 Determine the editor to be invoked when the \fB-e\fR option is specified. This
@@ -531,7 +529,7 @@ is overridden by the \fBVISUAL\fR environmental variable. The default editor is
 .sp
 .ne 2
 .na
-\fB\fBPATH\fR\fR
+\fBPATH\fR
 .ad
 .RS 10n
 The \fBPATH\fR in \fBcrontab\fR's environment specifies the search path used to
@@ -541,7 +539,7 @@ find the editor.
 .sp
 .ne 2
 .na
-\fB\fBVISUAL\fR\fR
+\fBVISUAL\fR
 .ad
 .RS 10n
 Determine the visual editor to be invoked when the \fB-e\fR option is
@@ -552,7 +550,7 @@ specified. If \fBVISUAL\fR is not specified, then the environment variable
 .SS "\fB/usr/xpg4/bin/crontab\fR"
 .ne 2
 .na
-\fB\fBEDITOR\fR\fR
+\fBEDITOR\fR
 .ad
 .RS 10n
 Determine the editor to be invoked when the \fB-e\fR option is specified. The
@@ -562,7 +560,7 @@ default editor is \fB/usr/xpg4/bin/vi\fR.
 .SS "\fB/usr/xpg6/bin/crontab\fR"
 .ne 2
 .na
-\fB\fBEDITOR\fR\fR
+\fBEDITOR\fR
 .ad
 .RS 10n
 Determine the editor to be invoked when the \fB-e\fR option is specified. The
@@ -574,7 +572,7 @@ The following exit values are returned:
 .sp
 .ne 2
 .na
-\fB\fB0\fR\fR
+\fB0\fR
 .ad
 .RS 6n
 Successful completion.
@@ -583,7 +581,7 @@ Successful completion.
 .sp
 .ne 2
 .na
-\fB\fB>0\fR\fR
+\fB>0\fR
 .ad
 .RS 6n
 An error occurred.
@@ -592,7 +590,7 @@ An error occurred.
 .SH FILES
 .ne 2
 .na
-\fB\fB/etc/cron.d\fR\fR
+\fB/etc/cron.d\fR
 .ad
 .RS 28n
 main cron directory
@@ -601,7 +599,7 @@ main cron directory
 .sp
 .ne 2
 .na
-\fB\fB/etc/cron.d/cron.allow\fR\fR
+\fB/etc/cron.d/cron.allow\fR
 .ad
 .RS 28n
 list of allowed users
@@ -610,7 +608,7 @@ list of allowed users
 .sp
 .ne 2
 .na
-\fB\fB/etc/default/cron\fR\fR
+\fB/etc/default/cron\fR
 .ad
 .RS 28n
 contains cron default settings
@@ -619,7 +617,7 @@ contains cron default settings
 .sp
 .ne 2
 .na
-\fB\fB/etc/cron.d/cron.deny\fR\fR
+\fB/etc/cron.d/cron.deny\fR
 .ad
 .RS 28n
 list of denied users
@@ -628,7 +626,7 @@ list of denied users
 .sp
 .ne 2
 .na
-\fB\fB/var/cron/log\fR\fR
+\fB/var/cron/log\fR
 .ad
 .RS 28n
 accounting information
@@ -637,7 +635,7 @@ accounting information
 .sp
 .ne 2
 .na
-\fB\fB/var/spool/cron/crontabs\fR\fR
+\fB/var/spool/cron/crontabs\fR
 .ad
 .RS 28n
 spool area for \fBcrontab\fR

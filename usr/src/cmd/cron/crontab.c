@@ -26,7 +26,7 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -72,10 +72,9 @@
 #define	WARNSHELL	"warning: commands will be executed using /usr/bin/sh\n"
 #define	BADUSAGE	\
 	"usage:\n"			\
-	"\tcrontab [file]\n"		\
-	"\tcrontab -e [username]\n"	\
-	"\tcrontab -l [username]\n"	\
-	"\tcrontab -r [username]"
+	"\tcrontab [-u username] [file]\n"		\
+	"\tcrontab [-u username] { -e | -l | -r }\n"	\
+	"\tcrontab { -e | -l | -r } [username]"
 #define	INVALIDUSER	"you are not a valid user (no entry in /etc/passwd)."
 #define	NOTALLOWED	"you are not authorized to use cron.  Sorry."
 #define	NOTROOT		\
@@ -136,6 +135,7 @@ main(int argc, char **argv)
 	int stat_loc;
 	int ret;
 	char real_login[UNAMESIZE];
+	char *user = NULL;
 	int tmpfd = -1;
 	pam_handle_t *pamh;
 	int pam_error;
@@ -144,7 +144,7 @@ main(int argc, char **argv)
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
-#define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't */
+#define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it wasn't */
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
@@ -154,7 +154,7 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-	while ((c = getopt(argc, argv, "elr")) != EOF)
+	while ((c = getopt(argc, argv, "elru:")) != EOF) {
 		switch (c) {
 			case 'e':
 				eflag++;
@@ -165,16 +165,28 @@ main(int argc, char **argv)
 			case 'r':
 				rflag++;
 				break;
+			case 'u':
+				user = optarg;
+				break;
 			case '?':
 				errflg++;
 				break;
 		}
+	}
+
+	argc -= optind;
+	argv += optind;
 
 	if (eflag + lflag + rflag > 1)
 		errflg++;
 
-	argc -= optind;
-	argv += optind;
+	if ((eflag || lflag || rflag) && argc > 0) {
+		if (user != NULL)
+			errflg++;
+		else
+			user = *argv;
+	}
+
 	if (errflg || argc > 1)
 		crabort(BADUSAGE);
 
@@ -183,11 +195,12 @@ main(int argc, char **argv)
 		crabort(INVALIDUSER);
 
 	if (strlcpy(real_login, pwp->pw_name, sizeof (real_login))
-	    >= sizeof (real_login))
+	    >= sizeof (real_login)) {
 		crabort(NAMETOOLONG);
+	}
 
-	if ((eflag || lflag || rflag) && argc == 1) {
-		if ((pwp = getpwnam(*argv)) == NULL)
+	if (user != NULL) {
+		if ((pwp = getpwnam(user)) == NULL)
 			crabort(INVALIDUSER);
 
 		if (!cron_admin(real_login)) {
@@ -195,8 +208,9 @@ main(int argc, char **argv)
 				crabort(NOTROOT);
 			else
 				pp = getuser(ruid);
-		} else
-			pp = *argv++;
+		} else {
+			pp = user;
+		}
 	} else {
 		pp = getuser(ruid);
 	}
