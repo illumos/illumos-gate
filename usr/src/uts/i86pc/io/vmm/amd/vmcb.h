@@ -212,15 +212,6 @@ struct svm_softc;
 #define	VMCB_OFF_SYSENTER_EIP		VMCB_OFF_STATE(0x238)
 #define	VMCB_OFF_GUEST_PAT		VMCB_OFF_STATE(0x268)
 
-/*
- * Encode the VMCB offset and bytes that we want to read from VMCB.
- */
-#define	VMCB_ACCESS(o, w)		(0x80000000 | (((w) & 0xF) << 16) | \
-					((o) & 0xFFF))
-#define	VMCB_ACCESS_OK(v)               ((v) & 0x80000000 )
-#define	VMCB_ACCESS_BYTES(v)            (((v) >> 16) & 0xF)
-#define	VMCB_ACCESS_OFFSET(v)           ((v) & 0xFFF)
-
 #ifdef _KERNEL
 /* VMCB save state area segment format */
 struct vmcb_segment {
@@ -230,6 +221,10 @@ struct vmcb_segment {
 	uint64_t	base;
 };
 CTASSERT(sizeof(struct vmcb_segment) == 16);
+
+/* Convert to/from vmcb segment access to generic (VMX) access */
+#define	VMCB_ATTR2ACCESS(attr)	((((attr) & 0xf00) << 4) | ((attr) & 0xff))
+#define	VMCB_ACCESS2ATTR(acc)	((((acc) & 0xf000) >> 4) | ((acc) & 0xff))
 
 /* Code segment descriptor attribute in 12 bit format as saved by VMCB. */
 #define	VMCB_CS_ATTRIB_L		BIT(9)	/* Long mode. */
@@ -360,6 +355,15 @@ struct vmcb_state {
 CTASSERT(sizeof(struct vmcb_state) == 0xC00);
 CTASSERT(offsetof(struct vmcb_state, int_to) == 0x290);
 
+/*
+ * The VMCB aka Virtual Machine Control Block is a 4KB aligned page
+ * in memory that describes the virtual machine.
+ *
+ * The VMCB contains:
+ * - instructions or events in the guest to intercept
+ * - control bits that modify execution environment of the guest
+ * - guest processor state (e.g. general purpose registers)
+ */
 struct vmcb {
 	struct vmcb_ctrl ctrl;
 	struct vmcb_state state;
@@ -367,11 +371,8 @@ struct vmcb {
 CTASSERT(sizeof(struct vmcb) == PAGE_SIZE);
 CTASSERT(offsetof(struct vmcb, state) == 0x400);
 
-int	vmcb_read(struct svm_softc *sc, int vcpu, int ident, uint64_t *retval);
-int	vmcb_write(struct svm_softc *sc, int vcpu, int ident, uint64_t val);
-int	vmcb_setdesc(void *arg, int vcpu, int ident, struct seg_desc *desc);
-int	vmcb_getdesc(void *arg, int vcpu, int ident, struct seg_desc *desc);
-int	vmcb_seg(struct vmcb *vmcb, int ident, struct vmcb_segment *seg);
+struct vmcb_segment *vmcb_segptr(struct vmcb *vmcb, int type);
+uint64_t *vmcb_regptr(struct vmcb *vmcb, int ident, uint32_t *dirtyp);
 
 #endif /* _KERNEL */
 #endif /* _VMCB_H_ */
