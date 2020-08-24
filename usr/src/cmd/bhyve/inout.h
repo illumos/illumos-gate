@@ -47,6 +47,7 @@
 
 struct vmctx;
 struct vm_exit;
+struct vm_inout;
 
 /*
  * inout emulation handlers return 0 on success and -1 on failure.
@@ -82,10 +83,10 @@ struct inout_port {
 		0							\
 	};								\
 	DATA_SET(inout_port_set, __CONCAT(__inout_port, __LINE__))
-	
+
 void	init_inout(void);
-int	emulate_inout(struct vmctx *, int vcpu, struct vm_exit *vmexit,
-		      int strict);
+int	emulate_inout(struct vmctx *, int vcpu, struct vm_inout *inout,
+    bool strict);
 int	register_inout(struct inout_port *iop);
 int	unregister_inout(struct inout_port *iop);
 void	init_bvmcons(void);

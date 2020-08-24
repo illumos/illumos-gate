@@ -116,7 +116,7 @@ static __inline uint64_t
 rdmsr(u_int msr)
 {
 	uint32_t low, high;
- 
+
 	__asm __volatile("rdmsr" : "=a" (low), "=d" (high) : "c" (msr));
 	return (low | ((uint64_t)high << 32));
 }
@@ -150,7 +150,7 @@ static __inline u_long
 rcr0(void)
 {
 	u_long  data;
- 
+
 	__asm __volatile("movq %%cr0,%0" : "=r" (data));
 	return (data);
 }
@@ -174,7 +174,7 @@ static __inline u_long
 rcr4(void)
 {
 	u_long  data;
- 
+
 	__asm __volatile("movq %%cr4,%0" : "=r" (data));
 	return (data);
 }

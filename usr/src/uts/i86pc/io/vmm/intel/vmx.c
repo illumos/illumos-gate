@@ -77,7 +77,7 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
-#include <machine/vmm_instruction_emul.h>
+#include <sys/vmm_instruction_emul.h>
 #include "vmm_lapic.h"
 #include "vmm_host.h"
 #include "vmm_ioport.h"
@@ -117,7 +117,7 @@ __FBSDID("$FreeBSD$");
 	 PROCBASED_CR8_STORE_EXITING)
 #else
 /* We consider TSC offset a necessity for unsynched TSC handling */
-#define	PROCBASED_CTLS_ONE_SETTING 					\
+#define	PROCBASED_CTLS_ONE_SETTING					\
 	(PROCBASED_SECONDARY_CONTROLS	|				\
 	 PROCBASED_TSC_OFFSET		|				\
 	 PROCBASED_MWAIT_EXITING	|				\
@@ -1885,69 +1885,6 @@ vmx_paging_mode(void)
 		return (PAGING_MODE_PAE);
 }
 
-static uint64_t
-inout_str_index(struct vmx *vmx, int vcpuid, int in)
-{
-	uint64_t val;
-	int error;
-	enum vm_reg_name reg;
-
-	reg = in ? VM_REG_GUEST_RDI : VM_REG_GUEST_RSI;
-	error = vmx_getreg(vmx, vcpuid, reg, &val);
-	KASSERT(error == 0, ("%s: vmx_getreg error %d", __func__, error));
-	return (val);
-}
-
-static uint64_t
-inout_str_count(struct vmx *vmx, int vcpuid, int rep)
-{
-	uint64_t val;
-	int error;
-
-	if (rep) {
-		error = vmx_getreg(vmx, vcpuid, VM_REG_GUEST_RCX, &val);
-		KASSERT(!error, ("%s: vmx_getreg error %d", __func__, error));
-	} else {
-		val = 1;
-	}
-	return (val);
-}
-
-static int
-inout_str_addrsize(uint32_t inst_info)
-{
-	uint32_t size;
-
-	size = (inst_info >> 7) & 0x7;
-	switch (size) {
-	case 0:
-		return (2);	/* 16 bit */
-	case 1:
-		return (4);	/* 32 bit */
-	case 2:
-		return (8);	/* 64 bit */
-	default:
-		panic("%s: invalid size encoding %d", __func__, size);
-	}
-}
-
-static void
-inout_str_seginfo(struct vmx *vmx, int vcpuid, uint32_t inst_info, int in,
-    struct vm_inout_str *vis)
-{
-	int error, s;
-
-	if (in) {
-		vis->seg_name = VM_REG_GUEST_ES;
-	} else {
-		s = (inst_info >> 15) & 0x7;
-		vis->seg_name = vm_segment_name(s);
-	}
-
-	error = vmx_getdesc(vmx, vcpuid, vis->seg_name, &vis->seg_desc);
-	KASSERT(error == 0, ("%s: vmx_getdesc error %d", __func__, error));
-}
-
 static void
 vmx_paging_info(struct vm_guest_paging *paging)
 {
@@ -1958,35 +1895,89 @@ vmx_paging_info(struct vm_guest_paging *paging)
 }
 
 static void
-vmexit_inst_emul(struct vm_exit *vmexit, uint64_t gpa, uint64_t gla)
+vmexit_mmio_emul(struct vm_exit *vmexit, struct vie *vie, uint64_t gpa,
+    uint64_t gla)
 {
-	struct vm_guest_paging *paging;
+	struct vm_guest_paging paging;
 	uint32_t csar;
 
-	paging = &vmexit->u.inst_emul.paging;
-
-	vmexit->exitcode = VM_EXITCODE_INST_EMUL;
+	vmexit->exitcode = VM_EXITCODE_MMIO_EMUL;
 	vmexit->inst_length = 0;
-	vmexit->u.inst_emul.gpa = gpa;
-	vmexit->u.inst_emul.gla = gla;
-	vmx_paging_info(paging);
-	switch (paging->cpu_mode) {
+	vmexit->u.mmio_emul.gpa = gpa;
+	vmexit->u.mmio_emul.gla = gla;
+	vmx_paging_info(&paging);
+
+	switch (paging.cpu_mode) {
 	case CPU_MODE_REAL:
-		vmexit->u.inst_emul.cs_base = vmcs_read(VMCS_GUEST_CS_BASE);
-		vmexit->u.inst_emul.cs_d = 0;
+		vmexit->u.mmio_emul.cs_base = vmcs_read(VMCS_GUEST_CS_BASE);
+		vmexit->u.mmio_emul.cs_d = 0;
 		break;
 	case CPU_MODE_PROTECTED:
 	case CPU_MODE_COMPATIBILITY:
-		vmexit->u.inst_emul.cs_base = vmcs_read(VMCS_GUEST_CS_BASE);
+		vmexit->u.mmio_emul.cs_base = vmcs_read(VMCS_GUEST_CS_BASE);
 		csar = vmcs_read(VMCS_GUEST_CS_ACCESS_RIGHTS);
-		vmexit->u.inst_emul.cs_d = SEG_DESC_DEF32(csar);
+		vmexit->u.mmio_emul.cs_d = SEG_DESC_DEF32(csar);
 		break;
 	default:
-		vmexit->u.inst_emul.cs_base = 0;
-		vmexit->u.inst_emul.cs_d = 0;
+		vmexit->u.mmio_emul.cs_base = 0;
+		vmexit->u.mmio_emul.cs_d = 0;
 		break;
 	}
-	vie_init(&vmexit->u.inst_emul.vie, NULL, 0);
+
+	vie_init_mmio(vie, NULL, 0, &paging, gpa);
+}
+
+static void
+vmexit_inout(struct vm_exit *vmexit, struct vie *vie, uint64_t qual,
+    uint32_t eax)
+{
+	struct vm_guest_paging paging;
+	struct vm_inout *inout;
+
+	inout = &vmexit->u.inout;
+
+	inout->bytes = (qual & 0x7) + 1;
+	inout->flags = 0;
+	inout->flags |= (qual & 0x8) ? INOUT_IN : 0;
+	inout->flags |= (qual & 0x10) ? INOUT_STR : 0;
+	inout->flags |= (qual & 0x20) ? INOUT_REP : 0;
+	inout->port = (uint16_t)(qual >> 16);
+	inout->eax = eax;
+	if (inout->flags & INOUT_STR) {
+		uint64_t inst_info;
+
+		inst_info = vmcs_read(VMCS_EXIT_INSTRUCTION_INFO);
+
+		/*
+		 * Bits 7-9 encode the address size of ins/outs operations where
+		 * the 0/1/2 values correspond to 16/32/64 bit sizes.
+		 */
+		inout->addrsize = 2 << (1 + ((inst_info >> 7) & 0x3));
+		VERIFY(inout->addrsize == 2 || inout->addrsize == 4 ||
+		    inout->addrsize == 8);
+
+		if (inout->flags & INOUT_IN) {
+			/*
+			 * The bits describing the segment in INSTRUCTION_INFO
+			 * are not defined for ins, leaving it to system
+			 * software to assume %es (encoded as 0)
+			 */
+			inout->segment = 0;
+		} else {
+			/*
+			 * Bits 15-17 encode the segment for OUTS.
+			 * This value follows the standard x86 segment order.
+			 */
+			inout->segment = (inst_info >> 15) & 0x7;
+		}
+	}
+
+	vmexit->exitcode = VM_EXITCODE_INOUT;
+	vmx_paging_info(&paging);
+	vie_init_inout(vie, inout, vmexit->inst_length, &paging);
+
+	/* The in/out emulation will handle advancing %rip */
+	vmexit->inst_length = 0;
 }
 
 static int
@@ -2134,6 +2125,7 @@ vmx_handle_apic_access(struct vmx *vmx, int vcpuid, struct vm_exit *vmexit)
 {
 	uint64_t qual;
 	int access_type, offset, allowed;
+	struct vie *vie;
 
 	if (!apic_access_virtualization(vmx, vcpuid))
 		return (UNHANDLED);
@@ -2180,7 +2172,8 @@ vmx_handle_apic_access(struct vmx *vmx, int vcpuid, struct vm_exit *vmexit)
 	}
 
 	if (allowed) {
-		vmexit_inst_emul(vmexit, DEFAULT_APIC_BASE + offset,
+		vie = vm_vie_ctx(vmx->vm, vcpuid);
+		vmexit_mmio_emul(vmexit, vie, DEFAULT_APIC_BASE + offset,
 		    VIE_INVALID_GLA);
 	}
 
@@ -2262,10 +2255,10 @@ emulate_rdmsr(struct vmx *vmx, int vcpuid, u_int num, bool *retu)
 static int
 vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 {
-	int error, errcode, errcode_valid, handled, in;
+	int error, errcode, errcode_valid, handled;
 	struct vmxctx *vmxctx;
+	struct vie *vie;
 	struct vlapic *vlapic;
-	struct vm_inout_str *vis;
 	struct vm_task_switch *ts;
 	uint32_t eax, ecx, edx, idtvec_info, idtvec_err, intr_info, inst_info;
 	uint32_t intr_type, intr_vec, reason;
@@ -2522,25 +2515,8 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		return (1);
 	case EXIT_REASON_INOUT:
 		vmm_stat_incr(vmx->vm, vcpu, VMEXIT_INOUT, 1);
-		vmexit->exitcode = VM_EXITCODE_INOUT;
-		vmexit->u.inout.bytes = (qual & 0x7) + 1;
-		vmexit->u.inout.in = in = (qual & 0x8) ? 1 : 0;
-		vmexit->u.inout.string = (qual & 0x10) ? 1 : 0;
-		vmexit->u.inout.rep = (qual & 0x20) ? 1 : 0;
-		vmexit->u.inout.port = (uint16_t)(qual >> 16);
-		vmexit->u.inout.eax = (uint32_t)(vmxctx->guest_rax);
-		if (vmexit->u.inout.string) {
-			inst_info = vmcs_read(VMCS_EXIT_INSTRUCTION_INFO);
-			vmexit->exitcode = VM_EXITCODE_INOUT_STR;
-			vis = &vmexit->u.inout_str;
-			vmx_paging_info(&vis->paging);
-			vis->rflags = vmcs_read(VMCS_GUEST_RFLAGS);
-			vis->cr0 = vmcs_read(VMCS_GUEST_CR0);
-			vis->index = inout_str_index(vmx, vcpu, in);
-			vis->count = inout_str_count(vmx, vcpu, vis->inout.rep);
-			vis->addrsize = inout_str_addrsize(inst_info);
-			inout_str_seginfo(vmx, vcpu, inst_info, in, vis);
-		}
+		vie = vm_vie_ctx(vmx->vm, vcpu);
+		vmexit_inout(vmexit, vie, qual, (uint32_t)vmxctx->guest_rax);
 		SDT_PROBE3(vmm, vmx, exit, inout, vmx, vcpu, vmexit);
 		break;
 	case EXIT_REASON_CPUID:
@@ -2651,8 +2627,9 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 			SDT_PROBE5(vmm, vmx, exit, nestedfault,
 			    vmx, vcpu, vmexit, gpa, qual);
 		} else if (ept_emulation_fault(qual)) {
-			vmexit_inst_emul(vmexit, gpa, vmcs_gla());
-			vmm_stat_incr(vmx->vm, vcpu, VMEXIT_INST_EMUL, 1);
+			vie = vm_vie_ctx(vmx->vm, vcpu);
+			vmexit_mmio_emul(vmexit, vie, gpa, vmcs_gla());
+			vmm_stat_incr(vmx->vm, vcpu, VMEXIT_MMIO_EMUL, 1);
 			SDT_PROBE4(vmm, vmx, exit, mmiofault,
 			    vmx, vcpu, vmexit, gpa);
 		}

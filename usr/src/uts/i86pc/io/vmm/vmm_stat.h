@@ -73,7 +73,7 @@ void	vmm_stat_register(void *arg);
 	};								\
 	SYSINIT(type##_stat, SI_SUB_KLD, SI_ORDER_ANY, vmm_stat_register, type)
 
-#define VMM_STAT_DEFINE(type, nelems, desc, scope) 			\
+#define	VMM_STAT_DEFINE(type, nelems, desc, scope)			\
 	VMM_STAT_FDEFINE(type, nelems, desc, NULL, scope)
 
 #define	VMM_STAT_DECLARE(type)						\
@@ -94,7 +94,7 @@ void	vmm_stat_register(void *arg);
 
 void	*vmm_stat_alloc(void);
 void	vmm_stat_init(void *vp);
-void 	vmm_stat_free(void *vp);
+void	vmm_stat_free(void *vp);
 
 /*
  * 'buf' should be at least fit 'MAX_VMM_STAT_TYPES' entries
@@ -108,7 +108,7 @@ vmm_stat_array_incr(struct vm *vm, int vcpu, struct vmm_stat_type *vst,
 {
 #ifdef VMM_KEEP_STATS
 	uint64_t *stats;
-	
+
 	stats = vcpu_stats(vm, vcpu);
 
 	if (vst->index >= 0 && statidx < vst->nelems)
@@ -122,7 +122,7 @@ vmm_stat_array_set(struct vm *vm, int vcpu, struct vmm_stat_type *vst,
 {
 #ifdef VMM_KEEP_STATS
 	uint64_t *stats;
-	
+
 	stats = vcpu_stats(vm, vcpu);
 
 	if (vst->index >= 0 && statidx < vst->nelems)
@@ -162,7 +162,7 @@ VMM_STAT_DECLARE(VMEXIT_NMI_WINDOW);
 VMM_STAT_DECLARE(VMEXIT_INOUT);
 VMM_STAT_DECLARE(VMEXIT_CPUID);
 VMM_STAT_DECLARE(VMEXIT_NESTED_FAULT);
-VMM_STAT_DECLARE(VMEXIT_INST_EMUL);
+VMM_STAT_DECLARE(VMEXIT_MMIO_EMUL);
 VMM_STAT_DECLARE(VMEXIT_UNKNOWN);
 VMM_STAT_DECLARE(VMEXIT_ASTPENDING);
 VMM_STAT_DECLARE(VMEXIT_USERSPACE);

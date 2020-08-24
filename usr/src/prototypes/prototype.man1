@@ -1,0 +1,104 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 <contributor>
+.\"
+.Dd Month Day, Year
+.Dt COMMAND 1
+.\" Here and in other places "COMMAND" and "command" are place holders
+.\" that should be replaced with the name of the actual command that
+.\" this is documenting.
+.Os
+.Sh NAME
+.Nm command
+.Nd short description
+.Sh SYNOPSIS
+.Nm
+.\" Each of the following lines should use the Fl and Ar options to
+.\" indicate the set of supported options and flags. There should be one
+.\" option and argument per line. If there are independent ways of
+.\" invoking the command or independent sub-commands ala zfs(1M) or
+.\" dladm(1M), there should be a fresh '.Nm' to indicate that and the
+.\" sub-command should use .Cm.
+.Sh DESCRIPTION
+.\" Describe the purpose of the utility, what it does and how it
+.\" operates. If there are certain privileges or other considerations
+.\" for using this, indicate that here.
+.Sh OPTIONS
+The following options are supported:
+.Bl -tag -width Ar
+.It Fl flag1
+Description of the above flag1
+.It Fl flag2
+Description of the above flag2
+.El
+.Sh OPERANDS
+.\" This should be a list of non-flag arguments that are supported
+.\" and what they do in the following form.
+The following operands are supported:
+.Bl -tag -width Ar
+.It Ar oper1
+Description of what oper1 is.
+.It Ar oper2
+Description of what oper2 is.
+.El
+.Sh EXIT STATUS
+.\" This section should indicate the set of exit codes one can expect.
+.\" In general, do not use the '.Ex' macro and instead call out the
+.\" different error values. One would expect at least a difference
+.\" between an error during execution and an error in the usage.
+.Sh EXAMPLES
+.\" There should be multiple examples present that describe how to use
+.\" different parts of the command. This section should not be skipped
+.\" and it's good to have a number of them.
+.\" .Sh ENVIRONMENT
+.\" If the program reacts to environment variables, most often locale
+.\" related ones, document those here. If they are just the standard
+.\" locale ones, use the following text, adjusting it for the exact set
+.\" of locale specific values that impact it:
+.\" See
+.\" .Xr environ 5
+.\" for descriptions of the following environment variables
+.\" that affect the execution of
+.\" .Nm :
+.\" .Ev LANG ,
+.\" .Ev LC_ALL ,
+.\" .Ev LC_MESSAGES ,
+.\" .Ev LC_NUMERIC ,
+.\" and
+.\" .Ev NLSPATH .
+.\" .Sh CODE SET INDEPENDENCE
+.\" If there are issues around the code set, indicate so here. See
+.\" attributes(5).
+.Sh INTERFACE STABILITY
+.\" When documenting the stability of commands it's useful to
+.\" distinguish between the stability of the options and the command's
+.\" actual output. For most commands, output stability should only be
+.\" guaranteed if there's an explicit parseable option that controls the
+.\" type of data. You can use the following template:
+.\" The command line interface of
+.\" .Nm
+.\" is
+.\" .Sy Committed .
+.\" .Sy Evolving .
+.\" .Sy Volatile .
+.\" .Sy Private .
+.\" The output of
+.\" .Nm
+.\" is
+.\" .Sy Not-An-Interface
+.\" and may change at any time.
+.Sh SEE ALSO
+.\" List other commands that are related to this. For programs that are
+.\" are primarily wrappers around libc functionality or a particular
+.\" library, it's helpful to mention those here so the reader has an
+.\" idea of what is used to implement this. For example, the sleep
+.\" command would mention nanosleep(3C).

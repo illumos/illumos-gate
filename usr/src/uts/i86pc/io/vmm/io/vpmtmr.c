@@ -80,7 +80,7 @@ vpmtmr_cleanup(struct vpmtmr *vpmtmr)
 }
 
 int
-vpmtmr_handler(struct vm *vm, int vcpuid, bool in, int port, int bytes,
+vpmtmr_handler(struct vm *vm, int vcpuid, bool in, uint16_t port, uint8_t bytes,
     uint32_t *val)
 {
 	struct vpmtmr *vpmtmr;

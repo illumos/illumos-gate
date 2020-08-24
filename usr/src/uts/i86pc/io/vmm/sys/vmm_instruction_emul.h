@@ -27,64 +27,57 @@
  *
  * $FreeBSD$
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ *
+ * Copyright 2020 Oxide Computer Company
+ */
 
 #ifndef	_VMM_INSTRUCTION_EMUL_H_
 #define	_VMM_INSTRUCTION_EMUL_H_
 
 #include <sys/mman.h>
+#include <machine/vmm.h>
 
-/*
- * Callback functions to read and write memory regions.
- */
-typedef int (*mem_region_read_t)(void *vm, int cpuid, uint64_t gpa,
-				 uint64_t *rval, int rsize, void *arg);
+struct vie;
 
-typedef int (*mem_region_write_t)(void *vm, int cpuid, uint64_t gpa,
-				  uint64_t wval, int wsize, void *arg);
+struct vie *vie_alloc();
+void vie_free(struct vie *);
 
-/*
- * Emulate the decoded 'vie' instruction.
- *
- * The callbacks 'mrr' and 'mrw' emulate reads and writes to the memory region
- * containing 'gpa'. 'mrarg' is an opaque argument that is passed into the
- * callback functions.
- *
- * 'void *vm' should be 'struct vm *' when called from kernel context and
- * 'struct vmctx *' when called from user context.
- * s
- */
-int vmm_emulate_instruction(void *vm, int cpuid, uint64_t gpa, struct vie *vie,
-    struct vm_guest_paging *paging, mem_region_read_t mrr,
-    mem_region_write_t mrw, void *mrarg);
+void vie_init_mmio(struct vie *vie, const char *inst_bytes, uint8_t inst_length,
+    const struct vm_guest_paging *paging, uint64_t gpa);
+void vie_init_inout(struct vie *vie, const struct vm_inout *inout,
+    uint8_t inst_len, const struct vm_guest_paging *paging);
 
-int vie_update_register(void *vm, int vcpuid, enum vm_reg_name reg,
-    uint64_t val, int size);
+int vie_fulfill_mmio(struct vie *vie, const struct vm_mmio *res);
+int vie_fulfill_inout(struct vie *vie, const struct vm_inout *res);
 
-/*
- * Returns 1 if an alignment check exception should be injected and 0 otherwise.
- */
-int vie_alignment_check(int cpl, int operand_size, uint64_t cr0,
-    uint64_t rflags, uint64_t gla);
+bool vie_needs_fetch(const struct vie *vie);
+bool vie_pending(const struct vie *vie);
+uint64_t vie_mmio_gpa(const struct vie *vie);
+void vie_exitinfo(const struct vie *vie, struct vm_exit *vme);
+void vie_fallback_exitinfo(const struct vie *vie, struct vm_exit *vme);
 
-/* Returns 1 if the 'gla' is not canonical and 0 otherwise. */
-int vie_canonical_check(enum vm_cpu_mode cpu_mode, uint64_t gla);
+void vie_reset(struct vie *vie);
+void vie_advance_pc(struct vie *vie, uint64_t *nextrip);
 
-uint64_t vie_size2mask(int size);
+int vie_emulate_mmio(struct vie *vie, void *vm, int vcpuid);
+int vie_emulate_inout(struct vie *vie, struct vm *vm, int vcpuid);
 
-int vie_calculate_gla(enum vm_cpu_mode cpu_mode, enum vm_reg_name seg,
-    struct seg_desc *desc, uint64_t off, int length, int addrsize, int prot,
-    uint64_t *gla);
-
-#ifdef _KERNEL
 /*
  * APIs to fetch and decode the instruction from nested page fault handler.
  *
- * 'vie' must be initialized before calling 'vmm_fetch_instruction()'
+ * 'vie' must be initialized before calling 'vie_fetch_instruction()'
  */
-int vmm_fetch_instruction(struct vm *vm, int cpuid,
-			  struct vm_guest_paging *guest_paging,
-			  uint64_t rip, int inst_length, struct vie *vie,
-			  int *is_fault);
+int vie_fetch_instruction(struct vie *vie, struct vm *vm, int cpuid,
+    uint64_t rip, int *is_fault);
 
 /*
  * Translate the guest linear address 'gla' to a guest physical address.
@@ -101,34 +94,23 @@ int vm_gla2gpa(struct vm *vm, int vcpuid, struct vm_guest_paging *paging,
  * Like vm_gla2gpa, but no exceptions are injected into the guest and
  * PTEs are not changed.
  */
-int vm_gla2gpa_nofault(struct vm *vm, int vcpuid, struct vm_guest_paging *paging,
-    uint64_t gla, int prot, uint64_t *gpa, int *is_fault);
-#endif /* _KERNEL */
+int vm_gla2gpa_nofault(struct vm *vm, int vcpuid,
+    struct vm_guest_paging *paging, uint64_t gla, int prot, uint64_t *gpa,
+    int *is_fault);
 
-void vie_init(struct vie *vie, const char *inst_bytes, int inst_length);
-
+int vie_verify_gla(struct vie *vie, struct vm *vm, int cpuid, uint64_t gla);
 /*
  * Decode the instruction fetched into 'vie' so it can be emulated.
  *
  * 'gla' is the guest linear address provided by the hardware assist
  * that caused the nested page table fault. It is used to verify that
  * the software instruction decoding is in agreement with the hardware.
- * 
+ *
  * Some hardware assists do not provide the 'gla' to the hypervisor.
  * To skip the 'gla' verification for this or any other reason pass
  * in VIE_INVALID_GLA instead.
  */
-#ifdef _KERNEL
 #define	VIE_INVALID_GLA		(1UL << 63)	/* a non-canonical address */
-int vmm_decode_instruction(struct vm *vm, int cpuid, uint64_t gla,
-			   enum vm_cpu_mode cpu_mode, int csd, struct vie *vie);
-#else /* !_KERNEL */
-/*
- * Permit instruction decoding logic to be compiled outside of the kernel for
- * rapid iteration and validation.  No GLA validation is performed, obviously.
- */
-int vmm_decode_instruction(enum vm_cpu_mode cpu_mode, int csd,
-    struct vie *vie);
-#endif	/* _KERNEL */
+int vie_decode_instruction(struct vie *vie, struct vm *vm, int cpuid, int csd);
 
 #endif	/* _VMM_INSTRUCTION_EMUL_H_ */

@@ -36,11 +36,10 @@
  * A full copy of the text of the CDDL should have accompanied this
  * source.  A copy of the CDDL is also available via the Internet at
  * http://www.illumos.org/license/CDDL.
- */
-
-/*
+ *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -358,13 +357,19 @@ dump_vm_run_exitcode(struct vm_exit *vmexit, int vcpu)
 	switch (vmexit->exitcode) {
 	case VM_EXITCODE_INOUT:
 		printf("\treason\t\tINOUT\n");
-		printf("\tdirection\t%s\n", vmexit->u.inout.in ? "IN" : "OUT");
+		printf("\tdirection\t%s\n",
+		    (vmexit->u.inout.flags & INOUT_IN) ? "IN" : "OUT");
 		printf("\tbytes\t\t%d\n", vmexit->u.inout.bytes);
-		printf("\tflags\t\t%s%s\n",
-			vmexit->u.inout.string ? "STRING " : "",
-			vmexit->u.inout.rep ? "REP " : "");
 		printf("\tport\t\t0x%04x\n", vmexit->u.inout.port);
 		printf("\teax\t\t0x%08x\n", vmexit->u.inout.eax);
+		break;
+	case VM_EXITCODE_MMIO:
+		printf("\treason\t\tMMIO\n");
+		printf("\toperation\t%s\n",
+		    vmexit->u.mmio.read ? "READ" : "WRITE");
+		printf("\tbytes\t\t%d\n", vmexit->u.mmio.bytes);
+		printf("\tgpa\t\t0x%08x\n", vmexit->u.mmio.gpa);
+		printf("\tdata\t\t0x%08x\n", vmexit->u.mmio.data);
 		break;
 	case VM_EXITCODE_VMX:
 		printf("\treason\t\tVMX\n");
@@ -2366,7 +2371,11 @@ main(int argc, char *argv[])
 	}
 
 	if (!error && run) {
-		error = vm_run(ctx, vcpu, &vmexit);
+		struct vm_entry entry;
+
+		bzero(&entry, sizeof (entry));
+
+		error = vm_run(ctx, vcpu, &entry, &vmexit);
 		if (error == 0)
 			dump_vm_run_exitcode(&vmexit, vcpu);
 		else

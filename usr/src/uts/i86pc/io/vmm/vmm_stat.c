@@ -163,7 +163,7 @@ VMM_STAT(VMEXIT_NMI_WINDOW, "vm exits due to nmi window opening");
 VMM_STAT(VMEXIT_INOUT, "number of times in/out was intercepted");
 VMM_STAT(VMEXIT_CPUID, "number of times cpuid was intercepted");
 VMM_STAT(VMEXIT_NESTED_FAULT, "vm exits due to nested page fault");
-VMM_STAT(VMEXIT_INST_EMUL, "vm exits for instruction emulation");
+VMM_STAT(VMEXIT_MMIO_EMUL, "vm exits for mmio emulation");
 VMM_STAT(VMEXIT_UNKNOWN, "number of vm exits for unknown reason");
 VMM_STAT(VMEXIT_ASTPENDING, "number of times astpending at exit");
 VMM_STAT(VMEXIT_REQIDLE, "number of times idle requested at exit");

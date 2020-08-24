@@ -32,8 +32,9 @@
 #define	_VMM_IOPORT_H_
 
 typedef int (*ioport_handler_func_t)(struct vm *vm, int vcpuid,
-    bool in, int port, int bytes, uint32_t *val);
+    bool in, uint16_t port, uint8_t bytes, uint32_t *val);
 
-int vm_handle_inout(struct vm *vm, int vcpuid, struct vm_exit *vme, bool *retu);
+int vm_inout_access(struct vm *vm, int vcpuid, bool in, uint16_t port,
+    uint8_t bytes, uint32_t *val);
 
 #endif	/* _VMM_IOPORT_H_ */

@@ -33,7 +33,7 @@ typedef long long		__int64_t;
 typedef unsigned long long	__uint64_t;
 #endif
 
-/* 
+/*
  * Standard type definitions.
  */
 #ifdef	_LP64

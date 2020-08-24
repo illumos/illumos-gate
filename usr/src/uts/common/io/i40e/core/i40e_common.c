@@ -3885,10 +3885,17 @@ static void i40e_parse_discover_capabilities(struct i40e_hw *hw, void *buff,
 	/* Always disable FCoE if compiled without the I40E_FCOE_ENA flag */
 	p->fcoe = FALSE;
 
+	valid_functions = p->valid_functions;
+	num_functions = 0;
+	while (valid_functions) {
+		if (valid_functions & 1)
+			num_functions++;
+		valid_functions >>= 1;
+	}
+
 	/* count the enabled ports (aka the "not disabled" ports) */
 	hw->num_ports = 0;
 	for (i = 0; i < 4; i++) {
-		enum i40e_status_code status;
 		u32 port_cfg_reg = I40E_PRTGEN_STATUS + (4 * i);
 		u64 port_cfg = 0;
 
@@ -3907,6 +3914,16 @@ static void i40e_parse_discover_capabilities(struct i40e_hw *hw, void *buff,
 	 * Those cards have 4 PFs at minimum, so using PRTGEN_CNF for counting
 	 * physical ports results in wrong partition id calculation and thus
 	 * not supporting WoL.
+	 *
+	 * Porting note: the above comment is no longer directly relevant: we
+	 * read PRTGEN_STATUS instead now, as PRTGEN_CNF was not reliable for
+	 * these parts.  In addition, the claim about having 4 PFs is not
+	 * correct.  For example, an X557-T2 is a dual port mezz card. Forcing
+	 * ports to four here will cause ->num_partitions to be zero.
+	 *
+	 * On the presumption that the hard-coded value is meaningful in some
+	 * cases, though, we'll take the minimal approach of ensuring that we
+	 * never have more ports than functions.
 	 */
 	if (hw->mac.type == I40E_MAC_X722) {
 		if (i40e_acquire_nvm(hw, I40E_RESOURCE_READ) == I40E_SUCCESS) {
@@ -3914,19 +3931,23 @@ static void i40e_parse_discover_capabilities(struct i40e_hw *hw, void *buff,
 						  2 * I40E_SR_OCP_CFG_WORD0,
 						  sizeof(ocp_cfg_word0),
 						  &ocp_cfg_word0, TRUE, NULL);
+#ifdef __sun__
+			if (status == I40E_SUCCESS &&
+			    (ocp_cfg_word0 & I40E_SR_OCP_ENABLED)) {
+				hw->num_ports = 4;
+				if (hw->num_ports > num_functions) {
+					hw->num_ports = num_functions;
+					DEBUGOUT1("clamped 4 OCP ports to %d\n",
+					    (int)hw->num_ports);
+				}
+			}
+#else
 			if (status == I40E_SUCCESS &&
 			    (ocp_cfg_word0 & I40E_SR_OCP_ENABLED))
 				hw->num_ports = 4;
+#endif
 			i40e_release_nvm(hw);
 		}
-	}
-
-	valid_functions = p->valid_functions;
-	num_functions = 0;
-	while (valid_functions) {
-		if (valid_functions & 1)
-			num_functions++;
-		valid_functions >>= 1;
 	}
 
 	/* partition id is 1-based, and functions are evenly spread
@@ -3936,6 +3957,8 @@ static void i40e_parse_discover_capabilities(struct i40e_hw *hw, void *buff,
 		hw->partition_id = (hw->pf_id / hw->num_ports) + 1;
 		hw->num_partitions = num_functions / hw->num_ports;
 	}
+
+	VERIFY(hw->num_partitions > 0);
 
 	/* additional HW specific goodies that might
 	 * someday be HW version specific

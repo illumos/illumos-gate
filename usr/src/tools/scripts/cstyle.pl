@@ -21,6 +21,7 @@
 #
 # Copyright 2015 Toomas Soome <tsoome@me.com>
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2020 Oxide Computer Company
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -120,6 +121,16 @@ if ($doxygen_comments) {
 } else {
 	$hdr_comment_start = qr/^\s*\/\*$/;
 }
+
+# FreeBSD uses comments styled as such for their license headers:
+# /*-
+#  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+#  *
+#  ...
+#
+# In order to apply other cstyle checks to those files without stumbling over
+# the license header, tolerate such comment openings as well.
+my $fbsd_comment_start = qr/^\s*\/\*-$/;
 
 # Note, following must be in single quotes so that \s and \w work right.
 my $typename = '(int|char|short|long|unsigned|float|double' .
@@ -463,7 +474,7 @@ line: while (<$filehandle>) {
 		$comment_done = 0;
 	}
 	# does this looks like the start of a block comment?
-	if (/$hdr_comment_start/) {
+	if (/$hdr_comment_start/ || /$fbsd_comment_start/) {
 		if (!/^\t*\/\*/) {
 			err("block comment not indented by tabs");
 		}

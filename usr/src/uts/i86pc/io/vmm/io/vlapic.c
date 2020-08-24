@@ -164,7 +164,7 @@ void
 vlapic_id_write_handler(struct vlapic *vlapic)
 {
 	struct LAPIC *lapic;
-	
+
 	/*
 	 * We don't allow the ID register to be modified so reset it back to
 	 * its default value.
@@ -214,7 +214,7 @@ vlapic_get_ccr(struct vlapic *vlapic)
 	struct bintime bt_now, bt_rem;
 	struct LAPIC *lapic;
 	uint32_t ccr;
-	
+
 	ccr = 0;
 	lapic = vlapic->apic_page;
 
@@ -250,7 +250,7 @@ vlapic_dcr_write_handler(struct vlapic *vlapic)
 {
 	struct LAPIC *lapic;
 	int divisor;
-	
+
 	lapic = vlapic->apic_page;
 	VLAPIC_TIMER_LOCK(vlapic);
 
@@ -275,7 +275,7 @@ void
 vlapic_esr_write_handler(struct vlapic *vlapic)
 {
 	struct LAPIC *lapic;
-	
+
 	lapic = vlapic->apic_page;
 	lapic->esr = vlapic->esr_pending;
 	vlapic->esr_pending = 0;
@@ -333,7 +333,7 @@ static __inline uint32_t *
 vlapic_get_lvtptr(struct vlapic *vlapic, uint32_t offset)
 {
 	struct LAPIC	*lapic = vlapic->apic_page;
-	int 		 i;
+	int		i;
 
 	switch (offset) {
 	case APIC_OFFSET_CMCI_LVT:
@@ -405,9 +405,9 @@ vlapic_lvt_write_handler(struct vlapic *vlapic, uint32_t offset)
 	uint32_t *lvtptr, mask, val;
 	struct LAPIC *lapic;
 	int idx;
-	
+
 	lapic = vlapic->apic_page;
-	lvtptr = vlapic_get_lvtptr(vlapic, offset);	
+	lvtptr = vlapic_get_lvtptr(vlapic, offset);
 	val = *lvtptr;
 	idx = lvt_off_to_idx(offset);
 
@@ -635,7 +635,7 @@ static __inline int
 vlapic_periodic_timer(struct vlapic *vlapic)
 {
 	uint32_t lvt;
-	
+
 	lvt = vlapic_get_lvt(vlapic, APIC_OFFSET_TIMER_LVT);
 
 	return (vlapic_get_lvt_field(lvt, APIC_LVTT_TM_PERIODIC));
@@ -988,7 +988,6 @@ vlapic_icrlo_write_handler(struct vlapic *vlapic, bool *retu)
 	uint64_t icrval;
 	uint32_t dest, vec, mode;
 	struct vlapic *vlapic2;
-	struct vm_exit *vmexit;
 	struct LAPIC *lapic;
 	uint16_t maxcpus;
 
@@ -1082,13 +1081,7 @@ vlapic_icrlo_write_handler(struct vlapic *vlapic, bool *retu)
 				return (0);
 
 			vlapic2->boot_state = BS_RUNNING;
-
-			*retu = true;
-			vmexit = vm_exitinfo(vlapic->vm, vlapic->vcpuid);
-			vmexit->exitcode = VM_EXITCODE_SPINUP_AP;
-			vmexit->u.spinup_ap.vcpu = dest;
-			vmexit->u.spinup_ap.rip = vec << PAGE_SHIFT;
-
+			vm_req_spinup_ap(vlapic->vm, dest, vec << PAGE_SHIFT);
 			return (0);
 		}
 	}
@@ -1117,7 +1110,7 @@ int
 vlapic_pending_intr(struct vlapic *vlapic, int *vecptr)
 {
 	struct LAPIC	*lapic = vlapic->apic_page;
-	int	  	 idx, i, bitpos, vector;
+	int		 idx, i, bitpos, vector;
 	uint32_t	*irrptr, val;
 
 	vlapic_update_ppr(vlapic);
@@ -1138,7 +1131,7 @@ vlapic_pending_intr(struct vlapic *vlapic, int *vecptr)
 				if (vecptr != NULL)
 					*vecptr = vector;
 				return (1);
-			} else 
+			} else
 				break;
 		}
 	}
@@ -1156,7 +1149,7 @@ vlapic_intr_accepted(struct vlapic *vlapic, int vector)
 		return ((*vlapic->ops.intr_accepted)(vlapic, vector));
 
 	/*
-	 * clear the ready bit for vector being accepted in irr 
+	 * clear the ready bit for vector being accepted in irr
 	 * and set the vector as in service in isr.
 	 */
 	idx = (vector / 32) * 4;
@@ -1247,7 +1240,7 @@ vlapic_read(struct vlapic *vlapic, int mmio_access, uint64_t offset,
 		*data = 0;
 		goto done;
 	}
-	
+
 	offset &= ~3;
 	switch(offset)
 	{
@@ -1296,17 +1289,17 @@ vlapic_read(struct vlapic *vlapic, int mmio_access, uint64_t offset,
 		case APIC_OFFSET_ESR:
 			*data = lapic->esr;
 			break;
-		case APIC_OFFSET_ICR_LOW: 
+		case APIC_OFFSET_ICR_LOW:
 			*data = lapic->icr_lo;
 			if (x2apic(vlapic))
 				*data |= (uint64_t)lapic->icr_hi << 32;
 			break;
-		case APIC_OFFSET_ICR_HI: 
+		case APIC_OFFSET_ICR_HI:
 			*data = lapic->icr_hi;
 			break;
 		case APIC_OFFSET_CMCI_LVT:
 		case APIC_OFFSET_TIMER_LVT ... APIC_OFFSET_ERROR_LVT:
-			*data = vlapic_get_lvt(vlapic, offset);	
+			*data = vlapic_get_lvt(vlapic, offset);
 #ifdef INVARIANTS
 			reg = vlapic_get_lvtptr(vlapic, offset);
 			KASSERT(*data == *reg, ("inconsistent lvt value at "
@@ -1401,7 +1394,7 @@ vlapic_write(struct vlapic *vlapic, int mmio_access, uint64_t offset,
 			lapic->svr = data;
 			vlapic_svr_write_handler(vlapic);
 			break;
-		case APIC_OFFSET_ICR_LOW: 
+		case APIC_OFFSET_ICR_LOW:
 			lapic->icr_lo = data;
 			if (x2apic(vlapic))
 				lapic->icr_hi = data >> 32;
@@ -1455,7 +1448,7 @@ static void
 vlapic_reset(struct vlapic *vlapic)
 {
 	struct LAPIC *lapic;
-	
+
 	lapic = vlapic->apic_page;
 	bzero(lapic, sizeof(struct LAPIC));
 

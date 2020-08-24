@@ -61,28 +61,25 @@ svm_npt_init(int ipinum)
 	npt_flags = ipinum & NPT_IPIMASK;
 	TUNABLE_INT_FETCH("hw.vmm.npt.enable_superpage", &enable_superpage);
 	if (enable_superpage)
-		npt_flags |= PMAP_PDE_SUPERPAGE; 
-	
+		npt_flags |= PMAP_PDE_SUPERPAGE;
+
 	return (0);
 }
 
 static int
 npt_pinit(pmap_t pmap)
 {
-
 	return (pmap_pinit_type(pmap, PT_RVI, npt_flags));
 }
 
 struct vmspace *
 svm_npt_alloc(vm_offset_t min, vm_offset_t max)
 {
-	
 	return (vmspace_alloc(min, max, npt_pinit));
 }
 
 void
 svm_npt_free(struct vmspace *vmspace)
 {
-
 	vmspace_free(vmspace);
 }

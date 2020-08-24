@@ -1,0 +1,79 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 <contributor>
+.\"
+.Dd Month Day, Year
+.Dt MANUALPAGE 3SECTION
+.\" MANUALPAGE should be replaced with the primary function that you are
+.\" documenting. If there is more than one function, then you should either
+.\" use the primary function of the group or a more general name. Every
+.\" documented function will appear in the NAME section below.
+.\"
+.\" The SECTION generally refers to the name of the library that this
+.\" appears in. For example for something in libc this would be 3C. In
+.\" general this is the capitalized version of the libraries shared
+.\" object name.
+.Os
+.Sh NAME
+.Nm funcname ,
+.Nm funcname2
+.Nd short description
+.Sh LIBRARY
+.Lb libname
+.Sh SYNOPSIS
+.\" Insert any required pre-processor macros with Dv
+.\" .In headerfile.h
+.\" .Ft return type
+.\" .Fo function name
+.\" .Fa "func arg 0 type and name"
+.\" .Fa "func arg 1 type and name"
+.\" .Fc
+.\" Repeat above for each function
+.Sh DESCRIPTION
+.\" Describe how the functions operate and what they do. Provide
+.\" background for the reader. Don't assume that they know how
+.\" everything works. Be clear about the semantics and the why.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn funcname
+function returns XXX and <state side effects>. Otherwise XXX is returned
+and <if errno is set describe it below>.
+.Sh EXAMPLES
+.Sh ERRORS
+The
+.fn funcname
+functions will fail if:
+.Bl  -tag -width Er
+.It Er ERRNO1
+A Reason why ERRNO1 could occur.
+.It Er ERRNO2
+A Reason why ERRNO2 could occur.
+.El
+.Sh INTERFACE STABILITY
+.\" Indicate the stability per attribute(5). One of:
+.\" .Sy Committed
+.\" .Sy Uncommitted
+.\" .Sy Volatile
+.\" .Sy Private
+.Sh MT-LEVEL
+.\" Indicate the MT-Level per attributes(5). If there are exceptions,
+.\" start with the level and go from there.
+.\" .Sy Safe
+.\" .Sy Unsafe
+.\" .Sy MT-Safe
+.\" .Sy Aysnc-Signal-Safe
+.Sh SEE ALSO
+.\" A list of mentioned manuals or others that are relevant to this
+.\" function. If there is a user command that exercises this, for
+.\" example, sleep(1) if documenting sleep(3C), list this here.
+.\" Generally an overview page for a library in 3LIB should also be
+.\" referenced.

@@ -72,9 +72,9 @@ struct svm_vcpu {
 struct svm_softc {
 	uint8_t apic_page[VM_MAXCPU][PAGE_SIZE];
 	struct svm_vcpu vcpu[VM_MAXCPU];
-	vm_offset_t 	nptp;			    /* nested page table */
-	uint8_t		*iopm_bitmap;    /* shared by all vcpus */
-	uint8_t		*msr_bitmap;    /* shared by all vcpus */
+	vm_offset_t	nptp;		/* nested page table */
+	uint8_t		*iopm_bitmap;	/* shared by all vcpus */
+	uint8_t		*msr_bitmap;	/* shared by all vcpus */
 	struct vm	*vm;
 #ifndef __FreeBSD__
 	uint64_t	host_msrs[VM_MAXCPU][SVM_HOST_MSR_NUM];

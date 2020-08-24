@@ -79,7 +79,7 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
-#include <machine/vmm_instruction_emul.h>
+#include <sys/vmm_instruction_emul.h>
 
 #include "vmm_ioport.h"
 #include "vmm_ktr.h"
@@ -109,7 +109,7 @@ struct vlapic;
  * (x) initialized before use
  */
 struct vcpu {
-	struct mtx 	mtx;		/* (o) protects 'state' and 'hostcpu' */
+	struct mtx	mtx;		/* (o) protects 'state' and 'hostcpu' */
 	enum vcpu_state	state;		/* (o) vcpu state */
 #ifndef __FreeBSD__
 	kcondvar_t	vcpu_cv;	/* (o) cpu waiter cv */
@@ -135,6 +135,7 @@ struct vcpu {
 	void		*stats;		/* (a,i) statistics */
 	struct vm_exit	exitinfo;	/* (x) exit reason and collateral */
 	uint64_t	nextrip;	/* (x) next instruction to execute */
+	struct vie	*vie_ctx;	/* (x) instruction emulation context */
 #ifndef __FreeBSD__
 	uint64_t	tsc_offset;	/* (x) offset from host TSC */
 #endif
@@ -185,7 +186,7 @@ struct vm {
 	volatile cpuset_t active_cpus;		/* (i) active vcpus */
 	volatile cpuset_t debug_cpus;		/* (i) vcpus stopped for debug */
 	int		suspend;		/* (i) stop VM execution */
-	volatile cpuset_t suspended_cpus; 	/* (i) suspended vcpus */
+	volatile cpuset_t suspended_cpus;	/* (i) suspended vcpus */
 	volatile cpuset_t halted_cpus;		/* (x) cpus in a hard halt */
 	struct mem_map	mem_maps[VM_MAX_MEMMAPS]; /* (i) guest address space */
 	struct mem_seg	mem_segs[VM_MAX_MEMSEGS]; /* (o) guest memory regions */
@@ -200,6 +201,14 @@ struct vm {
 #ifndef __FreeBSD__
 	list_t		ioport_hooks;
 #endif /* __FreeBSD__ */
+	bool		sipi_req;		/* (i) SIPI requested */
+	int		sipi_req_vcpu;		/* (i) SIPI destination */
+	uint64_t	sipi_req_rip;		/* (i) SIPI start %rip */
+
+	/* Miscellaneous VM-wide statistics and counters */
+	struct vm_wide_stats {
+		uint64_t sipi_supersede;
+	} stats;
 };
 
 static int vmm_initialized;
@@ -341,6 +350,8 @@ vcpu_cleanup(struct vm *vm, int i, bool destroy)
 	if (destroy) {
 		vmm_stat_free(vcpu->stats);
 		fpu_save_area_free(vcpu->guestfpu);
+		vie_free(vcpu->vie_ctx);
+		vcpu->vie_ctx = NULL;
 	}
 }
 
@@ -367,6 +378,10 @@ vcpu_init(struct vm *vm, int vcpu_id, bool create)
 #endif
 		vcpu->guestfpu = fpu_save_area_alloc();
 		vcpu->stats = vmm_stat_alloc();
+		vcpu->vie_ctx = vie_alloc();
+	} else {
+		vie_reset(vcpu->vie_ctx);
+		bzero(&vcpu->exitinfo, sizeof (vcpu->exitinfo));
 	}
 
 	vcpu->vlapic = VLAPIC_INIT(vm->cookie, vcpu_id);
@@ -400,6 +415,15 @@ vm_exitinfo(struct vm *vm, int cpuid)
 	vcpu = &vm->vcpu[cpuid];
 
 	return (&vcpu->exitinfo);
+}
+
+struct vie *
+vm_vie_ctx(struct vm *vm, int cpuid)
+{
+	if (cpuid < 0 || cpuid >= vm->maxcpus)
+		panic("vm_vie_ctx: invalid cpuid %d", cpuid);
+
+	return (vm->vcpu[cpuid].vie_ctx);
 }
 
 static int
@@ -1198,7 +1222,6 @@ vm_set_register(struct vm *vm, int vcpuid, int reg, uint64_t val)
 static bool
 is_descriptor_table(int reg)
 {
-
 	switch (reg) {
 	case VM_REG_GUEST_IDTR:
 	case VM_REG_GUEST_GDTR:
@@ -1211,7 +1234,6 @@ is_descriptor_table(int reg)
 static bool
 is_segment_register(int reg)
 {
-	
 	switch (reg) {
 	case VM_REG_GUEST_ES:
 	case VM_REG_GUEST_CS:
@@ -1558,82 +1580,187 @@ done:
 	return (0);
 }
 
+int
+vm_service_mmio_read(struct vm *vm, int cpuid, uint64_t gpa, uint64_t *rval,
+    int rsize)
+{
+	int err = ESRCH;
+	void *arg = NULL;
+
+	if (gpa >= DEFAULT_APIC_BASE && gpa < DEFAULT_APIC_BASE + PAGE_SIZE) {
+		err = lapic_mmio_read(vm, cpuid, gpa, rval, rsize, &arg);
+	} else if (gpa >= VIOAPIC_BASE && gpa < VIOAPIC_BASE + VIOAPIC_SIZE) {
+		err = vioapic_mmio_read(vm, cpuid, gpa, rval, rsize, &arg);
+	} else if (gpa >= VHPET_BASE && gpa < VHPET_BASE + VHPET_SIZE) {
+		err = vhpet_mmio_read(vm, cpuid, gpa, rval, rsize, &arg);
+	}
+
+	return (err);
+}
+
+int
+vm_service_mmio_write(struct vm *vm, int cpuid, uint64_t gpa, uint64_t wval,
+    int wsize)
+{
+	int err = ESRCH;
+	void *arg = NULL;
+
+	if (gpa >= DEFAULT_APIC_BASE && gpa < DEFAULT_APIC_BASE + PAGE_SIZE) {
+		err = lapic_mmio_write(vm, cpuid, gpa, wval, wsize, &arg);
+	} else if (gpa >= VIOAPIC_BASE && gpa < VIOAPIC_BASE + VIOAPIC_SIZE) {
+		err = vioapic_mmio_write(vm, cpuid, gpa, wval, wsize, &arg);
+	} else if (gpa >= VHPET_BASE && gpa < VHPET_BASE + VHPET_SIZE) {
+		err = vhpet_mmio_write(vm, cpuid, gpa, wval, wsize, &arg);
+	}
+
+	return (err);
+}
+
 static int
-vm_handle_inst_emul(struct vm *vm, int vcpuid, bool *retu)
+vm_handle_mmio_emul(struct vm *vm, int vcpuid, bool *retu)
 {
 	struct vie *vie;
 	struct vcpu *vcpu;
 	struct vm_exit *vme;
-	uint64_t gla, gpa, cs_base;
-	struct vm_guest_paging *paging;
-	mem_region_read_t mread;
-	mem_region_write_t mwrite;
-	enum vm_cpu_mode cpu_mode;
-	int cs_d, error, fault;
+	uint64_t inst_addr;
+	int error, fault, cs_d;
 
 	vcpu = &vm->vcpu[vcpuid];
 	vme = &vcpu->exitinfo;
+	vie = vcpu->vie_ctx;
 
 	KASSERT(vme->inst_length == 0, ("%s: invalid inst_length %d",
 	    __func__, vme->inst_length));
 
-	gla = vme->u.inst_emul.gla;
-	gpa = vme->u.inst_emul.gpa;
-	cs_base = vme->u.inst_emul.cs_base;
-	cs_d = vme->u.inst_emul.cs_d;
-	vie = &vme->u.inst_emul.vie;
-	paging = &vme->u.inst_emul.paging;
-	cpu_mode = paging->cpu_mode;
+	inst_addr = vme->rip + vme->u.mmio_emul.cs_base;
+	cs_d = vme->u.mmio_emul.cs_d;
 
-	VCPU_CTR1(vm, vcpuid, "inst_emul fault accessing gpa %#lx", gpa);
+	VCPU_CTR1(vm, vcpuid, "inst_emul fault accessing gpa %#lx",
+	    vme->u.mmio_emul.gpa);
 
-	/* Fetch, decode and emulate the faulting instruction */
-	if (vie->num_valid == 0) {
-		error = vmm_fetch_instruction(vm, vcpuid, paging, vme->rip +
-		    cs_base, VIE_INST_SIZE, vie, &fault);
-	} else {
-		/*
-		 * The instruction bytes have already been copied into 'vie'
-		 */
-		error = fault = 0;
+	/* Fetch the faulting instruction */
+	if (vie_needs_fetch(vie)) {
+		error = vie_fetch_instruction(vie, vm, vcpuid, inst_addr,
+		    &fault);
+		if (error != 0) {
+			return (error);
+		} else if (fault) {
+			/*
+			 * If a fault during instruction fetch was encounted, it
+			 * will have asserted that the appropriate exception be
+			 * injected at next entry.  No further work is required.
+			 */
+			return (0);
+		}
 	}
-	if (error || fault)
-		return (error);
 
-	if (vmm_decode_instruction(vm, vcpuid, gla, cpu_mode, cs_d, vie) != 0) {
+	if (vie_decode_instruction(vie, vm, vcpuid, cs_d) != 0) {
 		VCPU_CTR1(vm, vcpuid, "Error decoding instruction at %#lx",
-		    vme->rip + cs_base);
-		*retu = true;	    /* dump instruction bytes in userspace */
+		    inst_addr);
+		/* Dump (unrecognized) instruction bytes in userspace */
+		vie_fallback_exitinfo(vie, vme);
+		*retu = true;
 		return (0);
 	}
-
-	/*
-	 * Update 'nextrip' based on the length of the emulated instruction.
-	 */
-	vme->inst_length = vie->num_processed;
-	vcpu->nextrip += vie->num_processed;
-	VCPU_CTR1(vm, vcpuid, "nextrip updated to %#lx after instruction "
-	    "decoding", vcpu->nextrip);
- 
-	/* return to userland unless this is an in-kernel emulated device */
-	if (gpa >= DEFAULT_APIC_BASE && gpa < DEFAULT_APIC_BASE + PAGE_SIZE) {
-		mread = lapic_mmio_read;
-		mwrite = lapic_mmio_write;
-	} else if (gpa >= VIOAPIC_BASE && gpa < VIOAPIC_BASE + VIOAPIC_SIZE) {
-		mread = vioapic_mmio_read;
-		mwrite = vioapic_mmio_write;
-	} else if (gpa >= VHPET_BASE && gpa < VHPET_BASE + VHPET_SIZE) {
-		mread = vhpet_mmio_read;
-		mwrite = vhpet_mmio_write;
-	} else {
+	if (vme->u.mmio_emul.gla != VIE_INVALID_GLA &&
+	    vie_verify_gla(vie, vm, vcpuid, vme->u.mmio_emul.gla) != 0) {
+		/* Decoded GLA does not match GLA from VM exit state */
+		vie_fallback_exitinfo(vie, vme);
 		*retu = true;
 		return (0);
 	}
 
-	error = vmm_emulate_instruction(vm, vcpuid, gpa, vie, paging,
-	    mread, mwrite, retu);
-
+repeat:
+	error = vie_emulate_mmio(vie, vm, vcpuid);
+	if (error < 0) {
+		/*
+		 * MMIO not handled by any of the in-kernel-emulated devices, so
+		 * make a trip out to userspace for it.
+		 */
+		vie_exitinfo(vie, vme);
+		*retu = true;
+		error = 0;
+	} else if (error == EAGAIN) {
+		/*
+		 * Continue emulating the rep-prefixed instruction, which has
+		 * not completed its iterations.
+		 *
+		 * In case this can be emulated in-kernel and has a high
+		 * repetition count (causing a tight spin), it should be
+		 * deferential to yield conditions.
+		 */
+		if (!vcpu_should_yield(vm, vcpuid)) {
+			goto repeat;
+		} else {
+			/*
+			 * Defer to the contending load by making a trip to
+			 * userspace with a no-op (BOGUS) exit reason.
+			 */
+			vie_reset(vie);
+			vme->exitcode = VM_EXITCODE_BOGUS;
+			*retu = true;
+			return (0);
+		}
+	} else if (error == 0) {
+		/* Update %rip now that instruction has been emulated */
+		vie_advance_pc(vie, &vcpu->nextrip);
+	}
 	return (error);
+}
+
+static int
+vm_handle_inout(struct vm *vm, int vcpuid, struct vm_exit *vme, bool *retu)
+{
+	struct vcpu *vcpu;
+	struct vie *vie;
+	int err;
+
+	vcpu = &vm->vcpu[vcpuid];
+	vie = vcpu->vie_ctx;
+
+repeat:
+	err = vie_emulate_inout(vie, vm, vcpuid);
+
+	if (err < 0) {
+		/*
+		 * In/out not handled by any of the in-kernel-emulated devices,
+		 * so make a trip out to userspace for it.
+		 */
+		vie_exitinfo(vie, vme);
+		*retu = true;
+		return (0);
+	} else if (err == EAGAIN) {
+		/*
+		 * Continue emulating the rep-prefixed ins/outs, which has not
+		 * completed its iterations.
+		 *
+		 * In case this can be emulated in-kernel and has a high
+		 * repetition count (causing a tight spin), it should be
+		 * deferential to yield conditions.
+		 */
+		if (!vcpu_should_yield(vm, vcpuid)) {
+			goto repeat;
+		} else {
+			/*
+			 * Defer to the contending load by making a trip to
+			 * userspace with a no-op (BOGUS) exit reason.
+			 */
+			vie_reset(vie);
+			vme->exitcode = VM_EXITCODE_BOGUS;
+			*retu = true;
+			return (0);
+		}
+	} else if (err != 0) {
+		/* Emulation failure.  Bail all the way out to userspace. */
+		vme->exitcode = VM_EXITCODE_INST_EMUL;
+		bzero(&vme->u.inst_emul, sizeof (vme->u.inst_emul));
+		*retu = true;
+		return (0);
+	}
+
+	vie_advance_pc(vie, &vcpu->nextrip);
+	*retu = false;
+	return (0);
 }
 
 static int
@@ -1767,6 +1894,18 @@ vm_handle_wrmsr(struct vm *vm, int vcpuid, struct vm_exit *vme)
 	return (-1);
 }
 #endif /* __FreeBSD__ */
+
+void
+vm_req_spinup_ap(struct vm *vm, int req_vcpuid, uint64_t req_rip)
+{
+	if (vm->sipi_req) {
+		/* This should never occur if userspace is doing its job. */
+		vm->stats.sipi_supersede++;
+	}
+	vm->sipi_req = true;
+	vm->sipi_req_vcpu = req_vcpuid;
+	vm->sipi_req_rip = req_rip;
+}
 
 int
 vm_suspend(struct vm *vm, enum vm_suspend_how how)
@@ -1960,11 +2099,104 @@ vmm_freectx(void *arg, int isexec)
 
 #endif /* __FreeBSD */
 
+static int
+vm_entry_actions(struct vm *vm, int vcpuid, const struct vm_entry *entry,
+    struct vm_exit *vme)
+{
+	struct vcpu *vcpu;
+	struct vie *vie;
+	int err;
+
+	vcpu = &vm->vcpu[vcpuid];
+	vie = vcpu->vie_ctx;
+	err = 0;
+
+	switch (entry->cmd) {
+	case VEC_DEFAULT:
+		return (0);
+	case VEC_DISCARD_INSTR:
+		vie_reset(vie);
+		return (0);
+	case VEC_COMPLETE_MMIO:
+		err = vie_fulfill_mmio(vie, &entry->u.mmio);
+		if (err == 0) {
+			err = vie_emulate_mmio(vie, vm, vcpuid);
+			if (err == 0) {
+				vie_advance_pc(vie, &vcpu->nextrip);
+			} else if (err < 0) {
+				vie_exitinfo(vie, vme);
+			} else if (err == EAGAIN) {
+				/*
+				 * Clear the instruction emulation state in
+				 * order to re-enter VM context and continue
+				 * this 'rep <instruction>'
+				 */
+				vie_reset(vie);
+				err = 0;
+			}
+		}
+		break;
+	case VEC_COMPLETE_INOUT:
+		err = vie_fulfill_inout(vie, &entry->u.inout);
+		if (err == 0) {
+			err = vie_emulate_inout(vie, vm, vcpuid);
+			if (err == 0) {
+				vie_advance_pc(vie, &vcpu->nextrip);
+			} else if (err < 0) {
+				vie_exitinfo(vie, vme);
+			} else if (err == EAGAIN) {
+				/*
+				 * Clear the instruction emulation state in
+				 * order to re-enter VM context and continue
+				 * this 'rep ins/outs'
+				 */
+				vie_reset(vie);
+				err = 0;
+			}
+		}
+		break;
+	default:
+		return (EINVAL);
+	}
+	return (err);
+}
+
+static int
+vm_loop_checks(struct vm *vm, int vcpuid, struct vm_exit *vme)
+{
+	struct vie *vie;
+
+	vie = vm->vcpu[vcpuid].vie_ctx;
+
+	if (vie_pending(vie)) {
+		/*
+		 * Userspace has not fulfilled the pending needs of the
+		 * instruction emulation, so bail back out.
+		 */
+		vie_exitinfo(vie, vme);
+		return (-1);
+	}
+
+	if (vcpuid == 0 && vm->sipi_req) {
+		/* The boot vCPU has sent a SIPI to one of the other CPUs */
+		vme->exitcode = VM_EXITCODE_SPINUP_AP;
+		vme->u.spinup_ap.vcpu = vm->sipi_req_vcpu;
+		vme->u.spinup_ap.rip = vm->sipi_req_rip;
+
+		vm->sipi_req = false;
+		vm->sipi_req_vcpu = 0;
+		vm->sipi_req_rip = 0;
+		return (-1);
+	}
+
+	return (0);
+}
+
 int
-vm_run(struct vm *vm, struct vm_run *vmrun)
+vm_run(struct vm *vm, int vcpuid, const struct vm_entry *entry)
 {
 	struct vm_eventinfo evinfo;
-	int error, vcpuid;
+	int error;
 	struct vcpu *vcpu;
 #ifdef	__FreeBSD__
 	struct pcb *pcb;
@@ -1977,8 +2209,6 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 	vm_thread_ctx_t vtc;
 	int affinity_type = CPU_CURRENT;
 #endif
-
-	vcpuid = vmrun->cpuid;
 
 	if (vcpuid < 0 || vcpuid >= vm->maxcpus)
 		return (EINVAL);
@@ -2005,7 +2235,21 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 	    NULL, vmm_freectx);
 #endif
 
+	error = vm_entry_actions(vm, vcpuid, entry, vme);
+	if (error < 0) {
+		/* Exit condition to be serviced by userspace */
+		error = 0;
+		goto exit;
+	} else if (error != 0) {
+		goto exit;
+	}
+
 restart:
+	if (vm_loop_checks(vm, vcpuid, vme) != 0) {
+		error = 0;
+		goto exit;
+	}
+
 #ifndef	__FreeBSD__
 	thread_affinity_set(curthread, affinity_type);
 	/*
@@ -2091,11 +2335,10 @@ restart:
 		case VM_EXITCODE_PAGING:
 			error = vm_handle_paging(vm, vcpuid, &retu);
 			break;
-		case VM_EXITCODE_INST_EMUL:
-			error = vm_handle_inst_emul(vm, vcpuid, &retu);
+		case VM_EXITCODE_MMIO_EMUL:
+			error = vm_handle_mmio_emul(vm, vcpuid, &retu);
 			break;
 		case VM_EXITCODE_INOUT:
-		case VM_EXITCODE_INOUT_STR:
 			error = vm_handle_inout(vm, vcpuid, vme, &retu);
 			break;
 		case VM_EXITCODE_MONITOR:
@@ -2114,12 +2357,12 @@ restart:
 			affinity_type = CPU_BEST;
 			break;
 		}
+#endif
 
 		case VM_EXITCODE_MTRAP:
 			vm_suspend_cpu(vm, vcpuid);
 			retu = true;
 			break;
-#endif
 		default:
 			retu = true;	/* handled in userland */
 			break;
@@ -2129,6 +2372,7 @@ restart:
 	if (error == 0 && retu == false)
 		goto restart;
 
+exit:
 #ifndef	__FreeBSD__
 	removectx(curthread, &vtc, vmm_savectx, vmm_restorectx, NULL, NULL,
 	    NULL, vmm_freectx);
@@ -2136,8 +2380,6 @@ restart:
 
 	VCPU_CTR2(vm, vcpuid, "retu %d/%d", error, vme->exitcode);
 
-	/* copy the exit information */
-	bcopy(vme, &vmrun->vm_exit, sizeof (struct vm_exit));
 	return (error);
 }
 
@@ -2672,7 +2914,7 @@ vmm_is_pptdev(int bus, int slot, int func)
 				found = true;
 				break;
 			}
-		
+
 			if (cp2 != NULL)
 				*cp2++ = ' ';
 
@@ -3082,7 +3324,7 @@ vm_copyin(struct vm *vm, int vcpuid, struct vm_copyinfo *copyinfo, void *kaddr,
 {
 	char *dst;
 	int idx;
-	
+
 	dst = kaddr;
 	idx = 0;
 	while (len > 0) {
@@ -3123,8 +3365,8 @@ vm_get_rescnt(struct vm *vm, int vcpu, struct vmm_stat_type *stat)
 
 	if (vcpu == 0) {
 		vmm_stat_set(vm, vcpu, VMM_MEM_RESIDENT,
-	       	    PAGE_SIZE * vmspace_resident_count(vm->vmspace));
-	}	
+		    PAGE_SIZE * vmspace_resident_count(vm->vmspace));
+	}
 }
 
 static void
@@ -3133,8 +3375,8 @@ vm_get_wiredcnt(struct vm *vm, int vcpu, struct vmm_stat_type *stat)
 
 	if (vcpu == 0) {
 		vmm_stat_set(vm, vcpu, VMM_MEM_WIRED,
-	      	    PAGE_SIZE * pmap_wired_count(vmspace_pmap(vm->vmspace)));
-	}	
+		    PAGE_SIZE * pmap_wired_count(vmspace_pmap(vm->vmspace)));
+	}
 }
 
 VMM_STAT_FUNC(VMM_MEM_RESIDENT, "Resident memory", vm_get_rescnt);
@@ -3206,21 +3448,21 @@ vm_ioport_handle_hook(struct vm *vm, int cpuid, bool in, int port, int bytes,
 		}
 	}
 	if (hook == NULL) {
-		return (ENOENT);
+		return (ESRCH);
 	}
 
 	if (in) {
 		uint64_t tval;
 
 		if (hook->vmih_rmem_cb == NULL) {
-			return (ENOENT);
+			return (ESRCH);
 		}
 		err = hook->vmih_rmem_cb(hook->vmih_arg, (uintptr_t)port,
 		    (uint_t)bytes, &tval);
 		*val = (uint32_t)tval;
 	} else {
 		if (hook->vmih_wmem_cb == NULL) {
-			return (ENOENT);
+			return (ESRCH);
 		}
 		err = hook->vmih_wmem_cb(hook->vmih_arg, (uintptr_t)port,
 		    (uint_t)bytes, (uint64_t)*val);

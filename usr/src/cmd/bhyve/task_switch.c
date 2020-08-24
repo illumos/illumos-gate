@@ -25,6 +25,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ *
+ * Copyright 2020 Oxide Computer Company
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -37,7 +49,6 @@ __FBSDID("$FreeBSD$");
 #include <x86/segments.h>
 #include <x86/specialreg.h>
 #include <machine/vmm.h>
-#include <machine/vmm_instruction_emul.h>
 
 #include <assert.h>
 #include <errno.h>
@@ -618,6 +629,150 @@ tss32_restore(struct vmctx *ctx, int vcpu, struct vm_task_switch *ts,
 	return (0);
 }
 
+
+/*
+ * Copy of vie_alignment_check() from vmm_instruction_emul.c
+ */
+static int
+alignment_check(int cpl, int size, uint64_t cr0, uint64_t rf, uint64_t gla)
+{
+	assert(size == 1 || size == 2 || size == 4 || size == 8);
+	assert(cpl >= 0 && cpl <= 3);
+
+	if (cpl != 3 || (cr0 & CR0_AM) == 0 || (rf & PSL_AC) == 0)
+		return (0);
+
+	return ((gla & (size - 1)) ? 1 : 0);
+}
+
+/*
+ * Copy of vie_size2mask() from vmm_instruction_emul.c
+ */
+static uint64_t
+size2mask(int size)
+{
+	switch (size) {
+	case 1:
+		return (0xff);
+	case 2:
+		return (0xffff);
+	case 4:
+		return (0xffffffff);
+	case 8:
+		return (0xffffffffffffffff);
+	default:
+		assert(0);
+		/* not reached */
+		return (0);
+	}
+}
+
+/*
+ * Copy of vie_calculate_gla() from vmm_instruction_emul.c
+ */
+static int
+calculate_gla(enum vm_cpu_mode cpu_mode, enum vm_reg_name seg,
+    struct seg_desc *desc, uint64_t offset, int length, int addrsize,
+    int prot, uint64_t *gla)
+{
+	uint64_t firstoff, low_limit, high_limit, segbase;
+	int glasize, type;
+
+	assert(seg >= VM_REG_GUEST_ES && seg <= VM_REG_GUEST_GS);
+	assert((length == 1 || length == 2 || length == 4 || length == 8));
+	assert((prot & ~(PROT_READ | PROT_WRITE)) == 0);
+
+	firstoff = offset;
+	if (cpu_mode == CPU_MODE_64BIT) {
+		assert(addrsize == 4 || addrsize == 8);
+		glasize = 8;
+	} else {
+		assert(addrsize == 2 || addrsize == 4);
+		glasize = 4;
+		/*
+		 * If the segment selector is loaded with a NULL selector
+		 * then the descriptor is unusable and attempting to use
+		 * it results in a #GP(0).
+		 */
+		if (SEG_DESC_UNUSABLE(desc->access))
+			return (-1);
+
+		/*
+		 * The processor generates a #NP exception when a segment
+		 * register is loaded with a selector that points to a
+		 * descriptor that is not present. If this was the case then
+		 * it would have been checked before the VM-exit.
+		 */
+		assert(SEG_DESC_PRESENT(desc->access));
+
+		/*
+		 * The descriptor type must indicate a code/data segment.
+		 */
+		type = SEG_DESC_TYPE(desc->access);
+		assert(type >= 16 && type <= 31);
+
+		if (prot & PROT_READ) {
+			/* #GP on a read access to a exec-only code segment */
+			if ((type & 0xA) == 0x8)
+				return (-1);
+		}
+
+		if (prot & PROT_WRITE) {
+			/*
+			 * #GP on a write access to a code segment or a
+			 * read-only data segment.
+			 */
+			if (type & 0x8)			/* code segment */
+				return (-1);
+
+			if ((type & 0xA) == 0)		/* read-only data seg */
+				return (-1);
+		}
+
+		/*
+		 * 'desc->limit' is fully expanded taking granularity into
+		 * account.
+		 */
+		if ((type & 0xC) == 0x4) {
+			/* expand-down data segment */
+			low_limit = desc->limit + 1;
+			high_limit = SEG_DESC_DEF32(desc->access) ?
+			    0xffffffff : 0xffff;
+		} else {
+			/* code segment or expand-up data segment */
+			low_limit = 0;
+			high_limit = desc->limit;
+		}
+
+		while (length > 0) {
+			offset &= size2mask(addrsize);
+			if (offset < low_limit || offset > high_limit)
+				return (-1);
+			offset++;
+			length--;
+		}
+	}
+
+	/*
+	 * In 64-bit mode all segments except %fs and %gs have a segment
+	 * base address of 0.
+	 */
+	if (cpu_mode == CPU_MODE_64BIT && seg != VM_REG_GUEST_FS &&
+	    seg != VM_REG_GUEST_GS) {
+		segbase = 0;
+	} else {
+		segbase = desc->base;
+	}
+
+	/*
+	 * Truncate 'firstoff' to the effective address size before adding
+	 * it to the segment base.
+	 */
+	firstoff &= size2mask(addrsize);
+	*gla = (segbase + firstoff) & size2mask(glasize);
+	return (0);
+}
+
 /*
  * Push an error code on the stack of the new task. This is needed if the
  * task switch was triggered by a hardware exception that causes an error
@@ -667,14 +822,14 @@ push_errcode(struct vmctx *ctx, int vcpu, struct vm_guest_paging *paging,
 	esp = GETREG(ctx, vcpu, VM_REG_GUEST_RSP);
 	esp -= bytes;
 
-	if (vie_calculate_gla(paging->cpu_mode, VM_REG_GUEST_SS,
+	if (calculate_gla(paging->cpu_mode, VM_REG_GUEST_SS,
 	    &seg_desc, esp, bytes, stacksize, PROT_WRITE, &gla)) {
 		sel_exception(ctx, vcpu, IDT_SS, stacksel, 1);
 		*faultptr = 1;
 		return (0);
 	}
 
-	if (vie_alignment_check(paging->cpl, bytes, cr0, rflags, gla)) {
+	if (alignment_check(paging->cpl, bytes, cr0, rflags, gla)) {
 		vm_inject_ac(ctx, vcpu, 1);
 		*faultptr = 1;
 		return (0);

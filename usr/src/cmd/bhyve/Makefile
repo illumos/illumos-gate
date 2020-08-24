@@ -12,6 +12,7 @@
 #
 # Copyright 2014 Pluribus Networks Inc.
 # Copyright 2020 Joyent, Inc.
+# Copyright 2020 Oxide Computer Company
 #
 
 PROG =		bhyve
@@ -74,7 +75,6 @@ SRCS =	acpi.c			\
 	usb_mouse.c		\
 	vga.c			\
 	virtio.c		\
-	vmm_instruction_emul.c	\
 	vmgenc.c		\
 	xmsr.c			\
 	spinup_ap.c		\

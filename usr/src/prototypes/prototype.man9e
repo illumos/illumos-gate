@@ -1,0 +1,79 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 <contributor>
+.\"
+.Dd Month Day, Year
+.Dt ENTRYNAME 9E
+.\" ENTRYNAME should be replaced with the primary entry point that you are
+.\" documenting. If there is more than one function, then you should either
+.\" use the primary function of the group or a more general name. Every
+.\" documented entry point will appear in the NAME section below.
+.Os
+.Sh NAME
+.Nm entryname ,
+.Nm entryname2
+.Nd description
+.Sh SYNOPSIS
+.\" .In sys/header.h
+.\" .Ft "return type"
+.\" .Fo entryname
+.\" .Fa "arg 0 type and name"
+.\" .Fa "arg 1 type and name"
+.\" .Fc
+.\" Repeat above for each documented entry
+.Sh INTERFACE LEVEL
+.\" This should be one of the following:
+.\" .Sy Committed
+.\" .Sy Volatile -
+.\" This interface is still evolving in illumos.
+.\" API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa arg0
+Description of the parameter arg0.
+.It Fa arg1
+Description of the parameter arg1.
+.El
+.Sh DESCRIPTION
+.\" This should include a description of the entry point. This includes
+.\" information such as what framework it is a part of. What it is
+.\" expected to actually do. Any constraints on what it should validate.
+.\" Any concerns around locking or callbacks into the broader
+.\" frameworks. Whether it can be called in parallel by multiple
+.\" threads, etc.
+.Sh CONTEXT
+.\" Indicates the context in which this framework function is called.
+.\" Generally this is one or more of:
+.\" .Sy user
+.\" .Sy kernel
+.\" .Sy interrupt
+.\" However sometimes there may be something specific. Such as this is
+.\" only called or used during attach or detach.
+.Sh RETURN VALUES
+.\" This should indicate what the driver should return on successful
+.\" completion and what it should have done. Otherwise it should
+.\" indicate the class of error returned.
+.Sh ERRORS
+.\" This should be a list of recommended errors and causes. If the
+.\" interface only supports returning DDI_SUCCESS or DDI_FAILURE,
+.\" then this section should not be used. If it should only return these
+.\" specific errors and this section shouldn't be used as a guide,
+.\" indicate that.
+.Bl -tag -width Er
+.It Er ERRNO1
+Description of when to return ERRNO1.
+.It Er ERRNO2
+Description of when to return ERRNO2.
+.El
+.Sh SEE ALSO
+.\" A list of other manual pages related to the general framework or
+.\" section 9f functions they should call.

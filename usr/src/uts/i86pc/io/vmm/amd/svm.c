@@ -68,7 +68,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/smp.h>
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
-#include <machine/vmm_instruction_emul.h>
+#include <sys/vmm_instruction_emul.h>
 
 #include "vmm_lapic.h"
 #include "vmm_stat.h"
@@ -104,7 +104,7 @@ SYSCTL_NODE(_hw_vmm, OID_AUTO, svm, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
 #define AMD_CPUID_SVM_PAUSE_FTH		BIT(12) /* Pause filter threshold */
 #define	AMD_CPUID_SVM_AVIC		BIT(13)	/* AVIC present */
 
-#define	VMCB_CACHE_DEFAULT	(VMCB_CACHE_ASID 	|	\
+#define	VMCB_CACHE_DEFAULT	(VMCB_CACHE_ASID	|	\
 				VMCB_CACHE_IOPM		|	\
 				VMCB_CACHE_I		|	\
 				VMCB_CACHE_TPR		|	\
@@ -139,7 +139,7 @@ SYSCTL_UINT(_hw_vmm_svm, OID_AUTO, num_asids, CTLFLAG_RDTUN, &nasid, 0,
 /* Current ASID generation for each host cpu */
 static struct asid asid[MAXCPU];
 
-/* 
+/*
  * SVM host state saved area of size 4KB for each core.
  */
 static uint8_t hsave[MAXCPU][PAGE_SIZE] __aligned(PAGE_SIZE);
@@ -154,14 +154,12 @@ static int svm_setreg(void *arg, int vcpu, int ident, uint64_t val);
 static __inline int
 flush_by_asid(void)
 {
-
 	return (svm_feature & AMD_CPUID_SVM_FLUSH_BY_ASID);
 }
 
 static __inline int
 decode_assist(void)
 {
-
 	return (svm_feature & AMD_CPUID_SVM_DECODE_ASSIST);
 }
 
@@ -307,7 +305,7 @@ svm_restore(void)
 {
 
 	svm_enable(NULL);
-}		
+}
 #else /* __FreeBSD__ */
 static int
 svm_cleanup(void)
@@ -335,14 +333,14 @@ svm_restore(void)
 #endif /* __FreeBSD__ */
 
 /* Pentium compatible MSRs */
-#define MSR_PENTIUM_START 	0	
-#define MSR_PENTIUM_END 	0x1FFF
+#define MSR_PENTIUM_START	0
+#define MSR_PENTIUM_END		0x1FFF
 /* AMD 6th generation and Intel compatible MSRs */
-#define MSR_AMD6TH_START 	0xC0000000UL	
-#define MSR_AMD6TH_END 		0xC0001FFFUL	
+#define MSR_AMD6TH_START	0xC0000000UL
+#define MSR_AMD6TH_END		0xC0001FFFUL
 /* AMD 7th and 8th generation compatible MSRs */
-#define MSR_AMD7TH_START 	0xC0010000UL	
-#define MSR_AMD7TH_END 		0xC0011FFFUL	
+#define MSR_AMD7TH_START	0xC0010000UL
+#define MSR_AMD7TH_END		0xC0011FFFUL
 
 /*
  * Get the index and bit position for a MSR in permission bitmap.
@@ -362,12 +360,12 @@ svm_msr_index(uint64_t msr, int *index, int *bit)
 		return (0);
 	}
 
-	base += (MSR_PENTIUM_END - MSR_PENTIUM_START + 1); 
+	base += (MSR_PENTIUM_END - MSR_PENTIUM_START + 1);
 	if (msr >= MSR_AMD6TH_START && msr <= MSR_AMD6TH_END) {
-		off = (msr - MSR_AMD6TH_START); 
+		off = (msr - MSR_AMD6TH_START);
 		*index = (off + base) / 4;
 		return (0);
-	} 
+	}
 
 	base += (MSR_AMD6TH_END - MSR_AMD6TH_START + 1);
 	if (msr >= MSR_AMD7TH_START && msr <= MSR_AMD7TH_END) {
@@ -717,61 +715,6 @@ svm_paging_mode(uint64_t cr0, uint64_t cr4, uint64_t efer)
 /*
  * ins/outs utility routines
  */
-static uint64_t
-svm_inout_str_index(struct svm_regctx *regs, int in)
-{
-	uint64_t val;
-
-	val = in ? regs->sctx_rdi : regs->sctx_rsi;
-
-	return (val);
-}
-
-static uint64_t
-svm_inout_str_count(struct svm_regctx *regs, int rep)
-{
-	uint64_t val;
-
-	val = rep ? regs->sctx_rcx : 1;
-
-	return (val);
-}
-
-static void
-svm_inout_str_seginfo(struct svm_softc *svm_sc, int vcpu, int64_t info1,
-    int in, struct vm_inout_str *vis)
-{
-	int error, s;
-
-	if (in) {
-		vis->seg_name = VM_REG_GUEST_ES;
-	} else {
-		/* The segment field has standard encoding */
-		s = (info1 >> 10) & 0x7;
-		vis->seg_name = vm_segment_name(s);
-	}
-
-	error = vmcb_getdesc(svm_sc, vcpu, vis->seg_name, &vis->seg_desc);
-	KASSERT(error == 0, ("%s: svm_getdesc error %d", __func__, error));
-}
-
-static int
-svm_inout_str_addrsize(uint64_t info1)
-{
-        uint32_t size;
-
-        size = (info1 >> 7) & 0x7;
-        switch (size) {
-        case 1:
-                return (2);     /* 16 bit */
-        case 2:
-                return (4);     /* 32 bit */
-        case 4:
-                return (8);     /* 64 bit */
-        default:
-                panic("%s: invalid size encoding %d", __func__, size);
-        }
-}
 
 static void
 svm_paging_info(struct vmcb *vmcb, struct vm_guest_paging *paging)
@@ -792,52 +735,77 @@ svm_paging_info(struct vmcb *vmcb, struct vm_guest_paging *paging)
  * Handle guest I/O intercept.
  */
 static int
-svm_handle_io(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
+svm_handle_inout(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 {
 	struct vmcb_ctrl *ctrl;
 	struct vmcb_state *state;
-	struct svm_regctx *regs;
-	struct vm_inout_str *vis;
+	struct vm_inout *inout;
+	struct vie *vie;
 	uint64_t info1;
-	int inout_string;
+	struct vm_guest_paging paging;
 
 	state = svm_get_vmcb_state(svm_sc, vcpu);
-	ctrl  = svm_get_vmcb_ctrl(svm_sc, vcpu);
-	regs  = svm_get_guest_regctx(svm_sc, vcpu);
-
+	ctrl = svm_get_vmcb_ctrl(svm_sc, vcpu);
+	inout = &vmexit->u.inout;
 	info1 = ctrl->exitinfo1;
-	inout_string = info1 & BIT(2) ? 1 : 0;
 
-	/*
-	 * The effective segment number in EXITINFO1[12:10] is populated
-	 * only if the processor has the DecodeAssist capability.
-	 *
-	 * XXX this is not specified explicitly in APMv2 but can be verified
-	 * empirically.
-	 */
-	if (inout_string && !decode_assist())
-		return (UNHANDLED);
+	inout->bytes = (info1 >> 4) & 0x7;
+	inout->flags = 0;
+	inout->flags |= (info1 & BIT(0)) ? INOUT_IN : 0;
+	inout->flags |= (info1 & BIT(3)) ? INOUT_REP : 0;
+	inout->flags |= (info1 & BIT(2)) ? INOUT_STR : 0;
+	inout->port = (uint16_t)(info1 >> 16);
+	inout->eax = (uint32_t)(state->rax);
 
-	vmexit->exitcode 	= VM_EXITCODE_INOUT;
-	vmexit->u.inout.in 	= (info1 & BIT(0)) ? 1 : 0;
-	vmexit->u.inout.string 	= inout_string;
-	vmexit->u.inout.rep 	= (info1 & BIT(3)) ? 1 : 0;
-	vmexit->u.inout.bytes 	= (info1 >> 4) & 0x7;
-	vmexit->u.inout.port 	= (uint16_t)(info1 >> 16);
-	vmexit->u.inout.eax 	= (uint32_t)(state->rax);
+	if ((inout->flags & INOUT_STR) != 0) {
+		/*
+		 * The effective segment number in EXITINFO1[12:10] is populated
+		 * only if the processor has the DecodeAssist capability.
+		 *
+		 * This is not specified explicitly in APMv2 but can be verified
+		 * empirically.
+		 */
+		if (!decode_assist()) {
+			/*
+			 * Without decoding assistance, force the task of
+			 * emulating the ins/outs on userspace.
+			 */
+			vmexit->exitcode = VM_EXITCODE_INST_EMUL;
+			bzero(&vmexit->u.inst_emul,
+			    sizeof (vmexit->u.inst_emul));
+			return (UNHANDLED);
+		}
 
-	if (inout_string) {
-		vmexit->exitcode = VM_EXITCODE_INOUT_STR;
-		vis = &vmexit->u.inout_str;
-		svm_paging_info(svm_get_vmcb(svm_sc, vcpu), &vis->paging);
-		vis->rflags = state->rflags;
-		vis->cr0 = state->cr0;
-		vis->index = svm_inout_str_index(regs, vmexit->u.inout.in);
-		vis->count = svm_inout_str_count(regs, vmexit->u.inout.rep);
-		vis->addrsize = svm_inout_str_addrsize(info1);
-		svm_inout_str_seginfo(svm_sc, vcpu, info1,
-		    vmexit->u.inout.in, vis);
+		/*
+		 * Bits 7-9 encode the address size of ins/outs operations where
+		 * the 1/2/4 values correspond to 16/32/64 bit sizes.
+		 */
+		inout->addrsize = 2 * ((info1 >> 7) & 0x7);
+		VERIFY(inout->addrsize == 2 || inout->addrsize == 4 ||
+		    inout->addrsize == 8);
+
+		if (inout->flags & INOUT_IN) {
+			/*
+			 * For INS instructions, %es (encoded as 0) is the
+			 * implied segment for the operation.
+			 */
+			inout->segment = 0;
+		} else {
+			/*
+			 * Bits 10-12 encode the segment for OUTS.
+			 * This value follows the standard x86 segment order.
+			 */
+			inout->segment = (info1 >> 10) & 0x7;
+		}
 	}
+
+	vmexit->exitcode = VM_EXITCODE_INOUT;
+	svm_paging_info(svm_get_vmcb(svm_sc, vcpu), &paging);
+	vie = vm_vie_ctx(svm_sc->vm, vcpu);
+	vie_init_inout(vie, inout, vmexit->inst_length, &paging);
+
+	/* The in/out emulation will handle advancing %rip */
+	vmexit->inst_length = 0;
 
 	return (UNHANDLED);
 }
@@ -857,7 +825,6 @@ npf_fault_type(uint64_t exitinfo1)
 static bool
 svm_npf_emul_fault(uint64_t exitinfo1)
 {
-	
 	if (exitinfo1 & VMCB_NPF_INFO1_ID) {
 		return (false);
 	}
@@ -870,48 +837,52 @@ svm_npf_emul_fault(uint64_t exitinfo1)
 		return (false);
 	}
 
-	return (true);	
+	return (true);
 }
 
 static void
-svm_handle_inst_emul(struct vmcb *vmcb, uint64_t gpa, struct vm_exit *vmexit)
+svm_handle_mmio_emul(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit,
+    uint64_t gpa)
 {
-	struct vm_guest_paging *paging;
-	struct vmcb_segment seg;
 	struct vmcb_ctrl *ctrl;
-	char *inst_bytes;
-	int error, inst_len;
+	struct vmcb *vmcb;
+	struct vie *vie;
+	struct vm_guest_paging paging;
+	struct vmcb_segment seg;
+	char *inst_bytes = NULL;
+	uint8_t inst_len = 0;
+	int error;
 
+	vmcb = svm_get_vmcb(svm_sc, vcpu);
 	ctrl = &vmcb->ctrl;
-	paging = &vmexit->u.inst_emul.paging;
 
-	vmexit->exitcode = VM_EXITCODE_INST_EMUL;
-	vmexit->u.inst_emul.gpa = gpa;
-	vmexit->u.inst_emul.gla = VIE_INVALID_GLA;
-	svm_paging_info(vmcb, paging);
+	vmexit->exitcode = VM_EXITCODE_MMIO_EMUL;
+	vmexit->u.mmio_emul.gpa = gpa;
+	vmexit->u.mmio_emul.gla = VIE_INVALID_GLA;
+	svm_paging_info(vmcb, &paging);
 
 	error = vmcb_seg(vmcb, VM_REG_GUEST_CS, &seg);
 	KASSERT(error == 0, ("%s: vmcb_seg(CS) error %d", __func__, error));
 
-	switch(paging->cpu_mode) {
+	switch (paging.cpu_mode) {
 	case CPU_MODE_REAL:
-		vmexit->u.inst_emul.cs_base = seg.base;
-		vmexit->u.inst_emul.cs_d = 0;
+		vmexit->u.mmio_emul.cs_base = seg.base;
+		vmexit->u.mmio_emul.cs_d = 0;
 		break;
 	case CPU_MODE_PROTECTED:
 	case CPU_MODE_COMPATIBILITY:
-		vmexit->u.inst_emul.cs_base = seg.base;
+		vmexit->u.mmio_emul.cs_base = seg.base;
 
 		/*
 		 * Section 4.8.1 of APM2, Default Operand Size or D bit.
 		 */
-		vmexit->u.inst_emul.cs_d = (seg.attrib & VMCB_CS_ATTRIB_D) ?
+		vmexit->u.mmio_emul.cs_d = (seg.attrib & VMCB_CS_ATTRIB_D) ?
 		    1 : 0;
 		break;
 	default:
-		vmexit->u.inst_emul.cs_base = 0;
-		vmexit->u.inst_emul.cs_d = 0;
-		break;	
+		vmexit->u.mmio_emul.cs_base = 0;
+		vmexit->u.mmio_emul.cs_d = 0;
+		break;
 	}
 
 	/*
@@ -920,11 +891,9 @@ svm_handle_inst_emul(struct vmcb *vmcb, uint64_t gpa, struct vm_exit *vmexit)
 	if (decode_assist() && !disable_npf_assist) {
 		inst_len = ctrl->inst_len;
 		inst_bytes = (char *)ctrl->inst_bytes;
-	} else {
-		inst_len = 0;
-		inst_bytes = NULL;
 	}
-	vie_init(&vmexit->u.inst_emul.vie, inst_bytes, inst_len);
+	vie = vm_vie_ctx(svm_sc->vm, vcpu);
+	vie_init_mmio(vie, inst_bytes, inst_len, &paging, gpa);
 }
 
 #ifdef KTR
@@ -1014,7 +983,7 @@ svm_save_intinfo(struct svm_softc *svm_sc, int vcpu)
 	uint64_t intinfo;
 
 	ctrl  = svm_get_vmcb_ctrl(svm_sc, vcpu);
-	intinfo = ctrl->exitintinfo;	
+	intinfo = ctrl->exitintinfo;
 	if (!VMCB_EXITINTINFO_VALID(intinfo))
 		return;
 
@@ -1488,7 +1457,7 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		eax = state->rax;
 		ecx = ctx->sctx_rcx;
 		edx = ctx->sctx_rdx;
-		retu = false;	
+		retu = false;
 
 		if (info1) {
 			vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_WRMSR, 1);
@@ -1520,7 +1489,7 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		}
 		break;
 	case VMCB_EXIT_IO:
-		handled = svm_handle_io(svm_sc, vcpu, vmexit);
+		handled = svm_handle_inout(svm_sc, vcpu, vmexit);
 		vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_INOUT, 1);
 		break;
 	case VMCB_EXIT_CPUID:
@@ -1552,9 +1521,9 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 			    "on gpa %#lx/%#lx at rip %#lx",
 			    info2, info1, state->rip);
 		} else if (svm_npf_emul_fault(info1)) {
-			svm_handle_inst_emul(vmcb, info2, vmexit);
-			vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_INST_EMUL, 1);
-			VCPU_CTR3(svm_sc->vm, vcpu, "inst_emul fault "
+			svm_handle_mmio_emul(svm_sc, vcpu, vmexit, info2);
+			vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_MMIO_EMUL, 1);
+			VCPU_CTR3(svm_sc->vm, vcpu, "mmio_emul fault "
 			    "for gpa %#lx/%#lx at rip %#lx",
 			    info2, info1, state->rip);
 		}
@@ -1568,7 +1537,7 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 	default:
 		vmm_stat_incr(svm_sc->vm, vcpu, VMEXIT_UNKNOWN, 1);
 		break;
-	}	
+	}
 
 	VCPU_CTR4(svm_sc->vm, vcpu, "%s %s vmexit at %#lx/%d",
 	    handled ? "handled" : "unhandled", exit_reason_to_str(code),
@@ -1999,7 +1968,7 @@ svm_dr_leave_guest(struct svm_regctx *gctx)
  * Start vcpu with specified RIP.
  */
 static int
-svm_vmrun(void *arg, int vcpu, register_t rip, pmap_t pmap, 
+svm_vmrun(void *arg, int vcpu, register_t rip, pmap_t pmap,
 	struct vm_eventinfo *evinfo)
 {
 	struct svm_regctx *gctx;
@@ -2153,7 +2122,7 @@ svm_vmrun(void *arg, int vcpu, register_t rip, pmap_t pmap,
 		/* Restore host LDTR. */
 		lldt(ldt_sel);
 
-		/* #VMEXIT disables interrupts so re-enable them here. */ 
+		/* #VMEXIT disables interrupts so re-enable them here. */
 		enable_gintr();
 
 		/* Update 'nextrip' */

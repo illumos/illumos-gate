@@ -27,6 +27,18 @@
  *
  * $FreeBSD$
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ *
+ * Copyright 2020 Oxide Computer Company
+ */
 
 /*
  * Memory ranges are represented with an RB tree. On insertion, the range
@@ -41,7 +53,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/errno.h>
 #include <sys/tree.h>
 #include <machine/vmm.h>
-#include <machine/vmm_instruction_emul.h>
 
 #include <assert.h>
 #include <err.h>
@@ -96,7 +107,7 @@ mmio_rb_lookup(struct mmio_rb_tree *rbt, uint64_t addr,
 		*entry = res;
 		return (0);
 	}
-	
+
 	return (ENOENT);
 }
 
@@ -170,7 +181,7 @@ access_memory(struct vmctx *ctx, int vcpu, uint64_t paddr, mem_cb_t *cb,
 {
 	struct mmio_rb_range *entry;
 	int err, perror, immutable;
-	
+
 	pthread_rwlock_rdlock(&mmio_rwlock);
 	/*
 	 * First check the per-vCPU cache
@@ -185,7 +196,7 @@ access_memory(struct vmctx *ctx, int vcpu, uint64_t paddr, mem_cb_t *cb,
 	if (entry == NULL) {
 		if (mmio_rb_lookup(&mmio_rb_root, paddr, &entry) == 0) {
 			/* Update the per-vCPU cache */
-			mmio_hint[vcpu] = entry;			
+			mmio_hint[vcpu] = entry;
 		} else if (mmio_rb_lookup(&mmio_rb_fallback, paddr, &entry)) {
 			perror = pthread_rwlock_unlock(&mmio_rwlock);
 			assert(perror == 0);
@@ -223,32 +234,28 @@ access_memory(struct vmctx *ctx, int vcpu, uint64_t paddr, mem_cb_t *cb,
 	return (err);
 }
 
-struct emulate_mem_args {
-	struct vie *vie;
-	struct vm_guest_paging *paging;
-};
-
 static int
 emulate_mem_cb(struct vmctx *ctx, int vcpu, uint64_t paddr, struct mem_range *mr,
     void *arg)
 {
-	struct emulate_mem_args *ema;
+	struct vm_mmio *mmio;
+	int err = 0;
 
-	ema = arg;
-	return (vmm_emulate_instruction(ctx, vcpu, paddr, ema->vie, ema->paging,
-	    mem_read, mem_write, mr));
+	mmio = arg;
+
+	if (mmio->read != 0) {
+		err = mem_read(ctx, vcpu, paddr, &mmio->data, mmio->bytes, mr);
+	} else {
+		err = mem_write(ctx, vcpu, paddr, mmio->data, mmio->bytes, mr);
+	}
+
+	return (err);
 }
 
 int
-emulate_mem(struct vmctx *ctx, int vcpu, uint64_t paddr, struct vie *vie,
-    struct vm_guest_paging *paging)
-
+emulate_mem(struct vmctx *ctx, int vcpu, struct vm_mmio *mmio)
 {
-	struct emulate_mem_args ema;
-
-	ema.vie = vie;
-	ema.paging = paging;
-	return (access_memory(ctx, vcpu, paddr, emulate_mem_cb, &ema));
+	return (access_memory(ctx, vcpu, mmio->gpa, emulate_mem_cb, mmio));
 }
 
 struct rw_mem_args {
@@ -333,23 +340,23 @@ register_mem_fallback(struct mem_range *memp)
 	return (register_mem_int(&mmio_rb_fallback, memp));
 }
 
-int 
+int
 unregister_mem(struct mem_range *memp)
 {
 	struct mem_range *mr;
 	struct mmio_rb_range *entry = NULL;
 	int err, perror, i;
-	
+
 	pthread_rwlock_wrlock(&mmio_rwlock);
 	err = mmio_rb_lookup(&mmio_rb_root, memp->base, &entry);
 	if (err == 0) {
 		mr = &entry->mr_param;
 		assert(mr->name == memp->name);
-		assert(mr->base == memp->base && mr->size == memp->size); 
+		assert(mr->base == memp->base && mr->size == memp->size);
 		assert((mr->flags & MEM_F_IMMUTABLE) == 0);
 		RB_REMOVE(mmio_rb_tree, &mmio_rb_root, entry);
 
-		/* flush Per-vCPU cache */	
+		/* flush Per-vCPU cache */
 		for (i=0; i < VM_MAXCPU; i++) {
 			if (mmio_hint[i] == entry)
 				mmio_hint[i] = NULL;
@@ -360,7 +367,7 @@ unregister_mem(struct mem_range *memp)
 
 	if (entry)
 		free(entry);
-	
+
 	return (err);
 }
 

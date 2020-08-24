@@ -35,7 +35,7 @@
 
 #define	BIT(n)			(1ULL << (n))
 /* Return value of bits[n:m] where n and (n >= ) m are bit positions. */
-#define REG_BITS(x, n, m)	(((x) >> (m)) & 		\
+#define REG_BITS(x, n, m)	(((x) >> (m)) &			\
 				((1 << (((n) - (m)) + 1)) - 1))
 
 /*
@@ -111,10 +111,10 @@ CTASSERT(sizeof(struct amdvi_dte) == 32);
  * IOMMU command entry.
  */
 struct amdvi_cmd {
-	uint32_t 	word0;
-	uint32_t 	word1:28;
+	uint32_t	word0;
+	uint32_t	word1:28;
 	uint8_t		opcode:4;
-	uint64_t 	addr;
+	uint64_t	addr;
 } __attribute__((__packed__));
 
 /* Command opcodes. */
@@ -150,12 +150,12 @@ struct amdvi_cmd {
  * IOMMU event entry.
  */
 struct amdvi_event {
-	uint16_t 	devid;
-	uint16_t 	pasid_hi;
-	uint16_t 	pasid_domid;	/* PASID low or DomainID */
-	uint16_t 	flag:12;
+	uint16_t	devid;
+	uint16_t	pasid_hi;
+	uint16_t	pasid_domid;	/* PASID low or DomainID */
+	uint16_t	flag:12;
 	uint8_t		opcode:4;
-	uint64_t 	addr;
+	uint64_t	addr;
 } __attribute__((__packed__));
 CTASSERT(sizeof(struct amdvi_event) == 16);
 
@@ -210,8 +210,8 @@ struct amdvi_ctrl {
 		uint64_t limit:40;
 		uint16_t :12;
 	} excl;
-	/* 
-	 * Revision 2 only. 
+	/*
+	 * Revision 2 only.
 	 */
 	uint64_t ex_feature;
 	struct {
@@ -252,8 +252,8 @@ CTASSERT(offsetof(struct amdvi_ctrl, pad2)== 0x2028);
 CTASSERT(offsetof(struct amdvi_ctrl, pad3)== 0x2040);
 
 #define AMDVI_MMIO_V1_SIZE	(4 * PAGE_SIZE)	/* v1 size */
-/* 
- * AMF IOMMU v2 size including event counters 
+/*
+ * AMF IOMMU v2 size including event counters
  */
 #define AMDVI_MMIO_V2_SIZE	(8 * PAGE_SIZE)
 
@@ -374,38 +374,38 @@ enum IvrsType
  */
 struct amdvi_softc {
 	struct amdvi_ctrl *ctrl;	/* Control area. */
-	device_t 	dev;		/* IOMMU device. */
+	device_t	dev;		/* IOMMU device. */
 	enum IvrsType   ivhd_type;	/* IOMMU IVHD type. */
 	bool		iotlb;		/* IOTLB supported by IOMMU */
 	struct amdvi_cmd *cmd;		/* Command descriptor area. */
-	int 		cmd_max;	/* Max number of commands. */
+	int		cmd_max;	/* Max number of commands. */
 	uint64_t	cmp_data;	/* Command completion write back. */
 	struct amdvi_event *event;	/* Event descriptor area. */
 	struct resource *event_res;	/* Event interrupt resource. */
-	void   		*event_tag;	/* Event interrupt tag. */
+	void		*event_tag;	/* Event interrupt tag. */
 	int		event_max;	/* Max number of events. */
 	int		event_irq;
 	int		event_rid;
 	/* ACPI various flags. */
-	uint32_t 	ivhd_flag;	/* ACPI IVHD flag. */
-	uint32_t 	ivhd_feature;	/* ACPI v1 Reserved or v2 attribute. */
-	uint64_t 	ext_feature;	/* IVHD EFR */
+	uint32_t	ivhd_flag;	/* ACPI IVHD flag. */
+	uint32_t	ivhd_feature;	/* ACPI v1 Reserved or v2 attribute. */
+	uint64_t	ext_feature;	/* IVHD EFR */
 	/* PCI related. */
-	uint16_t 	cap_off;	/* PCI Capability offset. */
+	uint16_t	cap_off;	/* PCI Capability offset. */
 	uint8_t		pci_cap;	/* PCI capability. */
-	uint16_t 	pci_seg;	/* IOMMU PCI domain/segment. */
-	uint16_t 	pci_rid;	/* PCI BDF of IOMMU */
+	uint16_t	pci_seg;	/* IOMMU PCI domain/segment. */
+	uint16_t	pci_rid;	/* PCI BDF of IOMMU */
 	/* Device range under this IOMMU. */
-	uint16_t 	start_dev_rid;	/* First device under this IOMMU. */
-	uint16_t 	end_dev_rid;	/* Last device under this IOMMU. */
+	uint16_t	start_dev_rid;	/* First device under this IOMMU. */
+	uint16_t	end_dev_rid;	/* Last device under this IOMMU. */
 
 	/* BIOS provided device configuration for end points. */
-	struct 		ivhd_dev_cfg dev_cfg[10];
+	struct		ivhd_dev_cfg dev_cfg[10];
 	int		dev_cfg_cnt;
 
 	/* Software statistics. */
-	uint64_t 	event_intr_cnt;	/* Total event INTR count. */
-	uint64_t 	total_cmd;	/* Total number of commands. */
+	uint64_t	event_intr_cnt;	/* Total event INTR count. */
+	uint64_t	total_cmd;	/* Total number of commands. */
 };
 
 int	amdvi_setup_hw(struct amdvi_softc *softc);

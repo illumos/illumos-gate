@@ -500,25 +500,27 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	/* Execute the primary logic for the ioctl. */
 	switch (cmd) {
 	case VM_RUN: {
-		struct vm_run vmrun;
+		struct vm_entry entry;
 
-		if (ddi_copyin(datap, &vmrun, sizeof (vmrun), md)) {
+		if (ddi_copyin(datap, &entry, sizeof (entry), md)) {
 			error = EFAULT;
 			break;
 		}
-		vmrun.cpuid = vcpu;
 
 		if (!(curthread->t_schedflag & TS_VCPU))
 			smt_mark_as_vcpu();
 
-		error = vm_run(sc->vmm_vm, &vmrun);
-		/*
-		 * XXXJOY: I think it's necessary to do copyout, even in the
-		 * face of errors, since the exit state is communicated out.
-		 */
-		if (ddi_copyout(&vmrun, datap, sizeof (vmrun), md)) {
-			error = EFAULT;
-			break;
+		error = vm_run(sc->vmm_vm, vcpu, &entry);
+
+		if (error == 0) {
+			const struct vm_exit *vme;
+			void *outp = entry.exit_data;
+
+			vme = vm_exitinfo(sc->vmm_vm, vcpu);
+			if (ddi_copyout(vme, outp, sizeof (*vme), md)) {
+				error = EFAULT;
+				break;
+			}
 		}
 		break;
 	}
@@ -982,9 +984,6 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_GET_KERNEMU_DEV: {
 		struct vm_readwrite_kernemu_device kemu;
 		size_t size = 0;
-		mem_region_write_t mwrite = NULL;
-		mem_region_read_t mread = NULL;
-		uint64_t ignored = 0;
 
 		if (ddi_copyin(datap, &kemu, sizeof (kemu), md)) {
 			error = EFAULT;
@@ -998,31 +997,12 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		size = (1 << kemu.access_width);
 		ASSERT(size >= 1 && size <= 8);
 
-		if (kemu.gpa >= DEFAULT_APIC_BASE &&
-		    kemu.gpa < DEFAULT_APIC_BASE + PAGE_SIZE) {
-			mread = lapic_mmio_read;
-			mwrite = lapic_mmio_write;
-		} else if (kemu.gpa >= VIOAPIC_BASE &&
-		    kemu.gpa < VIOAPIC_BASE + VIOAPIC_SIZE) {
-			mread = vioapic_mmio_read;
-			mwrite = vioapic_mmio_write;
-		} else if (kemu.gpa >= VHPET_BASE &&
-		    kemu.gpa < VHPET_BASE + VHPET_SIZE) {
-			mread = vhpet_mmio_read;
-			mwrite = vhpet_mmio_write;
-		} else {
-			error = EINVAL;
-			break;
-		}
-
 		if (cmd == VM_SET_KERNEMU_DEV) {
-			VERIFY(mwrite != NULL);
-			error = mwrite(sc->vmm_vm, vcpu, kemu.gpa, kemu.value,
-			    size, &ignored);
+			error = vm_service_mmio_write(sc->vmm_vm, vcpu,
+			    kemu.gpa, kemu.value, size);
 		} else {
-			VERIFY(mread != NULL);
-			error = mread(sc->vmm_vm, vcpu, kemu.gpa, &kemu.value,
-			    size, &ignored);
+			error = vm_service_mmio_read(sc->vmm_vm, vcpu,
+			    kemu.gpa, &kemu.value, size);
 		}
 
 		if (error == 0) {
@@ -2003,6 +1983,11 @@ vmm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 {
 	vmm_softc_t	*sc;
 	minor_t		minor;
+
+	/* The structs in bhyve ioctls assume a 64-bit datamodel */
+	if (ddi_model_convert_from(mode & FMODELS) != DDI_MODEL_NONE) {
+		return (ENOTSUP);
+	}
 
 	minor = getminor(dev);
 

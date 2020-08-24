@@ -83,11 +83,6 @@ struct vm_register_set {
 	uint64_t	*regvals;
 };
 
-struct vm_run {
-	int		cpuid;
-	struct vm_exit	vm_exit;
-};
-
 struct vm_exception {
 	int		cpuid;
 	int		vector;
@@ -204,7 +199,7 @@ struct vm_suspend {
 
 struct vm_gla2gpa {
 	int		vcpuid;		/* inputs */
-	int 		prot;		/* PROT_READ or PROT_WRITE */
+	int		prot;		/* PROT_READ or PROT_WRITE */
 	uint64_t	gla;
 	struct vm_guest_paging paging;
 	int		fault;		/* outputs */
@@ -312,8 +307,8 @@ _Static_assert(sizeof(struct vm_readwrite_kernemu_device) == 24, "ABI");
 #define	VM_GET_MEMSEG			(VMM_IOC_BASE | 0x02)
 #define	VM_MMAP_GETNEXT			(VMM_IOC_BASE | 0x03)
 
-#define	VM_LAPIC_IRQ 			(VMM_IOC_BASE | 0x04)
-#define	VM_LAPIC_LOCAL_IRQ 		(VMM_IOC_BASE | 0x05)
+#define	VM_LAPIC_IRQ			(VMM_IOC_BASE | 0x04)
+#define	VM_LAPIC_LOCAL_IRQ		(VMM_IOC_BASE | 0x05)
 #define	VM_LAPIC_MSI			(VMM_IOC_BASE | 0x06)
 
 #define	VM_IOAPIC_ASSERT_IRQ		(VMM_IOC_BASE | 0x07)

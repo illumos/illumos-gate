@@ -153,7 +153,7 @@
 #define PGEX_RSV	0x08	/* reserved PTE field is non-zero */
 #define PGEX_I		0x10	/* during an instruction fetch */
 
-/* 
+/*
  * undef the PG_xx macros that define bits in the regular x86 PTEs that
  * have a different position in nested PTEs. This is done when compiling
  * code that needs to be aware of the differences between regular x86 and
