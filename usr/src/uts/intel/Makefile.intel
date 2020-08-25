@@ -27,6 +27,7 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2019 RackTop Systems
 # Copyright 2019 Peter Tribble.
+# Copyright 2021 Oxide Computer Company
 #
 
 #
@@ -385,6 +386,7 @@ DRV_KMODS	+= dmfe
 DRV_KMODS	+= e1000g
 DRV_KMODS	+= efe
 DRV_KMODS	+= elxl
+DRV_KMODS	+= ena
 DRV_KMODS	+= hme
 DRV_KMODS	+= mxfe
 DRV_KMODS	+= nge

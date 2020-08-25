@@ -29,6 +29,7 @@
 # Copyright 2016 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2020 RackTop Systems, Inc.
+# Copyright 2021 Oxide Computer Company
 #
 
 #
@@ -2288,3 +2289,10 @@ BNX_OBJS += \
 #
 MLXCX_OBJS +=	mlxcx.o mlxcx_dma.o mlxcx_cmd.o mlxcx_intr.o mlxcx_gld.o \
 		mlxcx_ring.o mlxcx_sensor.o
+
+#
+# ena(7D)
+#
+ENA_OBJS +=	ena.o ena_admin.o ena_dma.o ena_gld.o ena_hw.o ena_intr.o \
+		ena_stats.o ena_tx.o ena_rx.o
+

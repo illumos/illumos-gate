@@ -11,6 +11,7 @@
 
 #
 # Copyright 2016 Joyent, Inc.
+# Copyright 2021 Oxide Computer Company
 #
 
 #
@@ -40,4 +41,6 @@ SYMBOL_SCOPE {
 	servicing_interrupt		{ FLAGS = EXTERN };
 	fnvlist_alloc			{ FLAGS = EXTERN };
 	fnvlist_add_string		{ FLAGS = EXTERN };
+	ncpus_online			{ FLAGS = EXTERN };
+	utsname				{ FLAGS = EXTERN };
 };

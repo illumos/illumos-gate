@@ -12,6 +12,7 @@
 #
 # Copyright 2020 Joyent, Inc.
 # Copyright 2020 RackTop Systems, Inc.
+# Copyright 2021 Oxide Computer Company
 #
 
 #
@@ -78,6 +79,7 @@ SYMBOL_SCOPE {
 	ddi_dma_addr_bind_handle	{ FLAGS = EXTERN };
 	ddi_dma_alloc_handle		{ FLAGS = EXTERN };
 	ddi_dma_cookie_iter		{ FLAGS = EXTERN };
+	ddi_dma_cookie_one		{ FLAGS = EXTERN };
 	ddi_dma_free_handle		{ FLAGS = EXTERN };
 	ddi_dma_mem_alloc		{ FLAGS = EXTERN };
 	ddi_dma_mem_free		{ FLAGS = EXTERN };
@@ -153,6 +155,7 @@ SYMBOL_SCOPE {
 	dev_err				{ FLAGS = EXTERN };
 	drv_usectohz			{ FLAGS = EXTERN };
 	drv_usecwait			{ FLAGS = EXTERN };
+	ffs				{ FLAGS = EXTERN };
 	fm_ena_generate			{ FLAGS = EXTERN };
 	freeb				{ FLAGS = EXTERN };
 	freemsg				{ FLAGS = EXTERN };
@@ -168,6 +171,7 @@ SYMBOL_SCOPE {
 	list_create			{ FLAGS = EXTERN };
 	list_destroy			{ FLAGS = EXTERN };
 	list_head			{ FLAGS = EXTERN };
+	list_insert_head		{ FLAGS = EXTERN };
 	list_insert_tail		{ FLAGS = EXTERN };
 	list_next			{ FLAGS = EXTERN };
 	list_remove			{ FLAGS = EXTERN };
@@ -219,9 +223,12 @@ SYMBOL_SCOPE {
 	strcat				{ FLAGS = EXTERN };
 	strcmp				{ FLAGS = EXTERN };
 	strcpy				{ FLAGS = EXTERN };
+	strlcpy				{ FLAGS = EXTERN };
 	strlen				{ FLAGS = EXTERN };
 	timeout				{ FLAGS = EXTERN };
 	untimeout			{ FLAGS = EXTERN };
+	vcmn_err			{ FLAGS = EXTERN };
+	vdev_err			{ FLAGS = EXTERN };
 	vsnprintf			{ FLAGS = EXTERN };
 	vsprintf			{ FLAGS = EXTERN };
 };
