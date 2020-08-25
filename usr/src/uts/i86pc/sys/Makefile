@@ -37,7 +37,7 @@ include ../Makefile.i86pc
 #
 FILEMODE = 644
 
-CHKHDRS=  \
+HDRS=  \
 	acpidev.h	\
 	amd_iommu.h	\
 	asm_misc.h	\
@@ -69,15 +69,6 @@ CHKHDRS=  \
 	xc_levels.h	\
 	xsvc.h
 
-NOCHKHDRS= \
-	vmm.h		\
-	vmm_dev.h	\
-	vmm_instruction_emul.h
-
-HDRS= \
-	$(CHKHDRS)	\
-	$(NOCHKHDRS)
-
 ROOTHDRS=	$(HDRS:%=$(USR_PSM_ISYS_DIR)/%)
 
 ROOTDIR=	$(ROOT)/usr/share/src
@@ -86,7 +77,7 @@ ROOTDIRS=	$(ROOTDIR)/uts $(ROOTDIR)/uts/$(PLATFORM)
 ROOTLINK=	$(ROOTDIR)/uts/$(PLATFORM)/sys
 LINKDEST=	../../../../platform/$(PLATFORM)/include/sys
 
-CHECKHDRS=	$(CHKHDRS:%.h=%.check)
+CHECKHDRS=	$(HDRS:%.h=%.check)
 
 .KEEP_STATE:
 
