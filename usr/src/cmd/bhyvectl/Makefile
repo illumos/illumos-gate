@@ -31,8 +31,8 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		-I$(COMPAT)/bhyve/amd64 -I$(CONTRIB)/bhyve/amd64 \
 		$(CPPFLAGS.master) \
-		-I$(ROOT)/usr/platform/i86pc/include \
-		-I$(SRC)/uts/i86pc/io/vmm
+		-I$(SRC)/uts/i86pc/io/vmm \
+		-I$(SRC)/uts/i86pc
 LDLIBS +=	-lvmmapi
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
