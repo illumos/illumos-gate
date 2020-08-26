@@ -1,6 +1,9 @@
 .\" Copyright (c) 1992, 1993
 .\"     The Regents of the University of California.  All rights reserved.
 .\"
+.\" Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+.\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+.\"
 .\" This code is derived from software contributed to Berkeley by
 .\" the Institute of Electrical and Electronics Engineers, Inc.
 .\"
@@ -28,7 +31,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.TH SED 1 "Aug 7, 2020"
+.TH SED 1 "Aug 21, 2020"
 .SH NAME
 \fBsed\fP
 \- stream editor
@@ -152,7 +155,7 @@ option suppresses this behavior.
 Same as
 \fB\-E\fP
 for compatibility with GNU sed.
-
+.PP
 The form of a
 \fBsed\fP
 command is as follows:
@@ -177,6 +180,10 @@ deletes the pattern space.
 Some of the functions use a
 .IR "hold space"
 to save all or part of the pattern space for subsequent retrieval.
+
+If an input file is growing while sed is running, the
+``$''
+address match may be unreliable.
 .SH "Sed Addresses"
 An address is not required, but if specified must have one of the
 following formats:

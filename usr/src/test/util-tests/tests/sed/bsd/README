@@ -1,0 +1,10 @@
+The tests in this directory were imported from the sed tests in FreeBSD
+( https://github.com/freebsd/freebsd/tree/master/usr.bin/sed/tests )
+and adjusted as necessary for the illumos environment.
+
+Changes included:
+
+ * Switched to /bin/ksh
+ * Added more error checking
+ * Create all temporary files in a temporary /tmp directory
+ * Add escapes to echo commands where a backslash was present

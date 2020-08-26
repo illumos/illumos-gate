@@ -61,7 +61,7 @@ OBJS=	\
 	vers.o
 
 module.o := CPPFLAGS += -I$(BOOTSRC)/libcrypto
-tem.o := CPPFLAGS += $(DEFAULT_CONSOLE_COLOR) -I$(LZ4)
+tem.o := CPPFLAGS += $(DEFAULT_CONSOLE_COLOR)
 
 CPPFLAGS += -I../../../../../include -I../../..../
 CPPFLAGS += -I../../../../../lib/libstand

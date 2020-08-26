@@ -13,22 +13,25 @@
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
+.PARALLEL: $(SUBDIRS)
+SUBDIRS = bsd
+
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
 PROG = sed_addr
 
 ROOTOPTPKG = $(ROOT)/opt/util-tests
-TESTDIR = $(ROOTOPTPKG)/tests
+TESTDIR = $(ROOTOPTPKG)/tests/sed
 
-CMDS = $(PROG:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
+TESTS = $(PROG:%=$(TESTDIR)/%)
+$(TESTS) := FILEMODE = 0555
 
 all clean clobber:
 
-install: all $(CMDS)
+install: all $(TESTS)
 
-$(CMDS): $(TESTDIR) $(PROG).ksh
+$(TESTS): $(TESTDIR) $(PROG).ksh
 
 $(TESTDIR):
 	$(INS.dir)

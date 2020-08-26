@@ -1,4 +1,5 @@
 /*
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  * Copyright (c) 2013 Johann 'Myrkraverk' Oskarsson <johann@myrkraverk.com>
  * Copyright (c) 2011 Gary Mills
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
@@ -498,10 +499,30 @@ lastline(void)
 {
 	int ch;
 
-	if (files->next != NULL && (inplace == NULL || ispan))
-		return (0);
-	if ((ch = getc(infile)) == EOF)
+	if (feof(infile) != 0 || (ch = getc(infile)) == EOF) {
+		struct s_flist *f;
+
+		/*
+		 * Reached the end of the current input file.
+		 * If there are no more that contain data, then this is the
+		 * last line.
+		 */
+		if (inplace != NULL && ispan == 0)
+			return (1);
+
+		for (f = files->next; f != NULL; f = f->next) {
+			struct stat st;
+
+			if (stat(f->fname, &st) == -1) {
+				/* Treat an error here as an empty file */
+				continue;
+			}
+			if (st.st_size > 0)
+				return (0);
+		}
 		return (1);
+	}
+
 	(void) ungetc(ch, infile);
 	return (0);
 }

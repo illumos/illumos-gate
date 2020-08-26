@@ -11,6 +11,8 @@
 
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 
+SED=${SED:=/usr/bin/sed}
+
 function fatal {
 	echo "[FATAL] $*" > /dev/stderr
 	exit 1
@@ -19,29 +21,34 @@ function fatal {
 function runtest {
 	typeset script="$1"
 	typeset expect="$2"
+	typeset files="${3:-$input1}"
 
 	typeset ef=`mktemp`
 	[[ -n "$expect" ]] && printf "%s\n" $expect > $ef
 
-	sed -n "$script" < $input > $output
+	$SED -n "$script" $files > $output
 	if [[ $? -eq 0 ]] && cmp -s $output $ef; then
-		echo "[PASS] sed $script"
+		echo "[PASS] sed $script $files"
 	else
-		echo "[FAIL] sed $script"
+		echo "[FAIL] sed $script $files"
 		diff -u $ef $output
 		err=1
 	fi
 	rm -f $ef
 }
 
-input=`mktemp`
-output=`mktemp`
-[[ -n "$input" && -f "$input" ]] || fatal "Could not create temp input"
-[[ -n "$output" && -f "$output" ]] || fatal "Could not create temp output"
+for f in input1 input2 output; do
+	tf=`mktemp`
+	[[ -n "$tf" && -f "$tf" ]] || fatal "Could not create temp file $f"
+	eval $f=$tf
+done
 
 typeset err=0
-printf "%s\n" a b c d e f g h a j > $input
-[[ $? -eq 0 && -s "$input" ]] || fatal "Could not populate input file"
+
+printf "%s\n" a b c d e f g h a j > $input1
+[[ $? -eq 0 && -s "$input1" ]] || fatal "Could not populate input1 file"
+printf "%s\n" m n o p q z > $input2
+[[ $? -eq 0 && -s "$input2" ]] || fatal "Could not populate input2 file"
 
 # Simple
 runtest "3p" "c"
@@ -83,6 +90,28 @@ runtest "4,+3 { /e/b
 		p
 	}" "d f g"
 
-rm -f $input $output
+# stdin
+cat $input2 $input2 | runtest "\$p" "z" " "
+
+# Multi-file
+for fileset in \
+	"$input1 $input2" \
+	"$input1 /dev/null $input2" \
+	"/dev/null $input1 $input2" \
+	"$input1 $input2 /dev/null" \
+	"$input1 /dev/null $input2 /dev/null" \
+	"/dev/null $input1 /dev/null $input2" \
+	"$input1 $input2 /dev/null /dev/null" \
+	"$input1 /dev/null /dev/null $input2 /dev/null" \
+	"/dev/null $input1 /dev/null /dev/null $input2" \
+; do
+	runtest "\$p" "z" "$fileset"
+	runtest "3p" "c" "$fileset"
+	runtest "13p" "o" "$fileset"
+done
+
+rm -f $input1 $input2 $output
+
+[[ $err -eq 0 ]] && echo "--- All sed_addr tests passed"
 
 exit $err

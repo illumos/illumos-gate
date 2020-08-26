@@ -98,7 +98,7 @@ CPPFLAGS += -I$(PNGLITE)
 SRCS +=	$(COMMON)/gfx_fb.c $(PNGLITE)/pnglite.c
 OBJS +=	gfx_fb.o pnglite.o
 
-gfx_fb.o := CPPFLAGS += $(DEFAULT_CONSOLE_COLOR)
+gfx_fb.o := CPPFLAGS += $(DEFAULT_CONSOLE_COLOR) -I$(LZ4)
 pnglite.o := CPPFLAGS += -I$(ZLIB)
 
 SRCS +=	$(ZFSSRC)/devicename_stubs.c

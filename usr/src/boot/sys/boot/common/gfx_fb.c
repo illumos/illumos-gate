@@ -37,6 +37,15 @@
 #include <gfx_fb.h>
 #include <pnglite.h>
 #include <bootstrap.h>
+#include <lz4.h>
+
+/* VGA text mode does use bold font. */
+#if !defined(VGA_8X16_FONT)
+#define	VGA_8X16_FONT		"/boot/fonts/8x16b.fnt"
+#endif
+#if !defined(DEFAULT_8X16_FONT)
+#define	DEFAULT_8X16_FONT	"/boot/fonts/8x16.fnt"
+#endif
 
 /*
  * Global framebuffer struct, to be updated with mode changes.
@@ -67,6 +76,8 @@ static int gfx_bm_cons_clear(uint32_t data, uint32_t width, uint32_t height);
 static void gfx_bm_cons_copy(struct vis_conscopy *);
 static void gfx_bm_cons_display(struct vis_consdisplay *);
 static void gfx_bm_display_cursor(struct vis_conscursor *);
+
+static bool insert_font(char *, FONT_FLAGS);
 
 /*
  * Set default operations to use bitmap based implementation.
@@ -399,6 +410,11 @@ gfx_framework_init(struct visual_ops *fb_ops)
 	snprintf(buf, sizeof (buf), "%d", gfx_bg);
 	env_setenv("tem.bg_color", EV_VOLATILE, buf, gfx_set_colors,
 	    env_nounset);
+
+	/*
+	 * Setup font list to have builtin font.
+	 */
+	(void) insert_font(NULL, FONT_BUILTIN);
 }
 
 /*
@@ -1502,7 +1518,35 @@ load_mapping(int fd, struct font *fp, int n)
 	return (0);
 }
 
-/* Load font from file. */
+static int
+builtin_mapping(struct font *fp, int n)
+{
+	size_t size;
+	struct font_map *mp;
+
+	if (n >= VFNT_MAPS)
+		return (EINVAL);
+
+	if (fp->vf_map_count[n] == 0)
+		return (0);
+
+	size = fp->vf_map_count[n] * sizeof (*mp);
+	mp = malloc(size);
+	if (mp == NULL)
+		return (ENOMEM);
+	fp->vf_map[n] = mp;
+
+	memcpy(mp, DEFAULT_FONT_DATA.font->vf_map[n], size);
+	return (0);
+}
+
+/*
+ * Load font from builtin or from file.
+ * We do need special case for builtin because the builtin font glyphs
+ * are compressed and we do need to uncompress them.
+ * Having single load_font() for both cases will help us to simplify
+ * font switch handling.
+ */
 static bitmap_data_t *
 load_font(char *path)
 {
@@ -1510,7 +1554,7 @@ load_font(char *path)
 	uint32_t glyphs;
 	struct font_header fh;
 	struct fontlist *fl;
-	bitmap_data_t *bp = NULL;
+	bitmap_data_t *bp;
 	struct font *fp;
 	size_t size;
 	ssize_t rv;
@@ -1522,9 +1566,52 @@ load_font(char *path)
 	}
 	if (fl == NULL)
 		return (NULL);	/* Should not happen. */
+
 	bp = fl->font_data;
-	if (bp->font != NULL)
+	if (bp->font != NULL && fl->font_flags != FONT_RELOAD)
 		return (bp);
+
+	fd = -1;
+	/*
+	 * Special case for builtin font.
+	 * Builtin font is the very first font we load, we do not have
+	 * previous loads to be released.
+	 */
+	if (fl->font_flags == FONT_BUILTIN) {
+		if ((fp = calloc(1, sizeof (struct font))) == NULL)
+			return (NULL);
+
+		fp->vf_width = DEFAULT_FONT_DATA.width;
+		fp->vf_height = DEFAULT_FONT_DATA.height;
+
+		fp->vf_bytes = malloc(DEFAULT_FONT_DATA.uncompressed_size);
+		if (fp->vf_bytes == NULL) {
+			free(fp);
+			return (NULL);
+		}
+
+		bp->uncompressed_size = DEFAULT_FONT_DATA.uncompressed_size;
+		bp->compressed_size = DEFAULT_FONT_DATA.compressed_size;
+
+		if (lz4_decompress(DEFAULT_FONT_DATA.compressed_data,
+		    fp->vf_bytes,
+		    DEFAULT_FONT_DATA.compressed_size,
+		    DEFAULT_FONT_DATA.uncompressed_size, 0) != 0) {
+			free(fp->vf_bytes);
+			free(fp);
+			return (NULL);
+		}
+
+		for (i = 0; i < VFNT_MAPS; i++) {
+			fp->vf_map_count[i] =
+			    DEFAULT_FONT_DATA.font->vf_map_count[i];
+			if (builtin_mapping(fp, i) != 0)
+				goto free_done;
+		}
+
+		bp->font = fp;
+		return (bp);
+	}
 
 	fd = open(path, O_RDONLY);
 	if (fd < 0) {
@@ -1552,8 +1639,8 @@ load_font(char *path)
 	fp->vf_width = fh.fh_width;
 	fp->vf_height = fh.fh_height;
 
-	bp->uncompressed_size = howmany(bp->width, 8) * bp->height * glyphs;
-	size = bp->uncompressed_size;
+	size = howmany(fp->vf_width, 8) * fp->vf_height * glyphs;
+	bp->uncompressed_size = size;
 	if ((fp->vf_bytes = malloc(size)) == NULL)
 		goto free_done;
 
@@ -1564,42 +1651,36 @@ load_font(char *path)
 		if (load_mapping(fd, fp, i) != 0)
 			goto free_done;
 	}
-	bp->font = fp;
 
 	/*
-	 * Release previously loaded entry. We can do this now, as
+	 * Reset builtin flag now as we have full font loaded.
+	 */
+	if (fl->font_flags == FONT_BUILTIN)
+		fl->font_flags = FONT_AUTO;
+
+	/*
+	 * Release previously loaded entries. We can do this now, as
 	 * the new font is loaded. Note, there can be no console
 	 * output till the new font is in place and tem is notified.
 	 * We do need to keep fl->font_data for glyph dimensions.
 	 */
 	STAILQ_FOREACH(fl, &fonts, font_next) {
-		if (fl->font_data->width == bp->width &&
-		    fl->font_data->height == bp->height)
+		if (fl->font_data->font == NULL)
 			continue;
 
-		if (fl->font_data->font != NULL) {
-			for (i = 0; i < VFNT_MAPS; i++)
-				free(fl->font_data->font->vf_map[i]);
-
-			/* Unset vf_bytes pointer in tem. */
-			if (tems.ts_font.vf_bytes ==
-			    fl->font_data->font->vf_bytes) {
-				tems.ts_font.vf_bytes = NULL;
-			}
-			free(fl->font_data->font->vf_bytes);
-			free(fl->font_data->font);
-			fl->font_data->font = NULL;
-			fl->font_data->uncompressed_size = 0;
-			fl->font_flags = FONT_AUTO;
-		}
+		for (i = 0; i < VFNT_MAPS; i++)
+			free(fl->font_data->font->vf_map[i]);
+		free(fl->font_data->font->vf_bytes);
+		free(fl->font_data->font);
+		fl->font_data->font = NULL;
 	}
 
-	/* free the uncompressed builtin font data in tem. */
-	free(tems.ts_font.vf_bytes);
-	tems.ts_font.vf_bytes = NULL;
+	bp->font = fp;
+	bp->compressed_size = 0;
 
 done:
-	close(fd);
+	if (fd != -1)
+		close(fd);
 	return (bp);
 
 free_done:
@@ -1662,7 +1743,7 @@ read_list(char *fonts)
  * The font list is built in descending order.
  */
 static bool
-insert_font(char *name)
+insert_font(char *name, FONT_FLAGS flags)
 {
 	struct font_header fh;
 	struct fontlist *fp, *previous, *entry, *next;
@@ -1671,30 +1752,51 @@ insert_font(char *name)
 	int fd;
 	char *font_name;
 
-	fd = open(name, O_RDONLY);
-	if (fd < 0)
-		return (false);
-	rv = read(fd, &fh, sizeof (fh));
-	close(fd);
-	if (rv < 0 || (size_t)rv != sizeof (fh))
-		return (false);
+	font_name = NULL;
+	if (flags == FONT_BUILTIN) {
+		/*
+		 * We only install builtin font once, while setting up
+		 * initial console. Since this will happen very early,
+		 * we assume asprintf will not fail. Once we have access to
+		 * files, the builtin font will be replaced by font loaded
+		 * from file.
+		 */
+		if (!STAILQ_EMPTY(&fonts))
+			return (false);
 
-	if (memcmp(fh.fh_magic, FONT_HEADER_MAGIC, sizeof (fh.fh_magic)) != 0)
-		return (false);
+		fh.fh_width = DEFAULT_FONT_DATA.width;
+		fh.fh_height = DEFAULT_FONT_DATA.height;
 
-	font_name = strdup(name);
+		(void) asprintf(&font_name, "%dx%d",
+		    DEFAULT_FONT_DATA.width, DEFAULT_FONT_DATA.height);
+	} else {
+		fd = open(name, O_RDONLY);
+		if (fd < 0)
+			return (false);
+		rv = read(fd, &fh, sizeof (fh));
+		close(fd);
+		if (rv < 0 || (size_t)rv != sizeof (fh))
+			return (false);
+
+		if (memcmp(fh.fh_magic, FONT_HEADER_MAGIC,
+		    sizeof (fh.fh_magic)) != 0)
+			return (false);
+		font_name = strdup(name);
+	}
+
 	if (font_name == NULL)
 		return (false);
 
 	/*
-	 * If we have an entry with the same glyph dimensions, just replace
-	 * the file name. We only support unique dimensions.
+	 * If we have an entry with the same glyph dimensions, replace
+	 * the file name and mark us. We only support unique dimensions.
 	 */
 	STAILQ_FOREACH(entry, &fonts, font_next) {
 		if (fh.fh_width == entry->font_data->width &&
 		    fh.fh_height == entry->font_data->height) {
 			free(entry->font_name);
 			entry->font_name = font_name;
+			entry->font_flags = FONT_RELOAD;
 			return (true);
 		}
 	}
@@ -1711,7 +1813,7 @@ insert_font(char *name)
 		return (false);
 	}
 	fp->font_name = font_name;
-	fp->font_flags = FONT_AUTO;
+	fp->font_flags = flags;
 	fp->font_load = load_font;
 	fp->font_data->width = fh.fh_width;
 	fp->font_data->height = fh.fh_height;
@@ -1726,8 +1828,7 @@ insert_font(char *name)
 
 	STAILQ_FOREACH(entry, &fonts, font_next) {
 		/* Should fp be inserted before the entry? */
-		if (size >
-		    entry->font_data->width * entry->font_data->height) {
+		if (size > entry->font_data->width * entry->font_data->height) {
 			if (previous == NULL) {
 				STAILQ_INSERT_HEAD(&fonts, fp, font_next);
 			} else {
@@ -1789,7 +1890,17 @@ font_set(struct env_var *ev __unused, int flags __unused, const void *value)
 }
 
 void
-autoload_font(void)
+bios_text_font(bool use_vga_font)
+{
+	if (use_vga_font)
+		(void) insert_font(VGA_8X16_FONT, FONT_MANUAL);
+	else
+		(void) insert_font(DEFAULT_8X16_FONT, FONT_MANUAL);
+	tems.update_font = true;
+}
+
+void
+autoload_font(bool bios)
 {
 	struct name_list *nl;
 	struct name_entry *np;
@@ -1801,7 +1912,7 @@ autoload_font(void)
 	while (!SLIST_EMPTY(nl)) {
 		np = SLIST_FIRST(nl);
 		SLIST_REMOVE_HEAD(nl, n_entry);
-		if (insert_font(np->n_name) == false)
+		if (insert_font(np->n_name, FONT_AUTO) == false)
 			printf("failed to add font: %s\n", np->n_name);
 		free(np->n_name);
 		free(np);
@@ -1809,6 +1920,14 @@ autoload_font(void)
 
 	unsetenv("screen-font");
 	env_setenv("screen-font", EV_VOLATILE, NULL, font_set, env_nounset);
+
+	/*
+	 * If vga text mode was requested, load vga.font (8x16 bold) font.
+	 */
+	if (bios) {
+		bios_text_font(true);
+	}
+
 	/* Trigger tem update. */
 	tems.update_font = true;
 	plat_cons_update_mode(-1);
@@ -1819,44 +1938,62 @@ COMMAND_SET(load_font, "loadfont", "load console font from file", command_font);
 static int
 command_font(int argc, char *argv[])
 {
-	int i, rc = CMD_OK;
+	int i, c, rc = CMD_OK;
 	struct fontlist *fl;
-	bitmap_data_t *bd;
+	bool list;
 
-	if (argc > 2) {
-		printf("Usage: loadfont [file.fnt]\n");
+	list = false;
+	optind = 1;
+	optreset = 1;
+	rc = CMD_OK;
+
+	while ((c = getopt(argc, argv, "l")) != -1) {
+		switch (c) {
+		case 'l':
+			list = true;
+			break;
+		case '?':
+		default:
+			return (CMD_ERROR);
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if (argc > 1 || (list && argc != 0)) {
+		printf("Usage: loadfont [-l] | [file.fnt]\n");
 		return (CMD_ERROR);
 	}
 
-	if (argc == 2) {
-		char *name = argv[1];
-
-		if (insert_font(name) == false) {
-			printf("loadfont error: failed to load: %s\n", name);
-			return (CMD_ERROR);
-		}
-
-		bd = load_font(name);
-		if (bd == NULL) {
-			printf("loadfont error: failed to load: %s\n", name);
-			return (CMD_ERROR);
-		}
-
-		/* Get the font list entry and mark it manually loaded. */
+	if (list) {
 		STAILQ_FOREACH(fl, &fonts, font_next) {
-			if (strcmp(fl->font_name, name) == 0)
-				fl->font_flags = FONT_MANUAL;
+			printf("font %s: %dx%d%s\n", fl->font_name,
+			    fl->font_data->width,
+			    fl->font_data->height,
+			    fl->font_data->font == NULL? "" : " loaded");
 		}
+		return (CMD_OK);
+	}
+
+	if (argc == 1) {
+		char *name = argv[0];
+
+		if (insert_font(name, FONT_MANUAL) == false) {
+			printf("loadfont error: failed to load: %s\n", name);
+			return (CMD_ERROR);
+		}
+
 		tems.update_font = true;
 		plat_cons_update_mode(-1);
 		return (CMD_OK);
 	}
 
-	if (argc == 1) {
+	if (argc == 0) {
 		/*
 		 * Walk entire font list, release any loaded font, and set
-		 * autoload flag. If the font list is empty, the tem will
-		 * get the builtin default.
+		 * autoload flag. The font list does have at least the builtin
+		 * default font.
 		 */
 		STAILQ_FOREACH(fl, &fonts, font_next) {
 			if (fl->font_data->font != NULL) {

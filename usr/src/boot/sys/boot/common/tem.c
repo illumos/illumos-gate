@@ -68,7 +68,6 @@
 #include <sys/consplat.h>
 #include <sys/kd.h>
 #include <stdbool.h>
-#include <lz4.h>
 
 /* Terminal emulator internal helper functions */
 static void	tems_setup_terminal(struct vis_devinit *, size_t, size_t);
@@ -434,10 +433,9 @@ static void
 tems_setup_font(screen_size_t height, screen_size_t width)
 {
 	bitmap_data_t *font_data;
-	int i;
 
 	/*
-	 * set_font() will select a appropriate sized font for
+	 * set_font() will select an appropriate sized font for
 	 * the number of rows and columns selected.  If we don't
 	 * have a font that will fit, then it will use the
 	 * default builtin font and adjust the rows and columns
@@ -446,44 +444,24 @@ tems_setup_font(screen_size_t height, screen_size_t width)
 	font_data = set_font(&tems.ts_c_dimension.height,
 	    &tems.ts_c_dimension.width, height, width);
 
-	/*
-	 * The built in font is compressed, to use it, we
-	 * uncompress it into the allocated buffer.
-	 * To use loaded font, we assign the loaded buffer.
-	 * In case of next load, the previously loaded data
-	 * is freed by the process of loading the new font.
-	 */
-	if (tems.ts_font.vf_bytes == NULL) {
-		for (i = 0; i < VFNT_MAPS; i++) {
-			tems.ts_font.vf_map[i] =
-			    font_data->font->vf_map[i];
-		}
+	if (font_data == NULL)
+		panic("out of memory");
 
-		if (font_data->compressed_size != 0) {
-			/*
-			 * We only expect this allocation to
-			 * happen at startup, and therefore not to fail.
-			 */
-			tems.ts_font.vf_bytes =
-			    malloc(font_data->uncompressed_size);
-			if (tems.ts_font.vf_bytes == NULL)
-				panic("out of memory");
-			(void) lz4_decompress(
-			    font_data->compressed_data,
-			    tems.ts_font.vf_bytes,
-			    font_data->compressed_size,
-			    font_data->uncompressed_size, 0);
-		} else {
-			tems.ts_font.vf_bytes =
-			    font_data->font->vf_bytes;
-		}
-		tems.ts_font.vf_width = font_data->font->vf_width;
-		tems.ts_font.vf_height = font_data->font->vf_height;
-		for (i = 0; i < VFNT_MAPS; i++) {
-			tems.ts_font.vf_map_count[i] =
-			    font_data->font->vf_map_count[i];
-		}
+	/*
+	 * To use loaded font, we assign the loaded font data to tems.ts_font.
+	 * In case of next load, the previously loaded data is freed
+	 * when loading the new font.
+	 */
+	for (int i = 0; i < VFNT_MAPS; i++) {
+		tems.ts_font.vf_map[i] =
+		    font_data->font->vf_map[i];
+		tems.ts_font.vf_map_count[i] =
+		    font_data->font->vf_map_count[i];
 	}
+
+	tems.ts_font.vf_bytes = font_data->font->vf_bytes;
+	tems.ts_font.vf_width = font_data->font->vf_width;
+	tems.ts_font.vf_height = font_data->font->vf_height;
 }
 
 static void
@@ -900,24 +878,23 @@ tems_get_initial_color(tem_color_t *pcolor)
 	if (inverse_screen)
 		flags |= TEM_ATTR_SCREEN_REVERSE;
 
-	/*
-	 * In case of black on white we want bright white for BG.
-	 * In case if white on black, to improve readability,
-	 * we want bold white.
-	 */
 	if (flags != 0) {
 		/*
-		 * If either reverse flag is set, the screen is in
-		 * white-on-black mode.  We set the bold flag to
-		 * improve readability.
+		 * The reverse attribute is set.
+		 * In case of black on white we want bright white for BG.
 		 */
-		flags |= TEM_ATTR_BOLD;
+		if (pcolor->fg_color == ANSI_COLOR_WHITE)
+			flags |= TEM_ATTR_BRIGHT_BG;
+
+		/*
+		 * For white on black, unset the bright attribute we
+		 * had set to have bright white background.
+		 */
+		if (pcolor->fg_color == ANSI_COLOR_BLACK)
+			flags &= ~TEM_ATTR_BRIGHT_BG;
 	} else {
 		/*
-		 * Otherwise, the screen is in black-on-white mode.
-		 * The SPARC PROM console, which starts in this mode,
-		 * uses the bright white background colour so we
-		 * match it here.
+		 * In case of black on white we want bright white for BG.
 		 */
 		if (pcolor->bg_color == ANSI_COLOR_WHITE)
 			flags |= TEM_ATTR_BRIGHT_BG;
@@ -2815,19 +2792,29 @@ tem_get_attr(struct tem_vt_state *tem, text_color_t *fg,
 static void
 tem_get_color(text_color_t *fg, text_color_t *bg, term_char_t c)
 {
+	bool bold_font;
+
 	*fg = c.tc_fg_color;
 	*bg = c.tc_bg_color;
 
+	bold_font = tems.ts_font.vf_map_count[VFNT_MAP_BOLD] != 0;
+
+	/*
+	 * If we have both normal and bold font components,
+	 * we use bold font for TEM_ATTR_BOLD.
+	 * The bright color is traditionally used with TEM_ATTR_BOLD,
+	 * in case there is no bold font.
+	 */
 	if (c.tc_fg_color < XLATE_NCOLORS) {
-		if (TEM_CHAR_ATTR(c.tc_char) &
-		    (TEM_ATTR_BRIGHT_FG | TEM_ATTR_BOLD))
+		if (TEM_ATTR_ISSET(c.tc_char, TEM_ATTR_BRIGHT_FG) ||
+		    (TEM_ATTR_ISSET(c.tc_char, TEM_ATTR_BOLD) && !bold_font))
 			*fg = brt_xlate[c.tc_fg_color];
 		else
 			*fg = dim_xlate[c.tc_fg_color];
 	}
 
 	if (c.tc_bg_color < XLATE_NCOLORS) {
-		if (TEM_CHAR_ATTR(c.tc_char) & TEM_ATTR_BRIGHT_BG)
+		if (TEM_ATTR_ISSET(c.tc_char, TEM_ATTR_BRIGHT_BG))
 			*bg = brt_xlate[c.tc_bg_color];
 		else
 			*bg = dim_xlate[c.tc_bg_color];

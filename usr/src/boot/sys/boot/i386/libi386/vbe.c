@@ -758,6 +758,7 @@ command_vesa(int argc, char *argv[])
 			return (CMD_OK);
 
 		reset_font_flags();
+		bios_text_font(true);
 		bios_set_text_mode(VGA_TEXT_MODE);
 		plat_cons_update_mode(0);
 		return (CMD_OK);
@@ -805,6 +806,7 @@ command_vesa(int argc, char *argv[])
 	if (modenum >= 0x100) {
 		if (vbestate.vbe_mode != modenum) {
 			reset_font_flags();
+			bios_text_font(false);
 			vbe_set_mode(modenum);
 			plat_cons_update_mode(1);
 		}

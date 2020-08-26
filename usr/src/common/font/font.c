@@ -222,7 +222,8 @@ set_font(short *rows, short *cols, short h, short w)
 		font = fl->font_data;
 		if ((((*rows * font->height) + BORDER_PIXELS) <= height) &&
 		    (((*cols * font->width) + BORDER_PIXELS) <= width)) {
-			if (font->font == NULL) {
+			if (font->font == NULL ||
+			    fl->font_flags == FONT_RELOAD) {
 				if (fl->font_load != NULL &&
 				    fl->font_name != NULL) {
 					font = fl->font_load(fl->font_name);

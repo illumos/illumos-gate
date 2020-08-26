@@ -39,6 +39,7 @@
  * Copyright 2018 RackTop Systems.
  * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2013 Damian Bogel. All rights reserved.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <string.h>
@@ -58,6 +59,7 @@
 #include <wctype.h>
 #include <ftw.h>
 #include <sys/param.h>
+#include <getopt.h>
 
 #define	STDIN_FILENAME gettext("(standard input)")
 
@@ -76,7 +78,6 @@ static int	bmgtab[M_CSETSIZE];	/* BMG delta1 table */
 
 typedef	struct	_PATTERN	{
 	char	*pattern;		/* original pattern */
-	wchar_t	*wpattern;		/* wide, lowercased pattern */
 	struct	_PATTERN	*next;
 	regex_t	re;			/* compiled pattern */
 } PATTERN;
@@ -94,6 +95,7 @@ static uchar_t	iflag;			/* Case insensitve matching */
 static uchar_t	Hflag;			/* Precede lines by file name */
 static uchar_t	hflag;			/* Suppress printing of filename */
 static uchar_t	lflag;			/* Print file names of matches */
+static uchar_t	Lflag;			/* Print file names of non-matches */
 static uchar_t	nflag;			/* Precede lines by line number */
 static uchar_t	rflag;			/* Search directories recursively */
 static uchar_t	bflag;			/* Precede matches by block number */
@@ -106,14 +108,15 @@ static uchar_t	Fflag;			/* Fgrep or -F flag */
 static uchar_t	Rflag;			/* Like rflag, but follow symlinks */
 static uchar_t	outfn;			/* Put out file name */
 static uchar_t	conflag;		/* show context of matches */
+static uchar_t	oflag;			/* Print only matching output */
 static char	*cmdname;
+static char	*stdin_label;		/* Optional lable for stdin */
 
-static int	use_wchar, use_bmg, mblocale;
+static int	use_bmg, mblocale;
 
-static size_t	outbuflen, prntbuflen, conbuflen;
+static size_t	prntbuflen, conbuflen;
 static unsigned long	conalen, conblen, conmatches;
 static char	*prntbuf, *conbuf;
-static wchar_t	*outline;
 
 static void	addfile(const char *fn);
 static void	addpattern(char *s);
@@ -125,6 +128,20 @@ static char	*bmgexec(char *, char *);
 static int	recursive(const char *, const struct stat *, int, struct FTW *);
 static void	process_path(const char *);
 static void	process_file(const char *, int);
+
+/*
+ * These are values that we use to return from getopt_long. They start at
+ * SHRT_MAX to avoid any possible conflict with the normal options. These are
+ * used for long options that have no short option equivalent.
+ */
+enum grep_opts {
+	OPT_LABEL = SHRT_MAX + 1
+};
+
+static struct option grep_options[] = {
+	{ "label", required_argument, NULL, OPT_LABEL },
+	{ NULL }
+};
 
 /*
  * mainline for grep
@@ -166,6 +183,7 @@ main(int argc, char **argv)
 	} else {
 		if (*ap == 'f' || *ap == 'F') {
 			fgrep++;
+			regflags |= REG_NOSPEC;
 		}
 	}
 
@@ -201,7 +219,8 @@ main(int argc, char **argv)
 		}
 	}
 
-	while ((c = getopt(argc, argv, "vwchHilnrbse:f:qxEFIRA:B:C:")) != EOF) {
+	while ((c = getopt_long(argc, argv, "+vwchHilLnrbse:f:qxEFIRA:B:C:o",
+	    grep_options, NULL)) != EOF) {
 		unsigned long tval;
 		switch (c) {
 		case 'v':	/* POSIX: negate matches */
@@ -217,8 +236,17 @@ main(int argc, char **argv)
 			regflags |= REG_ICASE;
 			break;
 
+		/*
+		 * The last of -l and -L are honored.
+		 */
 		case 'l':	/* POSIX: Write filenames only */
 			lflag++;
+			Lflag = 0;
+			break;
+
+		case 'L':	/* Write non-matching filenames */
+			Lflag++;
+			lflag = 0;
 			break;
 
 		case 'n':	/* POSIX: Write line numbers */
@@ -294,6 +322,7 @@ main(int argc, char **argv)
 
 		case 'F':	/* POSIX: strings, not RE's */
 			Fflag++;
+			regflags |= REG_NOSPEC;
 			break;
 
 		case 'R':	/* Solaris: like rflag, but follow symlinks */
@@ -352,6 +381,14 @@ main(int argc, char **argv)
 			}
 			break;
 
+		case OPT_LABEL:
+			stdin_label = optarg;
+			break;
+
+		case 'o':
+			oflag++;
+			break;
+
 		default:
 			usage();
 		}
@@ -399,18 +436,46 @@ main(int argc, char **argv)
 		usage();
 
 	/*
-	 * -l overrides -H like in GNU grep
+	 * -l or -L overrides -H like in GNU grep. It also overrides -o.
 	 */
-	if (lflag)
+	if (lflag || Lflag) {
 		Hflag = 0;
+		oflag = 0;
+	}
 
 	/*
 	 * -c, -l and -q flags are mutually exclusive
 	 * We have -c override -l like in Solaris.
 	 * -q overrides -l & -c programmatically in grep() function.
+	 * -c overrides -o in GNU grep, we honor that.
 	 */
-	if (cflag && lflag)
+	if (cflag) {
 		lflag = 0;
+		Lflag = 0;
+		oflag = 0;
+	}
+
+	/*
+	 * If -o is set then we ignore all context related options, like other
+	 * greps.
+	 */
+	if (oflag) {
+		conflag = 0;
+	}
+
+	/*
+	 * These flags are a semantic mess with no clear answers as to their
+	 * behvaior. Based on some experimentation GNU grep will exit zero if a
+	 * non-match is present, but never print anything. BSD grep seems to
+	 * exit 1 and not print anything, even if there would have been a match.
+	 * Also, you probably don't want to ask about what happens with grep -x
+	 * -o -v, some implementations seem to just ignore -v.
+	 */
+	if (oflag && !nvflag) {
+		(void) fprintf(stderr, gettext("%s: the combination of -v and "
+		    "-o is not supported currently\n"), argv[0]);
+		exit(2);
+	}
 
 	argv += optind - 1;
 	argc -= optind - 1;
@@ -443,21 +508,17 @@ main(int argc, char **argv)
 	}
 
 	/*
-	 * If -x flag is not specified or -i flag is specified
-	 * with fgrep in a multibyte locale, need to use
-	 * the wide character APIs.  Otherwise, byte-oriented
-	 * process will be done.
-	 */
-	use_wchar = Fflag && mblocale && (!xflag || iflag);
-
-	/*
 	 * Compile Patterns and also decide if BMG can be used
 	 */
 	fixpatterns();
 
+	if (stdin_label == NULL) {
+		stdin_label = STDIN_FILENAME;
+	}
+
 	/* Process all files: stdin, or rest of arg list */
 	if (argc < 2) {
-		matched = grep(0, STDIN_FILENAME);
+		matched = grep(0, stdin_label);
 	} else {
 		if (Hflag || (argc > 2 && hflag == 0))
 			outfn = 1;	/* Print filename on match line */
@@ -695,6 +756,51 @@ addpattern(char *s)
 }
 
 /*
+ * Check if a given grep pattern that is being used with egrep or grep can be
+ * considered 'simple'. That is there are no characters that would be treated
+ * differently from fgrep. In this particular case, we're a little bit
+ * conservative and look for characters that are:
+ *
+ *  o 7-bit ASCII
+ *  o Letters
+ *  o Numbers
+ *  o Meta-characters not used in BREs/EREs: !, @, #, /, -, _, <, >, =
+ *
+ * This can certianly be made more complex and less restrictive with additional
+ * testing.
+ */
+static boolean_t
+simple_pattern(const char *str)
+{
+	for (; *str != '\0'; str++) {
+		if (!isascii(*str)) {
+			return (B_FALSE);
+		}
+
+		if (isalnum(*str)) {
+			continue;
+		}
+
+		switch (*str) {
+		case '!':
+		case '@':
+		case '#':
+		case '/':
+		case '-':
+		case '_':
+		case '<':
+		case '>':
+		case '=':
+			continue;
+		default:
+			return (B_FALSE);
+		}
+	}
+
+	return (B_TRUE);
+}
+
+/*
  * Fix patterns.
  * Must do after all arguments read, in case later -i option.
  */
@@ -702,15 +808,38 @@ static void
 fixpatterns(void)
 {
 	PATTERN	*pp;
-	int	rv, fix_pattern, npatterns;
+	int	rv, fix_pattern;
+
+	/*
+	 * Decide if we are able to run the Boyer-Moore-Gosper algorithm.
+	 * Use the Boyer-Moore-Gosper algorithm if:
+	 * - fgrep or non-BRE/ERE	(Fflag || simple_pattern())
+	 * - singlebyte locale		(!mblocale)
+	 * - no ignoring case		(!iflag)
+	 * - no printing line numbers	(!nflag)
+	 * - no negating the output	(nvflag)
+	 * - only one pattern		(patterns != NULL && patterns->next ==
+	 *				    NULL)
+	 * - non zero length pattern	(strlen(patterns->pattern) != 0)
+	 * - no context required	(conflag == 0)
+	 * - no exact matches		(!oflag)
+	 * - no word matches		(!wlag)
+	 */
+	use_bmg = !mblocale && !iflag && !nflag && nvflag && !oflag &&
+	    (patterns != NULL && patterns->next == NULL) && !wflag &&
+	    (strlen(patterns->pattern) != 0) && conflag == 0 &&
+	    (Fflag || simple_pattern(patterns->pattern));
+
+	if (use_bmg) {
+		return;
+	}
 
 	/*
 	 * Fix the specified pattern if -x is specified.
 	 */
 	fix_pattern = !Fflag && xflag;
 
-	for (npatterns = 0, pp = patterns; pp != NULL; pp = pp->next) {
-		npatterns++;
+	for (pp = patterns; pp != NULL; pp = pp->next) {
 		if (fix_pattern) {
 			char	*cp, *cq;
 			size_t	plen, nplen;
@@ -733,61 +862,9 @@ fixpatterns(void)
 			pp->pattern = cp;
 		}
 
-		if (Fflag) {
-			if (use_wchar) {
-				/*
-				 * Fflag && mblocale && iflag
-				 * Fflag && mblocale && !xflag
-				 */
-				size_t	n;
-				n = strlen(pp->pattern) + 1;
-				if ((pp->wpattern =
-				    malloc(sizeof (wchar_t) * n)) == NULL) {
-					(void) fprintf(stderr,
-					    gettext("%s: out of memory\n"),
-					    cmdname);
-					exit(2);
-				}
-				if (mbstowcs(pp->wpattern, pp->pattern, n) ==
-				    (size_t)-1) {
-					(void) fprintf(stderr,
-					    gettext("%s: failed to convert "
-					    "\"%s\" to wide-characters\n"),
-					    cmdname, pp->pattern);
-					exit(2);
-				}
-				if (iflag) {
-					wchar_t	*wp;
-					for (wp = pp->wpattern; *wp != L'\0';
-					    wp++) {
-						*wp = towlower((wint_t)*wp);
-					}
-				}
-				free(pp->pattern);
-			} else {
-				/*
-				 * Fflag && mblocale && !iflag
-				 * Fflag && !mblocale && iflag
-				 * Fflag && !mblocale && !iflag
-				 */
-				if (iflag) {
-					unsigned char	*cp;
-					for (cp = (unsigned char *)pp->pattern;
-					    *cp != '\0'; cp++) {
-						*cp = tolower(*cp);
-					}
-				}
-			}
-			/*
-			 * fgrep: No regular expressions.
-			 */
-			continue;
-		}
-
 		/*
-		 * For non-fgrep, compile the regular expression,
-		 * give an informative error message, and exit if
-		 * it didn't compile.
+		 * Compile the regular expression, give an informative error
+		 * message, and exit if it didn't compile.
 		 */
 		if ((rv = regcomp(&pp->re, pp->pattern, regflags)) != 0) {
 			(void) regerror(rv, &pp->re, errstr, sizeof (errstr));
@@ -798,25 +875,6 @@ fixpatterns(void)
 		}
 		free(pp->pattern);
 	}
-
-	/*
-	 * Decide if we are able to run the Boyer-Moore-Gosper algorithm.
-	 * Use the Boyer-Moore-Gosper algorithm if:
-	 * - fgrep			(Fflag)
-	 * - singlebyte locale		(!mblocale)
-	 * - no ignoring case		(!iflag)
-	 * - no printing line numbers	(!nflag)
-	 * - no negating the output	(nvflag)
-	 * - only one pattern		(npatterns == 1)
-	 * - non zero length pattern	(strlen(patterns->pattern) != 0)
-	 * - no context required	(conflag == 0)
-	 *
-	 * It's guaranteed patterns->pattern is still alive
-	 * when Fflag && !mblocale.
-	 */
-	use_bmg = Fflag && !mblocale && !iflag && !nflag && nvflag &&
-	    (npatterns == 1) && (strlen(patterns->pattern) != 0) &&
-	    conflag == 0;
 }
 
 /*
@@ -846,36 +904,6 @@ rfind_nl(const char *ptr, size_t len)
 		}
 	}
 	return (NULL);
-}
-
-/*
- * Duplicate the specified string converting each character
- * into a lower case.
- */
-static char *
-istrdup(const char *s1)
-{
-	static size_t	ibuflen = 0;
-	static char	*ibuf = NULL;
-	size_t	slen;
-	char	*p;
-
-	slen = strlen(s1);
-	if (slen >= ibuflen) {
-		/* ibuf does not fit to s1 */
-		ibuflen = slen + 1;
-		ibuf = realloc(ibuf, ibuflen);
-		if (ibuf == NULL) {
-			(void) fprintf(stderr,
-			    gettext("%s: out of memory\n"), cmdname);
-			exit(2);
-		}
-	}
-	p = ibuf;
-	do {
-		*p++ = tolower(*s1);
-	} while (*s1++ != '\0');
-	return (ibuf);
 }
 
 /*
@@ -909,6 +937,7 @@ grep(int fd, const char *fn)
 	int	conaprnt = 0, conbprnt = 0, lastmatch = 0;
 	boolean_t	nearmatch; /* w/in N+1 of last match */
 	boolean_t	havematch = B_FALSE; /* have a match in context */
+	boolean_t	sameline = B_FALSE; /* Are we still on the same line? */
 	size_t	prntlen;
 
 	if (patterns == NULL)
@@ -918,16 +947,6 @@ grep(int fd, const char *fn)
 
 	if (use_bmg) {
 		bmgcomp(pp->pattern, strlen(pp->pattern));
-	}
-
-	if (use_wchar && outline == NULL) {
-		outbuflen = BUFSIZE + 1;
-		outline = malloc(sizeof (wchar_t) * outbuflen);
-		if (outline == NULL) {
-			(void) fprintf(stderr, gettext("%s: out of memory\n"),
-			    cmdname);
-			exit(2);
-		}
 	}
 
 	if (prntbuf == NULL) {
@@ -958,6 +977,8 @@ grep(int fd, const char *fn)
 		long	count;
 		off_t	offset = 0;
 		char	separate;
+		char	*startmatch = NULL; /* -o, start of match */
+		char	*postmatch = NULL; /* -o, character after match */
 		boolean_t	last_ctx = B_FALSE, eof = B_FALSE;
 
 		if (data_len == 0) {
@@ -1129,7 +1150,18 @@ L_start_process:
 			}
 			goto L_next_line;
 		}
-		lineno++;
+
+		/*
+		 * When using -o, we might actually loop around while still on
+		 * the same line. In such a case, we need to make sure we don't
+		 * increment the line number.
+		 */
+		if (!sameline) {
+			lineno++;
+		} else {
+			sameline = B_FALSE;
+		}
+
 		/*
 		 * Line starts from ptr and ends at ptrend.
 		 * line_len will be the length of the line.
@@ -1141,108 +1173,59 @@ L_start_process:
 		 * From now, the process will be performed based
 		 * on the line from ptr to ptrend.
 		 */
-		if (use_wchar) {
-			size_t	len;
+		for (pp = patterns; pp; pp = pp->next) {
+			int	rv;
+			regmatch_t rm;
+			size_t nmatch = 0;
 
-			if (line_len >= outbuflen) {
-				outbuflen = line_len + 1;
-				outline = realloc(outline,
-				    sizeof (wchar_t) * outbuflen);
-				if (outline == NULL) {
-					(void) fprintf(stderr,
-					    gettext("%s: out of memory\n"),
-					    cmdname);
-					exit(2);
+			/*
+			 * The current implementation of regexec has a higher
+			 * cost when you ask for match information. As a result,
+			 * we only ask for a match when we know that we need it
+			 * specifically. This is always needed for -o because we
+			 * rely on it to tell us what we matched. For fgrep -x
+			 * we need it so we can determine whether we matched the
+			 * entire line.
+			 */
+			if (oflag || (Fflag && xflag))
+				nmatch = 1;
+
+			rv = regexec(&pp->re, ptr, nmatch, &rm, 0);
+			if (rv == REG_OK) {
+				/*
+				 * fgrep in this form cannot insert the
+				 * metacharacters to verify whether or not we
+				 * were the entire line. As a result, we check
+				 * the pattern length against the line length.
+				 */
+				if (Fflag && xflag &&
+				    line_len != rm.rm_eo - rm.rm_so) {
+					continue;
 				}
+
+				/* matched */
+				if (oflag) {
+					startmatch = ptr + rm.rm_so;
+					postmatch = ptr + rm.rm_eo;
+				}
+				break;
 			}
 
-			len = mbstowcs(outline, ptr, line_len);
-			if (len == (size_t)-1) {
+			switch (rv) {
+			case REG_NOMATCH:
+				break;
+			case REG_ECHAR:
 				(void) fprintf(stderr, gettext(
-	"%s: input file \"%s\": line %lld: invalid multibyte character\n"),
-				    cmdname, fn, lineno);
-				/* never match a line with invalid sequence */
-				goto L_skip_line;
-			}
-			outline[len] = L'\0';
-
-			if (iflag) {
-				wchar_t	*cp;
-				for (cp = outline; *cp != '\0'; cp++) {
-					*cp = towlower((wint_t)*cp);
-				}
-			}
-
-			if (xflag) {
-				for (pp = patterns; pp; pp = pp->next) {
-					if (outline[0] == pp->wpattern[0] &&
-					    wcscmp(outline,
-					    pp->wpattern) == 0) {
-						/* matched */
-						break;
-					}
-				}
-			} else {
-				for (pp = patterns; pp; pp = pp->next) {
-					if (wcswcs(outline, pp->wpattern)
-					    != NULL) {
-						/* matched */
-						break;
-					}
-				}
-			}
-		} else if (Fflag) {
-			/* fgrep in byte-oriented handling */
-			char	*fptr;
-			if (iflag) {
-				fptr = istrdup(ptr);
-			} else {
-				fptr = ptr;
-			}
-			if (xflag) {
-				/* fgrep -x */
-				for (pp = patterns; pp; pp = pp->next) {
-					if (fptr[0] == pp->pattern[0] &&
-					    strcmp(fptr, pp->pattern) == 0) {
-						/* matched */
-						break;
-					}
-				}
-			} else {
-				for (pp = patterns; pp; pp = pp->next) {
-					if (strstr(fptr, pp->pattern) != NULL) {
-						/* matched */
-						break;
-					}
-				}
-			}
-		} else {
-			/* grep or egrep */
-			for (pp = patterns; pp; pp = pp->next) {
-				int	rv;
-
-				rv = regexec(&pp->re, ptr, 0, NULL, 0);
-				if (rv == REG_OK) {
-					/* matched */
-					break;
-				}
-
-				switch (rv) {
-				case REG_NOMATCH:
-					break;
-				case REG_ECHAR:
-					(void) fprintf(stderr, gettext(
 	    "%s: input file \"%s\": line %lld: invalid multibyte character\n"),
-					    cmdname, fn, lineno);
-					break;
-				default:
-					(void) regerror(rv, &pp->re, errstr,
-					    sizeof (errstr));
-					(void) fprintf(stderr, gettext(
+				    cmdname, fn, lineno);
+				break;
+			default:
+				(void) regerror(rv, &pp->re, errstr,
+				    sizeof (errstr));
+				(void) fprintf(stderr, gettext(
 	    "%s: input file \"%s\": line %lld: %s\n"),
-					    cmdname, fn, lineno, errstr);
-					exit(2);
-				}
+				    cmdname, fn, lineno, errstr);
+				exit(2);
 			}
 		}
 
@@ -1368,8 +1351,21 @@ L_next_line:
 		 */
 		if (!last_ctx && nvflag == (pp != NULL)) {
 			matches++;
-			if (!nextend)
-				matchptr = (conflag != 0) ? conptrend : ptrend;
+			if (!nextend) {
+				if (conflag != 0) {
+					matchptr = conptrend;
+				} else if (oflag) {
+					matchptr = postmatch - 1;
+				} else {
+					matchptr = ptrend;
+				}
+			}
+		}
+
+		if (pp != NULL && oflag && postmatch == NULL) {
+			(void) fprintf(stderr, gettext("%s: internal error, "
+			    "-o set, but failed to find postmatch\n"), cmdname);
+			abort();
 		}
 
 		/*
@@ -1396,10 +1392,17 @@ L_next_line:
 				(void) fwrite("--\n", 1, 3, stdout);
 		} else if (conflag == 0 && nvflag == (pp != NULL)) {
 			*ptrend = '\n';
+			if (oflag) {
+				prntptr = startmatch;
+			} else {
+				prntptr = ptr;
+			}
 			prntlen = line_len + 1;
-			prntptr = ptr;
 			linenum = lineno;
 			blkoffset = line_offset;
+			if (oflag) {
+				blkoffset += startmatch - ptr;
+			}
 		} else if (eof) {
 			/* No match and no more data */
 			goto out;
@@ -1408,10 +1411,13 @@ L_next_line:
 			goto L_skip_line;
 		}
 
-		prntptrend = prntptr - 1;
-		while ((prntptrend = find_nl(prntptrend + 1,
+		if (oflag) {
+			prntptrend = postmatch - 1;
+		} else {
+			prntptrend = prntptr - 1;
+		}
+		while (oflag || (prntptrend = find_nl(prntptrend + 1,
 		    prntlen)) != NULL) {
-
 			/*
 			 * GNU grep uses '-' for context lines and ':' for
 			 * matching lines, so replicate that here.
@@ -1446,6 +1452,9 @@ L_next_line:
 				(void) printf("%s\n", fn);
 				goto out;
 			}
+			if (Lflag) {
+				goto out;
+			}
 			if (!cflag) {
 				if (Hflag || outfn) {
 					(void) printf("%s%c", fn, separate);
@@ -1460,10 +1469,23 @@ L_next_line:
 				}
 				(void) fwrite(prntptr, 1,
 				    prntptrend - prntptr + 1, stdout);
+
+				if (oflag) {
+					(void) fputc('\n', stdout);
+				}
 			}
 			if (ferror(stdout)) {
 				return (0);
 			}
+
+			/*
+			 * With -o we'll only ever take this loop once. Manually
+			 * break out.
+			 */
+			if (oflag) {
+				goto L_skip_line;
+			}
+
 			linenum++;
 			prntlen -= prntptrend - prntptr + 1;
 			blkoffset += prntptrend - prntptr + 1;
@@ -1504,9 +1526,15 @@ L_skip_line:
 		if (!newlinep)
 			break;
 
+		if (oflag && postmatch != NULL) {
+			line_len = postmatch - 1 - ptr;
+			ptr = postmatch;
+			sameline = B_TRUE;
+		} else {
+			ptr = ptrend + 1;
+		}
 		data_len -= line_len + 1;
 		line_offset += line_len + 1;
-		ptr = ptrend + 1;
 	}
 
 out:
@@ -1518,6 +1546,20 @@ out:
 			(void) printf("%lld\n", matches);
 		}
 	}
+
+	/*
+	 * -L tells us to print the filename only when it doesn't match. So we
+	 * run through the normal operationa and then invert it.
+	 */
+	if (Lflag) {
+		if (matches == 0) {
+			(void) printf("%s\n", fn);
+			matches = 1;
+		} else {
+			matches = 0;
+		}
+	}
+
 	return (matches != 0);
 }
 
@@ -1530,9 +1572,9 @@ usage(void)
 	(void) fprintf(stderr, gettext("usage: %5s"), cmdname);
 	if (!egrep && !fgrep)
 		(void) fprintf(stderr, gettext(" [-E|-F]"));
-	(void) fprintf(stderr, gettext(" [-bchHilnqrRsvx] [-A num] [-B num] "
-	    "[-C num|-num]\n             [-e pattern_list]... "
-	    "[-f pattern_file]... [pattern_list] [file]...\n"));
+	(void) fprintf(stderr, gettext(" [-bchHilLnoqrRsvx] [-A num] [-B num] "
+	    "[-C num|-num]\n             [--label=name] [-e pattern_list]... "
+	    "[-f pattern_file]...\n             [pattern_list] [file]...\n"));
 	exit(2);
 	/* NOTREACHED */
 }

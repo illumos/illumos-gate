@@ -83,4 +83,5 @@ tests = ['custr_remove', 'custr_trunc']
 
 [/opt/util-tests/tests/mdb/mdbtest]
 
-[/opt/util-tests/tests/sed_addr]
+[/opt/util-tests/tests/sed]
+tests = ['sed_addr', 'multi_test']

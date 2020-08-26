@@ -123,7 +123,7 @@ struct console
 extern struct console	*consoles[];
 void	cons_probe(void);
 void	cons_mode(int);
-void	autoload_font(void);
+void	autoload_font(bool);
 
 /*
  * Plug-and-play enumerator/configurator interface.

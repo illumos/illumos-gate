@@ -44,8 +44,9 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
 .\" Copyright 2018 Nexenta Systems, Inc.
+.\" Copyright 2020 Oxide Computer Company
 .\"
-.Dd February 10, 2018
+.Dd August 13, 2020
 .Dt GREP 1
 .Os
 .Sh NAME
@@ -56,10 +57,11 @@
 .Sh SYNOPSIS
 .Nm grep
 .Op Fl E Ns | Ns Fl F
-.Op Fl bchHilnrRsqvwx
+.Op Fl bchHilLnorRsqvwx
 .Op Fl A Ar num
 .Op Fl B Ar num
 .Op Fl C Ar num Ns | Ns Fl Ns Ar num
+.Op Fl -label Ns = Ns Ar name
 .Oo Fl e Ar pattern_list Oc Ns ...
 .Oo Fl f Ar pattern_file Oc Ns ...
 .Op Ar pattern_list
@@ -107,7 +109,9 @@ delimiter line.
 .It Fl c
 Prints only a count of the lines that contain the pattern.
 Overrides
-.Fl l .
+.Fl l
+and
+.Fl L .
 .It Fl C Ar num Ns \&, Fl Ns Ar num
 Prints
 .Ar num
@@ -164,22 +168,71 @@ Used when searching multiple files.
 Precedes each line by the name of the file containing the matching line.
 .It Fl i
 Ignores upper/lower case distinction during comparisons.
+.It Fl -label Ns = Ns Ar name
+When the name of the matching file is printed
+.Pq Fl H ,
+instead of printing the string
+.Ql (standard input)
+the string
+.Ar name
+is printed instead.
+See
+.Sx Example 5 .
 .It Fl l
 Prints only the names of files with matching lines, separated by NEWLINE
 characters.
 Does not repeat the names of files when the pattern is found more than once.
+If both
+.Fl l
+and
+.Fl L
+are specified, only the last specified takes effect.
+Overrides
+.Fl H .
+.It Fl L
+The opposite of the
+.Fl l
+flag.
+Prints only the names of files without matching lines.
+If both
+.Fl l
+and
+.Fl L
+are specified, only the last specified takes effect.
 Overrides
 .Fl H .
 .It Fl n
 Precedes each line by its line number in the file (first line is 1).
+.It Fl o
+Prints only the matching part of a line.
+If a pattern appears more than once in a line, it will be matched and
+printed multiple times.
+.Pp
+The
+.Fl o
+option is overridden when any of the
+.Fl l ,
+.Fl L ,
+or
+.Fl c
+options are specified.
+When the
+.Fl o
+option is specified, all context options are ignored.
+The
+.Fl o
+and
+.Fl v
+options are not supported together at this time.
 .It Fl q
 Quiet.
 Does not write anything to the standard output, regardless of matching lines.
 Exits with zero status if an input line is selected.
 Overrides
-.Fl c
+.Fl c ,
+.Fl l ,
 and
-.Fl l .
+.Fl L .
 .It Fl r
 Read all files under each directory, recursively.
 Follow symbolic links on the command line, but skip symlinks that are
@@ -340,6 +393,20 @@ $ grep -E '^abc$
 ^def$'
 $ grep -F -x 'abc
 def'
+.Ed
+.It Sy Example 5 No Using Fl -label
+When piping standard input into
+.Nm ,
+as part of a pipeline, occasionally it can be useful override the file
+name
+.Ql (standard input)
+with something from the pipeline.
+This would output each matching line instead with the name of the input
+file.
+.Bd -literal
+$ for f in *.gz; do
+> gzcat $f | grep -H --label=$f foo
+> done
 .Ed
 .El
 .Sh ENVIRONMENT VARIABLES
