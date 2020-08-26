@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 RackTop Systems, Inc.
  */
@@ -643,6 +643,17 @@ smb_oplock_wait_break(smb_node_t *node, int timeout)
 	printf("*smb_oplock_wait_break (state=0x%x)\n",
 	    node->n_oplock.ol_state);
 	return (0);
+}
+
+int
+smb_fem_oplock_install(smb_node_t *node)
+{
+	return (0);
+}
+
+void
+smb_fem_oplock_uninstall(smb_node_t *node)
+{
 }
 
 /*

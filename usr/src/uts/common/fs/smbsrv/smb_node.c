@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2021 RackTop Systems, Inc.
  */
 /*
  * SMB Node State Machine
@@ -491,6 +492,18 @@ smb_node_release(smb_node_t *node)
 			}
 
 			mutex_exit(&node->n_mutex);
+
+			/*
+			 * Out of caution, make sure FEM hooks
+			 * used by oplocks are also gone.
+			 */
+			mutex_enter(&node->n_oplock.ol_mutex);
+			ASSERT(node->n_oplock.ol_fem == B_FALSE);
+			if (node->n_oplock.ol_fem == B_TRUE) {
+				smb_fem_oplock_uninstall(node);
+				node->n_oplock.ol_fem = B_FALSE;
+			}
+			mutex_exit(&node->n_oplock.ol_mutex);
 
 			smb_llist_enter(node->n_hash_bucket, RW_WRITER);
 			smb_llist_remove(node->n_hash_bucket, node);

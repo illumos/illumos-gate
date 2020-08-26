@@ -977,7 +977,9 @@ smb_oplock_req_excl(
 		 * This operation MUST be made cancelable...
 		 * This operation waits until the oplock is
 		 * broken or canceled, as specified in
-		 * section 2.1.5.17.3.
+		 * section 2.1.5.17.3. Note: This function
+		 * does not cause breaks that require a wait,
+		 * so never returns ..._BREAK_IN_PROGRESS.
 		 *
 		 * When the operation specified in section
 		 * 2.1.5.17.3 is called, its following input
@@ -990,11 +992,18 @@ smb_oplock_req_excl(
 		 * section 2.1.5.17.3.
 		 */
 		/* Keep *rop = ... from caller. */
-		if ((node->n_oplock.ol_state & BREAK_ANY) != 0) {
-			status = NT_STATUS_OPLOCK_BREAK_IN_PROGRESS;
-			/* Caller does smb_oplock_wait_break() */
-		} else {
-			status = NT_STATUS_SUCCESS;
+		status = NT_STATUS_SUCCESS;
+
+		/*
+		 * First oplock grant installs FEM hooks.
+		 */
+		if (node->n_oplock.ol_fem == B_FALSE) {
+			if (smb_fem_oplock_install(node) != 0) {
+				cmn_err(CE_NOTE,
+				    "smb_fem_oplock_install failed");
+			} else {
+				node->n_oplock.ol_fem =	B_TRUE;
+			}
 		}
 	}
 
@@ -1386,6 +1395,18 @@ smb_oplock_req_shared(
 			/* Caller does smb_oplock_wait_break() */
 		} else {
 			status = NT_STATUS_SUCCESS;
+		}
+
+		/*
+		 * First oplock grant installs FEM hooks.
+		 */
+		if (node->n_oplock.ol_fem == B_FALSE) {
+			if (smb_fem_oplock_install(node) != 0) {
+				cmn_err(CE_NOTE,
+				    "smb_fem_oplock_install failed");
+			} else {
+				node->n_oplock.ol_fem =	B_TRUE;
+			}
 		}
 	}
 
@@ -2075,6 +2096,18 @@ out:
 	}
 
 	/*
+	 * If this node no longer has any oplock grants, let's
+	 * go ahead and remove the FEM hooks now. We could leave
+	 * that until close, but this lets access outside of SMB
+	 * be free of FEM oplock work after a "break to none".
+	 */
+	if (node->n_oplock.ol_state == NO_OPLOCK &&
+	    node->n_oplock.ol_fem == B_TRUE) {
+		smb_fem_oplock_uninstall(node);
+		node->n_oplock.ol_fem = B_FALSE;
+	}
+
+	/*
 	 * The spec. describes waiting for a break here,
 	 * but we let the caller do that (when needed) if
 	 * status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS
@@ -2506,6 +2539,14 @@ smb_oplock_break_CLOSE(smb_node_t *node, smb_ofile_t *ofile)
 	if ((node->n_oplock.ol_state & BREAK_ANY) == 0)
 		cv_broadcast(&node->n_oplock.WaitingOpenCV);
 
+	/*
+	 * If no longer any oplock, remove FEM hooks.
+	 */
+	if (node->n_oplock.ol_state == NO_OPLOCK &&
+	    node->n_oplock.ol_fem == B_TRUE) {
+		smb_fem_oplock_uninstall(node);
+		node->n_oplock.ol_fem = B_FALSE;
+	}
 }
 
 /*
