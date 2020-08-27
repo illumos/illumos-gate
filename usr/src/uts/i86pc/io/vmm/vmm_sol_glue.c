@@ -181,7 +181,7 @@ vmm_alloc_check(mod_hash_key_t key, mod_hash_val_t *val, void *unused)
 {
 	struct kmem_item *i = (struct kmem_item *)val;
 
-	cmn_err(CE_PANIC, "!vmm_alloc_check: hash not empty: %p, %d", i->addr,
+	cmn_err(CE_PANIC, "!vmm_alloc_check: hash not empty: %p, %lu", i->addr,
 	    i->size);
 
 	return (MH_WALK_TERMINATE);

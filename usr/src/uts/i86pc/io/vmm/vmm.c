@@ -1014,7 +1014,7 @@ vm_iommu_modify(struct vm *vm, bool map)
 
 		if (map) {
 			KASSERT((mm->flags & VM_MEMMAP_F_IOMMU) == 0,
-			    ("iommu map found invalid memmap %#lx/%#lx/%#x",
+			    ("iommu map found invalid memmap %lx/%lx/%x",
 			    mm->gpa, mm->len, mm->flags));
 			if ((mm->flags & VM_MEMMAP_F_WIRED) == 0)
 				continue;
@@ -1024,7 +1024,7 @@ vm_iommu_modify(struct vm *vm, bool map)
 				continue;
 			mm->flags &= ~VM_MEMMAP_F_IOMMU;
 			KASSERT((mm->flags & VM_MEMMAP_F_WIRED) != 0,
-			    ("iommu unmap found invalid memmap %#lx/%#lx/%#x",
+			    ("iommu unmap found invalid memmap %lx/%lx/%x",
 			    mm->gpa, mm->len, mm->flags));
 		}
 
@@ -1032,7 +1032,7 @@ vm_iommu_modify(struct vm *vm, bool map)
 		while (gpa < mm->gpa + mm->len) {
 			vp = vm_gpa_hold(vm, -1, gpa, PAGE_SIZE, VM_PROT_WRITE,
 					 &cookie);
-			KASSERT(vp != NULL, ("vm(%s) could not map gpa %#lx",
+			KASSERT(vp != NULL, ("vm(%s) could not map gpa %lx",
 			    vm_name(vm), gpa));
 
 			vm_gpa_release(cookie);
@@ -1213,7 +1213,7 @@ vm_set_register(struct vm *vm, int vcpuid, int reg, uint64_t val)
 		return (error);
 
 	/* Set 'nextrip' to match the value of %rip */
-	VCPU_CTR1(vm, vcpuid, "Setting nextrip to %#lx", val);
+	VCPU_CTR1(vm, vcpuid, "Setting nextrip to %lx", val);
 	vcpu = &vm->vcpu[vcpuid];
 	vcpu->nextrip = val;
 	return (0);
@@ -1561,7 +1561,7 @@ vm_handle_paging(struct vm *vm, int vcpuid, bool *retu)
 		rv = pmap_emulate_accessed_dirty(vmspace_pmap(vm->vmspace),
 		    vme->u.paging.gpa, ftype);
 		if (rv == 0) {
-			VCPU_CTR2(vm, vcpuid, "%s bit emulation for gpa %#lx",
+			VCPU_CTR2(vm, vcpuid, "%s bit emulation for gpa %lx",
 			    ftype == VM_PROT_READ ? "accessed" : "dirty",
 			    vme->u.paging.gpa);
 			goto done;
@@ -1571,7 +1571,7 @@ vm_handle_paging(struct vm *vm, int vcpuid, bool *retu)
 	map = &vm->vmspace->vm_map;
 	rv = vm_fault(map, vme->u.paging.gpa, ftype, VM_FAULT_NORMAL);
 
-	VCPU_CTR3(vm, vcpuid, "vm_handle_paging rv = %d, gpa = %#lx, "
+	VCPU_CTR3(vm, vcpuid, "vm_handle_paging rv = %d, gpa = %lx, "
 	    "ftype = %d", rv, vme->u.paging.gpa, ftype);
 
 	if (rv != KERN_SUCCESS)
@@ -1635,7 +1635,7 @@ vm_handle_mmio_emul(struct vm *vm, int vcpuid, bool *retu)
 	inst_addr = vme->rip + vme->u.mmio_emul.cs_base;
 	cs_d = vme->u.mmio_emul.cs_d;
 
-	VCPU_CTR1(vm, vcpuid, "inst_emul fault accessing gpa %#lx",
+	VCPU_CTR1(vm, vcpuid, "inst_emul fault accessing gpa %lx",
 	    vme->u.mmio_emul.gpa);
 
 	/* Fetch the faulting instruction */
@@ -1655,7 +1655,7 @@ vm_handle_mmio_emul(struct vm *vm, int vcpuid, bool *retu)
 	}
 
 	if (vie_decode_instruction(vie, vm, vcpuid, cs_d) != 0) {
-		VCPU_CTR1(vm, vcpuid, "Error decoding instruction at %#lx",
+		VCPU_CTR1(vm, vcpuid, "Error decoding instruction at %lx",
 		    inst_addr);
 		/* Dump (unrecognized) instruction bytes in userspace */
 		vie_fallback_exitinfo(vie, vme);
@@ -2406,7 +2406,7 @@ vm_restart_instruction(void *arg, int vcpuid)
 		 * instruction to be restarted.
 		 */
 		vcpu->exitinfo.inst_length = 0;
-		VCPU_CTR1(vm, vcpuid, "restarting instruction at %#lx by "
+		VCPU_CTR1(vm, vcpuid, "restarting instruction at %lx by "
 		    "setting inst_length to zero", vcpu->exitinfo.rip);
 	} else if (state == VCPU_FROZEN) {
 		/*
@@ -2418,7 +2418,7 @@ vm_restart_instruction(void *arg, int vcpuid)
 		error = vm_get_register(vm, vcpuid, VM_REG_GUEST_RIP, &rip);
 		KASSERT(!error, ("%s: error %d getting rip", __func__, error));
 		VCPU_CTR2(vm, vcpuid, "restarting instruction by updating "
-		    "nextrip from %#lx to %#lx", vcpu->nextrip, rip);
+		    "nextrip from %lx to %lx", vcpu->nextrip, rip);
 		vcpu->nextrip = rip;
 	} else {
 		panic("%s: invalid state %d", __func__, state);
@@ -2449,7 +2449,7 @@ vm_exit_intinfo(struct vm *vm, int vcpuid, uint64_t info)
 	} else {
 		info = 0;
 	}
-	VCPU_CTR2(vm, vcpuid, "%s: info1(%#lx)", __func__, info);
+	VCPU_CTR2(vm, vcpuid, "%s: info1(%lx)", __func__, info);
 	vcpu->exitintinfo = info;
 	return (0);
 }
@@ -2467,11 +2467,7 @@ exception_class(uint64_t info)
 {
 	int type, vector;
 
-#ifdef	__FreeBSD__
-	KASSERT(info & VM_INTINFO_VALID, ("intinfo must be valid: %#lx", info));
-#else
 	KASSERT(info & VM_INTINFO_VALID, ("intinfo must be valid: %lx", info));
-#endif
 	type = info & VM_INTINFO_TYPE;
 	vector = info & 0xff;
 
@@ -2519,13 +2515,8 @@ nested_fault(struct vm *vm, int vcpuid, uint64_t info1, uint64_t info2,
 	enum exc_class exc1, exc2;
 	int type1, vector1;
 
-#ifdef	__FreeBSD__
-	KASSERT(info1 & VM_INTINFO_VALID, ("info1 %#lx is not valid", info1));
-	KASSERT(info2 & VM_INTINFO_VALID, ("info2 %#lx is not valid", info2));
-#else
 	KASSERT(info1 & VM_INTINFO_VALID, ("info1 %lx is not valid", info1));
 	KASSERT(info2 & VM_INTINFO_VALID, ("info2 %lx is not valid", info2));
-#endif
 
 	/*
 	 * If an exception occurs while attempting to call the double-fault
@@ -2534,7 +2525,7 @@ nested_fault(struct vm *vm, int vcpuid, uint64_t info1, uint64_t info2,
 	type1 = info1 & VM_INTINFO_TYPE;
 	vector1 = info1 & 0xff;
 	if (type1 == VM_INTINFO_HWEXCEPTION && vector1 == IDT_DF) {
-		VCPU_CTR2(vm, vcpuid, "triple fault: info1(%#lx), info2(%#lx)",
+		VCPU_CTR2(vm, vcpuid, "triple fault: info1(%lx), info2(%lx)",
 		    info1, info2);
 		vm_suspend(vm, VM_SUSPEND_TRIPLEFAULT);
 		*retinfo = 0;
@@ -2594,7 +2585,7 @@ vm_entry_intinfo(struct vm *vm, int vcpuid, uint64_t *retinfo)
 	if (vcpu->exception_pending) {
 		info2 = vcpu_exception_intinfo(vcpu);
 		vcpu->exception_pending = 0;
-		VCPU_CTR2(vm, vcpuid, "Exception %d delivered: %#lx",
+		VCPU_CTR2(vm, vcpuid, "Exception %d delivered: %lx",
 		    vcpu->exc_vector, info2);
 	}
 
@@ -2611,8 +2602,8 @@ vm_entry_intinfo(struct vm *vm, int vcpuid, uint64_t *retinfo)
 	}
 
 	if (valid) {
-		VCPU_CTR4(vm, vcpuid, "%s: info1(%#lx), info2(%#lx), "
-		    "retinfo(%#lx)", __func__, info1, info2, *retinfo);
+		VCPU_CTR4(vm, vcpuid, "%s: info1(%lx), info2(%lx), "
+		    "retinfo(%lx)", __func__, info1, info2, *retinfo);
 	}
 
 	return (valid);
@@ -2735,7 +2726,7 @@ vm_inject_pf(void *vmarg, int vcpuid, int error_code, uint64_t cr2)
 	int error;
 
 	vm = vmarg;
-	VCPU_CTR2(vm, vcpuid, "Injecting page fault: error_code %#x, cr2 %#lx",
+	VCPU_CTR2(vm, vcpuid, "Injecting page fault: error_code %x, cr2 %lx",
 	    error_code, cr2);
 
 	error = vm_set_register(vm, vcpuid, VM_REG_GUEST_CR2, cr2);

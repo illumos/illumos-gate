@@ -355,7 +355,8 @@ gipt_map_next_page(gipt_map_t *map, uint64_t va, uint64_t max_va, gipt_t **ptp)
 			ASSERT3P(pt, !=, NULL);
 			break;
 		} else {
-			panic("unexpected PTE type %x @ va %p", ptet, cur_va);
+			panic("unexpected PTE type %x @ va %p", ptet,
+			    (void *)cur_va);
 		}
 	}
 
@@ -387,7 +388,8 @@ gipt_map_next_page(gipt_map_t *map, uint64_t va, uint64_t max_va, gipt_t **ptp)
 			pt = gipt_map_lookup(map, cur_va, pt->gipt_level - 1);
 			ASSERT3P(pt, !=, NULL);
 		} else {
-			panic("unexpected PTE type %x @ va %p", ptet, cur_va);
+			panic("unexpected PTE type %x @ va %p", ptet,
+			    (void *)cur_va);
 		}
 	}
 

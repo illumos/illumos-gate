@@ -1091,7 +1091,7 @@ static __inline void
 vmx_run_trace(struct vmx *vmx, int vcpu)
 {
 #ifdef KTR
-	VCPU_CTR1(vmx->vm, vcpu, "Resume execution at %#lx", vmcs_guest_rip());
+	VCPU_CTR1(vmx->vm, vcpu, "Resume execution at %lx", vmcs_guest_rip());
 #endif
 }
 
@@ -1264,7 +1264,7 @@ vmx_clear_int_window_exiting(struct vmx *vmx, int vcpu)
 {
 
 	KASSERT((vmx->cap[vcpu].proc_ctls & PROCBASED_INT_WINDOW_EXITING) != 0,
-	    ("intr_window_exiting not set: %#x", vmx->cap[vcpu].proc_ctls));
+	    ("intr_window_exiting not set: %x", vmx->cap[vcpu].proc_ctls));
 	vmx->cap[vcpu].proc_ctls &= ~PROCBASED_INT_WINDOW_EXITING;
 	vmcs_write(VMCS_PRI_PROC_BASED_CTLS, vmx->cap[vcpu].proc_ctls);
 	VCPU_CTR0(vmx->vm, vcpu, "Disabling interrupt window exiting");
@@ -1286,7 +1286,7 @@ vmx_clear_nmi_window_exiting(struct vmx *vmx, int vcpu)
 {
 
 	KASSERT((vmx->cap[vcpu].proc_ctls & PROCBASED_NMI_WINDOW_EXITING) != 0,
-	    ("nmi_window_exiting not set %#x", vmx->cap[vcpu].proc_ctls));
+	    ("nmi_window_exiting not set %x", vmx->cap[vcpu].proc_ctls));
 	vmx->cap[vcpu].proc_ctls &= ~PROCBASED_NMI_WINDOW_EXITING;
 	vmcs_write(VMCS_PRI_PROC_BASED_CTLS, vmx->cap[vcpu].proc_ctls);
 	VCPU_CTR0(vmx->vm, vcpu, "Disabling NMI window exiting");
@@ -1331,11 +1331,11 @@ vmx_inject_nmi(struct vmx *vmx, int vcpu)
 
 	gi = vmcs_read(VMCS_GUEST_INTERRUPTIBILITY);
 	KASSERT((gi & NMI_BLOCKING) == 0, ("vmx_inject_nmi: invalid guest "
-	    "interruptibility-state %#x", gi));
+	    "interruptibility-state %x", gi));
 
 	info = vmcs_read(VMCS_ENTRY_INTR_INFO);
 	KASSERT((info & VMCS_INTR_VALID) == 0, ("vmx_inject_nmi: invalid "
-	    "VM-entry interruption information %#x", info));
+	    "VM-entry interruption information %x", info));
 
 	/*
 	 * Inject the virtual NMI. The vector must be the NMI IDT entry
@@ -1371,7 +1371,7 @@ vmx_inject_interrupts(struct vmx *vmx, int vcpu, struct vlapic *vlapic,
 	if (vmx->state[vcpu].nextrip != guestrip &&
 	    (gi & HWINTR_BLOCKING) != 0) {
 		VCPU_CTR2(vmx->vm, vcpu, "Guest interrupt blocking "
-		    "cleared due to rip change: %#lx/%#lx",
+		    "cleared due to rip change: %lx/%lx",
 		    vmx->state[vcpu].nextrip, guestrip);
 		gi &= ~HWINTR_BLOCKING;
 		vmcs_write(VMCS_GUEST_INTERRUPTIBILITY, gi);
@@ -1388,10 +1388,10 @@ vmx_inject_interrupts(struct vmx *vmx, int vcpu, struct vlapic *vlapic,
 
 	if (vm_entry_intinfo(vmx->vm, vcpu, &entryinfo)) {
 		KASSERT((entryinfo & VMCS_INTR_VALID) != 0, ("%s: entry "
-		    "intinfo is not valid: %#lx", __func__, entryinfo));
+		    "intinfo is not valid: %lx", __func__, entryinfo));
 
 		KASSERT((info & VMCS_INTR_VALID) == 0, ("%s: cannot inject "
-		     "pending exception: %#lx/%#x", __func__, entryinfo, info));
+		     "pending exception: %lx/%x", __func__, entryinfo, info));
 
 		info = entryinfo;
 		vector = info & 0xff;
@@ -1430,11 +1430,11 @@ vmx_inject_interrupts(struct vmx *vmx, int vcpu, struct vlapic *vlapic,
 				need_nmi_exiting = 0;
 			} else {
 				VCPU_CTR1(vmx->vm, vcpu, "Cannot inject NMI "
-				    "due to VM-entry intr info %#x", info);
+				    "due to VM-entry intr info %x", info);
 			}
 		} else {
 			VCPU_CTR1(vmx->vm, vcpu, "Cannot inject NMI due to "
-			    "Guest Interruptibility-state %#x", gi);
+			    "Guest Interruptibility-state %x", gi);
 		}
 
 		if (need_nmi_exiting) {
@@ -1481,18 +1481,18 @@ vmx_inject_interrupts(struct vmx *vmx, int vcpu, struct vlapic *vlapic,
 	 */
 	if ((gi & HWINTR_BLOCKING) != 0) {
 		VCPU_CTR2(vmx->vm, vcpu, "Cannot inject vector %d due to "
-		    "Guest Interruptibility-state %#x", vector, gi);
+		    "Guest Interruptibility-state %x", vector, gi);
 		goto cantinject;
 	}
 	if ((info & VMCS_INTR_VALID) != 0) {
 		VCPU_CTR2(vmx->vm, vcpu, "Cannot inject vector %d due to "
-		    "VM-entry intr info %#x", vector, info);
+		    "VM-entry intr info %x", vector, info);
 		goto cantinject;
 	}
 	rflags = vmcs_read(VMCS_GUEST_RFLAGS);
 	if ((rflags & PSL_I) == 0) {
 		VCPU_CTR2(vmx->vm, vcpu, "Cannot inject vector %d due to "
-		    "rflags %#lx", vector, rflags);
+		    "rflags %lx", vector, rflags);
 		goto cantinject;
 	}
 
@@ -1571,7 +1571,7 @@ vmx_assert_nmi_blocking(struct vmx *vmx, int vcpuid)
 
 	gi = vmcs_read(VMCS_GUEST_INTERRUPTIBILITY);
 	KASSERT(gi & VMCS_INTERRUPTIBILITY_NMI_BLOCKING,
-	    ("NMI blocking is not in effect %#x", gi));
+	    ("NMI blocking is not in effect %x", gi));
 }
 
 static int
@@ -2357,7 +2357,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		 */
 		if (ts->reason == TSR_IDT_GATE) {
 			KASSERT(idtvec_info & VMCS_IDT_VEC_VALID,
-			    ("invalid idtvec_info %#x for IDT task switch",
+			    ("invalid idtvec_info %x for IDT task switch",
 			    idtvec_info));
 			intr_type = idtvec_info & VMCS_INTR_T_MASK;
 			if (intr_type != VMCS_INTR_T_SWINTR &&
@@ -2486,7 +2486,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 			return (1);
 		KASSERT((intr_info & VMCS_INTR_VALID) != 0 &&
 		    (intr_info & VMCS_INTR_T_MASK) == VMCS_INTR_T_HWINTR,
-		    ("VM exit interruption info invalid: %#x", intr_info));
+		    ("VM exit interruption info invalid: %x", intr_info));
 		vmx_trigger_hostintr(intr_info & 0xff);
 
 		/*
@@ -2518,7 +2518,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		vmm_stat_incr(vmx->vm, vcpu, VMEXIT_EXCEPTION, 1);
 		intr_info = vmcs_read(VMCS_EXIT_INTR_INFO);
 		KASSERT((intr_info & VMCS_INTR_VALID) != 0,
-		    ("VM exit interruption info invalid: %#x", intr_info));
+		    ("VM exit interruption info invalid: %x", intr_info));
 
 		intr_vec = intr_info & 0xff;
 		intr_type = intr_info & VMCS_INTR_T_MASK;
@@ -2588,7 +2588,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 			errcode_valid = 1;
 			errcode = vmcs_read(VMCS_EXIT_INTR_ERRCODE);
 		}
-		VCPU_CTR2(vmx->vm, vcpu, "Reflecting exception %d/%#x into "
+		VCPU_CTR2(vmx->vm, vcpu, "Reflecting exception %d/%x into "
 		    "the guest", intr_vec, errcode);
 		SDT_PROBE5(vmm, vmx, exit, exception,
 		    vmx, vcpu, vmexit, intr_vec, errcode);
@@ -2778,11 +2778,11 @@ vmx_exit_handle_nmi(struct vmx *vmx, int vcpuid, struct vm_exit *vmexit)
 
 	intr_info = vmcs_read(VMCS_EXIT_INTR_INFO);
 	KASSERT((intr_info & VMCS_INTR_VALID) != 0,
-	    ("VM exit interruption info invalid: %#x", intr_info));
+	    ("VM exit interruption info invalid: %x", intr_info));
 
 	if ((intr_info & VMCS_INTR_T_MASK) == VMCS_INTR_T_NMI) {
 		KASSERT((intr_info & 0xff) == IDT_NMI, ("VM exit due "
-		    "to NMI has invalid vector: %#x", intr_info));
+		    "to NMI has invalid vector: %x", intr_info));
 		VCPU_CTR0(vmx->vm, vcpuid, "Vectoring to NMI handler");
 #ifdef __FreeBSD__
 		__asm __volatile("int $2");
@@ -2910,7 +2910,7 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 	vmx_set_pcpu_defaults(vmx, vcpu, pmap);
 	do {
 		KASSERT(vmcs_guest_rip() == rip, ("%s: vmcs guest rip mismatch "
-		    "%#lx/%#lx", __func__, vmcs_guest_rip(), rip));
+		    "%lx/%lx", __func__, vmcs_guest_rip(), rip));
 
 		handled = UNHANDLED;
 		/*
@@ -3739,7 +3739,7 @@ vmx_enable_x2apic_mode_vid(struct vlapic *vlapic)
 
 	proc_ctls2 = vmx->cap[vcpuid].proc_ctls2;
 	KASSERT((proc_ctls2 & PROCBASED2_VIRTUALIZE_APIC_ACCESSES) != 0,
-	    ("%s: invalid proc_ctls2 %#x", __func__, proc_ctls2));
+	    ("%s: invalid proc_ctls2 %x", __func__, proc_ctls2));
 
 	proc_ctls2 &= ~PROCBASED2_VIRTUALIZE_APIC_ACCESSES;
 	proc_ctls2 |= PROCBASED2_VIRTUALIZE_X2APIC_MODE;
