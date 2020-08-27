@@ -47,7 +47,7 @@
 .\" Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 .\" Copyright 2020 Joyent, Inc.
 .\"
-.TH FIND 1 "Feb 20, 2020"
+.TH FIND 1 "Aug 23, 2020"
 .SH NAME
 find \- find files
 .SH SYNOPSIS
@@ -221,6 +221,18 @@ Always true. Writes the current file on \fIdevice\fR in \fBcpio\fR format
 .ad
 .RS 17n
 True if the file's status was changed \fIn\fR days ago.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-delete\fR\fR
+.ad
+.RS 17n
+Always true. Deletes the files and folders found recursing from the current
+directory. This option implicitly enables \fB-depth\fR and is incompatible
+with following symlinks, if specified. For security reasons, relative paths
+starting with '\fB\&/\fR' are not allowed.
 .RE
 
 .sp

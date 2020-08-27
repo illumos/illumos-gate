@@ -1800,7 +1800,7 @@ mlxcx_setup_ports(mlxcx_t *mlxp)
 		p->mlx_port_event.mla_mlx = mlxp;
 		p->mlx_port_event.mla_port = p;
 		mutex_init(&p->mlx_port_event.mla_mtx, NULL,
-		    MUTEX_DRIVER, DDI_INTR_PRI(mlxp->mlx_intr_pri));
+		    MUTEX_DRIVER, DDI_INTR_PRI(mlxp->mlx_async_intr_pri));
 		p->mlp_init |= MLXCX_PORT_INIT;
 		mutex_init(&p->mlp_mtx, NULL, MUTEX_DRIVER,
 		    DDI_INTR_PRI(mlxp->mlx_intr_pri));
@@ -2716,7 +2716,7 @@ mlxcx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	for (i = 0; i <= MLXCX_FUNC_ID_MAX; i++) {
 		mlxp->mlx_npages_req[i].mla_mlx = mlxp;
 		mutex_init(&mlxp->mlx_npages_req[i].mla_mtx, NULL,
-		    MUTEX_DRIVER, DDI_INTR_PRI(mlxp->mlx_intr_pri));
+		    MUTEX_DRIVER, DDI_INTR_PRI(mlxp->mlx_async_intr_pri));
 	}
 	mlxp->mlx_attach |= MLXCX_ATTACH_ASYNC_TQ;
 
@@ -2913,7 +2913,6 @@ static struct dev_ops mlxcx_dev_ops = {
 	.devo_attach = mlxcx_attach,
 	.devo_detach = mlxcx_detach,
 	.devo_reset = nodev,
-	.devo_power = ddi_power,
 	.devo_quiesce = ddi_quiesce_not_supported,
 	.devo_cb_ops = &mlxcx_cb_ops
 };
