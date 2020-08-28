@@ -38,6 +38,7 @@
 #include <errno.h>
 #include <sys/lx_misc.h>
 #include <sys/lx_syscall.h>
+#include <sys/stat.h>
 
 #if defined(_ILP32)
 long
@@ -72,6 +73,18 @@ lx_sendfile(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	/* Suppress errors if we were able to write any data at all. */
 	if (xferred > 0) {
 		error = 0;
+	}
+	/*
+	 * If we got EINVAL due to our offset being past EOF, also suppress
+	 * errors (Linux just returns 0 here).
+	 */
+	if (error == EINVAL) {
+		struct stat stat;
+		if (fstat((int)p2, &stat) == 0) {
+			if (off >= stat.st_size) {
+				error = 0;
+			}
+		}
 	}
 
 	if (error == 0) {
@@ -124,6 +137,18 @@ lx_sendfile64(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4)
 	/* Suppress errors if we were able to write any data at all. */
 	if (xferred > 0) {
 		error = 0;
+	}
+	/*
+	 * If we got EINVAL due to our offset being past EOF, also suppress
+	 * errors (Linux just returns 0 here).
+	 */
+	if (error == EINVAL) {
+		struct stat stat;
+		if (fstat((int)p2, &stat) == 0) {
+			if (off >= stat.st_size) {
+				error = 0;
+			}
+		}
 	}
 
 	if (error == 0) {
