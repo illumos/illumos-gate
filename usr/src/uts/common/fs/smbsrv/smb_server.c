@@ -1516,6 +1516,7 @@ smb_server_shutdown(smb_server_t *sv)
 		sv->sv_rootuser = NULL;
 	}
 	if (sv->sv_session != NULL) {
+		smb_session_cancel_requests(sv->sv_session, NULL, NULL);
 		smb_slist_wait_for_empty(&sv->sv_session->s_req_list);
 
 		/* Just in case import left users and trees */

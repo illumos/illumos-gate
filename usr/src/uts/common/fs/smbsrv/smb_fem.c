@@ -659,7 +659,7 @@ smb_fem_oplock_wait(smb_node_t *node, caller_context_t *ct)
 		ct->cc_flags |= CC_WOULDBLOCK;
 		rc = EAGAIN;
 	} else {
-		(void) smb_oplock_wait_break(node,
+		(void) smb_oplock_wait_break_fem(node,
 		    smb_fem_oplock_timeout);
 		rc = 0;
 	}

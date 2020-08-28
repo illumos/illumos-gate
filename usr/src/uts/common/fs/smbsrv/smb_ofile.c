@@ -20,9 +20,9 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2011-2020 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2016 Syneto S.R.L. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
- * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2021 RackTop Systems, Inc.
  */
 
@@ -795,6 +795,22 @@ smb_ofile_hold(smb_ofile_t *of)
 
 	mutex_exit(&of->f_mutex);
 	return (B_TRUE);
+}
+
+/*
+ * Void arg variant of smb_ofile_release for use with smb_llist_post.
+ * This is needed because smb_ofile_release may need to enter the
+ * smb_llist as writer when it drops the last reference, so when
+ * we're in the llist as reader, use smb_llist_post with this
+ * function to arrange for the release call at llist_exit.
+ */
+void
+smb_ofile_release_LL(void *arg)
+{
+	smb_ofile_t	*of = arg;
+
+	SMB_OFILE_VALID(of);
+	smb_ofile_release(of);
 }
 
 /*
@@ -1772,7 +1788,7 @@ smb_ofile_set_delete_on_close(smb_request_t *sr, smb_ofile_t *of)
 	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
 		if (sr->session->dialect >= SMB_VERS_2_BASE)
 			(void) smb2sr_go_async(sr);
-		(void) smb_oplock_wait_break(of->f_node, 0);
+		(void) smb_oplock_wait_break(sr, of->f_node, 0);
 	}
 
 	mutex_enter(&of->f_mutex);
