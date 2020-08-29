@@ -55,12 +55,10 @@ clobber: clean
 
 all: default
 
-lint:
-
 install: all $(PROTO_TEST_JAR)
 
 JFLAGS= -g -cp $(CLASSPATH) -d $(CLASSDIR)
-JFLAGS += -source 1.5 -target 1.6 -Xlint:all,-options,-rawtypes
+JFLAGS += -source 7 -target 7 -Xlint:all,-deprecation,-options,-rawtypes
 COMPILE.java=$(JAVAC) $(JFLAGS)
 
 $(TEST_JAR): $(SRCDIR)/*.java

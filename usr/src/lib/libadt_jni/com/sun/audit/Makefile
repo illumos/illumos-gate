@@ -22,9 +22,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2020 Peter Tribble
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-# lib/libadt_jni/com/sun/audit/Makefile
 
 include ../Makefile.com
 
@@ -33,19 +32,15 @@ ADT_PKG = com.sun.audit
 TOP = $(SRC)/lib/libadt_jni
 CLASSPATH = $(TOP):com/sun/audit
 
-JAVAFLAGS +=	-source 1.4 -target 1.4
-
 SOURCE:sh = ls *.java
 
 CLASSES = $(SOURCE:java=class)
-
-JNIH    = AuditSession.h
 
 JAR_FILE=Audit.jar
 
 INSTALL_JAR = $(ROOTAUDITHOME)/$(JAR_FILE)
 
-CLEAN_FILES = *.class $(JNIH) *.jar AuditEvent*.java
+CLEAN_FILES = *.class *.jar AuditEvent*.java
 
 DEFINES=
 
@@ -54,20 +49,10 @@ INCLUDES=	-I${JAVA_HOME}/include	\
 
 .KEEP_STATE:
 
-all:	$(JNIH) $(CLASSES)
+all:	$(CLASSES)
 
 install:	$(CLASSES) $(ROOTAUDITHOME)	\
-		$(JAR_FILE) $(INSTALL_JAR)	\
-		$(JNIH)
-
-$(JNIH): $(CLASSES)
-	@for class_name in $(CLASSES) ; do \
-		k=`/bin/basename $$class_name .class`; \
-		class="$$class $(ADT_PKG).$$k"; \
-	done; \
-	JC="$(JAVAH) -classpath $(CLASSPATH) -jni -o $(JNIH) $$class"; \
-	echo $$JC; \
-	$$JC
+		$(JAR_FILE) $(INSTALL_JAR)
 
 clean clobber:
 	$(RM) $(CLEAN_FILES)

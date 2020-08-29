@@ -66,8 +66,6 @@ clobber: clean
 	-$(RM) $(JDTRACE_JAR)
 	-$(RM) $(PROG)
 
-lint:
-
 install: all $(PROTO_JDTRACE_JAR) $(CMD) $(XLIST)
 
 $(PROG): $(SRCS)
@@ -75,7 +73,7 @@ $(PROG): $(SRCS)
 	$(POST_PROCESS) ; $(STRIP_STABS)
 
 JFLAGS= -g -cp $(CLASSPATH) -d $(CLASSDIR)
-JFLAGS += -source 1.5 -target 1.6 -Xlint:all,-options
+JFLAGS += -source 7 -target 7 -Xlint:all,-options
 COMPILE.java=$(JAVAC) $(JFLAGS)
 JAVASRC= JDTrace.java Getopt.java
 
