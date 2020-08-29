@@ -113,7 +113,8 @@ typedef struct ses_sensor_desc {
 static const topo_method_t ses_indicator_methods[] = {
 	{ "ses_indicator_mode", TOPO_PROP_METH_DESC,
 	    TOPO_METH_SES_MODE_VERSION, TOPO_STABILITY_INTERNAL,
-	    ses_indicator_mode }
+	    ses_indicator_mode },
+	{ NULL }
 };
 
 static const topo_method_t ses_sensor_methods[] = {
@@ -126,6 +127,7 @@ static const topo_method_t ses_sensor_methods[] = {
 	{ "ses_psu_state", TOPO_PROP_METH_DESC,
 	    TOPO_METH_SES_PSU_VERSION, TOPO_STABILITY_INTERNAL,
 	    ses_psu_state },
+	{ NULL }
 };
 
 /*
