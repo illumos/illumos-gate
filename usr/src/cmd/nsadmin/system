@@ -138,12 +138,6 @@ set dump_plat_mincpu=0
 set dump_bzip2_level=1
 
 *
-* See OS-1361 for dealing with the timer woes.
-*
-set pcplusmp:apic_timer_preferred_mode=0
-set apix:apic_timer_preferred_mode=0
-
-*
 * Want additional crash dump metrics
 *
 set dump_metrics_on=1
