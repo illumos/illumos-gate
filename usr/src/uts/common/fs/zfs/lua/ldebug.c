@@ -467,7 +467,7 @@ static const char *getfuncname (lua_State *L, CallInfo *ci, const char **name) {
       return getobjname(p, pc, GETARG_A(i), name);
     case OP_TFORCALL: {  /* for iterator */
       *name = "for iterator";
-       return "for iterator";
+      return "for iterator";
     }
     /* all other instructions can call only through metamethods */
     case OP_SELF:
