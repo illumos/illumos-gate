@@ -40,8 +40,6 @@ void vmx_msr_guest_exit(struct vmx *vmx, int vcpuid);
 int vmx_rdmsr(struct vmx *, int vcpuid, u_int num, uint64_t *val, bool *retu);
 int vmx_wrmsr(struct vmx *, int vcpuid, u_int num, uint64_t val, bool *retu);
 
-uint32_t vmx_revision(void);
-
 int vmx_set_ctlreg(int ctl_reg, int true_ctl_reg, uint32_t ones_mask,
 		   uint32_t zeros_mask, uint32_t *retval);
 

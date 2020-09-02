@@ -19920,6 +19920,7 @@ d usr/share/man/man9f 0755 root bin
 f usr/share/man/man9f/ASSERT.9f 0444 root bin
 s usr/share/man/man9f/AVL_NEXT.9f=avl.9f
 s usr/share/man/man9f/AVL_PREV.9f=avl.9f
+s usr/share/man/man9f/CRED.9f=credentials.9f
 f usr/share/man/man9f/Intro.9f 0444 root bin
 f usr/share/man/man9f/OTHERQ.9f 0444 root bin
 f usr/share/man/man9f/RD.9f 0444 root bin
@@ -20102,6 +20103,10 @@ f usr/share/man/man9f/copyb.9f 0444 root bin
 f usr/share/man/man9f/copyin.9f 0444 root bin
 f usr/share/man/man9f/copymsg.9f 0444 root bin
 f usr/share/man/man9f/copyout.9f 0444 root bin
+f usr/share/man/man9f/credentials.9f 0444 root bin
+s usr/share/man/man9f/crdup.9f=credentials.9f
+s usr/share/man/man9f/crfree.9f=credentials.9f
+s usr/share/man/man9f/crget.9f=credentials.9f
 s usr/share/man/man9f/crgetgid.9f=ddi_cred.9f
 s usr/share/man/man9f/crgetgroups.9f=ddi_cred.9f
 s usr/share/man/man9f/crgetngroups.9f=ddi_cred.9f
@@ -20111,6 +20116,7 @@ s usr/share/man/man9f/crgetsgid.9f=ddi_cred.9f
 s usr/share/man/man9f/crgetsuid.9f=ddi_cred.9f
 s usr/share/man/man9f/crgetuid.9f=ddi_cred.9f
 s usr/share/man/man9f/crgetzoneid.9f=ddi_cred.9f
+s usr/share/man/man9f/crhold.9f=credentials.9f
 f usr/share/man/man9f/csx_AccessConfigurationRegister.9f 0444 root bin
 f usr/share/man/man9f/csx_CS_DDI_Info.9f 0444 root bin
 f usr/share/man/man9f/csx_ConvertSize.9f 0444 root bin
@@ -20603,6 +20609,7 @@ s usr/share/man/man9f/inl.9f=inb.9f
 f usr/share/man/man9f/insq.9f 0444 root bin
 s usr/share/man/man9f/intro.9f=Intro.9f
 s usr/share/man/man9f/inw.9f=inb.9f
+s usr/share/man/man9f/kcred.9f=credentials.9f
 f usr/share/man/man9f/kiconv.9f 0444 root bin
 f usr/share/man/man9f/kiconv_close.9f 0444 root bin
 f usr/share/man/man9f/kiconv_open.9f 0444 root bin
@@ -21210,6 +21217,7 @@ s usr/share/man/man9f/vsprintf.9f=sprintf.9f
 s usr/share/man/man9f/vzcmn_err.9f=cmn_err.9f
 s usr/share/man/man9f/wr.9f=WR.9f
 s usr/share/man/man9f/zcmn_err.9f=cmn_err.9f
+s usr/share/man/man9f/zone_kcred.9f=credentials.9f
 d usr/share/man/man9p 0755 root bin
 s usr/share/man/man9p/Nblock.9p=size.9p
 s usr/share/man/man9p/blksize.9p=size.9p

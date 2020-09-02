@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Nexenta by DDN, Inc. All rights reserved.
  */
 
 #include <stdio.h>
@@ -26,6 +26,8 @@
 #include <sys/note.h>
 #include <synch.h>
 #include <thread.h>
+
+#include <ads/dsgetdc.h>
 
 #include "idmapd.h"
 #include "libadutils.h"
@@ -99,6 +101,12 @@ _krb5_override_service_locator(
 	 */
 	if ((ds = pgcfg->domain_controller) == NULL) {
 		rc = KRB5_REALM_CANT_RESOLVE;
+		goto out;
+	}
+
+	if ((ds->flags & DS_KDC_FLAG) == 0) {
+		idmapdlog(LOG_WARNING, "Domain Controller is not a KDC: "
+		    "Kerberos auth may be slow");
 		goto out;
 	}
 

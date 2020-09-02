@@ -447,6 +447,8 @@ smb2_fsctl_copychunk_meta(smb_request_t *sr, smb_ofile_t *src_of)
 	 * here don't generally have WRITE_DAC access (sigh) so we
 	 * have to bypass ofile access checks for this operation.
 	 * The file-system level still does its access checking.
+	 *
+	 * TODO: this should really copy the SACL, too.
 	 */
 	smb_fssd_init(&fs_sd, secinfo, sd_flags);
 	sr->fid_ofile = NULL;

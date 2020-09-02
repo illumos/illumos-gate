@@ -741,7 +741,12 @@ vmexit_spinup_ap(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
 	return (VMEXIT_CONTINUE);
 }
 
+#ifdef __FreeBSD__
 #define	DEBUG_EPT_MISCONFIG
+#else
+/* EPT misconfig debugging not possible now that raw VMCS access is gone */
+#endif
+
 #ifdef DEBUG_EPT_MISCONFIG
 #define	VMCS_GUEST_PHYSICAL_ADDRESS	0x00002400
 

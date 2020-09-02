@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/cpuvar.h>
@@ -33,6 +34,7 @@ struct hma_reg {
 static kmutex_t hma_lock;
 static list_t hma_registrations;
 static boolean_t hma_exclusive = B_FALSE;
+int hma_disable = 0;
 
 static boolean_t hma_vmx_ready = B_FALSE;
 static const char *hma_vmx_error = NULL;
@@ -88,6 +90,11 @@ hma_init(void)
 	mutex_init(&hma_lock, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&hma_registrations, sizeof (struct hma_reg),
 	    offsetof(struct hma_reg, hr_node));
+
+	if (hma_disable != 0) {
+		cmn_err(CE_CONT, "?hma_init: disabled");
+		return;
+	}
 
 	switch (cpuid_getvendor(CPU)) {
 	case X86_VENDOR_Intel:

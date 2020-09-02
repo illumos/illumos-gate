@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright 2020 RackTop Systems, Inc.
  */
 
@@ -641,6 +641,7 @@ typedef struct smb_trusted_domains {
 typedef struct smb_dcinfo {
 	char			dc_name[MAXHOSTNAMELEN];
 	smb_inaddr_t		dc_addr;
+	uint32_t		dc_flags;
 } smb_dcinfo_t;
 
 /*
