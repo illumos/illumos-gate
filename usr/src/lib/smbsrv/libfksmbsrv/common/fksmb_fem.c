@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc.  All rights reserved.
  */
 
 #include <sys/fcntl.h>
@@ -44,9 +44,10 @@ smb_fem_fcn_install(smb_node_t *node)
 }
 
 /* ARGSUSED */
-void
+int
 smb_fem_fcn_uninstall(smb_node_t *node)
 {
+	return (0);
 }
 
 /* ARGSUSED */

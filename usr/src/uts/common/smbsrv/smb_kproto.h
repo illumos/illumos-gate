@@ -570,7 +570,7 @@ void smb_nt_transact_notify_finish(void *);
 void smb2_change_notify_finish(void *);
 
 int smb_fem_fcn_install(smb_node_t *);
-void smb_fem_fcn_uninstall(smb_node_t *);
+int smb_fem_fcn_uninstall(smb_node_t *);
 int smb_fem_oplock_install(smb_node_t *);
 void smb_fem_oplock_uninstall(smb_node_t *);
 
