@@ -21,10 +21,10 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013, 2017 by Delphix. All rights reserved.
  * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2020 Joyent, Inc.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -1018,10 +1018,23 @@ finish:
 
 	/* If we have an upper handle (socket), release it */
 	if (IPCL_IS_NONSTR(connp)) {
-		ASSERT(connp->conn_upper_handle != NULL);
-		(*connp->conn_upcalls->su_closed)(connp->conn_upper_handle);
+		sock_upcalls_t *upcalls = connp->conn_upcalls;
+		sock_upper_handle_t handle = connp->conn_upper_handle;
+
+		ASSERT(upcalls != NULL);
+		ASSERT(upcalls->su_closed != NULL);
+		ASSERT(handle != NULL);
+		/*
+		 * Set these to NULL first because closed() will free upper
+		 * structures.  Acquire conn_lock because an external caller
+		 * like conn_get_socket_info() will upcall if these are
+		 * non-NULL.
+		 */
+		mutex_enter(&connp->conn_lock);
 		connp->conn_upper_handle = NULL;
 		connp->conn_upcalls = NULL;
+		mutex_exit(&connp->conn_lock);
+		upcalls->su_closed(handle);
 	}
 }
 
@@ -1435,13 +1448,26 @@ tcp_free(tcp_t *tcp)
 	 * nothing to do other than clearing the field.
 	 */
 	if (connp->conn_upper_handle != NULL) {
-		if (IPCL_IS_NONSTR(connp)) {
-			(*connp->conn_upcalls->su_closed)(
-			    connp->conn_upper_handle);
-			tcp->tcp_detached = B_TRUE;
-		}
+		sock_upcalls_t *upcalls = connp->conn_upcalls;
+		sock_upper_handle_t handle = connp->conn_upper_handle;
+
+		/*
+		 * Set these to NULL first because closed() will free upper
+		 * structures.  Acquire conn_lock because an external caller
+		 * like conn_get_socket_info() will upcall if these are
+		 * non-NULL.
+		 */
+		mutex_enter(&connp->conn_lock);
 		connp->conn_upper_handle = NULL;
 		connp->conn_upcalls = NULL;
+		mutex_exit(&connp->conn_lock);
+		if (IPCL_IS_NONSTR(connp)) {
+			ASSERT(upcalls != NULL);
+			ASSERT(upcalls->su_closed != NULL);
+			ASSERT(handle != NULL);
+			upcalls->su_closed(handle);
+			tcp->tcp_detached = B_TRUE;
+		}
 	}
 }
 

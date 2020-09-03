@@ -580,6 +580,7 @@ vm_set_vmcs_field(struct vmctx *ctx, int vcpu, int field, uint64_t val)
 }
 #endif /* __FreeBSD__ */
 
+#ifdef __FreeBSD__
 static int
 vm_get_vmcb_field(struct vmctx *ctx, int vcpu, int off, int bytes,
 	uint64_t *ret_val)
@@ -595,6 +596,23 @@ vm_set_vmcb_field(struct vmctx *ctx, int vcpu, int off, int bytes,
 	
 	return (vm_set_register(ctx, vcpu, VMCB_ACCESS(off, bytes), val));
 }
+#else /* __FreeBSD__ */
+/* Arbitrary VMCB read/write is not allowed */
+static int
+vm_get_vmcb_field(struct vmctx *ctx, int vcpu, int off, int bytes,
+	uint64_t *ret_val)
+{
+	*ret_val = 0;
+	return (0);
+}
+
+static int
+vm_set_vmcb_field(struct vmctx *ctx, int vcpu, int off, int bytes,
+	uint64_t val)
+{
+	return (EINVAL);
+}
+#endif /* __FreeBSD__ */
 
 enum {
 	VMNAME = 1000,	/* avoid collision with return values from getopt */
