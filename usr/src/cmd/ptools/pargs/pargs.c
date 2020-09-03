@@ -623,6 +623,7 @@ get_args(pargs_data_t *datap)
 	if (read_ptr_array(datap, argvoff, datap->pd_argv, argc) <= 0) {
 		free(datap->pd_argv);
 		datap->pd_argv = NULL;
+		datap->pd_argc = 0;
 		return;
 	}
 

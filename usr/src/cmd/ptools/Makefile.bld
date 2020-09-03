@@ -27,6 +27,8 @@
 
 PROG:sh = basename `cd ..; pwd`
 
+include ../../../Makefile.ctf
+
 OBJS = $(PROG).o
 
 SRCS = ../$(PROG).c
@@ -112,12 +114,15 @@ INSTALL_LEGACY=$(RM) $(ROOTPROCBINSYMLINK) ; \
 
 elfcap.o:	$(ELFCAP)/elfcap.c
 		$(COMPILE.c) -o $@ $(ELFCAP)/elfcap.c
+		$(POST_PROCESS_O)
 
 pmap_common.o:	$(PMAP)/pmap_common.c
 		$(COMPILE.c) -o $@ $(PMAP)/pmap_common.c
+		$(POST_PROCESS_O)
 
 %.o:	../%.c
 	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
 
 all:	$(PROG) $(LN_$(PROG))
 
