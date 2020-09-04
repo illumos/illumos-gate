@@ -1843,6 +1843,7 @@ esp_submit_req_inbound(mblk_t *esp_mp, ip_recv_attr_t *ira,
 	ipsec_stack_t *ipss = ns->netstack_ipsec;
 	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
 
+	mp = NULL;
 	do_auth = assoc->ipsa_auth_alg != SADB_AALG_NONE;
 	do_encr = assoc->ipsa_encr_alg != SADB_EALG_NULL;
 	force = (assoc->ipsa_flags & IPSA_F_ASYNC);
@@ -2172,6 +2173,7 @@ esp_submit_req_outbound(mblk_t *data_mp, ip_xmit_attr_t *ixa, ipsa_t *assoc,
 	esp3dbg(espstack, ("esp_submit_req_outbound:%s",
 	    is_natt ? "natt" : "not natt"));
 
+	mp = NULL;
 	do_encr = assoc->ipsa_encr_alg != SADB_EALG_NULL;
 	do_auth = assoc->ipsa_auth_alg != SADB_AALG_NONE;
 	force = (assoc->ipsa_flags & IPSA_F_ASYNC);
@@ -2441,6 +2443,7 @@ esp_outbound(mblk_t *data_mp, ip_xmit_attr_t *ixa)
 	 * Reality check....
 	 */
 	ipha = (ipha_t *)data_mp->b_rptr;  /* So we can call esp_acquire(). */
+	ip6h = (ip6_t *)ipha;
 
 	if (ixa->ixa_flags & IXAF_IS_IPV4) {
 		ASSERT(IPH_HDR_VERSION(ipha) == IPV4_VERSION);
@@ -2455,7 +2458,6 @@ esp_outbound(mblk_t *data_mp, ip_xmit_attr_t *ixa)
 		ASSERT(IPH_HDR_VERSION(ipha) == IPV6_VERSION);
 
 		af = AF_INET6;
-		ip6h = (ip6_t *)ipha;
 		bzero(&ipp, sizeof (ipp));
 		divpoint = ip_find_hdr_v6(data_mp, ip6h, B_FALSE, &ipp, NULL);
 		if (ipp.ipp_dstopts != NULL &&

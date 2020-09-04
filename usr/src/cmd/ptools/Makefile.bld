@@ -149,10 +149,6 @@ pmap_common.o:	$(PMAP)/pmap_common.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 
-%.o:	../../common/%.c
-	$(COMPILE.c) $<
-	$(POST_PROCESS_O)
-
 all:	$(PROG) $(LN_$(PROG))
 
 ROOTBINLN=$(LN_$(PROG):%=$(ROOTBIN)/%)
