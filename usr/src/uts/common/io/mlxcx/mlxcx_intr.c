@@ -12,6 +12,7 @@
 /*
  * Copyright (c) 2020, the University of Queensland
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -1195,12 +1196,17 @@ mlxcx_intr_setup(mlxcx_t *mlxp)
 		return (B_FALSE);
 	}
 	if (nintrs < 2) {
-		mlxcx_warn(mlxp, "%d MSI-X interrupts available, but mlxcx "
+		mlxcx_warn(mlxp, "%d MSI-X interrupts supported, but mlxcx "
 		    "requires 2", nintrs);
 		return (B_FALSE);
 	}
 
 	ret = ddi_intr_get_navail(dip, DDI_INTR_TYPE_MSIX, &navail);
+	if (ret != DDI_SUCCESS) {
+		mlxcx_warn(mlxp,
+		    "Failed to get number of available interrupts");
+		return (B_FALSE);
+	}
 	if (navail < 2) {
 		mlxcx_warn(mlxp, "%d MSI-X interrupts available, but mlxcx "
 		    "requires 2", navail);
@@ -1281,11 +1287,30 @@ mlxcx_intr_setup(mlxcx_t *mlxp)
 		    offsetof(mlxcx_completion_queue_t, mlcq_eq_entry));
 	}
 
-	ret = ddi_intr_set_pri(mlxp->mlx_intr_handles[0],
-	    mlxp->mlx_async_intr_pri);
-	if (ret != DDI_SUCCESS) {
-		mlxcx_warn(mlxp, "Failed to set interrupt priority to %u for "
+	while (mlxp->mlx_async_intr_pri > DDI_INTR_PRI_MIN) {
+		ret = ddi_intr_set_pri(mlxp->mlx_intr_handles[0],
+		    mlxp->mlx_async_intr_pri);
+		if (ret == DDI_SUCCESS)
+			break;
+		mlxcx_note(mlxp,
+		    "!Failed to set interrupt priority to %u for "
 		    "async interrupt vector", mlxp->mlx_async_intr_pri);
+		/*
+		 * If it was not possible to set the IPL for the async
+		 * interrupt to the desired value, then try a lower priority.
+		 * Some PSMs can only accommodate a limited number of vectors
+		 * at eatch priority level (or group of priority levels). Since
+		 * the async priority must be set higher than the ring
+		 * handlers, lower both. The ring handler priority is set
+		 * below.
+		 */
+		mlxp->mlx_async_intr_pri--;
+		mlxp->mlx_intr_pri--;
+	}
+
+	if (mlxp->mlx_async_intr_pri == DDI_INTR_PRI_MIN) {
+		mlxcx_warn(mlxp, "Failed to find an interrupt priority for "
+		    "async interrupt vector");
 		mlxcx_intr_teardown(mlxp);
 		return (B_FALSE);
 	}
@@ -1320,12 +1345,20 @@ mlxcx_intr_setup(mlxcx_t *mlxp)
 			eqt = MLXCX_EQ_TYPE_RX;
 		}
 
-		ret = ddi_intr_set_pri(mlxp->mlx_intr_handles[i],
-		    mlxp->mlx_intr_pri);
-		if (ret != DDI_SUCCESS) {
-			mlxcx_warn(mlxp, "Failed to set interrupt priority to "
-			    "%u for interrupt vector %d", mlxp->mlx_intr_pri,
-			    i);
+		while (mlxp->mlx_intr_pri >= DDI_INTR_PRI_MIN) {
+			ret = ddi_intr_set_pri(mlxp->mlx_intr_handles[i],
+			    mlxp->mlx_intr_pri);
+			if (ret == DDI_SUCCESS)
+				break;
+			mlxcx_note(mlxp, "!Failed to set interrupt priority to "
+			    "%u for interrupt vector %d",
+			    mlxp->mlx_intr_pri, i);
+			mlxp->mlx_intr_pri--;
+		}
+		if (mlxp->mlx_intr_pri < DDI_INTR_PRI_MIN) {
+			mlxcx_warn(mlxp,
+			    "Failed to find an interrupt priority for "
+			    "interrupt vector %d", i);
 			mlxcx_intr_teardown(mlxp);
 			return (B_FALSE);
 		}
