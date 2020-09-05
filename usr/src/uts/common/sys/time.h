@@ -15,6 +15,8 @@
  * Use is subject to license terms.
  *
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ *
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -356,14 +358,14 @@ extern	todinfo_t	utc_to_tod(time_t);
 extern	time_t		tod_to_utc(todinfo_t);
 extern	int		hr_clock_lock(void);
 extern	void		hr_clock_unlock(int);
-extern	hrtime_t 	gethrtime(void);
-extern	hrtime_t 	gethrtime_unscaled(void);
+extern	hrtime_t	gethrtime(void);
+extern	hrtime_t	gethrtime_unscaled(void);
 extern	hrtime_t	gethrtime_max(void);
 extern	hrtime_t	gethrtime_waitfree(void);
 extern	void		scalehrtime(hrtime_t *);
 extern	uint64_t	unscalehrtime(hrtime_t);
-extern	void 		gethrestime(timespec_t *);
-extern	time_t 		gethrestime_sec(void);
+extern	void		gethrestime(timespec_t *);
+extern	time_t		gethrestime_sec(void);
 extern	void		gethrestime_lasttick(timespec_t *);
 extern	void		hrt2ts(hrtime_t, timestruc_t *);
 extern	hrtime_t	ts2hrt(const timestruc_t *);
@@ -399,6 +401,7 @@ int futimesat(int, const char *, const struct timeval *);
 
 int getitimer(int, struct itimerval *);
 int utimes(const char *, const struct timeval *);
+
 #if defined(_XPG4_2)
 int setitimer(int, const struct itimerval *_RESTRICT_KYWD,
 	struct itimerval *_RESTRICT_KYWD);
@@ -408,6 +411,22 @@ int setitimer(int, struct itimerval *_RESTRICT_KYWD,
 #endif /* defined(_XPG2_2) */
 
 #endif /* !defined(_KERNEL) ... defined(_XPG4_2) */
+
+#if !defined(_KERNEL) && !defined(_STRICT_SYMBOLS)
+int futimes(int, const struct timeval *);
+int lutimes(const char *, const struct timeval *);
+
+#define	TIMESPEC_TO_TIMEVAL(tv, ts) { \
+	(tv)->tv_sec = (ts)->tv_sec; \
+	(tv)->tv_usec = (ts)->tv_nsec / 1000; \
+}
+
+#define	TIMEVAL_TO_TIMESPEC(tv, ts) { \
+	(ts)->tv_sec = (tv)->tv_sec; \
+	(ts)->tv_nsec = (tv)->tv_usec * 1000; \
+}
+
+#endif /* !defined(_KERNEL) && !defined(_STRICT_SYMBOLS) */
 
 /*
  * gettimeofday() and settimeofday() were included in SVr4 due to their

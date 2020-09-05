@@ -14,6 +14,7 @@
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Joyent, Inc.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/test/libctest@$(PKGVERS)
@@ -189,6 +190,8 @@ file path=opt/libc-tests/tests/timespec_get.32 mode=0555
 file path=opt/libc-tests/tests/timespec_get.64 mode=0555
 file path=opt/libc-tests/tests/uchar.32 mode=0555
 file path=opt/libc-tests/tests/uchar.64 mode=0555
+file path=opt/libc-tests/tests/utimes.32 mode=0555
+file path=opt/libc-tests/tests/utimes.64 mode=0555
 file path=opt/libc-tests/tests/wcsncasecmp-7344.32 mode=0555
 file path=opt/libc-tests/tests/wcsncasecmp-7344.64 mode=0555
 file path=opt/libc-tests/tests/wcsncasecmp-7350.32 mode=0555

@@ -15,6 +15,7 @@
 # Copyright 2013, OmniTI Computer Consulting, Inc.
 # Copyright 2017 Peter Tribble
 # Copyright 2018, Joyent, Inc.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 file path=usr/share/man/man2/Intro.2
@@ -192,6 +193,7 @@ link path=usr/share/man/man2/fstat.2 target=stat.2
 link path=usr/share/man/man2/fstatat.2 target=stat.2
 link path=usr/share/man/man2/fstatvfs.2 target=statvfs.2
 link path=usr/share/man/man2/futimens.2 target=utimes.2
+link path=usr/share/man/man2/futimes.2 target=utimes.2
 link path=usr/share/man/man2/futimesat.2 target=utimes.2
 link path=usr/share/man/man2/getaudit_addr.2 target=getaudit.2
 link path=usr/share/man/man2/getegid.2 target=getuid.2
@@ -205,9 +207,10 @@ link path=usr/share/man/man2/getprojid.2 target=settaskid.2
 link path=usr/share/man/man2/getrctl.2 target=setrctl.2
 link path=usr/share/man/man2/gettaskid.2 target=settaskid.2
 link path=usr/share/man/man2/intro.2 target=Intro.2
-link path=usr/share/man/man2/linkat.2 target=link.2
 link path=usr/share/man/man2/lchown.2 target=chown.2
+link path=usr/share/man/man2/linkat.2 target=link.2
 link path=usr/share/man/man2/lstat.2 target=stat.2
+link path=usr/share/man/man2/lutimes.2 target=utimes.2
 link path=usr/share/man/man2/mkdirat.2 target=mkdir.2
 link path=usr/share/man/man2/mknodat.2 target=mknod.2
 link path=usr/share/man/man2/openat.2 target=open.2

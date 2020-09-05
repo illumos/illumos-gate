@@ -1,0 +1,106 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd Sep 06, 2020
+.Dt timespec 3HEAD
+.Os
+.Sh NAME
+.Nm timespec ,
+.Nm timeval ,
+.Nm TIMESPEC_TO_TIMEVAL ,
+.Nm TIMEVAL_TO_TIMESPEC
+.Nd time structures and conversion
+.Sh SYNOPSIS
+.In sys/time.h
+.Ft void
+.Fo TIMESPEC_TO_TIMEVAL
+.Fa "struct timeval *tv"
+.Fa "const struct timespec *ts"
+.Fc
+.Ft void
+.Fo TIMEVAL_TO_TIMESPEC
+.Fa "const struct timeval *tv"
+.Fa "struct timespec *ts"
+.Fc
+.Sh DESCRIPTION
+The
+.Vt timeval
+and
+.Vt timespec
+structures are declared in the
+.In time.h
+and
+.In sys/time.h
+headers respectively:
+.Bd -literal -offset indent
+typedef struct timespec {
+	time_t		tv_sec;		/* seconds */
+	long		tv_nsec;	/* and nanoseconds */
+} timespec_t;
+
+struct timeval {
+	time_t		tv_sec;		/* seconds */
+	suseconds_t	tv_usec;	/* and microseconds */
+};
+.Ed
+.Pp
+In both cases, the
+.Fa tv_sec
+member represents elapsed time in whole seconds.
+The
+.Fa tv_nsec
+and
+.Fa tv_usec
+members represent the rest of the elapsed time in nanoseconds and
+microseconds respectively, depending on the structure.
+.Pp
+The
+.Dv TIMEVAL_TO_TIMESPEC
+macro can be used to convert a
+.Vt struct timeval
+structure to a
+.Vt struct timespec
+structure, while the
+.Dv TIMESPEC_TO_TIMEVAL
+macro works in the opposite direction.
+.Pp
+When converting from a
+.Vt struct timespec
+to a
+.Vt struct timeval
+structure, the
+.Fa tv_nsec
+member is truncated, losing precision.
+When converting from a
+.Vt struct timeval
+to a
+.Vt struct timespec
+structure, the
+.Fa tv_usec
+member is multiplied by 1000 to reach the precision of the target
+structure.
+The
+.Fa tv_sec
+member is always preserved, no matter which conversion is performed.
+.Pp
+Note that the
+.Dv TIMEVAL_TO_TIMESPEC
+and
+.Dv TIMESPEC_TO_TIMEVAL
+macros are non-standard but are commonly found on UNIX and UNIX-like systems.
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr time.h 3HEAD

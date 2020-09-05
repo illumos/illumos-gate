@@ -43,16 +43,26 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright (c) 2014, Joyent, Inc.
+.\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.TH UTIMES 2 "Dec 20, 2014"
+.TH UTIMES 2 "Sep 06, 2020"
 .SH NAME
-utimes, futimesat \- set file access and modification times
+utimes, lutimes, futimes, futimesat, utimens, utimensat \- set file access and modification times
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/time.h>
 
 \fBint\fR \fButimes\fR(\fBconst char *\fR\fIpath\fR, \fBconst struct timeval\fR \fItimes\fR[2]);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBlutimes\fR(\fBconst char *\fR\fIpath\fR, \fBconst struct timeval\fR \fItimes\fR[2]);
+.fi
+
+.LP
+.nf
+\fBint\fR \fBfutimes\fR(\fBint\fR \fIfildes\fR, \fBconst struct timeval\fR \fItimes\fR[2]);
 .fi
 
 .LP
@@ -65,16 +75,25 @@ utimes, futimesat \- set file access and modification times
 .nf
 #include <sys/stat.h>
 
-\fBint\fR \fBfutimens\fR(\fBint\fR \fIfiledes\fR, \fBconst timespec_t\fR \fInstimes[2]\fR);
+\fBint\fR \fBfutimens\fR(\fBint\fR \fIfildes\fR, \fBconst timespec_t\fR \fInstimes[2]\fR);
 
-\fBint\fR \fButimensat\fR(\fBint\fR \fIfiledes\fR, \fBconst char *\fR\fIpath\fR,
+\fBint\fR \fButimensat\fR(\fBint\fR \fIfildes\fR, \fBconst char *\fR\fIpath\fR,
     \fBconst timespec_t\fR \fInstimes[2]\fR, \fBint\fR \fIflag\fR);
 
 .SH DESCRIPTION
-.LP
 The \fButimes()\fR function sets the access and modification times of the file
 pointed to by the \fIpath\fR argument to the value of the \fItimes\fR argument.
 It allows time specifications accurate to the microsecond.
+.sp
+.LP
+The \fBlutimes()\fR function operates like \fButimes()\fR except if \fIpath\fR
+points to a symbolic link; in that case \fBlutimes()\fR changes the access and
+modifications times of the link, while \fButimes()\fR changes the file that
+is referenced by the link.
+.sp
+.LP
+The \fBfutimes()\fR function sets the access and modification times of the
+file referenced by the file descriptor \fIfildes\fR.
 .sp
 .LP
 The \fBfutimesat()\fR function also sets access and modification times.  See
@@ -84,7 +103,7 @@ rather than the current working directory.  If \fIfildes\fR is set to
 \fBAT_FDCWD\fR, defined in <\fBfcntl.h\fR>, \fBfutimesat()\fR resolves the path
 relative to the current working directory.  If \fIpath\fR is a null pointer,
 \fBfutimesat()\fR sets the access and modification times on the file referenced
-by \fIfildes\fR. The \fIfildes\fR argument is ignored even when
+by \fIfildes\fR. The \fIfildes\fR argument is ignored if
 \fBfutimesat()\fR is provided with an absolute path.
 .sp
 .LP
@@ -107,28 +126,28 @@ The \fBfutimens()\fR and \fButimensat()\fR functions also set access and
 modification times; however, instead of taking \fBstruct timeval\fR, they take
 \fBtimespec_t\fR which allows for nanosecond granularity. The \fBfutimens()\fR
 function sets the access and modification times on the file descriptor
-referenced by \fIfiledes\fR.
+referenced by \fIfildes\fR.
 .sp
 .LP
 The \fButimensat()\fR function determines the file to set the access and
-modification times in an similar way to \fBfutemsat()\fR. If the argument
-\fIpath\fR is an absolute path, then the argument \fIfiledes\fR is ignored;
+modification times in an similar way to \fBfutimesat()\fR. If the argument
+\fIpath\fR is an absolute path, then the argument \fIfildes\fR is ignored;
 otherwise, \fIpath\fR is interpreted as a path relative to the directory
-specified by \fIfiledes\fR. If \fIfiledes\fR is set to \fBAT_FDCWD\fR, then
+specified by \fIfildes\fR. If \fIfildes\fR is set to \fBAT_FDCWD\fR, then
 \fIpath\fR is resolved relative to the current working directory. The behavior
 when encountering symbolic links may be controlled by the value of the
 \fIflag\fR argument. If the value of flag is the constant
 \fBAT_SYMLINK_NOFOLLOW\fR, then when a symbolic link is encountered while
 resolving a path, it will not be followed. Otherwise, the value of \fIflag\fR
-should be \fB0\fR.
+should be \fB0\fR. Note that, unlike \fBfutimesat()\fR, \fButimensat()\fR
+does not accept a null pointer for the \fIpath\fR argument.
 .SH RETURN VALUES
-.LP
 Upon successful completion, \fB0\fR is returned.  Otherwise, \fB\(mi1\fR is
 returned, \fBerrno\fR is set to indicate the error, and the file times will not
 be affected.
 .SH ERRORS
-.LP
-The \fButimes()\fR, \fBfutimesat()\fR, \fBfutimens()\fR, and \fButimensat()\fR
+The \fButimes()\fR, \fBlutimes()\fR, \fBfutimes()\fR, \fBfutimesat()\fR,
+\fBfutimens()\fR, and \fButimensat()\fR
 functions will fail if:
 .sp
 .ne 2
@@ -147,9 +166,7 @@ process does not match the owner of the file and write access is denied.
 \fB\fBEFAULT\fR\fR
 .ad
 .RS 16n
-The \fIpath\fR or \fItimes\fR argument points to an illegal address. For
-\fBfutimesat()\fR, \fIpath\fR might have the value \fINULL\fR if the
-\fIfildes\fR argument refers to a valid open file descriptor.
+The \fIpath\fR or \fItimes\fR argument points to an illegal address.
 .RE
 
 .sp
@@ -159,6 +176,7 @@ The \fIpath\fR or \fItimes\fR argument points to an illegal address. For
 .ad
 .RS 16n
 A signal was caught during the execution of the \fButimes()\fR,
+\fBlutimes()\fR, \fBfutimes()\fR,
 \fBfutimesat()\fR, \fBfutimens()\fR, or \fButimensat()\fR functions.
 .RE
 
@@ -270,7 +288,6 @@ length exceeds {\fIPATH_MAX\fR}.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -290,6 +307,5 @@ Standard	See below.
 .LP
 For \fButimes()\fR, \fButimensat()\fR and \fBfutimensat()\fR, see \fBstandards\fR(5).
 .SH SEE ALSO
-.LP
-\fBfutimens\fR(2), \fBstat\fR(2), \fButime\fR(2), \fBattributes\fR(5),
+fBstat\fR(2), \fButime\fR(2), \fBattributes\fR(5),
 \fBfsattr\fR(5), \fBstandards\fR(5)

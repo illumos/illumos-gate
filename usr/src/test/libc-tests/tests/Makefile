@@ -13,6 +13,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
 # Copyright 2019 Joyent, Inc.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 SUBDIRS = \
@@ -52,7 +53,8 @@ PROGS = \
 	wcsncasecmp \
 	wcsncasecmp-7344 \
 	wcsncasecmp-7350 \
-	uchar
+	uchar \
+	utimes
 
 SCRIPTS = \
 	quick_exit \
