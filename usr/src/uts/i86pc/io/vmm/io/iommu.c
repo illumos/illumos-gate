@@ -204,12 +204,8 @@ iommu_find_device(dev_info_t *dip, void *arg)
 static void
 iommu_init(void)
 {
-	int error, bus, slot, func;
+	int error;
 	vm_paddr_t maxaddr;
-#ifdef __FreeBSD__
-	devclass_t dc;
-#endif
-	device_t dev;
 
 	if (!iommu_enable)
 		return;
@@ -246,35 +242,7 @@ iommu_init(void)
 	 */
 	iommu_create_mapping(host_domain, 0, 0, maxaddr);
 
-#ifdef __FreeBSD__
-	add_tag = EVENTHANDLER_REGISTER(pci_add_device, iommu_pci_add, NULL, 0);
-	delete_tag = EVENTHANDLER_REGISTER(pci_delete_device, iommu_pci_delete,
-	    NULL, 0);
-	dc = devclass_find("ppt");
-	for (bus = 0; bus <= PCI_BUSMAX; bus++) {
-		for (slot = 0; slot <= PCI_SLOTMAX; slot++) {
-			for (func = 0; func <= PCI_FUNCMAX; func++) {
-				dev = pci_find_dbsf(0, bus, slot, func);
-				if (dev == NULL)
-					continue;
-
-				/* Skip passthrough devices. */
-				if (dc != NULL &&
-				    device_get_devclass(dev) == dc)
-					continue;
-
-				/*
-				 * Everything else belongs to the host
-				 * domain.
-				 */
-				iommu_add_device(host_domain,
-				    pci_get_rid(dev));
-			}
-		}
-	}
-#else
 	ddi_walk_devs(ddi_root_node(), iommu_find_device, (void *)B_TRUE);
-#endif
 	IOMMU_ENABLE();
 
 }

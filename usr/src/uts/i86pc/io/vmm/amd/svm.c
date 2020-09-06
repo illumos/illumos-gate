@@ -1937,7 +1937,7 @@ svm_dr_leave_guest(struct svm_regctx *gctx)
  * Start vcpu with specified RIP.
  */
 static int
-svm_vmrun(void *arg, int vcpu, register_t rip, pmap_t pmap,
+svm_vmrun(void *arg, int vcpu, uint64_t rip, pmap_t pmap,
 	struct vm_eventinfo *evinfo)
 {
 	struct svm_regctx *gctx;
@@ -2121,7 +2121,7 @@ svm_vmcleanup(void *arg)
 	free(sc, M_SVM);
 }
 
-static register_t *
+static uint64_t *
 swctx_regptr(struct svm_regctx *regctx, int reg)
 {
 	switch (reg) {
@@ -2171,7 +2171,7 @@ svm_getreg(void *arg, int vcpu, int ident, uint64_t *val)
 {
 	struct svm_softc *sc;
 	struct vmcb *vmcb;
-	register_t *regp;
+	uint64_t *regp;
 	uint64_t *fieldp;
 	struct vmcb_segment *seg;
 
@@ -2233,7 +2233,7 @@ svm_setreg(void *arg, int vcpu, int ident, uint64_t val)
 {
 	struct svm_softc *sc;
 	struct vmcb *vmcb;
-	register_t *regp;
+	uint64_t *regp;
 	uint64_t *fieldp;
 	uint32_t dirty;
 	struct vmcb_segment *seg;
