@@ -310,7 +310,7 @@ setattrat(int basefd, xattr_view_t view, const char *name, nvlist_t *request)
 void
 libc_nvlist_free(nvlist_t *nvp)
 {
-	nvfree(nvp);
+	(void) nvfree(nvp);
 }
 
 int
