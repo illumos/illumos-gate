@@ -208,10 +208,10 @@ cleanup:
  * either still allowed or not deprecated.
  *
  * RETURN VALUES
- * 	Return a pointer to the new salt, the caller is responsible
- * 	for using free(3c) on the return value.
- * 	Returns NULL on error and sets errno to one of:
- * 		EINVAL, ELIBACC, ENOMEM
+ *	Return a pointer to the new salt, the caller is responsible
+ *	for using free(3c) on the return value.
+ *	Returns NULL on error and sets errno to one of:
+ *		EINVAL, ELIBACC, ENOMEM
  */
 char *
 crypt_gensalt(const char *oldsalt, const struct passwd *userinfo)
@@ -570,7 +570,7 @@ getalgbyname(const char *algname, boolean_t *found)
 			*found = B_TRUE;
 		}
 	}
-	if (!found) {
+	if (!(*found)) {
 		errno = EINVAL;
 		goto cleanup;
 	}
@@ -731,7 +731,7 @@ free_crypt_policy(struct crypt_policy_s *policy)
 
 /*
  * isa_path - prepend the default dir or patch up the $ISA in path
- * 	Caller is responsible for calling free(3c) on the result.
+ *	Caller is responsible for calling free(3c) on the result.
  */
 static char *
 isa_path(const char *path)
@@ -778,10 +778,10 @@ isa_path(const char *path)
 /*ARGSUSED*/
 static char *
 _unix_crypt_gensalt(char *gsbuffer,
-	    size_t gsbufflen,
-	    const char *oldpuresalt,
-	    const struct passwd *userinfo,
-	    const char *argv[])
+    size_t gsbufflen,
+    const char *oldpuresalt,
+    const struct passwd *userinfo,
+    const char *argv[])
 {
 	static const char saltchars[] =
 	    "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -807,7 +807,7 @@ _unix_crypt_gensalt(char *gsbuffer,
 
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 
