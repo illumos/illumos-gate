@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -475,7 +475,7 @@ getutline(const struct utmp *entry)
  * to the /etc/utmp file.
  */
 
-#define	UTMP_UPDATE 	"/usr/lib/utmp_update"
+#define	UTMP_UPDATE	"/usr/lib/utmp_update"
 #define	STRSZ	64	/* Size of char buffer for argument strings */
 
 static struct utmpx *
@@ -1054,7 +1054,7 @@ allocid(char *srcid, unsigned char *saveid)
 				 */
 				saveid[i] = 0;
 				while (!isalnum(saveid[i]))
-				saveid[i]++;
+					saveid[i]++;
 				copyid[i] = ++saveid[i];
 			}
 		}
