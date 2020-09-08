@@ -53,6 +53,7 @@
 #include <sys/byteorder.h>
 #include <sys/errno.h>
 #include <sys/u8_textprep_data.h>
+#include <sys/sysmacros.h>
 
 
 /* The maximum possible number of bytes in a UTF-8 character. */
@@ -871,6 +872,8 @@ do_decomp(size_t uv, uchar_t *u8s, uchar_t *s, int sz,
 		start_id = u8_decomp_b4_16bit_tbl[uv][b3_tbl][b4];
 		end_id = u8_decomp_b4_16bit_tbl[uv][b3_tbl][b4 + 1];
 	} else {
+		if (b3_tbl >= ARRAY_SIZE(u8_decomp_b4_tbl[uv]))
+			return ((size_t)sz);
 		start_id = u8_decomp_b4_tbl[uv][b3_tbl][b4];
 		end_id = u8_decomp_b4_tbl[uv][b3_tbl][b4 + 1];
 	}
@@ -1018,6 +1021,8 @@ find_composition_start(size_t uv, uchar_t *s, size_t sz)
 		start_id = u8_composition_b4_16bit_tbl[uv][b3_tbl][b4];
 		end_id = u8_composition_b4_16bit_tbl[uv][b3_tbl][b4 + 1];
 	} else {
+		if (b3_tbl >= ARRAY_SIZE(u8_composition_b4_tbl[uv]))
+			return (NULL);
 		start_id = u8_composition_b4_tbl[uv][b3_tbl][b4];
 		end_id = u8_composition_b4_tbl[uv][b3_tbl][b4 + 1];
 	}
