@@ -84,8 +84,9 @@ extern "C" {
 	(__NSW_COMMON_ACTION(act) || \
 	    ((act) == __NSW_TRYAGAIN_FOREVER) || \
 	    ((act) == __NSW_TRYAGAIN_NTIMES))
-#define	__NSW_UNPAUSE_ACTION(act)\
-	(((act) == __NSW_TRYAGAIN_PAUSED) && ((act) = __NSW_TRYAGAIN_NTIMES))
+#define	__NSW_UNPAUSE_ACTION(act)	\
+	{ if ((act) == __NSW_TRYAGAIN_PAUSED) \
+		(act) = __NSW_TRYAGAIN_NTIMES; }
 
 #define	__NSW_STR_FOREVER	"forever"
 
@@ -106,7 +107,7 @@ struct __nsw_switchconfig_v1 {
 	struct __nsw_lookup_v1 *lookups;
 };
 
-#define	__NSW_ACTION_V1(lkp, err) 	\
+#define	__NSW_ACTION_V1(lkp, err)	\
 	((lkp)->next == NULL ? \
 		__NSW_RETURN \
 	: \
