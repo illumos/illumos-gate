@@ -544,7 +544,7 @@ FAIL:
 	if (rv != 0) {
 		if (softc->flags & TSAL_OPENED)
 			(void) ldi_close(softc->lh, FREAD|FWRITE, credp);
-		if (softc->flags * TSAL_IDENTED)
+		if (softc->flags & TSAL_IDENTED)
 			(void) ldi_ident_release(softc->li);
 		softc->flags &= ~(TSAL_OPENED | TSAL_IDENTED);
 		if (softc->req_ptr != NULL)

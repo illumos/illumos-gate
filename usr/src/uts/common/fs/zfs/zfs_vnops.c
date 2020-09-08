@@ -4839,7 +4839,7 @@ zfs_seek(vnode_t *vp, offset_t ooff, offset_t *noffp,
 {
 	if (vp->v_type == VDIR)
 		return (0);
-	return ((*noffp < 0 || *noffp > MAXOFFSET_T) ? EINVAL : 0);
+	return ((*noffp < 0) ? EINVAL : 0);
 }
 
 /*

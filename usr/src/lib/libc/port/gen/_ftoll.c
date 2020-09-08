@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include <sys/isa_defs.h>
 #include <floatingpoint.h>
@@ -104,7 +102,7 @@ __dtoll(double dval)
 	default:
 		if (exp > 30) {
 			m1 = (m0 << (exp - 30)) |
-			    (m1 >> (62 - exp)) & ~(-1 << (exp - 30));
+			    (m1 >> (62 - exp)) & ~(UINT_MAX << (exp - 30));
 			m0 >>= 62 - exp;
 		} else {
 			m1 = m0 >> (30 - exp);
@@ -275,7 +273,7 @@ _Q_qtoll(long double longdbl)
 	default:
 		if (exp > 30) {
 			m1 = (m0 << (exp - 30)) |
-			    (m1 >> (62 - exp)) & ~(-1 << (exp - 30));
+			    (m1 >> (62 - exp)) & ~(UINT_MAX << (exp - 30));
 			m0 >>= 62 - exp;
 		} else {
 			m1 = m0 >> (30 - exp);

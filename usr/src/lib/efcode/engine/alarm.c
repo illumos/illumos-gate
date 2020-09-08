@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -54,8 +52,8 @@ catch_alarm(int signo)
 	if (env && alarm_xt && alarm_ms) {
 		PUSH(DS, alarm_xt);
 		execute(env);
-		signal(SIGALRM, catch_alarm);
-		alarm((alarm_ms + 999)/1000);
+		(void) signal(SIGALRM, catch_alarm);
+		(void) alarm((alarm_ms + 999)/1000);
 	}
 }
 
@@ -71,17 +69,17 @@ do_alarm(fcode_env_t *env)
 	ms = POP(DS);
 	xt = POP(DS);
 	if (ms == 0) {
-		alarm(0);
-		signal(SIGALRM, SIG_DFL);
+		(void) alarm(0);
+		(void) signal(SIGALRM, SIG_DFL);
 		alarm_xt = 0;
 		alarm_ms = 0;
 		alarm_env = 0;
 	} else {
-		signal(SIGALRM, catch_alarm);
+		(void) signal(SIGALRM, catch_alarm);
 		alarm_xt = xt;
 		alarm_ms = ms;
 		alarm_env = env;
-		alarm((ms + 999)/1000);
+		(void) alarm((ms + 999)/1000);
 	}
 }
 

@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include <fcode/private.h>
@@ -51,7 +49,7 @@ do_encode_unit(fcode_env_t *env)
 	hi = POP(DS);
 	lo = POP(DS);
 	hi = ((hi >> 1) & 0x1f);
-	sprintf(buf, "%x,%x", hi, lo);
+	(void) sprintf(buf, "%x,%x", hi, lo);
 	push_a_string(env, buf);
 }
 

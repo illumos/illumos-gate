@@ -1,5 +1,6 @@
 '\" te
 .\"  Copyright 1989 AT&T Copyright (c) 2008 Sun Microsystems, Inc. All Rights Reserved.
+.\"  Copyright 2020 (c) Sergio Aguayo, All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -7,7 +8,6 @@
 .SH NAME
 dispadmin \- process scheduler administration
 .SH SYNOPSIS
-.LP
 .nf
 \fBdispadmin\fR \fB-l\fR
 .fi
@@ -23,8 +23,6 @@ dispadmin \- process scheduler administration
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBdispadmin\fR command displays or changes process scheduler parameters
 while the system is running.
 .sp
@@ -35,8 +33,6 @@ not attempt to analyze the effect that the new values have on the performance
 of the system. Inappropriate values can have a negative effect on system
 performance. (See \fISystem Administration Guide: Advanced Administration\fR.)
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -48,9 +44,9 @@ The following options are supported:
 Specifies the class whose parameters are to be displayed or changed. Valid
 \fIclass\fR values are: \fBRT\fR for the real-time class, \fBTS\fR for the
 time-sharing class, \fBIA\fR for the inter-active class, \fBFSS\fR for the
-fair-share class, and FX for the fixed-priority class. The time-sharing and
-inter-active classes share the same scheduler, so changes to the scheduling
-parameters of one will change those of the other.
+fair-share class, and \fBFX\fR for the fixed-priority class. The time-sharing
+and inter-active classes share the same scheduler, so changes to the
+scheduling parameters of one will change those of the other.
 .RE
 
 .sp
@@ -142,7 +138,6 @@ the table at the same time you are overwriting it.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRRetrieving the Current Scheduler Parameters for the real-time
 class
 .sp
@@ -209,7 +204,6 @@ dispadmin \fB-c\fR TS \fB-s\fR ts.config
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/dispadmin.conf\fR\fR
@@ -220,8 +214,6 @@ Possible location for argument to \fB-s\fR option.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBpriocntl\fR(1), \fBsvcs\fR(1), \fBsvcadm\fR(1M), \fBpriocntl\fR(2),
 \fBfx_dptbl\fR(4), \fBrt_dptbl\fR(4), \fBts_dptbl\fR(4), \fBattributes\fR(5),
 \fBsmf\fR(5), \fBFSS\fR(7)
@@ -229,14 +221,10 @@ Possible location for argument to \fB-s\fR option.
 .LP
 \fI\fR \fI\fR
 .SH DIAGNOSTICS
-.sp
-.LP
 \fBdispadmin\fR prints an appropriate diagnostic message if it fails to
 overwrite the current scheduler parameters due to lack of required permissions
 or a problem with the specified input file.
 .SH NOTES
-.sp
-.LP
 The default scheduling class setting facility is managed by the service
 management facility, \fBsmf\fR(5), under the service identifier:
 .sp

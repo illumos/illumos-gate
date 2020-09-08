@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -157,10 +155,9 @@ upload_nodes(fcode_env_t *env)
 void
 validate_nodes(fcode_env_t *env)
 {
-	int error;
 	common_data_t *cdp = env->private;
 
-	error = ioctl(cdp->fcode_fd, FC_VALIDATE);
+	(void) ioctl(cdp->fcode_fd, FC_VALIDATE);
 }
 
 #pragma init(_init)

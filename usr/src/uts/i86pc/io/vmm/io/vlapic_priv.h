@@ -27,6 +27,18 @@
  *
  * $FreeBSD$
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ *
+ * Copyright 2020 Oxide Computer Company
+ */
 
 #ifndef _VLAPIC_PRIV_H_
 #define	_VLAPIC_PRIV_H_
@@ -140,6 +152,10 @@ enum boot_state {
 
 #define VLAPIC_TMR_CNT		8
 
+#ifdef DEBUG
+#define	__ISRVEC_DEBUG
+#endif
+
 struct vlapic;
 
 struct vlapic_ops {
@@ -166,15 +182,6 @@ struct vlapic {
 	struct bintime	timer_period_bt; /* timer period */
 	struct mtx	timer_mtx;
 
-	/*
-	 * The 'isrvec_stk' is a stack of vectors injected by the local apic.
-	 * A vector is popped from the stack when the processor does an EOI.
-	 * The vector on the top of the stack is used to compute the
-	 * Processor Priority in conjunction with the TPR.
-	 */
-	uint8_t		isrvec_stk[ISRVEC_STK_SIZE];
-	int		isrvec_stk_top;
-
 	uint64_t	msr_apicbase;
 	enum boot_state	boot_state;
 
@@ -199,6 +206,19 @@ struct vlapic {
 	 */
 	uint32_t	tmr_vec_deassert[VLAPIC_TMR_CNT];
 	uint32_t	tmr_vec_assert[VLAPIC_TMR_CNT];
+
+#ifdef __ISRVEC_DEBUG
+	/*
+	 * The 'isrvec_stk' is a stack of vectors injected by the local APIC.
+	 * It is used as a debugging method to double-check the behavior of the
+	 * emulation.  Vectors are pushed to the stack when they are accepted
+	 * for injection and popped from the stack when the processor performs
+	 * an EOI.  The vector on the top of the stack is used to verify the
+	 * computed Processor Priority.
+	 */
+	uint8_t		isrvec_stk[ISRVEC_STK_SIZE];
+	int		isrvec_stk_top;
+#endif
 };
 
 void vlapic_init(struct vlapic *vlapic);

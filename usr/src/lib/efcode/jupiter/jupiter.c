@@ -239,7 +239,7 @@ do_device_id(fcode_env_t *env)
 	lo = POP(DS);
 
 	portid = 0;
-	if (cdp && cdp->fc.unit_address &&
+	if (cdp != NULL && *cdp->fc.unit_address != '\0' &&
 	    ((buf = strdup(cdp->fc.unit_address)) != NULL)) {
 		/*
 		 * Get portid number from unit_address

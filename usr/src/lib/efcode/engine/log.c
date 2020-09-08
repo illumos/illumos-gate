@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Daemon log message.  This can direct log messages to either stdout,
  * an error log file or syslog (or any combination).
@@ -183,22 +181,22 @@ log_message(int msg_level, char *fmt, ...)
 
 	va_start(ap, fmt);
 
-	vsprintf(msg, fmt, ap);
+	(void) vsprintf(msg, fmt, ap);
 
 	if (log_to_stdout(msg_level)) {
 		printf(msg);
 		fflush(stdout);
 	}
 	if (log_to_error_log(msg_level)) {
-		fprintf(error_log_fp, msg);
-		fflush(error_log_fp);
+		(void) fprintf(error_log_fp, msg);
+		(void) fflush(error_log_fp);
 	}
 	if (log_to_syslog(msg_level)) {
 		if (strlen(log_msg) + strlen(msg) > LOG_LINESIZE - 1) {
 			syslog(msg_level_to_syslog(msg_level), log_msg);
 			log_msg[0] = '\0';
 		}
-		strcat(log_msg, msg);
+		(void) strcat(log_msg, msg);
 		if ((p = strchr(log_msg, '\n')) != NULL) {
 			*p = '\0';
 			syslog(msg_level_to_syslog(msg_level), log_msg);
@@ -221,7 +219,7 @@ debug_msg(int debug_level, char *fmt, ...)
 
 	va_start(ap, fmt);
 
-	vsprintf(msg, fmt, ap);
+	(void) vsprintf(msg, fmt, ap);
 
 	log_message(MSG_DEBUG, msg);
 }
@@ -237,8 +235,8 @@ log_perror(int msg_level, char *fmt, ...)
 
 	va_start(ap, fmt);
 
-	vsprintf(msg, fmt, ap);
-	sprintf(tmp, "%s: %s\n", msg, strerror(errno));
+	(void) vsprintf(msg, fmt, ap);
+	(void) sprintf(tmp, "%s: %s\n", msg, strerror(errno));
 	log_message(msg_level, tmp);
 }
 
@@ -333,7 +331,7 @@ set_error_log(fcode_env_t *env)
 			return;
 		}
 		if (error_log_fp)
-			fclose(error_log_fp);
+			(void) fclose(error_log_fp);
 		if (error_log_name)
 			FREE(error_log_name);
 		error_log_fp = fp;

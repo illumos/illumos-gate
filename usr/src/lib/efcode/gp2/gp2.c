@@ -163,9 +163,9 @@ do_encode_unit(fcode_env_t *env)
 	off = lo & 0x7fffff;		/* build config offset */
 
 	if (off) {
-		sprintf(enc_buf, "%x,%x", id, off);
+		(void) sprintf(enc_buf, "%x,%x", id, off);
 	} else {
-		sprintf(enc_buf, "%x", id);
+		(void) sprintf(enc_buf, "%x", id);
 	}
 	debug_msg(DEBUG_REG_ACCESS, "gp2:encode_unit ( %x %x ) -> '%s'\n",
 	    (int)hi, (int)lo, enc_buf);

@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -85,7 +83,7 @@ fc_run_priv(common_data_t *cdp, char *service, int nin, int nout, ...)
 		error_msg = "Error";
 		error = 1;
 	}
-	if ((error & !no_err) ||
+	if ((error && !no_err) ||
 	    (get_interpreter_debug_level() & DEBUG_REG_ACCESS)) {
 		if (error)
 			log_message(MSG_ERROR, "%s: FC_RUN_PRIV: %s: ",

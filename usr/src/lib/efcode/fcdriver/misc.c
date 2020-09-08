@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -463,11 +461,11 @@ get_eeprom_value(fcode_env_t *env, char *name)
 	FILE *fd;
 	char buf[80], *p;
 
-	sprintf(buf, "eeprom '%s'", name);
+	(void) sprintf(buf, "eeprom '%s'", name);
 	if ((fd = popen(buf, "r")) == NULL)
 		return (NULL);
-	fgets(buf, sizeof (buf), fd);
-	pclose(fd);
+	(void) fgets(buf, sizeof (buf), fd);
+	(void) pclose(fd);
 	if ((p = strchr(buf, '\n')) != NULL)
 		*p = '\0';
 	if ((p = strchr(buf, '=')) != NULL)

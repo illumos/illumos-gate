@@ -178,8 +178,8 @@ save_fcode_to_file(fcode_env_t *env)
 		return;
 	}
 	log_message(MSG_INFO, "Fcode %p,%x to file '%s'\n", buf, len, fname);
-	fwrite(buf, len, sizeof (char), fd);
-	fclose(fd);
+	(void) fwrite(buf, len, sizeof (char), fd);
+	(void) fclose(fd);
 }
 
 void
@@ -325,7 +325,7 @@ get_request(fcode_env_t *env)
 	common_data_t *cdp = env->private;
 
 	if (cdp->fcode_fd >= 0)
-		close(cdp->fcode_fd);
+		(void) close(cdp->fcode_fd);
 	if (!open_fcode_dev(env))
 		exit(1);
 	if (!fc_get_request(cdp)) {
@@ -405,7 +405,7 @@ finish_request(fcode_env_t *env)
 {
 	common_data_t *cdp = env->private;
 
-	close(cdp->fcode_fd);
+	(void) close(cdp->fcode_fd);
 }
 
 /*

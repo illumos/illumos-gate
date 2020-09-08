@@ -241,9 +241,9 @@ do_encode_unit(fcode_env_t *env)
 	dev = ((hi >> 11) & 0x1f);
 
 	if (fn) {
-		sprintf(enc_buf, "%x,%x", dev, fn);
+		(void) sprintf(enc_buf, "%x,%x", dev, fn);
 	} else {
-		sprintf(enc_buf, "%x", dev);
+		(void) sprintf(enc_buf, "%x", dev);
 	}
 	debug_msg(DEBUG_REG_ACCESS, "pci:encode-unit ( %x ) -> %s\n",
 	    hi, enc_buf);
@@ -287,7 +287,7 @@ do_device_id(fcode_env_t *env)
 	PUSH(DS, cfgadd + PCI_CONF_DEVID);
 	config_wfetch(env);
 	dev_id = POP(DS);
-	sprintf(buf, "pci%x,%x", ven_id, dev_id);
+	(void) sprintf(buf, "pci%x,%x", ven_id, dev_id);
 	push_a_string(env, STRDUP(buf));
 }
 
@@ -311,7 +311,8 @@ do_class_id(fcode_env_t *env)
 	PUSH(DS, cfgadd + PCI_CONF_PROGCLASS);
 	config_bfetch(env);
 	progclass = POP(DS);
-	sprintf(buf, "pciclass%02x%02x%02x", basclass, subclass, progclass);
+	(void) sprintf(buf, "pciclass%02x%02x%02x", basclass, subclass,
+	    progclass);
 	push_a_string(env, STRDUP(buf));
 }
 

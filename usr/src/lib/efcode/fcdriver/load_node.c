@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -71,22 +69,22 @@ build_default_search_path(char *arch)
 	struct utsname utsname;
 	int len;
 
-	sysinfo(SI_PLATFORM, platform, sizeof (platform));
-	uname(&utsname);
+	(void) sysinfo(SI_PLATFORM, platform, sizeof (platform));
+	(void) uname(&utsname);
 	len = strlen(search_proto) + strlen(platform) + strlen(utsname.machine);
 	if (*arch != '\0') {
 		len += len + (3 * strlen(arch)) + 1;
 	}
 	default_search_path = MALLOC(len);
 	if (*arch != '\0') {
-		sprintf(default_search_path, search_proto, platform, arch,
-		    utsname.machine, arch, arch);
+		(void) sprintf(default_search_path, search_proto, platform,
+		    arch, utsname.machine, arch, arch);
 		p = default_search_path + strlen(default_search_path);
 		*p++ = ':';
 	} else
 		p = default_search_path;
 
-	sprintf(p, search_proto, platform, "", utsname.machine, "", "");
+	(void) sprintf(p, search_proto, platform, "", utsname.machine, "", "");
 }
 
 static void
@@ -121,7 +119,7 @@ search_path(char *name, char *search, int (*fn)(char *))
 		if ((next_p = strchr(p, ':')) != NULL)
 			*next_p++ = '\0';
 		tpath = MALLOC(strlen(p) + strlen(name) + 2);
-		sprintf(tpath, "%s/%s", p, name);
+		(void) sprintf(tpath, "%s/%s", p, name);
 		if ((*fn)(tpath)) {
 			FREE(fpath);
 			return (tpath);
@@ -169,13 +167,13 @@ is_fcode_file(char *path)
 	if (fstat(fd, &statb) != 0 || read(fd, header, sizeof (header)) < 0) {
 		debug_msg(DEBUG_FIND_FCODE, "%s: '%s' can't fstat/read\n",
 		    func_name, path);
-		close(fd);
+		(void) close(fd);
 		return (0);
 	}
 	status = check_fcode_header(path, header, statb.st_size);
 	debug_msg(DEBUG_FIND_FCODE, "%s: '%s' format %s\n", func_name, path,
 	    status ? "OK" : "NOT OK");
-	close(fd);
+	(void) close(fd);
 	return (status);
 }
 
@@ -194,7 +192,7 @@ find_lib_file(fcode_env_t *env, char *prefix, char *name, char *suffix,
 	}
 
 	lib_name = MALLOC(strlen(name) + strlen(prefix) + strlen(suffix) + 1);
-	sprintf(lib_name, "%s%s%s", prefix, name, suffix);
+	(void) sprintf(lib_name, "%s%s%s", prefix, name, suffix);
 	fname = search_path(lib_name, search, fn);
 	FREE(lib_name);
 	return (fname);
@@ -245,8 +243,8 @@ install_node_data(fcode_env_t *env, device_t *d)
 		 * build the property node returned, so we have to grab a copy
 		 * of the data.
 		 */
-		strcpy(libname, (char *)p->data);
-		strcat(libname, "_");
+		(void) strcpy(libname, (char *)p->data);
+		(void) strcat(libname, "_");
 	} else
 		libname[0] = '\0';
 
@@ -261,7 +259,7 @@ install_node_data(fcode_env_t *env, device_t *d)
 	 * the property node returned, so we have to grab a copy of the
 	 * data.
 	 */
-	strcat(libname, (char *)p->data);
+	(void) strcat(libname, (char *)p->data);
 
 	debug_msg(DEBUG_FIND_FCODE, "%s: `%s` lname: '%s'\n", func_name,
 	    get_path(env, d), libname);

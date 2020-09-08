@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -97,7 +95,7 @@ output_return_stack(fcode_env_t *env, int show_wa, int msglevel)
 	for (i = (RS - env->rs0) - 1; i > 0; i--) {
 		anyout++;
 		log_message(msglevel, "%s ",
-			    acf_backup_search(env, (acf_t)env->rs0[i+1]));
+		    acf_backup_search(env, (acf_t)env->rs0[i+1]));
 	}
 	if (!anyout)
 		log_message(msglevel, "<empty> ");
@@ -239,7 +237,7 @@ acf_to_str(acf_t acf)
 {
 	static char msg[(sizeof (acf) * 2) + 3];
 
-	sprintf(msg, "(%08p)", acf);
+	(void) sprintf(msg, "(%08p)", acf);
 	return (msg);
 }
 
@@ -622,9 +620,9 @@ verify_usage(fcode_env_t *env)
 		verify = env->table[i].flags & (ANSI_WORD|P1275_WORD);
 		if ((verify) &&
 #ifdef DEBUG
-			(env->table[i].usage == 0) &&
+		    (env->table[i].usage == 0) &&
 #endif
-			(env->table[i].apf)) {
+		    (env->table[i].apf)) {
 			log_message(MSG_DEBUG,
 			    "Untested: %4x %32s acf = %8p, %8p\n", i,
 			    env->table[i].name, env->table[i].apf,
@@ -726,11 +724,11 @@ debug_flags_to_mask(char *str)
 		if (*str == '0') {
 			str++;
 			if (*str == 'x' || *str == 'X') {
-				sscanf(str + 1, "%x", &flags);
+				(void) sscanf(str + 1, "%x", &flags);
 			} else
-				sscanf(str, "%o", &flags);
+				(void) sscanf(str, "%o", &flags);
 		} else
-			sscanf(str, "%d", &flags);
+			(void) sscanf(str, "%d", &flags);
 		return (flags);
 	}
 	if (strcmp(str, "clear") == 0)
@@ -929,13 +927,13 @@ ctrace(fcode_env_t *env)
 	FILE *fd;
 
 	log_message(MSG_DEBUG, "Interpreter C Stack:\n");
-	sprintf(buf, "/usr/proc/bin/pstack %d", getpid());
+	(void) sprintf(buf, "/usr/proc/bin/pstack %d", getpid());
 	if ((fd = popen(buf, "r")) == NULL)
 		log_perror(MSG_ERROR, "Can't run: %s", buf);
 	else {
 		while (fgets(buf, sizeof (buf), fd))
 			log_message(MSG_DEBUG, buf);
-		fclose(fd);
+		(void) fclose(fd);
 	}
 }
 
@@ -969,7 +967,7 @@ forth_abort(fcode_env_t *env, char *fmt, ...)
 	in_forth_abort++;
 
 	va_start(ap, fmt);
-	vsprintf(msg, fmt, ap);
+	(void) vsprintf(msg, fmt, ap);
 	log_message(MSG_ERROR, "ABORT: %s\n", msg);
 
 	if (env) {
@@ -995,7 +993,7 @@ forth_perror(fcode_env_t *env, char *fmt, ...)
 	int save_errno = errno;	/* just in case... */
 
 	va_start(ap, fmt);
-	vsprintf(msg, fmt, ap);
+	(void) vsprintf(msg, fmt, ap);
 
 	forth_abort(env, "%s: %s", msg, strerror(save_errno));
 }
@@ -1048,7 +1046,7 @@ dump(fcode_env_t *env)
 	offset = ((long)data) & 0xf;
 	len += offset;
 	data = (uchar_t *)((long)data & ~0xf);
-	sprintf(buf, "%p", data);
+	(void) sprintf(buf, "%p", data);
 	print_bytes_header(strlen(buf), offset);
 	for (len += offset; len > 0; len -= 16, data += 16)
 		dump_line(data);
@@ -1412,7 +1410,7 @@ dot_calls(fcode_env_t *env)
 {
 	acf_t acf = (acf_t)POP(DS);
 
-	search_all_dictionaries(env, do_dot_calls, acf);
+	(void) search_all_dictionaries(env, do_dot_calls, acf);
 	output_acf_name(NULL);
 }
 
@@ -1484,7 +1482,7 @@ do_memory_watch(fcode_env_t *env)
 			    "memory-watch: %p/%d: %llx -> %llx\n",
 			    mw_addr, mw_size, (uint64_t)mw_lastvalue,
 			    (uint64_t)value);
-			do_fclib_step(env);
+			(void) do_fclib_step(env);
 		}
 		mw_lastvalue = value;
 	}

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -288,7 +286,7 @@ f_exit(fcode_env_t *env)
 
 #define	COMPARE(cmp, rhs)	((((s_lforth_t)TOS) cmp((s_lforth_t)(rhs))) ? \
 				    TRUE : FALSE)
-#define	UCOMPARE(cmp, rhs) 	((((u_lforth_t)TOS) cmp((u_lforth_t)(rhs))) ? \
+#define	UCOMPARE(cmp, rhs)	((((u_lforth_t)TOS) cmp((u_lforth_t)(rhs))) ? \
 				    TRUE : FALSE)
 #define	EQUALS		==
 #define	NOTEQUALS	!=
@@ -689,7 +687,7 @@ pack_str(fcode_env_t *env)
 	str = (char *)TOS;
 	TOS = (fstack_t)buf;
 	*buf++ = (uchar_t)len;
-	strncpy(buf, str, (len&0xff));
+	(void) strncpy(buf, str, (len&0xff));
 }
 
 void
@@ -2416,7 +2414,7 @@ throw_from_fclib(fcode_env_t *env, fstack_t errcode, char *fmt, ...)
 	char msg[256];
 
 	va_start(ap, fmt);
-	vsprintf(msg, fmt, ap);
+	(void) vsprintf(msg, fmt, ap);
 
 	if (errcode) {
 

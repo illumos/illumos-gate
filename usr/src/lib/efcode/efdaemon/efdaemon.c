@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * efdaemon - Emebbed Fcode Interpreter daemon.
  *
@@ -89,7 +87,7 @@ main(int argc, char **argv)
 			    strerror(errno));
 		exit(1);
 	}
-	close(fd);
+	(void) close(fd);
 
 	/*
 	 * Ensure that /usr/lib/efcode/efcode.sh exists and is executable.
@@ -113,10 +111,10 @@ main(int argc, char **argv)
 	/*
 	 * detach from tty here.
 	 */
-	setpgrp();
-	close(0);
-	close(1);
-	close(2);
+	(void) setpgrp();
+	(void) close(0);
+	(void) close(1);
+	(void) close(2);
 	(void) open("/dev/null", O_RDWR);
 	(void) dup(0);
 	(void) dup(0);
@@ -127,7 +125,7 @@ main(int argc, char **argv)
 			if (nerr == 1)
 				syslog(LOG_ERR, "Can't open %s: %s\n",
 				    dev_fcode_file, strerror(errno));
-			sleep(1);
+			(void) sleep(1);
 		}
 		if (nerr > 1) {
 			syslog(LOG_ERR, "Open on %s failed %d times\n",
@@ -138,7 +136,7 @@ main(int argc, char **argv)
 		if (nbytes < 0) {
 			syslog(LOG_ERR, "Read of %s: %s\n", dev_fcode_file,
 			    strerror(errno));
-			close(fd);
+			(void) close(fd);
 			continue;
 		}
 		if (debug)
@@ -148,7 +146,7 @@ main(int argc, char **argv)
 			if (nerr == 1)
 				syslog(LOG_ERR, "Fork failed: %s\n",
 				    strerror(errno));
-			sleep(1);
+			(void) sleep(1);
 		}
 		if ((nerr > 1) && pid) {
 			syslog(LOG_ERR, "Fork failed %d times\n", nerr);
@@ -178,19 +176,19 @@ main(int argc, char **argv)
 				}
 			} else if (debug)
 				syslog(LOG_DEBUG, "Wait: pid: %d\n", pid);
-			close(fd);
+			(void) close(fd);
 			continue;
 		}
 		if (debug)
 			syslog(LOG_DEBUG, "Child: %d processing request\n",
 			    getpid());
-		fcntl(fd, F_DUP2FD, 0);
+		(void) fcntl(fd, F_DUP2FD, 0);
 		while (execl("/bin/sh", "sh", efcode_sh_file, NULL)) {
 			nerr++;
 			if (nerr == 1)
 				syslog(LOG_ERR, "execl(/bin/sh) failed: %s\n",
 				    strerror(errno));
-			sleep(1);
+			(void) sleep(1);
 		}
 	}
 

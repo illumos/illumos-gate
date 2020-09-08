@@ -64,7 +64,7 @@ do_emit(fcode_env_t *env, uchar_t c)
 	if (isatty(fileno(stdout))) {
 		if ((c >= 0x20 && c <= 0x7f) || c == '\n' || c == '\r' ||
 		    c == '\b')
-			putchar(c);
+			(void) putchar(c);
 		else if (c < 0x20)
 			printf("@%c", c + '@');
 		else
@@ -100,14 +100,14 @@ keyquestion(fcode_env_t *env)
 {
 	struct timeval timeval;
 	fd_set readfds;
-	int ret;
 
 	if (isatty(fileno(stdin))) {
 		FD_ZERO(&readfds);
 		FD_SET(fileno(stdin), &readfds);
 		timeval.tv_sec = 0;
 		timeval.tv_usec = 1000;
-		ret = select(fileno(stdin) + 1, &readfds, NULL, NULL, &timeval);
+		(void) select(fileno(stdin) + 1, &readfds, NULL, NULL,
+		    &timeval);
 		if (FD_ISSET(fileno(stdin), &readfds))
 			PUSH(DS, TRUE);
 		else
@@ -125,7 +125,7 @@ key(fcode_env_t *env)
 	uchar_t c;
 
 	if (isatty(fileno(stdin))) {
-		read(fileno(stdin), &c, 1);
+		(void) read(fileno(stdin), &c, 1);
 		PUSH(DS, c);
 	} else
 		forth_abort(env, "'key' called in non-interactive mode");
@@ -178,7 +178,7 @@ expect(fcode_env_t *env)
 	read_line(env);
 	rbuf = pop_a_string(env, NULL);
 	if (rbuf) {
-		strcpy(buf, rbuf);
+		(void) strcpy(buf, rbuf);
 		env->span = strlen(buf);
 	} else
 		env->span = 0;
@@ -201,7 +201,7 @@ do_ms(fcode_env_t *env)
 	if (d) {
 		rqtp.tv_sec = 0;
 		rqtp.tv_nsec = d*1000*1000;
-		nanosleep(&rqtp, 0);
+		(void) nanosleep(&rqtp, 0);
 	}
 }
 
@@ -212,12 +212,12 @@ do_get_msecs(fcode_env_t *env)
 	long ms;
 	timespec_t rqtp;
 
-	gettimeofday(&tp, NULL);
+	(void) gettimeofday(&tp, NULL);
 	ms = (tp.tv_usec/1000) + (tp.tv_sec * 1000);
 	PUSH(DS, (fstack_t)ms);
 	rqtp.tv_sec = 0;
 	rqtp.tv_nsec = 1000*1000;
-	nanosleep(&rqtp, 0);
+	(void) nanosleep(&rqtp, 0);
 }
 
 #define	CMN_MSG_SIZE	256
@@ -334,7 +334,7 @@ validfmt(char *fmt, cmn_fmt_t *cfstr)
 		/* if too many digits in the width return error */
 		if (nbytes > CMN_MAX_DIGITS)
 			return (1);
-		strncpy(cdigs, dig1, nbytes);
+		(void) strncpy(cdigs, dig1, nbytes);
 		cdigs[nbytes] = 0;
 		*cwidth = atoi(cdigs);
 	}
@@ -353,6 +353,7 @@ validfmt(char *fmt, cmn_fmt_t *cfstr)
 	case '%':
 		if (isll)
 			return (1);
+		/* FALLTHROUGH */
 	case 'd':
 	case 'x':
 		*format = *fmt;
@@ -408,6 +409,7 @@ fmt_args(fcode_env_t *env, int cw, int fw, char format, long *arg,
 		switch (format) {
 		case 'x':
 			cnv = 16;
+			/* FALLTHROUGH */
 		case 'd':
 		case 'c':
 		case 'p':
@@ -551,9 +553,9 @@ fmt_str(fcode_env_t *env, char *fmt, char *fmtbuf, int bsize)
 			}
 
 			bytes = pct - fmt;
-			strncpy(tbuf, fmt, bytes);
-			strncpy(tbuf+bytes, "%", 1);
-			strncpy(tbuf+bytes+1, fmt+bytes, 1);
+			(void) strncpy(tbuf, fmt, bytes);
+			(void) strncpy(tbuf+bytes, "%", 1);
+			(void) strncpy(tbuf+bytes+1, fmt+bytes, 1);
 			bytes += 2;
 			tbuf[bytes] = 0;
 
@@ -561,25 +563,25 @@ fmt_str(fcode_env_t *env, char *fmt, char *fmtbuf, int bsize)
 			    "fmt_str: invalid format type! (%s)\n",
 			    tbuf+bytes-3);
 
-			strncpy(fmtbuf, tbuf, bsize);
+			(void) strncpy(fmtbuf, tbuf, bsize);
 			return;
 		}
 
 		if (fw > 0) {	/* process normal (not long) formats */
 			bytes = pct - fmt + fw;
-			strncpy(tbuf, fmt, bytes);
+			(void) strncpy(tbuf, fmt, bytes);
 			tbuf[bytes] = 0;
 		} else {
 			/* if here, fw must be a long format */
 			if (*fmptr == 'p') {
 				bytes = pct - fmt - fw;
-				strncpy(tbuf, fmt, bytes);
+				(void) strncpy(tbuf, fmt, bytes);
 				tbuf[bytes] = 0;
 			} else {
 				bytes = pct - fmt - fw - 2;
-				strncpy(tbuf, fmt, bytes);
+				(void) strncpy(tbuf, fmt, bytes);
 				tbuf[bytes] = 'l';
-				strncpy(tbuf+bytes+1, fmt+bytes, 2);
+				(void) strncpy(tbuf+bytes+1, fmt+bytes, 2);
 				tbuf[bytes+1+2] = 0;
 			}
 		}
@@ -616,7 +618,7 @@ fmt_str(fcode_env_t *env, char *fmt, char *fmtbuf, int bsize)
 			(void) snprintf(fmtbuf, bsize, tbuf, llarg);
 
 	} else
-		strncpy(fmtbuf, fmt, bsize);
+		(void) strncpy(fmtbuf, fmt, bsize);
 }
 
 /*
@@ -718,13 +720,13 @@ fc_cmn_start(fcode_env_t *env, char *head, int path)
 	new->prev = root;
 	if (root != 0)
 		root->next = new;
-	strcpy(new->buf, head);
+	(void) strcpy(new->buf, head);
 	new->len = strlen(head);
 	if (path && env->current_device) {
 		dpath = get_path(env, env->current_device);
-		strcpy(new->buf+new->len, dpath);
+		(void) strcpy(new->buf+new->len, dpath);
 		new->len += strlen(dpath);
-		strncpy(new->buf+new->len++, ": ", 2);
+		(void) strncpy(new->buf+new->len++, ": ", 2);
 		++new->len;
 		free(dpath);
 	}
