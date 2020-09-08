@@ -27,6 +27,7 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2025 Hans Rosenfeld
+# Copyright 2025 MNX Cloud, Inc.
 #
 
 LIBCDIR=	$(SRC)/lib/libc
@@ -1233,6 +1234,11 @@ pics/arc4random.o :=	CPPFLAGS += -I$(SRC)/common/crypto/chacha
 pics/__clock_gettime.o := CPPFLAGS += $(COMMPAGE_CPPFLAGS)
 pics/__gethrtime.o := CPPFLAGS += $(COMMPAGE_CPPFLAGS)
 pics/gettimeofday.o := CPPFLAGS += $(COMMPAGE_CPPFLAGS)
+
+# because of char_to_decimal.h
+pics/file_decim.o := SMOFF += indenting
+pics/func_decim.o := SMOFF += indenting
+pics/string_decim.o := SMOFF += indenting
 
 #
 # Disable the stack protector due to issues with bootstrapping rtld. See

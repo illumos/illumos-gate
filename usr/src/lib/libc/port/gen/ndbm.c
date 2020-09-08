@@ -23,6 +23,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2025 MNX Cloud, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -765,7 +766,7 @@ dbm_access(DBM *db, unsigned long hash)
 			    PBLKSIZ)) {
 				db->dbm_flags |= _DBM_IOERR;
 			}
-		dbm_clrdirty(db);
+			dbm_clrdirty(db);
 		}
 
 		db->dbm_pagbno = my_blkno;

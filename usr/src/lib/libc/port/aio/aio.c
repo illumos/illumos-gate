@@ -1963,8 +1963,8 @@ _aio_req_del(aio_worker_t *aiowp, aio_req_t *reqp, int ostate)
 			if (aiowp->work_prev1 == next) {
 				ASSERT(ostate == AIO_REQ_INPROGRESS &&
 				    !POSIX_AIO(reqp) && aiowp->work_done1 > 0);
-					aiowp->work_prev1 = NULL;
-					aiowp->work_done1--;
+				aiowp->work_prev1 = NULL;
+				aiowp->work_done1--;
 			}
 
 			if (ostate == AIO_REQ_QUEUED) {
