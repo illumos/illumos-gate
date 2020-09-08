@@ -63,7 +63,7 @@ memset_s(void *s, rsize_t smax, int c, rsize_t n)
 		 * memset() called through a volatile pointer to guarantee
 		 * it will not be optimized away.
 		 */
-		(*__memset_vp)(s, v, lim);
+		(void) (*__memset_vp)(s, v, lim);
 
 		if (n > RSIZE_MAX) {
 			__throw_constraint_handler_s("memset_s: n > RSIZE_MAX",
