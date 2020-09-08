@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2025 MNX Cloud, Inc.
  */
 
 #include "lint.h"
@@ -2225,9 +2226,6 @@ _aio_rw(aiocb_t *aiocbp, aio_lio_t *lio_head, aio_worker_t **nextworker,
 	if ((flg & AIO_NO_DUPS) &&
 	    _aio_hash_insert(&aiocbp->aio_resultp, reqp) != 0) {
 		aio_panic("_aio_rw(): request already in hash table");
-		_aio_req_free(reqp);
-		errno = EINVAL;
-		return (-1);
 	}
 	_aio_req_add(reqp, nextworker, mode);
 	return (0);
@@ -2338,9 +2336,6 @@ _aio_rw64(aiocb64_t *aiocbp, aio_lio_t *lio_head, aio_worker_t **nextworker,
 	if ((flg & AIO_NO_DUPS) &&
 	    _aio_hash_insert(&aiocbp->aio_resultp, reqp) != 0) {
 		aio_panic("_aio_rw64(): request already in hash table");
-		_aio_req_free(reqp);
-		errno = EINVAL;
-		return (-1);
 	}
 	_aio_req_add(reqp, nextworker, mode);
 	return (0);
