@@ -1428,7 +1428,6 @@ load_zoneinfo(const char *name, state_t *sp)
 	char	*bufp;
 	size_t	flen;
 	prev_t	*prevp;
-/* LINTED */
 	struct	tzhead *tzhp;
 	struct	stat64	stbuf;
 	ttinfo_t	*most_recent_alt = NULL;
@@ -1436,8 +1435,12 @@ load_zoneinfo(const char *name, state_t *sp)
 	ttinfo_t	*ttisp;
 
 
-	if (name == NULL && (name = TZDEFAULT) == NULL)
-		return (-1);
+	if (name == NULL) {
+		/* May TZDEFAULT be function call? */
+		name = TZDEFAULT;
+		if (name == NULL)
+			return (-1);
+	}
 
 	if ((name[0] == '/') || strstr(name, "../"))
 		return (-1);
