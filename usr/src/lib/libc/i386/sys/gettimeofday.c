@@ -40,9 +40,10 @@ gettimeofday(struct timeval *tv, void *tz)
 	 * and layout of their members, the conversion can be done in-place.
 	 */
 	if (cp != NULL && __cp_can_gettime(cp) != 0) {
-		__cp_clock_gettime_realtime(cp, (struct timespec *)tv);
+		(void) __cp_clock_gettime_realtime(cp, (struct timespec *)tv);
 	} else {
-		__clock_gettime_sys(CLOCK_REALTIME, (struct timespec *)tv);
+		(void) __clock_gettime_sys(CLOCK_REALTIME,
+		    (struct timespec *)tv);
 	}
 	/* Convert from tv_nsec to tv_usec */
 	tv->tv_usec /= 1000;
