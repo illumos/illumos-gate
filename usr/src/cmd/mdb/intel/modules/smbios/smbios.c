@@ -28,7 +28,7 @@
  * _KERNEL. Therefore we have to manually declare an extern delaration for
  * strerror().
  */
-extern char *strerror(int);
+extern const char *strerror(int);
 
 /*
  * Take an existing smbios_hdl_t from a dump and slurp out its memory so we can

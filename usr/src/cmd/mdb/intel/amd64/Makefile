@@ -27,7 +27,7 @@
 include ../../Makefile.common
 
 MODULES = $(COMMON_MODULES_PROC) $(COMMON_MODULES_KVM)
-MODULES += disk_label uhci libsmbios
+MODULES += disk_label uhci
 
 SUBDIRS = mdb mdb_ks kmdb libstandctf libstand .WAIT $(MODULES)
 
