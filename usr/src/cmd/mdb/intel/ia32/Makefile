@@ -28,7 +28,7 @@
 include ../../Makefile.common
 
 MODULES = $(COMMON_MODULES_PROC) $(COMMON_MODULES_PROC_32BIT)
-MODULES += disk_label
+MODULES += disk_label libsmbios
 
 SUBDIRS = mdb .WAIT $(MODULES)
 
