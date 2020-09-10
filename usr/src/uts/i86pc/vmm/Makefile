@@ -62,8 +62,6 @@ INC_PATH	+= -I$(UTSBASE)/i86pc/io/vmm -I$(UTSBASE)/i86pc/io/vmm/io
 AS_INC_PATH	+= -I$(UTSBASE)/i86pc/io/vmm -I$(OBJS_DIR)
 
 CFLAGS		+= -_gcc=-Wimplicit-function-declaration
-# The FreeBSD %# notation makes gcc gripe
-CFLAGS		+= -_gcc=-Wno-format
 # enable collection of VMM statistics
 CFLAGS		+= -DVMM_KEEP_STATS
 

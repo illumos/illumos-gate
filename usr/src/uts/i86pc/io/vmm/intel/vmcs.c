@@ -178,7 +178,7 @@ vmcs_clear(uintptr_t vmcs_pa)
 	    : "memory");
 
 	if (err != 0) {
-		panic("vmclear(%p) error %d", vmcs_pa, err);
+		panic("vmclear(%p) error %d", (void *)vmcs_pa, err);
 	}
 
 	/*
@@ -208,7 +208,7 @@ vmcs_initialize(struct vmcs *vmcs, uintptr_t vmcs_pa)
 	    : "memory");
 
 	if (err != 0) {
-		panic("vmclear(%p) error %d", vmcs_pa, err);
+		panic("vmclear(%p) error %d", (void *)vmcs_pa, err);
 	}
 }
 
@@ -232,7 +232,7 @@ vmcs_load(uintptr_t vmcs_pa)
 	    : "memory");
 
 	if (err != 0) {
-		panic("vmptrld(%p) error %d", vmcs_pa, err);
+		panic("vmptrld(%p) error %d", (void *)vmcs_pa, err);
 	}
 }
 
@@ -267,6 +267,6 @@ vmcs_write(uint32_t encoding, uint64_t val)
 	    : "memory");
 
 	if (error != 0) {
-		panic("vmwrite(%x, %x) error %d", encoding, val, error);
+		panic("vmwrite(%x, %lx) error %d", encoding, val, error);
 	}
 }
