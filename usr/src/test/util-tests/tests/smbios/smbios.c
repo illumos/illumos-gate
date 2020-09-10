@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*
@@ -219,7 +220,23 @@ static const smbios_test_t smbios_tests[] = {
 	    .st_mktable = smbios_test_slot_mktable,
 	    .st_canopen = B_TRUE,
 	    .st_verify = smbios_test_slot_verify,
-	    .st_desc = "slot tests"
+	    .st_desc = "slot 3.2"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION_34,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_slot_mktable_34_nopeers,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_slot_verify_34_nopeers,
+	    .st_desc = "slot 3.4 without peers"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION_34,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_slot_mktable_34_peers,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_slot_verify_34_peers,
+	    .st_desc = "slot 3.4 with peers"
 	}, {
 	    .st_entry = SMBIOS_ENTRY_POINT_30,
 	    .st_tvers = SMB_VERSION,

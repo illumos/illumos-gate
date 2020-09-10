@@ -22,6 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -250,7 +251,24 @@ typedef struct smb_slot {
 	uint8_t	smbsl_dbw;		/* Data bus width */
 	uint8_t	smbsl_npeers;		/* Peer bdf groups */
 	smb_slot_peer_t smbsl_peers[];	/* bifurcation peers */
+	/* There are later additions in 3.4+, see smbios_slot_cont_t */
 } smb_slot_t;
+
+/*
+ * After the variable number of smbsl_peers, the smbios_slot has continued in
+ * size and has the following members defined as of version 3.4. These occur
+ * starting at byte 14 + 5 * smbsl_npeers.
+ */
+typedef struct smb_slot_cont {
+	uint8_t smbsl_info;		/* slot info */
+	uint8_t smbsl_pwidth;		/* slot physical width */
+	uint16_t smbsl_pitch;		/* slot pitch */
+} smb_slot_cont_t;
+
+/*
+ * The first byte that the smb_slot_cont_t is defined to start at.
+ */
+#define	SMB_SLOT_CONT_START	0x14
 
 /*
  * SMBIOS implementation structure for SMB_TYPE_OBDEVS.
