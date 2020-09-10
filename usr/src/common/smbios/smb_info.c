@@ -22,6 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -232,13 +233,24 @@ smb_info_strptr(const smb_struct_t *stp, uint8_t off, int *n)
 }
 
 static void
+smb_info_bcopy_offset(const smb_header_t *hp, void *dst, size_t dstlen,
+    size_t offset)
+{
+	if (offset >= hp->smbh_len) {
+		bzero(dst, dstlen);
+	} else if (offset + dstlen > hp->smbh_len) {
+		size_t nvalid = MIN(hp->smbh_len - offset, dstlen);
+		bcopy((char *)hp + offset, dst, nvalid);
+		bzero((char *)dst + nvalid, dstlen - nvalid);
+	} else {
+		bcopy((char *)hp + offset, dst, dstlen);
+	}
+}
+
+static void
 smb_info_bcopy(const smb_header_t *hp, void *dst, size_t dstlen)
 {
-	if (dstlen > hp->smbh_len) {
-		bcopy(hp, dst, hp->smbh_len);
-		bzero((char *)dst + hp->smbh_len, dstlen - hp->smbh_len);
-	} else
-		bcopy(hp, dst, dstlen);
+	return (smb_info_bcopy_offset(hp, dst, dstlen, 0));
 }
 
 smbios_entry_point_t
@@ -674,6 +686,8 @@ smbios_info_slot(smbios_hdl_t *shp, id_t id, smbios_slot_t *sp)
 {
 	const smb_struct_t *stp = smb_lookup_id(shp, id);
 	smb_slot_t s;
+	smb_slot_cont_t cont;
+	size_t off;
 
 	if (stp == NULL)
 		return (-1); /* errno is set for us */
@@ -700,6 +714,24 @@ smbios_info_slot(smbios_hdl_t *shp, id_t id, smbios_slot_t *sp)
 		sp->smbl_dbw = s.smbsl_dbw;
 		sp->smbl_npeers = s.smbsl_npeers;
 	}
+
+	if (!smb_libgteq(shp, SMB_VERSION_34)) {
+		return (0);
+	}
+
+	/*
+	 * In SMBIOS 3.4, several members were added to follow the variable
+	 * number of peers. These are defined to start at byte 0x14 + 5 *
+	 * npeers. If the table is from before 3.4, we simple zero things out.
+	 * Otherwise we check if the length covers the peers and this addendum
+	 * to include it as the table length is allowed to be less than this and
+	 * not include it.
+	 */
+	off = SMB_SLOT_CONT_START + 5 * s.smbsl_npeers;
+	smb_info_bcopy_offset(stp->smbst_hdr, &cont, sizeof (cont), off);
+	sp->smbl_info = cont.smbsl_info;
+	sp->smbl_pwidth = cont.smbsl_pwidth;
+	sp->smbl_pitch = cont.smbsl_pitch;
 
 	return (0);
 }

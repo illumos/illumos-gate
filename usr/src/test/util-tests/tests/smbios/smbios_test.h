@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Robert Mustacchi
+ * Copyright 2020 Oxide Computer Company
  */
 
 #ifndef _SMBIOS_TEST_H
@@ -78,7 +79,11 @@ typedef struct smbios_test {
  * Test functions
  */
 extern boolean_t smbios_test_slot_mktable(smbios_test_table_t *);
+extern boolean_t smbios_test_slot_mktable_34_nopeers(smbios_test_table_t *);
+extern boolean_t smbios_test_slot_mktable_34_peers(smbios_test_table_t *);
 extern boolean_t smbios_test_slot_verify(smbios_hdl_t *);
+extern boolean_t smbios_test_slot_verify_34_nopeers(smbios_hdl_t *);
+extern boolean_t smbios_test_slot_verify_34_peers(smbios_hdl_t *);
 extern boolean_t smbios_test_badvers_mktable(smbios_test_table_t *);
 
 extern boolean_t smbios_test_memdevice_mktable_32(smbios_test_table_t *);
