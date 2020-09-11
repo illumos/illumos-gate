@@ -31,11 +31,7 @@ RELUSRSBIN=     ../usr/sbin
 ROOTSYMLINK=    $(ROOTETC)/$(PROG)
 LDLIBS +=	-ladm -lefi
 
-CERRWARN +=	-_gcc=-Wno-parentheses
-CERRWARN +=	$(CNOWARN_UNINIT)
-
-# not linted
-SMATCH=off
+CSTD =		$(CSTD_GNU99)
 
 .KEEP_STATE:
 
