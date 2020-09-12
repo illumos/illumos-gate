@@ -143,6 +143,19 @@ hpet_acpi_init(int *hpet_vect, iflag_t *hpet_flags)
 	(void) memset(&hpet_info, 0, sizeof (hpet_info));
 	hpet.supported = HPET_NO_SUPPORT;
 
+	if ((get_hwenv() & HW_XEN_HVM) != 0) {
+		/*
+		 * In some AWS EC2 guests, though the HPET is advertised via
+		 * ACPI, programming the interrupt on the non-legacy timer can
+		 * result in an immediate reset of the instance.  It is not
+		 * currently possible to tell whether this is an instance with
+		 * broken HPET emulation or not, so we simply disable it across
+		 * the board.
+		 */
+		PRM_POINT("will not program HPET in Xen HVM");
+		return (DDI_FAILURE);
+	}
+
 	if (idle_cpu_no_deep_c ||
 	    !cpuid_deep_cstates_supported()) {
 		/*
