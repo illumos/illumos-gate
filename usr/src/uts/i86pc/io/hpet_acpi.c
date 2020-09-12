@@ -609,14 +609,25 @@ hpet_write_gen_intrpt_stat(hpet_info_t *hip, uint64_t l)
 }
 
 static void
-hpet_write_timer_N_config(hpet_info_t *hip, uint_t n, uint64_t l)
+hpet_write_timer_N_config(hpet_info_t *hip, uint_t n, uint64_t conf)
 {
-	if (hip->timer_n_config[n].size_cap == 1)
-		*(uint64_t *)HPET_TIMER_N_CONF_ADDRESS(
-		    hip->logical_address, n) = l;
-	else
-		*(uint32_t *)HPET_TIMER_N_CONF_ADDRESS(
-		    hip->logical_address, n) = (uint32_t)(0xFFFFFFFF & l);
+	/*
+	 * The configuration register size is not affected by the size
+	 * capability; it is always a 64-bit value.  The top 32-bit half of
+	 * this register is always read-only so we constrain our write to the
+	 * bottom half.
+	 */
+	uint32_t *confaddr = (uint32_t *)HPET_TIMER_N_CONF_ADDRESS(
+	    hip->logical_address, n);
+	uint32_t conf32 = 0xFFFFFFFF & conf;
+
+	PRM_DEBUG(n);
+	PRM_DEBUG(conf);
+	PRM_DEBUG(conf32);
+
+	*confaddr = conf32;
+
+	PRM_POINT("write done");
 }
 
 static void
