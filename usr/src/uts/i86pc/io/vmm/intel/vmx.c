@@ -1947,10 +1947,11 @@ vmexit_inout(struct vm_exit *vmexit, struct vie *vie, uint64_t qual,
 		inst_info = vmcs_read(VMCS_EXIT_INSTRUCTION_INFO);
 
 		/*
-		 * Bits 7-9 encode the address size of ins/outs operations where
-		 * the 0/1/2 values correspond to 16/32/64 bit sizes.
+		 * According to the SDM, bits 9:7 encode the address size of the
+		 * ins/outs operation, but only values 0/1/2 are expected,
+		 * corresponding to 16/32/64 bit sizes.
 		 */
-		inout->addrsize = 2 << (1 + ((inst_info >> 7) & 0x3));
+		inout->addrsize = 2 << BITX(inst_info, 9, 7);
 		VERIFY(inout->addrsize == 2 || inout->addrsize == 4 ||
 		    inout->addrsize == 8);
 
