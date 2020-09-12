@@ -30,6 +30,7 @@ dir path=opt/libc-tests/cfg/symbols
 dir path=opt/libc-tests/runfiles
 dir path=opt/libc-tests/tests
 dir path=opt/libc-tests/tests/i18n
+dir path=opt/libc-tests/tests/qsort
 dir path=opt/libc-tests/tests/random
 dir path=opt/libc-tests/tests/regex
 dir path=opt/libc-tests/tests/regex/data
@@ -116,6 +117,9 @@ file path=opt/libc-tests/tests/psignal mode=0555
 file path=opt/libc-tests/tests/psignal-5097.32 mode=0555
 file path=opt/libc-tests/tests/psignal-5097.64 mode=0555
 file path=opt/libc-tests/tests/pthread_attr_get_np mode=0555
+file path=opt/libc-tests/tests/qsort/qsort_test mode=0555
+file path=opt/libc-tests/tests/qsort/qsort_test.$(ARCH) mode=0555
+file path=opt/libc-tests/tests/qsort/qsort_test.$(ARCH64) mode=0555
 file path=opt/libc-tests/tests/quick_exit mode=0555
 file path=opt/libc-tests/tests/quick_exit_order.32 mode=0555
 file path=opt/libc-tests/tests/quick_exit_order.64 mode=0555

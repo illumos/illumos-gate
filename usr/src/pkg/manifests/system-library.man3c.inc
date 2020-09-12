@@ -1216,6 +1216,7 @@ link path=usr/share/man/man3c/putwchar.3c target=fputwc.3c
 link path=usr/share/man/man3c/qeconvert.3c target=econvert.3c
 link path=usr/share/man/man3c/qfconvert.3c target=econvert.3c
 link path=usr/share/man/man3c/qgconvert.3c target=econvert.3c
+link path=usr/share/man/man3c/qsort_r.3c target=qsort.3c
 link path=usr/share/man/man3c/quadruple_to_decimal.3c \
     target=floating_to_decimal.3c
 link path=usr/share/man/man3c/rand_r.3c target=rand.3c

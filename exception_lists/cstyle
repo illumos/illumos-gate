@@ -1405,6 +1405,7 @@ usr/src/cmd/bhyvectl/bhyvectl.c
 usr/src/compat/bhyve/*
 usr/src/contrib/bhyve/*
 usr/src/lib/libvmmapi/common/vmmapi.[ch]
+usr/src/test/libc-tests/tests/qsort/*.c
 usr/src/uts/i86pc/io/vmm/amd/*.[ch]
 usr/src/uts/i86pc/io/vmm/intel/*.[chs]
 usr/src/uts/i86pc/io/vmm/io/*.[ch]

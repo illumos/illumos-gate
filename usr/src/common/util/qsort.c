@@ -22,9 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 Oxide Computer Company
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if !defined(_KERNEL) && !defined(_KMDB)
 #include "lint.h"
@@ -44,15 +43,32 @@ static void swapp64(uint64_t *r1, uint64_t *r2, size_t cnt);
 static void swapi(uint32_t *r1, uint32_t *r2, size_t cnt);
 static void swapb(char *r1, char *r2, size_t cnt);
 
+typedef int (*cmp_f)(const void *, const void *, void *);
+
 /*
  * choose a median of 3 values
- *
- * note: cstyle specifically prohibits nested conditional operators
- * but this is the only way to do the median of 3 function in-line
  */
-#define	med3(a, b, c) (cmp((a), (b)) < 0) \
-	? ((cmp((b), (c)) < 0) ? (b) : (cmp((a), (c)) < 0) ? (c) : (a)) \
-	: ((cmp((b), (c)) > 0) ? (b) : (cmp((a), (c)) > 0) ? (c) : (a))
+static __GNU_INLINE char *
+med3(char *a, char *b, char *c, cmp_f cmp, void *arg)
+{
+	if (cmp(a, b, arg) < 0) {
+		if (cmp(b, c, arg) < 0) {
+			return (b);
+		} else if (cmp(a, c, arg) < 0) {
+			return (c);
+		} else {
+			return (a);
+		}
+	} else {
+		if (cmp(b, c, arg) > 0) {
+			return (b);
+		} else if (cmp(a, c, arg) > 0) {
+			return (c);
+		} else {
+			return (a);
+		}
+	}
+}
 
 #define	THRESH_L	5	/* threshold for insertion sort */
 #define	THRESH_M3	20	/* threshold for median of 3 */
@@ -104,12 +120,17 @@ typedef struct {
  *   9) The user compare function modifies the data records
  */
 
+static int
+qsort_r_wrapper(const void *a, const void *b, void *arg)
+{
+	int (*cmp)(const void *, const void *) =
+	    (int(*)(const void *, const void *))(uintptr_t)arg;
+	return (cmp(a, b));
+}
+
 void
-qsort(
-	void		*basep,
-	size_t		nrec,
-	size_t		rsiz,
-	int		(*cmp)(const void *, const void *))
+qsort_r(void *basep, size_t nrec, size_t rsiz,
+    cmp_f cmp, void *arg)
 {
 	size_t		i;		/* temporary variable */
 
@@ -209,7 +230,8 @@ qsort(
 				b_par = t_par;
 				while (b_par > b_lim) {
 					b_par -= rsiz;
-					if ((*cmp)(b_par, b_par + rsiz) <= 0) {
+					if ((*cmp)(b_par, b_par + rsiz, arg) <=
+					    0) {
 						break;
 					}
 					(*swapf)(b_par, b_par + rsiz, loops);
@@ -264,14 +286,16 @@ qsort(
 		} else if (nrec < THRESH_M9) {
 			/* use median of 3 */
 			i = ((nrec - 1) / 2) * rsiz;
-			m2 = med3(b_lim, b_lim + i, b_lim + 2 * i);
+			m2 = med3(b_lim, b_lim + i, b_lim + 2 * i, cmp, arg);
 		} else {
 			/* approx median of 9 */
 			i = ((nrec - 1) / 8) * rsiz;
-			m1 = med3(b_lim, b_lim +  i, b_lim + 2 * i);
-			m2 = med3(b_lim + 3 * i, b_lim + 4 * i, b_lim + 5 * i);
-			m3 = med3(b_lim + 6 * i, b_lim + 7 * i, b_lim + 8 * i);
-			m2 = med3(m1, m2, m3);
+			m1 = med3(b_lim, b_lim +  i, b_lim + 2 * i, cmp, arg);
+			m2 = med3(b_lim + 3 * i, b_lim + 4 * i, b_lim + 5 * i,
+			    cmp, arg);
+			m3 = med3(b_lim + 6 * i, b_lim + 7 * i, b_lim + 8 * i,
+			    cmp, arg);
+			m2 = med3(m1, m2, m3, cmp, arg);
 		}
 
 		/*
@@ -323,7 +347,7 @@ qsort(
 				if (b_par == m2) {
 					continue;
 				}
-				cv = cmp(b_par, m2);
+				cv = cmp(b_par, m2, arg);
 				if (cv > 0) {
 					break;
 				}
@@ -342,7 +366,7 @@ qsort(
 				if (t_par == m2) {
 					continue;
 				}
-				cv = cmp(t_par, m2);
+				cv = cmp(t_par, m2, arg);
 				if (cv < 0) {
 					break;
 				}
@@ -465,6 +489,14 @@ qsort(
 			sp++;
 		}
 	}
+}
+
+void
+qsort(void *basep, size_t nrec, size_t rsiz,
+    int (*cmp)(const void *, const void *))
+{
+	return (qsort_r(basep, nrec, rsiz, qsort_r_wrapper,
+	    (void *)(uintptr_t)cmp));
 }
 
 /*
