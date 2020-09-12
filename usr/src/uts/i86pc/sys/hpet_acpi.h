@@ -36,7 +36,7 @@ extern "C" {
 #endif
 
 /*
- * Solaris uses an HPET Timer to generate interrupts for CPUs in Deep C-state
+ * illumos uses an HPET Timer to generate interrupts for CPUs in Deep C-state
  * with stalled LAPIC Timers.  All CPUs use one HPET timer.  The timer's
  * interrupt targets one CPU (via the I/O APIC).  The one CPU that receives
  * the HPET's interrupt wakes up other CPUs as needed during the HPET Interrupt
@@ -46,7 +46,7 @@ extern "C" {
  * Please see the Intel Programmer's guides.  Interrupts are disabled before
  * a CPU Halts into Deep C-state.  (This allows CPU-hardware-specific cleanup
  * before servicing interrupts.)  When a Deep C-state CPU wakes up (due to
- * an externally generated interrupt), it resume execution where it halted.
+ * an externally generated interrupt), it resumes execution where it halted.
  * The CPU returning from Deep C-state must enable interrupts before it will
  * handle the pending interrupt that woke it from Deep C-state.
  *
@@ -72,7 +72,7 @@ extern "C" {
  *	} timers[32];
  * }
  *
- * There are 32 possible timers in an hpet.  Only the first 3 timers are
+ * There are 32 possible timers in an HPET.  Only the first 3 timers are
  * required.  The other 29 timers are optional.
  *
  * HPETs can have 64-bit or 32-bit timers.  Timers/compare registers can
@@ -80,7 +80,7 @@ extern "C" {
  * The first two timers are not used.  The HPET spec intends the first two
  * timers to be used as "legacy replacement" for the PIT and RTC timers.
  *
- * Solaris uses the first available non-legacy replacement timer as a proxy
+ * illumos uses the first available non-legacy replacement timer as a proxy
  * timer for processor Local APIC Timers that stop in deep idle C-states.
  */
 
@@ -97,7 +97,7 @@ extern "C" {
 #define	HPET_SIZE		(1024)
 
 /*
- * Offsets of hpet registers and macros to access them from HPET base address.
+ * Offsets of HPET registers and macros to access them from HPET base address.
  */
 #define	HPET_GEN_CAP_OFFSET		(0)
 #define	HPET_GEN_CONFIG_OFFSET		(0x10)

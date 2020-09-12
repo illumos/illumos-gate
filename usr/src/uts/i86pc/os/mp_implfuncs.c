@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 Oxide Computer Company
  */
 #define	PSMI_1_7
 
@@ -32,6 +33,7 @@
 #include <sys/psm_modctl.h>
 #include <sys/smp_impldefs.h>
 #include <sys/reboot.h>
+#include <sys/prom_debug.h>
 #if defined(__xpv)
 #include <sys/hypervisor.h>
 #include <vm/kboot_mmu.h>
@@ -390,12 +392,6 @@ psm_modload(void)
 	close_mach_list();
 }
 
-#if defined(__xpv)
-#define	NOTSUP_MSG "This version of Solaris xVM does not support this hardware"
-#else
-#define	NOTSUP_MSG "This version of Solaris does not support this hardware"
-#endif	/* __xpv */
-
 void
 psm_install(void)
 {
@@ -406,14 +402,18 @@ psm_install(void)
 
 	mutex_enter(&psmsw_lock);
 	for (swp = psmsw->psw_forw; swp != psmsw; ) {
+		PRM_DEBUGS(swp->psw_infop->p_mach_idstring);
 		opsp = swp->psw_infop->p_ops;
 		if (opsp->psm_probe) {
+			PRM_POINT("psm_probe()");
 			if ((*opsp->psm_probe)() == PSM_SUCCESS) {
+				PRM_POINT("psm_probe() PSM_SUCCESS");
 				psmcnt++;
 				swp->psw_flag |= PSM_MOD_IDENTIFY;
 				swp = swp->psw_forw;
 				continue;
 			}
+			PRM_POINT("psm_probe() FAILURE");
 		}
 		/* remove the unsuccessful psm modules */
 		cswp = swp;
@@ -429,7 +429,8 @@ psm_install(void)
 	}
 	mutex_exit(&psmsw_lock);
 	if (psmcnt == 0)
-		halt(NOTSUP_MSG);
+		halt("the operating system does not yet support this hardware");
+	PRM_POINT("psminitf()");
 	(*psminitf)();
 }
 

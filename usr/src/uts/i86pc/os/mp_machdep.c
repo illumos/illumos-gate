@@ -26,6 +26,7 @@
  * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #define	PSMI_1_7
@@ -63,6 +64,8 @@
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
 #include <sys/cpc_pcbe.h>
+#include <sys/prom_debug.h>
+
 
 #define	OFFSETOF(s, m)		(size_t)(&(((s *)0)->m))
 
@@ -978,6 +981,7 @@ mach_init()
 {
 	struct psm_ops  *pops;
 
+	PRM_POINT("mach_construct_info()");
 	mach_construct_info();
 
 	pops = mach_set[0];
@@ -1017,6 +1021,7 @@ mach_init()
 		notify_error = pops->psm_notify_error;
 	}
 
+	PRM_POINT("psm_softinit()");
 	(*pops->psm_softinit)();
 
 	/*
@@ -1034,6 +1039,7 @@ mach_init()
 #ifndef __xpv
 	non_deep_idle_disp_enq_thread = disp_enq_thread;
 #endif
+	PRM_DEBUG(idle_cpu_use_hlt);
 	if (idle_cpu_use_hlt) {
 		idle_cpu = cpu_idle_adaptive;
 		CPU->cpu_m.mcpu_idle_cpu = cpu_idle;
@@ -1068,6 +1074,7 @@ mach_init()
 #endif
 	}
 
+	PRM_POINT("mach_smpinit()");
 	mach_smpinit();
 }
 
