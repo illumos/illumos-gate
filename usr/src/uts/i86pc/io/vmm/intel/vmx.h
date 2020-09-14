@@ -50,44 +50,34 @@
 struct pmap;
 
 struct vmxctx {
-	register_t	guest_rdi;		/* Guest state */
-	register_t	guest_rsi;
-	register_t	guest_rdx;
-	register_t	guest_rcx;
-	register_t	guest_r8;
-	register_t	guest_r9;
-	register_t	guest_rax;
-	register_t	guest_rbx;
-	register_t	guest_rbp;
-	register_t	guest_r10;
-	register_t	guest_r11;
-	register_t	guest_r12;
-	register_t	guest_r13;
-	register_t	guest_r14;
-	register_t	guest_r15;
-	register_t	guest_cr2;
-	register_t	guest_dr0;
-	register_t	guest_dr1;
-	register_t	guest_dr2;
-	register_t	guest_dr3;
-	register_t	guest_dr6;
+	uint64_t	guest_rdi;		/* Guest state */
+	uint64_t	guest_rsi;
+	uint64_t	guest_rdx;
+	uint64_t	guest_rcx;
+	uint64_t	guest_r8;
+	uint64_t	guest_r9;
+	uint64_t	guest_rax;
+	uint64_t	guest_rbx;
+	uint64_t	guest_rbp;
+	uint64_t	guest_r10;
+	uint64_t	guest_r11;
+	uint64_t	guest_r12;
+	uint64_t	guest_r13;
+	uint64_t	guest_r14;
+	uint64_t	guest_r15;
+	uint64_t	guest_cr2;
+	uint64_t	guest_dr0;
+	uint64_t	guest_dr1;
+	uint64_t	guest_dr2;
+	uint64_t	guest_dr3;
+	uint64_t	guest_dr6;
 
-#ifdef __FreeBSD__
-	register_t	host_r15;		/* Host state */
-	register_t	host_r14;
-	register_t	host_r13;
-	register_t	host_r12;
-	register_t	host_rbp;
-	register_t	host_rsp;
-	register_t	host_rbx;
-#endif /* __FreeBSD__ */
-
-	register_t	host_dr0;
-	register_t	host_dr1;
-	register_t	host_dr2;
-	register_t	host_dr3;
-	register_t	host_dr6;
-	register_t	host_dr7;
+	uint64_t	host_dr0;
+	uint64_t	host_dr1;
+	uint64_t	host_dr2;
+	uint64_t	host_dr3;
+	uint64_t	host_dr6;
+	uint64_t	host_dr7;
 	uint64_t	host_debugctl;
 	int		host_tf;
 

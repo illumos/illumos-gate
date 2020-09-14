@@ -55,48 +55,45 @@ extern boolean_t consconfig_console_is_ready(void);
 /*
  * Prototypes for static functions
  */
-static	int	usba_hubdi_bus_ctl(
-			dev_info_t		*dip,
-			dev_info_t		*rdip,
-			ddi_ctl_enum_t		op,
-			void			*arg,
-			void			*result);
+static	int	usba_hubdi_bus_ctl(dev_info_t *dip,
+    dev_info_t *rdip,
+    ddi_ctl_enum_t op,
+    void *arg,
+    void *result);
 
-static int	usba_hubdi_map_fault(
-			dev_info_t		*dip,
-			dev_info_t		*rdip,
-			struct hat		*hat,
-			struct seg		*seg,
-			caddr_t 		addr,
-			struct devpage		*dp,
-			pfn_t			pfn,
-			uint_t			prot,
-			uint_t			lock);
+static int	usba_hubdi_map_fault(dev_info_t *dip,
+    dev_info_t *rdip,
+    struct hat *hat,
+    struct seg *seg,
+    caddr_t addr,
+    struct devpage *dp,
+    pfn_t pfn,
+    uint_t prot,
+    uint_t lock);
 
 static int hubd_busop_get_eventcookie(dev_info_t *dip,
-			dev_info_t *rdip,
-			char *eventname,
-			ddi_eventcookie_t *cookie);
+    dev_info_t *rdip,
+    char *eventname,
+    ddi_eventcookie_t *cookie);
 static int hubd_busop_add_eventcall(dev_info_t *dip,
-			dev_info_t *rdip,
-			ddi_eventcookie_t cookie,
-			void (*callback)(dev_info_t *dip,
-				ddi_eventcookie_t cookie, void *arg,
-				void *bus_impldata),
-			void *arg, ddi_callback_id_t *cb_id);
+    dev_info_t *rdip,
+    ddi_eventcookie_t cookie,
+    void (*callback)(dev_info_t *dip, ddi_eventcookie_t cookie, void *arg,
+	void *bus_impldata),
+    void *arg, ddi_callback_id_t *cb_id);
 static int hubd_busop_remove_eventcall(dev_info_t *dip,
-			ddi_callback_id_t cb_id);
+    ddi_callback_id_t cb_id);
 static int hubd_bus_config(dev_info_t *dip,
-			uint_t flag,
-			ddi_bus_config_op_t op,
-			void *arg,
-			dev_info_t **child);
+    uint_t flag,
+    ddi_bus_config_op_t op,
+    void *arg,
+    dev_info_t **child);
 static int hubd_bus_unconfig(dev_info_t *dip,
-			uint_t flag,
-			ddi_bus_config_op_t op,
-			void *arg);
+    uint_t flag,
+    ddi_bus_config_op_t op,
+    void *arg);
 static int hubd_bus_power(dev_info_t *dip, void *impl_arg,
-			pm_bus_power_op_t op, void *arg, void *result);
+    pm_bus_power_op_t op, void *arg, void *result);
 
 static usb_port_t  hubd_get_port_num(hubd_t *, struct devctl_iocdata *);
 static dev_info_t *hubd_get_child_dip(hubd_t *, usb_port_t);
@@ -251,14 +248,14 @@ usba_hubdi_unregister(dev_info_t *dip)
 /*ARGSUSED*/
 static int
 usba_hubdi_map_fault(dev_info_t *dip,
-	dev_info_t	*rdip,
-	struct hat	*hat,
-	struct seg	*seg,
-	caddr_t 	addr,
-	struct devpage	*dp,
-	pfn_t		pfn,
-	uint_t		prot,
-	uint_t		lock)
+    dev_info_t	*rdip,
+    struct hat	*hat,
+    struct seg	*seg,
+    caddr_t	addr,
+    struct devpage	*dp,
+    pfn_t		pfn,
+    uint_t		prot,
+    uint_t		lock)
 {
 	return (DDI_FAILURE);
 }
@@ -269,9 +266,9 @@ usba_hubdi_map_fault(dev_info_t *dip,
  */
 int
 usba_hubdi_bind_root_hub(dev_info_t *dip,
-	uchar_t	*root_hub_config_descriptor,
-	size_t config_length,
-	usb_dev_descr_t *root_hub_device_descriptor)
+    uchar_t	*root_hub_config_descriptor,
+    size_t config_length,
+    usb_dev_descr_t *root_hub_device_descriptor)
 {
 	usba_device_t *usba_device;
 	usba_hcdi_t *hcdi = usba_hcdi_get_hcdi(dip);
@@ -1145,10 +1142,10 @@ hubd_post_power(hubd_t *hubd, usb_port_t port, pm_bp_child_pwrchg_t *bpc,
  */
 static int
 usba_hubdi_bus_ctl(dev_info_t *dip,
-	dev_info_t	*rdip,
-	ddi_ctl_enum_t	op,
-	void		*arg,
-	void		*result)
+    dev_info_t	*rdip,
+    ddi_ctl_enum_t	op,
+    void		*arg,
+    void		*result)
 {
 	usba_device_t *hub_usba_device = usba_get_usba_device(rdip);
 	dev_info_t *root_hub_dip = hub_usba_device->usb_root_hub_dip;
@@ -1294,7 +1291,7 @@ usba_hubdi_bus_ctl(dev_info_t *dip,
 
 /*
  * hubd_config_one:
- * 	enumerate one child according to 'port'
+ *	enumerate one child according to 'port'
  */
 
 static boolean_t
@@ -2625,8 +2622,7 @@ hubd_restore_device_state(dev_info_t *dip, hubd_t *hubd)
 
 	/*
 	 * wait at least 3 frames before accessing devices
-	 * (note that delay's minimal time is one clock tick which
-	 * is 10ms unless hires_tick has been changed)
+	 * (note that delay's minimal time is one clock tick).
 	 */
 	mutex_exit(HUBD_MUTEX(hubd));
 	delay(drv_usectohz(10000));
@@ -3331,8 +3327,8 @@ hubd_set_hub_depth(hubd_t *hubd)
 	int rval;
 	usb_cr_t	completion_reason;
 	usb_cb_flags_t	cb_flags;
-	usba_device_t 	*ud;
-	uint16_t 	depth;
+	usba_device_t	*ud;
+	uint16_t	depth;
 
 	/*
 	 * We only need to set the hub depth devices for hubs that are at least
@@ -6044,7 +6040,7 @@ hubd_ready_device(hubd_t *hubd, dev_info_t *child_dip, usba_device_t *child_ud,
 	child_ud->usb_active_cfg_ndx	= config_index;
 	child_ud->usb_cfg		= child_ud->usb_cfg_array[config_index];
 	child_ud->usb_cfg_length	= config_descriptor.wTotalLength;
-	child_ud->usb_cfg_value 	= config_descriptor.bConfigurationValue;
+	child_ud->usb_cfg_value		= config_descriptor.bConfigurationValue;
 	child_ud->usb_n_ifs		= config_descriptor.bNumInterfaces;
 	child_ud->usb_dip		= child_dip;
 
@@ -6089,11 +6085,11 @@ hubd_ready_device(hubd_t *hubd, dev_info_t *child_dip, usba_device_t *child_ud,
  */
 static int
 hubd_create_child(dev_info_t *dip,
-		hubd_t		*hubd,
-		usba_device_t	*hubd_ud,
-		usb_port_status_t port_status,
-		usb_port_t	port,
-		int		iteration)
+    hubd_t		*hubd,
+    usba_device_t	*hubd_ud,
+    usb_port_status_t port_status,
+    usb_port_t	port,
+    int		iteration)
 {
 	dev_info_t		*child_dip = NULL;
 	usb_dev_descr_t	usb_dev_descr;
@@ -6869,9 +6865,9 @@ hubd_free_usba_device(hubd_t *hubd, usba_device_t *usba_device)
  */
 static int
 hubd_busop_get_eventcookie(dev_info_t *dip,
-	dev_info_t	*rdip,
-	char		*eventname,
-	ddi_eventcookie_t *cookie)
+    dev_info_t	*rdip,
+    char		*eventname,
+    ddi_eventcookie_t *cookie)
 {
 	hubd_t	*hubd = (hubd_t *)hubd_get_soft_state(dip);
 
@@ -6891,12 +6887,11 @@ hubd_busop_get_eventcookie(dev_info_t *dip,
 
 static int
 hubd_busop_add_eventcall(dev_info_t *dip,
-	dev_info_t	*rdip,
-	ddi_eventcookie_t cookie,
-	void		(*callback)(dev_info_t *dip,
-			ddi_eventcookie_t cookie, void *arg,
-			void *bus_impldata),
-	void *arg, ddi_callback_id_t *cb_id)
+    dev_info_t	*rdip,
+    ddi_eventcookie_t cookie,
+    void (*callback)(dev_info_t *dip, ddi_eventcookie_t cookie, void *arg,
+	void *bus_impldata),
+    void *arg, ddi_callback_id_t *cb_id)
 {
 	hubd_t	*hubd = (hubd_t *)hubd_get_soft_state(dip);
 	usb_port_t port = hubd_child_dip2port(hubd, rdip);
@@ -7671,7 +7666,7 @@ usba_hubdi_open(dev_info_t *dip, dev_t *devp, int flags, int otyp,
 /* ARGSUSED */
 int
 usba_hubdi_close(dev_info_t *dip, dev_t dev, int flag, int otyp,
-	cred_t *credp)
+    cred_t *credp)
 {
 	hubd_t *hubd;
 

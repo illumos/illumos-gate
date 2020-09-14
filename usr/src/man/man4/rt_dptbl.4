@@ -7,8 +7,6 @@
 .SH NAME
 rt_dptbl \- real-time dispatcher parameter table
 .SH DESCRIPTION
-.sp
-.LP
 The process scheduler (or dispatcher) is the portion of the kernel that
 controls allocation of the \fBCPU\fR to processes. The scheduler supports the
 notion of scheduling classes where each class defines a scheduling policy, used
@@ -59,9 +57,11 @@ processes at a particular level as the time quantum of a real-time process can
 be changed by the user with the \fBpriocntl\fR command or the \fBpriocntl\fR
 system call.
 .sp
-In the high resolution clock mode (\fBhires_tick\fR set to \fB1\fR), the value
-of \fBhz\fR is set to \fB1000\fR. Increase quantums to maintain the same
-absolute time quantums.
+In the default high resolution clock mode (\fBhires_tick\fR set to \fB1\fR),
+the value of \fBhz\fR is set to \fB1000\fR.  If this value is overridden to
+\fB0\fR then \fBhz\fR will instead be \fB100\fR; the number of ticks per
+quantum must then be decreased to maintain the same length of quantum in
+absolute time.
 .RE
 
 .sp
@@ -71,8 +71,6 @@ scheduler by reconfiguring the \fBrt_dptbl\fR. There are two methods available
 for doing this: reconfigure with a loadable module at boot-time or by using
 \fBdispadmin\fR(1M) at run-time.
 .SS "rt_dptbl Loadable Module"
-.sp
-.LP
 The \fBrt_dptbl\fR can be reconfigured with a loadable module which contains a
 new real time dispatch table. The module containing the dispatch table is
 separate from the RT loadable module which contains the rest of the real time
@@ -81,8 +79,6 @@ time priority levels or the set of global scheduling priorities used by the
 real time class. The relevant procedure and source code is described in the
 Examples section.
 .SS "dispadmin Configuration File"
-.sp
-.LP
 The \fBrt_quantum\fR values in the \fBrt_dptbl\fR can be examined and modified
 on a running system using the \fBdispadmin\fR(1M) command. Invoking
 \fBdispadmin\fR for the real-time class allows the administrator to retrieve
@@ -120,7 +116,6 @@ level. Each \fBrt_quantum\fR entry must be either a positive integer specifying
 the desired time quantum (in the resolution given by \fIres\fR), or the value
 -2 indicating an infinite time quantum for that level.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRA Sample \fBdispadmin\fR Configuration File
 .sp
 .LP
@@ -341,8 +336,6 @@ rtdpent_t       config_rt_dptbl[] = {
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fBpriocntl\fR(1), \fBdispadmin\fR(1M), \fBpriocntl\fR(2), \fBsystem\fR(4)
 .sp
 .LP

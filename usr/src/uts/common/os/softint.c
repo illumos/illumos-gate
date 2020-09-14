@@ -58,29 +58,29 @@
  *
  * Starting state is IDLE.
  *
- * 				softint()
+ *				softint()
  *
  *
  *				(c)
- * 	____________________________________________________
- * 	|                          ^                         ^
- * 	v            (a)           |           (b)           |
- * 	IDLE--------------------->PEND--------------------->DRAIN
- *	^                         |                         |
- * 	|                         |                         |
- * 	|                         |                         |
- * 	|                         |                         |
- * 	|                         |                         |
- * 	|                         d                         d
- * 	|                         |                         |
- * 	|                         v                         v
- * 	|                         PEND                      DRAIN
- * 	|            (e)           &                          &
- * 	|<-----------------------STEAL                      STEAL
- * 	^                                                    |
- * 	|                                                    |
- * 	|                         (e)                        v
- * 	|_________________________<__________________________|
+ *	____________________________________________________
+ *	|			   ^			     ^
+ *	v	     (a)	   |	       (b)	     |
+ *	IDLE--------------------->PEND--------------------->DRAIN
+ *	^			  |			    |
+ *	|			  |			    |
+ *	|			  |			    |
+ *	|			  |			    |
+ *	|			  |			    |
+ *	|			  d			    d
+ *	|			  |			    |
+ *	|			  v			    v
+ *	|			  PEND			    DRAIN
+ *	|	     (e)	   &			      &
+ *	|<-----------------------STEAL			    STEAL
+ *	^						     |
+ *	|						     |
+ *	|			  (e)			     v
+ *	|_________________________<__________________________|
  *
  *
  *
@@ -146,9 +146,9 @@ uint_t softcall_pokemax = 10;
 
 /*
  * This ensures that softcall entries don't get stuck for long. It's expressed
- * in 10 milliseconds as 1 unit. When hires_tick is set or other clock frequency
- * is used, softcall_init() ensures that it's still expressed as 1 =  10 milli
- * seconds.
+ * in 10 milliseconds as 1 unit. Regardless of the value of hires_tick or
+ * clock frequency, softcall_init() ensures that it's still expressed as 1 =
+ * 10 milliseconds.
  */
 unsigned int softcall_delay = 1;
 

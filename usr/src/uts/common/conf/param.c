@@ -116,7 +116,7 @@ const unsigned int	_diskrpm	= (unsigned int)DISKRPM;
 const unsigned long	_pgthresh	= (unsigned long)PGTHRESH;
 const unsigned int	_maxslp		= (unsigned int)MAXSLP;
 const unsigned long	_maxhandspreadpages = (unsigned long)MAXHANDSPREADPAGES;
-const int		_ncpu 		= (int)NCPU;
+const int		_ncpu		= (int)NCPU;
 const int		_ncpu_log2	= (int)NCPU_LOG2;
 const int		_ncpu_p2	= (int)NCPU_P2;
 const unsigned long	_defaultstksz	= (unsigned long)DEFAULTSTKSZ;
@@ -131,9 +131,12 @@ const unsigned int	_nbpg		= (unsigned int)MMU_PAGESIZE;
  */
 
 /*
- * Default hz is 100, but if we set hires_tick we get higher resolution
- * clock behavior (currently defined to be 1000 hz).  Higher values seem
- * to work, but are not supported.
+ * hz is 100, but we set hires_tick to get higher resolution clock behavior
+ * (currently defined to be 1000 hz).  Higher values seem to work, but are not
+ * supported.
+ *
+ * This is configured via hires_tick to allow users to explicitly customize it
+ * to 0 should the need arise.
  *
  * If we do decide to play with higher values, remember that hz should
  * satisfy the following constraints to avoid integer round-off problems:
@@ -160,7 +163,7 @@ const unsigned int	_nbpg		= (unsigned int)MMU_PAGESIZE;
 int hz = HZ_DEFAULT;
 int hires_hz = HIRES_HZ_DEFAULT;
 
-int hires_tick = 0;
+int hires_tick = 1;
 int cpu_decay_factor = 10;	/* this is no longer tied to clock */
 int max_hres_adj;	/* maximum adjustment of hrtime per tick */
 int tick_per_msec;	/* clock ticks per millisecond (zero if hz < 1000) */
