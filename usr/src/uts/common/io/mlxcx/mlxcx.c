@@ -1066,6 +1066,11 @@ mlxcx_teardown(mlxcx_t *mlxp)
 		mlxcx_intr_disable(mlxp);
 	}
 
+	if (mlxp->mlx_attach & MLXCX_ATTACH_SENSORS) {
+		mlxcx_teardown_sensors(mlxp);
+		mlxp->mlx_attach &= ~MLXCX_ATTACH_SENSORS;
+	}
+
 	if (mlxp->mlx_attach & MLXCX_ATTACH_CHKTIMERS) {
 		mlxcx_teardown_checktimers(mlxp);
 		mlxp->mlx_attach &= ~MLXCX_ATTACH_CHKTIMERS;
@@ -2868,6 +2873,11 @@ mlxcx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto err;
 	}
 	mlxp->mlx_attach |= MLXCX_ATTACH_CHKTIMERS;
+
+	if (!mlxcx_setup_sensors(mlxp)) {
+		goto err;
+	}
+	mlxp->mlx_attach |= MLXCX_ATTACH_SENSORS;
 
 	/*
 	 * Finally, tell MAC that we exist!

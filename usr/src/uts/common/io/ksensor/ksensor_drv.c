@@ -90,15 +90,15 @@ ksensor_ioctl_kind(minor_t min, intptr_t arg, int mode)
 }
 
 static int
-ksensor_ioctl_temp(minor_t min, intptr_t arg, int mode)
+ksensor_ioctl_scalar(minor_t min, intptr_t arg, int mode)
 {
 	int ret;
-	sensor_ioctl_temperature_t temp;
+	sensor_ioctl_scalar_t scalar;
 
-	bzero(&temp, sizeof (temp));
-	ret = ksensor_op_temperature((id_t)min, &temp);
+	bzero(&scalar, sizeof (scalar));
+	ret = ksensor_op_scalar((id_t)min, &scalar);
 	if (ret == 0) {
-		if (ddi_copyout(&temp, (void *)arg, sizeof (temp),
+		if (ddi_copyout(&scalar, (void *)arg, sizeof (scalar),
 		    mode & FKIOCTL) != 0) {
 			ret = EFAULT;
 		}
@@ -118,10 +118,10 @@ ksensor_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	m = getminor(dev);
 	switch (cmd) {
-	case SENSOR_IOCTL_TYPE:
+	case SENSOR_IOCTL_KIND:
 		return (ksensor_ioctl_kind(m, arg, mode));
-	case SENSOR_IOCTL_TEMPERATURE:
-		return (ksensor_ioctl_temp(m, arg, mode));
+	case SENSOR_IOCTL_SCALAR:
+		return (ksensor_ioctl_scalar(m, arg, mode));
 	default:
 		return (ENOTTY);
 	}

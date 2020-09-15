@@ -24,8 +24,8 @@
 extern "C" {
 #endif
 
-extern int topo_sensor_create_temp_sensor(topo_mod_t *, tnode_t *, const char *,
-    const char *);
+extern int topo_sensor_create_scalar_sensor(topo_mod_t *, tnode_t *,
+    const char *, const char *);
 
 #ifdef __cplusplus
 }

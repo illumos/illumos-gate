@@ -11,6 +11,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*
@@ -20,6 +21,29 @@
 #include "smbios_test.h"
 
 static const char *smbios_test_name = "The One Slot";
+static uint8_t smbios_slot_bus = 0x42;
+static uint8_t smbios_slot_df = 0x23;
+static uint8_t smbios_slot_info = 0x65;
+static uint16_t smbios_slot_pitch = 0x12af;
+
+static void
+smbios_test_slot_fill(smb_slot_t *slot)
+{
+	bzero(slot, sizeof (smb_slot_t));
+	slot->smbsl_hdr.smbh_type = SMB_TYPE_SLOT;
+	slot->smbsl_hdr.smbh_len = sizeof (smb_slot_t);
+	slot->smbsl_name = 1;
+	slot->smbsl_type = SMB_SLT_PCIE3G16;
+	slot->smbsl_width = SMB_SLW_16X;
+	slot->smbsl_length = SMB_SLL_SHORT;
+	slot->smbsl_id = htole16(1);
+	slot->smbsl_ch1 = SMB_SLCH1_33V;
+	slot->smbsl_ch2 = SMB_SLCH2_PME;
+	slot->smbsl_sg = htole16(1);
+	slot->smbsl_bus = smbios_slot_bus;
+	slot->smbsl_df = smbios_slot_df;
+	slot->smbsl_dbw = SMB_SLW_16X;
+}
 
 boolean_t
 smbios_test_slot_mktable(smbios_test_table_t *table)
@@ -28,21 +52,11 @@ smbios_test_slot_mktable(smbios_test_table_t *table)
 	smb_slot_peer_t peers[2];
 	const uint8_t endstring = 0;
 
-	slot.smbsl_hdr.smbh_type = SMB_TYPE_SLOT;
-	slot.smbsl_hdr.smbh_len = sizeof (smb_slot_t) + sizeof (peers);
+	smbios_test_slot_fill(&slot);
 
-	slot.smbsl_name = 1;
-	slot.smbsl_type = SMB_SLT_PCIE3G16;
-	slot.smbsl_width = SMB_SLW_16X;
-	slot.smbsl_length = SMB_SLL_SHORT;
-	slot.smbsl_id = htole16(1);
-	slot.smbsl_ch1 = SMB_SLCH1_33V;
-	slot.smbsl_ch2 = SMB_SLCH2_PME;
-	slot.smbsl_sg = htole16(1);
-	slot.smbsl_bus = 0x42;
-	slot.smbsl_df = 0x23;
-	slot.smbsl_dbw = SMB_SLW_16X;
+	slot.smbsl_hdr.smbh_len += sizeof (peers);
 	slot.smbsl_npeers = 2;
+
 	peers[0].smbspb_group_no = htole16(1);
 	peers[0].smbspb_bus = 0x42;
 	peers[0].smbspb_df = 0x42;
@@ -60,6 +74,121 @@ smbios_test_slot_mktable(smbios_test_table_t *table)
 	    sizeof (endstring));
 
 	smbios_test_table_append_eot(table);
+
+	return (B_TRUE);
+}
+
+/*
+ * 3.4 introduced additional data after peers. This verison constructs a variant
+ * with no peers.
+ */
+boolean_t
+smbios_test_slot_mktable_34_nopeers(smbios_test_table_t *table)
+{
+	smb_slot_t slot;
+	smb_slot_cont_t cont;
+	const uint8_t endstring = 0;
+
+	smbios_test_slot_fill(&slot);
+	slot.smbsl_hdr.smbh_len = SMB_SLOT_CONT_START + sizeof (cont);
+
+	cont.smbsl_info = smbios_slot_info;
+	cont.smbsl_pwidth = SMB_SLW_32X;
+	cont.smbsl_pitch = htole16(smbios_slot_pitch);
+
+	(void) smbios_test_table_append(table, &slot, sizeof (slot));
+	/*
+	 * Append a raw zero to fill in the gaps that the peers would have had
+	 * so the cont structure starts at the right offset.
+	 */
+	(void) smbios_test_table_append_raw(table, &endstring,
+	    sizeof (endstring));
+	(void) smbios_test_table_append_raw(table, &cont, sizeof (cont));
+	(void) smbios_test_table_append_string(table, smbios_test_name);
+	(void) smbios_test_table_append_raw(table, &endstring,
+	    sizeof (endstring));
+	smbios_test_table_append_eot(table);
+	return (B_TRUE);
+}
+
+boolean_t
+smbios_test_slot_mktable_34_peers(smbios_test_table_t *table)
+{
+	smb_slot_t slot;
+	smb_slot_cont_t cont;
+	smb_slot_peer_t peers[1];
+	const uint8_t endstring = 0;
+
+	smbios_test_slot_fill(&slot);
+	slot.smbsl_npeers = 1;
+	slot.smbsl_hdr.smbh_len = SMB_SLOT_CONT_START + 5 * slot.smbsl_npeers +
+	    sizeof (cont);
+
+	peers[0].smbspb_group_no = htole16(1);
+	peers[0].smbspb_bus = 0x42;
+	peers[0].smbspb_df = 0x9a;
+	peers[0].smbspb_width = SMB_SLW_8X;
+
+	cont.smbsl_info = smbios_slot_info;
+	cont.smbsl_pwidth = SMB_SLW_32X;
+	cont.smbsl_pitch = htole16(smbios_slot_pitch);
+
+	(void) smbios_test_table_append(table, &slot, sizeof (slot));
+	(void) smbios_test_table_append_raw(table, peers, sizeof (peers));
+	(void) smbios_test_table_append_raw(table, &endstring,
+	    sizeof (endstring));
+	(void) smbios_test_table_append_raw(table, &cont, sizeof (cont));
+	(void) smbios_test_table_append_string(table, smbios_test_name);
+	(void) smbios_test_table_append_raw(table, &endstring,
+	    sizeof (endstring));
+	smbios_test_table_append_eot(table);
+	return (B_TRUE);
+}
+
+
+static boolean_t
+smbios_test_slot_common(smbios_slot_t *slot)
+{
+	uint_t errs = 0;
+
+	if (strcmp(slot->smbl_name, smbios_test_name) != 0) {
+		warnx("slot name mismatch, expected %s, found %s",
+		    smbios_test_name, slot->smbl_name);
+		errs++;
+	}
+
+	if (slot->smbl_type != SMB_SLT_PCIE3G16) {
+		warnx("incorrect slot type, found %u", slot->smbl_type);
+		errs++;
+	}
+
+	if (slot->smbl_width != SMB_SLW_16X) {
+		warnx("incorrect slot width, found %u", slot->smbl_width);
+		errs++;
+	}
+
+	if (slot->smbl_length != SMB_SLL_SHORT) {
+		warnx("incorrect slot length, found %u", slot->smbl_length);
+		errs++;
+	}
+
+	if (slot->smbl_dbw != SMB_SLW_16X) {
+		warnx("incorrect slot data bus width, found %u",
+		    slot->smbl_dbw);
+		errs++;
+	}
+
+	if (slot->smbl_bus != smbios_slot_bus) {
+		warnx("incorrect slot bus id, found 0x%x\n", slot->smbl_bus);
+	}
+
+	if (slot->smbl_df != smbios_slot_df) {
+		warnx("incorrect slot df id, found 0x%x\n", slot->smbl_df);
+	}
+
+	if (errs > 0) {
+		return (B_FALSE);
+	}
 
 	return (B_TRUE);
 }
@@ -85,32 +214,7 @@ smbios_test_slot_verify(smbios_hdl_t *hdl)
 		return (B_FALSE);
 	}
 
-	/*
-	 * Verify everything we'd expect about the slot.
-	 */
-	if (strcmp(slot.smbl_name, smbios_test_name) != 0) {
-		warnx("slot name mismatch, expected %s, found %s",
-		    smbios_test_name, slot.smbl_name);
-		errs++;
-	}
-
-	if (slot.smbl_type != SMB_SLT_PCIE3G16) {
-		warnx("incorrect slot type, found %u", slot.smbl_type);
-		errs++;
-	}
-
-	if (slot.smbl_width != SMB_SLW_16X) {
-		warnx("incorrect slot width, found %u", slot.smbl_width);
-		errs++;
-	}
-
-	if (slot.smbl_length != SMB_SLL_SHORT) {
-		warnx("incorrect slot length, found %u", slot.smbl_length);
-		errs++;
-	}
-
-	if (slot.smbl_dbw != SMB_SLW_16X) {
-		warnx("incorrect slot data bus width, found %u", slot.smbl_dbw);
+	if (!smbios_test_slot_common(&slot)) {
 		errs++;
 	}
 
@@ -127,8 +231,7 @@ smbios_test_slot_verify(smbios_hdl_t *hdl)
 	}
 
 	if (npeers != 2) {
-		warnx("got wrong number of slot peers: %u\n",
-		    npeers);
+		warnx("got wrong number of slot peers: %u", npeers);
 		return (B_FALSE);
 	}
 
@@ -179,6 +282,194 @@ smbios_test_slot_verify(smbios_hdl_t *hdl)
 	}
 
 	smbios_info_slot_peers_free(hdl, npeers, peers);
+
+	if (slot.smbl_info != 0) {
+		warnx("found wrong slot info: 0x%x", slot.smbl_info);
+		errs++;
+	}
+
+	if (slot.smbl_pwidth != 0) {
+		warnx("found wrong slot physical width: 0x%x",
+		    slot.smbl_pwidth);
+		errs++;
+	}
+
+	if (slot.smbl_pitch != 0) {
+		warnx("found wrong slot pitch: 0x%x", slot.smbl_pitch);
+		errs++;
+	}
+
+	if (errs > 0) {
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
+boolean_t
+smbios_test_slot_verify_34_nopeers(smbios_hdl_t *hdl)
+{
+	smbios_struct_t sp;
+	smbios_slot_t slot;
+	uint_t npeers;
+	smbios_slot_peer_t *peers;
+	uint_t errs = 0;
+
+	if (smbios_lookup_type(hdl, SMB_TYPE_SLOT, &sp) == -1) {
+		warnx("failed to lookup SMBIOS slot: %s",
+		    smbios_errmsg(smbios_errno(hdl)));
+		return (B_FALSE);
+	}
+
+	if (smbios_info_slot(hdl, sp.smbstr_id, &slot) != 0) {
+		warnx("failed to get SMBIOS slot info: %s",
+		    smbios_errmsg(smbios_errno(hdl)));
+		return (B_FALSE);
+	}
+
+	if (!smbios_test_slot_common(&slot)) {
+		errs++;
+	}
+
+	if (slot.smbl_npeers != 0) {
+		warnx("incorrect number of slot peers, found %u",
+		    slot.smbl_npeers);
+		errs++;
+	}
+
+	if (smbios_info_slot_peers(hdl, sp.smbstr_id, &npeers, &peers) != 0) {
+		warnx("failed to get SMBIOS peer info: %s",
+		    smbios_errmsg(smbios_errno(hdl)));
+		return (B_FALSE);
+	}
+
+	if (npeers != 0) {
+		warnx("got wrong number of slot peers: %u", npeers);
+		errs++;
+	}
+
+	if (peers != NULL) {
+		warnx("expected NULL peers pointer, but found %p", peers);
+		errs++;
+	}
+
+	smbios_info_slot_peers_free(hdl, npeers, peers);
+
+	if (slot.smbl_info != smbios_slot_info) {
+		warnx("found wrong slot info: 0x%x, expected 0x%x",
+		    slot.smbl_info, smbios_slot_info);
+		errs++;
+	}
+
+	if (slot.smbl_pwidth != SMB_SLW_32X) {
+		warnx("found wrong slot physical width: 0x%x, expected 0x%x",
+		    slot.smbl_pwidth, SMB_SLW_32X);
+		errs++;
+	}
+
+	if (slot.smbl_pitch != smbios_slot_pitch) {
+		warnx("found wrong slot pitch: 0x%x, expected 0x%x",
+		    slot.smbl_pitch, smbios_slot_pitch);
+		errs++;
+	}
+
+	if (errs > 0) {
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
+boolean_t
+smbios_test_slot_verify_34_peers(smbios_hdl_t *hdl)
+{
+	smbios_struct_t sp;
+	smbios_slot_t slot;
+	uint_t npeers;
+	smbios_slot_peer_t *peers;
+	uint_t errs = 0;
+
+	if (smbios_lookup_type(hdl, SMB_TYPE_SLOT, &sp) == -1) {
+		warnx("failed to lookup SMBIOS slot: %s",
+		    smbios_errmsg(smbios_errno(hdl)));
+		return (B_FALSE);
+	}
+
+	if (smbios_info_slot(hdl, sp.smbstr_id, &slot) != 0) {
+		warnx("failed to get SMBIOS slot info: %s",
+		    smbios_errmsg(smbios_errno(hdl)));
+		return (B_FALSE);
+	}
+
+	if (!smbios_test_slot_common(&slot)) {
+		errs++;
+	}
+
+	if (slot.smbl_npeers != 1) {
+		warnx("incorrect number of slot peers, found %u",
+		    slot.smbl_npeers);
+		errs++;
+	}
+
+	if (smbios_info_slot_peers(hdl, sp.smbstr_id, &npeers, &peers) != 0) {
+		warnx("failed to get SMBIOS peer info: %s",
+		    smbios_errmsg(smbios_errno(hdl)));
+		return (B_FALSE);
+	}
+
+	if (npeers != 1) {
+		warnx("got wrong number of slot peers: %u", npeers);
+		errs++;
+	}
+
+	if (peers[0].smblp_group != 1) {
+		warnx("incorrect group for peer 0: %u", peers[0].smblp_group);
+		errs++;
+	}
+
+	if (peers[0].smblp_data_width != SMB_SLW_8X) {
+		warnx("incorrect data width for peer 0: %u",
+		    peers[0].smblp_data_width);
+		errs++;
+	}
+
+	if (peers[0].smblp_bus != 0x42) {
+		warnx("incorrect PCI bus for peer 0: %u",
+		    peers[0].smblp_bus);
+		errs++;
+	}
+
+	if (peers[0].smblp_device != (0x9a >> 3)) {
+		warnx("incorrect PCI device for peer 0: %u",
+		    peers[0].smblp_device);
+		errs++;
+	}
+
+	if (peers[0].smblp_function != (0x9a & 0x7)) {
+		warnx("incorrect PCI function for peer 0: %u",
+		    peers[0].smblp_function);
+		errs++;
+	}
+
+	smbios_info_slot_peers_free(hdl, npeers, peers);
+
+	if (slot.smbl_info != smbios_slot_info) {
+		warnx("found wrong slot info: 0x%x, expected 0x%x",
+		    slot.smbl_info, smbios_slot_info);
+		errs++;
+	}
+
+	if (slot.smbl_pwidth != SMB_SLW_32X) {
+		warnx("found wrong slot physical width: 0x%x, expected 0x%x",
+		    slot.smbl_pwidth, SMB_SLW_32X);
+		errs++;
+	}
+
+	if (slot.smbl_pitch != smbios_slot_pitch) {
+		warnx("found wrong slot pitch: 0x%x, expected 0x%x",
+		    slot.smbl_pitch, smbios_slot_pitch);
+		errs++;
+	}
 
 	if (errs > 0) {
 		return (B_FALSE);

@@ -544,13 +544,28 @@ ksensor_create(dev_info_t *dip, const ksensor_ops_t *ops, void *arg,
 }
 
 int
-ksensor_create_temp_pcidev(dev_info_t *dip, const ksensor_ops_t *ops,
-    void *arg, const char *name, id_t *idp)
+ksensor_create_scalar_pcidev(dev_info_t *dip, uint_t kind,
+    const ksensor_ops_t *ops, void *arg, const char *name, id_t *idp)
 {
 	char *pci_name, *type;
+	const char *class;
 	int *regs, ret;
 	uint_t nregs;
 	uint16_t bus, dev;
+
+	switch (kind) {
+	case SENSOR_KIND_TEMPERATURE:
+		class = "ddi_sensor:temperature:pci";
+		break;
+	case SENSOR_KIND_VOLTAGE:
+		class = "ddi_sensor:voltage:pci";
+		break;
+	case SENSOR_KIND_CURRENT:
+		class = "ddi_sensor:current:pci";
+		break;
+	default:
+		return (ENOTSUP);
+	}
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0, "device_type",
 	    &type) != DDI_PROP_SUCCESS) {
@@ -579,8 +594,7 @@ ksensor_create_temp_pcidev(dev_info_t *dip, const ksensor_ops_t *ops,
 
 	pci_name = kmem_asprintf("%x.%x:%s", bus, dev, name);
 
-	ret = ksensor_create(dip, ops, arg, pci_name,
-	    "ddi_sensor:temperature:pci", idp);
+	ret = ksensor_create(dip, ops, arg, pci_name, class, idp);
 	strfree(pci_name);
 	return (ret);
 }
@@ -750,7 +764,7 @@ ksensor_op_kind(id_t id, sensor_ioctl_kind_t *kind)
 }
 
 int
-ksensor_op_temperature(id_t id, sensor_ioctl_temperature_t *temp)
+ksensor_op_scalar(id_t id, sensor_ioctl_scalar_t *scalar)
 {
 	int ret;
 	ksensor_t *sensor;
@@ -759,7 +773,7 @@ ksensor_op_temperature(id_t id, sensor_ioctl_temperature_t *temp)
 		return (ret);
 	}
 
-	ret = sensor->ksensor_ops->kso_temp(sensor->ksensor_arg, temp);
+	ret = sensor->ksensor_ops->kso_scalar(sensor->ksensor_arg, scalar);
 	ksensor_release(sensor);
 
 	return (ret);
@@ -828,6 +842,20 @@ int
 ksensor_kind_temperature(void *unused, sensor_ioctl_kind_t *k)
 {
 	k->sik_kind = SENSOR_KIND_TEMPERATURE;
+	return (0);
+}
+
+int
+ksensor_kind_current(void *unused, sensor_ioctl_kind_t *k)
+{
+	k->sik_kind = SENSOR_KIND_CURRENT;
+	return (0);
+}
+
+int
+ksensor_kind_voltage(void *unused, sensor_ioctl_kind_t *k)
+{
+	k->sik_kind = SENSOR_KIND_VOLTAGE;
 	return (0);
 }
 

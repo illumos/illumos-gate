@@ -1688,6 +1688,10 @@ mlxcx_reg_name(mlxcx_register_id_t rid)
 		return ("PPCNT");
 	case MLXCX_REG_PPLM:
 		return ("PPLM");
+	case MLXCX_REG_MTCAP:
+		return ("MTCAP");
+	case MLXCX_REG_MTMP:
+		return ("MTMP");
 	default:
 		return ("???");
 	}
@@ -1736,6 +1740,12 @@ mlxcx_cmd_access_register(mlxcx_t *mlxp, mlxcx_cmd_reg_opmod_t opmod,
 		break;
 	case MLXCX_REG_PPLM:
 		dsize = sizeof (mlxcx_reg_pplm_t);
+		break;
+	case MLXCX_REG_MTCAP:
+		dsize = sizeof (mlxcx_reg_mtcap_t);
+		break;
+	case MLXCX_REG_MTMP:
+		dsize = sizeof (mlxcx_reg_mtmp_t);
 		break;
 	default:
 		dsize = 0;

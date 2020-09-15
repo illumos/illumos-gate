@@ -137,7 +137,7 @@ pchtemp_read_check(pchtemp_t *pch)
 }
 
 static int
-pchtemp_read(void *arg, sensor_ioctl_temperature_t *sit)
+pchtemp_read(void *arg, sensor_ioctl_scalar_t *scalar)
 {
 	uint16_t temp, ctt, tahv, talv;
 	uint8_t tsel;
@@ -175,9 +175,9 @@ pchtemp_read(void *arg, sensor_ioctl_temperature_t *sit)
 	}
 
 	pch->pcht_temp = (temp & PCHTEMP_REG_TEMP_TSR) - PCHTEMP_TEMP_OFFSET;
-	sit->sit_unit = SENSOR_UNIT_CELSIUS;
-	sit->sit_gran = PCHTEMP_TEMP_RESOLUTION;
-	sit->sit_temp = pch->pcht_temp;
+	scalar->sis_unit = SENSOR_UNIT_CELSIUS;
+	scalar->sis_gran = PCHTEMP_TEMP_RESOLUTION;
+	scalar->sis_value = pch->pcht_temp;
 	mutex_exit(&pch->pcht_mutex);
 
 	return (0);
@@ -185,7 +185,7 @@ pchtemp_read(void *arg, sensor_ioctl_temperature_t *sit)
 
 static const ksensor_ops_t pchtemp_temp_ops = {
 	.kso_kind = ksensor_kind_temperature,
-	.kso_temp = pchtemp_read
+	.kso_scalar = pchtemp_read
 };
 
 static void

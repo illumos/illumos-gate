@@ -71,7 +71,7 @@ chip_create_core_temp_sensor(topo_mod_t *mod, tnode_t *pnode)
 		}
 	}
 
-	return (topo_sensor_create_temp_sensor(mod, pnode, buf, "temp"));
+	return (topo_sensor_create_scalar_sensor(mod, pnode, buf, "temp"));
 }
 
 int
@@ -87,5 +87,5 @@ chip_create_chip_temp_sensor(topo_mod_t *mod, tnode_t *pnode)
 		return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
 	}
 
-	return (topo_sensor_create_temp_sensor(mod, pnode, buf, "temp"));
+	return (topo_sensor_create_scalar_sensor(mod, pnode, buf, "temp"));
 }

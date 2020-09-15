@@ -35,7 +35,7 @@ extern void ksensor_init(void);
  * Operations vectors.
  */
 extern int ksensor_op_kind(id_t, sensor_ioctl_kind_t *);
-extern int ksensor_op_temperature(id_t, sensor_ioctl_temperature_t *);
+extern int ksensor_op_scalar(id_t, sensor_ioctl_scalar_t *);
 
 /*
  * Registration callbacks.

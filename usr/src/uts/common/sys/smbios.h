@@ -22,6 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -527,6 +528,8 @@ typedef struct smbios_processor {
 #define	SMB_PRU_BGA1392		0x3A	/* Socket BGA1392 */
 #define	SMB_PRU_BGA1510		0x3B	/* Socket BGA1510 */
 #define	SMB_PRU_BGA1528		0x3C	/* Socket BGA1528 */
+#define	SMB_PRU_LGA4189		0x3D	/* Socket LGA4189 */
+#define	SMB_PRU_LGA1200		0x3E	/* Socket LGA1200 */
 
 #define	SMB_PRC_RESERVED	0x0001	/* reserved */
 #define	SMB_PRC_UNKNOWN		0x0002	/* unknown */
@@ -944,6 +947,9 @@ typedef struct smbios_slot {
 	uint8_t smbl_df;		/* device/function number */
 	uint8_t smbl_dbw;		/* data bus width */
 	uint8_t smbl_npeers;		/* PCIe bifurcation peers */
+	uint8_t smbl_info;		/* slot info */
+	uint8_t smbl_pwidth;		/* slot physical width */
+	uint32_t smbl_pitch;		/* slot pitch in 10um */
 } smbios_slot_t;
 
 #define	SMB_SLT_OTHER		0x01	/* other */
@@ -976,8 +982,8 @@ typedef struct smbios_slot {
 #define	SMB_SLT_MXM_V		0x1C	/* MXM Type IV */
 #define	SMB_SLT_MXM3_A		0x1D	/* MXM 3.0 Type A */
 #define	SMB_SLT_MXM3_B		0x1E	/* MXM 3.0 Type B */
-#define	SMB_SLT_PCIEG2_SFF	0x1F	/* PCI Express Gen 2 SFF-8639 */
-#define	SMB_SLT_PCIEG3_SFF	0x20	/* PCI Express Gen 3 SFF-8639 */
+#define	SMB_SLT_PCIEG2_SFF	0x1F	/* PCI Express Gen 2 SFF-8639 (U.2) */
+#define	SMB_SLT_PCIEG3_SFF	0x20	/* PCI Express Gen 3 SFF-8639 (U.2) */
 /*
  * These lines must be on one line for the string generating code.
  */
@@ -986,6 +992,11 @@ typedef struct smbios_slot {
 #define	SMB_SLT_PCIE_M52_WOBSKO	0x22	/* PCI Express Mini 52-pin without bottom-side keep-outs */
 /* END CSTYLED */
 #define	SMB_SLT_PCIE_M76	0x23	/* PCI Express Mini 72-pin */
+#define	SMB_SLT_PCIEG4_SFF	0x24	/* PCI Express Gen 4 SFF-8639 (U.2) */
+#define	SMB_SLT_PCIEG5_SFF	0x25	/* PCI Express Gen 5 SFF-8639 (U.2) */
+#define	SMB_SLT_OCP3_SFF	0x26	/* OCP NIC 3.0 Small Form Factor */
+#define	SMB_SLT_OCP3_LFF	0x27	/* OCP NIC 3.0 Large Form Factor */
+#define	SMB_SLT_OCP_PRE		0x28	/* OCP NIC prior to 3.0 */
 #define	SMB_SLT_CXL1		0x30	/* CXL Flexbus 1.0 */
 #define	SMB_SLT_PC98_C20	0xA0	/* PC-98/C20 */
 #define	SMB_SLT_PC98_C24	0xA1	/* PC-98/C24 */
@@ -1016,6 +1027,15 @@ typedef struct smbios_slot {
 #define	SMB_SLT_PCIE4G4		0xBB	/* PCI Exp. Gen 4 x4 */
 #define	SMB_SLT_PCIE4G8		0xBC	/* PCI Exp. Gen 4 x8 */
 #define	SMB_SLT_PCIE4G16	0xBD	/* PCI Exp. Gen 4 x16 */
+#define	SMB_SLT_PCIE5G		0xBE	/* PCI Exp. Gen 5 */
+#define	SMB_SLT_PCIE5G1		0xBF	/* PCI Exp. Gen 5 x1 */
+#define	SMB_SLT_PCIE5G2		0xC0	/* PCI Exp. Gen 5 x2 */
+#define	SMB_SLT_PCIE5G4		0xC1	/* PCI Exp. Gen 5 x4 */
+#define	SMB_SLT_PCIE5G8		0xC2	/* PCI Exp. Gen 5 x8 */
+#define	SMB_SLT_PCIE5G16	0xC3	/* PCI Exp. Gen 5 x16 */
+#define	SMB_SLT_PCIEG6P		0xC4	/* PCI Exp. Gen 6+ */
+#define	SMB_SLT_EDSFF_E1	0xC5	/* Ent. and DC 1U E1 Form Factor */
+#define	SMB_SLT_EDSFF_E3	0xC6	/* Ent. and DC 3" E3 Form Factor */
 
 #define	SMB_SLW_OTHER		0x01	/* other */
 #define	SMB_SLW_UNKNOWN		0x02	/* unknown */
@@ -1041,6 +1061,8 @@ typedef struct smbios_slot {
 #define	SMB_SLL_UNKNOWN		0x02	/* unknown */
 #define	SMB_SLL_SHORT		0x03	/* short length */
 #define	SMB_SLL_LONG		0x04	/* long length */
+#define	SMB_SLL_2IN5		0x05	/* 2.5" drive form factor */
+#define	SMB_SLL_3IN5		0x06	/* 3.5" drive form factor */
 
 #define	SMB_SLCH1_UNKNOWN	0x01	/* characteristics unknown */
 #define	SMB_SLCH1_5V		0x02	/* provides 5.0V */
@@ -1055,6 +1077,9 @@ typedef struct smbios_slot {
 #define	SMB_SLCH2_HOTPLUG	0x02	/* slot supports hot-plug devices */
 #define	SMB_SLCH2_SMBUS		0x04	/* slot supports SMBus signal */
 #define	SMB_SLCH2_BIFUR		0x08	/* slot supports PCIe bifurcation */
+#define	SMB_SLCH2_SURPREM	0x10	/* slot supports surprise removal */
+#define	SMB_SLCH2_CXL1		0x20	/* Flexbus slot, CXL 1.0 capable */
+#define	SMB_SLCH2_CXL2		0x40	/* Flexbus slot, CXL 2.0 capable */
 
 /*
  * SMBIOS 7.10.9 Slot Peer Devices
@@ -1178,7 +1203,7 @@ typedef struct smbios_memarray {
 #define	SMB_MAL_PC98C24		0xA1	/* PC-98/C24 add-on card */
 #define	SMB_MAL_PC98E		0xA2	/* PC-98/E add-on card */
 #define	SMB_MAL_PC98LB		0xA3	/* PC-98/Local bus add-on card */
-#define	SMB_MAL_CXL1		0xA4	/* CXL Flexbus 1.0 add-on card */
+#define	SMB_MAL_CXL1		0xA4	/* CXL add-on card */
 
 #define	SMB_MAU_OTHER		0x01	/* other */
 #define	SMB_MAU_UNKNOWN		0x02	/* unknown */
@@ -1285,6 +1310,8 @@ typedef struct smbios_memdevice {
 #define	SMB_MDT_LOGNV		0x1F	/* Logical non-volatile device */
 #define	SMB_MDT_HBM		0x20	/* High Bandwidth Memory */
 #define	SMB_MDT_HBM2		0x21	/* High Bandwidth Memory 2 */
+#define	SMB_MDT_DDR5		0x22	/* DDR5 */
+#define	SMB_MDT_LPDDR5		0x23	/* LPDDR5 */
 
 #define	SMB_MDF_OTHER		0x0002	/* other */
 #define	SMB_MDF_UNKNOWN		0x0004	/* unknown */
@@ -1313,7 +1340,7 @@ typedef struct smbios_memdevice {
 #define	SMB_MTECH_NVDIMM_N	0x04	/* NVDIMM-N */
 #define	SMB_MTECH_NVDIMM_F	0x05	/* NVDIMM-F */
 #define	SMB_MTECH_NVDIMM_P	0x06	/* NVDIMM-P */
-#define	SMB_MTECH_INTCPM	0x07	/* Intel Optane DC Persistent Memory */
+#define	SMB_MTECH_INTCPM	0x07	/* Intel Optane persistent memory */
 
 #define	SMB_MOMC_RESERVED	0x01	/* reserved */
 #define	SMB_MOMC_OTHER		0x02	/* other */
@@ -1838,7 +1865,8 @@ typedef struct smbios_memdevice_ext {
 #define	SMB_VERSION_31	0x0301		/* SMBIOS encoding for DMTF spec 3.1 */
 #define	SMB_VERSION_32	0x0302		/* SMBIOS encoding for DMTF spec 3.2 */
 #define	SMB_VERSION_33	0x0303		/* SMBIOS encoding for DMTF spec 3.3 */
-#define	SMB_VERSION	SMB_VERSION_33	/* SMBIOS latest version definitions */
+#define	SMB_VERSION_34	0x0304		/* SMBIOS encoding for DMTF spec 3.4 */
+#define	SMB_VERSION	SMB_VERSION_34	/* SMBIOS latest version definitions */
 
 #define	SMB_O_NOCKSUM	0x1		/* do not verify header checksums */
 #define	SMB_O_NOVERS	0x2		/* do not verify header versions */

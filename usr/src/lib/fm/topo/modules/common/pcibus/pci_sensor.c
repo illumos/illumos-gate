@@ -29,27 +29,14 @@
 #include <pcibus.h>
 #include <topo_sensor.h>
 
-int
-pci_create_dev_sensors(topo_mod_t *mod, tnode_t *dev)
+static const char *pci_sensor_types[] = { "current", "voltage", "temperature" };
+
+static int
+pci_create_dev_scandir(topo_mod_t *mod, tnode_t *dev, const char *path)
 {
 	int ret;
 	DIR *d;
-	char path[PATH_MAX];
-	topo_instance_t binst, dinst;
 	struct dirent *ent;
-	tnode_t *parent = topo_node_parent(dev);
-
-	binst = topo_node_instance(parent);
-	dinst = topo_node_instance(dev);
-
-	if (snprintf(path, sizeof (path), "/dev/sensors/temperature/pci/%x.%x",
-	    binst, dinst) >= sizeof (path)) {
-		topo_mod_dprintf(mod, "failed to construct temp sensor "
-		    "directory path, path too long");
-		return (topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM));
-	}
-
-	topo_mod_dprintf(mod, "searching for sensors in %s", path);
 
 	d = opendir(path);
 	if (d == NULL) {
@@ -72,24 +59,54 @@ pci_create_dev_sensors(topo_mod_t *mod, tnode_t *dev)
 
 		if (snprintf(spath, sizeof (spath), "%s/%s", path,
 		    ent->d_name) >= sizeof (spath)) {
-			topo_mod_dprintf(mod, "failed to construct temp sensor "
-			    "path for %s/%s, path too long", path, ent->d_name);
+			topo_mod_dprintf(mod, "failed to construct sensor path "
+			    "for %s/%s, path too long", path, ent->d_name);
 			ret = topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM);
 			goto out;
 		}
 
 		topo_mod_dprintf(mod, "attempting to create sensor at %s",
 		    spath);
-		if ((ret = topo_sensor_create_temp_sensor(mod, dev, spath,
+		if ((ret = topo_sensor_create_scalar_sensor(mod, dev, spath,
 		    ent->d_name)) < 0) {
 			goto out;
 		}
-
 	}
+
 	ret = 0;
 
 out:
 	(void) closedir(d);
-
 	return (ret);
+}
+
+int
+pci_create_dev_sensors(topo_mod_t *mod, tnode_t *dev)
+{
+	uint_t i;
+	char path[PATH_MAX];
+	topo_instance_t binst, dinst;
+	tnode_t *parent = topo_node_parent(dev);
+
+	binst = topo_node_instance(parent);
+	dinst = topo_node_instance(dev);
+
+	for (i = 0; i < ARRAY_SIZE(pci_sensor_types); i++) {
+		int ret;
+
+		if (snprintf(path, sizeof (path), "/dev/sensors/%s/pci/%x.%x",
+		    pci_sensor_types[i], binst, dinst) >= sizeof (path)) {
+			topo_mod_dprintf(mod, "failed to construct %s sensor "
+			    "directory path, path too long",
+			    pci_sensor_types[i]);
+			return (topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM));
+		}
+
+		topo_mod_dprintf(mod, "searching for sensors in %s", path);
+		if ((ret = pci_create_dev_scandir(mod, dev, path)) != 0) {
+			return (ret);
+		}
+	}
+
+	return (0);
 }

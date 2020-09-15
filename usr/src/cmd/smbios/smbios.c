@@ -22,6 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -736,7 +737,7 @@ print_slot(smbios_hdl_t *shp, id_t id, FILE *fp)
 			oprintf(fp, "  Slot Peer %u:\n", i);
 			oprintf(fp, "    Segment group: %u\n",
 			    peer[i].smblp_group);
-			oprintf(fp, "    Bus/Device/Function: %u/%u/%u",
+			oprintf(fp, "    Bus/Device/Function: %u/%u/%u\n",
 			    peer[i].smblp_bus, peer[i].smblp_device,
 			    peer[i].smblp_function);
 			oprintf(fp, "    Electrical width: %u\n",
@@ -744,6 +745,25 @@ print_slot(smbios_hdl_t *shp, id_t id, FILE *fp)
 		}
 
 		smbios_info_slot_peers_free(shp, npeers, peer);
+	}
+
+	if (s.smbl_info != 0) {
+		if (s.smbl_type >= SMB_SLT_PCIE &&
+		    s.smbl_type <= SMB_SLT_PCIEG6P) {
+			oprintf(fp, "  PCIe Generation: %d\n", s.smbl_info);
+		} else {
+			oprintf(fp, "  Slot Type: 0x%x\n", s.smbl_info);
+		}
+	}
+
+	if (s.smbl_pwidth != 0) {
+		desc_printf(smbios_slot_width_desc(s.smbl_pwidth),
+		    fp, "  Physical Width: 0x%x", s.smbl_pwidth);
+	}
+
+	if (s.smbl_pitch != 0) {
+		oprintf(fp, "  Slot Pitch: %u.%u mm\n", s.smbl_pitch / 100,
+		    s.smbl_pitch % 100);
 	}
 }
 

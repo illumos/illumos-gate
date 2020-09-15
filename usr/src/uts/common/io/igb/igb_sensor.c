@@ -72,7 +72,7 @@
 #define	EMC1413_REG_EXT3_DIODE_LO	0x2b
 
 static int
-igb_sensor_reg_temp(void *arg, sensor_ioctl_temperature_t *temp)
+igb_sensor_reg_temperature(void *arg, sensor_ioctl_scalar_t *scalar)
 {
 	igb_t *igb = arg;
 	uint32_t reg;
@@ -87,17 +87,17 @@ igb_sensor_reg_temp(void *arg, sensor_ioctl_temperature_t *temp)
 		return (EIO);
 	}
 
-	temp->sit_unit = SENSOR_UNIT_CELSIUS;
-	temp->sit_gran = E1000_THMJT_RESOLUTION;
-	temp->sit_prec = E1000_THMJT_PRECISION;
-	temp->sit_temp = E1000_THMJT_TEMP(reg);
+	scalar->sis_unit = SENSOR_UNIT_CELSIUS;
+	scalar->sis_gran = E1000_THMJT_RESOLUTION;
+	scalar->sis_prec = E1000_THMJT_PRECISION;
+	scalar->sis_value = E1000_THMJT_TEMP(reg);
 
 	return (0);
 }
 
 static const ksensor_ops_t igb_sensor_reg_ops = {
 	.kso_kind = ksensor_kind_temperature,
-	.kso_temp = igb_sensor_reg_temp
+	.kso_scalar = igb_sensor_reg_temperature
 };
 
 static boolean_t
@@ -106,8 +106,9 @@ igb_sensors_create_minors(igb_t *igb)
 	int ret;
 	igb_sensors_t *sp = &igb->igb_sensors;
 
-	if ((ret = ksensor_create_temp_pcidev(igb->dip, &igb_sensor_reg_ops,
-	    igb, "builtin", &sp->isn_reg_ksensor)) != 0) {
+	if ((ret = ksensor_create_scalar_pcidev(igb->dip,
+	    SENSOR_KIND_TEMPERATURE, &igb_sensor_reg_ops, igb, "builtin",
+	    &sp->isn_reg_ksensor)) != 0) {
 		igb_log(igb, IGB_LOG_ERROR, "failed to create main sensor: %d",
 		    ret);
 		return (B_FALSE);

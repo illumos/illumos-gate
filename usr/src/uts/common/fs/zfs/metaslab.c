@@ -2414,7 +2414,7 @@ metaslab_load_impl(metaslab_t *msp)
 	msp->ms_max_size = metaslab_largest_allocatable(msp);
 	ASSERT3U(max_size, <=, msp->ms_max_size);
 	hrtime_t load_end = gethrtime();
-		msp->ms_load_time = load_end;
+	msp->ms_load_time = load_end;
 	if (zfs_flags & ZFS_DEBUG_LOG_SPACEMAP) {
 		zfs_dbgmsg("loading: txg %llu, spa %s, vdev_id %llu, "
 		    "ms_id %llu, smp_length %llu, "

@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2020 the University of Queensland
 .\"
-.Dd April 9, 2020
+.Dd August 27, 2020
 .Dt MLXCX 7D
 .Os
 .Sh NAME
@@ -44,6 +44,8 @@ Promiscuous access via
 LED control
 .It
 Transceiver information
+.It
+Internal temperature sensors
 .El
 .Pp
 At this time, the driver does not support Large Send Offload (LSO), energy
