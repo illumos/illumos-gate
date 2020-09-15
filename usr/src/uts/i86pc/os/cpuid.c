@@ -1431,7 +1431,7 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"tbm",
 	"avx512_vnni",
 	"amd_pcec",
-	"mb_clear",
+	"md_clear",
 	"mds_no",
 	"core_thermal",
 	"pkg_thermal",
