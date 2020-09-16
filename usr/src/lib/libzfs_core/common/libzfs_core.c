@@ -1359,13 +1359,9 @@ lzc_change_key(const char *fsname, uint64_t crypt_cmd, nvlist_t *props,
  * Set the bootenv contents for the given pool.
  */
 int
-lzc_set_bootenv(const char *pool, const char *env)
+lzc_set_bootenv(const char *pool, const nvlist_t *env)
 {
-	nvlist_t *args = fnvlist_alloc();
-	fnvlist_add_string(args, "envmap", env);
-	int error = lzc_ioctl(ZFS_IOC_SET_BOOTENV, pool, args, NULL);
-	fnvlist_free(args);
-	return (error);
+	return (lzc_ioctl(ZFS_IOC_SET_BOOTENV, pool, (nvlist_t *)env, NULL));
 }
 
 /*

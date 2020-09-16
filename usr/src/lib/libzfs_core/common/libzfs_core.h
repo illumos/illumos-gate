@@ -118,7 +118,7 @@ int lzc_channel_program_nosync(const char *, const char *, uint64_t,
 int lzc_pool_checkpoint(const char *);
 int lzc_pool_checkpoint_discard(const char *);
 
-int lzc_set_bootenv(const char *, const char *);
+int lzc_set_bootenv(const char *, const nvlist_t *);
 int lzc_get_bootenv(const char *, nvlist_t **);
 #ifdef	__cplusplus
 }

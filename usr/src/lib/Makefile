@@ -243,6 +243,7 @@ SUBDIRS +=				\
 	libxcurses2	\
 	libxnet		\
 	libzfs		\
+	libzfsbootenv	\
 	libzfs_core	\
 	libzfs_jni	\
 	libzonecfg	\
@@ -702,6 +703,7 @@ libvrrpadm:	libdladm libscf
 libvscan:	libscf libsecdb
 libzfs:		libdevid libgen libuutil libavl libefi libidmap \
 		libumem libtsol libzfs_core libcryptoutil pkcs11 libmd libzutil
+libzfsbootenv:	libzfs libnvpair
 libzfs_core:	libnvpair
 libzfs_jni:	libdiskmgt libzfs libzutil
 libzonecfg:	libuuid libsysevent libsec libbrand libpool libscf libproc \
