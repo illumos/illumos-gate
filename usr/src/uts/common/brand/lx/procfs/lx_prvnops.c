@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -470,7 +471,7 @@ typedef struct lxpr_rlimtab {
 	char	*rlim_rctl;	/* rctl source */
 } lxpr_rlimtab_t;
 
-#define RLIM_MAXFD	"Max open files"
+#define	RLIM_MAXFD	"Max open files"
 
 static lxpr_rlimtab_t lxpr_rlimtab[] = {
 	{ "Max cpu time",	"seconds",	"process.max-cpu-time" },
@@ -1737,8 +1738,9 @@ lxpr_read_pid_limits(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		 * match the max value so that we do not output "unlimited".
 		 */
 		if (strcmp(lxpr_rlimtab[i].rlim_name, RLIM_MAXFD) == 0 &&
-		    cur[i] == RLIM_INFINITY)
-		    cur[i] = max[i];
+		    cur[i] == RLIM_INFINITY) {
+			cur[i] = max[i];
+		}
 
 	}
 	lxpr_unlock(p);
@@ -4001,10 +4003,10 @@ lxpr_read_meminfo(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	 * model, so just inform the caller that no swap is being used.
 	 *
 	 * MemAvailable
-	 * MemAvailable entry is available since Linux Kernel +3.14, is an 
-	 * estimate of how much memory is available for starting new applications, 
-	 * without swapping. In lxbrand we will always return the available free 
-	 * memory as an estimate of this value.
+	 * MemAvailable entry is available since Linux Kernel +3.14, is an
+	 * estimate of how much memory is available for starting new
+	 * applications, without swapping. In lxbrand we will always return the
+	 * available free memory as an estimate of this value.
 	 */
 	lxpr_uiobuf_printf(uiobuf,
 	    "MemTotal:       %8lu kB\n"
@@ -8094,6 +8096,58 @@ lxpr_write_pid_loginuid(lxpr_node_t *lxpnp, struct uio *uio, struct cred *cr,
 	return (0);
 }
 
+static int
+lxpr_readlink_exe(lxpr_node_t *lxpnp, char *buf, size_t size, cred_t *cr)
+{
+	size_t dlen = DIRENT64_RECLEN(MAXPATHLEN);
+	dirent64_t *dp;
+	vnode_t *dirvp;
+	int error = ENOENT;
+	char *dbuf;
+	proc_t *p;
+	size_t len;
+
+	p = lxpr_lock(lxpnp, NO_ZOMB);
+
+	if (p == NULL)
+		return (error);
+
+	dirvp = p->p_execdir;
+	if (dirvp == NULL) {
+		lxpr_unlock(p);
+		return (error);
+	}
+
+	VN_HOLD(dirvp);
+	lxpr_unlock(p);
+
+	/* Look up the parent directory path */
+	if ((error = vnodetopath(NULL, dirvp, buf, size, cr)) != 0) {
+		VN_RELE(dirvp);
+		return (error);
+	}
+
+	len = strlen(buf);
+
+	dbuf = kmem_alloc(dlen, KM_SLEEP);
+
+	/*
+	 * Walk the parent directory to find the vnode for p->p_exec, in order
+	 * to derive its path.
+	 */
+	if ((error = dirfindvp(NULL, dirvp, lxpnp->lxpr_realvp,
+	    cr, dbuf, dlen, &dp)) == 0 &&
+	    strlen(dp->d_name) + len + 1 < size) {
+		buf[len] = '/';
+		(void) strcpy(buf + len + 1, dp->d_name);
+	} else {
+		error = ENOENT;
+	}
+	VN_RELE(dirvp);
+	kmem_free(dbuf, dlen);
+	return (error);
+}
+
 /*
  * lxpr_readlink(): Vnode operation for VOP_READLINK()
  */
@@ -8135,7 +8189,16 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 		if (error != 0)
 			return (error);
 
-		if ((error = vnodetopath(NULL, rvp, bp, buflen, cr)) != 0) {
+		error = vnodetopath(NULL, rvp, bp, buflen, cr);
+
+		/*
+		 * Special handling for /proc/<pid>/exe where the vnode path is
+		 * not cached.
+		 */
+		if (error != 0 && lxpnp->lxpr_type == LXPR_PID_EXE)
+			error = lxpr_readlink_exe(lxpnp, bp, buflen, cr);
+
+		if (error != 0) {
 			/*
 			 * Special handling possible for /proc/<pid>/fd/<num>
 			 * Generate <type>:[<inode>] links, if allowed.
