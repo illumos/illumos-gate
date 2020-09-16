@@ -130,7 +130,9 @@ COMOBJS=			\
 	bcopy.o			\
 	bsearch.o		\
 	bzero.o			\
+	explicit_bzero.o	\
 	memccpy.o		\
+	memmem.o		\
 	qsort.o			\
 	strtol.o		\
 	strtoul.o		\
@@ -409,7 +411,6 @@ PORTGEN=			\
 	euclen.o		\
 	event_port.o		\
 	execvp.o		\
-	explicit_bzero.o	\
 	fattach.o		\
 	fdetach.o		\
 	fdopendir.o		\
@@ -489,7 +490,6 @@ PORTGEN=			\
 	madvise.o		\
 	malloc.o		\
 	memalign.o		\
-	memmem.o		\
 	memset_s.o		\
 	mkdev.o			\
 	mkdtemp.o		\
