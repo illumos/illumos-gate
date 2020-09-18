@@ -15932,6 +15932,8 @@ s usr/share/man/man3head/TAILQ_NEXT.3head=queue.h.3head
 s usr/share/man/man3head/TAILQ_PREV.3head=queue.h.3head
 s usr/share/man/man3head/TAILQ_REMOVE.3head=queue.h.3head
 s usr/share/man/man3head/TAILQ_SWAP.3head=queue.h.3head
+s usr/share/man/man3head/TIMESPEC_TO_TIMEVAL.3head=timespec.3head
+s usr/share/man/man3head/TIMEVAL_TO_TIMESPEC.3head=timespec.3head
 s usr/share/man/man3head/acct.3head=acct.h.3head
 f usr/share/man/man3head/acct.h.3head 0444 root bin
 s usr/share/man/man3head/aio.3head=aio.h.3head
@@ -16078,6 +16080,8 @@ s usr/share/man/man3head/timeb.3head=timeb.h.3head
 f usr/share/man/man3head/timeb.h.3head 0444 root bin
 s usr/share/man/man3head/times.3head=times.h.3head
 f usr/share/man/man3head/times.h.3head 0444 root bin
+f usr/share/man/man3head/timespec.3head 0444 root bin
+s usr/share/man/man3head/timeval.3head=timespec.3head
 s usr/share/man/man3head/types.3head=types.h.3head
 f usr/share/man/man3head/types.h.3head 0444 root bin
 s usr/share/man/man3head/types32.3head=types32.h.3head

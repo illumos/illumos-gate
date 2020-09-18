@@ -13,6 +13,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2019 Joyent, Inc.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 [DEFAULT]
@@ -128,6 +129,8 @@ timeout = 600
 [/opt/libc-tests/tests/timespec_get.64]
 [/opt/libc-tests/tests/uchar.32]
 [/opt/libc-tests/tests/uchar.64]
+[/opt/libc-tests/tests/utimes.32]
+[/opt/libc-tests/tests/utimes.64]
 
 #
 # root privs required for priority changes

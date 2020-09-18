@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #include "lint.h"
 #include <string.h>
 #include <utime.h>
@@ -67,8 +71,8 @@ utime(const char *path, const struct utimbuf *times)
 	return (utimensat(AT_FDCWD, path, tsp, 0));
 }
 
-int
-utimes(const char *path, const struct timeval times[2])
+static int
+utimes_impl(const char *path, const struct timeval times[2], int flag)
 {
 	struct timeval ltimes[2];
 	timespec_t ts[2];
@@ -86,7 +90,19 @@ utimes(const char *path, const struct timeval times[2])
 		ts[1].tv_nsec = ltimes[1].tv_usec * 1000;
 		tsp = ts;
 	}
-	return (utimensat(AT_FDCWD, path, tsp, 0));
+	return (utimensat(AT_FDCWD, path, tsp, flag));
+}
+
+int
+utimes(const char *path, const struct timeval times[2])
+{
+	return (utimes_impl(path, times, 0));
+}
+
+int
+lutimes(const char *path, const struct timeval times[2])
+{
+	return (utimes_impl(path, times, AT_SYMLINK_NOFOLLOW));
 }
 
 #pragma weak _futimesat = futimesat
@@ -114,4 +130,10 @@ futimesat(int fd, const char *path, const struct timeval times[2])
 		return (futimens(fd, tsp));
 
 	return (utimensat(fd, path, tsp, 0));
+}
+
+int
+futimes(int fd, const struct timeval times[2])
+{
+	return (futimesat(fd, NULL, times));
 }

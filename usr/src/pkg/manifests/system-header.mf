@@ -28,6 +28,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2020 Joyent, Inc.
 # Copyright 2019 Peter Tribble.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/header@$(PKGVERS)
@@ -1910,6 +1911,7 @@ file path=usr/share/man/man3head/tgmath.h.3head
 file path=usr/share/man/man3head/time.h.3head
 file path=usr/share/man/man3head/timeb.h.3head
 file path=usr/share/man/man3head/times.h.3head
+file path=usr/share/man/man3head/timespec.3head
 file path=usr/share/man/man3head/types.h.3head
 file path=usr/share/man/man3head/types32.h.3head
 file path=usr/share/man/man3head/uchar.h.3head
@@ -2114,6 +2116,10 @@ link path=usr/share/man/man3head/TAILQ_NEXT.3head target=queue.h.3head
 link path=usr/share/man/man3head/TAILQ_PREV.3head target=queue.h.3head
 link path=usr/share/man/man3head/TAILQ_REMOVE.3head target=queue.h.3head
 link path=usr/share/man/man3head/TAILQ_SWAP.3head target=queue.h.3head
+link path=usr/share/man/man3head/TIMESPEC_TO_TIMEVAL.3head \
+    target=timespec.3head
+link path=usr/share/man/man3head/TIMEVAL_TO_TIMESPEC.3head \
+    target=timespec.3head
 link path=usr/share/man/man3head/acct.3head target=acct.h.3head
 link path=usr/share/man/man3head/aio.3head target=aio.h.3head
 link path=usr/share/man/man3head/ar.3head target=ar.h.3head
@@ -2187,6 +2193,7 @@ link path=usr/share/man/man3head/tgmath.3head target=tgmath.h.3head
 link path=usr/share/man/man3head/time.3head target=time.h.3head
 link path=usr/share/man/man3head/timeb.3head target=timeb.h.3head
 link path=usr/share/man/man3head/times.3head target=times.h.3head
+link path=usr/share/man/man3head/timeval.3head target=timespec.3head
 link path=usr/share/man/man3head/types.3head target=types.h.3head
 link path=usr/share/man/man3head/types32.3head target=types32.h.3head
 link path=usr/share/man/man3head/ucontext.3head target=ucontext.h.3head

@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		$(SRC)/Makefile.master
@@ -93,6 +94,7 @@ MANFILES=	acct.h.3head		\
 		time.h.3head		\
 		timeb.h.3head		\
 		times.h.3head		\
+		timespec.3head		\
 		types.h.3head		\
 		types32.h.3head		\
 		uchar.h.3head		\
@@ -273,6 +275,9 @@ MANLINKS +=	acct.3head		\
 		time.3head		\
 		timeb.3head		\
 		times.3head		\
+		timeval.3head		\
+		TIMEVAL_TO_TIMESPEC.3head \
+		TIMESPEC_TO_TIMEVAL.3head \
 		types.3head		\
 		types32.3head		\
 		ucontext.3head		\
@@ -451,6 +456,10 @@ tgmath.3head		:= LINKSRC = tgmath.h.3head
 time.3head		:= LINKSRC = time.h.3head
 timeb.3head		:= LINKSRC = timeb.h.3head
 times.3head		:= LINKSRC = times.h.3head
+timespec.3head		:= LINKSRC = time.h.3head
+timeval.3head		:= LINKSRC = timespec.3head
+TIMEVAL_TO_TIMESPEC.3head := LINKSRC = timespec.3head
+TIMESPEC_TO_TIMEVAL.3head := LINKSRC = timespec.3head
 types.3head		:= LINKSRC = types.h.3head
 types32.3head		:= LINKSRC = types32.h.3head
 ucontext.3head		:= LINKSRC = ucontext.h.3head

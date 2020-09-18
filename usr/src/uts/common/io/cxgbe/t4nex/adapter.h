@@ -559,6 +559,10 @@ struct adapter {
 	kmutex_t sfl_lock;	/* same cache-line as sc_lock? but that's ok */
 	TAILQ_HEAD(, sge_fl) sfl;
 	timeout_id_t sfl_timer;
+
+	/* Sensors */
+	id_t temp_sensor;
+	id_t volt_sensor;
 };
 
 enum {

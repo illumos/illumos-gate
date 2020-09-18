@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Toomas Soome <tsoome@me.com>
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -79,6 +80,17 @@ gfxp_check_for_console(dev_info_t *devi, struct gfxp_fb_softc *softc,
 	ddi_acc_handle_t pci_conf;
 	dev_info_t *pdevi;
 	uint16_t data16;
+
+	/*
+	 * fb_info is filled in by data gathered by the bootloader.
+	 * In particular we are interested in "paddr" which is the physical
+	 * address of the framebuffer. If that is not zero, then we have
+	 * a valid framebuffer and we can use this device as a console.
+	 */
+	if (fb_info.paddr != 0) {
+		softc->flags |= GFXP_FLAG_CONSOLE;
+		return;
+	}
 
 	/*
 	 * Based on Section 11.3, "PCI Display Subsystem Initialization",

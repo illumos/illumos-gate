@@ -78,6 +78,12 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.34 {
+    protected:
+	futimes;
+	lutimes;
+} ILLUMOS_0.33;
+
 SYMBOL_VERSION ILLUMOS_0.33 {
     protected:
 	c16rtomb;

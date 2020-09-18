@@ -37,6 +37,7 @@
 #include <sys/mkdev.h>
 #include <sys/queue.h>
 #include <sys/containerof.h>
+#include <sys/sensors.h>
 
 #include "version.h"
 #include "common/common.h"
@@ -179,6 +180,18 @@ static SLIST_HEAD(, adapter) t4_adapter_list;
 static kmutex_t t4_uld_list_lock;
 static SLIST_HEAD(, uld_info) t4_uld_list;
 #endif
+
+static int t4_temperature_read(void *, sensor_ioctl_scalar_t *);
+static int t4_voltage_read(void *, sensor_ioctl_scalar_t *);
+static const ksensor_ops_t t4_temp_ops = {
+	.kso_kind = ksensor_kind_temperature,
+	.kso_scalar = t4_temperature_read
+};
+
+static const ksensor_ops_t t4_volt_ops = {
+	.kso_kind = ksensor_kind_voltage,
+	.kso_scalar = t4_voltage_read
+};
 
 int
 _init(void)
@@ -758,7 +771,23 @@ ofld_queues:
 	}
 	sc->flags |= INTR_ALLOCATED;
 
-	ASSERT(rc == DDI_SUCCESS);
+	if ((rc = ksensor_create_scalar_pcidev(dip, SENSOR_KIND_TEMPERATURE,
+	    &t4_temp_ops, sc, "temp", &sc->temp_sensor)) != 0) {
+		cxgb_printf(dip, CE_WARN, "failed to create temperature "
+		    "sensor: %d", rc);
+		rc = DDI_FAILURE;
+		goto done;
+	}
+
+	if ((rc = ksensor_create_scalar_pcidev(dip, SENSOR_KIND_VOLTAGE,
+	    &t4_volt_ops, sc, "vdd", &sc->volt_sensor)) != 0) {
+		cxgb_printf(dip, CE_WARN, "failed to create voltage "
+		    "sensor: %d", rc);
+		rc = DDI_FAILURE;
+		goto done;
+	}
+
+
 	ddi_report_dev(dip);
 
 	/*
@@ -849,6 +878,7 @@ t4_devo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 
 	/* Safe to call no matter what */
+	(void) ksensor_remove(dip, KSENSOR_ALL_IDS);
 	ddi_prop_remove_all(dip);
 	ddi_remove_minor_node(dip, NULL);
 
@@ -2919,3 +2949,76 @@ t4_iterate(void (*func)(int, void *), void *arg)
 }
 
 #endif
+
+static int
+t4_sensor_read(struct adapter *sc, uint32_t diag, uint32_t *valp)
+{
+	int rc;
+	struct port_info *pi = sc->port[0];
+	uint32_t param, val;
+
+	rc = begin_synchronized_op(pi, 1, 1);
+	if (rc != 0) {
+		return (rc);
+	}
+	param = V_FW_PARAMS_MNEM(FW_PARAMS_MNEM_DEV) |
+	    V_FW_PARAMS_PARAM_X(FW_PARAMS_PARAM_DEV_DIAG) |
+	    V_FW_PARAMS_PARAM_Y(diag);
+	rc = -t4_query_params(sc, sc->mbox, sc->pf, 0, 1, &param, &val);
+	end_synchronized_op(pi, 1);
+
+	if (rc != 0) {
+		return (rc);
+	}
+
+	if (val == 0) {
+		return (EIO);
+	}
+
+	*valp = val;
+	return (0);
+}
+
+static int
+t4_temperature_read(void *arg, sensor_ioctl_scalar_t *scalar)
+{
+	int ret;
+	struct adapter *sc = arg;
+	uint32_t val;
+
+	ret = t4_sensor_read(sc, FW_PARAM_DEV_DIAG_TMP, &val);
+	if (ret != 0) {
+		return (ret);
+	}
+
+	/*
+	 * The device measures temperature in units of 1 degree Celsius. We
+	 * don't know its precision.
+	 */
+	scalar->sis_unit = SENSOR_UNIT_CELSIUS;
+	scalar->sis_gran = 1;
+	scalar->sis_prec = 0;
+	scalar->sis_value = val;
+
+	return (0);
+}
+
+static int
+t4_voltage_read(void *arg, sensor_ioctl_scalar_t *scalar)
+{
+	int ret;
+	struct adapter *sc = arg;
+	uint32_t val;
+
+	ret = t4_sensor_read(sc, FW_PARAM_DEV_DIAG_VDD, &val);
+	if (ret != 0) {
+		return (ret);
+	}
+
+	scalar->sis_unit = SENSOR_UNIT_VOLTS;
+	scalar->sis_gran = 1000;
+	scalar->sis_prec = 0;
+	scalar->sis_value = val;
+
+	return (0);
+}
