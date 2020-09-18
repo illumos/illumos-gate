@@ -12804,6 +12804,7 @@ s usr/share/man/man2/fstat.2=stat.2
 s usr/share/man/man2/fstatat.2=stat.2
 s usr/share/man/man2/fstatvfs.2=statvfs.2
 s usr/share/man/man2/futimens.2=utimes.2
+s usr/share/man/man2/futimes.2=utimes.2
 s usr/share/man/man2/futimesat.2=utimes.2
 f usr/share/man/man2/getacct.2 0444 root bin
 f usr/share/man/man2/getaudit.2 0444 root bin
@@ -12843,6 +12844,7 @@ s usr/share/man/man2/linkat.2=link.2
 f usr/share/man/man2/llseek.2 0444 root bin
 f usr/share/man/man2/lseek.2 0444 root bin
 s usr/share/man/man2/lstat.2=stat.2
+s usr/share/man/man2/lutimes.2=utimes.2
 f usr/share/man/man2/memcntl.2 0444 root bin
 f usr/share/man/man2/meminfo.2 0444 root bin
 f usr/share/man/man2/mincore.2 0444 root bin
