@@ -24,6 +24,7 @@
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /* This file contains all TCP input processing functions. */
@@ -5108,6 +5109,15 @@ tcp_input_add_ancillary(tcp_t *tcp, mblk_t *mp, ip_pkt_t *ipp,
 
 	optlen = 0;
 	addflag.crb_all = 0;
+
+	/* If app asked for TOS and it has changed ... */
+	if (connp->conn_recv_ancillary.crb_recvtos &&
+	    ipp->ipp_type_of_service != tcp->tcp_recvtos &&
+	    (ira->ira_flags & IRAF_IS_IPV4)) {
+		optlen += sizeof (struct T_opthdr) +
+		    P2ROUNDUP(sizeof (uint8_t), __TPI_ALIGN_SIZE);
+		addflag.crb_recvtos = 1;
+	}
 	/* If app asked for pktinfo and the index has changed ... */
 	if (connp->conn_recv_ancillary.crb_ip_recvpktinfo &&
 	    ira->ira_ruifindex != tcp->tcp_recvifindex) {
@@ -5127,8 +5137,9 @@ tcp_input_add_ancillary(tcp_t *tcp, mblk_t *mp, ip_pkt_t *ipp,
 		optlen += sizeof (struct T_opthdr) + sizeof (uint_t);
 		addflag.crb_ipv6_recvtclass = 1;
 	}
+
 	/*
-	 * If app asked for hopbyhop headers and it has changed ...
+	 * If app asked for hop-by-hop headers and it has changed ...
 	 * For security labels, note that (1) security labels can't change on
 	 * a connected socket at all, (2) we're connected to at most one peer,
 	 * (3) if anything changes, then it must be some other extra option.
@@ -5206,6 +5217,23 @@ tcp_input_add_ancillary(tcp_t *tcp, mblk_t *mp, ip_pkt_t *ipp,
 	todi->OPT_length = optlen;
 	todi->OPT_offset = sizeof (*todi);
 	optptr = (uchar_t *)&todi[1];
+
+	/* If app asked for TOS and it has changed ... */
+	if (addflag.crb_recvtos) {
+		toh = (struct T_opthdr *)optptr;
+		toh->level = IPPROTO_IP;
+		toh->name = IP_RECVTOS;
+		toh->len = sizeof (*toh) +
+		    P2ROUNDUP(sizeof (uint8_t), __TPI_ALIGN_SIZE);
+		toh->status = 0;
+		optptr += sizeof (*toh);
+		*(uint8_t *)optptr = ipp->ipp_type_of_service;
+		optptr = (uchar_t *)toh + toh->len;
+		ASSERT(__TPI_TOPT_ISALIGNED(optptr));
+		/* Save as "last" value */
+		tcp->tcp_recvtos = ipp->ipp_type_of_service;
+	}
+
 	/*
 	 * If app asked for pktinfo and the index has changed ...
 	 * Note that the local address never changes for the connection.

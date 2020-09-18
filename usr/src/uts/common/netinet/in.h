@@ -3,6 +3,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 /*
  * Copyright (c) 1982, 1986 Regents of the University of California.
@@ -381,7 +382,7 @@ struct in_addr {
 
 /* Well known 6to4 Relay Router Anycast address defined in RFC 3068 */
 #if !defined(_XPG4_2) || !defined(__EXTENSIONS__)
-#define	INADDR_6TO4RRANYCAST	0xc0586301U 	/* 192.88.99.1 */
+#define	INADDR_6TO4RRANYCAST	0xc0586301U	/* 192.88.99.1 */
 #endif	/* !defined(_XPG4_2) || !defined(__EXTENSIONS__) */
 
 #define	IN_LOOPBACKNET		127			/* official! */
@@ -466,7 +467,7 @@ struct sockaddr_in6 {
 
 #define	IN6ADDR_ANY_INIT	    {	0, 0, 0, 0,	\
 					0, 0, 0, 0,	\
-					0, 0, 0, 0, 	\
+					0, 0, 0, 0,	\
 					0, 0, 0, 0 }
 
 #define	IN6ADDR_LOOPBACK_INIT	    {	0, 0, 0, 0,	\
@@ -905,6 +906,7 @@ struct sockaddr_in6 {
 #define	IP_RECVIF	0x9	/* int; receive the inbound interface index */
 #define	IP_RECVSLLA	0xa	/* sockaddr_dl; get source link layer address */
 #define	IP_RECVTTL	0xb	/* uint8_t; get TTL for inbound packet */
+#define	IP_RECVTOS	0xc	/* uint8_t; get TOS for inbound packet */
 
 #define	IP_MULTICAST_IF		0x10	/* set/get IP multicast interface  */
 #define	IP_MULTICAST_TTL	0x11	/* set/get IP multicast timetolive */
@@ -939,8 +941,8 @@ struct sockaddr_in6 {
  */
 
 typedef struct ipsec_req {
-	uint_t 		ipsr_ah_req;		/* AH request */
-	uint_t 		ipsr_esp_req;		/* ESP request */
+	uint_t		ipsr_ah_req;		/* AH request */
+	uint_t		ipsr_esp_req;		/* ESP request */
 	uint_t		ipsr_self_encap_req;	/* Self-Encap request */
 	uint8_t		ipsr_auth_alg;		/* Auth algs for AH */
 	uint8_t		ipsr_esp_alg;		/* Encr algs for ESP */
@@ -1246,7 +1248,7 @@ typedef struct {
 #define	IPV6_RECVRTHDRDSTOPTS	0x17
 
 #define	IPV6_CHECKSUM		0x18	/* Control checksum on raw sockets */
-#define	IPV6_RECVTCLASS		0x19	/* enable/disable IPV6_CLASS */
+#define	IPV6_RECVTCLASS		0x19	/* enable/disable IPV6_TCLASS */
 #define	IPV6_USE_MIN_MTU	0x20	/* send packets with minimum MTU */
 #define	IPV6_DONTFRAG		0x21	/* don't fragment packets */
 #define	IPV6_SEC_OPT		0x22	/* Used to set IPSEC options */

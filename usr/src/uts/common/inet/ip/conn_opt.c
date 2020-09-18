@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -235,11 +236,22 @@ conn_recvancillary_size(conn_t *connp, crb_t recv_ancillary,
 	}
 
 	/*
+	 * If IP_RECVTOS is set allocate the appropriately sized buffer
+	 */
+	if (recv_ancillary.crb_recvtos &&
+	    (ira->ira_flags & IRAF_IS_IPV4)) {
+		ancil_size += sizeof (struct T_opthdr) +
+		    P2ROUNDUP(sizeof (uint8_t), __TPI_ALIGN_SIZE);
+		IP_STAT(ipst, conn_in_recvtos);
+	}
+
+	/*
 	 * If IP_RECVTTL is set allocate the appropriate sized buffer
 	 */
 	if (recv_ancillary.crb_recvttl &&
 	    (ira->ira_flags & IRAF_IS_IPV4)) {
-		ancil_size += sizeof (struct T_opthdr) + sizeof (uint8_t);
+		ancil_size += sizeof (struct T_opthdr) +
+		    P2ROUNDUP(sizeof (uint8_t), __TPI_ALIGN_SIZE);
 		IP_STAT(ipst, conn_in_recvttl);
 	}
 
@@ -549,14 +561,25 @@ conn_recvancillary_add(conn_t *connp, crb_t recv_ancillary,
 		ancil_size -= toh->len;
 	}
 
-	/*
-	 * CAUTION:
-	 * Due to aligment issues
-	 * Processing of IP_RECVTTL option
-	 * should always be the last. Adding
-	 * any option processing after this will
-	 * cause alignment panic.
-	 */
+	if (recv_ancillary.crb_recvtos &&
+	    (ira->ira_flags & IRAF_IS_IPV4)) {
+		struct	T_opthdr *toh;
+		uint8_t	*dstptr;
+
+		toh = (struct T_opthdr *)ancil_buf;
+		toh->level = IPPROTO_IP;
+		toh->name = IP_RECVTOS;
+		toh->len = sizeof (struct T_opthdr) +
+		    P2ROUNDUP(sizeof (uint8_t), __TPI_ALIGN_SIZE);
+		toh->status = 0;
+		ancil_buf += sizeof (struct T_opthdr);
+		dstptr = (uint8_t *)ancil_buf;
+		*dstptr = ipp->ipp_type_of_service;
+		ancil_buf = (uchar_t *)toh + toh->len;
+		ancil_size -= toh->len;
+		ASSERT(__TPI_TOPT_ISALIGNED(toh));
+	}
+
 	if (recv_ancillary.crb_recvttl &&
 	    (ira->ira_flags & IRAF_IS_IPV4)) {
 		struct	T_opthdr *toh;
@@ -565,13 +588,15 @@ conn_recvancillary_add(conn_t *connp, crb_t recv_ancillary,
 		toh = (struct T_opthdr *)ancil_buf;
 		toh->level = IPPROTO_IP;
 		toh->name = IP_RECVTTL;
-		toh->len = sizeof (struct T_opthdr) + sizeof (uint8_t);
+		toh->len = sizeof (struct T_opthdr) +
+		    P2ROUNDUP(sizeof (uint8_t), __TPI_ALIGN_SIZE);
 		toh->status = 0;
 		ancil_buf += sizeof (struct T_opthdr);
 		dstptr = (uint8_t *)ancil_buf;
 		*dstptr = ipp->ipp_hoplimit;
-		ancil_buf += sizeof (uint8_t);
+		ancil_buf = (uchar_t *)toh + toh->len;
 		ancil_size -= toh->len;
+		ASSERT(__TPI_TOPT_ISALIGNED(toh));
 	}
 
 	/* Consumed all of allocated space */
@@ -772,6 +797,9 @@ conn_opt_get(conn_opt_arg_t *coa, t_scalar_t level, t_scalar_t name,
 			break;	/* goto sizeof (int) option return */
 		case IP_RECVTTL:
 			*i1 = connp->conn_recv_ancillary.crb_recvttl;
+			break;	/* goto sizeof (int) option return */
+		case IP_RECVTOS:
+			*i1 = connp->conn_recv_ancillary.crb_recvtos;
 			break;	/* goto sizeof (int) option return */
 		case IP_ADD_MEMBERSHIP:
 		case IP_DROP_MEMBERSHIP:
@@ -1363,6 +1391,11 @@ conn_opt_set_ip(conn_opt_arg_t *coa, t_scalar_t name, uint_t inlen,
 	case IP_RECVTTL:
 		mutex_enter(&connp->conn_lock);
 		connp->conn_recv_ancillary.crb_recvttl = onoff;
+		mutex_exit(&connp->conn_lock);
+		break;
+	case IP_RECVTOS:
+		mutex_enter(&connp->conn_lock);
+		connp->conn_recv_ancillary.crb_recvtos = onoff;
 		mutex_exit(&connp->conn_lock);
 		break;
 	case IP_PKTINFO: {

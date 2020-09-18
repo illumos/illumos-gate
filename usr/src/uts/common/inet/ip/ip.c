@@ -25,6 +25,7 @@
  * Copyright (c) 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright (c) 2019 Joyent, Inc. All rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -13975,6 +13976,7 @@ ip_kstat2_init(netstackid_t stackid, ip_stat_t *ip_statisticsp)
 		{ "conn_in_recvslla",		KSTAT_DATA_UINT64 },
 		{ "conn_in_recvucred",		KSTAT_DATA_UINT64 },
 		{ "conn_in_recvttl",		KSTAT_DATA_UINT64 },
+		{ "conn_in_recvtos",		KSTAT_DATA_UINT64 },
 		{ "conn_in_recvhopopts",	KSTAT_DATA_UINT64 },
 		{ "conn_in_recvhoplimit",	KSTAT_DATA_UINT64 },
 		{ "conn_in_recvdstopts",	KSTAT_DATA_UINT64 },

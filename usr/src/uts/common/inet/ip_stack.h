@@ -26,6 +26,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_INET_IP_STACK_H
@@ -85,6 +86,7 @@ typedef struct ip_stat {
 	kstat_named_t	conn_in_recvslla;
 	kstat_named_t	conn_in_recvucred;
 	kstat_named_t	conn_in_recvttl;
+	kstat_named_t	conn_in_recvtos;
 	kstat_named_t	conn_in_recvhopopts;
 	kstat_named_t	conn_in_recvhoplimit;
 	kstat_named_t	conn_in_recvdstopts;

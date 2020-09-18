@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -111,8 +112,8 @@ opdes_t	udp_opt_arr[] = {
 	},
 { IP_RECVIF, IPPROTO_IP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
 { IP_RECVSLLA, IPPROTO_IP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
-{ IP_RECVTTL,	IPPROTO_IP,  OA_RW, OA_RW, OP_NP, 0, sizeof (int),
-	0 },
+{ IP_RECVTTL,	IPPROTO_IP,  OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ IP_RECVTOS,	IPPROTO_IP,  OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
 { IP_MULTICAST_IF, IPPROTO_IP, OA_RW, OA_RW, OP_NP, 0,
 	sizeof (struct in_addr),	0 /* INADDR_ANY */ },
 

@@ -114,6 +114,11 @@ MANFILES=	acct.h.3head		\
 		xlocale.h.3head
 
 MANLINKS=	\
+		CMSG_DATA.3head \
+		CMSG_FIRSTHDR.3head \
+		CMSG_LEN.3head \
+		CMSG_NXTHDR.3head \
+		CMSG_SPACE.3head \
 		LIST_CLASS_ENTRY.3head \
 		LIST_CLASS_HEAD.3head \
 		LIST_CONCAT.3head \
@@ -295,6 +300,11 @@ MANLINKS +=	acct.3head		\
 		wordexp.3head		\
 		xlocale.3head
 
+CMSG_DATA.3head := LINKSRC = socket.h.3head
+CMSG_FIRSTHDR.3head := LINKSRC = socket.h.3head
+CMSG_LEN.3head := LINKSRC = socket.h.3head
+CMSG_NXTHDR.3head := LINKSRC = socket.h.3head
+CMSG_SPACE.3head := LINKSRC = socket.h.3head
 LIST_CLASS_ENTRY.3head := LINKSRC = queue.h.3head
 LIST_CLASS_HEAD.3head := LINKSRC = queue.h.3head
 LIST_CONCAT.3head := LINKSRC = queue.h.3head
