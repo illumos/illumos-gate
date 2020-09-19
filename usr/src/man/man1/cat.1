@@ -45,26 +45,22 @@
 .\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\"
-.TH CAT 1 "Apr 8, 2008"
+.TH CAT 1 "Sep 19, 2020"
 .SH NAME
 cat \- concatenate and display files
 .SH SYNOPSIS
 .SS "\fB/usr/bin/cat\fR"
-.LP
 .nf
 \fB/usr/bin/cat\fR [\fB-nbsuvet\fR] [\fIfile\fR...]
 .fi
 
 .SS "\fBksh93\fR"
-.LP
 .nf
 \fBcat\fR [\fB-bdenstuvABDEST\fR] [\fIfile\fR...]
 .fi
 
 .SH DESCRIPTION
 .SS "\fB/usr/bin/cat\fR"
-.sp
-.LP
 The \fBcat\fR utility reads each \fIfile\fR in sequence and writes it on the
 standard output. Thus:
 .sp
@@ -92,8 +88,6 @@ concatenates \fIfile1\fR and \fIfile2\fR, and writes the results in
 \fIfile3\fR. If no input file is given, \fBcat\fR reads from the standard input
 file.
 .SS "\fBksh93\fR"
-.sp
-.LP
 The \fBcat\fR built-in in \fBksh93\fR is associated with the \fB/bin\fR and
 \fB/usr/bin\fR paths. It is invoked when \fBcat\fR is executed without a
 pathname prefix and the pathname search finds a \fB/bin/cat\fR or
@@ -102,8 +96,6 @@ standard output. If no file is specified, or if the file is \fB-\fR, \fBcat\fR
 copies from standard input starting at the current location.
 .SH OPTIONS
 .SS "\fB/usr/bin/cat\fR"
-.sp
-.LP
 The following options are supported by \fB/usr/bin/cat\fR:
 .sp
 .ne 2
@@ -184,8 +176,6 @@ Tabs are printed as \fB^I\fRs and form feeds to be printed as \fB^L\fRs.
 The \fB-e\fR and \fB-t\fR options are ignored if the \fB-v\fR option is not
 specified.
 .SS "\fBksh93\fR"
-.sp
-.LP
 \fBksh93\fR \fBcat\fR supports the following options:
 .sp
 .ne 2
@@ -323,8 +313,6 @@ Copies TABs as \fB^I\fR and form feeds as \fB^L\fR.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operand is supported:
 .sp
 .ne 2
@@ -340,12 +328,9 @@ occurrences of \fB\|\(mi\|\fR as \fIfile\fR.
 .RE
 
 .SH USAGE
-.sp
-.LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBcat\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRConcatenating a File
 .sp
 .LP
@@ -393,11 +378,6 @@ example% \fBcat start - middle - end > file\fR
 
 .sp
 .LP
-when standard input is a terminal, gets two arbitrary pieces of input from the
-terminal with a single invocation of \fBcat\fR.
-
-.sp
-.LP
 If standard input is a regular file,
 
 .sp
@@ -415,7 +395,7 @@ would be equivalent to the following command:
 .sp
 .in +2
 .nf
-\fBcat start - middle /dev/null end > file\fR
+example% \fBcat start - middle /dev/null end > file\fR
 .fi
 .in -2
 .sp
@@ -424,18 +404,14 @@ would be equivalent to the following command:
 .LP
 because the entire contents of the file would be consumed by \fBcat\fR the
 first time \fB\|\(mi\|\fR was used as a \fIfile\fR operand and an end-of-file
-condition would be detected immediately when \fB\|\(mi\|\fRwas referenced the
+condition would be detected immediately when \fB\|\(mi\|\fR was referenced the
 second time.
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBcat\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -456,13 +432,9 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .SS "\fB/usr/bin/cat\fR"
-.sp
 
-.sp
 .TS
 box;
 c | c
@@ -477,9 +449,7 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SS "\fBksh93\fR"
-.sp
 
-.sp
 .TS
 box;
 c | c
@@ -494,13 +464,9 @@ Interface Stability	See below.
 The \fBksh93\fR built-in binding to \fB/bin\fR and \fB/usr/bin\fR is Volatile.
 The built-in interfaces are Uncommitted.
 .SH SEE ALSO
-.sp
-.LP
 \fBtouch\fR(1), \fBattributes\fR(5), \fBenviron\fR(5), \fBlargefile\fR(5),
 \fBstandards\fR(5)
 .SH NOTES
-.sp
-.LP
 Redirecting the output of \fBcat\fR onto one of the files being read causes the
 loss of the data originally in the file being read. For example,
 .sp
