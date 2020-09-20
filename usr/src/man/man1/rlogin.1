@@ -4,19 +4,16 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RLOGIN 1 "Dec 23, 2008"
+.TH RLOGIN 1 "September 12, 2020"
 .SH NAME
 rlogin \- remote login
 .SH SYNOPSIS
-.LP
 .nf
 \fBrlogin\fR [\fB-8EL\fR] [\fB-e\fIc\fR\fR ] [\fB-A\fR] [\fB-K\fR] [\fB-x\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-f\fR | \fB-F\fR] [\fB-a\fR]
      [\fB-l\fR \fIusername\fR] [\fB-k\fR \fIrealm\fR] \fIhostname\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBrlogin\fR utility establishes a remote login session from your terminal
 to the remote machine named \fIhostname\fR. The user can choose to kerberize
 the rlogin session using Kerberos V5 and also protect the data being
@@ -55,8 +52,6 @@ are reflected as well. All echoing takes place at the remote site, so that
 Control-S and Control-Q and flushing of input and output on interrupts are
 handled properly.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -190,7 +185,7 @@ Allows the rlogin session to be run in "\fBlitout\fR" mode.
 .RS 15n
 Explicitly requests the new (\fB-PN\fR) or old (\fB-PO\fR) version of the
 Kerberos `\fBrcmd\fR' protocol. The new protocol avoids many security problems
-prevalant in the old one and is considered much more secure, but is not
+prevalent in the old one and is considered much more secure, but is not
 interoperable with older (MIT/SEAM) servers. The new protocol is used by
 default, unless explicitly specified using these options or by using
 \fBkrb5.conf\fR(4). If Kerberos authorization fails when using the old
@@ -210,8 +205,6 @@ This reduces response time and increases \fBCPU\fR utilization.
 .RE
 
 .SS "Escape Sequences"
-.sp
-.LP
 Lines that you type which start with the tilde character (\fB~\fR) are "escape
 sequences." The escape character can be changed using the \fB-e\fR option.
 .sp
@@ -246,7 +239,6 @@ suspend" character, usually Control-Y. See \fBtty\fR(1).
 .RE
 
 .SH OPERANDS
-.sp
 .ne 2
 .na
 \fB\fIhostname\fR\fR
@@ -256,8 +248,6 @@ The remote machine on which \fIrlogin\fR establishes the remote login session.
 .RE
 
 .SH USAGE
-.sp
-.LP
 For the kerberized rlogin session, each user can have a private authorization
 list in a file, \fB\&.k5login\fR, in his home directory. Each line in this file
 should contain a Kerberos principal name of the form
@@ -276,7 +266,7 @@ For the non-secure rlogin session, each remote machine can have a file named
 shares user names. Users with the same user name on both the local and remote
 machine can \fBrlogin\fR from the machines listed in the remote machine's
 \fB/etc/hosts.equiv\fR file without supplying a password. Individual users
-camayn set up a similar private equivalence list with the file \fB\&.rhosts\fR
+may set up a similar private equivalence list with the file \fB\&.rhosts\fR
 in their home directories. Each line in this file contains two names, that is,
 a host name and a user name, separated by a space. An entry in a remote user's
 \fB\&.rhosts\fR file permits the user named \fIusername\fR who is logged into
@@ -293,7 +283,6 @@ of these files.
 For security reasons, the \fB\&.rhosts\fR file must be owned by either the
 remote user or by root.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/passwd\fR\fR
@@ -366,16 +355,12 @@ Hosts database.
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBrsh\fR(1), \fBstty\fR(1), \fBtty\fR(1), \fBin.rlogind\fR(1M),
 \fBhosts\fR(4), \fBhosts.equiv\fR(4), \fBkrb5.conf\fR(4), \fBnologin\fR(4),
 \fBattributes\fR(5), \fBkrb5_auth_rules\fR(5)
 .SH DIAGNOSTICS
-.sp
-.LP
 The following message indicates that the machine is in the process of being
-shutdown and logins have been disabled:
+shut down and logins have been disabled:
 .sp
 .in +2
 .nf
@@ -385,8 +370,6 @@ NO LOGINS: System going down in \fIN\fR \fBminutes\fR
 .sp
 
 .SH NOTES
-.sp
-.LP
 When a system is listed in \fBhosts.equiv\fR, its security must be as good as
 local security. One insecure system listed in \fBhosts.equiv\fR can compromise
 the security of the entire system.
