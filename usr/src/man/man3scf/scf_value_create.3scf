@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCF_VALUE_CREATE 3SCF "May 28, 2009"
+.TH SCF_VALUE_CREATE 3SCF "September 12, 2020"
 .SH NAME
 scf_value_create, scf_value_handle, scf_value_reset, scf_value_destroy,
 scf_value_type, scf_value_base_type, scf_value_is_type, scf_type_base_type,
@@ -15,7 +15,6 @@ scf_value_set_time, scf_value_set_from_string, scf_value_set_astring,
 scf_value_set_ustring, scf_value_set_opaque \- manipulate values in the Service
 Configuration Facility
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libscf.h>
@@ -152,8 +151,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscf_value_create()\fR function creates a new, reset \fBscf_value_t\fR
 that holds a single typed value. The value can be used only with the handle
 specified by \fIh\fR and objects associated with \fIh\fR.
@@ -229,8 +226,6 @@ The \fBscf_value_set_from_string()\fR function is the inverse of
 The \fBscf_value_set_*()\fR functions will succeed on \fBscf_value_t\fR objects
 that have already been set.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBscf_value_create()\fR returns a new, reset
 \fBscf_value_t\fR. Otherwise, it returns \fINULL\fR.
 .sp
@@ -264,8 +259,6 @@ not including the terminating null byte. Otherwise, they return -1.
 Upon successful completion, \fBscf_value_get_opaque()\fR returns the number of
 bytes written. Otherwise, it returns -1.
 .SH ERRORS
-.sp
-.LP
 The \fBscf_value_create()\fR function will fail if:
 .sp
 .ne 2
@@ -364,7 +357,7 @@ The \fBscf_value_type()\fR, \fBscf_value_base_type()\fR,
 \fBscf_value_get_boolean()\fR, \fBscf_value_get_count()\fR,
 \fBscf_value_get_integer()\fR, \fBscf_value_get_time()\fR,
 \fBscf_value_get_astring()\fR, \fBscf_value_get_ustring()\fR,
-\fBscf_value_get_as_string()\fR, and\fBscf_value_get_as_string_typed()\fR
+\fBscf_value_get_as_string()\fR, and \fBscf_value_get_as_string_typed()\fR
 functions will fail if:
 .sp
 .ne 2
@@ -395,8 +388,6 @@ base-type chain.
 .LP
 The \fBscf_error\fR(3SCF) function can be used to retrieve the error value.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -413,7 +404,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibscf\fR(3LIB), \fBscf_entry_add_value\fR(3SCF), \fBscf_error\fR(3SCF),
 \fBattributes\fR(5)
