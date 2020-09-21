@@ -31,6 +31,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2019 RackTop Systems.
 # Copyright 2020 Oxide Computer Company
+# Copyright 2020 Peter Tribble
 #
 
 #
@@ -137,10 +138,9 @@ ONBLD_TOOLS=		$(BUILD_TOOLS)/onbld
 JAVA_HOME=	/usr/java
 # define buildtime JAVA_ROOT
 JAVA_ROOT=	/usr/java
-# Build uses java7 by default.  Pass one the variables below set to empty
+# Build uses java8 by default.  Pass the variable below set to empty
 # string in the environment to override.
-BLD_JAVA_6=	$(POUND_SIGN)
-BLD_JAVA_8=	$(POUND_SIGN)
+BLD_JAVA_11=	$(POUND_SIGN)
 
 GNUC_ROOT=	/usr/gcc/7
 GCCLIBDIR=	$(GNUC_ROOT)/lib
@@ -193,9 +193,7 @@ BISON=		/usr/bin/bison
 CPP=		/usr/lib/cpp
 ANSI_CPP=	$(GNUC_ROOT)/bin/cpp
 JAVAC=		$(JAVA_ROOT)/bin/javac
-JAVAH=		$(JAVA_ROOT)/bin/javah
 JAVADOC=	$(JAVA_ROOT)/bin/javadoc
-RMIC=		$(JAVA_ROOT)/bin/rmic
 JAR=		$(JAVA_ROOT)/bin/jar
 CTFCONVERT=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfconvert
 CTFDIFF=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfdiff
@@ -687,7 +685,8 @@ CPPFLAGS.master=$(DTEXTDOM) $(DTS_ERRNO) \
 CPPFLAGS.native=-I$(NATIVE_ADJUNCT)/include
 CPPFLAGS=	$(CPPFLAGS.first) $(CPPFLAGS.master)
 AS_CPPFLAGS=	$(CPPFLAGS.first) $(CPPFLAGS.master)
-JAVAFLAGS=	-source 1.6 -target 1.6 -Xlint:deprecation,-options
+JAVAFLAGS=	-source 7 -target 7 -Xlint:deprecation,-options
+$(BLD_JAVA_11)JAVAFLAGS=	-source 7 -target 7 -Xlint:-options
 
 #
 # For source message catalogue

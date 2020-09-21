@@ -84,6 +84,11 @@ usr/src/cmd/krb5/slave/kprop.c
 usr/src/cmd/krb5/slave/kprop.h
 usr/src/cmd/krb5/slave/kpropd.c
 usr/src/cmd/mandoc
+usr/src/cmd/pools/poold/libjkstat/jkstat.h
+usr/src/cmd/pools/poold/libjlgrp/jlgrp.h
+usr/src/cmd/pools/poold/libjpool/jpool.h
+usr/src/cmd/pools/poold/libjsyslog/jsyslog.h
+usr/src/cmd/print/printmgr/com/sun/admin/pm/server/com_sun_admin_pm_server_DoPrinterNS.h
 usr/src/cmd/ttymon/sttyparse.c
 usr/src/common/ficl/ficltokens.h
 usr/src/common/bzip2/bzlib.h
@@ -107,7 +112,9 @@ usr/src/grub/grub-0.97/stage2/moddiv.c
 usr/src/grub/grub-0.97/stage2/pc_slice.h
 usr/src/grub/grub-0.97/stage2/shared.h
 usr/src/grub/grub-0.97/stage2/stage1_5.c
+usr/src/lib/libadt_jni/com/sun/audit/AuditSession.h
 usr/src/lib/libc/port/gen/arc4random_uniform.c
+usr/src/lib/libdtrace_jni/java/native/LocalConsumer.h
 usr/src/lib/libdwarf/common/cmplrs/dwarf_addr_finder.h
 usr/src/lib/libdwarf/common/config.h
 usr/src/lib/libdwarf/common/dwarf_abbrev.c

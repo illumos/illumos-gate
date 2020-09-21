@@ -171,6 +171,7 @@ typedef enum {
  * Please append properties to the end of this list. Do not reorder the list.
  */
 typedef enum {
+	MAC_PROP_PRIVATE = -1,
 	MAC_PROP_DUPLEX = 0x00000001,
 	MAC_PROP_SPEED,
 	MAC_PROP_STATUS,
@@ -248,8 +249,7 @@ typedef enum {
 	MAC_PROP_ADV_50GFDX_CAP,
 	MAC_PROP_EN_50GFDX_CAP,
 	MAC_PROP_EN_FEC_CAP,
-	MAC_PROP_ADV_FEC_CAP,
-	MAC_PROP_PRIVATE = -1
+	MAC_PROP_ADV_FEC_CAP
 } mac_prop_id_t;
 
 /*

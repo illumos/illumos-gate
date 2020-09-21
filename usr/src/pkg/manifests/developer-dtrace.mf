@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 Peter Tribble
 #
 
 #
@@ -59,6 +60,24 @@ dir path=usr/share/lib/java group=sys
 dir path=usr/share/lib/java/javadoc group=other
 dir path=usr/share/lib/java/javadoc/dtrace group=other
 dir path=usr/share/lib/java/javadoc/dtrace/api group=other
+$(JAVA_11_ONLY)dir path=usr/share/lib/java/javadoc/dtrace/api/jquery \
+    group=other
+$(JAVA_11_ONLY)dir path=usr/share/lib/java/javadoc/dtrace/api/jquery/external \
+    group=other
+$(JAVA_11_ONLY)dir \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/external/jquery \
+    group=other
+$(JAVA_11_ONLY)dir path=usr/share/lib/java/javadoc/dtrace/api/jquery/images \
+    group=other
+$(JAVA_11_ONLY)dir path=usr/share/lib/java/javadoc/dtrace/api/jquery/jszip \
+    group=other
+$(JAVA_11_ONLY)dir \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/jszip-utils group=other
+$(JAVA_11_ONLY)dir \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/jszip-utils/dist \
+    group=other
+$(JAVA_11_ONLY)dir \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/jszip/dist group=other
 dir path=usr/share/lib/java/javadoc/dtrace/api/org group=other
 dir path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris group=other
 dir path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os group=other
@@ -67,7 +86,7 @@ dir path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace \
 dir \
     path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use \
     group=other
-$(JAVA_7_ONLY)dir path=usr/share/lib/java/javadoc/dtrace/api/resources \
+$(JAVA_11_ONLY)dir path=usr/share/lib/java/javadoc/dtrace/api/resources \
     group=other
 dir path=usr/share/lib/java/javadoc/dtrace/examples group=other
 dir path=usr/share/lib/java/javadoc/dtrace/html group=other
@@ -220,17 +239,113 @@ file path=usr/sbin/$(ARCH64)/intrstat mode=0555
 file path=usr/sbin/$(ARCH64)/lockstat mode=0555
 file path=usr/sbin/$(ARCH64)/plockstat mode=0555
 file path=usr/share/lib/java/dtrace.jar group=sys
-file path=usr/share/lib/java/javadoc/dtrace/api/allclasses-frame.html \
+$(JAVA_8_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/allclasses-frame.html \
     group=other
-file path=usr/share/lib/java/javadoc/dtrace/api/allclasses-noframe.html \
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/allclasses-index.html \
+    group=other
+$(JAVA_8_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/allclasses-noframe.html \
+    group=other
+$(JAVA_11_ONLY)file path=usr/share/lib/java/javadoc/dtrace/api/allclasses.html \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/allpackages-index.html \
     group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/constant-values.html \
     group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/deprecated-list.html \
     group=other
+$(JAVA_11_ONLY)file path=usr/share/lib/java/javadoc/dtrace/api/element-list \
+    group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/help-doc.html group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/index-all.html group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/index.html group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/external/jquery/jquery.js \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/images/ui-bg_glass_55_fbf9ee_1x400.png \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/images/ui-bg_glass_65_dadada_1x400.png \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/images/ui-bg_glass_75_dadada_1x400.png \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/images/ui-bg_glass_75_e6e6e6_1x400.png \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/images/ui-bg_glass_95_fef1ec_1x400.png \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/images/ui-bg_highlight-soft_75_cccccc_1x100.png \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/images/ui-icons_222222_256x240.png \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/images/ui-icons_2e83ff_256x240.png \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/images/ui-icons_454545_256x240.png \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/images/ui-icons_888888_256x240.png \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/images/ui-icons_cd0a0a_256x240.png \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/jquery-3.3.1.js \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/jquery-migrate-3.0.1.js \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/jquery-ui.css \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/jquery-ui.js \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/jquery-ui.min.css \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/jquery-ui.min.js \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/jquery-ui.structure.css \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/jquery-ui.structure.min.css \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/jszip-utils/dist/jszip-utils-ie.js \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/jszip-utils/dist/jszip-utils-ie.min.js \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/jszip-utils/dist/jszip-utils.js \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/jszip-utils/dist/jszip-utils.min.js \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/jszip/dist/jszip.js \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/jquery/jszip/dist/jszip.min.js \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/member-search-index.js \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/member-search-index.zip \
+    group=other
 file \
     path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/Aggregate.html \
     group=other
@@ -609,7 +724,7 @@ file \
 file \
     path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/class-use/ValueRecord.html \
     group=other
-file \
+$(JAVA_8_ONLY)file \
     path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/package-frame.html \
     group=other
 file \
@@ -622,23 +737,31 @@ file \
     path=usr/share/lib/java/javadoc/dtrace/api/org/opensolaris/os/dtrace/package-use.html \
     group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/overview-tree.html group=other
-file path=usr/share/lib/java/javadoc/dtrace/api/package-list group=other
-$(JAVA_7_ONLY)file \
-    path=usr/share/lib/java/javadoc/dtrace/api/resources/background.gif \
+$(JAVA_8_ONLY)file path=usr/share/lib/java/javadoc/dtrace/api/package-list \
     group=other
-$(JAVA_7_ONLY)file \
-    path=usr/share/lib/java/javadoc/dtrace/api/resources/tab.gif group=other
-$(JAVA_7_ONLY)file \
-    path=usr/share/lib/java/javadoc/dtrace/api/resources/titlebar.gif \
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/package-search-index.js \
     group=other
-$(JAVA_7_ONLY)file \
-    path=usr/share/lib/java/javadoc/dtrace/api/resources/titlebar_end.gif \
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/package-search-index.zip \
     group=other
-$(JAVA_8_ONLY)file path=usr/share/lib/java/javadoc/dtrace/api/script.js \
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/resources/glass.png \
+    group=other
+$(JAVA_11_ONLY)file path=usr/share/lib/java/javadoc/dtrace/api/resources/x.png \
+    group=other
+file path=usr/share/lib/java/javadoc/dtrace/api/script.js group=other
+$(JAVA_11_ONLY)file path=usr/share/lib/java/javadoc/dtrace/api/search.js \
     group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/serialized-form.html \
     group=other
 file path=usr/share/lib/java/javadoc/dtrace/api/stylesheet.css group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/type-search-index.js \
+    group=other
+$(JAVA_11_ONLY)file \
+    path=usr/share/lib/java/javadoc/dtrace/api/type-search-index.zip \
+    group=other
 file path=usr/share/lib/java/javadoc/dtrace/examples/TestAPI.java group=other
 file path=usr/share/lib/java/javadoc/dtrace/examples/TestAPI2.java group=other
 file path=usr/share/lib/java/javadoc/dtrace/examples/TestTarget.java \

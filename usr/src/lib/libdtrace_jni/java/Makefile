@@ -23,6 +23,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2020 Peter Tribble
+#
 
 include $(SRC)/Makefile.master
 
@@ -35,7 +37,6 @@ PKGNAME=org.opensolaris.os.dtrace
 
 APIDIR=$(SRC)/lib/libdtrace_jni/java
 CLASSES=$(APIDIR)/classes
-JNI=$(APIDIR)/native
 JARS=$(APIDIR)/lib
 DOCS=$(APIDIR)/docs
 DOCAPI=$(DOCS)/api
@@ -55,7 +56,7 @@ DOCAPIDESTDIR=$(DOCDESTDIR)/api
 DOCEXAMPLESDESTDIR=$(DOCDESTDIR)/examples
 DOCHTMLDESTDIR=$(DOCDESTDIR)/html
 DOCIMAGESDESTDIR=$(DOCDESTDIR)/images
-$(BLD_JAVA_8)XDOCLINT_OPTION=-Xdoclint:none
+XDOCLINT_OPTION=-Xdoclint:none
 
 $(JARDESTDIR)/%: $(JARS)/%
 	$(INS.file)
@@ -78,26 +79,14 @@ APICLASSPATH=$(CLASSES):$(APIJAVASRC)
 
 # javac flags
 JFLAGS= -g -d $(CLASSES) -sourcepath $(APICLASSPATH)
-JFLAGS += -source 1.5 -target 1.6
-JFLAGS += -Xlint:all,-rawtypes,-options
+JFLAGS += -source 7 -target 7
+JFLAGS += -Xlint:all,-deprecation,-rawtypes,-options
 
 # The default make rule for Java files
 COMPILE.java=$(JAVAC) $(JFLAGS)
 
 $(CLASSES)/$(PKGPATH)/%.class:	$(APIJAVASRC)/$(PKGPATH)/%.java
 				$(COMPILE.java) $<
-
-# javah generated headers
-APIHDR= LocalConsumer.h
-JNIHDRS=$(JNI)/$(APIHDR)
-
-# API classes with native methods
-JNI_CLASSNAMES=\
-    LocalConsumer
-
-JNI_CLASSES=${JNI_CLASSNAMES:%=%.class}
-DTRACE_JNI_CLASSES=${JNI_CLASSES:%=$(CLASSES)/$(PKGPATH)/%}
-JNI_FULL_CLASSNAMES=${JNI_CLASSNAMES:%=$(PKGNAME).%}
 
 # All API classes
 API_CLASSNAMES=\
@@ -163,11 +152,10 @@ API_CLASSES=${API_CLASSNAMES:%=%.class}
 DTRACE_API_CLASSES=${API_CLASSES:%=$(CLASSES)/$(PKGPATH)/%}
 
 
-all:            $(CLASSES) $(DTRACE_API_CLASSES) $(JNI)/$(APIHDR)
+all:            $(CLASSES) $(DTRACE_API_CLASSES)
 
 clean:
 		-$(RM) $(CLASSES)/$(PKGPATH)/*.class
-		-$(RM) $(JNI)/*.h
 		-$(RM) -r $(DOCAPI)
 
 clobber:	clean
@@ -176,14 +164,6 @@ clobber:	clean
 # Make the class dir, if it doesn't exist
 $(CLASSES):
 		-@mkdir -p $@
-
-# Make the directory for javah-generated headers, if it doesn't exist
-$(JNI):
-		-@mkdir -p $@
-
-$(JNI)/$(APIHDR): $(JNI) $(DTRACE_JNI_CLASSES)
-		$(JAVAH) -o $@ -classpath $(CLASSES) $(JNI_FULL_CLASSNAMES)
-		-@touch $@
 
 # Rule for installing API javadoc.
 $(DOCAPIDESTDIR)/index.html: $(DTRACE_API_CLASSES)

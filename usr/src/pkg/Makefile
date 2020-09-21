@@ -25,6 +25,7 @@
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 RackTop Systems.
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 Peter Tribble
 #
 
 include $(SRC)/Makefile.master
@@ -170,12 +171,10 @@ PM_TRANSFORMS= common_actions publish restart_fmri facets defaults \
 PM_FINAL_TRANSFORMS= strip_dependinfo
 PM_INC= transforms manifests
 
-JAVA_7_ONLY=
 JAVA_8_ONLY=
-$(BLD_JAVA_6)JAVA_7_ONLY=$(POUND_SIGN)
-$(BLD_JAVA_6)JAVA_8_ONLY=$(POUND_SIGN)
-$(BLD_JAVA_8)JAVA_7_ONLY=$(POUND_SIGN)
-$(JAVA_7_ONLY)JAVA_8_ONLY=$(POUND_SIGN)
+JAVA_11_ONLY=
+$(BLD_JAVA_11)JAVA_8_ONLY=$(POUND_SIGN)
+$(JAVA_8_ONLY)JAVA_11_ONLY=$(POUND_SIGN)
 
 PKGMOG_DEFINES= \
 	i386_ONLY=$(POUND_SIGN) \
@@ -202,8 +201,8 @@ PKGMOG_DEFINES= \
 	python3_ONLY=$(BUILDPY3) \
 	python2tools_ONLY=$(BUILDPY2TOOLS) \
 	python3tools_ONLY=$(BUILDPY3TOOLS) \
-	JAVA_8_ONLY=$(JAVA_8_ONLY) \
-	JAVA_7_ONLY=$(JAVA_7_ONLY)
+	JAVA_11_ONLY=$(JAVA_11_ONLY) \
+	JAVA_8_ONLY=$(JAVA_8_ONLY)
 
 PKGDEP_TOKENS_i386= \
 	'PLATFORM=i86hvm' \

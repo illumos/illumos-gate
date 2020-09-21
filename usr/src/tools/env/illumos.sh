@@ -139,8 +139,8 @@ export ENABLE_SMB_PRINTING=
 # Set if your distribution has different package versioning
 #export PKGVERS_BRANCH=2018.0.0.17900
 
-# Skip Java 8 builds on distributions that don't support it
-#export BLD_JAVA_8=
+# Skip Java 11 builds on distributions that don't support it
+#export BLD_JAVA_11=
 
 # POST_NIGHTLY can be any command to be run at the end of nightly.  See
 # nightly(1) for interactions between environment variables and this command.
