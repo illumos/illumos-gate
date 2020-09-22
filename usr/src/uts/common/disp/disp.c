@@ -110,7 +110,7 @@ static void	cpu_resched(cpu_t *cp, pri_t tpri);
 /*
  * If this is set, only interrupt threads will cause kernel preemptions.
  * This is done by changing the value of kpreemptpri.  kpreemptpri
- * will either be the max sysclass pri + 1 or the min interrupt pri.
+ * will either be the max sysclass pri or the min interrupt pri.
  */
 int	only_intr_kpreempt;
 
@@ -257,7 +257,23 @@ dispinit(void)
 				maxglobpri = cl_maxglobpri;
 		}
 	}
-	kpreemptpri = (pri_t)v.v_maxsyspri + 1;
+
+	/*
+	 * Historically, kpreemptpri was set to v_maxsyspri + 1 -- which is
+	 * to say, maxclsyspri + 1.  However, over time, the system has used
+	 * more and more asynchronous kernel threads, with an increasing number
+	 * of these doing work on direct behalf of higher-level software (e.g.,
+	 * network processing).  This has led to potential priority inversions:
+	 * threads doing low-priority lengthy kernel work can effectively
+	 * delay kernel-level processing of higher-priority data. To minimize
+	 * such inversions, we set kpreemptpri to be v_maxsyspri; anything in
+	 * the kernel that runs at maxclsyspri will therefore induce kernel
+	 * preemption, and this priority should be used if/when an asynchronous
+	 * thread (or, as is often the case, task queue) is performing a task
+	 * on behalf of higher-level software (or any task that is otherwise
+	 * latency-sensitve).
+	 */
+	kpreemptpri = (pri_t)v.v_maxsyspri;
 	if (kpqpri == KPQPRI)
 		kpqpri = kpreemptpri;
 
