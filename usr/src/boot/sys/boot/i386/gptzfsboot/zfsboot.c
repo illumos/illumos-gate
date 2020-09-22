@@ -30,6 +30,7 @@
 #include <machine/pc/bios.h>
 
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stddef.h>
 
 #include <a.out.h>
@@ -90,6 +91,18 @@ static const unsigned char flags[NOPT] = {
 };
 uint32_t opts;
 
+/*
+ * Paths to try loading before falling back to the boot2 prompt.
+ */
+#define	PATH_ZFSLOADER "/boot/zfsloader"
+static const struct string {
+	const char *p;
+	size_t len;
+} loadpath[] = {
+	{ PATH_LOADER, sizeof (PATH_LOADER) },
+	{ PATH_ZFSLOADER, sizeof (PATH_ZFSLOADER) }
+};
+
 static const unsigned char dev_maj[NDEV] = {30, 4, 2};
 
 static struct i386_devdesc *bdev;
@@ -130,7 +143,9 @@ struct fs_ops *file_system[] = {
 int
 main(void)
 {
-	int auto_boot, i, fd;
+	unsigned i;
+	int fd;
+	bool auto_boot;
 	struct disk_devdesc devdesc;
 
 	bios_getmem();
@@ -198,7 +213,7 @@ main(void)
 
 	/* Process configuration file */
 	setenv("screen-#rows", "24", 1);
-	auto_boot = 1;
+	auto_boot = true;
 
 	fd = open(PATH_CONFIG, O_RDONLY);
 	if (fd == -1)
@@ -222,37 +237,29 @@ main(void)
 		 */
 		memcpy(cmddup, cmd, sizeof (cmd));
 		if (parse_cmd())
-			auto_boot = 0;
+			auto_boot = false;
 		if (!OPT_CHECK(RBX_QUIET))
 			printf("%s: %s\n", PATH_CONFIG, cmddup);
 		/* Do not process this command twice */
 		*cmd = 0;
 	}
 
-	/*
-	 * Try to exec stage 3 boot loader. If interrupted by a keypress,
-	 * or in case of failure, switch off auto boot.
-	 */
-
 	if (auto_boot && !*kname) {
-		memcpy(kname, PATH_LOADER, sizeof (PATH_LOADER));
-		if (!keyhit(3)) {
+		/*
+		 * Try to exec stage 3 boot loader. If interrupted by a
+		 * keypress, or in case of failure, drop the user to the
+		 * boot2 prompt..
+		 */
+		auto_boot = false;
+		for (i = 0; i < nitems(loadpath); i++) {
+			memcpy(kname, loadpath[i].p, loadpath[i].len);
+			if (keyhit(3))
+				break;
 			load();
-			auto_boot = 0;
-			/*
-			 * Try to fall back to /boot/zfsloader.
-			 * This fallback should be eventually removed.
-			 * Created: 08/03/2018
-			 */
-#define	PATH_ZFSLOADER "/boot/zfsloader"
-			memcpy(kname, PATH_ZFSLOADER, sizeof (PATH_ZFSLOADER));
-			load();
-			/*
-			 * Still there? restore default loader name for prompt.
-			 */
-			memcpy(kname, PATH_LOADER, sizeof (PATH_LOADER));
 		}
 	}
+	/* Reset to default */
+	memcpy(kname, loadpath[0].p, loadpath[0].len);
 
 	/* Present the user with the boot2 prompt. */
 
@@ -267,7 +274,7 @@ main(void)
 			getstr(cmd, sizeof (cmd));
 		else if (!auto_boot || !OPT_CHECK(RBX_QUIET))
 			putchar('\n');
-		auto_boot = 0;
+		auto_boot = false;
 		if (parse_cmd())
 			putchar('\a');
 		else
