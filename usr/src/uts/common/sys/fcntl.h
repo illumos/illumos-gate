@@ -37,7 +37,7 @@
  */
 
 /* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
-/* Copyright 2015, Joyent, Inc. */
+/* Copyright 2020 Joyent, Inc. */
 
 #ifndef	_SYS_FCNTL_H
 #define	_SYS_FCNTL_H
@@ -88,6 +88,9 @@ extern "C" {
 #define	O_CLOEXEC	0x800000	/* set the close-on-exec flag */
 #if !defined(_STRICT_SYMBOLS) || defined(_XPG7)
 #define	O_DIRECTORY	0x1000000	/* fail if not a directory */
+#endif
+#if !defined(_STRICT_SYMBOLS)
+#define	O_DIRECT	0x2000000	/* direct disk access hint */
 #endif
 
 /*

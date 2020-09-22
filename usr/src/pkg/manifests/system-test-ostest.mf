@@ -39,6 +39,7 @@ dir path=opt/os-tests/tests/secflags
 dir path=opt/os-tests/tests/sigqueue
 dir path=opt/os-tests/tests/sockfs
 dir path=opt/os-tests/tests/stress
+dir path=opt/os-tests/tests/syscall
 dir path=opt/os-tests/tests/timer
 dir path=opt/os-tests/tests/uccid
 file path=kernel/drv/$(ARCH64)/ksensor_test group=sys
@@ -108,6 +109,8 @@ file path=opt/os-tests/tests/sockfs/rights.64 mode=0555
 file path=opt/os-tests/tests/sockfs/sockpair mode=0555
 file path=opt/os-tests/tests/spoof-ras mode=0555
 file path=opt/os-tests/tests/stress/dladm-kstat mode=0555
+file path=opt/os-tests/tests/syscall/open.32 mode=0555
+file path=opt/os-tests/tests/syscall/open.64 mode=0555
 file path=opt/os-tests/tests/timer/timer_limit mode=0555
 file path=opt/os-tests/tests/uccid/atrparse mode=0555
 file path=opt/os-tests/tests/uccid/excl-badread mode=0555

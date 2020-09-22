@@ -68,6 +68,9 @@ user = root
 tests = ['conn', 'dgram', 'drop_priv', 'nosignal', 'rights.32', 'rights.64',
          'sockpair']
 
+[/opt/os-tests/tests/syscall]
+tests = ['open.32', 'open.64']
+
 [/opt/os-tests/tests/pf_key]
 user = root
 timeout = 180

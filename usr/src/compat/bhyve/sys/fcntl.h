@@ -16,8 +16,6 @@
 #ifndef _COMPAT_FREEBSD_SYS_FCNTL_H_
 #define	_COMPAT_FREEBSD_SYS_FCNTL_H_
 
-#define	O_DIRECT	0x0
-
 #include_next <sys/fcntl.h>
 
 #endif	/* _COMPAT_FREEBSD_SYS_FCNTL_H_ */
