@@ -152,15 +152,6 @@
 
 #include <io/xnf.h>
 
-#if defined(DEBUG) || defined(__lint)
-#define	XNF_DEBUG
-#endif
-
-#ifdef XNF_DEBUG
-int xnf_debug = 0;
-xnf_t *xnf_debug_instance = NULL;
-#endif
-
 /*
  * On a 32 bit PAE system physical and machine addresses are larger
  * than 32 bits.  ddi_btop() on such systems take an unsigned long
@@ -564,9 +555,14 @@ xnf_data_txbuf_free_chain(xnf_t *xnfp, xnf_txbuf_t *txp)
 }
 
 static xnf_txbuf_t *
-xnf_data_txbuf_alloc(xnf_t *xnfp)
+xnf_data_txbuf_alloc(xnf_t *xnfp, int flag)
 {
-	xnf_txbuf_t *txp = kmem_cache_alloc(xnfp->xnf_tx_buf_cache, KM_SLEEP);
+	xnf_txbuf_t *txp;
+
+	if ((txp = kmem_cache_alloc(xnfp->xnf_tx_buf_cache, flag)) == NULL) {
+		return (NULL);
+	}
+
 	txp->tx_type = TX_DATA;
 	txp->tx_next = NULL;
 	txp->tx_prev = NULL;
@@ -992,12 +988,6 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	int err;
 	char cachename[32];
 
-#ifdef XNF_DEBUG
-	if (xnf_debug & XNF_DEBUG_DDI)
-		printf("xnf%d: attach(0x%p)\n", ddi_get_instance(devinfo),
-		    (void *)devinfo);
-#endif
-
 	switch (cmd) {
 	case DDI_RESUME:
 		xnfp = ddi_get_driver_private(devinfo);
@@ -1156,11 +1146,6 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	    "Ethernet controller");
 #endif
 
-#ifdef XNF_DEBUG
-	if (xnf_debug_instance == NULL)
-		xnf_debug_instance = xnfp;
-#endif
-
 	return (DDI_SUCCESS);
 
 failure_5:
@@ -1208,11 +1193,6 @@ static int
 xnf_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 {
 	xnf_t *xnfp;		/* Our private device info */
-
-#ifdef XNF_DEBUG
-	if (xnf_debug & XNF_DEBUG_DDI)
-		printf("xnf_detach(0x%p)\n", (void *)devinfo);
-#endif
 
 	xnfp = ddi_get_driver_private(devinfo);
 
@@ -1547,9 +1527,9 @@ xnf_tx_get_lookaside(xnf_t *xnfp, mblk_t *mp, size_t *plen)
 	xnf_buf_t *bd;
 	caddr_t bp;
 
-	bd = xnf_buf_get(xnfp, KM_SLEEP, B_TRUE);
-	if (bd == NULL)
+	if ((bd = xnf_buf_get(xnfp, KM_NOSLEEP, B_TRUE)) == NULL) {
 		return (NULL);
+	}
 
 	bp = bd->buf;
 	while (mp != NULL) {
@@ -1751,8 +1731,12 @@ xnf_tx_push_packet(xnf_t *xnfp, xnf_txbuf_t *head)
 static xnf_txbuf_t *
 xnf_mblk_copy(xnf_t *xnfp, mblk_t *mp)
 {
-	xnf_txbuf_t *txp = xnf_data_txbuf_alloc(xnfp);
+	xnf_txbuf_t *txp;
 	size_t length;
+
+	if ((txp = xnf_data_txbuf_alloc(xnfp, KM_NOSLEEP)) == NULL) {
+		return (NULL);
+	}
 
 	txp->tx_bdesc = xnf_tx_get_lookaside(xnfp, mp, &length);
 	if (txp->tx_bdesc == NULL) {
@@ -1786,7 +1770,9 @@ xnf_mblk_map(xnf_t *xnfp, mblk_t *mp, int *countp)
 		if (MBLKL(ml) == 0)
 			continue;
 
-		txp = xnf_data_txbuf_alloc(xnfp);
+		if ((txp = xnf_data_txbuf_alloc(xnfp, KM_NOSLEEP)) == NULL) {
+			goto error;
+		}
 
 		if (head == NULL) {
 			head = txp;
@@ -1825,7 +1811,10 @@ xnf_mblk_map(xnf_t *xnfp, mblk_t *mp, int *countp)
 				goto error;
 			}
 			if (dma_cookie_prev != NULL) {
-				txp = xnf_data_txbuf_alloc(xnfp);
+				if ((txp = xnf_data_txbuf_alloc(xnfp,
+				    KM_NOSLEEP)) == NULL) {
+					goto error;
+				}
 				ASSERT(tail != NULL);
 				TXBUF_SETNEXT(tail, txp);
 				txp->tx_head = head;
@@ -2016,6 +2005,12 @@ pulledup:
 			 * Defragment packet if it spans too many pages.
 			 */
 			mblk_t *newmp = msgpullup(mp, -1);
+			if (newmp == NULL) {
+				dev_err(xnfp->xnf_devinfo, CE_WARN,
+				    "msgpullup() failed");
+				goto drop;
+			}
+
 			freemsg(mp);
 			mp = newmp;
 			xnfp->xnf_stat_tx_pullup++;
@@ -2166,12 +2161,6 @@ xnf_start(void *arg)
 {
 	xnf_t *xnfp = arg;
 
-#ifdef XNF_DEBUG
-	if (xnf_debug & XNF_DEBUG_TRACE)
-		printf("xnf%d start(0x%p)\n",
-		    ddi_get_instance(xnfp->xnf_devinfo), (void *)xnfp);
-#endif
-
 	mutex_enter(&xnfp->xnf_rxlock);
 	mutex_enter(&xnfp->xnf_txlock);
 
@@ -2189,12 +2178,6 @@ static void
 xnf_stop(void *arg)
 {
 	xnf_t *xnfp = arg;
-
-#ifdef XNF_DEBUG
-	if (xnf_debug & XNF_DEBUG_TRACE)
-		printf("xnf%d stop(0x%p)\n",
-		    ddi_get_instance(xnfp->xnf_devinfo), (void *)xnfp);
-#endif
 
 	mutex_enter(&xnfp->xnf_rxlock);
 	mutex_enter(&xnfp->xnf_txlock);
@@ -2571,7 +2554,7 @@ xnf_rx_collect(xnf_t *xnfp)
 static int
 xnf_alloc_dma_resources(xnf_t *xnfp)
 {
-	dev_info_t 		*devinfo = xnfp->xnf_devinfo;
+	dev_info_t		*devinfo = xnfp->xnf_devinfo;
 	size_t			len;
 	ddi_dma_cookie_t	dma_cookie;
 	uint_t			ncookies;
