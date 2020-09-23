@@ -4,11 +4,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RSH 1 "Dec 23, 2008"
+.TH RSH 1 "September 12, 2020"
 .SH NAME
 rsh, remsh, remote_shell \- remote shell
 .SH SYNOPSIS
-.LP
 .nf
 \fBrsh\fR [\fB-n\fR] [\fB-a\fR] [\fB-K\fR] [\fB-PN\fR | \fB-PO\fR] [\fB-x\fR] [\fB-f\fR | \fB-F\fR] [\fB-l\fR \fIusername\fR]
      [\fB-k\fR \fIrealm\fR] \fIhostname\fR \fIcommand\fR
@@ -39,8 +38,6 @@ rsh, remsh, remote_shell \- remote shell
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBrsh\fR utility connects to the specified \fIhostname\fR and executes the
 specified \fIcommand\fR. \fBrsh\fR copies its standard input to the remote
 command, the standard output of the remote command to its standard output, and
@@ -86,8 +83,6 @@ machine.
 The command is sent unencrypted to the remote system. All subsequent network
 session traffic is encrypted. See \fB-x\fR.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -189,7 +184,7 @@ this.
 .ad
 .RS 15n
 Explicitly request new (\fB-PN\fR) or old (\fB-PO\fR) version of the Kerberos
-"\fBrcmd\fR" protocol. The new protocol avoids many security problems prevalant
+"\fBrcmd\fR" protocol. The new protocol avoids many security problems prevalent
 in the old one and is regarded much more secure, but is not interoperable with
 older (MIT/SEAM) servers. The new protocol is used by default, unless
 explicitly specified using these options or through \fBkrb5.conf\fR(4). If
@@ -212,8 +207,6 @@ Cause the network session traffic to be encrypted. See \fBDESCRIPTION\fR.
 The type of remote shell (\fBsh\fR, \fBrsh\fR, or other) is determined by the
 user's entry in the file \fB/etc/passwd\fR on the remote system.
 .SH OPERANDS
-.sp
-.LP
 The following operand is supported:
 .sp
 .ne 2
@@ -225,8 +218,6 @@ The command to be executed on the specified \fIhostname\fR.
 .RE
 
 .SH USAGE
-.sp
-.LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBrsh\fR and
 \fBremsh\fR when encountering files greater than or equal to 2 Gbyte ( 2^31
 bytes).
@@ -262,7 +253,7 @@ For the kerberized \fBrsh\fR session, each user can have a private
 authorization list in a file \fB\&.k5login\fR in their home directory. Each
 line in this file should contain a Kerberos principal name of the form
 \fIprincipal\fR/\fIinstance\fR@\fIrealm\fR. If there is a \fB~/.k5login\fR
-file, then access is granted to the account if and only if the originater user
+file, then access is granted to the account if and only if the originating user
 is authenticated to one of the principals named in the \fB~/.k5login\fR file.
 Otherwise, the originating user is granted access to the account if and only if
 the authenticated principal name of the user can be mapped to the local account
@@ -295,7 +286,6 @@ the trusted user account is locked.
 \fBrsh\fR does not prompt for a password if access is denied on the remote
 machine unless the \fIcommand\fR argument is omitted.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUsing rsh to Append Files
 .sp
 .LP
@@ -326,8 +316,6 @@ example% \fBrsh lizard cat lizard.file ">>" lizard.file2\fR
 .sp
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -348,7 +336,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/hosts\fR\fR
@@ -394,8 +381,6 @@ Kerberos configuration file
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -410,15 +395,11 @@ CSI	Enabled
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
-\fBon\fR(1), \fBrlogin\fR(1), \fBssh\fR(1), \fBtelnet\fR(1), \fBvi\fR(1),
+\fBrlogin\fR(1), \fBssh\fR(1), \fBtelnet\fR(1), \fBvi\fR(1),
 \fBin.rshd\fR(1M), \fBhosts\fR(4), \fBhosts.equiv\fR(4), \fBkrb5.conf\fR(4),
 \fBattributes\fR(5), \fBkrb5_auth_rules\fR(5), \fBlargefile\fR(5),
 \fBip6\fR(7P)
 .SH NOTES
-.sp
-.LP
 When a system is listed in \fBhosts.equiv\fR, its security must be as good as
 local security. One insecure system listed in \fBhosts.equiv\fR can compromise
 the security of the entire system.

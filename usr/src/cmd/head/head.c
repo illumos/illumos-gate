@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -38,6 +38,7 @@
  */
 /*
  * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2020 Oxide Computer Company
  */
 
 
@@ -47,6 +48,7 @@
 #include <locale.h>
 #include <string.h>
 #include <ctype.h>
+#include <err.h>
 
 #define	DEF_LINE_COUNT	10
 
@@ -70,6 +72,7 @@ main(int argc, char **argv)
 	int	isline = 1;
 	int	error = 0;
 	int	quiet = 0;
+	int	verbose = 0;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
@@ -122,9 +125,11 @@ main(int argc, char **argv)
 			break;
 		case 'q':
 			quiet = 1;
+			verbose = 0;
 			break;
 		case 'v':
 			quiet = 0;
+			verbose = 1;
 			break;
 		default:
 			Usage();
@@ -154,8 +159,13 @@ main(int argc, char **argv)
 			if (around)
 				(void) putchar('\n');
 
-			if (fileCount > 1)
-				(void) printf("==> %s <==\n", argv[optind]);
+			if (fileCount > 1 || verbose != 0) {
+				const char *file = argv[optind];
+				if (file == NULL) {
+					file = "standard input";
+				}
+				(void) printf("==> %s <==\n", file);
+			}
 		}
 
 		if (argv[optind] != NULL)
@@ -176,27 +186,34 @@ copyout(off_t cnt, int isline)
 	char lbuf[BUFSIZ];
 	size_t len;
 
-	while (cnt > 0 && fgets(lbuf, sizeof (lbuf), input) != 0) {
-		len = strlen(lbuf);
+	while (cnt > 0) {
+		len = fread(lbuf, sizeof (char), sizeof (lbuf) / sizeof (char),
+		    input);
+		if (len == 0) {
+			return;
+		}
+
 		if (isline) {
-			(void) printf("%s", lbuf);
-			/*
-			 * only count as a line if buffer read ends with newline
-			 */
-			if (len > 0) {
-				if (lbuf[len - 1] == '\n') {
-					(void) fflush(stdout);
+			size_t i;
+			for (i = 0; i < len; i++) {
+				if (lbuf[i] == '\n') {
 					cnt--;
+					if (cnt == 0) {
+						i++;
+						break;
+					}
 				}
 			}
+			len = i;
 		} else {
 			if (len > cnt) {
-				lbuf[cnt] = '\0';
 				len = cnt;
 			}
-			(void) printf("%s", lbuf);
 			cnt -= len;
-			(void) fflush(stdout);
+		}
+
+		if (fwrite(lbuf, sizeof (char), len, stdout) != len) {
+			err(EXIT_FAILURE, "failed to write to stdout");
 		}
 	}
 }

@@ -3,17 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IN.NDPD 1M "Sep 02, 2015"
+.TH IN.NDPD 1M "September 12, 2020"
 .SH NAME
 in.ndpd \- daemon for IPv6 autoconfiguration
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/lib/inet/in.ndpd\fR [\fB-adt\fR] [\fB-f\fR \fIconfig_file\fR]
 .fi
 
 .SH DESCRIPTION
-.LP
 \fBin.ndpd\fR provides both the host and router autoconfiguration components of
 Neighbor Discovery for IPv6 and Stateless and Stateful Address
 Autoconfiguration for IPv6. In particular, \fBin.ndpd\fR implements:
@@ -148,9 +146,9 @@ of routers, a host can generate only link-local addresses. Link-local addresses
 can only be used for communication with nodes on the same link.
 .sp
 .LP
-For information on how to enable IPv6 address autoconfiguration, see \fI\fR
+For information on how to enable IPv6 address autoconfiguration, see
+\fISystem Administration Guide: IP Services\fR.
 .SH OPTIONS
-.LP
 Supported options and equivalent SMF service properties are listed below. SMF
 service properties are set using a command of the form:
 .sp
@@ -215,7 +213,7 @@ Use \fIconfig_file\fR for configuration information instead of the default
 .ad
 .sp .6
 .RS 4n
-Turn on tracing (printing) of all sent and received packets to\fBstdout\fR.
+Turn on tracing (printing) of all sent and received packets to \fBstdout\fR.
 When set, the program runs in the foreground and stays attached to the
 controlling terminal. As such, this option cannot be run under the SMF.
 .RE
@@ -232,7 +230,6 @@ the hosts.
 .RE
 
 .SH SEE ALSO
-.LP
 \fBdhcpagent\fR(1M), \fBifconfig\fR(1M), \fBndp\fR(1M), \fBrouteadm\fR(1M),
 \fBsvcadm\fR(1M), \fBndpd.conf\fR(4), \fBattributes\fR(5), \fBsmf\fR(5),
 \fBicmp6\fR(7P), \fBip6\fR(7P), \fBndp\fR(7P)
@@ -249,11 +246,9 @@ Autoconfiguration\fR. The Internet Society. December 1998.
 Narten, T., and Draves, R. \fIRFC 3041, Privacy Extensions for Stateless
 Address Autoconfiguration in IPv6\fR. The Internet Society. January 2001.
 .SH DIAGNOSTICS
-.LP
 Receipt of a \fBSIGHUP\fR signal will make \fBin.ndpd\fR restart and reread
 \fB/etc/inet/ndpd.conf\fR.
 .SH NOTES
-.LP
 The \fBin.ndpd\fR daemon service is managed by the service management facility,
 \fBsmf\fR(5), under the service identifier:
 .sp

@@ -68,6 +68,7 @@ timeout = 300
 [/opt/util-tests/tests/date_test]
 [/opt/util-tests/tests/chown_test]
 [/opt/util-tests/tests/make_test]
+[/opt/util-tests/tests/head/head_test]
 
 [/opt/util-tests/tests/demangle]
 tests = ['afl-fast', 'gcc-libstdc++', 'llvm-stdcxxabi']

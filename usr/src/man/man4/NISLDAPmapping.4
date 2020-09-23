@@ -3,17 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NISLDAPMAPPING 4 "Feb 25, 2017"
+.TH NISLDAPMAPPING 4 "September 12, 2020"
 .SH NAME
 NISLDAPmapping \- mapping file used by the NIS server components
 .SH SYNOPSIS
-.LP
 .nf
 \fB/var/yp/NISLDAPmapping\fR
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBNISLDAPmapping\fR file specifies the mapping between NIS map entries and
 equivalent Directory Information Tree (DIT) entries.
 .sp
@@ -50,7 +48,6 @@ a horizontal tab. In general, lines consist of optional white space, an
 attribute name, at least one white space character, and an attribute value.
 .SH EXTENDED DESCRIPTION
 .SS "File Syntax"
-.LP
 Repeated fields, with separator characters, are described by the following
 syntax:
 .sp
@@ -85,9 +82,8 @@ entry[":"...]
 .RE
 
 .SS "Attributes"
-.LP
 Attributes generally apply to one more more NIS maps. Map names can be
-specified either on their own,that is in \fBpasswd.byname\fR, in which case
+specified either on their own, that is in \fBpasswd.byname\fR, in which case
 they apply to all domains, or for individual NIS domains, for example, in
 \fBpasswd.byname,example.sun.uk\fR. Where a map is mentioned in more than one
 attribute, both versions are applied. If any parts of the attributes are in
@@ -208,7 +204,7 @@ subset match is unambiguous.
 .sp
 If the \fBfieldvaluestring\fR contains white space or commas, it must either be
 surrounded by double quotes, or the special characters must be escaped.
-Wildcards are allowed in the \fBfieldvaluestring\fR. See Wildcards
+Wildcards are allowed in the \fBfieldvaluestring\fR. See Wildcards.
 .sp
 To associate the \fBpasswd.byname\fR and \fBpasswd.byuid\fR maps with the
 \fBpasswd databaseId\fR:
@@ -257,7 +253,7 @@ where
 The lower limit for the initial \fBTTL\fR (in seconds) for data read from LDAP
 when the \fBypserv\fR starts. If the \fBinitialTTLhi\fR also is specified, the
 actual \fBinitialTTL\fR will be randomly selected from the interval
-\fBinitialTTLlo\fR to \fBinitialTTLhi\fR , inclusive. Leaving the field empty
+\fBinitialTTLlo\fR to \fBinitialTTLhi\fR, inclusive. Leaving the field empty
 yields the default value of 1800 seconds.
 .RE
 
@@ -267,7 +263,7 @@ yields the default value of 1800 seconds.
 \fB\fBinitialTTLhi\fR\fR
 .ad
 .RS 16n
-The upper limit for the initial TTL. If left empty, defaults to 5400.
+The upper limit for the initial TTL. If left empty, defaults to 5400 seconds.
 .RE
 
 .sp
@@ -436,7 +432,7 @@ matchspec       = \e" formatString \e"
 .fi
 .in -2
 
-\fBformatString\fR may contains a list of \fB%s\fR and \fB%a\fR elements each
+\fBformatString\fR may contain a list of \fB%s\fR and \fB%a\fR elements each
 of which represents a single named field or a list of repeated fields. A
 \fB%a\fR field is interpreted as an IPv4 address or an IPv6 address in
 preferred format. If an IPv6 address in non preferred format is found, then it
@@ -456,7 +452,7 @@ Regardless of the content of this entry some \fBfieldNames\fR are reserved:
 \fB\fBrf_key\fR\fR
 .ad
 .RS 18n
-The DBM key value
+The DBM key value.
 .RE
 
 .sp
@@ -620,7 +616,7 @@ Specifies which character represents the start of the special comment field in
 a given NIS map. If this attribute is not present then the default comment
 character \fB#\fR is used.
 .sp
-To specify that a map uses a asterix to mark the start of comments.
+To specify that a map uses an asterisk to mark the start of comments.
 .sp
 .in +2
 .nf
@@ -741,7 +737,6 @@ field name are ignored when information is mapped into the DIT.
 .RE
 
 .SS "Field and Attribute Conversion Syntax"
-.LP
 The general format of a \fBfieldattrspec\fR is:
 .sp
 .in +2
@@ -998,7 +993,7 @@ attribute to be retrieved or modified. To use previously existing field or
 attribute values in the mapping rules requires a lookup to find those values.
 Obviously, this adds to the time required to perform the modification. Also,
 there is a window between the time when a value is retrieved and then slightly
-later stored back. If the values have changed in the mean time, the change may
+later stored back. If the values have changed in the meantime, the change may
 be overwritten.
 .sp
 .LP
@@ -1010,7 +1005,6 @@ If there is an error when evaluating a certain \fBfieldattrspec\fR, including
 retrieval or assignment of entry or field values, the extent to which the other
 \fBfieldattrspec\fR rules are evaluated is unspecified.
 .SS "Wildcards"
-.LP
 Where wildcard support is available, it is of the following limited form:
 .sp
 .ne 2
@@ -1273,7 +1267,6 @@ Remove value of \fBmyName\fR from value \fBmyAliases\fR
 This results in the field values \fBmyName\fR is set to \fBfoo\fR, and
 \fBmyAliases\fR is set to \fBfoo1 foo2\fR.
 .SS "Assignments"
-.LP
 The assignment syntax, also found at Field and Attribute Conversion Syntax, is
 as follows:
 .sp
@@ -1365,7 +1358,7 @@ Equivalent to \fBfieldname=attrname\fR
 If a multi-valued \fBRHS\fR is assigned to a single-valued \fBLHS\fR, the
 \fBLHS\fR value will be the first of the \fBRHS\fR values. If the \fBRHS\fR is
 an attribute list, the first attribute is the first one returned by the LDAP
-server when queried. Otherwise, the definition of "first"is implementation
+server when queried. Otherwise, the definition of "first" is implementation
 dependent.
 .sp
 .LP
@@ -1385,7 +1378,6 @@ entities in the list. If the \fBRHS\fR is multi-valued, the first value is
 assigned to the first entity of the list, the second value to the second
 entity, and so on. Excess values or entities are silently ignored.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRAssigning an Attribute Value to a Field
 .sp
 .LP
@@ -1477,7 +1469,6 @@ Mapping file used by the NIS server components
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -1488,11 +1479,10 @@ c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability 	Obsolete
+Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-.LP
 \fBinityp2l\fR(1M), \fBmakedbm\fR(1M), \fBypserv\fR(1M),
 \fBber_printf\fR(3LDAP), \fBsprintf\fR(3C), \fBsscanf\fR(3C),
 \fBypserv\fR(4), \fBattributes\fR(5)

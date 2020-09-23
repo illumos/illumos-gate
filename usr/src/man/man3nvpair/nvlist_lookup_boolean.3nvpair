@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH NVLIST_LOOKUP_BOOLEAN 3NVPAIR "Aug 1, 2008"
+.TH NVLIST_LOOKUP_BOOLEAN 3NVPAIR "September 12, 2020"
 .SH NAME
 nvlist_lookup_boolean, nvlist_lookup_boolean_value, nvlist_lookup_byte,
 nvlist_lookup_int8, nvlist_lookup_uint8, nvlist_lookup_int16,
@@ -17,7 +17,6 @@ nvlist_lookup_int64_array, nvlist_lookup_uint64_array,
 nvlist_lookup_nvlist_array, nvlist_lookup_string_array, nvlist_lookup_pairs \-
 match name and type indicated by the interface name and retrieve data value
 .SH SYNOPSIS
-.LP
 .nf
 \fBcc\fR [ \fIflag\fR... ] \fIfile\fR... \fB-lnvpair\fR [ \fIlibrary\fR... ]
 #include <libnvpair.h>
@@ -181,7 +180,6 @@ match name and type indicated by the interface name and retrieve data value
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fInvl\fR\fR
@@ -230,14 +228,12 @@ Specify bit fields defining lookup behavior:
 \fB\fBNV_FLAG_NOENTOK\fR\fR
 .ad
 .RS 19n
-The retrival function will not fail if no matching name-value pair is found.
+The retrieval function will not fail if no matching name-value pair is found.
 .RE
 
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions find the \fBnvpair\fR (name-value pair) that matches the name
 and type as indicated by the interface name. If one is found, \fInelem\fR and
 \fIval\fR are modified to contain the number of elements in value and the
@@ -313,12 +309,8 @@ The order of the arguments is \fIname\fR, \fItype\fR, [\fIval\fR],
 When using \fBNV_FLAG_NOENTOK\fR and no matching name-value pair is found, the
 memory pointed to by \fIval\fR and \fInelem\fR is left untouched.
 .SH RETURN VALUES
-.sp
-.LP
 These functions return 0 on success and an error value on failure.
 .SH ERRORS
-.sp
-.LP
 These functions will fail if:
 .sp
 .ne 2
@@ -335,7 +327,7 @@ There is an invalid argument.
 \fB\fBENOENT\fR\fR
 .ad
 .RS 11n
-No matching name-value pair is found
+No matching name-value pair is found.
 .RE
 
 .sp
@@ -348,8 +340,6 @@ An encode/decode method is not supported.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5)  for descriptions of the following attributes:
 .sp
 
@@ -366,7 +356,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibnvpair\fR(3LIB), \fBnvlist_alloc\fR(3NVPAIR), \fBnvpair_type\fR(3NVPAIR),
 \fBattributes\fR(5)

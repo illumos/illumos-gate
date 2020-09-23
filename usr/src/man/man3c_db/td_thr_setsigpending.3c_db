@@ -3,18 +3,17 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TD_THR_SETSIGPENDING 3C_DB "Oct 20, 1998"
+.TH TD_THR_SETSIGPENDING 3C_DB "September 12, 2020"
 .SH NAME
 td_thr_setsigpending, td_thr_sigsetmask \- manage thread signals for libc_db
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR... ] \fIfile\fR... -lc_db [ \fIlibrary\fR... ]
 #include <proc_service.h>
 #include <thread_db.h>
 
-\fBtd_err_e\fR \fBtd_thr_setsigpending\fR(\fBconst td_thrhandle_t *\fR \fIth_p\fR, \fBconst uchar_ t\fR \fIti_sigpending_flag\fR,
-     \fBconst sigset_t\fR \fIti_sigmask\fR;);
+\fBtd_err_e\fR \fBtd_thr_setsigpending\fR(\fBconst td_thrhandle_t *\fR \fIth_p\fR, \fBconst uchar_t\fR \fIti_sigpending_flag\fR,
+     \fBconst sigset_t\fR \fIti_sigmask\fR);
 .fi
 
 .LP
@@ -23,8 +22,6 @@ cc [ \fIflag\fR... ] \fIfile\fR... -lc_db [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBtd_thr_setsigpending()\fR and \fBtd_thr_setsigmask()\fR functions affect
 the signal state of the thread identified by \fIth_p\fR.
 .sp
@@ -66,10 +63,9 @@ desired, and
 .RS +4
 .TP
 4.
-set the new signal mask with\fBtd_thr_sigsetmask()\fR.
+set the new signal mask with \fBtd_thr_sigsetmask()\fR.
 .RE
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBTD_OK\fR\fR
@@ -106,8 +102,6 @@ A \fBlibc_db\fR internal error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for description of the following attributes:
 .sp
 
@@ -122,7 +116,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBlibc_db\fR(3LIB), \fBtd_thr_dbsuspend\fR(3C_DB),
 \fBtd_thr_get_info\fR(3C_DB), \fBattributes\fR(5)

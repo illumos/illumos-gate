@@ -44,18 +44,16 @@
 .\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
 .\"
-.TH LIMIT 1 "Nov 2, 2007"
+.TH LIMIT 1 "September 12, 2020"
 .SH NAME
 limit, ulimit, unlimit \- set or get limitations on the system resources
 available to the current shell and its descendents
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/bin/ulimit\fR [\fB-f\fR] [\fIblocks\fR]
 .fi
 
 .SS "sh"
-.LP
 .nf
 \fBulimit\fR [\fB-\fR [HS] [a | cdfnstv]]
 .fi
@@ -66,7 +64,6 @@ available to the current shell and its descendents
 .fi
 
 .SS "csh"
-.LP
 .nf
 \fBlimit\fR [\fB-h\fR] [\fIresource\fR [\fIlimit\fR]]
 .fi
@@ -77,27 +74,21 @@ available to the current shell and its descendents
 .fi
 
 .SS "ksh"
-.LP
 .nf
 \fBulimit\fR [\fB-HSacdfnstv\fR] [\fIlimit\fR]
 .fi
 
 .SS "ksh93"
-.LP
 .nf
 \fBulimit\fR [\fB-HSacdfmnpstv\fR] [\fIlimit\fR]
 .fi
 
 .SH DESCRIPTION
 .SS "/usr/bin/ulimit"
-.sp
-.LP
 The \fBulimit\fR utility sets or reports the file-size writing limit imposed on
 files written by the shell and its child processes (files of any size can be
 read). Only a process with appropriate privileges can increase the limit.
 .SS "sh"
-.sp
-.LP
 The Bourne shell built-in function, \fBulimit\fR, prints or sets hard or soft
 resource limits. These limits are described in \fBgetrlimit\fR(2).
 .sp
@@ -107,7 +98,7 @@ number of limits can be printed at one time. The \fB-a\fR option prints all
 limits.
 .sp
 .LP
-If \fIlimit\fR is present, \fBulimit\fR sets the specified limit to\fIlimit\fR.
+If \fIlimit\fR is present, \fBulimit\fR sets the specified limit to \fIlimit\fR.
 The string \fBunlimited\fR requests that the current limit, if any, be removed.
 Any user can set a soft limit to any value less than or equal to the hard
 limit. Any user can lower a hard limit. Only a user with appropriate privileges
@@ -185,8 +176,6 @@ Maximum size of virtual memory (in Kbytes)
 .RE
 
 .SS "csh"
-.sp
-.LP
 The C-shell built-in function, \fBlimit\fR, limits the consumption by the
 current process or any process it spawns, each not to exceed \fIlimit\fR on the
 specified \fIresource\fR. The string \fBunlimited\fR requests that the current
@@ -328,8 +317,6 @@ Remove corresponding hard limits. Only the privileged user can do this.
 .RE
 
 .SS "ksh"
-.sp
-.LP
 The Korn shell built-in function, \fBulimit\fR, sets or displays a resource
 limit. The available resources limits are listed below. Many systems do not
 contain one or more of these limits. The limit for a specified resource is set
@@ -421,15 +408,11 @@ The number of K-bytes for virtual memory.
 .LP
 If no option is specified, \fB-f\fR is assumed.
 .SS "Per-Shell Memory Parameters"
-.sp
-.LP
 The \fBheapsize\fR, \fBdatasize\fR, and \fBstacksize\fR parameters are not
 system tunables. The only controls for these are hard limits, set in a shell
 startup file, or system-wide soft limits, which, for the current version of the
 Solaris OS, is 2^64bytes.
 .SS "ksh93"
-.sp
-.LP
 \fBulimit\fR sets or displays resource limits. These limits apply to the
 current process and to each child process created after the resource limit has
 been set. If \fIlimit\fR is specified, the resource limit is set, otherwise,
@@ -681,8 +664,6 @@ Specifies the process size in Kbytes.
 .RE
 
 .SH OPTIONS
-.sp
-.LP
 The following option is supported by \fB/usr/bin/ulimit\fR:
 .sp
 .ne 2
@@ -695,8 +676,6 @@ in blocks. The \fB-f\fR option is also the default case.
 .RE
 
 .SH OPERANDS
-.sp
-.LP
 The following operand is supported by \fB/usr/bin/ulimit\fR:
 .sp
 .ne 2
@@ -709,7 +688,6 @@ The number of 512-byte blocks to use as the new file size limit.
 
 .SH EXAMPLES
 .SS "/usr/bin/ulimit"
-.LP
 \fBExample 1 \fRLimiting the Stack Size
 .sp
 .LP
@@ -732,7 +710,6 @@ memory(kbytes)          unlimited
 .sp
 
 .SS "sh/ksh"
-.LP
 \fBExample 2 \fRLimiting the Number of File Descriptors
 .sp
 .LP
@@ -755,7 +732,6 @@ vmemory(kbytes)          unlimited
 .sp
 
 .SS "csh"
-.LP
 \fBExample 3 \fRLimiting the Core Dump File Size
 .sp
 .LP
@@ -800,14 +776,10 @@ memorysize              unlimited
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBulimit\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned by \fBulimit\fR:
 .sp
 .ne 2
@@ -828,13 +800,8 @@ A request for a higher limit was rejected or an error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .SS "/usr/bin/ulimit, csh, ksh, sh"
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -847,9 +814,6 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SS "ksh93"
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -860,8 +824,6 @@ Interface Stability	Uncommitted
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBbc\fR(1), \fBcsh\fR(1), \fBksh\fR(1), \fBksh93\fR(1), \fBsh\fR(1),
 \fBdf\fR(1M), \fBsu\fR(1M), \fBswap\fR(1M), \fBsysdef\fR(1M),
 \fBgetrlimit\fR(2), \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)

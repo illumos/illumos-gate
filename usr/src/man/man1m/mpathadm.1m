@@ -3,25 +3,22 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing. See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MPATHADM 1M "May 4, 2009"
+.TH MPATHADM 1M "September 12, 2020"
 .SH NAME
 mpathadm \- multipath discovery and administration
 .SH SYNOPSIS
-.LP
 .nf
 \fBmpathadm\fR \fIsubcommand\fR \fIdirect-object\fR [\fIoptions\fR] [\fIoperand\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBmpathadm\fR command enables multipathing discovery and management. The
 \fBmpathadm\fR command is implemented as a set of subcommands, many with their
 own options, that are described in the section for that subcommand. Options not
 associated with a particular subcommand are described under OPTIONS. The
 \fBmpathadm\fR subcommands operate on a \fIdirect-object\fR. These are
 described in this section for each subcommand. The \fIdirect-objects\fR,
-\fIinitiator-port\fR, \fItarget-port\fR, and\fIlogical-unit\fR in the
+\fIinitiator-port\fR, \fItarget-port\fR, and \fIlogical-unit\fR in the
 subcommands are consistent with SCSI standard definitions.
 .sp
 .LP
@@ -95,8 +92,6 @@ Set a path to be used over other paths on a logical-unit.
 The \fBmpathadm\fR subcommands operate on a \fIdirect-object\fR. These are
 described in this section for each subcommand.
 .SS "list Subcommand"
-.sp
-.LP
 The syntax for the \fBlist\fR subcommand is:
 .sp
 .in +2
@@ -171,8 +166,6 @@ Return the list of logical units names that are associated with the given
 .RE
 
 .SS "\fBshow\fR Subcommand"
-.sp
-.LP
 The syntax for the \fBshow\fR subcommand is:
 .sp
 .in +2
@@ -225,8 +218,6 @@ associated identifier type defined by the SCSI standards.
 .RE
 
 .SS "\fBmodify\fR Subcommand"
-.sp
-.LP
 The syntax for the \fBmodify\fR subcommand is:
 .sp
 .in +2
@@ -329,8 +320,6 @@ configuration is supported at the logical unit level.
 .RE
 
 .SS "\fBenable\fR Subcommand"
-.sp
-.LP
 The syntax for the \fBenable\fR subcommand is:
 .sp
 .in +2
@@ -360,8 +349,6 @@ logical unit will be enabled.
 .RE
 
 .SS "\fBdisable\fR Subcommand"
-.sp
-.LP
 The syntax for the \fBdisable\fR subcommand is:
 .sp
 .in +2
@@ -391,8 +378,6 @@ logical unit will be disabled.
 .RE
 
 .SS "\fBfailover\fR Subcommand"
-.sp
-.LP
 The syntax for the \fBfailover\fR subcommand is:
 .sp
 .in +2
@@ -419,8 +404,6 @@ active.
 .RE
 
 .SS "\fBoverride\fR Subcommand"
-.sp
-.LP
 The syntax for the \fBoverride\fR subcommand is:
 .sp
 .in +2
@@ -500,8 +483,6 @@ also be included.
 .RE
 
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -535,7 +516,6 @@ combination of subcommand and direct-object.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRObtaining a List of Multipathing Support
 .sp
 .LP
@@ -652,7 +632,7 @@ Logical Unit: /dev/rdsk/c4t60003BA27D2120004204AC2B000DAB00d0s2
 	Asymmetric: yes
 	Current Load Balance: round-robin
 	Logical Unit Group ID: NA
-	Aauto Failback: on
+	Auto Failback: on
 	Auto Probing: NA
 
 Paths:
@@ -713,8 +693,6 @@ with the specified initiator port, target port, and logical unit.
 .sp
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -729,7 +707,5 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBstmsboot\fR(1M), \fBlibMPAPI\fR(3LIB), \fBexec_attr\fR(4),
 \fBattributes\fR(5)

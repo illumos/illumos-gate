@@ -4,13 +4,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TASKQ 9F "Jul 25, 2015"
+.TH TASKQ 9F "September 12, 2020"
 .SH NAME
 taskq, ddi_taskq_create, ddi_taskq_destroy, ddi_taskq_dispatch, ddi_taskq_wait,
 ddi_taskq_suspend, taskq_suspended, ddi_taskq_resume \- Kernel task queue
 operations
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/sunddi.h>
 
@@ -50,7 +49,6 @@ operations
 .fi
 
 .SH INTERFACE LEVEL
-.LP
 Solaris DDI specific (Solaris DDI)
 .SH PARAMETERS
 .ne 2
@@ -166,7 +164,6 @@ Pointer to a thread structure.
 .RE
 
 .SH DESCRIPTION
-.LP
 A kernel task queue is a mechanism for general-purpose asynchronous task
 scheduling that enables tasks to be performed at a later time by another
 thread. There are several reasons why you may utilize asynchronous task
@@ -244,7 +241,6 @@ queue is suspended.
 .LP
 The \fBddi_taskq_resume()\fR function resumes task queue execution.
 .SH RETURN VALUES
-.LP
 The \fBddi_taskq_create()\fR function creates an opaque handle that is used for
 all other \fBtaskq\fR operations. It returns a \fBtaskq\fR pointer on success
 and NULL on failure.
@@ -257,9 +253,8 @@ dispatch a task and returns \fBDDI_SUCCESS\fR if dispatch succeeded.
 The \fBddi_taskq_suspended()\fR function returns \fBB_TRUE\fR if \fBtaskq\fR is
 suspended. Otherwise \fBB_FALSE\fR is returned.
 .SH CONTEXT
-.LP
 All functions may be called from the user or kernel contexts.
 .sp
 .LP
-Addtionally, the \fBddi_taskq_dispatch\fR function may be called from the
+Additionally, the \fBddi_taskq_dispatch\fR function may be called from the
 interrupt context only if the DDI_NOSLEEP flag is set.

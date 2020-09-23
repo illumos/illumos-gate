@@ -1,0 +1,9 @@
+==> 5221.in <==
+5221 head shouldn't reuse stdin
+
+==> /dev/stdin <==
+Old
+Bill Joy
+Bug
+
+Lasts Forever

@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBPICLTREE 3PICLTREE "May 16, 2020"
+.TH LIBPICLTREE 3PICLTREE "September 12, 2020"
 .SH NAME
 libpicltree \- PTree and Plug-in Registration interface library
 .SH SYNOPSIS
@@ -135,10 +135,10 @@ completion.
 For all volatile properties, the 'size' of the property must be specified to be
 the maximum possible size of the value. The maximum size of the value cannot
 exceed \fBPICL_PROPSIZE_MAX\fR. This allows a client to allocate a sufficiently
-large buffer before retrieving a volatile property's value
+large buffer before retrieving a volatile property's value.
 .SS "Plug-in Modules"
 Plug-in modules are shared objects that are located in well-known directories
-for the daemon to locate and load them. Plug-in modules are located in the one
+for the daemon to locate and load them. Plug-in modules are located in one
 of the following plug-in directories depending on the platform-specific nature
 of the data they collect and publish.
 .sp

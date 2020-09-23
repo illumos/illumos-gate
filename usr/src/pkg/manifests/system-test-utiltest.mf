@@ -59,6 +59,7 @@ dir path=opt/util-tests/tests/files/make_a/b
 dir path=opt/util-tests/tests/files/make_a/c
 dir path=opt/util-tests/tests/files/make_l
 dir path=opt/util-tests/tests/find
+dir path=opt/util-tests/tests/head
 dir path=opt/util-tests/tests/libcustr
 dir path=opt/util-tests/tests/libnvpair_json
 dir path=opt/util-tests/tests/libsff
@@ -1530,6 +1531,26 @@ file path=opt/util-tests/tests/files/make_a/c/make.rules mode=0444
 file path=opt/util-tests/tests/files/make_a/make.rules mode=0444
 file path=opt/util-tests/tests/find/findtest mode=0555
 file path=opt/util-tests/tests/grep_test mode=0555
+file path=opt/util-tests/tests/head/5221.in mode=0444
+file path=opt/util-tests/tests/head/5221.out mode=0444
+file path=opt/util-tests/tests/head/head_test mode=0555
+file path=opt/util-tests/tests/head/multi.1.out mode=0444
+file path=opt/util-tests/tests/head/multi.4.out mode=0444
+file path=opt/util-tests/tests/head/rings.1.out mode=0444
+file path=opt/util-tests/tests/head/rings.2.out mode=0444
+file path=opt/util-tests/tests/head/rings.3.out mode=0444
+file path=opt/util-tests/tests/head/rings.5.out mode=0444
+file path=opt/util-tests/tests/head/rings.in mode=0444
+file path=opt/util-tests/tests/head/stdin-nul.1.out mode=0444
+file path=opt/util-tests/tests/head/stdin-nul.2.out mode=0444
+file path=opt/util-tests/tests/head/stdin-nul.3.out mode=0444
+file path=opt/util-tests/tests/head/stdin.1.out mode=0444
+file path=opt/util-tests/tests/head/stdin.11.out mode=0444
+file path=opt/util-tests/tests/head/stdin.2.out mode=0444
+file path=opt/util-tests/tests/head/stdin.3.out mode=0444
+file path=opt/util-tests/tests/head/stdin.5.out mode=0444
+file path=opt/util-tests/tests/head/stdin.multi.out mode=0444
+file path=opt/util-tests/tests/head/stdin.nonewline.out mode=0444
 file path=opt/util-tests/tests/iconv_test mode=0555
 file path=opt/util-tests/tests/libcustr/custr_remove mode=0555
 file path=opt/util-tests/tests/libcustr/custr_trunc mode=0555

@@ -3,18 +3,15 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SSD 7D "Aug 9, 2008"
+.TH SSD 7D "September 12, 2020"
 .SH NAME
 ssd \- Fibre Channel Arbitrated Loop disk device driver
 .SH SYNOPSIS
-.LP
 .nf
 \fBssd@\fR\fIport\fR\fB,\fR\fItarget\fR\fB:\fR\fIpartition\fR
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
  The \fBssd\fR driver supports Fibre Channel disk devices.
 .sp
 .LP
@@ -51,8 +48,6 @@ The device has associated error statistics. These must include counters for
 hard errors, soft errors and transport errors. Other data may be implemented as
 required.
 .SH DEVICE STATISTICS SUPPORT
-.sp
-.LP
 The device maintains I/O statistics for the device and for partitions allocated
 for that device. For each device/partition, the  driver accumulates reads,
 writes, bytes read, and bytes written. The driver also initiates hi-resolution
@@ -64,11 +59,8 @@ Not all device drivers make per-partition IO statistics available for
 reporting. \fBssd\fR and \fBsd\fR(7D) per-partition statistics are  enabled by
 default but may be disabled in their configuration files.
 .SH IOCTLS
-.sp
-.LP
 Refer to  \fBdkio\fR(7I).
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBEACCES\fR\fR
@@ -142,8 +134,6 @@ The device is a read-only device.
 .RE
 
 .SH CONFIGURATION
-.sp
-.LP
 You configure the \fBssd\fR driver by defining  properties in the
 \fBssd.conf\fR file. The \fBssd\fR driver supports the following properties:
 .sp
@@ -154,7 +144,7 @@ You configure the \fBssd\fR driver by defining  properties in the
 .RS 27n
 The default value is 1, which causes partition IO statistics to be maintained.
 Set this value to zero to prevent the driver from recording partition
-statistics. This slightly reduces the CPU overhead for IO, mimimizes the amount
+statistics. This slightly reduces the CPU overhead for IO, minimizes the amount
 of \fBsar\fR(1) data collected and makes these statistics unavailable for
 reporting by \fBiostat\fR(1M) even though the \fB-p\fR/\fB-P\fR option is
 specified.  Regardless of this setting, disk IO statistics are always
@@ -169,7 +159,7 @@ value of this property is a list of duplets. The formal syntax is:
 .sp
 .in +2
 .nf
-ssd-config-list = 	<duplet> [, <duplet> ]* ;
+ssd-config-list =	<duplet> [, <duplet> ]* ;
 
 where
 
@@ -196,7 +186,6 @@ tunable names are:
 .in -2
 
 .SH EXAMPLES
-.sp
 .in +2
 .nf
 The following is an example of a global ssd-config-list property:
@@ -208,7 +197,6 @@ The following is an example of a global ssd-config-list property:
 .in -2
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fBssd.conf\fR
@@ -272,8 +260,6 @@ partition \fIn\fR (0-7)
 .RE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBsar\fR(1), \fBformat\fR(1M), \fBiostat\fR(1M), \fBioctl\fR(2),
 \fBlseek\fR(2), \fBopen\fR(2), \fBread\fR(2), \fBwrite\fR(2),
 \fBscsi\fR(4), \fBdriver.conf\fR(4), \fBcdio\fR(7I), \fBdkio\fR(7I)
@@ -287,7 +273,6 @@ partition \fIn\fR (0-7)
 .LP
 \fIFibre Channel - Private Loop SCSI Direct Attach (FC-PLDA)\fR
 .SH DIAGNOSTICS
-.sp
 .in +2
 .nf
 Error for command '<command name>' Error Level: Fatal Requested Block <n>,

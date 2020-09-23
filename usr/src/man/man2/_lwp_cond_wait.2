@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH _LWP_COND_WAIT 2 "Apr 13, 2001"
+.TH _LWP_COND_WAIT 2 "September 12, 2020"
 .SH NAME
 _lwp_cond_wait, _lwp_cond_timedwait, _lwp_cond_reltimedwait \- wait on a
 condition variable
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/lwp.h>
 
@@ -28,8 +27,6 @@ condition variable
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 These functions are used to wait for the occurrence of a condition represented
 by an LWP condition variable. LWP condition variables must be initialized to 0
 before use.
@@ -61,13 +58,9 @@ The \fB_lwp_cond_wait()\fR, \fB_lwp_cond_timedwait()\fR, and
 \fB_lwp_cond_reltimedwait()\fR functions always return with the mutex locked
 and owned by the calling lightweight process.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fB0\fR is returned. A non-zero value indicates an
 error.
 .SH ERRORS
-.sp
-.LP
 If any of the following conditions are detected, \fB_lwp_cond_wait()\fR,
 \fB_lwp_cond_timedwait()\fR, and \fB_lwp_cond_reltimedwait()\fR fail and return
 the corresponding value:
@@ -115,11 +108,10 @@ If any of the following conditions occur, \fB_lwp_cond_timedwait()\fR and
 \fB\fBETIME\fR\fR
 .ad
 .RS 9n
-The time specified in\fIabstime\fR or \fIreltime\fR has passed.
+The time specified in \fIabstime\fR or \fIreltime\fR has passed.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRUse the \fB_lwp_cond_wait()\fR function in a loop testing some
 condition.
 .sp
@@ -164,7 +156,7 @@ while (cond == FALSE) {
         if (err == ETIME) {
                 /* timeout, do something */
                 break;
-        SENDwhom}
+        }
 }
 (void) _lwp_mutex_unlock(&m);
 .fi
@@ -206,7 +198,5 @@ while (cond == FALSE) {
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 \fB_lwp_cond_broadcast\fR(2), \fB_lwp_cond_signal\fR(2), \fB_lwp_kill\fR(2),
 \fB_lwp_mutex_lock\fR(2), \fBfork\fR(2), \fBkill\fR(2)
