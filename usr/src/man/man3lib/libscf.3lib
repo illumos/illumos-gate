@@ -3,24 +3,19 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBSCF 3LIB "Aug 28, 2007"
+.TH LIBSCF 3LIB "September 22, 2020"
 .SH NAME
 libscf \- service configuration facility library
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR... ] \fIfile\fR... \fB-lscf\fR [ \fIlibrary\fR... ]
 #include <\fBlibscf.h\fR>
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 Functions in this library define the interface for reading, writing, and
 manipulating service configurations.
 .SH INTERFACES
-.sp
-.LP
 The shared object \fBlibscf.so.1\fR provides the public interfaces defined
 below. See \fBIntro\fR(3) for additional information on shared object
 interfaces.
@@ -115,14 +110,14 @@ l l .
 \fBscf_tmpl_prop_visibility\fR	\fBscf_tmpl_reset_errors\fR
 \fBscf_tmpl_strerror\fR	\fBscf_tmpl_validate_fmri\fR
 \fBscf_tmpl_value_common_name\fR	\fBscf_tmpl_value_count_range_choices\fR
-\fBscf_tmpl_value_count_range_ constraints\fR	\fBscf_tmpl_value_description\fR
+\fBscf_tmpl_value_count_range_constraints\fR	\fBscf_tmpl_value_description\fR
 \fBscf_tmpl_value_in_constraint\fR	\fBscf_tmpl_value_int_range_choices\fR
-\fBscf_tmpl_value_int_range_ constraints\fR	\fBscf_tmpl_value_name_choices\fR
+\fBscf_tmpl_value_int_range_constraints\fR	\fBscf_tmpl_value_name_choices\fR
 \fBscf_tmpl_value_name_constraints\fR	\fBscf_tmpl_visibility_to_string\fR
 \fBscf_transaction_commit\fR	\fBscf_transaction_create\fR
 \fBscf_transaction_destroy\fR	\fBscf_transaction_destroy_children\fR
-\fBscf_transaction_handle\fR	\fBscf_transacion_property_change\fR
-\fBscf_transaction_property_change_ type\fR	\fBscf_transaction_property_delete\fR
+\fBscf_transaction_handle\fR	\fBscf_transaction_property_change\fR
+\fBscf_transaction_property_change_type\fR	\fBscf_transaction_property_delete\fR
 \fBscf_transaction_property_new\fR	\fBscf_transaction_reset\fR
 \fBscf_transaction_reset_all\fR	\fBscf_transaction_start\fR
 \fBscf_type_base_type\fR	\fBscf_type_to_string\fR
@@ -142,11 +137,10 @@ l l .
 \fBsmf_disable_instance\fR	\fBsmf_enable_instance\fR
 \fBsmf_get_state\fR	\fBsmf_maintain_instance\fR
 \fBsmf_refresh_instance\fR	\fBsmf_restart_instance\fR
-\fBsmf_restore_instance\fR	
+\fBsmf_restore_instance\fR
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/libscf.so.1\fR\fR
@@ -165,8 +159,6 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -183,6 +175,4 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBIntro\fR(3), \fBattributes\fR(5), \fBsmf\fR(5)

@@ -4,12 +4,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DAT_LMR_SYNC_RDMA_WRITE 3DAT "Jul 16, 2004"
+.TH DAT_LMR_SYNC_RDMA_WRITE 3DAT "September 22, 2020"
 .SH NAME
 dat_lmr_sync_rdma_write \- synchronize local memory with RDMA write on
 non-coherent memory
 .SH SYNOPSIS
-.LP
 .nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-ldat\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <\fBdat/udat.h\fR>
@@ -23,7 +22,6 @@ DAT_RETURN
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIia_handle\fR\fR
@@ -51,8 +49,6 @@ The number of segments in the \fIlocal_segments\fR argument.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBdat_lmr_sync_rdma_write()\fR function makes effects of an incoming RDMA
 Write operation visible to the Consumer. This operation guarantees consistency
 by locally invalidating the non-coherent cache whose buffer has been populated
@@ -66,7 +62,7 @@ before reading data from a memory range in this region that was the target of
 an incoming RDMA Write operation. The \fBdat_lmr_sync_rdma_write()\fR function
 must be called after the RDMA Write operation completes, and the memory range
 that was modified by the RDMA Write must be supplied by the caller in the
-\fIlocal_ segments\fR array. After this call returns, the Consumer may safely
+\fIlocal_segments\fR array. After this call returns, the Consumer may safely
 see the modified contents of the memory range. It is permissible to batch
 synchronizations of multiple RDMA Write operations in a single call by passing
 a \fIlocal_segments\fR array that includes all modified memory ranges. The
@@ -89,7 +85,6 @@ synchronizing using \fBdat_lmr_sync_rdma_write()\fR, the returned contents are
 undefined. If the Consumer attempts to write to a memory range without properly
 synchronizing, the contents of the memory range become undefined.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDAT_SUCCESS\fR\fR
@@ -119,8 +114,6 @@ the LMR handle was invalid.
 .RE
 
 .SH USAGE
-.sp
-.LP
 Determining when an RDMA Write completes and determining which memory range was
 modified is the Consumer's responsibility. One possibility is for the RDMA
 Write initiator to post a Send DTO message after each RDMA Write that
@@ -152,8 +145,6 @@ I/O noncoherent cache will be flushed.
 CPU noncoherent cache will be invalidated.
 .RE
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -170,6 +161,4 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBdat_lmr_sync_rdma_read\fR(3DAT), \fBlibdat\fR(3LIB), \fBattributes\fR(5)

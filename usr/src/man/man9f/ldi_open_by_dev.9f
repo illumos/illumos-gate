@@ -3,12 +3,11 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LDI_OPEN_BY_DEV 9F "Aug 9, 2004"
+.TH LDI_OPEN_BY_DEV 9F "September 22, 2020"
 .SH NAME
 ldi_open_by_dev, ldi_open_by_name, ldi_open_by_devid, ldi_close \- open and
 close devices
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/sunldi.h>
 
@@ -30,11 +29,10 @@ close devices
 
 .LP
 .nf
-\fBint\fR \fBldi_close\fR(\fBldi_handle_t\fR \fIlh\fR, \fBint\fR \fIflag\fR, \fBcred_ t *\fR\fIcr\fR);
+\fBint\fR \fBldi_close\fR(\fBldi_handle_t\fR \fIlh\fR, \fBint\fR \fIflag\fR, \fBcred_t *\fR\fIcr\fR);
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIlh\fR\fR
@@ -197,8 +195,6 @@ session-controlling tty.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBldi_open_by_dev()\fR, \fBldi_open_by_name()\fR and
 \fBldi_open_by_devid()\fR functions allow a caller to open a block, character,
 or streams device. Upon a successful open, a layered handle to the device is
@@ -232,8 +228,6 @@ either \fBldi_open_by_dev()\fR, \fBldi_open_by_name()\fR, or
 \fBldi_open_by_devid()\fR. After \fBldi_close()\fR returns the layered handle,
 the \fIlh\fR that was previously passed in is no longer valid.
 .SH RETURN VALUES
-.sp
-.LP
 The \fBldi_close()\fR function returns \fB0\fR for success. \fBEINVAL\fR is
 returned for invalid input parameters. Otherwise, any other error number may be
 returned by the device.
@@ -313,21 +307,15 @@ Unsupported device operation or access mode.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 These functions may be called from user or kernel context.
 .sp
 .LP
 These functions should not be called from a device's attach, detach, or power
 entry point. This could result in a system crash or deadlock.
 .SH SEE ALSO
-.sp
-.LP
 \fBscsi_vhci\fR(7D), \fBldi_ident_from_dev\fR(9F),
 \fBldi_ident_from_dip\fR(9F), \fBldi_ident_from_stream\fR(9F)
 .SH NOTES
-.sp
-.LP
 Use only OTYP_CHR or OTYP_BLK options when you use the \fBldi_open_by_dev()\fR
 and \fBldi_open_by_devid()\fR functions to open a device. Other flags,
 including OTYP_LYR, have been deprecated and should not be used with these

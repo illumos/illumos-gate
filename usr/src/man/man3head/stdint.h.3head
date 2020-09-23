@@ -43,18 +43,15 @@
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\"
-.TH STDINT.H 3HEAD "Sep 10, 2004"
+.TH STDINT.H 3HEAD "September 22, 2020"
 .SH NAME
 stdint.h, stdint \- integer types
 .SH SYNOPSIS
-.LP
 .nf
 #include <\fBstdint.h\fR>
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The <\fBstdint.h\fR> header declares sets of integer types having specified
 widths, and defines corresponding sets of macros. It also defines macros that
 specify limits of integer types corresponding to types defined in other
@@ -116,8 +113,6 @@ that \fBtypedef\fR name, nor does it define the associated macros. An
 implementation provides those types described as required, but need not provide
 any of the others (described as optional).
 .SS "Integer Types"
-.sp
-.LP
 When \fBtypedef\fR names differing only in the absence or presence of the
 initial \fBu\fR are defined, they denote corresponding signed and unsigned
 types as described in the ISO/IEC 9899: 1999 standard, Section 6.2.5; an
@@ -204,12 +199,12 @@ All other types of this form are optional.
 .RS 4n
 The \fBtypedef\fR name \fBint_least\fIN\fR_t\fR designates a signed integer
 type with a width of at least \fIN\fR, such that no signed integer type with
-lesser size has at least the specified width. Thus, \fBint_least32 _t\fR
+lesser size has at least the specified width. Thus, \fBint_least32_t\fR
 denotes a signed integer type with a width of at least 32 bits.
 .sp
 The \fBtypedef\fR name \fBuint_least\fIN\fR_t\fR designates an unsigned integer
 type with a width of at least \fIN\fR, such that no unsigned integer type with
-lesser size has at least the specified width. Thus, \fBuint_ least16_t\fR
+lesser size has at least the specified width. Thus, \fBuint_least16_t\fR
 denotes an unsigned integer type with a width of at least 16 bits.
 .sp
 The following types are required:
@@ -246,7 +241,7 @@ simply pick some integer type satisfying the signedness and width requirements.
 .sp
 The \fBtypedef\fR name \fBint_fast\fIN\fR_t\fR designates the fastest signed
 integer type with a width of at least \fIN\fR. The \fBtypedef\fR name
-\fBuint_fast\fIN\fR_ t\fR designates the fastest unsigned integer type with a
+\fBuint_fast\fIN\fR_t\fR designates the fastest unsigned integer type with a
 width of at least \fIN\fR.
 .sp
 The following types are required:
@@ -334,8 +329,6 @@ from \fBLimits of Specified-Width Integer Types\fR.
 .RE
 
 .SS "Limits of Specified-Width Integer Types"
-.sp
-.LP
 The following macros specify the minimum and maximum limits of the types
 declared in the <\fBstdint.h\fR> header. Each macro name corresponds to a
 similar type name in \fBInteger Types\fR.
@@ -686,8 +679,6 @@ Maximum value of greatest-width unsigned integer type:
 .RE
 
 .SS "Limits of Other Integer Types"
-.sp
-.LP
 The following macros specify the minimum and maximum limits of integer types
 corresponding to types defined in other standard headers.
 .sp
@@ -842,8 +833,6 @@ type, the value of {\fBWINT_MIN\fR} is no greater than -32767 and the value of
 an unsigned integer type, and the value of {\fBWINT_MIN\fR} is 0 and the value
 of {\fBWINT_MAX\fR} is no less than 65535.
 .SS "Macros for Integer Constant Expressions"
-.sp
-.LP
 The following macros expand to integer constant expressions suitable for
 initializing objects that have integer types corresponding to types defined in
 the <\fBstdint.h\fR> header. Each macro name corresponds to a similar type name
@@ -900,8 +889,6 @@ UINTMAX_C(\fIvalue\fR)
 .RE
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -916,7 +903,5 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBinttypes.h\fR(3HEAD), \fBsignal.h\fR(3HEAD), \fBstddef.h\fR(3HEAD),
 \fBwchar.h\fR(3HEAD), \fBattributes\fR(5), \fBstandards\fR(5)

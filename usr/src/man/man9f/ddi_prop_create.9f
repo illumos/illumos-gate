@@ -3,13 +3,12 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_PROP_CREATE 9F "Jan 16, 2006"
+.TH DDI_PROP_CREATE 9F "September 22, 2020"
 .SH NAME
 ddi_prop_create, ddi_prop_modify, ddi_prop_remove, ddi_prop_remove_all,
 ddi_prop_undefine \- create, remove, or modify properties for leaf device
 drivers
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -42,14 +41,10 @@ drivers
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
 Solaris DDI specific (Solaris DDI). The \fBddi_prop_create()\fR and
 \fBddi_prop_modify()\fR functions are obsolete. Use \fBddi_prop_update\fR(9F)
 instead of these functions.
 .SH PARAMETERS
-.sp
-.LP
 \fBddi_prop_create()\fR
 .sp
 .ne 2
@@ -247,8 +242,6 @@ name of property.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 Device drivers have the ability to create and manage their own properties as
 well as gain access to properties that the system creates on behalf of the
 driver. A driver uses \fBddi_getproplen\fR(9F) to query whether or not a
@@ -350,8 +343,6 @@ associated with the \fIdip\fR. It is called before unloading a driver.
 .RE
 
 .SH RETURN VALUES
-.sp
-.LP
 The \fBddi_prop_create()\fR function returns the following values:
 .sp
 .ne 2
@@ -384,7 +375,7 @@ If an attempt is made to create a property with \fIdev\fR equal to
 
 .sp
 .LP
-The \fBddi_prop_ undefine()\fR function returns the following values:
+The \fBddi_prop_undefine()\fR function returns the following values:
 .sp
 .ne 2
 .na
@@ -487,13 +478,10 @@ On property search failure.
 .RE
 
 .SH CONTEXT
-.sp
-.LP
 If \fBDDI_PROP_CANSLEEP\fR is set, these functions can cannot be called from
 interrupt context. Otherwise, they can be called from user, interrupt, or
 kernel context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCreating a Property
 .sp
 .LP
@@ -515,8 +503,6 @@ for (minor = 0; minor < 8; minor ++) {
 .in -2
 
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
 
@@ -533,8 +519,6 @@ T}
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBdriver.conf\fR(4), \fBattributes\fR(5), \fBattach\fR(9E),
 \fBddi_getproplen\fR(9F), \fBddi_prop_op\fR(9F), \fBddi_prop_update\fR(9F),
 \fBmakedevice\fR(9F)

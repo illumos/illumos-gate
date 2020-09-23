@@ -43,18 +43,15 @@
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\"
-.TH WCTYPE.H 3HEAD "Sep 10, 2004"
+.TH WCTYPE.H 3HEAD "September 22, 2020"
 .SH NAME
 wctype.h, wctype \- wide-character classification and mapping utilities
 .SH SYNOPSIS
-.LP
 .nf
 #include <\fBwctype.h\fR>
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The <\fBwctype.h\fR> header defines the following types:
 .sp
 .ne 2
@@ -100,7 +97,7 @@ functions to indicate end-of-file.
 .sp
 .LP
 For all functions described in this header that accept an argument of type
-\fBwint_t\fR, the value is representable as a \fBwchar _t\fR or equals the
+\fBwint_t\fR, the value is representable as a \fBwchar_t\fR or equals the
 value of \fBWEOF\fR. If this argument has any other value, the behavior is
 undefined.
 .sp
@@ -113,8 +110,6 @@ Inclusion of the <\fBwctype.h\fR> header can make visible all symbols from the
 headers <\fBctype.h\fR>, <\fBstdarg.h\fR>, <\fBstddef.h\fR>, <\fBstdio.h\fR>,
 <\fBstdlib.h\fR>, <\fBstring.h\fR>, <\fBtime.h\fR>, and <\fBwchar.h\fR>.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -129,8 +124,6 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBiswalpha\fR(3C), \fBiswctype\fR(3C), \fBlocale.h\fR(3HEAD),
 \fBsetlocale\fR(3C), \fBstdarg\fR(3EXT), \fBstddef.h\fR(3HEAD),
 \fBstdio.h\fR(3HEAD), \fBstdlib.h\fR(3HEAD), \fBstring.h\fR(3HEAD),
