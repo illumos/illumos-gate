@@ -43,11 +43,10 @@
 .\" Copyright (c) 1992, X/Open Company Limited All.  Rights Reserved.
 .\" Portions Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\"
-.TH PAX 1 "Jul 16, 2008"
+.TH PAX 1 "September 22, 2020"
 .SH NAME
 pax \- portable archive interchange
 .SH SYNOPSIS
-.LP
 .nf
 \fBpax\fR [\fB-cdnv\fR] [\fB-H\fR | \fB-L\fR] [\fB-f\fR \fIarchive\fR] [\fB-o\fR \fIoptions\fR]...
      [\fB-s\fR \fIreplstr\fR]... [\fIpattern\fR]...
@@ -73,14 +72,10 @@ pax \- portable archive interchange
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 \fBpax\fR reads, writes, and writes lists of the members of archive files and
 copies directory hierarchies. A variety of archive formats are supported. See
 the \fB-x\fR \fIformat\fR option.
 .SS "Modes of Operations"
-.sp
-.LP
 The action to be taken depends on the presence of the \fB-r\fR and \fB-w\fR
 options. The four combinations of \fB-r\fR and \fB-w\fR are referred to as the
 four modes of operation: \fBlist\fR, \fBread\fR, \fBwrite\fR, and \fBcopy\fR
@@ -203,8 +198,6 @@ that is, entering a previously visited directory that is an ancestor of the
 last file visited. When it detects an infinite loop, \fBpax\fR writes a
 diagnostic message to standard error and terminates.
 .SH OPTIONS
-.sp
-.LP
 The following options are supported:
 .sp
 .ne 2
@@ -1079,8 +1072,6 @@ If both the \fB-u\fR and \fB-n\fR options are specified, \fBpax\fR does not
 consider a file selected unless it is newer than the file to which it is
 compared.
 .SS "List Mode Format Specifications"
-.sp
-.LP
 In \fBlist\fR mode with the \fB-o\fR \fBlistopt=\fR\fIformat\fR option, the
 format argument is applied for each selected file. \fBpax\fR appends a NEWLINE
 to the \fBlistopt\fR output for each selected file. The \fIformat\fR argument
@@ -1133,7 +1124,7 @@ keywords are supported (see IEEE Std 1003.1-2001):
 Any of the Field Name entries in \fBustar Header Block\fR and \fBOctet-Oriented
 cpio Archive Entry\fR. The implementation supports the \fBcpio\fR keywords
 without the leading \fBc_\fR in addition to the form required by \fBValues for
-cpio c_ mode Field\fR.
+cpio c_mode Field\fR.
 .RE
 .RS +4
 .TP
@@ -1229,8 +1220,6 @@ expands to:
 Otherwise, the \fB%L\fR conversion specification is the equivalent of \fB%F\fR.
 .RE
 .SH OPERANDS
-.sp
-.LP
 The following operands are supported:
 .sp
 .ne 2
@@ -1263,12 +1252,8 @@ in the archive.
 .RE
 
 .SH OUTPUT
-.sp
-.LP
 Output formats are discussed below:
 .SS "Standard Output"
-.sp
-.LP
 In \fBwrite\fR mode, if \fB-f\fR is not specified, the standard output is the
 archive formatted according to one of the formats described below. See \fB-x\fR
 \fBformat\fR for a list of supported formats.
@@ -1330,8 +1315,6 @@ blank-character-separated fields is written.
 .LP
 In \fBlist\fR mode, standard output is not buffered more than a line at a time.
 .SS "Standard Error"
-.sp
-.LP
 If \fB-v\fR is specified in \fBread\fR, \fBwrite\fR or \fBcopy\fR modes,
 \fBpax\fR writes the path names it processes to the standard error output using
 the following format:
@@ -1381,8 +1364,6 @@ UTF-8 codeset format to the codeset and current locale of the implementation,
 described for the \fB-o\fR \fBinvalid=\fRoption, and then processes the next
 file in the archive.
 .SS "Output Files"
-.sp
-.LP
 In \fBread\fR mode, the extracted output files are of the archived file type.
 In \fBcopy\fR mode, the copied output files are the type of the file being
 copied . In either mode, existing files in the destination hierarchy are
@@ -1391,8 +1372,6 @@ and invalid-value (\fB-o\fR \fBinvalid=\fR) tests allow it. In \fBwrite\fR
 mode, the output file named by the \fB-f\fR option-argument is a file formatted
 according to one of the specifications in IEEE Std 1003.1-2001.
 .SH ERRORS
-.sp
-.LP
 If \fBpax\fR cannot create a file or a link when reading an archive, or cannot
 find a file when writing an archive, or cannot preserve the user \fBID\fR,
 group \fBID\fR, or file mode when the \fB-p\fR option is specified, a
@@ -1410,8 +1389,6 @@ Additionally, the file modes of extracted directories can have additional bits
 from the read, write, execute mask set as well as incorrect modification and
 access times.
 .SH USAGE
-.sp
-.LP
 The \fB-p\fR (privileges) option was invented to reconcile differences between
 historical \fBtar\fR(1) and \fBcpio\fR(1) implementations. In particular, the
 two utilities use \fB-m\fR in diametrically opposed ways. The \fB-p\fR option
@@ -1479,22 +1456,17 @@ when it is extracted.
 See \fBlargefile\fR(5) for the description of the behavior of \fBpax\fR when
 encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
 .SS "Standard Input"
-.sp
-.LP
 In \fBwrite\fR mode, the standard input is used only if no \fIfile\fR operands
 are specified. It is a text file containing a list of path names, one per line,
 without leading or trailing blanks. In \fBlist\fR and \fBread\fR modes, if
 \fB-f\fR is not specified, the standard input is an archive file. Otherwise,
 the standard input is not used.
 .SS "Input Files"
-.sp
-.LP
 The input file named by the \fIarchive\fR option-argument, or standard input
 when the archive is read from there, is a file formatted according to one of
 the formats described below. See \fBExtended Description\fR. The file
 \fB/dev/tty\fR is used to write prompts and read responses.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCopying the Contents of the Current Directory
 .sp
 .LP
@@ -1608,8 +1580,6 @@ Jan 31 15:53 2003
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
-.LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBpax\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, \fBLC_TIME\fR, and \fBNLSPATH\fR.
@@ -1649,8 +1619,6 @@ default timezone is used.
 .RE
 
 .SH EXIT STATUS
-.sp
-.LP
 The following exit values are returned:
 .sp
 .ne 2
@@ -1672,8 +1640,6 @@ An error occurred.
 
 .SH EXTENDED DESCRIPTION
 .SS "\fBpax\fR Interchange Format"
-.sp
-.LP
 A \fBpax\fR archive tape or file produced in the \fB-xpax\fR format contains a
 series of blocks. The physical layout of the archive is identical to the
 \fBustar\fR format described in \fBustar Interchange Format\fR. Each file
@@ -1730,8 +1696,6 @@ End of Archive Indicator	Block of binary zeros
 .TE
 
 .SS "\fBpax\fR Header Block"
-.sp
-.LP
 The \fBpax\fR header block is identical to the \fBustar\fR header block
 described in \fBustar Interchange Format\fR except that two additional
 \fItypeflag\fR values are defined:
@@ -1779,8 +1743,6 @@ which means that the \fIsize\fR field can be greater than zero. Archives
 created by \fBpax\fR \fB-o\fR \fBlinkdata\fR includes these data blocks with
 the hard links.
 .SS "\fBpax\fR Extended Header"
-.sp
-.LP
 A \fBpax\fR extended header contains values that are inappropriate for the
 \fBustar\fR header block because of limitations in that format: fields
 requiring a character encoding other than that described in the \fIISO/IEC 646:
@@ -2056,8 +2018,6 @@ Unlike the \fBustar\fR header block fields, \fBNULLs\fR does not delimit
 values; all characters within the value field are considered data for the
 field.
 .SS "\fBpax\fR Extended Header Keyword Precedence"
-.sp
-.LP
 This section describes the precedence in which the various header records and
 fields and command line options are selected to apply to a file in the archive.
 When \fBpax\fR is used in read or list modes, it determines a file attribute in
@@ -2105,8 +2065,6 @@ the last one given in the global header takes precedence.
 Otherwise, the attribute is determined from the \fBustar\fR header block.
 .RE
 .SS "\fBpax\fR Extended Header File Times"
-.sp
-.LP
 \fBpax\fR writes an \fImtime\fR record for each file in write or copy modes if
 the file's modification time cannot be represented exactly in the \fBustar\fR
 header logical record described in \fBustar\fR Interchange Format. This can
@@ -2124,8 +2082,6 @@ a decimal number, and otherwise generates only enough digits so that the same
 time is recovered if the file is extracted on a system whose underlying
 implementation supports the same time granularity.
 .SS "\fBustar\fR Interchange Format"
-.sp
-.LP
 A \fBustar\fR archive tape or file contains a series of logical records. Each
 logical record is a fixed-size logical record of 512 octets. Although this
 format can be thought of as being stored on 9-track industry-standard 12.7mm
@@ -2248,7 +2204,7 @@ l l l
 l l l .
 Bit Value	IEE Std 1003.1-2001 Bit	Description
 04000	S_ISUID	Set UID on execution
-02000	S_ISGID	Set GID on exectution
+02000	S_ISGID	Set GID on execution
 01000	\fIreserved\fR	Reserved for future standardization
 00400	S_IRUSR	Read permission for file owner class
 00200	S_IWUSR	Write permission for file owner class
@@ -2524,8 +2480,6 @@ scanned for these names. If found, the user and group IDs contained within
 these files are used rather than the values contained within the \fIuid\fR and
 \fBgid\fR fields.
 .SS "\fBcpio\fR Interchange Format"
-.sp
-.LP
 The octet-oriented \fBcpio\fR archive format are a series of entries, each
 comprising a header that describes the file, name of the file, and contents of
 the file.
@@ -2581,8 +2535,6 @@ Filename Field Name	Length	Interpreted as
 .TE
 
 .SS "\fBcpio\fR Header"
-.sp
-.LP
 For each file in the archive, a header as defined previously written. The
 information in the header fields is written as streams of the \fIISO/IEC 646:
 1991\fR standard characters interpreted as octal numbers. The octal numbers are
@@ -2739,8 +2691,6 @@ section following the header structure.
 .RE
 
 .SS "\fBcpio\fR Filename"
-.sp
-.LP
 The \fIc_name\fR field contains the pathname of the file. The length of this
 field in octets is the value of \fIc_namesize\fR. If a filename is found on the
 medium that would create an invalid pathname, it is implementation-defined
@@ -2760,8 +2710,6 @@ is stored on the local file system and under what name it is stored. \fBpax\fR
 can choose to ignore these files as long as it produces an error indicating
 that the file is being ignored.
 .SS "\fBcpio\fR File Data"
-.sp
-.LP
 Following \fIc_name\fR, there is \fIc_filesize\fR octets of data.
 Interpretation of such data occurs in a manner dependent on the file. If
 \fIc_filesize\fR is zero, no data is contained in \fIc_filedata\fR . When
@@ -2792,8 +2740,6 @@ are not mentioned in volume \fIIEEE Std 1003.1-200x\fR. If the implementation
 does not support those flags, they can be ignored.
 .RE
 .SS "\fBcpio\fR Special Entries"
-.sp
-.LP
 FIFO special files, directories, and the trailer are recorded with
 \fIc_filesize\fR equal to zero. For other special files, \fIc_filesize\fR is
 unspecified in volume \fIIEEE Std 1003.1-200x\fR. The header for the next file
@@ -2802,8 +2748,6 @@ entry preceding it. A header denoting the filename trailer indicates the end of
 the archive; the contents of octets in the last block of the archive following
 such a header are undefined.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -2820,8 +2764,6 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBchmod\fR(1), \fBcpio\fR(1), \fBed\fR(1), \fBprintf\fR(1), \fBtar\fR(1),
 \fBmkdir\fR(2), \fBlseek\fR(2), \fBstat\fR(2), \fBwrite\fR(2),
 \fBarchives.h\fR(3HEAD), \fBattributes\fR(5), \fBenviron\fR(5),
