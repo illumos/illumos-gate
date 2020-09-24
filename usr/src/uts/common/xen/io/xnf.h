@@ -50,10 +50,6 @@ extern "C" {
 #define	XNF_MAXPKT	16384
 #define	XNF_FRAMESIZE	1514		/* frame size including MAC header */
 
-/* DEBUG flags */
-#define	XNF_DEBUG_DDI		0x01
-#define	XNF_DEBUG_TRACE		0x02
-
 /*
  * Based on XEN_NETIF_NR_SLOTS_MIN in Linux. Packets that span more pages
  * than this must be defragmented or dropped.

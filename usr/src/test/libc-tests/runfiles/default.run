@@ -40,6 +40,7 @@ outputdir = /var/tmp/test_results
 [/opt/libc-tests/tests/wcsncasecmp-7350.64]
 
 [/opt/libc-tests/tests/i18n/bindtextdomain_test]
+[/opt/libc-tests/tests/qsort/qsort_test]
 
 [/opt/libc-tests/tests/random/getrandom]
 [/opt/libc-tests/tests/random/getentropy]

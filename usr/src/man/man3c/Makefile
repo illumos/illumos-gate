@@ -1160,6 +1160,7 @@ MANLINKS=	FD_CLR.3c				\
 		qeconvert.3c				\
 		qfconvert.3c				\
 		qgconvert.3c				\
+		qsort_r.3c				\
 		quadruple_to_decimal.3c			\
 		rand_r.3c				\
 		rctlblk_get_enforced_value.3c		\
@@ -2251,6 +2252,8 @@ pthread_spin_init.3c			:= LINKSRC = pthread_spin_destroy.3c
 pthread_spin_trylock.3c			:= LINKSRC = pthread_spin_lock.3c
 
 fputs.3c				:= LINKSRC = puts.3c
+
+qsort_r.3c				:= LINKSRC = qsort.3c
 
 rand_r.3c				:= LINKSRC = rand.3c
 srand.3c				:= LINKSRC = rand.3c

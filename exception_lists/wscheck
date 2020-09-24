@@ -107,6 +107,7 @@ usr/src/uts/common/io/qede/*
 usr/src/uts/common/io/i40e/core/*
 usr/src/test/crypto-tests/tests/digest/data/*.rsp
 usr/src/test/util-tests/tests/dis/i386/*.out
+usr/src/test/libc-tests/tests/qsort/*.c
 usr/src/tools/smatch/src/*
 usr/src/uts/common/io/cxgbe/*
 usr/src/uts/common/io/e1000api/*

@@ -14004,6 +14004,7 @@ s usr/share/man/man3c/qeconvert.3c=econvert.3c
 s usr/share/man/man3c/qfconvert.3c=econvert.3c
 s usr/share/man/man3c/qgconvert.3c=econvert.3c
 f usr/share/man/man3c/qsort.3c 0444 root bin
+s usr/share/man/man3c/qsort_r.3c=qsort.3c
 s usr/share/man/man3c/quadruple_to_decimal.3c=floating_to_decimal.3c
 f usr/share/man/man3c/quick_exit.3c 0444 root bin
 f usr/share/man/man3c/raise.3c 0444 root bin

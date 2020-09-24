@@ -25,8 +25,8 @@
  * Copyright 2018 Joyent, Inc.
  */
 
-/*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989  AT&T	*/
-/*	  All Rights Reserved  	*/
+/* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989  AT&T */
+/* All Rights Reserved */
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -173,8 +173,8 @@ struct pcf {
 	kmutex_t	pcf_lock;	/* protects the structure */
 	uint_t		pcf_count;	/* page count */
 	uint_t		pcf_wait;	/* number of waiters */
-	uint_t		pcf_block; 	/* pcgs flag to page_free() */
-	uint_t		pcf_reserve; 	/* pages freed after pcf_block set */
+	uint_t		pcf_block;	/* pcgs flag to page_free() */
+	uint_t		pcf_reserve;	/* pages freed after pcf_block set */
 	uint_t		pcf_fill[10];	/* to line up on the caches */
 };
 
@@ -1353,7 +1353,7 @@ wakeup_pcgs(void)
  * clock() on each TICK.
  */
 void
-set_freemem()
+set_freemem(void)
 {
 	struct pcf	*p;
 	ulong_t		t;
@@ -3922,8 +3922,8 @@ page_pp_unlock(
 
 /*
  * This routine reserves availrmem for npages;
- * 	flags: KM_NOSLEEP or KM_SLEEP
- * 	returns 1 on success or 0 on failure
+ *	flags: KM_NOSLEEP or KM_SLEEP
+ *	returns 1 on success or 0 on failure
  */
 int
 page_resv(pgcnt_t npages, uint_t flags)
@@ -3980,7 +3980,7 @@ void
 page_pp_useclaim(
 	page_t *opp,		/* original page frame losing lock */
 	page_t *npp,		/* new page frame gaining lock */
-	uint_t	write_perm) 	/* set if vpage has PROT_WRITE */
+	uint_t write_perm)	/* set if vpage has PROT_WRITE */
 {
 	int payback = 0;
 	int nidx, oidx;
@@ -4734,7 +4734,7 @@ group_page_unlock(page_t *pp)
 
 /*
  * returns
- * 0 		: on success and *nrelocp is number of relocated PAGESIZE pages
+ * 0		: on success and *nrelocp is number of relocated PAGESIZE pages
  * ERANGE	: this is not a base page
  * EBUSY	: failure to get locks on the page/pages
  * ENOMEM	: failure to obtain replacement pages

@@ -23,6 +23,7 @@ SUBDIRS = \
 	newlocale \
 	nl_langinfo \
 	priv_gettext \
+	qsort \
 	random \
 	regex \
 	select \
