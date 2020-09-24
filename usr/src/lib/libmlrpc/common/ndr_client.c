@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 #include <sys/errno.h>
@@ -45,6 +45,7 @@ ndr_clnt_bind(ndr_client_t *clnt, ndr_service_t *msvc,
 	ndr_binding_t		*mbind;
 	ndr_xa_t		mxa;
 	ndr_bind_hdr_t		*bhdr;
+	ndr_common_header_t	*hdr;
 	ndr_p_cont_elem_t	*pce;
 	ndr_bind_ack_hdr_t	*bahdr;
 	ndr_p_result_t		*pre;
@@ -59,8 +60,8 @@ ndr_clnt_bind(ndr_client_t *clnt, ndr_service_t *msvc,
 	ndr_clnt_init_hdr(clnt, &mxa);
 
 	bhdr = &mxa.send_hdr.bind_hdr;
-	bhdr->common_hdr.ptype = NDR_PTYPE_BIND;
-	bhdr->common_hdr.frag_length = sizeof (*bhdr);
+	hdr = &mxa.send_hdr.bind_hdr.common_hdr;
+	hdr->ptype = NDR_PTYPE_BIND;
 	bhdr->max_xmit_frag = NDR_DEFAULT_FRAGSZ;
 	bhdr->max_recv_frag = NDR_DEFAULT_FRAGSZ;
 	bhdr->assoc_group_id = 0;
@@ -89,6 +90,30 @@ ndr_clnt_bind(ndr_client_t *clnt, ndr_service_t *msvc,
 	if ((*clnt->xa_init)(clnt, &mxa) < 0)
 		return (NDR_DRC_FAULT_OUT_OF_MEMORY);
 
+	/* Reserve room for hdr */
+	mxa.send_nds.pdu_scan_offset = sizeof (*bhdr);
+
+	/* GSS_Init_sec_context */
+	rc = ndr_add_sec_context(&clnt->auth_ctx, &mxa);
+	if (NDR_DRC_IS_FAULT(rc))
+		goto fault_exit;
+
+	rc = ndr_encode_pdu_auth(&mxa);
+	if (NDR_DRC_IS_FAULT(rc))
+		goto fault_exit;
+
+	/*
+	 * If we have auth data, then pdu_size has been initialized.
+	 * Otherwise, it hasn't.
+	 */
+	if (hdr->auth_length == 0)
+		hdr->frag_length = sizeof (*bhdr);
+	else
+		hdr->frag_length = mxa.send_nds.pdu_size;
+
+	/* Reset scan_offset to header */
+	mxa.send_nds.pdu_scan_offset = 0;
+
 	rc = ndr_encode_pdu_hdr(&mxa);
 	if (NDR_DRC_IS_FAULT(rc))
 		goto fault_exit;
@@ -102,21 +127,36 @@ ndr_clnt_bind(ndr_client_t *clnt, ndr_service_t *msvc,
 	if (NDR_DRC_IS_FAULT(rc))
 		goto fault_exit;
 
-	/* done with buffers */
-	(*clnt->xa_destruct)(clnt, &mxa);
+	rc = ndr_decode_pdu_auth(&mxa);
+	if (NDR_DRC_IS_FAULT(rc))
+		goto fault_exit;
 
 	bahdr = &mxa.recv_hdr.bind_ack_hdr;
 
-	if (mxa.ptype != NDR_PTYPE_BIND_ACK)
-		return (NDR_DRC_FAULT_RECEIVED_MALFORMED);
+	if (mxa.ptype != NDR_PTYPE_BIND_ACK) {
+		rc = NDR_DRC_FAULT_RECEIVED_MALFORMED;
+		goto fault_exit;
+	}
 
-	if (bahdr->p_result_list.n_results != 1)
-		return (NDR_DRC_FAULT_RECEIVED_MALFORMED);
+	if (bahdr->p_result_list.n_results != 1) {
+		rc = NDR_DRC_FAULT_RECEIVED_MALFORMED;
+		goto fault_exit;
+	}
 
 	pre = &bahdr->p_result_list.p_results[0];
 
-	if (pre->result != NDR_PCDR_ACCEPTANCE)
-		return (NDR_DRC_FAULT_RECEIVED_MALFORMED);
+	if (pre->result != NDR_PCDR_ACCEPTANCE) {
+		rc = NDR_DRC_FAULT_RECEIVED_MALFORMED;
+		goto fault_exit;
+	}
+
+	/* GSS_init_sec_context 2 */
+	rc = ndr_recv_sec_context(&clnt->auth_ctx, &mxa);
+	if (NDR_DRC_IS_FAULT(rc))
+		goto fault_exit;
+
+	/* done with buffers */
+	(*clnt->xa_destruct)(clnt, &mxa);
 
 	mbind->p_cont_id = pce->p_cont_id;
 	mbind->which_side = NDR_BIND_SIDE_CLIENT;
@@ -139,7 +179,7 @@ ndr_clnt_call(ndr_binding_t *mbind, int opnum, void *params)
 	ndr_xa_t		mxa;
 	ndr_request_hdr_t	*reqhdr;
 	ndr_common_header_t	*rsphdr;
-	unsigned long		recv_pdu_scan_offset;
+	unsigned long		recv_pdu_scan_offset, recv_pdu_size;
 	int			rc;
 
 	bzero(&mxa, sizeof (mxa));
@@ -160,20 +200,36 @@ ndr_clnt_call(ndr_binding_t *mbind, int opnum, void *params)
 
 	/* Reserve room for hdr */
 	mxa.send_nds.pdu_scan_offset = sizeof (*reqhdr);
+	/* pdu_scan_offset now points to start of stub */
+	mxa.send_nds.pdu_body_offset = mxa.send_nds.pdu_scan_offset;
 
 	rc = ndr_encode_call(&mxa, params);
 	if (!NDR_DRC_IS_OK(rc))
 		goto fault_exit;
 
-	mxa.send_nds.pdu_scan_offset = 0;
+	/*
+	 * With the Stub data encoded, calculate the alloc_hint
+	 * before we add padding or auth data.
+	 */
+	reqhdr->alloc_hint = mxa.send_nds.pdu_size -
+	    sizeof (ndr_request_hdr_t);
+
+	/* GSS_WrapEx/VerifyMICEx */
+	rc = ndr_add_auth(&clnt->auth_ctx, &mxa);
+	if (NDR_DRC_IS_FAULT(rc))
+		goto fault_exit;
+
+	rc = ndr_encode_pdu_auth(&mxa);
+	if (NDR_DRC_IS_FAULT(rc))
+		goto fault_exit;
 
 	/*
 	 * Now we have the PDU size, we need to set up the
-	 * frag_length and calculate the alloc_hint.
+	 * frag_length.
+	 * Also reset pdu_scan_offset to header.
 	 */
 	mxa.send_hdr.common_hdr.frag_length = mxa.send_nds.pdu_size;
-	reqhdr->alloc_hint = mxa.send_nds.pdu_size -
-	    sizeof (ndr_request_hdr_t);
+	mxa.send_nds.pdu_scan_offset = 0;
 
 	rc = ndr_encode_pdu_hdr(&mxa);
 	if (NDR_DRC_IS_FAULT(rc))
@@ -192,26 +248,44 @@ ndr_clnt_call(ndr_binding_t *mbind, int opnum, void *params)
 		goto fault_exit;
 	}
 
+	rc = ndr_decode_pdu_auth(&mxa);
+	if (NDR_DRC_IS_FAULT(rc))
+		goto fault_exit;
+
+	rc = ndr_check_auth(&clnt->auth_ctx, &mxa);
+	if (NDR_DRC_IS_FAULT(rc))
+		goto fault_exit;
+
 	rsphdr = &mxa.recv_hdr.common_hdr;
 
 	if (!NDR_IS_LAST_FRAG(rsphdr->pfc_flags)) {
 		/*
 		 * This is a multi-fragment response.
-		 * Preserve the current scan offset while getting
+		 * Preserve the current body offset while getting
 		 * fragments so that we can continue afterward
 		 * as if we had received the entire response as
 		 * a single PDU.
+		 *
+		 * GROW_PDU trashes pdu_size; reset it afterwards.
 		 */
+		recv_pdu_size = mxa.recv_nds.pdu_size;
 		(void) NDS_GROW_PDU(&mxa.recv_nds, NDR_MULTI_FRAGSZ, NULL);
 
-		recv_pdu_scan_offset = mxa.recv_nds.pdu_scan_offset;
-		mxa.recv_nds.pdu_scan_offset = rsphdr->frag_length;
-		mxa.recv_nds.pdu_size = rsphdr->frag_length;
+		/*
+		 * pdu_scan_offset needs to be the first byte after the first
+		 * fragment in pdu_base_addr (minus the sec_trailer).
+		 *
+		 * pdu_size needs to be all of the (usable) data we've
+		 * received thus far.
+		 */
+		recv_pdu_scan_offset = mxa.recv_nds.pdu_body_offset;
+		mxa.recv_nds.pdu_scan_offset = mxa.recv_nds.pdu_body_offset +
+		    mxa.recv_nds.pdu_body_size - mxa.recv_auth.auth_pad_len;
+		mxa.recv_nds.pdu_size = recv_pdu_size;
 
-		if (ndr_clnt_get_frags(clnt, &mxa) < 0) {
-			rc = NDR_DRC_FAULT_RECEIVED_MALFORMED;
+		rc = ndr_clnt_get_frags(clnt, &mxa);
+		if (NDR_DRC_IS_FAULT(rc))
 			goto fault_exit;
-		}
 
 		mxa.recv_nds.pdu_scan_offset = recv_pdu_scan_offset;
 	}
@@ -225,6 +299,15 @@ ndr_clnt_call(ndr_binding_t *mbind, int opnum, void *params)
 	return (NDR_DRC_OK);
 
 fault_exit:
+	ndr_show_hdr(&mxa.send_hdr.common_hdr);
+	nds_show_state(&mxa.send_nds);
+	if (mxa.send_hdr.common_hdr.auth_length != 0)
+		ndr_show_auth(&mxa.send_auth);
+
+	ndr_show_hdr(&mxa.recv_hdr.common_hdr);
+	nds_show_state(&mxa.recv_nds);
+	if (mxa.recv_hdr.common_hdr.auth_length != 0)
+		ndr_show_auth(&mxa.recv_auth);
 	(*clnt->xa_destruct)(clnt, &mxa);
 	return (rc);
 }
@@ -270,23 +353,44 @@ ndr_clnt_get_frags(ndr_client_t *clnt, ndr_xa_t *mxa)
 	ndr_common_header_t hdr;
 	int frag_size;
 	int last_frag;
+	int rc;
 
 	do {
 		if (ndr_clnt_get_frag(clnt, mxa, &hdr) < 0) {
 			nds_show_state(nds);
-			return (-1);
+			return (NDR_DRC_FAULT_RECEIVED_RUNT);
 		}
 
 		last_frag = NDR_IS_LAST_FRAG(hdr.pfc_flags);
 		frag_size = hdr.frag_length;
 
+		/*
+		 * ndr_clnt_get_frag() doesn't change pdu_scan_offset.
+		 */
 		if (frag_size > (nds->pdu_size - nds->pdu_scan_offset)) {
 			nds_show_state(nds);
-			return (-1);
+			return (NDR_DRC_FAULT_RECEIVED_MALFORMED);
 		}
 
+		if (hdr.auth_length != 0 && hdr.auth_length >
+		    (hdr.frag_length - nds->pdu_hdr_size - SEC_TRAILER_SIZE))
+			return (NDR_DRC_FAULT_RECEIVED_MALFORMED);
+
+		rc = ndr_decode_pdu_auth(mxa);
+		if (NDR_DRC_IS_FAULT(rc))
+			return (rc);
+
+		rc = ndr_check_auth(&clnt->auth_ctx, mxa);
+		if (NDR_DRC_IS_FAULT(rc))
+			return (rc);
+
+		/*
+		 * Headers, Auth Padding, and auth data shouldn't be kept
+		 * from fragments.
+		 */
 		ndr_remove_frag_hdr(nds);
-		nds->pdu_scan_offset += frag_size - NDR_RSP_HDR_SIZE;
+		nds->pdu_scan_offset +=
+		    nds->pdu_body_size - mxa->recv_auth.auth_pad_len;
 	} while (!last_frag);
 
 	return (0);
@@ -307,7 +411,7 @@ ndr_clnt_get_frag(ndr_client_t *clnt, ndr_xa_t *mxa, ndr_common_header_t *hdr)
 	available = nds->pdu_size - nds->pdu_scan_offset;
 
 	while (available < NDR_RSP_HDR_SIZE) {
-		if ((nbytes += (*clnt->xa_read)(clnt, mxa)) <= 0)
+		if ((nbytes = (*clnt->xa_read)(clnt, mxa)) <= 0)
 			return (-1);
 		available += nbytes;
 	}

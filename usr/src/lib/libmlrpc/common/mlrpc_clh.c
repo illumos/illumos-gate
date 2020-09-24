@@ -23,7 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -71,9 +71,8 @@ mlrpc_clh_create(mlrpc_handle_t *handle, void *ctx)
 	/*
 	 * Allocate...
 	 */
-	if ((clnt = malloc(sizeof (*clnt))) == NULL)
+	if ((clnt = calloc(1, sizeof (*clnt))) == NULL)
 		return (ENOMEM);
-	bzero(clnt, sizeof (*clnt));
 
 	clnt->xa_fd = -1;
 
@@ -108,6 +107,24 @@ nomem:
 	return (ENOMEM);
 }
 
+/*
+ * Set up this handle to perform RPC-level authentication.
+ */
+uint32_t
+mlrpc_clh_set_auth(mlrpc_handle_t *handle, ndr_auth_ctx_t *auth_ctx)
+{
+	ndr_client_t		*clnt = NULL;
+
+	if ((clnt = handle->clnt) == NULL)
+		return (NT_STATUS_INTERNAL_ERROR);
+
+	if (auth_ctx != NULL) {
+		/* struct copy */
+		clnt->auth_ctx = *auth_ctx;
+	}
+
+	return (NT_STATUS_SUCCESS);
+}
 
 /*
  * This call must be made to initialize an RPC client structure and bind

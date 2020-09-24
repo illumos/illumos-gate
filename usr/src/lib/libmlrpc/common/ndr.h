@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef _SMBSRV_NDR_H
@@ -145,6 +145,7 @@ extern "C" {
 #define	NDR_F_INTERFACE		0x0700	/* type is a union, special */
 #define	NDR_F_CONFORMANT	0x1000	/* struct conforming (var-size tail) */
 #define	NDR_F_VARYING		0x2000	/* not implemented */
+#define	NDR_F_FAKE		0x4000	/* not a real struct */
 
 struct ndr_heap;
 struct ndr_stream;
@@ -230,11 +231,43 @@ typedef struct ndr_stream_ops {
 #define	NDS_RESET(NDS)		(*(NDS)->ndo->ndo_reset)(NDS)
 #define	NDS_DESTRUCT(NDS)	(*(NDS)->ndo->ndo_destruct)(NDS)
 
+/*
+ * The ndr_stream_t tracks the state for a particular RPC call or response.
+ * A single call/response may be transmitted as multiple fragments, where
+ * each fragment has its own header and sec_trailer. For the layout of
+ * a fragment, see the comment at the top of ndr_marshal.c.
+ *
+ * pdu_base_addr is the buffer in which marshalled/received data is stored.
+ *
+ * pdu_base_offset is pdu_base_addr with a different type.
+ *
+ * pdu_max_size is the size of the buffer in pdu_base_addr.
+ *
+ * pdu_size represents the total amount of data stored in pdu_base_addr.
+ * It is typically less than pdu_max_size, and may contain more than one
+ * fragment (when reconstructing fragmented calls/responses, for example).
+ *
+ * pdu_body_offset points to the offset from pdu_base_addr of the PDU body
+ * of the currently encoded/decoded fragment.
+ *
+ * pdu_body_size is the size of the PDU body in the currently encoded/decoded
+ * fragment.
+ * For what constitutes the PDU Body, see ndr_marshal.c.
+ *
+ * pdu_hdr_size is the size of the header for the currently encoded/decoded
+ * fragment.
+ *
+ * pdu_scan_offset points to the next valid byte in pdu_base_addr
+ * (the next free space for encode, and the next unread byte for decode).
+ */
 typedef struct ndr_stream {
 	unsigned long		pdu_size;
 	unsigned long		pdu_max_size;
 	unsigned long		pdu_base_offset;
 	unsigned long		pdu_scan_offset;
+	unsigned long		pdu_body_offset;
+	unsigned long		pdu_body_size;
+	unsigned long		pdu_hdr_size;
 	unsigned char		*pdu_base_addr;
 
 	ndr_stream_ops_t	*ndo;
@@ -325,6 +358,22 @@ typedef struct ndr_stream {
 #define	NDR_DIR_IS_IN  (encl_ref->stream->dir == NDR_DIR_IN)
 #define	NDR_DIR_IS_OUT (encl_ref->stream->dir == NDR_DIR_OUT)
 
+#define	NDR_MEMBER_PTR_WITH_ARG(TYPE, MEMBER, OFFSET, \
+		ARGFLAGS, ARGMEM, ARGVAL) { \
+		myref.pdu_offset = encl_ref->pdu_offset + (OFFSET);	\
+		myref.name = MEMBER_STR(MEMBER);			\
+		myref.datum = (char *)val->MEMBER;			\
+		myref.inner_flags = ARGFLAGS;				\
+		myref.ti = &ndt_##TYPE;					\
+		myref.ARGMEM = ARGVAL;					\
+		if (!ndr_inner(&myref))					\
+			return (0);					\
+	}
+
+#define	NDR_MEMBER_PTR_WITH_DIMENSION(TYPE, MEMBER, OFFSET, SIZE_IS)	\
+	NDR_MEMBER_PTR_WITH_ARG(TYPE, MEMBER, OFFSET, \
+		NDR_F_DIMENSION_IS, dimension_is, SIZE_IS)
+
 #define	NDR_MEMBER_WITH_ARG(TYPE, MEMBER, OFFSET, \
 		ARGFLAGS, ARGMEM, ARGVAL) { \
 		myref.pdu_offset = encl_ref->pdu_offset + (OFFSET);	\
@@ -374,16 +423,16 @@ typedef struct ndr_stream {
 			return (0);					\
 	}
 
-#define	NDR_TOPMOST_MEMBER(TYPE, MEMBER)	   			\
+#define	NDR_TOPMOST_MEMBER(TYPE, MEMBER)				\
 	NDR_TOPMOST_MEMBER_WITH_ARG(TYPE, MEMBER,			\
 		NDR_F_NONE, size_is, 0)
 
 #define	NDR_TOPMOST_MEMBER_ARR_WITH_SIZE_IS(TYPE, MEMBER, SIZE_IS)	\
-	NDR_TOPMOST_MEMBER_WITH_ARG(TYPE, MEMBER,		    	\
+	NDR_TOPMOST_MEMBER_WITH_ARG(TYPE, MEMBER,			\
 		NDR_F_SIZE_IS, size_is, SIZE_IS)
 
 #define	NDR_TOPMOST_MEMBER_ARR_WITH_DIMENSION(TYPE, MEMBER, SIZE_IS)	\
-	NDR_TOPMOST_MEMBER_WITH_ARG(TYPE, MEMBER,		      	\
+	NDR_TOPMOST_MEMBER_WITH_ARG(TYPE, MEMBER,			\
 		NDR_F_DIMENSION_IS, dimension_is, SIZE_IS)
 
 #define	NDR_TOPMOST_MEMBER_PTR_WITH_SIZE_IS(TYPE, MEMBER, SIZE_IS)	\

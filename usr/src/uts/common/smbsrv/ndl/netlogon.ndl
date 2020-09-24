@@ -22,7 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 #ifndef _MLSVC_NETR_NDL_
@@ -70,6 +70,8 @@
 #define NETR_OPNUM_DsrGetSiteName		0x1C
 #define NETR_OPNUM_LogonGetDomainInfo		0x1D
 #define NETR_OPNUM_ServerPasswordSet2		0x1E
+
+#define	NETR_OPNUM_SamLogonEx			0x27
 
 /*
  * This is not a real NETR OPNUM.  It's used to unpack the
@@ -302,6 +304,7 @@ union netr_logon_info_u {
 };
 
 
+FAKE
 struct netr_login_info {
 	WORD logon_level;
 	WORD switch_value;
@@ -410,6 +413,19 @@ struct netr_SamLogon {
 	OUT		DWORD status;
 };
 
+ALIGN(2)
+OPERATION(NETR_OPNUM_SamLogonEx)
+struct netr_SamLogonEx {
+	IN		LPTSTR servername;
+	IN		LPTSTR hostname;
+	IN		struct netr_login_info logon_info;
+	INOUT	WORD validation_level;
+  SWITCH(validation_level)
+	OUT		union netr_validation_u ru;
+	OUT		DWORD authoritative;
+	INOUT		DWORD extra_flags;
+	OUT		DWORD status;
+};
 
 /*
  ***********************************************************************
@@ -442,6 +458,8 @@ union netr_interface {
 		struct netr_ServerAuthenticate2		ServerAuthenticate2;
 	CASE(NETR_OPNUM_SamLogon)
 		struct netr_SamLogon			SamLogon;
+	CASE(NETR_OPNUM_SamLogonEx)
+		struct netr_SamLogonEx			SamLogonEx;
 	CASE(NETR_OPNUM_SamLogoff)
 		struct netr_SamLogoff			SamLogoff;
 	CASE(NETR_OPNUM_ServerPasswordSet)

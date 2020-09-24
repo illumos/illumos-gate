@@ -19,7 +19,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2020 Tintri by DDN, Inc. All rights reserved.
 #
 
 #
@@ -185,6 +185,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_gen_random_passwd;
 	smb_get_dcinfo;
 	smb_get_nameservers;
+	smb_get_netlogon_flags;
 	smb_get_txid;
 	smb_getdataset;
 	smb_getdomainname;

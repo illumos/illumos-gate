@@ -25,6 +25,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
+ */
+
 #include "ndrgen.h"
 
 typedef struct node *node_ptr;
@@ -39,7 +43,7 @@ typedef struct node *node_ptr;
 %token INTERFACE_KW UUID_KW _NO_REORDER_KW EXTERN_KW
 %token SIZE_IS_KW LENGTH_IS_KW STRING_KW REFERENCE_KW
 %token CASE_KW DEFAULT_KW SWITCH_IS_KW
-%token TRANSMIT_AS_KW ARG_IS_KW 
+%token TRANSMIT_AS_KW ARG_IS_KW FAKE_KW
 
 /* composite keywords */
 %token BASIC_TYPE TYPENAME
@@ -112,6 +116,7 @@ adv_attr:	IN_KW			={ $$ = n_cons (IN_KW); }
 	|	OPERATION_KW LP arg RP	={ $$ = n_cons (OPERATION_KW, $3); }
 	|	ALIGN_KW LP arg RP	={ $$ = n_cons (ALIGN_KW, $3); }
 	|	STRING_KW		={ $$ = n_cons (STRING_KW); }
+	|	FAKE_KW			={ $$ = n_cons (FAKE_KW); }
 
 	|	SIZE_IS_KW LP arg RP
 				={ $$ = n_cons (SIZE_IS_KW, $3, $3, $3); }

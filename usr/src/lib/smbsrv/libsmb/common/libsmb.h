@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2020 RackTop Systems, Inc.
  */
 
@@ -162,6 +162,7 @@ typedef enum {
 	SMB_CI_MIN_PROTOCOL,
 	SMB_CI_BYPASS_TRAVERSE_CHECKING,
 	SMB_CI_ENCRYPT_CIPHER,
+	SMB_CI_NETLOGON_FLAGS,
 
 	SMB_CI_MAX
 } smb_cfg_id_t;
@@ -320,6 +321,8 @@ extern int smb_chk_hostaccess(smb_inaddr_t *, char *);
 
 extern int smb_getnameinfo(smb_inaddr_t *, char *, int, int);
 
+extern uint32_t smb_get_netlogon_flags(void);
+
 void smb_trace(const char *s);
 void smb_tracef(const char *fmt, ...);
 
@@ -340,6 +343,7 @@ void libsmb_redirect_syslog(__FILE_TAG *fp, int priority);
 #define	SMBAUTH_SESSION_KEY_SZ	SMBAUTH_HASH_SZ
 #define	SMBAUTH_HEXHASH_SZ	(SMBAUTH_HASH_SZ * 2)
 
+#define	SMBAUTH_RETRY		2
 #define	SMBAUTH_FAILURE		1
 #define	SMBAUTH_SUCCESS		0
 #define	MD_DIGEST_LEN		16

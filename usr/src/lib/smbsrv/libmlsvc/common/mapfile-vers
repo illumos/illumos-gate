@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2020 Tintri by DDN, Inc. All rights reserved.
 #
 
 #
@@ -54,6 +54,9 @@ SYMBOL_VERSION SUNWprivate {
 	mlsvc_init;
 	mlsvc_join;
 	mlsvc_netlogon;
+	netlogon_init_global;
+	netlogon_logon;
+	netr_initialize;
 	smb_autohome_add;
 	smb_autohome_remove;
 	smb_ddiscover_bad_dc;

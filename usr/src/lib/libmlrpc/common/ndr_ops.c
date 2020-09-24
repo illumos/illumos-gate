@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -186,9 +186,11 @@ nds_show_state(ndr_stream_t *nds)
 		return;
 	}
 
-	ndo_printf(NULL, NULL, "nds: base=0x%x, size=%d, max=%d, scan=%d",
+	ndo_printf(NULL, NULL, "nds: base=0x%x, size=%d, max=%d, scan=%d, "
+	    "hdr_size=%d, body_size=%d, body_offset=%d",
 	    nds->pdu_base_offset, nds->pdu_size, nds->pdu_max_size,
-	    nds->pdu_scan_offset);
+	    nds->pdu_scan_offset, nds->pdu_hdr_size, nds->pdu_body_size,
+	    nds->pdu_body_offset);
 }
 
 /*

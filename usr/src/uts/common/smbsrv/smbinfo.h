@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2020 RackTop Systems, Inc.
  */
 
@@ -119,6 +119,8 @@ extern "C" {
 #define	SMB_PI_MAXIMUM_CREDITS_MIN	64
 #define	SMB_PI_MAXIMUM_CREDITS_DEF	1000
 #define	SMB_PI_MAXIMUM_CREDITS_MAX	1024
+
+#define	SMB_PI_NETLOGON_FLAGS_DEFAULT	0x00000000
 
 /*
  * sv_size is used by the RPC services and should be set to
