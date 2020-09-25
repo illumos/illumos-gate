@@ -51,6 +51,7 @@
 #include <sys/vfs.h>
 #include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
+#include <sys/filio.h>
 #include <sys/rwstlock.h>
 #include <sys/fem.h>
 #include <sys/stat.h>
@@ -1253,6 +1254,22 @@ top:
 		vattr.va_mask = AT_SIZE;
 		if ((error = VOP_SETATTR(vp, &vattr, 0, CRED(), NULL)) != 0)
 			goto out;
+	}
+
+	/*
+	 * Turn on directio, if requested.
+	 */
+	if (filemode & FDIRECT) {
+		if ((error = VOP_IOCTL(vp, _FIODIRECTIO, DIRECTIO_ON, 0,
+		    CRED(), NULL, NULL)) != 0) {
+			/*
+			 * On Linux, O_DIRECT returns EINVAL when the file
+			 * system does not support directio, so we'll do the
+			 * same.
+			 */
+			error = EINVAL;
+			goto out;
+		}
 	}
 out:
 	ASSERT(vp->v_count > 0);

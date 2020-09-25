@@ -46,8 +46,9 @@
 .\" Portions Copyright (c) 2013, OmniTI Computer Consulting, Inc.
 .\" All Rights Reserved.
 .\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright 2020 Joyent, Inc.
 .\"
-.TH OPEN 2 "Jan 20, 2020"
+.TH OPEN 2 "Mar 10, 2020"
 .SH NAME
 open, openat \- open a file
 .SH SYNOPSIS
@@ -171,6 +172,19 @@ file's permission mask. The "save text image after execution bit" of the mode
 is cleared (see \fBchmod\fR(2)). When bits other than the file permission bits
 are set, the effect is unspecified. The \fImode\fR argument does not affect
 whether the file is open for reading, writing or for both.
+.RE
+
+.sp
+.ne 2
+.na
+.B O_DIRECT
+.ad
+.sp .6
+.RS 4n
+Indicates that the file data is not going to be reused in the near future.
+When possible, data is read or written directly between the application's
+memory and the device when the data is accessed with \fBread\fR(2) and
+\fBwrite\fR(2) operations. See \fBdirectio\fR(3C) for more details.
 .RE
 
 .sp
@@ -619,7 +633,7 @@ The \fIpath\fR argument points to an illegal address.
 \fB\fBEINVAL\fR\fR
 .ad
 .RS 16n
-The system does not support synchronized I/O for this file, or the
+The system does not support synchronized or direct I/O for this file, or the
 \fBO_XATTR\fR flag was supplied and the underlying file system does not support
 extended file attributes.
 .RE
@@ -1018,7 +1032,8 @@ Standard	For \fBopen()\fR, see \fBstandards\fR(5).
 \fBIntro\fR(2), \fBchmod\fR(2), \fBclose\fR(2), \fBcreat\fR(2), \fBdup\fR(2),
 \fBexec\fR(2), \fBfcntl\fR(2), \fBgetmsg\fR(2), \fBgetrlimit\fR(2),
 \fBlseek\fR(2), \fBputmsg\fR(2), \fBread\fR(2), \fBstat\fR(2), \fBumask\fR(2),
-\fBwrite\fR(2), \fBattropen\fR(3C), \fBfcntl.h\fR(3HEAD), \fBstat.h\fR(3HEAD),
+\fBwrite\fR(2), \fBattropen\fR(3C), \fBdirectio\fR(3C),
+\fBfcntl.h\fR(3HEAD), \fBstat.h\fR(3HEAD),
 \fBunlockpt\fR(3C), \fBattributes\fR(5), \fBlf64\fR(5), \fBprivileges\fR(5),
 \fBstandards\fR(5), \fBconnld\fR(7M), \fBstreamio\fR(7I)
 .SH NOTES
