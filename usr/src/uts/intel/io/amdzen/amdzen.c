@@ -142,10 +142,12 @@ amdzen_t *amdzen_data;
 static const uint16_t amdzen_nb_ids[] = {
 	/* Family 17h Ryzen, Epyc Models 00h-0fh (Zen uarch) */
 	0x1450,
-	/* Family 17h Raven Ridge Models 10h-1fh (Zen uarch) */
+	/* Family 17h Raven Ridge, Kestrel, Dali Models 10h-2fh (Zen uarch) */
 	0x15d0,
-	/* Family 17h Epyc Models 30h-3fh, Matisse 700-7fh (Zen 2 uarch) */
-	0x1480
+	/* Family 17h Epyc Models 30h-3fh, Matisse 70-7fh (Zen 2 uarch) */
+	0x1480,
+	/* Family 17h Renoir Models 60-6fh (Zen 2 uarch) */
+	0x1630
 };
 
 typedef struct {
