@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*
@@ -865,18 +866,41 @@ out:
 	return (set_retnvl(mod, out, TOPO_METH_REPLACED_RET, ret));
 }
 
-const char *
-get_chip_brand(topo_mod_t *mod, kstat_ctl_t *kc, int32_t chipid)
+void
+get_chip_kstat_strs(topo_mod_t *mod, kstat_ctl_t *kc, int32_t chipid,
+    char **brandp, char **sktp)
 {
 	kstat_t *ksp;
 	kstat_named_t *ks;
+	uint_t i;
 
-	if ((ksp = kstat_lookup(kc, "cpu_info", chipid, NULL)) == NULL ||
-	    kstat_read(kc, ksp, NULL) == -1 ||
-	    (ks = kstat_data_lookup(ksp, "brand")) == NULL) {
-		topo_mod_dprintf(mod, "failed to read stat cpu_info:%d:brand",
-		    chipid);
-		return (NULL);
+	for (i = 0, ksp = kc->kc_chain; ksp != NULL; ksp = ksp->ks_next, i++) {
+		if (strcmp(ksp->ks_module, "cpu_info") != 0)
+			continue;
+
+		if (kstat_read(kc, ksp, NULL) == -1) {
+			topo_mod_dprintf(mod, "failed to read stat cpu_info:%u",
+			    i);
+			continue;
+		}
+
+		if ((ks = kstat_data_lookup(ksp, "chip_id")) == NULL ||
+		    chipid != ks->value.i32) {
+			continue;
+		}
+
+		if ((ks = kstat_data_lookup(ksp, "brand")) != NULL) {
+			*brandp = topo_mod_strdup(mod, ks->value.str.addr.ptr);
+
+		}
+
+		if ((ks = kstat_data_lookup(ksp, "socket_type")) != NULL) {
+			if (strcmp(ks->value.str.addr.ptr, "Unknown") != 0) {
+				*sktp = topo_mod_strdup(mod,
+				    ks->value.str.addr.ptr);
+			}
+		}
+
+		return;
 	}
-	return (topo_mod_strdup(mod, ks->value.str.addr.ptr));
 }

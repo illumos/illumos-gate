@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #ifndef _CHIP_H
@@ -74,6 +75,7 @@ extern "C" {
 #define	CHIP_FAMILY		"family"
 #define	CHIP_MODEL		"model"
 #define	CHIP_NCORE		"ncore_per_chip"
+#define	CHIP_SOCKET		"socket"
 #define	CHIP_STEPPING		"stepping"
 #define	CHIP_VENDOR_ID		"vendor_id"
 
@@ -158,7 +160,8 @@ extern int mkrsrc(topo_mod_t *, tnode_t *, const char *, int,
     nvlist_t *, nvlist_t **);
 extern nvlist_t *cpu_fmri_create(topo_mod_t *, uint32_t, char *, uint8_t);
 extern boolean_t is_xpv();
-extern const char *get_chip_brand(topo_mod_t *, kstat_ctl_t *, int32_t);
+extern void get_chip_kstat_strs(topo_mod_t *, kstat_ctl_t *, int32_t, char **,
+    char **);
 
 /*
  * topo methods
