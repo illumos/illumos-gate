@@ -3622,10 +3622,10 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_CLFLUSHOPT)
 			add_x86_feature(featureset, X86FSET_CLFLUSHOPT);
 
-		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
-			if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_INVPCID)
-				add_x86_feature(featureset, X86FSET_INVPCID);
+		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_INVPCID)
+			add_x86_feature(featureset, X86FSET_INVPCID);
 
+		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
 			if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_MPX)
 				add_x86_feature(featureset, X86FSET_MPX);
 
@@ -3820,10 +3820,8 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		}
 	}
 
-	if (cpi->cpi_vendor == X86_VENDOR_Intel) {
-		if (cp->cp_ecx & CPUID_INTC_ECX_PCID) {
-			add_x86_feature(featureset, X86FSET_PCID);
-		}
+	if (cp->cp_ecx & CPUID_INTC_ECX_PCID) {
+		add_x86_feature(featureset, X86FSET_PCID);
 	}
 
 	if (cp->cp_ecx & CPUID_INTC_ECX_X2APIC) {
