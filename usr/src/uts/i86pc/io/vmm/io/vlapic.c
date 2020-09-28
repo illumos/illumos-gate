@@ -956,7 +956,7 @@ vlapic_get_cr8(struct vlapic *vlapic)
 }
 
 int
-vlapic_icrlo_write_handler(struct vlapic *vlapic, bool *retu)
+vlapic_icrlo_write_handler(struct vlapic *vlapic)
 {
 	int i;
 	bool phys;
@@ -1062,10 +1062,8 @@ vlapic_icrlo_write_handler(struct vlapic *vlapic, bool *retu)
 		}
 	}
 
-	/*
-	 * This will cause a return to userland.
-	 */
-	return (1);
+	/* Return to userland.  */
+	return (-1);
 }
 
 void
@@ -1181,7 +1179,7 @@ vlapic_svr_write_handler(struct vlapic *vlapic)
 
 int
 vlapic_read(struct vlapic *vlapic, int mmio_access, uint64_t offset,
-    uint64_t *data, bool *retu)
+    uint64_t *data)
 {
 	struct LAPIC	*lapic = vlapic->apic_page;
 	uint32_t	*reg;
@@ -1302,7 +1300,7 @@ done:
 
 int
 vlapic_write(struct vlapic *vlapic, int mmio_access, uint64_t offset,
-    uint64_t data, bool *retu)
+    uint64_t data)
 {
 	struct LAPIC	*lapic = vlapic->apic_page;
 	uint32_t	*regptr;
@@ -1367,7 +1365,7 @@ vlapic_write(struct vlapic *vlapic, int mmio_access, uint64_t offset,
 			lapic->icr_lo = data;
 			if (x2apic(vlapic))
 				lapic->icr_hi = data >> 32;
-			retval = vlapic_icrlo_write_handler(vlapic, retu);
+			retval = vlapic_icrlo_write_handler(vlapic);
 			break;
 		case APIC_OFFSET_ICR_HI:
 			lapic->icr_hi = data;

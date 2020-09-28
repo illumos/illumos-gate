@@ -382,8 +382,6 @@ struct vm_entry {
 	} u;
 };
 
-void vm_inject_pf(void *vm, int vcpuid, int error_code, uint64_t cr2);
-
 int vm_restart_instruction(void *vm, int vcpuid);
 
 #endif	/* _VMM_H_ */

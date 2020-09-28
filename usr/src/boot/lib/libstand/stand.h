@@ -298,9 +298,6 @@ extern struct	dirent *readdirfd(int);
 extern void	srandom(ulong_t seed);
 extern ulong_t	random(void);
 
-/* imports from stdlib, locally modified */
-extern long	strtol(const char *, char **, int);
-extern unsigned long	strtoul(const char *, char **, int);
 extern char	*optarg;		/* getopt(3) external variables */
 extern int	optind, opterr, optopt, optreset;
 extern int	getopt(int, char * const [], const char *);
@@ -353,6 +350,13 @@ extern int		unsetenv(const char *name);
 
 extern ev_sethook_t	env_noset;		/* refuse set operation */
 extern ev_unsethook_t	env_nounset;		/* refuse unset operation */
+
+/* stdlib.h routines */
+extern long strtol(const char *__restrict, char **__restrict, int);
+extern long long strtoll(const char *__restrict, char **__restrict, int);
+extern unsigned long strtoul(const char *__restrict, char **__restrict, int);
+extern unsigned long long strtoull(const char *__restrict, char **__restrict,
+    int);
 
 /* BCD conversions (undocumented) */
 extern uchar_t const	bcd2bin_data[];

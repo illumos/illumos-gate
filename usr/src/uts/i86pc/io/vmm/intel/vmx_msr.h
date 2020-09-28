@@ -37,8 +37,8 @@ void vmx_msr_init(void);
 void vmx_msr_guest_init(struct vmx *vmx, int vcpuid);
 void vmx_msr_guest_enter(struct vmx *vmx, int vcpuid);
 void vmx_msr_guest_exit(struct vmx *vmx, int vcpuid);
-int vmx_rdmsr(struct vmx *, int vcpuid, u_int num, uint64_t *val, bool *retu);
-int vmx_wrmsr(struct vmx *, int vcpuid, u_int num, uint64_t val, bool *retu);
+int vmx_rdmsr(struct vmx *, int vcpuid, u_int num, uint64_t *val);
+int vmx_wrmsr(struct vmx *, int vcpuid, u_int num, uint64_t val);
 
 int vmx_set_ctlreg(int ctl_reg, int true_ctl_reg, uint32_t ones_mask,
 		   uint32_t zeros_mask, uint32_t *retval);

@@ -512,14 +512,22 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 
 		error = vm_run(sc->vmm_vm, vcpu, &entry);
 
-		if (error == 0) {
+		/*
+		 * Unexpected states in vm_run() are expressed through positive
+		 * errno-oriented return values.  VM states which expect further
+		 * processing in userspace (necessary context via exitinfo) are
+		 * expressed through negative return values.  For the time being
+		 * a return value of 0 is not expected from vm_run().
+		 */
+		ASSERT(error != 0);
+		if (error < 0) {
 			const struct vm_exit *vme;
 			void *outp = entry.exit_data;
 
+			error = 0;
 			vme = vm_exitinfo(sc->vmm_vm, vcpu);
 			if (ddi_copyout(vme, outp, sizeof (*vme), md)) {
 				error = EFAULT;
-				break;
 			}
 		}
 		break;

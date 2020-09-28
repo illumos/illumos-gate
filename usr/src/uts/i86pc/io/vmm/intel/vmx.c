@@ -2044,9 +2044,8 @@ static int
 vmx_handle_apic_write(struct vmx *vmx, int vcpuid, struct vlapic *vlapic,
     uint64_t qual)
 {
-	int error, handled, offset;
+	int handled, offset;
 	uint32_t *apic_regs, vector;
-	bool retu;
 
 	handled = HANDLED;
 	offset = APIC_WRITE_OFFSET(qual);
@@ -2086,10 +2085,9 @@ vmx_handle_apic_write(struct vmx *vmx, int vcpuid, struct vlapic *vlapic,
 		vlapic_esr_write_handler(vlapic);
 		break;
 	case APIC_OFFSET_ICR_LOW:
-		retu = false;
-		error = vlapic_icrlo_write_handler(vlapic, &retu);
-		if (error != 0 || retu)
+		if (vlapic_icrlo_write_handler(vlapic) != 0) {
 			handled = UNHANDLED;
+		}
 		break;
 	case APIC_OFFSET_CMCI_LVT:
 	case APIC_OFFSET_TIMER_LVT ... APIC_OFFSET_ERROR_LVT:
@@ -2208,28 +2206,28 @@ vmx_task_switch_reason(uint64_t qual)
 }
 
 static int
-emulate_wrmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t val, bool *retu)
+emulate_wrmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t val)
 {
 	int error;
 
 	if (lapic_msr(num))
-		error = lapic_wrmsr(vmx->vm, vcpuid, num, val, retu);
+		error = lapic_wrmsr(vmx->vm, vcpuid, num, val);
 	else
-		error = vmx_wrmsr(vmx, vcpuid, num, val, retu);
+		error = vmx_wrmsr(vmx, vcpuid, num, val);
 
 	return (error);
 }
 
 static int
-emulate_rdmsr(struct vmx *vmx, int vcpuid, u_int num, bool *retu)
+emulate_rdmsr(struct vmx *vmx, int vcpuid, u_int num)
 {
 	uint64_t result;
 	int error;
 
 	if (lapic_msr(num))
-		error = lapic_rdmsr(vmx->vm, vcpuid, num, &result, retu);
+		error = lapic_rdmsr(vmx->vm, vcpuid, num, &result);
 	else
-		error = vmx_rdmsr(vmx, vcpuid, num, &result, retu);
+		error = vmx_rdmsr(vmx, vcpuid, num, &result);
 
 	if (error == 0) {
 		vmx->ctx[vcpuid].guest_rax = (uint32_t)result;
@@ -2254,7 +2252,6 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 	uint32_t eax, ecx, edx, idtvec_info, idtvec_err, intr_info;
 	uint32_t intr_type, intr_vec, reason;
 	uint64_t exitintinfo, qual, gpa;
-	bool retu;
 
 	CTASSERT((PINBASED_CTLS_ONE_SETTING & PINBASED_VIRTUAL_NMI) != 0);
 	CTASSERT((PINBASED_CTLS_ONE_SETTING & PINBASED_NMI_EXITING) != 0);
@@ -2397,16 +2394,15 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		break;
 	case EXIT_REASON_RDMSR:
 		vmm_stat_incr(vmx->vm, vcpu, VMEXIT_RDMSR, 1);
-		retu = false;
 		ecx = vmxctx->guest_rcx;
 		VCPU_CTR1(vmx->vm, vcpu, "rdmsr 0x%08x", ecx);
 		SDT_PROBE4(vmm, vmx, exit, rdmsr, vmx, vcpu, vmexit, ecx);
-		error = emulate_rdmsr(vmx, vcpu, ecx, &retu);
-		if (error) {
+		error = emulate_rdmsr(vmx, vcpu, ecx);
+		if (error == 0) {
+			handled = HANDLED;
+		} else if (error > 0) {
 			vmexit->exitcode = VM_EXITCODE_RDMSR;
 			vmexit->u.msr.code = ecx;
-		} else if (!retu) {
-			handled = HANDLED;
 		} else {
 			/* Return to userspace with a valid exitcode */
 			KASSERT(vmexit->exitcode != VM_EXITCODE_BOGUS,
@@ -2415,7 +2411,6 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		break;
 	case EXIT_REASON_WRMSR:
 		vmm_stat_incr(vmx->vm, vcpu, VMEXIT_WRMSR, 1);
-		retu = false;
 		eax = vmxctx->guest_rax;
 		ecx = vmxctx->guest_rcx;
 		edx = vmxctx->guest_rdx;
@@ -2424,13 +2419,13 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		SDT_PROBE5(vmm, vmx, exit, wrmsr, vmx, vmexit, vcpu, ecx,
 		    (uint64_t)edx << 32 | eax);
 		error = emulate_wrmsr(vmx, vcpu, ecx,
-		    (uint64_t)edx << 32 | eax, &retu);
-		if (error) {
+		    (uint64_t)edx << 32 | eax);
+		if (error == 0) {
+			handled = HANDLED;
+		} else if (error > 0) {
 			vmexit->exitcode = VM_EXITCODE_WRMSR;
 			vmexit->u.msr.code = ecx;
 			vmexit->u.msr.wval = (uint64_t)edx << 32 | eax;
-		} else if (!retu) {
-			handled = HANDLED;
 		} else {
 			/* Return to userspace with a valid exitcode */
 			KASSERT(vmexit->exitcode != VM_EXITCODE_BOGUS,

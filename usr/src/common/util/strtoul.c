@@ -25,18 +25,25 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #if	defined(_KERNEL) && !defined(_BOOT)
+#include <sys/null.h>
 #include <sys/errno.h>
 #else	/* _KERNEL && !_BOOT */
-#if	!defined(_BOOT) && !defined(_KMDB)
+#if	!defined(_BOOT) && !defined(_KMDB) && !defined(_STANDALONE)
 #include "lint.h"
-#endif	/* !_BOOT && !_KMDB */
+#endif	/* !_BOOT && !_KMDB && !_STANDALONE */
+#if	defined(_STANDALONE)
+#include <sys/cdefs.h>
+#include <stand.h>
+#include <limits.h>
+#else
 #include <errno.h>
 #include <ctype.h>
 #include <limits.h>
 #include <stdlib.h>
+#endif	/* _STANDALONE */
 #endif	/* _KERNEL && !_BOOT */
 #include "strtolctype.h"
 #include <sys/types.h>
@@ -57,7 +64,7 @@ strtoul(const char *str, char **nptr, int base)
 	const char **ptr = (const char **)nptr;
 	const unsigned char *ustr = (const unsigned char *)str;
 
-	if (ptr != (const char **)0)
+	if (ptr != NULL)
 		*ptr = (char *)ustr; /* in case no number is formed */
 	if (base < 0 || base > MBASE || base == 1) {
 		/* base is invalid -- should be a fatal error */
@@ -79,13 +86,14 @@ strtoul(const char *str, char **nptr, int base)
 			c = *++ustr;
 		}
 	}
-	if (base == 0)
+	if (base == 0) {
 		if (c != '0')
 			base = 10;
 		else if (ustr[1] == 'x' || ustr[1] == 'X')
 			base = 16;
 		else
 			base = 8;
+	}
 	/*
 	 * for any base > 10, the digits incrementally following
 	 *	9 are assumed to be "abc...z" or "ABC...Z"
@@ -108,12 +116,12 @@ strtoul(const char *str, char **nptr, int base)
 		if (val > multmax)
 			goto overflow;
 		val *= base;
-		if (ULONG_MAX - val < xx)
+		if (ULONG_MAX - val < (unsigned long)xx)
 			goto overflow;
 		val += xx;
 		c = *++ustr;
 	}
-	if (ptr != (const char **)0)
+	if (ptr != NULL)
 		*ptr = (char *)ustr;
 #if	defined(_KERNEL) && !defined(_BOOT)
 	*result = neg ? -val : val;
@@ -125,7 +133,7 @@ strtoul(const char *str, char **nptr, int base)
 overflow:
 	for (c = *++ustr; lisalnum(c) && (xx = DIGIT(c)) < base; (c = *++ustr))
 		;
-	if (ptr != (const char **)0)
+	if (ptr != NULL)
 		*ptr = (char *)ustr;
 #if	defined(_KERNEL) && !defined(_BOOT)
 	return (ERANGE);
