@@ -199,7 +199,7 @@ static int
 tcp_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
     socklen_t len, cred_t *cr)
 {
-	int 		error;
+	int		error;
 	conn_t		*connp = (conn_t *)proto_handle;
 
 	/* All Solaris components should pass a cred for this operation. */
@@ -240,7 +240,7 @@ tcp_listen(sock_lower_handle_t proto_handle, int backlog, cred_t *cr)
 {
 	conn_t	*connp = (conn_t *)proto_handle;
 	tcp_t	*tcp = connp->conn_tcp;
-	int 	error;
+	int	error;
 
 	ASSERT(connp->conn_upper_handle != NULL);
 
@@ -660,7 +660,7 @@ static int
 tcp_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
     int mode, int32_t *rvalp, cred_t *cr)
 {
-	conn_t  	*connp = (conn_t *)proto_handle;
+	conn_t		*connp = (conn_t *)proto_handle;
 	int		error;
 
 	ASSERT(connp->conn_upper_handle != NULL);
@@ -825,7 +825,7 @@ tcp_fallback_noneager(tcp_t *tcp, mblk_t *stropt_mp, queue_t *q,
 	struct stroptions	*stropt;
 	struct T_capability_ack tca;
 	struct sockaddr_in6	laddr, faddr;
-	socklen_t 		laddrlen, faddrlen;
+	socklen_t		laddrlen, faddrlen;
 	short			opts;
 	int			error;
 	mblk_t			*mp, *mpnext;
@@ -999,7 +999,7 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
     sock_quiesce_arg_t *arg)
 {
 	tcp_t			*tcp;
-	conn_t 			*connp = (conn_t *)proto_handle;
+	conn_t			*connp = (conn_t *)proto_handle;
 	int			error;
 	mblk_t			*stropt_mp;
 	mblk_t			*ordrel_mp;

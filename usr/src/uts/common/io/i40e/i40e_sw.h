@@ -867,6 +867,7 @@ typedef struct i40e {
 	link_state_t		i40e_link_state;
 	uint32_t		i40e_link_speed;	/* In Mbps */
 	link_duplex_t		i40e_link_duplex;
+	link_fec_t		i40e_fec_requested;
 	uint_t			i40e_sdu;
 	uint_t			i40e_frame_max;
 

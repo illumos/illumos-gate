@@ -638,11 +638,11 @@ static void
 squeue_drain(squeue_t *sqp, uint_t proc_type, hrtime_t expire)
 {
 	mblk_t		*mp;
-	mblk_t 		*head;
-	sqproc_t 	proc;
+	mblk_t		*head;
+	sqproc_t	proc;
 	conn_t		*connp;
 	ill_rx_ring_t	*sq_rx_ring = sqp->sq_rx_ring;
-	hrtime_t 	now;
+	hrtime_t	now;
 	boolean_t	sq_poll_capable;
 	ip_recv_attr_t	*ira, iras;
 
