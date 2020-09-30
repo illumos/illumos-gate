@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2019 Joyent, Inc.
 .\"
-.Dd January 10, 2020
+.Dd September 30, 2020
 .Dt PCHTEMP 7D
 .Os
 .Sh NAME
@@ -44,6 +44,8 @@ Intel 7th/8th Generation Processor Family U/Y Platforms
 .It
 Intel 300 Series and Intel C240 Series Chipset Family Platform
 Controller Hub
+.It
+Intel 400 Series Chipset Family On-Package Platform Controller Hub
 .El
 .Pp
 Temperature information is available to the system via the fault
