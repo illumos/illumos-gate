@@ -26,13 +26,12 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 2013 RackTop Systems.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
-
-/*LINTLIBRARY*/
 
 #include	<sys/types.h>
 #include	<stdio.h>
@@ -55,7 +54,7 @@
 		(void) fprintf(fptr, "\n"); \
 	}
 
-#define	SKIPWS(ptr)	while (*ptr && (*ptr == ' ' || *ptr == '\t')) ptr++
+#define	SKIPWS(ptr)	while (*(ptr) == ' ' || *(ptr) == '\t') (ptr)++
 
 static char *dup_to_nl(char *);
 
@@ -63,7 +62,7 @@ static struct userdefs defaults = {
 	DEFRID, DEFGROUP, DEFGNAME, DEFPARENT, DEFSKL,
 	DEFSHL, DEFINACT, DEFEXPIRE, DEFAUTH, DEFPROF,
 	DEFROLE, DEFPROJ, DEFPROJNAME, DEFLIMPRIV,
-	DEFDFLTPRIV, DEFLOCK_AFTER_RETRIES
+	DEFDFLTPRIV, DEFLOCK_AFTER_RETRIES, DEFROLEAUTH
 };
 
 #define	INT	0
@@ -104,6 +103,8 @@ static const parsent_t tab[] = {
 	{ LOCK_AFTER_RETRIESSTR,	sizeof (LOCK_AFTER_RETRIESSTR) - 1,
 		STR,	DEFOFF(deflock_after_retries),
 		USERATTR_LOCK_AFTER_RETRIES_KW },
+	{ ROLEAUTHSTR,	sizeof (ROLEAUTHSTR) - 1, STR,	DEFOFF(defroleauth),
+		USERATTR_ROLEAUTH_KW },
 };
 
 #define	NDEF	(sizeof (tab) / sizeof (parsent_t))
@@ -152,12 +153,13 @@ scan(char **start_p)
  *		defauth = 0
  *		defprof = 0
  *		defrole = 0
+ *		defroleauth = role
  *
  *	If getusrdef() is unable to access the defaults file, it
  *	returns a NULL pointer.
  *
- * 	If user defaults file exists, then getusrdef uses values
- *  in it to override the above values.
+ *	If user defaults file exists, then getusrdef uses values
+ *	in it to override the above values.
  */
 
 struct userdefs *
@@ -170,6 +172,7 @@ getusrdef(char *usertype)
 		if ((defptr = fopen(DEFROLEFILE, "r")) == NULL) {
 			defaults.defshell = DEFROLESHL;
 			defaults.defprof = DEFROLEPROF;
+			defaults.defroleauth = DEFROLEROLEAUTH;
 			return (&defaults);
 		}
 	} else {
@@ -191,11 +194,11 @@ getusrdef(char *usertype)
 			switch (pe->type) {
 			case INT:
 				FIELD(&defaults, pe, int) =
-					(int)strtol(ptr, NULL, 10);
+				    (int)strtol(ptr, NULL, 10);
 				break;
 			case PROJID:
 				FIELD(&defaults, pe, projid_t) =
-					(projid_t)strtol(ptr, NULL, 10);
+				    (projid_t)strtol(ptr, NULL, 10);
 				break;
 			case STR:
 				FIELD(&defaults, pe, char *) = dup_to_nl(ptr);
@@ -231,7 +234,7 @@ dispusrdef(FILE *fptr, unsigned flags, char *usertype)
 
 	if (flags & D_GROUP) {
 		outcount += fprintf(fptr, "group=%s,%ld  ",
-			deflts->defgname, deflts->defgroup);
+		    deflts->defgname, deflts->defgroup);
 		PRINTNL();
 	}
 
@@ -288,20 +291,25 @@ dispusrdef(FILE *fptr, unsigned flags, char *usertype)
 	}
 
 	if (flags & D_LPRIV) {
-		outcount += fprintf(fptr, "limitpriv=%s  ",
-			deflts->deflimpriv);
+		outcount += fprintf(fptr, "limitpriv=%s  ", deflts->deflimpriv);
 		PRINTNL();
 	}
 
 	if (flags & D_DPRIV) {
 		outcount += fprintf(fptr, "defaultpriv=%s  ",
-			deflts->defdfltpriv);
+		    deflts->defdfltpriv);
 		PRINTNL();
 	}
 
 	if (flags & D_LOCK) {
 		outcount += fprintf(fptr, "lock_after_retries=%s  ",
 		    deflts->deflock_after_retries);
+		PRINTNL();
+	}
+
+	if ((flags & D_ROLEAUTH) && is_role(usertype)) {
+		outcount += fprintf(fptr, "roleauth=%s  ",
+		    deflts->defroleauth);
 	}
 
 	if (outcount > 0)
@@ -310,7 +318,7 @@ dispusrdef(FILE *fptr, unsigned flags, char *usertype)
 
 /*
  * putusrdef -
- * 	changes default values in defadduser file
+ *	changes default values in defadduser file
  */
 int
 putusrdef(struct userdefs *defs, char *usertype)
@@ -353,10 +361,11 @@ putusrdef(struct userdefs *defs, char *usertype)
 
 	if (is_role(usertype)) {
 		/* If it's a role, we must skip the defrole field */
-		skip = offsetof(struct userdefs, defrole);
+		skip = DEFOFF(defrole);
 		hdr = FHEADER_ROLE;
 	} else {
-		skip = -1;
+		/* If it's a user, we must skip the defroleauth field */
+		skip = DEFOFF(defroleauth);
 		hdr = FHEADER;
 	}
 
@@ -378,15 +387,15 @@ putusrdef(struct userdefs *defs, char *usertype)
 		switch (tab[i].type) {
 		case INT:
 			res = fprintf(defptr, "%s%d\n", tab[i].name,
-					FIELD(defs, &tab[i], int));
+			    FIELD(defs, &tab[i], int));
 			break;
 		case STR:
 			res = fprintf(defptr, "%s%s\n", tab[i].name,
-					FIELD(defs, &tab[i], char *));
+			    FIELD(defs, &tab[i], char *));
 			break;
 		case PROJID:
 			res = fprintf(defptr, "%s%d\n", tab[i].name,
-					(int)FIELD(defs, &tab[i], projid_t));
+			    (int)FIELD(defs, &tab[i], projid_t));
 			break;
 		}
 

@@ -20,10 +20,11 @@
  */
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -90,6 +91,7 @@ kvopts_t ua_opts[] =  {
 { '\0',	USERATTR_LIMPRIV_KW },
 { '\0',	USERATTR_DFLTPRIV_KW },
 { '\0', USERATTR_LOCK_AFTER_RETRIES_KW },
+{ '\0', USERATTR_ROLEAUTH_KW },
 { '\0', USERATTR_LABELVIEW },
 { '\0', USERATTR_CLEARANCE },
 { '\0', USERATTR_MINLABEL },
@@ -346,7 +348,7 @@ main(int argc, char **argv)
 	shadow_st.sp_lstchg = -1;	/* no lastchanged date */
 	shadow_st.sp_min = -1;	/* no min */
 	shadow_st.sp_max = -1;	/* no max */
-	shadow_st.sp_warn = -1; 	/* no warn */
+	shadow_st.sp_warn = -1;		/* no warn */
 	shadow_st.sp_inact = -1;	/* no inactive */
 	shadow_st.sp_expire = -1;	/* no expire */
 	shadow_st.sp_flag = 0;	/* no flag */

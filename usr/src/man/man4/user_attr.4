@@ -1,19 +1,18 @@
 '\" te
+.\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"  Copyright (C) 2008 Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USER_ATTR 4 "Aug 3, 2017"
+.TH USER_ATTR 4 "Oct 1, 2020"
 .SH NAME
 user_attr \- extended user attributes database
 .SH SYNOPSIS
-.LP
 .nf
 \fB/etc/user_attr\fR
 .fi
 
 .SH DESCRIPTION
-.LP
 \fB/etc/user_attr\fR is a local source of extended attributes associated with
 users and roles. \fBuser_attr\fR can be used with other user attribute sources,
 including the LDAP people container and the \fBuser_attr\fR \fBNIS\fR map.
@@ -90,7 +89,7 @@ system:
 .sp
 .ne 2
 .na
-\fB\fBauths\fR\fR
+\fBauths\fR
 .ad
 .sp .6
 .RS 4n
@@ -103,7 +102,7 @@ specified using the asterisk (\fB*\fR) character as a wildcard. For example,
 .sp
 .ne 2
 .na
-\fB\fBprofiles\fR\fR
+\fBprofiles\fR
 .ad
 .sp .6
 .RS 4n
@@ -117,7 +116,20 @@ are assigned, the profile shells do not allow the user to execute any commands.
 .sp
 .ne 2
 .na
-\fB\fBroles\fR\fR
+\fBroleauth\fR
+.ad
+.sp .6
+.RS 4n
+Specifies whether a user assuming a role is required to use the role password
+or their own password.
+If the \fBroleauth\fR key value is not specified, the role password is required
+for users assuming the role.
+.RE
+
+.sp
+.ne 2
+.na
+\fBroles\fR
 .ad
 .sp .6
 .RS 4n
@@ -130,7 +142,7 @@ to assume any role.
 .sp
 .ne 2
 .na
-\fB\fBtype\fR\fR
+\fBtype\fR
 .ad
 .sp .6
 .RS 4n
@@ -143,7 +155,7 @@ the user has logged in.
 .sp
 .ne 2
 .na
-\fB\fBproject\fR\fR
+\fBproject\fR
 .ad
 .sp .6
 .RS 4n
@@ -155,7 +167,7 @@ information, see \fBgetdefaultproj\fR(3PROJECT).
 .sp
 .ne 2
 .na
-\fB\fBdefaultpriv\fR\fR
+\fBdefaultpriv\fR
 .ad
 .sp .6
 .RS 4n
@@ -166,7 +178,7 @@ See "Privileges Keywords," below.
 .sp
 .ne 2
 .na
-\fB\fBlimitpriv\fR\fR
+\fBlimitpriv\fR
 .ad
 .sp .6
 .RS 4n
@@ -181,7 +193,7 @@ requiring privileges to malfunction. See "Privileges Keywords," below.
 .sp
 .ne 2
 .na
-\fB\fBlock_after_retries\fR\fR
+\fBlock_after_retries\fR
 .ad
 .sp .6
 .RS 4n
@@ -197,7 +209,7 @@ Trusted Extensions feature:
 .sp
 .ne 2
 .na
-\fB\fBclearance\fR\fR
+\fBclearance\fR
 .ad
 .sp .6
 .RS 4n
@@ -210,7 +222,7 @@ specified in \fBlabel_encodings\fR(4) (see \fBlabel_encodings\fR(4) and
 .sp
 .ne 2
 .na
-\fB\fBmin_label\fR\fR
+\fBmin_label\fR
 .ad
 .sp .6
 .RS 4n
@@ -231,7 +243,6 @@ modify \fB\fIkey\fR=\fIvalue\fR\fR fields in \fB/etc/user_attr\fR. Modification
 of the \fBtype\fR key is restricted as described in \fBrolemod\fR and
 \fBusermod\fR.
 .SS "Privileges Keywords"
-.LP
 The \fBdefaultpriv\fR and \fBlimitpriv\fR are the privileges-related keywords
 and are described above.
 .sp
@@ -248,7 +259,6 @@ privileges. Note that you specify privileges as they are displayed by
 See \fBusermod\fR(1M) for examples of commands that
 modify privileges and their subsequent effect on \fBuser_attr\fR.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRAssigning a Profile to Root
 .sp
 .LP
@@ -274,7 +284,7 @@ authorizations.
 .SH FILES
 .ne 2
 .na
-\fB\fB/etc/nsswitch.conf\fR\fR
+\fB/etc/nsswitch.conf\fR
 .ad
 .sp .6
 .RS 4n
@@ -284,7 +294,7 @@ See \fBnsswitch.conf\fR(4).
 .sp
 .ne 2
 .na
-\fB\fB/etc/user_attr\fR\fR
+\fB/etc/user_attr\fR
 .ad
 .sp .6
 .RS 4n
@@ -292,7 +302,6 @@ Described here.
 .RE
 
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -312,7 +321,6 @@ Interface Stability	See below
 .LP
 The command-line syntax is Committed. The output is Uncommitted.
 .SH SEE ALSO
-.LP
 \fBauths\fR(1), \fBpfcsh\fR(1), \fBpfksh\fR(1), \fBpfsh\fR(1), \fBppriv\fR(1),
 \fBprofiles\fR(1), \fBroles\fR(1), \fBroleadd\fR(1M), \fBrolemod\fR(1M),
 \fBuseradd\fR(1M), \fBusermod\fR(1M), \fBgetdefaultproj\fR(3PROJECT),
@@ -323,7 +331,6 @@ The command-line syntax is Committed. The output is Uncommitted.
 .LP
 \fISystem Administration Guide: Security Services\fR
 .SH NOTES
-.LP
 The root user is usually defined in local databases for a number of reasons,
 including the fact that root needs to be able to log in and do system
 maintenance in single-user mode, before the network name service databases are

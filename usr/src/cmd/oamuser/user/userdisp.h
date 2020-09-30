@@ -25,13 +25,14 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
+/*
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ */
 
 #ifndef	_USERDISP_H
 #define	_USERDISP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -52,10 +53,11 @@ extern "C" {
 #define	D_LPRIV		0x0800
 #define	D_DPRIV		0x1000
 #define	D_LOCK		0x2000
+#define	D_ROLEAUTH	0x4000
 
 #define	D_ALL	(D_GROUP | D_BASEDIR | D_RID | D_SKEL | D_SHELL \
 	| D_INACT | D_EXPIRE | D_AUTH | D_PROF | D_ROLE | D_PROJ | \
-	D_LPRIV | D_DPRIV | D_LOCK)
+	D_LPRIV | D_DPRIV | D_LOCK | D_ROLEAUTH)
 
 #ifdef	__cplusplus
 }

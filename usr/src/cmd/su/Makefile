@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+#
 # build two versions, su and su.static
 # su.static is dynamically linked; the .static suffix is historical.
 
@@ -44,19 +46,13 @@ $(PROG_STATIC) := FILEMODE = 0555
 # A reduced su.static is created, with just enough functionality
 # to satisfy the needs of a single-user login with /usr not mounted.
 # In particular, nss_files.so.1 may be dlopen()'ed at runtime.
-$(ROOTFS_PROG) :=	LDLIBS += -lbsm -lpam -lsecdb
+$(ROOTFS_PROG) :=	LDLIBS += -lbsm -lpam
 
 # The standard su is fully functional.
 $(PROG) :=	CPPFLAGS += -DDYNAMIC_SU
 $(PROG) :=	LDLIBS += -lbsm -lpam -lsecdb
 
-LINTFLAGS += -DDYNAMIC_SU
-
 CLOBBERFILES	+= $(ROOTFS_PROG) $(EMB_PROG)
-
-CERRWARN +=	-_gcc=-Wno-parentheses
-
-lint :=		LDLIBS += -lbsm -lpam -lsecdb
 
 .KEEP_STATE:
 
@@ -84,7 +80,5 @@ $(EMB_PROG):
 		$(SYMLINK) $(PROG) $(EMB_PROG)
 
 clean:
-
-lint:		lint_PROG
 
 include		../Makefile.targ
