@@ -1401,9 +1401,20 @@ lx_futex(uintptr_t addr, int op, int val, uintptr_t lx_timeout,
 		break;
 
 	case FUTEX_CMP_REQUEUE:
-	case FUTEX_REQUEUE:
 		rval = futex_requeue(&memid, &memid2, val,
 		    val2, (void *)addr2, &val3);
+
+		break;
+
+	case FUTEX_REQUEUE:
+		/*
+		 * Per Linux futex(2), FUTEX_REQUEUE is the same as
+		 * FUTEX_CMP_REQUEUE, except val3 is ignored. futex_requeue()
+		 * will elide the val3 check if cmpval (the last argument) is
+		 * NULL.
+		 */
+		rval = futex_requeue(&memid, &memid2, val,
+		    val2, (void *)addr2, NULL);
 
 		break;
 
