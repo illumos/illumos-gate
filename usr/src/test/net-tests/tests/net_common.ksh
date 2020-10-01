@@ -11,6 +11,7 @@
 
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -214,31 +215,14 @@ function create_vnic
 	fi
 
 	dbg "creating VNIC: $vnic_info"
-	if ! dladm create-vnic -t -l $over $vid_opt $name > /dev/null 2>&1
+	if dladm create-vnic -l $over $vid_opt $name > /dev/null 2>&1 && \
+	    dladm set-linkprop -t -p zone=$zone $name > /dev/null 2>&1
 	then
-		maybe_fail "$err"
-		return 1
-	fi
-
-	dbg "created VNIC: $vnic_info"
-	if ! zonecfg -z $zone "add net; set physical=$name; end"; then
-		maybe_fail "failed to assign $name to $zone"
-		return 1
-	fi
-
-	dbg "assigned VNIC $name to $zone"
-	if zoneadm -z $zone reboot; then
-		dbg "rebooted $zone"
-		#
-		# Make sure the vnic is visible before returning. Without this
-		# a create_addr command following immediately afterwards could
-		# fail because the zone is up but the vnic isn't visible yet.
-		#
-		sleep 1
+		dbg "created VNIC: $vnic_info"
 		return 0
 	fi
 
-	maybe_fail "failed to reboot $zone"
+	maybe_fail "$err"
 }
 
 function delete_vnic
@@ -255,13 +239,8 @@ function delete_vnic
 	fi
 
 	dbg "assigning VNIC $name from $zone to GZ"
-
-	if ! zonecfg -z $zone "remove net physical=$name"; then
-		maybe_fail "failed to remove $name from $zone"
-		return 1
-	fi
-	if ! zoneadm -z $zone reboot; then
-		maybe_fail "failed to reboot $zone"
+	if ! dladm set-linkprop -t -p zone=global $name; then
+		maybe_fail "$err1"
 		return 1
 	fi
 
