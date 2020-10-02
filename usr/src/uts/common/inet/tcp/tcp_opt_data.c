@@ -23,6 +23,7 @@
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -157,6 +158,7 @@ opdes_t	tcp_opt_arr[] = {
 { T_IP_TOS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
 { IP_TTL,	IPPROTO_IP, OA_RW, OA_RW, OP_NP, OP_DEF_FN,
 	sizeof (int), -1 /* not initialized */ },
+{ IP_RECVTOS,	IPPROTO_IP,  OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
 
 { IP_SEC_OPT, IPPROTO_IP, OA_RW, OA_RW, OP_NP, OP_NODEFAULT,
 	sizeof (ipsec_req_t), -1 /* not initialized */ },
@@ -626,9 +628,9 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 		/*
 		 * Note: Implies T_CHECK semantics for T_OPTCOM_REQ
 		 * inlen != 0 implies value supplied and
-		 * 	we have to "pretend" to set it.
+		 *	we have to "pretend" to set it.
 		 * inlen == 0 implies that there is no
-		 * 	value part in T_CHECK request and just validation
+		 *	value part in T_CHECK request and just validation
 		 * done elsewhere should be enough, we just return here.
 		 */
 		if (inlen == 0) {
@@ -1130,6 +1132,16 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 			 */
 			if (tcp->tcp_state == TCPS_LISTEN) {
 				return (EINVAL);
+			}
+			break;
+		case IP_RECVTOS:
+			if (!checkonly) {
+				/*
+				 * Force it to be sent up with the next msg
+				 * by setting it to a value which cannot
+				 * appear in a packet (TOS is only 8-bits)
+				 */
+				tcp->tcp_recvtos = 0xffffffffU;
 			}
 			break;
 		}

@@ -23,6 +23,7 @@
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2018, Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -2479,8 +2480,8 @@ udp_input(void *arg1, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 		*(uint32_t *)&sin->sin_zero[4] = 0;
 
 		/*
-		 * Add options if IP_RECVDSTADDR, IP_RECVIF, IP_RECVSLLA or
-		 * IP_RECVTTL has been set.
+		 * Add options if IP_RECVDSTADDR, IP_RECVIF, IP_RECVSLLA,
+		 * IP_RECVTTL or IP_RECVTOS has been set.
 		 */
 		if (udi_size != 0) {
 			conn_recvancillary_add(connp, recv_ancillary, ira,

@@ -42,18 +42,17 @@
 .\"
 .\" Copyright (c) 1992, X/Open Company Limited All Rights Reserved.
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.TH SOCKET.H 3HEAD "Jun 18, 2017"
+.TH SOCKET.H 3HEAD "Sep 18, 2020"
 .SH NAME
-socket.h, socket \- Internet Protocol family
+socket.h, socket, CMSG_DATA, CMSG_FIRSTHDR, CMSG_LEN, CMSG_NXTHDR, CMSG_SPACE \- Internet Protocol family
 .SH SYNOPSIS
-.LP
 .nf
 \fB#include <sys/socket.h>\fR
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fB<sys/socket.h>\fR header defines the unsigned integral type
 \fBsa_family_t\fR through \fBtypedef\fR.
 .sp
@@ -70,7 +69,6 @@ char          sa_data[]     /* socket   address (variable-length
 .in -2
 
 .SS "\fBlibxnet\fR Interfaces"
-.LP
 The \fB<sys/socket.h>\fR header defines the \fBmsghdr\fR structure for
 \fBlibxnet\fR interfaces that includes the following members:
 .sp
@@ -118,17 +116,17 @@ header defines the following macros for use as the \fBcmsg_type\fR values when
 .sp
 .ne 2
 .na
-\fB\fBSCM_RIGHTS\fR\fR
+\fBSCM_RIGHTS\fR
 .ad
 .RS 14n
-Indicates that the data array contains the access rights to be sent or
-received.
+Indicates that the data array contains the access rights (set of open file
+descriptors) to be sent or received.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBSCM_UCRED\fR\fR
+\fBSCM_UCRED\fR
 .ad
 .RS 14n
 Indicates that the data array contains a \fBucred_t\fR to be received. The
@@ -138,17 +136,12 @@ was sent. This is a Sun-specific, Evolving interface. See \fBucred_get\fR(3C).
 
 .sp
 .LP
-The IPv4 data formats generally use the same values for data passed back in
-\fBcmsghdr\fR as for \fBsetsockopt()\fR to enable the feature. The IPv4 data
-formats are listed below with the associated payload for each.
+The IPv4 ancillary data formats are listed below by \fBcmsg_level\fR and
+\fBcmsg_type\fR, along with the associated payload for each.
 .sp
 .ne 2
 .na
-\fB\fBIPPROTO_IP\fR\fR
-.ad
-.br
-.na
-\fB\fBIP_RECVDSTADDR\fR\fR
+\fBIPPROTO_IP\fR, \fBIP_RECVDSTADDR\fR \(em \fBSOCK_DGRAM\fR only
 .ad
 .sp .6
 .RS 4n
@@ -158,25 +151,7 @@ formats are listed below with the associated payload for each.
 .sp
 .ne 2
 .na
-\fB\fBIPPROTO_IP\fR\fR
-.ad
-.br
-.na
-\fB\fBIP_RECVOPTS\fR\fR
-.ad
-.sp .6
-.RS 4n
-variable-length IP options, up to 40 bytes
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBIPPROTO_IP\fR\fR
-.ad
-.br
-.na
-\fB\fBIP_RECVIF\fR\fR
+\fBIPPROTO_IP\fR, \fBIP_RECVIF\fR
 .ad
 .sp .6
 .RS 4n
@@ -186,11 +161,27 @@ variable-length IP options, up to 40 bytes
 .sp
 .ne 2
 .na
-\fB\fBIPPROTO_IP\fR\fR
+\fBIPPROTO_IP\fR, \fBIP_RECVOPTS\fR \(em \fBSOCK_DGRAM\fR only
 .ad
-.br
+.sp .6
+.RS 4n
+variable-length IP options, up to 40 bytes
+.RE
+
+.sp
+.ne 2
 .na
-\fB\fBIP_RECVSLLA\fR\fR
+\fBIPPROTO_IP\fR, \fBIP_RECVPKTINFO\fR \(em \fBSOCK_DGRAM\fR only
+.ad
+.sp .6
+.RS 4n
+\fBin_pktinfo_t\fR
+.RE
+
+.sp
+.ne 2
+.na
+\fBIPPROTO_IP\fR, \fBIP_RECVSLLA\fR \(em \fBSOCK_DGRAM\fR only
 .ad
 .sp .6
 .RS 4n
@@ -200,147 +191,115 @@ variable-length IP options, up to 40 bytes
 .sp
 .ne 2
 .na
-\fB\fBIPPROTO_IP\fR\fR
-.ad
-.br
-.na
-\fB\fBIP_RECVTTL\fR\fR
+\fBIPPROTO_IP\fR, \fBIP_RECVTTL\fR \(em \fBSOCK_DGRAM\fR only
 .ad
 .sp .6
 .RS 4n
-\fBuint8_t\fR
+\fBuint8_t\fR, the IP TTL (time to live)
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBSOL_SOCKET\fR\fR
-.ad
-.br
-.na
-\fB\fBSO_RECVUCRED\fR\fR
+\fBIPPROTO_IP\fR, \fBIP_RECVTOS\fR
 .ad
 .sp .6
 .RS 4n
-\fBucred_t\fR \(em \fBcmsghdr.cmsg_type\fR is \fBSCM_UCRED\fR, not
-\fBSO_RECVUCRED\fR
+\fBuint8_t\fR, the IP TOS (type of service)
+.RE
+
+.sp
+.ne 2
+.na
+\fBSOL_SOCKET\fR, \fBSO_UCRED\fR
+.ad
+.sp .6
+.RS 4n
+\fBucred_t\fR
 .RE
 
 .sp
 .LP
-The IPv6 data formats use different values for enabling the option and for
-passing the value back to the application. The IPv6 data formats are listed
-below with the associated payload for each.
+The IPv6 ancillary data formats are listed below by \fBcmsg_level\fR and
+\fBcmsg_type\fR, along with the associated payload for each.
 .sp
 .ne 2
 .na
-\fB\fBIPPROTO_IPV6\fR\fR
-.ad
-.br
-.na
-\fB\fBIPV6_RECVPKTINFO\fR\fR
+\fBIPPROTO_IPV6\fR, \fBIPV6_PKTINFO\fR
 .ad
 .sp .6
 .RS 4n
-\fBin_pktinfo\fR, \fBcmsg_type\fR \fBIPV6_PKTINFO\fR
+\fBin_pktinfo_t\fR
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBIPPROTO_IPV6\fR\fR
-.ad
-.br
-.na
-\fB\fBIPV6_RECVTCLASS\fR\fR
+\fBIPPROTO_IPV6\fR, \fBIPV6_TCLASS\fR
 .ad
 .sp .6
 .RS 4n
-\fBuint_t\fR, \fBcmsg_type\fR \fBIPV6_TCLASS\fR
+\fBuint_t\fR
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBIPPROTO_IPV6\fR\fR
-.ad
-.br
-.na
-\fB\fBIPV6_RECVPATHMTU\fR\fR
+\fBIPPROTO_IPV6\fR, \fBIPV6_PATHMTU\fR
 .ad
 .sp .6
 .RS 4n
-\fBip6_mtuinfo\fR, \fBcmsg_type\fR \fBIPV6_PATHMTU\fR
+\fBip6_mtuinfo\fR
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBIPPROTO_IPV6\fR\fR
-.ad
-.br
-.na
-\fB\fBIPV6_RECVHOPLIMIT\fR\fR
+\fBIPPROTO_IPV6\fR, \fBIPV6_HOPLIMIT\fR
 .ad
 .sp .6
 .RS 4n
-\fBuint_t\fR, \fBcmsg_type\fR \fBIPV6_HOPLIMIT\fR
+\fBuint_t\fR
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBIPPROTO_IPV6\fR\fR
-.ad
-.br
-.na
-\fB\fBIPV6_RECVHOPOPTS\fR\fR
+\fBIPPROTO_IPV6\fR, \fBIPV6_HOPOPTS\fR
 .ad
 .sp .6
 .RS 4n
-variable-length IPv6 options, \fBcmsg_type\fR \fBIPV6_HOPOPTS\fR
+variable-length IPv6 options
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBIPPROTO_IPV6\fR\fR
-.ad
-.br
-.na
-\fB\fBIPV6_RECVDSTOPTS\fR\fR
+\fBIPPROTO_IPV6\fR, \fBIPV6_DSTOPTS\fR
 .ad
 .sp .6
 .RS 4n
-variable-length IPv6 options, \fBcmsg_type\fR \fBIPV6_DSTOPTS\fR
+variable-length IPv6 options
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBIPPROTO_IPV6\fR\fR
-.ad
-.br
-.na
-\fB\fBIPV6_RECVRTHDR\fR\fR
+\fBIPPROTO_IPV6\fR, \fBIPV6_RTHDR\fR
 .ad
 .sp .6
 .RS 4n
-variable-length IPv6 options, \fBcmsg_type\fR \fBIPV6_RTHDR\fR
+variable-length IPv6 options
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fBIPPROTO_IPV6\fR\fR
-.ad
-.br
-.na
-\fB\fBIPV6_RECVRTHDRDSTOPTS\fR\fR
+\fBIPPROTO_IPV6\fR, \fBIPV6_DSTOPTS\fR
 .ad
 .sp .6
 .RS 4n
-variable-length IPv6 options, \fBcmsg_type\fR \fBIPV6_DSTOPTS\fR
+variable-length IPv6 options
 .RE
 
 .sp
@@ -431,7 +390,7 @@ The \fB<sys/socket.h>\fR header defines the following macros:
 .sp
 .ne 2
 .na
-\fB\fBSOCK_DGRAM\fR\fR
+\fBSOCK_DGRAM\fR
 .ad
 .RS 18n
 Datagram socket
@@ -440,7 +399,7 @@ Datagram socket
 .sp
 .ne 2
 .na
-\fB\fBSOCK_STREAM\fR\fR
+\fBSOCK_STREAM\fR
 .ad
 .RS 18n
 Byte-stream socket
@@ -449,7 +408,7 @@ Byte-stream socket
 .sp
 .ne 2
 .na
-\fB\fBSOCK_SEQPACKET\fR\fR
+\fBSOCK_SEQPACKET\fR
 .ad
 .RS 18n
 Sequenced-packet socket
@@ -462,7 +421,7 @@ The \fB<sys/socket.h>\fR header defines the following macros for use as the
 .sp
 .ne 2
 .na
-\fB\fBSOL_SOCKET\fR\fR
+\fBSOL_SOCKET\fR
 .ad
 .RS 14n
 Options to be accessed at the socket level, not the protocol level.
@@ -471,7 +430,7 @@ Options to be accessed at the socket level, not the protocol level.
 .sp
 .ne 2
 .na
-\fB\fBSOL_ROUTE\fR\fR
+\fBSOL_ROUTE\fR
 .ad
 .RS 14n
 Options to be accessed at the routing socket level, not the protocol level.
@@ -484,7 +443,7 @@ The \fB<sys/socket.h>\fR header defines the following macros for use as the
 .sp
 .ne 2
 .na
-\fB\fBSO_DEBUG\fR\fR
+\fBSO_DEBUG\fR
 .ad
 .RS 17n
 Debugging information is being recorded.
@@ -493,7 +452,7 @@ Debugging information is being recorded.
 .sp
 .ne 2
 .na
-\fB\fBSO_ACCEPTCONN\fR\fR
+\fBSO_ACCEPTCONN\fR
 .ad
 .RS 17n
 Socket is accepting connections.
@@ -502,7 +461,7 @@ Socket is accepting connections.
 .sp
 .ne 2
 .na
-\fB\fBSO_BROADCAST\fR\fR
+\fBSO_BROADCAST\fR
 .ad
 .RS 17n
 Transmission of broadcast messages is supported.
@@ -511,7 +470,7 @@ Transmission of broadcast messages is supported.
 .sp
 .ne 2
 .na
-\fB\fBSO_REUSEADDR\fR\fR
+\fBSO_REUSEADDR\fR
 .ad
 .RS 17n
 Reuse of local addresses is supported.
@@ -520,7 +479,7 @@ Reuse of local addresses is supported.
 .sp
 .ne 2
 .na
-\fB\fBSO_KEEPALIVE\fR\fR
+\fBSO_KEEPALIVE\fR
 .ad
 .RS 17n
 Connections are kept alive with periodic messages.
@@ -529,7 +488,7 @@ Connections are kept alive with periodic messages.
 .sp
 .ne 2
 .na
-\fB\fBSO_LINGER\fR\fR
+\fBSO_LINGER\fR
 .ad
 .RS 17n
 Socket lingers on close.
@@ -538,7 +497,7 @@ Socket lingers on close.
 .sp
 .ne 2
 .na
-\fB\fBSO_OOBINLINE\fR\fR
+\fBSO_OOBINLINE\fR
 .ad
 .RS 17n
 Out-of-band data is transmitted in line.
@@ -547,7 +506,7 @@ Out-of-band data is transmitted in line.
 .sp
 .ne 2
 .na
-\fB\fBSO_SNDBUF\fR\fR
+\fBSO_SNDBUF\fR
 .ad
 .RS 17n
 Send buffer size.
@@ -556,7 +515,7 @@ Send buffer size.
 .sp
 .ne 2
 .na
-\fB\fBSO_RCVBUF\fR\fR
+\fBSO_RCVBUF\fR
 .ad
 .RS 17n
 Receive buffer size.
@@ -565,7 +524,7 @@ Receive buffer size.
 .sp
 .ne 2
 .na
-\fB\fBSO_ERROR\fR\fR
+\fBSO_ERROR\fR
 .ad
 .RS 17n
 Socket error status.
@@ -574,7 +533,7 @@ Socket error status.
 .sp
 .ne 2
 .na
-\fB\fBSO_TYPE\fR\fR
+\fBSO_TYPE\fR
 .ad
 .RS 17n
 Socket type.
@@ -583,7 +542,7 @@ Socket type.
 .sp
 .ne 2
 .na
-\fB\fBSO_RECVUCRED\fR\fR
+\fBSO_RECVUCRED\fR
 .ad
 .RS 17n
 Request the reception of user credential ancillary data. This is a
@@ -593,7 +552,7 @@ Sun-specific, Evolving interface. See \fBucred_get\fR(3C).
 .sp
 .ne 2
 .na
-\fB\fBSO_MAC_EXEMPT\fR\fR
+\fBSO_MAC_EXEMPT\fR
 .ad
 .RS 17n
 Mandatory Access Control (\fBMAC\fR) exemption for unlabeled peers. This option
@@ -603,7 +562,7 @@ is available only if the system is configured with Trusted Extensions.
 .sp
 .ne 2
 .na
-\fB\fBSO_ALLZONES\fR\fR
+\fBSO_ALLZONES\fR
 .ad
 .RS 17n
 Bypass zone boundaries (privileged).
@@ -618,7 +577,7 @@ the flags parameter in \fBrecvfrom()\fR, \fBrecvmsg()\fR, \fBsendto()\fR, or
 .sp
 .ne 2
 .na
-\fB\fBMSG_CTRUNC\fR\fR
+\fBMSG_CTRUNC\fR
 .ad
 .RS 15n
 Control data truncated.
@@ -627,7 +586,7 @@ Control data truncated.
 .sp
 .ne 2
 .na
-\fB\fBMSG_EOR\fR\fR
+\fBMSG_EOR\fR
 .ad
 .RS 15n
 Terminates a record (if supported by the protocol).
@@ -636,7 +595,7 @@ Terminates a record (if supported by the protocol).
 .sp
 .ne 2
 .na
-\fB\fBMSG_OOB\fR\fR
+\fBMSG_OOB\fR
 .ad
 .RS 15n
 Out-of-band data.
@@ -645,7 +604,7 @@ Out-of-band data.
 .sp
 .ne 2
 .na
-\fB\fBMSG_PEEK\fR\fR
+\fBMSG_PEEK\fR
 .ad
 .RS 15n
 Leave received data in queue.
@@ -654,7 +613,7 @@ Leave received data in queue.
 .sp
 .ne 2
 .na
-\fB\fBMSG_TRUNC\fR\fR
+\fBMSG_TRUNC\fR
 .ad
 .RS 15n
 Normal data truncated.
@@ -663,7 +622,7 @@ Normal data truncated.
 .sp
 .ne 2
 .na
-\fB\fBMSG_WAITALL\fR\fR
+\fBMSG_WAITALL\fR
 .ad
 .RS 15n
 Wait for complete message.
@@ -672,7 +631,7 @@ Wait for complete message.
 .sp
 .ne 2
 .na
-\fB\fBMSG_NOSIGNAL\fR\fR
+\fBMSG_NOSIGNAL\fR
 .ad
 .RS 15n
 Do not generate \fBSIGPIPE\fR signal.
@@ -684,7 +643,7 @@ The \fB<sys/socket.h>\fR header defines the following macros:
 .sp
 .ne 2
 .na
-\fB\fBAF_UNIX\fR\fR
+\fBAF_UNIX\fR
 .ad
 .RS 11n
 UNIX domain sockets
@@ -693,7 +652,7 @@ UNIX domain sockets
 .sp
 .ne 2
 .na
-\fB\fBAF_INET\fR\fR
+\fBAF_INET\fR
 .ad
 .RS 11n
 Internet domain sockets
@@ -705,7 +664,7 @@ The \fB<sys/socket.h>\fR header defines the following macros:
 .sp
 .ne 2
 .na
-\fB\fBSHUT_RD\fR\fR
+\fBSHUT_RD\fR
 .ad
 .RS 13n
 Disables further receive operations.
@@ -714,7 +673,7 @@ Disables further receive operations.
 .sp
 .ne 2
 .na
-\fB\fBSHUT_WR\fR\fR
+\fBSHUT_WR\fR
 .ad
 .RS 13n
 Disables further send operations.
@@ -723,14 +682,13 @@ Disables further send operations.
 .sp
 .ne 2
 .na
-\fB\fBSHUT_RDWR\fR\fR
+\fBSHUT_RDWR\fR
 .ad
 .RS 13n
 Disables further send and receive operations.
 .RE
 
 .SS "\fBlibsocket\fR Interfaces"
-.LP
 The \fB<sys/socket.h>\fR header defines the \fBmsghdr\fR structure for
 \fBlibsocket\fR interfaces that includes the following members:
 .sp
@@ -754,7 +712,6 @@ in \fBread\fR(2). The \fImsg_accrights\fR parameter specifies the buffer in
 which access rights sent along with the message are received. The
 \fImsg_accrightslen\fR specifies the length of the buffer.
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -769,7 +726,6 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.LP
 \fBaccept\fR(3SOCKET), \fBaccept\fR(3XNET), \fBbind\fR(3SOCKET),
 \fBbind\fR(3XNET), \fBconnect\fR(3SOCKET), \fBconnect\fR(3XNET),
 \fBgetpeername\fR(3SOCKET), \fBgetpeername\fR(3XNET), \fBgetpeerucred\fR(3C),

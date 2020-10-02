@@ -23,6 +23,7 @@
  * Copyright 2015 Joyent, Inc.
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014, 2017 by Delphix. All rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -377,6 +378,7 @@ typedef struct tcp_s {
 
 	int		tcp_ipsec_overhead;
 
+	uint_t		tcp_recvtos;	/* Last received IP_RECVTOS */
 	uint_t		tcp_recvifindex; /* Last received IPV6_RCVPKTINFO */
 	uint_t		tcp_recvhops;	/* Last received IPV6_RECVHOPLIMIT */
 	uint_t		tcp_recvtclass;	/* Last received IPV6_RECVTCLASS */

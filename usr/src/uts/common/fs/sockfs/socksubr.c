@@ -1321,8 +1321,24 @@ so_opt2cmsg(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg,
 
 			cmsg->cmsg_level = tohp->level;
 			cmsg->cmsg_type = tohp->name;
-			cmsg->cmsg_len = (socklen_t)(_TPI_TOPT_DATALEN(tohp) +
-			    sizeof (struct cmsghdr));
+			cmsg->cmsg_len = (socklen_t)sizeof (struct cmsghdr);
+			if (tohp->level == IPPROTO_IP &&
+			    (tohp->name == IP_RECVTOS ||
+			    tohp->name == IP_RECVTTL)) {
+				/*
+				 * The data for these is a uint8_t but, in
+				 * order to maintain alignment for any
+				 * following TPI primitives in the message,
+				 * there will be some trailing padding bytes
+				 * which are included in the TPI_TOPT_DATALEN.
+				 * For these types, we set the cmsg_len
+				 * explicitly to the correct value.
+				 */
+				cmsg->cmsg_len += (socklen_t)sizeof (uint8_t);
+			} else {
+				cmsg->cmsg_len +=
+				    (socklen_t)(_TPI_TOPT_DATALEN(tohp));
+			}
 
 			/* copy content to control data part */
 			bcopy(&tohp[1], CMSG_CONTENT(cmsg),

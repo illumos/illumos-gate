@@ -2011,6 +2011,11 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-4/include \
     target=../sun4u/include
 $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-Enterprise/include \
     target=../sun4u/include
+link path=usr/share/man/man3head/CMSG_DATA.3head target=socket.h.3head
+link path=usr/share/man/man3head/CMSG_FIRSTHDR.3head target=socket.h.3head
+link path=usr/share/man/man3head/CMSG_LEN.3head target=socket.h.3head
+link path=usr/share/man/man3head/CMSG_NXTHDR.3head target=socket.h.3head
+link path=usr/share/man/man3head/CMSG_SPACE.3head target=socket.h.3head
 link path=usr/share/man/man3head/LIST_CLASS_ENTRY.3head target=queue.h.3head
 link path=usr/share/man/man3head/LIST_CLASS_HEAD.3head target=queue.h.3head
 link path=usr/share/man/man3head/LIST_CONCAT.3head target=queue.h.3head

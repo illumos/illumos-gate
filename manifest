@@ -15847,6 +15847,11 @@ f usr/share/man/man3gss/gss_verify_mic.3gss 0444 root bin
 f usr/share/man/man3gss/gss_wrap.3gss 0444 root bin
 f usr/share/man/man3gss/gss_wrap_size_limit.3gss 0444 root bin
 d usr/share/man/man3head 0755 root bin
+s usr/share/man/man3head/CMSG_DATA.3head=socket.h.3head
+s usr/share/man/man3head/CMSG_FIRSTHDR.3head=socket.h.3head
+s usr/share/man/man3head/CMSG_LEN.3head=socket.h.3head
+s usr/share/man/man3head/CMSG_NXTHDR.3head=socket.h.3head
+s usr/share/man/man3head/CMSG_SPACE.3head=socket.h.3head
 s usr/share/man/man3head/LIST_CLASS_ENTRY.3head=queue.h.3head
 s usr/share/man/man3head/LIST_CLASS_HEAD.3head=queue.h.3head
 s usr/share/man/man3head/LIST_CONCAT.3head=queue.h.3head
