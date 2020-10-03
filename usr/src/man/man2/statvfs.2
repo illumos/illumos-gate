@@ -3,11 +3,10 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH STATVFS 2 "Mar 22, 2004"
+.TH STATVFS 2 "Oct 3, 2020"
 .SH NAME
 statvfs, fstatvfs \- get file system information
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/statvfs.h>
@@ -21,8 +20,6 @@ statvfs, fstatvfs \- get file system information
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBstatvfs()\fR function returns a "generic superblock" describing a file
 system; it can be used to acquire information about mounted  file systems.  The
 \fIbuf\fR argument is a pointer to a structure (described below) that is filled
@@ -86,13 +83,9 @@ file named by \fIpath\fR in \fBstatvfs()\fR is instead identified by an open
 file descriptor \fIfildes\fR obtained from a successful \fBopen\fR(2),
 \fBcreat\fR(2), \fBdup\fR(2), \fBfcntl\fR(2), or \fBpipe\fR(2) function call.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fB0\fR is returned. Otherwise, \fB\(mi1\fR is
 returned and \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
-.LP
 The \fBstatvfs()\fR and \fBfstatvfs()\fR functions will fail if:
 .sp
 .ne 2
@@ -159,7 +152,7 @@ Too many symbolic links were encountered in translating \fIpath\fR.
 .ad
 .RS 16n
 The length of a \fIpath\fR component exceeds \fBNAME_MAX\fR characters, or the
-length of \fIpath\fR The exceeds \fBPATH_MAX\fR characters.
+length of \fIpath\fR exceeds \fBPATH_MAX\fR characters.
 .RE
 
 .sp
@@ -231,13 +224,9 @@ An I/O error occurred while reading the file system.
 .RE
 
 .SH USAGE
-.sp
-.LP
 The \fBstatvfs()\fR and \fBfstatvfs()\fR functions have transitional interfaces
 for 64-bit file offsets.  See \fBlf64\fR(5).
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -252,14 +241,10 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
-.LP
 \fBchmod\fR(2), \fBchown\fR(2), \fBcreat\fR(2), \fBdup\fR(2), \fBfcntl\fR(2),
 \fBlink\fR(2), \fBmknod\fR(2), \fBopen\fR(2), \fBpipe\fR(2), \fBread\fR(2),
 \fBtime\fR(2), \fBunlink\fR(2), \fButime\fR(2), \fBwrite\fR(2),
 \fBattributes\fR(5), \fBlf64\fR(5), \fBstandards\fR(5)
 .SH BUGS
-.sp
-.LP
 The values returned for \fBf_files\fR, \fBf_ffree\fR, and \fBf_favail\fR may
 not be valid for \fBNFS\fR mounted file systems.
