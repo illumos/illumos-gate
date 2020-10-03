@@ -238,6 +238,9 @@ i386_MANFILES=	ahci.7d		\
 		uath.7d		\
 		ural.7d		\
 		urtw.7d		\
+		vioblk.7d	\
+		vioif.7d	\
+		virtio.7d	\
 		wpi.7d		\
 		xhci.7d		\
 		zyd.7d

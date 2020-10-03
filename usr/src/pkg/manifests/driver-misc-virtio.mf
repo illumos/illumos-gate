@@ -38,5 +38,8 @@ set name=variant.arch value=i386
 dir path=kernel group=sys
 dir path=kernel/misc group=sys
 dir path=kernel/misc/$(ARCH64) group=sys
+dir path=usr/share/man
+dir path=usr/share/man/man7d
 file path=kernel/misc/$(ARCH64)/virtio group=sys mode=0755
+file path=usr/share/man/man7d/virtio.7d
 license lic_CDDL license=lic_CDDL
