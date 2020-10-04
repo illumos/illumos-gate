@@ -47,7 +47,9 @@ static struct vbeinfoblock *vbe =
 	(struct vbeinfoblock *)&vbestate.vbe_control_info;
 static struct modeinfoblock *vbe_mode =
 	(struct modeinfoblock *)&vbestate.vbe_mode_info;
-multiboot_color_t cmap[16];
+multiboot_color_t *cmap;
+/* The default VGA color palette format is 6 bits per primary color. */
+int palette_format = 6;
 
 /* Actually assuming mode 3. */
 void
@@ -55,6 +57,18 @@ bios_set_text_mode(int mode)
 {
 	int atr;
 
+	if (vbe->Capabilities & VBE_CAP_DAC8) {
+		int m;
+
+		/*
+		 * The mode change should reset the palette format to
+		 * 6 bits, but apparently some systems do fail with 8-bit
+		 * palette, so we switch to 6-bit here.
+		 */
+		m = 0x0600;
+		(void) biosvbe_palette_format(&m);
+		palette_format = m;
+	}
 	v86.ctl = V86_FLAGS;
 	v86.addr = 0x10;
 	v86.eax = mode;				/* set VGA text mode */
@@ -107,6 +121,20 @@ biosvbe_get_mode_info(int mode, struct modeinfoblock *mi)
 static int
 biosvbe_set_mode(int mode, struct crtciinfoblock *ci)
 {
+	int rv;
+
+	if (vbe->Capabilities & VBE_CAP_DAC8) {
+		int m;
+
+		/*
+		 * The mode change should reset the palette format to
+		 * 6 bits, but apparently some systems do fail with 8-bit
+		 * palette, so we switch to 6-bit here.
+		 */
+		m = 0x0600;
+		if (biosvbe_palette_format(&m) == VBE_SUCCESS)
+			palette_format = m;
+	}
 	v86.ctl = V86_FLAGS;
 	v86.addr = 0x10;
 	v86.eax = 0x4f02;
@@ -114,7 +142,16 @@ biosvbe_set_mode(int mode, struct crtciinfoblock *ci)
 	v86.es = VTOPSEG(ci);
 	v86.edi = VTOPOFF(ci);
 	v86int();
-	return (v86.eax & 0xffff);
+	rv = v86.eax & 0xffff;
+	if (vbe->Capabilities & VBE_CAP_DAC8) {
+		int m;
+
+		/* Switch to 8-bits per primary color. */
+		m = 0x0800;
+		if (biosvbe_palette_format(&m) == VBE_SUCCESS)
+			palette_format = m;
+	}
+	return (rv);
 }
 
 /* Function 03h - Get VBE Mode */
@@ -138,7 +175,7 @@ biosvbe_palette_format(int *format)
 	v86.eax = 0x4f08;
 	v86.ebx = *format;
 	v86int();
-	*format = v86.ebx & 0xffff;
+	*format = (v86.ebx >> 8) & 0xff;
 	return (v86.eax & 0xffff);
 }
 
@@ -276,9 +313,9 @@ int
 vbe_set_palette(const struct paletteentry *entry, size_t slot)
 {
 	struct paletteentry pe;
-	int ret;
+	int mode, ret;
 
-	if (!vbe_check())
+	if (!vbe_check() || (vbe->Capabilities & VBE_CAP_DAC8) == 0)
 		return (1);
 
 	if (gfx_fb.framebuffer_common.framebuffer_type !=
@@ -286,13 +323,21 @@ vbe_set_palette(const struct paletteentry *entry, size_t slot)
 		return (1);
 	}
 
+	if (cmap == NULL)
+		cmap = calloc(CMAP_SIZE, sizeof (*cmap));
+
 	pe.Blue = entry->Blue;
 	pe.Green = entry->Green;
 	pe.Red = entry->Red;
 	pe.Alignment = entry->Alignment;
 
-	ret = biosvbe_palette_data(0x00, slot, &pe);
-	if (ret == VBE_SUCCESS && slot < sizeof (cmap)) {
+	if (vbe->Capabilities & VBE_CAP_SNOW)
+		mode = 0x80;
+	else
+		mode = 0;
+
+	ret = biosvbe_palette_data(mode, slot, &pe);
+	if (cmap != NULL && slot < CMAP_SIZE) {
 		cmap[slot].mb_red = entry->Red;
 		cmap[slot].mb_green = entry->Green;
 		cmap[slot].mb_blue = entry->Blue;
@@ -361,15 +406,7 @@ vbe_set_mode(int modenum)
 	case 0x4:
 		gfx_fb.framebuffer_common.framebuffer_type =
 		    MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED;
-		if (vbe->VbeVersion >= 0x300) {
-			gfx_fb.framebuffer_common.framebuffer_pitch =
-			    mi.LinBytesPerScanLine;
-		} else {
-			gfx_fb.framebuffer_common.framebuffer_pitch =
-			    mi.BytesPerScanLine;
-		}
-		gfx_fb.u.fb1.framebuffer_palette_num_colors = 16;
-		return (0);	/* done */
+		break;
 	case 0x6:
 		gfx_fb.framebuffer_common.framebuffer_type =
 		    MULTIBOOT_FRAMEBUFFER_TYPE_RGB;
@@ -671,10 +708,14 @@ done:
 }
 
 static void
-vbe_print_mode(void)
+vbe_print_mode(bool verbose)
 {
-	int mode, i, rc;
-	struct paletteentry pe;
+	int nc, mode, i, rc;
+
+	if (verbose)
+		nc = 256;
+	else
+		nc = 16;
 
 	memset(vbe, 0, sizeof (vbe));
 	memcpy(vbe->VbeSignature, "VBE2", 4);
@@ -728,15 +769,18 @@ vbe_print_mode(void)
 	if (rc != VBE_SUCCESS)
 		return;
 
-	printf("    palette format: %x bits per primary\n", mode >> 8);
-	for (i = 0; i < 16; i++) {
-		rc = biosvbe_palette_data(1, i, &pe);
-		if (rc != VBE_SUCCESS)
-			break;
+	printf("    palette format: %x bits per primary\n", mode);
+	if (cmap == NULL)
+		return;
 
-		printf("%d: R=%02x, G=%02x, B=%02x\n", i,
-		    pe.Red, pe.Green, pe.Blue);
+	pager_open();
+	for (i = 0; i < nc; i++) {
+		printf("%d: R=%02x, G=%02x, B=%02x", i,
+		    cmap[i].mb_red, cmap[i].mb_green, cmap[i].mb_blue);
+		if (pager_output("\n") != 0)
+			break;
 	}
+	pager_close();
 }
 
 /*
@@ -812,10 +856,15 @@ command_vesa(int argc, char *argv[])
 	}
 
 	if (strcmp(argv[1], "get") == 0) {
-		if (argc != 2)
-			goto usage;
+		bool verbose = false;
 
-		vbe_print_mode();
+		if (argc > 2) {
+			if (argc > 3 || strcmp(argv[2], "-v") != 0)
+				goto usage;
+			verbose = true;
+		}
+
+		vbe_print_mode(verbose);
 		return (CMD_OK);
 	}
 
@@ -888,7 +937,7 @@ command_vesa(int argc, char *argv[])
 
 usage:
 	snprintf(command_errbuf, sizeof (command_errbuf),
-	    "usage: %s on | off | get | list [depth] | "
+	    "usage: %s on | off | get [-v] | list [depth] | "
 	    "set <display or VBE mode number>", argv[0]);
 	return (CMD_ERROR);
 }

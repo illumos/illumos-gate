@@ -43,6 +43,9 @@ struct vbeinfoblock {
 	uint16_t VbeVersion;
 	uint32_t OemStringPtr;
 	uint32_t Capabilities;
+#define	VBE_CAP_DAC8	(1 << 0)	/* Can switch DAC */
+#define	VBE_CAP_NONVGA	(1 << 1)	/* Controller is not VGA comp. */
+#define	VBE_CAP_SNOW	(1 << 2)	/* Set data during Vertical Reterace */
 	uint32_t VideoModePtr;
 	uint16_t TotalMemory;
 	uint16_t OemSoftwareRev;
@@ -136,6 +139,10 @@ struct flatpanelinfo
 #define	VGA_TEXT_MODE		(3)		/* 80x25 text mode */
 #define	TEXT_ROWS		(25)		/* VGATEXT rows */
 #define	TEXT_COLS		(80)		/* VGATEXT columns */
+
+#define	CMAP_SIZE		256	/* Number of colors in palette */
+
+extern int palette_format;
 
 /* high-level VBE helpers, from vbe.c */
 void bios_set_text_mode(int);

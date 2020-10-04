@@ -774,8 +774,7 @@ mbi_size(struct preloaded_file *fp, char *cmdline)
 	if (gfx_fb.framebuffer_common.framebuffer_type ==
 	    MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED) {
 		size += sizeof (struct multiboot_tag_framebuffer_common);
-		size += gfx_fb.u.fb1.framebuffer_palette_num_colors *
-		    sizeof (multiboot_color_t);
+		size += CMAP_SIZE * sizeof (multiboot_color_t);
 	} else {
 		size += sizeof (multiboot_tag_framebuffer_t);
 	}
@@ -1177,9 +1176,10 @@ multiboot2_exec(struct preloaded_file *fp)
 
 		if (gfx_fb.framebuffer_common.framebuffer_type ==
 		    MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED) {
+			gfx_fb.u.fb1.framebuffer_palette_num_colors = CMAP_SIZE;
+
 			memcpy(tag->u.fb1.framebuffer_palette, cmap,
-			    sizeof (multiboot_color_t) *
-			    gfx_fb.u.fb1.framebuffer_palette_num_colors);
+			    sizeof (multiboot_color_t) * CMAP_SIZE);
 		}
 #endif /* EFI */
 	}
