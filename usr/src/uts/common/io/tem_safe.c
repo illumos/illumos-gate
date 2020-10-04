@@ -518,33 +518,41 @@ tem_safe_setparam(struct tem_vt_state *tem, int count, int newparam)
 	}
 }
 
-
+/*
+ * For colors 0-15 the tem is using color code translation
+ * from sun colors to vga (dim_xlate and brt_xlate tables, see tem_get_color).
+ * Colors 16-255 are used without translation.
+ */
 static void
 tem_select_color(struct tem_vt_state *tem, text_color_t color, boolean_t fg)
 {
-	if (tems.ts_pdepth >= 24 ||
-	    (color < 8 && tems.ts_pdepth < 24)) {
-		if (fg == B_TRUE) {
-			tem->tvs_fg_color = color;
+	if (fg == B_TRUE)
+		tem->tvs_fg_color = color;
+	else
+		tem->tvs_bg_color = color;
+
+	/*
+	 * For colors 0-7, make sure the BRIGHT attribute is not set.
+	 */
+	if (color < 8) {
+		if (fg == B_TRUE)
 			tem->tvs_flags &= ~TEM_ATTR_BRIGHT_FG;
-		} else {
-			tem->tvs_bg_color = color;
+		else
 			tem->tvs_flags &= ~TEM_ATTR_BRIGHT_BG;
-		}
 		return;
 	}
 
-	if (color > 15)
-		return;
-
-	/* Bright color and depth < 24 */
-	color -= 8;
-	if (fg == B_TRUE) {
-		tem->tvs_fg_color = color;
-		tem->tvs_flags |= TEM_ATTR_BRIGHT_FG;
-	} else {
-		tem->tvs_bg_color = color;
-		tem->tvs_flags |= TEM_ATTR_BRIGHT_BG;
+	/*
+	 * For colors 8-15, we use color codes 0-7 and set BRIGHT attribute.
+	 */
+	if (color < 16) {
+		if (fg == B_TRUE) {
+			tem->tvs_fg_color -= 8;
+			tem->tvs_flags |= TEM_ATTR_BRIGHT_FG;
+		} else {
+			tem->tvs_bg_color -= 8;
+			tem->tvs_flags |= TEM_ATTR_BRIGHT_BG;
+		}
 	}
 }
 
