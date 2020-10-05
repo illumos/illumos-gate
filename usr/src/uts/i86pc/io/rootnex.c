@@ -26,6 +26,7 @@
  * Copyright (c) 2011 Bayard G. Bell.  All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2020 Ryan Zezeski
  */
 
 /*
@@ -3130,10 +3131,10 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 			sgl[cnt].dmac_size += psize;
 
 			/*
-			 * if this exactly ==  the maximum cookie size, and
-			 * it isn't the last cookie, go to the next cookie.
+			 * If this cookie is used up, and more cookies
+			 * are available, then move onto the next one.
 			 */
-			if (((sgl[cnt].dmac_size + psize) == maxseg) &&
+			if ((sgl[cnt].dmac_size == maxseg) &&
 			    ((cnt + 1) < sglinfo->si_max_pages)) {
 				cnt++;
 				sgl[cnt].dmac_laddress = 0;
@@ -3230,10 +3231,10 @@ rootnex_dvma_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 			sgl[cnt].dmac_size += psize;
 
 			/*
-			 * if this exactly ==  the maximum cookie size, and
-			 * it isn't the last cookie, go to the next cookie.
+			 * If this cookie is used up, and more cookies
+			 * are available, then move onto the next one.
 			 */
-			if (((sgl[cnt].dmac_size + psize) == maxseg) &&
+			if ((sgl[cnt].dmac_size == maxseg) &&
 			    ((cnt + 1) < sglinfo->si_max_pages)) {
 				cnt++;
 				sgl[cnt].dmac_laddress = 0;
