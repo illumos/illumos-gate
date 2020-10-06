@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright 2019 Peter Tribble.
+.\" Copyright 2020 Carlos Neira <cneirabustos@gmail.com>.
 .\"  Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
@@ -8,13 +9,11 @@
 .SH NAME
 eeprom \- EEPROM display and load utility
 .SH SYNOPSIS
-.LP
 .nf
 \fB/usr/sbin/eeprom\fR [\fB-\fR] [\fB-f\fR \fIdevice\fR] [\fIparameter\fR[=\fIvalue\fR]]
 .fi
 
 .SH DESCRIPTION
-.LP
 \fBeeprom\fR displays or changes the values of parameters in the \fBEEPROM.\fR
 It processes parameters in the order given. When processing a \fIparameter\fR
 accompanied by a \fIvalue\fR, \fBeeprom\fR makes the indicated alteration to
@@ -35,12 +34,10 @@ incorrect.
 \fIplatform-name\fR is the name of the platform implementation and can be found
 using the \fB-i\fR option of \fBuname\fR(1).
 .SS "SPARC"
-.LP
 \fBSPARC\fR based systems implement firmware password protection with
 \fBeeprom\fR, using the \fBsecurity-mode\fR, \fBsecurity-password\fR and
 \fBsecurity-#badlogins\fR properties.
 .SS "x86"
-.LP
 \fBEEPROM\fR storage is simulated using a file residing in the
 platform-specific boot area. The \fB/boot/solaris/bootenv.rc\fR file simulates
 \fBEEPROM\fR storage.
@@ -134,8 +131,25 @@ to \fBdiag-device\fR, until the console drivers are loaded.
 After that, only \fBkmdb\fR will continue to use the \fBdiag-device\fR.
 .RE
 
+.ne 2
+.na
+\fB\fIsegkpsize\fR\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the amount in \fBbytes\fR of kernel pageable memory available.
+Increasing this variable allows either larger stacks for the same number
+of kernel threads or more kernel threads, by default this value is \fB0x80000000 (2GiB)\fR.
+If the value specified exceeds the size of physical memory it will be automatically capped to
+that.
+
+Valid Ranges: 0xC800000 - 0x200000000(200MiB - 8GiB)
+
+
+.RE
+
+
 .SH NVRAM CONFIGURATION PARAMETERS
-.LP
 Not all OpenBoot systems support all parameters. Defaults vary depending on the
 system and the \fBPROM\fR revision. See the output in the "Default Value"
 column of the \fBprintenv\fR command, as entered at the \fBok\fR (OpenBoot)
@@ -1092,7 +1106,6 @@ If \fBtrue\fR, reboot after watchdog reset. Defaults to \fBfalse\fR.
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRChanging the Number of Megabytes of RAM.
 .sp
 .LP
@@ -1231,6 +1244,23 @@ consult the BIOS documentation for that machine. Also, on some x86 machines,
 you might use a device other than device \fBa\fR, as shown above. For example,
 you could set console to \fBttyb\fR if the second serial port is present.
 
+\fBExample 5 \fRChanging segkpsize.
+.sp
+.LP
+The following example demonstrates the method for changing the
+number of bytes that will be used for kernel pageable memory.
+Running the following command will set segkpsize to 3GiB.
+.sp
+.in +2
+.nf
+# \fBeeprom segkpsize=0xC0000000\fR
+
+.fi
+.in -2
+.sp
+
+
+
 .SH FILES
 .ne 2
 .na
@@ -1262,8 +1292,8 @@ Platform-specific version of \fBeeprom\fR. Use \fBuname\fR \fB-i\fR to obtain
 \fIplatform-name\fR.
 .RE
 
+
 .SH SEE ALSO
-.LP
 \fBpasswd\fR(1), \fBsh\fR(1), \fBsvcs\fR(1), \fBtip\fR(1), \fBuname\fR(1),
 \fBboot\fR(1M), \fBkadb\fR(1M), \fBkernel\fR(1M), \fBinit\fR(1M),
 \fBsvcadm\fR(1M), \fBattributes\fR(5), \fBsmf\fR(5)
