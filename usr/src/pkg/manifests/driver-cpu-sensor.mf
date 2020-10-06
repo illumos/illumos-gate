@@ -44,6 +44,7 @@ driver name=amdnbtemp \
     alias=pci1022,1703,p
 driver name=coretemp
 driver name=pchtemp \
+    alias=pci8086,2f9,p \
     alias=pci8086,8c24,p \
     alias=pci8086,8ca4,p \
     alias=pci8086,8d24,p \

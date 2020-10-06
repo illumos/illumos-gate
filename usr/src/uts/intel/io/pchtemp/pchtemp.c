@@ -42,6 +42,7 @@
  *  - Intel Sunrise Point-LP (Kaby Lake-U) PCH
  *  - Intel Cannon Lake (Whiskey Lake-U) PCH
  *  - Intel 300 Series and C240 Chipset
+ *  - Intel 400 Series (On-Package) PCH
  *
  * The following chipsets use a different format and are not currently
  * supported:
