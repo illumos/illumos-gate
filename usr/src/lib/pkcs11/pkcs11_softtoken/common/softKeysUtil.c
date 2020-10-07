@@ -839,6 +839,9 @@ soft_derivekey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 
 	switch (pMechanism->mechanism) {
 	case CKM_DH_PKCS_DERIVE:
+		if (phKey == NULL_PTR)
+			return (CKR_ARGUMENTS_BAD);
+
 		/*
 		 * Create a new object for secret key. The key type should
 		 * be provided in the template.
@@ -868,6 +871,9 @@ soft_derivekey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		break;
 
 	case CKM_ECDH1_DERIVE:
+		if (phKey == NULL_PTR)
+			return (CKR_ARGUMENTS_BAD);
+
 		/*
 		 * Create a new object for secret key. The key type should
 		 * be provided in the template.
@@ -932,6 +938,9 @@ soft_derivekey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		goto common;
 
 common:
+		if (phKey == NULL_PTR)
+			return (CKR_ARGUMENTS_BAD);
+
 		/*
 		 * Create a new object for secret key. The key type is optional
 		 * to be provided in the template. If it is not specified in
@@ -945,8 +954,6 @@ common:
 		if (rv != CKR_OK) {
 			return (rv);
 		}
-
-		*phKey = secret_key->handle;
 
 		/* Validate the key type and key length */
 		rv = soft_key_derive_check_length(secret_key, hash_size);
@@ -1034,10 +1041,12 @@ common:
 
 	case CKM_SSL3_KEY_AND_MAC_DERIVE:
 	case CKM_TLS_KEY_AND_MAC_DERIVE:
+		/* These mechanisms do not use phKey */
 		return (soft_ssl_key_and_mac_derive(session_p, pMechanism,
 		    basekey_p, pTemplate, ulAttributeCount));
 
 	case CKM_TLS_PRF:
+		/* This mechanism does not use phKey */
 		if (pMechanism->pParameter == NULL ||
 		    pMechanism->ulParameterLen != sizeof (CK_TLS_PRF_PARAMS) ||
 		    phKey != NULL)
@@ -1064,6 +1073,19 @@ common:
 		if (rv != CKR_OK)
 			soft_delete_token_object(secret_key, B_FALSE, B_FALSE);
 	}
+
+	/*
+	 * Some mechanisms don't use phKey either because they create
+	 * multiple key objects and instead populate a structure passed in
+	 * as a field in their pParameter parameter with the resulting key
+	 * objects (e.g. CKM_TLS_KEY_AND_MAC_DERIVE) or they instead write
+	 * their result to an output buffer passed in their pParameter
+	 * parameter (e.g. CKM_TLS_PRF). All such mechanisms return prior
+	 * to reaching here. The remaining mechanisms (which do use phKey)
+	 * should have already validated phKey is not NULL prior to doing
+	 * their key derivation.
+	 */
+	*phKey = secret_key->handle;
 
 	return (rv);
 }
