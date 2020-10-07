@@ -1107,7 +1107,8 @@ out:
 	mutex_enter(&odd->odd_lock);
 	overlay_io_done(odd, OVERLAY_F_IN_TX);
 	mutex_exit(&odd->odd_lock);
-	return (mp_chain);
+	freemsgchain(mp_chain);
+	return (NULL);
 }
 
 /* ARGSUSED */

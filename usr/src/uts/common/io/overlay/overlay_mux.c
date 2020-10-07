@@ -354,8 +354,16 @@ overlay_mux_tx(overlay_mux_t *mux, struct msghdr *hdr, mblk_t *mp)
 	/*
 	 * It'd be nice to be able to use MSG_MBLK_QUICKRELE, unfortunately,
 	 * that isn't actually supported by UDP at this time.
+	 *
+	 * Send with MSG_DONTWAIT to indicate clogged UDP sockets upstack.
 	 */
-	ret = ksocket_sendmblk(mux->omux_ksock, hdr, 0, &mp, kcred);
+	ret = ksocket_sendmblk(mux->omux_ksock, hdr, MSG_DONTWAIT, &mp, kcred);
+	/*
+	 * NOTE: ksocket_sendmblk() may send partial packets downstack,
+	 * returning what's not sent in &mp (i.e. mp pre-call might be a
+	 * b_cont of mp post-call).  We can't hold up this message (it's a
+	 * datagram), so we drop, and let the caller cope.
+	 */
 	if (ret != 0)
 		freemsg(mp);
 
