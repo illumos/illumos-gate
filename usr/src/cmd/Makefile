@@ -489,6 +489,7 @@ i386_SUBDIRS=		\
 	acpihpd		\
 	addbadsec	\
 	ahciem		\
+	amdzen		\
 	bhyve		\
 	bhyvectl	\
 	biosdev		\
@@ -499,7 +500,6 @@ i386_SUBDIRS=		\
 	rdmsr		\
 	rtc		\
 	ucodeadm	\
-	usmn		\
 	xhci		\
 	xvm
 

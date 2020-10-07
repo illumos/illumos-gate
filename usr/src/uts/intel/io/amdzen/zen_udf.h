@@ -13,26 +13,32 @@
  * Copyright 2020 Oxide Computer Company
  */
 
-#ifndef _AMDZEN_CLIENT_H
-#define	_AMDZEN_CLIENT_H
+#ifndef _ZEN_UDF_H
+#define	_ZEN_UDF_H
 
 /*
- * This header provides client routines to clients of the amdzen nexus driver.
+ * Private ioctls for interfacing with the zen_udf driver.
  */
-
-#include <sys/types.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern int amdzen_c_smn_read32(uint_t, uint32_t, uint32_t *);
-extern uint_t amdzen_c_df_count(void);
-extern int amdzen_c_df_read32(uint_t, uint8_t, uint8_t, uint16_t, uint32_t *);
-extern int amdzen_c_df_read64(uint_t, uint8_t, uint8_t, uint16_t, uint64_t *);
+#define	ZEN_UDF_IOCTL	(('u' << 24) | ('d' << 16) | ('f' << 8))
+
+#define	ZEN_UDF_READ32	(ZEN_UDF_IOCTL | 0x01)
+#define	ZEN_UDF_READ64	(ZEN_UDF_IOCTL | 0x02)
+
+typedef struct zen_udf_io {
+	uint8_t zui_inst;
+	uint8_t zui_func;
+	uint16_t zui_reg;
+	uint32_t zui_pad;
+	uint64_t zui_data;
+} zen_udf_io_t;
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _AMDZEN_CLIENT_H */
+#endif /* _ZEN_UDF_H */

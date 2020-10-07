@@ -776,4 +776,4 @@ DRV_KMODS	+= smntemp
 #
 DRV_KMODS	+= amdzen
 DRV_KMODS	+= amdzen_stub
-DRV_KMODS	+= usmn
+DRV_KMODS	+= usmn zen_udf

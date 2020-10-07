@@ -157,13 +157,20 @@ typedef struct {
 
 static const amdzen_child_data_t amdzen_children[] = {
 	{ "smntemp", AMDZEN_C_SMNTEMP },
-	{ "usmn", AMDZEN_C_USMN }
+	{ "usmn", AMDZEN_C_USMN },
+	{ "zen_udf", AMDZEN_C_ZEN_UDF }
 };
 
 static uint32_t
 amdzen_stub_get32(amdzen_stub_t *stub, off_t reg)
 {
 	return (pci_config_get32(stub->azns_cfgspace, reg));
+}
+
+static uint64_t
+amdzen_stub_get64(amdzen_stub_t *stub, off_t reg)
+{
+	return (pci_config_get64(stub->azns_cfgspace, reg));
 }
 
 static void
@@ -188,6 +195,24 @@ amdzen_df_read32(amdzen_t *azn, amdzen_df_t *df, uint8_t inst, uint8_t func,
 	amdzen_stub_put32(df->adf_funcs[4], AMDZEN_DF_F4_FICAA, val);
 	return (amdzen_stub_get32(df->adf_funcs[4], AMDZEN_DF_F4_FICAD_LO));
 }
+
+/*
+ * Perform a targeted 64-bit indirect read to a specific instance and function.
+ */
+static uint64_t
+amdzen_df_read64(amdzen_t *azn, amdzen_df_t *df, uint8_t inst, uint8_t func,
+    uint16_t reg)
+{
+	uint32_t val;
+
+	VERIFY(MUTEX_HELD(&azn->azn_mutex));
+	val = AMDZEN_DF_F4_FICAA_TARG_INST | AMDZEN_DF_F4_FICAA_SET_REG(reg) |
+	    AMDZEN_DF_F4_FICAA_SET_FUNC(func) |
+	    AMDZEN_DF_F4_FICAA_SET_INST(inst) | AMDZEN_DF_F4_FICAA_SET_64B;
+	amdzen_stub_put32(df->adf_funcs[4], AMDZEN_DF_F4_FICAA, val);
+	return (amdzen_stub_get64(df->adf_funcs[4], AMDZEN_DF_F4_FICAD_LO));
+}
+
 
 static uint32_t
 amdzen_smn_read32(amdzen_t *azn, amdzen_df_t *df, uint32_t reg)
@@ -260,6 +285,45 @@ amdzen_c_df_count(void)
 	return (ret);
 }
 
+int
+amdzen_c_df_read32(uint_t dfno, uint8_t inst, uint8_t func,
+    uint16_t reg, uint32_t *valp)
+{
+	amdzen_df_t *df;
+	amdzen_t *azn = amdzen_data;
+
+	mutex_enter(&azn->azn_mutex);
+	df = amdzen_df_find(azn, dfno);
+	if (df == NULL) {
+		mutex_exit(&azn->azn_mutex);
+		return (ENOENT);
+	}
+
+	*valp = amdzen_df_read32(azn, df, inst, func, reg);
+	mutex_exit(&azn->azn_mutex);
+
+	return (0);
+}
+
+int
+amdzen_c_df_read64(uint_t dfno, uint8_t inst, uint8_t func,
+    uint16_t reg, uint64_t *valp)
+{
+	amdzen_df_t *df;
+	amdzen_t *azn = amdzen_data;
+
+	mutex_enter(&azn->azn_mutex);
+	df = amdzen_df_find(azn, dfno);
+	if (df == NULL) {
+		mutex_exit(&azn->azn_mutex);
+		return (ENOENT);
+	}
+
+	*valp = amdzen_df_read64(azn, df, inst, func, reg);
+	mutex_exit(&azn->azn_mutex);
+
+	return (0);
+}
 
 static boolean_t
 amdzen_create_child(amdzen_t *azn, const amdzen_child_data_t *acd)
@@ -269,14 +333,14 @@ amdzen_create_child(amdzen_t *azn, const amdzen_child_data_t *acd)
 
 	if (ndi_devi_alloc(azn->azn_dip, acd->acd_name,
 	    (pnode_t)DEVI_SID_NODEID, &child) != NDI_SUCCESS) {
-		dev_err(azn->azn_dip, CE_WARN, "failed to allocate child "
+		dev_err(azn->azn_dip, CE_WARN, "!failed to allocate child "
 		    "dip for %s", acd->acd_name);
 		return (B_FALSE);
 	}
 
 	ddi_set_parent_data(child, (void *)acd);
 	if ((ret = ndi_devi_online(child, 0)) != NDI_SUCCESS) {
-		dev_err(azn->azn_dip, CE_WARN, "failed to online child "
+		dev_err(azn->azn_dip, CE_WARN, "!failed to online child "
 		    "dip %s: %d", acd->acd_name, ret);
 		return (B_FALSE);
 	}

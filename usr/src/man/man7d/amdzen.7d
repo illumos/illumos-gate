@@ -45,4 +45,6 @@ drivers are limited to
 .Sy x86
 platforms with AMD Family 17h processors.
 .Sh SEE ALSO
-.Xr smntemp 7D
+.Xr smntemp 7D ,
+.Xr usmn 7D ,
+.Xr zen_udf 7D

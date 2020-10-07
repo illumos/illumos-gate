@@ -245,6 +245,7 @@ i386_MANFILES=	ahci.7d		\
 		virtio.7d	\
 		wpi.7d		\
 		xhci.7d		\
+		zen_udf.7d	\
 		zyd.7d
 
 _MANLINKS=	1394.7d		\

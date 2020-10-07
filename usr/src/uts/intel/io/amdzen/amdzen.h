@@ -289,7 +289,8 @@ typedef struct amdzen {
 
 typedef enum {
 	AMDZEN_C_SMNTEMP = 1,
-	AMDZEN_C_USMN
+	AMDZEN_C_USMN,
+	AMDZEN_C_ZEN_UDF
 } amdzen_child_t;
 
 /*

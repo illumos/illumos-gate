@@ -11,20 +11,19 @@
 .\"
 .\" Copyright 2020 Oxide Computer Company
 .\"
-.Dd September 1, 2020
-.Dt USMN 7D
+.Dd October 7, 2020
+.Dt ZEN_UDF 7D
 .Os
 .Sh NAME
-.Nm usmn
-.Nd AMD SMN user access driver
+.Nm zen_udf
+.Nd AMD data fabric user access driver
 .Sh SYNOPSIS
-.Pa /devices/pseudo/amdzen@0/usmn@2:usmn.*
+.Pa /devices/pseudo/amdzen@0/zen_udf@3:zen_udf.*
 .Sh DESCRIPTION
 The
 .Nm
-driver provides the ability to read data from the AMD system management
-network
-.Pq SMN
+driver provides the ability to read data from the AMD data fabric
+.Pq DF
 on AMD Family 17h
 .Pq Zen, Zen+, and Zen 2
 processors.
@@ -34,4 +33,4 @@ and is not recommended for systems that aren't doing kernel development
 on AMD Zen platforms.
 .Sh SEE ALSO
 .Xr amdzen 7D ,
-.Xr zen_udf 7D
+.Xr usmn 7D

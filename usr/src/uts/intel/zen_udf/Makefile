@@ -13,20 +13,29 @@
 # Copyright 2020 Oxide Computer Company
 #
 
-PROG= usmn
+UTSBASE = ../..
 
-include ../Makefile.cmd
+MODULE		= zen_udf
+OBJECTS		= $(ZEN_UDF_OBJS:%=$(OBJS_DIR)/%)
+ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 
-ROOTCMDDIR = $(ROOTLIB)
-CPPFLAGS += -I$(SRC)/uts/intel/io/amdzen
-CFLAGS += $(CCVERBOSE)
+include $(UTSBASE)/intel/Makefile.intel
+
+ALL_TARGET	= $(BINARY)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+CPPFLAGS	+= -I$(UTSBASE)/intel/io/amdzen
+LDFLAGS		+= -dy -Ndrv/amdzen
 
 .KEEP_STATE:
 
-all: $(PROG)
+def:		$(DEF_DEPS)
 
-install: all $(ROOTCMD)
+all:		$(ALL_DEPS)
 
-clean:
+clean:		$(CLEAN_DEPS)
 
-include ../Makefile.targ
+clobber:	$(CLOBBER_DEPS)
+
+install:	$(INSTALL_DEPS)
+
+include $(UTSBASE)/intel/Makefile.targ
