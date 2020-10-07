@@ -946,8 +946,6 @@ common:
 			return (rv);
 		}
 
-		*phKey = secret_key->handle;
-
 		/* Validate the key type and key length */
 		rv = soft_key_derive_check_length(secret_key, hash_size);
 		if (rv != CKR_OK) {
@@ -1064,6 +1062,8 @@ common:
 		if (rv != CKR_OK)
 			soft_delete_token_object(secret_key, B_FALSE, B_FALSE);
 	}
+
+	*phKey = secret_key->handle;
 
 	return (rv);
 }
