@@ -33,7 +33,10 @@
  * VESA disabled.
  */
 
-#define VBE_DEFAULT_MODE	"800x600"
+#ifndef _VBE_H
+#define	_VBE_H
+
+#define	VBE_DEFAULT_MODE	"800x600"
 
 struct vbeinfoblock {
 	char VbeSignature[4];
@@ -61,8 +64,10 @@ struct modeinfoblock {
 	uint8_t XCharSize, YCharSize, NumberOfPlanes, BitsPerPixel;
 	uint8_t NumberOfBanks, MemoryModel, BankSize, NumberOfImagePages;
 	uint8_t Reserved1;
-	/* Direct Color fields
-	   (required for direct/6 and YUV/7 memory models) */
+	/*
+	 * Direct Color fields
+	 * (required for direct/6 and YUV/7 memory models)
+	 */
 	uint8_t RedMaskSize, RedFieldPosition;
 	uint8_t GreenMaskSize, GreenFieldPosition;
 	uint8_t BlueMaskSize, BlueFieldPosition;
@@ -108,17 +113,16 @@ struct paletteentry {
 
 struct flatpanelinfo
 {
-	uint16_t HorizontalSize;
-	uint16_t VerticalSize;
-	uint16_t PanelType;
-	uint8_t RedBPP;
-	uint8_t GreenBPP;
-	uint8_t BlueBPP;
-	uint8_t ReservedBPP;
-	uint32_t ReservedOffScreenMemSize;
-	uint32_t ReservedOffScreenMemPtr;
-
-	uint8_t Reserved[14];
+	uint16_t HorizontalSize;	/* Horizontal Size in Pixels */
+	uint16_t VerticalSize;		/* Vertical Size in Lines */
+	uint16_t PanelType;		/* Flat Panel Type */
+	uint8_t RedBPP;			/* Red Bits Per Primary */
+	uint8_t GreenBPP;		/* Green Bits Per Primary */
+	uint8_t BlueBPP;		/* Blue Bits Per Primary */
+	uint8_t ReservedBPP;		/* Reserved Bits Per Primary */
+	uint32_t RsvdOffScreenMemSize;	/* Size in KB of Offscreen Memory */
+	uint32_t RsvdOffScreenMemPtr; /* Pointer to reserved offscreen memory */
+	uint8_t Reserved[14];		/* remainder of FPInfo */
 } __packed;
 
 #define	VBE_BASE_MODE		(0x100)		/* VBE 3.0 page 18 */
@@ -143,3 +147,5 @@ int vbe_set_mode(int);
 int vbe_get_mode(void);
 int vbe_set_palette(const struct paletteentry *, size_t);
 void vbe_modelist(int);
+
+#endif /* _VBE_H */

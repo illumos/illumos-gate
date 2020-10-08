@@ -46,18 +46,18 @@ static char *pager_blank   = \
 void
 pager_open(void)
 {
-    int		nlines;
-    char	*cp, *lp;
+	int	nlines;
+	char	*cp, *lp;
 
-    nlines = 24;		/* sensible default */
-    if ((cp = getenv("screen-#rows")) != NULL) {
-	nlines = strtol(cp, &lp, 0);
-    }
+	nlines = 24;		/* sensible default */
+	if ((cp = getenv("screen-#rows")) != NULL) {
+		nlines = strtol(cp, &lp, 0);
+	}
 
-    p_maxlines = nlines - 1;
-    if (p_maxlines < 1)
-	p_maxlines = 1;
-    p_freelines = p_maxlines;
+	p_maxlines = nlines - 1;
+	if (p_maxlines < 1)
+		p_maxlines = 1;
+	p_freelines = p_maxlines;
 }
 
 /*
@@ -66,7 +66,7 @@ pager_open(void)
 void
 pager_close(void)
 {
-    p_maxlines = -1;
+	p_maxlines = -1;
 }
 
 /*
@@ -82,47 +82,47 @@ pager_close(void)
 int
 pager_output(const char *cp)
 {
-    int		action;
+	int	action;
 
-    if (cp == NULL)
-	return(0);
+	if (cp == NULL)
+		return (0);
 
-    for (;;) {
-	if (*cp == 0)
-	    return(0);
+	for (;;) {
+		if (*cp == 0)
+			return (0);
 
-	putchar(*cp);			/* always emit character */
+		putchar(*cp);			/* always emit character */
 
-	if (*(cp++) == '\n') {		/* got a newline? */
-	    p_freelines--;
-	    if (p_freelines <= 0) {
-		printf("%s", pager_prompt1);
-		action = 0;
-		while (action == 0) {
-		    switch(getchar()) {
-		    case '\r':
-		    case '\n':
-			p_freelines = 1;
-			action = 1;
-			break;
-		    case ' ':
-			p_freelines = p_maxlines;
-			action = 1;
-			break;
-		    case 'q':
-		    case 'Q':
-			action = 2;
-			break;
-		    default:
-			break;
-		    }
+		if (*(cp++) == '\n') {		/* got a newline? */
+			p_freelines--;
+			if (p_freelines <= 0) {
+				printf("%s", pager_prompt1);
+				action = 0;
+				while (action == 0) {
+					switch (getchar()) {
+					case '\r':
+					case '\n':
+						p_freelines = 1;
+						action = 1;
+						break;
+					case ' ':
+						p_freelines = p_maxlines;
+						action = 1;
+						break;
+					case 'q':
+					case 'Q':
+						action = 2;
+						break;
+					default:
+						break;
+					}
+				}
+				printf("\r%s\r", pager_blank);
+				if (action == 2)
+					return (1);
+			}
 		}
-		printf("\r%s\r", pager_blank);
-		if (action == 2)
-		    return(1);
-	    }
 	}
-    }
 }
 
 /*
@@ -131,32 +131,32 @@ pager_output(const char *cp)
 int
 pager_file(const char *fname)
 {
-    char	buf[80];
-    size_t	hmuch;
-    int		fd;
-    int		result;
+	char	buf[80];
+	size_t	hmuch;
+	int	fd;
+	int	result;
 
-    if ((fd = open(fname, O_RDONLY)) == -1) {
-	printf("can't open '%s': %s\n", fname, strerror(errno));
-	return(-1);
-    }
+	if ((fd = open(fname, O_RDONLY)) == -1) {
+		printf("can't open '%s': %s\n", fname, strerror(errno));
+		return (-1);
+	}
 
-    for (;;) {
-	hmuch = read(fd, buf, sizeof(buf) - 1);
-	if (hmuch == -1) {
-	    result = -1;
-	    break;
+	for (;;) {
+		hmuch = read(fd, buf, sizeof (buf) - 1);
+		if (hmuch == -1) {
+			result = -1;
+			break;
+		}
+		if (hmuch == 0) {
+			result = 0;
+			break;
+		}
+		buf[hmuch] = 0;
+		if (pager_output(buf)) {
+			result = 1;
+			break;
+		}
 	}
-	if (hmuch == 0) {
-	    result = 0;
-	    break;
-	}
-	buf[hmuch] = 0;
-	if (pager_output(buf)) {
-	    result = 1;
-	    break;
-	}
-    }
-    close(fd);
-    return(result);
+	close(fd);
+	return (result);
 }

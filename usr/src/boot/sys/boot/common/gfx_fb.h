@@ -93,15 +93,21 @@ struct vesa_edid_info {
 	uint8_t checksum;
 } __packed;
 
+/*
+ * Number of pixels and lines is 12-bit int, valid values 0-4095.
+ */
+#define	EDID_MAX_PIXELS	4095
+#define	EDID_MAX_LINES	4095
+
 #define	GET_EDID_INFO_WIDTH(edid_info, timings_num) \
-    ((edid_info)->detailed_timings[(timings_num)].horizontal_active_lo | \
-    (((uint_t)(edid_info)->detailed_timings[(timings_num)].horizontal_hi & \
-    0xf0) << 4))
+	((edid_info)->detailed_timings[(timings_num)].horizontal_active_lo | \
+	(((uint_t)(edid_info)->detailed_timings[(timings_num)].horizontal_hi & \
+	0xf0) << 4))
 
 #define	GET_EDID_INFO_HEIGHT(edid_info, timings_num) \
-    ((edid_info)->detailed_timings[(timings_num)].vertical_active_lo | \
-    (((uint_t)(edid_info)->detailed_timings[(timings_num)].vertical_hi & \
-    0xf0) << 4))
+	((edid_info)->detailed_timings[(timings_num)].vertical_active_lo | \
+	(((uint_t)(edid_info)->detailed_timings[(timings_num)].vertical_hi & \
+	0xf0) << 4))
 
 extern multiboot_tag_framebuffer_t gfx_fb;
 
