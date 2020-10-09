@@ -674,7 +674,7 @@ prtusb(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	/* tree, print usb device tree info */
 	if (usb_flag & OPT_TREE) {
 
-		mdb_printf("\nusba_device: 0x%x\n", addr);
+		mdb_printf("\nusba_device: 0x%lx\n", addr);
 
 		mdb_printf("mfg_prod_sn: ");
 		if (mdb_readstr(strbuf, STRLEN,
@@ -826,12 +826,12 @@ prt_usb_tree_node(uintptr_t paddr)
 	mdb_printf("  %s\n", strbuf);
 
 	/* dip addr */
-	mdb_printf("  dip: 0x%x\n", paddr);
+	mdb_printf("  dip: 0x%lx\n", paddr);
 
 	/* softe_sate */
 	mdb_snprintf(strbuf, STRLEN, "%s_statep", driver_name);
 	if (mdb_devinfo2statep(paddr, strbuf, &statep) != -1) {
-		mdb_printf("  %s: 0x%x\n", strbuf, statep);
+		mdb_printf("  %s: 0x%lx\n", strbuf, statep);
 	}
 
 	/* error level */
