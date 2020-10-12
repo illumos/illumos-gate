@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright 2012 OmniTI Computer Consulting, Inc  All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #ifndef	_SYS_AGGR_IMPL_H
@@ -161,7 +162,8 @@ typedef struct aggr_port_s {
 	 */
 	mac_group_handle_t	lp_hwghs[MAX_GROUPS_PER_PORT];
 
-	int			lp_tx_ring_cnt;
+	uint_t			lp_tx_ring_alloc;
+	uint_t			lp_tx_ring_cnt;
 	/* handles of the underlying HW TX rings */
 	mac_ring_handle_t	*lp_tx_rings;
 	/*
@@ -195,6 +197,7 @@ typedef struct aggr_grp_s {
 	uint16_t	lg_key;			/* key (group port number) */
 	uint32_t	lg_refs;		/* refcount */
 	uint16_t	lg_nports;		/* number of MAC ports */
+	uint16_t	lg_nports_high;		/* highest no. of MAC ports */
 	uint8_t		lg_addr[ETHERADDRL];	/* group MAC address */
 	uint16_t
 			lg_closing : 1,
