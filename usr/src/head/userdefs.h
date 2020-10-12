@@ -27,6 +27,9 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
+/*
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+ */
 
 #ifndef	_USERDEFS_H
 #define	_USERDEFS_H
@@ -62,6 +65,8 @@ extern "C" {
 #define	DEFLIMPRIV	""
 #define	DEFDFLTPRIV	""
 #define	DEFLOCK_AFTER_RETRIES	""
+#define	DEFROLEAUTH	""
+#define	DEFROLEROLEAUTH	"role"
 
 /* Defaults file keywords */
 #define	RIDSTR		"defrid="
@@ -82,6 +87,7 @@ extern "C" {
 #define	FHEADER		"#	Default values for useradd.  Changed "
 #define	FHEADER_ROLE	"#	Default values for roleadd.  Changed "
 #define	LOCK_AFTER_RETRIESSTR	"deflock_after_retries="
+#define	ROLEAUTHSTR	"defroleauth="
 
 /* Defaults file */
 #define	DEFFILE		"/usr/sadm/defadduser"
@@ -110,6 +116,7 @@ struct userdefs {
 	char *deflimpriv;	/* default limitpriv */
 	char *defdfltpriv;	/* default defaultpriv */
 	char *deflock_after_retries;	/* default lock_after_retries */
+	char *defroleauth;		/* default roleauth */
 
 };
 
