@@ -494,7 +494,7 @@ vbe_dump_mode(int modenum, struct modeinfoblock *mi)
 }
 
 static bool
-vbe_get_edid(uint_t *pwidth, uint_t *pheight)
+vbe_get_edid(edid_res_list_t *res)
 {
 	struct vesa_edid_info *edid_info;
 	const uint8_t magic[] = EDID_MAGIC;
@@ -517,18 +517,11 @@ vbe_get_edid(uint_t *pwidth, uint_t *pheight)
 	if (memcmp(edid_info, magic, sizeof (magic)) != 0)
 		goto done;
 
-	if (!(edid_info->header.version == 1 &&
-	    (edid_info->display.supported_features
-	    & EDID_FEATURE_PREFERRED_TIMING_MODE) &&
-	    edid_info->detailed_timings[0].pixel_clock))
+	/* Unknown EDID version. */
+	if (edid_info->header.version != 1)
 		goto done;
 
-	*pwidth = GET_EDID_INFO_WIDTH(edid_info, 0);
-	*pheight = GET_EDID_INFO_HEIGHT(edid_info, 0);
-
-	if (*pwidth > 0 && *pwidth <= EDID_MAX_PIXELS &&
-	    *pheight > 0 && *pheight <= EDID_MAX_LINES)
-		ret = true;
+	ret = gfx_get_edid_resolution(edid_info, res);
 done:
 	bio_free(edid_info, sizeof (*edid_info));
 	return (ret);
@@ -596,6 +589,8 @@ vbe_modelist(int depth)
 	int ddc_caps;
 	uint_t width, height;
 	bool edid = false;
+	edid_res_list_t res;
+	struct resolution *rp;
 
 	if (!vbe_check())
 		return;
@@ -608,11 +603,19 @@ vbe_modelist(int depth)
 		if (ddc_caps & 2)
 			printf(" [DDC2]");
 
-		edid = vbe_get_edid(&width, &height);
-		if (edid)
-			printf(": EDID %dx%d\n", width, height);
-		else
+		TAILQ_INIT(&res);
+		edid = vbe_get_edid(&res);
+		if (edid) {
+			printf(": EDID");
+			while ((rp = TAILQ_FIRST(&res)) != NULL) {
+				printf(" %dx%d", rp->width, rp->height);
+				TAILQ_REMOVE(&res, rp, next);
+				free(rp);
+			}
+			printf("\n");
+		} else {
 			printf(": no EDID information\n");
+		}
 	}
 	if (!edid)
 		if (vbe_get_flatpanel(&width, &height))
@@ -744,12 +747,23 @@ vbe_print_mode(void)
 int
 vbe_default_mode(void)
 {
+	edid_res_list_t res;
+	struct resolution *rp;
 	int modenum;
 	uint_t width, height;
 
 	modenum = 0;
-	if (vbe_get_edid(&width, &height))
-		modenum = vbe_find_mode_xydm(width, height, -1, -1);
+	TAILQ_INIT(&res);
+	if (vbe_get_edid(&res)) {
+		while ((rp = TAILQ_FIRST(&res)) != NULL) {
+			if (modenum == 0) {
+				modenum = vbe_find_mode_xydm(
+				    rp->width, rp->height, -1, -1);
+			}
+			TAILQ_REMOVE(&res, rp, next);
+			free(rp);
+		}
+	}
 
 	if (modenum == 0 &&
 	    vbe_get_flatpanel(&width, &height)) {

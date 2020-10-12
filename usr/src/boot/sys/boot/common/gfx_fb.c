@@ -2011,3 +2011,85 @@ command_font(int argc, char *argv[])
 	}
 	return (rc);
 }
+
+bool
+gfx_get_edid_resolution(struct vesa_edid_info *edid, edid_res_list_t *res)
+{
+	struct resolution *rp, *p;
+
+	/*
+	 * Walk detailed timings tables (4).
+	 */
+	if ((edid->display.supported_features
+	    & EDID_FEATURE_PREFERRED_TIMING_MODE) != 0) {
+		/* Walk detailed timing descriptors (4) */
+		for (int i = 0; i < DET_TIMINGS; i++) {
+			/*
+			 * Reserved value 0 is not used for display decriptor.
+			 */
+			if (edid->detailed_timings[i].pixel_clock == 0)
+				continue;
+			if ((rp = malloc(sizeof (*rp))) == NULL)
+				continue;
+			rp->width = GET_EDID_INFO_WIDTH(edid, i);
+			rp->height = GET_EDID_INFO_HEIGHT(edid, i);
+			if (rp->width > 0 && rp->width <= EDID_MAX_PIXELS &&
+			    rp->height > 0 && rp->height <= EDID_MAX_LINES)
+				TAILQ_INSERT_TAIL(res, rp, next);
+			else
+				free(rp);
+		}
+	}
+
+	/*
+	 * Walk standard timings list (8).
+	 */
+	for (int i = 0; i < STD_TIMINGS; i++) {
+		/* Is this field unused? */
+		if (edid->standard_timings[i] == 0x0101)
+			continue;
+
+		if ((rp = malloc(sizeof (*rp))) == NULL)
+			continue;
+
+		rp->width = HSIZE(edid->standard_timings[i]);
+		switch (RATIO(edid->standard_timings[i])) {
+		case RATIO1_1:
+			rp->height = HSIZE(edid->standard_timings[i]);
+			if (edid->header.version > 1 ||
+			    edid->header.revision > 2) {
+				rp->height = rp->height * 10 / 16;
+			}
+			break;
+		case RATIO4_3:
+			rp->height = HSIZE(edid->standard_timings[i]) * 3 / 4;
+			break;
+		case RATIO5_4:
+			rp->height = HSIZE(edid->standard_timings[i]) * 4 / 5;
+			break;
+		case RATIO16_9:
+			rp->height = HSIZE(edid->standard_timings[i]) * 9 / 16;
+			break;
+		}
+
+		/*
+		 * Create resolution list in decreasing order, except keep
+		 * first entry (preferred timing mode).
+		 */
+		TAILQ_FOREACH(p, res, next) {
+			if (p->width * p->height < rp->width * rp->height) {
+				/* Keep preferred mode first */
+				if (TAILQ_FIRST(res) == p)
+					TAILQ_INSERT_AFTER(res, p, rp, next);
+				else
+					TAILQ_INSERT_BEFORE(p, rp, next);
+				break;
+			}
+			if (TAILQ_NEXT(p, next) == NULL) {
+				TAILQ_INSERT_TAIL(res, rp, next);
+				break;
+			}
+		}
+	}
+	return (!TAILQ_EMPTY(res));
+}

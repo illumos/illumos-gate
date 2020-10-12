@@ -52,7 +52,6 @@
 .SH NAME
 open, openat \- open a file
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -68,7 +67,6 @@ open, openat \- open a file
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBopen()\fR function establishes the connection between a file and a file
 descriptor. It creates an open file description that refers to a file and a
 file descriptor that refers to that open file description. The file descriptor
@@ -526,13 +524,11 @@ Certain flag values can be set following \fBopen()\fR as described in
 The largest value that can be represented correctly in an object of type
 \fBoff_t\fR is established as the offset maximum in the open file description.
 .SH RETURN VALUES
-.LP
 Upon successful completion, both \fBopen()\fR and \fBopenat()\fR functions open
 the file and return a non-negative integer representing the lowest numbered
 unused file descriptor.  Otherwise, \fB\(mi1\fR is returned, \fBerrno\fR is set
 to indicate the error, and no files are created or modified.
 .SH ERRORS
-.LP
 The \fBopen()\fR and \fBopenat()\fR functions will fail if:
 .sp
 .ne 2
@@ -565,15 +561,6 @@ processes to open files for reading regardless of permission bits.
 .RS 16n
 A mandatory share reservation could not be obtained because the desired access
 conflicts with an existing \fBf_deny\fR share reservation.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEBADF\fR\fR
-.ad
-.RS 16n
-The file descriptor provided to \fBopenat()\fR is invalid.
 .RE
 
 .sp
@@ -917,7 +904,6 @@ The file is a pure procedure (shared text) file that is being executed and
 .RE
 
 .SH EXAMPLES
-.LP
 \fBExample 1 \fROpen a file for writing by the owner.
 .sp
 .LP
@@ -1004,12 +990,10 @@ if ((pfd = open(filename, O_WRONLY | O_CREAT | O_TRUNC,
 .in -2
 
 .SH USAGE
-.LP
 The \fBopen()\fR function has a transitional interface for 64-bit file offsets.
 See \fBlf64\fR(5). Note that using \fBopen64()\fR is equivalent to using
 \fBopen()\fR with \fBO_LARGEFILE\fR set in \fIoflag\fR.
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
 
@@ -1028,7 +1012,6 @@ Standard	For \fBopen()\fR, see \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.LP
 \fBIntro\fR(2), \fBchmod\fR(2), \fBclose\fR(2), \fBcreat\fR(2), \fBdup\fR(2),
 \fBexec\fR(2), \fBfcntl\fR(2), \fBgetmsg\fR(2), \fBgetrlimit\fR(2),
 \fBlseek\fR(2), \fBputmsg\fR(2), \fBread\fR(2), \fBstat\fR(2), \fBumask\fR(2),
@@ -1037,7 +1020,6 @@ Standard	For \fBopen()\fR, see \fBstandards\fR(5).
 \fBunlockpt\fR(3C), \fBattributes\fR(5), \fBlf64\fR(5), \fBprivileges\fR(5),
 \fBstandards\fR(5), \fBconnld\fR(7M), \fBstreamio\fR(7I)
 .SH NOTES
-.LP
 Hierarchical Storage Management (HSM) file systems can sometimes cause long
 delays when opening a file, since HSM files must be recalled from secondary
 storage.

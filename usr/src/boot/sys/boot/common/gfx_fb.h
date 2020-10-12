@@ -19,6 +19,7 @@
 #include <stdbool.h>
 #include <sys/visual_io.h>
 #include <sys/multiboot2.h>
+#include <sys/queue.h>
 #include <pnglite.h>
 
 #ifdef __cplusplus
@@ -93,6 +94,18 @@ struct vesa_edid_info {
 	uint8_t checksum;
 } __packed;
 
+#define	STD_TIMINGS	8
+#define	DET_TIMINGS	4
+
+#define	HSIZE(x)	(((x & 0xff) + 31) * 8)
+#define	RATIO(x)	((x & 0xC000) >> 14)
+#define	RATIO1_1	0
+/* EDID Ver. 1.3 redefined this */
+#define	RATIO16_10	RATIO1_1
+#define	RATIO4_3	1
+#define	RATIO5_4	2
+#define	RATIO16_9	3
+
 /*
  * Number of pixels and lines is 12-bit int, valid values 0-4095.
  */
@@ -109,9 +122,18 @@ struct vesa_edid_info {
 	(((uint_t)(edid_info)->detailed_timings[(timings_num)].vertical_hi & \
 	0xf0) << 4))
 
+struct resolution {
+	uint32_t width;
+	uint32_t height;
+	TAILQ_ENTRY(resolution) next;
+};
+
+typedef TAILQ_HEAD(edid_resolution, resolution) edid_res_list_t;
+
 extern multiboot_tag_framebuffer_t gfx_fb;
 
 void bios_text_font(bool);
+bool gfx_get_edid_resolution(struct vesa_edid_info *, edid_res_list_t *);
 void gfx_framework_init(struct visual_ops *);
 uint32_t gfx_fb_color_map(uint8_t);
 void gfx_fb_display_cursor(struct vis_conscursor *);

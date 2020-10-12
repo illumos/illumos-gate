@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <unistd.h>
@@ -482,7 +483,8 @@ create_chip(topo_mod_t *mod, tnode_t *pnode, topo_instance_t min,
 	nvlist_t *fmri = NULL;
 	int err, perr, nerr = 0;
 	int32_t chipid, procnodeid, procnodes_per_pkg;
-	const char *vendor, *brand;
+	const char *vendor;
+	char *brand, *socket;
 	int32_t family, model;
 	boolean_t create_mc = B_FALSE;
 	uint16_t smbios_id;
@@ -549,16 +551,24 @@ create_chip(topo_mod_t *mod, tnode_t *pnode, topo_instance_t min,
 		    NULL, CHIP_FAMILY, CHIP_MODEL, CHIP_STEPPING, NULL);
 
 		/*
-		 * Attempt to lookup the processor brand string in kstats.
-		 * and add it as a prop, if found.
+		 * Attempt to lookup the processor brand and socket string in
+		 * kstats and add it as a prop, if found.
 		 */
-		brand = get_chip_brand(mod, kc, chipid);
+		brand = socket = NULL;
+		get_chip_kstat_strs(mod, kc, chipid, &brand, &socket);
 		if (brand != NULL && topo_prop_set_string(chip, PGNAME(CHIP),
 		    CHIP_BRAND, TOPO_PROP_IMMUTABLE, brand, &perr) != 0) {
 			whinge(mod, &nerr, "failed to set prop %s/%s",
 			    PGNAME(CHIP), CHIP_BRAND);
 		}
-		topo_mod_strfree(mod, (char *)brand);
+		topo_mod_strfree(mod, brand);
+
+		if (socket != NULL && topo_prop_set_string(chip, PGNAME(CHIP),
+		    CHIP_SOCKET, TOPO_PROP_IMMUTABLE, socket, &perr) != 0) {
+			whinge(mod, &nerr, "failed to set prop %s/%s",
+			    PGNAME(CHIP), CHIP_SOCKET);
+		}
+		topo_mod_strfree(mod, socket);
 
 		if (FM_AWARE_SMBIOS(mod)) {
 			int fru = 0;
