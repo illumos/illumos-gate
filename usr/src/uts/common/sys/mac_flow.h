@@ -23,6 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2013 Joyent, Inc.  All rights reserved.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #ifndef	_MAC_FLOW_H
@@ -92,7 +93,7 @@ typedef struct flow_desc_s {
 	uint8_t				fd_dsfield_mask;
 } flow_desc_t;
 
-#define	MRP_NCPUS	128
+#define	MRP_NCPUS	256
 
 /*
  * In MCM_CPUS mode, cpu bindings is user specified. In MCM_FANOUT mode,
@@ -118,7 +119,7 @@ typedef struct mac_tx_intr_cpus_s {
 
 typedef struct mac_cpus_props_s {
 	uint32_t		mc_ncpus;		/* num of cpus */
-	uint32_t		mc_cpus[MRP_NCPUS]; 	/* cpu list */
+	uint32_t		mc_cpus[MRP_NCPUS];	/* cpu list */
 	uint32_t		mc_rx_fanout_cnt;	/* soft ring cpu cnt */
 	uint32_t		mc_rx_fanout_cpus[MRP_NCPUS]; /* SR cpu list */
 	uint32_t		mc_rx_pollid;		/* poll thr binding */
@@ -188,10 +189,10 @@ typedef struct mac_protect_s {
 /* The default priority for flows */
 #define	MPL_SUBFLOW_DEFAULT		MPL_MEDIUM
 
-#define	MRP_MAXBW		0x00000001 	/* Limit set */
-#define	MRP_CPUS		0x00000002 	/* CPU/fanout set */
-#define	MRP_CPUS_USERSPEC	0x00000004 	/* CPU/fanout from user */
-#define	MRP_PRIORITY		0x00000008 	/* Priority set */
+#define	MRP_MAXBW		0x00000001	/* Limit set */
+#define	MRP_CPUS		0x00000002	/* CPU/fanout set */
+#define	MRP_CPUS_USERSPEC	0x00000004	/* CPU/fanout from user */
+#define	MRP_PRIORITY		0x00000008	/* Priority set */
 #define	MRP_PROTECT		0x00000010	/* Protection set */
 #define	MRP_RX_RINGS		0x00000020	/* Rx rings */
 #define	MRP_TX_RINGS		0x00000040	/* Tx rings */
