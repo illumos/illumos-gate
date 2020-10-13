@@ -28,7 +28,7 @@
  * $FreeBSD$
  */
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2020 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -417,6 +417,14 @@ vmx_rdmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t *val)
 	case MSR_MTRR16kBase ... MSR_MTRR16kBase + 1:
 	case MSR_MTRR64kBase:
 		*val = 0;
+		break;
+	case MSR_IA32_FEATURE_CONTROL:
+		/*
+		 * We currently don't support SGX support in guests, so
+		 * always report those features as disabled with the MSR
+		 * locked so the guest won't attempt to write to it.
+		 */
+		*val = IA32_FEATURE_CONTROL_LOCK;
 		break;
 	case MSR_IA32_MISC_ENABLE:
 		*val = misc_enable;
