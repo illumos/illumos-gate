@@ -31,7 +31,7 @@ include ../../Makefile.lx
 LIBNAME =	lx_vdso
 
 MAPFILES =	../common/mapfile-vers
-MAPOPTS =	$(MAPFILES:%=-M%)
+MAPOPTS =	$(MAPFILES:%=-Wl,-M%)
 
 ASOBJS  =	vdso_subr.o
 COBJS  =	vdso_main.o

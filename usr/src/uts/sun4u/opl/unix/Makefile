@@ -148,15 +148,15 @@ install:	$(INSTALL_DEPS)
 
 symcheck:       $(SYM_DEPS)
 
-$(UNIX_BIN):	$(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(MAPFILE) $(LIBS) \
+$(UNIX_BIN):	$(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(UNIX_MAPFILE) $(LIBS) \
 		$(DTRACESTUBS)
-	$(LD) -dy -b -o $@ -e _start -M $(MAPFILE) \
+	$(LD) -dy -b -o $@ -e _start -M $(UNIX_MAPFILE) \
 	    $(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(LIBOPTS) $(DTRACESTUBS)
 	$(CTFMERGE_UNIQUIFY_AGAINST_GENUNIX)
 	$(POST_PROCESS)
 
 symcheck.targ:	$(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(LIBS) $(DTRACESTUBS)
-	$(LD) -dy -b -o $(SYM_MOD) -M $(MAPFILE) \
+	$(LD) -dy -b -o $(SYM_MOD) -M $(UNIX_MAPFILE) \
 	$(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(LIBOPTS) $(DTRACESTUBS)
 
 $(UNIX_O):	$(OBJECTS) $(OBJS_DIR)/vers.o
