@@ -71,7 +71,7 @@ pics/elfcap.o:	$(ELFCAP)/elfcap.c
 		$(POST_PROCESS_O)
 
 $(RTLD):	pics $(PICS) $(CRTS)
-		$(LD) -o $@ -dy -G $(DYNFLAGS) $(CRTI) $(PICS) \
+		$(LD) -o $@ -dy $(GSHARED) $(DYNFLAGS) $(CRTI) $(PICS) \
 		    $(LDLIBS) $(CRTN)
 		$(POST_PROCESS_SO)
 

@@ -84,14 +84,13 @@ $(__GNUC4)CERRWARN += -_gcc=-Wno-array-bounds
 
 # vi maintains its own versions of various routines from libc and libcurses,
 # so localize all symbols to avoid name space collisions.
-LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
+LDFLAGS +=	$(MAPFILE.NGB:%=-Wl,-M%)
 
 CLOBBERFILES += $(LIBPROGS)
 ex :=		LDLIBS += -lmapmalloc -lcurses -lgen -lcrypt_i
 $(XPG4) :=	LDLIBS += -lmapmalloc -lcurses -lgen -lcrypt_i
 $(XPG6) :=	LDLIBS += -lmapmalloc -lcurses -lgen -lcrypt_i
 exrecover :=	LDLIBS += -lmapmalloc -lcrypt_i
-lint :=		LDLIBS += -lmapmalloc -lcurses -lgen -lcrypt
 
 ROOTLIBPROGS= $(LIBPROGS:%=$(ROOTLIB)/%)
 
@@ -174,7 +173,5 @@ $(ROOTXPG6LINKS): $(ROOTXPG6PROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint: lint_SRCS
 
 include ../../Makefile.targ

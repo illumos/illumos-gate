@@ -1111,7 +1111,7 @@ CFLAGS += $(XSTRCONST)
 
 ALTPICS= $(TRACEOBJS:%=pics/%)
 
-$(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS) \
+$(DYNLIB) := BUILD.SO = $(LD) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(ALTPICS) \
 		$(EXTPICS) $(LDLIBS)
 
 MAPFILES =	$(LIBCDIR)/port/mapfile-vers

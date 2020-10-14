@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 /*
@@ -1749,7 +1750,8 @@ done:
 int
 aggr_grp_rem_ports(datalink_id_t linkid, uint_t nports, laioc_port_t *ports)
 {
-	int rc = 0, i;
+	int rc = 0;
+	uint_t i;
 	aggr_grp_t *grp = NULL;
 	aggr_port_t *port;
 	boolean_t mac_addr_update = B_FALSE, mac_addr_changed;
@@ -1842,8 +1844,8 @@ aggr_grp_rem_ports(datalink_id_t linkid, uint_t nports, laioc_port_t *ports)
 		 * aggr_find_tx_ring() will not return any rings
 		 * belonging to it.
 		 */
-		for (i = 0; i < grp->lg_rx_group_count; i++)
-			aggr_rem_pseudo_rx_group(port, &grp->lg_rx_groups[i]);
+		for (uint_t j = 0; j < grp->lg_rx_group_count; j++)
+			aggr_rem_pseudo_rx_group(port, &grp->lg_rx_groups[j]);
 
 		/* remove port from group */
 		rc = aggr_grp_rem_port(grp, port, &mac_addr_changed,

@@ -32,7 +32,7 @@ SRCS= $(OBJS:%.o=%.c)
 
 include ../Makefile.cmd
 
-LDFLAGS +=	$(MAPFILE.INT:%=-M%)
+LDFLAGS +=	$(MAPFILE.INT:%=-Wl,-M%)
 LDLIBS +=	-lcurses
 CPPFLAGS +=	-I../../lib/libcurses/screen
 CERRWARN +=	-_gcc=-Wno-parentheses
@@ -52,7 +52,5 @@ install: all $(ROOTPROG)
 
 clean:
 	$(RM) $(OBJS)
-
-lint: lint_SRCS
 
 include ../Makefile.targ

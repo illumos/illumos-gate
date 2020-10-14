@@ -92,7 +92,6 @@ ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 ROOTMANIFEST = $(ROOTMANIFESTDIR)/$(PROG).xml
 
 OBJS = $(SRCS:%.c=%.o)
-LINTFILES = $(SRCS:%.c=%.ln)
 
 CLEANFILES += ../common/fmd_rpc_api.h ../common/fmd_rpc_adm.h
 CLEANFILES += fmd_svc_adm.c fmd_svc_api.c fmd_xdr_adm.c fmd_xdr_api.c
@@ -102,7 +101,6 @@ DMOD = fmd.so
 ROOTDMOD = $(ROOT)/usr/lib/mdb/proc/$(DMOD)
 DMOD_SRCS = fmd_mdb.c
 DMOD_OBJS = $(DMOD_SRCS:%.c=%.o)
-DMOD_LINT = $(DMOD_SRCS:%.c=%.ln)
 
 HDRS = fmd_api.h fmd_fmri.h
 ROOTCDIR = $(ROOT)/etc/fm/$(PROG)
@@ -117,7 +115,6 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CPPFLAGS += -I. -I../common
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT
 CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
-LINTFLAGS += -mu
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += $(CNOWARN_UNINIT)
@@ -132,25 +129,18 @@ $(PROG) := LDFLAGS += -R/usr/lib/fm
 $(PROG) := LDLIBS += -L$(ROOTLIB)/fm -ltopo -ldiagcode -lsysevent -lsmbios \
 		-luuid -lnvpair -lexacct -lnsl -lumem -ldevinfo -lfmd_msg
 
-$(DMOD) := CFLAGS += $(CC_PICFLAGS) -G $(XREGSFLAG)
-$(DMOD) := LDFLAGS += $(ZTEXT) $(ZDEFS) $(MAPFILE-DMOD:%=-M%)
+$(DMOD) := CFLAGS += $(CC_PICFLAGS) $(GSHARED) $(XREGSFLAG)
+$(DMOD) := LDFLAGS += $(ZTEXT) $(ZDEFS) $(MAPFILE-DMOD:%=-Wl,-M%)
 
 #
 # rpcgen(1) produces code that wants to be in the foreground if we're compiled
 # DEBUG, which isn't appropriate for our daemon.  Forcibly undefine this code.
-# It also produces various lint warnings; turn these off for these files only.
-# Unfortunately we also have to turn off IGNOR2 for pass2 lint as well.
 #
 fmd_svc_adm.o fmd_svc_api.o := CPPFLAGS += -UDEBUG -URPC_SVC_FG
 fmd_xdr_adm.o fmd_xdr_api.o := CPPFLAGS += -UDEBUG -URPC_SVC_FG
 
-fmd_svc_adm.ln fmd_svc_api.ln fmd_xdr_adm.ln fmd_xdr_api.ln := LINTFLAGS += \
-  -xerroff=E_FUNC_ARG_UNUSED -xerroff=E_FUNC_VAR_UNUSED -xerroff=E_STATIC_UNUSED
-
-lint_prog := LINTFLAGS += -xerroff=E_FUNC_RET_ALWAYS_IGNOR2
-
 .NO_PARALLEL:
-.PARALLEL: $(OBJS) $(LINTFILES)
+.PARALLEL: $(OBJS)
 
 all: $(PROG) $(DMOD) install_h
 
@@ -194,25 +184,11 @@ fmd_xdr_%.c: ../common/fmd_rpc_%.x
 	$(RPCGEN) -CMN -c -o $@ $<
 
 clean:
-	$(RM) $(OBJS) $(DMOD_OBJS) $(LINTFILES) $(DMOD_LINT)
+	$(RM) $(OBJS) $(DMOD_OBJS)
 	$(RM) $(CLEANFILES)
 
 clobber: clean
 	$(RM) $(PROG) $(DMOD)
-
-%.ln: ../common/%.c
-	$(LINT.c) -c $<
-
-%.ln: %.c
-	$(LINT.c) -c $<
-
-lint_prog: $(LINTFILES)
-	$(LINT) $(LINTFLAGS) $(LINTFILES) $(LDLIBS)
-
-lint_dmod: $(DMOD_LINT)
-	$(LINT) $(LINTFLAGS) $(DMOD_LINT) $(LDLIBS)
-
-lint: lint_prog lint_dmod
 
 $(ROOT)/etc/fm:
 	$(INS.dir)

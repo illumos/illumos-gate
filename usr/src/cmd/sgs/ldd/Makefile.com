@@ -39,7 +39,7 @@ SGSCOMMONOBJ=	alist.o
 OBJS=		$(BLTOBJ) $(COMOBJ) $(SGSCOMMONOBJ)
 
 MAPFILE=	$(MAPFILE.NGB)
-MAPOPTS=	$(MAPFILE:%=-M%)
+MAPOPTS=	$(MAPFILE:%=-Wl,-M%)
 
 CPPFLAGS +=	-I. -I../../include -I../../include/$(MACH) \
 		-I$(SRC)/uts/$(ARCH)/sys \

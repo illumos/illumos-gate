@@ -31,7 +31,7 @@ CLEANFILES =	y.tab.c y.tab.h $(YACCSRC:%.y=%.c) $(YACCSRC:%.y=%.def)
 
 YFLAGS =	-d
 CPPFLAGS =	-I. -I.. $(CPPFLAGS.master)
-LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
+LDFLAGS +=	$(MAPFILE.NGB:%=-Wl,-M%)
 
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-unused-label
@@ -42,7 +42,7 @@ SMATCH=off
 
 .KEEP_STATE:
 
-all :		$(PROG) 
+all :		$(PROG)
 
 catalog:        $(POFILE)
 
@@ -66,10 +66,5 @@ install :	all $(ROOTPROG)
 
 clean:
 		$(RM) $(OBJS) $(CLEANFILES)
-
-lint:		lint_SRCS
-
-strip :
-		$(STRIP) $(PROG)
 
 include		../../Makefile.targ

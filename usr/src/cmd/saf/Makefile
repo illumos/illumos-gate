@@ -54,8 +54,7 @@ ROOTSACF= $(SACF:%=$(LIBSAFD)/%)
 ROOTADMF= $(ADMF:%=$(ROOTUSRSBIN)/%)
 
 LDLIBS += -lnsl
-LDFLAGS += $(MAPFILE.NGB:%=-M%)
-LINTFLAGS += -b -x
+LDFLAGS += $(MAPFILE.NGB:%=-Wl,-M%)
 
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-parentheses
@@ -79,7 +78,7 @@ $(LIBSAFD)/% : %
 
 .PARALLEL: $(OBJS)
 
-all: $(PROG) 
+all: $(PROG)
 
 sac: $(SACOBJS) $(MAPFILE.NGB)
 	$(LINK.c) $(SACOBJS) -o $@ $(LDLIBS)
@@ -109,10 +108,5 @@ check:	$(CHKMANIFEST)
 
 clean:
 	$(RM) $(OBJS)
-
-lint:
-	$(LINT.c) $(SACSRCS)
-	$(LINT.c) $(SACADMSRCS)
-	$(LINT.c) $(PMADMSRCS)
 
 include ../Makefile.targ

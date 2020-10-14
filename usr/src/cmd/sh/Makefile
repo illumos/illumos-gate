@@ -51,7 +51,7 @@ CERRWARN += -_gcc=-Wno-unused-variable
 SMATCH=off
 
 MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
-LDFLAGS += $(MAPFILES:%=-M%)
+LDFLAGS += $(MAPFILES:%=-Wl,-M%)
 LDLIBS += -lgen
 
 .KEEP_STATE:
@@ -74,9 +74,7 @@ install: all $(ROOTHASBINPROG)
 	$(RM) $(ROOTHASLIB)/rsh
 	$(SYMLINK) ../bin/sh $(ROOTHASLIB)/rsh
 
-clean:	
+clean:
 	$(RM) $(OBJS)
-
-lint: lint_SRCS
 
 include ../Makefile.targ

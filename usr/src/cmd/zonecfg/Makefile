@@ -35,7 +35,7 @@ include ../Makefile.ctf
 # still export a number of "yy*" (libl) interfaces.  Reduce all other symbols
 # to local scope.
 MAPFILES +=	$(MAPFILE.LEX) $(MAPFILE.NGB)
-MAPOPTS =	$(MAPFILES:%=-M%)
+MAPOPTS =	$(MAPFILES:%=-Wl,-M%)
 
 LFLAGS =	-t
 YFLAGS =	-d -b zonecfg_grammar
@@ -81,11 +81,5 @@ check:	$(PROG).c $(PROG).h
 
 clean:
 	$(RM) $(OBJS) $(CLEANFILES)
-
-#
-# We don't do lint of lex- and yacc- generated source files
-#
-lint:
-	$(LINT.c) -c $(PROG).c $(LDLIBS)
 
 include ../Makefile.targ

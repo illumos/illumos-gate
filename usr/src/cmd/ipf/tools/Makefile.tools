@@ -57,7 +57,7 @@ include ../../../Makefile.cmd
 include ../../Makefile.ipf
 
 LDLIBS		+= $(LIBBPF)
-LDFLAGS		+= $(MAPFILE.NGB:%=-M%)
+LDFLAGS		+= $(MAPFILE.NGB:%=-Wl,-M%)
 
 CPPFLAGS	+= -I. -DIPFILTER_LOOKUP -DIPFILTER_LOG
 

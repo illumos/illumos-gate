@@ -19,7 +19,7 @@
 .\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
 .\" Copyright 2020 Oxide Computer Company
 .\"
-.Dd September 11, 2020
+.Dd October 11, 2020
 .Dt QSORT 3C
 .Os
 .Sh NAME
@@ -35,7 +35,8 @@
 .Fa "size_t width"
 .Fa "int (*compar)(const void *, const void *)"
 .Fc
-.Fo qsort
+.Ft void
+.Fo qsort_r
 .Fa "void *base"
 .Fa "size_t nel"
 .Fa "size_t width"

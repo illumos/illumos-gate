@@ -49,7 +49,7 @@ XGETFLAGS += -a -x expr.xcl
 LDLIBS += -lgen
 
 MAPFILES =	$(MAPFILE.INT) $(MAPFILE.NGB)
-LDFLAGS +=	$(MAPFILES:%=-M%)
+LDFLAGS +=	$(MAPFILES:%=-Wl,-M%)
 
 .KEEP_STATE:
 
@@ -89,7 +89,5 @@ exprobjs.xpg6:
 
 clean:
 	$(RM) $(OBJS)
-
-lint:	lint_PROG
 
 include ../Makefile.targ

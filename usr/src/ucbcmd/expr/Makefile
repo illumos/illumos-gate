@@ -32,7 +32,7 @@ CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-extra
 CERRWARN +=	-_gcc=-Wno-char-subscripts
 
-LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
+LDFLAGS +=	$(MAPFILE.NGB:%=-Wl,-M%)
 
 .KEEP_STATE:
 

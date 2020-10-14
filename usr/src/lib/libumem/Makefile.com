@@ -120,8 +120,8 @@ MAPFILE_SUPPLEMENTAL = $(MAPFILE_SUPPLEMENTAL_$(CURTYPE))
 
 LDLIBS +=	-lc
 
-LDFLAGS_standalone = $(ZNOVERSION) $(BREDUCE) -M../common/mapfile-vers \
-	-M$(MAPFILE_SUPPLEMENTAL) -dy -r
+LDFLAGS_standalone = $(ZNOVERSION) $(BREDUCE) -Wl,-M../common/mapfile-vers \
+	-Wl,-M$(MAPFILE_SUPPLEMENTAL) -dy -r
 LDFLAGS = $(LDFLAGS_$(CURTYPE))
 
 ASFLAGS_standalone = -DUMEM_STANDALONE

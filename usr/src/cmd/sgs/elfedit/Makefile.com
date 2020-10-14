@@ -48,7 +48,7 @@ CPPFLAGS=	-I. -I../common -I../../include -I../../include/$(MACH) \
 		$(CPPFLAGS.master) -I$(ELFCAP)
 LLDFLAGS =	$(VAR_ELFEDIT_LLDFLAGS)
 LLDFLAGS64 =	$(VAR_ELFEDIT_LLDFLAGS64)
-LDFLAGS +=	$(VERSREF) -M$(MAPFILE) $(LLDFLAGS)
+LDFLAGS +=	$(VERSREF) -Wl,-M$(MAPFILE) $(LLDFLAGS)
 LDLIBS +=	$(ELFLIBDIR) -lelf $(LDDBGLIBDIR) -llddbg \
 		    $(CONVLIBDIR) -lconv -ltecla
 NATIVE_LIBS +=	libtecla.so

@@ -40,8 +40,8 @@ LDLIBS +=	-lc
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR) -mt $(CCVERBOSE) -D_POSIX_PTHREAD_SEMANTICS
 CPPFLAGS +=	-DBUILD_TIME='"Wed Sep 24 12:00:00 2008"'
-DYNFLAGS +=	-z finiarray=ExitLibrary
-DYNFLAGS +=	-z initarray=InitLibrary
+DYNFLAGS +=	-Wl,-zfiniarray=ExitLibrary
+DYNFLAGS +=	-Wl,-zinitarray=InitLibrary
 
 CERRWARN +=	-_gcc=-Wno-type-limits
 CERRWARN +=	-_gcc=-Wno-unused-variable

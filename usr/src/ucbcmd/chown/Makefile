@@ -33,7 +33,7 @@ FILEMODE=	755
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-parentheses
-LDFLAGS += $(MAPFILE.NGB:%=-M%)
+LDFLAGS += $(MAPFILE.NGB:%=-Wl,-M%)
 
 .KEEP_STATE:
 

@@ -27,7 +27,7 @@
 include		../../Makefile.cmd
 include		../Makefile.cmd
 
-PROG= 		mailstats mconnect vacation mailcompat praliases
+PROG=		mailstats mconnect vacation mailcompat praliases
 
 LIBPROG=	mail.local smrsh
 
@@ -38,11 +38,11 @@ LIBSMTPSMPROG= mailq
 # $(PROG) by default
 CLOBBERFILES=	$(LIBPROG) $(USRSBINPROG) $(LIBSMTPSMPROG)
 
-OBJS= 		$(PROG:%=%.o)
+OBJS=		$(PROG:%=%.o)
 
 .PARALLEL:	$(OBJS) $(PROG) $(LIBPROG) $(USRSBINPROG)
 
-SRCS= 		$(PROG:%=%.c)
+SRCS=		$(PROG:%=%.c)
 
 editmap :=	LDLIBS += -lldap
 mail.local :=	LDLIBS += -lsocket -lnsl -lmail -lldap
@@ -65,7 +65,7 @@ CPPFLAGS =	$(INCPATH) $(ENVDEF) $(SUNENVDEF) $(DBMDEF) $(CPPFLAGS.sm)
 
 # Nearly every support application provides sleep().  This isn't incompatible
 # with libc, but can be confined to the applications themselves.
-LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
+LDFLAGS +=	$(MAPFILE.NGB:%=-Wl,-M%)
 
 .KEEP_STATE:
 
@@ -118,8 +118,5 @@ install: all $(ROOTPROG) $(ROOTLIB)/mail.local $(ROOTLIB)/smrsh \
 
 clean:
 	$(RM) $(OBJS) *.o
-
-lint:		lint_PROG
-
 
 include	../../Makefile.targ

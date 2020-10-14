@@ -59,7 +59,7 @@ $(LNSLPROG) :=	LDLIBS += -lnsl
 $(NIS2LDAPPROG) := LDLIBS += -lc -lnsl -lnisdb
 stdethers :=	LDLIBS += -lsocket
 makedbm :=	MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
-makedbm :=	LDFLAGS += $(MAPFILES:%=-M%)
+makedbm :=	LDFLAGS += $(MAPFILES:%=-Wl,-M%)
 
 $(ROOTVAR_YP)/aliases :=	FILEMODE=555
 
@@ -73,10 +73,10 @@ SUBDIRS = yppasswd mknetid revnetgroup ypupdated yp2lscripts
 
 YPBINDOBJ= yp_b_svc.o yp_b_subr.o rpc_bootstrap.o getlist.o
 #
-# Some sort of obsolete idea of common files which are only now used by a 
+# Some sort of obsolete idea of common files which are only now used by a
 # few minor utilities
 #
-COMMONOBJ= getlist.o yp_getalias.o 
+COMMONOBJ= getlist.o yp_getalias.o
 
 #
 # Objects shared between all the major components
@@ -128,19 +128,19 @@ YPMASTERSRC =	$(YPMASTEROBJ:.o=.c)
 
 YPALLSRC =	$(YPALLOBJ:.o=.c)
 
-COMMONSRC = 	$(COMMONOBJ:.o=.c)
+COMMONSRC =	$(COMMONOBJ:.o=.c)
 
 #COMMONCLNTSRC =	$(COMMONCLNTOBJ:.o=.c)
 
 SRCS = $(BINSRC) $(SBINSRC) $(NETYPSRC) \
 	$(COMMONSRC) $(SHAREDSRC)
 
-CLEANFILES =	ypxfrd.h ypxfrd_xdr.c 
+CLEANFILES =	ypxfrd.h ypxfrd_xdr.c
 
 IBINPROG=		$(BINPROG:%=$(ROOTBIN)/%)
 ISBINPROG=		$(SBINPROG:%=$(ROOTUSRSBIN)/%)
 INETYPPROG=		$(NETYPPROG:%=$(NETYP)/%)
-INIS2LDAPPROG = 	$(NIS2LDAPPROG:%=$(NETYP)/%)
+INIS2LDAPPROG =		$(NIS2LDAPPROG:%=$(NETYP)/%)
 
 NIS2LDAPINC =		-I$(SRC)/lib/libnisdb/yptol
 
@@ -157,7 +157,7 @@ CERRWARN +=	-_gcc=-Wno-unused-function
 # too many unknown types
 SMATCH =	off
 
-ZGUIDANCE = -zguidance=nounused
+ZGUIDANCE = -Wl,-zguidance=nounused
 
 #conditional assignments
 ypalias.o :=	CPPFLAGS= -DMAIN $(CPPFLAGS.master)
@@ -182,7 +182,7 @@ clean:=		TARGET= clean
 clobber:=	TARGET= clobber
 cstyle :=	TARGET= cstyle
 
-all: $(SHAREDOBJ) $(SUBDIRS) $(PROG) $(TXTS) 
+all: $(SHAREDOBJ) $(SUBDIRS) $(PROG) $(TXTS)
 
 # install rules
 $(ROOTVAR_YP)/% \

@@ -28,7 +28,7 @@
 ROOTTERMINFO = $(ROOTSHLIB)/terminfo
 
 $(PROG).core: $(OBJS) $(KMDBLIBS) $(MAPFILE)
-	$(LD) -r $(BREDUCE) $(ZNOVERSION) $(ZDEFS) -M$(MAPFILE) -o $@ $(OBJS) \
+	$(LD) -r $(BREDUCE) $(ZNOVERSION) $(ZDEFS) -Wl,-M$(MAPFILE) -o $@ $(OBJS) \
 	    $(KMDBLIBS)
 
 $(PROG): $(PROG).core $(KCTLOBJS)
@@ -38,9 +38,6 @@ $(PROG): $(PROG).core $(KCTLOBJS)
 	$(POST_PROCESS)
 	$(SETDYNFLAG) -f DF_1_IGNMULDEF,DF_1_NOKSYMS $@
 
-clean.lint:
-	$(RM) $(ALLLINTFILES)
-
 clean:
 	$(RM) $(OBJS) $(KCTLOBJS) $(PROG).core $(MAPFILE)
 	$(RM) $(MAPFILE_INTERMEDIATE)
@@ -48,7 +45,7 @@ clean:
 	$(RM) kaif_off.h kmdb_context_off.h
 	$(RM) mdb_lex.c mdb_grammar.c mdb_grammar.h y.tab.h y.tab.c y.output
 
-clobber: clean clean.lint
+clobber: clean
 	$(RM) $(PROG)
 
 dmods:
@@ -142,49 +139,3 @@ kmdb_modlinktest.c: $(MAPFILE_INTERMEDIATE)
 %.o: $(SRC)/common/util/%.c
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
-
-#
-# Lint
-#
-
-%.ln: ../../../common/kmdb/%.c
-	$(LINT.c) -c $<
-
-%.ln: ../../../common/kmdb/kctl/%.c
-	$(LINT.c) -c $<
-
-%.ln: ../../../common/kmdb/kctl/%.s
-	$(LINT.s) -c $<
-
-%.ln: ../../../common/mdb/%.c
-	$(LINT.c) -c $<
-
-%.ln: ../../kmdb/%.c
-	$(LINT.c) -c $<
-
-%.ln: ../../kmdb/%.s
-	$(LINT.s) -c $<
-
-%.ln: ../../kmdb/kctl/%.c
-	$(LINT.c) -c $<
-
-%.ln: ../../kmdb/kctl/%.s
-	$(LINT.s) -c $<
-
-%.ln: ../../mdb/%.c
-	$(LINT.c) -c $<
-
-%.ln: %.c
-	$(LINT.c) -c $<
-
-%.ln: %.s
-	$(LINT.s) -c $<
-
-%.ln: kctl/%.s
-	$(LINT.s) -c $<
-
-%.ln: $(SRC)/common/net/util/%.c
-	$(LINT.c) -c $<
-
-%.ln: $(SRC)/common/util/%.c
-	$(LINT.c) -c $<

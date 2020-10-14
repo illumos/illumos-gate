@@ -45,7 +45,6 @@
  * -#		Verbose mode
  * -###		Show compiler commands built by driver, no compilation
  * -A<name[(tokens)]>	Preprocessor predicate assertion
- * -B<[static|dynamic]>	Specify dynamic or static binding
  * -C		Prevent preprocessor from removing comments
  * -c		Compile only - produce .o files, suppress linking
  * -cg92	Alias for -xtarget=ss1000
@@ -66,7 +65,6 @@
  * -fsingle	Use single-precision arithmetic (-Xt and -Xs modes only)
  * -ftrap=<t>	Select floating-point trapping mode in effect at startup
  * -fstore	force floating pt. values to target precision on assignment
- * -G		Build a dynamic shared library
  * -g		Compile for debugging
  * -H		Print path name of each file included during compilation
  * -h <name>	Assign <name> to generated dynamic shared library
@@ -158,7 +156,6 @@
  * -c				pass-thru
  * -cg92			-m32 -mcpu=v8 -mtune=supersparc (SPARC only)
  * -D<name[=token]>		pass-thru
- * -dy or -dn			-Wl,-dy or -Wl,-dn
  * -E				pass-thru
  * -erroff=E_EMPTY_TRANSLATION_UNIT ignore
  * -errtags=%all		-Wall
@@ -173,7 +170,6 @@
  * -fsingle[=<n>]		error
  * -ftrap=<t>			error
  * -fstore			error
- * -G				pass-thru
  * -g				pass-thru
  * -H				pass-thru
  * -h <name>			pass-thru
@@ -197,8 +193,6 @@
  * -Q[y|n]			error
  * -R<dir[:dir]>		pass-thru
  * -S				pass-thru
- * -s				-Wl,-s
- * -t				-Wl,-t
  * -U<name>			pass-thru
  * -V				--version
  * -v				-Wall
@@ -823,16 +817,6 @@ do_gcc(cw_ictx_t *ctx)
 				newae(ctx->i_ae, "-ffreestanding");
 			break;
 		case 'd':
-			if (arglen == 2) {
-				if (strcmp(arg, "-dy") == 0) {
-					newae(ctx->i_ae, "-Wl,-dy");
-					break;
-				}
-				if (strcmp(arg, "-dn") == 0) {
-					newae(ctx->i_ae, "-Wl,-dn");
-					break;
-				}
-			}
 			if (strcmp(arg, "-dalign") == 0) {
 				/*
 				 * -dalign forces alignment in some cases;
@@ -865,10 +849,6 @@ do_gcc(cw_ictx_t *ctx)
 			}
 			error(arg);
 			break;
-		case 'G':
-			newae(ctx->i_ae, "-shared");
-			nolibc = 1;
-			break;
 		case 'k':
 			if (strcmp(arg, "-keeptmp") == 0) {
 				newae(ctx->i_ae, "-save-temps");
@@ -896,30 +876,6 @@ do_gcc(cw_ictx_t *ctx)
 			}
 			error(arg);
 			break;
-		case 'B':	/* linker options */
-		case 'M':
-		case 'z':
-			{
-				char *opt;
-				size_t len;
-				char *s;
-
-				if (arglen == 1) {
-					opt = *++ctx->i_oldargv;
-					if (opt == NULL || *opt == '\0')
-						error(arg);
-					ctx->i_oldargc--;
-				} else {
-					opt = arg + 2;
-				}
-				len = strlen(opt) + 7;
-				if ((s = malloc(len)) == NULL)
-					nomem();
-				(void) snprintf(s, len, "-Wl,-%c%s", c, opt);
-				newae(ctx->i_ae, s);
-				free(s);
-			}
-			break;
 		case 'O':
 			if (arglen == 1) {
 				newae(ctx->i_ae, "-O");
@@ -940,19 +896,14 @@ do_gcc(cw_ictx_t *ctx)
 			nolibc = 1;
 			break;
 		case 's':
-			if (arglen == 1) {
-				newae(ctx->i_ae, "-Wl,-s");
+			if (strcmp(arg, "-shared") == 0) {
+				newae(ctx->i_ae, "-shared");
+				nolibc = 1;
 				break;
 			}
 			error(arg);
 			break;
-		case 't':
-			if (arglen == 1) {
-				newae(ctx->i_ae, "-Wl,-t");
-				break;
-			}
-			error(arg);
-			break;
+
 		case 'V':
 			if (arglen == 1) {
 				ctx->i_flags &= ~CW_F_ECHO;

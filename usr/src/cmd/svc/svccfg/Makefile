@@ -35,9 +35,6 @@ SRCS  =		svccfg_main.c \
 		svccfg_xml.c \
 		svccfg_help.c
 
-LNTS =		$(SRCS:%.c=%.ln) \
-		manifest_find.ln \
-		manifest_hash.ln
 
 MYOBJS =	$(SRCS:%.c=%.o) \
 		svccfg_grammar.o \
@@ -68,7 +65,7 @@ $(NATIVE_BUILD)OBJS = $(MYOBJS:%.o=%-native.o)
 # still export a number of "yy*" (libl) interfaces.  Reduce all other symbols
 # to local scope.
 MAPFILES +=	$(MAPFILE.LEX) $(MAPFILE.NGB)
-MAPOPTS =	$(MAPFILES:%=-M%)
+MAPOPTS =	$(MAPFILES:%=-Wl,-M%)
 
 MYCPPFLAGS =	-I ../common -I$(ADJUNCT_PROTO)/usr/include/libxml2
 CPPFLAGS +=	$(MYCPPFLAGS)
@@ -102,9 +99,6 @@ LIBSCF		= $(SRC)/lib/libscf
 LIBTECLA	= $(SRC)/lib/libtecla		# just for the header
 LIBUUTIL	= $(SRC)/lib/libuutil
 
-lint := LINTFLAGS = -mux
-lint := SVCCFG_EXTRA_LIBS = -lscf -ll -luutil -lumem -lmd5 -lnvpair
-
 LDLIBS += $(SVCCFG_EXTRA_LIBS)
 
 $(NATIVE_BUILD)NATIVE_LIBS += libl.so libumem.so libmd5.so libnvpair.so libc.so
@@ -129,7 +123,7 @@ svccfg_lex.o svccfg_grammar.o := CCVERBOSE =
 svccfg_help.po := XGETFLAGS =	-a
 
 .KEEP_STATE:
-.PARALLEL: $(OBJS) $(LNTS)
+.PARALLEL: $(OBJS)
 
 all debug: $(PROG)
 
@@ -161,10 +155,7 @@ svccfg_grammar.h svccfg_grammar.c: svccfg.y
 	@$(MV) y.tab.c svccfg_grammar.c
 
 clean: FRC
-	$(RM) $(MYOBJS) $(MYOBJS:%.o=%-native.o) $(LNTS)
-
-lint: $(LNTS)
-	$(LINT.c) $(LINTFLAGS) $(LNTS) $(LDLIBS)
+	$(RM) $(MYOBJS) $(MYOBJS:%.o=%-native.o)
 
 %-native.o: %.c
 	$(COMPILE.c) -o $@ $<
@@ -177,9 +168,6 @@ lint: $(LNTS)
 %.o: ../common/%.c
 	$(COMPILE.c) $(OUTPUT_OPTION) $<
 	$(POST_PROCESS_O)
-
-%.ln: ../common/%.c
-	$(LINT.c) $(OUTPUT_OPTION) -c $<
 
 include ../../Makefile.targ
 

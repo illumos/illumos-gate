@@ -60,7 +60,7 @@ $(PICS):	pics
 # to this object, and define the interface.
 
 pics/objcap.o:	$(PICS) $(MAPFILE-CAP)
-		$(LD) -r -o $@ $(MAPOPT-CAP) -Breduce $(PICS)
+		$(LD) -r -o $@ $(MAPOPT-CAP) $(BREDUCE) $(PICS)
 
 # Convert the combined object capabilities object into a symbol capabilities
 # object.

@@ -122,7 +122,7 @@ CERRWARN += -_gcc=-Wno-unused-function
 SMATCH=off
 
 MAPFILES = ../common/mapfile-intf $(MAPFILE.NGB)
-rcm_daemon := LDFLAGS += $(MAPFILES:%=-M%)
+rcm_daemon := LDFLAGS += $(MAPFILES:%=-Wl,-M%)
 
 LDLIBS_MODULES =
 SUNW_pool_rcm.so := LDLIBS_MODULES += -L$(ROOT)/usr/lib -lpool -lnvpair

@@ -22,12 +22,10 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
 
-DYNFLAGS += $(FCODE64) -Mmapfile-extern
+DYNFLAGS += $(FCODE64) -Wl,-Mmapfile-extern
 
 install: all $(ROOTLIBS64)

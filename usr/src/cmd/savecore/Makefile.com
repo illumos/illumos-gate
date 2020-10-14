@@ -44,7 +44,7 @@ SMATCH=off
 # savecore.c it will compile, but trying to call that function
 # will jump to 0.  So we use -ztext to avoid that.
 #
-LDFLAGS += -ztext
+LDFLAGS += $(ZTEXT)
 
 BZIP2OBJS =	bz2blocksort.o	\
 		bz2compress.o	\
@@ -66,23 +66,6 @@ $(PROG): $(OBJS) $(BZIP2OBJS) $(CHACHAOBJ)
 
 clean:
 	$(RM) $(OBJS) $(BZIP2OBJS)
-
-lint := CPPFLAGS += -I$(SRC)/common
-
-#
-# Linting the usr/src/common/bzip2 source produces reams of complaints.
-# So we only lint regular SRCS, but we need to excuse two complaints
-# related to bz_internal_error.
-#
-
-lint := BZ2LINTCOPOUTS = -erroff=E_NAME_USED_NOT_DEF2
-lint := BZ2LINTCOPOUTS += -erroff=E_NAME_DEF_NOT_USED2
-
-lint := LINTFLAGS += $(BZ2LINTCOPOUTS)
-lint := LINTFLAGS64 += $(BZ2LINTCOPOUTS)
-
-lint:	$(LINTSRCS)
-	$(LINT.c) $(SRCS) $(LDLIBS)
 
 include ../../Makefile.targ
 

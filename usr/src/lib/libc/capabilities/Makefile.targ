@@ -43,7 +43,7 @@ pics/%.o:	../../$(ALT_PLATFORM)/common/%.s
 # to this object, and define the interface.
 
 pics/objcap.o:	$(PICS) $(MAPFILE-CAP)
-		$(LD) -r -o $@ $(MAPOPT-CAP) -Breduce $(PICS)
+		$(LD) -r -o $@ $(MAPOPT-CAP) $(BREDUCE) $(PICS)
 		$(POST_PROCESS_OBJCAP_O)
 
 # Convert the combined object capabilities object into a symbol capabilities

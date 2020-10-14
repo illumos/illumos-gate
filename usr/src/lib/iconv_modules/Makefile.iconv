@@ -47,7 +47,7 @@ CPPFLAGS	+= -I../../inc -I. -I../../common
 CFLAGS		+= $(C_PICFLAGS) $(GSHARED)
 
 DYNFLAGS=	$(GSHARED) $(ZTEXT) $(ZDEFS) $(BDIRECT) \
-		$(MAPFILES:%=-M%) $(MAPFILE.PGA:%=-M%) $(MAPFILE.NED:%=-M%)
+		$(MAPFILES:%=-Wl,-M%) $(MAPFILE.PGA:%=-Wl,-M%) $(MAPFILE.NED:%=-Wl,-M%)
 
 LDLIBS=		-lc
 

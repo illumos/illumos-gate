@@ -28,6 +28,6 @@ ASFLAGS=	$(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(sparcv9_AS_XARCH)
 include ../Makefile.com
 include ../../Makefile.lib.64
 
-BUILD.SO=	$(LD) -o $@ -G -64 $(DYNFLAGS) $(PICS) $(LDLIBS)
+BUILD.SO=	$(LD) -o $@ $(GSHARED) -64 $(DYNFLAGS) $(PICS) $(LDLIBS)
 
 install: all $(ROOTLIBS64)

@@ -25,7 +25,7 @@
 #
 # Copyright 2020 Joyent, Inc.
 
-TESTPROG = kwarndtest 
+TESTPROG = kwarndtest
 
 PROG= ktkt_warnd
 MANIFEST=	ktkt_warn.xml
@@ -33,7 +33,7 @@ MANIFEST=	ktkt_warn.xml
 KWARNDOBJS = kwarnd.o kwarnd_svc.o kwarnd_proc.o kwarnd_generic.o kwarnd_send.o
 KWARNTOBJS = kwarndtest.o
 
-G_OBJS   = kwarnd_xdr.o 
+G_OBJS   = kwarnd_xdr.o
 
 OBJS	= $(KWARNDOBJS) $(KWARNTOBJS) $(G_OBJS)
 SRCS	= $(OBJS:.o=.c)
@@ -49,7 +49,7 @@ ROOTMANIFESTDIR=	$(ROOTSVCNETWORKSECURITY)
 POFILE = $(PROG).po
 POFILES = generic.po
 
-COPTFLAG +=	$(XESS) #-I$(KINCDIR) 
+COPTFLAG +=	$(XESS) #-I$(KINCDIR)
 CPPFLAGS +=	-D_REENTRANT
 
 CERRWARN +=	-_gcc=-Wno-unused-variable
@@ -66,7 +66,7 @@ CPPFLAGS += -I../../lib/gss_mechs/mech_krb5/include \
                  -I$(SRC)/uts/common/gssapi/mechs/krb5/include
 
 ktkt_warnd :=	MAPFILES =	$(MAPFILE.INT) $(MAPFILE.NGB)
-ktkt_warnd :=	LDFLAGS +=	$(KRUNPATH) $(MAPFILES:%=-M%)
+ktkt_warnd :=	LDFLAGS +=	$(KRUNPATH) $(MAPFILES:%=-Wl,-M%)
 ktkt_warnd :=	LDLIBS +=	-lnsl
 
 LDFLAGS +=	$(KRUNPATH)
@@ -110,8 +110,6 @@ check:	$(CHKMANIFEST)
 
 clean:
 	$(RM) $(OBJS) $(RSRC)
-
-lint: lint_SRCS
 
 include ../../Makefile.targ
 

@@ -42,19 +42,11 @@ LDLIBS += -ll
 YFLAGS = -d
 CPPFLAGS = -I../head $(CPPFLAGS.master)
 
-# lex and yacc generates lint-unclean C code.
-LINTSUPPRESS=	\
-	-erroff=E_FUNC_RET_MAYBE_IGNORED2 \
-	-erroff=E_EQUALITY_NOT_ASSIGNMENT \
-	-erroff=E_BLOCK_DECL_UNUSED
-
-LINTFLAGS +=	-um
-
 # genmsg has a name clash with main() and libl.so.1.  However, genmsg must
 # still export a number of "yy*" (libl) interfaces.  Reduce all other symbols
 # to local scope.
 MAPFILES +=	$(MAPFILE.LEX) $(MAPFILE.NGB)
-MAPOPTS =	$(MAPFILES:%=-M%)
+MAPOPTS =	$(MAPFILES:%=-Wl,-M%)
 
 LDFLAGS +=	$(MAPOPTS)
 
@@ -89,10 +81,6 @@ $(POFILE):      $(SRCS)
 	$(XGETTEXT) $(XGETFLAGS)        $(POFILE).i
 	$(SED) "/^domain/d" messages.po > $@
 	$(RM) $(POFILE).i messages.po
-
-lint:	$(LEXINTSRCS) $(PSRC_C)
-	$(LINT.c) $(C_OBJS:%.o=%.c) $(LDLIBS)
-	$(LINT.c) $(LEXINTSRCS) $(PSRC_C) $(LINTSUPPRESS) $(LDLIBS)
 
 clean:
 	$(RM) $(OBJS) $(PSRC_C) $(LEXINTSRCS) y.tab.h *.po

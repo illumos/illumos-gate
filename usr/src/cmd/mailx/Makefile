@@ -72,9 +72,8 @@ CERRWARN +=	-_gcc=-Wno-clobbered
 # not linted
 SMATCH=off
 
-LINTFLAGS=	-hb
 LDLIBS +=	-lmail -lcustr
-LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
+LDFLAGS +=	$(MAPFILE.NGB:%=-Wl,-M%)
 
 CLOBBERFILES += $(MAILXHELP)
 
@@ -111,8 +110,6 @@ $(POFILE):      $(POFILES)
 
 clean:
 	$(RM) $(OBJS)
-
-lint: lint_SRCS
 
 include ../Makefile.targ
 

@@ -37,7 +37,7 @@
 #
 # These object capabilities relocatable objects are then translated into symbol
 # capabilities relocatable objects, pics/symcap.o.
-# 
+#
 # The sun4u and sun4v families of symbol capabilities object are eventually
 # included in the final build of trapstat.
 
@@ -48,7 +48,7 @@ $(OBJCAP):	$(OBJECTS)
 # to this object, and define the interface.
 
 objcap.o:	$(OBJECTS) $(MAPFILE-CAP)
-		$(LD) -r -o $@ $(MAPOPT-CAP) -Breduce $(OBJECTS)
+		$(LD) -r -o $@ $(MAPOPT-CAP) $(BREDUCE) $(OBJECTS)
 
 # Convert the combined object capabilities object into a symbol capabilities
 # object.
@@ -64,7 +64,5 @@ symcap.o:	$(OBJCAP)
 
 clean:
 		$(RM) $(OBJECTS)
-
-lint:
 
 include		$(SRC)/cmd/Makefile.targ

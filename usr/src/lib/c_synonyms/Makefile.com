@@ -30,10 +30,10 @@ OBJECTS = synonyms.o
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
-LIBS 		 = $(DYNLIB)
-LDLIBS 		+= -lc
+LIBS		 = $(DYNLIB)
+LDLIBS		+= -lc
 
-BUILD.SO =	$(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(LDLIBS)
+BUILD.SO =	$(LD) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(LDLIBS)
 
 CLEANFILES += synonym_list mapfile-vers
 

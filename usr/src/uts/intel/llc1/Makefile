@@ -27,8 +27,8 @@
 # Copyright (c) 2018, Joyent, Inc.
 
 #
-#	This makefile drives the production of the Sound-Blaster driver 
-#	kernel module.
+#	This makefile drives the production of the
+#	Logical Link Control Class 1 driver kernel module.
 #
 #	intel architecture dependent
 #

@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 #
 
-include 	../Makefile.lp
+include		../Makefile.lp
 
 SUBDIRS =	lptest lpadmin lpsched scripts
 
@@ -34,7 +34,7 @@ SBINPROG =	lpfilter lpforms lpusers
 
 LIBLINKS =	$(SBINPROG)
 
-PROG =		$(LOCALPROG) $(SBINPROG) 
+PROG =		$(LOCALPROG) $(SBINPROG)
 
 OBJS=	$(SBINPROG:=.o)
 
@@ -49,7 +49,7 @@ ROOTSYMLINKS=	$(LIBLINKS:%=$(ROOTLIB)/%)
 
 
 CPPFLAGS =	-I$(LPINC) $(CPPFLAGS.master)
-LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
+LDFLAGS +=	$(MAPFILE.NGB:%=-Wl,-M%)
 
 # conditional assignments
 #
@@ -65,7 +65,7 @@ lpusers:=	LDLIBS += $(LIBMSG) $(LIBACC) $(LIBOAM) $(LIBUSR) $(LIBLP)
 all:		$(PROG) $(SUBDIRS)
 
 install:	$(PROG) $(ROOTLIBLPLOCLPROG) $(ROOTSBINPROG) \
-		$(ROOTSYMLINKS) $(SUBDIRS) 
+		$(ROOTSYMLINKS) $(SUBDIRS)
 
 catalog:	$(SUBDIRS) $(POFILE)
 		$(CP) $(POFILE) ..
@@ -77,12 +77,6 @@ clobber:	$(SUBDIRS) local_clobber
 
 local_clobber:
 		$(RM) $(OBJS) $(PROG) $(CLOBBERFILES)
-
-strip:		$(SUBDIRS)
-		$(STRIP) $(PROG)
-
-lint:
-		$(LINT.c) $(SRCS) $(LDLIBS)
 
 $(ROOTSYMLINKS):
 		$(RM) $@; $(SYMLINK) ../sbin/$(@F) $@

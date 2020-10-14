@@ -35,7 +35,7 @@ CERRWARN += -_gcc=-Wno-extra
 LDLIBS += -lcurses
 
 MAPFILES =	../mapfile-intf $(MAPFILE.NGB)
-LDFLAGS +=	$(MAPFILES:%=-M%)
+LDFLAGS +=	$(MAPFILES:%=-Wl,-M%)
 
 PFOBJS = sh_policy.o
 
@@ -75,9 +75,6 @@ $(CSH_PROG): $(COMMONOBJS) $(LOCALOBJS) $(MAPFILES)
 $(HDDEP): ../sh.tconst.h
 
 install: all $(ROOTBINPROG)  $(ROOTPROG)
-
-lint:	../sh.tconst.h
-	$(LINT.c) $(COMMONSRCS) signal.c $(LDLIBS)
 
 clean:
 	$(RM) $(LOCALOBJS) $(COMMONOBJS)

@@ -48,7 +48,7 @@ GENOBJS =				\
 	rpc_svc.o
 
 SERVERSRCS =	$(SERVEROBJS:%.o=%.c)
-GENSRCS = 	$(GENOBJS:%.o=%.c)
+GENSRCS =	$(GENOBJS:%.o=%.c)
 OBJS =		$(SERVEROBJS) $(GENOBJS)
 SRCS =		$(SERVERSRCS)
 POFILES =	$(OBJS:%.o=%.po)
@@ -95,9 +95,6 @@ INCS += -I $(ROOT)/usr/include/kerberosv5
 $(OBJS) := CPPFLAGS += $(INCS) -D_REENTRANT
 $(POFILE) := CPPFLAGS += $(INCS)
 
-LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
-LINTFLAGS += -xerroff=E_NAME_USED_NOT_DEF2
-
 CFLAGS += $(CCVERBOSE)
 LDLIBS += \
 	-lsqlite-sys \
@@ -120,13 +117,11 @@ LDLIBS += \
 rpc_svc.o := CFLAGS += $(RPC_MSGOUT_OPT)
 
 $(PROG) := MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
-$(PROG) := LDFLAGS += $(MAPFILES:%=-M%) \
+$(PROG) := LDFLAGS += $(MAPFILES:%=-Wl,-M%) \
 	-R /usr/lib/smbsrv
 
 DIRMODE = 0755
 FILEMODE = 0555
-
-lint_SRCS := CPPFLAGS += $(INCS) -D_REENTRANT $(RPC_MSGOUT_OPT)
 
 .KEEP_STATE:
 
@@ -149,15 +144,11 @@ check: $(CHKMANIFEST)
 clean:
 	$(RM) $(OBJS) $(GENSRCS)
 
-lint:   lint_SRCS
-
-lint_SRCS:
-
 RPCGENFLAGS = -CMN
 
 adspriv_srv.o : adspriv_srv.c
 
-adspriv_srv.c: 
+adspriv_srv.c:
 	$(RPCGEN) $(RPCGENFLAGS) -m $(ADS_CMN)/ads_priv.x > $@
 
 rpc_svc.o : rpc_svc.c

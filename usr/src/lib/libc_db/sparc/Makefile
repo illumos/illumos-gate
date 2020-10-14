@@ -28,7 +28,7 @@ CRTSRCS= ../../crt/sparc
 
 include ../Makefile.com
 
-BUILD.SO= $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(LDLIBS)
+BUILD.SO= $(LD) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(LDLIBS)
 
 install: all $(ROOTLIBDIR) .WAIT $(ROOTLIBS) $(ROOTLINKS) \
 	$(ROOTCOMPATLINKS)
