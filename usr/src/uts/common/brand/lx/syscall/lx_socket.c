@@ -23,7 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2020 Joyent, Inc.
- * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/errno.h>
@@ -706,12 +706,16 @@ static lx_cmsg_xlate_t lx_cmsg_xlate_tbl[] = {
 	    LX_IPPROTO_IP, LX_IP_PKTINFO, cmsg_conv_generic },
 	{ IPPROTO_IP, IP_RECVTTL, stol_conv_recvttl,
 	    LX_IPPROTO_IP, LX_IP_TTL, NULL },
+	{ IPPROTO_IP, IP_RECVTOS, cmsg_conv_generic,
+	    LX_IPPROTO_IP, LX_IP_TOS, cmsg_conv_generic },
 	{ IPPROTO_IP, IP_TTL, cmsg_conv_generic,
 	    LX_IPPROTO_IP, LX_IP_TTL, cmsg_conv_generic },
 	{ IPPROTO_IPV6, IPV6_HOPLIMIT, cmsg_conv_generic,
 	    LX_IPPROTO_IPV6, LX_IPV6_HOPLIMIT, cmsg_conv_generic },
 	{ IPPROTO_IPV6, IPV6_PKTINFO, cmsg_conv_generic,
-	    LX_IPPROTO_IPV6, LX_IPV6_PKTINFO, cmsg_conv_generic }
+	    LX_IPPROTO_IPV6, LX_IPV6_PKTINFO, cmsg_conv_generic },
+	{ IPPROTO_IPV6, IPV6_TCLASS, cmsg_conv_generic,
+	    LX_IPPROTO_IPV6, LX_IPV6_TCLASS, cmsg_conv_generic }
 };
 
 #define	LX_MAX_CMSG_XLATE	\
@@ -2664,7 +2668,7 @@ static const lx_sockopt_map_t ltos_ip_sockopts[LX_IP_UNICAST_IF + 1] = {
 	{ OPTNOTSUP, 0 },			/* IP_MTUDISCOVER	*/
 	{ OPTNOTSUP, 0 },			/* IP_RECVERR		*/
 	{ IP_RECVTTL, sizeof (int) },		/* IP_RECVTTL		*/
-	{ OPTNOTSUP, 0 },			/* IP_RECVTOS		*/
+	{ IP_RECVTOS, sizeof (int) },		/* IP_RECVTOS		*/
 	{ OPTNOTSUP, 0 },			/* IP_MTU		*/
 	{ OPTNOTSUP, 0 },			/* IP_FREEBIND		*/
 	{ OPTNOTSUP, 0 },			/* IP_IPSEC_POLICY	*/
@@ -2774,7 +2778,7 @@ static const lx_sockopt_map_t ltos_ipv6_sockopts[LX_IPV6_TCLASS + 1] = {
 	{ OPTNOTSUP, 0 },
 	{ OPTNOTSUP, 0 },
 	{ OPTNOTSUP, 0 },
-	{ OPTNOTSUP, 0 },			/* IPV6_RECVTCLASS	*/
+	{ IPV6_RECVTCLASS, sizeof (int) },	/* IPV6_RECVTCLASS	*/
 	{ IPV6_TCLASS, sizeof (int) }		/* IPV6_TCLASS		*/
 };
 
