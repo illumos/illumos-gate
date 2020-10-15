@@ -27,8 +27,11 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-#if	defined(_KERNEL) && !defined(_BOOT)
+#if	defined(_KERNEL)
 #include <sys/null.h>
+#endif	/* _KERNEL */
+
+#if	defined(_KERNEL) && !defined(_BOOT)
 #include <sys/errno.h>
 #else	/* _KERNEL && !_BOOT */
 #if	!defined(_BOOT) && !defined(_KMDB) && !defined(_STANDALONE)
