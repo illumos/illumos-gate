@@ -102,6 +102,7 @@ LDLIBS +=	-lelf -lc -lz
 NATIVE_LIBS +=	libz.so
 
 SRCDIR =	../common
+CFLAGS64 +=	$(C_BIGPICFLAGS)
 CPPFLAGS +=	-I$(SRCDIR) -DELF_TARGET_ALL=1
 CERRWARN +=	-_gcc=-Wno-unused
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
