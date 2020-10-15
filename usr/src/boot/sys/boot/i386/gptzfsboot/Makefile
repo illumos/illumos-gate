@@ -89,7 +89,7 @@ CLEANFILES +=	gptzfsboot.bin gptzfsboot.out
 gptzfsboot.bin: gptzfsboot.out
 	$(OBJCOPY) -S -O binary gptzfsboot.out $@
 
-gptzfsboot.out: $(BTXCRT) $(OBJS) $(LIBSTAND)
+gptzfsboot.out: $(BTXCRT) $(OBJS) $(LIBI386) $(LIBSTAND)
 	$(LD) $(LD_FLAGS) -T $(LDSCRIPT) -o $@ $(BTXCRT) $(OBJS) $(LIBS)
 
 machine:
