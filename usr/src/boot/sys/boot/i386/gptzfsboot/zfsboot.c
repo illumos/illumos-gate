@@ -183,9 +183,15 @@ main(void)
 	bootinfo.bi_memsizes_valid++;
 	bootinfo.bi_bios_dev = *(uint8_t *)PTOV(ARGS);
 
-	/* Set up fall back device name. */
-	snprintf(boot_devname, sizeof (boot_devname), "disk%d:",
-	    bd_bios2unit(bootinfo.bi_bios_dev));
+	/*
+	 * Set up fall back device name. bd_bios2unit() is not available yet.
+	 */
+	if (bootinfo.bi_bios_dev < 0x80)
+		snprintf(boot_devname, sizeof (boot_devname), "disk%d:",
+		    bootinfo.bi_bios_dev);
+	else
+		snprintf(boot_devname, sizeof (boot_devname), "disk%d:",
+		    bootinfo.bi_bios_dev - 0x80);
 
 	for (i = 0; devsw[i] != NULL; i++)
 		if (devsw[i]->dv_init != NULL)
