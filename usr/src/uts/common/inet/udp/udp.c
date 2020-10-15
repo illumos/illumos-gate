@@ -6412,7 +6412,7 @@ udp_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
 		 */
 		error = ip_create_helper_stream(connp, us->us_ldi_ident);
 		if (error != 0) {
-			ip0dbg(("tcp_ioctl: create of IP helper stream "
+			ip0dbg(("udp_ioctl: create of IP helper stream "
 			    "failed %d\n", error));
 			return (error);
 		}
