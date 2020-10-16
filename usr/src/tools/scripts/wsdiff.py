@@ -1461,7 +1461,7 @@ def main() :
 	# Wait for the threads to finish and do cleanup if interrupted
 	debug("Waiting for the threads to finish")
 	while True:
-		if not True in [thread.isAlive() for thread in mythreads]:
+		if not True in [thread.is_alive() for thread in mythreads]:
 		    break
 		else:
 		    # Some threads are still going
