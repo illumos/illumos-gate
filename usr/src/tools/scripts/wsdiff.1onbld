@@ -18,14 +18,14 @@
 .\" " CDDL HEADER END
 .\" "
 .\" " Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+.\" " Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\" "
-.TH WSDIFF 1ONBLD "Jul 15, 2010"
+.TH WSDIFF 1ONBLD "Oct 20, 2020"
 .I wsdiff
 \- report differences between proto area objects
 .SH SYNOPSIS
-\fBwsdiff [-dvVst] [-r \fIresults\fP] [-i \fIfilelist\fP] \fIold\fP \fInew\fP
+\fBwsdiff\fP [-dstuvV] [-U \fIlines\fP] [-r \fIresults\fP] [-i \fIfilelist\fP] \fIold\fP \fInew\fP
 .SH DESCRIPTION
-.LP
 The wsdiff utility detects and reports on object differences found between
 two proto areas constructed from the same workspace. This can be useful
 when trying to understand which objects have changed as a result of a particular
@@ -41,18 +41,13 @@ with the source change.
 .B -d
 Print debug information. The debug lines are prefixed with ##.
 .TP 10
-.B -v
-Do not truncate the diffs logged to the results file. By default wsdiff
-will truncate the length of a sufficiently long set of object diffs to preserve
-the readability of the results file. -v can be used to override this behaviour.
-.TP 10
-.B -V
-Log observed differences for all ELF sections, rather than logging only the first
-difference found. When wsdiff encounters an ELF section difference, by default
-it will log the difference associated with that section only, and move on. -V forces
-wsdiff to log all ELF section differences found between two objects, rather than
-just the first. Because of the extra work involved, this may slow wsdiff down
-considerably.
+.BI "-i " filelist
+Specify which objects should be compared by wsdiff via an input file list (See
+EXAMPLES).
+.BI "-r " results
+Log results to the specified log file. The log file contains a list of new,
+deleted, and changed objects, as well as diffs signifying what wsdiff found to
+be different.
 .TP 10
 .B -s
 Produce sorted lists. This is handy when comparing multiple wsdiff outputs
@@ -62,20 +57,31 @@ sorted and can differ between multiple runs.
 .B -t
 Look for the onbld tools in $SRC/tools rather than /opt/onbld/bin
 .TP 10
-.B -r
-Log results to the specified log file. The log file contains a list of new, deleted,
-and changed objects, as well as diffs signifying what wsdiff found to be different.
+.B -u
+Use unified diff output for diffs logged to the results file.
 .TP 10
-.B -i
-Specify which objects should be compared by wsdiff via an input file list (See
-EXAMPLES).
+.BI "-U " lines
+Use unified diff output with
+.I lines
+context lines for diffs logged to the results file.
+.TP 10
+.B -v
+Do not truncate the diffs logged to the results file. By default wsdiff
+will truncate the length of a sufficiently long set of object diffs to preserve
+the readability of the results file. -v can be used to override this behaviour.
+.TP 10
+.B -V
+Log observed differences for all ELF sections, rather than logging only the
+first difference found. When wsdiff encounters an ELF section difference, by
+default it will log the difference associated with that section only, and move
+on. -V forces wsdiff to log all ELF section differences found between two
+objects, rather than just the first. Because of the extra work involved, this
+may slow wsdiff down considerably.
 .SH OUTPUT
-.LP
 The list of objects appearing to differ between \fIold\fP and \fInew\fP is
 printed to stdout. If -r was specified, the list of differing objects and
-their differrences are logged to \fIresults\fP.
+their differences are logged to \fIresults\fP.
 .SH EXAMPLES
-.PP
 \fBExample 1: Using wsdiff to determine patch deliverables\fR
 .PP
 The following example shows how to use wsdiff to determine the set of objects
@@ -108,8 +114,8 @@ platform/SUNW,Sun-Fire/kernel/sparcv9/unix
 .PP
 \fBExample 2: The wsdiff results file\fR
 .PP
-With the -r option, wsdiff will log the list of objects that appear different, as well
-as a set of diffs highlighting the observed difference:
+With the -r option, wsdiff will log the list of objects that appear different,
+as well as a set of diffs highlighting the observed difference:
 .LP
 .nf
 user@example$ wsdiff -r results proto.old proto
@@ -150,9 +156,9 @@ NOTE: ELF .text difference detected.
 .PP
 \fBExample 3: Using an input file list\fR
 .PP
-The -i option tells wsdiff to compare a specific list of objects. This can be useful
-in conjunction with other options that direct wsdiff to log more verbosely, allowing
-one to "drill down" into a particular object's differences:
+The -i option tells wsdiff to compare a specific list of objects. This can be
+useful in conjunction with other options that direct wsdiff to log more
+verbosely, allowing one to "drill down" into a particular object's differences:
 .LP
 .nf
 user@example$ echo "usr/lib/mdb/kvm/sparcv9/genunix.so" > flist
@@ -165,18 +171,18 @@ user@example$ cat results
 .PP
 \fBExample 4: Invoking wsdiff through nightly(1ONBLD)\fR
 .PP
-By specifying -w in NIGHTLY_OPTIONS, nightly(1ONBLD) will use wsdiff(1ONBLD) to determine
-which objects look different, compared to the previous build. A pre-existing proto area
-must exist for wsdiff(1ONBLD) to compare against. nightly(1ONBLD) will move aside the
-pre-existing proto area (renaming it to $ROOT.prev under proto), and will
-invoke wsdiff at the end of the build. The list of changed objects will be reported
-in the nightly mail message, and a results file "wsdiff_results" will appear in the
-nightly log area.
+By specifying -w in NIGHTLY_OPTIONS, nightly(1ONBLD) will use wsdiff(1ONBLD) to
+determine which objects look different, compared to the previous build. A
+pre-existing proto area must exist for wsdiff(1ONBLD) to compare against.
+nightly(1ONBLD) will move aside the pre-existing proto area (renaming it to
+$ROOT.prev under proto), and will invoke wsdiff at the end of the build. The
+list of changed objects will be reported in the nightly mail message, and a
+results file "wsdiff_results" will appear in the nightly log area.
 .PP
-\fBExample 5: Influencing the level of paralelism\fR
+\fBExample 5: Influencing the level of parallelism\fR
 .PP
 wsdiff spawns a number of threads by default after it determines the list
-of files for comparison. Default number of threads is based on the number of
+of files for comparison. The default number of threads is based on the number of
 on-line CPUs present in the system. To set the number of threads for processing
 to some other value the DMAKE_MAX_JOBS environment variable can be used:
 .LP
@@ -187,6 +193,5 @@ $ DMAKE_MAX_JOBS=24 wsdiff proto_base proto_patch
 Note that this variable is also used for nightly(1ONBLD) so when run from
 nightly(1ONBLD), wsdiff will honor the setting.
 .SH SEE ALSO
-.LP
 .IR nightly(1ONBLD),
 .IR elfdump(1),
