@@ -19687,6 +19687,9 @@ f usr/share/man/man7d/usbftdi.7d 0444 root bin
 f usr/share/man/man7d/usbsacm.7d 0444 root bin
 f usr/share/man/man7d/usbsksp.7d 0444 root bin
 f usr/share/man/man7d/usbsprl.7d 0444 root bin
+f usr/share/man/man7d/vioblk.7d 0444 root bin
+f usr/share/man/man7d/vioif.7d 0444 root bin
+f usr/share/man/man7d/virtio.7d 0444 root bin
 f usr/share/man/man7d/virtualkm.7d 0444 root bin
 f usr/share/man/man7d/vnd.7d 0444 root bin
 f usr/share/man/man7d/vni.7d 0444 root bin

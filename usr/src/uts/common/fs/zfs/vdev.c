@@ -3787,6 +3787,8 @@ void
 vdev_get_stats_ex(vdev_t *vd, vdev_stat_t *vs, vdev_stat_ex_t *vsx)
 {
 	vdev_t *tvd = vd->vdev_top;
+	spa_t *spa = vd->vdev_spa;
+
 	mutex_enter(&vd->vdev_stat_lock);
 	if (vs) {
 		bcopy(&vd->vdev_stat, vs, sizeof (*vs));
@@ -3828,8 +3830,8 @@ vdev_get_stats_ex(vdev_t *vd, vdev_stat_t *vs, vdev_stat_ex_t *vsx)
 		 */
 		if (vd->vdev_aux == NULL && tvd != NULL) {
 			vs->vs_esize = P2ALIGN(
-			    vd->vdev_max_asize - vd->vdev_asize,
-			    1ULL << tvd->vdev_ms_shift);
+			    vd->vdev_max_asize - vd->vdev_asize -
+			    spa->spa_bootsize, 1ULL << tvd->vdev_ms_shift);
 		}
 		if (vd->vdev_aux == NULL && vd == vd->vdev_top &&
 		    vdev_is_concrete(vd)) {
