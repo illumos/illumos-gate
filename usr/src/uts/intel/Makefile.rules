@@ -149,6 +149,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/amdnbtemp/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/amdzen/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/amr/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)

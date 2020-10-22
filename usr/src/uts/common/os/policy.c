@@ -1381,7 +1381,7 @@ secpolicy_xvattr(xvattr_t *xvap, uid_t owner, cred_t *cr, vtype_t vtype)
  * this is required because vop_access function should lock the
  * node for reading.  A three argument function should be defined
  * which accepts the following argument:
- * 	A pointer to the internal "node" type (inode *)
+ *	A pointer to the internal "node" type (inode *)
  *	vnode access bits (VREAD|VWRITE|VEXEC)
  *	a pointer to the credential
  *
@@ -1453,8 +1453,8 @@ secpolicy_vnode_setattr(cred_t *cr, struct vnode *vp, struct vattr *vap,
 		 *
 		 * If you are the file owner:
 		 *	chown to other uid		FILE_CHOWN_SELF
-		 *	chown to gid (non-member) 	FILE_CHOWN_SELF
-		 *	chown to gid (member) 		<none>
+		 *	chown to gid (non-member)	FILE_CHOWN_SELF
+		 *	chown to gid (member)		<none>
 		 *
 		 * Instead of PRIV_FILE_CHOWN_SELF, FILE_CHOWN is also
 		 * acceptable but the first one is reported when debugging.
@@ -2433,13 +2433,14 @@ secpolicy_gart_map(const cred_t *cr)
 }
 
 /*
- * secpolicy_xhci
+ * secpolicy_hwmanip
  *
- * Determine if the subject can observe and manipulate the xhci driver with a
- * dangerous blunt hammer.  Requires all privileges.
+ * Determine if the subject can observe and manipulate a hardware device with a
+ * dangerous blunt hammer, often suggests they can do something destructive.
+ * Requires all privileges.
  */
 int
-secpolicy_xhci(const cred_t *cr)
+secpolicy_hwmanip(const cred_t *cr)
 {
 	return (secpolicy_require_set(cr, PRIV_FULLSET, NULL, KLPDARG_NONE));
 }

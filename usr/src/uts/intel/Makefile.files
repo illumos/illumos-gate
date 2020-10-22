@@ -434,3 +434,12 @@ PCHTEMP_OBJS = pchtemp.o
 # AMD Family 10h-16h temperature driver
 #
 AMDNBTEMP_OBJS = amdnbtemp.o
+
+#
+# AMD Zen Nexus Driver
+#
+AMDZEN_OBJS = amdzen.o
+AMDZEN_STUB_OBJS = amdzen_stub.o
+SMNTEMP_OBJS = smntemp.o
+USMN_OBJS = usmn.o
+ZEN_UDF_OBJS = zen_udf.o

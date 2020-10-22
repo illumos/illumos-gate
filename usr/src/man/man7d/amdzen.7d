@@ -1,0 +1,50 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 Oxide Computer Company
+.\"
+.Dd September 1, 2020
+.Dt AMDZEN 7D
+.Os
+.Sh NAME
+.Nm amdzen ,
+.Nm amdzen_stub
+.Nd AMD Zen Nexus Driver
+.Sh DESCRIPTION
+The
+.Sy amdzen
+driver provides access to the AMD Zen, Zen+, and Zen 2
+.Pq Family 17h
+processor families Northbridge, Data Fabric, and System Management Network
+.Pq SMN .
+This driver is a nexus driver and facilitates access to these devices
+between various other devices such as
+.Xr smntemp 7D .
+The various processor devices that make up the northbridge and data
+fabric have the
+.Sy amdzen_stub
+driver attached to them.
+The different devices are all amalgamated and a single uniform view is
+provided by the
+.Sy amdzen
+driver.
+.Sh ARCHITECTURE
+The
+.Sy amdzen
+and
+.Sy amdzen_stub
+drivers are limited to
+.Sy x86
+platforms with AMD Family 17h processors.
+.Sh SEE ALSO
+.Xr smntemp 7D ,
+.Xr usmn 7D ,
+.Xr zen_udf 7D
