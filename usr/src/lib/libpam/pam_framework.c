@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2020, Joyent, Inc.
  */
 
 #include <syslog.h>
@@ -656,9 +656,10 @@ parse_user_name(char *user_input, char **ret_username)
 	 * - we skip leading whitespaces and ignore trailing whitespaces
 	 */
 	while (*ptr != '\0') {
-		if ((*ptr == ' ') || (*ptr == '\t'))
+		if ((*ptr == ' ') || (*ptr == '\t') ||
+		    (index >= PAM_MAX_RESP_SIZE)) {
 			break;
-		else {
+		} else {
 			username[index] = *ptr;
 			index++;
 			ptr++;
@@ -666,9 +667,9 @@ parse_user_name(char *user_input, char **ret_username)
 	}
 
 	/* ret_username will be freed in pam_get_user(). */
-	if ((*ret_username = malloc(index + 1)) == NULL)
+	if (index >= PAM_MAX_RESP_SIZE ||
+	    (*ret_username = strdup(username)) == NULL)
 		return (PAM_BUF_ERR);
-	(void) strcpy(*ret_username, username);
 	return (PAM_SUCCESS);
 }
 
