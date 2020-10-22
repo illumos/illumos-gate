@@ -151,6 +151,7 @@ file path=usr/share/man/man2/umask.2
 file path=usr/share/man/man2/umount.2
 file path=usr/share/man/man2/uname.2
 file path=usr/share/man/man2/unlink.2
+file path=usr/share/man/man2/upanic.2
 file path=usr/share/man/man2/ustat.2
 file path=usr/share/man/man2/utime.2
 file path=usr/share/man/man2/utimes.2

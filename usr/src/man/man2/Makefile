@@ -155,6 +155,7 @@ MANFILES=	Intro.2			\
 		umount.2		\
 		uname.2			\
 		unlink.2		\
+		upanic.2		\
 		ustat.2			\
 		utime.2			\
 		utimes.2		\

@@ -24,6 +24,7 @@
  * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  * Copyright 2019, Carlos Neira <cneirabustos@gmail.com>
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -241,7 +242,7 @@ static const char *const systable[] = {
 	"writev",		/* 122 */
 	"preadv",		/* 123 */
 	"pwritev",		/* 124 */
-	NULL,			/* 125 */
+	"upanic",		/* 125 */
 	"getrandom",		/* 126 */
 	"mmapobj",		/* 127 */
 	"setrlimit",		/* 128 */

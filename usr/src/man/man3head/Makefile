@@ -103,6 +103,7 @@ MANFILES=	acct.h.3head		\
 		ulimit.h.3head		\
 		un.h.3head		\
 		unistd.h.3head		\
+		upanic.h.3head		\
 		utime.h.3head		\
 		utmpx.h.3head		\
 		utsname.h.3head		\

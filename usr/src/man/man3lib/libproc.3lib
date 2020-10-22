@@ -13,7 +13,7 @@
 .\" Copyright (c) 2019 Carlos Neira <cneirabustos@gmail.com>
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd May 22, 2020
+.Dd October 31, 2020
 .Dt LIBPROC 3LIB
 .Os
 .Sh NAME
@@ -240,7 +240,8 @@ manipulation of the process itself.
 .It Sy Pstatus Ta Sy Pstop
 .It Sy Pstopstatus Ta Sy Psync
 .It Sy Psysentry Ta Sy Psysexit
-.It Sy Puname Ta Sy Punsetflags
+.It Sy Puname Ta Sy Pupanic
+.It Sy Pupanic_free Ta Sy Punsetflags
 .It Sy Pupdate_maps Ta Sy Pupdate_syms
 .It Sy Pwait Ta Sy Pwrite
 .It Sy Pxecbkpt Ta Sy Pxecwapt
@@ -1208,6 +1209,8 @@ changes may occur which break both source and binary compatibility.
 .Xr Psysentry 3PROC ,
 .Xr Psysexit 3PROC ,
 .Xr Puname 3PROC ,
+.Xr Pupanic 3PROC ,
+.Xr Pupanic_free 3PROC ,
 .Xr Punsetflags 3PROC ,
 .Xr Pupdate_maps 3PROC ,
 .Xr Pupdate_syms 3PROC ,

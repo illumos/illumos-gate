@@ -161,6 +161,7 @@ MANFILES=					\
 		Psync.3proc			\
 		Psysentry.3proc			\
 		Puname.3proc			\
+		Pupanic.3proc			\
 		Pupdate_maps.3proc		\
 		Pupdate_syms.3proc		\
 		Pwrite.3proc			\
@@ -265,6 +266,7 @@ MANLINKS=					\
 		Psymbol_iter_by_lmid.3proc	\
 		Psymbol_iter_by_name.3proc	\
 		Psysexit.3proc			\
+		Pupanic_free.3proc		\
 		Punsetflags.3proc		\
 		Pwait.3proc			\
 		Pxcreate.3proc			\
@@ -382,6 +384,8 @@ Lclearfault.3proc		:= LINKSRC = Pclearfault.3proc
 Lclearsig.3proc			:= LINKSRC = Pclearsig.3proc
 
 Lsetrun.3proc			:= LINKSRC = Psetrun.3proc
+
+Pupanic_free.3proc		:= LINKSRC = Pupanic.3proc
 
 Pzonepath.3proc			:= LINKSRC = Pzonename.3proc
 Pzoneroot.3proc			:= LINKSRC = Pzonename.3proc

@@ -1,0 +1,95 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 Oxide Computer Company
+.\"
+.Dd October 31, 2020
+.Dt UPANIC 2
+.Os
+.Sh NAME
+.Nm upanic
+.Nd user process panic
+.Sh SYNOPSIS
+.In upanic.h
+.Ft void noreturn
+.Fo upanic
+.Fa "const char *msg"
+.Fa "size_t len"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn upanic
+system call terminates the calling process and generates a core file in
+the process, subject to the current core file settings as described in
+.Xr core 4
+and controlled by
+.Xr coreadm 1M .
+.Pp
+Unlike
+.Xr abort 3C ,
+signals are not generated, which avoids two related challenges:
+.Bl -enum
+.It
+A signal handler attempting to catch a
+.Dv SIGABRT .
+.It
+Needing to make multiple system calls and potentially unmasking the
+signal.
+.El
+.Pp
+The
+.Fn upanic
+system call allows an optional message to be transmitted that will be
+put in a
+.Dv NT_UPANIC
+elf note in the resulting core file.
+If a message is not desired, then one should pass
+.Dv NULL
+for
+.Fa msg .
+In general, it is expected that
+.Fa msg
+is a character string with a human-readable message; however, it may
+include binary data.
+The system will copy
+.Fa len
+bytes regardless of whether the string has a NUL character to terminate
+it or not.
+If
+.Fa msg
+points to an invalid value or
+.Fa len
+is a size that is larger than the system's internal maximum size, then
+the process will still terminate; however, this will be noted in the
+.Dv NT_UPANIC
+elf note.
+.Pp
+The
+.Fn upanic
+system call is illumos-specific and not portable to other systems.
+For portable applications, instead use
+.Xr abort 3C .
+.Sh RETURN VALUES
+The
+.Fn upanic
+system call does not return.
+It always terminates the process.
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy Async-Signal-Safe
+.Sh SEE ALSO
+.Xr elfdump 1 ,
+.Xr mdb 1 ,
+.Xr coreadm 1M ,
+.Xr abort 3 ,
+.Xr upanic.h 3HEAD ,
+.Xr core 4

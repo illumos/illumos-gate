@@ -1,0 +1,103 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 Oxide Comptuer Company
+.\"
+.Dd October 31, 2020
+.Dt PUPANIC 3PROC
+.Os
+.Sh NAME
+.Nm Pupanic ,
+.Nm Pupanic_free
+.Nd get upanic information from a core file
+.Sh LIBRARY
+.Lb libproc
+.Sh SYNOPSIS
+.In libproc.h
+.Ft int
+.Fo Pupanic
+.Fa "struct ps_prochandle *P"
+.Fa "prupanic_t **prup"
+.Fc
+.Ft void
+.Fo Pupanic_free
+.Fa "prupanic_t *pru"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Pupanic
+function copies the contents of the
+.Dv NT_UPANIC
+elf note from the process handle
+.Fa P
+that corresponds to a core file into
+.Fa prup .
+.Pp
+The library will allocate the memory needed for a
+.Ft prupanic_t
+and it is the caller's responsibility to release it by calling the
+.Fn Pupanic_free
+function with the returned data when they are done with the data.
+.Pp
+The allocated data stored in
+.Fa prup
+has a lifetime independent of the underlying process handle
+.Fa P .
+That is, it is safe to continue using it whether the process handle is
+still valid or has been released with
+.Xr Pfree 3PROC .
+.Pp
+If the process handle doesn't correspond to a core file or this note is
+not present in the core file, then the
+.Fn Pupanic
+function will fail.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Pupanic
+function returns
+.Sy 0
+and stores the allocated
+.Ft prupanic_t
+structure in
+.Fa prup .
+Otherwise
+.Sy -1
+is returned
+and
+.Vt errno
+is set to indicate the error.
+.Sh ERRORS
+The
+.Fn Pupanic
+function will fail if:
+.Bl -tag -width Er
+.It Er ENODATA
+The process handle
+.Fa P
+does not correspond to a core file.
+.It Er ENOENT
+The core file does not have a
+.Dv NT_UPANIC
+elf note.
+.It Er EAGAIN, Er ENOMEM
+An underlying memory allocation failed.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr upanic 3C ,
+.Xr libproc 3LIB ,
+.Xr core 4

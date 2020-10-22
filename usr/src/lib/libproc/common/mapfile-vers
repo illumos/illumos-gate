@@ -307,6 +307,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	Punsetflags;
 	Pupdate_maps;
 	Pupdate_syms;
+	Pupanic;
+	Pupanic_free;
 	Pwait;
 	Pwrite;
 	Pxcreate;

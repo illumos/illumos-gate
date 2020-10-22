@@ -396,6 +396,14 @@ static const sl_prlwpname_layout_t prlwpname_layout = {
 };
 
 
+static const sl_prupanic_layout_t prupanic_layout = {
+	{ 0,	1032,	0,	0 },		/* sizeof (prupanic_t) */
+	{ 0,	4,	0,	0 },		/* pru_version */
+	{ 4,	4,	0,	0 },		/* pru_flags */
+	{ 8,	1,	1024,	0 },		/* pru_data[] */
+};
+
+
 
 
 static const sl_arch_layout_t layout_amd64 = {
@@ -421,6 +429,7 @@ static const sl_arch_layout_t layout_amd64 = {
 	&prfdinfo_layout,
 	&prsecflags_layout,
 	&prlwpname_layout,
+	&prupanic_layout,
 };
 
 

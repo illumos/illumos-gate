@@ -78,6 +78,11 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.36 {
+    protected:
+	upanic;
+} ILLUMOS_0.35;
+
 SYMBOL_VERSION ILLUMOS_0.35 {
     protected:
 	qsort_r;

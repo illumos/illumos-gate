@@ -27,6 +27,7 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2016 RackTop Systems.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #ifndef	_CONV_H
@@ -335,6 +336,13 @@ typedef union {
 	char				buf[CONV_PRSECFLAGS_BUFSIZE];
 } Conv_secflags_buf_t;
 
+/* conv_prupanic() */
+#define	CONV_PRUPANIC_BUFSIZE		56
+typedef union {
+	Conv_inv_buf_t			inv_buf;
+	char				buf[CONV_PRUPANIC_BUFSIZE];
+} Conv_upanic_buf_t;
+
 /* conv_cnote_sigset() */
 #define	CONV_CNOTE_SIGSET_BUFSIZE	639
 typedef union {
@@ -350,7 +358,7 @@ typedef union {
 } Conv_cnote_fltset_buf_t;
 
 /* conv_cnote_sysset() */
-#define	CONV_CNOTE_SYSSET_BUFSIZE	3195
+#define	CONV_CNOTE_SYSSET_BUFSIZE	3227
 typedef union {
 	Conv_inv_buf_t			inv_buf;
 	char				buf[CONV_CNOTE_SYSSET_BUFSIZE];
@@ -833,6 +841,8 @@ extern	const char	*conv_cnote_priv(int, Conv_fmt_flags_t,
 			    Conv_inv_buf_t *);
 extern	const char	*conv_prsecflags(secflagset_t, Conv_fmt_flags_t,
 			    Conv_secflags_buf_t *);
+extern	const char	*conv_prupanic(uint32_t, Conv_fmt_flags_t,
+			    Conv_upanic_buf_t *);
 extern	const char	*conv_cnote_psetid(int, Conv_fmt_flags_t,
 			    Conv_inv_buf_t *);
 extern	const char	*conv_cnote_sa_flags(int, Conv_fmt_flags_t,
