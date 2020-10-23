@@ -93,6 +93,7 @@ usage(bool cpu_intel)
 	"       [--create]\n"
 	"       [--destroy]\n"
 #ifndef __FreeBSD__
+	"       [--pmtmr-port=ioport]\n"
 	"       [--wrlock-cycle]\n"
 #endif
 	"       [--get-all]\n"
@@ -309,6 +310,7 @@ static int unassign_pptdev, bus, slot, func;
 static int run;
 static int get_cpu_topology;
 #ifndef __FreeBSD__
+static int pmtmr_port;
 static int wrlock_cycle;
 #endif
 
@@ -655,6 +657,9 @@ enum {
 	SET_RTC_TIME,
 	SET_RTC_NVRAM,
 	RTC_NVRAM_OFFSET,
+#ifndef __FreeBSD__
+	PMTMR_PORT,
+#endif
 };
 
 static void
@@ -1527,6 +1532,7 @@ setup_options(bool cpu_intel)
 		{ "get-intinfo", 	NO_ARG,	&get_intinfo,		1 },
 		{ "get-cpu-topology",	NO_ARG, &get_cpu_topology,	1 },
 #ifndef __FreeBSD__
+		{ "pmtmr-port",		REQ_ARG,	0,	PMTMR_PORT },
 		{ "wrlock-cycle",	NO_ARG,	&wrlock_cycle,	1 },
 #endif
 	};
@@ -1930,6 +1936,11 @@ main(int argc, char *argv[])
 		case ASSERT_LAPIC_LVT:
 			assert_lapic_lvt = atoi(optarg);
 			break;
+#ifndef __FreeBSD__
+		case PMTMR_PORT:
+			pmtmr_port = strtoul(optarg, NULL, 16);
+			break;
+#endif
 		default:
 			usage(cpu_intel);
 		}
@@ -1954,6 +1965,10 @@ main(int argc, char *argv[])
 	}
 
 #ifndef __FreeBSD__
+	if (!error && pmtmr_port) {
+		error = vm_pmtmr_set_location(ctx, pmtmr_port);
+		exit(error);
+	}
 	if (!error && wrlock_cycle) {
 		error = vm_wrlock_cycle(ctx);
 		exit(error);

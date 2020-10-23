@@ -52,6 +52,7 @@
 #include "io/vioapic.h"
 #include "io/vrtc.h"
 #include "io/vhpet.h"
+#include "io/vpmtmr.h"
 #include "vmm_lapic.h"
 #include "vmm_stat.h"
 #include "vmm_util.h"
@@ -466,6 +467,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_ALLOC_MEMSEG:
 	case VM_MMAP_MEMSEG:
 	case VM_WRLOCK_CYCLE:
+	case VM_PMTMR_LOCATE:
 		vmm_write_lock(sc);
 		lock_type = LOCK_WRITE_HOLD;
 		break;
@@ -1275,6 +1277,12 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		break;
 	}
 
+	case VM_PMTMR_LOCATE: {
+		uint16_t port = arg;
+		error = vpmtmr_set_location(sc->vmm_vm, port);
+		break;
+	}
+
 	case VM_RESTART_INSTRUCTION:
 		error = vm_restart_instruction(sc->vmm_vm, vcpu);
 		break;
@@ -1683,8 +1691,8 @@ vmm_drv_msi(vmm_lease_t *lease, uint64_t addr, uint64_t msg)
 }
 
 int
-vmm_drv_ioport_hook(vmm_hold_t *hold, uint_t ioport, vmm_drv_rmem_cb_t rfunc,
-    vmm_drv_wmem_cb_t wfunc, void *arg, void **cookie)
+vmm_drv_ioport_hook(vmm_hold_t *hold, uint16_t ioport, vmm_drv_iop_cb_t func,
+    void *arg, void **cookie)
 {
 	vmm_softc_t *sc;
 	int err;
@@ -1707,8 +1715,8 @@ vmm_drv_ioport_hook(vmm_hold_t *hold, uint_t ioport, vmm_drv_rmem_cb_t rfunc,
 	mutex_exit(&vmm_mtx);
 
 	vmm_write_lock(sc);
-	err = vm_ioport_hook(sc->vmm_vm, ioport, (vmm_rmem_cb_t)rfunc,
-	    (vmm_wmem_cb_t)wfunc, arg, cookie);
+	err = vm_ioport_hook(sc->vmm_vm, ioport, (ioport_handler_t)func,
+	    arg, cookie);
 	vmm_write_unlock(sc);
 
 	if (err != 0) {

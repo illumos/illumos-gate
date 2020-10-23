@@ -28,6 +28,7 @@
  */
 /*
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -441,3 +442,14 @@ sci_init(struct vmctx *ctx)
 	}
 #endif
 }
+
+#ifndef	__FreeBSD__
+void pmtmr_init(struct vmctx *ctx)
+{
+	int err;
+
+	/* Attach in-kernel PM timer emulation to correct IO port */
+	err = vm_pmtmr_set_location(ctx, IO_PMTMR);
+	assert(err == 0);
+}
+#endif

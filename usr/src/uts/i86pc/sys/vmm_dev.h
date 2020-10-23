@@ -299,6 +299,7 @@ _Static_assert(sizeof(struct vm_readwrite_kernemu_device) == 24, "ABI");
 #define	VM_MAP_PPTDEV_MMIO	(VMM_LOCK_IOC_BASE | 0x04)
 #define	VM_ALLOC_MEMSEG		(VMM_LOCK_IOC_BASE | 0x05)
 #define	VM_MMAP_MEMSEG		(VMM_LOCK_IOC_BASE | 0x06)
+#define	VM_PMTMR_LOCATE		(VMM_LOCK_IOC_BASE | 0x07)
 
 #define	VM_WRLOCK_CYCLE		(VMM_LOCK_IOC_BASE | 0xff)
 

@@ -2023,7 +2023,7 @@ vie_emulate_inout_port(struct vie *vie, struct vm *vm, int vcpuid)
 	}
 
 	if (vie->inout_req_state != VR_DONE) {
-		err = vm_inout_access(vm, vcpuid, in, vie->inout.port,
+		err = vm_ioport_access(vm, vcpuid, in, vie->inout.port,
 		    vie->inout.bytes, &val);
 	} else {
 		/*

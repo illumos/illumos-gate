@@ -198,9 +198,9 @@ struct vm {
 	uint16_t	cores;			/* (o) num of cores/socket */
 	uint16_t	threads;		/* (o) num of threads/core */
 	uint16_t	maxcpus;		/* (o) max pluggable cpus */
-#ifndef __FreeBSD__
-	list_t		ioport_hooks;
-#endif /* __FreeBSD__ */
+
+	struct ioport_config ioports;		/* (o) ioport handling */
+
 	bool		sipi_req;		/* (i) SIPI requested */
 	int		sipi_req_vcpu;		/* (i) SIPI destination */
 	uint64_t	sipi_req_rip;		/* (i) SIPI start %rip */
@@ -301,14 +301,6 @@ static void vcpu_notify_event_locked(struct vcpu *vcpu, bool lapic_intr);
 
 #ifndef __FreeBSD__
 static void vm_clear_memseg(struct vm *, int);
-
-typedef struct vm_ioport_hook {
-	list_node_t	vmih_node;
-	uint_t		vmih_ioport;
-	void		*vmih_arg;
-	vmm_rmem_cb_t	vmih_rmem_cb;
-	vmm_wmem_cb_t	vmih_wmem_cb;
-} vm_ioport_hook_t;
 
 /* Flags for vtc_status */
 #define	VTCS_FPU_RESTORED	1 /* guest FPU restored, host FPU saved */
@@ -508,14 +500,10 @@ vm_init(struct vm *vm, bool create)
 	vm->vpmtmr = vpmtmr_init(vm);
 	if (create)
 		vm->vrtc = vrtc_init(vm);
-#ifndef __FreeBSD__
+
 	if (create) {
-		list_create(&vm->ioport_hooks, sizeof (vm_ioport_hook_t),
-		    offsetof (vm_ioport_hook_t, vmih_node));
-	} else {
-		VERIFY(list_is_empty(&vm->ioport_hooks));
+		vm_inout_init(vm, &vm->ioports);
 	}
-#endif /* __FreeBSD__ */
 
 	CPU_ZERO(&vm->active_cpus);
 	CPU_ZERO(&vm->debug_cpus);
@@ -617,6 +605,10 @@ vm_cleanup(struct vm *vm, bool destroy)
 
 	if (vm->iommu != NULL)
 		iommu_destroy_domain(vm->iommu);
+
+	if (destroy) {
+		vm_inout_cleanup(vm, &vm->ioports);
+	}
 
 	if (destroy)
 		vrtc_cleanup(vm->vrtc);
@@ -3359,94 +3351,75 @@ vm_get_wiredcnt(struct vm *vm, int vcpu, struct vmm_stat_type *stat)
 VMM_STAT_FUNC(VMM_MEM_RESIDENT, "Resident memory", vm_get_rescnt);
 VMM_STAT_FUNC(VMM_MEM_WIRED, "Wired memory", vm_get_wiredcnt);
 
-#ifndef __FreeBSD__
 int
-vm_ioport_hook(struct vm *vm, uint_t ioport, vmm_rmem_cb_t rfunc,
-    vmm_wmem_cb_t wfunc, void *arg, void **cookie)
+vm_ioport_access(struct vm *vm, int vcpuid, bool in, uint16_t port,
+    uint8_t bytes, uint32_t *val)
 {
-	list_t *ih = &vm->ioport_hooks;
-	vm_ioport_hook_t *hook, *node;
-
-	if (ioport == 0) {
-		return (EINVAL);
-	}
-
-	/*
-	 * Find the node position in the list which this region should be
-	 * inserted behind to maintain sorted order.
-	 */
-	for (node = list_tail(ih); node != NULL; node = list_prev(ih, node)) {
-		if (ioport == node->vmih_ioport) {
-			/* Reject duplicate port hook  */
-			return (EEXIST);
-		} else if (ioport > node->vmih_ioport) {
-			break;
-		}
-	}
-
-	hook = kmem_alloc(sizeof (*hook), KM_SLEEP);
-	hook->vmih_ioport = ioport;
-	hook->vmih_arg = arg;
-	hook->vmih_rmem_cb = rfunc;
-	hook->vmih_wmem_cb = wfunc;
-	if (node == NULL) {
-		list_insert_head(ih, hook);
-	} else {
-		list_insert_after(ih, node, hook);
-	}
-
-	*cookie = (void *)hook;
-	return (0);
+	return (vm_inout_access(&vm->ioports, in, port, bytes, val));
 }
 
-void
-vm_ioport_unhook(struct vm *vm, void **cookie)
-{
-	vm_ioport_hook_t *hook;
-	list_t *ih = &vm->ioport_hooks;
-
-	hook = *cookie;
-	list_remove(ih, hook);
-	kmem_free(hook, sizeof (*hook));
-	*cookie = NULL;
-}
-
+/*
+ * bhyve-internal interfaces to attach or detach IO port handlers.
+ * Must be called with VM write lock held for safety.
+ */
 int
-vm_ioport_handle_hook(struct vm *vm, int cpuid, bool in, int port, int bytes,
-    uint32_t *val)
+vm_ioport_attach(struct vm *vm, uint16_t port, ioport_handler_t func, void *arg,
+    void **cookie)
 {
-	vm_ioport_hook_t *hook;
-	list_t *ih = &vm->ioport_hooks;
-	int err = 0;
-
-	for (hook = list_head(ih); hook != NULL; hook = list_next(ih, hook)) {
-		if (hook->vmih_ioport == port) {
-			break;
-		}
+	int err;
+	err = vm_inout_attach(&vm->ioports, port, IOPF_DEFAULT, func, arg);
+	if (err == 0) {
+		*cookie = (void *)IOP_GEN_COOKIE(func, arg, port);
 	}
-	if (hook == NULL) {
-		return (ESRCH);
+	return (err);
+}
+int
+vm_ioport_detach(struct vm *vm, void **cookie, ioport_handler_t *old_func,
+    void **old_arg)
+{
+	uint16_t port = IOP_PORT_FROM_COOKIE((uintptr_t)*cookie);
+	int err;
+
+	err = vm_inout_detach(&vm->ioports, port, false, old_func, old_arg);
+	if (err == 0) {
+		*cookie = NULL;
 	}
-
-	if (in) {
-		uint64_t tval;
-
-		if (hook->vmih_rmem_cb == NULL) {
-			return (ESRCH);
-		}
-		err = hook->vmih_rmem_cb(hook->vmih_arg, (uintptr_t)port,
-		    (uint_t)bytes, &tval);
-		*val = (uint32_t)tval;
-	} else {
-		if (hook->vmih_wmem_cb == NULL) {
-			return (ESRCH);
-		}
-		err = hook->vmih_wmem_cb(hook->vmih_arg, (uintptr_t)port,
-		    (uint_t)bytes, (uint64_t)*val);
-	}
-
 	return (err);
 }
 
+/*
+ * External driver interfaces to attach or detach IO port handlers.
+ * Must be called with VM write lock held for safety.
+ */
+int
+vm_ioport_hook(struct vm *vm, uint16_t port, ioport_handler_t func,
+    void *arg, void **cookie)
+{
+	int err;
 
-#endif /* __FreeBSD__ */
+	if (port == 0) {
+		return (EINVAL);
+	}
+
+	err = vm_inout_attach(&vm->ioports, port, IOPF_DRV_HOOK, func, arg);
+	if (err == 0) {
+		*cookie = (void *)IOP_GEN_COOKIE(func, arg, port);
+	}
+	return (err);
+}
+void
+vm_ioport_unhook(struct vm *vm, void **cookie)
+{
+	uint16_t port = IOP_PORT_FROM_COOKIE((uintptr_t)*cookie);
+	ioport_handler_t old_func;
+	void *old_arg;
+	int err;
+
+	err = vm_inout_detach(&vm->ioports, port, true, &old_func, &old_arg);
+
+	/* ioport-hook-using drivers are expected to be well-behaved */
+	VERIFY0(err);
+	VERIFY(IOP_GEN_COOKIE(old_func, old_arg, port) == (uintptr_t)*cookie);
+
+	*cookie = NULL;
+}

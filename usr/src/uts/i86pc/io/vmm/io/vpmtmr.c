@@ -25,6 +25,18 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ *
+ * Copyright 2020 Oxide Computer Company
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -49,6 +61,9 @@ __FBSDID("$FreeBSD$");
 #define PMTMR_FREQ	3579545  /* 3.579545MHz */
 
 struct vpmtmr {
+	struct vm	*vm;
+	void		*io_cookie;
+	uint16_t	io_port;
 	sbintime_t	freq_sbt;
 	sbintime_t	baseuptime;
 	uint32_t	baseval;
@@ -80,16 +95,47 @@ vpmtmr_cleanup(struct vpmtmr *vpmtmr)
 }
 
 int
-vpmtmr_handler(struct vm *vm, int vcpuid, bool in, uint16_t port, uint8_t bytes,
-    uint32_t *val)
+vpmtmr_set_location(struct vm *vm, uint16_t ioport)
 {
-	struct vpmtmr *vpmtmr;
+	struct vpmtmr *vpmtmr = vm_pmtmr(vm);
+	int err;
+
+	if (vpmtmr->io_cookie != NULL) {
+		ioport_handler_t old_func;
+		void *old_arg;
+
+		if (vpmtmr->io_port == ioport) {
+			/* already attached in the right place */
+			return (0);
+		}
+
+		err = vm_ioport_detach(vm, &vpmtmr->io_cookie, &old_func,
+		    &old_arg);
+		if (err != 0) {
+			return (err);
+		}
+
+		ASSERT3P(old_func, ==, vpmtmr_handler);
+		ASSERT3P(old_arg, ==, vpmtmr);
+		vpmtmr->io_port = 0;
+	}
+	err = vm_ioport_attach(vm, ioport, vpmtmr_handler, vpmtmr,
+	    &vpmtmr->io_cookie);
+	if (err == 0) {
+		vpmtmr->io_port = ioport;
+	}
+
+	return (err);
+}
+
+int
+vpmtmr_handler(void *arg, bool in, uint16_t port, uint8_t bytes, uint32_t *val)
+{
+	struct vpmtmr *vpmtmr = arg;
 	sbintime_t now, delta;
 
 	if (!in || bytes != 4)
 		return (-1);
-
-	vpmtmr = vm_pmtmr(vm);
 
 	/*
 	 * No locking needed because 'baseuptime' and 'baseval' are

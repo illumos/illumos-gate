@@ -385,16 +385,21 @@ int vmm_mod_unload(void);
 void vmm_call_trap(uint64_t);
 
 /*
- * Because of tangled headers, these are mirrored by vmm_drv.h to present the
- * interface to driver consumers.
+ * Because of tangled headers, this is not exposed directly via the vmm_drv
+ * interface, but rather mirrored as vmm_drv_iop_cb_t in vmm_drv.h.
  */
-typedef int (*vmm_rmem_cb_t)(void *, uintptr_t, uint_t, uint64_t *);
-typedef int (*vmm_wmem_cb_t)(void *, uintptr_t, uint_t, uint64_t);
+typedef int (*ioport_handler_t)(void *, bool, uint16_t, uint8_t, uint32_t *);
 
-int vm_ioport_hook(struct vm *, uint_t, vmm_rmem_cb_t, vmm_wmem_cb_t, void *,
-    void **);
+int vm_ioport_access(struct vm *vm, int vcpuid, bool in, uint16_t port,
+    uint8_t bytes, uint32_t *val);
+
+int vm_ioport_attach(struct vm *vm, uint16_t port, ioport_handler_t func,
+    void *arg, void **cookie);
+int vm_ioport_detach(struct vm *vm, void **cookie, ioport_handler_t *old_func,
+    void **old_arg);
+
+int vm_ioport_hook(struct vm *, uint16_t, ioport_handler_t, void *, void **);
 void vm_ioport_unhook(struct vm *, void **);
-int vm_ioport_handle_hook(struct vm *, int, bool, int, int, uint32_t *);
 
 #endif /* __FreeBSD */
 

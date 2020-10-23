@@ -1425,6 +1425,9 @@ main(int argc, char *argv[])
 
 	rtc_init(ctx, rtc_localtime);
 	sci_init(ctx);
+#ifndef	__FreeBSD__
+	pmtmr_init(ctx);
+#endif
 
 	/*
 	 * Exit if a device emulation finds an error in its initilization

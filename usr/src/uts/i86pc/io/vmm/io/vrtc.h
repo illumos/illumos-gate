@@ -48,10 +48,10 @@ int vrtc_set_time(struct vm *vm, time_t secs);
 int vrtc_nvram_write(struct vm *vm, int offset, uint8_t value);
 int vrtc_nvram_read(struct vm *vm, int offset, uint8_t *retval);
 
-int vrtc_addr_handler(struct vm *vm, int vcpuid, bool in, uint16_t port,
-    uint8_t bytes, uint32_t *val);
-int vrtc_data_handler(struct vm *vm, int vcpuid, bool in, uint16_t port,
-    uint8_t bytes, uint32_t *val);
+int vrtc_addr_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
+    uint32_t *val);
+int vrtc_data_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
+    uint32_t *val);
 
 #ifndef __FreeBSD__
 void vrtc_localize_resources(struct vrtc *);
