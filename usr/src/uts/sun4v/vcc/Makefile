@@ -40,9 +40,8 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= vcc 
+MODULE		= vcc
 OBJECTS		= $(VCC_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(VCC_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 
 #
@@ -61,11 +60,12 @@ CLEANFILES	+= $(MODSTUBS_O)
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-# lint pass one enforcement
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
+# Please do not carry these forward to new Makefiles.
 #
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-type-limits
@@ -83,14 +83,10 @@ CERRWARN += -erroff=E_STATEMENT_NOT_REACHED
 LDFLAGS += -dy -Nmisc/ldc -Nmisc/platsvc
 
 #
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.
 #
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 
 #
 #	Default build targets.
@@ -104,12 +100,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

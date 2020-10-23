@@ -22,13 +22,11 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 UTSBASE	= ../..
 
 MODULE		= fbt
 OBJECTS		= $(FBT_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(FBT_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 ROOTLINK	= $(ROOT_DTRACE_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/intel/dtrace
@@ -36,17 +34,9 @@ CONF_SRCDIR	= $(UTSBASE)/intel/dtrace
 include $(UTSBASE)/intel/Makefile.intel
 
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 
 LDFLAGS		+= -dy -Ndrv/dtrace -Nmisc/ctf
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
 .KEEP_STATE:
 
@@ -57,12 +47,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

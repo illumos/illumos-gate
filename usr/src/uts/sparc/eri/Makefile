@@ -39,7 +39,6 @@ UTSBASE	= ../..
 #
 MODULE		= eri
 OBJECTS		= $(ERI_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(ERI_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 
 #
@@ -51,7 +50,6 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -59,15 +57,16 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 ALL_BUILDS	= $(ALL_BUILDSONLY64)
 DEF_BUILDS	= $(DEF_BUILDSONLY64)
-CLEANLINTFILES	+= $(LINT32_FILES)
+LDFLAGS		+= -dy -N misc/mac -N drv/ip
 
 #
-#	Overrides.
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
+# Please do not carry these forward to new Makefiles.
 #
 CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-label
-LDFLAGS		+= -dy -N misc/mac -N drv/ip
 
 #
 #	Default build targets.
@@ -81,12 +80,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS) lint32
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

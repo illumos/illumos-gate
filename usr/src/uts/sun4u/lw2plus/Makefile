@@ -46,12 +46,8 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
-lintlib		:=	TARGET= lintlib
-modlintlib	:=	TARGET= modlintlib
 modlist		:=	TARGET= modlist
 modlist		:=	NO_STATE= -K $$MODSTATE$$$$
-clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
 #
@@ -59,11 +55,7 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clean.lint clobber modlist: $(LW2PLUS_KMODS)
-
-lintlib:	unix
-
-modlintlib:	$(LW2PLUS_KMODS)
+def all clean clobber modlist: $(LW2PLUS_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,Netra-T4
 LINKS2DESTDIR	= ../../../../SUNW,Sun-Fire-280R/kernel/misc/sparcv9
@@ -80,13 +72,6 @@ install:	$(ROOT_LW2PLUS_DIR) $(USR_LW2PLUS_DIR) \
 		$(LW2PLUS_CRYPTO_LINKS)
 
 install_h check:
-
-lint:		modlintlib
-
-LINT_LIBS	 = $(LINT_LIB) \
-		   -L$(LW2PLUS_LINT_LIB_DIR) \
-		   -L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
-		   -L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
 
 $(LW2PLUS_KMODS): FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)

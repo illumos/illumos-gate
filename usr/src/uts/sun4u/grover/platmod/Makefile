@@ -61,9 +61,6 @@ CLEANFILES	+= $(PLATLIB) $(SYM_MOD)
 ALL_TARGET	= $(SYM_MOD)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-#
-# lint pass one enforcement
-#
 CFLAGS += $(CCVERBOSE)
 
 #

@@ -112,8 +112,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/pciex/%.c
 
 #	We need this one to make sure we share dtrace_subr.c with i86pc
 #	Otherwise we pick up common/os/dtrace_subr.c instead :(
-#	Note that only the non-commented versions of this hack end up
-#	in the lint section below.
 
 $(OBJS_DIR)/dtrace_subr.o:	$(UTSBASE)/i86pc/os/dtrace_subr.c
 	$(COMPILE.c) -o $@ $(UTSBASE)/i86pc/os/dtrace_subr.c
@@ -135,42 +133,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/xen/os/%.c
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/xen/dtrace/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
-#
-#	Section 1b: Lint `object' build rules
-#
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/conf/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/io/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/io/psm/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/ml/%.s
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/os/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/vm/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/boot/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/boot/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/xen/dtrace/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-#	See note above.
-
-$(LINTS_DIR)/dtrace_subr.ln:	$(UTSBASE)/i86pc/os/dtrace_subr.c
-	@($(LHEAD) $(LINT.c) $(UTSBASE)/i86pc/os/dtrace_subr.c $(LTAIL))
-
 #
 # stuff for dboot
 #
@@ -190,8 +152,6 @@ DBOOT_CFLAGS = $(DBOOT_XARCH_$(CLASS)) $(CSTD) $(CERRWARN) \
 DBOOT_AS_XARCH_32 = $(i386_AS_XARCH)
 DBOOT_AS_XARCH_64 = $(amd64_AS_XARCH)
 DBOOT_ASFLAGS = $(DBOOT_AS_XARCH_$(CLASS)) -P -D_ASM
-
-DBOOT_LINTFLAGS_i86xpv	= $(LINTFLAGS_i386_$(CLASS)) $(LINTTAGS_i386_$(CLASS))
 
 $(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/common/xen/os/%.c
 	$(CC) $(DBOOT_CFLAGS) $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
@@ -232,57 +192,3 @@ $(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/dboot/%.s
 include $(UTSBASE)/i86pc/Makefile.rules
 
 DBOOT_DEFS += -D__xpv
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/cpr/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(SRC)/common/font/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/ioat/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/pci/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/pciex/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/pciex/hotplug/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/gfx_private/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/xsvc/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/pciex/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/xen/io/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/xen/os/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(DBOOT_LINTS_DIR)/%.ln:		$(UTSBASE)/intel/ia32/ml/%.s
-	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
-
-$(DBOOT_LINTS_DIR)/%.ln:		$(SRC)/common/font/%.c
-	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
-
-$(DBOOT_LINTS_DIR)/%.ln:		$(DBOOT_LINTS_DIR)/%.c
-	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
-
-$(DBOOT_LINTS_DIR)/%.ln:		$(UTSBASE)/common/xen/os/%.c
-	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
-
-$(DBOOT_LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/os/%.c
-	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
-
-$(DBOOT_LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/ml/%.s
-	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
-
-$(DBOOT_LINTS_DIR)/%.ln:		$(UTSBASE)/i86xpv/boot/%.c
-	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))

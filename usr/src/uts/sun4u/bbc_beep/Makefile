@@ -20,12 +20,10 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/bbc_beep/Makefile
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the consconfig_dacf module.
 #
@@ -39,7 +37,6 @@ UTSBASE	= ../..
 #
 MODULE		= bbc_beep
 OBJECTS		= $(BBC_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(BBC_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 
 #
@@ -47,16 +44,12 @@ ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 #
 include $(UTSBASE)/sun4u/Makefile.sun4u
 
-# 
-# lint pass one enforcement 
-# 
 CFLAGS += $(CCVERBOSE)
 
 #
 #       Define targets
 #
 ALL_TARGET      = $(BINARY)
-LINT_TARGET     = $(MODULE).lint
 INSTALL_TARGET  = $(BINARY) $(ROOTMODULE)
 
 .KEEP_STATE:
@@ -68,12 +61,6 @@ def:            $(DEF_DEPS)
 clean:          $(CLEAN_DEPS)
 
 clobber:        $(CLOBBER_DEPS)
-
-lint:           $(LINT_DEPS)
-
-modlintlib:     $(MODLINTLIB_DEPS)
-
-clean.lint:     $(CLEAN_LINT_DEPS)
 
 install:        $(INSTALL_DEPS)
 

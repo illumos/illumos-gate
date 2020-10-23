@@ -42,7 +42,6 @@ UTSBASE	= ../..
 #
 MODULE		= opl_cfg
 OBJECTS		= $(OPLCFG_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(OPLCFG_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 
 #
@@ -54,13 +53,7 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
-
-#
-# lint pass one enforcement
-#
-CFLAGS += $(CCVERBOSE)
 
 #
 # module dependencies
@@ -77,12 +70,11 @@ INC_PATH	+= -I$(UTSBASE)/sun4u/opl/
 CFLAGS += -dalign
 
 #
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.
 #
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-
+CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= $(CNOWARN_UNINIT)
 
 #
@@ -97,12 +89,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

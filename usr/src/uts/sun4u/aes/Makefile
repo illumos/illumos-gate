@@ -44,7 +44,6 @@ COM_DIR = $(COMMONBASE)/crypto
 #
 MODULE		= aes
 OBJECTS		= $(AES_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(AES_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_US3_CRYPTO_DIR)/$(MODULE)
 
 #
@@ -56,7 +55,6 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -64,12 +62,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 LDFLAGS += -dy -Nmisc/kcf
 
-#
-# lint pass one enforcement
-#
 CFLAGS		+= $(CCVERBOSE) -I$(COM_DIR)
 CPPFLAGS	+= -DCRYPTO_PROVIDER_NAME=\"$(MODULE)\"
-LINTFLAGS	+= -I$(COM_DIR)
 
 #
 # Turn on doubleword alignment for 64 bit registers
@@ -88,12 +82,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

@@ -77,6 +77,5 @@ ZSH_OBJS +=	zs_hdlc.o
 #
 #	Section 3:	Misc.
 #
-LINT_DEFS	+= -Dsun
 
 INC_PATH	+= -I$(UTSBASE)/sun

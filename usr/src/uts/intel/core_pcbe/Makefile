@@ -66,7 +66,6 @@ CPCGEN_SRCS	= $(CPCGEN_OBJS:%.o=%.c) core_pcbe_cpcgen.h
 MODULE		= pcbe.GenuineIntel.6.15
 OBJECTS		= $(CORE_PCBE_OBJS:%=$(OBJS_DIR)/%)
 OBJECTS		+= $(CPCGEN_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(CORE_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_PCBE_DIR)/$(MODULE)
 
 #
@@ -128,8 +127,6 @@ CLEANFILES	+= $(CPCGEN_SRCS)
 #	Define targets.
 #
 ALL_TARGET	= $(CPCGEN_COMMON) .WAIT $(BINARY)
-LINT_MODULE	= core_pcbe
-LINT_TARGET	= $(LINT_MODULE).lint
 INSTALL_TARGET	= $(CPCGEN_COMMON) .WAIT $(BINARY) $(ROOTMODULE) $(ROOTSOFTLINKS)
 
 #
@@ -144,12 +141,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

@@ -36,7 +36,6 @@ COM_DIR = $(COMMONBASE)/crypto/aes
 #	Define the module and object file sets.
 #
 MODULE		= aes
-LINTS		= $(AESPROV_OBJS:%.o=$(LINTS_DIR)/%.ln)
 AESPROV_OBJS_32	=
 AESPROV_OBJS_64	= aes_amd64.o aes_intel.o aeskey.o
 AESPROV_OBJS	+= $(AESPROV_OBJS_$(CLASS))
@@ -52,7 +51,6 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -77,12 +75,6 @@ clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
 
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
-
 install:	$(INSTALL_DEPS)
 
 #
@@ -90,15 +82,9 @@ install:	$(INSTALL_DEPS)
 #
 include $(UTSBASE)/intel/Makefile.targ
 
-$(OBJS_DIR)/%.ln: $(COM_DIR)/amd64/%.c
-	@($(LHEAD) $(LINT.c) $(COM_DIR)/amd64/${@F:.ln=.c} $(LTAIL))
-
 $(OBJS_DIR)/%.o:  $(COM_DIR)/amd64/%.c
 	$(COMPILE.c) -o $@ $(COM_DIR)/amd64/${@F:.o=.c}
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o: $(COM_DIR)/amd64/%.s
 	$(COMPILE.s) -o $@ $(COM_DIR)/amd64/${@F:.o=.s}
-
-$(OBJS_DIR)/%.ln: $(COM_DIR)/amd64/%.s
-	@($(LHEAD) $(LINT.s) $(COM_DIR)/amd64/${@F:.ln=.s} $(LTAIL))

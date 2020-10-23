@@ -39,7 +39,6 @@ UTSBASE	= ../..
 #
 MODULE		= neti
 OBJECTS		= $(NETI_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(NETI_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
@@ -51,12 +50,8 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 
-#
-# lint pass one enforcement
-#
 CFLAGS += $(CCVERBOSE)
 
 LDFLAGS		+= -dy -Nmisc/hook
@@ -73,12 +68,6 @@ all:		$(ALL_DEPS) $(SISCHECK_DEPS)
 clean:		$(CLEAN_DEPS) $(SISCLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS) $(SISCLEAN_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS) $(SISCHECK_DEPS)
 

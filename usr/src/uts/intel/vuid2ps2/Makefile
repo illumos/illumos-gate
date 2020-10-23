@@ -43,7 +43,6 @@ UTSBASE	= ../..
 #
 MODULE		= vuid2ps2
 OBJECTS		= $(VUIDPS2_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(VUIDPS2_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_STRMOD_DIR)/$(MODULE)
 
 #
@@ -61,7 +60,6 @@ SMOFF += deref_check
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -81,12 +79,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

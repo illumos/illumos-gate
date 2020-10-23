@@ -32,7 +32,6 @@ UTSBASE = ../..
 #
 MODULE		= bnx
 OBJECTS		= $(BNX_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(LINTS_DIR)/bnx_lint.ln
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 SRCDIR		= $(UTSBASE)/common/io/bnx
 CONF_SRCDIR	= $(SRCDIR)
@@ -46,7 +45,6 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(CONFMOD)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 C99MODE=	-xc99=%all
@@ -89,12 +87,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

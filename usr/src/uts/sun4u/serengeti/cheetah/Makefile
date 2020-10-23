@@ -39,7 +39,6 @@ UTSBASE	= ../../..
 #
 MODULE		= SUNW,UltraSPARC-III
 OBJECTS		= $(CHEETAH_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(CHEETAH_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_SERENGETI_CPU_DIR)/$(MODULE)
 ROOTSOFTLINKS	= $(SOFTLINKS:%=$(ROOT_SERENGETI_CPU_DIR)/%)
 
@@ -61,7 +60,6 @@ CLEANFILES	+= $(CPULIB) $(SYM_MOD)
 #
 SYM_MOD		= $(OBJS_DIR)/unix.sym
 ALL_TARGET	= $(SYM_MOD)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= def $(BINARY) $(ROOTMODULE) $(ROOTSOFTLINKS)
 
 #
@@ -69,14 +67,16 @@ INSTALL_TARGET	= def $(BINARY) $(ROOTMODULE) $(ROOTSOFTLINKS)
 #
 ALL_BUILDS	= $(ALL_BUILDSONLY64)
 DEF_BUILDS	= $(DEF_BUILDSONLY64)
-CLEANLINTFILES	+= $(LINT32_FILES)
 
-#
-# lint pass one enforcement
-#
-CFLAGS += $(CCVERBOSE) -DCHEETAH
+CFLAGS += -DCHEETAH
 ASFLAGS +=  -DCHEETAH
 
+#
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
+# Please do not carry these forward to new Makefiles.
+#
+CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-type-limits
@@ -101,12 +101,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

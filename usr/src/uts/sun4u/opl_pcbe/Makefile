@@ -36,7 +36,6 @@ UTSBASE = ../..
 #
 MODULE		= pcbe.4.6
 OBJECTS		= $(OPL_PCBE_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(OPL_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_PCBE_DIR)/$(MODULE)
 ROOTLINK        = $(USR_PCBE_DIR)/pcbe.4.7
 
@@ -49,23 +48,14 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 #	Define targets.
 #
 ALL_TARGET	= $(BINARY)
-LINT_MODULE	= opl_pcbe
-LINT_TARGET	= $(LINT_MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 
 #
-# lint pass one enforcement
-#
-CFLAGS += $(CCVERBOSE)
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.
 #
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-
+CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= -_gcc=-Wno-type-limits
 
 #
@@ -80,12 +70,6 @@ def:		$(DEF_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

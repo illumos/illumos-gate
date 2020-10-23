@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the mac_ib MAC-Type plugin 
+#	This makefile drives the production of the mac_ib MAC-Type plugin
 #	kernel module.
 #
 
@@ -36,7 +36,6 @@ UTSBASE	= ../..
 #
 MODULE		= mac_ib
 OBJECTS		= $(MAC_IB_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(MAC_IB_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MAC_DIR)/$(MODULE)
 
 #
@@ -48,7 +47,6 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -70,12 +68,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

@@ -23,9 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# uts/sparc/usbs49_fw/Makefile
 
 #
 #	This makefile drives the production of the usbs49_fw kernel module.
@@ -40,7 +37,6 @@ UTSBASE	= ../..
 #
 MODULE		= usbs49_fw
 OBJECTS		= $(USBS49_FW_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(USBS49_FW_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
@@ -48,16 +44,12 @@ ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 #
 include $(UTSBASE)/sparc/Makefile.sparc
 
-# 
-# lint pass one enforcement 
-# 
 CFLAGS += $(CCVERBOSE)
 
 #
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 .KEEP_STATE:
@@ -69,12 +61,6 @@ def:		$(DEF_DEPS)
 clean:		$(CLEAN_DEPS);
 
 clobber:	$(CLOBBER_DEPS);
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

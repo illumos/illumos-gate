@@ -25,7 +25,7 @@
 # Copyright 2019 Peter Tribble.
 #
 #	This Makefile defines all file modules for the directory uts/sun4u
-#	and it's children. These are the source files which are sun4u
+#	and its children. These are the source files which are sun4u
 #	"implementation architecture" dependent.
 #
 
@@ -216,10 +216,7 @@ INC_PATH	+= -I$(UTSBASE)/sun4u
 
 #
 # Since assym.h is a derived file, the dependency must be explicit for
-# all files including this file. (This is only actually required in the
-# instance when the .make.state file does not exist.) It may seem that
-# the lint targets should also have a similar dependency, but they don't
-# since only C headers are included when #defined(lint) is true.
+# all files including this file.
 #
 ASSYM_DEPS	+= mach_locore.o
 ASSYM_DEPS	+= module_sfmmu_asm.o

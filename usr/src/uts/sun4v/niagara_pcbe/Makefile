@@ -34,7 +34,6 @@ UTSBASE = ../..
 #
 MODULE		= pcbe.SUNW,UltraSPARC-T1
 OBJECTS		= $(NI_PCBE_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(NI_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_PCBE_DIR)/$(MODULE)
 
 #
@@ -46,17 +45,13 @@ include $(UTSBASE)/sun4v/Makefile.sun4v
 #	Define targets.
 #
 ALL_TARGET	= $(BINARY)
-LINT_MODULE	= niagara_pcbe
-LINT_TARGET	= $(LINT_MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.
 #
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 
 CERRWARN	+= -_gcc=-Wno-type-limits
 
@@ -72,12 +67,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

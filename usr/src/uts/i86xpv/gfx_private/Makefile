@@ -42,7 +42,6 @@ UTSBASE	= ../..
 #
 MODULE		= gfx_private
 OBJECTS		= $(GFX_PRIVATE_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(GFX_PRIVATE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 
 #
@@ -59,12 +58,8 @@ include $(UTSBASE)/i86xpv/Makefile.i86xpv
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-LINTTAGS +=	-erroff=E_ASSIGN_NARROW_CONV
-LINTTAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS +=	-erroff=E_STATIC_UNUSED
 
 CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-parentheses
@@ -81,12 +76,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

@@ -23,8 +23,6 @@
 # Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # This makefile drives the production of the platform power
@@ -60,7 +58,6 @@ INSTALL_TARGET	= $(ROOT_CONFFILE)
 NO_BUILDS	=
 ALL_BUILDS	= $(ALL_BUILDSONLY64)
 DEF_BUILDS	= $(DEF_BUILDSONLY64)
-CLEANLINTFILES	+= $(LINT32_FILES)
 
 #
 # The only thing we do from here is install the .conf file
@@ -86,7 +83,7 @@ CFLAGS += -dalign
 #
 .KEEP_STATE:
 
-def all clean clobber lint modlintlib clean.lint:
+def all clean clobber:
 
 install:	$(CONF_INSTALL_DEPS)
 

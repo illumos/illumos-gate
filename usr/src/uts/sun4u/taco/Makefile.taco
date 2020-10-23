@@ -23,8 +23,6 @@
 # Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # Global definitions for sun4u implementation specific modules
@@ -56,8 +54,6 @@ USR_TACO_INC_DIR	= $(USR_TACO_DIR)/include
 USR_TACO_ISYS_DIR	= $(USR_TACO_INC_DIR)/sys
 USR_TACO_SBIN_DIR	= $(USR_TACO_DIR)/sbin
 USR_TACO_LIB_DIR	= $(USR_TACO_DIR)/lib
-
-TACO_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/taco/lint-libs/$(OBJS_DIR)
 
 #
 # Define objects

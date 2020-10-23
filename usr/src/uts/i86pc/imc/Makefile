@@ -17,14 +17,12 @@ UTSBASE = ../..
 
 MODULE		= imc
 OBJECTS		= $(IMC_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(IMC_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/i86pc/io/imc
 
 include $(UTSBASE)/i86pc/Makefile.i86pc
 
 ALL_TARGET	= $(BINARY) $(CONFMOD)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 CPPFLAGS	+= -I$(CONF_SRCDIR)
@@ -39,12 +37,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

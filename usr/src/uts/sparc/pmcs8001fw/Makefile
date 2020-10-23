@@ -38,7 +38,6 @@ UTSBASE   = ../../../../src/uts
 #
 MODULE		= pmcs8001fw
 OBJECTS		= $(PMCS8001FW_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PMCS8001FW_C_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PMCS_FW_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/scsi/adapters/pmcs
 
@@ -53,13 +52,8 @@ include $(CONF_SRCDIR)/pmcs8001fw.version
 #
 ALL_TARGET	= $(BINARY) $(CONFMOD) $(ITUMOD)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
-LINT_TARGET	= $(MODULE).lint
 
 LDFLAGS		+= -dy
-
-#
-#	Lint tags
-#
 
 #
 #	Extra flags
@@ -80,12 +74,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

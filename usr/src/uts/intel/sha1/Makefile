@@ -38,7 +38,6 @@ SHA1_OBJS_32	=
 SHA1_OBJS_64	= sha1-x86_64.o
 SHA1_OBJS	+= $(SHA1_OBJS_$(CLASS))
 OBJECTS		= $(SHA1_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(SHA1_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_CRYPTO_DIR)/$(MODULE)
 ROOTLINK	= $(ROOT_MISC_DIR)/$(MODULE)
 
@@ -58,14 +57,12 @@ CLEANFILES += sha1-x86_64.s
 LDFLAGS += -dy -Nmisc/kcf
 
 CFLAGS += -I$(COMDIR)
-LINTFLAGS	+= -I$(COMDIR)
 
 
 #
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 
 #
@@ -81,12 +78,6 @@ clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
 
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
-
 install:	$(INSTALL_DEPS)
 
 $(ROOTLINK):	$(ROOT_MISC_DIR) $(ROOTMODULE)
@@ -99,9 +90,6 @@ include $(UTSBASE)/intel/Makefile.targ
 
 $(OBJS_DIR)/sha1-x86_64.o: sha1-x86_64.s
 	$(COMPILE.s) -o $@ ${@F:.o=.s}
-
-$(OBJS_DIR)/sha1-x86_64.ln: sha1-x86_64.s
-	@($(LHEAD) $(LINT.c) ${@F:.ln=.s} $(LTAIL))
 
 sha1-x86_64.s: $(COMDIR)/sha1/amd64/sha1-x86_64.pl
 	$(PERL) $? $@

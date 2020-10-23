@@ -77,33 +77,3 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/scsi/targets/%.c
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/scsi/adapters/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
-#
-#	Section 1b: Lint `object' build rules
-#
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/audio/drv/audiocs/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/eri/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/scsi/adapters/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/scsi/targets/%.c
-	@($(LHEAD) $(LINT.c) -I. $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/dada/impl/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/dada/conf/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/dada/targets/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/scsi/adapters/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))

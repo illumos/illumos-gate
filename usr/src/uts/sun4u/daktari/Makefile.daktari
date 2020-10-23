@@ -19,11 +19,10 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/daktari/Makefile.daktari
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile contains the common definitions for the
 #	sun4u Daktari system dependent modules.
@@ -59,8 +58,6 @@ USR_DAKTARI_SBIN_DIR	= $(USR_DAKTARI_DIR)/sbin
 USR_DAKTARI_LIB_DIR	= $(USR_DAKTARI_DIR)/lib
 USR_DAKTARI_ISYS_DIR	= $(USR_DAKTARI_INC_DIR)/sys
 
-DAKTARI_LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/daktari/lint-libs/$(OBJS_DIR)
-
 #
 # Define objects.
 
@@ -82,12 +79,3 @@ include $(UTSBASE)/sun4u/daktari/Makefile.files
 #	Include common rules.
 #
 include $(UTSBASE)/sun4u/Makefile.sun4u
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-

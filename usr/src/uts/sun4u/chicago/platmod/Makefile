@@ -40,7 +40,6 @@ UTSBASE	= ../../..
 #
 MODULE		= platmod
 OBJECTS		= $(CHICAGO_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(CHICAGO_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_CHICAGO_MISC_DIR)/$(MODULE)
 
 PLAT_DIR	= .
@@ -60,11 +59,12 @@ CLEANFILES	+= $(PLATLIB) $(SYM_MOD)
 #	Define targets
 #
 ALL_TARGET	= $(SYM_MOD)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-# lint pass one enforcement
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
+# Please do not carry these forward to new Makefiles.
 #
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-unused-variable
@@ -82,17 +82,10 @@ clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
 
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
-
 install:	$(INSTALL_DEPS)
 
 check:
 
-LINT_LIB_DIR	= $(CHICAGO_LINT_LIB_DIR)
 
 $(PLATLIB):	$(OBJECTS)
 	$(BUILD.SO) $(OBJECTS)

@@ -26,7 +26,7 @@ include $(UTSBASE)/intel/Makefile.intel
 
 SUBDIRS= t4nex cxgbe
 
-all def clean clobber lint modlintlib clean.lint install: $(SUBDIRS)
+all def clean clobber install: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

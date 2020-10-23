@@ -39,7 +39,6 @@ UTSBASE	= ../..
 #
 MODULE		= usb_ah
 OBJECTS		= $(USB_AH_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(USB_AH_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_STRMOD_DIR)/$(MODULE)
 
 #
@@ -47,10 +46,6 @@ ROOTMODULE	= $(ROOT_STRMOD_DIR)/$(MODULE)
 #
 include $(UTSBASE)/sparc/Makefile.sparc
 
-#
-# lint pass one enforcement
-#
-CFLAGS += $(CCVERBOSE)
 
 #
 # depends on usba, hidparser and audio related misc modules
@@ -61,17 +56,15 @@ LDFLAGS	+= -dy -Nmisc/usba -Nmisc/hidparser -Ndrv/usb_ac
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-CERRWARN	+= $(CNOWARN_UNINIT)
-
 #
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.
 #
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+CFLAGS		+= $(CCVERBOSE)
+CERRWARN	+= $(CNOWARN_UNINIT)
 
 .KEEP_STATE:
 
@@ -82,12 +75,6 @@ def:		$(DEF_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

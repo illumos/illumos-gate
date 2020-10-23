@@ -23,7 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	Global definitions for sun4u implementation specific modules.
 #
@@ -54,8 +54,6 @@ USR_ENCHILADA_INC_DIR	= $(USR_ENCHILADA_DIR)/include
 USR_ENCHILADA_ISYS_DIR	= $(USR_ENCHILADA_INC_DIR)/sys
 USR_ENCHILADA_SBIN_DIR	= $(USR_ENCHILADA_DIR)/sbin
 USR_ENCHILADA_LIB_DIR	= $(USR_ENCHILADA_DIR)/lib
-
-ENCHILADA_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/enchilada/lint-libs/$(OBJS_DIR)
 
 #
 # Define objects.

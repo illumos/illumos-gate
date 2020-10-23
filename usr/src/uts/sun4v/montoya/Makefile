@@ -45,12 +45,8 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
-lintlib		:=	TARGET= lintlib
-modlintlib	:=	TARGET= modlintlib
 modlist		:=	TARGET= modlist
 modlist		:=	NO_STATE= -K $$MODSTATE$$$$
-clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
 #
@@ -58,11 +54,7 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clobber clean.lint modlist:	$(MONTOYA_KMODS)
-
-lintlib:      unix
-
-modlintlib:   $(MONTOYA_KMODS)
+def all clean clobber modlist:	$(MONTOYA_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,Netra-CP3060
 
@@ -77,18 +69,6 @@ $(MONTOYA_KMODS):	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 install_h check:	FRC
-
-lint:	modlintlib .WAIT $(LINT_DEPS)
-
-LINT_LIBS	= $(LINT_LIB) \
-			-L$(MONTOYA_LINT_LIB_DIR) \
-			-L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
-			    $(CLOSED_LINT_KMODS:%=-l%) \
-			-L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
-
-lint.platmod:   modlintlib
-	@-$(ECHO) "\n$(IMPLEMENTED_PLATFORM) platform-dependent module: global crosschecks:"
-	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
 #
 #	Include common targets.

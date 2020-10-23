@@ -39,7 +39,6 @@ UTSBASE		= ../..
 #
 MODULE		= iommulib
 OBJECTS		= $(IOMMULIB_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(IOMMULIB_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 INC_PATH        += -I$(UTSBASE)/intel
 INC_PATH	+= -I$(UTSBASE)/i86pc
@@ -53,7 +52,6 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(CONFMOD)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -61,15 +59,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 DEBUG_DEFS	+= $(DEBUG_FLGS)
 
-#
-# lint pass one non-enforcement
-#
 CFLAGS += $(CCVERBOSE)
-
-#
-# 3rd party code is not lint clean
-#
-LINTFLAGS += -errwarn=%all
 
 #
 #	Default build targets.
@@ -83,12 +73,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

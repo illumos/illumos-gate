@@ -22,7 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	Global definitions for sun4u implementation specific modules.
 #
@@ -54,8 +54,6 @@ USR_CHICAGO_ISYS_DIR	= $(USR_CHICAGO_INC_DIR)/sys
 USR_CHICAGO_SBIN_DIR	= $(USR_CHICAGO_DIR)/sbin
 USR_CHICAGO_LIB_DIR	= $(USR_CHICAGO_DIR)/lib
 
-CHICAGO_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/chicago/lint-libs/$(OBJS_DIR)
-
 #
 # Define objects.
 #
@@ -77,11 +75,3 @@ include $(UTSBASE)/sun4u/chicago/Makefile.files
 #	Include common rules.
 #
 include $(UTSBASE)/sun4u/Makefile.sun4u
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-

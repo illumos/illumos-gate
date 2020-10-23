@@ -20,14 +20,13 @@
 # CDDL HEADER END
 #
 #
-# uts/sparc/v9/Makefile.files
 # Copyright 1991,1998-1999,2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This Makefile defines all file modules and build rules for the
-# directory uts/sparc/v9 and it's children. These are the source files which
+# directory uts/sparc/v9 and its children. These are the source files which
 # are specific to the sparcv9 processor.
 #
 
@@ -62,10 +61,7 @@ INC_PATH	+= -I$(UTSBASE)/sparc/v9
 
 #
 # Since assym.h is a derived file, the dependency must be explicit for
-# all files including this file. (This is only actually required in the
-# instance when the .nse_depinfo file does not exist.) It may seem that
-# the lint targets should also have a similar dependency, but they don't
-# since only C headers are included when #defined(lint) is true.
+# all files including this file.
 #
 ASSYM_DEPS +=	crt.o		\
 		float.o		\

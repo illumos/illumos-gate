@@ -23,8 +23,6 @@
 # Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 #	This Makefile defines the build rules for the directory
@@ -49,13 +47,3 @@ $(OBJS_DIR)/%.o:	$(UTSBASE)/sun4u/mpxu/os/%.c
 $(OBJS_DIR)/%.o:	$(UTSBASE)/sun4u/mpxu/io/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
-#
-#	Section 1b: Lint `object' build rules
-#
-
-$(LINTS_DIR)/%.ln:	$(UTSBASE)/sun4u/mpxu/os/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/mpxu/io/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))

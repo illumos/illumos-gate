@@ -39,7 +39,6 @@ UTSBASE	= ../../..
 #
 MODULE		= SUNW,UltraSPARC-III+
 OBJECTS		= $(CHEETAHPLUS_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(CHEETAHPLUS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_SERENGETI_CPU_DIR)/$(MODULE)
 SOFTLINKS	= SUNW,UltraSPARC-IV SUNW,UltraSPARC-IV+
 ROOTSOFTLINKS	= $(SOFTLINKS:%=$(ROOT_SERENGETI_CPU_DIR)/%)
@@ -62,7 +61,6 @@ CLEANFILES	+= $(CPULIB) $(SYM_MOD)
 #
 SYM_MOD		= $(OBJS_DIR)/unix.sym
 ALL_TARGET	= $(SYM_MOD)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= def $(BINARY) $(ROOTMODULE) $(ROOTSOFTLINKS)
 
 #
@@ -70,16 +68,23 @@ INSTALL_TARGET	= def $(BINARY) $(ROOTMODULE) $(ROOTSOFTLINKS)
 #
 ALL_BUILDS	= $(ALL_BUILDSONLY64)
 DEF_BUILDS	= $(DEF_BUILDSONLY64)
-CLEANLINTFILES	+= $(LINT32_FILES)
 
 #
-# lint pass one enforcement
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
+# Please do not carry these forward to new Makefiles.
 #
-CFLAGS += $(CCVERBOSE) -DCHEETAH -DCHEETAH_PLUS -DCPU_IMP_L1_CACHE_PARITY \
-	     -DCPU_IMP_ECACHE_ASSOC -DCPU_IMP_DUAL_PAGESIZE -DCPU_IMP_AFSR_EXT
+CFLAGS +=   -DCHEETAH -DCHEETAH_PLUS -DCPU_IMP_L1_CACHE_PARITY \
+	    -DCPU_IMP_ECACHE_ASSOC -DCPU_IMP_DUAL_PAGESIZE -DCPU_IMP_AFSR_EXT
 ASFLAGS +=  -DCHEETAH -DCHEETAH_PLUS -DCPU_IMP_L1_CACHE_PARITY \
 	    -DCPU_IMP_ECACHE_ASSOC -DCPU_IMP_DUAL_PAGESIZE -DCPU_IMP_AFSR_EXT
 
+#
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
+# Please do not carry these forward to new Makefiles.
+#
+CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= $(CNOWARN_UNINIT)
 CERRWARN	+= -_gcc=-Wno-unused-variable
@@ -107,12 +112,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

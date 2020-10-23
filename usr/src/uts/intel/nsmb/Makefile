@@ -40,7 +40,6 @@ UTSBASE	= ../..
 #
 MODULE		= nsmb
 OBJECTS		= $(NSMB_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(NSMB_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/fs/smbclnt/netsmb
 OFFSETS_SRC	= $(CONF_SRCDIR)/offsets.in
@@ -55,7 +54,6 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(ALL_TARGET_$(OBJS_DIR))
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(INSTALL_TARGET_$(OBJS_DIR))
 
 #
@@ -88,19 +86,18 @@ INSTALL_TARGET_obj64	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 MODSTUBS_DIR	= $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DNSMB_MODULE
 CLEANFILES	+= $(MODSTUBS_O) $(IOC_CHECK_H)
-CERRWARN	+= -erroff=E_STATEMENT_NOT_REACHED
 INC_PATH	+= -I$(UTSBASE)/common/fs/smbclnt
 LDFLAGS         += -dy -Ncrypto/md4 -Ncrypto/md5 -Nmisc/tlimod
 
-# Until CR 4994570 is fixed...
-LINTTAGS	+= -erroff=E_BAD_FORMAT_ARG_TYPE2
+#
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
+# Please do not carry these forward to new Makefiles.
+#
+CERRWARN	+= -erroff=E_STATEMENT_NOT_REACHED
 
 # The mb_put/md_get functions are intentionally used with and without
-# return value checks, so filter those out like LGREP.2 does.
-LGREP.nsmb =	egrep -v ' ignored: (mb_init|mb_put|md_get)'
-LTAIL	+=	2>&1 | $(LGREP.2) | $(LGREP.nsmb) || true
-
-# same for smatch
+# return value checks, so filter those.
 SMOFF += all_func_returns
 
 # needs work
@@ -118,12 +115,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

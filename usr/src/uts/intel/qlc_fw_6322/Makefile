@@ -33,7 +33,6 @@ UTSBASE	= ../..
 #
 MODULE		= qlc_fw_6322
 OBJECTS		= $(QLC_FW_6322_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(QLC_FW_6322_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_QLC_FW_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/fibre-channel/fca/qlc
 
@@ -48,15 +47,9 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(CONFMOD) $(ITUMOD)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 LDFLAGS		+= -dy -Nmisc/fctl
-
-#
-#	Lint tags
-#
-LINTTAGS	+= -erroff=E_NAME_MULTIPLY_DEF2 
 
 #
 #	Default build targets.
@@ -70,12 +63,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

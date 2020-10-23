@@ -38,7 +38,6 @@ COMDIR	= $(COMMONBASE)/crypto
 #
 MODULE		= edonr
 OBJECTS		= $(EDONR_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(EDONR_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_CRYPTO_DIR)/$(MODULE)
 ROOTLINK	= $(ROOT_MISC_DIR)/$(MODULE)
 
@@ -51,7 +50,6 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 
 #
@@ -60,7 +58,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 LDFLAGS += -dy -Nmisc/kcf
 
 CFLAGS += -I$(COMDIR)
-LINTFLAGS	+= -I$(COMDIR)
 
 #
 #	Default build targets.
@@ -74,12 +71,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

@@ -41,7 +41,6 @@ COM_DIR = $(SRC)/common/crypto
 #
 MODULE		= dprov
 OBJECTS		= $(DPROV_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(DPROV_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 ROOTLINK	= $(ROOT_CRYPTO_DIR)/$(MODULE)
 TARGET_32	= ../../kernel/drv/$(MODULE)
@@ -58,7 +57,6 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 
 #
@@ -69,21 +67,14 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 # uses private KCF functions.
 LDFLAGS += -dy -Nmisc/kcf
 
-#
-# lint pass one enforcement
-#
-CFLAGS		+= $(CCVERBOSE) -I$(COM_DIR)
-LINTFLAGS	+= -I$(COM_DIR)
+CFLAGS		+= -I$(COM_DIR)
 
 #
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.
 #
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-
+CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-label
@@ -100,12 +91,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

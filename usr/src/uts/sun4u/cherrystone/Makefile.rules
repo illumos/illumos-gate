@@ -23,9 +23,9 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
-#	This Makefile defines the build rules for the directory 
+#	This Makefile defines the build rules for the directory
 #	uts/sun4u/cherrystone and its children.
 #
 
@@ -38,12 +38,3 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/cherrystone/os/%.c
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/cherrystone/ml/%.s
 	$(COMPILE.s) -o $@ $<
-
-#
-#	Section 1b: Lint `object' build rules
-#
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/cherrystone/os/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/cherrystone/ml/%.s
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))

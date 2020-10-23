@@ -42,7 +42,6 @@ UTSBASE	= ../..
 #
 MODULE		= sppptun
 OBJECTS		= $(SPPPTUN_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(SPPPTUN_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
 ROOTLINK	= $(USR_STRMOD_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/ppp/sppptun
@@ -56,7 +55,6 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 
 #
@@ -68,19 +66,13 @@ CPPFLAGS	+= -DINTERNAL_BUILD -DSOL2
 #	Overrides.
 #
 INC_PATH	+= -I$(UTSBASE)/common/io/ppp/common
-CFLAGS		+= $(CCVERBOSE)
-
-CLEANLINTFILES	+= $(LINT64_FILES)
 
 #
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.
 #
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-
+CFLAGS		+= $(CCVERBOSE)
 CERRWARN	+= $(CNOWARN_UNINIT)
 
 #
@@ -95,12 +87,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS) lint64
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

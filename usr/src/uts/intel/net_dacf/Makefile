@@ -19,12 +19,9 @@
 # CDDL HEADER END
 #
 #
-# uts/intel/net_dacf/Makefile
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -36,7 +33,6 @@ UTSBASE = ../..
 #
 MODULE		= net_dacf
 OBJECTS		= $(NET_DACF_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(NET_DACF_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DACF_DIR)/$(MODULE)
 
 #
@@ -44,17 +40,14 @@ ROOTMODULE	= $(ROOT_DACF_DIR)/$(MODULE)
 #
 include $(UTSBASE)/intel/Makefile.intel
 
-# 
-# lint pass one enforcement 
-# 
 CFLAGS += $(CCVERBOSE)
+
 LDFLAGS += -dy -Ndrv/softmac
 
 #
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 .KEEP_STATE:
@@ -66,12 +59,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

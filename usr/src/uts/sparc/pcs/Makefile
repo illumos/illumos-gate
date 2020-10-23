@@ -20,11 +20,9 @@
 # CDDL HEADER END
 #
 #
-# uts/sparc/pcs/Makefile
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the DoRight driver kernel module.
 #
@@ -41,7 +39,6 @@ UTSBASE	= ../..
 #
 MODULE		= pcs
 OBJECTS		= $(PCS_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PCS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 
 #
@@ -53,7 +50,6 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -61,11 +57,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 DEF_BUILDS	= $(DEF_BUILDS64)
 ALL_BUILDS	= $(ALL_BUILDS64)
-CLEANLINTFILES	+= $(LINT64_FILES)
 
-#
-# lint pass one enforcement
-#
 CFLAGS += $(CCVERBOSE)
 
 #
@@ -80,12 +72,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS) lint64
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

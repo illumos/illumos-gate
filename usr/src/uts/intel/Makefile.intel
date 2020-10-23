@@ -52,14 +52,10 @@ GENLIB_DIR	 = $(UTSBASE)/intel/genunix
 IPDRV_DIR	 = $(UTSBASE)/intel/ip
 MODSTUBS_DIR	 = $(UNIX_DIR)
 DSF_DIR		 = $(UTSBASE)/$(PLATFORM)/genassym
-LINTS_DIR	 = $(OBJS_DIR)
-LINT_LIB_DIR	 = $(UTSBASE)/intel/lint-libs/$(OBJS_DIR)
 
 UNIX_O		 = $(UNIX_DIR)/$(OBJS_DIR)/unix.o
 GENLIB		 = $(GENLIB_DIR)/$(OBJS_DIR)/libgenunix.so
 MODSTUBS_O	 = $(MODSTUBS_DIR)/$(OBJS_DIR)/modstubs.o
-LINT_LIB	 = $(UTSBASE)/i86pc/lint-libs/$(OBJS_DIR)/llib-lunix.ln
-GEN_LINT_LIB	 = $(UTSBASE)/intel/lint-libs/$(OBJS_DIR)/llib-lgenunix.ln
 
 #
 #	Include the makefiles which define build rule templates, the
@@ -724,13 +720,6 @@ KICONV_KMODS	+= kiconv_emea kiconv_ja kiconv_ko kiconv_sc kiconv_tc
 #	'Dacf' Modules (/kernel/dacf):
 #
 DACF_KMODS	+= net_dacf
-
-#
-# Ensure that the variable member of the cpu_t (cpu_m) is defined
-# for the lint builds so as not to cause lint errors during the
-# global cross check.
-#
-LINTFLAGS	+= -D_MACHDEP -I$(UTSBASE)/i86pc
 
 #
 #	Sensor related drivers

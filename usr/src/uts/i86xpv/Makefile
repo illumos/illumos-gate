@@ -32,37 +32,13 @@ UTSBASE = ..
 
 include Makefile.i86xpv
 
-#
-#	The following are x86 specific (rather than i86pc) specific modules
-#	which are required for the i86pc kernel to completely lint. They are
-#	not involved in the build in any other way. In order to minimize
-#	build time, it is assumed that they are up to date.
-#
-INTEL_LIB_DIR	 = $(UTSBASE)/intel/lint-libs/$(OBJS_DIR)
-
-INTEL_LINTS	 = genunix
-
-LINT_LIBS	 = \
-		   $(GENUNIX_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
-		   $(PARALLEL_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
-		   $(INTEL_LINTS:%=$(INTEL_LIB_DIR)/llib-l%.ln)
-
-I86XPV_LINTS =	xdb xnb xnbe xnbo xnbu xpvtap
-
-#
-#
-#
 def		:=	TARGET= def
 all		:=	TARGET= all
 install		:=	TARGET= install
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
-lintlib		:=	TARGET= lintlib
-machmodlintlib	:=	TARGET= modlintlib
 modlist		:=	TARGET= modlist
 modlist	modlist.intel :=	NO_STATE= -K $$MODSTATE$$$$
-clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
 .KEEP_STATE:
@@ -74,14 +50,13 @@ INITIAL_TARGETS = \
 	unix \
 	cpu/scripts
 
-def all clean clobber clean.lint: setup genassym unix .WAIT \
+def all clean clobber: setup genassym unix .WAIT \
 	$(KMODS) $(XMODS)
 
 install: install_platforms setup genassym unix .WAIT \
 	$(KMODS) $(XMODS)
 
-# Need to clean in here too because of lint.
-clean: $(I86XPV_LINTS)
+clean:
 
 # list the modules under i86xpv.
 modlist: unix $(KMODS) $(XMODS)
@@ -91,10 +66,6 @@ modlist.karch: modlist modlist.intel
 
 modlist.intel:
 	@cd $(SRC)/uts/intel; pwd; $(MAKE) $(NO_STATE) modlist
-
-lintlib:	unix
-
-modlintlib:	$(KMODS)
 
 genassym unix $(KMODS):	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
@@ -127,23 +98,6 @@ PLAT_LINKS	=
 install_platforms:	$(ROOT_PSM_DIR) $(USR_PSM_DIR) \
 			$(ROOT_PLAT_LINKS) $(USR_PLAT_LINKS) \
 			$(OEM_USR_PLAT_LINKS)
-
-#
-#	Full kernel lint target.
-#
-LINT_TARGET	= globallint
-
-# workaround for multiply defined errors
-globallint := LINTFLAGS += -erroff=E_NAME_MULTIPLY_DEF2
-
-globallint:
-	@-$(ECHO) "\nFULL KERNEL: global crosschecks:"
-	@-$(LINT) $(LINTFLAGS) $(LINT_LIB) $(LINT_LIBS) 2>&1 | $(LGREP.2)
-
-lint:	lintlib .WAIT modlintlib .WAIT $(INTEL_LINTS) $(LINT_DEPS)
-
-$(INTEL_LINTS):	FRC
-	@cd $(UTSBASE)/intel/$@; pwd; $(MAKE) modlintlib
 
 FRC:
 

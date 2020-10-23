@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 #
-#	This makefile drives the production of the mac_ipv4 plugin 
+#	This makefile drives the production of the mac_ipv4 plugin
 #	kernel module.
 #
 
@@ -37,7 +37,6 @@ UTSBASE	= ../..
 #
 MODULE		= mac_ipv4
 OBJECTS		= $(MAC_IPV4_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(MAC_IPV4_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MAC_DIR)/$(MODULE)
 
 #
@@ -49,7 +48,6 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -58,8 +56,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 CFLAGS		+= $(CCVERBOSE)
 LDFLAGS		+= -dy -Nmisc/mac
 
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
 #
 #	Default build targets.
@@ -73,12 +69,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

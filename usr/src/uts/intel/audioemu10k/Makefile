@@ -36,7 +36,6 @@ UTSBASE = ../..
 #
 MODULE		= audioemu10k
 OBJECTS		= $(AUDIOEMU10K_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(AUDIOEMU10K_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 DSP_SRCDIR	= $(UTSBASE)/common/io/audio/drv/audioemu10k/dsp
 DSP_HNAMES	= emu10k_gpr.h emu10k1_dsp.h emu10k2_dsp.h
@@ -54,7 +53,6 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 LDFLAGS		+= -dy -Ndrv/audio -Nmisc/ac97
@@ -65,7 +63,6 @@ CERRWARN	+= $(CNOWARN_UNINIT)
 SMOFF += all_func_returns
 
 $(OBJS_DIR)/%.o			:= CPPFLAGS += -I$(OBJS_DIR)
-$(OBJS_DIR)/%.ln		:= CPPFLAGS += -I$(OBJS_DIR)
 $(OBJS_DIR)/emu10k_gpr.h	:= ASM10KFLAGS = -v -0 -P gpr
 $(OBJS_DIR)/emu10k1_dsp.h	:= ASM10KFLAGS = -v -1 -P emu10k1
 $(OBJS_DIR)/emu10k2_dsp.h	:= MODEL10K = SBLIVE
@@ -84,12 +81,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

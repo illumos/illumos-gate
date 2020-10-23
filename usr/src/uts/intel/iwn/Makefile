@@ -72,10 +72,6 @@ clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
 
-lint:
-modlintlib:
-clean.lint:
-
 install:	$(INSTALL_DEPS)
 
 #

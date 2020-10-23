@@ -39,7 +39,6 @@ COM_DIR = $(COMMONBASE)/crypto
 #
 MODULE		= sha1
 OBJECTS		= $(SHA1_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(SHA1_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_CRYPTO_DIR)/$(MODULE)
 ROOTLINK	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 
@@ -52,7 +51,6 @@ include $(UTSBASE)/sun4u/Makefile.sun4u
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 
 #
@@ -60,13 +58,15 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 #
 LDFLAGS += -dy -Nmisc/kcf
 
-# 
-# lint pass one enforcement 
-# 
-CFLAGS += $(CCVERBOSE) -I$(COM_DIR)
+CFLAGS += -I$(COM_DIR)
 CFLAGS += -DVIS_SHA1
-LINTFLAGS	+= -I$(COM_DIR)
 
+#
+# For now, disable these warnings; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
+# Please do not carry these forward to new Makefiles.
+#
+CFLAGS += $(CCVERBOSE)
 CERRWARN += $(CNOWARN_UNINIT)
 
 #
@@ -81,12 +81,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

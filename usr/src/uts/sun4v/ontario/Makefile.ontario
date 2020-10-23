@@ -19,11 +19,10 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4v/ontario/Makefile
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	Global definitions for sun4v ontario implementation specific modules.
 #
@@ -56,9 +55,6 @@ USR_ONTARIO_INC_DIR	= $(USR_ONTARIO_DIR)/include
 USR_ONTARIO_LIB_DIR	= $(USR_ONTARIO_DIR)/lib
 USR_ONTARIO_ISYS_DIR	= $(USR_ONTARIO_INC_DIR)/sys
 
-
-ONTARIO_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/ontario/lint-libs/$(OBJS_DIR)
-
 #
 #	Define modules.
 #
@@ -83,8 +79,6 @@ include $(UTSBASE)/sun4v/ontario/Makefile.files
 include $(UTSBASE)/sun4v/Makefile.sun4v
 
 MODSTUBS_DIR  = $(UNIX_DIR)
-LINTS_DIR	= $(OBJS_DIR)
-LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/ontario/lint-libs/$(OBJS_DIR)
 
 
 #

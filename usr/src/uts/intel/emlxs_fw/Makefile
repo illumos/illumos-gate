@@ -33,7 +33,6 @@ UTSBASE	= ../..
 #
 MODULE		= emlxs_fw
 OBJECTS		= $(EMLXS_FW_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(EMLXS_FW_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_EMLXS_FW_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/fibre-channel/fca/emlxs
 
@@ -48,7 +47,6 @@ include $(UTSBASE)/intel/Makefile.intel
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(CONFMOD) $(ITUMOD)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 EMLXS_FLAGS             = -DEMLXS_I386
@@ -58,16 +56,10 @@ EMLXS_FLAGS             += -DMACH=\"$(MACH)\"
 EMLXS_CFLAGS            = $(EMLXS_FLAGS)
 EMLXS_LFLAGS            = $(EMLXS_FLAGS)
 CFLAGS	                += $(EMLXS_CFLAGS) -DEMLXS_ARCH=\"$(CLASS)\"
-LINTTAGS                += $(EMLXS_LFLAGS) -DEMLXS_ARCH=\"$(CLASS)\"
 
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/fca/emlxs
 
 LDFLAGS		+= -dy -Nmisc/fctl
-
-#
-#	Lint tags
-#
-LINTTAGS	+= -erroff=E_NAME_MULTIPLY_DEF2
 
 #
 #	Default build targets.
@@ -81,12 +73,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
