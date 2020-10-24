@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -256,7 +256,7 @@ vnode_t negative_cache_vnode;
  */
 #define	dnlc_free(ncp) \
 { \
-	kmem_free((ncp), sizeof (ncache_t) + (ncp)->namlen); \
+	kmem_free((ncp), NCACHE_SIZE((ncp)->namlen)); \
 	atomic_dec_32(&dnlc_nentries); \
 }
 
@@ -460,7 +460,7 @@ dnlc_enter(vnode_t *dp, const char *name, vnode_t *vp)
 	VN_HOLD_DNLC(dp);
 	ncp->vp = vp;
 	VN_HOLD_DNLC(vp);
-	bcopy(name, ncp->name, namlen + 1); /* name and null */
+	bcopy(name, ncp->name, namlen);
 	ncp->hash = hash;
 	hp = &nc_hash[hash & nc_hashmask];
 
@@ -534,7 +534,7 @@ dnlc_update(vnode_t *dp, const char *name, vnode_t *vp)
 	VN_HOLD_DNLC(dp);
 	ncp->vp = vp;
 	VN_HOLD_DNLC(vp);
-	bcopy(name, ncp->name, namlen + 1); /* name and null */
+	bcopy(name, ncp->name, namlen);
 	ncp->hash = hash;
 	hp = &nc_hash[hash & nc_hashmask];
 
@@ -977,7 +977,7 @@ dnlc_get(uchar_t namlen)
 		dnlc_max_nentries_cnt++; /* keep a statistic */
 		return (NULL);
 	}
-	ncp = kmem_alloc(sizeof (ncache_t) + namlen, KM_NOSLEEP);
+	ncp = kmem_alloc(NCACHE_SIZE(namlen), KM_NOSLEEP);
 	if (ncp == NULL) {
 		return (NULL);
 	}
@@ -1257,7 +1257,7 @@ dnlc_dir_add_entry(dcanchor_t *dcap, const char *name, uint64_t handle)
 	 * dnlc_dir_reclaim() is called as a result of memory shortage.
 	 */
 	DNLC_DIR_HASH(name, hash, namlen);
-	dep = kmem_alloc(sizeof (dcentry_t) - 1 + namlen, KM_NOSLEEP);
+	dep = kmem_alloc(DCENTTRY_SIZE(namlen), KM_NOSLEEP);
 	if (dep == NULL) {
 #ifdef DEBUG
 		/*
@@ -1268,7 +1268,7 @@ dnlc_dir_add_entry(dcanchor_t *dcap, const char *name, uint64_t handle)
 		 * performance running a debug kernel.
 		 * This random error only occurs in debug mode.
 		 */
-		dep = kmem_alloc(sizeof (dcentry_t) - 1 + namlen, KM_NOSLEEP);
+		dep = kmem_alloc(DCENTTRY_SIZE(namlen), KM_NOSLEEP);
 		if (dep != NULL)
 			goto ok;
 #endif
@@ -1278,7 +1278,7 @@ dnlc_dir_add_entry(dcanchor_t *dcap, const char *name, uint64_t handle)
 		 * called with.
 		 */
 		dnlc_dir_reclaim(NULL);
-		dep = kmem_alloc(sizeof (dcentry_t) - 1 + namlen, KM_NOSLEEP);
+		dep = kmem_alloc(DCENTTRY_SIZE(namlen), KM_NOSLEEP);
 		if (dep == NULL) {
 			/*
 			 * still no memory, better delete this cache
@@ -1311,7 +1311,7 @@ ok:
 		    dnlc_dir_max_size) {
 			mutex_exit(&dcap->dca_lock);
 			dnlc_dir_purge(dcap);
-			kmem_free(dep, sizeof (dcentry_t) - 1 + namlen);
+			kmem_free(dep, DCENTTRY_SIZE(namlen));
 			ncs.ncs_dir_add_max.value.ui64++;
 			return (DTOOBIG);
 		}
@@ -1348,7 +1348,7 @@ ok:
 		return (DOK);
 	} else {
 		mutex_exit(&dcap->dca_lock);
-		kmem_free(dep, sizeof (dcentry_t) - 1 + namlen);
+		kmem_free(dep, DCENTTRY_SIZE(namlen));
 		return (DNOCACHE);
 	}
 }
@@ -1481,8 +1481,7 @@ dnlc_dir_abort(dircache_t *dcp)
 		nhp = dcp->dc_namehash[i];
 		while (nhp != NULL) { /* for each chained entry */
 			dep = nhp->de_next;
-			kmem_free(nhp, sizeof (dcentry_t) - 1 +
-			    nhp->de_namelen);
+			kmem_free(nhp, DCENTTRY_SIZE(nhp->de_namelen));
 			nhp = dep;
 		}
 	}
@@ -1578,8 +1577,7 @@ dnlc_dir_rem_entry(dcanchor_t *dcap, const char *name, uint64_t *handlep)
 				}
 				te = *prevpp;
 				*prevpp = (*prevpp)->de_next;
-				kmem_free(te, sizeof (dcentry_t) - 1 +
-				    te->de_namelen);
+				kmem_free(te, DCENTTRY_SIZE(te->de_namelen));
 
 				/*
 				 * If the total number of entries
