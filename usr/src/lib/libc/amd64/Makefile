@@ -267,6 +267,7 @@ COMSYSOBJS=			\
 	sigprocmsk.o		\
 	sigsendset.o		\
 	sigsuspend.o		\
+	ssp.o			\
 	statfs.o		\
 	statvfs.o		\
 	stty.o			\

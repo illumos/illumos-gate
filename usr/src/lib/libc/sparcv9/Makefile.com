@@ -560,6 +560,7 @@ PORTGEN=			\
 	sigsend.o		\
 	sigsetops.o		\
 	ssignal.o		\
+	ssp.o			\
 	stack.o			\
 	stpcpy.o		\
 	stpncpy.o		\

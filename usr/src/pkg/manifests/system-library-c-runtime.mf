@@ -18,6 +18,7 @@ set name=variant.arch value=$(ARCH)
 file path=usr/lib/$(ARCH64)/crt1.o
 file path=usr/lib/$(ARCH64)/crti.o
 file path=usr/lib/$(ARCH64)/crtn.o
+file path=usr/lib/$(ARCH64)/libssp_ns.a
 file path=usr/lib/$(ARCH64)/values-Xa.o
 file path=usr/lib/$(ARCH64)/values-Xc.o
 file path=usr/lib/$(ARCH64)/values-Xs.o
@@ -27,6 +28,7 @@ file path=usr/lib/$(ARCH64)/values-xpg6.o
 file path=usr/lib/crt1.o
 file path=usr/lib/crti.o
 file path=usr/lib/crtn.o
+file path=usr/lib/libssp_ns.a
 file path=usr/lib/values-Xa.o
 file path=usr/lib/values-Xc.o
 file path=usr/lib/values-Xs.o
