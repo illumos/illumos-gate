@@ -135,7 +135,7 @@ SUNW_ip_rcm.so := LDLIBS_MODULES += -linetutil -ldladm -lipmp -lipadm -lnvpair -
 SUNW_ip_anon_rcm.so := LDLIBS_MODULES += -linetutil
 SUNW_bridge_rcm.so := LDLIBS_MODULES += -ldladm -lnvpair
 SUNW_mpxio_rcm.so := LDLIBS_MODULES += -ldevinfo
-LDLIBS_MODULES += -lrcm -lc
+LDLIBS_MODULES += -lrcm -lc $(LDSTACKPROTECT)
 
 LDLIBS += -lrcm -lnvpair
 

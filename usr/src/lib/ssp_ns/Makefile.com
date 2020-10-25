@@ -30,6 +30,12 @@ LIBS =		$(LIBRARY)
 SRCDIR =	../common
 CFLAGS +=	$($(MACH)_C_PICFLAGS)
 
+#
+# Disable stack protection for the things providing the stack
+# protection.
+#
+STACKPROTECT = none
+
 CLOBBERFILES +=	$(LIBRARY)
 
 .KEEP_STATE:

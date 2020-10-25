@@ -58,6 +58,11 @@ CFLAGS64 += $(STAND_FLAGS_64)
 
 ASFLAGS += -P -D_ASM $(INCDIRS:%=-I%) $(ARCHOPTS)
 
+#
+# kmdb has bootstrapping challenges with the stack protector.
+#
+STACKPROTECT = none
+
 SUBDIR64_sparc		= sparcv9
 SUBDIR64_i386		= amd64
 SUBDIR64		= $(SUBDIR64_$(MACH))

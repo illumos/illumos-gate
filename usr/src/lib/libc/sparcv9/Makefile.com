@@ -1241,6 +1241,12 @@ pics/arc4random.o :=	CPPFLAGS += -I$(SRC)/common/crypto/chacha
 # Files which need extra optimization
 pics/getenv.o := sparcv9_COPTFLAG = -xO4
 
+#
+# Disable the stack protector due to issues with bootstrapping rtld. See
+# cmd/sgs/rtld/Makefile.com for more information.
+#
+STACKPROTECT = none
+
 .KEEP_STATE:
 
 all: $(LIBS) $(LIB_PIC)

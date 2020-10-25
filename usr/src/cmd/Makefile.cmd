@@ -115,7 +115,13 @@ ROOTAUDIOSAMPAU=$(ROOTAUDIOSAMP)/au
 ISAEXEC=	$(ROOT)/usr/lib/isaexec
 PLATEXEC=	$(ROOT)/usr/lib/platexec
 
-LDLIBS =	$(LDLIBS.cmd)
+#
+# Enable the stack protector by default.
+#
+CFLAGS +=	$(CCSTACKPROTECT)
+CFLAGS64 +=	$(CCSTACKPROTECT)
+
+LDLIBS =	$(LDLIBS.cmd) $(LDSTACKPROTECT)
 
 LDFLAGS.cmd = \
 	$(BDIRECT) $(ENVLDFLAGS1) $(ENVLDFLAGS2) $(ENVLDFLAGS3) \

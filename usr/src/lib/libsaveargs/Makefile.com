@@ -60,6 +60,12 @@ LINKTEST_OBJ = objs/linktest_stand.o
 CLOBBERFILES_standalone = $(LINKTEST_OBJ)
 CLOBBERFILES += $(CLOBBERFILES_$(CURTYPE))
 
+#
+# The standalone environment currently does not support the stack
+# protector.
+#
+$(STANDLIBRARY) := STACKPROTECT = none
+
 LIBS_standalone	= $(STANDLIBRARY)
 LIBS_library = $(DYNLIB)
 LIBS = $(LIBS_$(CURTYPE))

@@ -51,6 +51,12 @@ CSTD = $(CSTD_GNU99)
 C99LMODE = -Xc99=%all
 
 #
+# We cannot currently use the stack protector in the kmdb standalone
+# environment.
+#
+STACKPROTECT = none
+
+#
 # kmdb is a kernel module, so we'll use the kernel's build flags.
 CFLAGS64 += $(STAND_FLAGS_64)
 
