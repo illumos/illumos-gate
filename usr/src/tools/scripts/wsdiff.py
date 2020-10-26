@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -58,17 +58,21 @@
 # Use the -i option in conjunction with -v and -V to dive deeper and have
 # wsdiff(1) report with more verbosity.
 #
-# Usage: wsdiff [-vVt] [-r results ] [-i filelist ] old new
+# Usage: wsdiff [-dstuvV] [-U lines] [-r results ] [-i filelist ] old new
 #
 # Where "old" is the path to the proto area build without the changes, and
 # "new" is the path to the proto area built with the changes. The following
 # options are supported:
 #
-#        -v      Do not truncate observed diffs in results
-#        -V      Log *all* ELF sect diffs vs. logging the first diff found
-#        -t      Use onbld tools in $SRC/tools
-#        -r      Log results and observed differences
-#        -i      Tell wsdiff which objects to compare via an input file list
+#       -d      Print debug messages about the progress
+#       -i      Tell wsdiff which objects to compare via an input file list
+#       -r      Log results and observed differences
+#       -s      Produce sorted list of differences
+#       -t      Use onbld tools in $SRC/tools
+#       -u      Produce unified diff output
+#       -U      Produce unified diff output with <lines> lines of context
+#       -v      Do not truncate observed diffs in results
+#       -V      Log *all* ELF sect diffs vs. logging the first diff found
 
 from __future__ import print_function
 import datetime, fnmatch, getopt, os, profile, io, subprocess
@@ -78,12 +82,10 @@ from stat import *
 
 PY3 = sys.version_info[0] == 3
 
-if not PY3:
-	import commands
-
 # Human readable diffs truncated by default if longer than this
 # Specifying -v on the command line will override
 diffs_sz_thresh = 4096
+diff_args = ''
 
 # Lock name	 Provides exclusive access to
 # --------------+------------------------------------------------
@@ -108,16 +110,11 @@ wsdiff_path = [ "/usr/bin",
 # and therefore the *only* reasons why anything would be listed here is because
 # the objects do not build deterministically, yet we *cannot* fix this.
 #
-# These perl libraries use __DATE__ and therefore always look different.
-# Ideally, we would purge use the use of __DATE__ from the source, but because
-# this is source we wish to distribute with Solaris "unchanged", we cannot modify.
-#
 wsdiff_exceptions = [
-	"usr/perl5/5.8.4/lib/sun4-solaris-64int/CORE/libperl.so.1",
-	"usr/perl5/5.6.1/lib/sun4-solaris-64int/CORE/libperl.so.1",
-	"usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/libperl.so.1",
-	"usr/perl5/5.6.1/lib/i86pc-solaris-64int/CORE/libperl.so.1"
 ]
+
+# Path to genunix, used for CTF diff
+genunix = "/kernel/amd64/genunix"
 
 if PY3:
 	def getoutput(cmd):
@@ -126,13 +123,14 @@ if PY3:
 		status = os.system("{ " + cmd + "; } >" +
 			shlex.quote(fpath) + " 2>&1")
 		returncode = os.WEXITSTATUS(status)
-		with os.fdopen(f, "r") as tfile:
+		with os.fdopen(f, mode="r", errors="ignore") as tfile:
 			output = tfile.read()
 		os.unlink(fpath)
 		if output[-1:] == '\n':
 			output = output[:-1]
 		return returncode, output
 else:
+	import commands
 	getoutput = commands.getstatusoutput
 
 #####
@@ -200,7 +198,7 @@ def difference(f, dtype, diffs) :
 		return
 
 	output_lock.acquire()
-	if sorted :
+	if o_sorted :
 		differentFiles.append(f)
 	else:
 		print(f)
@@ -260,8 +258,17 @@ def diffFileData(tmpf1, tmpf2) :
 		tmpf1 = tmp_od1
 		tmpf2 = tmp_od2
 
+	dcmd = "{} {} {} {}".format(diff_cmd, diff_args, tmpf1, tmpf2)
 	try:
-		rc, data = getoutput(diff_cmd + " " + tmpf1 + " " + tmpf2)
+		rc, data = getoutput(dcmd)
+		if rc == 0:
+			# No differences found
+			data = ''
+		# If producing unified output, strip the first two lines
+		# which just show the temporary file names.
+		if diff_args:
+			data = data.split("\n", 2)[-1]
+
 		# Remove the temp files as we no longer need them.
 		if binaries :
 			try:
@@ -273,8 +280,7 @@ def diffFileData(tmpf1, tmpf2) :
 			except OSError as e:
 				error("diffFileData: unlink failed %s" % e)
 	except:
-		error("failed to get output of command: " + diff_cmd + " "
-		    + tmpf1 + " " + tmpf2)
+		error("failed to get output of command: " + dcmd)
 
 		# Send exception for the failed command up
 		raise
@@ -309,6 +315,24 @@ def fnFormat(fn) :
 
 	return fn[pos + 1:]
 
+#
+# Find the path to a proto root given the name of a file or directory under it
+# e.g. proto.base/root_i386-nd/usr/bin => proto.base/root_i386-nd
+#
+def protoroot(fn):
+	root_arch_str = "root_" + arch
+
+	pos = fn.find(root_arch_str)
+	if pos == -1:
+		return None
+
+	pos = fn.find("/", pos)
+	if pos == -1:
+		return fn
+
+	return fn[:pos]
+
+
 #####
 # Usage / argument processing
 #
@@ -318,14 +342,16 @@ def fnFormat(fn) :
 #
 def usage() :
 	sys.stdout.flush()
-	print("""Usage: wsdiff [-dvVst] [-r results ] [-i filelist ] old new
+	print("""Usage: wsdiff [-dstuvV] [-U lines] [-r results ] [-i filelist ] old new
         -d      Print debug messages about the progress
-        -v      Do not truncate observed diffs in results
-        -V      Log *all* ELF sect diffs vs. logging the first diff found
-        -t      Use onbld tools in $SRC/tools
+        -i      Tell wsdiff which objects to compare via an input file list
         -r      Log results and observed differences
         -s      Produce sorted list of differences
-        -i      Tell wsdiff which objects to compare via an input file list""",
+        -t      Use onbld tools in $SRC/tools
+        -u      Produce unified diff output
+        -U      Produce unified diff output with <lines> lines of context
+        -v      Do not truncate observed diffs in results
+        -V      Log *all* ELF sect diffs vs. logging the first diff found""",
 	    file=sys.stderr)
 	sys.exit(1)
 
@@ -338,9 +364,10 @@ def args() :
 	global logging
 	global vdiffs
 	global reportAllSects
-	global sorted
+	global o_sorted
+	global diff_args
 
-	validOpts = 'di:r:vVst?'
+	validOpts = 'di:r:uU:vVst?'
 
 	baseRoot = ""
 	ptchRoot = ""
@@ -371,7 +398,11 @@ def args() :
 			results = val
 			logging = True
 		elif opt == '-s' :
-			sorted = True
+			o_sorted = True
+		elif opt == '-u' :
+			diff_args = '-u'
+		elif opt == '-U' :
+			diff_args = '-U' + str(val)
 		elif opt == '-v' :
 			vdiffs = True
 		elif opt == '-V' :
@@ -716,7 +747,65 @@ def extract_elf_section(f, section) :
 # Depending on the section, various means for dumping and diffing
 # the data may be employed.
 #
+
 text_sections = [ '.text', '.init', '.fini' ]
+
+# Helper to generate the requireed commands for diffing two .SUNW_ctf
+# sections.
+def diff_ctf(f1, f2):
+
+	# Find genunix so that it can be used for parent CTF data when
+	# appropriate.
+	if diff_ctf.genunix1 is None:
+		global genunix, baseRoot, ptchRoot
+
+		d1 = protoroot(baseRoot)
+		d2 = protoroot(ptchRoot)
+		if (d1 and d2 and os.path.isfile(d1 + genunix) and
+		    os.path.isfile(d2 + genunix)):
+			diff_ctf.genunix1 = d1 + genunix
+			diff_ctf.genunix2 = d2 + genunix
+			debug("CTF: Found {}".format(diff_ctf.genunix1))
+			debug("CTF: Found {}".format(diff_ctf.genunix2))
+		else:
+			# Could not find genunix, do the best we can.
+			error("diff_ctf: Could not find genunix. " +
+			    "CTF diffs will be less useful.")
+			diff_ctf.genunix1 = diff_ctf.genunix2 = False
+
+	# Determine if this is a merged file from genunix by looking
+	# at the parent
+	rc, data = getoutput("{} -h {}".format(ctfdump_cmd, f1))
+	if rc != 0:
+		error("Could not read CTF header: {}".format(data))
+		return (None, None)
+
+	parent = None
+	for line in data.split('\n'):
+		if line.strip().startswith('cth_parname'):
+			try:
+				parent = line.split('=')[1].strip()
+				break
+			except:
+				pass
+
+	cmd1 = cmd2 = "{} -c ".format(ctfdump_cmd)
+	if parent == "genunix":
+		if diff_ctf.genunix1 and diff_ctf.genunix2:
+			cmd1 += "-p {} ".format(diff_ctf.genunix1)
+			cmd2 += "-p {} ".format(diff_ctf.genunix2)
+	elif parent is None or (len(parent) > 0 and parent != "(anon)"):
+		error("Unknown CTF Parent: {}".format(parent))
+		return (None, None)
+
+	cmd1 += f1
+	cmd2 += f2
+
+	return (cmd1, cmd2)
+
+diff_ctf.genunix1 = None
+diff_ctf.genunix2 = None
+
 def diff_elf_section(f1, f2, section, sh_type) :
 
 	t = threading.currentThread()
@@ -758,6 +847,13 @@ def diff_elf_section(f1, f2, section, sh_type) :
 		       " 2>/dev/null | grep -v disassembly > " + tmpFile1)
 		cmd2 = (dis_cmd + " -t " + section + " " + f2 +
 		       " 2>/dev/null | grep -v disassembly > " + tmpFile2)
+	elif (section == ".SUNW_ctf"):
+		(cmd1, cmd2) = diff_ctf(f1, f2)
+		if not cmd1:
+			return ""
+		cmd1 += " > {}".format(tmpFile1)
+		cmd2 += " > {}".format(tmpFile2)
+
 	else :
 		cmd1 = (elfdump_cmd + " -w " + tmpFile1 + " -N " +
 		       section + " " + f1)
@@ -795,7 +891,6 @@ def diff_elf_section(f1, f2, section, sh_type) :
 # significant where patch deliverable identification is concerned.
 sections_to_skip = [ ".SUNW_signature",
 		     ".comment",
-		     ".SUNW_ctf",
 		     ".debug",
 		     ".plt",
 		     ".rela.bss",
@@ -803,15 +898,21 @@ sections_to_skip = [ ".SUNW_signature",
 		     ".line",
 		     ".note",
 		     ".compcom",
+		     ".SUNW_dof",
 		     ]
 
-sections_preferred = [ ".rodata.str1.8",
+sections_preferred = [ ".SUNW_ctf",
+		       ".rodata.str1.8",
 		       ".rodata.str1.1",
 		       ".rodata",
 		       ".data1",
 		       ".data",
 		       ".text",
 		       ]
+
+# Some sections must always be extracted and diffed to check that there are
+# real differences.
+sections_to_always_diff = [ ".SUNW_ctf" ]
 
 def compareElfs(base, ptch, quiet) :
 
@@ -822,12 +923,14 @@ def compareElfs(base, ptch, quiet) :
 	except:
 		return
 	sections = list(base_header.keys())
+	sections.sort()
 
 	try:
 		ptch_header = get_elfheader(ptch)
 	except:
 		return
 	e2_only_sections = list(ptch_header.keys())
+	e2_only_sections.sort()
 
 	e1_only_sections = []
 
@@ -898,15 +1001,20 @@ def compareElfs(base, ptch, quiet) :
 			return
 
 		if len(s1) != len (s2) or s1 != s2:
-			if not quiet:
+			if not quiet or sect in sections_to_always_diff:
 				sh_type = base_header[sect]
 				data = diff_elf_section(base, ptch,
 							sect, sh_type)
 
+				if len(data) == 0:
+					continue # No differences
+
+			if not quiet:
 				# If all ELF sections are being reported, then
 				# invoke difference() to flag the file name to
-				# stdout only once. Any other section differences
-				# should be logged to the results file directly
+				# stdout only once. Any other section
+				# differences should be logged to the results
+				# file directly
 				if not first_section :
 					log_difference(fileName,
 					    "ELF " + sect, data)
@@ -1207,7 +1315,8 @@ def compareOneFile(base, ptch, quiet) :
 
 	if (btype != ptype) :
 		if not quiet :
-			difference(fileName, "file type", btype + " to " + ptype)
+			difference(fileName, "file type",
+			    btype + " to " + ptype)
 		return 1
 	else :
 		fileType = btype
@@ -1258,7 +1367,8 @@ def main() :
 	global tmpDir1, tmpDir2
 
 	# Command paths
-	global lintdump_cmd, elfdump_cmd, dump_cmd, dis_cmd, od_cmd, diff_cmd, sqlite_cmd
+	global lintdump_cmd, elfdump_cmd, dump_cmd, dis_cmd, od_cmd, \
+	    diff_cmd, sqlite_cmd, ctfdump_cmd
 
 	# Default search path
 	global wsdiff_path
@@ -1272,15 +1382,14 @@ def main() :
 	global ptchRoot
 
 	# Sort the list of files from a temporary file
-	global sorted
+	global o_sorted
 	global differentFiles
 
 	# Debugging indicator
 	global debugon
 
 	# Some globals need to be initialized
-	debugon = logging = vdiffs = reportAllSects = sorted = False
-
+	debugon = logging = vdiffs = reportAllSects = o_sorted = False
 
 	# Process command line arguments
 	# Return values are returned from args() in alpha order
@@ -1288,7 +1397,8 @@ def main() :
 	# Note that args() also set the globals:
 	#	logging to True if verbose logging (to a file) was enabled
 	#	vdiffs to True if logged differences aren't to be truncated
-	#	reportAllSects to True if all ELF section differences are to be reported
+	#	reportAllSects to True if all ELF section differences are to
+	#	be reported
 	#
 	baseRoot, fileNamesFile, localTools, ptchRoot, results = args()
 
@@ -1303,12 +1413,13 @@ def main() :
 			error("failed to open log file: " + log)
 			sys.exit(1)
 
-		dateTimeStr= "# %04d-%02d-%02d at %02d:%02d:%02d" % time.localtime()[:6]
+		dateTimeStr= "# %04d-%02d-%02d at %02d:%02d:%02d" % \
+		    time.localtime()[:6]
 		v_info("# This file was produced by wsdiff")
 		v_info(dateTimeStr)
 
 	# Changed files (used only for the sorted case)
-	if sorted :
+	if o_sorted :
 		differentFiles = []
 
 	#
@@ -1323,10 +1434,12 @@ def main() :
 		try:
 			src = os.environ['SRC']
 		except:
-			error("-t specified, but $SRC not set. Cannot find $SRC/tools")
+			error("-t specified, but $SRC not set. " +
+			    "Cannot find $SRC/tools")
 			src = ""
 		if len(src) > 0 :
-			wsdiff_path.insert(0, src + "/tools/proto/opt/onbld/bin")
+			wsdiff_path.insert(0,
+			    src + "/tools/proto/opt/onbld/bin")
 
 	lintdump_cmd = find_tool("lintdump")
 	elfdump_cmd = find_tool("elfdump")
@@ -1335,6 +1448,7 @@ def main() :
 	dis_cmd = find_tool("dis")
 	diff_cmd = find_tool("diff")
 	sqlite_cmd = find_tool("sqlite")
+	ctfdump_cmd = find_tool("ctfdump")
 
 	#
 	# Set resource limit for number of open files as high as possible.
@@ -1404,7 +1518,7 @@ def main() :
 		newOrDeleted = True
 		info("\nNew objects found: ")
 
-		if sorted :
+		if o_sorted :
 			newFiles.sort()
 		for fn in newFiles :
 			info(fnFormat(fn))
@@ -1413,14 +1527,14 @@ def main() :
 		newOrDeleted = True
 		info("\nObjects removed: ")
 
-		if sorted :
+		if o_sorted :
 			deletedFiles.sort()
 		for fn in deletedFiles :
 			info(fnFormat(fn))
 
 	if newOrDeleted :
 		info("\nChanged objects: ")
-	if sorted :
+	if o_sorted :
 		debug("The list will appear after the processing is done")
 
 	# Here's where all the heavy lifting happens
@@ -1472,7 +1586,7 @@ def main() :
 		cleanup(1)
 
 	# If the list of differences was sorted it is stored in an array
-	if sorted :
+	if o_sorted :
 		differentFiles.sort()
 		for f in differentFiles :
 			info(fnFormat(f))
