@@ -29,9 +29,9 @@
 extern "C" {
 #endif
 
-typedef int (*ctf_convert_f)(int, Elf *, uint_t, uint_t,
+typedef int (*ctf_convert_f)(int, Elf *, uint_t, uint_t, uint_t,
     ctf_file_t **, char *, size_t);
-extern int ctf_dwarf_convert(int, Elf *, uint_t, uint_t,
+extern int ctf_dwarf_convert(int, Elf *, uint_t, uint_t, uint_t,
     ctf_file_t **, char *, size_t);
 
 /*

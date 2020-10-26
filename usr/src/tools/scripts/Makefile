@@ -24,6 +24,7 @@
 # Copyright 2010, Richard Lowe
 #
 # Copyright 2020 Joyent, Inc.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 
 SHELL=/usr/bin/ksh93
 
@@ -83,6 +84,7 @@ MAN1ONBLDFILES= \
 	cddlchk.1onbld \
 	checkpaths.1onbld \
 	check_rtime.1onbld \
+	ctfconvert.1onbld \
 	cstyle.1onbld \
 	find_elf.1onbld \
 	flg.flp.1onbld \

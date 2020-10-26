@@ -376,6 +376,7 @@ file path=opt/onbld/man/man1onbld/cddlchk.1onbld
 file path=opt/onbld/man/man1onbld/check_rtime.1onbld
 file path=opt/onbld/man/man1onbld/checkpaths.1onbld
 file path=opt/onbld/man/man1onbld/cstyle.1onbld
+file path=opt/onbld/man/man1onbld/ctfconvert.1onbld
 file path=opt/onbld/man/man1onbld/cw.1onbld
 file path=opt/onbld/man/man1onbld/find_elf.1onbld
 file path=opt/onbld/man/man1onbld/findunref.1onbld

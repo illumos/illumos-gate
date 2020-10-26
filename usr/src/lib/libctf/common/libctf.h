@@ -81,8 +81,8 @@ extern void ctf_diff_fini(ctf_diff_t *);
  */
 #define	CTF_ALLOW_MISSING_DEBUG	0x01
 
-extern ctf_file_t *ctf_fdconvert(int, const char *, uint_t, uint_t, int *,
-    char *, size_t);
+extern ctf_file_t *ctf_fdconvert(int, const char *, uint_t, uint_t, uint_t,
+    int *, char *, size_t);
 
 typedef enum ctf_hsc_ret {
 	CHR_ERROR = -1,

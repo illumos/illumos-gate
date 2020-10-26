@@ -37,6 +37,7 @@
 #define	CTFCONVERT_FATAL	1
 #define	CTFCONVERT_USAGE	2
 
+#define	CTFCONVERT_DEFAULT_BATCHSIZE	256
 #define	CTFCONVERT_DEFAULT_NTHREADS	4
 
 static char *ctfconvert_progname;
@@ -67,17 +68,21 @@ ctfconvert_usage(const char *fmt, ...)
 		va_end(ap);
 	}
 
-	(void) fprintf(stderr, "Usage: %s [-ims] [-j nthrs] [-l label | "
-	    "-L labelenv] [-o outfile] input\n"
+	(void) fprintf(stderr, "Usage: %s [-ikm] [-j nthrs] [-l label | "
+	    "-L labelenv] [-b batchsize]\n"
+	    "                  [-o outfile] input\n"
 	    "\n"
+	    "\t-b  batch process this many dies at a time (default %d)\n"
 	    "\t-i  ignore files not built partially from C sources\n"
-	    "\t-j  use nthrs threads to perform the merge\n"
+	    "\t-j  use nthrs threads to perform the merge (default %d)\n"
 	    "\t-k  keep around original input file on failure\n"
-	    "\t-m  allow input to have missing debug info\n"
-	    "\t-o  copy input to outfile and add CTF\n"
 	    "\t-l  set output container's label to specified value\n"
-	    "\t-L  set output container's label to value from environment\n",
-	    ctfconvert_progname);
+	    "\t-L  set output container's label to value from environment\n"
+	    "\t-m  allow input to have missing debug info\n"
+	    "\t-o  copy input to outfile and add CTF\n",
+	    ctfconvert_progname,
+	    CTFCONVERT_DEFAULT_BATCHSIZE,
+	    CTFCONVERT_DEFAULT_NTHREADS);
 }
 
 /*
@@ -226,35 +231,48 @@ main(int argc, char *argv[])
 	int c, ifd, err;
 	boolean_t keep = B_FALSE;
 	uint_t flags = 0;
+	uint_t bsize = CTFCONVERT_DEFAULT_BATCHSIZE;
 	uint_t nthreads = CTFCONVERT_DEFAULT_NTHREADS;
 	const char *outfile = NULL;
 	const char *label = NULL;
 	const char *infile = NULL;
 	char *tmpfile;
 	ctf_file_t *ofp;
-	long argj;
-	char *eptr;
 	char buf[4096];
 	boolean_t optx = B_FALSE;
 	boolean_t ignore_non_c = B_FALSE;
 
 	ctfconvert_progname = basename(argv[0]);
 
-	while ((c = getopt(argc, argv, ":ij:kl:L:mo:X")) != -1) {
+	while ((c = getopt(argc, argv, ":b:ij:kl:L:mo:X")) != -1) {
 		switch (c) {
+		case 'b': {
+			long argno;
+			const char *errstr;
+
+			argno = strtonum(optarg, 1, UINT_MAX, &errstr);
+			if (errstr != NULL) {
+				ctfconvert_fatal("invalid argument for -b: "
+				    "%s - %s\n", optarg, errstr);
+			}
+			bsize = (uint_t)argno;
+			break;
+		}
 		case 'i':
 			ignore_non_c = B_TRUE;
 			break;
-		case 'j':
-			errno = 0;
-			argj = strtol(optarg, &eptr, 10);
-			if (errno != 0 || argj == LONG_MAX ||
-			    argj > 1024 || *eptr != '\0') {
+		case 'j': {
+			long argno;
+			const char *errstr;
+
+			argno = strtonum(optarg, 1, 1024, &errstr);
+			if (errstr != NULL) {
 				ctfconvert_fatal("invalid argument for -j: "
-				    "%s\n", optarg);
+				    "%s - %s\n", optarg, errstr);
 			}
-			nthreads = (uint_t)argj;
+			nthreads = (uint_t)argno;
 			break;
+		}
 		case 'k':
 			keep = B_TRUE;
 			break;
@@ -309,7 +327,7 @@ main(int argc, char *argv[])
 	if (outfile != NULL && strcmp(infile, outfile) != 0)
 		keep = B_TRUE;
 
-	ofp = ctf_fdconvert(ifd, label, nthreads, flags, &err, buf,
+	ofp = ctf_fdconvert(ifd, label, bsize, nthreads, flags, &err, buf,
 	    sizeof (buf));
 	if (ofp == NULL) {
 		/*

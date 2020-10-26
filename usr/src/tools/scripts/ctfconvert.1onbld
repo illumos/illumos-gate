@@ -1,0 +1,116 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd October 23, 2020
+.Dt ctfconvert 1ONBLD
+.Os
+.Sh NAME
+.Nm ctfconvert
+.Nd Convert ELF object debug data to CTF container
+.Sh SYNOPSIS
+.Nm
+.Op Fl ikm
+.Op Fl b Ar batchsize
+.Op Fl j Ar threads
+.Op Fl l Ar label | Fl L Ar labelenv
+.Op Fl o Ar outfile
+.Ar ELF_object
+.Sh DESCRIPTION
+The
+.Nm
+utility converts debug information found within
+.Ar ELF_object
+to CTF data and adds this to a CTF container.
+.Ar ELF_object
+can be a single object file or a fully linked object such as a shared library
+or binary.
+.Nm
+currently supports input debug data in DWARFv2 or DWARFv4 format.
+Unless the
+.Fl o
+option is present, this is done in-place; the original file being modified
+with a new CTF container being added.
+For in-place processing, unless the
+.Fl k
+option is present, the source file will be removed if an error occurs.
+.Sh OPTIONS
+The following options are supported:
+.Bl -tag -width Ar
+.It Fl i
+Ignore files not built partially from C sources.
+.Nm
+will usually check
+.Ar ELF_object
+to see if at least one of the input files was a
+.Sq .c
+file, and exit with an error if not.
+The
+.Fl i
+option overrides this check and allows processing to continue.
+.It Fl k
+When processing a file in-place and an error occurs, keep the input file
+rather than deleting it.
+.It Fl m
+Allow
+.Ar ELF_object
+to have missing debug data.
+By default,
+.Nm
+requires that each C source compilation unit in
+.Ar ELF_object
+contains debug data, and will exit with an error if this is not the case.
+The
+.Fl m
+option relaxes this restriction allowing processing of such files.
+Note that if the file contains no debug data in any of the compilation units
+then this flag will cause
+.Nm
+to exit successfully without taking any action, and can mask missing CTF data.
+.It Fl b Ar batchsize
+Batch-process this many compilation units from the source file at once (default
+256). This helps to reduce memory usage when processing large objects which
+were built from many source files.
+.It Fl j Ar threads
+Use this many threads to perform the merge (default 4).
+.It Fl l Ar label
+Set the output container's label to the specified value.
+.It Fl L Ar labelenv
+Set the output container's label to the value of the specified environment
+variable.
+.It Fl o Ar outfile
+Write the new object with added CTF ta to the specified output file, rather
+than updating the input in-place.
+.El
+.Sh OPERANDS
+The following operands are supported:
+.Bl -tag -width Ar
+.It Ar object_file
+The source object file to process.
+.El
+.Sh EXIT STATUS
+.Bl -inset
+.It Sy 0
+.Dl Execution completed successfully.
+.It Sy 1
+.Dl A fatal error occurred.
+.It Sy 2
+.Dl Invalid command line options were specified.
+.El
+.Sh INTERFACE STABILITY
+The command line interface of
+.Nm
+is
+.Sy Uncommitted .
+.Sh SEE ALSO
+.Xr ctfdiff 1 ,
+.Xr ctfdump 1 ,
+.Xr ctf 4
