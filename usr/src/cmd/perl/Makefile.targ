@@ -14,7 +14,9 @@
 # Copyright (c) 2018, Joyent, Inc.
 
 # Link against libc as per solaris specs
+$(PERLEXT):= PICS = $(MACH)/$(MODULE).o
 $(PERLEXT):= LDLIBS += -lc
+$(PERLEXT64):= PICS = $(MACH64)/$(MODULE).o
 $(PERLEXT64):= LDLIBS += -lc
 
 # Allow for undefined symbols satisfied by perl
@@ -38,10 +40,10 @@ $(MACH) $(MACH64):
 	$(INS.dir)
 
 $(PERLEXT): $(MACH)/$(MODULE).o
-	$(BUILD.SO) $(MACH)/$(MODULE).o
+	$(BUILD.SO)
 
 $(PERLEXT64): $(MACH64)/$(MODULE).o
-	$(BUILD64.SO) $(MACH64)/$(MODULE).o
+	$(BUILD64.SO)
 
 $(MACH)/$(MODULE).o: $(MACH)/$(MODULE).c
 	$(COMPILE.c) $(PCFLAGS) $(C_PICFLAGS) -I$(PERLINCDIR) $< -o $@
