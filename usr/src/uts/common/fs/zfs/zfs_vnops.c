@@ -5147,27 +5147,6 @@ zfs_addmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
 	return (0);
 }
 
-/*
- * The reason we push dirty pages as part of zfs_delmap() is so that we get a
- * more accurate mtime for the associated file.  Since we don't have a way of
- * detecting when the data was actually modified, we have to resort to
- * heuristics.  If an explicit msync() is done, then we mark the mtime when the
- * last page is pushed.  The problem occurs when the msync() call is omitted,
- * which by far the most common case:
- *
- *	open()
- *	mmap()
- *	<modify memory>
- *	munmap()
- *	close()
- *	<time lapse>
- *	putpage() via fsflush
- *
- * If we wait until fsflush to come along, we can have a modification time that
- * is some arbitrary point in the future.  In order to prevent this in the
- * common case, we flush pages whenever a (MAP_SHARED, PROT_WRITE) mapping is
- * torn down.
- */
 /* ARGSUSED */
 static int
 zfs_delmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,

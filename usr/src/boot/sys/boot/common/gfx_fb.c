@@ -247,10 +247,7 @@ gfx_set_colors(struct env_var *ev, int flags, const void *value)
 	if (value == NULL)
 		return (CMD_OK);
 
-	if (gfx_fb.framebuffer_common.framebuffer_bpp < 24)
-		limit = 7;
-	else
-		limit = 255;
+	limit = 255;
 
 	if (color_name_to_ansi(value, &val)) {
 		snprintf(buf, sizeof (buf), "%d", val);
@@ -262,18 +259,16 @@ gfx_set_colors(struct env_var *ev, int flags, const void *value)
 		val = (int)strtol(value, &end, 0);
 		if (errno != 0 || *end != '\0') {
 			printf("Allowed values are either ansi color name or "
-			    "number from range [0-7]%s.\n",
-			    limit == 7 ? "" : " or [16-255]");
+			    "number from range [0-255].\n");
 			return (CMD_OK);
 		}
 		evalue = value;
 	}
 
 	/* invalid value? */
-	if ((val < 0 || val > limit) || (val > 7 && val < 16)) {
+	if ((val < 0 || val > limit)) {
 		printf("Allowed values are either ansi color name or "
-		    "number from range [0-7]%s.\n",
-		    limit == 7 ? "" : " or [16-255]");
+		    "number from range [0-255].\n");
 		return (CMD_OK);
 	}
 

@@ -538,42 +538,54 @@ vidc_cons_cursor(struct vis_conscursor *cc)
 	}
 }
 
-static uint8_t
-c24_to_vga(uint8_t c, uint8_t mask)
-{
-	switch (c) {
-	case 0x40:
-		return (0x15 & mask);
-	case 0x80:
-		return (0x2A & mask);
-	case 0xFF:
-		return (c & mask);
-	default:
-		return (0);
-	}
-}
-
 static int
 vidc_vbe_cons_put_cmap(struct vis_cmap *cm)
 {
-	int i, bits, rc = 0;
+	int i, rc;
 	struct paletteentry pe;
+	rgb_t rgb;
+	uint32_t c;
 
-	bits = 1;	/* get DAC palette width */
-	rc = biosvbe_palette_format(&bits);
-	if (rc != VBE_SUCCESS)
-		return (rc);
+	rc = 0;
 
-	bits = 0xFF >> (8 - (bits >> 8));
+	/*
+	 * we need to set position and size for rgb_color_map()
+	 * to be able to work.
+	 */
+	gfx_fb.u.fb2.framebuffer_red_field_position = 16;
+	gfx_fb.u.fb2.framebuffer_green_field_position = 8;
+	gfx_fb.u.fb2.framebuffer_blue_field_position = 0;
+	gfx_fb.u.fb2.framebuffer_red_mask_size = palette_format;
+	gfx_fb.u.fb2.framebuffer_green_mask_size = palette_format;
+	gfx_fb.u.fb2.framebuffer_blue_mask_size = palette_format;
+
+	rgb.red.pos = gfx_fb.u.fb2.framebuffer_red_field_position;
+	rgb.red.size = gfx_fb.u.fb2.framebuffer_red_mask_size;
+
+	rgb.green.pos = gfx_fb.u.fb2.framebuffer_green_field_position;
+	rgb.green.size = gfx_fb.u.fb2.framebuffer_green_mask_size;
+
+	rgb.blue.pos = gfx_fb.u.fb2.framebuffer_blue_field_position;
+	rgb.blue.size = gfx_fb.u.fb2.framebuffer_blue_mask_size;
+
 	pe.Alignment = 0;
-	for (i = 0; i < cm->count; i++) {
-		pe.Red = c24_to_vga(cm->red[i], bits);
-		pe.Green = c24_to_vga(cm->green[i], bits);
-		pe.Blue = c24_to_vga(cm->blue[i], bits);
-		rc = vbe_set_palette(&pe,
-		    solaris_color_to_pc_color[cm->index + i]);
-		if (rc != 0)
-			break;
+
+	/*
+	 * The first 16 colors need to be in VGA color order.
+	 */
+	for (i = cm->index; i < 256 && rc == 0; i++) {
+		if (i < 16) {
+			if (i < 15)
+				c = rgb_color_map(&rgb, i + 1);
+			else
+				c = rgb_color_map(&rgb, 0);
+		} else {
+			c = rgb_color_map(&rgb, i);
+		}
+		pe.Red = (c >> rgb.red.pos) & ((1 << rgb.red.size) - 1);
+		pe.Green = (c >> rgb.green.pos) & ((1 << rgb.green.size) - 1);
+		pe.Blue = (c >> rgb.blue.pos) & ((1 << rgb.blue.size) - 1);
+		rc = vbe_set_palette(&pe, i);
 	}
 	return (rc);
 }

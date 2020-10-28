@@ -3738,3 +3738,9 @@ CTASSERT(offsetof(mlxcx_cmd_access_register_in_t,
 
 CTASSERT(offsetof(mlxcx_cmd_access_register_out_t,
     mlxo_access_register_data) == 0x10);
+
+CTASSERT(sizeof (mlxcx_cmd_set_flow_table_root_in_t) == 64);
+CTASSERT(offsetof(mlxcx_cmd_set_flow_table_root_in_t,
+    mlxi_set_flow_table_root_table_id) == 0x15);
+CTASSERT(offsetof(mlxcx_cmd_set_flow_table_root_in_t,
+    mlxi_set_flow_table_root_esw_owner_vhca_id_valid) == 0x1C);

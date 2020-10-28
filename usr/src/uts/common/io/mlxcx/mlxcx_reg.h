@@ -2082,6 +2082,10 @@ typedef struct {
 	uint8_t		mlxi_set_flow_table_root_rsvd3[4];
 	uint24be_t	mlxi_set_flow_table_root_table_id;
 	uint8_t		mlxi_set_flow_table_root_rsvd4[4];
+	uint8_t		mlxi_set_flow_table_root_esw_owner_vhca_id_valid;
+	uint8_t		mlxi_set_flow_table_root_rsvd5;
+	uint16be_t	mlxi_set_flow_table_root_esw_owner_vhca_id;
+	uint8_t		mlxi_set_flow_table_root_rsvd6[32];
 } mlxcx_cmd_set_flow_table_root_in_t;
 
 typedef struct {
