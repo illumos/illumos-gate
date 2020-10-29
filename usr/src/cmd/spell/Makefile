@@ -75,9 +75,13 @@ $(ROOTSPELLD)/hlista :=	FILEMODE =	0644
 $(ROOTVARADMF) :=	FILEMODE =	0666
 
 spellin1 hashmk1 := CC = $(NATIVECC)
+spellin1 hashmk1 := LD = $(NATIVELD)
+spellin1 hashmk1 := CFLAGS = $(NATIVE_CFLAGS)
 spellin1 hashmk1 := POST_PROCESS =
 spellin1 hashmk1 := CPPFLAGS =
+spellin1 hashmk1 := LDLIBS =
 spellin1 hashmk1 := LDFLAGS = $(BDIRECT)
+spellin1 hashmk1 := NATIVE_LIBS = libc.so
 
 $(ROOTSPELLD)/% $(ROOTVARADMD)/% : %
 	$(INS.file)
