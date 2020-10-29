@@ -43,7 +43,7 @@ addrs-32: addrs.c
 	$(POST_PROCESS)
 
 addrs-64: addrs.c
-	$(LINK64.c) addrs.c -o $@ $(LDLIBS)
+	$(LINK64.c) addrs.c -o $@ $(LDLIBS64)
 	$(POST_PROCESS)
 
 stacky := MAPFILE.NES=			# Will foil the test, clearly
