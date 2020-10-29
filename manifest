@@ -13714,8 +13714,7 @@ s usr/share/man/man3c/mbrlen_l.3c=mbrlen.3c
 f usr/share/man/man3c/mbrtoc16.3c 0444 root bin
 s usr/share/man/man3c/mbrtoc32.3c=mbrtoc16.3c
 s usr/share/man/man3c/mbrtowc.3c=mbrtoc16.3c
-s usr/share/man/man3c/mbrtowc32.3c=mbrtoc16.3c
-s usr/share/man/man3c/mbrtowc_l.3c=mbrtowc16.3c
+s usr/share/man/man3c/mbrtowc_l.3c=mbrtoc16.3c
 f usr/share/man/man3c/mbsinit.3c 0444 root bin
 s usr/share/man/man3c/mbsinit_l.3c=mbsinit.3c
 s usr/share/man/man3c/mbsnrtowcs.3c=mbsrtowcs.3c
