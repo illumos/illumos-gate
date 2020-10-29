@@ -20,42 +20,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-.KEEP_STATE:
-
-PROG = esc
-
-include $(SRC)/cmd/fm/eversholt/Makefile.esc.com
-
-EFTCLASS = writer
-LOCALOBJS = escmain.o
-OBJS = $(LOCALOBJS) $(COMMONOBJS)
-SRCS = $(LOCALOBJS:.o=.c) $(COMMONSRCS)
-
-CPPFLAGS += -I../common
-CFLAGS += -DESC $(CTF_FLAGS)
-LDLIBS += -lumem
-
-all debug: $(PROG)
-
-install: all $(ROOTPROG)
-
-$(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-	$(CTFMRG)
-	$(POST_PROCESS)
-
-clean:
-	$(RM) $(OBJS) y.output y.tab.c y.tab.h
-
-clobber: clean
-	$(RM) $(PROG)
-
-esclex.o: escparse.o
-
-%.o: ../common/%.c
-	$(COMPILE.c) $<
-	$(CTFCONVO)
+include ../../../../Makefile.cmd
+include ../Makefile.com

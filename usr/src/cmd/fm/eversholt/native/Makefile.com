@@ -30,18 +30,26 @@ PROG = esc
 
 include $(SRC)/cmd/fm/eversholt/Makefile.esc.com
 
+#
+# This is a version of esc we're going to use in the build. Change most
+# things to be their native counterparts.
+#
+CC = $(NATIVECC)
+LD = $(NATIVELD)
+
 EFTCLASS = writer
 LOCALOBJS = escmain.o
 OBJS = $(LOCALOBJS) $(COMMONOBJS)
 SRCS = $(LOCALOBJS:.o=.c) $(COMMONSRCS)
 
-CPPFLAGS += -I../common
-CFLAGS += -DESC $(CTF_FLAGS)
-LDLIBS += -lumem
+CPPFLAGS = $(NATIVE_CPPFLAGS) $(BASECPPFLAGS) -I../../esc/common
+CFLAGS = $(NATIVE_CFLAGS) -DESC $(CTF_FLAGS)
+LDLIBS = -lumem
+NATIVE_LIBS = libumem.so libc.so
 
-all debug: $(PROG)
+all: $(PROG)
 
-install: all $(ROOTPROG)
+install: all
 
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
@@ -56,6 +64,6 @@ clobber: clean
 
 esclex.o: escparse.o
 
-%.o: ../common/%.c
+%.o: ../../esc/common/%.c
 	$(COMPILE.c) $<
 	$(CTFCONVO)

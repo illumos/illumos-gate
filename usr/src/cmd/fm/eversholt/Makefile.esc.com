@@ -39,12 +39,9 @@ CMNOBJS = alloc.o check.o eftread.o esclex.o io.o literals.o lut.o \
 COMMONOBJS = escparse.o $(CMNOBJS)
 COMMONSRCS = $(COMMONOBJS:%.o=$(EVERCMNSRC)/%.c)
 
-LINTSRCS = $(CMNOBJS:%.o=$(EVERCMNSRC)/%.c)
-LINTFLAGS = -mnux
-
-$(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
-
-CPPFLAGS += -I$(EVERCMNSRC) -I.
+BASECPPFLAGS = -I$(EVERCMNSRC) -I.
+$(NOT_RELEASE_BUILD)BASECPPFLAGS += -DDEBUG
+CPPFLAGS += $(BASECPPFLAGS)
 CFLAGS += $(CCVERBOSE)
 CERRWARN += $(CNOWARN_UNINIT)
 CERRWARN += -_gcc=-Wno-unused-label
@@ -62,12 +59,7 @@ debug := COPTFLAG64 =
 ROOTPDIR = $(ROOT)/usr/lib/fm
 ROOTPROG = $(ROOTPDIR)/$(PROG)
 
-install: $(PROG) $(ROOTPROG)
-
 install_h: $(ROOTHDIR) $(ROOTHDRS)
-
-lint:	$(LINTSRCS)
-	$(LINT.c) $(LINTSRCS) $(LDLIBS)
 
 %.o: %.c
 	$(COMPILE.c) $<
@@ -87,4 +79,3 @@ $(ROOTPDIR):
 
 $(ROOTPDIR)/%: % $(ROOTPDIR)
 	$(INS.file)
-
