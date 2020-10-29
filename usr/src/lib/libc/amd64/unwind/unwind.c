@@ -23,6 +23,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -124,7 +125,6 @@
 #define	_Unwind_GetIP  _SUNW_Unwind_GetIP
 #define	_Unwind_GetLanguageSpecificData _SUNW_Unwind_GetLanguageSpecificData
 #define	_Unwind_GetRegionStart  _SUNW_Unwind_GetRegionStart
-#define	_Unwind_RaiseException  _SUNW_Unwind_RaiseException
 #define	_Unwind_Resume  _SUNW_Unwind_Resume
 #define	_Unwind_SetGR  _SUNW_Unwind_SetGR
 #define	_Unwind_SetIP  _SUNW_Unwind_SetIP
@@ -137,7 +137,6 @@
 #pragma weak _SUNW_Unwind_GetLanguageSpecificData = \
 		_Unwind_GetLanguageSpecificData
 #pragma weak _SUNW_Unwind_GetRegionStart = _Unwind_GetRegionStart
-#pragma weak _SUNW_Unwind_RaiseException = _Unwind_RaiseException
 #pragma weak _SUNW_Unwind_Resume = _Unwind_Resume
 #pragma weak _SUNW_Unwind_SetGR = _Unwind_SetGR
 #pragma weak _SUNW_Unwind_SetIP = _Unwind_SetIP
@@ -174,8 +173,7 @@ ctx_who(struct _Unwind_Context *ctx)
 /* ARGSUSED */
 _Unwind_Reason_Code
 _Unw_very_boring_personality(int version, int actions, uint64_t exclass,
-	struct _Unwind_Exception *exception_object,
-	struct _Unwind_Context *ctx)
+    struct _Unwind_Exception *exception_object, struct _Unwind_Context *ctx)
 {
 	_Unwind_Reason_Code res = _URC_CONTINUE_UNWIND;
 	uint64_t fp;
@@ -287,7 +285,7 @@ jmp_ctx(struct _Unwind_Context *ctx)
  */
 _Unwind_Reason_Code
 _Unwind_RaiseException_Body(struct _Unwind_Exception *exception_object,
-	struct _Unwind_Context *entry_ctx, int phase)
+    struct _Unwind_Context *entry_ctx, int phase)
 {
 	struct _Unwind_Context context;
 	struct _Unwind_Context *ctx = &context;
@@ -347,8 +345,17 @@ _Unwind_RaiseException_Body(struct _Unwind_Exception *exception_object,
 	return (res);
 }
 
+/*
+ * Unfortunately, the closed source libCrun.so library calls into the
+ * _Unwind_RaiseException function without ensuring that the stack pointer
+ * is properly aligned. Some of the downstream functions use SSE instructions
+ * and raise GP when the stack is not aligned.
+ * To work around this, the entry point for _Unwind_RaiseException is
+ * implemented in assembler (in unwind_wrap.s) and it properly aligns the stack
+ * before calling the real function here.
+ */
 _Unwind_Reason_Code
-_Unwind_RaiseException(struct _Unwind_Exception *exception_object)
+__Unwind_RaiseException_Backend(struct _Unwind_Exception *exception_object)
 {
 	struct _Unwind_Context entry_context;
 	struct _Unwind_Context *entry_ctx = &entry_context;
@@ -361,8 +368,8 @@ _Unwind_RaiseException(struct _Unwind_Exception *exception_object)
 
 _Unwind_Reason_Code
 _Unwind_ForcedUnwind_Body(struct _Unwind_Exception *exception_object,
-	_Unwind_Stop_Fn stop, void *stop_parameter,
-	struct _Unwind_Context *ctx, int resume)
+    _Unwind_Stop_Fn stop, void *stop_parameter,
+    struct _Unwind_Context *ctx, int resume)
 {
 	_Unwind_Reason_Code res;
 	int phase = _UA_CLEANUP_PHASE | _UA_FORCE_UNWIND;
@@ -433,7 +440,7 @@ _Unwind_ForcedUnwind_Body(struct _Unwind_Exception *exception_object,
 
 _Unwind_Reason_Code
 _Unwind_ForcedUnwind(struct _Unwind_Exception *exception_object,
-	_Unwind_Stop_Fn stop, void *stop_parameter)
+    _Unwind_Stop_Fn stop, void *stop_parameter)
 {
 	struct _Unwind_Context context;
 	struct _Unwind_Context *ctx = &context;
@@ -492,8 +499,7 @@ _Unwind_GetGR(struct _Unwind_Context *context, int index)
 
 
 void
-_Unwind_SetGR(struct _Unwind_Context *context, int index,
-uint64_t new_value)
+_Unwind_SetGR(struct _Unwind_Context *context, int index, uint64_t new_value)
 {
 	if (index <= EIR_R15) {
 		context->current_regs[index] = new_value;

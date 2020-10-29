@@ -25,7 +25,7 @@
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2019 Joyent, Inc.
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 LIBCBASE=	.
@@ -884,7 +884,8 @@ UNWINDMACHOBJS=			\
 pics/unwind.o:= COPTFLAG64 =
 
 UNWINDASMOBJS=			\
-	unwind_frame.o
+	unwind_frame.o		\
+	unwind_wrap.o
 
 # Preserved solely to ease maintenance of 32-bit and 64-bit library builds
 # This macro should ALWAYS be empty; native APIs are already 'large file'.
