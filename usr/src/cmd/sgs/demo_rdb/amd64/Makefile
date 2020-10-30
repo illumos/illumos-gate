@@ -60,5 +60,5 @@ $(OBJDIR)/%.o:	../i386/%.c
 		$(POST_PROCESS_O)
 
 # DEMO DELETE START
-include		../../../../../Makefile.master.64
+include		../../../../Makefile.master.64
 # DEMO DELETE END

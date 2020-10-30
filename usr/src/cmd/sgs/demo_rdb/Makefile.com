@@ -25,7 +25,7 @@
 PROG=		rdb
 
 # DEMO DELETE START
-include		../../../../Makefile.cmd
+include		../../../Makefile.cmd
 # DEMO DELETE END
 
 MACH:sh=	uname -p
@@ -54,7 +54,6 @@ MV =		mv
 
 CPPFLAGS=	-I../common -I. $(CPPFLAGS.master)
 LDLIBS +=	$(BDIRECT) $(ZLAZYLOAD) -lrtld_db -lelf -ll -ly
-NATIVE_LIBS +=	libelf.so liby.so libl.so
 
 CLEANFILES +=	$(BLTSRC) $(BLTHDR) simp libsub.so.1
 
