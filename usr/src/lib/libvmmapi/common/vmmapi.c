@@ -1826,6 +1826,12 @@ vm_get_device_fd(struct vmctx *ctx)
 
 #ifndef __FreeBSD__
 int
+vm_pmtmr_set_location(struct vmctx *ctx, uint16_t ioport)
+{
+	return (ioctl(ctx->fd, VM_PMTMR_LOCATE, ioport));
+}
+
+int
 vm_wrlock_cycle(struct vmctx *ctx)
 {
 	if (ioctl(ctx->fd, VM_WRLOCK_CYCLE, 0) != 0) {

@@ -39,6 +39,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #ifndef _VMMAPI_H_
@@ -301,6 +302,7 @@ int	vm_get_topology(struct vmctx *ctx, uint16_t *sockets, uint16_t *cores,
 
 #ifndef	__FreeBSD__
 /* illumos-specific APIs */
+int	vm_pmtmr_set_location(struct vmctx *ctx, uint16_t ioport);
 int	vm_wrlock_cycle(struct vmctx *ctx);
 #endif	/* __FreeBSD__ */
 

@@ -336,15 +336,12 @@ vatpit_update_mode(struct vatpit *vatpit, uint8_t val)
 }
 
 int
-vatpit_handler(struct vm *vm, int vcpuid, bool in, uint16_t port, uint8_t bytes,
-    uint32_t *eax)
+vatpit_handler(void *arg, bool in, uint16_t port, uint8_t bytes, uint32_t *eax)
 {
-	struct vatpit *vatpit;
+	struct vatpit *vatpit = arg;
 	struct channel *c;
 	uint8_t val;
 	int error;
-
-	vatpit = vm_atpit(vm);
 
 	if (bytes != 1)
 		return (-1);
@@ -419,12 +416,10 @@ vatpit_handler(struct vm *vm, int vcpuid, bool in, uint16_t port, uint8_t bytes,
 }
 
 int
-vatpit_nmisc_handler(struct vm *vm, int vcpuid, bool in, uint16_t port,
-    uint8_t bytes, uint32_t *eax)
+vatpit_nmisc_handler(void *arg, bool in, uint16_t port, uint8_t bytes,
+    uint32_t *eax)
 {
-	struct vatpit *vatpit;
-
-	vatpit = vm_atpit(vm);
+	struct vatpit *vatpit = arg;
 
 	if (in) {
 			VATPIT_LOCK(vatpit);

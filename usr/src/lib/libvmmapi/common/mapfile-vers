@@ -121,6 +121,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_suspended_cpus;
 		vm_resume_cpu;
 		vm_unassign_pptdev;
+		vm_pmtmr_set_location;
 		vm_wrlock_cycle;
 
 	local:

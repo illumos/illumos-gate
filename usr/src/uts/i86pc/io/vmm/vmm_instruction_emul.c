@@ -74,7 +74,8 @@ enum vie_status {
 	VIES_PENDING_MMIO	= (1U << 5),
 	VIES_PENDING_INOUT	= (1U << 6),
 	VIES_REPEAT		= (1U << 7),
-	VIES_COMPLETE		= (1U << 8),
+	VIES_USER_FALLBACK	= (1U << 8),
+	VIES_COMPLETE		= (1U << 9),
 };
 
 /* State of request to perform emulated access (inout or MMIO) */
@@ -1893,6 +1894,12 @@ vie_mmio_read(struct vie *vie, struct vm *vm, int cpuid, uint64_t gpa,
 		vie->mmio_req_read.gpa = gpa;
 		vie->mmio_req_read.state = VR_PENDING;
 		vie->status |= VIES_PENDING_MMIO;
+	} else if (err < 0) {
+		/*
+		 * The MMIO read failed in such a way that fallback to handling
+		 * in userspace is required.
+		 */
+		vie->status |= VIES_USER_FALLBACK;
 	}
 	return (err);
 }
@@ -1928,6 +1935,12 @@ vie_mmio_write(struct vie *vie, struct vm *vm, int cpuid, uint64_t gpa,
 		vie->mmio_req_write.data = wval;
 		vie->mmio_req_write.state = VR_PENDING;
 		vie->status |= VIES_PENDING_MMIO;
+	} else if (err < 0) {
+		/*
+		 * The MMIO write failed in such a way that fallback to handling
+		 * in userspace is required.
+		 */
+		vie->status |= VIES_USER_FALLBACK;
 	}
 	return (err);
 }
@@ -2023,7 +2036,7 @@ vie_emulate_inout_port(struct vie *vie, struct vm *vm, int vcpuid)
 	}
 
 	if (vie->inout_req_state != VR_DONE) {
-		err = vm_inout_access(vm, vcpuid, in, vie->inout.port,
+		err = vm_ioport_access(vm, vcpuid, in, vie->inout.port,
 		    vie->inout.bytes, &val);
 	} else {
 		/*
@@ -2205,21 +2218,21 @@ vie_emulate_inout(struct vie *vie, struct vm *vm, int vcpuid)
 		}
 
 		err = vie_emulate_inout_port(vie, vm, vcpuid);
-
-		if (err == ESRCH) {
-			ASSERT(vie->status & VIES_PENDING_INOUT);
-			/* Return to userspace with the in/out request */
-			err = -1;
-		}
 	} else {
 		vie->status &= ~VIES_REPEAT;
 		err = vie_emulate_inout_str(vie, vm, vcpuid);
 
-		if (err == ESRCH) {
-			ASSERT(vie->status & VIES_PENDING_INOUT);
-			/* Return to userspace with the in/out request */
-			err = -1;
-		}
+	}
+	if (err < 0) {
+		/*
+		 * Access to an I/O port failed in such a way that fallback to
+		 * handling in userspace is required.
+		 */
+		vie->status |= VIES_USER_FALLBACK;
+	} else if (err == ESRCH) {
+		ASSERT(vie->status & VIES_PENDING_INOUT);
+		/* Return to userspace with the in/out request */
+		err = -1;
 	}
 
 	return (err);
@@ -2244,7 +2257,14 @@ vie_advance_pc(struct vie *vie, uint64_t *nextrip)
 void
 vie_exitinfo(const struct vie *vie, struct vm_exit *vme)
 {
-	if (vie->status & VIES_MMIO) {
+	if (vie->status & VIES_USER_FALLBACK) {
+		/*
+		 * Despite the fact that the instruction was successfully
+		 * decoded, some aspect of the emulation failed in such a way
+		 * that it is left up to userspace to complete the operation.
+		 */
+		vie_fallback_exitinfo(vie, vme);
+	} else if (vie->status & VIES_MMIO) {
 		vme->exitcode = VM_EXITCODE_MMIO;
 		if (vie->mmio_req_read.state == VR_PENDING) {
 			vme->u.mmio.gpa = vie->mmio_req_read.gpa;
@@ -2298,7 +2318,16 @@ vie_fallback_exitinfo(const struct vie *vie, struct vm_exit *vme)
 bool
 vie_pending(const struct vie *vie)
 {
-	return ((vie->status & (VIES_PENDING_MMIO|VIES_PENDING_INOUT)) != 0);
+	/*
+	 * These VIE status bits indicate conditions which must be addressed
+	 * through either device IO fulfillment (with corresponding
+	 * vie_fulfill_*()) or complete userspace emulation (followed by a
+	 * vie_reset()).
+	 */
+	const enum vie_status of_interest =
+	    VIES_PENDING_MMIO | VIES_PENDING_INOUT | VIES_USER_FALLBACK;
+
+	return ((vie->status & of_interest) != 0);
 }
 
 bool
