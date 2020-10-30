@@ -124,18 +124,18 @@ SMATCH=off
 MAPFILES = ../common/mapfile-intf $(MAPFILE.NGB)
 rcm_daemon := LDFLAGS += $(MAPFILES:%=-Wl,-M%)
 
-LDLIBS_MODULES =
-SUNW_pool_rcm.so := LDLIBS_MODULES += -L$(ROOT)/usr/lib -lpool -lnvpair
-SUNW_network_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm -lnvpair -ldevinfo
-SUNW_vlan_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm -lnvpair
-SUNW_vnic_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm -lnvpair
-SUNW_ibpart_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm -lnvpair
-SUNW_aggr_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm -lnvpair
-SUNW_ip_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil -ldladm -lipmp -lipadm -lnvpair -lsocket -lgen
-SUNW_ip_anon_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil
-SUNW_bridge_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm -lnvpair
+LDLIBS_MODULES = -L$(ROOT)/lib -L$(ROOT)/usr/lib
+SUNW_pool_rcm.so := LDLIBS_MODULES += -lpool -lnvpair
+SUNW_network_rcm.so := LDLIBS_MODULES += -ldladm -lnvpair -ldevinfo
+SUNW_vlan_rcm.so := LDLIBS_MODULES += -ldladm -lnvpair
+SUNW_vnic_rcm.so := LDLIBS_MODULES += -ldladm -lnvpair
+SUNW_ibpart_rcm.so := LDLIBS_MODULES += -ldladm -lnvpair
+SUNW_aggr_rcm.so := LDLIBS_MODULES += -ldladm -lnvpair
+SUNW_ip_rcm.so := LDLIBS_MODULES += -linetutil -ldladm -lipmp -lipadm -lnvpair -lsocket -lgen
+SUNW_ip_anon_rcm.so := LDLIBS_MODULES += -linetutil
+SUNW_bridge_rcm.so := LDLIBS_MODULES += -ldladm -lnvpair
 SUNW_mpxio_rcm.so := LDLIBS_MODULES += -ldevinfo
-LDLIBS_MODULES += -L$(ROOT)/lib -lrcm -lc
+LDLIBS_MODULES += -lrcm -lc
 
 LDLIBS += -lrcm -lnvpair
 
