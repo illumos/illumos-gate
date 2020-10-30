@@ -578,7 +578,8 @@ basedeps :=	TARGET=install
 
 # The following dependencies are currently required by libdbus-1 and should
 # be used for anything linking against it.
-dbusdeps:	libsecdb libtsol libinetutil libscf libuutil libgen libsmbios
+dbusdeps:	libsecdb libtsol libinetutil libscf libuutil libgen libsmbios \
+		libbsm
 
 # The following dependencies don't need to be listed below as they are built
 # before everything else:
