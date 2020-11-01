@@ -96,36 +96,36 @@ __FBSDID("$FreeBSD$");
 
 #define	PINBASED_CTLS_ONE_SETTING					\
 	(PINBASED_EXTINT_EXITING	|				\
-	 PINBASED_NMI_EXITING		|				\
-	 PINBASED_VIRTUAL_NMI)
+	PINBASED_NMI_EXITING		|				\
+	PINBASED_VIRTUAL_NMI)
 #define	PINBASED_CTLS_ZERO_SETTING	0
 
-#define PROCBASED_CTLS_WINDOW_SETTING					\
+#define	PROCBASED_CTLS_WINDOW_SETTING					\
 	(PROCBASED_INT_WINDOW_EXITING	|				\
-	 PROCBASED_NMI_WINDOW_EXITING)
+	PROCBASED_NMI_WINDOW_EXITING)
 
 #ifdef __FreeBSD__
 #define	PROCBASED_CTLS_ONE_SETTING					\
 	(PROCBASED_SECONDARY_CONTROLS	|				\
-	 PROCBASED_MWAIT_EXITING	|				\
-	 PROCBASED_MONITOR_EXITING	|				\
-	 PROCBASED_IO_EXITING		|				\
-	 PROCBASED_MSR_BITMAPS		|				\
-	 PROCBASED_CTLS_WINDOW_SETTING	|				\
-	 PROCBASED_CR8_LOAD_EXITING	|				\
-	 PROCBASED_CR8_STORE_EXITING)
+	PROCBASED_MWAIT_EXITING		|				\
+	PROCBASED_MONITOR_EXITING	|				\
+	PROCBASED_IO_EXITING		|				\
+	PROCBASED_MSR_BITMAPS		|				\
+	PROCBASED_CTLS_WINDOW_SETTING	|				\
+	PROCBASED_CR8_LOAD_EXITING	|				\
+	PROCBASED_CR8_STORE_EXITING)
 #else
 /* We consider TSC offset a necessity for unsynched TSC handling */
 #define	PROCBASED_CTLS_ONE_SETTING					\
 	(PROCBASED_SECONDARY_CONTROLS	|				\
-	 PROCBASED_TSC_OFFSET		|				\
-	 PROCBASED_MWAIT_EXITING	|				\
-	 PROCBASED_MONITOR_EXITING	|				\
-	 PROCBASED_IO_EXITING		|				\
-	 PROCBASED_MSR_BITMAPS		|				\
-	 PROCBASED_CTLS_WINDOW_SETTING	|				\
-	 PROCBASED_CR8_LOAD_EXITING	|				\
-	 PROCBASED_CR8_STORE_EXITING)
+	PROCBASED_TSC_OFFSET		|				\
+	PROCBASED_MWAIT_EXITING		|				\
+	PROCBASED_MONITOR_EXITING	|				\
+	PROCBASED_IO_EXITING		|				\
+	PROCBASED_MSR_BITMAPS		|				\
+	PROCBASED_CTLS_WINDOW_SETTING	|				\
+	PROCBASED_CR8_LOAD_EXITING	|				\
+	PROCBASED_CR8_STORE_EXITING)
 #endif /* __FreeBSD__ */
 
 #define	PROCBASED_CTLS_ZERO_SETTING	\
@@ -175,24 +175,13 @@ static uint32_t pinbased_ctls, procbased_ctls, procbased_ctls2;
 static uint32_t exit_ctls, entry_ctls;
 
 static uint64_t cr0_ones_mask, cr0_zeros_mask;
-SYSCTL_ULONG(_hw_vmm_vmx, OID_AUTO, cr0_ones_mask, CTLFLAG_RD,
-	     &cr0_ones_mask, 0, NULL);
-SYSCTL_ULONG(_hw_vmm_vmx, OID_AUTO, cr0_zeros_mask, CTLFLAG_RD,
-	     &cr0_zeros_mask, 0, NULL);
 
 static uint64_t cr4_ones_mask, cr4_zeros_mask;
-SYSCTL_ULONG(_hw_vmm_vmx, OID_AUTO, cr4_ones_mask, CTLFLAG_RD,
-	     &cr4_ones_mask, 0, NULL);
-SYSCTL_ULONG(_hw_vmm_vmx, OID_AUTO, cr4_zeros_mask, CTLFLAG_RD,
-	     &cr4_zeros_mask, 0, NULL);
 
 static int vmx_initialized;
-SYSCTL_INT(_hw_vmm_vmx, OID_AUTO, initialized, CTLFLAG_RD,
-	   &vmx_initialized, 0, "Intel VMX initialized");
 
+/* Do not flush RSB upon vmexit */
 static int no_flush_rsb;
-SYSCTL_INT(_hw_vmm_vmx, OID_AUTO, no_flush_rsb, CTLFLAG_RW,
-    &no_flush_rsb, 0, "Do not flush RSB upon vmexit");
 
 /*
  * Optional capabilities
@@ -204,42 +193,31 @@ static SYSCTL_NODE(_hw_vmm_vmx, OID_AUTO, cap,
     NULL);
 #endif
 
+/* HLT triggers a VM-exit */
 static int cap_halt_exit;
-SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, halt_exit, CTLFLAG_RD, &cap_halt_exit, 0,
-    "HLT triggers a VM-exit");
 
+/* PAUSE triggers a VM-exit */
 static int cap_pause_exit;
-SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, pause_exit, CTLFLAG_RD, &cap_pause_exit,
-    0, "PAUSE triggers a VM-exit");
 
+/* Monitor trap flag */
 static int cap_monitor_trap;
-SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, monitor_trap, CTLFLAG_RD,
-    &cap_monitor_trap, 0, "Monitor trap flag");
 
+/* Guests are allowed to use INVPCID */
 static int cap_invpcid;
-SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, invpcid, CTLFLAG_RD, &cap_invpcid,
-    0, "Guests are allowed to use INVPCID");
 
 /* Extra capabilities (VMX_CAP_*) beyond the minimum */
 static enum vmx_caps vmx_capabilities;
 
+/* APICv posted interrupt vector */
 static int pirvec = -1;
-SYSCTL_INT(_hw_vmm_vmx, OID_AUTO, posted_interrupt_vector, CTLFLAG_RD,
-    &pirvec, 0, "APICv posted interrupt vector");
 
 #ifdef __FreeBSD__
 static struct unrhdr *vpid_unr;
 #endif /* __FreeBSD__ */
-static u_int vpid_alloc_failed;
-SYSCTL_UINT(_hw_vmm_vmx, OID_AUTO, vpid_alloc_failed, CTLFLAG_RD,
-	    &vpid_alloc_failed, 0, NULL);
+static uint_t vpid_alloc_failed;
 
 int guest_l1d_flush;
-SYSCTL_INT(_hw_vmm_vmx, OID_AUTO, l1d_flush, CTLFLAG_RD,
-    &guest_l1d_flush, 0, NULL);
 int guest_l1d_flush_sw;
-SYSCTL_INT(_hw_vmm_vmx, OID_AUTO, l1d_flush_sw, CTLFLAG_RD,
-    &guest_l1d_flush_sw, 0, NULL);
 
 /* MSR save region is composed of an array of 'struct msr_entry' */
 struct msr_entry {
@@ -254,6 +232,7 @@ static struct msr_entry msr_load_list[1] __aligned(16);
  * The definitions of SDT probes for VMX.
  */
 
+/* BEGIN CSTYLED */
 SDT_PROBE_DEFINE3(vmm, vmx, exit, entry,
     "struct vmx *", "int", "struct vm_exit *");
 
@@ -328,6 +307,7 @@ SDT_PROBE_DEFINE4(vmm, vmx, exit, unknown,
 
 SDT_PROBE_DEFINE4(vmm, vmx, exit, return,
     "struct vmx *", "int", "struct vm_exit *", "int");
+/* END CSTYLED */
 
 /*
  * Use the last page below 4GB as the APIC access address. This address is
@@ -342,126 +322,6 @@ static void vmx_apply_tsc_adjust(struct vmx *, int);
 static void vmx_apicv_sync_tmr(struct vlapic *vlapic);
 static void vmx_tpr_shadow_enter(struct vlapic *vlapic);
 static void vmx_tpr_shadow_exit(struct vlapic *vlapic);
-
-#ifdef KTR
-static const char *
-exit_reason_to_str(int reason)
-{
-	static char reasonbuf[32];
-
-	switch (reason) {
-	case EXIT_REASON_EXCEPTION:
-		return "exception";
-	case EXIT_REASON_EXT_INTR:
-		return "extint";
-	case EXIT_REASON_TRIPLE_FAULT:
-		return "triplefault";
-	case EXIT_REASON_INIT:
-		return "init";
-	case EXIT_REASON_SIPI:
-		return "sipi";
-	case EXIT_REASON_IO_SMI:
-		return "iosmi";
-	case EXIT_REASON_SMI:
-		return "smi";
-	case EXIT_REASON_INTR_WINDOW:
-		return "intrwindow";
-	case EXIT_REASON_NMI_WINDOW:
-		return "nmiwindow";
-	case EXIT_REASON_TASK_SWITCH:
-		return "taskswitch";
-	case EXIT_REASON_CPUID:
-		return "cpuid";
-	case EXIT_REASON_GETSEC:
-		return "getsec";
-	case EXIT_REASON_HLT:
-		return "hlt";
-	case EXIT_REASON_INVD:
-		return "invd";
-	case EXIT_REASON_INVLPG:
-		return "invlpg";
-	case EXIT_REASON_RDPMC:
-		return "rdpmc";
-	case EXIT_REASON_RDTSC:
-		return "rdtsc";
-	case EXIT_REASON_RSM:
-		return "rsm";
-	case EXIT_REASON_VMCALL:
-		return "vmcall";
-	case EXIT_REASON_VMCLEAR:
-		return "vmclear";
-	case EXIT_REASON_VMLAUNCH:
-		return "vmlaunch";
-	case EXIT_REASON_VMPTRLD:
-		return "vmptrld";
-	case EXIT_REASON_VMPTRST:
-		return "vmptrst";
-	case EXIT_REASON_VMREAD:
-		return "vmread";
-	case EXIT_REASON_VMRESUME:
-		return "vmresume";
-	case EXIT_REASON_VMWRITE:
-		return "vmwrite";
-	case EXIT_REASON_VMXOFF:
-		return "vmxoff";
-	case EXIT_REASON_VMXON:
-		return "vmxon";
-	case EXIT_REASON_CR_ACCESS:
-		return "craccess";
-	case EXIT_REASON_DR_ACCESS:
-		return "draccess";
-	case EXIT_REASON_INOUT:
-		return "inout";
-	case EXIT_REASON_RDMSR:
-		return "rdmsr";
-	case EXIT_REASON_WRMSR:
-		return "wrmsr";
-	case EXIT_REASON_INVAL_VMCS:
-		return "invalvmcs";
-	case EXIT_REASON_INVAL_MSR:
-		return "invalmsr";
-	case EXIT_REASON_MWAIT:
-		return "mwait";
-	case EXIT_REASON_MTF:
-		return "mtf";
-	case EXIT_REASON_MONITOR:
-		return "monitor";
-	case EXIT_REASON_PAUSE:
-		return "pause";
-	case EXIT_REASON_MCE_DURING_ENTRY:
-		return "mce-during-entry";
-	case EXIT_REASON_TPR:
-		return "tpr";
-	case EXIT_REASON_APIC_ACCESS:
-		return "apic-access";
-	case EXIT_REASON_GDTR_IDTR:
-		return "gdtridtr";
-	case EXIT_REASON_LDTR_TR:
-		return "ldtrtr";
-	case EXIT_REASON_EPT_FAULT:
-		return "eptfault";
-	case EXIT_REASON_EPT_MISCONFIG:
-		return "eptmisconfig";
-	case EXIT_REASON_INVEPT:
-		return "invept";
-	case EXIT_REASON_RDTSCP:
-		return "rdtscp";
-	case EXIT_REASON_VMX_PREEMPT:
-		return "vmxpreempt";
-	case EXIT_REASON_INVVPID:
-		return "invvpid";
-	case EXIT_REASON_WBINVD:
-		return "wbinvd";
-	case EXIT_REASON_XSETBV:
-		return "xsetbv";
-	case EXIT_REASON_APIC_WRITE:
-		return "apic-write";
-	default:
-		snprintf(reasonbuf, sizeof(reasonbuf), "%d", reason);
-		return (reasonbuf);
-	}
-}
-#endif	/* KTR */
 
 static int
 vmx_allow_x2apic_msrs(struct vmx *vmx)
@@ -511,14 +371,14 @@ vmx_allow_x2apic_msrs(struct vmx *vmx)
 	return (error);
 }
 
-static u_long
-vmx_fix_cr0(u_long cr0)
+static ulong_t
+vmx_fix_cr0(ulong_t cr0)
 {
 	return ((cr0 | cr0_ones_mask) & ~cr0_zeros_mask);
 }
 
-static u_long
-vmx_fix_cr4(u_long cr4)
+static ulong_t
+vmx_fix_cr4(ulong_t cr4)
 {
 	return ((cr4 | cr4_ones_mask) & ~cr4_zeros_mask);
 }
@@ -623,12 +483,12 @@ vmx_init(int ipinum)
 
 	/* Check support for primary processor-based VM-execution controls */
 	error = vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS,
-			       MSR_VMX_TRUE_PROCBASED_CTLS,
-			       PROCBASED_CTLS_ONE_SETTING,
-			       PROCBASED_CTLS_ZERO_SETTING, &procbased_ctls);
+	    MSR_VMX_TRUE_PROCBASED_CTLS,
+	    PROCBASED_CTLS_ONE_SETTING,
+	    PROCBASED_CTLS_ZERO_SETTING, &procbased_ctls);
 	if (error) {
 		printf("vmx_init: processor does not support desired primary "
-		       "processor-based controls\n");
+		    "processor-based controls\n");
 		return (error);
 	}
 
@@ -637,37 +497,39 @@ vmx_init(int ipinum)
 
 	/* Check support for secondary processor-based VM-execution controls */
 	error = vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS2,
-			       MSR_VMX_PROCBASED_CTLS2,
-			       PROCBASED_CTLS2_ONE_SETTING,
-			       PROCBASED_CTLS2_ZERO_SETTING, &procbased_ctls2);
+	    MSR_VMX_PROCBASED_CTLS2,
+	    PROCBASED_CTLS2_ONE_SETTING,
+	    PROCBASED_CTLS2_ZERO_SETTING, &procbased_ctls2);
 	if (error) {
 		printf("vmx_init: processor does not support desired secondary "
-		       "processor-based controls\n");
+		    "processor-based controls\n");
 		return (error);
 	}
 
 	/* Check support for VPID */
-	error = vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS2, MSR_VMX_PROCBASED_CTLS2,
-			       PROCBASED2_ENABLE_VPID, 0, &tmp);
+	error = vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS2,
+	    MSR_VMX_PROCBASED_CTLS2,
+	    PROCBASED2_ENABLE_VPID,
+	    0, &tmp);
 	if (error == 0)
 		procbased_ctls2 |= PROCBASED2_ENABLE_VPID;
 
 	/* Check support for pin-based VM-execution controls */
 	error = vmx_set_ctlreg(MSR_VMX_PINBASED_CTLS,
-			       MSR_VMX_TRUE_PINBASED_CTLS,
-			       PINBASED_CTLS_ONE_SETTING,
-			       PINBASED_CTLS_ZERO_SETTING, &pinbased_ctls);
+	    MSR_VMX_TRUE_PINBASED_CTLS,
+	    PINBASED_CTLS_ONE_SETTING,
+	    PINBASED_CTLS_ZERO_SETTING, &pinbased_ctls);
 	if (error) {
 		printf("vmx_init: processor does not support desired "
-		       "pin-based controls\n");
+		    "pin-based controls\n");
 		return (error);
 	}
 
 	/* Check support for VM-exit controls */
 	error = vmx_set_ctlreg(MSR_VMX_EXIT_CTLS, MSR_VMX_TRUE_EXIT_CTLS,
-			       VM_EXIT_CTLS_ONE_SETTING,
-			       VM_EXIT_CTLS_ZERO_SETTING,
-			       &exit_ctls);
+	    VM_EXIT_CTLS_ONE_SETTING,
+	    VM_EXIT_CTLS_ZERO_SETTING,
+	    &exit_ctls);
 	if (error) {
 		printf("vmx_init: processor does not support desired "
 		    "exit controls\n");
@@ -689,25 +551,26 @@ vmx_init(int ipinum)
 	 * as individual bits
 	 */
 	cap_halt_exit = (vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS,
-					MSR_VMX_TRUE_PROCBASED_CTLS,
-					PROCBASED_HLT_EXITING, 0,
-					&tmp) == 0);
+	    MSR_VMX_TRUE_PROCBASED_CTLS,
+	    PROCBASED_HLT_EXITING, 0,
+	    &tmp) == 0);
 
 	cap_monitor_trap = (vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS,
-					MSR_VMX_PROCBASED_CTLS,
-					PROCBASED_MTF, 0,
-					&tmp) == 0);
+	    MSR_VMX_PROCBASED_CTLS,
+	    PROCBASED_MTF, 0,
+	    &tmp) == 0);
 
 	cap_pause_exit = (vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS,
-					 MSR_VMX_TRUE_PROCBASED_CTLS,
-					 PROCBASED_PAUSE_EXITING, 0,
-					 &tmp) == 0);
+	    MSR_VMX_TRUE_PROCBASED_CTLS,
+	    PROCBASED_PAUSE_EXITING, 0,
+	    &tmp) == 0);
 
 	cap_invpcid = (vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS2,
 	    MSR_VMX_PROCBASED_CTLS2, PROCBASED2_ENABLE_INVPCID, 0,
 	    &tmp) == 0);
 
-	/* Check for APIC virtualization capabilities:
+	/*
+	 * Check for APIC virtualization capabilities:
 	 * - TPR shadowing
 	 * - Full APICv (with or without x2APIC support)
 	 * - Posted interrupt handling
@@ -860,10 +723,10 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 	uint16_t maxcpus;
 	uint32_t proc_ctls, proc2_ctls, pin_ctls;
 
-	vmx = malloc(sizeof(struct vmx), M_VMX, M_WAITOK | M_ZERO);
+	vmx = malloc(sizeof (struct vmx), M_VMX, M_WAITOK | M_ZERO);
 	if ((uintptr_t)vmx & PAGE_MASK) {
 		panic("malloc of struct vmx not aligned on %d byte boundary",
-		      PAGE_SIZE);
+		    PAGE_SIZE);
 	}
 	vmx->vm = vm;
 
@@ -982,7 +845,8 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 
 		/*
 		 * Configure host sysenter MSRs to be restored on VM exit.
-		 * The thread-specific MSR_INTC_SEP_ESP value is loaded in vmx_run.
+		 * The thread-specific MSR_INTC_SEP_ESP value is loaded in
+		 * vmx_run.
 		 */
 		vmcs_write(VMCS_HOST_IA32_SYSENTER_CS, KCS_SEL);
 		vmcs_write(VMCS_HOST_IA32_SYSENTER_EIP,
@@ -1098,19 +962,6 @@ vmx_run_trace(struct vmx *vmx, int vcpu)
 }
 
 static __inline void
-vmx_exit_trace(struct vmx *vmx, int vcpu, uint64_t rip, uint32_t exit_reason,
-	       int handled)
-{
-#ifdef KTR
-	VCPU_CTR3(vmx->vm, vcpu, "%s %s vmexit at 0x%0lx",
-		 handled ? "handled" : "unhandled",
-		 exit_reason_to_str(exit_reason), rip);
-#endif
-	DTRACE_PROBE3(vmm__vexit, int, vcpu, uint64_t, rip,
-	    uint32_t, exit_reason);
-}
-
-static __inline void
 vmx_astpending_trace(struct vmx *vmx, int vcpu, uint64_t rip)
 {
 #ifdef KTR
@@ -1131,7 +982,7 @@ struct invvpid_desc {
 	uint32_t	_res2;
 	uint64_t	linear_addr;
 };
-CTASSERT(sizeof(struct invvpid_desc) == 16);
+CTASSERT(sizeof (struct invvpid_desc) == 16);
 
 static __inline void
 invvpid(uint64_t type, struct invvpid_desc desc)
@@ -1318,9 +1169,9 @@ vmx_apply_tsc_adjust(struct vmx *vmx, int vcpu)
 }
 
 #define	NMI_BLOCKING	(VMCS_INTERRUPTIBILITY_NMI_BLOCKING |		\
-			 VMCS_INTERRUPTIBILITY_MOVSS_BLOCKING)
+			VMCS_INTERRUPTIBILITY_MOVSS_BLOCKING)
 #define	HWINTR_BLOCKING	(VMCS_INTERRUPTIBILITY_STI_BLOCKING |		\
-			 VMCS_INTERRUPTIBILITY_MOVSS_BLOCKING)
+			VMCS_INTERRUPTIBILITY_MOVSS_BLOCKING)
 
 static void
 vmx_inject_nmi(struct vmx *vmx, int vcpu)
@@ -1475,7 +1326,7 @@ vmx_inject_vlapic(struct vmx *vmx, int vcpu, struct vlapic *vlapic)
 	 * Hardware Interrupts":
 	 * - maskable interrupt vectors [16,255] can be delivered
 	 *   through the local APIC.
-	*/
+	 */
 	KASSERT(vector >= 16 && vector <= 255,
 	    ("invalid vector %d from local APIC", vector));
 
@@ -1632,7 +1483,8 @@ vmx_emulate_xsetbv(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 	}
 
 	/* We only handle xcr0 if both the host and guest have XSAVE enabled. */
-	if (!limits->xsave_enabled || !(vmcs_read(VMCS_GUEST_CR4) & CR4_XSAVE)) {
+	if (!limits->xsave_enabled ||
+	    !(vmcs_read(VMCS_GUEST_CR4) & CR4_XSAVE)) {
 		vm_inject_ud(vmx->vm, vcpu);
 		return (HANDLED);
 	}
@@ -2024,7 +1876,7 @@ ept_fault_type(uint64_t ept_qual)
 	else if (ept_qual & EPT_VIOLATION_INST_FETCH)
 		fault_type = VM_PROT_EXECUTE;
 	else
-		fault_type= VM_PROT_READ;
+		fault_type = VM_PROT_READ;
 
 	return (fault_type);
 }
@@ -2241,7 +2093,7 @@ vmx_task_switch_reason(uint64_t qual)
 }
 
 static int
-emulate_wrmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t val)
+emulate_wrmsr(struct vmx *vmx, int vcpuid, uint_t num, uint64_t val)
 {
 	int error;
 
@@ -2254,7 +2106,7 @@ emulate_wrmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t val)
 }
 
 static int
-emulate_rdmsr(struct vmx *vmx, int vcpuid, u_int num)
+emulate_rdmsr(struct vmx *vmx, int vcpuid, uint_t num)
 {
 	uint64_t result;
 	int error;
@@ -2586,7 +2438,8 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		 * If the hypervisor has requested user exits for
 		 * debug exceptions, bounce them out to userland.
 		 */
-		if (intr_type == VMCS_INTR_T_SWEXCEPTION && intr_vec == IDT_BP &&
+		if (intr_type == VMCS_INTR_T_SWEXCEPTION &&
+		    intr_vec == IDT_BP &&
 		    (vmx->cap[vcpu].set & (1 << VM_CAP_BPT_EXIT))) {
 			vmexit->exitcode = VM_EXITCODE_BPT;
 			vmexit->u.bpt.inst_length = vmexit->inst_length;
@@ -3127,7 +2980,8 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap,
 #ifdef	__FreeBSD__
 		launched = 1;
 #endif
-		vmx_exit_trace(vmx, vcpu, rip, exit_reason, handled);
+		DTRACE_PROBE3(vmm__vexit, int, vcpu, uint64_t, rip,
+		    uint32_t, exit_reason);
 		rip = vmexit->rip;
 	} while (handled);
 
@@ -3138,7 +2992,7 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap,
 	if ((handled && vmexit->exitcode != VM_EXITCODE_BOGUS) ||
 	    (!handled && vmexit->exitcode == VM_EXITCODE_BOGUS)) {
 		panic("Mismatch between handled (%d) and exitcode (%d)",
-		      handled, vmexit->exitcode);
+		    handled, vmexit->exitcode);
 	}
 
 	if (!handled)
@@ -3173,8 +3027,6 @@ vmx_vmcleanup(void *arg)
 		vpid_free(vmx->state[i].vpid);
 
 	free(vmx, M_VMX);
-
-	return;
 }
 
 static uint64_t *
@@ -3583,13 +3435,13 @@ struct vlapic_vtx {
 
 	struct pir_desc	*pir_desc;
 	struct vmx	*vmx;
-	u_int	pending_prio;
+	uint_t	pending_prio;
 	boolean_t	tmr_sync;
 };
 
-CTASSERT((offsetof (struct vlapic_vtx, tmr_active) & 63) == 0);
+CTASSERT((offsetof(struct vlapic_vtx, tmr_active) & 63) == 0);
 
-#define VPR_PRIO_BIT(vpr)	(1 << ((vpr) >> 4))
+#define	VPR_PRIO_BIT(vpr)	(1 << ((vpr) >> 4))
 
 static vcpu_notify_t
 vmx_apicv_set_ready(struct vlapic *vlapic, int vector, bool level)
@@ -3662,8 +3514,8 @@ vmx_apicv_set_ready(struct vlapic *vlapic, int vector, bool level)
 		notify = VCPU_NOTIFY_APIC;
 		vlapic_vtx->pending_prio = 0;
 	} else {
-		const u_int old_prio = vlapic_vtx->pending_prio;
-		const u_int prio_bit = VPR_PRIO_BIT(vector & APIC_TPR_INT);
+		const uint_t old_prio = vlapic_vtx->pending_prio;
+		const uint_t prio_bit = VPR_PRIO_BIT(vector & APIC_TPR_INT);
 
 		if ((old_prio & prio_bit) == 0 && prio_bit > old_prio) {
 			atomic_set_int(&vlapic_vtx->pending_prio, prio_bit);
@@ -3874,7 +3726,8 @@ vmx_vlapic_init(void *arg, int vcpuid)
 
 	vmx = arg;
 
-	vlapic = malloc(sizeof(struct vlapic_vtx), M_VLAPIC, M_WAITOK | M_ZERO);
+	vlapic = malloc(sizeof (struct vlapic_vtx), M_VLAPIC,
+	    M_WAITOK | M_ZERO);
 	vlapic->vm = vmx->vm;
 	vlapic->vcpuid = vcpuid;
 	vlapic->apic_page = (struct LAPIC *)&vmx->apic_page[vcpuid];

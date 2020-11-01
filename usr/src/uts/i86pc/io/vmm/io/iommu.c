@@ -51,17 +51,9 @@ __FBSDID("$FreeBSD$");
 #include "vmm_mem.h"
 #include "iommu.h"
 
-SYSCTL_DECL(_hw_vmm);
-SYSCTL_NODE(_hw_vmm, OID_AUTO, iommu, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
-    "bhyve iommu parameters");
-
 static int iommu_avail;
-SYSCTL_INT(_hw_vmm_iommu, OID_AUTO, initialized, CTLFLAG_RD, &iommu_avail,
-    0, "bhyve iommu initialized?");
 
 static int iommu_enable = 1;
-SYSCTL_INT(_hw_vmm_iommu, OID_AUTO, enable, CTLFLAG_RDTUN, &iommu_enable, 0,
-    "Enable use of I/O MMU (required for PCI passthrough).");
 
 static struct iommu_ops *ops;
 static void *host_domain;
@@ -70,7 +62,7 @@ static eventhandler_tag add_tag, delete_tag;
 #endif
 
 #ifndef __FreeBSD__
-static volatile u_int iommu_initted;
+static volatile uint_t iommu_initted;
 #endif
 
 static __inline int

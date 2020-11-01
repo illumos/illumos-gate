@@ -74,7 +74,8 @@ int vm_inout_detach(struct ioport_config *ports, uint16_t port, bool drv_hook,
 int vm_inout_access(struct ioport_config *ports, bool in, uint16_t port,
     uint8_t bytes, uint32_t *val);
 
-/* Arbitrary cookie for io port hook:
+/*
+ * Arbitrary cookie for io port hook:
  * - top 48 bits: func address + arg
  * - lower 16 bits: port
  */

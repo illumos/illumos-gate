@@ -34,7 +34,7 @@
 struct vmx;
 
 int	ept_init(int ipinum);
-void	ept_invalidate_mappings(u_long eptp);
+void	ept_invalidate_mappings(ulong_t eptp);
 struct vmspace *ept_vmspace_alloc(vm_offset_t min, vm_offset_t max);
 void	ept_vmspace_free(struct vmspace *vmspace);
 uint64_t eptp(uint64_t pml4);

@@ -75,7 +75,7 @@ vmx_ctl_allows_zero_setting(uint64_t msr_val, int bitpos)
  */
 int
 vmx_set_ctlreg(int ctl_reg, int true_ctl_reg, uint32_t ones_mask,
-	       uint32_t zeros_mask, uint32_t *retval)
+    uint32_t zeros_mask, uint32_t *retval)
 {
 	int i;
 	uint64_t val, trueval;
@@ -98,8 +98,8 @@ vmx_set_ctlreg(int ctl_reg, int true_ctl_reg, uint32_t ones_mask,
 		zero_allowed = vmx_ctl_allows_zero_setting(trueval, i);
 
 		KASSERT(one_allowed || zero_allowed,
-			("invalid zero/one setting for bit %d of ctl 0x%0x, "
-			 "truectl 0x%0x\n", i, ctl_reg, true_ctl_reg));
+		    ("invalid zero/one setting for bit %d of ctl 0x%0x, "
+		    "truectl 0x%0x\n", i, ctl_reg, true_ctl_reg));
 
 		if (zero_allowed && !one_allowed) {		/* b(i),c(i) */
 			if (ones_mask & (1 << i))
@@ -110,21 +110,26 @@ vmx_set_ctlreg(int ctl_reg, int true_ctl_reg, uint32_t ones_mask,
 				return (EINVAL);
 			*retval |= 1 << i;
 		} else {
-			if (zeros_mask & (1 << i))	/* b(ii),c(ii) */
+			if (zeros_mask & (1 << i)) {
+				/* b(ii),c(ii) */
 				*retval &= ~(1 << i);
-			else if (ones_mask & (1 << i)) /* b(ii), c(ii) */
+			} else if (ones_mask & (1 << i)) {
+				/* b(ii), c(ii) */
 				*retval |= 1 << i;
-			else if (!true_ctls_avail)
-				*retval &= ~(1 << i);	/* b(iii) */
-			else if (vmx_ctl_allows_zero_setting(val, i))/* c(iii)*/
+			} else if (!true_ctls_avail) {
+				/* b(iii) */
 				*retval &= ~(1 << i);
-			else if (vmx_ctl_allows_one_setting(val, i)) /* c(iv) */
+			} else if (vmx_ctl_allows_zero_setting(val, i)) {
+				/* c(iii) */
+				*retval &= ~(1 << i);
+			} else if (vmx_ctl_allows_one_setting(val, i)) {
+				/* c(iv) */
 				*retval |= 1 << i;
-			else {
+			} else {
 				panic("vmx_set_ctlreg: unable to determine "
-				      "correct value of ctl bit %d for msr "
-				      "0x%0x and true msr 0x%0x", i, ctl_reg,
-				      true_ctl_reg);
+				    "correct value of ctl bit %d for msr "
+				    "0x%0x and true msr 0x%0x", i, ctl_reg,
+				    true_ctl_reg);
 			}
 		}
 	}
@@ -140,7 +145,7 @@ msr_bitmap_initialize(char *bitmap)
 }
 
 int
-msr_bitmap_change_access(char *bitmap, u_int msr, int access)
+msr_bitmap_change_access(char *bitmap, uint_t msr, int access)
 {
 	int byte, bit;
 
@@ -177,7 +182,7 @@ static uint64_t host_msrs[GUEST_MSR_NUM];
 static bool
 nehalem_cpu(void)
 {
-	u_int family, model;
+	uint_t family, model;
 
 	/*
 	 * The family:model numbers belonging to the Nehalem microarchitecture
@@ -202,7 +207,7 @@ nehalem_cpu(void)
 static bool
 westmere_cpu(void)
 {
-	u_int family, model;
+	uint_t family, model;
 
 	/*
 	 * The family:model numbers belonging to the Westmere microarchitecture
@@ -343,8 +348,6 @@ vmx_msr_guest_init(struct vmx *vmx, int vcpuid)
 	    PAT_VALUE(5, PAT_WRITE_THROUGH)	|
 	    PAT_VALUE(6, PAT_UNCACHED)		|
 	    PAT_VALUE(7, PAT_UNCACHEABLE);
-
-	return;
 }
 
 void
@@ -398,7 +401,7 @@ vmx_msr_guest_exit(struct vmx *vmx, int vcpuid)
 }
 
 int
-vmx_rdmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t *val)
+vmx_rdmsr(struct vmx *vmx, int vcpuid, uint_t num, uint64_t *val)
 {
 	const uint64_t *guest_msrs;
 	int error;
@@ -447,7 +450,7 @@ vmx_rdmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t *val)
 }
 
 int
-vmx_wrmsr(struct vmx *vmx, int vcpuid, u_int num, uint64_t val)
+vmx_wrmsr(struct vmx *vmx, int vcpuid, uint_t num, uint64_t val)
 {
 	uint64_t *guest_msrs;
 	uint64_t changed;

@@ -80,7 +80,7 @@ sysinit(void)
 		(*si)->func((*si)->data);
 }
 
-u_char const bin2bcd_data[] = {
+uint8_t const bin2bcd_data[] = {
 	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
 	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
 	0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29,
@@ -411,7 +411,7 @@ vmm_glue_callout_localize(struct callout *c)
 }
 
 void
-ipi_cpu(int cpu, u_int ipi)
+ipi_cpu(int cpu, uint_t ipi)
 {
 	/*
 	 * This was previously implemented as an invocation of asynchronous
@@ -422,21 +422,21 @@ ipi_cpu(int cpu, u_int ipi)
 	poke_cpu(cpu);
 }
 
-u_int	cpu_high;		/* Highest arg to CPUID */
-u_int	cpu_exthigh;		/* Highest arg to extended CPUID */
-u_int	cpu_id;			/* Stepping ID */
+uint_t	cpu_high;		/* Highest arg to CPUID */
+uint_t	cpu_exthigh;		/* Highest arg to extended CPUID */
+uint_t	cpu_id;			/* Stepping ID */
 char	cpu_vendor[20];		/* CPU Origin code */
 
 static void
 vmm_cpuid_init(void)
 {
-	u_int regs[4];
+	uint_t regs[4];
 
 	do_cpuid(0, regs);
 	cpu_high = regs[0];
-	((u_int *)&cpu_vendor)[0] = regs[1];
-	((u_int *)&cpu_vendor)[1] = regs[3];
-	((u_int *)&cpu_vendor)[2] = regs[2];
+	((uint_t *)&cpu_vendor)[0] = regs[1];
+	((uint_t *)&cpu_vendor)[1] = regs[3];
+	((uint_t *)&cpu_vendor)[2] = regs[2];
 	cpu_vendor[12] = '\0';
 
 	do_cpuid(1, regs);
@@ -565,7 +565,7 @@ vmm_sol_glue_cleanup(void)
 
 #include <sys/clock.h>
 
-/*--------------------------------------------------------------------*
+/*
  * Generic routines to convert between a POSIX date
  * (seconds since 1/1/1970) and yr/mo/day/hr/min/sec
  * Derived from NetBSD arch/hp300/hp300/clock.c
@@ -625,8 +625,8 @@ clock_ct_to_ts(struct clocktime *ct, struct timespec *ts)
 	/* Sanity checks. */
 	if (ct->mon < 1 || ct->mon > 12 || ct->day < 1 ||
 	    ct->day > days_in_month(year, ct->mon) ||
-	    ct->hour > 23 ||  ct->min > 59 || ct->sec > 59 ||
-	    (sizeof(time_t) == 4 && year > 2037)) {	/* time_t overflow */
+	    ct->hour > 23 || ct->min > 59 || ct->sec > 59 ||
+	    (sizeof (time_t) == 4 && year > 2037)) {	/* time_t overflow */
 #ifdef __FreeBSD__
 		if (ct_debug)
 			printf(" = EINVAL\n");

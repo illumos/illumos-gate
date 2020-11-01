@@ -319,7 +319,6 @@ vhpet_handler(void *a)
 	vhpet_timer_interrupt(vhpet, n);
 done:
 	VHPET_UNLOCK(vhpet);
-	return;
 }
 
 static void
@@ -718,8 +717,8 @@ vhpet_init(struct vm *vm)
 	struct vhpet_callout_arg *arg;
 	struct bintime bt;
 
-	vhpet = malloc(sizeof(struct vhpet), M_VHPET, M_WAITOK | M_ZERO);
-        vhpet->vm = vm;
+	vhpet = malloc(sizeof (struct vhpet), M_VHPET, M_WAITOK | M_ZERO);
+	vhpet->vm = vm;
 	mtx_init(&vhpet->mtx, "vhpet lock", NULL, MTX_DEF);
 
 	FREQ2BT(HPET_FREQ, &bt);

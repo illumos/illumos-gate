@@ -28,11 +28,11 @@
  * $FreeBSD$
  */
 
-#ifndef _SVM_SOFTC_H_
-#define _SVM_SOFTC_H_
+#ifndef	_SVM_SOFTC_H_
+#define	_SVM_SOFTC_H_
 
-#define SVM_IO_BITMAP_SIZE	(3 * PAGE_SIZE)
-#define SVM_MSR_BITMAP_SIZE	(2 * PAGE_SIZE)
+#define	SVM_IO_BITMAP_SIZE	(3 * PAGE_SIZE)
+#define	SVM_MSR_BITMAP_SIZE	(2 * PAGE_SIZE)
 
 #ifdef __FreeBSD__
 struct asid {
@@ -43,7 +43,7 @@ struct asid {
 #include <sys/hma.h>
 
 /* This must match HOST_MSR_NUM in svm_msr.c (where it is CTASSERTed) */
-#define SVM_HOST_MSR_NUM	4
+#define	SVM_HOST_MSR_NUM	4
 #endif /* __FreeBSD__ */
 
 /*
@@ -55,7 +55,7 @@ struct svm_vcpu {
 	struct svm_regctx swctx; /* software saved vcpu context */
 	uint64_t	vmcb_pa; /* VMCB physical address */
 	uint64_t	nextrip; /* next instruction to be executed by guest */
-        int		lastcpu; /* host cpu that the vcpu last ran on */
+	int		lastcpu; /* host cpu that the vcpu last ran on */
 	uint32_t	dirty;	 /* state cache bits that must be cleared */
 	long		eptgen;	 /* pmap->pm_eptgen when the vcpu last ran */
 #ifdef __FreeBSD__
@@ -121,11 +121,10 @@ svm_get_guest_regctx(struct svm_softc *sc, int vcpu)
 static __inline void
 svm_set_dirty(struct svm_softc *sc, int vcpu, uint32_t dirtybits)
 {
-        struct svm_vcpu *vcpustate;
+	struct svm_vcpu *vcpustate;
 
-        vcpustate = svm_get_vcpu(sc, vcpu);
-
-        vcpustate->dirty |= dirtybits;
+	vcpustate = svm_get_vcpu(sc, vcpu);
+	vcpustate->dirty |= dirtybits;
 }
 
 #endif /* _SVM_SOFTC_H_ */

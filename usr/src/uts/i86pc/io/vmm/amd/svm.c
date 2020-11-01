@@ -92,16 +92,16 @@ SYSCTL_NODE(_hw_vmm, OID_AUTO, svm, CTLFLAG_RW | CTLFLAG_MPSAFE, NULL,
 /*
  * SVM CPUID function 0x8000_000A, edx bit decoding.
  */
-#define AMD_CPUID_SVM_NP		BIT(0)  /* Nested paging or RVI */
-#define AMD_CPUID_SVM_LBR		BIT(1)  /* Last branch virtualization */
-#define AMD_CPUID_SVM_SVML		BIT(2)  /* SVM lock */
-#define AMD_CPUID_SVM_NRIP_SAVE		BIT(3)  /* Next RIP is saved */
-#define AMD_CPUID_SVM_TSC_RATE		BIT(4)  /* TSC rate control. */
-#define AMD_CPUID_SVM_VMCB_CLEAN	BIT(5)  /* VMCB state caching */
-#define AMD_CPUID_SVM_FLUSH_BY_ASID	BIT(6)  /* Flush by ASID */
-#define AMD_CPUID_SVM_DECODE_ASSIST	BIT(7)  /* Decode assist */
-#define AMD_CPUID_SVM_PAUSE_INC		BIT(10) /* Pause intercept filter. */
-#define AMD_CPUID_SVM_PAUSE_FTH		BIT(12) /* Pause filter threshold */
+#define	AMD_CPUID_SVM_NP		BIT(0)  /* Nested paging or RVI */
+#define	AMD_CPUID_SVM_LBR		BIT(1)  /* Last branch virtualization */
+#define	AMD_CPUID_SVM_SVML		BIT(2)  /* SVM lock */
+#define	AMD_CPUID_SVM_NRIP_SAVE		BIT(3)  /* Next RIP is saved */
+#define	AMD_CPUID_SVM_TSC_RATE		BIT(4)  /* TSC rate control. */
+#define	AMD_CPUID_SVM_VMCB_CLEAN	BIT(5)  /* VMCB state caching */
+#define	AMD_CPUID_SVM_FLUSH_BY_ASID	BIT(6)  /* Flush by ASID */
+#define	AMD_CPUID_SVM_DECODE_ASSIST	BIT(7)  /* Decode assist */
+#define	AMD_CPUID_SVM_PAUSE_INC		BIT(10) /* Pause intercept filter. */
+#define	AMD_CPUID_SVM_PAUSE_FTH		BIT(12) /* Pause filter threshold */
 #define	AMD_CPUID_SVM_AVIC		BIT(13)	/* AVIC present */
 
 #define	VMCB_CACHE_DEFAULT	(VMCB_CACHE_ASID	|	\
@@ -122,28 +122,10 @@ SYSCTL_INT(_hw_vmm_svm, OID_AUTO, vmcb_clean, CTLFLAG_RDTUN, &vmcb_clean,
 static MALLOC_DEFINE(M_SVM, "svm", "svm");
 static MALLOC_DEFINE(M_SVM_VLAPIC, "svm-vlapic", "svm-vlapic");
 
+/* SVM features advertised by CPUID.8000000AH:EDX */
 static uint32_t svm_feature = ~0U;	/* AMD SVM features. */
-SYSCTL_UINT(_hw_vmm_svm, OID_AUTO, features, CTLFLAG_RDTUN, &svm_feature, 0,
-    "SVM features advertised by CPUID.8000000AH:EDX");
 
 static int disable_npf_assist;
-SYSCTL_INT(_hw_vmm_svm, OID_AUTO, disable_npf_assist, CTLFLAG_RWTUN,
-    &disable_npf_assist, 0, NULL);
-
-#ifdef __FreeBSD__
-/* Maximum ASIDs supported by the processor */
-static uint32_t nasid;
-SYSCTL_UINT(_hw_vmm_svm, OID_AUTO, num_asids, CTLFLAG_RDTUN, &nasid, 0,
-    "Number of ASIDs supported by this processor");
-
-/* Current ASID generation for each host cpu */
-static struct asid asid[MAXCPU];
-
-/*
- * SVM host state saved area of size 4KB for each core.
- */
-static uint8_t hsave[MAXCPU][PAGE_SIZE] __aligned(PAGE_SIZE);
-#endif /* __FreeBSD__ */
 
 static VMM_STAT_AMD(VCPU_EXITINTINFO, "VM exits during event delivery");
 static VMM_STAT_AMD(VCPU_INTINFO_INJECTED, "Events pending at VM entry");
@@ -191,7 +173,7 @@ svm_cleanup(void)
 static int
 check_svm_features(void)
 {
-	u_int regs[4];
+	uint_t regs[4];
 
 	/* CPUID Fn8000_000A is for SVM */
 	do_cpuid(0x8000000A, regs);
@@ -333,14 +315,14 @@ svm_restore(void)
 #endif /* __FreeBSD__ */
 
 /* Pentium compatible MSRs */
-#define MSR_PENTIUM_START	0
-#define MSR_PENTIUM_END		0x1FFF
+#define	MSR_PENTIUM_START	0
+#define	MSR_PENTIUM_END		0x1FFF
 /* AMD 6th generation and Intel compatible MSRs */
-#define MSR_AMD6TH_START	0xC0000000UL
-#define MSR_AMD6TH_END		0xC0001FFFUL
+#define	MSR_AMD6TH_START	0xC0000000UL
+#define	MSR_AMD6TH_END		0xC0001FFFUL
 /* AMD 7th and 8th generation compatible MSRs */
-#define MSR_AMD7TH_START	0xC0010000UL
-#define MSR_AMD7TH_END		0xC0011FFFUL
+#define	MSR_AMD7TH_START	0xC0010000UL
+#define	MSR_AMD7TH_END		0xC0011FFFUL
 
 /*
  * Get the index and bit position for a MSR in permission bitmap.
@@ -418,7 +400,7 @@ svm_get_intercept(struct svm_softc *sc, int vcpu, int idx, uint32_t bitmask)
 {
 	struct vmcb_ctrl *ctrl;
 
-	KASSERT(idx >=0 && idx < 5, ("invalid intercept index %d", idx));
+	KASSERT(idx >= 0 && idx < 5, ("invalid intercept index %d", idx));
 
 	ctrl = svm_get_vmcb_ctrl(sc, vcpu);
 	return (ctrl->intercept[idx] & bitmask ? 1 : 0);
@@ -431,7 +413,7 @@ svm_set_intercept(struct svm_softc *sc, int vcpu, int idx, uint32_t bitmask,
 	struct vmcb_ctrl *ctrl;
 	uint32_t oldval;
 
-	KASSERT(idx >=0 && idx < 5, ("invalid intercept index %d", idx));
+	KASSERT(idx >= 0 && idx < 5, ("invalid intercept index %d", idx));
 
 	ctrl = svm_get_vmcb_ctrl(sc, vcpu);
 	oldval = ctrl->intercept[idx];
@@ -940,7 +922,7 @@ svm_save_exitintinfo(struct svm_softc *svm_sc, int vcpu)
 	 * that was being delivered.
 	 */
 	VCPU_CTR2(svm_sc->vm, vcpu, "SVM:Pending INTINFO(0x%lx), vector=%d.\n",
-		intinfo, VMCB_EXITINTINFO_VECTOR(intinfo));
+	    intinfo, VMCB_EXITINTINFO_VECTOR(intinfo));
 	vmm_stat_incr(svm_sc->vm, vcpu, VCPU_EXITINTINFO, 1);
 	vm_exit_intinfo(svm_sc->vm, vcpu, intinfo);
 }
@@ -1186,7 +1168,7 @@ gpf:
 }
 
 static int
-emulate_wrmsr(struct svm_softc *sc, int vcpu, u_int num, uint64_t val)
+emulate_wrmsr(struct svm_softc *sc, int vcpu, uint_t num, uint64_t val)
 {
 	int error;
 
@@ -1201,7 +1183,7 @@ emulate_wrmsr(struct svm_softc *sc, int vcpu, u_int num, uint64_t val)
 }
 
 static int
-emulate_rdmsr(struct svm_softc *sc, int vcpu, u_int num)
+emulate_rdmsr(struct svm_softc *sc, int vcpu, uint_t num)
 {
 	struct vmcb_state *state;
 	struct svm_regctx *ctx;
@@ -1222,50 +1204,6 @@ emulate_rdmsr(struct svm_softc *sc, int vcpu, u_int num)
 
 	return (error);
 }
-
-#ifdef KTR
-static const char *
-exit_reason_to_str(uint64_t reason)
-{
-	static char reasonbuf[32];
-
-	switch (reason) {
-	case VMCB_EXIT_INVALID:
-		return ("invalvmcb");
-	case VMCB_EXIT_SHUTDOWN:
-		return ("shutdown");
-	case VMCB_EXIT_NPF:
-		return ("nptfault");
-	case VMCB_EXIT_PAUSE:
-		return ("pause");
-	case VMCB_EXIT_HLT:
-		return ("hlt");
-	case VMCB_EXIT_CPUID:
-		return ("cpuid");
-	case VMCB_EXIT_IO:
-		return ("inout");
-	case VMCB_EXIT_MC:
-		return ("mchk");
-	case VMCB_EXIT_INTR:
-		return ("extintr");
-	case VMCB_EXIT_NMI:
-		return ("nmi");
-	case VMCB_EXIT_VINTR:
-		return ("vintr");
-	case VMCB_EXIT_MSR:
-		return ("msr");
-	case VMCB_EXIT_IRET:
-		return ("iret");
-	case VMCB_EXIT_MONITOR:
-		return ("monitor");
-	case VMCB_EXIT_MWAIT:
-		return ("mwait");
-	default:
-		snprintf(reasonbuf, sizeof(reasonbuf), "%lx", reason);
-		return (reasonbuf);
-	}
-}
-#endif	/* KTR */
 
 /*
  * From section "State Saved on Exit" in APMv2: nRIP is saved for all #VMEXITs
@@ -1551,10 +1489,6 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 		break;
 	}
 
-	VCPU_CTR4(svm_sc->vm, vcpu, "%s %s vmexit at %lx/%d",
-	    handled ? "handled" : "unhandled", exit_reason_to_str(code),
-	    vmexit->rip, vmexit->inst_length);
-
 	DTRACE_PROBE3(vmm__vexit, int, vcpu, uint64_t, vmexit->rip, uint32_t,
 	    code);
 
@@ -1790,7 +1724,7 @@ svm_inject_recheck(struct svm_softc *sc, int vcpu,
 
 #ifdef __FreeBSD__
 static void
-check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, u_int thiscpu)
+check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, uint_t thiscpu)
 {
 	struct svm_vcpu *vcpustate;
 	struct vmcb_ctrl *ctrl;
@@ -1816,26 +1750,26 @@ check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, u_int thiscpu)
 	 *    the 'vcpustate'. This happens when the host invalidates pages
 	 *    belonging to the guest.
 	 *
-	 *	asidgen		eptgen	      Action
+	 *	asidgen		eptgen		Action
 	 *	mismatch	mismatch
-	 *	   0		   0		(a)
-	 *	   0		   1		(b1) or (b2)
-	 *	   1		   0		(c)
-	 *	   1		   1		(d)
+	 *	0		0		(a)
+	 *	0		1		(b1) or (b2)
+	 *	1		0		(c)
+	 *	1		1		(d)
 	 *
-	 * (a) There is no mismatch in eptgen or ASID generation and therefore
-	 *     no further action is needed.
+	 * (a)	There is no mismatch in eptgen or ASID generation and therefore
+	 *	no further action is needed.
 	 *
-	 * (b1) If the cpu supports FlushByAsid then the vcpu's ASID is
-	 *      retained and the TLB entries associated with this ASID
-	 *      are flushed by VMRUN.
+	 * (b1)	If the cpu supports FlushByAsid then the vcpu's ASID is
+	 *	retained and the TLB entries associated with this ASID
+	 *	are flushed by VMRUN.
 	 *
-	 * (b2) If the cpu does not support FlushByAsid then a new ASID is
-	 *      allocated.
+	 * (b2)	If the cpu does not support FlushByAsid then a new ASID is
+	 *	allocated.
 	 *
-	 * (c) A new ASID is allocated.
+	 * (c)	A new ASID is allocated.
 	 *
-	 * (d) A new ASID is allocated.
+	 * (d)	A new ASID is allocated.
 	 */
 
 	alloc_asid = false;
@@ -1893,7 +1827,7 @@ check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, u_int thiscpu)
 }
 #else /* __FreeBSD__ */
 static void
-check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, u_int thiscpu)
+check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, uint_t thiscpu)
 {
 	struct svm_vcpu *vcpustate = svm_get_vcpu(sc, vcpuid);
 	struct vmcb_ctrl *ctrl = svm_get_vmcb_ctrl(sc, vcpuid);
@@ -1916,15 +1850,13 @@ check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, u_int thiscpu)
 static __inline void
 disable_gintr(void)
 {
-
 	__asm __volatile("clgi");
 }
 
 static __inline void
 enable_gintr(void)
 {
-
-        __asm __volatile("stgi");
+	__asm __volatile("stgi");
 }
 
 static __inline void
@@ -1986,7 +1918,7 @@ svm_dr_leave_guest(struct svm_regctx *gctx)
  */
 static int
 svm_vmrun(void *arg, int vcpu, uint64_t rip, pmap_t pmap,
-	struct vm_eventinfo *evinfo)
+    struct vm_eventinfo *evinfo)
 {
 	struct svm_regctx *gctx;
 	struct svm_softc *svm_sc;
@@ -2538,7 +2470,8 @@ svm_vlapic_init(void *arg, int vcpuid)
 	struct vlapic *vlapic;
 
 	svm_sc = arg;
-	vlapic = malloc(sizeof(struct vlapic), M_SVM_VLAPIC, M_WAITOK | M_ZERO);
+	vlapic = malloc(sizeof (struct vlapic), M_SVM_VLAPIC,
+	    M_WAITOK | M_ZERO);
 	vlapic->vm = svm_sc->vm;
 	vlapic->vcpuid = vcpuid;
 	vlapic->apic_page = (struct LAPIC *)&svm_sc->apic_page[vcpuid];
@@ -2551,9 +2484,8 @@ svm_vlapic_init(void *arg, int vcpuid)
 static void
 svm_vlapic_cleanup(void *arg, struct vlapic *vlapic)
 {
-
-        vlapic_cleanup(vlapic);
-        free(vlapic, M_SVM_VLAPIC);
+	vlapic_cleanup(vlapic);
+	free(vlapic, M_SVM_VLAPIC);
 }
 
 #ifndef __FreeBSD__

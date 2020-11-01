@@ -131,7 +131,7 @@ vatpic_get_highest_isrpin(struct atpic *atpic)
 	int i;
 
 	ATPIC_PIN_FOREACH(pin, atpic, i) {
-                bit = (1 << pin);
+		bit = (1 << pin);
 
 		if (atpic->service & bit) {
 			/*
@@ -625,7 +625,7 @@ vatpic_intr_accepted(struct vm *vm, int vector)
 
 static int
 vatpic_read(struct vatpic *vatpic, struct atpic *atpic, bool in, int port,
-	    int bytes, uint32_t *eax)
+    int bytes, uint32_t *eax)
 {
 	int pin;
 
@@ -788,7 +788,7 @@ vatpic_init(struct vm *vm)
 {
 	struct vatpic *vatpic;
 
-	vatpic = malloc(sizeof(struct vatpic), M_VATPIC, M_WAITOK | M_ZERO);
+	vatpic = malloc(sizeof (struct vatpic), M_VATPIC, M_WAITOK | M_ZERO);
 	vatpic->vm = vm;
 
 	mtx_init(&vatpic->mtx, "vatpic lock", NULL, MTX_SPIN);

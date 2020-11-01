@@ -65,7 +65,7 @@ struct vm_guest_paging;
 struct pmap;
 
 struct vm_eventinfo {
-	u_int	*rptr;		/* runblock cookie */
+	uint_t	*rptr;		/* runblock cookie */
 	int	*sptr;		/* suspend cookie */
 	int	*iptr;		/* reqidle cookie */
 };
@@ -75,21 +75,21 @@ typedef int	(*vmm_cleanup_func_t)(void);
 typedef void	(*vmm_resume_func_t)(void);
 typedef void *	(*vmi_init_func_t)(struct vm *vm, struct pmap *pmap);
 typedef int	(*vmi_run_func_t)(void *vmi, int vcpu, uint64_t rip,
-		    struct pmap *pmap, struct vm_eventinfo *info);
+    struct pmap *pmap, struct vm_eventinfo *info);
 typedef void	(*vmi_cleanup_func_t)(void *vmi);
 typedef int	(*vmi_get_register_t)(void *vmi, int vcpu, int num,
-				      uint64_t *retval);
+    uint64_t *retval);
 typedef int	(*vmi_set_register_t)(void *vmi, int vcpu, int num,
-				      uint64_t val);
+    uint64_t val);
 typedef int	(*vmi_get_desc_t)(void *vmi, int vcpu, int num,
-				  struct seg_desc *desc);
+    struct seg_desc *desc);
 typedef int	(*vmi_set_desc_t)(void *vmi, int vcpu, int num,
-				  struct seg_desc *desc);
+    struct seg_desc *desc);
 typedef int	(*vmi_get_cap_t)(void *vmi, int vcpu, int num, int *retval);
 typedef int	(*vmi_set_cap_t)(void *vmi, int vcpu, int num, int val);
-typedef struct vmspace * (*vmi_vmspace_alloc)(vm_offset_t min, vm_offset_t max);
+typedef struct vmspace *(*vmi_vmspace_alloc)(vm_offset_t min, vm_offset_t max);
 typedef void	(*vmi_vmspace_free)(struct vmspace *vmspace);
-typedef struct vlapic * (*vmi_vlapic_init)(void *vmi, int vcpu);
+typedef struct vlapic *(*vmi_vlapic_init)(void *vmi, int vcpu);
 typedef void	(*vmi_vlapic_cleanup)(void *vmi, struct vlapic *vlapic);
 #ifndef __FreeBSD__
 typedef void	(*vmi_savectx)(void *vmi, int vcpu);
@@ -430,4 +430,3 @@ void vm_ioport_unhook(struct vm *, void **);
 #endif /* __FreeBSD */
 
 #endif /* _VMM_KERNEL_H_ */
-

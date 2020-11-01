@@ -38,9 +38,9 @@ typedef void (*iommu_disable_func_t)(void);
 typedef void *(*iommu_create_domain_t)(vm_paddr_t maxaddr);
 typedef void (*iommu_destroy_domain_t)(void *domain);
 typedef uint64_t (*iommu_create_mapping_t)(void *domain, vm_paddr_t gpa,
-					   vm_paddr_t hpa, uint64_t len);
+    vm_paddr_t hpa, uint64_t len);
 typedef uint64_t (*iommu_remove_mapping_t)(void *domain, vm_paddr_t gpa,
-					   uint64_t len);
+    uint64_t len);
 typedef void (*iommu_add_device_t)(void *domain, uint16_t rid);
 typedef void (*iommu_remove_device_t)(void *dom, uint16_t rid);
 typedef void (*iommu_invalidate_tlb_t)(void *dom);
@@ -68,7 +68,7 @@ void	*iommu_host_domain(void);
 void	*iommu_create_domain(vm_paddr_t maxaddr);
 void	iommu_destroy_domain(void *dom);
 void	iommu_create_mapping(void *dom, vm_paddr_t gpa, vm_paddr_t hpa,
-			     size_t len);
+    size_t len);
 void	iommu_remove_mapping(void *dom, vm_paddr_t gpa, size_t len);
 void	iommu_add_device(void *dom, uint16_t rid);
 void	iommu_remove_device(void *dom, uint16_t rid);
