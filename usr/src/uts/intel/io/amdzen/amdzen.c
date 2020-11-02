@@ -144,7 +144,7 @@ static const uint16_t amdzen_nb_ids[] = {
 	0x1450,
 	/* Family 17h Raven Ridge, Kestrel, Dali Models 10h-2fh (Zen uarch) */
 	0x15d0,
-	/* Family 17h Epyc Models 30h-3fh, Matisse 70-7fh (Zen 2 uarch) */
+	/* Family 17h/19h Rome, Milan, Matisse, Vermeer Zen 2/Zen 3 uarch */
 	0x1480,
 	/* Family 17h Renoir Models 60-6fh (Zen 2 uarch) */
 	0x1630
@@ -436,6 +436,16 @@ static const uint8_t amdzen_df_rome_ids[0x2b] = {
 };
 
 /*
+ * Check the first df entry to see if it belongs to Rome or Milan. If so, then
+ * it uses the disjoint ID space.
+ */
+static boolean_t
+amdzen_is_rome_style(uint_t id)
+{
+	return (id == 0x1490 || id == 0x1650);
+}
+
+/*
  * Initialize our knowledge about a given series of nodes on the data fabric.
  */
 static void
@@ -464,11 +474,11 @@ amdzen_setup_df(amdzen_t *azn, amdzen_df_t *df)
 		 * indexes that we iterate over, though the total number of
 		 * entries is right.
 		 */
-		if (df->adf_funcs[0]->azns_did == 0x1490) {
+		if (amdzen_is_rome_style(df->adf_funcs[0]->azns_did)) {
 			if (inst > ARRAY_SIZE(amdzen_df_rome_ids)) {
 				dev_err(azn->azn_dip, CE_WARN, "Rome family "
 				    "processor reported more ids than the PPR, "
-				    "resting %u to instance zero", inst);
+				    "resetting %u to instance zero", inst);
 				inst = 0;
 			} else {
 				inst = amdzen_df_rome_ids[inst];

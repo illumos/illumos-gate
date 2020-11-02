@@ -113,9 +113,11 @@ extern "C" {
 #define	AV_386_2_MONITORX	0x01000000 /* MONITORX insns */
 #define	AV_386_2_CLZERO		0x02000000 /* CLZERO */
 #define	AV_386_2_AVX512_VNNI	0x04000000 /* AVX512_VNNI */
+#define	AV_386_2_VPCLMULQDQ	0x08000000 /* VPCLMULQDQ */
+#define	AV_386_2_VAES		0x10000000 /* VAES */
 
 #define	FMT_AV_386_2							\
-	"\033avx512_vnni"						\
+	"\035vaes\034vpclmulqdq\033avx512_vnni"				\
 	"\032clzero\031monitorx\030clwb\027clflushopt\026fsgsbase"	\
 	"\025sha\024avx512_4fmaps\023avx512_4nniw\022avx512vpopcntdq"	\
 	"\021avx512vbmi\020avx512vl\017avx512bw\016avx512cd"		\

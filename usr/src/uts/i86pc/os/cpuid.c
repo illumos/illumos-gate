@@ -1437,7 +1437,9 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"pkg_thermal",
 	"tsx_ctrl",
 	"taa_no",
-	"ppin"
+	"ppin",
+	"vaes",
+	"vpclmulqdq"
 };
 
 boolean_t
@@ -3595,6 +3597,8 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 			ecp->cp_ebx &= ~CPUID_INTC_EBX_7_0_ALL_AVX512;
 			ecp->cp_ecx &= ~CPUID_INTC_ECX_7_0_ALL_AVX512;
 			ecp->cp_edx &= ~CPUID_INTC_EDX_7_0_ALL_AVX512;
+			ecp->cp_ecx &= ~CPUID_INTC_ECX_7_0_VAES;
+			ecp->cp_ecx &= ~CPUID_INTC_ECX_7_0_VPCLMULQDQ;
 		}
 
 		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_SMEP)
@@ -3622,10 +3626,17 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_CLFLUSHOPT)
 			add_x86_feature(featureset, X86FSET_CLFLUSHOPT);
 
-		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
-			if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_INVPCID)
-				add_x86_feature(featureset, X86FSET_INVPCID);
+		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_INVPCID)
+			add_x86_feature(featureset, X86FSET_INVPCID);
 
+		if (ecp->cp_ecx & CPUID_INTC_ECX_7_0_UMIP)
+			add_x86_feature(featureset, X86FSET_UMIP);
+		if (ecp->cp_ecx & CPUID_INTC_ECX_7_0_PKU)
+			add_x86_feature(featureset, X86FSET_PKU);
+		if (ecp->cp_ecx & CPUID_INTC_ECX_7_0_OSPKE)
+			add_x86_feature(featureset, X86FSET_OSPKE);
+
+		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
 			if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_MPX)
 				add_x86_feature(featureset, X86FSET_MPX);
 
@@ -3717,13 +3728,6 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		if (cpi->cpi_std[7].cp_ebx & CPUID_INTC_EBX_7_0_SHA)
 			add_x86_feature(featureset, X86FSET_SHA);
 
-		if (cpi->cpi_std[7].cp_ecx & CPUID_INTC_ECX_7_0_UMIP)
-			add_x86_feature(featureset, X86FSET_UMIP);
-		if (cpi->cpi_std[7].cp_ecx & CPUID_INTC_ECX_7_0_PKU)
-			add_x86_feature(featureset, X86FSET_PKU);
-		if (cpi->cpi_std[7].cp_ecx & CPUID_INTC_ECX_7_0_OSPKE)
-			add_x86_feature(featureset, X86FSET_OSPKE);
-
 		if (cp->cp_ecx & CPUID_INTC_ECX_XSAVE) {
 			add_x86_feature(featureset, X86FSET_XSAVE);
 
@@ -3759,6 +3763,16 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 				    CPUID_INTC_EBX_7_0_AVX2)
 					add_x86_feature(featureset,
 					    X86FSET_AVX2);
+
+				if (cpi->cpi_std[7].cp_ecx &
+				    CPUID_INTC_ECX_7_0_VAES)
+					add_x86_feature(featureset,
+					    X86FSET_VAES);
+
+				if (cpi->cpi_std[7].cp_ecx &
+				    CPUID_INTC_ECX_7_0_VPCLMULQDQ)
+					add_x86_feature(featureset,
+					    X86FSET_VPCLMULQDQ);
 			}
 
 			if (cpi->cpi_vendor == X86_VENDOR_Intel &&
@@ -3820,10 +3834,8 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		}
 	}
 
-	if (cpi->cpi_vendor == X86_VENDOR_Intel) {
-		if (cp->cp_ecx & CPUID_INTC_ECX_PCID) {
-			add_x86_feature(featureset, X86FSET_PCID);
-		}
+	if (cp->cp_ecx & CPUID_INTC_ECX_PCID) {
+		add_x86_feature(featureset, X86FSET_PCID);
 	}
 
 	if (cp->cp_ecx & CPUID_INTC_ECX_X2APIC) {
@@ -4492,6 +4504,10 @@ cpuid_pass2(cpu_t *cpu)
 					    X86FSET_AVX512NNIW);
 					remove_x86_feature(x86_featureset,
 					    X86FSET_AVX512FMAPS);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_VAES);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_VPCLMULQDQ);
 
 					CPI_FEATURES_ECX(cpi) &=
 					    ~CPUID_INTC_ECX_XSAVE;
@@ -4514,6 +4530,11 @@ cpuid_pass2(cpu_t *cpu)
 
 					CPI_FEATURES_7_0_ECX(cpi) &=
 					    ~CPUID_INTC_ECX_7_0_ALL_AVX512;
+
+					CPI_FEATURES_7_0_ECX(cpi) &=
+					    ~CPUID_INTC_ECX_7_0_VAES;
+					CPI_FEATURES_7_0_ECX(cpi) &=
+					    ~CPUID_INTC_ECX_7_0_VPCLMULQDQ;
 
 					CPI_FEATURES_7_0_EDX(cpi) &=
 					    ~CPUID_INTC_EDX_7_0_ALL_AVX512;
@@ -5305,6 +5326,10 @@ cpuid_pass4(cpu_t *cpu, uint_t *hwcap_out)
 					hwcap_flags_2 |= AV_386_2_AVX512_VNNI;
 				if (*ecx_7 & CPUID_INTC_ECX_7_0_AVX512VPOPCDQ)
 					hwcap_flags_2 |= AV_386_2_AVX512VPOPCDQ;
+				if (*ecx_7 & CPUID_INTC_ECX_7_0_VAES)
+					hwcap_flags_2 |= AV_386_2_VAES;
+				if (*ecx_7 & CPUID_INTC_ECX_7_0_VPCLMULQDQ)
+					hwcap_flags_2 |= AV_386_2_VPCLMULQDQ;
 
 				if (*edx_7 & CPUID_INTC_EDX_7_0_AVX5124NNIW)
 					hwcap_flags_2 |= AV_386_2_AVX512_4NNIW;

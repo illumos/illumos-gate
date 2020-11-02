@@ -88,10 +88,12 @@
  *		15 for family 0x17, models 30 - 3f
  *		16 for family 0x17, models 60 - 6f
  *		17 for family 0x17, models 70 - 7f
+ *		18 for family 0x19, models 00 - 0f
+ *		19 for family 0x19, models 20 - 2f
  * Second index by (model & 0x3) for family 0fh,
  * CPUID pkg bits (Fn8000_0001_EBX[31:28]) for later families.
  */
-static uint32_t amd_skts[18][8] = {
+static uint32_t amd_skts[20][8] = {
 	/*
 	 * Family 0xf revisions B through E
 	 */
@@ -361,6 +363,36 @@ static uint32_t amd_skts[18][8] = {
 		X86_SOCKET_UNKNOWN,	/* 0b110 */
 		X86_SOCKET_UNKNOWN	/* 0b111 */
 	},
+
+	/*
+	 * Family 0x19 models 00-0f	(Zen 3 - Milan)
+	 */
+#define	A_SKTS_18			18
+	{
+		X86_SOCKET_UNKNOWN,	/* 0b000 */
+		X86_SOCKET_UNKNOWN,	/* 0b001 */
+		X86_SOCKET_UNKNOWN,	/* 0b010 */
+		X86_SOCKET_UNKNOWN,	/* 0b011 */
+		X86_SOCKET_SP3,		/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_STRX4	/* 0b111 */
+	},
+
+	/*
+	 * Family 0x19 models 20-2f	(Zen 3 - Vermeer)
+	 */
+#define	A_SKTS_19			19
+	{
+		X86_SOCKET_UNKNOWN,	/* 0b000 */
+		X86_SOCKET_UNKNOWN,	/* 0b001 */
+		X86_SOCKET_AM4,		/* 0b010 */
+		X86_SOCKET_UNKNOWN,	/* 0b011 */
+		X86_SOCKET_UNKNOWN,	/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
+	}
 };
 
 struct amd_sktmap_s {
@@ -401,6 +433,7 @@ static struct amd_sktmap_s amd_sktmap_strs[X86_NUM_SOCKETS_AMD + 1] = {
 	{ X86_SOCKET_SP3R2,	"SP3r2" },
 	{ X86_SOCKET_FP5,	"FP5" },
 	{ X86_SOCKET_FP6,	"FP6" },
+	{ X86_SOCKET_STRX4,	"sTRX4" },
 	{ X86_SOCKET_UNKNOWN,	"Unknown" }
 };
 
@@ -425,7 +458,9 @@ static const struct amd_skt_mapent {
 	{ 0x17, 0x10, 0x2f, A_SKTS_14 },
 	{ 0x17, 0x30, 0x3f, A_SKTS_15 },
 	{ 0x17, 0x60, 0x6f, A_SKTS_16 },
-	{ 0x17, 0x70, 0x7f, A_SKTS_17 }
+	{ 0x17, 0x70, 0x7f, A_SKTS_17 },
+	{ 0x19, 0x00, 0x0f, A_SKTS_18 },
+	{ 0x19, 0x20, 0x2f, A_SKTS_19 }
 };
 
 /*
