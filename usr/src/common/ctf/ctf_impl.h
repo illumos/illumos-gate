@@ -273,6 +273,7 @@ extern ctf_helem_t *ctf_hash_lookup(ctf_hash_t *, ctf_file_t *,
     const char *, size_t);
 extern uint_t ctf_hash_size(const ctf_hash_t *);
 extern void ctf_hash_destroy(ctf_hash_t *);
+extern void ctf_hash_dump(const char *, ctf_hash_t *, ctf_file_t *);
 
 #define	ctf_list_prev(elem)	((void *)(((ctf_list_t *)(elem))->l_prev))
 #define	ctf_list_next(elem)	((void *)(((ctf_list_t *)(elem))->l_next))

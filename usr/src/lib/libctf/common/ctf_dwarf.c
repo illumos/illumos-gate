@@ -1507,14 +1507,15 @@ ctf_dwarf_create_sou(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp,
 		decl = 0;
 	}
 
-	if (decl != 0) {
+	if (decl == B_TRUE) {
 		base = ctf_add_forward(cup->cu_ctfp, isroot, name, kind);
 	} else if (kind == CTF_K_STRUCT) {
 		base = ctf_add_struct(cup->cu_ctfp, isroot, name);
 	} else {
 		base = ctf_add_union(cup->cu_ctfp, isroot, name);
 	}
-	ctf_dprintf("added sou %s (%d) (%d)\n", name, kind, base);
+	ctf_dprintf("added sou %s (%d) (%ld) forward=%d\n",
+	    name, kind, base, decl == B_TRUE);
 	if (name != NULL)
 		ctf_free(name, strlen(name) + 1);
 	if (base == CTF_ERR)
@@ -2952,7 +2953,7 @@ ctf_dwarf_convert_one(void *arg, void *unused)
 	}
 
 	ret = ctf_dwarf_fixup_die(cup, B_FALSE);
-	ctf_dprintf("ctf_dwarf_fixup_die (%s) returned %d\n", name,
+	ctf_dprintf("ctf_dwarf_fixup_die (%s, FALSE) returned %d\n", name,
 	    ret);
 	if (ret != 0)
 		return (ret);
@@ -2963,7 +2964,7 @@ ctf_dwarf_convert_one(void *arg, void *unused)
 	}
 
 	ret = ctf_dwarf_fixup_die(cup, B_TRUE);
-	ctf_dprintf("ctf_dwarf_fixup_die (%s) returned %d\n", name,
+	ctf_dprintf("ctf_dwarf_fixup_die (%s, TRUE) returned %d\n", name,
 	    ret);
 	if (ret != 0)
 		return (ret);
@@ -2974,6 +2975,8 @@ ctf_dwarf_convert_one(void *arg, void *unused)
 	}
 
 	if ((ret = ctf_dwarf_conv_funcvars(cup)) != 0) {
+		ctf_dprintf("ctf_dwarf_conv_funcvars (%s) returned %d\n",
+		    name, ret);
 		return (ctf_dwarf_error(cup, NULL, ret,
 		    "failed to convert strong functions and variables"));
 	}
@@ -2985,6 +2988,8 @@ ctf_dwarf_convert_one(void *arg, void *unused)
 
 	if (cup->cu_doweaks == B_TRUE) {
 		if ((ret = ctf_dwarf_conv_weaks(cup)) != 0) {
+			ctf_dprintf("ctf_dwarf_conv_weaks (%s) returned %d\n",
+			    name, ret);
 			return (ctf_dwarf_error(cup, NULL, ret,
 			    "failed to convert weak functions and variables"));
 		}
@@ -3408,6 +3413,8 @@ ctf_dwarf_convert_batch(uint_t start, uint_t end, int fd, uint_t nthrs,
 		goto out;
 	}
 
+	ctf_dprintf("Running conversion phase\n");
+
 	/* Run the conversions */
 	ret = workq_work(wqp, ctf_dwarf_convert_one, NULL, &err);
 	if (ret == WORKQ_ERROR) {
@@ -3418,6 +3425,8 @@ ctf_dwarf_convert_batch(uint_t start, uint_t end, int fd, uint_t nthrs,
 		    ctf_errmsg(err));
 		goto out;
 	}
+
+	ctf_dprintf("starting merge phase\n");
 
 	ctf_merge_t *cmp = ctf_merge_init(fd, &err);
 	if (cmp == NULL)

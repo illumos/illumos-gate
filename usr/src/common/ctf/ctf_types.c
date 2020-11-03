@@ -26,6 +26,7 @@
  */
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <ctf_impl.h>
@@ -369,8 +370,24 @@ ctf_type_qlname(ctf_file_t *fp, ctf_id_t type, char *buf, size_t len,
 				    cdp->cd_type, want_func_args);
 				vname = NULL;
 				break;
-			case CTF_K_STRUCT:
 			case CTF_K_FORWARD:
+				switch (tp->ctt_type) {
+				case CTF_K_UNION:
+					ctf_decl_sprintf(&cd, "union ");
+					break;
+				case CTF_K_ENUM:
+					ctf_decl_sprintf(&cd, "enum ");
+					break;
+				case CTF_K_STRUCT:
+				default:
+					ctf_decl_sprintf(&cd, "struct ");
+					break;
+				}
+				if (qname != NULL)
+					ctf_decl_sprintf(&cd, "%s`", qname);
+				ctf_decl_sprintf(&cd, "%s", name);
+				break;
+			case CTF_K_STRUCT:
 				ctf_decl_sprintf(&cd, "struct ");
 				if (qname != NULL)
 					ctf_decl_sprintf(&cd, "%s`", qname);
