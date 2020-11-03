@@ -64,18 +64,12 @@ struct vm_object;
 struct vm_guest_paging;
 struct pmap;
 
-struct vm_eventinfo {
-	uint_t	*rptr;		/* runblock cookie */
-	int	*sptr;		/* suspend cookie */
-	int	*iptr;		/* reqidle cookie */
-};
-
 typedef int	(*vmm_init_func_t)(int ipinum);
 typedef int	(*vmm_cleanup_func_t)(void);
 typedef void	(*vmm_resume_func_t)(void);
 typedef void *	(*vmi_init_func_t)(struct vm *vm, struct pmap *pmap);
 typedef int	(*vmi_run_func_t)(void *vmi, int vcpu, uint64_t rip,
-    struct pmap *pmap, struct vm_eventinfo *info);
+    struct pmap *pmap);
 typedef void	(*vmi_cleanup_func_t)(void *vmi);
 typedef int	(*vmi_get_register_t)(void *vmi, int vcpu, int num,
     uint64_t *retval);
@@ -84,7 +78,7 @@ typedef int	(*vmi_set_register_t)(void *vmi, int vcpu, int num,
 typedef int	(*vmi_get_desc_t)(void *vmi, int vcpu, int num,
     struct seg_desc *desc);
 typedef int	(*vmi_set_desc_t)(void *vmi, int vcpu, int num,
-    struct seg_desc *desc);
+    const struct seg_desc *desc);
 typedef int	(*vmi_get_cap_t)(void *vmi, int vcpu, int num, int *retval);
 typedef int	(*vmi_set_cap_t)(void *vmi, int vcpu, int num, int val);
 typedef struct vmspace *(*vmi_vmspace_alloc)(vm_offset_t min, vm_offset_t max);
@@ -169,9 +163,13 @@ bool vm_mem_allocated(struct vm *vm, int vcpuid, vm_paddr_t gpa);
 int vm_get_register(struct vm *vm, int vcpu, int reg, uint64_t *retval);
 int vm_set_register(struct vm *vm, int vcpu, int reg, uint64_t val);
 int vm_get_seg_desc(struct vm *vm, int vcpu, int reg,
-		    struct seg_desc *ret_desc);
+    struct seg_desc *ret_desc);
 int vm_set_seg_desc(struct vm *vm, int vcpu, int reg,
-		    struct seg_desc *desc);
+    const struct seg_desc *desc);
+int vm_get_run_state(struct vm *vm, int vcpuid, uint32_t *state,
+    uint8_t *sipi_vec);
+int vm_set_run_state(struct vm *vm, int vcpuid, uint32_t state,
+    uint8_t sipi_vec);
 int vm_run(struct vm *vm, int vcpuid, const struct vm_entry *);
 int vm_suspend(struct vm *vm, enum vm_suspend_how how);
 int vm_inject_nmi(struct vm *vm, int vcpu);
@@ -180,6 +178,8 @@ void vm_nmi_clear(struct vm *vm, int vcpuid);
 int vm_inject_extint(struct vm *vm, int vcpu);
 int vm_extint_pending(struct vm *vm, int vcpuid);
 void vm_extint_clear(struct vm *vm, int vcpuid);
+int vm_inject_init(struct vm *vm, int vcpuid);
+int vm_inject_sipi(struct vm *vm, int vcpuid, uint8_t vec);
 struct vlapic *vm_lapic(struct vm *vm, int cpu);
 struct vioapic *vm_ioapic(struct vm *vm);
 struct vhpet *vm_hpet(struct vm *vm);
@@ -195,14 +195,13 @@ struct vm_exit *vm_exitinfo(struct vm *vm, int vcpuid);
 struct vie *vm_vie_ctx(struct vm *vm, int vcpuid);
 void vm_exit_suspended(struct vm *vm, int vcpuid, uint64_t rip);
 void vm_exit_debug(struct vm *vm, int vcpuid, uint64_t rip);
-void vm_exit_runblock(struct vm *vm, int vcpuid, uint64_t rip);
 void vm_exit_astpending(struct vm *vm, int vcpuid, uint64_t rip);
 void vm_exit_reqidle(struct vm *vm, int vcpuid, uint64_t rip);
+void vm_exit_run_state(struct vm *vm, int vcpuid, uint64_t rip);
 int vm_service_mmio_read(struct vm *vm, int cpuid, uint64_t gpa, uint64_t *rval,
     int rsize);
 int vm_service_mmio_write(struct vm *vm, int cpuid, uint64_t gpa, uint64_t wval,
     int wsize);
-void vm_req_spinup_ap(struct vm *vm, int req_vcpuid, uint64_t req_rip);
 
 #ifdef _SYS__CPUSET_H_
 cpuset_t vm_active_cpus(struct vm *vm);
@@ -210,28 +209,9 @@ cpuset_t vm_debug_cpus(struct vm *vm);
 cpuset_t vm_suspended_cpus(struct vm *vm);
 #endif	/* _SYS__CPUSET_H_ */
 
-static __inline int
-vcpu_runblocked(struct vm_eventinfo *info)
-{
-
-	return (*info->rptr != 0);
-}
-
-static __inline int
-vcpu_suspended(struct vm_eventinfo *info)
-{
-
-	return (*info->sptr);
-}
-
-static __inline int
-vcpu_reqidle(struct vm_eventinfo *info)
-{
-
-	return (*info->iptr);
-}
-
-int vcpu_debugged(struct vm *vm, int vcpuid);
+bool vcpu_entry_bailout_checks(struct vm *vm, int vcpuid, uint64_t rip);
+bool vcpu_run_state_pending(struct vm *vm, int vcpuid);
+int vcpu_arch_reset(struct vm *vm, int vcpuid, bool init_only);
 
 /*
  * Return true if device indicated by bus/slot/func is supposed to be a

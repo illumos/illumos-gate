@@ -259,6 +259,28 @@ struct vm_readwrite_kernemu_device {
 };
 _Static_assert(sizeof(struct vm_readwrite_kernemu_device) == 24, "ABI");
 
+enum vcpu_reset_kind {
+	VRK_RESET = 0,
+	/*
+	 * The reset performed by an INIT IPI clears much of the CPU state, but
+	 * some portions are left untouched, unlike VRK_RESET, which represents
+	 * a "full" reset as if the system was freshly powered on.
+	 */
+	VRK_INIT = 1,
+};
+
+struct vm_vcpu_reset {
+	int		vcpuid;
+	uint32_t	kind;	/* contains: enum vcpu_reset_kind */
+};
+
+struct vm_run_state {
+	int		vcpuid;
+	uint32_t	state;	/* of enum cpu_init_status type */
+	uint8_t		sipi_vector;	/* vector of SIPI, if any */
+	uint8_t		_pad[3];
+};
+
 #define	VMMCTL_IOC_BASE		(('V' << 16) | ('M' << 8))
 #define	VMM_IOC_BASE		(('v' << 16) | ('m' << 8))
 #define	VMM_LOCK_IOC_BASE	(('v' << 16) | ('l' << 8))
@@ -291,6 +313,9 @@ _Static_assert(sizeof(struct vm_readwrite_kernemu_device) == 24, "ABI");
 #define	VM_RESTART_INSTRUCTION		(VMM_CPU_IOC_BASE | 0x13)
 #define	VM_SET_KERNEMU_DEV		(VMM_CPU_IOC_BASE | 0x14)
 #define	VM_GET_KERNEMU_DEV		(VMM_CPU_IOC_BASE | 0x15)
+#define	VM_RESET_CPU			(VMM_CPU_IOC_BASE | 0x16)
+#define	VM_GET_RUN_STATE		(VMM_CPU_IOC_BASE | 0x17)
+#define	VM_SET_RUN_STATE		(VMM_CPU_IOC_BASE | 0x18)
 
 /* Operations requiring write-locking the VM */
 #define	VM_REINIT		(VMM_LOCK_IOC_BASE | 0x01)

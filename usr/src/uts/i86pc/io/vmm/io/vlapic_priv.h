@@ -137,12 +137,6 @@ do {									\
 	VLAPIC_CTR1((vlapic), msg " isr7 0x%08x", isrptr[7 << 2]);	\
 } while (0)
 
-enum boot_state {
-	BS_INIT,
-	BS_SIPI,
-	BS_RUNNING
-};
-
 /*
  * 16 priority levels with at most one vector injected per level.
  */
@@ -182,7 +176,6 @@ struct vlapic {
 	struct mtx	timer_mtx;
 
 	uint64_t	msr_apicbase;
-	enum boot_state	boot_state;
 
 	/*
 	 * Copies of some registers in the virtual APIC page. We do this for

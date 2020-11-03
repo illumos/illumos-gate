@@ -514,13 +514,14 @@ void
 fbsdrun_addcpu(struct vmctx *ctx, int fromcpu, int newcpu, uint64_t rip)
 #else
 void
-fbsdrun_addcpu(struct vmctx *ctx, int fromcpu, int newcpu, uint64_t rip,
-    bool suspend)
+fbsdrun_addcpu(struct vmctx *ctx, int newcpu, uint64_t rip, bool suspend)
 #endif
 {
 	int error;
 
+#ifdef __FreeBSD__
 	assert(fromcpu == BSP);
+#endif
 
 	/*
 	 * The 'newcpu' must be activated in the context of 'fromcpu'. If
@@ -573,7 +574,7 @@ vmentry_mmio_read(int vcpu, uint64_t gpa, uint8_t bytes, uint64_t data)
 
 	assert(entry->cmd == VEC_DEFAULT);
 
-	entry->cmd = VEC_COMPLETE_MMIO;
+	entry->cmd = VEC_FULFILL_MMIO;
 	mmio->bytes = bytes;
 	mmio->read = 1;
 	mmio->gpa = gpa;
@@ -588,7 +589,7 @@ vmentry_mmio_write(int vcpu, uint64_t gpa, uint8_t bytes)
 
 	assert(entry->cmd == VEC_DEFAULT);
 
-	entry->cmd = VEC_COMPLETE_MMIO;
+	entry->cmd = VEC_FULFILL_MMIO;
 	mmio->bytes = bytes;
 	mmio->read = 0;
 	mmio->gpa = gpa;
@@ -603,7 +604,7 @@ vmentry_inout_read(int vcpu, uint16_t port, uint8_t bytes, uint32_t data)
 
 	assert(entry->cmd == VEC_DEFAULT);
 
-	entry->cmd = VEC_COMPLETE_INOUT;
+	entry->cmd = VEC_FULFILL_INOUT;
 	inout->bytes = bytes;
 	inout->flags = INOUT_IN;
 	inout->port = port;
@@ -618,7 +619,7 @@ vmentry_inout_write(int vcpu, uint16_t port, uint8_t bytes)
 
 	assert(entry->cmd == VEC_DEFAULT);
 
-	entry->cmd = VEC_COMPLETE_INOUT;
+	entry->cmd = VEC_FULFILL_INOUT;
 	inout->bytes = bytes;
 	inout->flags = 0;
 	inout->port = port;
@@ -727,6 +728,7 @@ vmexit_wrmsr(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
 	return (VMEXIT_CONTINUE);
 }
 
+#ifdef __FreeBSD__
 static int
 vmexit_spinup_ap(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
 {
@@ -736,6 +738,18 @@ vmexit_spinup_ap(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
 
 	return (VMEXIT_CONTINUE);
 }
+#else
+static int
+vmexit_run_state(struct vmctx *ctx, struct vm_exit *vme, int *pvcpu)
+{
+	/*
+	 * Run-state transitions (INIT, SIPI, etc) are handled in-kernel, so an
+	 * exit to userspace with that code is not expected.
+	 */
+	fprintf(stderr, "unexpected run-state VM exit");
+	return (VMEXIT_ABORT);
+}
+#endif /* __FreeBSD__ */
 
 #ifdef __FreeBSD__
 #define	DEBUG_EPT_MISCONFIG
@@ -1013,7 +1027,11 @@ static vmexit_handler_t handler[VM_EXITCODE_MAX] = {
 	[VM_EXITCODE_WRMSR]  = vmexit_wrmsr,
 	[VM_EXITCODE_MTRAP]  = vmexit_mtrap,
 	[VM_EXITCODE_INST_EMUL] = vmexit_inst_emul,
+#ifdef __FreeBSD__
 	[VM_EXITCODE_SPINUP_AP] = vmexit_spinup_ap,
+#else
+	[VM_EXITCODE_RUN_STATE] = vmexit_run_state,
+#endif
 	[VM_EXITCODE_SUSPENDED] = vmexit_suspend,
 	[VM_EXITCODE_TASK_SWITCH] = vmexit_task_switch,
 	[VM_EXITCODE_DEBUG] = vmexit_debug,
@@ -1521,13 +1539,21 @@ main(int argc, char *argv[])
 		errx(EX_OSERR, "cap_enter() failed");
 #endif
 
+#ifdef __FreeBSD__
 	/*
 	 * Add CPU 0
 	 */
-#ifdef __FreeBSD__
 	fbsdrun_addcpu(ctx, BSP, BSP, rip);
 #else
-	fbsdrun_addcpu(ctx, BSP, BSP, rip, suspend);
+	/* Set BSP to run (unlike the APs which wait for INIT) */
+	error = vm_set_run_state(ctx, BSP, VRS_RUN, 0);
+	assert(error == 0);
+	fbsdrun_addcpu(ctx, BSP, rip, suspend);
+
+	/* Add subsequent CPUs, which will wait until INIT/SIPI-ed */
+	for (uint_t i = 1; i < guest_ncpus; i++) {
+		spinup_halted_ap(ctx, i);
+	}
 #endif
 	/*
 	 * Head off to the main event dispatch loop
