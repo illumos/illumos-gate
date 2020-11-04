@@ -180,12 +180,14 @@ typedef struct overlay_targ_pkt {
 
 #ifdef _KERNEL
 
+#pragma pack(4)
 typedef struct overlay_targ_pkt32 {
 	uint64_t	otp_linkid;
 	uint64_t	otp_reqid;
 	uint64_t	otp_size;
 	caddr32_t	otp_buf;
 } overlay_targ_pkt32_t;
+#pragma pack()
 
 #endif /* _KERNEL */
 
