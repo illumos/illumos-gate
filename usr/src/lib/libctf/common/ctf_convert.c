@@ -11,12 +11,13 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
  * Main conversion entry points. This has been designed such that there can be
  * any number of different conversion backends. Currently we only have one that
- * understands DWARFv2 (and bits of DWARFv4). Each backend should be placed in
+ * understands DWARFv2 and DWARFv4. Each backend should be placed in
  * the ctf_converters list and each will be tried in turn.
  */
 
@@ -24,7 +25,7 @@
 #include <assert.h>
 #include <gelf.h>
 
-ctf_convert_f ctf_converters[] = {
+static ctf_convert_f ctf_converters[] = {
 	ctf_dwarf_convert
 };
 
@@ -100,8 +101,8 @@ ctf_has_c_source(Elf *elf, char *errmsg, size_t errlen)
 }
 
 static ctf_file_t *
-ctf_elfconvert(int fd, Elf *elf, const char *label, uint_t bsize, uint_t nthrs,
-    uint_t flags, int *errp, char *errbuf, size_t errlen)
+ctf_elfconvert(ctf_convert_t *cch, int fd, Elf *elf, int *errp, char *errbuf,
+    size_t errlen)
 {
 	int err, i;
 	ctf_file_t *fp = NULL;
@@ -110,11 +111,6 @@ ctf_elfconvert(int fd, Elf *elf, const char *label, uint_t bsize, uint_t nthrs,
 		errp = &err;
 
 	if (elf == NULL) {
-		*errp = EINVAL;
-		return (NULL);
-	}
-
-	if (flags & ~CTF_ALLOW_MISSING_DEBUG) {
 		*errp = EINVAL;
 		return (NULL);
 	}
@@ -139,8 +135,7 @@ ctf_elfconvert(int fd, Elf *elf, const char *label, uint_t bsize, uint_t nthrs,
 
 	for (i = 0; i < NCONVERTS; i++) {
 		fp = NULL;
-		err = ctf_converters[i](fd, elf, bsize, nthrs, flags,
-		    &fp, errbuf, errlen);
+		err = ctf_converters[i](cch, fd, elf, &fp, errbuf, errlen);
 
 		if (err != ECTF_CONVNODEBUG)
 			break;
@@ -152,8 +147,9 @@ ctf_elfconvert(int fd, Elf *elf, const char *label, uint_t bsize, uint_t nthrs,
 		return (NULL);
 	}
 
-	if (label != NULL) {
-		if (ctf_add_label(fp, label, fp->ctf_typemax, 0) == CTF_ERR) {
+	if (cch->cch_label != NULL) {
+		if (ctf_add_label(fp, cch->cch_label, fp->ctf_typemax, 0) ==
+		    CTF_ERR) {
 			*errp = ctf_errno(fp);
 			ctf_close(fp);
 			return (NULL);
@@ -168,9 +164,101 @@ ctf_elfconvert(int fd, Elf *elf, const char *label, uint_t bsize, uint_t nthrs,
 	return (fp);
 }
 
+ctf_convert_t *
+ctf_convert_init(int *errp)
+{
+	struct ctf_convert_handle *cch;
+	int err;
+
+	if (errp == NULL)
+		errp = &err;
+	*errp = 0;
+
+	cch = ctf_alloc(sizeof (struct ctf_convert_handle));
+	if (cch == NULL) {
+		*errp = ENOMEM;
+		return (NULL);
+	}
+
+	cch->cch_label = NULL;
+	cch->cch_flags = 0;
+	cch->cch_nthreads = CTF_CONVERT_DEFAULT_NTHREADS;
+	cch->cch_batchsize = CTF_CONVERT_DEFAULT_BATCHSIZE;
+	cch->cch_warncb = NULL;
+	cch->cch_warncb_arg = NULL;
+
+	return (cch);
+}
+
+void
+ctf_convert_fini(ctf_convert_t *cch)
+{
+	if (cch->cch_label != NULL) {
+		size_t len = strlen(cch->cch_label) + 1;
+		ctf_free(cch->cch_label, len);
+	}
+	ctf_free(cch, sizeof (struct ctf_convert_handle));
+}
+
+int
+ctf_convert_set_nthreads(ctf_convert_t *cch, uint_t nthrs)
+{
+	if (nthrs == 0)
+		return (EINVAL);
+	cch->cch_nthreads = nthrs;
+	return (0);
+}
+
+int
+ctf_convert_set_batchsize(ctf_convert_t *cch, uint_t bsize)
+{
+	if (bsize == 0)
+		return (EINVAL);
+	cch->cch_batchsize = bsize;
+	return (0);
+}
+
+int
+ctf_convert_set_flags(ctf_convert_t *cch, uint_t flags)
+{
+	if ((flags & ~CTF_CONVERT_ALL_FLAGS) != 0)
+		return (EINVAL);
+	cch->cch_flags = flags;
+	return (0);
+}
+
+int
+ctf_convert_set_label(ctf_convert_t *cch, const char *label)
+{
+	char *dup;
+
+	if (label == NULL)
+		return (EINVAL);
+
+	dup = ctf_strdup(label);
+	if (dup == NULL)
+		return (ENOMEM);
+
+	if (cch->cch_label != NULL) {
+		size_t len = strlen(cch->cch_label) + 1;
+		ctf_free(cch->cch_label, len);
+	}
+
+	cch->cch_label = dup;
+	return (0);
+}
+
+int
+ctf_convert_set_warncb(ctf_convert_t *cch, ctf_convert_warn_f cb, void *arg)
+{
+	cch->cch_warncb = cb;
+	cch->cch_warncb_arg = arg;
+	return (0);
+}
+
 ctf_file_t *
-ctf_fdconvert(int fd, const char *label, uint_t bsize, uint_t nthrs,
-    uint_t flags, int *errp, char *errbuf, size_t errlen)
+ctf_fdconvert(ctf_convert_t *cch, int fd, int *errp,
+    char *errbuf, size_t errlen)
 {
 	int err;
 	Elf *elf;
@@ -185,8 +273,7 @@ ctf_fdconvert(int fd, const char *label, uint_t bsize, uint_t nthrs,
 		return (NULL);
 	}
 
-	fp = ctf_elfconvert(fd, elf, label, bsize, nthrs, flags, errp, errbuf,
-	    errlen);
+	fp = ctf_elfconvert(cch, fd, elf, errp, errbuf, errlen);
 
 	(void) elf_end(elf);
 	return (fp);

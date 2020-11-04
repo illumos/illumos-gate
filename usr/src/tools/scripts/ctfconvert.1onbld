@@ -10,7 +10,7 @@
 .\"
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd October 23, 2020
+.Dd November 04, 2020
 .Dt ctfconvert 1ONBLD
 .Os
 .Sh NAME
@@ -18,7 +18,7 @@
 .Nd Convert ELF object debug data to CTF container
 .Sh SYNOPSIS
 .Nm
-.Op Fl ikm
+.Op Fl ikms
 .Op Fl b Ar batchsize
 .Op Fl j Ar threads
 .Op Fl l Ar label | Fl L Ar labelenv
@@ -74,7 +74,7 @@ option relaxes this restriction allowing processing of such files.
 Note that if the file contains no debug data in any of the compilation units
 then this flag will cause
 .Nm
-to exit successfully without taking any action, and can mask missing CTF data.
+to exit successfully without taking any action, and can mask missing debug data.
 .It Fl b Ar batchsize
 Batch-process this many compilation units from the source file at once (default
 256). This helps to reduce memory usage when processing large objects which
@@ -89,6 +89,17 @@ variable.
 .It Fl o Ar outfile
 Write the new object with added CTF ta to the specified output file, rather
 than updating the input in-place.
+.It Fl s
+This option allows truncation of data that cannot be converted to CTF format
+because it exceeds the allowed size.
+Without this option being provided, conversion of such data would produce a
+fatal error.
+The current implementation allows truncation of
+.Vt enum
+definitions.
+When this occurs the resulting CTF data does not contain all possible
+.Vt enum
+values and a warning will be produced for each truncation.
 .El
 .Sh OPERANDS
 The following operands are supported:
@@ -110,6 +121,11 @@ The command line interface of
 .Nm
 is
 .Sy Uncommitted .
+The output of
+.Nm
+is
+.Sy Not-An-Interface
+and may change at any time.
 .Sh SEE ALSO
 .Xr ctfdiff 1 ,
 .Xr ctfdump 1 ,

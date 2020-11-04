@@ -274,6 +274,7 @@ typedef struct ctf_die {
 	avl_tree_t	cu_map;		/* map die offsets to CTF types */
 	char		*cu_errbuf;	/* error message buffer */
 	size_t		cu_errlen;	/* error message buffer length */
+	ctf_convert_t	*cu_handle;	/* ctf convert handle */
 	size_t		cu_ptrsz;	/* object's pointer size */
 	boolean_t	cu_bigend;	/* is it big endian */
 	boolean_t	cu_doweaks;	/* should we convert weak symbols? */
@@ -485,7 +486,7 @@ ctf_dwarf_ref(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half name, Dwarf_Off *refp)
 	}
 
 	(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
-	    "failed to get unsigned attribute for type: %s\n",
+	    "failed to get attribute descriptor offset: %s\n",
 	    dwarf_errmsg(derr));
 	return (ECTF_CONVBKERR);
 }
@@ -535,7 +536,7 @@ ctf_dwarf_signed(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half name,
 	}
 
 	(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
-	    "failed to get unsigned attribute for type: %s\n",
+	    "failed to get signed attribute for type: %s\n",
 	    dwarf_errmsg(derr));
 	return (ECTF_CONVBKERR);
 }
@@ -649,7 +650,8 @@ ctf_dwarf_member_location(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Unsigned *valp)
 	DWARF_UNLOCK(cup);
 	if (ret != DW_DLV_OK) {
 		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
-		    "failed to get dwarf attribute for for member location: %s",
+		    "failed to get dwarf attribute for for member "
+		    "location: %s\n",
 		    dwarf_errmsg(derr));
 		ctf_dwarf_dealloc(cup, attr, DW_DLA_ATTR);
 		return (ECTF_CONVBKERR);
@@ -679,7 +681,7 @@ ctf_dwarf_member_location(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Unsigned *valp)
 			if (sign < 0) {
 				(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 				    "encountered negative member data "
-				    "location: %d", sign);
+				    "location: %d\n", sign);
 			}
 			*valp = (Dwarf_Unsigned)sign;
 			return (0);
@@ -689,7 +691,7 @@ ctf_dwarf_member_location(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Unsigned *valp)
 	if (dwarf_loclist(attr, &loc, &locnum, &derr) != DW_DLV_OK) {
 		DWARF_UNLOCK(cup);
 		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
-		    "failed to obtain location list for member offset: %s",
+		    "failed to obtain location list for member offset: %s\n",
 		    dwarf_errmsg(derr));
 		ctf_dwarf_dealloc(cup, attr, DW_DLA_ATTR);
 		return (ECTF_CONVBKERR);
@@ -699,7 +701,7 @@ ctf_dwarf_member_location(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Unsigned *valp)
 
 	if (locnum != 1 || loc->ld_s->lr_atom != DW_OP_plus_uconst) {
 		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
-		    "failed to parse location structure for member");
+		    "failed to parse location structure for member\n");
 		ctf_dwarf_dealloc(cup, loc->ld_s, DW_DLA_LOC_BLOCK);
 		ctf_dwarf_dealloc(cup, loc, DW_DLA_LOCDESC);
 		return (ECTF_CONVBKERR);
@@ -853,7 +855,7 @@ ctf_dwarf_die_elfenc(Elf *elf, ctf_cu_t *cup, char *errbuf, size_t errlen)
 		VERIFY(ctf_setmodel(cup->cu_ctfp, CTF_MODEL_LP64) == 0);
 	} else {
 		(void) snprintf(errbuf, errlen,
-		    "unknown ELF class %d", ehdr.e_ident[EI_CLASS]);
+		    "unknown ELF class %d\n", ehdr.e_ident[EI_CLASS]);
 		return (ECTF_CONVBKERR);
 	}
 
@@ -863,7 +865,7 @@ ctf_dwarf_die_elfenc(Elf *elf, ctf_cu_t *cup, char *errbuf, size_t errlen)
 		cup->cu_bigend = B_TRUE;
 	} else {
 		(void) snprintf(errbuf, errlen,
-		    "unknown ELF data encoding: %hhu", ehdr.e_ident[EI_DATA]);
+		    "unknown ELF data encoding: %hhu\n", ehdr.e_ident[EI_DATA]);
 		return (ECTF_CONVBKERR);
 	}
 
@@ -1031,7 +1033,7 @@ ctf_dwarf_dwarf_base(ctf_cu_t *cup, Dwarf_Die die, int *kindp,
 		break;
 	default:
 		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
-		    "encountered unknown DWARF encoding: %d", type);
+		    "encountered unknown DWARF encoding: %d\n", type);
 		return (ECTF_CONVBKERR);
 	}
 
@@ -1230,7 +1232,7 @@ ctf_dwarf_member_offset(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t mid,
 		if ((tsz = ctf_type_size(cup->cu_ctfp, mid)) == CTF_ERR) {
 			int e = ctf_errno(cup->cu_ctfp);
 			(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
-			    "failed to get type size: %s", ctf_errmsg(e));
+			    "failed to get type size: %s\n", ctf_errmsg(e));
 			return (ECTF_CONVBKERR);
 		}
 	} else {
@@ -1350,7 +1352,7 @@ ctf_dwarf_member_bitfield(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp)
 		    name, &e);
 		if (cdb->cdb_id == CTF_ERR) {
 			(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
-			    "failed to get add bitfield type %s: %s", name,
+			    "failed to get add bitfield type %s: %s\n", name,
 			    ctf_errmsg(ctf_errno(cup->cu_ctfp)));
 			ctf_free(name, namesz + 1);
 			ctf_free(cdb, sizeof (ctf_dwbitf_t));
@@ -1437,7 +1439,7 @@ ctf_dwarf_fixup_sou(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t base, boolean_t add)
 		ret = ctf_add_member(cup->cu_ctfp, base, mname, mid, memboff);
 		if (ret == CTF_ERR) {
 			(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
-			    "failed to add member %s: %s",
+			    "failed to add member %s: %s\n",
 			    mname, ctf_errmsg(ctf_errno(cup->cu_ctfp)));
 			if (mname != NULL)
 				ctf_free(mname, strlen(mname) + 1);
@@ -1466,7 +1468,7 @@ next:
 	if ((ctf_set_size(cup->cu_ctfp, base, size)) == CTF_ERR) {
 		int e = ctf_errno(cup->cu_ctfp);
 		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
-		    "failed to set type size for %d to 0x%x: %s", base,
+		    "failed to set type size for %d to 0x%x: %s\n", base,
 		    (uint32_t)size, ctf_errmsg(e));
 		return (ECTF_CONVBKERR);
 	}
@@ -1891,14 +1893,14 @@ ctf_dwarf_create_enum(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp, int isroot)
 	Dwarf_Die child;
 	Dwarf_Unsigned dw;
 	ctf_id_t id;
-	char *name;
+	char *enumname;
 	int ret;
 
-	if ((ret = ctf_dwarf_string(cup, die, DW_AT_name, &name)) != 0 &&
-	    ret != ENOENT)
+	ret = ctf_dwarf_string(cup, die, DW_AT_name, &enumname);
+	if (ret != 0 && ret != ENOENT)
 		return (ret);
 	if (ret == ENOENT)
-		name = NULL;
+		enumname = NULL;
 
 	/*
 	 * Enumerations may have a size associated with them, particularly if
@@ -1910,20 +1912,21 @@ ctf_dwarf_create_enum(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp, int isroot)
 		size = (size_t)dw;
 	}
 
-	id = ctf_add_enum(cup->cu_ctfp, isroot, name, size);
-	ctf_dprintf("added enum %s (%d)\n", name, id);
-	if (name != NULL)
-		ctf_free(name, strlen(name) + 1);
-	if (id == CTF_ERR)
-		return (ctf_errno(cup->cu_ctfp));
+	id = ctf_add_enum(cup->cu_ctfp, isroot, enumname, size);
+	ctf_dprintf("added enum %s (%d)\n",
+	    enumname == NULL ? "<anon>" : enumname, id);
+	if (id == CTF_ERR) {
+		ret = ctf_errno(cup->cu_ctfp);
+		goto out;
+	}
 	*idp = id;
 	if ((ret = ctf_dwmap_add(cup, id, die, B_FALSE)) != 0)
-		return (ret);
+		goto out;
 
 	if ((ret = ctf_dwarf_child(cup, die, &child)) != 0) {
 		if (ret == ENOENT)
 			ret = 0;
-		return (ret);
+		goto out;
 	}
 
 	while (child != NULL) {
@@ -1931,18 +1934,20 @@ ctf_dwarf_create_enum(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp, int isroot)
 		Dwarf_Signed sval;
 		Dwarf_Unsigned uval;
 		Dwarf_Die arg = child;
+		char *name;
 		int eval;
 
 		if ((ret = ctf_dwarf_sib(cup, arg, &child)) != 0)
-			return (ret);
+			break;
 
 		if ((ret = ctf_dwarf_tag(cup, arg, &tag)) != 0)
-			return (ret);
+			break;
 
 		if (tag != DW_TAG_enumerator) {
 			if ((ret = ctf_dwarf_convert_type(cup, arg, NULL,
-			    CTF_ADD_NONROOT)) != 0)
-				return (ret);
+			    CTF_ADD_NONROOT)) != 0) {
+				break;
+			}
 			continue;
 		}
 
@@ -1950,7 +1955,7 @@ ctf_dwarf_create_enum(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp, int isroot)
 		 * DWARF v4 section 5.7 tells us we'll always have names.
 		 */
 		if ((ret = ctf_dwarf_string(cup, arg, DW_AT_name, &name)) != 0)
-			return (ret);
+			break;
 
 		/*
 		 * We have to be careful here: newer GCCs generate DWARF where
@@ -1961,32 +1966,62 @@ ctf_dwarf_create_enum(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp, int isroot)
 		if ((ret = ctf_dwarf_unsigned(cup, arg, DW_AT_const_value,
 		    &uval)) == 0) {
 			eval = (int)uval;
-		} else if ((ret = ctf_dwarf_signed(cup, arg, DW_AT_const_value,
-		    &sval)) == 0) {
-			eval = sval;
+		} else {
+			/*
+			 * ctf_dwarf_unsigned will have left an error in the
+			 * buffer
+			 */
+			*cup->cu_errbuf = '\0';
+
+			if ((ret = ctf_dwarf_signed(cup, arg, DW_AT_const_value,
+			    &sval)) == 0) {
+				eval = sval;
+			}
 		}
 
 		if (ret != 0) {
-			if (ret != ENOENT)
-				return (ret);
-
-			(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
-			    "encountered enumeration without constant value\n");
-			return (ECTF_CONVBKERR);
+			if (ret == ENOENT) {
+				(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
+				    "encountered enumeration without constant "
+				    "value\n");
+				ret = ECTF_CONVBKERR;
+			}
+			ctf_free(name, strlen(name) + 1);
+			break;
 		}
 
 		ret = ctf_add_enumerator(cup->cu_ctfp, id, name, eval);
 		if (ret == CTF_ERR) {
-			(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
-			    "failed to add enumarator %s (%d) to %d\n",
-			    name, eval, id);
+			ret = ctf_errno(cup->cu_ctfp);
+
+			if (ret == ECTF_DTFULL && (cup->cu_handle->cch_flags &
+			    CTF_ALLOW_TRUNCATION)) {
+				if (cup->cu_handle->cch_warncb != NULL) {
+					cup->cu_handle->cch_warncb(
+					    cup->cu_handle->cch_warncb_arg,
+					    "truncating enumeration %s at %s\n",
+					    name, enumname == NULL ? "<anon>" :
+					    enumname);
+				}
+				ret = 0;
+			} else {
+				(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
+				    "failed to add enumerator %s (%d) "
+				    "to %s (%d)\n", name, eval,
+				    enumname == NULL ? "<anon>" : enumname, id);
+			}
 			ctf_free(name, strlen(name) + 1);
-			return (ctf_errno(cup->cu_ctfp));
+			break;
 		}
 		ctf_free(name, strlen(name) + 1);
 	}
 
-	return (0);
+out:
+
+	if (enumname != NULL)
+		ctf_free(enumname, strlen(enumname) + 1);
+
+	return (ret);
 }
 
 /*
@@ -3124,9 +3159,9 @@ ctf_dwarf_count_dies(Dwarf_Debug dw, Dwarf_Error *derr, uint_t *ndies,
  * be able to finish the rest in a (potentially) multithreaded context.
  */
 static int
-ctf_dwarf_preinit_dies(int fd, Elf *elf, Dwarf_Debug dw,
+ctf_dwarf_preinit_dies(ctf_convert_t *cch, int fd, Elf *elf, Dwarf_Debug dw,
     mutex_t *dwlock, Dwarf_Error *derr, uint_t ndies, ctf_cu_t *cdies,
-    uint_t flags, char *errbuf, size_t errlen)
+    char *errbuf, size_t errlen)
 {
 	Dwarf_Unsigned hdrlen, abboff, nexthdr;
 	Dwarf_Half addrsz, vers;
@@ -3144,6 +3179,7 @@ ctf_dwarf_preinit_dies(int fd, Elf *elf, Dwarf_Debug dw,
 
 		cup = &cdies[i++];
 
+		cup->cu_handle = cch;
 		cup->cu_fd = fd;
 		cup->cu_elf = elf;
 		cup->cu_dwarf = dw;
@@ -3176,7 +3212,7 @@ ctf_dwarf_preinit_dies(int fd, Elf *elf, Dwarf_Debug dw,
 		if (cu == NULL) {
 			ctf_dprintf("cu %d - no cu data\n", i);
 			(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
-			    "file does not contain DWARF data");
+			    "file does not contain DWARF data\n");
 			return (ECTF_CONVNODEBUG);
 		}
 
@@ -3212,12 +3248,19 @@ ctf_dwarf_preinit_dies(int fd, Elf *elf, Dwarf_Debug dw,
 				 * Missing DEBUG data for a .c file, return an
 				 * error unless this is permitted.
 				 */
-				if (!(flags & CTF_ALLOW_MISSING_DEBUG)) {
+				if (!(cch->cch_flags &
+				    CTF_ALLOW_MISSING_DEBUG)) {
 					(void) snprintf(
 					    cup->cu_errbuf, cup->cu_errlen,
-					    "file %s is missing debug info",
+					    "missing debug information "
+					    "(first seen in %s)\n",
 					    cup->cu_name);
 					return (ECTF_CONVNODEBUG);
+				}
+				if (cch->cch_warncb != NULL) {
+					cch->cch_warncb(cch->cch_warncb_arg,
+					    "file %s is missing debug "
+					    "information\n", cup->cu_name);
 				}
 			}
 		} else {
@@ -3304,13 +3347,14 @@ c_source_has_debug(const char *file, ctf_cu_t *cus, size_t nr_cus)
 }
 
 static int
-ctf_dwarf_check_missing(ctf_cu_t *cus, size_t nr_cus, Elf *elf,
-    char *errmsg, size_t errlen)
+ctf_dwarf_check_missing(ctf_convert_t *cch, ctf_cu_t *cus, size_t nr_cus,
+    Elf *elf, char *errmsg, size_t errlen)
 {
 	Elf_Scn *scn, *strscn;
 	Elf_Data *data, *strdata;
 	GElf_Shdr shdr;
 	ulong_t i;
+	int ret = 0;
 
 	scn = NULL;
 	while ((scn = elf_nextscn(elf, scn)) != NULL) {
@@ -3369,13 +3413,22 @@ ctf_dwarf_check_missing(ctf_cu_t *cus, size_t nr_cus, Elf *elf,
 			continue;
 
 		if (!c_source_has_debug(file, cus, nr_cus)) {
-			(void) snprintf(errmsg, errlen,
-			    "file %s is missing debug info", file);
-			return (ECTF_CONVNODEBUG);
+			if (cch->cch_warncb != NULL) {
+				cch->cch_warncb(
+				    cch->cch_warncb_arg,
+				    "file %s is missing debug information\n",
+				    file);
+			}
+			if (ret != ECTF_CONVNODEBUG) {
+				(void) snprintf(errmsg, errlen,
+				    "missing debug information "
+				    "(first seen in %s)\n", file);
+				ret = ECTF_CONVNODEBUG;
+			}
 		}
 	}
 
-	return (0);
+	return (ret);
 }
 
 static int
@@ -3488,11 +3541,11 @@ out:
 }
 
 int
-ctf_dwarf_convert(int fd, Elf *elf, uint_t bsize, uint_t nthrs, uint_t flags,
-    ctf_file_t **fpp, char *errbuf, size_t errlen)
+ctf_dwarf_convert(ctf_convert_t *cch, int fd, Elf *elf, ctf_file_t **fpp,
+    char *errbuf, size_t errlen)
 {
 	int err, ret;
-	uint_t ndies, i;
+	uint_t ndies, i, bsize, nthrs;
 	Dwarf_Debug dw;
 	Dwarf_Error derr;
 	ctf_cu_t *cdies = NULL, *cup;
@@ -3542,15 +3595,21 @@ ctf_dwarf_convert(int fd, Elf *elf, uint_t bsize, uint_t nthrs, uint_t flags,
 
 	bzero(cdies, sizeof (ctf_cu_t) * ndies);
 
-	if ((err = ctf_dwarf_preinit_dies(fd, elf, dw, &dwlock, &derr,
-	    ndies, cdies, flags, errbuf, errlen)) != 0) {
+	if ((err = ctf_dwarf_preinit_dies(cch, fd, elf, dw, &dwlock, &derr,
+	    ndies, cdies, errbuf, errlen)) != 0) {
 		goto out;
 	}
 
-	if (!(flags & CTF_ALLOW_MISSING_DEBUG) &&
-	    (err = ctf_dwarf_check_missing(cdies, ndies,
-	    elf, errbuf, errlen)) != 0) {
-		goto out;
+	if ((err = ctf_dwarf_check_missing(cch, cdies, ndies, elf,
+	    errbuf, errlen)) != 0) {
+		if (!(cch->cch_flags & CTF_ALLOW_MISSING_DEBUG)) {
+			goto out;
+		}
+		if (err != ECTF_CONVNODEBUG && *errbuf != '\0' &&
+		    cch->cch_warncb != NULL) {
+			cch->cch_warncb(cch->cch_warncb_arg, "%s", errbuf);
+			*errbuf = '\0';
+		}
 	}
 
 	/* Only one cu, no merge required */
@@ -3570,8 +3629,8 @@ ctf_dwarf_convert(int fd, Elf *elf, uint_t bsize, uint_t nthrs, uint_t flags,
 	 * There's no need to have either more threads or a batch size larger
 	 * than the total number of dies, even if the user requested them.
 	 */
-	nthrs = min(ndies, nthrs);
-	bsize = min(ndies, bsize);
+	nthrs = min(ndies, cch->cch_nthreads);
+	bsize = min(ndies, cch->cch_batchsize);
 
 	if (workq_init(&wqp, nthrs) == -1) {
 		err = errno;
