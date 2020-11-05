@@ -98,9 +98,17 @@ LDLIBS += \
 	-lumem \
 	-luutil
 
+#
+# While svc.startd only searches for libfmevent, which is in
+# $(ROOT)/lib/fm, when resolving dependencies it needs to know to search
+# for those in $(ROOT)/usr/lib/fm. However, we don't need a runpath
+# because libfmevent has that properly set already, but it doesn't help
+# us during the build.
+#
 LDLIBS_i386 +=	-lbe
-LDLIBS +=	$(LDLIBS_$(MACH)) -L $(ROOT)/lib/fm -lfmevent
-LDFLAGS +=	-R /lib/fm
+LDLIBS +=	$(LDLIBS_$(MACH)) -L$(ROOT)/lib/fm -lfmevent \
+		-L$(ROOT)/usr/lib/fm
+LDFLAGS +=	-R/lib/fm
 
 FILEMODE = 0555
 

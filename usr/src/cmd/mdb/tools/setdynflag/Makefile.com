@@ -42,10 +42,12 @@ include ../../common/Makefile.util
 # running kernel's includes and libraries.
 #
 CPPFLAGS = -I../../common
-CFLAGS += $(CCVERBOSE)
+CFLAGS = $(NATIVE_CFLAGS) $(CCVERBOSE)
 CERRWARN += $(CNOWARN_UNINIT)
-LDFLAGS = $(ZLAZYLOAD) $(BDIRECT)
-LDLIBS	= -lelf
+LDFLAGS = $(NATIVE_LDFLAGS) $(ZLAZYLOAD) $(BDIRECT)
+LDLIBS = -lelf
+CC = $(NATIVECC)
+LD = $(NATIVELD)
 NATIVE_LIBS += libelf.so libc.so
 
 install all: $(PROG)

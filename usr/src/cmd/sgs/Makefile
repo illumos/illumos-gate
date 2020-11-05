@@ -77,7 +77,9 @@ SUBDIRS-common= libconv		\
 		symorder	\
 		tsort		\
 		unifdef		\
-		yacc
+		yacc		\
+		.WAIT		\
+		demo_rdb
 
 SUBDIRS-i386=
 SUBDIRS-sparc=	rtld.4.x

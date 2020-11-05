@@ -25,7 +25,7 @@
 
 .SUFFIXES: .eft .esc
 
-ESC=$(SRC)/cmd/fm/eversholt/esc/$(MACH)/esc
+ESC=$(SRC)/cmd/fm/eversholt/native/$(MACH)/esc
 
 include $(SRC)/cmd/Makefile.cmd
 

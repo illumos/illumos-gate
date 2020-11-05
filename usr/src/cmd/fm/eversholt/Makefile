@@ -23,14 +23,13 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 debug := TARGET += debug
 
-SUBDIRS = esc eftinfo files
+SUBDIRS = esc eftinfo native files
 
 include ../Makefile.subdirs
 
 debug: $(SUBDIRS)
 
-files: esc
+files: native
