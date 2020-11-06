@@ -538,7 +538,6 @@ struct ofl_desc {
 #define	FLG_OFG_NO_MF		0x00000008	/* use v2 mapfile syntax */
 #define	FLG_OFG_NO_TEXT		0x00000010	/* verify pure text segment */
 #define	FLG_OFG_NO_UNUSED	0x00000020	/* remove unused dependency */
-#define	FLG_OFG_NO_KMOD		0x00000040	/* use -z type=kmod */
 
 /*
  * Test to see if a guidance should be given for a given category
