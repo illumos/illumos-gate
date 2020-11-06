@@ -378,12 +378,14 @@ mlxcx_cq_setup(mlxcx_t *mlxp, mlxcx_event_queue_t *eq,
 	mutex_exit(&cq->mlcq_mtx);
 
 	mutex_enter(&eq->mleq_mtx);
+	mutex_enter(&cq->mlcq_arm_mtx);
 	mutex_enter(&cq->mlcq_mtx);
 	ASSERT0(cq->mlcq_state & MLXCX_CQ_EQAVL);
 	avl_add(&eq->mleq_cqs, cq);
 	atomic_or_uint(&cq->mlcq_state, MLXCX_CQ_EQAVL);
 	mlxcx_arm_cq(mlxp, cq);
 	mutex_exit(&cq->mlcq_mtx);
+	mutex_exit(&cq->mlcq_arm_mtx);
 	mutex_exit(&eq->mleq_mtx);
 
 	*cqp = cq;
