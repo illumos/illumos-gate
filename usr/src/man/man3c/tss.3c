@@ -11,13 +11,13 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd "Jan 11, 2015"
+.Dd "November 8, 2020"
 .Dt TSS 3C
 .Os
 .Sh NAME
 .Nm tss ,
 .Nm tss_create ,
-.Nm tss_destroy ,
+.Nm tss_delete ,
 .Nm tss_get ,
 .Nm tss_set
 .Nd thread-specific storage
@@ -47,7 +47,7 @@ The
 .Sy tss
 family of functions create, get, set, and destroy thread-specific
 storage.
-.Ss Creating and Destorying Thread-Specific Storage
+.Ss Creating and Destroying Thread-Specific Storage
 The
 .Fn tss_create
 function creates a new thread-specific data key.
@@ -58,7 +58,7 @@ and
 .Fn tss_set
 functions.
 A given key persists until
-.Fn tss_destroy
+.Fn tss_delete
 is called.
 .Pp
 When a key is created, the value
@@ -81,17 +81,17 @@ When the destructor is run due to a thread exiting, all signals will be blocked.
 .Pp
 The
 .Fn tss_delete
-function deletes the key identify by
+function deletes the key identified by
 .Fa key
 from the global name-space.
 When a key is deleted, no registered destructor is called, it is up to the
 calling program to free any storage that was associated with
 .Fa key
 across all threads.
-Because of this propety, it is legal to call
+Because of this property, it is legal to call
 .Fn tss_delete
 from inside a destructor.
-Any destructors that had been assocaited with
+Any destructors that had been associated with
 .Fa key
 will no longer be called when a thread terminates.
 .Ss Obtaining Values
@@ -110,7 +110,7 @@ The
 .Fn tss_set
 function sets the value of the key
 .Fa key
-for the callling thread to
+for the calling thread to
 .Fa value ,
 which may be obtained by subsequent calls to
 .Fa tss_get .
