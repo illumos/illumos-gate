@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd Feb 07, 2015
+.Dd November 8, 2020
 .Dt PTHREAD_ATTR_GET_NP 3C
 .Os
 .Sh NAME
@@ -39,7 +39,7 @@ will be filled in with the current attributes for the thread.
 The attributes should be allocated by a call to
 .Xr pthread_attr_init 3C
 prior to calling the
-.Fn pthrad_attr_get_np
+.Fn pthread_attr_get_np
 function.
 When
 .Fa attr

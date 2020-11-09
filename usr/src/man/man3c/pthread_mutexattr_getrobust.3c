@@ -11,12 +11,12 @@
 .\"
 .\" Copyright (c) 2014, Joyent, Inc.
 .\"
-.Dd "Dec 22, 2014"
+.Dd "November 8, 2020"
 .Dt PTHREAD_MUTEXATTR_GETROBUST 3C
 .Os
 .Sh NAME
 .Nm pthread_mutexattr_getrobust ,
-.Nm pthrad_mutexattr_setrobust
+.Nm pthread_mutexattr_setrobust
 .Nd get and set the mutex robust attribute
 .Sh SYNOPSIS
 .In pthread.h
@@ -34,7 +34,7 @@
 The
 .Fn pthread_mutexattr_getrobust
 and
-.Fn pthread_mtuexattr_setrobust
+.Fn pthread_mutexattr_setrobust
 functions obtain and set a mutex's
 .Em robust
 attribute, putting it in, or obtaining it from
