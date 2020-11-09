@@ -16,9 +16,9 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3devid
+MANSECT=	3devid
 
-MANFILES= 	devid_get.3devid
+MANFILES=	devid_get.3devid
 
 MANLINKS=	devid_compare.3devid		\
 		devid_deviceid_to_nmlist.3devid	\
@@ -29,6 +29,7 @@ MANLINKS=	devid_compare.3devid		\
 		devid_str_decode.3devid		\
 		devid_str_encode.3devid		\
 		devid_str_free.3devid		\
+		devid_str_from_path.3devid	\
 		devid_valid.3devid
 
 devid_compare.3devid		:= LINKSRC = devid_get.3devid
@@ -40,6 +41,7 @@ devid_sizeof.3devid		:= LINKSRC = devid_get.3devid
 devid_str_decode.3devid		:= LINKSRC = devid_get.3devid
 devid_str_encode.3devid		:= LINKSRC = devid_get.3devid
 devid_str_free.3devid		:= LINKSRC = devid_get.3devid
+devid_str_from_path.3devid	:= LINKSRC = devid_get.3devid
 devid_valid.3devid		:= LINKSRC = devid_get.3devid
 
 .KEEP_STATE:

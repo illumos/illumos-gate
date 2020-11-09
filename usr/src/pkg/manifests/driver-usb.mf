@@ -267,6 +267,7 @@ link path=usr/share/man/man9s/usb_ctrl_req_t.9s target=usb_ctrl_req.9s
 link path=usr/share/man/man9s/usb_ctrl_request.9s target=usb_ctrl_req.9s
 link path=usr/share/man/man9s/usb_ep_ss_comp_descr_t.9s \
     target=usb_ep_ss_comp_descr.9s
+link path=usr/share/man/man9s/usb_ep_xdescr_t.9s target=usb_ep_xdescr.9s
 link path=usr/share/man/man9s/usb_intr_req_t.9s target=usb_intr_req.9s
 link path=usr/share/man/man9s/usb_intr_request.9s target=usb_intr_req.9s
 link path=usr/share/man/man9s/usb_isoc_req_t.9s target=usb_isoc_req.9s
