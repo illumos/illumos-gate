@@ -56,5 +56,5 @@ install:	all $(ROOTONLDBINPROG64)
 include		../Makefile.targ
 
 # DEMO DELETE START
-include		../../../../../Makefile.master.64
+include		../../../../Makefile.master.64
 # DEMO DELETE END
