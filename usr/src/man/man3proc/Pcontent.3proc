@@ -11,11 +11,11 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd November 8, 2020
 .Dt PCONTENT 3PROC
 .Os
 .Sh NAME
-.Nm Pconent
+.Nm Pcontent
 .Nd obtain process content types available
 .Sh LIBRARY
 .Lb libproc

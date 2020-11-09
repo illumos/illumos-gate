@@ -11,23 +11,23 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd November 8, 2020
 .Dt PROC_GET_STATUS 3PROC
 .Os
 .Sh NAME
-.Nm proc_get_pstatus
+.Nm proc_get_status
 .Nd get process status information
 .Sh SYNOPSIS
 .Lb libproc
 .In libproc.h
 .Ft int
-.Fo proc_get_pstatus
+.Fo proc_get_status
 .Fa "pid_t pid"
 .Fa "pstatus_t *psp"
 .Fc
 .Sh DESCRIPTION
 The
-.Fn proc_get_pstatus
+.Fn proc_get_status
 function is a convenient way to read the /proc status file for the
 process
 .Fa pid .
@@ -39,7 +39,7 @@ structure may be found in
 .Xr proc 4 .
 .Sh RETURN VALUES
 Upon successful completion, the
-.Fn proc_get_pstatus
+.Fn proc_get_status
 function returns
 .Sy 0 .
 Otherwise,
