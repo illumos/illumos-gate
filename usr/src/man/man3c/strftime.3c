@@ -46,11 +46,10 @@
 .\" Copyright (c) 2014 Gary Mills
 .\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"
-.TH STRFTIME 3C "Mar 30, 2019"
+.TH STRFTIME 3C "November 8, 2020"
 .SH NAME
-strftime, strftime_l cftime, ascftime \- convert date and time to string
+strftime, strftime_l, cftime, ascftime \- convert date and time to string
 .SH SYNOPSIS
-.LP
 .nf
 #include <time.h>
 
@@ -75,7 +74,6 @@ strftime, strftime_l cftime, ascftime \- convert date and time to string
 .fi
 
 .SH DESCRIPTION
-.LP
 The \fBstrftime()\fR, \fBstrftime_l()\fR, \fBascftime()\fR, and \fBcftime()\fR
 functions place
 bytes into the array pointed to by \fIs\fR as controlled by the string pointed
@@ -517,7 +515,6 @@ with a Sunday for \fB%U\fR or a Monday for \fB%W\fR. Week number 0 contains
 those days before the first Sunday or Monday in January for \fB%U\fR and
 \fB%W\fR, respectively.
 .SS "Modified Conversion Specifications"
-.LP
 Some conversion specifications can be modified by the \fBE\fR and \fBO\fR
 modifiers to indicate that an alternate format or specification should be used
 rather than the one normally used by the unmodified conversion specification.
@@ -718,15 +715,12 @@ the locale's alternate numeric symbols.
 .RE
 
 .SS "Selecting the Output Language"
-.LP
 These routines produce output that is formatted according to the \fBLC_TIME\fR
 locale category.  They use either the current locale, or in the case of
 \fBstrftime_l()\fR, the locale supplied by \fIloc\fR.
 .SS "Time Zone"
-.LP
 Local time zone information is used as though \fBtzset\fR(3C) were called.
 .SH RETURN VALUES
-.LP
 These functions return the
 number of characters placed into the array pointed to by \fIs\fR, not including
 the terminating null character. If the total number of resulting characters
@@ -734,7 +728,6 @@ including the terminating null character is more than \fImaxsize\fR,
 \fBstrftime()\fR returns \fB0\fR and the contents of the array are
 indeterminate.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRAn example of the \fBstrftime()\fR function.
 .LP
 The following example illustrates the use of \fBstrftime()\fR for the
@@ -748,7 +741,6 @@ Thursday, August 28, 1986 at 12:44:36.
 .LP
 This results in \fIstr\fR containing "Thursday Aug 28 240".
 .SH ATTRIBUTES
-.LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .TS
 box;
@@ -771,13 +763,11 @@ The \fBstrftime()\fR and \fBstrftime_l()\fR functions are Standard.
 .LP
 For \fBstrftime()\fR and \fBstrftime_l()\fR, see \fBstandards\fR(5).
 .SH SEE ALSO
-.LP
 \fBdate\fR(1), \fBctime\fR(3C), \fBmktime\fR(3C),
 \fBnewlocale\fR(3C), \fBsetlocale\fR(3C), \fBstrptime\fR(3C), \fBtzset\fR(3C),
 \fBuselocale\fR(3C), \fBTIMEZONE\fR(4), \fBzoneinfo\fR(4),
 \fBattributes\fR(5), \fBenviron\fR(5), \fBstandards\fR(5)
 .SH NOTES
-.LP
 The conversion specification for \fB%V\fR was changed in the Solaris 7 release.
 This change was based on the public review draft of the ISO C9x standard at
 that time. Previously, the specification stated that if the week containing 1
