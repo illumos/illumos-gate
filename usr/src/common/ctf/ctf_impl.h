@@ -26,6 +26,7 @@
  */
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_CTF_IMPL_H
@@ -248,6 +249,11 @@ struct ctf_file {
 #define	LCTF_CHILD	0x0002	/* CTF container is a child */
 #define	LCTF_RDWR	0x0004	/* CTF container is writable */
 #define	LCTF_DIRTY	0x0008	/* CTF container has been modified */
+/*
+ * The storage for this CTF container was allocated via ctf_data_alloc()
+ * and libctf should free it with ctf_data_free() on close.
+ */
+#define	LCTF_FREE	0x0010
 
 #define	CTF_ELF_SCN_NAME	".SUNW_ctf"
 

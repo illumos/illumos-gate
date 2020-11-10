@@ -2290,8 +2290,10 @@ ctf_dwarf_convert_function(ctf_cu_t *cup, Dwarf_Die die)
 	    name, ctf_die_offset(cup, die));
 
 	if ((ret = ctf_dwarf_boolean(cup, die, DW_AT_declaration, &b)) != 0) {
-		if (ret != ENOENT)
+		if (ret != ENOENT) {
+			ctf_free(name, strlen(name) + 1);
 			return (ret);
+		}
 	} else if (b != 0) {
 		/*
 		 * GCC7 at least creates empty DW_AT_declarations for functions
@@ -2302,6 +2304,7 @@ ctf_dwarf_convert_function(ctf_cu_t *cup, Dwarf_Die die)
 		 */
 		ctf_dprintf("ignoring declaration of function %s (die %llx)\n",
 		    name, ctf_die_offset(cup, die));
+		ctf_free(name, strlen(name) + 1);
 		return (0);
 	}
 
