@@ -13642,6 +13642,7 @@ f usr/share/man/man3c/iswalpha.3c 0444 root bin
 s usr/share/man/man3c/iswalpha_l.3c=iswalpha.3c
 s usr/share/man/man3c/iswantrl_l.3c=iswalpha.3c
 s usr/share/man/man3c/iswascii.3c=iswalpha.3c
+s usr/share/man/man3c/iswascii_l.3c=iswalpha.3c
 s usr/share/man/man3c/iswblank.3c=iswalpha.3c
 s usr/share/man/man3c/iswblank_l.3c=iswalpha.3c
 s usr/share/man/man3c/iswcntrl.3c=iswalpha.3c
@@ -15397,6 +15398,7 @@ s usr/share/man/man3devid/devid_sizeof.3devid=devid_get.3devid
 s usr/share/man/man3devid/devid_str_decode.3devid=devid_get.3devid
 s usr/share/man/man3devid/devid_str_encode.3devid=devid_get.3devid
 s usr/share/man/man3devid/devid_str_free.3devid=devid_get.3devid
+s usr/share/man/man3devid/devid_str_from_path.3devid=devid_get.3devid
 s usr/share/man/man3devid/devid_valid.3devid=devid_get.3devid
 d usr/share/man/man3devinfo 0755 root bin
 f usr/share/man/man3devinfo/di_binding_name.3devinfo 0444 root bin
@@ -17323,6 +17325,8 @@ f usr/share/man/man3ofmt/ofmt.3ofmt 0444 root bin
 s usr/share/man/man3ofmt/ofmt_close.3ofmt=ofmt.3ofmt
 s usr/share/man/man3ofmt/ofmt_open.3ofmt=ofmt.3ofmt
 s usr/share/man/man3ofmt/ofmt_print.3ofmt=ofmt.3ofmt
+s usr/share/man/man3ofmt/ofmt_print_header.3ofmt=ofmt.3ofmt
+s usr/share/man/man3ofmt/ofmt_set_fs.3ofmt=ofmt.3ofmt
 s usr/share/man/man3ofmt/ofmt_strerror.3ofmt=ofmt.3ofmt
 s usr/share/man/man3ofmt/ofmt_update_winsize.3ofmt=ofmt.3ofmt
 d usr/share/man/man3pam 0755 root bin
@@ -17593,6 +17597,7 @@ f usr/share/man/man3proc/Prelease.3proc 0444 root bin
 f usr/share/man/man3proc/Preopen.3proc 0444 root bin
 f usr/share/man/man3proc/Preset_maps.3proc 0444 root bin
 f usr/share/man/man3proc/Psecflags.3proc 0444 root bin
+s usr/share/man/man3proc/Psecflags_free.3proc=Psecflags.3proc
 f usr/share/man/man3proc/Psetbkpt.3proc 0444 root bin
 f usr/share/man/man3proc/Psetcred.3proc 0444 root bin
 f usr/share/man/man3proc/Psetfault.3proc 0444 root bin
@@ -21334,6 +21339,7 @@ f usr/share/man/man9s/usb_ep_descr.9s 0444 root bin
 f usr/share/man/man9s/usb_ep_ss_comp_descr.9s 0444 root bin
 s usr/share/man/man9s/usb_ep_ss_comp_descr_t.9s=usb_ep_ss_comp_descr.9s
 f usr/share/man/man9s/usb_ep_xdescr.9s 0444 root bin
+s usr/share/man/man9s/usb_ep_xdescr_t.9s=usb_ep_xdescr.9s
 f usr/share/man/man9s/usb_if_descr.9s 0444 root bin
 f usr/share/man/man9s/usb_intr_req.9s 0444 root bin
 s usr/share/man/man9s/usb_intr_req_t.9s=usb_intr_req.9s

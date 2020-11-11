@@ -105,6 +105,7 @@ MANLINKS=	dblk.9s				\
 		mac_register_t.9s		\
 		mblk.9s				\
 		usb_ep_ss_comp_descr_t.9s	\
+		usb_ep_xdescr_t.9s		\
 		usb_bulk_req_t.9s		\
 		usb_bulk_request.9s		\
 		usb_ctrl_req_t.9s		\

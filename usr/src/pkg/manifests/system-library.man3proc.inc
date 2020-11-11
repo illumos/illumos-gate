@@ -216,6 +216,7 @@ link path=usr/share/man/man3proc/Pobjname_resolved.3proc target=Pobjname.3proc
 link path=usr/share/man/man3proc/Ppriv_free.3proc target=Ppriv.3proc
 link path=usr/share/man/man3proc/Pputareg.3proc target=Pgetareg.3proc
 link path=usr/share/man/man3proc/Pread_string.3proc target=Pread.3proc
+link path=usr/share/man/man3proc/Psecflags_free.3proc target=Psecflags.3proc
 link path=usr/share/man/man3proc/Psetsysexit.3proc target=Psetsysentry.3proc
 link path=usr/share/man/man3proc/Pstop.3proc target=Pstopstatus.3proc
 link path=usr/share/man/man3proc/Psymbol_iter_by_addr.3proc \

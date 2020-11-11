@@ -215,6 +215,7 @@ MANLINKS=					\
 		Pobjname_resolved.3proc		\
 		Ppriv_free.3proc		\
 		Pputareg.3proc			\
+		Psecflags_free.3proc		\
 		pr_fstat.3proc			\
 		pr_fstat64.3proc		\
 		pr_getrlimit64.3proc		\
@@ -363,6 +364,8 @@ Pobjname_resolved.3proc		:= LINKSRC = Pobjname.3proc
 Ppriv_free.3proc		:= LINKSRC = Ppriv.3proc
 
 Pread_string.3proc		:= LINKSRC = Pread.3proc
+
+Psecflags_free.3proc		:= LINKSRC = Psecflags.3proc
 
 Punsetflags.3proc		:= LINKSRC = Psetflags.3proc
 

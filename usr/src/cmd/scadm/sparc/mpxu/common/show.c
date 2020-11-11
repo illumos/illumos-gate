@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * show.c: support for scadm show <variable> option (to show the value of
  * a service processor NV variable)
@@ -107,9 +105,10 @@ ADM_Process_show_network()
 		    gettext("SC network configuration is:"),
 		    netParams->ipMode);
 #endif
-	if (strcmp(netParams->ipMode, "dhcp") == 0)
-		(void) printf("%s %s\r\n", gettext("DHCP server:"),
-		    netParams->ipDHCPServer);
+		if (strcmp(netParams->ipMode, "dhcp") == 0) {
+			(void) printf("%s %s\r\n", gettext("DHCP server:"),
+			    netParams->ipDHCPServer);
+		}
 		(void) printf("%s %s\r\n", gettext("IP Address:"),
 		    netParams->ipAddr);
 		(void) printf("%s %s\r\n", gettext("Gateway address:"),

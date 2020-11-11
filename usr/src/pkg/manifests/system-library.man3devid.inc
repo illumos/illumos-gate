@@ -30,4 +30,6 @@ link path=usr/share/man/man3devid/devid_str_encode.3devid \
     target=devid_get.3devid
 link path=usr/share/man/man3devid/devid_str_free.3devid \
     target=devid_get.3devid
+link path=usr/share/man/man3devid/devid_str_from_path.3devid \
+    target=devid_get.3devid
 link path=usr/share/man/man3devid/devid_valid.3devid target=devid_get.3devid

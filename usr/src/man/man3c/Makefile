@@ -952,6 +952,7 @@ MANLINKS=	FD_CLR.3c				\
 		iswalnum_l.3c				\
 		iswalpha_l.3c				\
 		iswascii.3c				\
+		iswascii_l.3c				\
 		iswblank.3c				\
 		iswblank_l.3c				\
 		iswcntrl.3c				\
@@ -1964,6 +1965,7 @@ iswalnum.3c				:= LINKSRC = iswalpha.3c
 iswalnum_l.3c				:= LINKSRC = iswalpha.3c
 iswalpha_l.3c				:= LINKSRC = iswalpha.3c
 iswascii.3c				:= LINKSRC = iswalpha.3c
+iswascii_l.3c				:= LINKSRC = iswalpha.3c
 iswblank.3c				:= LINKSRC = iswalpha.3c
 iswblank_l.3c				:= LINKSRC = iswalpha.3c
 iswcntrl.3c				:= LINKSRC = iswalpha.3c

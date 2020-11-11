@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2015 Joyent, Inc.
 .\"
-.Dd May 11, 2016
+.Dd November 8, 2020
 .Dt PROC_UNCTRL_PSINFO 3PROC
 .Os
 .Sh NAME
@@ -26,7 +26,7 @@
 .Fc
 .Sh DESCRIPTION
 The
-.Fn proc_uncctrl_psinfo
+.Fn proc_unctrl_psinfo
 function walks the process arguments of the
 .Fa psp
 structure (the

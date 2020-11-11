@@ -952,6 +952,7 @@ link path=usr/share/man/man3c/iswalnum.3c target=iswalpha.3c
 link path=usr/share/man/man3c/iswalnum_l.3c target=iswalpha.3c
 link path=usr/share/man/man3c/iswalpha_l.3c target=iswalpha.3c
 link path=usr/share/man/man3c/iswascii.3c target=iswalpha.3c
+link path=usr/share/man/man3c/iswascii_l.3c target=iswalpha.3c
 link path=usr/share/man/man3c/iswblank.3c target=iswalpha.3c
 link path=usr/share/man/man3c/iswblank_l.3c target=iswalpha.3c
 link path=usr/share/man/man3c/iswcntrl.3c target=iswalpha.3c
