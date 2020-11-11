@@ -501,9 +501,7 @@ vm_init(struct vm *vm, bool create)
 	if (create)
 		vm->vrtc = vrtc_init(vm);
 
-	if (create) {
-		vm_inout_init(vm, &vm->ioports);
-	}
+	vm_inout_init(vm, &vm->ioports);
 
 	CPU_ZERO(&vm->active_cpus);
 	CPU_ZERO(&vm->debug_cpus);
@@ -606,15 +604,19 @@ vm_cleanup(struct vm *vm, bool destroy)
 	if (vm->iommu != NULL)
 		iommu_destroy_domain(vm->iommu);
 
-	if (destroy) {
-		vm_inout_cleanup(vm, &vm->ioports);
-	}
+	/*
+	 * Devices which attach their own ioport hooks should be cleaned up
+	 * first so they can tear down those registrations.
+	 */
+	vpmtmr_cleanup(vm->vpmtmr);
+
+	vm_inout_cleanup(vm, &vm->ioports);
 
 	if (destroy)
 		vrtc_cleanup(vm->vrtc);
 	else
 		vrtc_reset(vm->vrtc);
-	vpmtmr_cleanup(vm->vpmtmr);
+
 	vatpit_cleanup(vm->vatpit);
 	vhpet_cleanup(vm->vhpet);
 	vatpic_cleanup(vm->vatpic);
