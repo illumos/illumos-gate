@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*
@@ -1210,6 +1211,43 @@ bhyve_vtop(mdb_tgt_t *tgt, mdb_tgt_as_t as, uintptr_t va, physaddr_t *pa)
 }
 
 /*
+ * t_lookup_by_addr: find symbol information for a given name
+ */
+static int
+bhyve_lookup_by_name(mdb_tgt_t *t, const char *object, const char *name,
+    GElf_Sym *symp, mdb_syminfo_t *sip)
+{
+	int err;
+
+	/*
+	 * Search only the private symbols, as nothing else will be populated.
+	 */
+	err = mdb_gelf_symtab_lookup_by_name(mdb.m_prsym, name, symp,
+	    &sip->sym_id);
+	sip->sym_table = MDB_TGT_PRVSYM;
+	return (err);
+}
+
+/*
+ * t_lookup_by_addr: find symbol information for a given address
+ */
+static int
+bhyve_lookup_by_addr(mdb_tgt_t *tgt, uintptr_t addr, uint_t flags, char *buf,
+    size_t nbytes, GElf_Sym *symp, mdb_syminfo_t *sip)
+{
+	int err;
+
+	/*
+	 * Only the private symbols (created with ::nmadd) will be populated, so
+	 * search against those.
+	 */
+	err = mdb_gelf_symtab_lookup_by_addr(mdb.m_prsym, addr, flags, buf,
+	    nbytes, symp, &sip->sym_id);
+	sip->sym_table = MDB_TGT_PRVSYM;
+	return (err);
+}
+
+/*
  * t_status: get target status
  */
 static int
@@ -1391,8 +1429,8 @@ static const mdb_tgt_ops_t bhyve_ops = {
 	.t_ioread =		bhyve_ioread,
 	.t_iowrite =		bhyve_iowrite,
 	.t_vtop =		bhyve_vtop,
-	.t_lookup_by_name =	(int (*)()) mdb_tgt_notsup,
-	.t_lookup_by_addr =	(int (*)()) mdb_tgt_notsup,
+	.t_lookup_by_name =	bhyve_lookup_by_name,
+	.t_lookup_by_addr =	bhyve_lookup_by_addr,
 	.t_symbol_iter =	(int (*)()) mdb_tgt_notsup,
 	.t_mapping_iter =	(int (*)()) mdb_tgt_notsup,
 	.t_object_iter =	(int (*)()) mdb_tgt_notsup,
