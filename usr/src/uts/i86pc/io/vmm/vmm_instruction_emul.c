@@ -993,11 +993,19 @@ vie_emulate_movs(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 			 */
 			error = vie_mmio_read(vie, vm, vcpuid, gpa, &val,
 			    opsize);
-			if (error)
-				goto done;
 
-			vm_copyout(vm, vcpuid, &val, copyinfo, opsize);
-			vm_copy_teardown(vm, vcpuid, copyinfo, nitems(copyinfo));
+			if (error == 0) {
+				vm_copyout(vm, vcpuid, &val, copyinfo, opsize);
+			}
+			/*
+			 * Regardless of whether the MMIO read was successful or
+			 * not, the copy resources must be cleaned up.
+			 */
+			vm_copy_teardown(vm, vcpuid, copyinfo,
+			    nitems(copyinfo));
+			if (error != 0) {
+				goto done;
+			}
 		} else {
 			/*
 			 * Case (4): read from and write to mmio.
