@@ -35,7 +35,7 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri \
-    value=pkg:/system/microcode/intel@20200616,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/microcode/intel@20201112,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.description value="Microcode for Intel CPUs"
 set name=pkg.summary value="Microcode for Intel CPUs"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -373,6 +373,8 @@ file path=platform/i86pc/ucode/GenuineIntel/00050656-01 group=sys mode=0444 \
     reboot-needed=true
 file path=platform/i86pc/ucode/GenuineIntel/00050657-01 group=sys mode=0444 \
     reboot-needed=true
+file path=platform/i86pc/ucode/GenuineIntel/0005065B-01 group=sys mode=0444 \
+    reboot-needed=true
 file path=platform/i86pc/ucode/GenuineIntel/00050662-10 group=sys mode=0444 \
     reboot-needed=true
 file path=platform/i86pc/ucode/GenuineIntel/00050663-10 group=sys mode=0444 \
@@ -399,6 +401,10 @@ file path=platform/i86pc/ucode/GenuineIntel/000706A8-01 group=sys mode=0444 \
     reboot-needed=true
 file path=platform/i86pc/ucode/GenuineIntel/000706E5-80 group=sys mode=0444 \
     reboot-needed=true
+file path=platform/i86pc/ucode/GenuineIntel/000806A1-10 group=sys mode=0444 \
+    reboot-needed=true
+file path=platform/i86pc/ucode/GenuineIntel/000806C1-80 group=sys mode=0444 \
+    reboot-needed=true
 file path=platform/i86pc/ucode/GenuineIntel/000806E9-10 group=sys mode=0444 \
     reboot-needed=true
 file path=platform/i86pc/ucode/GenuineIntel/000806E9-40 group=sys mode=0444 \
@@ -419,7 +425,15 @@ file path=platform/i86pc/ucode/GenuineIntel/000906EC-02 group=sys mode=0444 \
     reboot-needed=true
 file path=platform/i86pc/ucode/GenuineIntel/000906ED-02 group=sys mode=0444 \
     reboot-needed=true
+file path=platform/i86pc/ucode/GenuineIntel/000A0652-20 group=sys mode=0444 \
+    reboot-needed=true
+file path=platform/i86pc/ucode/GenuineIntel/000A0653-02 group=sys mode=0444 \
+    reboot-needed=true
+file path=platform/i86pc/ucode/GenuineIntel/000A0655-02 group=sys mode=0444 \
+    reboot-needed=true
 file path=platform/i86pc/ucode/GenuineIntel/000A0660-80 group=sys mode=0444 \
+    reboot-needed=true
+file path=platform/i86pc/ucode/GenuineIntel/000A0661-80 group=sys mode=0444 \
     reboot-needed=true
 hardlink path=platform/i86pc/ucode/GenuineIntel/00000F32-04 target=00000F32-01
 hardlink path=platform/i86pc/ucode/GenuineIntel/00000F32-08 target=00000F32-01
@@ -542,6 +556,12 @@ hardlink path=platform/i86pc/ucode/GenuineIntel/00050657-08 target=00050657-01
 hardlink path=platform/i86pc/ucode/GenuineIntel/00050657-10 target=00050657-01
 hardlink path=platform/i86pc/ucode/GenuineIntel/00050657-20 target=00050657-01
 hardlink path=platform/i86pc/ucode/GenuineIntel/00050657-80 target=00050657-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/0005065B-02 target=0005065B-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/0005065B-04 target=0005065B-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/0005065B-08 target=0005065B-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/0005065B-10 target=0005065B-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/0005065B-20 target=0005065B-01
+hardlink path=platform/i86pc/ucode/GenuineIntel/0005065B-80 target=0005065B-01
 hardlink path=platform/i86pc/ucode/GenuineIntel/000506C9-02 target=000506C9-01
 hardlink path=platform/i86pc/ucode/GenuineIntel/000506CA-02 target=000506CA-01
 hardlink path=platform/i86pc/ucode/GenuineIntel/000506E3-04 target=000506E3-02
@@ -558,6 +578,8 @@ hardlink path=platform/i86pc/ucode/GenuineIntel/000906E9-20 target=000906E9-02
 hardlink path=platform/i86pc/ucode/GenuineIntel/000906EA-20 target=000906EA-02
 hardlink path=platform/i86pc/ucode/GenuineIntel/000906EC-20 target=000906EC-02
 hardlink path=platform/i86pc/ucode/GenuineIntel/000906ED-20 target=000906ED-02
+hardlink path=platform/i86pc/ucode/GenuineIntel/000A0653-20 target=000A0653-02
+hardlink path=platform/i86pc/ucode/GenuineIntel/000A0655-20 target=000A0655-02
 license lic_CDDL license=lic_CDDL
 license usr/src/data/ucode/intel/THIRDPARTYLICENSE \
     license=usr/src/data/ucode/intel/THIRDPARTYLICENSE
