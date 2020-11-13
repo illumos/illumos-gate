@@ -307,12 +307,13 @@ main(int argc, char *argv[])
 				if (hrs > 0 && mins > 0) {
 					PRINTF((" %2d:%02d,", hrs, mins));
 				} else {
-					if (hrs > 0)
+					if (hrs > 0) {
 						PRINTF((gettext(
 						    " %d hr(s),"), hrs));
-					if (mins > 0)
+					} else { /* mins can be zero */
 						PRINTF((gettext(
 						    " %d min(s),"), mins));
+					}
 				}
 			}
 		}
