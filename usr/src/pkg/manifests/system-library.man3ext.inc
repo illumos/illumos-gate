@@ -16,7 +16,6 @@
 
 file path=usr/share/man/man3ext/NOTE.3ext
 file path=usr/share/man/man3ext/SUNW_C_GetMechSession.3ext
-file path=usr/share/man/man3ext/auto_ef.3ext
 file path=usr/share/man/man3ext/crypt.3ext
 file path=usr/share/man/man3ext/demangle.3ext
 file path=usr/share/man/man3ext/ecb_crypt.3ext
@@ -59,11 +58,6 @@ link path=usr/share/man/man3ext/SHA512Update.3ext target=sha2.3ext
 link path=usr/share/man/man3ext/SUNW_C_KeyToObject.3ext \
     target=SUNW_C_GetMechSession.3ext
 link path=usr/share/man/man3ext/_NOTE.3ext target=NOTE.3ext
-link path=usr/share/man/man3ext/auto_ef_file.3ext target=auto_ef.3ext
-link path=usr/share/man/man3ext/auto_ef_free.3ext target=auto_ef.3ext
-link path=usr/share/man/man3ext/auto_ef_get_encoding.3ext target=auto_ef.3ext
-link path=usr/share/man/man3ext/auto_ef_get_score.3ext target=auto_ef.3ext
-link path=usr/share/man/man3ext/auto_ef_str.3ext target=auto_ef.3ext
 link path=usr/share/man/man3ext/cbc_crypt.3ext target=ecb_crypt.3ext
 link path=usr/share/man/man3ext/cplus_demangle.3ext target=demangle.3ext
 link path=usr/share/man/man3ext/crypt_close.3ext target=crypt.3ext
