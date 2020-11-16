@@ -775,14 +775,14 @@ Pconvert_file_ctf(file_info_t *fptr)
 	fp = NULL;
 	if (fptr->file_dbgelf != NULL) {
 		fp = ctf_elfconvert(fptr->file_fd, fptr->file_dbgelf, NULL, 1,
-		    0, &err, errmsg, sizeof (errmsg));
+		    1, 0, &err, errmsg, sizeof (errmsg));
 		if (fp == NULL) {
 			dprintf("failed to convert %s: %s\n", fptr->file_pname,
 			    err == ECTF_CONVBKERR ? errmsg : ctf_errmsg(err));
 		}
 	}
 	if (fp == NULL) {
-		fp = ctf_elfconvert(fptr->file_fd, fptr->file_elf, NULL, 1,
+		fp = ctf_elfconvert(fptr->file_fd, fptr->file_elf, NULL, 1, 1,
 		    0, &err, errmsg, sizeof (errmsg));
 		if (fp == NULL) {
 			dprintf("failed to convert %s: %s\n", fptr->file_pname,

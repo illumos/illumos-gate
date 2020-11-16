@@ -100,8 +100,8 @@ ctf_has_c_source(Elf *elf, char *errmsg, size_t errlen)
 }
 
 ctf_file_t *
-ctf_elfconvert(int fd, Elf *elf, const char *label, uint_t nthrs, uint_t flags,
-    int *errp, char *errbuf, size_t errlen)
+ctf_elfconvert(int fd, Elf *elf, const char *label, uint_t bsize, uint_t nthrs,
+    uint_t flags, int *errp, char *errbuf, size_t errlen)
 {
 	int err, i;
 	ctf_file_t *fp = NULL;
