@@ -1301,6 +1301,10 @@ const struct ioc {
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_CHANGE_KEY,		"ZFS_IOC_CHANGE_KEY",
 		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_SET_BOOTENV,		"ZFS_IOC_SET_BOOTENV",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_GET_BOOTENV,		"ZFS_IOC_GET_BOOTENV",
+		"zfs_cmd_t" },
 
 	/* kssl ioctls */
 	{ (uint_t)KSSL_ADD_ENTRY,		"KSSL_ADD_ENTRY",

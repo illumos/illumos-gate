@@ -30,6 +30,7 @@
 /*
  * Copyright 2020 Joyent, Inc.
  * Copyright 2020 Robert Mustacchi
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -206,6 +207,8 @@
 #include <dwarf.h>
 #include <libgen.h>
 #include <workq.h>
+#include <thread.h>
+#include <macros.h>
 #include <errno.h>
 
 #define	DWARF_VERSION_TWO	2
@@ -254,12 +257,14 @@ typedef struct ctf_dwbitf {
  */
 typedef struct ctf_die {
 	Elf		*cu_elf;	/* shared libelf handle */
+	int		cu_fd;		/* shared file descriptor */
 	char		*cu_name;	/* basename of the DIE */
 	ctf_merge_t	*cu_cmh;	/* merge handle */
 	ctf_list_t	cu_vars;	/* List of variables */
 	ctf_list_t	cu_funcs;	/* List of functions */
 	ctf_list_t	cu_bitfields;	/* Bit field members */
 	Dwarf_Debug	cu_dwarf;	/* libdwarf handle */
+	mutex_t		*cu_dwlock;	/* libdwarf lock */
 	Dwarf_Die	cu_cu;		/* libdwarf compilation unit */
 	Dwarf_Off	cu_cuoff;	/* cu's offset */
 	Dwarf_Off	cu_maxoff;	/* maximum offset */
@@ -277,6 +282,7 @@ typedef struct ctf_die {
 	ctf_id_t	cu_longtid;	/* id for a 'long' */
 } ctf_cu_t;
 
+static int ctf_dwarf_init_die(ctf_cu_t *);
 static int ctf_dwarf_offset(ctf_cu_t *, Dwarf_Die, Dwarf_Off *);
 static int ctf_dwarf_convert_die(ctf_cu_t *, Dwarf_Die);
 static int ctf_dwarf_convert_type(ctf_cu_t *, Dwarf_Die, ctf_id_t *, int);
@@ -285,6 +291,13 @@ static int ctf_dwarf_function_count(ctf_cu_t *, Dwarf_Die, ctf_funcinfo_t *,
     boolean_t);
 static int ctf_dwarf_convert_fargs(ctf_cu_t *, Dwarf_Die, ctf_funcinfo_t *,
     ctf_id_t *);
+
+#define	DWARF_LOCK(cup) \
+	if ((cup)->cu_dwlock != NULL) \
+		mutex_enter((cup)->cu_dwlock)
+#define	DWARF_UNLOCK(cup) \
+	if ((cup)->cu_dwlock != NULL) \
+		mutex_exit((cup)->cu_dwlock)
 
 /*
  * This is a generic way to set a CTF Conversion backend error depending on what
@@ -305,7 +318,8 @@ ctf_dwarf_error(ctf_cu_t *cup, ctf_file_t *cfp, int err, const char *fmt, ...)
 	if (err == ENOMEM)
 		return (err);
 
-	ret = snprintf(cup->cu_errbuf, rem, "die %s: ", cup->cu_name);
+	ret = snprintf(cup->cu_errbuf, rem, "die %s: ",
+	    cup->cu_name != NULL ? cup->cu_name : "NULL");
 	if (ret < 0)
 		goto err;
 	off += ret;
@@ -429,7 +443,10 @@ ctf_dwarf_attribute(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half name,
 	int ret;
 	Dwarf_Error derr;
 
-	if ((ret = dwarf_attr(die, name, attrp, &derr)) == DW_DLV_OK)
+	DWARF_LOCK(cup);
+	ret = dwarf_attr(die, name, attrp, &derr);
+	DWARF_UNLOCK(cup);
+	if (ret == DW_DLV_OK)
 		return (0);
 	if (ret == DW_DLV_NO_ENTRY) {
 		*attrp = NULL;
@@ -439,6 +456,14 @@ ctf_dwarf_attribute(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half name,
 	    "failed to get attribute for type: %s\n",
 	    dwarf_errmsg(derr));
 	return (ECTF_CONVBKERR);
+}
+
+static void
+ctf_dwarf_dealloc(ctf_cu_t *cup, Dwarf_Ptr ptr, Dwarf_Unsigned type)
+{
+	DWARF_LOCK(cup);
+	dwarf_dealloc(cup->cu_dwarf, ptr, type);
+	DWARF_UNLOCK(cup);
 }
 
 static int
@@ -451,8 +476,11 @@ ctf_dwarf_ref(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half name, Dwarf_Off *refp)
 	if ((ret = ctf_dwarf_attribute(cup, die, name, &attr)) != 0)
 		return (ret);
 
-	if (dwarf_formref(attr, refp, &derr) == DW_DLV_OK) {
-		dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
+	DWARF_LOCK(cup);
+	ret = dwarf_formref(attr, refp, &derr);
+	DWARF_UNLOCK(cup);
+	if (ret == DW_DLV_OK) {
+		ctf_dwarf_dealloc(cup, attr, DW_DLA_ATTR);
 		return (0);
 	}
 
@@ -474,8 +502,10 @@ ctf_dwarf_refdie(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half name,
 		return (ret);
 
 	off += cup->cu_cuoff;
-	if ((ret = dwarf_offdie(cup->cu_dwarf, off, diep, &derr)) !=
-	    DW_DLV_OK) {
+	DWARF_LOCK(cup);
+	ret = dwarf_offdie(cup->cu_dwarf, off, diep, &derr);
+	DWARF_UNLOCK(cup);
+	if (ret != DW_DLV_OK) {
 		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 		    "failed to get die from offset %" DW_PR_DUu ": %s\n",
 		    off, dwarf_errmsg(derr));
@@ -496,8 +526,11 @@ ctf_dwarf_signed(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half name,
 	if ((ret = ctf_dwarf_attribute(cup, die, name, &attr)) != 0)
 		return (ret);
 
-	if (dwarf_formsdata(attr, valp, &derr) == DW_DLV_OK) {
-		dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
+	DWARF_LOCK(cup);
+	ret = dwarf_formsdata(attr, valp, &derr);
+	DWARF_UNLOCK(cup);
+	if (ret == DW_DLV_OK) {
+		ctf_dwarf_dealloc(cup, attr, DW_DLA_ATTR);
 		return (0);
 	}
 
@@ -518,8 +551,11 @@ ctf_dwarf_unsigned(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half name,
 	if ((ret = ctf_dwarf_attribute(cup, die, name, &attr)) != 0)
 		return (ret);
 
-	if (dwarf_formudata(attr, valp, &derr) == DW_DLV_OK) {
-		dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
+	DWARF_LOCK(cup);
+	ret = dwarf_formudata(attr, valp, &derr);
+	DWARF_UNLOCK(cup);
+	if (ret == DW_DLV_OK) {
+		ctf_dwarf_dealloc(cup, attr, DW_DLA_ATTR);
 		return (0);
 	}
 
@@ -540,8 +576,11 @@ ctf_dwarf_boolean(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half name,
 	if ((ret = ctf_dwarf_attribute(cup, die, name, &attr)) != 0)
 		return (ret);
 
-	if (dwarf_formflag(attr, val, &derr) == DW_DLV_OK) {
-		dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
+	DWARF_LOCK(cup);
+	ret = dwarf_formflag(attr, val, &derr);
+	DWARF_UNLOCK(cup);
+	if (ret == DW_DLV_OK) {
+		ctf_dwarf_dealloc(cup, attr, DW_DLA_ATTR);
 		return (0);
 	}
 
@@ -564,12 +603,15 @@ ctf_dwarf_string(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half name, char **strp)
 	if ((ret = ctf_dwarf_attribute(cup, die, name, &attr)) != 0)
 		return (ret);
 
-	if (dwarf_formstring(attr, &s, &derr) == DW_DLV_OK) {
+	DWARF_LOCK(cup);
+	ret = dwarf_formstring(attr, &s, &derr);
+	DWARF_UNLOCK(cup);
+	if (ret == DW_DLV_OK) {
 		if ((*strp = ctf_strdup(s)) == NULL)
 			ret = ENOMEM;
 		else
 			ret = 0;
-		dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
+		ctf_dwarf_dealloc(cup, attr, DW_DLA_ATTR);
 		return (ret);
 	}
 
@@ -598,17 +640,22 @@ ctf_dwarf_member_location(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Unsigned *valp)
 	enum Dwarf_Form_Class class;
 
 	if ((ret = ctf_dwarf_attribute(cup, die, DW_AT_data_member_location,
-	    &attr)) != 0)
+	    &attr)) != 0) {
 		return (ret);
+	}
 
-	if (dwarf_whatform(attr, &form, &derr) != DW_DLV_OK) {
+	DWARF_LOCK(cup);
+	ret = dwarf_whatform(attr, &form, &derr);
+	DWARF_UNLOCK(cup);
+	if (ret != DW_DLV_OK) {
 		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 		    "failed to get dwarf attribute for for member location: %s",
 		    dwarf_errmsg(derr));
-		dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
+		ctf_dwarf_dealloc(cup, attr, DW_DLA_ATTR);
 		return (ECTF_CONVBKERR);
 	}
 
+	DWARF_LOCK(cup);
 	class = dwarf_get_form_class(cup->cu_vers, DW_AT_data_member_location,
 	    cup->cu_addrsz, form);
 	if (class == DW_FORM_CLASS_CONSTANT) {
@@ -621,12 +668,14 @@ ctf_dwarf_member_location(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Unsigned *valp)
 		 * match, fall through to the normal path.
 		 */
 		if (dwarf_formudata(attr, valp, &derr) == DW_DLV_OK) {
-			dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
+			DWARF_UNLOCK(cup);
+			ctf_dwarf_dealloc(cup, attr, DW_DLA_ATTR);
 			return (0);
 		}
 
 		if (dwarf_formsdata(attr, &sign, &derr) == DW_DLV_OK) {
-			dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
+			DWARF_UNLOCK(cup);
+			ctf_dwarf_dealloc(cup, attr, DW_DLA_ATTR);
 			if (sign < 0) {
 				(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 				    "encountered negative member data "
@@ -638,26 +687,28 @@ ctf_dwarf_member_location(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Unsigned *valp)
 	}
 
 	if (dwarf_loclist(attr, &loc, &locnum, &derr) != DW_DLV_OK) {
+		DWARF_UNLOCK(cup);
 		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 		    "failed to obtain location list for member offset: %s",
 		    dwarf_errmsg(derr));
-		dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
+		ctf_dwarf_dealloc(cup, attr, DW_DLA_ATTR);
 		return (ECTF_CONVBKERR);
 	}
-	dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
+	DWARF_UNLOCK(cup);
+	ctf_dwarf_dealloc(cup, attr, DW_DLA_ATTR);
 
 	if (locnum != 1 || loc->ld_s->lr_atom != DW_OP_plus_uconst) {
 		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 		    "failed to parse location structure for member");
-		dwarf_dealloc(cup->cu_dwarf, loc->ld_s, DW_DLA_LOC_BLOCK);
-		dwarf_dealloc(cup->cu_dwarf, loc, DW_DLA_LOCDESC);
+		ctf_dwarf_dealloc(cup, loc->ld_s, DW_DLA_LOC_BLOCK);
+		ctf_dwarf_dealloc(cup, loc, DW_DLA_LOCDESC);
 		return (ECTF_CONVBKERR);
 	}
 
 	*valp = loc->ld_s->lr_number;
 
-	dwarf_dealloc(cup->cu_dwarf, loc->ld_s, DW_DLA_LOC_BLOCK);
-	dwarf_dealloc(cup->cu_dwarf, loc, DW_DLA_LOCDESC);
+	ctf_dwarf_dealloc(cup, loc->ld_s, DW_DLA_LOC_BLOCK);
+	ctf_dwarf_dealloc(cup, loc, DW_DLA_LOCDESC);
 	return (0);
 }
 
@@ -666,8 +717,12 @@ static int
 ctf_dwarf_offset(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Off *offsetp)
 {
 	Dwarf_Error derr;
+	int ret;
 
-	if (dwarf_dieoffset(die, offsetp, &derr) == DW_DLV_OK)
+	DWARF_LOCK(cup);
+	ret = dwarf_dieoffset(die, offsetp, &derr);
+	DWARF_UNLOCK(cup);
+	if (ret == DW_DLV_OK)
 		return (0);
 
 	(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
@@ -678,12 +733,14 @@ ctf_dwarf_offset(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Off *offsetp)
 
 /* simpler variant for debugging output */
 static Dwarf_Off
-ctf_die_offset(Dwarf_Die die)
+ctf_die_offset(ctf_cu_t *cup, Dwarf_Die die)
 {
 	Dwarf_Off off = -1;
 	Dwarf_Error derr;
 
+	DWARF_LOCK(cup);
 	(void) dwarf_dieoffset(die, &off, &derr);
+	DWARF_UNLOCK(cup);
 	return (off);
 }
 
@@ -691,8 +748,12 @@ static int
 ctf_dwarf_tag(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half *tagp)
 {
 	Dwarf_Error derr;
+	int ret;
 
-	if (dwarf_tag(die, tagp, &derr) == DW_DLV_OK)
+	DWARF_LOCK(cup);
+	ret = dwarf_tag(die, tagp, &derr);
+	DWARF_UNLOCK(cup);
+	if (ret == DW_DLV_OK)
 		return (0);
 
 	(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
@@ -708,7 +769,9 @@ ctf_dwarf_sib(ctf_cu_t *cup, Dwarf_Die base, Dwarf_Die *sibp)
 	int ret;
 
 	*sibp = NULL;
+	DWARF_LOCK(cup);
 	ret = dwarf_siblingof(cup->cu_dwarf, base, sibp, &derr);
+	DWARF_UNLOCK(cup);
 	if (ret == DW_DLV_OK || ret == DW_DLV_NO_ENTRY)
 		return (0);
 
@@ -725,7 +788,9 @@ ctf_dwarf_child(ctf_cu_t *cup, Dwarf_Die base, Dwarf_Die *childp)
 	int ret;
 
 	*childp = NULL;
+	DWARF_LOCK(cup);
 	ret = dwarf_child(base, childp, &derr);
+	DWARF_UNLOCK(cup);
 	if (ret == DW_DLV_OK || ret == DW_DLV_NO_ENTRY)
 		return (0);
 
@@ -1442,14 +1507,15 @@ ctf_dwarf_create_sou(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp,
 		decl = 0;
 	}
 
-	if (decl != 0) {
+	if (decl == B_TRUE) {
 		base = ctf_add_forward(cup->cu_ctfp, isroot, name, kind);
 	} else if (kind == CTF_K_STRUCT) {
 		base = ctf_add_struct(cup->cu_ctfp, isroot, name);
 	} else {
 		base = ctf_add_union(cup->cu_ctfp, isroot, name);
 	}
-	ctf_dprintf("added sou %s (%d) (%d)\n", name, kind, base);
+	ctf_dprintf("added sou %s (%d) (%ld) forward=%d\n",
+	    name, kind, base, decl == B_TRUE);
 	if (name != NULL)
 		ctf_free(name, strlen(name) + 1);
 	if (base == CTF_ERR)
@@ -1545,7 +1611,9 @@ ctf_dwarf_array_upper_bound(ctf_cu_t *cup, Dwarf_Die range, ctf_arinfo_t *ar)
 		}
 	}
 
-	if (dwarf_whatform(attr, &form, &derr) != DW_DLV_OK) {
+	DWARF_LOCK(cup);
+	ret = dwarf_whatform(attr, &form, &derr);
+	if (ret != DW_DLV_OK) {
 		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 		    "failed to get DW_AT_upper_bound attribute form: %s\n",
 		    dwarf_errmsg(derr));
@@ -1606,7 +1674,8 @@ ctf_dwarf_array_upper_bound(ctf_cu_t *cup, Dwarf_Die range, ctf_arinfo_t *ar)
 	ret = ECTF_CONVBKERR;
 
 done:
-	dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
+	DWARF_UNLOCK(cup);
+	ctf_dwarf_dealloc(cup, attr, DW_DLA_ATTR);
 	return (ret);
 }
 
@@ -2219,11 +2288,13 @@ ctf_dwarf_convert_function(ctf_cu_t *cup, Dwarf_Die die)
 	}
 
 	ctf_dprintf("beginning work on function %s (die %llx)\n",
-	    name, ctf_die_offset(die));
+	    name, ctf_die_offset(cup, die));
 
 	if ((ret = ctf_dwarf_boolean(cup, die, DW_AT_declaration, &b)) != 0) {
-		if (ret != ENOENT)
+		if (ret != ENOENT) {
+			ctf_free(name, strlen(name) + 1);
 			return (ret);
+		}
 	} else if (b != 0) {
 		/*
 		 * GCC7 at least creates empty DW_AT_declarations for functions
@@ -2233,7 +2304,8 @@ ctf_dwarf_convert_function(ctf_cu_t *cup, Dwarf_Die die)
 		 * DW_TAG_subprogram that is more complete.
 		 */
 		ctf_dprintf("ignoring declaration of function %s (die %llx)\n",
-		    name, ctf_die_offset(die));
+		    name, ctf_die_offset(cup, die));
+		ctf_free(name, strlen(name) + 1);
 		return (0);
 	}
 
@@ -2347,7 +2419,7 @@ ctf_dwarf_convert_variable(ctf_cu_t *cup, Dwarf_Die die)
 		if ((ret = ctf_dwarf_offset(cup, tdie, &offset)) != 0)
 			return (ret);
 		ctf_dprintf("die 0x%llx DW_AT_specification -> die 0x%llx\n",
-		    ctf_die_offset(die), ctf_die_offset(tdie));
+		    ctf_die_offset(cup, die), ctf_die_offset(cup, tdie));
 		die = tdie;
 	} else if (ret != ENOENT) {
 		return (ret);
@@ -2853,53 +2925,58 @@ ctf_dwarf_conv_weaks(ctf_cu_t *cup)
 	return (ctf_symtab_iter(cup->cu_ctfp, ctf_dwarf_conv_weaks_cb, cup));
 }
 
-/* ARGSUSED */
 static int
 ctf_dwarf_convert_one(void *arg, void *unused)
 {
 	int ret;
 	ctf_file_t *dedup;
 	ctf_cu_t *cup = arg;
+	const char *name = cup->cu_name != NULL ? cup->cu_name : "NULL";
 
-	ctf_dprintf("converting die: %s\n", cup->cu_name);
-	ctf_dprintf("max offset: %x\n", cup->cu_maxoff);
 	VERIFY(cup != NULL);
 
-	ret = ctf_dwarf_convert_die(cup, cup->cu_cu);
-	ctf_dprintf("ctf_dwarf_convert_die (%s) returned %d\n", cup->cu_name,
-	    ret);
-	if (ret != 0) {
+	if ((ret = ctf_dwarf_init_die(cup)) != 0)
 		return (ret);
-	}
+
+	ctf_dprintf("converting die: %s - max offset: %x\n", name,
+	    cup->cu_maxoff);
+
+	ret = ctf_dwarf_convert_die(cup, cup->cu_cu);
+	ctf_dprintf("ctf_dwarf_convert_die (%s) returned %d\n", name,
+	    ret);
+	if (ret != 0)
+		return (ret);
+
 	if (ctf_update(cup->cu_ctfp) != 0) {
 		return (ctf_dwarf_error(cup, cup->cu_ctfp, 0,
 		    "failed to update output ctf container"));
 	}
 
 	ret = ctf_dwarf_fixup_die(cup, B_FALSE);
-	ctf_dprintf("ctf_dwarf_fixup_die (%s) returned %d\n", cup->cu_name,
+	ctf_dprintf("ctf_dwarf_fixup_die (%s, FALSE) returned %d\n", name,
 	    ret);
-	if (ret != 0) {
+	if (ret != 0)
 		return (ret);
-	}
+
 	if (ctf_update(cup->cu_ctfp) != 0) {
 		return (ctf_dwarf_error(cup, cup->cu_ctfp, 0,
 		    "failed to update output ctf container"));
 	}
 
 	ret = ctf_dwarf_fixup_die(cup, B_TRUE);
-	ctf_dprintf("ctf_dwarf_fixup_die (%s) returned %d\n", cup->cu_name,
+	ctf_dprintf("ctf_dwarf_fixup_die (%s, TRUE) returned %d\n", name,
 	    ret);
-	if (ret != 0) {
+	if (ret != 0)
 		return (ret);
-	}
+
 	if (ctf_update(cup->cu_ctfp) != 0) {
 		return (ctf_dwarf_error(cup, cup->cu_ctfp, 0,
 		    "failed to update output ctf container"));
 	}
 
-
 	if ((ret = ctf_dwarf_conv_funcvars(cup)) != 0) {
+		ctf_dprintf("ctf_dwarf_conv_funcvars (%s) returned %d\n",
+		    name, ret);
 		return (ctf_dwarf_error(cup, NULL, ret,
 		    "failed to convert strong functions and variables"));
 	}
@@ -2911,6 +2988,8 @@ ctf_dwarf_convert_one(void *arg, void *unused)
 
 	if (cup->cu_doweaks == B_TRUE) {
 		if ((ret = ctf_dwarf_conv_weaks(cup)) != 0) {
+			ctf_dprintf("ctf_dwarf_conv_weaks (%s) returned %d\n",
+			    name, ret);
 			return (ctf_dwarf_error(cup, NULL, ret,
 			    "failed to convert weak functions and variables"));
 		}
@@ -2921,30 +3000,26 @@ ctf_dwarf_convert_one(void *arg, void *unused)
 		}
 	}
 
-	ctf_phase_dump(cup->cu_ctfp, "pre-dwarf-dedup", cup->cu_name);
+	ctf_phase_dump(cup->cu_ctfp, "pre-dwarf-dedup", name);
 	ctf_dprintf("adding inputs for dedup\n");
 	if ((ret = ctf_merge_add(cup->cu_cmh, cup->cu_ctfp)) != 0) {
 		return (ctf_dwarf_error(cup, NULL, ret,
 		    "failed to add inputs for merge"));
 	}
 
-	ctf_dprintf("starting dedup of %s\n", cup->cu_name);
+	ctf_dprintf("starting dedup of %s\n", name);
 	if ((ret = ctf_merge_dedup(cup->cu_cmh, &dedup)) != 0) {
 		return (ctf_dwarf_error(cup, NULL, ret,
 		    "failed to deduplicate die"));
 	}
+
 	ctf_close(cup->cu_ctfp);
 	cup->cu_ctfp = dedup;
-	ctf_phase_dump(cup->cu_ctfp, "post-dwarf-dedup", cup->cu_name);
+	ctf_phase_dump(cup->cu_ctfp, "post-dwarf-dedup", name);
 
 	return (0);
 }
 
-/*
- * Note, we expect that if we're returning a ctf_file_t from one of the dies,
- * say in the single node case, it's been saved and the entry here has been set
- * to NULL, which ctf_close happily ignores.
- */
 static void
 ctf_dwarf_free_die(ctf_cu_t *cup)
 {
@@ -2953,13 +3028,18 @@ ctf_dwarf_free_die(ctf_cu_t *cup)
 	ctf_dwbitf_t *cdb, *ndb;
 	ctf_dwmap_t *map;
 	void *cookie;
-	Dwarf_Error derr;
 
 	ctf_dprintf("Beginning to free die: %p\n", cup);
+
+	VERIFY3P(cup->cu_elf, !=, NULL);
 	cup->cu_elf = NULL;
+
 	ctf_dprintf("Trying to free name: %p\n", cup->cu_name);
-	if (cup->cu_name != NULL)
+	if (cup->cu_name != NULL) {
 		ctf_free(cup->cu_name, strlen(cup->cu_name) + 1);
+		cup->cu_name = NULL;
+	}
+
 	ctf_dprintf("Trying to free merge handle: %p\n", cup->cu_cmh);
 	if (cup->cu_cmh != NULL) {
 		ctf_merge_fini(cup->cu_cmh);
@@ -2990,35 +3070,25 @@ ctf_dwarf_free_die(ctf_cu_t *cup)
 		ctf_free(cdb, sizeof (ctf_dwbitf_t));
 	}
 
-	ctf_dprintf("Trying to clean up dwarf_t: %p\n", cup->cu_dwarf);
-	if (cup->cu_dwarf != NULL)
-		(void) dwarf_finish(cup->cu_dwarf, &derr);
-	cup->cu_dwarf = NULL;
-	ctf_close(cup->cu_ctfp);
+	if (cup->cu_ctfp != NULL) {
+		ctf_close(cup->cu_ctfp);
+		cup->cu_ctfp = NULL;
+	}
 
 	cookie = NULL;
-	while ((map = avl_destroy_nodes(&cup->cu_map, &cookie)) != NULL) {
+	while ((map = avl_destroy_nodes(&cup->cu_map, &cookie)) != NULL)
 		ctf_free(map, sizeof (ctf_dwmap_t));
-	}
 	avl_destroy(&cup->cu_map);
 	cup->cu_errbuf = NULL;
-}
 
-static void
-ctf_dwarf_free_dies(ctf_cu_t *cdies, int ndies)
-{
-	int i;
-
-	ctf_dprintf("Beginning to free dies\n");
-	for (i = 0; i < ndies; i++) {
-		ctf_dwarf_free_die(&cdies[i]);
+	if (cup->cu_cu != NULL) {
+		ctf_dwarf_dealloc(cup, cup->cu_cu, DW_DLA_DIE);
+		cup->cu_cu = NULL;
 	}
-
-	ctf_free(cdies, sizeof (ctf_cu_t) * ndies);
 }
 
 static int
-ctf_dwarf_count_dies(Dwarf_Debug dw, Dwarf_Error *derr, int *ndies,
+ctf_dwarf_count_dies(Dwarf_Debug dw, Dwarf_Error *derr, uint_t *ndies,
     char *errbuf, size_t errlen)
 {
 	int ret;
@@ -3049,87 +3119,145 @@ ctf_dwarf_count_dies(Dwarf_Debug dw, Dwarf_Error *derr, int *ndies,
 	return (0);
 }
 
+/*
+ * Fill out just enough of each ctf_cu_t for the conversion process to
+ * be able to finish the rest in a (potentially) multithreaded context.
+ */
 static int
-ctf_dwarf_init_die(int fd, Elf *elf, ctf_cu_t *cup, int ndie, char *errbuf,
-    size_t errlen)
+ctf_dwarf_preinit_dies(int fd, Elf *elf, Dwarf_Debug dw,
+    mutex_t *dwlock, Dwarf_Error *derr, uint_t ndies, ctf_cu_t *cdies,
+    uint_t flags, char *errbuf, size_t errlen)
 {
-	int ret;
 	Dwarf_Unsigned hdrlen, abboff, nexthdr;
 	Dwarf_Half addrsz, vers;
 	Dwarf_Unsigned offset = 0;
-	Dwarf_Error derr;
+	uint_t added = 0;
+	int ret, i = 0;
 
-	while ((ret = dwarf_next_cu_header(cup->cu_dwarf, &hdrlen, &vers,
-	    &abboff, &addrsz, &nexthdr, &derr)) != DW_DLV_NO_ENTRY) {
+	while ((ret = dwarf_next_cu_header(dw, &hdrlen, &vers, &abboff,
+	    &addrsz, &nexthdr, derr)) != DW_DLV_NO_ENTRY) {
+		Dwarf_Die cu;
+		ctf_cu_t *cup;
 		char *name;
-		Dwarf_Die cu, child;
 
-		/* Based on the counting above, we should be good to go */
-		VERIFY(ret == DW_DLV_OK);
-		if (ndie > 0) {
-			ndie--;
-			offset = nexthdr;
-			continue;
+		VERIFY3U(i, <, ndies);
+
+		cup = &cdies[i++];
+
+		cup->cu_fd = fd;
+		cup->cu_elf = elf;
+		cup->cu_dwarf = dw;
+		cup->cu_errbuf = errbuf;
+		cup->cu_errlen = errlen;
+		cup->cu_dwarf = dw;
+		if (ndies > 1) {
+			/*
+			 * Only need to lock calls into libdwarf if there are
+			 * multiple CUs.
+			 */
+			cup->cu_dwlock = dwlock;
+			cup->cu_doweaks = B_FALSE;
+		} else {
+			cup->cu_doweaks = B_TRUE;
 		}
 
-		/*
-		 * Compilers are apparently inconsistent. Some emit no DWARF for
-		 * empty files and others emit empty compilation unit.
-		 */
 		cup->cu_voidtid = CTF_ERR;
 		cup->cu_longtid = CTF_ERR;
-		cup->cu_elf = elf;
+		cup->cu_cuoff = offset;
 		cup->cu_maxoff = nexthdr - 1;
 		cup->cu_vers = vers;
 		cup->cu_addrsz = addrsz;
-		cup->cu_ctfp = ctf_fdcreate(fd, &ret);
-		if (cup->cu_ctfp == NULL)
-			return (ret);
 
-		avl_create(&cup->cu_map, ctf_dwmap_comp, sizeof (ctf_dwmap_t),
-		    offsetof(ctf_dwmap_t, cdm_avl));
-		cup->cu_errbuf = errbuf;
-		cup->cu_errlen = errlen;
-		bzero(&cup->cu_vars, sizeof (ctf_list_t));
-		bzero(&cup->cu_funcs, sizeof (ctf_list_t));
-		bzero(&cup->cu_bitfields, sizeof (ctf_list_t));
-
-		if ((ret = ctf_dwarf_die_elfenc(elf, cup, errbuf,
-		    errlen)) != 0)
+		if ((ret = ctf_dwarf_sib(cup, NULL, &cu)) != 0) {
+			ctf_dprintf("cu %d - no cu %d\n", i, ret);
 			return (ret);
-
-		if ((ret = ctf_dwarf_sib(cup, NULL, &cu)) != 0)
-			return (ret);
+		}
 
 		if (cu == NULL) {
-			(void) snprintf(errbuf, errlen,
+			ctf_dprintf("cu %d - no cu data\n", i);
+			(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 			    "file does not contain DWARF data");
 			return (ECTF_CONVNODEBUG);
 		}
-
-		if ((ret = ctf_dwarf_child(cup, cu, &child)) != 0)
-			return (ret);
-
-		if (child == NULL) {
-			(void) snprintf(errbuf, errlen,
-			    "file does not contain DWARF data");
-			return (ECTF_CONVNODEBUG);
-		}
-
-		cup->cu_cuoff = offset;
-		cup->cu_cu = child;
-
-		if ((cup->cu_cmh = ctf_merge_init(fd, &ret)) == NULL)
-			return (ret);
 
 		if (ctf_dwarf_string(cup, cu, DW_AT_name, &name) == 0) {
 			size_t len = strlen(name) + 1;
 			char *b = basename(name);
+
 			cup->cu_name = strdup(b);
 			ctf_free(name, len);
+			if (cup->cu_name == NULL)
+				return (ENOMEM);
 		}
-		break;
+
+		ret = ctf_dwarf_child(cup, cu, &cup->cu_cu);
+		dwarf_dealloc(cup->cu_dwarf, cu, DW_DLA_DIE);
+		if (ret != 0) {
+			ctf_dprintf("cu %d - no child '%s' %d\n",
+			    i, cup->cu_name != NULL ? cup->cu_name : "NULL",
+			    ret);
+			return (ret);
+		}
+
+		if (cup->cu_cu == NULL) {
+			size_t len;
+
+			ctf_dprintf("cu %d - no child data '%s' %d\n",
+			    i, cup->cu_name != NULL ? cup->cu_name : "NULL",
+			    ret);
+			if (cup->cu_name != NULL &&
+			    (len = strlen(cup->cu_name)) > 2 &&
+			    strncmp(".c", &cup->cu_name[len - 2], 2) == 0) {
+				/*
+				 * Missing DEBUG data for a .c file, return an
+				 * error unless this is permitted.
+				 */
+				if (!(flags & CTF_ALLOW_MISSING_DEBUG)) {
+					(void) snprintf(
+					    cup->cu_errbuf, cup->cu_errlen,
+					    "file %s is missing debug info",
+					    cup->cu_name);
+					return (ECTF_CONVNODEBUG);
+				}
+			}
+		} else {
+			added++;
+		}
+
+		ctf_dprintf("Pre-initialised cu %d - '%s'\n", i,
+		    cup->cu_name != NULL ? cup->cu_name : "NULL");
+
+		offset = nexthdr;
 	}
+
+	/*
+	 * If none of the CUs had debug data, return an error.
+	 */
+	if (added == 0)
+		return (ECTF_CONVNODEBUG);
+
+	return (0);
+}
+
+static int
+ctf_dwarf_init_die(ctf_cu_t *cup)
+{
+	int ret;
+
+	cup->cu_ctfp = ctf_fdcreate(cup->cu_fd, &ret);
+	if (cup->cu_ctfp == NULL)
+		return (ret);
+
+	avl_create(&cup->cu_map, ctf_dwmap_comp, sizeof (ctf_dwmap_t),
+	    offsetof(ctf_dwmap_t, cdm_avl));
+
+	if ((ret = ctf_dwarf_die_elfenc(cup->cu_elf, cup,
+	    cup->cu_errbuf, cup->cu_errlen)) != 0) {
+		return (ret);
+	}
+
+	if ((cup->cu_cmh = ctf_merge_init(cup->cu_fd, &ret)) == NULL)
+		return (ret);
 
 	return (0);
 }
@@ -3165,8 +3293,10 @@ c_source_has_debug(const char *file, ctf_cu_t *cus, size_t nr_cus)
 		return (B_TRUE);
 
 	for (size_t i = 0; i < nr_cus; i++) {
-		if (strcmp(basename, cus[i].cu_name) == 0)
+		if (cus[i].cu_name != NULL &&
+		    strcmp(basename, cus[i].cu_name) == 0) {
 			return (B_TRUE);
+		}
 	}
 
 	return (B_FALSE);
@@ -3239,7 +3369,7 @@ ctf_dwarf_check_missing(ctf_cu_t *cus, size_t nr_cus, Elf *elf,
 
 		if (!c_source_has_debug(file, cus, nr_cus)) {
 			(void) snprintf(errmsg, errlen,
-			    "file %s is missing debug info\n", file);
+			    "file %s is missing debug info", file);
 			return (ECTF_CONVNODEBUG);
 		}
 	}
@@ -3247,15 +3377,126 @@ ctf_dwarf_check_missing(ctf_cu_t *cus, size_t nr_cus, Elf *elf,
 	return (0);
 }
 
+static int
+ctf_dwarf_convert_batch(uint_t start, uint_t end, int fd, uint_t nthrs,
+    workq_t *wqp, ctf_cu_t *cdies, ctf_file_t **fpp)
+{
+	ctf_file_t *fpprev = NULL;
+	uint_t i, added;
+	ctf_cu_t *cup;
+	int ret, err;
+
+	ctf_dprintf("Processing CU batch %u - %u\n", start, end - 1);
+
+	added = 0;
+	for (i = start; i < end; i++) {
+		cup = &cdies[i];
+		if (cup->cu_cu == NULL)
+			continue;
+		ctf_dprintf("adding cu %s: %p, %x %x\n",
+		    cup->cu_name != NULL ? cup->cu_name : "NULL",
+		    cup->cu_cu, cup->cu_cuoff, cup->cu_maxoff);
+		if (workq_add(wqp, cup) == -1) {
+			err = errno;
+			goto out;
+		}
+		added++;
+	}
+
+	/*
+	 * No debug data found in this batch, move on to the next.
+	 * NB:	ctf_dwarf_preinit_dies() has already checked that there is at
+	 *	least one CU with debug data present.
+	 */
+	if (added == 0) {
+		err = 0;
+		goto out;
+	}
+
+	ctf_dprintf("Running conversion phase\n");
+
+	/* Run the conversions */
+	ret = workq_work(wqp, ctf_dwarf_convert_one, NULL, &err);
+	if (ret == WORKQ_ERROR) {
+		err = errno;
+		goto out;
+	} else if (ret == WORKQ_UERROR) {
+		ctf_dprintf("internal convert failed: %s\n",
+		    ctf_errmsg(err));
+		goto out;
+	}
+
+	ctf_dprintf("starting merge phase\n");
+
+	ctf_merge_t *cmp = ctf_merge_init(fd, &err);
+	if (cmp == NULL)
+		goto out;
+
+	if ((err = ctf_merge_set_nthreads(cmp, nthrs)) != 0) {
+		ctf_merge_fini(cmp);
+		goto out;
+	}
+
+	/*
+	 * If we have the result of a previous merge then add it as an input to
+	 * the next one.
+	 */
+	if (*fpp != NULL) {
+		ctf_dprintf("adding previous merge CU\n");
+		fpprev = *fpp;
+		*fpp = NULL;
+		if ((err = ctf_merge_add(cmp, fpprev)) != 0) {
+			ctf_merge_fini(cmp);
+			goto out;
+		}
+	}
+
+	ctf_dprintf("adding CUs to merge\n");
+	for (i = start; i < end; i++) {
+		cup = &cdies[i];
+		if (cup->cu_cu == NULL)
+			continue;
+		if ((err = ctf_merge_add(cmp, cup->cu_ctfp)) != 0) {
+			ctf_merge_fini(cmp);
+			*fpp = NULL;
+			goto out;
+		}
+	}
+
+	ctf_dprintf("performing merge\n");
+	err = ctf_merge_merge(cmp, fpp);
+	if (err != 0) {
+		ctf_dprintf("failed merge!\n");
+		*fpp = NULL;
+		ctf_merge_fini(cmp);
+		goto out;
+	}
+
+	ctf_merge_fini(cmp);
+
+	ctf_dprintf("freeing CUs\n");
+	for (i = start; i < end; i++) {
+		cup = &cdies[i];
+		ctf_dprintf("freeing cu %d\n", i);
+		ctf_dwarf_free_die(cup);
+	}
+
+out:
+	ctf_close(fpprev);
+	return (err);
+}
+
 int
-ctf_dwarf_convert(int fd, Elf *elf, uint_t nthrs, uint_t flags,
+ctf_dwarf_convert(int fd, Elf *elf, uint_t bsize, uint_t nthrs, uint_t flags,
     ctf_file_t **fpp, char *errbuf, size_t errlen)
 {
-	int err, ret, ndies, i;
+	int err, ret;
+	uint_t ndies, i;
 	Dwarf_Debug dw;
 	Dwarf_Error derr;
 	ctf_cu_t *cdies = NULL, *cup;
 	workq_t *wqp = NULL;
+	mutex_t dwlock = ERRORCHECKMUTEX;
 
 	*fpp = NULL;
 
@@ -3288,116 +3529,74 @@ ctf_dwarf_convert(int fd, Elf *elf, uint_t nthrs, uint_t flags,
 	if (ndies == 0) {
 		(void) snprintf(errbuf, errlen,
 		    "file does not contain DWARF data\n");
+		(void) dwarf_finish(dw, &derr);
 		return (ECTF_CONVNODEBUG);
 	}
 
-	(void) dwarf_finish(dw, &derr);
 	cdies = ctf_alloc(sizeof (ctf_cu_t) * ndies);
 	if (cdies == NULL) {
+		(void) dwarf_finish(dw, &derr);
 		return (ENOMEM);
 	}
 
 	bzero(cdies, sizeof (ctf_cu_t) * ndies);
 
-	for (i = 0; i < ndies; i++) {
-		cup = &cdies[i];
-		ret = dwarf_elf_init(elf, DW_DLC_READ, NULL, NULL,
-		    &cup->cu_dwarf, &derr);
-		if (ret != 0) {
-			ctf_free(cdies, sizeof (ctf_cu_t) * ndies);
-			(void) snprintf(errbuf, errlen,
-			    "failed to initialize DWARF: %s\n",
-			    dwarf_errmsg(derr));
-			return (ECTF_CONVBKERR);
-		}
-
-		err = ctf_dwarf_init_die(fd, elf, cup, i, errbuf, errlen);
-		if (err != 0)
-			goto out;
-
-		cup->cu_doweaks = ndies > 1 ? B_FALSE : B_TRUE;
+	if ((err = ctf_dwarf_preinit_dies(fd, elf, dw, &dwlock, &derr,
+	    ndies, cdies, flags, errbuf, errlen)) != 0) {
+		goto out;
 	}
 
 	if (!(flags & CTF_ALLOW_MISSING_DEBUG) &&
 	    (err = ctf_dwarf_check_missing(cdies, ndies,
-	    elf, errbuf, errlen)) != 0)
+	    elf, errbuf, errlen)) != 0) {
 		goto out;
+	}
+
+	/* Only one cu, no merge required */
+	if (ndies == 1) {
+		cup = cdies;
+
+		if ((err = ctf_dwarf_convert_one(cup, NULL)) != 0)
+			goto out;
+
+		*fpp = cup->cu_ctfp;
+		cup->cu_ctfp = NULL;
+		ctf_dwarf_free_die(cup);
+		goto success;
+	}
 
 	/*
-	 * If we only have one compilation unit, there's no reason to use
-	 * multiple threads, even if the user requested them. After all, they
-	 * just gave us an upper bound.
+	 * There's no need to have either more threads or a batch size larger
+	 * than the total number of dies, even if the user requested them.
 	 */
-	if (ndies == 1)
-		nthrs = 1;
+	nthrs = min(ndies, nthrs);
+	bsize = min(ndies, bsize);
 
 	if (workq_init(&wqp, nthrs) == -1) {
 		err = errno;
 		goto out;
 	}
 
-	for (i = 0; i < ndies; i++) {
-		cup = &cdies[i];
-		ctf_dprintf("adding cu %s: %p, %x %x\n", cup->cu_name,
-		    cup->cu_cu, cup->cu_cuoff, cup->cu_maxoff);
-		if (workq_add(wqp, cup) == -1) {
-			err = errno;
-			goto out;
-		}
-	}
-
-	ret = workq_work(wqp, ctf_dwarf_convert_one, NULL, &err);
-	if (ret == WORKQ_ERROR) {
-		err = errno;
-		goto out;
-	} else if (ret == WORKQ_UERROR) {
-		ctf_dprintf("internal convert failed: %s\n",
-		    ctf_errmsg(err));
-		goto out;
-	}
-
-	ctf_dprintf("Determining next phase: have %d CUs\n", ndies);
-	if (ndies != 1) {
-		ctf_merge_t *cmp;
-
-		cmp = ctf_merge_init(fd, &err);
-		if (cmp == NULL)
-			goto out;
-
-		ctf_dprintf("setting threads\n");
-		if ((err = ctf_merge_set_nthreads(cmp, nthrs)) != 0) {
-			ctf_merge_fini(cmp);
-			goto out;
-		}
-
-		for (i = 0; i < ndies; i++) {
-			cup = &cdies[i];
-			if ((err = ctf_merge_add(cmp, cup->cu_ctfp)) != 0) {
-				ctf_merge_fini(cmp);
-				goto out;
-			}
-		}
-
-		ctf_dprintf("performing merge\n");
-		err = ctf_merge_merge(cmp, fpp);
+	/*
+	 * In order to avoid exhausting memory limits when converting files
+	 * with a large number of dies, we process them in batches.
+	 */
+	for (i = 0; i < ndies; i += bsize) {
+		err = ctf_dwarf_convert_batch(i, min(i + bsize, ndies),
+		    fd, nthrs, wqp, cdies, fpp);
 		if (err != 0) {
-			ctf_dprintf("failed merge!\n");
 			*fpp = NULL;
-			ctf_merge_fini(cmp);
 			goto out;
 		}
-		ctf_merge_fini(cmp);
-		err = 0;
-		ctf_dprintf("successfully converted!\n");
-	} else {
-		err = 0;
-		*fpp = cdies->cu_ctfp;
-		cdies->cu_ctfp = NULL;
-		ctf_dprintf("successfully converted!\n");
 	}
+
+success:
+	err = 0;
+	ctf_dprintf("successfully converted!\n");
 
 out:
+	(void) dwarf_finish(dw, &derr);
 	workq_fini(wqp);
-	ctf_dwarf_free_dies(cdies, ndies);
+	ctf_free(cdies, sizeof (ctf_cu_t) * ndies);
 	return (err);
 }

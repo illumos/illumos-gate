@@ -993,11 +993,19 @@ vie_emulate_movs(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 			 */
 			error = vie_mmio_read(vie, vm, vcpuid, gpa, &val,
 			    opsize);
-			if (error)
-				goto done;
 
-			vm_copyout(vm, vcpuid, &val, copyinfo, opsize);
-			vm_copy_teardown(vm, vcpuid, copyinfo, nitems(copyinfo));
+			if (error == 0) {
+				vm_copyout(vm, vcpuid, &val, copyinfo, opsize);
+			}
+			/*
+			 * Regardless of whether the MMIO read was successful or
+			 * not, the copy resources must be cleaned up.
+			 */
+			vm_copy_teardown(vm, vcpuid, copyinfo,
+			    nitems(copyinfo));
+			if (error != 0) {
+				goto done;
+			}
 		} else {
 			/*
 			 * Case (4): read from and write to mmio.
@@ -2022,7 +2030,8 @@ vie_emulate_mmio(struct vie *vie, struct vm *vm, int vcpuid)
 }
 
 static int
-vie_emulate_inout_port(struct vie *vie, struct vm *vm, int vcpuid)
+vie_emulate_inout_port(struct vie *vie, struct vm *vm, int vcpuid,
+    uint32_t *eax)
 {
 	uint32_t mask, val;
 	bool in;
@@ -2032,18 +2041,19 @@ vie_emulate_inout_port(struct vie *vie, struct vm *vm, int vcpuid)
 	in = (vie->inout.flags & INOUT_IN) != 0;
 
 	if (!in) {
-		val = vie->inout.eax & mask;
+		val = *eax & mask;
 	}
 
 	if (vie->inout_req_state != VR_DONE) {
 		err = vm_ioport_access(vm, vcpuid, in, vie->inout.port,
 		    vie->inout.bytes, &val);
+		val &= mask;
 	} else {
 		/*
 		 * This port access was handled in userspace and the result was
 		 * injected in to be handled now.
 		 */
-		val = vie->inout_req_val;
+		val = vie->inout_req_val & mask;
 		vie->inout_req_state = VR_NONE;
 		err = 0;
 	}
@@ -2057,11 +2067,7 @@ vie_emulate_inout_port(struct vie *vie, struct vm *vm, int vcpuid)
 	}
 
 	if (in) {
-		val &= mask;
-		val |= (vie->inout.eax & ~mask);
-		err = vm_set_register(vm, vcpuid, VM_REG_GUEST_RAX, val);
-		KASSERT(err == 0, ("emulate_ioport: error %d setting guest "
-		    "rax register", err));
+		*eax = (*eax & ~mask) | val;
 	}
 	return (0);
 }
@@ -2156,7 +2162,7 @@ vie_emulate_inout_str(struct vie *vie, struct vm *vm, int vcpuid)
 		vm_copyin(vm, vcpuid, copyinfo, &vie->inout.eax, bytes);
 	}
 
-	err = vie_emulate_inout_port(vie, vm, vcpuid);
+	err = vie_emulate_inout_port(vie, vm, vcpuid, &vie->inout.eax);
 
 	if (err == 0 && in) {
 		vm_copyout(vm, vcpuid, &vie->inout.eax, copyinfo, bytes);
@@ -2217,7 +2223,16 @@ vie_emulate_inout(struct vie *vie, struct vm *vm, int vcpuid)
 			return (EINVAL);
 		}
 
-		err = vie_emulate_inout_port(vie, vm, vcpuid);
+		err = vie_emulate_inout_port(vie, vm, vcpuid, &vie->inout.eax);
+		if (err == 0 && (vie->inout.flags & INOUT_IN) != 0) {
+			/*
+			 * With the inX access now a success, the result needs
+			 * to be stored in the guest %rax.
+			 */
+			err = vm_set_register(vm, vcpuid, VM_REG_GUEST_RAX,
+			    vie->inout.eax);
+			VERIFY0(err);
+		}
 	} else {
 		vie->status &= ~VIES_REPEAT;
 		err = vie_emulate_inout_str(vie, vm, vcpuid);

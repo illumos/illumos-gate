@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2020 by Delphix. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>
@@ -397,7 +397,7 @@ zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *buf, size_t len,
  * Assuming bootfs is a valid dataset name.
  */
 static boolean_t
-bootfs_name_valid(const char *pool, char *bootfs)
+bootfs_name_valid(const char *pool, const char *bootfs)
 {
 	int len = strlen(pool);
 	if (bootfs[0] == '\0')
@@ -4412,6 +4412,38 @@ zpool_obj_to_path(zpool_handle_t *zhp, uint64_t dsobj, uint64_t obj,
 		(void) snprintf(pathname, len, "%s:<0x%llx>", dsname, obj);
 	}
 	free(mntpnt);
+}
+
+int
+zpool_set_bootenv(zpool_handle_t *zhp, const nvlist_t *envmap)
+{
+	int error = lzc_set_bootenv(zhp->zpool_name, envmap);
+	if (error != 0) {
+		(void) zpool_standard_error_fmt(zhp->zpool_hdl, error,
+		    dgettext(TEXT_DOMAIN,
+		    "error setting bootenv in pool '%s'"), zhp->zpool_name);
+	}
+
+	return (error);
+}
+
+int
+zpool_get_bootenv(zpool_handle_t *zhp, nvlist_t **nvlp)
+{
+	nvlist_t *nvl;
+	int error;
+
+	nvl = NULL;
+	error = lzc_get_bootenv(zhp->zpool_name, &nvl);
+	if (error != 0) {
+		(void) zpool_standard_error_fmt(zhp->zpool_hdl, error,
+		    dgettext(TEXT_DOMAIN,
+		    "error getting bootenv in pool '%s'"), zhp->zpool_name);
+	} else {
+		*nvlp = nvl;
+	}
+
+	return (error);
 }
 
 /*

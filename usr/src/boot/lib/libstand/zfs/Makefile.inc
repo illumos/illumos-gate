@@ -23,6 +23,7 @@ SRCS +=		$(SRC)/common/list/list.c
 OBJS +=		zfs.o
 OBJS +=		gzip.o
 OBJS +=		edonr.o
+OBJS +=		nvlist.o
 OBJS +=		skein.o
 OBJS +=		skein_iv.o
 OBJS +=		skein_block.o
@@ -30,6 +31,8 @@ OBJS +=		list.o
 
 zfs.o := CPPFLAGS +=	-I../../common
 zfs.o := CPPFLAGS +=	-I../../../cddl/boot/zfs -I$(LZ4)
+zfs.o := CPPFLAGS +=	-I$(SRC)/uts/common/fs/zfs
+nvlist.o := CPPFLAGS +=	-I../../common -I../../../cddl/boot/zfs
 
 # Do not unroll skein loops, reduce code size
 skein_block.o := CPPFLAGS +=	-DSKEIN_LOOP=111

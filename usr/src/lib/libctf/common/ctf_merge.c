@@ -129,10 +129,11 @@ ctf_merge_diffcb(ctf_file_t *ifp, ctf_id_t iid, boolean_t same, ctf_file_t *ofp,
 {
 	ctf_merge_types_t *cmp = arg;
 	ctf_merge_tinfo_t *cmt = cmp->cm_tmap;
+	uint_t kind;
 
 	if (same == B_TRUE) {
 		if (ctf_type_kind(ifp, iid) == CTF_K_FORWARD &&
-		    ctf_type_kind(ofp, oid) != CTF_K_FORWARD) {
+		    (kind = ctf_type_kind(ofp, oid)) != CTF_K_FORWARD) {
 			VERIFY(cmt[oid].cmt_map == 0);
 
 			/*
@@ -153,8 +154,8 @@ ctf_merge_diffcb(ctf_file_t *ifp, ctf_id_t iid, boolean_t same, ctf_file_t *ofp,
 
 			cmt[oid].cmt_map = iid;
 			cmt[oid].cmt_forward = B_TRUE;
-			ctf_dprintf("merge diff forward mapped %d->%d\n", oid,
-			    iid);
+			ctf_dprintf("merge diff forward mapped %ld->%ld (%u)\n",
+			    oid, iid, kind);
 			return;
 		}
 
@@ -421,7 +422,7 @@ ctf_merge_add_func(ctf_merge_types_t *cmp, ctf_id_t id)
 }
 
 static int
-ctf_merge_add_forward(ctf_merge_types_t *cmp, ctf_id_t id)
+ctf_merge_add_forward(ctf_merge_types_t *cmp, ctf_id_t id, uint_t kind)
 {
 	int ret, flags;
 	const ctf_type_t *tp;
@@ -434,14 +435,7 @@ ctf_merge_add_forward(ctf_merge_types_t *cmp, ctf_id_t id)
 	else
 		flags = CTF_ADD_NONROOT;
 
-	/*
-	 * ctf_add_forward tries to check to see if a given forward already
-	 * exists in one of its hash tables.  If we're here then we know that we
-	 * have a forward in a container that isn't present in another.
-	 * Therefore, we choose a token hash table to satisfy the API choice
-	 * here.
-	 */
-	ret = ctf_add_forward(cmp->cm_out, flags, name, CTF_K_STRUCT);
+	ret = ctf_add_forward(cmp->cm_out, flags, name, kind);
 	if (ret == CTF_ERR)
 		return (CTF_ERR);
 
@@ -494,19 +488,32 @@ ctf_merge_add_sou(ctf_merge_types_t *cmp, ctf_id_t id, boolean_t forward)
 	else
 		suid = ctf_add_union(cmp->cm_out, flags, name);
 
+	ctf_dprintf("added sou \"%s\" as (%d) %d->%d\n", name, kind, id, suid);
+
 	if (suid == CTF_ERR)
 		return (suid);
 
-	/*
-	 * If this is a forward reference then its mapping should already
-	 * exist.
-	 */
 	if (forward == B_FALSE) {
 		VERIFY(cmp->cm_tmap[id].cmt_map == 0);
 		cmp->cm_tmap[id].cmt_map = suid;
-		ctf_dprintf("added sou \"%s\" as (%d) %d->%d\n", name, kind, id,
-		    suid);
 	} else {
+		/*
+		 * If this is a forward reference then its mapping should
+		 * already exist.
+		 */
+		if (cmp->cm_tmap[id].cmt_map != suid) {
+			ctf_dprintf(
+			    "mismatch sou \"%s\" as (%d) %d->%d (exp %d)\n",
+			    name, kind, id, suid, cmp->cm_tmap[id].cmt_map);
+			ctf_hash_dump("src structs",
+			    &cmp->cm_src->ctf_structs, cmp->cm_src);
+			ctf_hash_dump("src unions",
+			    &cmp->cm_src->ctf_unions, cmp->cm_src);
+			ctf_hash_dump("out structs",
+			    &cmp->cm_out->ctf_structs, cmp->cm_out);
+			ctf_hash_dump("out unions",
+			    &cmp->cm_out->ctf_unions, cmp->cm_out);
+		}
 		VERIFY(cmp->cm_tmap[id].cmt_map == suid);
 	}
 	cmp->cm_tmap[id].cmt_fixup = B_TRUE;
@@ -551,9 +558,27 @@ ctf_merge_add_type(ctf_merge_types_t *cmp, ctf_id_t id)
 	case CTF_K_FUNCTION:
 		ret = ctf_merge_add_func(cmp, id);
 		break;
-	case CTF_K_FORWARD:
-		ret = ctf_merge_add_forward(cmp, id);
+	case CTF_K_FORWARD: {
+		const ctf_type_t *tp;
+		uint_t kind;
+
+		tp = LCTF_INDEX_TO_TYPEPTR(cmp->cm_src, id);
+
+		/*
+		 * For forward declarations, ctt_type is the CTF_K_*
+		 * kind for the tag. Older versions of the CTF tools may
+		 * not have filled this in so if ctt_type is unknown or
+		 * invalid, treat it as a struct. This mirrors the logic in
+		 * ctf_bufopen().
+		 */
+
+		kind = tp->ctt_type;
+		if (kind == CTF_K_UNKNOWN || kind >= CTF_K_MAX)
+			kind = CTF_K_STRUCT;
+
+		ret = ctf_merge_add_forward(cmp, id, kind);
 		break;
+	}
 	case CTF_K_STRUCT:
 	case CTF_K_UNION:
 		ret = ctf_merge_add_sou(cmp, id, B_FALSE);
@@ -690,6 +715,7 @@ ctf_merge_common(ctf_merge_types_t *cmp)
 	/* Pass 1 */
 	for (i = 1; i <= cmp->cm_src->ctf_typemax; i++) {
 		if (cmp->cm_tmap[i].cmt_forward == B_TRUE) {
+			ctf_dprintf("Forward %d\n", i);
 			ret = ctf_merge_add_sou(cmp, i, B_TRUE);
 			if (ret != 0) {
 				return (ret);
@@ -1566,11 +1592,11 @@ ctf_dedup_cb(ctf_file_t *ifp, ctf_id_t iid, boolean_t same, ctf_file_t *ofp,
 		while (cmt[oid].cmt_missing == B_FALSE)
 			oid = cmt[oid].cmt_map;
 		cmt[iid].cmt_map = oid;
-		ctf_dprintf("%d->%d \n", iid, oid);
+		ctf_dprintf("dedup %d->%d \n", iid, oid);
 	} else {
 		VERIFY(cmt[iid].cmt_map == 0);
 		cmt[iid].cmt_missing = B_TRUE;
-		ctf_dprintf("%d is missing\n", iid);
+		ctf_dprintf("dedup %d is missing\n", iid);
 	}
 }
 

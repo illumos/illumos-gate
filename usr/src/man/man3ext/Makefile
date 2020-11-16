@@ -20,7 +20,6 @@ MANSECT=	3ext
 
 MANFILES=	NOTE.3ext			\
 		SUNW_C_GetMechSession.3ext	\
-		auto_ef.3ext			\
 		crypt.3ext			\
 		demangle.3ext			\
 		ecb_crypt.3ext			\
@@ -63,11 +62,6 @@ MANLINKS=	DES_FAILED.3ext			\
 		SHA512Update.3ext		\
 		SUNW_C_KeyToObject.3ext		\
 		_NOTE.3ext			\
-		auto_ef_file.3ext		\
-		auto_ef_free.3ext		\
-		auto_ef_get_encoding.3ext	\
-		auto_ef_get_score.3ext		\
-		auto_ef_str.3ext		\
 		cbc_crypt.3ext			\
 		cplus_demangle.3ext		\
 		crypt_close.3ext		\
@@ -131,12 +125,6 @@ MANLINKS=	DES_FAILED.3ext			\
 _NOTE.3ext			:= LINKSRC = NOTE.3ext
 
 SUNW_C_KeyToObject.3ext		:= LINKSRC = SUNW_C_GetMechSession.3ext
-
-auto_ef_file.3ext		:= LINKSRC = auto_ef.3ext
-auto_ef_free.3ext		:= LINKSRC = auto_ef.3ext
-auto_ef_get_encoding.3ext	:= LINKSRC = auto_ef.3ext
-auto_ef_get_score.3ext		:= LINKSRC = auto_ef.3ext
-auto_ef_str.3ext		:= LINKSRC = auto_ef.3ext
 
 crypt_close.3ext		:= LINKSRC = crypt.3ext
 des_crypt.3ext			:= LINKSRC = crypt.3ext

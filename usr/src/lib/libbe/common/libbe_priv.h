@@ -142,6 +142,12 @@ struct be_defaults {
 	char		be_deflt_bename_starts_with[ZFS_MAX_DATASET_NAME_LEN];
 };
 
+typedef enum be_nextboot_state {
+	BE_NEXTBOOT_IGNORE = -1,
+	BE_NEXTBOOT_SET,
+	BE_NEXTBOOT_UNSET
+} be_nextboot_state_t;
+
 /* Library globals */
 extern libzfs_handle_t *g_zfs;
 extern boolean_t do_print;
@@ -201,7 +207,7 @@ int zfs_err_to_be_err(libzfs_handle_t *);
 int errno_to_be_err(int);
 
 /* be_activate.c */
-int _be_activate(char *);
+int _be_activate(char *, be_nextboot_state_t);
 int be_activate_current_be(void);
 boolean_t be_is_active_on_boot(char *);
 

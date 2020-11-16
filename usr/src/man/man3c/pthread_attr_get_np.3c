@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd November 8, 2020
+.Dd November 10, 2020
 .Dt PTHREAD_ATTR_GET_NP 3C
 .Os
 .Sh NAME
@@ -100,13 +100,11 @@ For more information on the guard size of a thread and its purpose, see
 .Sh RETURN VALUES
 Upon successful completion, the
 .Fn pthread_attr_get_np
-and
-.Fn pthread_getattr_np
-functions return
+function returns
 .Sy 0 .
 Otherwise, an error number is returned to indicate the error.
 .Sh EXAMPLES
-The following program demonstrates how to use these functions to get
+The following program demonstrates how to use this function to get
 the location and stack size of a newly created thread.
 .Bd -literal
 #include <assert.h>

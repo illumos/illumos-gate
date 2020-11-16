@@ -78,6 +78,7 @@ vpmtmr_init(struct vm *vm)
 	struct bintime bt;
 
 	vpmtmr = malloc(sizeof(struct vpmtmr), M_VPMTMR, M_WAITOK | M_ZERO);
+	vpmtmr->vm = vm;
 	vpmtmr->baseuptime = sbinuptime();
 	vpmtmr->baseval = 0;
 
@@ -87,9 +88,35 @@ vpmtmr_init(struct vm *vm)
 	return (vpmtmr);
 }
 
+static int
+vpmtmr_detach_ioport(struct vpmtmr *vpmtmr)
+{
+	if (vpmtmr->io_cookie != NULL) {
+		ioport_handler_t old_func;
+		void *old_arg;
+		int err;
+
+		err = vm_ioport_detach(vpmtmr->vm, &vpmtmr->io_cookie,
+		    &old_func, &old_arg);
+		if (err != 0) {
+			return (err);
+		}
+
+		ASSERT3P(old_func, ==, vpmtmr_handler);
+		ASSERT3P(old_arg, ==, vpmtmr);
+		ASSERT3P(vpmtmr->io_cookie, ==, NULL);
+		vpmtmr->io_port = 0;
+	}
+	return (0);
+}
+
 void
 vpmtmr_cleanup(struct vpmtmr *vpmtmr)
 {
+	int err;
+
+	err = vpmtmr_detach_ioport(vpmtmr);
+	VERIFY3P(err, ==, 0);
 
 	free(vpmtmr, M_VPMTMR);
 }
@@ -101,23 +128,13 @@ vpmtmr_set_location(struct vm *vm, uint16_t ioport)
 	int err;
 
 	if (vpmtmr->io_cookie != NULL) {
-		ioport_handler_t old_func;
-		void *old_arg;
-
 		if (vpmtmr->io_port == ioport) {
 			/* already attached in the right place */
 			return (0);
 		}
 
-		err = vm_ioport_detach(vm, &vpmtmr->io_cookie, &old_func,
-		    &old_arg);
-		if (err != 0) {
-			return (err);
-		}
-
-		ASSERT3P(old_func, ==, vpmtmr_handler);
-		ASSERT3P(old_arg, ==, vpmtmr);
-		vpmtmr->io_port = 0;
+		err = vpmtmr_detach_ioport(vpmtmr);
+		VERIFY3P(err, ==, 0);
 	}
 	err = vm_ioport_attach(vm, ioport, vpmtmr_handler, vpmtmr,
 	    &vpmtmr->io_cookie);

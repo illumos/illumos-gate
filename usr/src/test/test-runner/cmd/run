@@ -15,6 +15,7 @@
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
 # Copyright 2019 Joyent, Inc.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 from __future__ import print_function
@@ -114,13 +115,13 @@ class Result(object):
             self.result = 'KILLED'
             Result.runresults['KILLED'] += 1
             retcode = 2;
-        elif self.returncode is 0:
+        elif self.returncode == 0:
             self.result = 'PASS'
             Result.runresults['PASS'] += 1
-        elif self.returncode is 3 or self.returncode is 4:
+        elif self.returncode == 3 or self.returncode == 4:
             self.result = 'SKIP'
             Result.runresults['SKIP'] += 1
-        elif self.returncode is not 0:
+        elif self.returncode != 0:
             self.result = 'FAIL'
             Result.runresults['FAIL'] += 1
             retcode = 1;
@@ -335,7 +336,7 @@ class Cmd(object):
         # line summary will only be printed in the logfile for failures.
         if not options.quiet:
             logger.info('%s%s%s' % (msga, pad, msgb))
-        elif self.result.result is not 'PASS':
+        elif self.result.result != 'PASS':
             logger.info('%s%s%s' % (msga, pad, msgb))
         else:
             logger.debug('%s%s%s' % (msga, pad, msgb))
@@ -431,7 +432,7 @@ class Test(Cmd):
         cont = True
         if len(pretest.pathname):
             pretest.run(options)
-            cont = pretest.result.result is 'PASS'
+            cont = pretest.result.result == 'PASS'
             pretest.log(logger, options)
 
         if cont:
@@ -506,7 +507,7 @@ class TestGroup(Test):
         self.tests[:] = [f for f in self.tests if
           verify_file(os.path.join(self.pathname, f))]
 
-        return len(self.tests) is not 0
+        return len(self.tests) != 0
 
     def run(self, logger, options):
         """
@@ -524,7 +525,7 @@ class TestGroup(Test):
         cont = True
         if len(pretest.pathname):
             pretest.run(options)
-            cont = pretest.result.result is 'PASS'
+            cont = pretest.result.result == 'PASS'
             pretest.log(logger, options)
 
         for fname in self.tests:
@@ -742,7 +743,7 @@ class TestRun(object):
         testlogger = logging.getLogger(__name__)
         testlogger.setLevel(logging.DEBUG)
 
-        if options.cmd is not 'wrconfig':
+        if options.cmd != 'wrconfig':
             try:
                 old = os.umask(0)
                 os.makedirs(self.outputdir, mode=0o777)
@@ -780,12 +781,12 @@ class TestRun(object):
             self.testgroups[testgroup].run(self.logger, options)
 
     def summary(self):
-        if Result.total is 0:
+        if Result.total == 0:
             return
 
         print('\nResults Summary')
         for key in list(Result.runresults.keys()):
-            if Result.runresults[key] is not 0:
+            if Result.runresults[key] != 0:
                 print('%s\t% 4d' % (key, Result.runresults[key]))
 
         m, s = divmod(time() - self.starttime, 60)
@@ -841,7 +842,7 @@ def verify_user(user, logger):
 
     p = Popen(testcmd)
     p.wait()
-    if p.returncode is not 0:
+    if p.returncode != 0:
         logger.info("Warning: user '%s' cannot use passwordless sudo.", user)
         return False
     else:
@@ -877,16 +878,16 @@ def fail(retstr, ret=1):
 def options_cb(option, opt_str, value, parser):
     path_options = ['runfile', 'outputdir', 'template']
 
-    if option.dest is 'runfile' and '-w' in parser.rargs or \
-            option.dest is 'template' and '-c' in parser.rargs:
+    if option.dest == 'runfile' and '-w' in parser.rargs or \
+            option.dest == 'template' and '-c' in parser.rargs:
         fail('-c and -w are mutually exclusive.')
 
     if opt_str in parser.rargs:
         fail('%s may only be specified once.' % opt_str)
 
-    if option.dest is 'runfile':
+    if option.dest == 'runfile':
         parser.values.cmd = 'rdconfig'
-    if option.dest is 'template':
+    if option.dest == 'template':
         parser.values.cmd = 'wrconfig'
 
     setattr(parser.values, option.dest, value)
@@ -946,11 +947,11 @@ def main():
     options = parse_args()
     testrun = TestRun(options)
 
-    if options.cmd is 'runtests':
+    if options.cmd == 'runtests':
         find_tests(testrun, options)
-    elif options.cmd is 'rdconfig':
+    elif options.cmd == 'rdconfig':
         testrun.read(testrun.logger, options)
-    elif options.cmd is 'wrconfig':
+    elif options.cmd == 'wrconfig':
         find_tests(testrun, options)
         testrun.write(options)
         exit(0)

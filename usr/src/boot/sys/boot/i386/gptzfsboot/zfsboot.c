@@ -24,6 +24,7 @@
 #include <sys/reboot.h>
 #include <sys/queue.h>
 #include <sys/multiboot.h>
+#include <sys/zfs_bootenv.h>
 
 #include <machine/bootinfo.h>
 #include <machine/elf.h>
@@ -146,6 +147,7 @@ main(void)
 	unsigned i;
 	int fd;
 	bool auto_boot;
+	bool nextboot = false;
 	struct disk_devdesc devdesc;
 
 	bios_getmem();
@@ -201,11 +203,31 @@ main(void)
 	if (bdev != NULL && bdev->dd.d_dev->dv_type == DEVT_ZFS) {
 		/* set up proper device name string for ZFS */
 		strncpy(boot_devname, zfs_fmtdev(bdev), sizeof (boot_devname));
+		if (zfs_get_bootonce(bdev, OS_BOOTONCE, cmd,
+		    sizeof (cmd)) == 0) {
+			nvlist_t *benv;
+
+			nextboot = true;
+			memcpy(cmddup, cmd, sizeof (cmd));
+			if (parse_cmd()) {
+				printf("failed to parse bootonce command\n");
+				exit(0);
+			}
+			if (!OPT_CHECK(RBX_QUIET))
+				printf("zfs bootonce: %s\n", cmddup);
+
+			if (zfs_get_bootenv(bdev, &benv) == 0) {
+				nvlist_add_string(benv, OS_BOOTONCE_USED,
+				    cmddup);
+				zfs_set_bootenv(bdev, benv);
+			}
+			/* Do not process this command twice */
+			*cmd = 0;
+		}
 	}
 
 	/* now make sure we have bdev on all cases */
-	if (bdev != NULL)
-		free(bdev);
+	free(bdev);
 	i386_getdev((void **)&bdev, boot_devname, NULL);
 
 	env_setenv("currdev", EV_VOLATILE, boot_devname, i386_setcurrdev,
@@ -243,6 +265,10 @@ main(void)
 		/* Do not process this command twice */
 		*cmd = 0;
 	}
+
+	/* Do not risk waiting at the prompt forever. */
+	if (nextboot && !auto_boot)
+		exit(0);
 
 	if (auto_boot && !*kname) {
 		/*

@@ -28,6 +28,7 @@ SRCDIR		= ..
 include $(SRCDIR)/Makefile.com
 
 OBJS += benv.o benv_kvm.o
+LDLIBS += -lzfsbootenv
 
 .KEEP_STATE:
 

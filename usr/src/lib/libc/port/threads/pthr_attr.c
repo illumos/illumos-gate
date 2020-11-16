@@ -529,16 +529,16 @@ pthread_attr_getname_np(pthread_attr_t *attr, char *buf, size_t len)
 /*
  * This function is a common BSD extension to pthread which is used to obtain
  * the attributes of a thread that might have changed after its creation, for
- * example, it's stack address.
+ * example, its stack address.
  *
  * Note, there is no setattr analogue, nor do we desire to add one at this time.
  * Similarly there is no native threads API analogue (nor should we add one for
  * C11).
  *
  * The astute reader may note that there is a GNU version of this called
- * pthread_getattr_np(). The two functions are similar, but subtley different in
- * a rather important way. While the pthread_attr_get_np() expects to be given
- * a pthread_attr_t that has had pthread_attr_init() called on in,
+ * pthread_getattr_np(). The two functions are similar, but subtly different in
+ * a rather important way. While pthread_attr_get_np() expects to be given
+ * a pthread_attr_t that has had pthread_attr_init() called on it,
  * pthread_getattr_np() does not. However, on GNU systems, where the function
  * originates, the pthread_attr_t is not opaque and thus it is entirely safe to
  * both call pthread_attr_init() and then call pthread_getattr_np() on the same
@@ -556,7 +556,7 @@ pthread_attr_get_np(pthread_t tid, pthread_attr_t *attr)
 
 	/*
 	 * To ensure that information about the target thread does not change or
-	 * disappear while we're trying to interrogate it, we grab the uwlp
+	 * disappear while we're trying to interrogate it, we grab the ulwp
 	 * lock.
 	 */
 	if (self->ul_lwpid == tid) {

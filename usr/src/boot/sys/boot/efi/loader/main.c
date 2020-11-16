@@ -32,6 +32,7 @@
 #include <sys/reboot.h>
 #include <sys/boot.h>
 #include <sys/consplat.h>
+#include <sys/zfs_bootenv.h>
 #include <stand.h>
 #include <inttypes.h>
 #include <string.h>
@@ -230,6 +231,23 @@ out:
 }
 
 static void
+set_currdev(const char *devname)
+{
+
+	/*
+	 * Don't execute hooks here; we may need to try setting these more than
+	 * once here if we're probing for the ZFS pool we're supposed to boot.
+	 * The currdev hook is intended to just validate user input anyways,
+	 * while the loaddev hook makes it immutable once we've determined what
+	 * the proper currdev is.
+	 */
+	env_setenv("currdev", EV_VOLATILE | EV_NOHOOK, devname, efi_setcurrdev,
+	    env_nounset);
+	env_setenv("loaddev", EV_VOLATILE | EV_NOHOOK, devname, env_noset,
+	    env_nounset);
+}
+
+static void
 set_currdev_devdesc(struct devdesc *currdev)
 {
 	char *devname;
@@ -237,10 +255,7 @@ set_currdev_devdesc(struct devdesc *currdev)
 	devname = efi_fmtdev(currdev);
 
 	printf("Setting currdev to %s\n", devname);
-
-	env_setenv("currdev", EV_VOLATILE, devname, efi_setcurrdev,
-	    env_nounset);
-	env_setenv("loaddev", EV_VOLATILE, devname, env_noset, env_nounset);
+	set_currdev(devname);
 }
 
 static void
@@ -294,6 +309,8 @@ static bool
 probe_zfs_currdev(uint64_t guid)
 {
 	struct zfs_devdesc currdev;
+	char *bootonce;
+	bool rv;
 
 	currdev.dd.d_dev = &zfs_dev;
 	currdev.dd.d_unit = 0;
@@ -301,7 +318,24 @@ probe_zfs_currdev(uint64_t guid)
 	currdev.root_guid = 0;
 	set_currdev_devdesc((struct devdesc *)&currdev);
 
-	return (sanity_check_currdev());
+	rv = sanity_check_currdev();
+	if (rv) {
+		bootonce = malloc(VDEV_PAD_SIZE);
+		if (bootonce != NULL) {
+			if (zfs_get_bootonce(&currdev, OS_BOOTONCE, bootonce,
+			    VDEV_PAD_SIZE) == 0) {
+				printf("zfs bootonce: %s\n", bootonce);
+				set_currdev(bootonce);
+				setenv("zfs-bootonce", bootonce, 1);
+			}
+			free(bootonce);
+			(void) zfs_attach_nvstore(&currdev);
+		} else {
+			printf("Failed to process bootonce data: %s\n",
+			    strerror(errno));
+		}
+	}
+	return (rv);
 }
 
 static bool

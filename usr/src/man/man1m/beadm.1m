@@ -1,7 +1,7 @@
 '\" te
 .\" Copyright 2013 Nexenta Systems, Inc. All rights reserved.
 .\" Copyright 2016 Toomas Soome <tsoome@me.com>
-.TH BEADM 1M "Feb 21, 2016"
+.TH BEADM 1M "May 2, 2020"
 .SH NAME
 beadm \- utility for managing zfs boot environments
 .SH SYNOPSIS
@@ -45,7 +45,7 @@ beadm \- utility for managing zfs boot environments
 
 .LP
 .nf
-\fBbeadm\fR \fBactivate\fR [\fB-v\fR] \fIbeName\fR
+\fBbeadm\fR \fBactivate\fR [\fB-v\fR] [\fB-t\fR | \fB-T\fR] \fIbeName\fR
 .fi
 
 .LP
@@ -338,7 +338,9 @@ The 'Active'
 field indicates whether the boot environment is active now,
 represented
 by 'N'; active on reboot, represented by 'R'; or both, represented
-by 'NR'. In non-global zone the 'Active' field also indicates whether the
+by 'NR'. If temporary next boot configuration is used, the boot environment
+is marked with 'T'.
+In non-global zone the 'Active' field also indicates whether the
 boot environment has a non-active parent BE, represented by 'x'; is active
 on boot in a non-active parent BE, represented by 'b'. Activate, rollback
 and snapshot operations for boot environments from non-active global parent
@@ -539,11 +541,34 @@ Verbose mode. Displays verbose error messages from \fBbeadm\fR.
 .sp
 .ne 2
 .na
-\fBbeadm\fR \fBactivate\fR [\fB-v\fR] \fIbeName\fR
+\fBbeadm\fR \fBactivate\fR [\fB-v\fR] [\fB-t\fR | \fB-T\fR] \fIbeName\fR
 .ad
 .sp .6
 .RS 4n
 Makes beName the active BE on next reboot.
+.sp
+.ne 2
+.na
+\fB-t\fR
+.ad
+.sp .6
+.RS 4n
+Sets temporary, one time activation. For next boot, the \fIbeName\fR
+is used for boot, and the temporary activation is removed.
+When temporary activation is removed, the next boot will use zfs dataset
+specified in boot pool \fIbootfs\fR property.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-T\fR
+.ad
+.sp .6
+.RS 4n
+Removes temporary next boot configuration of \fIbeName\fR.
+.RE
+
 .sp
 .ne 2
 .na
@@ -790,6 +815,32 @@ BE2;;;;55296;static;1211397974
 BE3;;;;339968;static;1219771706
 BE4;;;;16541696;static;1220664051
 BE5;215b8387-4968-627c-d2d0-f4a011414bab;NR;/;7786206208;static;1221004384
+.fi
+.in -2
+.sp
+.LP
+\fBExample 19\fR: Create and list temporary activation.
+
+.sp
+.in +2
+.nf
+\fB# beadm list\fR
+BE  Active Mountpoint Space  Policy Created
+--  ------ ---------- -----  ------ -------
+BE2 -      -          4,85M  static 2016-10-30 14:29
+BE3 -      -          4,84M  static 2016-10-30 18:53
+BE4 -      -          5,54M  static 2016-10-30 23:53
+BE5 NR     /          12,6G  static 2016-11-06 01:46
+\fB# beadm create BE6\fR
+\fB# beadm activate -t BE6\fR
+\fB# beadm list\fR
+BE  Active Mountpoint Space  Policy Created
+--  ------ ---------- -----  ------ -------
+BE2 -      -          4,85M  static 2016-10-30 14:29
+BE3 -      -          4,84M  static 2016-10-30 18:53
+BE4 -      -          5,54M  static 2016-10-30 23:53
+BE5 NR     /          60,0K  static 2016-11-06 01:46
+BE6 T      -          12,6G  static 2016-11-06 12:56
 .fi
 .in -2
 .sp

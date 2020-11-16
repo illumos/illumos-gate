@@ -26,6 +26,7 @@
  */
 /*
  * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <ctf_impl.h>
@@ -935,6 +936,10 @@ ctf_close(ctf_file_t *fp)
 			ctf_sect_munmap(&fp->ctf_symtab);
 		if (fp->ctf_strtab.cts_data != NULL)
 			ctf_sect_munmap(&fp->ctf_strtab);
+	}
+	if (fp->ctf_flags & LCTF_FREE) {
+		ctf_data_free((void *)fp->ctf_data.cts_data,
+		    fp->ctf_data.cts_size);
 	}
 
 	if (fp->ctf_data.cts_name != _CTF_NULLSTR &&

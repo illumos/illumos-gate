@@ -59,8 +59,12 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
-#ifndef _ZFSIMPL_H
-#define	_ZFSIMPL_H
+#ifndef _ZFSIMPL_H_
+#define	_ZFSIMPL_H_
+
+#include <sys/queue.h>
+#include <sys/list.h>
+#include <bootstrap.h>
 
 #define	MAXNAMELEN	256
 
@@ -495,7 +499,7 @@ typedef struct zio_gbh {
 #define	VDEV_RAIDZ_MAXPARITY	3
 
 #define	VDEV_PAD_SIZE		(8 << 10)
-/* 2 padding areas (vl_pad1 and vl_pad2) to skip */
+/* 2 padding areas (vl_pad1 and vl_be) to skip */
 #define	VDEV_SKIP_SIZE		VDEV_PAD_SIZE * 2
 #define	VDEV_PHYS_SIZE		(112 << 10)
 #define	VDEV_UBERBLOCK_RING	(128 << 10)
@@ -521,9 +525,29 @@ typedef struct vdev_phys {
 	zio_eck_t	vp_zbt;
 } vdev_phys_t;
 
+typedef enum vbe_vers {
+	/* The bootenv file is stored as ascii text in the envblock */
+	VB_RAW = 0,
+
+	/*
+	 * The bootenv file is converted to an nvlist and then packed into the
+	 * envblock.
+	 */
+	VB_NVLIST = 1
+} vbe_vers_t;
+
+typedef struct vdev_boot_envblock {
+	uint64_t	vbe_version;
+	char		vbe_bootenv[VDEV_PAD_SIZE - sizeof (uint64_t) -
+			sizeof (zio_eck_t)];
+	zio_eck_t	vbe_zbt;
+} vdev_boot_envblock_t;
+
+CTASSERT(sizeof (vdev_boot_envblock_t) == VDEV_PAD_SIZE);
+
 typedef struct vdev_label {
 	char		vl_pad1[VDEV_PAD_SIZE];			/*  8K  */
-	char		vl_pad2[VDEV_PAD_SIZE];			/*  8K  */
+	vdev_boot_envblock_t vl_be;				/*  8K  */
 	vdev_phys_t	vl_vdev_phys;				/* 112K	*/
 	char		vl_uberblock[VDEV_UBERBLOCK_RING];	/* 128K	*/
 } vdev_label_t;							/* 256K total */
@@ -899,6 +923,7 @@ typedef struct uberblock {
 	 */
 	uint64_t	ub_mmp_delay;
 
+	/* BEGIN CSTYLED */
 	/*
 	 * The ub_mmp_config contains the multihost write interval, multihost
 	 * fail intervals, sequence number for sub-second granularity, and
@@ -917,6 +942,7 @@ typedef struct uberblock {
 	 * - 0x04 - Fail Intervals
 	 * - 0xf8 - Reserved
 	 */
+	/* END CSTYLED */
 	uint64_t	ub_mmp_config;
 
 	/*
@@ -1020,6 +1046,7 @@ typedef struct dnode_phys {
 
 	uint64_t dn_pad3[4];
 
+	/* BEGIN CSTYLED */
 	/*
 	 * The tail region is 448 bytes for a 512 byte dnode, and
 	 * correspondingly larger for larger dnode sizes. The spill
@@ -1036,6 +1063,7 @@ typedef struct dnode_phys {
 	 * | dn_blkptr[0]  | dn_bonus[0..191]      | dn_spill      |
 	 * +---------------+-----------------------+---------------+
 	 */
+	/* END CSTYLED */
 	union {
 		blkptr_t dn_blkptr[1+DN_OLD_MAX_BONUSLEN/sizeof (blkptr_t)];
 		struct {
@@ -1641,10 +1669,9 @@ typedef struct znode_phys {
  */
 struct vdev;
 struct spa;
-typedef int vdev_phys_read_t(struct vdev *vdev, void *priv,
-    off_t offset, void *buf, size_t bytes);
-typedef int vdev_read_t(struct vdev *vdev, const blkptr_t *bp,
-    void *buf, off_t offset, size_t bytes);
+typedef int vdev_phys_read_t(struct vdev *, void *, off_t, void *, size_t);
+typedef int vdev_phys_write_t(struct vdev *, off_t, void *, size_t);
+typedef int vdev_read_t(struct vdev *, const blkptr_t *, void *, off_t, size_t);
 
 typedef STAILQ_HEAD(vdev_list, vdev) vdev_list_t;
 
@@ -1774,8 +1801,9 @@ typedef struct vdev {
 	size_t		v_nchildren;	/* # children */
 	vdev_state_t	v_state;	/* current state */
 	vdev_phys_read_t *v_phys_read;	/* read from raw leaf vdev */
+	vdev_phys_write_t *v_phys_write; /* write to raw leaf vdev */
 	vdev_read_t	*v_read;	/* read from vdev */
-	void		*v_read_priv;	/* private data for read function */
+	void		*v_priv;	/* data for read/write function */
 	boolean_t	v_islog;
 	struct spa	*v_spa;		/* link to spa */
 	/*
@@ -1802,6 +1830,7 @@ typedef struct spa {
 	void		*spa_cksum_tmpls[ZIO_CHECKSUM_FUNCTIONS];
 	vdev_t		*spa_boot_vdev;	/* boot device for kernel */
 	boolean_t	spa_with_log;	/* this pool has log */
+	void		*spa_bootenv;	/* bootenv from pool label */
 } spa_t;
 
 /* IO related arguments. */
@@ -1819,6 +1848,6 @@ typedef struct zio {
 	int		io_error;
 } zio_t;
 
-static void decode_embedded_bp_compressed(const blkptr_t *, void *);
+extern void decode_embedded_bp_compressed(const blkptr_t *, void *);
 
-#endif	/* _ZFSIMPL_H */
+#endif	/* _ZFSIMPL_H_ */

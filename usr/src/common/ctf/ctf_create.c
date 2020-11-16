@@ -26,6 +26,7 @@
  */
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/sysmacros.h>
@@ -671,6 +672,7 @@ ctf_update(ctf_file_t *fp)
 
 	nfp->ctf_refcnt = fp->ctf_refcnt;
 	nfp->ctf_flags |= fp->ctf_flags & ~LCTF_DIRTY;
+	nfp->ctf_flags |= LCTF_FREE;
 	nfp->ctf_dthash = fp->ctf_dthash;
 	nfp->ctf_dthashlen = fp->ctf_dthashlen;
 	nfp->ctf_dtdefs = fp->ctf_dtdefs;

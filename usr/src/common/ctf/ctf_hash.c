@@ -23,6 +23,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <ctf_impl.h>
@@ -173,5 +175,27 @@ ctf_hash_destroy(ctf_hash_t *hp)
 	if (hp->h_chains != NULL) {
 		ctf_free(hp->h_chains, sizeof (ctf_helem_t) * hp->h_nelems);
 		hp->h_chains = NULL;
+	}
+}
+
+void
+ctf_hash_dump(const char *tag, ctf_hash_t *hp, ctf_file_t *fp)
+{
+	ctf_dprintf("---------------\nHash dump - %s\n", tag);
+
+	for (ushort_t h = 0; h < hp->h_nbuckets; h++) {
+		ctf_helem_t *hep;
+
+		for (ushort_t i = hp->h_buckets[h]; i != 0; i = hep->h_next) {
+			ctf_strs_t *ctsp;
+			const char *str;
+
+			hep = &hp->h_chains[i];
+			ctsp = &fp->ctf_str[CTF_NAME_STID(hep->h_name)];
+			str = ctsp->cts_strs + CTF_NAME_OFFSET(hep->h_name);
+
+			ctf_dprintf(" - %3u/%3u  - '%s' type %u\n", h, i, str,
+			    hep->h_type);
+		}
 	}
 }

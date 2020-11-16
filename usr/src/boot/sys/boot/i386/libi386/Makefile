@@ -131,6 +131,11 @@ CFLAGS +=	-I$(SRC)/common/ficl -I../../libficl \
 # the location of libstand
 CFLAGS +=	-I../../../../lib/libstand/
 
+multiboot.o := CPPFLAGS += -I../../../cddl/boot/zfs
+multiboot2.o := CPPFLAGS += -I../../../cddl/boot/zfs
+devicename.o := CPPFLAGS += -I../../../cddl/boot/zfs
+devicename_stubs.o := CPPFLAGS += -I../../../cddl/boot/zfs
+
 # Handle FreeBSD specific %b and %D printf format specifiers
 #FORMAT_EXTENSIONS=-D__printf__=__freebsd_kprintf__
 #CFLAGS += ${FORMAT_EXTENSIONS}

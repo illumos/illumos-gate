@@ -131,8 +131,8 @@ pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	    flag, &tid, ap->guardsize, ap->name);
 	if (error == 0) {
 		/*
-		 * Record the original inheritence value for
-		 * pthread_getattr_np(). We should always be able to find the
+		 * Record the original inheritance value for
+		 * pthread_attr_get_np(). We should always be able to find the
 		 * thread.
 		 */
 		(void) _thr_setinherit(tid, ap->inherit);
