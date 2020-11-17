@@ -709,7 +709,6 @@
 @ MSG_GUIDE_TEXT	"position independent (PIC) code recommended for \
 			 shared objects"
 @ MSG_GUIDE_UNUSED	"removal of unused dependency recommended: %s"
-@ MSG_GUIDE_KMOD	"use -z type=kmod, not -r -dy"
 
 @ _END_
 

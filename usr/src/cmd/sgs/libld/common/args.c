@@ -325,11 +325,6 @@ check_flags(Ofl_desc * ofl, int argc)
 		if (otype == OT_RELOC) {
 			if (dflag == SET_UNKNOWN)
 				dflag = SET_FALSE;
-			if ((dflag == SET_TRUE) &&
-			    OFL_GUIDANCE(ofl, FLG_OFG_NO_KMOD)) {
-				ld_eprintf(ofl, ERR_GUIDANCE,
-				    MSG_INTL(MSG_GUIDE_KMOD));
-			}
 		} else if (otype == OT_KMOD) {
 			if (dflag != SET_UNKNOWN) {
 				ld_eprintf(ofl, ERR_FATAL,
