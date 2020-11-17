@@ -15691,12 +15691,6 @@ s usr/share/man/man3ext/SHA512Update.3ext=sha2.3ext
 f usr/share/man/man3ext/SUNW_C_GetMechSession.3ext 0444 root bin
 s usr/share/man/man3ext/SUNW_C_KeyToObject.3ext=SUNW_C_GetMechSession.3ext
 s usr/share/man/man3ext/_NOTE.3ext=NOTE.3ext
-f usr/share/man/man3ext/auto_ef.3ext 0444 root bin
-s usr/share/man/man3ext/auto_ef_file.3ext=auto_ef.3ext
-s usr/share/man/man3ext/auto_ef_free.3ext=auto_ef.3ext
-s usr/share/man/man3ext/auto_ef_get_encoding.3ext=auto_ef.3ext
-s usr/share/man/man3ext/auto_ef_get_score.3ext=auto_ef.3ext
-s usr/share/man/man3ext/auto_ef_str.3ext=auto_ef.3ext
 s usr/share/man/man3ext/cbc_crypt.3ext=ecb_crypt.3ext
 s usr/share/man/man3ext/cplus_demangle.3ext=demangle.3ext
 f usr/share/man/man3ext/crypt.3ext 0444 root bin
