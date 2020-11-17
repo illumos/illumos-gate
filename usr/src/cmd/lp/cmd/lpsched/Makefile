@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # cmd/lp/cmd/lpsched/lpsched/Makefile
 #
 
@@ -102,13 +100,13 @@ LPLIBS =			\
 
 SYSLIBS=	-lcurses -lgen -lcurses -lnsl -ltsol -lsecdb -lbsm
 
-LDLIBS +=	$(LPLIBS) $(SYSLIBS)
+LDLIBS +=	$(LPLIBS) $(SYSLIBS) $(LDSTACKPROTECT)
 
 POFILE=		lp_cmd_lpsched.po
 
 .KEEP_STATE:
 
-all:		$(PROG) 
+all:		$(PROG)
 
 $(PROG):	$(OBJS) $(LPLIBS)
 		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)

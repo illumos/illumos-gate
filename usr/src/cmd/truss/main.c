@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -59,7 +60,7 @@
  */
 typedef struct proc_set {
 	pid_t		pid;
-	const char 	*lwps;
+	const char	*lwps;
 } proc_set_t;
 
 /*
@@ -684,6 +685,7 @@ main(int argc, char *argv[])
 	praddset(&traceeven, SYS_open64);
 	praddset(&traceeven, SYS_vfork);
 	praddset(&traceeven, SYS_forksys);
+	praddset(&traceeven, SYS_upanic);
 
 	/* for I/O buffer dumps, force tracing of read()s and write()s */
 	if (!isemptyset(&readfd)) {
@@ -723,8 +725,10 @@ main(int argc, char *argv[])
 	/* special case -- sysexit never reached */
 	(void) Psysentry(Proc, SYS_exit, TRUE);
 	(void) Psysentry(Proc, SYS_lwp_exit, TRUE);
+	(void) Psysentry(Proc, SYS_upanic, TRUE);
 	(void) Psysexit(Proc, SYS_exit, FALSE);
 	(void) Psysexit(Proc, SYS_lwp_exit, FALSE);
+	(void) Psysexit(Proc, SYS_upanic, FALSE);
 
 	Psetsignal(Proc, &signals);	/* trace these signals */
 	Psetfault(Proc, &faults);	/* trace these faults */
@@ -1090,6 +1094,7 @@ worker_thread(void *arg)
 			switch (what) {
 			case SYS_exit:			/* exit() */
 			case SYS_lwp_exit:		/* lwp_exit() */
+			case SYS_upanic:		/* upanic() */
 			case SYS_context:		/* [get|set]context() */
 				if (dotrace && cflag &&
 				    prismember(&trace, what)) {
@@ -2692,7 +2697,7 @@ letgo(private_t *pri)
  */
 int
 is_empty(const uint32_t *sp,	/* pointer to set (array of int32's) */
-	size_t n)		/* number of int32's in set */
+    size_t n)			/* number of int32's in set */
 {
 	if (n) {
 		do {

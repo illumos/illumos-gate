@@ -245,6 +245,8 @@ Pfini_core(struct ps_prochandle *P, void *data)
 			free(core->core_zonename);
 		if (core->core_secflags != NULL)
 			free(core->core_secflags);
+		if (core->core_upanic != NULL)
+			free(core->core_upanic);
 #ifdef __x86
 		if (core->core_ldt != NULL)
 			free(core->core_ldt);
@@ -1201,6 +1203,34 @@ err:
 	return (-1);
 }
 
+static int
+note_upanic(struct ps_prochandle *P, size_t nbytes)
+{
+	core_info_t *core = P->data;
+	prupanic_t *pru;
+
+	if (core->core_upanic != NULL)
+		return (0);
+
+	if (sizeof (*pru) != nbytes) {
+		dprintf("Pgrab_core: NT_UPANIC changed size."
+		    "  Need to handle a version change?\n");
+		return (-1);
+	}
+
+	if (nbytes != 0 && ((pru = malloc(nbytes)) != NULL)) {
+		if (read(P->asfd, pru, nbytes) != nbytes) {
+			dprintf("Pgrab_core: failed to read NT_UPANIC\n");
+			free(pru);
+			return (-1);
+		}
+
+		core->core_upanic = pru;
+	}
+
+	return (0);
+}
+
 /*ARGSUSED*/
 static int
 note_notsup(struct ps_prochandle *P, size_t nbytes)
@@ -1266,6 +1296,7 @@ static int (*nhdlrs[])(struct ps_prochandle *, size_t) = {
 	note_spymaster,		/* 23	NT_SPYMASTER		*/
 	note_secflags,		/* 24	NT_SECFLAGS		*/
 	note_lwpname,		/* 25	NT_LWPNAME		*/
+	note_upanic		/* 26	NT_UPANIC		*/
 };
 
 static void
@@ -2879,4 +2910,38 @@ Pgrab_core(const char *core, const char *aout, int gflag, int *perr)
 		*perr = G_NOCORE;
 
 	return (NULL);
+}
+
+int
+Pupanic(struct ps_prochandle *P, prupanic_t **pru)
+{
+	core_info_t *core;
+
+	if (P->state != PS_DEAD) {
+		errno = ENODATA;
+		return (-1);
+	}
+
+	core = P->data;
+	if (core->core_upanic == NULL) {
+		errno = ENOENT;
+		return (-1);
+	}
+
+	if (core->core_upanic->pru_version != PRUPANIC_VERSION_1) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	if ((*pru = calloc(1, sizeof (prupanic_t))) == NULL)
+		return (-1);
+	(void) memcpy(*pru, core->core_upanic, sizeof (prupanic_t));
+
+	return (0);
+}
+
+void
+Pupanic_free(prupanic_t *pru)
+{
+	free(pru);
 }

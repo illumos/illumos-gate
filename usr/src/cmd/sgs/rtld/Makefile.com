@@ -154,3 +154,19 @@ SRCS=		$(AVLOBJ:%.o=$(VAR_AVLDIR)/%.c) \
 
 CLEANFILES +=	$(CRTS) $(BLTFILES)
 CLOBBERFILES +=	$(RTLD)
+
+#
+# We cannot currently enable the stack protector for rtld as it runs
+# before libc initializes, which is where we always enable the stack
+# protector values. Because rtld is likely on an alternate link map and
+# links in the relevant portions of libc through libc_pic.a, there is
+# probably a path to enabling an rtld specific version of the stack
+# protector.
+#
+# As a result, this currently disables the stack protector in two
+# related targets which really could use it. These are libconv and libc.
+# Both of these end up building position-independent archive libraries
+# that are directly linked into rtld. This situation can and should be
+# improved.
+#
+STACKPROTECT = none

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -347,7 +348,7 @@ const struct systable systable[] = {
 {"writev",	3, DEC, NOV, DEC, HEX, DEC},			/* 122 */
 {"preadv",	4, DEC, NOV, DEC, HEX, DEC, DEC},		/* 123 */
 {"pwritev",	4, DEC, NOV, DEC, HEX, DEC, DEC},		/* 124 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"upanic",	2, DEC, NOV, HEX, DEC},				/* 125 */
 {"getrandom",	3, DEC, NOV, IOB, UNS, GRF},			/* 126 */
 {"mmapobj",	5, DEC, NOV, DEC, MOB, HEX, HEX, HEX},		/* 127 */
 {"setrlimit",	2, DEC, NOV, RLM, HEX},				/* 128 */

@@ -5399,6 +5399,7 @@ f usr/lib/amd64/libsoftcrypto.so.1 0755 root bin
 s usr/lib/amd64/libsoftcrypto.so=libsoftcrypto.so.1
 f usr/lib/amd64/libsrpt.so.1 0755 root bin
 s usr/lib/amd64/libsrpt.so=libsrpt.so.1
+f usr/lib/amd64/libssp_ns.a 0755 root bin
 f usr/lib/amd64/libstmf.so.1 0755 root bin
 s usr/lib/amd64/libstmf.so=libstmf.so.1
 f usr/lib/amd64/libstmfproxy.so.1 0755 root bin
@@ -6928,6 +6929,7 @@ f usr/lib/libsoftcrypto.so.1 0755 root bin
 s usr/lib/libsoftcrypto.so=libsoftcrypto.so.1
 f usr/lib/libsrpt.so.1 0755 root bin
 s usr/lib/libsrpt.so=libsrpt.so.1
+f usr/lib/libssp_ns.a 0755 root bin
 f usr/lib/libstmf.so.1 0755 root bin
 s usr/lib/libstmf.so=libstmf.so.1
 f usr/lib/libstmfproxy.so.1 0755 root bin
@@ -12967,6 +12969,7 @@ s usr/share/man/man2/umount2.2=umount.2
 f usr/share/man/man2/uname.2 0444 root bin
 f usr/share/man/man2/unlink.2 0444 root bin
 s usr/share/man/man2/unlinkat.2=unlink.2
+f usr/share/man/man2/upanic.2 0444 root bin
 f usr/share/man/man2/ustat.2 0444 root bin
 f usr/share/man/man2/utime.2 0444 root bin
 s usr/share/man/man2/utimensat.2=utimes.2
@@ -16103,6 +16106,7 @@ s usr/share/man/man3head/un.3head=un.h.3head
 f usr/share/man/man3head/un.h.3head 0444 root bin
 s usr/share/man/man3head/unistd.3head=unistd.h.3head
 f usr/share/man/man3head/unistd.h.3head 0444 root bin
+f usr/share/man/man3head/upanic.h.3head 0444 root bin
 s usr/share/man/man3head/utime.3head=utime.h.3head
 f usr/share/man/man3head/utime.h.3head 0444 root bin
 s usr/share/man/man3head/utmpx.3head=utmpx.h.3head
@@ -17618,6 +17622,8 @@ f usr/share/man/man3proc/Psysentry.3proc 0444 root bin
 s usr/share/man/man3proc/Psysexit.3proc=Psysentry.3proc
 f usr/share/man/man3proc/Puname.3proc 0444 root bin
 s usr/share/man/man3proc/Punsetflags.3proc=Psetflags.3proc
+f usr/share/man/man3proc/Pupanic.3proc 0444 root bin
+s usr/share/man/man3proc/Pupanic_free.3proc=Pupanic.3proc
 f usr/share/man/man3proc/Pupdate_maps.3proc 0444 root bin
 f usr/share/man/man3proc/Pupdate_syms.3proc 0444 root bin
 s usr/share/man/man3proc/Pwait.3proc=Pstopstatus.3proc

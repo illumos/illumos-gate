@@ -1,0 +1,41 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 Oxide Computer Company
+.\"
+.Dd October 31, 2020
+.Dt UPANIC.H 3HEAD
+.Os
+.Sh NAME
+.Nm upanic.h
+.Nd user panic header
+.Sh SYNOPSIS
+.In upanic.h
+.Sh DESCRIPTION
+The
+.In upanic.h
+header provides illumos-specific routines that provide a means for a
+process to terminate itself with an optional message left in a core
+file.
+.Pp
+The
+.In upanic.h
+header defines the following functions:
+.Bl -tag -width upanic
+.It Xr upanic 2
+Panic a user process with an optional message, terminating it and
+generating core files.
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh SEE ALSO
+.Xr upanic 2 ,
+.Xr core 4

@@ -36,7 +36,7 @@ include $(SRC)/cmd/picl/plugins/Makefile.com
 MODULES = picl_slm.so
 MOD_SRCS = picl_slm.c
 MOD_OBJS = picl_slm.o
-MOD_LDLIBS = -L$(ROOT)/usr/lib -lsysevent -lnvpair -lc
+MOD_LDLIBS = -L$(ROOT)/usr/lib -lsysevent -lnvpair -lc $(LDSTACKPROTECT)
 
 # sysevent SLM dirs
 SYSEVENT = sysevent

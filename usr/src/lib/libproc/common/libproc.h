@@ -792,6 +792,12 @@ extern int proc_finistdio(void);
 typedef int proc_fdinfo_f(void *, const prfdinfo_t *);
 extern int Pfdinfo_iter(struct ps_prochandle *, proc_fdinfo_f *, void *);
 
+/*
+ * NT_UPANIC information.
+ */
+extern int Pupanic(struct ps_prochandle *, prupanic_t **);
+extern void Pupanic_free(prupanic_t *);
+
 #ifdef	__cplusplus
 }
 #endif

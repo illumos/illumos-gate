@@ -26,6 +26,7 @@
 /*
  * Copyright 2018 Joyent, Inc.
  * Copyright (c) 2014 by Delphix. All rights reserved.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*
@@ -103,6 +104,7 @@
 #include <stdio_ext.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #define	PC_FAKE		-1UL			/* illegal pc value unequal 0 */
 #define	PANIC_BUFSIZE	1024
@@ -1574,6 +1576,38 @@ pt_print_reason(const lwpstatus_t *psp)
 	}
 }
 
+static void
+pt_status_dcmd_upanic(prupanic_t *pru)
+{
+	size_t i;
+
+	mdb_printf("process panicked\n");
+	if ((pru->pru_flags & PRUPANIC_FLAG_MSG_ERROR) != 0) {
+		mdb_printf("warning: process upanic message was bad\n");
+		return;
+	}
+
+	if ((pru->pru_flags & PRUPANIC_FLAG_MSG_VALID) == 0)
+		return;
+
+	if ((pru->pru_flags & PRUPANIC_FLAG_MSG_TRUNC) != 0) {
+		mdb_printf("warning: process upanic message truncated\n");
+	}
+
+	mdb_printf("upanic message: ");
+
+	for (i = 0; i < PRUPANIC_BUFLEN; i++) {
+		if (pru->pru_data[i] == '\0')
+			break;
+		if (isascii(pru->pru_data[i]) && isprint(pru->pru_data[i])) {
+			mdb_printf("%c", pru->pru_data[i]);
+		} else {
+			mdb_printf("\\x%02x", pru->pru_data[i]);
+		}
+	}
+	mdb_printf("\n");
+}
+
 /*ARGSUSED*/
 static int
 pt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -1591,6 +1625,7 @@ pt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		uintptr_t panicstr;
 		char *panicbuf = mdb_alloc(PANIC_BUFSIZE, UM_SLEEP);
 		const siginfo_t *sip = &(psp->pr_lwp.pr_info);
+		prupanic_t *pru = NULL;
 
 		char execname[MAXPATHLEN], buf[BUFSIZ];
 		char signame[SIG2STR_MAX + 4]; /* enough for SIG+name+\0 */
@@ -1696,12 +1731,19 @@ pt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		case PS_DEAD:
 			if (cursig == 0 && WIFSIGNALED(pi.pr_wstat))
 				cursig = WTERMSIG(pi.pr_wstat);
+
+			(void) Pupanic(P, &pru);
+
 			/*
-			 * We can only use pr_wstat == 0 as a test for gcore if
-			 * an NT_PRCRED note is present; these features were
-			 * added at the same time in Solaris 8.
+			 * Test for upanic first. We can only use pr_wstat == 0
+			 * as a test for gcore if an NT_PRCRED note is present;
+			 * these features were added at the same time in Solaris
+			 * 8.
 			 */
-			if (pi.pr_wstat == 0 && Pstate(P) == PS_DEAD &&
+			if (pru != NULL) {
+				pt_status_dcmd_upanic(pru);
+				Pupanic_free(pru);
+			} else if (pi.pr_wstat == 0 && Pstate(P) == PS_DEAD &&
 			    Pcred(P, &cred, 1) == 0) {
 				mdb_printf("process core file generated "
 				    "with gcore(1)\n");
@@ -1747,10 +1789,9 @@ pt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    sym.st_value) == sizeof (panicstr) &&
 			    Pread_string(t->t_pshandle, panicbuf,
 			    PANIC_BUFSIZE, panicstr) > 0) {
-				mdb_printf("panic message: %s",
+				mdb_printf("libc panic message: %s",
 				    panicbuf);
 			}
-
 
 			break;
 
@@ -4681,27 +4722,27 @@ pt_auxv(mdb_tgt_t *t, const auxv_t **auxvp)
 
 static const mdb_tgt_ops_t proc_ops = {
 	pt_setflags,				/* t_setflags */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_setcontext */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_setcontext */
 	pt_activate,				/* t_activate */
 	pt_deactivate,				/* t_deactivate */
 	pt_periodic,				/* t_periodic */
 	pt_destroy,				/* t_destroy */
 	pt_name,				/* t_name */
-	(const char *(*)()) mdb_conf_isa,	/* t_isa */
+	(const char *(*)())mdb_conf_isa,	/* t_isa */
 	pt_platform,				/* t_platform */
 	pt_uname,				/* t_uname */
 	pt_dmodel,				/* t_dmodel */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_aread */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_awrite */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_aread */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_awrite */
 	pt_vread,				/* t_vread */
 	pt_vwrite,				/* t_vwrite */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_pread */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_pwrite */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_pread */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_pwrite */
 	pt_fread,				/* t_fread */
 	pt_fwrite,				/* t_fwrite */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_ioread */
-	(ssize_t (*)()) mdb_tgt_notsup,		/* t_iowrite */
-	(int (*)())(uintptr_t) mdb_tgt_notsup,	/* t_vtop */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_ioread */
+	(ssize_t (*)())mdb_tgt_notsup,		/* t_iowrite */
+	(int (*)())(uintptr_t)mdb_tgt_notsup,	/* t_vtop */
 	pt_lookup_by_name,			/* t_lookup_by_name */
 	pt_lookup_by_addr,			/* t_lookup_by_addr */
 	pt_symbol_iter,				/* t_symbol_iter */
@@ -4720,9 +4761,9 @@ static const mdb_tgt_ops_t proc_ops = {
 	pt_signal,				/* t_signal */
 	pt_add_vbrkpt,				/* t_add_vbrkpt */
 	pt_add_sbrkpt,				/* t_add_sbrkpt */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_pwapt */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_pwapt */
 	pt_add_vwapt,				/* t_add_vwapt */
-	(int (*)())(uintptr_t) mdb_tgt_null,	/* t_add_iowapt */
+	(int (*)())(uintptr_t)mdb_tgt_null,	/* t_add_iowapt */
 	pt_add_sysenter,			/* t_add_sysenter */
 	pt_add_sysexit,				/* t_add_sysexit */
 	pt_add_signal,				/* t_add_signal */
@@ -4848,8 +4889,8 @@ pt_lwp_setfpregs(mdb_tgt_t *t, void *tap, mdb_tgt_tid_t tid,
 }
 
 static const pt_ptl_ops_t proc_lwp_ops = {
-	(int (*)())(uintptr_t) mdb_tgt_nop,
-	(void (*)())(uintptr_t) mdb_tgt_nop,
+	(int (*)())(uintptr_t)mdb_tgt_nop,
+	(void (*)())(uintptr_t)mdb_tgt_nop,
 	pt_lwp_tid,
 	pt_lwp_iter,
 	pt_lwp_getregs,

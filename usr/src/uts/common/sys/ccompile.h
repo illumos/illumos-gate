@@ -160,6 +160,7 @@ extern "C" {
 #define	__unused		__sun_attr__((__unused__))
 #define	__used			__attribute__((__used__))
 #define	__weak_symbol		__attribute__((__weak__))
+#define	__HIDDEN		__attribute__((visibility("hidden")))
 
 #ifdef	__cplusplus
 }

@@ -24,6 +24,7 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -168,38 +169,38 @@ extern "C" {
 #define	SYS_tasksys	70
 	/*
 	 * subcodes:
-	 * 	settaskid(...) :: tasksys(0, ...)
-	 * 	gettaskid(...) :: tasksys(1, ...)
-	 * 	getprojid(...) :: tasksys(2, ...)
+	 *	settaskid(...) :: tasksys(0, ...)
+	 *	gettaskid(...) :: tasksys(1, ...)
+	 *	getprojid(...) :: tasksys(2, ...)
 	 */
 #define	SYS_acctctl	71
 #define	SYS_exacctsys	72
 	/*
 	 * subcodes:
-	 * 	getacct(...) :: exacct(0, ...)
-	 * 	putacct(...) :: exacct(1, ...)
-	 * 	wracct(...) :: exacct(2, ...)
+	 *	getacct(...) :: exacct(0, ...)
+	 *	putacct(...) :: exacct(1, ...)
+	 *	wracct(...) :: exacct(2, ...)
 	 */
 #define	SYS_getpagesizes	73
 	/*
 	 * subcodes:
 	 *	getpagesizes2(...)	:: getpagesizes(0, ...)
-	 * 	getpagesizes(...)	:: getpagesizes(1, ...) legacy
+	 *	getpagesizes(...)	:: getpagesizes(1, ...) legacy
 	 */
 #define	SYS_rctlsys	74
 	/*
 	 * subcodes:
-	 * 	getrctl(...) :: rctlsys(0, ...)
-	 * 	setrctl(...) :: rctlsys(1, ...)
-	 * 	rctllist(...) :: rctlsys(2, ...)
-	 * 	rctlctl(...) :: rctlsys(3, ...)
+	 *	getrctl(...) :: rctlsys(0, ...)
+	 *	setrctl(...) :: rctlsys(1, ...)
+	 *	rctllist(...) :: rctlsys(2, ...)
+	 *	rctlctl(...) :: rctlsys(3, ...)
 	 */
 #define	SYS_sidsys	75
 	/*
 	 * subcodes:
-	 * 	allocids(...)		:: sidsys(0, ...)
-	 * 	idmap_reg(...)		:: sidsys(1, ...)
-	 * 	idmap_unreg(...)	:: sidsys(2, ...)
+	 *	allocids(...)		:: sidsys(0, ...)
+	 *	idmap_reg(...)		:: sidsys(1, ...)
+	 *	idmap_unreg(...)	:: sidsys(2, ...)
 	 */
 #define	SYS_lwp_park	77
 	/*
@@ -213,8 +214,8 @@ extern "C" {
 #define	SYS_sendfilev	78
 	/*
 	 * subcodes :
-	 * 	sendfilev()   :: sendfilev(0, ...)
-	 * 	sendfilev64() :: sendfilev(1, ...)
+	 *	sendfilev()   :: sendfilev(0, ...)
+	 *	sendfilev64() :: sendfilev(1, ...)
 	 */
 #define	SYS_rmdir	79
 #define	SYS_mkdir	80
@@ -222,11 +223,11 @@ extern "C" {
 #define	SYS_privsys	82
 	/*
 	 * subcodes:
-	 * 	setppriv(...)		:: privsys(0, ...)
-	 * 	getppriv(...)		:: privsys(1, ...)
-	 * 	getimplinfo(...)	:: privsys(2, ...)
-	 * 	setpflags(...) 		:: privsys(3, ...)
-	 * 	getpflags(...) 		:: privsys(4, ...)
+	 *	setppriv(...)		:: privsys(0, ...)
+	 *	getppriv(...)		:: privsys(1, ...)
+	 *	getimplinfo(...)	:: privsys(2, ...)
+	 *	setpflags(...)		:: privsys(3, ...)
+	 *	getpflags(...)		:: privsys(4, ...)
 	 *	issetugid();		:: privsys(5)
 	 */
 #define	SYS_ucredsys	83
@@ -297,6 +298,7 @@ extern "C" {
 #define	SYS_writev	122
 #define	SYS_preadv	123
 #define	SYS_pwritev	124
+#define	SYS_upanic	125
 #define	SYS_getrandom	126
 #define	SYS_mmapobj	127
 #define	SYS_setrlimit	128
@@ -368,7 +370,7 @@ extern "C" {
 #define	SYS_meminfosys		SYS_lgrpsys
 	/*
 	 * subcodes:
-	 * 	meminfo(...) :: meminfosys(MISYS_MEMINFO, ...)
+	 *	meminfo(...) :: meminfosys(MISYS_MEMINFO, ...)
 	 */
 #define	SYS_rusagesys		181
 	/*

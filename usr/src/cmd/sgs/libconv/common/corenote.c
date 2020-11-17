@@ -26,6 +26,7 @@
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright (c) 2018 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*
@@ -59,9 +60,9 @@ conv_cnote_type(Word type, Conv_fmt_flags_t fmt_flags,
 		MSG_NT_PRPRIVINFO,	MSG_NT_CONTENT,
 		MSG_NT_ZONENAME,	MSG_NT_FDINFO,
 		MSG_NT_SPYMASTER,	MSG_NT_SECFLAGS,
-		MSG_NT_LWPNAME,
+		MSG_NT_LWPNAME,		MSG_NT_UPANIC
 	};
-#if NT_NUM != NT_LWPNAME
+#if NT_NUM != NT_UPANIC
 #error "NT_NUM has grown. Update core note types[]"
 #endif
 	static const conv_ds_msg_t ds_types = {
@@ -255,8 +256,8 @@ conv_cnote_syscall(Word sysnum, Conv_fmt_flags_t fmt_flags,
 		MSG_SYS_MUNMAP,			MSG_SYS_FPATHCONF,
 		MSG_SYS_VFORK,			MSG_SYS_FCHDIR,
 		MSG_SYS_READV,			MSG_SYS_WRITEV,
-		MSG_SYS_123,			MSG_SYS_124,
-		MSG_SYS_125,			MSG_SYS_126,
+		MSG_SYS_PREADV,			MSG_SYS_PWRITEV,
+		MSG_SYS_UPANIC,			MSG_SYS_GETRANDOM,
 		MSG_SYS_MMAPOBJ,		MSG_SYS_SETRLIMIT,
 		MSG_SYS_GETRLIMIT,		MSG_SYS_LCHOWN,
 		MSG_SYS_MEMCNTL,		MSG_SYS_GETPMSG,
@@ -1956,10 +1957,10 @@ conv_cnote_fltset(uint32_t *maskarr, int n_mask,
 	MSG_SYS_FCHDIR_ALT_SIZE			/* 120 */ + \
 	MSG_SYS_READV_ALT_SIZE			/* 121 */ + \
 	MSG_SYS_WRITEV_ALT_SIZE			/* 122 */ + \
-	MSG_SYS_123_SIZE			/* 123 (unused) */ + \
-	MSG_SYS_124_SIZE			/* 124 (unused) */ + \
-	MSG_SYS_125_SIZE			/* 125 (unused) */ + \
-	MSG_SYS_126_SIZE			/* 126 (unused) */ + \
+	MSG_SYS_PREADV_SIZE			/* 123 */ + \
+	MSG_SYS_PWRITEV_SIZE			/* 124 */ + \
+	MSG_SYS_UPANIC_SIZE			/* 125 */ + \
+	MSG_SYS_GETRANDOM_SIZE			/* 126 */ + \
 	MSG_SYS_MMAPOBJ_ALT_SIZE		/* 127 */ + \
 	MSG_SYS_SETRLIMIT_ALT_SIZE		/* 128 */ + \
 	\
@@ -2279,10 +2280,10 @@ conv_cnote_sysset(uint32_t *maskarr, int n_mask,
 		{ 0x00800000,	MSG_SYS_FCHDIR_ALT },
 		{ 0x01000000,	MSG_SYS_READV_ALT },
 		{ 0x02000000,	MSG_SYS_WRITEV_ALT },
-		{ 0x04000000,	MSG_SYS_123 },
-		{ 0x08000000,	MSG_SYS_124 },
-		{ 0x10000000,	MSG_SYS_125 },
-		{ 0x20000000,	MSG_SYS_126 },
+		{ 0x04000000,	MSG_SYS_PREADV_ALT },
+		{ 0x08000000,	MSG_SYS_PWRITEV_ALT },
+		{ 0x10000000,	MSG_SYS_UPANIC_ALT },
+		{ 0x20000000,	MSG_SYS_GETRANDOM_ALT },
 		{ 0x40000000,	MSG_SYS_MMAPOBJ_ALT },
 		{ 0x80000000,	MSG_SYS_SETRLIMIT_ALT },
 		{ 0,			0 }
@@ -2641,4 +2642,55 @@ conv_prsecflags(secflagset_t flags, Conv_fmt_flags_t fmt_flags,
 	(void) conv_expn_field(&conv_arg, vda, fmt_flags);
 
 	return ((const char *)secflags_buf->buf);
+}
+
+
+#define	UPANICFLGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE +		\
+	MSG_MSG_VALID_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE +	\
+	MSG_MSG_ERROR_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE +	\
+	MSG_MSG_TRUNC_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE +	\
+	CONV_INV_BUFSIZE	+ CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+
+/*
+ * Ensure that Conv_upanic_buf_t is large enough:
+ *
+ * UPANICFLGSZ is the real minimum size of the buffer required by
+ * conv_prsecflags(). However, Conv_upanic_buf_t uses CONV_PRUPANIC_BUFSIZE to
+ * set the buffer size. We do things this way because the definition of
+ * UPANICFLGSZ uses information that is not available in the environment of
+ * other programs that include the conv.h header file.
+ */
+#if (CONV_PRUPANIC_BUFSIZE != UPANICFLGSZ)
+#define	REPORT_BUFSIZE UPANICFLGSZ
+#include "report_bufsize.h"
+#error "CONV_PRUPANIC_BUFSIZE does not match UPANICFLGSZ"
+#endif
+
+const char *
+conv_prupanic(uint32_t flags, Conv_fmt_flags_t fmt_flags,
+    Conv_upanic_buf_t *upanic_buf)
+{
+	/*
+	 * Unfortunately, we cannot directly use the PRUPANIC_FLAG_* macros here
+	 * because of the fact that this is also built natively and that would
+	 * create an unresolvable flag day.
+	 */
+	static Val_desc vda[] = {
+		{ 0x01, MSG_MSG_VALID },
+		{ 0x02, MSG_MSG_ERROR },
+		{ 0x04, MSG_MSG_TRUNC },
+		{ 0, 0 }
+	};
+	static CONV_EXPN_FIELD_ARG conv_arg = {
+	    NULL, sizeof (upanic_buf->buf)
+	};
+
+	if (flags == 0)
+		return (MSG_ORIG(MSG_GBL_ZERO));
+
+	conv_arg.buf = upanic_buf->buf;
+	conv_arg.oflags = conv_arg.rflags = flags;
+	(void) conv_expn_field(&conv_arg, vda, fmt_flags);
+
+	return ((const char *)upanic_buf->buf);
 }

@@ -543,6 +543,13 @@ typedef struct {
 	sl_field_t		pr_lwpname;
 } sl_prlwpname_layout_t;
 
+typedef struct {
+	sl_field_t		sizeof_struct;
+	sl_field_t		pru_version;
+	sl_field_t		pru_flags;
+	sl_field_t		pru_data;
+} sl_prupanic_layout_t;
+
 /*
  * This type collects all of the layout definitions for
  * a given architecture.
@@ -570,6 +577,7 @@ typedef struct {
 	const sl_prfdinfo_layout_t	*prfdinfo;	/* prdinfo_t */
 	const sl_prsecflags_layout_t	*prsecflags;	/* prsecflags_t */
 	const sl_prlwpname_layout_t	*prlwpname;	/* prlwpname_t */
+	const sl_prupanic_layout_t	*prupanic;	/* prupanic_t */
 } sl_arch_layout_t;
 
 

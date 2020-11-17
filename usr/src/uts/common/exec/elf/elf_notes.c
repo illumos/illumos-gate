@@ -164,6 +164,13 @@ setup_note_header(Phdr *v, proc_t *p)
 		v[0].p_filesz += nlwp * sizeof (Note)
 		    + nlwp * roundup(sizeof (asrset_t), sizeof (Word));
 #endif /* __sparc */
+
+	mutex_enter(&p->p_lock);
+	if ((p->p_upanicflag & P_UPF_PANICKED) != 0) {
+		v[0].p_filesz += sizeof (Note) +
+		    roundup(sizeof (prupanic_t), sizeof (Word));
+	}
+	mutex_exit(&p->p_lock);
 }
 
 int
@@ -186,6 +193,7 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 		priv_impl_info_t prinfo;
 		struct utsname	uts;
 		prsecflags_t	psecflags;
+		prupanic_t	upanic;
 	} *bigwad;
 
 	size_t xregsize = prhasx(p)? prgetprxregsize(p) : 0;
@@ -598,6 +606,36 @@ write_elfnotes(proc_t *p, int sig, vnode_t *vp, offset_t offset,
 		}
 	}
 	ASSERT(nlwp == 0);
+
+	/*
+	 * If a upanic occurred, add a note for it.
+	 */
+	mutex_enter(&p->p_lock);
+	if ((p->p_upanicflag & P_UPF_PANICKED) != 0) {
+		bzero(&bigwad->upanic, sizeof (prupanic_t));
+		bigwad->upanic.pru_version = PRUPANIC_VERSION_1;
+		if ((p->p_upanicflag & P_UPF_INVALMSG) != 0) {
+			bigwad->upanic.pru_flags |= PRUPANIC_FLAG_MSG_ERROR;
+		}
+
+		if ((p->p_upanicflag & P_UPF_TRUNCMSG) != 0) {
+			bigwad->upanic.pru_flags |= PRUPANIC_FLAG_MSG_TRUNC;
+		}
+
+		if ((p->p_upanicflag & P_UPF_HAVEMSG) != 0) {
+			bigwad->upanic.pru_flags |= PRUPANIC_FLAG_MSG_VALID;
+			bcopy(p->p_upanic, bigwad->upanic.pru_data,
+			    PRUPANIC_BUFLEN);
+		}
+
+		error = elfnote(vp, &offset, NT_UPANIC, sizeof (prupanic_t),
+		    &bigwad->upanic, rlimit, credp);
+		if (error != 0) {
+			mutex_exit(&p->p_lock);
+			goto done;
+		}
+	}
+	mutex_exit(&p->p_lock);
 
 done:
 	kmem_free(bigwad, bigsize);

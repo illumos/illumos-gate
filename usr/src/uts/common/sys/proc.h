@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -355,6 +356,8 @@ typedef struct	proc {
 	kcondvar_t	p_poolcv;	/* synchronization with pools */
 	uint_t		p_poolcnt;	/* # threads inside pool barrier */
 	uint_t		p_poolflag;	/* pool-related flags (see below) */
+	uint_t		p_upanicflag;	/* upanic-related flags (see below) */
+	void		*p_upanic;	/* optional upanic data */
 	uintptr_t	p_portcnt;	/* event ports counter */
 	struct zone	*p_zone;	/* zone in which process lives */
 	struct vnode	*p_execdir;	/* directory that p_exec came from */
@@ -523,6 +526,14 @@ extern struct pid pid0;		/* p0's pid */
  */
 #define	PBWAIT		0x0001  /* process should wait outside fork/exec/exit */
 #define	PEXITED		0x0002  /* process exited and about to become zombie */
+
+/*
+ * p_upanicflag codes
+ */
+#define	P_UPF_PANICKED	0x0001
+#define	P_UPF_HAVEMSG	0x0002
+#define	P_UPF_TRUNCMSG	0x0004
+#define	P_UPF_INVALMSG	0x0008
 
 /* Macro to convert proc pointer to a user block pointer */
 #define	PTOU(p)		(&(p)->p_user)

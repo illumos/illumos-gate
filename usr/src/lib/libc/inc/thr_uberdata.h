@@ -1323,6 +1323,7 @@ extern	void	_flush_windows(void);
 #define	_flush_windows()
 #endif
 extern	void	set_curthread(void *);
+extern	void	ssp_init(void);
 
 /*
  * Utility function used when waking up many threads (more than MAXLWPS)

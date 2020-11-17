@@ -1318,6 +1318,8 @@ Psecflags(struct ps_prochandle *P, prsecflags_t **psf)
 
 	if ((ret = P->ops.pop_secflags(P, psf, P->data)) == 0) {
 		if ((*psf)->pr_version != PRSECFLAGS_VERSION_1) {
+			free(*psf);
+			*psf = NULL;
 			errno = EINVAL;
 			return (-1);
 		}

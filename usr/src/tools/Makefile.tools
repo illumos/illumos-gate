@@ -63,6 +63,13 @@ LDFLAGS=		$(MAPFILE.NES:%=-Wl,-M%) $(MAPFILE.NED:%=-Wl,-M%) \
 # tools.
 GSHARED = -_cc=-G -_gcc=-shared
 
+#
+# To work around a bootstrapping problem, we don't assume that the
+# compiler or environment are properly configured to make the stack
+# protector work. Disable it right now for the tools.
+#
+STACKPROTECT = none
+
 # Unset CW_LINKER so we run the default.  We don't set LD here to avoid taking
 # the journey through LD_ALTEXEC unnecessarily.
 CW_LINKER=

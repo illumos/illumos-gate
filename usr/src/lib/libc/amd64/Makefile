@@ -267,6 +267,7 @@ COMSYSOBJS=			\
 	sigprocmsk.o		\
 	sigsendset.o		\
 	sigsuspend.o		\
+	ssp.o			\
 	statfs.o		\
 	statvfs.o		\
 	stty.o			\
@@ -279,6 +280,7 @@ COMSYSOBJS=			\
 	ulimit.o		\
 	umask.o			\
 	umount2.o		\
+	upanic.o		\
 	utssys.o		\
 	uucopy.o		\
 	vhangup.o		\
@@ -1200,6 +1202,12 @@ pics/arc4random.o :=	CPPFLAGS += -I$(SRC)/common/crypto/chacha
 
 pics/__clock_gettime.o := CPPFLAGS += $(COMMPAGE_CPPFLAGS)
 pics/gettimeofday.o := CPPFLAGS += $(COMMPAGE_CPPFLAGS)
+
+#
+# Disable the stack protector due to issues with bootstrapping rtld. See
+# cmd/sgs/rtld/Makefile.com for more information.
+#
+STACKPROTECT = none
 
 .KEEP_STATE:
 

@@ -182,6 +182,13 @@ INS.liblink64=	-$(RM) $@; $(SYMLINK) $(LIBLINKPATH)$(LIBLINKS)$(VERS) $@
 INS.liblinkccc64= -$(RM) $@; $(SYMLINK) $(LIBLINKPATH)$(LIBLINKSCCC)$(VERS) $@
 
 #
+# Default to adding stack protection to all libraries.
+#
+CFLAGS +=	$(CCSTACKPROTECT)
+CFLAGS64 +=	$(CCSTACKPROTECT)
+LDLIBS +=	$(LDSTACKPROTECT)
+
+#
 # If appropriate, augment POST_PROCESS_O and POST_PROCESS_SO to do CTF
 # processing.  We'd like to just conditionally append to POST_PROCESS_O and
 # POST_PROCESS_SO, but ParallelMake has a bug which causes the same value to

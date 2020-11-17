@@ -21,6 +21,7 @@
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
@@ -1018,7 +1019,8 @@ typedef	Elf64_Word	Elf64_Capchain;
 #define	NT_SPYMASTER	23	/* psinfo_t for agent LWP spymaster	*/
 #define	NT_SECFLAGS	24	/* process security-flags */
 #define	NT_LWPNAME	25	/* prlwpname_t */
-#define	NT_NUM		25
+#define	NT_UPANIC	26	/* prupanic_t */
+#define	NT_NUM		26
 
 
 #ifdef _KERNEL

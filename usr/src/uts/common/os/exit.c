@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -71,6 +72,7 @@
 #include <sys/pool.h>
 #include <sys/sdt.h>
 #include <sys/corectl.h>
+#include <sys/core.h>
 #include <sys/brand.h>
 #include <sys/libc_kernel.h>
 
@@ -597,6 +599,14 @@ proc_exit(int why, int what)
 	if ((tmp_id = p->p_alarmid) != 0) {
 		p->p_alarmid = 0;
 		(void) untimeout(tmp_id);
+	}
+
+	/*
+	 * If we had generated any upanic(2) state, free that now.
+	 */
+	if (p->p_upanic != NULL) {
+		kmem_free(p->p_upanic, PRUPANIC_BUFLEN);
+		p->p_upanic = NULL;
 	}
 
 	/*

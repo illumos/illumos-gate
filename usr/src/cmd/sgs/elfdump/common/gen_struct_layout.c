@@ -610,6 +610,16 @@ gen_prlwpname(void)
 	END;
 }
 
+static void
+gen_prupanic(void)
+{
+	START(prupanic, prupanic_t);
+	SCALAR_FIELD(prupanic_t, pru_version, 0);
+	SCALAR_FIELD(prupanic_t, pru_flags, 0);
+	ARRAY_FIELD(prupanic_t, pru_data, 0);
+	END;
+}
+
 /*ARGSUSED*/
 int
 main(int argc, char *argv[])
@@ -652,6 +662,7 @@ main(int argc, char *argv[])
 	gen_prfdinfo();
 	gen_prsecflags();
 	gen_prlwpname();
+	gen_prupanic();
 
 	/*
 	 * Generate the full arch_layout description
@@ -681,6 +692,7 @@ main(int argc, char *argv[])
 	(void) printf(fmt, "prfdinfo");
 	(void) printf(fmt, "prsecflags");
 	(void) printf(fmt, "prlwpname");
+	(void) printf(fmt, "prupanic");
 	(void) printf("};\n");
 
 	/*

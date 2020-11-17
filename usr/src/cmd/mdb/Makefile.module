@@ -127,6 +127,7 @@ $(MODOBJS) :=	CFLAGS64 += $(C_BIGPICFLAGS) $(XREGSFLAG)
 $(KMODOBJS) :=	CPPFLAGS += -D_KMDB
 $(KMODOBJS) :=	V9CODESIZE = $(CCABS32)
 $(KMODOBJS) :=	DTS_ERRNO =
+$(KMODFILE) :=	STACKPROTECT = none
 
 # Modules aren't allowed to export symbols
 MAPFILE		= $(SRC)/cmd/mdb/common/modules/conf/mapfile

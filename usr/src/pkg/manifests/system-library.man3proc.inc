@@ -97,6 +97,7 @@ file path=usr/share/man/man3proc/Psymbol_iter.3proc
 file path=usr/share/man/man3proc/Psync.3proc
 file path=usr/share/man/man3proc/Psysentry.3proc
 file path=usr/share/man/man3proc/Puname.3proc
+file path=usr/share/man/man3proc/Pupanic.3proc
 file path=usr/share/man/man3proc/Pupdate_maps.3proc
 file path=usr/share/man/man3proc/Pupdate_syms.3proc
 file path=usr/share/man/man3proc/Pwrite.3proc
@@ -227,6 +228,7 @@ link path=usr/share/man/man3proc/Psymbol_iter_by_name.3proc \
     target=Psymbol_iter.3proc
 link path=usr/share/man/man3proc/Psysexit.3proc target=Psysentry.3proc
 link path=usr/share/man/man3proc/Punsetflags.3proc target=Psetflags.3proc
+link path=usr/share/man/man3proc/Pupanic_free.3proc target=Pupanic.3proc
 link path=usr/share/man/man3proc/Pwait.3proc target=Pstopstatus.3proc
 link path=usr/share/man/man3proc/Pxcreate.3proc target=Pcreate.3proc
 link path=usr/share/man/man3proc/Pxecwapt.3proc target=Pxecbkpt.3proc

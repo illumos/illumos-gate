@@ -120,3 +120,9 @@ MSGSRCS=	$(COMOBJS:%.o=../common/%.c) \
 SGSMSGTARG=	$(BLTOBJS:%_msg.o=../common/%.msg)
 
 CLEANFILES +=	$(BLTDATA) bld_vernote vernote.s
+
+#
+# Disable the stack protector due to issues with bootstrapping rtld. See
+# cmd/sgs/rtld/Makefile.com for more information.
+#
+STACKPROTECT = none

@@ -137,4 +137,10 @@ DHCPCPPFLAGS = -I$(CMNNETDIR)/dhcp
 #
 SOCKCPPFLAGS = -I$(STANDDIR)/lib/sock -D_SYS_STREAM_H
 
+#
+# Using Makefile.lib pulls in the stack protector. Explicitly disable it
+# as it is not initialized or supported in this environment currently.
+#
+STACKPROTECT = none
+
 .KEEP_STATE:

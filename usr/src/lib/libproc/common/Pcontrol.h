@@ -172,6 +172,7 @@ typedef struct core_info {	/* information specific to core files */
 	priv_impl_info_t *core_ppii;	/* NOTE entry for core_privinfo */
 	char *core_zonename;	/* zone name from core file */
 	prsecflags_t *core_secflags; /* secflags from core file */
+	prupanic_t *core_upanic; /* upanic from core file */
 #if defined(__i386) || defined(__amd64)
 	struct ssd *core_ldt;	/* LDT entries from core file */
 	uint_t core_nldt;	/* number of LDT entries in core file */

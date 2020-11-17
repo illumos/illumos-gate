@@ -411,6 +411,45 @@ CCNOAGGRESSIVELOOPS= \
 	-_gcc8=-fno-aggressive-loop-optimizations \
 	-_gcc9=-fno-aggressive-loop-optimizations
 
+#
+# Options to control which version of stack-protector we enable. This
+# gives us a bit of flexibility and is unfortunately necessary as some
+# modules do not function correctly with our defaults (qede).
+#
+#  o STACKPROTECT_              Sets the appropriate version for the compiler
+#  o STACKPROTECT_strong        Sets us to use strong on all of the
+#                               compilers it supports. This is the same
+#                               as the default.
+#
+#  o STACKPROTECT_none          Disables the stack protector.
+#
+#  o STACKPROTECT_all           Enables it for everything.
+#
+#  o STACKPROTECT_basic         Enables the basic stack protector.
+#
+# -fstack-protector-strong is not available in gcc4 which is why we
+# have per-compiler versions below. These are not added to the default
+# global CFLAGS at this time as it's being incrementally enabled
+# throughout the build.
+#
+STACKPROTECT_           = -_gcc4=-fstack-protector
+STACKPROTECT_           += -_gcc7=-fstack-protector-strong
+STACKPROTECT_           += -_gcc8=-fstack-protector-strong
+STACKPROTECT_           += -_gcc9=-fstack-protector-strong
+
+STACKPROTECT_strong     = $(STACKPROTECT_)
+STACKPROTECT_none       =
+STACKPROTECT_all        = -_gcc=-fstack-protector-all
+STACKPROTECT_basic      = -_gcc=-fstack-protector
+
+STACKPROTECT_LD_	= -lssp_ns
+STACKPROTECT_LD_none	=
+STACKRPTOECT_LD_all	= $(STACKRPOTECT_LD_)
+STACKRPTOECT_LD_basic	= $(STACKRPOTECT_LD_)
+
+CCSTACKPROTECT= $(STACKPROTECT_$(STACKPROTECT))
+LDSTACKPROTECT= $(STACKPROTECT_LD_$(STACKPROTECT))
+
 # One optimization the compiler might perform is to turn this:
 #	#pragma weak foo
 #	extern int foo;

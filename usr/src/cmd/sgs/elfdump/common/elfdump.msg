@@ -314,6 +314,7 @@
 @ MSG_NOTE_BADCORETYPE	"%s: unknown note type %#x\n"
 
 @ MSG_NOTE_BAD_SECFLAGS_VER	"unknown prsecflags_t version: "
+@ MSG_NOTE_BAD_UPANIC_VER	"unknown prupanic_t version: "
 
 @ _END_
 
@@ -472,6 +473,7 @@
 @ MSG_CNOTE_DESC_PRFDINFO_T		"desc: (prfdinfo_core_t)"
 @ MSG_CNOTE_DESC_PRSECFLAGS_T		"desc: (prsecflags_t)"
 @ MSG_CNOTE_DESC_PRLWPNAME_T		"desc: (prlwpname_t)"
+@ MSG_CNOTE_DESC_PRUPANIC_T		"desc: (prupanic_t)"
 
 @ MSG_CNOTE_FMT_LINE		"%*s%-*s%s"
 @ MSG_CNOTE_FMT_LINE_2UP	"%*s%-*s%-*s%-*s%s"
@@ -646,6 +648,9 @@
 @ MSG_CNOTE_T_PR_INO			"pr_ino:"
 @ MSG_CNOTE_T_PR_FILEFLAGS		"pr_fileflags:"
 @ MSG_CNOTE_T_PR_FDFLAGS		"pr_fdflags:"
+@ MSG_CNOTE_T_PRU_VERSION		"pru_version:"
+@ MSG_CNOTE_T_PRU_FLAGS			"pru_flags:"
+@ MSG_CNOTE_T_PRU_DATA			"pru_data:"
 
 
 # Names of fake sections generated from program header data

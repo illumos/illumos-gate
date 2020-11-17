@@ -387,6 +387,7 @@ GENUNIX_OBJS +=	\
 		uname.o		\
 		unix_bb.o	\
 		unlink.o	\
+		upanic.o	\
 		urw.o		\
 		utime.o		\
 		utssys.o	\

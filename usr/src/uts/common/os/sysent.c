@@ -25,6 +25,7 @@
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2016 Joyent, Inc.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -330,6 +331,7 @@ int	setsockopt(int, int, int, void *, socklen_t *, int);
 int	sockconfig(int, void *, void *, void *, void *);
 ssize_t	sendfilev(int, int, const struct sendfilevec *, int, size_t *);
 ssize_t	getrandom(void *, size_t, unsigned int);
+void	upanic(void *, size_t);
 
 typedef int64_t	(*llfcn_t)();	/* for casting one-word returns */
 
@@ -583,7 +585,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 122 */ SYSENT_CL("writev",		writev,		3),
 	/* 123 */ SYSENT_CL("preadv",		preadv,		5),
 	/* 124 */ SYSENT_CL("pwritev",		pwritev,	5),
-	/* 125 */ SYSENT_LOADABLE(),			/* (was fxstat) */
+	/* 125 */ SYSENT_CI("upanic",		upanic,		2),
 	/* 126 */ SYSENT_CL("getrandom",	getrandom,	3),
 	/* 127 */ SYSENT_CI("mmapobj",		mmapobjsys,	5),
 	/* 128 */ IF_LP64(
@@ -948,7 +950,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 122 */ SYSENT_CI("writev",		writev32,	3),
 	/* 123 */ SYSENT_CI("preadv",		preadv,		5),
 	/* 124 */ SYSENT_CI("pwritev",		pwritev,	5),
-	/* 125 */ SYSENT_LOADABLE32(),		/*	was fxstat32	*/
+	/* 125 */ SYSENT_CI("upanic",		upanic,		2),
 	/* 126 */ SYSENT_CI("getrandom",	getrandom,	3),
 	/* 127 */ SYSENT_CI("mmapobj",		mmapobjsys,	5),
 	/* 128 */ SYSENT_CI("setrlimit",	setrlimit32,	2),

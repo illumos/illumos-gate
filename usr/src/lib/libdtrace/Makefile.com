@@ -143,7 +143,7 @@ SMATCH=off
 YYCFLAGS =
 LDLIBS += -lgen -lproc -lrtld_db -lnsl -lsocket -lctf -lelf -lc -lzonecfg
 DRTILDLIBS = $(LDLIBS.lib) -lc
-LIBDAUDITLIBS = $(LDLIBS.lib) -lmapmalloc -lc -lproc
+LIBDAUDITLIBS = $(LDLIBS.lib) -lmapmalloc -lc -lproc $(LDSTACKPROTECT)
 
 yydebug := YYCFLAGS += -DYYDEBUG
 
@@ -156,6 +156,14 @@ ROOTDLIBDIR64 = $(ROOT)/usr/lib/dtrace/64
 ROOTDLIBS = $(DLIBSRCS:%=$(ROOTDLIBDIR)/%)
 ROOTDOBJS = $(ROOTDLIBDIR)/$(DRTIOBJ) $(ROOTDLIBDIR)/$(LIBDAUDIT)
 ROOTDOBJS64 = $(ROOTDLIBDIR64)/$(DRTIOBJ) $(ROOTDLIBDIR64)/$(LIBDAUDIT)
+
+#
+# We do not build drti.o with the stack protector as otherwise
+# everything that uses dtrace -G may have a surprise stack protector
+# requirement right now. While in theory this could be handled by libc,
+# this will make the overall default transition smoother.
+#
+$(DRTIOBJ) := STACKPROTECT = none
 
 $(ROOTDLIBDIR)/%.d := FILEMODE=444
 $(ROOTDLIBDIR)/%.o := FILEMODE=444

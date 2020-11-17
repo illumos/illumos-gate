@@ -19,6 +19,9 @@ include ../../../../../cmd/Makefile.cmd
 
 OBJS =			vdso_tool.o
 
+# Native tool, doesn't need stack protection.
+STACKPROTECT = none
+
 CLOBBERFILES +=		$(PROG)
 
 NATIVECC_CFLAGS +=	$(CFLAGS) $(CCVERBOSE)

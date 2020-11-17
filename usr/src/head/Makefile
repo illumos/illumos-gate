@@ -206,6 +206,7 @@ HDRS=   $($(MACH)_HDRS)	\
 	ucred.h		\
 	ulimit.h	\
 	unistd.h	\
+	upanic.h	\
 	userdefs.h	\
 	ustat.h		\
 	utime.h		\

@@ -47,6 +47,7 @@ include ../Makefile.master
 
 # Build libc and its dependencies
 SUBDIRS=			\
+	ssp_ns			\
 	crt			\
 	../cmd/sgs/libconv	\
 	../cmd/sgs/libdl	\

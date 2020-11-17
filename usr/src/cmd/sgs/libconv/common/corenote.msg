@@ -25,6 +25,7 @@
 #
 # Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
 # Copyright (c) 2018 Joyent, Inc.
+# Copyright 2020 Oxide Computer Company
 #
 
 @ MSG_NT_PRSTATUS		"[ NT_PRSTATUS ]"
@@ -50,6 +51,7 @@
 @ MSG_NT_SPYMASTER		"[ NT_SPYMASTER ]"
 @ MSG_NT_SECFLAGS		"[ NT_SECFLAGS ]"
 @ MSG_NT_LWPNAME		"[ NT_LWPNAME ]"
+@ MSG_NT_UPANIC			"[ NT_UPANIC ]"
 
 
 @ MSG_AUXV_AF_SUN_SETUGID		"AF_SUN_SETUGID"
@@ -290,6 +292,10 @@
 @ MSG_ASLR		"ASLR"
 @ MSG_FORBIDNULLMAP	"FORBIDNULLMAP"
 @ MSG_NOEXECSTACK	"NOEXECSTACK"
+
+@ MSG_MSG_VALID		"MSG_VALID"
+@ MSG_MSG_ERROR		"MSG_ERROR"
+@ MSG_MSG_TRUNC		"MSG_TRUNC"
 
 @ MSG_PS_NONE			"[ PS_NONE ]"
 @ MSG_PS_QUERY			"[ PS_QUERY ]"
@@ -829,10 +835,14 @@
 @ MSG_SYS_READV_ALT			"readv"
 @ MSG_SYS_WRITEV			"[ writev ]"			# 122
 @ MSG_SYS_WRITEV_ALT			"writev"
-@ MSG_SYS_123				"123"				# 123(u)
-@ MSG_SYS_124				"124"				# 124(u)
-@ MSG_SYS_125				"125"				# 125(u)
-@ MSG_SYS_126				"126"				# 126(u)
+@ MSG_SYS_PREADV			"[ preadv ]"			# 123
+@ MSG_SYS_PREADV_ALT			"preadv"
+@ MSG_SYS_PWRITEV			"[ pwritev ]"			# 124
+@ MSG_SYS_PWRITEV_ALT			"pwritev"
+@ MSG_SYS_UPANIC			"[ upanic ]"			# 125
+@ MSG_SYS_UPANIC_ALT			"upanic"
+@ MSG_SYS_GETRANDOM			"[ getrandom ]"			# 126
+@ MSG_SYS_GETRANDOM_ALT			"getrandom"
 @ MSG_SYS_MMAPOBJ			"[ mmapobj ]"			# 127
 @ MSG_SYS_MMAPOBJ_ALT			"mmapobj"
 @ MSG_SYS_SETRLIMIT			"[ setrlimit ]"			# 128
