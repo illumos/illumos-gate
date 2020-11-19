@@ -1,0 +1,207 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2020 Joyent, Inc.
+.\"
+.Dd November 22, 2020
+.Dt GETGROUPLIST 3C
+.Os
+.Sh NAME
+.Nm getgrouplist
+.Nd calculate group access list
+.Sh SYNOPSIS
+.In grp.h
+.Ft int
+.Fo getgrouplist
+.Fa "const char *user"
+.Fa "gid_t agroup"
+.Fa "gid_t *groups"
+.Fa "int *ngroups"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn getgrouplist
+function queries the group database to obtain the list of groups that
+.Fa user
+belongs to.
+The
+.Fa agroup
+group is always added to the resulting group list.
+This value is typically the primary gid of the user from the
+.Sy passwd
+database.
+.Pp
+When calling
+.Fn getgrouplist ,
+the caller should set the maximum number of groups that
+.Fa groups
+can hold in
+.Fa *ngroups .
+The value of
+.Dv NGROUPS_MAX
+can be used to size
+.Fa groups
+to ensure it can hold any number of groups supported by the system.
+.Pp
+Upon return,
+.Fn getgrouplist
+stores the list of groups that
+.Fa user
+belongs to in
+.Fa groups
+and stores the number of groups
+.Fa user
+belongs to in
+.Fa *ngroups
+.Po
+this may be a smaller than the value passed in when
+calling
+.Fn getgrouplist
+.Pc .
+If
+.Fa groups
+is too small to hold all of the groups
+.Fa user
+belongs to,
+.Fn getgrouplist
+fails and sets
+.Fa *ngroups
+to a value large enough to hold the full result.
+.Sh RETURN VALUES
+On success,
+.Fn getgrouplist
+returns the number of groups
+.Fa user
+belongs to, fills in
+.Fa groups
+with the gids of the groups
+.Fa user
+belongs to, and also sets
+.Fa *ngroups
+to the number of groups
+.Fa user
+belongs to.
+.Pp
+On failure,
+.Fn getgrouplist
+returns -1 and
+.Va errno
+is set.
+.Pp
+The behavior of
+.Fn getgrouplist
+is undefined if the total number of groups a user belongs to exceeds
+.Dv NGROUPS_MAX .
+.Pp
+Note that on
+.Fx ,
+.Fn getgrouplist
+always returns -1 on failure or 0 on success.
+A caller must rely on the value set in
+.Fa *ngroups
+upon return to determine the number of entries in
+.Fa groups .
+.Pp
+On Linux, both glibc and musl return the number of groups
+.Fa user
+belongs to on success and returns -1 on failure.
+.Pp
+None of these other implementations document any
+.Va errno
+values on failure, however their implementations show that
+.Va errno
+may be set on failure.
+Software using
+.Fn getgrouplist
+should be aware of these differences when attemping to write portable
+software.
+.Sh EXAMPLES
+.Sy Example 1
+Print all the groups for a user.
+.Bd -literal
+#include <pwd.h>
+#include <grp.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <limits.h>
+#include <err.h>
+
+void
+printgroups(const char *user)
+{
+    struct passwd *pw;
+    gid_t *groups;
+    int ngroups, ret;
+
+    if ((groups = calloc(NGROUPS_MAX, sizeof (gid_t))) == NULL)
+        err(EXIT_FAILURE, "calloc");
+
+    if ((pw = getpwnam(user)) == NULL)
+        err(EXIT_FAILURE, "getpwname");
+
+    ngroups = NGROUPS_MAX;
+    ret = getgrouplist(user, pw->pw_gid, groups, &ngroups);
+    if (ret < 0)
+        err(EXIT_FAILURE, "getgrouplist");
+
+    for (int i = 0; i < ret; i++) {
+        struct group *gr = getgrgid(groups[i]);
+
+        (void) printf("%s ", gr->gr_name);
+    }
+    (void) fputc('\\n', stdout);
+
+    free(groups);
+}
+.Ed
+.Sh ERRORS
+On failure,
+.Fn getgrouplist
+returns -1, and will set errno to one one of the following values:
+.Bl -tag -width Dv
+.It Er ENOMEM
+Not enough memory to complete the request.
+.It Er EINVAL
+One of the parameters is invalid
+.Po
+for example,
+.Fa ngroups
+is
+.Dv NULL
+.Pc .
+.It Dv ERANGE
+The supplied value of
+.Fa *ngroups
+is too small to hold the results.
+.Fa *ngroups
+is set
+.Po
+upon return
+.Pc
+to a value large enough to hold the results, and a partial set of
+results is written to
+.Fa groups .
+The value written to
+.Fa *ngroups
+may be larger than the value returned by a successful call to
+.Fn getgrouplist .
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr groups 1 ,
+.Xr getuid 2 ,
+.Xr getgrnam 3C ,
+.Xr getgroups 3C ,
+.Xr initgroups 3C ,
+.Xr limits.h 3HEAD

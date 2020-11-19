@@ -14,7 +14,7 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2018 Joyent, Inc.
+# Copyright 2020 Joyent, Inc.
 # Copyright 2018 Jason King
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
@@ -172,6 +172,7 @@ MANFILES=	__fbufsize.3c					\
 		getenv.3c					\
 		getexecname.3c					\
 		getgrnam.3c					\
+		getgrouplist.3c					\
 		gethostid.3c					\
 		gethostname.3c					\
 		gethrtime.3c					\
