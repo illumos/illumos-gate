@@ -38,6 +38,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2014 Pluribus Networks Inc.
+ * Copyright 2020 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -127,19 +128,18 @@ lapic_intr_msi(struct vm *vm, uint64_t addr, uint64_t msg)
 	}
 
 	/*
-	 * Extract the x86-specific fields from the MSI addr/msg
-	 * params according to the Intel Arch spec, Vol3 Ch 10.
+	 * Extract the x86-specific fields from the MSI addr/msg params
+	 * according to the Intel Arch spec, Vol3 Ch 10.
 	 *
-	 * The PCI specification does not support level triggered
-	 * MSI/MSI-X so ignore trigger level in 'msg'.
+	 * The PCI specification does not support level triggered MSI/MSI-X so
+	 * ignore trigger level in 'msg'.
 	 *
-	 * The 'dest' is interpreted as a logical APIC ID if both
-	 * the Redirection Hint and Destination Mode are '1' and
-	 * physical otherwise.
+	 * Certain kinds of interrupt broadcasts (physical or logical-clustered
+	 * for destination 0xff) are prohibited when the redirection hint bit is
+	 * set for a given message.  Those edge cases are ignored for now.
 	 */
 	dest = (addr >> 12) & 0xff;
-	phys = ((addr & (MSI_X86_ADDR_RH | MSI_X86_ADDR_LOG)) !=
-	    (MSI_X86_ADDR_RH | MSI_X86_ADDR_LOG));
+	phys = (addr & MSI_X86_ADDR_LOG) == 0;
 	delmode = msg & APIC_DELMODE_MASK;
 	vec = msg & 0xff;
 
