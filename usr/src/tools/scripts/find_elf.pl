@@ -22,6 +22,7 @@
 
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -57,7 +58,28 @@ use POSIX qw(getenv);
 use Getopt::Std;
 use File::Basename;
 use IO::Dir;
+use Config;
 
+BEGIN {
+	if ($Config{useithreads}) {
+		require threads;
+		require threads::shared;
+		threads::shared->import(qw(share));
+		require Thread::Queue;
+	}
+}
+
+chomp (my $NPROCESSORS_ONLN = `getconf NPROCESSORS_ONLN 2>/dev/null` || 1);
+my $max_threads = $ENV{DMAKE_MAX_JOBS} || $NPROCESSORS_ONLN;
+my $tq;
+
+if ($Config{useithreads}) {
+	share(%Output);
+	share(%id_hash);
+	share(%alias_hash);
+
+	$tq = Thread::Queue->new;
+}
 
 ## GetObjectInfo(path)
 #
@@ -229,6 +251,23 @@ sub ProcFile {
 #		or generating nonsensical paths (i.e., 32/amd64/...).
 #
 sub ProcDir {
+	if ($Config{useithreads}) {
+		threads->create(sub {
+			while (my $q = $tq->dequeue) {
+				ProcFile(@$q)
+			}
+		}) for (1 .. $max_threads);
+	}
+
+	_ProcDir(@_);
+
+	if ($Config{useithreads}) {
+		$tq->end;
+		$_->join for threads->list;
+	}
+}
+
+sub _ProcDir {
 	my($FullDir, $RelDir, $AliasedPath, $SelfSymlink) = @_;
 	my($NewFull, $NewRel, $Entry);
 
@@ -279,7 +318,7 @@ sub ProcDir {
 				# via that link.
 				next if $SelfSymlink;
 
-				ProcDir($NewFull, $NewRel, $RecurseAliasedPath,
+				_ProcDir($NewFull, $NewRel, $RecurseAliasedPath,
 				    $RecurseSelfSymlink);
 				next;
 			}
@@ -296,8 +335,16 @@ sub ProcDir {
 			# Process any standard files.
 			if (-f _) {
 				my ($dev, $ino) = stat(_);
-				ProcFile($NewFull, $NewRel, $AliasedPath,
-				    $IsSymLink, $dev, $ino);
+				if ($Config{useithreads}) {
+					$tq->enqueue([ $NewFull, $NewRel,
+					    $AliasedPath, $IsSymLink, $dev,
+					    $ino ]);
+				}
+				else {
+					ProcFile($NewFull, $NewRel,
+					    $AliasedPath, $IsSymLink, $dev,
+					    $ino);
+				}
 				next;
 			}
 
