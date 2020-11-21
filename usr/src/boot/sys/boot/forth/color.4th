@@ -1,6 +1,6 @@
 \ Copyright (c) 2011-2013 Devin Teske <dteske@FreeBSD.org>
 \ All rights reserved.
-\ 
+\
 \ Redistribution and use in source and binary forms, with or without
 \ modification, are permitted provided that the following conditions
 \ are met:
@@ -9,7 +9,7 @@
 \ 2. Redistributions in binary form must reproduce the above copyright
 \    notice, this list of conditions and the following disclaimer in the
 \    documentation and/or other materials provided with the distribution.
-\ 
+\
 \ THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
 \ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 \ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -21,18 +21,18 @@
 \ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 \ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 \ SUCH DAMAGE.
-\ 
-\ $FreeBSD$
+\
 
 marker task-color.4th
 
 \ This function returns FALSE if the `loader_color' environment variable is set
-\ to NO, no, or 0. Otherwise, TRUE is returned (unless booting serial).
-\ 
+\ to NO, no, or 0. Otherwise, TRUE is returned.
+\
 : loader_color? ( -- N )
 
 	s" loader_color" getenv dup -1 <> if
-
+		\ `loader_color' is set.
+		\ Check if it is explicitly disabled.
 		2dup s" NO" compare-insensitive 0= if
 			2drop
 			FALSE exit
@@ -44,6 +44,6 @@ marker task-color.4th
 		drop
 	then
 	drop
-
-	boot_serial? if FALSE else TRUE then
+	\ It is enabled.
+	TRUE
 ;
