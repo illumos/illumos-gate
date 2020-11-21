@@ -1121,14 +1121,17 @@ gfx_term_drawrect(uint32_t ux1, uint32_t uy1, uint32_t ux2, uint32_t uy2)
 	width = vf_width / 4;			/* line width */
 	xshift = (vf_width - width) / 2;
 	yshift = (vf_height - width) / 2;
-	/* Terminal coordinates start from (1,1) */
-	ux1--;
-	uy1--;
+
+	/* Shift coordinates */
+	if (ux1 != 0)
+		ux1--;
+	if (uy1 != 0)
+		uy1--;
 	ux2--;
 	uy2--;
 
 	/* mark area used in tem */
-	tem_image_display(tems.ts_active, uy1 - 1, ux1 - 1, uy2, ux2);
+	tem_image_display(tems.ts_active, uy1, ux1, uy2 + 1, ux2 + 1);
 
 	/*
 	 * Draw horizontal lines width points thick, shifted from outer edge.
@@ -1320,10 +1323,10 @@ gfx_fb_putimage(png_t *png, uint32_t ux1, uint32_t uy1, uint32_t ux2,
 	 */
 	if (!(flags & FL_PUTIMAGE_NOSCROLL)) {
 		tem_image_display(tems.ts_active,
-		    da.row / tems.ts_font.vf_height - 1,
-		    da.col / tems.ts_font.vf_width - 1,
-		    (da.row + da.height) / tems.ts_font.vf_height - 1,
-		    (da.col + da.width) / tems.ts_font.vf_width - 1);
+		    da.row / tems.ts_font.vf_height,
+		    da.col / tems.ts_font.vf_width,
+		    (da.row + da.height) / tems.ts_font.vf_height,
+		    (da.col + da.width) / tems.ts_font.vf_width);
 	}
 
 	if ((flags & FL_PUTIMAGE_BORDER))
