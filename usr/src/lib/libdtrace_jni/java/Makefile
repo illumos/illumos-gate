@@ -38,6 +38,9 @@ PKGNAME=org.opensolaris.os.dtrace
 APIDIR=$(SRC)/lib/libdtrace_jni/java
 CLASSES=$(APIDIR)/classes
 JARS=$(APIDIR)/lib
+# the files in the docs directory go with the api javadoc
+# which can be generated using the doc target
+# the documentation is not built or packaged by default
 DOCS=$(APIDIR)/docs
 DOCAPI=$(DOCS)/api
 DOCEXAMPLES=$(DOCS)/examples
@@ -50,24 +53,8 @@ APIJAVASRC=$(APIDIR)/src
 APIJAR=dtrace.jar
 JARDESTDIR=$(ROOT)/usr/share/lib/java
 INSJARS=$(JARDESTDIR)/$(APIJAR)
-# javadoc
-DOCDESTDIR=$(ROOT)/usr/share/lib/java/javadoc/dtrace
-DOCAPIDESTDIR=$(DOCDESTDIR)/api
-DOCEXAMPLESDESTDIR=$(DOCDESTDIR)/examples
-DOCHTMLDESTDIR=$(DOCDESTDIR)/html
-DOCIMAGESDESTDIR=$(DOCDESTDIR)/images
-XDOCLINT_OPTION=-Xdoclint:none
 
 $(JARDESTDIR)/%: $(JARS)/%
-	$(INS.file)
-
-$(DOCEXAMPLESDESTDIR)/%: $(DOCEXAMPLES)/%
-	$(INS.file)
-
-$(DOCHTMLDESTDIR)/%: $(DOCHTML)/%
-	$(INS.file)
-
-$(DOCIMAGESDESTDIR)/%: $(DOCIMAGES)/%
 	$(INS.file)
 
 # Manifest files
@@ -165,15 +152,6 @@ clobber:	clean
 $(CLASSES):
 		-@mkdir -p $@
 
-# Rule for installing API javadoc.
-$(DOCAPIDESTDIR)/index.html: $(DTRACE_API_CLASSES)
-		-@mkdir -p $(DOCAPIDESTDIR)
-		-$(RM) -r $(DOCAPIDESTDIR)/*
-		cd $(APIJAVASRC); umask 022; \
-		$(JAVADOC) -protected -use -notimestamp $(XDOCLINT_OPTION) \
-		-classpath $(APICLASSPATH) -d $(DOCAPIDESTDIR) \
-		$(PKGNAME)
-
 $(CLASSES)/$(PKGPATH):
 		$(INS.dir)
 
@@ -184,37 +162,7 @@ $(JARS)/$(APIJAR): $(DTRACE_API_CLASSES) $(APIMANI)
 $(JARDESTDIR):
 		$(INS.dir)
 
-$(DOCDESTDIR):
-		$(INS.dir)
-
-$(DOCAPIDESTDIR):
-		$(INS.dir)
-
-$(DOCEXAMPLESDESTDIR):
-		$(INS.dir)
-
-$(DOCHTMLDESTDIR):
-		$(INS.dir)
-
-$(DOCIMAGESDESTDIR):
-		$(INS.dir)
-
-install:	all $(JARDESTDIR) $(INSJARS) $(DOCDESTDIR) \
-	$(DOCAPIDESTDIR) \
-	$(DOCAPIDESTDIR)/index.html \
-	$(DOCEXAMPLESDESTDIR) \
-	$(DOCEXAMPLESDESTDIR)/TestAPI.java \
-	$(DOCEXAMPLESDESTDIR)/TestAPI2.java \
-	$(DOCEXAMPLESDESTDIR)/TestTarget.java \
-	$(DOCEXAMPLESDESTDIR)/hello.d \
-	$(DOCEXAMPLESDESTDIR)/intrstat.d \
-	$(DOCEXAMPLESDESTDIR)/syscall.d \
-	$(DOCEXAMPLESDESTDIR)/target.d \
-	$(DOCHTMLDESTDIR) \
-	$(DOCHTMLDESTDIR)/JavaDTraceAPI.html \
-	$(DOCHTMLDESTDIR)/fast.html \
-	$(DOCIMAGESDESTDIR) \
-	$(DOCIMAGESDESTDIR)/JavaDTraceAPI.gif
+install:	all $(JARDESTDIR) $(INSJARS)
 
 # empty targets for top-level building compatability
 install_h:
