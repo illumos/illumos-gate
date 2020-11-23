@@ -1510,6 +1510,7 @@ bd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 	}
 	case DKIOCGMEDIAINFOEXT: {
 		struct dk_minfo_ext miext;
+		size_t len;
 
 		/* make sure our state information is current */
 		bd_update_state(bd);
@@ -1518,7 +1519,17 @@ bd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 		miext.dki_lbsize = (1U << bd->d_blkshift);
 		miext.dki_pbsize = (1U << bd->d_pblkshift);
 		miext.dki_capacity = bd->d_numblks;
-		if (ddi_copyout(&miext, ptr, sizeof (miext), flag)) {
+
+		switch (ddi_model_convert_from(flag & FMODELS)) {
+		case DDI_MODEL_ILP32:
+			len = sizeof (struct dk_minfo_ext32);
+			break;
+		default:
+			len = sizeof (struct dk_minfo_ext);
+			break;
+		}
+
+		if (ddi_copyout(&miext, ptr, len, flag)) {
 			return (EFAULT);
 		}
 		return (0);

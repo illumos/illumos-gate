@@ -1668,6 +1668,7 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 	case DKIOCGMEDIAINFOEXT:
 	{
 		struct dk_minfo_ext dkmext;
+		size_t len;
 
 		bzero(&dkmext, sizeof (dkmext));
 		dkmext.dki_lbsize = 1U << zv->zv_min_bs;
@@ -1675,7 +1676,17 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 		dkmext.dki_capacity = zv->zv_volsize >> zv->zv_min_bs;
 		dkmext.dki_media_type = DK_UNKNOWN;
 		mutex_exit(&zfsdev_state_lock);
-		if (ddi_copyout(&dkmext, (void *)arg, sizeof (dkmext), flag))
+
+		switch (ddi_model_convert_from(flag & FMODELS)) {
+		case DDI_MODEL_ILP32:
+			len = sizeof (struct dk_minfo_ext32);
+			break;
+		default:
+			len = sizeof (struct dk_minfo_ext);
+			break;
+		}
+
+		if (ddi_copyout(&dkmext, (void *)arg, len, flag))
 			error = SET_ERROR(EFAULT);
 		return (error);
 	}
