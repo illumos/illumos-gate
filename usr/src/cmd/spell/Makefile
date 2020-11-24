@@ -113,19 +113,19 @@ htemp1:	list local extra hashmk1
 	$(RM) $@; cat list local extra | $(_SH_) ./hashmk1 > $@
 
 hlista: american $(HASHPROG) htemp1
-	$(RM) htemp2; ./hashmk1 <american |sort -u - htemp1 >htemp2
-	$(RM) $@; ./spellin1 `wc htemp2|sed -n 's/\([^ ]\) .*/\1/p'`<htemp2 >$@
-	$(RM) htemp2
+	$(RM) htemp2a; ./hashmk1 <american |sort -u - htemp1 >htemp2a
+	$(RM) $@; ./spellin1 `wc htemp2a|sed -n 's/\([^ ]\) .*/\1/p'`<htemp2a >$@
+	$(RM) htemp2a
 
 hlistb: british $(HASHPROG) htemp1
-	$(RM) htemp2; ./hashmk1 <british |sort -u - htemp1 >htemp2
-	$(RM) $@; ./spellin1 `wc htemp2|sed -n 's/\([^ ]\) .*/\1/p'`<htemp2 >$@
-	$(RM) htemp2
+	$(RM) htemp2b; ./hashmk1 <british |sort -u - htemp1 >htemp2b
+	$(RM) $@; ./spellin1 `wc htemp2b|sed -n 's/\([^ ]\) .*/\1/p'`<htemp2b >$@
+	$(RM) htemp2b
 
 hstop:	stop $(HASHPROG)
-	$(RM) htemp2; ./hashmk1 <stop | sort -u >htemp2
-	$(RM) $@; ./spellin1 `wc htemp2|sed -n 's/\([^ ]\) .*/\1/p'`<htemp2 >$@
-	$(RM) htemp2
+	$(RM) htemp2s; ./hashmk1 <stop | sort -u >htemp2s
+	$(RM) $@; ./spellin1 `wc htemp2s|sed -n 's/\([^ ]\) .*/\1/p'`<htemp2s >$@
+	$(RM) htemp2s
 
 install: all $(ROOTDIRS) $(ROOTBINF) $(ROOTSPELLF) $(ROOTVARADMF)
 

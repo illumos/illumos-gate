@@ -25,10 +25,8 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved   */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -97,7 +95,7 @@ main(int argc, char **argv)
 		(void) fprintf(stderr, gettext("%s: arg count\n"), argv[0]);
 		exit(1);
 	}
-	table = (unsigned *)malloc(ND * sizeof (*table));
+	table = (unsigned *)calloc(ND, sizeof (*table));
 	if (table == 0) {
 		(void) fprintf(stderr, gettext("%s: no space for table\n"),
 		    argv[0]);
@@ -129,8 +127,8 @@ main(int argc, char **argv)
 					break;
 			}
 			if (i > B) {
-				if (!(append((unsigned)(w1>>(long) (i-B)), B) &&
-				    append((unsigned)(w1<<(long) (B+B-i)),
+				if (!(append((unsigned)(w1>>(long)(i-B)), B) &&
+				    append((unsigned)(w1<<(long)(B+B-i)),
 				    i-B)))
 					ignore++;
 			} else
