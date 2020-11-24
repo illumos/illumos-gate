@@ -10,11 +10,12 @@
  */
 
 /*
- * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
  * Dispatch function for SMB2_READ
+ * MS-SMB2 sec. 3.3.5.12
  */
 
 #include <smbsrv/smb2_kproto.h>
@@ -158,6 +159,14 @@ smb2_read(smb_request_t *sr)
 	sr->raw_data.max_bytes = XferCount;
 	smb_mbuf_trim(m, XferCount);
 	MBC_ATTACH_MBUF(&sr->raw_data, m);
+
+	/*
+	 * [MS-SMB2] If the read returns fewer bytes than specified by
+	 * the MinimumCount field of the request, the server MUST fail
+	 * the request with STATUS_END_OF_FILE
+	 */
+	if (status == 0 && XferCount < MinCount)
+		status = NT_STATUS_END_OF_FILE;
 
 	/*
 	 * Checking the error return _after_ dealing with
