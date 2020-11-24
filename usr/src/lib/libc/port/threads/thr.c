@@ -717,7 +717,7 @@ _thrp_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
 
 	exit_critical(self);
 
-	if (name != NULL)
+	if (name != NULL && name[0] != '\0')
 		(void) pthread_setname_np(tid, name);
 
 	if (!(flags & THR_SUSPENDED))

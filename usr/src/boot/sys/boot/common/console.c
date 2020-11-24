@@ -185,7 +185,8 @@ cons_find(const char *name)
 static int
 cons_set(struct env_var *ev, int flags, const void *value)
 {
-	int	ret;
+	int	ret, cons;
+	char	*list, *tmp;
 
 	if ((value == NULL) || (cons_check(value) == 0)) {
 		/*
@@ -200,7 +201,36 @@ cons_set(struct env_var *ev, int flags, const void *value)
 	if (ret != CMD_OK)
 		return (ret);
 
-	env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
+	/*
+	 * build list of active consoles.
+	 */
+	list = NULL;
+	for (cons = 0; consoles[cons] != NULL; cons++) {
+		if ((consoles[cons]->c_flags & (C_ACTIVEIN | C_ACTIVEOUT)) ==
+		    (C_ACTIVEIN | C_ACTIVEOUT)) {
+			if (list == NULL) {
+				list = strdup(consoles[cons]->c_name);
+			} else {
+				if (asprintf(&tmp, "%s,%s", list,
+				    consoles[cons]->c_name) > 0) {
+					free(list);
+					list = tmp;
+				}
+			}
+		}
+	}
+
+	/*
+	 * set console variable.
+	 */
+	if (list != NULL) {
+		(void) env_setenv(ev->ev_name, flags | EV_NOHOOK, list,
+		    NULL, NULL);
+	} else {
+		(void) env_setenv(ev->ev_name, flags | EV_NOHOOK, value,
+		    NULL, NULL);
+	}
+	free(list);
 	return (CMD_OK);
 }
 

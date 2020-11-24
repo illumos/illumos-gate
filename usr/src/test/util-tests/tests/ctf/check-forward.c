@@ -15,14 +15,6 @@
 
 /*
  * Verify that we can properly handle forward declarations.
- *
- * In test-forward.c barp is declared as a union, not a struct. However, today
- * the CTF tooling does not contain enough information to know whether a forward
- * declaration was for a struct or a union, only that it was a forward.
- * Therefore, the type printing information assumes at the moment that the type
- * is a struct. In a future revision of the CTF type data, we should encode this
- * information in the equivalent of ctt_info so we can properly distinguish
- * between these.
  */
 
 #include "check-common.h"
@@ -30,7 +22,7 @@
 static check_symbol_t check_syms[] = {
 	{ "forward", "struct forward" },
 	{ "foop", "struct foo *" },
-	{ "barp", "struct bar *" },
+	{ "barp", "union bar *" },
 	{ "bazp", "enum baz *" },
 	{ NULL }
 };
@@ -39,12 +31,12 @@ static check_member_t check_member_forward[] = {
 #ifdef	TARGET_LP64
 	{ "prev", "struct foo *", 0 },
 	{ "next", "struct foo *", 8 * NBBY },
-	{ "data", "struct bar *", 16 * NBBY },
+	{ "data", "union bar *", 16 * NBBY },
 	{ "tag", "enum baz *", 24 * NBBY },
 #else
 	{ "prev", "struct foo *", 0 },
 	{ "next", "struct foo *", 4 * NBBY },
-	{ "data", "struct bar *", 8 * NBBY },
+	{ "data", "union bar *", 8 * NBBY },
 	{ "tag", "enum baz *", 12 * NBBY },
 #endif
 	{ NULL }
@@ -67,8 +59,8 @@ static check_descent_t check_descent_foo[] = {
 };
 
 static check_descent_t check_descent_bar[] = {
-	{ "struct bar *", CTF_K_POINTER },
-	{ "struct bar", CTF_K_FORWARD },
+	{ "union bar *", CTF_K_POINTER },
+	{ "union bar", CTF_K_FORWARD },
 	{ NULL }
 };
 
