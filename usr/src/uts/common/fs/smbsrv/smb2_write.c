@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -148,7 +148,6 @@ smb2_write(smb_request_t *sr)
 		    &vdb->vdb_uio, &XferCount, stability);
 		if (rc)
 			break;
-		of->f_written = B_TRUE;
 		/* This revokes read cache delegations. */
 		(void) smb_oplock_break_WRITE(of->f_node, of);
 		break;

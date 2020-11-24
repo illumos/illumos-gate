@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 #include <sys/sdt.h>
@@ -516,17 +516,6 @@ smb_common_write(smb_request_t *sr, smb_rw_param_t *param)
 
 		if (rc)
 			return (rc);
-
-		/*
-		 * Used to have code here to set mtime.
-		 * We have just done a write, so we know
-		 * the file system will update mtime.
-		 * No need to do it again here.
-		 *
-		 * However, keep track of the fact that
-		 * we have written data via this handle.
-		 */
-		ofile->f_written = B_TRUE;
 
 		/* This revokes read cache delegations. */
 		(void) smb_oplock_break_WRITE(node, ofile);

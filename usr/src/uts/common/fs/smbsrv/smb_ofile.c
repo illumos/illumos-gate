@@ -22,7 +22,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Syneto S.R.L. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
- * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -446,7 +446,6 @@ void
 smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 {
 	smb_attr_t *pa;
-	timestruc_t now;
 
 	SMB_OFILE_VALID(of);
 
@@ -496,20 +495,6 @@ smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 		if (mtime_sec != 0) {
 			pa->sa_vattr.va_mtime.tv_sec = mtime_sec;
 			pa->sa_mask |= SMB_AT_MTIME;
-		}
-
-		/*
-		 * If we have ever modified data via this handle
-		 * (write or truncate) and if the mtime was not
-		 * set via this handle, update the mtime again
-		 * during the close.  Windows expects this.
-		 * [ MS-FSA 2.1.5.4 "Update Timestamps" ]
-		 */
-		if (of->f_written &&
-		    (pa->sa_mask & SMB_AT_MTIME) == 0) {
-			pa->sa_mask |= SMB_AT_MTIME;
-			gethrestime(&now);
-			pa->sa_vattr.va_mtime = now;
 		}
 
 		if (of->f_flags & SMB_OFLAGS_SET_DELETE_ON_CLOSE) {
