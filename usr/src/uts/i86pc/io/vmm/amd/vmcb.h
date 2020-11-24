@@ -141,10 +141,15 @@ struct svm_softc;
 #define	VMCB_EVENTINJ_TYPE_INTn		(4 << 8)
 
 /* VMCB exit code, APM vol2 Appendix C */
+#define	VMCB_EXIT_CR0_READ		0x00
+#define	VMCB_EXIT_CR15_READ		0x0f
+#define	VMCB_EXIT_CR0_WRITE		0x10
+#define	VMCB_EXIT_CR15_WRITE		0x1f
 #define	VMCB_EXIT_MC			0x52
 #define	VMCB_EXIT_INTR			0x60
 #define	VMCB_EXIT_NMI			0x61
 #define	VMCB_EXIT_VINTR			0x64
+#define	VMCB_EXIT_CR0_SEL_WRITE		0x65
 #define	VMCB_EXIT_PUSHF			0x70
 #define	VMCB_EXIT_POPF			0x71
 #define	VMCB_EXIT_CPUID			0x72
@@ -168,6 +173,13 @@ struct svm_softc;
 #define	VMCB_EXIT_MWAIT			0x8B
 #define	VMCB_EXIT_NPF			0x400
 #define	VMCB_EXIT_INVALID		-1
+
+/*
+ * Move to/from CRx
+ * Bit definitions to decode EXITINFO1
+ */
+#define	VMCB_CRx_INFO1_GPR(x)		((x) & 0xf)
+#define	VMCB_CRx_INFO1_VALID(x)		((x) & (1UL << 63))
 
 /*
  * Nested page fault.

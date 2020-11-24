@@ -53,6 +53,7 @@ struct svm_regctx {
 	uint64_t	sctx_dr1;
 	uint64_t	sctx_dr2;
 	uint64_t	sctx_dr3;
+	uint64_t	sctx_cr0_shadow;
 
 	uint64_t	host_dr0;
 	uint64_t	host_dr1;

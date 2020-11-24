@@ -51,10 +51,13 @@ struct vie;
 struct vie *vie_alloc();
 void vie_free(struct vie *);
 
+enum vm_reg_name vie_regnum_map(uint8_t);
+
 void vie_init_mmio(struct vie *vie, const char *inst_bytes, uint8_t inst_length,
     const struct vm_guest_paging *paging, uint64_t gpa);
 void vie_init_inout(struct vie *vie, const struct vm_inout *inout,
     uint8_t inst_len, const struct vm_guest_paging *paging);
+void vie_init_other(struct vie *vie, const struct vm_guest_paging *paging);
 
 int vie_fulfill_mmio(struct vie *vie, const struct vm_mmio *res);
 int vie_fulfill_inout(struct vie *vie, const struct vm_inout *res);
@@ -64,12 +67,15 @@ bool vie_pending(const struct vie *vie);
 uint64_t vie_mmio_gpa(const struct vie *vie);
 void vie_exitinfo(const struct vie *vie, struct vm_exit *vme);
 void vie_fallback_exitinfo(const struct vie *vie, struct vm_exit *vme);
+void vie_cs_info(const struct vie *vie, struct vm *vm, int vcpuid,
+    uint64_t *cs_base, int *cs_d);
 
 void vie_reset(struct vie *vie);
 void vie_advance_pc(struct vie *vie, uint64_t *nextrip);
 
 int vie_emulate_mmio(struct vie *vie, struct vm *vm, int vcpuid);
 int vie_emulate_inout(struct vie *vie, struct vm *vm, int vcpuid);
+int vie_emulate_other(struct vie *vie, struct vm *vm, int vcpuid);
 
 /*
  * APIs to fetch and decode the instruction from nested page fault handler.

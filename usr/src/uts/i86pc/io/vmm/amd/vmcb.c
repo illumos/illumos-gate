@@ -91,11 +91,6 @@ vmcb_regptr(struct vmcb *vmcb, int ident, uint32_t *dirtyp)
 	state = &vmcb->state;
 
 	switch (ident) {
-	case VM_REG_GUEST_CR0:
-		res = &state->cr0;
-		dirty = VMCB_CACHE_CR;
-		break;
-
 	case VM_REG_GUEST_CR2:
 		res = &state->cr2;
 		dirty = VMCB_CACHE_CR2;

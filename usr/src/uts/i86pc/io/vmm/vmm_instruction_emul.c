@@ -69,13 +69,14 @@ enum vie_status {
 	VIES_INIT		= (1U << 0),
 	VIES_MMIO		= (1U << 1),
 	VIES_INOUT		= (1U << 2),
-	VIES_INST_FETCH		= (1U << 3),
-	VIES_INST_DECODE	= (1U << 4),
-	VIES_PENDING_MMIO	= (1U << 5),
-	VIES_PENDING_INOUT	= (1U << 6),
-	VIES_REPEAT		= (1U << 7),
-	VIES_USER_FALLBACK	= (1U << 8),
-	VIES_COMPLETE		= (1U << 9),
+	VIES_OTHER		= (1U << 3),
+	VIES_INST_FETCH		= (1U << 4),
+	VIES_INST_DECODE	= (1U << 5),
+	VIES_PENDING_MMIO	= (1U << 6),
+	VIES_PENDING_INOUT	= (1U << 7),
+	VIES_REPEAT		= (1U << 8),
+	VIES_USER_FALLBACK	= (1U << 9),
+	VIES_COMPLETE		= (1U << 10),
 };
 
 /* State of request to perform emulated access (inout or MMIO) */
@@ -181,6 +182,7 @@ enum {
 	VIE_OP_TYPE_ADD,
 	VIE_OP_TYPE_TEST,
 	VIE_OP_TYPE_BEXTR,
+	VIE_OP_TYPE_CLTS,
 	VIE_OP_TYPE_LAST
 };
 
@@ -199,6 +201,11 @@ static const struct vie_op three_byte_opcodes_0f38[256] = {
 };
 
 static const struct vie_op two_byte_opcodes[256] = {
+	[0x06] = {
+		.op_byte = 0x06,
+		.op_type = VIE_OP_TYPE_CLTS,
+		.op_flags = VIE_OP_F_NO_MODRM | VIE_OP_F_NO_GLA_VERIFICATION
+	},
 	[0xAE] = {
 		.op_byte = 0xAE,
 		.op_type = VIE_OP_TYPE_TWOB_GRP15,
@@ -405,6 +412,13 @@ void
 vie_free(struct vie *vie)
 {
 	kmem_free(vie, sizeof (struct vie));
+}
+
+enum vm_reg_name
+vie_regnum_map(uint8_t regnum)
+{
+	VERIFY3U(regnum, <, 16);
+	return (gpr_map[regnum]);
 }
 
 static void
@@ -1876,6 +1890,30 @@ vie_emulate_twob_group15(struct vie *vie, struct vm *vm, int vcpuid,
 }
 
 static int
+vie_emulate_clts(struct vie *vie, struct vm *vm, int vcpuid)
+{
+	uint64_t val;
+	int error;
+
+	if (vie->paging.cpl != 0) {
+		vm_inject_gp(vm, vcpuid);
+		vie->num_processed = 0;
+		return (0);
+	}
+
+	error = vm_get_register(vm, vcpuid, VM_REG_GUEST_CR0, &val);
+	ASSERT(error == 0);
+
+	/* Clear %cr0.TS */
+	val &= ~CR0_TS;
+
+	error = vm_set_register(vm, vcpuid, VM_REG_GUEST_CR0, val);
+	ASSERT(error == 0);
+
+	return (0);
+}
+
+static int
 vie_mmio_read(struct vie *vie, struct vm *vm, int cpuid, uint64_t gpa,
     uint64_t *rval, int bytes)
 {
@@ -2261,6 +2299,28 @@ vie_emulate_inout(struct vie *vie, struct vm *vm, int vcpuid)
 	return (err);
 }
 
+int
+vie_emulate_other(struct vie *vie, struct vm *vm, int vcpuid)
+{
+	int error;
+
+	if ((vie->status & (VIES_INST_DECODE | VIES_OTHER)) !=
+	    (VIES_INST_DECODE | VIES_OTHER)) {
+		return (EINVAL);
+	}
+
+	switch (vie->op.op_type) {
+	case VIE_OP_TYPE_CLTS:
+		error = vie_emulate_clts(vie, vm, vcpuid);
+		break;
+	default:
+		error = EINVAL;
+		break;
+	}
+
+	return (error);
+}
+
 void
 vie_reset(struct vie *vie)
 {
@@ -2336,6 +2396,35 @@ vie_fallback_exitinfo(const struct vie *vie, struct vm_exit *vme)
 		vme->u.inst_emul.num_valid = vie->num_valid;
 	}
 	vme->exitcode = VM_EXITCODE_INST_EMUL;
+}
+
+void
+vie_cs_info(const struct vie *vie, struct vm *vm, int vcpuid, uint64_t *cs_base,
+    int *cs_d)
+{
+	struct seg_desc cs_desc;
+	int error;
+
+	error = vm_get_seg_desc(vm, vcpuid, VM_REG_GUEST_CS, &cs_desc);
+	ASSERT(error == 0);
+
+	/* Initialization required for the paging info to be populated */
+	VERIFY(vie->status & VIES_INIT);
+	switch (vie->paging.cpu_mode) {
+	case CPU_MODE_REAL:
+		*cs_base = cs_desc.base;
+		*cs_d = 0;
+		break;
+	case CPU_MODE_PROTECTED:
+	case CPU_MODE_COMPATIBILITY:
+		*cs_base = cs_desc.base;
+		*cs_d = SEG_DESC_DEF32(cs_desc.access) ? 1 : 0;
+		break;
+	default:
+		*cs_base = 0;
+		*cs_d = 0;
+		break;
+	}
 }
 
 bool
@@ -2554,6 +2643,19 @@ vie_init_inout(struct vie *vie, const struct vm_inout *inout, uint8_t inst_len,
 	 */
 	vie->status |= VIES_INST_FETCH | VIES_INST_DECODE;
 	vie->num_processed = inst_len;
+}
+
+void
+vie_init_other(struct vie *vie, const struct vm_guest_paging *paging)
+{
+	bzero(vie, sizeof (struct vie));
+
+	vie->base_register = VM_REG_LAST;
+	vie->index_register = VM_REG_LAST;
+	vie->segment_register = VM_REG_LAST;
+	vie->status = VIES_INIT | VIES_OTHER;
+
+	vie->paging = *paging;
 }
 
 int
@@ -2873,7 +2975,7 @@ vie_fetch_instruction(struct vie *vie, struct vm *vm, int vcpuid, uint64_t rip,
 	struct vm_copyinfo copyinfo[2];
 	int error, prot;
 
-	if (vie->status != (VIES_INIT|VIES_MMIO)) {
+	if ((vie->status & VIES_INIT) == 0) {
 		return (EINVAL);
 	}
 

@@ -1615,9 +1615,10 @@ vm_handle_mmio_emul(struct vm *vm, int vcpuid)
 			return (error);
 		} else if (fault) {
 			/*
-			 * If a fault during instruction fetch was encounted, it
-			 * will have asserted that the appropriate exception be
-			 * injected at next entry.  No further work is required.
+			 * If a fault during instruction fetch was encountered,
+			 * it will have asserted that the appropriate exception
+			 * be injected at next entry.
+			 * No further work is required.
 			 */
 			return (0);
 		}
@@ -1721,6 +1722,56 @@ repeat:
 
 	vie_advance_pc(vie, &vcpu->nextrip);
 	return (0);
+}
+
+static int
+vm_handle_inst_emul(struct vm *vm, int vcpuid)
+{
+	struct vie *vie;
+	struct vcpu *vcpu;
+	struct vm_exit *vme;
+	uint64_t cs_base;
+	int error, fault, cs_d;
+
+	vcpu = &vm->vcpu[vcpuid];
+	vme = &vcpu->exitinfo;
+	vie = vcpu->vie_ctx;
+
+	vie_cs_info(vie, vm, vcpuid, &cs_base, &cs_d);
+
+	/* Fetch the faulting instruction */
+	ASSERT(vie_needs_fetch(vie));
+	error = vie_fetch_instruction(vie, vm, vcpuid, vme->rip + cs_base,
+	    &fault);
+	if (error != 0) {
+		return (error);
+	} else if (fault) {
+		/*
+		 * If a fault during instruction fetch was encounted, it will
+		 * have asserted that the appropriate exception be injected at
+		 * next entry.  No further work is required.
+		 */
+		return (0);
+	}
+
+	if (vie_decode_instruction(vie, vm, vcpuid, cs_d) != 0) {
+		/* Dump (unrecognized) instruction bytes in userspace */
+		vie_fallback_exitinfo(vie, vme);
+		return (-1);
+	}
+
+	error = vie_emulate_other(vie, vm, vcpuid);
+	if (error != 0) {
+		/*
+		 * Instruction emulation was unable to complete successfully, so
+		 * kick it out to userspace for handling.
+		 */
+		vie_fallback_exitinfo(vie, vme);
+	} else {
+		/* Update %rip now that instruction has been emulated */
+		vie_advance_pc(vie, &vcpu->nextrip);
+	}
+	return (error);
 }
 
 static int
@@ -2361,6 +2412,9 @@ restart:
 		break;
 	case VM_EXITCODE_INOUT:
 		error = vm_handle_inout(vm, vcpuid, vme);
+		break;
+	case VM_EXITCODE_INST_EMUL:
+		error = vm_handle_inst_emul(vm, vcpuid);
 		break;
 	case VM_EXITCODE_MONITOR:
 	case VM_EXITCODE_MWAIT:
