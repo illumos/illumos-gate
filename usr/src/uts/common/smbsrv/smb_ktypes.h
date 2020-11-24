@@ -22,6 +22,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright 2020 RackTop Systems, Inc.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -1425,7 +1426,6 @@ typedef struct smb_ofile {
 	cred_t			*f_cr;
 	pid_t			f_pid;
 	smb_attr_t		f_pending_attr;
-	boolean_t		f_written;
 	smb_oplock_grant_t	f_oplock;
 	uint8_t			TargetOplockKey[SMB_LEASE_KEY_SZ];
 	uint8_t			ParentOplockKey[SMB_LEASE_KEY_SZ];

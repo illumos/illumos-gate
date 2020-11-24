@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2020 Tintri by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -1146,22 +1146,6 @@ smb_set_open_attributes(smb_request_t *sr, smb_ofile_t *of)
 		attr.sa_vattr.va_mtime = op->mtime;
 		attr.sa_mask |= SMB_AT_MTIME;
 	}
-
-	/*
-	 * Used to have code here to set mtime, ctime, atime
-	 * when the open op->create_disposition is any of:
-	 * FILE_SUPERSEDE, FILE_OVERWRITE_IF, FILE_OVERWRITE.
-	 * We know that in those cases we will have set the
-	 * file size, in which case the file system will
-	 * update those times, so we don't have to.
-	 *
-	 * However, keep track of the fact that we modified
-	 * the file via this handle, so we can do the evil,
-	 * gratuitious mtime update on close that Windows
-	 * clients expect.
-	 */
-	if (op->action_taken == SMB_OACT_TRUNCATED)
-		of->f_written = B_TRUE;
 
 	if (attr.sa_mask != 0)
 		rc = smb_node_setattr(sr, node, of->f_cr, of, &attr);
