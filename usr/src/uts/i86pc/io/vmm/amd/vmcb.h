@@ -136,9 +136,9 @@ struct svm_softc;
 
 /* Event types that can be injected */
 #define	VMCB_EVENTINJ_TYPE_INTR		0
-#define	VMCB_EVENTINJ_TYPE_NMI		2
-#define	VMCB_EVENTINJ_TYPE_EXCEPTION	3
-#define	VMCB_EVENTINJ_TYPE_INTn		4
+#define	VMCB_EVENTINJ_TYPE_NMI		(2 << 8)
+#define	VMCB_EVENTINJ_TYPE_EXCEPTION	(3 << 8)
+#define	VMCB_EVENTINJ_TYPE_INTn		(4 << 8)
 
 /* VMCB exit code, APM vol2 Appendix C */
 #define	VMCB_EXIT_MC			0x52
@@ -187,9 +187,9 @@ struct svm_softc;
  * Section 15.7.2, Intercepts during IDT Interrupt Delivery.
  */
 #define VMCB_EXITINTINFO_VECTOR(x)	((x) & 0xFF)
-#define VMCB_EXITINTINFO_TYPE(x)	(((x) >> 8) & 0x7)
-#define VMCB_EXITINTINFO_EC_VALID(x)	(((x) & BIT(11)) ? 1 : 0)
-#define VMCB_EXITINTINFO_VALID(x)	(((x) & BIT(31)) ? 1 : 0)
+#define VMCB_EXITINTINFO_TYPE(x)	((x) & (0x7 << 8))
+#define VMCB_EXITINTINFO_EC_VALID(x)	(((x) & BIT(11)) != 0)
+#define VMCB_EXITINTINFO_VALID(x)	(((x) & BIT(31)) != 0)
 #define VMCB_EXITINTINFO_EC(x)		(((x) >> 32) & 0xFFFFFFFF)
 
 /* Offset of various VMCB fields. */

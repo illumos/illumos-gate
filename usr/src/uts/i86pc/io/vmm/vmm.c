@@ -297,7 +297,7 @@ SYSCTL_INT(_hw_vmm, OID_AUTO, trace_guest_exceptions, CTLFLAG_RDTUN,
 
 static void vm_free_memmap(struct vm *vm, int ident);
 static bool sysmem_mapping(struct vm *vm, struct mem_map *mm);
-static void vcpu_notify_event_locked(struct vcpu *vcpu, bool lapic_intr);
+static void vcpu_notify_event_locked(struct vcpu *vcpu, vcpu_notify_t);
 
 #ifndef __FreeBSD__
 static void vm_clear_memseg(struct vm *, int);
@@ -1338,7 +1338,7 @@ vcpu_set_state_locked(struct vm *vm, int vcpuid, enum vcpu_state newstate,
 	if (from_idle) {
 		while (vcpu->state != VCPU_IDLE) {
 			vcpu->reqidle = 1;
-			vcpu_notify_event_locked(vcpu, false);
+			vcpu_notify_event_locked(vcpu, VCPU_NOTIFY_EXIT);
 			VCPU_CTR1(vm, vcpuid, "vcpu state change from %s to "
 			    "idle requested", vcpu_state2str(vcpu->state));
 #ifdef __FreeBSD__
@@ -1839,7 +1839,7 @@ vm_handle_suspend(struct vm *vm, int vcpuid)
 	 */
 	for (i = 0; i < vm->maxcpus; i++) {
 		if (CPU_ISSET(i, &vm->suspended_cpus)) {
-			vcpu_notify_event(vm, i, false);
+			vcpu_notify_event(vm, i);
 		}
 	}
 
@@ -1909,7 +1909,7 @@ vm_suspend(struct vm *vm, enum vm_suspend_how how)
 	 */
 	for (i = 0; i < vm->maxcpus; i++) {
 		if (CPU_ISSET(i, &vm->active_cpus))
-			vcpu_notify_event(vm, i, false);
+			vcpu_notify_event(vm, i);
 	}
 
 	return (0);
@@ -2620,6 +2620,14 @@ vm_inject_exception(struct vm *vm, int vcpuid, int vector, int errcode_valid,
 		return (EINVAL);
 
 	/*
+	 * NMIs (which bear an exception vector of 2) are to be injected via
+	 * their own specialized path using vm_inject_nmi().
+	 */
+	if (vector == 2) {
+		return (EINVAL);
+	}
+
+	/*
 	 * A double fault exception should never be injected directly into
 	 * the guest. It is a derived exception that results from specific
 	 * combinations of nested faults.
@@ -2728,7 +2736,7 @@ vm_inject_nmi(struct vm *vm, int vcpuid)
 	vcpu = &vm->vcpu[vcpuid];
 
 	vcpu->nmi_pending = 1;
-	vcpu_notify_event(vm, vcpuid, false);
+	vcpu_notify_event(vm, vcpuid);
 	return (0);
 }
 
@@ -2775,7 +2783,7 @@ vm_inject_extint(struct vm *vm, int vcpuid)
 	vcpu = &vm->vcpu[vcpuid];
 
 	vcpu->extint_pending = 1;
-	vcpu_notify_event(vm, vcpuid, false);
+	vcpu_notify_event(vm, vcpuid);
 	return (0);
 }
 
@@ -2956,7 +2964,7 @@ vcpu_block_run(struct vm *vm, int vcpuid)
 	vcpu_lock(vcpu);
 	vcpu->runblock++;
 	if (vcpu->runblock == 1 && vcpu->state == VCPU_RUNNING) {
-		vcpu_notify_event_locked(vcpu, false);
+		vcpu_notify_event_locked(vcpu, VCPU_NOTIFY_EXIT);
 	}
 	while (vcpu->state == VCPU_RUNNING) {
 #ifdef __FreeBSD__
@@ -3026,14 +3034,14 @@ vm_suspend_cpu(struct vm *vm, int vcpuid)
 		vm->debug_cpus = vm->active_cpus;
 		for (i = 0; i < vm->maxcpus; i++) {
 			if (CPU_ISSET(i, &vm->active_cpus))
-				vcpu_notify_event(vm, i, false);
+				vcpu_notify_event(vm, i);
 		}
 	} else {
 		if (!CPU_ISSET(vcpuid, &vm->active_cpus))
 			return (EINVAL);
 
 		CPU_SET_ATOMIC(vcpuid, &vm->debug_cpus);
-		vcpu_notify_event(vm, vcpuid, false);
+		vcpu_notify_event(vm, vcpuid);
 	}
 	return (0);
 }
@@ -3126,15 +3134,17 @@ vm_set_x2apic_state(struct vm *vm, int vcpuid, enum x2apic_state state)
  *   to the host_cpu to cause the vcpu to trap into the hypervisor.
  */
 static void
-vcpu_notify_event_locked(struct vcpu *vcpu, bool lapic_intr)
+vcpu_notify_event_locked(struct vcpu *vcpu, vcpu_notify_t ntype)
 {
 	int hostcpu;
+
+	ASSERT(ntype == VCPU_NOTIFY_APIC || VCPU_NOTIFY_EXIT);
 
 	hostcpu = vcpu->hostcpu;
 	if (vcpu->state == VCPU_RUNNING) {
 		KASSERT(hostcpu != NOCPU, ("vcpu running on invalid hostcpu"));
 		if (hostcpu != curcpu) {
-			if (lapic_intr) {
+			if (ntype == VCPU_NOTIFY_APIC) {
 				vlapic_post_intr(vcpu->vlapic, hostcpu,
 				    vmm_ipinum);
 			} else {
@@ -3162,12 +3172,26 @@ vcpu_notify_event_locked(struct vcpu *vcpu, bool lapic_intr)
 }
 
 void
-vcpu_notify_event(struct vm *vm, int vcpuid, bool lapic_intr)
+vcpu_notify_event(struct vm *vm, int vcpuid)
 {
 	struct vcpu *vcpu = &vm->vcpu[vcpuid];
 
 	vcpu_lock(vcpu);
-	vcpu_notify_event_locked(vcpu, lapic_intr);
+	vcpu_notify_event_locked(vcpu, VCPU_NOTIFY_EXIT);
+	vcpu_unlock(vcpu);
+}
+
+void
+vcpu_notify_event_type(struct vm *vm, int vcpuid, vcpu_notify_t ntype)
+{
+	struct vcpu *vcpu = &vm->vcpu[vcpuid];
+
+	if (ntype == VCPU_NOTIFY_NONE) {
+		return;
+	}
+
+	vcpu_lock(vcpu);
+	vcpu_notify_event_locked(vcpu, ntype);
 	vcpu_unlock(vcpu);
 }
 

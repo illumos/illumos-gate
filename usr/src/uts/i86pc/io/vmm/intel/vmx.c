@@ -338,8 +338,10 @@ SDT_PROBE_DEFINE4(vmm, vmx, exit, return,
 
 static int vmx_getdesc(void *arg, int vcpu, int reg, struct seg_desc *desc);
 static int vmx_getreg(void *arg, int vcpu, int reg, uint64_t *retval);
-static void vmx_inject_pir(struct vlapic *vlapic);
 static void vmx_apply_tsc_adjust(struct vmx *, int);
+static void vmx_apicv_sync_tmr(struct vlapic *vlapic);
+static void vmx_tpr_shadow_enter(struct vlapic *vlapic);
+static void vmx_tpr_shadow_exit(struct vlapic *vlapic);
 
 #ifdef KTR
 static const char *
@@ -1270,26 +1272,27 @@ vmx_clear_int_window_exiting(struct vmx *vmx, int vcpu)
 	VCPU_CTR0(vmx->vm, vcpu, "Disabling interrupt window exiting");
 }
 
+static __inline bool
+vmx_nmi_window_exiting(struct vmx *vmx, int vcpu)
+{
+	return ((vmx->cap[vcpu].proc_ctls & PROCBASED_NMI_WINDOW_EXITING) != 0);
+}
+
 static __inline void
 vmx_set_nmi_window_exiting(struct vmx *vmx, int vcpu)
 {
-
-	if ((vmx->cap[vcpu].proc_ctls & PROCBASED_NMI_WINDOW_EXITING) == 0) {
+	if (!vmx_nmi_window_exiting(vmx, vcpu)) {
 		vmx->cap[vcpu].proc_ctls |= PROCBASED_NMI_WINDOW_EXITING;
 		vmcs_write(VMCS_PRI_PROC_BASED_CTLS, vmx->cap[vcpu].proc_ctls);
-		VCPU_CTR0(vmx->vm, vcpu, "Enabling NMI window exiting");
 	}
 }
 
 static __inline void
 vmx_clear_nmi_window_exiting(struct vmx *vmx, int vcpu)
 {
-
-	KASSERT((vmx->cap[vcpu].proc_ctls & PROCBASED_NMI_WINDOW_EXITING) != 0,
-	    ("nmi_window_exiting not set %x", vmx->cap[vcpu].proc_ctls));
+	ASSERT(vmx_nmi_window_exiting(vmx, vcpu));
 	vmx->cap[vcpu].proc_ctls &= ~PROCBASED_NMI_WINDOW_EXITING;
 	vmcs_write(VMCS_PRI_PROC_BASED_CTLS, vmx->cap[vcpu].proc_ctls);
-	VCPU_CTR0(vmx->vm, vcpu, "Disabling NMI window exiting");
 }
 
 /*
@@ -1319,60 +1322,46 @@ vmx_apply_tsc_adjust(struct vmx *vmx, int vcpu)
 #define	HWINTR_BLOCKING	(VMCS_INTERRUPTIBILITY_STI_BLOCKING |		\
 			 VMCS_INTERRUPTIBILITY_MOVSS_BLOCKING)
 
-#ifndef __FreeBSD__
-static uint32_t
-vmx_inject_nmi(struct vmx *vmx, int vcpu)
-#else
 static void
 vmx_inject_nmi(struct vmx *vmx, int vcpu)
-#endif
 {
-	uint32_t gi, info;
-
-	gi = vmcs_read(VMCS_GUEST_INTERRUPTIBILITY);
-	KASSERT((gi & NMI_BLOCKING) == 0, ("vmx_inject_nmi: invalid guest "
-	    "interruptibility-state %x", gi));
-
-	info = vmcs_read(VMCS_ENTRY_INTR_INFO);
-	KASSERT((info & VMCS_INTR_VALID) == 0, ("vmx_inject_nmi: invalid "
-	    "VM-entry interruption information %x", info));
+	ASSERT0(vmcs_read(VMCS_GUEST_INTERRUPTIBILITY) & NMI_BLOCKING);
+	ASSERT0(vmcs_read(VMCS_ENTRY_INTR_INFO) & VMCS_INTR_VALID);
 
 	/*
 	 * Inject the virtual NMI. The vector must be the NMI IDT entry
 	 * or the VMCS entry check will fail.
 	 */
-	info = IDT_NMI | VMCS_INTR_T_NMI | VMCS_INTR_VALID;
-	vmcs_write(VMCS_ENTRY_INTR_INFO, info);
-
-	VCPU_CTR0(vmx->vm, vcpu, "Injecting vNMI");
+	vmcs_write(VMCS_ENTRY_INTR_INFO,
+	    IDT_NMI | VMCS_INTR_T_NMI | VMCS_INTR_VALID);
 
 	/* Clear the request */
 	vm_nmi_clear(vmx->vm, vcpu);
-
-#ifndef __FreeBSD__
-	return (info);
-#endif
 }
 
-static void
-vmx_inject_interrupts(struct vmx *vmx, int vcpu, struct vlapic *vlapic,
-    uint64_t guestrip)
+/*
+ * Inject exceptions, NMIs, and ExtINTs.
+ *
+ * The logic behind these are complicated and may involve mutex contention, so
+ * the injection is performed without the protection of host CPU interrupts
+ * being disabled.  This means a racing notification could be "lost",
+ * necessitating a later call to vmx_inject_recheck() to close that window
+ * of opportunity.
+ */
+static enum event_inject_state
+vmx_inject_events(struct vmx *vmx, int vcpu, uint64_t rip)
 {
-	uint64_t entryinfo, rflags;
+	uint64_t entryinfo;
 	uint32_t gi, info;
 	int vector;
-	boolean_t extint_pending = B_FALSE;
-
-	vlapic_tmr_update(vlapic);
+	enum event_inject_state state;
 
 	gi = vmcs_read(VMCS_GUEST_INTERRUPTIBILITY);
 	info = vmcs_read(VMCS_ENTRY_INTR_INFO);
+	state = EIS_CAN_INJECT;
 
-	if (vmx->state[vcpu].nextrip != guestrip &&
-	    (gi & HWINTR_BLOCKING) != 0) {
-		VCPU_CTR2(vmx->vm, vcpu, "Guest interrupt blocking "
-		    "cleared due to rip change: %lx/%lx",
-		    vmx->state[vcpu].nextrip, guestrip);
+	/* Clear any interrupt blocking if the guest %rip has changed */
+	if (vmx->state[vcpu].nextrip != rip && (gi & HWINTR_BLOCKING) != 0) {
 		gi &= ~HWINTR_BLOCKING;
 		vmcs_write(VMCS_GUEST_INTERRUPTIBILITY, gi);
 	}
@@ -1383,15 +1372,11 @@ vmx_inject_interrupts(struct vmx *vmx, int vcpu, struct vlapic *vlapic,
 	 * such as an AST before a vm-entry delivered the injection.
 	 */
 	if ((info & VMCS_INTR_VALID) != 0) {
-		goto cantinject;
+		return (EIS_EV_EXISTING | EIS_REQ_EXIT);
 	}
 
 	if (vm_entry_intinfo(vmx->vm, vcpu, &entryinfo)) {
-		KASSERT((entryinfo & VMCS_INTR_VALID) != 0, ("%s: entry "
-		    "intinfo is not valid: %lx", __func__, entryinfo));
-
-		KASSERT((info & VMCS_INTR_VALID) == 0, ("%s: cannot inject "
-		     "pending exception: %lx/%x", __func__, entryinfo, info));
+		ASSERT(entryinfo & VMCS_INTR_VALID);
 
 		info = entryinfo;
 		vector = info & 0xff;
@@ -1404,50 +1389,49 @@ vmx_inject_interrupts(struct vmx *vmx, int vcpu, struct vlapic *vlapic,
 			info |= VMCS_INTR_T_SWEXCEPTION;
 		}
 
-		if (info & VMCS_INTR_DEL_ERRCODE)
+		if (info & VMCS_INTR_DEL_ERRCODE) {
 			vmcs_write(VMCS_ENTRY_EXCEPTION_ERROR, entryinfo >> 32);
+		}
 
 		vmcs_write(VMCS_ENTRY_INTR_INFO, info);
+		state = EIS_EV_INJECTED;
 	}
 
 	if (vm_nmi_pending(vmx->vm, vcpu)) {
-		int need_nmi_exiting = 1;
-
 		/*
-		 * If there are no conditions blocking NMI injection then
-		 * inject it directly here otherwise enable "NMI window
-		 * exiting" to inject it as soon as we can.
+		 * If there are no conditions blocking NMI injection then inject
+		 * it directly here otherwise enable "NMI window exiting" to
+		 * inject it as soon as we can.
 		 *
-		 * We also check for STI_BLOCKING because some implementations
-		 * don't allow NMI injection in this case. If we are running
-		 * on a processor that doesn't have this restriction it will
-		 * immediately exit and the NMI will be injected in the
-		 * "NMI window exiting" handler.
+		 * According to the Intel manual, some CPUs do not allow NMI
+		 * injection when STI_BLOCKING is active.  That check is
+		 * enforced here, regardless of CPU capability.  If running on a
+		 * CPU without such a restriction it will immediately exit and
+		 * the NMI will be injected in the "NMI window exiting" handler.
 		 */
 		if ((gi & (HWINTR_BLOCKING | NMI_BLOCKING)) == 0) {
-			if ((info & VMCS_INTR_VALID) == 0) {
-				info = vmx_inject_nmi(vmx, vcpu);
-				need_nmi_exiting = 0;
+			if (state == EIS_CAN_INJECT) {
+				vmx_inject_nmi(vmx, vcpu);
+				state = EIS_EV_INJECTED;
 			} else {
-				VCPU_CTR1(vmx->vm, vcpu, "Cannot inject NMI "
-				    "due to VM-entry intr info %x", info);
+				return (state | EIS_REQ_EXIT);
 			}
 		} else {
-			VCPU_CTR1(vmx->vm, vcpu, "Cannot inject NMI due to "
-			    "Guest Interruptibility-state %x", gi);
-		}
-
-		if (need_nmi_exiting) {
 			vmx_set_nmi_window_exiting(vmx, vcpu);
-			return;
 		}
 	}
 
-	/* Check the AT-PIC and APIC for interrupts. */
 	if (vm_extint_pending(vmx->vm, vcpu)) {
+		if (state != EIS_CAN_INJECT) {
+			return (state | EIS_REQ_EXIT);
+		}
+		if ((gi & HWINTR_BLOCKING) != 0 ||
+		    (vmcs_read(VMCS_GUEST_RFLAGS) & PSL_I) == 0) {
+			return (EIS_GI_BLOCK);
+		}
+
 		/* Ask the legacy pic for a vector to inject */
 		vatpic_pending_intr(vmx->vm, &vector);
-		extint_pending = B_TRUE;
 
 		/*
 		 * From the Intel SDM, Volume 3, Section "Maskable
@@ -1457,80 +1441,131 @@ vmx_inject_interrupts(struct vmx *vmx, int vcpu, struct vlapic *vlapic,
 		 */
 		KASSERT(vector >= 0 && vector <= 255,
 		    ("invalid vector %d from INTR", vector));
-	} else if (!vmx_cap_en(vmx, VMX_CAP_APICV)) {
-		/* Ask the local apic for a vector to inject */
-		if (!vlapic_pending_intr(vlapic, &vector))
-			return;
 
-		/*
-		 * From the Intel SDM, Volume 3, Section "Maskable
-		 * Hardware Interrupts":
-		 * - maskable interrupt vectors [16,255] can be delivered
-		 *   through the local APIC.
-		*/
-		KASSERT(vector >= 16 && vector <= 255,
-		    ("invalid vector %d from local APIC", vector));
-	} else {
-		/* No futher injection needed */
-		return;
+		/* Inject the interrupt */
+		vmcs_write(VMCS_ENTRY_INTR_INFO,
+		    VMCS_INTR_T_HWINTR | VMCS_INTR_VALID | vector);
+
+		vm_extint_clear(vmx->vm, vcpu);
+		vatpic_intr_accepted(vmx->vm, vector);
+		state = EIS_EV_INJECTED;
+	}
+
+	return (state);
+}
+
+/*
+ * Inject any interrupts pending on the vLAPIC.
+ *
+ * This is done with host CPU interrupts disabled so notification IPIs, either
+ * from the standard vCPU notification or APICv posted interrupts, will be
+ * queued on the host APIC and recognized when entering VMX context.
+ */
+static enum event_inject_state
+vmx_inject_vlapic(struct vmx *vmx, int vcpu, struct vlapic *vlapic)
+{
+	int vector;
+
+	if (!vlapic_pending_intr(vlapic, &vector)) {
+		return (EIS_CAN_INJECT);
 	}
 
 	/*
-	 * Verify that the guest is interruptable and the above logic has not
-	 * already queued an event for injection.
-	 */
-	if ((gi & HWINTR_BLOCKING) != 0) {
-		VCPU_CTR2(vmx->vm, vcpu, "Cannot inject vector %d due to "
-		    "Guest Interruptibility-state %x", vector, gi);
-		goto cantinject;
+	 * From the Intel SDM, Volume 3, Section "Maskable
+	 * Hardware Interrupts":
+	 * - maskable interrupt vectors [16,255] can be delivered
+	 *   through the local APIC.
+	*/
+	KASSERT(vector >= 16 && vector <= 255,
+	    ("invalid vector %d from local APIC", vector));
+
+	if (vmx_cap_en(vmx, VMX_CAP_APICV)) {
+		uint16_t status_old = vmcs_read(VMCS_GUEST_INTR_STATUS);
+		uint16_t status_new = (status_old & 0xff00) | vector;
+
+		/*
+		 * The APICv state will have been synced into the vLAPIC
+		 * as part of vlapic_pending_intr().  Prepare the VMCS
+		 * for the to-be-injected pending interrupt.
+		 */
+		if (status_new > status_old) {
+			vmcs_write(VMCS_GUEST_INTR_STATUS, status_new);
+			VCPU_CTR2(vlapic->vm, vlapic->vcpuid,
+			    "vmx_inject_interrupts: guest_intr_status "
+			    "changed from 0x%04x to 0x%04x",
+			    status_old, status_new);
+		}
+
+		/*
+		 * Ensure VMCS state regarding EOI traps is kept in sync
+		 * with the TMRs in the vlapic.
+		 */
+		vmx_apicv_sync_tmr(vlapic);
+
+		/*
+		 * The rest of the injection process for injecting the
+		 * interrupt(s) is handled by APICv. It does not preclude other
+		 * event injection from occurring.
+		 */
+		return (EIS_CAN_INJECT);
 	}
-	if ((info & VMCS_INTR_VALID) != 0) {
-		VCPU_CTR2(vmx->vm, vcpu, "Cannot inject vector %d due to "
-		    "VM-entry intr info %x", vector, info);
-		goto cantinject;
-	}
-	rflags = vmcs_read(VMCS_GUEST_RFLAGS);
-	if ((rflags & PSL_I) == 0) {
-		VCPU_CTR2(vmx->vm, vcpu, "Cannot inject vector %d due to "
-		    "rflags %lx", vector, rflags);
-		goto cantinject;
+
+	ASSERT0(vmcs_read(VMCS_ENTRY_INTR_INFO) & VMCS_INTR_VALID);
+
+	/* Does guest interruptability block injection? */
+	if ((vmcs_read(VMCS_GUEST_INTERRUPTIBILITY) & HWINTR_BLOCKING) != 0 ||
+	    (vmcs_read(VMCS_GUEST_RFLAGS) & PSL_I) == 0) {
+		return (EIS_GI_BLOCK);
 	}
 
 	/* Inject the interrupt */
-	info = VMCS_INTR_T_HWINTR | VMCS_INTR_VALID;
-	info |= vector;
-	vmcs_write(VMCS_ENTRY_INTR_INFO, info);
+	vmcs_write(VMCS_ENTRY_INTR_INFO,
+	    VMCS_INTR_T_HWINTR | VMCS_INTR_VALID | vector);
 
-	if (extint_pending) {
-		vm_extint_clear(vmx->vm, vcpu);
-		vatpic_intr_accepted(vmx->vm, vector);
+	/* Update the Local APIC ISR */
+	vlapic_intr_accepted(vlapic, vector);
 
-		/*
-		 * After we accepted the current ExtINT the PIC may
-		 * have posted another one.  If that is the case, set
-		 * the Interrupt Window Exiting execution control so
-		 * we can inject that one too.
-		 *
-		 * Also, interrupt window exiting allows us to inject any
-		 * pending APIC vector that was preempted by the ExtINT
-		 * as soon as possible. This applies both for the software
-		 * emulated vlapic and the hardware assisted virtual APIC.
-		 */
-		vmx_set_int_window_exiting(vmx, vcpu);
+	return (EIS_EV_INJECTED);
+}
+
+/*
+ * Re-check for events to be injected.
+ *
+ * Once host CPU interrupts are disabled, check for the presence of any events
+ * which require injection processing.  If an exit is required upon injection,
+ * or once the guest becomes interruptable, that will be configured too.
+ */
+static bool
+vmx_inject_recheck(struct vmx *vmx, int vcpu, enum event_inject_state state)
+{
+	if (state == EIS_CAN_INJECT) {
+		if (vm_nmi_pending(vmx->vm, vcpu) &&
+		    !vmx_nmi_window_exiting(vmx, vcpu)) {
+			/* queued NMI not blocked by NMI-window-exiting */
+			return (true);
+		}
+		if (vm_extint_pending(vmx->vm, vcpu)) {
+			/* queued ExtINT not blocked by existing injection */
+			return (true);
+		}
 	} else {
-		/* Update the Local APIC ISR */
-		vlapic_intr_accepted(vlapic, vector);
+		if ((state & EIS_REQ_EXIT) != 0) {
+			/*
+			 * Use a self-IPI to force an immediate exit after
+			 * event injection has occurred.
+			 */
+			poke_cpu(CPU->cpu_id);
+		} else {
+			/*
+			 * If any event is being injected, an exit immediately
+			 * upon becoming interruptable again will allow pending
+			 * or newly queued events to be injected in a timely
+			 * manner.
+			 */
+			vmx_set_int_window_exiting(vmx, vcpu);
+		}
 	}
-
-	VCPU_CTR1(vmx->vm, vcpu, "Injecting hwintr at vector %d", vector);
-	return;
-
-cantinject:
-	/*
-	 * Set the Interrupt Window Exiting execution control so we can inject
-	 * the interrupt as soon as blocking condition goes away.
-	 */
-	vmx_set_int_window_exiting(vmx, vcpu);
+	return (false);
 }
 
 /*
@@ -2437,12 +2472,6 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		SDT_PROBE3(vmm, vmx, exit, halt, vmx, vcpu, vmexit);
 		vmexit->exitcode = VM_EXITCODE_HLT;
 		vmexit->u.hlt.rflags = vmcs_read(VMCS_GUEST_RFLAGS);
-		if (vmx_cap_en(vmx, VMX_CAP_APICV)) {
-			vmexit->u.hlt.intr_status =
-			    vmcs_read(VMCS_GUEST_INTR_STATUS);
-		} else {
-			vmexit->u.hlt.intr_status = 0;
-		}
 		break;
 	case EXIT_REASON_MTF:
 		vmm_stat_incr(vmx->vm, vcpu, VMEXIT_MTRAP, 1);
@@ -2871,6 +2900,7 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap,
 	struct region_descriptor gdtr, idtr;
 	uint16_t ldt_sel;
 #endif
+	bool tpr_shadow_active;
 
 	vmx = arg;
 	vm = vmx->vm;
@@ -2879,6 +2909,9 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap,
 	vlapic = vm_lapic(vm, vcpu);
 	vmexit = vm_exitinfo(vm, vcpu);
 	launched = 0;
+	tpr_shadow_active = vmx_cap_en(vmx, VMX_CAP_TPR_SHADOW) &&
+	    !vmx_cap_en(vmx, VMX_CAP_APICV) &&
+	    (vmx->cap[vcpu].proc_ctls & PROCBASED_USE_TPR_SHADOW) != 0;
 
 	KASSERT(vmxctx->pmap == pmap,
 	    ("pmap %p different than ctx pmap %p", pmap, vmxctx->pmap));
@@ -2905,10 +2938,19 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap,
 	vmcs_write(VMCS_GUEST_RIP, rip);
 	vmx_set_pcpu_defaults(vmx, vcpu, pmap);
 	do {
+		enum event_inject_state inject_state;
+
 		KASSERT(vmcs_guest_rip() == rip, ("%s: vmcs guest rip mismatch "
 		    "%lx/%lx", __func__, vmcs_guest_rip(), rip));
 
 		handled = UNHANDLED;
+
+		/*
+		 * Perform initial event/exception/interrupt injection before
+		 * host CPU interrupts are disabled.
+		 */
+		inject_state = vmx_inject_events(vmx, vcpu, rip);
+
 		/*
 		 * Interrupts are disabled from this point on until the
 		 * guest starts executing. This is done for the following
@@ -2919,27 +2961,28 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap,
 		 * will cause a VM exit due to external interrupt as soon as
 		 * the guest state is loaded.
 		 *
-		 * A posted interrupt after 'vmx_inject_interrupts()' will
-		 * not be "lost" because it will be held pending in the host
-		 * APIC because interrupts are disabled. The pending interrupt
-		 * will be recognized as soon as the guest state is loaded.
+		 * A posted interrupt after vmx_inject_vlapic() will not be
+		 * "lost" because it will be held pending in the host APIC
+		 * because interrupts are disabled. The pending interrupt will
+		 * be recognized as soon as the guest state is loaded.
 		 *
 		 * The same reasoning applies to the IPI generated by
 		 * pmap_invalidate_ept().
-		 *
-		 * The bulk of guest interrupt injection is done without
-		 * interrupts disabled on the host CPU.  This is necessary
-		 * since contended mutexes might force the thread to sleep.
 		 */
-		vmx_inject_interrupts(vmx, vcpu, vlapic, rip);
 		disable_intr();
-		if (vmx_cap_en(vmx, VMX_CAP_APICV)) {
-			vmx_inject_pir(vlapic);
+
+		/*
+		 * If not precluded by existing events, inject any interrupt
+		 * pending on the vLAPIC.  As a lock-less operation, it is safe
+		 * (and prudent) to perform with host CPU interrupts disabled.
+		 */
+		if (inject_state == EIS_CAN_INJECT) {
+			inject_state = vmx_inject_vlapic(vmx, vcpu, vlapic);
 		}
 
 		/*
 		 * Check for vcpu suspension after injecting events because
-		 * vmx_inject_interrupts() can suspend the vcpu due to a
+		 * vmx_inject_events() can suspend the vcpu due to a
 		 * triple fault.
 		 */
 		if (vcpu_suspended(evinfo)) {
@@ -2972,6 +3015,16 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap,
 			enable_intr();
 			vm_exit_debug(vmx->vm, vcpu, rip);
 			break;
+		}
+
+		/*
+		 * If subsequent activity queued events which require injection
+		 * handling, take another lap to handle them.
+		 */
+		if (vmx_inject_recheck(vmx, vcpu, inject_state)) {
+			enable_intr();
+			handled = HANDLED;
+			continue;
 		}
 
 #ifndef __FreeBSD__
@@ -3032,17 +3085,8 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap,
 		ldt_sel = sldt();
 #endif
 
-		/*
-		 * If TPR Shadowing is enabled, the TPR Threshold must be
-		 * updated right before entering the guest.
-		 */
-		if (vmx_cap_en(vmx, VMX_CAP_TPR_SHADOW) &&
-		    !vmx_cap_en(vmx, VMX_CAP_APICV)) {
-			if ((vmx->cap[vcpu].proc_ctls &
-			    PROCBASED_USE_TPR_SHADOW) != 0) {
-				vmcs_write(VMCS_TPR_THRESHOLD,
-				    vlapic_get_cr8(vlapic));
-			}
+		if (tpr_shadow_active) {
+			vmx_tpr_shadow_enter(vlapic);
 		}
 
 		vmx_run_trace(vmx, vcpu);
@@ -3058,6 +3102,10 @@ vmx_run(void *arg, int vcpu, uint64_t rip, pmap_t pmap,
 		lidt(&idtr);
 		lldt(ldt_sel);
 #endif
+
+		if (tpr_shadow_active) {
+			vmx_tpr_shadow_exit(vlapic);
+		}
 
 		/* Collect some information for VM exit processing */
 		vmexit->rip = rip = vmcs_guest_rip();
@@ -3524,47 +3572,73 @@ vmx_setcap(void *arg, int vcpu, int type, int val)
 
 struct vlapic_vtx {
 	struct vlapic	vlapic;
+
+	/* Align to the nearest cacheline */
+	uint8_t		_pad[64 - (sizeof (struct vlapic) % 64)];
+
+	/* TMR handling state for posted interrupts */
+	uint32_t	tmr_active[8];
+	uint32_t	pending_level[8];
+	uint32_t	pending_edge[8];
+
 	struct pir_desc	*pir_desc;
 	struct vmx	*vmx;
 	u_int	pending_prio;
+	boolean_t	tmr_sync;
 };
+
+CTASSERT((offsetof (struct vlapic_vtx, tmr_active) & 63) == 0);
 
 #define VPR_PRIO_BIT(vpr)	(1 << ((vpr) >> 4))
 
-#define	VMX_CTR_PIR(vm, vcpuid, pir_desc, notify, vector, level, msg)	\
-do {									\
-	VCPU_CTR2(vm, vcpuid, msg " assert %s-triggered vector %d",	\
-	    level ? "level" : "edge", vector);				\
-	VCPU_CTR1(vm, vcpuid, msg " pir0 0x%016lx", pir_desc->pir[0]);	\
-	VCPU_CTR1(vm, vcpuid, msg " pir1 0x%016lx", pir_desc->pir[1]);	\
-	VCPU_CTR1(vm, vcpuid, msg " pir2 0x%016lx", pir_desc->pir[2]);	\
-	VCPU_CTR1(vm, vcpuid, msg " pir3 0x%016lx", pir_desc->pir[3]);	\
-	VCPU_CTR1(vm, vcpuid, msg " notify: %s", notify ? "yes" : "no");\
-} while (0)
-
-/*
- * vlapic->ops handlers that utilize the APICv hardware assist described in
- * Chapter 29 of the Intel SDM.
- */
-static int
-vmx_set_intr_ready(struct vlapic *vlapic, int vector, bool level)
+static vcpu_notify_t
+vmx_apicv_set_ready(struct vlapic *vlapic, int vector, bool level)
 {
 	struct vlapic_vtx *vlapic_vtx;
 	struct pir_desc *pir_desc;
-	uint64_t mask;
-	int idx, notify = 0;
+	uint32_t mask, tmrval;
+	int idx;
+	vcpu_notify_t notify = VCPU_NOTIFY_NONE;
 
 	vlapic_vtx = (struct vlapic_vtx *)vlapic;
 	pir_desc = vlapic_vtx->pir_desc;
+	idx = vector / 32;
+	mask = 1UL << (vector % 32);
 
 	/*
-	 * Keep track of interrupt requests in the PIR descriptor. This is
-	 * because the virtual APIC page pointed to by the VMCS cannot be
-	 * modified if the vcpu is running.
+	 * If the currently asserted TMRs do not match the state requested by
+	 * the incoming interrupt, an exit will be required to reconcile those
+	 * bits in the APIC page.  This will keep the vLAPIC behavior in line
+	 * with the architecturally defined expectations.
+	 *
+	 * If actors of mixed types (edge and level) are racing against the same
+	 * vector (toggling its TMR bit back and forth), the results could
+	 * inconsistent.  Such circumstances are considered a rare edge case and
+	 * are never expected to be found in the wild.
 	 */
-	idx = vector / 64;
-	mask = 1UL << (vector % 64);
-	atomic_set_long(&pir_desc->pir[idx], mask);
+	tmrval = atomic_load_acq_int(&vlapic_vtx->tmr_active[idx]);
+	if (!level) {
+		if ((tmrval & mask) != 0) {
+			/* Edge-triggered interrupt needs TMR de-asserted */
+			atomic_set_int(&vlapic_vtx->pending_edge[idx], mask);
+			atomic_store_rel_long(&pir_desc->pending, 1);
+			return (VCPU_NOTIFY_EXIT);
+		}
+	} else {
+		if ((tmrval & mask) == 0) {
+			/* Level-triggered interrupt needs TMR asserted */
+			atomic_set_int(&vlapic_vtx->pending_level[idx], mask);
+			atomic_store_rel_long(&pir_desc->pending, 1);
+			return (VCPU_NOTIFY_EXIT);
+		}
+	}
+
+	/*
+	 * If the interrupt request does not require manipulation of the TMRs
+	 * for delivery, set it in PIR descriptor.  It cannot be inserted into
+	 * the APIC page while the vCPU might be running.
+	 */
+	atomic_set_int(&pir_desc->pir[idx], mask);
 
 	/*
 	 * A notification is required whenever the 'pending' bit makes a
@@ -3585,7 +3659,7 @@ vmx_set_intr_ready(struct vlapic *vlapic, int vector, bool level)
 	 * cleared whenever the 'pending' bit makes another 0->1 transition.
 	 */
 	if (atomic_cmpset_long(&pir_desc->pending, 0, 1) != 0) {
-		notify = 1;
+		notify = VCPU_NOTIFY_APIC;
 		vlapic_vtx->pending_prio = 0;
 	} else {
 		const u_int old_prio = vlapic_vtx->pending_prio;
@@ -3593,113 +3667,44 @@ vmx_set_intr_ready(struct vlapic *vlapic, int vector, bool level)
 
 		if ((old_prio & prio_bit) == 0 && prio_bit > old_prio) {
 			atomic_set_int(&vlapic_vtx->pending_prio, prio_bit);
-			notify = 1;
+			notify = VCPU_NOTIFY_APIC;
 		}
 	}
 
-	VMX_CTR_PIR(vlapic->vm, vlapic->vcpuid, pir_desc, notify, vector,
-	    level, "vmx_set_intr_ready");
 	return (notify);
 }
 
-static int
-vmx_pending_intr(struct vlapic *vlapic, int *vecptr)
-{
-	struct vlapic_vtx *vlapic_vtx;
-	struct pir_desc *pir_desc;
-	struct LAPIC *lapic;
-	uint64_t pending, pirval;
-	uint32_t ppr, vpr;
-	int i;
-
-	/*
-	 * This function is only expected to be called from the 'HLT' exit
-	 * handler which does not care about the vector that is pending.
-	 */
-	KASSERT(vecptr == NULL, ("vmx_pending_intr: vecptr must be NULL"));
-
-	vlapic_vtx = (struct vlapic_vtx *)vlapic;
-	pir_desc = vlapic_vtx->pir_desc;
-
-	pending = atomic_load_acq_long(&pir_desc->pending);
-	if (!pending) {
-		/*
-		 * While a virtual interrupt may have already been
-		 * processed the actual delivery maybe pending the
-		 * interruptibility of the guest.  Recognize a pending
-		 * interrupt by reevaluating virtual interrupts
-		 * following Section 29.2.1 in the Intel SDM Volume 3.
-		 */
-		struct vm_exit *vmexit;
-		uint8_t rvi, ppr;
-
-		vmexit = vm_exitinfo(vlapic->vm, vlapic->vcpuid);
-		rvi = vmexit->u.hlt.intr_status & APIC_TPR_INT;
-		lapic = vlapic->apic_page;
-		ppr = lapic->ppr & APIC_TPR_INT;
-		if (rvi > ppr) {
-			return (1);
-		}
-
-		return (0);
-	}
-
-	/*
-	 * If there is an interrupt pending then it will be recognized only
-	 * if its priority is greater than the processor priority.
-	 *
-	 * Special case: if the processor priority is zero then any pending
-	 * interrupt will be recognized.
-	 */
-	lapic = vlapic->apic_page;
-	ppr = lapic->ppr & APIC_TPR_INT;
-	if (ppr == 0)
-		return (1);
-
-	VCPU_CTR1(vlapic->vm, vlapic->vcpuid, "HLT with non-zero PPR %d",
-	    lapic->ppr);
-
-	vpr = 0;
-	for (i = 3; i >= 0; i--) {
-		pirval = pir_desc->pir[i];
-		if (pirval != 0) {
-			vpr = (i * 64 + flsl(pirval) - 1) & APIC_TPR_INT;
-			break;
-		}
-	}
-
-	/*
-	 * If the highest-priority pending interrupt falls short of the
-	 * processor priority of this vCPU, ensure that 'pending_prio' does not
-	 * have any stale bits which would preclude a higher-priority interrupt
-	 * from incurring a notification later.
-	 */
-	if (vpr <= ppr) {
-		const u_int prio_bit = VPR_PRIO_BIT(vpr);
-		const u_int old = vlapic_vtx->pending_prio;
-
-		if (old > prio_bit && (old & prio_bit) == 0) {
-			vlapic_vtx->pending_prio = prio_bit;
-		}
-		return (0);
-	}
-	return (1);
-}
-
 static void
-vmx_intr_accepted(struct vlapic *vlapic, int vector)
+vmx_apicv_accepted(struct vlapic *vlapic, int vector)
 {
-
+	/*
+	 * When APICv is enabled for an instance, the traditional interrupt
+	 * injection method (populating ENTRY_INTR_INFO in the VMCS) is not
+	 * used and the CPU does the heavy lifting of virtual interrupt
+	 * delivery.  For that reason vmx_intr_accepted() should never be called
+	 * when APICv is enabled.
+	 */
 	panic("vmx_intr_accepted: not expected to be called");
 }
 
 static void
-vmx_set_tmr(struct vlapic *vlapic, const uint32_t *masks)
+vmx_apicv_sync_tmr(struct vlapic *vlapic)
 {
-	vmcs_write(VMCS_EOI_EXIT0, ((uint64_t)masks[1] << 32) | masks[0]);
-	vmcs_write(VMCS_EOI_EXIT1, ((uint64_t)masks[3] << 32) | masks[2]);
-	vmcs_write(VMCS_EOI_EXIT2, ((uint64_t)masks[5] << 32) | masks[4]);
-	vmcs_write(VMCS_EOI_EXIT3, ((uint64_t)masks[7] << 32) | masks[6]);
+	struct vlapic_vtx *vlapic_vtx;
+	const uint32_t *tmrs;
+
+	vlapic_vtx = (struct vlapic_vtx *)vlapic;
+	tmrs = &vlapic_vtx->tmr_active[0];
+
+	if (!vlapic_vtx->tmr_sync) {
+		return;
+	}
+
+	vmcs_write(VMCS_EOI_EXIT0, ((uint64_t)tmrs[1] << 32) | tmrs[0]);
+	vmcs_write(VMCS_EOI_EXIT1, ((uint64_t)tmrs[3] << 32) | tmrs[2]);
+	vmcs_write(VMCS_EOI_EXIT2, ((uint64_t)tmrs[5] << 32) | tmrs[4]);
+	vmcs_write(VMCS_EOI_EXIT3, ((uint64_t)tmrs[7] << 32) | tmrs[6]);
+	vlapic_vtx->tmr_sync = B_FALSE;
 }
 
 static void
@@ -3765,107 +3770,99 @@ vmx_enable_x2apic_mode_vid(struct vlapic *vlapic)
 }
 
 static void
-vmx_post_intr(struct vlapic *vlapic, int hostcpu)
+vmx_apicv_notify(struct vlapic *vlapic, int hostcpu)
 {
-#ifdef __FreeBSD__
-	ipi_cpu(hostcpu, pirvec);
-#else
 	psm_send_pir_ipi(hostcpu);
-#endif
 }
 
-/*
- * Transfer the pending interrupts in the PIR descriptor to the IRR
- * in the virtual APIC page.
- */
 static void
-vmx_inject_pir(struct vlapic *vlapic)
+vmx_apicv_sync(struct vlapic *vlapic)
 {
 	struct vlapic_vtx *vlapic_vtx;
 	struct pir_desc *pir_desc;
 	struct LAPIC *lapic;
-	uint64_t val, pirval;
-	int rvi, pirbase = -1;
-	uint16_t intr_status_old, intr_status_new;
+	uint_t i;
 
 	vlapic_vtx = (struct vlapic_vtx *)vlapic;
 	pir_desc = vlapic_vtx->pir_desc;
+	lapic = vlapic->apic_page;
+
 	if (atomic_cmpset_long(&pir_desc->pending, 1, 0) == 0) {
-		VCPU_CTR0(vlapic->vm, vlapic->vcpuid, "vmx_inject_pir: "
-		    "no posted interrupt pending");
 		return;
 	}
 
-	pirval = 0;
-	pirbase = -1;
-	lapic = vlapic->apic_page;
+	vlapic_vtx->pending_prio = 0;
 
-	val = atomic_readandclear_long(&pir_desc->pir[0]);
-	if (val != 0) {
-		lapic->irr0 |= val;
-		lapic->irr1 |= val >> 32;
-		pirbase = 0;
-		pirval = val;
-	}
+	/* Make sure the invalid (0-15) vectors are not set */
+	ASSERT0(vlapic_vtx->pending_level[0] & 0xffff);
+	ASSERT0(vlapic_vtx->pending_edge[0] & 0xffff);
+	ASSERT0(pir_desc->pir[0] & 0xffff);
 
-	val = atomic_readandclear_long(&pir_desc->pir[1]);
-	if (val != 0) {
-		lapic->irr2 |= val;
-		lapic->irr3 |= val >> 32;
-		pirbase = 64;
-		pirval = val;
-	}
+	for (i = 0; i <= 7; i++) {
+		uint32_t *tmrp = &lapic->tmr0 + (i * 4);
+		uint32_t *irrp = &lapic->irr0 + (i * 4);
 
-	val = atomic_readandclear_long(&pir_desc->pir[2]);
-	if (val != 0) {
-		lapic->irr4 |= val;
-		lapic->irr5 |= val >> 32;
-		pirbase = 128;
-		pirval = val;
-	}
+		const uint32_t pending_level =
+		    atomic_readandclear_int(&vlapic_vtx->pending_level[i]);
+		const uint32_t pending_edge =
+		    atomic_readandclear_int(&vlapic_vtx->pending_edge[i]);
+		const uint32_t pending_inject =
+		    atomic_readandclear_int(&pir_desc->pir[i]);
 
-	val = atomic_readandclear_long(&pir_desc->pir[3]);
-	if (val != 0) {
-		lapic->irr6 |= val;
-		lapic->irr7 |= val >> 32;
-		pirbase = 192;
-		pirval = val;
-	}
+		if (pending_level != 0) {
+			/*
+			 * Level-triggered interrupts assert their corresponding
+			 * bit in the TMR when queued in IRR.
+			 */
+			*tmrp |= pending_level;
+			*irrp |= pending_level;
+		}
+		if (pending_edge != 0) {
+			/*
+			 * When queuing an edge-triggered interrupt in IRR, the
+			 * corresponding bit in the TMR is cleared.
+			 */
+			*tmrp &= ~pending_edge;
+			*irrp |= pending_edge;
+		}
+		if (pending_inject != 0) {
+			/*
+			 * Interrupts which do not require a change to the TMR
+			 * (because it already matches the necessary state) can
+			 * simply be queued in IRR.
+			 */
+			*irrp |= pending_inject;
+		}
 
-	VLAPIC_CTR_IRR(vlapic, "vmx_inject_pir");
-
-	/*
-	 * Update RVI so the processor can evaluate pending virtual
-	 * interrupts on VM-entry.
-	 *
-	 * It is possible for pirval to be 0 here, even though the
-	 * pending bit has been set. The scenario is:
-	 * CPU-Y is sending a posted interrupt to CPU-X, which
-	 * is running a guest and processing posted interrupts in h/w.
-	 * CPU-X will eventually exit and the state seen in s/w is
-	 * the pending bit set, but no PIR bits set.
-	 *
-	 *      CPU-X                      CPU-Y
-	 *   (vm running)                (host running)
-	 *   rx posted interrupt
-	 *   CLEAR pending bit
-	 *				 SET PIR bit
-	 *   READ/CLEAR PIR bits
-	 *				 SET pending bit
-	 *   (vm exit)
-	 *   pending bit set, PIR 0
-	 */
-	if (pirval != 0) {
-		rvi = pirbase + flsl(pirval) - 1;
-		intr_status_old = vmcs_read(VMCS_GUEST_INTR_STATUS);
-		intr_status_new = (intr_status_old & 0xFF00) | rvi;
-		if (intr_status_new > intr_status_old) {
-			vmcs_write(VMCS_GUEST_INTR_STATUS, intr_status_new);
-			VCPU_CTR2(vlapic->vm, vlapic->vcpuid, "vmx_inject_pir: "
-			    "guest_intr_status changed from 0x%04x to 0x%04x",
-			    intr_status_old, intr_status_new);
+		if (*tmrp != vlapic_vtx->tmr_active[i]) {
+			/* Check if VMX EOI triggers require updating. */
+			vlapic_vtx->tmr_active[i] = *tmrp;
+			vlapic_vtx->tmr_sync = B_TRUE;
 		}
 	}
+}
+
+static void
+vmx_tpr_shadow_enter(struct vlapic *vlapic)
+{
+	/*
+	 * When TPR shadowing is enabled, VMX will initiate a guest exit if its
+	 * TPR falls below a threshold priority.  That threshold is set to the
+	 * current TPR priority, since guest interrupt status should be
+	 * re-evaluated if its TPR is set lower.
+	 */
+	vmcs_write(VMCS_TPR_THRESHOLD, vlapic_get_cr8(vlapic));
+}
+
+static void
+vmx_tpr_shadow_exit(struct vlapic *vlapic)
+{
+	/*
+	 * Unlike full APICv, where changes to the TPR are reflected in the PPR,
+	 * with TPR shadowing, that duty is relegated to the VMM.  Upon exit,
+	 * the PPR is updated to reflect any change in the TPR here.
+	 */
+	vlapic_sync_tpr(vlapic);
 }
 
 static struct vlapic *
@@ -3890,14 +3887,13 @@ vmx_vlapic_init(void *arg, int vcpuid)
 		vlapic->ops.enable_x2apic_mode = vmx_enable_x2apic_mode_ts;
 	}
 	if (vmx_cap_en(vmx, VMX_CAP_APICV)) {
-		vlapic->ops.set_intr_ready = vmx_set_intr_ready;
-		vlapic->ops.pending_intr = vmx_pending_intr;
-		vlapic->ops.intr_accepted = vmx_intr_accepted;
-		vlapic->ops.set_tmr = vmx_set_tmr;
+		vlapic->ops.set_intr_ready = vmx_apicv_set_ready;
+		vlapic->ops.sync_state = vmx_apicv_sync;
+		vlapic->ops.intr_accepted = vmx_apicv_accepted;
 		vlapic->ops.enable_x2apic_mode = vmx_enable_x2apic_mode_vid;
 
 		if (vmx_cap_en(vmx, VMX_CAP_APICV_PIR)) {
-			vlapic->ops.post_intr = vmx_post_intr;
+			vlapic->ops.post_intr = vmx_apicv_notify;
 		}
 	}
 

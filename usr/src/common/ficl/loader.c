@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2000 Daniel Capo Sobral
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2020 RackTop Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -79,6 +80,7 @@ ficl_fb_putimage(ficlVm *pVM)
 	ficlInteger ret = FICL_FALSE;
 	uint32_t x1, y1, x2, y2, f;
 	png_t png;
+	int error;
 
 	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 7, 1);
 
@@ -96,7 +98,10 @@ ficl_fb_putimage(ficlVm *pVM)
 	(void) strncpy(name, namep, names);
 	name[names] = '\0';
 
-	if (png_open(&png, name) == PNG_NO_ERROR) {
+	if ((error = png_open(&png, name)) != PNG_NO_ERROR) {
+		if (f & FL_PUTIMAGE_DEBUG)
+			printf("%s\n", png_error_string(error));
+	} else {
 		if (gfx_fb_putimage(&png, x1, y1, x2, y2, f) == 0)
 			ret = FICL_TRUE;	/* success */
 		(void) png_close(&png);

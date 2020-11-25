@@ -70,7 +70,13 @@ __FBSDID("$FreeBSD$");
 #include "vlapic_priv.h"
 #include "vioapic.h"
 
-#define	PRIO(x)			((x) >> 4)
+
+/*
+ * The 4 high bits of a given interrupt vector represent its priority.  The same
+ * is true for the contents of the TPR when it is used to calculate the ultimate
+ * PPR of an APIC - the 4 high bits hold the priority.
+ */
+#define	PRIO(x)			((x) & 0xf0)
 
 #define VLAPIC_VERSION		(16)
 
@@ -94,7 +100,6 @@ __FBSDID("$FreeBSD$");
 #define VLAPIC_BUS_FREQ		(128 * 1024 * 1024)
 
 static void vlapic_set_error(struct vlapic *, uint32_t, bool);
-static void vlapic_tmr_reset(struct vlapic *);
 
 #ifdef __ISRVEC_DEBUG
 static void vlapic_isrstk_accept(struct vlapic *, int);
@@ -289,52 +294,60 @@ vlapic_esr_write_handler(struct vlapic *vlapic)
 	vlapic->esr_pending = 0;
 }
 
-int
+vcpu_notify_t
 vlapic_set_intr_ready(struct vlapic *vlapic, int vector, bool level)
 {
 	struct LAPIC *lapic;
-	uint32_t *irrptr, *tmrptr, mask;
+	uint32_t *irrptr, *tmrptr, mask, tmr;
 	int idx;
 
 	KASSERT(vector >= 0 && vector < 256, ("invalid vector %d", vector));
 
 	lapic = vlapic->apic_page;
 	if (!(lapic->svr & APIC_SVR_ENABLE)) {
-		VLAPIC_CTR1(vlapic, "vlapic is software disabled, ignoring "
-		    "interrupt %d", vector);
-		return (0);
+		/* ignore interrupt on software-disabled APIC */
+		return (VCPU_NOTIFY_NONE);
 	}
 
 	if (vector < 16) {
 		vlapic_set_error(vlapic, APIC_ESR_RECEIVE_ILLEGAL_VECTOR,
 		    false);
-		VLAPIC_CTR1(vlapic, "vlapic ignoring interrupt to vector %d",
-		    vector);
-		return (1);
+
+		/*
+		 * If the error LVT is configured to interrupt the vCPU, it will
+		 * have delivered a notification through that mechanism.
+		 */
+		return (VCPU_NOTIFY_NONE);
 	}
 
-	if (vlapic->ops.set_intr_ready)
+	if (vlapic->ops.set_intr_ready) {
 		return ((*vlapic->ops.set_intr_ready)(vlapic, vector, level));
+	}
 
 	idx = (vector / 32) * 4;
 	mask = 1 << (vector % 32);
-
+	tmrptr = &lapic->tmr0;
 	irrptr = &lapic->irr0;
-	atomic_set_int(&irrptr[idx], mask);
 
 	/*
-	 * Verify that the trigger-mode of the interrupt matches with
-	 * the vlapic TMR registers.
+	 * Update TMR for requested vector, if necessary.
+	 * This must be done prior to asserting the bit in IRR so that the
+	 * proper TMR state is always visible before the to-be-queued interrupt
+	 * can be injected.
 	 */
-	tmrptr = &lapic->tmr0;
-	if ((tmrptr[idx] & mask) != (level ? mask : 0)) {
-		VLAPIC_CTR3(vlapic, "vlapic TMR[%d] is 0x%08x but "
-		    "interrupt is %s-triggered", idx / 4, tmrptr[idx],
-		    level ? "level" : "edge");
+	tmr = atomic_load_acq_32(&tmrptr[idx]);
+	if ((tmr & mask) != (level ? mask : 0)) {
+		if (level) {
+			atomic_set_int(&tmrptr[idx], mask);
+		} else {
+			atomic_clear_int(&tmrptr[idx], mask);
+		}
 	}
 
-	VLAPIC_CTR_IRR(vlapic, "vlapic_set_intr_ready");
-	return (1);
+	/* Now set the bit in IRR */
+	atomic_set_int(&irrptr[idx], mask);
+
+	return (VCPU_NOTIFY_EXIT);
 }
 
 static __inline uint32_t *
@@ -472,6 +485,7 @@ static int
 vlapic_fire_lvt(struct vlapic *vlapic, u_int lvt)
 {
 	uint32_t mode, reg, vec;
+	vcpu_notify_t notify;
 
 	reg = atomic_load_acq_32(&vlapic->lvt_last[lvt]);
 
@@ -487,8 +501,8 @@ vlapic_fire_lvt(struct vlapic *vlapic, u_int lvt)
 			    lvt == APIC_LVT_ERROR);
 			return (0);
 		}
-		if (vlapic_set_intr_ready(vlapic, vec, false))
-			vcpu_notify_event(vlapic->vm, vlapic->vcpuid, true);
+		notify = vlapic_set_intr_ready(vlapic, vec, false);
+		vcpu_notify_event_type(vlapic->vm, vlapic->vcpuid, notify);
 		break;
 	case APIC_LVT_DM_NMI:
 		vm_inject_nmi(vlapic->vm, vlapic->vcpuid);
@@ -532,8 +546,8 @@ vlapic_active_isr(struct vlapic *vlapic)
 }
 
 /*
- * Algorithm adopted from section "Interrupt, Task and Processor Priority"
- * in Intel Architecture Manual Vol 3a.
+ * After events which might arbitrarily change the value of PPR, such as a TPR
+ * write or an EOI, calculate that new PPR value and store it in the APIC page.
  */
 static void
 vlapic_update_ppr(struct vlapic *vlapic)
@@ -543,16 +557,41 @@ vlapic_update_ppr(struct vlapic *vlapic)
 	isrvec = vlapic_active_isr(vlapic);
 	tpr = vlapic->apic_page->tpr;
 
-#ifdef __ISRVEC_DEBUG
-	vlapic_isrstk_verify(vlapic);
-#endif
-
-	if (PRIO(tpr) >= PRIO(isrvec))
+	/*
+	 * Algorithm adopted from section "Interrupt, Task and Processor
+	 * Priority" in Intel Architecture Manual Vol 3a.
+	 */
+	if (PRIO(tpr) >= PRIO(isrvec)) {
 		ppr = tpr;
-	else
-		ppr = isrvec & 0xf0;
+	} else {
+		ppr = PRIO(isrvec);
+	}
 
 	vlapic->apic_page->ppr = ppr;
+	VLAPIC_CTR1(vlapic, "vlapic_update_ppr 0x%02x", ppr);
+}
+
+/*
+ * When a vector is asserted in ISR as in-service, the PPR must be raised to the
+ * priority of that vector, as the vCPU would have been at a lower priority in
+ * order for the vector to be accepted.
+ */
+static void
+vlapic_raise_ppr(struct vlapic *vlapic, int vec)
+{
+	struct LAPIC *lapic = vlapic->apic_page;
+	int ppr;
+
+	ppr = PRIO(vec);
+
+#ifdef __ISRVEC_DEBUG
+	KASSERT(vec >= 16 && vec < 256, ("invalid vector %d", vec));
+	KASSERT(ppr > lapic->tpr, ("ppr %x <= tpr %x", ppr, lapic->tpr));
+	KASSERT(ppr > lapic->ppr, ("ppr %x <= old ppr %x", ppr, lapic->ppr));
+	KASSERT(vec == (int)vlapic_active_isr(vlapic), ("ISR missing for ppr"));
+#endif /* __ISRVEC_DEBUG */
+
+	lapic->ppr = ppr;
 	VLAPIC_CTR1(vlapic, "vlapic_update_ppr 0x%02x", ppr);
 }
 
@@ -1087,10 +1126,9 @@ vlapic_pending_intr(struct vlapic *vlapic, int *vecptr)
 	int		 idx, i, bitpos, vector;
 	uint32_t	*irrptr, val;
 
-	vlapic_update_ppr(vlapic);
-
-	if (vlapic->ops.pending_intr)
-		return ((*vlapic->ops.pending_intr)(vlapic, vecptr));
+	if (vlapic->ops.sync_state) {
+		(*vlapic->ops.sync_state)(vlapic);
+	}
 
 	irrptr = &lapic->irr0;
 
@@ -1119,6 +1157,8 @@ vlapic_intr_accepted(struct vlapic *vlapic, int vector)
 	uint32_t	*irrptr, *isrptr;
 	int		idx;
 
+	KASSERT(vector >= 16 && vector < 256, ("invalid vector %d", vector));
+
 	if (vlapic->ops.intr_accepted)
 		return ((*vlapic->ops.intr_accepted)(vlapic, vector));
 
@@ -1135,6 +1175,13 @@ vlapic_intr_accepted(struct vlapic *vlapic, int vector)
 	isrptr = &lapic->isr0;
 	isrptr[idx] |= 1 << (vector % 32);
 	VLAPIC_CTR_ISR(vlapic, "vlapic_intr_accepted");
+
+	/*
+	 * The only way a fresh vector could be accepted into ISR is if it was
+	 * of a higher priority than the current PPR.  With that vector now
+	 * in-service, the PPR must be raised.
+	 */
+	vlapic_raise_ppr(vlapic, vector);
 
 #ifdef __ISRVEC_DEBUG
 	vlapic_isrstk_accept(vlapic, vector);
@@ -1425,7 +1472,6 @@ vlapic_reset(struct vlapic *vlapic)
 	lapic->dfr = 0xffffffff;
 	lapic->svr = APIC_SVR_VECTOR;
 	vlapic_mask_lvts(vlapic);
-	vlapic_tmr_reset(vlapic);
 
 	lapic->dcr_timer = 0;
 	vlapic_dcr_write_handler(vlapic);
@@ -1592,82 +1638,6 @@ vlapic_enabled(struct vlapic *vlapic)
 		return (false);
 }
 
-static void
-vlapic_tmr_reset(struct vlapic *vlapic)
-{
-	struct LAPIC *lapic;
-
-	lapic = vlapic->apic_page;
-	lapic->tmr0 = lapic->tmr1 = lapic->tmr2 = lapic->tmr3 = 0;
-	lapic->tmr4 = lapic->tmr5 = lapic->tmr6 = lapic->tmr7 = 0;
-	vlapic->tmr_pending = 1;
-}
-
-/*
- * Synchronize TMR designations into the LAPIC state.
- * The vCPU must be in the VCPU_RUNNING state.
- */
-void
-vlapic_tmr_update(struct vlapic *vlapic)
-{
-	struct LAPIC *lapic;
-	uint32_t *tmrptr;
-	uint32_t result[VLAPIC_TMR_CNT];
-	u_int i, tmr_idx;
-
-	if (vlapic->tmr_pending == 0) {
-		return;
-	}
-
-	lapic = vlapic->apic_page;
-	tmrptr = &lapic->tmr0;
-
-	VLAPIC_CTR0(vlapic, "synchronizing TMR");
-	for (i = 0; i < VLAPIC_TMR_CNT; i++) {
-		tmr_idx = i * 4;
-
-		tmrptr[tmr_idx] &= ~vlapic->tmr_vec_deassert[i];
-		tmrptr[tmr_idx] |= vlapic->tmr_vec_assert[i];
-		vlapic->tmr_vec_deassert[i] = 0;
-		vlapic->tmr_vec_assert[i] = 0;
-		result[i] = tmrptr[tmr_idx];
-	}
-	vlapic->tmr_pending = 0;
-
-	if (vlapic->ops.set_tmr != NULL) {
-		(*vlapic->ops.set_tmr)(vlapic, result);
-	}
-}
-
-/*
- * Designate the TMR state for a given interrupt vector.
- * The caller must hold the vIOAPIC lock and prevent the vCPU corresponding to
- * this vLAPIC instance from being-in or entering the VCPU_RUNNING state.
- */
-void
-vlapic_tmr_set(struct vlapic *vlapic, uint8_t vector, bool active)
-{
-	const uint32_t idx = vector / 32;
-	const uint32_t mask = 1 << (vector % 32);
-
-	VLAPIC_CTR2(vlapic, "TMR for vector %u %sasserted", vector,
-	    active ? "" : "de");
-	if (active) {
-		vlapic->tmr_vec_assert[idx] |= mask;
-		vlapic->tmr_vec_deassert[idx] &= ~mask;
-	} else {
-		vlapic->tmr_vec_deassert[idx] |= mask;
-		vlapic->tmr_vec_assert[idx] &= ~mask;
-	}
-
-	/*
-	 * Track the number of TMR changes between calls to vlapic_tmr_update.
-	 * While a simple boolean would suffice, this count may be useful when
-	 * tracing or debugging, and is cheap to calculate.
-	 */
-	vlapic->tmr_pending = MIN(UINT32_MAX - 1, vlapic->tmr_pending) + 1;
-}
-
 #ifndef __FreeBSD__
 void
 vlapic_localize_resources(struct vlapic *vlapic)
@@ -1685,6 +1655,7 @@ vlapic_isrstk_eoi(struct vlapic *vlapic, int vector)
 		      vlapic->isrvec_stk_top);
 	}
 	vlapic->isrvec_stk_top--;
+	vlapic_isrstk_verify(vlapic);
 }
 
 static void
@@ -1699,6 +1670,7 @@ vlapic_isrstk_accept(struct vlapic *vlapic, int vector)
 		panic("isrvec_stk_top overflow %d", stk_top);
 
 	vlapic->isrvec_stk[stk_top] = vector;
+	vlapic_isrstk_verify(vlapic);
 }
 
 static void

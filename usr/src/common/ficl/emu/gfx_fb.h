@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Toomas Some <tsoome@me.com>
+ * Copyright 2020 RackTop Systems, Inc.
  */
 
 #ifndef _GFX_FB_H
@@ -59,6 +60,11 @@ void gfx_term_drawrect(uint32_t, uint32_t, uint32_t, uint32_t);
 void gfx_fb_line(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 void gfx_fb_bezier(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t,
 	uint32_t);
+
+#define	FL_PUTIMAGE_BORDER	0x1
+#define	FL_PUTIMAGE_NOSCROLL	0x2
+#define	FL_PUTIMAGE_DEBUG	0x80
+
 int gfx_fb_putimage(png_t *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 
 #ifdef __cplusplus
