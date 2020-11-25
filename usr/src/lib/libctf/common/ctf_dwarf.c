@@ -3288,6 +3288,7 @@ c_source_has_debug(const char *file, ctf_cu_t *cus, size_t nr_cus)
 	    strcmp(basename, "gmon.c") == 0 ||
 	    strcmp(basename, "dlink_init.c") == 0 ||
 	    strcmp(basename, "dlink_common.c") == 0 ||
+	    strcmp(basename, "ssp_ns.c") == 0 ||
 	    strncmp(basename, "crt", strlen("crt")) == 0 ||
 	    strncmp(basename, "values-", strlen("values-")) == 0)
 		return (B_TRUE);
