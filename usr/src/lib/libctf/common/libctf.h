@@ -91,11 +91,18 @@ typedef enum ctf_convert_flag {
 	 * to CTF format, such as an enum with too many values. This flag
 	 * allows us to continue and convert what we can.
 	 */
-	CTF_ALLOW_TRUNCATION = 0x02
+	CTF_ALLOW_TRUNCATION = 0x02,
+	/*
+	 * Conversion is not usually attempted for objects that don't appear
+	 * to be built from C sources. This flag overrides this and attempts
+	 * conversion anyway.
+	 */
+	CTF_FORCE_CONVERSION = 0x04
 } ctf_convert_flag_t;
 
 #define	CTF_CONVERT_ALL_FLAGS	(CTF_ALLOW_MISSING_DEBUG | \
-				    CTF_ALLOW_TRUNCATION)
+				    CTF_ALLOW_TRUNCATION | \
+				    CTF_FORCE_CONVERSION)
 
 /* opaque handle for ctfconvert functions */
 struct ctf_convert_handle;

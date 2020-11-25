@@ -80,11 +80,12 @@ ctfconvert_usage(const char *fmt, ...)
 		va_end(ap);
 	}
 
-	(void) fprintf(stderr, "Usage: %s [-ikms] [-j nthrs] [-l label | "
+	(void) fprintf(stderr, "Usage: %s [-fikms] [-j nthrs] [-l label | "
 	    "-L labelenv] [-b batchsize]\n"
 	    "                  [-o outfile] input\n"
 	    "\n"
 	    "\t-b  batch process this many dies at a time (default %d)\n"
+	    "\t-f  always attempt to convert files\n"
 	    "\t-i  ignore files not built partially from C sources\n"
 	    "\t-j  use nthrs threads to perform the merge (default %d)\n"
 	    "\t-k  keep around original input file on failure\n"
@@ -258,7 +259,7 @@ main(int argc, char *argv[])
 
 	ctfconvert_progname = basename(argv[0]);
 
-	while ((c = getopt(argc, argv, ":b:ij:kl:L:mo:sX")) != -1) {
+	while ((c = getopt(argc, argv, ":b:fij:kl:L:mo:sX")) != -1) {
 		switch (c) {
 		case 'b': {
 			long argno;
@@ -272,6 +273,9 @@ main(int argc, char *argv[])
 			bsize = (uint_t)argno;
 			break;
 		}
+		case 'f':
+			flags |= CTF_FORCE_CONVERSION;
+			break;
 		case 'i':
 			ignore_non_c = B_TRUE;
 			break;

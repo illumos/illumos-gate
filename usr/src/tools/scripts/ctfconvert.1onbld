@@ -10,7 +10,7 @@
 .\"
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd November 04, 2020
+.Dd December 06, 2020
 .Dt ctfconvert 1ONBLD
 .Os
 .Sh NAME
@@ -18,7 +18,7 @@
 .Nd Convert ELF object debug data to CTF container
 .Sh SYNOPSIS
 .Nm
-.Op Fl ikms
+.Op Fl fikms
 .Op Fl b Ar batchsize
 .Op Fl j Ar threads
 .Op Fl l Ar label | Fl L Ar labelenv
@@ -45,6 +45,13 @@ option is present, the source file will be removed if an error occurs.
 .Sh OPTIONS
 The following options are supported:
 .Bl -tag -width Ar
+.It Fl f
+Always attempt conversion.
+This option causes
+.Nm
+to attempt conversion even for files where it does not seem appropriate.
+This is occasionally necessary to convert objects which have had some
+local symbols removed from the symbol table.
 .It Fl i
 Ignore files not built partially from C sources.
 .Nm
@@ -53,9 +60,16 @@ will usually check
 to see if at least one of the input files was a
 .Sq .c
 file, and exit with an error if not.
-The
+With the
 .Fl i
-option overrides this check and allows processing to continue.
+option, the check is still done but
+.Nm
+will exit with a success status instead of an error.
+In either case, conversion is not attempted.
+To attempt conversion even when the object does not appear to have been built
+from C sources, use the
+.Fl f
+option.
 .It Fl k
 When processing a file in-place and an error occurs, keep the input file
 rather than deleting it.
