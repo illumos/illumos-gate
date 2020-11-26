@@ -140,7 +140,8 @@ kcpc_hw_init(cpu_t *cp)
 					strands_perfmon_shared = 1;
 				}
 			}
-		} else if (cpuid_getvendor(cpu[0]) == X86_VENDOR_AMD) {
+		} else if (cpuid_getvendor(cpu[0]) == X86_VENDOR_AMD ||
+		    cpuid_getvendor(cpu[0]) == X86_VENDOR_HYGON) {
 			/*
 			 * On AMD systems with HT, all of the performance
 			 * monitors exist on a per-logical CPU basis.

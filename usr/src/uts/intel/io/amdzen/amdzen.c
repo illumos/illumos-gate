@@ -624,7 +624,7 @@ amdzen_stub_scan_cb(dev_info_t *dip, void *arg)
 		return (DDI_WALK_CONTINUE);
 	}
 
-	if (vid != AMDZEN_PCI_VID_AMD) {
+	if (vid != AMDZEN_PCI_VID_AMD && vid != AMDZEN_PCI_VID_HYGON) {
 		return (DDI_WALK_CONTINUE);
 	}
 
@@ -737,9 +737,10 @@ amdzen_attach_stub(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	if (vid != AMDZEN_PCI_VID_AMD) {
-		dev_err(dip, CE_WARN, "expected AMD vendor ID (0x%x), found "
-		    "0x%x", AMDZEN_PCI_VID_AMD, vid);
+	if (vid != AMDZEN_PCI_VID_AMD && vid != AMDZEN_PCI_VID_HYGON) {
+		dev_err(dip, CE_WARN, "expected vendor ID (0x%x), found 0x%x",
+		    cpuid_getvendor(CPU) == X86_VENDOR_HYGON ?
+		    AMDZEN_PCI_VID_HYGON : AMDZEN_PCI_VID_AMD, vid);
 		return (DDI_FAILURE);
 	}
 
@@ -996,7 +997,8 @@ _init(void)
 {
 	int ret;
 
-	if (cpuid_getvendor(CPU) != X86_VENDOR_AMD) {
+	if (cpuid_getvendor(CPU) != X86_VENDOR_AMD &&
+	    cpuid_getvendor(CPU) != X86_VENDOR_HYGON) {
 		return (ENOTSUP);
 	}
 

@@ -88,12 +88,13 @@
  *		15 for family 0x17, models 30 - 3f
  *		16 for family 0x17, models 60 - 6f
  *		17 for family 0x17, models 70 - 7f
- *		18 for family 0x19, models 00 - 0f
- *		19 for family 0x19, models 20 - 2f
+ *		18 for family 0x18, models 00 - 0f
+ *		19 for family 0x19, models 00 - 0f
+ *		20 for family 0x19, models 20 - 2f
  * Second index by (model & 0x3) for family 0fh,
  * CPUID pkg bits (Fn8000_0001_EBX[31:28]) for later families.
  */
-static uint32_t amd_skts[20][8] = {
+static uint32_t amd_skts[21][8] = {
 	/*
 	 * Family 0xf revisions B through E
 	 */
@@ -365,9 +366,24 @@ static uint32_t amd_skts[20][8] = {
 	},
 
 	/*
-	 * Family 0x19 models 00-0f	(Zen 3 - Milan)
+	 * Family 0x18 models 00-0f	(Dhyana)
 	 */
 #define	A_SKTS_18			18
+	{
+		X86_SOCKET_UNKNOWN,	/* 0b000 */
+		X86_SOCKET_UNKNOWN,	/* 0b001 */
+		X86_SOCKET_UNKNOWN,	/* 0b010 */
+		X86_SOCKET_UNKNOWN,	/* 0b011 */
+		X86_SOCKET_SL1,		/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_DM1,		/* 0b110 */
+		X86_SOCKET_SL1R2	/* 0b111 */
+	},
+
+	/*
+	 * Family 0x19 models 00-0f	(Zen 3 - Milan)
+	 */
+#define	A_SKTS_19			19
 	{
 		X86_SOCKET_UNKNOWN,	/* 0b000 */
 		X86_SOCKET_UNKNOWN,	/* 0b001 */
@@ -382,7 +398,7 @@ static uint32_t amd_skts[20][8] = {
 	/*
 	 * Family 0x19 models 20-2f	(Zen 3 - Vermeer)
 	 */
-#define	A_SKTS_19			19
+#define	A_SKTS_20			20
 	{
 		X86_SOCKET_UNKNOWN,	/* 0b000 */
 		X86_SOCKET_UNKNOWN,	/* 0b001 */
@@ -399,7 +415,7 @@ struct amd_sktmap_s {
 	uint32_t	skt_code;
 	char		sktstr[16];
 };
-static struct amd_sktmap_s amd_sktmap_strs[X86_NUM_SOCKETS_AMD + 1] = {
+static struct amd_sktmap_s amd_sktmap_strs[X86_NUM_SOCKETS + 1] = {
 	{ X86_SOCKET_754,	"754" },
 	{ X86_SOCKET_939,	"939" },
 	{ X86_SOCKET_940,	"940" },
@@ -434,6 +450,9 @@ static struct amd_sktmap_s amd_sktmap_strs[X86_NUM_SOCKETS_AMD + 1] = {
 	{ X86_SOCKET_FP5,	"FP5" },
 	{ X86_SOCKET_FP6,	"FP6" },
 	{ X86_SOCKET_STRX4,	"sTRX4" },
+	{ X86_SOCKET_SL1,	"SL1" },
+	{ X86_SOCKET_SL1R2,	"SL1R2" },
+	{ X86_SOCKET_DM1,	"DM1" },
 	{ X86_SOCKET_UNKNOWN,	"Unknown" }
 };
 
@@ -459,8 +478,9 @@ static const struct amd_skt_mapent {
 	{ 0x17, 0x30, 0x3f, A_SKTS_15 },
 	{ 0x17, 0x60, 0x6f, A_SKTS_16 },
 	{ 0x17, 0x70, 0x7f, A_SKTS_17 },
-	{ 0x19, 0x00, 0x0f, A_SKTS_18 },
-	{ 0x19, 0x20, 0x2f, A_SKTS_19 }
+	{ 0x18, 0x00, 0x0f, A_SKTS_18 },
+	{ 0x19, 0x00, 0x0f, A_SKTS_19 },
+	{ 0x19, 0x20, 0x2f, A_SKTS_20 }
 };
 
 /*
@@ -629,7 +649,13 @@ static const struct amd_rev_mapent {
 	    A_SKTS_15 },
 
 	{ 0x17, 0x71, 0x71, 0x0, 0x0, X86_CHIPREV_AMD_17_MTS_B0, "MTS-B0",
-	    A_SKTS_17 }
+	    A_SKTS_17 },
+
+	/*
+	 * =============== HygonGenuine Family 0x18 ===============
+	 */
+	{ 0x18, 0x00, 0x00, 0x1, 0x1, X86_CHIPREV_HYGON_18_DN_A1, "DN_A1",
+	    A_SKTS_18 },
 };
 
 /*
@@ -759,6 +785,7 @@ _cpuid_skt(uint_t vendor, uint_t family, uint_t model, uint_t step)
 
 	switch (vendor) {
 	case X86_VENDOR_AMD:
+	case X86_VENDOR_HYGON:
 		synth_amd_info(family, model, step, &skt, NULL, NULL);
 		break;
 
@@ -779,6 +806,7 @@ _cpuid_sktstr(uint_t vendor, uint_t family, uint_t model, uint_t step)
 
 	switch (vendor) {
 	case X86_VENDOR_AMD:
+	case X86_VENDOR_HYGON:
 		synth_amd_info(family, model, step, &skt, NULL, NULL);
 
 		sktmapp = amd_sktmap_strs;
@@ -805,6 +833,7 @@ _cpuid_chiprev(uint_t vendor, uint_t family, uint_t model, uint_t step)
 
 	switch (vendor) {
 	case X86_VENDOR_AMD:
+	case X86_VENDOR_HYGON:
 		synth_amd_info(family, model, step, NULL, &chiprev, NULL);
 		break;
 
@@ -823,6 +852,7 @@ _cpuid_chiprevstr(uint_t vendor, uint_t family, uint_t model, uint_t step)
 
 	switch (vendor) {
 	case X86_VENDOR_AMD:
+	case X86_VENDOR_HYGON:
 		synth_amd_info(family, model, step, NULL, NULL, &revstr);
 		break;
 
@@ -851,6 +881,8 @@ _cpuid_vendorstr_to_vendorcode(char *vendorstr)
 		return (X86_VENDOR_Intel);
 	else if (strcmp(vendorstr, X86_VENDORSTR_AMD) == 0)
 		return (X86_VENDOR_AMD);
+	else if (strcmp(vendorstr, X86_VENDORSTR_HYGON) == 0)
+		return (X86_VENDOR_HYGON);
 	else if (strcmp(vendorstr, X86_VENDORSTR_TM) == 0)
 		return (X86_VENDOR_TM);
 	else if (strcmp(vendorstr, CyrixInstead) == 0)

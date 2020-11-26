@@ -200,6 +200,11 @@ typedef enum {
  */
 #define	AMDZEN_PCI_VID_AMD	0x1022
 
+/*
+ * Hygon PCI ID for reference
+ */
+#define	AMDZEN_PCI_VID_HYGON	0x1d94
+
 typedef enum {
 	AMDZEN_STUB_TYPE_DF,
 	AMDZEN_STUB_TYPE_NB

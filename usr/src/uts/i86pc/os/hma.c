@@ -101,6 +101,7 @@ hma_init(void)
 		(void) hma_vmx_init();
 		break;
 	case X86_VENDOR_AMD:
+	case X86_VENDOR_HYGON:
 		(void) hma_svm_init();
 		break;
 	default:
@@ -121,6 +122,7 @@ hma_register_backend(const char *name)
 		is_ready = hma_vmx_ready;
 		break;
 	case X86_VENDOR_AMD:
+	case X86_VENDOR_HYGON:
 		is_ready = hma_svm_ready;
 		break;
 	default:
