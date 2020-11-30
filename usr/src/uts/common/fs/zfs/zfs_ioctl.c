@@ -5627,9 +5627,6 @@ zfs_ioc_id_quota_upgrade(zfs_cmd_t *zc)
 	if (error != 0)
 		return (error);
 
-	dsl_dataset_long_hold(dmu_objset_ds(os), FTAG);
-	dsl_pool_rele(dmu_objset_pool(os), FTAG);
-
 	if (dmu_objset_userobjspace_upgradable(os) ||
 	    dmu_objset_projectquota_upgradable(os)) {
 		mutex_enter(&os->os_upgrade_lock);
@@ -5643,11 +5640,14 @@ zfs_ioc_id_quota_upgrade(zfs_cmd_t *zc)
 			mutex_exit(&os->os_upgrade_lock);
 		}
 
+		dsl_pool_rele(dmu_objset_pool(os), FTAG);
+
 		taskq_wait_id(os->os_spa->spa_upgrade_taskq, os->os_upgrade_id);
 		error = os->os_upgrade_status;
+	} else {
+		dsl_pool_rele(dmu_objset_pool(os), FTAG);
 	}
 
-	dsl_dataset_long_rele(dmu_objset_ds(os), FTAG);
 	dsl_dataset_rele(dmu_objset_ds(os), FTAG);
 
 	return (error);

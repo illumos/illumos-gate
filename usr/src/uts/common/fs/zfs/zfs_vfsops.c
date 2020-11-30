@@ -924,8 +924,13 @@ zfs_id_overobjquota(zfsvfs_t *zfsvfs, uint64_t usedobj, uint64_t id)
 	int err;
 
 	if (!dmu_objset_userobjspace_present(zfsvfs->z_os)) {
-		if (dmu_objset_userobjspace_upgradable(zfsvfs->z_os))
+		if (dmu_objset_userobjspace_upgradable(zfsvfs->z_os)) {
+			dsl_pool_config_enter(
+			    dmu_objset_pool(zfsvfs->z_os), FTAG);
 			dmu_objset_id_quota_upgrade(zfsvfs->z_os);
+			dsl_pool_config_exit(
+			    dmu_objset_pool(zfsvfs->z_os), FTAG);
+		}
 		return (B_FALSE);
 	}
 
